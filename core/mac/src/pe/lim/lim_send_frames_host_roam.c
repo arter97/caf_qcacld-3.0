@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -143,7 +143,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		      LIM_BSS_CAPS_GET(WSM, pe_session->limReassocBssQosCaps);
 
 	if (pe_session->lim11hEnable &&
-	    pe_session->pLimReAssocReq->spectrumMgtIndicator == true) {
+	    pe_session->spectrumMgtEnabled) {
 		power_caps_populated = true;
 
 		populate_dot11f_power_caps(mac_ctx, &frm->PowerCaps,
@@ -451,7 +451,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 				(uint16_t) (bytes + ft_ies_length),
 				TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 				lim_tx_complete, frame, tx_flag, vdev_id,
-				0, RATEID_DEFAULT);
+				0, RATEID_DEFAULT, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -609,7 +609,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 		     LIM_BSS_CAPS_GET(WSM, pe_session->limReassocBssQosCaps);
 
 	if (pe_session->lim11hEnable &&
-	    pe_session->pLimReAssocReq->spectrumMgtIndicator == true) {
+	    pe_session->spectrumMgtEnabled) {
 		PowerCapsPopulated = true;
 		populate_dot11f_power_caps(mac, &frm->PowerCaps, LIM_REASSOC,
 					   pe_session);
@@ -786,7 +786,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 			   (uint16_t) (sizeof(tSirMacMgmtHdr) + nPayload),
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, pFrame, txFlag, smeSessionId, 0,
-			   RATEID_DEFAULT);
+			   RATEID_DEFAULT, 0);
 	MTRACE(qdf_trace
 		       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));

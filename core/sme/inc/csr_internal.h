@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -92,6 +92,7 @@ enum csr_cfgdot11mode {
 	eCSR_CFG_DOT11_MODE_AUTO,
 	eCSR_CFG_DOT11_MODE_11AX,
 	eCSR_CFG_DOT11_MODE_11AX_ONLY,
+	eCSR_CFG_DOT11_MODE_MAX,
 };
 
 enum csr_scan_reason {
@@ -101,20 +102,24 @@ enum csr_scan_reason {
 enum csr_roam_reason {
 	/* Roaming because we've not established the initial connection. */
 	eCsrNoConnection,
-	/* roaming because LIM reported a cap change in the associated AP. */
-	eCsrCapsChange,
+#ifndef FEATURE_CM_ENABLE
 	/* roaming because someone asked us to Disassoc & stay disassociated. */
 	eCsrForcedDisassoc,
+#endif
 	/* roaming because an 802.11 request was issued to the driver. */
 	eCsrHddIssued,
+#ifndef FEATURE_CM_ENABLE
 	/* roaming because we need to force a Disassoc due to MIC failure */
 	eCsrForcedDisassocMICFailure,
+#endif
 	eCsrHddIssuedReassocToSameAP,
 	eCsrSmeIssuedReassocToSameAP,
+#ifndef FEATURE_CM_ENABLE
 	/* roaming because someone asked us to deauth and stay disassociated. */
 	eCsrForcedDeauth,
 	/* will be issued by Handoff logic to disconect from current AP */
 	eCsrSmeIssuedDisassocForHandoff,
+#endif
 	/* will be issued by Handoff logic to join a new AP with same profile */
 	eCsrSmeIssuedAssocToSimilarAP,
 	eCsrStopBss,
@@ -160,9 +165,10 @@ enum csr_roam_state {
 enum csr_join_state {
 	eCsrContinueRoaming,
 	eCsrStopRoaming,
+#ifndef FEATURE_CM_ENABLE
 	eCsrReassocToSelfNoCapChange,
 	eCsrStopRoamingDueToConcurrency,
-
+#endif
 };
 
 enum csr_roaming_reason {
@@ -345,12 +351,6 @@ struct csr_config {
 	uint8_t fAllowMCCGODiffBI;
 	uint8_t bCatRssiOffset; /* to set RSSI difference for each category */
 	bool nRoamScanControl;
-
-	/*
-	 * Remove this code once SLM_Sessionization is supported
-	 * BMPS_WORKAROUND_NOT_NEEDED
-	 */
-	bool doBMPSWorkaround;
 	uint32_t nVhtChannelWidth;
 	bool send_smps_action;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -421,7 +421,9 @@ struct csr_scanstruct {
 	int8_t inScanResultBestAPRssi;
 	bool fcc_constraint;
 	bool pending_channel_list_req;
+#ifndef FEATURE_CM_ENABLE
 	wlan_scan_requester requester_id;
+#endif
 };
 
 /*
@@ -528,10 +530,6 @@ struct csr_roam_session {
 	tPmkidCacheInfo PmkidCacheInfo[CSR_MAX_PMKID_ALLOWED];
 	uint8_t cJoinAttemps;
 	int32_t sPendingCommands;   /* 0 means CSR is ok to low power */
-#ifdef FEATURE_WLAN_WAPI
-	uint16_t NumBkidCache;
-	tBkidCacheInfo BkidCacheInfo[CSR_MAX_BKID_ALLOWED];
-#endif /* FEATURE_WLAN_WAPI */
 	/*
 	 * indicate whether CSR is roaming
 	 * (either via lostlink or dynamic roaming)
@@ -546,19 +544,11 @@ struct csr_roam_session {
 	uint32_t nWpaRsnReqIeLength;
 	/* contain the WPA/RSN IE in assoc req */
 	uint8_t *pWpaRsnReqIE;
-	/* the byte count for pWpaRsnRspIE */
-	uint32_t nWpaRsnRspIeLength;
-	/* this contain the WPA/RSN IE in beacon/probe rsp */
-	uint8_t *pWpaRsnRspIE;
 #ifdef FEATURE_WLAN_WAPI
 	/* the byte count of pWapiReqIE; */
 	uint32_t nWapiReqIeLength;
 	/* this contain the WAPI IE in assoc req */
 	uint8_t *pWapiReqIE;
-	/* the byte count for pWapiRspIE */
-	uint32_t nWapiRspIeLength;
-	/* this contain the WAPI IE in beacon/probe rsp */
-	uint8_t *pWapiRspIE;
 #endif /* FEATURE_WLAN_WAPI */
 	uint32_t nAddIEScanLength;      /* the byte count of pAddIeScanIE; */
 	/* contains the additional IE in (unicast) probe req at time of join */
@@ -579,8 +569,6 @@ struct csr_roam_session {
 	struct csr_roam_joinstatus joinFailStatusCode;
 	/* status from PE for deauth/disassoc(lostlink) or our own dyn roam */
 	uint32_t roamingStatusCode;
-	uint16_t NumPmkidCandidate;
-	tPmkidCandidateInfo PmkidCandidateInfo[CSR_MAX_PMKID_ALLOWED];
 	bool fWMMConnection;
 	bool fQOSConnection;
 #ifdef FEATURE_WLAN_ESE
@@ -600,25 +588,29 @@ struct csr_roam_session {
 	struct pmkid_mode_bits pmkid_modes;
 #endif
 	tftSMEContext ftSmeContext;
+#ifndef FEATURE_CM_ENABLE
 	/* This count represents the number of bssid's we try to join. */
 	uint8_t join_bssid_count;
+#endif
 	struct csr_roam_stored_profile stored_roam_profile;
 	bool ch_switch_in_progress;
 	bool supported_nss_1x1;
 	uint8_t vdev_nss;
 	uint8_t nss;
-	bool disable_hi_rssi;
 	bool dhcp_done;
+#ifndef FEATURE_CM_ENABLE
 	enum wlan_reason_code disconnect_reason;
+#endif
 	uint8_t uapsd_mask;
 	struct scan_cmd_info scan_info;
 	qdf_mc_timer_t roaming_offload_timer;
+#ifndef FEATURE_CM_ENABLE
 	bool is_fils_connection;
 	uint16_t fils_seq_num;
+#endif
 	bool discon_in_progress;
 	bool is_adaptive_11r_connection;
 	struct csr_disconnect_stats disconnect_stats;
-	qdf_mc_timer_t join_retry_timer;
 };
 
 struct csr_roamstruct {
@@ -852,14 +844,15 @@ QDF_STATUS csr_get_modify_profile_fields(struct mac_context *mac,
 void csr_set_global_cfgs(struct mac_context *mac);
 void csr_set_default_dot11_mode(struct mac_context *mac);
 bool csr_is_conn_state_disconnected(struct mac_context *mac,
-						   uint32_t sessionId);
-bool csr_is_conn_state_connected_infra(struct mac_context *mac,
-							uint32_t sessionId);
+				    uint8_t vdev_id);
 bool csr_is_conn_state_connected(struct mac_context *mac,
 					       uint32_t sessionId);
+#ifndef FEATURE_CM_ENABLE
+bool csr_is_conn_state_connected_infra(struct mac_context *mac,
+							uint32_t sessionId);
 bool csr_is_conn_state_infra(struct mac_context *mac,
 					uint32_t sessionId);
-
+#endif
 bool csr_is_conn_state_wds(struct mac_context *mac, uint32_t sessionId);
 bool csr_is_conn_state_connected_wds(struct mac_context *mac,
 						    uint32_t sessionId);
@@ -868,17 +861,6 @@ bool csr_is_conn_state_disconnected_wds(struct mac_context *mac,
 bool csr_is_any_session_in_connect_state(struct mac_context *mac);
 bool csr_is_all_session_disconnected(struct mac_context *mac);
 
-/**
- * csr_get_connected_infra() - get the session id of the connected infra
- * @mac_ctx:  pointer to global mac structure
- *
- * The function check if any infra is present in connected state and if present
- * return the session id of the connected infra else if no infra is in connected
- * state return WLAN_UMAC_VDEV_ID_MAX
- *
- * Return: session id of the connected infra
- */
-uint8_t csr_get_connected_infra(struct mac_context *mac_ctx);
 bool csr_is_concurrent_session_running(struct mac_context *mac);
 bool csr_is_infra_ap_started(struct mac_context *mac);
 bool csr_is_valid_mc_concurrent_session(struct mac_context *mac,
@@ -911,19 +893,6 @@ void csr_set_cfg_privacy(struct mac_context *mac,
 			 struct csr_roam_profile *pProfile,
 			 bool fPrivacy);
 
-/**
- * csr_get_infra_operation_chan_freq() - get operating chan freq of
- * given vdev id
- * @mac_ctx: Pointer to mac context
- * @vdev_id: vdev id
- *
- * Return: chan freq of given vdev id
- */
-uint32_t csr_get_infra_operation_chan_freq(
-	struct mac_context *mac, uint8_t vdev_id);
-
-bool csr_is_session_client_and_connected(struct mac_context *mac,
-		uint8_t sessionId);
 /**
  * csr_get_concurrent_operation_freq() - To get concurrent operating freq
  * @mac_ctx: Pointer to mac context
@@ -959,7 +928,6 @@ uint16_t csr_check_concurrent_channel_overlap(
 #endif
 QDF_STATUS csr_roam_copy_connect_profile(struct mac_context *mac,
 		uint32_t sessionId, tCsrRoamConnectedProfile *pProfile);
-bool csr_is_set_key_allowed(struct mac_context *mac, uint32_t sessionId);
 
 /* Returns whether the current association is a 11r assoc or not */
 bool csr_roam_is11r_assoc(struct mac_context *mac, uint8_t sessionId);
@@ -975,8 +943,7 @@ QDF_STATUS csr_get_tsm_stats(struct mac_context *mac,
 #endif
 
 /* Returns whether "Legacy Fast Roaming" is enabled...or not */
-bool csr_roam_is_fast_roam_enabled(struct mac_context *mac,
-						uint32_t sessionId);
+bool csr_roam_is_fast_roam_enabled(struct mac_context *mac,  uint8_t vdev_id);
 bool csr_roam_is_roam_offload_scan_enabled(
 	struct mac_context *mac);
 bool csr_is_channel_present_in_list(uint32_t *pChannelList,
@@ -997,7 +964,7 @@ static inline QDF_STATUS csr_roam_offload_scan_rsp_hdlr(
 QDF_STATUS csr_handoff_request(struct mac_context *mac, uint8_t sessionId,
 		tCsrHandoffRequest
 		*pHandoffInfo);
-bool csr_roam_is_sta_mode(struct mac_context *mac, uint32_t sessionId);
+bool csr_roam_is_sta_mode(struct mac_context *mac, uint8_t vdev_id);
 
 /* Post Channel Change Indication */
 QDF_STATUS csr_roam_channel_change_req(struct mac_context *mac,
@@ -1108,8 +1075,7 @@ void csr_purge_pdev_all_ser_cmd_list(struct mac_context *mac_ctx);
 
 bool csr_wait_for_connection_update(struct mac_context *mac,
 		bool do_release_reacquire_lock);
-enum QDF_OPMODE csr_get_session_persona(struct mac_context *pmac,
-					uint32_t session_id);
+
 void csr_roam_substate_change(
 			struct mac_context *mac, enum csr_roam_substate
 					NewSubstate, uint32_t sessionId);

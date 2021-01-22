@@ -161,6 +161,66 @@ QDF_STATUS mlme_set_bigtk_support(struct wlan_objmgr_vdev *vdev, bool val);
 
 bool mlme_get_bigtk_support(struct wlan_objmgr_vdev *vdev);
 
+#ifdef FEATURE_WLAN_TDLS
+/**
+ * mlme_set_tdls_chan_switch_prohibited() - set tdls chan switch prohibited
+ * @vdev: vdev pointer
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_set_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev, bool val);
+
+/**
+ * mlme_get_tdls_chan_switch_prohibited() - get tdls chan switch prohibited
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+bool mlme_get_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_tdls_prohibited() - set tdls prohibited
+ * @vdev: vdev pointer
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_set_tdls_prohibited(struct wlan_objmgr_vdev *vdev, bool val);
+
+/**
+ * mlme_get_tdls_prohibited() - get tdls prohibited
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+bool mlme_get_tdls_prohibited(struct wlan_objmgr_vdev *vdev);
+#else
+static inline QDF_STATUS
+mlme_set_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool mlme_get_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+mlme_set_tdls_prohibited(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool mlme_get_tdls_prohibited(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
 /**
  * mlme_set_roam_reason_better_ap() - set roam reason better AP
  * @vdev: vdev pointer
@@ -309,19 +369,6 @@ bool mlme_is_vdev_in_beaconning_mode(enum QDF_OPMODE vdev_opmode);
  */
 QDF_STATUS mlme_set_assoc_type(struct wlan_objmgr_vdev *vdev,
 			       enum vdev_assoc_type assoc_type);
-
-/**
- * mlme_get_vdev_bss_peer_mac_addr() - to get peer mac address
- * @vdev: pointer to vdev
- * @bss_peer_mac_address: pointer to bss_peer_mac_address
- *
- * This API is used to get mac address of peer.
- *
- * Return: QDF_STATUS based on overall success
- */
-QDF_STATUS mlme_get_vdev_bss_peer_mac_addr(
-		struct wlan_objmgr_vdev *vdev,
-		struct qdf_mac_addr *bss_peer_mac_address);
 
 /**
  * mlme_get_vdev_stop_type() - to get vdev stop type

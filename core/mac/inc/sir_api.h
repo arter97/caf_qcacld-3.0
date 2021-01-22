@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -141,6 +141,9 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define SIR_UAPSD_GET(ac, mask)      (((mask) & (SIR_UAPSD_FLAG_ ## ac)) >> SIR_UAPSD_BITOFFSET_ ## ac)
 
 #endif
+
+/* Maximum management packet data unit length */
+#define MAX_MGMT_MPDU_LEN 2304
 
 struct scheduler_msg;
 
@@ -905,21 +908,8 @@ struct join_req {
 	uint16_t length;
 	uint8_t vdev_id;
 	tSirMacSSid ssId;
-	tSirMacAddr self_mac_addr;        /* self Mac address */
 	uint8_t dot11mode;      /* to support BT-AMP */
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-	uint8_t cc_switch_mode;
-#endif
 	bool wps_registration;
-	ePhyChanBondState cbMode;       /* Pass CB mode value in Join. */
-
-	/*This contains the UAPSD Flag for all 4 AC
-	 * B0: AC_VO UAPSD FLAG
-	 * B1: AC_VI UAPSD FLAG
-	 * B2: AC_BK UAPSD FLAG
-	 * B3: AC_BE UASPD FLAG
-	 */
-	uint8_t uapsdPerAcBitmask;
 
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */
@@ -948,17 +938,12 @@ struct join_req {
 	bool isESEconnection;
 	tESETspecInfo eseTspecInfo;
 #endif
-	bool he_with_wep_tkip;
 	bool isOSENConnection;
-	bool spectrumMgtIndicator;
-	struct power_cap_info powerCap;
 	struct supported_channels supportedChannels;
 	bool sae_pmk_cached;
 	/* Pls make this as last variable in struct */
 	bool force_24ghz_in_ht20;
 	bool force_rsne_override;
-	bool supported_nss_1x1;
-	bool enable_session_twt_support;
 	struct bss_description bssDescription;
 	/*
 	 * WARNING: Pls make bssDescription as last variable in struct
@@ -1071,8 +1056,6 @@ struct assoc_ind {
 	bool wmmEnabledSta; /* if present - STA is WMM enabled */
 	bool reassocReq;
 	/* Required for indicating the frames to upper layer */
-	uint32_t beaconLength;
-	uint8_t *beaconPtr;
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
 
@@ -1843,7 +1826,6 @@ typedef struct sSirSmeProbeReqInd {
 	tSirWPSPBCProbeReq WPSPBCProbeReq;
 } tSirSmeProbeReqInd, *tpSirSmeProbeReqInd;
 
-#define SIR_ROAM_MAX_CHANNELS            80
 #define SIR_ROAM_SCAN_MAX_PB_REQ_SIZE    450
 /* Occupied channel list remains static */
 #define CHANNEL_LIST_STATIC                   1
@@ -1999,7 +1981,7 @@ typedef struct {
 	uint8_t mcencryption;
 	tAniEdType gp_mgmt_cipher_suite;
 	uint8_t ChannelCount;
-	uint32_t chan_freq_cache[SIR_ROAM_MAX_CHANNELS];
+	uint32_t chan_freq_cache[ROAM_MAX_CHANNELS];
 #ifdef WLAN_FEATURE_11W
 	bool mfp_enabled;
 #endif
@@ -4451,7 +4433,7 @@ struct obss_ht40_scanind {
 	uint8_t bss_id;
 	uint8_t fortymhz_intolerent;
 	uint8_t channel_count;
-	uint32_t chan_freq_list[SIR_ROAM_MAX_CHANNELS];
+	uint32_t chan_freq_list[ROAM_MAX_CHANNELS];
 	uint8_t current_operatingclass;
 	uint16_t iefield_len;
 	uint8_t  iefield[SIR_ROAM_SCAN_MAX_PB_REQ_SIZE];

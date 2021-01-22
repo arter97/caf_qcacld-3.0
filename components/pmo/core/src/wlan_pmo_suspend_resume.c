@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -111,7 +111,7 @@ static QDF_STATUS pmo_core_calculate_listen_interval(
 			struct pmo_vdev_priv_obj *vdev_ctx,
 			uint32_t *listen_interval)
 {
-	uint32_t max_mod_dtim, max_dtim;
+	uint32_t max_mod_dtim, max_dtim = 0;
 	uint32_t beacon_interval_mod;
 	struct pmo_psoc_cfg *psoc_cfg = &vdev_ctx->pmo_psoc_ctx->psoc_cfg;
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
@@ -166,6 +166,11 @@ static QDF_STATUS pmo_core_calculate_listen_interval(
 			*listen_interval = cfg_default(CFG_LISTEN_INTERVAL);
 		}
 	}
+
+	pmo_info("sta dynamic dtim %d sta mod dtim %d sta_max_li_mod_dtim %d max_dtim %d",
+		 psoc_cfg->sta_dynamic_dtim, psoc_cfg->sta_mod_dtim,
+		 psoc_cfg->sta_max_li_mod_dtim, max_dtim);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -422,6 +427,8 @@ void pmo_core_configure_dynamic_wake_events(struct wlan_objmgr_psoc *psoc)
 			pmo_tgt_enable_wow_wakeup_event(vdev, enable_mask);
 		if (disable_configured)
 			pmo_tgt_disable_wow_wakeup_event(vdev, disable_mask);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 	}
 
 }
@@ -842,6 +849,8 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		goto out;
 	}
 
+	pmo_tgt_update_target_suspend_acked_flag(psoc, true);
+
 	host_credits = pmo_tgt_psoc_get_host_credits(psoc);
 	wmi_pending_cmds = pmo_tgt_psoc_get_pending_cmnds(psoc);
 
@@ -890,6 +899,8 @@ QDF_STATUS pmo_core_psoc_suspend_target(struct wlan_objmgr_psoc *psoc,
 		pmo_tgt_update_target_suspend_flag(psoc, false);
 		if (!psoc_ctx->wow.target_suspend.force_set)
 			qdf_trigger_self_recovery(psoc, QDF_SUSPEND_TIMEOUT);
+	} else {
+		pmo_tgt_update_target_suspend_acked_flag(psoc, true);
 	}
 
 out:
@@ -966,6 +977,7 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status;
 	int ret;
 	struct pmo_wow_enable_params wow_params = {0};
+	struct pmo_psoc_priv_obj *psoc_ctx;
 	qdf_time_t begin, end;
 	int pending;
 
@@ -1053,7 +1065,25 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	hif_process_runtime_suspend_success(hif_ctx);
+	if (hif_pm_get_wake_irq_type(hif_ctx) == HIF_PM_CE_WAKE) {
+		/*
+		 * In moselle, there is no separate interrupt for wake_irq,
+		 * shares CE interrupt, there is a chance of wow wakeup
+		 * while suspend is in-progress, so handling such scenario
+		 */
+		hif_pm_runtime_suspend_lock(hif_ctx);
+		psoc_ctx = pmo_psoc_get_priv(psoc);
+		if (pmo_core_get_wow_initial_wake_up(psoc_ctx)) {
+			hif_pm_runtime_suspend_unlock(hif_ctx);
+			pmo_err("Target wake up received before suspend completion");
+			status = QDF_STATUS_E_BUSY;
+			goto resume_hif;
+		}
+		hif_process_runtime_suspend_success(hif_ctx);
+		hif_pm_runtime_suspend_unlock(hif_ctx);
+	} else {
+		hif_process_runtime_suspend_success(hif_ctx);
+	}
 
 	goto dec_psoc_ref;
 
@@ -1227,10 +1257,9 @@ QDF_STATUS pmo_core_psoc_send_host_wakeup_ind_to_fw(
 			qdf_trigger_self_recovery(psoc, QDF_RESUME_TIMEOUT);
 	} else {
 		pmo_debug("Host wakeup received");
-	}
-
-	if (status == QDF_STATUS_SUCCESS)
 		pmo_tgt_update_target_suspend_flag(psoc, false);
+		pmo_tgt_update_target_suspend_acked_flag(psoc, false);
+	}
 out:
 	pmo_exit();
 
@@ -1300,10 +1329,9 @@ QDF_STATUS pmo_core_psoc_resume_target(struct wlan_objmgr_psoc *psoc,
 			qdf_trigger_self_recovery(psoc, QDF_RESUME_TIMEOUT);
 	} else {
 		pmo_debug("Host wakeup received");
-	}
-
-	if (status == QDF_STATUS_SUCCESS)
 		pmo_tgt_update_target_suspend_flag(psoc, false);
+		pmo_tgt_update_target_suspend_acked_flag(psoc, false);
+	}
 out:
 	pmo_exit();
 
@@ -1340,6 +1368,7 @@ QDF_STATUS pmo_core_psoc_bus_resume_req(struct wlan_objmgr_psoc *psoc,
 	/* If target was not suspended, bail out */
 	if (qdf_is_fw_down() || !pmo_tgt_is_target_suspended(psoc)) {
 		pmo_psoc_put_ref(psoc);
+		status = QDF_STATUS_E_AGAIN;
 		goto out;
 	}
 

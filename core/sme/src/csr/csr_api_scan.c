@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -66,9 +66,10 @@ static void csr_save_tx_power_to_cfg(struct mac_context *mac,
 static void csr_purge_channel_power(struct mac_context *mac,
 				    tDblLinkList *pChannelList);
 
+#ifndef FEATURE_CM_ENABLE
 static bool csr_roam_is_valid_channel(struct mac_context *mac,
 				      uint32_t ch_freq);
-
+#endif
 /* pResult is invalid calling this function. */
 void csr_free_scan_result_entry(struct mac_context *mac,
 				struct tag_csrscan_result *pResult)
@@ -114,6 +115,7 @@ QDF_STATUS csr_scan_close(struct mac_context *mac)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifndef FEATURE_CM_ENABLE
 QDF_STATUS csr_scan_handle_search_for_ssid(struct mac_context *mac_ctx,
 					   uint32_t session_id)
 {
@@ -172,12 +174,7 @@ QDF_STATUS csr_scan_handle_search_for_ssid(struct mac_context *mac_ctx,
 		qdf_mem_free(filter);
 		if (!QDF_IS_STATUS_SUCCESS(status))
 			break;
-		if (mac_ctx->roam.roamSession[session_id].connectState ==
-				eCSR_ASSOC_STATE_TYPE_INFRA_DISCONNECTING) {
-			sme_err("upper layer issued disconnetion");
-			status = QDF_STATUS_E_FAILURE;
-			break;
-		}
+
 		status = csr_roam_issue_connect(mac_ctx, session_id, profile,
 						hBSSList, eCsrHddIssued,
 						session->scan_info.roam_id,
@@ -301,6 +298,7 @@ roam_completion:
 			    false);
 	return status;
 }
+#endif
 
 QDF_STATUS csr_scan_result_purge(struct mac_context *mac,
 				 tScanResultHandle hScanList)
@@ -905,6 +903,7 @@ free_ie:
 	return fRet;
 }
 
+#ifndef FEATURE_CM_ENABLE
 static enum csr_scancomplete_nextcommand
 csr_scan_get_next_command_state(struct mac_context *mac_ctx,
 				uint32_t session_id,
@@ -1230,6 +1229,7 @@ void csr_scan_callback(struct wlan_objmgr_vdev *vdev,
 
 	sme_release_global_lock(&mac_ctx->sme);
 }
+#endif
 
 tCsrScanResultInfo *csr_scan_result_get_first(struct mac_context *mac,
 					      tScanResultHandle hScanResult)
@@ -1281,6 +1281,7 @@ tCsrScanResultInfo *csr_scan_result_get_next(struct mac_context *mac,
 	return pRet;
 }
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * csr_scan_for_ssid() -  Function usually used for BSSs that suppresses SSID
  * @mac_ctx: Pointer to Global Mac structure
@@ -1429,6 +1430,7 @@ error:
 	}
 	return status;
 }
+#endif
 
 static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 					   uint32_t *pchan_freq_list,
@@ -1614,6 +1616,7 @@ QDF_STATUS csr_scan_abort_mac_scan(struct mac_context *mac_ctx,
 	return status;
 }
 
+#ifndef FEATURE_CM_ENABLE
 bool csr_roam_is_valid_channel(struct mac_context *mac, uint32_t ch_freq)
 {
 	bool fValid = false;
@@ -1628,6 +1631,7 @@ bool csr_roam_is_valid_channel(struct mac_context *mac, uint32_t ch_freq)
 	}
 	return fValid;
 }
+#endif
 
 QDF_STATUS csr_scan_create_entry_in_scan_cache(struct mac_context *mac,
 					       uint32_t sessionId,
@@ -1796,6 +1800,7 @@ csr_get_bssdescr_from_scan_handle(tScanResultHandle result_handle,
 	return bss_descr;
 }
 
+#ifndef FEATURE_CM_ENABLE
 uint32_t
 csr_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 				   tScanResultHandle result_handle,
@@ -1917,6 +1922,7 @@ csr_scan_get_channel_for_hw_mode_change(struct mac_context *mac_ctx,
 
 	return candidate_ch_freq;
 }
+#endif
 
 static void csr_fill_rsn_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 {
@@ -1987,9 +1993,9 @@ static void csr_fill_wapi_auth_type(enum csr_akm_type *auth_type, uint32_t akm)
 		*auth_type = eCSR_AUTH_TYPE_NONE;
 }
 
-static void csr_fill_auth_type(enum csr_akm_type *auth_type,
-			       uint32_t authmodeset, uint32_t akm,
-			       uint32_t ucastcipherset)
+void csr_fill_auth_type(enum csr_akm_type *auth_type,
+			uint32_t authmodeset, uint32_t akm,
+			uint32_t ucastcipherset)
 {
 	if (!authmodeset) {
 		*auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
@@ -2040,8 +2046,7 @@ static void csr_fill_auth_type(enum csr_akm_type *auth_type,
 	*auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
 }
 
-static void csr_fill_enc_type(eCsrEncryptionType *cipher_type,
-			      uint32_t cipherset)
+void csr_fill_enc_type(eCsrEncryptionType *cipher_type, uint32_t cipherset)
 {
 	if (!cipherset) {
 		*cipher_type = eCSR_ENCRYPT_TYPE_NONE;
@@ -2464,39 +2469,51 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	bool dual_sta_roam_active;
 	struct wlan_channel *chan;
 	struct wlan_objmgr_vdev *vdev;
-
-	tpCsrNeighborRoamControlInfo neighbor_roam_info =
-		&mac_ctx->roam.neighborRoamInfo[sessionId];
 	tCsrRoamConnectedProfile *profile = NULL;
 	QDF_STATUS status;
+	struct rso_config *rso_cfg;
+	struct rso_cfg_params *cfg_params;
 
 	if (!(mac_ctx && mac_ctx->roam.roamSession &&
 	      CSR_IS_SESSION_VALID(mac_ctx, sessionId))) {
 		sme_debug("Invalid session");
 		return;
 	}
-	if (neighbor_roam_info->cfgParams.specific_chan_info.numOfChannels) {
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac_ctx->pdev, sessionId,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", sessionId);
+		return;
+	}
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg)
+		goto rel_vdev_ref;
+
+	cfg_params = &rso_cfg->cfg_param;
+
+	if (cfg_params->specific_chan_info.num_chan) {
 		/*
 		 * Ini file contains neighbor scan channel list, hence NO need
 		 * to build occupied channel list"
 		 */
 		sme_debug("Ini contains neighbor scan ch list");
-		return;
+		goto rel_vdev_ref;
 	}
 
 	profile = &mac_ctx->roam.roamSession[sessionId].connectedProfile;
 	if (!profile)
-		return;
+		goto rel_vdev_ref;
 
 	filter = qdf_mem_malloc(sizeof(*filter));
 	if (!filter)
-		return;
+		goto rel_vdev_ref;
 
 	status = csr_fill_filter_from_vdev_crypto(mac_ctx, filter, sessionId);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sme_err("fail to fill filter crypto");
 		qdf_mem_free(filter);
-		return;
+		goto rel_vdev_ref;
 	}
 	filter->num_of_ssid = 1;
 	filter->ssid_list[0].length = profile->SSID.length;
@@ -2509,7 +2526,7 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	if (!pdev) {
 		sme_err("pdev is NULL");
 		qdf_mem_free(filter);
-		return;
+		goto rel_vdev_ref;
 	}
 
 	/* Empty occupied channels here */
@@ -2523,21 +2540,13 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 			&mac_ctx->scan.occupiedChannels[sessionId],
 			true);
 	list = ucfg_scan_get_result(pdev, filter);
-	if (list)
-		sme_debug("num_entries %d", qdf_list_size(list));
 	if (!list || (list && !qdf_list_size(list))) {
-		goto err;
-	}
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, sessionId,
-						    WLAN_LEGACY_MAC_ID);
-	if (!vdev) {
-		sme_err("vdev null");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 		goto err;
 	}
 
 	chan = wlan_vdev_get_active_channel(vdev);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	if (!chan) {
 		sme_err("no active channel");
 		goto err;
@@ -2573,6 +2582,9 @@ err:
 		ucfg_scan_purge_results(list);
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_LEGACY_MAC_ID);
 	return;
+
+rel_vdev_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 }
 
 /**

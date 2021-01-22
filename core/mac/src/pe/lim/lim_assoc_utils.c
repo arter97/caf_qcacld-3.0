@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -378,46 +378,15 @@ QDF_STATUS lim_del_sta_all(struct mac_context *mac,
 	return status;
 }
 
-/**
- * lim_cleanup_rx_path()
- *
- ***FUNCTION:
- * This function is called to cleanup STA state at SP & RFP.
- *
- ***LOGIC:
- * To circumvent RFP's handling of dummy packet when it does not
- * have an incomplete packet for the STA to be deleted, a packet
- * with 'more framgents' bit set will be queued to RFP's WQ before
- * queuing 'dummy packet'.
- * A 'dummy' BD is pushed into RFP's WQ with type=00, subtype=1010
- * (Disassociation frame) and routing flags in BD set to eCPU's
- * Low Priority WQ.
- * RFP cleans up its local context for the STA id mentioned in the
- * BD and then pushes BD to eCPU's low priority WQ.
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param mac    Pointer to Global MAC structure
- * @param sta  Pointer to the per STA data structure
- *                initialized by LIM and maintained at DPH
- *
- * @return None
- */
-
 QDF_STATUS
 lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
-		    struct pe_session *pe_session)
+		    struct pe_session *pe_session, bool delete_peer)
 {
 	QDF_STATUS retCode = QDF_STATUS_SUCCESS;
 
-	pe_debug("Cleanup Rx Path for AID: %d"
-		"pe_session->limSmeState: %d, mlmState: %d",
-		sta->assocId, pe_session->limSmeState,
-		sta->mlmStaContext.mlmState);
+	pe_debug("Cleanup Rx Path for AID: %d limSmeState: %d, mlmState: %d, delete_peer %d",
+		 sta->assocId, pe_session->limSmeState,
+		 sta->mlmStaContext.mlmState, delete_peer);
 
 	pe_session->isCiscoVendorAP = false;
 
@@ -441,9 +410,8 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
 			 * Release our assigned AID back to the free pool
 			 */
 			if (LIM_IS_AP_ROLE(pe_session)) {
-				lim_del_sta(mac, sta, false, pe_session);
-				lim_release_peer_idx(mac, sta->assocId,
-						     pe_session);
+				lim_del_sta(mac, sta, true, pe_session);
+				return retCode;
 			}
 			lim_delete_dph_hash_entry(mac, sta->staAddr,
 						  sta->assocId, pe_session);
@@ -462,7 +430,7 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
 	sta->valid = 0;
 	lim_send_sme_tsm_ie_ind(mac, pe_session, 0, 0, 0);
 	/* Any roaming related changes should be above this line */
-	if (lim_is_roam_synch_in_progress(mac->psoc, pe_session))
+	if (!delete_peer)
 		return QDF_STATUS_SUCCESS;
 
 	sta->mlmStaContext.mlmState = eLIM_MLM_WT_DEL_STA_RSP_STATE;
@@ -744,7 +712,7 @@ lim_reject_association(struct mac_context *mac_ctx, tSirMacAddr peer_addr,
 	sta_ds->mlmStaContext.cleanupTrigger = eLIM_REASSOC_REJECT;
 
 	/* Receive path cleanup */
-	lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry);
+	lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry, true);
 
 	/*
 	 * Send Re/Association Response with
@@ -4418,7 +4386,7 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 					  uint16_t deauth_disassoc_frame_len)
 {
 	uint16_t reason_code, ie_offset;
-	struct wlan_ies ie;
+	struct element_info ie;
 
 	if (!session) {
 		pe_err("NULL session");
@@ -4431,7 +4399,7 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	if (!deauth_disassoc_frame || deauth_disassoc_frame_len <= ie_offset)
 		return;
 
-	ie.data = deauth_disassoc_frame + ie_offset;
+	ie.ptr = deauth_disassoc_frame + ie_offset;
 	ie.len = deauth_disassoc_frame_len - ie_offset;
 
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);

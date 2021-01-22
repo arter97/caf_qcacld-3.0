@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015, 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,36 @@
 #include "wlan_scan_utils_api.h"
 #include "wlan_mlme_dbg.h"
 #include "wlan_cm_api.h"
+#include "wlan_policy_mgr_api.h"
+#include "wlan_p2p_api.h"
+#include "wlan_tdls_api.h"
+#include "wlan_mlme_vdev_mgr_interface.h"
+
+QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
+				struct wlan_cm_connect_req *req)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct rso_config *rso_cfg;
+
+	if (!vdev || !req) {
+		mlme_err("vdev or req is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		mlme_err("vdev_id: %d psoc not found", req->vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	if (policy_mgr_is_sta_mon_concurrency(psoc))
+		return QDF_STATUS_E_NOSUPPORT;
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (rso_cfg)
+		rso_cfg->rsn_cap = req->crypto.rsn_caps;
+
+	return QDF_STATUS_SUCCESS;
+}
 
 void cm_free_join_req(struct cm_vdev_join_req *join_req)
 {
@@ -106,6 +136,7 @@ QDF_STATUS wlan_cm_send_connect_rsp(struct scheduler_msg *msg)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	cm_csr_connect_rsp(vdev, rsp);
 	status = wlan_cm_connect_rsp(vdev, &rsp->connect_rsp);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
@@ -138,6 +169,14 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	status = cm_csr_handle_connect_req(vdev, req, join_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_err("vdev_id: %d cm_id 0x%x : fail to fill params from legacy",
+			 req->vdev_id, req->cm_id);
+		cm_free_join_req(join_req);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	msg.bodyptr = join_req;
 	msg.callback = cm_process_join_req;
 	msg.flush_callback = cm_flush_join_req;
@@ -155,18 +194,80 @@ QDF_STATUS
 cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
 			    struct qdf_mac_addr *peer_mac)
 {
-	return QDF_STATUS_SUCCESS;
+	struct scheduler_msg msg;
+	QDF_STATUS status;
+	struct cm_peer_create_req *req;
+
+	if (!vdev || !peer_mac)
+		return QDF_STATUS_E_FAILURE;
+
+	qdf_mem_zero(&msg, sizeof(msg));
+	req = qdf_mem_malloc(sizeof(*req));
+
+	if (!req)
+		return QDF_STATUS_E_NOMEM;
+
+	req->vdev_id = wlan_vdev_get_id(vdev);
+	qdf_copy_macaddr(&req->peer_mac, peer_mac);
+
+	msg.bodyptr = req;
+	msg.callback = cm_process_peer_create;
+
+	status = scheduler_post_message(QDF_MODULE_ID_MLME,
+					QDF_MODULE_ID_PE,
+					QDF_MODULE_ID_PE, &msg);
+	if (QDF_IS_STATUS_ERROR(status))
+		qdf_mem_free(req);
+
+	return status;
+
 }
 
 QDF_STATUS
-cm_handle_connect_complete(struct wlan_objmgr_vdev *vdev,
-			   struct wlan_cm_connect_resp *rsp)
+cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
+			struct wlan_cm_connect_resp *rsp)
 {
+	uint8_t vdev_id;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	enum QDF_OPMODE op_mode;
+
+	if (!vdev || !rsp) {
+		mlme_err("vdev or rsp is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	op_mode = wlan_vdev_mlme_get_opmode(vdev);
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		mlme_err("vdev_id: %d pdev not found", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		mlme_err("vdev_id: %d psoc not found", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cm_csr_connect_done_ind(vdev, rsp);
+	/* start wait for key timer */
+
+	if (QDF_IS_STATUS_SUCCESS(rsp->connect_status))
+		policy_mgr_incr_active_session(psoc, op_mode, vdev_id);
+	wlan_tdls_notify_sta_connect(vdev_id,
+				     mlme_get_tdls_chan_switch_prohibited(vdev),
+				     mlme_get_tdls_prohibited(vdev), vdev);
+	wlan_p2p_status_connect(vdev);
+	if (op_mode == QDF_STA_MODE)
+		wlan_cm_roam_state_change(pdev, vdev_id, WLAN_ROAM_INIT,
+					  REASON_CONNECT);
+
 	return QDF_STATUS_SUCCESS;
 }
 
 #ifdef WLAN_FEATURE_FILS_SK
-static inline void wlan_cm_free_fils_ie(struct wlan_connect_rsp_ies *connect_ie)
+static inline void cm_free_fils_ie(struct wlan_connect_rsp_ies *connect_ie)
 {
 	if (!connect_ie->fils_ie)
 		return;
@@ -180,9 +281,22 @@ static inline void wlan_cm_free_fils_ie(struct wlan_connect_rsp_ies *connect_ie)
 	qdf_mem_free(connect_ie->fils_ie);
 }
 #else
-static inline void wlan_cm_free_fils_ie(struct wlan_connect_rsp_ies *connect_ie)
+static inline void cm_free_fils_ie(struct wlan_connect_rsp_ies *connect_ie)
 {
 }
+#endif
+
+#ifdef FEATURE_WLAN_ESE
+static void cm_free_tspec_ie(struct cm_vdev_join_rsp *rsp)
+{
+	qdf_mem_free(rsp->tspec_ie.ptr);
+	rsp->tspec_ie.ptr = NULL;
+	rsp->tspec_ie.len = 0;
+}
+
+#else
+static void cm_free_tspec_ie(struct cm_vdev_join_rsp *rsp)
+{}
 #endif
 
 void wlan_cm_free_connect_rsp(struct cm_vdev_join_rsp *rsp)
@@ -193,8 +307,32 @@ void wlan_cm_free_connect_rsp(struct cm_vdev_join_rsp *rsp)
 	qdf_mem_free(connect_ie->assoc_req.ptr);
 	qdf_mem_free(connect_ie->bcn_probe_rsp.ptr);
 	qdf_mem_free(connect_ie->assoc_rsp.ptr);
-	qdf_mem_free(connect_ie->ric_resp_ie.ptr);
-	wlan_cm_free_fils_ie(connect_ie);
+	cm_free_fils_ie(connect_ie);
+	cm_free_tspec_ie(rsp);
+	qdf_mem_free(rsp->ric_resp_ie.ptr);
 	qdf_mem_zero(rsp, sizeof(*rsp));
 	qdf_mem_free(rsp);
+}
+
+bool cm_is_vdevid_connected(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool connected;
+	enum QDF_OPMODE opmode;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev_id: %d: vdev not found", vdev_id);
+		return false;
+	}
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return false;
+	}
+	connected = cm_is_vdev_connected(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
+	return connected;
 }

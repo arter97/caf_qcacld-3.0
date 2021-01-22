@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -771,16 +771,7 @@ static QDF_STATUS wma_set_bss_rate_flags_he(enum tx_rate_info *rate_flags,
 	if (!add_bss->he_capable)
 		return QDF_STATUS_E_NOSUPPORT;
 
-	/*extend TX_RATE_HE160 in future*/
-	if (add_bss->ch_width == CH_WIDTH_160MHZ ||
-	    add_bss->ch_width == CH_WIDTH_80P80MHZ)
-		*rate_flags |= TX_RATE_HE160;
-	else if (add_bss->ch_width == CH_WIDTH_80MHZ)
-		*rate_flags |= TX_RATE_HE80;
-	else if (add_bss->ch_width)
-		*rate_flags |= TX_RATE_HE40;
-	else
-		*rate_flags |= TX_RATE_HE20;
+	*rate_flags |= wma_get_he_rate_flags(add_bss->ch_width);
 
 	wma_debug("he_capable %d rate_flags 0x%x", add_bss->he_capable,
 		  *rate_flags);
@@ -823,6 +814,36 @@ enum tx_rate_info wma_get_vht_rate_flags(enum phy_ch_width ch_width)
 	return rate_flags;
 }
 
+enum tx_rate_info wma_get_ht_rate_flags(enum phy_ch_width ch_width)
+{
+	enum tx_rate_info rate_flags = 0;
+
+	if (ch_width)
+		rate_flags |= TX_RATE_HT40 | TX_RATE_HT20;
+	else
+		rate_flags |= TX_RATE_HT20;
+
+	return rate_flags;
+}
+
+enum tx_rate_info wma_get_he_rate_flags(enum phy_ch_width ch_width)
+{
+	enum tx_rate_info rate_flags = 0;
+
+	if (ch_width == CH_WIDTH_160MHZ ||
+	    ch_width == CH_WIDTH_80P80MHZ)
+		rate_flags |= TX_RATE_HE160 | TX_RATE_HE80 | TX_RATE_HE40 |
+				TX_RATE_HE20;
+	else if (ch_width == CH_WIDTH_80MHZ)
+		rate_flags |= TX_RATE_HE80 | TX_RATE_HE40 | TX_RATE_HE20;
+	else if (ch_width)
+		rate_flags |= TX_RATE_HE40 | TX_RATE_HE20;
+	else
+		rate_flags |= TX_RATE_HE20;
+
+	return rate_flags;
+}
+
 void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 			    struct bss_params *add_bss)
 {
@@ -846,10 +867,7 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 		}
 		/* avoid to conflict with htCapable flag */
 		else if (add_bss->htCapable) {
-			if (add_bss->ch_width)
-				*rate_flags |= TX_RATE_HT40;
-			else
-				*rate_flags |= TX_RATE_HT20;
+			*rate_flags |= wma_get_ht_rate_flags(add_bss->ch_width);
 		}
 	}
 
@@ -913,6 +931,7 @@ static void wma_data_tx_ack_work_handler(void *ack_work)
 
 	if (cds_is_load_or_unload_in_progress()) {
 		wma_err("Driver load/unload in progress");
+		qdf_mem_free(ack_work);
 		return;
 	}
 
@@ -954,10 +973,8 @@ wma_data_tx_ack_comp_hdlr(void *wma_context, qdf_nbuf_t netbuf, int32_t status)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) wma_context;
 
-	if (!wma_handle) {
-		wma_err("Invalid WMA Handle");
+	if (wma_validate_handle(wma_handle))
 		return;
-	}
 
 	/*
 	 * if netBuf does not match with pending nbuf then just free the
@@ -1990,10 +2007,8 @@ int wma_thermal_mgmt_evt_handler(void *handle, uint8_t *event, uint32_t len)
 
 	wma = (tp_wma_handle) handle;
 
-	if (!wma) {
-		wma_err("Failed to get wma handle");
+	if (wma_validate_handle(wma))
 		return -EINVAL;
-	}
 
 	param_buf = (WMI_THERMAL_MGMT_EVENTID_param_tlvs *) event;
 
@@ -2218,7 +2233,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 void *pData,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
 			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
-			 uint16_t channel_freq, enum rateid rid)
+			 uint16_t channel_freq, enum rateid rid,
+			 int8_t peer_rssi)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) (wma_context);
 	int32_t status;
@@ -2248,11 +2264,11 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	bool is_5g = false;
 	uint8_t pdev_id;
 
-	if (!wma_handle) {
-		wma_err("wma_handle is NULL");
+	if (wma_validate_handle(wma_handle)) {
 		cds_packet_free((void *)tx_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	iface = &wma_handle->interfaces[vdev_id];
 
 	if (!soc) {
@@ -2616,6 +2632,8 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	mgmt_param.qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	mgmt_param.use_6mbps = use_6mbps;
 	mgmt_param.tx_type = tx_frm_index;
+	mgmt_param.peer_rssi = peer_rssi;
+
 	if (tx_flag & HAL_USE_INCORRECT_KEY_PMF)
 		mgmt_param.tx_flags |= MGMT_TX_USE_INCORRECT_KEY;
 

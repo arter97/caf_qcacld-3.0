@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -43,9 +43,12 @@ QDF_STATUS csr_roam_issue_reassociate(struct mac_context *mac, uint32_t vdev_id,
 	/* Set the roaming substate to 'join attempt'... */
 	csr_roam_substate_change(mac, eCSR_ROAM_SUBSTATE_REASSOC_REQ, vdev_id);
 	sme_debug("calling csr_send_join_req_msg (eWNI_SME_REASSOC_REQ)");
+	/* This is temp ifdef will be removed in near future */
+#ifndef FEATURE_CM_ENABLE
 	/* attempt to Join this BSS... */
 	return csr_send_join_req_msg(mac, vdev_id, bss_desc, roam_profile, ies,
 				     eWNI_SME_REASSOC_REQ);
+#endif
 }
 
 QDF_STATUS
@@ -568,6 +571,8 @@ void csr_neighbor_roam_request_handoff(struct mac_context *mac_ctx,
 
 	sme_debug("csr_roamHandoffRequested: disassociating with current AP");
 
+	/* This is temp ifdef will be removed in near future */
+#ifndef FEATURE_CM_ENABLE
 	if (!QDF_IS_STATUS_SUCCESS(csr_roam_issue_disassociate_cmd(
 					mac_ctx,
 					session_id,
@@ -577,6 +582,7 @@ void csr_neighbor_roam_request_handoff(struct mac_context *mac_ctx,
 		qdf_mem_free(roam_info);
 		return;
 	}
+#endif
 	/* notify HDD for handoff, providing the BSSID too */
 	roam_info->reasonCode = eCsrRoamReasonBetterAP;
 

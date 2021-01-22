@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -86,6 +86,13 @@
 #define CFG_VALID_CHANNEL_LIST_STRING_LEN (CFG_VALID_CHANNEL_LIST_LEN * 4)
 
 #define DEFAULT_ROAM_TRIGGER_BITMAP 0xFFFFFFFF
+
+/**
+ * detect AP off based FW reported last RSSI > roaming Low rssi
+ * and not less than 20db of host cached RSSI
+ */
+#define AP_OFF_RSSI_OFFSET 20
+
 /**
  * struct mlme_cfg_str - generic structure for all mlme CFG string items
  *
@@ -1392,17 +1399,19 @@ struct wlan_mlme_acs {
 
 /*
  * struct wlan_mlme_cfg_twt - All twt related cfg items
- * @is_twt_bcast_enabled: twt capability for the session
  * @is_twt_enabled: global twt configuration
- * @is_twt_responder_enabled: twt responder
- * @is_twt_requestor_enabled: twt requestor
+ * @bcast_requestor_tgt_cap: Broadcast requestor target capability
+ * @bcast_responder_tgt_cap: Broadcast responder target capability
+ * @is_bcast_responder_enabled: bcast responder enable/disable
+ * @is_bcast_requestor_enabled: bcast requestor enable/disable
  * @twt_congestion_timeout: congestion timeout value
  */
 struct wlan_mlme_cfg_twt {
-	bool is_twt_bcast_enabled;
 	bool is_twt_enabled;
-	bool is_twt_responder_enabled;
-	bool is_twt_requestor_enabled;
+	bool is_bcast_responder_enabled;
+	bool is_bcast_requestor_enabled;
+	bool bcast_requestor_tgt_cap;
+	bool bcast_responder_tgt_cap;
 	uint32_t twt_congestion_timeout;
 };
 
@@ -1717,6 +1726,7 @@ struct fw_scan_channels {
  * @saved_freq_list: Valid channel list
  * @sae_single_pmk_feature_enabled: Contains value of ini
  * sae_single_pmk_feature_enabled
+ * @rso_user_config: RSO user config
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -1832,6 +1842,7 @@ struct wlan_mlme_lfr_cfg {
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	bool sae_single_pmk_feature_enabled;
 #endif
+	struct rso_config_params rso_user_config;
 };
 
 /**
@@ -2487,6 +2498,7 @@ struct wlan_mlme_sae_single_pmk {
  * @data_11kv:          Neighbor report/BTM parameters.
  * @btm_rsp:            BTM response information
  * @roam_init_info:     Roam initial info
+ * @roam_msg_info:      roam related message information
  */
 struct mlme_roam_debug_info {
 	struct wmi_roam_trigger_info trigger;
@@ -2495,15 +2507,6 @@ struct mlme_roam_debug_info {
 	struct wmi_neighbor_report_data data_11kv;
 	struct roam_btm_response_data btm_rsp;
 	struct roam_initial_data roam_init_info;
-};
-
-/**
- * struct wlan_ies - Generic WLAN Information Element(s) format
- * @len: Total length of the IEs
- * @data: IE data
- */
-struct wlan_ies {
-	uint16_t len;
-	uint8_t *data;
+	struct roam_msg_info roam_msg_info;
 };
 #endif

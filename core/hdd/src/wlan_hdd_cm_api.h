@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -44,6 +44,20 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 			struct cfg80211_connect_params *req);
 
 /**
+ * wlan_hdd_cm_issue_disconnect() - initiate disconnect from osif
+ * @adapter: Pointer to adapter
+ * @reason: Disconnect reason code
+ * @sync: true if wait for disconnect to complete is required.
+ *
+ * This function is used to issue disconnect request to conection manager
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
+					enum wlan_reason_code reason,
+					bool sync);
+
+/**
  * wlan_hdd_cm_disconnect() - cfg80211 disconnect api
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to network device
@@ -68,18 +82,152 @@ QDF_STATUS hdd_cm_connect_complete(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_resp *rsp,
 				   enum osif_cb_type type);
 
-#else
-static inline int
-wlan_hdd_cm_connect(struct wiphy *wiphy, struct net_device *ndev,
-		    struct cfg80211_connect_params *req)
-{
-	return 0;
-}
+#ifdef WLAN_FEATURE_FILS_SK
+/**
+ * hdd_cm_save_gtk() - save gtk api
+ * @vdev: Pointer to vdev
+ * @rsp: Pointer to connect rsp
+ *
+ * This function is used to save gtk in legacy mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_cm_save_gtk(struct wlan_objmgr_vdev *vdev,
+			   struct wlan_cm_connect_resp *rsp);
 
-static inline int
-wlan_hdd_cm_disconnect(struct wiphy *wiphy, struct net_device *dev, u16 reason)
+/**
+ * hdd_cm_set_hlp_data() - api to set hlp data for dhcp
+ * @dev: pointer to net device
+ * @vdev: Pointer to vdev
+ * @rsp: Pointer to connect rsp
+ *
+ * This function is used to set hlp data for dhcp in legacy mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_cm_set_hlp_data(struct net_device *dev,
+			       struct wlan_objmgr_vdev *vdev,
+			       struct wlan_cm_connect_resp *rsp);
+#endif
+#endif
+
+#ifdef WLAN_FEATURE_MSCS
+/**
+ * reset_mscs_params() - Reset mscs parameters
+ * @adapter: pointer to adapter structure
+ *
+ * Reset mscs parameters whils disconnection
+ *
+ * Return: None
+ */
+void reset_mscs_params(struct hdd_adapter *adapter);
+#else
+static inline
+void reset_mscs_params(struct hdd_adapter *adapter)
 {
-	return 0;
+	return;
 }
 #endif
+
+static const uint8_t acm_mask_bit[WLAN_MAX_AC] = {
+	0x4,                    /* SME_AC_BK */
+	0x8,                    /* SME_AC_BE */
+	0x2,                    /* SME_AC_VI */
+	0x1                     /* SME_AC_VO */
+};
+
+/**
+ * hdd_handle_disassociation_event() - Handle disassociation event
+ * @adapter: Pointer to adapter
+ * @peer_macaddr: Pointer to peer mac address
+ *
+ * Return: None
+ */
+void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
+				     struct qdf_mac_addr *peer_macaddr);
+
+/**
+ * __hdd_cm_disconnect_handler_pre_user_update() - Handle disconnect indication
+ * before updating to user space
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter);
+
+/**
+ * __hdd_cm_disconnect_handler_post_user_update() - Handle disconnect indication
+ * after updating to user space
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter);
+
+/**
+ * hdd_cm_update_rssi_snr_by_bssid() - update rsi and snr into adapter
+ * @adapter: Pointer to adapter
+ *
+ * Return: None
+ */
+void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter);
+
+/**
+ *  hdd_cm_handle_assoc_event() - Send disassociation indication to oem
+ * app
+ * @vdev: Pointer to adapter
+ * @peer_mac: Pointer to peer mac address
+ *
+ * Return: None
+ */
+void hdd_cm_handle_assoc_event(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac);
+
+/**
+ * hdd_cm_netif_queue_enable() - Enable the network queue for a
+ *			      particular adapter.
+ * @adapter: pointer to the adapter structure
+ *
+ * This function schedules a work to update the netdev features
+ * and enable the network queue if the feature "disable checksum/tso
+ * for legacy connections" is enabled via INI. If not, it will
+ * retain the existing behavior by just enabling the network queues.
+ *
+ * Returns: none
+ */
+void hdd_cm_netif_queue_enable(struct hdd_adapter *adapter);
+
+#ifdef WLAN_FEATURE_11W
+/**
+ * hdd_cm_clear_pmf_stats() - Clear pmf stats
+ * @adapter: pointer to the adapter structure
+ *
+ * Returns: None
+ */
+
+void hdd_cm_clear_pmf_stats(struct hdd_adapter *adapter);
+#else
+static inline void hdd_cm_clear_pmf_stats(struct hdd_adapter *adapter)
+{
+}
+#endif
+
+/**
+ * hdd_cm_save_connect_status() - Save connect status
+ * @adapter: pointer to the adapter structure
+ * @reason_code: IEE80211 wlan status code
+ *
+ * Returns: None
+ */
+void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
+				uint32_t reason_code);
+
+/**
+ * hdd_cm_is_vdev_associated() - Checks if vdev is associated or not
+ * @adapter: pointer to the adapter structure
+ *
+ * Returns: True if vdev is associated else false
+ */
+bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter);
+
 #endif

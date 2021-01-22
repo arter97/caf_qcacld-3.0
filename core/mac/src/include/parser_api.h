@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -700,9 +700,11 @@ populate_dot_11_f_ext_chann_switch_ann(struct mac_context *mac_ptr,
 				struct pe_session *session_entry);
 
 void
-populate_dot11f_vht_tx_power_env(struct mac_context *mac,
-				 tDot11fIEvht_transmit_power_env *pDot11f,
-				 enum phy_ch_width ch_width, uint32_t chan_freq);
+populate_dot11f_tx_power_env(struct mac_context *mac,
+			     tDot11fIEtransmit_power_env *pDot11f,
+			     enum phy_ch_width ch_width, uint32_t chan_freq,
+			     uint16_t *num_tpe, bool is_ch_switch);
+
 /* / Populate a tDot11fIEChannelSwitchWrapper */
 void
 populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
@@ -1210,7 +1212,7 @@ static inline QDF_STATUS populate_dot11f_he_bss_color_change(
 }
 #endif
 
-#ifdef WLAN_SUPPORT_TWT
+#if defined(WLAN_FEATURE_11AX) && defined(WLAN_SUPPORT_TWT)
 /**
  * populate_dot11f_twt_extended_caps() - populate TWT extended capabilities
  * @mac_ctx: Global MAC context.
@@ -1260,6 +1262,8 @@ wlan_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
 				    struct bss_description *bss_desc,
 				    tDot11fBeaconIEs **ie_struct);
 
+int8_t wlan_get_cfg_max_tx_power(struct mac_context *mac, uint32_t ch_freq);
+
 QDF_STATUS
 wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 				   struct bss_description *bss_desc,
@@ -1278,5 +1282,20 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 uint16_t
 wlan_get_ielen_from_bss_description(struct bss_description *bss_desc);
 
+/**
+ * dot11f_parse_assoc_response() - API to parse Assoc IE buffer to struct
+ * @mac_ctx: MAC context
+ * @p_buf: Pointer to the assoc IE buffer
+ * @n_buf: length of the @p_buf
+ * @p_frm: Struct to populate the IE buffer after parsing
+ * @append_ie: Boolean to indicate whether to reset @p_frm or not. If @append_ie
+ *             is true, @p_frm struct is not reset to zeros.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dot11f_parse_assoc_response(struct mac_context *mac_ctx,
+				       uint8_t *p_buf, uint32_t n_buf,
+				       tDot11fAssocResponse *p_frm,
+				       bool append_ie);
 
 #endif /* __PARSE_H__ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -584,14 +584,16 @@ wma_send_roam_preauth_status(tp_wma_handle wma_handle,
 			     struct wmi_roam_auth_status_params *params)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
-	if (!wma_handle || !wma_handle->wmi_handle) {
-		wma_err("WMA is closed, cannot send roam prauth status");
+	if (wma_validate_handle(wma_handle))
 		return;
-	}
 
-	status = wmi_unified_send_roam_preauth_status(wma_handle->wmi_handle,
-						      params);
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return;
+
+	status = wmi_unified_send_roam_preauth_status(wmi_handle, params);
 	if (QDF_IS_STATUS_ERROR(status))
 		wma_err("failed to send disconnect roam preauth status");
 }
@@ -613,18 +615,21 @@ void wma_process_roam_invoke(WMA_HANDLE handle,
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
 	uint32_t ch_hz;
+	struct wmi_unified *wmi_handle;
 
-	if (!wma_handle || !wma_handle->wmi_handle) {
-		wma_err("WMA is closed, can not send roam invoke");
+	if (wma_validate_handle(wma_handle))
 		goto free_frame_buf;
-	}
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		goto free_frame_buf;
 
 	if (!wma_is_vdev_valid(roaminvoke->vdev_id)) {
 		wma_err("Invalid vdev id:%d", roaminvoke->vdev_id);
 		goto free_frame_buf;
 	}
 	ch_hz = roaminvoke->ch_freq;
-	wmi_unified_roam_invoke_cmd(wma_handle->wmi_handle,
+	wmi_unified_roam_invoke_cmd(wmi_handle,
 				(struct wmi_roam_invoke_cmd *)roaminvoke,
 				ch_hz);
 free_frame_buf:
@@ -645,11 +650,15 @@ void wma_process_roam_synch_fail(WMA_HANDLE handle,
 				 struct roam_offload_synch_fail *synch_fail)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	struct wmi_unified *wmi_handle;
 
-	if (!wma_handle || !wma_handle->wmi_handle) {
-		wma_err("WMA is closed, can not clean-up roam synch");
+	if (wma_validate_handle(wma_handle))
 		return;
-	}
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return;
+
 	wlan_roam_debug_log(synch_fail->session_id,
 			    DEBUG_ROAM_SYNCH_FAIL,
 			    DEBUG_INVALID_PEER_ID, NULL, NULL, 0, 0);
@@ -1868,7 +1877,7 @@ wma_rso_print_trigger_info(struct wmi_roam_trigger_info *data, uint8_t vdev_id)
 
 	wma_get_trigger_detail_str(data, buf);
 	mlme_get_converted_timestamp(data->timestamp, time);
-	wma_info("%s [ROAM_TRIGGER]: VDEV[%d] %s", time, vdev_id, buf);
+	wma_nofl_info("%s [ROAM_TRIGGER]: VDEV[%d] %s", time, vdev_id, buf);
 
 	qdf_mem_free(buf);
 }
@@ -1889,9 +1898,9 @@ wma_rso_print_btm_rsp_info(struct roam_btm_response_data *data,
 	char time[TIME_STRING_LEN];
 
 	mlme_get_converted_timestamp(data->timestamp, time);
-	wma_info("%s [BTM RSP]: VDEV[%d], Status: %d, VSIE reason: %d, BSSID: "QDF_MAC_ADDR_FMT,
-		 time, vdev_id, data->btm_status, data->vsie_reason,
-		 QDF_MAC_ADDR_REF(data->target_bssid.bytes));
+	wma_nofl_info("%s [BTM RSP]: VDEV[%d], Status: %d, VSIE reason: %d, BSSID: " QDF_MAC_ADDR_FMT,
+		      time, vdev_id, data->btm_status, data->vsie_reason,
+		      QDF_MAC_ADDR_REF(data->target_bssid.bytes));
 }
 
 /**
@@ -1908,9 +1917,32 @@ static void
 wma_rso_print_roam_initial_info(struct roam_initial_data *data,
 				uint8_t vdev_id)
 {
-	wma_info("[ROAM INIT INFO]: VDEV[%d], roam_full_scan_count: %d, rssi_th: %d, cu_th: %d, fw_cancel_timer_bitmap: %d",
-		 vdev_id, data->roam_full_scan_count, data->rssi_th,
-		 data->cu_th, data->fw_cancel_timer_bitmap);
+	wma_nofl_info("[ROAM INIT INFO]: VDEV[%d], roam_full_scan_count: %d, rssi_th: %d, cu_th: %d, fw_cancel_timer_bitmap: %d",
+		      vdev_id, data->roam_full_scan_count, data->rssi_th,
+		      data->cu_th, data->fw_cancel_timer_bitmap);
+}
+
+/**
+ * wma_rso_print_roam_msg_info - Roaming related message details
+ * @data:    Pointer to the btm rsp data
+ * @vdev_id: vdev id
+ *
+ * Prints the vdev, msg_id, msg_param1, msg_param2 and timer
+ *
+ * Return: None
+ */
+static void wma_rso_print_roam_msg_info(struct roam_msg_info *data,
+					uint8_t vdev_id)
+{
+	char time[TIME_STRING_LEN];
+	static const char msg_id1_str[] = "Roam RSSI TH Reset";
+
+	if (data->msg_id == WMI_ROAM_MSG_RSSI_RECOVERED) {
+		mlme_get_converted_timestamp(data->timestamp, time);
+		wma_info("%s [ROAM MSG INFO]: VDEV[%d] %s, Current rssi: %d dbm, next_rssi_threshold: %d dbm",
+			 time, vdev_id, msg_id1_str, data->msg_param1,
+			 data->msg_param2);
+	}
 }
 
 /**
@@ -2013,9 +2045,9 @@ wma_rso_print_scan_info(struct wmi_roam_scan_data *scan, uint8_t vdev_id,
 			    scan->next_rssi_threshold);
 
 	mlme_get_converted_timestamp(timestamp, time);
-	wma_info("%s [ROAM_SCAN]: VDEV[%d] Scan_type: %s %s %s",
-		 time, vdev_id, mlme_get_roam_scan_type_str(scan->type),
-		 buf1, buf);
+	wma_nofl_info("%s [ROAM_SCAN]: VDEV[%d] Scan_type: %s %s %s",
+		      time, vdev_id, mlme_get_roam_scan_type_str(scan->type),
+		      buf1, buf);
 	wma_log_roam_scan_candidates(scan->ap, scan->num_ap);
 
 	qdf_mem_free(buf);
@@ -2047,8 +2079,9 @@ wma_rso_print_roam_result(struct wmi_roam_result *res,
 			    mlme_get_roam_fail_reason_str(res->fail_reason));
 
 	mlme_get_converted_timestamp(res->timestamp, time);
-	wma_info("%s [ROAM_RESULT]: VDEV[%d] %s %s",
-		 time, vdev_id, mlme_get_roam_status_str(res->status), buf);
+	wma_nofl_info("%s [ROAM_RESULT]: VDEV[%d] %s %s",
+		      time, vdev_id, mlme_get_roam_status_str(res->status),
+		      buf);
 
 	qdf_mem_free(buf);
 }
@@ -2099,17 +2132,18 @@ wma_rso_print_11kv_info(struct wmi_neighbor_report_data *neigh_rpt,
 	}
 
 	mlme_get_converted_timestamp(neigh_rpt->req_time, time);
-	wma_info("%s [%s] VDEV[%d]", time,
-		 (type == 1) ? "BTM_QUERY" : "NEIGH_RPT_REQ", vdev_id);
+	wma_nofl_info("%s [%s] VDEV[%d]", time,
+		      (type == 1) ? "BTM_QUERY" : "NEIGH_RPT_REQ", vdev_id);
 
 	if (neigh_rpt->resp_time) {
 		mlme_get_converted_timestamp(neigh_rpt->resp_time, time1);
-		wma_info("%s [%s] VDEV[%d] %s", time1,
-			 (type == 1) ? "BTM_REQ" : "NEIGH_RPT_RSP", vdev_id,
-			 (num_ch > 0) ? buf : "NO Ch update");
+		wma_nofl_info("%s [%s] VDEV[%d] %s", time1,
+			      (type == 1) ? "BTM_REQ" : "NEIGH_RPT_RSP",
+			      vdev_id,
+			      (num_ch > 0) ? buf : "NO Ch update");
 	} else {
-		wma_info("%s No response received from AP",
-			 (type == 1) ? "BTM" : "NEIGH_RPT");
+		wma_nofl_info("%s No response received from AP",
+			      (type == 1) ? "BTM" : "NEIGH_RPT");
 	}
 	qdf_mem_free(buf);
 }
@@ -2122,7 +2156,7 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 	wmi_roam_stats_event_fixed_param *fixed_param;
 	struct mlme_roam_debug_info *roam_info = NULL;
 	uint8_t vdev_id, i;
-	uint8_t num_tlv = 0, num_chan = 0, num_ap = 0, num_rpt = 0;
+	uint8_t num_tlv = 0, num_chan = 0, num_ap = 0, num_rpt = 0, rem_tlv = 0;
 	uint32_t rem_len;
 	QDF_STATUS status;
 
@@ -2216,26 +2250,12 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 		goto err;
 	}
 
-	if (!num_tlv) {
-		roam_info = qdf_mem_malloc(sizeof(*roam_info));
-		if (!roam_info)
-			return -ENOMEM;
-
-		status = wmi_unified_extract_roam_11kv_stats(
-					wma->wmi_handle, event,
-					&roam_info->data_11kv, 0, 0);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_debug("Roam 11kv stats extract failed vdev %d",
-				  vdev_id);
-			qdf_mem_free(roam_info);
-			goto err;
-		}
-
-		if (roam_info->data_11kv.present)
-			wma_rso_print_11kv_info(&roam_info->data_11kv, vdev_id);
-
-		qdf_mem_free(roam_info);
-		return 0;
+	rem_len -= param_buf->num_roam_initial_info *
+			sizeof(wmi_roam_initial_info);
+	if (rem_len < param_buf->num_roam_msg_info *
+	    sizeof(wmi_roam_msg_info)) {
+		wma_err_rl("Invalid roam msg info");
+		goto err;
 	}
 
 	for (i = 0; i < num_tlv; i++) {
@@ -2251,8 +2271,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 						wma->wmi_handle, event,
 						&roam_info->trigger, i);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_debug("Extract roam trigger stats failed vdev %d at %d iteration",
-				  vdev_id, i);
+			wma_debug_rl("Extract roam trigger stats failed vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -2263,8 +2283,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 							&roam_info->scan, i,
 							num_chan, num_ap);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_debug("Roam scan stats extract failed vdev %d at %d iteration",
-				  vdev_id, i);
+			wma_debug_rl("Roam scan stats extract failed vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -2276,8 +2296,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 							wma->wmi_handle, event,
 							&roam_info->result, i);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_debug("Roam result stats extract failed vdev %d at %d iteration",
-				  vdev_id, i);
+			wma_debug_rl("Roam result stats extract failed vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -2288,8 +2308,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 							   &roam_info->btm_rsp,
 							   i);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_debug("Roam btm rsp stats extract fail vdev %d at %d iteration",
-				  vdev_id, i);
+			wma_debug_rl("Roam btm rsp stats extract fail vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -2299,8 +2319,19 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 				wma->wmi_handle, event,
 				&roam_info->roam_init_info, i);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_debug("Initial roam stats extract fail vdev %d at %d iteration",
-				  vdev_id, i);
+			wma_debug_rl("Initial roam stats extract fail vdev %d at %d iteration",
+				     vdev_id, i);
+			qdf_mem_free(roam_info);
+			return -EINVAL;
+		}
+
+		/* Roam message info */
+		status = wlan_cm_roam_extract_roam_msg_info(
+				wma->wmi_handle, event,
+				&roam_info->roam_msg_info, i);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("roam msg stats extract fail vdev %d",
+				vdev_id);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -2310,8 +2341,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 				wma->wmi_handle, event,
 				&roam_info->data_11kv, i, num_rpt);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_debug("Roam 11kv stats extract failed vdev %d at %d iteration",
-				  vdev_id, i);
+			wma_debug_rl("Roam 11kv stats extract failed vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -2341,7 +2372,104 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 			wma_rso_print_roam_initial_info(
 					&roam_info->roam_init_info, vdev_id);
 
+		if (roam_info->roam_msg_info.present) {
+			rem_tlv++;
+			wma_rso_print_roam_msg_info(
+					&roam_info->roam_msg_info, vdev_id);
+		}
+
 		qdf_mem_free(roam_info);
+	}
+
+	if (!num_tlv) {
+		roam_info = qdf_mem_malloc(sizeof(*roam_info));
+		if (!roam_info)
+			return -ENOMEM;
+
+		status = wmi_unified_extract_roam_11kv_stats(
+					wma->wmi_handle, event,
+					&roam_info->data_11kv, 0, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("Roam 11kv stats extract failed vdev %d",
+				vdev_id);
+			qdf_mem_free(roam_info);
+			return -EINVAL;
+		}
+
+		status = wmi_unified_extract_roam_trigger_stats(
+						wma->wmi_handle, event,
+						&roam_info->trigger, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug_rl("Extract roam trigger stats failed vdev %d",
+				     vdev_id);
+			qdf_mem_free(roam_info);
+			return -EINVAL;
+		}
+
+		status = wmi_unified_extract_roam_scan_stats(wma->wmi_handle,
+							     event,
+							     &roam_info->scan,
+							     0, 0, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug_rl("Roam scan stats extract failed vdev %d",
+				     vdev_id);
+			qdf_mem_free(roam_info);
+			return -EINVAL;
+		}
+
+		status = wlan_cm_roam_extract_btm_response(wma->wmi_handle,
+							   event,
+							   &roam_info->btm_rsp,
+							   0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug_rl("Roam btm rsp stats extract fail vdev %d",
+				     vdev_id);
+			qdf_mem_free(roam_info);
+			return -EINVAL;
+		}
+
+		/* Driver debug logs */
+		if (roam_info->data_11kv.present)
+			wma_rso_print_11kv_info(&roam_info->data_11kv, vdev_id);
+
+		if (roam_info->trigger.present)
+			wma_rso_print_trigger_info(&roam_info->trigger,
+						   vdev_id);
+
+		if (roam_info->scan.present && roam_info->trigger.present)
+			wma_rso_print_scan_info(&roam_info->scan, vdev_id,
+					roam_info->trigger.trigger_reason,
+					roam_info->trigger.timestamp);
+
+		if (roam_info->btm_rsp.present)
+			wma_rso_print_btm_rsp_info(&roam_info->btm_rsp,
+						   vdev_id);
+
+		qdf_mem_free(roam_info);
+	}
+
+	if (param_buf->roam_msg_info && param_buf->num_roam_msg_info &&
+	    param_buf->num_roam_msg_info - rem_tlv) {
+		for (i = 0; i < (param_buf->num_roam_msg_info - rem_tlv); i++) {
+			roam_info = qdf_mem_malloc(sizeof(*roam_info));
+			if (!roam_info)
+				return -ENOMEM;
+			status = wlan_cm_roam_extract_roam_msg_info(
+					wma->wmi_handle, event,
+					&roam_info->roam_msg_info, rem_tlv + i);
+			if (QDF_IS_STATUS_ERROR(status)) {
+				wma_err("roam msg stats extract fail vdev %d",
+					vdev_id);
+				qdf_mem_free(roam_info);
+				return -EINVAL;
+			}
+
+			if (roam_info->roam_msg_info.present)
+				wma_rso_print_roam_msg_info(
+						&roam_info->roam_msg_info,
+						vdev_id);
+			qdf_mem_free(roam_info);
+		}
 	}
 
 	return 0;
@@ -2490,17 +2618,19 @@ wma_roam_ho_fail_handler(tp_wma_handle wma, uint32_t vdev_id,
 void wma_process_roam_synch_complete(WMA_HANDLE handle, uint8_t vdev_id)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	struct wmi_unified *wmi_handle;
 
-	if (!wma_handle || !wma_handle->wmi_handle) {
-		wma_err("WMA is closed, can not issue roam synch cnf");
+	if (wma_validate_handle(wma_handle))
 		return;
-	}
+
+	wmi_handle = wma_handle->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return;
 
 	if (!wma_is_vdev_valid(vdev_id))
 		return;
 
-	if (wmi_unified_roam_synch_complete_cmd(wma_handle->wmi_handle,
-						vdev_id))
+	if (wmi_unified_roam_synch_complete_cmd(wmi_handle, vdev_id))
 		return;
 
 	DPTRACE(qdf_dp_trace_record_event(QDF_DP_TRACE_EVENT_RECORD,
@@ -2768,10 +2898,9 @@ int wma_extscan_wow_event_callback(void *handle, void *event, uint32_t len)
  */
 void wma_register_extscan_event_handler(tp_wma_handle wma_handle)
 {
-	if (!wma_handle) {
-		wma_err("extscan wma_handle is NULL");
+	if (wma_validate_handle(wma_handle))
 		return;
-	}
+
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   wmi_extscan_start_stop_event_id,
 					   wma_extscan_start_stop_event_handler,
@@ -2833,10 +2962,9 @@ int wma_extscan_start_stop_event_handler(void *handle,
 	uint16_t event_type;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mac) {
-		wma_err("Invalid mac");
+	if (!mac)
 		return -EINVAL;
-	}
+
 	if (!mac->sme.ext_scan_ind_cb) {
 		wma_err("Callback not registered");
 		return -EINVAL;
@@ -2930,10 +3058,9 @@ int wma_extscan_operations_event_handler(void *handle,
 	uint32_t cnt;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mac) {
-		wma_err("Invalid mac");
+	if (!mac)
 		return -EINVAL;
-	}
+
 	if (!mac->sme.ext_scan_ind_cb) {
 		wma_err("Callback not registered");
 		return -EINVAL;
@@ -3038,10 +3165,9 @@ int wma_extscan_table_usage_event_handler(void *handle,
 	tSirExtScanResultsAvailableIndParams *tbl_usg_ind;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mac) {
-		wma_err("Invalid mac");
+	if (!mac)
 		return -EINVAL;
-	}
+
 	if (!mac->sme.ext_scan_ind_cb) {
 		wma_err("Callback not registered");
 		return -EINVAL;
@@ -3090,10 +3216,9 @@ int wma_extscan_capabilities_event_handler(void *handle,
 	struct ext_scan_capabilities_response  *dest_capab;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mac) {
-		wma_err("Invalid mac");
+	if (!mac)
 		return -EINVAL;
-	}
+
 	if (!mac->sme.ext_scan_ind_cb) {
 		wma_err("Callback not registered");
 		return -EINVAL;
@@ -3195,10 +3320,9 @@ int wma_extscan_hotlist_match_event_handler(void *handle,
 	uint32_t buf_len;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
-	if (!mac) {
-		wma_err("Invalid mac");
+	if (!mac)
 		return -EINVAL;
-	}
+
 	if (!mac->sme.ext_scan_ind_cb) {
 		wma_err("Callback not registered");
 		return -EINVAL;
@@ -3879,12 +4003,16 @@ QDF_STATUS wma_start_extscan(tp_wma_handle wma,
 			     struct wifi_scan_cmd_req_params *params)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue cmd");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
-	if (!wmi_service_enabled(wma->wmi_handle, wmi_service_extscan)) {
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("extscan not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -3894,7 +4022,7 @@ QDF_STATUS wma_start_extscan(tp_wma_handle wma,
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	status = wmi_unified_start_extscan_cmd(wma->wmi_handle, params);
+	status = wmi_unified_start_extscan_cmd(wmi_handle, params);
 	if (QDF_IS_STATUS_SUCCESS(status))
 		wma->interfaces[params->vdev_id].extscan_in_progress = true;
 
@@ -3907,17 +4035,21 @@ QDF_STATUS wma_stop_extscan(tp_wma_handle wma,
 			    struct extscan_stop_req_params *params)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, cannot issue cmd");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
-	if (!wmi_service_enabled(wma->wmi_handle, wmi_service_extscan)) {
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("extscan not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	status = wmi_unified_stop_extscan_cmd(wma->wmi_handle, params);
+	status = wmi_unified_stop_extscan_cmd(wmi_handle, params);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
@@ -3931,39 +4063,46 @@ QDF_STATUS wma_stop_extscan(tp_wma_handle wma,
 QDF_STATUS wma_extscan_start_hotlist_monitor(tp_wma_handle wma,
 			struct extscan_bssid_hotlist_set_params *params)
 {
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue hotlist cmd");
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
 
 	if (!params) {
 		wma_err("Invalid params");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	return wmi_unified_extscan_start_hotlist_monitor_cmd(wma->wmi_handle,
+	return wmi_unified_extscan_start_hotlist_monitor_cmd(wmi_handle,
 							     params);
 }
 
 QDF_STATUS wma_extscan_stop_hotlist_monitor(tp_wma_handle wma,
 		    struct extscan_bssid_hotlist_reset_params *params)
 {
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue cmd");
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
 
 	if (!params) {
 		wma_err("Invalid params");
 		return QDF_STATUS_E_INVAL;
 	}
-	if (!wmi_service_enabled(wma->wmi_handle,
-				 wmi_service_extscan)) {
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("extscan not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	return wmi_unified_extscan_stop_hotlist_monitor_cmd(wma->wmi_handle,
+	return wmi_unified_extscan_stop_hotlist_monitor_cmd(wmi_handle,
 							    params);
 }
 
@@ -3972,18 +4111,21 @@ wma_extscan_start_change_monitor(tp_wma_handle wma,
 			struct extscan_set_sig_changereq_params *params)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed,can not issue cmd");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
 
 	if (!params) {
 		wma_err("NULL params");
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	status = wmi_unified_extscan_start_change_monitor_cmd(wma->wmi_handle,
+	status = wmi_unified_extscan_start_change_monitor_cmd(wmi_handle,
 							      params);
 	return status;
 }
@@ -3991,17 +4133,21 @@ wma_extscan_start_change_monitor(tp_wma_handle wma,
 QDF_STATUS wma_extscan_stop_change_monitor(tp_wma_handle wma,
 			struct extscan_capabilities_reset_params *params)
 {
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue cmd");
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
-	if (!wmi_service_enabled(wma->wmi_handle,
-				    wmi_service_extscan)) {
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("ext scan not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	return wmi_unified_extscan_stop_change_monitor_cmd(wma->wmi_handle,
+	return wmi_unified_extscan_stop_change_monitor_cmd(wmi_handle,
 							   params);
 }
 
@@ -4009,16 +4155,21 @@ QDF_STATUS
 wma_extscan_get_cached_results(tp_wma_handle wma,
 			       struct extscan_cached_result_params *params)
 {
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, cannot issue cmd");
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
-	if (!wmi_service_enabled(wma->wmi_handle, wmi_service_extscan)) {
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("extscan not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	return wmi_unified_extscan_get_cached_results_cmd(wma->wmi_handle,
+	return wmi_unified_extscan_get_cached_results_cmd(wmi_handle,
 							  params);
 }
 
@@ -4026,16 +4177,21 @@ QDF_STATUS
 wma_extscan_get_capabilities(tp_wma_handle wma,
 			     struct extscan_capabilities_params *params)
 {
-	if (!wma || !wma->wmi_handle) {
-		wma_er("WMA is closed, can not issue cmd");
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
-	if (!wmi_service_enabled(wma->wmi_handle, wmi_service_extscan)) {
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("extscan not enabled");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	return wmi_unified_extscan_get_capabilities_cmd(wma->wmi_handle,
+	return wmi_unified_extscan_get_capabilities_cmd(wmi_handle,
 							params);
 }
 
@@ -4043,20 +4199,23 @@ QDF_STATUS wma_set_epno_network_list(tp_wma_handle wma,
 				     struct wifi_enhanced_pno_params *req)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
 	wma_debug("Enter");
 
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue cmd");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_FAILURE;
-	}
 
-	if (!wmi_service_enabled(wma->wmi_handle, wmi_service_extscan)) {
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_FAILURE;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("extscan not enabled");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
-	status = wmi_unified_set_epno_network_list_cmd(wma->wmi_handle, req);
+	status = wmi_unified_set_epno_network_list_cmd(wmi_handle, req);
 	wma_debug("Exit, vdev %d, status %d", req->vdev_id, status);
 
 	return status;
@@ -4067,19 +4226,23 @@ wma_set_passpoint_network_list(tp_wma_handle wma,
 			       struct wifi_passpoint_req_param *params)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
 	wma_debug("Enter");
 
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue cmd");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_FAILURE;
-	}
-	if (!wmi_service_enabled(wma->wmi_handle, wmi_service_extscan)) {
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_FAILURE;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("extscan not enabled");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
-	status = wmi_unified_set_passpoint_network_list_cmd(wma->wmi_handle,
+	status = wmi_unified_set_passpoint_network_list_cmd(wmi_handle,
 							    params);
 	wma_debug("Exit, vdev %d, status %d", params->vdev_id, status);
 
@@ -4091,19 +4254,23 @@ wma_reset_passpoint_network_list(tp_wma_handle wma,
 				 struct wifi_passpoint_req_param *params)
 {
 	QDF_STATUS status;
+	struct wmi_unified *wmi_handle;
 
 	wma_debug("Enter");
 
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue cmd");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_FAILURE;
-	}
-	if (!wmi_service_enabled(wma->wmi_handle, wmi_service_extscan)) {
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_FAILURE;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_extscan)) {
 		wma_err("extscan not enabled");
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
-	status = wmi_unified_reset_passpoint_network_list_cmd(wma->wmi_handle,
+	status = wmi_unified_reset_passpoint_network_list_cmd(wmi_handle,
 							      params);
 	wma_debug("Exit, vdev %d, status %d", params->vdev_id, status);
 
@@ -4115,17 +4282,21 @@ wma_reset_passpoint_network_list(tp_wma_handle wma,
 QDF_STATUS wma_scan_probe_setoui(tp_wma_handle wma,
 				 struct scan_mac_oui *set_oui)
 {
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue cmd");
+	struct wmi_unified *wmi_handle;
+
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
 
 	if (!wma_is_vdev_valid(set_oui->vdev_id)) {
 		wma_err("vdev_id: %d is not active", set_oui->vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	return wmi_unified_scan_probe_setoui_cmd(wma->wmi_handle, set_oui);
+	return wmi_unified_scan_probe_setoui_cmd(wmi_handle, set_oui);
 }
 
 /**
@@ -4456,10 +4627,8 @@ int wma_roam_event_callback(WMA_HANDLE handle, uint8_t *event_buf,
 QDF_STATUS wma_set_gateway_params(tp_wma_handle wma,
 				  struct gateway_update_req_param *req)
 {
-	if (!wma) {
-		wma_err("wma handle is NULL");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
 
 	return wmi_unified_set_gateway_params_cmd(wma->wmi_handle, req);
 }
@@ -4720,10 +4889,8 @@ int wma_handle_btm_blacklist_event(void *handle, uint8_t *cmd_param_info,
 #if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_FIPS)
 void wma_register_pmkid_req_event_handler(tp_wma_handle wma_handle)
 {
-	if (!wma_handle) {
-		wma_err("pmkid req wma_handle is NULL");
+	if (wma_validate_handle(wma_handle))
 		return;
-	}
 
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   wmi_roam_pmkid_request_event_id,
