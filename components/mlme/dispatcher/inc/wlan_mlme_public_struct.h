@@ -1213,7 +1213,6 @@ struct wlan_mlme_ratemask {
  * @bigtk_support: Whether BIGTK is supported or not
  * @stop_all_host_scan_support: Target capability that indicates if the target
  * supports stop all host scan request type.
- * @peer_create_conf_support: Peer create confirmation command support
  * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
  * @sae_connect_retries: sae connect retry bitmask
  * @wls_6ghz_capable: wifi location service(WLS) is 6ghz capable
@@ -1256,7 +1255,6 @@ struct wlan_mlme_generic {
 	uint8_t dfs_chan_ageout_time;
 	bool bigtk_support;
 	bool stop_all_host_scan_support;
-	bool peer_create_conf_support;
 	bool dual_sta_roam_fw_support;
 	uint32_t sae_connect_retries;
 	bool wls_6ghz_capable;
@@ -1339,6 +1337,8 @@ struct wlan_mlme_acs {
  * @is_twt_enabled: global twt configuration
  * @is_twt_responder_enabled: twt responder
  * @is_twt_requestor_enabled: twt requestor
+ * @is_bcast_responder_enabled: bcast responder enable/disable
+ * @is_bcast_requestor_enabled: bcast requestor enable/disable
  * @twt_congestion_timeout: congestion timeout value
  */
 struct wlan_mlme_cfg_twt {
@@ -1346,6 +1346,8 @@ struct wlan_mlme_cfg_twt {
 	bool is_twt_enabled;
 	bool is_twt_responder_enabled;
 	bool is_twt_requestor_enabled;
+	bool is_bcast_responder_enabled;
+	bool is_bcast_requestor_enabled;
 	uint32_t twt_congestion_timeout;
 };
 

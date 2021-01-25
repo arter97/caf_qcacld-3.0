@@ -1414,6 +1414,7 @@ TDLS_OBJS := $(TDLS_DIR)/core/src/wlan_tdls_main.o \
        $(TDLS_DIR)/dispatcher/src/wlan_tdls_ucfg_api.o \
        $(TDLS_DIR)/dispatcher/src/wlan_tdls_utils_api.o \
        $(TDLS_DIR)/dispatcher/src/wlan_tdls_cfg.o \
+       $(TDLS_DIR)/dispatcher/src/wlan_tdls_api.o \
        $(TDLS_OS_IF_SRC)/wlan_cfg80211_tdls.o \
        $(TDLS_TARGET_IF_SRC)/target_if_tdls.o
 endif
@@ -2568,9 +2569,12 @@ cppflags-$(CONFIG_DIRECT_BUF_RX_ENABLE) += -DDBR_MULTI_SRNG_ENABLE
 endif
 cppflags-$(CONFIG_WMI_CMD_STRINGS) += -DWMI_CMD_STRINGS
 cppflags-$(CONFIG_WLAN_FEATURE_TWT) += -DWLAN_SUPPORT_TWT
+
 ifdef CONFIG_WLAN_TWT_SAP_STA_COUNT
-ccflags-y += -DWLAN_TWT_SAP_STA_COUNT=$(CONFIG_WLAN_TWT_SAP_STA_COUNT)
+WLAN_TWT_SAP_STA_COUNT ?= 32
+ccflags-y += -DWLAN_TWT_SAP_STA_COUNT=$(WLAN_TWT_SAP_STA_COUNT)
 endif
+
 cppflags-$(CONFIG_WLAN_TWT_SAP_PDEV_COUNT) += -DWLAN_TWT_AP_PDEV_COUNT_NUM_PHY
 cppflags-$(CONFIG_WLAN_DISABLE_EXPORT_SYMBOL) += -DWLAN_DISABLE_EXPORT_SYMBOL
 cppflags-$(CONFIG_WIFI_POS_CONVERGED) += -DWIFI_POS_CONVERGED
@@ -3225,6 +3229,8 @@ cppflags-y += -DENABLE_HAL_SOC_STATS
 cppflags-y += -DENABLE_HAL_REG_WR_HISTORY
 cppflags-y += -DDP_RX_DESC_COOKIE_INVALIDATE
 cppflags-y += -DMON_ENABLE_DROP_FOR_MAC
+cppflags-y += -DPCI_LINK_STATUS_SANITY
+cppflags-y += -DDP_MON_RSSI_IN_DBM
 endif
 
 # Enable Low latency optimisation mode
@@ -3406,7 +3412,7 @@ cppflags-$(CONFIG_WLAN_DP_PENDING_MEM_FLUSH) += -DWLAN_DP_PENDING_MEM_FLUSH
 cppflags-$(CONFIG_WLAN_SUPPORT_DATA_STALL) += -DWLAN_SUPPORT_DATA_STALL
 cppflags-$(CONFIG_WLAN_SUPPORT_TXRX_HL_BUNDLE) += -DWLAN_SUPPORT_TXRX_HL_BUNDLE
 cppflags-$(CONFIG_QCN7605_PCIE_SHADOW_REG_SUPPORT) += -DQCN7605_PCIE_SHADOW_REG_SUPPORT
-cppflags-$(CONFIG_SEND_ICMP_PKT_TO_FW) += -DWLAN_DP_FEATURE_SEND_ICMP_TO_FW
+cppflags-$(CONFIG_MARK_ICMP_REQ_TO_FW) += -DWLAN_DP_FEATURE_MARK_ICMP_REQ_TO_FW
 
 ifdef CONFIG_MAX_LOGS_PER_SEC
 ccflags-y += -DWLAN_MAX_LOGS_PER_SEC=$(CONFIG_MAX_LOGS_PER_SEC)
@@ -3560,7 +3566,7 @@ ccflags-y += -DMAX_BCN_PROBE_IN_SCAN_QUEUE=$(CONFIG_MAX_BCN_PROBE_IN_SCAN_QUEUE)
 #
 # Value 0 represents no limit and any non zero value represents the maximum
 # size of the work queue.
-CONFIG_RX_DIAG_WQ_MAX_SIZE ?= 0
+CONFIG_RX_DIAG_WQ_MAX_SIZE ?= 1000
 ccflags-y += -DRX_DIAG_WQ_MAX_SIZE=$(CONFIG_RX_DIAG_WQ_MAX_SIZE)
 
 CONFIG_MGMT_DESC_POOL_MAX ?= 64

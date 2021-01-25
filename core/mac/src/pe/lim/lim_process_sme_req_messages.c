@@ -2306,7 +2306,7 @@ void __lim_process_sme_disassoc_cnf(struct mac_context *mac, uint32_t *msg_buf)
 
 		/* Delete FT session if there exists one */
 		lim_ft_cleanup_pre_auth_info(mac, pe_session);
-		lim_cleanup_rx_path(mac, sta, pe_session);
+		lim_cleanup_rx_path(mac, sta, pe_session, true);
 
 		lim_clean_up_disassoc_deauth_req(mac,
 				 (char *)&smeDisassocCnf.peer_macaddr, 0);
@@ -2574,6 +2574,8 @@ void lim_delete_all_peers(struct pe_session *session)
 		}
 	}
 	lim_disconnect_complete(session, false);
+	if (mac_ctx->del_peers_ind_cb)
+		mac_ctx->del_peers_ind_cb(mac_ctx->psoc, session->vdev_id);
 }
 
 QDF_STATUS lim_sta_send_del_bss(struct pe_session *session)

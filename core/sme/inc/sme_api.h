@@ -683,26 +683,6 @@ QDF_STATUS sme_roam_get_wpa_rsn_req_ie(mac_handle_t mac_handle,
 				       uint8_t session_id,
 				       uint32_t *len, uint8_t *buf);
 
-/**
- * sme_roam_get_wpa_rsn_rsp_ie() - Retrieve WPA/RSN Response IE
- * @mac_handle: Opaque handle to the global MAC context
- * @session_id: ID of the specific session
- * @len: Caller allocated memory that has the length of @buf as input.
- *	Upon returned, @len has the length of the IE store in @buf
- * @buf: Caller allocated memory that contain the IE field, if any,
- *	upon return
- *
- * A wrapper function to request CSR to return the WPA or RSN IE CSR
- * passes to PE to JOIN request or START_BSS request
- * This is a synchronous call.
- *
- * Return: QDF_STATUS - when fail, it usually means the buffer allocated is not
- *			 big enough
- */
-QDF_STATUS sme_roam_get_wpa_rsn_rsp_ie(mac_handle_t mac_handle,
-				       uint8_t session_id,
-				       uint32_t *len, uint8_t *buf);
-
 QDF_STATUS sme_get_config_param(mac_handle_t mac_handle,
 				struct sme_config_params *pParam);
 QDF_STATUS sme_get_snr(mac_handle_t mac_handle,
@@ -2151,6 +2131,19 @@ void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
 void sme_set_pdev_ht_vht_ies(mac_handle_t mac_handle, bool enable2x2);
 
 /**
+ * sme_get_sap_vdev_type_nss() - get the sap nss per vdev type
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_nss: Pointer to vdev_nss
+ * @band: 5G or 2.4G band
+ *
+ * Get SAP vdev nss
+ *
+ * Return: None
+ */
+void sme_get_sap_vdev_type_nss(mac_handle_t mac_handle, uint8_t *vdev_nss,
+			       enum band_info band);
+
+/**
  * sme_update_vdev_type_nss() - sets the nss per vdev type
  * @mac_handle: Opaque handle to the global MAC context
  * @max_supp_nss: max_supported Nss
@@ -2399,6 +2392,20 @@ QDF_STATUS sme_get_nud_debug_stats(mac_handle_t mac_handle,
 QDF_STATUS sme_set_nud_debug_stats_cb(mac_handle_t mac_handle,
 			void (*cb)(void *, struct rsp_stats *, void *context),
 			void *context);
+
+/**
+ * sme_set_del_peers_ind_callback() - Register del peers ind callback
+ * @mac_handle - MAC global handle
+ * @callback_routine - callback routine from HDD
+ *
+ * This API is invoked by HDD to register its callback to mac
+ *
+ * Return: QDF_STATUS
+ */
+void
+sme_set_del_peers_ind_callback(mac_handle_t mac_handle,
+			       void (*callback)(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id));
 
 /**
  * sme_set_chan_info_callback() - Register chan info callback
@@ -3607,7 +3614,7 @@ static inline void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
  * sme_get_mcs_idx() - gets mcs index
  * @raw_rate: raw rate from fw
  * @rate_flags: rate flags
- * @he_mcs_12_13_map: he mcs12/13 map
+ * @is_he_mcs_12_13_supported: is he mcs12/13 supported
  * @nss: number of nss
  * @dcm: dcm will be calculated from rate
  * @guard_interval: guard interval info from rate
@@ -3616,7 +3623,7 @@ static inline void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
  * Return: return mcs index
  */
 uint8_t sme_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
-			uint16_t he_mcs_12_13_map,
+			bool is_he_mcs_12_13_supported,
 			uint8_t *nss, uint8_t *dcm,
 			enum txrate_gi *guard_interval,
 			enum tx_rate_info *mcs_rate_flags);

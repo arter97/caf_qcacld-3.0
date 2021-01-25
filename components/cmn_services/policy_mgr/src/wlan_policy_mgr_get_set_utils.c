@@ -2166,7 +2166,7 @@ uint32_t policy_mgr_get_mode_specific_conn_info(
 		policy_mgr_err("Invalid Context");
 		return count;
 	}
-	if (!ch_freq_list || !vdev_id) {
+	if (!vdev_id) {
 		policy_mgr_err("Null pointer error");
 		return count;
 	}
@@ -2175,13 +2175,16 @@ uint32_t policy_mgr_get_mode_specific_conn_info(
 				psoc, mode, list);
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	if (count == 1) {
-		*ch_freq_list = pm_conc_connection_list[list[index]].freq;
+		if (ch_freq_list)
+			*ch_freq_list =
+				pm_conc_connection_list[list[index]].freq;
 		*vdev_id =
 			pm_conc_connection_list[list[index]].vdev_id;
 	} else {
 		for (index = 0; index < count; index++) {
-			ch_freq_list[index] = pm_conc_connection_list[
-						      list[index]].freq;
+			if (ch_freq_list)
+				ch_freq_list[index] =
+			pm_conc_connection_list[list[index]].freq;
 
 			vdev_id[index] =
 			pm_conc_connection_list[list[index]].vdev_id;
@@ -3940,6 +3943,40 @@ bool policy_mgr_is_force_scc(struct wlan_objmgr_psoc *psoc)
 		QDF_MCC_TO_SCC_WITH_PREFERRED_BAND));
 }
 
+bool policy_mgr_is_sap_allowed_on_dfs_chan(struct wlan_objmgr_pdev *pdev,
+					   uint8_t vdev_id, uint8_t channel)
+{
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t sta_sap_scc_on_dfs_chan;
+	uint32_t sta_cnt, gc_cnt;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return false;
+
+	sta_sap_scc_on_dfs_chan =
+		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
+	sta_cnt = policy_mgr_mode_specific_connection_count(psoc,
+							    PM_STA_MODE, NULL);
+	gc_cnt = policy_mgr_mode_specific_connection_count(psoc,
+						PM_P2P_CLIENT_MODE, NULL);
+
+	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, sta_cnt %u, gc_cnt %u",
+		  sta_sap_scc_on_dfs_chan, sta_cnt, gc_cnt);
+
+	/* if sta_sap_scc_on_dfs_chan ini is set, DFS master capability is
+	 * assumed disabled in the driver.
+	 */
+	if ((wlan_reg_get_channel_state(pdev, channel) == CHANNEL_STATE_DFS) &&
+	    !sta_cnt && !gc_cnt && sta_sap_scc_on_dfs_chan &&
+	    !policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id)) {
+		policy_mgr_err("SAP not allowed on DFS channel if no dfs master capability!!");
+		return false;
+	}
+
+	return true;
+}
+
 bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 		struct wlan_objmgr_psoc *psoc)
 {
@@ -4323,7 +4360,9 @@ bool policy_mgr_is_sta_sap_scc(struct wlan_objmgr_psoc *psoc,
 		conn_index++) {
 		if (pm_conc_connection_list[conn_index].in_use &&
 				(pm_conc_connection_list[conn_index].mode ==
-				PM_STA_MODE) && (sap_freq ==
+				PM_STA_MODE ||
+				pm_conc_connection_list[conn_index].mode ==
+				PM_P2P_CLIENT_MODE) && (sap_freq ==
 				pm_conc_connection_list[conn_index].freq)) {
 			is_scc = true;
 			break;
@@ -4456,8 +4495,10 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 			connection[i].in_use &&
 			(connection[i].mode == PM_STA_MODE ||
 			connection[i].mode == PM_P2P_CLIENT_MODE);
-		is_same_mac = connection[i].mac == mac &&
-			      connection[i].freq != freq;
+
+		is_same_mac = connection[i].freq != freq &&
+			      (connection[i].mac == mac ||
+			       !policy_mgr_is_hw_dbs_capable(psoc));
 
 		if (is_sta_p2p_cli && is_same_mac) {
 			restart_required = true;

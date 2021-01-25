@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -960,6 +960,52 @@ static void wlan_hdd_fix_broadcast_eapol(struct hdd_adapter *adapter,
 }
 #endif /* HANDLE_BROADCAST_EAPOL_TX_FRAME */
 
+#ifdef WLAN_DP_FEATURE_MARK_ICMP_REQ_TO_FW
+/**
+ * hdd_mark_icmp_req_to_fw() - Mark the ICMP request at a certain time interval
+ *			       to be sent to the FW.
+ * @hdd_ctx: Global hdd context (Caller's responsibility to validate)
+ * @skb: packet to be transmitted
+ *
+ * This func sets the "to_fw" flag in the packet context block, if the
+ * current packet is an ICMP request packet. This marking is done at a
+ * specific time interval, unless the INI value indicates to disable/enable
+ * this for all frames.
+ *
+ * Return: none
+ */
+static void hdd_mark_icmp_req_to_fw(struct hdd_context *hdd_ctx,
+				    struct sk_buff *skb)
+{
+	uint64_t curr_time, time_delta;
+	int time_interval_ms = hdd_ctx->config->icmp_req_to_fw_mark_interval;
+	static uint64_t prev_marked_icmp_time;
+
+	if (!hdd_ctx->config->icmp_req_to_fw_mark_interval)
+		return;
+
+	if (qdf_nbuf_get_icmp_subtype(skb) != QDF_PROTO_ICMP_REQ)
+		return;
+
+	/* Mark all ICMP request to be sent to FW */
+	if (time_interval_ms == WLAN_CFG_ICMP_REQ_TO_FW_MARK_ALL)
+		QDF_NBUF_CB_TX_PACKET_TO_FW(skb) = 1;
+
+	curr_time = qdf_get_log_timestamp();
+	time_delta = curr_time - prev_marked_icmp_time;
+	if (time_delta >= (time_interval_ms *
+			   QDF_LOG_TIMESTAMP_CYCLES_PER_10_US * 100)) {
+		QDF_NBUF_CB_TX_PACKET_TO_FW(skb) = 1;
+		prev_marked_icmp_time = curr_time;
+	}
+}
+#else
+static void hdd_mark_icmp_req_to_fw(struct hdd_context *hdd_ctx,
+				    struct sk_buff *skb)
+{
+}
+#endif
+
 /**
  * __hdd_hard_start_xmit() - Transmit a frame
  * @skb: pointer to OS packet (sk_buff)
@@ -1052,15 +1098,9 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		}
 	} else if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) ==
 		   QDF_NBUF_CB_PACKET_TYPE_ICMP) {
-		subtype = qdf_nbuf_get_icmp_subtype(skb);
-		/*
-		 * Mark the ICMP requests to be sent to FW.
-		 * The decision on whether its actually sent to FW
-		 * is done in the DATAPATH layer.
-		 */
-		if (subtype == QDF_PROTO_ICMP_REQ)
-			QDF_NBUF_CB_TX_PACKET_TO_FW(skb) = 1;
+		hdd_mark_icmp_req_to_fw(hdd_ctx, skb);
 	}
+
 	/* track connectivity stats */
 	if (adapter->pkt_type_bitmap)
 		hdd_tx_rx_collect_connectivity_stats_info(skb, adapter,
@@ -2273,7 +2313,8 @@ QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
 	adapter->hdd_stats.tx_rx_stats.rx_non_aggregated++;
 
 	/* Account for GRO/LRO ineligible packets, mostly UDP */
-	hdd_ctx->no_rx_offload_pkt_cnt++;
+	if (qdf_nbuf_get_gso_segs(skb) == 0)
+		hdd_ctx->no_rx_offload_pkt_cnt++;
 
 	if (qdf_likely((hdd_ctx->enable_dp_rx_threads ||
 		        hdd_ctx->enable_rxthread) &&
@@ -2331,7 +2372,8 @@ QDF_STATUS hdd_rx_deliver_to_stack(struct hdd_adapter *adapter,
 	adapter->hdd_stats.tx_rx_stats.rx_non_aggregated++;
 
 	/* Account for GRO/LRO ineligible packets, mostly UDP */
-	hdd_ctx->no_rx_offload_pkt_cnt++;
+	if (qdf_nbuf_get_gso_segs(skb) == 0)
+		hdd_ctx->no_rx_offload_pkt_cnt++;
 
 	if (qdf_likely((hdd_ctx->enable_dp_rx_threads ||
 		        hdd_ctx->enable_rxthread) &&
@@ -2559,6 +2601,8 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 		skb->protocol = eth_type_trans(skb, skb->dev);
 		++adapter->hdd_stats.tx_rx_stats.rx_packets[cpu_index];
 		++adapter->stats.rx_packets;
+		/* count aggregated RX frame into stats */
+		adapter->stats.rx_packets += qdf_nbuf_get_gso_segs(skb);
 		adapter->stats.rx_bytes += skb->len;
 
 		/* Incr GW Rx count for NUD tracking based on GW mac addr */
@@ -3681,6 +3725,8 @@ void hdd_dp_cfg_update(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_DP_RX_WAKELOCK_TIMEOUT);
 	config->num_dp_rx_threads = cfg_get(psoc, CFG_DP_NUM_DP_RX_THREADS);
 	config->cfg_wmi_credit_cnt = cfg_get(psoc, CFG_DP_HTC_WMI_CREDIT_CNT);
+	config->icmp_req_to_fw_mark_interval =
+		cfg_get(psoc, CFG_DP_ICMP_REQ_TO_FW_MARK_INTERVAL);
 	hdd_dp_dp_trace_cfg_update(config, psoc);
 	hdd_dp_nud_tracking_cfg_update(config, psoc);
 }

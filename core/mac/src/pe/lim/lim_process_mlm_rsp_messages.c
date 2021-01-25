@@ -1281,7 +1281,7 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param)
 		 * make sure PE is sending eWNI_SME_JOIN_RSP
 		 * to SME
 		 */
-		lim_cleanup_rx_path(mac_ctx, sta_ds, session);
+		lim_cleanup_rx_path(mac_ctx, sta_ds, session, true);
 		qdf_mem_free(session->lim_join_req);
 		session->lim_join_req = NULL;
 		/* Cleanup if add bss failed */
@@ -2026,7 +2026,8 @@ static void lim_process_ap_mlm_add_bss_rsp(struct mac_context *mac,
 		pe_session->limSystemRole = eLIM_AP_ROLE;
 
 		sch_edca_profile_update(mac, pe_session);
-		lim_init_pre_auth_list(mac);
+		/* For dual AP case, delete pre auth node if any */
+		lim_delete_pre_auth_list(mac);
 		/* Check the SAP security configuration.If configured to
 		 * WEP then max clients supported is 16
 		 */

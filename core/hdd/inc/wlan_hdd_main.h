@@ -1439,6 +1439,8 @@ struct hdd_adapter {
 	ol_txrx_rx_fp rx_stack;
 
 	qdf_work_t netdev_features_update_work;
+	/* Flag to indicate whether it is a pre cac adapter or not */
+	bool is_pre_cac_adapter;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
@@ -1758,6 +1760,7 @@ struct hdd_adapter_ops_history {
  * @adapter_ops_wq: High priority workqueue for handling adapter operations
  * @multi_client_thermal_mitigation: Multi client thermal mitigation by fw
  * @disconnect_for_sta_mon_conc: disconnect if sta monitor intf concurrency
+ * @is_dual_mac_cfg_updated: indicate whether dual mac cfg has been updated
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -2100,6 +2103,7 @@ struct hdd_context {
 	bool multi_client_thermal_mitigation;
 #endif
 	bool disconnect_for_sta_mon_conc;
+	bool is_dual_mac_cfg_updated;
 };
 
 /**

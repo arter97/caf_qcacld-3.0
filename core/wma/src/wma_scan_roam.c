@@ -2880,7 +2880,9 @@ wma_roam_update_vdev(tp_wma_handle wma,
 
 	wma_delete_sta(wma, del_sta_params);
 	wma_delete_bss(wma, vdev_id);
-	wma_add_bss_peer_sta(vdev_id, roam_synch_ind_ptr->bssid.bytes);
+	wma_create_peer(wma, roam_synch_ind_ptr->bssid.bytes,
+			WMI_PEER_TYPE_DEFAULT, vdev_id);
+
 	/* Update new peer's uc cipher */
 	wma_update_roamed_peer_unicast_cipher(wma, uc_cipher, cipher_cap,
 					      roam_synch_ind_ptr->bssid.bytes);
@@ -4010,15 +4012,56 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 					wma->wmi_handle, event,
 					&roam_info->data_11kv, 0, 0);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Roam 11kv stats extract failed vdev %d",
-				vdev_id);
+			wma_debug_rl("Roam 11kv stats extract failed vdev %d",
+				     vdev_id);
 			qdf_mem_free(roam_info);
 			goto err;
 		}
 
+		status = wmi_unified_extract_roam_trigger_stats(
+						wma->wmi_handle, event,
+						&roam_info->trigger, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug_rl("Extract roam trigger stats failed vdev %d",
+				     vdev_id);
+			qdf_mem_free(roam_info);
+			return -EINVAL;
+		}
+
+		status = wmi_unified_extract_roam_scan_stats(wma->wmi_handle,
+							     event,
+							     &roam_info->scan,
+							     0, 0, 0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug_rl("Roam scan stats extract failed vdev %d",
+				     vdev_id);
+			qdf_mem_free(roam_info);
+			return -EINVAL;
+		}
+
+		status = wlan_cm_roam_extract_btm_response(wma->wmi_handle,
+							   event,
+							   &roam_info->btm_rsp,
+							   0);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_debug_rl("Roam btm rsp stats extract fail vdev %d",
+				     vdev_id);
+			qdf_mem_free(roam_info);
+			return -EINVAL;
+		}
 		if (roam_info->data_11kv.present)
 			wma_rso_print_11kv_info(&roam_info->data_11kv, vdev_id);
 
+		if (roam_info->trigger.present)
+			wma_rso_print_trigger_info(&roam_info->trigger,
+						   vdev_id);
+		if (roam_info->scan.present && roam_info->trigger.present)
+			wma_rso_print_scan_info(&roam_info->scan, vdev_id,
+					roam_info->trigger.trigger_reason,
+					roam_info->trigger.timestamp);
+		if (roam_info->btm_rsp.present)
+			wma_rso_print_btm_rsp_info(&roam_info->btm_rsp,
+						   vdev_id);
 		qdf_mem_free(roam_info);
 		return 0;
 	}
@@ -4036,8 +4079,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 						wma->wmi_handle, event,
 						&roam_info->trigger, i);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Extract roam trigger stats failed vdev%d",
-				vdev_id);
+			wma_debug_rl("Extract roam trigger stats failed vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -4048,8 +4091,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 							&roam_info->scan, i,
 							num_chan, num_ap);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Roam scan stats extract failed vdev %d",
-				vdev_id);
+			wma_debug_rl("Roam scan stats extract failed vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -4061,8 +4104,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 							wma->wmi_handle, event,
 							&roam_info->result, i);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Roam result stats extract failed vdev %d",
-				vdev_id);
+			wma_debug_rl("Roam result stats extract failed vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -4073,8 +4116,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 							   &roam_info->btm_rsp,
 							   i);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Roam btm rsp stats extract fail vdev %d",
-				vdev_id);
+			wma_debug_rl("Roam btm rsp stats extract fail vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -4084,8 +4127,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 				wma->wmi_handle, event,
 				&roam_info->roam_init_info, i);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Initial roam stats extract fail vdev %d",
-				vdev_id);
+			wma_debug_rl("Initial roam stats extract fail vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
@@ -4095,8 +4138,8 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 				wma->wmi_handle, event,
 				&roam_info->data_11kv, i, num_rpt);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("Roam 11kv stats extract failed vdev %d",
-				vdev_id);
+			wma_debug_rl("Roam 11kv stats extract failed vdev %d at %d iteration",
+				     vdev_id, i);
 			qdf_mem_free(roam_info);
 			return -EINVAL;
 		}
