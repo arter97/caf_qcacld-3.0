@@ -387,24 +387,40 @@ populate_dot11f_country(struct mac_context *mac,
 			tDot11fIECountry *ctry_ie, struct pe_session *pe_session)
 {
 	uint8_t code[REG_ALPHA2_LEN + 1];
-	qdf_freq_t cur_triplet_freq;
-	uint8_t cur_triplet_num_chans;
-	uint8_t cur_triplet_tx_power;
-	bool cur_triplet_valid;
-	enum reg_wifi_band cur_triplet_band;
-	int chan_enum;
+	uint8_t cur_triplet_num_chans = 0;
+	int chan_enum, chan_num, chan_spacing = 0;
 	struct regulatory_channel *cur_chan_list;
-	QDF_STATUS status;
+	struct regulatory_channel *cur_chan, *start, *prev;
+	enum reg_wifi_band rf_band = REG_BAND_UNKNOWN;
+	uint8_t buffer_triplets[81][3];
+	uint8_t i, j, num_triplets = 0;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	cur_chan_list = qdf_mem_malloc(NUM_CHANNELS * sizeof(*cur_chan_list));
 	if (!cur_chan_list)
 		return QDF_STATUS_E_NOMEM;
 
-	status = wlan_reg_get_current_chan_list(mac->pdev, cur_chan_list);
-	if (status != QDF_STATUS_SUCCESS) {
+	lim_get_rf_band_new(mac, &rf_band, pe_session);
+	switch (rf_band) {
+	case REG_BAND_2G:
+		chan_spacing = 1;
+		break;
+	case REG_BAND_5G:
+	case REG_BAND_6G:
+		chan_spacing = 4;
+		break;
+	case REG_BAND_UNKNOWN:
+		pe_err("Wrong reg band for country info");
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	chan_num = wlan_reg_get_band_channel_list(mac->pdev, BIT(rf_band),
+						  cur_chan_list);
+	if (!chan_num) {
 		pe_err("failed to get cur_chan list");
-		qdf_mem_free(cur_chan_list);
-		return status;
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
 	}
 
 	wlan_reg_read_current_country(mac->psoc, code);
@@ -413,84 +429,71 @@ populate_dot11f_country(struct mac_context *mac,
 	/* advertise global operating class */
 	ctry_ie->country[REG_ALPHA2_LEN] = 0x04;
 
-	cur_triplet_valid = false;
-	ctry_ie->num_triplets = 0;
-	for (chan_enum = 0; chan_enum < NUM_CHANNELS; chan_enum++) {
-		if (wlan_reg_is_6ghz_chan_freq(
-			    cur_chan_list[chan_enum].center_freq)) {
-			if (cur_triplet_valid) {
-				ctry_ie->triplets[ctry_ie->num_triplets][0] =
-					wlan_reg_freq_to_chan(mac->pdev,
-							      cur_triplet_freq);
-				ctry_ie->triplets[ctry_ie->num_triplets][1] =
-					cur_triplet_num_chans;
-				ctry_ie->triplets[ctry_ie->num_triplets][2] =
-					cur_triplet_tx_power;
-				ctry_ie->num_triplets++;
-				cur_triplet_valid =  false;
-			}
-			break;
-		}
+	start = NULL;
+	prev = NULL;
+	for (chan_enum = 0; chan_enum < chan_num; chan_enum++) {
+		cur_chan = &cur_chan_list[chan_enum];
 
-		if (cur_chan_list[chan_enum].chan_flags &
-		    REGULATORY_CHAN_DISABLED) {
-			if (cur_triplet_valid) {
-				ctry_ie->triplets[ctry_ie->num_triplets][0] =
-					wlan_reg_freq_to_chan(mac->pdev,
-							      cur_triplet_freq);
-				ctry_ie->triplets[ctry_ie->num_triplets][1] =
-					cur_triplet_num_chans;
-				ctry_ie->triplets[ctry_ie->num_triplets][2] =
-					cur_triplet_tx_power;
-				ctry_ie->num_triplets++;
-				cur_triplet_valid =  false;
-			}
+		if (cur_chan->chan_flags & REGULATORY_CHAN_DISABLED)
+			continue;
+
+		if (start && prev &&
+		    prev->chan_num + chan_spacing == cur_chan->chan_num &&
+		    start->tx_power == cur_chan->tx_power) {
+			/* Can use same entry */
+			prev = cur_chan;
+			cur_triplet_num_chans++;
 			continue;
 		}
 
-		if (cur_triplet_valid) {
-			if ((cur_chan_list[chan_enum].tx_power ==
-			     cur_triplet_tx_power) &&
-			    (cur_triplet_band ==
-			     wlan_reg_freq_to_band(cur_chan_list[chan_enum].center_freq)))
-				cur_triplet_num_chans++;
-			else {
-				ctry_ie->triplets[ctry_ie->num_triplets][0] =
-					wlan_reg_freq_to_chan(mac->pdev,
-							      cur_triplet_freq);
-				ctry_ie->triplets[ctry_ie->num_triplets][1] =
-					cur_triplet_num_chans;
-				ctry_ie->triplets[ctry_ie->num_triplets][2] =
-					cur_triplet_tx_power;
-				ctry_ie->num_triplets++;
+		if (start && prev) {
+			/* Save as entry */
+			buffer_triplets[num_triplets][0] = start->chan_num;
+			buffer_triplets[num_triplets][1] =
+					cur_triplet_num_chans + 1;
+			buffer_triplets[num_triplets][2] = start->tx_power;
+			start = NULL;
+			cur_triplet_num_chans = 0;
 
-				cur_triplet_freq =
-					cur_chan_list[chan_enum].center_freq;
-				cur_triplet_num_chans = 1;
-				cur_triplet_tx_power =
-					cur_chan_list[chan_enum].tx_power;
-				cur_triplet_band = wlan_reg_freq_to_band(cur_triplet_freq);
+			num_triplets++;
+			if (num_triplets > 80) {
+				pe_err("Triplets number exceed max size");
+				status = QDF_STATUS_E_FAILURE;
+				goto out;
 			}
-		} else {
-			cur_triplet_freq = cur_chan_list[chan_enum].center_freq;
-			cur_triplet_num_chans = 1;
-			cur_triplet_tx_power =
-				cur_chan_list[chan_enum].tx_power;
-			cur_triplet_band = wlan_reg_freq_to_band(cur_triplet_freq);
-			cur_triplet_valid = true;
 		}
+
+		/* Start new group */
+		start = cur_chan;
+		prev = cur_chan;
 	}
 
-	if (ctry_ie->num_triplets == 0) {
+	if (start) {
+		buffer_triplets[num_triplets][0] = start->chan_num;
+		buffer_triplets[num_triplets][1] = cur_triplet_num_chans + 1;
+		buffer_triplets[num_triplets][2] = start->tx_power;
+		num_triplets++;
+	}
+
+	if (!num_triplets) {
 		/* at-least one triplet should be present */
-		qdf_mem_free(cur_chan_list);
-		return QDF_STATUS_SUCCESS;
+		pe_err("No triplet present");
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
+	ctry_ie->num_triplets = num_triplets;
+	for (i = 0; i < ctry_ie->num_triplets; i++) {
+		for (j = 0; j < 3; j++) {
+			ctry_ie->triplets[i][j] = buffer_triplets[i][j];
+		}
 	}
 
 	ctry_ie->present = 1;
 
+out:
 	qdf_mem_free(cur_chan_list);
-	return QDF_STATUS_SUCCESS;
+	return status;
 } /* End populate_dot11f_country. */
 
 /**
