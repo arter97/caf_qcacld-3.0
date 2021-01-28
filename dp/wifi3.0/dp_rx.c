@@ -2250,6 +2250,12 @@ done:
 			qdf_nbuf_set_sa_valid(nbuf, is_sa_vld);
 
 			qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
+
+			if (qdf_nbuf_is_ipv4_eapol_pkt(nbuf)) {
+				if (qdf_nbuf_linearize(nbuf) == -ENOMEM)
+					dp_err("unable to linearize EAPOL pkt");
+			}
+
 		} else if (qdf_nbuf_is_rx_chfrag_cont(nbuf)) {
 			msdu_len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
 			nbuf = dp_rx_sg_create(nbuf);
