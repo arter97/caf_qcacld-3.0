@@ -143,9 +143,13 @@ dp_rx_mon_status_buf_validate(struct dp_pdev *pdev,
 			 * dp_rx_mon_status_process() replenishes entry to
 			 * status ring
 			 */
-			qdf_nbuf_unmap_nbytes_single(soc->osdev, status_nbuf,
-						     QDF_DMA_FROM_DEVICE,
-						     rx_desc_pool->buf_size);
+			if (!rx_desc->unmapped) {
+				qdf_nbuf_unmap_nbytes_single(soc->osdev,
+						status_nbuf,
+						QDF_DMA_FROM_DEVICE,
+						rx_desc_pool->buf_size);
+				rx_desc->unmapped = 1;
+			}
 			qdf_nbuf_free(status_nbuf);
 			dp_rx_add_to_free_desc_list(&desc_list,
 						&tail, rx_desc);
@@ -158,9 +162,13 @@ dp_rx_mon_status_buf_validate(struct dp_pdev *pdev,
 		goto done;
 	}
 
-	qdf_nbuf_unmap_nbytes_single(soc->osdev, status_nbuf,
-			QDF_DMA_FROM_DEVICE,
-			rx_desc_pool->buf_size);
+	if (!rx_desc->unmapped) {
+		qdf_nbuf_unmap_nbytes_single(soc->osdev, status_nbuf,
+					     QDF_DMA_FROM_DEVICE,
+					     rx_desc_pool->buf_size);
+
+		rx_desc->unmapped = 1;
+	}
 
 	rx_tlv = hal_rx_status_get_next_tlv(rx_tlv);
 
