@@ -15663,6 +15663,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	uint32_t roamId = INVALID_ROAM_ID;
 	QDF_STATUS qdf_ret_status;
 	struct hdd_context *hdd_ctx;
+	struct qdf_mac_addr mac_address;
 
 	ENTER();
 
@@ -15716,6 +15717,20 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	setKey.keyLength = params->key_len;
 	qdf_mem_copy(&setKey.Key[0], params->key, params->key_len);
 	qdf_mem_copy(&setKey.keyRsc[0], params->seq, params->seq_len);
+
+	if (!pairwise && ((adapter->device_mode == QDF_STA_MODE) ||
+	    (adapter->device_mode == QDF_P2P_CLIENT_MODE))) {
+		qdf_mem_copy(mac_address.bytes,
+			     adapter->session.station.conn_info.bssId.bytes,
+			     QDF_MAC_ADDR_SIZE);
+	} else {
+		if (mac_addr)
+			qdf_mem_copy(mac_address.bytes, mac_addr,
+				     QDF_MAC_ADDR_SIZE);
+	}
+
+	cdp_peer_flush_frags(cds_get_context(QDF_MODULE_ID_SOC),
+			     adapter->session_id, mac_address.bytes);
 
 	switch (params->cipher) {
 	case WLAN_CIPHER_SUITE_WEP40:
@@ -15823,6 +15838,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 		setKey.keyDirection = eSIR_TX_RX;
 		qdf_mem_copy(setKey.peerMac.bytes, mac_addr, QDF_MAC_ADDR_SIZE);
 	}
+
 	if ((QDF_IBSS_MODE == adapter->device_mode) && !pairwise) {
 		/* if a key is already installed, block all subsequent ones */
 		if (adapter->session.station.ibss_enc_key_installed) {
