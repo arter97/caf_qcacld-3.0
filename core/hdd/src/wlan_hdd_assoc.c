@@ -1890,7 +1890,7 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 	    (QDF_P2P_CLIENT_MODE == adapter->device_mode)) {
 		sme_ps_disable_auto_ps_timer(mac_handle,
 					     adapter->vdev_id);
-		adapter->send_mode_change = true;
+		adapter->send_mode_change = false;
 	}
 	wlan_hdd_clear_link_layer_stats(adapter);
 

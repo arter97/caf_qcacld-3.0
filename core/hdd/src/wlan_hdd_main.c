@@ -3868,7 +3868,7 @@ hdd_alloc_station_adapter(struct hdd_context *hdd_ctx, tSirMacAddr mac_addr,
 	adapter->offloads_configured = false;
 	adapter->is_link_up_service_needed = false;
 	adapter->disconnection_in_progress = false;
-	adapter->send_mode_change = true;
+	adapter->send_mode_change = false;
 
 	/* Init the net_device structure */
 	strlcpy(dev->name, name, IFNAMSIZ);
