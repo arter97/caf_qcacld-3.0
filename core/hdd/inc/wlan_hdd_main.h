@@ -910,6 +910,11 @@ enum hdd_mic_work_status {
 	MIC_DISABLED
 };
 
+enum hdd_work_status {
+	HDD_WORK_UNINITIALIZED,
+	HDD_WORK_INITIALIZED,
+};
+
 /**
  * struct hdd_mic_work - mic work info in HDD
  * @mic_error_work: mic error work
@@ -1128,7 +1133,8 @@ struct hdd_context;
  * @handle_feature_update: Handle feature update only if it is triggered
  *			   by hdd_netdev_feature_update
  * @netdev_features_update_work: work for handling the netdev features update
-				 for the adapter.
+ *				 for the adapter.
+ * @netdev_features_update_work_status: status for netdev_features_update_work
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1436,6 +1442,7 @@ struct hdd_adapter {
 	ol_txrx_rx_fp rx_stack;
 
 	qdf_work_t netdev_features_update_work;
+	enum hdd_work_status netdev_features_update_work_status;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(adapter) (&(adapter)->session.station)
