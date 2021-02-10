@@ -1078,6 +1078,34 @@ static void __wlan_ipa_w2i_cb(void *priv, qdf_ipa_dp_evt_type_t evt,
 				     QDF_NBUF_SRC_MAC_OFFSET,
 				     QDF_MAC_ADDR_SIZE);
 
+		if (qdf_nbuf_is_ipv4_eapol_pkt(skb) ||
+		    qdf_nbuf_is_ipv4_wapi_pkt(skb))
+			is_eapol_wapi = true;
+
+		/*
+		 * Check for peer authorized state before allowing
+		 * non-EAPOL/WAPI frames to be intrabss forwarded
+		 * or submitted to stack.
+		 */
+		if (cdp_peer_state_get(ipa_ctx->dp_soc,
+				       iface_context->session_id,
+				       &peer_mac_addr.bytes[0]) !=
+		    OL_TXRX_PEER_STATE_AUTH && !is_eapol_wapi) {
+			ipa_err_rl("Non EAPOL/WAPI packet received when peer "QDF_MAC_ADDR_FMT" is unauthorized",
+				   QDF_MAC_ADDR_REF(peer_mac_addr.bytes));
+			ipa_ctx->ipa_rx_internal_drop_count++;
+			dev_kfree_skb_any(skb);
+			return;
+		}
+
+		if (iface_context->device_mode == QDF_STA_MODE)
+			qdf_copy_macaddr(&peer_mac_addr, &iface_context->bssid);
+		else if (iface_context->device_mode == QDF_SAP_MODE)
+			qdf_mem_copy(&peer_mac_addr.bytes[0],
+				     qdf_nbuf_data(skb) +
+				     QDF_NBUF_SRC_MAC_OFFSET,
+				     QDF_MAC_ADDR_SIZE);
+
 		if (qdf_nbuf_is_ipv4_eapol_pkt(skb)) {
 			is_eapol_wapi = true;
 			if (iface_context->device_mode == QDF_SAP_MODE &&
@@ -2465,6 +2493,10 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 
 		ipa_ctx->vdev_to_iface[session_id] =
 				wlan_ipa_get_ifaceid(ipa_ctx, session_id);
+
+		wlan_ipa_save_bssid_iface_ctx(ipa_ctx,
+					     ipa_ctx->vdev_to_iface[session_id],
+					     mac_addr);
 
 		wlan_ipa_save_bssid_iface_ctx(ipa_ctx,
 					     ipa_ctx->vdev_to_iface[session_id],
