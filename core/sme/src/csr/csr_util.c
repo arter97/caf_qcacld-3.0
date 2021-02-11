@@ -2805,7 +2805,7 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	uint8_t *rsn_ie = (uint8_t *)pRSNIe;
 	uint8_t ie_len = 0;
 	tDot11fBeaconIEs *local_ap_ie = ap_ie;
-	uint16_t rsn_cap = 0;
+	uint16_t rsn_cap = 0, self_rsn_cap;
 	struct wlan_crypto_pmksa pmksa, *pmksa_peer;
 	struct csr_roam_session *session = &mac->roam.roamSession[sessionId];
 
@@ -2826,13 +2826,21 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 		sme_err("Invalid vdev");
 		return ie_len;
 	}
-	/*
-	 * Use intersection of the RSN cap sent by user space and
-	 * the AP, so that only common capability are enabled.
-	 */
-	rsn_cap &= (uint16_t)wlan_crypto_get_param(vdev,
+
+	self_rsn_cap = (uint16_t)wlan_crypto_get_param(vdev,
 						   WLAN_CRYPTO_PARAM_RSN_CAP);
-	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP, rsn_cap);
+	/* If AP is capable then use self capability else set PMF as 0 */
+	if (rsn_cap & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED &&
+	    pProfile->MFPCapable) {
+		self_rsn_cap |= WLAN_CRYPTO_RSN_CAP_MFP_ENABLED;
+		if (pProfile->MFPRequired)
+			self_rsn_cap |= WLAN_CRYPTO_RSN_CAP_MFP_REQUIRED;
+	} else {
+		self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_MFP_ENABLED;
+		self_rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_MFP_REQUIRED;
+	}
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP,
+				   self_rsn_cap);
 	qdf_mem_zero(&pmksa, sizeof(pmksa));
 	if (pSirBssDesc->fils_info_element.is_cache_id_present) {
 		pmksa.ssid_len =

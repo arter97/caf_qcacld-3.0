@@ -1902,8 +1902,7 @@ static QDF_STATUS sap_cac_start_notify(mac_handle_t mac_handle)
 		    (false == sap_context->isCacStartNotified)) {
 			/* Don't start CAC for non-dfs channel, its violation */
 			profile = &sap_context->csr_roamProfile;
-			ch_freq = wlan_reg_legacy_chan_to_freq(mac->pdev,
-						profile->op_freq);
+			ch_freq = profile->op_freq;
 			if (!wlan_reg_is_dfs_for_freq(mac->pdev,
 						      ch_freq))
 				continue;
@@ -2332,6 +2331,13 @@ static QDF_STATUS sap_fsm_state_init(struct sap_context *sap_ctx,
 				  QDF_TRACE_LEVEL_ERROR,
 				  FL("sap_goto_starting failed"));
 	} else if (msg == eSAP_DFS_CHANNEL_CAC_START) {
+		if (sap_ctx->is_chan_change_inprogress) {
+			sap_ctx->is_chan_change_inprogress = false;
+			sap_signal_hdd_event(sap_ctx,
+					     NULL,
+					     eSAP_CHANNEL_CHANGE_EVENT,
+					     (void *)eSAP_STATUS_SUCCESS);
+		}
 		qdf_status = sap_fsm_cac_start(sap_ctx, mac_ctx, mac_handle);
 	} else {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
