@@ -746,6 +746,41 @@ static enum wlan_ipa_forward_type wlan_ipa_intrabss_forward(
 }
 
 /**
+ * wlan_ipa_eapol_intrabss_fwd_check() - Check if eapol pkt intrabss fwd is
+ *  allowed or not
+ * @ipa_ctx: IPA global context
+ * @vdev_id: vdev id
+ * @nbuf: network buffer
+ *
+ * Return: true if intrabss fwd is allowed for eapol else false
+ */
+static bool
+wlan_ipa_eapol_intrabss_fwd_check(struct wlan_ipa_priv *ipa_ctx,
+				  uint8_t vdev_id, qdf_nbuf_t nbuf)
+{
+	struct cdp_vdev *vdev;
+	uint8_t *vdev_mac_addr;
+
+	vdev = cdp_get_vdev_from_vdev_id(ipa_ctx->dp_soc, ipa_ctx->dp_pdev,
+					 vdev_id);
+	if (!vdev) {
+		ipa_err_rl("txrx vdev is NULL for vdev_id = %d", vdev_id);
+		return false;
+	}
+
+	vdev_mac_addr = cdp_get_vdev_mac_addr(ipa_ctx->dp_soc, vdev);
+
+	if (!vdev_mac_addr)
+		return false;
+
+	if (qdf_mem_cmp(qdf_nbuf_data(nbuf) + QDF_NBUF_DEST_MAC_OFFSET,
+			vdev_mac_addr, QDF_MAC_ADDR_SIZE))
+		return false;
+
+	return true;
+}
+
+/**
  * __wlan_ipa_w2i_cb() - WLAN to IPA callback handler
  * @priv: pointer to private data registered with IPA (we register a
  *	pointer to the global IPA context)
@@ -767,6 +802,7 @@ static void __wlan_ipa_w2i_cb(void *priv, qdf_ipa_dp_evt_type_t evt,
 	bool is_eapol_wapi = false;
 	struct qdf_mac_addr peer_mac_addr = QDF_MAC_ADDR_ZERO_INIT;
 	uint8_t sta_idx;
+	bool fwd_allowed = true;
 
 	ipa_ctx = (struct wlan_ipa_priv *)priv;
 	if (!ipa_ctx) {
@@ -830,9 +866,15 @@ static void __wlan_ipa_w2i_cb(void *priv, qdf_ipa_dp_evt_type_t evt,
 				     QDF_NBUF_SRC_MAC_OFFSET,
 				     QDF_MAC_ADDR_SIZE);
 
-		if (qdf_nbuf_is_ipv4_eapol_pkt(skb) ||
-		    qdf_nbuf_is_ipv4_wapi_pkt(skb))
+		if (qdf_nbuf_is_ipv4_eapol_pkt(skb)) {
 			is_eapol_wapi = true;
+			if (iface_context->device_mode == QDF_SAP_MODE)
+				fwd_allowed =
+				      wlan_ipa_eapol_intrabss_fwd_check(ipa_ctx,
+						iface_context->session_id, skb);
+		} else if (qdf_nbuf_is_ipv4_wapi_pkt(skb)) {
+			is_eapol_wapi = true;
+		}
 
 		peer = cdp_peer_find_by_addr(ipa_ctx->dp_soc, ipa_ctx->dp_pdev,
 					     peer_mac_addr.bytes, &sta_idx);
@@ -855,7 +897,7 @@ static void __wlan_ipa_w2i_cb(void *priv, qdf_ipa_dp_evt_type_t evt,
 		/* Disable to forward Intra-BSS Rx packets when
 		 * ap_isolate=1 in hostapd.conf
 		 */
-		if (!ipa_ctx->ap_intrabss_fwd) {
+		if (!ipa_ctx->ap_intrabss_fwd && fwd_allowed) {
 			/*
 			 * When INTRA_BSS_FWD_OFFLOAD is enabled, FW will send
 			 * all Rx packets to IPA uC, which need to be forwarded
