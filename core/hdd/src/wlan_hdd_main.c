@@ -5595,6 +5595,11 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 						   GFP_KERNEL, false, 0);
 			}
 
+			if (cds_is_driver_recovering() &&
+			     (adapter->device_mode == QDF_STA_MODE &&
+			      wlan_hdd_nan_is_supported()))
+				hdd_nan_disable_ind_to_userspace(hdd_ctx);
+
 			hdd_register_tx_flow_control(adapter,
 					hdd_tx_resume_timer_expired_handler,
 					hdd_tx_resume_cb,

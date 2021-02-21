@@ -59,6 +59,16 @@ static inline void hdd_nan_populate_cds_config(struct cds_config_info *cds_cfg,
 	cds_cfg->is_nan_enabled = hdd_ctx->config->enable_nan_support;
 }
 void wlan_hdd_cfg80211_nan_callback(void *ctx, tSirNanEvent *msg);
+
+/**
+ * ucfg_nan_disable_ind_to_userspace() - Send NAN disble ind to userspace
+ * @psoc: pointer to psoc object
+ *
+ * Prepare NAN disable indication and send it to userspace
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_nan_disable_ind_to_userspace(hdd_context_t *hdd_ctx);
 #else
 static inline bool wlan_hdd_nan_is_supported(void)
 {
@@ -70,6 +80,11 @@ static inline void hdd_nan_populate_cds_config(struct cds_config_info *cds_cfg,
 }
 static inline void wlan_hdd_cfg80211_nan_callback(void *ctx,
 						  tSirNanEvent *msg)
+{
+}
+
+static inline
+QDF_STATUS hdd_nan_disable_ind_to_userspace(hdd_context_t *hdd_ctx)
 {
 }
 #endif /* WLAN_FEATURE_NAN */
