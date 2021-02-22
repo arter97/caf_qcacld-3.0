@@ -5543,7 +5543,8 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 	while (NULL != adapterNode && QDF_STATUS_SUCCESS == status) {
 		adapter = adapterNode->pAdapter;
 
-		if (!hdd_is_interface_up(adapter))
+		if (!hdd_is_interface_up(adapter) &&
+		    adapter->device_mode != QDF_NDI_MODE)
 			goto get_adapter;
 
 		hdd_wmm_init(adapter);
@@ -5634,7 +5635,10 @@ QDF_STATUS hdd_start_all_adapters(hdd_context_t *hdd_ctx)
 			wlan_hdd_set_mon_chan(adapter, adapter->mon_chan,
 					      adapter->mon_bandwidth);
 			break;
-
+		case QDF_NDI_MODE:
+			hdd_ndi_start_bss(adapter,
+				hdd_ctx->config->nan_datapath_ndi_channel);
+			break;
 		default:
 			break;
 		}

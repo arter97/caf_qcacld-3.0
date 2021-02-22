@@ -270,6 +270,15 @@ int wlan_hdd_cfg80211_process_ndp_cmd(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void *data, int data_len);
 int hdd_init_nan_data_mode(struct hdd_adapter_s *adapter);
 void hdd_ndp_session_end_handler(hdd_adapter_t *adapter);
+
+/**
+ * hdd_ndi_start_bss() - Start BSS on NAN data interface
+ * @adapter: adapter context
+ * @operating_channel: channel on which the BSS to be started
+ *
+ * Return: 0 on success, error value on failure
+ */
+int hdd_ndi_start_bss(hdd_adapter_t *adapter, uint8_t operating_channel);
 #else
 static inline void hdd_ndp_print_ini_config(struct hdd_context_s *hdd_ctx)
 {
@@ -294,6 +303,10 @@ static inline int hdd_init_nan_data_mode(struct hdd_adapter_s *adapter)
 }
 static inline void hdd_ndp_session_end_handler(hdd_adapter_t *adapter)
 {
+}
+int hdd_ndi_start_bss(hdd_adapter_t *adapter, uint8_t operating_channel)
+{
+	return 0;
 }
 #endif /* WLAN_FEATURE_NAN_DATAPATH */
 

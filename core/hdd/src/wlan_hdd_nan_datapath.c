@@ -214,15 +214,7 @@ next_adapter:
 	return true;
 }
 
-/**
- * hdd_ndi_start_bss() - Start BSS on NAN data interface
- * @adapter: adapter context
- * @operating_channel: channel on which the BSS to be started
- *
- * Return: 0 on success, error value on failure
- */
-static int hdd_ndi_start_bss(hdd_adapter_t *adapter,
-				uint8_t operating_channel)
+int hdd_ndi_start_bss(hdd_adapter_t *adapter, uint8_t operating_channel)
 {
 	int ret;
 	uint32_t roam_id;
