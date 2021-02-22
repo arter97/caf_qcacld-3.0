@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -263,7 +263,6 @@ QDF_STATUS sme_check_ft_status(mac_handle_t mac_handle, uint32_t session_id)
 #ifdef WLAN_FEATURE_HOST_ROAM
 bool sme_ft_key_ready_for_install(mac_handle_t mac_handle, uint32_t session_id)
 {
-	QDF_STATUS status;
 	bool ret = false;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session = CSR_GET_SESSION(mac, session_id);
@@ -273,16 +272,11 @@ bool sme_ft_key_ready_for_install(mac_handle_t mac_handle, uint32_t session_id)
 		return false;
 	}
 
-	status = sme_acquire_global_lock(&mac->sme);
-	if (!(QDF_IS_STATUS_SUCCESS(status)))
-		return false;
-
 	if (sme_get_ft_pre_auth_state(mac_handle, session_id) &&
 	    session->ftSmeContext.FTState == eFT_START_READY) {
 		ret = true;
 		sme_set_ft_pre_auth_state(mac_handle, session_id, false);
 	}
-	sme_release_global_lock(&mac->sme);
 
 	return ret;
 }
@@ -417,11 +411,10 @@ void sme_reset_key(mac_handle_t mac_handle, uint32_t vdev_id)
 		return;
 	}
 
+	wlan_cm_set_psk_pmk(mac->pdev, vdev_id, NULL, 0);
 	session = CSR_GET_SESSION(mac, vdev_id);
 	if (!session)
 		return;
-	qdf_mem_zero(&session->psk_pmk, sizeof(session->psk_pmk));
-	session->pmk_len = 0;
 	sme_reset_esecckm_info(session);
 }
 #endif

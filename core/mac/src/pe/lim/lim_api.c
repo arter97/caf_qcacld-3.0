@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1517,13 +1517,12 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 				     struct pe_session *pe_session)
 {
 	uint8_t len;
-	struct ap_new_caps apNewCaps;
 	uint32_t new_chan_freq;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool security_caps_matched = true;
+	uint16_t ap_cap;
 
-	apNewCaps.capabilityInfo =
-		lim_get_u16((uint8_t *) &pBeacon->capabilityInfo);
+	ap_cap = lim_get_u16((uint8_t *) &pBeacon->capabilityInfo);
 	new_chan_freq = pBeacon->chan_freq;
 
 	security_caps_matched = lim_enc_type_matched(mac, pBeacon,
@@ -1531,11 +1530,11 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 	if ((false == pe_session->limSentCapsChangeNtf) &&
 	    (((!lim_is_null_ssid(&pBeacon->ssId)) &&
 	       lim_cmp_ssid(&pBeacon->ssId, pe_session)) ||
-	     ((SIR_MAC_GET_ESS(apNewCaps.capabilityInfo) !=
+	     ((SIR_MAC_GET_ESS(ap_cap) !=
 	       SIR_MAC_GET_ESS(pe_session->limCurrentBssCaps)) ||
-	      (SIR_MAC_GET_PRIVACY(apNewCaps.capabilityInfo) !=
+	      (SIR_MAC_GET_PRIVACY(ap_cap) !=
 	       SIR_MAC_GET_PRIVACY(pe_session->limCurrentBssCaps)) ||
-	      (SIR_MAC_GET_QOS(apNewCaps.capabilityInfo) !=
+	      (SIR_MAC_GET_QOS(ap_cap) !=
 	       SIR_MAC_GET_QOS(pe_session->limCurrentBssCaps)) ||
 	      ((new_chan_freq != pe_session->curr_op_freq) &&
 		(new_chan_freq != 0)) ||
@@ -1573,8 +1572,6 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 		len = sizeof(tSirMacCapabilityInfo) + sizeof(tSirMacAddr) + sizeof(uint8_t) + 3 * sizeof(uint8_t) + /* reserved fields */
 		      pBeacon->ssId.length + 1;
 
-		qdf_mem_copy(apNewCaps.bssId.bytes,
-			     pe_session->bssId, QDF_MAC_ADDR_SIZE);
 		if (new_chan_freq != pe_session->curr_op_freq) {
 			pe_err("Channel freq Change from %d --> %d Ignoring beacon!",
 			       pe_session->curr_op_freq, new_chan_freq);
@@ -1591,21 +1588,22 @@ lim_detect_change_in_ap_capabilities(struct mac_context *mac,
 		 * disconnect from the AP. The following check makes sure that we can
 		 * connect to such APs
 		 */
-		else if ((SIR_MAC_GET_PRIVACY(apNewCaps.capabilityInfo) == 0) &&
+		else if ((SIR_MAC_GET_PRIVACY(ap_cap) == 0) &&
 			 (pBeacon->rsnPresent || pBeacon->wpaPresent)) {
 			pe_err("BSS Caps (Privacy) bit 0 in beacon, but WPA or RSN IE present, Ignore Beacon!");
 			return;
 		}
-		qdf_mem_copy((uint8_t *) &apNewCaps.ssId,
-			     (uint8_t *) &pBeacon->ssId,
-			     pBeacon->ssId.length + 1);
 
 		pe_session->fIgnoreCapsChange = false;
 		pe_session->fWaitForProbeRsp = false;
 		pe_session->limSentCapsChangeNtf = true;
-		lim_send_sme_wm_status_change_ntf(mac, eSIR_SME_AP_CAPS_CHANGED,
-						  (uint32_t *) &apNewCaps,
-						  len, pe_session->smeSessionId);
+		pe_err("Disconnect as cap mismatch!");
+		lim_send_deauth_mgmt_frame(mac, REASON_UNSPEC_FAILURE,
+					   pe_session->bssId, pe_session,
+					   false);
+		lim_tear_down_link_with_ap(mac, pe_session->peSessionId,
+					   REASON_UNSPEC_FAILURE,
+					   eLIM_HOST_DISASSOC);
 	} else if (true == pe_session->fWaitForProbeRsp) {
 		/* Only for probe response frames and matching capabilities the control
 		 * will come here. If beacon is with broadcast ssid then fWaitForProbeRsp
@@ -1644,7 +1642,7 @@ QDF_STATUS lim_update_short_slot(struct mac_context *mac,
 				    struct pe_session *pe_session)
 {
 
-	struct ap_new_caps apNewCaps;
+	uint16_t ap_cap;
 	uint32_t nShortSlot;
 	uint32_t phyMode;
 
@@ -1658,8 +1656,7 @@ QDF_STATUS lim_update_short_slot(struct mac_context *mac,
 	    || (phyMode == WNI_CFG_PHY_MODE_11B))
 		return QDF_STATUS_SUCCESS;
 
-	apNewCaps.capabilityInfo =
-		lim_get_u16((uint8_t *) &pBeacon->capabilityInfo);
+	ap_cap = lim_get_u16((uint8_t *) &pBeacon->capabilityInfo);
 
 	/*  Earlier implementation: determine the appropriate short slot mode based on AP advertised modes */
 	/* when erp is present, apply short slot always unless, prot=on  && shortSlot=off */
@@ -1680,7 +1677,7 @@ QDF_STATUS lim_update_short_slot(struct mac_context *mac,
 	   Case7        0                                   0                       1                       1
 	   Case8        0                                   0                       0                       0
 	 */
-	nShortSlot = SIR_MAC_GET_SHORT_SLOT_TIME(apNewCaps.capabilityInfo);
+	nShortSlot = SIR_MAC_GET_SHORT_SLOT_TIME(ap_cap);
 
 	if (nShortSlot != pe_session->shortSlotTimeSupported) {
 		/* Short slot time capability of AP has changed. Adopt to it. */
@@ -1737,46 +1734,6 @@ void lim_ps_offload_handle_missed_beacon_ind(struct mac_context *mac,
 	/*  Do AP probing immediately */
 	lim_send_heart_beat_timeout_ind(mac, pe_session);
 }
-
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-/**
- * lim_fill_join_rsp_ht_caps() - Fill the HT caps in join response
- * @session: PE Session
- * @join_rsp: Join response buffer to be filled up.
- *
- * Return: None
- */
-void lim_fill_join_rsp_ht_caps(struct pe_session *session,
-			       struct join_rsp *join_rsp)
-{
-	struct ht_profile *ht_profile;
-
-	if (!session) {
-		pe_err("Invalid Session");
-		return;
-	}
-	if (!join_rsp) {
-		pe_err("Invalid Join Response");
-		return;
-	}
-
-	if (session->cc_switch_mode == QDF_MCC_TO_SCC_SWITCH_DISABLE)
-		return;
-
-	ht_profile = &join_rsp->ht_profile;
-	ht_profile->htSupportedChannelWidthSet =
-		session->htSupportedChannelWidthSet;
-	ht_profile->htRecommendedTxWidthSet =
-		session->htRecommendedTxWidthSet;
-	ht_profile->htSecondaryChannelOffset =
-		session->htSecondaryChannelOffset;
-	ht_profile->dot11mode = session->dot11mode;
-	ht_profile->htCapability = session->htCapability;
-	ht_profile->vhtCapability = session->vhtCapability;
-	ht_profile->apCenterChan = session->ch_center_freq_seg0;
-	ht_profile->apChanWidth = session->ch_width;
-}
-#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifdef WLAN_FEATURE_11W
@@ -2642,7 +2599,6 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 			lim_get_max_rate_flags(mac_ctx, curr_sta_ds);
 	lim_set_tdls_flags(roam_sync_ind_ptr, ft_session_ptr);
 	roam_sync_ind_ptr->join_rsp->aid = ft_session_ptr->limAID;
-	lim_fill_join_rsp_ht_caps(ft_session_ptr, roam_sync_ind_ptr->join_rsp);
 	ft_session_ptr->limSmeState = eLIM_SME_LINK_EST_STATE;
 	ft_session_ptr->limPrevSmeState = ft_session_ptr->limSmeState;
 	ft_session_ptr->bRoamSynchInProgress = false;

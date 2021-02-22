@@ -47,7 +47,9 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
  * wlan_hdd_cm_issue_disconnect() - initiate disconnect from osif
  * @adapter: Pointer to adapter
  * @reason: Disconnect reason code
- * @sync: true if wait for disconnect to complete is required.
+ * @sync: true if wait for disconnect to complete is required. for the
+ *        supplicant initiated disconnect or during vdev delete/change interface
+ *        sync should be true.
  *
  * This function is used to issue disconnect request to conection manager
  *
@@ -229,5 +231,29 @@ void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
  * Returns: True if vdev is associated else false
  */
 bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter);
+
+/**
+ * hdd_cm_is_connecting() - Function to check connection in progress
+ * @adapter: pointer to the adapter structure
+ *
+ * Return: true if connecting, false otherwise
+ */
+bool hdd_cm_is_connecting(struct hdd_adapter *adapter);
+
+/**
+ * hdd_cm_is_disconnected() - Function to check if vdev is disconnected or not
+ * @adapter: pointer to the adapter structure
+ *
+ * Return: true if disconnected, false otherwise
+ */
+bool hdd_cm_is_disconnected(struct hdd_adapter *adapter);
+
+/**
+ * hdd_cm_is_disconnecting() - Function to check disconnection in progress
+ * @adapter: pointer to the adapter structure
+ *
+ * Return: true if disconnecting, false otherwise
+ */
+bool hdd_cm_is_disconnecting(struct hdd_adapter *adapter);
 
 #endif

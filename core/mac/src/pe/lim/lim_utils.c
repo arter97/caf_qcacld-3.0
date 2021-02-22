@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -234,8 +234,6 @@ char *lim_msg_str(uint32_t msgType)
 		return "eWNI_SME_DEAUTH_RSP";
 	case eWNI_SME_DEAUTH_IND:
 		return "eWNI_SME_DEAUTH_IND";
-	case eWNI_SME_WM_STATUS_CHANGE_NTF:
-		return "eWNI_SME_WM_STATUS_CHANGE_NTF";
 	case eWNI_SME_START_BSS_REQ:
 		return "eWNI_SME_START_BSS_REQ";
 	case eWNI_SME_START_BSS_RSP:
@@ -706,8 +704,8 @@ uint8_t lim_write_deferred_msg_q(struct mac_context *mac_ctx,
 			 * We reach the quota for management frames,
 			 * drop this one
 			 */
-			pe_warn("Too many queue->MsgQ Msg: %d count: %d",
-				lim_msg->type, count);
+			pe_warn_rl("Too many queue->MsgQ Msg: %d count: %d",
+				   lim_msg->type, count);
 			/* Return error, caller knows what to do */
 			return TX_QUEUE_FULL;
 		}
@@ -2002,6 +2000,13 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 	struct wlan_channel *des_chan;
 	struct vdev_mlme_obj *mlme_obj;
 
+	if (QDF_IS_STATUS_ERROR(status)) {
+		lim_tear_down_link_with_ap(mac, pe_session->peSessionId,
+					   REASON_CHANNEL_SWITCH_FAILED,
+					   eLIM_HOST_DISASSOC);
+		return;
+	}
+
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
 	if (!mlme_obj) {
 		pe_err("vdev component object is NULL");
@@ -2043,6 +2048,7 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 		pSirSmeSwitchChInd->chan_params.mhz_freq_seg1 =
 							des_chan->ch_cfreq2;
 	}
+	pSirSmeSwitchChInd->ch_phymode = des_chan->ch_phymode;
 
 	pSirSmeSwitchChInd->status = status;
 	qdf_mem_copy(pSirSmeSwitchChInd->bssid.bytes, pe_session->bssId,
@@ -2055,8 +2061,7 @@ void lim_switch_channel_cback(struct mac_context *mac, QDF_STATUS status,
 
 	sys_process_mmh_msg(mac, &mmhMsg);
 
-	if (QDF_IS_STATUS_SUCCESS(status))
-		lim_switch_channel_vdev_started(pe_session);
+	lim_switch_channel_vdev_started(pe_session);
 }
 
 void lim_switch_primary_channel(struct mac_context *mac,
@@ -5753,95 +5758,14 @@ QDF_STATUS lim_send_ext_cap_ie(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * lim_strip_ie() - strip requested IE from IE buffer
- * @mac_ctx: global MAC context
- * @addn_ie: Additional IE buffer
- * @addn_ielen: Length of additional IE
- * @eid: EID of IE to strip
- * @size_of_len_field: length of IE length field
- * @oui: if present matches OUI also
- * @oui_length: if previous present, this is length of oui
- * @extracted_ie: if not NULL, copy the stripped IE to this buffer
- *
- * This utility function is used to strip of the requested IE if present
- * in IE buffer.
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS lim_strip_ie(struct mac_context *mac_ctx,
 		uint8_t *addn_ie, uint16_t *addn_ielen,
-		uint8_t eid, eSizeOfLenField size_of_len_field,
+		uint8_t eid, enum size_of_len_field size_of_len_field,
 		uint8_t *oui, uint8_t oui_length, uint8_t *extracted_ie,
 		uint32_t eid_max_len)
 {
-	uint8_t *tempbuf = NULL;
-	uint16_t templen = 0;
-	int left = *addn_ielen;
-	uint8_t *ptr = addn_ie;
-	uint8_t elem_id;
-	uint16_t elem_len, ie_len, extracted_ie_len = 0;
-
-	if (!addn_ie) {
-		pe_debug("NULL addn_ie pointer");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	tempbuf = qdf_mem_malloc(left);
-	if (!tempbuf)
-		return QDF_STATUS_E_NOMEM;
-
-	if (extracted_ie)
-		qdf_mem_zero(extracted_ie, eid_max_len + size_of_len_field + 1);
-
-	while (left >= 2) {
-		elem_id  = ptr[0];
-		left -= 1;
-		if (size_of_len_field == TWO_BYTE) {
-			elem_len = *((uint16_t *)&ptr[1]);
-			left -= 2;
-		} else {
-			elem_len = ptr[1];
-			left -= 1;
-		}
-		if (elem_len > left) {
-			pe_err("Invalid IEs eid: %d elem_len: %d left: %d",
-				elem_id, elem_len, left);
-			qdf_mem_free(tempbuf);
-			return QDF_STATUS_E_FAILURE;
-		}
-
-		if (eid != elem_id ||
-				(oui && qdf_mem_cmp(oui,
-						&ptr[size_of_len_field + 1],
-						oui_length))) {
-			qdf_mem_copy(tempbuf + templen, &ptr[0],
-				     elem_len + size_of_len_field + 1);
-			templen += (elem_len + size_of_len_field + 1);
-		} else {
-			/*
-			 * eid matched and if provided OUI also matched
-			 * take oui IE and store in provided buffer.
-			 */
-			if (extracted_ie) {
-				ie_len = elem_len + size_of_len_field + 1;
-				if (ie_len <= eid_max_len - extracted_ie_len) {
-					qdf_mem_copy(
-					extracted_ie + extracted_ie_len,
-					&ptr[0], ie_len);
-					extracted_ie_len += ie_len;
-				}
-			}
-		}
-		left -= elem_len;
-		ptr += (elem_len + size_of_len_field + 1);
-	}
-	qdf_mem_copy(addn_ie, tempbuf, templen);
-
-	*addn_ielen = templen;
-	qdf_mem_free(tempbuf);
-
-	return QDF_STATUS_SUCCESS;
+	return wlan_strip_ie(addn_ie, addn_ielen, eid, size_of_len_field,
+			     oui, oui_length, extracted_ie, eid_max_len);
 }
 
 #ifdef WLAN_FEATURE_11W
@@ -5928,11 +5852,10 @@ uint8_t lim_op_class_from_bandwidth(struct mac_context *mac_ctx,
 	} else if (ch_bandwidth == CH_WIDTH_80P80MHZ) {
 		ch_behav_limit = BEHAV_BW80_PLUS;
 	}
-	wlan_reg_freq_width_to_chan_op_class_auto
-		(mac_ctx->pdev, channel_freq,
-		 ch_width_in_mhz(ch_bandwidth),
-		 true, BIT(ch_behav_limit), &op_class,
-		 &channel);
+	wlan_reg_freq_width_to_chan_op_class(mac_ctx->pdev, channel_freq,
+					     ch_width_in_mhz(ch_bandwidth),
+					     true, BIT(ch_behav_limit),
+					     &op_class, &channel);
 
 	return op_class;
 }
@@ -6809,6 +6732,10 @@ void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 			      struct pe_session *session_entry,
 			      tSchBeaconStruct *beacon)
 {
+	/* If HE is not supported, do not fill sta_ds and return */
+	if (!IS_DOT11_MODE_HE(session_entry->dot11mode))
+		goto out;
+
 	if (!assoc_rsp->he_cap.present && beacon && beacon->he_cap.present) {
 		/* Use beacon HE caps if assoc resp doesn't have he caps */
 		pe_debug("he_caps missing in assoc rsp");
@@ -6818,7 +6745,7 @@ void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 
 	/* assoc resp and beacon doesn't have he caps */
 	if (!assoc_rsp->he_cap.present)
-		return;
+		goto out;
 
 	sta_ds->mlmStaContext.he_capable = assoc_rsp->he_cap.present;
 
@@ -6834,18 +6761,12 @@ void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 	qdf_mem_copy(&sta_ds->he_config, &assoc_rsp->he_cap,
 		     sizeof(tDot11fIEhe_cap));
 
-	/* If HE is not supported, do not fill sta_ds and return */
-	if (!IS_DOT11_MODE_HE(session_entry->dot11mode))
-		return;
-
 	/* If MCS 12/13 is supported by the assoc resp QCN IE */
 	if (assoc_rsp->qcn_ie.present &&
 	    assoc_rsp->qcn_ie.he_mcs13_attr.present) {
 		sta_ds->he_mcs_12_13_map =
 		assoc_rsp->qcn_ie.he_mcs13_attr.he_mcs_12_13_supp_80 |
 		assoc_rsp->qcn_ie.he_mcs13_attr.he_mcs_12_13_supp_160 << 8;
-	} else {
-		return;
 	}
 
 	/* Take intersection of the FW capability for HE MCS 12/13 */
@@ -6855,7 +6776,11 @@ void lim_update_stads_he_caps(struct mac_context *mac_ctx,
 	else
 		sta_ds->he_mcs_12_13_map &=
 			mac_ctx->mlme_cfg->he_caps.he_mcs_12_13_supp_5g;
-
+out:
+	pe_debug("he_mcs_12_13_map: sta_ds 0x%x, 2g_fw 0x%x, 5g_fw 0x%x",
+		 sta_ds->he_mcs_12_13_map,
+		 mac_ctx->mlme_cfg->he_caps.he_mcs_12_13_supp_2g,
+		 mac_ctx->mlme_cfg->he_caps.he_mcs_12_13_supp_5g);
 	lim_update_he_mcs_12_13_map(mac_ctx->psoc,
 				    session_entry->smeSessionId,
 				    sta_ds->he_mcs_12_13_map);
@@ -6897,6 +6822,8 @@ void lim_update_usr_he_cap(struct mac_context *mac_ctx, struct pe_session *sessi
 	uint8_t extracted_buff[DOT11F_IE_HE_CAP_MAX_LEN + 2];
 	QDF_STATUS status;
 	struct wlan_vht_config *vht_cfg = &session->vht_config;
+	struct mlme_legacy_priv *mlme_priv;
+
 	qdf_mem_zero(extracted_buff, sizeof(extracted_buff));
 	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
 			&add_ie->probeRespBCNDataLen,
@@ -6937,6 +6864,19 @@ void lim_update_usr_he_cap(struct mac_context *mac_ctx, struct pe_session *sessi
 		vht_cfg->su_beam_formee = 0;
 		vht_cfg->mu_beam_formee = 0;
 		vht_cfg->csnof_beamformer_antSup = 0;
+	}
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
+	if (mlme_priv) {
+		mlme_priv->he_config.mu_beamformer = he_cap->mu_beamformer;
+		mlme_priv->he_config.su_beamformer = he_cap->su_beamformer;
+		mlme_priv->he_config.su_beamformee = he_cap->su_beamformee;
+		mlme_priv->he_config.bfee_sts_lt_80 = he_cap->bfee_sts_lt_80;
+		mlme_priv->he_config.bfee_sts_gt_80 = he_cap->bfee_sts_gt_80;
+		mlme_priv->he_config.num_sounding_lt_80 =
+						he_cap->num_sounding_lt_80;
+		mlme_priv->he_config.num_sounding_gt_80 =
+						he_cap->num_sounding_gt_80;
 	}
 	wma_set_he_txbf_params(session->vdev_id, he_cap->su_beamformer,
 			       he_cap->su_beamformee, he_cap->mu_beamformer);

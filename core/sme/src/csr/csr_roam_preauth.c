@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -87,7 +87,6 @@ void csr_neighbor_roam_tranistion_preauth_done_to_disconnected(
 	qdf_mc_timer_stop(&session->ftSmeContext.preAuthReassocIntvlTimer);
 	csr_neighbor_roam_state_transition(mac_ctx,
 		eCSR_NEIGHBOR_ROAM_STATE_INIT, session_id);
-	pNeighborRoamInfo->roamChannelInfo.IAPPNeighborListReceived = false;
 	pNeighborRoamInfo->uOsRequestedHandoff = 0;
 }
 
@@ -167,10 +166,13 @@ void csr_neighbor_roam_purge_preauth_failed_list(struct mac_context *mac_ctx)
 void csr_neighbor_roam_reset_preauth_control_info(struct mac_context *mac_ctx,
 		uint8_t session_id)
 {
+	struct cm_roam_values_copy src_cfg;
 	tpCsrNeighborRoamControlInfo neigh_roam_info =
 		&mac_ctx->roam.neighborRoamInfo[session_id];
 
-	neigh_roam_info->is11rAssoc = false;
+	src_cfg.bool_value = false;
+	wlan_cm_roam_cfg_set_value(mac_ctx->psoc, session_id,
+				   IS_11R_CONNECTION, &src_cfg);
 	csr_neighbor_roam_purge_preauth_failed_list(mac_ctx);
 
 	neigh_roam_info->FTRoamInfo.preauthRspPending = false;
@@ -340,10 +342,10 @@ ABORT_PREAUTH:
 			reason = REASON_PREAUTH_FAILED_FOR_ALL;
 			if (neighbor_roam_info->uOsRequestedHandoff) {
 				neighbor_roam_info->uOsRequestedHandoff = 0;
-				csr_post_roam_state_change(
-						   mac_ctx, session_id,
-						   WLAN_ROAM_RSO_ENABLED,
-						   reason);
+				wlan_cm_roam_state_change(mac_ctx->pdev,
+						session_id,
+						WLAN_ROAM_RSO_ENABLED,
+						reason);
 			} else {
 				/* ROAM_SCAN_OFFLOAD_RESTART is a
 				 * special command to trigger bmiss
@@ -351,7 +353,8 @@ ABORT_PREAUTH:
 				 * preauth failure.
 				 * This should be decoupled from RSO.
 				 */
-				csr_roam_offload_scan(mac_ctx, session_id,
+				wlan_cm_roam_send_rso_cmd(mac_ctx->psoc,
+						      session_id,
 						      ROAM_SCAN_OFFLOAD_RESTART,
 						      reason);
 			}

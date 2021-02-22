@@ -493,7 +493,10 @@ typedef enum {
 	eCSR_CONNECT_STATE_TYPE_NDI_NOT_STARTED,
 	/* NAN Data interface started */
 	eCSR_CONNECT_STATE_TYPE_NDI_STARTED,
-
+#ifndef FEATURE_CM_ENABLE
+	/* Disconnecting with AP or stop connecting process */
+	eCSR_ASSOC_STATE_TYPE_INFRA_DISCONNECTING,
+#endif
 } eCsrConnectState;
 
 /*
@@ -503,14 +506,12 @@ typedef enum {
 typedef enum eCSR_MEDIUM_ACCESS {
 	eCSR_MEDIUM_ACCESS_AUTO = 0,
 	eCSR_MEDIUM_ACCESS_DCF,
-	eCSR_MEDIUM_ACCESS_eDCF,
-	eCSR_MEDIUM_ACCESS_HCF,
+	eCSR_MEDIUM_ACCESS_11e_eDCF,
+	eCSR_MEDIUM_ACCESS_11e_HCF,
 
 	eCSR_MEDIUM_ACCESS_WMM_eDCF_802dot1p,
 	eCSR_MEDIUM_ACCESS_WMM_eDCF_DSCP,
 	eCSR_MEDIUM_ACCESS_WMM_eDCF_NoClassify,
-	eCSR_MEDIUM_ACCESS_11e_eDCF = eCSR_MEDIUM_ACCESS_eDCF,
-	eCSR_MEDIUM_ACCESS_11e_HCF = eCSR_MEDIUM_ACCESS_HCF,
 } eCsrMediaAccessType;
 
 typedef enum {
@@ -596,6 +597,9 @@ typedef struct tagPmkidCacheInfo {
 	uint8_t ssid_len;
 	uint8_t ssid[WLAN_SSID_MAX_LEN];
 	uint8_t cache_id[CACHE_ID_LEN];
+	uint32_t   pmk_lifetime;
+	uint8_t    pmk_lifetime_threshold;
+	qdf_time_t pmk_ts;
 } tPmkidCacheInfo;
 
 #ifdef FEATURE_WLAN_WAPI
@@ -717,27 +721,13 @@ struct csr_roam_profile {
 	bool force_24ghz_in_ht20;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
+#ifndef FEATURE_CM_ENABLE
 #ifdef WLAN_FEATURE_FILS_SK
-	uint8_t *hlp_ie;
-	uint32_t hlp_ie_len;
 	struct wlan_fils_connection_info *fils_con_info;
 #endif
-	bool force_rsne_override;
-	bool is_hs_20_ap;
-};
-
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-typedef struct tagCsrRoamHTProfile {
-	uint8_t phymode;
-	uint8_t htCapability;
-	uint8_t htSupportedChannelWidthSet;
-	uint8_t htRecommendedTxWidthSet;
-	ePhyChanBondState htSecondaryChannelOffset;
-	uint8_t vhtCapability;
-	uint8_t apCenterChan;
-	uint8_t apChanWidth;
-} tCsrRoamHTProfile;
 #endif
+	bool force_rsne_override;
+};
 
 typedef struct tagCsrRoamConnectedProfile {
 	tSirMacSSid SSID;
@@ -760,78 +750,12 @@ typedef struct tagCsrRoamConnectedProfile {
 	uint8_t acm_mask;
 	tCsrRoamModifyProfileFields modifyProfileFields;
 	bool qosConnection;     /* A connection is QoS enabled */
-	struct bss_description *bss_desc;
 	bool qap;               /* AP supports QoS */
-	struct mobility_domain_info mdid;
-#ifdef FEATURE_WLAN_ESE
-	bool isESEAssoc;
-#endif
 	uint32_t dot11Mode;
 #ifndef FEATURE_CM_ENABLE
 	uint8_t proxy_arp_service;
 #endif
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-	tCsrRoamHTProfile ht_profile;
-#endif
-#ifdef WLAN_FEATURE_11W
-	/* Management Frame Protection */
-	bool MFPEnabled;
-	uint8_t MFPRequired;
-	uint8_t MFPCapable;
-#endif
 } tCsrRoamConnectedProfile;
-
-/**
- * enum sta_roam_policy_dfs_mode - state of DFS mode for STA ROME policy
- * @CSR_STA_ROAM_POLICY_NONE: DFS mode attribute is not valid
- * @CSR_STA_ROAM_POLICY_DFS_ENABLED:  DFS mode is enabled
- * @CSR_STA_ROAM_POLICY_DFS_DISABLED: DFS mode is disabled
- * @CSR_STA_ROAM_POLICY_DFS_DEPRIORITIZE: Deprioritize DFS channels in scanning
- */
-enum sta_roam_policy_dfs_mode {
-	CSR_STA_ROAM_POLICY_NONE,
-	CSR_STA_ROAM_POLICY_DFS_ENABLED,
-	CSR_STA_ROAM_POLICY_DFS_DISABLED,
-	CSR_STA_ROAM_POLICY_DFS_DEPRIORITIZE
-};
-
-/**
- * struct csr_sta_roam_policy_params - sta roam policy params for station
- * @dfs_mode: tell is DFS channels needs to be skipped while scanning
- * @skip_unsafe_channels: tells if unsafe channels needs to be skip in scanning
- * @sap_operating_band: Opearting band for SAP
- */
-struct csr_sta_roam_policy_params {
-	enum sta_roam_policy_dfs_mode dfs_mode;
-	bool skip_unsafe_channels;
-	uint8_t sap_operating_band;
-};
-
-/**
- * struct csr_neighbor_report_offload_params - neighbor report offload params
- * @params_bitmask: bitmask to specify which of the below are enabled
- * @time_offset: time offset after 11k offload command to trigger a neighbor
- *		report request (in seconds)
- * @low_rssi_offset: Offset from rssi threshold to trigger neighbor
- *	report request (in dBm)
- * @bmiss_count_trigger: Number of beacon miss events to trigger neighbor
- *		report request
- * @per_threshold_offset: offset from PER threshold to trigger neighbor
- *		report request (in %)
- * @neighbor_report_cache_timeout: timeout after which new trigger can enable
- *		sending of a neighbor report request (in seconds)
- * @max_neighbor_report_req_cap: max number of neighbor report requests that
- *		can be sent to the peer in the current session
- */
-struct csr_neighbor_report_offload_params {
-	uint8_t params_bitmask;
-	uint32_t time_offset;
-	uint32_t low_rssi_offset;
-	uint32_t bmiss_count_trigger;
-	uint32_t per_threshold_offset;
-	uint32_t neighbor_report_cache_timeout;
-	uint32_t max_neighbor_report_req_cap;
-};
 
 struct csr_config_params {
 	/* keep this uint32_t. This gets converted to ePhyChannelBondState */
@@ -842,12 +766,6 @@ struct csr_config_params {
 	eCsrRoamWmmUserModeType WMMSupportMode;
 	bool Is11eSupportEnabled;
 	bool ProprietaryRatesEnabled;
-	/*
-	 * this number minus one is the number of times a scan doesn't find it
-	 * before it is removed
-	 */
-	/* to set the RSSI difference for each category */
-	uint8_t bCatRssiOffset;
 	/* to set MCC Enable/Disable mode */
 	uint8_t fEnableMCCMode;
 	bool mcc_rts_cts_prot_enable;
@@ -881,19 +799,12 @@ struct csr_config_params {
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	bool sap_channel_avoidance;
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
-	struct csr_sta_roam_policy_params sta_roam_policy_params;
 	enum force_1x1_type is_force_1x1;
-	uint32_t offload_11k_enable_bitmask;
 	bool wep_tkip_in_he;
-	struct csr_neighbor_report_offload_params neighbor_report_offload;
 };
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-#define csr_is_roam_offload_enabled(mac) \
-	(mac->mlme_cfg->lfr.lfr3_roaming_offload)
 #define DEFAULT_REASSOC_FAILURE_TIMEOUT 1000
-#else
-#define csr_is_roam_offload_enabled(mac)  false
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -1216,6 +1127,7 @@ typedef QDF_STATUS (*csr_session_close_cb)(uint8_t session_id);
 #define CSR_IS_CONN_NDI(profile)  (false)
 #endif
 
+#ifndef FEATURE_CM_ENABLE
 #ifdef WLAN_FEATURE_SAE
 #define CSR_IS_AUTH_TYPE_SAE(auth_type) \
 	(eCSR_AUTH_TYPE_SAE == auth_type)
@@ -1260,6 +1172,7 @@ typedef QDF_STATUS (*csr_session_close_cb)(uint8_t session_id);
 
 #define CSR_IS_FW_SUITEB_ROAM_SUPPORTED(fw_akm_bitmap) \
 	(((fw_akm_bitmap) & (1 << AKM_SUITEB))  ? true : false)
+#endif
 
 QDF_STATUS csr_set_channels(struct mac_context *mac,
 			    struct csr_config_params *pParam);
@@ -1384,23 +1297,6 @@ QDF_STATUS csr_update_owe_info(struct mac_context *mac,
 
 typedef void (*csr_ani_callback)(int8_t *ani, void *context);
 
-#ifdef WLAN_FEATURE_11W
-/**
- * csr_update_pmf_cap_from_connected_profile() - Update pmf cap from profile
- * @profile: connected profile
- * @filter: scan filter
- *
- * Return: None
- */
-void
-csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
-					  struct scan_filter *filter);
-#else
-void
-csr_update_pmf_cap_from_connected_profile(tCsrRoamConnectedProfile *profile,
-					  struct scan_filter *filter);
-#endif
-
 /*
  * csr_convert_to_reg_phy_mode() - CSR API to convert CSR phymode into
  * regulatory phymode
@@ -1465,4 +1361,29 @@ void csr_fill_auth_type(enum csr_akm_type *auth_type,
  */
 enum csr_cfgdot11mode csr_phy_mode_to_dot11mode(enum wlan_phymode phy_mode);
 
+/*
+ * csr_mlme_vdev_disconnect_all_p2p_client_event() - Callback for MLME module
+ *	to send a disconnect all P2P event to the SAP event handler
+ * @vdev_id: vdev id of SAP
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS csr_mlme_vdev_disconnect_all_p2p_client_event(uint8_t vdev_id);
+
+/*
+ * csr_mlme_vdev_stop_bss() - Callback for MLME module to send a stop BSS event
+ *	to the SAP event handler
+ * @vdev_id: vdev id of SAP
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS csr_mlme_vdev_stop_bss(uint8_t vdev_id);
+
+/*
+ * csr_mlme_get_concurrent_operation_freq() - Callback for MLME module to
+ *	get the concurrent operation frequency
+ *
+ * Return: concurrent frequency
+ */
+qdf_freq_t csr_mlme_get_concurrent_operation_freq(void);
 #endif

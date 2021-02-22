@@ -198,21 +198,15 @@ struct hdd_adapter;
 struct hdd_station_ctx;
 struct hdd_context;
 
-/**
- * hdd_is_connecting() - Function to check connection progress
- * @hdd_sta_ctx:    pointer to global HDD Station context
- *
- * Return: true if connecting, false otherwise
- */
-bool hdd_is_connecting(struct hdd_station_ctx *hdd_sta_ctx);
-
 /*
  * hdd_is_fils_connection: API to determine if connection is FILS
+ * @hdd_ctx: hdd context
  * @adapter: hdd adapter
  *
  * Return: true if fils connection else false
  */
-bool hdd_is_fils_connection(struct hdd_adapter *adapter);
+bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,
+			    struct hdd_adapter *adapter);
 
 /**
  * hdd_conn_set_connection_state() - set connection state
@@ -225,22 +219,6 @@ bool hdd_is_fils_connection(struct hdd_adapter *adapter);
  */
 void hdd_conn_set_connection_state(struct hdd_adapter *adapter,
 				   eConnectionState conn_state);
-
-/**
- * hdd_conn_is_connected() - Function to check connection status
- * @sta_ctx:    pointer to global HDD Station context
- *
- * Return: false if any errors encountered, true otherwise
- */
-bool hdd_conn_is_connected(struct hdd_station_ctx *sta_ctx);
-
-/**
- * hdd_adapter_is_connected_sta() - check if @adapter is a connected station
- * @adapter: the adapter to check
- *
- * Return: true if @adapter is a connected station
- */
-bool hdd_adapter_is_connected_sta(struct hdd_adapter *adapter);
 
 /**
  * hdd_conn_get_connected_band() - get current connection radio band
@@ -287,6 +265,7 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 				 eRoamCmdStatus roam_status,
 				 eCsrRoamResult roam_result);
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * hdd_set_genie_to_csr() - set genie to csr
  * @adapter: pointer to adapter
@@ -297,6 +276,7 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 int hdd_set_genie_to_csr(struct hdd_adapter *adapter,
 			 enum csr_akm_type *rsn_auth_type);
 
+
 /**
  * hdd_set_csr_auth_type() - set csr auth type
  * @adapter: pointer to adapter
@@ -306,7 +286,7 @@ int hdd_set_genie_to_csr(struct hdd_adapter *adapter,
  */
 int hdd_set_csr_auth_type(struct hdd_adapter *adapter,
 			  enum csr_akm_type rsn_auth_type);
-
+#endif
 #ifdef FEATURE_WLAN_TDLS
 /**
  * hdd_roam_register_tdlssta() - register new TDLS station

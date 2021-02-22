@@ -33,6 +33,7 @@
 #include "csr_neighbor_roam.h"
 #include "mac_trace.h"
 #include "wlan_policy_mgr_api.h"
+#include <../../core/src/wlan_cm_vdev_api.h>
 
 QDF_STATUS csr_roam_issue_reassociate(struct mac_context *mac, uint32_t vdev_id,
 				      struct bss_description *bss_desc,
@@ -48,6 +49,8 @@ QDF_STATUS csr_roam_issue_reassociate(struct mac_context *mac, uint32_t vdev_id,
 	/* attempt to Join this BSS... */
 	return csr_send_join_req_msg(mac, vdev_id, bss_desc, roam_profile, ies,
 				     eWNI_SME_REASSOC_REQ);
+#else
+	return QDF_STATUS_SUCCESS;
 #endif
 }
 
@@ -113,7 +116,7 @@ csr_roam_issue_reassociate_cmd(struct mac_context *mac,	uint32_t sessionId)
 		pCommand = tmp_command;
 		/* Change the substate in case it is wait-for-key */
 		if (CSR_IS_WAIT_FOR_KEY(mac, sessionId)) {
-			csr_roam_stop_wait_for_key_timer(mac);
+			cm_stop_wait_for_key_timer(mac->psoc, sessionId);
 			csr_roam_substate_change(mac, eCSR_ROAM_SUBSTATE_NONE,
 						 sessionId);
 		}
@@ -139,6 +142,7 @@ void csr_neighbor_roam_process_scan_results(struct mac_context *mac_ctx,
 	uint32_t bss_chan_freq;
 	uint8_t num_candidates = 0;
 	uint8_t num_dropped = 0;
+	struct cm_roam_values_copy config;
 	/*
 	 * first iteration of scan list should consider
 	 * age constraint for candidates
@@ -225,8 +229,10 @@ void csr_neighbor_roam_process_scan_results(struct mac_context *mac_ctx,
 					  "SKIP-not a candidate AP for OS requested roam");
 				continue;
 			}
-
-			if ((n_roam_info->is11rAssoc) &&
+			wlan_cm_roam_cfg_get_value(mac_ctx->psoc, sessionid,
+						   IS_11R_CONNECTION,
+						   &config);
+			if ((config.bool_value) &&
 			    (!csr_neighbor_roam_is_preauth_candidate(mac_ctx,
 					sessionid, descr->bssId))) {
 				sme_err("BSSID in preauth fail list. Ignore");
@@ -235,7 +241,7 @@ void csr_neighbor_roam_process_scan_results(struct mac_context *mac_ctx,
 
 #ifdef FEATURE_WLAN_ESE
 			if (!csr_roam_is_roam_offload_scan_enabled(mac_ctx) &&
-			    (n_roam_info->isESEAssoc) &&
+			    (wlan_cm_get_ese_assoc(mac_ctx->pdev, sessionid)) &&
 			    !csr_neighbor_roam_is_preauth_candidate(mac_ctx,
 				sessionid, descr->bssId)) {
 				sme_err("BSSID in preauth faillist. Ignore");
@@ -396,7 +402,7 @@ QDF_STATUS csr_neighbor_roam_process_scan_complete(struct mac_context *mac,
 
 	if (csr_roam_is_roam_offload_scan_enabled(mac)) {
 		if (pNeighborRoamInfo->uOsRequestedHandoff) {
-			csr_roam_offload_scan(mac, sessionId,
+			wlan_cm_roam_send_rso_cmd(mac->psoc, sessionId,
 				ROAM_SCAN_OFFLOAD_START,
 				REASON_NO_CAND_FOUND_OR_NOT_ROAMING_NOW);
 			pNeighborRoamInfo->uOsRequestedHandoff = 0;
@@ -404,7 +410,7 @@ QDF_STATUS csr_neighbor_roam_process_scan_complete(struct mac_context *mac,
 			/* There is no candidate or We are not roaming Now.
 			 * Inform the FW to restart Roam Offload Scan
 			 */
-			csr_roam_offload_scan(mac, sessionId,
+			wlan_cm_roam_send_rso_cmd(mac->psoc, sessionId,
 				ROAM_SCAN_OFFLOAD_RESTART,
 				REASON_NO_CAND_FOUND_OR_NOT_ROAMING_NOW);
 		}
@@ -604,12 +610,15 @@ csr_neighbor_roam_get_handoff_ap_info(struct mac_context *mac,
 	tpCsrNeighborRoamControlInfo ngbr_roam_info =
 		&mac->roam.neighborRoamInfo[session_id];
 	tpCsrNeighborRoamBSSInfo bss_node = NULL;
+	struct cm_roam_values_copy config;
 
 	if (!hand_off_node) {
 		QDF_ASSERT(hand_off_node);
 		return false;
 	}
-	if (ngbr_roam_info->is11rAssoc) {
+	wlan_cm_roam_cfg_get_value(mac->psoc, session_id, IS_11R_CONNECTION,
+				   &config);
+	if (config.bool_value) {
 		/* Always the BSS info in the head is the handoff candidate */
 		bss_node = csr_neighbor_roam_next_roamable_ap(
 			mac,
@@ -620,7 +629,7 @@ csr_neighbor_roam_get_handoff_ap_info(struct mac_context *mac,
 				ngbr_roam_info->FTRoamInfo.preAuthDoneList));
 	} else
 #ifdef FEATURE_WLAN_ESE
-	if (ngbr_roam_info->isESEAssoc) {
+	if (wlan_cm_get_ese_assoc(mac->pdev, session_id)) {
 		/* Always the BSS info in the head is the handoff candidate */
 		bss_node =
 			csr_neighbor_roam_next_roamable_ap(mac,

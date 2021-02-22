@@ -4013,7 +4013,7 @@ static int hdd_we_set_11n_rate(struct hdd_adapter *adapter, int rate_code)
 
 	hdd_debug("Rate code %d", rate_code);
 
-	if (rate_code != 0xff) {
+	if (rate_code != 0xffff) {
 		rix = RC_2_RATE_IDX(rate_code);
 		if (rate_code & 0x80) {
 			preamble = WMI_RATE_PREAMBLE_HT;
@@ -4066,7 +4066,7 @@ static int hdd_we_set_vht_rate(struct hdd_adapter *adapter, int rate_code)
 
 	hdd_debug("Rate code %d", rate_code);
 
-	if (rate_code != 0xff) {
+	if (rate_code != 0xffff) {
 		rix = RC_2_RATE_IDX_11AC(rate_code);
 		preamble = WMI_RATE_PREAMBLE_VHT;
 		nss = HT_RC_2_STREAMS_11AC(rate_code) - 1;
@@ -7924,7 +7924,7 @@ static int __iw_set_host_offload(struct net_device *dev,
 	if (0 != ret)
 		return ret;
 
-	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err("dev is not in CONNECTED state, ignore!!!");
 		return -EINVAL;
 	}
@@ -8178,7 +8178,7 @@ static int __iw_set_packet_filter_params(struct net_device *dev,
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err("Packet filter not supported in disconnected state");
 		return -ENOTSUPP;
 	}
@@ -8832,6 +8832,16 @@ static void hdd_ioctl_log_buffer(int log_id, uint32_t count)
 		break;
 	}
 }
+
+#ifdef WLAN_DUMP_LOG_BUF_CNT
+void hdd_dump_log_buffer(void)
+{
+	int i;
+
+	for (i = 0; i <= MGMT_EVENT_LOG; i++)
+		hdd_ioctl_log_buffer(i, WLAN_DUMP_LOG_BUF_CNT);
+}
+#endif
 
 #ifdef CONFIG_DP_TRACE
 void hdd_set_dump_dp_trace(uint16_t cmd_type, uint16_t count)

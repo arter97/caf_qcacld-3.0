@@ -574,6 +574,7 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int ret = 0;
 	QDF_STATUS status;
+	uint8_t connected_vdev;
 
 	if (!hdd_ctx) {
 		hdd_err("Invalid hdd ctx");
@@ -620,6 +621,14 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 	    wlan_hdd_validate_operation_channel(adapter, ch_freq)) {
 		hdd_err("Invalid Ch freq: %d", ch_freq);
 		ret = -EINVAL;
+		goto exit;
+	}
+	if (wlan_get_connected_vdev_by_bssid(hdd_ctx->pdev, (uint8_t *)bssid,
+					     &connected_vdev) &&
+	    connected_vdev != adapter->vdev_id) {
+		hdd_err("bssid "QDF_MAC_ADDR_FMT" connected by other vdev %d",
+			QDF_MAC_ADDR_REF(bssid), connected_vdev);
+		ret = -EPERM;
 		goto exit;
 	}
 
@@ -780,12 +789,6 @@ static int hdd_parse_reassoc(struct hdd_adapter *adapter, const char *command,
 	return ret;
 }
 
-static inline
-void hdd_abort_roam_scan(struct hdd_context *hdd_ctx, uint8_t vdev_id)
-{
-	ucfg_cm_abort_roam_scan(hdd_ctx->pdev, vdev_id);
-}
-
 /**
  * hdd_sendactionframe() - send a userspace-supplied action frame
  * @adapter:	Adapter upon which the command was received
@@ -877,7 +880,8 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 				 * may cause long delays in sending action
 				 * frames.
 				 */
-				hdd_abort_roam_scan(hdd_ctx, adapter->vdev_id);
+				ucfg_cm_abort_roam_scan(hdd_ctx->pdev,
+							adapter->vdev_id);
 			} else {
 				/*
 				 * 0 is accepted as current home frequency,
@@ -1341,7 +1345,8 @@ hdd_parse_set_roam_scan_channels_v2(struct hdd_adapter *adapter,
 			ret = -EINVAL;
 			goto exit;
 		}
-		channel_freq_list[i] = wlan_reg_chan_to_freq(hdd_ctx->pdev,
+		channel_freq_list[i] = wlan_reg_legacy_chan_to_freq(
+							     hdd_ctx->pdev,
 							     channel);
 	}
 
@@ -2637,7 +2642,7 @@ static int hdd_parse_ese_beacon_req(struct wlan_objmgr_pdev *pdev,
 					return -EINVAL;
 				}
 				req->bcnReq[j].ch_freq =
-				wlan_reg_chan_to_freq(pdev, temp_int);
+				wlan_reg_legacy_chan_to_freq(pdev, temp_int);
 				break;
 
 			case 2: /* Scan mode */
@@ -3284,7 +3289,6 @@ static int drv_cmd_set_roam_mode(struct hdd_adapter *adapter,
 		roam_mode = cfg_max(CFG_LFR_FEATURE_ENABLED);
 	}
 
-	ucfg_mlme_set_lfr_enabled(hdd_ctx->psoc, (bool)roam_mode);
 	mac_handle = hdd_ctx->mac_handle;
 	if (roam_mode) {
 		ucfg_mlme_set_roam_scan_offload_enabled(hdd_ctx->psoc,
@@ -5137,7 +5141,7 @@ static int drv_cmd_ccx_beacon_req(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
-	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not associated");
 
 		if (!req.numBcnReqIe)
@@ -5767,7 +5771,7 @@ static int hdd_set_rx_filter(struct hdd_adapter *adapter, bool action,
 	if (((adapter->device_mode == QDF_STA_MODE) ||
 		(adapter->device_mode == QDF_P2P_CLIENT_MODE)) &&
 		adapter->mc_addr_list.mc_cnt &&
-		hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+		hdd_cm_is_vdev_associated(adapter)) {
 
 
 		filter = qdf_mem_malloc(sizeof(*filter));
@@ -6668,7 +6672,7 @@ static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 		 * Restore and Free the cache channels when the command is
 		 * received with num channels as 0
 		 */
-		wlan_hdd_restore_channels(hdd_ctx, false);
+		wlan_hdd_restore_channels(hdd_ctx);
 		return 0;
 	}
 
