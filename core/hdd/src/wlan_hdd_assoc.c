@@ -2694,7 +2694,9 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					  adapter->device_mode,
 					  adapter->vdev_id,
 					  WLAN_IPA_STA_CONNECT,
-					  roam_info->bssid.bytes);
+					  roam_info->bssid.bytes,
+					  WLAN_REG_IS_24GHZ_CH_FREQ(
+						sta_ctx->conn_info.chan_freq));
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 		wlan_hdd_auto_shutdown_enable(hdd_ctx, false);
