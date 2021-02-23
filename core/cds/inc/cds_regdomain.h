@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011, 2014-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -112,6 +112,8 @@ enum country_code {
 	CTRY_CHINA = 156,
 	CTRY_CHRISTMAS_ISLAND = 162,
 	CTRY_COLOMBIA = 170,
+	CTRY_CONGO = 178,
+	CTRY_CONGO_DRC = 180,
 	CTRY_COSTA_RICA = 188,
 	CTRY_COTE_DIVOIRE = 384,
 	CTRY_CROATIA = 191,
@@ -298,6 +300,7 @@ enum reg_domain {
 	ETSI9_WORLD = 0x3E,
 	ETSI10_WORLD = 0x24,
 	ETSI11_WORLD = 0x26,
+	ETSI12_WORLD = 0x28,
 	ETSI13_WORLD = 0x27,
 	ETSI14_WORLD = 0x29,
 	ETSI15_WORLD = 0x31,
@@ -403,6 +406,7 @@ enum reg_domain {
 	ETSI9 = 0x0930,
 	ETSI10 = 0x0D30,
 	ETSI11 = 0x0E30,
+	ETSI12 = 0x0E38,
 	ETSI13 = 0x0E39,
 	ETSI14 = 0x0E40,
 	ETSI15 = 0x0E41,
