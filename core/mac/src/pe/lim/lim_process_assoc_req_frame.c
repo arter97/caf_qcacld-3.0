@@ -2538,7 +2538,7 @@ QDF_STATUS lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 
 	if (!session_entry->parsedAssocReq) {
 		pe_err(" Parsed Assoc req is NULL");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	/* Get a copy of the already parsed Assoc Request */
@@ -2547,7 +2547,7 @@ QDF_STATUS lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 
 	if (!assoc_req) {
 		pe_err("assoc req for assoc_id:%d is NULL", sta_ds->assocId);
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	/* Get the phy_mode */
