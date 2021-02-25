@@ -1095,6 +1095,8 @@ QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 	struct wlan_crypto_cipher *cipher_table;
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t bssid_mac[QDF_MAC_ADDR_SIZE];
+        struct wlan_objmgr_peer *peer = NULL;
+        QDF_STATUS ret = QDF_STATUS_SUCCESS;
 
 	if (!vdev || !macaddr ||
 		(key_idx >=
@@ -1123,7 +1125,6 @@ QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_INVAL;
 		}
 	} else {
-		struct wlan_objmgr_peer *peer;
 		uint8_t pdev_id;
 
 		pdev_id = wlan_objmgr_pdev_get_pdev_id(
@@ -1138,10 +1139,10 @@ QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 		}
 		crypto_params = wlan_crypto_peer_get_comp_params(peer,
 								&crypto_priv);
-		wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
 		if (!crypto_priv) {
 			crypto_err("crypto_priv NULL");
-			return QDF_STATUS_E_INVAL;
+                        ret = QDF_STATUS_E_INVAL;
+                        goto ret_rel_ref;
 		}
 	}
 
@@ -1149,7 +1150,8 @@ QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 		uint8_t igtk_idx = key_idx - WLAN_CRYPTO_MAXKEYIDX;
 		if (igtk_idx >= WLAN_CRYPTO_MAXIGTKKEYIDX) {
 			crypto_err("Igtk key invalid keyid %d", igtk_idx);
-			return QDF_STATUS_E_INVAL;
+                        ret = QDF_STATUS_E_INVAL;
+                        goto ret_rel_ref;
 		}
 		key = crypto_priv->igtk_key[igtk_idx];
 		crypto_priv->igtk_key[igtk_idx] = NULL;
@@ -1160,8 +1162,10 @@ QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 		crypto_priv->key[key_idx] = NULL;
 	}
 
-	if (!key)
-		return QDF_STATUS_E_INVAL;
+        if (!key) {
+                ret = QDF_STATUS_E_INVAL;
+                goto ret_rel_ref;
+        }
 
 	if (key->valid) {
 		cipher_table = (struct wlan_crypto_cipher *)key->cipher_table;
@@ -1180,6 +1184,10 @@ QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 	/* Zero-out local key variables */
 	qdf_mem_zero(key, sizeof(struct wlan_crypto_key));
 	qdf_mem_free(key);
+
+ret_rel_ref:
+        if (peer)
+                wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
 
 	return QDF_STATUS_SUCCESS;
 }
