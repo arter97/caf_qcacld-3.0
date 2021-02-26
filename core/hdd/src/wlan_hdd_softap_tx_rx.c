@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, 2021 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -701,6 +701,13 @@ QDF_STATUS hdd_softap_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 	++pAdapter->hdd_stats.hddTxRxStats.rxPackets[cpu_index];
 	++pAdapter->stats.rx_packets;
 	pAdapter->stats.rx_bytes += skb->len;
+
+	if (qdf_unlikely(qdf_nbuf_is_ipv4_eapol_pkt(skb) &&
+			 qdf_mem_cmp(qdf_nbuf_data(skb) +
+				     QDF_NBUF_DEST_MAC_OFFSET,
+				     pAdapter->macAddressCurrent.bytes,
+				     QDF_MAC_ADDR_SIZE)))
+		return QDF_STATUS_E_FAILURE;
 
 	hdd_event_eapol_log(skb, QDF_RX);
 	DPTRACE(qdf_dp_trace(skb,
