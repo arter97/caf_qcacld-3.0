@@ -925,6 +925,15 @@ QDF_STATUS hdd_softap_rx_packet_cbk(void *context, qdf_nbuf_t rxBuf)
 
 		hdd_inspect_dhcp_packet(adapter, staid, skb, QDF_RX);
 
+		if (qdf_unlikely(qdf_nbuf_is_ipv4_eapol_pkt(skb) &&
+				 qdf_mem_cmp(qdf_nbuf_data(skb) +
+					     QDF_NBUF_DEST_MAC_OFFSET,
+					     adapter->mac_addr.bytes,
+					     QDF_MAC_ADDR_SIZE))) {
+			qdf_nbuf_free(skb);
+			continue;
+		}
+
 		hdd_event_eapol_log(skb, QDF_RX);
 		proto_pkt_logged = qdf_dp_trace_log_pkt(adapter->session_id,
 						skb, QDF_RX,
