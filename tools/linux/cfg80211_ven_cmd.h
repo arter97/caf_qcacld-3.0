@@ -772,6 +772,8 @@ enum {
 	IEEE80211_PARAM_VAP_DIFF_MODE              = 742,   /* Enable different mode for the vap */
 	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743,   /* Switch between RTT intiator/responder modes */
 	IEEE80211_PARAM_SPL_VAP_SCAN               = 744,   /* Scan on cur_chan for special VAP */
+	IEEE80211_PARAM_DSCP_ACTION_POLICY         = 745,   /* Enable DSCP Action Policy protocol */
+
 };
 
 enum {
@@ -2188,6 +2190,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"rsim_de_frmcnt",      IEEE80211_PARAM_RAWSIM_DEBUG_NUM_DECAP_FRAMES, SET_PARAM, 1},
 	{"g_rsim_de_frmcnt",    IEEE80211_PARAM_RAWSIM_DEBUG_NUM_DECAP_FRAMES, GET_PARAM, 0},
 #endif
+	{"dscp_action_policy", IEEE80211_PARAM_DSCP_ACTION_POLICY, SET_PARAM, 1},
+	{"g_dscp_action_policy", IEEE80211_PARAM_DSCP_ACTION_POLICY, GET_PARAM, 0},
 	{"mscs",                IEEE80211_PARAM_ENABLE_MSCS, SET_PARAM, 1},
 	{"g_mscs",              IEEE80211_PARAM_ENABLE_MSCS, GET_PARAM, 0},
 	{"scs",                 IEEE80211_PARAM_ENABLE_SCS, SET_PARAM, 1},
