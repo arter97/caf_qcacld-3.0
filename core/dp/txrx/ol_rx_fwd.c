@@ -209,6 +209,7 @@ ol_rx_fwd_check(struct ol_txrx_vdev_t *vdev,
 								 pdev->htt_pdev,
 								 rx_desc);
 
+
 			if (vdev->opmode == wlan_op_mode_ap &&
 			    __qdf_nbuf_data_is_ipv4_eapol_pkt(
 						   qdf_nbuf_data(msdu) + off) &&
