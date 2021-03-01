@@ -1277,6 +1277,8 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ENABLE_LOW_LATENCY_MODE = 467,
 	/* Enable/disable pktlog dump upload on SSR */
 	OL_ATH_PARAM_PKTLOG_DUMP_UPLOAD_SSR = 468,
+	/* Display the phy_id of the radio */
+	OL_ATH_PARAM_DISPLAY_PHY_ID = 469,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3300,6 +3302,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_USER_RNR_FRM_CTRL, GET_PARAM, 1},
 	{"low_latency_mode",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_LOW_LATENCY_MODE, SET_PARAM, 1},
+	{"g_phy_id",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_PHY_ID, GET_PARAM, 0},
 };
 #endif
 #endif
