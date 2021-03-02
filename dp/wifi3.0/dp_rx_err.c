@@ -1111,6 +1111,119 @@ fail:
 	return;
 }
 
+#ifdef WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG
+/**
+ * dp_rx_err_route_hdl() - Function to send EAPOL frames to stack
+ *                            Free any other packet which comes in
+ *                            this path.
+ *
+ * @soc: core DP main context
+ * @nbuf: buffer pointer
+ * @peer: peer handle
+ * @rx_tlv_hdr: start of rx tlv header
+ * @err_src: rxdma/reo
+ *
+ * This function indicates EAPOL frame received in wbm error ring to stack.
+ * Any other frame should be dropped.
+ *
+ * Return: SUCCESS if delivered to stack
+ */
+static void
+dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
+		struct dp_peer *peer, uint8_t *rx_tlv_hdr,
+		enum hal_rx_wbm_error_source err_src)
+{
+	uint32_t pkt_len, l2_hdr_offset;
+	uint16_t msdu_len;
+	struct dp_vdev *vdev;
+
+	l2_hdr_offset = hal_rx_msdu_end_l3_hdr_padding_get(rx_tlv_hdr);
+	msdu_len = hal_rx_msdu_start_msdu_len_get(rx_tlv_hdr);
+	pkt_len = msdu_len + l2_hdr_offset + RX_PKT_TLVS_LEN;
+
+	if (qdf_likely(!qdf_nbuf_is_frag(nbuf))) {
+		/* Set length in nbuf */
+		qdf_nbuf_set_pktlen(
+				nbuf, qdf_min(pkt_len, (uint32_t)RX_BUFFER_SIZE));
+		qdf_assert_always(nbuf->data == rx_tlv_hdr);
+	}
+
+	/*
+	 * Check if DMA completed -- msdu_done is the last bit
+	 * to be written
+	 */
+	if (!hal_rx_attn_msdu_done_get(rx_tlv_hdr)) {
+		dp_err_rl("MSDU DONE failure");
+		hal_rx_dump_pkt_tlvs(soc->hal_soc, rx_tlv_hdr,
+				QDF_TRACE_LEVEL_INFO);
+		qdf_assert(0);
+	}
+
+	if (!peer)
+		goto drop_nbuf;
+
+	vdev = peer->vdev;
+	if (!vdev) {
+		dp_err_rl("Null vdev!");
+		DP_STATS_INC(soc, rx.err.invalid_vdev, 1);
+		goto drop_nbuf;
+	}
+
+	/*
+	 * Advance the packet start pointer by total size of
+	 * pre-header TLV's
+	 */
+	if (qdf_nbuf_is_frag(nbuf))
+		qdf_nbuf_pull_head(nbuf, RX_PKT_TLVS_LEN);
+	else
+		qdf_nbuf_pull_head(nbuf, (l2_hdr_offset +
+					RX_PKT_TLVS_LEN));
+
+	/*
+	 * Indicate EAPOL frame to stack only when vap mac address
+	 * matches the destination address.
+	 */
+	if (qdf_nbuf_is_ipv4_eapol_pkt(nbuf) ||
+			qdf_nbuf_is_ipv4_wapi_pkt(nbuf)) {
+		qdf_ether_header_t *eh =
+			(qdf_ether_header_t *)qdf_nbuf_data(nbuf);
+		if (qdf_mem_cmp(eh->ether_dhost, &vdev->mac_addr.raw[0],
+					QDF_MAC_ADDR_SIZE) == 0) {
+			DP_STATS_INC(peer, rx.to_stack.num, 1);
+			dp_rx_deliver_to_stack(vdev, peer, nbuf, NULL);
+			return;
+		}
+	}
+
+drop_nbuf:
+
+	qdf_nbuf_free(nbuf);
+}
+#else
+
+static void
+dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
+		struct dp_peer *peer, uint8_t *rx_tlv_hdr,
+		enum hal_rx_wbm_error_source err_src)
+{
+	qdf_nbuf_free(nbuf);
+}
+#endif
+
+
+
+/**
+ * dp_rx_err_process() - Processes error frames routed to REO error ring
+ *
+ * @soc: core txrx main context
+ * @hal_ring: opaque pointer to the HAL Rx Error Ring, which will be serviced
+ * @quota: No. of units (packets) that can be serviced in one shot.
+ *
+ * This function implements error processing and top level demultiplexer
+ * for all the frames routed to REO error ring.
+ *
+ * Return: uint32_t: No. of elements processed
+ */
 uint32_t
 dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		  hal_ring_handle_t hal_ring_hdl, uint32_t quota)
@@ -1517,6 +1630,15 @@ done:
 						  wbm_err_info.reo_err_code);
 					break;
 				}
+			} else if (wbm_err_info.reo_psh_rsn
+					== HAL_RX_WBM_REO_PSH_RSN_ROUTE) {
+				dp_rx_err_route_hdl(soc, nbuf, peer,
+						rx_tlv_hdr,
+						HAL_RX_WBM_ERR_SRC_REO);
+				nbuf = next;
+				if (peer)
+					dp_peer_unref_del_find_by_id(peer);
+				continue;
 			}
 		} else if (wbm_err_info.wbm_err_src ==
 					HAL_RX_WBM_ERR_SRC_RXDMA) {
@@ -1588,7 +1710,17 @@ done:
 					dp_err_rl("RXDMA error %d",
 						  wbm_err_info.rxdma_err_code);
 				}
+			} else if (wbm_err_info.rxdma_psh_rsn
+					== HAL_RX_WBM_RXDMA_PSH_RSN_ROUTE) {
+				dp_rx_err_route_hdl(soc, nbuf, peer,
+						rx_tlv_hdr,
+						HAL_RX_WBM_ERR_SRC_RXDMA);
+				nbuf = next;
+				if (peer)
+					dp_peer_unref_del_find_by_id(peer);
+				continue;
 			}
+
 		} else {
 			/* Should not come here */
 			qdf_assert(0);

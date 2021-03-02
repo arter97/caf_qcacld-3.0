@@ -1286,7 +1286,7 @@ dp_rx_enqueue_rx(struct dp_peer *peer, qdf_nbuf_t rx_buf_list)
 }
 #endif
 
-static inline void dp_rx_deliver_to_stack(struct dp_vdev *vdev,
+void dp_rx_deliver_to_stack(struct dp_vdev *vdev,
 						struct dp_peer *peer,
 						qdf_nbuf_t nbuf_head,
 						qdf_nbuf_t nbuf_tail)

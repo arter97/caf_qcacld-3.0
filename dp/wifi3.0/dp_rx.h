@@ -1093,4 +1093,6 @@ QDF_STATUS dp_peer_set_rx_capture_enabled(struct dp_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+void dp_rx_deliver_to_stack(struct dp_vdev *vdev, struct dp_peer *peer,
+		         qdf_nbuf_t nbuf_head, qdf_nbuf_t nbuf_tail);
 #endif /* _DP_RX_H */
