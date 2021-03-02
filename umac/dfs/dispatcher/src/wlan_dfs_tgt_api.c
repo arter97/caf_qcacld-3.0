@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -33,6 +33,7 @@
 #include "../../core/src/dfs_process_radar_found_ind.h"
 #include <qdf_module.h>
 #include "../../core/src/dfs_partial_offload_radar.h"
+#include "../../core/src/dfs_internal.h"
 #ifdef QCA_MCL_DFS_SUPPORT
 #include "wlan_mlme_ucfg_api.h"
 #endif
@@ -912,6 +913,7 @@ qdf_export_symbol(tgt_dfs_send_subchan_marking);
 void tgt_dfs_enable_stadfs(struct wlan_objmgr_pdev *pdev, bool val)
 {
 	struct wlan_dfs *dfs;
+	uint32_t dfs_reg = 0;
 
 	dfs = wlan_pdev_get_dfs_obj(pdev);
 	if (!dfs) {
@@ -919,6 +921,20 @@ void tgt_dfs_enable_stadfs(struct wlan_objmgr_pdev *pdev, bool val)
 		return;
 	}
 
+	if (val == dfs->dfs_is_stadfs_enabled) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			"STA DFS enable already set to %d", val);
+		return;
+	}
+
+	wlan_reg_get_dfs_region(pdev, &dfs_reg);
+
+	if ((dfs_reg != DFS_ETSI_DOMAIN) && val) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			"Cannot enable STA DFS on non ETSI Domain %d", dfs_reg);
+		dfs->dfs_is_stadfs_enabled = 0;
+		return;
+	}
 	dfs->dfs_is_stadfs_enabled = val;
 }
 

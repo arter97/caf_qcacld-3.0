@@ -76,6 +76,14 @@
 			((buf) |= ((freq) & WMI_SCAN_CHANNEL_FREQ_MASK))
 #define TARGET_SET_FLAGS_IN_CHAN_LIST_TLV(buf, flags) \
 			((buf) |= ((flags) << CHAN_LIST_FLAG_MASK_POS))
+/*
+ * WMI_CHAN_FLAG_STA_DFS definition not available
+ * in the current branch, but part of 11.4.
+ * Locally define the value here.
+ */
+#ifndef WMI_CHAN_FLAG_STA_DFS
+#define WMI_CHAN_FLAG_STA_DFS     20 /* Indicates if STA should process radar signals */
+#endif
 
 /* HTC service ids for WMI for multi-radio */
 static const uint32_t multi_svc_ids[] = {WMI_CONTROL_SVC,
@@ -995,6 +1003,9 @@ static inline void copy_channel_info(
 
 	if (req->channel.dfs_set_cfreq2)
 		WMI_SET_CHANNEL_FLAG(chan, WMI_CHAN_FLAG_DFS_CFREQ2);
+
+	if (req->channel.is_stadfs_en)
+		WMI_SET_CHANNEL_FLAG(chan, WMI_CHAN_FLAG_STA_DFS);
 
 	/* According to firmware both reg power and max tx power
 	 * on set channel power is used and set it to max reg
