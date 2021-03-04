@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1403,6 +1403,7 @@ struct cdp_pdev_stats {
 	uint64_t ack_ba_comes_twice;
 	uint64_t ppdu_drop;
 	uint64_t ppdu_wrap_drop;
+	uint32_t peer_unauth_rx_pkt_drop;
 };
 
 #ifdef QCA_ENH_V3_STATS_SUPPORT
