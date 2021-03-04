@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -932,4 +932,31 @@ cdp_dump_rx_flow_tag_stats(ol_txrx_soc_handle soc, struct cdp_pdev *pdev,
 	return soc->ops->ctrl_ops->txrx_dump_rx_flow_tag_stats(pdev, flow_info);
 }
 #endif /* WLAN_SUPPORT_RX_FLOW_TAG */
+
+/**
+ * cdp_peer_flush_frags() - get per-peer protocol count drop-mask
+ *
+ * @soc - pointer to the soc
+ * @vdev - the data virtual device object
+ *
+ * Get peer-protocol-count drop-mask
+ *
+ * Return: peer-protocol-count drop-mask
+ */
+static inline
+void cdp_txrx_peer_flush_frags(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *peer_mac)
+{
+        if (!soc || !soc->ops) {
+		dp_err("Invalid SOC instance");
+                QDF_BUG(0);
+                return;
+        }
+
+        if (!soc->ops->ctrl_ops ||
+            !soc->ops->ctrl_ops->txrx_peer_flush_frags)
+                return;
+
+        return soc->ops->ctrl_ops->txrx_peer_flush_frags(soc, vdev_id, peer_mac);
+}
+
 #endif /* _CDP_TXRX_CTRL_H_ */

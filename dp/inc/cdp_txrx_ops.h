@@ -644,6 +644,7 @@ struct cdp_ctrl_ops {
 					  uint32_t val);
 	void * (*txrx_get_pldev)(struct cdp_pdev *pdev);
 
+	void (*txrx_peer_flush_frags)(struct cdp_soc_t *soc, uint8_t vdev_id, uint8_t *peer_mac);
 #ifdef ATH_SUPPORT_NAC_RSSI
 	QDF_STATUS (*txrx_vdev_config_for_nac_rssi)(struct cdp_vdev *vdev,
 		enum cdp_nac_param_cmd cmd, char *bssid, char *client_macaddr,
