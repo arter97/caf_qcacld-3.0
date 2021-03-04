@@ -4254,7 +4254,7 @@ dp_tx_mon_proc_pending_ppdus(struct dp_pdev *pdev, struct dp_tx_tid *tx_tid,
 	}
 }
 
-static uint32_t
+static QDF_STATUS
 dp_send_mgmt_ctrl_to_stack(struct dp_pdev *pdev,
 			   qdf_nbuf_t nbuf_ppdu_desc,
 			   struct cdp_tx_indication_info *ptr_tx_cap_info,
@@ -4269,11 +4269,27 @@ dp_send_mgmt_ctrl_to_stack(struct dp_pdev *pdev,
 	struct ieee80211_frame_min_one *wh_min;
 	uint16_t frame_ctrl_le;
 	uint8_t type, subtype;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	mpdu_info = &ptr_tx_cap_info->mpdu_info;
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)
 			qdf_nbuf_data(nbuf_ppdu_desc);
 	user = &ppdu_desc->user[0];
+
+	/*
+	 * only for the packets send over the air are handled
+	 * packets drop by firmware is not handled in this
+	 * feature
+	 */
+	if (user->completion_status == HTT_PPDU_STATS_USER_STATUS_FILTERED) {
+		status = QDF_STATUS_SUCCESS;
+		qdf_nbuf_free(nbuf_ppdu_desc);
+
+		/* free mgmt_ctl_nbuf only if it is available */
+		if (mgmt_ctl_nbuf)
+			qdf_nbuf_free(mgmt_ctl_nbuf);
+		goto free_mpdu_nbuf;
+	}
 
 	if (ppdu_desc->mprot_type)
 		dp_send_dummy_rts_cts_frame(pdev, ppdu_desc, 0);
@@ -4330,10 +4346,16 @@ dp_send_mgmt_ctrl_to_stack(struct dp_pdev *pdev,
 
 	TX_CAP_WDI_EVENT_HANDLER(pdev->soc, pdev->pdev_id, ptr_tx_cap_info);
 
+	if (nbuf_ppdu_desc) {
+		status = QDF_STATUS_SUCCESS;
+		qdf_nbuf_free(nbuf_ppdu_desc);
+	}
+
+free_mpdu_nbuf:
 	if (ptr_tx_cap_info->mpdu_nbuf)
 		qdf_nbuf_free(ptr_tx_cap_info->mpdu_nbuf);
 
-	return 0;
+	return status;
 }
 
 static uint32_t
@@ -4395,7 +4417,17 @@ dp_update_tx_cap_info(struct dp_pdev *pdev,
 	return 0;
 }
 
-static uint32_t
+/**
+ * dp_check_mgmt_ctrl_ppdu(): Function to correlate payload to ppdu_desc and
+ * send to above layer.
+ * @pdev: DP pdev handle
+ * @nbuf_ppdu_desc: qdf_nbuf_t ppdu_desc
+ * @bar_frm_with_data: flag for bar frame with data
+ *
+ * return: QDF_STATUS_SUCCESS - ppdu desc is free inside
+ * QDF_STATUS_E_FAILURE - on ppdu desc not free yet.
+ */
+static QDF_STATUS
 dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 			qdf_nbuf_t nbuf_ppdu_desc, bool bar_frm_with_data)
 {
@@ -4411,12 +4443,12 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 	uint32_t ppdu_id;
 	uint32_t desc_ppdu_id;
 	size_t head_size;
-	uint32_t status = 1;
 	uint64_t tsf_delta;
 	uint64_t start_tsf;
 	uint64_t end_tsf;
 	uint16_t ppdu_desc_frame_ctrl;
 	struct dp_peer *peer;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)
 		qdf_nbuf_data(nbuf_ppdu_desc);
@@ -4469,7 +4501,7 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 						    ppdu_desc->user[0].mac_addr
 						    )) {
 			qdf_nbuf_free(nbuf_ppdu_desc);
-			status = 0;
+			status = QDF_STATUS_SUCCESS;
 			DP_TX_PEER_DEL_REF(peer);
 			goto free_ppdu_desc;
 		}
@@ -4486,7 +4518,7 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 							    ppdu_desc->user[0]
 							    .mac_addr)) {
 				qdf_nbuf_free(nbuf_ppdu_desc);
-				status = 0;
+				status = QDF_STATUS_SUCCESS;
 				goto free_ppdu_desc;
 			}
 		}
@@ -4571,7 +4603,7 @@ get_mgmt_pkt_from_queue:
 				} else {
 					/* drop the ppdu_desc */
 					qdf_nbuf_free(nbuf_ppdu_desc);
-					status = 0;
+					status = QDF_STATUS_SUCCESS;
 					goto insert_mgmt_buf_to_queue;
 				}
 			}
@@ -4584,7 +4616,7 @@ get_mgmt_pkt_from_queue:
 			if (user->completion_status ==
 			    HTT_PPDU_STATS_USER_STATUS_FILTERED) {
 				qdf_nbuf_free(nbuf_ppdu_desc);
-				status = 0;
+				status = QDF_STATUS_SUCCESS;
 				goto insert_mgmt_buf_to_queue;
 			}
 
@@ -4612,7 +4644,7 @@ get_mgmt_pkt_from_queue:
 				TX_CAP_NBUF_QUEUE_FREE(retries_q);
 			}
 
-			status = 0;
+			status = QDF_STATUS_SUCCESS;
 
 insert_mgmt_buf_to_queue:
 			/*
@@ -4638,19 +4670,6 @@ insert_mgmt_buf_to_queue:
 					   start_tsf, ptr_comp_info->tx_tsf,
 					   bar_frm_with_data, is_sgen_pkt);
 
-			/*
-			 * only for the packets send over the air are handled
-			 * packets drop by firmware is not handled in this
-			 * feature
-			 */
-			if (user->completion_status ==
-			    HTT_PPDU_STATS_USER_STATUS_FILTERED) {
-				qdf_nbuf_free(nbuf_ppdu_desc);
-				qdf_nbuf_free(mgmt_ctl_nbuf);
-				status = 0;
-				goto free_ppdu_desc;
-			}
-
 			/* pull head based on sgen pkt or mgmt pkt */
 			if (NULL == qdf_nbuf_pull_head(mgmt_ctl_nbuf,
 						       head_size)) {
@@ -4673,7 +4692,7 @@ insert_mgmt_buf_to_queue:
 					qdf_nbuf_free(nbuf_ppdu_desc);
 					qdf_nbuf_free(mgmt_ctl_nbuf);
 					TX_CAP_NBUF_QUEUE_FREE(retries_q);
-					status = 0;
+					status = QDF_STATUS_SUCCESS;
 					goto free_ppdu_desc;
 				}
 			}
@@ -4730,14 +4749,12 @@ insert_mgmt_buf_to_queue:
 				/*
 				 * send MPDU to osif layer
 				 */
-				dp_send_mgmt_ctrl_to_stack(pdev,
-							   nbuf_retry_ppdu,
-							   &tx_capture_info,
-							   tmp_mgmt_ctl_nbuf,
-							   true);
-
-				/* free retried queue nbuf ppdu_desc */
-				qdf_nbuf_free(nbuf_retry_ppdu);
+				status = dp_send_mgmt_ctrl_to_stack(
+							pdev,
+							nbuf_retry_ppdu,
+							&tx_capture_info,
+							tmp_mgmt_ctl_nbuf,
+							true);
 			}
 
 			dp_update_tx_cap_info(pdev, nbuf_ppdu_desc,
@@ -4746,7 +4763,7 @@ insert_mgmt_buf_to_queue:
 			if (!tx_capture_info.mpdu_nbuf) {
 				qdf_nbuf_free(mgmt_ctl_nbuf);
 				qdf_nbuf_free(nbuf_ppdu_desc);
-				status = 0;
+				status = QDF_STATUS_SUCCESS;
 				goto free_ppdu_desc;
 			}
 
@@ -4764,9 +4781,11 @@ insert_mgmt_buf_to_queue:
 			/*
 			 * send MPDU to osif layer
 			 */
-			dp_send_mgmt_ctrl_to_stack(pdev, nbuf_ppdu_desc,
-						   &tx_capture_info,
-						   mgmt_ctl_nbuf, true);
+			status = dp_send_mgmt_ctrl_to_stack(pdev,
+							    nbuf_ppdu_desc,
+							    &tx_capture_info,
+							    mgmt_ctl_nbuf,
+							    true);
 		}
 	} else if (!is_sgen_pkt) {
 		/*
@@ -4777,7 +4796,7 @@ insert_mgmt_buf_to_queue:
 		if (user->completion_status ==
 		    HTT_PPDU_STATS_USER_STATUS_FILTERED) {
 			qdf_nbuf_free(nbuf_ppdu_desc);
-			status = 0;
+			status = QDF_STATUS_SUCCESS;
 			goto free_ppdu_desc;
 		}
 
@@ -4805,36 +4824,25 @@ insert_mgmt_buf_to_queue:
 			TX_CAP_NBUF_QUEUE_FREE(retries_q);
 		}
 
-		status = 0;
+		status = QDF_STATUS_SUCCESS;
 	} else if ((ppdu_desc_frame_ctrl &
 		   IEEE80211_FC0_TYPE_MASK) ==
 		   IEEE80211_FC0_TYPE_CTL) {
-
-		/*
-		 * only for the packets send over the air are handled
-		 * packets drop by firmware is not handled in this
-		 * feature
-		 */
-		if (user->completion_status ==
-		    HTT_PPDU_STATS_USER_STATUS_FILTERED) {
-			qdf_nbuf_free(nbuf_ppdu_desc);
-			status = 0;
-			goto free_ppdu_desc;
-		}
 
 		dp_update_tx_cap_info(pdev, nbuf_ppdu_desc,
 				      &tx_capture_info, false,
 				      bar_frm_with_data);
 		if (!tx_capture_info.mpdu_nbuf) {
 			qdf_nbuf_free(nbuf_ppdu_desc);
-			status = 0;
+			status = QDF_STATUS_SUCCESS;
 			goto free_ppdu_desc;
 		}
 		/*
 		 * send MPDU to osif layer
 		 */
-		dp_send_mgmt_ctrl_to_stack(pdev, nbuf_ppdu_desc,
-					   &tx_capture_info, NULL, false);
+		status = dp_send_mgmt_ctrl_to_stack(pdev, nbuf_ppdu_desc,
+						    &tx_capture_info,
+						    NULL, false);
 	}
 
 free_ppdu_desc:
@@ -5030,6 +5038,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 		    (ppdu_desc->htt_frame_type ==
 		     HTT_STATS_FTYPE_SGEN_QOS_NULL)) {
 			qdf_nbuf_t tmp_nbuf_ppdu;
+			QDF_STATUS status;
 
 			tmp_nbuf_ppdu = nbuf_ppdu;
 			/*
@@ -5056,12 +5065,16 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 				is_bar_frm_with_data = true;
 			}
 
-			if (dp_check_mgmt_ctrl_ppdu(pdev, tmp_nbuf_ppdu,
-						    is_bar_frm_with_data)) {
-				dp_tx_cap_nbuf_list_dec_ref(ptr_nbuf_list);
+			status = dp_check_mgmt_ctrl_ppdu(pdev, tmp_nbuf_ppdu,
+							 is_bar_frm_with_data);
+
+			dp_tx_cap_nbuf_list_dec_ref(ptr_nbuf_list);
+			if (status == QDF_STATUS_E_FAILURE) {
+				/*
+				 * QDF_STATUS_E_FAILURE - when tmp_nbuf_ppdu
+				 * is not free in dp_check_mgmt_ctrl_ppdu()
+				 */
 				qdf_nbuf_free(tmp_nbuf_ppdu);
-			} else {
-				dp_tx_cap_nbuf_list_dec_ref(ptr_nbuf_list);
 			}
 
 			if (!is_bar_frm_with_data)
