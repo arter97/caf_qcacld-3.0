@@ -3378,6 +3378,12 @@ qdf_nbuf_linearize(qdf_nbuf_t buf)
 	return __qdf_nbuf_linearize(buf);
 }
 
+static inline bool
+qdf_nbuf_is_cloned(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_is_cloned(buf);
+}
+
 #ifdef NBUF_MEMORY_DEBUG
 #define qdf_nbuf_unshare(d) \
 	qdf_nbuf_unshare_debug(d, __func__, __LINE__)
@@ -3387,15 +3393,17 @@ qdf_nbuf_unshare_debug(qdf_nbuf_t buf, const char *func_name, uint32_t line_num)
 {
 	qdf_nbuf_t unshared_buf;
 
+	/* Not a shared buffer, nothing to do */
+	if(!qdf_nbuf_is_cloned(buf))
+		return buf;
+
+	qdf_net_buf_debug_delete_node(buf);
+
 	unshared_buf = __qdf_nbuf_unshare(buf);
 
-	if (qdf_likely(buf != unshared_buf)) {
-		qdf_net_buf_debug_delete_node(buf);
-
-		if (unshared_buf)
-			qdf_net_buf_debug_add_node(unshared_buf, 0,
-						   func_name, line_num);
-	}
+	if (qdf_likely(unshared_buf))
+		qdf_net_buf_debug_add_node(unshared_buf, 0,
+					   func_name, line_num);
 
 	return unshared_buf;
 }
@@ -3407,12 +3415,6 @@ qdf_nbuf_unshare(qdf_nbuf_t buf)
 	return __qdf_nbuf_unshare(buf);
 }
 #endif
-
-static inline bool
-qdf_nbuf_is_cloned(qdf_nbuf_t buf)
-{
-	return __qdf_nbuf_is_cloned(buf);
-}
 
 static inline void
 qdf_nbuf_frag_info(qdf_nbuf_t buf, qdf_sglist_t *sg)
