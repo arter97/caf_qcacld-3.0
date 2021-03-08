@@ -783,10 +783,8 @@ enum {
 	IEEE80211_PARAM_PEER_AUTHORIZE             = 724, /* Enable port authorization */
 	IEEE80211_PARAM_FWD_ACTION_FRAMES_TO_APP   = 725,   /* Forward 11k/v frames to Hostapd instead of handling in driver */
 	IEEE80211_PARAM_WNM_STATS                  = 726,   /* WNM Stats */
-#ifdef FEATURE_CM_ENABLE
 #if SM_ENG_HIST_ENABLE
 	IEEE80211_PARAM_CM_HISTORY                 = 727,   /* Print Connection SM history */
-#endif
 #endif
 	IEEE80211_PARAM_RTS                        = 728,   /* Vdev specific minimum packet size setting for which RTS/CTS is used */
 	IEEE80211_PARAM_SM_GAP_PS_ENABLE           = 729,   /* Enable SMPS-GAP power saving */
@@ -2285,10 +2283,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_fwd_act_app",             IEEE80211_PARAM_FWD_ACTION_FRAMES_TO_APP, GET_PARAM, 0},
 	{"wnmstats",                  IEEE80211_PARAM_WNM_STATS, SET_PARAM, 1},
 	{"get_wnmstats",              IEEE80211_PARAM_WNM_STATS, GET_PARAM, 0},
-#ifdef FEATURE_CM_ENABLE
 #if SM_ENG_HIST_ENABLE
 	{"cm_history", IEEE80211_PARAM_CM_HISTORY, GET_PARAM, 0},
-#endif
 #endif
 	{"rts",                       IEEE80211_PARAM_RTS, SET_PARAM, 1},
 	{"get_rts",                   IEEE80211_PARAM_RTS, GET_PARAM, 0},
