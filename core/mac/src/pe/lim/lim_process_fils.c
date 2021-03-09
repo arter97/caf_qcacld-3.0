@@ -1025,7 +1025,7 @@ void lim_add_fils_data_to_auth_frame(struct pe_session *session,
 	 * MDIE to be sent in auth frame during initial
 	 * mobility domain association
 	 */
-	if (session->lim_join_req->is11Rconnection) {
+	if (session->is11Rconnection) {
 		struct bss_description *bss_desc;
 
 		bss_desc = &session->lim_join_req->bssDescription;
@@ -1452,7 +1452,7 @@ void lim_update_fils_config(struct mac_context *mac_ctx,
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
 	if (!mlme_priv)
 		return;
-	fils_info = mlme_priv->fils_con_info;
+	fils_info = mlme_priv->connect_info.fils_con_info;
 	if (!fils_info)
 		return;
 	pe_fils_info = session->fils_info;
@@ -2365,6 +2365,11 @@ QDF_STATUS aead_decrypt_assoc_rsp(struct mac_context *mac_ctx,
 	uint32_t data_len, fils_ies_len;
 	uint8_t *fils_ies;
 	struct pe_fils_session *fils_info = session->fils_info;
+
+	if (*n_frame < FIXED_PARAM_OFFSET_ASSOC_RSP) {
+		pe_debug("payload len is less than ASSOC RES offset");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	status = find_ie_data_after_fils_session_ie(mac_ctx, p_frame +
 					      FIXED_PARAM_OFFSET_ASSOC_RSP,

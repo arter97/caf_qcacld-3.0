@@ -47,7 +47,9 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
  * wlan_hdd_cm_issue_disconnect() - initiate disconnect from osif
  * @adapter: Pointer to adapter
  * @reason: Disconnect reason code
- * @sync: true if wait for disconnect to complete is required.
+ * @sync: true if wait for disconnect to complete is required. for the
+ *        supplicant initiated disconnect or during vdev delete/change interface
+ *        sync should be true.
  *
  * This function is used to issue disconnect request to conection manager
  *
@@ -81,6 +83,15 @@ QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS hdd_cm_connect_complete(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_resp *rsp,
 				   enum osif_cb_type type);
+/**
+ * hdd_cm_napi_serialize_control() - NAPI serialize hdd cb
+ * @action: serialize or de-serialize NAPI activities
+ *
+ * This function is for napi serialize
+ *
+ * Return: qdf status
+ */
+QDF_STATUS hdd_cm_napi_serialize_control(bool action);
 
 #ifdef WLAN_FEATURE_FILS_SK
 /**
@@ -163,6 +174,18 @@ void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter);
  * Return: None
  */
 void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter);
+
+/**
+ * hdd_cm_set_peer_authenticate() - set peer as authenticated
+ * @adapter: pointer to adapter
+ * @bssid: bssid of the connection
+ * @is_auth_required: is upper layer authenticatoin required
+ *
+ * Return: QDF_STATUS enumeration
+ */
+void hdd_cm_set_peer_authenticate(struct hdd_adapter *adapter,
+				  struct qdf_mac_addr *bssid,
+				  bool is_auth_required);
 
 /**
  * hdd_cm_update_rssi_snr_by_bssid() - update rsi and snr into adapter

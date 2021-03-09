@@ -22,6 +22,7 @@
  * Host based roaming preauthentication implementation
  */
 
+#ifndef FEATURE_CM_ENABLE
 #include "wma_types.h"
 #include "csr_inside_api.h"
 #include "sme_qos_internal.h"
@@ -342,10 +343,10 @@ ABORT_PREAUTH:
 			reason = REASON_PREAUTH_FAILED_FOR_ALL;
 			if (neighbor_roam_info->uOsRequestedHandoff) {
 				neighbor_roam_info->uOsRequestedHandoff = 0;
-				csr_post_roam_state_change(
-						   mac_ctx, session_id,
-						   WLAN_ROAM_RSO_ENABLED,
-						   reason);
+				wlan_cm_roam_state_change(mac_ctx->pdev,
+						session_id,
+						WLAN_ROAM_RSO_ENABLED,
+						reason);
 			} else {
 				/* ROAM_SCAN_OFFLOAD_RESTART is a
 				 * special command to trigger bmiss
@@ -353,7 +354,8 @@ ABORT_PREAUTH:
 				 * preauth failure.
 				 * This should be decoupled from RSO.
 				 */
-				csr_roam_offload_scan(mac_ctx, session_id,
+				wlan_cm_roam_send_rso_cmd(mac_ctx->psoc,
+						      session_id,
 						      ROAM_SCAN_OFFLOAD_RESTART,
 						      reason);
 			}
@@ -788,4 +790,4 @@ QDF_STATUS csr_neighbor_roam_issue_preauth_req(struct mac_context *mac_ctx,
 
 	return status;
 }
-
+#endif

@@ -45,6 +45,52 @@ wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 					uint8_t vdev_id);
 
 /**
+ * wlan_cm_roam_send_rso_cmd() - send rso command
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @rso_command: roam command to send
+ * @reason: reason for changing roam state for the requested vdev id
+ *
+ * similar to csr_roam_offload_scan, will be used from many legacy
+ * process directly, generate a new function wlan_cm_roam_send_rso_cmd
+ * for external usage.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint8_t rso_command,
+				     uint8_t reason);
+
+/**
+ * wlan_cm_roam_state_change() - Post roam state change to roam state machine
+ * @pdev: pdev pointer
+ * @vdev_id: vdev id
+ * @requested_state: roam state to be set
+ * @reason: reason for changing roam state for the requested vdev id
+ *
+ * This function posts roam state change to roam state machine handling
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
+				     uint8_t vdev_id,
+				     enum roam_offload_state requested_state,
+				     uint8_t reason);
+
+/**
+ * csr_roam_update_cfg() - Process RSO update cfg request
+ * @psoc: psoc context
+ * @vdev_id: vdev id
+ * @reason: reason for requesting RSO update cfg
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+		     uint8_t reason);
+
+#ifndef FEATURE_CM_ENABLE
+/**
  * wlan_cm_roam_cmd_allowed() - check roam cmd is allowed or not
  * @psoc: pointer to psoc object
  * @vdev_id: vdev id
@@ -60,42 +106,6 @@ wlan_cm_roam_cmd_allowed(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			 uint8_t rso_command, uint8_t reason);
 
 /**
- * wlan_cm_roam_fill_start_req() - fill start request structure content
- * @psoc: pointer to psoc object
- * @vdev_id: vdev id
- * @req: roam start config pointer
- * @reason: reason to roam
- *
- * This function gets called to fill start request structure content
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_roam_fill_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			    struct wlan_roam_start_config *req, uint8_t reason);
-
-/**
- * wlan_cm_roam_scan_offload_rsp() - send roam scan offload response message
- * @vdev_id: vdev id
- * @reason: reason to roam
- *
- * This function gets called to send roam scan offload response message
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_roam_scan_offload_rsp(uint8_t vdev_id, uint8_t reason);
-
-/**
- * wlan_cm_send_beacon_miss() - initiate beacon miss
- * @vdev_id: vdev id
- * @rssi: AP rssi
- *
- * Return: void
- */
-void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
-
-/**
  * wlan_cm_roam_neighbor_proceed_with_handoff_req() - invoke host handover to
  * new AP
  * @vdev_id: vdev id
@@ -108,6 +118,28 @@ QDF_STATUS
 wlan_cm_roam_neighbor_proceed_with_handoff_req(uint8_t vdev_id);
 
 /**
+ * wlan_cm_roam_scan_offload_rsp() - send roam scan offload response message
+ * @vdev_id: vdev id
+ * @reason: reason to roam
+ *
+ * This function gets called to send roam scan offload response message
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_roam_scan_offload_rsp(uint8_t vdev_id, uint8_t reason);
+#endif
+
+/**
+ * wlan_cm_send_beacon_miss() - initiate beacon miss
+ * @vdev_id: vdev id
+ * @rssi: AP rssi
+ *
+ * Return: void
+ */
+void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
+
+/**
  * wlan_cm_is_sta_connected() - check if STA is connected
  * @vdev_id: vdev id
  *
@@ -116,6 +148,30 @@ wlan_cm_roam_neighbor_proceed_with_handoff_req(uint8_t vdev_id);
 bool wlan_cm_is_sta_connected(uint8_t vdev_id);
 
 #else
+static inline
+QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint8_t rso_command,
+				     uint8_t reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+		     uint8_t reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS wlan_cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
+				     uint8_t vdev_id,
+				     enum roam_offload_state requested_state,
+				     uint8_t reason)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline QDF_STATUS
 wlan_cm_enable_roaming_on_connected_sta(struct wlan_objmgr_pdev *pdev,
 					uint8_t vdev_id)
@@ -143,18 +199,20 @@ bool wlan_cm_host_roam_in_progress(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id);
 
 /**
- * cm_roam_acquire_lock() - Wrapper for sme_acquire_global_lock.
+ * cm_roam_acquire_lock() - Wrapper for rso lock.
+ * @vdev: Pointer to vdev
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cm_roam_acquire_lock(void);
+QDF_STATUS cm_roam_acquire_lock(struct wlan_objmgr_vdev *vdev);
 
 /**
- * cm_roam_release_lock() - Wrapper for sme_release_global_lock()
+ * cm_roam_release_lock() - Wrapper for rso lock
+ * @vdev: Pointer to vdev
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS cm_roam_release_lock(void);
+QDF_STATUS cm_roam_release_lock(struct wlan_objmgr_vdev *vdev);
 
 /**
  * cm_roam_get_requestor_string() - RSO control requestor to string api
@@ -229,39 +287,6 @@ bool
 wlan_cm_roaming_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
- * wlan_cm_roam_state_change() - Post roam state change to roam state machine
- * @pdev: pdev pointer
- * @vdev_id: vdev id
- * @requested_state: roam state to be set
- * @reason: reason for changing roam state for the requested vdev id
- *
- * This function posts roam state change to roam state machine handling
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
-				     uint8_t vdev_id,
-				     enum roam_offload_state requested_state,
-				     uint8_t reason);
-
-/**
- * wlan_cm_roam_send_rso_cmd() - send rso command
- * @psoc: psoc pointer
- * @vdev_id: vdev id
- * @rso_command: roam command to send
- * @reason: reason for changing roam state for the requested vdev id
- *
- * similar to csr_roam_offload_scan, will be used from many legacy
- * process directly, generate a new function wlan_cm_roam_send_rso_cmd
- * for external usage.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id, uint8_t rso_command,
-				     uint8_t reason);
-
-/**
  * wlan_cm_roam_stop_req() - roam stop request handling
  * @psoc: psoc pointer
  * @vdev_id: vdev id
@@ -286,6 +311,12 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 				      uint8_t vdev_id,
 				      enum roam_cfg_param roam_cfg_type,
 				      struct cm_roam_values_copy *dst_config);
+
+static inline void
+wlan_cm_flush_roam_channel_list(struct rso_chan_info *channel_info)
+{
+	cm_flush_roam_channel_list(channel_info);
+}
 
 /**
  * wlan_cm_roam_cfg_set_value  - Set RSO config value
@@ -418,8 +449,9 @@ void wlan_cm_init_occupied_ch_freq_list(struct wlan_objmgr_pdev *pdev,
 					struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
 
-uint32_t cm_crpto_authmode_to_wmi_authmode(int32_t authmodeset,
-					   int32_t akm, int32_t ucastcipherset);
+uint32_t cm_crypto_authmode_to_wmi_authmode(int32_t authmodeset,
+					    int32_t akm,
+					    int32_t ucastcipherset);
 uint8_t *wlan_cm_get_rrm_cap_ie_data(void);
 
 /**
@@ -530,6 +562,20 @@ wlan_cm_update_mlme_fils_info(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_cm_update_fils_ft(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id, uint8_t *fils_ft,
 				  uint8_t fils_ft_len);
+
+/**
+ * wlan_cm_update_hlp_info - API to save HLP IE
+ * @psoc: Pointer to psoc
+ * @gen_ie: IE buffer to store
+ * @len: length of the IE buffer @gen_ie
+ * @vdev_id: vdev id
+ * @flush: Flush the older saved HLP if any
+ *
+ * Return: None
+ */
+void wlan_cm_update_hlp_info(struct wlan_objmgr_psoc *psoc,
+			     const uint8_t *gen_ie, uint16_t len,
+			     uint8_t vdev_id, bool flush);
 #else
 static inline
 struct wlan_fils_connection_info *wlan_cm_get_fils_connection_info(
@@ -538,6 +584,63 @@ struct wlan_fils_connection_info *wlan_cm_get_fils_connection_info(
 {
 	return NULL;
 }
+
+static inline void wlan_cm_update_hlp_info(struct wlan_objmgr_psoc *psoc,
+					   const uint8_t *gen_ie, uint16_t len,
+					   uint8_t vdev_id, bool flush)
+{}
+#endif
+
+static inline
+bool wlan_cm_is_auth_type_11r(struct wlan_mlme_psoc_ext_obj *mlme_obj,
+			      struct wlan_objmgr_vdev *vdev,
+			      bool mdie_present)
+{
+	return cm_is_auth_type_11r(mlme_obj, vdev, mdie_present);
+}
+
+/**
+ * cm_roam_start_init_on_connect() - init roaming
+ * @pdev: pdev pointer
+ * @vdev_id: vdev_id
+ *
+ * Return: void
+ */
+void cm_roam_start_init_on_connect(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id);
+#ifdef FEATURE_CM_ENABLE
+/**
+ * wlan_cm_roam_invoke() - Validate and send Roam invoke req to CM
+ * @pdev: Pdev pointer
+ * @vdev_id: vdev_id
+ * @bssid: Target bssid
+ * @chan_freq: channel frequency on which reassoc should be send
+ * @source: source of roam
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		    struct qdf_mac_addr *bssid, qdf_freq_t chan_freq,
+		    enum wlan_cm_source source);
+
+#ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * wlan_cm_host_roam_start() - fw host roam start handler
+ * @msg: msg pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg);
+#else
+static inline QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
+{
+	if (msg && msg->bodyptr)
+		qdf_mem_free(msg->bodyptr);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -704,6 +807,32 @@ wlan_cm_update_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
  */
 uint32_t wlan_cm_get_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
 					     uint8_t vdev_id);
+
+/**
+ * wlan_cm_update_roam_states() - Set roam states for the vdev
+ * @psoc: PSOC pointer
+ * @vdev_id: VDEV id
+ * @value: Value to update
+ * @states: type of value to update
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_update_roam_states(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			   uint32_t value, enum roam_fail_params states);
+
+/**
+ * wlan_cm_get_roam_states() - Get roam states value
+ * @psoc: PSOC pointer
+ * @vdev_id: VDEV id
+ * @states: For which action get roam states
+ *
+ * Return: Roam fail reason value
+ */
+uint32_t
+wlan_cm_get_roam_states(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			enum roam_fail_params states);
+
 void wlan_cm_set_psk_pmk(struct wlan_objmgr_pdev *pdev,
 			 uint8_t vdev_id, uint8_t *psk_pmk,
 			 uint8_t pmk_len);
@@ -790,6 +919,21 @@ uint32_t wlan_cm_get_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
 {
 	return 0;
 }
+
+static inline QDF_STATUS
+wlan_cm_update_roam_states(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			   uint32_t value, enum roam_fail_params states)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline uint32_t
+wlan_cm_get_roam_states(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			enum roam_fail_params states)
+{
+	return 0;
+}
+
 static inline void wlan_cm_set_psk_pmk(struct wlan_objmgr_pdev *pdev,
 				       uint8_t vdev_id, uint8_t *psk_pmk,
 				       uint8_t pmk_len)

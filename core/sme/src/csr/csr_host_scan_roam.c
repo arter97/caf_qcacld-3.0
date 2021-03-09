@@ -22,6 +22,7 @@
  * Host based roaming processing scan results and initiating the roaming
  */
 
+#ifndef FEATURE_CM_ENABLE
 #include "wma_types.h"
 #include "csr_inside_api.h"
 #include "sme_qos_internal.h"
@@ -33,6 +34,7 @@
 #include "csr_neighbor_roam.h"
 #include "mac_trace.h"
 #include "wlan_policy_mgr_api.h"
+#include <../../core/src/wlan_cm_vdev_api.h>
 
 QDF_STATUS csr_roam_issue_reassociate(struct mac_context *mac, uint32_t vdev_id,
 				      struct bss_description *bss_desc,
@@ -44,13 +46,10 @@ QDF_STATUS csr_roam_issue_reassociate(struct mac_context *mac, uint32_t vdev_id,
 	csr_roam_substate_change(mac, eCSR_ROAM_SUBSTATE_REASSOC_REQ, vdev_id);
 	sme_debug("calling csr_send_join_req_msg (eWNI_SME_REASSOC_REQ)");
 	/* This is temp ifdef will be removed in near future */
-#ifndef FEATURE_CM_ENABLE
+
 	/* attempt to Join this BSS... */
 	return csr_send_join_req_msg(mac, vdev_id, bss_desc, roam_profile, ies,
 				     eWNI_SME_REASSOC_REQ);
-#else
-	return QDF_STATUS_SUCCESS;
-#endif
 }
 
 QDF_STATUS
@@ -115,7 +114,7 @@ csr_roam_issue_reassociate_cmd(struct mac_context *mac,	uint32_t sessionId)
 		pCommand = tmp_command;
 		/* Change the substate in case it is wait-for-key */
 		if (CSR_IS_WAIT_FOR_KEY(mac, sessionId)) {
-			csr_roam_stop_wait_for_key_timer(mac, sessionId);
+			cm_stop_wait_for_key_timer(mac->psoc, sessionId);
 			csr_roam_substate_change(mac, eCSR_ROAM_SUBSTATE_NONE,
 						 sessionId);
 		}
@@ -401,7 +400,7 @@ QDF_STATUS csr_neighbor_roam_process_scan_complete(struct mac_context *mac,
 
 	if (csr_roam_is_roam_offload_scan_enabled(mac)) {
 		if (pNeighborRoamInfo->uOsRequestedHandoff) {
-			csr_roam_offload_scan(mac, sessionId,
+			wlan_cm_roam_send_rso_cmd(mac->psoc, sessionId,
 				ROAM_SCAN_OFFLOAD_START,
 				REASON_NO_CAND_FOUND_OR_NOT_ROAMING_NOW);
 			pNeighborRoamInfo->uOsRequestedHandoff = 0;
@@ -409,7 +408,7 @@ QDF_STATUS csr_neighbor_roam_process_scan_complete(struct mac_context *mac,
 			/* There is no candidate or We are not roaming Now.
 			 * Inform the FW to restart Roam Offload Scan
 			 */
-			csr_roam_offload_scan(mac, sessionId,
+			wlan_cm_roam_send_rso_cmd(mac->psoc, sessionId,
 				ROAM_SCAN_OFFLOAD_RESTART,
 				REASON_NO_CAND_FOUND_OR_NOT_ROAMING_NOW);
 		}
@@ -576,8 +575,6 @@ void csr_neighbor_roam_request_handoff(struct mac_context *mac_ctx,
 
 	sme_debug("csr_roamHandoffRequested: disassociating with current AP");
 
-	/* This is temp ifdef will be removed in near future */
-#ifndef FEATURE_CM_ENABLE
 	if (!QDF_IS_STATUS_SUCCESS(csr_roam_issue_disassociate_cmd(
 					mac_ctx,
 					session_id,
@@ -587,7 +584,7 @@ void csr_neighbor_roam_request_handoff(struct mac_context *mac_ctx,
 		qdf_mem_free(roam_info);
 		return;
 	}
-#endif
+
 	/* notify HDD for handoff, providing the BSSID too */
 	roam_info->reasonCode = eCsrRoamReasonBetterAP;
 
@@ -686,4 +683,4 @@ void csr_neighbor_roam_free_neighbor_roam_bss_node(struct mac_context *mac,
 	qdf_mem_free(neighborRoamBSSNode);
 	neighborRoamBSSNode = NULL;
 }
-
+#endif

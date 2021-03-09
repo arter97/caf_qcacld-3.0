@@ -468,6 +468,20 @@ QDF_STATUS wlan_mlme_get_tx_chainmask_1ss(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool
+wlan_mlme_is_data_stall_recovery_fw_supported(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_err("MLME obj is NULL");
+		return false;
+	}
+
+	return mlme_obj->cfg.gen.data_stall_recovery_fw_support;
+}
+
 void
 wlan_mlme_update_cfg_with_tgt_caps(struct wlan_objmgr_psoc *psoc,
 				   struct mlme_tgt_caps *tgt_caps)
@@ -488,7 +502,7 @@ wlan_mlme_update_cfg_with_tgt_caps(struct wlan_objmgr_psoc *psoc,
 			tgt_caps->stop_all_host_scan_support;
 	mlme_obj->cfg.gen.dual_sta_roam_fw_support =
 			tgt_caps->dual_sta_roam_fw_support;
-
+	mlme_obj->cfg.gen.ocv_support = tgt_caps->ocv_support;
 }
 
 #ifdef WLAN_FEATURE_11AX
@@ -2113,6 +2127,19 @@ QDF_STATUS wlan_mlme_get_bigtk_support(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_mlme_get_ocv_support(struct wlan_objmgr_psoc *psoc,
+				     bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.gen.ocv_support;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 bool wlan_mlme_get_host_scan_abort_support(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
@@ -2607,48 +2634,6 @@ QDF_STATUS mlme_get_wep_key(struct wlan_objmgr_vdev *vdev,
 	}
 	*key_len = crypto_key->keylen;
 	qdf_mem_copy(default_key, &crypto_key->keyval, crypto_key->keylen);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS mlme_set_wep_key(struct wlan_mlme_wep_cfg *wep_params,
-			    enum wep_key_id wep_keyid, uint8_t *key_to_set,
-			    qdf_size_t len)
-{
-	if (len == 0)
-		return QDF_STATUS_E_FAILURE;
-
-	mlme_legacy_debug("WEP set key for key_id:%d key_len:%zd",
-			  wep_keyid, len);
-	switch (wep_keyid) {
-	case MLME_WEP_DEFAULT_KEY_1:
-		wlan_mlme_set_cfg_str(key_to_set,
-				      &wep_params->wep_default_key_1,
-				      len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_2:
-		wlan_mlme_set_cfg_str(key_to_set,
-				      &wep_params->wep_default_key_2,
-				      len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_3:
-		wlan_mlme_set_cfg_str(key_to_set,
-				      &wep_params->wep_default_key_3,
-				      len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_4:
-		wlan_mlme_set_cfg_str(key_to_set,
-				      &wep_params->wep_default_key_4,
-				      len);
-		break;
-
-	default:
-		mlme_legacy_err("Invalid key id:%d", wep_keyid);
-		return QDF_STATUS_E_INVAL;
-	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3699,6 +3684,8 @@ char *mlme_get_roam_trigger_str(uint32_t roam_scan_trigger)
 		return "WTC BTM";
 	case WMI_ROAM_TRIGGER_REASON_NONE:
 		return "NONE";
+	case WMI_ROAM_TRIGGER_REASON_PMK_TIMEOUT:
+		return "PMK Expired";
 	default:
 		return "UNKNOWN";
 	}
@@ -3778,7 +3765,7 @@ void wlan_mlme_get_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_mlme_sae_single_pmk *pmksa)
 {
 	struct mlme_legacy_priv *mlme_priv;
-	struct mlme_pmk_info pmk_info;
+	struct mlme_pmk_info *pmk_info;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv) {
@@ -3786,15 +3773,17 @@ void wlan_mlme_get_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	pmk_info = mlme_priv->mlme_roam.sae_single_pmk.pmk_info;
+	pmk_info = &mlme_priv->mlme_roam.sae_single_pmk.pmk_info;
 
 	pmksa->sae_single_pmk_ap =
 		mlme_priv->mlme_roam.sae_single_pmk.sae_single_pmk_ap;
+	pmksa->pmk_info.spmk_timeout_period = pmk_info->spmk_timeout_period;
+	pmksa->pmk_info.spmk_timestamp = pmk_info->spmk_timestamp;
 
-	if (pmk_info.pmk_len) {
-		qdf_mem_copy(pmksa->pmk_info.pmk, pmk_info.pmk,
-			     pmk_info.pmk_len);
-		pmksa->pmk_info.pmk_len = pmk_info.pmk_len;
+	if (pmk_info->pmk_len) {
+		qdf_mem_copy(pmksa->pmk_info.pmk, pmk_info->pmk,
+			     pmk_info->pmk_len);
+		pmksa->pmk_info.pmk_len = pmk_info->pmk_len;
 		return;
 	}
 
@@ -4694,4 +4683,15 @@ bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc)
 		return true;
 
 	return false;
+}
+
+bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.power.use_local_tpe;
 }

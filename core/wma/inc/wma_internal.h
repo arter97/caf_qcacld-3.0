@@ -171,9 +171,10 @@ QDF_STATUS wma_set_ppsconfig(uint8_t vdev_id, uint16_t pps_param,
  */
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifndef FEATURE_CM_ENABLE
 void wma_process_roam_invoke(WMA_HANDLE handle,
-				struct wma_roam_invoke_cmd *roaminvoke);
-
+				struct roam_invoke_req *roaminvoke);
+#endif
 void wma_process_roam_synch_fail(WMA_HANDLE handle,
 				 struct roam_offload_synch_fail *synch_fail);
 
@@ -777,8 +778,6 @@ int wma_vdev_install_key_complete_event_handler(void *handle,
  */
 void wma_objmgr_set_peer_mlme_phymode(tp_wma_handle wma, uint8_t *mac_addr,
 				      enum wlan_phymode phymode);
-
-uint32_t wma_convert_crypto_akm_to_wmi_akm(uint32_t keymgmt);
 
 QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 					   tSirNwType nw_type,

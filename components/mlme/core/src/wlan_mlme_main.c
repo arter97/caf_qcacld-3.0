@@ -653,6 +653,7 @@ static void mlme_init_timeout_cfg(struct wlan_objmgr_psoc *psoc,
 {
 	timeouts->join_failure_timeout =
 			cfg_get(psoc, CFG_JOIN_FAILURE_TIMEOUT);
+	timeouts->join_failure_timeout_ori = timeouts->join_failure_timeout;
 	timeouts->auth_failure_timeout =
 			cfg_get(psoc, CFG_AUTH_FAILURE_TIMEOUT);
 	timeouts->auth_rsp_timeout =
@@ -791,6 +792,8 @@ static void mlme_init_qos_cfg(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_SAP_MAX_INACTIVITY_OVERRIDE);
 	qos_aggr_params->sap_uapsd_enabled =
 				cfg_get(psoc, CFG_SAP_QOS_UAPSD);
+	qos_aggr_params->reject_addba_req =
+				cfg_get(psoc, CFG_REJECT_ADDBA_REQ);
 }
 
 static void mlme_init_mbo_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1243,12 +1246,6 @@ static bool is_sae_sap_enabled(struct wlan_objmgr_psoc *psoc)
 static void mlme_init_sap_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_cfg_sap *sap_cfg)
 {
-	uint8_t *ssid;
-
-	ssid = cfg_default(CFG_SSID);
-	qdf_mem_zero(sap_cfg->cfg_ssid, WLAN_SSID_MAX_LEN);
-	sap_cfg->cfg_ssid_len = STR_SSID_DEFAULT_LEN;
-	qdf_mem_copy(sap_cfg->cfg_ssid, ssid, STR_SSID_DEFAULT_LEN);
 	sap_cfg->beacon_interval = cfg_get(psoc, CFG_BEACON_INTERVAL);
 	sap_cfg->dtim_interval = cfg_default(CFG_DTIM_PERIOD);
 	sap_cfg->listen_interval = cfg_default(CFG_LISTEN_INTERVAL);
@@ -1857,6 +1854,7 @@ static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
 			(uint8_t)cfg_default(CFG_CURRENT_TX_POWER_LEVEL);
 	power->local_power_constraint =
 			(uint8_t)cfg_default(CFG_LOCAL_POWER_CONSTRAINT);
+	power->use_local_tpe = cfg_get(psoc, CFG_USE_LOCAL_TPE);
 }
 
 static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1955,29 +1953,6 @@ static void mlme_init_nss_chains(struct wlan_objmgr_psoc *psoc,
 	nss_chains->enable_dynamic_nss_chains_cfg =
 			cfg_get(psoc, CFG_ENABLE_DYNAMIC_NSS_CHAIN_CONFIG);
 }
-static void mlme_init_wep_keys(struct wlan_mlme_wep_cfg *wep_params)
-{
-	/* initialize the default key values to zero */
-	wep_params->wep_default_key_1.len = WLAN_CRYPTO_KEY_WEP104_LEN;
-	wep_params->wep_default_key_1.max_len = WLAN_CRYPTO_KEY_WEP104_LEN;
-	qdf_mem_zero(wep_params->wep_default_key_1.data,
-		     WLAN_CRYPTO_KEY_WEP104_LEN);
-
-	wep_params->wep_default_key_2.len = WLAN_CRYPTO_KEY_WEP104_LEN;
-	wep_params->wep_default_key_2.max_len = WLAN_CRYPTO_KEY_WEP104_LEN;
-	qdf_mem_zero(wep_params->wep_default_key_2.data,
-		     WLAN_CRYPTO_KEY_WEP104_LEN);
-
-	wep_params->wep_default_key_3.len = WLAN_CRYPTO_KEY_WEP104_LEN;
-	wep_params->wep_default_key_3.max_len = WLAN_CRYPTO_KEY_WEP104_LEN;
-	qdf_mem_zero(wep_params->wep_default_key_3.data,
-		     WLAN_CRYPTO_KEY_WEP104_LEN);
-
-	wep_params->wep_default_key_4.len = WLAN_CRYPTO_KEY_WEP104_LEN;
-	wep_params->wep_default_key_4.max_len = WLAN_CRYPTO_KEY_WEP104_LEN;
-	qdf_mem_zero(wep_params->wep_default_key_4.data,
-		     WLAN_CRYPTO_KEY_WEP104_LEN);
-}
 
 static void mlme_init_wep_cfg(struct wlan_mlme_wep_cfg *wep_params)
 {
@@ -1989,7 +1964,6 @@ static void mlme_init_wep_cfg(struct wlan_mlme_wep_cfg *wep_params)
 			cfg_default(CFG_OPEN_SYSTEM_AUTH_ENABLE);
 
 	wep_params->wep_default_key_id = cfg_default(CFG_WEP_DEFAULT_KEYID);
-	mlme_init_wep_keys(wep_params);
 }
 
 static void mlme_init_wifi_pos_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2824,33 +2798,6 @@ void mlme_get_discon_reason_n_from_ap(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 
-bool wlan_is_wps_connection(struct wlan_objmgr_pdev *pdev,
-			    uint8_t vdev_id)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct mlme_legacy_priv *mlme_priv;
-	bool wps;
-
-	if (!pdev)
-		return false;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-						    WLAN_LEGACY_MAC_ID);
-	if (!vdev)
-		return false;
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-		return false;
-	}
-
-	wps = mlme_priv->connect_info.is_wps;
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-
-	return wps;
-}
-
 enum QDF_OPMODE wlan_get_opmode_from_vdev_id(struct wlan_objmgr_pdev *pdev,
 					     uint8_t vdev_id)
 {
@@ -3080,6 +3027,26 @@ bool wlan_is_channel_present_in_list(qdf_freq_t *freq_lst,
 	}
 
 	return false;
+}
+
+bool wlan_roam_is_channel_valid(struct wlan_mlme_reg *reg, qdf_freq_t chan_freq)
+{
+	bool valid = false;
+	uint32_t i;
+	uint32_t len = reg->valid_channel_list_num;
+
+	for (i = 0; (i < len); i++) {
+		if (wlan_reg_is_dsrc_freq(
+			reg->valid_channel_freq_list[i]))
+			continue;
+
+		if (chan_freq == reg->valid_channel_freq_list[i]) {
+			valid = true;
+			break;
+		}
+	}
+
+	return valid;
 }
 
 int8_t wlan_get_cfg_max_tx_power(struct wlan_objmgr_psoc *psoc,

@@ -515,6 +515,7 @@ typedef enum {
 	NET_DEV_HOLD_CACHE_STATION_STATS_CB = 57,
 	NET_DEV_HOLD_DISPLAY_TXRX_STATS = 58,
 	NET_DEV_HOLD_BUS_BW_MGR = 59,
+	NET_DEV_HOLD_START_PRE_CAC_TRANS = 60,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -991,6 +992,11 @@ enum hdd_mic_work_status {
 	MIC_DISABLED
 };
 
+enum hdd_work_status {
+	HDD_WORK_UNINITIALIZED,
+	HDD_WORK_INITIALIZED,
+};
+
 /**
  * struct hdd_mic_work - mic work info in HDD
  * @mic_error_work: mic error work
@@ -1217,6 +1223,7 @@ struct hdd_context;
  *			   by hdd_netdev_feature_update
  * @netdev_features_update_work: work for handling the netdev features update
  *				 for the adapter.
+ * @netdev_features_update_work_status: status for netdev_features_update_work
  * @delete_in_progress: Flag to indicate that the adapter delete is in
  *			progress, and any operation using rtnl lock inside
  *			the driver can be avoided/skipped.
@@ -1268,8 +1275,11 @@ struct hdd_adapter {
 #endif
 
 	struct hdd_mic_work mic_work;
+#ifndef FEATURE_CM_ENABLE
 	bool disconnection_in_progress;
 	qdf_mutex_t disconnection_status_lock;
+	struct completion roaming_comp_var;
+#endif
 	unsigned long event_flags;
 
 	/**Device TX/RX statistics*/
@@ -1303,9 +1313,6 @@ struct hdd_adapter {
 	/* TODO: move these to sta ctx. These may not be used in AP */
 	/** completion variable for disconnect callback */
 	struct completion disconnect_comp_var;
-
-	struct completion roaming_comp_var;
-
 	/* completion variable for Linkup Event */
 	struct completion linkup_event_var;
 
@@ -1527,7 +1534,8 @@ struct hdd_adapter {
 	ol_txrx_rx_fp rx_stack;
 
 	qdf_work_t netdev_features_update_work;
-	uint8_t net_dev_hold_ref_count[NET_DEV_HOLD_ID_MAX];
+	enum hdd_work_status netdev_features_update_work_status;
+	qdf_atomic_t net_dev_hold_ref_count[NET_DEV_HOLD_ID_MAX];
 	/* Flag to indicate whether it is a pre cac adapter or not */
 	bool is_pre_cac_adapter;
 	bool delete_in_progress;
@@ -2200,6 +2208,9 @@ struct hdd_context {
 	struct bbm_context *bbm_ctx;
 #endif
 	bool is_dual_mac_cfg_updated;
+	bool is_regulatory_update_in_progress;
+	qdf_event_t regulatory_update_event;
+	qdf_mutex_t regulatory_status_lock;
 };
 
 /**
@@ -3564,7 +3575,6 @@ int hdd_update_components_config(struct hdd_context *hdd_ctx);
  * @dev:		Net device structure
  * @chan_change:	New channel change parameters
  * @legacy_phymode:	is the phymode legacy
- * @lock_wdev:  need wdev lock or not
  *
  * This function is used to notify hostapd about the channel change
  *
@@ -3574,8 +3584,7 @@ int hdd_update_components_config(struct hdd_context *hdd_ctx);
 QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 		struct net_device *dev,
 		struct hdd_chan_change_params chan_change,
-		bool legacy_phymode,
-		bool lock_wdev);
+		bool legacy_phymode);
 int wlan_hdd_set_channel(struct wiphy *wiphy,
 		struct net_device *dev,
 		struct cfg80211_chan_def *chandef,
@@ -3770,6 +3779,7 @@ QDF_STATUS hdd_sme_open_session_callback(uint8_t vdev_id,
 					 QDF_STATUS qdf_status);
 QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id);
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * hdd_reassoc() - perform a userspace-directed reassoc
  * @adapter:    Adapter upon which the command was received
@@ -3783,6 +3793,7 @@ QDF_STATUS hdd_sme_close_session_callback(uint8_t vdev_id);
  */
 int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 		uint32_t ch_freq, const handoff_src src);
+#endif
 
 int hdd_register_cb(struct hdd_context *hdd_ctx);
 void hdd_deregister_cb(struct hdd_context *hdd_ctx);
@@ -4231,15 +4242,6 @@ int hdd_reset_limit_off_chan(struct hdd_adapter *adapter);
 	(defined(CFG80211_FILS_SK_OFFLOAD_SUPPORT) || \
 		 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)))
 /**
- * hdd_clear_fils_connection_info: API to clear fils info from roam profile and
- * free allocated memory
- * @adapter: pointer to hdd adapter
- *
- * Return: None
- */
-void hdd_clear_fils_connection_info(struct hdd_adapter *adapter);
-
-/**
  * hdd_update_hlp_info() - Update HLP packet received in FILS (re)assoc rsp
  * @dev: net device
  * @roam_fils_params: Fils join rsp params
@@ -4252,8 +4254,6 @@ void hdd_clear_fils_connection_info(struct hdd_adapter *adapter);
 void hdd_update_hlp_info(struct net_device *dev,
 			 struct csr_roam_info *roam_info);
 #else
-static inline void hdd_clear_fils_connection_info(struct hdd_adapter *adapter)
-{ }
 static inline void hdd_update_hlp_info(struct net_device *dev,
 				       struct csr_roam_info *roam_info)
 {}
@@ -4394,6 +4394,8 @@ static inline void hdd_driver_mem_cleanup(void)
 {
 }
 #endif /* WLAN_FEATURE_MEMDUMP_ENABLE */
+
+#ifndef FEATURE_CM_ENABLE
 /**
  * hdd_set_disconnect_status() - set adapter disconnection status
  * @hdd_adapter: Pointer to hdd adapter
@@ -4402,6 +4404,7 @@ static inline void hdd_driver_mem_cleanup(void)
  * Return: None
  */
 void hdd_set_disconnect_status(struct hdd_adapter *adapter, bool disconnecting);
+#endif
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 /**

@@ -51,6 +51,9 @@ struct mac_context;
 #include "wlan_cp_stats_mc_defs.h"
 
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
+#define WLAN_DOT11_BASIC_RATE_MASK (0x80)
+#define BITS_ON(_Field, _Bitmask)  ((_Field) |=  (_Bitmask))
+#define BITS_OFF(_Field, _Bitmask) ((_Field) &= ~(_Bitmask))
 
 /* / Max supported channel list */
 #define SIR_MAX_SUPPORTED_CHANNEL_LIST      96
@@ -126,7 +129,6 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define KEK_256BIT_KEY_LEN 32
 
 #define SIR_REPLAY_CTR_LEN 8
-#define SIR_PMK_LEN  48
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #define SIR_UAPSD_BITOFFSET_ACVO     0
 #define SIR_UAPSD_BITOFFSET_ACVI     1
@@ -165,6 +167,158 @@ enum sir_roam_op_code {
 	SIR_ROAM_SYNCH_NAPI_OFF,
 	SIR_ROAMING_INVOKE_FAIL,
 	SIR_ROAMING_DEAUTH,
+};
+
+/**
+ * enum ps_state - State of the power save
+ * @FULL_POWER_MODE: for Full power mode
+ * @LEGACY_POWER_SAVE_MODE: For Legacy Power Save mode
+ * @UAPSD_MODE: for UAPSD power save
+ */
+enum ps_state {
+	FULL_POWER_MODE,
+	LEGACY_POWER_SAVE_MODE,
+	UAPSD_MODE
+};
+
+/**
+ * \var g_phy_rates_suppt
+ *
+ * \brief Rate support lookup table
+ *
+ *
+ * This is a  lookup table indexing rates &  configuration parameters to
+ * support.  Given a rate (in  unites of 0.5Mpbs) & three bools (MIMO
+ * Enabled, Channel  Bonding Enabled, & Concatenation  Enabled), one can
+ * determine  whether  the given  rate  is  supported  by computing  two
+ * indices.  The  first maps  the rate to  table row as  indicated below
+ * (i.e. eHddSuppRate_6Mbps maps to  row zero, eHddSuppRate_9Mbps to row
+ * 1, and so on).  Index two can be computed like so:
+ *
+ * \code
+ *  idx2 = ( fEsf  ? 0x4 : 0x0 ) |
+ *         ( fCb   ? 0x2 : 0x0 ) |
+ *         ( fMimo ? 0x1 : 0x0 );
+ * \endcode
+ *
+ *
+ * Given that:
+ *
+ *  \code
+ *  fSupported = g_phy_rates_suppt[idx1][idx2];
+ *  \endcode
+ *
+ *
+ * This table is based on  the document "PHY Supported Rates.doc".  This
+ * table is  permissive in that a  rate is reflected  as being supported
+ * even  when turning  off an  enabled feature  would be  required.  For
+ * instance, "PHY Supported Rates"  lists 42Mpbs as unsupported when CB,
+ * ESF, &  MIMO are all  on.  However,  if we turn  off either of  CB or
+ * MIMO, it then becomes supported.   Therefore, we mark it as supported
+ * even in index 7 of this table.
+ *
+ *
+ */
+
+static const bool g_phy_rates_suppt[24][8] = {
+
+	/* SSF   SSF    SSF    SSF    ESF    ESF    ESF    ESF */
+	/* SIMO  MIMO   SIMO   MIMO   SIMO   MIMO   SIMO   MIMO */
+	/* No CB No CB  CB     CB     No CB  No CB  CB     CB */
+	{true, true, true, true, true, true, true, true},       /* 6Mbps */
+	{true, true, true, true, true, true, true, true},       /* 9Mbps */
+	{true, true, true, true, true, true, true, true},       /* 12Mbps */
+	{true, true, true, true, true, true, true, true},       /* 18Mbps */
+	{false, false, true, true, false, false, true, true},   /* 20Mbps */
+	{true, true, true, true, true, true, true, true},       /* 24Mbps */
+	{true, true, true, true, true, true, true, true},       /* 36Mbps */
+	{false, false, true, true, false, true, true, true},    /* 40Mbps */
+	{false, false, true, true, false, true, true, true},    /* 42Mbps */
+	{true, true, true, true, true, true, true, true},       /* 48Mbps */
+	{true, true, true, true, true, true, true, true},       /* 54Mbps */
+	{false, true, true, true, false, true, true, true},     /* 72Mbps */
+	{false, false, true, true, false, true, true, true},    /* 80Mbps */
+	{false, false, true, true, false, true, true, true},    /* 84Mbps */
+	{false, true, true, true, false, true, true, true},     /* 96Mbps */
+	{false, true, true, true, false, true, true, true},     /* 108Mbps */
+	{false, false, true, true, false, true, true, true},    /* 120Mbps */
+	{false, false, true, true, false, true, true, true},    /* 126Mbps */
+	{false, false, false, true, false, false, false, true}, /* 144Mbps */
+	{false, false, false, true, false, false, false, true}, /* 160Mbps */
+	{false, false, false, true, false, false, false, true}, /* 168Mbps */
+	{false, false, false, true, false, false, false, true}, /* 192Mbps */
+	{false, false, false, true, false, false, false, true}, /* 216Mbps */
+	{false, false, false, true, false, false, false, true}, /* 240Mbps */
+};
+
+typedef enum {
+	/* 11b rates */
+	SUPP_RATE_1_MBPS   =   1 * 2,
+	SUPP_RATE_2_MBPS   =   2 * 2,
+	SUPP_RATE_5_MBPS =     11,
+	SUPP_RATE_11_MBPS  =   11 * 2,
+
+	/* 11a / 11g rates */
+	SUPP_RATE_6_MBPS   =   6 * 2,
+	SUPP_RATE_9_MBPS   =   9 * 2,
+	SUPP_RATE_12_MBPS  =   12 * 2,
+	SUPP_RATE_18_MBPS  =   18 * 2,
+	SUPP_RATE_24_MBPS  =   24 * 2,
+	SUPP_RATE_36_MBPS  =   36 * 2,
+	SUPP_RATE_48_MBPS  =   48 * 2,
+	SUPP_RATE_54_MBPS  =   54 * 2,
+
+	/* Airgo prop. rates */
+	SUPP_RATE_20_MBPS   =  20 * 2,
+	SUPP_RATE_40_MBPS   =  40 * 2,
+	SUPP_RATE_42_MBPS   =  42 * 2,
+	SUPP_RATE_72_MBPS   =  72 * 2,
+	SUPP_RATE_80_MBPS   =  80 * 2,
+	SUPP_RATE_84_MBPS   =  84 * 2,
+	SUPP_RATE_96_MBPS   =  96 * 2,
+	SUPP_RATE_108_MBPS  =  108 * 2,
+	SUPP_RATE_120_MBPS  =  120 * 2,
+	SUPP_RATE_126_MBPS  =  126 * 2,
+	SUPP_RATE_144_MBPS  =  144 * 2,
+	SUPP_RATE_160_MBPS  =  160 * 2,
+	SUPP_RATE_168_MBPS  =  168 * 2,
+	SUPP_RATE_192_MBPS  =  192 * 2,
+	SUPP_RATE_216_MBPS  =  216 * 2,
+	SUPP_RATE_240_MBPS  =  240 * 2
+} eCsrSupportedRates;
+
+/**
+ * struct ps_params - maintain power save state and USAPD params
+ * @mac_ctx: mac_ctx
+ * @session_id: Session Id.
+ * @ps_state : State of the power save
+ * @uapsd_per_ac_trigger_enable_mask: dynamic UPASD mask setting
+ *		derived from AddTS Rsp and DelTS frame.
+ *		If a particular AC bit is set, it means AC is trigger  enabled.
+ * @uapsd_per_ac_delivery_enable_mask: dynamic UPASD mask setting
+ *		derived from AddTS Rsp and DelTs frame.
+ *		If a particular AC bit is set, it means AC is delivery enabled.
+ * @ac_admit_mask: used for AC downgrade. This is a dynamic mask
+ *		setting which keep tracks of ACs being admitted.
+ *		If bit is set to 0: That particular AC is not admitted
+ *		If bit is set to 1: That particular AC is admitted
+ * @uapsd_per_ac_bit_mask: This is a static UAPSD mask setting
+ *		derived from SME_JOIN_REQ and SME_REASSOC_REQ.
+ *		If a particular AC bit is set, it means the AC is both
+ *		trigger enabled and delivery enabled.
+ * @auto_ps_enable_timer: Upon expiration of this timer	Power Save Offload
+ *		module will try to enable sta mode ps
+ */
+
+struct ps_params {
+	void *mac_ctx;
+	uint32_t     session_id;
+	enum    ps_state ps_state;
+	uint8_t uapsd_per_ac_trigger_enable_mask;
+	uint8_t uapsd_per_ac_delivery_enable_mask;
+	uint8_t ac_admit_mask[SIR_MAC_DIRECTION_DIRECT];
+	uint8_t uapsd_per_ac_bit_mask;
+	qdf_mc_timer_t auto_ps_enable_timer;
 };
 
 /* Type declarations used by Firmware and Host software */
@@ -776,10 +930,9 @@ typedef struct sTspecInfo {
 	struct mac_tspec_ie tspec;
 } tTspecInfo;
 
-#define SIR_ESE_MAX_TSPEC_IES   4
 typedef struct sESETspecTspecInfo {
 	uint8_t numTspecs;
-	tTspecInfo tspec[SIR_ESE_MAX_TSPEC_IES];
+	tTspecInfo tspec[ESE_MAX_TSPEC_IES];
 } tESETspecInfo;
 
 struct tsm_ie {
@@ -881,42 +1034,26 @@ struct join_req {
 	uint16_t length;
 	uint8_t vdev_id;
 	tSirMacSSid ssId;
-	uint8_t dot11mode;      /* to support BT-AMP */
-	bool wps_registration;
-
-	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
-	tSirMacRateSet extendedRateSet; /* Has 11g rates */
 	tSirRSNie rsnIE;        /* RSN IE to be sent in */
-	/* (Re) Association Request */
-#ifdef FEATURE_WLAN_ESE
-	/* CCMK IE to be included as handler for join and reassoc is */
-	tSirCCKMie cckmIE;
-	/* the same. The join will never carry cckm, but will be set to */
-	/* 0. */
-#endif
-
 	tSirAddie addIEScan;    /* Additional IE to be sent in */
 	/* (unicast) Probe Request at the time of join */
 
 	tSirAddie addIEAssoc;   /* Additional IE to be sent in */
 	/* (Re) Association Request */
-
+#ifndef FEATURE_CM_ENABLE
 	tAniEdType UCEncryptionType;
 	enum ani_akm_type akm;
+	bool wps_registration;
+	bool isOSENConnection;
+	bool force_24ghz_in_ht20;
+#endif
 
-	bool is11Rconnection;
-	bool is_adaptive_11r_connection;
 #ifdef FEATURE_WLAN_ESE
-	bool isESEFeatureIniEnabled;
-	bool isESEconnection;
 	tESETspecInfo eseTspecInfo;
 #endif
-	bool isOSENConnection;
 	struct supported_channels supportedChannels;
-	bool sae_pmk_cached;
-	/* Pls make this as last variable in struct */
-	bool force_24ghz_in_ht20;
 	bool force_rsne_override;
+	/* Pls make this as last variable in struct */
 	struct bss_description bssDescription;
 	/*
 	 * WARNING: Pls make bssDescription as last variable in struct
@@ -925,6 +1062,7 @@ struct join_req {
 	 */
 };
 
+#ifndef FEATURE_CM_ENABLE
 /* / Definition for response message to previously issued join request */
 /* / MAC ---> */
 struct join_rsp {
@@ -932,13 +1070,11 @@ struct join_rsp {
 	uint16_t length;
 	uint8_t vdev_id;      /* Session ID */
 	tSirResultCodes status_code;
-	tAniAuthType authType;
 	uint32_t vht_channel_width;
 	/* It holds reasonCode when join fails due to deauth/disassoc frame.
 	 * Otherwise it holds status code.
 	 */
 	uint16_t protStatusCode;
-	uint16_t aid;
 	uint32_t beaconLength;
 	uint32_t assocReqLength;
 	uint32_t assocRspLength;
@@ -976,6 +1112,7 @@ struct join_rsp {
 #endif
 	uint8_t frames[1];
 };
+#endif
 
 struct oem_channel_info {
 	uint32_t mhz;
@@ -1079,29 +1216,6 @@ struct assoc_cnf {
 	bool need_assoc_rsp_tx_cb;
 };
 
-/* / Enum definition for  Wireless medium status change codes */
-typedef enum eSirSmeStatusChangeCode {
-	eSIR_SME_DEAUTH_FROM_PEER,
-	eSIR_SME_DISASSOC_FROM_PEER,
-	eSIR_SME_LOST_LINK_WITH_PEER,
-	eSIR_SME_CHANNEL_SWITCH,
-	eSIR_SME_RADAR_DETECTED,
-	eSIR_SME_AP_CAPS_CHANGED,
-} tSirSmeStatusChangeCode;
-
-struct new_bss_info {
-	struct qdf_mac_addr bssId;
-	uint32_t freq;
-	uint8_t reserved;
-	tSirMacSSid ssId;
-};
-
-struct ap_new_caps {
-	uint16_t capabilityInfo;
-	struct qdf_mac_addr bssId;
-	tSirMacSSid ssId;
-};
-
 /**
  * Table below indicates what information is passed for each of
  * the Wireless Media status change notifications:
@@ -1117,27 +1231,6 @@ struct ap_new_caps {
  *                                  that STA is currently associated with
  *                                  have changed.
  */
-
-/* / Definition for Wireless medium status change notification */
-struct wm_status_change_ntf {
-	uint16_t messageType;   /* eWNI_SME_WM_STATUS_CHANGE_NTF */
-	uint16_t length;
-	uint8_t sessionId;      /* Session ID */
-	tSirSmeStatusChangeCode statusChangeCode;
-	struct qdf_mac_addr bssid;      /* Self BSSID */
-	union {
-		/* eSIR_SME_DEAUTH_FROM_PEER */
-		uint16_t deAuthReasonCode;
-		/* eSIR_SME_DISASSOC_FROM_PEER */
-		uint16_t disassocReasonCode;
-		/* none for eSIR_SME_LOST_LINK_WITH_PEER */
-		/* eSIR_SME_CHANNEL_SWITCH */
-		uint32_t new_freq;
-		/* none for eSIR_SME_RADAR_DETECTED */
-		/* eSIR_SME_AP_CAPS_CHANGED */
-		struct ap_new_caps apNewCaps;
-	} statusChangeInfo;
-};
 
 /* Definition for Disassociation request */
 struct disassoc_req {
@@ -1278,6 +1371,7 @@ struct switch_channel_ind {
 	struct ch_params chan_params;
 	struct qdf_mac_addr bssid;      /* BSSID */
 	QDF_STATUS status;
+	enum wlan_phymode ch_phymode;
 };
 
 /* / Definition for MIC failure indication */
@@ -1750,15 +1844,6 @@ struct sir_delete_session {
 	uint8_t vdev_id;
 };
 
-/* Beacon Interval */
-struct change_bi_params {
-	uint16_t messageType;
-	uint16_t length;
-	uint16_t beaconInterval;        /* Beacon Interval */
-	struct qdf_mac_addr bssid;
-	uint8_t sessionId;      /* Session ID */
-};
-
 #ifdef QCA_HT_2040_COEX
 struct set_ht2040_mode {
 	uint16_t messageType;
@@ -2128,19 +2213,14 @@ struct sir_antenna_mode_resp {
 	enum set_antenna_mode_status status;
 };
 
-/* Reset AP Caps Changed */
-typedef struct sSirResetAPCapsChange {
-	uint16_t messageType;
-	uint16_t length;
-	struct qdf_mac_addr bssId;
-} tSirResetAPCapsChange, *tpSirResetAPCapsChange;
-
+#ifndef FEATURE_CM_ENABLE
 /* / Definition for Candidate found indication from FW */
 typedef struct sSirSmeCandidateFoundInd {
 	uint16_t messageType;   /* eWNI_SME_CANDIDATE_FOUND_IND */
 	uint16_t length;
 	uint8_t sessionId;      /* Session Identifier */
 } tSirSmeCandidateFoundInd, *tpSirSmeCandidateFoundInd;
+#endif
 
 #ifdef WLAN_FEATURE_11W
 typedef struct sSirWlanExcludeUnencryptParam {
@@ -2519,8 +2599,6 @@ typedef struct {
 #endif
 
 struct roam_offload_synch_ind {
-	uint16_t messageType;   /*eWNI_SME_ROAM_OFFLOAD_SYNCH_IND */
-	uint16_t length;
 	uint16_t beaconProbeRespOffset;
 	uint16_t beaconProbeRespLength;
 	uint16_t reassocRespOffset;
@@ -2536,18 +2614,24 @@ struct roam_offload_synch_ind {
 	uint8_t rssi;
 	uint8_t roamReason;
 	uint32_t chan_freq;
-	uint8_t kck[KCK_256BIT_KEY_LEN];
+	uint8_t kck[MAX_KCK_LEN];
 	uint8_t kck_len;
 	uint32_t kek_len;
-	uint8_t kek[SIR_KEK_KEY_LEN_FILS];
+	uint8_t kek[MAX_KEK_LENGTH];
 	uint32_t   pmk_len;
-	uint8_t    pmk[SIR_PMK_LEN];
+	uint8_t    pmk[MAX_PMK_LEN];
 	uint8_t    pmkid[PMKID_LEN];
 	bool update_erp_next_seq_num;
 	uint16_t next_erp_seq_num;
-	uint8_t replay_ctr[SIR_REPLAY_CTR_LEN];
+	uint8_t replay_ctr[REPLAY_CTR_LEN];
 	void *add_bss_params;
-	struct join_rsp *join_rsp;
+	enum phy_ch_width chan_width;
+	uint32_t max_rate_flags;
+	uint32_t ric_data_len;
+#ifdef FEATURE_WLAN_ESE
+	uint32_t tspec_len;
+#endif
+	uint8_t *ric_tspec_data;
 	uint16_t aid;
 	struct sir_hw_mode_trans_ind hw_mode_trans_ind;
 	uint8_t nss;
@@ -2562,6 +2646,7 @@ struct roam_offload_synch_ind {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 struct handoff_failure_ind {
 	uint8_t vdev_id;
+	struct qdf_mac_addr bssid;
 };
 
 struct roam_offload_synch_fail {
@@ -4013,7 +4098,7 @@ struct sir_qos_params {
 struct sir_sme_ext_cng_chan_req {
 	uint16_t  message_type; /* eWNI_SME_EXT_CHANGE_CHANNEL */
 	uint16_t  length;
-	uint32_t  new_channel;
+	uint32_t  new_ch_freq;
 	uint8_t   vdev_id;
 };
 

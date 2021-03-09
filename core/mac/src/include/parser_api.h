@@ -71,6 +71,8 @@
 #define SIZE_MASK 0x7FFF
 #define FIXED_MASK 0x8000
 
+#define MAX_TPE_IES 8
+
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 #define QCOM_VENDOR_IE_MCC_AVOID_CH 0x01
 
@@ -180,6 +182,19 @@ struct sir_fils_indication {
 };
 #endif
 
+enum operating_class_num {
+	OP_CLASS_131 = 131,
+	OP_CLASS_132,
+	OP_CLASS_133,
+	OP_CLASS_134,
+	OP_CLASS_135,
+	OP_CLASS_136,
+};
+
+enum operating_extension_identifier {
+	OP_CLASS_ID_200 = 200,
+};
+
 /* Structure common to Beacons & Probe Responses */
 typedef struct sSirProbeRespBeacon {
 	tSirMacTimeStamp timeStamp;
@@ -275,6 +290,9 @@ typedef struct sSirProbeRespBeacon {
 #ifdef WLAN_FEATURE_FILS_SK
 	struct sir_fils_indication fils_ind;
 #endif
+	uint8_t num_transmit_power_env;
+	tDot11fIEtransmit_power_env transmit_power_env[MAX_TPE_IES];
+	uint8_t ap_power_type;
 } tSirProbeRespBeacon, *tpSirProbeRespBeacon;
 
 /* probe Request structure */
@@ -342,6 +360,7 @@ typedef struct sSirAssocReq {
 	tDot11fIEVHTCaps VHTCaps;
 	tDot11fIEOperatingMode operMode;
 	tDot11fIEExtCap ExtCap;
+	tDot11fIEbss_max_idle_period bss_max_idle_period;
 	tDot11fIEvendor_vht_ie vendor_vht_ie;
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 	tDot11fIEhe_cap he_cap;
@@ -417,7 +436,7 @@ typedef struct sSirAssocRsp {
 
 #ifdef FEATURE_WLAN_ESE
 	uint8_t num_tspecs;
-	tDot11fIEWMMTSPEC TSPECInfo[SIR_ESE_MAX_TSPEC_IES];
+	tDot11fIEWMMTSPEC TSPECInfo[ESE_MAX_TSPEC_IES];
 	struct ese_tsm_ie tsmIE;
 #endif
 
@@ -452,6 +471,7 @@ typedef struct sSirAssocRsp {
 	tDot11fIEhe_6ghz_band_cap he_6ghz_band_cap;
 	bool mu_edca_present;
 	tSirMacEdcaParamSetIE mu_edca;
+	tDot11fIEbss_max_idle_period bss_max_idle_period;
 #ifdef WLAN_FEATURE_FILS_SK
 	tDot11fIEfils_session fils_session;
 	tDot11fIEfils_key_confirmation fils_key_auth;
@@ -830,7 +850,7 @@ populate_dot11f_ssid(struct mac_context *mac,
 		tSirMacSSid *pInternal, tDot11fIESSID *pDot11f);
 
 /* / Populate a tDot11fIESSID from CFG */
-QDF_STATUS populate_dot11f_ssid2(struct mac_context *mac,
+QDF_STATUS populate_dot11f_ssid2(struct pe_session *pe_session,
 				tDot11fIESSID *pDot11f);
 
 /**
@@ -911,7 +931,7 @@ void populate_dot11f_ese_version(tDot11fIEESEVersion *pESEVersion);
 void populate_dot11f_ese_rad_mgmt_cap(tDot11fIEESERadMgmtCap *pESERadMgmtCap);
 /* Fill the CCKM IE */
 QDF_STATUS populate_dot11f_ese_cckm_opaque(struct mac_context *mac,
-					tpSirCCKMie pCCKMie,
+					struct mlme_connect_info *connect_info,
 					tDot11fIEESECckmOpaque *pDot11f);
 
 void populate_dot11_tsrsie(struct mac_context *mac,
@@ -1047,6 +1067,10 @@ void populate_dot11f_assoc_rsp_rates(struct mac_context *mac,
 				uint16_t *_11bRates, uint16_t *_11aRates);
 
 int find_ie_location(struct mac_context *mac, tpSirRSNie pRsnIe, uint8_t EID);
+
+ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
+				   qdf_freq_t ch_freq,
+				   tDot11fBeaconIEs *ie_struct);
 
 void lim_log_vht_cap(struct mac_context *mac, tDot11fIEVHTCaps *pDot11f);
 
@@ -1251,6 +1275,12 @@ wlan_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
 				    struct bss_description *bss_desc,
 				    tDot11fBeaconIEs **ie_struct);
 
+void wlan_populate_basic_rates(tSirMacRateSet *rate_set, bool is_ofdm_rates,
+			       bool is_basic_rates);
+
+uint32_t wlan_get_11h_power_constraint(struct mac_context *mac_ctx,
+				       tDot11fIEPowerConstraints *constraints);
+
 QDF_STATUS
 wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 				   struct bss_description *bss_desc,
@@ -1268,6 +1298,18 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
  */
 uint16_t
 wlan_get_ielen_from_bss_description(struct bss_description *bss_desc);
+
+bool wlan_rates_is_dot11_rate_supported(struct mac_context *mac_ctx,
+					uint8_t rate);
+
+bool wlan_check_rate_bitmap(uint8_t rate, uint16_t rate_bitmap);
+
+QDF_STATUS wlan_get_rate_set(struct mac_context *mac,
+			     tDot11fBeaconIEs *ie_struct,
+			     tSirMacRateSet *op_rate,
+			     tSirMacRateSet *ext_rate);
+
+void wlan_add_rate_bitmap(uint8_t rate, uint16_t *rate_bitmap);
 
 /**
  * dot11f_parse_assoc_response() - API to parse Assoc IE buffer to struct

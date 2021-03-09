@@ -160,80 +160,6 @@ uint8_t csr_group_mgmt_oui[][CSR_RSN_OUI_SIZE] = {
 	{0x00, 0x0F, 0xAC, 0x0C},
 };
 
-
-/* ////////////////////////////////////////////////////////////////////// */
-
-/**
- * \var g_phy_rates_suppt
- *
- * \brief Rate support lookup table
- *
- *
- * This is a  lookup table indexing rates &  configuration parameters to
- * support.  Given a rate (in  unites of 0.5Mpbs) & three bools (MIMO
- * Enabled, Channel  Bonding Enabled, & Concatenation  Enabled), one can
- * determine  whether  the given  rate  is  supported  by computing  two
- * indices.  The  first maps  the rate to  table row as  indicated below
- * (i.e. eHddSuppRate_6Mbps maps to  row zero, eHddSuppRate_9Mbps to row
- * 1, and so on).  Index two can be computed like so:
- *
- * \code
- *  idx2 = ( fEsf  ? 0x4 : 0x0 ) |
- *         ( fCb   ? 0x2 : 0x0 ) |
- *         ( fMimo ? 0x1 : 0x0 );
- * \endcode
- *
- *
- * Given that:
- *
- *  \code
- *  fSupported = g_phy_rates_suppt[idx1][idx2];
- *  \endcode
- *
- *
- * This table is based on  the document "PHY Supported Rates.doc".  This
- * table is  permissive in that a  rate is reflected  as being supported
- * even  when turning  off an  enabled feature  would be  required.  For
- * instance, "PHY Supported Rates"  lists 42Mpbs as unsupported when CB,
- * ESF, &  MIMO are all  on.  However,  if we turn  off either of  CB or
- * MIMO, it then becomes supported.   Therefore, we mark it as supported
- * even in index 7 of this table.
- *
- *
- */
-
-static const bool g_phy_rates_suppt[24][8] = {
-
-	/* SSF   SSF    SSF    SSF    ESF    ESF    ESF    ESF */
-	/* SIMO  MIMO   SIMO   MIMO   SIMO   MIMO   SIMO   MIMO */
-	/* No CB No CB  CB     CB     No CB  No CB  CB     CB */
-	{true, true, true, true, true, true, true, true},       /* 6Mbps */
-	{true, true, true, true, true, true, true, true},       /* 9Mbps */
-	{true, true, true, true, true, true, true, true},       /* 12Mbps */
-	{true, true, true, true, true, true, true, true},       /* 18Mbps */
-	{false, false, true, true, false, false, true, true},   /* 20Mbps */
-	{true, true, true, true, true, true, true, true},       /* 24Mbps */
-	{true, true, true, true, true, true, true, true},       /* 36Mbps */
-	{false, false, true, true, false, true, true, true},    /* 40Mbps */
-	{false, false, true, true, false, true, true, true},    /* 42Mbps */
-	{true, true, true, true, true, true, true, true},       /* 48Mbps */
-	{true, true, true, true, true, true, true, true},       /* 54Mbps */
-	{false, true, true, true, false, true, true, true},     /* 72Mbps */
-	{false, false, true, true, false, true, true, true},    /* 80Mbps */
-	{false, false, true, true, false, true, true, true},    /* 84Mbps */
-	{false, true, true, true, false, true, true, true},     /* 96Mbps */
-	{false, true, true, true, false, true, true, true},     /* 108Mbps */
-	{false, false, true, true, false, true, true, true},    /* 120Mbps */
-	{false, false, true, true, false, true, true, true},    /* 126Mbps */
-	{false, false, false, true, false, false, false, true}, /* 144Mbps */
-	{false, false, false, true, false, false, false, true}, /* 160Mbps */
-	{false, false, false, true, false, false, false, true}, /* 168Mbps */
-	{false, false, false, true, false, false, false, true}, /* 192Mbps */
-	{false, false, false, true, false, false, false, true}, /* 216Mbps */
-	{false, false, false, true, false, false, false, true}, /* 240Mbps */
-
-};
-
 #define CASE_RETURN_STR(n) {\
 	case (n): return (# n);\
 }
@@ -241,8 +167,8 @@ static const bool g_phy_rates_suppt[24][8] = {
 const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 {
 	switch (val) {
+#ifndef FEATURE_CM_ENABLE
 		CASE_RETURN_STR(eCSR_ROAM_CANCELLED);
-		CASE_RETURN_STR(eCSR_ROAM_FAILED);
 		CASE_RETURN_STR(eCSR_ROAM_ROAMING_START);
 		CASE_RETURN_STR(eCSR_ROAM_ROAMING_COMPLETION);
 		CASE_RETURN_STR(eCSR_ROAM_CONNECT_COMPLETION);
@@ -250,18 +176,15 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_DISASSOCIATED);
 		CASE_RETURN_STR(eCSR_ROAM_ASSOCIATION_FAILURE);
 		CASE_RETURN_STR(eCSR_ROAM_SHOULD_ROAM);
-		CASE_RETURN_STR(eCSR_ROAM_SCAN_FOUND_NEW_BSS);
+#endif
 		CASE_RETURN_STR(eCSR_ROAM_LOSTLINK);
-		CASE_RETURN_STR(eCSR_ROAM_LOSTLINK_DETECTED);
 		CASE_RETURN_STR(eCSR_ROAM_MIC_ERROR_IND);
-		CASE_RETURN_STR(eCSR_ROAM_CONNECT_STATUS_UPDATE);
-		CASE_RETURN_STR(eCSR_ROAM_GEN_INFO);
 		CASE_RETURN_STR(eCSR_ROAM_SET_KEY_COMPLETE);
 		CASE_RETURN_STR(eCSR_ROAM_INFRA_IND);
 		CASE_RETURN_STR(eCSR_ROAM_WPS_PBC_PROBE_REQ_IND);
+#ifndef FEATURE_CM_ENABLE
 		CASE_RETURN_STR(eCSR_ROAM_FT_RESPONSE);
 		CASE_RETURN_STR(eCSR_ROAM_FT_START);
-		CASE_RETURN_STR(eCSR_ROAM_SESSION_OPENED);
 		CASE_RETURN_STR(eCSR_ROAM_FT_REASSOC_FAILED);
 		CASE_RETURN_STR(eCSR_ROAM_PMK_NOTIFY);
 #ifdef FEATURE_WLAN_LFR_METRICS
@@ -270,9 +193,6 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_PREAUTH_STATUS_FAILURE);
 		CASE_RETURN_STR(eCSR_ROAM_HANDOVER_SUCCESS);
 #endif
-#ifdef FEATURE_WLAN_TDLS
-		CASE_RETURN_STR(eCSR_ROAM_TDLS_STATUS_UPDATE);
-		CASE_RETURN_STR(eCSR_ROAM_RESULT_MGMT_TX_COMPLETE_IND);
 #endif
 		CASE_RETURN_STR(eCSR_ROAM_DISCONNECT_ALL_P2P_CLIENTS);
 		CASE_RETURN_STR(eCSR_ROAM_SEND_P2P_STOP_BSS);
@@ -281,7 +201,9 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 #endif
 #ifdef FEATURE_WLAN_ESE
 		CASE_RETURN_STR(eCSR_ROAM_TSM_IE_IND);
+#ifndef FEATURE_CM_ENABLE
 		CASE_RETURN_STR(eCSR_ROAM_CCKM_PREAUTH_NOTIFY);
+#endif
 		CASE_RETURN_STR(eCSR_ROAM_ESE_ADJ_AP_REPORT_IND);
 		CASE_RETURN_STR(eCSR_ROAM_ESE_BCN_REPORT_IND);
 #endif /* FEATURE_WLAN_ESE */
@@ -291,10 +213,11 @@ const char *get_e_roam_cmd_status_str(eRoamCmdStatus val)
 		CASE_RETURN_STR(eCSR_ROAM_EXT_CHG_CHNL_IND);
 		CASE_RETURN_STR(eCSR_ROAM_STA_CHANNEL_SWITCH);
 		CASE_RETURN_STR(eCSR_ROAM_NDP_STATUS_UPDATE);
-		CASE_RETURN_STR(eCSR_ROAM_UPDATE_SCAN_RESULT);
+#ifndef FEATURE_CM_ENABLE
 		CASE_RETURN_STR(eCSR_ROAM_START);
 		CASE_RETURN_STR(eCSR_ROAM_ABORT);
 		CASE_RETURN_STR(eCSR_ROAM_NAPI_OFF);
+#endif
 		CASE_RETURN_STR(eCSR_ROAM_CHANNEL_COMPLETE_IND);
 		CASE_RETURN_STR(eCSR_ROAM_SAE_COMPUTE);
 		CASE_RETURN_STR(eCSR_ROAM_FIPS_PMK_REQUEST);
@@ -1034,17 +957,20 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 		} else if (cc_switch_mode ==
 			   QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL) {
 			status = policy_mgr_get_sap_mandatory_channel(
-					mac_ctx->psoc,
+					mac_ctx->psoc, sap_ch_freq,
 					&intf_ch_freq);
 			if (QDF_IS_STATUS_ERROR(status))
-				sme_err("no mandatory channel");
+				sme_err("no mandatory channels (%d, %d)",
+					sap_ch_freq, intf_ch_freq);
 		}
 	} else if ((intf_ch_freq == sap_ch_freq) && (cc_switch_mode ==
 				QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)) {
-		if (WLAN_REG_IS_24GHZ_CH_FREQ(intf_ch_freq)) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(intf_ch_freq) ||
+		    WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_ch_freq)) {
 			status =
 				policy_mgr_get_sap_mandatory_channel(
-					mac_ctx->psoc, &intf_ch_freq);
+					mac_ctx->psoc, sap_ch_freq,
+					&intf_ch_freq);
 			if (QDF_IS_STATUS_ERROR(status))
 				sme_err("no mandatory channel");
 		}
@@ -1053,7 +979,8 @@ uint16_t csr_check_concurrent_channel_overlap(struct mac_context *mac_ctx,
 	if (intf_ch_freq == sap_ch_freq)
 		intf_ch_freq = 0;
 
-	sme_debug("##Concurrent Channels %s Interfering",
+	sme_debug("##Concurrent Channels (%d, %d) %s Interfering", sap_ch_freq,
+		  intf_ch_freq,
 		  intf_ch_freq == 0 ? "Not" : "Are");
 
 	return intf_ch_freq;
@@ -1139,40 +1066,6 @@ bool csr_is_conn_state_disconnected(struct mac_context *mac, uint8_t vdev_id)
 	       mac->roam.roamSession[vdev_id].connectState;
 }
 #endif
-
-/**
- * csr_is_valid_mc_concurrent_session() - To check concurren session is valid
- * @mac_ctx: pointer to mac context
- * @session_id: session id
- * @bss_descr: bss description
- *
- * This function validates the concurrent session
- *
- * Return: true or false
- */
-bool csr_is_valid_mc_concurrent_session(struct mac_context *mac_ctx,
-		uint32_t session_id,
-		struct bss_description *bss_descr)
-{
-	struct csr_roam_session *pSession = NULL;
-	enum QDF_OPMODE opmode;
-
-	/* Check for MCC support */
-	if (!mac_ctx->roam.configParam.fenableMCCMode)
-		return false;
-	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id))
-		return false;
-	/* Validate BeaconInterval */
-	pSession = CSR_GET_SESSION(mac_ctx, session_id);
-	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, session_id);
-	if (QDF_STATUS_SUCCESS == csr_validate_mcc_beacon_interval(
-				mac_ctx,
-				bss_descr->chan_freq,
-				&bss_descr->beaconInterval, session_id,
-				opmode))
-		return true;
-	return false;
-}
 
 bool csr_is_infra_bss_desc(struct bss_description *pSirBssDesc)
 {
@@ -2003,21 +1896,6 @@ eCsrPhyMode csr_convert_from_reg_phy_mode(enum reg_phymode phymode)
 	}
 }
 
-uint32_t csr_get11h_power_constraint(struct mac_context *mac_ctx,
-				     tDot11fIEPowerConstraints *constraints)
-{
-	uint32_t localPowerConstraint = 0;
-
-	/* check if .11h support is enabled, if not,
-	 * the power constraint is 0.
-	 */
-	if (mac_ctx->mlme_cfg->gen.enabled_11h &&
-	    constraints->present)
-		localPowerConstraint = constraints->localPowerConstraints;
-
-	return localPowerConstraint;
-}
-
 #ifndef FEATURE_CM_ENABLE
 bool csr_is_profile_wpa(struct csr_roam_profile *pProfile)
 {
@@ -2119,424 +1997,6 @@ bool csr_is_profile_rsn(struct csr_roam_profile *pProfile)
 	return fRSNProfile;
 }
 #endif
-/**
- * csr_update_mcc_p2p_beacon_interval() - update p2p beacon interval
- * @mac_ctx: pointer to mac context
- *
- * This function is to update the mcc p2p beacon interval
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS csr_update_mcc_p2p_beacon_interval(struct mac_context *mac_ctx)
-{
-	uint32_t session_id = 0;
-	struct csr_roam_session *roam_session;
-
-	/* If MCC is not supported just break and return SUCCESS */
-	if (!mac_ctx->roam.configParam.fenableMCCMode)
-		return QDF_STATUS_E_FAILURE;
-
-	for (session_id = 0; session_id < WLAN_MAX_VDEVS; session_id++) {
-		/*
-		 * If GO in MCC support different beacon interval,
-		 * change the BI of the P2P-GO
-		 */
-		roam_session = &mac_ctx->roam.roamSession[session_id];
-		if (roam_session->bssParams.bssPersona != QDF_P2P_GO_MODE)
-			continue;
-		/*
-		 * Handle different BI scneario based on the
-		 * configuration set.If Config is set to 0x02 then
-		 * Disconnect all the P2P clients associated. If config
-		 * is set to 0x04 then update the BI without
-		 * disconnecting all the clients
-		 */
-		if ((mac_ctx->roam.configParam.fAllowMCCGODiffBI == 0x04)
-				&& (roam_session->bssParams.
-					updatebeaconInterval)) {
-			return csr_send_chng_mcc_beacon_interval(mac_ctx,
-					session_id);
-		} else if (roam_session->bssParams.updatebeaconInterval) {
-			/*
-			 * If the configuration of fAllowMCCGODiffBI is set to
-			 * other than 0x04
-			 */
-			return csr_roam_call_callback(mac_ctx,
-					session_id,
-					NULL, 0,
-					eCSR_ROAM_DISCONNECT_ALL_P2P_CLIENTS,
-					eCSR_ROAM_RESULT_NONE);
-		}
-	}
-	return QDF_STATUS_E_FAILURE;
-}
-
-static uint16_t csr_calculate_mcc_beacon_interval(struct mac_context *mac,
-						  uint16_t sta_bi,
-						  uint16_t go_gbi)
-{
-	uint8_t num_beacons = 0;
-	uint8_t is_multiple = 0;
-	uint16_t go_cbi = 0;
-	uint16_t go_fbi = 0;
-	uint16_t sta_cbi = 0;
-
-	/* If GO's given beacon Interval is less than 100 */
-	if (go_gbi < 100)
-		go_cbi = 100;
-	/* if GO's given beacon Interval is greater than or equal to 100 */
-	else
-		go_cbi = 100 + (go_gbi % 100);
-
-	if (sta_bi == 0) {
-		/* There is possibility to receive zero as value.
-		 * Which will cause divide by zero. Hence initialise with 100
-		 */
-		sta_bi = 100;
-		sme_warn("sta_bi 2nd parameter is zero, initialize to %d",
-			sta_bi);
-	}
-	/* check, if either one is multiple of another */
-	if (sta_bi > go_cbi)
-		is_multiple = !(sta_bi % go_cbi);
-	else
-		is_multiple = !(go_cbi % sta_bi);
-
-	/* if it is multiple, then accept GO's beacon interval
-	 * range [100,199] as it is
-	 */
-	if (is_multiple)
-		return go_cbi;
-
-	/* else , if it is not multiple, then then check for number of beacons
-	 * to be inserted based on sta BI
-	 */
-	num_beacons = sta_bi / 100;
-	if (num_beacons) {
-		/* GO's final beacon interval will be aligned to sta beacon
-		 * interval, but in the range of [100, 199].
-		 */
-		sta_cbi = sta_bi / num_beacons;
-		go_fbi = sta_cbi;
-	} else
-		/* if STA beacon interval is less than 100, use GO's change
-		 * bacon interval instead of updating to STA's beacon interval.
-		 */
-		go_fbi = go_cbi;
-
-	return go_fbi;
-}
-
-/**
- * csr_validate_p2pcli_bcn_intrvl() - to validate p2pcli beacon interval
- * @mac_ctx: pointer to mac context
- * @chnl_id: channel id variable
- * @bcn_interval: pointer to given beacon interval
- * @session_id: given session id
- * @status: fill the status in terms of QDF_STATUS to inform caller
- *
- * This API can provide the validation the beacon interval and re-calculate
- * in case concurrency
- *
- * Return: bool
- */
-static bool csr_validate_p2pcli_bcn_intrvl(struct mac_context *mac_ctx,
-		uint32_t ch_freq, uint16_t *bcn_interval, uint32_t session_id,
-		QDF_STATUS *status)
-{
-	struct csr_roam_session *roamsession;
-	enum QDF_OPMODE opmode;
-
-	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, session_id);
-	roamsession = &mac_ctx->roam.roamSession[session_id];
-	if (opmode == QDF_STA_MODE) {
-		/* check for P2P client mode */
-		sme_debug("Ignore Beacon Interval Validation...");
-	} else if (opmode == QDF_P2P_GO_MODE) {
-		/* Check for P2P go scenario */
-		if (roamsession->bssParams.operation_chan_freq != ch_freq &&
-		    roamsession->bssParams.beaconInterval != *bcn_interval) {
-			sme_err("BcnIntrvl is diff can't connect to P2P_GO network");
-			*status = QDF_STATUS_E_FAILURE;
-			return true;
-		}
-	}
-	return false;
-}
-
-/**
- * csr_validate_p2pgo_bcn_intrvl() - to validate p2pgo beacon interval
- * @mac_ctx: pointer to mac context
- * @chnl_id: channel id variable
- * @bcn_interval: pointer to given beacon interval
- * @session_id: given session id
- * @status: fill the status in terms of QDF_STATUS to inform caller
- *
- * This API can provide the validation the beacon interval and re-calculate
- * in case concurrency
- *
- * Return: bool
- */
-static bool csr_validate_p2pgo_bcn_intrvl(struct mac_context *mac_ctx,
-		uint32_t ch_freq, uint16_t *bcn_interval,
-		uint32_t session_id, QDF_STATUS *status)
-{
-	struct csr_roam_session *roamsession;
-	struct csr_config *cfg_param;
-	tCsrRoamConnectedProfile *conn_profile;
-	uint16_t new_bcn_interval;
-	enum QDF_OPMODE opmode;
-
-	roamsession = &mac_ctx->roam.roamSession[session_id];
-	cfg_param = &mac_ctx->roam.configParam;
-	conn_profile = &roamsession->connectedProfile;
-	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, session_id);
-	if (opmode == QDF_P2P_CLIENT_MODE || opmode == QDF_STA_MODE) {
-		/* check for P2P_client scenario */
-		if ((conn_profile->op_freq == 0) &&
-		    (conn_profile->beaconInterval == 0))
-			return false;
-
-		/* This is temp ifdef will be removed in near future */
-#ifdef FEATURE_CM_ENABLE
-		if (cm_is_vdevid_connected(mac_ctx->pdev, session_id) &&
-#else
-		if (csr_is_conn_state_connected_infra(mac_ctx, session_id) &&
-#endif
-		    conn_profile->op_freq != ch_freq &&
-		    conn_profile->beaconInterval != *bcn_interval) {
-			/*
-			 * Updated beaconInterval should be used only when
-			 * we are starting a new BSS not incase of
-			 * client or STA case
-			 */
-
-			/* Calculate beacon Interval for P2P-GO incase of MCC */
-			if (cfg_param->conc_custom_rule1 ||
-					cfg_param->conc_custom_rule2) {
-				new_bcn_interval = CSR_CUSTOM_CONC_GO_BI;
-			} else {
-				new_bcn_interval =
-					csr_calculate_mcc_beacon_interval(
-						mac_ctx,
-						conn_profile->beaconInterval,
-						*bcn_interval);
-			}
-			if (*bcn_interval != new_bcn_interval)
-				*bcn_interval = new_bcn_interval;
-			*status = QDF_STATUS_SUCCESS;
-			return true;
-		}
-	}
-	return false;
-}
-
-/**
- * csr_validate_sta_bcn_intrvl() - to validate sta beacon interval
- * @mac_ctx: pointer to mac context
- * @chnl_id: channel id variable
- * @bcn_interval: pointer to given beacon interval
- * @session_id: given session id
- * @status: fill the status in terms of QDF_STATUS to inform caller
- *
- * This API can provide the validation the beacon interval and re-calculate
- * in case concurrency
- *
- * Return: bool
- */
-static bool csr_validate_sta_bcn_intrvl(struct mac_context *mac_ctx,
-			uint32_t ch_freq, uint16_t *bcn_interval,
-			uint32_t session_id, QDF_STATUS *status)
-{
-	struct csr_roam_session *roamsession;
-	struct csr_config *cfg_param;
-	uint16_t new_bcn_interval;
-	enum QDF_OPMODE opmode;
-
-	roamsession = &mac_ctx->roam.roamSession[session_id];
-	cfg_param = &mac_ctx->roam.configParam;
-
-	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, session_id);
-	if (opmode == QDF_P2P_CLIENT_MODE) {
-		/* check for P2P client mode */
-		sme_debug("Bcn Intrvl validation not require for STA/CLIENT");
-		return false;
-	}
-	if (opmode == QDF_SAP_MODE &&
-	    roamsession->bssParams.operation_chan_freq != ch_freq) {
-		/*
-		 * IF SAP has started and STA wants to connect
-		 * on different channel MCC should
-		 *  MCC should not be enabled so making it
-		 * false to enforce on same channel
-		 */
-		sme_debug("*** MCC with SAP+STA sessions ****");
-		*status = QDF_STATUS_SUCCESS;
-		return true;
-	}
-	/*
-	 * Check for P2P go scenario
-	 * if GO in MCC support different
-	 * beacon interval,
-	 * change the BI of the P2P-GO
-	 */
-	if (opmode == QDF_P2P_GO_MODE &&
-	    roamsession->bssParams.operation_chan_freq != ch_freq &&
-	    roamsession->bssParams.beaconInterval != *bcn_interval) {
-		/* if GO in MCC support diff beacon interval, return success */
-		if (cfg_param->fAllowMCCGODiffBI == 0x01) {
-			*status = QDF_STATUS_SUCCESS;
-			return true;
-		}
-		/*
-		 * Send only Broadcast disassoc and update bcn_interval
-		 * If configuration is set to 0x04 then dont
-		 * disconnect all the station
-		 */
-		if ((cfg_param->fAllowMCCGODiffBI == 0x02)
-			|| (cfg_param->fAllowMCCGODiffBI == 0x04)) {
-			/* Check to pass the right beacon Interval */
-			if (cfg_param->conc_custom_rule1 ||
-				cfg_param->conc_custom_rule2) {
-				new_bcn_interval = CSR_CUSTOM_CONC_GO_BI;
-			} else {
-				new_bcn_interval =
-				csr_calculate_mcc_beacon_interval(
-					mac_ctx, *bcn_interval,
-					roamsession->bssParams.beaconInterval);
-			}
-			sme_debug("Peer AP BI : %d, new Beacon Interval: %d",
-				*bcn_interval, new_bcn_interval);
-			/* Update the becon Interval */
-			if (new_bcn_interval !=
-					roamsession->bssParams.beaconInterval) {
-				/* Update the bcn_interval now */
-				sme_err("Beacon Interval got changed config used: %d",
-					cfg_param->fAllowMCCGODiffBI);
-
-				roamsession->bssParams.beaconInterval =
-					new_bcn_interval;
-				roamsession->bssParams.updatebeaconInterval =
-					true;
-				*status = csr_update_mcc_p2p_beacon_interval(
-					mac_ctx);
-				return true;
-			}
-			*status = QDF_STATUS_SUCCESS;
-			return true;
-		}
-		if (cfg_param->fAllowMCCGODiffBI
-				== 0x03) {
-			/* Disconnect the P2P session */
-			roamsession->bssParams.updatebeaconInterval = false;
-			*status = csr_roam_call_callback(mac_ctx,
-					session_id, NULL, 0,
-					eCSR_ROAM_SEND_P2P_STOP_BSS,
-					eCSR_ROAM_RESULT_NONE);
-			return true;
-		}
-		sme_err("BcnIntrvl is diff can't connect to preferred AP");
-		*status = QDF_STATUS_E_FAILURE;
-		return true;
-	}
-	return false;
-}
-
-QDF_STATUS csr_validate_mcc_beacon_interval(struct mac_context *mac_ctx,
-					    uint32_t ch_freq,
-					    uint16_t *bcn_interval,
-					    uint32_t cur_session_id,
-					    enum QDF_OPMODE cur_bss_persona)
-{
-	uint32_t session_id = 0;
-	QDF_STATUS status;
-	bool is_done;
-
-	/* If MCC is not supported just break */
-	if (!mac_ctx->roam.configParam.fenableMCCMode)
-		return QDF_STATUS_E_FAILURE;
-
-	for (session_id = 0; session_id < WLAN_MAX_VDEVS; session_id++) {
-		if (cur_session_id == session_id)
-			continue;
-
-		if (!CSR_IS_SESSION_VALID(mac_ctx, session_id))
-			continue;
-
-		switch (cur_bss_persona) {
-		case QDF_STA_MODE:
-			is_done = csr_validate_sta_bcn_intrvl(
-						mac_ctx, ch_freq, bcn_interval,
-						session_id, &status);
-			if (true == is_done)
-				return status;
-			break;
-
-		case QDF_P2P_CLIENT_MODE:
-			is_done = csr_validate_p2pcli_bcn_intrvl(mac_ctx,
-					ch_freq, bcn_interval, session_id,
-					&status);
-			if (true == is_done)
-				return status;
-			break;
-
-		case QDF_SAP_MODE:
-		case QDF_IBSS_MODE:
-			break;
-
-		case QDF_P2P_GO_MODE:
-			is_done = csr_validate_p2pgo_bcn_intrvl(mac_ctx,
-					ch_freq, bcn_interval,
-					session_id, &status);
-			if (true == is_done)
-				return status;
-			break;
-
-		default:
-			sme_err("Persona not supported: %d", cur_bss_persona);
-			return QDF_STATUS_E_FAILURE;
-		}
-	}
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * csr_is_auth_type11r() - Check if Authentication type is 11R
- * @mac: pointer to mac context
- * @auth_type: The authentication type that is used to make the connection
- * @mdie_present: Is MDIE IE present
- *
- * Return: true if is 11R auth type, false otherwise
- */
-bool csr_is_auth_type11r(struct mac_context *mac, enum csr_akm_type auth_type,
-			 uint8_t mdie_present)
-{
-	switch (auth_type) {
-	case eCSR_AUTH_TYPE_OPEN_SYSTEM:
-		if (mdie_present &&
-		    mac->mlme_cfg->lfr.enable_ftopen)
-			return true;
-		break;
-	case eCSR_AUTH_TYPE_FT_RSN_PSK:
-	case eCSR_AUTH_TYPE_FT_RSN:
-	case eCSR_AUTH_TYPE_FT_SAE:
-	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
-	case eCSR_AUTH_TYPE_FT_FILS_SHA256:
-	case eCSR_AUTH_TYPE_FT_FILS_SHA384:
-		return true;
-	default:
-		break;
-	}
-	return false;
-}
-
-/* Function to return true if the profile is 11r */
-bool csr_is_profile11r(struct mac_context *mac,
-			struct csr_roam_profile *pProfile)
-{
-	return csr_is_auth_type11r(mac, pProfile->negotiatedAuthType,
-				   pProfile->mdid.mdie_present);
-}
 
 bool csr_is_auth_type_ese(enum csr_akm_type AuthType)
 {
@@ -2599,21 +2059,22 @@ bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 {
 	uint32_t i;
 	uint8_t *session_pmkid;
-	tPmkidCacheInfo *pmkid_cache;
+	struct wlan_crypto_pmksa *pmkid_cache;
 
 	pmkid_cache = qdf_mem_malloc(sizeof(*pmkid_cache));
 	if (!pmkid_cache)
 		return false;
 
-	qdf_mem_copy(pmkid_cache->BSSID.bytes, peer_mac_addr,
+	qdf_mem_copy(pmkid_cache->bssid.bytes, peer_mac_addr,
 		     QDF_MAC_ADDR_SIZE);
 
-	if (!csr_lookup_pmkid_using_bssid(mac, session, pmkid_cache)) {
+	if (!cm_lookup_pmkid_using_bssid(mac->psoc, session->vdev_id,
+					 pmkid_cache)) {
 		qdf_mem_free(pmkid_cache);
 		return false;
 	}
 
-	session_pmkid = pmkid_cache->PMKID;
+	session_pmkid = pmkid_cache->pmkid;
 	for (i = 0; i < pmkid_count; i++) {
 		if (!qdf_mem_cmp(pmkid + (i * PMKID_LEN),
 				 session_pmkid, PMKID_LEN)) {
@@ -2626,33 +2087,6 @@ bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 	qdf_mem_free(pmkid_cache);
 
 	return false;
-}
-
-bool csr_lookup_pmkid_using_bssid(struct mac_context *mac,
-				  struct csr_roam_session *session,
-				  tPmkidCacheInfo *pmk_cache)
-{
-	struct wlan_crypto_pmksa *pmksa;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, session->vdev_id,
-						    WLAN_LEGACY_SME_ID);
-	if (!vdev) {
-		sme_err("Invalid vdev");
-		return false;
-	}
-
-	pmksa = wlan_crypto_get_pmksa(vdev, &pmk_cache->BSSID);
-	if (!pmksa) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
-		return false;
-	}
-	qdf_mem_copy(pmk_cache->PMKID, pmksa->pmkid, sizeof(pmk_cache->PMKID));
-	qdf_mem_copy(pmk_cache->pmk, pmksa->pmk, pmksa->pmk_len);
-	pmk_cache->pmk_len = pmksa->pmk_len;
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
-
-	return true;
 }
 
 #ifndef FEATURE_CM_ENABLE
@@ -2703,12 +2137,12 @@ static inline void csr_update_pmksa_to_profile(struct wlan_objmgr_vdev *vdev,
 		mlme_err("vdev legacy private object is NULL");
 		return;
 	}
-	if (!mlme_priv->fils_con_info)
+	if (!mlme_priv->connect_info.fils_con_info)
 		return;
-	mlme_priv->fils_con_info->pmk_len = pmksa->pmk_len;
-	qdf_mem_copy(mlme_priv->fils_con_info->pmk,
+	mlme_priv->connect_info.fils_con_info->pmk_len = pmksa->pmk_len;
+	qdf_mem_copy(mlme_priv->connect_info.fils_con_info->pmk,
 		     pmksa->pmk, pmksa->pmk_len);
-	qdf_mem_copy(mlme_priv->fils_con_info->pmkid,
+	qdf_mem_copy(mlme_priv->connect_info.fils_con_info->pmkid,
 		     pmksa->pmkid, PMKID_LEN);
 }
 #else
@@ -2731,7 +2165,6 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 	uint16_t rsn_cap = 0, self_rsn_cap;
 	int32_t rsn_val;
 	struct wlan_crypto_pmksa pmksa, *pmksa_peer;
-	struct rso_config *rso_cfg;
 
 	if (!local_ap_ie &&
 	    (!QDF_IS_STATUS_SUCCESS(csr_get_parsed_bss_description_ies
@@ -2810,14 +2243,6 @@ uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 		wlan_cm_set_psk_pmk(mac->pdev, sessionId,
 				    pmksa_peer->pmk, pmksa_peer->pmk_len);
 		csr_update_pmksa_to_profile(vdev, pmksa_peer);
-	}
-	rso_cfg = wlan_cm_get_rso_config(vdev);
-	if (rso_cfg) {
-		rso_cfg->rsn_cap = 0;
-		if (pProfile->MFPRequired)
-			rso_cfg->rsn_cap |= WLAN_CRYPTO_RSN_CAP_MFP_REQUIRED;
-		if (pProfile->MFPCapable)
-			rso_cfg->rsn_cap |= WLAN_CRYPTO_RSN_CAP_MFP_ENABLED;
 	}
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
@@ -2990,10 +2415,10 @@ bool csr_rates_is_dot11_rate11b_supported_rate(uint8_t dot11Rate)
 		(uint16_t) (BITS_OFF(dot11Rate, CSR_DOT11_BASIC_RATE_MASK));
 
 	switch (nonBasicRate) {
-	case eCsrSuppRate_1Mbps:
-	case eCsrSuppRate_2Mbps:
-	case eCsrSuppRate_5_5Mbps:
-	case eCsrSuppRate_11Mbps:
+	case SUPP_RATE_1_MBPS:
+	case SUPP_RATE_2_MBPS:
+	case SUPP_RATE_5_MBPS:
+	case SUPP_RATE_11_MBPS:
 		fSupported = true;
 		break;
 
@@ -3011,14 +2436,14 @@ bool csr_rates_is_dot11_rate11a_supported_rate(uint8_t dot11Rate)
 		(uint16_t) (BITS_OFF(dot11Rate, CSR_DOT11_BASIC_RATE_MASK));
 
 	switch (nonBasicRate) {
-	case eCsrSuppRate_6Mbps:
-	case eCsrSuppRate_9Mbps:
-	case eCsrSuppRate_12Mbps:
-	case eCsrSuppRate_18Mbps:
-	case eCsrSuppRate_24Mbps:
-	case eCsrSuppRate_36Mbps:
-	case eCsrSuppRate_48Mbps:
-	case eCsrSuppRate_54Mbps:
+	case SUPP_RATE_6_MBPS:
+	case SUPP_RATE_9_MBPS:
+	case SUPP_RATE_12_MBPS:
+	case SUPP_RATE_18_MBPS:
+	case SUPP_RATE_24_MBPS:
+	case SUPP_RATE_36_MBPS:
+	case SUPP_RATE_48_MBPS:
+	case SUPP_RATE_54_MBPS:
 		fSupported = true;
 		break;
 
@@ -3185,275 +2610,10 @@ bool csr_is_bssid_match(struct qdf_mac_addr *pProfBssid,
 	return fMatch;
 }
 
-/**
- * csr_is_aggregate_rate_supported() - to check if aggregate rate is supported
- * @mac_ctx: pointer to mac context
- * @rate: A rate in units of 500kbps
- *
- *
- * The rate encoding  is just as in 802.11  Information Elements, except
- * that the high bit is \em  not interpreted as indicating a Basic Rate,
- * and proprietary rates are allowed, too.
- *
- * Note  that if the  adapter's dot11Mode  is g,  we don't  restrict the
- * rates.  According to hwReadEepromParameters, this will happen when:
- * ... the  card is  configured for ALL  bands through  the property
- * page.  If this occurs, and the card is not an ABG card ,then this
- * code  is  setting the  dot11Mode  to  assume  the mode  that  the
- * hardware can support.   For example, if the card  is an 11BG card
- * and we  are configured to support  ALL bands, then  we change the
- * dot11Mode  to 11g  because  ALL in  this  case is  only what  the
- * hardware can support.
- *
- * Return: true if  the adapter is currently capable of supporting this rate
- */
-
-static bool csr_is_aggregate_rate_supported(struct mac_context *mac_ctx,
-			uint16_t rate)
+bool csr_rates_is_dot11_rate_supported(struct mac_context *mac_ctx,
+				       uint8_t rate)
 {
-	bool supported = false;
-	uint16_t idx, new_rate;
-
-	/* In case basic rate flag is set */
-	new_rate = BITS_OFF(rate, CSR_DOT11_BASIC_RATE_MASK);
-	if (eCSR_CFG_DOT11_MODE_11A ==
-			mac_ctx->roam.configParam.uCfgDot11Mode) {
-		switch (new_rate) {
-		case eCsrSuppRate_6Mbps:
-		case eCsrSuppRate_9Mbps:
-		case eCsrSuppRate_12Mbps:
-		case eCsrSuppRate_18Mbps:
-		case eCsrSuppRate_24Mbps:
-		case eCsrSuppRate_36Mbps:
-		case eCsrSuppRate_48Mbps:
-		case eCsrSuppRate_54Mbps:
-			supported = true;
-			break;
-		default:
-			supported = false;
-			break;
-		}
-
-	} else if (eCSR_CFG_DOT11_MODE_11B ==
-		   mac_ctx->roam.configParam.uCfgDot11Mode) {
-		switch (new_rate) {
-		case eCsrSuppRate_1Mbps:
-		case eCsrSuppRate_2Mbps:
-		case eCsrSuppRate_5_5Mbps:
-		case eCsrSuppRate_11Mbps:
-			supported = true;
-			break;
-		default:
-			supported = false;
-			break;
-		}
-	} else if (!mac_ctx->roam.configParam.ProprietaryRatesEnabled) {
-
-		switch (new_rate) {
-		case eCsrSuppRate_1Mbps:
-		case eCsrSuppRate_2Mbps:
-		case eCsrSuppRate_5_5Mbps:
-		case eCsrSuppRate_6Mbps:
-		case eCsrSuppRate_9Mbps:
-		case eCsrSuppRate_11Mbps:
-		case eCsrSuppRate_12Mbps:
-		case eCsrSuppRate_18Mbps:
-		case eCsrSuppRate_24Mbps:
-		case eCsrSuppRate_36Mbps:
-		case eCsrSuppRate_48Mbps:
-		case eCsrSuppRate_54Mbps:
-			supported = true;
-			break;
-		default:
-			supported = false;
-			break;
-		}
-	} else if (eCsrSuppRate_1Mbps == new_rate ||
-			eCsrSuppRate_2Mbps == new_rate ||
-			eCsrSuppRate_5_5Mbps == new_rate ||
-			eCsrSuppRate_11Mbps == new_rate)
-		supported = true;
-	else {
-		idx = 0x1;
-
-		switch (new_rate) {
-		case eCsrSuppRate_6Mbps:
-			supported = g_phy_rates_suppt[0][idx];
-			break;
-		case eCsrSuppRate_9Mbps:
-			supported = g_phy_rates_suppt[1][idx];
-			break;
-		case eCsrSuppRate_12Mbps:
-			supported = g_phy_rates_suppt[2][idx];
-			break;
-		case eCsrSuppRate_18Mbps:
-			supported = g_phy_rates_suppt[3][idx];
-			break;
-		case eCsrSuppRate_20Mbps:
-			supported = g_phy_rates_suppt[4][idx];
-			break;
-		case eCsrSuppRate_24Mbps:
-			supported = g_phy_rates_suppt[5][idx];
-			break;
-		case eCsrSuppRate_36Mbps:
-			supported = g_phy_rates_suppt[6][idx];
-			break;
-		case eCsrSuppRate_40Mbps:
-			supported = g_phy_rates_suppt[7][idx];
-			break;
-		case eCsrSuppRate_42Mbps:
-			supported = g_phy_rates_suppt[8][idx];
-			break;
-		case eCsrSuppRate_48Mbps:
-			supported = g_phy_rates_suppt[9][idx];
-			break;
-		case eCsrSuppRate_54Mbps:
-			supported = g_phy_rates_suppt[10][idx];
-			break;
-		case eCsrSuppRate_72Mbps:
-			supported = g_phy_rates_suppt[11][idx];
-			break;
-		case eCsrSuppRate_80Mbps:
-			supported = g_phy_rates_suppt[12][idx];
-			break;
-		case eCsrSuppRate_84Mbps:
-			supported = g_phy_rates_suppt[13][idx];
-			break;
-		case eCsrSuppRate_96Mbps:
-			supported = g_phy_rates_suppt[14][idx];
-			break;
-		case eCsrSuppRate_108Mbps:
-			supported = g_phy_rates_suppt[15][idx];
-			break;
-		case eCsrSuppRate_120Mbps:
-			supported = g_phy_rates_suppt[16][idx];
-			break;
-		case eCsrSuppRate_126Mbps:
-			supported = g_phy_rates_suppt[17][idx];
-			break;
-		case eCsrSuppRate_144Mbps:
-			supported = g_phy_rates_suppt[18][idx];
-			break;
-		case eCsrSuppRate_160Mbps:
-			supported = g_phy_rates_suppt[19][idx];
-			break;
-		case eCsrSuppRate_168Mbps:
-			supported = g_phy_rates_suppt[20][idx];
-			break;
-		case eCsrSuppRate_192Mbps:
-			supported = g_phy_rates_suppt[21][idx];
-			break;
-		case eCsrSuppRate_216Mbps:
-			supported = g_phy_rates_suppt[22][idx];
-			break;
-		case eCsrSuppRate_240Mbps:
-			supported = g_phy_rates_suppt[23][idx];
-			break;
-		default:
-			supported = false;
-			break;
-		}
-	}
-	return supported;
-}
-
-void csr_add_rate_bitmap(uint8_t rate, uint16_t *pRateBitmap)
-{
-	uint16_t rateBitmap;
-	uint16_t n = BITS_OFF(rate, CSR_DOT11_BASIC_RATE_MASK);
-
-	rateBitmap = *pRateBitmap;
-	switch (n) {
-	case SIR_MAC_RATE_1:
-		rateBitmap |= SIR_MAC_RATE_1_BITMAP;
-		break;
-	case SIR_MAC_RATE_2:
-		rateBitmap |= SIR_MAC_RATE_2_BITMAP;
-		break;
-	case SIR_MAC_RATE_5_5:
-		rateBitmap |= SIR_MAC_RATE_5_5_BITMAP;
-		break;
-	case SIR_MAC_RATE_11:
-		rateBitmap |= SIR_MAC_RATE_11_BITMAP;
-		break;
-	case SIR_MAC_RATE_6:
-		rateBitmap |= SIR_MAC_RATE_6_BITMAP;
-		break;
-	case SIR_MAC_RATE_9:
-		rateBitmap |= SIR_MAC_RATE_9_BITMAP;
-		break;
-	case SIR_MAC_RATE_12:
-		rateBitmap |= SIR_MAC_RATE_12_BITMAP;
-		break;
-	case SIR_MAC_RATE_18:
-		rateBitmap |= SIR_MAC_RATE_18_BITMAP;
-		break;
-	case SIR_MAC_RATE_24:
-		rateBitmap |= SIR_MAC_RATE_24_BITMAP;
-		break;
-	case SIR_MAC_RATE_36:
-		rateBitmap |= SIR_MAC_RATE_36_BITMAP;
-		break;
-	case SIR_MAC_RATE_48:
-		rateBitmap |= SIR_MAC_RATE_48_BITMAP;
-		break;
-	case SIR_MAC_RATE_54:
-		rateBitmap |= SIR_MAC_RATE_54_BITMAP;
-		break;
-	}
-	*pRateBitmap = rateBitmap;
-}
-
-bool csr_check_rate_bitmap(uint8_t rate, uint16_t rateBitmap)
-{
-	uint16_t n = BITS_OFF(rate, CSR_DOT11_BASIC_RATE_MASK);
-
-	switch (n) {
-	case SIR_MAC_RATE_1:
-		rateBitmap &= SIR_MAC_RATE_1_BITMAP;
-		break;
-	case SIR_MAC_RATE_2:
-		rateBitmap &= SIR_MAC_RATE_2_BITMAP;
-		break;
-	case SIR_MAC_RATE_5_5:
-		rateBitmap &= SIR_MAC_RATE_5_5_BITMAP;
-		break;
-	case SIR_MAC_RATE_11:
-		rateBitmap &= SIR_MAC_RATE_11_BITMAP;
-		break;
-	case SIR_MAC_RATE_6:
-		rateBitmap &= SIR_MAC_RATE_6_BITMAP;
-		break;
-	case SIR_MAC_RATE_9:
-		rateBitmap &= SIR_MAC_RATE_9_BITMAP;
-		break;
-	case SIR_MAC_RATE_12:
-		rateBitmap &= SIR_MAC_RATE_12_BITMAP;
-		break;
-	case SIR_MAC_RATE_18:
-		rateBitmap &= SIR_MAC_RATE_18_BITMAP;
-		break;
-	case SIR_MAC_RATE_24:
-		rateBitmap &= SIR_MAC_RATE_24_BITMAP;
-		break;
-	case SIR_MAC_RATE_36:
-		rateBitmap &= SIR_MAC_RATE_36_BITMAP;
-		break;
-	case SIR_MAC_RATE_48:
-		rateBitmap &= SIR_MAC_RATE_48_BITMAP;
-		break;
-	case SIR_MAC_RATE_54:
-		rateBitmap &= SIR_MAC_RATE_54_BITMAP;
-		break;
-	}
-	return !!rateBitmap;
-}
-
-bool csr_rates_is_dot11_rate_supported(struct mac_context *mac_ctx, uint8_t rate)
-{
-	uint16_t n = BITS_OFF(rate, CSR_DOT11_BASIC_RATE_MASK);
-
-	return csr_is_aggregate_rate_supported(mac_ctx, n);
+	return wlan_rates_is_dot11_rate_supported(mac_ctx, rate);
 }
 
 #ifndef FEATURE_CM_ENABLE
@@ -3465,12 +2625,6 @@ void csr_free_fils_profile_info(struct mac_context *mac,
 	if (profile->fils_con_info) {
 		qdf_mem_free(profile->fils_con_info);
 		profile->fils_con_info = NULL;
-	}
-
-	if (profile->hlp_ie) {
-		qdf_mem_free(profile->hlp_ie);
-		profile->hlp_ie = NULL;
-		profile->hlp_ie_len = 0;
 	}
 }
 #else
@@ -3561,18 +2715,6 @@ tSirResultCodes csr_get_de_auth_rsp_status_code(struct deauth_rsp *pSmeRsp)
 	qdf_get_u32(pBuffer, &ret);
 
 	return (tSirResultCodes) ret;
-}
-
-tSirScanType csr_get_scan_type(struct mac_context *mac, uint8_t chnId)
-{
-	tSirScanType scanType = eSIR_PASSIVE_SCAN;
-	enum channel_state channelEnabledType;
-
-	channelEnabledType = wlan_reg_get_channel_state(mac->pdev, chnId);
-	if (CHANNEL_STATE_ENABLE == channelEnabledType)
-		scanType = eSIR_ACTIVE_SCAN;
-
-	return scanType;
 }
 
 enum bss_type csr_translate_bsstype_to_mac_type(eCsrRoamBssType csrtype)
@@ -3953,4 +3095,38 @@ enum csr_cfgdot11mode csr_phy_mode_to_dot11mode(enum wlan_phymode phy_mode)
 		sme_err("invalid phy mode %d", phy_mode);
 		return eCSR_CFG_DOT11_MODE_MAX;
 	}
+}
+
+QDF_STATUS csr_mlme_vdev_disconnect_all_p2p_client_event(uint8_t vdev_id)
+{
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_SME);
+
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	return csr_roam_call_callback(mac_ctx, vdev_id, NULL, 0,
+				      eCSR_ROAM_DISCONNECT_ALL_P2P_CLIENTS,
+				      eCSR_ROAM_RESULT_NONE);
+}
+
+QDF_STATUS csr_mlme_vdev_stop_bss(uint8_t vdev_id)
+{
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_SME);
+
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	return csr_roam_call_callback(mac_ctx, vdev_id, NULL, 0,
+				      eCSR_ROAM_SEND_P2P_STOP_BSS,
+				      eCSR_ROAM_RESULT_NONE);
+}
+
+qdf_freq_t csr_mlme_get_concurrent_operation_freq(void)
+{
+	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_SME);
+
+	if (!mac_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	return csr_get_concurrent_operation_freq(mac_ctx);
 }

@@ -1,3 +1,13 @@
+# Android makefile for the WLAN Module
+
+# set WLAN_BUILD_DEBUG=y in your environment to enable debug logging
+define wlog
+$(if $(WLAN_BUILD_DEBUG),$(info $(1)))
+endef
+
+LOCAL_PATH := $(call my-dir)
+$(call wlog,LOCAL_PATH=$(LOCAL_PATH))
+
 ENABLE_QCACLD := true
 ifeq ($(TARGET_USES_QMAA), true)
 ifneq ($(TARGET_USES_QMAA_OVERRIDE_WLAN), true)
@@ -8,8 +18,6 @@ endif
 endif
 
 ifeq  ($(ENABLE_QCACLD), true)
-# Android makefile for the WLAN Module
-LOCAL_PATH := $(call my-dir)
 
 # Assume no targets will be supported
 WLAN_CHIPSET :=
@@ -35,6 +43,9 @@ endif # opensource
 # Multi-ko check
 LOCAL_DEV_NAME := $(patsubst .%,%,\
 	$(lastword $(strip $(subst /, ,$(LOCAL_PATH)))))
+
+$(call wlog,LOCAL_DEV_NAME=$(LOCAL_DEV_NAME))
+$(call wlog,TARGET_WLAN_CHIP=$(TARGET_WLAN_CHIP))
 
 ifeq (1, $(strip $(shell expr $(words $(strip $(TARGET_WLAN_CHIP))) \>= 2)))
 
@@ -125,6 +136,7 @@ KBUILD_OPTIONS += DYNAMIC_SINGLE_CHIP=$(DYNAMIC_SINGLE_CHIP)
 # This means we need to rename the module to <chipset>_wlan.ko
 # after wlan.ko is built.
 KBUILD_OPTIONS += MODNAME=$(LOCAL_MOD_NAME)
+KBUILD_OPTIONS += DEVNAME=$(LOCAL_DEV_NAME)
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(WLAN_SELECT)
 
@@ -165,7 +177,7 @@ endif
 # Create Symbolic link
 ifneq ($(findstring $(WLAN_CHIPSET),$(WIFI_DRIVER_DEFAULT)),)
 ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
-ifneq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),)
+ifneq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),true)
 $(shell mkdir -p $(TARGET_OUT_VENDOR)/lib/modules; \
 	ln -sf /$(TARGET_COPY_OUT_VENDOR)/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE) $(TARGET_OUT_VENDOR)/lib/modules/$(LOCAL_MODULE))
 endif
@@ -185,11 +197,11 @@ $(shell mkdir -p $(TARGET_FW_PATH); \
 	ln -sf $(TARGET_MAC_BIN_PATH)/wlan_mac.bin $(TARGET_FW_PATH)/wlan_mac.bin)
 ifeq ($(TARGET_BOARD_AUTO),true)
 $(shell ln -sf $(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
-$(warning "generate soft link because TARGET_BOARD_AUTO true")
+$(call wlog,"generate soft link because TARGET_BOARD_AUTO true")
 else
 ifneq ($(GENERIC_ODM_IMAGE),true)
 $(shell ln -sf $(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
-$(warning "generate soft link because GRNERIC_ODM_IMAGE not true")
+$(call wlog,"generate soft link because GENERIC_ODM_IMAGE not true")
 endif
 endif
 endif # Multi-ko check

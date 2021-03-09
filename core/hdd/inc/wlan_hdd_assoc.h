@@ -209,6 +209,20 @@ bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,
 			    struct hdd_adapter *adapter);
 
 /**
+ * hdd_conn_set_authenticated() - set authentication state
+ * @adapter: pointer to the adapter
+ * @auth_state: authentication state
+ *
+ * This function updates the global HDD station context
+ * authentication state. And to start auto powersave timer
+ * if ptk installed case and open security case.
+ *
+ * Return: none
+ */
+void
+hdd_conn_set_authenticated(struct hdd_adapter *adapter, uint8_t auth_state);
+
+/**
  * hdd_conn_set_connection_state() - set connection state
  * @adapter: pointer to the adapter
  * @conn_state: connection state
@@ -219,22 +233,6 @@ bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,
  */
 void hdd_conn_set_connection_state(struct hdd_adapter *adapter,
 				   eConnectionState conn_state);
-
-/**
- * hdd_conn_is_connected() - Function to check connection status
- * @sta_ctx:    pointer to global HDD Station context
- *
- * Return: false if any errors encountered, true otherwise
- */
-bool hdd_conn_is_connected(struct hdd_station_ctx *sta_ctx);
-
-/**
- * hdd_adapter_is_connected_sta() - check if @adapter is a connected station
- * @adapter: the adapter to check
- *
- * Return: true if @adapter is a connected station
- */
-bool hdd_adapter_is_connected_sta(struct hdd_adapter *adapter);
 
 /**
  * hdd_conn_get_connected_band() - get current connection radio band
@@ -399,12 +397,12 @@ bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
 void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
 		     struct qdf_mac_addr *peer_mac_addr);
 
+#ifndef FEATURE_CM_ENABLE
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS
 hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 			     const tSirMacAddr bssid, uint32_t ch_freq);
 
-#ifndef FEATURE_CM_ENABLE
 /**
  * hdd_save_gtk_params() - Save GTK offload params
  * @adapter: HDD adapter
@@ -415,24 +413,19 @@ hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
  */
 void hdd_save_gtk_params(struct hdd_adapter *adapter,
 			 struct csr_roam_info *csr_roam_info, bool is_reassoc);
-#endif
-
 #else
-
-#ifndef FEATURE_CM_ENABLE
 static inline void hdd_save_gtk_params(struct hdd_adapter *adapter,
 				       struct csr_roam_info *csr_roam_info,
 				       bool is_reassoc)
 {
 }
-#endif
-
 static inline QDF_STATUS
 hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 			     const tSirMacAddr bssid, uint32_t ch_freq)
 {
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 #endif
 
 /**
