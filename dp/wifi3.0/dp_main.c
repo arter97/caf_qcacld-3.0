@@ -5726,6 +5726,10 @@ static void dp_peer_authorize(struct cdp_peer *peer_handle, uint32_t authorize)
 		qdf_spin_lock_bh(&soc->peer_ref_mutex);
 		peer->authorize = authorize ? 1 : 0;
 		qdf_spin_unlock_bh(&soc->peer_ref_mutex);
+		if (!peer->authorize)
+			dp_peer_flush_frags((struct cdp_soc_t  *)soc,
+					     peer->vdev->vdev_id,
+					     peer->mac_addr.raw);
 	}
 }
 
