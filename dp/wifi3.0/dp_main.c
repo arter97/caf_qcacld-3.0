@@ -4354,6 +4354,7 @@ static void dp_pdev_deinit(struct cdp_pdev *txrx_pdev, int force)
 
 	qdf_spinlock_destroy(&pdev->tx_mutex);
 	qdf_spinlock_destroy(&pdev->vdev_list_lock);
+	qdf_spinlock_destroy(&pdev->ppdu_stats_lock);
 
 	if (pdev->invalid_peer)
 		qdf_mem_free(pdev->invalid_peer);
@@ -13503,6 +13504,7 @@ static inline QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 
 	TAILQ_INIT(&pdev->vdev_list);
 	qdf_spinlock_create(&pdev->vdev_list_lock);
+	qdf_spinlock_create(&pdev->ppdu_stats_lock);
 	pdev->vdev_count = 0;
 
 	qdf_spinlock_create(&pdev->tx_mutex);
@@ -13630,6 +13632,7 @@ fail4:
 	qdf_spinlock_destroy(&pdev->neighbour_peer_mutex);
 	qdf_spinlock_destroy(&pdev->tx_mutex);
 	qdf_spinlock_destroy(&pdev->vdev_list_lock);
+	qdf_spinlock_destroy(&pdev->ppdu_stats_lock);
 	qdf_mem_free(pdev->invalid_peer);
 fail3:
 	dp_pdev_srng_deinit(pdev);
