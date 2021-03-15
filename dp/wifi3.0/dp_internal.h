@@ -2097,4 +2097,16 @@ void dp_set_max_page_size(struct qdf_mem_multi_page_t *pages,
  * Return: None
  */
 void dp_rx_skip_tlvs(qdf_nbuf_t nbuf, uint32_t l3_padding);
+
+/**
+ * dp_peer_flush_frags() - Flush all fragments for a particular
+ *  peer
+ * @soc_hdl - data path soc handle
+ * @vdev_id - vdev id
+ * @peer_addr - peer mac address
+ *
+ * Return: None
+ */
+void dp_peer_flush_frags(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+		uint8_t *peer_mac);
 #endif /* #ifndef _DP_INTERNAL_H_ */
