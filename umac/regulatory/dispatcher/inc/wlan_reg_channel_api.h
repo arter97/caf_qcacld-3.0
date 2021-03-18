@@ -29,7 +29,7 @@
 
 #ifdef CONFIG_HOST_FIND_CHAN
 
-#define WLAN_CHAN_PASSIVE       0x0000000000000200 /* Passive channel flag */
+#define WLAN_CHAN_PASSIVE       0x0000000000100000 /* Passive channel flag */
 
 #define WLAN_CHAN_DFS              0x0002  /* DFS set on primary segment */
 #define WLAN_CHAN_DFS_CFREQ2       0x0004  /* DFS set on secondary segment */

@@ -176,6 +176,18 @@ static int reg_is_phymode_in_wireless_modes(enum reg_phymode phy_in,
 	return sup_wireless_modes & wireless_modes;
 }
 
+static uint16_t get_contiguous_bw[CH_WIDTH_MAX + 1] = {
+	BW_20_MHZ,   /* CH_WIDTH_20MHZ */
+	BW_40_MHZ,   /* CH_WIDTH_40MHZ */
+	BW_80_MHZ,   /* CH_WIDTH_80MHZ */
+	BW_160_MHZ,  /* CH_WIDTH_160MHZ */
+	BW_80_MHZ,   /* CH_WIDTH_80P80MHZ */
+	BW_5_MHZ,    /* CH_WIDTH_5MHZ */
+	BW_10_MHZ,   /* CH_WIDTH_10MHZ */
+	0,           /* CH_WIDTH_INVALID */
+	BW_160_MHZ,  /* CH_WIDTH_MAX */
+};
+
 bool reg_is_phymode_chwidth_allowed(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
 		enum reg_phymode phy_in,
@@ -183,7 +195,7 @@ bool reg_is_phymode_chwidth_allowed(
 		qdf_freq_t freq)
 {
 	uint32_t phymode_bitmap, wireless_modes;
-	uint16_t i, bw = reg_get_bw_value(ch_width);
+	uint16_t i, bw = get_contiguous_bw[ch_width];
 
 	if (ch_width == CH_WIDTH_INVALID)
 		return false;
