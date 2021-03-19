@@ -115,6 +115,15 @@
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #define ROAM_SCAN_PSK_SIZE    48
 #define ROAM_R0KH_ID_MAX_LEN  48
+/* connected but not authenticated */
+#define ROAM_AUTH_STATUS_CONNECTED      0x1
+/* connected and authenticated */
+#define ROAM_AUTH_STATUS_AUTHENTICATED  0x2
+
+#define IS_ROAM_REASON_STA_KICKOUT(reason) ((reason & 0xF) == \
+	WMI_ROAM_TRIGGER_REASON_STA_KICKOUT)
+#define IS_ROAM_REASON_DISCONNECTION(reason) ((reason & 0xF) == \
+	WMI_ROAM_TRIGGER_REASON_DEAUTH)
 #endif
 
 /*
@@ -307,16 +316,16 @@ struct rso_config {
 
 /**
  * enum sta_roam_policy_dfs_mode - state of DFS mode for STA ROME policy
- * @CSR_STA_ROAM_POLICY_NONE: DFS mode attribute is not valid
- * @CSR_STA_ROAM_POLICY_DFS_ENABLED:  DFS mode is enabled
- * @CSR_STA_ROAM_POLICY_DFS_DISABLED: DFS mode is disabled
- * @CSR_STA_ROAM_POLICY_DFS_DEPRIORITIZE: Deprioritize DFS channels in scanning
+ * @STA_ROAM_POLICY_NONE: DFS mode attribute is not valid
+ * @STA_ROAM_POLICY_DFS_ENABLED:  DFS mode is enabled
+ * @STA_ROAM_POLICY_DFS_DISABLED: DFS mode is disabled
+ * @STA_ROAM_POLICY_DFS_DEPRIORITIZE: Deprioritize DFS channels in scanning
  */
 enum sta_roam_policy_dfs_mode {
-	CSR_STA_ROAM_POLICY_NONE,
-	CSR_STA_ROAM_POLICY_DFS_ENABLED,
-	CSR_STA_ROAM_POLICY_DFS_DISABLED,
-	CSR_STA_ROAM_POLICY_DFS_DEPRIORITIZE
+	STA_ROAM_POLICY_NONE,
+	STA_ROAM_POLICY_DFS_ENABLED,
+	STA_ROAM_POLICY_DFS_DISABLED,
+	STA_ROAM_POLICY_DFS_DEPRIORITIZE
 };
 
 /**
@@ -354,6 +363,7 @@ struct rso_roam_policy_params {
  * @drop_factor_5g: Penalty factor
  * @max_raise_rssi_5g: Maximum amount of Boost that can added
  * @is_fils_roaming_supported: fils roaming supported
+ * @roam_scan_control: roam scan control
  * @policy_params: roam policy params
  * @neighbor_report_offload: neighbor report offload params
  */
@@ -373,6 +383,7 @@ struct rso_config_params {
 	int max_raise_rssi_5g;
 	uint8_t cat_rssi_offset;
 	bool is_fils_roaming_supported;
+	bool roam_scan_control;
 	struct rso_roam_policy_params policy_params;
 	struct cm_roam_neighbor_report_offload_params neighbor_report_offload;
 };
@@ -1606,6 +1617,26 @@ struct set_pcl_req {
 };
 
 /**
+ * struct roam_invoke_req - roam invoke request
+ * @vdev_id: vdev for which the roaming has to be enabled/disabled
+ * @target_bssid: target mac address
+ * @ch_freq: channel frequency
+ * @frame_len: frame length, includs mac header, fixed params and ies
+ * @frame_buf: buffer contaning probe response or beacon
+ * @is_same_bssid: flag to indicate if roaming is requested for same bssid
+ * @forced_roaming: Roam to any bssid in any ch (here bssid & ch is not given)
+ */
+struct roam_invoke_req {
+	uint8_t vdev_id;
+	struct qdf_mac_addr target_bssid;
+	uint32_t ch_freq;
+	uint32_t frame_len;
+	uint8_t *frame_buf;
+	uint8_t is_same_bssid;
+	bool forced_roaming;
+};
+
+/**
  * wlan_cm_roam_tx_ops  - structure of tx function pointers for
  * roaming related commands
  * @send_vdev_set_pcl_cmd: TX ops function pointer to send set vdev PCL
@@ -1640,6 +1671,10 @@ struct wlan_cm_roam_tx_ops {
 					 struct wlan_roam_triggers *req);
 	QDF_STATUS (*send_roam_disable_config)(struct wlan_objmgr_vdev *vdev,
 				struct roam_disable_cfg *req);
+#ifdef FEATURE_CM_ENABLE
+	QDF_STATUS (*send_roam_invoke_cmd)(struct wlan_objmgr_vdev *vdev,
+					   struct roam_invoke_req *req);
+#endif
 };
 
 /**

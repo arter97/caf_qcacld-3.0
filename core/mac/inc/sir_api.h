@@ -126,7 +126,6 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define KEK_256BIT_KEY_LEN 32
 
 #define SIR_REPLAY_CTR_LEN 8
-#define SIR_PMK_LEN  48
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #define SIR_UAPSD_BITOFFSET_ACVO     0
 #define SIR_UAPSD_BITOFFSET_ACVI     1
@@ -933,14 +932,6 @@ struct join_req {
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */
 	tSirRSNie rsnIE;        /* RSN IE to be sent in */
-	/* (Re) Association Request */
-#ifdef FEATURE_WLAN_ESE
-	/* CCMK IE to be included as handler for join and reassoc is */
-	tSirCCKMie cckmIE;
-	/* the same. The join will never carry cckm, but will be set to */
-	/* 0. */
-#endif
-
 	tSirAddie addIEScan;    /* Additional IE to be sent in */
 	/* (unicast) Probe Request at the time of join */
 
@@ -2117,12 +2108,14 @@ struct sir_antenna_mode_resp {
 	enum set_antenna_mode_status status;
 };
 
+#ifndef FEATURE_CM_ENABLE
 /* / Definition for Candidate found indication from FW */
 typedef struct sSirSmeCandidateFoundInd {
 	uint16_t messageType;   /* eWNI_SME_CANDIDATE_FOUND_IND */
 	uint16_t length;
 	uint8_t sessionId;      /* Session Identifier */
 } tSirSmeCandidateFoundInd, *tpSirSmeCandidateFoundInd;
+#endif
 
 #ifdef WLAN_FEATURE_11W
 typedef struct sSirWlanExcludeUnencryptParam {
@@ -2523,7 +2516,7 @@ struct roam_offload_synch_ind {
 	uint32_t kek_len;
 	uint8_t kek[SIR_KEK_KEY_LEN_FILS];
 	uint32_t   pmk_len;
-	uint8_t    pmk[SIR_PMK_LEN];
+	uint8_t    pmk[MAX_PMK_LEN];
 	uint8_t    pmkid[PMKID_LEN];
 	bool update_erp_next_seq_num;
 	uint16_t next_erp_seq_num;
@@ -2544,6 +2537,7 @@ struct roam_offload_synch_ind {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 struct handoff_failure_ind {
 	uint8_t vdev_id;
+	struct qdf_mac_addr bssid;
 };
 
 struct roam_offload_synch_fail {
@@ -3995,7 +3989,7 @@ struct sir_qos_params {
 struct sir_sme_ext_cng_chan_req {
 	uint16_t  message_type; /* eWNI_SME_EXT_CHANGE_CHANNEL */
 	uint16_t  length;
-	uint32_t  new_channel;
+	uint32_t  new_ch_freq;
 	uint8_t   vdev_id;
 };
 

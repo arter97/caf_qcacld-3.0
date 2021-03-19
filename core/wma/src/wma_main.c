@@ -5272,6 +5272,10 @@ static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
 	if (wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_sta_nan_ndi_four_port))
 		tgt_cfg->nan_caps.sta_nan_ndi_ndi_allowed = 1;
+
+	if (wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_ndi_txbf_support))
+		tgt_cfg->nan_caps.ndi_txbf_supported = 1;
 }
 #else
 static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
@@ -5352,7 +5356,12 @@ static void wma_update_mlme_related_tgt_caps(struct wlan_objmgr_psoc *psoc,
 		wmi_service_enabled(wmi_handle,
 				    wmi_service_dual_sta_roam_support);
 
-	wma_debug("beacon protection support %d", mlme_tgt_cfg.bigtk_support);
+	mlme_tgt_cfg.ocv_support =
+		wmi_service_enabled(wmi_handle,
+				    wmi_service_ocv_support);
+
+	wma_debug("beacon protection support %d, ocv support %d",
+		  mlme_tgt_cfg.bigtk_support, mlme_tgt_cfg.ocv_support);
 
 	/* Call this at last only after filling all the tgt caps */
 	wlan_mlme_update_cfg_with_tgt_caps(psoc, &mlme_tgt_cfg);
@@ -8708,11 +8717,14 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 			(struct roam_offload_synch_fail *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
+#ifndef FEATURE_CM_ENABLE
 	case SIR_HAL_ROAM_INVOKE:
+		wma_debug("SIR_HAL_ROAM_INVOKE - wma_process_roam_invoke");
 		wma_process_roam_invoke(wma_handle,
-			(struct wma_roam_invoke_cmd *)msg->bodyptr);
+			(struct roam_invoke_req *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
+#endif
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 	case SIR_HAL_SET_BASE_MACADDR_IND:
 		wma_set_base_macaddr_indicate(wma_handle,

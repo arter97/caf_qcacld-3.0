@@ -128,7 +128,8 @@ void cm_wait_for_key_time_out_handler(void *data)
 		return;
 	}
 
-	if (cm_csr_is_wait_for_key_n_change_state(vdev_id)) {
+	if (cm_csr_is_ss_wait_for_key(vdev_id)) {
+		cm_csr_set_ss_none(vdev_id);
 		if (wlan_cm_is_vdev_id_roam_reassoc_state(vdev))
 			mlme_obj->cfg.timeouts.heart_beat_threshold =
 					cfg_default(CFG_HEART_BEAT_THRESHOLD);
@@ -203,6 +204,17 @@ void cm_stop_wait_for_key_timer(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 
 end:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+
+void cm_update_wait_for_key_timer(struct wlan_objmgr_vdev *vdev,
+				  uint8_t vdev_id, uint32_t interval)
+{
+	cm_csr_set_ss_wait_for_key(vdev_id);
+
+	if (QDF_IS_STATUS_ERROR(cm_start_wait_for_key_timer(vdev,  interval))) {
+		mlme_err("Failed wait for key timer start");
+		cm_csr_set_ss_none(vdev_id);
+	}
 }
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
@@ -402,7 +414,7 @@ static enum mgmt_bss_type cm_get_diag_persona(enum QDF_OPMODE persona)
 	}
 }
 
-enum mgmt_encrypt_type cm_get_diag_enc_type(uint32_t cipherset)
+static enum mgmt_encrypt_type cm_get_diag_enc_type(uint32_t cipherset)
 {
 	enum mgmt_encrypt_type n = ENC_MODE_OPEN;
 
@@ -467,9 +479,9 @@ static void cm_diag_fill_wapi_auth_type(uint8_t *auth_type, uint32_t akm)
 		*auth_type = AUTH_WAPI_PSK;
 }
 
-void cm_diag_get_auth_type(uint8_t *auth_type,
-			   uint32_t authmodeset, uint32_t akm,
-			   uint32_t ucastcipherset)
+static void cm_diag_get_auth_type(uint8_t *auth_type,
+				  uint32_t authmodeset, uint32_t akm,
+				  uint32_t ucastcipherset)
 {
 	if (!authmodeset) {
 		*auth_type = AUTH_OPEN;
@@ -690,6 +702,43 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 
 	/* store connect info on success */
 	cm_connect_success_diag(mlme_obj, &conn_stats);
+}
+
+void cm_diag_get_auth_enc_type_vdev_id(struct wlan_objmgr_psoc *psoc,
+				       uint8_t *auth_type,
+				       uint8_t *ucast_cipher,
+				       uint8_t *mcast_cipher,
+				       uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_crypto_params *crypto_params;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL for vdev %d", vdev_id);
+		return;
+	}
+
+	crypto_params = wlan_crypto_vdev_get_crypto_params(vdev);
+	if (!crypto_params) {
+		mlme_err("crypto params is null");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+		return;
+	}
+	if (auth_type)
+		cm_diag_get_auth_type(auth_type,
+				      crypto_params->authmodeset,
+				      crypto_params->key_mgmt,
+				      crypto_params->ucastcipherset);
+	if (ucast_cipher)
+		*ucast_cipher =
+			cm_get_diag_enc_type(crypto_params->ucastcipherset);
+	if (mcast_cipher)
+		*mcast_cipher =
+			cm_get_diag_enc_type(crypto_params->ucastcipherset);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+
 }
 
 #ifdef WLAN_UNIT_TEST
@@ -1110,6 +1159,58 @@ cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
 
 }
 
+#ifdef WLAN_FEATURE_FILS_SK
+static inline bool is_fils_connection(struct wlan_cm_connect_resp *resp)
+{
+	return resp->is_fils_connection;
+}
+#else
+static inline bool is_fils_connection(struct wlan_cm_connect_resp *resp)
+{
+	return false;
+}
+#endif
+
+static void cm_process_connect_complete(struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_pdev *pdev,
+					struct wlan_objmgr_vdev *vdev,
+					struct wlan_cm_connect_resp *rsp)
+{
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	int32_t ucast_cipher, akm;
+	uint32_t key_interval;
+
+	akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_SAE)) {
+		mlme_debug("Update the MDID in PMK cache for FT-SAE case");
+		cm_update_pmk_cache_ft(psoc, vdev_id);
+	}
+
+	cm_csr_set_joined(vdev_id);
+
+	ucast_cipher = wlan_crypto_get_param(vdev,
+					     WLAN_CRYPTO_PARAM_UCAST_CIPHER);
+	if (!rsp->is_wps_connection &&
+	    (is_fils_connection(rsp) || !ucast_cipher ||
+	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_NONE) ==
+			  ucast_cipher ||
+	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP_40) ||
+	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP_104) ||
+	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP))) {
+		cm_csr_set_ss_none(vdev_id);
+		cm_roam_start_init_on_connect(pdev, vdev_id);
+	} else {
+		if (rsp->is_wps_connection)
+			key_interval =
+				WAIT_FOR_WPS_KEY_TIMEOUT_PERIOD;
+		else
+			key_interval =
+				WAIT_FOR_KEY_TIMEOUT_PERIOD;
+		cm_update_wait_for_key_timer(vdev, vdev_id, key_interval);
+	}
+
+}
+
 QDF_STATUS
 cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp)
@@ -1143,6 +1244,8 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 		wlan_cm_roam_state_change(pdev, vdev_id, WLAN_ROAM_INIT,
 					  REASON_CONNECT);
 	cm_csr_connect_done_ind(vdev, rsp);
+	if (QDF_IS_STATUS_SUCCESS(rsp->connect_status))
+		cm_process_connect_complete(psoc, pdev, vdev, rsp);
 	cm_connect_info(vdev, QDF_IS_STATUS_SUCCESS(rsp->connect_status) ?
 			true : false, &rsp->bssid, &rsp->ssid,
 			rsp->freq);

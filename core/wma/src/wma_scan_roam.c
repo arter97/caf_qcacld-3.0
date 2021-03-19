@@ -477,7 +477,7 @@ wma_send_roam_preauth_status(tp_wma_handle wma_handle,
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-
+#ifndef FEATURE_CM_ENABLE
 /**
  * wma_process_roam_invoke() - send roam invoke command to fw.
  * @handle: wma handle
@@ -488,10 +488,9 @@ wma_send_roam_preauth_status(tp_wma_handle wma_handle,
  * Return: none
  */
 void wma_process_roam_invoke(WMA_HANDLE handle,
-		struct wma_roam_invoke_cmd *roaminvoke)
+		struct roam_invoke_req *roaminvoke)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
-	uint32_t ch_hz;
 	struct wmi_unified *wmi_handle;
 
 	if (wma_validate_handle(wma_handle))
@@ -505,16 +504,17 @@ void wma_process_roam_invoke(WMA_HANDLE handle,
 		wma_err("Invalid vdev id:%d", roaminvoke->vdev_id);
 		goto free_frame_buf;
 	}
-	ch_hz = roaminvoke->ch_freq;
+	wma_err("Sending ROAM INVOKE CMD vdev id:%d", roaminvoke->vdev_id);
+
 	wmi_unified_roam_invoke_cmd(wmi_handle,
-				(struct wmi_roam_invoke_cmd *)roaminvoke,
-				ch_hz);
+				(struct roam_invoke_req *)roaminvoke);
 free_frame_buf:
 	if (roaminvoke->frame_len) {
 		qdf_mem_free(roaminvoke->frame_buf);
 		roaminvoke->frame_buf = NULL;
 	}
 }
+#endif
 
 /**
  * wma_process_roam_synch_fail() -roam synch failure handle
@@ -831,7 +831,7 @@ static int wma_fill_roam_synch_buffer(tp_wma_handle wma,
 	fils_info = param_buf->roam_fils_synch_info;
 	if (fils_info) {
 		if ((fils_info->kek_len > SIR_KEK_KEY_LEN_FILS) ||
-		    (fils_info->pmk_len > SIR_PMK_LEN)) {
+		    (fils_info->pmk_len > MAX_PMK_LEN)) {
 			wma_err("Invalid kek_len %d or pmk_len %d",
 				 fils_info->kek_len,
 				 fils_info->pmk_len);
@@ -862,7 +862,7 @@ static int wma_fill_roam_synch_buffer(tp_wma_handle wma,
 
 	pmk_cache_info = param_buf->roam_pmk_cache_synch_info;
 	if (pmk_cache_info && (pmk_cache_info->pmk_len)) {
-		if (pmk_cache_info->pmk_len > SIR_PMK_LEN) {
+		if (pmk_cache_info->pmk_len > MAX_PMK_LEN) {
 			wma_err("Invalid pmk_len %d",
 				 pmk_cache_info->pmk_len);
 			wma_free_roam_synch_frame_ind(iface);
@@ -1014,6 +1014,8 @@ wma_roam_update_vdev(tp_wma_handle wma,
 	wma_add_sta(wma, add_sta_params);
 	qdf_mem_copy(bssid, roam_synch_ind_ptr->bssid.bytes,
 		     QDF_MAC_ADDR_SIZE);
+	lim_fill_roamed_peer_twt_caps(wma->mac_context, vdev_id,
+				      roam_synch_ind_ptr);
 	qdf_mem_free(add_sta_params);
 }
 
@@ -2456,19 +2458,14 @@ wma_roam_ho_fail_handler(tp_wma_handle wma, uint32_t vdev_id,
 	struct handoff_failure_ind *ho_failure_ind;
 	struct scheduler_msg sme_msg = { 0 };
 	QDF_STATUS qdf_status;
-	struct reject_ap_info ap_info;
-
-	ap_info.bssid = bssid;
-	ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
-	ap_info.reject_reason = REASON_ROAM_HO_FAILURE;
-	ap_info.source = ADDED_BY_DRIVER;
-	wlan_blm_add_bssid_to_reject_list(wma->pdev, &ap_info);
 
 	ho_failure_ind = qdf_mem_malloc(sizeof(*ho_failure_ind));
 	if (!ho_failure_ind)
 		return;
 
 	ho_failure_ind->vdev_id = vdev_id;
+	ho_failure_ind->bssid = bssid;
+
 	sme_msg.type = eWNI_SME_HO_FAIL_IND;
 	sme_msg.bodyptr = ho_failure_ind;
 	sme_msg.bodyval = 0;
@@ -4189,10 +4186,31 @@ QDF_STATUS wma_scan_probe_setoui(tp_wma_handle wma,
  */
 void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id)
 {
-	struct scheduler_msg cds_msg = {0};
-	tSirSmeCandidateFoundInd *candidate_ind;
+	struct scheduler_msg msg = {0};
 	QDF_STATUS status;
+#ifdef FEATURE_CM_ENABLE
+	struct cm_host_roam_start_ind *ind;
+#else
+	tSirSmeCandidateFoundInd *candidate_ind;
+#endif
 
+#ifdef FEATURE_CM_ENABLE
+	ind = qdf_mem_malloc(sizeof(*ind));
+	if (!ind)
+		return;
+
+	wma->interfaces[vdev_id].roaming_in_progress = true;
+	ind->pdev = wma->pdev;
+	ind->vdev_id = vdev_id;
+	msg.bodyptr = ind;
+	msg.callback = wlan_cm_host_roam_start;
+	wma_debug("Posting ROam start ind to connection manager, vdev %d",
+		  vdev_id);
+	status = scheduler_post_message(QDF_MODULE_ID_WMA,
+					QDF_MODULE_ID_OS_IF,
+					QDF_MODULE_ID_SCAN, &msg);
+
+#else
 	candidate_ind = qdf_mem_malloc(sizeof(tSirSmeCandidateFoundInd));
 	if (!candidate_ind)
 		return;
@@ -4202,15 +4220,16 @@ void wma_roam_better_ap_handler(tp_wma_handle wma, uint32_t vdev_id)
 	candidate_ind->sessionId = vdev_id;
 	candidate_ind->length = sizeof(tSirSmeCandidateFoundInd);
 
-	cds_msg.type = eWNI_SME_CANDIDATE_FOUND_IND;
-	cds_msg.bodyptr = candidate_ind;
-	cds_msg.callback = sme_mc_process_handler;
+	msg.type = eWNI_SME_CANDIDATE_FOUND_IND;
+	msg.bodyptr = candidate_ind;
+	msg.callback = sme_mc_process_handler;
 	wma_debug("Posting candidate ind to SME, vdev %d", vdev_id);
 
 	status = scheduler_post_message(QDF_MODULE_ID_WMA, QDF_MODULE_ID_SME,
-					QDF_MODULE_ID_SCAN,  &cds_msg);
+					QDF_MODULE_ID_SCAN,  &msg);
+#endif
 	if (QDF_IS_STATUS_ERROR(status))
-		qdf_mem_free(candidate_ind);
+		qdf_mem_free(msg.bodyptr);
 }
 
 /**

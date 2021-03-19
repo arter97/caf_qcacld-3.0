@@ -51,6 +51,7 @@
 #include "lim_session.h"
 #include "wma_types.h"
 #include "wlan_crypto_global_api.h"
+#include "wlan_crypto_def_i.h"
 
 #include "rrm_api.h"
 
@@ -73,6 +74,7 @@
 #include <wlan_tdls_cfg_api.h>
 #include "cfg_ucfg_api.h"
 #include "wlan_mlme_public_struct.h"
+#include "wlan_mlme_twt_api.h"
 #include "wlan_scan_utils_api.h"
 #include <qdf_hang_event_notifier.h>
 #include <qdf_notifier.h>
@@ -1746,6 +1748,7 @@ static void pe_set_rmf_caps(struct mac_context *mac_ctx,
 	tDot11fReAssocRequest *assoc_req;
 	uint32_t status;
 	tSirMacRsnInfo rsn_ie;
+	uint32_t value = WPA_TYPE_OUI;
 
 	assoc_body = (uint8_t *)roam_synch + roam_synch->reassoc_req_offset +
 			sizeof(tSirMacMgmtHdr);
@@ -1770,16 +1773,31 @@ static void pe_set_rmf_caps(struct mac_context *mac_ctx,
 			 status, len);
 	}
 	ft_session->limRmfEnabled = false;
-	if (!assoc_req->RSNOpaque.present) {
+	if (!assoc_req->RSNOpaque.present && !assoc_req->WPAOpaque.present) {
 		qdf_mem_free(assoc_req);
 		return;
 	}
-	rsn_ie.info[0] = WLAN_ELEMID_RSN;
-	rsn_ie.info[1] = assoc_req->RSNOpaque.num_data;
 
-	rsn_ie.length = assoc_req->RSNOpaque.num_data + 2;
-	qdf_mem_copy(&rsn_ie.info[2], assoc_req->RSNOpaque.data,
-		     assoc_req->RSNOpaque.num_data);
+	if (assoc_req->RSNOpaque.present) {
+		rsn_ie.info[0] = WLAN_ELEMID_RSN;
+		rsn_ie.info[1] = assoc_req->RSNOpaque.num_data;
+
+		rsn_ie.length = assoc_req->RSNOpaque.num_data + 2;
+		qdf_mem_copy(&rsn_ie.info[2], assoc_req->RSNOpaque.data,
+			     assoc_req->RSNOpaque.num_data);
+	} else if (assoc_req->WPAOpaque.present) {
+		rsn_ie.info[0] = WLAN_ELEMID_VENDOR;
+		rsn_ie.info[1] = WLAN_OUI_SIZE + assoc_req->WPAOpaque.num_data;
+
+		rsn_ie.length = WLAN_OUI_SIZE +
+				assoc_req->WPAOpaque.num_data + 2;
+
+		qdf_mem_copy(&rsn_ie.info[2], (uint8_t *)&value, WLAN_OUI_SIZE);
+		qdf_mem_copy(&rsn_ie.info[WLAN_OUI_SIZE + 2],
+			     assoc_req->WPAOpaque.data,
+			     assoc_req->WPAOpaque.num_data);
+	}
+
 	qdf_mem_free(assoc_req);
 	wlan_set_vdev_crypto_prarams_from_ie(ft_session->vdev, rsn_ie.info,
 					     rsn_ie.length);
@@ -2089,6 +2107,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 				sizeof(bss_desc_ptr->length) + ie_len);
 
 	bss_desc_ptr->fProbeRsp = !roam_synch_ind_ptr->isBeacon;
+	bss_desc_ptr->rssi = roam_synch_ind_ptr->rssi;
 	/* Copy Timestamp */
 	bss_desc_ptr->scansystimensec = qdf_get_monotonic_boottime_ns();
 	if (parsed_frm_ptr->he_op.oper_info_6g_present) {
@@ -2125,6 +2144,11 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	qdf_mem_copy((uint8_t *) &bss_desc_ptr->bssId,
 		     (uint8_t *)roam_synch_ind_ptr->bssid.bytes,
 		     sizeof(tSirMacAddr));
+
+	qdf_mem_copy((uint8_t *)&bss_desc_ptr->seq_ctrl,
+		     (uint8_t *)&mac_hdr->seqControl,
+		     sizeof(tSirMacSeqCtl));
+
 	bss_desc_ptr->received_time =
 		      (uint64_t)qdf_mc_timer_get_system_time();
 	if (parsed_frm_ptr->mdiePresent) {
@@ -2358,6 +2382,55 @@ lim_fill_fils_ft(struct pe_session *src_session,
 {}
 #endif
 
+#ifdef WLAN_SUPPORT_TWT
+void
+lim_fill_roamed_peer_twt_caps(struct mac_context *mac_ctx,
+			      uint8_t vdev_id,
+			      struct roam_offload_synch_ind *roam_synch)
+{
+	uint8_t *reassoc_body;
+	uint16_t len;
+	uint32_t status;
+	tDot11fReAssocResponse *reassoc_rsp;
+	struct pe_session *pe_session;
+
+	pe_session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	if (!pe_session) {
+		pe_err("session not found for given vdev_id %d", vdev_id);
+		return;
+	}
+
+	reassoc_rsp = qdf_mem_malloc(sizeof(*reassoc_rsp));
+	if (!reassoc_rsp)
+		return;
+
+	len = roam_synch->reassocRespLength - sizeof(tSirMacMgmtHdr);
+	reassoc_body = (uint8_t *)roam_synch + sizeof(tSirMacMgmtHdr) +
+			roam_synch->reassocRespOffset;
+
+	status = dot11f_unpack_re_assoc_response(mac_ctx, reassoc_body, len,
+						 reassoc_rsp, false);
+	if (DOT11F_FAILED(status)) {
+		pe_err("Failed to parse a Re-association Rsp (0x%08x, %d bytes):",
+		       status, len);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_INFO,
+				   reassoc_body, len);
+		qdf_mem_free(reassoc_rsp);
+		return;
+	} else if (DOT11F_WARNED(status)) {
+		pe_debug("Warnings while unpacking a Re-association Rsp (0x%08x, %d bytes):",
+			 status, len);
+	}
+
+	if (lim_is_session_he_capable(pe_session))
+		mlme_set_twt_peer_capabilities(mac_ctx->psoc,
+					       &roam_synch->bssid,
+					       &reassoc_rsp->he_cap,
+					       &reassoc_rsp->he_op);
+	qdf_mem_free(reassoc_rsp);
+}
+#endif
+
 /**
  * lim_check_ft_initial_im_association() - To check FT initial mobility(im)
  * association
@@ -2528,7 +2601,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 
 
 	if (roam_sync_ind_ptr->authStatus ==
-	    CSR_ROAM_AUTH_STATUS_AUTHENTICATED) {
+	    ROAM_AUTH_STATUS_AUTHENTICATED) {
 		ft_session_ptr->is_key_installed = true;
 		curr_sta_ds->is_key_installed = true;
 	}

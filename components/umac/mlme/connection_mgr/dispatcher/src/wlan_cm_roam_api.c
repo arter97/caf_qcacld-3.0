@@ -28,6 +28,9 @@
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include "wlan_crypto_global_api.h"
 #include <wlan_cm_api.h>
+#ifdef FEATURE_CM_ENABLE
+#include "connection_mgr/core/src/wlan_cm_roam.h"
+#endif
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
 #define BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN 15
@@ -849,8 +852,9 @@ void cm_dump_freq_list(struct rso_chan_info *chan_info)
 	if (chan_info->freq_list) {
 		for (i = 0; i < chan_info->num_chan; i++) {
 			if (j < buflen)
-				j += snprintf(channel_list + j, buflen - j,
-					      "%d ", chan_info->freq_list[i]);
+				j += qdf_scnprintf(channel_list + j, buflen - j,
+						   "%d ",
+						   chan_info->freq_list[i]);
 			else
 				break;
 		}
@@ -897,16 +901,6 @@ static QDF_STATUS cm_create_bg_scan_roam_channel_list(struct rso_chan_info *chan
 		chan_info->freq_list[i] = chan_freq_lst[i];
 
 	return status;
-}
-
-static void cm_flush_roam_channel_list(struct rso_chan_info *channel_info)
-{
-	/* Free up the memory first (if required) */
-	if (channel_info->freq_list) {
-		qdf_mem_free(channel_info->freq_list);
-		channel_info->freq_list = NULL;
-		channel_info->num_chan = 0;
-	}
 }
 
 static QDF_STATUS
@@ -1277,6 +1271,11 @@ struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 
 {
 	struct cm_ext_obj *cm_ext_obj;
+	enum QDF_OPMODE op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	/* get only for CLI and STA */
+	if (op_mode != QDF_STA_MODE && op_mode != QDF_P2P_CLIENT_MODE)
+		return NULL;
 
 	cm_ext_obj = cm_get_ext_hdl_fl(vdev, func, line);
 	if (!cm_ext_obj)
@@ -1306,11 +1305,60 @@ QDF_STATUS cm_roam_release_lock(struct wlan_objmgr_vdev *vdev)
 
 	return qdf_mutex_release(&rso_cfg->cm_rso_lock);
 }
+
+QDF_STATUS
+wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		    struct qdf_mac_addr *bssid, qdf_freq_t chan_freq,
+		    enum wlan_cm_source source)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		mlme_err("Invalid psoc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = cm_start_roam_invoke(psoc, vdev, bssid, chan_freq, source);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+
+	return status;
+}
+
+#ifdef WLAN_FEATURE_HOST_ROAM
+QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
+{
+	struct cm_host_roam_start_ind *req;
+	struct qdf_mac_addr bssid = QDF_MAC_ADDR_ZERO_INIT;
+
+	if (!msg || !msg->bodyptr)
+		return QDF_STATUS_E_FAILURE;
+
+	req = msg->bodyptr;
+	return wlan_cm_roam_invoke(req->pdev, req->vdev_id, &bssid, 0,
+				   CM_ROAMING_FW);
+}
+#endif
+
 #else
 struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 					     const char *func, uint32_t line)
 {
 	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE op_mode = wlan_vdev_mlme_get_opmode(vdev);
+
+	/* get only for CLI and STA */
+	if (op_mode != QDF_STA_MODE && op_mode != QDF_P2P_CLIENT_MODE)
+		return NULL;
 
 	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
 	if (!mlme_priv) {

@@ -64,10 +64,6 @@
 	( \
 	  ((mac)->mlme_cfg->lfr.roam_prefer_5ghz) \
 	)
-#define CSR_IS_ROAM_INTRA_BAND_ENABLED(mac) \
-	( \
-	  ((mac)->mlme_cfg->lfr.roam_intra_band) \
-	)
 #define CSR_IS_FASTROAM_IN_CONCURRENCY_INI_FEATURE_ENABLED(mac) \
 	( \
 	  ((mac)->mlme_cfg->lfr.enable_fast_roam_in_concurrency) \
@@ -109,22 +105,22 @@ enum csr_roam_reason {
 #ifndef FEATURE_CM_ENABLE
 	/* roaming because we need to force a Disassoc due to MIC failure */
 	eCsrForcedDisassocMICFailure,
-#endif
 	eCsrHddIssuedReassocToSameAP,
 	eCsrSmeIssuedReassocToSameAP,
-#ifndef FEATURE_CM_ENABLE
 	/* roaming because someone asked us to deauth and stay disassociated. */
 	eCsrForcedDeauth,
 	/* will be issued by Handoff logic to disconect from current AP */
 	eCsrSmeIssuedDisassocForHandoff,
-#endif
 	/* will be issued by Handoff logic to join a new AP with same profile */
 	eCsrSmeIssuedAssocToSimilarAP,
+#endif
 	eCsrStopBss,
 	eCsrSmeIssuedFTReassoc,
 	eCsrForcedDisassocSta,
 	eCsrForcedDeauthSta,
+#ifndef FEATURE_CM_ENABLE
 	eCsrPerformPreauth,
+#endif
 	/* Roaming disabled from driver during connect/start BSS */
 	ecsr_driver_disabled,
 };
@@ -145,7 +141,9 @@ enum csr_roam_substate {
 	eCSR_ROAM_SUBSTATE_DISASSOC_REASSOC_FAILURE,
 	eCSR_ROAM_SUBSTATE_DISASSOC_FORCED,
 	eCSR_ROAM_SUBSTATE_WAIT_FOR_KEY,
+#ifndef FEATURE_CM_ENABLE
 	eCSR_ROAM_SUBSTATE_DISASSOC_HANDOFF,
+#endif
 	eCSR_ROAM_SUBSTATE_JOINED_NO_TRAFFIC,
 	eCSR_ROAM_SUBSTATE_JOINED_NON_REALTIME_TRAFFIC,
 	eCSR_ROAM_SUBSTATE_JOINED_REALTIME_TRAFFIC,
@@ -310,7 +308,6 @@ struct csr_config {
 	bool mcc_rts_cts_prot_enable;
 	bool mcc_bcast_prob_resp_enable;
 	uint8_t fAllowMCCGODiffBI;
-	bool nRoamScanControl;
 	uint32_t nVhtChannelWidth;
 	bool send_smps_action;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -522,7 +519,6 @@ struct csr_roam_session {
 	bool isPrevApInfoValid;
 	tSirMacSSid prevApSSID;
 	uint32_t roamTS1;
-	tCsrEseCckmIe suppCckmIeInfo;
 #endif
 	uint8_t bRefAssocStartCnt;      /* Tracking assoc start indication */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -547,8 +543,9 @@ struct csr_roamstruct {
 	 */
 	int32_t sPendingCommands;
 	struct csr_roam_session *roamSession;
+#ifndef FEATURE_CM_ENABLE
 	tCsrNeighborRoamControlInfo neighborRoamInfo[WLAN_MAX_VDEVS];
-	uint8_t isFastRoamIniFeatureEnabled;
+#endif
 #ifdef FEATURE_WLAN_ESE
 	uint8_t isEseIniFeatureEnabled;
 #endif
@@ -613,9 +610,11 @@ struct csr_roamstruct {
 #define CSR_IS_ROAM_SUBSTATE_WAITFORKEY(mac, sessionId) \
 		CSR_IS_ROAM_SUBSTATE((mac), \
 			eCSR_ROAM_SUBSTATE_WAIT_FOR_KEY, sessionId)
+#ifndef FEATURE_CM_ENABLE
 #define CSR_IS_ROAM_SUBSTATE_DISASSOC_HO(mac, sessionId) \
 		CSR_IS_ROAM_SUBSTATE((mac), \
 			eCSR_ROAM_SUBSTATE_DISASSOC_HANDOFF, sessionId)
+#endif
 #define CSR_IS_ROAM_SUBSTATE_HO_NT(mac, sessionId) \
 		CSR_IS_ROAM_SUBSTATE((mac), \
 			eCSR_ROAM_SUBSTATE_JOINED_NO_TRAFFIC, sessionId)
@@ -860,6 +859,7 @@ QDF_STATUS csr_get_tsm_stats(struct mac_context *mac,
 bool csr_roam_is_fast_roam_enabled(struct mac_context *mac,  uint8_t vdev_id);
 bool csr_roam_is_roam_offload_scan_enabled(
 	struct mac_context *mac);
+#ifndef FEATURE_CM_ENABLE
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
 QDF_STATUS csr_roam_offload_scan_rsp_hdlr(struct mac_context *mac,
 		struct roam_offload_scan_rsp *scanOffloadRsp);
@@ -874,6 +874,7 @@ static inline QDF_STATUS csr_roam_offload_scan_rsp_hdlr(
 QDF_STATUS csr_handoff_request(struct mac_context *mac, uint8_t sessionId,
 		tCsrHandoffRequest
 		*pHandoffInfo);
+#endif
 bool csr_roam_is_sta_mode(struct mac_context *mac, uint8_t vdev_id);
 
 /* Post Channel Change Indication */
@@ -898,6 +899,7 @@ QDF_STATUS
 csr_roam_update_add_ies(struct mac_context *mac,
 		tSirUpdateIE *pUpdateIE, eUpdateIEsType updateType);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifndef FEATURE_CM_ENABLE
 /**
  * csr_scan_save_roam_offload_ap_to_scan_cache() - This function parses the
  * received beacon/probe response from the firmware as part of the roam synch
@@ -913,7 +915,7 @@ QDF_STATUS
 csr_rso_save_ap_to_scan_cache(struct mac_context *mac,
 			      struct roam_offload_synch_ind *roam_synch_ind,
 			      struct bss_description *bss_desc_ptr);
-
+#endif
 /**
  * csr_process_ho_fail_ind  - This function will process the Hand Off Failure
  * indication received from the firmware. It will trigger a disconnect on

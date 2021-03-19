@@ -931,7 +931,7 @@ void populate_dot11f_ese_version(tDot11fIEESEVersion *pESEVersion);
 void populate_dot11f_ese_rad_mgmt_cap(tDot11fIEESERadMgmtCap *pESERadMgmtCap);
 /* Fill the CCKM IE */
 QDF_STATUS populate_dot11f_ese_cckm_opaque(struct mac_context *mac,
-					tpSirCCKMie pCCKMie,
+					struct mlme_connect_info *connect_info,
 					tDot11fIEESECckmOpaque *pDot11f);
 
 void populate_dot11_tsrsie(struct mac_context *mac,
@@ -1067,6 +1067,10 @@ void populate_dot11f_assoc_rsp_rates(struct mac_context *mac,
 				uint16_t *_11bRates, uint16_t *_11aRates);
 
 int find_ie_location(struct mac_context *mac, tpSirRSNie pRsnIe, uint8_t EID);
+
+ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
+				   qdf_freq_t ch_freq,
+				   tDot11fBeaconIEs *ie_struct);
 
 void lim_log_vht_cap(struct mac_context *mac, tDot11fIEVHTCaps *pDot11f);
 

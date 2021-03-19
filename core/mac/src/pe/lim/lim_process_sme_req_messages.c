@@ -778,6 +778,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 				session->vdev_nss = vdev_type_nss->p2p_go;
 			break;
 		case eSIR_NDI_MODE:
+			session->vdev_nss = vdev_type_nss->ndi;
 			session->limSystemRole = eLIM_NDI_ROLE;
 			break;
 
@@ -2191,98 +2192,6 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 	return status;
 }
 
-#define SEC_CHANNEL_OFFSET                      20
-
-static ePhyChanBondState lim_get_cb_mode(struct mac_context *mac,
-					 struct pe_session *session,
-					 tDot11fBeaconIEs *ie_struct)
-{
-	ePhyChanBondState cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
-	uint32_t sec_ch_freq = 0;
-	uint32_t self_cb_mode;
-	struct ch_params ch_params = {0};
-	uint32_t ch_freq = session->lim_join_req->bssDescription.chan_freq;
-	bool force_ht20_in_2_4 = session->lim_join_req->force_24ghz_in_ht20;
-
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) {
-		self_cb_mode =
-			mac->roam.configParam.channelBondingMode24GHz;
-	} else {
-		self_cb_mode =
-			mac->roam.configParam.channelBondingMode5GHz;
-	}
-
-	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
-		return PHY_SINGLE_CHANNEL_CENTERED;
-
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq) && force_ht20_in_2_4) {
-		pe_debug("Force ht20 in 2.4ghz flag set");
-		return PHY_SINGLE_CHANNEL_CENTERED;
-	}
-
-	if (!(ie_struct->HTCaps.present && (eHT_CHANNEL_WIDTH_40MHZ ==
-		ie_struct->HTCaps.supportedChannelWidthSet))) {
-		return PHY_SINGLE_CHANNEL_CENTERED;
-	}
-
-	/* In Case WPA2 and TKIP is the only one cipher suite in Pairwise */
-	if ((ie_struct->RSN.present &&
-	    (ie_struct->RSN.pwise_cipher_suite_count == 1) &&
-	    !qdf_mem_cmp(&(ie_struct->RSN.pwise_cipher_suites[0][0]),
-			 "\x00\x0f\xac\x02", 4)) ||
-		/* In Case only WPA1 is supported and TKIP is
-		 * the only one cipher suite in Unicast.
-		 */
-	    (!ie_struct->RSN.present && (ie_struct->WPA.present &&
-	    (ie_struct->WPA.unicast_cipher_count == 1) &&
-	    !qdf_mem_cmp(&(ie_struct->WPA.unicast_ciphers[0][0]),
-			 "\x00\x50\xf2\x02", 4)))) {
-		pe_debug("No channel bonding in TKIP mode");
-		return PHY_SINGLE_CHANNEL_CENTERED;
-	}
-
-	if (!ie_struct->HTInfo.present)
-		return PHY_SINGLE_CHANNEL_CENTERED;
-
-	pe_debug("ch freq %d scws %u rtws %u sco %u", ch_freq,
-		 ie_struct->HTCaps.supportedChannelWidthSet,
-		 ie_struct->HTInfo.recommendedTxWidthSet,
-		 ie_struct->HTInfo.secondaryChannelOffset);
-
-	if (ie_struct->HTInfo.recommendedTxWidthSet == eHT_CHANNEL_WIDTH_40MHZ)
-		cb_mode = ie_struct->HTInfo.secondaryChannelOffset;
-	else
-		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
-
-	switch (cb_mode) {
-	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
-		sec_ch_freq = ch_freq + SEC_CHANNEL_OFFSET;
-		break;
-	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
-		sec_ch_freq = ch_freq - SEC_CHANNEL_OFFSET;
-		break;
-	default:
-		break;
-	}
-
-	if (cb_mode != PHY_SINGLE_CHANNEL_CENTERED) {
-		ch_params.ch_width = CH_WIDTH_40MHZ;
-		wlan_reg_set_channel_params_for_freq(mac->pdev, ch_freq,
-						     sec_ch_freq, &ch_params);
-		if (ch_params.ch_width == CH_WIDTH_20MHZ ||
-		    ch_params.sec_ch_offset != cb_mode) {
-			pe_err("ch freq %d :: Supported HT BW %d and cbmode %d, APs HT BW %d and cbmode %d, so switch to 20Mhz",
-				ch_freq, ch_params.ch_width,
-				ch_params.sec_ch_offset,
-				ie_struct->HTInfo.recommendedTxWidthSet,
-				cb_mode);
-			cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
-		}
-	}
-
-	return cb_mode;
-}
-
 #ifdef WLAN_FEATURE_11AX
 static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)
 {
@@ -2569,7 +2478,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->enable_session_twt_support =
 					lim_enable_twt(mac_ctx, ie_struct);
 
-	cb_mode = lim_get_cb_mode(mac_ctx, session, ie_struct);
+	cb_mode = wlan_get_cb_mode(mac_ctx, session->curr_op_freq, ie_struct);
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
 	    session->force_24ghz_in_ht20) {
 		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
@@ -2790,10 +2699,9 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	/* Enable the spectrum management if this is a DFS channel */
 	if (session->country_info_present &&
-	    lim_isconnected_on_dfs_channel(
+	    lim_isconnected_on_dfs_freq(
 			mac_ctx,
-			wlan_reg_freq_to_chan(
-			mac_ctx->pdev, session->curr_op_freq)))
+			session->curr_op_freq))
 		session->spectrumMgtEnabled = true;
 
 	ap_cap_info = (tSirMacCapabilityInfo *)&bss_desc->capabilityInfo;
@@ -4312,12 +4220,6 @@ void lim_calculate_tpc(struct mac_context *mac,
 							session->ch_width);
 	}
 
-	if (!wlan_reg_is_6ghz_chan_freq(oper_freq))
-		reg_max = wlan_reg_get_channel_reg_power_for_freq(mac->pdev,
-								  oper_freq);
-	else
-		is_6ghz_freq = true;
-
 	ch_params.ch_width = CH_WIDTH_20MHZ;
 
 	for (i = 0; i < num_pwr_levels; i++) {
@@ -4513,9 +4415,11 @@ static void __lim_process_sme_reassoc_req(struct mac_context *mac_ctx,
 
 	lim_check_oui_and_update_session(mac_ctx, session_entry, ie_struct);
 
-	cb_mode = lim_get_cb_mode(mac_ctx, session_entry, ie_struct);
 	session_entry->lim_reassoc_chan_freq =
 		session_entry->pLimReAssocReq->bssDescription.chan_freq;
+	cb_mode = wlan_get_cb_mode(mac_ctx,
+				  session_entry->lim_reassoc_chan_freq,
+				  ie_struct);
 	session_entry->reAssocHtSupportedChannelWidthSet = cb_mode ? 1 : 0;
 	session_entry->reAssocHtRecommendedTxWidthSet =
 		session_entry->reAssocHtSupportedChannelWidthSet;
@@ -4705,9 +4609,8 @@ static void __lim_process_sme_reassoc_req(struct mac_context *mac_ctx,
 
 	/* Enable the spectrum management if this is a DFS channel */
 	if (session_entry->country_info_present &&
-	    lim_isconnected_on_dfs_channel(
-		mac_ctx, wlan_reg_freq_to_chan(
-		mac_ctx->pdev, session_entry->curr_op_freq)))
+	    lim_isconnected_on_dfs_freq(
+		mac_ctx, session_entry->curr_op_freq))
 		session_entry->spectrumMgtEnabled = true;
 
 	session_entry->limPrevSmeState = session_entry->limSmeState;
@@ -7378,10 +7281,13 @@ bool lim_process_sme_req_messages(struct mac_context *mac,
 		__lim_process_report_message(mac, pMsg);
 		break;
 
+#ifndef FEATURE_CM_ENABLE
 	case eWNI_SME_FT_PRE_AUTH_REQ:
 		bufConsumed = (bool) lim_process_ft_pre_auth_req(mac, pMsg);
 		break;
-
+#else
+	/* handle new command */
+#endif
 	case eWNI_SME_FT_AGGR_QOS_REQ:
 		lim_process_ft_aggr_qos_req(mac, msg_buf);
 		break;
@@ -8313,7 +8219,6 @@ static void lim_process_ext_change_channel(struct mac_context *mac_ctx,
 	struct sir_sme_ext_cng_chan_req *ext_chng_channel =
 				(struct sir_sme_ext_cng_chan_req *) msg;
 	struct pe_session *session_entry = NULL;
-	uint32_t new_ext_chan_freq;
 
 	if (!msg) {
 		pe_err("Buffer is Pointing to NULL");
@@ -8330,11 +8235,9 @@ static void lim_process_ext_change_channel(struct mac_context *mac_ctx,
 		pe_err("not an STA/CLI session");
 		return;
 	}
-	new_ext_chan_freq =
-		wlan_reg_legacy_chan_to_freq(mac_ctx->pdev,
-					     ext_chng_channel->new_channel);
 	session_entry->gLimChannelSwitch.sec_ch_offset = 0;
-	send_extended_chan_switch_action_frame(mac_ctx, new_ext_chan_freq, 0,
+	send_extended_chan_switch_action_frame(mac_ctx,
+					       ext_chng_channel->new_ch_freq, 0,
 					       session_entry);
 }
 

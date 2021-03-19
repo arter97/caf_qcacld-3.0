@@ -252,11 +252,6 @@ typedef struct tagCsrEseCckmInfo {
 	uint8_t btk[SIR_BTK_KEY_LEN];
 #endif
 } tCsrEseCckmInfo;
-
-typedef struct tagCsrEseCckmIe {
-	uint8_t cckmIe[DOT11F_IE_RSN_MAX_LEN];
-	uint8_t cckmIeLen;
-} tCsrEseCckmIe;
 #endif /* FEATURE_WLAN_ESE */
 
 typedef struct sCsrChannel_ {
@@ -584,24 +579,6 @@ typedef enum {
 
 } eCsrRoamWmmUserModeType;
 
-typedef struct tagPmkidCandidateInfo {
-	struct qdf_mac_addr BSSID;
-	bool preAuthSupported;
-} tPmkidCandidateInfo;
-
-typedef struct tagPmkidCacheInfo {
-	struct qdf_mac_addr BSSID;
-	uint8_t PMKID[PMKID_LEN];
-	uint8_t pmk[CSR_RSN_MAX_PMK_LEN];
-	uint8_t pmk_len;
-	uint8_t ssid_len;
-	uint8_t ssid[WLAN_SSID_MAX_LEN];
-	uint8_t cache_id[CACHE_ID_LEN];
-	uint32_t   pmk_lifetime;
-	uint8_t    pmk_lifetime_threshold;
-	qdf_time_t pmk_ts;
-} tPmkidCacheInfo;
-
 #ifdef FEATURE_WLAN_WAPI
 typedef struct tagBkidCandidateInfo {
 	struct qdf_mac_addr BSSID;
@@ -807,13 +784,6 @@ struct csr_config_params {
 #define DEFAULT_REASSOC_FAILURE_TIMEOUT 1000
 #endif
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-/* connected but not authenticated */
-#define CSR_ROAM_AUTH_STATUS_CONNECTED      0x1
-/* connected and authenticated */
-#define CSR_ROAM_AUTH_STATUS_AUTHENTICATED  0x2
-#endif
-
 struct csr_roam_info {
 	struct csr_roam_profile *pProfile;
 	struct bss_description *bss_desc;
@@ -887,7 +857,7 @@ struct csr_roam_info {
 	uint8_t kek[SIR_KEK_KEY_LEN_FILS];
 	uint8_t kek_len;
 	uint32_t pmk_len;
-	uint8_t pmk[SIR_PMK_LEN];
+	uint8_t pmk[MAX_PMK_LEN];
 	uint8_t pmkid[PMKID_LEN];
 	bool update_erp_next_seq_num;
 	uint16_t next_erp_seq_num;
@@ -1108,8 +1078,10 @@ typedef QDF_STATUS (*csr_session_open_cb)(uint8_t session_id,
 					  QDF_STATUS qdf_status);
 typedef QDF_STATUS (*csr_session_close_cb)(uint8_t session_id);
 
+#ifndef FEATURE_CM_ENABLE
 #define CSR_IS_INFRASTRUCTURE(pProfile) (eCSR_BSS_TYPE_INFRASTRUCTURE == \
 					 (pProfile)->BSSType)
+#endif
 #define CSR_IS_ANY_BSS_TYPE(pProfile) (eCSR_BSS_TYPE_ANY == \
 				       (pProfile)->BSSType)
 #define CSR_IS_INFRA_AP(pProfile) (eCSR_BSS_TYPE_INFRA_AP ==  \
@@ -1188,6 +1160,7 @@ typedef void (*tCsrTsmStatsCallback)(tAniTrafStrmMetrics tsmMetrics,
 #endif /* FEATURE_WLAN_ESE */
 typedef void (*tCsrSnrCallback)(int8_t snr, void *pContext);
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * csr_roam_issue_ft_preauth_req() - Initiate Preauthentication request
  * @max_ctx: Global MAC context
@@ -1219,7 +1192,7 @@ QDF_STATUS csr_continue_lfr2_connect(struct mac_context *mac,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif
-
+#endif
 typedef void (*csr_readyToSuspendCallback)(void *pContext, bool suspended);
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 typedef void (*csr_readyToExtWoWCallback)(void *pContext, bool status);

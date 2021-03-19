@@ -427,14 +427,14 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 						     chan_freq,
 						     &chan_params);
 
-		psd_start_freq = chan_params.mhz_freq_seg0 - bw_val + 10;
+		psd_start_freq = chan_params.mhz_freq_seg0 - bw_val / 2 + 10;
 
 		for (count = 0; count < num_tx_power_psd; count++) {
 			wlan_reg_get_client_power_for_6ghz_ap(
 							mac->pdev,
 							REG_DEFAULT_CLIENT,
 							psd_start_freq +
-							20 * num_tx_power_psd,
+							20 * count,
 							&psd_tpe,
 							&reg_power,
 							&eirp_power);
@@ -469,7 +469,7 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 							mac->pdev,
 							REG_SUBORDINATE_CLIENT,
 							psd_start_freq +
-							20 * num_tx_power_psd,
+							20 * count,
 							&psd_tpe,
 							&reg_power,
 							&eirp_power);
@@ -1051,6 +1051,91 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 
 } /* End populate_dot11f_ht_caps. */
+
+#define SEC_CHANNEL_OFFSET                      20
+
+ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
+				   qdf_freq_t ch_freq,
+				   tDot11fBeaconIEs *ie_struct)
+{
+	ePhyChanBondState cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
+	uint32_t sec_ch_freq = 0;
+	uint32_t self_cb_mode;
+	struct ch_params ch_params = {0};
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) {
+		self_cb_mode =
+			mac->roam.configParam.channelBondingMode24GHz;
+	} else {
+		self_cb_mode =
+			mac->roam.configParam.channelBondingMode5GHz;
+	}
+
+	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
+		return PHY_SINGLE_CHANNEL_CENTERED;
+
+	if (!(ie_struct->HTCaps.present && (eHT_CHANNEL_WIDTH_40MHZ ==
+		ie_struct->HTCaps.supportedChannelWidthSet))) {
+		return PHY_SINGLE_CHANNEL_CENTERED;
+	}
+
+	/* In Case WPA2 and TKIP is the only one cipher suite in Pairwise */
+	if ((ie_struct->RSN.present &&
+	    (ie_struct->RSN.pwise_cipher_suite_count == 1) &&
+	    !qdf_mem_cmp(&(ie_struct->RSN.pwise_cipher_suites[0][0]),
+			 "\x00\x0f\xac\x02", 4)) ||
+		/* In Case only WPA1 is supported and TKIP is
+		 * the only one cipher suite in Unicast.
+		 */
+	    (!ie_struct->RSN.present && (ie_struct->WPA.present &&
+	    (ie_struct->WPA.unicast_cipher_count == 1) &&
+	    !qdf_mem_cmp(&(ie_struct->WPA.unicast_ciphers[0][0]),
+			 "\x00\x50\xf2\x02", 4)))) {
+		pe_debug("No channel bonding in TKIP mode");
+		return PHY_SINGLE_CHANNEL_CENTERED;
+	}
+
+	if (!ie_struct->HTInfo.present)
+		return PHY_SINGLE_CHANNEL_CENTERED;
+
+	pe_debug("ch freq %d scws %u rtws %u sco %u", ch_freq,
+		 ie_struct->HTCaps.supportedChannelWidthSet,
+		 ie_struct->HTInfo.recommendedTxWidthSet,
+		 ie_struct->HTInfo.secondaryChannelOffset);
+
+	if (ie_struct->HTInfo.recommendedTxWidthSet == eHT_CHANNEL_WIDTH_40MHZ)
+		cb_mode = ie_struct->HTInfo.secondaryChannelOffset;
+	else
+		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
+
+	switch (cb_mode) {
+	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+		sec_ch_freq = ch_freq + SEC_CHANNEL_OFFSET;
+		break;
+	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+		sec_ch_freq = ch_freq - SEC_CHANNEL_OFFSET;
+		break;
+	default:
+		break;
+	}
+
+	if (cb_mode != PHY_SINGLE_CHANNEL_CENTERED) {
+		ch_params.ch_width = CH_WIDTH_40MHZ;
+		wlan_reg_set_channel_params_for_freq(mac->pdev, ch_freq,
+						     sec_ch_freq, &ch_params);
+		if (ch_params.ch_width == CH_WIDTH_20MHZ ||
+		    ch_params.sec_ch_offset != cb_mode) {
+			pe_err("ch freq %d :: Supported HT BW %d and cbmode %d, APs HT BW %d and cbmode %d, so switch to 20Mhz",
+				ch_freq, ch_params.ch_width,
+				ch_params.sec_ch_offset,
+				ie_struct->HTInfo.recommendedTxWidthSet,
+				cb_mode);
+			cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
+		}
+	}
+
+	return cb_mode;
+}
 
 void lim_log_vht_cap(struct mac_context *mac, tDot11fIEVHTCaps *pDot11f)
 {
@@ -5392,21 +5477,26 @@ void populate_dot11f_ese_rad_mgmt_cap(tDot11fIEESERadMgmtCap *pESERadMgmtCap)
 	pESERadMgmtCap->reserved = 0;
 }
 
-QDF_STATUS populate_dot11f_ese_cckm_opaque(struct mac_context *mac,
-					   tpSirCCKMie pCCKMie,
-					   tDot11fIEESECckmOpaque *pDot11f)
+QDF_STATUS
+populate_dot11f_ese_cckm_opaque(struct mac_context *mac,
+				struct mlme_connect_info *connect_info,
+				tDot11fIEESECckmOpaque *pDot11f)
 {
 	int idx;
+	tSirRSNie ie;
 
-	if (pCCKMie->length) {
-		idx = find_ie_location(mac, (tpSirRSNie) pCCKMie,
-						 DOT11F_EID_ESECCKMOPAQUE);
-		if (0 <= idx) {
+	if (connect_info->cckm_ie_len &&
+	    connect_info->cckm_ie_len < DOT11F_IE_RSN_MAX_LEN) {
+		qdf_mem_copy(ie.rsnIEdata, connect_info->cckm_ie,
+			     connect_info->cckm_ie_len);
+		ie.length = connect_info->cckm_ie_len;
+		idx = find_ie_location(mac, &ie, DOT11F_EID_ESECCKMOPAQUE);
+		if (idx >= 0) {
 			pDot11f->present = 1;
 			/* Dont include OUI */
-			pDot11f->num_data = pCCKMie->cckmIEdata[idx + 1] - 4;
-			qdf_mem_copy(pDot11f->data, pCCKMie->cckmIEdata + idx + 2 + 4,  /* EID,len,OUI */
-				     pCCKMie->cckmIEdata[idx + 1] - 4); /* Skip OUI */
+			pDot11f->num_data = ie.rsnIEdata[idx + 1] - 4;
+			qdf_mem_copy(pDot11f->data, ie.rsnIEdata + idx + 2 + 4,  /* EID,len,OUI */
+				     ie.rsnIEdata[idx + 1] - 4); /* Skip OUI */
 		}
 	}
 	return QDF_STATUS_SUCCESS;
@@ -6790,9 +6880,12 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 uint16_t
 wlan_get_ielen_from_bss_description(struct bss_description *bss_desc)
 {
-	uint16_t ielen;
+	uint16_t ielen, ieFields_offset;
 
-	if (!bss_desc)
+	ieFields_offset = GET_FIELD_OFFSET(struct bss_description, ieFields);
+
+	if ((!bss_desc || !bss_desc->length) ||
+	    (bss_desc->length - sizeof(bss_desc->length) <= ieFields_offset))
 		return 0;
 
 	/*
@@ -6809,7 +6902,7 @@ wlan_get_ielen_from_bss_description(struct bss_description *bss_desc)
 	 */
 
 	ielen = (uint16_t)(bss_desc->length + sizeof(bss_desc->length) -
-			   GET_FIELD_OFFSET(struct bss_description, ieFields));
+			   ieFields_offset);
 
 	return ielen;
 }

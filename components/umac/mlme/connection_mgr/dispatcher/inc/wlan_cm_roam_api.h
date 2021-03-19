@@ -104,28 +104,6 @@ wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 QDF_STATUS
 wlan_cm_roam_cmd_allowed(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			 uint8_t rso_command, uint8_t reason);
-#endif
-
-/**
- * wlan_cm_roam_scan_offload_rsp() - send roam scan offload response message
- * @vdev_id: vdev id
- * @reason: reason to roam
- *
- * This function gets called to send roam scan offload response message
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_roam_scan_offload_rsp(uint8_t vdev_id, uint8_t reason);
-
-/**
- * wlan_cm_send_beacon_miss() - initiate beacon miss
- * @vdev_id: vdev id
- * @rssi: AP rssi
- *
- * Return: void
- */
-void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
 
 /**
  * wlan_cm_roam_neighbor_proceed_with_handoff_req() - invoke host handover to
@@ -138,6 +116,28 @@ void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
  */
 QDF_STATUS
 wlan_cm_roam_neighbor_proceed_with_handoff_req(uint8_t vdev_id);
+
+/**
+ * wlan_cm_roam_scan_offload_rsp() - send roam scan offload response message
+ * @vdev_id: vdev id
+ * @reason: reason to roam
+ *
+ * This function gets called to send roam scan offload response message
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_roam_scan_offload_rsp(uint8_t vdev_id, uint8_t reason);
+#endif
+
+/**
+ * wlan_cm_send_beacon_miss() - initiate beacon miss
+ * @vdev_id: vdev id
+ * @rssi: AP rssi
+ *
+ * Return: void
+ */
+void wlan_cm_send_beacon_miss(uint8_t vdev_id, int32_t rssi);
 
 /**
  * wlan_cm_is_sta_connected() - check if STA is connected
@@ -312,6 +312,12 @@ QDF_STATUS wlan_cm_roam_cfg_get_value(struct wlan_objmgr_psoc *psoc,
 				      enum roam_cfg_param roam_cfg_type,
 				      struct cm_roam_values_copy *dst_config);
 
+static inline void
+wlan_cm_flush_roam_channel_list(struct rso_chan_info *channel_info)
+{
+	cm_flush_roam_channel_list(channel_info);
+}
+
 /**
  * wlan_cm_roam_cfg_set_value  - Set RSO config value
  * @psoc: psoc pointer
@@ -443,8 +449,9 @@ void wlan_cm_init_occupied_ch_freq_list(struct wlan_objmgr_pdev *pdev,
 					struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
 
-uint32_t cm_crpto_authmode_to_wmi_authmode(int32_t authmodeset,
-					   int32_t akm, int32_t ucastcipherset);
+uint32_t cm_crypto_authmode_to_wmi_authmode(int32_t authmodeset,
+					    int32_t akm,
+					    int32_t ucastcipherset);
 uint8_t *wlan_cm_get_rrm_cap_ie_data(void);
 
 /**
@@ -584,19 +591,6 @@ static inline void wlan_cm_update_hlp_info(struct wlan_objmgr_psoc *psoc,
 {}
 #endif
 
-#if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
-void
-cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
-					struct wlan_objmgr_pdev *pdev,
-					struct wlan_objmgr_vdev *vdev);
-#else
-static inline void
-cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
-					struct wlan_objmgr_pdev *pdev,
-					struct wlan_objmgr_vdev *vdev)
-{}
-#endif
-
 static inline
 bool wlan_cm_is_auth_type_11r(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			      struct wlan_objmgr_vdev *vdev,
@@ -605,7 +599,6 @@ bool wlan_cm_is_auth_type_11r(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 	return cm_is_auth_type_11r(mlme_obj, vdev, mdie_present);
 }
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * cm_roam_start_init_on_connect() - init roaming
  * @pdev: pdev pointer
@@ -615,6 +608,39 @@ bool wlan_cm_is_auth_type_11r(struct wlan_mlme_psoc_ext_obj *mlme_obj,
  */
 void cm_roam_start_init_on_connect(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id);
+#ifdef FEATURE_CM_ENABLE
+/**
+ * wlan_cm_roam_invoke() - Validate and send Roam invoke req to CM
+ * @pdev: Pdev pointer
+ * @vdev_id: vdev_id
+ * @bssid: Target bssid
+ * @chan_freq: channel frequency on which reassoc should be send
+ * @source: source of roam
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+		    struct qdf_mac_addr *bssid, qdf_freq_t chan_freq,
+		    enum wlan_cm_source source);
+
+#ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * wlan_cm_host_roam_start() - fw host roam start handler
+ * @msg: msg pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg);
+#else
+static inline QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
+{
+	if (msg && msg->bodyptr)
+		qdf_mem_free(msg->bodyptr);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD

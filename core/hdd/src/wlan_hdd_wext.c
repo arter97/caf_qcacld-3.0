@@ -113,6 +113,7 @@
 #include "wlan_fwol_ucfg_api.h"
 #include "wlan_hdd_unit_test.h"
 #include "wlan_hdd_thermal.h"
+#include "wlan_cm_roam_ucfg_api.h"
 
 /* Private ioctls and their sub-ioctls */
 #define WLAN_PRIV_SET_INT_GET_NONE    (SIOCIWFIRSTPRIV + 0)
@@ -4663,6 +4664,7 @@ static int hdd_we_start_fw_profile(struct hdd_adapter *adapter, int value)
 static int hdd_we_set_channel(struct hdd_adapter *adapter, int channel)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	qdf_freq_t ch_freq;
 	QDF_STATUS status;
 
 	hdd_debug("Set Channel %d Session ID %d mode %d", channel,
@@ -4681,9 +4683,10 @@ static int hdd_we_set_channel(struct hdd_adapter *adapter, int channel)
 			adapter->device_mode);
 		return -EINVAL;
 	}
-
-	status = sme_ext_change_channel(hdd_ctx->mac_handle, channel,
-					adapter->vdev_id);
+	ch_freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+					       channel);
+	status = sme_ext_change_freq(hdd_ctx->mac_handle, ch_freq,
+				     adapter->vdev_id);
 	if (status != QDF_STATUS_SUCCESS)
 		hdd_err("Error in change channel status %d", status);
 
@@ -6173,14 +6176,10 @@ static int __iw_get_char_setnone(struct net_device *dev,
 				scnprintf(extra + len, WE_MAX_STR_LEN - len,
 					  "\n HDD Conn State - %s "
 					  "\n\n SME State:"
-					  "\n Neighbour Roam State - %s"
 					  "\n CSR State - %s"
 					  "\n CSR Substate - %s",
 					  hdd_connection_state_string
 						  (sta_ctx->conn_info.conn_state),
-					  mac_trace_get_neighbour_roam_state
-						  (sme_get_neighbor_roam_state
-							  (mac_handle, stat_adapter->vdev_id)),
 					  mac_trace_getcsr_roam_state
 						  (sme_get_current_roam_state
 							  (mac_handle, stat_adapter->vdev_id)),
@@ -6619,26 +6618,36 @@ static int __iw_setnone_getnone(struct net_device *dev,
 	case WE_SET_REASSOC_TRIGGER:
 	{
 		struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+#ifndef FEATURE_CM_ENABLE
 		tSirMacAddr bssid;
-		uint32_t roam_id = INVALID_ROAM_ID;
-		uint8_t operating_ch =
-			wlan_reg_freq_to_chan(
-				hdd_ctx->pdev,
-				adapter->session.station.conn_info.chan_freq);
 		tCsrRoamModifyProfileFields mod_fields;
+		uint32_t roam_id = INVALID_ROAM_ID;
+#endif
+		uint8_t operating_ch =
+			wlan_get_operation_chan_freq(adapter->vdev);
+		struct qdf_mac_addr target_bssid;
+
+		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev, adapter->vdev_id,
+					    &target_bssid);
+#ifdef FEATURE_CM_ENABLE
+		ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev, adapter->vdev_id,
+					 &target_bssid, operating_ch,
+					 CM_ROAMING_HOST);
+#else
 
 		sme_get_modify_profile_fields(mac_handle, adapter->vdev_id,
 					      &mod_fields);
 		if (roaming_offload_enabled(hdd_ctx)) {
 			qdf_mem_copy(bssid,
-				&adapter->session.station.conn_info.bssid,
-				sizeof(bssid));
-			hdd_wma_send_fastreassoc_cmd(adapter,
-						     bssid, operating_ch);
+				     &target_bssid,
+				     sizeof(bssid));
+		hdd_wma_send_fastreassoc_cmd(adapter,
+					     bssid, operating_ch);
 		} else {
 			sme_roam_reassoc(mac_handle, adapter->vdev_id,
 					 NULL, mod_fields, &roam_id, 1);
 		}
+#endif
 		return 0;
 	}
 
