@@ -2921,6 +2921,19 @@ csr_update_sae_single_pmk_cfg_param(tpAniSirGlobal mac, tCsrConfigParam *param)
 }
 #endif
 
+#ifdef WLAN_FEATURE_SAE
+static void
+csr_update_sae_connect_retries(tpAniSirGlobal mac, tCsrConfigParam *param)
+{
+	mac->sae_connect_retries = param->sae_connect_retries;
+}
+#else
+static void
+csr_update_sae_connect_retries(tpAniSirGlobal mac, tCsrConfigParam *param)
+{
+}
+#endif
+
 QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 					   tCsrConfigParam *pParam)
 {
@@ -3494,6 +3507,7 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 					pParam->enable_pending_list_req;
 		pMac->roam.configParam.sta_disable_roam =
 					pParam->sta_disable_roam;
+		csr_update_sae_connect_retries(pMac, pParam);
 	}
 	return status;
 }
@@ -3553,6 +3567,17 @@ csr_get_sae_single_pmk_config(tpAniSirGlobal mac, tCsrConfigParam *param)
 #else
 static inline void
 csr_get_sae_single_pmk_config(tpAniSirGlobal mac, tCsrConfigParam *param)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_SAE
+static void csr_get_sae_reties_count(tpAniSirGlobal mac, tCsrConfigParam *param)
+{
+	param->sae_connect_retries = mac->sae_connect_retries;
+}
+#else
+static void csr_get_sae_reties_count(tpAniSirGlobal mac, tCsrConfigParam *param)
 {
 }
 #endif
@@ -3900,6 +3925,7 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	csr_get_adaptive_11r_config(pMac, pParam);
 	csr_get_sae_single_pmk_config(pMac, pParam);
 	csr_get_he_config_param(pParam, pMac);
+	csr_get_sae_reties_count(pMac, pParam);
 
 	csr_get_11k_offload_config_param(&pMac->roam.configParam, pParam);
 
