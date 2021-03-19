@@ -2165,6 +2165,49 @@ static void lim_process_periodic_join_probe_req_timer(tpAniSirGlobal mac_ctx)
 	}
 }
 
+static void lim_handle_sae_auth_timeout(tpAniSirGlobal mac_ctx,
+					tpPESession session_entry)
+{
+	struct sae_auth_retry *sae_retry;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+			session_entry->smeSessionId,
+			WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("vdev is NULL for vdev id %d",
+		       session_entry->smeSessionId);
+		return;
+	}
+
+	sae_retry = mlme_get_sae_auth_retry(vdev);
+	if (!(sae_retry && sae_retry->sae_auth.ptr)) {
+		pe_debug("sae auth frame is not buffered vdev id %d",
+			 session_entry->smeSessionId);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	pe_debug("retry sae auth for seq num %d vdev id %d",
+		 mac_ctx->mgmtSeqNum, session_entry->smeSessionId);
+	lim_send_frame(mac_ctx, session_entry->smeSessionId,
+		       sae_retry->sae_auth.ptr, sae_retry->sae_auth.len);
+
+	sae_retry->sae_auth_max_retry--;
+	/* Activate Auth Retry timer if max_retries are not done */
+	if (!sae_retry->sae_auth_max_retry || (tx_timer_activate(
+	    &mac_ctx->lim.limTimers.g_lim_periodic_auth_retry_timer) !=
+				TX_SUCCESS))
+		goto free_and_deactivate_timer;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	return;
+
+free_and_deactivate_timer:
+	lim_sae_auth_cleanup_retry(mac_ctx, session_entry->smeSessionId);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
+
 /**
  * lim_process_auth_retry_timer()- function to Retry Auth when auth timeout
  * occurs
@@ -2186,7 +2229,10 @@ static void lim_process_auth_retry_timer(tpAniSirGlobal mac_ctx)
 		pe_err("session does not exist for vdev_id: %d", vdev_id);
 		return;
 	}
-
+	/*
+	 * For WPA3 SAE gLimAuthFailureTimer is not running hence
+	 *  we don't enter in below "if" block in case of wpa3 sae
+	 */
 	if (tx_timer_running(&mac_ctx->lim.limTimers.gLimAuthFailureTimer) &&
 	    (session_entry->limMlmState == eLIM_MLM_WT_AUTH_FRAME2_STATE) &&
 	    (LIM_AUTH_ACK_RCD_SUCCESS != mac_ctx->auth_ack_status)) {
@@ -2226,8 +2272,12 @@ static void lim_process_auth_retry_timer(tpAniSirGlobal mac_ctx)
 			pe_err("could not activate Auth Retry failure timer");
 			return;
 		}
+
+		return;
 	}
-	return;
+
+	/* Auth retry time out for wpa3 sae */
+	lim_handle_sae_auth_timeout(mac_ctx, session_entry);
 } /*** lim_process_auth_retry_timer() ***/
 
 void lim_process_auth_failure_timeout(tpAniSirGlobal mac_ctx)

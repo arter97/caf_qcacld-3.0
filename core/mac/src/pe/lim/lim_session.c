@@ -810,6 +810,7 @@ void pe_delete_session(tpAniSirGlobal mac_ctx, tpPESession session)
 		 QDF_MAC_ADDR_ARRAY(session->bssId));
 
 	lim_reset_bcn_probe_filter(mac_ctx, session);
+	lim_sae_auth_cleanup_retry(mac_ctx, session->smeSessionId);
 
 	/* Restore default failure timeout */
 	if (session->defaultAuthFailureTimeout) {

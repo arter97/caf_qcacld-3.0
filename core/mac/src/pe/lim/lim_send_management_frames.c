@@ -58,6 +58,7 @@
 #include "lim_process_fils.h"
 #include "wlan_utility.h"
 #include <wlan_mlme_main.h>
+#include "wlan_mlme_main.h"
 
 /**
  *
@@ -5111,6 +5112,7 @@ error_addba_rsp:
 /**
  * lim_tx_mgmt_frame() - Transmits Auth mgmt frame
  * @mac_ctx Pointer to Global MAC structure
+ * @vdev_id: vdev id
  * @mb_msg: Received message info
  * @msg_len: Received message length
  * @packet: Packet to be transmitted
@@ -5118,21 +5120,18 @@ error_addba_rsp:
  *
  * Return: None
  */
-static void lim_tx_mgmt_frame(tpAniSirGlobal mac_ctx,
-	struct sir_mgmt_msg *mb_msg, uint32_t msg_len,
-	void *packet, uint8_t *frame)
+static void lim_tx_mgmt_frame(tpAniSirGlobal mac_ctx, uint8_t vdev_id,
+			      uint32_t msg_len, void *packet, uint8_t *frame)
 {
 #ifdef WLAN_DEBUG
-	tpSirMacFrameCtl fc = (tpSirMacFrameCtl) mb_msg->data;
+	tpSirMacFrameCtl fc = (tpSirMacFrameCtl)frame;
 #endif
 	QDF_STATUS qdf_status;
-	uint8_t sme_session_id = 0;
 	tpPESession session;
 	uint16_t auth_ack_status;
 	enum rateid min_rid = RATEID_DEFAULT;
 
-	sme_session_id = mb_msg->session_id;
-	session = pe_find_session_by_sme_session_id(mac_ctx, sme_session_id);
+	session = pe_find_session_by_sme_session_id(mac_ctx, vdev_id);
 	if (session == NULL) {
 		pe_err("session not found for given sme session");
 		return;
@@ -5151,7 +5150,7 @@ static void lim_tx_mgmt_frame(tpAniSirGlobal mac_ctx,
 					 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
 					 7, lim_tx_complete, frame,
 					 lim_auth_tx_complete_cnf,
-					 0, sme_session_id, false, 0, min_rid);
+					 0, vdev_id, false, 0, min_rid);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -5165,6 +5164,122 @@ static void lim_tx_mgmt_frame(tpAniSirGlobal mac_ctx,
 	}
 }
 
+static QDF_STATUS
+lim_get_sae_auth_retry_count(tpAniSirGlobal mac, uint8_t *retry_count)
+{
+	*retry_count =
+		WLAN_GET_BITS(mac->sae_connect_retries,
+			      AUTH_INDEX * NUM_RETRY_BITS, NUM_RETRY_BITS);
+
+	*retry_count = QDF_MIN(MAX_AUTH_RETRIES, *retry_count);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+lim_get_sae_roam_auth_retry_count(tpAniSirGlobal mac, uint8_t *retry_count)
+{
+	*retry_count =
+		WLAN_GET_BITS(mac->sae_connect_retries,
+			      ROAM_AUTH_INDEX * NUM_RETRY_BITS, NUM_RETRY_BITS);
+
+	*retry_count = QDF_MIN(MAX_ROAM_AUTH_RETRIES, *retry_count);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+lim_handle_sae_auth_retry(tpAniSirGlobal mac_ctx, uint8_t vdev_id,
+			  uint8_t *frame, uint32_t frame_len)
+{
+	tPESession *session;
+	struct sae_auth_retry *sae_retry;
+	uint8_t retry_count = 0;
+	struct wlan_objmgr_vdev *vdev;
+
+	session = pe_find_session_by_sme_session_id(mac_ctx, vdev_id);
+	if (!session) {
+		pe_err("session not found for given vdev_id %d", vdev_id);
+		return;
+	}
+	if (session->pePersona != QDF_STA_MODE)
+		return;
+
+	if (session->limMlmState == eLIM_MLM_WT_SAE_AUTH_STATE)
+		lim_get_sae_auth_retry_count(mac_ctx, &retry_count);
+	else
+		lim_get_sae_roam_auth_retry_count(mac_ctx, &retry_count);
+
+	if (!retry_count) {
+		pe_debug("vdev %d: SAE Auth retry disabled", vdev_id);
+		return;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("vdev is NULL for vdev id %d", vdev_id);
+		return;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	sae_retry = mlme_get_sae_auth_retry(vdev);
+	if (!sae_retry) {
+		pe_err("sae retry pointer is NULL for vdev_id %d", vdev_id);
+		return;
+	}
+
+	if (sae_retry->sae_auth.ptr)
+		lim_sae_auth_cleanup_retry(mac_ctx, vdev_id);
+
+	sae_retry->sae_auth.ptr = qdf_mem_malloc(frame_len);
+	if (!sae_retry->sae_auth.ptr)
+		return;
+
+	pe_debug("SAE auth frame queued vdev_id %d seq_num %d",
+		 vdev_id, mac_ctx->mgmtSeqNum);
+	qdf_mem_copy(sae_retry->sae_auth.ptr, frame, frame_len);
+	mac_ctx->lim.limTimers.g_lim_periodic_auth_retry_timer.sessionId =
+		session->peSessionId;
+	sae_retry->sae_auth.len = frame_len;
+	sae_retry->sae_auth_max_retry = retry_count;
+
+	tx_timer_change(
+		&mac_ctx->lim.limTimers.g_lim_periodic_auth_retry_timer,
+		SYS_MS_TO_TICKS(WLAN_SAE_AUTH_TIMEOUT), 0);
+	/* Activate Auth Retry timer */
+	if (tx_timer_activate(
+		&mac_ctx->lim.limTimers.g_lim_periodic_auth_retry_timer) !=
+		TX_SUCCESS) {
+		pe_err("failed to start periodic auth retry timer");
+		lim_sae_auth_cleanup_retry(mac_ctx, vdev_id);
+	}
+}
+
+void lim_send_frame(tpAniSirGlobal mac_ctx, uint8_t vdev_id, uint8_t *buf,
+		    uint16_t buf_len)
+{
+	QDF_STATUS qdf_status;
+	uint8_t *frame;
+	void *packet;
+	tpSirMacFrameCtl fc = (tpSirMacFrameCtl)buf;
+	tpSirMacMgmtHdr mac_hdr = (tpSirMacMgmtHdr)buf;
+
+	pe_debug("sending fc->type: %d fc->subType: %d",
+		 fc->type, fc->subType);
+
+	lim_add_mgmt_seq_num(mac_ctx, mac_hdr);
+	qdf_status = cds_packet_alloc(buf_len, (void **)&frame,
+				      (void **)&packet);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
+		pe_err("call to bufAlloc failed for AUTH frame");
+		return;
+	}
+
+	qdf_mem_copy(frame, buf, buf_len);
+	lim_tx_mgmt_frame(mac_ctx, vdev_id, buf_len, packet, frame);
+}
+
 void lim_send_mgmt_frame_tx(tpAniSirGlobal mac_ctx,
 		struct scheduler_msg *msg)
 {
@@ -5174,28 +5289,20 @@ void lim_send_mgmt_frame_tx(tpAniSirGlobal mac_ctx,
 	tpSirMacFrameCtl fc = (tpSirMacFrameCtl) mb_msg->data;
 #endif
 	uint8_t sme_session_id;
-	QDF_STATUS qdf_status;
-	uint8_t *frame;
-	void *packet;
-	tpSirMacMgmtHdr mac_hdr;
+	uint16_t auth_algo;
 
 	msg_len = mb_msg->msg_len - sizeof(*mb_msg);
 	pe_debug("sending fc->type: %d fc->subType: %d",
 		fc->type, fc->subType);
 
 	sme_session_id = mb_msg->session_id;
-	mac_hdr = (tpSirMacMgmtHdr)mb_msg->data;
-
-	lim_add_mgmt_seq_num(mac_ctx, mac_hdr);
-
-	qdf_status = cds_packet_alloc((uint16_t) msg_len, (void **)&frame,
-				 (void **)&packet);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		pe_err("call to bufAlloc failed for AUTH frame");
-		return;
+	if (fc->subType == SIR_MAC_MGMT_AUTH) {
+		auth_algo = *(uint16_t *)(mb_msg->data +
+				sizeof(tSirMacMgmtHdr));
+		if (auth_algo == eSIR_AUTH_TYPE_SAE)
+			lim_handle_sae_auth_retry(mac_ctx, sme_session_id,
+						  mb_msg->data, msg_len);
 	}
 
-	qdf_mem_copy(frame, mb_msg->data, msg_len);
-
-	lim_tx_mgmt_frame(mac_ctx, mb_msg, msg_len, packet, frame);
+	lim_send_frame(mac_ctx, sme_session_id, mb_msg->data, msg_len);
 }
