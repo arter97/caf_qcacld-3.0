@@ -10168,6 +10168,16 @@ bool is_disconnect_pending(tpAniSirGlobal pmac,
 	return disconnect_cmd_exist;
 }
 
+static void
+csr_get_sae_assoc_retry_count(tpAniSirGlobal pMac, uint8_t *retry_count)
+{
+	*retry_count =
+		WLAN_GET_BITS(pMac->sae_connect_retries,
+			      ASSOC_INDEX * NUM_RETRY_BITS, NUM_RETRY_BITS);
+
+	*retry_count = QDF_MIN(MAX_RETRIES, *retry_count);
+}
+
 static void csr_roam_join_rsp_processor(tpAniSirGlobal pMac,
 					tSirSmeJoinRsp *pSmeJoinRsp)
 {
@@ -10177,10 +10187,15 @@ static void csr_roam_join_rsp_processor(tpAniSirGlobal pMac,
 	struct csr_roam_session *session_ptr;
 	struct csr_roam_connectedinfo *prev_connect_info;
 	tPmkidCacheInfo pmksa_entry;
+	struct csr_roam_profile *profile = NULL;
+	bool attempt_next_bss = true;
 	uint32_t len = 0, roamId = 0, reason_code = 0;
 	bool is_dis_pending;
 	bool use_same_bss = false;
 	bool retry_same_bss = false;
+	uint8_t max_retry_count = 1;
+	eCsrAuthType auth_type = eCSR_AUTH_TYPE_NONE;
+	tPmkidCacheInfo pmk_cache;
 
 	if (!pSmeJoinRsp) {
 		sme_err("Sme Join Response is NULL");
@@ -10246,14 +10261,28 @@ static void csr_roam_join_rsp_processor(tpAniSirGlobal pMac,
 	/* The head of the active list is the request we sent
 	 * Try to get back the same profile and roam again
 	 */
-	if (pCommand)
+	if (pCommand) {
 		roamId = pCommand->u.roamCmd.roamId;
+		profile = &pCommand->u.roamCmd.roamProfile;
+		auth_type = profile->AuthType.authType[0];
+	}
+
 	reason_code = pSmeJoinRsp->protStatusCode;
 	session_ptr->joinFailStatusCode.reasonCode = reason_code;
 	session_ptr->joinFailStatusCode.statusCode = pSmeJoinRsp->statusCode;
 	sme_warn("SmeJoinReq failed with status_code= 0x%08X [%d] reason:%d",
 		 pSmeJoinRsp->statusCode, pSmeJoinRsp->statusCode,
 		 reason_code);
+
+	is_dis_pending = is_disconnect_pending(pMac, session_ptr->sessionId);
+	/*
+	 * if userspace has issued disconnection or we have reached mac tries,
+	 * driver should not continue for next connection.
+	 */
+	if (is_dis_pending ||
+	    session_ptr->join_bssid_count >= CSR_MAX_BSSID_COUNT)
+		attempt_next_bss = false;
+
 	/*
 	 * Delete the PMKID of the BSSID for which the assoc reject is
 	 * received from the AP due to invalid PMKID reason.
@@ -10272,25 +10301,49 @@ static void csr_roam_join_rsp_processor(tpAniSirGlobal pMac,
 					      &pmksa_entry, false);
 		retry_same_bss = true;
 	}
+
 	if (pSmeJoinRsp->messageType == eWNI_SME_JOIN_RSP &&
 	    pSmeJoinRsp->statusCode == eSIR_SME_ASSOC_TIMEOUT_RESULT_CODE &&
-	    mlme_get_reconn_after_assoc_timeout_flag(pMac->psoc,
-						     pSmeJoinRsp->sessionId))
+	    (mlme_get_reconn_after_assoc_timeout_flag(pMac->psoc,
+						     pSmeJoinRsp->sessionId) ||
+	    (auth_type == eCSR_AUTH_TYPE_SAE ||
+	    auth_type == eCSR_AUTH_TYPE_FT_SAE))) {
 		retry_same_bss = true;
-	if (retry_same_bss && pCommand && pCommand->u.roamCmd.pRoamBssEntry) {
+		if (auth_type == eCSR_AUTH_TYPE_SAE ||
+		    auth_type == eCSR_AUTH_TYPE_FT_SAE)
+			csr_get_sae_assoc_retry_count(pMac,
+						      &max_retry_count);
+	}
+
+	if (attempt_next_bss && retry_same_bss &&
+	    pCommand && pCommand->u.roamCmd.pRoamBssEntry) {
 		struct tag_csrscan_result *scan_result;
 
 		scan_result =
 			GET_BASE_ADDR(pCommand->u.roamCmd.pRoamBssEntry,
 				      struct tag_csrscan_result, Link);
 		/* Retry with same BSSID without PMKID */
-		if (!scan_result->retry_count) {
-			sme_info("Retry once with same BSSID, status %d reason %d",
-				 pSmeJoinRsp->statusCode, reason_code);
-			scan_result->retry_count = 1;
+		if (scan_result->retry_count < max_retry_count) {
+			sme_info("Retry once with same BSSID, status %d reason %d, auth_type %d retry count %d max count %d",
+				 pSmeJoinRsp->statusCode, reason_code,
+				 auth_type, scan_result->retry_count,
+				 max_retry_count);
+			scan_result->retry_count++;
 			use_same_bss = true;
 		}
 	}
+
+	/*
+	 * If connection fails with Single PMK bssid, clear this pmk
+	 * entry, Flush in case if we are not trying again with same AP
+	 */
+	qdf_mem_copy(&pmk_cache.BSSID.bytes,
+		     &pCommand->u.roamCmd.pLastRoamBss->bssId,
+		     sizeof(pmk_cache.BSSID.bytes));
+	if (!use_same_bss && pCommand && pCommand->u.roamCmd.pLastRoamBss)
+		csr_clear_sae_single_pmk(pMac, pSmeJoinRsp->sessionId,
+					 &pmk_cache);
+
 	/* If Join fails while Handoff is in progress, indicate
 	 * disassociated event to supplicant to reconnect
 	 */
@@ -10305,13 +10358,7 @@ static void csr_roam_join_rsp_processor(tpAniSirGlobal pMac,
 						   QDF_STATUS_E_FAILURE);
 	}
 
-	/*
-	 * if userspace has issued disconnection, driver should not continue
-	 * connecting
-	 */
-	is_dis_pending = is_disconnect_pending(pMac, session_ptr->sessionId);
-	if (pCommand && !is_dis_pending &&
-	    session_ptr->join_bssid_count < CSR_MAX_BSSID_COUNT) {
+	if (pCommand && attempt_next_bss) {
 		csr_roam(pMac, pCommand, use_same_bss);
 		return;
 	}
