@@ -731,7 +731,15 @@ QDF_STATUS cfr_8074v2_deinit_pdev(struct wlan_objmgr_psoc *psoc,
 			   struct wlan_objmgr_pdev *pdev)
 {
 	QDF_STATUS status;
+	struct pdev_cfr *pdev_cfrobj;
 
+	pdev_cfrobj =
+		wlan_objmgr_pdev_get_comp_private_obj(pdev,
+						      WLAN_UMAC_COMP_CFR);
+	if (!pdev_cfrobj)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	pdev_cfrobj->cfr_timer_enable = 0;
 	status = target_if_unregister_to_dbr(pdev);
 	if (QDF_STATUS_SUCCESS != status) {
 		cfr_err("Failed to register with dbr");
