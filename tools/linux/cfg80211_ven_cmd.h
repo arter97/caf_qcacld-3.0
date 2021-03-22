@@ -391,9 +391,6 @@ enum {
 	IEEE80211_PARAM_MGMT_RATE               = 384, /* Set mgmt rate, will set mcast/bcast/ucast to same rate*/
 	IEEE80211_PARAM_NO_VAP_RESET            = 385, /* Disable the VAP reset in NSS */
 	IEEE80211_PARAM_STA_COUNT               = 386, /* TO get number of station associated*/
-#if QCA_SUPPORT_SSID_STEERING
-	IEEE80211_PARAM_VAP_SSID_CONFIG         = 387, /* Vap configuration  */
-#endif
 #if ATH_SUPPORT_DSCP_OVERRIDE
 	IEEE80211_PARAM_DSCP_MAP_ID             = 388,
 	IEEE80211_PARAM_DSCP_TID_MAP            = 389,
@@ -1749,10 +1746,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"novap_reset",         IEEE80211_PARAM_NO_VAP_RESET, SET_PARAM, 1},
 	{"get_novap_reset",     IEEE80211_PARAM_NO_VAP_RESET, GET_PARAM, 0},
 	{"get_sta_count",       IEEE80211_PARAM_STA_COUNT, GET_PARAM, 0},
-#if QCA_SUPPORT_SSID_STEERING
-	{"ssid_config",         IEEE80211_PARAM_VAP_SSID_CONFIG, SET_PARAM, 1},
-	{"get_ssid_config",     IEEE80211_PARAM_VAP_SSID_CONFIG, GET_PARAM, 0},
-#endif
 #if ATH_SUPPORT_DSCP_OVERRIDE
 	{"set_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, SET_PARAM, 1},
 	{"get_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, GET_PARAM, 0},
