@@ -713,17 +713,13 @@ static void lim_nan_register_callbacks(tpAniSirGlobal mac_ctx)
 #endif
 
 #ifdef WLAN_FEATURE_11W
-static void lim_stop_pmfcomeback_timer(struct sPESession *session)
+void lim_stop_pmfcomeback_timer(struct sPESession *session)
 {
 	if (session->pePersona != QDF_STA_MODE)
 		return;
 
 	qdf_mc_timer_stop(&session->pmf_retry_timer);
 	session->pmf_retry_timer_info.retried = false;
-}
-#else
-static void lim_stop_pmfcomeback_timer(struct sPESession *session)
-{
 }
 #endif
 
