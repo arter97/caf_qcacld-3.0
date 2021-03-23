@@ -898,7 +898,9 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				  adapter->device_mode,
 				  adapter->vdev_id,
 				  WLAN_IPA_STA_CONNECT,
-				  rsp->bssid.bytes);
+				  rsp->bssid.bytes,
+				  WLAN_REG_IS_24GHZ_CH_FREQ(
+					sta_ctx->conn_info.chan_freq));
 
 	wlan_hdd_auto_shutdown_enable(hdd_ctx, false);
 
