@@ -26,6 +26,29 @@
 #define DP_MSCS_VALID_TID_MASK 0x7
 
 /**
+ * dp_mscs_get_tid_from_iptos() - Get tid from ip TOS
+ * @nbuf - network buffer
+ *
+ * Return: tid
+ */
+static int dp_mscs_get_tid_from_iptos(qdf_nbuf_t nbuf)
+{
+	int protocol;
+
+	protocol = ntohs(nbuf->protocol);
+
+	if (protocol == ETH_P_IP) {
+		return ((ipv4_get_dsfield(ip_hdr(nbuf))) >> 5);
+	}
+
+	if (protocol == ETH_P_IPV6) {
+		return ((ipv6_get_dsfield(ipv6_hdr(nbuf))) >> 5);
+	}
+
+	return 0;
+}
+
+/**
  * dp_mscs_peer_lookup_n_get_priority() - Get priority for MSCS peer
  * @soc_hdl - soc handle
  * @src_mac_addr - src mac address from connection
@@ -56,19 +79,21 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 			DP_VDEV_ALL, DP_MOD_ID_MSCS);
 
 	if (!peer) {
+		qdf_nbuf_set_priority(nbuf, dp_mscs_get_tid_from_iptos(nbuf));
 		/*
 		 * No WLAN client peer found with this peer mac
 		 */
-		return -1;
+		return 0;
 	}
 
 	/*
 	 * check if there is any active MSCS session for this peer
 	 */
 	if (!peer->mscs_active) {
+		status = 0;
+		qdf_nbuf_set_priority(nbuf, dp_mscs_get_tid_from_iptos(nbuf));
 		QDF_TRACE(QDF_MODULE_ID_MSCS, QDF_TRACE_LEVEL_DEBUG,
 				"%s: MSCS session not active on peer or peer delete in progress\n", __func__);
-		status = 1;
 		goto fail;
 	}
 
