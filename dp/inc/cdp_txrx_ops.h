@@ -655,6 +655,7 @@ struct cdp_ctrl_ops {
 				       bool is_egress,
 				       bool is_rx);
 #endif
+	void (*txrx_peer_flush_frags)(struct cdp_soc_t *soc, uint8_t vdev_id, uint8_t *peer_mac);
 #ifdef ATH_SUPPORT_NAC_RSSI
 	QDF_STATUS (*txrx_vdev_config_for_nac_rssi)(struct cdp_soc_t *cdp_soc,
 						    uint8_t vdev_id,
