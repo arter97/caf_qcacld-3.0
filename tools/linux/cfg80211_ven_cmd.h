@@ -1279,6 +1279,10 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_PKTLOG_DUMP_UPLOAD_SSR = 468,
 	/* Display the phy_id of the radio */
 	OL_ATH_PARAM_DISPLAY_PHY_ID = 469,
+	/* Control random channel selection for DCS */
+	OL_ATH_PARAM_DCS_RANDOM_CHAN_EN = 470,
+	/* Configure CSA TBTT count for DCS */
+	OL_ATH_PARAM_DCS_CSA_TBTT = 471,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3304,6 +3308,14 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_LOW_LATENCY_MODE, SET_PARAM, 1},
 	{"g_phy_id",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_PHY_ID, GET_PARAM, 0},
+	{"dcs_random_chan_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_RANDOM_CHAN_EN, SET_PARAM, 1},
+	{"g_dcs_random_chan_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_RANDOM_CHAN_EN, GET_PARAM, 0},
+	{"dcs_csa_tbtt",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_CSA_TBTT, SET_PARAM, 1},
+	{"g_dcs_csa_tbtt",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_CSA_TBTT, GET_PARAM, 0},
 };
 #endif
 #endif
