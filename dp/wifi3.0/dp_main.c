@@ -6353,6 +6353,10 @@ dp_peer_authorize(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		qdf_spin_lock_bh(&soc->peer_ref_mutex);
 		peer->authorize = authorize ? 1 : 0;
 		qdf_spin_unlock_bh(&soc->peer_ref_mutex);
+
+		if (!peer->authorize)
+			dp_peer_flush_frags(soc_hdl, vdev_id, peer_mac);
+
 	}
 
 	if (peer)
