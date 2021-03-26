@@ -463,7 +463,7 @@ void dp_print_tid_qlen_per_peer(void *pdev_hdl, uint8_t consolidated)
 		dp_pdev_iterate_peer(pdev, dp_peer_print_tid_qlen, &c_tid_q_len,
 				     DP_MOD_ID_TX_CAPTURE);
 
-		DP_PRINT_STATS("consolidated: msdu_comp_q[%d] defer_msdu_q[%d] pending_ppdu_q[%d]",
+		DP_PRINT_STATS("consolidated: msdu_comp_q[%llu] defer_msdu_q[%llu] pending_ppdu_q[%llu]",
 			       c_tid_q_len.tasklet_msdu_len, c_tid_q_len.defer_msdu_len,
 			       c_tid_q_len.pending_q_len);
 	}
@@ -1071,7 +1071,7 @@ void dp_deliver_mgmt_frm(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 		}
 
 		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE, QDF_TRACE_LEVEL_DEBUG,
-			  "dlvr mgmt frm(%d 0x%08x): fc 0x%x %x, dur 0x%x%x tsf:%u, retries_count: %d, is_sgen: %d",
+			  "dlvr mgmt frm(%d 0x%08x): fc 0x%x %x, dur 0x%x%x tsf:%llu, retries_count: %d, is_sgen: %d",
 			  ptr_mgmt_hdr->ppdu_id,
 			  ptr_mgmt_hdr->ppdu_id,
 			  wh->i_fc[1], wh->i_fc[0],
@@ -4392,7 +4392,7 @@ get_mgmt_pkt_from_queue:
 
 				QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
 					  QDF_TRACE_LEVEL_INFO,
-					  "%s: ppdu_id[m:%d desc:%d] start_tsf: %u mgmt_tsf:%u tsf_delta:%u bar_frm_with_data:%d",
+					  "%s: ppdu_id[m:%d desc:%d] start_tsf: %llu mgmt_tsf:%llu tsf_delta:%u bar_frm_with_data:%d",
 					  __func__, ppdu_id, desc_ppdu_id,
 					  start_tsf, ptr_comp_info->tx_tsf,
 					  tsf_delta, bar_frm_with_data);
@@ -4471,7 +4471,7 @@ insert_mgmt_buf_to_queue:
 
 			QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
 				  QDF_TRACE_LEVEL_INFO,
-				  "%s: ppdu_id[m:%d desc:%d] start_tsf: %u mgmt_tsf:%u bar_frm_with_data:%d is_sgen:%d",
+				  "%s: ppdu_id[m:%d desc:%d] start_tsf: %llu mgmt_tsf:%llu bar_frm_with_data:%d is_sgen:%d",
 				  __func__, ppdu_id, desc_ppdu_id,
 				  start_tsf, ptr_comp_info->tx_tsf,
 				  bar_frm_with_data, is_sgen_pkt);
@@ -4769,7 +4769,7 @@ dp_peer_tx_cap_tid_queue_flush_tlv(struct dp_pdev *pdev,
 
 	QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
 		  QDF_TRACE_LEVEL_INFO_MED,
-		  "peer_id [%d 0x%x] tid[%d] qlen[%d -> %d]",
+		  "peer_id [%d 0x%p] tid[%d] qlen[%d -> %d]",
 		  ppdu_desc->user[usr_idx].peer_id, peer, tid, qlen, qlen_curr);
 
 }
@@ -5512,7 +5512,7 @@ free_nbuf_dec_ref:
 		/* print ppdu_desc info for debugging purpose */
 		QDF_TRACE(QDF_MODULE_ID_TX_CAPTURE,
 			  QDF_TRACE_LEVEL_INFO_LOW,
-			  "%s: ppdu[%d], p_id[%d], tid[%d], fctrl[0x%x 0x%x] ftype[%d] h_frm_t[%d] seq[%d] tsf[%u b %u] dur[%u]",
+			  "%s: ppdu[%d], p_id[%d], tid[%d], fctrl[0x%x 0x%x] ftype[%d] h_frm_t[%d] seq[%d] tsf[%llu b %u] dur[%u]",
 			  __func__, ppdu_desc->ppdu_id,
 			  ppdu_desc->user[0].peer_id,
 			  ppdu_desc->user[0].tid,

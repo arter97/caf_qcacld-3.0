@@ -272,8 +272,8 @@ dp_rx_mon_drop_ppdu(struct dp_pdev *pdev, uint32_t mac_id)
 
 				QDF_TRACE(QDF_MODULE_ID_DP,
 					  QDF_TRACE_LEVEL_DEBUG,
-					  "[%s][%d] mon_skb=%pK len %u"
-					  " __func__, __LINE__",
+					  FL("[%s][%d] mon_skb=%p len %u"),
+					   __func__, __LINE__,
 					  mon_skb, mon_skb->len);
 
 				qdf_nbuf_free(mon_skb);
@@ -612,7 +612,7 @@ next_msdu:
 			QDF_TRACE(QDF_MODULE_ID_DP,
 				  QDF_TRACE_LEVEL_DEBUG,
 				  FL("%s total_len %u frag_len %u flags %u"),
-				  total_frag_len, frag_len,
+				  __func__, total_frag_len, frag_len,
 				  msdu_list.msdu_info[msdu_index].msdu_flags);
 		}
 
@@ -925,7 +925,7 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 				  FL("ppdu_id: %d ring_entry: %pK"
 				     "status_buf_count: %d rxdma_push: %d"
-				     "rxdma_err: %d link_desc: %pK "),
+				     "rxdma_err: %d link_desc: %lld "),
 				  desc_info->ppdu_id, ring_desc,
 				  desc_info->status_buf_count,
 				  desc_info->rxdma_push_reason,

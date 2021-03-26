@@ -768,7 +768,7 @@ void dp_tx_vdev_multipass_deinit(struct dp_vdev *vdev)
 	struct dp_peer *peer = NULL;
 	qdf_spin_lock_bh(&vdev->mpass_peer_mutex);
 	TAILQ_FOREACH(peer, &vdev->mpass_peer_list, mpass_peer_list_elem)
-		qdf_err("Peers present in mpass list : %llx",
+		qdf_err("Peers present in mpass list : %pM",
 			peer->mac_addr.raw);
 	qdf_spin_unlock_bh(&vdev->mpass_peer_mutex);
 
