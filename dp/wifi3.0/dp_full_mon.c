@@ -1008,14 +1008,17 @@ void dp_full_mon_detach(struct dp_pdev *pdev)
 		return;
 	}
 
-	if (pdev->mon_desc)
+	if (pdev->mon_desc) {
 		qdf_mem_free(pdev->mon_desc);
+		pdev->mon_desc = NULL;
+	}
 
 	if (!TAILQ_EMPTY(&pdev->mon_mpdu_q)) {
 		TAILQ_FOREACH_SAFE(mpdu,
 				   &pdev->mon_mpdu_q,
 				   mpdu_list_elem,
 				   temp_mpdu) {
+			TAILQ_REMOVE(&pdev->mon_mpdu_q, mpdu, mpdu_list_elem);
 			qdf_mem_free(mpdu);
 		}
 	}
