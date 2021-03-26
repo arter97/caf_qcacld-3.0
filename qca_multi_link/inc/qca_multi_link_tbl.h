@@ -28,6 +28,7 @@
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
 #include <br_private.h>
+#include <net/switchdev.h>
 
 /**
  * qca_multi_link_entry_type - bridge entry type
