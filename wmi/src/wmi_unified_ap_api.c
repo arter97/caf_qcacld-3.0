@@ -271,6 +271,17 @@ QDF_STATUS wmi_extract_dcs_interference_type(
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_extract_dcs_awgn_info(wmi_unified_t wmi_handle,
+				     void *evt_buf,
+				     struct wmi_host_dcs_awgn_info *awgn_info)
+{
+	if (wmi_handle->ops->extract_dcs_awgn_info) {
+		return wmi_handle->ops->extract_dcs_awgn_info(wmi_handle,
+						evt_buf, awgn_info);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_extract_dcs_cw_int(wmi_unified_t wmi_handle, void *evt_buf,
 				  wmi_host_ath_dcs_cw_int *cw_int)
 {

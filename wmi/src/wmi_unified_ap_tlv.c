@@ -1277,6 +1277,41 @@ static QDF_STATUS extract_dcs_interference_type_tlv(
 }
 
 /*
+ * extract_dcs_awgn_info_tlv() - extract DCS AWGN interference from event
+ * @wmi_handle      : wmi handle
+ * @param evt_buf   : pointer to event buffer
+ * @param awgn_info : Pointer to hold cw interference
+ *
+ * Return: QDF_STATUS_SUCCESS for success or QDF_STATUS_E_* for error
+ */
+static QDF_STATUS extract_dcs_awgn_info_tlv(wmi_unified_t wmi_handle,
+				void *evt_buf,
+				struct wmi_host_dcs_awgn_info *awgn_info)
+{
+	WMI_DCS_INTERFERENCE_EVENTID_param_tlvs *param_buf;
+	wmi_dcs_awgn_int_t *ev;
+
+	param_buf = (WMI_DCS_INTERFERENCE_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf)
+		return QDF_STATUS_E_INVAL;
+
+	ev = param_buf->awgn_int;
+
+	awgn_info->channel_width       = ev->channel_width;
+	awgn_info->center_freq         = ev->chan_freq;
+	awgn_info->center_freq0        = ev->center_freq0;
+	awgn_info->center_freq1        = ev->center_freq1;
+	awgn_info->chan_bw_intf_bitmap = ev->chan_bw_interference_bitmap;
+	wmi_debug("DCS AWGN extraction: channel_width: %u, center_freq: %u, "
+		  "center_freq0: %u, center_freq1: %u, chan_bw_intf_bitmap: %x",
+		  awgn_info->channel_width, awgn_info->channel_width,
+		  awgn_info->center_freq0, awgn_info->center_freq1,
+		  awgn_info->chan_bw_intf_bitmap);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/*
  * extract_dcs_cw_int_tlv() - extract dcs cw interference from event
  * @wmi_handle: wmi handle
  * @param evt_buf: pointer to event buffer
@@ -2922,6 +2957,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_multiple_vdev_restart_req_cmd =
 				send_multiple_vdev_restart_req_cmd_tlv;
 	ops->extract_dcs_interference_type = extract_dcs_interference_type_tlv;
+	ops->extract_dcs_awgn_info = extract_dcs_awgn_info_tlv;
 	ops->extract_dcs_cw_int = extract_dcs_cw_int_tlv;
 	ops->extract_dcs_im_tgt_stats = extract_dcs_im_tgt_stats_tlv;
 	ops->extract_peer_create_response_event =
