@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -141,13 +141,13 @@
  * <ini>
  * gEnableModulatedDTIM - Enable/Disable modulated DTIM feature
  * @Min: 0
- * @Max: 5
+ * @Max: 10
  * @Default: 0
  *
  * This ini is used to enable/disable modulated DTIM feature.
  *
  * 0 - Disable modulated DTIM.
- * 1 to 5 - The maximum No. of modulated DTIM period used for calculating the
+ * 1 to 10 - The maximum No. of modulated DTIM period used for calculating the
  * target listen interval.
  *
  * The target listen interval will be updated to firmware when host driver is
@@ -163,7 +163,7 @@
 #define CFG_PMO_ENABLE_MODULATED_DTIM CFG_INI_UINT( \
 	"gEnableModulatedDTIM", \
 	0, \
-	5, \
+	10, \
 	0, \
 	CFG_VALUE_OR_DEFAULT, \
 	"Enable/disable modulated DTIM feature")
@@ -246,6 +246,28 @@
 	"enable_mod_dtim_on_system_suspend", \
 	0, \
 	"Modulated DTIM on System suspend wow")
+
+/*
+ * <ini>
+ * gEnableForcedDTIM - Enable/Disable forced DTIM feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable forced DTIM feature.
+ *
+ * 0 - Disable forced DTIM.
+ * 1 - Enable forced DTIM
+ *
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_PMO_ENABLE_FORCED_DTIM CFG_INI_BOOL( \
+	"gEnableForcedDTIM", \
+	0, \
+	"Enable/disable Forced DTIM feature")
 
 /*
  * <ini>
@@ -404,6 +426,62 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"RA rate limit interval")
 
+/*
+ * <ini>
+ * enable_bus_suspend_in_sap_mode - enable PCIe bus suspend as part of
+ * platform system suspend for SAP with one or more clients connected
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to PCIe bus suspend as part of platform system suspend for
+ * SAP with one or more clients connected
+ *
+ * 0: PCIe Bus suspend is not supported in SAP mode with one or more clients
+ * connected
+ * 1: PCIe Bus suspend is supported in SAP mode with one or more clients
+ * connected
+ * Related: None
+ *
+ * Supported Feature: Power Save
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_BUS_SUSPEND_IN_SAP_MODE CFG_INI_BOOL( \
+		"enable_bus_suspend_in_sap_mode", \
+		0, \
+		"This ini is used to enable bus suspend in SAP mode")
+
+/*
+ * <ini>
+ * enable_bus_suspend_in_go_mode - enable PCIe bus suspend as part of
+ * platform system suspend for P2PGO with one or more clients connected
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to PCIe bus suspend as part of platform system suspend for
+ * P2PGO with one or more clients connected
+ *
+ * 0: PCIe Bus suspend is not supported in P2PGO mode with one or more clients
+ * connected
+ * 1: PCIe Bus suspend is supported in P2PGO mode with one or more clients
+ * connected
+ * Related: None
+ *
+ * Supported Feature: Power Save
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_BUS_SUSPEND_IN_GO_MODE CFG_INI_BOOL( \
+		"enable_bus_suspend_in_go_mode", \
+		0, \
+		"This ini is used to enable bus suspend in P2PGO mode")
+
 #define CFG_PMO_COMMON_ALL \
 	CFG(CFG_ENABLE_SAP_SUSPEND) \
 	CFG(CFG_PMO_ENABLE_HOST_ARPOFFLOAD) \
@@ -412,6 +490,7 @@
 	CFG(CFG_PMO_ENABLE_HOST_NSOFFLOAD) \
 	CFG(CFG_PMO_ENABLE_DYNAMIC_DTIM) \
 	CFG(CFG_PMO_ENABLE_MODULATED_DTIM) \
+	CFG(CFG_PMO_ENABLE_FORCED_DTIM) \
 	CFG(CFG_PMO_MC_ADDR_LIST_ENABLE) \
 	CFG(CFG_PMO_POWERSAVE_MODE) \
 	CFG(CFG_PMO_MAX_PS_POLL) \
@@ -420,6 +499,8 @@
 	CFG(CFG_PMO_PWR_FAILURE) \
 	CFG(CFG_PMO_WOW_DATA_INACTIVITY_TIMEOUT) \
 	CFG(CFG_RA_RATE_LIMIT_INTERVAL) \
-	CFG(CFG_PMO_MOD_DTIM_ON_SYS_SUSPEND)
+	CFG(CFG_PMO_MOD_DTIM_ON_SYS_SUSPEND) \
+	CFG(CFG_ENABLE_BUS_SUSPEND_IN_SAP_MODE) \
+	CFG(CFG_ENABLE_BUS_SUSPEND_IN_GO_MODE)
 
 #endif /* WLAN_PMO_COMMON_CFG_H__ */

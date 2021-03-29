@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -363,6 +363,7 @@ struct bss_params {
 	uint32_t he_sta_obsspd;
 #endif
 	bool no_ptk_4_way;
+	uint16_t bss_max_idle_period;
 };
 
 /**
@@ -377,16 +378,6 @@ struct add_bss_rsp {
 	QDF_STATUS status;
 	uint32_t chain_mask;
 	uint8_t smps_mode;
-};
-
-/**
- * struct del_bss_resp - params required for del bss response
- * @status: QDF status
- * @vdev_id: vdev_id
- */
-struct del_bss_resp {
-	QDF_STATUS status;
-	uint8_t vdev_id;
 };
 
 typedef enum eDelStaReasonCode {
@@ -735,6 +726,14 @@ struct send_peer_unmap_conf_params {
 	uint8_t vdev_id;
 	uint32_t peer_id_cnt;
 	uint16_t *peer_id_list;
+};
+
+/**
+ * struct peer_create_rsp_params  - Peer create response parameters
+ * @peer_mac: Peer mac address
+ */
+struct peer_create_rsp_params {
+	struct qdf_mac_addr peer_mac;
 };
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -153,10 +153,8 @@ const struct nla_policy vendor_attr_policy[
 						.type = NLA_U32,
 						.len = sizeof(uint32_t)
 	},
-	[QCA_WLAN_VENDOR_ATTR_NDP_IPV6_ADDR] = {
-						.type = NLA_EXACT_LEN,
-						.len = QDF_IPV6_ADDR_SIZE
-	},
+	[QCA_WLAN_VENDOR_ATTR_NDP_IPV6_ADDR] =
+				VENDOR_NLA_POLICY_IPV6_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_NDP_TRANSPORT_PORT] = {
 						.type = NLA_U16,
 						.len = sizeof(uint16_t)
@@ -2576,6 +2574,7 @@ static int os_if_process_nan_enable_req(struct wlan_objmgr_psoc *psoc,
 
 	ucfg_mlme_get_fine_time_meas_cap(psoc, &fine_time_meas_cap);
 	nan_req->params.rtt_cap = fine_time_meas_cap;
+	nan_req->params.disable_6g_nan = ucfg_get_disable_6g_nan(psoc);
 
 	nla_memcpy(nan_req->params.request_data,
 		   tb[QCA_WLAN_VENDOR_ATTR_NAN_CMD_DATA], buf_len);

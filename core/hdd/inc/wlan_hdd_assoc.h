@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -126,7 +126,6 @@ struct hdd_conn_flag {
  * @peer_macaddr:Peer Mac Address of the IBSS Stations
  * @auth_type: Auth Type
  * @uc_encrypt_type: Unicast Encryption Type
- * @mc_encrypt_type: Multicast Encryption Type
  * @is_authenticated: Remembers authenticated state
  * @dot11mode: dot11mode
  * @proxy_arp_service: proxy arp service
@@ -161,7 +160,6 @@ struct hdd_connection_info {
 	struct qdf_mac_addr peer_macaddr[MAX_PEERS];
 	enum csr_akm_type auth_type;
 	eCsrEncryptionType uc_encrypt_type;
-	eCsrEncryptionType mc_encrypt_type;
 	uint8_t is_authenticated;
 	uint32_t dot11mode;
 	uint8_t proxy_arp_service;
@@ -200,21 +198,29 @@ struct hdd_adapter;
 struct hdd_station_ctx;
 struct hdd_context;
 
-/**
- * hdd_is_connecting() - Function to check connection progress
- * @hdd_sta_ctx:    pointer to global HDD Station context
- *
- * Return: true if connecting, false otherwise
- */
-bool hdd_is_connecting(struct hdd_station_ctx *hdd_sta_ctx);
-
 /*
  * hdd_is_fils_connection: API to determine if connection is FILS
+ * @hdd_ctx: hdd context
  * @adapter: hdd adapter
  *
  * Return: true if fils connection else false
  */
-bool hdd_is_fils_connection(struct hdd_adapter *adapter);
+bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,
+			    struct hdd_adapter *adapter);
+
+/**
+ * hdd_conn_set_authenticated() - set authentication state
+ * @adapter: pointer to the adapter
+ * @auth_state: authentication state
+ *
+ * This function updates the global HDD station context
+ * authentication state. And to start auto powersave timer
+ * if ptk installed case and open security case.
+ *
+ * Return: none
+ */
+void
+hdd_conn_set_authenticated(struct hdd_adapter *adapter, uint8_t auth_state);
 
 /**
  * hdd_conn_set_connection_state() - set connection state
@@ -229,29 +235,13 @@ void hdd_conn_set_connection_state(struct hdd_adapter *adapter,
 				   eConnectionState conn_state);
 
 /**
- * hdd_conn_is_connected() - Function to check connection status
- * @sta_ctx:    pointer to global HDD Station context
- *
- * Return: false if any errors encountered, true otherwise
- */
-bool hdd_conn_is_connected(struct hdd_station_ctx *sta_ctx);
-
-/**
- * hdd_adapter_is_connected_sta() - check if @adapter is a connected station
- * @adapter: the adapter to check
- *
- * Return: true if @adapter is a connected station
- */
-bool hdd_adapter_is_connected_sta(struct hdd_adapter *adapter);
-
-/**
  * hdd_conn_get_connected_band() - get current connection radio band
- * @sta_ctx:    pointer to global HDD Station context
+ * @adapter: HDD adapter
  *
  * Return: BAND_2G or BAND_5G based on current AP connection
  *      BAND_ALL if not connected
  */
-enum band_info hdd_conn_get_connected_band(struct hdd_station_ctx *sta_ctx);
+enum band_info hdd_conn_get_connected_band(struct hdd_adapter *adapter);
 
 /**
  * hdd_get_sta_connection_in_progress() - get STA for which connection
@@ -289,6 +279,7 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 				 eRoamCmdStatus roam_status,
 				 eCsrRoamResult roam_result);
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * hdd_set_genie_to_csr() - set genie to csr
  * @adapter: pointer to adapter
@@ -299,6 +290,7 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 int hdd_set_genie_to_csr(struct hdd_adapter *adapter,
 			 enum csr_akm_type *rsn_auth_type);
 
+
 /**
  * hdd_set_csr_auth_type() - set csr auth type
  * @adapter: pointer to adapter
@@ -308,7 +300,7 @@ int hdd_set_genie_to_csr(struct hdd_adapter *adapter,
  */
 int hdd_set_csr_auth_type(struct hdd_adapter *adapter,
 			  enum csr_akm_type rsn_auth_type);
-
+#endif
 #ifdef FEATURE_WLAN_TDLS
 /**
  * hdd_roam_register_tdlssta() - register new TDLS station
@@ -370,9 +362,17 @@ QDF_STATUS hdd_update_dp_vdev_flags(void *cbk_data,
 				    uint32_t vdev_param,
 				    bool is_link_up);
 
+/**
+ * hdd_roam_register_sta() - register station
+ * @adapter: pointer to adapter
+ * @bssid: bssid of the connection
+ * @is_auth_required: is upper layer authenticatoin required
+ *
+ * Return: QDF_STATUS enumeration
+ */
 QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
-				 struct csr_roam_info *roam_info,
-				 struct bss_description *bss_desc);
+				 struct qdf_mac_addr *bssid,
+				 bool is_auth_required);
 
 /**
  * hdd_save_peer() - Save peer MAC address in adapter peer table.
@@ -397,10 +397,12 @@ bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
 void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
 		     struct qdf_mac_addr *peer_mac_addr);
 
+#ifndef FEATURE_CM_ENABLE
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS
 hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 			     const tSirMacAddr bssid, uint32_t ch_freq);
+
 /**
  * hdd_save_gtk_params() - Save GTK offload params
  * @adapter: HDD adapter
@@ -412,17 +414,18 @@ hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 void hdd_save_gtk_params(struct hdd_adapter *adapter,
 			 struct csr_roam_info *csr_roam_info, bool is_reassoc);
 #else
+static inline void hdd_save_gtk_params(struct hdd_adapter *adapter,
+				       struct csr_roam_info *csr_roam_info,
+				       bool is_reassoc)
+{
+}
 static inline QDF_STATUS
 hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 			     const tSirMacAddr bssid, uint32_t ch_freq)
 {
 	return QDF_STATUS_SUCCESS;
 }
-static inline void hdd_save_gtk_params(struct hdd_adapter *adapter,
-				       struct csr_roam_info *csr_roam_info,
-				       bool is_reassoc)
-{
-}
+#endif
 #endif
 
 /**
@@ -477,5 +480,129 @@ void hdd_roam_profile_init(struct hdd_adapter *adapter);
  * Return: True if there is any valid peer present
  */
 bool hdd_any_valid_peer_present(struct hdd_adapter *adapter);
+
+#ifdef FEATURE_CM_ENABLE
+/**
+ * hdd_cm_register_cb() - Sets legacy callbacks to osif
+ *
+ * API to set legacy callbacks to osif
+ * Context: Any context.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_cm_register_cb(void);
+
+/**
+ * void hdd_cm_unregister_cb(void)() - Resets legacy callbacks to osif
+ *
+ * API to reset legacy callbacks to osif
+ * Context: Any context.
+ *
+ * Return: QDF_STATUS
+ */
+
+void hdd_cm_unregister_cb(void);
+
+#else
+static inline QDF_STATUS hdd_cm_register_cb(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void hdd_cm_unregister_cb(void)
+{
+}
+#endif
+
+/**
+ * hdd_conn_remove_connect_info() - remove connection info
+ * @sta_ctx: pointer to global HDD station context
+ *
+ * Return: none
+ */
+void hdd_conn_remove_connect_info(struct hdd_station_ctx *sta_ctx);
+
+/**
+ * hdd_clear_roam_profile_ie() - Clear Roam Profile IEs
+ * @adapter: adapter who's IEs are to be cleared
+ *
+ * Return: None
+ */
+void hdd_clear_roam_profile_ie(struct hdd_adapter *adapter);
+
+/**
+ * hdd_remove_beacon_filter() - remove beacon filter
+ * @adapter: Pointer to the hdd adapter
+ *
+ * Return: 0 on success and errno on failure
+ */
+int hdd_remove_beacon_filter(struct hdd_adapter *adapter);
+
+/**
+ * hdd_copy_ht_operation()- copy HT operation element to
+ * hdd station context.
+ * @hdd_sta_ctx: pointer to hdd station context
+ * @ht_ops: pointer to ht operation
+ *
+ * Return: None
+ */
+void hdd_copy_ht_operation(struct hdd_station_ctx *hdd_sta_ctx,
+			   tDot11fIEHTInfo *ht_ops);
+
+/**
+ * hdd_copy_vht_operation()- copy VHT operations element to
+ * hdd station context.
+ * @hdd_sta_ctx: pointer to hdd station context
+ * @vht_ops: pointer to vht operation
+ *
+ * Return: None
+ */
+void hdd_copy_vht_operation(struct hdd_station_ctx *hdd_sta_ctx,
+			    tDot11fIEVHTOperation *vht_ops);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
+     defined(WLAN_FEATURE_11AX)
+/**
+ * hdd_copy_he_operation()- copy HE operations element to
+ * hdd station context.
+ * @hdd_sta_ctx: pointer to hdd station context
+ * @he_operation: pointer to he operation
+ *
+ * Return: None
+ */
+void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,
+			   tDot11fIEhe_op *he_operation);
+#else
+static inline void hdd_copy_he_operation(struct hdd_station_ctx *hdd_sta_ctx,
+					 tDot11fIEhe_op *he_operation)
+{
+}
+#endif
+
+/**
+ * hdd_is_roam_sync_in_progress()- Check if roam offloaded
+ * @hdd_ctx: Pointer to hdd context
+ * @vdev_id: Vdev id
+ *
+ * Return: roam sync status if roaming offloaded else false
+ */
+bool hdd_is_roam_sync_in_progress(struct hdd_context *hdd_ctx, uint8_t vdev_id);
+
+#ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * wlan_hdd_ft_set_key_delay() - hdd set key delayed for FT mode
+ * @mac_handle: mac handler
+ * @adapter: pointer to adapter context
+ *
+ * Return: void
+ */
+void
+wlan_hdd_ft_set_key_delay(mac_handle_t mac_handle, struct hdd_adapter *adapter);
+#else
+static inline void
+wlan_hdd_ft_set_key_delay(mac_handle_t mac_handle, struct hdd_adapter *adapter)
+{
+}
+#endif
 
 #endif

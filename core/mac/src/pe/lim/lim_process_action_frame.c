@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -52,6 +52,11 @@
 #include <cdp_txrx_peer_ops.h>
 #include "dot11f.h"
 #include "wlan_p2p_cfg_api.h"
+
+#define SA_QUERY_REQ_MIN_LEN \
+(DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
+#define SA_QUERY_RESP_MIN_LEN \
+(DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
 
 static last_processed_msg rrm_link_action_frm;
 
@@ -558,9 +563,23 @@ static void __lim_process_add_ts_rsp(struct mac_context *mac_ctx,
 				addts.tspec.tsinfo.traffic.userPrio);
 		}
 	}
+
 	pe_debug("Recv AddTsRsp: tsid: %d UP: %d status: %d",
 		addts.tspec.tsinfo.traffic.tsid,
 		addts.tspec.tsinfo.traffic.userPrio, addts.status);
+
+	/*
+	 * If AP sends ADD TS response for an AC with medium time as 0
+	 * treat it as ADD TS failure.
+	 */
+	if (!addts.tspec.mediumTime) {
+		pe_err("Medium Time 0! Add TS failed");
+		/*
+		 * Change the status to failure and fallthrough to send response
+		 * to SME to cleanup the flow.
+		 */
+		addts.status = STATUS_UNSPECIFIED_FAILURE;
+	}
 
 	/* deactivate the response timer */
 	lim_deactivate_and_change_timer(mac_ctx, eLIM_ADDTS_RSP_TIMER);
@@ -1211,7 +1230,6 @@ __lim_process_neighbor_report(struct mac_context *mac, uint8_t *pRxPacketInfo,
 }
 
 
-#ifdef WLAN_FEATURE_11W
 /**
  * limProcessSAQueryRequestActionFrame
  *
@@ -1248,8 +1266,8 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
 
-	if (frame_len < sizeof(struct sDot11fSaQueryReq)) {
-		pe_err("Invalid frame length");
+	if (frame_len < SA_QUERY_REQ_MIN_LEN) {
+		pe_err("Invalid frame length %d", frame_len);
 		return;
 	}
 	/* If this is an unprotected SA Query Request, then ignore it. */
@@ -1315,8 +1333,8 @@ static void __lim_process_sa_query_response_action_frame(struct mac_context *mac
 	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
 	pe_debug("SA Query Response received");
 
-	if (frame_len < sizeof(struct sDot11fSaQueryRsp)) {
-		pe_err("Invalid frame length");
+	if (frame_len < SA_QUERY_RESP_MIN_LEN) {
+		pe_err("Invalid frame length %d", frame_len);
 		return;
 	}
 	/* When a station, supplicant handles SA Query Response.
@@ -1371,9 +1389,7 @@ static void __lim_process_sa_query_response_action_frame(struct mac_context *mac
 			break;
 		}
 }
-#endif
 
-#ifdef WLAN_FEATURE_11W
 /**
  * lim_drop_unprotected_action_frame
  *
@@ -1416,7 +1432,6 @@ lim_drop_unprotected_action_frame(struct mac_context *mac, struct pe_session *pe
 
 	return false;
 }
-#endif
 
 /**
  * lim_process_addba_req() - process ADDBA Request
@@ -1468,6 +1483,8 @@ static void lim_process_addba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 				       &session->dph.dphHashTable);
 	if (sta_ds && lim_is_session_he_capable(session))
 		he_cap = lim_is_sta_he_capable(sta_ds);
+	if (sta_ds && sta_ds->staType == STA_ENTRY_NDI_PEER)
+		he_cap = lim_is_session_he_capable(session);
 
 	if (he_cap)
 		buff_size = MAX_BA_BUFF_SIZE;
@@ -1591,9 +1608,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 {
 	uint8_t *body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
 	tpSirMacActionFrameHdr action_hdr = (tpSirMacActionFrameHdr) body_ptr;
-#ifdef WLAN_FEATURE_11W
 	tpSirMacMgmtHdr mac_hdr_11w = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
-#endif
 	tpSirMacMgmtHdr mac_hdr = NULL;
 	int8_t rssi;
 	uint32_t frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
@@ -1608,12 +1623,10 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		return;
 	}
 
-#ifdef WLAN_FEATURE_11W
 	if (lim_is_robust_mgmt_action_frame(action_hdr->category) &&
 	   lim_drop_unprotected_action_frame(mac_ctx, session,
 			mac_hdr_11w, action_hdr->category))
 		return;
-#endif
 
 	switch (action_hdr->category) {
 	case ACTION_CATEGORY_QOS:
@@ -1766,8 +1779,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 	case ACTION_CATEGORY_RRM:
 		/* Ignore RRM measurement request until DHCP is set */
 		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
-		    mac_ctx->roam.roamSession
-		    [session->smeSessionId].dhcp_done) {
+		    mac_ctx->roam.roamSession[session->smeSessionId].dhcp_done) {
 			switch (action_hdr->actionID) {
 			case RRM_RADIO_MEASURE_REQ:
 				__lim_process_radio_measure_request(mac_ctx,
@@ -1804,8 +1816,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			/* Else we will just ignore the RRM messages. */
 			pe_debug("RRM frm ignored, it is disabled in cfg: %d or DHCP not completed: %d",
 			  mac_ctx->rrm.rrmPEContext.rrmEnable,
-			  mac_ctx->roam.roamSession
-			  [session->smeSessionId].dhcp_done);
+			  mac_ctx->roam.roamSession[session->smeSessionId].dhcp_done);
 		}
 		break;
 
@@ -1913,7 +1924,6 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		}
 		break;
 
-#ifdef WLAN_FEATURE_11W
 	case ACTION_CATEGORY_SA_QUERY:
 		pe_debug("SA Query Action category: %d action: %d",
 			action_hdr->category, action_hdr->actionID);
@@ -1936,7 +1946,7 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			break;
 		}
 		break;
-#endif
+
 	case ACTION_CATEGORY_VHT:
 		if (!session->vhtCapability)
 			break;

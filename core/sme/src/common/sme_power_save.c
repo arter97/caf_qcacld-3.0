@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -354,11 +354,20 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 	 * also if command is power save disable  there is not need to check
 	 * for connected state as firmware can handle this
 	 */
+	/* This is temp ifdef will be removed in near future */
+#ifdef FEATURE_CM_ENABLE
+	if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id)) {
+		sme_debug("STA not infra/connected state Session_id: %d",
+			  session_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+#else
 	if (!csr_is_conn_state_connected_infra(mac_ctx, session_id)) {
 		sme_debug("STA not infra/connected state Session_id: %d",
 			  session_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+#endif
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -392,7 +401,12 @@ QDF_STATUS sme_ps_enable_disable(mac_handle_t mac_handle, uint32_t session_id,
 		 * But kernel expects return status success even
 		 * in the disconnected state.
 		 */
+		/* This is temp ifdef will be removed in near future */
+#ifdef FEATURE_CM_ENABLE
+		if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id))
+#else
 		if (!csr_is_conn_state_connected_infra(mac_ctx, session_id))
+#endif
 			status = QDF_STATUS_SUCCESS;
 		return status;
 	}
@@ -617,7 +631,6 @@ QDF_STATUS sme_set_ps_host_offload(mac_handle_t mac_handle,
 	struct sir_host_offload_req *request_buf;
 	struct scheduler_msg msg = {0};
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, session_id);
 
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			"%s: IP address = %d.%d.%d.%d", __func__,
@@ -626,18 +639,17 @@ QDF_STATUS sme_set_ps_host_offload(mac_handle_t mac_handle,
 			request->params.hostIpv4Addr[2],
 			request->params.hostIpv4Addr[3]);
 
-	if (!session) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"%s: SESSION not Found", __func__);
-		return QDF_STATUS_E_FAILURE;
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("CSR session is invalid");
+		return QDF_STATUS_E_INVAL;
 	}
 
 	request_buf = qdf_mem_malloc(sizeof(struct sir_host_offload_req));
 	if (!request_buf)
 		return QDF_STATUS_E_NOMEM;
 
-	qdf_copy_macaddr(&request->bssid, &session->connectedProfile.bssid);
-
+	wlan_mlme_get_bssid_vdev_id(mac_ctx->pdev, session_id,
+				    &request->bssid);
 	qdf_mem_copy(request_buf, request, sizeof(struct sir_host_offload_req));
 
 	msg.type = WMA_SET_HOST_OFFLOAD;
@@ -675,14 +687,14 @@ QDF_STATUS sme_set_ps_ns_offload(mac_handle_t mac_handle,
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct sir_host_offload_req *request_buf;
 	struct scheduler_msg msg = {0};
-	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, session_id);
 
-	if (!session) {
-		sme_err("Session not found");
-		return QDF_STATUS_E_FAILURE;
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("CSR session is invalid");
+		return QDF_STATUS_E_INVAL;
 	}
 
-	qdf_copy_macaddr(&request->bssid, &session->connectedProfile.bssid);
+	wlan_mlme_get_bssid_vdev_id(mac_ctx->pdev, session_id,
+				    &request->bssid);
 
 	request_buf = qdf_mem_malloc(sizeof(*request_buf));
 	if (!request_buf)

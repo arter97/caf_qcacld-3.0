@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -254,6 +254,7 @@
 
 /* Association/Reassociation offsets */
 #define SIR_MAC_REASSOC_REQ_SSID_OFFSET      10
+#define SIR_MAC_ASSOC_RSP_STATUS_CODE_OFFSET 2
 
 /* Association Request offsets */
 #define SIR_MAC_ASSOC_REQ_SSID_OFFSET        4
@@ -854,12 +855,6 @@ typedef struct sSirMacCfParamSetIE {
 	tSirMacCfParamSet cfParams;
 } qdf_packed tSirMacCfParamSetIE;
 
-typedef struct sSirMacChanInfo {
-	uint32_t first_freq;
-	uint8_t numChannels;
-	int8_t maxTxPower;
-} qdf_packed tSirMacChanInfo;
-
 typedef struct sSirMacNonErpPresentIE {
 	uint8_t type;
 	uint8_t length;
@@ -1368,7 +1363,6 @@ typedef struct sSirMacBeaconReport {
 
 } tSirMacBeaconReport, *tpSirMacBeaconReport;
 
-#define RADIO_REPORTS_MAX_IN_A_FRAME 7
 typedef struct sSirMacRadioMeasureReport {
 	uint8_t token;
 	uint8_t refused;

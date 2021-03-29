@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -127,7 +127,8 @@ static void lim_extract_he_op(struct pe_session *session,
 		session->he_op.oper_info_6g.info.center_freq_seg0;
 	session->ch_center_freq_seg1 =
 		session->he_op.oper_info_6g.info.center_freq_seg1;
-
+	session->ap_power_type =
+		session->he_op.oper_info_6g.info.reg_info;
 	pe_debug("6G op info: ch_wd %d cntr_freq_seg0 %d cntr_freq_seg1 %d",
 		 session->ch_width, session->ch_center_freq_seg0,
 		 session->ch_center_freq_seg1);
@@ -255,12 +256,34 @@ void lim_update_he_bw_cap_mcs(struct pe_session *session,
 							HE_MCS_ALL_DISABLED;
 	}
 }
+
+void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id, uint16_t he_mcs_12_13_map)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("vdev not found for id: %d", vdev_id);
+		return;
+	}
+	wlan_vdev_obj_lock(vdev);
+	wlan_vdev_mlme_set_he_mcs_12_13_map(vdev, he_mcs_12_13_map);
+	wlan_vdev_obj_unlock(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
 #else
 static inline void lim_extract_he_op(struct pe_session *session,
 		tSirProbeRespBeacon *beacon_struct)
 {}
 static void lim_check_is_he_mcs_valid(struct pe_session *session,
 				      tSirProbeRespBeacon *beacon_struct)
+{
+}
+
+void lim_update_he_mcs_12_13_map(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id, uint16_t he_mcs_12_13_map)
 {
 }
 #endif
@@ -353,7 +376,8 @@ static void lim_check_peer_ldpc_and_update(struct pe_session *session,
 void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 			       uint16_t ie_len, uint8_t *qos_cap,
 			       uint8_t *uapsd, int8_t *local_constraint,
-			       struct pe_session *session)
+			       struct pe_session *session,
+			       bool *is_pwr_constraint)
 {
 	tSirProbeRespBeacon *beacon_struct;
 	uint8_t ap_bcon_ch_width;
@@ -374,9 +398,11 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 
 	*qos_cap = 0;
 	*uapsd = 0;
+#ifndef FEATURE_CM_ENABLE
 	pe_debug("The IE's being received:");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 			   p_ie, ie_len);
+#endif
 	if (sir_parse_beacon_ie(mac_ctx, beacon_struct, p_ie,
 		(uint32_t) ie_len) != QDF_STATUS_SUCCESS) {
 		pe_err("sir_parse_beacon_ie failed to parse beacon");
@@ -581,12 +607,14 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 
 	if (mac_ctx->mlme_cfg->sta.allow_tpc_from_ap) {
 		if (beacon_struct->powerConstraintPresent) {
-			*local_constraint -=
+			*local_constraint =
 				beacon_struct->localPowerConstraint.
 					localPowerConstraints;
+			*is_pwr_constraint = true;
 		} else {
 			get_local_power_constraint_probe_response(
 				beacon_struct, local_constraint, session);
+			*is_pwr_constraint = false;
 		}
 	}
 

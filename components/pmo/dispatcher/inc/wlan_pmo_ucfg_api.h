@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1138,6 +1138,66 @@ static inline bool ucfg_pmo_is_apf_enabled(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+#ifdef WLAN_ENABLE_GPIO_WAKEUP
+/**
+ * ucfg_pmo_get_enable_gpio_wakeup() - to get gpio wakeup enable configuration
+ * @psoc: objmgr psoc handle
+ *
+ * Return: gpio wakeup enable configuration
+ */
+bool ucfg_pmo_is_gpio_wakeup_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_gpio_wakeup_pin() - to get gpio wakeup pin number
+ * @psoc: objmgr psoc handle
+ *
+ * Return: gpio wakeup pin number
+ */
+uint32_t ucfg_pmo_get_gpio_wakeup_pin(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_gpio_wakeup_mode() - to get gpio wakeup interrupt mode
+ * @psoc: objmgr psoc handle
+ *
+ * Return: gpio wakeup mode
+ */
+enum pmo_gpio_wakeup_mode
+ucfg_pmo_get_gpio_wakeup_mode(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+ucfg_pmo_is_gpio_wakeup_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+static inline uint32_t
+ucfg_pmo_get_gpio_wakeup_pin(struct wlan_objmgr_psoc *psoc)
+{
+	return 0;
+}
+
+static inline enum pmo_gpio_wakeup_mode
+ucfg_pmo_get_gpio_wakeup_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return PMO_GPIO_WAKEUP_MODE_INVALID;
+}
+#endif
+
+/**
+ * ucfg_pmo_core_txrx_suspend(): suspends TX/RX
+ * @psoc: objmgr psoc
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS ucfg_pmo_core_txrx_suspend(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_core_txrx_resume(): resumes TX/RX
+ * @psoc: objmgr psoc
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS ucfg_pmo_core_txrx_resume(struct wlan_objmgr_psoc *psoc);
 #else /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 static inline QDF_STATUS
 ucfg_pmo_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -1787,6 +1847,16 @@ ucfg_pmo_get_active_mc_bc_apf_mode(struct wlan_objmgr_psoc *psoc)
 {
 	return 0;
 }
+
+QDF_STATUS ucfg_pmo_core_txrx_suspend(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ucfg_pmo_core_txrx_resume(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
@@ -1982,4 +2052,25 @@ ucfg_pmo_get_runtime_pm_delay(struct wlan_objmgr_psoc *psoc)
  */
 bool
 ucfg_pmo_get_enable_sap_suspend(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_sap_mode_bus_suspend() - get PMO config for PCIe bus
+ * suspend in SAP mode with one or more clients
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool
+ */
+bool
+ucfg_pmo_get_sap_mode_bus_suspend(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_go_mode_bus_suspend() - get PMO config for PCIe bus
+ * suspend in P2PGO mode with one or more clients
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool
+ */
+bool
+ucfg_pmo_get_go_mode_bus_suspend(struct wlan_objmgr_psoc *psoc);
+
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

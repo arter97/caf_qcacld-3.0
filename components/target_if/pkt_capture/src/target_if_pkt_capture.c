@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -175,17 +175,22 @@ target_if_register_mgmt_data_offload_event(struct wlan_objmgr_psoc *psoc)
 	}
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 
-	if (ucfg_pkt_capture_get_mode(psoc) &&
+	if (!wmi_handle) {
+		pkt_capture_err("wmi_handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if ((ucfg_pkt_capture_get_mode(psoc) != PACKET_CAPTURE_MODE_DISABLE) &&
 	    wmi_service_enabled(wmi_handle,
 				wmi_service_packet_capture_support)) {
-		uint8_t status;
+		QDF_STATUS status;
 
 		status = wmi_unified_register_event_handler(
 				wmi_handle,
 				wmi_mgmt_offload_data_event_id,
 				target_if_mgmt_offload_data_event_handler,
 				WMI_RX_WORK_CTX);
-		if (status) {
+		if (QDF_IS_STATUS_ERROR(status)) {
 			pkt_capture_err("Failed to register MGMT offload handler");
 			return QDF_STATUS_E_FAILURE;
 		}

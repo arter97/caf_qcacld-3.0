@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -171,6 +171,24 @@ static void wlan_pmo_ra_filtering_init_cfg(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_ENABLE_GPIO_WAKEUP
+static void wlan_pmo_gpio_wakeup_init_cfg(struct wlan_objmgr_psoc *psoc,
+					  struct pmo_psoc_cfg *psoc_cfg)
+{
+	psoc_cfg->enable_gpio_wakeup =
+		cfg_get(psoc, CFG_PMO_ENABLE_GPIO_WAKEUP);
+	psoc_cfg->gpio_wakeup_pin =
+		cfg_get(psoc, CFG_PMO_GPIO_WAKEUP_PIN);
+	psoc_cfg->gpio_wakeup_mode =
+		cfg_get(psoc, CFG_PMO_GPIO_WAKEUP_MODE);
+}
+#else
+static void wlan_pmo_gpio_wakeup_init_cfg(struct wlan_objmgr_psoc *psoc,
+					  struct pmo_psoc_cfg *psoc_cfg)
+{
+}
+#endif
+
 static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct pmo_psoc_cfg *psoc_cfg)
 {
@@ -186,8 +204,13 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 	psoc_cfg->sta_mod_dtim = cfg_get(psoc, CFG_PMO_ENABLE_MODULATED_DTIM);
 	psoc_cfg->enable_mc_list = cfg_get(psoc, CFG_PMO_MC_ADDR_LIST_ENABLE);
 	psoc_cfg->power_save_mode = cfg_get(psoc, CFG_PMO_POWERSAVE_MODE);
+	psoc_cfg->sta_forced_dtim = cfg_get(psoc, CFG_PMO_ENABLE_FORCED_DTIM);
 	psoc_cfg->is_mod_dtim_on_sys_suspend_enabled =
 			cfg_get(psoc, CFG_PMO_MOD_DTIM_ON_SYS_SUSPEND);
+	psoc_cfg->is_bus_suspend_enabled_in_sap_mode =
+		cfg_get(psoc, CFG_ENABLE_BUS_SUSPEND_IN_SAP_MODE);
+	psoc_cfg->is_bus_suspend_enabled_in_go_mode =
+		cfg_get(psoc, CFG_ENABLE_BUS_SUSPEND_IN_GO_MODE);
 	psoc_cfg->default_power_save_mode = psoc_cfg->power_save_mode;
 	psoc_cfg->max_ps_poll = cfg_get(psoc, CFG_PMO_MAX_PS_POLL);
 
@@ -212,6 +235,7 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_ACTIVE_MC_BC_APF_MODE);
 	psoc_cfg->ito_repeat_count = cfg_get(psoc, CFG_ITO_REPEAT_COUNT);
 	wlan_pmo_ra_filtering_init_cfg(psoc, psoc_cfg);
+	wlan_pmo_gpio_wakeup_init_cfg(psoc, psoc_cfg);
 }
 
 QDF_STATUS pmo_psoc_open(struct wlan_objmgr_psoc *psoc)

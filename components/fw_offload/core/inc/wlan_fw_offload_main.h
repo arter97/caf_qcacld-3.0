@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 - 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012 - 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -197,7 +197,9 @@ struct wlan_fwol_neighbor_report_cfg {
  * @enable_fw_log_level: Set the FW log level
  * @enable_fw_log_type: Set the FW log type
  * @enable_fw_module_log_level: enable fw module log level
- * @enable_fw_module_log_level_num: enablefw module log level num
+ * @enable_fw_module_log_level_num: enable fw module log level num
+ * @enable_fw_mod_wow_log_level: enable fw wow module log level
+ * @enable_fw_mod_wow_log_level_num: enable fw wow module log level num
  * @sap_xlna_bypass: bypass SAP xLNA
  * @is_rate_limit_enabled: Enable/disable RA rate limited
  * @tsf_gpio_pin: TSF GPIO Pin config
@@ -213,6 +215,8 @@ struct wlan_fwol_neighbor_report_cfg {
  * @dhcp_max_num_clients: Max number of DHCP client supported
  * @dwelltime_params: adaptive dwell time parameters
  * @enable_ilp: ILP HW block configuration
+ * @sap_sho: SAP SHO HW offload configuration
+ * @disable_hw_assist: Flag to configure HW assist feature in FW
  */
 struct wlan_fwol_cfg {
 	/* Add CFG and INI items here */
@@ -235,6 +239,8 @@ struct wlan_fwol_cfg {
 	uint16_t enable_fw_log_type;
 	uint8_t enable_fw_module_log_level[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
 	uint8_t enable_fw_module_log_level_num;
+	uint8_t enable_fw_mod_wow_log_level[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
+	uint8_t enable_fw_mod_wow_log_level_num;
 	bool sap_xlna_bypass;
 #ifdef FEATURE_WLAN_RA_FILTERING
 	bool is_rate_limit_enabled;
@@ -263,7 +269,17 @@ struct wlan_fwol_cfg {
 	uint32_t dhcp_max_num_clients;
 #endif
 	struct adaptive_dwelltime_params dwelltime_params;
-	bool enable_ilp;
+	uint32_t enable_ilp;
+	uint32_t sap_sho;
+	bool disable_hw_assist;
+};
+
+/**
+ * struct wlan_fwol_thermal_throttle_info - FW offload thermal throttle info
+ * @level: thermal throttle level
+ */
+struct wlan_fwol_thermal_throttle_info {
+	enum thermal_throttle_level level;
 };
 
 /**
@@ -272,12 +288,18 @@ struct wlan_fwol_cfg {
  * @cbs:     callback functions
  * @tx_ops: tx operations for target interface
  * @rx_ops: rx operations for target interface
+ * @thermal_throttle: cached target thermal stats information
+ * @thermal_cbs: thermal notification callbacks to hdd layer
  */
 struct wlan_fwol_psoc_obj {
 	struct wlan_fwol_cfg cfg;
 	struct wlan_fwol_callbacks cbs;
 	struct wlan_fwol_tx_ops tx_ops;
 	struct wlan_fwol_rx_ops rx_ops;
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+	struct wlan_fwol_thermal_throttle_info thermal_throttle;
+	struct fwol_thermal_callbacks thermal_cbs;
+#endif
 };
 
 /**
@@ -379,10 +401,34 @@ fwol_set_adaptive_dwelltime_config(
 /**
  * fwol_set_ilp_config() - API to set ILP HW block config
  * @pdev: pointer to the pdev object
- * @enable_ilp: enable/disable config for ILP
+ * @enable_ilp: ILP HW block configuration with various options
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS fwol_set_ilp_config(struct wlan_objmgr_pdev *pdev,
-			       bool enable_ilp);
+			       uint32_t enable_ilp);
+
+/**
+ * fwol_set_sap_sho() - API to set SAP SHO config
+ * @psoc: pointer to the psoc object
+ * @vdev_id: vdev id
+ * @sap_sho: enable/disable config for SAP SHO
+ * SHO- SoftAP hardware offload – When enabled the beacon/probe resp
+ * will be offloaded to HW.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS fwol_set_sap_sho(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    uint32_t sap_sho);
+
+/**
+ * fwol_configure_hw_assist() - API to configure HW assist feature in FW
+ * @pdev: pointer to the pdev object
+ * @disable_he_assist: Flag to enable/disable HW assist feature
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS fwol_configure_hw_assist(struct wlan_objmgr_pdev *pdev,
+				    bool disable_hw_assist);
+
 #endif

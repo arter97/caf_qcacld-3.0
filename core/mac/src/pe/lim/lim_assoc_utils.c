@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -378,46 +378,15 @@ QDF_STATUS lim_del_sta_all(struct mac_context *mac,
 	return status;
 }
 
-/**
- * lim_cleanup_rx_path()
- *
- ***FUNCTION:
- * This function is called to cleanup STA state at SP & RFP.
- *
- ***LOGIC:
- * To circumvent RFP's handling of dummy packet when it does not
- * have an incomplete packet for the STA to be deleted, a packet
- * with 'more framgents' bit set will be queued to RFP's WQ before
- * queuing 'dummy packet'.
- * A 'dummy' BD is pushed into RFP's WQ with type=00, subtype=1010
- * (Disassociation frame) and routing flags in BD set to eCPU's
- * Low Priority WQ.
- * RFP cleans up its local context for the STA id mentioned in the
- * BD and then pushes BD to eCPU's low priority WQ.
- *
- ***ASSUMPTIONS:
- * NA
- *
- ***NOTE:
- * NA
- *
- * @param mac    Pointer to Global MAC structure
- * @param sta  Pointer to the per STA data structure
- *                initialized by LIM and maintained at DPH
- *
- * @return None
- */
-
 QDF_STATUS
 lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
-		    struct pe_session *pe_session)
+		    struct pe_session *pe_session, bool delete_peer)
 {
 	QDF_STATUS retCode = QDF_STATUS_SUCCESS;
 
-	pe_debug("Cleanup Rx Path for AID: %d"
-		"pe_session->limSmeState: %d, mlmState: %d",
-		sta->assocId, pe_session->limSmeState,
-		sta->mlmStaContext.mlmState);
+	pe_debug("Cleanup Rx Path for AID: %d limSmeState: %d, mlmState: %d, delete_peer %d",
+		 sta->assocId, pe_session->limSmeState,
+		 sta->mlmStaContext.mlmState, delete_peer);
 
 	pe_session->isCiscoVendorAP = false;
 
@@ -441,9 +410,8 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
 			 * Release our assigned AID back to the free pool
 			 */
 			if (LIM_IS_AP_ROLE(pe_session)) {
-				lim_del_sta(mac, sta, false, pe_session);
-				lim_release_peer_idx(mac, sta->assocId,
-						     pe_session);
+				lim_del_sta(mac, sta, true, pe_session);
+				return retCode;
 			}
 			lim_delete_dph_hash_entry(mac, sta->staAddr,
 						  sta->assocId, pe_session);
@@ -462,7 +430,7 @@ lim_cleanup_rx_path(struct mac_context *mac, tpDphHashNode sta,
 	sta->valid = 0;
 	lim_send_sme_tsm_ie_ind(mac, pe_session, 0, 0, 0);
 	/* Any roaming related changes should be above this line */
-	if (lim_is_roam_synch_in_progress(mac->psoc, pe_session))
+	if (!delete_peer)
 		return QDF_STATUS_SUCCESS;
 
 	sta->mlmStaContext.mlmState = eLIM_MLM_WT_DEL_STA_RSP_STATE;
@@ -744,7 +712,7 @@ lim_reject_association(struct mac_context *mac_ctx, tSirMacAddr peer_addr,
 	sta_ds->mlmStaContext.cleanupTrigger = eLIM_REASSOC_REJECT;
 
 	/* Receive path cleanup */
-	lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry);
+	lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry, true);
 
 	/*
 	 * Send Re/Association Response with
@@ -1332,12 +1300,14 @@ QDF_STATUS lim_populate_vht_mcs_set(struct mac_context *mac_ctx,
 		}
 	}
 
-	rates->vhtTxHighestDataRate =
-		QDF_MIN(rates->vhtTxHighestDataRate,
-			peer_vht_caps->txSupDataRate);
-	rates->vhtRxHighestDataRate =
-		QDF_MIN(rates->vhtRxHighestDataRate,
-			peer_vht_caps->rxHighSupDataRate);
+	if (peer_vht_caps->txSupDataRate)
+		rates->vhtTxHighestDataRate =
+			QDF_MIN(rates->vhtTxHighestDataRate,
+				peer_vht_caps->txSupDataRate);
+	if (peer_vht_caps->rxHighSupDataRate)
+		rates->vhtRxHighestDataRate =
+			QDF_MIN(rates->vhtRxHighestDataRate,
+				peer_vht_caps->rxHighSupDataRate);
 
 	if (session_entry && session_entry->nss == NSS_2x2_MODE)
 		mcs_map_mask2x2 = MCSMAPMASK2x2;
@@ -1782,7 +1752,11 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 	if (IS_DOT11_MODE_HE(pe_session->dot11mode) && he_caps) {
 		lim_calculate_he_nss(pRates, pe_session);
 	} else if (pe_session->vhtCapability) {
-		if ((pRates->vhtRxMCSMap & MCSMAPMASK2x2) == MCSMAPMASK2x2)
+		/*
+		 * pRates->vhtTxMCSMap is intersection of self tx and peer rx
+		 * mcs so update nss as per peer rx mcs
+		 */
+		if ((pRates->vhtTxMCSMap & MCSMAPMASK2x2) == MCSMAPMASK2x2)
 			pe_session->nss = NSS_1x1_MODE;
 	} else if (pRates->supportedMCSSet[1] == 0) {
 		pe_session->nss = NSS_1x1_MODE;
@@ -2108,6 +2082,10 @@ static void lim_update_he_mcs_12_13(tpAddStaParams add_sta_params,
 		add_sta_params->he_mcs_12_13_map = sta_ds->he_mcs_12_13_map;
 }
 
+static bool lim_is_add_sta_params_he_capable(tpAddStaParams add_sta_params)
+{
+	return add_sta_params->he_capable;
+}
 #else
 static void lim_update_he_stbc_capable(tpAddStaParams add_sta_params)
 {}
@@ -2115,7 +2093,29 @@ static void lim_update_he_stbc_capable(tpAddStaParams add_sta_params)
 static void lim_update_he_mcs_12_13(tpAddStaParams add_sta_params,
 				    tpDphHashNode sta_ds)
 {}
+
+static bool lim_is_add_sta_params_he_capable(tpAddStaParams add_sta_params)
+{
+	return false;
+}
 #endif
+
+#ifdef FEATURE_WLAN_TDLS
+#ifdef WLAN_FEATURE_11AX
+static void lim_add_tdls_sta_he_config(tpAddStaParams add_sta_params,
+				       tpDphHashNode sta_ds)
+{
+	pe_debug("Adding tdls he capabilities");
+	qdf_mem_copy(&add_sta_params->he_config, &sta_ds->he_config,
+		     sizeof(add_sta_params->he_config));
+}
+#else
+static void lim_add_tdls_sta_he_config(tpAddStaParams add_sta_params,
+				       tpDphHashNode sta_ds)
+{
+}
+#endif /* WLAN_FEATURE_11AX */
+#endif /* FEATURE_WLAN_TDLS */
 
 /**
  * lim_add_sta()- called to add an STA context at hardware
@@ -2393,6 +2393,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 		pe_debug("Sta type is TDLS_PEER, ht_caps: 0x%x, vht_caps: 0x%x",
 			  add_sta_params->ht_caps,
 			  add_sta_params->vht_caps);
+		lim_add_tdls_sta_he_config(add_sta_params, sta_ds);
 	}
 #endif
 
@@ -2432,10 +2433,8 @@ lim_add_sta(struct mac_context *mac_ctx,
 		pe_debug("uAPSD = 0x%x, maxSpLen = %d",
 			add_sta_params->uAPSD, add_sta_params->maxSPLen);
 	}
-#ifdef WLAN_FEATURE_11W
 	add_sta_params->rmfEnabled = sta_ds->rmfEnabled;
 	pe_debug("PMF enabled %d", add_sta_params->rmfEnabled);
-#endif
 
 	pe_debug("htLdpcCapable: %d vhtLdpcCapable: %d "
 			"p2pCapableSta: %d",
@@ -2456,7 +2455,8 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 	add_sta_params->nwType = session_entry->nwType;
 
-	if (!(add_sta_params->htCapable || add_sta_params->vhtCapable)) {
+	if (!(add_sta_params->htCapable || add_sta_params->vhtCapable ||
+	    lim_is_add_sta_params_he_capable(add_sta_params))) {
 		nw_type_11b = 1;
 		for (i = 0; i < SIR_NUM_11A_RATES; i++) {
 			if (sirIsArate(sta_ds->supportedRates.llaRates[i] &
@@ -2469,7 +2469,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 			add_sta_params->nwType = eSIR_11B_NW_TYPE;
 	}
 
-	if (add_sta_params->htCapable && session_entry->ht_config.ht_tx_stbc) {
+	if (add_sta_params->htCapable && session_entry->ht_config.tx_stbc) {
 		struct sDot11fIEHTCaps *ht_caps = (struct sDot11fIEHTCaps *)
 			&add_sta_params->ht_caps;
 		if (ht_caps->rxSTBC)
@@ -2751,8 +2751,10 @@ lim_add_sta_self(struct mac_context *mac, uint8_t updateSta,
 		pAddStaParams->maxAmpduSize =
 			lim_get_ht_capability(mac, eHT_MAX_RX_AMPDU_FACTOR,
 					      pe_session);
-		pAddStaParams->fShortGI20Mhz = pe_session->ht_config.ht_sgi20;
-		pAddStaParams->fShortGI40Mhz = pe_session->ht_config.ht_sgi40;
+		pAddStaParams->fShortGI20Mhz =
+			pe_session->ht_config.short_gi_20_mhz;
+		pAddStaParams->fShortGI40Mhz =
+			pe_session->ht_config.short_gi_40_mhz;
 	}
 	pAddStaParams->vhtCapable = pe_session->vhtCapability;
 	if (pAddStaParams->vhtCapable)
@@ -2963,14 +2965,12 @@ lim_delete_dph_hash_entry(struct mac_context *mac_ctx, tSirMacAddr sta_addr,
 
 		lim_obss_send_detection_cfg(mac_ctx, session_entry, false);
 
-#ifdef WLAN_FEATURE_11W
 		if (sta_ds->rmfEnabled) {
 			pe_debug("delete pmf timer assoc-id:%d sta mac "
 				 QDF_MAC_ADDR_FMT, sta_ds->assocId,
 				 QDF_MAC_ADDR_REF(sta_ds->staAddr));
 			tx_timer_delete(&sta_ds->pmfSaQueryTimer);
 		}
-#endif
 	}
 
 	if (dph_delete_hash_entry(mac_ctx, sta_addr, sta_id,
@@ -3505,6 +3505,14 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		lim_add_bss_he_cap(pAddBssParams, pAssocRsp);
 		lim_add_bss_he_cfg(pAddBssParams, pe_session);
 	}
+	if (pAssocRsp->bss_max_idle_period.present) {
+		pAddBssParams->bss_max_idle_period =
+			pAssocRsp->bss_max_idle_period.max_idle_period;
+		pe_debug("bss_max_idle_period %d",
+			 pAddBssParams->bss_max_idle_period);
+	} else {
+		pAddBssParams->bss_max_idle_period = 0;
+	}
 	/*
 	 * Populate the STA-related parameters here
 	 * Note that the STA here refers to the AP
@@ -3541,7 +3549,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	if (IS_DOT11_MODE_HT(pe_session->dot11mode)
 			&& pBeaconStruct->HTCaps.present) {
 		pAddBssParams->staContext.htCapable = 1;
-		if (pe_session->ht_config.ht_tx_stbc)
+		if (pe_session->ht_config.tx_stbc)
 			pAddBssParams->staContext.stbc_capable =
 				pAssocRsp->HTCaps.rxSTBC;
 
@@ -3637,14 +3645,14 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		 * values are set as 0 in session entry then we will
 		 * hardcode this values to 0.
 		 */
-		if (pe_session->ht_config.ht_sgi20) {
+		if (pe_session->ht_config.short_gi_20_mhz) {
 			pAddBssParams->staContext.fShortGI20Mhz =
 				(uint8_t)pAssocRsp->HTCaps.shortGI20MHz;
 		} else {
 			pAddBssParams->staContext.fShortGI20Mhz = false;
 		}
 
-		if (pe_session->ht_config.ht_sgi40) {
+		if (pe_session->ht_config.short_gi_40_mhz) {
 			pAddBssParams->staContext.fShortGI40Mhz =
 				(uint8_t) pAssocRsp->HTCaps.shortGI40MHz;
 		} else {
@@ -3755,12 +3763,10 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	if (QDF_P2P_CLIENT_MODE == pe_session->opmode)
 		pAddBssParams->staContext.p2pCapableSta = 1;
 
-#ifdef WLAN_FEATURE_11W
 	if (pe_session->limRmfEnabled) {
 		pAddBssParams->rmfEnabled = 1;
 		pAddBssParams->staContext.rmfEnabled = 1;
 	}
-#endif
 
 	/* Set a new state for MLME */
 	if (eLIM_MLM_WT_ASSOC_RSP_STATE == pe_session->limMlmState)
@@ -3997,13 +4003,13 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 		 * from AP supports. If these values are set as 0 in ini file
 		 * then we will hardcode this values to 0.
 		 */
-		if (pe_session->ht_config.ht_sgi20)
+		if (pe_session->ht_config.short_gi_20_mhz)
 			pAddBssParams->staContext.fShortGI20Mhz =
 				(uint8_t)pBeaconStruct->HTCaps.shortGI20MHz;
 		else
 			pAddBssParams->staContext.fShortGI20Mhz = false;
 
-		if (pe_session->ht_config.ht_sgi40)
+		if (pe_session->ht_config.short_gi_40_mhz)
 			pAddBssParams->staContext.fShortGI40Mhz =
 				(uint8_t) pBeaconStruct->HTCaps.shortGI40MHz;
 		else
@@ -4067,12 +4073,10 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 	pAddBssParams->staContext.smesessionId = pe_session->smeSessionId;
 	pAddBssParams->staContext.sessionId = pe_session->peSessionId;
 
-#ifdef WLAN_FEATURE_11W
 	if (pe_session->limRmfEnabled) {
 		pAddBssParams->rmfEnabled = 1;
 		pAddBssParams->staContext.rmfEnabled = 1;
 	}
-#endif
 	/* Set a new state for MLME */
 	pe_session->limMlmState = eLIM_MLM_WT_ADD_BSS_RSP_PREASSOC_STATE;
 
@@ -4330,7 +4334,6 @@ void lim_fill_rx_highest_supported_rate(struct mac_context *mac,
 	return;
 }
 
-#ifdef WLAN_FEATURE_11W
 /** -------------------------------------------------------------
    \fn     lim_send_sme_unprotected_mgmt_frame_ind
    \brief  Forwards the unprotected management frame to SME.
@@ -4369,7 +4372,6 @@ void lim_send_sme_unprotected_mgmt_frame_ind(struct mac_context *mac, uint8_t fr
 	lim_sys_process_mmh_msg_api(mac, &mmhMsg);
 	return;
 }
-#endif
 
 #ifdef FEATURE_WLAN_ESE
 void lim_send_sme_tsm_ie_ind(struct mac_context *mac,
@@ -4405,7 +4407,7 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 					  uint16_t deauth_disassoc_frame_len)
 {
 	uint16_t reason_code, ie_offset;
-	struct wlan_ies ie;
+	struct element_info ie;
 
 	if (!session) {
 		pe_err("NULL session");
@@ -4418,7 +4420,7 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	if (!deauth_disassoc_frame || deauth_disassoc_frame_len <= ie_offset)
 		return;
 
-	ie.data = deauth_disassoc_frame + ie_offset;
+	ie.ptr = deauth_disassoc_frame + ie_offset;
 	ie.len = deauth_disassoc_frame_len - ie_offset;
 
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);

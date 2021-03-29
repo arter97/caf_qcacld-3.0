@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -277,13 +277,20 @@ typedef enum {
 #define CFG_PROPAGATION_DELAY_BASE             (64)
 #define CFG_AGG_RETRY_MIN                      (5)
 
+#define CFG_NO_SUPPORT_UL_MUMIMO		(0)
+#define CFG_FULL_BW_SUPPORT_UL_MUMIMO		(1)
+#define CFG_PARTIAL_BW_SUPPORT_UL_MUMIMO	(2)
+#define CFG_FULL_PARTIAL_BW_SUPPORT_UL_MUMIMO	(3)
+
 #define PCL_CHANNEL_SUPPORT_GO			BIT(0)
 #define PCL_CHANNEL_SUPPORT_CLI			BIT(1)
 #define PCL_CHANNEL_EXCLUDE_IN_GO_NEG		BIT(3)
 
+#ifndef FEATURE_CM_ENABLE
 struct cfg80211_bss *
 wlan_hdd_cfg80211_update_bss_db(struct hdd_adapter *adapter,
 				struct csr_roam_info *roam_info);
+#endif
 
 #define CONNECTIVITY_CHECK_SET_ARP \
 	QCA_WLAN_VENDOR_CONNECTIVITY_CHECK_SET_ARP
@@ -313,6 +320,8 @@ wlan_hdd_wifi_test_config_policy[
 #define CSA_IGNORE 1
 #define SA_QUERY_TIMEOUT_DEFAULT 0
 #define SA_QUERY_TIMEOUT_IGNORE 1
+#define FILS_DISCV_FRAMES_DISABLE 0
+#define FILS_DISCV_FRAMES_ENABLE 1
 
 #define FEATURE_VENDOR_SUBCMD_WIFI_TEST_CONFIGURATION                    \
 {                                                                        \
@@ -330,12 +339,11 @@ wlan_hdd_wifi_test_config_policy[
 int wlan_hdd_cfg80211_pmksa_candidate_notify(struct hdd_adapter *adapter,
 					struct csr_roam_info *roam_info,
 					int index, bool preauth);
-
+#ifndef FEATURE_CM_ENABLE
 #ifdef FEATURE_WLAN_LFR_METRICS
 QDF_STATUS
 wlan_hdd_cfg80211_roam_metrics_preauth(struct hdd_adapter *adapter,
 				       struct csr_roam_info *roam_info);
-
 QDF_STATUS
 wlan_hdd_cfg80211_roam_metrics_preauth_status(struct hdd_adapter *adapter,
 					      struct csr_roam_info *roam_info,
@@ -344,6 +352,7 @@ wlan_hdd_cfg80211_roam_metrics_preauth_status(struct hdd_adapter *adapter,
 QDF_STATUS
 wlan_hdd_cfg80211_roam_metrics_handover(struct hdd_adapter *adapter,
 					struct csr_roam_info *roam_info);
+#endif
 #endif
 
 extern const struct nla_policy
@@ -483,7 +492,7 @@ int wlan_hdd_send_hang_reason_event(struct hdd_context *hdd_ctx,
 				    size_t data_len);
 
 int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
-				      uint8_t op_chan);
+				      qdf_freq_t op_freq);
 
 /**
  * wlan_hdd_rso_cmd_status_cb() - HDD callback to read RSO command status
@@ -498,6 +507,7 @@ int wlan_hdd_send_avoid_freq_for_dnbs(struct hdd_context *hdd_ctx,
 void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
 				struct rso_cmd_status *rso_status);
 
+#ifndef FEATURE_CM_ENABLE
 /*
  * wlan_hdd_cfg80211_unlink_bss :to inform nl80211
  * interface that BSS might have been lost.
@@ -511,6 +521,7 @@ void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
 void wlan_hdd_cfg80211_unlink_bss(struct hdd_adapter *adapter,
 				  tSirMacAddr bssid, uint8_t *ssid,
 				  uint8_t ssid_len);
+#endif
 
 void wlan_hdd_cfg80211_acs_ch_select_evt(struct hdd_adapter *adapter);
 
@@ -528,11 +539,14 @@ void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 				      uint8_t vdev_id, uint16_t buf_len,
 				      uint8_t *buf);
 
+#ifndef FEATURE_CM_ENABLE
 int wlan_hdd_send_roam_auth_event(struct hdd_adapter *adapter, uint8_t *bssid,
 		uint8_t *req_rsn_ie, uint32_t req_rsn_length, uint8_t
 		*rsp_rsn_ie, uint32_t rsp_rsn_length, struct csr_roam_info
 		*roam_info_ptr);
+#endif
 #else
+#ifndef FEATURE_CM_ENABLE
 static inline int wlan_hdd_send_roam_auth_event(struct hdd_adapter *adapter,
 		uint8_t *bssid, uint8_t *req_rsn_ie, uint32_t req_rsn_length,
 		uint8_t *rsp_rsn_ie, uint32_t rsp_rsn_length,
@@ -540,7 +554,7 @@ static inline int wlan_hdd_send_roam_auth_event(struct hdd_adapter *adapter,
 {
 	return 0;
 }
-
+#endif
 static inline
 void hdd_send_roam_scan_ch_list_event(struct hdd_context *hdd_ctx,
 				      uint8_t vdev_id, uint16_t buf_len,
@@ -605,19 +619,6 @@ wlan_hdd_cfg80211_indicate_disconnect(struct hdd_adapter *adapter,
 				      uint16_t disconnect_ies_len);
 
 /**
- * wlan_hdd_inform_bss_frame() - inform bss details to NL80211
- * @adapter: Pointer to adapter
- * @bss_desc: Pointer to bss descriptor
- *
- * This function is used to inform the BSS details to nl80211 interface.
- *
- * Return: struct cfg80211_bss pointer
- */
-struct cfg80211_bss *
-wlan_hdd_inform_bss_frame(struct hdd_adapter *adapter,
-				     struct bss_description *bss_desc);
-
-/**
  * wlan_hdd_change_hw_mode_for_given_chnl() - change HW mode for given channel
  * @adapter: pointer to adapter
  * @chan_freq: given channel frequency
@@ -677,6 +678,7 @@ void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw);
  */
 uint8_t hdd_get_sap_operating_band(struct hdd_context *hdd_ctx);
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * wlan_hdd_try_disconnect() - try disconnnect from previous connection
  * @adapter: Pointer to adapter
@@ -701,19 +703,7 @@ int wlan_hdd_try_disconnect(struct hdd_adapter *adapter,
  */
 int wlan_hdd_disconnect(struct hdd_adapter *adapter, u16 reason,
 			enum wlan_reason_code mac_reason);
-
-/**
- * wlan_hdd_get_adjacent_chan(): Gets next/previous channel
- * to the channel passed.
- * @chan: Channel
- * @upper: If "true" then next channel is returned or else
- * previous channel is returned.
- *
- * This function returns the next/previous adjacent-channel to
- * the channel passed. If "upper = true" then next channel is
- * returned else previous is returned.
- */
-int wlan_hdd_get_adjacent_chan(uint8_t chan, bool upper);
+#endif
 
 /**
  * wlan_hdd_merge_avoid_freqs(): Merge two tHddAvoidFreqList
@@ -783,12 +773,10 @@ int wlan_hdd_send_mode_change_event(void);
  * wlan_hdd_restore_channels() - Restore the channels which were cached
  * and disabled in wlan_hdd_disable_channels api.
  * @hdd_ctx: Pointer to the HDD context
- * @notify_sap_event: Indicates if SAP event needs to be notified
  *
  * Return: 0 on success, Error code on failure
  */
-int wlan_hdd_restore_channels(struct hdd_context *hdd_ctx,
-			      bool notify_sap_event);
+int wlan_hdd_restore_channels(struct hdd_context *hdd_ctx);
 
 /*
  * wlan_hdd_send_sta_authorized_event: Function to send station authorized

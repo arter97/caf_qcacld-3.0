@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1157,7 +1157,7 @@
  * FastRoamEnabled - Enable fast roaming
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to inform FW to enable fast roaming
  *
@@ -1171,7 +1171,7 @@
  */
 #define CFG_LFR_FEATURE_ENABLED CFG_INI_BOOL( \
 	"FastRoamEnabled", \
-	0, \
+	1, \
 	"Enable fast roaming")
 
 /*
@@ -1671,7 +1671,7 @@
  * gAllowDFSChannelRoam - Allow dfs channel in roam
  * @Min: 0
  * @Max: 2
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to set default dfs channel
  *
@@ -1687,7 +1687,7 @@
 	"gAllowDFSChannelRoam", \
 	0, \
 	2, \
-	0, \
+	1, \
 	CFG_VALUE_OR_DEFAULT, \
 	"Allow dfs channel in roam")
 
@@ -2436,7 +2436,7 @@
  * used for WFA certification.
  * @Min: 0
  * @Max: 0xFFFFFFFF
- * @Default: 0x1FFFF
+ * @Default: 0x3FFFF
  *
  * ROAM_TRIGGER_REASON_PER         BIT 1
  * ROAM_TRIGGER_REASON_BMISS       BIT 2
@@ -2454,7 +2454,9 @@
  * ROAM_TRIGGER_REASON_IDLE        BIT 14
  * ROAM_TRIGGER_REASON_STA_KICKOUT BIT 15
  * ROAM_TRIGGER_REASON_ESS_RSSI    BIT 16
- * ROAM_TRIGGER_REASON_MAX         BIT 17
+ * ROAM_TRIGGER_REASON_WTC_BTM     BIT 17
+ * ROAM_TRIGGER_REASON_PMK_TIMEOUT BIT 18
+ * ROAM_TRIGGER_REASON_MAX         BIT 19
  *
  * Related: none
  *
@@ -2468,7 +2470,7 @@
 			"roam_triggers", \
 			0, \
 			0xFFFFFFFF, \
-			0x1FFFF, \
+			0x7FFFF, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Bitmap of roaming triggers")
 

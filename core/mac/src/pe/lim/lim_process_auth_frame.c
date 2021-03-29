@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -418,9 +418,9 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 
-	pe_nofl_info("SAE Auth RX type %d subtype %d from "QDF_MAC_ADDR_FMT,
-		     mac_hdr->fc.type, mac_hdr->fc.subType,
-		     QDF_MAC_ADDR_REF(mac_hdr->sa));
+	pe_nofl_rl_info("SAE Auth RX type %d subtype %d from "QDF_MAC_ADDR_FMT,
+			mac_hdr->fc.type, mac_hdr->fc.subType,
+			QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    pe_session->limMlmState != eLIM_MLM_WT_SAE_AUTH_STATE)
@@ -451,9 +451,9 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 
 	sae_retry = mlme_get_sae_auth_retry(pe_session->vdev);
 	if (LIM_IS_STA_ROLE(pe_session) && sae_retry &&
-	    sae_retry->sae_auth.data) {
+	    sae_retry->sae_auth.ptr) {
 		if (lim_is_sae_auth_algo_match(
-		    sae_retry->sae_auth.data, sae_retry->sae_auth.len,
+		    sae_retry->sae_auth.ptr, sae_retry->sae_auth.len,
 		     rx_pkt_info))
 			lim_sae_auth_cleanup_retry(mac_ctx,
 						   pe_session->vdev_id);
@@ -532,11 +532,7 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		 * SA-Query procedure determines that the original SA is
 		 * invalid.
 		 */
-		if (is_connected
-#ifdef WLAN_FEATURE_11W
-			&& !sta_ds_ptr->rmfEnabled
-#endif
-		   ) {
+		if (is_connected && !sta_ds_ptr->rmfEnabled) {
 			pe_err("STA is already connected but received auth frame"
 			       "Send the Deauth and lim Delete Station Context"
 			       "(associd: %d) sta mac" QDF_MAC_ADDR_FMT,
@@ -597,11 +593,7 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 			sta_ds_ptr = NULL;
 		}
 
-		if (sta_ds_ptr
-#ifdef WLAN_FEATURE_11W
-			&& !sta_ds_ptr->rmfEnabled
-#endif
-		   ) {
+		if (sta_ds_ptr && !sta_ds_ptr->rmfEnabled) {
 			pe_debug("lim Del Sta Ctx associd: %d sta mac"
 				 QDF_MAC_ADDR_FMT, associd,
 				 QDF_MAC_ADDR_REF(sta_ds_ptr->staAddr));
@@ -1319,14 +1311,17 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		(mac_hdr->seqControl.seqNumLo);
 
 	if (pe_session->prev_auth_seq_num == curr_seq_num &&
+	    !qdf_mem_cmp(pe_session->prev_auth_mac_addr, &mac_hdr->sa,
+			 ETH_ALEN) &&
 	    mac_hdr->fc.retry) {
 		pe_debug("auth frame, seq num: %d is already processed, drop it",
 			 curr_seq_num);
 		return;
 	}
 
-	/* save seq number in pe_session */
+	/* save seq number and mac_addr in pe_session */
 	pe_session->prev_auth_seq_num = curr_seq_num;
+	qdf_mem_copy(pe_session->prev_auth_mac_addr, mac_hdr->sa, ETH_ALEN);
 
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
 
@@ -1336,12 +1331,12 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	}
 	auth_alg = *(uint16_t *) body_ptr;
 
-	pe_nofl_info("Auth RX: vdev %d sys role %d lim_state %d from " QDF_MAC_ADDR_FMT " rssi %d auth_alg %d seq %d",
-		     pe_session->vdev_id, GET_LIM_SYSTEM_ROLE(pe_session),
-		     pe_session->limMlmState,
-		     QDF_MAC_ADDR_REF(mac_hdr->sa),
-		     WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
-		     auth_alg, curr_seq_num);
+	pe_nofl_rl_info("Auth RX: vdev %d sys role %d lim_state %d from " QDF_MAC_ADDR_FMT " rssi %d auth_alg %d seq %d",
+			pe_session->vdev_id, GET_LIM_SYSTEM_ROLE(pe_session),
+			pe_session->limMlmState,
+			QDF_MAC_ADDR_REF(mac_hdr->sa),
+			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+			auth_alg, curr_seq_num);
 
 	/* Restore default failure timeout */
 	if (QDF_P2P_CLIENT_MODE == pe_session->opmode &&
@@ -1708,15 +1703,14 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
  *
  ***----------------------------------------------------------------------
  */
-QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac, uint8_t *pBd,
-						void *body)
+QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
+					     uint8_t *pBd, void *body)
 {
 	tpSirMacMgmtHdr pHdr;
 	struct pe_session *pe_session = NULL;
 	uint8_t *pBody;
 	uint16_t frameLen;
-	tSirMacAuthFrameBody rxAuthFrame;
-	tSirMacAuthFrameBody *pRxAuthFrameBody = NULL;
+	tSirMacAuthFrameBody *rx_auth_frame;
 	QDF_STATUS ret_status = QDF_STATUS_E_FAILURE;
 	int i;
 	bool sae_auth_frame;
@@ -1818,28 +1812,36 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac, uint8_t *p
 	/* of our choice. */
 	lim_deactivate_and_change_timer(mac, eLIM_FT_PREAUTH_RSP_TIMER);
 
+	rx_auth_frame = qdf_mem_malloc(sizeof(*rx_auth_frame));
+	if (!rx_auth_frame) {
+		lim_handle_ft_pre_auth_rsp(mac, QDF_STATUS_E_FAILURE, NULL, 0,
+					   pe_session);
+		return QDF_STATUS_E_NOMEM;
+	}
+
 	/* Save off the auth resp. */
-	if ((sir_convert_auth_frame2_struct(mac, pBody, frameLen, &rxAuthFrame) !=
-	     QDF_STATUS_SUCCESS)) {
+	if ((sir_convert_auth_frame2_struct(mac, pBody, frameLen,
+					    rx_auth_frame) !=
+					    QDF_STATUS_SUCCESS)) {
 		pe_err("failed to convert Auth frame to struct");
 		lim_handle_ft_pre_auth_rsp(mac, QDF_STATUS_E_FAILURE, NULL, 0,
 					   pe_session);
+		qdf_mem_free(rx_auth_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
-	pRxAuthFrameBody = &rxAuthFrame;
 
 	pe_debug("Received Auth frame with type: %d seqnum: %d status: %d %d",
-		       (uint32_t) pRxAuthFrameBody->authAlgoNumber,
-		       (uint32_t) pRxAuthFrameBody->authTransactionSeqNumber,
-		       (uint32_t) pRxAuthFrameBody->authStatusCode,
-		       (uint32_t) mac->lim.gLimNumPreAuthContexts);
-	switch (pRxAuthFrameBody->authTransactionSeqNumber) {
+		       (uint32_t)rx_auth_frame->authAlgoNumber,
+		       (uint32_t)rx_auth_frame->authTransactionSeqNumber,
+		       (uint32_t)rx_auth_frame->authStatusCode,
+		       (uint32_t)mac->lim.gLimNumPreAuthContexts);
+	switch (rx_auth_frame->authTransactionSeqNumber) {
 	case SIR_MAC_AUTH_FRAME_2:
-		if (pRxAuthFrameBody->authStatusCode != STATUS_SUCCESS) {
+		if (rx_auth_frame->authStatusCode != STATUS_SUCCESS) {
 			pe_err("Auth status code received is %d",
-				(uint32_t) pRxAuthFrameBody->authStatusCode);
+				(uint32_t)rx_auth_frame->authStatusCode);
 			if (STATUS_AP_UNABLE_TO_HANDLE_NEW_STA ==
-			    pRxAuthFrameBody->authStatusCode)
+			    rx_auth_frame->authStatusCode)
 				ret_status = QDF_STATUS_E_NOSPC;
 		} else {
 			ret_status = QDF_STATUS_SUCCESS;
@@ -1848,12 +1850,14 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac, uint8_t *p
 
 	default:
 		pe_warn("Seq. no incorrect expected 2 received %d",
-			(uint32_t) pRxAuthFrameBody->authTransactionSeqNumber);
+			(uint32_t)rx_auth_frame->authTransactionSeqNumber);
 		break;
 	}
 
 	/* Send the Auth response to SME */
-	lim_handle_ft_pre_auth_rsp(mac, ret_status, pBody, frameLen, pe_session);
+	lim_handle_ft_pre_auth_rsp(mac, ret_status, pBody,
+				   frameLen, pe_session);
+	qdf_mem_free(rx_auth_frame);
 
 	return ret_status;
 }

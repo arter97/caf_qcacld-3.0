@@ -1,3 +1,13 @@
+# Android makefile for the WLAN Module
+
+# set WLAN_BUILD_DEBUG=y in your environment to enable debug logging
+define wlog
+$(if $(WLAN_BUILD_DEBUG),$(info $(1)))
+endef
+
+LOCAL_PATH := $(call my-dir)
+$(call wlog,LOCAL_PATH=$(LOCAL_PATH))
+
 ENABLE_QCACLD := true
 ifeq ($(TARGET_USES_QMAA), true)
 ifneq ($(TARGET_USES_QMAA_OVERRIDE_WLAN), true)
@@ -8,8 +18,6 @@ endif
 endif
 
 ifeq  ($(ENABLE_QCACLD), true)
-# Android makefile for the WLAN Module
-LOCAL_PATH := $(call my-dir)
 
 # Assume no targets will be supported
 WLAN_CHIPSET :=
@@ -36,14 +44,15 @@ endif # opensource
 LOCAL_DEV_NAME := $(patsubst .%,%,\
 	$(lastword $(strip $(subst /, ,$(LOCAL_PATH)))))
 
-ifeq (1, $(strip $(shell expr $(words $(strip $(TARGET_WLAN_CHIP))) \>= 2)))
+$(call wlog,LOCAL_DEV_NAME=$(LOCAL_DEV_NAME))
+$(call wlog,TARGET_WLAN_CHIP=$(TARGET_WLAN_CHIP))
 
+TARGET_WLAN_CHIP ?= wlan
+LOCAL_MULTI_KO := false
+ifneq ($(TARGET_WLAN_CHIP), wlan)
 ifeq ($(LOCAL_DEV_NAME), qcacld-3.0)
 LOCAL_MULTI_KO := true
-else
-LOCAL_MULTI_KO := false
 endif
-
 endif
 
 ifeq ($(LOCAL_MULTI_KO), true)
@@ -53,28 +62,19 @@ $(shell find $(LOCAL_WLAN_BLD_DIR)/qcacld-3.0/ -maxdepth 1 \
 	-name '.*' ! -name '.git' -exec rm -rf {} +)
 
 $(foreach chip, $(TARGET_WLAN_CHIP), \
-	$($(shell mkdir -p $(LOCAL_WLAN_BLD_DIR)/qcacld-3.0/.$(chip); \
-	ln -sf $(LOCAL_WLAN_BLD_DIR)/qca-wifi-host-cmn \
-		$(LOCAL_WLAN_BLD_DIR)/qcacld-3.0/.$(chip)/qca-wifi-host-cmn); \
-	$(foreach node, \
-	$(shell find $(LOCAL_WLAN_BLD_DIR)/qcacld-3.0/ -maxdepth 1 \
-		! -name '.*' ! -name '*~' \
-		! -name '.' ! -name 'qcacld-3.0'), \
-	$(shell ln -sf $(node) \
-	$(LOCAL_WLAN_BLD_DIR)/qcacld-3.0/.$(chip)/$(lastword $(strip $(subst /, ,$(node)))) \
-	))))
-
+	$(shell ln -sf . $(LOCAL_WLAN_BLD_DIR)/qcacld-3.0/.$(chip)))
 include $(foreach chip, $(TARGET_WLAN_CHIP), $(LOCAL_PATH)/.$(chip)/Android.mk)
 
 else # Multi-ok check
 
+ifeq ($(WLAN_PROFILE),)
 WLAN_PROFILE := default
+endif
 
 ifeq ($(LOCAL_DEV_NAME), qcacld-3.0)
 
 LOCAL_DEV_NAME := wlan
 LOCAL_MOD_NAME := wlan
-CMN_OFFSET := ..
 LOCAL_SRC_DIR :=
 TARGET_FW_DIR := firmware/wlan/qca_cld
 TARGET_CFG_PATH := /vendor/etc/wifi
@@ -83,7 +83,6 @@ TARGET_MAC_BIN_PATH := /mnt/vendor/persist
 else
 
 LOCAL_SRC_DIR := .$(LOCAL_DEV_NAME)
-CMN_OFFSET := .
 # Use default profile if WLAN_CFG_USE_DEFAULT defined.
 ifeq ($(WLAN_CFG_USE_DEFAULT),)
 WLAN_PROFILE := $(LOCAL_DEV_NAME)
@@ -112,8 +111,8 @@ endif # platform-sdk-version
 ###########################################################
 # This is set once per LOCAL_PATH, not per (kernel) module
 KBUILD_OPTIONS := WLAN_ROOT=$(WLAN_BLD_DIR)/qcacld-3.0/$(LOCAL_SRC_DIR)
-KBUILD_OPTIONS += WLAN_COMMON_ROOT=$(CMN_OFFSET)/qca-wifi-host-cmn
-KBUILD_OPTIONS += WLAN_COMMON_INC=$(WLAN_BLD_DIR)/qca-wifi-host-cmn
+KBUILD_OPTIONS += WLAN_COMMON_ROOT=cmn
+KBUILD_OPTIONS += WLAN_COMMON_INC=$(WLAN_BLD_DIR)/qcacld-3.0/cmn
 KBUILD_OPTIONS += WLAN_FW_API=$(WLAN_BLD_DIR)/fw-api
 KBUILD_OPTIONS += WLAN_PROFILE=$(WLAN_PROFILE)
 KBUILD_OPTIONS += DYNAMIC_SINGLE_CHIP=$(DYNAMIC_SINGLE_CHIP)
@@ -123,6 +122,7 @@ KBUILD_OPTIONS += DYNAMIC_SINGLE_CHIP=$(DYNAMIC_SINGLE_CHIP)
 # This means we need to rename the module to <chipset>_wlan.ko
 # after wlan.ko is built.
 KBUILD_OPTIONS += MODNAME=$(LOCAL_MOD_NAME)
+KBUILD_OPTIONS += DEVNAME=$(LOCAL_DEV_NAME)
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(WLAN_SELECT)
 
@@ -153,13 +153,17 @@ else
     LOCAL_MODULE_PATH := $(TARGET_OUT)/lib/modules/$(WLAN_CHIPSET)
 endif
 
-include $(DLKM_DIR)/AndroidKernelModule.mk
+ifeq ($(TARGET_PRODUCT), taro)
+    include $(DLKM_DIR)/Build_external_kernelmodule.mk
+else
+    include $(DLKM_DIR)/AndroidKernelModule.mk
+endif
 ###########################################################
 
 # Create Symbolic link
 ifneq ($(findstring $(WLAN_CHIPSET),$(WIFI_DRIVER_DEFAULT)),)
 ifeq ($(PRODUCT_VENDOR_MOVE_ENABLED),true)
-ifneq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),)
+ifneq ($(WIFI_DRIVER_INSTALL_TO_KERNEL_OUT),true)
 $(shell mkdir -p $(TARGET_OUT_VENDOR)/lib/modules; \
 	ln -sf /$(TARGET_COPY_OUT_VENDOR)/lib/modules/$(WLAN_CHIPSET)/$(LOCAL_MODULE) $(TARGET_OUT_VENDOR)/lib/modules/$(LOCAL_MODULE))
 endif
@@ -177,8 +181,14 @@ endif
 
 $(shell mkdir -p $(TARGET_FW_PATH); \
 	ln -sf $(TARGET_MAC_BIN_PATH)/wlan_mac.bin $(TARGET_FW_PATH)/wlan_mac.bin)
+ifeq ($(TARGET_BOARD_AUTO),true)
+$(shell ln -sf $(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
+$(call wlog,"generate soft link because TARGET_BOARD_AUTO true")
+else
 ifneq ($(GENERIC_ODM_IMAGE),true)
 $(shell ln -sf $(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini)
+$(call wlog,"generate soft link because GENERIC_ODM_IMAGE not true")
+endif
 endif
 endif # Multi-ko check
 endif # DLKM check

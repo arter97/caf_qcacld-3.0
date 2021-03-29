@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -659,10 +659,9 @@ ol_rx_defrag(ol_txrx_pdev_handle pdev,
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
-	if (qdf_unlikely(!soc)) {
-		ol_txrx_err("soc is NULL");
+	if (qdf_unlikely(!soc))
 		return;
-	}
+
 	vdev = peer->vdev;
 
 	/* bypass defrag for safe mode */
@@ -904,7 +903,7 @@ ol_rx_frag_tkip_demic(ol_txrx_pdev_handle pdev, const uint8_t *key,
 
 	ol_rx_defrag_copydata(msdu, pktlen - f_tkip.ic_miclen + rx_desc_len,
 			      f_tkip.ic_miclen, (caddr_t) mic0);
-	if (!qdf_mem_cmp(mic, mic0, f_tkip.ic_miclen))
+	if (qdf_mem_cmp(mic, mic0, f_tkip.ic_miclen))
 		return OL_RX_DEFRAG_ERR;
 
 	qdf_nbuf_trim_tail(msdu, f_tkip.ic_miclen);

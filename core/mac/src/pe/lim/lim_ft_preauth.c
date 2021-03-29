@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,7 @@
 #include <lim_admit_control.h>
 #include <wlan_scan_ucfg_api.h>
 #include "wma.h"
+#include "wlan_crypto_global_api.h"
 
 /**
  * lim_ft_cleanup_pre_auth_info() - Cleanup preauth related information
@@ -225,22 +226,26 @@ void lim_perform_ft_pre_auth(struct mac_context *mac, QDF_STATUS status,
 			     uint32_t *data, struct pe_session *pe_session)
 {
 	tSirMacAuthFrameBody authFrame;
-	unsigned int session_id;
-	enum csr_akm_type auth_type;
+	int32_t ucast_cipher;
+	bool is_open = false;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
 		return;
 	}
-	session_id = pe_session->smeSessionId;
-	auth_type =
-		mac->roam.roamSession[session_id].connectedProfile.AuthType;
+
+	ucast_cipher = wlan_crypto_get_param(pe_session->vdev,
+					     WLAN_CRYPTO_PARAM_UCAST_CIPHER);
+	if (!ucast_cipher ||
+	    ((QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_NONE) ==
+	      ucast_cipher)))
+		is_open = true;
 
 	if (pe_session->is11Rconnection &&
 	    pe_session->ftPEContext.pFTPreAuthReq) {
 		/* Only 11r assoc has FT IEs */
-		if ((auth_type != eCSR_AUTH_TYPE_OPEN_SYSTEM) &&
-			(pe_session->ftPEContext.pFTPreAuthReq->ft_ies_length
+		if ((!is_open) &&
+		     (pe_session->ftPEContext.pFTPreAuthReq->ft_ies_length
 									== 0)) {
 			pe_err("FTIEs for Auth Req Seq 1 is absent");
 			goto preauth_fail;
@@ -442,8 +447,7 @@ void lim_handle_ft_pre_auth_rsp(struct mac_context *mac, QDF_STATUS status,
 					  &sessionId,
 					  mac->lim.max_sta_of_pe_session,
 					  pe_session->bssType,
-					  pe_session->vdev_id,
-					  pe_session->opmode);
+					  pe_session->vdev_id);
 		if (!ft_session) {
 			pe_err("Session not created for pre-auth 11R AP");
 			status = QDF_STATUS_E_FAILURE;
@@ -589,6 +593,7 @@ void lim_post_ft_pre_auth_rsp(struct mac_context *mac_ctx,
 			      uint16_t auth_rsp_length,
 			      struct pe_session *session)
 {
+#ifndef FEATURE_CM_ENABLE
 	tpSirFTPreAuthRsp ft_pre_auth_rsp;
 	struct scheduler_msg mmh_msg = {0};
 	uint16_t rsp_len = sizeof(tSirFTPreAuthRsp);
@@ -613,6 +618,7 @@ void lim_post_ft_pre_auth_rsp(struct mac_context *mac_ctx,
 			sir_copy_mac_addr(ft_pre_auth_rsp->preAuthbssId,
 			    session->ftPEContext.pFTPreAuthReq->preAuthbssId);
 	}
+
 
 	ft_pre_auth_rsp->messageType = eWNI_SME_FT_PRE_AUTH_RSP;
 	ft_pre_auth_rsp->length = (uint16_t) rsp_len;
@@ -641,12 +647,22 @@ void lim_post_ft_pre_auth_rsp(struct mac_context *mac_ctx,
 	mmh_msg.bodyval = 0;
 
 	pe_debug("Posted Auth Rsp to SME with status of 0x%x", status);
+
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	if (status == QDF_STATUS_SUCCESS)
 		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_PREAUTH_DONE,
 				      session, status, 0);
 #endif
+
 	lim_sys_process_mmh_msg_api(mac_ctx, &mmh_msg);
+#else
+#ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
+	if (status == QDF_STATUS_SUCCESS)
+		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_PREAUTH_DONE,
+				      session, status, 0);
+#endif
+	/* post msg to osif to cm */
+#endif
 }
 
 /**

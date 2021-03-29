@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -237,6 +237,7 @@ wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
 {
 	uint16_t i;
 	uint16_t num_safe_ch = 0;
+	uint32_t freq;
 
 	/*
 	 * There are two channel list, one acs cfg channel list, and one
@@ -252,13 +253,12 @@ wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
 	 * the acs channel list before chosing one of them as a default channel
 	 */
 	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
-		if (!policy_mgr_is_safe_channel(
-				psoc, sap_ctx->acs_cfg->freq_list[i])) {
-			sap_debug("unsafe freq %d removed from acs list",
-				  sap_ctx->acs_cfg->freq_list[i]);
+		freq = sap_ctx->acs_cfg->freq_list[i];
+		if (!policy_mgr_is_sap_freq_allowed(psoc, freq)) {
+			sap_debug("remove freq %d from acs list", freq);
 			continue;
 		}
-		/* Add only safe channels to the acs cfg ch list */
+		/* Add only allowed channels to the acs cfg ch list */
 		sap_ctx->acs_cfg->freq_list[num_safe_ch++] =
 						sap_ctx->acs_cfg->freq_list[i];
 	}
@@ -794,7 +794,9 @@ static void wlansap_update_vendor_acs_chan(struct mac_context *mac_ctx,
 	}
 
 	mac_ctx->sap.SapDfsInfo.target_chan_freq =
-				wlan_reg_chan_to_freq(mac_ctx->pdev, sap_ctx->dfs_vendor_channel);
+				wlan_reg_legacy_chan_to_freq(
+						mac_ctx->pdev,
+						sap_ctx->dfs_vendor_channel);
 
 	mac_ctx->sap.SapDfsInfo.new_chanWidth =
 				sap_ctx->dfs_vendor_chan_bw;
@@ -882,18 +884,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		if (roam_result == eCSR_ROAM_RESULT_FAILURE)
 			sap_signal_hdd_event(sap_ctx, csr_roam_info,
 					     eSAP_STA_SET_KEY_EVENT,
-					     (void *) eSAP_STATUS_FAILURE);
-		break;
-	case eCSR_ROAM_ASSOCIATION_COMPLETION:
-		if (roam_result == eCSR_ROAM_RESULT_FAILURE)
-			sap_signal_hdd_event(sap_ctx, csr_roam_info,
-					     eSAP_STA_REASSOC_EVENT,
-					     (void *) eSAP_STATUS_FAILURE);
-		break;
-	case eCSR_ROAM_DISASSOCIATED:
-		if (roam_result == eCSR_ROAM_RESULT_MIC_FAILURE)
-			sap_signal_hdd_event(sap_ctx, csr_roam_info,
-					     eSAP_STA_MIC_FAILURE_EVENT,
 					     (void *) eSAP_STATUS_FAILURE);
 		break;
 	case eCSR_ROAM_WPS_PBC_PROBE_REQ_IND:
@@ -1092,12 +1082,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			qdf_ret_status = QDF_STATUS_E_FAILURE;
 		break;
-	case eCSR_ROAM_RESULT_ASSOCIATED:
-		/* Fill in the event structure */
-		sap_signal_hdd_event(sap_ctx, csr_roam_info,
-				     eSAP_STA_REASSOC_EVENT,
-				     (void *) eSAP_STATUS_SUCCESS);
-		break;
 	case eCSR_ROAM_RESULT_INFRA_STARTED:
 		if (!csr_roam_info) {
 			sap_err("csr_roam_info is NULL");
@@ -1264,10 +1248,8 @@ void sap_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 	session_id = wlan_vdev_get_id(vdev);
 	scan_id = event->scan_id;
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (!mac_handle) {
-		sap_alert("invalid MAC handle");
+	if (!mac_handle)
 		return;
-	}
 
 	qdf_mtrace(QDF_MODULE_ID_SCAN, QDF_MODULE_ID_SAP, event->type,
 		   event->vdev_id, event->scan_id);

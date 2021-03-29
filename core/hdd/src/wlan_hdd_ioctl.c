@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,6 +38,7 @@
 #include "wma.h"
 #include "wlan_hdd_napi.h"
 #include "wlan_mlme_ucfg_api.h"
+#include "target_type.h"
 #ifdef FEATURE_WLAN_ESE
 #include <sme_api.h>
 #include <sir_api.h>
@@ -521,6 +522,7 @@ static int hdd_parse_reassoc_command_v1_data(const uint8_t *command,
 	return 0;
 }
 
+#ifndef FEATURE_CM_ENABLE
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 					const tSirMacAddr bssid,
@@ -539,7 +541,6 @@ QDF_STATUS hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 				adapter->vdev_id, connected_bssid);
 }
 #endif
-
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
 /**
  * hdd_is_fast_reassoc_allowed  - check if roaming offload init is
@@ -573,6 +574,7 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	int ret = 0;
 	QDF_STATUS status;
+	uint8_t connected_vdev;
 
 	if (!hdd_ctx) {
 		hdd_err("Invalid hdd ctx");
@@ -597,14 +599,18 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 	 * So check both the HDD state and SME state here.
 	 * If not associated, no need to proceed with reassoc
 	 */
-	if ((eConnectionState_Associated != sta_ctx->conn_info.conn_state) ||
-	    (!sme_is_conn_state_connected(hdd_ctx->mac_handle,
-	    adapter->vdev_id))) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_warn("Not associated");
 		ret = -EINVAL;
 		goto exit;
 	}
 
+	if (!sme_is_conn_state_connected(hdd_ctx->mac_handle,
+					 adapter->vdev_id)) {
+		hdd_warn("Not in connected state");
+		ret = -EINVAL;
+		goto exit;
+	}
 	/*
 	 * if the target bssid is same as currently associated AP,
 	 * use the current connections's channel.
@@ -621,6 +627,14 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 		ret = -EINVAL;
 		goto exit;
 	}
+	if (wlan_get_connected_vdev_by_bssid(hdd_ctx->pdev, (uint8_t *)bssid,
+					     &connected_vdev) &&
+	    connected_vdev != adapter->vdev_id) {
+		hdd_err("bssid "QDF_MAC_ADDR_FMT" connected by other vdev %d",
+			QDF_MAC_ADDR_REF(bssid), connected_vdev);
+		ret = -EPERM;
+		goto exit;
+	}
 
 	/* Proceed with reassoc */
 	if (roaming_offload_enabled(hdd_ctx)) {
@@ -631,7 +645,6 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 			ret = -EPERM;
 			goto exit;
 		}
-
 		status = hdd_wma_send_fastreassoc_cmd(adapter, bssid, ch_freq);
 		if (status != QDF_STATUS_SUCCESS) {
 			hdd_err("Failed to send fast reassoc cmd");
@@ -649,6 +662,7 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 exit:
 	return ret;
 }
+#endif /* FEATURE_CM_ENABLE */
 
 /**
  * hdd_parse_reassoc_v1() - parse version 1 of the REASSOC command
@@ -673,14 +687,31 @@ static int hdd_parse_reassoc_v1(struct hdd_adapter *adapter, const char *command
 	qdf_freq_t freq = 0;
 	tSirMacAddr bssid;
 	int ret;
+#ifdef FEATURE_CM_ENABLE
+	struct qdf_mac_addr target_bssid;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	QDF_STATUS status;
+#endif
+
 
 	ret = hdd_parse_reassoc_command_v1_data(command, bssid, &freq);
-	if (ret)
+	if (ret) {
 		hdd_err("Failed to parse reassoc command data");
-	else
-		ret = hdd_reassoc(adapter, bssid, freq, REASSOC);
+		return ret;
+	}
+
+#ifdef FEATURE_CM_ENABLE
+	qdf_mem_copy(target_bssid.bytes, bssid, sizeof(tSirMacAddr));
+	status = ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
+					  adapter->vdev_id,
+					  &target_bssid, freq,
+					  CM_ROAMING_HOST);
+	return qdf_status_to_os_return(status);
+#else
+	ret = hdd_reassoc(adapter, bssid, freq, REASSOC);
 
 	return ret;
+#endif
 }
 
 /**
@@ -704,6 +735,12 @@ static int hdd_parse_reassoc_v2(struct hdd_adapter *adapter,
 	tSirMacAddr bssid;
 	qdf_freq_t freq = 0;
 	int ret;
+#ifdef FEATURE_CM_ENABLE
+	struct qdf_mac_addr target_bssid;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	QDF_STATUS status;
+#endif
+
 
 	if (total_len < sizeof(params) + 8) {
 		hdd_err("Invalid command length");
@@ -726,7 +763,16 @@ static int hdd_parse_reassoc_v2(struct hdd_adapter *adapter,
 		if (!hdd_check_and_fill_freq(params.channel, &freq))
 			return -EINVAL;
 
+#ifdef FEATURE_CM_ENABLE
+		qdf_mem_copy(target_bssid.bytes, bssid, sizeof(tSirMacAddr));
+		status = ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev,
+						  adapter->vdev_id,
+						  &target_bssid, freq,
+						  CM_ROAMING_HOST);
+		ret = qdf_status_to_os_return(status);
+#else
 		ret = hdd_reassoc(adapter, bssid, freq, REASSOC);
+#endif
 	}
 
 	return ret;
@@ -779,19 +825,6 @@ static int hdd_parse_reassoc(struct hdd_adapter *adapter, const char *command,
 	return ret;
 }
 
-#ifdef ROAM_OFFLOAD_V1
-static inline
-void hdd_abort_roam_scan(struct hdd_context *hdd_ctx, uint8_t vdev_id)
-{
-	ucfg_cm_abort_roam_scan(hdd_ctx->pdev, vdev_id);
-}
-#else
-static inline
-void hdd_abort_roam_scan(struct hdd_context *hdd_ctx, uint8_t vdev_id)
-{
-	sme_abort_roam_scan(hdd_ctx->mac_handle, vdev_id);
-}
-#endif
 /**
  * hdd_sendactionframe() - send a userspace-supplied action frame
  * @adapter:	Adapter upon which the command was received
@@ -839,7 +872,7 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	/* if not associated, no need to send action frame */
-	if (eConnectionState_Associated != sta_ctx->conn_info.conn_state) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_warn("Not associated");
 		ret = -EINVAL;
 		goto exit;
@@ -883,7 +916,8 @@ hdd_sendactionframe(struct hdd_adapter *adapter, const uint8_t *bssid,
 				 * may cause long delays in sending action
 				 * frames.
 				 */
-				hdd_abort_roam_scan(hdd_ctx, adapter->vdev_id);
+				ucfg_cm_abort_roam_scan(hdd_ctx->pdev,
+							adapter->vdev_id);
 			} else {
 				/*
 				 * 0 is accepted as current home frequency,
@@ -1347,7 +1381,8 @@ hdd_parse_set_roam_scan_channels_v2(struct hdd_adapter *adapter,
 			ret = -EINVAL;
 			goto exit;
 		}
-		channel_freq_list[i] = wlan_reg_chan_to_freq(hdd_ctx->pdev,
+		channel_freq_list[i] = wlan_reg_legacy_chan_to_freq(
+							     hdd_ctx->pdev,
 							     channel);
 	}
 
@@ -2293,6 +2328,145 @@ static int hdd_conc_set_dwell_time(struct hdd_adapter *adapter,
 	return retval;
 }
 
+static int hdd_enable_unit_test_commands(struct hdd_adapter *adapter,
+					 struct hdd_context *hdd_ctx)
+{
+	enum pld_bus_type bus_type = pld_get_bus_type(hdd_ctx->parent_dev);
+	u32 arg[2];
+	QDF_STATUS status;
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
+	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
+		return -EPERM;
+
+	if (adapter->vdev_id >= WLAN_MAX_VDEVS) {
+		hdd_err_rl("Invalid vdev id");
+		return -EINVAL;
+	}
+
+	if (bus_type == PLD_BUS_TYPE_PCIE) {
+		arg[0] = 360;
+		arg[1] = 3;
+
+		status = sme_send_unit_test_cmd(adapter->vdev_id,
+						WLAN_MODULE_TX,
+						2,
+						arg);
+		if (status != QDF_STATUS_SUCCESS)
+			return qdf_status_to_os_return(status);
+
+		arg[0] = 361;
+		arg[1] = 1;
+
+		status = sme_send_unit_test_cmd(adapter->vdev_id,
+						WLAN_MODULE_TX,
+						2,
+						arg);
+		if (status != QDF_STATUS_SUCCESS)
+			return qdf_status_to_os_return(status);
+
+		if (hdd_ctx->target_type == TARGET_TYPE_QCA6390) {
+			arg[0] = 37;
+			arg[1] = 3000;
+
+			status = sme_send_unit_test_cmd(adapter->vdev_id,
+							WLAN_MODULE_RX,
+							2,
+							arg);
+			if (status != QDF_STATUS_SUCCESS)
+				return qdf_status_to_os_return(status);
+		}
+
+		if (hdd_ctx->target_type == TARGET_TYPE_QCA6490) {
+			arg[0] = 39;
+			arg[1] = 3000;
+
+			status = sme_send_unit_test_cmd(adapter->vdev_id,
+							WLAN_MODULE_RX,
+							2,
+							arg);
+			if (status != QDF_STATUS_SUCCESS)
+				return qdf_status_to_os_return(status);
+		}
+	} else if (bus_type == PLD_BUS_TYPE_SNOC) {
+		arg[0] = 7;
+		arg[1] = 1;
+
+		status = sme_send_unit_test_cmd(adapter->vdev_id,
+						0x44,
+						2,
+						arg);
+		if (status != QDF_STATUS_SUCCESS)
+			return qdf_status_to_os_return(status);
+	} else {
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int hdd_disable_unit_test_commands(struct hdd_adapter *adapter,
+					  struct hdd_context *hdd_ctx)
+{
+	enum pld_bus_type bus_type = pld_get_bus_type(hdd_ctx->parent_dev);
+	u32 arg[2];
+	QDF_STATUS status;
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
+	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
+		return -EPERM;
+
+	if (adapter->vdev_id >= WLAN_MAX_VDEVS) {
+		hdd_err_rl("Invalid vdev id");
+		return -EINVAL;
+	}
+
+	if (bus_type == PLD_BUS_TYPE_PCIE) {
+		arg[0] = 360;
+		arg[1] = 0;
+
+		status = sme_send_unit_test_cmd(adapter->vdev_id,
+						WLAN_MODULE_TX,
+						2,
+						arg);
+		if (status != QDF_STATUS_SUCCESS)
+			return qdf_status_to_os_return(status);
+
+		arg[0] = 361;
+		arg[1] = 0;
+
+		status = sme_send_unit_test_cmd(adapter->vdev_id,
+						WLAN_MODULE_TX,
+						2,
+						arg);
+		if (status != QDF_STATUS_SUCCESS)
+			return qdf_status_to_os_return(status);
+
+		arg[0] = 39;
+		arg[1] = 0;
+
+		status = sme_send_unit_test_cmd(adapter->vdev_id,
+						WLAN_MODULE_RX,
+						2,
+						arg);
+		if (status != QDF_STATUS_SUCCESS)
+			return qdf_status_to_os_return(status);
+
+	} else if (bus_type == PLD_BUS_TYPE_SNOC) {
+		arg[0] = 7;
+		arg[1] = 0;
+
+		status = sme_send_unit_test_cmd(adapter->vdev_id,
+						0x44,
+						2,
+						arg);
+		if (status != QDF_STATUS_SUCCESS)
+			return qdf_status_to_os_return(status);
+	} else {
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static void hdd_get_link_status_cb(uint8_t status, void *context)
 {
 	struct osif_request *request;
@@ -2350,7 +2524,7 @@ static int wlan_hdd_get_link_status(struct hdd_adapter *adapter)
 	}
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (eConnectionState_Associated != sta_ctx->conn_info.conn_state) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		/* If not associated, then expected link status return
 		 * value is 0
 		 */
@@ -2504,7 +2678,7 @@ static int hdd_parse_ese_beacon_req(struct wlan_objmgr_pdev *pdev,
 					return -EINVAL;
 				}
 				req->bcnReq[j].ch_freq =
-				wlan_reg_chan_to_freq(pdev, temp_int);
+				wlan_reg_legacy_chan_to_freq(pdev, temp_int);
 				break;
 
 			case 2: /* Scan mode */
@@ -3151,7 +3325,6 @@ static int drv_cmd_set_roam_mode(struct hdd_adapter *adapter,
 		roam_mode = cfg_max(CFG_LFR_FEATURE_ENABLED);
 	}
 
-	ucfg_mlme_set_lfr_enabled(hdd_ctx->psoc, (bool)roam_mode);
 	mac_handle = hdd_ctx->mac_handle;
 	if (roam_mode) {
 		ucfg_mlme_set_roam_scan_offload_enabled(hdd_ctx->psoc,
@@ -4411,11 +4584,16 @@ static int drv_cmd_fast_reassoc(struct hdd_adapter *adapter,
 	uint8_t *value = command;
 	qdf_freq_t freq = 0;
 	tSirMacAddr bssid;
+#ifdef FEATURE_CM_ENABLE
+	struct qdf_mac_addr target_bssid;
+#else
 	uint32_t roam_id = INVALID_ROAM_ID;
 	tCsrRoamModifyProfileFields mod_fields;
 	tCsrHandoffRequest req;
-	struct hdd_station_ctx *sta_ctx;
 	mac_handle_t mac_handle;
+	qdf_freq_t chan_freq;
+	struct qdf_mac_addr connected_bssid;
+#endif
 
 	if (QDF_STA_MODE != adapter->device_mode) {
 		hdd_warn("Unsupported in mode %s(%d)",
@@ -4424,11 +4602,10 @@ static int drv_cmd_fast_reassoc(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	/* if not associated, no need to proceed with reassoc */
-	if (eConnectionState_Associated != sta_ctx->conn_info.conn_state) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_warn("Not associated!");
 		ret = -EINVAL;
 		goto exit;
@@ -4441,17 +4618,25 @@ static int drv_cmd_fast_reassoc(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
+#ifdef FEATURE_CM_ENABLE
+	qdf_mem_copy(target_bssid.bytes, bssid, sizeof(tSirMacAddr));
+	ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev, adapter->vdev_id,
+				 &target_bssid, freq, CM_ROAMING_HOST);
+#else
 	mac_handle = hdd_ctx->mac_handle;
+	chan_freq = wlan_get_operation_chan_freq(adapter->vdev);
+	wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev, adapter->vdev_id,
+				    &connected_bssid);
 	/*
 	 * if the target bssid is same as currently associated AP,
 	 * issue reassoc to same AP
 	 */
-	if (!qdf_mem_cmp(bssid, sta_ctx->conn_info.bssid.bytes,
+	if (!qdf_mem_cmp(bssid, connected_bssid.bytes,
 			 QDF_MAC_ADDR_SIZE)) {
 		hdd_warn("Reassoc BSSID is same as currently associated AP bssid");
 		if (roaming_offload_enabled(hdd_ctx)) {
 			hdd_wma_send_fastreassoc_cmd(
-				adapter, bssid, sta_ctx->conn_info.chan_freq);
+				adapter, bssid, chan_freq);
 		} else {
 			sme_get_modify_profile_fields(mac_handle,
 				adapter->vdev_id,
@@ -4478,6 +4663,7 @@ static int drv_cmd_fast_reassoc(struct hdd_adapter *adapter,
 	req.src = FASTREASSOC;
 	qdf_mem_copy(req.bssid.bytes, bssid, sizeof(tSirMacAddr));
 	sme_handoff_request(mac_handle, adapter->vdev_id, &req);
+#endif
 exit:
 	return ret;
 }
@@ -4764,6 +4950,24 @@ exit:
 	return ret;
 }
 
+static int drv_cmd_tput_debug_mode_enable(struct hdd_adapter *adapter,
+					  struct hdd_context *hdd_ctx,
+					  u8 *command,
+					  u8 command_len,
+					  struct hdd_priv_data *priv_data)
+{
+	return hdd_enable_unit_test_commands(adapter, hdd_ctx);
+}
+
+static int drv_cmd_tput_debug_mode_disable(struct hdd_adapter *adapter,
+					   struct hdd_context *hdd_ctx,
+					   u8 *command,
+					   u8 command_len,
+					   struct hdd_priv_data *priv_data)
+{
+	return hdd_disable_unit_test_commands(adapter, hdd_ctx);
+}
+
 #ifdef FEATURE_WLAN_ESE
 static int drv_cmd_set_ccx_roam_scan_channels(struct hdd_adapter *adapter,
 					      struct hdd_context *hdd_ctx,
@@ -4806,10 +5010,10 @@ static int drv_cmd_set_ccx_roam_scan_channels(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
-	status = sme_set_ese_roam_scan_channel_list(mac_handle,
-						    adapter->vdev_id,
-						    channel_freq_list,
-						    num_channels);
+	status = ucfg_cm_set_ese_roam_scan_channel_list(hdd_ctx->pdev,
+							adapter->vdev_id,
+							channel_freq_list,
+							num_channels);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("Failed to update channel list information");
 		ret = -EINVAL;
@@ -4845,7 +5049,7 @@ static int drv_cmd_get_tsm_stats(struct hdd_adapter *adapter,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	/* if not associated, return error */
-	if (eConnectionState_Associated != sta_ctx->conn_info.conn_state) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err("Not associated!");
 		ret = -EINVAL;
 		goto exit;
@@ -4951,8 +5155,8 @@ static int drv_cmd_set_cckm_ie(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
-	sme_set_cckm_ie(hdd_ctx->mac_handle, adapter->vdev_id,
-			cckm_ie, cckm_ie_len);
+	ucfg_cm_set_cckm_ie(hdd_ctx->psoc, adapter->vdev_id, cckm_ie,
+			    cckm_ie_len);
 	if (cckm_ie) {
 		qdf_mem_free(cckm_ie);
 		cckm_ie = NULL;
@@ -4986,7 +5190,7 @@ static int drv_cmd_ccx_beacon_req(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
-	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not associated");
 
 		if (!req.numBcnReqIe)
@@ -5154,6 +5358,8 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 	uint8_t *value = command;
 	struct qdf_mac_addr bssid = QDF_MAC_ADDR_BCAST_INIT;
 	struct qdf_mac_addr selfmac = QDF_MAC_ADDR_BCAST_INIT;
+	struct hdd_adapter *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DRV_CMD_MAX_TX_POWER;
 
 	ret = hdd_parse_setmaxtxpower_command(value, &tx_power);
 	if (ret) {
@@ -5161,7 +5367,8 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 		return ret;
 	}
 
-	hdd_for_each_adapter(hdd_ctx, adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
 		/* Assign correct self MAC address */
 		qdf_copy_macaddr(&bssid,
 				 &adapter->mac_addr);
@@ -5179,9 +5386,14 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("Set max tx power failed");
 			ret = -EINVAL;
+			hdd_adapter_dev_put_debug(adapter, dbgid);
+			if (next_adapter)
+				hdd_adapter_dev_put_debug(next_adapter,
+							  dbgid);
 			goto exit;
 		}
 		hdd_debug("Set max tx power success");
+		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
 exit:
@@ -5446,6 +5658,7 @@ static int drv_cmd_tdls_off_channel(struct hdd_adapter *adapter,
 	uint8_t *value = command;
 	int channel;
 	enum channel_state reg_state;
+	qdf_freq_t ch_freq;
 
 	/* Move pointer to point the string */
 	value += command_len;
@@ -5453,7 +5666,10 @@ static int drv_cmd_tdls_off_channel(struct hdd_adapter *adapter,
 	ret = sscanf(value, "%d", &channel);
 	if (ret != 1)
 		return -EINVAL;
-	reg_state = wlan_reg_get_channel_state(hdd_ctx->pdev, channel);
+
+	ch_freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, channel);
+	reg_state = wlan_reg_get_channel_state_for_freq(hdd_ctx->pdev,
+							ch_freq);
 
 	if (reg_state == CHANNEL_STATE_DFS ||
 		reg_state == CHANNEL_STATE_DISABLE ||
@@ -5608,7 +5824,7 @@ static int hdd_set_rx_filter(struct hdd_adapter *adapter, bool action,
 	if (((adapter->device_mode == QDF_STA_MODE) ||
 		(adapter->device_mode == QDF_P2P_CLIENT_MODE)) &&
 		adapter->mc_addr_list.mc_cnt &&
-		hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+		hdd_cm_is_vdev_associated(adapter)) {
 
 
 		filter = qdf_mem_malloc(sizeof(*filter));
@@ -6097,7 +6313,7 @@ static inline int drv_cmd_get_antenna_mode(struct hdd_adapter *adapter,
 	uint8_t len = 0;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
@@ -6107,7 +6323,7 @@ static inline int drv_cmd_get_antenna_mode(struct hdd_adapter *adapter,
 	/* Overwrite this antenna mode if dynamic vdev chains are supported */
 	hdd_get_dynamic_antenna_mode(&antenna_mode,
 				     hdd_ctx->dynamic_nss_chains_support, vdev);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	len = scnprintf(extra, sizeof(extra), "%s %d", command,
 			antenna_mode);
 	len = QDF_MIN(priv_data->total_len, len + 1);
@@ -6402,19 +6618,18 @@ static bool check_disable_channels(struct hdd_context *hdd_ctx,
 }
 
 /**
- * disconnect_sta_and_stop_sap() - Disconnect STA and stop SAP
+ * disconnect_sta_and_restart_sap() - Disconnect STA and restart SAP
  *
  * @hdd_ctx: Pointer to hdd context
  * @reason: Disconnect reason code as per @enum wlan_reason_code
  *
  * Disable channels provided by user and disconnect STA if it is
- * connected to any AP, stop SAP and send deauthentication request
- * to STAs connected to SAP.
+ * connected to any AP, restart SAP.
  *
  * Return: None
  */
-static void disconnect_sta_and_stop_sap(struct hdd_context *hdd_ctx,
-					enum wlan_reason_code reason)
+static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
+					   enum wlan_reason_code reason)
 {
 	struct hdd_adapter *adapter, *next = NULL;
 	QDF_STATUS status;
@@ -6433,7 +6648,8 @@ static void disconnect_sta_and_stop_sap(struct hdd_context *hdd_ctx,
 				hdd_ctx->pdev,
 				adapter->session.ap.operating_chan_freq);
 			if (check_disable_channels(hdd_ctx, ap_ch))
-				wlan_hdd_stop_sap(adapter);
+				policy_mgr_check_sap_restart(hdd_ctx->psoc,
+							     adapter->vdev_id);
 		}
 
 		status = hdd_get_next_adapter(hdd_ctx, adapter, &next);
@@ -6509,7 +6725,7 @@ static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 		 * Restore and Free the cache channels when the command is
 		 * received with num channels as 0
 		 */
-		wlan_hdd_restore_channels(hdd_ctx, false);
+		wlan_hdd_restore_channels(hdd_ctx);
 		return 0;
 	}
 
@@ -6620,8 +6836,9 @@ mem_alloc_failed:
 		ret = wlan_hdd_disable_channels(hdd_ctx);
 		if (ret)
 			return ret;
-		disconnect_sta_and_stop_sap(hdd_ctx,
-					    REASON_OPER_CHANNEL_BAND_CHANGE);
+		disconnect_sta_and_restart_sap(
+					hdd_ctx,
+					REASON_OPER_CHANNEL_BAND_CHANGE);
 	}
 
 	hdd_exit();
@@ -7033,6 +7250,8 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"GETDWELLTIME",              drv_cmd_get_dwell_time, false},
 	{"SETDWELLTIME",              drv_cmd_set_dwell_time, true},
 	{"MIRACAST",                  drv_cmd_miracast, true},
+	{"TPUT_DEBUG_MODE_ENABLE",    drv_cmd_tput_debug_mode_enable, false},
+	{"TPUT_DEBUG_MODE_DISABLE",   drv_cmd_tput_debug_mode_disable, false},
 #ifdef FEATURE_WLAN_ESE
 	{"SETCCXROAMSCANCHANNELS",    drv_cmd_set_ccx_roam_scan_channels, true},
 	{"GETTSMSTATS",               drv_cmd_get_tsm_stats, true},

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -530,11 +530,12 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 	num = 0;
 	for (i = 0; i < peer->supported_channels_len; i++) {
 		chan_id = peer->supported_channels[i];
-		ch_state = wlan_reg_get_channel_state(pdev, chan_id);
+		ch_freq = wlan_reg_legacy_chan_to_freq(pdev, chan_id);
+		ch_state = wlan_reg_get_channel_state_for_freq(pdev, ch_freq);
 
 		if (CHANNEL_STATE_INVALID != ch_state &&
 		    CHANNEL_STATE_DFS != ch_state &&
-		    !wlan_reg_is_dsrc_chan(pdev, chan_id)) {
+		    !wlan_reg_is_dsrc_freq(ch_freq)) {
 			peer_param->peer_cap.peer_chan[num].chan_id = chan_id;
 			peer_param->peer_cap.peer_chan[num].pwr =
 				wlan_reg_get_channel_reg_power(pdev, chan_id);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -66,6 +66,8 @@ extern "C" {
 #define SAP_DEFAULT_24GHZ_CHANNEL     (6)
 #define SAP_DEFAULT_5GHZ_CHANNEL      (40)
 #define SAP_CHANNEL_NOT_SELECTED (0)
+
+#define SAP_PRE_CAC_IFNAME "precac"
 
 /*--------------------------------------------------------------------------
  * reasonCode taken from 802.11 standard.
@@ -244,15 +246,9 @@ typedef struct sap_StationAssocIndication_s {
 	uint8_t staId;
 	uint8_t status;
 	/* Required for indicating the frames to upper layer */
-	uint32_t beaconLength;
-	uint8_t *beaconPtr;
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
 	bool fWmmEnabled;
-	enum csr_akm_type negotiatedAuthType;
-	eCsrEncryptionType negotiatedUCEncryptionType;
-	eCsrEncryptionType negotiatedMCEncryptionType;
-	bool fAuthRequired;
 	uint8_t ecsa_capable;
 	uint32_t owe_ie_len;
 	uint8_t *owe_ie;
@@ -487,8 +483,8 @@ struct sap_config {
 	uint32_t ch_width_orig;
 	uint8_t max_num_sta;      /* maximum number of STAs in station table */
 	uint8_t dtim_period;      /* dtim interval */
-	uint8_t num_accept_mac;
-	uint8_t num_deny_mac;
+	uint16_t num_accept_mac;
+	uint16_t num_deny_mac;
 	/* Max ie length 255 * 2(WPA+RSN) + 2 bytes(vendor specific ID) * 2 */
 	uint8_t RSNWPAReqIE[(WLAN_MAX_IE_LEN * 2) + 4];
 	/* it is ignored if [0] is 0. */
@@ -505,10 +501,8 @@ struct sap_config {
 	uint32_t beacon_int;            /* Beacon Interval */
 	enum QDF_OPMODE persona; /* Tells us which persona, GO or AP */
 	bool enOverLapCh;
-#ifdef WLAN_FEATURE_11W
 	bool mfpRequired;
 	bool mfpCapable;
-#endif
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
 #endif
@@ -832,6 +826,7 @@ QDF_STATUS wlan_sap_update_next_channel(struct sap_context *sap_ctx,
 					uint8_t channel,
 					enum phy_ch_width chan_bw);
 
+#ifdef FEATURE_SAP_COND_CHAN_SWITCH
 /**
  * wlan_sap_set_pre_cac_status() - Set the pre cac status
  * @sap_ctx: SAP context
@@ -845,16 +840,31 @@ QDF_STATUS wlan_sap_set_pre_cac_status(struct sap_context *sap_ctx,
 				       bool status);
 
 /**
- * wlan_sap_set_chan_before_pre_cac() - Save the channel before pre cac
+ * wlan_sap_set_chan_freq_before_pre_cac() - Save the channel before pre cac
  * @sap_ctx: SAP context
- * @chan_before_pre_cac: Channel before pre cac
+ * @freq_before_pre_cac: Channel frequency before pre cac
  *
- * Saves the channel that was in use before pre cac operation
+ * Saves the channel frequency that was in use before pre cac operation
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS wlan_sap_set_chan_before_pre_cac(struct sap_context *sap_ctx,
-					    uint8_t chan_before_pre_cac);
+QDF_STATUS
+wlan_sap_set_chan_freq_before_pre_cac(struct sap_context *sap_ctx,
+				      qdf_freq_t freq_before_pre_cac);
+#else
+static inline QDF_STATUS
+wlan_sap_set_pre_cac_status(struct sap_context *sap_ctx, bool status)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_sap_set_chan_freq_before_pre_cac(struct sap_context *sap_ctx,
+				      qdf_freq_t freq_before_pre_cac)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * wlan_sap_set_pre_cac_complete_status() - Sets pre cac complete status
@@ -986,7 +996,7 @@ QDF_STATUS wlansap_clear_acl(struct sap_context *sap_ctx);
  */
 QDF_STATUS wlansap_get_acl_accept_list(struct sap_context *sap_ctx,
 				       struct qdf_mac_addr *pAcceptList,
-				       uint8_t *nAcceptList);
+				       uint16_t *nAcceptList);
 
 /**
  * wlansap_is_channel_present_in_acs_list() - Freq present in ACS list or not
@@ -1012,7 +1022,7 @@ bool wlansap_is_channel_present_in_acs_list(uint32_t freq,
  */
 QDF_STATUS wlansap_get_acl_deny_list(struct sap_context *sap_ctx,
 				     struct qdf_mac_addr *pDenyList,
-				     uint8_t *nDenyList);
+				     uint16_t *nDenyList);
 
 /**
  * wlansap_set_acl_mode() - Set the SAP ACL mode
@@ -1229,6 +1239,25 @@ struct csr_roam_profile *wlan_sap_get_roam_profile(struct sap_context *sap_ctx);
  * Return: phymode
  */
 eCsrPhyMode wlan_sap_get_phymode(struct sap_context *sap_ctx);
+
+/**
+ * wlan_sap_get_concurrent_bw() - Returns SAP BW based on concurrent channel &
+ *                                STA DFS channel
+ * @pdev: Pointer to Pdev
+ * @psoc: Pointer to Psoc
+ * @con_ch_freq: interfering concurrent channel
+ * @channel_width: Channel width
+ *
+ * Return: Channel width. If STA is not present on con_ch_freq, it returns
+ *        max of STA BW and 80 Mhz. If STA is not connected in dfs chan or STA
+ *........BW is not 160 Mhz (which includes DFS channel), then it will return
+ *        BW maximum of STA BW and 80 Mhz. If DFS STA is present, then return
+ *        BW as min of 80 and STA BW.
+ */
+enum phy_ch_width wlan_sap_get_concurrent_bw(struct wlan_objmgr_pdev *pdev,
+					     struct wlan_objmgr_psoc *psoc,
+					     qdf_freq_t con_ch_freq,
+					     enum phy_ch_width channel_width);
 
 /**
  * wlan_sap_get_vht_ch_width() - Returns SAP VHT channel width.
@@ -1485,6 +1514,19 @@ bool wlansap_is_6ghz_included_in_acs_range(struct sap_context *sap_ctx);
  */
 uint32_t
 wlansap_get_safe_channel_from_pcl_and_acs_range(struct sap_context *sap_ctx);
+
+/**
+ * wlansap_get_safe_channel_from_pcl_for_sap() - Get safe and active channel
+ * for SAP restart
+ * @sap_ctx: sap context
+ *
+ * Get a safe and active channel to restart SAP. PCL already takes into account
+ * the unsafe channels.
+ *
+ * Return: Chan freq num to restart SAP in case of success. In case of any
+ * failure, the channel number returned is zero.
+ */
+uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx);
 
 /**
  * wlansap_get_chan_band_restrict() -  get new chan for band change

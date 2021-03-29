@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,9 +34,7 @@
 #include "lim_send_messages.h"
 #include "lim_assoc_utils.h"
 #include "lim_ft.h"
-#ifdef WLAN_FEATURE_11W
 #include "wni_cfg.h"
-#endif
 
 #include "lim_ft_defs.h"
 #include "lim_session.h"
@@ -84,8 +82,13 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	bool vht_enabled = false;
 	tpSirMacMgmtHdr mac_hdr;
 	tftSMEContext *ft_sme_context;
+	struct mlme_legacy_priv *mlme_priv;
 
 	if (!pe_session)
+		return;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(pe_session->vdev);
+	if (!mlme_priv)
 		return;
 
 	vdev_id = pe_session->vdev_id;
@@ -129,7 +132,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	qdf_mem_copy((uint8_t *)frm->CurrentAPAddress.mac,
 			pe_session->prev_ap_bssid, sizeof(tSirMacAddr));
 
-	populate_dot11f_ssid2(mac_ctx, &frm->SSID);
+	populate_dot11f_ssid2(pe_session, &frm->SSID);
 	populate_dot11f_supp_rates(mac_ctx, POPULATE_DOT11F_RATES_OPERATIONAL,
 		&frm->SuppRates, pe_session);
 
@@ -143,7 +146,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		      LIM_BSS_CAPS_GET(WSM, pe_session->limReassocBssQosCaps);
 
 	if (pe_session->lim11hEnable &&
-	    pe_session->pLimReAssocReq->spectrumMgtIndicator == true) {
+	    pe_session->spectrumMgtEnabled) {
 		power_caps_populated = true;
 
 		populate_dot11f_power_caps(mac_ctx, &frm->PowerCaps,
@@ -213,9 +216,9 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 				&frm->WPAOpaque);
 		}
 #ifdef FEATURE_WLAN_ESE
-		if (pe_session->pLimReAssocReq->cckmIE.length) {
+		if (mlme_priv->connect_info.cckm_ie_len) {
 			populate_dot11f_ese_cckm_opaque(mac_ctx,
-				&(pe_session->pLimReAssocReq->cckmIE),
+				&mlme_priv->connect_info,
 				&frm->ESECckmOpaque);
 		}
 #endif
@@ -232,7 +235,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_ese_version(&frm->ESEVersion);
 	/* For ESE Associations fill the ESE IEs */
 	if (pe_session->isESEconnection &&
-	    pe_session->pLimReAssocReq->isESEFeatureIniEnabled) {
+	    mac_ctx->mlme_cfg->lfr.ese_enabled) {
 #ifndef FEATURE_DISABLE_RM
 		populate_dot11f_ese_rad_mgmt_cap(&frm->ESERadMgmtCap);
 #endif
@@ -451,7 +454,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 				(uint16_t) (bytes + ft_ies_length),
 				TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 				lim_tx_complete, frame, tx_flag, vdev_id,
-				0, RATEID_DEFAULT);
+				0, RATEID_DEFAULT, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -595,7 +598,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 	qdf_mem_copy((uint8_t *) frm->CurrentAPAddress.mac,
 		     (uint8_t *) pe_session->bssId, 6);
 
-	populate_dot11f_ssid2(mac, &frm->SSID);
+	populate_dot11f_ssid2(pe_session, &frm->SSID);
 	populate_dot11f_supp_rates(mac, POPULATE_DOT11F_RATES_OPERATIONAL,
 				   &frm->SuppRates, pe_session);
 
@@ -609,7 +612,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 		     LIM_BSS_CAPS_GET(WSM, pe_session->limReassocBssQosCaps);
 
 	if (pe_session->lim11hEnable &&
-	    pe_session->pLimReAssocReq->spectrumMgtIndicator == true) {
+	    pe_session->spectrumMgtEnabled) {
 		PowerCapsPopulated = true;
 		populate_dot11f_power_caps(mac, &frm->PowerCaps, LIM_REASSOC,
 					   pe_session);
@@ -786,7 +789,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 			   (uint16_t) (sizeof(tSirMacMgmtHdr) + nPayload),
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, pFrame, txFlag, smeSessionId, 0,
-			   RATEID_DEFAULT);
+			   RATEID_DEFAULT, 0);
 	MTRACE(qdf_trace
 		       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));

@@ -99,7 +99,13 @@ wlan_hdd_btc_chain_mode_handler(struct wlan_objmgr_vdev *vdev)
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
+		/* This is temp ifdef will be removed in near future */
+#ifdef FEATURE_CM_ENABLE
+		wlan_hdd_cm_issue_disconnect(adapter,
+					     REASON_PREV_AUTH_NOT_VALID, false);
+#else
 		wlan_hdd_disconnect(adapter, 0, REASON_PREV_AUTH_NOT_VALID);
+#endif
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
@@ -151,12 +157,12 @@ static int __wlan_hdd_cfg80211_set_btc_chain_mode(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 	if (!vdev)
 		return -EINVAL;
 
 	errno = wlan_cfg80211_coex_set_btc_chain_mode(vdev, data, data_len);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	return errno;
 }

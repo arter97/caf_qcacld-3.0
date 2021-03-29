@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -55,11 +55,13 @@
  * enum pmo_vdev_param_id: tell vdev param id
  * @pmo_vdev_param_listen_interval: vdev listen interval param id
  * @pmo_vdev_param_dtim_policy: vdev param dtim policy
+ * @pmo_vdev_param_forced_dtim_count: vdev param forced dtim count
  * @pmo_vdev_max_param: Max vdev param id
  */
 enum pmo_vdev_param_id {
 	pmo_vdev_param_listen_interval = 0,
 	pmo_vdev_param_dtim_policy,
+	pmo_vdev_param_forced_dtim_count,
 	pmo_vdev_max_param
 };
 
@@ -251,6 +253,22 @@ enum active_apf_mode {
 };
 
 /**
+ * enum pmo_gpio_wakeup_mode - gpio wakeup mode
+ * @PMO_GPIO_WAKEUP_MODE_INVALID: gpio wakeup trigger invalid
+ * @PMO_GPIO_WAKEUP_MODE_RISING: gpio wakeup trigger rising
+ * @PMO_GPIO_WAKEUP_MODE_FALLING: gpio wakeup trigger failing
+ * @PMO_GPIO_WAKEUP_MODE_HIGH: gpio wakeup trigger high
+ * @PMO_GPIO_WAKEUP_MODE_LOW: gpio wakeup trigger low
+ */
+enum pmo_gpio_wakeup_mode {
+	PMO_GPIO_WAKEUP_MODE_INVALID,
+	PMO_GPIO_WAKEUP_MODE_RISING,
+	PMO_GPIO_WAKEUP_MODE_FALLING,
+	PMO_GPIO_WAKEUP_MODE_HIGH,
+	PMO_GPIO_WAKEUP_MODE_LOW,
+};
+
+/**
  * struct pmo_psoc_cfg - user configuration required for pmo
  * @ptrn_match_enable_all_vdev: true when pattern match is enable for all vdev
  * @apf_enable: true if psoc supports apf else false
@@ -275,6 +293,7 @@ enum active_apf_mode {
  * @sta_dynamic_dtim: station dynamic DTIM value
  * @sta_mod_dtim: station modulated DTIM value
  * @sta_max_li_mod_dtim: station max listen interval DTIM value
+ * @sta_forced_dtim: station forced DTIM value
  * @wow_enable: enable wow with majic pattern match or pattern byte match
  * @power_save_mode: power save mode for psoc
  * @runtime_pm_delay: set runtime pm's inactivity timer
@@ -307,6 +326,9 @@ enum active_apf_mode {
  * @ito_repeat_count: Indicates ito repeated count
  * @is_mod_dtim_on_sys_suspend_enabled: true when mod dtim is enabled for
  * system suspend wow else false
+ * @enable_gpio_wakeup: enable gpio wakeup
+ * @gpio_wakeup_pin: gpio wakeup pin
+ * @gpio_wakeup_mode: gpio wakeup mode
  */
 struct pmo_psoc_cfg {
 	bool ptrn_match_enable_all_vdev;
@@ -333,6 +355,7 @@ struct pmo_psoc_cfg {
 	uint8_t sta_dynamic_dtim;
 	uint8_t sta_mod_dtim;
 	uint8_t sta_max_li_mod_dtim;
+	bool sta_forced_dtim;
 	enum pmo_wow_enable_type wow_enable;
 	enum powersave_mode power_save_mode;
 	enum powersave_mode default_power_save_mode;
@@ -371,6 +394,13 @@ struct pmo_psoc_cfg {
 	enum active_apf_mode active_mc_bc_apf_mode;
 	uint8_t ito_repeat_count;
 	bool is_mod_dtim_on_sys_suspend_enabled;
+	bool is_bus_suspend_enabled_in_sap_mode;
+	bool is_bus_suspend_enabled_in_go_mode;
+#ifdef WLAN_ENABLE_GPIO_WAKEUP
+	bool enable_gpio_wakeup;
+	uint32_t gpio_wakeup_pin;
+	enum pmo_gpio_wakeup_mode gpio_wakeup_mode;
+#endif
 };
 
 /**

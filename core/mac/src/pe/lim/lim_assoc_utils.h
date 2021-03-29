@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,8 +44,30 @@ uint8_t lim_compare_capabilities(struct mac_context *,
 				 tSirMacCapabilityInfo *, struct pe_session *);
 uint8_t lim_check_rx_basic_rates(struct mac_context *, tSirMacRateSet, struct pe_session *);
 uint8_t lim_check_mcs_set(struct mac_context *mac, uint8_t *supportedMCSSet);
+
+/**
+ * lim_cleanup_rx_path() - Called to cleanup STA state at SP & RFP.
+ * @mac: Pointer to Global MAC structure
+ * @sta: Pointer to the per STA data structure initialized by LIM
+ *	 and maintained at DPH
+ * @pe_session: pointer to pe session
+ * @delete_peer: is peer delete allowed
+ *
+ * To circumvent RFP's handling of dummy packet when it does not
+ * have an incomplete packet for the STA to be deleted, a packet
+ * with 'more framgents' bit set will be queued to RFP's WQ before
+ * queuing 'dummy packet'.
+ * A 'dummy' BD is pushed into RFP's WQ with type=00, subtype=1010
+ * (Disassociation frame) and routing flags in BD set to eCPU's
+ * Low Priority WQ.
+ * RFP cleans up its local context for the STA id mentioned in the
+ * BD and then pushes BD to eCPU's low priority WQ.
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE.
+ */
 QDF_STATUS lim_cleanup_rx_path(struct mac_context *, tpDphHashNode,
-			       struct pe_session *);
+			       struct pe_session *, bool delete_peer);
+
 void lim_reject_association(struct mac_context *, tSirMacAddr, uint8_t,
 			    uint8_t, tAniAuthType, uint16_t, uint8_t,
 			    enum wlan_status_code, struct pe_session *);
@@ -296,13 +318,10 @@ QDF_STATUS lim_is_dot11h_power_capabilities_in_range(struct mac_context *mac,
 void lim_fill_rx_highest_supported_rate(struct mac_context *mac,
 					uint16_t *rxHighestRate,
 					uint8_t *pSupportedMCSSet);
-#ifdef WLAN_FEATURE_11W
 void lim_send_sme_unprotected_mgmt_frame_ind(struct mac_context *mac, uint8_t frameType,
 					     uint8_t *frame, uint32_t frameLen,
 					     uint16_t sessionId,
 					     struct pe_session *pe_session);
-#endif
-
 /**
  * lim_send_sme_tsm_ie_ind() - Send TSM IE information to SME
  * @mac: Global MAC context

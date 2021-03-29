@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -523,8 +523,7 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 	if (mac_ctx->lim.gLimSmeState == eLIM_SME_OFFLINE_STATE) {
 		/* Defer processing this message */
 		if (lim_defer_msg(mac_ctx, lim_msg) != TX_SUCCESS) {
-			QDF_TRACE(QDF_MODULE_ID_PE, LOGE,
-					FL("Unable to Defer Msg"));
+			pe_err_rl("Unable to Defer Msg");
 			lim_log_session_states(mac_ctx);
 			lim_handle_defer_msg_error(mac_ctx, lim_msg);
 		}
@@ -939,10 +938,8 @@ void lim_handle_sap_beacon(struct wlan_objmgr_pdev *pdev,
 		return;
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	if (!mac_ctx) {
-		pe_err("Failed to get mac_ctx");
+	if (!mac_ctx)
 		return;
-	}
 
 	filter = &mac_ctx->bcn_filter;
 
@@ -1011,7 +1008,8 @@ uint32_t lim_defer_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 			(mac, NO_SESSION,
 			LIM_TRACE_MAKE_RXMSG(pMsg->type, LIM_MSG_DEFERRED)));
 	} else {
-		pe_err("Dropped lim message (0x%X) Message %s", pMsg->type, lim_msg_str(pMsg->type));
+		pe_err_rl("Dropped lim message (0x%X) Message %s", pMsg->type,
+			  lim_msg_str(pMsg->type));
 		MTRACE(mac_trace_msg_rx
 			(mac, NO_SESSION,
 			LIM_TRACE_MAKE_RXMSG(pMsg->type, LIM_MSG_DROPPED)));
@@ -1717,7 +1715,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_TDLS_DEL_STA_REQ:
 	case eWNI_SME_TDLS_LINK_ESTABLISH_REQ:
 #endif
-	case eWNI_SME_RESET_AP_CAPS_CHANGED:
 	case eWNI_SME_SET_HW_MODE_REQ:
 	case eWNI_SME_SET_DUAL_MAC_CFG_REQ:
 	case eWNI_SME_SET_ANTENNA_MODE_REQ:
@@ -1751,7 +1748,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #if defined FEATURE_WLAN_ESE
 	case eWNI_SME_ESE_ADJACENT_AP_REPORT:
 #endif
+#ifndef FEATURE_CM_ENABLE
 	case eWNI_SME_FT_PRE_AUTH_REQ:
+#endif
 	case eWNI_SME_FT_AGGR_QOS_REQ:
 	case eWNI_SME_REGISTER_MGMT_FRAME_REQ:
 #ifdef FEATURE_WLAN_ESE
@@ -1762,12 +1761,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_ROAM_INVOKE:
 		/* fall through */
 	case eWNI_SME_ROAM_SEND_SET_PCL_REQ:
-#ifndef ROAM_OFFLOAD_V1
-	case eWNI_SME_ROAM_INIT_PARAM:
-	case eWNI_SME_ROAM_DISABLE_CFG:
-	case eWNI_SME_ROAM_SEND_PER_REQ:
-	case eWNI_SME_ROAM_SCAN_OFFLOAD_REQ:
-#endif
 	case eWNI_SME_SET_ADDBA_ACCEPT:
 	case eWNI_SME_UPDATE_EDCA_PROFILE:
 	case WNI_SME_UPDATE_MU_EDCA_PARAMS:
@@ -1836,11 +1829,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #endif
 	case WMA_ADD_TS_RSP:
 		lim_process_hal_add_ts_rsp(mac_ctx, msg);
-		break;
-	case SIR_LIM_BEACON_GEN_IND:
-		if (mac_ctx->lim.gLimSystemRole != eLIM_AP_ROLE)
-			sch_process_pre_beacon_ind(mac_ctx,
-						   msg, REASON_DEFAULT);
 		break;
 	case SIR_LIM_DELETE_STA_CONTEXT_IND:
 		lim_delete_sta_context(mac_ctx, msg);
@@ -1976,11 +1964,10 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 			 *    restart, in such a case, beacon params will be
 			 *    reset and thus will not contain Q2Q IE, by default
 			 */
-			if (wlan_reg_get_channel_state(
+			if (wlan_reg_get_channel_state_for_freq(
 				mac_ctx->pdev,
-				wlan_reg_freq_to_chan(
-				mac_ctx->pdev, session_entry->curr_op_freq))
-					!= CHANNEL_STATE_DFS) {
+				session_entry->curr_op_freq) !=
+				CHANNEL_STATE_DFS) {
 				beacon_params.bss_idx = session_entry->vdev_id;
 				beacon_params.beaconInterval =
 					session_entry->beaconParams.beaconInterval;
@@ -2108,6 +2095,17 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		break;
 	case SIR_LIM_PROCESS_DEFERRED_QUEUE:
 		break;
+#ifdef FEATURE_CM_ENABLE
+	case CM_BSS_PEER_CREATE_REQ:
+		cm_process_peer_create(msg);
+		break;
+	case CM_CONNECT_REQ:
+		cm_process_join_req(msg);
+		break;
+	case CM_DISCONNECT_REQ:
+		cm_process_disconnect_req(msg);
+		break;
+#endif
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;

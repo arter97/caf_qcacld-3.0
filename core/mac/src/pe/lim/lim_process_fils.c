@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1025,7 +1025,7 @@ void lim_add_fils_data_to_auth_frame(struct pe_session *session,
 	 * MDIE to be sent in auth frame during initial
 	 * mobility domain association
 	 */
-	if (session->lim_join_req->is11Rconnection) {
+	if (session->is11Rconnection) {
 		struct bss_description *bss_desc;
 
 		bss_desc = &session->lim_join_req->bssDescription;
@@ -1408,6 +1408,149 @@ bool lim_process_fils_auth_frame2(struct mac_context *mac_ctx,
 	return true;
 }
 
+#ifdef FEATURE_CM_ENABLE
+static enum eAniAuthType lim_get_auth_type(uint8_t auth_type)
+{
+	switch (auth_type) {
+	case FILS_SK_WITHOUT_PFS:
+		return SIR_FILS_SK_WITHOUT_PFS;
+	case FILS_SK_WITH_PFS:
+		return SIR_FILS_SK_WITH_PFS;
+	case FILS_PK_AUTH:
+		return SIR_FILS_PK_AUTH;
+	default:
+		return eSIR_DONOT_USE_AUTH_TYPE;
+	}
+}
+
+static uint8_t lim_get_akm_type(struct wlan_objmgr_vdev *vdev)
+{
+	int32_t akm;
+
+	akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+
+	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA384))
+		return eCSR_AUTH_TYPE_FT_FILS_SHA384;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_FILS_SHA256))
+		return eCSR_AUTH_TYPE_FT_FILS_SHA256;
+	else if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384))
+		return eCSR_AUTH_TYPE_FILS_SHA384;
+	else
+		return eCSR_AUTH_TYPE_FILS_SHA256;
+}
+
+void lim_update_fils_config(struct mac_context *mac_ctx,
+			    struct pe_session *session,
+			    struct cm_vdev_join_req *join_req)
+{
+	struct pe_fils_session *pe_fils_info;
+	struct wlan_fils_connection_info *fils_info = NULL;
+	tDot11fIERSN dot11f_ie_rsn = {0};
+	uint32_t ret;
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(session->vdev);
+	if (!mlme_priv)
+		return;
+	fils_info = mlme_priv->connect_info.fils_con_info;
+	if (!fils_info)
+		return;
+	pe_fils_info = session->fils_info;
+	if (!pe_fils_info)
+		return;
+
+	if (!fils_info->is_fils_connection)
+		return;
+
+	pe_fils_info->is_fils_connection = fils_info->is_fils_connection;
+	pe_fils_info->keyname_nai_length = fils_info->key_nai_length;
+	pe_fils_info->fils_rrk_len = fils_info->r_rk_length;
+	pe_fils_info->akm = lim_get_akm_type(session->vdev);
+	pe_fils_info->auth = lim_get_auth_type(fils_info->auth_type);
+	pe_fils_info->sequence_number = fils_info->erp_sequence_number;
+
+	if (fils_info->key_nai_length > FILS_MAX_KEYNAME_NAI_LENGTH) {
+		pe_err("Restricting the key_nai_length of %d to max %d",
+		       fils_info->key_nai_length,
+		       FILS_MAX_KEYNAME_NAI_LENGTH);
+		fils_info->key_nai_length = FILS_MAX_KEYNAME_NAI_LENGTH;
+	}
+
+	if (fils_info->key_nai_length) {
+		pe_fils_info->keyname_nai_data =
+			qdf_mem_malloc(fils_info->key_nai_length);
+		if (!pe_fils_info->keyname_nai_data)
+			return;
+
+		qdf_mem_copy(pe_fils_info->keyname_nai_data,
+			     fils_info->keyname_nai,
+			     fils_info->key_nai_length);
+	}
+
+	if (fils_info->r_rk_length) {
+		pe_fils_info->fils_rrk =
+			qdf_mem_malloc(fils_info->r_rk_length);
+		if (!pe_fils_info->fils_rrk) {
+			qdf_mem_free(pe_fils_info->keyname_nai_data);
+			return;
+		}
+
+		if (fils_info->r_rk_length <= WLAN_FILS_MAX_RRK_LENGTH)
+			qdf_mem_copy(pe_fils_info->fils_rrk,
+				     fils_info->r_rk,
+				     fils_info->r_rk_length);
+	}
+
+	qdf_mem_copy(pe_fils_info->fils_pmkid, fils_info->pmkid,
+		     PMKID_LEN);
+	pe_fils_info->rsn_ie_len = session->lim_join_req->rsnIE.length;
+	qdf_mem_copy(pe_fils_info->rsn_ie,
+		     session->lim_join_req->rsnIE.rsnIEdata,
+		     session->lim_join_req->rsnIE.length);
+
+	/*
+	 * When AP is MFP capable and STA is also MFP capable,
+	 * the supplicant fills the RSN IE with PMKID count as 0
+	 * and PMKID as 0, then appends the group management cipher
+	 * suite. This opaque RSN IE is copied into fils_info in pe
+	 * session. For FT-FILS association, STA has to fill the
+	 * PMKR0 derived after authentication response is received from
+	 * the AP. So unpack the RSN IE to find if group management cipher
+	 * suite is present and based on this RSN IE will be constructed in
+	 * lim_generate_fils_pmkr1_name() for FT-FILS connection.
+	 */
+	ret = dot11f_unpack_ie_rsn(mac_ctx, pe_fils_info->rsn_ie + 2,
+				   pe_fils_info->rsn_ie_len - 2,
+				   &dot11f_ie_rsn, 0);
+	if (DOT11F_SUCCEEDED(ret))
+		pe_fils_info->group_mgmt_cipher_present =
+			dot11f_ie_rsn.gp_mgmt_cipher_suite_present;
+	else
+		pe_err("FT-FILS: Invalid RSN IE");
+
+	pe_fils_info->fils_pmk_len = fils_info->pmk_len;
+	if (fils_info->pmk_len) {
+		pe_fils_info->fils_pmk =
+			qdf_mem_malloc(fils_info->pmk_len);
+		if (!pe_fils_info->fils_pmk) {
+			qdf_mem_free(pe_fils_info->keyname_nai_data);
+			qdf_mem_free(pe_fils_info->fils_rrk);
+			return;
+		}
+		qdf_mem_copy(pe_fils_info->fils_pmk, fils_info->pmk,
+			     fils_info->pmk_len);
+	}
+
+	pe_debug("FILS: fils=%d nai-len=%d rrk_len=%d akm=%d auth=%d pmk_len=%d",
+		 fils_info->is_fils_connection,
+		 fils_info->key_nai_length,
+		 fils_info->r_rk_length,
+		 fils_info->akm_type,
+		 fils_info->auth_type,
+		 fils_info->pmk_len);
+}
+
+#else
 void lim_update_fils_config(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    struct join_req *sme_join_req)
@@ -1518,6 +1661,7 @@ void lim_update_fils_config(struct mac_context *mac_ctx,
 		 fils_info->auth_type,
 		 fils_info->pmk_len);
 }
+#endif
 
 #define EXTENDED_IE_HEADER_LEN 3
 /**
@@ -1574,6 +1718,65 @@ QDF_STATUS lim_create_fils_auth_data(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef FEATURE_CM_ENABLE
+void populate_fils_connect_params(struct mac_context *mac_ctx,
+				  struct pe_session *session,
+				  struct wlan_cm_connect_resp *connect_rsp)
+{
+	struct pe_fils_session *fils_info = session->fils_info;
+	struct fils_connect_rsp_params *fils_ie;
+
+	if (!lim_is_fils_connection(session))
+		return;
+
+	if (!fils_info->fils_pmk_len ||
+	    !fils_info->tk_len || !fils_info->gtk_len ||
+	    !fils_info->fils_pmk || !fils_info->kek_len) {
+		pe_err("Invalid FILS info pmk len %d kek len %d tk len %d gtk len %d",
+		       fils_info->fils_pmk_len, fils_info->kek_len,
+		       fils_info->tk_len, fils_info->gtk_len);
+		return;
+	}
+
+	connect_rsp->connect_ies.fils_ie = qdf_mem_malloc(sizeof(*fils_ie));
+	if (!connect_rsp->connect_ies.fils_ie) {
+		pe_delete_fils_info(session);
+		return;
+	}
+
+	fils_ie = connect_rsp->connect_ies.fils_ie;
+	fils_ie->fils_pmk = qdf_mem_malloc(fils_info->fils_pmk_len);
+	if (!fils_ie->fils_pmk) {
+		qdf_mem_free(fils_ie);
+		connect_rsp->connect_ies.fils_ie = NULL;
+		pe_delete_fils_info(session);
+		return;
+	}
+	fils_ie->fils_seq_num = fils_info->sequence_number;
+	fils_ie->fils_pmk_len = fils_info->fils_pmk_len;
+	qdf_mem_copy(fils_ie->fils_pmk, fils_info->fils_pmk,
+		     fils_info->fils_pmk_len);
+
+	qdf_mem_copy(fils_ie->fils_pmkid, fils_info->fils_pmkid, PMKID_LEN);
+
+	fils_ie->kek_len = fils_info->kek_len;
+	qdf_mem_copy(fils_ie->kek, fils_info->kek, fils_info->kek_len);
+
+	fils_ie->tk_len = fils_info->tk_len;
+	qdf_mem_copy(fils_ie->tk, fils_info->tk, fils_info->tk_len);
+
+	fils_ie->gtk_len = fils_info->gtk_len;
+	qdf_mem_copy(fils_ie->gtk, fils_info->gtk, fils_info->gtk_len);
+
+	cds_copy_hlp_info(&fils_info->dst_mac, &fils_info->src_mac,
+			  fils_info->hlp_data_len, fils_info->hlp_data,
+			  &fils_ie->dst_mac, &fils_ie->src_mac,
+			  &fils_ie->hlp_data_len,
+			  fils_ie->hlp_data);
+
+	pe_debug("FILS connect params copied lim");
+}
+#else
 void populate_fils_connect_params(struct mac_context *mac_ctx,
 				  struct pe_session *session,
 				  struct join_rsp *sme_join_rsp)
@@ -1633,6 +1836,7 @@ void populate_fils_connect_params(struct mac_context *mac_ctx,
 
 	pe_debug("FILS connect params copied lim");
 }
+#endif
 
 /**
  * lim_parse_kde_elements() - Parse Key Delivery Elements
@@ -1778,8 +1982,7 @@ bool lim_verify_fils_params_assoc_rsp(struct mac_context *mac_ctx,
 {
 	struct pe_fils_session *fils_info = session_entry->fils_info;
 	tDot11fIEfils_session fils_session = assoc_rsp->fils_session;
-	tDot11fIEfils_key_confirmation fils_key_auth = assoc_rsp->fils_key_auth;
-	tDot11fIEfils_kde fils_kde = assoc_rsp->fils_kde;
+	tDot11fIEfils_key_confirmation *fils_key_auth;
 	QDF_STATUS status;
 
 	if (!lim_is_fils_connection(session_entry))
@@ -1802,28 +2005,41 @@ bool lim_verify_fils_params_assoc_rsp(struct mac_context *mac_ctx,
 		goto verify_fils_params_fails;
 	}
 
+	fils_key_auth = qdf_mem_malloc(sizeof(*fils_key_auth));
+	if (!fils_key_auth) {
+		pe_err("malloc failed for fils_key_auth");
+		goto verify_fils_params_fails;
+	}
+
+	*fils_key_auth = assoc_rsp->fils_key_auth;
+
 	/* Compare FILS key auth */
-	if ((fils_key_auth.num_key_auth != fils_info->key_auth_len) ||
-		qdf_mem_cmp(fils_info->ap_key_auth_data, fils_key_auth.key_auth,
-					 fils_info->ap_key_auth_len)) {
+	if (fils_key_auth->num_key_auth != fils_info->key_auth_len ||
+	    qdf_mem_cmp(fils_info->ap_key_auth_data,
+			fils_key_auth->key_auth,
+			fils_info->ap_key_auth_len)) {
 		lim_fils_data_dump("session keyauth",
 				   fils_info->ap_key_auth_data,
 				   fils_info->ap_key_auth_len);
 		lim_fils_data_dump("Pkt keyauth",
-				   fils_key_auth.key_auth,
-				   fils_key_auth.num_key_auth);
+				   fils_key_auth->key_auth,
+				   fils_key_auth->num_key_auth);
+		qdf_mem_free(fils_key_auth);
 		goto verify_fils_params_fails;
 	}
 
+	qdf_mem_free(fils_key_auth);
+
 	/* Verify the Key Delivery Element presence */
-	if (!fils_kde.num_kde_list) {
+	if (!assoc_rsp->fils_kde.num_kde_list) {
 		pe_err("FILS KDE list absent");
 		goto verify_fils_params_fails;
 	}
 
 	/* Derive KDE elements */
-	status = lim_parse_kde_elements(mac_ctx, fils_info, fils_kde.kde_list,
-					fils_kde.num_kde_list);
+	status = lim_parse_kde_elements(mac_ctx, fils_info,
+					assoc_rsp->fils_kde.kde_list,
+					assoc_rsp->fils_kde.num_kde_list);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		pe_err("KDE parsing fails");
 		goto verify_fils_params_fails;
@@ -2184,61 +2400,4 @@ QDF_STATUS aead_decrypt_assoc_rsp(struct mac_context *mac_ctx,
 	(*n_frame) -= AES_BLOCK_SIZE;
 	return status;
 }
-
-#ifndef ROAM_OFFLOAD_V1
-void lim_update_fils_rik(struct pe_session *pe_session,
-			 struct roam_offload_scan_req *req_buffer)
-{
-	struct pe_fils_session *pe_fils_info = pe_session->fils_info;
-	struct roam_fils_params *roam_fils_params =
-		&req_buffer->roam_fils_params;
-
-	/*
-	 * If it is first connection, LIM session entries will not be
-	 * set with FILS. However in RSO, CSR filled the RRK, realm
-	 * info and is_fils_connection to true in req_buffer, RIK
-	 * can be created with RRK and send all the FILS info to fw
-	 */
-	if ((!lim_is_fils_connection(pe_session) ||
-	     !pe_fils_info) && (req_buffer->is_fils_connection)) {
-		if (roam_fils_params->rrk_length > WLAN_FILS_MAX_RRK_LENGTH) {
-			if (lim_is_fils_connection(pe_session))
-				pe_debug("FILS rrk len(%d) max (%d)",
-					 roam_fils_params->rrk_length,
-					 WLAN_FILS_MAX_RRK_LENGTH);
-			return;
-		}
-
-		wlan_crypto_create_fils_rik(roam_fils_params->rrk,
-					    roam_fils_params->rrk_length,
-					    roam_fils_params->rik,
-					    &roam_fils_params->rik_length);
-		pe_debug("Fils created rik len %d",
-			 roam_fils_params->rik_length);
-		return;
-	}
-
-	if (!pe_fils_info) {
-		pe_debug("No FILS info available in the session");
-		return;
-	}
-	if (pe_fils_info->fils_rik_len > WLAN_FILS_MAX_RIK_LENGTH ||
-	    !pe_fils_info->fils_rik) {
-		if (pe_fils_info->fils_rik)
-			pe_debug("Fils rik len(%d) max %d",
-				 pe_fils_info->fils_rik_len,
-				 WLAN_FILS_MAX_RIK_LENGTH);
-		return;
-	}
-
-	roam_fils_params->rik_length = pe_fils_info->fils_rik_len;
-	qdf_mem_copy(roam_fils_params->rik, pe_fils_info->fils_rik,
-		     roam_fils_params->rik_length);
-	qdf_mem_copy(roam_fils_params->fils_ft, pe_fils_info->fils_ft,
-		     pe_fils_info->fils_ft_len);
-	roam_fils_params->fils_ft_len = pe_fils_info->fils_ft_len;
-	pe_debug("fils rik len %d ft-len:%d", roam_fils_params->rik_length,
-		 pe_fils_info->fils_ft_len);
-}
-#endif
 #endif

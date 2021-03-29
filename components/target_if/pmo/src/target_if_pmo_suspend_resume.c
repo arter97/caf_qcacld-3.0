@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -64,6 +64,9 @@ QDF_STATUS target_if_pmo_send_vdev_update_param_req(
 		break;
 	case pmo_vdev_param_dtim_policy:
 		param_id = WMI_VDEV_PARAM_DTIM_POLICY;
+		break;
+	case pmo_vdev_param_forced_dtim_count:
+		param_id = WMI_VDEV_PARAM_FORCE_DTIM_CNT;
 		break;
 	default:
 		target_if_err("invalid vdev param id %d", param_id);
@@ -201,6 +204,21 @@ void target_if_pmo_update_target_suspend_flag(struct wlan_objmgr_psoc *psoc,
 	wmi_set_target_suspend(wmi_handle, value);
 }
 
+void target_if_pmo_update_target_suspend_acked_flag(
+					struct wlan_objmgr_psoc *psoc,
+					uint8_t value)
+{
+	wmi_unified_t wmi_handle;
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		target_if_err("Invalid wmi handle");
+		return;
+	}
+
+	wmi_set_target_suspend_acked(wmi_handle, value);
+}
+
 bool target_if_pmo_is_target_suspended(struct wlan_objmgr_psoc *psoc)
 {
 	wmi_unified_t wmi_handle;
@@ -226,7 +244,7 @@ QDF_STATUS target_if_pmo_psoc_send_wow_enable_req(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	wma_check_and_set_wake_timer(SIR_INSTALL_KEY_TIMEOUT_MS);
+	wma_check_and_set_wake_timer(INSTALL_KEY_TIMEOUT_MS);
 	return wmi_unified_wow_enable_send(wmi_handle,
 					   (struct wow_cmd_params *)param,
 					   TGT_WILDCARD_PDEV_ID);

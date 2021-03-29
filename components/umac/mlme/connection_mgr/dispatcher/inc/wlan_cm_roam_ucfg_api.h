@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,6 @@
 #define _WLAN_CM_ROAM_UCFG_API_H_
 
 #include "wlan_cm_roam_api.h"
-
-#ifdef ROAM_OFFLOAD_V1
 
 /**
  * ucfg_user_space_enable_disable_rso() - Enable/Disable Roam Scan offload
@@ -54,6 +52,24 @@ ucfg_user_space_enable_disable_rso(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS ucfg_cm_abort_roam_scan(struct wlan_objmgr_pdev *pdev,
 				   uint8_t vdev_id);
 
+#ifdef FEATURE_WLAN_ESE
+/**
+ * ucfg_cm_set_ese_roam_scan_channel_list() - To set ese roam scan channel list
+ * @pdev: pdev pointer
+ * @vdev_id: vdev_id id
+ * @chan_freq_list: Output channel list
+ * @num_chan: Output number of channels
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_cm_set_ese_roam_scan_channel_list(struct wlan_objmgr_pdev *pdev,
+						  uint8_t vdev_id,
+						  qdf_freq_t *chan_freq_list,
+						  uint8_t num_chan);
+QDF_STATUS ucfg_cm_set_cckm_ie(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			       const uint8_t *cck_ie, const uint8_t cck_ie_len);
+#endif
+
 /**
  * ucfg_cm_rso_set_roam_trigger() - Send roam trigger bitmap firmware
  * @pdev: Pointer to pdev
@@ -69,73 +85,6 @@ ucfg_cm_rso_set_roam_trigger(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 {
 	return wlan_cm_rso_set_roam_trigger(pdev, vdev_id, trigger);
 }
-
-/**
- * ucfg_cm_disable_rso() - Disable roam scan offload to firmware
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- * @requestor: RSO disable requestor
- * @reason: Reason for RSO disable
- *
- * Return:  QDF_STATUS
- */
-static inline
-QDF_STATUS ucfg_cm_disable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
-			       enum wlan_cm_rso_control_requestor requestor,
-			       uint8_t reason)
-{
-	return wlan_cm_disable_rso(pdev, vdev_id, requestor, reason);
-}
-
-/**
- * ucfg_cm_enable_rso() - Enable roam scan offload to firmware
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- * @requestor: RSO disable requestor
- * @reason: Reason for RSO disable
- *
- * Return:  QDF_STATUS
- */
-static inline
-QDF_STATUS ucfg_cm_enable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
-			      enum wlan_cm_rso_control_requestor requestor,
-			      uint8_t reason)
-{
-	return wlan_cm_enable_rso(pdev, vdev_id, requestor, reason);
-}
-
-/**
- * ucfg_cm_abort_rso() - Enable roam scan offload to firmware
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- *
- * Returns:
- * QDF_STATUS_E_BUSY if roam_synch is in progress and upper layer has to wait
- *                   before RSO stop cmd can be issued;
- * QDF_STATUS_SUCCESS if roam_synch is not outstanding. RSO stop cmd will be
- *                    issued with the global SME lock held in this case, and
- *                    uppler layer doesn't have to do any wait.
- */
-static inline
-QDF_STATUS ucfg_cm_abort_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
-{
-	return wlan_cm_abort_rso(pdev, vdev_id);
-}
-
-/**
- * ucfg_cm_roaming_in_progress() - check if roaming is in progress
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- *
- * Return: true or false
- */
-static inline bool
-ucfg_cm_roaming_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
-{
-	return wlan_cm_roaming_in_progress(pdev, vdev_id);
-}
-
-#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 static inline QDF_STATUS
@@ -155,4 +104,37 @@ ucfg_cm_update_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#ifdef FEATURE_CM_ENABLE
+/**
+ * ucfg_wlan_cm_roam_invoke() - Invokes Roam request
+ * @pdev: Pointer to pdev
+ * @vdev_id: vdev id
+ * @bssid: Pointer to bssid to look for in scan cache
+ * @ch_freq: channel on which reassoc should be send
+ * @source: source of roam
+ *
+ * Return: true or false
+ */
+QDF_STATUS
+ucfg_wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
+			 struct qdf_mac_addr *bssid, qdf_freq_t ch_freq,
+			 enum wlan_cm_source source);
+
+#ifdef WLAN_FEATURE_FILS_SK
+QDF_STATUS
+ucfg_cm_update_fils_config(struct wlan_objmgr_psoc *psoc,
+			   uint8_t vdev_id,
+			   struct wlan_fils_con_info *fils_info);
+#else
+static inline QDF_STATUS
+ucfg_cm_update_fils_config(struct wlan_objmgr_psoc *psoc,
+			   uint8_t vdev_id,
+			   struct wlan_fils_con_info *fils_info)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
+#endif
+
+#endif /* _WLAN_CM_ROAM_UCFG_API_H_ */

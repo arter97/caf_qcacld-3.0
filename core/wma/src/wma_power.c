@@ -106,10 +106,9 @@ QDF_STATUS wma_unified_set_sta_ps_param(wmi_unified_t wmi_handle,
 	QDF_STATUS status;
 
 	wma = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma) {
-		wma_err("wma is NULL");
+	if (!wma)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	wma_debug("Set Sta Ps param vdevId %d Param %d val %d",
 		 vdev_id, param, value);
 	iface = &wma->interfaces[vdev_id];
@@ -315,33 +314,6 @@ end:
 	qdf_mem_free(tx_pwr_params);
 	if (QDF_IS_STATUS_ERROR(ret))
 		wma_err("Failed to set vdev param WMI_VDEV_PARAM_TX_PWRLIMIT");
-}
-
-void wma_send_max_tx_pwrlmt(WMA_HANDLE handle, uint8_t vdev_id)
-{
-	uint32_t max_tx_pwr;
-	struct wma_txrx_node *iface;
-	struct vdev_mlme_obj *mlme_obj;
-	tp_wma_handle wma_handle = (tp_wma_handle) handle;
-
-	iface = &wma_handle->interfaces[vdev_id];
-	if (!iface) {
-		wma_err("Failed to get iface handle for vdev_id %d", vdev_id);
-		return;
-	}
-
-	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(iface->vdev);
-	if (!mlme_obj)
-		return;
-
-	max_tx_pwr = mlme_obj->mgmt.generic.tx_pwrlimit;
-	if (!max_tx_pwr)
-		return;
-
-	wma_nofl_debug("TXP[W][send_max_tx_pwr]: %d", max_tx_pwr);
-	wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
-			   WMI_VDEV_PARAM_TX_PWRLIMIT,
-			   max_tx_pwr);
 }
 
 /**
@@ -642,10 +614,8 @@ void wma_enable_sta_ps_mode(tpEnablePsParams ps_req)
 	t_wma_handle *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		wma_err("wma handle is null");
+	if (!wma_handle)
 		return;
-	}
 
 	iface = &wma_handle->interfaces[vdev_id];
 
@@ -749,10 +719,8 @@ void wma_disable_sta_ps_mode(tpDisablePsParams ps_req)
 	t_wma_handle *wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		wma_err("wma handle is null");
+	if (!wma_handle)
 		return;
-	}
 
 	iface = &wma_handle->interfaces[vdev_id];
 
@@ -786,10 +754,8 @@ QDF_STATUS wma_set_power_config(uint8_t vdev_id, enum powersave_mode power)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma) {
-		wma_err("WMA context is invalid!");
+	if (!wma)
 		return QDF_STATUS_E_INVAL;
-	}
 
 	wma_info("configuring power: %d", power);
 	wma->powersave_mode = power;
@@ -1121,11 +1087,15 @@ QDF_STATUS wma_process_tx_power_limits(WMA_HANDLE handle,
 	uint32_t txpower_params2g = 0;
 	uint32_t txpower_params5g = 0;
 	struct pdev_params pdevparam;
+	struct wmi_unified *wmi_handle;
 
-	if (!wma || !wma->wmi_handle) {
-		wma_err("WMA is closed, can not issue tx power limit");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
-	}
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
 	/* Set value and reason code for 2g and 5g power limit */
 
 	SET_PDEV_PARAM_TXPOWER_REASON(txpower_params2g,
@@ -1141,7 +1111,7 @@ QDF_STATUS wma_process_tx_power_limits(WMA_HANDLE handle,
 
 	pdevparam.param_id = WMI_PDEV_PARAM_TXPOWER_LIMIT2G;
 	pdevparam.param_value = txpower_params2g;
-	ret = wmi_unified_pdev_param_send(wma->wmi_handle,
+	ret = wmi_unified_pdev_param_send(wmi_handle,
 					 &pdevparam,
 					 WMA_WILDCARD_PDEV_ID);
 	if (ret) {
@@ -1150,7 +1120,7 @@ QDF_STATUS wma_process_tx_power_limits(WMA_HANDLE handle,
 	}
 	pdevparam.param_id = WMI_PDEV_PARAM_TXPOWER_LIMIT5G;
 	pdevparam.param_value = txpower_params5g;
-	ret = wmi_unified_pdev_param_send(wma->wmi_handle,
+	ret = wmi_unified_pdev_param_send(wmi_handle,
 					 &pdevparam,
 					 WMA_WILDCARD_PDEV_ID);
 	if (ret) {
@@ -1530,13 +1500,10 @@ QDF_STATUS wma_set_smps_params(tp_wma_handle wma, uint8_t vdev_id,
 QDF_STATUS wma_set_tx_power_scale(uint8_t vdev_id, int value)
 {
 	QDF_STATUS ret;
-	tp_wma_handle wma_handle =
-			(tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma_handle) {
-		wma_err("wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	if (!wma_is_vdev_up(vdev_id)) {
 		wma_err("vdev id %d is not up", vdev_id);
@@ -1561,13 +1528,10 @@ QDF_STATUS wma_set_tx_power_scale(uint8_t vdev_id, int value)
 QDF_STATUS wma_set_tx_power_scale_decr_db(uint8_t vdev_id, int value)
 {
 	QDF_STATUS ret;
-	tp_wma_handle wma_handle =
-			(tp_wma_handle)cds_get_context(QDF_MODULE_ID_WMA);
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma_handle) {
-		wma_err("wma_handle is NULL");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	if (!wma_is_vdev_up(vdev_id)) {
 		wma_err("vdev id %d is not up", vdev_id);

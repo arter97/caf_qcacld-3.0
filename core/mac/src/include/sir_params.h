@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,15 +41,6 @@
 #define SYSTEM_TIME_SEC_TO_MSEC       1000
 #define SYSTEM_TIME_NSEC_TO_USEC      1000
 
-/*
- * Following time is used to program WOW_TIMER_PATTERN to FW so that FW will
- * wake host up to do graceful disconnect in case PEER remains un-authorized
- * for this long.
- */
-#define SIR_INSTALL_KEY_TIMEOUT_SEC      70
-#define SIR_INSTALL_KEY_TIMEOUT_MS       \
-			(SIR_INSTALL_KEY_TIMEOUT_SEC * SYSTEM_TIME_SEC_TO_MSEC)
-
 /* defines for WPS config states */
 #define       SAP_WPS_DISABLED             0
 #define       SAP_WPS_ENABLED_UNCONFIGURED 1
@@ -83,7 +74,6 @@ typedef enum {
  * MCC - indicate MCC
  * P2P - indicate P2P
  * DOT11AC - indicate 11AC
- * SLM_SESSIONIZATION - indicate SLM_SESSIONIZATION
  * DOT11AC_OPMODE - indicate 11ac opmode
  * SAP32STA - indicate SAP32STA
  * TDLS - indicate TDLS
@@ -108,7 +98,6 @@ enum cap_bitmap {
 	MCC = 0,
 	P2P = 1,
 	DOT11AC = 2,
-	SLM_SESSIONIZATION = 3,
 	DOT11AC_OPMODE = 4,
 	SAP32STA = 5,
 	TDLS = 6,
@@ -358,17 +347,13 @@ enum halmsgtype {
 
 /* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 136) is unused */
 /* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 137) is unused */
+/* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 138) is unused */
 
-#ifndef ROAM_OFFLOAD_V1
-	SIR_HAL_ROAM_SCAN_OFFLOAD_REQ     = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 138),
-#endif
 	SIR_HAL_ROAM_PRE_AUTH_STATUS_IND  = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 139),
 
 	SIR_HAL_TRAFFIC_STATS_IND         = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 141),
 
-#ifdef WLAN_FEATURE_11W
 	SIR_HAL_EXCLUDE_UNENCRYPTED_IND   = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 142),
-#endif
 #ifdef FEATURE_WLAN_TDLS
 /* / PE <-> HAL TDLS messages */
 	SIR_HAL_TDLS_LINK_ESTABLISH_REQ   = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 143),
@@ -597,10 +582,8 @@ enum halmsgtype {
 	SIR_HAL_SET_WOW_PULSE_CMD         = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 369),
 
 /* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 370) is unused */
+/* (SIR_HAL_ITC_MSG_TYPES_BEGIN + 371) is unused */
 
-#ifndef ROAM_OFFLOAD_V1
-	SIR_HAL_SET_PER_ROAM_CONFIG_CMD   = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 371),
-#endif
 	SIR_HAL_RX_CHN_STATUS_EVENT       = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 372),
 
 	SIR_HAL_GET_RCPI_REQ              = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 373),
@@ -611,13 +594,8 @@ enum halmsgtype {
 #endif
 	SIR_HAL_SET_DBS_SCAN_SEL_PARAMS   = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 379),
 
-#ifndef ROAM_OFFLOAD_V1
-	SIR_HAL_INIT_ROAM_OFFLOAD_PARAM   = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 380),
-	SIR_HAL_INIT_ROAM_DISABLE_CFG     = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 381),
-#endif
-
 /*
- * Unused SIR_HAL_ITC_MSG_TYPES_BEGIN + 382 to
+ * Unused SIR_HAL_ITC_MSG_TYPES_BEGIN + 380 to
  * SIR_HAL_ITC_MSG_TYPES_BEGIN + 387
  */
 
@@ -672,6 +650,9 @@ enum halmsgtype {
 	SIR_HAL_TWT_DEL_DIALOG_REQUEST    = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 418),
 	SIR_HAL_TWT_PAUSE_DIALOG_REQUEST  = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 419),
 	SIR_HAL_TWT_RESUME_DIALOG_REQUEST = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 420),
+	SIR_HAL_PEER_CREATE_REQ           = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 421),
+	SIR_HAL_TWT_NUDGE_DIALOG_REQUEST  = (SIR_HAL_ITC_MSG_TYPES_BEGIN + 422),
+
 
 	SIR_HAL_MSG_TYPES_END               = (SIR_HAL_MSG_TYPES_BEGIN + 0x1FF),
 };
@@ -723,7 +704,6 @@ enum halmsgtype {
 #define SIR_LIM_WPS_OVERLAP_TIMEOUT      (SIR_LIM_TIMEOUT_MSG_START + 0x1D)
 #define SIR_LIM_FT_PREAUTH_RSP_TIMEOUT   (SIR_LIM_TIMEOUT_MSG_START + 0x1E)
 
-#define SIR_LIM_BEACON_GEN_IND          (SIR_LIM_TIMEOUT_MSG_START + 0x23)
 /* currently unused                     (SIR_LIM_TIMEOUT_MSG_START + 0x24) */
 /* currently unused                     (SIR_LIM_TIMEOUT_MSG_START + 0x25) */
 
