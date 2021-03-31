@@ -101,6 +101,15 @@
 				  center_freq + HALF_20MHZ_BW)
 
 #ifdef CONFIG_BAND_6GHZ
+/*
+ * The list of domain pairs. To be used for supporting psd power. This is a
+ * temporary list . In future code the psd power values are supposed to come
+ * directly from the Firmware regulatory.
+ */
+#define ETSI31_WORLD            0xF1
+#define ETSI32_WORLD            0xF2
+#define FCC38_ETSIC             0xF3
+#define APL39_MKKC              0xF4
 #define SIX_GIG_STARTING_EDGE_FREQ  (channel_map_global[MIN_6GHZ_CHANNEL]. \
 				  center_freq - HALF_20MHZ_BW)
 #define SIX_GIG_ENDING_EDGE_FREQ    (channel_map_global[MAX_6GHZ_CHANNEL]. \

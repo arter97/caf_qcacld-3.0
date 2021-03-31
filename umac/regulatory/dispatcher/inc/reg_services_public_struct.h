@@ -1232,4 +1232,15 @@ enum reg_phymode {
 	REG_PHYMODE_MAX,
 };
 
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * struct regdmn_6g_psd_power_mapping: operating class
+ * @regdmn_pair_id: Regdomain pair id
+ * @psd_power: PSD power in dBm/Mhz
+ */
+struct regdmn_6g_psd_power_map {
+	uint16_t regdmn_pair_id;
+	uint8_t psd_power;
+};
+#endif
 #endif

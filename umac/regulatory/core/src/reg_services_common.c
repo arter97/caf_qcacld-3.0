@@ -1026,6 +1026,16 @@ const struct chan_map channel_map_china[NUM_CHANNELS] = {
 #endif /* CONFIG_BAND_6GHZ */
 };
 
+#ifdef CONFIG_BAND_6GHZ
+static const struct regdmn_6g_psd_power_map reg_psd_power_map_non_us[] = {
+	{ETSI31_WORLD, 10}, /* ETSI */
+	{ETSI32_WORLD, 11}, /* UK */
+	{FCC38_ETSIC, 5},   /* Brazil */
+	{APL39_MKKC, 2},    /* Korea */
+	{0,0},
+};
+#endif /* CONFIG_BAND_6GHZ */
+
 void reg_init_channel_map(enum dfs_reg dfs_region)
 {
 	switch (dfs_region) {
@@ -2587,6 +2597,42 @@ bool reg_is_6g_freq_indoor(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
 }
 
 /**
+ * reg_fill_psd_power_for_non_us_countries() - Get max PSD power for non-US
+ * countries.
+ * @pdev: Pointer to pdev.
+ * @tx_power: Pointer to tx-power.
+ *
+ * Return: Return QDF_STATUS_SUCCESS, if the reg domain id sent by the FW is
+ * of a valid non-US country, else return QDF_STATUS_E_FAILURE.
+ */
+static QDF_STATUS
+reg_fill_psd_power_for_non_us_countries(struct wlan_objmgr_pdev *pdev,
+					uint8_t *tx_power)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	uint8_t i;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	i = 0;
+	while (reg_psd_power_map_non_us[i].regdmn_pair_id) {
+		if (pdev_priv_obj->reg_dmn_pair ==
+		    reg_psd_power_map_non_us[i].regdmn_pair_id) {
+			*tx_power = reg_psd_power_map_non_us[i].psd_power;
+			return QDF_STATUS_SUCCESS;
+		}
+
+		i++;
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  * reg_get_max_psd() - Get max PSD.
  * @freq: Channel frequency.
  * @bw: Channel bandwidth.
@@ -2597,13 +2643,19 @@ bool reg_is_6g_freq_indoor(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
  * Return: Return QDF_STATUS_SUCCESS, if PSD is filled for 6G TPE IE
  * else return QDF_STATUS_E_FAILURE.
  */
-static QDF_STATUS reg_get_max_psd(qdf_freq_t freq,
+static QDF_STATUS reg_get_max_psd(struct wlan_objmgr_pdev *pdev,
+				  qdf_freq_t freq,
 				  uint16_t bw,
 				  enum reg_6g_ap_type reg_ap,
 				  enum reg_6g_client_type reg_client,
 				  uint8_t *tx_power)
 {
+
 	if (reg_ap == REG_INDOOR_AP) {
+		if (reg_fill_psd_power_for_non_us_countries(pdev, tx_power) ==
+		    QDF_STATUS_SUCCESS)
+			return QDF_STATUS_SUCCESS;
+
 		switch (reg_client) {
 		case REG_DEFAULT_CLIENT:
 			*tx_power = REG_PSD_MAX_TXPOWER_FOR_DEFAULT_CLIENT;
@@ -2674,7 +2726,7 @@ QDF_STATUS reg_get_max_txpower_for_6g_tpe(struct wlan_objmgr_pdev *pdev,
 	 * LPI power values.
 	 */
 	if (is_psd)
-		return reg_get_max_psd(freq, bw, reg_ap, reg_client, tx_power);
+		return reg_get_max_psd(pdev, freq, bw, reg_ap, reg_client, tx_power);
 
 	return reg_get_max_eirp(pdev, freq, bw, reg_ap, reg_client, tx_power);
 }
