@@ -196,6 +196,7 @@
 #include <cdp_txrx_ctrl.h>
 #include "qdf_lock.h"
 #include "wlan_hdd_thermal.h"
+#include "wlan_hdd_medium_assess.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -7485,6 +7486,7 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 
 		if (value &&
 		    adapter->device_mode == QDF_SAP_MODE) {
+			hdd_medium_assess_set_ssr_flag();
 			wlan_hdd_netif_queue_control(adapter,
 						     WLAN_STOP_ALL_NETIF_QUEUE,
 						     WLAN_CONTROL_PATH);
@@ -15742,6 +15744,10 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 		goto end;
 	}
 	hdd_info("SAP Start Success");
+
+	if (reinit)
+		hdd_medium_assess_init();
+
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
 	if (hostapd_state->bss_state == BSS_START) {

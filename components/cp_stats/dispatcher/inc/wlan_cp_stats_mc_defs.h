@@ -173,6 +173,21 @@ struct wake_lock_stats {
 struct stats_event;
 
 /**
+ * struct medium_assess_data - medium assess data from firmware
+ * @part1_valid: the flag for part1 data
+ * @cycle_count: accumulative cycle count (total time)
+ * @rx_clear_count: accumulative rx clear count (busy time)
+ * @tx_frame_count: accumulative tx frame count (total time)
+ */
+struct medium_assess_data {
+	/* part1 data */
+	uint8_t part1_valid;
+	uint32_t cycle_count;
+	uint32_t rx_clear_count;
+	uint32_t tx_frame_count;
+};
+
+/**
  * struct request_info: details of each request
  * @cookie: identifier for os_if request
  * @u: unified data type for callback to process tx power/peer rssi/
@@ -194,7 +209,7 @@ struct request_info {
 		void (*get_peer_stats_cb)(struct stats_event *ev,
 					  void *cookie);
 		void (*congestion_notif_cb)(uint8_t vdev_id,
-					    uint8_t congestion);
+					    struct medium_assess_data *data);
 	} u;
 	uint32_t vdev_id;
 	uint32_t pdev_id;
@@ -238,19 +253,17 @@ struct psoc_mc_cp_stats {
 /**
  * struct pdev_mc_cp_stats: pdev specific stats
  * @max_pwr: max tx power for pdev
- * @congestion: percentage of congestion = (busy_time / total_time) * 100
- * @congestion_threshold: threshold for congestion precentage of pdev
+ * @pdev_id: pdev id
  * @rx_clear_count: accumulative rx clear count (busy time) of pdev
  * @cycle_count: accumulative cycle count (total time) of pdev
+ * @tx_frame_count: accumulative tx frame count (total time) of pdev
  */
 struct pdev_mc_cp_stats {
 	int32_t max_pwr;
-#ifdef WLAN_FEATURE_MEDIUM_ASSESS
-	uint8_t congestion;
-	uint8_t congestion_threshold;
+	uint32_t pdev_id;
 	uint32_t rx_clear_count;
 	uint32_t cycle_count;
-#endif
+	uint32_t tx_frame_count;
 };
 
 /**
