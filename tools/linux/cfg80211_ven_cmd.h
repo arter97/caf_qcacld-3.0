@@ -1281,6 +1281,11 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_DCS_RANDOM_CHAN_EN = 470,
 	/* Configure CSA TBTT count for DCS */
 	OL_ATH_PARAM_DCS_CSA_TBTT = 471,
+	/*
+	 *Display the maximum allowed regulatory power of current channel of
+	 *the radio
+	 */
+	OL_ATH_PARAM_CURCHAN_REG_TXPOWER = 472,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3312,6 +3317,9 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_CSA_TBTT, SET_PARAM, 1},
 	{"g_dcs_csa_tbtt",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_CSA_TBTT, GET_PARAM, 0},
+	{"g_reg_txpower",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CURCHAN_REG_TXPOWER,
+		GET_PARAM, 0},
 };
 #endif
 #endif
