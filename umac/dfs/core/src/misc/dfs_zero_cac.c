@@ -2436,7 +2436,16 @@ bool dfs_restart_rcac_on_nol_expiry(struct wlan_dfs *dfs)
 	 * on it due to radar. After NOL expiry, we try to come up on that
 	 * channel doing RCAC.
 	 */
-	if (!dfs->dfs_precac_inter_chan_freq && !dfs->dfs_autoswitch_chan)
+
+	/**
+	 * dfs_autoswitch_chan is set to NULL once we come up on that
+	 * channel. However, "dfs_precac_inter_chan_freq" is not set to 0
+	 * once interCAC channel change is done. The setting of this channel
+	 * is retained so that, next time the same channel can be used to come
+	 * up without CAC. Hence validating if dfs_precac_inter_chan_freq is 0
+	 * is of no purpose.
+	 */
+	if (!dfs->dfs_autoswitch_chan)
 		return is_rcac_started;
 
 	chan = qdf_mem_malloc(sizeof(struct dfs_channel));
