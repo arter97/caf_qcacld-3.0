@@ -419,6 +419,8 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	gen->mgmt_retry_max = cfg_get(psoc, CFG_MGMT_RETRY_MAX);
 	gen->bmiss_skip_full_scan = cfg_get(psoc, CFG_BMISS_SKIP_FULL_SCAN);
 	gen->enable_ring_buffer = cfg_get(psoc, CFG_ENABLE_RING_BUFFER);
+	gen->sae_connect_retries =
+		cfg_get(psoc, CFG_SAE_CONNECION_RETRIES);
 }
 
 static void mlme_init_edca_ani_cfg(struct wlan_mlme_edca_params *edca_params)
