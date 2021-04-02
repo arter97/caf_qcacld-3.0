@@ -251,4 +251,19 @@ void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 				 qdf_freq_t freq,
 				 qdf_freq_t sec_ch_2g_freq,
 				 struct ch_params *ch_params);
+
+/**
+ * wlan_reg_filter_wireless_modes() - Filter out the wireless modes
+ * that are not supported by the available regulatory channels.
+ * @pdev: Pointer to pdev.
+ * @mode_select: Wireless modes to be filtered.
+ * @include_nol_chan: boolean to indicate whether NOL channels are to be
+ * considered as available channels.
+ *
+ * Return: Void.
+ */
+void wlan_reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
+				    uint64_t *mode_select,
+				    bool include_nol_chan);
+
 #endif /* __WLAN_REG_CHANNEL_API_H */

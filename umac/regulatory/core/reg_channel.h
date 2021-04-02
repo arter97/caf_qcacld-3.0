@@ -212,6 +212,51 @@ enum {
 			      | HOST_REGDMN_MODE_11AXA_HE160)
 #endif
 
+#define WIRELESS_80P80_MODES (HOST_REGDMN_MODE_11AC_VHT80_80 \
+			      | HOST_REGDMN_MODE_11AXA_HE80_80)
+
+#define WIRELESS_6G_MODES (HOST_REGDMN_MODE_11AXA_HE20 \
+			   | HOST_REGDMN_MODE_11AXA_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXA_HE40MINUS \
+			   | HOST_REGDMN_MODE_11AXA_HE80 \
+			   | HOST_REGDMN_MODE_11AXA_HE160 \
+			   | HOST_REGDMN_MODE_11AXA_HE80_80)
+
+#define WIRELESS_5G_MODES (HOST_REGDMN_MODE_11AXA_HE20 \
+			   | HOST_REGDMN_MODE_11AXA_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXA_HE40MINUS \
+			   | HOST_REGDMN_MODE_11AXA_HE80 \
+			   | HOST_REGDMN_MODE_11AXA_HE160 \
+			   | HOST_REGDMN_MODE_11AXA_HE80_80 \
+			   | HOST_REGDMN_MODE_11AC_VHT20 \
+			   | HOST_REGDMN_MODE_11AC_VHT40PLUS \
+			   | HOST_REGDMN_MODE_11AC_VHT40MINUS \
+			   | HOST_REGDMN_MODE_11AC_VHT80 \
+			   | HOST_REGDMN_MODE_11AC_VHT160 \
+			   | HOST_REGDMN_MODE_11AC_VHT80_80 \
+			   | HOST_REGDMN_MODE_11NA_HT20 \
+			   | HOST_REGDMN_MODE_11NA_HT40PLUS \
+			   | HOST_REGDMN_MODE_11NA_HT40MINUS \
+			   | HOST_REGDMN_MODE_11A \
+			   | HOST_REGDMN_MODE_TURBO \
+			   | HOST_REGDMN_MODE_108A \
+			   | HOST_REGDMN_MODE_11A_HALF_RATE \
+			   | HOST_REGDMN_MODE_11A_QUARTER_RATE)
+
+#define WIRELESS_49G_MODES (HOST_REGDMN_MODE_11A \
+			    | HOST_REGDMN_MODE_11A_HALF_RATE \
+			    | HOST_REGDMN_MODE_11A_QUARTER_RATE)
+
+#define WIRELESS_2G_MODES (HOST_REGDMN_MODE_11AXG_HE20 \
+			   | HOST_REGDMN_MODE_11AXG_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXG_HE40MINUS \
+			   | HOST_REGDMN_MODE_11NG_HT20 \
+			   | HOST_REGDMN_MODE_11NG_HT40PLUS \
+			   | HOST_REGDMN_MODE_11NG_HT40MINUS \
+			   | HOST_REGDMN_MODE_PUREG \
+			   | HOST_REGDMN_MODE_11G \
+			   | HOST_REGDMN_MODE_108G \
+			   | HOST_REGDMN_MODE_11B)
 /**
  * reg_is_chan_disabled() - In the regulatory channel list, a channel
  * may be disabled by the regulatory/device or by radar. Radar is temporary
@@ -359,4 +404,19 @@ void reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 			    qdf_freq_t freq,
 			    qdf_freq_t sec_ch_2g_freq,
 			    struct ch_params *ch_params);
+
+/**
+ * reg_filter_wireless_modes() - Filter out the wireless modes
+ * that are not supported by the available regulatory channels.
+ * @pdev: Pointer to pdev.
+ * @mode_select: Wireless modes to be filtered.
+ * @include_nol_chan: boolean to indicate whether NOL channels are to be
+ * considered as available channels.
+ *
+ * Return: Void.
+ */
+void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
+			       uint64_t *mode_select,
+			       bool include_nol_chan);
+
 #endif /* __REG_CHANNEL_H_ */

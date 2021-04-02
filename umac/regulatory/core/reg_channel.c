@@ -28,6 +28,7 @@
 #include <reg_services_common.h>
 #include "reg_channel.h"
 #include <wlan_reg_channel_api.h>
+#include <wlan_reg_services_api.h>
 
 #ifdef CONFIG_HOST_FIND_CHAN
 
@@ -759,4 +760,91 @@ void reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
     else if  (reg_is_24ghz_ch_freq(freq))
 	reg_set_2g_channel_params_for_freq(pdev, freq, ch_params,
 					   sec_ch_2g_freq);
+}
+
+static enum phy_ch_width reg_find_chwidth_from_bw(uint16_t bw)
+{
+	switch (bw) {
+	case BW_5_MHZ:
+		return CH_WIDTH_5MHZ;
+	case BW_10_MHZ:
+		return CH_WIDTH_10MHZ;
+	case BW_20_MHZ:
+		return CH_WIDTH_20MHZ;
+	case BW_40_MHZ:
+		return CH_WIDTH_40MHZ;
+	case BW_80_MHZ:
+		return CH_WIDTH_80MHZ;
+	case BW_160_MHZ:
+		return CH_WIDTH_160MHZ;
+	default:
+		return CH_WIDTH_INVALID;
+	}
+}
+
+void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
+			       uint64_t *mode_select,
+			       bool include_nol_chan)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	uint64_t in_wireless_modes = *mode_select;
+	struct regulatory_channel *cur_chan_list;
+	int i, max_bw = 20;
+	uint64_t band_modes = 0;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg obj is NULL");
+		return;
+	}
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		qdf_freq_t freq = cur_chan_list[i].center_freq;
+		uint16_t cur_bw = cur_chan_list[i].max_bw;
+		struct ch_params ch_param = {0};
+
+		if (reg_is_chan_disabled(&cur_chan_list[i]))
+			continue;
+
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq))
+			band_modes |= WIRELESS_2G_MODES;
+
+		if (WLAN_REG_IS_49GHZ_FREQ(freq))
+			band_modes |= WIRELESS_49G_MODES;
+
+		if (WLAN_REG_IS_5GHZ_CH_FREQ(freq))
+			band_modes |= WIRELESS_5G_MODES;
+
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(freq))
+			band_modes |= WIRELESS_6G_MODES;
+
+		if (!include_nol_chan) {
+			ch_param.ch_width = reg_find_chwidth_from_bw(cur_bw);
+			wlan_reg_set_channel_params_for_freq(pdev, freq, 0,
+							     &ch_param);
+			cur_bw = get_contiguous_bw[ch_param.ch_width];
+		}
+
+		if (max_bw < cur_bw)
+			max_bw = cur_bw;
+	}
+
+	in_wireless_modes &= band_modes;
+
+	if (max_bw < BW_40_MHZ)
+		in_wireless_modes &= (~WIRELESS_40_MODES);
+
+	if (max_bw < BW_80_MHZ)
+		in_wireless_modes &= (~WIRELESS_80_MODES);
+
+	if (max_bw < BW_160_MHZ) {
+		in_wireless_modes &= (~WIRELESS_160_MODES);
+		if (include_nol_chan)
+			in_wireless_modes &= (~WIRELESS_80P80_MODES);
+	}
+
+	*mode_select = in_wireless_modes;
 }

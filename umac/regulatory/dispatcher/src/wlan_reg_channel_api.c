@@ -196,3 +196,10 @@ void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 {
     reg_get_channel_params(pdev, freq, sec_ch_2g_freq, ch_params);
 }
+
+void wlan_reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
+				    uint64_t *mode_select,
+				    bool include_nol_chan)
+{
+	reg_filter_wireless_modes(pdev, mode_select, include_nol_chan);
+}
