@@ -135,7 +135,6 @@ qdf_export_symbol(qca_multi_link_tbl_find_sta_or_ap);
 QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, uint8_t *addr,
 							qca_multi_link_entry_type_t entry_type)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 24)
 	int status;
 	uint16_t state = NUD_NONE;
 
@@ -146,31 +145,19 @@ QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, u
 	} else if (entry_type == QCA_MULTI_LINK_ENTRY_STATIC) {
 		state = NUD_NOARP;
 	}
-#endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 24)
 	status = br_fdb_add_or_refresh_by_netdev(net_dev, addr, 0, state);
 	if (status < 0) {
 		return QDF_STATUS_E_FAILURE;
 	}
-#else
-	/* Use 5.4-specific API */
-#endif
 	return QDF_STATUS_SUCCESS;
 }
-
 qdf_export_symbol(qca_multi_link_tbl_add_or_refresh_entry);
 
 QDF_STATUS qca_multi_link_tbl_delete_entry(struct net_device *net_dev, uint8_t *addr)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 24)
 	QDF_STATUS status;
-#endif
 	struct net_bridge_fdb_entry *fdb_entry = NULL;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 24)
-	struct net_bridge_port *fdb_port = NULL;
-	struct net_bridge *br = NULL;
-#endif
 
 	fdb_entry = qal_bridge_fdb_has_entry(net_dev, addr, 0);
 	if (!fdb_entry) {
@@ -185,24 +172,10 @@ QDF_STATUS qca_multi_link_tbl_delete_entry(struct net_device *net_dev, uint8_t *
 		return QDF_STATUS_SUCCESS;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 24)
-	fdb_port = br_port_get_rcu(net_dev);
-	if (!fdb_port) {
-		qdf_err("fdb port is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	br = fdb_port->br;
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 24)
 	status = qal_bridge_fdb_delete_by_netdev(net_dev, addr, 0);
 	if (status != QDF_STATUS_SUCCESS) {
 		return QDF_STATUS_E_FAILURE;
 	}
-#else
-	/* Use 5.4-specific API */
-#endif
 
 	return QDF_STATUS_SUCCESS;
 }
