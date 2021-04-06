@@ -24,6 +24,8 @@
 #ifndef __REG_CHANNEL_H_
 #define __REG_CHANNEL_H_
 
+#include <wlan_reg_channel_api.h>
+
 #define NEXT_20_CH_OFFSET 20
 
 #ifdef CONFIG_HOST_FIND_CHAN
@@ -313,6 +315,52 @@ bool reg_is_chan_blocked(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
  */
 void reg_clear_allchan_blocked(struct wlan_objmgr_pdev *pdev);
 
+/**
+ * reg_set_chan_ht40intol() - Set ht40intol_flags to the value for a
+ * frequency in the current chan list.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency in MHz.
+ * @ht40intol_flags: ht40intol_flags to be set.
+ *
+ * Return: void.
+ */
+void reg_set_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			    enum ht40_intol ht40intol_flags);
+
+/**
+ * reg_clear_chan_ht40intol() - Clear the ht40intol_flags from the
+ * regulatory channel corresponding to the frequency in the current chan list.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency in MHz.
+ * @ht40intol_flags: ht40intol_flags to be cleared.
+ *
+ * Return: void.
+ */
+void reg_clear_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			      enum ht40_intol ht40intol_flags);
+
+/**
+ * reg_is_chan_ht40intol() - Check if the ht40intol flag is set to the
+ * given enum for a frequency in the current chan list.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency in MHz.
+ * @ht40intol_flags: The ht40intol flag (plus/minus) to check.
+ *
+ * Return: true if is_chan_htintol is set to given value for the input
+ * frequency, else false.
+ */
+bool reg_is_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			   enum ht40_intol ht40intol_flags);
+
+/**
+ * wlan_reg_clear_allchan_ht40intol() - Clear ht40intol_flags for all channels
+ * in the current chan list.
+ * @pdev: Pointer to pdev.
+ *
+ * Return: void.
+ */
+void reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev);
+
 /*
  * reg_is_band_present() - Check if input band channels are present
  * in the regulatory current channel list.
@@ -349,6 +397,30 @@ bool reg_is_chan_blocked(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
 }
 
 static inline void reg_clear_allchan_blocked(struct wlan_objmgr_pdev *pdev)
+{
+}
+
+static inline void
+reg_set_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+		       enum ht40_intol ht40intol_flags)
+{
+}
+
+	static inline void
+reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			    enum ht40_intol ht40intol_flags)
+{
+}
+
+static inline bool
+reg_is_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+		      enum ht40_intol ht40intol_flags)
+{
+	return false;
+}
+
+static inline void
+reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev)
 {
 }
 

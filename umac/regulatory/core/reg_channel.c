@@ -292,6 +292,95 @@ void reg_clear_allchan_blocked(struct wlan_objmgr_pdev *pdev)
 		cur_chan_list[i].is_chan_hop_blocked = false;
 }
 
+void reg_set_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			    enum ht40_intol ht40intol_flags)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *cur_chan_list;
+	int i;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return;
+	}
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		if (cur_chan_list[i].center_freq == freq)
+			cur_chan_list[i].ht40intol_flags |=
+					BIT(ht40intol_flags);
+	}
+}
+
+void reg_clear_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			      enum ht40_intol ht40intol_flags)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *cur_chan_list;
+	int i;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return;
+	}
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		if (cur_chan_list[i].center_freq == freq)
+			cur_chan_list[i].ht40intol_flags &=
+				~(BIT(ht40intol_flags));
+	}
+}
+
+bool reg_is_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			   enum ht40_intol ht40intol_flags)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *cur_chan_list;
+	int i;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return false;
+	}
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+
+	for (i = 0; i < NUM_CHANNELS; i++)
+		if (cur_chan_list[i].center_freq == freq)
+			return (cur_chan_list[i].ht40intol_flags &
+				BIT(ht40intol_flags));
+
+	return false;
+}
+
+void reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *cur_chan_list;
+	int i;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return;
+	}
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+
+	for (i = 0; i < NUM_CHANNELS; i++)
+		cur_chan_list[i].ht40intol_flags = 0;
+}
+
 /*
  * reg_is_band_found_internal - Check if a band channel is found in the
  * current channel list.
