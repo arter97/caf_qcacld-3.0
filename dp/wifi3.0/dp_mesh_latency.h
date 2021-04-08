@@ -37,8 +37,9 @@ enum dp_mesh_latency_service_interval {
 };
 
 QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
-				    uint8_t *dest_mac, uint32_t service_interval,
-					uint32_t burst_size, uint16_t priority,
+				    uint8_t *dest_mac, uint32_t service_interval_dl,
+					uint32_t burst_size_dl, uint32_t service_interval_ul,
+					uint32_t burst_size_ul, uint16_t priority,
 					uint8_t add_or_sub);
 #endif
 

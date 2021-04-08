@@ -21,6 +21,7 @@
 #define __qca_mesh_latency_if_H_
 
 int qca_mesh_latency_update_peer_parameter(uint8_t *dest_mac,
-		uint32_t service_interval, uint32_t burst_size,
+		uint32_t service_interval_dl, uint32_t burst_size_dl,
+		uint32_t service_interval_ul, uint32_t burst_size_ul,
 		uint16_t priority, uint8_t add_or_sub);
 #endif /* qca_mesh_latency_if_H*/
