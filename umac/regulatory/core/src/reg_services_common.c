@@ -4235,7 +4235,12 @@ reg_get_cur_6g_ap_pwr_type(struct wlan_objmgr_pdev *pdev,
 		reg_err("pdev reg component is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (pdev_priv_obj->reg_cur_6g_ap_pwr_type >= REG_CURRENT_MAX_AP_TYPE)
+		return QDF_STATUS_E_FAILURE;
+
 	*reg_cur_6g_ap_pwr_type = pdev_priv_obj->reg_cur_6g_ap_pwr_type;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -4251,8 +4256,14 @@ reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 		reg_err("pdev reg component is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (pdev_priv_obj->reg_cur_6g_client_mobility_type >=
+	    REG_MAX_CLIENT_TYPE)
+		return QDF_STATUS_E_FAILURE;
+
 	*reg_cur_6g_client_mobility_type =
 	    pdev_priv_obj->reg_cur_6g_client_mobility_type;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -4436,9 +4447,6 @@ QDF_STATUS reg_get_client_power_for_6ghz_ap(struct wlan_objmgr_pdev *pdev,
 		reg_err("pdev priv obj is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	if (ap_pwr_type >= REG_CURRENT_MAX_AP_TYPE)
-		return QDF_STATUS_E_FAILURE;
 
 	master_chan_list = pdev_priv_obj->
 			mas_chan_list_6g_client[ap_pwr_type][client_type];
