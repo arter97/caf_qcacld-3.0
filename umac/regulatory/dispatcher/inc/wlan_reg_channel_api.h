@@ -236,4 +236,19 @@ bool wlan_reg_is_nol_hist_for_freq(struct wlan_objmgr_pdev *pdev,
 bool wlan_reg_is_freq_width_dfs(struct wlan_objmgr_pdev *pdev,
 				qdf_freq_t freq,
 				enum phy_ch_width ch_width);
+
+/**
+ * wlan_reg_get_channel_params() - Sets channel parameteres for
+ * given bandwidth
+ * @pdev: The physical dev to program country code or regdomain
+ * @freq: channel center frequency.
+ * @sec_ch_2g_freq: Secondary channel center frequency.
+ * @ch_params: pointer to the channel parameters.
+ *
+ * Return: None
+ */
+void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
+				 qdf_freq_t freq,
+				 qdf_freq_t sec_ch_2g_freq,
+				 struct ch_params *ch_params);
 #endif /* __WLAN_REG_CHANNEL_API_H */

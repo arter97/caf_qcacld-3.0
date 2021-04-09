@@ -188,3 +188,11 @@ bool wlan_reg_is_freq_width_dfs(struct wlan_objmgr_pdev *pdev,
 {
 	return reg_is_freq_width_dfs(pdev, freq, ch_width);
 }
+
+void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
+				 qdf_freq_t freq,
+				 qdf_freq_t sec_ch_2g_freq,
+				 struct ch_params *ch_params)
+{
+    reg_get_channel_params(pdev, freq, sec_ch_2g_freq, ch_params);
+}
