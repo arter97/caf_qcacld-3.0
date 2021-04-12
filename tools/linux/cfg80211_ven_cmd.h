@@ -391,9 +391,6 @@ enum {
 	IEEE80211_PARAM_MGMT_RATE               = 384, /* Set mgmt rate, will set mcast/bcast/ucast to same rate*/
 	IEEE80211_PARAM_NO_VAP_RESET            = 385, /* Disable the VAP reset in NSS */
 	IEEE80211_PARAM_STA_COUNT               = 386, /* TO get number of station associated*/
-#if QCA_SUPPORT_SSID_STEERING
-	IEEE80211_PARAM_VAP_SSID_CONFIG         = 387, /* Vap configuration  */
-#endif
 #if ATH_SUPPORT_DSCP_OVERRIDE
 	IEEE80211_PARAM_DSCP_MAP_ID             = 388,
 	IEEE80211_PARAM_DSCP_TID_MAP            = 389,
@@ -421,11 +418,6 @@ enum {
 #if ATH_DATA_RX_INFO_EN
 	IEEE80211_PARAM_RXINFO_PERPKT          = 408,  /* update rx info per pkt */
 #endif
-	IEEE80211_PARAM_WHC_APINFO_WDS          = 415, /* Whether associated AP supports WDS
-							  (as determined from the vendor IE) */
-	IEEE80211_PARAM_WHC_APINFO_ROOT_DIST    = 416, /* Distance from the root AP (in hops);
-							  only valid if the WDS flag is set
-							  based on the param above */
 	IEEE80211_PARAM_ATH_SUPPORT_VLAN        = 417,
 	IEEE80211_PARAM_CONFIG_ASSOC_WAR_160W   = 418, /* Configure association WAR for 160 MHz width (i.e.
 							  160/80+80 MHz modes). Some STAs may have an issue
@@ -452,8 +444,6 @@ enum {
 	IEEE80211_PARAM_11N_TX_AMSDU            = 425, /* Enable/Disable HT Tx AMSDU only */
 	IEEE80211_PARAM_BSS_CHAN_INFO           = 426,
 	IEEE80211_PARAM_LCR_ENABLE              = 427,
-	IEEE80211_PARAM_WHC_APINFO_SON          = 428, /* Whether associated AP supports SON mode
-							  (as determined from the vendor IE) */
 	IEEE80211_PARAM_SON                     = 429, /* Mark/query AP as SON enabled */
 	IEEE80211_PARAM_CTSPROT_DTIM_BCN        = 430, /* Enable/Disable CTS2SELF protection for DTIM Beacons */
 	IEEE80211_PARAM_RAWMODE_PKT_SIM         = 431, /* Enable/Disable RAWMODE_PKT_SIM*/
@@ -529,9 +519,6 @@ enum {
 	IEEE80211_PARAM_REPT_MULTI_SPECIAL         = 482,
 	IEEE80211_PARAM_VSP_ENABLE                 = 483,   /* Video Stream Protection */
 	IEEE80211_PARAM_ENABLE_VENDOR_IE           = 484,    /* Enable/ disable Vendor ie advertise in Beacon/ proberesponse*/
-	IEEE80211_PARAM_WHC_APINFO_SFACTOR         = 485,  /* Set Scaling factor for best uplink selection algorithm */
-	IEEE80211_PARAM_WHC_APINFO_BSSID           = 486,  /* Get the best uplink BSSID for scan entries */
-	IEEE80211_PARAM_WHC_APINFO_RATE            = 487,  /* Get the current uplink data rate(estimate) */
 	IEEE80211_PARAM_CONFIG_MON_DECODER         = 488,  /* Monitor VAP decoder format radiotap/prism */
 	IEEE80211_PARAM_DYN_BW_RTS                 = 489,   /* Enable/Disable the dynamic bandwidth RTS */
 	IEEE80211_PARAM_CONFIG_MU_CAP_TIMER        = 490,  /* Set/Get timer period in seconds(1 to 300) for de-assoc dedicated client when
@@ -541,7 +528,6 @@ enum {
 	IEEE80211_PARAM_CONFIG_BSSID               = 492,  /* Configure hidden ssid AP's bssid */
 #endif
 	IEEE80211_PARAM_CONFIG_NSTSCAP_WAR         = 493,  /* Enable/Disable NSTS CAP WAR */
-	IEEE80211_PARAM_WHC_APINFO_CAP_BSSID       = 494,   /* get the CAP BSSID from scan entries */
 	IEEE80211_PARAM_BEACON_RATE_FOR_VAP        = 495,      /*Configure beacon rate to user provided rate*/
 	IEEE80211_PARAM_CHANNEL_SWITCH_MODE        = 496,   /* channel switch mode to be used in CSA and ECSA IE*/
 	IEEE80211_PARAM_ENABLE_ECSA_IE             = 497,   /* ECSA IE  enable/disable*/
@@ -576,13 +562,7 @@ enum {
 	IEEE80211_PARAM_CONFIG_CATEGORY_VERBOSE    = 521,   /* Configure verbose level for a category */
 	IEEE80211_PARAM_TXRX_DP_STATS              = 522,   /* Display stats aggregated at host */
 	IEEE80211_PARAM_RX_FILTER_SMART_MONITOR    = 523,   /* Get per vap smart monitor stats */
-	IEEE80211_PARAM_WHC_CAP_RSSI               = 524,   /* Set/Get the CAP RSSI threshold for best uplink selection */
-	IEEE80211_PARAM_WHC_CURRENT_CAP_RSSI       = 525,   /* Get the current CAP RSSI from scan entrie */
 	IEEE80211_PARAM_RX_SMART_MONITOR_RSSI      = 526,   /* Get smart monitor rssi */
-	IEEE80211_PARAM_WHC_APINFO_BEST_UPLINK_OTHERBAND_BSSID = 527, /* Get the best otherband uplink BSSID */
-	IEEE80211_PARAM_WHC_APINFO_OTHERBAND_UPLINK_BSSID = 528, /* Get the current otherband uplink BSSID from scan entry */
-	IEEE80211_PARAM_WHC_APINFO_OTHERBAND_BSSID = 529,   /* Set the otherband BSSID for AP vap */
-	IEEE80211_PARAM_WHC_APINFO_UPLINK_RATE     = 530,   /* Get the current uplink rate */
 	IEEE80211_PARAM_HE_SU_BFEE                 = 531,   /* Set 11ax - HE SU BFEE */
 	IEEE80211_PARAM_HE_SU_BFER                 = 532,   /* Set 11ax - HE SU BFER */
 	IEEE80211_PARAM_HE_MU_BFEE                 = 533,   /* Set 11ax - HE MU BFEE */
@@ -619,7 +599,6 @@ enum {
 #endif
 	IEEE80211_PARAM_DMS_AMSDU_WAR              = 557,   /* Enable 11v DMS AMSDU WAR */
 	IEEE80211_PARAM_TXPOW                      = 558,   /* set/get the control frame tx power per vap */
-	IEEE80211_PARAM_BEST_UL_HYST               = 559,
 	IEEE80211_PARAM_HE_TX_MCSMAP               = 560,   /* set 11ax - HE TX MCSMAP */
 	IEEE80211_PARAM_HE_RX_MCSMAP               = 561,   /* set 11ax - HE RX MCSMAP */
 	IEEE80211_PARAM_CONFIG_M_COPY              = 562,   /* Enable/Disable Mirror copy mode */
@@ -629,8 +608,6 @@ enum {
 	IEEE80211_PARAM_HE_SOUNDING_MODE           = 566,   /* Select HE/VHT, SU/MU and Trig/Nong-Trig sounding */
 	IEEE80211_PARAM_PRB_RATE                   = 570,   /* Set/Get probe-response frame rate */
 	IEEE80211_PARAM_RSN_OVERRIDE               = 571,   /* enable/disable rsn override feature */
-	IEEE80211_PARAM_MAP                        = 572,   /* multi ap enable */
-	IEEE80211_PARAM_MAP_BSS_TYPE               = 573,   /* Multi Ap BSS TYPES */
 	/* Enable/Disable HE HT control support */
 	IEEE80211_PARAM_HE_HT_CTRL                 = 574,
 	IEEE80211_PARAM_OCE_HLP                    = 575,   /* Enable/disable OCE FILS HLP */
@@ -640,7 +617,6 @@ enum {
 	IEEE80211_PARAM_RNR_TBTT                   = 579,   /* enable/disable calculation TBTT in RNR IE */
 	IEEE80211_PARAM_AP_CHAN_RPT                = 580,   /* enable/disable inclusion of AP Channel Report IE in Beacon/Probe-Rsp */
 	IEEE80211_PARAM_MAX_SCAN_TIME_ACS_REPORT   = 581,   /* max scan time for acs scan report */
-	IEEE80211_PARAM_MAP_VAP_BEACONING          = 582,   /* multi ap vap teardown */
 	IEEE80211_PARAM_ACL_SET_BLOCK_MGMT         = 583,   /* block mgmt from a mac-address */
 	IEEE80211_PARAM_ACL_CLR_BLOCK_MGMT         = 584,   /* allow mgmt from a mac-address */
 	IEEE80211_PARAM_ACL_GET_BLOCK_MGMT         = 585,   /* get list of mac-addresses */
@@ -652,14 +628,10 @@ enum {
 	IEEE80211_PARAM_LOG_FLUSH_TIMER_PERIOD     = 589,   /* time interval in which wlan log buffers will be pushed to user-space */
 	IEEE80211_PARAM_LOG_FLUSH_ONE_TIME         = 590,   /* push the logs to user space one time */
 	IEEE80211_PARAM_LOG_DUMP_AT_KERNEL_ENABLE  = 591,   /* enable/disable kernel print call in logging */
-	IEEE80211_PARAM_LOG_ENABLE_BSTEERING_RSSI  = 592,   /* enable/disable inst rssi log for son */
 	IEEE80211_PARAM_FT_ENABLE                  = 593,   /* Enable/Disable BSS fast transition */
 	IEEE80211_PARAM_BCN_STATS_RESET            = 594,   /* send beacon stats reset command */
 	IEEE80211_PARAM_WLAN_SER_TEST              = 595,   /* Start unit testing of serialization */
 	IEEE80211_PARAM_SIFS_TRIGGER               = 596,   /* get/set sifs trigger interval per vdev */
-#if QCA_SUPPORT_SON
-	IEEE80211_PARAM_SON_EVENT_BCAST            = 597,   /* enable/disable events broadcast for son */
-#endif
 	IEEE80211_PARAM_HE_UL_SHORTGI              = 598,   /* Shortgi configuration in UL Trigger */
 	IEEE80211_PARAM_HE_UL_LTF                  = 599,   /* LTF configuration in UL Trigger */
 	IEEE80211_PARAM_HE_UL_NSS                  = 600,   /* Maximum NSS allowed in UL Trigger */
@@ -678,11 +650,8 @@ enum {
 #if UMAC_SUPPORT_WPA3_STA
 	IEEE80211_PARAM_SAE_AUTH_ATTEMPTS          = 610,   /* To set/get sae maximum auth attempts */
 #endif
-	IEEE80211_PARAM_WHC_SKIP_HYST              = 611,   /* Set/Get Skip hyst for best AP*/
 	IEEE80211_PARAM_GET_FREQUENCY              = 612,   /* Get Frequency */
 	IEEE80211_PARAM_SON_NUM_VAP                = 613,   /* To get the number of SON enabled Vaps */
-	IEEE80211_PARAM_WHC_MIXEDBH_ULRATE         = 614,   /* Get or Set the Uplink rate for SON mixedbackhaul */
-	IEEE80211_PARAM_WHC_BACKHAUL_TYPE          = 615,   /* Set the SON Mode and Wifi or Ether backhaul type */
 	IEEE80211_PARAM_GET_OPMODE                 = 616,   /* Get operation mode of VAP*/
 	IEEE80211_PARAM_HE_BSR_SUPPORT             = 617,   /* HE BSR Support */
 	IEEE80211_PARAM_SET_VLAN_TYPE              = 618,   /* enable/disable VLAN configuration on VAP in NSS offload mode */
@@ -700,7 +669,6 @@ enum {
 	IEEE80211_PARAM_TWT_RESPONDER_SUPRT        = 630,   /* HE TWT responder support */
 	IEEE80211_PARAM_CONFIG_CAPTURE_LATENCY_ENABLE  = 631, /* Cap tx latency */
 	IEEE80211_PARAM_GET_RU26_TOLERANCE         = 632,   /* Get ru 26 intolerence status */
-	IEEE80211_PARAM_WHC_APINFO_UPLINK_SNR      = 633, /* Get uplink SNR */
 	IEEE80211_PARAM_DPP_VAP_MODE               = 634, /* Disable/Enable the DPP mode */
 #if SM_ENG_HIST_ENABLE
 	IEEE80211_PARAM_SM_HISTORY                 = 635,   /* Print all the VDEV SM history */
@@ -736,7 +704,6 @@ enum {
 	IEEE80211_PARAM_ENABLE_MCAST_RC            = 685, /* Enable Mcast RC */
 	IEEE80211_PARAM_VHT_MCS_12_13_SUPP         = 686, /* Overall HE MCS 12/13 Support*/
 	IEEE80211_PARAM_RRM_CAP_IE                 = 687, /* Include RRM Cap IE in Assoc Request for STA mode */
-	IEEE80211_PARAM_MAP2_BSTA_VLAN_ID          = 688, /* Multi Ap Primary VLAN Id for STA */
 	IEEE80211_PARAM_SET_STATS_UPDATE_PERIOD    = 689, /* Set stats update period on legacy targets */
 	IEEE80211_PARAM_VDEV_PEER_PROTOCOL_COUNT        = 690, /* Sets peer-prot count feature enable */
 	IEEE80211_PARAM_VDEV_PEER_PROTOCOL_DROP_MASK    = 691, /* Sets peer-prot count feature dropmask */
@@ -1281,6 +1248,11 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_DCS_RANDOM_CHAN_EN = 470,
 	/* Configure CSA TBTT count for DCS */
 	OL_ATH_PARAM_DCS_CSA_TBTT = 471,
+	/*
+	 *Display the maximum allowed regulatory power of current channel of
+	 *the radio
+	 */
+	OL_ATH_PARAM_CURCHAN_REG_TXPOWER = 472,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -1774,10 +1746,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"novap_reset",         IEEE80211_PARAM_NO_VAP_RESET, SET_PARAM, 1},
 	{"get_novap_reset",     IEEE80211_PARAM_NO_VAP_RESET, GET_PARAM, 0},
 	{"get_sta_count",       IEEE80211_PARAM_STA_COUNT, GET_PARAM, 0},
-#if QCA_SUPPORT_SSID_STEERING
-	{"ssid_config",         IEEE80211_PARAM_VAP_SSID_CONFIG, SET_PARAM, 1},
-	{"get_ssid_config",     IEEE80211_PARAM_VAP_SSID_CONFIG, GET_PARAM, 0},
-#endif
 #if ATH_SUPPORT_DSCP_OVERRIDE
 	{"set_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, SET_PARAM, 1},
 	{"get_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, GET_PARAM, 0},
@@ -1808,9 +1776,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_blbwnssmap",      IEEE80211_DISABLE_STA_BWNSS_ADV, GET_PARAM, 0},
 	{"neighbourfilter",     IEEE80211_PARAM_RX_FILTER_NEIGHBOUR_PEERS_MONITOR,
 		SET_PARAM, 1},
-	{"get_whc_wds",         IEEE80211_PARAM_WHC_APINFO_WDS, GET_PARAM, 0},
-	{"set_whc_dist",        IEEE80211_PARAM_WHC_APINFO_ROOT_DIST, SET_PARAM, 1},
-	{"get_whc_dist",        IEEE80211_PARAM_WHC_APINFO_ROOT_DIST, GET_PARAM, 0},
 	{"assocwar160",         IEEE80211_PARAM_CONFIG_ASSOC_WAR_160W, SET_PARAM, 1},
 	{"get_assocwar160",     IEEE80211_PARAM_CONFIG_ASSOC_WAR_160W, GET_PARAM, 0},
 #if QCA_AIRTIME_FAIRNESS
@@ -1827,7 +1792,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 #endif
 	{"bss_chan_info",       IEEE80211_PARAM_BSS_CHAN_INFO, SET_PARAM, 1},
 	{"enable_lcr",          IEEE80211_PARAM_LCR_ENABLE, SET_PARAM, 1},
-	{"get_whc_son",         IEEE80211_PARAM_WHC_APINFO_SON, GET_PARAM, 0},
 	{"son",                 IEEE80211_PARAM_SON, SET_PARAM, 1},
 	{"get_son",             IEEE80211_PARAM_SON, GET_PARAM, 0},
 	{"rmode_pktsim",        IEEE80211_PARAM_RAWMODE_PKT_SIM, SET_PARAM, 1},
@@ -1900,9 +1864,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_rept_spl",          IEEE80211_PARAM_REPT_MULTI_SPECIAL, GET_PARAM, 0},
 	{"vie_ena",             IEEE80211_PARAM_ENABLE_VENDOR_IE, SET_PARAM, 1},
 	{"g_vie_ena",           IEEE80211_PARAM_ENABLE_VENDOR_IE, GET_PARAM, 0},
-	{"set_whc_sfactor",     IEEE80211_PARAM_WHC_APINFO_SFACTOR, SET_PARAM, 1},
-	{"get_whc_sfactor",     IEEE80211_PARAM_WHC_APINFO_SFACTOR, GET_PARAM, 0},
-	{"get_whc_rate",        IEEE80211_PARAM_WHC_APINFO_RATE, GET_PARAM, 0},
 	{"mon_decoder",         IEEE80211_PARAM_CONFIG_MON_DECODER, SET_PARAM, 1},
 	{"g_mon_decoder",       IEEE80211_PARAM_CONFIG_MON_DECODER, GET_PARAM, 0},
 	{"mudeasoc",            IEEE80211_PARAM_CONFIG_MU_CAP_TIMER, SET_PARAM, 1},
@@ -1956,11 +1917,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"qdf_cv_lvl",          IEEE80211_PARAM_CONFIG_CATEGORY_VERBOSE, SET_PARAM, 1},
 	{"g_qdf_cv_lvl",        IEEE80211_PARAM_CONFIG_CATEGORY_VERBOSE, GET_PARAM, 0},
 	{"txrx_stats",          IEEE80211_PARAM_TXRX_DP_STATS, SET_PARAM, 1},
-	{"caprssi",             IEEE80211_PARAM_WHC_CAP_RSSI, SET_PARAM, 1},
-	{"g_caprssi",           IEEE80211_PARAM_WHC_CAP_RSSI, GET_PARAM, 0},
-	{"g_curr_caprssi",      IEEE80211_PARAM_WHC_CURRENT_CAP_RSSI, GET_PARAM, 0},
-	{"set_whc_ul_rate",     IEEE80211_PARAM_WHC_APINFO_UPLINK_RATE, SET_PARAM, 1},
-	{"get_whc_ul_rate",     IEEE80211_PARAM_WHC_APINFO_UPLINK_RATE, GET_PARAM, 0},
 	{"he_subfee",           IEEE80211_PARAM_HE_SU_BFEE, SET_PARAM, 1},
 	{"get_he_subfee",       IEEE80211_PARAM_HE_SU_BFEE, GET_PARAM, 0},
 	{"he_subfer",           IEEE80211_PARAM_HE_SU_BFER, SET_PARAM, 1},
@@ -2022,8 +1978,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_enable_11v_dms",    IEEE80211_PARAM_DMS_AMSDU_WAR, GET_PARAM, 0},
 	{"s_txpow",             IEEE80211_PARAM_TXPOW, SET_PARAM, 2},
 	{"g_txpow",             IEEE80211_PARAM_TXPOW, GET_PARAM, 1},
-	{"ul_hyst",             IEEE80211_PARAM_BEST_UL_HYST, SET_PARAM, 1},
-	{"g_ul_hyst",           IEEE80211_PARAM_BEST_UL_HYST, GET_PARAM, 0},
 	{"he_txmcsmap",         IEEE80211_PARAM_HE_TX_MCSMAP, SET_PARAM, 1},
 	{"get_he_txmcsmap",     IEEE80211_PARAM_HE_TX_MCSMAP, GET_PARAM, 0},
 	{"he_rxmcsmap",         IEEE80211_PARAM_HE_RX_MCSMAP, SET_PARAM, 1},
@@ -2040,16 +1994,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_he_sounding_mode",    IEEE80211_PARAM_HE_SOUNDING_MODE, GET_PARAM, 0},
 	{"rsn_override",        IEEE80211_PARAM_RSN_OVERRIDE, SET_PARAM, 1},
 	{"g_rsn_override",      IEEE80211_PARAM_RSN_OVERRIDE, GET_PARAM, 0},
-	{"map",                 IEEE80211_PARAM_MAP, SET_PARAM, 1},
-	{"get_map",             IEEE80211_PARAM_MAP, GET_PARAM, 0},
-	{"MapBSSType",          IEEE80211_PARAM_MAP_BSS_TYPE, SET_PARAM, 1},
-	{"get_MapBSSType",      IEEE80211_PARAM_MAP_BSS_TYPE, GET_PARAM, 0},
 	{"he_ht_ctrl",          IEEE80211_PARAM_HE_HT_CTRL, SET_PARAM, 1},
 	{"get_he_ht_ctrl",      IEEE80211_PARAM_HE_HT_CTRL, GET_PARAM, 0},
 	{"acsmaxscantime",      IEEE80211_PARAM_MAX_SCAN_TIME_ACS_REPORT, SET_PARAM, 1},
 	{"g_acsmaxscan_t",      IEEE80211_PARAM_MAX_SCAN_TIME_ACS_REPORT, GET_PARAM, 0},
-	{"mapset_vapup",        IEEE80211_PARAM_MAP_VAP_BEACONING, SET_PARAM, 1},
-	{"mapget_vapup",        IEEE80211_PARAM_MAP_VAP_BEACONING, GET_PARAM, 0},
 #if UMAC_SUPPORT_XBSSLOAD
 	{"xbssload",            IEEE80211_PARAM_XBSS_LOAD, SET_PARAM, 1},
 	{"get_xbssload",        IEEE80211_PARAM_XBSS_LOAD, GET_PARAM, 0},
@@ -2061,16 +2009,11 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"log_flush_one_time",          IEEE80211_PARAM_LOG_FLUSH_ONE_TIME, SET_PARAM, 1},
 	{"log_dump_at_kernel_enable",   IEEE80211_PARAM_LOG_DUMP_AT_KERNEL_ENABLE,
 		SET_PARAM, 1},
-	{"bsteerrssi_log",      IEEE80211_PARAM_LOG_ENABLE_BSTEERING_RSSI, SET_PARAM, 1},
 	{"ft",                  IEEE80211_PARAM_FT_ENABLE, SET_PARAM, 1},
 	{"g_ft",                IEEE80211_PARAM_FT_ENABLE, GET_PARAM, 0},
 	{"bcn_stats_clr",       IEEE80211_PARAM_BCN_STATS_RESET, SET_PARAM, 1},
 	{"sifs_trigger",        IEEE80211_PARAM_SIFS_TRIGGER, SET_PARAM, 1},
 	{"g_sifs_trigger",      IEEE80211_PARAM_SIFS_TRIGGER, GET_PARAM, 0},
-#if QCA_SUPPORT_SON
-	{"son_event_bcast",     IEEE80211_PARAM_SON_EVENT_BCAST, SET_PARAM, 1},
-	{"g_son_event_bcast",   IEEE80211_PARAM_SON_EVENT_BCAST, GET_PARAM, 0},
-#endif
 	{"he_ul_shortgi",       IEEE80211_PARAM_HE_UL_SHORTGI, SET_PARAM, 1},
 	{"get_he_ul_shortgi",   IEEE80211_PARAM_HE_UL_SHORTGI, GET_PARAM, 0},
 	{"he_ul_ltf",           IEEE80211_PARAM_HE_UL_LTF, SET_PARAM, 1},
@@ -2096,11 +2039,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_advertise_sta_maxcap",  IEEE80211_PARAM_STA_MAX_CH_CAP, GET_PARAM, 0},
 	{"rawmode_open_war",    IEEE80211_PARAM_RAWMODE_OPEN_WAR, SET_PARAM, 1},
 	{"g_rawmode_open_war",  IEEE80211_PARAM_RAWMODE_OPEN_WAR, GET_PARAM, 0},
-	{"set_skip_hyst",       IEEE80211_PARAM_WHC_SKIP_HYST, SET_PARAM, 1},
-	{"get_skip_hyst",       IEEE80211_PARAM_WHC_SKIP_HYST, GET_PARAM, 0},
-	{"whc_mixedbh_ul",      IEEE80211_PARAM_WHC_MIXEDBH_ULRATE, SET_PARAM, 1},
-	{"g_whc_mixedbh_ul",    IEEE80211_PARAM_WHC_MIXEDBH_ULRATE, GET_PARAM, 0},
-	{"whc_mixedbh_bh_type", IEEE80211_PARAM_WHC_BACKHAUL_TYPE, SET_PARAM, 1},
 	{"he_bsr_supp",         IEEE80211_PARAM_HE_BSR_SUPPORT, SET_PARAM, 1},
 	{"get_he_bsr_supp",     IEEE80211_PARAM_HE_BSR_SUPPORT, GET_PARAM, 0},
 	{"display_me_info",     IEEE80211_PARAM_DUMP_RA_TABLE, GET_PARAM, 0},
@@ -2138,7 +2076,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_tx_lat_cptr",       IEEE80211_PARAM_CONFIG_CAPTURE_LATENCY_ENABLE,
 		GET_PARAM, 1},
 	{"get_ru26_tolerance",  IEEE80211_PARAM_GET_RU26_TOLERANCE, GET_PARAM, 0},
-	{"get_whc_ul_snr",      IEEE80211_PARAM_WHC_APINFO_UPLINK_SNR, GET_PARAM, 0},
 	{"set_dpp_mode",        IEEE80211_PARAM_DPP_VAP_MODE, SET_PARAM, 1},
 	{"get_dpp_mode",        IEEE80211_PARAM_DPP_VAP_MODE, GET_PARAM, 0},
 #if SM_ENG_HIST_ENABLE
@@ -2216,8 +2153,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_mcs12_13_supp",     IEEE80211_PARAM_VHT_MCS_12_13_SUPP, GET_PARAM, 0},
 	{"rrm_capie",           IEEE80211_PARAM_RRM_CAP_IE, SET_PARAM, 1},
 	{"g_rrm_capie",         IEEE80211_PARAM_RRM_CAP_IE, GET_PARAM, 0},
-	{"map_sta_vlan",        IEEE80211_PARAM_MAP2_BSTA_VLAN_ID, SET_PARAM, 1},
-	{"get_map_sta_vlan",    IEEE80211_PARAM_MAP2_BSTA_VLAN_ID, GET_PARAM, 0},
 	{"set_vdev_peer_prot_count",    IEEE80211_PARAM_VDEV_PEER_PROTOCOL_COUNT,
 		SET_PARAM, 1},
 	{"get_vdev_peer_prot_count",    IEEE80211_PARAM_VDEV_PEER_PROTOCOL_COUNT,
@@ -3312,6 +3247,9 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_CSA_TBTT, SET_PARAM, 1},
 	{"g_dcs_csa_tbtt",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_CSA_TBTT, GET_PARAM, 0},
+	{"g_reg_txpower",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CURCHAN_REG_TXPOWER,
+		GET_PARAM, 0},
 };
 #endif
 #endif

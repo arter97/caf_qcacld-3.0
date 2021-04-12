@@ -4346,10 +4346,8 @@ dp_send_mgmt_ctrl_to_stack(struct dp_pdev *pdev,
 
 	TX_CAP_WDI_EVENT_HANDLER(pdev->soc, pdev->pdev_id, ptr_tx_cap_info);
 
-	if (nbuf_ppdu_desc) {
-		status = QDF_STATUS_SUCCESS;
-		qdf_nbuf_free(nbuf_ppdu_desc);
-	}
+	status = QDF_STATUS_SUCCESS;
+	qdf_nbuf_free(nbuf_ppdu_desc);
 
 free_mpdu_nbuf:
 	if (ptr_tx_cap_info->mpdu_nbuf)
