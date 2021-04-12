@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -123,9 +123,9 @@
 #include <wlan_hdd_ota_test.h>
 #include "wlan_policy_mgr_ucfg.h"
 #include "wlan_mlme_ucfg_api.h"
+#include "wlan_mlme_twt_ucfg_api.h"
 #include "wlan_mlme_public_struct.h"
 #include "wlan_extscan_ucfg_api.h"
-#include "wlan_mlme_ucfg_api.h"
 #include "wlan_pmo_cfg.h"
 #include "cfg_ucfg_api.h"
 
@@ -165,6 +165,7 @@
 #include "wlan_if_mgr_public_struct.h"
 #endif
 #include "wlan_wfa_ucfg_api.h"
+#include "wlan_roam_debug.h"
 
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
@@ -1677,7 +1678,10 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 	[QCA_NL80211_VENDOR_SUBCMD_UPDATE_STA_INFO_INDEX] = {
 		.vendor_id = QCA_NL80211_VENDOR_ID,
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_UPDATE_STA_INFO,
-	}
+	},
+#ifdef WLAN_SUPPORT_TWT
+	FEATURE_TWT_VENDOR_EVENTS
+#endif
 };
 
 /**
@@ -3047,6 +3051,24 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		qdf_event_reset(&adapter->acs_complete_event);
 	}
 
+	qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
+	if (hdd_ctx->is_regulatory_update_in_progress) {
+		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
+		hdd_debug("waiting for channel list to update");
+		qdf_wait_for_event_completion(&hdd_ctx->regulatory_update_event,
+					      CHANNEL_LIST_UPDATE_TIMEOUT);
+		/* In case of set country failure in FW, response never comes
+		 * so wait the full timeout, then set in_progress to false.
+		 * If the response comes back, in_progress will already be set
+		 * to false anyways.
+		 */
+		qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
+		hdd_ctx->is_regulatory_update_in_progress = false;
+		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
+	} else {
+		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
+	}
+
 	ret = wlan_cfg80211_nla_parse(tb, QCA_WLAN_VENDOR_ATTR_ACS_MAX, data,
 					 data_len,
 					 wlan_hdd_cfg80211_do_acs_policy);
@@ -4014,9 +4036,14 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &twt_req);
 	ucfg_mlme_get_twt_responder(hdd_ctx->psoc, &twt_res);
 
-	if (twt_req || twt_res)
+	if (twt_req || twt_res) {
 		wlan_hdd_cfg80211_set_feature(feature_flags,
 					      QCA_WLAN_VENDOR_FEATURE_TWT);
+
+		wlan_hdd_cfg80211_set_feature(
+				feature_flags,
+				QCA_WLAN_VENDOR_FEATURE_TWT_ASYNC_SUPPORT);
+	}
 
 	/* Check the kernel version for upstream commit aced43ce780dc5 that
 	 * has support for processing user cell_base hints when wiphy is
@@ -4792,13 +4819,8 @@ hdd_send_roam_triggers_to_sme(struct hdd_context *hdd_ctx,
 	status = ucfg_cm_update_roam_scan_scheme_bitmap(hdd_ctx->psoc,
 							vdev_id, 0);
 
-#ifdef ROAM_OFFLOAD_V1
 	status = ucfg_cm_rso_set_roam_trigger(hdd_ctx->pdev, vdev_id,
 					      &triggers);
-#else
-	/* temp change, This will be removed with ROAM_OFFLOAD_V1 enabled */
-	status = sme_set_roam_triggers(hdd_ctx->mac_handle, &triggers);
-#endif
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to set roam control trigger bitmap");
 
@@ -5756,8 +5778,11 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct hdd_ap_ctx *ap_ctx;
 	struct hdd_station_ctx *sta_ctx;
+	wlan_net_dev_ref_dbgid dbgid =
+				NET_DEV_HOLD_CHECK_DFS_CHANNEL_FOR_ADAPTER;
 
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
 		if ((device_mode == adapter->device_mode) &&
 		    (device_mode == QDF_SAP_MODE)) {
 			ap_ctx =
@@ -5774,9 +5799,10 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 				hdd_ctx->pdev,
 				ap_ctx->operating_chan_freq)) {
 				hdd_err("SAP running on DFS channel");
-				dev_put(adapter->dev);
+				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
-					dev_put(next_adapter->dev);
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
 				return true;
 			}
 		}
@@ -5795,13 +5821,14 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 				hdd_ctx->pdev,
 				sta_ctx->conn_info.chan_freq))) {
 				hdd_err("client connected on DFS channel");
-				dev_put(adapter->dev);
+				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
-					dev_put(next_adapter->dev);
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
 				return true;
 			}
 		}
-		dev_put(adapter->dev);
+		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
 	return false;
@@ -11956,10 +11983,12 @@ uint8_t hdd_get_sap_operating_band(struct hdd_context *hdd_ctx)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	uint32_t  operating_chan_freq;
 	uint8_t sap_operating_band = 0;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_SAP_OPERATING_BAND;
 
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter) {
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
 		if (adapter->device_mode != QDF_SAP_MODE) {
-			dev_put(adapter->dev);
+			hdd_adapter_dev_put_debug(adapter, dbgid);
 			continue;
 		}
 
@@ -11972,7 +12001,7 @@ uint8_t hdd_get_sap_operating_band(struct hdd_context *hdd_ctx)
 		else
 			sap_operating_band = BAND_ALL;
 
-		dev_put(adapter->dev);
+		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
 	return sap_operating_band;
@@ -13364,7 +13393,6 @@ void wlan_hdd_rso_cmd_status_cb(hdd_handle_t hdd_handle,
 	complete(&adapter->lfr_fw_status.disable_lfr_event);
 }
 
-#ifdef ROAM_OFFLOAD_V1
 /**
  * __wlan_hdd_cfg80211_set_fast_roaming() - enable/disable roaming
  * @wiphy: Pointer to wireless phy
@@ -13456,98 +13484,6 @@ static int __wlan_hdd_cfg80211_set_fast_roaming(struct wiphy *wiphy,
 	hdd_exit();
 	return ret;
 }
-#else
-/**
- * __wlan_hdd_cfg80211_set_fast_roaming() - enable/disable roaming
- * @wiphy: Pointer to wireless phy
- * @wdev: Pointer to wireless device
- * @data: Pointer to data
- * @data_len: Length of @data
- *
- * This function is used to enable/disable roaming using vendor commands
- *
- * Return: 0 on success, negative errno on failure
- */
-static int __wlan_hdd_cfg80211_set_fast_roaming(struct wiphy *wiphy,
-					    struct wireless_dev *wdev,
-					    const void *data, int data_len)
-{
-	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
-	struct net_device *dev = wdev->netdev;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_MAX + 1];
-	uint32_t is_fast_roam_enabled;
-	int ret;
-	QDF_STATUS qdf_status;
-	unsigned long rc;
-	struct hdd_station_ctx *hdd_sta_ctx =
-		WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	mac_handle_t mac_handle;
-
-	hdd_enter_dev(dev);
-
-	ret = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != ret)
-		return ret;
-
-	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
-		hdd_err("Command not allowed in FTM mode");
-		return -EINVAL;
-	}
-
-	ret = wlan_cfg80211_nla_parse(tb,
-				      QCA_WLAN_VENDOR_ATTR_MAX, data, data_len,
-				      qca_wlan_vendor_attr);
-	if (ret) {
-		hdd_err("Invalid ATTR");
-		return -EINVAL;
-	}
-
-	/* Parse and fetch Enable flag */
-	if (!tb[QCA_WLAN_VENDOR_ATTR_ROAMING_POLICY]) {
-		hdd_err("attr enable failed");
-		return -EINVAL;
-	}
-
-	is_fast_roam_enabled = nla_get_u32(
-				tb[QCA_WLAN_VENDOR_ATTR_ROAMING_POLICY]);
-	hdd_debug("isFastRoamEnabled %d", is_fast_roam_enabled);
-
-	/* Update roaming */
-	mac_handle = hdd_ctx->mac_handle;
-	qdf_status = sme_config_fast_roaming(mac_handle, adapter->vdev_id,
-					     is_fast_roam_enabled);
-	if (qdf_status != QDF_STATUS_SUCCESS)
-		hdd_err("sme_config_fast_roaming failed with status=%d",
-				qdf_status);
-	ret = qdf_status_to_os_return(qdf_status);
-
-	if (eConnectionState_Associated == hdd_sta_ctx->conn_info.conn_state &&
-		QDF_IS_STATUS_SUCCESS(qdf_status) && !is_fast_roam_enabled) {
-
-		INIT_COMPLETION(adapter->lfr_fw_status.disable_lfr_event);
-		/*
-		 * wait only for LFR disable in fw as LFR enable
-		 * is always success
-		 */
-		rc = wait_for_completion_timeout(
-				&adapter->lfr_fw_status.disable_lfr_event,
-				msecs_to_jiffies(WAIT_TIME_RSO_CMD_STATUS));
-		if (!rc) {
-			hdd_err("Timed out waiting for RSO CMD status");
-			return -ETIMEDOUT;
-		}
-
-		if (!adapter->lfr_fw_status.is_disabled) {
-			hdd_err("Roam disable attempt in FW fails");
-			return -EBUSY;
-		}
-	}
-
-	hdd_exit();
-	return ret;
-}
-#endif
 
 /**
  * wlan_hdd_cfg80211_set_fast_roaming() - enable/disable roaming
@@ -15928,6 +15864,19 @@ static void wlan_hdd_cfg80211_set_bigtk_flags(struct wiphy *wiphy)
 }
 #endif
 
+#if defined(CFG80211_OCV_CONFIGURATION_SUPPORT) || \
+	   (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
+static void wlan_hdd_cfg80211_set_ocv_flags(struct wiphy *wiphy)
+{
+	wiphy_ext_feature_set(wiphy,
+			      NL80211_EXT_FEATURE_OPERATING_CHANNEL_VALIDATION);
+}
+#else
+static void wlan_hdd_cfg80211_set_ocv_flags(struct wiphy *wiphy)
+{
+}
+#endif
+
 #if defined(CFG80211_SCAN_OCE_CAPABILITY_SUPPORT) || \
 	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0))
 static void wlan_hdd_cfg80211_set_wiphy_oce_scan_flags(struct wiphy *wiphy)
@@ -16576,6 +16525,7 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 	struct wiphy *wiphy = hdd_ctx->wiphy;
 	uint8_t allow_mcc_go_diff_bi = 0, enable_mcc = 0;
 	bool is_bigtk_supported;
+	bool is_ocv_supported;
 
 	if (!wiphy) {
 		hdd_err("Invalid wiphy");
@@ -16606,6 +16556,11 @@ void wlan_hdd_update_wiphy(struct hdd_context *hdd_ctx)
 
 	if (QDF_IS_STATUS_SUCCESS(status) && is_bigtk_supported)
 		wlan_hdd_cfg80211_set_bigtk_flags(wiphy);
+
+	status = ucfg_mlme_get_ocv_support(hdd_ctx->psoc,
+					   &is_ocv_supported);
+	if (QDF_IS_STATUS_SUCCESS(status) && is_ocv_supported)
+		wlan_hdd_cfg80211_set_ocv_flags(wiphy);
 
 	status = ucfg_mlme_get_oce_sta_enabled_info(hdd_ctx->psoc,
 						    &is_oce_sta_enabled);
@@ -19784,6 +19739,9 @@ static void hdd_populate_crypto_params(struct wlan_objmgr_vdev *vdev,
 {
 	uint32_t set_val = 0;
 
+	/* Resetting the RSN caps for every connection */
+	wlan_crypto_set_vdev_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP, set_val);
+
 	if (req->crypto.n_akm_suites) {
 		hdd_populate_crypto_akm_type(vdev, req->crypto.akm_suites[0]);
 	} else {
@@ -19819,6 +19777,7 @@ static void hdd_populate_crypto_params(struct wlan_objmgr_vdev *vdev,
 	}
 
 	hdd_populate_crypto_auth_type(vdev, req);
+	wlan_crypto_free_vdev_key(vdev);
 }
 
 #ifdef FEATURE_WLAN_WAPI
@@ -20800,6 +20759,24 @@ static int __wlan_hdd_cfg80211_connect(struct wiphy *wiphy,
 	if (policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))
 		return -EINVAL;
 
+	qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
+	if (hdd_ctx->is_regulatory_update_in_progress) {
+		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
+		hdd_debug("waiting for channel list to update");
+		qdf_wait_for_event_completion(&hdd_ctx->regulatory_update_event,
+					      CHANNEL_LIST_UPDATE_TIMEOUT);
+		/* In case of set country failure in FW, response never comes
+		 * so wait the full timeout, then set in_progress to false.
+		 * If the response comes back, in_progress will already be set
+		 * to false anyways.
+		 */
+		qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
+		hdd_ctx->is_regulatory_update_in_progress = false;
+		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
+	} else {
+		qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
+	}
+
 	if (req->bssid)
 		bssid = req->bssid;
 	else if (bssid_hint)
@@ -21222,6 +21199,7 @@ int wlan_hdd_disconnect(struct hdd_adapter *adapter, u16 reason,
 {
 	int ret;
 	mac_handle_t mac_handle;
+	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 	wlan_hdd_wait_for_roaming(mac_handle, adapter);
@@ -21231,7 +21209,9 @@ int wlan_hdd_disconnect(struct hdd_adapter *adapter, u16 reason,
 	reset_mscs_params(adapter);
 	wlan_hdd_netif_queue_control(adapter,
 		WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER, WLAN_CONTROL_PATH);
-
+	wlan_rec_conn_info(adapter->vdev_id, DEBUG_CONN_DISCONNECT,
+			   sta_ctx->conn_info.bssid.bytes,
+			   sta_ctx->conn_info.conn_state, mac_reason);
 	ret = wlan_hdd_wait_for_disconnect(mac_handle, adapter, reason,
 					   mac_reason);
 
@@ -21366,6 +21346,7 @@ static int __wlan_hdd_cfg80211_disconnect(struct wiphy *wiphy,
 		hdd_err("Unexpected cfg disconnect called while in state: %d",
 		       sta_ctx->conn_info.conn_state);
 		hdd_set_disconnect_status(adapter, false);
+		wlan_rec_debug_dump_table(REC_CONN, 20, true);
 	}
 
 	return status;
@@ -22049,6 +22030,33 @@ static int wlan_hdd_cfg80211_add_station(struct wiphy *wiphy,
 	return errno;
 }
 
+
+#if (defined(CFG80211_CONFIG_PMKSA_TIMER_PARAMS_SUPPORT) || \
+	     (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)))
+static inline void
+hdd_fill_pmksa_lifetime(struct cfg80211_pmksa *pmksa,
+			tPmkidCacheInfo *pmk_cache)
+{
+	pmk_cache->pmk_lifetime = pmksa->pmk_lifetime;
+	if (pmk_cache->pmk_lifetime > WLAN_CRYPTO_MAX_PMKID_LIFETIME)
+		pmk_cache->pmk_lifetime = WLAN_CRYPTO_MAX_PMKID_LIFETIME;
+
+	pmk_cache->pmk_lifetime_threshold = pmksa->pmk_reauth_threshold;
+	if (pmk_cache->pmk_lifetime_threshold >=
+	    WLAN_CRYPTO_MAX_PMKID_LIFETIME_THRESHOLD)
+		pmk_cache->pmk_lifetime_threshold =
+			WLAN_CRYPTO_MAX_PMKID_LIFETIME_THRESHOLD - 1;
+
+	hdd_debug("PMKSA: lifetime:%d threshold:%d",  pmk_cache->pmk_lifetime,
+		  pmk_cache->pmk_lifetime_threshold);
+}
+#else
+static inline void
+hdd_fill_pmksa_lifetime(struct cfg80211_pmksa *pmksa,
+			tPmkidCacheInfo *src_pmk_cache)
+{}
+#endif
+
 static QDF_STATUS wlan_hdd_set_pmksa_cache(struct hdd_adapter *adapter,
 					   tPmkidCacheInfo *pmk_cache)
 {
@@ -22089,6 +22097,9 @@ static QDF_STATUS wlan_hdd_set_pmksa_cache(struct hdd_adapter *adapter,
 	qdf_mem_copy(pmksa->pmkid, pmk_cache->PMKID, PMKID_LEN);
 	qdf_mem_copy(pmksa->pmk, pmk_cache->pmk, pmk_cache->pmk_len);
 	pmksa->pmk_len = pmk_cache->pmk_len;
+	pmksa->pmk_entry_ts = qdf_get_system_timestamp();
+	pmksa->pmk_lifetime = pmk_cache->pmk_lifetime;
+	pmksa->pmk_lifetime_threshold = pmk_cache->pmk_lifetime_threshold;
 
 	result = wlan_crypto_set_del_pmksa(vdev, pmksa, true);
 	if (result != QDF_STATUS_SUCCESS) {
@@ -22187,6 +22198,8 @@ static void hdd_fill_pmksa_info(struct hdd_adapter *adapter,
 			  pmk_cache->ssid, pmk_cache->cache_id[0],
 			  pmk_cache->cache_id[1]);
 	}
+
+	hdd_fill_pmksa_lifetime(pmksa, pmk_cache);
 
 	if (is_delete)
 		return;
@@ -23226,12 +23239,17 @@ __wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
 	int retval = 0;
+	enum nl80211_channel_type channel_type;
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
 		return -EINVAL;
 	}
 
+	if (chandef->width > NL80211_CHAN_WIDTH_40) {
+		hdd_err_rl("invalid chan width %d", chandef->width);
+		return -EINVAL;
+	}
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
 
@@ -23244,12 +23262,14 @@ __wlan_hdd_cfg80211_set_ap_channel_width(struct wiphy *wiphy,
 	if (status)
 		return status;
 
-	hdd_debug("Channel width changed to %d ",
-		  cfg80211_get_chandef_type(chandef));
+	if (chandef->width < NL80211_CHAN_WIDTH_80)
+		channel_type = cfg80211_get_chandef_type(chandef);
+	else
+		channel_type = NL80211_CHAN_HT40PLUS;
+	hdd_debug("Channel width changed to %d ", channel_type);
 
 	/* Change SAP ht2040 mode */
-	status = hdd_set_sap_ht2040_mode(adapter,
-					 cfg80211_get_chandef_type(chandef));
+	status = hdd_set_sap_ht2040_mode(adapter, channel_type);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Cannot set SAP HT20/40 mode!");
 		retval = -EINVAL;

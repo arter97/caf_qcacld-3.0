@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -768,10 +768,16 @@
 
 /*
  * <ini>
- * g_enable_ilp - Enable/Disable ILP HW Block
- * @Default: 1
+ * g_enable_ilp - ILP HW Block Configuration
+ * @Min: 0
+ * @Max: 3
+ * @Default: 2
  *
- * This ini is used to enable/disable the ILP HW block
+ * This ini is used to configure ILP HW block with various options
+ * 0: disable
+ * 1: perf settings
+ * 2: max power saving
+ * 3: balanced settings
  *
  * Related: none
  *
@@ -782,10 +788,53 @@
  * <ini>
  */
 
-#define CFG_SET_ENABLE_ILP CFG_INI_BOOL( \
+#define CFG_SET_ENABLE_ILP CFG_INI_UINT( \
 		"g_enable_ilp", \
-		1, \
+		0, \
+		3, \
+		2, \
+		CFG_VALUE_OR_DEFAULT, \
 		"ILP configuration")
+
+/*
+ * <ini>
+ * g_disable_hw_assist - Flag to disable HW assist feature
+ * @Default: 0
+ *
+ * This ini is used to enable/disable the HW assist feature in FW
+ *
+ * Related: none
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: External
+ *
+ * <ini>
+ */
+
+#define CFG_DISABLE_HW_ASSIST CFG_INI_BOOL( \
+		"g_disable_hw_assist", \
+		0, \
+		"Disable HW assist feature in FW")
+
+/*
+ * <ini>
+ * g_enable_pci_gen - To enable pci gen switch
+ * @Default: 0
+ *
+ * Related: None
+ *
+ * Supported Feature: PCI
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_ENABLE_PCI_GEN CFG_INI_BOOL( \
+		"g_enable_pci_gen", \
+		0, \
+		"enable pci gen")
 
 #define CFG_FWOL_GENERIC_ALL \
 	CFG_FWOL_DHCP \
@@ -815,5 +864,8 @@
 	CFG(CFG_ENABLE_SECONDARY_RATE) \
 	CFG(CFG_SET_SAP_XLNA_BYPASS) \
 	CFG(CFG_SET_ENABLE_ILP) \
-	CFG(CFG_ENABLE_FW_WOW_MODULE_LOG_LEVEL)
+	CFG(CFG_ENABLE_FW_WOW_MODULE_LOG_LEVEL) \
+	CFG(CFG_DISABLE_HW_ASSIST) \
+	CFG(CFG_ENABLE_PCI_GEN)
+
 #endif
