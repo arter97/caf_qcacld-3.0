@@ -95,7 +95,7 @@
  * </ini>
  */
 #define CFG_ETSI_SRD_CHAN_IN_MASTER_MODE CFG_INI_UINT( \
-	"etsi13_srd_chan_in_master_mode", \
+	"etsi_srd_chan_in_master_mode", \
 	0, \
 	0xff, \
 	6, \
