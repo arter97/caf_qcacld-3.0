@@ -1592,6 +1592,7 @@ QDF_STATUS wlan_crypto_encap(struct wlan_objmgr_vdev *vdev,
 
 	if (peer)
 		wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
+	peer = NULL;
 
 	if (qdf_is_macaddr_group((struct qdf_mac_addr *)mac_addr)) {
 		crypto_params = wlan_crypto_vdev_get_comp_params(vdev,
@@ -1606,31 +1607,28 @@ QDF_STATUS wlan_crypto_encap(struct wlan_objmgr_vdev *vdev,
 			return QDF_STATUS_E_INVAL;
 
 	} else {
-		struct wlan_objmgr_peer *peer;
-		uint8_t pdev_id;
-
-		pdev_id = wlan_objmgr_pdev_get_pdev_id(
-				wlan_vdev_get_pdev(vdev));
 		peer = wlan_objmgr_get_peer_by_mac_n_vdev(psoc, pdev_id,
 							  bssid_mac, mac_addr,
 							  WLAN_CRYPTO_ID);
-
 		if (!peer) {
 			crypto_err("crypto_priv NULL");
 			return QDF_STATUS_E_INVAL;
 		}
 		crypto_params = wlan_crypto_peer_get_comp_params(peer,
 								&crypto_priv);
-		wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
 
 		if (!crypto_priv) {
 			crypto_err("crypto_priv NULL");
-			return QDF_STATUS_E_INVAL;
+			status = QDF_STATUS_E_INVAL;
+			goto err;
 		}
 
 		key = crypto_priv->key[crypto_priv->def_tx_keyid];
-		if (!key)
-			return QDF_STATUS_E_INVAL;
+		if (!key) {
+			crypto_err("Key is NULL");
+			status = QDF_STATUS_E_INVAL;
+			goto err;
+		}
 	}
 	if (opmode == QDF_MONITOR_MODE)
 		hdrlen = ieee80211_hdrsize((uint8_t *)qdf_nbuf_data(wbuf));
@@ -1642,6 +1640,10 @@ QDF_STATUS wlan_crypto_encap(struct wlan_objmgr_vdev *vdev,
 	cipher_table = (struct wlan_crypto_cipher *)key->cipher_table;
 	status = cipher_table->encap(key, wbuf, encapdone,
 				     hdrlen);
+
+err:
+	if (peer)
+		wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
 
 	return status;
 }
@@ -1710,6 +1712,7 @@ QDF_STATUS wlan_crypto_decap(struct wlan_objmgr_vdev *vdev,
 
 	if (peer)
 		wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
+	peer = NULL;
 
 	if (qdf_is_macaddr_group((struct qdf_mac_addr *)mac_addr)) {
 		crypto_params = wlan_crypto_vdev_get_comp_params(vdev,
@@ -1722,13 +1725,7 @@ QDF_STATUS wlan_crypto_decap(struct wlan_objmgr_vdev *vdev,
 		key = crypto_priv->key[keyid];
 		if (!key)
 			return QDF_STATUS_E_INVAL;
-
 	} else {
-		struct wlan_objmgr_peer *peer;
-		uint8_t pdev_id;
-
-		pdev_id = wlan_objmgr_pdev_get_pdev_id(
-				wlan_vdev_get_pdev(vdev));
 		peer = wlan_objmgr_get_peer_by_mac_n_vdev(
 					psoc, pdev_id, bssid_mac,
 					mac_addr, WLAN_CRYPTO_ID);
@@ -1739,20 +1736,27 @@ QDF_STATUS wlan_crypto_decap(struct wlan_objmgr_vdev *vdev,
 
 		crypto_params = wlan_crypto_peer_get_comp_params(peer,
 								&crypto_priv);
-		wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
 
 		if (!crypto_priv) {
 			crypto_err("crypto_priv NULL");
-			return QDF_STATUS_E_INVAL;
+			status = QDF_STATUS_E_INVAL;
+			goto err;
 		}
 
 		key = crypto_priv->key[keyid];
-		if (!key)
-			return QDF_STATUS_E_INVAL;
+		if (!key) {
+			crypto_err("Key is NULL");
+			status = QDF_STATUS_E_INVAL;
+			goto err;
+		}
 	}
 	/* if tkip, is counter measures enabled, then drop the frame */
 	cipher_table = (struct wlan_crypto_cipher *)key->cipher_table;
 	status = cipher_table->decap(key, wbuf, tid, hdrlen);
+
+err:
+	if (peer)
+		wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
 
 	return status;
 }
