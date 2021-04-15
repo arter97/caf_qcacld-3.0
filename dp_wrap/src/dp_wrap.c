@@ -621,6 +621,11 @@ int dp_wrap_tx_process(struct net_device **dev, struct wlan_objmgr_vdev *vdev,
 				  vdev->vdev_objmgr.vdev_id);
 			return QWRAP_TX_FAILURE;
 		}
+		if (wvdev == NULL) {
+			qwrap_err("wvdev is NULL, Drop the pkt");
+			return QWRAP_TX_FAILURE;
+		}
+
 		eh = (struct ether_header *)((*skb)->data);
 		if (qdf_likely(dp_wrap_vdev_is_psta(wvdev->vdev))) {
 			if (dp_wrap_mat_tx(wvdev, (wbuf_t)*skb)) {
@@ -635,6 +640,7 @@ int dp_wrap_tx_process(struct net_device **dev, struct wlan_objmgr_vdev *vdev,
 		vdev = wvdev->vdev;
 	}
 	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS) {
+		eh = (struct ether_header *)((*skb)->data);
 		qwrap_err("Drop pkt, vdev is not up:"QDF_MAC_ADDR_FMT
 			  "vdevid:%d", QDF_MAC_ADDR_REF(eh->ether_shost),
 			  vdev->vdev_objmgr.vdev_id);
@@ -678,6 +684,11 @@ int dp_wrap_rx_bridge(struct wlan_objmgr_vdev *vdev, struct net_device **dev,
 		}
 		return ret;
 	}
+	if (wrap_vdev == NULL) {
+		qwrap_err("wvdev is NULL, Drop the pkt");
+		return QWRAP_RX_FAILURE;
+	}
+
 	/* isolation mode enabled. Wired and wireless client
 	 * connected to Qwrap AP can talk through root AP
 	 */
@@ -702,6 +713,11 @@ int dp_wrap_rx_bridge(struct wlan_objmgr_vdev *vdev, struct net_device **dev,
 		 * should always xmit through wrap AP vap
 		 */
 		wrap_wvdev = dp_wrap_get_vdev_handle(wrap_vdev);
+		if (wrap_wvdev == NULL) {
+			qwrap_err("wvdev is NULL, Drop the pkt");
+			return QWRAP_RX_FAILURE;
+		}
+
 		wrap_wvdev->wlan_vdev_xmit_queue(wrap_wvdev->dev, skb);
 		ret = QWRAP_RX_SUCCESS_TO_NON_BRIDGE;
 	} else if ((wvdev->is_wrap &&
@@ -712,6 +728,11 @@ int dp_wrap_rx_bridge(struct wlan_objmgr_vdev *vdev, struct net_device **dev,
 		 * main proxy vap
 		 */
 		mpsta_wvdev = dp_wrap_get_vdev_handle(mpsta_vdev);
+		if (mpsta_wvdev == NULL) {
+			qwrap_err("mpsta_wvdev is NULL, Drop the pkt");
+			return QWRAP_RX_FAILURE;
+		}
+
 		mpsta_wvdev->wlan_vdev_xmit_queue(
 				mpsta_wvdev->dev, skb);
 		ret = QWRAP_RX_SUCCESS_TO_NON_BRIDGE;
@@ -727,6 +748,11 @@ int dp_wrap_rx_bridge(struct wlan_objmgr_vdev *vdev, struct net_device **dev,
 			 */
 			wrap_wvdev = dp_wrap_get_vdev_handle(
 					wrap_vdev);
+			if (wrap_wvdev == NULL) {
+				qwrap_err("wvdev is NULL, Drop the pkt");
+				return QWRAP_RX_FAILURE;
+			}
+
 			wrap_wvdev->wlan_vdev_xmit_queue(
 					wrap_wvdev->dev, skb);
 			ret = QWRAP_RX_SUCCESS_TO_NON_BRIDGE;
@@ -742,6 +768,12 @@ int dp_wrap_rx_bridge(struct wlan_objmgr_vdev *vdev, struct net_device **dev,
 					wrap_wvdev =
 						dp_wrap_get_vdev_handle(
 								wrap_vdev);
+					if (wrap_wvdev == NULL) {
+						qwrap_err("wvdev is"
+							  "NULL, Drop the pkt");
+						return QWRAP_RX_FAILURE;
+					}
+
 					wrap_wvdev->
 						wlan_vdev_xmit_queue
 						(wrap_wvdev->dev, skb);
@@ -766,6 +798,12 @@ int dp_wrap_rx_bridge(struct wlan_objmgr_vdev *vdev, struct net_device **dev,
 					wrap_wvdev =
 						dp_wrap_get_vdev_handle(
 								wrap_vdev);
+					if (wrap_wvdev == NULL) {
+						qwrap_err("wvdev is"
+							  "NULL, Drop the pkt");
+						return QWRAP_RX_FAILURE;
+					}
+
 					wrap_wvdev->
 						wlan_vdev_xmit_queue(
 								wrap_wvdev->dev, copy);
@@ -800,6 +838,10 @@ int dp_wrap_rx_process(struct net_device **dev, struct wlan_objmgr_vdev *vdev,
 	int rv = QWRAP_RX_SUCCESS_TO_BRIDGE;
 
 	wvdev = dp_wrap_get_vdev_handle(vdev);
+	if (wvdev == NULL) {
+		qwrap_err("wvdev is NULL, Drop the pkt");
+		return QWRAP_RX_FAILURE;
+	}
 
 	if (qdf_unlikely(dp_wrap_vdev_is_psta(vdev) || dp_wrap_vdev_is_wrap(vdev))) {
 		dp_wrap_mat_rx(wvdev, (wbuf_t)skb);
