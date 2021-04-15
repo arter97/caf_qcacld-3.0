@@ -658,105 +658,105 @@ int dp_wrap_rx_bridge(struct wlan_objmgr_vdev *vdev, struct net_device **dev,
 			}
 			ret = 0;
 		}
-	} else {
-		/* isolation mode enabled. Wired and wireless client
-		 * connected to Qwrap AP can talk through root AP
+		return ret;
+	}
+	/* isolation mode enabled. Wired and wireless client
+	 * connected to Qwrap AP can talk through root AP
+	 */
+	if (wvdev->is_psta && !wvdev->is_mpsta &&
+			wvdev->is_wired_psta) {
+		/* Packets recevied through wired psta vap */
+		if (qdf_likely(!(eh->ether_type == htons(ETHERTYPE_PAE)
+				)) && (mpsta_vdev)) {
+			/* rx packets from wired psta should go through
+			 * bridge.Here qwrap bridge learning for wired
+			 * proxy clients is always through mpsta
+			 */
+			skb->dev = wpdev->mpsta_dev;
+			*dev = skb->dev;
+			ret = 0;
+		}
+	} else if (wvdev->is_psta && !wvdev->is_mpsta &&
+			!wvdev->is_wired_psta &&
+			!(eh->ether_type == htons(ETHERTYPE_PAE)) &&
+			(wrap_vdev)) {
+		/* rx unicast from wireless proxy, client
+		 * should always xmit through wrap AP vap
 		 */
-		if (wvdev->is_psta && !wvdev->is_mpsta &&
-		    wvdev->is_wired_psta) {
-			/* Packets recevied through wired psta vap */
-			if (qdf_likely(!(eh->ether_type == htons(ETHERTYPE_PAE)
-					)) && (mpsta_vdev)) {
-				/* rx packets from wired psta should go through
-				 * bridge.Here qwrap bridge learning for wired
-				 * proxy clients is always through mpsta
-				 */
-				skb->dev = wpdev->mpsta_dev;
-				*dev = skb->dev;
-				ret = 0;
-			}
-		} else if (wvdev->is_psta && !wvdev->is_mpsta &&
-			  !wvdev->is_wired_psta &&
-			  !(eh->ether_type == htons(ETHERTYPE_PAE)) &&
-			  (wrap_vdev)) {
-			/* rx unicast from wireless proxy, client
+		wrap_wvdev = dp_wrap_get_vdev_handle(wrap_vdev);
+		wrap_wvdev->wlan_vdev_xmit_queue(wrap_wvdev->dev, skb);
+		ret = 1;
+	} else if ((wvdev->is_wrap &&
+				!(eh->ether_type == htons(ETHERTYPE_PAE))) &&
+			(mpsta_vdev)) {
+		/* rx from wrap AP , since wrap not connected to
+		 * in isolation , should always xmit through
+		 * main proxy vap
+		 */
+		mpsta_wvdev = dp_wrap_get_vdev_handle(mpsta_vdev);
+		mpsta_wvdev->wlan_vdev_xmit_queue(
+				mpsta_wvdev->dev, skb);
+		ret = 1;
+	} else if (wvdev->is_mpsta &&
+			IEEE80211_IS_MULTICAST(eh->ether_dhost) &&
+			(mpsta_vdev) && (wrap_vdev)) {
+		/*check oma or vma, for MPSTA both are same*/
+		mpsta_wvdev = dp_wrap_get_vdev_handle(mpsta_vdev);
+		if ((OS_MEMCMP(mpsta_wvdev->wrap_dev_oma,
+						eh->ether_shost, 6) == 0))  {
+			/* Multicast orginated from mpsta/bridge
 			 * should always xmit through wrap AP vap
 			 */
-			wrap_wvdev = dp_wrap_get_vdev_handle(wrap_vdev);
-			wrap_wvdev->wlan_vdev_xmit_queue(wrap_wvdev->dev, skb);
+			wrap_wvdev = dp_wrap_get_vdev_handle(
+					wrap_vdev);
+			wrap_wvdev->wlan_vdev_xmit_queue(
+					wrap_wvdev->dev, skb);
 			ret = 1;
-		} else if ((wvdev->is_wrap &&
-			   !(eh->ether_type == htons(ETHERTYPE_PAE))) &&
-			   (mpsta_vdev)) {
-			/* rx from wrap AP , since wrap not connected to
-			 * in isolation , should always xmit through
-			 * main proxy vap
-			 */
-			mpsta_wvdev = dp_wrap_get_vdev_handle(mpsta_vdev);
-			mpsta_wvdev->wlan_vdev_xmit_queue(
-							mpsta_wvdev->dev, skb);
-			ret = 1;
-		} else if (wvdev->is_mpsta &&
-			   IEEE80211_IS_MULTICAST(eh->ether_dhost) &&
-			   (mpsta_vdev) && (wrap_vdev)) {
-			/*check oma or vma, for MPSTA both are same*/
-			mpsta_wvdev = dp_wrap_get_vdev_handle(mpsta_vdev);
-			if ((OS_MEMCMP(mpsta_wvdev->wrap_dev_oma,
-				       eh->ether_shost, 6) == 0))  {
-				/* Multicast orginated from mpsta/bridge
-				 * should always xmit through wrap AP vap
-				 */
-				wrap_wvdev = dp_wrap_get_vdev_handle(
-						wrap_vdev);
-				wrap_wvdev->wlan_vdev_xmit_queue(
-						wrap_wvdev->dev, skb);
-				ret = 1;
-			} else {
-				t_wvdev = dp_wrap_wdev_vma_find(
-						&wpdev->wp_devt,
-						eh->ether_shost);
-				if (t_wvdev) {
-					if (t_wvdev->is_wired_psta) {
-						/*Multicast received from wired
-						 *clients , forward to wrap AP
-						 */
-						wrap_wvdev =
-						dp_wrap_get_vdev_handle(
-								wrap_vdev);
-						wrap_wvdev->
-							wlan_vdev_xmit_queue
-							(wrap_wvdev->dev, skb);
-						ret = 1;
-					} else {
-						/*Multicast received from
-						 *wireless client,fwd to bridge
-						 */
-						skb->dev = wpdev->mpsta_dev;
-						*dev = skb->dev;
-						ret = 0;
-					}
-				} else  {
-					qdf_nbuf_t copy;
-
-					copy = qdf_nbuf_copy(skb);
-					/*Multicast received from client behind
-					 *root side forward to both wrap and
-					 *bridge side
+		} else {
+			t_wvdev = dp_wrap_wdev_vma_find(
+					&wpdev->wp_devt,
+					eh->ether_shost);
+			if (t_wvdev) {
+				if (t_wvdev->is_wired_psta) {
+					/*Multicast received from wired
+					 *clients , forward to wrap AP
 					 */
-					if (copy) {
-						wrap_wvdev =
+					wrap_wvdev =
 						dp_wrap_get_vdev_handle(
 								wrap_vdev);
-						wrap_wvdev->
-						wlan_vdev_xmit_queue(
-							wrap_wvdev->dev, copy);
-					} else {
-						qdf_err("Wrap buf cpy fail");
-					}
+					wrap_wvdev->
+						wlan_vdev_xmit_queue
+						(wrap_wvdev->dev, skb);
+					ret = 1;
+				} else {
+					/*Multicast received from
+					 *wireless client,fwd to bridge
+					 */
 					skb->dev = wpdev->mpsta_dev;
 					*dev = skb->dev;
 					ret = 0;
 				}
+			} else  {
+				qdf_nbuf_t copy;
+
+				copy = qdf_nbuf_copy(skb);
+				/*Multicast received from client behind
+				 *root side forward to both wrap and
+				 *bridge side
+				 */
+				if (copy) {
+					wrap_wvdev =
+						dp_wrap_get_vdev_handle(
+								wrap_vdev);
+					wrap_wvdev->
+						wlan_vdev_xmit_queue(
+								wrap_wvdev->dev, copy);
+				} else {
+					qdf_err("Wrap buf cpy fail");
+				}
+				skb->dev = wpdev->mpsta_dev;
+				*dev = skb->dev;
+				ret = 0;
 			}
 		}
 	}
