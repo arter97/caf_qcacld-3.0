@@ -344,6 +344,7 @@ static void dfs_abort_agile_precac(struct wlan_dfs *dfs)
 	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
 	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
 
+	dfs_cancel_precac_timer(dfs);
 	dfs_agile_precac_cleanup(dfs);
 	/*Send the abort to F/W as well */
 	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
@@ -456,6 +457,7 @@ static bool dfs_agile_state_init_event(void *ctx,
 			 * This happens when there is no preCAC chan
 			 * in any of the radios
 			 */
+			dfs_cancel_precac_timer(dfs);
 			dfs_agile_precac_cleanup(dfs);
 			/* Cleanup and wait */
 		}

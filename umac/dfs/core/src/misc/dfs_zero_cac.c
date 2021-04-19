@@ -506,8 +506,6 @@ void dfs_agile_precac_cleanup(struct wlan_dfs *dfs)
 	struct dfs_soc_priv_obj *dfs_soc_obj;
 
 	dfs_soc_obj = dfs->dfs_soc_obj;
-	qdf_timer_sync_cancel(&dfs_soc_obj->dfs_precac_timer);
-	dfs_soc_obj->dfs_precac_timer_running = 0;
 	dfs_soc_obj->precac_state_started = 0;
 	dfs->dfs_agile_precac_freq_mhz = 0;
 	dfs->dfs_precac_chwidth = CH_WIDTH_INVALID;
@@ -590,6 +588,7 @@ void  dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs, bool *is_chan_found)
 				"dfs_tx_ops=%pK", dfs_tx_ops);
 		*is_chan_found = true;
 	} else {
+		dfs_cancel_precac_timer(dfs);
 		dfs_agile_precac_cleanup(dfs);
 		*is_chan_found = false;
 	}
@@ -767,6 +766,7 @@ void dfs_process_ocac_complete(struct wlan_objmgr_pdev *pdev,
 	}
 
 	dfs_soc_obj->ocac_status = ocac_status;
+	dfs_cancel_precac_timer(dfs);
 	dfs_agile_sm_deliver_evt(dfs_soc_obj,
 				 DFS_AGILE_SM_EV_AGILE_DONE,
 				 0, (void *)dfs);
