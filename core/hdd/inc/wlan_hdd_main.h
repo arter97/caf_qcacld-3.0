@@ -2218,6 +2218,7 @@ struct hdd_context {
 	bool is_regulatory_update_in_progress;
 	qdf_event_t regulatory_update_event;
 	qdf_mutex_t regulatory_status_lock;
+	bool is_fw_dbg_log_levels_configured;
 };
 
 /**
@@ -3359,6 +3360,20 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason);
 void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
 			    bool forced);
 
+/**
+ * hdd_switch_sap_chan_freq() - Move SAP to the given channel
+ * @adapter: AP adapter
+ * @chan_freq: Channel frequency
+ * @forced: Force to switch channel, ignore SCC/MCC check
+ *
+ * Moves the SAP interface by invoking the function which
+ * executes the callback to perform channel switch using (E)CSA.
+ *
+ * Return: None
+ */
+void hdd_switch_sap_chan_freq(struct hdd_adapter *adapter, qdf_freq_t chan_freq,
+			      bool forced);
+
 #if defined(FEATURE_WLAN_CH_AVOID)
 void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
 
@@ -4185,6 +4200,14 @@ void hdd_unregister_notifiers(struct hdd_context *hdd_ctx);
 int hdd_dbs_scan_selection_init(struct hdd_context *hdd_ctx);
 
 /**
+ * hdd_update_scan_config - API to update scan configuration parameters
+ * @hdd_ctx: HDD context
+ *
+ * Return: 0 if success else err
+ */
+int hdd_update_scan_config(struct hdd_context *hdd_ctx);
+
+/**
  * hdd_start_complete()- complete the start event
  * @ret: return value for complete event.
  *
@@ -4911,6 +4934,14 @@ static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
 }
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0) */
 #endif /* defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM) */
+
+/**
+ * hdd_is_runtime_pm_enabled - if runtime pm enabled
+ * @hdd_ctx: hdd context
+ *
+ * Return: true if runtime pm enabled. false if disabled.
+ */
+bool hdd_is_runtime_pm_enabled(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_netdev_feature_update - Update the netdev features

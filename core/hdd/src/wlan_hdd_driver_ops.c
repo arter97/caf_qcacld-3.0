@@ -1208,6 +1208,8 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 		goto late_hif_resume;
 	}
 
+	hif_system_pm_set_state_suspended(hif_ctx);
+
 	err = hif_bus_suspend(hif_ctx);
 	if (err) {
 		hdd_err("Failed hif bus suspend: %d", err);
@@ -1259,6 +1261,7 @@ late_hif_resume:
 resume_cdp:
 	status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+	hif_system_pm_set_state_on(hif_ctx);
 
 	return err;
 }
@@ -1415,6 +1418,8 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 		goto out;
 	}
 
+	hif_system_pm_set_state_resuming(hif_ctx);
+
 	qdf_status = ucfg_pmo_psoc_bus_resume_req(hdd_ctx->psoc,
 						  type);
 	status = qdf_status_to_os_return(qdf_status);
@@ -1422,6 +1427,8 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 		hdd_err("Failed pmo bus resume");
 		goto out;
 	}
+
+	hif_system_pm_set_state_on(hif_ctx);
 
 	status = hif_bus_late_resume(hif_ctx);
 	if (status) {
@@ -1441,6 +1448,7 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 	return 0;
 
 out:
+	hif_system_pm_set_state_suspended(hif_ctx);
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state() ||
 		cds_is_fw_down())
 		return 0;
@@ -1561,9 +1569,17 @@ static int wlan_hdd_runtime_suspend(struct device *dev)
 		return 0;
 	}
 
+	if (!hdd_is_runtime_pm_enabled(hdd_ctx))
+		return 0;
+
 	if (ucfg_scan_get_pdev_status(hdd_ctx->pdev) !=
 	    SCAN_NOT_IN_PROGRESS) {
 		hdd_debug("Scan in progress, ignore runtime suspend");
+		return -EBUSY;
+	}
+
+	if (ucfg_ipa_is_tx_pending(hdd_ctx->pdev)) {
+		hdd_debug("IPA TX comps pending, ignore rtpm suspend");
 		return -EBUSY;
 	}
 
@@ -1641,6 +1657,9 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 		hdd_debug("Driver module closed skipping runtime resume");
 		return 0;
 	}
+
+	if (!hdd_is_runtime_pm_enabled(hdd_ctx))
+		return 0;
 
 	hdd_ctx->runtime_resume_start_time_stamp =
 						qdf_get_log_timestamp_usecs();

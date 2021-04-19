@@ -432,14 +432,14 @@ void sme_cleanup_session(mac_handle_t mac_handle, uint8_t vdev_id);
  */
 void sme_set_curr_device_mode(mac_handle_t mac_handle,
 			      enum QDF_OPMODE curr_device_mode);
-
+#ifndef FEATURE_CM_ENABLE
 /**
  * sme_update_nud_config() - update nud config
  * @mac_handle: The handle returned by mac_open.
  * @nud_fail_behavior: Vlaue of nud fail behaviour
  */
 void sme_update_nud_config(mac_handle_t mac_handle, uint8_t nud_fail_behavior);
-
+#endif
 /**
  * sme_update_roam_params() - Store/Update the roaming params
  * @mac_handle: Opaque handle to the global MAC context
@@ -3622,6 +3622,16 @@ void sme_set_amsdu(mac_handle_t mac_handle, bool enable);
  */
 void sme_set_pmf_wep_cfg(mac_handle_t mac_handle, uint8_t pmf_wep_cfg);
 
+/**
+ * sme_set_cfg_disable_tx() - set user cfg to disable data and mgmt tx
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: vdev id
+ * @val: configuration value
+ *
+ * Return: None
+ */
+void sme_set_cfg_disable_tx(mac_handle_t mac_handle, uint8_t vdev_id,
+			    uint8_t val);
 #ifdef WLAN_FEATURE_11AX
 void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id);
 void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id);

@@ -1308,16 +1308,6 @@ wlan_mlme_get_80211e_is_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
 QDF_STATUS
 wlan_mlme_get_wmm_uapsd_mask(struct wlan_objmgr_psoc *psoc, uint8_t *value);
 
-/**
- * wlan_mlme_get_implicit_qos_is_enabled() - Enable implicit QOS
- * @psoc: pointer to psoc object
- * @value: pointer to the value which will be filled for the caller
- *
- * Return: QDF Status
- */
-QDF_STATUS wlan_mlme_get_implicit_qos_is_enabled(struct wlan_objmgr_psoc *psoc,
-						 bool *value);
-
 #ifdef FEATURE_WLAN_ESE
 /**
  * wlan_mlme_get_inactivity_interval() - Infra Inactivity Interval
@@ -2135,6 +2125,26 @@ wlan_mlme_is_11d_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
  */
 QDF_STATUS
 wlan_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value);
+
+/**
+ * wlan_mlme_is_rf_test_mode_enabled() - Get the rf test mode flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
+
+/**
+ * wlan_mlme_set_rf_test_mode_enabled() - Set the rf test mode flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 /**
  * wlan_mlme_get_sta_miracast_mcc_rest_time() - Get STA/MIRACAST MCC rest time
