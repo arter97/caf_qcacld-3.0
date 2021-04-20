@@ -763,6 +763,10 @@ enum {
 	IEEE80211_PARAM_WLAN_SCHED_TIMEOUT         = 735,
 	IEEE80211_PARAM_AP_MAX_AUTH_FAIL           = 736,   /* Set max continuous auth failures to be sent auth response within 15 seconds */
 	IEEE80211_PARAM_VAP_PROFILE_CONFIG         = 737,   /* Per vap resource profile size for EMA non tx vap */
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_EHT_TX_MCSMAP = 738,   /* set 11be - EHT TX MCSMAP */
+	IEEE80211_PARAM_EHT_RX_MCSMAP = 739,   /* set 11be - EHT RX MCSMAP */
+#endif /* WLAN_FEATURE_11BE */
 };
 
 enum {
@@ -2240,6 +2244,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"max_auth_fail",          IEEE80211_PARAM_AP_MAX_AUTH_FAIL, SET_PARAM, 1},
 	{"g_max_auth_fail",        IEEE80211_PARAM_AP_MAX_AUTH_FAIL, GET_PARAM, 0},
 	{"vap_resource_profile ",     IEEE80211_PARAM_VAP_PROFILE_CONFIG, SET_PARAM, 2},
+#ifdef WLAN_FEATURE_11BE
+	{"eht_txmcsmap",         IEEE80211_PARAM_EHT_TX_MCSMAP, SET_PARAM, 1},
+	{"get_eht_txmcsmap",     IEEE80211_PARAM_EHT_TX_MCSMAP, GET_PARAM, 0},
+	{"eht_rxmcsmap",         IEEE80211_PARAM_EHT_RX_MCSMAP, SET_PARAM, 1},
+	{"get_eht_rxmcsmap",     IEEE80211_PARAM_EHT_RX_MCSMAP, GET_PARAM, 0},
+#endif /* WLAN_FEATURE_11BE */
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
