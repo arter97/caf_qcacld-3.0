@@ -27,48 +27,6 @@
 #include "qal_devnode.h"
 
 /**
- * qal_devnode_fetch_pci_domain_id() - This function will try to obtain the
- * host bridge domain number
- * @node: device tree node
- * @domain_id: pointer to domain number
- *
- * Return: QDF_STATUS_SUCCESS on valid domain_id, error code otherwise
- */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0))
-
-QDF_STATUS
-qal_devnode_fetch_pci_domain_id(qdf_devnode_t devnode, int *domain_id)
-{
-	*domain_id = 0;
-
-	return QDF_STATUS_SUCCESS;
-}
-
-qdf_export_symbol(qal_devnode_fetch_pci_domain_id);
-#else
-QDF_STATUS
-qal_devnode_fetch_pci_domain_id(qdf_devnode_t devnode, int *domain_id)
-{
-	int ret;
-
-	if (!devnode) {
-		qdf_err("Device node information is invalid");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	ret = of_get_pci_domain_nr(devnode);
-	if ((ret >= PCI_DOMAIN_ID_MIN) && (ret <= PCI_DOMAIN_ID_MAX)) {
-		*domain_id = ret;
-		return QDF_STATUS_SUCCESS;
-	}
-
-	return qdf_status_from_os_return(ret);
-}
-
-qdf_export_symbol(qal_devnode_fetch_pci_domain_id);
-#endif
-
-/**
  * qal_devnode_read_u32_array() - Find and read an array of 32 bit integers
  * from a property.
  * @devnode: device node from which the property value is to be read.
