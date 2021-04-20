@@ -146,7 +146,6 @@ QDF_STATUS lim_start(struct mac_context *mac);
 QDF_STATUS pe_start(struct mac_context *mac);
 void pe_stop(struct mac_context *mac);
 
-#ifdef WLAN_FEATURE_11W
 /**
  * lim_stop_pmfcomeback_timer() - stop pmf comeback timer
  * @session: Pointer to PE session
@@ -154,11 +153,6 @@ void pe_stop(struct mac_context *mac);
  * Return: None
  */
 void lim_stop_pmfcomeback_timer(struct pe_session *session);
-#else
-static inline void lim_stop_pmfcomeback_timer(struct pe_session *session)
-{
-}
-#endif
 
 /**
  * pe_register_mgmt_rx_frm_callback() - registers callback for receiving
@@ -251,25 +245,6 @@ void lim_trigger_sta_deletion(struct mac_context *mac, tpDphHashNode sta,
 void lim_send_sme_tdls_del_sta_ind(struct mac_context *mac, tpDphHashNode sta,
 				   struct pe_session *pe_session,
 				   uint16_t reasonCode);
-
-/**
- * lim_set_tdls_flags() - update tdls flags based on newer STA connection
- * information
- * @roam_sync_ind_ptr: pointer to roam offload structure
- * @ft_session_ptr: pointer to PE session
- *
- * Set TDLS flags as per new STA connection capabilities.
- *
- * Return: None
- */
-void lim_set_tdls_flags(struct roam_offload_synch_ind *roam_sync_ind_ptr,
-			struct pe_session *ft_session_ptr);
-#else
-static inline
-void lim_set_tdls_flags(struct roam_offload_synch_ind *roam_sync_ind_ptr,
-			struct pe_session *ft_session_ptr)
-{
-}
 #endif
 
 /* / Function that checks for change in AP's capabilties on STA */

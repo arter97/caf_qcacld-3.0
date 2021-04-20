@@ -175,15 +175,6 @@ bool mlme_is_twt_notify_in_progress(struct wlan_objmgr_psoc *psoc,
 bool mlme_is_flexible_twt_enabled(struct wlan_objmgr_psoc *psoc);
 
 /**
- * mlme_get_twt_bcast_requestor_tgt_cap() - Get broadcast requestor target
- * capability.
- * @psoc: Pointer to psoc object
- *
- * Return: True if tgt cap is advertised.
- */
-bool mlme_get_twt_bcast_requestor_tgt_cap(struct wlan_objmgr_psoc *psoc);
-
-/**
  * mlme_set_twt_command_in_progress() - Set TWT command is in progress.
  * @psoc: Pointer to psoc object
  * @peer_mac: Pointer to peer mac address
@@ -210,6 +201,15 @@ bool mlme_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
 				     struct qdf_mac_addr *peer_mac,
 				     uint8_t dialog_id,
 				     enum wlan_twt_commands cmd);
+
+/**
+ * mlme_is_24ghz_twt_enabled() - Get if TWT is enabled on 2.4Ghz
+ * @psoc: Pointer to psoc object
+ *
+ * Return: True if TWT is allowed on 2.4Ghz connection.
+ */
+bool mlme_is_24ghz_twt_enabled(struct wlan_objmgr_psoc *psoc);
+
 #else
 static inline
 void mlme_set_twt_peer_capabilities(struct wlan_objmgr_psoc *psoc,
@@ -217,5 +217,13 @@ void mlme_set_twt_peer_capabilities(struct wlan_objmgr_psoc *psoc,
 				    tDot11fIEhe_cap *he_cap,
 				    tDot11fIEhe_op *he_op)
 {}
+
+static inline
+QDF_STATUS mlme_init_twt_context(struct wlan_objmgr_psoc *psoc,
+				 struct qdf_mac_addr *peer_mac,
+				 uint8_t dialog_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #endif /* WLAN_SUPPORT_TWT */
 #endif /* _WLAN_MLME_TWT_API_H_ */

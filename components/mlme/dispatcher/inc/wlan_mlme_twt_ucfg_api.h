@@ -76,28 +76,6 @@ ucfg_mlme_set_twt_responder(struct wlan_objmgr_psoc *psoc,
 			    bool val);
 
 /**
- * ucfg_mlme_get_bcast_twt() - Get bcast twt
- * @psoc: pointer to psoc object
- * @val:  Pointer to the value which will be filled for the caller
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_mlme_get_bcast_twt(struct wlan_objmgr_psoc *psoc,
-			bool *val);
-
-/**
- * ucfg_mlme_set_bcast_twt() - Set bcast twt
- * @psoc: pointer to psoc object
- * @val:  value that needs to set to this config
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_mlme_set_bcast_twt(struct wlan_objmgr_psoc *psoc,
-			bool val);
-
-/**
  * ucfg_mlme_get_twt_congestion_timeout() - Get twt congestion timeout
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -142,7 +120,7 @@ QDF_STATUS
 ucfg_mlme_set_enable_twt(struct wlan_objmgr_psoc *psoc,
 			 bool val);
 
-/**
+/*
  * ucfg_mlme_get_twt_bcast_requestor() - Get twt requestor enabled
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -154,17 +132,6 @@ ucfg_mlme_get_twt_bcast_requestor(struct wlan_objmgr_psoc *psoc,
 				  bool *val);
 
 /**
- * ucfg_mlme_set_twt_bcast_requestor() - Set Global twt bcast requestor support
- * @psoc: pointer to psoc object
- * @val:  Value to be set to config
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_mlme_set_twt_bcast_requestor(struct wlan_objmgr_psoc *psoc,
-				  bool val);
-
-/**
  * ucfg_mlme_get_twt_bcast_responder() - Get twt responder enabled
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -174,54 +141,63 @@ ucfg_mlme_set_twt_bcast_requestor(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_get_twt_bcast_responder(struct wlan_objmgr_psoc *psoc,
 				  bool *val);
+/**
+ * 1. If both of the new service caps
+ * WMI_SERVICE_BROADCAST_TWT_REQUESTER And
+ * WMI_SERVICE_BROADCAST_TWT_RESPONDER are enabled then the old
+ * WMI_SERVICE_BROADCAST_TWT will be set to 1.
+ *
+ * 2.a. If any of the new service caps in case of new firmware:
+ * WMI_SERVICE_BROADCAST_TWT_REQUESTER And
+ * WMI_SERVICE_BROADCAST_TWT_RESPONDER is DISABLED then the old
+ * WMI_SERVICE_BROADCAST_TWT will be set to 0.
+ *
+ * 2.b In case of new firmware wants to disable broadcast TWT:
+ * all 3 WMI_SERVICE_BROADCAST_TWT_REQUESTER,
+ * WMI_SERVICE_BROADCAST_TWT_RESPONDER &
+ * WMI_SERVICE_BROADCAST_TWT will be disabled.
+ *
+ * 2.c IN case of old firmware:
+ * WMI_SERVICE_BROADCAST_TWT will be 1 and
+ * WMI_SERVICE_BROADCAST_TWT_REQUESTER,
+ * WMI_SERVICE_BROADCAST_TWT_RESPONDER will be 0.
+ *
+ * bcast_requestor_cfg/bcast_responder_cfg is intersection of
+ * "enable_twt", "twt_bcast_req_resp_config" ini and above target
+ * service cap combination.
+ */
+
+/**
+ * ucfg_mlme_set_twt_bcast_requestor() - Set Global twt bcast requestor support
+ * @psoc: pointer to psoc object
+ * @val:  Value to be set to config
+ *
+ * The caller of ucfg_mlme_set_twt_bcast_requestor() updates with the
+ * intersection of "enable_twt", "twt_bcast_req_resp_config" ini and the
+ * WMI_SERVICE_BROADCAST_TWT_REQUESTOR, WMI_SERVICE_BROADCAST_TWT
+ * combination.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_set_twt_bcast_requestor(struct wlan_objmgr_psoc *psoc,
+				  bool val);
 
 /**
  * ucfg_mlme_set_twt_bcast_responder() - Set Global twt bcast responder support
  * @psoc: pointer to psoc object
  * @val:  Value to be set to config
  *
+ * The caller of ucfg_mlme_set_twt_bcast_requestor() updates with the
+ * intersection of "enable_twt", "twt_bcast_req_resp_config" ini and the
+ * WMI_SERVICE_BROADCAST_TWT_RESPONDER, WMI_SERVICE_BROADCAST_TWT
+ * combination.
+ *
  * Return: QDF Status
  */
 QDF_STATUS
 ucfg_mlme_set_twt_bcast_responder(struct wlan_objmgr_psoc *psoc,
 				  bool val);
-
-/**
- * ucfg_mlme_set_twt_bcast_requestor_tgt_cap() - Update the broadast requestor
- * target capability
- * @psoc: pointer to psoc object
- * @val:  Value to be set to config
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_mlme_set_twt_bcast_requestor_tgt_cap(struct wlan_objmgr_psoc *psoc,
-					  bool val);
-
-/**
- * ucfg_mlme_get_twt_bcast_requestor_tgt_cap() - Get broadcast requestor TGT
- * capability.
- * @psoc: pointer to psoc object
- *
- * Return: True if broadcast requestor target capability is present.
- */
-static inline bool
-ucfg_mlme_get_twt_bcast_requestor_tgt_cap(struct wlan_objmgr_psoc *psoc)
-{
-	return mlme_get_twt_bcast_requestor_tgt_cap(psoc);
-}
-
-/**
- * ucfg_mlme_set_twt_bcast_responder_tgt_cap() - Update the broadast responder
- * target capability
- * @psoc: pointer to psoc object
- * @val:  Value to be set to config
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_mlme_set_twt_bcast_responder_tgt_cap(struct wlan_objmgr_psoc *psoc,
-					  bool val);
 
 /**
  * ucfg_mlme_is_twt_setup_in_progress() - Get TWT setup in progress for
@@ -238,6 +214,34 @@ ucfg_mlme_is_twt_setup_in_progress(struct wlan_objmgr_psoc *psoc,
 				   uint8_t dialog_id)
 {
 	return mlme_is_twt_setup_in_progress(psoc, peer_mac, dialog_id);
+}
+
+/**
+ * ucfg_mlme_twt_is_command_in_progress() - Get TWT command in progress
+ * @psoc: Pointer to global PSOC object
+ * @peer_mac: Global peer mac address
+ * @dialog_id: TWT session dialog id
+ * @cmd: TWT command
+ *
+ * Return: True if given command is in progress
+ */
+
+static inline bool
+ucfg_mlme_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
+				     struct qdf_mac_addr *peer_mac,
+				     uint8_t dialog_id,
+				     enum wlan_twt_commands cmd)
+{
+	return mlme_twt_is_command_in_progress(psoc, peer_mac, dialog_id, cmd);
+}
+
+static inline QDF_STATUS
+ucfg_mlme_set_twt_command_in_progress(struct wlan_objmgr_psoc *psoc,
+				      struct qdf_mac_addr *peer_mac,
+				      uint8_t dialog_id,
+				      enum wlan_twt_commands cmd)
+{
+	return mlme_set_twt_command_in_progress(psoc, peer_mac, dialog_id, cmd);
 }
 
 /**
@@ -313,6 +317,19 @@ QDF_STATUS ucfg_mlme_init_twt_context(struct wlan_objmgr_psoc *psoc,
 				      uint8_t dialog_id)
 {
 	return mlme_init_twt_context(psoc, peer_mac, dialog_id);
+}
+
+/**
+ * ucfg_mlme_is_24ghz_twt_enabled() - Get if host triggered TWT is enabled on
+ * 2.4Ghz band.
+ * @psoc: Pointer to global psoc object
+ *
+ * Return: True if host TWT is enabled on 2.4 Ghz band.
+ */
+static inline bool
+ucfg_mlme_is_24ghz_twt_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return mlme_is_24ghz_twt_enabled(psoc);
 }
 
 /**
@@ -442,21 +459,6 @@ ucfg_mlme_set_twt_responder(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline QDF_STATUS
-ucfg_mlme_get_bcast_twt(struct wlan_objmgr_psoc *psoc,
-			bool *val)
-{
-	*val = false;
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-ucfg_mlme_set_bcast_twt(struct wlan_objmgr_psoc *psoc,
-			bool val)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
 ucfg_mlme_get_twt_congestion_timeout(struct wlan_objmgr_psoc *psoc,
 				     uint32_t *val)
 {
@@ -506,6 +508,24 @@ ucfg_mlme_is_twt_setup_in_progress(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline QDF_STATUS
+ucfg_mlme_set_twt_command_in_progress(struct wlan_objmgr_psoc *psoc,
+				      struct qdf_mac_addr *peer_mac,
+				      uint8_t dialog_id,
+				      enum wlan_twt_commands cmd)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline bool
+ucfg_mlme_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
+				     struct qdf_mac_addr *peer_mac,
+				     uint8_t dialog_id,
+				     enum wlan_twt_commands cmd)
+{
+	return false;
+}
+
+static inline QDF_STATUS
 ucfg_mlme_get_twt_bcast_requestor(struct wlan_objmgr_psoc *psoc,
 				  bool *val)
 {
@@ -535,28 +555,8 @@ ucfg_mlme_set_twt_bcast_responder(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-static inline QDF_STATUS
-ucfg_mlme_set_twt_bcast_requestor_tgt_cap(struct wlan_objmgr_psoc *psoc,
-					  bool val)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline QDF_STATUS
-ucfg_mlme_set_twt_bcast_responder_tgt_cap(struct wlan_objmgr_psoc *psoc,
-					  bool val)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-
 static inline
 bool ucfg_mlme_is_flexible_twt_enabled(struct wlan_objmgr_psoc *psoc)
-{
-	return false;
-}
-
-static inline bool
-ucfg_mlme_get_twt_bcast_requestor_tgt_cap(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }
@@ -574,6 +574,12 @@ QDF_STATUS ucfg_mlme_init_twt_context(struct wlan_objmgr_psoc *psoc,
 				      uint8_t dialog_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool
+ucfg_mlme_is_24ghz_twt_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 
 static inline QDF_STATUS

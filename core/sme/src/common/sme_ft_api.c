@@ -286,6 +286,7 @@ bool sme_ft_key_ready_for_install(mac_handle_t mac_handle, uint32_t session_id)
 }
 #endif
 
+#ifndef FEATURE_CM_ENABLE
 /*
  * HDD Interface to SME. SME now sends the Auth 2 and RIC IEs up to the
  * supplicant. The supplicant will then proceed to send down the
@@ -379,7 +380,6 @@ void sme_get_rici_es(mac_handle_t mac_handle, uint32_t sessionId,
 	sme_release_global_lock(&mac->sme);
 }
 
-#ifndef FEATURE_CM_ENABLE
 /*
  * Timer callback for the timer that is started between the preauth completion
  * and reassoc request to the PE. In this interval, it is expected that the
@@ -398,19 +398,37 @@ void sme_preauth_reassoc_intvl_timer_callback(void *context)
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifdef FEATURE_WLAN_ESE
-static void sme_reset_esecckm_info(struct csr_roam_session *session)
+static void sme_reset_esecckm_info(struct mac_context *mac, uint8_t vdev_id)
 {
-	qdf_mem_zero(&session->eseCckmInfo, sizeof(session->eseCckmInfo));
+	struct wlan_objmgr_vdev *vdev;
+	struct rso_config *rso_cfg;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac->pdev, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev object is NULL for vdev %d", vdev_id);
+		return;
+	}
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return;
+	}
+
+	qdf_mem_zero(rso_cfg->krk, WMI_KRK_KEY_LEN);
+	qdf_mem_zero(rso_cfg->btk, WMI_BTK_KEY_LEN);
+	rso_cfg->is_ese_assoc = false;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
 }
 #else
-static void sme_reset_esecckm_info(struct csr_roam_session *session)
+static void sme_reset_esecckm_info(struct mac_context *mac, uint8_t vdev_id)
 {
 }
 #endif
 void sme_reset_key(mac_handle_t mac_handle, uint32_t vdev_id)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct csr_roam_session *session = NULL;
 
 	if (!mac) {
 		sme_err("mac is NULL");
@@ -418,10 +436,7 @@ void sme_reset_key(mac_handle_t mac_handle, uint32_t vdev_id)
 	}
 
 	wlan_cm_set_psk_pmk(mac->pdev, vdev_id, NULL, 0);
-	session = CSR_GET_SESSION(mac, vdev_id);
-	if (!session)
-		return;
-	sme_reset_esecckm_info(session);
+	sme_reset_esecckm_info(mac, vdev_id);
 }
 #endif
 /* Reset the FT context. */

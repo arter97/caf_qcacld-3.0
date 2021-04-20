@@ -1444,15 +1444,6 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		assoc_ind->assocReqPtr = csr_roaminfo->assocReqPtr;
 		assoc_ind->fWmmEnabled = csr_roaminfo->wmmEnabledSta;
 		assoc_ind->ecsa_capable = csr_roaminfo->ecsa_capable;
-		if (csr_roaminfo->u.pConnectedProfile) {
-			assoc_ind->negotiatedAuthType =
-				csr_roaminfo->u.pConnectedProfile->AuthType;
-			assoc_ind->negotiatedUCEncryptionType =
-			    csr_roaminfo->u.pConnectedProfile->EncryptionType;
-			assoc_ind->negotiatedMCEncryptionType =
-			    csr_roaminfo->u.pConnectedProfile->mcEncryptionType;
-			assoc_ind->fAuthRequired = csr_roaminfo->fAuthRequired;
-		}
 		if (csr_roaminfo->owe_pending_assoc_ind) {
 			if (!sap_fill_owe_ie_in_assoc_ind(assoc_ind,
 					 csr_roaminfo->owe_pending_assoc_ind)) {
@@ -2984,11 +2975,9 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 	/* wps config info */
 	profile->wps_state = config->wps_state;
 
-#ifdef WLAN_FEATURE_11W
 	/* MFP capable/required */
 	profile->MFPCapable = config->mfpCapable ? 1 : 0;
 	profile->MFPRequired = config->mfpRequired ? 1 : 0;
-#endif
 
 	if (config->probeRespIEsBufferLen > 0 &&
 	    config->pProbeRespIEsBuffer) {
@@ -3571,7 +3560,7 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 		mac->sap.SapDfsInfo.csaIERequired = true;
 
 	if (mac->mlme_cfg->dfs_cfg.dfs_disable_channel_switch)
-		return wlan_reg_freq_to_chan(mac->pdev, sap_ctx->chan_freq);
+		return sap_ctx->chan_freq;
 
 	/* set the Radar Found flag in SapDfsInfo */
 	mac->sap.SapDfsInfo.sap_radar_found_status = true;

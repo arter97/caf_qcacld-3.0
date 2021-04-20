@@ -193,6 +193,7 @@ enum operating_class_num {
 
 enum operating_extension_identifier {
 	OP_CLASS_ID_200 = 200,
+	OP_CLASS_ID_201,
 };
 
 /* Structure common to Beacons & Probe Responses */
@@ -436,7 +437,7 @@ typedef struct sSirAssocRsp {
 
 #ifdef FEATURE_WLAN_ESE
 	uint8_t num_tspecs;
-	tDot11fIEWMMTSPEC TSPECInfo[SIR_ESE_MAX_TSPEC_IES];
+	tDot11fIEWMMTSPEC TSPECInfo[ESE_MAX_TSPEC_IES];
 	struct ese_tsm_ie tsmIE;
 #endif
 
@@ -458,9 +459,7 @@ typedef struct sSirAssocRsp {
 	tDot11fIEVHTOperation VHTOperation;
 	tDot11fIEExtCap ExtCap;
 	struct qos_map_set QosMapSet;
-#ifdef WLAN_FEATURE_11W
 	tDot11fIETimeoutInterval TimeoutInterval;
-#endif
 	tDot11fIERRMEnabledCap rrm_caps;
 	tDot11fIEvendor_vht_ie vendor_vht_ie;
 	tDot11fIEOBSSScanParameters obss_scanparams;
@@ -850,7 +849,7 @@ populate_dot11f_ssid(struct mac_context *mac,
 		tSirMacSSid *pInternal, tDot11fIESSID *pDot11f);
 
 /* / Populate a tDot11fIESSID from CFG */
-QDF_STATUS populate_dot11f_ssid2(struct mac_context *mac,
+QDF_STATUS populate_dot11f_ssid2(struct pe_session *pe_session,
 				tDot11fIESSID *pDot11f);
 
 /**
@@ -1250,6 +1249,20 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 #endif
 
 /**
+ * populate_dot11f_btm_extended_caps() - populate btm extended capabilities
+ * @mac_ctx: Global MAC context.
+ * @pe_session: Pointer to the PE session.
+ * @dot11f: Pointer to the extended capabilities of the session.
+ *
+ * Disable btm for SAE types for Helium firmware limit
+ *
+ * Return: QDF_STATUS Success or Failure
+ */
+QDF_STATUS populate_dot11f_btm_extended_caps(struct mac_context *mac_ctx,
+					     struct pe_session *pe_session,
+					     struct sDot11fIEExtCap *dot11f);
+
+/**
  * lim_truncate_ppet: truncates ppet of trailling zeros
  * @ppet: ppet to truncate
  * max_len: max length of ppet
@@ -1275,6 +1288,9 @@ wlan_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
 				    struct bss_description *bss_desc,
 				    tDot11fBeaconIEs **ie_struct);
 
+void wlan_populate_basic_rates(tSirMacRateSet *rate_set, bool is_ofdm_rates,
+			       bool is_basic_rates);
+
 uint32_t wlan_get_11h_power_constraint(struct mac_context *mac_ctx,
 				       tDot11fIEPowerConstraints *constraints);
 
@@ -1295,6 +1311,18 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
  */
 uint16_t
 wlan_get_ielen_from_bss_description(struct bss_description *bss_desc);
+
+bool wlan_rates_is_dot11_rate_supported(struct mac_context *mac_ctx,
+					uint8_t rate);
+
+bool wlan_check_rate_bitmap(uint8_t rate, uint16_t rate_bitmap);
+
+QDF_STATUS wlan_get_rate_set(struct mac_context *mac,
+			     tDot11fBeaconIEs *ie_struct,
+			     tSirMacRateSet *op_rate,
+			     tSirMacRateSet *ext_rate);
+
+void wlan_add_rate_bitmap(uint8_t rate, uint16_t *rate_bitmap);
 
 /**
  * dot11f_parse_assoc_response() - API to parse Assoc IE buffer to struct

@@ -1650,20 +1650,6 @@ wlan_mlme_get_wmm_uapsd_mask(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS wlan_mlme_get_implicit_qos_is_enabled(struct wlan_objmgr_psoc *psoc,
-						 bool *value)
-{
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj)
-		return QDF_STATUS_E_FAILURE;
-
-	*value = mlme_obj->cfg.wmm_params.wmm_config.bimplicit_qos_enabled;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifdef FEATURE_WLAN_ESE
 void wlan_mlme_get_inactivity_interval(struct wlan_objmgr_psoc *psoc,
 					uint32_t *value)
@@ -2638,48 +2624,6 @@ QDF_STATUS mlme_get_wep_key(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS mlme_set_wep_key(struct wlan_mlme_wep_cfg *wep_params,
-			    enum wep_key_id wep_keyid, uint8_t *key_to_set,
-			    qdf_size_t len)
-{
-	if (len == 0)
-		return QDF_STATUS_E_FAILURE;
-
-	mlme_legacy_debug("WEP set key for key_id:%d key_len:%zd",
-			  wep_keyid, len);
-	switch (wep_keyid) {
-	case MLME_WEP_DEFAULT_KEY_1:
-		wlan_mlme_set_cfg_str(key_to_set,
-				      &wep_params->wep_default_key_1,
-				      len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_2:
-		wlan_mlme_set_cfg_str(key_to_set,
-				      &wep_params->wep_default_key_2,
-				      len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_3:
-		wlan_mlme_set_cfg_str(key_to_set,
-				      &wep_params->wep_default_key_3,
-				      len);
-		break;
-
-	case MLME_WEP_DEFAULT_KEY_4:
-		wlan_mlme_set_cfg_str(key_to_set,
-				      &wep_params->wep_default_key_4,
-				      len);
-		break;
-
-	default:
-		mlme_legacy_err("Invalid key id:%d", wep_keyid);
-		return QDF_STATUS_E_INVAL;
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS
 wlan_mlme_is_11h_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
 {
@@ -2732,6 +2676,34 @@ wlan_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 		return QDF_STATUS_E_FAILURE;
 
 	mlme_obj->cfg.gen.enabled_11d = value;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.gen.enabled_rf_test_mode;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.gen.enabled_rf_test_mode = value;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4717,6 +4689,20 @@ wlan_mlme_get_monitor_mode_concurrency(struct wlan_objmgr_psoc *psoc)
 
 	return mlme_obj->cfg.gen.monitor_mode_concurrency;
 }
+
+#ifdef FEATURE_WDS
+enum wlan_wds_mode
+wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_default(CFG_WDS_MODE);
+
+	return mlme_obj->cfg.gen.wds_mode;
+}
+#endif
 
 bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc)
 {

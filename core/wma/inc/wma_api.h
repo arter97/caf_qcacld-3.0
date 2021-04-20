@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -296,7 +296,7 @@ bool wma_capability_enhanced_mcast_filter(void);
 void wma_process_pdev_hw_mode_trans_ind(void *wma,
 	wmi_pdev_hw_mode_transition_event_fixed_param *fixed_param,
 	wmi_pdev_set_hw_mode_response_vdev_mac_entry *vdev_mac_entry,
-	struct sir_hw_mode_trans_ind *hw_mode_trans_ind);
+	struct cm_hw_mode_trans_ind *hw_mode_trans_ind);
 
 /**
  * wma_set_cts2self_for_p2p_go() - set CTS2SELF command for P2P GO.
@@ -828,5 +828,15 @@ QDF_STATUS wma_vdev_self_peer_create(struct vdev_mlme_obj *vdev_mlme);
  * Return: None
  */
 void wma_cleanup_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wma_set_wakeup_logs_to_console() - Enable/disable wakeup logs to console
+ * @value: boolean value
+ *
+ * API to enable/disable wow host wakeup event logs to console.
+ *
+ * Return: None
+ */
+void wma_set_wakeup_logs_to_console(bool value);
 
 #endif /* WMA_API_H */

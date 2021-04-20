@@ -625,25 +625,6 @@
 #define CFG_FWOL_DHCP
 #endif
 
-/*
- * <ini>
- * gEnableLPRx - Enable/Disable LPRx
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini Enables or disables the LPRx in FW
- *
- * Usage: External
- *
- * </ini>
- */
-
-#define CFG_LPRX CFG_INI_BOOL( \
-		"gEnableLPRx", \
-		1, \
-		"LPRx control")
-
 #ifdef WLAN_FEATURE_SAE
 /*
  * <ini>
@@ -768,10 +749,16 @@
 
 /*
  * <ini>
- * g_enable_ilp - Enable/Disable ILP HW Block
- * @Default: 1
+ * g_enable_ilp - ILP HW Block Configuration
+ * @Min: 0
+ * @Max: 3
+ * @Default: 2
  *
- * This ini is used to enable/disable the ILP HW block
+ * This ini is used to configure ILP HW block with various options
+ * 0: disable
+ * 1: perf settings
+ * 2: max power saving
+ * 3: balanced settings
  *
  * Related: none
  *
@@ -782,9 +769,12 @@
  * <ini>
  */
 
-#define CFG_SET_ENABLE_ILP CFG_INI_BOOL( \
+#define CFG_SET_ENABLE_ILP CFG_INI_UINT( \
 		"g_enable_ilp", \
-		1, \
+		0, \
+		3, \
+		2, \
+		CFG_VALUE_OR_DEFAULT, \
 		"ILP configuration")
 
 /*
@@ -877,7 +867,6 @@
 	__CFG_SET_TSF_IRQ_HOST_GPIO_PIN \
 	__CFG_SET_TSF_SYNC_HOST_GPIO_PIN \
 	__CFG_SET_TSF_PTP_OPT \
-	CFG(CFG_LPRX) \
 	__CFG_IS_SAE_ENABLED \
 	CFG(CFG_ENABLE_GCMP) \
 	CFG(CFG_TX_SCH_DELAY) \

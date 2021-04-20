@@ -50,7 +50,15 @@ struct mac_context;
 #include "qca_vendor.h"
 #include "wlan_cp_stats_mc_defs.h"
 
+/* The ini gDataInactivityTimeout is deprecated. So, definng a new macro
+ * PS_DATA_INACTIVITY_TIMEOUT with the ini's default value.
+ */
+#define PS_DATA_INACTIVITY_TIMEOUT (200)
+
 #define OFFSET_OF(structType, fldName)   (&((structType *)0)->fldName)
+#define WLAN_DOT11_BASIC_RATE_MASK (0x80)
+#define BITS_ON(_Field, _Bitmask)  ((_Field) |=  (_Bitmask))
+#define BITS_OFF(_Field, _Bitmask) ((_Field) &= ~(_Bitmask))
 
 /* / Max supported channel list */
 #define SIR_MAX_SUPPORTED_CHANNEL_LIST      96
@@ -82,15 +90,12 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 /* Add extra PMO_RESUME_TIMEOUT for runtime PM resume timeout */
 #define SIR_PEER_CREATE_RESPONSE_TIMEOUT (4000 + PMO_RESUME_TIMEOUT)
 #define SIR_DELETE_STA_TIMEOUT           (4000 + PMO_RESUME_TIMEOUT)
-#define SIR_VDEV_PLCY_MGR_TIMEOUT        (2000 + PMO_RESUME_TIMEOUT)
+#define SIR_VDEV_PLCY_MGR_TIMEOUT        (4000 + PMO_RESUME_TIMEOUT)
 #else
 #define SIR_PEER_CREATE_RESPONSE_TIMEOUT (4000)
 #define SIR_DELETE_STA_TIMEOUT           (4000) /* 4 seconds */
-#define SIR_VDEV_PLCY_MGR_TIMEOUT        (2000)
+#define SIR_VDEV_PLCY_MGR_TIMEOUT        (4000)
 #endif
-
-/* This should not be greater than MAX_NUMBER_OF_CONC_CONNECTIONS */
-#define MAX_VDEV_SUPPORTED                        4
 
 #define MAX_POWER_DBG_ARGS_SUPPORTED 8
 #define QOS_MAP_MAX_EX  21
@@ -115,9 +120,6 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define SIR_SAP_MAX_NUM_PEERS 32
 #endif
 
-#define SIR_KRK_KEY_LEN 16
-#define SIR_BTK_KEY_LEN 32
-#define SIR_KCK_KEY_LEN 16
 #define KCK_192BIT_KEY_LEN 24
 #define KCK_256BIT_KEY_LEN 32
 
@@ -177,6 +179,112 @@ enum ps_state {
 	LEGACY_POWER_SAVE_MODE,
 	UAPSD_MODE
 };
+
+/**
+ * \var g_phy_rates_suppt
+ *
+ * \brief Rate support lookup table
+ *
+ *
+ * This is a  lookup table indexing rates &  configuration parameters to
+ * support.  Given a rate (in  unites of 0.5Mpbs) & three bools (MIMO
+ * Enabled, Channel  Bonding Enabled, & Concatenation  Enabled), one can
+ * determine  whether  the given  rate  is  supported  by computing  two
+ * indices.  The  first maps  the rate to  table row as  indicated below
+ * (i.e. eHddSuppRate_6Mbps maps to  row zero, eHddSuppRate_9Mbps to row
+ * 1, and so on).  Index two can be computed like so:
+ *
+ * \code
+ *  idx2 = ( fEsf  ? 0x4 : 0x0 ) |
+ *         ( fCb   ? 0x2 : 0x0 ) |
+ *         ( fMimo ? 0x1 : 0x0 );
+ * \endcode
+ *
+ *
+ * Given that:
+ *
+ *  \code
+ *  fSupported = g_phy_rates_suppt[idx1][idx2];
+ *  \endcode
+ *
+ *
+ * This table is based on  the document "PHY Supported Rates.doc".  This
+ * table is  permissive in that a  rate is reflected  as being supported
+ * even  when turning  off an  enabled feature  would be  required.  For
+ * instance, "PHY Supported Rates"  lists 42Mpbs as unsupported when CB,
+ * ESF, &  MIMO are all  on.  However,  if we turn  off either of  CB or
+ * MIMO, it then becomes supported.   Therefore, we mark it as supported
+ * even in index 7 of this table.
+ *
+ *
+ */
+
+static const bool g_phy_rates_suppt[24][8] = {
+
+	/* SSF   SSF    SSF    SSF    ESF    ESF    ESF    ESF */
+	/* SIMO  MIMO   SIMO   MIMO   SIMO   MIMO   SIMO   MIMO */
+	/* No CB No CB  CB     CB     No CB  No CB  CB     CB */
+	{true, true, true, true, true, true, true, true},       /* 6Mbps */
+	{true, true, true, true, true, true, true, true},       /* 9Mbps */
+	{true, true, true, true, true, true, true, true},       /* 12Mbps */
+	{true, true, true, true, true, true, true, true},       /* 18Mbps */
+	{false, false, true, true, false, false, true, true},   /* 20Mbps */
+	{true, true, true, true, true, true, true, true},       /* 24Mbps */
+	{true, true, true, true, true, true, true, true},       /* 36Mbps */
+	{false, false, true, true, false, true, true, true},    /* 40Mbps */
+	{false, false, true, true, false, true, true, true},    /* 42Mbps */
+	{true, true, true, true, true, true, true, true},       /* 48Mbps */
+	{true, true, true, true, true, true, true, true},       /* 54Mbps */
+	{false, true, true, true, false, true, true, true},     /* 72Mbps */
+	{false, false, true, true, false, true, true, true},    /* 80Mbps */
+	{false, false, true, true, false, true, true, true},    /* 84Mbps */
+	{false, true, true, true, false, true, true, true},     /* 96Mbps */
+	{false, true, true, true, false, true, true, true},     /* 108Mbps */
+	{false, false, true, true, false, true, true, true},    /* 120Mbps */
+	{false, false, true, true, false, true, true, true},    /* 126Mbps */
+	{false, false, false, true, false, false, false, true}, /* 144Mbps */
+	{false, false, false, true, false, false, false, true}, /* 160Mbps */
+	{false, false, false, true, false, false, false, true}, /* 168Mbps */
+	{false, false, false, true, false, false, false, true}, /* 192Mbps */
+	{false, false, false, true, false, false, false, true}, /* 216Mbps */
+	{false, false, false, true, false, false, false, true}, /* 240Mbps */
+};
+
+typedef enum {
+	/* 11b rates */
+	SUPP_RATE_1_MBPS   =   1 * 2,
+	SUPP_RATE_2_MBPS   =   2 * 2,
+	SUPP_RATE_5_MBPS =     11,
+	SUPP_RATE_11_MBPS  =   11 * 2,
+
+	/* 11a / 11g rates */
+	SUPP_RATE_6_MBPS   =   6 * 2,
+	SUPP_RATE_9_MBPS   =   9 * 2,
+	SUPP_RATE_12_MBPS  =   12 * 2,
+	SUPP_RATE_18_MBPS  =   18 * 2,
+	SUPP_RATE_24_MBPS  =   24 * 2,
+	SUPP_RATE_36_MBPS  =   36 * 2,
+	SUPP_RATE_48_MBPS  =   48 * 2,
+	SUPP_RATE_54_MBPS  =   54 * 2,
+
+	/* Airgo prop. rates */
+	SUPP_RATE_20_MBPS   =  20 * 2,
+	SUPP_RATE_40_MBPS   =  40 * 2,
+	SUPP_RATE_42_MBPS   =  42 * 2,
+	SUPP_RATE_72_MBPS   =  72 * 2,
+	SUPP_RATE_80_MBPS   =  80 * 2,
+	SUPP_RATE_84_MBPS   =  84 * 2,
+	SUPP_RATE_96_MBPS   =  96 * 2,
+	SUPP_RATE_108_MBPS  =  108 * 2,
+	SUPP_RATE_120_MBPS  =  120 * 2,
+	SUPP_RATE_126_MBPS  =  126 * 2,
+	SUPP_RATE_144_MBPS  =  144 * 2,
+	SUPP_RATE_160_MBPS  =  160 * 2,
+	SUPP_RATE_168_MBPS  =  168 * 2,
+	SUPP_RATE_192_MBPS  =  192 * 2,
+	SUPP_RATE_216_MBPS  =  216 * 2,
+	SUPP_RATE_240_MBPS  =  240 * 2
+} eCsrSupportedRates;
 
 /**
  * struct ps_params - maintain power save state and USAPD params
@@ -424,6 +532,7 @@ struct bss_description;
 struct roam_offload_synch_ind;
 struct roam_pmkid_req_event;
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * typedef csr_roam_synch_fn_t - CSR roam synch callback routine pointer
  * @mac: Global MAC context
@@ -444,6 +553,7 @@ typedef QDF_STATUS
 		       struct roam_offload_synch_ind *roam_synch_data,
 		       struct bss_description *bss_desc_ptr,
 		       enum sir_roam_op_code reason);
+#endif
 
 /**
  * typedef pe_roam_synch_fn_t - PE roam synch callback routine pointer
@@ -500,7 +610,9 @@ typedef QDF_STATUS
 struct sme_ready_req {
 	uint16_t messageType;   /* eWNI_SME_SYS_READY_IND */
 	uint16_t length;
+#ifndef FEATURE_CM_ENABLE
 	csr_roam_synch_fn_t csr_roam_synch_cb;
+#endif
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
 						    struct qdf_mac_addr bssid);
@@ -672,10 +784,8 @@ struct start_bss_req {
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */
-#ifdef WLAN_FEATURE_11W
 	bool pmfCapable;
 	bool pmfRequired;
-#endif
 
 	struct add_ie_params add_ie_params;
 
@@ -821,10 +931,9 @@ typedef struct sTspecInfo {
 	struct mac_tspec_ie tspec;
 } tTspecInfo;
 
-#define SIR_ESE_MAX_TSPEC_IES   4
 typedef struct sESETspecTspecInfo {
 	uint8_t numTspecs;
-	tTspecInfo tspec[SIR_ESE_MAX_TSPEC_IES];
+	tTspecInfo tspec[ESE_MAX_TSPEC_IES];
 } tESETspecInfo;
 
 struct tsm_ie {
@@ -926,29 +1035,26 @@ struct join_req {
 	uint16_t length;
 	uint8_t vdev_id;
 	tSirMacSSid ssId;
-	uint8_t dot11mode;      /* to support BT-AMP */
-	bool wps_registration;
-
-	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
-	tSirMacRateSet extendedRateSet; /* Has 11g rates */
 	tSirRSNie rsnIE;        /* RSN IE to be sent in */
 	tSirAddie addIEScan;    /* Additional IE to be sent in */
 	/* (unicast) Probe Request at the time of join */
 
 	tSirAddie addIEAssoc;   /* Additional IE to be sent in */
 	/* (Re) Association Request */
-
+#ifndef FEATURE_CM_ENABLE
 	tAniEdType UCEncryptionType;
 	enum ani_akm_type akm;
+	bool wps_registration;
+	bool isOSENConnection;
+	bool force_24ghz_in_ht20;
+#endif
 
 #ifdef FEATURE_WLAN_ESE
 	tESETspecInfo eseTspecInfo;
 #endif
-	bool isOSENConnection;
 	struct supported_channels supportedChannels;
-	/* Pls make this as last variable in struct */
-	bool force_24ghz_in_ht20;
 	bool force_rsne_override;
+	/* Pls make this as last variable in struct */
 	struct bss_description bssDescription;
 	/*
 	 * WARNING: Pls make bssDescription as last variable in struct
@@ -957,6 +1063,7 @@ struct join_req {
 	 */
 };
 
+#ifndef FEATURE_CM_ENABLE
 /* / Definition for response message to previously issued join request */
 /* / MAC ---> */
 struct join_rsp {
@@ -964,13 +1071,11 @@ struct join_rsp {
 	uint16_t length;
 	uint8_t vdev_id;      /* Session ID */
 	tSirResultCodes status_code;
-	tAniAuthType authType;
 	uint32_t vht_channel_width;
 	/* It holds reasonCode when join fails due to deauth/disassoc frame.
 	 * Otherwise it holds status code.
 	 */
 	uint16_t protStatusCode;
-	uint16_t aid;
 	uint32_t beaconLength;
 	uint32_t assocReqLength;
 	uint32_t assocRspLength;
@@ -1008,6 +1113,7 @@ struct join_rsp {
 #endif
 	uint8_t frames[1];
 };
+#endif
 
 struct oem_channel_info {
 	uint32_t mhz;
@@ -1847,14 +1953,12 @@ struct sir_sme_mgmt_frame_cb_req {
 	sir_mgmt_frame_ind_callback callback;
 };
 
-#ifdef WLAN_FEATURE_11W
 typedef struct sSirSmeUnprotMgmtFrameInd {
 	uint8_t sessionId;
 	uint8_t frameType;
 	uint8_t frameLen;
 	uint8_t frameBuf[1];    /* variable */
 } tSirSmeUnprotMgmtFrameInd, *tpSirSmeUnprotMgmtFrameInd;
-#endif
 
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 
@@ -2064,20 +2168,6 @@ struct sir_set_hw_mode_resp {
 };
 
 /**
- * struct sir_hw_mode_trans_ind - HW mode transition indication
- * @old_hw_mode_index: Index of old HW mode
- * @new_hw_mode_index: Index of new HW mode
- * @num_vdev_mac_entries: Number of vdev-mac id entries
- * @vdev_mac_map: vdev id-mac id map
- */
-struct sir_hw_mode_trans_ind {
-	uint32_t old_hw_mode_index;
-	uint32_t new_hw_mode_index;
-	uint32_t num_vdev_mac_entries;
-	struct policy_mgr_vdev_mac_map vdev_mac_map[MAX_VDEV_SUPPORTED];
-};
-
-/**
  * struct sir_dual_mac_config_resp - Dual MAC config response
  * @status: Status of setting the dual mac configuration
  */
@@ -2117,12 +2207,10 @@ typedef struct sSirSmeCandidateFoundInd {
 } tSirSmeCandidateFoundInd, *tpSirSmeCandidateFoundInd;
 #endif
 
-#ifdef WLAN_FEATURE_11W
 typedef struct sSirWlanExcludeUnencryptParam {
 	bool excludeUnencrypt;
 	struct qdf_mac_addr bssid;
 } tSirWlanExcludeUnencryptParam, *tpSirWlanExcludeUnencryptParam;
-#endif
 
 typedef enum {
 	P2P_SCAN_TYPE_SEARCH = 1,       /* P2P Search */
@@ -2492,47 +2580,6 @@ typedef struct {
 	uint8_t event_data[];
 } tSirStatsExtEvent, *tpSirStatsExtEvent;
 #endif
-
-struct roam_offload_synch_ind {
-	uint16_t messageType;   /*eWNI_SME_ROAM_OFFLOAD_SYNCH_IND */
-	uint16_t length;
-	uint16_t beaconProbeRespOffset;
-	uint16_t beaconProbeRespLength;
-	uint16_t reassocRespOffset;
-	uint16_t reassocRespLength;
-	uint16_t reassoc_req_offset;
-	uint16_t reassoc_req_length;
-	uint8_t isBeacon;
-	uint8_t roamed_vdev_id;
-	struct qdf_mac_addr bssid;
-	struct qdf_mac_addr self_mac;
-	int8_t txMgmtPower;
-	uint32_t authStatus;
-	uint8_t rssi;
-	uint8_t roamReason;
-	uint32_t chan_freq;
-	uint8_t kck[KCK_256BIT_KEY_LEN];
-	uint8_t kck_len;
-	uint32_t kek_len;
-	uint8_t kek[SIR_KEK_KEY_LEN_FILS];
-	uint32_t   pmk_len;
-	uint8_t    pmk[MAX_PMK_LEN];
-	uint8_t    pmkid[PMKID_LEN];
-	bool update_erp_next_seq_num;
-	uint16_t next_erp_seq_num;
-	uint8_t replay_ctr[SIR_REPLAY_CTR_LEN];
-	void *add_bss_params;
-	struct join_rsp *join_rsp;
-	uint16_t aid;
-	struct sir_hw_mode_trans_ind hw_mode_trans_ind;
-	uint8_t nss;
-	struct qdf_mac_addr dst_mac;
-	struct qdf_mac_addr src_mac;
-	uint16_t hlp_data_len;
-	uint8_t hlp_data[FILS_MAX_HLP_DATA_LEN];
-	bool is_ft_im_roam;
-	enum wlan_phymode phy_mode; /*phy mode sent by fw */
-};
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 struct handoff_failure_ind {

@@ -89,17 +89,6 @@ QDF_STATUS mlme_get_wep_key(struct wlan_objmgr_vdev *vdev,
 			    qdf_size_t *key_len);
 
 /**
- * mlme_set_wep_key() - set the wep keys during auth
- * @wep_params: cfg wep parametrs structure
- * @wep_key_id: default key number that needs to be copied
- * @key_to_set: destination buffer to be copied
- * @len:        size to be copied
- */
-QDF_STATUS mlme_set_wep_key(struct wlan_mlme_wep_cfg *wep_params,
-			    enum wep_key_id wep_keyid, uint8_t *key_to_set,
-			    qdf_size_t len);
-
-/**
  * wlan_mlme_get_tx_power() - Get the max tx power in particular band
  * @psoc: pointer to psoc object
  * @band: 2ghz/5ghz band
@@ -1319,16 +1308,6 @@ wlan_mlme_get_80211e_is_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
 QDF_STATUS
 wlan_mlme_get_wmm_uapsd_mask(struct wlan_objmgr_psoc *psoc, uint8_t *value);
 
-/**
- * wlan_mlme_get_implicit_qos_is_enabled() - Enable implicit QOS
- * @psoc: pointer to psoc object
- * @value: pointer to the value which will be filled for the caller
- *
- * Return: QDF Status
- */
-QDF_STATUS wlan_mlme_get_implicit_qos_is_enabled(struct wlan_objmgr_psoc *psoc,
-						 bool *value);
-
 #ifdef FEATURE_WLAN_ESE
 /**
  * wlan_mlme_get_inactivity_interval() - Infra Inactivity Interval
@@ -2146,6 +2125,26 @@ wlan_mlme_is_11d_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
  */
 QDF_STATUS
 wlan_mlme_set_11d_enabled(struct wlan_objmgr_psoc *psoc, bool value);
+
+/**
+ * wlan_mlme_is_rf_test_mode_enabled() - Get the rf test mode flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_is_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
+
+/**
+ * wlan_mlme_set_rf_test_mode_enabled() - Set the rf test mode flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
 
 /**
  * wlan_mlme_get_sta_miracast_mcc_rest_time() - Get STA/MIRACAST MCC rest time
@@ -3060,6 +3059,23 @@ QDF_STATUS mlme_set_ext_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *src,
  * Return: True if supported
  */
 bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc);
+
+#ifdef FEATURE_WDS
+/**
+ * wlan_mlme_get_wds_mode() - Check wds mode supported
+ * @psoc: pointer to psoc object
+ *
+ * Return: supprted wds mode
+ */
+enum wlan_wds_mode
+wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc);
+#else
+static inline enum wlan_wds_mode
+wlan_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return WLAN_WDS_MODE_DISABLED;
+}
+#endif
 
 #ifdef WLAN_SUPPORT_TWT
 /**

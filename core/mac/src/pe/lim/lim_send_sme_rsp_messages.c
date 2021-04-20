@@ -389,7 +389,8 @@ void lim_cm_send_connect_rsp(struct mac_context *mac_ctx,
 			     struct cm_vdev_join_req *req,
 			     enum wlan_cm_connect_fail_reason reason,
 			     QDF_STATUS connect_status,
-			     enum wlan_status_code status_code)
+			     enum wlan_status_code status_code,
+			     bool is_reassoc)
 {
 	struct cm_vdev_join_rsp *rsp;
 	QDF_STATUS status;
@@ -424,6 +425,7 @@ void lim_cm_send_connect_rsp(struct mac_context *mac_ctx,
 		}
 	}
 
+	rsp->connect_rsp.is_reassoc = is_reassoc;
 	qdf_mem_zero(&msg, sizeof(msg));
 
 	msg.bodyptr = rsp;
@@ -522,10 +524,11 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 			lim_cm_get_fail_reason_from_result_code(result_code);
 	}
 
-	if (msg_type == eWNI_SME_JOIN_RSP)
-		return lim_cm_send_connect_rsp(mac_ctx, session_entry, NULL,
-					       fail_reason, connect_status,
-					       prot_status_code);
+	return lim_cm_send_connect_rsp(mac_ctx, session_entry, NULL,
+				       fail_reason, connect_status,
+				       prot_status_code,
+				       msg_type == eWNI_SME_JOIN_RSP ?
+				       false : true);
 
 	/* add reassoc resp API */
 }
@@ -655,7 +658,6 @@ static void lim_handle_join_rsp_status(struct mac_context *mac_ctx,
 				sme_join_rsp->tspecIeLen);
 		}
 #endif
-		sme_join_rsp->aid = session_entry->limAID;
 		sme_join_rsp->vht_channel_width =
 			session_entry->ch_width;
 
@@ -2015,8 +2017,9 @@ static QDF_STATUS lim_process_csa_wbw_ie(struct mac_context *mac_ctx,
 			 fw_vht_ch_wd);
 		ap_new_ch_width = fw_vht_ch_wd;
 		ch_params.ch_width = ap_new_ch_width;
-		wlan_reg_set_channel_params(mac_ctx->pdev,
-					    csa_params->channel, 0, &ch_params);
+		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+						     csa_params->csa_chan_freq,
+						     0, &ch_params);
 		ap_new_ch_width = ch_params.ch_width;
 		csa_params->new_ch_freq_seg1 = ch_params.center_freq_seg0;
 		csa_params->new_ch_freq_seg2 = ch_params.center_freq_seg1;
@@ -2080,7 +2083,6 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 	struct ch_params ch_params = {0};
 	uint32_t channel_bonding_mode;
 	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
-
 	tLimWiderBWChannelSwitchInfo *chnl_switch_info = NULL;
 	tLimChannelSwitchInfo *lim_ch_switch = NULL;
 
@@ -2172,8 +2174,9 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 			if (chnl_switch_info->newChanWidth) {
 				ch_params.ch_width =
 					chnl_switch_info->newChanWidth;
-				wlan_reg_set_channel_params(mac_ctx->pdev,
-					csa_params->channel, 0, &ch_params);
+				wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+								     csa_params->csa_chan_freq,
+								     0, &ch_params);
 				lim_ch_switch->sec_ch_offset =
 					ch_params.sec_ch_offset;
 				session_entry->htSupportedChannelWidthSet =
@@ -2243,8 +2246,9 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 			lim_ch_switch->state =
 				eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
 			ch_params.ch_width = CH_WIDTH_40MHZ;
-			wlan_reg_set_channel_params(mac_ctx->pdev,
-					csa_params->channel, 0, &ch_params);
+			wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+							     csa_params->csa_chan_freq,
+							     0, &ch_params);
 			lim_ch_switch->sec_ch_offset =
 				ch_params.sec_ch_offset;
 			chnl_switch_info->newChanWidth = CH_WIDTH_40MHZ;
@@ -2277,9 +2281,9 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 					CH_WIDTH_40MHZ;
 				ch_params.ch_width =
 					chnl_switch_info->newChanWidth;
-				wlan_reg_set_channel_params(mac_ctx->pdev,
-						csa_params->channel,
-						0, &ch_params);
+				wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+								     csa_params->csa_chan_freq,
+								     0, &ch_params);
 				lim_ch_switch->ch_center_freq_seg0 =
 					ch_params.center_freq_seg0;
 				lim_ch_switch->sec_ch_offset =
@@ -2302,8 +2306,9 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 			lim_ch_switch->state =
 				eLIM_CHANNEL_SWITCH_PRIMARY_AND_SECONDARY;
 			ch_params.ch_width = CH_WIDTH_40MHZ;
-			wlan_reg_set_channel_params(mac_ctx->pdev,
-					csa_params->channel, 0, &ch_params);
+			wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+							     csa_params->csa_chan_freq,
+							     0, &ch_params);
 			lim_ch_switch->ch_center_freq_seg0 =
 				ch_params.center_freq_seg0;
 			lim_ch_switch->sec_ch_offset =
