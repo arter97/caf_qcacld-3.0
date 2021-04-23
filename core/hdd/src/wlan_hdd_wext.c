@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -106,7 +106,7 @@ static const struct ccp_freq_chan_map freq_chan_map[] = {
 	{5765, 153}, {5785, 157}, {5805, 161}, {5825, 165}, {5852, 170},
 	{5855, 171}, {5860, 172}, {5865, 173}, {5870, 174}, {5875, 175},
 	{5880, 176}, {5885, 177}, {5890, 178}, {5895, 179}, {5900, 180},
-	{5905, 181}, {5910, 182}, {5915, 183}, {5920, 184} };
+	{5905, 181}, {5910, 182}, {5915, 183}, {5920, 184}, {5845, 169} };
 
 #define FREQ_CHAN_MAP_TABLE_SIZE QDF_ARRAY_SIZE(freq_chan_map)
 
