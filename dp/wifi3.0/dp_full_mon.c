@@ -26,6 +26,9 @@
 #include "dp_htt.h"
 #include "dp_full_mon.h"
 #include "qdf_mem.h"
+#ifndef DP_BE_WAR_DISABLED
+#include "li/hal_li_rx.h"
+#endif
 
 #ifdef QCA_SUPPORT_FULL_MON
 
@@ -155,9 +158,11 @@ dp_rx_mon_status_buf_validate(struct dp_pdev *pdev,
 						&tail, rx_desc);
 			dp_rx_add_desc_list_to_free_list(soc, &desc_list,
 						&tail, mac_id, rx_desc_pool);
-			hal_rxdma_buff_addr_info_set(
+			hal_rxdma_buff_addr_info_set(soc->hal_soc,
 						ring_entry,
-						0, 0, HAL_RX_BUF_RBM_SW3_BM);
+						0, 0,
+						HAL_RX_BUF_RBM_SW3_BM
+						(soc->wbm_sw0_bm_id));
 		}
 		goto done;
 	}
@@ -588,7 +593,7 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 						    l3_hdr_pad +
 						    frag_len);
 
-			if (dp_rx_mon_add_msdu_to_list(head_msdu, msdu,
+			if (dp_rx_mon_add_msdu_to_list(soc, head_msdu, msdu,
 						       &last_msdu,
 						       rx_tlv_hdr, frag_len,
 						       l3_hdr_pad)
@@ -611,13 +616,13 @@ next_msdu:
 					     msdu_list.msdu_info[msdu_index].msdu_flags);
 		}
 
-		hal_rxdma_buff_addr_info_set(rx_link_buf_info,
+		hal_rxdma_buff_addr_info_set(soc->hal_soc, rx_link_buf_info,
 					     desc_info->link_desc.paddr,
 					     desc_info->link_desc.sw_cookie,
 					     desc_info->link_desc.rbm);
 
 		/* Get next link desc VA from current link desc */
-		hal_rx_mon_next_link_desc_get(link_desc_va,
+		hal_rx_mon_next_link_desc_get(soc->hal_soc, link_desc_va,
 					      &desc_info->link_desc);
 
 		/* return msdu link descriptor to WBM */
@@ -633,7 +638,7 @@ next_msdu:
 	pdev->rx_mon_stats.dest_mpdu_done++;
 
 	dp_rx_mon_init_tail_msdu(head_msdu, msdu, last_msdu, tail_msdu);
-	dp_rx_mon_remove_raw_frame_fcs_len(head_msdu, tail_msdu);
+	dp_rx_mon_remove_raw_frame_fcs_len(soc, head_msdu, tail_msdu);
 
 	return rx_buf_reaped;
 }
