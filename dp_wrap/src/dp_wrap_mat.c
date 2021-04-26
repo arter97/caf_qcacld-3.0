@@ -564,6 +564,8 @@ int dp_wrap_mat_rx(struct dp_wrap_vdev *wvdev, wbuf_t buf)
 				wlan_pdev_obj_unlock(pdev);
 				if (n_vdev) {
 					wvdev = dp_wrap_get_vdev_handle(n_vdev);
+					if (!wvdev)
+						return -EINVAL;
 				} else {
 					return 0;
 				}
