@@ -174,9 +174,7 @@ void wlan_objmgr_notify_log_delete(void *obj,
 		return;
 	}
 
-	qdf_spin_lock_bh(&g_umac_glb_obj->global_lock);
 	debug_info = g_umac_glb_obj->debug_info;
-	qdf_spin_unlock_bh(&g_umac_glb_obj->global_lock);
 
 	if (!debug_info) {
 		obj_mgr_err("debug_info is null");
@@ -269,9 +267,7 @@ void wlan_objmgr_notify_destroy(void *obj,
 	const char *obj_name;
 	union wlan_objmgr_del_obj *del_obj = (union wlan_objmgr_del_obj *)&obj;
 
-	qdf_spin_lock_bh(&g_umac_glb_obj->global_lock);
 	debug_info = g_umac_glb_obj->debug_info;
-	qdf_spin_unlock_bh(&g_umac_glb_obj->global_lock);
 
 	if (!debug_info) {
 		obj_mgr_err("debug_info is null");
@@ -441,9 +437,7 @@ static void wlan_objmgr_iterate_log_del_obj_handler(void *timer_arg)
 	qdf_time_t cur_tstamp;
 	QDF_STATUS status;
 
-	qdf_spin_lock_bh(&g_umac_glb_obj->global_lock);
 	debug_info = g_umac_glb_obj->debug_info;
-	qdf_spin_unlock_bh(&g_umac_glb_obj->global_lock);
 
 	if (!debug_info) {
 		obj_mgr_err("debug_info is not initialized");
@@ -516,9 +510,7 @@ void wlan_objmgr_debug_info_deinit(void)
 	qdf_list_t *list;
 	bool is_child_alive = false;
 
-	qdf_spin_lock_bh(&g_umac_glb_obj->global_lock);
 	debug_info = g_umac_glb_obj->debug_info;
-	qdf_spin_unlock_bh(&g_umac_glb_obj->global_lock);
 
 	if (!debug_info) {
 		obj_mgr_err("debug_info is not initialized");
@@ -585,9 +577,7 @@ void wlan_objmgr_debug_info_init(void)
 	qdf_spinlock_create(&debug_info->list_lock);
 
 	/* attach debug_info object to global object */
-	qdf_spin_lock_bh(&g_umac_glb_obj->global_lock);
 	g_umac_glb_obj->debug_info = debug_info;
-	qdf_spin_unlock_bh(&g_umac_glb_obj->global_lock);
 }
 
 #ifdef WLAN_OBJMGR_REF_ID_TRACE
