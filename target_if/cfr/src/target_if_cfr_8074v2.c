@@ -327,15 +327,10 @@ void dump_cfr_peer_tx_event(wmi_cfr_peer_tx_event_param *event)
 }
 
 void prepare_cfr_header_txstatus(wmi_cfr_peer_tx_event_param *tx_evt_param,
-		struct csi_cfr_header *header)
+				 struct csi_cfr_header *header,
+				 uint32_t target_type)
 {
-	header->start_magic_num        = 0xDEADBEAF;
-	header->vendorid               = 0x8cfdf0;
-	header->cfr_metadata_version   = CFR_META_VERSION_4;
-	header->cfr_data_version       = CFR_DATA_VERSION_1;
-	header->chip_type              = CFR_CAPTURE_RADIO_HKV2;
-	header->pltform_type           = CFR_PLATFORM_TYPE_ARM;
-	header->cfr_metadata_len       = sizeof(struct cfr_metadata_version_4);
+	target_if_cfr_fill_header(header, false, target_type, false);
 	header->u.meta_v4.status       = 0; /* failure */
 	header->u.meta_v4.length       = 0;
 
@@ -362,6 +357,7 @@ target_if_peer_capture_event(ol_scn_t sc, uint8_t *data, uint32_t datalen)
 	qdf_dma_addr_t buf_addr = 0, buf_addr_temp = 0;
 	int status;
 	struct wlan_lmac_if_rx_ops *rx_ops;
+	uint32_t target_type;
 
 	psoc = scn->psoc_obj;
 	if (!psoc) {
@@ -432,6 +428,8 @@ target_if_peer_capture_event(ol_scn_t sc, uint8_t *data, uint32_t datalen)
 		goto done;
 	}
 
+	target_type = target_if_cfr_get_target_type(psoc);
+
 	if (tx_evt_param.status & PEER_CFR_CAPTURE_EVT_PS_STATUS_MASK) {
 		cfr_debug("CFR capture failed as peer is in powersave : %s",
 			  ether_sprintf(&tx_evt_param.peer_mac_addr.bytes[0]));
@@ -477,13 +475,7 @@ target_if_peer_capture_event(ol_scn_t sc, uint8_t *data, uint32_t datalen)
 	lut->tx_address2 = tx_evt_param.correlation_info_2;
 	header = &lut->header;
 
-	header->start_magic_num        = 0xDEADBEAF;
-	header->vendorid               = 0x8cfdf0;
-	header->cfr_metadata_version   = CFR_META_VERSION_4;
-	header->cfr_data_version       = CFR_DATA_VERSION_1;
-	header->chip_type              = CFR_CAPTURE_RADIO_HKV2;
-	header->pltform_type           = CFR_PLATFORM_TYPE_ARM;
-	header->cfr_metadata_len       = sizeof(struct cfr_metadata_version_4);
+	target_if_cfr_fill_header(header, false, target_type, false);
 	header->u.meta_v4.status       = (tx_evt_param.status &
 					  PEER_CFR_CAPTURE_EVT_STATUS_MASK)?1:0;
 	header->u.meta_v4.capture_bw   = tx_evt_param.bandwidth;
@@ -538,7 +530,7 @@ target_if_peer_capture_event(ol_scn_t sc, uint8_t *data, uint32_t datalen)
 	goto done;
 
 relay_failure:
-	prepare_cfr_header_txstatus(&tx_evt_param, &header_error);
+	prepare_cfr_header_txstatus(&tx_evt_param, &header_error, target_type);
 	rx_ops->cfr_rx_ops.cfr_info_send(pdev, &header_error,
 					 sizeof(struct csi_cfr_header),
 					 NULL, 0, &end_magic, 4);
