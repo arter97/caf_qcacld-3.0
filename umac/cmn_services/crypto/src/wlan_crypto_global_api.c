@@ -1412,6 +1412,7 @@ QDF_STATUS wlan_crypto_delkey(struct wlan_objmgr_vdev *vdev,
 	/* Zero-out local key variables */
 	qdf_mem_zero(key, sizeof(struct wlan_crypto_key));
 	qdf_mem_free(key);
+	key = NULL;
 
 ret_rel_ref:
 	if (peer)
@@ -1750,6 +1751,10 @@ QDF_STATUS wlan_crypto_decap(struct wlan_objmgr_vdev *vdev,
 		if (!key)
 			return QDF_STATUS_E_INVAL;
 	}
+
+	if (!key->valid || !key->cipher_table)
+		return QDF_STATUS_E_INVAL;
+
 	/* if tkip, is counter measures enabled, then drop the frame */
 	cipher_table = (struct wlan_crypto_cipher *)key->cipher_table;
 	status = cipher_table->decap(key, wbuf, tid, hdrlen);
