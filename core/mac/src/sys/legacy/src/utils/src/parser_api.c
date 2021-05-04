@@ -963,20 +963,11 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 		if (pe_session->ht_config.ht_rx_ldpc)
 			pDot11f->ldpcCodingCap =
 				pe_session->vht_config.ldpc_coding;
-		if (pe_session->ch_width < CH_WIDTH_80MHZ) {
-			 pDot11f->shortGI80MHz = 0;
-		} else {
-			pDot11f->shortGI80MHz =
-				pe_session->vht_config.shortgi80;
-		}
 
-		if (pe_session->ch_width < CH_WIDTH_160MHZ) {
-			pDot11f->shortGI160and80plus80MHz = 0;
-			pDot11f->supportedChannelWidthSet = 0;
-		} else {
-			pDot11f->shortGI160and80plus80MHz =
-				pe_session->vht_config.shortgi160and80plus80;
-		}
+		pDot11f->shortGI80MHz =
+			pe_session->vht_config.shortgi80;
+		pDot11f->shortGI160and80plus80MHz =
+			pe_session->vht_config.shortgi160and80plus80;
 
 		if (pe_session->ht_config.ht_tx_stbc)
 			pDot11f->txSTBC = pe_session->vht_config.tx_stbc;
@@ -2933,7 +2924,7 @@ QDF_STATUS wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,
 				  struct sSirAssocRsp *assoc_rsp)
 {
 	const uint8_t *ie, *ie_end, *pos;
-	uint8_t ie_len;
+	uint8_t ie_len, remaining_ie_len;
 	struct wlan_sha384_ftinfo_subelem *ft_subelem;
 
 	ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_FTINFO, frame, frame_len);
@@ -2952,11 +2943,13 @@ QDF_STATUS wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,
 		pe_err("Invalid FTIE len:%d", ie_len);
 		return QDF_STATUS_E_FAILURE;
 	}
+	remaining_ie_len = ie_len;
 	pos = ie + 2;
 	qdf_mem_copy(&assoc_rsp->sha384_ft_info, pos,
 		     sizeof(struct wlan_sha384_ftinfo));
 	ie_end = ie + ie_len;
 	pos += sizeof(struct wlan_sha384_ftinfo);
+	remaining_ie_len -= sizeof(struct wlan_sha384_ftinfo);
 	ft_subelem = &assoc_rsp->sha384_ft_subelem;
 	qdf_mem_zero(ft_subelem, sizeof(*ft_subelem));
 	while (ie_end - pos >= 2) {
@@ -2964,10 +2957,19 @@ QDF_STATUS wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,
 
 		id = *pos++;
 		len = *pos++;
-		if (len < 1) {
+		/* Subtract data length(len) + 1 bytes for
+		 * Subelement ID + 1 bytes for length from
+		 * remaining FTIE buffer len (ie_len).
+		 * Subelement Parameter(s) field :
+		 *         Subelement ID  Length     Data
+		 * Octets:      1            1     variable
+		 */
+		if (len < 1 || remaining_ie_len < (len + 2)) {
 			pe_err("Invalid FT subelem length");
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		remaining_ie_len -= (len + 2);
 
 		switch (id) {
 		case FTIE_SUBELEM_R1KH_ID:

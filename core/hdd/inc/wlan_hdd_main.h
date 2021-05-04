@@ -4184,4 +4184,13 @@ void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
 {
 }
 #endif /* WLAN_FEATURE_PKT_CAPTURE */
+
+/**
+ * hdd_max_sta_vdev_count_reached() - check sta vdev count
+ * @hdd_ctx: global hdd context
+ *
+ * Return: true if vdev limit reached
+ */
+bool hdd_max_sta_vdev_count_reached(struct hdd_context *hdd_ctx);
+
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
