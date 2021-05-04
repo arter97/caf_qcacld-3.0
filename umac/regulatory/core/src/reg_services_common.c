@@ -209,9 +209,6 @@ enum phy_ch_width get_next_lower_bandwidth(enum phy_ch_width ch_width)
 {
 	static const enum phy_ch_width get_next_lower_bw[] = {
     /* 80+80 mode not supported in chips that support 320 mode */
-#ifdef WLAN_FEATURE_11BE
-		[CH_WIDTH_320MHZ] = CH_WIDTH_160MHZ,
-#endif
 		[CH_WIDTH_80P80MHZ] = CH_WIDTH_160MHZ,
 		[CH_WIDTH_160MHZ] = CH_WIDTH_80MHZ,
 		[CH_WIDTH_80MHZ] = CH_WIDTH_40MHZ,
