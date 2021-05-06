@@ -193,7 +193,9 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 				const char *addr, uint16_t vlan_id,
 				qca_multi_link_tbl_entry_t *qca_ml_entry)
 {
+#if !QRB5165_RB5
 	struct net_bridge_fdb_entry *fdb_entry = NULL;
+#endif
 	struct net_bridge_port *fdb_port = NULL;
 	struct net_device *fdb_dev = NULL;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
@@ -220,7 +222,9 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 	}
 
 	br = fdb_port->br;
+#if !QRB5165_RB5
 	fdb_entry = br_fdb_find_rcu(br, addr, vlan_id);
+#endif
 #endif
 
 	fdb_dev = fdb_port->dev;
@@ -231,7 +235,9 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 
 	qca_ml_entry->qal_fdb_ieee80211_ptr = fdb_dev->ieee80211_ptr;
 	qca_ml_entry->qal_fdb_dev = fdb_dev;
+#if !QRB5165_RB5
 	qca_ml_entry->qal_fdb_is_local = fdb_entry->is_local;
+#endif
 
 	return QDF_STATUS_SUCCESS;
 }
