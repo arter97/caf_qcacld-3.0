@@ -1,0 +1,130 @@
+ifeq ($(obj),)
+obj := .
+endif
+
+DEPTH := ../../../..
+OSDEP_SRC := $(DEPTH)/os/linux/src
+HOST_COMP_CONVG_SRC := $(DEPTH)/component_dev
+HOST_CMN_CONVG_SRC := $(DEPTH)/cmn_dev
+HOST_COMP_CONVG_SRC := $(DEPTH)/component_dev
+HOST_CMN_CONVG_HIF_SRC := $(DEPTH)/cmn_dev/hif/src
+HOST_CMN_CONVG_HIF_INC1 := $(DEPTH)/cmn_dev/hif
+HOST_CMN_CONVG_HTC_INC := $(DEPTH)/cmn_dev/htc
+HOST_CMN_CONVG_DP_INC := $(DEPTH)/cmn_dev/dp/wifi3.0
+HOST_CMN_CONVG_CFG_INC := $(DEPTH)/cmn_dev/wlan_cfg
+HOST_CMN_CONVG_HAL_INC := $(DEPTH)/cmn_dev/hal/inc
+HOST_CMN_CONVG_HAL_WIFI_INC := $(DEPTH)/cmn_dev/hal/wifi3.0
+PERF_PWR_OFFLOAD_WMI_SRC := $(DEPTH)/cmn_dev/wmi
+PERF_PWR_OFFLOAD_REGDMN_SRC := $(DEPTH)/offload/wlan/regdmn
+PERF_PWR_OFFLOAD_TARGET_IF_SRC := $(DEPTH)/cmn_dev/target_if
+
+obj-m += monitor.o
+
+include $(obj)/$(DEPTH)/os/linux/Makefile-linux.common
+
+INCS += -I$(obj)/$(DEPTH)/include \
+        -I$(obj)/$(DEPTH)/umac/base/ \
+        -I$(obj)/$(DEPTH)/ini_cfg/inc/ \
+        -I$(obj)/$(DEPTH)/offload/hw/include/ \
+        -I$(obj)/$(DEPTH)/umac/son/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/lmac/ath_pktlog \
+        -I$(obj)/$(DEPTH)/cmn_dev/hif/src/ce \
+        -I$(obj)/$(DEPTH)/cmn_dev/wbuff/inc \
+        -I$(obj)/$(DEPTH)/cmn_dev/hif/src/pcie/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/thermal/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/green_ap/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/cfr/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/target_if/init_deinit/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/mlme/vdev_mgr/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/mlme/connection_mgr/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/cmn_services/obj_mgr/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/cmn_services/obj_mgr/src/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/regulatory/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/mlme/mlme_objmgr/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/mlme/pdev_mgr/dispatcher/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/fwcommon \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/cmn_services/utils/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/qdf/inc \
+        -I$(obj)/$(DEPTH)/cmn_dev/qdf/linux/src \
+        -I$(obj)/$(DEPTH)/cmn_dev/dp/inc \
+        -I$(obj)/$(DEPTH)/cmn_dev/wlan_cfg \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/cmn_services/obj_mgr/src/ \
+	-I$(obj)/$(DEPTH)/cmn_dev/dp/cmn_dp_api \
+        -I$(obj)/$(DEPTH)/cmn_dev/cfg/inc \
+        -I$(obj)/$(DEPTH)/component_dev/dp/inc \
+        -I$(obj)/$(DEPTH)/component_dev/wmi/inc/ \
+        -I$(obj)/$(DEPTH)/component_dev/dp/inc \
+        -I$(obj)/$(DEPTH)/component_dev/dp/wifi3.0 \
+        -I$(obj)/$(DEPTH)/component_dev/dp/wifi3.0/monitor/inc \
+        -I$(obj)/$(DEPTH)/component_dev/crypto/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/dp/wifi3.0 \
+        -I$(obj)/$(DEPTH)/cmn_dev/dp/wifi3.0/monitor \
+        -I$(obj)/$(DEPTH)/cmn_dev/hal/wifi3.0 \
+        -I$(obj)/$(DEPTH)/cmn_dev/qal/inc/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/qal/linux/src/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/wmi/inc/ \
+        -I$(obj)/$(DEPTH)/dp/ \
+        -I$(obj)/$(DEPTH)/pld/inc  \
+        -I$(obj)/$(DEPTH)/cmn_dev/fw_hdr/fw/
+
+PERF_PWR_OFFLOAD_INC :=  \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/wlan/include \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/wlan/ath_pktlog/include \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/htt/include \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/wlan/txrx/include \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/os/linux/include \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/wlan/regdmn \
+        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/wlan/lmac_offload_if \
+        -I$(HOST_CMN_CONVG_HIF_INC1)/inc \
+        -I$(HOST_CMN_CONVG_HIF_INC1)/src \
+        -I$(HOST_CMN_CONVG_HIF_SRC)/ce \
+        -I$(HOST_CMN_CONVG_HTC_INC) \
+        -I$(HOST_CMN_CONVG_CFG_INC) \
+        -I$(HOST_CMN_CONVG_DP_INC) \
+        -I$(HOST_CMN_CONVG_HAL_INC) \
+        -I$(HOST_CMN_CONVG_HAL_WIFI_INC) \
+        -I$(PERF_PWR_OFFLOAD_WMI_SRC)/inc \
+        -I$(obj)/$(DEPTH)/offload/extra_include \
+        -I$(obj)/$(DEPTH)/cmn_dev/wbuff/inc
+
+
+PERF_PWR_OFFLOAD_INC += -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qca8074/v1/
+
+INCS += $(PERF_PWR_OFFLOAD_INC)
+
+ccflags-y+= $(INCS) $(COPTS)
+
+ifeq ($(strip ${QCA_PARTNER_MAKE_F_SUPPORT}),1)
+MOD_CFLAGS = -D"KBUILD_STR(s)=\#s" -D"KBUILD_BASENAME=KBUILD_STR(monitor.mod)"  -D"KBUILD_MODNAME=KBUILD_STR(monitor)"
+endif
+
+monitor-objs := \
+        $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/dp_rx_mon_status.o \
+        $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/dp_rx_mon_dest.o \
+        $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/dp_mon_filter.o \
+        $(HOST_CMN_CONVG_SRC)/dp/wifi3.0/monitor/dp_mon.o \
+        $(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_full_mon.o \
+        $(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_rx_mon_feature.o \
+        $(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_tx_capture.o \
+        $(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/linux/dp_mon_module.o
+
+clean-files := modules.order
+
+ifeq ($(strip ${QCA_PARTNER_MAKE_F_SUPPORT}),1)
+all: monitor.ko
+
+monitor.mod.o: monitor.mod.c
+        ${CC} -c -o $@ ${ccflags-y} ${MOD_CFLAGS} $<
+
+monitor.o: ${monitor-objs}
+        $(LD) -m elf32btsmip -r -o monitor.o $(monitor-objs)
+        $(KERNELPATH)/scripts/mod/modpost monitor.o
+
+monitor.ko: monitor.o monitor.mod.o
+        $(LD) $(LDOPTS) -o monitor.ko monitor.o monitor.mod.o
+
+%.o: %.c
+        ${CC} -c -o $@ ${ccflags-y} $<
+endif
