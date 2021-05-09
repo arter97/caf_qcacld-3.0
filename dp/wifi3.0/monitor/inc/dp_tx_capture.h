@@ -58,12 +58,16 @@ struct dp_tx_desc_s;
 
 #define DP_TX_CAP_MAX_MS 0xFFFFFFFF
 
-#define dp_tx_capture_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_DP_TX_CAPTURE, params)
-#define dp_tx_capture_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_DP_TX_CAPTURE, params)
-#define dp_tx_capture_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_DP_TX_CAPTURE, params)
+#define dp_tx_capture_alert(params...) \
+	QDF_TRACE_FATAL(QDF_MODULE_ID_DP_TX_CAPTURE, params)
+#define dp_tx_capture_err(params...) \
+	QDF_TRACE_ERROR(QDF_MODULE_ID_DP_TX_CAPTURE, params)
+#define dp_tx_capture_warn(params...) \
+	QDF_TRACE_WARN(QDF_MODULE_ID_DP_TX_CAPTURE, params)
 #define dp_tx_capture_info(params...) \
 	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP_TX_CAPTURE, ## params)
-#define dp_tx_capture_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_TX_CAPTURE, params)
+#define dp_tx_capture_debug(params...) \
+	QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_TX_CAPTURE, params)
 
 /* stats */
 enum CDP_PEER_MSDU_DESC {
@@ -277,6 +281,7 @@ struct tid_q_len {
 	uint64_t tasklet_msdu_len;
 	uint64_t pending_q_len;
 };
+
 /*
  * dp_peer_tid_peer_id_update() – update peer_id to tid structure
  * @peer: Datapath peer
@@ -471,8 +476,8 @@ dp_handle_tx_capture_from_dest(struct dp_soc *soc, struct dp_pdev *pdev,
  *         others on error
  */
 QDF_STATUS dp_bar_send_ack_frm_to_stack(struct dp_soc *soc,
-			      struct dp_pdev *pdev,
-			      qdf_nbuf_t nbuf);
+					struct dp_pdev *pdev,
+					qdf_nbuf_t nbuf);
 
 /**
  * dp_peer_set_tx_capture_enabled: Set tx_cap_enabled bit in peer

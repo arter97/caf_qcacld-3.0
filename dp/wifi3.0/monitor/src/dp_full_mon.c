@@ -84,16 +84,16 @@ dp_rx_mon_status_buf_validate(struct dp_pdev *pdev,
 	qdf_assert(hal_soc);
 
 	if (qdf_unlikely(hal_srng_access_start(hal_soc, mon_status_srng))) {
-		 dp_rx_mon_dest_debug("%pK: HAL SRNG access Failed -- %pK",
-				      soc, mon_status_srng);
+		dp_rx_mon_dest_debug("%pK: HAL SRNG access Failed -- %pK",
+				     soc, mon_status_srng);
 		QDF_ASSERT(0);
 		return status;
 	}
 
 	ring_entry = hal_srng_src_peek_n_get_next(hal_soc, mon_status_srng);
 	if (!ring_entry) {
-		 dp_rx_mon_dest_debug("%pK: HAL SRNG entry is NULL srng:-- %pK",
-				      soc, mon_status_srng);
+		dp_rx_mon_dest_debug("%pK: HAL SRNG entry is NULL srng:-- %pK",
+				     soc, mon_status_srng);
 		status = DP_MON_STATUS_REPLENISH;
 		goto done;
 	}
@@ -148,21 +148,22 @@ dp_rx_mon_status_buf_validate(struct dp_pdev *pdev,
 			 */
 			if (!rx_desc->unmapped) {
 				qdf_nbuf_unmap_nbytes_single(soc->osdev,
-						status_nbuf,
-						QDF_DMA_FROM_DEVICE,
-						rx_desc_pool->buf_size);
+							     status_nbuf,
+							     QDF_DMA_FROM_DEVICE,
+							     rx_desc_pool->buf_size);
 				rx_desc->unmapped = 1;
 			}
 			qdf_nbuf_free(status_nbuf);
 			dp_rx_add_to_free_desc_list(&desc_list,
-						&tail, rx_desc);
+						    &tail, rx_desc);
 			dp_rx_add_desc_list_to_free_list(soc, &desc_list,
-						&tail, mac_id, rx_desc_pool);
+							 &tail, mac_id,
+							 rx_desc_pool);
 			hal_rxdma_buff_addr_info_set(soc->hal_soc,
-						ring_entry,
-						0, 0,
-						HAL_RX_BUF_RBM_SW3_BM
-						(soc->wbm_sw0_bm_id));
+						     ring_entry,
+						     0, 0,
+						     HAL_RX_BUF_RBM_SW3_BM
+						     (soc->wbm_sw0_bm_id));
 		}
 		goto done;
 	}
@@ -206,14 +207,15 @@ dp_rx_mon_status_buf_validate(struct dp_pdev *pdev,
 	}
 
 	if ((pdev->mon_desc->status_buf.paddr != buf_paddr) ||
-	     (pdev->mon_desc->ppdu_id != pdev->mon_desc->status_ppdu_id)) {
+	    (pdev->mon_desc->ppdu_id != pdev->mon_desc->status_ppdu_id)) {
 		dp_rx_mon_dest_debug("%pK: Monitor: PPDU id or status buf_addr mismatch "
 				     "status_ppdu_id: %d dest_ppdu_id: %d "
 				     "status_addr: %llx status_buf_cookie: %d "
 				     "dest_addr: %llx tlv_tag: %d"
 				     " status_nbuf: %pK pdev->hold_mon_dest: %d",
 				     soc, pdev->mon_desc->status_ppdu_id,
-				     pdev->mon_desc->ppdu_id, pdev->status_buf_addr,
+				     pdev->mon_desc->ppdu_id,
+				     pdev->status_buf_addr,
 				     rx_buf_cookie,
 				     pdev->mon_desc->status_buf.paddr, tlv_tag,
 				     status_nbuf, pdev->hold_mon_dest_ring);
@@ -278,7 +280,8 @@ dp_rx_mon_drop_ppdu(struct dp_pdev *pdev, uint32_t mac_id)
 				skb_next = qdf_nbuf_next(mon_skb);
 
 				dp_rx_mon_dest_debug("%pK: mon_skb=%pK len %u",
-						     pdev->soc, mon_skb, mon_skb->len);
+						     pdev->soc, mon_skb,
+						     mon_skb->len);
 
 				qdf_nbuf_free(mon_skb);
 				mon_skb = skb_next;
@@ -363,49 +366,50 @@ dp_rx_mon_reap_status_ring(struct dp_soc *soc,
 
 	status = dp_rx_mon_status_buf_validate(pdev, int_ctx, mac_id);
 	switch (status) {
-		case DP_MON_STATUS_NO_DMA:
-			/* If DMA is not done for status ring entry,
-			 * hold on to monitor destination ring and
-			 * deliver current ppdu data once DMA is done.
-			 */
-			pdev->hold_mon_dest_ring = true;
-			break;
-		case DP_MON_STATUS_LAG:
-			/* If status_ppdu_id is lagging behind destination,
-			 * a. Hold on to destination ring
-			 * b. Drop status ppdus until ppdu id matches
-			 * c. Increment stats for ppdu_id mismatch and
-			 *    status ppdu drop
-			 */
-			pdev->hold_mon_dest_ring = true;
-			pdev->rx_mon_stats.ppdu_id_mismatch++;
-			pdev->rx_mon_stats.status_ppdu_drop++;
-			break;
-		case DP_MON_STATUS_LEAD:
-			/* If status_ppdu_id is leading ahead destination,
-			 * a. Drop destination ring ppdu until ppdu_id matches
-			 * b. Unhold monitor destination ring so status ppdus
-			 *    can be dropped.
-			 * c. Increment stats for ppdu_id mismatch and
-			 *    destination ppdu drop
-			 */
-			desc_info->drop_ppdu = true;
-			pdev->hold_mon_dest_ring = false;
-			pdev->rx_mon_stats.ppdu_id_mismatch++;
-			pdev->rx_mon_stats.dest_ppdu_drop++;
-			break;
-		case DP_MON_STATUS_REPLENISH:
-			/* If status ring hp entry is NULL, replenish it */
-			work_done = dp_rx_mon_status_process(soc,  int_ctx, mac_id, 1);
-			break;
-		case DP_MON_STATUS_MATCH:
-			/* If status ppdu id matches with destnation,
-			 * unhold monitor destination ring and deliver ppdu
-			 */
-			pdev->hold_mon_dest_ring = false;
-			break;
-		default:
-			dp_err("mon reap status is not supported");
+	case DP_MON_STATUS_NO_DMA:
+		/* If DMA is not done for status ring entry,
+		 * hold on to monitor destination ring and
+		 * deliver current ppdu data once DMA is done.
+		 */
+		pdev->hold_mon_dest_ring = true;
+		break;
+	case DP_MON_STATUS_LAG:
+		/* If status_ppdu_id is lagging behind destination,
+		 * a. Hold on to destination ring
+		 * b. Drop status ppdus until ppdu id matches
+		 * c. Increment stats for ppdu_id mismatch and
+		 *    status ppdu drop
+		 */
+		pdev->hold_mon_dest_ring = true;
+		pdev->rx_mon_stats.ppdu_id_mismatch++;
+		pdev->rx_mon_stats.status_ppdu_drop++;
+		break;
+	case DP_MON_STATUS_LEAD:
+		/* If status_ppdu_id is leading ahead destination,
+		 * a. Drop destination ring ppdu until ppdu_id matches
+		 * b. Unhold monitor destination ring so status ppdus
+		 *    can be dropped.
+		 * c. Increment stats for ppdu_id mismatch and
+		 *    destination ppdu drop
+		 */
+		desc_info->drop_ppdu = true;
+		pdev->hold_mon_dest_ring = false;
+		pdev->rx_mon_stats.ppdu_id_mismatch++;
+		pdev->rx_mon_stats.dest_ppdu_drop++;
+		break;
+	case DP_MON_STATUS_REPLENISH:
+		/* If status ring hp entry is NULL, replenish it */
+		work_done = dp_rx_mon_status_process(soc, int_ctx,
+						     mac_id, 1);
+		break;
+	case DP_MON_STATUS_MATCH:
+		/* If status ppdu id matches with destnation,
+		 * unhold monitor destination ring and deliver ppdu
+		 */
+		pdev->hold_mon_dest_ring = false;
+		break;
+	default:
+		dp_err("mon reap status is not supported");
 	}
 
 	/* If status ring is lagging behind detination ring,
@@ -493,9 +497,10 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 	 * and forms nbuf queue.
 	 */
 	while (desc_info->msdu_count && desc_info->link_desc.paddr) {
-		link_desc_va = dp_rx_cookie_2_mon_link_desc(pdev,
-							    desc_info->link_desc,
-							    mac_id);
+		link_desc_va =
+			dp_rx_cookie_2_mon_link_desc(pdev,
+						     desc_info->link_desc,
+						     mac_id);
 
 		qdf_assert_always(link_desc_va);
 
@@ -561,13 +566,13 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 			 *      a msdu and decrement one msdu_count
 			 */
 			dp_rx_mon_parse_desc_buffer(soc,
-					&(msdu_list.msdu_info[msdu_index]),
-						 &msdu_frag,
-						 &total_frag_len,
-						 &frag_len,
-						 &l3_hdr_pad,
-						 rx_tlv_hdr,
-						 &is_frag_non_raw, rx_tlv_hdr);
+					&msdu_list.msdu_info[msdu_index],
+					&msdu_frag,
+					&total_frag_len,
+					&frag_len,
+					&l3_hdr_pad,
+					rx_tlv_hdr,
+					&is_frag_non_raw, rx_tlv_hdr);
 			if (!msdu_frag)
 				desc_info->msdu_count--;
 
@@ -579,7 +584,6 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 			 * from the buffer beginning where the L2
 			 * header begins.
 			 */
-
 
 			/*******************************************************
 			 *                    RX_PACKET                        *
@@ -659,7 +663,6 @@ dp_rx_mon_deliver_prev_ppdu(struct dp_pdev *pdev,
 			    uint32_t mac_id,
 			    uint32_t quota)
 {
-
 	struct dp_soc *soc = pdev->soc;
 	struct hal_rx_mon_desc_info *desc_info = pdev->mon_desc;
 	uint32_t work_done = 0, work = 0;
@@ -670,14 +673,14 @@ dp_rx_mon_deliver_prev_ppdu(struct dp_pdev *pdev,
 		status = dp_rx_mon_status_buf_validate(pdev, int_ctx, mac_id);
 
 		switch (status) {
-			case DP_MON_STATUS_NO_DMA:
+		case DP_MON_STATUS_NO_DMA:
 			/* If DMA is not done for status ring entry,
 			 * hold on to monitor destination ring and
 			 * deliver current ppdu data once DMA is done.
 			 */
 			pdev->hold_mon_dest_ring = true;
 			break;
-			case DP_MON_STATUS_LAG:
+		case DP_MON_STATUS_LAG:
 			/* If status_ppdu_id is lagging behind destination,
 			 * a. Hold on to destination ring
 			 * b. Drop status ppdus until ppdu id matches
@@ -688,7 +691,7 @@ dp_rx_mon_deliver_prev_ppdu(struct dp_pdev *pdev,
 			pdev->rx_mon_stats.ppdu_id_mismatch++;
 			pdev->rx_mon_stats.status_ppdu_drop++;
 			break;
-			case DP_MON_STATUS_LEAD:
+		case DP_MON_STATUS_LEAD:
 			/* If status_ppdu_id is leading ahead destination,
 			 * a. Drop destination ring ppdu until ppdu_id matches
 			 * b. Unhold monitor destination ring so status ppdus
@@ -701,18 +704,19 @@ dp_rx_mon_deliver_prev_ppdu(struct dp_pdev *pdev,
 			pdev->rx_mon_stats.ppdu_id_mismatch++;
 			pdev->rx_mon_stats.dest_ppdu_drop++;
 			break;
-			case DP_MON_STATUS_REPLENISH:
+		case DP_MON_STATUS_REPLENISH:
 			/* If status ring hp entry is NULL, replenish it */
-			work = dp_rx_mon_status_process(soc, int_ctx, mac_id, 1);
+			work = dp_rx_mon_status_process(soc, int_ctx,
+							mac_id, 1);
 			break;
-			case DP_MON_STATUS_MATCH:
+		case DP_MON_STATUS_MATCH:
 			/* If status ppdu id matches with destnation,
 			 * unhold monitor destination ring and deliver ppdu
 			 */
 			pdev->hold_mon_dest_ring = false;
 			break;
-			default:
-				dp_err("mon reap status is not supported");
+		default:
+			dp_err("mon reap status is not supported");
 		}
 
 		/* When status ring entry's DMA is not done or
@@ -726,7 +730,8 @@ dp_rx_mon_deliver_prev_ppdu(struct dp_pdev *pdev,
 		}
 
 		if (status == DP_MON_STATUS_LAG) {
-			work = dp_rx_mon_status_process(soc, int_ctx, mac_id, 1);
+			work = dp_rx_mon_status_process(soc, int_ctx,
+							mac_id, 1);
 
 			if (!work)
 				return 0;
@@ -784,7 +789,7 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 
 	if (!pdev) {
 		dp_rx_mon_dest_err("pdev is null for mac_id = %d",
-				     mac_id);
+				   mac_id);
 		return work_done;
 	}
 
@@ -843,9 +848,8 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 		/* Assert if end_of_ppdu is zero and number of reaped buffers
 		 * are zero.
 		 */
-		if (qdf_unlikely(!desc_info->end_of_ppdu && !rx_bufs_reaped)) {
+		if (qdf_unlikely(!desc_info->end_of_ppdu && !rx_bufs_reaped))
 			qdf_err("end_of_ppdu and rx_bufs_reaped are zero");
-		}
 
 		rx_mon_stats->mon_rx_bufs_reaped_dest += rx_bufs_reaped;
 
@@ -863,7 +867,8 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 			if (status != QDF_STATUS_SUCCESS)
 				qdf_assert_always(0);
 
-			rx_mon_stats->mon_rx_bufs_replenished_dest += rx_bufs_reaped;
+			rx_mon_stats->mon_rx_bufs_replenished_dest +=
+								rx_bufs_reaped;
 		}
 
 		head_desc = NULL;
@@ -882,8 +887,9 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 			 * move srng to next and continue reaping next entry
 			 */
 			if (!head_msdu) {
-				ring_desc = hal_srng_dst_get_next(hal_soc,
-								  mon_dest_srng);
+				ring_desc =
+					hal_srng_dst_get_next(hal_soc,
+							      mon_dest_srng);
 
 				continue;
 			}
@@ -921,8 +927,8 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 		 */
 
 		if (!desc_info->ppdu_id && !desc_info->status_buf.paddr) {
-			dp_rx_mon_dest_debug("%pK: ppdu_id: %d ring_entry: %pK"
-					     "status_buf_count: %d rxdma_push: %d"
+			dp_rx_mon_dest_debug("%pK: ppdu_id: %d ring_entry: %pK "
+					     "status_buf_count: %d rxdma_push: %d "
 					     "rxdma_err: %d link_desc: %llx ",
 					     soc, desc_info->ppdu_id, ring_desc,
 					     desc_info->status_buf_count,

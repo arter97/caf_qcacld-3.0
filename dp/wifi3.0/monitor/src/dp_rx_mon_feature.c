@@ -403,6 +403,7 @@ dp_rx_enh_capture_is_peer_enabled(struct dp_soc *soc,
 	}
 	return false;
 }
+
 /*
  * dp_rx_handle_enh_capture() - Deliver Rx enhanced capture data
  * @pdev: pdev ctx
@@ -429,7 +430,6 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 		dp_rx_free_msdu_list(msdu_list);
 		pdev->is_mpdu_hdr[user] = true;
 
-
 		if (pdev->rx_enh_capture_peer &&
 		    !dp_rx_enh_capture_is_peer_enabled(
 				soc, ppdu_info, user)) {
@@ -441,7 +441,6 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 				pdev, &pdev->ppdu_info, mpdu_info, user);
 
 			while ((mpdu_head = qdf_nbuf_queue_remove(mpdu_q))) {
-
 				mpdu_ind->nbuf = mpdu_head;
 				mpdu_info->fcs_err =
 					QDF_NBUF_CB_RX_FCS_ERR(mpdu_head);
@@ -458,6 +457,7 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
 /*
  * dp_rx_mon_enh_capture_process() - Rx enhanced capture mode
  * processing.
@@ -493,7 +493,6 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 	    (pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_MPDU_MSDU) ||
 	    ((pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_MPDU) &&
 	    pdev->is_mpdu_hdr[user_id]))) {
-
 		if (*nbuf_used) {
 			nbuf = qdf_nbuf_clone(status_nbuf);
 		} else {
@@ -516,7 +515,7 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 				RX_ENH_CB_BUF_ALIGNMENT,
 				FALSE);
 
-			if (mpdu_head == NULL)
+			if (!mpdu_head)
 				return;
 
 			qdf_nbuf_queue_add(&pdev->mpdu_q[user_id],
@@ -581,7 +580,7 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 					pdev->soc->wlan_cfg_ctx);
 
 		if (is_rx_mon_protocol_flow_tag_en) {
-			 /* Set the protocol tag value from CCE metadata */
+			/* Set the protocol tag value from CCE metadata */
 			dp_rx_mon_enh_capture_tag_protocol_type(pdev, ppdu_info,
 								user_id, nbuf);
 			/* Set the flow tag from FSE metadata */
@@ -629,7 +628,7 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 	}
 
 	if ((pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED) &&
-			(rx_cap_mode == CDP_RX_ENH_CAPTURE_DISABLED)) {
+	    (rx_cap_mode == CDP_RX_ENH_CAPTURE_DISABLED)) {
 		dp_err("Rx capture is already disabled %d", rx_cap_mode);
 		return QDF_STATUS_E_INVAL;
 	}
