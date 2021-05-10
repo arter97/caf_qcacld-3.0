@@ -267,7 +267,7 @@ static int copy_station_stats_to_adapter(struct hdd_adapter *adapter,
 		goto out;
 	}
 
-	switch (hdd_conn_get_connected_band(&adapter->session.station)) {
+	switch (hdd_conn_get_connected_band(adapter)) {
 	case BAND_2G:
 		tx_nss = dynamic_cfg->tx_nss[NSS_CHAINS_BAND_2GHZ];
 		rx_nss = dynamic_cfg->rx_nss[NSS_CHAINS_BAND_2GHZ];
@@ -750,26 +750,22 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 	     (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
 	     (QDF_P2P_DEVICE_MODE == adapter->device_mode))) {
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-		if (eConnectionState_NotConnected ==
-		    sta_ctx->conn_info.conn_state) {
+		if (hdd_cm_is_disconnected(adapter)) {
 			info->state = WIFI_DISCONNECTED;
 		}
-		if (eConnectionState_Connecting ==
-		    sta_ctx->conn_info.conn_state) {
+		if (hdd_cm_is_connecting(adapter)) {
 			hdd_debug("Session ID %d, Connection is in progress",
 				  adapter->vdev_id);
 			info->state = WIFI_ASSOCIATING;
 		}
-		if ((eConnectionState_Associated ==
-		     sta_ctx->conn_info.conn_state) &&
-		    (!sta_ctx->conn_info.is_authenticated)) {
+		if (hdd_cm_is_vdev_associated(adapter) &&
+		    !sta_ctx->conn_info.is_authenticated) {
 			hdd_err("client " QDF_MAC_ADDR_FMT
 				" is in the middle of WPS/EAPOL exchange.",
 				QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
 			info->state = WIFI_AUTHENTICATING;
 		}
-		if (eConnectionState_Associated ==
-		    sta_ctx->conn_info.conn_state) {
+		if (hdd_cm_is_vdev_associated(adapter)) {
 			info->state = WIFI_ASSOCIATED;
 			qdf_copy_macaddr(&info->bssid,
 					 &sta_ctx->conn_info.bssid);
@@ -972,7 +968,7 @@ static int hdd_llstats_radio_fill_channels(struct hdd_adapter *adapter,
 	chlist = nla_nest_start(vendor_event,
 				QCA_WLAN_VENDOR_ATTR_LL_STATS_CH_INFO);
 	if (!chlist) {
-		hdd_err("nla_nest_start failed");
+		hdd_err("nla_nest_start failed, %u", radiostat->num_channels);
 		return -EINVAL;
 	}
 
@@ -983,7 +979,8 @@ static int hdd_llstats_radio_fill_channels(struct hdd_adapter *adapter,
 
 		chinfo = nla_nest_start(vendor_event, i);
 		if (!chinfo) {
-			hdd_err("nla_nest_start failed");
+			hdd_err("nla_nest_start failed, chan number %u",
+				radiostat->num_channels);
 			return -EINVAL;
 		}
 
@@ -1005,7 +1002,9 @@ static int hdd_llstats_radio_fill_channels(struct hdd_adapter *adapter,
 		    nla_put_u32(vendor_event,
 				QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_CCA_BUSY_TIME,
 				channel_stats->cca_busy_time)) {
-			hdd_err("nla_put failed");
+			hdd_err("nla_put failed for channel info (%u, %d, %u)",
+				radiostat->num_channels, i,
+				channel_stats->channel.center_freq);
 			return -EINVAL;
 		}
 
@@ -1019,7 +1018,8 @@ static int hdd_llstats_radio_fill_channels(struct hdd_adapter *adapter,
 				vendor_event,
 				QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_RX_TIME,
 				channel_stats->rx_time)) {
-				hdd_err("nla_put failed");
+				hdd_err("nla_put failed for tx time (%u, %d)",
+					radiostat->num_channels, i);
 				return -EINVAL;
 			}
 		}
@@ -1923,6 +1923,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	if (ret) {
 		hdd_err("Target response timed out request id %d request bitmap 0x%x",
 			priv->request_id, priv->request_bitmap);
+		sme_radio_tx_mem_free();
 		qdf_spin_lock(&priv->ll_stats_lock);
 		priv->request_bitmap = 0;
 		qdf_spin_unlock(&priv->ll_stats_lock);
@@ -5283,7 +5284,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 		   TRACE_CODE_HDD_CFG80211_GET_STA,
 		   adapter->vdev_id, 0);
 
-	if (eConnectionState_Associated != sta_ctx->conn_info.conn_state) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not associated");
 		/*To keep GUI happy */
 		return 0;
@@ -5537,7 +5538,8 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
 
-	if (adapter->device_mode == QDF_SAP_MODE) {
+	if (adapter->device_mode == QDF_SAP_MODE ||
+	    adapter->device_mode == QDF_P2P_GO_MODE) {
 		qdf_status = ucfg_mlme_get_sap_get_peer_info(
 				hdd_ctx->psoc, &get_peer_info_enable);
 		if (qdf_status == QDF_STATUS_SUCCESS && get_peer_info_enable) {
@@ -5941,8 +5943,7 @@ static bool hdd_is_rcpi_applicable(struct hdd_adapter *adapter,
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
 		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-		if (hdd_sta_ctx->conn_info.conn_state !=
-		    eConnectionState_Associated)
+		if (!hdd_cm_is_vdev_associated(adapter))
 			return false;
 
 		if (hdd_sta_ctx->hdd_reassoc_scenario) {
@@ -6190,7 +6191,7 @@ QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value)
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
-	if (eConnectionState_Associated != sta_ctx->conn_info.conn_state) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not associated!, rssi on disconnect %d",
 			  adapter->rssi_on_disconnect);
 		*rssi_value = adapter->rssi_on_disconnect;
@@ -6439,7 +6440,7 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed)
 		return -ENOTSUPP;
 	}
 
-	if (eConnectionState_Associated != hdd_stactx->conn_info.conn_state) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		/* we are not connected so we don't have a classAstats */
 		*link_speed = 0;
 	} else {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,7 +60,7 @@
 #define CSR_DOT11_SUPPORTED_RATES_MAX (12)
 #define CSR_DOT11_EXTENDED_SUPPORTED_RATES_MAX (8)
 
-#define CSR_DOT11_BASIC_RATE_MASK (0x80)
+#define CSR_DOT11_BASIC_RATE_MASK    WLAN_DOT11_BASIC_RATE_MASK
 
 /* NOTE these index are use as array index for csr_rsn_oui */
 #define CSR_OUI_USE_GROUP_CIPHER_INDEX 0x00
@@ -83,47 +83,6 @@
 /* max idx, should be last & highest */
 #define CSR_OUI_WAPI_WAI_MAX_INDEX     0x03
 #endif /* FEATURE_WLAN_WAPI */
-
-typedef enum {
-	/* 11b rates */
-	eCsrSuppRate_1Mbps   = 1 * 2,
-	eCsrSuppRate_2Mbps   = 2 * 2,
-	eCsrSuppRate_5_5Mbps = 11,      /* 5.5 * 2 */
-	eCsrSuppRate_11Mbps  = 11 * 2,
-
-	/* 11a / 11g rates */
-	eCsrSuppRate_6Mbps   = 6 * 2,
-	eCsrSuppRate_9Mbps   = 9 * 2,
-	eCsrSuppRate_12Mbps  = 12 * 2,
-	eCsrSuppRate_18Mbps  = 18 * 2,
-	eCsrSuppRate_24Mbps  = 24 * 2,
-	eCsrSuppRate_36Mbps  = 36 * 2,
-	eCsrSuppRate_48Mbps  = 48 * 2,
-	eCsrSuppRate_54Mbps  = 54 * 2,
-
-	/* airgo proprietary rates */
-	eCsrSuppRate_10Mbps   = 10 * 2,
-	eCsrSuppRate_10_5Mbps = 21,     /* 10.5 * 2 */
-	eCsrSuppRate_20Mbps   = 20 * 2,
-	eCsrSuppRate_21Mbps   = 21 * 2,
-	eCsrSuppRate_40Mbps   = 40 * 2,
-	eCsrSuppRate_42Mbps   = 42 * 2,
-	eCsrSuppRate_60Mbps   = 60 * 2,
-	eCsrSuppRate_63Mbps   = 63 * 2,
-	eCsrSuppRate_72Mbps   = 72 * 2,
-	eCsrSuppRate_80Mbps   = 80 * 2,
-	eCsrSuppRate_84Mbps   = 84 * 2,
-	eCsrSuppRate_96Mbps   = 96 * 2,
-	eCsrSuppRate_108Mbps  = 108 * 2,
-	eCsrSuppRate_120Mbps  = 120 * 2,
-	eCsrSuppRate_126Mbps  = 126 * 2,
-	eCsrSuppRate_144Mbps  = 144 * 2,
-	eCsrSuppRate_160Mbps  = 160 * 2,
-	eCsrSuppRate_168Mbps  = 168 * 2,
-	eCsrSuppRate_192Mbps  = 192 * 2,
-	eCsrSuppRate_216Mbps  = 216 * 2,
-	eCsrSuppRate_240Mbps  = 240 * 2
-} eCsrSupportedRates;
 
 /* Generic Information Element Structure */
 typedef struct sDot11IEHeader {
@@ -233,8 +192,7 @@ bool csr_is_infra_bss_desc(struct bss_description *pSirBssDesc);
 tSirResultCodes csr_get_de_auth_rsp_status_code(struct deauth_rsp *pSmeRsp);
 uint32_t csr_get_frag_thresh(struct mac_context *mac_ctx);
 uint32_t csr_get_rts_thresh(struct mac_context *mac_ctx);
-uint32_t csr_get11h_power_constraint(struct mac_context *mac_ctx,
-				     tDot11fIEPowerConstraints *constraints);
+
 uint8_t csr_construct_rsn_ie(struct mac_context *mac, uint32_t sessionId,
 			     struct csr_roam_profile *pProfile,
 			     struct bss_description *pSirBssDesc,
@@ -248,6 +206,7 @@ uint8_t csr_construct_wpa_ie(struct mac_context *mac, uint8_t session_id,
 #ifdef FEATURE_WLAN_WAPI
 bool csr_is_profile_wapi(struct csr_roam_profile *pProfile);
 #endif /* FEATURE_WLAN_WAPI */
+#ifndef FEATURE_CM_ENABLE
 /*
  * If a WPAIE exists in the profile, just use it.
  * Or else construct one from the BSS Caller allocated memory for pWpaIe and
@@ -257,7 +216,6 @@ uint8_t csr_retrieve_wpa_ie(struct mac_context *mac, uint8_t session_id,
 			    struct csr_roam_profile *pProfile,
 			    struct bss_description *pSirBssDesc,
 			    tDot11fBeaconIEs *pIes, tCsrWpaIe *pWpaIe);
-
 bool csr_is_ssid_equal(struct mac_context *mac,
 		       struct bss_description *pSirBssDesc1,
 		       struct bss_description *pSirBssDesc2,
@@ -287,6 +245,7 @@ uint8_t csr_retrieve_wapi_ie(struct mac_context *mac, uint32_t sessionId,
 			     struct bss_description *pSirBssDesc,
 			     tDot11fBeaconIEs *pIes, tCsrWapiIe *pWapiIe);
 #endif /* FEATURE_WLAN_WAPI */
+#endif
 bool csr_rates_is_dot11_rate11b_supported_rate(uint8_t dot11Rate);
 bool csr_rates_is_dot11_rate11a_supported_rate(uint8_t dot11Rate);
 tAniEdType csr_translate_encrypt_type_to_ed_type(
@@ -294,8 +253,6 @@ tAniEdType csr_translate_encrypt_type_to_ed_type(
 
 bool csr_is_bssid_match(struct qdf_mac_addr *pProfBssid,
 			struct qdf_mac_addr *BssBssid);
-void csr_add_rate_bitmap(uint8_t rate, uint16_t *pRateBitmap);
-bool csr_check_rate_bitmap(uint8_t rate, uint16_t RateBitmap);
 bool csr_rates_is_dot11_rate_supported(struct mac_context *mac_ctx, uint8_t rate);
 enum bss_type csr_translate_bsstype_to_mac_type(eCsrRoamBssType csrtype);
 /* Caller allocates memory for pIEStruct */
@@ -311,11 +268,11 @@ QDF_STATUS csr_get_parsed_bss_description_ies(struct mac_context *mac_ctx,
 					      struct bss_description *bss_desc,
 					      tDot11fBeaconIEs **ppIEStruct);
 
-tSirScanType csr_get_scan_type(struct mac_context *mac, uint8_t chnId);
-
 QDF_STATUS csr_get_phy_mode_from_bss(struct mac_context *mac,
 		struct bss_description *pBSSDescription,
 		eCsrPhyMode *pPhyMode, tDot11fBeaconIEs *pIes);
+
+#ifndef FEATURE_CM_ENABLE
 /*
  * fForce -- force reassoc regardless of whether there is any change.
  * The reason is that for UAPSD-bypass, the code underneath this call determine
@@ -326,28 +283,7 @@ QDF_STATUS csr_get_phy_mode_from_bss(struct mac_context *mac,
 QDF_STATUS csr_reassoc(struct mac_context *mac, uint32_t sessionId,
 		tCsrRoamModifyProfileFields *pModProfileFields,
 		uint32_t *pRoamId, bool fForce);
-
-/**
- * csr_validate_mcc_beacon_interval() - to validate the mcc beacon interval
- * @mac_ctx: pointer to mac context
- * @ch_freq: channel frequency
- * @bcn_interval: provided beacon interval
- * @cur_session_id: current session id
- * @cur_bss_persona: Current BSS persona
- *
- * This API will validate the mcc beacon interval
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS csr_validate_mcc_beacon_interval(struct mac_context *mac_ctx,
-					    uint32_t ch_freq,
-					    uint16_t *bcn_interval,
-					    uint32_t cur_session_id,
-					    enum QDF_OPMODE cur_bss_persona);
-
-bool csr_is_profile11r(struct mac_context *mac, struct csr_roam_profile *pProfile);
-bool csr_is_auth_type11r(struct mac_context *mac, enum csr_akm_type AuthType,
-			 uint8_t mdiePresent);
+#endif
 #ifdef FEATURE_WLAN_ESE
 bool csr_is_profile_ese(struct csr_roam_profile *pProfile);
 #endif

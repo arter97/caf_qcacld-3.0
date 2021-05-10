@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -427,6 +427,8 @@ void pmo_core_configure_dynamic_wake_events(struct wlan_objmgr_psoc *psoc)
 			pmo_tgt_enable_wow_wakeup_event(vdev, enable_mask);
 		if (disable_configured)
 			pmo_tgt_disable_wow_wakeup_event(vdev, disable_mask);
+
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 	}
 
 }
@@ -809,6 +811,8 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 	if (type == QDF_SYSTEM_SUSPEND) {
 		pmo_info("system suspend wow");
 		param.flags |= WMI_WOW_FLAG_SYSTEM_SUSPEND_WOW;
+	} else if (type == QDF_UNIT_TEST_WOW_SUSPEND) {
+		pmo_info("unit test wow suspend");
 	} else {
 		pmo_info("RTPM wow");
 	}
@@ -1032,6 +1036,8 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 	if (status != QDF_STATUS_SUCCESS)
 		goto resume_htc;
 
+	hif_pm_set_link_state(hif_ctx, HIF_PM_LINK_STATE_DOWN);
+
 	status = pmo_core_psoc_bus_suspend_req(psoc, QDF_RUNTIME_SUSPEND,
 					       &wow_params);
 	if (status != QDF_STATUS_SUCCESS)
@@ -1063,16 +1069,25 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	hif_pm_runtime_suspend_lock(hif_ctx);
-	psoc_ctx = pmo_psoc_get_priv(psoc);
-	if (pmo_core_get_wow_initial_wake_up(psoc_ctx)) {
+	if (hif_pm_get_wake_irq_type(hif_ctx) == HIF_PM_CE_WAKE) {
+		/*
+		 * In moselle, there is no separate interrupt for wake_irq,
+		 * shares CE interrupt, there is a chance of wow wakeup
+		 * while suspend is in-progress, so handling such scenario
+		 */
+		hif_pm_runtime_suspend_lock(hif_ctx);
+		psoc_ctx = pmo_psoc_get_priv(psoc);
+		if (pmo_core_get_wow_initial_wake_up(psoc_ctx)) {
+			hif_pm_runtime_suspend_unlock(hif_ctx);
+			pmo_err("Target wake up received before suspend completion");
+			status = QDF_STATUS_E_BUSY;
+			goto resume_hif;
+		}
+		hif_process_runtime_suspend_success(hif_ctx);
 		hif_pm_runtime_suspend_unlock(hif_ctx);
-		pmo_err("Target wake up received before suspend completion");
-		status = QDF_STATUS_E_BUSY;
-		goto resume_hif;
+	} else {
+		hif_process_runtime_suspend_success(hif_ctx);
 	}
-	hif_process_runtime_suspend_success(hif_ctx);
-	hif_pm_runtime_suspend_unlock(hif_ctx);
 
 	goto dec_psoc_ref;
 
@@ -1173,6 +1188,8 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 	status = pmo_core_psoc_bus_resume_req(psoc, QDF_RUNTIME_SUSPEND);
 	if (status != QDF_STATUS_SUCCESS)
 		goto fail;
+
+	hif_pm_set_link_state(hif_ctx, HIF_PM_LINK_STATE_UP);
 
 	status = pmo_core_psoc_configure_resume(psoc, true);
 	if (status != QDF_STATUS_SUCCESS)

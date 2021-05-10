@@ -918,8 +918,7 @@ void hdd_get_transmit_mac_addr(struct hdd_adapter *adapter, struct sk_buff *skb,
 			qdf_copy_macaddr(mac_addr_tx_allowed,
 					 (struct qdf_mac_addr *)skb->data);
 	} else {
-		if (sta_ctx->conn_info.conn_state ==
-		    eConnectionState_Associated)
+		if (hdd_cm_is_vdev_associated(adapter))
 			qdf_copy_macaddr(mac_addr_tx_allowed,
 					 &sta_ctx->conn_info.bssid);
 	}
@@ -1060,6 +1059,11 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	hdd_ctx = adapter->hdd_ctx;
 	if (wlan_hdd_validate_context(hdd_ctx))
 		goto drop_pkt;
+
+	if (hdd_ctx->hdd_wlan_suspended) {
+		hdd_err_rl("Device is system suspended, drop pkt");
+		goto drop_pkt;
+	}
 
 	wlan_hdd_classify_pkt(skb);
 	if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) == QDF_NBUF_CB_PACKET_TYPE_ARP) {

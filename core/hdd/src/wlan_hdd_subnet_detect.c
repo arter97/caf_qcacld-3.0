@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,14 +45,10 @@ const struct nla_policy subnet_detect_policy[
 			QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_MAX + 1] = {
 		[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_GW_MAC_ADDR] =
 				VENDOR_NLA_POLICY_MAC_ADDR,
-		[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_IPV4_ADDR] = {
-				.type = NLA_EXACT_LEN,
-				.len = QDF_IPV4_ADDR_SIZE
-		},
-		[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_IPV6_ADDR] = {
-				.type = NLA_EXACT_LEN,
-				.len = QDF_IPV6_ADDR_SIZE
-		},
+		[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_IPV4_ADDR] =
+				VENDOR_NLA_POLICY_IPV4_ADDR,
+		[QCA_WLAN_VENDOR_ATTR_GW_PARAM_CONFIG_IPV6_ADDR] =
+				VENDOR_NLA_POLICY_IPV6_ADDR,
 };
 
 /**
@@ -100,7 +96,7 @@ static int __wlan_hdd_cfg80211_set_gateway_params(struct wiphy *wiphy,
 		return -ENOTSUPP;
 	}
 
-	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Received GW param update in disconnected state!");
 		return -ENOTSUPP;
 	}

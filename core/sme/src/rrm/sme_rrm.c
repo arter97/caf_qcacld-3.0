@@ -451,7 +451,6 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 	tpRrmSMEContext rrm_ctx =
 		&mac_ctx->rrm.rrmSmeContext[measurement_index];
 	uint32_t session_id;
-	struct csr_roam_info *roam_info = NULL;
 	tSirScanType scan_type;
 	struct csr_roam_session *session;
 
@@ -573,12 +572,6 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		goto rrm_send_scan_results_done;
 	}
 
-	roam_info = qdf_mem_malloc(sizeof(*roam_info));
-	if (!roam_info) {
-		status = QDF_STATUS_E_NOMEM;
-		goto rrm_send_scan_results_done;
-	}
-
 	session = CSR_GET_SESSION(mac_ctx, session_id);
 
 	/* This is temp ifdef will be removed in near future */
@@ -631,13 +624,8 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		sme_debug("Scan res timer:%lu, rrm scan timer:%llu",
 				scan_results->timer, rrm_scan_timer);
 		if ((scan_results->timer >= rrm_scan_timer) ||
-		    (is_conn_bss_found == true) || is_nontx_of_conn_bss) {
-			roam_info->bss_desc = &scan_results->BssDescriptor;
-			csr_roam_call_callback(mac_ctx, session_id, roam_info,
-						0, eCSR_ROAM_UPDATE_SCAN_RESULT,
-						eCSR_ROAM_RESULT_NONE);
+		    (is_conn_bss_found == true) || is_nontx_of_conn_bss)
 			scanresults_arr[counter++] = scan_results;
-		}
 		scan_results = next_result;
 		if (counter >= num_scan_results)
 			break;
@@ -670,7 +658,6 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 rrm_send_scan_results_done:
 	if (scanresults_arr)
 		qdf_mem_free(scanresults_arr);
-	qdf_mem_free(roam_info);
 	sme_scan_result_purge(result_handle);
 
 	return status;
@@ -1094,10 +1081,10 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 	bool chan_valid;
 	uint32_t *rrm_freq_list, *local_rrm_freq_list;
 	uint32_t bcn_chan_freq, local_bcn_chan_freq;
-	tRrmPEContext rrm_context;
+	tpRrmPEContext rrm_ctx;
 
 	sme_rrm_ctx = &mac->rrm.rrmSmeContext[beacon_req->measurement_idx];
-	rrm_context = mac->rrm.rrmPEContext;
+	rrm_ctx = &mac->rrm.rrmPEContext;
 
 	status = csr_roam_get_session_id_from_bssid(mac, (struct qdf_mac_addr *)
 						    beacon_req->bssId,
@@ -1200,7 +1187,8 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 
 		if (beacon_req->channel_info.chan_num != 255) {
 			chan_valid =
-				csr_roam_is_channel_valid(mac, bcn_chan_freq);
+				wlan_roam_is_channel_valid(&mac->mlme_cfg->reg,
+							   bcn_chan_freq);
 
 			if (chan_valid) {
 				rrm_freq_list[num_chan] = bcn_chan_freq;
@@ -1215,7 +1203,8 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 			bcn_chan_freq =
 				beacon_req->channel_list.chan_freq_lst[i];
 			chan_valid =
-				csr_roam_is_channel_valid(mac, bcn_chan_freq);
+				wlan_roam_is_channel_valid(&mac->mlme_cfg->reg,
+							   bcn_chan_freq);
 
 			if (chan_valid) {
 				rrm_freq_list[num_chan] = bcn_chan_freq;
@@ -1233,8 +1222,8 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 		chan_valid = true;
 
 		if (beacon_req->measurement_idx > 0) {
-			for (j = 0; j < rrm_context.beacon_rpt_chan_num; j ++) {
-				if (rrm_context.beacon_rpt_chan_list[j] ==
+			for (j = 0; j < rrm_ctx->beacon_rpt_chan_num; j++) {
+				if (rrm_ctx->beacon_rpt_chan_list[j] ==
 				    local_bcn_chan_freq) {
 				/*
 				 * Ignore this channel, As this is already
@@ -1247,17 +1236,19 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 		}
 
 		if (chan_valid) {
-			rrm_context.
-			beacon_rpt_chan_list[rrm_context.beacon_rpt_chan_num] =
-							local_bcn_chan_freq;
-			rrm_context.beacon_rpt_chan_num++;
+			uint8_t beacon_rpt_chan_num;
 
-			if (rrm_context.beacon_rpt_chan_num >=
+			beacon_rpt_chan_num = rrm_ctx->beacon_rpt_chan_num;
+			rrm_ctx->beacon_rpt_chan_list[beacon_rpt_chan_num] =
+						local_bcn_chan_freq;
+			rrm_ctx->beacon_rpt_chan_num++;
+
+			if (rrm_ctx->beacon_rpt_chan_num >=
 			    MAX_NUM_CHANNELS) {
 			    /* this should never happen */
 				sme_err("Reset beacon_rpt_chan_num : %d",
-					rrm_context.beacon_rpt_chan_num);
-				rrm_context.beacon_rpt_chan_num = 0;
+					rrm_ctx->beacon_rpt_chan_num);
+				rrm_ctx->beacon_rpt_chan_num = 0;
 			}
 			local_rrm_freq_list[local_num_channel] =
 							local_bcn_chan_freq;
@@ -1419,7 +1410,9 @@ rrm_calculate_neighbor_ap_roam_score(struct mac_context *mac_ctx,
 	uint32_t roam_score = 0;
 #ifdef FEATURE_WLAN_ESE
 	uint8_t session_id;
+	struct cm_roam_values_copy config;
 #endif
+
 	if (!nbr_report_desc) {
 		QDF_ASSERT(0);
 		return;
@@ -1471,8 +1464,10 @@ rrm_calculate_neighbor_ap_roam_score(struct mac_context *mac_ctx,
 check_11r_assoc:
 #ifdef FEATURE_WLAN_ESE
 	session_id = nbr_report_desc->sessionId;
+	wlan_cm_roam_cfg_get_value(mac_ctx->psoc, session_id, IS_11R_CONNECTION,
+				   &config);
 	/* It has come in the report so its the best score */
-	if (csr_neighbor_roam_is11r_assoc(mac_ctx, session_id) == false) {
+	if (!config.bool_value) {
 		/* IAPP Route so lets make use of this info save all AP, as the
 		 * list does not come all the time. Save and reuse till the next
 		 * AP List comes to us. Even save our own MAC address. Will be

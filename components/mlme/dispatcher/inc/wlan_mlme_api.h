@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -87,17 +87,6 @@ QDF_STATUS mlme_get_wep_key(struct wlan_objmgr_vdev *vdev,
 			    struct wlan_mlme_wep_cfg *wep_params,
 			    enum wep_key_id wep_keyid, uint8_t *default_key,
 			    qdf_size_t *key_len);
-
-/**
- * mlme_set_wep_key() - set the wep keys during auth
- * @wep_params: cfg wep parametrs structure
- * @wep_key_id: default key number that needs to be copied
- * @key_to_set: destination buffer to be copied
- * @len:        size to be copied
- */
-QDF_STATUS mlme_set_wep_key(struct wlan_mlme_wep_cfg *wep_params,
-			    enum wep_key_id wep_keyid, uint8_t *key_to_set,
-			    qdf_size_t len);
 
 /**
  * wlan_mlme_get_tx_power() - Get the max tx power in particular band
@@ -835,6 +824,16 @@ QDF_STATUS wlan_mlme_get_oce_sta_enabled_info(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS wlan_mlme_get_bigtk_support(struct wlan_objmgr_psoc *psoc,
 				       bool *value);
+
+/**
+ * wlan_mlme_get_ocv_support() - Get the OCV support
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_get_ocv_support(struct wlan_objmgr_psoc *psoc,
+				     bool *value);
 
 /**
  * wlan_mlme_get_host_scan_abort_support() - Get support for stop all host
@@ -3050,4 +3049,42 @@ QDF_STATUS mlme_set_ext_opr_rate(struct wlan_objmgr_vdev *vdev, uint8_t *src,
  * Return: True if supported
  */
 bool wlan_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc);
+
+#ifdef WLAN_SUPPORT_TWT
+/**
+ * mlme_is_twt_enabled() - Get if TWT is enabled via ini.
+ * @psoc: pointer to psoc object
+ * @val: pointer to the value to be filled
+ *
+ * Return: True if TWT is enabled else false.
+ */
+bool
+mlme_is_twt_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+mlme_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif /* WLAN_SUPPORT_TWT */
+
+/**
+ * wlan_mlme_is_local_tpe_pref() - Get preference to use local TPE or
+ * regulatory TPE values
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if there is local preference, false if there is regulatory
+ * preference
+ */
+bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_is_data_stall_recovery_fw_supported() - Check if data stall
+ * recovery is supported by fw
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if supported
+ */
+bool
+wlan_mlme_is_data_stall_recovery_fw_supported(struct wlan_objmgr_psoc *psoc);
 #endif /* _WLAN_MLME_API_H_ */

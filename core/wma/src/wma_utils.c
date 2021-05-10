@@ -2026,6 +2026,13 @@ static int wma_copy_chan_stats(uint32_t num_chan,
 		rs_results->channels = channels;
 		return 0;
 	}
+	if (rs_results->num_channels + num_chan > NUM_CHANNELS) {
+		wma_err("total chan stats num unexpected %d new %d",
+			rs_results->num_channels, num_chan);
+		/* do not add more */
+		qdf_mem_free(channels);
+		return 0;
+	}
 
 	rs_results->num_channels += num_chan;
 	rs_results->channels = qdf_mem_malloc(rs_results->num_channels *
@@ -2238,7 +2245,8 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 		chn_results =
 			(struct wifi_channel_stats *)&channels_in_this_event[0];
 		next_chan_offset = WMI_TLV_HDR_SIZE;
-		wma_debug("Channel Stats Info");
+		wma_debug("Channel Stats Info, radio id %d",
+			  radio_stats->radio_id);
 		for (count = 0; count < radio_stats->num_channels; count++) {
 			wma_nofl_debug("freq %u width %u freq0 %u freq1 %u awake time %u cca busy time %u",
 				       channel_stats->center_freq,
@@ -2541,10 +2549,8 @@ wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
 		return wmi_unified_process_ll_stats_get_cmd(
 						wma_handle->wmi_handle, cmd);
 
-	return wmi_process_unified_ll_stats_get_sta_cmd(
-			wma_handle->wmi_handle, cmd,
-			cfg_get(wma_handle->psoc,
-				CFG_SEND_LL_AND_GET_STATION_STATS_OVER_QMI));
+	return wmi_process_unified_ll_stats_get_sta_cmd(wma_handle->wmi_handle,
+							cmd);
 }
 #else
 static QDF_STATUS
@@ -4150,8 +4156,7 @@ QDF_STATUS wma_get_roam_scan_stats(WMA_HANDLE handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-void wma_remove_bss_peer_on_vdev_start_failure(tp_wma_handle wma,
-					       uint8_t vdev_id)
+void wma_remove_bss_peer_on_failure(tp_wma_handle wma, uint8_t vdev_id)
 {
 	uint8_t pdev_id = WMI_PDEV_ID_SOC;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
@@ -4162,12 +4167,10 @@ void wma_remove_bss_peer_on_vdev_start_failure(tp_wma_handle wma,
 	iface = &wma->interfaces[vdev_id];
 
 	status = wlan_vdev_get_bss_peer_mac(iface->vdev, &bss_peer);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("Failed to get bssid");
+	if (QDF_IS_STATUS_ERROR(status))
 		return;
-	}
 
-	wma_err("ADD BSS failure for vdev %d", vdev_id);
+	wma_err("connect failure for vdev %d", vdev_id);
 
 	if (!cdp_find_peer_exist(soc, pdev_id, bss_peer.bytes)) {
 		wma_err("Failed to find peer "QDF_MAC_ADDR_FMT,
@@ -4400,7 +4403,7 @@ QDF_STATUS wma_ap_mlme_vdev_stop_start_send(struct vdev_mlme_obj *vdev_mlme,
 		wma_err("Failed to send vdev stop for vdev id %d",
 			 add_bss_rsp->vdev_id);
 
-	wma_remove_bss_peer_on_vdev_start_failure(wma, add_bss_rsp->vdev_id);
+	wma_remove_bss_peer_on_failure(wma, add_bss_rsp->vdev_id);
 
 	return wma_vdev_send_start_resp(wma, add_bss_rsp);
 }

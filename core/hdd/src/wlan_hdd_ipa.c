@@ -72,8 +72,7 @@ void hdd_ipa_set_tx_flow_info(void)
 		switch (adapter->device_mode) {
 		case QDF_STA_MODE:
 			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-			if (eConnectionState_Associated ==
-			    sta_ctx->conn_info.conn_state) {
+			if (hdd_cm_is_vdev_associated(adapter)) {
 				staChannel = wlan_reg_freq_to_chan(
 						hdd_ctx->pdev,
 						sta_ctx->conn_info.chan_freq);
@@ -86,8 +85,7 @@ void hdd_ipa_set_tx_flow_info(void)
 			break;
 		case QDF_P2P_CLIENT_MODE:
 			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-			if (eConnectionState_Associated ==
-			    sta_ctx->conn_info.conn_state) {
+			if (hdd_cm_is_vdev_associated(adapter)) {
 				p2pChannel = wlan_reg_freq_to_chan(
 					hdd_ctx->pdev,
 					sta_ctx->conn_info.chan_freq);
@@ -450,6 +448,8 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 		kfree_skb(nbuf);
 		return;
 	}
+
+	hdd_ipa_update_rx_mcbc_stats(adapter, nbuf);
 
 	if ((adapter->device_mode == QDF_SAP_MODE) &&
 	    (qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) == true)) {

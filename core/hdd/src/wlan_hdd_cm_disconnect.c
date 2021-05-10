@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,6 +43,8 @@
 #include "wlan_crypto_global_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "hif.h"
+#include "wlan_hdd_power.h"
+#include "wlan_hdd_napi.h"
 
 void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
 				     struct qdf_mac_addr *peer_macaddr)
@@ -112,6 +114,7 @@ void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
+	hdd_stop_tsf_sync(adapter);
 	if (ucfg_ipa_is_enabled() &&
 	    QDF_IS_STATUS_SUCCESS(wlan_hdd_validate_mac_address(
 				  &sta_ctx->conn_info.bssid)))
@@ -129,7 +132,6 @@ void __hdd_cm_disconnect_handler_pre_user_update(struct hdd_adapter *adapter)
 		QDF_TRACE_DEFAULT_PDEV_ID,
 		QDF_PROTO_TYPE_MGMT, QDF_PROTO_MGMT_DISASSOC));
 
-	hdd_clear_roam_profile_ie(adapter);
 	hdd_wmm_dscp_initial_state(adapter);
 	wlan_deregister_txrx_packetdump(OL_TXRX_PDEV_ID);
 
@@ -150,11 +152,11 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter)
 	mac_handle = hdd_ctx->mac_handle;
 	sme_ft_reset(mac_handle, adapter->vdev_id);
 	sme_reset_key(mac_handle, adapter->vdev_id);
+	hdd_clear_roam_profile_ie(adapter);
 
 	if (adapter->device_mode == QDF_STA_MODE) {
 		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 		if (vdev) {
-			wlan_crypto_free_vdev_key(vdev);
 			wlan_crypto_reset_vdev_params(vdev);
 			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		}
@@ -191,6 +193,7 @@ void __hdd_cm_disconnect_handler_post_user_update(struct hdd_adapter *adapter)
 	 * the hdd_reassoc_scenario flag will not be reset if disconnection
 	 * happens before EAP/EAPOL at supplicant is complete.
 	 */
+	sta_ctx->ft_carrier_on = false;
 	sta_ctx->hdd_reassoc_scenario = false;
 
 	hdd_nud_reset_tracking(adapter);
@@ -266,7 +269,19 @@ int wlan_hdd_cm_disconnect(struct wiphy *wiphy,
 		qdf_dp_trace_dump_all(
 				WLAN_DEAUTH_DPTRACE_DUMP_COUNT,
 				QDF_TRACE_DEFAULT_PDEV_ID);
-	status = wlan_hdd_cm_issue_disconnect(adapter, reason, false);
+	/*
+	 * for Supplicant initiated disconnect always wait for complete,
+	 * as for WPS connection or back to back connect, supplicant initiate a
+	 * disconnect which is followed by connect and if kernel is not yet
+	 * disconnected, this new connect will be rejected by kernel with status
+	 * EALREADY. In case connect is rejected with EALREADY, supplicant will
+	 * queue one more disconnect followed by connect immediately, Now if
+	 * driver is not disconnected by this time, the kernel will again reject
+	 * connect and thus the failing the connect req in supplicant.
+	 * Thus we need to wait for disconnect to complete in this case,
+	 * and thus use sync API here.
+	 */
+	status = wlan_hdd_cm_issue_disconnect(adapter, reason, true);
 
 	return qdf_status_to_os_return(status);
 }
@@ -279,6 +294,8 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	struct hdd_adapter *adapter = hdd_get_adapter_by_vdev(hdd_ctx,
 					wlan_vdev_get_id(vdev));
 
+	hdd_napi_serialize(0);
+	hdd_disable_and_flush_mc_addr_list(adapter, pmo_peer_disconnect);
 	__hdd_cm_disconnect_handler_pre_user_update(adapter);
 
 	hdd_handle_disassociation_event(adapter, &rsp->req.req.bssid);
@@ -335,5 +352,13 @@ QDF_STATUS hdd_cm_netif_queue_control(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS hdd_cm_napi_serialize_control(bool action)
+{
+	hdd_napi_serialize(action);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif
 

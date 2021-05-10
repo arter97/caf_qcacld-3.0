@@ -24,19 +24,26 @@
 #ifndef __WLAN_CM_VDEV_API_H__
 #define __WLAN_CM_VDEV_API_H__
 
-#ifdef FEATURE_CM_ENABLE
 #include <wlan_cm_public_struct.h>
 #include "scheduler_api.h"
+#ifdef FEATURE_CM_ENABLE
+#include "connection_mgr/core/src/wlan_cm_main.h"
 #include "connection_mgr/core/src/wlan_cm_main_api.h"
+#endif
+#include <wlan_cm_roam_api.h>
 
+#ifdef FEATURE_CM_ENABLE
 /**
  * struct cm_vdev_join_req - connect req from legacy CM to vdev manager
  * @vdev_id: vdev id
  * @cm_id: Connect manager id
+ * @force_24ghz_in_ht20: force 24ghz_in ht20
  * @force_rsne_override: force the arbitrary rsne received in connect req to be
  * used with out validation, used for the scenarios where the device is used
  * as a testbed device with special functionality and not recommended
  * for production.
+ * @is_wps_connection: is wps connection
+ * @is_osen_connection: is osen connectgion
  * @assoc_ie: assoc ie to be used in assoc req
  * @scan_ie: Default scan ie to be used in the uncast probe req
  * @entry: scan entry for the candidate
@@ -44,7 +51,10 @@
 struct cm_vdev_join_req {
 	uint8_t vdev_id;
 	wlan_cm_id cm_id;
-	bool force_rsne_override;
+	uint8_t force_24ghz_in_ht20:1,
+		force_rsne_override:1,
+		is_wps_connection:1,
+		is_osen_connection:1;
 	struct element_info assoc_ie;
 	struct element_info scan_ie;
 	struct scan_cache_entry *entry;
@@ -89,10 +99,20 @@ struct cm_vdev_disconnect_rsp {
  * struct cm_vdev_join_rsp - connect rsp from vdev mgr to connection mgr
  * @psoc: psoc object
  * @connect_rsp: Connect response to be sent to CM
+ * @ric_resp_ie: ric ie data
+ * @tspec_ie: tspec ie
+ * @nss: used nss
+ * @uapsd_mask: uapsd mask
  */
 struct cm_vdev_join_rsp {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_cm_connect_resp connect_rsp;
+	struct element_info ric_resp_ie;
+#ifdef FEATURE_WLAN_ESE
+	struct element_info tspec_ie;
+#endif
+	uint8_t nss;
+	uint8_t uapsd_mask;
 };
 
 /**
@@ -104,6 +124,164 @@ struct cm_peer_create_req {
 	uint8_t vdev_id;
 	struct qdf_mac_addr peer_mac;
 };
+
+/**
+ * struct cm_host_roam_start_ind - roam start ind for host roam from FW
+ * @vdev_id: vdev id
+ * @pdev: pdev object
+ */
+struct cm_host_roam_start_ind {
+	uint8_t vdev_id;
+	struct wlan_objmgr_pdev *pdev;
+};
+
+/**
+ * struct cm_ext_obj - Connection manager legacy object
+ * @rso_cfg: connect info to be used in RSO.
+ */
+struct cm_ext_obj {
+	struct rso_config rso_cfg;
+};
+#endif
+
+#ifdef WLAN_FEATURE_FILS_SK
+/**
+ * cm_update_hlp_info - API to save HLP IE
+ * @psoc: Pointer to psoc
+ * @gen_ie: IE buffer to store
+ * @len: length of the IE buffer @gen_ie
+ * @vdev_id: vdev id
+ * @flush: Flush the older saved HLP if any
+ *
+ * Return: None
+ */
+void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
+			const uint8_t *gen_ie, uint16_t len,
+			bool flush);
+#else
+static inline void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
+				      const uint8_t *gen_ie, uint16_t len,
+				      bool flush)
+{}
+#endif
+
+#ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
+/**
+ * cm_connect_info - send connect info to diag
+ * @vdev: vdev ptr
+ * @connect_success: if connect was success
+ * @bssid: bssid
+ * @ssid: ssid
+ * @freq: freq
+ *
+ * Return: none
+ */
+void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
+		     struct qdf_mac_addr *bssid, struct wlan_ssid *ssid,
+		     qdf_freq_t freq);
+
+void cm_diag_get_auth_enc_type_vdev_id(struct wlan_objmgr_psoc *psoc,
+				       uint8_t *auth_type,
+				       uint8_t *ucast_cipher,
+				       uint8_t *mcast_cipher,
+				       uint8_t vdev_id);
+
+#ifdef WLAN_UNIT_TEST
+/**
+ * cm_get_sta_cxn_info - fill sta context info in buffer
+ * @buf: buffer to fill
+ * @buf_sz: buf size
+ *
+ * Return: none
+ */
+void cm_get_sta_cxn_info(struct wlan_objmgr_vdev *vdev,
+			 char *buf, uint32_t buf_sz);
+#endif
+#else
+static inline void
+cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
+		struct qdf_mac_addr *bssid, struct wlan_ssid *ssid,
+		qdf_freq_t freq)
+{}
+#endif
+
+/**
+ * cm_wait_for_key_time_out_handler() - Wait key time out handler API
+ * @data: Pointer to wait key timer data
+ *
+ * Return: none
+ */
+void cm_wait_for_key_time_out_handler(void *data);
+
+/**
+ * cm_start_wait_for_key_timer() - Wait for key start API
+ * @vdev: Pointer to vdev
+ * @interval: timer trigger interval
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS cm_start_wait_for_key_timer(struct wlan_objmgr_vdev *vdev,
+				       uint32_t interval);
+
+/**
+ * cm_stop_wait_for_key_timer() - Wait key stop API
+ * @psoc: Pointer to psoc
+ * @vdev_id: vdev id
+ *
+ * Return: none
+ */
+void cm_stop_wait_for_key_timer(struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id);
+
+void cm_update_wait_for_key_timer(struct wlan_objmgr_vdev *vdev,
+				  uint8_t vdev_id, uint32_t interval);
+
+bool cm_csr_is_ss_wait_for_key(uint8_t vdev_id);
+void cm_csr_set_ss_wait_for_key(uint8_t vdev_id);
+void cm_csr_set_ss_none(uint8_t vdev_id);
+void cm_csr_set_joining(uint8_t vdev_id);
+void cm_csr_set_joined(uint8_t vdev_id);
+void cm_csr_set_idle(uint8_t vdev_id);
+
+#ifndef FEATURE_CM_ENABLE
+/**
+ * cm_csr_is_handoff_in_progress() - CM CSR API to check handoff in progress
+ * @vdev_id: vdev_id
+ *
+ * Return: true if handoff is in progress, else false
+ */
+bool cm_csr_is_handoff_in_progress(uint8_t vdev_id);
+
+/**
+ * cm_csr_disconnect_on_wait_key_timeout() - CM CSR API to issue disconnect on
+ * wait for key timeout
+ * @vdev_id: vdev_id
+ *
+ * Return: None
+ */
+void cm_csr_disconnect_on_wait_key_timeout(uint8_t vdev_id);
+#endif
+
+#ifdef FEATURE_CM_ENABLE
+static inline QDF_STATUS cm_ext_hdl_create(struct cnx_mgr *cm_ctx)
+{
+	cm_ctx->ext_cm_ptr = qdf_mem_malloc(sizeof(struct cm_ext_obj));
+	if (!cm_ctx->ext_cm_ptr)
+		return QDF_STATUS_E_NOMEM;
+
+	wlan_cm_rso_config_init(cm_ctx->vdev, &cm_ctx->ext_cm_ptr->rso_cfg);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS cm_ext_hdl_destroy(struct cnx_mgr *cm_ctx)
+{
+	wlan_cm_rso_config_deinit(cm_ctx->vdev, &cm_ctx->ext_cm_ptr->rso_cfg);
+	qdf_mem_free(cm_ctx->ext_cm_ptr);
+
+	return QDF_STATUS_SUCCESS;
+}
 
 /**
  * cm_connect_start_ind() - Connection manager ext connect start indication
@@ -122,6 +300,10 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
  * @vdev: VDEV object
  * @req: Vdev connect request
  * @join_req: join req to be sent to LIM
+ *
+ * This API is to update legacy struct and should be removed once
+ * CSR is cleaned up fully. No new params should be added to CSR, use
+ * vdev/pdev/psoc instead.
  *
  * Return: QDF_STATUS
  */
@@ -155,6 +337,20 @@ cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
 			    struct qdf_mac_addr *peer_mac);
 
 /**
+ * cm_csr_connect_rsp() - Connection manager ext connect resp indication
+ * @vdev: VDEV object
+ * @rsp: Connection vdev response
+ *
+ * This API is to update legacy struct and should be removed once
+ * CSR is cleaned up fully. No new params should be added to CSR, use
+ * vdev/pdev/psoc instead.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_csr_connect_rsp(struct wlan_objmgr_vdev *vdev,
+			      struct cm_vdev_join_rsp *rsp);
+
+/**
  * cm_connect_complete_ind() - Connection manager ext connect complete
  * indication
  * @vdev: VDEV object
@@ -171,6 +367,10 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
  * legacy structures on connect complete
  * @vdev: VDEV object
  * @rsp: Connection manager connect response
+ *
+ * This API is to update legacy struct and should be removed once
+ * CSR is cleaned up fully. No new params should be added to CSR, use
+ * vdev/pdev/psoc instead.
  *
  * Return: QDF_STATUS
  */
@@ -216,6 +416,10 @@ cm_handle_disconnect_req(struct wlan_objmgr_vdev *vdev,
  * @vdev: VDEV object
  * @req: vdev disconnect request
  *
+ * This API is to update legacy struct and should be removed once
+ * CSR is cleaned up fully. No new params should be added to CSR, use
+ * vdev/pdev/psoc instead.
+ *
  * Return: QDF_STATUS
  */
 QDF_STATUS
@@ -249,6 +453,10 @@ cm_disconnect_complete_ind(struct wlan_objmgr_vdev *vdev,
  * legacy structures on disconnect complete
  * @vdev: VDEV object
  * @rsp: Connection manager disconnect response
+ *
+ * This API is to update legacy struct and should be removed once
+ * CSR is cleaned up fully. No new params should be added to CSR, use
+ * vdev/pdev/psoc instead.
  *
  * Return: QDF_STATUS
  */
@@ -309,7 +517,10 @@ QDF_STATUS cm_process_disconnect_req(struct scheduler_msg *msg);
  * @reason_code: disconnect reason
  * @bssid: bssid of AP to disconnect, can be null if not known
  *
- * Context: can be called from any context
+ * Context: can be called from any context, should not hold sme global lock
+ * while calling as can lead to deadlock (disconnect access sme lock holding CM
+ * lock and thus calling cm api (which will hold CM lock) while holding sme lock
+ * can lead to deadlock)
  *
  * Return: QDF_STATUS
  */

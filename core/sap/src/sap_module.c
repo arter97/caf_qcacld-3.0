@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -310,7 +310,6 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 	sap_ctx->csr_roamProfile.SSIDs.numOfSSIDs = 1;   /* This is true for now. */
 	sap_ctx->csr_roamProfile.SSIDs.SSIDList = sap_ctx->SSIDList;     /* Array of two */
 	sap_ctx->csr_roamProfile.SSIDs.SSIDList[0].SSID.length = 0;
-	sap_ctx->csr_roamProfile.SSIDs.SSIDList[0].handoffPermitted = false;
 	sap_ctx->csr_roamProfile.SSIDs.SSIDList[0].ssidHidden =
 		sap_ctx->SSIDList[0].ssidHidden;
 
@@ -922,7 +921,7 @@ QDF_STATUS wlansap_get_acl_mode(struct sap_context *sap_ctx,
 
 QDF_STATUS wlansap_get_acl_accept_list(struct sap_context *sap_ctx,
 				       struct qdf_mac_addr *pAcceptList,
-				       uint8_t *nAcceptList)
+				       uint16_t *nAcceptList)
 {
 	if (!sap_ctx) {
 		sap_err("Invalid SAP pointer");
@@ -937,7 +936,7 @@ QDF_STATUS wlansap_get_acl_accept_list(struct sap_context *sap_ctx,
 
 QDF_STATUS wlansap_get_acl_deny_list(struct sap_context *sap_ctx,
 				     struct qdf_mac_addr *pDenyList,
-				     uint8_t *nDenyList)
+				     uint16_t *nDenyList)
 {
 	if (!sap_ctx) {
 		sap_err("Invalid SAP pointer from p_cds_gctx");
@@ -952,13 +951,13 @@ QDF_STATUS wlansap_get_acl_deny_list(struct sap_context *sap_ctx,
 
 QDF_STATUS wlansap_clear_acl(struct sap_context *sap_ctx)
 {
-	uint8_t i;
+	uint16_t i;
 
 	if (!sap_ctx) {
 		return QDF_STATUS_E_RESOURCES;
 	}
 
-	for (i = 0; i < (sap_ctx->nDenyMac - 1); i++) {
+	for (i = 0; i < sap_ctx->nDenyMac; i++) {
 		qdf_mem_zero((sap_ctx->denyMacList + i)->bytes,
 			     QDF_MAC_ADDR_SIZE);
 	}
@@ -966,7 +965,7 @@ QDF_STATUS wlansap_clear_acl(struct sap_context *sap_ctx)
 	sap_print_acl(sap_ctx->denyMacList, sap_ctx->nDenyMac);
 	sap_ctx->nDenyMac = 0;
 
-	for (i = 0; i < (sap_ctx->nAcceptMac - 1); i++) {
+	for (i = 0; i < sap_ctx->nAcceptMac; i++) {
 		qdf_mem_zero((sap_ctx->acceptMacList + i)->bytes,
 			     QDF_MAC_ADDR_SIZE);
 	}
@@ -982,7 +981,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 			      eSapACLType list_type, eSapACLCmdType cmd)
 {
 	bool sta_white_list = false, sta_black_list = false;
-	uint8_t staWLIndex, staBLIndex;
+	uint16_t staWLIndex, staBLIndex;
 
 	if (!sap_ctx) {
 		sap_err("Invalid SAP Context");

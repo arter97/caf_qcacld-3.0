@@ -719,6 +719,15 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		is_vht_enabled = true;
 	}
 
+	if (wlan_reg_is_6ghz_chan_freq(pe_session->curr_op_freq)) {
+		populate_dot11f_tx_power_env(mac_ctx,
+					     &frm->transmit_power_env[0],
+					     pe_session->ch_width,
+					     pe_session->curr_op_freq,
+					     &frm->num_transmit_power_env,
+					     false);
+	}
+
 	if (lim_is_session_he_capable(pe_session)) {
 		pe_debug("Populate HE IEs");
 		populate_dot11f_he_caps(mac_ctx, pe_session,
@@ -2137,7 +2146,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	swap_bit_field16(caps, (uint16_t *) &frm->Capabilities);
 
 	frm->ListenInterval.interval = mlm_assoc_req->listenInterval;
-	populate_dot11f_ssid2(mac_ctx, &frm->SSID);
+
+	populate_dot11f_ssid2(pe_session, &frm->SSID);
 	populate_dot11f_supp_rates(mac_ctx, POPULATE_DOT11F_RATES_OPERATIONAL,
 		&frm->SuppRates, pe_session);
 
@@ -2155,7 +2165,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		      LIM_BSS_CAPS_GET(WSM, pe_session->limCurrentBssQosCaps);
 
 	if (pe_session->lim11hEnable &&
-	    pe_session->lim_join_req->spectrumMgtIndicator == true) {
+	    pe_session->spectrumMgtEnabled == true) {
 		power_caps = true;
 
 		populate_dot11f_power_caps(mac_ctx, &frm->PowerCaps,
@@ -2294,7 +2304,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 					    &frm->he_6ghz_band_cap);
 	}
 
-	if (pe_session->lim_join_req->is11Rconnection) {
+	if (pe_session->is11Rconnection) {
 		struct bss_description *bssdescr;
 
 		bssdescr = &pe_session->lim_join_req->bssDescription;
@@ -2329,7 +2339,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_ese_version(&frm->ESEVersion);
 	/* For ESE Associations fill the ESE IEs */
 	if (pe_session->isESEconnection &&
-	    pe_session->lim_join_req->isESEFeatureIniEnabled) {
+	    mac_ctx->mlme_cfg->lfr.ese_enabled) {
 #ifndef FEATURE_DISABLE_RM
 		populate_dot11f_ese_rad_mgmt_cap(&frm->ESERadMgmtCap);
 #endif
@@ -2916,7 +2926,7 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 
 		/* include MDIE in FILS authentication frame */
 		if (session->lim_join_req &&
-		    session->lim_join_req->is11Rconnection &&
+		    session->is11Rconnection &&
 		    auth_frame->authAlgoNumber == SIR_FILS_SK_WITHOUT_PFS &&
 		    session->lim_join_req->bssDescription.mdiePresent)
 			frame_len += (2 + SIR_MDIE_SIZE);
@@ -5262,8 +5272,10 @@ QDF_STATUS lim_send_sa_query_response_frame(struct mac_context *mac,
 			nStatus);
 	}
 
-	pe_debug("Sending a SA Query Response to");
-	lim_print_mac_addr(mac, peer, LOGD);
+	pe_debug("Sending SA Query Response to "QDF_MAC_ADDR_FMT" op_class %d prim_ch_num %d freq_seg_1_ch_num %d oci_present %d",
+		 QDF_MAC_ADDR_REF(peer), frm.oci.op_class,
+		 frm.oci.prim_ch_num, frm.oci.freq_seg_1_ch_num,
+		 frm.oci.present);
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -5328,20 +5340,22 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	tpDphHashNode sta_ds;
 	uint16_t aid;
 	bool he_cap = false;
+	struct wlan_mlme_qos *qos_aggr;
 
 	vdev_id = session->vdev_id;
 
 	cdp_addba_responsesetup(soc, peer_mac, vdev_id, tid,
 				&dialog_token, &status_code, &buff_size,
 				&batimeout);
-
+	qos_aggr = &mac_ctx->mlme_cfg->qos_mlme_params;
 	qdf_mem_zero((uint8_t *) &frm, sizeof(frm));
 	frm.Category.category = ACTION_CATEGORY_BACK;
 	frm.Action.action = ADDBA_RESPONSE;
 
 	frm.DialogToken.token = dialog_token;
 	frm.Status.status = status_code;
-	if (mac_ctx->reject_addba_req) {
+
+	if (qos_aggr->reject_addba_req) {
 		frm.Status.status = STATUS_REQUEST_DECLINED;
 		pe_err("refused addba req");
 	}
