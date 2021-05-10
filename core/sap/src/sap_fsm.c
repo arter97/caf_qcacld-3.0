@@ -281,9 +281,11 @@ static uint8_t sap_random_channel_sel(struct sap_context *sap_ctx)
 static bool
 sap_is_channel_bonding_etsi_weather_channel(struct sap_context *sap_ctx)
 {
-	if (IS_CH_BONDING_WITH_WEATHER_CH(wlan_freq_to_chan(
-					  sap_ctx->chan_freq)) &&
-	    (sap_ctx->ch_params.ch_width != CH_WIDTH_20MHZ))
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(sap_ctx->vdev);
+
+	if (IS_CH_BONDING_WITH_WEATHER_CH(wlan_reg_freq_to_chan(pdev,
+								sap_ctx->chan_freq)) &&
+	    sap_ctx->ch_params.ch_width != CH_WIDTH_20MHZ)
 		return true;
 
 	return false;
@@ -648,7 +650,7 @@ sap_dfs_is_channel_in_nol_list(struct sap_context *sap_context,
 					&sap_context->ch_params, freq_list);
 	else
 		num_ch_freq = sap_get_bonding_channels(
-					sap_context, sap_context->chan_freq,
+					sap_context, channel_freq,
 					freq_list, MAX_BONDED_CHANNELS,
 					chan_bondState);
 

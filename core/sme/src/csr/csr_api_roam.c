@@ -1006,6 +1006,14 @@ QDF_STATUS csr_update_channel_list(struct mac_context *mac)
 	    (mac->roam.configParam.uCfgDot11Mode ==
 	     eCSR_CFG_DOT11_MODE_11AX_ONLY))
 		pChanList->he_en = true;
+#ifdef WLAN_FEATURE_11BE
+	if ((mac->roam.configParam.uCfgDot11Mode == eCSR_CFG_DOT11_MODE_AUTO) ||
+	    CSR_IS_CFG_DOT11_PHY_MODE_11BE(
+		mac->roam.configParam.uCfgDot11Mode) ||
+	    CSR_IS_CFG_DOT11_PHY_MODE_11BE_ONLY(
+		mac->roam.configParam.uCfgDot11Mode))
+		pChanList->eht_en = true;
+#endif
 
 	pChanList->numChan = num_channel;
 	mlme_store_fw_scan_channels(mac->psoc, pChanList);
@@ -1787,6 +1795,33 @@ uint32_t csr_convert_phy_cb_state_to_ini_value(ePhyChanBondState phyCbState)
 	}
 	return cbIniValue;
 }
+
+#ifdef WLAN_FEATURE_11BE
+void csr_update_session_eht_cap(struct mac_context *mac_ctx,
+				struct csr_roam_session *session)
+{
+	tDot11fIEeht_cap *eht_cap;
+	struct wlan_objmgr_vdev *vdev;
+	struct mlme_legacy_priv *mlme_priv;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    session->vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev)
+		return;
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		return;
+	}
+	qdf_mem_copy(&mlme_priv->eht_config,
+		     &mac_ctx->mlme_cfg->eht_caps.dot11_eht_cap,
+		     sizeof(mlme_priv->eht_config));
+	eht_cap = &mlme_priv->eht_config;
+	eht_cap->present = true;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+}
+#endif
 
 #ifdef WLAN_FEATURE_11AX
 void csr_update_session_he_cap(struct mac_context *mac_ctx,
@@ -2966,6 +3001,7 @@ QDF_STATUS csr_roam_prepare_bss_config(struct mac_context *mac,
 		} else if (band == REG_BAND_5G) {
 			pBssConfig->uCfgDot11Mode = eCSR_CFG_DOT11_MODE_11A;
 		} else if (band == REG_BAND_6G) {
+			// Still use 11AX even 11BE is supported
 			pBssConfig->uCfgDot11Mode =
 						eCSR_CFG_DOT11_MODE_11AX_ONLY;
 		}
@@ -5395,6 +5431,19 @@ static inline void csr_process_fils_join_rsp(struct mac_context *mac_ctx,
 {}
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+static void csr_roam_process_eht_info(struct join_rsp *sme_join_rsp,
+				      struct csr_roam_info *roam_info)
+{
+	roam_info->eht_operation = sme_join_rsp->eht_operation;
+}
+#else
+static inline void csr_roam_process_eht_info(struct join_rsp *sme_join_rsp,
+					     struct csr_roam_info *roam_info)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 static void csr_roam_process_he_info(struct join_rsp *sme_join_rsp,
 				     struct csr_roam_info *roam_info)
@@ -5718,6 +5767,7 @@ static void csr_roam_process_join_res(struct mac_context *mac_ctx,
 			roam_info->ht_operation = join_rsp->ht_operation;
 			roam_info->vht_operation = join_rsp->vht_operation;
 			csr_roam_process_he_info(join_rsp, roam_info);
+			csr_roam_process_eht_info(join_rsp, roam_info);
 		} else {
 			if (cmd->u.roamCmd.fReassoc) {
 				roam_info->fReassocReq =
@@ -10334,6 +10384,10 @@ csr_roam_chk_lnk_swt_ch_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	else if (IS_WLAN_PHYMODE_VHT(pSwitchChnInd->ch_phymode) ||
 		 IS_WLAN_PHYMODE_HE(pSwitchChnInd->ch_phymode))
 		roam_info->mode = SIR_SME_PHY_MODE_VHT;
+#ifdef WLAN_FEATURE_11BE
+	else if (IS_WLAN_PHYMODE_EHT(pSwitchChnInd->ch_phymode))
+		roam_info->mode = SIR_SME_PHY_MODE_VHT;
+#endif
 	else
 		roam_info->mode = SIR_SME_PHY_MODE_LEGACY;
 
@@ -11183,7 +11237,36 @@ csr_compute_mode_and_band(struct mac_context *mac_ctx,
 		}
 		*band = wlan_reg_freq_to_band(opr_ch_freq);
 		break;
+#ifdef WLAN_FEATURE_11BE
+	case eCSR_CFG_DOT11_MODE_11BE:
+	case eCSR_CFG_DOT11_MODE_11BE_ONLY:
+		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11BE)) {
+			*dot11_mode = mac_ctx->roam.configParam.uCfgDot11Mode;
+		} else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX)) {
+			*dot11_mode = eCSR_CFG_DOT11_MODE_11AX;
+		} else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC)) {
+			/*
+			 * If the operating channel is in 2.4 GHz band, check
+			 * for INI item to disable VHT operation in 2.4 GHz band
+			 */
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(opr_ch_freq) &&
+			    !vht_24_ghz)
+				/* Disable 11AC operation */
+				*dot11_mode = eCSR_CFG_DOT11_MODE_11N;
+			else
+				*dot11_mode = eCSR_CFG_DOT11_MODE_11AC;
+		} else {
+			*dot11_mode = eCSR_CFG_DOT11_MODE_11N;
+		}
+		*band = wlan_reg_freq_to_band(opr_ch_freq);
+		break;
+#endif
 	case eCSR_CFG_DOT11_MODE_AUTO:
+#ifdef WLAN_FEATURE_11BE
+		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11BE)) {
+			*dot11_mode = eCSR_CFG_DOT11_MODE_11BE;
+		} else
+#endif
 		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX)) {
 			*dot11_mode = eCSR_CFG_DOT11_MODE_11AX;
 		} else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AC)) {
@@ -11310,7 +11393,8 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 		eCSR_ENCRYPT_TYPE_NONE)))
 		&& ((eCSR_CFG_DOT11_MODE_11N == cfg_dot11_mode) ||
 		    (eCSR_CFG_DOT11_MODE_11AC == cfg_dot11_mode) ||
-		    (eCSR_CFG_DOT11_MODE_11AX == cfg_dot11_mode))) {
+		    (eCSR_CFG_DOT11_MODE_11AX == cfg_dot11_mode) ||
+		    CSR_IS_CFG_DOT11_PHY_MODE_11BE(cfg_dot11_mode))) {
 		/* We cannot do 11n here */
 		if (wlan_reg_is_24ghz_ch_freq(bss_op_ch_freq))
 			cfg_dot11_mode = eCSR_CFG_DOT11_MODE_11G;
@@ -11319,6 +11403,9 @@ csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac_ctx,
 	}
 	sme_debug("dot11mode: %d phyMode %d fw sup AX %d", cfg_dot11_mode,
 		  profile->phyMode, IS_FEATURE_SUPPORTED_BY_FW(DOT11AX));
+#ifdef WLAN_FEATURE_11BE
+	sme_debug("BE :%d", IS_FEATURE_SUPPORTED_BY_FW(DOT11BE));
+#endif
 	return cfg_dot11_mode;
 }
 
@@ -12602,9 +12689,12 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 {
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
-	int32_t ucast_cipher;
+	int32_t ucast_cipher, count;
 	struct set_context_rsp install_key_rsp;
-	int32_t rsn_cap;
+	int32_t rsn_cap, set_value;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct dual_sta_policy *dual_sta_policy;
+	bool enable_mcc_adaptive_sch = false;
 
 	/*
 	 * This API is to update legacy struct and should be removed once
@@ -12615,6 +12705,10 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 	if (!mac_ctx)
 		return QDF_STATUS_E_INVAL;
 
+	mlme_obj = mlme_get_psoc_ext_obj(mac_ctx->psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_INVAL;
+
 	if (QDF_IS_STATUS_ERROR(rsp->connect_status)) {
 		cm_csr_set_idle(vdev_id);
 		sme_qos_update_hand_off(vdev_id, false);
@@ -12623,6 +12717,52 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 		/* Fill legacy structures from resp for failure */
 
 		return QDF_STATUS_SUCCESS;
+	}
+
+	dual_sta_policy = &mlme_obj->cfg.gen.dual_sta_policy;
+	count = policy_mgr_mode_specific_connection_count(mac_ctx->psoc,
+							  PM_STA_MODE, NULL);
+	/*
+	 * send duty cycle percentage to FW only if STA + STA
+	 * concurrency is in MCC.
+	 */
+	sme_debug("Current iface vdev_id:%d, Primary vdev_id:%d, Dual sta policy:%d, count:%d",
+		  vdev_id, dual_sta_policy->primary_vdev_id,
+		  dual_sta_policy->concurrent_sta_policy, count);
+
+	if (dual_sta_policy->primary_vdev_id != WLAN_UMAC_VDEV_ID_MAX &&
+	    dual_sta_policy->concurrent_sta_policy ==
+	    QCA_WLAN_CONCURRENT_STA_POLICY_PREFER_PRIMARY && count == 2 &&
+	    policy_mgr_current_concurrency_is_mcc(mac_ctx->psoc)) {
+		policy_mgr_get_mcc_adaptive_sch(mac_ctx->psoc,
+						&enable_mcc_adaptive_sch);
+		if (enable_mcc_adaptive_sch) {
+			sme_debug("Disable mcc_adaptive_scheduler");
+			policy_mgr_set_dynamic_mcc_adaptive_sch(
+							mac_ctx->psoc, false);
+			if (QDF_STATUS_SUCCESS != sme_set_mas(false)) {
+				sme_err("Failed to disable mcc_adaptive_sched");
+				return -EAGAIN;
+			}
+		}
+		set_value =
+			wlan_mlme_get_mcc_duty_cycle_percentage(mac_ctx->pdev);
+		sme_cli_set_command(vdev_id, WMA_VDEV_MCC_SET_TIME_QUOTA,
+				    set_value, VDEV_CMD);
+	  } else if (dual_sta_policy->concurrent_sta_policy ==
+		     QCA_WLAN_CONCURRENT_STA_POLICY_UNBIASED && count == 2 &&
+		     policy_mgr_current_concurrency_is_mcc(mac_ctx->psoc)) {
+		policy_mgr_get_mcc_adaptive_sch(mac_ctx->psoc,
+						&enable_mcc_adaptive_sch);
+		if (enable_mcc_adaptive_sch) {
+			sme_debug("Enable mcc_adaptive_scheduler");
+			policy_mgr_set_dynamic_mcc_adaptive_sch(
+						  mac_ctx->psoc, true);
+			if (QDF_STATUS_SUCCESS != sme_set_mas(true)) {
+				sme_err("Failed to enable mcc_adaptive_sched");
+				return -EAGAIN;
+			}
+		}
 	}
 
 	/*
@@ -14029,6 +14169,7 @@ QDF_STATUS csr_setup_vdev_session(struct vdev_mlme_obj *vdev_mlme)
 			vht_cap_info->ampdu_len_exponent;
 	vdev_mlme->proto.vht_info.caps = vht_config.caps;
 	csr_update_session_he_cap(mac_ctx, session);
+	csr_update_session_eht_cap(mac_ctx, session);
 
 	csr_send_set_ie(vdev_mlme->mgmt.generic.type,
 			vdev_mlme->mgmt.generic.subtype,
