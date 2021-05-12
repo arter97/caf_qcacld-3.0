@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,7 +29,7 @@ extern ol_ath_soc_softc_t *ol_global_soc[GLOBAL_SOC_SIZE];
  *
  * Return: QDF_STATUS_SUCCESS for successful peer lookup
  */
-int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, struct sk_buff *skb)
+int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, uint8_t *dst_mac, struct sk_buff *skb)
 {
 	uint8_t i = 0;
 	ol_ath_soc_softc_t *soc = NULL;
@@ -48,7 +48,7 @@ int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, struct sk_buff *skb)
 		soc = ol_global_soc[i];
 		soc_txrx_handle = wlan_psoc_get_dp_handle(soc->psoc_obj);
 		status = cdp_mscs_peer_lookup_n_get_priority(soc_txrx_handle,
-				src_mac, nbuf);
+				src_mac, dst_mac, nbuf);
 		/*
 		 * wifi peer is found with this mac address.there can
 		 * be 3 possiblities -
