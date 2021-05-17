@@ -753,7 +753,6 @@ struct wma_invalid_peer_params {
  * @roam_synch_in_progress: flag is in progress or not
  * @plink_status_req: link status request
  * @psnr_req: snr request
- * @delay_before_vdev_stop: delay
  * @tx_streams: number of tx streams can be used by the vdev
  * @rx_streams: number of rx streams can be used by the vdev
  * @chain_mask: chain mask can be used by the vdev
@@ -823,7 +822,6 @@ struct wma_txrx_node {
 	bool roam_synch_in_progress;
 	void *plink_status_req;
 	void *psnr_req;
-	uint8_t delay_before_vdev_stop;
 #ifdef FEATURE_WLAN_EXTSCAN
 	bool extscan_in_progress;
 #endif
