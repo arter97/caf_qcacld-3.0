@@ -1967,15 +1967,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 
 		if (ucfg_ipa_is_enabled()) {
-			status = ucfg_ipa_wlan_evt(
-					hdd_ctx->pdev,
-					adapter->dev,
-					adapter->device_mode,
-					adapter->vdev_id,
-					WLAN_IPA_AP_CONNECT,
-					adapter->dev->dev_addr,
-					WLAN_REG_IS_24GHZ_CH_FREQ(
-						ap_ctx->operating_chan_freq));
+			status = ucfg_ipa_wlan_evt(hdd_ctx->pdev,
+						   adapter->dev,
+						   adapter->device_mode,
+						   adapter->vdev_id,
+						   WLAN_IPA_AP_CONNECT,
+						   adapter->dev->dev_addr);
 			if (status)
 				hdd_err("WLAN_AP_CONNECT event failed");
 		}
@@ -2315,8 +2312,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 						   adapter->device_mode,
 						   adapter->vdev_id,
 						   WLAN_IPA_CLIENT_CONNECT_EX,
-						   event->staMac.bytes,
-						   false);
+						   event->staMac.bytes);
 			if (status)
 				hdd_err("WLAN_CLIENT_CONNECT_EX event failed");
 		}

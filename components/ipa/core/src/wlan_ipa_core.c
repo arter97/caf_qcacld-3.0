@@ -1604,19 +1604,6 @@ static void wlan_ipa_nbuf_cb(qdf_nbuf_t skb)
 
 #endif /* QCA_LL_TX_FLOW_CONTROL_V2 */
 
-#ifdef IPA_WDI3_TX_TWO_PIPES
-#define WLAN_IPA_SESSION_ID_SHIFT 1
-static uint8_t wlan_ipa_set_session_id(uint8_t session_id, bool is_2g_iface)
-{
-	return (session_id << WLAN_IPA_SESSION_ID_SHIFT) | is_2g_iface;
-}
-#else
-static uint8_t wlan_ipa_set_session_id(uint8_t session_id, bool is_2g_iface)
-{
-	return session_id;
-}
-#endif
-
 /**
  * wlan_ipa_setup_iface() - Setup IPA on a given interface
  * @ipa_ctx: IPA IPA global context
@@ -1625,7 +1612,6 @@ static uint8_t wlan_ipa_set_session_id(uint8_t session_id, bool is_2g_iface)
  * @adapter: Interface upon which IPA is being setup
  * @session_id: Station ID of the API instance
  * @mac_addr: MAC addr of the API instance
- * @is_2g_iface: true if Net interface is operating on 2G band, otherwise false
  *
  * Return: QDF STATUS
  */
@@ -1633,8 +1619,7 @@ static QDF_STATUS wlan_ipa_setup_iface(struct wlan_ipa_priv *ipa_ctx,
 				       qdf_netdev_t net_dev,
 				       uint8_t device_mode,
 				       uint8_t session_id,
-				       uint8_t *mac_addr,
-				       bool is_2g_iface)
+				       uint8_t *mac_addr)
 {
 	struct wlan_ipa_iface_context *iface_context = NULL;
 	int i;
@@ -1719,8 +1704,7 @@ static QDF_STATUS wlan_ipa_setup_iface(struct wlan_ipa_priv *ipa_ctx,
 				     net_dev->dev_addr,
 				     iface_context->prod_client,
 				     iface_context->cons_client,
-				     wlan_ipa_set_session_id(session_id,
-							     is_2g_iface),
+				     session_id,
 				     wlan_ipa_is_ipv6_enabled(ipa_ctx->config));
 	if (status != QDF_STATUS_SUCCESS)
 		goto end;
@@ -2187,8 +2171,6 @@ void wlan_ipa_handle_multiple_sap_evt(struct wlan_ipa_priv *ipa_ctx,
  * @session_id: session id for the event
  * @type: event enum of type ipa_wlan_event
  * @mac_address: MAC address associated with the event
- * @is_2g_iface: @net_dev is 2G or not for QDF_IPA_STA_CONNECT and
- *		 QDF_IPA_AP_CONNECT
  *
  * This function is meant to be called from within wlan_ipa_ctx.c
  *
@@ -2197,7 +2179,7 @@ void wlan_ipa_handle_multiple_sap_evt(struct wlan_ipa_priv *ipa_ctx,
 static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 				      uint8_t session_id,
 				      qdf_ipa_wlan_event type,
-				      uint8_t *mac_addr, bool is_2g_iface)
+				      uint8_t *mac_addr)
 {
 	struct wlan_ipa_priv *ipa_ctx = gp_ipa;
 	struct wlan_ipa_iface_context *iface_ctx = NULL;
@@ -2314,7 +2296,6 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			pending_event->is_loading = ipa_ctx->resource_loading;
 			qdf_mem_copy(pending_event->mac_addr,
 				     mac_addr, QDF_MAC_ADDR_SIZE);
-			pending_event->is_2g_iface = is_2g_iface;
 			qdf_list_insert_back(&ipa_ctx->pending_event,
 					     &pending_event->node);
 
@@ -2378,8 +2359,7 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 		}
 
 		status = wlan_ipa_setup_iface(ipa_ctx, net_dev, device_mode,
-					      session_id, mac_addr,
-					      is_2g_iface);
+					      session_id, mac_addr);
 		if (status != QDF_STATUS_SUCCESS) {
 			ipa_err("wlan_ipa_setup_iface failed %u", status);
 			qdf_mutex_release(&ipa_ctx->event_lock);
@@ -2450,8 +2430,7 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 		}
 
 		status = wlan_ipa_setup_iface(ipa_ctx, net_dev, device_mode,
-					      session_id, mac_addr,
-					      is_2g_iface);
+					      session_id, mac_addr);
 		if (status != QDF_STATUS_SUCCESS) {
 			qdf_mutex_release(&ipa_ctx->event_lock);
 			ipa_err("%s: Evt: %d, Interface setup failed",
@@ -2881,14 +2860,13 @@ wlan_host_to_ipa_wlan_event(enum wlan_ipa_wlan_event wlan_ipa_event_type)
  * @session_id: session id for the event
  * @ipa_event_type: event enum of type wlan_ipa_wlan_event
  * @mac_address: MAC address associated with the event
- * @is_2g_iface: @net_dev is 2g interface or not
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 		      uint8_t session_id,
 		      enum wlan_ipa_wlan_event ipa_event_type,
-		      uint8_t *mac_addr, bool is_2g_iface)
+		      uint8_t *mac_addr)
 {
 	qdf_ipa_wlan_event type = wlan_host_to_ipa_wlan_event(ipa_event_type);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -2897,8 +2875,7 @@ QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 	if ((device_mode == QDF_STA_MODE) ||
 	    (device_mode == QDF_SAP_MODE))
 		status  = __wlan_ipa_wlan_evt(net_dev, device_mode,
-					      session_id, type, mac_addr,
-					      is_2g_iface);
+					      session_id, type, mac_addr);
 
 	return status;
 }
@@ -2937,8 +2914,7 @@ wlan_ipa_uc_proc_pending_event(struct wlan_ipa_priv *ipa_ctx, bool is_loading)
 					   pending_event->device_mode,
 					   pending_event->session_id,
 					   pending_event->type,
-					   pending_event->mac_addr,
-					   pending_event->is_2g_iface);
+					   pending_event->mac_addr);
 		}
 
 		if (vdev)
