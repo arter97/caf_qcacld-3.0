@@ -715,6 +715,7 @@ typedef enum eSirNwType {
 	eSIR_11N_NW_TYPE,
 	eSIR_11AC_NW_TYPE,
 	eSIR_11AX_NW_TYPE,
+	eSIR_11BE_NW_TYPE,
 	eSIR_DONOT_USE_NW_TYPE = SIR_MAX_ENUM_SIZE
 } tSirNwType;
 
@@ -1112,6 +1113,9 @@ struct join_rsp {
 	struct fils_join_rsp_params *fils_join_rsp;
 #endif
 	uint8_t frames[1];
+#ifdef WLAN_FEATURE_11BE
+	tDot11fIEeht_op eht_operation;
+#endif
 };
 #endif
 
@@ -2285,6 +2289,7 @@ typedef struct sSirUpdateChan {
 	uint8_t vht_en;
 	uint8_t vht_24_en;
 	bool he_en;
+	bool eht_en;
 	tSirUpdateChanParam chanParam[1];
 } tSirUpdateChanList, *tpSirUpdateChanList;
 
@@ -5082,6 +5087,26 @@ struct he_capability {
 			(nss)++;                                     \
 	} while (0)
 
+#ifdef WLAN_FEATURE_11BE
+#define EHT_MAX_PHY_CAP_SIZE 3
+#define EHT_CAP_OUI_TYPE "\xfd"
+#define EHT_CAP_OUI_SIZE 1
+
+#define EHT_OP_OUI_TYPE "\xfe"
+#define EHT_OP_OUI_SIZE 1
+
+/**
+ * struct eht_capability - to store 11be EHT capabilities
+ * @phy_cap: EHT PHY capabilities
+ * @mac_cap: EHT MAC capabilities
+ * @mcs: EHT MCS
+ */
+struct eht_capability {
+	uint32_t phy_cap[EHT_MAX_PHY_CAP_SIZE];
+	uint32_t mac_cap;
+	uint32_t mcs;
+};
+#endif
 /**
  * struct rsp_stats - arp packet stats
  * @arp_req_enqueue: fw tx count

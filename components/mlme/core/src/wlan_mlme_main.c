@@ -761,8 +761,9 @@ static void mlme_init_ht_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_SHORT_SLOT_TIME_ENABLED);
 }
 
-static void mlme_init_qos_cfg(struct wlan_objmgr_psoc *psoc,
-			      struct wlan_mlme_qos *qos_aggr_params)
+#ifdef TX_AGGREGATION_SIZE_ENABLE
+static void mlme_init_tx_aggregation_size(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_mlme_qos *qos_aggr_params)
 {
 	qos_aggr_params->tx_aggregation_size =
 				cfg_get(psoc, CFG_TX_AGGREGATION_SIZE);
@@ -774,6 +775,23 @@ static void mlme_init_qos_cfg(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_TX_AGGREGATION_SIZEVI);
 	qos_aggr_params->tx_aggregation_size_vo =
 				cfg_get(psoc, CFG_TX_AGGREGATION_SIZEVO);
+}
+#else
+static void mlme_init_tx_aggregation_size(struct wlan_objmgr_psoc *psoc,
+					  struct wlan_mlme_qos *qos_aggr_params)
+{
+	qos_aggr_params->tx_aggregation_size = 0;
+	qos_aggr_params->tx_aggregation_size_be = 0;
+	qos_aggr_params->tx_aggregation_size_bk = 0;
+	qos_aggr_params->tx_aggregation_size_vi = 0;
+	qos_aggr_params->tx_aggregation_size_vo = 0;
+}
+#endif
+
+static void mlme_init_qos_cfg(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_mlme_qos *qos_aggr_params)
+{
+	mlme_init_tx_aggregation_size(psoc, qos_aggr_params);
 	qos_aggr_params->rx_aggregation_size =
 				cfg_get(psoc, CFG_RX_AGGREGATION_SIZE);
 	qos_aggr_params->tx_aggr_sw_retry_threshold_be =
@@ -1244,6 +1262,18 @@ static void mlme_init_twt_cfg(struct wlan_objmgr_psoc *psoc,
 	twt_cfg->is_bcast_requestor_enabled = CFG_TWT_GET_BCAST_REQ(bcast_conf);
 	twt_cfg->is_bcast_responder_enabled = CFG_TWT_GET_BCAST_RES(bcast_conf);
 }
+
+#ifdef WLAN_FEATURE_11BE
+static void mlme_init_eht_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_mlme_cfg *mlme_cfg)
+{
+}
+#else
+static void mlme_init_eht_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_mlme_cfg *mlme_cfg)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_SAE
 static bool is_sae_sap_enabled(struct wlan_objmgr_psoc *psoc)
@@ -2283,7 +2313,8 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_reg *reg)
 {
 	reg->self_gen_frm_pwr = cfg_get(psoc, CFG_SELF_GEN_FRM_PWR);
-	reg->etsi_srd_chan_in_master_mode = ETSI_SRD_CHAN_IN_MASTER_MODE;
+	reg->etsi_srd_chan_in_master_mode =
+			cfg_get(psoc, CFG_ETSI_SRD_CHAN_IN_MASTER_MODE);
 	reg->fcc_5dot9_ghz_chan_in_master_mode =
 			cfg_get(psoc, CFG_FCC_5DOT9_GHZ_CHAN_IN_MASTER_MODE);
 	reg->restart_beaconing_on_ch_avoid =
@@ -2343,10 +2374,11 @@ mlme_iot_parse_aggr_info(struct wlan_objmgr_psoc *psoc,
 
 	aggr_info_list = iot->aggr;
 	qdf_mem_copy(aggr_info, cfg_str, cfg_str_len);
+	mlme_legacy_debug("aggr_info=[%s]", aggr_info);
+
 	aggr_info_temp = aggr_info;
 	while (aggr_info_temp) {
 		/* skip possible spaces before oui string */
-		mlme_legacy_err("aggr_info=[%s]", aggr_info_temp);
 		while (*aggr_info_temp == ' ')
 			aggr_info_temp++;
 
@@ -2431,6 +2463,19 @@ mlme_init_iot_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_iot_parse_aggr_info(psoc, iot);
 }
 
+/**
+ * mlme_init_primary_iface - Initialize primary iface
+ *
+ * @gen: Generic CFG config items
+ *
+ * Return: None
+ */
+static void
+mlme_init_primary_iface(struct wlan_mlme_generic *gen)
+{
+	gen->dual_sta_policy.primary_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+}
+
 QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -2460,6 +2505,7 @@ QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	mlme_init_nss_chains(psoc, &mlme_cfg->nss_chains_ini_cfg);
 	mlme_init_twt_cfg(psoc, &mlme_cfg->twt_cfg);
 	mlme_init_he_cap_in_cfg(psoc, mlme_cfg);
+	mlme_init_eht_cap_in_cfg(psoc, mlme_cfg);
 	mlme_init_obss_ht40_cfg(psoc, &mlme_cfg->obss_ht40);
 	mlme_init_product_details_cfg(&mlme_cfg->product_details);
 	mlme_init_powersave_params(psoc, &mlme_cfg->ps_params);
@@ -2484,6 +2530,7 @@ QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	mlme_init_roam_score_config(psoc, mlme_cfg);
 	mlme_init_ratemask_cfg(psoc, &mlme_cfg->ratemask_cfg);
 	mlme_init_iot_cfg(psoc, &mlme_cfg->iot);
+	mlme_init_primary_iface(&mlme_cfg->gen);
 
 	return status;
 }

@@ -928,6 +928,9 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst, tDot11fIEExtCap *src,
 void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
 				   struct pe_session *session);
 
+void lim_strip_eht_ies_from_add_ies(struct mac_context *mac_ctx,
+				    struct pe_session *session);
+
 /**
  * lim_del_pmf_sa_query_timer() - This function deletes SA query timer
  * @mac_ctx: pointer to mac context
@@ -1021,7 +1024,6 @@ static inline void lim_deactivate_and_change_timer_host_roam(
 {}
 #endif
 
-bool lim_is_robust_mgmt_action_frame(uint8_t action_category);
 uint8_t lim_compute_ext_cap_ie_length(tDot11fIEExtCap *ext_cap);
 
 void lim_update_caps_info_for_bss(struct mac_context *mac_ctx,
@@ -1194,6 +1196,9 @@ void lim_log_he_cap(struct mac_context *mac, tDot11fIEhe_cap *he_cap);
  */
 bool lim_check_he_80_mcs11_supp(struct pe_session *session,
 				       tDot11fIEhe_cap *he_cap);
+
+void lim_check_and_force_he_ldpc_cap(struct pe_session *session,
+				     tDot11fIEhe_cap *he_cap);
 
 /**
  * lim_update_stads_he_caps() - Copy HE capability into STA DPH hash table entry
@@ -1568,6 +1573,430 @@ lim_update_he_6ghz_band_caps(struct mac_context *mac,
 {
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+static inline bool lim_is_session_eht_capable(struct pe_session *session)
+{
+	return session->eht_capable;
+}
+
+static inline bool lim_is_sta_eht_capable(tpDphHashNode sta_ds)
+{
+	return sta_ds->mlmStaContext.eht_capable;
+}
+
+/**
+ * lim_populate_eht_mcs_set() - function to populate EHT mcs rate set
+ * @mac_ctx: pointer to global mac structure
+ * @rates: pointer to supported rate set
+ * @peer_eht_caps: pointer to peer EHT capabilities
+ * @session_entry: pe session entry
+ * @nss: number of spatial streams
+ *
+ * Populates EHT mcs rate set based on peer and self capabilities
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
+				    struct supported_rates *rates,
+				    tDot11fIEeht_cap *peer_eht_caps,
+				    struct pe_session *session_entry,
+				    uint8_t nss);
+
+/**
+ * lim_update_eht_bw_cap_mcs(): Update eht mcs map per bandwidth
+ * @session_entry: pointer to PE session
+ * @beacon: pointer to beacon
+ *
+ * Return: None
+ */
+void lim_update_eht_bw_cap_mcs(struct pe_session *session,
+			       tSirProbeRespBeacon *beacon);
+
+/**
+ * lim_add_self_eht_cap() - Copy EHT capability into add sta from PE session
+ * @add_sta_params: pointer to add sta params
+ * @session: pointer to PE Session
+ *
+ * Return: None
+ */
+void lim_add_self_eht_cap(tpAddStaParams add_sta_params,
+			  struct pe_session *session);
+
+/**
+ * lim_update_usr_eht_cap() - Update EHT capability based on userspace
+ * @mac_ctx: global mac context
+ * @session: PE session entry
+ *
+ * Parse the EHT Capability IE and populate the fields to be
+ * sent to FW as part of add bss and update PE session.
+ */
+void lim_update_usr_eht_cap(struct mac_context *mac_ctx,
+			    struct pe_session *session);
+
+/**
+ * lim_copy_bss_eht_cap() - Copy EHT capability into PE session from start bss
+ * @session: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_copy_bss_eht_cap(struct pe_session *session);
+
+/**
+ * lim_copy_join_req_eht_cap() - Copy EHT capability to PE session from Join req
+ * and update as per bandwidth supported
+ * @session: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_copy_join_req_eht_cap(struct pe_session *session);
+
+/**
+ * lim_add_eht_cap() - Copy EHT capability into Add sta params
+ * @mac_ctx: Global MAC context
+ * @pe_session: pe session entry
+ * @add_sta_params: pointer to add sta params
+ * @assoc_req: pointer to Assoc request
+ *
+ * Return: None
+ */
+void lim_add_eht_cap(struct mac_context *mac_ctx, struct pe_session *pe_session,
+		     tpAddStaParams add_sta_params, tpSirAssocReq assoc_req);
+
+/**
+ * lim_intersect_ap_eht_caps() - Intersect AP and self STA EHT capabilities
+ * @session: pointer to PE session
+ * @add_bss: pointer to ADD BSS params
+ * @beacon: pointer to beacon
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_intersect_ap_eht_caps(struct pe_session *session,
+			       struct bss_params *add_bss,
+			       tSchBeaconStruct *pBeaconStruct,
+			       tpSirAssocRsp assoc_rsp);
+
+/**
+ * lim_add_bss_eht_cap() - Copy EHT capability into ADD BSS params
+ * @add_bss: pointer to add bss params
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_add_bss_eht_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp);
+
+/**
+ * lim_intersect_sta_eht_caps() - Intersect STA capability with SAP capability
+ * @mac_ctx: pointer to the MAC context
+ * @assoc_req: pointer to assoc request
+ * @session: pointer to PE session
+ * @sta_ds: pointer to STA dph hash table entry
+ *
+ * Return: None
+ */
+void lim_intersect_sta_eht_caps(struct mac_context *mac_ctx,
+				tpSirAssocReq assoc_req,
+				struct pe_session *session,
+				tpDphHashNode sta_ds);
+
+/**
+ * lim_update_session_eht_capable(): Update eht_capable in PE session
+ * @mac: pointer to MAC context
+ * @session: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_update_session_eht_capable(struct mac_context *mac,
+				    struct pe_session *session);
+
+/**
+ * lim_add_bss_eht_cfg() - Set EHT config to BSS params
+ * @add_bss: pointer to add bss params
+ * @session: Pointer to Session entry struct
+ *
+ * Return: None
+ */
+void lim_add_bss_eht_cfg(struct bss_params *add_bss,
+			 struct pe_session *session);
+
+/**
+ * lim_decide_eht_op() - Determine EHT operation elements
+ * @mac_ctx: global mac context
+ * @eht_ops: mlme eht ops
+ * @session: PE session entry
+ *
+ * Parse the EHT Operation IE and populate the fields to be
+ * sent to FW as part of add bss.
+ */
+void lim_decide_eht_op(struct mac_context *mac_ctx, uint32_t *mlme_eht_ops,
+		       struct pe_session *session);
+
+/**
+ * lim_update_stads_eht_capable() - Update eht_capable in sta ds context
+ * @sta_ds: pointer to sta ds
+ * @assoc_req: pointer to assoc request
+ *
+ * Return: None
+ */
+void lim_update_stads_eht_capable(tpDphHashNode sta_ds,
+				  tpSirAssocReq assoc_req);
+
+/**
+ * lim_update_sta_eht_capable(): Update eht_capable in add sta params
+ * @mac: pointer to MAC context
+ * @add_sta_params: pointer to add sta params
+ * @sta_ds: pointer to dph hash table entry
+ * @session_entry: pointer to PE session
+ *
+ * Return: None
+ */
+void lim_update_sta_eht_capable(struct mac_context *mac,
+				tpAddStaParams add_sta_params,
+				tpDphHashNode sta_ds,
+				struct pe_session *session_entry);
+
+/**
+ * lim_update_session_eht_capable_chan_switch(): Update eht_capable in PE
+ *                                               session
+ * @mac: pointer to MAC context
+ * @session: pointer to PE session
+ * @new_chan_freq: new channel frequency Mhz
+ *
+ * Update session eht capable during AP channel switching
+ *
+ * Return: None
+ */
+void lim_update_session_eht_capable_chan_switch(struct mac_context *mac,
+						struct pe_session *session,
+						uint32_t new_chan_freq);
+
+/**
+ * lim_update_bss_eht_capable() - Update eht_capable in add BSS params
+ * @mac: pointer to MAC context
+ * @add_bss: pointer to add BSS params
+ *
+ * Return: None
+ */
+void lim_update_bss_eht_capable(struct mac_context *mac,
+				struct bss_params *add_bss);
+
+/**
+ * lim_log_eht_cap() - Print EHT capabilities
+ * @mac: pointer to MAC context
+ * @eht_cap: pointer to HE Capability
+ *
+ * Received EHT capabilities are converted into dot11f structure.
+ * This function will print all the EHT capabilities as stored
+ * in the dot11f structure.
+ *
+ * Return: None
+ */
+void lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap);
+
+/**
+ * lim_set_eht_caps() - update EHT caps to be sent to FW as part of scan IE
+ * @mac: pointer to MAC
+ * @session: pointer to PE session
+ * @ie_start: pointer to start of IE buffer
+ * @num_bytes: length of IE buffer
+ *
+ * Return: None
+ */
+void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
+		      uint8_t *ie_start, uint32_t num_bytes);
+
+/**
+ * lim_send_eht_caps_ie() - gets EHT capability and send to firmware via wma
+ * @mac_ctx: global mac context
+ * @session: pe session. This can be NULL. In that case self cap will be sent
+ * @device_mode: VDEV op mode
+ * @vdev_id: vdev for which IE is targeted
+ *
+ * This function gets EHT capability and send to firmware via wma
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
+				struct pe_session *session,
+				enum QDF_OPMODE device_mode,
+				uint8_t vdev_id);
+/**
+ * lim_log_eht_op() - Print EHT Operation
+ * @mac: pointer to MAC context
+ * @eht_op: pointer to EHT Operation
+ * @session: pointer to PE session
+ *
+ * Print EHT operation stored as dot11f structure
+ *
+ * Return: None
+ */
+void lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
+		    struct pe_session *session);
+
+/**
+ * lim_update_stads_eht_caps() - Copy EHT capability into STA DPH hash table
+ *                               entry
+ * @mac_ctx: pointer to mac context
+ * @sta_ds: pointer to sta dph hash table entry
+ * @assoc_rsp: pointer to assoc response
+ * @session_entry: pointer to PE session
+ * @beacon: pointer to beacon
+ *
+ * Return: None
+ */
+void lim_update_stads_eht_caps(struct mac_context *mac_ctx,
+			       tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
+			       struct pe_session *session_entry,
+			       tSchBeaconStruct *beacon);
+
+#else
+static inline bool lim_is_session_eht_capable(struct pe_session *session)
+{
+	return false;
+}
+
+static inline bool lim_is_sta_eht_capable(tpDphHashNode sta_ds)
+{
+	return false;
+}
+
+static inline
+QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
+				    struct supported_rates *rates,
+				    tDot11fIEeht_cap *peer_eht_caps,
+				    struct pe_session *session_entry,
+				    uint8_t nss)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void lim_update_eht_bw_cap_mcs(struct pe_session *session,
+					     tSirProbeRespBeacon *beacon)
+{
+}
+
+static inline void lim_add_self_eht_cap(tpAddStaParams add_sta_params,
+					struct pe_session *session)
+{
+}
+
+static inline void lim_update_usr_eht_cap(struct mac_context *mac_ctx,
+					  struct pe_session *session)
+{
+}
+
+static inline void lim_copy_bss_eht_cap(struct pe_session *session)
+{
+}
+
+static inline void lim_copy_join_req_eht_cap(struct pe_session *session)
+{
+}
+
+static inline void lim_add_eht_cap(struct mac_context *mac_ctx,
+				   struct pe_session *pe_session,
+				   tpAddStaParams add_sta_params,
+				   tpSirAssocReq assoc_req)
+{
+}
+
+static inline void
+lim_intersect_ap_eht_caps(struct pe_session *session,
+			  struct bss_params *add_bss,
+			  tSchBeaconStruct *pBeaconStruct,
+			  tpSirAssocRsp assoc_rsp)
+{
+}
+
+static inline void lim_add_bss_eht_cap(struct bss_params *add_bss,
+				       tpSirAssocRsp assoc_rsp)
+{
+}
+
+static inline
+void lim_intersect_sta_eht_caps(struct mac_context *mac_ctx,
+				tpSirAssocReq assoc_req,
+				struct pe_session *session,
+				tpDphHashNode sta_ds)
+{
+}
+
+static inline
+void lim_update_session_eht_capable(struct mac_context *mac,
+				    struct pe_session *session)
+{
+}
+
+static inline void
+lim_add_bss_eht_cfg(struct bss_params *add_bss, struct pe_session *session)
+{
+}
+
+static inline void
+lim_decide_eht_op(struct mac_context *mac_ctx, uint32_t *mlme_eht_ops,
+		  struct pe_session *session)
+{
+}
+
+static inline void
+lim_update_stads_eht_capable(tpDphHashNode sta_ds, tpSirAssocReq assoc_req)
+{
+}
+
+static inline void
+lim_update_sta_eht_capable(struct mac_context *mac,
+			   tpAddStaParams add_sta_params,
+			   tpDphHashNode sta_ds,
+			   struct pe_session *session_entry)
+{
+}
+
+static inline void
+lim_update_session_eht_capable_chan_switch(struct mac_context *mac,
+					   struct pe_session *session,
+					   uint32_t new_chan_freq)
+{
+}
+
+static inline void
+lim_update_bss_eht_capable(struct mac_context *mac,
+			   struct bss_params *add_bss)
+{
+}
+
+static inline void
+lim_log_eht_cap(struct mac_context *mac, tDot11fIEeht_cap *eht_cap)
+{
+}
+
+static inline void
+lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
+		 uint8_t *ie_start, uint32_t num_bytes)
+{
+}
+
+static inline QDF_STATUS
+lim_send_eht_caps_ie(struct mac_context *mac_ctx, struct pe_session *session,
+		     enum QDF_OPMODE device_mode, uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+lim_log_eht_op(struct mac_context *mac, tDot11fIEeht_op *eht_ops,
+	       struct pe_session *session)
+{
+}
+
+static inline void
+lim_update_stads_eht_caps(struct mac_context *mac_ctx,
+			  tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
+			  struct pe_session *session_entry,
+			  tSchBeaconStruct *beacon)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
 
 #if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)
 /**

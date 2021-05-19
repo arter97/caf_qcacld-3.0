@@ -201,6 +201,8 @@
 #include "wlan_hdd_gpio_wakeup.h"
 #include "wlan_hdd_bootup_marker.h"
 #include "wlan_hdd_bus_bandwidth.h"
+#include "wlan_hdd_medium_assess.h"
+#include "wlan_hdd_eht.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -2165,7 +2167,7 @@ static void hdd_sar_target_config(struct hdd_context *hdd_ctx,
 
 static void hdd_update_vhtcap_2g(struct hdd_context *hdd_ctx)
 {
-	uint32_t chip_mode = 0;
+	uint64_t chip_mode = 0;
 	QDF_STATUS status;
 	bool b2g_vht_cfg = false;
 	bool b2g_vht_target = false;
@@ -2555,6 +2557,8 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 		hdd_update_wiphy_he_cap(hdd_ctx);
 	}
 	hdd_update_tgt_twt_cap(hdd_ctx, cfg);
+	hdd_update_tgt_eht_cap(hdd_ctx, cfg);
+	hdd_update_wiphy_eht_cap(hdd_ctx, cfg);
 
 	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX; band++) {
 		sme_modify_nss_chains_tgt_cfg(hdd_ctx->mac_handle,
@@ -6566,7 +6570,10 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 		goto error;
 	}
 
-	hdd_set_fw_log_params(hdd_ctx, adapter);
+	if (!hdd_ctx->is_fw_dbg_log_levels_configured) {
+		hdd_set_fw_log_params(hdd_ctx, adapter);
+		hdd_ctx->is_fw_dbg_log_levels_configured = true;
+	}
 
 	ret = hdd_send_coex_config_params(hdd_ctx, adapter);
 	if (ret) {
@@ -7727,6 +7734,7 @@ QDF_STATUS hdd_reset_all_adapters(struct hdd_context *hdd_ctx)
 
 		if (value &&
 		    adapter->device_mode == QDF_SAP_MODE) {
+			hdd_medium_assess_ssr_enable_flag();
 			wlan_hdd_netif_queue_control(adapter,
 						     WLAN_STOP_ALL_NETIF_QUEUE,
 						     WLAN_CONTROL_PATH);
@@ -12328,11 +12336,21 @@ static void hdd_init_runtime_pm(struct hdd_config *config,
 {
 	config->runtime_pm = cfg_get(psoc, CFG_ENABLE_RUNTIME_PM);
 }
+
+bool hdd_is_runtime_pm_enabled(struct hdd_context *hdd_ctx)
+{
+	return hdd_ctx->config->runtime_pm != hdd_runtime_pm_disabled;
+}
 #else
 static void hdd_init_runtime_pm(struct hdd_config *config,
 				struct wlan_objmgr_psoc *psoc)
 
 {
+}
+
+bool hdd_is_runtime_pm_enabled(struct hdd_context *hdd_ctx)
+{
+	return false;
 }
 #endif
 
@@ -12872,8 +12890,7 @@ static int hdd_update_cds_config(struct hdd_context *hdd_ctx)
 						    &value);
 	cds_cfg->ap_maxoffload_reorderbuffs = value;
 
-	cds_cfg->reorder_offload =
-			cfg_get(hdd_ctx->psoc, CFG_DP_REORDER_OFFLOAD_SUPPORT);
+	cds_cfg->reorder_offload = DP_REORDER_OFFLOAD_SUPPORT;
 
 	/* IPA micro controller data path offload resource config item */
 	cds_cfg->uc_offload_enabled = ucfg_ipa_uc_is_enabled();
@@ -14588,6 +14605,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	hdd_ctx->imps_enabled = false;
 	hdd_ctx->is_dual_mac_cfg_updated = false;
 	hdd_ctx->driver_status = DRIVER_MODULES_CLOSED;
+	hdd_ctx->is_fw_dbg_log_levels_configured = false;
 	hdd_debug("Wlan transitioned (now CLOSED)");
 
 done:
@@ -16142,6 +16160,10 @@ void wlan_hdd_start_sap(struct hdd_adapter *ap_adapter, bool reinit)
 		goto end;
 	}
 	hdd_info("SAP Start Success");
+
+	if (reinit)
+		hdd_medium_assess_init();
+
 	wlansap_reset_sap_config_add_ie(sap_config, eUPDATE_IE_ALL);
 	set_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags);
 	if (hostapd_state->bss_state == BSS_START) {
@@ -16482,6 +16504,39 @@ dev_alloc_err:
 	return -ENODEV;
 }
 
+/*
+ * When multiple instances of the driver are loaded in parallel, only
+ * one can create and own the state ctrl param. An instance of the
+ * driver that creates the state ctrl param will wait for
+ * HDD_WLAN_START_WAIT_TIME to be probed. If it is probed, then that
+ * instance of the driver will stay loaded and no other instances of
+ * the driver can load. But if it is not probed, then that instance of
+ * the driver will destroy the state ctrl param and exit, and another
+ * instance of the driver can then create the state ctrl param.
+ */
+
+/* max number of instances we expect (arbitrary) */
+#define WLAN_DRIVER_MAX_INSTANCES 5
+
+/* max amount of time an instance has to wait for all instances */
+#define CTRL_PARAM_WAIT (WLAN_DRIVER_MAX_INSTANCES * HDD_WLAN_START_WAIT_TIME)
+
+/* amount of time we sleep for each retry (arbitrary) */
+#define CTRL_PARAM_SLEEP 100
+
+static int wlan_hdd_state_ctrl_param_create_with_retry(void)
+{
+	int retries = CTRL_PARAM_WAIT / CTRL_PARAM_SLEEP;
+	int errno;
+
+	do {
+		errno = wlan_hdd_state_ctrl_param_create();
+		if (!errno || !--retries)
+			return errno;
+		msleep(CTRL_PARAM_SLEEP);
+	} while (true);
+}
+
 static void wlan_hdd_state_ctrl_param_destroy(void)
 {
 	cdev_del(&wlan_hdd_state_cdev);
@@ -16494,7 +16549,7 @@ static void wlan_hdd_state_ctrl_param_destroy(void)
 
 #else /* WLAN_CTRL_NAME */
 
-static int  wlan_hdd_state_ctrl_param_create(void)
+static int  wlan_hdd_state_ctrl_param_create_with_retry(void)
 {
 	return 0;
 }
@@ -17222,6 +17277,40 @@ static int con_mode_handler(const char *kmessage, const struct kernel_param *kp)
 	return hdd_set_con_mode_cb(mode);
 }
 
+/*
+ * If the wlan_hdd_register_driver will return an error
+ * if the wlan driver tries to register with the
+ * platform driver before cnss_probe is completed.
+ * Depending on the error code, the wlan driver waits
+ * and retries to register.
+ */
+
+/* Max number of retries (arbitrary)*/
+#define HDD_MAX_PLD_REGISTER_RETRY (50)
+
+/* Max amount of time we sleep before each retry */
+#define HDD_PLD_REGISTER_FAIL_SLEEP_DURATION (100)
+
+static int hdd_register_driver_retry(void)
+{
+	int count = 0;
+	int errno;
+
+	while (true) {
+		errno = wlan_hdd_register_driver();
+		if (errno != -EAGAIN)
+			return errno;
+		hdd_nofl_info("Retry Platform Driver Registration; errno:%d count:%d",
+			      errno, count);
+		if (++count == HDD_MAX_PLD_REGISTER_RETRY)
+			return errno;
+		msleep(HDD_PLD_REGISTER_FAIL_SLEEP_DURATION);
+		continue;
+	}
+
+	return errno;
+}
+
 int hdd_driver_load(void)
 {
 	struct osif_driver_sync *driver_sync;
@@ -17276,7 +17365,7 @@ int hdd_driver_load(void)
 
 	hdd_set_conparam(con_mode);
 
-	errno = wlan_hdd_state_ctrl_param_create();
+	errno = wlan_hdd_state_ctrl_param_create_with_retry();
 	if (errno) {
 		hdd_err("Failed to create ctrl param; errno:%d", errno);
 		goto wakelock_destroy;
@@ -17299,12 +17388,11 @@ int hdd_driver_load(void)
 	osif_driver_sync_trans_stop(driver_sync);
 
 	/* psoc probe can happen in registration; do after 'load' transition */
-	errno = wlan_hdd_register_driver();
+	errno = hdd_register_driver_retry();
 	if (errno) {
 		hdd_err("Failed to register driver; errno:%d", errno);
 		goto pld_deinit;
 	}
-
 	hdd_debug("%s: driver loaded", WLAN_MODULE_NAME);
 	hdd_place_marker(NULL, "DRIVER LOADED", NULL);
 
@@ -18541,13 +18629,13 @@ bool hdd_set_connection_in_progress(bool value)
 	return status;
 }
 
-int wlan_hdd_send_p2p_quota(struct hdd_adapter *adapter, int set_value)
+int wlan_hdd_send_mcc_vdev_quota(struct hdd_adapter *adapter, int set_value)
 {
 	if (!adapter) {
 		hdd_err("Invalid adapter");
 		return -EINVAL;
 	}
-	hdd_info("Send MCC P2P QUOTA to WMA: %d", set_value);
+	hdd_info("send mcc vdev quota to fw: %d", set_value);
 	sme_cli_set_command(adapter->vdev_id,
 			    WMA_VDEV_MCC_SET_TIME_QUOTA,
 			    set_value, VDEV_CMD);

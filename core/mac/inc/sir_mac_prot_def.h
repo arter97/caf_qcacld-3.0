@@ -134,6 +134,7 @@
 /* block acknowledgment action frame types */
 #define SIR_MAC_ACTION_VENDOR_SPECIFIC 9
 #define SIR_MAC_ACTION_VENDOR_SPECIFIC_CATEGORY     0x7F
+#define SIR_MAC_PROT_ACTION_VENDOR_SPECIFIC_CATEGORY 0x7E
 #define SIR_MAC_ACTION_P2P_SUBTYPE_PRESENCE_RSP     2
 
 /* Public Action for 20/40 BSS Coexistence */
@@ -1016,6 +1017,9 @@ typedef enum eSirMacHTChannelWidth {
 	eHT_CHANNEL_WIDTH_80MHZ = 2,
 	eHT_CHANNEL_WIDTH_160MHZ = 3,
 	eHT_CHANNEL_WIDTH_80P80MHZ = 4,
+#ifdef WLAN_FEATURE_11BE
+	eHT_CHANNEL_WIDTH_320MHZ = 5,
+#endif
 	eHT_MAX_CHANNEL_WIDTH
 } tSirMacHTChannelWidth;
 

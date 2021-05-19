@@ -74,6 +74,7 @@
 #include "wlan_reg_services_api.h"
 #include <include/wlan_vdev_mlme.h>
 #include "wma_he.h"
+#include "wma_eht.h"
 #include "wlan_roam_debug.h"
 #include "wlan_ocb_ucfg_api.h"
 #include "init_deinit_lmac.h"
@@ -922,12 +923,21 @@ static void wma_peer_send_phymode(struct wlan_objmgr_vdev *vdev,
 	} else {
 		nw_type = eSIR_11A_NW_TYPE;
 	}
+#ifdef WLAN_FEATURE_11BE
 	new_phymode = wma_peer_phymode(nw_type, STA_ENTRY_PEER,
 				       IS_WLAN_PHYMODE_HT(old_peer_phymode),
 				       vdev_chan->ch_width,
 				       IS_WLAN_PHYMODE_VHT(old_peer_phymode),
-				       IS_WLAN_PHYMODE_HE(old_peer_phymode));
-
+				       IS_WLAN_PHYMODE_HE(old_peer_phymode),
+				       IS_WLAN_PHYMODE_EHT(old_peer_phymode));
+#else
+	new_phymode = wma_peer_phymode(nw_type, STA_ENTRY_PEER,
+				       IS_WLAN_PHYMODE_HT(old_peer_phymode),
+				       vdev_chan->ch_width,
+				       IS_WLAN_PHYMODE_VHT(old_peer_phymode),
+				       IS_WLAN_PHYMODE_HE(old_peer_phymode),
+				       0);
+#endif
 	if (new_phymode == old_peer_phymode) {
 		wma_debug("Ignore update as old %d and new %d phymode are same for mac "QDF_MAC_ADDR_FMT,
 			  old_peer_phymode, new_phymode,
@@ -2535,7 +2545,6 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	struct wlan_mlme_qos *qos_aggr;
 	struct vdev_mlme_obj *vdev_mlme;
 	tp_wma_handle wma_handle;
-	uint8_t amsdu_val;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -2566,34 +2575,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 		vdev_mlme->mgmt.generic.subtype;
 
 	qos_aggr = &mac->mlme_cfg->qos_mlme_params;
-	status = wma_set_tx_rx_aggr_size(vdev_id, qos_aggr->tx_aggregation_size,
-					 qos_aggr->rx_aggregation_size,
-					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
-	if (QDF_IS_STATUS_ERROR(status))
-		wma_err("failed to set aggregation sizes(status = %d)", status);
-
-	status = wlan_mlme_get_max_amsdu_num(wma_handle->psoc, &amsdu_val);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("failed to get amsdu aggr.size %d", status);
-	} else {
-		status = wma_set_tx_rx_aggr_size(vdev_id, amsdu_val,
-						 amsdu_val,
-					    WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			wma_err("failed to set amsdu aggr.size %d", status);
-		}
-	}
-
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA) {
-		status = wma_set_tx_rx_aggr_size_per_ac(
-					wma_handle, vdev_id,
-					qos_aggr,
-					WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
-
-		if (QDF_IS_STATUS_ERROR(status))
-			wma_err("failed to set aggr size per ac(status = %d)",
-				 status);
-
 		wma_set_sta_keep_alive(
 				wma_handle, vdev_id,
 				SIR_KEEP_ALIVE_NULL_PKT,
@@ -2827,6 +2809,8 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 	struct wlan_channel *des_chan;
 	QDF_STATUS status;
 	uint8_t btc_chain_mode;
+	struct wlan_mlme_qos *qos_aggr;
+	uint8_t amsdu_val;
 
 	if (!wma || !mac_ctx)
 		return QDF_STATUS_E_FAILURE;
@@ -2932,6 +2916,33 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 				btc_chain_mode);
 			return QDF_STATUS_E_FAILURE;
 		}
+	}
+
+	qos_aggr = &mac_ctx->mlme_cfg->qos_mlme_params;
+	status = wma_set_tx_rx_aggr_size(vdev_id, qos_aggr->tx_aggregation_size,
+					 qos_aggr->rx_aggregation_size,
+					 WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("failed to set aggregation sizes(status = %d)", status);
+
+	status = wlan_mlme_get_max_amsdu_num(wma->psoc, &amsdu_val);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("failed to get amsdu aggr.size(status = %d)", status);
+	} else {
+		status = wma_set_tx_rx_aggr_size(vdev_id, amsdu_val, amsdu_val,
+					WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU);
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("failed to set amsdu aggr.size(status = %d)",
+				status);
+	}
+
+	if (mlme_obj->mgmt.generic.type == WMI_VDEV_TYPE_STA) {
+		status = wma_set_tx_rx_aggr_size_per_ac(wma, vdev_id, qos_aggr,
+					WMI_VDEV_CUSTOM_AGGR_TYPE_AMPDU);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("failed to set aggr size per ac(status = %d)",
+				status);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -3664,6 +3675,10 @@ QDF_STATUS wma_post_vdev_start_setup(uint8_t vdev_id)
 
 	wma_vdev_set_he_bss_params(wma, vdev_id,
 				   &mlme_obj->proto.he_ops_info);
+#ifdef WLAN_FEATURE_11BE
+	wma_vdev_set_eht_bss_params(wma, vdev_id,
+				    &mlme_obj->proto.eht_ops_info);
+#endif
 
 	return status;
 }
@@ -4878,7 +4893,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 {
 	uint8_t oper_mode = BSS_OPERATIONAL_MODE_STA;
-	uint8_t smesession_id = del_sta->smesessionId;
+	uint8_t vdev_id = del_sta->smesessionId;
 	bool rsp_requested = del_sta->respReqd;
 	void *htc_handle;
 
@@ -4888,18 +4903,17 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 		return;
 	}
 
-	if (wma_is_vdev_in_ap_mode(wma, smesession_id))
+	if (wma_is_vdev_in_ap_mode(wma, vdev_id))
 		oper_mode = BSS_OPERATIONAL_MODE_AP;
 	if (del_sta->staType == STA_ENTRY_NDI_PEER)
 		oper_mode = BSS_OPERATIONAL_MODE_NDI;
 
-	wma_debug("vdev %d oper_mode %d", del_sta->smesessionId, oper_mode);
+	wma_debug("vdev %d oper_mode %d", vdev_id, oper_mode);
 
 	switch (oper_mode) {
 	case BSS_OPERATIONAL_MODE_STA:
-		if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma->psoc, smesession_id)) {
-			wma_debug("LFR3: Del STA on vdev_id %d",
-				  del_sta->smesessionId);
+		if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id)) {
+			wma_debug("LFR3: Del STA on vdev_id %d", vdev_id);
 			qdf_mem_free(del_sta);
 			return;
 		}
@@ -4928,7 +4942,7 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 		qdf_mem_free(del_sta);
 	}
 
-	if (wma_is_vdev_in_sap_mode(wma, del_sta->smesessionId)) {
+	if (wma_is_vdev_in_sap_mode(wma, vdev_id)) {
 		bool is_bus_suspend_allowed_in_sap_mode =
 			(wlan_pmo_get_sap_mode_bus_suspend(wma->psoc) &&
 				wmi_service_enabled(wma->wmi_handle,
@@ -4944,7 +4958,7 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 		return;
 	}
 
-	if (wma_is_vdev_in_go_mode(wma, del_sta->smesessionId)) {
+	if (wma_is_vdev_in_go_mode(wma, vdev_id)) {
 		bool is_bus_suspend_allowed_in_go_mode =
 			(wlan_pmo_get_go_mode_bus_suspend(wma->psoc) &&
 				wmi_service_enabled(wma->wmi_handle,

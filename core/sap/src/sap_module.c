@@ -406,7 +406,7 @@ QDF_STATUS sap_destroy_ctx(struct sap_context *sap_ctx)
 } /* sap_destroy_ctx */
 
 bool wlansap_is_channel_in_nol_list(struct sap_context *sap_ctx,
-				    uint8_t channelNumber,
+				    qdf_freq_t chan_freq,
 				    ePhyChanBondState chanBondState)
 {
 	if (!sap_ctx) {
@@ -414,7 +414,7 @@ bool wlansap_is_channel_in_nol_list(struct sap_context *sap_ctx,
 		return QDF_STATUS_E_FAULT;
 	}
 
-	return sap_dfs_is_channel_in_nol_list(sap_ctx, channelNumber,
+	return sap_dfs_is_channel_in_nol_list(sap_ctx, chan_freq,
 					      chanBondState);
 }
 
@@ -1220,7 +1220,11 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 		    sap_context->csr_roamProfile.phyMode ==
 		    eCSR_DOT11_MODE_11ax ||
 		    sap_context->csr_roamProfile.phyMode ==
-		    eCSR_DOT11_MODE_11ax_ONLY) {
+		    eCSR_DOT11_MODE_11ax_ONLY ||
+		    CSR_IS_DOT11_PHY_MODE_11BE(
+			sap_context->csr_roamProfile.phyMode) ||
+		    CSR_IS_DOT11_PHY_MODE_11BE_ONLY(
+			sap_context->csr_roamProfile.phyMode)) {
 			max_fw_bw = sme_get_vht_ch_width();
 			if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
 				ch_width = CH_WIDTH_160MHZ;

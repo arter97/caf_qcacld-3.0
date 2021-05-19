@@ -538,6 +538,41 @@ lim_send_start_vdev_req(struct pe_session *session, tLimMlmStartReq *mlm_start_r
 					     mlm_start_req);
 }
 
+#ifdef WLAN_FEATURE_11BE
+void lim_strip_eht_ies_from_add_ies(struct mac_context *mac_ctx,
+				    struct pe_session *session)
+{
+	struct add_ie_params *add_ie = &session->add_ie_params;
+	QDF_STATUS status;
+	uint8_t eht_cap_buff[DOT11F_IE_EHT_CAP_MAX_LEN + 2];
+	uint8_t eht_op_buff[DOT11F_IE_EHT_OP_MAX_LEN + 2];
+
+	qdf_mem_zero(eht_cap_buff, sizeof(eht_cap_buff));
+	qdf_mem_zero(eht_op_buff, sizeof(eht_op_buff));
+
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      DOT11F_EID_EHT_CAP, ONE_BYTE,
+			      EHT_CAP_OUI_TYPE, (uint8_t)EHT_CAP_OUI_SIZE,
+			      eht_cap_buff, DOT11F_IE_EHT_CAP_MAX_LEN);
+	if (status != QDF_STATUS_SUCCESS)
+		pe_debug("Failed to strip EHT cap IE status: %d", status);
+
+	status = lim_strip_ie(mac_ctx, add_ie->probeRespBCNData_buff,
+			      &add_ie->probeRespBCNDataLen,
+			      DOT11F_EID_EHT_OP, ONE_BYTE,
+			      EHT_OP_OUI_TYPE, (uint8_t)EHT_OP_OUI_SIZE,
+			      eht_op_buff, DOT11F_IE_EHT_OP_MAX_LEN);
+	if (status != QDF_STATUS_SUCCESS)
+		pe_debug("Failed to strip EHT op IE status: %d", status);
+}
+#else
+void lim_strip_eht_ies_from_add_ies(struct mac_context *mac_ctx,
+				    struct pe_session *session)
+{
+}
+#endif
+
 #ifdef WLAN_FEATURE_11AX
 void lim_strip_he_ies_from_add_ies(struct mac_context *mac_ctx,
 				   struct pe_session *session)
@@ -810,6 +845,13 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			lim_strip_he_ies_from_add_ies(mac_ctx, session);
 		}
 
+		if (IS_DOT11_MODE_EHT(session->dot11mode)) {
+			lim_update_session_eht_capable(mac_ctx, session);
+			lim_copy_bss_eht_cap(session);
+		} else {
+			lim_strip_eht_ies_from_add_ies(mac_ctx, session);
+		}
+
 		session->txLdpcIniFeatureEnabled =
 			sme_start_bss_req->txLdpcIniFeatureEnabled;
 		session->limRmfEnabled = sme_start_bss_req->pmfCapable ? 1 : 0;
@@ -890,6 +932,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 		session->htRecommendedTxWidthSet =
 			(session->htSecondaryChannelOffset) ? 1 : 0;
 		if (lim_is_session_he_capable(session) ||
+		    lim_is_session_eht_capable(session) ||
 		    session->vhtCapability || session->htCapability) {
 			chanwidth = sme_start_bss_req->vht_channel_width;
 			session->ch_width = chanwidth;
@@ -898,6 +941,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 			session->ch_center_freq_seg1 =
 				sme_start_bss_req->center_freq_seg1;
 			lim_update_he_bw_cap_mcs(session, NULL);
+			lim_update_eht_bw_cap_mcs(session, NULL);
 		}
 
 		/* Delete pre-auth list if any */
@@ -1496,6 +1540,18 @@ lim_update_he_caps_mcs(struct mac_context *mac, struct pe_session *session)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+static void
+lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
+{
+}
+#else
+static void
+lim_update_eht_caps_mcs(struct mac_context *mac, struct pe_session *session)
+{
+}
+#endif
+
 static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 					     struct pe_session *session,
 					     tDot11fBeaconIEs *ie_struct)
@@ -1648,6 +1704,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 
 	lim_handle_iot_ap_no_common_he_rates(mac_ctx, session, ie_struct);
 	lim_update_he_caps_mcs(mac_ctx, session);
+	lim_update_eht_caps_mcs(mac_ctx, session);
 }
 
 static enum mlme_dot11_mode
@@ -1726,6 +1783,9 @@ lim_get_bss_dot11_mode(struct bss_description *bss_desc,
 
 	if (ie_struct->he_cap.present)
 		bss_dot11_mode = MLME_DOT11_MODE_11AX;
+
+	if (ie_struct->eht_cap.present)
+		bss_dot11_mode = MLME_DOT11_MODE_11BE;
 
 	pe_debug("bss HT %d VHT %d HE %d nw_type %d bss dot11_mode %d",
 		 ie_struct->HTCaps.present, ie_struct->VHTCaps.present,
@@ -1976,6 +2036,40 @@ lim_handle_11ax_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 }
 
 static QDF_STATUS
+lim_handle_11be_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
+			   enum mlme_dot11_mode *intersected_mode)
+{
+	switch (bss_dot11_mode) {
+	case MLME_DOT11_MODE_11N:
+		*intersected_mode = MLME_DOT11_MODE_11N;
+		break;
+	case MLME_DOT11_MODE_11AC:
+		*intersected_mode = MLME_DOT11_MODE_11AC;
+		break;
+	case MLME_DOT11_MODE_11AX:
+		*intersected_mode = MLME_DOT11_MODE_11AX;
+		break;
+	case MLME_DOT11_MODE_11BE:
+		*intersected_mode = MLME_DOT11_MODE_11BE;
+		break;
+	case MLME_DOT11_MODE_11G:
+		*intersected_mode = MLME_DOT11_MODE_11G;
+		break;
+	case MLME_DOT11_MODE_11B:
+		*intersected_mode = MLME_DOT11_MODE_11B;
+		break;
+	case MLME_DOT11_MODE_11A:
+		*intersected_mode = MLME_DOT11_MODE_11A;
+		break;
+	default:
+		pe_err("Invalid bss dot11mode %d passed", bss_dot11_mode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
 lim_handle_11g_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 			       enum mlme_dot11_mode *intersected_mode,
 			       struct bss_description *bss_desc)
@@ -2128,6 +2222,36 @@ lim_handle_11ax_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
 }
 
 static QDF_STATUS
+lim_handle_11be_only_dot11_mode(enum mlme_dot11_mode bss_dot11_mode,
+				enum mlme_dot11_mode *intersected_mode)
+{
+	switch (bss_dot11_mode) {
+	case MLME_DOT11_MODE_11BE:
+		*intersected_mode = MLME_DOT11_MODE_11BE;
+		break;
+	case MLME_DOT11_MODE_11N:
+		/* fallthrough */
+	case MLME_DOT11_MODE_11AC:
+		/* fallthrough */
+	case MLME_DOT11_MODE_11AX:
+		/* fallthrough */
+	case MLME_DOT11_MODE_11G:
+		/* fallthrough */
+	case MLME_DOT11_MODE_11B:
+		/* fallthrough */
+	case MLME_DOT11_MODE_11A:
+		pe_err("Self dot11mode 11BE only, bss dot11mode %d not compatible",
+		       bss_dot11_mode);
+		return QDF_STATUS_E_INVAL;
+	default:
+		pe_err("Invalid bss dot11mode %d passed", bss_dot11_mode);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
 lim_get_intersected_dot11_mode_sta_ap(struct mac_context *mac_ctx,
 				      enum mlme_dot11_mode self_dot11_mode,
 				      enum mlme_dot11_mode bss_dot11_mode,
@@ -2175,6 +2299,12 @@ lim_get_intersected_dot11_mode_sta_ap(struct mac_context *mac_ctx,
 						  intersected_mode);
 	case MLME_DOT11_MODE_11AX_ONLY:
 		return lim_handle_11ax_only_dot11_mode(bss_dot11_mode,
+						       intersected_mode);
+	case MLME_DOT11_MODE_11BE:
+		return lim_handle_11be_dot11_mode(bss_dot11_mode,
+						  intersected_mode);
+	case MLME_DOT11_MODE_11BE_ONLY:
+		return lim_handle_11be_only_dot11_mode(bss_dot11_mode,
 						       intersected_mode);
 	default:
 		pe_err("Invalid self dot11mode %d not supported",
@@ -2703,6 +2833,11 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	if (IS_DOT11_MODE_HE(session->dot11mode)) {
 		lim_update_session_he_capable(mac_ctx, session);
 		lim_copy_join_req_he_cap(session);
+	}
+
+	if (IS_DOT11_MODE_EHT(session->dot11mode)) {
+		lim_update_session_eht_capable(mac_ctx, session);
+		lim_copy_join_req_eht_cap(session);
 	}
 
 	/* Record if management frames need to be protected */
@@ -7572,7 +7707,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 	uint8_t session_id;      /* PE session_id */
 	int8_t max_tx_pwr;
 	uint32_t target_freq;
-	bool is_curr_ch_2g, is_new_ch_2g, update_he_cap;
+	bool is_curr_ch_2g, is_new_ch_2g, update_he_cap, update_eht_cap;
 
 	if (!msg_buf) {
 		pe_err("msg_buf is NULL");
@@ -7649,6 +7784,34 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 			 target_freq, ch_change_req->dot11mode,
 			 lim_is_session_he_capable(session_entry));
 		return;
+	}
+
+	if (IS_DOT11_MODE_EHT(ch_change_req->dot11mode) &&
+	    ((QDF_MONITOR_MODE == session_entry->opmode) ||
+	     lim_is_session_eht_capable(session_entry))) {
+		lim_update_session_eht_capable_chan_switch(
+				mac_ctx, session_entry, target_freq);
+		is_new_ch_2g = wlan_reg_is_24ghz_ch_freq(target_freq);
+		is_curr_ch_2g = wlan_reg_is_24ghz_ch_freq(
+					session_entry->curr_op_freq);
+		if ((is_new_ch_2g && !is_curr_ch_2g) ||
+		    (!is_new_ch_2g && is_curr_ch_2g))
+			update_eht_cap = true;
+		else
+			update_eht_cap = false;
+		if (!update_eht_cap) {
+			if ((session_entry->ch_width !=
+			     ch_change_req->ch_width) &&
+			    (session_entry->ch_width > CH_WIDTH_80MHZ ||
+			     ch_change_req->ch_width > CH_WIDTH_80MHZ))
+				update_eht_cap = true;
+		}
+		if (update_eht_cap) {
+			session_entry->curr_op_freq = target_freq;
+			session_entry->ch_width = ch_change_req->ch_width;
+			lim_copy_bss_eht_cap(session_entry);
+			lim_update_eht_bw_cap_mcs(session_entry, NULL);
+		}
 	}
 
 	/* Store the New Channel Params in session_entry */

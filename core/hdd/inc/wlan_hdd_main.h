@@ -2218,6 +2218,7 @@ struct hdd_context {
 	bool is_regulatory_update_in_progress;
 	qdf_event_t regulatory_update_event;
 	qdf_mutex_t regulatory_status_lock;
+	bool is_fw_dbg_log_levels_configured;
 };
 
 /**
@@ -4145,15 +4146,15 @@ static inline void hdd_send_peer_status_ind_to_app(
 #endif /* WIFI_POS_CONVERGENCE */
 
 /**
- * wlan_hdd_send_p2p_quota()- Send P2P Quota value to FW
+ * wlan_hdd_send_mcc_vdev_quota()- Send mcc vdev quota value to FW
  * @adapter: Adapter data
- * @sval:    P2P quota value
+ * @sval:    mcc vdev quota value
  *
- * Send P2P quota value to FW
+ * Send mcc vdev quota value value to FW
  *
  * Return: 0 success else failure
  */
-int wlan_hdd_send_p2p_quota(struct hdd_adapter *adapter, int sval);
+int wlan_hdd_send_mcc_vdev_quota(struct hdd_adapter *adapter, int sval);
 
 /**
  * wlan_hdd_send_p2p_quota()- Send MCC latency to FW
@@ -4933,6 +4934,14 @@ static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
 }
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0) */
 #endif /* defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM) */
+
+/**
+ * hdd_is_runtime_pm_enabled - if runtime pm enabled
+ * @hdd_ctx: hdd context
+ *
+ * Return: true if runtime pm enabled. false if disabled.
+ */
+bool hdd_is_runtime_pm_enabled(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_netdev_feature_update - Update the netdev features

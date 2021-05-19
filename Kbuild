@@ -36,15 +36,39 @@ endif
 include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
 
 # add configurations in WLAN_CFG_OVERRIDE
-ifneq ($(WLAN_CFG_OVERRIDE),)
-WLAN_CFG_OVERRIDE_FILE := $(WLAN_ROOT)/.wlan_cfg_override
-$(shell echo > $(WLAN_CFG_OVERRIDE_FILE))
-
 $(foreach cfg, $(WLAN_CFG_OVERRIDE), \
-	$(shell echo $(cfg) >> $(WLAN_CFG_OVERRIDE_FILE)))
+	$(eval $(cfg)) \
+	$(warning "Overriding WLAN config with: $(cfg)"))
 
-include $(WLAN_CFG_OVERRIDE_FILE)
-$(warning "Overriding WLAN config with: $(shell cat $(WLAN_CFG_OVERRIDE_FILE))")
+# This is temp change until connection manager changes for LFR2 are done.
+# Once LFR2 changes are done, CONFIG_CM_ENABLE will be removed and all
+# connection manager files would compile by default.
+# For now enable Connection manager only for platforms supporting LFR3
+ifeq ($(CONFIG_QCACLD_WLAN_LFR3), y)
+CONFIG_CM_ENABLE := y
+endif
+
+# KERNEL_SUPPORTS_NESTED_COMPOSITES := y is used to enable nested
+# composite support. The nested composite support is available in some
+# MSM kernels, and is available in all GKI kernels beginning with
+# 5.10.20, but unfortunately is not available in any upstream kernel.
+#
+# When the feature is present in an MSM kernel, the flag is explicitly
+# set in the kernel sources.  When a GKI kernel is used, there isn't a
+# flag set in the sources, so set the flag here if we are building
+# with GKI kernel 5.10.20 or greater
+KERNEL_VERSION = $(shell echo $$(( ( $1 << 16 ) + ( $2 << 8 ) + $3 )))
+LINUX_CODE := $(call KERNEL_VERSION,$(VERSION),$(PATCHLEVEL),$(SUBLEVEL))
+COMPOSITE_CODE := 330260 # hardcoded $(call KERNEL_VERSION,5,10,20)
+ifeq ($(KERNEL_SUPPORTS_NESTED_COMPOSITES),)
+  #flag is not explicitly present
+  ifneq ($(findstring gki,$(CONFIG_LOCALVERSION)),)
+    # GKI kernel
+    ifeq ($(shell test $(LINUX_CODE) -ge $(COMPOSITE_CODE); echo $$?),0)
+      # version >= 5.10.20
+      KERNEL_SUPPORTS_NESTED_COMPOSITES := y
+    endif
+  endif
 endif
 
 OBJS :=
@@ -217,11 +241,15 @@ ifeq ($(CONFIG_WLAN_FEATURE_11AX), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_he.o
 endif
 
+ifeq ($(CONFIG_WLAN_FEATURE_11BE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_eht.o
+endif
+
 ifeq ($(CONFIG_WLAN_FEATURE_TWT), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_twt.o
 endif
 
-ifeq ($(CONFIG_LITHIUM), y)
+ifeq ($(CONFIG_FEATURE_MONITOR_MODE_SUPPORT), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_rx_monitor.o
 endif
 
@@ -498,6 +526,7 @@ endif
 $(call add-wlan-objs,dsc,$(DSC_OBJS))
 
 cppflags-$(CONFIG_ONE_MSI_VECTOR) += -DWLAN_ONE_MSI_VECTOR
+cppflags-$(CONFIG_CNSS_UTILS) += -DCONFIG_CNSS_UTILS
 
 cppflags-$(CONFIG_DSC_DEBUG) += -DWLAN_DSC_DEBUG
 cppflags-$(CONFIG_DSC_TEST) += -DWLAN_DSC_TEST
@@ -2464,6 +2493,9 @@ WMA_OBJS :=	$(WMA_SRC_DIR)/wma_main.o \
 		$(WMA_SRC_DIR)/wlan_qct_wma_legacy.o\
 		$(WMA_NDP_OBJS)
 
+ifeq ($(CONFIG_WLAN_FEATURE_11BE), y)
+WMA_OBJS +=	$(WMA_SRC_DIR)/wma_eht.o
+endif
 ifeq ($(CONFIG_WLAN_FEATURE_DSRC), y)
 WMA_OBJS+=	$(WMA_SRC_DIR)/wma_ocb.o
 endif
@@ -3055,6 +3087,7 @@ cppflags-$(CONFIG_HL_DP_SUPPORT) += -DQCA_COMPUTE_TX_DELAY_PER_TID
 cppflags-$(CONFIG_LL_DP_SUPPORT) += -DCONFIG_LL_DP_SUPPORT
 cppflags-$(CONFIG_LL_DP_SUPPORT) += -DWLAN_FULL_REORDER_OFFLOAD
 cppflags-$(CONFIG_WLAN_FEATURE_BIG_DATA_STATS) += -DWLAN_FEATURE_BIG_DATA_STATS
+cppflags-$(CONFIG_WLAN_FEATURE_IGMP_OFFLOAD) += -DWLAN_FEATURE_IGMP_OFFLOAD
 
 # For PCIe GEN switch
 cppflags-$(CONFIG_PCIE_GEN_SWITCH) += -DPCIE_GEN_SWITCH
@@ -3413,6 +3446,10 @@ cppflags-y += -DDP_MON_RSSI_IN_DBM
 cppflags-y += -DSYSTEM_PM_CHECK
 endif
 
+ifeq ($(CONFIG_TX_AGGREGATION_SIZE_ENABLE), y)
+cppflags-y += -DTX_AGGREGATION_SIZE_ENABLE
+endif
+
 # Enable Low latency optimisation mode
 cppflags-$(CONFIG_WLAN_FEATURE_LL_MODE) += -DWLAN_FEATURE_LL_MODE
 
@@ -3426,6 +3463,7 @@ cppflags-$(CONFIG_RXDMA_ERR_PKT_DROP) += -DRXDMA_ERR_PKT_DROP
 cppflags-$(CONFIG_MAX_ALLOC_PAGE_SIZE) += -DMAX_ALLOC_PAGE_SIZE
 cppflags-$(CONFIG_DELIVERY_TO_STACK_STATUS_CHECK) += -DDELIVERY_TO_STACK_STATUS_CHECK
 cppflags-$(CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS) += -DWLAN_TRACE_HIDE_MAC_ADDRESS
+cppflags-$(CONFIG_WLAN_FEATURE_11BE) += -DWLAN_FEATURE_11BE
 
 cppflags-$(CONFIG_LITHIUM) += -DFIX_TXDMA_LIMITATION
 cppflags-$(CONFIG_LITHIUM) += -DFEATURE_AST
@@ -3585,6 +3623,7 @@ cppflags-$(CONFIG_SAR_SAFETY_FEATURE) += -DSAR_SAFETY_FEATURE
 
 cppflags-$(CONFIG_WLAN_FEATURE_DP_EVENT_HISTORY) += -DWLAN_FEATURE_DP_EVENT_HISTORY
 cppflags-$(CONFIG_WLAN_FEATURE_DP_RX_RING_HISTORY) += -DWLAN_FEATURE_DP_RX_RING_HISTORY
+cppflags-$(CONFIG_REO_QDESC_HISTORY) += -DREO_QDESC_HISTORY
 cppflags-$(CONFIG_WLAN_DP_PER_RING_TYPE_CONFIG) += -DWLAN_DP_PER_RING_TYPE_CONFIG
 cppflags-$(CONFIG_WLAN_CE_INTERRUPT_THRESHOLD_CONFIG) += -DWLAN_CE_INTERRUPT_THRESHOLD_CONFIG
 cppflags-$(CONFIG_SAP_DHCP_FW_IND) += -DSAP_DHCP_FW_IND
@@ -3808,6 +3847,7 @@ cppflags-$(CONFIG_BAND_6GHZ) += -DCONFIG_BAND_6GHZ
 cppflags-$(CONFIG_6G_SCAN_CHAN_SORT_ALGO) += -DFEATURE_6G_SCAN_CHAN_SORT_ALGO
 
 cppflags-$(CONFIG_RX_FISA) += -DWLAN_SUPPORT_RX_FISA
+cppflags-$(CONFIG_RX_FISA_HISTORY) += -DWLAN_SUPPORT_RX_FISA_HIST
 
 cppflags-$(CONFIG_DP_SWLM) += -DWLAN_DP_FEATURE_SW_LATENCY_MGR
 
@@ -3875,8 +3915,8 @@ cppflags-$(CONFIG_WLAN_MAC_ADDR_UPDATE_DISABLE) += -DWLAN_MAC_ADDR_UPDATE_DISABL
 ifeq ($(CONFIG_SMP), y)
 ifeq ($(CONFIG_HIF_DETECTION_LATENCY_ENABLE), y)
 cppflags-y += -DHIF_DETECTION_LATENCY_ENABLE
-cppflags-y += -DDETECTION_TIMER_TIMEOUT=2000
-cppflags-y += -DDETECTION_LATENCY_THRESHOLD=1900
+cppflags-y += -DDETECTION_TIMER_TIMEOUT=4000
+cppflags-y += -DDETECTION_LATENCY_THRESHOLD=3900
 endif
 endif
 
@@ -3884,6 +3924,8 @@ endif
 cppflags-$(CONFIG_FEATURE_WDS) += -DFEATURE_WDS
 cppflags-$(CONFIG_FEATURE_MEC) += -DFEATURE_MEC
 cppflags-$(CONFIG_FEATURE_MCL_REPEATER) += -DFEATURE_MCL_REPEATER
+
+ccflags-$(CONFIG_IPA_WDI3_TX_TWO_PIPES) += -DIPA_WDI3_TX_TWO_PIPES
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 
@@ -3950,6 +3992,10 @@ endif
 # WIN.
 
 ccflags-y += -DSCHEDULER_CORE_MAX_MESSAGES=1000
+
+ccflags-y += -DLOG_DEL_OBJ_TIMEOUT_VALUE_MSEC=10000
+
+ccflags-y += -DLOG_DEL_OBJ_DESTROY_DURATION_SEC=10
 
 # Defining Reduction Limit 0 for MCL. If it is not defined,
 #then WLAN_SCHED_REDUCTION_LIMIT will be 32 for
