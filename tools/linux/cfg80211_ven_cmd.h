@@ -797,6 +797,7 @@ enum {
 	IEEE80211_PARAM_AP_MAX_AUTH_FAIL           = 736,   /* Set max continuous auth failures to be sent auth response within 15 seconds */
 	IEEE80211_PARAM_VAP_PROFILE_CONFIG         = 737,   /* Per vap resource profile size for EMA non tx vap */
 	IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE = 738,  /* Discovery frame override with OOB */
+	IEEE80211_PARAM_MBSS_GROUP                 = 739,
 };
 
 enum {
@@ -1287,6 +1288,9 @@ enum _ol_ath_param_t {
 	 *the radio
 	 */
 	OL_ATH_PARAM_CURCHAN_REG_TXPOWER = 472,
+	/* Query the number of supported MBSSID-groups in the radio */
+	OL_ATH_PARAM_MBSS_GET_MAX_NGROUPS = 473,
+	OL_ATH_PARAM_MBSS_GET_ACTIVE_NGROUPS = 474,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -2253,6 +2257,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_mscs",              IEEE80211_PARAM_ENABLE_MSCS, GET_PARAM, 0},
 	{"mbss_tx_vdev",        IEEE80211_PARAM_MBSS_TXVDEV, SET_PARAM, 1},
 	{"g_mbss_tx_vdev",      IEEE80211_PARAM_MBSS_TXVDEV, GET_PARAM, 0},
+	{"g_mbss_grp",          IEEE80211_PARAM_MBSS_GROUP, GET_PARAM, 0},
 	{"setiebuf",            35828, SET_PARAM, 1},
 	{"getiebuf",            35827, GET_PARAM, 0},
 	{"dbgreq",              35832, SET_PARAM, 1},
@@ -3321,6 +3326,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_CSA_TBTT, GET_PARAM, 0},
 	{"g_reg_txpower",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CURCHAN_REG_TXPOWER,
+		GET_PARAM, 0},
+	{"g_mbss_max_ngroups",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MBSS_GET_MAX_NGROUPS,
+		GET_PARAM, 0},
+	{"g_mbss_active_ngroups",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MBSS_GET_ACTIVE_NGROUPS,
 		GET_PARAM, 0},
 };
 #endif
