@@ -784,6 +784,7 @@ enum {
 #endif /* WLAN_FEATURE_11BE */
 	IEEE80211_PARAM_MBO_BSTM_REQ               = 747,   /* Enable MBO IE in BSTM req. */
 	IEEE80211_PARAM_MCAST_STEER                = 748,   /* Enable Mcast Steering */
+	IEEE80211_PARAM_MBSS_GROUP                 = 749,
 };
 
 enum {
@@ -1290,6 +1291,9 @@ enum _ol_ath_param_t {
 	 * the vap resatrt.
 	 */
 	OL_ATH_PARAM_SWITCH_RTT_ROLE = 478,
+	/* Query the number of supported MBSSID-groups in the radio */
+	OL_ATH_PARAM_MBSS_GET_MAX_NGROUPS = 479,
+	OL_ATH_PARAM_MBSS_GET_ACTIVE_NGROUPS = 480,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -2235,6 +2239,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_scs",               IEEE80211_PARAM_ENABLE_SCS, GET_PARAM, 0},
 	{"mbss_tx_vdev",        IEEE80211_PARAM_MBSS_TXVDEV, SET_PARAM, 1},
 	{"g_mbss_tx_vdev",      IEEE80211_PARAM_MBSS_TXVDEV, GET_PARAM, 0},
+	{"g_mbss_grp",          IEEE80211_PARAM_MBSS_GROUP, GET_PARAM, 0},
 	{"setiebuf",            35828, SET_PARAM, 1},
 	{"getiebuf",            35827, GET_PARAM, 0},
 	{"dbgreq",              35832, SET_PARAM, 1},
@@ -3365,6 +3370,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"switch_rtt_role",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SWITCH_RTT_ROLE,
 		SET_PARAM, 1},
+	{"g_mbss_max_ngroups",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MBSS_GET_MAX_NGROUPS,
+		GET_PARAM, 0},
+	{"g_mbss_active_ngroups",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MBSS_GET_ACTIVE_NGROUPS,
+		GET_PARAM, 0},
 };
 #endif
 #endif
