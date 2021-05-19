@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018, 2021 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -879,7 +879,7 @@ ol_rx_frag_tkip_demic(ol_txrx_pdev_handle pdev, const uint8_t *key,
 
 	ol_rx_defrag_copydata(msdu, pktlen - f_tkip.ic_miclen + rx_desc_len,
 			      f_tkip.ic_miclen, (caddr_t) mic0);
-	if (!qdf_mem_cmp(mic, mic0, f_tkip.ic_miclen))
+	if (qdf_mem_cmp(mic, mic0, f_tkip.ic_miclen))
 		return OL_RX_DEFRAG_ERR;
 
 	qdf_nbuf_trim_tail(msdu, f_tkip.ic_miclen);
