@@ -3100,6 +3100,7 @@ cppflags-$(CONFIG_WLAN_TX_FLOW_CONTROL_V2) += -DQCA_AC_BASED_FLOW_CONTROL
 cppflags-y += -DHAL_DISABLE_NON_BA_2K_JUMP_ERROR
 cppflags-y += -DENABLE_HAL_SOC_STATS
 cppflags-y += -DENABLE_HAL_REG_WR_HISTORY
+cppflags-y += -DDISABLE_EAPOL_INTRABSS_FWD
 endif
 
 # Enable Low latency optimisation mode
