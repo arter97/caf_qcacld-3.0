@@ -207,7 +207,9 @@ static void lim_process_sae_msg(struct mac_context *mac, struct sir_sae_msg *bod
 	}
 
 	if (session->opmode != QDF_STA_MODE &&
-	    session->opmode != QDF_SAP_MODE) {
+	    session->opmode != QDF_SAP_MODE &&
+	    session->opmode != QDF_P2P_GO_MODE &&
+	    session->opmode != QDF_P2P_CLIENT_MODE) {
 		pe_err("SAE:Not supported in this mode %d",
 				session->opmode);
 		return;
@@ -2101,6 +2103,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		break;
 	case CM_CONNECT_REQ:
 		cm_process_join_req(msg);
+		break;
+	case CM_REASSOC_REQ:
+		cm_process_reassoc_req(msg);
 		break;
 	case CM_DISCONNECT_REQ:
 		cm_process_disconnect_req(msg);

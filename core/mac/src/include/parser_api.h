@@ -942,9 +942,11 @@ void populate_dot11_tsrsie(struct mac_context *mac,
 			struct ese_tsrs_ie *pOld,
 			tDot11fIEESETrafStrmRateSet *pDot11f,
 			uint8_t rate_length);
+#ifdef WLAN_FEATURE_HOST_ROAM
 void populate_dot11f_re_assoc_tspec(struct mac_context *mac,
 				tDot11fReAssocRequest *pReassoc,
 				struct pe_session *pe_session);
+#endif
 QDF_STATUS
 sir_beacon_ie_ese_bcn_report(struct mac_context *mac,
 		uint8_t *pPayload, const uint32_t payloadLength,
@@ -1365,8 +1367,7 @@ bool wlan_check_rate_bitmap(uint8_t rate, uint16_t rate_bitmap);
 
 QDF_STATUS wlan_get_rate_set(struct mac_context *mac,
 			     tDot11fBeaconIEs *ie_struct,
-			     tSirMacRateSet *op_rate,
-			     tSirMacRateSet *ext_rate);
+			     struct pe_session *pe_session);
 
 void wlan_add_rate_bitmap(uint8_t rate, uint16_t *rate_bitmap);
 

@@ -115,6 +115,10 @@ wma_map_phy_ch_bw_to_wmi_channel_width(enum phy_ch_width ch_width)
 		return WMI_HOST_CHAN_WIDTH_5;
 	case CH_WIDTH_10MHZ:
 		return WMI_HOST_CHAN_WIDTH_10;
+#ifdef WLAN_FEATURE_11BE
+	case CH_WIDTH_320MHZ:
+		return WMI_HOST_CHAN_WIDTH_320;
+#endif
 	default:
 		return WMI_HOST_CHAN_WIDTH_20;
 	}
@@ -124,6 +128,18 @@ wma_map_phy_ch_bw_to_wmi_channel_width(enum phy_ch_width ch_width)
 #define WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ         1
 #define WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ        2
 #define WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ 3
+
+#ifdef WLAN_FEATURE_11BE
+static void wma_update_ch_list_11be_params(struct ch_params *ch)
+{
+	ch->ch_width = CH_WIDTH_320MHZ;
+}
+#else /* !WLAN_FEATURE_11BE */
+static void wma_update_ch_list_11be_params(struct ch_params *ch)
+{
+	ch->ch_width = CH_WIDTH_160MHZ;
+}
+#endif /* WLAN_FEATURE_11BE */
 
 /**
  * wma_update_channel_list() - update channel list
@@ -206,7 +222,8 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 		/*TODO: WMI_SET_CHANNEL_REG_CLASSID */
 		chan_p->maxregpower = chan_list->chanParam[i].pwr;
 
-		ch_params.ch_width = CH_WIDTH_160MHZ;
+		wma_update_ch_list_11be_params(&ch_params);
+
 		wlan_reg_set_channel_params_for_freq(wma_handle->pdev,
 						     chan_p->mhz, 0,
 						     &ch_params);
@@ -974,6 +991,9 @@ static void wma_update_phymode_on_roam(tp_wma_handle wma, uint8_t *bssid,
 	struct wlan_objmgr_pdev *pdev = NULL;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(iface->vdev);
+	if (!vdev_mlme)
+		return;
+
 	pdev = wlan_vdev_get_pdev(vdev_mlme->vdev);
 
 	channel = wlan_reg_freq_to_chan(pdev, iface->ch_freq);
@@ -998,8 +1018,6 @@ static void wma_update_phymode_on_roam(tp_wma_handle wma, uint8_t *bssid,
 	}
 	qdf_mem_copy(bss_chan, des_chan, sizeof(struct wlan_channel));
 
-	if (!vdev_mlme)
-		return;
 	/* Till conversion is not done in WMI we need to fill fw phy mode */
 	vdev_mlme->mgmt.generic.phy_mode = wma_host_to_fw_phymode(bss_phymode);
 
@@ -1238,9 +1256,11 @@ int wma_mlme_roam_synch_event_handler_cb(void *handle, uint8_t *event,
 cleanup_label:
 	if (status != 0) {
 #ifdef FEATURE_CM_ENABLE
-		cm_fw_roam_abort_req(wma->psoc, synch_event->vdev_id);
-		cm_roam_stop_req(wma->psoc, synch_event->vdev_id,
-				 REASON_ROAM_SYNCH_FAILED);
+		if (synch_event) {
+			cm_fw_roam_abort_req(wma->psoc, synch_event->vdev_id);
+			cm_roam_stop_req(wma->psoc, synch_event->vdev_id,
+					 REASON_ROAM_SYNCH_FAILED);
+		}
 #else
 		if (roam_synch_ind_ptr)
 			wma->csr_roam_synch_cb(wma->mac_context,
