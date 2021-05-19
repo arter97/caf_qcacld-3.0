@@ -3849,6 +3849,8 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		return 0;
 	}
 
+	cds_set_driver_state_module_stop(false);
+
 	switch (hdd_ctx->driver_status) {
 	case DRIVER_MODULES_UNINITIALIZED:
 		hdd_nofl_debug("Wlan transitioning (UNINITIALIZED -> CLOSED)");
@@ -4124,6 +4126,7 @@ release_lock:
 	cds_shutdown_notifier_purge();
 	hdd_check_for_leaks(hdd_ctx, reinit);
 	hdd_debug_domain_set(QDF_DEBUG_DOMAIN_INIT);
+	cds_set_driver_state_module_stop(true);
 
 	hdd_exit();
 
@@ -14057,7 +14060,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		return -EINVAL;
 	}
 
-	cds_set_module_stop_in_progress(true);
+	cds_set_driver_state_module_stop(true);
 
 	debugfs_threads = hdd_return_debugfs_threads_count();
 
@@ -14067,7 +14070,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 
 		if (IS_IDLE_STOP && !ftm_mode) {
 			hdd_psoc_idle_timer_start(hdd_ctx);
-			cds_set_module_stop_in_progress(false);
+			cds_set_driver_state_module_stop(false);
 
 			hdd_bus_bw_compute_timer_stop(hdd_ctx);
 			return -EAGAIN;
@@ -14235,8 +14238,6 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	hdd_debug("Wlan transitioned (now CLOSED)");
 
 done:
-	cds_set_module_stop_in_progress(false);
-
 	hdd_exit();
 
 	return ret;
