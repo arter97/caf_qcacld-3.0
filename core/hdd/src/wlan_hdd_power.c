@@ -1870,8 +1870,8 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		goto exit_with_code;
 	}
 
-	if (hdd_ctx->config->is_wow_disabled) {
-		hdd_err("wow is disabled");
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
+		hdd_info_rl("Suspend is not supported");
 		return -EINVAL;
 	}
 
@@ -2038,11 +2038,8 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	if (0 != rc)
 		return rc;
 
-	/* Wait for the stop module if already in progress */
-	hdd_psoc_idle_timer_stop(hdd_ctx);
-
-	if (hdd_ctx->config->is_wow_disabled) {
-		hdd_info_rl("wow is disabled");
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
+		hdd_info_rl("Suspend is not supported");
 		return -EINVAL;
 	}
 
