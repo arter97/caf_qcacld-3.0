@@ -26,11 +26,7 @@
 
 #ifdef IPA_OFFLOAD
 
-#include <linux/version.h>
-#include <linux/kernel.h>
-
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)) || \
-	defined(CONFIG_IPA_WDI_UNIFIED_API)
+#ifdef CONFIG_IPA_WDI_UNIFIED_API
 #include <qdf_ipa_wdi3.h>
 #else
 #include <qdf_ipa.h>

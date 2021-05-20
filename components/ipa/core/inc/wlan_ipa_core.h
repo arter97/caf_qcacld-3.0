@@ -155,8 +155,7 @@ struct wlan_ipa_iface_context *
 wlan_ipa_get_iface_by_mode_netdev(struct wlan_ipa_priv *ipa_ctx,
 				  qdf_netdev_t ndev, uint8_t mode);
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)) && \
-	!defined(CONFIG_IPA_WDI_UNIFIED_API)
+#ifndef CONFIG_IPA_WDI_UNIFIED_API
 
 /**
  * wlan_ipa_is_rm_enabled() - Is IPA RM enabled?

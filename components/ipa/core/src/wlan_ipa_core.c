@@ -424,8 +424,7 @@ drop_pkt:
 	return ret;
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)) || \
-	defined(CONFIG_IPA_WDI_UNIFIED_API)
+#ifdef CONFIG_IPA_WDI_UNIFIED_API
 /*
  * TODO: Get WDI version through FW capabilities
  */
@@ -882,9 +881,9 @@ int wlan_ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)
 	}
 
 	if (map)
-		return qdf_ipa_wdi_create_smmu_mapping(num_buf, buf_arr);
+		return qdf_ipa_create_wdi_mapping(num_buf, buf_arr);
 	else
-		return qdf_ipa_wdi_release_smmu_mapping(num_buf, buf_arr);
+		return qdf_ipa_release_wdi_mapping(num_buf, buf_arr);
 }
 
 static enum wlan_ipa_forward_type
