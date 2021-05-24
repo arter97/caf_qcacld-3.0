@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,6 +24,8 @@
 #include "dp_peer.h"
 #include "dp_internal.h"
 #include "dp_rx_tag.h"
+
+#define DP_RX_CCE_DROP 0xDEAD
 
 #if defined(WLAN_SUPPORT_RX_TAG_STATISTICS) && \
 	defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG)
@@ -209,6 +211,37 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 						   ring_index);
 	}
 }
+
+bool dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
+			qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+{
+	uint16_t cce_metadata = RX_PROTOCOL_TAG_START_OFFSET;
+	qdf_ether_header_t *eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
+
+	if (qdf_likely(!hal_rx_msdu_cce_match_get(rx_tlv_hdr)))
+		return false;
+
+	/* Get the cce_metadata from RX MSDU TLV */
+	cce_metadata = hal_rx_msdu_cce_metadata_get(soc->hal_soc, rx_tlv_hdr);
+
+	if (cce_metadata == DP_RX_CCE_DROP)
+		return true;
+
+	if (!(qdf_nbuf_is_ipv4_eapol_pkt(nbuf) ||
+	      qdf_nbuf_is_ipv4_wapi_pkt(nbuf)))
+		return false;
+
+	/* Eapol packet with destination mac address other than vdev mac address
+	 * can leak from here and reach bridge. This code will come into picture
+	 * if first packet received is eapol and tidq is not yet setup.
+	 */
+	if (qdf_mem_cmp(eh->ether_dhost, &vdev->mac_addr.raw[0],
+			QDF_MAC_ADDR_SIZE) != 0)
+		return true;
+
+	return false;
+}
+
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
 
 /**
