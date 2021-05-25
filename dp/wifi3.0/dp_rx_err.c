@@ -1604,6 +1604,7 @@ dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
 					      true);
 			DP_STATS_INC(peer, rx.to_stack.num, 1);
 			qdf_nbuf_set_exc_frame(nbuf, 1);
+			qdf_nbuf_set_next(nbuf, NULL);
 			dp_rx_deliver_to_stack(soc, vdev, peer, nbuf, NULL);
 			return;
 		}
