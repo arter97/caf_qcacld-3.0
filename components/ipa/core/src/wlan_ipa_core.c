@@ -29,6 +29,7 @@
 #include "wlan_ipa_core.h"
 #include "wlan_ipa_main.h"
 #include <ol_txrx.h>
+#include <ol_txrx_peer_find.h>
 #include "cdp_txrx_ipa.h"
 #include "wal_rx_desc.h"
 #include "qdf_str.h"
@@ -722,6 +723,42 @@ static enum wlan_ipa_forward_type wlan_ipa_intrabss_forward(
 }
 
 /**
+ * wlan_ipa_eapol_intrabss_fwd_check() - Check if eapol pkt intrabss fwd is
+ *  allowed or not
+ * @ipa_ctx: IPA global context
+ * @vdev_id: vdev id
+ * @nbuf: network buffer
+ *
+ * Return: true if intrabss fwd is allowed for eapol else false
+ */
+static bool
+wlan_ipa_eapol_intrabss_fwd_check(struct wlan_ipa_priv *ipa_ctx,
+				  uint8_t vdev_id, qdf_nbuf_t nbuf)
+{
+	uint8_t *vdev_mac_addr;
+	void *vdev;
+	struct cdp_pdev *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+
+	if (!pdev)
+		return false;
+
+	vdev = cdp_get_vdev_from_vdev_id(ipa_ctx->dp_soc, pdev, vdev_id);
+	if (!vdev)
+		return false;
+
+	vdev_mac_addr = cdp_get_vdev_mac_addr(ipa_ctx->dp_soc, vdev);
+
+	if (!vdev_mac_addr)
+		return false;
+
+	if (qdf_mem_cmp(qdf_nbuf_data(nbuf) + QDF_NBUF_DEST_MAC_OFFSET,
+			vdev_mac_addr, QDF_MAC_ADDR_SIZE))
+		return false;
+
+	return true;
+}
+
+/**
  * wlan_ipa_w2i_cb() - WLAN to IPA callback handler
  * @priv: pointer to private data registered with IPA (we register a
  *	pointer to the global IPA context)
@@ -739,10 +776,14 @@ static void wlan_ipa_w2i_cb(void *priv, qdf_ipa_dp_evt_type_t evt,
 	uint8_t session_id;
 	struct wlan_ipa_iface_context *iface_context;
 	uint8_t fw_desc;
+	bool is_eapol_wapi = false;
+	struct qdf_mac_addr peer_mac_addr = QDF_MAC_ADDR_ZERO_INIT;
+	struct ol_txrx_pdev_t *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	struct ol_txrx_peer_t *peer = NULL;
 
 	ipa_ctx = (struct wlan_ipa_priv *)priv;
 
-	if (!ipa_ctx)
+	if (!ipa_ctx || !pdev)
 		return;
 
 	switch (evt) {
@@ -779,6 +820,49 @@ static void wlan_ipa_w2i_cb(void *priv, qdf_ipa_dp_evt_type_t evt,
 		}
 
 		iface_context->stats.num_rx_ipa_excep++;
+
+		if (iface_context->device_mode == QDF_STA_MODE)
+			qdf_copy_macaddr(&peer_mac_addr, &iface_context->bssid);
+		else if (iface_context->device_mode == QDF_SAP_MODE)
+			qdf_mem_copy(&peer_mac_addr.bytes[0],
+				     qdf_nbuf_data(skb) +
+				     QDF_NBUF_SRC_MAC_OFFSET,
+				     QDF_MAC_ADDR_SIZE);
+
+		if (qdf_nbuf_is_ipv4_eapol_pkt(skb)) {
+			is_eapol_wapi = true;
+			if (iface_context->device_mode == QDF_SAP_MODE &&
+			    !wlan_ipa_eapol_intrabss_fwd_check(ipa_ctx,
+					      iface_context->session_id, skb)) {
+				ipa_err_rl("EAPOL intrabss fwd drop DA:"QDF_MAC_ADDR_FMT,
+					   QDF_MAC_ADDR_REF(qdf_nbuf_data(skb) +
+					   QDF_NBUF_DEST_MAC_OFFSET));
+				ipa_ctx->ipa_rx_internal_drop_count++;
+				dev_kfree_skb_any(skb);
+				return;
+			}
+		} else if (qdf_nbuf_is_ipv4_wapi_pkt(skb)) {
+			is_eapol_wapi = true;
+		}
+
+		/*
+		 * Check for peer authorized state before allowing
+		 * non-EAPOL/WAPI frames to be intrabss forwarded
+		 * or submitted to stack.
+		 */
+		peer = ol_txrx_peer_find_hash_find_get_ref(pdev, &peer_mac_addr.bytes[0],
+							   0, 1, PEER_DEBUG_ID_OL_INTERNAL);
+		if (!peer)
+			return;
+
+		if (cdp_peer_state_get(ipa_ctx->dp_soc, peer) !=
+		    OL_TXRX_PEER_STATE_AUTH && !is_eapol_wapi) {
+			ipa_err_rl("Non EAPOL/WAPI packet received when peer "QDF_MAC_ADDR_FMT" is unauthorized",
+				   QDF_MAC_ADDR_REF(peer_mac_addr.bytes));
+			ipa_ctx->ipa_rx_internal_drop_count++;
+			dev_kfree_skb_any(skb);
+			return;
+		}
 
 		/* Disable to forward Intra-BSS Rx packets when
 		 * ap_isolate=1 in hostapd.conf
@@ -1090,6 +1174,7 @@ static void wlan_ipa_cleanup_iface(struct wlan_ipa_iface_context *iface_context)
 	iface_context->sta_id = WLAN_IPA_MAX_STA_COUNT;
 	qdf_spin_unlock_bh(&iface_context->interface_lock);
 	iface_context->ifa_address = 0;
+	qdf_zero_macaddr(&iface_context->bssid);
 	if (!iface_context->ipa_ctx->num_iface) {
 		ipa_err("NUM INTF 0, Invalid");
 		QDF_ASSERT(0);
