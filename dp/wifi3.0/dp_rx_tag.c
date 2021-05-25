@@ -59,6 +59,12 @@ void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 
 	pdev->reo_proto_tag_stats[ring_index][protocol_index].tag_ctr++;
 }
+#elif defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG)
+void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
+					uint16_t protocol_index,
+					uint16_t ring_index)
+{
+}
 #endif /* WLAN_SUPPORT_RX_TAG_STATISTICS */
 
 #if defined(WLAN_SUPPORT_RX_TAG_STATISTICS) && \
@@ -80,6 +86,12 @@ void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
 					    uint16_t protocol_index)
 {
 	pdev->rx_err_proto_tag_stats[protocol_index].tag_ctr++;
+}
+
+#elif defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG)
+void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
+					    uint16_t protocol_index)
+{
 }
 #endif /* WLAN_SUPPORT_RX_TAG_STATISTICS */
 
@@ -467,7 +479,16 @@ __dp_reset_pdev_rx_protocol_tag_stats(struct dp_pdev *pdev,
 		pdev->reo_proto_tag_stats[ring_idx][protocol_type].tag_ctr = 0;
 	pdev->rx_err_proto_tag_stats[protocol_type].tag_ctr = 0;
 }
+#else
+static void
+__dp_reset_pdev_rx_protocol_tag_stats(struct dp_pdev *pdev,
+				      uint16_t protocol_type)
+{
+}
 
+#endif
+
+#ifdef WLAN_SUPPORT_RX_TAG_STATISTICS
 /**
  * dp_reset_pdev_rx_protocol_tag_stats - resets the stats counters for
  * given protocol type
