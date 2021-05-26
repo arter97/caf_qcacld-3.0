@@ -2246,11 +2246,11 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 	dfs_compute_radar_found_cfreq(dfs, radar_found, &freq_center);
 	radarfound_freq = freq_center + radar_found->freq_offset;
 	if (is_radar_source_agile)
-		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			 "Radar found on Agile detector freq=%d radar freq=%d",
 			 freq_center, radarfound_freq);
 	else if (radar_found->segment_id == SEG_ID_SECONDARY)
-		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			 "Radar found on second segment.Radarfound Freq=%d MHz.Secondary Chan cfreq=%d MHz.",
 			 radarfound_freq, freq_center);
 	utils_dfs_deliver_event(dfs->dfs_pdev_obj, radarfound_freq,
