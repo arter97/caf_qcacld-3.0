@@ -127,6 +127,7 @@ enum cds_hang_reason {
  * @flow_steering_enabled: Receive flow steering.
  * @is_fw_timeout: Indicate whether crash host when fw timesout or not
  * @force_target_assert_enabled: Indicate whether target assert enabled or not
+ * @bandcapability: Configured band by user
  * @active_uc_bpf_mode: Setting that determines how BPF is applied in active
  * mode for uc packets
  * @active_mc_bc_bpf_mode: Setting that determines how BPF is applied in
@@ -190,6 +191,7 @@ struct cds_config_info {
 	struct ol_tx_sched_wrr_ac_specs_t ac_specs[TX_WMM_AC_NUM];
 
 	bool force_target_assert_enabled;
+	uint8_t bandcapability;
 	enum active_bpf_mode active_uc_bpf_mode;
 	enum active_bpf_mode active_mc_bc_bpf_mode;
 	bool rps_enabled;

@@ -2847,6 +2847,7 @@ QDF_STATUS wma_open(void *cds_context,
 			WMA_RX_SERIALIZER_CTX);
 
 	wma_handle->ito_repeat_count = cds_cfg->ito_repeat_count;
+	wma_handle->bandcapability = cds_cfg->bandcapability;
 
 	wma_handle->auto_power_save_enabled =
 		cds_cfg->auto_power_save_fail_mode;
@@ -8320,6 +8321,20 @@ QDF_STATUS wma_send_pdev_set_pcl_cmd(tp_wma_handle wma_handle,
 		msg->chan_weights.weighed_valid_list[i] =
 			wma_map_pcl_weights(msg->chan_weights.
 					    weighed_valid_list[i]);
+		/* Dont allow roaming on 2G when 5G_ONLY configured */
+		if (((wma_handle->bandcapability == SIR_BAND_5_GHZ) ||
+			(msg->band == SIR_BAND_5_GHZ)) &&
+			(CDS_IS_CHANNEL_24GHZ(
+			msg->chan_weights.saved_chan_list[i]))) {
+				msg->chan_weights.weighed_valid_list[i] =
+					WEIGHT_OF_DISALLOWED_CHANNELS;
+		}
+		if ((msg->band == SIR_BAND_2_4_GHZ) &&
+			CDS_IS_CHANNEL_5GHZ((msg->chan_weights.
+					saved_chan_list[i]))) {
+				msg->chan_weights.weighed_valid_list[i] =
+				WEIGHT_OF_DISALLOWED_CHANNELS;
+		}
 		WMA_LOGD("%s: chan:%d weight[%d]=%d", __func__,
 			 msg->chan_weights.saved_chan_list[i], i,
 			 msg->chan_weights.weighed_valid_list[i]);
