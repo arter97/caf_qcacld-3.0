@@ -134,6 +134,14 @@ struct tx_cap_debug_log_info {
 	struct tx_cap_debugfs_info tx_cap_debugfs_infos[NUM_TX_CAP_DEBUG_INFOS];
 };
 
+struct dp_soc_tx_capture {
+	qdf_atomic_t  ppdu_bytes;
+	qdf_atomic_t  ppdu_mgmt_bytes;
+	uint32_t mem_limit_drops;
+	uint32_t data_enq_drops;
+	uint32_t last_dropped_id;
+};
+
 struct dp_pdev_tx_capture {
 	/* For deferred PPDU status processing */
 	qdf_spinlock_t ppdu_stats_lock;
