@@ -80,6 +80,18 @@ QDF_STATUS wlan_repeater_init(void);
  */
 QDF_STATUS wlan_repeater_deinit(void);
 
+#if DBDC_REPEATER_SUPPORT
+/**
+ * struct dbdc_flags - legacy dbdc flags used by rep comp
+ * @dbdc_process_enable:            dbdc_process_enable value
+ * @delay_stavap_connection:        delay_stavap_connection value
+ */
+struct dbdc_flags {
+	bool dbdc_process_enable;
+	u8 delay_stavap_connection;
+};
+#endif
+
 /**
  * struct rptr_ext_cbacks - Repeater extended callbacks
  * @vdev_set_powersave:             Set powersave
@@ -90,11 +102,24 @@ QDF_STATUS wlan_repeater_deinit(void);
  * @peer_disassoc:                  disconnect peer
  * @pdev_update_beacon:             update beacon
  * @target_lithium:                 check target type
+ * @dessired_ssid_found:            desired ssid found
+ * @legacy_dbdc_flags_get:          Get legacy dbdc flag
+ * @max_pri_stavap_process_up:      Max pri stavap up
+ * @delay_stavap_conn_process_up:   Delay stavap conn up
+ * @dbdc_process_mac_db_up:         dbdc mac db up
+ * @act_update_force_cli_mcast_process_up: Activity update force client mcast up
+ * @legacy_dbdc_rootap_set:         Set legacy dbdc rootap flag
+ * @max_pri_stavap_process_down:    Max pri stavap down
+ * @delay_stavap_conn_process_down: Delay stavap conn down
+ * @force_cli_mcast_process_down:   force client mcast down
+ * @rptr_send_event:                Send rptr specific event
  * @vdev_nss_ol_psta_add:           NSS OL API to add PSTA
  * @vdev_nss_ol_psta_delete:        NSS OL API to delete PSTA
  * @vdev_nss_ol_set_cfg:            NSS OL API to set cfg
- * @vdev_is_psta:		     check vdev is PSTA
- * @vdev_is_mpsta:		    check vdev is MPSTA
+ * @nss_dbdc_process_mac_db_down:   NSS OL API for dbdc mac db down
+ * @nss_prep_mac_db_store_stavap:   NSS OL API for prep macdb store stavap
+ * @vdev_is_psta:                   check vdev is PSTA
+ * @vdev_is_mpsta:                  check vdev is MPSTA
  * @get_mpsta_vdev:                 get MPSTA vdev pointer
  */
 struct rptr_ext_cbacks {
@@ -108,10 +133,32 @@ struct rptr_ext_cbacks {
 	void (*peer_disassoc)(struct wlan_objmgr_peer *peer);
 	void (*pdev_update_beacon)(struct wlan_objmgr_pdev *pdev);
 	bool (*target_lithium)(struct wlan_objmgr_pdev *pdev);
+	bool (*dessired_ssid_found)(struct wlan_objmgr_vdev *vdev,
+				    u8 *ssid, u8 ssid_len);
+#if DBDC_REPEATER_SUPPORT
+	void (*legacy_dbdc_flags_get)(struct wlan_objmgr_pdev *pdev,
+				      struct dbdc_flags *flags);
+	void (*max_pri_stavap_process_up)(struct wlan_objmgr_vdev *vdev);
+	void (*delay_stavap_conn_process_up)(struct wlan_objmgr_vdev *vdev);
+	void (*dbdc_process_mac_db_up)(struct wlan_objmgr_vdev *vdev,
+				       u8 num_sta);
+	void (*act_update_force_cli_mcast_process_up)(struct wlan_objmgr_vdev *vdev);
+	void (*legacy_dbdc_rootap_set)(struct wlan_objmgr_pdev *pdev, int value);
+	void (*max_pri_stavap_process_down)(struct wlan_objmgr_vdev *vdev,
+					    bool *max_priority_stavap_disconnected);
+	void (*delay_stavap_conn_process_down)(struct wlan_objmgr_vdev *vdev);
+	void (*force_cli_mcast_process_down)(struct wlan_objmgr_vdev *vdev,
+					     bool *max_priority_stavap_disconnected);
+#endif
+	void (*rptr_send_event)(struct wlan_objmgr_vdev *vdev,
+				u8 *ev_data, u32 ev_len, u8 ev_flags);
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
 	void (*vdev_nss_ol_psta_add)(struct wlan_objmgr_vdev *vdev);
 	void (*vdev_nss_ol_psta_delete)(struct wlan_objmgr_vdev *vdev);
 	void (*vdev_nss_ol_set_cfg)(struct wlan_objmgr_vdev *vdev, int cmd);
+	void (*nss_dbdc_process_mac_db_down)(struct wlan_objmgr_vdev *vdev);
+	void (*nss_prep_mac_db_store_stavap)(struct wlan_objmgr_vdev *vdev,
+					     u8 num_sta);
 #endif
 #if ATH_SUPPORT_WRAP
 #if WLAN_QWRAP_LEGACY
@@ -124,7 +171,7 @@ struct rptr_ext_cbacks {
 };
 
 /**
- * repeater_register_ext_cb() - Register repeater legacy callbacks
+ * wlan_rptr_register_ext_cb() - Register repeater legacy callbacks
  * commands on repeater parameters
  * @psoc    - the physical device object
  * @ext_cbacks - Reference to struct rptr_ext_cbacks from which
@@ -135,12 +182,12 @@ struct rptr_ext_cbacks {
  * Return: QDF_STATUS_SUCCESS upon successful registration,
  *         QDF_STATUS_E_FAILURE upon failure
  */
-QDF_STATUS repeater_register_ext_cb(
+QDF_STATUS wlan_rptr_register_ext_cb(
 		struct wlan_objmgr_psoc *psoc,
 		struct rptr_ext_cbacks *ext_cbacks);
 
 /**
- * wlan_rptr_vdev_feat_cap_set() - set feature caps
+ * wlan_rptr_vdev_set_feat_cap() - set feature caps
  * @vdev: vdev object
  * @cap: capabilities to be set
  *
@@ -148,11 +195,11 @@ QDF_STATUS repeater_register_ext_cb(
  *
  * return: void
  */
-void wlan_rptr_vdev_feat_cap_set(struct wlan_objmgr_vdev *vdev,
+void wlan_rptr_vdev_set_feat_cap(struct wlan_objmgr_vdev *vdev,
 				 uint32_t cap);
 
 /**
- * wlan_rptr_vdev_feat_cap_clear() - clear feature caps
+ * wlan_rptr_vdev_clear_feat_cap() - clear feature caps
  * @vdev: vdev object
  * @cap: capabilities to be cleared
  *
@@ -160,11 +207,11 @@ void wlan_rptr_vdev_feat_cap_set(struct wlan_objmgr_vdev *vdev,
  *
  * return: void
  */
-void wlan_rptr_vdev_feat_cap_clear(struct wlan_objmgr_vdev *vdev,
+void wlan_rptr_vdev_clear_feat_cap(struct wlan_objmgr_vdev *vdev,
 				   uint32_t cap);
 
 /**
- * wlan_rptr_vdev_feat_cap_get() - get feature caps
+ * wlan_rptr_vdev_is_feat_cap_set() - get feature caps
  * @vdev: vdev object
  * @cap: capabilities to be checked
  *
@@ -172,11 +219,11 @@ void wlan_rptr_vdev_feat_cap_clear(struct wlan_objmgr_vdev *vdev,
  *
  * return: 1 if capabilities is  set or else 0
  */
-uint8_t wlan_rptr_vdev_feat_cap_get(struct wlan_objmgr_vdev *vdev,
+uint8_t wlan_rptr_vdev_is_feat_cap_set(struct wlan_objmgr_vdev *vdev,
 				    uint32_t cap);
 
 /**
- * wlan_rptr_pdev_feat_cap_set() - set feature caps
+ * wlan_rptr_pdev_set_feat_cap() - set feature caps
  * @pdev: pdev object
  * @cap: capabilities to be set
  *
@@ -184,11 +231,11 @@ uint8_t wlan_rptr_vdev_feat_cap_get(struct wlan_objmgr_vdev *vdev,
  *
  * return: void
  */
-void wlan_rptr_pdev_feat_cap_set(struct wlan_objmgr_pdev *pdev,
+void wlan_rptr_pdev_set_feat_cap(struct wlan_objmgr_pdev *pdev,
 				 uint32_t cap);
 
 /**
- * wlan_rptr_pdev_feat_cap_clear() - clear feature caps
+ * wlan_rptr_pdev_clear_feat_cap() - clear feature caps
  * @pdev: pdev object
  * @cap: capabilities to be cleared
  *
@@ -196,11 +243,11 @@ void wlan_rptr_pdev_feat_cap_set(struct wlan_objmgr_pdev *pdev,
  *
  * return: void
  */
-void wlan_rptr_pdev_feat_cap_clear(struct wlan_objmgr_pdev *pdev,
+void wlan_rptr_pdev_clear_feat_cap(struct wlan_objmgr_pdev *pdev,
 				   uint32_t cap);
 
 /**
- * wlan_rptr_pdev_feat_cap_get() - get feature caps
+ * wlan_rptr_pdev_is_feat_cap_set() - get feature caps
  * @vdev: pdev object
  * @cap: capabilities to be checked
  *
@@ -208,10 +255,10 @@ void wlan_rptr_pdev_feat_cap_clear(struct wlan_objmgr_pdev *pdev,
  *
  * return: 1 if capabilities is  set or else 0
  */
-uint8_t wlan_rptr_pdev_feat_cap_get(struct wlan_objmgr_pdev *pdev,
+uint8_t wlan_rptr_pdev_is_feat_cap_set(struct wlan_objmgr_pdev *pdev,
 				    uint32_t cap);
 /**
- * wlan_rptr_psoc_feat_cap_set() - set feature caps
+ * wlan_rptr_psoc_set_feat_cap() - set feature caps
  * @psoc: psoc object
  * @cap: capabilities to be set
  *
@@ -219,11 +266,11 @@ uint8_t wlan_rptr_pdev_feat_cap_get(struct wlan_objmgr_pdev *pdev,
  *
  * return: void
  */
-void wlan_rptr_psoc_feat_cap_set(struct wlan_objmgr_psoc *psoc,
+void wlan_rptr_psoc_set_feat_cap(struct wlan_objmgr_psoc *psoc,
 				 uint32_t cap);
 
 /**
- * wlan_rptr_psoc_feat_cap_clear() - clear feature caps
+ * wlan_rptr_psoc_clear_feat_cap() - clear feature caps
  * @psoc: psoc object
  * @cap: capabilities to be cleared
  *
@@ -231,11 +278,11 @@ void wlan_rptr_psoc_feat_cap_set(struct wlan_objmgr_psoc *psoc,
  *
  * return: void
  */
-void wlan_rptr_psoc_feat_cap_clear(struct wlan_objmgr_psoc *psoc,
+void wlan_rptr_psoc_clear_feat_cap(struct wlan_objmgr_psoc *psoc,
 				   uint32_t cap);
 
 /**
- * wlan_rptr_psoc_feat_cap_get() - get feature caps
+ * wlan_rptr_psoc_is_feat_cap_set() - get feature caps
  * @psoc: psoc object
  * @cap: capabilities to be checked
  *
@@ -243,38 +290,38 @@ void wlan_rptr_psoc_feat_cap_clear(struct wlan_objmgr_psoc *psoc,
  *
  * return: 1 if capabilities is  set or else 0
  */
-uint8_t wlan_rptr_psoc_feat_cap_get(struct wlan_objmgr_psoc *psoc,
+uint8_t wlan_rptr_psoc_is_feat_cap_set(struct wlan_objmgr_psoc *psoc,
 				    uint32_t cap);
 
 /**
- * wlan_rptr_global_feat_cap_set() - set feature caps
+ * wlan_rptr_global_set_feat_cap() - set feature caps
  * @cap: capabilities to be set
  *
  * api to set repeater feature capabilities
  *
  * return: void
  */
-void wlan_rptr_global_feat_cap_set(uint32_t cap);
+void wlan_rptr_global_set_feat_cap(uint32_t cap);
 
 /**
- * wlan_rptr_global_feat_cap_clear() - clear feature caps
+ * wlan_rptr_global_clear_feat_cap() - clear feature caps
  * @cap: capabilities to be cleared
  *
  * api to clear rapeater feature capabilities
  *
  * return: void
  */
-void wlan_rptr_global_feat_cap_clear(uint32_t cap);
+void wlan_rptr_global_clear_feat_cap(uint32_t cap);
 
 /**
- * wlan_rptr_global_feat_cap_get() - get feature caps
+ * wlan_rptr_global_is_feat_cap_set() - get feature caps
  * @cap: capabilities to be checked
  *
  * api to know repeater feature capability is set or not
  *
  * return: 1 if capabilities is  set or else 0
  */
-uint8_t wlan_rptr_global_feat_cap_get(uint32_t cap);
+uint8_t wlan_rptr_global_is_feat_cap_set(uint32_t cap);
 
 /**
  * wlan_rptr_reset_flags() - reset global flags
@@ -287,17 +334,17 @@ void wlan_rptr_reset_flags(struct wlan_objmgr_pdev *pdev);
 
 #define WLAN_RPTR_VDEV_FLAG_FUNCS(xyz) \
 static INLINE void \
-wlan_rptr_vdev_##xyz##_set(struct wlan_objmgr_vdev *_vdev) { \
-wlan_rptr_vdev_feat_cap_set(_vdev, wlan_rptr_vdev_f_##xyz); \
+wlan_rptr_vdev_set_##xyz(struct wlan_objmgr_vdev *_vdev) { \
+wlan_rptr_vdev_set_feat_cap(_vdev, wlan_rptr_vdev_f_##xyz); \
 return; \
 } \
 static INLINE int \
-wlan_rptr_vdev_##xyz##_get(struct wlan_objmgr_vdev *_vdev) { \
-return wlan_rptr_vdev_feat_cap_get(_vdev, wlan_rptr_vdev_f_##xyz); \
+wlan_rptr_vdev_is_##xyz(struct wlan_objmgr_vdev *_vdev) { \
+return wlan_rptr_vdev_is_feat_cap_set(_vdev, wlan_rptr_vdev_f_##xyz); \
 } \
 static INLINE void \
-wlan_rptr_vdev_##xyz##_clear(struct wlan_objmgr_vdev *_vdev) { \
-wlan_rptr_vdev_feat_cap_clear(_vdev, wlan_rptr_vdev_f_##xyz); \
+wlan_rptr_vdev_clear_##xyz(struct wlan_objmgr_vdev *_vdev) { \
+wlan_rptr_vdev_clear_feat_cap(_vdev, wlan_rptr_vdev_f_##xyz); \
 return; \
 }
 
@@ -312,17 +359,17 @@ WLAN_RPTR_VDEV_FLAG_FUNCS(no_event)
 
 #define WLAN_RPTR_PDEV_FLAG_FUNCS(xyz) \
 static INLINE void \
-wlan_rptr_pdev_##xyz##_set(struct wlan_objmgr_pdev *_pdev) { \
-wlan_rptr_pdev_feat_cap_set(_pdev, wlan_rptr_pdev_f_##xyz); \
+wlan_rptr_pdev_set_##xyz(struct wlan_objmgr_pdev *_pdev) { \
+wlan_rptr_pdev_set_feat_cap(_pdev, wlan_rptr_pdev_f_##xyz); \
 return; \
 } \
 static INLINE int \
-wlan_rptr_pdev_##xyz##_get(struct wlan_objmgr_pdev *_pdev) { \
-return wlan_rptr_pdev_feat_cap_get(_pdev, wlan_rptr_pdev_f_##xyz); \
+wlan_rptr_pdev_is_##xyz(struct wlan_objmgr_pdev *_pdev) { \
+return wlan_rptr_pdev_is_feat_cap_set(_pdev, wlan_rptr_pdev_f_##xyz); \
 } \
 static INLINE void \
-wlan_rptr_pdev_##xyz##_clear(struct wlan_objmgr_pdev *_pdev) { \
-wlan_rptr_pdev_feat_cap_clear(_pdev, wlan_rptr_pdev_f_##xyz); \
+wlan_rptr_pdev_clear_##xyz(struct wlan_objmgr_pdev *_pdev) { \
+wlan_rptr_pdev_clear_feat_cap(_pdev, wlan_rptr_pdev_f_##xyz); \
 return; \
 }
 
@@ -331,17 +378,17 @@ WLAN_RPTR_PDEV_FLAG_FUNCS(qwrap)
 
 #define WLAN_RPTR_PSOC_FLAG_FUNCS(xyz) \
 static INLINE void \
-wlan_rptr_psoc_##xyz##_set(struct wlan_objmgr_psoc *_psoc) { \
-wlan_rptr_psoc_feat_cap_set(_psoc, wlan_rptr_psoc_f_##xyz); \
+wlan_rptr_psoc_set_##xyz(struct wlan_objmgr_psoc *_psoc) { \
+wlan_rptr_psoc_set_feat_cap(_psoc, wlan_rptr_psoc_f_##xyz); \
 return; \
 } \
 static INLINE int \
-wlan_rptr_psoc_##xyz##_get(struct wlan_objmgr_psoc *_psoc) { \
-return wlan_rptr_psoc_feat_cap_get(_psoc, wlan_rptr_psoc_f_##xyz); \
+wlan_rptr_psoc_is_##xyz(struct wlan_objmgr_psoc *_psoc) { \
+return wlan_rptr_psoc_is_feat_cap_set(_psoc, wlan_rptr_psoc_f_##xyz); \
 } \
 static INLINE void \
-wlan_rptr_psoc_##xyz##_clear(struct wlan_objmgr_psoc *_psoc) { \
-wlan_rptr_psoc_feat_cap_clear(_psoc, wlan_rptr_psoc_f_##xyz); \
+wlan_rptr_psoc_clear_##xyz(struct wlan_objmgr_psoc *_psoc) { \
+wlan_rptr_psoc_clear_feat_cap(_psoc, wlan_rptr_psoc_f_##xyz); \
 return; \
 }
 
@@ -349,17 +396,17 @@ WLAN_RPTR_PSOC_FLAG_FUNCS(max_qwrap)
 
 #define WLAN_RPTR_GLOBAL_FLAG_FUNCS(xyz) \
 static INLINE void \
-wlan_rptr_global_##xyz##_set(void) { \
-wlan_rptr_global_feat_cap_set(wlan_rptr_global_f_##xyz); \
+wlan_rptr_global_set_##xyz(void) { \
+wlan_rptr_global_set_feat_cap(wlan_rptr_global_f_##xyz); \
 return; \
 } \
 static INLINE int \
-wlan_rptr_global_##xyz##_get(void) { \
-return wlan_rptr_global_feat_cap_get(wlan_rptr_global_f_##xyz); \
+wlan_rptr_global_is_##xyz(void) { \
+return wlan_rptr_global_is_feat_cap_set(wlan_rptr_global_f_##xyz); \
 } \
 static INLINE void \
-wlan_rptr_global_##xyz##_clear(void) { \
-wlan_rptr_global_feat_cap_clear(wlan_rptr_global_f_##xyz); \
+wlan_rptr_global_clear_##xyz(void) { \
+wlan_rptr_global_clear_feat_cap(wlan_rptr_global_f_##xyz); \
 return; \
 }
 
@@ -374,6 +421,72 @@ WLAN_RPTR_GLOBAL_FLAG_FUNCS(g_wds)
  * return: void
  */
 void wlan_rptr_vdev_set_params(struct wlan_objmgr_vdev *vdev);
+
+#if DBDC_REPEATER_SUPPORT
+/**
+ * wlan_rptr_conn_up_dbdc_process() - mlme up dbdc process
+ * @vdev: vdev object manager
+ * @dev: net device
+ *
+ * return: void
+ */
+void wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
+				    struct net_device *dev);
+
+/**
+ * wlan_rptr_conn_down_dbdc_process() - mlme down dbdc process
+ * @vdev: vdev object manager
+ * @dev: net device
+ *
+ * return: void
+ */
+void wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
+				      struct net_device *dev);
+#endif
+
+/**
+ * wlan_rptr_pdev_ucfg_config_get() - Get ucfg pdev param
+ * @pdev: pdev object manager
+ * @param: pdev param to get
+ *
+ * return: param value
+ */
+uint32_t wlan_rptr_pdev_ucfg_config_get(struct wlan_objmgr_pdev *pdev,
+					int param);
+
+/**
+ * wlan_rptr_pdev_ucfg_config_set() - Set ucfg pdev param
+ * @pdev: pdev object manager
+ * @param: pdev param to set
+ * @value: value to set
+ *
+ * return: QDF_STATUS_SUCCESS if success and non-zero value on failure
+ */
+QDF_STATUS wlan_rptr_pdev_ucfg_config_set(struct wlan_objmgr_pdev *pdev,
+					  int param, u8 value);
+
+/**
+ * wlan_rptr_pdev_extd_ioctl() - Rptr specific extd ioctl
+ * @pdev: pdev object manager
+ * @param: pdev param to set
+ * @data: ptr to buffer
+ *
+ * return: 0 if success and negative value on failure
+ */
+int wlan_rptr_pdev_extd_ioctl(struct wlan_objmgr_pdev *pdev, int param,
+			      char *data);
+
+/**
+ * wlan_rptr_vdev_get_qwrap_cflags() - Get qwrap cflags
+ * @vdev: vdev object manager
+ * @psta: psta
+ * @mpsta: mpsta
+ * @wrap: wrap
+ *
+ * return: void
+ */
+void wlan_rptr_vdev_get_qwrap_cflags(struct wlan_objmgr_vdev *vdev, bool *psta,
+				     bool *mpsta, bool *wrap);
 
 #if ATH_SUPPORT_WRAP
 /**
@@ -583,4 +696,3 @@ uint8_t
 wlan_rptr_update_extender_info(struct wlan_objmgr_vdev *vdev,
 			       ieee80211_scan_entry_t scan_entry,
 			       u8 *disconnect_sec_stavap, u8 *bssid);
-void wlan_rptr_global_same_ssid_disable(u_int32_t value);

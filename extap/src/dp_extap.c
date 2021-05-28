@@ -522,12 +522,12 @@ int dp_extap_output(dp_pdev_extap_t *extap, uint8_t *vdev_macaddr,
 
 void dp_extap_enable(struct wlan_objmgr_vdev *vdev)
 {
-	wlan_rptr_vdev_extap_set(vdev);
+	wlan_rptr_vdev_set_extap(vdev);
 }
 
 void dp_extap_disable(struct wlan_objmgr_vdev *vdev)
 {
-	wlan_rptr_vdev_extap_clear(vdev);
+	wlan_rptr_vdev_clear_extap(vdev);
 }
 
 void dp_extap_mitbl_dump(dp_pdev_extap_t *extap)
@@ -558,7 +558,7 @@ int dp_extap_tx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff **skb,
 	qdf_ether_header_t *eh;
 	uint8_t vdev_mac[ETH_ALEN];
 
-	if (qdf_unlikely(wlan_rptr_vdev_extap_get(vdev) &&
+	if (qdf_unlikely(wlan_rptr_vdev_is_extap(vdev) &&
 			 wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
 		*skb = qdf_nbuf_unshare(*skb);
 		if (!(*skb))
@@ -583,7 +583,7 @@ int dp_extap_rx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff *skb)
 	qdf_ether_header_t *eh;
 	uint8_t vdev_mac[ETH_ALEN];
 
-	if (qdf_unlikely(wlan_rptr_vdev_extap_get(vdev) &&
+	if (qdf_unlikely(wlan_rptr_vdev_is_extap(vdev) &&
 			 wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
 
 		wlan_vdev_obj_lock(vdev);

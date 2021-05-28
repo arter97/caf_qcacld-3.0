@@ -310,12 +310,12 @@ qdf_export_symbol(dp_wrap_attach);
  */
 void dp_wrap_vdev_attach(struct wlan_objmgr_vdev *vdev)
 {
-	if (wlan_rptr_vdev_psta_get(vdev)) {
+	if (wlan_rptr_vdev_is_psta(vdev)) {
 		dp_wrap_vdev_set_psta(vdev);
-		if (wlan_rptr_vdev_mpsta_get(vdev))
+		if (wlan_rptr_vdev_is_mpsta(vdev))
 			dp_wrap_vdev_set_mpsta(vdev);
 	}
-	if (wlan_rptr_vdev_wrap_get(vdev))
+	if (wlan_rptr_vdev_is_wrap(vdev))
 		dp_wrap_vdev_set_wrap(vdev);
 }
 
@@ -328,9 +328,9 @@ void dp_wrap_vdev_attach(struct wlan_objmgr_vdev *vdev)
  */
 void dp_wrap_vdev_detach(struct wlan_objmgr_vdev *vdev)
 {
-	if (wlan_rptr_vdev_psta_get(vdev))
+	if (wlan_rptr_vdev_is_psta(vdev))
 		dp_wrap_vdev_clear_psta(vdev);
-	if (wlan_rptr_vdev_wrap_get(vdev))
+	if (wlan_rptr_vdev_is_wrap(vdev))
 		dp_wrap_vdev_clear_wrap(vdev);
 }
 
@@ -393,9 +393,9 @@ void dp_wrap_vdev_set_psta(struct wlan_objmgr_vdev *vdev)
 		wvdev->is_psta = 1;
 		wvdev->vdev = vdev;
 		wpdev->npstavaps++;
-		if (wlan_rptr_vdev_wired_psta_get(vdev))
+		if (wlan_rptr_vdev_is_wired_psta(vdev))
 			wvdev->is_wired_psta = 1;
-		if (wlan_rptr_vdev_mat_get(vdev)) {
+		if (wlan_rptr_vdev_is_mat(vdev)) {
 			wvdev->mat_enabled = 1;
 			WLAN_ADDR_COPY(wvdev->wrap_dev_oma,
 				       vdev->vdev_mlme.mataddr);
@@ -613,7 +613,7 @@ int dp_wrap_tx_process(struct net_device **dev, struct wlan_objmgr_vdev *vdev,
 	struct dp_wrap_vdev *wvdev = NULL;
 	struct ether_header *eh;
 
-	if (qdf_unlikely(wlan_rptr_vdev_mpsta_get(vdev))) {
+	if (qdf_unlikely(wlan_rptr_vdev_is_mpsta(vdev))) {
 		if (dp_wrap_tx_bridge(vdev, &wvdev, skb))
 			return QWRAP_TX_FAILURE;
 		if (*(skb) == NULL) {
@@ -623,7 +623,7 @@ int dp_wrap_tx_process(struct net_device **dev, struct wlan_objmgr_vdev *vdev,
 		}
 
 		eh = (struct ether_header *)((*skb)->data);
-		if (qdf_likely(wlan_rptr_vdev_psta_get(wvdev->vdev))) {
+		if (qdf_likely(wlan_rptr_vdev_is_psta(wvdev->vdev))) {
 			if (dp_wrap_mat_tx(wvdev, (wbuf_t)*skb)) {
 				qwrap_err("Drop pkt,MAT error:"QDF_MAC_ADDR_FMT
 					   "vdev_id:%d", QDF_MAC_ADDR_REF(
@@ -839,8 +839,8 @@ int dp_wrap_rx_process(struct net_device **dev, struct wlan_objmgr_vdev *vdev,
 		return QWRAP_RX_FAILURE;
 	}
 
-	if (qdf_unlikely(wlan_rptr_vdev_psta_get(vdev) ||
-			 wlan_rptr_vdev_wrap_get(vdev))) {
+	if (qdf_unlikely(wlan_rptr_vdev_is_psta(vdev) ||
+			 wlan_rptr_vdev_is_wrap(vdev))) {
 		dp_wrap_mat_rx(wvdev, (wbuf_t)skb);
 		rv = dp_wrap_rx_bridge(vdev, dev, wvdev, skb);
 	}
@@ -862,7 +862,7 @@ dp_wrap_vdev_set_netdev(struct wlan_objmgr_vdev *vdev, struct net_device *dev)
 			return;
 		}
 		wvdev->dev = dev;
-		if (wlan_rptr_vdev_mpsta_get(vdev)) {
+		if (wlan_rptr_vdev_is_mpsta(vdev)) {
 			pdev = vdev->vdev_objmgr.wlan_pdev;
 			if (!pdev) {
 				qwrap_err("pdev is NULL");
