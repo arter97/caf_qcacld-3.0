@@ -768,7 +768,7 @@ enum {
 	IEEE80211_PARAM_EHT_RX_MCSMAP = 739,   /* set 11be - EHT RX MCSMAP */
 	IEEE80211_PARAM_EHT_MCS = 740,         /* set 11be - EHT MCS */
 #endif /* WLAN_FEATURE_11BE */
-	IEEE80211_PARAM_ENABLE_SCS                 = 740,   /* Enable SCS Procedures */
+	IEEE80211_PARAM_ENABLE_SCS                 = 741,   /* Enable SCS Procedures */
 };
 
 enum {
