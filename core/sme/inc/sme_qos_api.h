@@ -142,6 +142,8 @@ enum sme_qos_statustype {
 
 };
 
+#define WLAN_MAX_DSCP 0x3f
+
 /*
  * Enumeration of the various User priority (UP) types
  * From 802.1D/802.11e/WMM specifications (all refer to same table)
