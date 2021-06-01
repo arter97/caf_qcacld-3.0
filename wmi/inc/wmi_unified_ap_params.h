@@ -867,7 +867,7 @@ struct wmi_peer_latency_info_params {
 struct wmi_peer_latency_config_params {
 	uint32_t num_peer;
 	uint32_t pdev_id;
-	struct wmi_peer_latency_info_params latency_info[1];
+	struct wmi_peer_latency_info_params latency_info[2];
 };
 #endif
 #endif

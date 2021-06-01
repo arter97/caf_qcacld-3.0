@@ -58,16 +58,20 @@ dp_mesh_latency_get_ac_frm_service_interval(uint32_t *service_interval)
 /**
  * dp_mesh_latency_update_peer_parameter() - Update peer mesh latency parameter
  * @soc_hdl - soc handle
- * @dest_mac - destination mac address
- * @burst_size - per peer additive burst size
+ * @peer_mac - destination mac address
+ * @dl_burst_size - per peer additive burst size for DL
+ * @dl_service_interval - per peer service interval for DL
+ * @ul_burst_size - per peer additive burst size for UL
+ * @ul_service_interval - per peer service interval for UL
  * @priority - user priority/TID
  * @add_or_sub - bit to Addition/Substraction of latency parameters
  *
  * Return: 0 when peer has active mscs session and valid user priority
  */
 QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
-		uint8_t *peer_mac, uint32_t service_interval,
-		uint32_t burst_size, uint16_t priority, uint8_t add_or_sub )
+		uint8_t *peer_mac, uint32_t service_interval_dl,
+		uint32_t burst_size_dl, uint32_t service_interval_ul,
+		uint32_t burst_size_ul, uint16_t priority, uint8_t add_or_sub)
 {
 	struct dp_peer *peer;
 	struct dp_vdev *vdev;
@@ -131,19 +135,19 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 	 * 40ms (Video Call): AC_VI
 	 * 80ms (Web-browsing): AC__BE
 	 */
-	ac = dp_mesh_latency_get_ac_frm_service_interval(&service_interval);
+	ac = dp_mesh_latency_get_ac_frm_service_interval(&service_interval_dl);
 
 	/*
 	 * Update per TID peer mesh latency related parameters
 	 */
-	peer->mesh_latency_params[tid].service_interval = service_interval;
-	peer->mesh_latency_params[tid].burst_size = burst_size;
+	peer->mesh_latency_params[tid].service_interval_dl = service_interval_dl;
+	peer->mesh_latency_params[tid].burst_size_dl = burst_size_dl;
 	peer->mesh_latency_params[tid].ac = ac;
 	peer->mesh_latency_params[tid].msduq = msduq;
 
 	status = cdp_soc->ol_ops->peer_update_mesh_latency_params(dpsoc->ctrl_psoc,
-			vdev->vdev_id, peer_mac, tid, service_interval,
-			burst_size, add_or_sub, ac);
+			vdev->vdev_id, peer_mac, tid, service_interval_dl,
+			burst_size_dl, service_interval_ul, burst_size_ul, add_or_sub, ac);
 	/*
 	 * Unref the peer
 	 */
