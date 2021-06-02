@@ -2851,21 +2851,6 @@ void sme_send_hlp_ie_info(mac_handle_t mac_handle, uint8_t vdev_id,
 			  uint32_t if_addr);
 
 /**
- * sme_update_session_assoc_ie() - Updates the assoc IEs to csr_roam_session
- * @mac_handle: Opaque handle to the global MAC context
- * @vdev_id: vdev id
- * @assoc_ie: assoc ie
- *
- * This API is used to copy the assoc IE sent from user space to
- * csr_roam_session
- *
- * Return: None
- */
-void sme_update_session_assoc_ie(mac_handle_t mac_handle,
-				 uint8_t vdev_id,
-				 struct element_info *assoc_ie);
-
-/**
  * sme_send_rso_connect_params() - Updates the assoc IEs to csr_roam_session
  * @mac_handle: Opaque handle to the global MAC context
  * @vdev_id: vdev id
@@ -4465,5 +4450,19 @@ void sme_fill_auth_type(enum csr_akm_type *auth_type,
  * Return: csr_cfgdot11mode
  */
 enum csr_cfgdot11mode sme_phy_mode_to_dot11mode(enum wlan_phymode phy_mode);
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * sme_get_eht_ch_width() - SME API to get max supported EHT chan width by FW
+ *
+ * Return: Max EHT channel width supported by FW (eg. 80, 160, 320)
+ */
+uint32_t sme_get_eht_ch_width(void);
+#else /* !WLAN_FEATURE_11BE */
+static inline uint32_t sme_get_eht_ch_width(void)
+{
+	return 0;
+}
+#endif /* WLAN_FEATURE_11BE */
 
 #endif /* #if !defined( __SME_API_H ) */

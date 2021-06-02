@@ -1529,6 +1529,16 @@ wlan_mlme_cfg_set_vht_max_mpdu_len(struct wlan_objmgr_psoc *psoc,
 				   uint8_t value);
 
 /**
+ * wlan_mlme_cfg_get_ht_smps() - gets HT SM Power Save mode from cfg item
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_cfg_get_ht_smps(struct wlan_objmgr_psoc *psoc,
+				     uint8_t *value);
+
+/**
  * wlan_mlme_cfg_get_vht_chan_width() - gets vht supported channel width from
  * cfg item
  * @psoc: psoc context
@@ -2520,6 +2530,15 @@ wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
 void
 wlan_mlme_get_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
 				  struct wlan_mlme_sae_single_pmk *pmksa);
+
+/**
+ * wlan_mlme_is_sae_single_pmk_enabled() - Get is SAE single pmk feature enabled
+ * @psoc: Pointer to Global psoc
+ *
+ * Return: True if SAE single PMK is enabled
+ */
+bool wlan_mlme_is_sae_single_pmk_enabled(struct wlan_objmgr_psoc *psoc);
+
 /**
  * wlan_mlme_clear_sae_single_pmk_info - API to clear mlme_pmkid_info ap caps
  * @vdev: vdev object
@@ -2534,6 +2553,12 @@ static inline void
 wlan_mlme_set_sae_single_pmk_bss_cap(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id, bool val)
 {
+}
+
+static inline
+bool wlan_mlme_is_sae_single_pmk_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 
 static inline void
@@ -3174,6 +3199,16 @@ mlme_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
  * preference
  */
 bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_skip_tpe() - Get preference to not consider TPE in 2G/5G case
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if host should not consider TPE IE in TX power calculation when
+ * operating in 2G/5G bands, false if host should always consider TPE IE values
+ */
+bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mlme_is_data_stall_recovery_fw_supported() - Check if data stall

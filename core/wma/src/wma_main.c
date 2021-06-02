@@ -843,6 +843,28 @@ static void wma_set_dtim_period(tp_wma_handle wma,
 
 }
 
+static inline bool wma_is_tx_chainmask_valid(int value,
+					     struct target_psoc_info *tgt_hdl)
+{
+	struct wlan_psoc_host_mac_phy_caps *mac_phy_cap;
+	uint8_t total_mac_phy_cnt, i;
+
+	mac_phy_cap = target_psoc_get_mac_phy_cap(tgt_hdl);
+	if (!mac_phy_cap) {
+		wma_err("Invalid MAC PHY capabilities handle");
+		return false;
+	}
+
+	total_mac_phy_cnt = target_psoc_get_total_mac_phy_cnt(tgt_hdl);
+	for (i = 0; i < total_mac_phy_cnt; i++) {
+		if (((mac_phy_cap[i].tx_chain_mask_5G) & (value))) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /**
  * wma_process_cli_set_cmd() - set parameters to fw
  * @wma: wma handle
@@ -910,6 +932,14 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 					wma_check_txrx_chainmask(
 					target_if_get_num_rf_chains(tgt_hdl),
 					privcmd->param_value)) {
+				wma_debug("Chainmask value is invalid");
+				return;
+			}
+		}
+
+		if (privcmd->param_id == WMI_PDEV_PARAM_TX_CHAIN_MASK) {
+			if (!wma_is_tx_chainmask_valid(privcmd->param_value,
+						       tgt_hdl)) {
 				wma_debug("Chainmask value is invalid");
 				return;
 			}
@@ -4554,6 +4584,36 @@ wma_get_igmp_offload_enable(struct wmi_unified *wmi_handle,
 {}
 #endif
 
+#ifdef WLAN_FEATURE_11AX
+#ifdef FEATURE_WLAN_TDLS
+/**
+ * wma_get_tdls_ax_support() - update tgt service with service tdls ax support
+ * @wmi_handle: Unified wmi handle
+ * @cfg: target services
+ *
+ * Return: none
+ */
+static inline void
+wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
+			struct wma_tgt_services *cfg)
+{
+	cfg->en_tdls_11ax_support = wmi_service_enabled(
+						wmi_handle,
+						wmi_service_tdls_ax_support);
+}
+#else
+static inline void
+wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
+			struct wma_tgt_services *cfg)
+{}
+#endif
+#else
+static inline void
+wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
+			struct wma_tgt_services *cfg)
+{}
+#endif
+
 /**
  * wma_update_target_services() - update target services from wma handle
  * @wmi_handle: Unified wmi handle
@@ -4696,6 +4756,7 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 	wma_get_service_cap_club_get_sta_in_ll_stats_req(wmi_handle, cfg);
 
 	wma_get_igmp_offload_enable(wmi_handle, cfg);
+	wma_get_tdls_ax_support(wmi_handle, cfg);
 }
 
 /**
@@ -6357,6 +6418,10 @@ static enum hw_mode_bandwidth wma_map_wmi_channel_width_to_hw_mode_bw(
 		return HW_MODE_5_MHZ;
 	case WMI_CHAN_WIDTH_10:
 		return HW_MODE_10_MHZ;
+#ifdef WLAN_FEATURE_11BE
+	case WMI_CHAN_WIDTH_320:
+		return HW_MODE_320_MHZ;
+#endif
 	default:
 		return HW_MODE_BW_NONE;
 	}
@@ -6894,50 +6959,6 @@ int wma_rx_ready_event(void *handle, uint8_t *cmd_param_info,
 	wma_debug("Exit");
 
 	return 0;
-}
-
-/**
- * wma_setneedshutdown() - setting wma needshutdown flag
- *
- * Return: none
- */
-void wma_setneedshutdown(void)
-{
-	tp_wma_handle wma_handle;
-
-	wma_debug("Enter");
-
-	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-
-	if (!wma_handle) {
-		QDF_ASSERT(0);
-		return;
-	}
-
-	wma_handle->needShutdown = true;
-	wma_debug("Exit");
-}
-
-/**
- * wma_needshutdown() - Is wma needs shutdown?
- *
- * Return: returns true/false
- */
-bool wma_needshutdown(void)
-{
-	tp_wma_handle wma_handle;
-
-	wma_debug("Enter");
-
-	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-
-	if (!wma_handle) {
-		QDF_ASSERT(0);
-		return false;
-	}
-
-	wma_debug("Exit");
-	return wma_handle->needShutdown;
 }
 
 /**
