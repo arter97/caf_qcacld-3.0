@@ -6631,7 +6631,6 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx, uint8_t sessio
 		hdd_nud_init_tracking(adapter);
 		hdd_mic_init_work(adapter);
 
-		qdf_mutex_create(&adapter->disconnection_status_lock);
 		hdd_periodic_sta_stats_mutex_create(adapter);
 
 		break;
@@ -6733,6 +6732,8 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx, uint8_t sessio
 	qdf_event_create(&adapter->peer_cleanup_done);
 	hdd_sta_info_init(&adapter->sta_info_list);
 	hdd_sta_info_init(&adapter->cache_sta_info_list);
+
+	qdf_mutex_create(&adapter->disconnection_status_lock);
 
 	/* Add it to the hdd's session list. */
 	status = hdd_add_adapter_back(hdd_ctx, adapter);
