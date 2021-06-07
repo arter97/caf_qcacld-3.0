@@ -1894,18 +1894,15 @@ populate_dot11f_supp_channels(struct mac_context *mac,
 {
 	uint8_t i;
 	uint8_t *p;
+	struct supported_channels supportedChannels;
 
-	if (nAssocType == LIM_REASSOC) {
-		p = (uint8_t *) pe_session->pLimReAssocReq->
-		    supportedChannels.channelList;
-		pDot11f->num_bands =
-			pe_session->pLimReAssocReq->supportedChannels.numChnl;
-	} else {
-		p = (uint8_t *)pe_session->lim_join_req->supportedChannels.
-		    channelList;
-		pDot11f->num_bands =
-			pe_session->lim_join_req->supportedChannels.numChnl;
-	}
+	wlan_add_supported_5Ghz_channels(mac->psoc, mac->pdev,
+					 supportedChannels.channelList,
+					 &supportedChannels.numChnl,
+					 false);
+	p = supportedChannels.channelList;
+	pDot11f->num_bands = supportedChannels.numChnl;
+
 	for (i = 0U; i < pDot11f->num_bands; ++i, ++p) {
 		pDot11f->bands[i][0] = *p;
 		pDot11f->bands[i][1] = 1;
@@ -2145,15 +2142,27 @@ void populate_dot11f_wmm_caps(tDot11fIEWMMCaps *pCaps)
 } /* End PopulateDot11fWmmCaps. */
 
 #ifdef FEATURE_WLAN_ESE
+#ifdef WLAN_FEATURE_HOST_ROAM
 void populate_dot11f_re_assoc_tspec(struct mac_context *mac,
 				    tDot11fReAssocRequest *pReassoc,
 				    struct pe_session *pe_session)
 {
 	uint8_t numTspecs = 0, idx;
 	tTspecInfo *pTspec = NULL;
+#ifdef FEATURE_CM_ENABLE
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(pe_session->vdev);
+	if (!mlme_priv)
+		return;
+
+	numTspecs = mlme_priv->connect_info.ese_tspec_info.numTspecs;
+	pTspec = &mlme_priv->connect_info.ese_tspec_info.tspec[0];
+#else
 
 	numTspecs = pe_session->pLimReAssocReq->eseTspecInfo.numTspecs;
 	pTspec = &pe_session->pLimReAssocReq->eseTspecInfo.tspec[0];
+#endif
 	pReassoc->num_WMMTSPEC = numTspecs;
 	if (numTspecs) {
 		for (idx = 0; idx < numTspecs; idx++) {
@@ -2164,7 +2173,7 @@ void populate_dot11f_re_assoc_tspec(struct mac_context *mac,
 		}
 	}
 }
-
+#endif
 void ese_populate_wmm_tspec(struct mac_tspec_ie *source,
 			    ese_wmm_tspec_ie *dest)
 {
@@ -6673,15 +6682,18 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
  * Return: None
  */
 static void
-wlan_fill_single_pmk_ap_cap_from_scan_entry(struct bss_description *bss_desc,
+wlan_fill_single_pmk_ap_cap_from_scan_entry(struct mac_context *mac_ctx,
+					    struct bss_description *bss_desc,
 					    struct scan_cache_entry *scan_entry)
 {
-	bss_desc->is_single_pmk = util_scan_entry_single_pmk(scan_entry);
+	bss_desc->is_single_pmk =
+		util_scan_entry_single_pmk(mac_ctx->psoc, scan_entry) &&
+		mac_ctx->mlme_cfg->lfr.sae_single_pmk_feature_enabled;
 }
-
 #else
 static inline void
-wlan_fill_single_pmk_ap_cap_from_scan_entry(struct bss_description *bss_desc,
+wlan_fill_single_pmk_ap_cap_from_scan_entry(struct mac_context *mac_ctx,
+					    struct bss_description *bss_desc,
 					    struct scan_cache_entry *scan_entry)
 {
 }
@@ -7044,15 +7056,47 @@ void wlan_add_rate_bitmap(uint8_t rate, uint16_t *rate_bitmap)
 	}
 }
 
+static bool is_ofdm_rates(uint16_t rate)
+{
+	uint16_t n = BITS_OFF(rate, WLAN_DOT11_BASIC_RATE_MASK);
+
+	switch (n) {
+	case SIR_MAC_RATE_6:
+	case SIR_MAC_RATE_9:
+	case SIR_MAC_RATE_12:
+	case SIR_MAC_RATE_18:
+	case SIR_MAC_RATE_24:
+	case SIR_MAC_RATE_36:
+	case SIR_MAC_RATE_48:
+	case SIR_MAC_RATE_54:
+		return true;
+	default:
+		break;
+	}
+
+	return false;
+}
+
 QDF_STATUS wlan_get_rate_set(struct mac_context *mac,
 			     tDot11fBeaconIEs *ie_struct,
-			     tSirMacRateSet *op_rate,
-			     tSirMacRateSet *ext_rate)
+			     struct pe_session *pe_session)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	int i;
 	uint8_t *dst_rate;
 	uint16_t rateBitmap = 0;
+	bool is_5ghz_freq;
+	tSirMacRateSet *op_rate;
+	tSirMacRateSet *ext_rate;
+
+
+	if (!pe_session) {
+		pe_err("pe session is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+	op_rate = &pe_session->rateSet;
+	ext_rate = &pe_session->extRateSet;
+	is_5ghz_freq = wlan_reg_is_5ghz_ch_freq(pe_session->curr_op_freq);
 
 	qdf_mem_zero(op_rate, sizeof(tSirMacRateSet));
 	qdf_mem_zero(ext_rate, sizeof(tSirMacRateSet));
@@ -7073,7 +7117,11 @@ QDF_STATUS wlan_get_rate_set(struct mac_context *mac,
 	dst_rate = op_rate->rate;
 	if (ie_struct->SuppRates.present) {
 		for (i = 0; i < ie_struct->SuppRates.num_rates; i++) {
-			if (csr_rates_is_dot11_rate_supported(mac,
+			if (is_5ghz_freq &&
+			    !is_ofdm_rates(ie_struct->SuppRates.rates[i]))
+				continue;
+
+			if (wlan_rates_is_dot11_rate_supported(mac,
 				ie_struct->SuppRates.rates[i]) &&
 				!wlan_check_rate_bitmap(
 					ie_struct->SuppRates.rates[i],
@@ -7262,7 +7310,8 @@ wlan_fill_bss_desc_from_scan_entry(struct mac_context *mac_ctx,
 	bss_desc->mbo_oce_enabled_ap =
 			util_scan_entry_mbo_oce(scan_entry) ? true : false;
 
-	wlan_fill_single_pmk_ap_cap_from_scan_entry(bss_desc, scan_entry);
+	wlan_fill_single_pmk_ap_cap_from_scan_entry(mac_ctx, bss_desc,
+						    scan_entry);
 
 	qdf_mem_copy(&bss_desc->mbssid_info, &scan_entry->mbssid_info,
 		     sizeof(struct scan_mbssid_info));

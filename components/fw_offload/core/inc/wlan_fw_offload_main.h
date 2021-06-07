@@ -60,7 +60,7 @@ enum wlan_fwol_southbound_event {
 };
 
 /**
- * struct wlan_fwol_three_antenna_btc - Three antenna BTC config items
+ * struct wlan_fwol_coex_config - BTC config items
  * @btc_mode: Config BTC mode
  * @antenna_isolation: Antenna isolation
  * @max_tx_power_for_btc: Max wlan tx power in co-ex scenario
@@ -77,6 +77,8 @@ enum wlan_fwol_southbound_event {
  *                             BT SCO connection is on
  * @btc_three_way_coex_config_legacy_enable: Enable/Disable tri-radio coex
  *                             config legacy feature
+ * @ble_scan_coex_policy: BLE Scan policy, true - better BLE scan result, false
+ *                        better wlan throughput
  */
 struct wlan_fwol_coex_config {
 	uint8_t btc_mode;
@@ -97,6 +99,7 @@ struct wlan_fwol_coex_config {
 #ifdef FEATURE_COEX_CONFIG
 	bool    btc_three_way_coex_config_legacy_enable;
 #endif
+	bool ble_scan_coex_policy;
 };
 
 #define FWOL_THERMAL_LEVEL_MAX 4
@@ -206,6 +209,7 @@ struct wlan_fwol_neighbor_report_cfg {
  * @tsf_irq_host_gpio_pin: TSF GPIO Pin config
  * @tsf_sync_host_gpio_pin: TSF Sync GPIO Pin config
  * @tsf_ptp_options: TSF Plus feature options config
+ * @tsf_sync_enable: TSF sync feature enable/disable
  * @sae_enable: SAE feature enable config
  * @gcmp_enable: GCMP feature enable config
  * @enable_tx_sch_delay: Enable TX SCH delay value config
@@ -248,6 +252,7 @@ struct wlan_fwol_cfg {
 	uint32_t tsf_gpio_pin;
 #ifdef WLAN_FEATURE_TSF_PLUS
 	uint32_t tsf_ptp_options;
+	bool tsf_sync_enable;
 #ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ
 	uint32_t tsf_irq_host_gpio_pin;
 #endif

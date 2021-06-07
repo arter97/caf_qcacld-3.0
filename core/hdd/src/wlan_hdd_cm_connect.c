@@ -45,6 +45,7 @@
 #include <enet.h>
 #include <wlan_mlme_twt_ucfg_api.h>
 #include "wlan_roam_debug.h"
+#include <wlan_hdd_regulatory.h>
 
 #ifdef FEATURE_CM_ENABLE
 bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
@@ -374,9 +375,13 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	if (status)
 		return status;
 
+	hdd_reg_wait_for_country_change(hdd_ctx);
+
 	qdf_mem_zero(&params, sizeof(params));
 	ucfg_blm_dump_black_list_ap(hdd_ctx->pdev);
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	if (!vdev)
+		return -EINVAL;
 
 	ucfg_pmo_flush_gtk_offload_req(vdev);
 
@@ -472,6 +477,8 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 		qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.connect);
 		hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_CONNECT);
 	}
+
+	hdd_clear_roam_profile_ie(adapter);
 	sme_reset_key(hdd_ctx->mac_handle, adapter->vdev_id);
 	hdd_wmm_dscp_initial_state(adapter);
 	hdd_debug("Disabling queues");
