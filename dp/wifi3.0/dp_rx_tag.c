@@ -24,6 +24,9 @@
 #include "dp_peer.h"
 #include "dp_internal.h"
 #include "dp_rx_tag.h"
+#ifndef DP_BE_WAR_DISABLED
+#include "li/hal_li_rx.h" /* Currently build dp_rx_tag for Lithium only */
+#endif
 
 #if defined(WLAN_SUPPORT_RX_TAG_STATISTICS) && \
 	defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG)
