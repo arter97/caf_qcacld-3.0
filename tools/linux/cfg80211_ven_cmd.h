@@ -769,6 +769,7 @@ enum {
 	IEEE80211_PARAM_EHT_MCS = 740,         /* set 11be - EHT MCS */
 #endif /* WLAN_FEATURE_11BE */
 	IEEE80211_PARAM_ENABLE_SCS                 = 741,   /* Enable SCS Procedures */
+	IEEE80211_PARAM_VAP_DIFF_MODE              = 742,   /* Enable different mode for the vap */
 };
 
 enum {
@@ -2256,6 +2257,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	SET_PARAM, 1},
 	{"g_eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
+	{"vap_diff_mode",        IEEE80211_PARAM_VAP_DIFF_MODE, SET_PARAM, 1},
+	{"g_vap_diff_mode",      IEEE80211_PARAM_VAP_DIFF_MODE, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
