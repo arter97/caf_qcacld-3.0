@@ -162,6 +162,18 @@ enum powersave_mode {
 	PMO_PS_ADVANCED_POWER_SAVE_ENABLE = 1
 };
 
+/**
+ * enum pmo_suspend_mode - suspend_mode
+ * @PMO_SUSPEND_NONE: Does not support suspend
+ * @PMO_SUSPEND_LEGENCY: Legency PDEV suspend mode
+ * @PMO_SUSPEND_WOW: WoW suspend mode
+ */
+enum pmo_suspend_mode {
+	PMO_SUSPEND_NONE = 0,
+	PMO_SUSPEND_LEGENCY,
+	PMO_SUSPEND_WOW
+};
+
 #define PMO_TARGET_SUSPEND_TIMEOUT   (4000)
 #define PMO_WAKE_LOCK_TIMEOUT        1000
 #define PMO_RESUME_TIMEOUT           (4000)
@@ -293,6 +305,7 @@ enum pmo_gpio_wakeup_mode {
  * @sta_max_li_mod_dtim: station max listen interval DTIM value
  * @wow_enable: enable wow with majic pattern match or pattern byte match
  * @power_save_mode: power save mode for psoc
+ * @suspend_mode: suspend mode for psoc
  * @runtime_pm_delay: set runtime pm's inactivity timer
  * @extwow_goto_suspend: true when extended WoW enabled else false
  * @extwow_app1_wakeup_pin_num: set wakeup1 PIN number
@@ -355,6 +368,7 @@ struct pmo_psoc_cfg {
 	enum pmo_wow_enable_type wow_enable;
 	enum powersave_mode power_save_mode;
 	enum powersave_mode default_power_save_mode;
+	enum pmo_suspend_mode suspend_mode;
 #ifdef FEATURE_RUNTIME_PM
 	uint32_t runtime_pm_delay;
 #endif
