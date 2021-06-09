@@ -823,6 +823,7 @@ void dfs_precac_csa(struct wlan_dfs *dfs)
 		global_dfs_to_mlme.mlme_precac_chan_change_csa_for_freq
 			(dfs->dfs_pdev_obj,
 			 dfs->dfs_autoswitch_chan->dfs_ch_freq,
+			 dfs->dfs_autoswitch_chan->dfs_ch_mhz_freq_seg2,
 			 dfs->dfs_autoswitch_des_mode);
 	qdf_mem_free(dfs->dfs_autoswitch_chan);
 	dfs->dfs_autoswitch_chan = NULL;
