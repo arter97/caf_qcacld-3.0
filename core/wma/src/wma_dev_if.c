@@ -81,6 +81,7 @@
 #include "wlan_mlme_public_struct.h"
 #include "wlan_mlme_api.h"
 #include "wlan_mlme_main.h"
+#include "wlan_mlme_ucfg_api.h"
 
 #ifdef FEATURE_STA_MODE_VOTE_LINK
 #include "wlan_ipa_ucfg_api.h"
@@ -6251,8 +6252,9 @@ static void wma_wait_tx_complete(tp_wma_handle wma,
 				uint32_t session_id)
 {
 	struct cdp_pdev *pdev;
-	uint8_t max_wait_iterations = 0;
+	uint8_t max_wait_iterations = 0, delay = 0;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_STATUS status;
 
 	if (!wma_is_vdev_valid(session_id)) {
 		WMA_LOGE("%s: Vdev is not valid: %d",
@@ -6266,9 +6268,12 @@ static void wma_wait_tx_complete(tp_wma_handle wma,
 			 __func__, session_id);
 		return;
 	}
-	max_wait_iterations =
-		wma->interfaces[session_id].delay_before_vdev_stop /
-		WMA_TX_Q_RECHECK_TIMER_WAIT;
+
+	status = ucfg_mlme_get_delay_before_vdev_stop(wma->psoc, &delay);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to get delay before vdev stop");
+
+	max_wait_iterations = delay / WMA_TX_Q_RECHECK_TIMER_WAIT;
 
 	while (cdp_get_tx_pending(soc, pdev) && max_wait_iterations) {
 		WMA_LOGW(FL("Waiting for outstanding packet to drain."));
