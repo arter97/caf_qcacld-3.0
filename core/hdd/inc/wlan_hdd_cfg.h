@@ -17737,19 +17737,18 @@ enum hdd_external_acs_policy {
 					 CFG_PKT_CAPTURE_MODE_DATA_PKT)
 #define CFG_PKT_CAPTURE_MODE_DEFAULT	0
 
-#define CFG_DISABLE_4WAY_HS_OFFLOAD_ALL_AKM	BIT(0)
-#define CFG_DISABLE_4WAY_HS_OFFLOAD_WPA3_SAE	BIT(1)
-
 /*
  * <ini>
  * disable_4way_hs_offload - Enable/Disable 4 way handshake offload to firmware
  * @Min: 0
- * @Max: 2
- * @Default: 0
+ * @Max: 0x2
+ * @Default: 0x2
  *
- * 0  4-way HS to be handled in firmware
- * 1  4-way HS to be handled in supplicant
- * 2  4-way HS to be handled in supplicant for WPA3-SAE Roam
+ * 0x0 - 4-way HS to be handled in firmware for the AKMs except for SAE and
+ * OWE roaming the 4way HS is handled in supplicant by default
+ * 0x1 - 4-way HS to be handled in supplicant
+ * 0x2 - 4-way HS to be handled in firmware for the AKMs including the SAE
+ * Roam except for OWE roaming the 4way HS is handled in supplicant
  *
  * Based on the requirement the Max value can be increased per AKM.
  *
@@ -17762,9 +17761,9 @@ enum hdd_external_acs_policy {
  * </ini>
  */
 #define CFG_DISABLE_4WAY_HS_OFFLOAD         "disable_4way_hs_offload"
-#define CFG_DISABLE_4WAY_HS_OFFLOAD_MIN     0
-#define CFG_DISABLE_4WAY_HS_OFFLOAD_MAX     CFG_DISABLE_4WAY_HS_OFFLOAD_WPA3_SAE
-#define CFG_DISABLE_4WAY_HS_OFFLOAD_DEFAULT 0
+#define CFG_DISABLE_4WAY_HS_OFFLOAD_MIN     (0x0)
+#define CFG_DISABLE_4WAY_HS_OFFLOAD_MAX     (0x2)
+#define CFG_DISABLE_4WAY_HS_OFFLOAD_DEFAULT (0x2)
 
 /*
  * <ini>
