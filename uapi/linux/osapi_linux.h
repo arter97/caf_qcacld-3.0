@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018, 2021 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -84,6 +84,7 @@
 #define A_PRINTF_LOG(args ...) \
 		QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR, ## args)
 #define A_SNPRINTF(buf, len, args ...)   snprintf(buf, len, args)
+#define A_OFFSETOF(type, field)   offsetof(type, field)
 
 /*
  * Timer Functions
