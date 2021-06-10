@@ -1007,6 +1007,7 @@ void dp_full_mon_detach(struct dp_pdev *pdev)
 		return;
 	}
 
+	qdf_spin_lock_bh(&pdev->mon_lock);
 	if (pdev->mon_desc) {
 		qdf_mem_free(pdev->mon_desc);
 		pdev->mon_desc = NULL;
@@ -1035,5 +1036,6 @@ void dp_full_mon_detach(struct dp_pdev *pdev)
 			qdf_mem_free(mpdu);
 		}
 	}
+	qdf_spin_unlock_bh(&pdev->mon_lock);
 }
 #endif
