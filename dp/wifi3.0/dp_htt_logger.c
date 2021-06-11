@@ -36,27 +36,6 @@
 #define HTT_DISPLAY_SIZE 25
 
 /**
- * Used for stop_seq
- * Bit 0: htt_command_log
- * Bit 1: htt_event_log
- * Bit 2: htt_wbm_event_log
- * Bit 3: htt_log_size
- * Bit 4: htt_enable
- * Bit 5: htt_cmd_disable_list
- * Bit 6: htt_event_disable_list
- * Bit 7: htt_wbm_event_disable_list
- * Bit 8-15: Reserved
- */
-#define HTT_COMMAND_LOG_BP         0
-#define HTT_EVENT_LOG_BP           1
-#define HTT_WBM_EVENT_LOG_BP       2
-#define HTT_LOG_SIZE_BP            3
-#define HTT_ENABLE_BP              4
-#define HTT_CMD_DISABLE_LIST_BP    5
-#define HTT_EVENT_DISABLE_LIST     6
-#define HTT_WBM_EVENT_DISABLE_LIST 7
-
-/**
  * Host messages which needs to be enabled by default
  *
  * Note: Below macro definition is cloned from
@@ -70,6 +49,20 @@
 #define HTT_T2H_MSG_TYPE_RX_DELBA_C       0x6
 #define HTT_T2H_MSG_TYPE_PEER_MAP_V2_C    0x1e
 #define HTT_T2H_MSG_TYPE_PEER_UNMAP_V2_C  0x1f
+
+/**
+ * HTT commands sent by Host to FW which needs to be
+ * enabled by default
+ *
+ * Note: Below macro definition is cloned from
+ * enum htt_h2t_msg_type fw_hdr/fw/htt.h and any
+ * change in enum htt_h2t_msg_type for below field
+ * will need a change here as well.
+ */
+#define HTT_H2T_MSG_TYPE_RX_RING_CFG_C              0x2
+#define HTT_H2T_MSG_TYPE_SRING_SETUP_C              0xb
+#define HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG_C    0xc
+#define HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE_C     0x17
 
 /**
  * disable_all_command(): Disable all command
@@ -88,6 +81,13 @@
 do { \
 	htt_disable_mask = ~(0x1 << eventid); \
 	htt_logger_handle->log_info.htt_event_disable_list &= \
+		htt_disable_mask; \
+} while (0)
+
+#define enable_command(htt_logger_handle, cmd_id) \
+do { \
+	htt_disable_mask = ~(0x1 << cmd_id); \
+	htt_logger_handle->log_info.htt_cmd_disable_list &= \
 		htt_disable_mask; \
 } while (0)
 
@@ -279,25 +279,12 @@ static QDF_STATUS debug_htt_command_log_show(qdf_debugfs_file_t file, void *arg)
 	uint64_t secs, usecs;
 
 	htt_log = &htt_logger_handle->log_info.htt_command_log_buf_info;
-	/* If message already read, return and reset this bit*/
-	/* Bit set to 1 : indicates it is read
-	 * Bit set to 0 : indicates 1st time read
-	 */
-	if ((htt_logger_handle->log_info.stop_seq &
-	    (0x1 << HTT_COMMAND_LOG_BP))) {
-		htt_logger_handle->log_info.stop_seq &=
-			(~(0x1 << HTT_COMMAND_LOG_BP));
-		return QDF_STATUS_SUCCESS;
-	}
 
 	qdf_spin_lock(&htt_logger_handle->log_info.htt_record_lock);
 	if (!htt_log->length) {
 		qdf_spin_unlock(&htt_logger_handle->log_info.htt_record_lock);
 		qdf_debugfs_printf(file,
 				   "no elements to read from ring buffer!\n");
-		/* setting bit sothat in next come we will return in start */
-		htt_logger_handle->log_info.stop_seq |=
-			(0x1 << HTT_COMMAND_LOG_BP);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -335,8 +322,6 @@ static QDF_STATUS debug_htt_command_log_show(qdf_debugfs_file_t file, void *arg)
 		else
 			pos--;
 	}
-	htt_logger_handle->log_info.stop_seq |=
-		(0x1 << HTT_COMMAND_LOG_BP);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -348,20 +333,12 @@ static QDF_STATUS debug_htt_event_log_show(qdf_debugfs_file_t file, void *arg)
 	uint64_t secs, usecs;
 
 	htt_log = &htt_logger_handle->log_info.htt_event_log_buf_info;
-	if ((htt_logger_handle->log_info.stop_seq &
-	    (0x1 << HTT_EVENT_LOG_BP))) {
-		htt_logger_handle->log_info.stop_seq &=
-			(~(0x1 << HTT_EVENT_LOG_BP));
-		return QDF_STATUS_SUCCESS;
-	}
 
 	qdf_spin_lock(&htt_logger_handle->log_info.htt_record_lock);
 	if (!htt_log->length) {
 		qdf_spin_unlock(&htt_logger_handle->log_info.htt_record_lock);
 		qdf_debugfs_printf(file,
 				   "no elements to read from ring buffer!\n");
-		htt_logger_handle->log_info.stop_seq |=
-			(0x1 << HTT_EVENT_LOG_BP);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -398,8 +375,6 @@ static QDF_STATUS debug_htt_event_log_show(qdf_debugfs_file_t file, void *arg)
 		else
 			pos--;
 	}
-	htt_logger_handle->log_info.stop_seq |=
-		(0x1 << HTT_EVENT_LOG_BP);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -413,20 +388,11 @@ static QDF_STATUS debug_htt_wbm_event_log_show(qdf_debugfs_file_t file,
 
 	htt_log = &htt_logger_handle->log_info.htt_wbm_event_log_buf_info;
 
-	if ((htt_logger_handle->log_info.stop_seq &
-	    (0x1 << HTT_WBM_EVENT_LOG_BP))) {
-		htt_logger_handle->log_info.stop_seq &=
-			(~(0x1 << HTT_WBM_EVENT_LOG_BP));
-		return QDF_STATUS_SUCCESS;
-	}
-
 	qdf_spin_lock(&htt_logger_handle->log_info.htt_record_lock);
 	if (!htt_log->length) {
 		qdf_spin_unlock(&htt_logger_handle->log_info.htt_record_lock);
 		qdf_debugfs_printf(file,
 				   "no elements to read from ring buffer!\n");
-		htt_logger_handle->log_info.stop_seq |=
-			(0x1 << HTT_WBM_EVENT_LOG_BP);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -465,8 +431,6 @@ static QDF_STATUS debug_htt_wbm_event_log_show(qdf_debugfs_file_t file,
 			pos--;
 	}
 
-	htt_logger_handle->log_info.stop_seq |=
-		(0x1 << HTT_WBM_EVENT_LOG_BP);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -484,17 +448,8 @@ static QDF_STATUS debug_htt_enable_show(qdf_debugfs_file_t file, void *arg)
 	struct htt_logger *htt_logger_handle = (struct htt_logger *)arg;
 	struct htt_debug_log_info *log_info_p = &htt_logger_handle->log_info;
 
-	if ((htt_logger_handle->log_info.stop_seq &
-	    (0x1 << HTT_ENABLE_BP))) {
-		htt_logger_handle->log_info.stop_seq &=
-			(~(0x1 << HTT_ENABLE_BP));
-		return QDF_STATUS_SUCCESS;
-	}
-
 	qdf_debugfs_printf(file, "%d\n",
 			   log_info_p->htt_logging_enable);
-	htt_logger_handle->log_info.stop_seq |=
-		(0x1 << HTT_ENABLE_BP);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -513,18 +468,8 @@ static QDF_STATUS debug_htt_cmd_disable_list_show(qdf_debugfs_file_t file,
 	struct htt_logger *htt_logger_handle = (struct htt_logger *)arg;
 	struct htt_debug_log_info *log_info_p = &htt_logger_handle->log_info;
 
-	if ((htt_logger_handle->log_info.stop_seq &
-	    (0x1 << HTT_CMD_DISABLE_LIST_BP))) {
-		htt_logger_handle->log_info.stop_seq &=
-			(~(0x1 << HTT_CMD_DISABLE_LIST_BP));
-		return QDF_STATUS_SUCCESS;
-	}
-
 	qdf_debugfs_printf(file, "%llu\n",
 			   log_info_p->htt_cmd_disable_list);
-
-	htt_logger_handle->log_info.stop_seq |=
-		(0x1 << HTT_CMD_DISABLE_LIST_BP);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -544,18 +489,8 @@ static QDF_STATUS debug_htt_event_disable_list_show(qdf_debugfs_file_t file,
 	struct htt_logger *htt_logger_handle = (struct htt_logger *)arg;
 	struct htt_debug_log_info *log_info_p = &htt_logger_handle->log_info;
 
-	if ((htt_logger_handle->log_info.stop_seq &
-	    (0x1 << HTT_EVENT_DISABLE_LIST))) {
-		htt_logger_handle->log_info.stop_seq &=
-			(~(0x1 << HTT_EVENT_DISABLE_LIST));
-		return QDF_STATUS_SUCCESS;
-	}
-
 	qdf_debugfs_printf(file, "%llu\n",
 			   log_info_p->htt_event_disable_list);
-
-	htt_logger_handle->log_info.stop_seq |=
-		(0x1 << HTT_EVENT_DISABLE_LIST);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -575,18 +510,8 @@ static QDF_STATUS debug_htt_wbm_event_disable_list_show(qdf_debugfs_file_t file
 	struct htt_logger *htt_logger_handle = (struct htt_logger *)arg;
 	struct htt_debug_log_info *log_info_p = &htt_logger_handle->log_info;
 
-	if ((htt_logger_handle->log_info.stop_seq &
-	    (0x1 << HTT_WBM_EVENT_DISABLE_LIST))) {
-		htt_logger_handle->log_info.stop_seq &=
-			(~(0x1 << HTT_WBM_EVENT_DISABLE_LIST));
-		return QDF_STATUS_SUCCESS;
-	}
-
 	qdf_debugfs_printf(file, "%llu\n",
 			   log_info_p->htt_wbm_event_disable_list);
-
-	htt_logger_handle->log_info.stop_seq |=
-		(0x1 << HTT_WBM_EVENT_DISABLE_LIST);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -602,21 +527,8 @@ static QDF_STATUS debug_htt_wbm_event_disable_list_show(qdf_debugfs_file_t file
  */
 static QDF_STATUS debug_htt_log_size_show(qdf_debugfs_file_t file, void *arg)
 {
-	struct htt_logger *htt_logger_handle = (struct htt_logger *)arg;
-
-	if ((htt_logger_handle->log_info.stop_seq &
-	    (0x1 << HTT_LOG_SIZE_BP))) {
-		htt_logger_handle->log_info.stop_seq &=
-			(~(0x1 << HTT_LOG_SIZE_BP));
-
-		return QDF_STATUS_SUCCESS;
-	}
-
 	qdf_debugfs_printf(file, "HTT command/event log max size:%d\n",
 			   HTT_EVENT_DEBUG_MAX_ENTRY);
-
-	htt_logger_handle->log_info.stop_seq |=
-		(0x1 << HTT_LOG_SIZE_BP);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -987,7 +899,8 @@ static QDF_STATUS htt_debugfs_init(struct htt_logger *htt_logger_handle,
 
 	for (i = 0; i < NUM_HTT_DEBUG_INFOS; ++i) {
 		htt_debugfs_infos[i].ops->priv = htt_logger_handle;
-		htt_logger_handle->debugfs_de[i] = qdf_debugfs_create_file(
+		htt_logger_handle->debugfs_de[i] =
+				qdf_debugfs_create_file_simplified(
 				htt_debugfs_infos[i].name, HTT_DBG_FILE_PERM,
 				htt_logger_handle->log_info.htt_log_debugfs_dir,
 				htt_debugfs_infos[i].ops);
@@ -1043,8 +956,18 @@ void htt_interface_logging_init(struct htt_logger **phtt_logger_handle,
 	log_buf_init(event_log_buf);
 	log_buf_init(wbm_event_log_buf);
 
-	/* Disable all command */
+	/**
+	 * Disable all command except:
+	 * HTT_H2T_MSG_TYPE_SRING_SETUP, HTT_H2T_MSG_TYPE_RX_RING_CFG
+	 * HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG, HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE
+	 */
 	disable_all_command(htt_logger_handle);
+	enable_command(htt_logger_handle, HTT_H2T_MSG_TYPE_RX_RING_CFG_C);
+	enable_command(htt_logger_handle, HTT_H2T_MSG_TYPE_SRING_SETUP_C);
+	enable_command(htt_logger_handle,
+		       HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG_C);
+	enable_command(htt_logger_handle,
+		       HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE_C);
 
 	/* Disable all event except:
 	 * HTT_T2H_MSG_TYPE_PEER_MAP, HTT_T2H_MSG_TYPE_PEER_UNMAP
