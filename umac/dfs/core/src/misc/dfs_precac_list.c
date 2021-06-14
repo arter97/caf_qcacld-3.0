@@ -861,7 +861,7 @@ static void dfs_fill_max_bw_for_chan(struct wlan_dfs *dfs,
 		return;
 	}
 
-	for (i = 0; i < NUM_CHANNELS; i++) {
+	for (i = MIN_5GHZ_CHANNEL; i < MAX_5GHZ_CHANNEL; i++) {
 		if (!WLAN_REG_IS_5GHZ_CH_FREQ(cur_chan_list[i].center_freq))
 			continue;
 
@@ -1160,7 +1160,6 @@ void dfs_init_precac_list(struct wlan_dfs *dfs)
 	u_int i;
 	uint8_t found;
 	struct dfs_precac_entry *tmp_precac_entry;
-	int nchans = 0;
 	QDF_STATUS status;
 	struct dfs_channel_bw *dfs_max_bw_info;
 	int num_precac_roots;
@@ -1173,8 +1172,7 @@ void dfs_init_precac_list(struct wlan_dfs *dfs)
 	 * array with unique frequencies and copy the unique list of frequencies
 	 * to the final list with exact size.
 	 */
-	dfs_mlme_get_dfs_ch_nchans(dfs->dfs_pdev_obj, &nchans);
-	dfs_max_bw_info = qdf_mem_malloc(nchans *
+	dfs_max_bw_info = qdf_mem_malloc(NUM_5GHZ_CHANNELS *
 		sizeof(struct dfs_channel_bw));
 	if (!dfs_max_bw_info) {
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,

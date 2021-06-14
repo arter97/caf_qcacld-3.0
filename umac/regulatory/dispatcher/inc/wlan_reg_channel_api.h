@@ -29,7 +29,7 @@
 
 #ifdef CONFIG_HOST_FIND_CHAN
 
-#define WLAN_CHAN_PASSIVE       0x0000000000000200 /* Passive channel flag */
+#define WLAN_CHAN_PASSIVE       0x0000000000100000 /* Passive channel flag */
 
 #define WLAN_CHAN_DFS              0x0002  /* DFS set on primary segment */
 #define WLAN_CHAN_DFS_CFREQ2       0x0004  /* DFS set on secondary segment */
@@ -251,4 +251,19 @@ void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 				 qdf_freq_t freq,
 				 qdf_freq_t sec_ch_2g_freq,
 				 struct ch_params *ch_params);
+
+/**
+ * wlan_reg_filter_wireless_modes() - Filter out the wireless modes
+ * that are not supported by the available regulatory channels.
+ * @pdev: Pointer to pdev.
+ * @mode_select: Wireless modes to be filtered.
+ * @include_nol_chan: boolean to indicate whether NOL channels are to be
+ * considered as available channels.
+ *
+ * Return: Void.
+ */
+void wlan_reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
+				    uint64_t *mode_select,
+				    bool include_nol_chan);
+
 #endif /* __WLAN_REG_CHANNEL_API_H */
