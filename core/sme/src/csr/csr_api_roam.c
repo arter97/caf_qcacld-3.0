@@ -3445,10 +3445,11 @@ QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t sessionId,
 		 * failure, decrement bRefAssocStartCnt.
 		 */
 		pSession->bRefAssocStartCnt--;
-	} else if (roam_info && (u1 == eCSR_ROAM_SET_CHANNEL_RSP)
-		   && (u2 == eCSR_ROAM_RESULT_CHANNEL_CHANGE_SUCCESS)) {
-		pSession->connectedProfile.operationChannel =
+	} else if (roam_info && (u1 == eCSR_ROAM_SET_CHANNEL_RSP)) {
+		if (u2 == eCSR_ROAM_RESULT_CHANNEL_CHANGE_SUCCESS)
+			pSession->connectedProfile.operationChannel =
 			roam_info->channelChangeRespEvent->newChannelNumber;
+		mac->roam.roamSession[sessionId].ch_switch_in_progress = false;
 	} else if (u1 == eCSR_ROAM_SESSION_OPENED) {
 		ret = (u2 == eCSR_ROAM_RESULT_SUCCESS) ?
 		      QDF_STATUS_SUCCESS : QDF_STATUS_E_FAILURE;
