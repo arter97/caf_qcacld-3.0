@@ -9736,6 +9736,29 @@ enum dot11p_mode {
 
 /*
  * <ini>
+ * enable_nan_indoor_channel - Enable Indoor channels for NAN
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to support to indoor channels for NAN interface
+ * Customer can config this item to enable/disable NAN in indoor channel
+ *
+ * Related: None
+ *
+ * Supported Feature: NAN
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN    "enable_nan_indoor_channel"
+#define CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN_DEF (0)
+#define CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN_MIN (0)
+#define CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN_MAX (1)
+
+/*
+ * <ini>
  * num_tx_chains_2g - Config Param to change number of tx
  * chains per vdev for 2.4ghz frequency connections
  * @Min: 0x01249249
@@ -19034,6 +19057,8 @@ struct hdd_config {
 	uint32_t periodic_stats_timer_duration;
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 	uint8_t dfs_chan_ageout_time;
+
+	bool enable_nan_indoor_channel;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
