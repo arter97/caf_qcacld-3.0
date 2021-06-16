@@ -2971,6 +2971,8 @@ cppflags-y += -DCONFIG_SDIO_TRANSFER_MAILBOX
 endif
 endif
 
+cppflags-$(CONFIG_AR6320_SUPPORT) += -DCONFIG_AR6320_SUPPORT
+
 ifeq ($(CONFIG_WLAN_FEATURE_DSRC), y)
 cppflags-y += -DWLAN_FEATURE_DSRC
 
@@ -3288,6 +3290,7 @@ cppflags-y += -DHAL_DISABLE_NON_BA_2K_JUMP_ERROR
 cppflags-y += -DENABLE_HAL_SOC_STATS
 cppflags-y += -DENABLE_HAL_REG_WR_HISTORY
 cppflags-y += -DDP_RX_DESC_COOKIE_INVALIDATE
+cppflags-y += -DDISABLE_EAPOL_INTRABSS_FWD
 endif
 
 # Enable Low latency optimisation mode
