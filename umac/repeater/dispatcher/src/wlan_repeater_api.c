@@ -672,26 +672,21 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 		if (retv == EOK) {
 			/*
 			 * For AP mode, keep WDS always enabled
-			*/
-			if (opmode == QDF_SAP_MODE) {
+			 */
+			if (opmode != QDF_SAP_MODE) {
 				cdp_config_param_type val = {0};
 
-				if (value) {
-					val.cdp_vdev_param_wds = 1;
-					cdp_txrx_set_vdev_param(
-					soc_txrx_handle, vdev_id,
-						CDP_ENABLE_WDS, val);
-				} else {
-					val.cdp_vdev_param_mec = 0;
-					cdp_txrx_set_vdev_param(soc_txrx_handle,
-								vdev_id,
-								CDP_ENABLE_MEC,
-								val);
-					/* DA_WAR is enabled by default
-					 * within DP in AP mode,
-					 * for Hawkeye v1.x
-					 */
-				}
+				val.cdp_vdev_param_wds = value;
+				cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id,
+								CDP_ENABLE_WDS, val);
+				val.cdp_vdev_param_mec = value;
+				cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id,
+								CDP_ENABLE_MEC, val);
+
+				/* DA_WAR is enabled by default
+				 * within DP in AP mode,
+				 * for Hawkeye v1.x
+				 */
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
 				ext_cb->vdev_nss_ol_set_cfg(vdev,
 							    OSIF_NSS_VDEV_WDS_CFG);
