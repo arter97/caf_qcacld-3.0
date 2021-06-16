@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2017, 2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,7 @@
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_regulatory.h"
 #include "pld_common.h"
+#include "wlan_hdd_hostapd.h"
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)) || defined(WITH_BACKPORTS)
 #define IEEE80211_CHAN_PASSIVE_SCAN IEEE80211_CHAN_NO_IR
@@ -853,6 +854,15 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 
 		cds_get_dfs_region(&dfs_reg);
 		cds_set_wma_dfs_region(dfs_reg);
+
+		qdf_mutex_acquire(&hdd_ctx->cache_channel_lock);
+		if (hdd_ctx->original_channels &&
+		    hdd_ctx->original_channels->num_channels) {
+			qdf_mutex_release(&hdd_ctx->cache_channel_lock);
+			wlan_hdd_disable_channels(hdd_ctx);
+		} else {
+			qdf_mutex_release(&hdd_ctx->cache_channel_lock);
+		}
 		break;
 
 	default:
