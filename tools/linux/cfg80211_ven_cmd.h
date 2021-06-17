@@ -770,6 +770,7 @@ enum {
 #endif /* WLAN_FEATURE_11BE */
 	IEEE80211_PARAM_ENABLE_SCS                 = 741,   /* Enable SCS Procedures */
 	IEEE80211_PARAM_VAP_DIFF_MODE              = 742,   /* Enable different mode for the vap */
+	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743,   /* Switch between RTT intiator/responder modes */
 };
 
 enum {
@@ -1766,6 +1767,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"allowdata",           IEEE80211_PARAM_ALLOW_DATA, SET_PARAM, 2},
 	{"meshdbg",             IEEE80211_PARAM_SET_MESHDBG, SET_PARAM, 1},
 	{"enable_rtt",          IEEE80211_PARAM_RTT_ENABLE, SET_PARAM, 1},
+	{"switch_rtt_role",     IEEE80211_PARAM_SWITCH_RTT_ROLE, SET_PARAM, 1},
 	{"enable_lci",          IEEE80211_PARAM_LCI_ENABLE, SET_PARAM, 1},
 	{"athnewind",           IEEE80211_PARAM_VAP_ENHIND, SET_PARAM, 1},
 	{"get_athnewind",       IEEE80211_PARAM_VAP_ENHIND, GET_PARAM, 0},
