@@ -119,7 +119,7 @@ static inline bool is_other_fast_lane_radio_primary(struct wiphy *fl_wiphy)
  * Return: true: if it primary radio
  *	   false: if it is secondary radio
  */
-static inline bool qca_multi_link_is_primary_radio(struct wiphy *dev_wiphy)
+bool qca_multi_link_is_primary_radio(struct wiphy *dev_wiphy)
 {
 	bool is_primary = false;
 

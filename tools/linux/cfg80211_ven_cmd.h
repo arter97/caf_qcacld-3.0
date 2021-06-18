@@ -1150,10 +1150,8 @@ enum _ol_ath_param_t {
 	OL_ATH_EXT_ACS_REQUEST_IN_PROGRESS = 423,
 	/* set/get hw mode */
 	OL_ATH_PARAM_HW_MODE  = 424,
-#if DBDC_REPEATER_SUPPORT
 	/* same ssid feature global disable */
 	OL_ATH_PARAM_SAME_SSID_DISABLE = 425,
-#endif
 	/* get MBSS enable flag */
 	OL_ATH_PARAM_MBSS_EN  = 426,
 	/* UNII-1 and UNII-2A channel coexistance */

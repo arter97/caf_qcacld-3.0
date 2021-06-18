@@ -132,17 +132,6 @@ void dp_extap_enable(struct wlan_objmgr_vdev *vdev);
 void dp_extap_disable(struct wlan_objmgr_vdev *vdev);
 
 /**
- * dp_is_extap_enabled() - check if extap is enabled
- * @vdev: vdev object pointer
- *
- * Return: 0 if not enabled else 1
- */
-static inline uint8_t dp_is_extap_enabled(struct wlan_objmgr_vdev *vdev)
-{
-	return wlan_vdev_mlme_feat_cap_get(vdev, WLAN_VDEV_F_AP);
-}
-
-/**
  * dp_get_extap_handle() - get extap handle from vdev
  * @vdev: vdev object pointer
  *
