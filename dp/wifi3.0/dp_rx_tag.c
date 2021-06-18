@@ -61,6 +61,12 @@ void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 
 	pdev->reo_proto_tag_stats[ring_index][protocol_index].tag_ctr++;
 }
+#elif defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG)
+void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
+                                        uint16_t protocol_index,
+                                        uint16_t ring_index)
+{
+}
 #endif /* WLAN_SUPPORT_RX_TAG_STATISTICS */
 
 #if defined(WLAN_SUPPORT_RX_TAG_STATISTICS) && \
@@ -82,6 +88,11 @@ void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
 					    uint16_t protocol_index)
 {
 	pdev->rx_err_proto_tag_stats[protocol_index].tag_ctr++;
+}
+#elif defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG)
+void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
+                                            uint16_t protocol_index)
+{
 }
 #endif /* WLAN_SUPPORT_RX_TAG_STATISTICS */
 
@@ -354,6 +365,10 @@ dp_rx_update_flow_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 	if (qdf_likely(update_stats))
 		dp_rx_update_rx_flow_tag_stats(pdev, flow_idx);
 }
+#else
+void
+dp_rx_update_flow_tag(struct dp_soc *soc, struct dp_vdev *vdev,
+		      qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr, bool update_stats) {};
 #endif /* WLAN_SUPPORT_RX_FLOW_TAG */
 
 #if defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG) ||\
@@ -501,7 +516,16 @@ __dp_reset_pdev_rx_protocol_tag_stats(struct dp_pdev *pdev,
 		pdev->reo_proto_tag_stats[ring_idx][protocol_type].tag_ctr = 0;
 	pdev->rx_err_proto_tag_stats[protocol_type].tag_ctr = 0;
 }
+#else
+static void
+__dp_reset_pdev_rx_protocol_tag_stats(struct dp_pdev *pdev,
+                                      uint16_t protocol_type)
+{
+}
 
+#endif
+
+#ifdef WLAN_SUPPORT_RX_TAG_STATISTICS
 /**
  * dp_reset_pdev_rx_protocol_tag_stats - resets the stats counters for
  * given protocol type
