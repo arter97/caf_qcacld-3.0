@@ -15996,39 +15996,51 @@ int sme_get_sec20chan_freq_mhz(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_FEATURE_SAE
 QDF_STATUS sme_handle_sae_msg(tHalHandle hal, uint8_t session_id,
-		uint8_t sae_status)
+		uint8_t sae_status, struct qdf_mac_addr peer_mac_addr,
+		const uint8_t *pmkid)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	tpAniSirGlobal mac = PMAC_STRUCT(hal);
 	struct sir_sae_msg *sae_msg;
 	struct scheduler_msg sch_msg = {0};
 
+	if (!CSR_IS_SESSION_VALID(mac, session_id)) {
+		sme_err("Invalid session id: %d", session_id);
+		return false;
+	}
 	qdf_status = sme_acquire_global_lock(&mac->sme);
-	if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
+
+	if(!CSR_IS_ROAM_JOINED(mac, session_id)) {
 		sae_msg = qdf_mem_malloc(sizeof(*sae_msg));
 		if (!sae_msg) {
 			qdf_status = QDF_STATUS_E_NOMEM;
 			sme_err("SAE: memory allocation failed");
-		} else {
-			sae_msg->message_type = eWNI_SME_SEND_SAE_MSG;
-			sae_msg->length = sizeof(*sae_msg);
-			sae_msg->session_id = session_id;
-			sae_msg->sae_status = sae_status;
-			sme_debug("SAE: sae_status %d session_id %d",
-				sae_msg->sae_status,
-				sae_msg->session_id);
-
-			sch_msg.type = eWNI_SME_SEND_SAE_MSG;
-			sch_msg.bodyptr = sae_msg;
-
-			qdf_status =
-				scheduler_post_message(QDF_MODULE_ID_SME,
-						       QDF_MODULE_ID_PE,
-						       QDF_MODULE_ID_PE,
-						      &sch_msg);
+			goto error;
 		}
-		sme_release_global_lock(&mac->sme);
+		sae_msg->message_type = eWNI_SME_SEND_SAE_MSG;
+		sae_msg->length = sizeof(*sae_msg);
+		sae_msg->session_id = session_id;
+		sae_msg->sae_status = sae_status;
+		sme_debug("SAE: sae_status %d session_id %d",
+			sae_msg->sae_status, sae_msg->session_id);
+
+		sch_msg.type = eWNI_SME_SEND_SAE_MSG;
+		sch_msg.bodyptr = sae_msg;
+
+		qdf_status = scheduler_post_message(QDF_MODULE_ID_SME,
+						    QDF_MODULE_ID_PE,
+						    QDF_MODULE_ID_PE,
+						    &sch_msg);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			qdf_mem_free(sae_msg);
+			goto error;
+		}
 	}
+
+error:
+	sme_release_global_lock(&mac->sme);
 
 	return qdf_status;
 }
