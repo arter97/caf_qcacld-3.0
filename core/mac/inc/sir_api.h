@@ -1032,9 +1032,9 @@ typedef struct sEsePEContext {
 /* Warning Do not add any new param in this struct */
 struct join_req {
 #ifndef FEATURE_CM_ENABLE
-	uint8_t vdev_id;
-	/* (Re) Association Request */
+	uint16_t messageType;   /* eWNI_SME_JOIN_REQ */
 	uint16_t length;
+	uint8_t vdev_id;
 	tSirMacSSid ssId;
 	tAniEdType UCEncryptionType;
 	enum ani_akm_type akm;
@@ -2581,6 +2581,7 @@ typedef struct {
 } tSirStatsExtEvent, *tpSirStatsExtEvent;
 #endif
 
+#ifndef FEATURE_CM_ENABLE
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 struct handoff_failure_ind {
 	uint8_t vdev_id;
@@ -2590,7 +2591,7 @@ struct handoff_failure_ind {
 struct roam_offload_synch_fail {
 	uint8_t session_id;
 };
-
+#endif
 #endif
 
 /**

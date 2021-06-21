@@ -2359,12 +2359,15 @@ static inline void hdd_update_wiphy_he_6ghz_capa(struct hdd_context *hdd_ctx)
 #if defined(CONFIG_BAND_6GHZ) && (defined(CFG80211_6GHZ_BAND_SUPPORTED) || \
       (KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE))
 static void
-hdd_update_wiphy_he_caps_6ghz(struct hdd_context *hdd_ctx)
+hdd_update_wiphy_he_caps_6ghz(struct hdd_context *hdd_ctx,
+			      tDot11fIEhe_cap *he_cap_cfg)
 {
 	struct ieee80211_supported_band *band_6g =
 		   hdd_ctx->wiphy->bands[HDD_NL80211_BAND_6GHZ];
 	uint8_t *phy_info =
 		    hdd_ctx->iftype_data_6g->he_cap.he_cap_elem.phy_cap_info;
+	uint8_t *mac_info_6g =
+		hdd_ctx->iftype_data_6g->he_cap.he_cap_elem.mac_cap_info;
 	uint8_t max_fw_bw = sme_get_vht_ch_width();
 
 	if (!band_6g || !phy_info) {
@@ -2387,13 +2390,20 @@ hdd_update_wiphy_he_caps_6ghz(struct hdd_context *hdd_ctx)
 		phy_info[0] |=
 		     IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G;
 
+	if (he_cap_cfg->twt_request)
+		mac_info_6g[0] |= IEEE80211_HE_MAC_CAP0_TWT_REQ;
+
+	if (he_cap_cfg->twt_responder)
+		mac_info_6g[0] |= IEEE80211_HE_MAC_CAP0_TWT_RES;
+
 	hdd_update_wiphy_he_6ghz_capa(hdd_ctx);
 
 	band_6g->iftype_data = hdd_ctx->iftype_data_6g;
 }
 #else
 static inline void
-hdd_update_wiphy_he_caps_6ghz(struct hdd_context *hdd_ctx)
+hdd_update_wiphy_he_caps_6ghz(struct hdd_context *hdd_ctx,
+			      tDot11fIEhe_cap *he_cap_cfg)
 {
 }
 #endif
@@ -2412,6 +2422,10 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 	uint32_t channel_bonding_mode_2g;
 	uint8_t *phy_info_2g =
 		    hdd_ctx->iftype_data_2g->he_cap.he_cap_elem.phy_cap_info;
+	uint8_t *mac_info_2g =
+		hdd_ctx->iftype_data_2g->he_cap.he_cap_elem.mac_cap_info;
+	uint8_t *mac_info_5g =
+		hdd_ctx->iftype_data_5g->he_cap.he_cap_elem.mac_cap_info;
 
 	status = ucfg_mlme_cfg_get_he_caps(hdd_ctx->psoc, &he_cap_cfg);
 
@@ -2430,6 +2444,12 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 		if (channel_bonding_mode_2g)
 			phy_info_2g[0] |=
 			    IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
+
+		if (he_cap_cfg.twt_request)
+			mac_info_2g[0] |= IEEE80211_HE_MAC_CAP0_TWT_REQ;
+
+		if (he_cap_cfg.twt_responder)
+			mac_info_2g[0] |= IEEE80211_HE_MAC_CAP0_TWT_RES;
 	}
 	if (band_5g) {
 		hdd_ctx->iftype_data_5g->types_mask =
@@ -2446,9 +2466,15 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 		if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
 			phy_info_5g[0] |=
 			     IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_80PLUS80_MHZ_IN_5G;
+
+		if (he_cap_cfg.twt_request)
+			mac_info_5g[0] |= IEEE80211_HE_MAC_CAP0_TWT_REQ;
+
+		if (he_cap_cfg.twt_responder)
+			mac_info_5g[0] |= IEEE80211_HE_MAC_CAP0_TWT_RES;
 	}
 
-	hdd_update_wiphy_he_caps_6ghz(hdd_ctx);
+	hdd_update_wiphy_he_caps_6ghz(hdd_ctx, &he_cap_cfg);
 }
 #else
 static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
@@ -3678,6 +3704,8 @@ static void hdd_nan_register_callbacks(struct hdd_context *hdd_ctx)
 
 	cb_obj.new_peer_ind = hdd_ndp_new_peer_handler;
 	cb_obj.peer_departed_ind = hdd_ndp_peer_departed_handler;
+
+	cb_obj.nan_concurrency_update = hdd_nan_concurrency_update;
 
 	os_if_nan_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 }
@@ -6924,10 +6952,6 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx, uint8_t sessio
 		hdd_nud_init_tracking(adapter);
 		hdd_mic_init_work(adapter);
 
-		/* This is temp ifdef will be removed in near future */
-#ifndef FEATURE_CM_ENABLE
-		qdf_mutex_create(&adapter->disconnection_status_lock);
-#endif
 		hdd_periodic_sta_stats_mutex_create(adapter);
 
 		break;
@@ -7029,6 +7053,11 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx, uint8_t sessio
 	qdf_event_create(&adapter->peer_cleanup_done);
 	hdd_sta_info_init(&adapter->sta_info_list);
 	hdd_sta_info_init(&adapter->cache_sta_info_list);
+
+	/* This is temp ifdef will be removed in near future */
+#ifndef FEATURE_CM_ENABLE
+	qdf_mutex_create(&adapter->disconnection_status_lock);
+#endif
 
 	for (i = 0; i < NET_DEV_HOLD_ID_MAX; i++)
 		qdf_atomic_init(
@@ -7291,7 +7320,6 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct hdd_station_ctx *sta_ctx;
 	struct sap_context *sap_ctx;
-	struct csr_roam_profile *roam_profile;
 	union iwreq_data wrqu;
 	tSirUpdateIE update_ie;
 	unsigned long rc;
@@ -7346,8 +7374,6 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 #endif
 		    ) {
 			INIT_COMPLETION(adapter->disconnect_comp_var);
-
-			roam_profile = hdd_roam_profile(adapter);
 			if (cds_is_driver_recovering())
 				reason = REASON_DEVICE_RECOVERY;
 
@@ -18822,9 +18848,7 @@ int hdd_get_rssi_snr_by_bssid(struct hdd_adapter *adapter, const uint8_t *bssid,
 {
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
-	struct csr_roam_profile *roam_profile;
 
-	roam_profile = hdd_roam_profile(adapter);
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 	status = sme_get_rssi_snr_by_bssid(mac_handle, bssid, rssi, snr);
 	if (QDF_STATUS_SUCCESS != status) {

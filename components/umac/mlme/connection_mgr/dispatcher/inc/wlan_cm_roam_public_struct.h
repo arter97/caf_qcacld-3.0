@@ -113,7 +113,12 @@
 #define MAX_BSSID_AVOID_LIST     16
 #define MAX_BSSID_FAVORED      16
 
+#if defined(FEATURE_CM_ENABLE) && defined(WLAN_FEATURE_HOST_ROAM)
+#define MAX_FTIE_SIZE CM_MAX_FTIE_SIZE
+#else
 #define MAX_FTIE_SIZE 384
+#endif
+
 #define ESE_MAX_TSPEC_IES 4
 
 /*
@@ -262,9 +267,25 @@ enum roam_fail_params {
 	ROAM_FAIL_REASON,
 };
 
+#if defined(FEATURE_CM_ENABLE) && defined(WLAN_FEATURE_HOST_ROAM)
+/**
+ * srtuct reassoc_timer_ctx - reassoc timer context
+ * @pdev: pdev object pointer
+ * @vdev_id: vdev id
+ * @cm_id: cm id to find cm_roam_req
+ */
+struct reassoc_timer_ctx {
+	struct wlan_objmgr_pdev *pdev;
+	uint8_t vdev_id;
+	wlan_cm_id cm_id;
+};
+#endif
+
 /**
  * struct rso_config - connect config to be used to send info in
  * RSO. This is the info we dont have in VDEV or CM ctx
+ * @reassoc_timer: reassoc timer
+ * @ctx: reassoc timer context
  * @cm_rso_lock: RSO lock
  * @rsn_cap: original rsn caps from the connect req from supplicant
  * @disable_hi_rssi: disable high rssi
@@ -309,6 +330,10 @@ enum roam_fail_params {
  * @lost_link_rssi: lost link RSSI
  */
 struct rso_config {
+#if defined(FEATURE_CM_ENABLE) && defined(WLAN_FEATURE_HOST_ROAM)
+	qdf_mc_timer_t reassoc_timer;
+	struct reassoc_timer_ctx ctx;
+#endif
 	qdf_mutex_t cm_rso_lock;
 	uint8_t rsn_cap;
 	bool disable_hi_rssi;
@@ -514,15 +539,21 @@ struct wlan_roam_offload_init_params {
  * qca_roam_scan_freq_scheme
  * @connected_rssi_threshold: RSSI threshold of the current
  * connected AP
- * @candidate_rssi_threshold: RSSI threshold of the
- * candidate AP
+ * @candidate_rssi_threshold_2g: RSSI threshold of the
+ * candidate AP in 2.4Ghz band
+ * @candidate_rssi_threshold_5g: RSSI threshold of the candidate AP in 5Ghz
+ * band
+ * @candidate_rssi_threshold_6g: RSSI threshold of the candidate AP in 6Ghz
+ * band
  * @user_roam_reason: Roam triggered reason code, value zero is for enable
  * and non zero value is disable
  */
 struct wlan_cm_roam_vendor_btm_params {
 	uint32_t scan_freq_scheme;
 	uint32_t connected_rssi_threshold;
-	uint32_t candidate_rssi_threshold;
+	uint32_t candidate_rssi_threshold_2g;
+	uint32_t candidate_rssi_threshold_5g;
+	uint32_t candidate_rssi_threshold_6g;
 	uint32_t user_roam_reason;
 };
 

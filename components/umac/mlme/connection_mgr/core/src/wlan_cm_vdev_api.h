@@ -346,22 +346,6 @@ QDF_STATUS
 cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
 			    struct qdf_mac_addr *peer_mac);
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-/**
- * cm_csr_roam_sync_rsp() - Connection manager ext roam sync resp indication
- * @vdev: VDEV object
- * @rsp: Connection vdev response
- *
- * This API is to update legacy struct and should be removed once
- * CSR is cleaned up fully. No new params should be added to CSR, use
- * vdev/pdev/psoc instead.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS cm_csr_roam_sync_rsp(struct wlan_objmgr_vdev *vdev,
-				struct cm_vdev_join_rsp *rsp);
-#endif
-
 /**
  * cm_csr_connect_rsp() - Connection manager ext connect resp indication
  * @vdev: VDEV object
@@ -516,6 +500,14 @@ QDF_STATUS cm_send_vdev_down_req(struct wlan_objmgr_vdev *vdev);
 void cm_free_join_req(struct cm_vdev_join_req *join_req);
 
 /**
+ * cm_flush_join_req() - Process join req flush
+ * @msg: scheduler message
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg);
+
+/**
  * cm_process_join_req() - Process vdev join req
  * @msg: scheduler message
  *
@@ -526,6 +518,16 @@ void cm_free_join_req(struct cm_vdev_join_req *join_req);
 QDF_STATUS cm_process_join_req(struct scheduler_msg *msg);
 
 #ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * cm_process_preauth_req() - Process preauth request
+ * @msg: scheduler message
+ *
+ * Process preauth request in LIM.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_process_preauth_req(struct scheduler_msg *msg);
+
 /**
  * cm_process_reassoc_req() - Process vdev reassoc req
  * @msg: scheduler message
@@ -547,14 +549,45 @@ QDF_STATUS cm_process_reassoc_req(struct scheduler_msg *msg);
 QDF_STATUS
 cm_handle_reassoc_req(struct wlan_objmgr_vdev *vdev,
 		      struct wlan_cm_vdev_reassoc_req *req);
+
+/**
+ * cm_handle_roam_start() - roam start indication
+ * @vdev: VDEV object
+ * @req: Connection manager roam request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_handle_roam_start(struct wlan_objmgr_vdev *vdev,
+		     struct wlan_cm_roam_req *req);
+
+/**
+ * cm_csr_preauth_done() - Process preauth done from csr part
+ * @vdev: vdev object pointer
+ *
+ * Return: void
+ */
+void cm_csr_preauth_done(struct wlan_objmgr_vdev *vdev);
 #else
+static inline QDF_STATUS cm_process_preauth_req(struct scheduler_msg *msg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline QDF_STATUS cm_process_reassoc_req(struct scheduler_msg *msg)
 {
 	return QDF_STATUS_SUCCESS;
 }
+
 static inline QDF_STATUS
 cm_handle_reassoc_req(struct wlan_objmgr_vdev *vdev,
 		      struct wlan_cm_vdev_reassoc_req *req)
+{
+	return QDF_STATUS_SUCCESS;
+}
+static inline QDF_STATUS
+cm_handle_roam_start(struct wlan_objmgr_vdev *vdev,
+		     struct wlan_cm_roam_req *req)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -637,6 +670,5 @@ QDF_STATUS wlan_cm_send_connect_rsp(struct scheduler_msg *msg);
  * Return: void
  */
 void wlan_cm_free_connect_rsp(struct cm_vdev_join_rsp *rsp);
-
 #endif /* FEATURE_CM_ENABLE */
 #endif /* __WLAN_CM_VDEV_API_H__ */

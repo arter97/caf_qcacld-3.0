@@ -1249,6 +1249,19 @@ UMAC_INTERFACE_MGR_OBJS := $(UMAC_INTERFACE_MGR_CMN_DIR)/src/wlan_if_mgr_main.o 
 
 $(call add-wlan-objs,umac_ifmgr,$(UMAC_INTERFACE_MGR_OBJS))
 
+###### UMAC MLO_MGR ########
+UMAC_MLO_MGR_CMN_DIR :=	$(WLAN_COMMON_ROOT)/umac/mlo_mgr
+
+UMAC_MLO_MGR_INC := -I$(WLAN_COMMON_INC)/umac/mlo_mgr/inc
+
+ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
+UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_if_mgr_cmn.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_if_mgr_sta.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_if_mgr_ap.o
+
+$(call add-wlan-objs,umac_ifmgr,$(UMAC_INTERFACE_MGR_OBJS))
+endif
 ########## POWER MANAGEMENT OFFLOADS (PMO) ##########
 PMO_DIR :=	components/pmo
 PMO_INC :=	-I$(WLAN_ROOT)/$(PMO_DIR)/core/inc \
@@ -1458,6 +1471,14 @@ ifeq ($(CONFIG_QCACLD_WLAN_LFR3), y)
 MLME_OBJS +=    $(CM_TGT_IF_DIR)/src/target_if_cm_roam_event.o \
 		$(CM_DIR)/core/src/wlan_cm_roam_fw_sync.o \
 		$(CM_DIR)/core/src/wlan_cm_roam_offload_event.o
+endif
+
+ifeq ($(CONFIG_CM_ENABLE), y)
+ifeq ($(CONFIG_QCACLD_WLAN_LFR2), y)
+# Add LFR2/host roam specific connection manager files here
+MLME_OBJS +=    $(CM_DIR)/core/src/wlan_cm_host_roam_preauth.o \
+		$(CM_DIR)/core/src/wlan_cm_host_util.o
+endif
 endif
 
 ####### WFA_CONFIG ########
@@ -2711,6 +2732,7 @@ INCS +=		$(UMAC_TARGET_GPIO_INC)
 INCS +=		$(UMAC_DBR_INC)
 INCS +=		$(UMAC_CRYPTO_INC)
 INCS +=		$(UMAC_INTERFACE_MGR_INC)
+INCS +=		$(UMAC_MLO_MGR_INC)
 INCS +=		$(COEX_OS_IF_INC)
 INCS +=		$(COEX_TGT_INC)
 INCS +=		$(COEX_DISPATCHER_INC)
@@ -3091,6 +3113,7 @@ cppflags-$(CONFIG_LL_DP_SUPPORT) += -DCONFIG_LL_DP_SUPPORT
 cppflags-$(CONFIG_LL_DP_SUPPORT) += -DWLAN_FULL_REORDER_OFFLOAD
 cppflags-$(CONFIG_WLAN_FEATURE_BIG_DATA_STATS) += -DWLAN_FEATURE_BIG_DATA_STATS
 cppflags-$(CONFIG_WLAN_FEATURE_IGMP_OFFLOAD) += -DWLAN_FEATURE_IGMP_OFFLOAD
+cppflags-$(CONFIG_WLAN_FEATURE_GET_USABLE_CHAN_LIST) += -DWLAN_FEATURE_GET_USABLE_CHAN_LIST
 
 # For PCIe GEN switch
 cppflags-$(CONFIG_PCIE_GEN_SWITCH) += -DPCIE_GEN_SWITCH
@@ -3472,6 +3495,7 @@ cppflags-$(CONFIG_MAX_ALLOC_PAGE_SIZE) += -DMAX_ALLOC_PAGE_SIZE
 cppflags-$(CONFIG_DELIVERY_TO_STACK_STATUS_CHECK) += -DDELIVERY_TO_STACK_STATUS_CHECK
 cppflags-$(CONFIG_WLAN_TRACE_HIDE_MAC_ADDRESS) += -DWLAN_TRACE_HIDE_MAC_ADDRESS
 cppflags-$(CONFIG_WLAN_FEATURE_11BE) += -DWLAN_FEATURE_11BE
+cppflags-$(CONFIG_WLAN_FEATURE_11BE_MLO) += -DWLAN_FEATURE_11BE_MLO
 
 cppflags-$(CONFIG_LITHIUM) += -DFIX_TXDMA_LIMITATION
 cppflags-$(CONFIG_LITHIUM) += -DFEATURE_AST

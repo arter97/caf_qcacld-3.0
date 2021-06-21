@@ -2868,7 +2868,6 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	struct net_device *ndev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	int status;
-	struct hdd_station_ctx *sta_ctx;
 	static bool is_rate_limited;
 
 	hdd_enter_dev(ndev);
@@ -2891,8 +2890,7 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
 	case QDF_P2P_CLIENT_MODE:
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-		if (sta_ctx->hdd_reassoc_scenario) {
+		if (hdd_cm_is_vdev_roaming(adapter)) {
 			hdd_debug("Roaming is in progress, rej this req");
 			return -EINVAL;
 		}
@@ -3105,15 +3103,15 @@ int hdd_wlan_fake_apps_suspend(struct wiphy *wiphy, struct net_device *dev,
 
 	if (pause_setting < WOW_INTERFACE_PAUSE_DEFAULT ||
 	    pause_setting >= WOW_INTERFACE_PAUSE_COUNT) {
-		hdd_err("Invalid interface pause %d (expected range [0, 2])",
-			pause_setting);
+		hdd_err_rl("Invalid interface pause %d (expected range [0, 2])",
+			   pause_setting);
 		return -EINVAL;
 	}
 
 	if (resume_setting < WOW_RESUME_TRIGGER_DEFAULT ||
 	    resume_setting >= WOW_RESUME_TRIGGER_COUNT) {
-		hdd_err("Invalid resume trigger %d (expected range [0, 2])",
-			resume_setting);
+		hdd_err_rl("Invalid resume trigger %d (expected range [0, 2])",
+			   resume_setting);
 		return -EINVAL;
 	}
 

@@ -689,7 +689,7 @@ out:
  * populate_dot11f_ds_params() - To populate DS IE params
  * mac_ctx: Pointer to global mac context
  * dot11f_param: pointer to DS params IE
- * channel: channel number
+ * freq: freq
  *
  * This routine will populate DS param in management frame like
  * beacon, probe response, and etc.
@@ -698,11 +698,13 @@ out:
  */
 QDF_STATUS
 populate_dot11f_ds_params(struct mac_context *mac_ctx,
-			  tDot11fIEDSParams *dot11f_param, uint8_t channel)
+			  tDot11fIEDSParams *dot11f_param, qdf_freq_t freq)
 {
-	if (IS_24G_CH(channel)) {
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq)) {
 		/* .11b/g mode PHY => Include the DS Parameter Set IE: */
-		dot11f_param->curr_channel = channel;
+		dot11f_param->curr_channel = wlan_reg_freq_to_chan(
+								mac_ctx->pdev,
+								freq);
 		dot11f_param->present = 1;
 	}
 
@@ -3358,35 +3360,6 @@ QDF_STATUS wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,
 	return QDF_STATUS_SUCCESS;
 }
 
-static void
-sir_get_iot_aggr_sz(struct mac_context *mac, uint8_t *ie_ptr, uint32_t ie_len,
-		    uint32_t *amsdu_sz, uint32_t *ampdu_sz)
-{
-	const uint8_t *oui, *vendor_ie;
-	struct wlan_mlme_iot *iot;
-	uint32_t oui_len, aggr_num;
-	int i;
-
-	iot = &mac->mlme_cfg->iot;
-	aggr_num = iot->aggr_num;
-	if (!aggr_num)
-		return;
-
-	for (i = 0; i < aggr_num; i++) {
-		oui = iot->aggr[i].oui;
-		oui_len = iot->aggr[i].oui_len;
-		vendor_ie = wlan_get_vendor_ie_ptr_from_oui(oui, oui_len,
-							    ie_ptr, ie_len);
-		if (vendor_ie) {
-			*amsdu_sz = iot->aggr[i].amsdu_sz;
-			*ampdu_sz = iot->aggr[i].ampdu_sz;
-			pe_debug("Found oui[%s] amsdu %u, ampdu %u",
-				 oui, *amsdu_sz, *ampdu_sz);
-			break;
-		}
-	}
-}
-
 QDF_STATUS
 sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 				     struct pe_session *session_entry,
@@ -3554,10 +3527,6 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 		qdf_mem_copy(&pAssocRsp->FTInfo, &ar->FTInfo,
 			     sizeof(tDot11fIEFTInfo));
 	}
-
-	sir_get_iot_aggr_sz(mac, ie_ptr, ie_len,
-			    &pAssocRsp->iot_amsdu_sz,
-			    &pAssocRsp->iot_ampdu_sz);
 
 	if (ar->num_RICDataDesc && ar->num_RICDataDesc <= 2) {
 		for (cnt = 0; cnt < ar->num_RICDataDesc; cnt++) {
@@ -6431,9 +6400,9 @@ populate_dot11f_timing_advert_frame(struct mac_context *mac_ctx,
 #ifdef WLAN_FEATURE_11AX
 #ifdef WLAN_SUPPORT_TWT
 static void
-populate_dot11f_broadcast_twt_he_cap(struct mac_context *mac,
-				     struct pe_session *session,
-				     tDot11fIEhe_cap *he_cap)
+populate_dot11f_twt_he_cap(struct mac_context *mac,
+			   struct pe_session *session,
+			   tDot11fIEhe_cap *he_cap)
 {
 	bool bcast_requestor =
 		mac->mlme_cfg->twt_cfg.is_bcast_requestor_enabled;
@@ -6441,6 +6410,17 @@ populate_dot11f_broadcast_twt_he_cap(struct mac_context *mac,
 		mac->mlme_cfg->twt_cfg.is_bcast_responder_enabled;
 
 	he_cap->broadcast_twt = 0;
+	if (session->opmode == QDF_STA_MODE &&
+	    !(mac->mlme_cfg->twt_cfg.req_flag)) {
+		/* Set twt_request as 0 if any SCC/MCC concurrency exist */
+		he_cap->twt_request = 0;
+		return;
+	} else if (session->opmode == QDF_SAP_MODE &&
+		   !(mac->mlme_cfg->twt_cfg.res_flag)) {
+		/** Set twt_responder as 0 if any SCC/MCC concurrency exist */
+		he_cap->twt_responder = 0;
+		return;
+	}
 
 	if (session->opmode == QDF_STA_MODE) {
 		he_cap->broadcast_twt = bcast_requestor;
@@ -6450,9 +6430,9 @@ populate_dot11f_broadcast_twt_he_cap(struct mac_context *mac,
 }
 #else
 static inline void
-populate_dot11f_broadcast_twt_he_cap(struct mac_context *mac_ctx,
-				     struct pe_session *session,
-				     tDot11fIEhe_cap *he_cap)
+populate_dot11f_twt_he_cap(struct mac_context *mac_ctx,
+			   struct pe_session *session,
+			   tDot11fIEhe_cap *he_cap)
 {
 	he_cap->broadcast_twt = 0;
 }
@@ -6500,7 +6480,7 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 	} else {
 		he_cap->ppet.ppe_threshold.num_ppe_th = 0;
 	}
-	populate_dot11f_broadcast_twt_he_cap(mac_ctx, session, he_cap);
+	populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -6662,11 +6642,13 @@ QDF_STATUS populate_dot11f_twt_extended_caps(struct mac_context *mac_ctx,
 
 	if (pe_session->opmode == QDF_STA_MODE)
 		p_ext_cap->twt_requestor_support =
-			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request;
+			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request &&
+			mac_ctx->mlme_cfg->twt_cfg.req_flag;
 
 	if (pe_session->opmode == QDF_SAP_MODE)
 		p_ext_cap->twt_responder_support =
-			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_responder;
+			mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_responder &&
+			mac_ctx->mlme_cfg->twt_cfg.res_flag;
 
 	dot11f->num_bytes = lim_compute_ext_cap_ie_length(dot11f);
 

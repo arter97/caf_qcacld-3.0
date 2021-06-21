@@ -25,7 +25,11 @@
 #include <cds_sched.h>
 
 /* Timeout in ms to wait for a DP rx thread */
+#ifdef HAL_CONFIG_SLUB_DEBUG_ON
+#define DP_RX_THREAD_WAIT_TIMEOUT 4000
+#else
 #define DP_RX_THREAD_WAIT_TIMEOUT 2000
+#endif
 
 #define DP_RX_TM_DEBUG 0
 #if DP_RX_TM_DEBUG
@@ -276,10 +280,10 @@ static QDF_STATUS dp_rx_tm_thread_enqueue(struct dp_rx_thread *rx_thread,
 		num_elements_in_nbuf--;
 		next_ptr_list = head_ptr->next;
 		qdf_nbuf_set_next(head_ptr, NULL);
-		qdf_nbuf_queue_head_enqueue_tail(&rx_thread->nbuf_queue,
-						 head_ptr);
 		/* count aggregated RX frame into enqueued stats */
 		nbuf_queued += qdf_nbuf_get_gso_segs(head_ptr);
+		qdf_nbuf_queue_head_enqueue_tail(&rx_thread->nbuf_queue,
+						 head_ptr);
 		head_ptr = next_ptr_list;
 	}
 
@@ -657,7 +661,6 @@ static int dp_rx_refill_thread_loop(void *arg)
 		qdf_get_current_pid());
 	while (!shutdown) {
 		/* This implements the execution model algorithm */
-		dp_debug("refill thread sleeping");
 		status =
 		    qdf_wait_queue_interruptible
 				(rx_thread->wait_q,
@@ -665,7 +668,6 @@ static int dp_rx_refill_thread_loop(void *arg)
 						     &rx_thread->event_flag) ||
 				 qdf_atomic_test_bit(RX_REFILL_SUSPEND_EVENT,
 						     &rx_thread->event_flag));
-		dp_debug("refill thread woken up");
 
 		if (status == -ERESTARTSYS) {
 			QDF_DEBUG_PANIC("wait_event_interruptible returned -ERESTARTSYS");

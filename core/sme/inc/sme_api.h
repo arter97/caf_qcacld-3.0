@@ -2854,7 +2854,6 @@ void sme_send_hlp_ie_info(mac_handle_t mac_handle, uint8_t vdev_id,
  * sme_send_rso_connect_params() - Updates the assoc IEs to csr_roam_session
  * @mac_handle: Opaque handle to the global MAC context
  * @vdev_id: vdev id
- * @src_profile: CSR Roam profile
  *
  * When the user space updates the assoc IEs or FILS auth type or FILS ERP info,
  * host driver needs to send these updated parameters to firmware via
@@ -2863,8 +2862,7 @@ void sme_send_hlp_ie_info(mac_handle_t mac_handle, uint8_t vdev_id,
  * Return: None
  */
 QDF_STATUS sme_send_rso_connect_params(mac_handle_t mac_handle,
-				       uint8_t vdev_id,
-				       struct csr_roam_profile *src_profile);
+				       uint8_t vdev_id);
 
 #if defined(WLAN_FEATURE_FILS_SK)
 #ifndef FEATURE_CM_ENABLE
@@ -3812,6 +3810,19 @@ QDF_STATUS sme_del_dialog_cmd(mac_handle_t mac_handle,
 			      struct wmi_twt_del_dialog_param *twt_params);
 
 /**
+ * sme_sap_del_dialog_cmd() - Register callback and send TWT del dialog
+ * command to firmware
+ * @mac_handle: MAC handle
+ * @twt_del_dialog_cb: Function callback to handle del_dialog event
+ * @twt_params: TWT del dialog parameters
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS sme_sap_del_dialog_cmd(mac_handle_t mac_handle,
+				  twt_del_dialog_cb del_dialog_cb,
+				  struct wmi_twt_del_dialog_param *twt_params);
+
+/**
  * sme_pause_dialog_cmd() - Register callback and send TWT pause dialog
  * command to firmware
  * @mac_handle: MAC handle
@@ -3849,6 +3860,15 @@ sme_nudge_dialog_cmd(mac_handle_t mac_handle,
 QDF_STATUS
 sme_resume_dialog_cmd(mac_handle_t mac_handle,
 		      struct wmi_twt_resume_dialog_cmd_param *twt_params);
+
+/**
+ * sme_twt_update_beacon_template() - API to send beacon update to fw
+ * @mac_handle: MAC handle
+ *
+ * Return: None
+ */
+void sme_twt_update_beacon_template(mac_handle_t mac_handle);
+
 #else
 
 static inline
@@ -3862,6 +3882,12 @@ sme_test_config_twt_terminate(struct wmi_twt_del_dialog_param *params)
 {
 	return QDF_STATUS_E_FAILURE;
 }
+
+static inline
+void sme_twt_update_beacon_template(mac_handle_t mac_handle)
+{
+}
+
 #endif
 
 #ifdef WLAN_UNIT_TEST

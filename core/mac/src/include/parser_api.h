@@ -485,8 +485,6 @@ typedef struct sSirAssocRsp {
 	uint16_t hlp_data_len;
 	uint8_t hlp_data[FILS_MAX_HLP_DATA_LEN];
 #endif
-	uint32_t iot_amsdu_sz;
-	uint32_t iot_ampdu_sz;
 } tSirAssocRsp, *tpSirAssocRsp;
 
 #ifdef FEATURE_WLAN_ESE
@@ -732,7 +730,7 @@ populate_dot11f_country(struct mac_context *mac,
 /* Populated a populate_dot11f_ds_params */
 QDF_STATUS
 populate_dot11f_ds_params(struct mac_context *mac,
-			tDot11fIEDSParams *pDot11f, uint8_t channel);
+			tDot11fIEDSParams *pDot11f, qdf_freq_t freq);
 
 /* / Populated a tDot11fIEEDCAParamSet */
 void

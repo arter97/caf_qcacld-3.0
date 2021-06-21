@@ -275,6 +275,26 @@ static void wma_update_num_peers_tids(t_wma_handle *wma_handle,
 						 tgt_cfg->num_vdevs);
 }
 
+#ifdef FEATURE_WDS
+/**
+ * wma_set_peer_map_unmap_v2_config() - Update peer_map_unmap_v2
+ * @tgt_cfg: Resource config given to target
+ *
+ * This function enables Peer map/unmap v2 feature.
+ *
+ * Return: none
+ */
+static void wma_set_peer_map_unmap_v2_config(target_resource_config *tgt_cfg)
+{
+	tgt_cfg->peer_map_unmap_v2 = true;
+}
+#else
+static void wma_set_peer_map_unmap_v2_config(target_resource_config *tgt_cfg)
+{
+	tgt_cfg->peer_map_unmap_v2 = false;
+}
+#endif
+
 /**
  * wma_set_default_tgt_config() - set default tgt config
  * @wma_handle: wma handle
@@ -365,6 +385,7 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 				     &tgt_cfg->max_ndp_sessions);
 
 	wma_set_ipa_disable_config(tgt_cfg);
+	wma_set_peer_map_unmap_v2_config(tgt_cfg);
 }
 
 /**
@@ -8759,12 +8780,12 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		break;
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifndef FEATURE_CM_ENABLE
 	case WMA_ROAM_OFFLOAD_SYNCH_FAIL:
 		wma_process_roam_synch_fail(wma_handle,
 			(struct roam_offload_synch_fail *)msg->bodyptr);
 		qdf_mem_free(msg->bodyptr);
 		break;
-#ifndef FEATURE_CM_ENABLE
 	case SIR_HAL_ROAM_INVOKE:
 		wma_debug("SIR_HAL_ROAM_INVOKE - wma_process_roam_invoke");
 		wma_process_roam_invoke(wma_handle,

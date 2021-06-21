@@ -96,6 +96,7 @@
 #include "ftm_time_sync_ucfg_api.h"
 #include <wlan_hdd_dcs.h>
 #include "wlan_tdls_ucfg_api.h"
+#include "wlan_mlme_twt_ucfg_api.h"
 #include "wlan_if_mgr_ucfg_api.h"
 #include "wlan_if_mgr_public_struct.h"
 #include "wlan_hdd_bootup_marker.h"
@@ -3988,18 +3989,7 @@ int wlan_hdd_set_channel(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if ((adapter->device_mode == QDF_STA_MODE) ||
-	    (adapter->device_mode == QDF_P2P_CLIENT_MODE)) {
-		struct csr_roam_profile *roam_profile;
-		struct hdd_station_ctx *sta_ctx =
-			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
-		roam_profile = hdd_roam_profile(adapter);
-		num_ch = roam_profile->ChannelInfo.numOfChannels = 1;
-		sta_ctx->conn_info.chan_freq = chandef->chan->center_freq;
-		roam_profile->ChannelInfo.freq_list =
-			&sta_ctx->conn_info.chan_freq;
-	} else if (adapter->device_mode == QDF_SAP_MODE ||
+	if (adapter->device_mode == QDF_SAP_MODE ||
 		   adapter->device_mode == QDF_P2P_GO_MODE) {
 		sap_config = &((WLAN_HDD_GET_AP_CTX_PTR(adapter))->sap_config);
 		sap_config->chan_freq = chandef->chan->center_freq;
@@ -5741,20 +5731,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	if (!cds_is_sub_20_mhz_enabled())
 		wlan_hdd_set_sap_hwmode(adapter);
 
-#ifdef WLAN_FEATURE_11BE_MLO
-	if (config->SapHw_mode == eCSR_DOT11_MODE_11be ||
-	    config->SapHw_mode == eCSR_DOT11_MODE_11be_ONLY) {
-		wlan_vdev_mlme_set_mlo_flag(adapter->vdev);
-		mlo_sap_update_with_config(); //TD
-	}
-
-	if (!policy_mgr_is_mlo_sap_concurrency_allowed(
-		hdd_ctx->psoc, wlan_vdev_mlme_is_mlo_sap(adapter->vdev))) {
-		hdd_err("MLO SAP concurrency check fails");
-		ret = -EINVAL;
-		goto error;
-	}
-#endif
 	status = ucfg_mlme_get_vht_for_24ghz(hdd_ctx->psoc, &bval);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		hdd_err("Failed to get vht_for_24ghz");
@@ -5980,6 +5956,7 @@ error:
 	wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_ALL);
 
 free:
+	wlan_twt_concurrency_update(hdd_ctx);
 	if (deliver_start_evt) {
 		status = ucfg_if_mgr_deliver_event(
 					adapter->vdev,
@@ -6140,6 +6117,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 						adapter->vdev_id);
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    false);
+		wlan_twt_concurrency_update(hdd_ctx);
 		status = ucfg_if_mgr_deliver_event(adapter->vdev,
 				WLAN_IF_MGR_EV_AP_STOP_BSS_COMPLETE,
 				NULL);
@@ -6496,6 +6474,25 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#if defined(WLAN_SUPPORT_TWT) && \
+	(LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+static void
+wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
+			      struct cfg80211_ap_settings *params)
+{
+	ucfg_mlme_set_twt_responder(hdd_ctx->psoc, params->twt_responder);
+	if (params->twt_responder)
+		hdd_send_twt_responder_enable_cmd(hdd_ctx);
+	else
+		hdd_send_twt_responder_disable_cmd(hdd_ctx);
+}
+#else
+static inline void
+wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
+			      struct cfg80211_ap_settings *params)
+{}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_start_ap() - start soft ap mode
  * @wiphy: Pointer to wiphy structure
@@ -6792,6 +6789,12 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 		}
 		adapter->session.ap.sap_config.ch_width_orig =
 						chandef->width;
+
+		/*
+		 * Enable/disable TWT responder based on
+		 * the twt_responder flag
+		 */
+		wlan_hdd_update_twt_responder(hdd_ctx, params);
 
 		hdd_place_marker(adapter, "TRY TO START", NULL);
 		status =

@@ -1639,6 +1639,58 @@ bool policy_mgr_is_scc_with_this_vdev_id(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
+bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc)
+{
+	uint32_t num_connections = 0;
+	bool is_scc = false;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return is_scc;
+	}
+
+	num_connections = policy_mgr_get_connection_count(psoc);
+
+	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+	switch (num_connections) {
+	case 1:
+		break;
+	case 2:
+		if (pm_conc_connection_list[0].freq ==
+		    pm_conc_connection_list[1].freq &&
+		    pm_conc_connection_list[0].mac ==
+		    pm_conc_connection_list[1].mac) {
+			is_scc = true;
+		}
+		break;
+	case 3:
+		if (policy_mgr_is_current_hwmode_dbs(psoc) &&
+		    (pm_conc_connection_list[0].freq ==
+		     pm_conc_connection_list[1].freq ||
+		     pm_conc_connection_list[0].freq ==
+		     pm_conc_connection_list[2].freq ||
+		     pm_conc_connection_list[1].freq ==
+		     pm_conc_connection_list[2].freq)) {
+			is_scc = true;
+		} else if ((pm_conc_connection_list[0].freq ==
+			    pm_conc_connection_list[1].freq) &&
+			   (pm_conc_connection_list[0].freq ==
+			   pm_conc_connection_list[2].freq)) {
+			is_scc = true;
+		}
+		break;
+	default:
+		policy_mgr_debug("unexpected num_connections value %d",
+				 num_connections);
+		break;
+	}
+	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+
+	return is_scc;
+}
+
 bool policy_mgr_current_concurrency_is_mcc(struct wlan_objmgr_psoc *psoc)
 {
 	uint32_t num_connections = 0;
@@ -2512,6 +2564,7 @@ bool policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
 		 conn_index++) {
 		if (pm_conc_connection_list[conn_index].in_use) {
+			vdev_id = pm_conc_connection_list[conn_index].vdev_id;
 			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
 					psoc, vdev_id, WLAN_POLICY_MGR_ID);
 			if (!vdev) {
@@ -2520,7 +2573,7 @@ bool policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 				return ret;
 			}
-			if (wlan_vdev_mlme_is_mlo_sap(vdev))
+			if (wlan_vdev_mlme_is_mlo_ap(vdev))
 				mlo_sap_count++;
 			else
 				non_mlo_sap_count++;
