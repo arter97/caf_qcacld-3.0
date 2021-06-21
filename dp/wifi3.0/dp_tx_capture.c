@@ -2284,7 +2284,7 @@ QDF_STATUS dp_tx_print_bitmap(struct dp_pdev *pdev,
 	start_seq = user->start_seq;
 	num_mpdu = user->mpdu_success;
 
-	if (user->tid > DP_MAX_TIDS) {
+	if (user->tid >= DP_MAX_TIDS) {
 		dp_tx_capture_err("%pK: ppdu[%d] peer_id[%d] TID[%d] > NON_QOS_TID!",
 				  pdev->soc, ppdu_id, user->peer_id, user->tid);
 
