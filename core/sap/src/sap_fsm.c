@@ -1147,13 +1147,14 @@ sap_find_valid_concurrent_session(mac_handle_t mac_handle)
 	return NULL;
 }
 
-static QDF_STATUS sap_clear_global_dfs_param(mac_handle_t mac_handle)
+static QDF_STATUS sap_clear_global_dfs_param(mac_handle_t mac_handle,
+					     struct sap_context *sap_ctx)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	struct sap_context *sap_ctx;
+	struct sap_context *con_sap_ctx;
 
-	sap_ctx = sap_find_valid_concurrent_session(mac_handle);
-	if (sap_ctx && WLAN_REG_IS_5GHZ_CH(sap_ctx->channel)) {
+	con_sap_ctx = sap_find_valid_concurrent_session(mac_handle);
+	if (con_sap_ctx && WLAN_REG_IS_5GHZ_CH(con_sap_ctx->channel)) {
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_DEBUG,
 			  "conc session exists, no need to clear dfs struct");
 		return QDF_STATUS_SUCCESS;
@@ -1164,12 +1165,7 @@ static QDF_STATUS sap_clear_global_dfs_param(mac_handle_t mac_handle)
 	 * immediately once the radar detected or timedout. So
 	 * as per design CAC timer should be destroyed after stop
 	 */
-	if (mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running) {
-		qdf_mc_timer_stop(&mac_ctx->sap.SapDfsInfo.sap_dfs_cac_timer);
-		mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running = 0;
-		qdf_mc_timer_destroy(
-			&mac_ctx->sap.SapDfsInfo.sap_dfs_cac_timer);
-	}
+	wlansap_cleanup_cac_timer(sap_ctx);
 	mac_ctx->sap.SapDfsInfo.cac_state = eSAP_DFS_DO_NOT_SKIP_CAC;
 	sap_cac_reset_notify(mac_handle);
 	qdf_mem_zero(&mac_ctx->sap, sizeof(mac_ctx->sap));
@@ -1263,7 +1259,7 @@ QDF_STATUS sap_clear_session_param(mac_handle_t mac_handle,
 	mac_ctx->sap.sapCtxList[sapctx->sessionId].sap_context = NULL;
 	mac_ctx->sap.sapCtxList[sapctx->sessionId].sapPersona =
 		QDF_MAX_NO_OF_MODE;
-	sap_clear_global_dfs_param(mac_handle);
+	sap_clear_global_dfs_param(mac_handle, sapctx);
 	sap_free_roam_profile(&sapctx->csr_roamProfile);
 	qdf_mem_zero(sapctx, sizeof(*sapctx));
 	sapctx->sessionId = WLAN_UMAC_VDEV_ID_MAX;
