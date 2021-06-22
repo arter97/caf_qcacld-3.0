@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,11 +24,12 @@
 #include "qdf_trace.h"
 #include "qdf_nbuf.h"
 #include "hal_api_mon.h"
-#include "dp_rx_mon.h"
 #include "dp_internal.h"
 #include "qdf_mem.h"   /* qdf_mem_malloc,free */
 #include "wlan_cfg.h"
 #include "dp_htt.h"
+#include "dp_mon.h"
+#include "dp_rx_mon.h"
 #include "dp_mon_filter.h"
 
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
@@ -421,24 +422,27 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 	struct cdp_rx_indication_mpdu *mpdu_ind;
 	struct cdp_rx_indication_mpdu_info *mpdu_info;
 	struct msdu_list *msdu_list;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
 	user = 0;
-	mpdu_q = &pdev->mpdu_q[user];
+	mpdu_q = &mon_pdev->mpdu_q[user];
 
 	while (!qdf_nbuf_is_queue_empty(mpdu_q) && user < MAX_MU_USERS) {
-		msdu_list = &pdev->msdu_list[user];
+		msdu_list = &mon_pdev->msdu_list[user];
 		dp_rx_free_msdu_list(msdu_list);
-		pdev->is_mpdu_hdr[user] = true;
+		mon_pdev->is_mpdu_hdr[user] = true;
 
-		if (pdev->rx_enh_capture_peer &&
+		if (mon_pdev->rx_enh_capture_peer &&
 		    !dp_rx_enh_capture_is_peer_enabled(
 				soc, ppdu_info, user)) {
 			qdf_nbuf_queue_free(mpdu_q);
 		} else {
-			mpdu_ind = &pdev->mpdu_ind;
+			mpdu_ind = &mon_pdev->mpdu_ind;
 			mpdu_info = &mpdu_ind->mpdu_info;
-			dp_rx_populate_cdp_indication_mpdu_info(
-				pdev, &pdev->ppdu_info, mpdu_info, user);
+			if (mon_pdev)
+				dp_rx_populate_cdp_indication_mpdu_info(
+					pdev, &mon_pdev->ppdu_info,
+					mpdu_info, user);
 
 			while ((mpdu_head = qdf_nbuf_queue_remove(mpdu_q))) {
 				mpdu_ind->nbuf = mpdu_head;
@@ -453,7 +457,7 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 			}
 		}
 		user++;
-		mpdu_q = &pdev->mpdu_q[user];
+		mpdu_q = &mon_pdev->mpdu_q[user];
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -480,8 +484,9 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 	uint32_t user_id;
 	struct dp_soc *soc;
 	qdf_nbuf_t mpdu_head;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
-	if (pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED)
+	if (mon_pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED)
 		return;
 
 	user_id = ppdu_info->user_id;
@@ -490,9 +495,9 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 		return;
 
 	if ((tlv_status == HAL_TLV_STATUS_HEADER) && (
-	    (pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_MPDU_MSDU) ||
-	    ((pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_MPDU) &&
-	    pdev->is_mpdu_hdr[user_id]))) {
+	    (mon_pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_MPDU_MSDU) ||
+	    ((mon_pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_MPDU) &&
+	    mon_pdev->is_mpdu_hdr[user_id]))) {
 		if (*nbuf_used) {
 			nbuf = qdf_nbuf_clone(status_nbuf);
 		} else {
@@ -507,7 +512,7 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 		dp_nbuf_set_data_and_len(nbuf, ppdu_info->data,
 					 ppdu_info->hdr_len - 4);
 
-		if (pdev->is_mpdu_hdr[user_id]) {
+		if (mon_pdev->is_mpdu_hdr[user_id]) {
 			soc = pdev->soc;
 			mpdu_head = qdf_nbuf_alloc(soc->osdev,
 				RX_ENH_CB_BUF_SIZE + RX_ENH_CB_BUF_RESERVATION,
@@ -518,11 +523,11 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 			if (!mpdu_head)
 				return;
 
-			qdf_nbuf_queue_add(&pdev->mpdu_q[user_id],
+			qdf_nbuf_queue_add(&mon_pdev->mpdu_q[user_id],
 					   mpdu_head);
-			pdev->is_mpdu_hdr[user_id] = false;
+			mon_pdev->is_mpdu_hdr[user_id] = false;
 		}
-		msdu_list = &pdev->msdu_list[user_id];
+		msdu_list = &mon_pdev->msdu_list[user_id];
 		if (!msdu_list->head)
 			msdu_list->head = nbuf;
 		else
@@ -532,8 +537,8 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 	}
 
 	if (tlv_status == HAL_TLV_STATUS_MPDU_END) {
-		msdu_list = &pdev->msdu_list[user_id];
-		mpdu_head = qdf_nbuf_queue_last(&pdev->mpdu_q[user_id]);
+		msdu_list = &mon_pdev->msdu_list[user_id];
+		mpdu_head = qdf_nbuf_queue_last(&mon_pdev->mpdu_q[user_id]);
 
 		if (mpdu_head) {
 			qdf_nbuf_append_ext_list(mpdu_head,
@@ -547,12 +552,12 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 		} else {
 			dp_rx_free_msdu_list(msdu_list);
 		}
-		pdev->is_mpdu_hdr[user_id] = true;
+		mon_pdev->is_mpdu_hdr[user_id] = true;
 	}
 
 	/* Tag the MSDU/MPDU if a cce_metadata is valid */
 	if ((tlv_status == HAL_TLV_STATUS_MSDU_END) &&
-	    (pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_MPDU_MSDU)) {
+	    (mon_pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_MPDU_MSDU)) {
 		bool is_rx_mon_protocol_flow_tag_en;
 		/**
 		 * Proceed only if this is a data frame.
@@ -564,7 +569,7 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 			IEEE80211_FC0_TYPE_MASK))))
 			return;
 
-		msdu_list = &pdev->msdu_list[user_id];
+		msdu_list = &mon_pdev->msdu_list[user_id];
 		qdf_assert_always(msdu_list->head);
 
 		/**
@@ -587,7 +592,7 @@ dp_rx_mon_enh_capture_process(struct dp_pdev *pdev, uint32_t tlv_status,
 			dp_rx_mon_enh_capture_set_flow_tag(pdev, ppdu_info,
 							   user_id, nbuf);
 		}
-		if (!pdev->is_rx_enh_capture_trailer_enabled)
+		if (!mon_pdev->is_rx_enh_capture_trailer_enabled)
 			return;
 		/**
 		 * Update necessary information in trailer (for debug purpose)
@@ -611,12 +616,14 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 	bool is_mpdu_hdr = false;
 	uint8_t user_id;
 	enum dp_mon_filter_action action = DP_MON_FILTER_SET;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
 	rx_enh_capture_peer =
 		(val & CDP_RX_ENH_CAPTURE_PEER_MASK)
 		>> CDP_RX_ENH_CAPTURE_PEER_LSB;
 
-	if (pdev->mcopy_mode || (rx_cap_mode < CDP_RX_ENH_CAPTURE_DISABLED) ||
+	if (mon_pdev->mcopy_mode ||
+	    (rx_cap_mode < CDP_RX_ENH_CAPTURE_DISABLED) ||
 	    (rx_cap_mode > CDP_RX_ENH_CAPTURE_MPDU_MSDU)) {
 		dp_err("Invalid mode: %d", rx_cap_mode);
 		return QDF_STATUS_E_INVAL;
@@ -627,7 +634,7 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if ((pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED) &&
+	if ((mon_pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED) &&
 	    (rx_cap_mode == CDP_RX_ENH_CAPTURE_DISABLED)) {
 		dp_err("Rx capture is already disabled %d", rx_cap_mode);
 		return QDF_STATUS_E_INVAL;
@@ -637,9 +644,9 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 	 * Store the monitor vdev if present. The monitor vdev will be restored
 	 * when the Rx enhance capture mode will be disabled.
 	 */
-	if (pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED &&
+	if (mon_pdev->rx_enh_capture_mode == CDP_RX_ENH_CAPTURE_DISABLED &&
 	    rx_cap_mode != CDP_RX_ENH_CAPTURE_DISABLED) {
-		pdev->rx_enh_monitor_vdev = pdev->monitor_vdev;
+		mon_pdev->rx_enh_monitor_vdev = mon_pdev->mvdev;
 	}
 
 	/*
@@ -648,31 +655,31 @@ dp_config_enh_rx_capture(struct dp_pdev *pdev, uint32_t val)
 	 */
 	dp_reset_monitor_mode((struct cdp_soc_t *)pdev->soc, pdev->pdev_id, 0);
 
-	if (pdev->rx_enh_capture_mode != CDP_RX_ENH_CAPTURE_DISABLED &&
+	if (mon_pdev->rx_enh_capture_mode != CDP_RX_ENH_CAPTURE_DISABLED &&
 	    rx_cap_mode == CDP_RX_ENH_CAPTURE_DISABLED) {
-		pdev->monitor_vdev = pdev->rx_enh_monitor_vdev;
-		pdev->rx_enh_monitor_vdev = NULL;
+		mon_pdev->mvdev = mon_pdev->rx_enh_monitor_vdev;
+		mon_pdev->rx_enh_monitor_vdev = NULL;
 		action = DP_MON_FILTER_CLEAR;
 	}
 
-	pdev->rx_enh_capture_mode = rx_cap_mode;
-	pdev->rx_enh_capture_peer = rx_enh_capture_peer;
+	mon_pdev->rx_enh_capture_mode = rx_cap_mode;
+	mon_pdev->rx_enh_capture_peer = rx_enh_capture_peer;
 
 	if (rx_cap_mode != CDP_RX_ENH_CAPTURE_DISABLED)
 		is_mpdu_hdr = true;
 
 	for (user_id = 0; user_id < MAX_MU_USERS; user_id++)
-		pdev->is_mpdu_hdr[user_id] = is_mpdu_hdr;
+		mon_pdev->is_mpdu_hdr[user_id] = is_mpdu_hdr;
 
 	/* Use a bit from val to enable MSDU trailer for internal debug use */
-	pdev->is_rx_enh_capture_trailer_enabled =
+	mon_pdev->is_rx_enh_capture_trailer_enabled =
 		(val & RX_ENH_CAPTURE_TRAILER_ENABLE_MASK) ? true : false;
 
 	/*
 	 * Restore the monitor filters if previously monitor mode was enabled.
 	 */
-	if (pdev->monitor_vdev) {
-		pdev->monitor_configured = true;
+	if (mon_pdev->mvdev) {
+		mon_pdev->monitor_configured = true;
 		dp_mon_filter_setup_mon_mode(pdev);
 	}
 
