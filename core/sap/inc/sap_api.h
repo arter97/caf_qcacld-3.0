@@ -608,6 +608,7 @@ typedef struct sap_config {
 	uint8_t RSNEncryptType;
 	uint8_t mcRSNEncryptType;
 	eSapAuthType authType;
+	tCsrAuthList akm_list;
 	bool privacy;
 	bool UapsdEnable;
 	bool fwdWPSPBCProbeReq;
