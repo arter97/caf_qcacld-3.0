@@ -162,7 +162,7 @@ int monitor_mod_init(void)
 				dp_mon_pdev_detach(pdev);
 				continue;
 			}
-			dp_tx_capture_debugfs_init(pdev);
+			dp_monitor_tx_capture_debugfs_init(pdev);
 			pdev_attach_success = true;
 		}
 		if (!pdev_attach_success) {

@@ -580,12 +580,12 @@ free_ppdu_desc_mpdu_q:
 }
 
 /*
- * dp_tx_cature_stats: print tx capture stats
+ * dp_print_pdev_tx_capture_stats_1_0: print tx capture stats
  * @pdev: DP PDEV handle
  *
  * return: void
  */
-void dp_print_pdev_tx_capture_stats(struct dp_pdev *pdev)
+void dp_print_pdev_tx_capture_stats_1_0(struct dp_pdev *pdev)
 {
 	struct dp_pdev_tx_capture *ptr_tx_cap;
 	uint8_t i = 0, j = 0;
@@ -726,12 +726,12 @@ dp_tx_find_usr_idx_from_peer_id(struct cdp_tx_completion_ppdu *ppdu_desc,
 }
 
 /*
- * dp_peer_tid_peer_id_update() – update peer_id to tid structure
+ * dp_peer_tid_peer_id_update_li() – update peer_id to tid structure
  * @peer: Datapath peer
  * @peer_id: peer_id
  *
  */
-void dp_peer_tid_peer_id_update(struct dp_peer *peer, uint16_t peer_id)
+void dp_peer_tid_peer_id_update_1_0(struct dp_peer *peer, uint16_t peer_id)
 {
 	int tid;
 	struct dp_tx_tid *tx_tid;
@@ -1621,12 +1621,12 @@ static void dp_tx_capture_work_q_timer_handler(void *arg)
 }
 
 /**
- * dp_tx_ppdu_stats_attach - Initialize Tx PPDU stats and enhanced capture
+ * dp_tx_ppdu_stats_attach_1_0 - Initialize Tx PPDU stats and enhanced capture
  * @pdev: DP PDEV
  *
  * Return: none
  */
-void dp_tx_ppdu_stats_attach(struct dp_pdev *pdev)
+void dp_tx_ppdu_stats_attach_1_0(struct dp_pdev *pdev)
 {
 	struct dp_peer_mgmt_list *ptr_peer_mgmt_list;
 	struct dp_pdev_tx_capture *tx_capture;
@@ -1696,12 +1696,12 @@ void dp_tx_ppdu_stats_attach(struct dp_pdev *pdev)
 }
 
 /**
- * dp_tx_ppdu_stats_detach - Cleanup Tx PPDU stats and enhanced capture
+ * dp_tx_ppdu_stats_detach_1_0 - Cleanup Tx PPDU stats and enhanced capture
  * @pdev: DP PDEV
  *
  * Return: none
  */
-void dp_tx_ppdu_stats_detach(struct dp_pdev *pdev)
+void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 {
 	struct ppdu_info *ppdu_info, *tmp_ppdu_info = NULL;
 	struct tx_cap_debug_log_info *ptr_log_info;
@@ -1792,7 +1792,7 @@ void dp_tx_ppdu_stats_detach(struct dp_pdev *pdev)
 
 	ppdu_desc_dbg_queue_deinit(ptr_log_info);
 
-	dp_tx_capture_debugfs_deinit(pdev);
+	dp_tx_capture_debugfs_deinit_1_0(pdev);
 }
 
 #define MAX_MSDU_THRESHOLD_TSF 100000
@@ -2004,7 +2004,7 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 }
 
 /**
- * dp_tx_add_to_comp_queue() - add completion msdu to queue
+ * dp_tx_add_to_comp_queue_1_0() - add completion msdu to queue
  * @soc: DP Soc handle
  * @tx_desc: software Tx descriptor
  * @ts: Tx completion status from HAL/HTT descriptor
@@ -2012,10 +2012,10 @@ dp_update_msdu_to_list(struct dp_soc *soc,
  *
  * Return: none
  */
-QDF_STATUS dp_tx_add_to_comp_queue(struct dp_soc *soc,
-				   struct dp_tx_desc_s *desc,
-				   struct hal_tx_completion_status *ts,
-				   struct dp_peer *peer)
+QDF_STATUS dp_tx_add_to_comp_queue_1_0(struct dp_soc *soc,
+				       struct dp_tx_desc_s *desc,
+				       struct hal_tx_completion_status *ts,
+				       struct dp_peer *peer)
 {
 	int ret = QDF_STATUS_E_FAILURE;
 	struct dp_pdev *pdev = desc->pdev;
@@ -2432,14 +2432,14 @@ dp_enh_tx_cap_mode_change(struct dp_pdev *pdev, uint8_t user_mode)
 }
 
 /*
- * dp_config_enh_tx_capture()- API to enable/disable enhanced tx capture
+ * dp_config_enh_tx_capture_1_0()- API to enable/disable enhanced tx capture
  * @pdev_handle: DP_PDEV handle
  * @val: user provided value
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-dp_config_enh_tx_capture(struct dp_pdev *pdev, uint8_t val)
+dp_config_enh_tx_capture_1_0(struct dp_pdev *pdev, uint8_t val)
 {
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
@@ -5492,7 +5492,7 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 						    pdev->soc);
 				dp_ppdu_desc_free_all(pdev, ptr_nbuf_list, num_users);
 				DP_TX_PEER_DEL_REF(peer);
-				dp_print_pdev_tx_capture_stats(pdev);
+				dp_print_pdev_tx_capture_stats_1_0(pdev);
 				qdf_assert_always(0);
 				return;
 			}
@@ -7208,7 +7208,7 @@ QDF_STATUS dp_handle_tx_capture_from_dest(struct dp_soc *soc,
 }
 
 /**
- * dp_peer_set_tx_capture_enabled: Set tx_cap_enabled bit in peer
+ * dp_peer_set_tx_capture_enabled_1_0: Set tx_cap_enabled bit in peer
  * @pdev: DP PDEV handle
  * @peer: Peer handle
  * @value: Enable/disable setting for tx_cap_enabled
@@ -7217,9 +7217,9 @@ QDF_STATUS dp_handle_tx_capture_from_dest(struct dp_soc *soc,
  * Return: QDF_STATUS
  */
 QDF_STATUS
-dp_peer_set_tx_capture_enabled(struct dp_pdev *pdev,
-			       struct dp_peer *peer, uint8_t value,
-			       uint8_t *peer_mac)
+dp_peer_set_tx_capture_enabled_1_0(struct dp_pdev *pdev,
+				   struct dp_peer *peer, uint8_t value,
+				   uint8_t *peer_mac)
 {
 	uint32_t peer_id = HTT_INVALID_PEER;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
@@ -7242,15 +7242,15 @@ dp_peer_set_tx_capture_enabled(struct dp_pdev *pdev,
 }
 
 /*
- * dp_peer_tx_capture_filter_check: check filter is enable for the filter
+ * dp_peer_tx_capture_filter_check_1_0: check filter is enable for the filter
  * and update tx_cap_enabled flag
  * @pdev: DP PDEV handle
  * @peer: DP PEER handle
  *
  * return: void
  */
-void dp_peer_tx_capture_filter_check(struct dp_pdev *pdev,
-				     struct dp_peer *peer)
+void dp_peer_tx_capture_filter_check_1_0(struct dp_pdev *pdev,
+					 struct dp_peer *peer)
 {
 	if (!peer)
 		return;
@@ -7647,12 +7647,12 @@ static void tx_cap_debugfs_remove(struct tx_cap_debug_log_info *ptr_log_info)
 }
 
 /*
- * dp_tx_capture_debugfs_init: tx capture debugfs init
+ * dp_tx_capture_debugfs_init_1_0: tx capture debugfs init
  * @pdev: DP PDEV handle
  *
  * return: QDF_STATUS
  */
-QDF_STATUS dp_tx_capture_debugfs_init(struct dp_pdev *pdev)
+QDF_STATUS dp_tx_capture_debugfs_init_1_0(struct dp_pdev *pdev)
 {
 	qdf_dentry_t dentry;
 	struct dp_soc *soc;
@@ -7717,12 +7717,12 @@ out:
 }
 
 /*
- * dp_tx_capture_debugfs_deinit: tx capture debugfs deinit
+ * dp_tx_capture_debugfs_deinit_1_0: tx capture debugfs deinit
  * @pdev: DP PDEV handle
  *
  * return: void
  */
-void dp_tx_capture_debugfs_deinit(struct dp_pdev *pdev)
+void dp_tx_capture_debugfs_deinit_1_0(struct dp_pdev *pdev)
 {
 	struct dp_pdev_tx_capture *ptr_tx_cap;
 	struct tx_cap_debug_log_info *ptr_log_info;
