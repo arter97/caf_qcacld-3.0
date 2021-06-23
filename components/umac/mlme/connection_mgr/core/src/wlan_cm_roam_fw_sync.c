@@ -478,7 +478,7 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 	if (roaming_info->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_SAE) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_OWE)) {
-		struct wlan_crypto_pmksa *pmkid_cache;
+		struct wlan_crypto_pmksa *pmkid_cache, *pmksa;
 
 		cm_csr_set_ss_none(vdev_id);
 		/*
@@ -513,6 +513,89 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 		if (cm_lookup_pmkid_using_bssid(psoc,
 						vdev_id,
 						pmkid_cache)) {
+			/*
+			 * Consider two APs: AP1, AP2
+			 * Both APs configured with EAP 802.1x security mode
+			 * and OKC is enabled in both APs by default. Initially
+			 * DUT successfully associated with AP1, and generated
+			 * PMK1 by performing full EAP and added an entry for
+			 * AP1 in pmk table. At this stage, pmk table has only
+			 * one entry for PMK1 (1. AP1-->PMK1). Now DUT try to
+			 * roam to AP2 using PMK1 (as OKC is enabled) but
+			 * session timeout happens on AP2 just before 4 way
+			 * handshake completion in FW. At this point of time
+			 * DUT not in authenticated state. Due to this DUT
+			 * performs full EAP with AP2 and generates PMK2. As
+			 * there is no previous entry of AP2 (AP2-->PMK1) in pmk
+			 * table. When host gets pmk delete command for BSSID of
+			 * AP2, the BSSID match fails. Hence host will not
+			 * delete pmk entry of AP1 as well.
+			 * At this point of time, the PMK table has two entry
+			 * 1. AP1-->PMK1 and 2. AP2 --> PMK2.
+			 * Ideally, if OKC is enabled then whenever timeout
+			 * occurs in a mobility domain, then the driver should
+			 * clear all APs cache entries related to that domain
+			 * but as the BSSID doesn't exist yet in the driver
+			 * cache there is no way of clearing the cache entries,
+			 * without disturbing the legacy roaming.
+			 * Now security profile for both APs changed to FT-RSN.
+			 * DUT first disassociate with AP2 and successfully
+			 * associated with AP2 and perform full EAP and
+			 * generates PMK3. DUT first deletes PMK entry for AP2
+			 * and then adds a new entry for AP2.
+			 * At this point of time pmk table has two entry
+			 * AP2--> PMK3 and AP1-->PMK1. Now DUT roamed to AP1
+			 * using PMK3 but sends stale entry of AP1 (PMK1) to
+			 * fw via RSO command. This override PMK for both APs
+			 * with PMK1 (as FW uses mlme session PMK for both APs
+			 * in case of FT roaming) and next time when FW try to
+			 * roam to AP2 using PMK1, AP2 rejects PMK1 (As AP2 is
+			 * expecting PMK3) and initiates full EAP with AP2,
+			 * which is wrong.
+			 * To address this issue update pmk table entry for
+			 * roamed AP1 with pmk3 value comes to host via roam
+			 * sync indication event. By this host override stale
+			 * entry (if any) with the latest valid pmk for that AP
+			 * at a point of time.
+			 */
+			if (roaming_info->pmk_len) {
+				pmksa = qdf_mem_malloc(sizeof(*pmksa));
+				if (!pmksa) {
+					status = QDF_STATUS_E_NOMEM;
+					qdf_mem_zero(pmkid_cache,
+						     sizeof(*pmkid_cache));
+					qdf_mem_free(pmkid_cache);
+					goto end;
+				}
+
+				/*
+				 * This pmksa buffer is to update the
+				 * crypto table
+				 */
+				wlan_vdev_get_bss_peer_mac(vdev, &pmksa->bssid);
+				qdf_mem_copy(pmksa->pmkid,
+					     roaming_info->pmkid, PMKID_LEN);
+				qdf_mem_copy(pmksa->pmk, roaming_info->pmk,
+					     roaming_info->pmk_len);
+				pmksa->pmk_len = roaming_info->pmk_len;
+				status = wlan_crypto_set_del_pmksa(vdev,
+								   pmksa, true);
+				if (QDF_IS_STATUS_ERROR(status)) {
+					qdf_mem_zero(pmksa, sizeof(*pmksa));
+					qdf_mem_free(pmksa);
+				}
+
+				/* update the pmkid_cache buffer to
+				 * update the global session pmk
+				 */
+				qdf_mem_copy(pmkid_cache->pmkid,
+					     roaming_info->pmkid, PMKID_LEN);
+				qdf_mem_copy(pmkid_cache->pmk,
+					     roaming_info->pmk,
+					     roaming_info->pmk_len);
+				pmkid_cache->pmk_len = roaming_info->pmk_len;
+			}
+
 			wlan_cm_set_psk_pmk(pdev, vdev_id,
 					    pmkid_cache->pmk,
 					    pmkid_cache->pmk_len);
@@ -536,22 +619,38 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 			 */
 			if (!cm_is_auth_type_11r(mlme_obj, vdev,
 						 mdie_present) &&
-				roaming_info->pmk_len) {
-				qdf_mem_zero(pmkid_cache, sizeof(*pmkid_cache));
+			    roaming_info->pmk_len) {
+				/*
+				 * This pmksa buffer is to update the
+				 * crypto table
+				 */
+				pmksa = qdf_mem_malloc(sizeof(*pmksa));
+				if (!pmksa) {
+					status = QDF_STATUS_E_NOMEM;
+					qdf_mem_zero(pmkid_cache,
+						     sizeof(*pmkid_cache));
+					qdf_mem_free(pmkid_cache);
+					goto end;
+				}
 				wlan_cm_set_psk_pmk(pdev, vdev_id,
 						    roaming_info->pmk,
 						    roaming_info->pmk_len);
 				wlan_vdev_get_bss_peer_mac(vdev,
-							   &pmkid_cache->bssid);
-				qdf_mem_copy(pmkid_cache->pmkid,
+							   &pmksa->bssid);
+				qdf_mem_copy(pmksa->pmkid,
 					     roaming_info->pmkid, PMKID_LEN);
-				qdf_mem_copy(pmkid_cache->pmk,
+				qdf_mem_copy(pmksa->pmk,
 					     roaming_info->pmk,
 					     roaming_info->pmk_len);
-				pmkid_cache->pmk_len = roaming_info->pmk_len;
+				pmksa->pmk_len = roaming_info->pmk_len;
 
-				wlan_crypto_set_del_pmksa(vdev, pmkid_cache,
-							  true);
+				status = wlan_crypto_set_del_pmksa(vdev,
+								   pmksa,
+								   true);
+				if (QDF_IS_STATUS_ERROR(status)) {
+					qdf_mem_zero(pmksa, sizeof(*pmksa));
+					qdf_mem_free(pmksa);
+				}
 			}
 		}
 		qdf_mem_zero(pmkid_cache, sizeof(*pmkid_cache));
@@ -647,7 +746,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	cm_update_scan_db_on_roam_success(vdev, connect_rsp,
 					  roam_synch_data, cm_id);
 
-	cm_csr_roam_sync_rsp(vdev, rsp);
+	cm_csr_connect_rsp(vdev, rsp);
 	cm_process_roam_keys(vdev, rsp, cm_id);
 
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
@@ -838,6 +937,22 @@ error:
 	return status;
 }
 
+#ifdef FEATURE_WLAN_DIAG_SUPPORT
+static void cm_ho_fail_diag_event(void)
+{
+	WLAN_HOST_DIAG_EVENT_DEF(roam_connection,
+				 host_event_wlan_status_payload_type);
+	qdf_mem_zero(&roam_connection,
+		     sizeof(host_event_wlan_status_payload_type));
+
+	roam_connection.eventId = DIAG_WLAN_STATUS_DISCONNECT;
+	roam_connection.reason = DIAG_REASON_ROAM_HO_FAIL;
+	WLAN_HOST_DIAG_EVENT_REPORT(&roam_connection, EVENT_WLAN_STATUS_V2);
+}
+#else
+static inline void cm_ho_fail_diag_event(void) {}
+#endif
+
 static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 {
 	QDF_STATUS status;
@@ -845,9 +960,11 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
 	struct cnx_mgr *cm_ctx;
-	wlan_cm_id cm_id;
+	wlan_cm_id cm_id = CM_ID_INVALID;
 	struct reject_ap_info ap_info;
 	struct cm_roam_req *roam_req = NULL;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!msg || !msg->bodyptr)
 		return QDF_STATUS_E_FAILURE;
@@ -869,6 +986,19 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 		goto error;
 	}
 
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		mlme_err("psoc object is NULL");
+		status = QDF_STATUS_E_NULL_VALUE;
+		goto error;
+	}
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		mlme_err("Failed to mlme psoc obj");
+		status = QDF_STATUS_E_FAILURE;
+		goto error;
+	}
+
 	cm_ctx = cm_get_cm_ctx(vdev);
 	if (!cm_ctx) {
 		status = QDF_STATUS_E_NULL_VALUE;
@@ -876,13 +1006,11 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 	}
 
 	roam_req = cm_get_first_roam_command(vdev);
-	if (!roam_req) {
-		mlme_err("Failed to find roam req from list");
-		status = QDF_STATUS_E_FAILURE;
-		goto error;
+	if (roam_req) {
+		mlme_debug("Roam req found, get cm id to remove it, before disconnect");
+		cm_id = roam_req->cm_id;
 	}
 
-	cm_id = roam_req->cm_id;
 	cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_HO_FAIL,
 			    sizeof(wlan_cm_id), &cm_id);
 
@@ -892,6 +1020,7 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 	ap_info.source = ADDED_BY_DRIVER;
 	wlan_blm_add_bssid_to_reject_list(pdev, &ap_info);
 
+	cm_ho_fail_diag_event();
 	wlan_roam_debug_log(ind->vdev_id,
 			    DEBUG_ROAM_SYNCH_FAIL,
 			    DEBUG_INVALID_PEER_ID, NULL, NULL, 0, 0);
@@ -900,6 +1029,11 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 			       CM_MLME_DISCONNECT,
 			       REASON_FW_TRIGGERED_ROAM_FAILURE,
 			       NULL);
+
+	if (mlme_obj->cfg.gen.fatal_event_trigger)
+		cds_flush_logs(WLAN_LOG_TYPE_FATAL,
+			       WLAN_LOG_INDICATOR_HOST_DRIVER,
+			       WLAN_LOG_REASON_ROAM_HO_FAILURE, false, false);
 
 	if (QDF_IS_STATUS_ERROR(status))
 		cm_remove_cmd(cm_ctx, &cm_id);

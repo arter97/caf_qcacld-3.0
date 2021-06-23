@@ -507,6 +507,7 @@ struct csr_roam_session {
 	enum csr_roaming_reason roamingReason;
 	bool fCancelRoaming;
 	uint8_t bRefAssocStartCnt;      /* Tracking assoc start indication */
+	tftSMEContext ftSmeContext;
 #endif /* ndef FEATURE_CM_ENABLE */
 #ifdef WLAN_BCN_RECV_FEATURE
 	bool is_bcn_recv_start;
@@ -527,7 +528,6 @@ struct csr_roam_session {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	struct roam_offload_synch_ind *roam_synch_data;
 #endif
-	tftSMEContext ftSmeContext;
 	bool ch_switch_in_progress;
 	uint8_t nss;
 	bool dhcp_done;
@@ -924,7 +924,7 @@ QDF_STATUS
 csr_rso_save_ap_to_scan_cache(struct mac_context *mac,
 			      struct roam_offload_synch_ind *roam_synch_ind,
 			      struct bss_description *bss_desc_ptr);
-#endif
+
 /**
  * csr_process_ho_fail_ind  - This function will process the Hand Off Failure
  * indication received from the firmware. It will trigger a disconnect on
@@ -936,16 +936,6 @@ csr_rso_save_ap_to_scan_cache(struct mac_context *mac,
  */
 void csr_process_ho_fail_ind(struct mac_context *mac, void *msg_buf);
 #endif
-#ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
-void csr_roaming_report_diag_event(struct mac_context *mac_ctx,
-		struct roam_offload_synch_ind *roam_synch_ind_ptr,
-		enum diagwlan_status_eventreason reason);
-#else
-static inline void csr_roaming_report_diag_event(
-		struct mac_context *mac_ctx,
-		struct roam_offload_synch_ind *roam_synch_ind_ptr,
-		enum diagwlan_status_eventreason reason)
-{}
 #endif
 
 QDF_STATUS csr_get_channels_and_power(struct mac_context *mac);

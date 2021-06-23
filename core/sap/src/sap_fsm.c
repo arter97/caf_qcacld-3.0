@@ -658,7 +658,9 @@ sap_dfs_is_channel_in_nol_list(struct sap_context *sap_context,
 	for (i = 0; i < num_ch_freq; i++) {
 		ch_freq = freq_list[i];
 
-		ch_state = wlan_reg_get_channel_state_for_freq(pdev, ch_freq);
+		ch_state =
+			wlan_reg_get_channel_state_from_secondary_list_for_freq(
+								pdev, ch_freq);
 		if (CHANNEL_STATE_ENABLE != ch_state &&
 		    CHANNEL_STATE_DFS != ch_state) {
 			sap_err_rl("Invalid ch freq = %d, ch state=%d", ch_freq,
@@ -776,6 +778,26 @@ uint32_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
 	return default_freq;
 }
 
+static bool is_mcc_preferred(struct sap_context *sap_context,
+			     uint32_t con_ch_freq)
+{
+	/*
+	 * If SAP ACS channel list is 1-11 and STA is on non-preferred
+	 * channel i.e. 12, 13, 14 then MCC is unavoidable. This is because
+	 * if SAP is started on 12,13,14 some clients may not be able to
+	 * join dependending on their regulatory country.
+	 */
+	if ((con_ch_freq >= 2467) && (con_ch_freq <= 2484) &&
+	    (sap_context->acs_cfg->start_ch_freq >= 2412 &&
+	     sap_context->acs_cfg->end_ch_freq <= 2462)) {
+		sap_debug("conc ch freq %d & sap acs ch list is 1-11, prefer mcc",
+			  con_ch_freq);
+		return true;
+	}
+
+	return false;
+}
+
 QDF_STATUS
 sap_validate_chan(struct sap_context *sap_context,
 		  bool pre_start_bss,
@@ -828,12 +850,9 @@ sap_validate_chan(struct sap_context *sap_context,
 					sap_context->chan_freq,
 					sap_context->csr_roamProfile.phyMode,
 					sap_context->cc_switch_mode);
-			sap_debug("After check overlap: con_ch:%d",
-				  con_ch_freq);
+			sap_debug("After check overlap: sap freq %d con freq:%d",
+				  sap_context->chan_freq, con_ch_freq);
 			ch_params = sap_context->ch_params;
-			if (con_ch_freq &&
-			    WLAN_REG_IS_24GHZ_CH_FREQ(con_ch_freq))
-				ch_params.ch_width = CH_WIDTH_20MHZ;
 
 			if (sap_context->cc_switch_mode !=
 		QDF_MCC_TO_SCC_SWITCH_FORCE_PREFERRED_WITHOUT_DISCONNECTION) {
@@ -847,15 +866,12 @@ sap_validate_chan(struct sap_context *sap_context,
 					return QDF_STATUS_E_ABORTED;
 				}
 			}
-			sap_debug("After check concurrency: con_ch:%d",
+
+			sap_debug("After check concurrency: con freq:%d",
 				  con_ch_freq);
 			sta_sap_scc_on_dfs_chan =
 				policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 						mac_ctx->psoc);
-			ch_params = sap_context->ch_params;
-			if (con_ch_freq &&
-			    WLAN_REG_IS_24GHZ_CH_FREQ(con_ch_freq))
-				ch_params.ch_width = CH_WIDTH_20MHZ;
 			if (con_ch_freq &&
 			    (policy_mgr_sta_sap_scc_on_lte_coex_chan(
 						mac_ctx->psoc) ||
@@ -865,20 +881,15 @@ sap_validate_chan(struct sap_context *sap_context,
 					mac_ctx->pdev, &ch_params,
 					con_ch_freq) ||
 			    sta_sap_scc_on_dfs_chan)) {
-				sap_debug("Override ch freq %d to %d due to CC Intf",
+				if (is_mcc_preferred(sap_context, con_ch_freq))
+					goto validation_done;
+
+				sap_debug("Override ch freq %d (bw %d) to %d (bw %d) due to CC Intf",
 					  sap_context->chan_freq,
-					con_ch_freq);
+					  sap_context->ch_params.ch_width,
+					  con_ch_freq, ch_params.ch_width);
 				sap_context->chan_freq = con_ch_freq;
-				sap_context->ch_params.ch_width =
-				    wlan_sap_get_concurrent_bw(mac_ctx->pdev,
-							       mac_ctx->psoc,
-							       con_ch_freq,
-					       sap_context->ch_params.ch_width);
-				wlan_reg_set_channel_params_for_freq(
-					mac_ctx->pdev,
-					sap_context->chan_freq,
-					0,
-					&sap_context->ch_params);
+				sap_context->ch_params = ch_params;
 			}
 		}
 #endif
@@ -2888,8 +2899,6 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 	profile->AuthType.numEntries = 1;
 	profile->AuthType.authType[0] = eCSR_AUTH_TYPE_OPEN_SYSTEM;
 
-	profile->akm_list = config->akm_list;
-
 	/* Always set the Encryption Type */
 	profile->EncryptionType.numEntries = 1;
 	profile->EncryptionType.encryptionType[0] =
@@ -2913,10 +2922,6 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 	} else {
 		profile->csr80211AuthType = eSIR_AUTO_SWITCH;
 	}
-
-	/* Initialize we are not going to use it */
-	profile->pWPAReqIE = NULL;
-	profile->nWPAReqIELength = 0;
 
 	if (profile->pRSNReqIE) {
 		sap_debug("pRSNReqIE already allocated.");
@@ -2968,11 +2973,6 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		sap_err("Get ap protection mode failed using default value");
 	profile->cfg_protection = ap_prot;
-
-	/* country code */
-	if (config->countryCode[0])
-		qdf_mem_copy(profile->countryCode, config->countryCode,
-			     REG_ALPHA2_LEN + 1);
 	profile->ieee80211d = config->ieee80211d;
 	/* wps config info */
 	profile->wps_state = config->wps_state;
@@ -3371,12 +3371,12 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 		 * - DFS scan disable but chan in CHANNEL_STATE_ENABLE
 		 */
 		if (!(((true == mac_ctx->scan.fEnableDFSChnlScan) &&
-		      wlan_reg_get_channel_state_for_freq(
+		      wlan_reg_get_channel_state_from_secondary_list_for_freq(
 			mac_ctx->pdev, WLAN_REG_CH_TO_FREQ(loop_count)))
 		      ||
 		    ((false == mac_ctx->scan.fEnableDFSChnlScan) &&
 		     (CHANNEL_STATE_ENABLE ==
-		      wlan_reg_get_channel_state_for_freq(
+		      wlan_reg_get_channel_state_from_secondary_list_for_freq(
 			mac_ctx->pdev, WLAN_REG_CH_TO_FREQ(loop_count)))
 		     )))
 			continue;
@@ -3409,7 +3409,7 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 		 * As it can result in SAP starting on DFS channel
 		 * resulting  MCC on DFS channel
 		 */
-		if (wlan_reg_is_dfs_for_freq(
+		if (wlan_reg_is_dfs_in_secondary_list_for_freq(
 					mac_ctx->pdev,
 					WLAN_REG_CH_TO_FREQ(loop_count))) {
 			if (!dfs_master_enable)
