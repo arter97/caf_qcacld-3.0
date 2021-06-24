@@ -404,15 +404,16 @@ void dp_rx_mon_update_protocol_flow_tag(struct dp_soc *soc,
 	if (qdf_likely(!is_mon_protocol_flow_tag_enabled))
 		return;
 
-	if (qdf_likely(!monitor_get_monitor_vdev_from_pdev(dp_pdev)))
-		return;
-
-	if (monitor_check_com_info_ppdu_id(dp_pdev, rx_desc) !=
-							QDF_STATUS_SUCCESS)
-		return;
-
 	mvdev = monitor_get_monitor_vdev_from_pdev(dp_pdev);
-	mon_recv_status = monitor_get_rx_status_addr(dp_pdev);
+
+	if (qdf_likely(!mvdev))
+		return;
+
+	if (qdf_likely(monitor_check_com_info_ppdu_id(dp_pdev, rx_desc) !=
+		       QDF_STATUS_SUCCESS))
+		return;
+
+	mon_recv_status = monitor_get_rx_status(dp_pdev);
 
 	if (mon_recv_status && mon_recv_status->frame_control_info_valid &&
 	    ((mon_recv_status->frame_control & IEEE80211_FC0_TYPE_MASK) ==

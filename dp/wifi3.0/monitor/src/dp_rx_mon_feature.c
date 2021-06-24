@@ -312,13 +312,6 @@ dp_rx_mon_enh_capture_tag_protocol_type(struct dp_pdev *pdev,
 {
 }
 
-static void
-dp_rx_mon_enh_capture_set_protocol_tag(struct dp_pdev *pdev,
-				       struct hal_rx_ppdu_info *ppdu_info,
-				       uint32_t user_id, qdf_nbuf_t nbuf)
-{
-}
-
 static inline
 void dp_rx_mon_enh_capture_set_protocol_tag_in_trailer(qdf_nbuf_t nbuf,
 						       void *trailer)
