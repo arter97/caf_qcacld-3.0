@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011,2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011,2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -181,6 +181,7 @@ static const struct reg_dmn_pair g_reg_dmn_pairs[] = {
 	{ETSI7_WORLD, ETSI4, WORLD, CTRY_DEFAULT},
 	{ETSI8_WORLD, ETSI8, WORLD, CTRY_DEFAULT},
 	{ETSI9_WORLD, ETSI9, WORLD, CTRY_DEFAULT},
+	{ETSI12_WORLD, ETSI12, WORLD, CTRY_DEFAULT},
 	{ETSI13_WORLD, ETSI13, WORLD, CTRY_DEFAULT},
 	{ETSI14_WORLD, ETSI14, WORLD, CTRY_DEFAULT},
 	{ETSI15_WORLD, ETSI15, WORLD, CTRY_DEFAULT},
@@ -256,6 +257,8 @@ static const struct country_code_to_reg_dmn g_all_countries[] = {
 	{CTRY_CHINA, APL14_WORLD, "CN", "CHINA"},
 	{CTRY_CHRISTMAS_ISLAND, FCC3_WORLD, "CX", "CHRISTMAS ISLAND"},
 	{CTRY_COLOMBIA, FCC3_WORLD, "CO", "COLOMBIA"},
+	{CTRY_CONGO, ETSI12_WORLD, "CG", "CONGO"},
+	{CTRY_CONGO_DRC, ETSI13_WORLD, "CD", "DEMOCRATIC REPUBLIC OF CONGO"},
 	{CTRY_COSTA_RICA, FCC3_WORLD, "CR", "COSTA RICA"},
 	{CTRY_COTE_DIVOIRE, FCC3_WORLD, "CI", "COTE DIVOIRE"},
 	{CTRY_CROATIA, ETSI13_WORLD, "HR", "CROATIA"},
@@ -420,6 +423,7 @@ static const struct reg_dmn g_reg_dmns[] = {
 	{ETSI9, ETSI},
 	{ETSI10, ETSI},
 	{ETSI11, ETSI},
+	{ETSI12, ETSI},
 	{ETSI13, ETSI},
 	{ETSI15, ETSI},
 	{APL1, ETSI},
