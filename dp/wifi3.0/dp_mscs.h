@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,8 +21,20 @@
 #define _DP_MSCS_H_
 
 #if WLAN_SUPPORT_MSCS
+/**
+ * dp_mscs_peer_lookup_status - mscs lookup status
+ * @DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_MSCS_QOS_TAG_UPDATE
+ * @DP_MSCS_PEER_LOOKUP_STATUS_DENY_QOS_TAG_UPDATE
+ * @DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE
+ */
+enum dp_mscs_peer_lookup_status {
+	DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_MSCS_QOS_TAG_UPDATE,
+	DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE,
+	DP_MSCS_PEER_LOOKUP_STATUS_DENY_QOS_TAG_UPDATE,
+};
+
 int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
-		        uint8_t *src_mac_addr, qdf_nbuf_t nbuf);
+		uint8_t *src_mac_addr, uint8_t *dst_mac_addr, qdf_nbuf_t nbuf);
 #endif
 
 #endif /* QCA_MSCS_H*/

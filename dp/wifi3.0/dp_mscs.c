@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,9 +34,10 @@
  * Return: 0 when peer has active mscs session and valid user priority
  */
 int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
-		uint8_t *src_mac_addr, qdf_nbuf_t nbuf)
+		uint8_t *src_mac_addr, uint8_t *dst_mac_addr, qdf_nbuf_t nbuf)
 {
-	struct dp_peer *peer;
+	struct dp_peer *src_peer;
+	struct dp_peer *dst_peer;
 	uint8_t user_prio_bitmap;
 	uint8_t user_prio_limit;
 	uint8_t user_prio;
@@ -46,38 +47,53 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 	if (!dpsoc) {
 		QDF_TRACE(QDF_MODULE_ID_MSCS, QDF_TRACE_LEVEL_ERROR,
 				"%s: Invalid soc\n", __func__);
-		return -1;
+		return DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE;
 	}
 
 	/*
 	 * Find the MSCS peer from global soc
 	 */
-	peer = dp_peer_find_hash_find(dpsoc, src_mac_addr, 0,
+	src_peer = dp_peer_find_hash_find(dpsoc, src_mac_addr, 0,
 			DP_VDEV_ALL, DP_MOD_ID_MSCS);
 
-	if (!peer) {
-		/*
-		 * No WLAN client peer found with this peer mac
-		 */
-		return -1;
+	if (!src_peer) {
+		dst_peer = dp_peer_find_hash_find(dpsoc, dst_mac_addr, 0,
+				DP_VDEV_ALL, DP_MOD_ID_MSCS);
+		if (dst_peer && dst_peer->mscs_active &&
+				!qdf_nbuf_get_priority(nbuf)) {
+			/*
+			 * This is a downlink flow with priority 0 for MSCS
+			 * client, this should not be accelerated as uplink
+			 * flow is the one which needs to be accelerated first
+			 */
+			dp_peer_unref_delete(dst_peer, DP_MOD_ID_MSCS);
+			return DP_MSCS_PEER_LOOKUP_STATUS_DENY_QOS_TAG_UPDATE;
+		} else {
+			if (dst_peer)
+				dp_peer_unref_delete(dst_peer, DP_MOD_ID_MSCS);
+
+			/*
+			 * No WLAN client peer found with this peer mac
+			 */
+			return DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE;
+		}
 	}
 
 	/*
 	 * check if there is any active MSCS session for this peer
 	 */
-	if (!peer->mscs_active) {
+	if (!src_peer->mscs_active) {
 		QDF_TRACE(QDF_MODULE_ID_MSCS, QDF_TRACE_LEVEL_DEBUG,
-				"%s: MSCS session not active on peer or peer delete in progress\n", __func__);
-		status = 1;
-		qdf_nbuf_set_priority(nbuf, (ipv4_get_dsfield(ip_hdr(nbuf))) >> 5);
+		"%s: MSCS session not active on peer or peer delete in progress\n", __func__);
+		status = DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE;
 		goto fail;
 	}
 
 	/*
 	 * Get user priority bitmap for this peer MSCS active session
 	 */
-	user_prio_bitmap = peer->mscs_ipv4_parameter.user_priority_bitmap;
-	user_prio_limit = peer->mscs_ipv4_parameter.user_priority_limit;
+	user_prio_bitmap = src_peer->mscs_ipv4_parameter.user_priority_bitmap;
+	user_prio_limit = src_peer->mscs_ipv4_parameter.user_priority_limit;
 	user_prio = qdf_nbuf_get_priority(nbuf) & DP_MSCS_VALID_TID_MASK;
 
 	/*
@@ -85,8 +101,8 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 	 */
 	if (!((1 << user_prio) & user_prio_bitmap)) {
 		QDF_TRACE(QDF_MODULE_ID_MSCS, QDF_TRACE_LEVEL_DEBUG,
-				"%s: Nbuf TID is not valid, no match in user prioroty bitmap\n", __func__);
-		status = 1;
+		"%s: Nbuf TID is not valid, no match in user prioroty bitmap\n", __func__);
+		status = DP_MSCS_PEER_LOOKUP_STATUS_DENY_QOS_TAG_UPDATE;
 		goto fail;
 	}
 
@@ -98,11 +114,11 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 	qdf_nbuf_set_priority(nbuf, user_prio);
 	QDF_TRACE(QDF_MODULE_ID_MSCS, QDF_TRACE_LEVEL_DEBUG,
 			"%s: User priority for this MSCS session %d\n", __func__, user_prio);
-	status = 0;
+	status = DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_MSCS_QOS_TAG_UPDATE;
 
 fail:
-	if (peer)
-		dp_peer_unref_delete(peer, DP_MOD_ID_MSCS);
+	if (src_peer)
+		dp_peer_unref_delete(src_peer, DP_MOD_ID_MSCS);
 	return status;
 }
 

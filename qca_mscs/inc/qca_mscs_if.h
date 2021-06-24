@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -20,5 +20,5 @@
 #ifndef __qca_mscs_if_H_
 #define __qca_mscs_if_H_
 
-int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, struct sk_buff *skb);
+int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, uint8_t *dst_mac, struct sk_buff *skb);
 #endif /* qca_mscs_if_H*/
