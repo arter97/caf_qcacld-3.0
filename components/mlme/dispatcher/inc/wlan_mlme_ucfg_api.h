@@ -4462,4 +4462,16 @@ ucfg_mlme_get_vdev_max_mcs_idx(struct wlan_objmgr_vdev *vdev)
 	return mlme_get_vdev_max_mcs_idx(vdev);
 }
 #endif /* WLAN_FEATURE_SON */
+
+/**
+ * ucfg_mlme_get_wds_mode() - Get the configured WDS mode
+ * @psoc: pointer to psoc object
+ *
+ * Return: supported wds mode from enum wlan_wds_mode
+ */
+static inline uint32_t
+ucfg_mlme_get_wds_mode(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_wds_mode(psoc);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */
