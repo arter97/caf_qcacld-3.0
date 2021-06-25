@@ -647,7 +647,7 @@ wlan_rptr_core_pdev_pref_uplink_set(struct wlan_objmgr_pdev *pdev,
 	if (pdev_priv) {
 		RPTR_PDEV_LOCK(&pdev_priv->rptr_pdev_lock);
 		pdev_priv->preferredUplink = value;
-		RPTR_PDEV_LOCK(&pdev_priv->rptr_pdev_lock);
+		RPTR_PDEV_UNLOCK(&pdev_priv->rptr_pdev_lock);
 	}
 	RPTR_LOGI("Preferred uplink set as %d for pdev_id: %d\n",
 		  value, pdev_id);
@@ -663,7 +663,7 @@ wlan_rptr_core_pdev_pref_uplink_get(struct wlan_objmgr_pdev *pdev,
 	if (pdev_priv) {
 		RPTR_PDEV_LOCK(&pdev_priv->rptr_pdev_lock);
 		*val = pdev_priv->preferredUplink;
-		RPTR_PDEV_LOCK(&pdev_priv->rptr_pdev_lock);
+		RPTR_PDEV_UNLOCK(&pdev_priv->rptr_pdev_lock);
 	}
 }
 
