@@ -32,45 +32,84 @@
 
 #ifdef CONFIG_HOST_FIND_CHAN
 
-static inline int is_11ax_supported(uint32_t wireless_modes, uint32_t phybitmap)
+#ifdef WLAN_FEATURE_11BE
+static inline int is_11be_supported(uint64_t wireless_modes, uint32_t phybitmap)
+{
+	return (WIRELESS_11BE_MODES & wireless_modes) &&
+		!(phybitmap & REGULATORY_PHYMODE_NO11BE);
+}
+#else
+static inline int is_11be_supported(uint64_t wireless_modes, uint32_t phybitmap)
+{
+	return false;
+}
+#endif
+
+static inline int is_11ax_supported(uint64_t wireless_modes, uint32_t phybitmap)
 {
 	return (WIRELESS_11AX_MODES & wireless_modes) &&
 		!(phybitmap & REGULATORY_PHYMODE_NO11AX);
 }
 
-static inline int is_11ac_supported(uint32_t wireless_modes, uint32_t phybitmap)
+static inline int is_11ac_supported(uint64_t wireless_modes, uint32_t phybitmap)
 {
 	return (WIRELESS_11AC_MODES & wireless_modes) &&
 		!(phybitmap & REGULATORY_PHYMODE_NO11AC);
 }
 
-static inline int is_11n_supported(uint32_t wireless_modes, uint32_t phybitmap)
+static inline int is_11n_supported(uint64_t wireless_modes, uint32_t phybitmap)
 {
 	return (WIRELESS_11N_MODES & wireless_modes) &&
 		!(phybitmap & REGULATORY_CHAN_NO11N);
 }
 
-static inline int is_11g_supported(uint32_t wireless_modes, uint32_t phybitmap)
+static inline int is_11g_supported(uint64_t wireless_modes, uint32_t phybitmap)
 {
 	return (WIRELESS_11G_MODES & wireless_modes) &&
 		!(phybitmap & REGULATORY_PHYMODE_NO11G);
 }
 
-static inline int is_11b_supported(uint32_t wireless_modes, uint32_t phybitmap)
+static inline int is_11b_supported(uint64_t wireless_modes, uint32_t phybitmap)
 {
 	return (WIRELESS_11B_MODES & wireless_modes) &&
 		!(phybitmap & REGULATORY_PHYMODE_NO11B);
 }
 
-static inline int is_11a_supported(uint32_t wireless_modes, uint32_t phybitmap)
+static inline int is_11a_supported(uint64_t wireless_modes, uint32_t phybitmap)
 {
 	return (WIRELESS_11A_MODES & wireless_modes) &&
 		!(phybitmap & REGULATORY_PHYMODE_NO11A);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static void fill_11be_max_phymode_chwidth(uint64_t wireless_modes,
+					  uint32_t phybitmap,
+					  enum phy_ch_width *max_chwidth,
+					  enum reg_phymode *max_phymode)
+{
+	*max_phymode = REG_PHYMODE_11BE;
+	if (wireless_modes & WIRELESS_320_MODES)
+		*max_chwidth = CH_WIDTH_320MHZ;
+	else if (wireless_modes & WIRELESS_160_MODES)
+		*max_chwidth = CH_WIDTH_160MHZ;
+	else if (wireless_modes & WIRELESS_80_MODES)
+		*max_chwidth = CH_WIDTH_80MHZ;
+	else if (wireless_modes & WIRELESS_40_MODES)
+		*max_chwidth = CH_WIDTH_40MHZ;
+}
+#else
+static inline void
+fill_11be_max_phymode_chwidth(uint64_t wireless_modes,
+			      uint32_t phybitmap,
+			      enum phy_ch_width *max_chwidth,
+			      enum reg_phymode *max_phymode)
+{
+}
+#endif
+
 void reg_update_max_phymode_chwidth_for_pdev(struct wlan_objmgr_pdev *pdev)
 {
-	uint32_t wireless_modes;
+	uint64_t wireless_modes;
 	uint32_t phybitmap;
 	enum phy_ch_width max_chwidth = CH_WIDTH_20MHZ;
 	enum reg_phymode max_phymode = REG_PHYMODE_MAX;
@@ -86,7 +125,10 @@ void reg_update_max_phymode_chwidth_for_pdev(struct wlan_objmgr_pdev *pdev)
 	wireless_modes = pdev_priv_obj->wireless_modes;
 	phybitmap = pdev_priv_obj->phybitmap;
 
-	if (is_11ax_supported(wireless_modes, phybitmap)) {
+	if (is_11be_supported(wireless_modes, phybitmap)) {
+		fill_11be_max_phymode_chwidth(wireless_modes, phybitmap,
+					      &max_chwidth, &max_phymode);
+	} else if (is_11ax_supported(wireless_modes, phybitmap)) {
 		max_phymode = REG_PHYMODE_11AX;
 		if (wireless_modes & WIRELESS_160_MODES)
 			max_chwidth = CH_WIDTH_160MHZ;
@@ -113,13 +155,85 @@ void reg_update_max_phymode_chwidth_for_pdev(struct wlan_objmgr_pdev *pdev)
 	} else if (is_11a_supported(wireless_modes, phybitmap)) {
 		max_phymode = REG_PHYMODE_11A;
 	} else {
-		reg_err("Device does not support any wireless_mode! %0x",
+		reg_err("Device does not support any wireless_mode! %0llx",
 			wireless_modes);
 	}
 
 	pdev_priv_obj->max_phymode = max_phymode;
 	pdev_priv_obj->max_chwidth = max_chwidth;
 }
+
+/**
+ * chwd_2_contbw_lst - Conversion array from channel width enum to value.
+ * Array index of type phy_ch_width, return of type uint16_t.
+ */
+static uint16_t chwd_2_contbw_lst[CH_WIDTH_MAX + 1] = {
+	BW_20_MHZ,   /* CH_WIDTH_20MHZ */
+	BW_40_MHZ,   /* CH_WIDTH_40MHZ */
+	BW_80_MHZ,   /* CH_WIDTH_80MHZ */
+	BW_160_MHZ,  /* CH_WIDTH_160MHZ */
+	BW_80_MHZ,   /* CH_WIDTH_80P80MHZ */
+	BW_5_MHZ,    /* CH_WIDTH_5MHZ */
+	BW_10_MHZ,   /* CH_WIDTH_10MHZ */
+#ifdef WLAN_FEATURE_11BE
+	BW_320_MHZ,  /* CH_WIDTH_320MHZ */
+#endif
+	0,           /* CH_WIDTH_INVALID */
+#ifdef WLAN_FEATURE_11BE
+	BW_320_MHZ,  /* CH_WIDTH_MAX */
+#else
+	BW_160_MHZ,  /* CH_WIDTH_MAX */
+#endif
+
+};
+
+/**
+ * reg_get_max_channel_width() - Get the maximum channel width supported
+ * given a frequency and a global maximum channel width.
+ * @pdev: Pointer to PDEV object.
+ * @freq: Input frequency.
+ * @g_max_width: Global maximum channel width.
+ *
+ * Return: Maximum channel width of type phy_ch_width.
+ */
+#ifdef WLAN_FEATURE_11BE
+static enum phy_ch_width
+reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum phy_ch_width g_max_width)
+{
+	struct reg_channel_list chan_list;
+	uint16_t i, max_bw = 0;
+	enum phy_ch_width output_width = CH_WIDTH_INVALID;
+
+	wlan_reg_fill_channel_list(pdev, freq, 0,
+				   g_max_width, 0,
+				   &chan_list);
+
+	for (i = 0; i < chan_list.num_ch_params; i++) {
+		struct ch_params *ch_param = &chan_list.chan_param[i];
+		uint16_t cont_bw = chwd_2_contbw_lst[ch_param->ch_width];
+
+		if (max_bw < cont_bw) {
+			output_width = ch_param->ch_width;
+			max_bw = cont_bw;
+		}
+	}
+	return output_width;
+}
+#else
+static enum phy_ch_width
+reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
+			  qdf_freq_t freq,
+			  enum phy_ch_width g_max_width)
+{
+	struct ch_params chan_params;
+
+	chan_params.ch_width = g_max_width;
+	reg_get_channel_params(pdev, freq, 0, &chan_params);
+	return chan_params.ch_width;
+}
+#endif
 
 void reg_modify_chan_list_for_max_chwidth(
 		struct wlan_objmgr_pdev *pdev,
@@ -136,30 +250,28 @@ void reg_modify_chan_list_for_max_chwidth(
 	}
 
 	for (i = 0; i < NUM_CHANNELS; i++) {
-		struct ch_params chan_params;
+		enum phy_ch_width g_max_width = pdev_priv_obj->max_chwidth;
+		enum phy_ch_width output_width = CH_WIDTH_INVALID;
+		qdf_freq_t freq = cur_chan_list[i].center_freq;
 
 		if (cur_chan_list[i].chan_flags & REGULATORY_CHAN_DISABLED)
 			continue;
-
-		chan_params.ch_width = pdev_priv_obj->max_chwidth;
 
 		/*
 		 * Correct the max bandwidths if they were not taken care of
 		 * while parsing the reg rules.
 		 */
-		reg_set_channel_params_for_freq(pdev_priv_obj->pdev_ptr,
-						cur_chan_list[i].center_freq,
-						0,
-						&chan_params);
+		output_width = reg_get_max_channel_width(pdev, freq,
+							 g_max_width);
 
-		if (chan_params.ch_width != CH_WIDTH_INVALID)
+		if (output_width != CH_WIDTH_INVALID)
 			cur_chan_list[i].max_bw =
 				qdf_min(cur_chan_list[i].max_bw,
-					reg_get_bw_value(chan_params.ch_width));
+					chwd_2_contbw_lst[output_width]);
 	}
 }
 
-static uint32_t convregphymode2wirelessmodes[REG_PHYMODE_MAX] = {
+static uint64_t convregphymode2wirelessmodes[REG_PHYMODE_MAX] = {
 	0xFFFFFFFF,                  /* REG_PHYMODE_INVALID */
 	WIRELESS_11B_MODES,          /* REG_PHYMODE_11B     */
 	WIRELESS_11G_MODES,          /* REG_PHYMODE_11G     */
@@ -167,27 +279,18 @@ static uint32_t convregphymode2wirelessmodes[REG_PHYMODE_MAX] = {
 	WIRELESS_11N_MODES,          /* REG_PHYMODE_11N     */
 	WIRELESS_11AC_MODES,         /* REG_PHYMODE_11AC    */
 	WIRELESS_11AX_MODES,         /* REG_PHYMODE_11AX    */
+#ifdef WLAN_FEATURE_11BE
+	WIRELESS_11BE_MODES,         /* REG_PHYMODE_11BE    */
+#endif
 };
 
 static int reg_is_phymode_in_wireless_modes(enum reg_phymode phy_in,
-					    uint32_t wireless_modes)
+					    uint64_t wireless_modes)
 {
-	uint32_t sup_wireless_modes = convregphymode2wirelessmodes[phy_in];
+	uint64_t sup_wireless_modes = convregphymode2wirelessmodes[phy_in];
 
 	return sup_wireless_modes & wireless_modes;
 }
-
-static uint16_t get_contiguous_bw[CH_WIDTH_MAX + 1] = {
-	BW_20_MHZ,   /* CH_WIDTH_20MHZ */
-	BW_40_MHZ,   /* CH_WIDTH_40MHZ */
-	BW_80_MHZ,   /* CH_WIDTH_80MHZ */
-	BW_160_MHZ,  /* CH_WIDTH_160MHZ */
-	BW_80_MHZ,   /* CH_WIDTH_80P80MHZ */
-	BW_5_MHZ,    /* CH_WIDTH_5MHZ */
-	BW_10_MHZ,   /* CH_WIDTH_10MHZ */
-	0,           /* CH_WIDTH_INVALID */
-	BW_160_MHZ,  /* CH_WIDTH_MAX */
-};
 
 bool reg_is_phymode_chwidth_allowed(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
@@ -195,8 +298,9 @@ bool reg_is_phymode_chwidth_allowed(
 		enum phy_ch_width ch_width,
 		qdf_freq_t freq)
 {
-	uint32_t phymode_bitmap, wireless_modes;
-	uint16_t i, bw = get_contiguous_bw[ch_width];
+	uint32_t phymode_bitmap;
+	uint64_t wireless_modes;
+	enum phy_ch_width output_width = CH_WIDTH_INVALID;
 
 	if (ch_width == CH_WIDTH_INVALID)
 		return false;
@@ -208,24 +312,14 @@ bool reg_is_phymode_chwidth_allowed(
 	    !reg_is_phymode_in_wireless_modes(phy_in, wireless_modes))
 		return false;
 
-	for (i = 0; i < NUM_CHANNELS; i++) {
-		if (pdev_priv_obj->cur_chan_list[i].center_freq != freq)
-			continue;
+	output_width = reg_get_max_channel_width(pdev_priv_obj->pdev_ptr,
+						 freq,
+						 ch_width);
 
-		if ((pdev_priv_obj->cur_chan_list[i].state ==
-		     CHANNEL_STATE_DISABLE) &&
-		    !(pdev_priv_obj->cur_chan_list[i].nol_chan) &&
-		    !(pdev_priv_obj->cur_chan_list[i].nol_history))
-			return false;
+	if (output_width != ch_width)
+		return false;
 
-		if (bw < pdev_priv_obj->cur_chan_list[i].min_bw ||
-		    bw > pdev_priv_obj->cur_chan_list[i].max_bw)
-			return false;
-
-		return true;
-	}
-
-	return false;
+	return true;
 }
 
 void reg_set_chan_blocked(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
@@ -851,6 +945,29 @@ void reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 					   sec_ch_2g_freq);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static enum phy_ch_width reg_find_chwidth_from_bw(uint16_t bw)
+{
+	switch (bw) {
+	case BW_5_MHZ:
+		return CH_WIDTH_5MHZ;
+	case BW_10_MHZ:
+		return CH_WIDTH_10MHZ;
+	case BW_20_MHZ:
+		return CH_WIDTH_20MHZ;
+	case BW_40_MHZ:
+		return CH_WIDTH_40MHZ;
+	case BW_80_MHZ:
+		return CH_WIDTH_80MHZ;
+	case BW_160_MHZ:
+		return CH_WIDTH_160MHZ;
+	case BW_320_MHZ:
+		return CH_WIDTH_320MHZ;
+	default:
+		return CH_WIDTH_INVALID;
+	}
+}
+#else
 static enum phy_ch_width reg_find_chwidth_from_bw(uint16_t bw)
 {
 	switch (bw) {
@@ -870,6 +987,21 @@ static enum phy_ch_width reg_find_chwidth_from_bw(uint16_t bw)
 		return CH_WIDTH_INVALID;
 	}
 }
+#endif
+
+#ifdef WLAN_FEATURE_11BE
+static void
+fill_320mhz_modes(int max_bw, uint64_t *wireless_modes)
+{
+	if (max_bw < BW_320_MHZ)
+		*wireless_modes &= (~WIRELESS_320_MODES);
+}
+#else
+static inline void
+fill_320mhz_modes(int max_bw, uint64_t *wireless_modes)
+{
+}
+#endif
 
 void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 			       uint64_t *mode_select,
@@ -914,7 +1046,7 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 			ch_param.ch_width = reg_find_chwidth_from_bw(cur_bw);
 			wlan_reg_set_channel_params_for_freq(pdev, freq, 0,
 							     &ch_param);
-			cur_bw = get_contiguous_bw[ch_param.ch_width];
+			cur_bw = chwd_2_contbw_lst[ch_param.ch_width];
 		}
 
 		if (max_bw < cur_bw)
@@ -935,5 +1067,6 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 			in_wireless_modes &= (~WIRELESS_80P80_MODES);
 	}
 
+	fill_320mhz_modes(max_bw, &in_wireless_modes);
 	*mode_select = in_wireless_modes;
 }
