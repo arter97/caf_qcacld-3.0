@@ -4706,7 +4706,6 @@ static void dp_htt_bkp_event_alert(u_int32_t *msg_word, struct htt_soc *soc)
 	}
 
 	dp_queue_ring_stats(pdev);
-	dp_print_napi_stats(pdev->soc);
 }
 
 /*
@@ -6051,6 +6050,7 @@ static void dp_bk_pressure_stats_handler(void *context)
 			       soc_srngs_state->seq_num);
 		qdf_mem_free(soc_srngs_state);
 	}
+	dp_print_napi_stats(pdev->soc);
 }
 
 /*
