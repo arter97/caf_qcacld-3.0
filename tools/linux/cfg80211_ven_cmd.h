@@ -777,6 +777,7 @@ enum {
 	IEEE80211_PARAM_PUNCTURE_BITMAP            = 746,   /* get 11be puncture bitmap */
 #endif /* WLAN_FEATURE_11BE */
 
+	IEEE80211_PARAM_MBO_BSTM_REQ               = 747,   /* Enable MBO IE in BSTM req. */
 };
 
 enum {
