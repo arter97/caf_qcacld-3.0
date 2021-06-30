@@ -186,9 +186,10 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 	 * Received CCE metadata should be within the
 	 * valid limits
 	 */
-	qdf_assert_always((cce_metadata >= RX_PROTOCOL_TAG_START_OFFSET) &&
-			  (cce_metadata < (RX_PROTOCOL_TAG_START_OFFSET +
-			   RX_PROTOCOL_TAG_MAX)));
+	if (qdf_unlikely(cce_metadata < RX_PROTOCOL_TAG_START_OFFSET) ||
+			  (cce_metadata >= (RX_PROTOCOL_TAG_START_OFFSET +
+			   RX_PROTOCOL_TAG_MAX)))
+		return;
 
 	/*
 	 * The CCE metadata received is just the
