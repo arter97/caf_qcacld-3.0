@@ -67,6 +67,7 @@ struct extender_msg {
 	u8 *frm;
 	u8 apvaps_cnt;
 	u8 stavaps_cnt;
+	enum QDF_OPMODE opmode;
 };
 
 struct ext_connection_info {
@@ -1190,8 +1191,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	wlan_rptr_same_ssid_feature_t *ss_info = NULL;
 	bool max_priority_stavap_disconnected = 0;
 	struct dbdc_flags flags;
-	struct iterate_info iterate_msg;
-	uint8_t i;
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ss_info = &g_priv->ss_info;
@@ -1207,13 +1206,6 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 
 	ext_cb->legacy_dbdc_flags_get(pdev, &flags);
 
-	if (g_priv->global_feature_caps & wlan_rptr_global_f_s_ssid) {
-		RPTR_PDEV_LOCK(&pdev_priv->rptr_pdev_lock);
-		pdev_priv->extender_connection = 0;
-		qdf_mem_zero(pdev_priv->preferred_bssid, QDF_MAC_ADDR_SIZE);
-		RPTR_PDEV_UNLOCK(&pdev_priv->rptr_pdev_lock);
-	}
-
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	g_priv->num_stavaps_up--;
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
@@ -1223,27 +1215,12 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 
 	qca_multi_link_append_num_sta(false);
 
+	wlan_rptr_s_ssid_vdev_connection_down(vdev);
+
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	if (g_priv->num_stavaps_up == 1) {
 		ext_cb->legacy_dbdc_rootap_set(pdev, 0);
 	} else if (g_priv->num_stavaps_up == 0) {
-		if (g_priv->global_feature_caps & wlan_rptr_global_f_s_ssid) {
-			ss_info->extender_info = 0;
-			ss_info->ap_preference = 0;
-			ss_info->rootap_access_downtime = qdf_get_system_timestamp();
-			for (i = 0; i < RPTR_MAX_RADIO_CNT; i++) {
-				qdf_mem_zero(&ss_info->preferred_bssid_list[i][0], QDF_MAC_ADDR_SIZE);
-				qdf_mem_zero(&ss_info->denied_client_list[i][0], QDF_MAC_ADDR_SIZE);
-			}
-			RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
-			iterate_msg.obj_type = WLAN_PDEV_OP;
-			iterate_msg.iterate_arg = NULL;
-			iterate_msg.cb_func = wlan_rptr_pdev_update_beacon_cb;
-
-			wlan_objmgr_iterate_psoc_list(wlan_rptr_psoc_iterate_list,
-					&iterate_msg, WLAN_MLME_NB_ID);
-			RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
-		}
 		val.cdp_vdev_param_da_war = 1;
 		cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id, CDP_ENABLE_DA_WAR,
 				val);
@@ -1416,19 +1393,21 @@ wlan_rptr_vdev_extender_info_cb(struct wlan_objmgr_psoc *psoc,
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	ext_info = ((struct extender_msg *)arg);
 
-	if (opmode == QDF_SAP_MODE) {
-		WLAN_ADDR_COPY(ext_info->frm, wlan_vdev_mlme_get_macaddr(vdev));
-		ext_info->frm += QDF_MAC_ADDR_SIZE;
-		ext_info->apvaps_cnt++;
-	}
-	if (opmode == QDF_STA_MODE) {
-		/*Copy only MPSTA mac address, not PSTA mac address*/
-		if (wlan_rptr_is_psta_vdev(vdev))
-			return;
+	if (opmode == ext_info->opmode) {
+		if (opmode == QDF_SAP_MODE) {
+			WLAN_ADDR_COPY(ext_info->frm, wlan_vdev_mlme_get_macaddr(vdev));
+			ext_info->frm += QDF_MAC_ADDR_SIZE;
+			ext_info->apvaps_cnt++;
+		}
+		if (opmode == QDF_STA_MODE) {
+			/*Copy only MPSTA mac address, not PSTA mac address*/
+			if (wlan_rptr_is_psta_vdev(vdev))
+				return;
 
-		WLAN_ADDR_COPY(ext_info->frm, wlan_vdev_mlme_get_macaddr(vdev));
-		ext_info->frm += QDF_MAC_ADDR_SIZE;
-		ext_info->stavaps_cnt++;
+			WLAN_ADDR_COPY(ext_info->frm, wlan_vdev_mlme_get_macaddr(vdev));
+			ext_info->frm += QDF_MAC_ADDR_SIZE;
+			ext_info->stavaps_cnt++;
+		}
 	}
 }
 
@@ -1487,8 +1466,14 @@ wlan_rptr_add_extender_ie(struct wlan_objmgr_vdev *vdev,
 		ext_info.apvaps_cnt = 0;
 		ext_info.stavaps_cnt = 0;
 
+		ext_info.opmode = QDF_SAP_MODE;
 		wlan_objmgr_iterate_psoc_list(wlan_rptr_psoc_iterate_list,
 					      &iterate_msg, WLAN_MLME_NB_ID);
+
+		ext_info.opmode = QDF_STA_MODE;
+		wlan_objmgr_iterate_psoc_list(wlan_rptr_psoc_iterate_list,
+					      &iterate_msg, WLAN_MLME_NB_ID);
+
 		*pos1 = ext_info.apvaps_cnt;
 		*pos2 = ext_info.stavaps_cnt;
 		*ie_len += ((ext_info.apvaps_cnt + ext_info.stavaps_cnt) *
@@ -1849,23 +1834,29 @@ wlan_rptr_s_ssid_vdev_connection_down(struct wlan_objmgr_vdev *vdev)
 	if (!pdev_priv)
 		return;
 
+	RPTR_PDEV_LOCK(&pdev_priv->rptr_pdev_lock);
 	pdev_priv->extender_connection = ext_connection_type_init;
-	OS_MEMSET(pdev_priv->preferred_bssid, 0, QDF_MAC_ADDR_SIZE);
+	qdf_mem_zero(pdev_priv->preferred_bssid, QDF_MAC_ADDR_SIZE);
+	RPTR_PDEV_UNLOCK(&pdev_priv->rptr_pdev_lock);
 
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
-	if (g_priv->num_stavaps_up) {
-		ss_info = &g_priv->ss_info;
+	ss_info = &g_priv->ss_info;
+	if (g_priv->num_stavaps_up == 0) {
 		ss_info->ap_preference = ap_preference_type_init;
 		ss_info->extender_info = 0;
-		ss_info->rootap_access_downtime = OS_GET_TIMESTAMP();
+		ss_info->rootap_access_downtime = qdf_get_system_timestamp();
 		for (i = 0; i < RPTR_MAX_RADIO_CNT; i++) {
-			OS_MEMZERO(&ss_info->preferred_bssid_list[i][0],
-				   QDF_MAC_ADDR_SIZE);
-			OS_MEMZERO(&ss_info->denied_client_list[i][0],
-				   QDF_MAC_ADDR_SIZE);
+			qdf_mem_zero(&ss_info->preferred_bssid_list[i][0],
+					QDF_MAC_ADDR_SIZE);
+			qdf_mem_zero(&ss_info->denied_client_list[i][0],
+					QDF_MAC_ADDR_SIZE);
 		}
 	}
+	RPTR_LOGI("AP preference:%d Extender connection:%d Extender info:0x%x",
+		 ss_info->ap_preference, pdev_priv->extender_connection,
+		 ss_info->extender_info);
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+
 	iterate_msg.obj_type = WLAN_PDEV_OP;
 	iterate_msg.iterate_arg = NULL;
 	iterate_msg.cb_func = wlan_rptr_pdev_update_beacon_cb;
