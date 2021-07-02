@@ -6649,6 +6649,7 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 		       soc->stats.rx.reo2rel_route_drop);
 	DP_PRINT_STATS("invalid buffer type: %u msdus",
 		       soc->stats.rx.err.reo_invalid_buf_type);
+	DP_PRINT_STATS("Rx Flush count:%d", soc->stats.rx.err.rx_flush_count);
 }
 
 #ifdef FEATURE_TSO_STATS
