@@ -2397,10 +2397,13 @@ enum hal_rx_wbm_reo_push_reason {
  * this frame to this queue
  * @ HAL_RX_WBM_RXDMA_PSH_RSN_ROUTE: RXDMA pushed the frame to this queue
  * per received routing instructions. No error within RXDMA was detected
+ * @ HAL_RX_WBM_RXDMA_PSH_RSN_FLUSH: RXDMA received an RX_FLUSH
  */
 enum hal_rx_wbm_rxdma_push_reason {
 	HAL_RX_WBM_RXDMA_PSH_RSN_ERROR = 0,
 	HAL_RX_WBM_RXDMA_PSH_RSN_ROUTE,
+	HAL_RX_WBM_RXDMA_PSH_RSN_FLUSH,
+
 };
 
 
