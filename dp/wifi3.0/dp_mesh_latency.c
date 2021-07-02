@@ -124,14 +124,7 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 	msduq = (priority >> DP_MESH_LATENCY_VALID_MSDUQ_SHIFT)
 					& DP_MESH_LATENCY_VALID_MSDUQ_MASK;
 
-	/*
-	 * Convert TID to service interval range
-	 * 10ms (XR): AC_VO
-	 * 20ms (VoIP/Gaming): AC_VO
-	 * 40ms (Video Call): AC_VI
-	 * 80ms (Web-browsing): AC__BE
-	 */
-	ac = dp_mesh_latency_get_ac_frm_service_interval(&service_interval);
+	ac = TID_TO_WME_AC(tid);;
 
 	/*
 	 * Update per TID peer mesh latency related parameters
