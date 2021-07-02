@@ -27,8 +27,10 @@
 #include <wlan_scan.h>
 
 /* REPEATER global Feature flags */
+#if REPEATER_SAME_SSID
 /* SAME SSID feature*/
 #define wlan_rptr_global_f_s_ssid     0x00000001
+#endif
 /* GLOBAL_WDS*/
 #define wlan_rptr_global_f_g_wds      0x00000002
 
@@ -133,8 +135,10 @@ struct rptr_ext_cbacks {
 	void (*peer_disassoc)(struct wlan_objmgr_peer *peer);
 	void (*pdev_update_beacon)(struct wlan_objmgr_pdev *pdev);
 	bool (*target_lithium)(struct wlan_objmgr_pdev *pdev);
+#if REPEATER_SAME_SSID
 	bool (*dessired_ssid_found)(struct wlan_objmgr_vdev *vdev,
 				    u8 *ssid, u8 ssid_len);
+#endif
 #if DBDC_REPEATER_SUPPORT
 	void (*legacy_dbdc_flags_get)(struct wlan_objmgr_pdev *pdev,
 				      struct dbdc_flags *flags);
@@ -410,7 +414,9 @@ wlan_rptr_global_clear_feat_cap(wlan_rptr_global_f_##xyz); \
 return; \
 }
 
+#if REPEATER_SAME_SSID
 WLAN_RPTR_GLOBAL_FLAG_FUNCS(s_ssid)
+#endif
 WLAN_RPTR_GLOBAL_FLAG_FUNCS(g_wds)
 
 /**
@@ -485,10 +491,10 @@ int wlan_rptr_pdev_extd_ioctl(struct wlan_objmgr_pdev *pdev, int param,
  *
  * return: void
  */
+#if ATH_SUPPORT_WRAP
 void wlan_rptr_vdev_get_qwrap_cflags(struct wlan_objmgr_vdev *vdev, bool *psta,
 				     bool *mpsta, bool *wrap);
 
-#if ATH_SUPPORT_WRAP
 /**
  * wlan_rptr_vdev_create_complete() - Set vdev params on vdev create
  * complete
@@ -561,7 +567,6 @@ wlan_rptr_set_psta_bssid_filter(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS
 wlan_rptr_psta_validate_chan(struct wlan_objmgr_vdev *vdev, uint16_t freq);
-#endif
 
 /**
  * wlan_rptr_get_qwrap_vdevs_for_pdev_id() - Get total number of qwrap vdevs
@@ -600,6 +605,7 @@ uint8_t wlan_rptr_get_qwrap_peers_for_pdev_id(struct wlan_objmgr_psoc *psoc,
  * @ssid_len- ssid length
  * return void
  */
+#if REPEATER_SAME_SSID
 void
 wlan_rptr_same_ssid_check(struct wlan_objmgr_vdev *vdev,
 			  u8 *ssid, u_int32_t ssid_len);
@@ -696,3 +702,5 @@ uint8_t
 wlan_rptr_update_extender_info(struct wlan_objmgr_vdev *vdev,
 			       ieee80211_scan_entry_t scan_entry,
 			       u8 *disconnect_sec_stavap, u8 *bssid);
+#endif
+#endif
