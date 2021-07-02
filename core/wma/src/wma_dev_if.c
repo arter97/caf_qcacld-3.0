@@ -2803,7 +2803,7 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 	}
 
 	/* Send the dynamic nss chain params before vdev start to fw */
-	if (wma->dynamic_nss_chains_support)
+	if (wma->dynamic_nss_chains_support && !restart)
 		wma_vdev_nss_chain_params_send(vdev_id, ini_cfg);
 
 	status = ucfg_coex_psoc_get_btc_chain_mode(wma->psoc, &btc_chain_mode);
@@ -3482,20 +3482,6 @@ static QDF_STATUS wma_update_iface_params(tp_wma_handle wma,
 	if (!iface->addBssStaContext)
 		return QDF_STATUS_E_RESOURCES;
 	*iface->addBssStaContext = add_bss->staContext;
-	if (iface->staKeyParams) {
-		qdf_mem_free(iface->staKeyParams);
-		iface->staKeyParams = NULL;
-	}
-	if (add_bss->extSetStaKeyParamValid) {
-		iface->staKeyParams =
-			qdf_mem_malloc(sizeof(tSetStaKeyParams));
-		if (!iface->staKeyParams) {
-			qdf_mem_free(iface->addBssStaContext);
-			iface->addBssStaContext = NULL;
-			return QDF_STATUS_E_RESOURCES;
-		}
-		*iface->staKeyParams = add_bss->extSetStaKeyParam;
-	}
 	/* Save parameters later needed by WMA_ADD_STA_REQ */
 	iface->rmfEnabled = add_bss->rmfEnabled;
 	if (add_bss->rmfEnabled)

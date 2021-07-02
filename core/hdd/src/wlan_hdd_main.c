@@ -2219,10 +2219,6 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	ucfg_ipa_set_dp_handle(hdd_ctx->psoc,
 			       cds_get_context(QDF_MODULE_ID_SOC));
 	ucfg_ipa_set_pdev_id(hdd_ctx->psoc, OL_TXRX_PDEV_ID);
-	ucfg_ipa_reg_sap_xmit_cb(hdd_ctx->pdev,
-				 hdd_softap_ipa_start_xmit);
-	ucfg_ipa_reg_send_to_nw_cb(hdd_ctx->pdev,
-				   hdd_ipa_send_nbuf_to_network);
 
 	status = ucfg_mlme_get_sub_20_chan_width(hdd_ctx->psoc,
 						 &sub_20_chan_width);
@@ -2438,6 +2434,8 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	hdd_ctx->dfs_cac_offload = cfg->dfs_cac_offload;
 	hdd_ctx->lte_coex_ant_share = cfg->services.lte_coex_ant_share;
 	hdd_ctx->obss_scan_offload = cfg->services.obss_scan_offload;
+	ucfg_scan_set_obss_scan_offload(hdd_ctx->psoc,
+					hdd_ctx->obss_scan_offload);
 	status = ucfg_mlme_set_obss_detection_offload_enabled(
 			hdd_ctx->psoc, cfg->obss_detection_offloaded);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -3682,9 +3680,11 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 	void *hif_ctx;
 	struct target_psoc_info *tgt_hdl;
 
+	hdd_enter();
 	qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 	if (!qdf_dev) {
 		hdd_err("QDF Device Context is Invalid return");
+		hdd_exit();
 		return -EINVAL;
 	}
 
@@ -3890,6 +3890,11 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 
 	hdd_ctx->driver_status = DRIVER_MODULES_ENABLED;
 	hdd_nofl_debug("Wlan transitioned (now ENABLED)");
+
+	ucfg_ipa_reg_sap_xmit_cb(hdd_ctx->pdev,
+				 hdd_softap_ipa_start_xmit);
+	ucfg_ipa_reg_send_to_nw_cb(hdd_ctx->pdev,
+				   hdd_ipa_send_nbuf_to_network);
 
 	hdd_exit();
 
@@ -6695,11 +6700,13 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 		if (!wlan_sap_is_pre_cac_context(sap_ctx) &&
 		    (hdd_ctx->sap_pre_cac_work.fn))
 			cds_flush_work(&hdd_ctx->sap_pre_cac_work);
-		wlansap_cleanup_cac_timer(sap_ctx);
 
 		/* fallthrough */
 
 	case QDF_P2P_GO_MODE:
+		sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+		wlansap_cleanup_cac_timer(sap_ctx);
+
 		cds_flush_work(&adapter->sap_stop_bss_work);
 		if (qdf_atomic_read(&adapter->session.ap.acs_in_progress)) {
 			hdd_info("ACS in progress, wait for complete");
@@ -12787,7 +12794,6 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	bool value;
 	enum pmo_auto_pwr_detect_failure_mode auto_power_fail_mode;
 	bool bval = false;
-	qdf_device_t qdf_ctx;
 
 	mac_handle = hdd_ctx->mac_handle;
 
@@ -12885,14 +12891,9 @@ int hdd_configure_cds(struct hdd_context *hdd_ctx)
 	 * observed otherwise.
 	 */
 
-	qdf_ctx = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
-	if (!qdf_ctx) {
-		hdd_err("QDF device context is NULL");
-		goto out;
-	}
-
-	if (ucfg_ipa_uc_ol_init(hdd_ctx->pdev, qdf_ctx)) {
-		hdd_err("Failed to setup pipes");
+	status = ipa_register_is_ipa_ready(hdd_ctx->pdev);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("ipa_register_is_ipa_ready failed");
 		goto out;
 	}
 
@@ -13161,6 +13162,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		}
 		/* pdev close and destroy use tx rx ops so call this here */
 		wlan_global_lmac_if_close(hdd_ctx->psoc);
+		ucfg_ipa_component_config_free();
 	}
 
 	/*

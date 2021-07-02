@@ -135,6 +135,7 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	bool qos_mode;
 	tDot11fIEVHTCaps *vht_caps = NULL;
 	tDot11fIEhe_cap *he_cap = NULL;
+	struct bss_description *bss_desc = NULL;
 
 	lim_get_phy_mode(mac_ctx, &phy_mode, session_entry);
 	sta_ds->staType = STA_ENTRY_SELF;
@@ -191,10 +192,14 @@ void lim_update_assoc_sta_datas(struct mac_context *mac_ctx,
 	if (lim_is_sta_he_capable(sta_ds))
 		he_cap = &assoc_rsp->he_cap;
 
+	if (session_entry->lim_join_req)
+		bss_desc = &session_entry->lim_join_req->bssDescription;
+
 	if (lim_populate_peer_rate_set(mac_ctx, &sta_ds->supportedRates,
 				assoc_rsp->HTCaps.supportedMCSSet,
 				false, session_entry,
-				vht_caps, he_cap, sta_ds) !=
+				vht_caps, he_cap, sta_ds,
+				bss_desc) !=
 				QDF_STATUS_SUCCESS) {
 		pe_err("could not get rateset and extended rate set");
 		return;
@@ -601,6 +606,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 #endif
 	uint8_t ap_nss;
 	int8_t rssi;
+	tpRRMCaps rrm_caps = &mac_ctx->rrm.rrmPEContext.rrmEnabledCaps;
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	vdev_id = session_entry->vdev_id;
@@ -1068,6 +1074,12 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx,
 			session_entry->beaconParams.fShortPreamble = true;
 	}
 
+	if (assoc_rsp->rrm_caps.present) {
+		rrm_caps->nonOperatingChanMax =
+					assoc_rsp->rrm_caps.nonOperatinChanMax;
+		rrm_caps->operatingChanMax =
+					assoc_rsp->rrm_caps.operatingChanMax;
+	}
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_CONNECTED, session_entry,
 			      QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);

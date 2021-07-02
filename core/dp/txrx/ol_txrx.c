@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -333,7 +333,7 @@ ol_txrx_get_vdev_by_peer_addr(struct cdp_pdev *ppdev,
 
 	if (!peer) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "PDEV not found for peer_addr:" QDF_MAC_ADDR_STR,
+			  "Peer not found for peer_addr:" QDF_MAC_ADDR_STR,
 			  QDF_MAC_ADDR_ARRAY(peer_addr.bytes));
 		return NULL;
 	}
@@ -1438,13 +1438,31 @@ ol_txrx_pdev_post_attach(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	 */
 	qdf_mem_zero(&pdev->rx_pn[0], sizeof(pdev->rx_pn));
 
+	/* WEP: 24-bit PN */
+	pdev->rx_pn[htt_sec_type_wep40].len =
+		pdev->rx_pn[htt_sec_type_wep104].len =
+			pdev->rx_pn[htt_sec_type_wep128].len = 24;
+
+	pdev->rx_pn[htt_sec_type_wep40].cmp =
+		pdev->rx_pn[htt_sec_type_wep104].cmp =
+			pdev->rx_pn[htt_sec_type_wep128].cmp = ol_rx_pn_cmp24;
+
 	/* TKIP: 48-bit TSC, CCMP: 48-bit PN */
 	pdev->rx_pn[htt_sec_type_tkip].len =
 		pdev->rx_pn[htt_sec_type_tkip_nomic].len =
 			pdev->rx_pn[htt_sec_type_aes_ccmp].len = 48;
+
+	pdev->rx_pn[htt_sec_type_aes_ccmp_256].len =
+		pdev->rx_pn[htt_sec_type_aes_gcmp].len =
+			pdev->rx_pn[htt_sec_type_aes_gcmp_256].len = 48;
+
 	pdev->rx_pn[htt_sec_type_tkip].cmp =
 		pdev->rx_pn[htt_sec_type_tkip_nomic].cmp =
 			pdev->rx_pn[htt_sec_type_aes_ccmp].cmp = ol_rx_pn_cmp48;
+
+	pdev->rx_pn[htt_sec_type_aes_ccmp_256].cmp =
+		pdev->rx_pn[htt_sec_type_aes_gcmp].cmp =
+		    pdev->rx_pn[htt_sec_type_aes_gcmp_256].cmp = ol_rx_pn_cmp48;
 
 	/* WAPI: 128-bit PN */
 	pdev->rx_pn[htt_sec_type_wapi].len = 128;
@@ -1619,11 +1637,39 @@ static void ol_tx_free_descs_inuse(ol_txrx_pdev_handle pdev)
 		 * In particular, check that there are no frames that have
 		 * been given to the target to transmit, for which the
 		 * target has never provided a response.
+		 *
+		 * Rome supports mgmt Tx via HTT interface, not via WMI.
+		 * When mgmt frame is sent, 2 tx desc is allocated:
+		 * mgmt_txrx_desc is allocated in wlan_mgmt_txrx_mgmt_frame_tx,
+		 * ol_tx_desc is allocated in ol_txrx_mgmt_send_ext.
+		 * They point to same net buffer.
+		 * net buffer is mapped in htt_tx_desc_init.
+		 *
+		 * When SSR during Rome STA connected, deauth frame is sent,
+		 * but no tx complete since firmware hung already.
+		 * Pending mgmt frames are unmapped and freed when destroy
+		 * vdev.
+		 * hdd_reset_all_adapters->hdd_stop_adapter->hdd_vdev_destroy
+		 * ->wma_handle_vdev_detach->wlan_mgmt_txrx_vdev_drain
+		 * ->wma_mgmt_frame_fill_peer_cb
+		 * ->mgmt_txrx_tx_completion_handler.
+		 *
+		 * Don't need unmap and free net buffer of mgmt frames again
+		 * during data path clean up, just free ol_tx_desc.
+		 * hdd_wlan_stop_modules->cds_post_disable->cdp_pdev_pre_detach
+		 * ->ol_txrx_pdev_pre_detach->ol_tx_free_descs_inuse.
 		 */
 		if (qdf_atomic_read(&tx_desc->ref_cnt)) {
-			ol_txrx_dbg("Warning: freeing tx frame (no compltn)");
-			ol_tx_desc_frame_free_nonstd(pdev,
-						     tx_desc, 1);
+			if (!ol_tx_get_is_mgmt_over_wmi_enabled() &&
+			    tx_desc->pkt_type >= OL_TXRX_MGMT_TYPE_BASE) {
+				qdf_atomic_init(&tx_desc->ref_cnt);
+				ol_txrx_dbg("Pending mgmt frames nbuf unmapped and freed already when vdev destroyed");
+				/* free the tx desc */
+				ol_tx_desc_free(pdev, tx_desc);
+			} else {
+				ol_txrx_dbg("Warning: freeing tx frame (no compltn)");
+				ol_tx_desc_frame_free_nonstd(pdev, tx_desc, 1);
+			}
 			num_freed_tx_desc++;
 		}
 		htt_tx_desc = tx_desc->htt_tx_desc;
@@ -3624,6 +3670,36 @@ static void ol_txrx_peer_unmap_sync_cb_set(
 }
 
 /**
+ * ol_txrx_peer_flush_frags() - Flush fragments for a particular peer
+ * @soc_hdl - datapath soc handle
+ * @vdev_id - virtual device id
+ * @peer_mac - peer mac address
+ *
+ * Return: None
+ */
+static void
+ol_txrx_peer_flush_frags(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+			 uint8_t *peer_mac)
+{
+	struct ol_txrx_peer_t *peer;
+	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
+	struct ol_txrx_pdev_t *pdev =
+		ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+
+	if (!pdev)
+		return;
+
+	peer =  ol_txrx_peer_find_hash_find_get_ref(pdev, peer_mac, 0, 1,
+						    PEER_DEBUG_ID_OL_INTERNAL);
+	if (!peer)
+		return;
+
+	ol_rx_reorder_peer_cleanup(peer->vdev, peer);
+
+	ol_txrx_peer_release_ref(peer, PEER_DEBUG_ID_OL_INTERNAL);
+}
+
+/**
  * ol_txrx_dump_tx_desc() - dump tx desc total and free count
  * @txrx_pdev: Pointer to txrx pdev
  *
@@ -5146,10 +5222,16 @@ static QDF_STATUS ol_txrx_register_peer(struct ol_txrx_desc_type *sta_desc)
 {
 	struct ol_txrx_peer_t *peer;
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	ol_txrx_pdev_handle pdev =
-		ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+	ol_txrx_pdev_handle pdev;
 	union ol_txrx_peer_update_param_t param;
 	struct privacy_exemption privacy_filter;
+
+	if (!soc) {
+		ol_txrx_err("Soc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
 
 	if (!pdev) {
 		ol_txrx_err("Pdev is NULL");
@@ -5191,12 +5273,18 @@ static QDF_STATUS ol_txrx_register_peer(struct ol_txrx_desc_type *sta_desc)
 static QDF_STATUS ol_txrx_register_ocb_peer(uint8_t *mac_addr)
 {
 	struct ol_txrx_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	ol_txrx_pdev_handle pdev =
-		ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+	ol_txrx_pdev_handle pdev;
 	ol_txrx_peer_handle peer;
 
-	if (!pdev || !soc) {
-		ol_txrx_err("Unable to find pdev or soc!");
+	if (!soc) {
+		ol_txrx_err("Unable to find soc!");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pdev = ol_txrx_get_pdev_from_pdev_id(soc, OL_TXRX_PDEV_ID);
+
+	if (!pdev) {
+		ol_txrx_err("Unable to find pdev!");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -6149,8 +6237,10 @@ static struct cdp_ipa_ops ol_ops_ipa = {
 	.ipa_set_perf_level = ol_txrx_ipa_set_perf_level,
 #ifdef FEATURE_METERING
 	.ipa_uc_get_share_stats = ol_txrx_ipa_uc_get_share_stats,
-	.ipa_uc_set_quota = ol_txrx_ipa_uc_set_quota
+	.ipa_uc_set_quota = ol_txrx_ipa_uc_set_quota,
 #endif
+	.ipa_tx_buf_smmu_mapping = ol_txrx_ipa_tx_buf_smmu_mapping,
+	.ipa_tx_buf_smmu_unmapping = ol_txrx_ipa_tx_buf_smmu_unmapping
 };
 #endif
 
@@ -6228,6 +6318,7 @@ static struct cdp_peer_ops ol_ops_peer = {
 	.set_peer_as_tdls_peer = ol_txrx_set_peer_as_tdls_peer,
 #endif /* CONFIG_HL_SUPPORT */
 	.peer_detach_force_delete = ol_txrx_peer_detach_force_delete,
+	.peer_flush_frags = ol_txrx_peer_flush_frags,
 };
 
 static struct cdp_tx_delay_ops ol_ops_delay = {

@@ -60,7 +60,7 @@ struct mac_context;
 
 #define SIR_MAX_ELEMENT_ID         255
 
-#define SIR_BCN_REPORT_MAX_BSS_DESC       4
+#define SIR_BCN_REPORT_MAX_BSS_DESC       8
 
 #define SIR_NUM_11B_RATES 4     /* 1,2,5.5,11 */
 #define SIR_NUM_11A_RATES 8     /* 6,9,12,18,24,36,48,54 */
@@ -72,7 +72,9 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 
 /* Periodic Tx pattern offload feature */
 #define PERIODIC_TX_PTRN_MAX_SIZE 1536
+#ifndef MAXNUM_PERIODIC_TX_PTRNS
 #define MAXNUM_PERIODIC_TX_PTRNS 6
+#endif
 
 /* FW response timeout values in milli seconds */
 #define SIR_PEER_ASSOC_TIMEOUT           (4000) /* 4 seconds */

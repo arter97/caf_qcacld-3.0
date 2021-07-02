@@ -687,7 +687,6 @@ struct wma_invalid_peer_params {
  * @is_channel_switch: is channel switch
  * @pause_bitmap: pause bitmap
  * @nwType: network type (802.11a/b/g/n/ac)
- * @staKeyParams: sta key parameters
  * @ps_enabled: is powersave enable/disable
  * @peer_count: peer count
  * @roam_synch_in_progress: flag is in progress or not
@@ -735,7 +734,6 @@ struct wma_txrx_node {
 	uint8_t nss;
 	uint16_t pause_bitmap;
 	uint32_t nwType;
-	tSetStaKeyParams *staKeyParams;
 	uint32_t peer_count;
 	bool roam_synch_in_progress;
 	void *plink_status_req;

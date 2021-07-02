@@ -6857,8 +6857,8 @@ static void csr_roam_process_start_bss_success(struct mac_context *mac_ctx,
 	struct bss_description *bss_desc = NULL;
 	struct csr_roam_info *roam_info;
 	struct start_bss_rsp *start_bss_rsp = NULL;
-	eRoamCmdStatus roam_status;
-	eCsrRoamResult roam_result;
+	eRoamCmdStatus roam_status = eCSR_ROAM_INFRA_IND;
+	eCsrRoamResult roam_result = eCSR_ROAM_RESULT_INFRA_STARTED;
 	tSirMacAddr bcast_mac = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	QDF_STATUS status;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
@@ -6931,10 +6931,6 @@ static void csr_roam_process_start_bss_success(struct mac_context *mac_ctx,
 	 * handler of eSIR_SME_JOINED_NEW_BSS will trigger the connection start
 	 * indication in Vista
 	 */
-	if (CSR_IS_INFRA_AP(profile)) {
-		roam_status = eCSR_ROAM_INFRA_IND;
-		roam_result = eCSR_ROAM_RESULT_INFRA_STARTED;
-	}
 	roam_info->staId = (uint8_t)start_bss_rsp->staId;
 	if (CSR_IS_NDI(profile)) {
 		csr_roam_update_ndp_return_params(mac_ctx,
@@ -7582,11 +7578,12 @@ static bool csr_roam_process_results(struct mac_context *mac_ctx, tSmeCmd *cmd,
 	struct csr_roam_info *roam_info;
 	uint32_t session_id = cmd->vdev_id;
 	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, session_id);
-	struct csr_roam_profile *profile = &cmd->u.roamCmd.roamProfile;
-	eRoamCmdStatus roam_status;
-	eCsrRoamResult roam_result;
+	struct csr_roam_profile *profile;
+	eRoamCmdStatus roam_status = eCSR_ROAM_INFRA_IND;
+	eCsrRoamResult roam_result = eCSR_ROAM_RESULT_INFRA_START_FAILED;
 	struct start_bss_rsp  *start_bss_rsp = NULL;
 
+	profile = &cmd->u.roamCmd.roamProfile;
 	if (!session) {
 		sme_err("session %d not found ", session_id);
 		return false;
@@ -7607,10 +7604,7 @@ static bool csr_roam_process_results(struct mac_context *mac_ctx, tSmeCmd *cmd,
 		break;
 	case eCsrStartBssFailure:
 		start_bss_rsp = (struct start_bss_rsp *)context;
-		if (CSR_IS_INFRA_AP(profile)) {
-			roam_status = eCSR_ROAM_INFRA_IND;
-			roam_result = eCSR_ROAM_RESULT_INFRA_START_FAILED;
-		}
+
 		if (CSR_IS_NDI(profile)) {
 			csr_roam_update_ndp_return_params(mac_ctx,
 							  eCsrStartBssFailure,
@@ -18467,6 +18461,8 @@ csr_post_rso_stop(struct mac_context *mac, uint8_t vdev_id, uint16_t reason)
 		req->reason = REASON_SUPPLICANT_DISABLED_ROAMING;
 	else if (reason == REASON_DISCONNECTED)
 		req->reason = REASON_DISCONNECTED;
+	else if (reason == REASON_OS_REQUESTED_ROAMING_NOW)
+		req->reason = REASON_OS_REQUESTED_ROAMING_NOW;
 	else
 		req->reason = REASON_SME_ISSUED;
 
@@ -18651,6 +18647,10 @@ csr_roam_switch_to_rso_stop(struct mac_context *mac, uint8_t vdev_id,
 	 * nothing to do here
 	 */
 	default:
+		/* For LFR2 BTM request, need handoff even roam disabled */
+		if (reason == REASON_OS_REQUESTED_ROAMING_NOW)
+			csr_neighbor_roam_proceed_with_handoff_req(mac,
+								   vdev_id);
 		return QDF_STATUS_SUCCESS;
 	}
 	mlme_set_roam_state(mac->psoc, vdev_id, ROAM_RSO_STOPPED);
