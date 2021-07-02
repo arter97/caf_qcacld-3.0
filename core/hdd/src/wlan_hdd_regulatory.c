@@ -37,6 +37,7 @@
 #include "wlan_hdd_hostapd.h"
 #include "osif_psoc_sync.h"
 #include "sap_internal.h"
+#include "lim_utils.h"
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -1481,15 +1482,27 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	struct hdd_station_ctx *sta_ctx = NULL;
 	struct wlan_objmgr_pdev *pdev = NULL;
 	uint32_t new_phy_mode;
-	bool freq_changed, phy_changed;
+	bool freq_changed, phy_changed, width_changed;
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_STA;
+	struct regulatory_channel *cur_chan_list = NULL;
+	int i;
+	enum phy_ch_width width;
+	uint16_t org_bw = 0;
 
 	pdev = hdd_ctx->pdev;
 
+	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
+	if (!cur_chan_list)
+		return;
+
+	ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
+				       cur_chan_list);
+
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
+		width_changed = false;
 		oper_freq = hdd_get_adapter_home_channel(adapter);
 		if (oper_freq)
 			freq_changed = wlan_reg_is_disable_for_freq(pdev,
@@ -1512,7 +1525,21 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 				csr_convert_from_reg_phy_mode(new_phy_mode);
 			phy_changed = (sta_ctx->reg_phymode != csr_phy_mode);
 
-			if (phy_changed || freq_changed) {
+			width = hdd_get_adapter_width(adapter);
+			org_bw = ch_width_in_mhz(width);
+
+			for (i = 0; i < NUM_CHANNELS; i++) {
+				if (cur_chan_list[i].state ==
+				    CHANNEL_STATE_DISABLE)
+					continue;
+
+				if (cur_chan_list[i].center_freq == oper_freq &&
+				    org_bw > cur_chan_list[i].max_bw) {
+					width_changed = true;
+					break;
+				}
+			}
+			if (phy_changed || freq_changed || width_changed) {
 				wlan_hdd_cm_issue_disconnect(adapter,
 							 REASON_UNSPEC_FAILURE,
 							 false);
@@ -1525,6 +1552,7 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
+	qdf_mem_free(cur_chan_list);
 }
 
 /**
