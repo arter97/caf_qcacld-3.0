@@ -157,6 +157,30 @@ void wlan_reg_clear_allchan_blocked(struct wlan_objmgr_pdev *pdev)
 	 reg_clear_allchan_blocked(pdev);
 }
 
+void wlan_reg_set_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+				 enum ht40_intol ht40intol_flags)
+{
+	reg_set_chan_ht40intol(pdev, freq, ht40intol_flags);
+}
+
+void wlan_reg_clear_chan_ht40intol(struct wlan_objmgr_pdev *pdev,
+				   qdf_freq_t freq,
+				   enum ht40_intol ht40intol_flags)
+{
+	reg_clear_chan_ht40intol(pdev, freq, ht40intol_flags);
+}
+
+bool wlan_reg_is_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+				enum ht40_intol ht40intol_flags)
+{
+	return reg_is_chan_ht40intol(pdev, freq, ht40intol_flags);
+}
+
+void wlan_reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev)
+{
+	 reg_clear_allchan_ht40intol(pdev);
+}
+
 bool wlan_reg_is_band_present(struct wlan_objmgr_pdev *pdev,
 			      enum reg_wifi_band reg_band)
 {
@@ -195,4 +219,11 @@ void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 				 struct ch_params *ch_params)
 {
     reg_get_channel_params(pdev, freq, sec_ch_2g_freq, ch_params);
+}
+
+void wlan_reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
+				    uint64_t *mode_select,
+				    bool include_nol_chan)
+{
+	reg_filter_wireless_modes(pdev, mode_select, include_nol_chan);
 }

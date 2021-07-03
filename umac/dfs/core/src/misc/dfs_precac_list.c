@@ -198,7 +198,8 @@ dfs_find_leftmost_leaf_of_precac_tree(struct precac_tree_node *node)
  */
 
 static void dfs_free_precac_tree_nodes(struct wlan_dfs *dfs,
-				       struct precac_tree_node *root_node)
+				       struct precac_tree_node *root_node,
+				       struct dfs_precac_entry *entry)
 {
 	struct precac_tree_node *left_most_leaf, *prev_root_node;
 
@@ -237,6 +238,12 @@ static void dfs_free_precac_tree_nodes(struct wlan_dfs *dfs,
 		/* Free current node */
 		prev_root_node = root_node;
 		root_node = root_node->left_child;
+
+		/* Update the precac entry with the current root for debug
+		 * purposes. */
+		if (entry)
+			entry->tree_root = root_node;
+		qdf_mem_zero(prev_root_node, sizeof(*prev_root_node));
 		qdf_mem_free(prev_root_node);
 	}
 }
@@ -402,7 +409,7 @@ dfs_create_precac_tree_for_freq(struct wlan_dfs *dfs,
 								 depth,
 								 dfs);
 			if (status) {
-				dfs_free_precac_tree_nodes(dfs, *root);
+				dfs_free_precac_tree_nodes(dfs, *root, NULL);
 				*root = NULL;
 				return status;
 			}
@@ -691,7 +698,8 @@ void dfs_deinit_precac_list(struct wlan_dfs *dfs)
 		TAILQ_FOREACH_SAFE(precac_entry,
 				   &dfs->dfs_precac_list,
 				   pe_list, tmp_precac_entry) {
-			dfs_free_precac_tree_nodes(dfs, precac_entry->tree_root);
+			dfs_free_precac_tree_nodes(dfs, precac_entry->tree_root,
+						   precac_entry);
 			precac_entry->tree_root = NULL;
 			TAILQ_REMOVE(&dfs->dfs_precac_list,
 				     precac_entry, pe_list);
@@ -853,7 +861,7 @@ static void dfs_fill_max_bw_for_chan(struct wlan_dfs *dfs,
 		return;
 	}
 
-	for (i = 0; i < NUM_CHANNELS; i++) {
+	for (i = MIN_5GHZ_CHANNEL; i < MAX_5GHZ_CHANNEL; i++) {
 		if (!WLAN_REG_IS_5GHZ_CH_FREQ(cur_chan_list[i].center_freq))
 			continue;
 
@@ -1152,7 +1160,6 @@ void dfs_init_precac_list(struct wlan_dfs *dfs)
 	u_int i;
 	uint8_t found;
 	struct dfs_precac_entry *tmp_precac_entry;
-	int nchans = 0;
 	QDF_STATUS status;
 	struct dfs_channel_bw *dfs_max_bw_info;
 	int num_precac_roots;
@@ -1165,8 +1172,7 @@ void dfs_init_precac_list(struct wlan_dfs *dfs)
 	 * array with unique frequencies and copy the unique list of frequencies
 	 * to the final list with exact size.
 	 */
-	dfs_mlme_get_dfs_ch_nchans(dfs->dfs_pdev_obj, &nchans);
-	dfs_max_bw_info = qdf_mem_malloc(nchans *
+	dfs_max_bw_info = qdf_mem_malloc(NUM_5GHZ_CHANNELS *
 		sizeof(struct dfs_channel_bw));
 	if (!dfs_max_bw_info) {
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
@@ -1175,9 +1181,8 @@ void dfs_init_precac_list(struct wlan_dfs *dfs)
 	}
 	dfs_fill_max_bw_for_chan(dfs, dfs_max_bw_info, &num_precac_roots);
 
-	TAILQ_INIT(&dfs->dfs_precac_list);
-
 	PRECAC_LIST_LOCK(dfs);
+	TAILQ_INIT(&dfs->dfs_precac_list);
 	for (i = 0; i < num_precac_roots; i++) {
 		uint16_t pri_chan_cfreq = dfs_max_bw_info[i].dfs_center_ch_freq;
 
@@ -1226,7 +1231,7 @@ void dfs_init_precac_list(struct wlan_dfs *dfs)
 							       precac_entry,
 							       dfs_max_bw_info,
 							       i);
-			if (status)
+			if (status) /* should we return? */
 				continue;
 			/* Some channels like 36HT160 might have a non DFS
 			 * part. Mark the non DFS portion as precac done.

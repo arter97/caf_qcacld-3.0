@@ -127,78 +127,6 @@ struct wlan_objmgr_vdev *dp_wrap_get_vdev(struct wlan_objmgr_pdev *pdev)
 }
 
 /**
- * dp_wrap_vdev_is_mat_set() - Indicates whether mat translation is set
- *
- * @vdev: handle to the objmgr vdev.
- * Return: true if mat is set, false otherwise
- */
-static inline bool dp_wrap_vdev_is_mat_set(struct wlan_objmgr_vdev *vdev)
-{
-	if (vdev && wlan_vdev_mlme_feat_ext_cap_get(vdev, WLAN_VDEV_FEXT_MAT))
-		return true;
-	else
-		return false;
-}
-
-/**
- * dp_wrap_vdev_is_wired_psta() - Indicates whether vdev is wired psta.
- *
- * @vdev: handle to the objmgr vdev.
- * Return: true if wired psta, false otherwise.
- */
-static inline bool dp_wrap_vdev_is_wired_psta(struct wlan_objmgr_vdev *vdev)
-{
-	if (vdev && wlan_vdev_mlme_feat_ext_cap_get(
-		vdev, WLAN_VDEV_FEXT_WIRED_PSTA))
-		return true;
-	else
-		return false;
-}
-
-/**
- * dp_wrap_vdev_is_psta() - Indicates whether vdev is of type PSTA.
- *
- * @vdev: handle to the objmgr vdev.
- * Return: True if psta, false otherwise
- */
-static inline bool dp_wrap_vdev_is_psta(struct wlan_objmgr_vdev *vdev)
-{
-	if (vdev && wlan_vdev_mlme_feat_ext_cap_get(vdev, WLAN_VDEV_FEXT_PSTA))
-		return true;
-	else
-		return false;
-}
-
-/**
- * dp_wrap_vdev_is_mpsta() - Indicates whether vdev is of type MPSTA.
- *
- * @vdev: handle to the objmgr vdev.
- * Return: True if mpsta, false otherwise.
- */
-static inline bool dp_wrap_vdev_is_mpsta(struct wlan_objmgr_vdev *vdev)
-{
-	if (vdev && wlan_vdev_mlme_feat_ext_cap_get(
-		vdev, WLAN_VDEV_FEXT_MPSTA))
-		return true;
-	else
-		return false;
-}
-
-/**
- * dp_wrap_vdev_is_wrap() - Indicates whether vdev is of type WRAP.
- *
- * @vdev: handle to the objmgr vdev.
- * Return: True if wrap, false otherwise.
- */
-static bool dp_wrap_vdev_is_wrap(struct wlan_objmgr_vdev *vdev)
-{
-	if (vdev && wlan_vdev_mlme_feat_ext_cap_get(vdev, WLAN_VDEV_FEXT_WRAP))
-		return true;
-	else
-		return false;
-}
-
-/**
  * dp_wrap_vdev_get_nwrapvaps() - Get number of wrap vaps
  *
  * @pdev: handle to the objmgr pdev.
@@ -387,6 +315,7 @@ void dp_wrap_vdev_set_netdev(struct wlan_objmgr_vdev *vdev,
 void dp_wrap_register_xmit_handler(struct wlan_objmgr_vdev *vdev,
 				    void (*wlan_vdev_xmit_queue)
 				    (struct net_device *dev, wbuf_t wbuf));
+struct net_device *dp_wrap_vdev_get_netdev(struct wlan_objmgr_vdev *vdev);
 #endif
 #endif
 #endif

@@ -133,7 +133,6 @@ struct htt_debug_log_info {
 	uint64_t htt_cmd_disable_list;
 	uint64_t htt_event_disable_list;
 	uint64_t htt_wbm_event_disable_list;
-	uint16_t stop_seq;
 	qdf_dentry_t htt_log_debugfs_dir;
 };
 

@@ -24,6 +24,8 @@
 #ifndef __REG_CHANNEL_H_
 #define __REG_CHANNEL_H_
 
+#include <wlan_reg_channel_api.h>
+
 #define NEXT_20_CH_OFFSET 20
 
 #ifdef CONFIG_HOST_FIND_CHAN
@@ -137,7 +139,8 @@ enum {
 			      | HOST_REGDMN_MODE_11BEA_EHT40PLUS \
 			      | HOST_REGDMN_MODE_11BEA_EHT40MINUS \
 			      | HOST_REGDMN_MODE_11BEA_EHT80 \
-			      | HOST_REGDMN_MODE_11BEA_EHT160)
+			      | HOST_REGDMN_MODE_11BEA_EHT160 \
+			      | HOST_REGDMN_MODE_11BEA_EHT320)
 #endif
 
 #define WIRELESS_11AC_MODES  (HOST_REGDMN_MODE_11AC_VHT20 \
@@ -212,6 +215,115 @@ enum {
 			      | HOST_REGDMN_MODE_11AXA_HE160)
 #endif
 
+#define WIRELESS_80P80_MODES (HOST_REGDMN_MODE_11AC_VHT80_80 \
+			      | HOST_REGDMN_MODE_11AXA_HE80_80)
+
+#ifdef WLAN_FEATURE_11BE
+#define WIRELESS_320_MODES (HOST_REGDMN_MODE_11BEA_EHT320)
+#endif
+
+#ifdef WLAN_FEATURE_11BE
+#define WIRELESS_6G_MODES (HOST_REGDMN_MODE_11AXA_HE20 \
+			   | HOST_REGDMN_MODE_11AXA_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXA_HE40MINUS \
+			   | HOST_REGDMN_MODE_11AXA_HE80 \
+			   | HOST_REGDMN_MODE_11AXA_HE160 \
+			   | HOST_REGDMN_MODE_11AXA_HE80_80 \
+			   | HOST_REGDMN_MODE_11BEA_EHT20 \
+			   | HOST_REGDMN_MODE_11BEA_EHT40PLUS \
+			   | HOST_REGDMN_MODE_11BEA_EHT40MINUS \
+			   | HOST_REGDMN_MODE_11BEA_EHT80 \
+			   | HOST_REGDMN_MODE_11BEA_EHT160 \
+			   | HOST_REGDMN_MODE_11BEA_EHT320)
+#else
+#define WIRELESS_6G_MODES (HOST_REGDMN_MODE_11AXA_HE20 \
+			   | HOST_REGDMN_MODE_11AXA_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXA_HE40MINUS \
+			   | HOST_REGDMN_MODE_11AXA_HE80 \
+			   | HOST_REGDMN_MODE_11AXA_HE160 \
+			   | HOST_REGDMN_MODE_11AXA_HE80_80)
+#endif
+
+#ifdef WLAN_FEATURE_11BE
+#define WIRELESS_5G_MODES (HOST_REGDMN_MODE_11BEA_EHT20 \
+			   | HOST_REGDMN_MODE_11BEA_EHT40PLUS \
+			   | HOST_REGDMN_MODE_11BEA_EHT40MINUS \
+			   | HOST_REGDMN_MODE_11BEA_EHT80 \
+			   | HOST_REGDMN_MODE_11BEA_EHT160 \
+			   | HOST_REGDMN_MODE_11BEA_EHT320 \
+			   | HOST_REGDMN_MODE_11AXA_HE20 \
+			   | HOST_REGDMN_MODE_11AXA_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXA_HE40MINUS \
+			   | HOST_REGDMN_MODE_11AXA_HE80 \
+			   | HOST_REGDMN_MODE_11AXA_HE160 \
+			   | HOST_REGDMN_MODE_11AXA_HE80_80 \
+			   | HOST_REGDMN_MODE_11AC_VHT20 \
+			   | HOST_REGDMN_MODE_11AC_VHT40PLUS \
+			   | HOST_REGDMN_MODE_11AC_VHT40MINUS \
+			   | HOST_REGDMN_MODE_11AC_VHT80 \
+			   | HOST_REGDMN_MODE_11AC_VHT160 \
+			   | HOST_REGDMN_MODE_11AC_VHT80_80 \
+			   | HOST_REGDMN_MODE_11NA_HT20 \
+			   | HOST_REGDMN_MODE_11NA_HT40PLUS \
+			   | HOST_REGDMN_MODE_11NA_HT40MINUS \
+			   | HOST_REGDMN_MODE_11A \
+			   | HOST_REGDMN_MODE_TURBO \
+			   | HOST_REGDMN_MODE_108A \
+			   | HOST_REGDMN_MODE_11A_HALF_RATE \
+			   | HOST_REGDMN_MODE_11A_QUARTER_RATE)
+#else
+#define WIRELESS_5G_MODES (HOST_REGDMN_MODE_11AXA_HE20 \
+			   | HOST_REGDMN_MODE_11AXA_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXA_HE40MINUS \
+			   | HOST_REGDMN_MODE_11AXA_HE80 \
+			   | HOST_REGDMN_MODE_11AXA_HE160 \
+			   | HOST_REGDMN_MODE_11AXA_HE80_80 \
+			   | HOST_REGDMN_MODE_11AC_VHT20 \
+			   | HOST_REGDMN_MODE_11AC_VHT40PLUS \
+			   | HOST_REGDMN_MODE_11AC_VHT40MINUS \
+			   | HOST_REGDMN_MODE_11AC_VHT80 \
+			   | HOST_REGDMN_MODE_11AC_VHT160 \
+			   | HOST_REGDMN_MODE_11AC_VHT80_80 \
+			   | HOST_REGDMN_MODE_11NA_HT20 \
+			   | HOST_REGDMN_MODE_11NA_HT40PLUS \
+			   | HOST_REGDMN_MODE_11NA_HT40MINUS \
+			   | HOST_REGDMN_MODE_11A \
+			   | HOST_REGDMN_MODE_TURBO \
+			   | HOST_REGDMN_MODE_108A \
+			   | HOST_REGDMN_MODE_11A_HALF_RATE \
+			   | HOST_REGDMN_MODE_11A_QUARTER_RATE)
+#endif
+
+#define WIRELESS_49G_MODES (HOST_REGDMN_MODE_11A \
+			    | HOST_REGDMN_MODE_11A_HALF_RATE \
+			    | HOST_REGDMN_MODE_11A_QUARTER_RATE)
+#ifdef WLAN_FEATURE_11BE
+#define WIRELESS_2G_MODES (HOST_REGDMN_MODE_11BEG_EHT20 \
+			   | HOST_REGDMN_MODE_11BEG_EHT40PLUS \
+			   | HOST_REGDMN_MODE_11BEG_EHT40MINUS \
+			   | HOST_REGDMN_MODE_11AXG_HE20 \
+			   | HOST_REGDMN_MODE_11AXG_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXG_HE40MINUS \
+			   | HOST_REGDMN_MODE_11NG_HT20 \
+			   | HOST_REGDMN_MODE_11NG_HT40PLUS \
+			   | HOST_REGDMN_MODE_11NG_HT40MINUS \
+			   | HOST_REGDMN_MODE_PUREG \
+			   | HOST_REGDMN_MODE_11G \
+			   | HOST_REGDMN_MODE_108G \
+			   | HOST_REGDMN_MODE_11B)
+#else
+#define WIRELESS_2G_MODES (HOST_REGDMN_MODE_11AXG_HE20 \
+			   | HOST_REGDMN_MODE_11AXG_HE40PLUS \
+			   | HOST_REGDMN_MODE_11AXG_HE40MINUS \
+			   | HOST_REGDMN_MODE_11NG_HT20 \
+			   | HOST_REGDMN_MODE_11NG_HT40PLUS \
+			   | HOST_REGDMN_MODE_11NG_HT40MINUS \
+			   | HOST_REGDMN_MODE_PUREG \
+			   | HOST_REGDMN_MODE_11G \
+			   | HOST_REGDMN_MODE_108G \
+			   | HOST_REGDMN_MODE_11B)
+#endif
+
 /**
  * reg_is_chan_disabled() - In the regulatory channel list, a channel
  * may be disabled by the regulatory/device or by radar. Radar is temporary
@@ -268,6 +380,52 @@ bool reg_is_chan_blocked(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
  */
 void reg_clear_allchan_blocked(struct wlan_objmgr_pdev *pdev);
 
+/**
+ * reg_set_chan_ht40intol() - Set ht40intol_flags to the value for a
+ * frequency in the current chan list.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency in MHz.
+ * @ht40intol_flags: ht40intol_flags to be set.
+ *
+ * Return: void.
+ */
+void reg_set_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			    enum ht40_intol ht40intol_flags);
+
+/**
+ * reg_clear_chan_ht40intol() - Clear the ht40intol_flags from the
+ * regulatory channel corresponding to the frequency in the current chan list.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency in MHz.
+ * @ht40intol_flags: ht40intol_flags to be cleared.
+ *
+ * Return: void.
+ */
+void reg_clear_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			      enum ht40_intol ht40intol_flags);
+
+/**
+ * reg_is_chan_ht40intol() - Check if the ht40intol flag is set to the
+ * given enum for a frequency in the current chan list.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency in MHz.
+ * @ht40intol_flags: The ht40intol flag (plus/minus) to check.
+ *
+ * Return: true if is_chan_htintol is set to given value for the input
+ * frequency, else false.
+ */
+bool reg_is_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			   enum ht40_intol ht40intol_flags);
+
+/**
+ * wlan_reg_clear_allchan_ht40intol() - Clear ht40intol_flags for all channels
+ * in the current chan list.
+ * @pdev: Pointer to pdev.
+ *
+ * Return: void.
+ */
+void reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev);
+
 /*
  * reg_is_band_present() - Check if input band channels are present
  * in the regulatory current channel list.
@@ -304,6 +462,30 @@ bool reg_is_chan_blocked(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
 }
 
 static inline void reg_clear_allchan_blocked(struct wlan_objmgr_pdev *pdev)
+{
+}
+
+static inline void
+reg_set_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+		       enum ht40_intol ht40intol_flags)
+{
+}
+
+	static inline void
+reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			    enum ht40_intol ht40intol_flags)
+{
+}
+
+static inline bool
+reg_is_chan_ht40intol(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+		      enum ht40_intol ht40intol_flags)
+{
+	return false;
+}
+
+static inline void
+reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev)
 {
 }
 
@@ -359,4 +541,19 @@ void reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 			    qdf_freq_t freq,
 			    qdf_freq_t sec_ch_2g_freq,
 			    struct ch_params *ch_params);
+
+/**
+ * reg_filter_wireless_modes() - Filter out the wireless modes
+ * that are not supported by the available regulatory channels.
+ * @pdev: Pointer to pdev.
+ * @mode_select: Wireless modes to be filtered.
+ * @include_nol_chan: boolean to indicate whether NOL channels are to be
+ * considered as available channels.
+ *
+ * Return: Void.
+ */
+void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
+			       uint64_t *mode_select,
+			       bool include_nol_chan);
+
 #endif /* __REG_CHANNEL_H_ */

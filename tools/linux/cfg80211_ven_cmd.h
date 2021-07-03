@@ -769,6 +769,9 @@ enum {
 	IEEE80211_PARAM_EHT_MCS = 740,         /* set 11be - EHT MCS */
 #endif /* WLAN_FEATURE_11BE */
 	IEEE80211_PARAM_ENABLE_SCS                 = 741,   /* Enable SCS Procedures */
+	IEEE80211_PARAM_VAP_DIFF_MODE              = 742,   /* Enable different mode for the vap */
+	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743,   /* Switch between RTT intiator/responder modes */
+	IEEE80211_PARAM_SPL_VAP_SCAN               = 744,   /* Scan on cur_chan for special VAP */
 };
 
 enum {
@@ -1149,10 +1152,8 @@ enum _ol_ath_param_t {
 	OL_ATH_EXT_ACS_REQUEST_IN_PROGRESS = 423,
 	/* set/get hw mode */
 	OL_ATH_PARAM_HW_MODE  = 424,
-#if DBDC_REPEATER_SUPPORT
 	/* same ssid feature global disable */
 	OL_ATH_PARAM_SAME_SSID_DISABLE = 425,
-#endif
 	/* get MBSS enable flag */
 	OL_ATH_PARAM_MBSS_EN  = 426,
 	/* UNII-1 and UNII-2A channel coexistance */
@@ -1767,6 +1768,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"allowdata",           IEEE80211_PARAM_ALLOW_DATA, SET_PARAM, 2},
 	{"meshdbg",             IEEE80211_PARAM_SET_MESHDBG, SET_PARAM, 1},
 	{"enable_rtt",          IEEE80211_PARAM_RTT_ENABLE, SET_PARAM, 1},
+	{"switch_rtt_role",     IEEE80211_PARAM_SWITCH_RTT_ROLE, SET_PARAM, 1},
 	{"enable_lci",          IEEE80211_PARAM_LCI_ENABLE, SET_PARAM, 1},
 	{"athnewind",           IEEE80211_PARAM_VAP_ENHIND, SET_PARAM, 1},
 	{"get_athnewind",       IEEE80211_PARAM_VAP_ENHIND, GET_PARAM, 0},
@@ -2256,6 +2258,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	SET_PARAM, 1},
 	{"g_eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
+	{"vap_diff_mode",        IEEE80211_PARAM_VAP_DIFF_MODE, SET_PARAM, 1},
+	{"g_vap_diff_mode",      IEEE80211_PARAM_VAP_DIFF_MODE, GET_PARAM, 0},
+	{"spl_vap_scan",        IEEE80211_PARAM_SPL_VAP_SCAN, SET_PARAM, 1},
+	{"g_spl_vap_scan",      IEEE80211_PARAM_SPL_VAP_SCAN, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {

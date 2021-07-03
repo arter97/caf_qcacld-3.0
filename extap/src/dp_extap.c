@@ -28,6 +28,7 @@
 
 #include "dp_extap.h"
 #include "dp_extap_mitbl.h"
+#include <wlan_repeater_api.h>
 
 char *arps[] = { NULL, "req", "rsp", "rreq", "rrsp" };
 
@@ -521,12 +522,12 @@ int dp_extap_output(dp_pdev_extap_t *extap, uint8_t *vdev_macaddr,
 
 void dp_extap_enable(struct wlan_objmgr_vdev *vdev)
 {
-	wlan_vdev_mlme_feat_cap_set(vdev, WLAN_VDEV_F_AP);
+	wlan_rptr_vdev_set_extap(vdev);
 }
 
 void dp_extap_disable(struct wlan_objmgr_vdev *vdev)
 {
-	wlan_vdev_mlme_feat_cap_clear(vdev, WLAN_VDEV_F_AP);
+	wlan_rptr_vdev_clear_extap(vdev);
 }
 
 void dp_extap_mitbl_dump(dp_pdev_extap_t *extap)
@@ -557,8 +558,8 @@ int dp_extap_tx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff **skb,
 	qdf_ether_header_t *eh;
 	uint8_t vdev_mac[ETH_ALEN];
 
-	if (qdf_unlikely(dp_is_extap_enabled(vdev) &&
-					wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
+	if (qdf_unlikely(wlan_rptr_vdev_is_extap(vdev) &&
+			 wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
 		*skb = qdf_nbuf_unshare(*skb);
 		if (!(*skb))
 			return 1;
@@ -582,8 +583,8 @@ int dp_extap_rx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff *skb)
 	qdf_ether_header_t *eh;
 	uint8_t vdev_mac[ETH_ALEN];
 
-	if (qdf_unlikely(dp_is_extap_enabled(vdev) &&
-					wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
+	if (qdf_unlikely(wlan_rptr_vdev_is_extap(vdev) &&
+			 wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
 
 		wlan_vdev_obj_lock(vdev);
 		qdf_mem_copy(vdev_mac, wlan_vdev_mlme_get_macaddr(vdev), ETH_ALEN);

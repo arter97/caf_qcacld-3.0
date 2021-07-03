@@ -26,6 +26,8 @@
 #include "hal_rx_flow.h"
 #include "dp_htt.h"
 
+QDF_STATUS
+hal_rx_flow_delete_entry(struct hal_rx_fst *fst, void *hal_rx_fse);
 /**
  * In Hawkeye, a hardware bug disallows SW to only clear a single flow entry
  * when added/deleted by upper layer. Workaround is to clear entire cache,

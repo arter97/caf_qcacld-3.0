@@ -28,6 +28,7 @@
 #include "qdf_types.h" /* qdf_vprint */
 #include "dp_wrap.h"
 #include "ol_if_athvar.h"
+#include <wlan_repeater_api.h>
 
 extern char *arps[];
 
@@ -499,7 +500,7 @@ int dp_wrap_mat_rx(struct dp_wrap_vdev *wvdev, wbuf_t buf)
 			if (qdf_is_macaddr_equal((struct qdf_mac_addr *)src_mac,
 			    (struct qdf_mac_addr *)vdev->vdev_mlme.macaddr)) {
 				buf->mark |= WRAP_MARK_REFLECT;
-				if (dp_wrap_vdev_is_mat_set(vdev))
+				if (wlan_rptr_vdev_is_mat(vdev))
 					IEEE80211_ADDR_COPY(src_mac,
 							    vdev->vdev_mlme.mataddr);
 				wlan_pdev_obj_unlock(pdev);
@@ -550,7 +551,7 @@ int dp_wrap_mat_rx(struct dp_wrap_vdev *wvdev, wbuf_t buf)
 				vdev = wlan_pdev_vdev_list_peek_head(vdev_list);
 
 				while (vdev != NULL) {
-					if (dp_wrap_vdev_is_mat_set(vdev) &&
+					if (wlan_rptr_vdev_is_mat(vdev) &&
 					    qdf_is_macaddr_equal((struct qdf_mac_addr *)arp_dmac,
 					    (struct qdf_mac_addr *)vdev->vdev_mlme.macaddr)) {
 						n_vdev = vdev;
