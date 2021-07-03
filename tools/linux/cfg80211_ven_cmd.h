@@ -1260,6 +1260,8 @@ enum _ol_ath_param_t {
 	 *the radio
 	 */
 	OL_ATH_PARAM_CURCHAN_REG_TXPOWER = 472,
+	/* Display the current 6G AP power type */
+	OL_ATH_PARAM_DISPLAY_AP_PWR_TYPE = 473,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3273,6 +3275,9 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_CSA_TBTT, GET_PARAM, 0},
 	{"g_reg_txpower",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CURCHAN_REG_TXPOWER,
+		GET_PARAM, 0},
+	{"g_ap_power_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_AP_PWR_TYPE,
 		GET_PARAM, 0},
 };
 #endif
