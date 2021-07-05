@@ -299,6 +299,7 @@ void wlan_rptr_reset_flags(struct wlan_objmgr_pdev *pdev)
 
 qdf_export_symbol(wlan_rptr_reset_flags);
 
+#if REPEATER_SAME_SSID
 void
 wlan_rptr_peer_disconnect_cb(struct wlan_objmgr_psoc *psoc,
 			     void *obj, void *arg)
@@ -323,6 +324,7 @@ wlan_rptr_peer_disconnect_cb(struct wlan_objmgr_psoc *psoc,
 	if (peer_priv->is_extender_client)
 		ext_cb->peer_disassoc(peer);
 }
+#endif
 
 void
 wlan_rptr_pdev_update_beacon_cb(struct wlan_objmgr_psoc *psoc,
@@ -358,15 +360,17 @@ void wlan_rptr_vdev_set_params(struct wlan_objmgr_vdev *vdev)
 	u8 vdev_id;
 	ol_txrx_soc_handle soc_txrx_handle;
 	struct wlan_objmgr_psoc *psoc = NULL;
+#if ATH_SUPPORT_WRAP
 	bool psta, mpsta, wrap;
+#endif
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 	vdev_id = wlan_vdev_get_id(vdev);
+#if ATH_SUPPORT_WRAP
 	wlan_rptr_vdev_get_qwrap_cflags(vdev, &psta, &mpsta, &wrap);
 
-#if ATH_SUPPORT_WRAP
 #if !WLAN_QWRAP_LEGACY
 	if (psta) {
 		val.cdp_vdev_param_proxysta = 1;
@@ -391,12 +395,15 @@ void wlan_rptr_vdev_set_params(struct wlan_objmgr_vdev *vdev)
 #endif
 #endif
 	if (opmode == QDF_SAP_MODE) {
+#if ATH_SUPPORT_WRAP
 		if (wrap) {
 			val.cdp_vdev_param_wds = 0;
 			cdp_txrx_set_vdev_param(soc_txrx_handle,
 						wlan_vdev_get_id(vdev),
 						CDP_ENABLE_WDS, val);
-		} else {
+		} else
+#endif
+		{
 			val.cdp_vdev_param_wds = 1;
 			cdp_txrx_set_vdev_param(soc_txrx_handle,
 						wlan_vdev_get_id(vdev),
@@ -404,12 +411,15 @@ void wlan_rptr_vdev_set_params(struct wlan_objmgr_vdev *vdev)
 		}
 	}
 	if (opmode == QDF_STA_MODE) {
+#if ATH_SUPPORT_WRAP
 		if (psta) {
 			val.cdp_vdev_param_wds = 0;
 			cdp_txrx_set_vdev_param(soc_txrx_handle,
 						wlan_vdev_get_id(vdev),
 						CDP_ENABLE_WDS, val);
-		} else {
+		} else
+#endif
+		{
 			val.cdp_vdev_param_wds = 1;
 			cdp_txrx_set_vdev_param(soc_txrx_handle,
 						wlan_vdev_get_id(vdev),
@@ -713,6 +723,7 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
  * wrap: wrap var ptr
  * ret: void
  */
+#if ATH_SUPPORT_WRAP
 void
 wlan_rptr_vdev_get_qwrap_cflags(struct wlan_objmgr_vdev *vdev, bool *psta,
 				bool *mpsta, bool *wrap)
@@ -739,6 +750,7 @@ wlan_rptr_vdev_get_qwrap_cflags(struct wlan_objmgr_vdev *vdev, bool *psta,
 			(flags & IEEE80211_WRAP_VAP)) ? 1 : 0;
 }
 qdf_export_symbol(wlan_rptr_vdev_get_qwrap_cflags);
+#endif
 
 void
 wlan_rptr_pdev_pref_uplink_set_cb(struct wlan_objmgr_psoc *psoc,
@@ -880,7 +892,9 @@ wlan_rptr_pdev_ucfg_config_set(struct wlan_objmgr_pdev *pdev,
 					      &iterate_msg, WLAN_MLME_NB_ID);
 		break;
 	case OL_ATH_PARAM_SAME_SSID_DISABLE:
+#if REPEATER_SAME_SSID
 		wlan_rptr_core_global_same_ssid_disable(value);
+#endif
 		break;
 	case OL_ATH_PARAM_DISCONNECTION_TIMEOUT:
 		wlan_rptr_core_global_disconnect_timeout_set(value);
@@ -1016,7 +1030,6 @@ wlan_rptr_psta_validate_chan(struct wlan_objmgr_vdev *vdev, uint16_t freq)
 	}
 	return QDF_STATUS_SUCCESS;
 }
-#endif
 
 /**
  * wlan_rptr_get_qwrap_vdevs_for_pdev_id() - Get total number of qwrap vdevs
@@ -1076,6 +1089,7 @@ uint8_t wlan_rptr_get_qwrap_peers_for_pdev_id(struct wlan_objmgr_psoc *psoc,
 }
 
 qdf_export_symbol(wlan_rptr_get_qwrap_peers_for_pdev_id);
+#endif
 
 #if DBDC_REPEATER_SUPPORT
 void
@@ -1092,8 +1106,10 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	struct wiphy *wiphy = NULL;
 	struct pdev_osif_priv *pdev_ospriv = NULL;
 	struct dbdc_flags flags;
+#if REPEATER_SAME_SSID
 	u8 disconnect_rptr_clients = 0;
 	struct iterate_info iterate_msg;
+#endif
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1117,8 +1133,10 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 
 	qca_multi_link_append_num_sta(true);
 
+#if REPEATER_SAME_SSID
 	if (g_priv->global_feature_caps & wlan_rptr_global_f_s_ssid)
 		wlan_rptr_s_ssid_vdev_connection_up(vdev, &disconnect_rptr_clients);
+#endif
 
 	val.cdp_vdev_param_da_war = 0;
 	cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id, CDP_ENABLE_DA_WAR,
@@ -1160,6 +1178,7 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 
 	ext_cb->act_update_force_cli_mcast_process_up(vdev);
 
+#if REPEATER_SAME_SSID
 	if ((g_priv->global_feature_caps & wlan_rptr_global_f_s_ssid) &&
 	    disconnect_rptr_clients) {
 		/* Disconnect only repeater clients*/
@@ -1170,6 +1189,7 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 		wlan_objmgr_iterate_psoc_list(wlan_rptr_psoc_iterate_list,
 					      &iterate_msg, WLAN_MLME_NB_ID);
 	}
+#endif
 	return;
 
 }
@@ -1188,12 +1208,10 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	struct wiphy *wiphy = NULL;
 	struct pdev_osif_priv *pdev_ospriv = NULL;
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
-	wlan_rptr_same_ssid_feature_t *ss_info = NULL;
 	bool max_priority_stavap_disconnected = 0;
 	struct dbdc_flags flags;
 
 	g_priv = wlan_rptr_get_global_ctx();
-	ss_info = &g_priv->ss_info;
 	ext_cb = &g_priv->ext_cbacks;
 	psoc = wlan_vdev_get_psoc(vdev);
 	pdev = wlan_vdev_get_pdev(vdev);
@@ -1215,7 +1233,10 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 
 	qca_multi_link_append_num_sta(false);
 
-	wlan_rptr_s_ssid_vdev_connection_down(vdev);
+#if REPEATER_SAME_SSID
+	if (g_priv->global_feature_caps & wlan_rptr_global_f_s_ssid)
+		wlan_rptr_s_ssid_vdev_connection_down(vdev);
+#endif
 
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	if (g_priv->num_stavaps_up == 1) {
@@ -1251,6 +1272,7 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+#if REPEATER_SAME_SSID
 void
 wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 			       void *obj, void *arg)
@@ -1896,6 +1918,7 @@ wlan_rptr_disconnect_sec_stavap_cb(struct wlan_objmgr_psoc *psoc,
 	}
 #endif
 }
+#endif
 
 /**
  * wlan_rptr_pdev_extd_ioctl - NB api for extd ioctl call
@@ -2002,6 +2025,7 @@ qdf_export_symbol(wlan_rptr_pdev_extd_ioctl);
  * @bssid- AP bssid
  * return update_beacon value
  */
+#if REPEATER_SAME_SSID
 uint8_t
 wlan_rptr_update_extender_info(struct wlan_objmgr_vdev *vdev,
 			       ieee80211_scan_entry_t scan_entry,
@@ -2067,3 +2091,4 @@ wlan_rptr_update_extender_info(struct wlan_objmgr_vdev *vdev,
 }
 
 qdf_export_symbol(wlan_rptr_update_extender_info);
+#endif

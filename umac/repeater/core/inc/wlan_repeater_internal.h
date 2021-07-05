@@ -33,6 +33,7 @@
 #define RPTR_PDEV_LOCK(_x)    qdf_spin_lock_bh(_x)
 #define RPTR_PDEV_UNLOCK(_x)  qdf_spin_unlock_bh(_x)
 
+#if REPEATER_SAME_SSID
 #define ROOTAP_ACCESS_MASK 0x0F
 #define STAVAP_CONNECTION_MASK 0xF0
 
@@ -72,6 +73,7 @@ typedef struct wlan_rptr_same_ssid_feature {
 	bool    same_ssid_disable;
 	systime_t    rootap_access_downtime;
 } wlan_rptr_same_ssid_feature_t;
+#endif
 
 /**
  * struct wlan_rptr_global_priv - reapeter global priv structure
@@ -87,7 +89,9 @@ typedef struct wlan_rptr_same_ssid_feature {
  */
 struct wlan_rptr_global_priv {
 	u32 global_feature_caps;
+#if REPEATER_SAME_SSID
 	wlan_rptr_same_ssid_feature_t   ss_info;
+#endif
 	u8     num_stavaps_up;
 	u16    disconnect_timeout;
 	u16    reconfiguration_timeout;
@@ -105,6 +109,7 @@ struct wlan_rptr_psoc_priv {
 	u32 psoc_feature_caps;
 };
 
+#if REPEATER_SAME_SSID
 /**
  * Extender connection type for same ssid feature
  * 0 - init value
@@ -116,6 +121,7 @@ enum wlan_rptr_ext_connection_type {
     ext_connection_type_no_root_access = 1,
     ext_connection_type_root_access = 2,
 };
+#endif
 
 /**
  * struct wlan_rptr_pdev_priv - reapeter pdev priv structure
@@ -130,8 +136,10 @@ enum wlan_rptr_ext_connection_type {
 struct wlan_rptr_pdev_priv {
 	struct wlan_objmgr_pdev  *pdev;
 	u32    pdev_feature_caps;
+#if REPEATER_SAME_SSID
 	enum wlan_rptr_ext_connection_type  extender_connection;
 	u8     preferred_bssid[QDF_MAC_ADDR_SIZE];
+#endif
 	u8     preferredUplink;
 	u8     nscanpsta;
 	qdf_spinlock_t  rptr_pdev_lock;
@@ -156,7 +164,9 @@ struct wlan_rptr_vdev_priv {
  */
 struct wlan_rptr_peer_priv {
 	struct wlan_objmgr_peer *peer;
+#if REPEATER_SAME_SSID
 	u8     is_extender_client;
+#endif
 };
 
 QDF_STATUS
@@ -185,9 +195,11 @@ uint8_t wlan_rptr_core_global_is_feat_cap_set(uint32_t cap);
 void wlan_rptr_core_reset_pdev_flags(struct wlan_objmgr_pdev *pdev);
 void wlan_rptr_core_reset_global_flags(void);
 struct wlan_rptr_global_priv *wlan_rptr_get_global_ctx(void);
+#if REPEATER_SAME_SSID
 void wlan_rptr_core_global_same_ssid_disable(u_int32_t value);
 void wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 					  struct scan_event *event);
+#endif
 void
 wlan_rptr_core_pdev_pref_uplink_set(struct wlan_objmgr_pdev *pdev,
 				    u32 value);
@@ -202,9 +214,11 @@ void
 wlan_rptr_core_global_reconfig_timeout_set(u_int32_t value);
 void
 wlan_rptr_core_global_reconfig_timeout_get(uint32_t *value);
+#if REPEATER_SAME_SSID
 QDF_STATUS
 wlan_rptr_core_validate_stavap_bssid(struct wlan_objmgr_vdev *vdev,
 				     u_int8_t *bssid);
+#endif
 struct wlan_rptr_pdev_priv *
 wlan_rptr_get_pdev_priv(struct wlan_objmgr_pdev *pdev);
 struct wlan_rptr_psoc_priv *

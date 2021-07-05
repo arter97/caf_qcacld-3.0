@@ -176,8 +176,10 @@ wlan_rptr_core_register_ext_cb(struct rptr_ext_cbacks *ext_cbacks)
 		g_priv->ext_cbacks.pdev_update_beacon =
 				ext_cbacks->pdev_update_beacon;
 		g_priv->ext_cbacks.target_lithium = ext_cbacks->target_lithium;
+#if REPEATER_SAME_SSID
 		g_priv->ext_cbacks.dessired_ssid_found =
 				ext_cbacks->dessired_ssid_found;
+#endif
 #if DBDC_REPEATER_SUPPORT
 		g_priv->ext_cbacks.legacy_dbdc_flags_get =
 				ext_cbacks->legacy_dbdc_flags_get;
@@ -368,8 +370,10 @@ void wlan_rptr_core_reset_pdev_flags(struct wlan_objmgr_pdev *pdev)
 void wlan_rptr_core_reset_global_flags(void)
 {
 	struct wlan_rptr_global_priv *g_priv = NULL;
+#if REPEATER_SAME_SSID
 	wlan_rptr_same_ssid_feature_t   *ss_info;
 	int i;
+#endif
 
 	g_priv = wlan_rptr_get_global_ctx();
 	if (g_priv) {
@@ -377,6 +381,7 @@ void wlan_rptr_core_reset_global_flags(void)
 		g_priv->global_feature_caps = 0;
 		g_priv->disconnect_timeout = 10;
 		g_priv->reconfiguration_timeout = 60;
+#if REPEATER_SAME_SSID
 		ss_info = &g_priv->ss_info;
 		ss_info->same_ssid_disable = 0;
 		ss_info->num_rptr_clients = 0;
@@ -389,10 +394,12 @@ void wlan_rptr_core_reset_global_flags(void)
 			OS_MEMZERO(&ss_info->denied_client_list[i][0],
 				   QDF_MAC_ADDR_SIZE);
 		}
+#endif
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 	}
 }
 
+#if REPEATER_SAME_SSID
 static bool
 wlan_rptr_dessired_ssid_found(struct wlan_objmgr_vdev *vdev,
 			      wlan_scan_entry_t se)
@@ -634,6 +641,7 @@ wlan_rptr_core_validate_stavap_bssid(struct wlan_objmgr_vdev *vdev,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 void
 wlan_rptr_core_pdev_pref_uplink_set(struct wlan_objmgr_pdev *pdev,
@@ -719,6 +727,7 @@ void wlan_rptr_core_global_reconfig_timeout_get(u32 *value)
 	}
 }
 
+#if REPEATER_SAME_SSID
 void wlan_rptr_core_global_same_ssid_disable(u32 value)
 {
 	struct wlan_rptr_global_priv *g_priv = NULL;
@@ -738,6 +747,7 @@ void wlan_rptr_core_global_same_ssid_disable(u32 value)
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 	}
 }
+#endif
 
 #if ATH_SUPPORT_WRAP
 #define ATH_NSCAN_PSTA_VAPS 0
@@ -1149,7 +1159,9 @@ wlan_repeater_peer_delete_handler(struct wlan_objmgr_peer *peer,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_rptr_peer_priv *peer_priv = NULL;
 	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+#if REPEATER_SAME_SSID
 	wlan_rptr_same_ssid_feature_t   *ss_info;
+#endif
 
 	if (!g_priv)
 		return QDF_STATUS_E_FAILURE;
@@ -1157,12 +1169,14 @@ wlan_repeater_peer_delete_handler(struct wlan_objmgr_peer *peer,
 	peer_priv = wlan_rptr_get_peer_priv(peer);
 
 	if (peer_priv) {
+#if REPEATER_SAME_SSID
 		RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 		ss_info = &g_priv->ss_info;
 		if (peer_priv->is_extender_client)
 			ss_info->num_rptr_clients--;
 
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+#endif
 		if (wlan_objmgr_peer_component_obj_detach(peer,
 							  WLAN_UMAC_COMP_REPEATER,
 							  peer_priv)) {
@@ -1200,7 +1214,9 @@ QDF_STATUS wlan_repeater_init(void)
 	rptr_ext_cbacks.target_lithium = wlan_target_lithium;
 	rptr_ext_cbacks.peer_disassoc = wlan_peer_disassoc;
 	rptr_ext_cbacks.pdev_update_beacon = wlan_pdev_update_beacon;
+#if REPEATER_SAME_SSID
 	rptr_ext_cbacks.dessired_ssid_found = wlan_dessired_ssid_found;
+#endif
 #if DBDC_REPEATER_SUPPORT
 	rptr_ext_cbacks.legacy_dbdc_flags_get = wlan_legacy_dbdc_flags_get;
 	rptr_ext_cbacks.max_pri_stavap_process_up = wlan_max_pri_stavap_process_up;
