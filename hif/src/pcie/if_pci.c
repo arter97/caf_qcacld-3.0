@@ -1707,6 +1707,7 @@ int hif_pci_bus_configure(struct hif_softc *hif_sc)
 	/* todo: consider replacing this with an srng field */
 	if (((hif_sc->target_info.target_type == TARGET_TYPE_QCA8074) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA8074V2) ||
+	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA9574) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA5018) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCN6122) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA6018)) &&
@@ -1729,6 +1730,7 @@ int hif_pci_bus_configure(struct hif_softc *hif_sc)
 
 	if (((hif_sc->target_info.target_type == TARGET_TYPE_QCA8074) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA8074V2) ||
+	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA9574) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA5018) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCN6122) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA6018)) &&
@@ -3245,6 +3247,7 @@ int hif_configure_irq(struct hif_softc *scn)
 	case TARGET_TYPE_QCA8074V2:
 	case TARGET_TYPE_QCA6018:
 	case TARGET_TYPE_QCA5018:
+	case TARGET_TYPE_QCA9574:
 		ret = hif_ahb_configure_irq(sc);
 		break;
 	default:
@@ -3360,6 +3363,9 @@ static void hif_pci_get_soc_info_pld(struct hif_pci_softc *sc,
 	sc->mem = info.v_addr;
 	sc->ce_sc.ol_sc.mem    = info.v_addr;
 	sc->ce_sc.ol_sc.mem_pa = info.p_addr;
+	/* dev_mem_info[0] is for CMEM */
+	scn->cmem_start = info.dev_mem_info[0].start;
+	scn->cmem_size = info.dev_mem_info[0].size;
 	scn->target_info.target_version = info.soc_id;
 	scn->target_info.target_revision = 0;
 }

@@ -63,8 +63,13 @@
 #define WLAN_CFG_TX_RING_SIZE 1024
 #endif
 
+#define WLAN_CFG_IPA_TX_RING_SIZE_MIN 1024
 #define WLAN_CFG_IPA_TX_RING_SIZE 1024
+#define WLAN_CFG_IPA_TX_RING_SIZE_MAX 8096
+
+#define WLAN_CFG_IPA_TX_COMP_RING_SIZE_MIN 1024
 #define WLAN_CFG_IPA_TX_COMP_RING_SIZE 1024
+#define WLAN_CFG_IPA_TX_COMP_RING_SIZE_MAX 8096
 
 #define WLAN_CFG_PER_PDEV_TX_RING 0
 #define WLAN_CFG_IPA_UC_TX_BUF_SIZE 2048
@@ -220,11 +225,11 @@
 
 #define WLAN_CFG_NUM_TCL_DATA_RINGS 3
 #define WLAN_CFG_NUM_TCL_DATA_RINGS_MIN 3
-#define WLAN_CFG_NUM_TCL_DATA_RINGS_MAX 3
+#define WLAN_CFG_NUM_TCL_DATA_RINGS_MAX 5
 
 #define WLAN_CFG_NUM_REO_DEST_RING 4
 #define WLAN_CFG_NUM_REO_DEST_RING_MIN 4
-#define WLAN_CFG_NUM_REO_DEST_RING_MAX 4
+#define WLAN_CFG_NUM_REO_DEST_RING_MAX 8
 
 #define WLAN_CFG_NSS_NUM_TCL_DATA_RINGS 2
 #define WLAN_CFG_NSS_NUM_TCL_DATA_RINGS_MIN 1
@@ -262,7 +267,7 @@
 #define WLAN_CFG_RX_RELEASE_RING_SIZE 1024
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MIN 8
 #if defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-    defined(QCA_WIFI_QCA6750)
+    defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_WCN7850)
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MAX 1024
 #else
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MAX 8192
@@ -1118,6 +1123,80 @@
 		CFG_INI_BOOL("gForceRX64BA", \
 		false, "Enable/Disable force 64 blockack in RX side")
 
+/*
+ * <ini>
+ * ghw_cc_enable - enable HW cookie conversion by register
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to control HW based 20 bits cookie to 64 bits
+ * Desc virtual address conversion
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_HW_CC_ENABLE \
+		CFG_INI_BOOL("ghw_cc_enable", \
+		true, "Enable/Disable HW cookie conversion")
+
+#ifdef IPA_OFFLOAD
+/*
+ * <ini>
+ * dp_ipa_tx_ring_size - Set tcl ring size for IPA
+ * @Min: 1024
+ * @Max: 8096
+ * @Default: 1024
+ *
+ * This ini sets the tcl ring size for IPA
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_IPA_TX_RING_SIZE \
+		CFG_INI_UINT("dp_ipa_tx_ring_size", \
+		WLAN_CFG_IPA_TX_RING_SIZE_MIN, \
+		WLAN_CFG_IPA_TX_RING_SIZE_MAX, \
+		WLAN_CFG_IPA_TX_RING_SIZE, \
+		CFG_VALUE_OR_DEFAULT, "IPA TCL ring size")
+
+/*
+ * <ini>
+ * dp_ipa_tx_comp_ring_size - Set tx comp ring size for IPA
+ * @Min: 1024
+ * @Max: 8096
+ * @Default: 1024
+ *
+ * This ini sets the tx comp ring size for IPA
+ *
+ * Related: N/A
+ *
+ * Supported Feature: IPA
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_IPA_TX_COMP_RING_SIZE \
+		CFG_INI_UINT("dp_ipa_tx_comp_ring_size", \
+		WLAN_CFG_IPA_TX_COMP_RING_SIZE_MIN, \
+		WLAN_CFG_IPA_TX_COMP_RING_SIZE_MAX, \
+		WLAN_CFG_IPA_TX_COMP_RING_SIZE, \
+		CFG_VALUE_OR_DEFAULT, "IPA tx comp ring size")
+
+#define CFG_DP_IPA_TX_RING_CFG \
+		CFG(CFG_DP_IPA_TX_RING_SIZE) \
+		CFG(CFG_DP_IPA_TX_COMP_RING_SIZE)
+#else
+#define CFG_DP_IPA_TX_RING_CFG
+#endif
+
 #define CFG_DP \
 		CFG(CFG_DP_HTT_PACKET_TYPE) \
 		CFG(CFG_DP_INT_BATCH_THRESHOLD_OTHER) \
@@ -1211,6 +1290,8 @@
 		CFG(CFG_DP_RX_RADIO_1_DEFAULT_REO) \
 		CFG(CFG_DP_RX_RADIO_2_DEFAULT_REO) \
 		CFG(CFG_DP_WOW_CHECK_RX_PENDING) \
+		CFG(CFG_DP_HW_CC_ENABLE) \
 		CFG(CFG_FORCE_RX_64_BA) \
-		CFG(CFG_DP_DELAY_MON_REPLENISH)
+		CFG(CFG_DP_DELAY_MON_REPLENISH) \
+		CFG_DP_IPA_TX_RING_CFG
 #endif /* _CFG_DP_H_ */

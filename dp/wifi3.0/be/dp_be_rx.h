@@ -1,0 +1,107 @@
+/*
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#ifndef _DP_BE_RX_H_
+#define _DP_BE_RX_H_
+
+#include <dp_types.h>
+#include "dp_be.h"
+
+uint32_t dp_rx_process_be(struct dp_intr *int_ctx,
+			  hal_ring_handle_t hal_ring_hdl, uint8_t reo_ring_num,
+			  uint32_t quota);
+
+/**
+ * dp_rx_desc_pool_init_be() - Initialize Rx Descriptor pool(s)
+ * @soc: Handle to DP Soc structure
+ * @rx_desc_pool: Rx descriptor pool handler
+ * @pool_id: Rx descriptor pool ID
+ *
+ * Return: QDF_STATUS_SUCCESS - succeeded, others - failed
+ */
+QDF_STATUS dp_rx_desc_pool_init_be(struct dp_soc *soc,
+				   struct rx_desc_pool *rx_desc_pool,
+				   uint32_t pool_id);
+
+/**
+ * dp_rx_desc_pool_deinit_be() - De-initialize Rx Descriptor pool(s)
+ * @soc: Handle to DP Soc structure
+ * @rx_desc_pool: Rx descriptor pool handler
+ * @pool_id: Rx descriptor pool ID
+ *
+ * Return: None
+ */
+void dp_rx_desc_pool_deinit_be(struct dp_soc *soc,
+			       struct rx_desc_pool *rx_desc_pool,
+			       uint32_t pool_id);
+
+/**
+ * dp_wbm_get_rx_desc_from_hal_desc_be() - Get corresponding Rx Desc
+ *					address from WBM ring Desc
+ * @soc: Handle to DP Soc structure
+ * @ring_desc: ring descriptor structure pointer
+ * @r_rx_desc: pointer to a pointer of Rx Desc
+ *
+ * Return: QDF_STATUS_SUCCESS - succeeded, others - failed
+ */
+QDF_STATUS dp_wbm_get_rx_desc_from_hal_desc_be(struct dp_soc *soc,
+					       void *ring_desc,
+					       struct dp_rx_desc **r_rx_desc);
+
+/**
+ * dp_rx_desc_cookie_2_va_be() - Convert RX Desc cookie ID to VA
+ * @soc:Handle to DP Soc structure
+ * @cookie: cookie used to lookup virtual address
+ *
+ * Return: Rx descriptor virtual address
+ */
+struct dp_rx_desc *dp_rx_desc_cookie_2_va_be(struct dp_soc *soc,
+					     uint32_t cookie);
+
+#if !defined(DP_FEATURE_HW_COOKIE_CONVERSION) || \
+		defined(DP_HW_COOKIE_CONVERT_EXCEPTION)
+/**
+ * dp_rx_desc_sw_cc_check() - check if RX desc VA is got correctly,
+			      if not, do SW cookie conversion.
+ * @soc:Handle to DP Soc structure
+ * @rx_buf_cookie: RX desc cookie ID
+ * @r_rx_desc: double pointer for RX desc
+ *
+ * Return: None
+ */
+static inline void
+dp_rx_desc_sw_cc_check(struct dp_soc *soc,
+		       uint32_t rx_buf_cookie,
+		       struct dp_rx_desc **r_rx_desc)
+{
+	if (qdf_unlikely(!(*r_rx_desc))) {
+		*r_rx_desc = (struct dp_rx_desc *)
+				dp_cc_desc_find(soc,
+						rx_buf_cookie,
+						true);
+	}
+}
+#else
+static inline void
+dp_rx_desc_sw_cc_check(struct dp_soc *soc,
+		       uint32_t rx_buf_cookie,
+		       struct dp_rx_desc **r_rx_desc)
+{
+}
+#endif /* DP_FEATURE_HW_COOKIE_CONVERSION && DP_HW_COOKIE_CONVERT_EXCEPTION */
+#endif

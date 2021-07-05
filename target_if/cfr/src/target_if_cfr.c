@@ -247,12 +247,13 @@ void target_if_cfr_fill_header(struct csi_cfr_header *hdr,
 		else
 			hdr->cmn.chip_type = CFR_CAPTURE_RADIO_NONE;
 	} else if (target_type == TARGET_TYPE_QCA8074V2) {
-		hdr->cmn.cfr_metadata_version = CFR_META_VERSION_4;
+		hdr->cmn.cfr_metadata_version = CFR_META_VERSION_6;
 		hdr->cmn.chip_type = CFR_CAPTURE_RADIO_HKV2;
 	} else {
-		if ((target_type == TARGET_TYPE_QCN9000) ||
-		    (target_type == TARGET_TYPE_QCA6018) ||
-		    ((target_type == TARGET_TYPE_QCA5018) && (!is_rcc)))
+		if (target_type == TARGET_TYPE_QCN9000)
+			hdr->cmn.cfr_metadata_version = CFR_META_VERSION_7;
+		else if ((target_type == TARGET_TYPE_QCA6018) ||
+			 ((target_type == TARGET_TYPE_QCA5018) && (!is_rcc)))
 			hdr->cmn.cfr_metadata_version = CFR_META_VERSION_5;
 		else
 			hdr->cmn.cfr_metadata_version = CFR_META_VERSION_3;
@@ -480,7 +481,7 @@ target_if_cfr_deinit_pdev(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #ifdef WLAN_ENH_CFR_ENABLE
-#ifdef QCA_WIFI_QCA6490
+#if defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_WCN7850)
 static uint8_t target_if_cfr_get_mac_id(struct wlan_objmgr_pdev *pdev)
 {
 	struct wlan_objmgr_vdev *vdev;

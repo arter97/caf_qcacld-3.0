@@ -75,6 +75,7 @@ typedef void *hif_handle_t;
 #define HIF_TYPE_QCN6122 25
 #define HIF_TYPE_WCN7850 26
 #define HIF_TYPE_QCN9224 27
+#define HIF_TYPE_QCA9574 28
 
 #define DMA_COHERENT_MASK_DEFAULT   37
 
@@ -1418,6 +1419,7 @@ int hif_apps_enable_irqs_except_wake_irq(struct hif_opaque_softc *hif_ctx);
 int hif_apps_disable_irqs_except_wake_irq(struct hif_opaque_softc *hif_ctx);
 
 #ifdef FEATURE_RUNTIME_PM
+void hif_print_runtime_pm_prevent_list(struct hif_opaque_softc *hif_ctx);
 int hif_pre_runtime_suspend(struct hif_opaque_softc *hif_ctx);
 void hif_pre_runtime_resume(struct hif_opaque_softc *hif_ctx);
 int hif_runtime_suspend(struct hif_opaque_softc *hif_ctx);
@@ -1425,6 +1427,10 @@ int hif_runtime_resume(struct hif_opaque_softc *hif_ctx);
 void hif_process_runtime_suspend_success(struct hif_opaque_softc *hif_ctx);
 void hif_process_runtime_suspend_failure(struct hif_opaque_softc *hif_ctx);
 void hif_process_runtime_resume_success(struct hif_opaque_softc *hif_ctx);
+#else
+static inline void
+hif_print_runtime_pm_prevent_list(struct hif_opaque_softc *hif_ctx)
+{}
 #endif
 
 int hif_get_irq_num(struct hif_opaque_softc *scn, int *irq, uint32_t size);

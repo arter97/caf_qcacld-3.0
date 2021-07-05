@@ -106,6 +106,13 @@ static struct qdf_track_timer alloc_track_timer;
 #define QDF_NBUF_ALLOC_EXPIRE_CNT_THRESHOLD  50
 #endif
 
+#ifdef NBUF_MEMORY_DEBUG
+/* SMMU crash indication*/
+static qdf_atomic_t smmu_crashed;
+/* Number of nbuf not added to history*/
+unsigned long g_histroy_add_drop;
+#endif
+
 /* Packet Counter */
 static uint32_t nbuf_tx_mgmt[QDF_NBUF_TX_PKT_STATE_MAX];
 static uint32_t nbuf_tx_data[QDF_NBUF_TX_PKT_STATE_MAX];
@@ -447,6 +454,9 @@ void qdf_nbuf_frag_count_inc(qdf_nbuf_t nbuf)
 	uint32_t num_nr_frags;
 	uint32_t total_num_nr_frags;
 
+	if (qdf_likely(is_initial_mem_debug_disabled))
+		return;
+
 	num_nr_frags = qdf_nbuf_get_nr_frags(nbuf);
 	qdf_assert_always(num_nr_frags <= QDF_NBUF_MAX_FRAGS);
 
@@ -471,6 +481,9 @@ void  qdf_nbuf_frag_count_dec(qdf_nbuf_t nbuf)
 	qdf_nbuf_t ext_list;
 	uint32_t num_nr_frags;
 	uint32_t total_num_nr_frags;
+
+	if (qdf_likely(is_initial_mem_debug_disabled))
+		return;
 
 	if (qdf_nbuf_get_users(nbuf) > 1)
 		return;
@@ -759,6 +772,11 @@ qdf_nbuf_history_add(qdf_nbuf_t nbuf, const char *func, uint32_t line,
 						   QDF_NBUF_HISTORY_SIZE);
 	struct qdf_nbuf_event *event = &qdf_nbuf_history[idx];
 
+	if (qdf_atomic_read(&smmu_crashed)) {
+		g_histroy_add_drop++;
+		return;
+	}
+
 	event->nbuf = nbuf;
 	qdf_str_lcopy(event->func, func, QDF_MEM_FUNC_NAME_SIZE);
 	event->line = line;
@@ -769,6 +787,14 @@ qdf_nbuf_history_add(qdf_nbuf_t nbuf, const char *func, uint32_t line,
 	else
 		event->iova = 0;
 }
+
+void qdf_set_smmu_fault_state(bool smmu_fault_state)
+{
+	qdf_atomic_set(&smmu_crashed, smmu_fault_state);
+	if (!smmu_fault_state)
+		g_histroy_add_drop = 0;
+}
+qdf_export_symbol(qdf_set_smmu_fault_state);
 #endif /* NBUF_MEMORY_DEBUG */
 
 #ifdef NBUF_MAP_UNMAP_DEBUG
@@ -4961,6 +4987,9 @@ QDF_STATUS qdf_nbuf_move_frag_page_offset_debug(qdf_nbuf_t nbuf, uint8_t idx,
 	p_fragp = qdf_nbuf_get_frag_addr(nbuf, idx);
 	result = __qdf_nbuf_move_frag_page_offset(nbuf, idx, offset);
 
+	if (qdf_likely(is_initial_mem_debug_disabled))
+		return result;
+
 	n_fragp = qdf_nbuf_get_frag_addr(nbuf, idx);
 
 	/*
@@ -4986,6 +5015,9 @@ void qdf_nbuf_add_rx_frag_debug(qdf_frag_t buf, qdf_nbuf_t nbuf,
 	__qdf_nbuf_add_rx_frag(buf, nbuf, offset,
 			       frag_len, truesize, take_frag_ref);
 
+	if (qdf_likely(is_initial_mem_debug_disabled))
+		return;
+
 	num_nr_frags = qdf_nbuf_get_nr_frags(nbuf);
 
 	qdf_assert_always(num_nr_frags <= QDF_NBUF_MAX_FRAGS);
@@ -5009,6 +5041,9 @@ void qdf_net_buf_debug_acquire_frag(qdf_nbuf_t buf, const char *func,
 	uint32_t idx = 0;
 	qdf_nbuf_t ext_list;
 	qdf_frag_t p_frag;
+
+	if (qdf_likely(is_initial_mem_debug_disabled))
+		return;
 
 	if (qdf_unlikely(!buf))
 		return;
@@ -5055,6 +5090,9 @@ void qdf_net_buf_debug_release_frag(qdf_nbuf_t buf, const char *func,
 	qdf_nbuf_t ext_list;
 	uint32_t idx = 0;
 	qdf_frag_t p_frag;
+
+	if (qdf_likely(is_initial_mem_debug_disabled))
+		return;
 
 	if (qdf_unlikely(!buf))
 		return;

@@ -57,6 +57,7 @@
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
 #include "dp_tx_capture.h"
 #endif
+//#include "dp_tx.h"
 
 #define REPT_MU_MIMO 1
 #define REPT_MU_OFDMA_MIMO 3
@@ -102,6 +103,8 @@
 #define MAX_IDLE_SCATTER_BUFS 16
 #define DP_MAX_IRQ_PER_CONTEXT 12
 #define DEFAULT_HW_PEER_ID 0xffff
+
+#define MAX_AST_AGEOUT_COUNT 128
 
 #define WBM_INT_ERROR_ALL 0
 #define WBM_INT_ERROR_REO_NULL_BUFFER 1
@@ -158,7 +161,7 @@ enum m_copy_mode {
 struct msdu_list {
 	qdf_nbuf_t head;
 	qdf_nbuf_t tail;
-	uint32 sum_len;
+	uint32_t sum_len;
 };
 
 struct dp_soc_cmn;
@@ -420,6 +423,9 @@ enum dp_desc_type {
 	DP_RX_DESC_BUF_TYPE,
 	DP_RX_DESC_STATUS_TYPE,
 	DP_HW_LINK_DESC_TYPE,
+#ifdef CONFIG_BERYLLIUM
+	DP_HW_CC_SPT_PAGE_TYPE,
+#endif
 };
 
 /**
@@ -504,7 +510,8 @@ struct dp_tx_ext_desc_pool_s {
  * @tx_encap_type: Transmit encap type (i.e. Raw, Native Wi-Fi, Ethernet).
  * 		   This is maintained in descriptor to allow more efficient
  * 		   processing in completion event processing code.
- * 		    This field is filled in with the htt_pkt_type enum.
+ * 		   This field is filled in with the htt_pkt_type enum.
+ * @buffer_src: buffer source TQM, REO, FW etc.
  * @frm_type: Frame Type - ToDo check if this is redundant
  * @pkt_offset: Offset from which the actual packet data starts
  * @me_buffer: Pointer to ME buffer - store this so that it can be freed on
@@ -522,7 +529,9 @@ struct dp_tx_desc_s {
 	uint8_t tx_status;
 	uint16_t peer_id;
 	struct dp_pdev *pdev;
-	uint8_t tx_encap_type;
+	uint8_t tx_encap_type:2,
+		buffer_src:3,
+		reserved:3;
 	uint8_t frm_type;
 	uint8_t pkt_offset;
 	uint8_t  pool_id;
@@ -1017,6 +1026,10 @@ struct dp_soc_stats {
 			uint32_t rx_2k_jump_to_stack;
 			/* RX 2k jump msdu dropped count */
 			uint32_t rx_2k_jump_drop;
+			/* REO ERR msdu buffer received */
+			uint32_t reo_err_msdu_buf_rcved;
+			/* REO ERR msdu buffer with invalid coookie received */
+			uint32_t reo_err_msdu_buf_invalid_cookie;
 			/* REO OOR msdu drop count */
 			uint32_t reo_err_oor_drop;
 			/* REO OOR msdu indicated to stack count */
@@ -1037,8 +1050,6 @@ struct dp_soc_stats {
 			uint32_t dup_refill_link_desc;
 			/* Incorrect msdu continuation bit in MSDU desc */
 			uint32_t msdu_continuation_err;
-			/* REO OOR eapol drop count */
-			uint32_t reo_err_oor_eapol_drop;
 			/* Non Eapol packet drop count due to peer not authorized  */
 			uint32_t peer_unauth_rx_pkt_drop;
 			/* count of start sequence (ssn) updates */
@@ -1047,6 +1058,8 @@ struct dp_soc_stats {
 			uint32_t bar_handle_fail_count;
 			/* EAPOL drop count in intrabss scenario */
 			uint32_t intrabss_eapol_drop;
+			/* MSDU len err count */
+			uint32_t msdu_len_err;
 		} err;
 
 		/* packet count per core - per ring */
@@ -1491,6 +1504,94 @@ struct ipa_dp_tx_rsc {
 };
 #endif
 
+struct dp_tx_msdu_info_s;
+/*
+ * enum dp_context_type- DP Context Type
+ * @DP_CONTEXT_TYPE_SOC: Context type DP SOC
+ * @DP_CONTEXT_TYPE_PDEV: Context type DP PDEV
+ * @DP_CONTEXT_TYPE_VDEV: Context type DP VDEV
+ * @DP_CONTEXT_TYPE_PEER: Context type DP PEER
+ *
+ * Helper enums to be used to retrieve the size of the corresponding
+ * data structure by passing the type.
+ */
+enum dp_context_type {
+	DP_CONTEXT_TYPE_SOC,
+	DP_CONTEXT_TYPE_PDEV,
+	DP_CONTEXT_TYPE_VDEV,
+	DP_CONTEXT_TYPE_PEER
+};
+
+/*
+ * struct dp_arch_ops- DP target specific arch ops
+ * @DP_CONTEXT_TYPE_SOC: Context type DP SOC
+ * @DP_CONTEXT_TYPE_PDEV: Context type DP PDEV
+ * @tx_hw_enqueue: enqueue TX data to HW
+ * @tx_comp_get_params_from_hal_desc: get software tx descriptor and release
+ * 				      source from HAL desc for wbm release ring
+ * @txrx_set_vdev_param: target specific ops while setting vdev params
+ */
+struct dp_arch_ops {
+	/* INIT/DEINIT Arch Ops */
+	QDF_STATUS (*txrx_soc_attach)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_soc_detach)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_soc_init)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_soc_deinit)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_pdev_attach)(struct dp_pdev *pdev);
+	QDF_STATUS (*txrx_pdev_detach)(struct dp_pdev *pdev);
+	QDF_STATUS (*txrx_vdev_attach)(struct dp_soc *soc,
+				       struct dp_vdev *vdev);
+	QDF_STATUS (*txrx_vdev_detach)(struct dp_soc *soc,
+				       struct dp_vdev *vdev);
+	QDF_STATUS (*dp_rxdma_ring_sel_cfg)(struct dp_soc *soc);
+
+	/* TX RX Arch Ops */
+	QDF_STATUS (*tx_hw_enqueue)(struct dp_soc *soc, struct dp_vdev *vdev,
+				    struct dp_tx_desc_s *tx_desc,
+				    uint16_t fw_metadata,
+				    struct cdp_tx_exception_metadata *metadata,
+				    struct dp_tx_msdu_info_s *msdu_info);
+
+	 void (*tx_comp_get_params_from_hal_desc)(struct dp_soc *soc,
+						  void *tx_comp_hal_desc,
+						  struct dp_tx_desc_s **desc);
+	uint32_t (*dp_rx_process)(struct dp_intr *int_ctx,
+				  hal_ring_handle_t hal_ring_hdl,
+				  uint8_t reo_ring_num, uint32_t quota);
+
+	QDF_STATUS (*dp_tx_desc_pool_init)(struct dp_soc *soc,
+					   uint16_t pool_desc_num,
+					   uint8_t pool_id);
+	void (*dp_tx_desc_pool_deinit)(
+				struct dp_soc *soc,
+				struct dp_tx_desc_pool_s *tx_desc_pool,
+				uint8_t pool_id);
+
+	QDF_STATUS (*dp_rx_desc_pool_init)(struct dp_soc *soc,
+					   struct rx_desc_pool *rx_desc_pool,
+					   uint32_t pool_id);
+	void (*dp_rx_desc_pool_deinit)(struct dp_soc *soc,
+				       struct rx_desc_pool *rx_desc_pool,
+				       uint32_t pool_id);
+
+	QDF_STATUS (*dp_wbm_get_rx_desc_from_hal_desc)(
+						struct dp_soc *soc,
+						void *ring_desc,
+						struct dp_rx_desc **r_rx_desc);
+
+	struct dp_rx_desc *(*dp_rx_desc_cookie_2_va)(struct dp_soc *soc,
+						     uint32_t cookie);
+
+	/* Control Arch Ops */
+	QDF_STATUS (*txrx_set_vdev_param)(struct dp_soc *soc,
+					  struct dp_vdev *vdev,
+					  enum cdp_vdev_param_type param,
+					  cdp_config_param_type val);
+
+	/* Misc Arch Ops */
+	qdf_size_t (*txrx_get_context_size)(enum dp_context_type);
+};
+
 /* SOC level structure for data path */
 struct dp_soc {
 	/**
@@ -1552,6 +1653,13 @@ struct dp_soc {
 
 	/* HAL SOC handle */
 	hal_soc_handle_t hal_soc;
+
+	/* rx monitor pkt tlv size */
+	uint16_t rx_mon_pkt_tlv_size;
+	/* rx pkt tlv size */
+	uint16_t rx_pkt_tlv_size;
+
+	struct dp_arch_ops arch_ops;
 
 	/* Device ID coming from Bus sub-system */
 	uint32_t device_id;
@@ -1728,6 +1836,12 @@ struct dp_soc {
 	/* SoC level data path statistics */
 	struct dp_soc_stats stats;
 
+	/* timestamp to keep track of msdu buffers received on reo err ring */
+	uint64_t rx_route_err_start_pkt_ts;
+
+	/* Num RX Route err in a given window to keep track of rate of errors */
+	uint32_t rx_route_err_in_window;
+
 	/* Enable processing of Tx completion status words */
 	bool process_tx_status;
 	bool process_rx_status;
@@ -1760,6 +1874,8 @@ struct dp_soc {
 
 	/*Timer counter for WDS AST entry ageout*/
 	uint8_t wds_ast_aging_timer_cnt;
+	bool pending_ageout;
+	uint32_t max_ast_ageout_count;
 
 	/*interrupt timer*/
 	qdf_timer_t mon_reap_timer;
@@ -1939,6 +2055,19 @@ struct dp_soc {
 	qdf_spinlock_t reo_desc_deferred_freelist_lock;
 	bool reo_desc_deferred_freelist_init;
 #endif
+	/* BM id for first WBM2SW  ring */
+	uint32_t wbm_sw0_bm_id;
+
+	/* Store arch_id from device_id */
+	uint16_t arch_id;
+
+	/* link desc ID start per device type */
+	uint32_t link_desc_id_start;
+
+	/* CMEM buffer target reserved for host usage */
+	uint64_t cmem_base;
+	/* CMEM size in bytes */
+	uint64_t cmem_size;
 };
 
 #ifdef IPA_OFFLOAD
@@ -1993,19 +2122,20 @@ struct dp_ipa_resources {
 #ifdef MAX_ALLOC_PAGE_SIZE
 #define LINK_DESC_PAGE_ID_MASK  0x007FE0
 #define LINK_DESC_ID_SHIFT      5
-#define LINK_DESC_COOKIE(_desc_id, _page_id) \
-	((((_page_id) + LINK_DESC_ID_START) << LINK_DESC_ID_SHIFT) | (_desc_id))
+#define LINK_DESC_COOKIE(_desc_id, _page_id, _desc_id_start) \
+	((((_page_id) + (_desc_id_start)) << LINK_DESC_ID_SHIFT) | (_desc_id))
 #define LINK_DESC_COOKIE_PAGE_ID(_cookie) \
 	(((_cookie) & LINK_DESC_PAGE_ID_MASK) >> LINK_DESC_ID_SHIFT)
 #else
 #define LINK_DESC_PAGE_ID_MASK  0x7
 #define LINK_DESC_ID_SHIFT      3
-#define LINK_DESC_COOKIE(_desc_id, _page_id) \
-	((((_desc_id) + LINK_DESC_ID_START) << LINK_DESC_ID_SHIFT) | (_page_id))
+#define LINK_DESC_COOKIE(_desc_id, _page_id, _desc_id_start) \
+	((((_desc_id) + (_desc_id_start)) << LINK_DESC_ID_SHIFT) | (_page_id))
 #define LINK_DESC_COOKIE_PAGE_ID(_cookie) \
 	((_cookie) & LINK_DESC_PAGE_ID_MASK)
 #endif
-#define LINK_DESC_ID_START 0x8000
+#define LINK_DESC_ID_START_21_BITS_COOKIE 0x8000
+#define LINK_DESC_ID_START_20_BITS_COOKIE 0x4000
 
 /* same as ieee80211_nac_param */
 enum dp_nac_param_cmd {
@@ -3217,22 +3347,14 @@ enum fisa_aggr_ret {
 };
 
 /**
- * struct fisa_pkt_hist_elem - FISA Packet history element
- * @ts: timestamp indicating when the packet was received by FISA framework.
- * @tlvs: record of TLVS for the packet coming to FISA framework
- */
-struct fisa_pkt_hist_elem {
-	qdf_time_t ts;
-	struct rx_pkt_tlvs tlvs;
-};
-
-/**
  * struct fisa_pkt_hist - FISA Packet history structure
- * @hist_elem: array of hist elements
+ * @tlv_hist: array of TLV history
+ * @ts: array of timestamps of fisa packets
  * @idx: index indicating the next location to be used in the array.
  */
 struct fisa_pkt_hist {
-	struct fisa_pkt_hist_elem hist_elem[FISA_FLOW_MAX_AGGR_COUNT];
+	uint8_t *tlv_hist;
+	qdf_time_t ts_hist[FISA_FLOW_MAX_AGGR_COUNT];
 	uint32_t idx;
 };
 
@@ -3284,7 +3406,7 @@ struct dp_fisa_rx_sw_ft {
 	qdf_time_t flow_init_ts;
 	qdf_time_t last_accessed_ts;
 #ifdef WLAN_SUPPORT_RX_FISA_HIST
-	struct fisa_pkt_hist *pkt_hist;
+	struct fisa_pkt_hist pkt_hist;
 #endif
 };
 
@@ -3358,6 +3480,8 @@ struct dp_req_rx_hw_stats_t {
 	bool is_query_timeout;
 };
 #endif
+/* soc level structure to declare arch specific ops for DP */
+
 
 void dp_hw_link_desc_pool_banks_free(struct dp_soc *soc, uint32_t mac_id);
 QDF_STATUS dp_hw_link_desc_pool_banks_alloc(struct dp_soc *soc,
