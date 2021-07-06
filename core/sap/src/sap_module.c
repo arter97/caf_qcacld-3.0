@@ -419,22 +419,22 @@ bool wlansap_is_channel_in_nol_list(struct sap_context *sap_ctx,
 }
 
 static QDF_STATUS wlansap_mark_leaking_channel(struct wlan_objmgr_pdev *pdev,
-		uint8_t *leakage_adjusted_lst,
+		uint16_t *leakage_adjusted_lst,
 		uint8_t chan_bw)
 {
 
-	return utils_dfs_mark_leaking_ch(pdev, chan_bw, 1,
-			leakage_adjusted_lst);
+	return utils_dfs_mark_leaking_chan_for_freq(pdev, chan_bw, 1,
+						    leakage_adjusted_lst);
 }
 
 bool wlansap_is_channel_leaking_in_nol(struct sap_context *sap_ctx,
-				       uint8_t channel,
+				       uint16_t chan_freq,
 				       uint8_t chan_bw)
 {
 	struct mac_context *mac_ctx;
-	uint8_t leakage_adjusted_lst[1];
+	uint16_t leakage_adjusted_lst[1];
 
-	leakage_adjusted_lst[0] = channel;
+	leakage_adjusted_lst[0] = chan_freq;
 	mac_ctx = sap_get_mac_context();
 	if (!mac_ctx) {
 		sap_err("Invalid MAC context");
@@ -758,13 +758,7 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	/* Channel selection is auto or configured */
 	sap_ctx->chan_freq = config->chan_freq;
 	sap_ctx->dfs_mode = config->acs_dfs_mode;
-	sap_ctx->ch_params.ch_width = config->ch_params.ch_width;
-	sap_ctx->ch_params.center_freq_seg0 =
-		config->ch_params.center_freq_seg0;
-	sap_ctx->ch_params.center_freq_seg1 =
-		config->ch_params.center_freq_seg1;
-	sap_ctx->ch_params.sec_ch_offset =
-		config->ch_params.sec_ch_offset;
+	sap_ctx->ch_params = config->ch_params;
 	sap_ctx->ch_width_orig = config->ch_width_orig;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	sap_ctx->cc_switch_mode = config->cc_switch_mode;
@@ -1463,13 +1457,15 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 		sap_err("%u is unsafe channel freq", target_chan_freq);
 		return QDF_STATUS_E_FAULT;
 	}
-	sap_nofl_debug("SAP CSA: %d ---> %d BW %d conn on 5GHz:%d, csa_reason:%s(%d) strict %d vdev %d",
-		       sap_ctx->chan_freq, target_chan_freq, target_bw,
+	sap_nofl_debug("SAP CSA: %d BW %d ---> %d BW %d conn on 5GHz:%d, csa_reason:%s(%d) strict %d vdev %d",
+		       sap_ctx->chan_freq, sap_ctx->ch_params.ch_width,
+		       target_chan_freq, target_bw,
 		       policy_mgr_is_any_mode_active_on_band_along_with_session(
 		       mac->psoc, sap_ctx->sessionId, POLICY_MGR_BAND_5),
 		       sap_get_csa_reason_str(sap_ctx->csa_reason),
 		       sap_ctx->csa_reason, strict, sap_ctx->sessionId);
-	if (sap_ctx->chan_freq == target_chan_freq)
+	if (sap_ctx->chan_freq == target_chan_freq &&
+	    sap_ctx->ch_params.ch_width == target_bw)
 		return QDF_STATUS_E_FAULT;
 
 	state = wlan_reg_get_channel_state_for_freq(mac->pdev,

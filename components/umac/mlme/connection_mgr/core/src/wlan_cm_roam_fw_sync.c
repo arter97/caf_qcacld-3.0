@@ -40,7 +40,6 @@
 #include "cds_utils.h"
 #include "wlan_roam_debug.h"
 #include "wlan_mlme_twt_api.h"
-#ifdef FEATURE_CM_ENABLE
 #include "connection_mgr/core/src/wlan_cm_roam.h"
 #include "connection_mgr/core/src/wlan_cm_main.h"
 #include "connection_mgr/core/src/wlan_cm_sm.h"
@@ -655,10 +654,11 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 		}
 		qdf_mem_zero(pmkid_cache, sizeof(*pmkid_cache));
 		qdf_mem_free(pmkid_cache);
-	} else {
+	}
+
+	if (roaming_info->auth_status != ROAM_AUTH_STATUS_AUTHENTICATED)
 		cm_update_wait_for_key_timer(vdev, vdev_id,
 					     WAIT_FOR_KEY_TIMEOUT_PERIOD);
-	}
 end:
 	return status;
 }
@@ -922,15 +922,15 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_INVOKE_FAIL,
 				     sizeof(wlan_cm_id), &cm_id);
 
+	if (QDF_IS_STATUS_ERROR(status))
+		cm_remove_cmd(cm_ctx, &cm_id);
+
 	if (source == CM_ROAMING_HOST ||
 	    source == CM_ROAMING_NUD_FAILURE)
 		status = cm_disconnect(psoc, vdev_id,
 				       CM_ROAM_DISCONNECT,
 				       REASON_USER_TRIGGERED_ROAM_FAILURE,
 				       NULL);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		cm_remove_cmd(cm_ctx, &cm_id);
 
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
@@ -1073,4 +1073,40 @@ void cm_fw_ho_fail_req(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 }
-#endif // FEATURE_CM_ENABLE
+
+#ifdef WLAN_FEATURE_FIPS
+QDF_STATUS cm_roam_pmkid_req_ind(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id,
+				 struct roam_pmkid_req_event *src_lst)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr *dst_list;
+	uint32_t num_entries, i;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	num_entries = src_lst->num_entries;
+	mlme_debug("Num entries %d", num_entries);
+	for (i = 0; i < num_entries; i++) {
+		dst_list = &src_lst->ap_bssid[i];
+		status = mlme_cm_osif_pmksa_candidate_notify(vdev, dst_list,
+							     1, false);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err("Number %d Notify failed for " QDF_MAC_ADDR_FMT,
+				 i, QDF_MAC_ADDR_REF(dst_list->bytes));
+			goto rel_ref;
+		}
+	}
+
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+
+	return status;
+}
+#endif /* WLAN_FEATURE_FIPS */

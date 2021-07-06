@@ -91,42 +91,6 @@ struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
 	return &mlme_priv->ini_cfg;
 }
 
-struct mlme_roam_after_data_stall *
-mlme_get_roam_invoke_params(struct wlan_objmgr_vdev *vdev)
-{
-	struct mlme_legacy_priv *mlme_priv;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		return NULL;
-	}
-
-	return &mlme_priv->roam_invoke_params;
-}
-
-bool mlme_is_roam_invoke_in_progress(struct wlan_objmgr_psoc *psoc,
-				     uint8_t vdev_id)
-{
-	struct mlme_roam_after_data_stall *vdev_roam_params;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-	if (!vdev)
-		return false;
-
-	vdev_roam_params = mlme_get_roam_invoke_params(vdev);
-	if (!vdev_roam_params) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return false;
-	}
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-
-	return vdev_roam_params->roam_invoke_in_progress;
-}
-
 uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev)
 {
 	struct mlme_legacy_priv *mlme_priv;
@@ -620,6 +584,8 @@ mlme_init_qos_edca_params(struct wlan_objmgr_psoc *psoc,
 	edca_params->enable_edca_params =
 			cfg_get(psoc, CFG_EDCA_ENABLE_PARAM);
 
+	edca_params->enable_wmm_txop =
+			cfg_get(psoc, CFG_ENABLE_WMM_TXOP);
 	edca_params->edca_ac_vo.vo_cwmin =
 			cfg_get(psoc, CFG_EDCA_VO_CWMIN);
 	edca_params->edca_ac_vo.vo_cwmax =
@@ -761,9 +727,8 @@ static void mlme_init_ht_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_SHORT_SLOT_TIME_ENABLED);
 }
 
-#ifdef TX_AGGREGATION_SIZE_ENABLE
-static void mlme_init_tx_aggregation_size(struct wlan_objmgr_psoc *psoc,
-					  struct wlan_mlme_qos *qos_aggr_params)
+static void mlme_init_qos_cfg(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_mlme_qos *qos_aggr_params)
 {
 	qos_aggr_params->tx_aggregation_size =
 				cfg_get(psoc, CFG_TX_AGGREGATION_SIZE);
@@ -775,23 +740,6 @@ static void mlme_init_tx_aggregation_size(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_TX_AGGREGATION_SIZEVI);
 	qos_aggr_params->tx_aggregation_size_vo =
 				cfg_get(psoc, CFG_TX_AGGREGATION_SIZEVO);
-}
-#else
-static void mlme_init_tx_aggregation_size(struct wlan_objmgr_psoc *psoc,
-					  struct wlan_mlme_qos *qos_aggr_params)
-{
-	qos_aggr_params->tx_aggregation_size = 0;
-	qos_aggr_params->tx_aggregation_size_be = 0;
-	qos_aggr_params->tx_aggregation_size_bk = 0;
-	qos_aggr_params->tx_aggregation_size_vi = 0;
-	qos_aggr_params->tx_aggregation_size_vo = 0;
-}
-#endif
-
-static void mlme_init_qos_cfg(struct wlan_objmgr_psoc *psoc,
-			      struct wlan_mlme_qos *qos_aggr_params)
-{
-	mlme_init_tx_aggregation_size(psoc, qos_aggr_params);
 	qos_aggr_params->rx_aggregation_size =
 				cfg_get(psoc, CFG_RX_AGGREGATION_SIZE);
 	qos_aggr_params->tx_aggr_sw_retry_threshold_be =
@@ -1366,6 +1314,8 @@ static void mlme_init_obss_ht40_cfg(struct wlan_objmgr_psoc *psoc,
 		(bool)cfg_default(CFG_OBSS_DETECTION_OFFLOAD);
 	obss_ht40->obss_color_collision_offload_enabled =
 		(bool)cfg_default(CFG_OBSS_COLOR_COLLISION_OFFLOAD);
+	obss_ht40->bss_color_collision_det_sta =
+		cfg_get(psoc, CFG_BSS_CLR_COLLISION_DETCN_STA);
 }
 
 static void mlme_init_threshold_cfg(struct wlan_objmgr_psoc *psoc,

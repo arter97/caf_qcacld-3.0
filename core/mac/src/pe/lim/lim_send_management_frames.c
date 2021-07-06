@@ -5333,8 +5333,7 @@ returnAfterError:
 	return nSirStatus;
 } /* End lim_send_sa_query_response_frame */
 
-#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
+#if defined(CONFIG_LITHIUM) || defined(CONFIG_BERYLLIUM)
 #ifdef WLAN_FEATURE_11AX
 #define IS_PE_SESSION_HE_MODE(_session) ((_session)->he_capable)
 #else
@@ -5347,7 +5346,7 @@ returnAfterError:
 QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		tSirMacAddr peer_mac, uint16_t tid,
 		struct pe_session *session, uint8_t addba_extn_present,
-		uint8_t amsdu_support, uint8_t is_wep)
+		uint8_t amsdu_support, uint8_t is_wep, uint16_t calc_buff_size)
 {
 
 	tDot11faddba_rsp frm;
@@ -5391,7 +5390,9 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	if (sta_ds && lim_is_session_he_capable(session))
 		he_cap = lim_is_sta_he_capable(sta_ds);
 
-	if (he_cap)
+	if (sta_ds && sta_ds->staType == STA_ENTRY_NDI_PEER)
+		frm.addba_param_set.buff_size = calc_buff_size;
+	else if (he_cap)
 		frm.addba_param_set.buff_size = MAX_BA_BUFF_SIZE;
 	else
 		frm.addba_param_set.buff_size = SIR_MAC_BA_DEFAULT_BUFF_SIZE;
@@ -5763,7 +5764,8 @@ lim_handle_sae_auth_retry(struct mac_context *mac_ctx, uint8_t vdev_id,
 		       vdev_id);
 		return;
 	}
-	if (session->opmode != QDF_STA_MODE)
+	if ((session->opmode != QDF_STA_MODE) &&
+	    (session->opmode != QDF_P2P_CLIENT_MODE))
 		return;
 
 	if (session->limMlmState == eLIM_MLM_WT_SAE_AUTH_STATE)

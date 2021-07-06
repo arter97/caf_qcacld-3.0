@@ -78,7 +78,6 @@ void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
-#ifdef FEATURE_CM_ENABLE
 static bool wlan_cm_is_vdev_id_roam_reassoc_state(struct wlan_objmgr_vdev *vdev)
 {
 	return wlan_cm_is_vdev_roam_reassoc_state(vdev);
@@ -91,19 +90,6 @@ wlan_cm_disconnect_on_wait_key_timeout(struct wlan_objmgr_psoc *psoc,
 	cm_disconnect(psoc, vdev->vdev_objmgr.vdev_id, CM_MLME_DISCONNECT,
 		      REASON_KEY_TIMEOUT, NULL);
 }
-#else
-static bool wlan_cm_is_vdev_id_roam_reassoc_state(struct wlan_objmgr_vdev *vdev)
-{
-	return cm_csr_is_handoff_in_progress(vdev->vdev_objmgr.vdev_id);
-}
-
-static void
-wlan_cm_disconnect_on_wait_key_timeout(struct wlan_objmgr_psoc *psoc,
-				       struct wlan_objmgr_vdev *vdev)
-{
-	cm_csr_disconnect_on_wait_key_timeout(vdev->vdev_objmgr.vdev_id);
-}
-#endif
 
 void cm_wait_for_key_time_out_handler(void *data)
 {
@@ -969,7 +955,6 @@ void cm_get_sta_cxn_info(struct wlan_objmgr_vdev *vdev,
 #endif
 #endif
 
-#ifdef FEATURE_CM_ENABLE
 QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 				struct wlan_cm_connect_req *req)
 {
@@ -1331,9 +1316,6 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (op_mode == QDF_STA_MODE)
-		wlan_cm_roam_state_change(pdev, vdev_id, WLAN_ROAM_INIT,
-					  REASON_CONNECT);
 	cm_csr_connect_done_ind(vdev, rsp);
 
 	cm_connect_info(vdev, QDF_IS_STATUS_SUCCESS(rsp->connect_status) ?
@@ -1349,6 +1331,10 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 					     vdev);
 		wlan_p2p_status_connect(vdev);
 	}
+
+	if (op_mode == QDF_STA_MODE)
+		wlan_cm_roam_state_change(pdev, vdev_id, WLAN_ROAM_INIT,
+					  REASON_CONNECT);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1459,5 +1445,3 @@ bool cm_is_vdevid_active(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 
 	return active;
 }
-
-#endif

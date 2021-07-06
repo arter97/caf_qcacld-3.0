@@ -190,7 +190,7 @@ static void hdd_enable_gtk_offload(struct hdd_adapter *adapter)
 
 	status = ucfg_pmo_enable_gtk_offload_in_fwr(vdev);
 	if (status != QDF_STATUS_SUCCESS)
-		hdd_info("Failed to enable gtk offload");
+		hdd_debug("Failed to enable gtk offload");
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 }
 
@@ -253,7 +253,7 @@ hdd_send_igmp_offload_params(struct hdd_adapter *adapter,
 
 	status = ucfg_pmo_enable_igmp_offload(vdev, igmp_req);
 	if (status != QDF_STATUS_SUCCESS)
-		hdd_info("Failed to enable igmp offload");
+		hdd_debug("Failed to enable igmp offload");
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	qdf_mem_free(igmp_req);
@@ -281,7 +281,7 @@ static void hdd_enable_igmp_offload(struct hdd_adapter *adapter)
 	}
 	status = hdd_send_igmp_offload_params(adapter, true);
 	if (status != QDF_STATUS_SUCCESS)
-		hdd_info("Failed to enable gtk offload");
+		hdd_debug("Failed to enable gtk offload");
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 }
 
@@ -305,7 +305,7 @@ static void hdd_disable_igmp_offload(struct hdd_adapter *adapter)
 	}
 	status = hdd_send_igmp_offload_params(adapter, false);
 	if (status != QDF_STATUS_SUCCESS)
-		hdd_info("Failed to enable igmp offload");
+		hdd_debug("Failed to enable igmp offload");
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 }
 #else
@@ -1622,6 +1622,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 		scheduler_resume();
 		hdd_ctx->is_scheduler_suspended = false;
 		hdd_ctx->is_wiphy_suspended = false;
+		hdd_ctx->hdd_wlan_suspended = false;
 	}
 
 	wlan_hdd_rx_thread_resume(hdd_ctx);
@@ -1840,10 +1841,6 @@ QDF_STATUS hdd_wlan_re_init(void)
 	hdd_start_all_adapters(hdd_ctx);
 
 	hdd_init_scan_reject_params(hdd_ctx);
-
-#ifndef FEATURE_CM_ENABLE
-	complete(&adapter->roaming_comp_var);
-#endif
 	hdd_ctx->bt_coex_mode_set = false;
 
 	/* Allow the phone to go to sleep */

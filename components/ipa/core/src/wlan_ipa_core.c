@@ -430,7 +430,8 @@ drop_pkt:
  * TODO: Get WDI version through FW capabilities
  */
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
+    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
+    defined(QCA_WIFI_WCN7850)
 static inline void wlan_ipa_wdi_get_wdi_version(struct wlan_ipa_priv *ipa_ctx)
 {
 	ipa_ctx->wdi_version = IPA_WDI_3;
@@ -1815,7 +1816,8 @@ end:
 }
 
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
+    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
+    defined(QCA_WIFI_WCN7850)
 
 #ifdef IPA_LAN_RX_NAPI_SUPPORT
 void ipa_set_rps(struct wlan_ipa_priv *ipa_ctx, enum QDF_OPMODE mode,
@@ -2957,6 +2959,33 @@ wlan_host_to_ipa_wlan_event(enum wlan_ipa_wlan_event wlan_ipa_event_type)
 	return ipa_event;
 }
 
+#ifdef IPA_P2P_SUPPORT
+/**
+ * wlan_ipa_device_mode_switch() - Switch P2p GO/CLI to SAP/STA mode
+ * @device_mode: device mode
+ *
+ * Return: New device mode after switching
+ */
+static uint8_t wlan_ipa_device_mode_switch(uint8_t device_mode)
+{
+	switch (device_mode) {
+	case QDF_P2P_CLIENT_MODE:
+		return QDF_STA_MODE;
+	case QDF_P2P_GO_MODE:
+		return QDF_SAP_MODE;
+	default:
+		break;
+	}
+
+	return device_mode;
+}
+#else
+static uint8_t wlan_ipa_device_mode_switch(uint8_t device_mode)
+{
+	return device_mode;
+}
+#endif
+
 /**
  * wlan_ipa_wlan_evt() - SSR wrapper for __wlan_ipa_wlan_evt
  * @net_dev: Interface net device
@@ -2975,6 +3004,8 @@ QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 {
 	qdf_ipa_wlan_event type = wlan_host_to_ipa_wlan_event(ipa_event_type);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	device_mode = wlan_ipa_device_mode_switch(device_mode);
 
 	/* Data path offload only support for STA and SAP mode */
 	if ((device_mode == QDF_STA_MODE) ||

@@ -829,45 +829,6 @@ void wma_set_sta_keep_alive(tp_wma_handle wma, uint8_t vdev_id,
 	wmi_unified_set_sta_keep_alive_cmd(wma->wmi_handle, &params);
 }
 
-/**
- * wma_vdev_install_key_complete_event_handler() - install key complete handler
- * @handle: wma handle
- * @event: event data
- * @len: data length
- *
- * This event is sent by fw once WPA/WPA2 keys are installed in fw.
- *
- * Return: 0 for success or error code
- */
-int wma_vdev_install_key_complete_event_handler(void *handle,
-						uint8_t *event,
-						uint32_t len)
-{
-	WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID_param_tlvs *param_buf = NULL;
-	wmi_vdev_install_key_complete_event_fixed_param *key_fp = NULL;
-
-	if (!event) {
-		wma_err("event param null");
-		return -EINVAL;
-	}
-
-	param_buf = (WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID_param_tlvs *) event;
-	if (!param_buf) {
-		wma_err("received null buf from target");
-		return -EINVAL;
-	}
-
-	key_fp = param_buf->fixed_param;
-	if (!key_fp) {
-		wma_err("received null event data from target");
-		return -EINVAL;
-	}
-	/*
-	 * Do nothing for now. Completion of set key is already indicated to lim
-	 */
-	wma_debug("WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID");
-	return 0;
-}
 /*
  * 802.11n D2.0 defined values for "Minimum MPDU Start Spacing":
  *   0 for no restriction
@@ -1869,8 +1830,7 @@ void wma_update_frag_params(tp_wma_handle wma, uint32_t value)
 
 #ifdef FEATURE_WLAN_WAPI
 #define WPI_IV_LEN 16
-#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
+#if defined(CONFIG_LITHIUM) || defined(CONFIG_BERYLLIUM)
 /**
  * wma_fill_in_wapi_key_params() - update key parameters about wapi
  * @key_params: wma key parameters
@@ -2100,8 +2060,22 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 		tmpl_len = *(uint32_t *) &bcn_info->beacon[0];
 	else
 		tmpl_len = bcn_info->beaconLength;
-	if (p2p_ie_len)
+
+	if (tmpl_len > WMI_BEACON_TX_BUFFER_SIZE) {
+		wma_err("tmpl_len: %d > %d. Invalid tmpl len", tmpl_len,
+			WMI_BEACON_TX_BUFFER_SIZE);
+		return -EINVAL;
+	}
+
+	if (p2p_ie_len) {
+		if (tmpl_len <= p2p_ie_len) {
+			wma_err("tmpl_len %d <= p2p_ie_len %d, Invalid",
+				tmpl_len, p2p_ie_len);
+			return -EINVAL;
+		}
 		tmpl_len -= (uint32_t) p2p_ie_len;
+	}
+
 	frm = bcn_info->beacon + bytes_to_strip;
 	tmpl_len_aligned = roundup(tmpl_len, sizeof(A_UINT32));
 	/*
@@ -3745,10 +3719,8 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_register_roaming_callbacks() - Register roaming callbacks
- * @csr_roam_synch_cb: CSR roam synch callback routine pointer
- * @pe_roam_synch_cb: PE roam synch callback routine pointer
  * @csr_roam_auth_event_handle_cb: CSR callback routine pointer
- * @csr_roam_pmkid_req_cb: CSR roam pmkid callback routine pointer
+ * @pe_roam_synch_cb: PE roam synch callback routine pointer
  *
  * Register the SME and PE callback routines with WMA for
  * handling roaming
@@ -3756,9 +3728,6 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
  * Return: Success or Failure Status
  */
 QDF_STATUS wma_register_roaming_callbacks(
-#ifndef FEATURE_CM_ENABLE
-	csr_roam_synch_fn_t csr_roam_synch_cb,
-#endif
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
 						    struct qdf_mac_addr bssid),
@@ -3767,8 +3736,7 @@ QDF_STATUS wma_register_roaming_callbacks(
 					uint8_t vdev_id,
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
-					uint16_t reason_code),
-	csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb)
+					uint16_t reason_code))
 {
 
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -3776,15 +3744,11 @@ QDF_STATUS wma_register_roaming_callbacks(
 	if (!wma)
 		return QDF_STATUS_E_FAILURE;
 
-#ifndef FEATURE_CM_ENABLE
-	wma->csr_roam_synch_cb = csr_roam_synch_cb;
-#endif
 	wma->csr_roam_auth_event_handle_cb = csr_roam_auth_event_handle_cb;
 	wma->pe_roam_synch_cb = pe_roam_synch_cb;
 	wma->pe_disconnect_cb = pe_disconnect_cb;
 	wma_debug("Registered roam synch callbacks with WMA successfully");
 
-	wma->csr_roam_pmkid_req_cb = csr_roam_pmkid_req_cb;
 	return QDF_STATUS_SUCCESS;
 }
 #endif

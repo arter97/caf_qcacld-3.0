@@ -2221,7 +2221,6 @@ void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 				      sizeof(*resp), resp);
 }
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * wma_send_vdev_down_req() - handle vdev down req
  * @wma: wma handle
@@ -2248,17 +2247,6 @@ static void wma_send_vdev_down_req(tp_wma_handle wma,
 				      WLAN_VDEV_SM_EV_MLME_DOWN_REQ,
 				      sizeof(*resp), resp);
 }
-#else
-static void wma_send_vdev_down_req(tp_wma_handle wma,
-				   struct del_bss_resp *resp)
-{
-	struct wma_txrx_node *iface = &wma->interfaces[resp->vdev_id];
-
-	wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
-				      WLAN_VDEV_SM_EV_MLME_DOWN_REQ,
-				      sizeof(*resp), resp);
-}
-#endif
 
 static QDF_STATUS
 wma_delete_peer_on_vdev_stop(tp_wma_handle wma, uint8_t vdev_id)
@@ -2332,7 +2320,6 @@ free_params:
 	return status;
 }
 
-#ifdef FEATURE_CM_ENABLE
 QDF_STATUS
 cm_send_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev)
 {
@@ -2394,39 +2381,7 @@ __wma_handle_vdev_stop_rsp(struct vdev_stop_response *resp_event)
 
 	return wma_delete_peer_on_vdev_stop(wma, resp_event->vdev_id);
 }
-#else
-QDF_STATUS
-__wma_handle_vdev_stop_rsp(struct vdev_stop_response *resp_event)
-{
-	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
-	struct wma_txrx_node *iface;
 
-	if (!wma)
-		return QDF_STATUS_E_INVAL;
-
-	/* Ignore stop_response in Monitor mode */
-	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
-		return  QDF_STATUS_SUCCESS;
-
-	iface = &wma->interfaces[resp_event->vdev_id];
-
-	/* vdev in stopped state, no more waiting for key */
-	iface->is_waiting_for_key = false;
-
-	/*
-	 * Reset the rmfEnabled as there might be MGMT action frames
-	 * sent on this vdev before the next session is established.
-	 */
-	if (iface->rmfEnabled) {
-		iface->rmfEnabled = 0;
-		wma_debug("Reset rmfEnabled for vdev %d",
-			 resp_event->vdev_id);
-	}
-
-	return wma_delete_peer_on_vdev_stop(wma, resp_event->vdev_id);
-}
-
-#endif
 /**
  * wma_handle_vdev_stop_rsp() - handle vdev stop resp
  * @wma: wma handle
@@ -2611,6 +2566,16 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 			wma_err("failed to set sw retry threshold per ac(status = %d)",
 				 status);
 	}
+
+	wma_debug("Setting WMI_VDEV_PARAM_WMM_TXOP_ENABLE: %d",
+		  mac->mlme_cfg->edca_params.enable_wmm_txop);
+
+	status  = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
+				WMI_VDEV_PARAM_WMM_TXOP_ENABLE,
+				mac->mlme_cfg->edca_params.enable_wmm_txop);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("failed to set WMM TXOP (status = %d)", status);
 
 	wma_debug("Setting WMI_VDEV_PARAM_DISCONNECT_TH: %d",
 		 mac->mlme_cfg->gen.dropped_pkt_disconnect_thresh);
@@ -4855,7 +4820,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 				wmi_service_enabled(wma->wmi_handle,
 					wmi_service_sap_connected_d3_wow));
 		if (!is_bus_suspend_allowed_in_sap_mode) {
-			htc_vote_link_up(htc_handle);
+			htc_vote_link_up(htc_handle, HTC_LINK_VOTE_SAP_USER_ID);
 			wmi_info("sap d0 wow");
 		} else {
 			wmi_info("sap d3 wow");
@@ -4872,7 +4837,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 				wmi_service_enabled(wma->wmi_handle,
 					wmi_service_go_connected_d3_wow));
 		if (!is_bus_suspend_allowed_in_go_mode) {
-			htc_vote_link_up(htc_handle);
+			htc_vote_link_up(htc_handle, HTC_LINK_VOTE_GO_USER_ID);
 			wmi_info("p2p go d0 wow");
 		} else {
 			wmi_info("p2p go d3 wow");
@@ -4885,11 +4850,11 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 	/* handle wow for nan with 1 or more peer in same way */
 	if (BSS_OPERATIONAL_MODE_NDI == oper_mode) {
 		wma_debug("disable runtime pm and vote for link up");
-		htc_vote_link_up(htc_handle);
+		htc_vote_link_up(htc_handle, HTC_LINK_VOTE_NDP_USER_ID);
 		wma_sap_prevent_runtime_pm(wma);
 	} else if (wma_add_sta_allow_sta_mode_vote_link(oper_mode)) {
 		wma_debug("vote for link up");
-		htc_vote_link_up(htc_handle);
+		htc_vote_link_up(htc_handle, HTC_LINK_VOTE_STA_USER_ID);
 	}
 }
 
@@ -4951,7 +4916,8 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 				wmi_service_enabled(wma->wmi_handle,
 					wmi_service_sap_connected_d3_wow));
 		if (!is_bus_suspend_allowed_in_sap_mode) {
-			htc_vote_link_down(htc_handle);
+			htc_vote_link_down(htc_handle,
+					   HTC_LINK_VOTE_SAP_USER_ID);
 			wmi_info("sap d0 wow");
 		} else {
 			wmi_info("sap d3 wow");
@@ -4967,7 +4933,8 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 				wmi_service_enabled(wma->wmi_handle,
 					wmi_service_go_connected_d3_wow));
 		if (!is_bus_suspend_allowed_in_go_mode) {
-			htc_vote_link_down(htc_handle);
+			htc_vote_link_down(htc_handle,
+					   HTC_LINK_VOTE_GO_USER_ID);
 			wmi_info("p2p go d0 wow");
 		} else {
 			wmi_info("p2p go d3 wow");
@@ -4979,11 +4946,11 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 
 	if (BSS_OPERATIONAL_MODE_NDI == oper_mode) {
 		wma_debug("allow runtime pm and vote for link down");
-		htc_vote_link_down(htc_handle);
+		htc_vote_link_down(htc_handle, HTC_LINK_VOTE_NDP_USER_ID);
 		wma_sap_allow_runtime_pm(wma);
 	} else if (wma_add_sta_allow_sta_mode_vote_link(oper_mode)) {
 		wma_debug("vote for link down");
-		htc_vote_link_down(htc_handle);
+		htc_vote_link_down(htc_handle, HTC_LINK_VOTE_STA_USER_ID);
 	}
 }
 

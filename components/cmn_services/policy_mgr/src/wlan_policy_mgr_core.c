@@ -1405,7 +1405,21 @@ void policy_mgr_set_pcl_for_connected_vdev(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id, bool clear_pcl)
 {
 	struct policy_mgr_pcl_list msg = { {0} };
+	struct wlan_objmgr_vdev *vdev;
 	uint8_t roam_enabled_vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		return;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	/*
 	 * Get the vdev id of the STA on which roaming is already
@@ -3025,8 +3039,6 @@ static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
 						next_action, reason,
 						request_id);
 	} else {
-		/* This is temp ifdef will be removed in near future */
-#ifdef FEATURE_CM_ENABLE
 		if (reason == POLICY_MGR_UPDATE_REASON_STA_CONNECT ||
 		    reason == POLICY_MGR_UPDATE_REASON_LFR2_ROAM) {
 			sme_debug("Continue connect/reassoc on vdev %d request_id %x reason %d",
@@ -3035,7 +3047,6 @@ static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
 						    request_id,
 						    QDF_STATUS_SUCCESS);
 		}
-#endif
 		policy_mgr_debug("No action needed right now");
 		ret = policy_mgr_set_opportunistic_update(psoc);
 		if (!QDF_IS_STATUS_SUCCESS(ret))

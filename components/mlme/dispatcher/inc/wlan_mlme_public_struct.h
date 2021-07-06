@@ -265,26 +265,6 @@ struct wlan_mlme_dot11_mode {
 };
 
 /**
- * enum roam_invoke_source_entity - Source of invoking roam invoke command.
- * @USERSPACE_INITIATED: Userspace (supplicant)
- * @CONNECTION_MGR_INITIATED: connection mgr initiated.
- */
-enum roam_invoke_source_entity {
-	USERSPACE_INITIATED,
-	CONNECTION_MGR_INITIATED,
-};
-
-/**
- * struct mlme_roam_after_data_stall - roam invoke entity params
- * @roam_invoke_in_progress: is roaming already in progress.
- * @source: source of the roam invoke command.
- */
-struct mlme_roam_after_data_stall {
-	bool roam_invoke_in_progress;
-	enum roam_invoke_source_entity source;
-};
-
-/**
  * struct mlme_edca_ac_vi - cwmin, cwmax and  aifs value for edca_ac_vi
  *
  * @vi_cwmin: cwmin value for video
@@ -395,6 +375,7 @@ struct wlan_mlme_edca_params {
 	struct mlme_cfg_str etsi_acvo_b;
 
 	bool enable_edca_params;
+	bool enable_wmm_txop;
 	struct mlme_edca_ac_vo edca_ac_vo;
 	struct mlme_edca_ac_vi edca_ac_vi;
 	struct mlme_edca_ac_bk edca_ac_bk;
@@ -1366,7 +1347,7 @@ struct wlan_mlme_generic {
 	bool enable_beacon_reception_stats;
 	bool enable_remove_time_stamp_sync_cmd;
 	bool data_stall_recovery_fw_support;
-	bool disable_4way_hs_offload;
+	uint32_t disable_4way_hs_offload;
 	bool as_enabled;
 	uint8_t mgmt_retry_max;
 	bool bmiss_skip_full_scan;
@@ -1501,6 +1482,7 @@ struct wlan_mlme_cfg_twt {
  * @is_override_ht20_40_24g: use channel bonding in 2.4 GHz
  * @obss_detection_offload_enabled:       Enable OBSS detection offload
  * @obss_color_collision_offload_enabled: Enable obss color collision
+ * @bss_color_collision_det_sta: STA BSS color collision detection offload
  */
 struct wlan_mlme_obss_ht40 {
 	uint32_t active_dwelltime;
@@ -1513,6 +1495,7 @@ struct wlan_mlme_obss_ht40 {
 	bool is_override_ht20_40_24g;
 	bool obss_detection_offload_enabled;
 	bool obss_color_collision_offload_enabled;
+	bool bss_color_collision_det_sta;
 };
 
 /**
@@ -1691,6 +1674,7 @@ struct fw_scan_channels {
 /*
  * @mawc_roam_enabled:              Enable/Disable MAWC during roaming
  * @enable_fast_roam_in_concurrency:Enable LFR roaming on STA during concurrency
+ * @vendor_btm_param:               Vendor WTC roam trigger parameters
  * @lfr3_roaming_offload:           Enable/disable roam offload feature
  * @lfr3_dual_sta_roaming_enabled:  Enable/Disable dual sta roaming offload
  * feature
@@ -1809,6 +1793,7 @@ struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
 	bool enable_fast_roam_in_concurrency;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+	struct wlan_cm_roam_vendor_btm_params vendor_btm_param;
 	bool lfr3_roaming_offload;
 	bool lfr3_dual_sta_roaming_enabled;
 	bool enable_self_bss_roam;

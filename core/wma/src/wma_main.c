@@ -278,18 +278,21 @@ static void wma_update_num_peers_tids(t_wma_handle *wma_handle,
 #ifdef FEATURE_WDS
 /**
  * wma_set_peer_map_unmap_v2_config() - Update peer_map_unmap_v2
+ * @psoc: Object manager psoc
  * @tgt_cfg: Resource config given to target
  *
  * This function enables Peer map/unmap v2 feature.
  *
  * Return: none
  */
-static void wma_set_peer_map_unmap_v2_config(target_resource_config *tgt_cfg)
+static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
+					     target_resource_config *tgt_cfg)
 {
-	tgt_cfg->peer_map_unmap_v2 = true;
+	tgt_cfg->peer_map_unmap_v2 = cfg_get(psoc, CFG_WDS_MODE) ? true : false;
 }
 #else
-static void wma_set_peer_map_unmap_v2_config(target_resource_config *tgt_cfg)
+static void wma_set_peer_map_unmap_v2_config(struct wlan_objmgr_psoc *psoc,
+					     target_resource_config *tgt_cfg)
 {
 	tgt_cfg->peer_map_unmap_v2 = false;
 }
@@ -385,7 +388,7 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 				     &tgt_cfg->max_ndp_sessions);
 
 	wma_set_ipa_disable_config(tgt_cfg);
-	wma_set_peer_map_unmap_v2_config(tgt_cfg);
+	wma_set_peer_map_unmap_v2_config(wma_handle->psoc, tgt_cfg);
 }
 
 /**
@@ -3305,12 +3308,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_handle->staDynamicDtim =
 			ucfg_pmo_get_sta_dynamic_dtim(wma_handle->psoc);
 
-	/* register for install key completion event */
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-				wmi_vdev_install_key_complete_event_id,
-				wma_vdev_install_key_complete_event_handler,
-				WMA_RX_SERIALIZER_CTX);
-
 #ifdef WLAN_FEATURE_STATS_EXT
 	/* register for extended stats event */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -5782,10 +5779,45 @@ static void wma_set_mlme_caps(struct wlan_objmgr_psoc *psoc)
 		wma_err("Failed to set sae roam support");
 }
 
+#ifdef WLAN_FEATURE_BIG_DATA_STATS
+static bool wma_is_big_data_support_enable(struct wmi_unified *wmi_handle)
+{
+	return wmi_service_enabled(wmi_handle, wmi_service_big_data_support);
+}
+#else
+static bool wma_is_big_data_support_enable(struct wmi_unified *wmi_handle)
+{
+	return false;
+}
+#endif
+
+/**
+ * wma_set_mc_cp_caps() - Populate mc cp component related capabilities
+ *			  to the mc cp component
+ *
+ * @psoc: Pointer to psoc object
+ *
+ * Return: None
+ */
+static void wma_set_mc_cp_caps(struct wlan_objmgr_psoc *psoc)
+{
+	tp_wma_handle wma;
+
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma)
+		return;
+
+	if (wma_is_big_data_support_enable(wma->wmi_handle))
+		ucfg_mc_cp_set_big_data_fw_support(psoc, true);
+	else
+		ucfg_mc_cp_set_big_data_fw_support(psoc, false);
+}
+
 static void wma_set_component_caps(struct wlan_objmgr_psoc *psoc)
 {
 	wma_set_pmo_caps(psoc);
 	wma_set_mlme_caps(psoc);
+	wma_set_mc_cp_caps(psoc);
 }
 
 #if defined(WLAN_FEATURE_GTK_OFFLOAD) && defined(WLAN_POWER_MANAGEMENT_OFFLOAD)
@@ -6920,6 +6952,12 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	else
 		wlan_res_cfg->pktcapture_support = false;
 
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_sae_eapol_offload_support))
+		wlan_res_cfg->sae_eapol_offload = true;
+	else
+		wlan_res_cfg->sae_eapol_offload = false;
+
 	wma_debug("num_vdevs: %u", wlan_res_cfg->num_vdevs);
 
 	wma_init_dbr_params(wma_handle);
@@ -7300,7 +7338,7 @@ static void wma_set_wifi_start_packet_stats(void *wma_handle,
 		ATH_PKTLOG_RX | ATH_PKTLOG_TX |
 		ATH_PKTLOG_TEXT | ATH_PKTLOG_SW_EVENT;
 #elif defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-      defined(QCA_WIFI_QCA6750)
+      defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_WCN7850)
 	log_state = ATH_PKTLOG_RCFIND | ATH_PKTLOG_RCUPDATE |
 		    ATH_PKTLOG_TX | ATH_PKTLOG_LITE_T2H |
 		    ATH_PKTLOG_SW_EVENT | ATH_PKTLOG_RX;
@@ -8779,21 +8817,6 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		qdf_mem_free(msg->bodyptr);
 		break;
 #endif /* WLAN_FEATURE_LINK_LAYER_STATS */
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-#ifndef FEATURE_CM_ENABLE
-	case WMA_ROAM_OFFLOAD_SYNCH_FAIL:
-		wma_process_roam_synch_fail(wma_handle,
-			(struct roam_offload_synch_fail *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-	case SIR_HAL_ROAM_INVOKE:
-		wma_debug("SIR_HAL_ROAM_INVOKE - wma_process_roam_invoke");
-		wma_process_roam_invoke(wma_handle,
-			(struct roam_invoke_req *)msg->bodyptr);
-		qdf_mem_free(msg->bodyptr);
-		break;
-#endif
-#endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 	case SIR_HAL_SET_BASE_MACADDR_IND:
 		wma_set_base_macaddr_indicate(wma_handle,
 					      (tSirMacAddr *) msg->bodyptr);

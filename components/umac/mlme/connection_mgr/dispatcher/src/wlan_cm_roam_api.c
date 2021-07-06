@@ -28,9 +28,7 @@
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include "wlan_crypto_global_api.h"
 #include <wlan_cm_api.h>
-#ifdef FEATURE_CM_ENABLE
 #include "connection_mgr/core/src/wlan_cm_roam.h"
-#endif
 
 /* Support for "Fast roaming" (i.e., ESE, LFR, or 802.11r.) */
 #define BG_SCAN_OCCUPIED_CHANNEL_LIST_LEN 15
@@ -232,7 +230,6 @@ release_ref:
 	return status;
 }
 
-#ifdef FEATURE_CM_ENABLE
 bool wlan_cm_host_roam_in_progress(struct wlan_objmgr_psoc *psoc,
 				   uint8_t vdev_id)
 {
@@ -254,7 +251,6 @@ bool wlan_cm_host_roam_in_progress(struct wlan_objmgr_psoc *psoc,
 
 	return host_roam_in_progress;
 }
-#endif
 
 QDF_STATUS wlan_cm_abort_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
@@ -295,10 +291,6 @@ release_ref:
 
 bool wlan_cm_roaming_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
-#ifndef FEATURE_CM_ENABLE
-	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
-	QDF_STATUS status;
-#endif
 	bool roaming_in_progress = false;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -309,23 +301,7 @@ bool wlan_cm_roaming_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 		return roaming_in_progress;
 	}
 
-	/* this is temp change will be removed in near future */
-#ifdef FEATURE_CM_ENABLE
 	roaming_in_progress = wlan_cm_is_vdev_roaming(vdev);
-#else
-	status = cm_roam_acquire_lock(vdev);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto release_ref;
-
-	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) ||
-	    MLME_IS_ROAMING_IN_PROG(psoc, vdev_id) ||
-	    mlme_is_roam_invoke_in_progress(psoc, vdev_id) ||
-	    wlan_cm_host_roam_in_progress(psoc, vdev_id))
-		roaming_in_progress = true;
-
-	cm_roam_release_lock(vdev);
-release_ref:
-#endif
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
@@ -538,85 +514,45 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 }
 
 void
-wlan_cm_roam_disable_vendor_btm(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+wlan_cm_roam_disable_vendor_btm(struct wlan_objmgr_psoc *psoc)
 {
-	struct wlan_objmgr_vdev *vdev;
-	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-	if (!vdev) {
-		mlme_err("vdev object is NULL");
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
 		return;
-	}
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_err("vdev legacy private object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return;
-	}
 
 	/* Set default value of reason code */
-	mlme_priv->cm_roam.vendor_btm_param.user_roam_reason =
-						DISABLE_VENDOR_BTM_CONFIG;
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+	mlme_obj->cfg.lfr.vendor_btm_param.user_roam_reason =
+					DISABLE_VENDOR_BTM_CONFIG;
 }
 
 void
 wlan_cm_roam_set_vendor_btm_params(struct wlan_objmgr_psoc *psoc,
-				   uint8_t vdev_id,
-				   struct wlan_cm_roam_vendor_btm_params
-									*param)
+				   struct wlan_cm_roam_vendor_btm_params *param)
 {
-	struct wlan_objmgr_vdev *vdev;
-	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-	if (!vdev) {
-		mlme_err("vdev object is NULL");
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
 		return;
-	}
 
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_err("vdev legacy private object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return;
-	}
-
-	qdf_mem_copy(&mlme_priv->cm_roam.vendor_btm_param, param,
+	qdf_mem_copy(&mlme_obj->cfg.lfr.vendor_btm_param, param,
 		     sizeof(struct wlan_cm_roam_vendor_btm_params));
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 }
 
 void
 wlan_cm_roam_get_vendor_btm_params(struct wlan_objmgr_psoc *psoc,
-				   uint8_t vdev_id,
 				   struct wlan_cm_roam_vendor_btm_params *param)
 {
-	struct wlan_objmgr_vdev *vdev;
-	struct mlme_legacy_priv *mlme_priv;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-	if (!vdev) {
-		mlme_err("vdev object is NULL");
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
 		return;
-	}
 
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_err("vdev legacy private object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return;
-	}
-
-	qdf_mem_copy(param, &mlme_priv->cm_roam.vendor_btm_param,
+	qdf_mem_copy(param, &mlme_obj->cfg.lfr.vendor_btm_param,
 		     sizeof(struct wlan_cm_roam_vendor_btm_params));
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 }
 
 void wlan_cm_set_psk_pmk(struct wlan_objmgr_pdev *pdev,
@@ -955,7 +891,7 @@ cm_append_pref_chan_list(struct rso_chan_info *chan_info, qdf_freq_t *freq_list,
 
 		if (j < num_chan)
 			continue;
-		if (num_chan == ROAM_MAX_CHANNELS)
+		if (num_chan == CFG_VALID_CHANNEL_LIST_LEN)
 			break;
 		freq_list[num_chan++] = chan_info->freq_list[i];
 	}
@@ -1220,7 +1156,7 @@ static void cm_rso_chan_to_freq_list(struct wlan_objmgr_pdev *pdev,
 			wlan_reg_legacy_chan_to_freq(pdev, chan_list[count]);
 }
 
-#if defined(FEATURE_CM_ENABLE) && defined(WLAN_FEATURE_HOST_ROAM)
+#ifdef WLAN_FEATURE_HOST_ROAM
 static QDF_STATUS cm_init_reassoc_timer(struct rso_config *rso_cfg)
 {
 	QDF_STATUS status;
@@ -1277,9 +1213,7 @@ QDF_STATUS wlan_cm_rso_config_init(struct wlan_objmgr_vdev *vdev,
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
 
-#ifdef FEATURE_CM_ENABLE
 	qdf_mutex_create(&rso_cfg->cm_rso_lock);
-#endif
 	cfg_params = &rso_cfg->cfg_param;
 	cfg_params->max_chan_scan_time =
 		mlme_obj->cfg.lfr.neighbor_scan_max_chan_time;
@@ -1384,13 +1318,11 @@ void wlan_cm_rso_config_deinit(struct wlan_objmgr_vdev *vdev,
 	cm_flush_roam_channel_list(&cfg_params->specific_chan_info);
 	cm_flush_roam_channel_list(&cfg_params->pref_chan_info);
 
-#ifdef FEATURE_CM_ENABLE
 	qdf_mutex_destroy(&rso_cfg->cm_rso_lock);
-#endif
+
 	cm_deinit_reassoc_timer(rso_cfg);
 }
 
-#ifdef FEATURE_CM_ENABLE
 struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
 					     const char *func, uint32_t line)
 
@@ -1494,6 +1426,7 @@ bool cm_is_rsn_or_8021x_sha256_auth_type(struct wlan_objmgr_vdev *vdev)
 #ifdef WLAN_FEATURE_HOST_ROAM
 QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 {
+	QDF_STATUS status;
 	struct cm_host_roam_start_ind *req;
 	struct qdf_mac_addr bssid = QDF_MAC_ADDR_ZERO_INIT;
 
@@ -1501,8 +1434,11 @@ QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 		return QDF_STATUS_E_FAILURE;
 
 	req = msg->bodyptr;
-	return wlan_cm_roam_invoke(req->pdev, req->vdev_id, &bssid, 0,
-				   CM_ROAMING_FW);
+	status = wlan_cm_roam_invoke(req->pdev, req->vdev_id, &bssid, 0,
+				     CM_ROAMING_FW);
+	qdf_mem_free(req);
+
+	return status;
 }
 
 QDF_STATUS cm_mlme_roam_preauth_fail(struct wlan_objmgr_vdev *vdev,
@@ -1534,28 +1470,6 @@ QDF_STATUS cm_mlme_roam_preauth_fail(struct wlan_objmgr_vdev *vdev,
 				     ROAM_SCAN_OFFLOAD_START,
 				     roam_reason);
 	return QDF_STATUS_SUCCESS;
-}
-#endif
-
-#else
-struct rso_config *wlan_cm_get_rso_config_fl(struct wlan_objmgr_vdev *vdev,
-					     const char *func, uint32_t line)
-{
-	struct mlme_legacy_priv *mlme_priv;
-	enum QDF_OPMODE op_mode = wlan_vdev_mlme_get_opmode(vdev);
-
-	/* get only for CLI and STA */
-	if (op_mode != QDF_STA_MODE && op_mode != QDF_P2P_CLIENT_MODE)
-		return NULL;
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_nofl_err("%s:%u: vdev %d legacy private object is NULL",
-			      func, line, wlan_vdev_get_id(vdev));
-		return NULL;
-	}
-
-	return &mlme_priv->rso_cfg;
 }
 #endif
 
@@ -1674,6 +1588,9 @@ static void cm_add_to_occupied_channels(qdf_freq_t ch_freq,
 					    num_occupied_ch, ch_freq))
 		return;
 
+	if (num_occupied_ch >= CFG_VALID_CHANNEL_LIST_LEN)
+		num_occupied_ch = CFG_VALID_CHANNEL_LIST_LEN - 1;
+
 	status = cm_add_to_freq_list_front(occupied_ch_lst,
 					   num_occupied_ch, ch_freq);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
@@ -1753,6 +1670,9 @@ void wlan_cm_init_occupied_ch_freq_list(struct wlan_objmgr_pdev *pdev,
 
 	dual_sta_roam_active =
 			wlan_mlme_get_dual_sta_roaming_enabled(psoc);
+	dual_sta_roam_active = dual_sta_roam_active &&
+			       policy_mgr_mode_specific_connection_count
+				(psoc, PM_STA_MODE, NULL) >= 2;
 
 	qdf_list_peek_front(list, &cur_lst);
 	while (cur_lst) {
@@ -1776,56 +1696,6 @@ rel_vdev_ref:
 }
 
 #ifdef WLAN_FEATURE_FILS_SK
-#ifndef FEATURE_CM_ENABLE
-QDF_STATUS wlan_cm_update_mlme_fils_connection_info(
-		struct wlan_objmgr_psoc *psoc,
-		struct wlan_fils_connection_info *src_fils_info,
-		uint8_t vdev_id)
-{
-	struct wlan_objmgr_vdev *vdev;
-	struct mlme_legacy_priv *mlme_priv;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_NB_ID);
-	if (!vdev) {
-		mlme_err("vdev object is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_err("vdev legacy private object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (!src_fils_info) {
-		mlme_debug("FILS: vdev:%d Clear fils info", vdev_id);
-		qdf_mem_free(mlme_priv->connect_info.fils_con_info);
-		mlme_priv->connect_info.fils_con_info = NULL;
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return QDF_STATUS_SUCCESS;
-	}
-
-	if (mlme_priv->connect_info.fils_con_info)
-		qdf_mem_free(mlme_priv->connect_info.fils_con_info);
-
-	mlme_priv->connect_info.fils_con_info =
-		qdf_mem_malloc(sizeof(struct wlan_fils_connection_info));
-	if (!mlme_priv->connect_info.fils_con_info) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	mlme_debug("FILS: vdev:%d update fils info", vdev_id);
-	qdf_mem_copy(mlme_priv->connect_info.fils_con_info, src_fils_info,
-		     sizeof(struct wlan_fils_connection_info));
-
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
-
-	return QDF_STATUS_SUCCESS;
-}
-#else
 QDF_STATUS
 wlan_cm_update_mlme_fils_info(struct wlan_objmgr_vdev *vdev,
 			      struct wlan_fils_con_info *src_fils_info)
@@ -1875,7 +1745,6 @@ wlan_cm_update_mlme_fils_info(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
-#endif
 
 void wlan_cm_update_hlp_info(struct wlan_objmgr_psoc *psoc,
 			     const uint8_t *gen_ie, uint16_t len,

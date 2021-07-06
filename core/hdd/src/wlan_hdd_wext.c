@@ -6591,36 +6591,15 @@ static int __iw_setnone_getnone(struct net_device *dev,
 	case WE_SET_REASSOC_TRIGGER:
 	{
 		struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-#ifndef FEATURE_CM_ENABLE
-		tSirMacAddr bssid;
-		tCsrRoamModifyProfileFields mod_fields;
-		uint32_t roam_id = INVALID_ROAM_ID;
-#endif
 		uint8_t operating_ch =
 			wlan_get_operation_chan_freq(adapter->vdev);
 		struct qdf_mac_addr target_bssid;
 
 		wlan_mlme_get_bssid_vdev_id(hdd_ctx->pdev, adapter->vdev_id,
 					    &target_bssid);
-#ifdef FEATURE_CM_ENABLE
 		ucfg_wlan_cm_roam_invoke(hdd_ctx->pdev, adapter->vdev_id,
 					 &target_bssid, operating_ch,
 					 CM_ROAMING_HOST);
-#else
-
-		sme_get_modify_profile_fields(mac_handle, adapter->vdev_id,
-					      &mod_fields);
-		if (roaming_offload_enabled(hdd_ctx)) {
-			qdf_mem_copy(bssid,
-				     &target_bssid,
-				     sizeof(bssid));
-		hdd_wma_send_fastreassoc_cmd(adapter,
-					     bssid, operating_ch);
-		} else {
-			sme_roam_reassoc(mac_handle, adapter->vdev_id,
-					 NULL, mod_fields, &roam_id, 1);
-		}
-#endif
 		return 0;
 	}
 
@@ -6775,7 +6754,9 @@ static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
 			hdd_ctx->psoc,
 			apps_args[0], apps_args[1], apps_args[2], apps_args[3],
 			apps_args[4], apps_args[5],
-			wlan_chan_to_freq(apps_args[6]), apps_args[7]);
+			wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+						     apps_args[6]),
+						     apps_args[7]);
 	}
 	break;
 
@@ -6835,7 +6816,8 @@ static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
 		}
 		policy_mgr_current_connections_update(
 			hdd_ctx->psoc, adapter->vdev_id,
-			wlan_chan_to_freq(apps_args[0]),
+			wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+						     apps_args[0]),
 			POLICY_MGR_UPDATE_REASON_UT, POLICY_MGR_DEF_REQ_ID);
 	}
 	break;
@@ -6852,7 +6834,9 @@ static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
 		}
 		allow = policy_mgr_allow_concurrency(
 				hdd_ctx->psoc, apps_args[0],
-				wlan_chan_to_freq(apps_args[1]), apps_args[2]);
+				wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
+							     apps_args[1]),
+							     apps_args[2]);
 		hdd_debug("allow %d {0 = don't allow, 1 = allow}", allow);
 	}
 	break;
@@ -7124,8 +7108,8 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 		else
 			vdev_id = adapter->vdev_id;
 
-		if (adapter->vdev_id >= WLAN_MAX_VDEVS) {
-			hdd_err_rl("Invalid vdev id");
+		if (vdev_id >= WLAN_MAX_VDEVS) {
+			hdd_err_rl("Invalid vdev id %d", vdev_id);
 			return -EINVAL;
 		}
 

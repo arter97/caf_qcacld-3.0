@@ -999,12 +999,6 @@ typedef struct {
 	bool tx_chain_mask_cck;
 	qdf_mc_timer_t service_ready_ext_timer;
 
-#ifndef FEATURE_CM_ENABLE
-	QDF_STATUS (*csr_roam_synch_cb)(struct mac_context *mac,
-		struct roam_offload_synch_ind *roam_synch_data,
-		struct bss_description *bss_desc_ptr,
-		enum sir_roam_op_code reason);
-#endif
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
 						    struct qdf_mac_addr bssid);
@@ -1017,8 +1011,6 @@ typedef struct {
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
 					uint16_t reason_code);
-	QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
-		struct roam_pmkid_req_event *bss_list);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	qdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
 	qdf_runtime_lock_t sap_prevent_runtime_pm_lock;
