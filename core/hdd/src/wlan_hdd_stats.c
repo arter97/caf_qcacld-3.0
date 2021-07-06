@@ -1919,6 +1919,20 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 
 	hdd_enter_dev(adapter->dev);
 
+	/*
+	 * FW can send radio stats with multiple events and for the first event
+	 * host allocates memory in wma and processes the events, there is a
+	 * possibility that host receives first event and gets timed out, on
+	 * time out host frees the allocated memory. now if host receives
+	 * remaining events it will again allocate memory and processes the
+	 * stats, since this is not an allocation for new command, this will
+	 * lead to out of order processing of the next event and this memory
+	 * might not be freed, so free the already allocated memory from WMA
+	 * before issuing any new ll stats request free memory allocated for
+	 * previous command
+	 */
+	sme_radio_tx_mem_free();
+
 	status = wlan_hdd_set_station_stats_request_pending(adapter);
 	if (status == QDF_STATUS_E_ALREADY)
 		return qdf_status_to_os_return(status);
@@ -1985,8 +1999,6 @@ int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
 {
 	int errno;
 	tSirLLStatsGetReq get_req;
-	struct hdd_station_ctx *hddstactx =
-					WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	hdd_enter_dev(adapter->dev);
 
@@ -1995,7 +2007,7 @@ int wlan_hdd_ll_stats_get(struct hdd_adapter *adapter, uint32_t req_id,
 		return -EPERM;
 	}
 
-	if (hddstactx->hdd_reassoc_scenario) {
+	if (hdd_cm_is_vdev_roaming(adapter)) {
 		hdd_err("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
@@ -2042,7 +2054,6 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 	tSirLLStatsGetReq LinkLayerStatsGetReq;
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-	struct hdd_station_ctx *hddstactx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	/* ENTER() intentionally not used in a frequently invoked API */
 
@@ -2061,7 +2072,7 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (hddstactx->hdd_reassoc_scenario) {
+	if (hdd_cm_is_vdev_roaming(adapter)) {
 		hdd_err("Roaming in progress, cannot process the request");
 		return -EBUSY;
 	}
@@ -5317,7 +5328,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 		return 0;
 	}
 
-	if (sta_ctx->hdd_reassoc_scenario) {
+	if (hdd_cm_is_vdev_roaming(adapter)) {
 		hdd_debug("Roaming is in progress, cannot continue with this request");
 		/*
 		 * supplicant reports very low rssi to upper layer
@@ -5752,7 +5763,10 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 
 	survey->channel = channels;
 	survey->noise = chan_info->noise_floor;
-	survey->filled = SURVEY_INFO_NOISE_DBM;
+	survey->filled = 0;
+
+	if (chan_info->noise_floor)
+		survey->filled |= SURVEY_INFO_NOISE_DBM;
 
 	if (opfreq == chan_info->freq)
 		survey->filled |= SURVEY_INFO_IN_USE;
@@ -5783,7 +5797,10 @@ static bool wlan_fill_survey_result(struct survey_info *survey, int opfreq,
 
 	survey->channel = channels;
 	survey->noise = chan_info->noise_floor;
-	survey->filled = SURVEY_INFO_NOISE_DBM;
+	survey->filled = 0;
+
+	if (chan_info->noise_floor)
+		survey->filled |= SURVEY_INFO_NOISE_DBM;
 
 	if (opfreq == chan_info->freq)
 		survey->filled |= SURVEY_INFO_IN_USE;
@@ -5853,7 +5870,6 @@ static int __wlan_hdd_cfg80211_dump_survey(struct wiphy *wiphy,
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
-	struct hdd_station_ctx *sta_ctx;
 	int status;
 	bool filled = false;
 
@@ -5875,12 +5891,10 @@ static int __wlan_hdd_cfg80211_dump_survey(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
 	if (!ucfg_scan_is_snr_monitor_enabled(hdd_ctx->psoc))
 		return -ENONET;
 
-	if (sta_ctx->hdd_reassoc_scenario) {
+	if (hdd_cm_is_vdev_roaming(adapter)) {
 		hdd_debug("Roaming in progress, hence return");
 		return -ENONET;
 	}
@@ -5973,7 +5987,7 @@ static bool hdd_is_rcpi_applicable(struct hdd_adapter *adapter,
 		if (!hdd_cm_is_vdev_associated(adapter))
 			return false;
 
-		if (hdd_sta_ctx->hdd_reassoc_scenario) {
+		if (hdd_cm_is_vdev_roaming(adapter)) {
 			/* return the cached rcpi, if mac addr matches */
 			hdd_debug("Roaming in progress, return cached RCPI");
 			if (!qdf_mem_cmp(&adapter->rcpi.mac_addr,
@@ -6225,7 +6239,7 @@ QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value)
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (sta_ctx->hdd_reassoc_scenario) {
+	if (hdd_cm_is_vdev_roaming(adapter)) {
 		hdd_debug("Roaming in progress, return cached RSSI");
 		*rssi_value = adapter->rssi;
 		return QDF_STATUS_SUCCESS;

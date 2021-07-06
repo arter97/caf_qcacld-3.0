@@ -30,6 +30,9 @@
 #include "wlan_utility.h"
 #include "wlan_policy_mgr_ucfg.h"
 
+/* quota in milliseconds */
+#define MCC_DUTY_CYCLE 70
+
 QDF_STATUS wlan_mlme_get_cfg_str(uint8_t *dst, struct mlme_cfg_str *cfg_str,
 				 qdf_size_t *len)
 {
@@ -225,6 +228,38 @@ QDF_STATUS wlan_mlme_set_band_capability(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 
 	mlme_obj->cfg.gen.band_capability = band_capability;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_set_dual_sta_policy(struct wlan_objmgr_psoc *psoc,
+					 uint8_t dual_sta_config)
+
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.gen.dual_sta_policy.concurrent_sta_policy =
+								dual_sta_config;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_get_dual_sta_policy(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *dual_sta_config)
+
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*dual_sta_config =
+		mlme_obj->cfg.gen.dual_sta_policy.concurrent_sta_policy;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1324,6 +1359,48 @@ QDF_STATUS wlan_mlme_get_wmm_uapsd_vo_sus_intv(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_mlme_cfg_get_vht_ampdu_len_exp(struct wlan_objmgr_psoc *psoc,
+					       uint8_t *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.vht_caps.vht_cap_info.ampdu_len_exponent;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_cfg_get_vht_max_mpdu_len(struct wlan_objmgr_psoc *psoc,
+					      uint8_t *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.vht_caps.vht_cap_info.ampdu_len;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_cfg_get_ht_smps(struct wlan_objmgr_psoc *psoc,
+				     uint8_t *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.ht_caps.smps;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS
 wlan_mlme_get_wmm_dir_ac_vi(struct wlan_objmgr_psoc *psoc, uint8_t *value)
 {
@@ -2395,6 +2472,115 @@ QDF_STATUS wlan_mlme_set_fils_enabled_info(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS wlan_mlme_set_primary_interface(struct wlan_objmgr_psoc *psoc,
+					   uint8_t value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.gen.dual_sta_policy.primary_vdev_id = value;
+	mlme_debug("Set primary iface to :%d", value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+int wlan_mlme_get_mcc_duty_cycle_percentage(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t i, operating_channel, quota_value = MCC_DUTY_CYCLE;
+	struct dual_sta_policy *dual_sta_policy;
+	uint32_t count, primary_sta_freq = 0, secondary_sta_freq = 0;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return -EINVAL;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return -EINVAL;
+	dual_sta_policy  = &mlme_obj->cfg.gen.dual_sta_policy;
+
+	if (dual_sta_policy->primary_vdev_id == WLAN_INVALID_VDEV_ID ||
+	    (dual_sta_policy->concurrent_sta_policy ==
+	     QCA_WLAN_CONCURRENT_STA_POLICY_UNBIASED)) {
+		mlme_debug("Invalid primary vdev id or policy is unbaised :%d",
+			   dual_sta_policy->concurrent_sta_policy);
+		return -EINVAL;
+	}
+
+	count = policy_mgr_get_mode_specific_conn_info(psoc, op_ch_freq_list,
+						       vdev_id_list,
+						       PM_STA_MODE);
+
+	/* Proceed only in case of STA+STA */
+	if (count != 2) {
+		mlme_debug("STA+STA concurrency is not present");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < count; i++) {
+		if (vdev_id_list[i] == dual_sta_policy->primary_vdev_id) {
+			primary_sta_freq = op_ch_freq_list[i];
+			mlme_debug("primary sta vdev:%d at inxex:%d, freq:%d",
+				   i, vdev_id_list[i], op_ch_freq_list[i]);
+		} else {
+			secondary_sta_freq = op_ch_freq_list[i];
+			mlme_debug("secondary sta vdev:%d at inxex:%d, freq:%d",
+				   i, vdev_id_list[i], op_ch_freq_list[i]);
+		}
+	}
+
+	if (!primary_sta_freq || !secondary_sta_freq) {
+		mlme_debug("Invalid primary or secondary sta freq");
+		return -EINVAL;
+	}
+
+	operating_channel = wlan_freq_to_chan(primary_sta_freq);
+
+	/*
+	 * The channel numbers for both adapters and the time
+	 * quota for the 1st adapter, i.e., one specified in cmd
+	 * are formatted as a bit vector
+	 * ******************************************************
+	 * |bit 31-24  | bit 23-16 |  bits 15-8  |bits 7-0   |
+	 * |  Unused   | Quota for | chan. # for |chan. # for|
+	 * |           |  1st chan | 1st chan.   |2nd chan.  |
+	 * ******************************************************
+	 */
+	mlme_debug("First connection channel No.:%d and quota:%dms",
+		   operating_channel, quota_value);
+	/* Move the time quota for first channel to bits 15-8 */
+	quota_value = quota_value << 8;
+	/*
+	 * Store the channel number of 1st channel at bits 7-0
+	 * of the bit vector
+	 */
+	quota_value |= operating_channel;
+		/* Second STA Connection */
+	operating_channel = wlan_freq_to_chan(secondary_sta_freq);
+	if (!operating_channel)
+		mlme_debug("Secondary adapter op channel is invalid");
+	/*
+	 * Now move the time quota and channel number of the
+	 * 1st adapter to bits 23-16 and bits 15-8 of the bit
+	 * vector, respectively.
+	 */
+	quota_value = quota_value << 8;
+	/*
+	 * Set the channel number for 2nd MCC vdev at bits
+	 * 7-0 of set_value
+	 */
+	quota_value |= operating_channel;
+	mlme_debug("quota value:%x", quota_value);
+
+	return quota_value;
+}
+
 QDF_STATUS wlan_mlme_set_enable_bcast_probe_rsp(struct wlan_objmgr_psoc *psoc,
 						bool value)
 {
@@ -3089,6 +3275,24 @@ wlan_mlme_get_vht20_mcs9(struct wlan_objmgr_psoc *psoc, bool *value)
 }
 
 QDF_STATUS
+wlan_mlme_get_indoor_support_for_nan(struct wlan_objmgr_psoc *psoc,
+				     bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = false;
+		mlme_legacy_err("Failed to get MLME Obj");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.reg.enable_nan_on_indoor_channels;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 wlan_mlme_get_srd_master_mode_for_vdev(struct wlan_objmgr_psoc *psoc,
 				       enum QDF_OPMODE vdev_opmode,
 				       bool *value)
@@ -3271,7 +3475,8 @@ mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg)
 	 */
 	if (vht_cap_info->ampdu_len > cfg->vht_max_mpdu)
 		vht_cap_info->ampdu_len = cfg->vht_max_mpdu;
-
+	if (vht_cap_info->ampdu_len >= 1)
+		mlme_obj->cfg.ht_caps.ht_cap_info.maximal_amsdu_size = 1;
 	value = (CFG_VHT_BASIC_MCS_SET_STADEF & VHT_MCS_1x1) |
 		vht_cap_info->basic_mcs_set;
 	if (vht_cap_info->enable2x2)
@@ -3568,7 +3773,7 @@ wlan_mlme_get_self_gen_frm_pwr(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
-wlan_mlme_get_4way_hs_offload(struct wlan_objmgr_psoc *psoc, bool *value)
+wlan_mlme_get_4way_hs_offload(struct wlan_objmgr_psoc *psoc, uint32_t *value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -3671,6 +3876,8 @@ char *mlme_get_roam_scan_type_str(uint32_t roam_scan_type)
 		return "FULL";
 	case 2:
 		return "NO SCAN";
+	case 3:
+		return "Higher Band";
 	default:
 		return "UNKNOWN";
 	}
@@ -3790,6 +3997,17 @@ void wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
 	if (mlme_priv->mlme_roam.sae_single_pmk.sae_single_pmk_ap &&
 	    is_sae_connection)
 		mlme_priv->mlme_roam.sae_single_pmk.pmk_info = *sae_single_pmk;
+}
+
+bool wlan_mlme_is_sae_single_pmk_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return cfg_default(CFG_SAE_SINGLE_PMK);
+
+	return mlme_obj->cfg.lfr.sae_single_pmk_feature_enabled;
 }
 
 void wlan_mlme_get_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
@@ -4739,6 +4957,17 @@ bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc)
 		return false;
 
 	return mlme_obj->cfg.power.use_local_tpe;
+}
+
+bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.power.skip_tpe;
 }
 
 #ifdef WLAN_FEATURE_11BE

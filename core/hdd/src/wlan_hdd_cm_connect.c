@@ -42,9 +42,11 @@
 #include "sme_qos_internal.h"
 #include "wlan_blm_ucfg_api.h"
 #include "wlan_hdd_scan.h"
+#include "wlan_osif_priv.h"
 #include <enet.h>
 #include <wlan_mlme_twt_ucfg_api.h>
 #include "wlan_roam_debug.h"
+#include <wlan_hdd_regulatory.h>
 
 #ifdef FEATURE_CM_ENABLE
 bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
@@ -141,6 +143,28 @@ bool hdd_cm_is_disconnecting(struct hdd_adapter *adapter)
 	return is_vdev_disconnecting;
 }
 
+bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool is_vdev_roaming;
+	enum QDF_OPMODE opmode;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	if (!vdev)
+		return false;
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+		return false;
+	}
+	is_vdev_roaming = ucfg_cm_is_vdev_roaming(vdev);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+
+	return is_vdev_roaming;
+}
+
 #else
 bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
 {
@@ -170,6 +194,13 @@ bool hdd_cm_is_disconnecting(struct hdd_adapter *adapter)
 
 	return sta_ctx->conn_info.conn_state == eConnectionState_Disconnecting;
 }
+
+bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	return sme_roaming_in_progress(hdd_ctx->mac_handle, adapter->vdev_id);
+}
 #endif
 
 void hdd_cm_set_peer_authenticate(struct hdd_adapter *adapter,
@@ -193,16 +224,7 @@ void hdd_cm_update_rssi_snr_by_bssid(struct hdd_adapter *adapter)
 	struct hdd_station_ctx *sta_ctx;
 	int8_t snr = 0;
 
-	if (!adapter) {
-		hdd_err("adapter is NULL");
-		return;
-	}
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is NULL");
-		return;
-	}
-
 	hdd_get_rssi_snr_by_bssid(adapter, sta_ctx->conn_info.bssid.bytes,
 				  &adapter->rssi, &snr);
 
@@ -235,16 +257,11 @@ void hdd_cm_handle_assoc_event(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mac)
 
 	adapter = hdd_get_adapter_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
 	if (!adapter) {
-		hdd_err("adapter is NULL");
+		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
 		return;
 	}
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is NULL");
-		return;
-	}
-
 	ret = hdd_objmgr_set_peer_mlme_state(adapter->vdev,
 					     WLAN_ASSOC_STATE);
 	if (ret)
@@ -359,6 +376,7 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	struct osif_connect_params params;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	struct hdd_context *hdd_ctx;
+	struct hdd_station_ctx *hdd_sta_ctx;
 
 	hdd_enter();
 
@@ -383,16 +401,31 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 	}
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status)
 		return status;
 
+	hdd_reg_wait_for_country_change(hdd_ctx);
+
 	qdf_mem_zero(&params, sizeof(params));
 	ucfg_blm_dump_black_list_ap(hdd_ctx->pdev);
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	if (!vdev)
+		return -EINVAL;
 
 	ucfg_pmo_flush_gtk_offload_req(vdev);
+	qdf_mem_zero(&hdd_sta_ctx->conn_info.conn_flag,
+		     sizeof(hdd_sta_ctx->conn_info.conn_flag));
+
+	/*
+	 * Reset the ptk, gtk status flags to avoid using old/previous
+	 * connection status.
+	 */
+	hdd_sta_ctx->conn_info.gtk_installed = false;
+	hdd_sta_ctx->conn_info.ptk_installed = false;
+	adapter->last_disconnect_reason = 0;
 
 	qdf_runtime_pm_prevent_suspend(&hdd_ctx->runtime_context.connect);
 	hdd_prevent_suspend_timeout(HDD_WAKELOCK_CONNECT_COMPLETE,
@@ -405,9 +438,14 @@ int wlan_hdd_cm_connect(struct wiphy *wiphy,
 
 	status = osif_cm_connect(ndev, vdev, req, &params);
 
-	if (status) {
-		hdd_err("Vdev %d connect failed status %d",
-			adapter->vdev_id, status);
+	if (status || ucfg_cm_is_vdev_roaming(vdev)) {
+		/* Release suspend and wake lock for failure or roam invoke */
+		if (status)
+			hdd_err("Vdev %d connect failed status %d",
+				adapter->vdev_id, status);
+		else
+			hdd_debug("Vdev %d: connect lead to roam invoke",
+				  adapter->vdev_id);
 		qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.connect);
 		hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_CONNECT);
 	}
@@ -442,18 +480,13 @@ hdd_cm_connect_failure_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx, wlan_vdev_get_id(vdev));
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
 	if (!adapter) {
-		hdd_err("adapter is NULL");
+		hdd_err("adapter is NULL vdev %d", rsp->vdev_id);
 		return;
 	}
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!hdd_sta_ctx) {
-		hdd_err("hdd_sta_ctx is NULL");
-		return;
-	}
-
 	hdd_init_scan_reject_params(hdd_ctx);
 	hdd_cm_save_connect_status(adapter, rsp->status_code);
 	hdd_conn_remove_connect_info(hdd_sta_ctx);
@@ -468,15 +501,26 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 					struct wlan_cm_connect_resp *rsp)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-						wlan_vdev_get_id(vdev));
+	struct hdd_adapter *adapter;
 	bool is_roam = rsp->is_reassoc;
 
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return;
+	}
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
+	if (!adapter) {
+		hdd_err("adapter is NULL for vdev %d", rsp->vdev_id);
+		return;
+	}
 	if (!is_roam) {
 		/* call only for connect */
 		qdf_runtime_pm_allow_suspend(&hdd_ctx->runtime_context.connect);
 		hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_CONNECT);
 	}
+
+	hdd_clear_roam_profile_ie(adapter);
 	sme_reset_key(hdd_ctx->mac_handle, adapter->vdev_id);
 	hdd_wmm_dscp_initial_state(adapter);
 	hdd_debug("Disabling queues");
@@ -484,6 +528,7 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 	hdd_periodic_sta_stats_start(adapter);
+	wlan_twt_concurrency_update(hdd_ctx);
 }
 
 static void hdd_cm_connect_failure(struct wlan_objmgr_vdev *vdev,
@@ -512,22 +557,8 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 	struct sDot11fAssocResponse *assoc_resp;
 
-	if (!adapter) {
-		hdd_err("Adapter is NULL");
-		return;
-	}
-
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is NULL");
-		return;
-	}
-
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!hdd_sta_ctx) {
-		hdd_err("hdd_sta_ctx is NULL");
-		return;
-	}
 
 	assoc_resp = qdf_mem_malloc(sizeof(struct sDot11fAssocResponse));
 	if (!assoc_resp)
@@ -535,9 +566,11 @@ static void hdd_cm_save_bss_info(struct hdd_adapter *adapter,
 
 	qdf_mem_zero(&hdd_sta_ctx->conn_info.hs20vendor_ie,
 		     sizeof(hdd_sta_ctx->conn_info.hs20vendor_ie));
-	sme_get_hs20vendor_ie(mac_handle, rsp->connect_ies.bcn_probe_rsp.ptr,
-			      rsp->connect_ies.bcn_probe_rsp.len,
-			      &hdd_sta_ctx->conn_info.hs20vendor_ie);
+	if (rsp->connect_ies.bcn_probe_rsp.ptr)
+		sme_get_hs20vendor_ie(mac_handle,
+				      rsp->connect_ies.bcn_probe_rsp.ptr,
+				      rsp->connect_ies.bcn_probe_rsp.len,
+				      &hdd_sta_ctx->conn_info.hs20vendor_ie);
 
 	status = sme_unpack_assoc_rsp(mac_handle,
 				      rsp->connect_ies.assoc_rsp.ptr,
@@ -701,17 +734,7 @@ static void hdd_cm_save_connect_info(struct hdd_adapter *adapter,
 	tDot11fBeaconIEs *bcn_ie;
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 
-	if (!adapter) {
-		hdd_err("adapter is NULL");
-		return;
-	}
-
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is NULL");
-		return;
-	}
-
 	bcn_ie = qdf_mem_malloc(sizeof(*bcn_ie));
 	if (!bcn_ie)
 		return;
@@ -720,14 +743,15 @@ static void hdd_cm_save_connect_info(struct hdd_adapter *adapter,
 
 	crypto_params = wlan_crypto_vdev_get_crypto_params(adapter->vdev);
 
-	sme_fill_enc_type(&sta_ctx->conn_info.uc_encrypt_type,
-			  crypto_params->ucastcipherset);
+	if (crypto_params) {
+		sme_fill_enc_type(&sta_ctx->conn_info.uc_encrypt_type,
+				  crypto_params->ucastcipherset);
 
-	sme_fill_auth_type(&sta_ctx->conn_info.auth_type,
-			   crypto_params->authmodeset,
-			   crypto_params->key_mgmt,
-			   crypto_params->ucastcipherset);
-
+		sme_fill_auth_type(&sta_ctx->conn_info.auth_type,
+				   crypto_params->authmodeset,
+				   crypto_params->key_mgmt,
+				   crypto_params->ucastcipherset);
+	}
 	des_chan = wlan_vdev_mlme_get_des_chan(adapter->vdev);
 
 	sta_ctx->conn_info.chan_freq = rsp->freq;
@@ -746,6 +770,15 @@ static void hdd_cm_save_connect_info(struct hdd_adapter *adapter,
 				sme_phy_mode_to_dot11mode(des_chan->ch_phymode);
 
 	sta_ctx->conn_info.ch_width = des_chan->ch_width;
+	if (!rsp->connect_ies.bcn_probe_rsp.ptr ||
+	    (rsp->connect_ies.bcn_probe_rsp.len <
+	     (sizeof(struct wlan_frame_hdr) +
+	      offsetof(struct wlan_bcn_frame, ie)))) {
+		hdd_err("beacon len is invalid %d",
+			rsp->connect_ies.bcn_probe_rsp.len);
+		qdf_mem_free(bcn_ie);
+		return;
+	}
 
 	ie_len = (rsp->connect_ies.bcn_probe_rsp.len -
 			sizeof(struct wlan_frame_hdr) -
@@ -783,6 +816,39 @@ static void hdd_cm_save_connect_info(struct hdd_adapter *adapter,
 	hdd_cm_save_bss_info(adapter, rsp);
 }
 
+#ifdef WLAN_FEATURE_FILS_SK
+static bool hdd_cm_is_fils_connection(struct wlan_cm_connect_resp *rsp)
+{
+	return rsp->is_fils_connection;
+}
+#else
+static inline
+bool hdd_cm_is_fils_connection(struct wlan_cm_connect_resp *rsp)
+{
+	return false;
+}
+#endif
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
+					 struct wlan_cm_connect_resp *rsp)
+{
+	if (!rsp->roaming_info)
+		return false;
+
+	if (rsp->roaming_info->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
+		return false;
+
+	return true;
+}
+#else
+static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
+					 struct wlan_cm_connect_resp *rsp)
+{
+	return true;
+}
+#endif
+
 static void
 hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 				       struct wlan_cm_connect_resp *rsp)
@@ -795,8 +861,11 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	uint32_t ie_len;
 	uint8_t *ie_field;
 	mac_handle_t mac_handle;
+	bool is_auth_required = true;
+	bool is_roam_offload = false;
 	bool is_roam = rsp->is_reassoc;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint32_t phymode;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
@@ -811,11 +880,6 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	}
 
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!sta_ctx) {
-		hdd_err("sta_ctx is NULL");
-		return;
-	}
-
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 
 	wlan_hdd_ft_set_key_delay(mac_handle, adapter);
@@ -827,22 +891,27 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_cm_rec_connect_info(adapter, rsp);
 
 	hdd_cm_save_connect_info(adapter, rsp);
+	phymode = wlan_reg_get_max_phymode(hdd_ctx->pdev, REG_PHYMODE_MAX,
+					   rsp->freq);
+	sta_ctx->reg_phymode = csr_convert_from_reg_phy_mode(phymode);
 
 	if (hdd_add_beacon_filter(adapter) != 0)
 		hdd_err("add beacon fileter failed");
 
 	adapter->wapi_info.is_wapi_sta = hdd_cm_is_wapi_sta(
 						sta_ctx->conn_info.auth_type);
-
-	ie_len = (rsp->connect_ies.bcn_probe_rsp.len -
-			sizeof(struct wlan_frame_hdr) -
-			offsetof(struct wlan_bcn_frame, ie));
-
-	ie_field  = (uint8_t *)(rsp->connect_ies.bcn_probe_rsp.ptr +
-				sizeof(struct wlan_frame_hdr) +
+	if (adapter->device_mode == QDF_STA_MODE &&
+	    rsp->connect_ies.bcn_probe_rsp.ptr &&
+	    (rsp->connect_ies.bcn_probe_rsp.len >
+	     (sizeof(struct wlan_frame_hdr) +
+	      offsetof(struct wlan_bcn_frame, ie)))) {
+		ie_len = (rsp->connect_ies.bcn_probe_rsp.len -
+				sizeof(struct wlan_frame_hdr) -
 				offsetof(struct wlan_bcn_frame, ie));
 
-	if (adapter->device_mode == QDF_STA_MODE) {
+		ie_field  = (uint8_t *)(rsp->connect_ies.bcn_probe_rsp.ptr +
+				sizeof(struct wlan_frame_hdr) +
+				offsetof(struct wlan_bcn_frame, ie));
 		sta_ctx->ap_supports_immediate_power_save =
 				wlan_hdd_is_ap_supports_immediate_power_save(
 				     ie_field, ie_len);
@@ -907,12 +976,29 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		adapter->is_link_up_service_needed = false;
 	}
 
-	if (ucfg_ipa_is_enabled())
+	if (!rsp->is_wps_connection &&
+	    (sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_NONE ||
+	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_OPEN_SYSTEM ||
+	     sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_SHARED_KEY ||
+	     hdd_cm_is_fils_connection(rsp)))
+		is_auth_required = false;
+
+	if (is_roam)
+		/* If roaming is set check if FW roaming/LFR3  */
+		ucfg_mlme_get_roaming_offload(hdd_ctx->psoc, &is_roam_offload);
+
+	if (is_roam_offload)
+		/* for LFR 3 get authenticated info from resp */
+		is_auth_required = hdd_cm_is_roam_auth_required(sta_ctx, rsp);
+
+	if (ucfg_ipa_is_enabled() && !is_auth_required)
 		ucfg_ipa_wlan_evt(hdd_ctx->pdev, adapter->dev,
 				  adapter->device_mode,
 				  adapter->vdev_id,
 				  WLAN_IPA_STA_CONNECT,
-				  rsp->bssid.bytes);
+				  rsp->bssid.bytes,
+				  WLAN_REG_IS_24GHZ_CH_FREQ(
+					sta_ctx->conn_info.chan_freq));
 
 	if (adapter->device_mode == QDF_STA_MODE)
 		cdp_reset_rx_hw_ext_stats(soc);
@@ -929,57 +1015,35 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 /* hdd_objmgr_set_peer_mlme_auth_state */
 }
 
-#ifdef WLAN_FEATURE_FILS_SK
-static bool hdd_cm_is_fils_connection(struct wlan_cm_connect_resp *rsp)
-{
-	return rsp->is_fils_connection;
-}
-#else
-static inline
-bool hdd_cm_is_fils_connection(struct wlan_cm_connect_resp *rsp)
-{
-	return false;
-}
-#endif
-
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
-					 struct wlan_cm_connect_resp *rsp)
-{
-	if (!rsp->roaming_info)
-		return false;
-
-	if (rsp->roaming_info->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED ||
-	    sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_SAE ||
-	    sta_ctx->conn_info.auth_type == eCSR_AUTH_TYPE_OWE)
-		return false;
-
-	return true;
-}
-#else
-static bool hdd_cm_is_roam_auth_required(struct hdd_station_ctx *sta_ctx,
-					 struct wlan_cm_connect_resp *rsp)
-{
-	return true;
-}
-#endif
-
 static void
 hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 					struct wlan_cm_connect_resp *rsp)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-						wlan_vdev_get_id(vdev));
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	struct hdd_adapter *adapter;
+	struct hdd_station_ctx *sta_ctx;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct vdev_mlme_obj *mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
-	uint8_t uapsd_mask =
-		mlme_obj->ext_vdev_ptr->connect_info.uapsd_per_ac_bitmask;
+	uint8_t uapsd_mask = 0;
 	bool is_auth_required = true;
 	bool is_roam_offload = false;
 	bool is_roam = rsp->is_reassoc;
 
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return;
+	}
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
+	if (!adapter) {
+		hdd_err("adapter is NULL for vdev %d", rsp->vdev_id);
+		return;
+	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	if (mlme_obj)
+		uapsd_mask =
+			mlme_obj->ext_vdev_ptr->connect_info.uapsd_per_ac_bitmask;
 	if (is_roam) {
 		/* If roaming is set check if FW roaming/LFR3  */
 		ucfg_mlme_get_roaming_offload(hdd_ctx->psoc, &is_roam_offload);
@@ -1027,6 +1091,7 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 					   WLAN_ALL_SESSIONS_DIALOG_ID);
 	}
 	hdd_periodic_sta_stats_start(adapter);
+	wlan_twt_concurrency_update(hdd_ctx);
 }
 
 static void hdd_cm_connect_success(struct wlan_objmgr_vdev *vdev,
@@ -1070,12 +1135,17 @@ QDF_STATUS hdd_cm_save_gtk(struct wlan_objmgr_vdev *vdev,
 	uint8_t replay_ctr_def[REPLAY_CTR_LEN] = {0};
 	uint8_t *replay_ctr;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-						wlan_vdev_get_id(vdev));
+	struct hdd_adapter *adapter;
 
-	if (!adapter || !rsp) {
-		hdd_err("adapter/connect rsp is NULL");
-		return QDF_STATUS_E_FAILURE;
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
+	if (!adapter) {
+		hdd_err("adapter is NULL for vdev %d", rsp->vdev_id);
+		return QDF_STATUS_E_INVAL;
 	}
 
 	if (rsp->is_reassoc && rsp->roaming_info) {
@@ -1106,12 +1176,17 @@ QDF_STATUS hdd_cm_save_gtk(struct wlan_objmgr_vdev *vdev,
 	uint8_t kck_len = 0;
 	uint8_t *replay_ctr;
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	struct hdd_adapter *adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-						wlan_vdev_get_id(vdev));
+	struct hdd_adapter *adapter;
 
-	if (!adapter || !rsp) {
-		hdd_err("adapter/connect rsp is NULL");
-		return QDF_STATUS_E_FAILURE;
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, rsp->vdev_id);
+	if (!adapter) {
+		hdd_err("adapter is NULL for vdev %d", rsp->vdev_id);
+		return QDF_STATUS_E_INVAL;
 	}
 
 	if (rsp->is_reassoc && rsp->roaming_info) {
@@ -1209,4 +1284,237 @@ QDF_STATUS hdd_cm_set_hlp_data(struct net_device *dev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#ifdef WLAN_FEATURE_PREAUTH_ENABLE
+/**
+ * hdd_cm_get_ft_preauth_response() - get ft preauth response
+ * related information
+ * @vdev: vdev pointer
+ * @rsp: preauth response
+ * @ft_ie: ft ie
+ * @ft_ie_ip_len: ft ie ip length
+ * @ft_ie_length: ft ies length
+ *
+ * This function is used to get ft ie related information
+ *
+ * Return: none
+ */
+static void
+hdd_cm_get_ft_preauth_response(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_preauth_rsp *rsp, uint8_t *ft_ie,
+			       uint32_t ft_ie_ip_len, uint16_t *ft_ie_length)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	*ft_ie_length = 0;
+
+	if (!vdev)
+		return;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv)
+		return;
+
+	/* All or nothing - proceed only if both BSSID and FT IE fit */
+	if ((QDF_MAC_ADDR_SIZE + rsp->ft_ie_length) > ft_ie_ip_len)
+		return;
+	/*
+	 * hdd needs to pack the bssid also along with the
+	 * auth response to supplicant
+	 */
+	qdf_mem_copy(ft_ie, rsp->pre_auth_bssid.bytes, QDF_MAC_ADDR_SIZE);
+
+	/* Copy the auth resp FTIEs */
+	qdf_mem_copy(&ft_ie[QDF_MAC_ADDR_SIZE],
+		     rsp->ft_ie, rsp->ft_ie_length);
+
+	*ft_ie_length = QDF_MAC_ADDR_SIZE + rsp->ft_ie_length;
+
+	hdd_debug("Filled auth resp: %d", *ft_ie_length);
+}
+
+#if defined(KERNEL_SUPPORT_11R_CFG80211)
+QDF_STATUS hdd_cm_ft_preauth_complete(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_preauth_rsp *rsp)
+{
+	mac_handle_t mac_handle;
+	struct vdev_osif_priv *osif_priv = wlan_vdev_get_ospriv(vdev);
+	struct wireless_dev *wdev;
+	uint16_t auth_resp_len = 0;
+	uint32_t ric_ies_length = 0;
+	struct cfg80211_ft_event_params ft_event;
+	uint8_t ft_ie[DOT11F_IE_FTINFO_MAX_LEN];
+	uint8_t ric_ies[DOT11F_IE_RICDESCRIPTOR_MAX_LEN];
+
+	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
+	if (!mac_handle) {
+		hdd_err("mac_handle is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!osif_priv) {
+		hdd_err("Invalid vdev osif priv");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(ft_ie, DOT11F_IE_FTINFO_MAX_LEN);
+	qdf_mem_zero(ric_ies, DOT11F_IE_RICDESCRIPTOR_MAX_LEN);
+
+	if (rsp->ric_ies_length &&
+	    rsp->ric_ies_length <= DOT11F_IE_RICDESCRIPTOR_MAX_LEN) {
+		qdf_mem_copy(ric_ies, rsp->ric_ies, rsp->ric_ies_length);
+		ric_ies_length = rsp->ric_ies_length;
+	} else {
+		hdd_warn("Do not send RIC IEs as length is 0");
+	}
+
+	ft_event.ric_ies = ric_ies;
+	ft_event.ric_ies_len = ric_ies_length;
+	hdd_debug("RIC IEs is of length %d", ric_ies_length);
+
+	hdd_cm_get_ft_preauth_response(vdev, rsp, ft_ie,
+				       DOT11F_IE_FTINFO_MAX_LEN,
+				       &auth_resp_len);
+	if (!auth_resp_len) {
+		hdd_debug("AuthRsp FTIES is of length 0");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sme_set_ft_pre_auth_state(mac_handle, wlan_vdev_get_id(vdev), true);
+
+	ft_event.target_ap = ft_ie;
+	ft_event.ies = (u8 *)(ft_ie + QDF_MAC_ADDR_SIZE);
+	ft_event.ies_len = auth_resp_len - QDF_MAC_ADDR_SIZE;
+
+	hdd_debug("ftEvent.ies_len %zu", ft_event.ies_len);
+	hdd_debug("ftEvent.ric_ies_len %zu", ft_event.ric_ies_len);
+	hdd_debug("ftEvent.target_ap %2x-%2x-%2x-%2x-%2x-%2x",
+		  ft_event.target_ap[0], ft_event.target_ap[1],
+		  ft_event.target_ap[2], ft_event.target_ap[3],
+		  ft_event.target_ap[4], ft_event.target_ap[5]);
+
+	(void)cfg80211_ft_event(wdev->netdev, &ft_event);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+QDF_STATUS hdd_cm_ft_preauth_complete(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_preauth_rsp *rsp)
+{
+	struct vdev_osif_priv *osif_priv = wlan_vdev_get_ospriv(vdev);
+	struct wireless_dev *wdev;
+	uint16_t auth_resp_len = 0;
+	uint32_t ric_ies_length = 0;
+	char *buff;
+	union iwreq_data wrqu;
+	uint16_t str_len;
+
+	if (!osif_priv) {
+		hdd_err("Invalid vdev osif priv");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* need to send the IEs to the supplicant */
+	buff = qdf_mem_malloc(IW_CUSTOM_MAX);
+	if (!buff)
+		return QDF_STATUS_E_NOMEM;
+
+	/* need to send the RIC IEs first */
+	str_len = strlcpy(buff, "RIC=", IW_CUSTOM_MAX);
+	if (rsp->ric_ies_length &&
+	    (rsp->ric_ies_length <= (IW_CUSTOM_MAX - str_len))) {
+		qdf_mem_copy(&buff[str_len], rsp->ric_ies,
+			     rsp->ric_ies_length);
+		ric_ies_length = rsp->ric_ies_length;
+		wrqu.data.length = str_len + ric_ies_length;
+		hdd_wext_send_event(wdev->netdev, IWEVCUSTOM, &wrqu, buff);
+	} else {
+		hdd_warn("Do not send RIC IEs as length is 0");
+	}
+
+	/* need to provide the Auth Resp */
+	qdf_mem_zero(buff, IW_CUSTOM_MAX);
+	str_len = strlcpy(buff, "AUTH=", IW_CUSTOM_MAX);
+	hdd_cm_get_ft_preauth_response(vdev, rsp, &buff[str_len],
+				       (IW_CUSTOM_MAX - str_len),
+				       &auth_resp_len);
+	if (!auth_resp_len) {
+		qdf_mem_free(buff);
+		hdd_debug("AuthRsp FTIES is of length 0");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wrqu.data.length = str_len + auth_resp_len;
+	hdd_wext_send_event(wdev->netdev, IWEVCUSTOM, &wrqu, buff);
+
+	qdf_mem_free(buff);
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef FEATURE_WLAN_ESE
+QDF_STATUS hdd_cm_cckm_preauth_complete(struct wlan_objmgr_vdev *vdev,
+					struct wlan_preauth_rsp *rsp)
+{
+	struct vdev_osif_priv *osif_priv = wlan_vdev_get_ospriv(vdev);
+	struct wireless_dev *wdev;
+	union iwreq_data wrqu;
+	char buf[IW_CUSTOM_MAX + 1];
+	char *pos = buf;
+	int nbytes = 0, freebytes = IW_CUSTOM_MAX;
+
+	if (!osif_priv) {
+		hdd_err("Invalid vdev osif priv");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		hdd_err("wdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* create the event */
+	memset(&wrqu, '\0', sizeof(wrqu));
+	memset(buf, '\0', sizeof(buf));
+
+	/* timestamp0 is lower 32 bits and timestamp1 is upper 32 bits */
+	hdd_debug("CCXPREAUTHNOTIFY=" QDF_MAC_ADDR_FMT " %d:%d",
+		  QDF_MAC_ADDR_REF(rsp->pre_auth_bssid.bytes),
+		  rsp->timestamp[0], rsp->timestamp[1]);
+
+	nbytes = snprintf(pos, freebytes, "CCXPREAUTHNOTIFY=");
+	pos += nbytes;
+	freebytes -= nbytes;
+
+	qdf_mem_copy(pos, rsp->pre_auth_bssid.bytes, QDF_MAC_ADDR_SIZE);
+	pos += QDF_MAC_ADDR_SIZE;
+	freebytes -= QDF_MAC_ADDR_SIZE;
+
+	nbytes = snprintf(pos, freebytes, " %u:%u",
+			  rsp->timestamp[0], rsp->timestamp[1]);
+	freebytes -= nbytes;
+
+	wrqu.data.pointer = buf;
+	wrqu.data.length = (IW_CUSTOM_MAX - freebytes);
+
+	/* send the event */
+	hdd_wext_send_event(wdev->netdev, IWEVCUSTOM, &wrqu, buf);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* FEATURE_WLAN_ESE */
+#endif /* WLAN_FEATURE_PREAUTH_ENABLE */
 #endif

@@ -817,8 +817,7 @@ pmo_core_enable_wow_in_fw(struct wlan_objmgr_psoc *psoc,
 		pmo_info("RTPM wow");
 	}
 
-	if ((psoc_cfg) &&
-	    (psoc_cfg->is_mod_dtim_on_sys_suspend_enabled)) {
+	if (psoc_cfg->is_mod_dtim_on_sys_suspend_enabled) {
 		pmo_info("mod DTIM enabled");
 		param.flags |= WMI_WOW_FLAG_MOD_DTIM_ON_SYS_SUSPEND;
 	}
@@ -1005,6 +1004,7 @@ QDF_STATUS pmo_core_txrx_suspend(struct wlan_objmgr_psoc *psoc)
 		goto out;
 
 	cdp_drain_txrx(dp_soc);
+	pmo_ctx->wow.txrx_suspended = true;
 out:
 	pmo_psoc_put_ref(psoc);
 	return status;
@@ -1024,7 +1024,7 @@ QDF_STATUS pmo_core_txrx_resume(struct wlan_objmgr_psoc *psoc)
 	}
 
 	pmo_ctx = pmo_psoc_get_priv(psoc);
-	if (pmo_core_get_wow_state(pmo_ctx) != pmo_wow_state_unified_d3)
+	if (!pmo_ctx->wow.txrx_suspended)
 		goto out;
 
 	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
@@ -1038,7 +1038,10 @@ QDF_STATUS pmo_core_txrx_resume(struct wlan_objmgr_psoc *psoc)
 	if (ret && ret != -EOPNOTSUPP) {
 		pmo_err("Failed to enable grp irqs: %d", ret);
 		status = qdf_status_from_os_return(ret);
+		goto out;
 	}
+
+	pmo_ctx->wow.txrx_suspended = false;
 out:
 	pmo_psoc_put_ref(psoc);
 	return status;
@@ -1175,6 +1178,12 @@ QDF_STATUS pmo_core_psoc_bus_runtime_suspend(struct wlan_objmgr_psoc *psoc,
 		hif_process_runtime_suspend_success(hif_ctx);
 	}
 
+	if (hif_try_prevent_ep_vote_access(hif_ctx)) {
+		pmo_debug("Prevent suspend, ep work pending");
+		status = QDF_STATUS_E_BUSY;
+		goto resume_txrx;
+	}
+
 	goto dec_psoc_ref;
 
 resume_txrx:
@@ -1191,6 +1200,8 @@ pmo_bus_resume:
 pmo_resume_configure:
 	PMO_CORE_PSOC_RUNTIME_PM_QDF_BUG(QDF_STATUS_SUCCESS !=
 		pmo_core_psoc_configure_resume(psoc, true));
+
+	hif_pm_set_link_state(hif_ctx, HIF_PM_LINK_STATE_UP);
 
 resume_htc:
 	PMO_CORE_PSOC_RUNTIME_PM_QDF_BUG(QDF_STATUS_SUCCESS !=
@@ -1268,10 +1279,6 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 
-	status = pmo_core_txrx_resume(psoc);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto fail;
-
 	if (hif_runtime_resume(hif_ctx)) {
 		status = QDF_STATUS_E_FAILURE;
 		goto fail;
@@ -1279,6 +1286,10 @@ QDF_STATUS pmo_core_psoc_bus_runtime_resume(struct wlan_objmgr_psoc *psoc,
 
 	status = pmo_core_psoc_bus_resume_req(psoc, QDF_RUNTIME_SUSPEND);
 	if (status != QDF_STATUS_SUCCESS)
+		goto fail;
+
+	status = pmo_core_txrx_resume(psoc);
+	if (QDF_IS_STATUS_ERROR(status))
 		goto fail;
 
 	hif_pm_set_link_state(hif_ctx, HIF_PM_LINK_STATE_UP);
@@ -1332,12 +1343,22 @@ QDF_STATUS pmo_core_psoc_send_host_wakeup_ind_to_fw(
 			struct pmo_psoc_priv_obj *psoc_ctx)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	void *hif_ctx;
 
 	pmo_enter();
+
+	hif_ctx = pmo_core_psoc_get_hif_handle(psoc);
+	hif_set_ep_vote_access(hif_ctx,
+			       HIF_EP_VOTE_NONDP_ACCESS,
+			       HIF_EP_VOTE_INTERMEDIATE_ACCESS);
+
 	qdf_event_reset(&psoc_ctx->wow.target_resume);
 
 	status = pmo_tgt_psoc_send_host_wakeup_ind(psoc);
 	if (status) {
+		hif_set_ep_vote_access(hif_ctx,
+				       HIF_EP_VOTE_NONDP_ACCESS,
+				       HIF_EP_VOTE_ACCESS_DISABLE);
 		status = QDF_STATUS_E_FAILURE;
 		goto out;
 	}
@@ -1357,6 +1378,12 @@ QDF_STATUS pmo_core_psoc_send_host_wakeup_ind_to_fw(
 		pmo_debug("Host wakeup received");
 		pmo_tgt_update_target_suspend_flag(psoc, false);
 		pmo_tgt_update_target_suspend_acked_flag(psoc, false);
+		hif_set_ep_vote_access(hif_ctx,
+				       HIF_EP_VOTE_NONDP_ACCESS,
+				       HIF_EP_VOTE_ACCESS_ENABLE);
+		hif_set_ep_vote_access(hif_ctx,
+				       HIF_EP_VOTE_DP_ACCESS,
+				       HIF_EP_VOTE_ACCESS_ENABLE);
 	}
 out:
 	pmo_exit();

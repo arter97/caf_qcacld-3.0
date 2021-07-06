@@ -91,6 +91,7 @@ struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
 	return &mlme_priv->ini_cfg;
 }
 
+#ifndef FEATURE_CM_ENABLE
 struct mlme_roam_after_data_stall *
 mlme_get_roam_invoke_params(struct wlan_objmgr_vdev *vdev)
 {
@@ -126,6 +127,7 @@ bool mlme_is_roam_invoke_in_progress(struct wlan_objmgr_psoc *psoc,
 
 	return vdev_roam_params->roam_invoke_in_progress;
 }
+#endif
 
 uint8_t *mlme_get_dynamic_oce_flags(struct wlan_objmgr_vdev *vdev)
 {
@@ -620,6 +622,8 @@ mlme_init_qos_edca_params(struct wlan_objmgr_psoc *psoc,
 	edca_params->enable_edca_params =
 			cfg_get(psoc, CFG_EDCA_ENABLE_PARAM);
 
+	edca_params->enable_wmm_txop =
+			cfg_get(psoc, CFG_ENABLE_WMM_TXOP);
 	edca_params->edca_ac_vo.vo_cwmin =
 			cfg_get(psoc, CFG_EDCA_VO_CWMIN);
 	edca_params->edca_ac_vo.vo_cwmax =
@@ -1899,6 +1903,7 @@ static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
 	power->local_power_constraint =
 			(uint8_t)cfg_default(CFG_LOCAL_POWER_CONSTRAINT);
 	power->use_local_tpe = cfg_get(psoc, CFG_USE_LOCAL_TPE);
+	power->skip_tpe = cfg_get(psoc, CFG_SKIP_TPE_CONSIDERATION);
 }
 
 static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2331,6 +2336,9 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->retain_nol_across_regdmn_update =
 		cfg_get(psoc, CFG_RETAIN_NOL_ACROSS_REG_DOMAIN);
 
+	reg->enable_nan_on_indoor_channels =
+		cfg_get(psoc, CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN);
+
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 }
 
@@ -2463,6 +2471,19 @@ mlme_init_iot_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_iot_parse_aggr_info(psoc, iot);
 }
 
+/**
+ * mlme_init_primary_iface - Initialize primary iface
+ *
+ * @gen: Generic CFG config items
+ *
+ * Return: None
+ */
+static void
+mlme_init_primary_iface(struct wlan_mlme_generic *gen)
+{
+	gen->dual_sta_policy.primary_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+}
+
 QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -2517,6 +2538,7 @@ QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	mlme_init_roam_score_config(psoc, mlme_cfg);
 	mlme_init_ratemask_cfg(psoc, &mlme_cfg->ratemask_cfg);
 	mlme_init_iot_cfg(psoc, &mlme_cfg->iot);
+	mlme_init_primary_iface(&mlme_cfg->gen);
 
 	return status;
 }

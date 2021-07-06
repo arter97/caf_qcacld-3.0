@@ -271,6 +271,26 @@ QDF_STATUS wlan_mlme_set_band_capability(struct wlan_objmgr_psoc *psoc,
 					 uint32_t band_capability);
 
 /**
+ * wlan_mlme_set_dual_sta_policy() - Set the dual sta config
+ * @psoc: pointer to psoc object
+ * @dual_sta_config: Value to be set from the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_dual_sta_policy(struct wlan_objmgr_psoc *psoc,
+					 uint8_t dual_sta_config);
+
+/**
+ * wlan_mlme_get_dual_sta_policy() - Get the dual sta policy
+ * @psoc: pointer to psoc object
+ * @dual_sta_config: Value to be set from the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_get_dual_sta_policy(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *dual_sta_config);
+
+/**
  * wlan_mlme_get_prevent_link_down() - Get the prevent link down config
  * @psoc: pointer to psoc object
  * @prevent_link_down: Pointer to the variable from caller
@@ -1044,6 +1064,41 @@ QDF_STATUS wlan_mlme_set_fils_enabled_info(struct wlan_objmgr_psoc *psoc,
 					   bool value);
 
 /**
+ * wlan_mlme_set_primary_interface() - Set the primary iface id for driver
+ * @psoc: pointer to psoc object
+ * @value: value that needs to be set from the caller
+ *
+ * When a vdev is set as primary then based on the dual sta policy
+ * "qca_wlan_concurrent_sta_policy_config" mcc preference and roaming has
+ * to be enabled on the primary vdev
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_primary_interface(struct wlan_objmgr_psoc *psoc,
+					   uint8_t value);
+
+/**
+ * wlan_mlme_set_default_primary_iface() - Set the default primary iface id
+ * for driver
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_default_primary_iface(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_get_mcc_duty_cycle_percentage() - Get primary STA iface duty
+ * cycle percentage
+ * @psoc: pointer to psoc object
+ * @value: value that needs to be set from the caller
+ *
+ * API to get the MCC duty cycle for primary and secondary STA's
+ *
+ * Return: primary iface quota on success
+ */
+int wlan_mlme_get_mcc_duty_cycle_percentage(struct wlan_objmgr_pdev *pdev);
+
+/**
  * wlan_mlme_get_tl_delayed_trgr_frm_int() - Get delay interval(in ms)
  * of UAPSD auto trigger
  * @psoc: pointer to psoc object
@@ -1472,6 +1527,16 @@ wlan_mlme_cfg_get_vht_max_mpdu_len(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_mlme_cfg_set_vht_max_mpdu_len(struct wlan_objmgr_psoc *psoc,
 				   uint8_t value);
+
+/**
+ * wlan_mlme_cfg_get_ht_smps() - gets HT SM Power Save mode from cfg item
+ * @psoc: psoc context
+ * @value: data to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlme_cfg_get_ht_smps(struct wlan_objmgr_psoc *psoc,
+				     uint8_t *value);
 
 /**
  * wlan_mlme_cfg_get_vht_chan_width() - gets vht supported channel width from
@@ -1972,6 +2037,17 @@ wlan_mlme_get_srd_master_mode_for_vdev(struct wlan_objmgr_psoc *psoc,
 				       bool *value);
 
 /**
+ * wlan_mlme_get_indoor_support_for_nan  - Get indoor channel support for NAN
+ * @psoc: pointer to psoc object
+ * @value: pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_indoor_support_for_nan(struct wlan_objmgr_psoc *psoc,
+				     bool *value);
+
+/**
  * wlan_mlme_get_force_sap_enabled() - Get the value of force SAP enabled
  * @psoc: psoc context
  * @value: data to get
@@ -2347,7 +2423,7 @@ wlan_mlme_get_self_gen_frm_pwr(struct wlan_objmgr_psoc *psoc,
  * Return: QDF Status
  */
 QDF_STATUS
-wlan_mlme_get_4way_hs_offload(struct wlan_objmgr_psoc *psoc, bool *value);
+wlan_mlme_get_4way_hs_offload(struct wlan_objmgr_psoc *psoc, uint32_t *value);
 
 /**
  * wlan_mlme_get_bmiss_skip_full_scan_value() - To get value of
@@ -2465,6 +2541,15 @@ wlan_mlme_update_sae_single_pmk(struct wlan_objmgr_vdev *vdev,
 void
 wlan_mlme_get_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
 				  struct wlan_mlme_sae_single_pmk *pmksa);
+
+/**
+ * wlan_mlme_is_sae_single_pmk_enabled() - Get is SAE single pmk feature enabled
+ * @psoc: Pointer to Global psoc
+ *
+ * Return: True if SAE single PMK is enabled
+ */
+bool wlan_mlme_is_sae_single_pmk_enabled(struct wlan_objmgr_psoc *psoc);
+
 /**
  * wlan_mlme_clear_sae_single_pmk_info - API to clear mlme_pmkid_info ap caps
  * @vdev: vdev object
@@ -2479,6 +2564,12 @@ static inline void
 wlan_mlme_set_sae_single_pmk_bss_cap(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id, bool val)
 {
+}
+
+static inline
+bool wlan_mlme_is_sae_single_pmk_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 
 static inline void
@@ -3119,6 +3210,16 @@ mlme_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
  * preference
  */
 bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_skip_tpe() - Get preference to not consider TPE in 2G/5G case
+ *
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if host should not consider TPE IE in TX power calculation when
+ * operating in 2G/5G bands, false if host should always consider TPE IE values
+ */
+bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mlme_is_data_stall_recovery_fw_supported() - Check if data stall

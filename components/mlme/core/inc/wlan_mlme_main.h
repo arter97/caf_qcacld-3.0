@@ -257,10 +257,51 @@ struct mscs_req_info {
 };
 #endif
 
+#ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * enum ft_ie_state - ft state
+ * @FT_START_READY: Start before and after 11r assoc
+ * @FT_AUTH_REQ_READY: When we have recvd the 1st or nth auth req
+ * @FT_REASSOC_REQ_WAIT: waiting for reassoc
+ * @FT_SET_KEY_WAIT: waiting for key
+ */
+enum ft_ie_state {
+	FT_START_READY,
+	FT_AUTH_REQ_READY,
+	FT_REASSOC_REQ_WAIT,
+	FT_SET_KEY_WAIT,
+};
+#endif
+
+/**
+ * struct ft_context - ft related information
+ * @r0kh_id_len: rokh id len
+ * @r0kh_id: rokh id
+ * @auth_ft_ie: auth ft ies received during preauth phase
+ * @auth_ie_len: auth ie lengt
+ * @reassoc_ft_ie: reassoc ft ies received during reassoc phas
+ * @reassoc_ie_len: reassoc ie length
+ * ric_ies: ric ie
+ * ric_ies_length: ric ie len
+ * @set_ft_preauth_state: preauth state
+ * @ft_state: ft state
+ * @add_mdie: add mdie in assoc req
+ */
 struct ft_context {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	uint32_t r0kh_id_len;
 	uint8_t r0kh_id[ROAM_R0KH_ID_MAX_LEN];
+#endif
+#ifdef WLAN_FEATURE_HOST_ROAM
+	uint8_t auth_ft_ie[MAX_FTIE_SIZE];
+	uint16_t auth_ie_len;
+	uint8_t reassoc_ft_ie[MAX_FTIE_SIZE];
+	uint16_t reassoc_ie_len;
+	uint8_t ric_ies[MAX_FTIE_SIZE];
+	uint16_t ric_ies_length;
+	bool set_ft_preauth_state;
+	enum ft_ie_state ft_state;
+	bool add_mdie;
 #endif
 };
 
@@ -280,6 +321,7 @@ struct ft_context {
  * @fils_con_info: Pointer to fils connection info from connect req
  * @cckm_ie: cck IE
  * @cckm_ie_len: cckm_ie len
+ * @ese_tspec_info: ese tspec info
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -299,6 +341,9 @@ struct mlme_connect_info {
 #ifdef FEATURE_WLAN_ESE
 	uint8_t cckm_ie[DOT11F_IE_RSN_MAX_LEN];
 	uint8_t cckm_ie_len;
+#ifdef WLAN_FEATURE_HOST_ROAM
+	tESETspecInfo ese_tspec_info;
+#endif
 #endif
 };
 
@@ -358,7 +403,9 @@ struct mlme_legacy_priv {
 	struct wlan_mlme_nss_chains dynamic_cfg;
 	struct wlan_mlme_nss_chains ini_cfg;
 	uint8_t sta_dynamic_oce_value;
+#ifndef FEATURE_CM_ENABLE
 	struct mlme_roam_after_data_stall roam_invoke_params;
+#endif
 	struct wlan_disconnect_info disconnect_info;
 	uint32_t vdev_stop_type;
 	struct wlan_mlme_roam mlme_roam;
@@ -483,6 +530,7 @@ uint32_t mlme_get_vdev_he_ops(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
 					struct wlan_objmgr_vdev *vdev);
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * mlme_get_roam_invoke_params() - get the roam invoke params
  * @vdev: vdev pointer
@@ -502,6 +550,7 @@ mlme_get_roam_invoke_params(struct wlan_objmgr_vdev *vdev);
  */
 bool mlme_is_roam_invoke_in_progress(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id);
+#endif
 /**
  * mlme_cfg_on_psoc_enable() - Populate MLME structure from CFG and INI
  * @psoc: pointer to the psoc object

@@ -492,6 +492,19 @@ bool policy_mgr_is_chnl_in_diff_band(struct wlan_objmgr_psoc *psoc,
 				     uint32_t ch_freq);
 
 /**
+ * policy_mgr_is_pcl_weightage_required() - to check that PCL weightage req or
+ * not
+ * @psoc: pointer to psoc
+ *
+ * This API will check that whether PCL weightage need to consider in best
+ * candidate selection or not. If some APs are in PCL list, those AP will get
+ * additional weightage.
+ *
+ * Return: true if pcl weightage is not required
+ */
+bool policy_mgr_is_pcl_weightage_required(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_check_for_session_conc() - Check if concurrency is
  * allowed for a session
  * @psoc: PSOC object information
@@ -1449,6 +1462,8 @@ struct policy_mgr_sme_cbacks {
  * @wlan_hdd_set_sap_csa_reason: Set the sap csa reason in cases like NAN.
  * @hdd_get_ap_6ghz_capable: get ap vdev 6ghz capable info from hdd ap adapter.
  * @wlan_hdd_indicate_active_ndp_cnt: indicate active ndp cnt to hdd
+ * @wlan_get_ap_prefer_conc_ch_params: get prefer ap channel bw parameters
+ *  based on target channel frequency and concurrent connections.
  */
 struct policy_mgr_hdd_cbacks {
 	void (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
@@ -1470,6 +1485,10 @@ struct policy_mgr_hdd_cbacks {
 					    uint8_t vdev_id);
 	void (*wlan_hdd_indicate_active_ndp_cnt)(struct wlan_objmgr_psoc *psoc,
 						 uint8_t vdev_id, uint8_t cnt);
+	QDF_STATUS (*wlan_get_ap_prefer_conc_ch_params)(
+			struct wlan_objmgr_psoc *psoc,
+			uint8_t vdev_id, uint32_t chan_freq,
+			struct ch_params *ch_params);
 };
 
 
@@ -2286,6 +2305,16 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 		uint32_t num_vdev_mac_entries,
 		struct policy_mgr_vdev_mac_map *vdev_mac_map,
 		struct wlan_objmgr_psoc *context);
+
+/**
+ * policy_mgr_current_concurrency_is_scc() - To check the current
+ * concurrency combination if it is doing SCC
+ * @psoc: PSOC object information
+ * This routine is called to check if it is doing SCC
+ *
+ * Return: True - SCC, False - Otherwise
+ */
+bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_current_concurrency_is_mcc() - To check the current
@@ -3625,4 +3654,15 @@ bool policy_mgr_is_sta_mon_concurrency(struct wlan_objmgr_psoc *psoc);
  *
  */
 QDF_STATUS policy_mgr_check_mon_concurrency(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_get_hw_max_dbs_bw() - Computes DBS BW
+ * @psoc: PSOC object information
+ * @dbs_bw: BW info of both MAC0 and MAC1
+ * This function computes BW info of both MAC0 and MAC1
+ *
+ * Return: void
+ */
+void policy_mgr_get_hw_dbs_max_bw(struct wlan_objmgr_psoc *psoc,
+				  struct dbs_bw *bw_dbs);
 #endif /* __WLAN_POLICY_MGR_API_H */

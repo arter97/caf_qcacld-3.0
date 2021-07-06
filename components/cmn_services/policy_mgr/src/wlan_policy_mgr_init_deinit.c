@@ -502,11 +502,17 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	/* Initialize non-DBS pcl table pointer to particular table*/
 	policy_mgr_init_non_dbs_pcl(psoc);
 
-	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
-	    policy_mgr_is_hw_dbs_required_for_band(psoc,
-						   HW_MODE_MAC_BAND_2G)) {
-		next_action_two_connection_table =
-		&pm_next_action_two_connection_dbs_2x2_table;
+	if (policy_mgr_is_hw_dbs_2x2_capable(psoc)) {
+		if (policy_mgr_is_hw_dbs_required_for_band(psoc,
+							HW_MODE_MAC_BAND_2G)) {
+			next_action_two_connection_table =
+				&pm_next_action_two_connection_dbs_2x2_table;
+			policy_mgr_debug("using hst/hsp policy manager table");
+		} else {
+			next_action_two_connection_table =
+			      &pm_next_action_two_connection_dbs_2x2_table_v2;
+			policy_mgr_debug("using hmt policy manager table");
+		}
 	} else if (policy_mgr_is_2x2_1x1_dbs_capable(psoc)) {
 		next_action_two_connection_table =
 		&pm_next_action_two_connection_dbs_2x2_5g_1x1_2g_table;
@@ -674,6 +680,8 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
 		hdd_cbacks->hdd_get_ap_6ghz_capable;
 	pm_ctx->hdd_cbacks.wlan_hdd_indicate_active_ndp_cnt =
 		hdd_cbacks->wlan_hdd_indicate_active_ndp_cnt;
+	pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params =
+		hdd_cbacks->wlan_get_ap_prefer_conc_ch_params;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -695,6 +703,7 @@ QDF_STATUS policy_mgr_deregister_hdd_cb(struct wlan_objmgr_psoc *psoc)
 	pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress = NULL;
 	pm_ctx->hdd_cbacks.hdd_is_cac_in_progress = NULL;
 	pm_ctx->hdd_cbacks.hdd_get_ap_6ghz_capable = NULL;
+	pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }

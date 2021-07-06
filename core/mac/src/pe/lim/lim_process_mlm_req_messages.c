@@ -121,7 +121,8 @@ static void lim_process_sae_auth_timeout(struct mac_context *mac_ctx)
 		 * SAE authentication is not completed. Restore from
 		 * auth state.
 		 */
-		if (session->opmode == QDF_STA_MODE)
+		if ((session->opmode == QDF_STA_MODE) ||
+		    (session->opmode == QDF_P2P_CLIENT_MODE))
 			lim_restore_from_auth_state(mac_ctx,
 				eSIR_SME_AUTH_TIMEOUT_RESULT_CODE,
 				proto_status_code, session);
@@ -398,6 +399,8 @@ void lim_send_peer_create_resp(struct mac_context *mac, uint8_t vdev_id,
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc,
 						    vdev_id,
 						    WLAN_LEGACY_MAC_ID);
+	if (!vdev)
+		return;
 	wlan_cm_bss_peer_create_rsp(vdev, status,
 				    (struct qdf_mac_addr *)peer_mac);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);

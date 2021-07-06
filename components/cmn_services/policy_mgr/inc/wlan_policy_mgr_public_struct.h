@@ -936,6 +936,7 @@ enum policy_mgr_conn_update_reason {
  * @HW_MODE_80_MHZ: 80 Mhz bandwidth
  * @HW_MODE_80_PLUS_80_MHZ: 80 Mhz plus 80 Mhz bandwidth
  * @HW_MODE_160_MHZ: 160 Mhz bandwidth
+ * @HW_MODE_320_MHZ: 320 Mhz bandwidth
  * @HW_MODE_MAX_BANDWIDTH: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -950,6 +951,7 @@ enum hw_mode_bandwidth {
 	HW_MODE_80_MHZ,
 	HW_MODE_80_PLUS_80_MHZ,
 	HW_MODE_160_MHZ,
+	HW_MODE_320_MHZ,
 	HW_MODE_MAX_BANDWIDTH
 };
 
@@ -1246,6 +1248,16 @@ enum policy_mgr_pri_id {
 struct policy_mgr_user_cfg {
 	bool enable2x2;
 	bool sub_20_mhz_enabled;
+};
+
+/**
+ * struct dbs_bw - Max BW supported in DBS mode
+ * @mac0_bw: BW of MAC0
+ * @mac1_bw: BW of MAC1
+ */
+struct dbs_bw {
+	enum hw_mode_bandwidth mac0_bw;
+	enum hw_mode_bandwidth mac1_bw;
 };
 
 /**

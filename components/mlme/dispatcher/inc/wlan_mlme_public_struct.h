@@ -264,6 +264,7 @@ struct wlan_mlme_dot11_mode {
 	uint32_t vdev_type_dot11_mode;
 };
 
+#ifndef FEATURE_CM_ENABLE
 /**
  * enum roam_invoke_source_entity - Source of invoking roam invoke command.
  * @USERSPACE_INITIATED: Userspace (supplicant)
@@ -283,6 +284,7 @@ struct mlme_roam_after_data_stall {
 	bool roam_invoke_in_progress;
 	enum roam_invoke_source_entity source;
 };
+#endif
 
 /**
  * struct mlme_edca_ac_vi - cwmin, cwmax and  aifs value for edca_ac_vi
@@ -395,6 +397,7 @@ struct wlan_mlme_edca_params {
 	struct mlme_cfg_str etsi_acvo_b;
 
 	bool enable_edca_params;
+	bool enable_wmm_txop;
 	struct mlme_edca_ac_vo edca_ac_vo;
 	struct mlme_edca_ac_vi edca_ac_vi;
 	struct mlme_edca_ac_bk edca_ac_bk;
@@ -1276,6 +1279,18 @@ struct wlan_mlme_ratemask {
 	uint32_t higher32_2;
 };
 
+/**
+ * struct dual_sta_policy - Concurrent STA policy configuration
+ * @concurrent_sta_policy: Possible values are defined in enum
+ * qca_wlan_concurrent_sta_policy_config
+ * @primary_vdev_id: specified iface is the primary STA iface, say 0 means
+ * vdev 0 is acting as primary interface
+ */
+struct dual_sta_policy {
+	uint8_t concurrent_sta_policy;
+	uint8_t primary_vdev_id;
+};
+
 /* struct wlan_mlme_generic - Generic CFG config items
  *
  * @band_capability: HW Band Capability - Both or 2.4G only or 5G only
@@ -1324,6 +1339,7 @@ struct wlan_mlme_ratemask {
  * @monitor_mode_concurrency: Monitor mode concurrency supported
  * @ocv_support: FW supports OCV or not
  * @wds_mode: wds mode supported
+ * @dual_sta_policy_cfg: Dual STA policies configuration
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1353,7 +1369,7 @@ struct wlan_mlme_generic {
 	bool enable_beacon_reception_stats;
 	bool enable_remove_time_stamp_sync_cmd;
 	bool data_stall_recovery_fw_support;
-	bool disable_4way_hs_offload;
+	uint32_t disable_4way_hs_offload;
 	bool as_enabled;
 	uint8_t mgmt_retry_max;
 	bool bmiss_skip_full_scan;
@@ -1369,6 +1385,7 @@ struct wlan_mlme_generic {
 	enum monitor_mode_concurrency monitor_mode_concurrency;
 	bool ocv_support;
 	enum wlan_wds_mode wds_mode;
+	struct dual_sta_policy dual_sta_policy;
 };
 
 /*
@@ -1456,6 +1473,8 @@ struct wlan_mlme_acs {
  * @twt_congestion_timeout: congestion timeout value
  * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
  * 2.4Ghz
+ * @req_flag: requestor flag enable/disable
+ * @res_flag: responder flag enable/disable
  */
 struct wlan_mlme_cfg_twt {
 	bool is_twt_enabled;
@@ -1469,6 +1488,8 @@ struct wlan_mlme_cfg_twt {
 	bool is_twt_statistics_tgt_cap_enabled;
 	uint32_t twt_congestion_timeout;
 	bool enable_twt_24ghz;
+	bool req_flag;
+	bool res_flag;
 };
 
 /**
@@ -1673,6 +1694,7 @@ struct fw_scan_channels {
 /*
  * @mawc_roam_enabled:              Enable/Disable MAWC during roaming
  * @enable_fast_roam_in_concurrency:Enable LFR roaming on STA during concurrency
+ * @vendor_btm_param:               Vendor WTC roam trigger parameters
  * @lfr3_roaming_offload:           Enable/disable roam offload feature
  * @lfr3_dual_sta_roaming_enabled:  Enable/Disable dual sta roaming offload
  * feature
@@ -1791,6 +1813,7 @@ struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
 	bool enable_fast_roam_in_concurrency;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+	struct wlan_cm_roam_vendor_btm_params vendor_btm_param;
 	bool lfr3_roaming_offload;
 	bool lfr3_dual_sta_roaming_enabled;
 	bool enable_self_bss_roam;
@@ -2186,6 +2209,7 @@ struct mlme_power_usage {
  * @current_tx_power_level: current tx power level
  * @local_power_constraint: local power constraint
  * @use_local_tpe: preference to use local or regulatory TPE
+ * @skip_tpe: option to not consider TPE values in 2.4G/5G bands
  */
 struct wlan_mlme_power {
 	struct mlme_max_tx_power_24 max_tx_power_24;
@@ -2198,6 +2222,7 @@ struct wlan_mlme_power {
 	uint8_t current_tx_power_level;
 	uint8_t local_power_constraint;
 	bool use_local_tpe;
+	bool skip_tpe;
 };
 
 /*
@@ -2405,6 +2430,7 @@ enum mlme_reg_srd_master_modes {
  * @enable_pending_chan_list_req: enables/disables scan channel
  * list command to FW till the current scan is complete.
  * @retain_nol_across_regdmn_update: Retain the NOL list across the regdomain.
+ * @enable_nan_on_indoor_channels: Enable nan on Indoor channels
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
@@ -2424,6 +2450,7 @@ struct wlan_mlme_reg {
 	bool ignore_fw_reg_offload_ind;
 	bool enable_pending_chan_list_req;
 	bool retain_nol_across_regdmn_update;
+	bool enable_nan_on_indoor_channels;
 };
 
 #define IOT_AGGR_INFO_MAX_NUM 32
