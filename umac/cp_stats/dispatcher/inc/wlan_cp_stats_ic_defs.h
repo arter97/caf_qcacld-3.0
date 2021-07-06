@@ -304,6 +304,12 @@ struct pdev_ic_cp_stats {
  * @cs_fils_frames_sent_fail: fils discovery sent success count
  * @cs_tx_offload_prb_resp_succ_cnt: Offload probe response success count
  * @cs_tx_offload_prb_resp_fail_cnt: Offload probe response fail count
+ * @cs_tx_mgmt_ok_cnt: raw frame home chan tx success cnt
+ * @cs_tx_mgmt_ok_bytes: raw frame home chan tx success bytes
+ * @cs_tx_mgmt_retry_cnt: raw frame home chan tx retry cnt
+ * @cs_tx_mgmt_retry_bytes: raw frame home chan tx retry bytes
+ * @cs_tx_mgmt_err_cnt: raw frame home chan tx err cnt
+ * @cs_tx_mgmt_err_bytes: raw frame home chan tx err bytes
  */
 struct vdev_80211_stats {
 	uint64_t cs_rx_wrongbss;
@@ -380,6 +386,12 @@ struct vdev_80211_stats {
 	uint64_t cs_fils_frames_sent_fail;
 	uint64_t cs_tx_offload_prb_resp_succ_cnt;
 	uint64_t cs_tx_offload_prb_resp_fail_cnt;
+	uint64_t cs_tx_mgmt_ok_cnt;
+	uint64_t cs_tx_mgmt_ok_bytes;
+	uint64_t cs_tx_mgmt_retry_cnt;
+	uint64_t cs_tx_mgmt_retry_bytes;
+	uint64_t cs_tx_mgmt_err_cnt;
+	uint64_t cs_tx_mgmt_err_bytes;
 };
 
 /**
