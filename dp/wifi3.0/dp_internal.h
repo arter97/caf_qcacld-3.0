@@ -2734,6 +2734,24 @@ static inline QDF_STATUS dp_runtime_init(struct dp_soc *soc)
 }
 #endif
 
+/*
+ * dp_pdev_bkp_stats_detach() - detach resources for back pressure stats
+ *				processing
+ * @pdev: Datapath PDEV handle
+ *
+ */
+void dp_pdev_bkp_stats_detach(struct dp_pdev *pdev);
+
+/*
+ * dp_pdev_bkp_stats_attach() - attach resources for back pressure stats
+ *				processing
+ * @pdev: Datapath PDEV handle
+ *
+ * Return: QDF_STATUS_SUCCESS: Success
+ *         QDF_STATUS_E_NOMEM: Error
+ */
+QDF_STATUS dp_pdev_bkp_stats_attach(struct dp_pdev *pdev);
+
 /**
  * dp_peer_flush_frags() - Flush all fragments for a particular
  *  peer
