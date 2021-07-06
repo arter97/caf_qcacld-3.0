@@ -13921,6 +13921,51 @@ enum hdd_external_acs_policy {
 #define CFG_IS_SAP_SAE_ENABLED_MAX     (1)
 
 /*
+ * <ini>
+ * sae_connect_retries - Bit mask to retry Auth and full connection on assoc
+ * timeout to same AP and auth retries during roaming
+ * @Min: 0x0
+ * @Max: 0x53
+ * @Default: 0x52
+ *
+ * This ini is used to set max auth retry in auth phase of roaming and initial
+ * connection and max connection retry in case of assoc timeout. MAX Auth
+ * retries are capped to 3, connection retries are capped to 2 and roam Auth
+ * retry is capped to 1.
+ * Default is 0x52 i.e. 1 roam auth retry, 2 auth retry and 2 full connection
+ * retry.
+ *
+ * Bits       Retry Type
+ * BIT[0:2]   AUTH retries
+ * BIT[3:5]   Connection reties
+ * BIT[6:8]   ROAM AUTH retries
+ *
+ * Some Possible values are as below
+ * 0          - NO auth/roam Auth retry and NO full connection retry after
+ *              assoc timeout
+ * 0x49       - 1 auth/roam auth retry and 1 full connection retry
+ * 0x52       - 1 roam auth retry, 2 auth retry and 2 full connection retry
+ * 0x1 /0x2   - 0 roam auth retry, 1 or 2 auth retry respectively and NO full
+ *              connection retry
+ * 0x8 /0x10  - 0 roam auth retry,NO auth retry and 1 or 2 full connection retry
+ *              respectively.
+ * 0x4A       - 1 roam auth retry,2 auth retry and 1 full connection retry
+ * 0x51       - 1 auth/roam auth retry and 2 full connection retry
+ *
+ * Related: None
+ *
+ * Supported Feature: STA SAE
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAE_CONNECION_RETRIES		"sae_connect_retries"
+#define CFG_SAE_CONNECION_RETRIES_MIN		(0x0)
+#define CFG_SAE_CONNECION_RETRIES_MAX		(0x53)
+#define CFG_SAE_CONNECION_RETRIES_DEFAULT	(0x52)
+
+/*
  * Type declarations
  */
 #define CFG_CHAN_BAND_WEIGHTAGE_NAME    "chan_band_weightage"
@@ -18842,6 +18887,7 @@ struct hdd_config {
 #ifdef WLAN_FEATURE_SAE
 	bool is_sae_enabled;
 	bool sap_sae_enabled;
+	uint32_t sae_connect_retries;
 #endif
 	uint32_t btm_solicited_timeout;
 	uint32_t btm_max_attempt_cnt;
