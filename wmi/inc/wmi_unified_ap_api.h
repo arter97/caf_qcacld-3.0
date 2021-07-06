@@ -217,6 +217,18 @@ QDF_STATUS wmi_unified_packet_power_info_get_cmd_send(
 		struct packet_power_info_params *param);
 
 /**
+ * wmi_unified_halphy_cal_status_get_cmd_send() - WMI get halphy cal
+ * status function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold halphy cal status param
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_halphy_cal_status_get_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct halphy_cal_status_params *param);
+
+/**
  *  wmi_extract_wds_addr_event - Extract WDS addr WMI event
  *  @wmi_handle: handle to WMI.
  *  @evt_buf: pointer to event buffer

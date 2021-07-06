@@ -499,6 +499,52 @@ send_packet_power_info_get_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
+ * send_get_halphy_cal_status_cmd_tlv() - send request to get halphy cal
+ * status to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer to hold halphy cal status param
+ *
+ * @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ */
+static QDF_STATUS
+send_get_halphy_cal_status_cmd_tlv(wmi_unified_t wmi_handle,
+				   struct halphy_cal_status_params *param)
+{
+	wmi_pdev_get_halphy_cal_status_cmd_fixed_param *cmd;
+	wmi_buf_t wmibuf;
+	uint8_t *buf_ptr;
+	u_int32_t len = sizeof(wmi_pdev_get_halphy_cal_status_cmd_fixed_param);
+
+	wmibuf = wmi_buf_alloc(wmi_handle, len);
+	if (wmibuf == NULL)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(wmibuf);
+
+	cmd = (wmi_pdev_get_halphy_cal_status_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_pdev_get_halphy_cal_status_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+				wmi_pdev_get_halphy_cal_status_cmd_fixed_param));
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+								wmi_handle,
+								param->pdev_id);
+
+	wmi_info("commandID %d, wmi_pdev_get_halphy_cal_status_cmd=0x%x",
+		 WMI_PDEV_GET_HALPHY_CAL_STATUS_CMDID, *((u_int32_t *)cmd));
+
+	wmi_mtrace(WMI_PDEV_GET_HALPHY_CAL_STATUS_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, wmibuf, len,
+				 WMI_PDEV_GET_HALPHY_CAL_STATUS_CMDID)) {
+		wmi_err("Failed to get halphy cal status command");
+		wmi_buf_free(wmibuf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * send_nf_dbr_dbm_info_get_cmd_tlv() - send request to get nf to fw
  * @wmi_handle: wmi handle
  * @mac_id: radio context
@@ -3005,4 +3051,5 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->config_vdev_tid_latency_info_cmd = config_vdev_tid_latency_info_cmd_tlv;
 	ops->config_peer_latency_info_cmd = config_peer_latency_info_cmd_tlv;
 #endif
+	ops->send_get_halphy_cal_status_cmd = send_get_halphy_cal_status_cmd_tlv;
 }

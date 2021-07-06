@@ -174,6 +174,14 @@ struct packet_power_info_params {
 	uint32_t pdev_id;
 };
 
+/**
+ * struct halphy_cal_status_params - Halphy can params info
+ * @pdev_id: Pdev id
+ */
+struct halphy_cal_status_params {
+	uint32_t pdev_id;
+};
+
 /* struct ht_ie_params - HT IE params
  * @ie_len: IE length
  * @ie_data: pointer to IE data

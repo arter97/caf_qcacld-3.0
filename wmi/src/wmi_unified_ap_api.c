@@ -97,6 +97,17 @@ QDF_STATUS wmi_unified_packet_power_info_get_cmd_send(
 	return QDF_STATUS_E_FAILURE;
 }
 
+QDF_STATUS wmi_unified_halphy_cal_status_get_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct halphy_cal_status_params *param)
+{
+	if (wmi_handle->ops->send_get_halphy_cal_status_cmd)
+		return wmi_handle->ops->send_get_halphy_cal_status_cmd(
+			wmi_handle, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS wmi_unified_nf_dbr_dbm_info_get_cmd_send(wmi_unified_t wmi_handle,
 						    uint8_t mac_id)
 {
