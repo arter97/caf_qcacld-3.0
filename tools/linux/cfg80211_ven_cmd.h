@@ -2055,6 +2055,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_advertise_sta_maxcap",  IEEE80211_PARAM_STA_MAX_CH_CAP, GET_PARAM, 0},
 	{"rawmode_open_war",    IEEE80211_PARAM_RAWMODE_OPEN_WAR, SET_PARAM, 1},
 	{"g_rawmode_open_war",  IEEE80211_PARAM_RAWMODE_OPEN_WAR, GET_PARAM, 0},
+#if UMAC_SUPPORT_WPA3_STA
+	{"set_sae_auth",    IEEE80211_PARAM_SAE_AUTH_ATTEMPTS, SET_PARAM, 1},
+	{"get_sae_auth",	 IEEE80211_PARAM_SAE_AUTH_ATTEMPTS, GET_PARAM, 0},
+#endif /* UMAC_SUPPORT_WPA3_STA */
 	{"he_bsr_supp",         IEEE80211_PARAM_HE_BSR_SUPPORT, SET_PARAM, 1},
 	{"get_he_bsr_supp",     IEEE80211_PARAM_HE_BSR_SUPPORT, GET_PARAM, 0},
 	{"display_me_info",     IEEE80211_PARAM_DUMP_RA_TABLE, GET_PARAM, 0},
