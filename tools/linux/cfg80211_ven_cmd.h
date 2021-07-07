@@ -2029,6 +2029,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"ft",                  IEEE80211_PARAM_FT_ENABLE, SET_PARAM, 1},
 	{"g_ft",                IEEE80211_PARAM_FT_ENABLE, GET_PARAM, 0},
 	{"bcn_stats_clr",       IEEE80211_PARAM_BCN_STATS_RESET, SET_PARAM, 1},
+	{"wlan_ser_utf",        IEEE80211_PARAM_WLAN_SER_TEST, SET_PARAM, 1},
 	{"sifs_trigger",        IEEE80211_PARAM_SIFS_TRIGGER, SET_PARAM, 1},
 	{"g_sifs_trigger",      IEEE80211_PARAM_SIFS_TRIGGER, GET_PARAM, 0},
 	{"he_ul_shortgi",       IEEE80211_PARAM_HE_UL_SHORTGI, SET_PARAM, 1},
