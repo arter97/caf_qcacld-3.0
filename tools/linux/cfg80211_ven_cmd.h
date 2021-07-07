@@ -2060,6 +2060,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"set_sae_auth",    IEEE80211_PARAM_SAE_AUTH_ATTEMPTS, SET_PARAM, 1},
 	{"get_sae_auth",	 IEEE80211_PARAM_SAE_AUTH_ATTEMPTS, GET_PARAM, 0},
 #endif /* UMAC_SUPPORT_WPA3_STA */
+	{"get_son_num_vap",     IEEE80211_PARAM_SON_NUM_VAP, GET_PARAM, 0},
 	{"he_bsr_supp",         IEEE80211_PARAM_HE_BSR_SUPPORT, SET_PARAM, 1},
 	{"get_he_bsr_supp",     IEEE80211_PARAM_HE_BSR_SUPPORT, GET_PARAM, 0},
 	{"display_me_info",     IEEE80211_PARAM_DUMP_RA_TABLE, GET_PARAM, 0},
