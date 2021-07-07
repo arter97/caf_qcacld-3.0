@@ -603,6 +603,7 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 	u8 vdev_id;
 	cdp_config_param_type val = {0};
 	struct wlan_vdev_state_event event;
+	struct wlan_lmac_if_rx_ops *rx_ops = NULL;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
@@ -705,7 +706,10 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 							    OSIF_NSS_VDEV_WDS_CFG);
 #endif
 			}
-			son_update_mlme_event(vdev, NULL, MLME_EVENT_VDEV_STATE, &event);
+			rx_ops = wlan_psoc_get_lmac_if_rxops(psoc);
+			if (rx_ops && rx_ops->son_rx_ops.deliver_event) {
+				rx_ops->son_rx_ops.deliver_event(vdev, NULL, MLME_EVENT_VDEV_STATE, &event);
+			}
 		}
 		break;
 	case IEEE80211_PARAM_VAP_ENHIND:
