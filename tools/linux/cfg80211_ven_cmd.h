@@ -2176,6 +2176,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_mcs12_13_supp",     IEEE80211_PARAM_VHT_MCS_12_13_SUPP, GET_PARAM, 0},
 	{"rrm_capie",           IEEE80211_PARAM_RRM_CAP_IE, SET_PARAM, 1},
 	{"g_rrm_capie",         IEEE80211_PARAM_RRM_CAP_IE, GET_PARAM, 0},
+	{"stats_period",        IEEE80211_PARAM_SET_STATS_UPDATE_PERIOD, SET_PARAM, 1},
 	{"set_vdev_peer_prot_count",    IEEE80211_PARAM_VDEV_PEER_PROTOCOL_COUNT,
 		SET_PARAM, 1},
 	{"get_vdev_peer_prot_count",    IEEE80211_PARAM_VDEV_PEER_PROTOCOL_COUNT,
