@@ -2894,6 +2894,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"get_WaitTimeout",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_HOST_WAIT_TIMEOUT, GET_PARAM, 0},
 #endif /* HOST_DFS_SPOOF_TEST */
+	{"acs_nf_thresh",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NF_THRESH, SET_PARAM, 1},
+	{"g_acs_nf_thresh",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NF_THRESH, GET_PARAM, 0},
 #ifdef OL_ATH_SMART_LOGGING
 	{"smartLogEn",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SMARTLOG_ENABLE, SET_PARAM, 1},
