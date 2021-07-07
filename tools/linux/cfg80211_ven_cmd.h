@@ -2696,6 +2696,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_atfobsssched",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_OBSS_SCHED, GET_PARAM, 0},
 #endif
+	{"g_phyofdmerr",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PHY_OFDM_ERR, GET_PARAM, 0},
 	{"g_phycckerr",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PHY_CCK_ERR, GET_PARAM, 0},
 	{"g_fcserr",
