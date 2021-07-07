@@ -1933,6 +1933,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"qdf_cv_lvl",          IEEE80211_PARAM_CONFIG_CATEGORY_VERBOSE, SET_PARAM, 1},
 	{"g_qdf_cv_lvl",        IEEE80211_PARAM_CONFIG_CATEGORY_VERBOSE, GET_PARAM, 0},
 	{"txrx_stats",          IEEE80211_PARAM_TXRX_DP_STATS, SET_PARAM, 1},
+	{"get_smartmoncfg",     IEEE80211_PARAM_RX_FILTER_SMART_MONITOR, GET_PARAM, 0},
 	{"he_subfee",           IEEE80211_PARAM_HE_SU_BFEE, SET_PARAM, 1},
 	{"get_he_subfee",       IEEE80211_PARAM_HE_SU_BFEE, GET_PARAM, 0},
 	{"he_subfer",           IEEE80211_PARAM_HE_SU_BFER, SET_PARAM, 1},
