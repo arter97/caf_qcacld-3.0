@@ -42,7 +42,6 @@ int qca_mesh_latency_update_peer_parameter(uint8_t *dest_mac,
 {
 	uint8_t i = 0;
 	ol_ath_soc_softc_t *soc = NULL;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	ol_txrx_soc_handle soc_txrx_handle = NULL;
 
 	/*
@@ -55,23 +54,13 @@ int qca_mesh_latency_update_peer_parameter(uint8_t *dest_mac,
 
 		soc = ol_global_soc[i];
 		soc_txrx_handle = wlan_psoc_get_dp_handle(soc->psoc_obj);
-		status = cdp_mesh_latency_update_peer_parameter(soc_txrx_handle,
-				dest_mac, service_interval_dl, burst_size_dl, service_interval_ul,
-				burst_size_ul, priority, add_or_sub);
-
-		if (status == QDF_STATUS_SUCCESS)
-			return status;
-		/*
-		 * no wifi peer exists in this soc with given dest taddress
-		 * iterate over next soc
-		 */
+		cdp_mesh_latency_update_peer_parameter(soc_txrx_handle,
+				dest_mac, service_interval_dl, burst_size_dl,
+				service_interval_ul, burst_size_ul,
+				priority, add_or_sub);
 	}
 
-	/*
-	 * No wlan peer is found in any of attached
-	 * soc with given mac address
-	 */
-	return QDF_STATUS_E_FAILURE;
+	return QDF_STATUS_SUCCESS;
 }
 
 qdf_export_symbol(qca_mesh_latency_update_peer_parameter);
