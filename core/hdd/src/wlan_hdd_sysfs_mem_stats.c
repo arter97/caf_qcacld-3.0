@@ -57,7 +57,8 @@ static ssize_t hdd_wlan_mem_stats_show(struct kobject *kobj,
 
 	length = __hdd_wlan_mem_stats_show(buf);
 
-	osif_psoc_sync_op_stop(psoc_sync);
+	if (psoc_sync)
+		osif_psoc_sync_op_stop(psoc_sync);
 
 	return length;
 }

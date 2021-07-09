@@ -6747,14 +6747,15 @@ int wlan_hdd_send_roam_auth_event(struct hdd_adapter *adapter, uint8_t *bssid,
 			goto nla_put_failure;
 		}
 		if (roam_info_ptr->kek_len > SIR_KEK_KEY_LEN_FILS ||
+		    roam_info_ptr->kck_len > KCK_256BIT_KEY_LEN ||
 		    nla_put(skb,
 			QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_PTK_KCK,
 			roam_info_ptr->kck_len, roam_info_ptr->kck) ||
 		    nla_put(skb,
 			QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_PTK_KEK,
 			roam_info_ptr->kek_len, roam_info_ptr->kek)) {
-			hdd_err("nla put fail, kek_len %d",
-				roam_info_ptr->kek_len);
+			hdd_err("nla put fail, kek_len %d, kck_len %d",
+				roam_info_ptr->kek_len, roam_info_ptr->kck_len);
 			goto nla_put_failure;
 		}
 
