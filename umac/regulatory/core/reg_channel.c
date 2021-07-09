@@ -284,8 +284,8 @@ static uint64_t convregphymode2wirelessmodes[REG_PHYMODE_MAX] = {
 #endif
 };
 
-static int reg_is_phymode_in_wireless_modes(enum reg_phymode phy_in,
-					    uint64_t wireless_modes)
+static uint64_t reg_is_phymode_in_wireless_modes(enum reg_phymode phy_in,
+						 uint64_t wireless_modes)
 {
 	uint64_t sup_wireless_modes = convregphymode2wirelessmodes[phy_in];
 
@@ -989,16 +989,69 @@ static enum phy_ch_width reg_find_chwidth_from_bw(uint16_t bw)
 }
 #endif
 
+/**
+ * reg_get_max_channel_width_without_radar() - Get the maximum channel width
+ * supported given a frequency and a global maximum channel width.
+ * The radar infected subchannel are not part of the max bandwidth.
+ * @pdev: Pointer to PDEV object.
+ * @freq: Input frequency.
+ * @g_max_width: Global maximum channel width.
+ *
+ * Return: Maximum channel width of type phy_ch_width.
+ */
+#ifdef WLAN_FEATURE_11BE
+static enum phy_ch_width
+reg_get_max_channel_width_without_radar(struct wlan_objmgr_pdev *pdev,
+					qdf_freq_t freq,
+					enum phy_ch_width g_max_width)
+{
+	struct reg_channel_list chan_list;
+	uint16_t i, max_bw = 0;
+	enum phy_ch_width output_width = CH_WIDTH_INVALID;
+
+	wlan_reg_fill_channel_list(pdev, freq, 0,
+				   g_max_width, 0,
+				   &chan_list);
+
+	for (i = 0; i < chan_list.num_ch_params; i++) {
+		struct ch_params *ch_param = &chan_list.chan_param[i];
+		uint16_t cont_bw = chwd_2_contbw_lst[ch_param->ch_width];
+
+		if (max_bw < cont_bw) {
+			output_width = ch_param->ch_width;
+			max_bw = cont_bw;
+		}
+	}
+	return output_width;
+}
+#else
+static enum phy_ch_width
+reg_get_max_channel_width_without_radar(struct wlan_objmgr_pdev *pdev,
+					qdf_freq_t freq,
+					enum phy_ch_width g_max_width)
+{
+	struct ch_params chan_params;
+
+	chan_params.ch_width = g_max_width;
+	reg_set_channel_params_for_freq(pdev, freq, 0, &chan_params);
+	return chan_params.ch_width;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 static void
-fill_320mhz_modes(int max_bw, uint64_t *wireless_modes)
+reg_remove_320mhz_modes(int max_bw, uint64_t *wireless_modes)
 {
-	if (max_bw < BW_320_MHZ)
+	/**
+	 * Check for max_bw greater than 160 to include both 240 and
+	 * 320MHz support as 320 modes.
+	 */
+	if (max_bw <= BW_160_MHZ)
 		*wireless_modes &= (~WIRELESS_320_MODES);
 }
 #else
 static inline void
-fill_320mhz_modes(int max_bw, uint64_t *wireless_modes)
+reg_remove_320mhz_modes(int max_bw, uint64_t *wireless_modes)
 {
 }
 #endif
@@ -1025,7 +1078,6 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 	for (i = 0; i < NUM_CHANNELS; i++) {
 		qdf_freq_t freq = cur_chan_list[i].center_freq;
 		uint16_t cur_bw = cur_chan_list[i].max_bw;
-		struct ch_params ch_param = {0};
 
 		if (reg_is_chan_disabled(&cur_chan_list[i]))
 			continue;
@@ -1042,11 +1094,15 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(freq))
 			band_modes |= WIRELESS_6G_MODES;
 
-		if (!include_nol_chan) {
-			ch_param.ch_width = reg_find_chwidth_from_bw(cur_bw);
-			wlan_reg_set_channel_params_for_freq(pdev, freq, 0,
-							     &ch_param);
-			cur_bw = chwd_2_contbw_lst[ch_param.ch_width];
+		if (!include_nol_chan &&
+		    WLAN_REG_IS_5GHZ_CH_FREQ(freq)) {
+			enum phy_ch_width in_chwidth, out_chwidth;
+
+			in_chwidth = reg_find_chwidth_from_bw(cur_bw);
+			out_chwidth =
+				reg_get_max_channel_width_without_radar(pdev,
+						freq, in_chwidth);
+			cur_bw = chwd_2_contbw_lst[out_chwidth];
 		}
 
 		if (max_bw < cur_bw)
@@ -1067,6 +1123,6 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 			in_wireless_modes &= (~WIRELESS_80P80_MODES);
 	}
 
-	fill_320mhz_modes(max_bw, &in_wireless_modes);
+	reg_remove_320mhz_modes(max_bw, &in_wireless_modes);
 	*mode_select = in_wireless_modes;
 }
