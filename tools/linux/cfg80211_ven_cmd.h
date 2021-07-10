@@ -2704,6 +2704,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_atfobsssched",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ATF_OBSS_SCHED, GET_PARAM, 0},
 #endif
+	{"g_phyofdmerr",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PHY_OFDM_ERR, GET_PARAM, 0},
 	{"g_phycckerr",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PHY_CCK_ERR, GET_PARAM, 0},
 	{"g_fcserr",
@@ -2846,10 +2848,18 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_SRLOADVAR, SET_PARAM, 1},
 	{"g_acssrloadvar",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_SRLOADVAR, GET_PARAM, 0},
+	{"mgmt_rssi_thr",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_SNR_THRESHOLD, SET_PARAM, 1},
+	{"g_mgmt_rssi_thr",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_SNR_THRESHOLD, GET_PARAM, 0},
 	{"ext_nss",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EXT_NSS_CAPABLE, SET_PARAM, 1},
 	{"g_ext_nss",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EXT_NSS_CAPABLE, GET_PARAM, 0},
+	{"p_stats_tmr",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_PDEV_STATS_TIMER, SET_PARAM, 1},
+	{"g_p_stats_tmr",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_PDEV_STATS_TIMER, GET_PARAM, 0},
 	{"acktimeout",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TXACKTIMEOUT, SET_PARAM, 1},
 	{"get_acktimeout",
@@ -2886,6 +2896,16 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MAX_CLIENTS_PER_RADIO, SET_PARAM, 1},
 	{"g_max_radio_sta",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MAX_CLIENTS_PER_RADIO, GET_PARAM, 0},
+#if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)
+	{"HostWaitTimeout",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_HOST_WAIT_TIMEOUT, SET_PARAM, 1},
+	{"get_WaitTimeout",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_HOST_WAIT_TIMEOUT, GET_PARAM, 0},
+#endif /* HOST_DFS_SPOOF_TEST */
+	{"acs_nf_thresh",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NF_THRESH, SET_PARAM, 1},
+	{"g_acs_nf_thresh",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_NF_THRESH, GET_PARAM, 0},
 #ifdef OL_ATH_SMART_LOGGING
 	{"smartLogEn",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SMARTLOG_ENABLE, SET_PARAM, 1},
@@ -2907,6 +2927,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PRECAC_INTER_CHANNEL, SET_PARAM, 1},
 	{"getInterCACChan",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PRECAC_INTER_CHANNEL, GET_PARAM, 0},
+	{"get_preCACState",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PRECAC_CHAN_STATE, GET_PARAM, 0},
 #endif
 	{"g_dbr_ring_status",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DBR_RING_STATUS, GET_PARAM, 0},
@@ -2971,6 +2993,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 #if PEER_FLOW_CONTROL
 	{"fc_video_stats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_VIDEO_STATS_FC, GET_PARAM, 0},
+	{"fc_delay_stats",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_VIDEO_DELAY_STATS_FC, GET_PARAM, 0},
 #endif
 	{"set_retry_stats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_PEER_RETRY_STATS, SET_PARAM, 1},
