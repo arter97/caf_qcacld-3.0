@@ -1954,6 +1954,7 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	uint16_t htt_tcl_metadata = 0;
 	enum cdp_tx_sw_drop drop_code = TX_MAX_DROP;
 	uint8_t tid = msdu_info->tid;
+	uint8_t modified_tid = 0;
 	struct cdp_tid_tx_stats *tid_stats = NULL;
 
 	/* Setup Tx descriptor for an MSDU, and MSDU extension descriptor */
@@ -2004,8 +2005,11 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		goto release_desc;
 	}
 
-	tid = dp_scs_get_tid(soc, vdev, qdf_nbuf_data(nbuf), tid);
-	msdu_info->tid = tid;
+	modified_tid = dp_scs_get_tid(soc, vdev, qdf_nbuf_data(nbuf), tid);
+	if (modified_tid == tid)
+		modified_tid = dp_mscs_get_tid(soc, vdev,
+				qdf_nbuf_data(nbuf), tid);
+	msdu_info->tid = modified_tid;
 	tx_desc->dma_addr = qdf_nbuf_mapped_paddr_get(tx_desc->nbuf);
 	dp_tx_desc_history_add(soc, tx_desc->dma_addr, nbuf,
 			       tx_desc->id, DP_TX_DESC_MAP);
