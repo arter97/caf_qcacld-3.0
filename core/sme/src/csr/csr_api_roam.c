@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -12076,7 +12076,7 @@ csr_roam_chk_lnk_swt_ch_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 	tpSirSmeSwitchChannelInd pSwitchChnInd;
 	tCsrRoamInfo roamInfo;
 	tSirMacDsParamSetIE *ds_params_ie;
-	tDot11fIEHTInfo *ht_info_ie;
+	struct ieee80211_ie_htinfo *ht_info_ie;
 
 	/* in case of STA, the SWITCH_CHANNEL originates from its AP */
 	sme_debug("eWNI_SME_SWITCH_CHL_IND from SME");
@@ -12110,16 +12110,15 @@ csr_roam_chk_lnk_swt_ch_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 			ds_params_ie->channelNumber =
 				(uint8_t)pSwitchChnInd->newChannelId;
 
-		ht_info_ie = (tDot11fIEHTInfo *)wlan_cfg_get_ie_ptr(
-				(uint8_t *)session->pConnectBssDesc->
-				ieFields,
-				csr_get_ielen_from_bss_description(
-					session->pConnectBssDesc),
-				DOT11F_EID_HTINFO, ONE_BYTE);
+		ht_info_ie = (struct ieee80211_ie_htinfo *)wlan_cfg_get_ie_ptr
+				((uint8_t *)session->pConnectBssDesc->ieFields,
+				 csr_get_ielen_from_bss_description
+					(session->pConnectBssDesc),
+				 DOT11F_EID_HTINFO, ONE_BYTE);
 		if (ht_info_ie) {
-			ht_info_ie->primaryChannel =
+			ht_info_ie->hi_ie.hi_ctrlchannel =
 				(uint8_t)pSwitchChnInd->newChannelId;
-			ht_info_ie->secondaryChannelOffset =
+			ht_info_ie->hi_ie.hi_extchoff =
 				pSwitchChnInd->chan_params.sec_ch_offset;
 		}
 	}
