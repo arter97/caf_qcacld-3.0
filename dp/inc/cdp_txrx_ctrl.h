@@ -1216,6 +1216,7 @@ cdp_dump_rx_flow_tag_stats(ol_txrx_soc_handle soc, uint8_t pdev_id,
 								pdev_id,
 								flow_info);
 }
+#endif /* WLAN_SUPPORT_RX_FLOW_TAG */
 
 /**
  * cdp_peer_flush_frags() - get per-peer protocol count drop-mask
@@ -1230,19 +1231,18 @@ cdp_dump_rx_flow_tag_stats(ol_txrx_soc_handle soc, uint8_t pdev_id,
 static inline
 void cdp_txrx_peer_flush_frags(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *peer_mac)
 {
-        if (!soc || !soc->ops) {
-                QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
-        			"%s: Invalid Instance:", __func__);
+	if (!soc || !soc->ops) {
+		QDF_TRACE(QDF_MODULE_ID_CDP, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Invalid Instance", __func__);
 		QDF_BUG(0);
-                return;
-        }
+		return;
+	}
 
-        if (!soc->ops->ctrl_ops ||
-            !soc->ops->ctrl_ops->txrx_peer_flush_frags)
-                return;
+	if (!soc->ops->ctrl_ops ||
+	    !soc->ops->ctrl_ops->txrx_peer_flush_frags)
+		return;
 
-        return soc->ops->ctrl_ops->txrx_peer_flush_frags(soc, vdev_id, peer_mac);
+	return soc->ops->ctrl_ops->txrx_peer_flush_frags(soc, vdev_id,
+							 peer_mac);
 }
-
-#endif /* WLAN_SUPPORT_RX_FLOW_TAG */
 #endif /* _CDP_TXRX_CTRL_H_ */
