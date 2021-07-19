@@ -165,6 +165,129 @@ QDF_STATUS wlan_mbss_deinit(void);
 QDF_STATUS wlan_mbss_if_mgr_send_event(struct wlan_objmgr_vdev *vdev,
 				       void *data);
 
+/*
+ * wlan_mbss_acs_in_progress() - check if ACS in progress
+ *
+ * @vdev: vdev object
+ * return: return true or false
+ */
+bool wlan_mbss_acs_in_progress(struct wlan_objmgr_vdev *vdev);
+
+/* wlan_mbss_ht40_in_progress() - check if HT40 in progress
+ *
+ * @vdev: vdev object
+ * return: return true or false
+ */
+bool wlan_mbss_ht40_in_progress(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * wlan_mbss_vdev_acs_in_progress() - check if ACS in progress for a vdev
+ *
+ * @vdev: vdev object
+ * @acs_source: ACS source
+ * return: return true or false
+ */
+bool wlan_mbss_vdev_acs_in_progress(struct wlan_objmgr_vdev *vdev,
+				    enum wlan_mbss_acs_source acs_src);
+
+/* wlan_mbss_num_sta_up() - find number of STA vdevs UP
+ *
+ * @pdev: pdev object
+ * return: nubner of STA vdevs UP
+ */
+uint8_t wlan_mbss_num_sta_up(struct wlan_objmgr_pdev *pdev);
+
+/* wlan_mbss_num_ap_up() - find number of AP vdevs UP
+ *
+ * @vdev: vdev object
+ * return: number of AP vdevs UP
+ */
+uint8_t wlan_mbss_num_ap_up(struct wlan_objmgr_pdev *pdev);
+
+/* wlan_mbss_sta_connecting() - find if STA vdev connecting
+ *
+ * @vdev: vdev object
+ * return: QDF_STATUS
+ */
+bool wlan_mbss_sta_connecting(struct wlan_objmgr_vdev *vdev);
+
+/* wlan_mbss_num_sta_connecting() - find number of STA vdevs connecting
+ *
+ * @vdev: vdev object
+ * return: number of STA vdevs connecting
+ */
+uint8_t wlan_mbss_num_sta_connecting(struct wlan_objmgr_pdev *pdev);
+
+/* wlan_mbss_num_sta() - find number of STA vdevs
+ *
+ * @pdev: pdev object
+ * return: number of STA vdevs
+ */
+uint8_t wlan_mbss_num_sta(struct wlan_objmgr_pdev *pdev);
+
+/* wlan_mbss_num_ap() - find number of AP vdev
+ *
+ * @pdev: pdev object
+ * return: number of AP vdevs
+ */
+uint8_t wlan_mbss_num_ap(struct wlan_objmgr_pdev *pdev);
+
+/* wlan_mbss_num_monitor() - find number of AP vdev
+ *
+ * @pdev: pdev object
+ * return: number of AP vdevs
+ */
+uint8_t wlan_mbss_num_monitor(struct wlan_objmgr_pdev *pdev);
+
+/* wlan_mbss_num_vdev() - find number of AP vdev
+ *
+ * @pdev: pdev object
+ * return: number of AP vdevs
+ */
+uint8_t wlan_mbss_num_vdev(struct wlan_objmgr_pdev *pdev);
+
+/* wlan_mbss_start_vdevs() - start all the vdevs
+ *
+ * @pdev: vdev object
+ * return: QDF_STATUS
+ */
+QDF_STATUS wlan_mbss_start_vdevs(struct wlan_objmgr_vdev *vdev);
+
+/* wlan_mbss_start_ap_vdevs() - start the AP vdevs
+ *
+ * @vdev: vdev object
+ * return: QDF_STATUS
+ */
+QDF_STATUS wlan_mbss_start_ap_vdevs(struct wlan_objmgr_vdev *vdev);
+
+/* wlan_mbss_start_sta_vdevs() - start the STA vdevs
+ *
+ * @vdev: vdev object
+ * return: QDF_STATUS
+ */
+QDF_STATUS wlan_mbss_start_sta_vdevs(struct wlan_objmgr_vdev *vdev);
+
+/* wlan_mbss_stop_vdevs() - stop all the vdevs
+ *
+ * @vdev: vdev object
+ * return: QDF_STATUS
+ */
+QDF_STATUS wlan_mbss_stop_vdevs(struct wlan_objmgr_vdev *vdev);
+
+/* wlan_mbss_stop_ap_vdevs() - stop all the AP vdevs
+ *
+ * @vdev: vdev object
+ * return: QDF_STATUS
+ */
+QDF_STATUS wlan_mbss_stop_ap_vdevs(struct wlan_objmgr_vdev *vdev);
+
+/* wlan_mbss_stop_sta_vdevs() - stop all the STA vdevs
+ *
+ * @vdev: vdev object
+ * return: QDF_STATUS
+ */
+QDF_STATUS wlan_mbss_stop_sta_vdevs(struct wlan_objmgr_vdev *vdev);
+
 #if defined WLAN_MBSS_DEBUG
 /* wlan_mbss_debug_print_history() - Print MBSS framework history
  *
