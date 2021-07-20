@@ -5371,6 +5371,7 @@ typedef struct {
 	bool carrier_vow_optimization;
 	uint32_t is_sap_connected_d3wow_enabled;
 	uint32_t is_go_connected_d3wow_enabled;
+	uint32_t ema_init_config;
 } target_resource_config;
 
 /**

@@ -7194,6 +7194,9 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 	resource_cfg->ema_max_vap_cnt = tgt_res_cfg->ema_max_vap_cnt;
 	resource_cfg->ema_max_profile_period =
 			tgt_res_cfg->ema_max_profile_period;
+#ifdef TBD_FR69640
+	resource_cfg->ema_init_config = tgt_res_cfg->ema_init_config;
+#endif
 
 	if (tgt_res_cfg->max_ndp_sessions)
 		resource_cfg->max_ndp_sessions =
