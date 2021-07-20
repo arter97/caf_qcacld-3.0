@@ -597,9 +597,6 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	if (sap_get_total_number_sap_intf(mac_handle) <= 1 ||
 	    policy_mgr_is_current_hwmode_dbs(mac_ctx->psoc) ||
 	    !sap_scc_dfs) {
-		sap_get_cac_dur_dfs_region(sap_ctx,
-			&sap_ctx->csr_roamProfile.cac_duration_ms,
-			&sap_ctx->csr_roamProfile.dfs_regdomain);
 		/*
 		 * Most likely, radar has been detected and SAP wants to
 		 * change the channel
@@ -647,9 +644,6 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
 			  FL("sapdfs:issue chnl change for sapctx[%pK]"),
 			  sap_context);
-		sap_get_cac_dur_dfs_region(sap_context,
-			&sap_context->csr_roamProfile.cac_duration_ms,
-			&sap_context->csr_roamProfile.dfs_regdomain);
 		/*
 		 * Most likely, radar has been detected and SAP wants to
 		 * change the channel
