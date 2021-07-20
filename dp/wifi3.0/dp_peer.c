@@ -5017,7 +5017,7 @@ uint8_t dp_mscs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 {
 	union dp_peer_mscs_tuple mscs_tuple;
 	uint16_t ether_type;
-	struct dp_peer *peer;
+	struct dp_peer *peer = NULL;
 	struct ether_header *eh;
 	char *mac;
 
@@ -5500,7 +5500,7 @@ dp_scs_get_tid(struct dp_soc *soc, struct dp_vdev *vdev,
 {
 	union dp_peer_scs_tuple scs_tuple;
 	uint16_t ether_type;
-	struct dp_peer *peer;
+	struct dp_peer *peer = NULL;
 	struct ether_header *eh;
 	char *mac;
 
