@@ -25,6 +25,7 @@
 #include "wlan_if_mgr_public_struct.h"
 #include "qdf_status.h"
 #include "wlan_objmgr_vdev_obj.h"
+#include "scheduler_api.h"
 
 typedef void (*if_mgr_ev_cb_t)(struct wlan_objmgr_vdev *vdev,
 			       void *data);
@@ -133,6 +134,33 @@ struct wlan_mbss_ext_cb {
  */
 struct wlan_mbss_ops {
 	struct wlan_mbss_ext_cb ext_ops;
+};
+
+/**
+ * enum wlan_mbss_acs_source: MBSS ACS event sources
+ * @MBSS_SCHED_PDEV_STOP: schedule AP/monitor VDEVs stop
+ * @MBSS_SCHED_PDEV_START: schedule AP/monitor VDEVs stop
+ * @MBSS_SCHED_PDEV_STOP_START: schedule AP/monitor VDEVs stop start
+ * @MBSS_SCHED_STA_VDEVS_STOP: schedule STA VDEVs stop
+ * @MBSS_SCHED_STA_VDEVS_STOP_START: schedule STA VDEVs stop
+ */
+enum wlan_mbss_sched_actions {
+	MBSS_SCHED_PDEV_STOP = 0,
+	MBSS_SCHED_PDEV_START = 1,
+	MBSS_SCHED_PDEV_STOP_START = 2,
+	MBSS_SCHED_STA_VDEVS_STOP = 3,
+	MBSS_SCHED_STA_VDEVS_START = 4,
+	MBSS_SCHED_MAX = 5,
+};
+
+/**
+ *  struct mbss_ops - MBSS callbacks
+ *  @vdev: vdev
+ *  @action: MBSS scheduler action
+ */
+struct mbss_sched_data {
+	struct wlan_objmgr_vdev *vdev;
+	enum wlan_mbss_sched_actions action;
 };
 
 /* wlan_mbss_alloc_ops() - alloc MBSS ops
@@ -377,9 +405,33 @@ wlan_mbss_stop_start_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev,
  * return: QDF_STATUS
  */
 QDF_STATUS
-wlan_mbss_start_restart_ap_monitor_vdevs(struct wlan_objmgr_pdev *vdev,
+wlan_mbss_start_restart_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev,
 					 void *arg);
 
+/* wlan_mbss_sched_action_flush() - flush callback to for scheduler mbss msg
+ *
+ * @msg: scheduler msg
+ * return: QDF_STATUS
+ */
+QDF_STATUS wlan_mbss_sched_action_flush(struct scheduler_msg *msg);
+
+/* wlan_mbss_sched_action() - callback to handle scheduler mbss msg
+ *
+ * @msg: scheduler msg
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_sched_action(struct scheduler_msg *msg);
+
+/* wlan_mbss_sched_start_stop() - handle scheduler mbss start stop
+ *
+ * @vdev: vdev object
+ * @action: mbss action to be scheduled
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_sched_start_stop(struct wlan_objmgr_vdev *vdev,
+			   enum wlan_mbss_sched_actions action);
 
 #if defined WLAN_MBSS_DEBUG
 /* wlan_mbss_debug_print_history() - Print MBSS framework history
