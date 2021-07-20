@@ -165,4 +165,21 @@ QDF_STATUS wlan_mbss_deinit(void);
 QDF_STATUS wlan_mbss_if_mgr_send_event(struct wlan_objmgr_vdev *vdev,
 				       void *data);
 
+#if defined WLAN_MBSS_DEBUG
+/* wlan_mbss_debug_print_history() - Print MBSS framework history
+ *
+ * return: none
+ */
+void wlan_mbss_debug_print_history(struct wlan_objmgr_pdev *pdev);
+
+/* wlan_mbss_debug_print_bitmap() - Print MBSS vdev bitmaps
+ *
+ * return: none
+ */
+void wlan_mbss_debug_print_bitmap(struct wlan_objmgr_pdev *pdev);
+#else
+#define wlan_mbss_debug_print_history
+#define wlan_mbss_debug_print_bitmap
+
+#endif
 #endif /* _WLAN_MBSS_H_ */

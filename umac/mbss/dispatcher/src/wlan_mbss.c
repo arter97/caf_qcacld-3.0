@@ -206,3 +206,14 @@ wlan_mbss_if_mgr_send_event(struct wlan_objmgr_vdev *vdev,
 
 qdf_export_symbol(wlan_mbss_if_mgr_send_event);
 
+#ifdef WLAN_MBSS_DEBUG
+void wlan_mbss_debug_print_history(struct wlan_objmgr_pdev *pdev)
+{
+	mbss_debug_print_history(pdev);
+}
+
+void wlan_mbss_debug_print_bitmap(struct wlan_objmgr_pdev *pdev)
+{
+	mbss_debug_print_bitmap(pdev);
+}
+#endif

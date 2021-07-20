@@ -188,6 +188,7 @@ struct mbss_ht40_ctx {
  * @stop_ap_vdevs_in_progress: inidcates AP vdevs stop in progress
  * @start_sta_vdevs_in_progress: indicates STA vdevs start in progress
  * @stop_sta_vdevs_in_progress: inidcates STA vdevs down in progress
+ * @mbss_dbg: MBSS debug data
  */
 struct mbss_pdev {
 	qdf_spinlock_t mbss_lock;
@@ -207,6 +208,9 @@ struct mbss_pdev {
 
 	uint32_t start_sta_vdevs_in_progress:1;
 	uint32_t stop_sta_vdevs_in_progress:1;
+#if defined WLAN_MBSS_DEBUG
+	struct mbss_dbg_data mbss_dbg;
+#endif
 };
 
 /* wlan_mbss_pdev_create_handler() - MBSS pdev create handler
