@@ -124,6 +124,22 @@ enum wlan_rptr_ext_connection_type {
 #endif
 
 /**
+ * struct wlan_rptr_move- Repeater move structure
+ * @state: repeater move state
+ * @ssid: repeater move ssid
+ * @chan: repeater move channel
+ * @same_chan: repeater move same channel
+ * @bssid: repeater move bssid
+ */
+struct wlan_rptr_move {
+	enum wlan_rptr_move_state state;
+	struct wlan_ssid ssid;
+	u_int32_t chan;
+	bool same_chan;
+	struct qdf_mac_addr bssid;
+};
+
+/**
  * struct wlan_rptr_pdev_priv - reapeter pdev priv structure
  * @pdev:                     objmgr pdev
  * @pdev_feature_caps:        pdev feature caps
@@ -143,6 +159,7 @@ struct wlan_rptr_pdev_priv {
 	u8     preferredUplink;
 	u8     nscanpsta;
 	qdf_spinlock_t  rptr_pdev_lock;
+	struct wlan_rptr_move rptr_move;
 };
 
 /**

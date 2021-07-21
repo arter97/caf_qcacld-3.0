@@ -2092,3 +2092,177 @@ wlan_rptr_update_extender_info(struct wlan_objmgr_vdev *vdev,
 
 qdf_export_symbol(wlan_rptr_update_extender_info);
 #endif
+
+enum wlan_rptr_move_state
+wlan_rptr_move_get_state(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		RPTR_LOGI("Repeater pdev is null");
+		return WLAN_REPEATER_MOVE_MAX;
+	}
+
+	rptr_move = &pdev_priv->rptr_move;
+	return rptr_move->state;
+}
+
+struct wlan_ssid *
+wlan_rptr_move_get_ssid(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		RPTR_LOGI("Repeater pdev is null");
+		return NULL;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	return &rptr_move->ssid;
+}
+
+uint32_t wlan_rptr_move_get_channel(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		RPTR_LOGI("Repeater pdev is null");
+		return 0;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	return rptr_move->chan;
+}
+
+bool wlan_rptr_move_get_same_channel(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		RPTR_LOGI("Repeater pdev is null");
+		return false;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	return rptr_move->same_chan;
+}
+
+struct qdf_mac_addr *
+wlan_rptr_move_get_bssid(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		RPTR_LOGI("Repeater pdev is null");
+		return NULL;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	return &rptr_move->bssid;
+}
+
+QDF_STATUS
+wlan_rptr_move_set_state(struct wlan_objmgr_pdev *pdev,
+			 enum wlan_rptr_move_state state)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	if (state < WLAN_REPEATER_MOVE_MAX)
+		rptr_move->state = state;
+exit:
+	return status;
+}
+
+QDF_STATUS
+wlan_rptr_move_set_ssid(struct wlan_objmgr_pdev *pdev,
+			struct wlan_ssid *ssid)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	qdf_mem_zero(rptr_move->ssid.ssid, WLAN_SSID_MAX_LEN);
+	rptr_move->ssid.length = ssid->length;
+	qdf_mem_copy(rptr_move->ssid.ssid, ssid->ssid, ssid->length);
+
+exit:
+	return status;
+}
+
+QDF_STATUS
+wlan_rptr_move_set_channel(struct wlan_objmgr_pdev *pdev,
+			   uint32_t chan)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	rptr_move->chan = chan;
+exit:
+	return status;
+}
+
+QDF_STATUS
+wlan_rptr_move_set_same_channel(struct wlan_objmgr_pdev *pdev,
+				bool same_chan)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	rptr_move->same_chan = same_chan;
+exit:
+	return status;
+}
+
+QDF_STATUS
+wlan_rptr_move_set_bssid(struct wlan_objmgr_pdev *pdev,
+			 struct qdf_mac_addr *bssid)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_move *rptr_move;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv) {
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+	rptr_move = &pdev_priv->rptr_move;
+	qdf_copy_macaddr(&rptr_move->bssid, bssid);
+exit:
+	return status;
+}
+
