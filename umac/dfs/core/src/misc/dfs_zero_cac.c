@@ -422,6 +422,11 @@ void dfs_zero_cac_timer_detach(struct dfs_soc_priv_obj *dfs_soc_obj)
 #ifdef QCA_SUPPORT_AGILE_DFS
 bool dfs_is_agile_precac_enabled(struct wlan_dfs *dfs)
 {
+	enum dfs_reg dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
+
+	if (dfsdomain != DFS_ETSI_REGION)
+		return false;
+
 	return (dfs->dfs_agile_precac_ucfg && dfs->dfs_fw_adfs_support_non_160);
 }
 #endif
