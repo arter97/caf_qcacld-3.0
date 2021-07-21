@@ -19,6 +19,10 @@
 #ifndef _WMI_UNIFIED_AP_PARAMS_H_
 #define _WMI_UNIFIED_AP_PARAMS_H_
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#include <wmi_unified_ap_11be_params.h>
+#endif
+
 /* Country code string length*/
 #define COUNTRY_CODE_LEN 2
 /* Civic information size in bytes */
@@ -231,6 +235,7 @@ struct set_quiet_mode_params {
  * @duration: Quite duration
  * @next_start: Next quiet start
  * @flag: 0 - disable, 1 - enable and continuous, 3 - enable and single shot
+ * @mlo_partner: Partner link information
  */
 struct set_bcn_offload_quiet_mode_params {
 	uint32_t vdev_id;
@@ -238,6 +243,9 @@ struct set_bcn_offload_quiet_mode_params {
 	uint32_t duration;
 	uint32_t next_start;
 	uint32_t flag;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct wmi_mlo_bcn_offload_partner_links mlo_partner;
+#endif
 };
 
 /**

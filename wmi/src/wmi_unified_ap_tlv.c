@@ -22,6 +22,7 @@
 #include "wmi_unified_ap_api.h"
 #include <wlan_utility.h>
 #include "wmi_unified_rtt.h"
+#include <wmi_unified_ap_11be_api.h>
 
 /**
  * send_peer_add_wds_entry_cmd_tlv() - send peer add command to fw
@@ -759,14 +760,17 @@ send_set_bcn_offload_quiet_mode_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_buf_t buf;
 	QDF_STATUS ret;
 	int32_t len;
+	uint8_t *buf_ptr;
 
 	len = sizeof(*quiet_cmd);
+	len += quiet_mlo_params_size(param);
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
 		wmi_err("wmi_buf_alloc failed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
 	quiet_cmd = (wmi_vdev_bcn_offload_quiet_config_cmd_fixed_param *)
 			wmi_buf_data(buf);
 	WMITLV_SET_HDR(&quiet_cmd->tlv_header,
@@ -780,6 +784,9 @@ send_set_bcn_offload_quiet_mode_cmd_tlv(wmi_unified_t wmi_handle,
 	quiet_cmd->duration = param->duration;
 	quiet_cmd->next_start = param->next_start;
 	quiet_cmd->flags = param->flag;
+
+	buf_ptr += sizeof(wmi_vdev_bcn_offload_quiet_config_cmd_fixed_param);
+	buf_ptr = bcn_offload_quiet_add_ml_partner_links(buf_ptr, param);
 
 	wmi_mtrace(WMI_VDEV_BCN_OFFLOAD_QUIET_CONFIG_CMDID, NO_SESSION, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
