@@ -82,16 +82,49 @@ struct wlan_mbss_ev_data {
  * @mbss_cancel_acs: Trigger ext ACS cancel
  * @mbss_start_ht40: Notify HT40 intolerance scan
  * @mbss_cancel_ht40: Notify HT40 intolerance scan
+ * @mbss_start_ap_vdevs: start AP vdevs
+ * @mbss_stop_start_ap_vdevs: stop start AP vdevs
+ * @mbss_stop_start_ap_monitor_vdevs: stop start AP and monitor vdevs
+ * @mbss_stop_ap_monitor_vdevs: stop AP and monitor vdevs
+ * @mbss_stop_sta_vdevs: stop STA vdevs
+ * @mbss_start_vdevs: start all vdevs
+ * @mbss_start_ap_monitor_vdevs: start AP and monitor vdevs
+ * @mbss_stop_vdevs: stop all the vdevs
+ * @mbss_start_sta_vdevs: start STA vdevs
+ * @mbss_start_restart_ap_monitor_vdevs: restart AP monitor vdevs
  */
 struct wlan_mbss_ext_cb {
 	QDF_STATUS (*mbss_start_acs)(
-			struct wlan_objmgr_vdev *vdev, void *event_data);
+		struct wlan_objmgr_vdev *vdev, void *event_data);
 	QDF_STATUS (*mbss_cancel_acs)(
-			struct wlan_objmgr_vdev *vdev, void *event_data);
+		struct wlan_objmgr_vdev *vdev, void *event_data);
 	QDF_STATUS (*mbss_start_ht40)(
-			struct wlan_objmgr_vdev *vdev, void *event_data);
+		struct wlan_objmgr_vdev *vdev, void *event_data);
 	QDF_STATUS (*mbss_cancel_ht40)(
-			struct wlan_objmgr_vdev *vdev, void *event_data);
+		struct wlan_objmgr_vdev *vdev, void *event_data);
+
+	void (*mbss_start_ap_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_stop_ap_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_stop_start_ap_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_stop_start_ap_monitor_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_stop_ap_monitor_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_stop_sta_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_start_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_start_ap_monitor_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_stop_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_start_sta_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_start_restart_ap_monitor_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
 };
 
 /**
@@ -248,45 +281,105 @@ uint8_t wlan_mbss_num_vdev(struct wlan_objmgr_pdev *pdev);
 
 /* wlan_mbss_start_vdevs() - start all the vdevs
  *
- * @pdev: vdev object
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
  * return: QDF_STATUS
  */
-QDF_STATUS wlan_mbss_start_vdevs(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS
+wlan_mbss_start_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
 
 /* wlan_mbss_start_ap_vdevs() - start the AP vdevs
  *
- * @vdev: vdev object
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
  * return: QDF_STATUS
  */
-QDF_STATUS wlan_mbss_start_ap_vdevs(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS
+wlan_mbss_start_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
 
 /* wlan_mbss_start_sta_vdevs() - start the STA vdevs
  *
- * @vdev: vdev object
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
  * return: QDF_STATUS
  */
-QDF_STATUS wlan_mbss_start_sta_vdevs(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS
+wlan_mbss_start_sta_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
 
 /* wlan_mbss_stop_vdevs() - stop all the vdevs
  *
- * @vdev: vdev object
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
  * return: QDF_STATUS
  */
-QDF_STATUS wlan_mbss_stop_vdevs(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS
+wlan_mbss_stop_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
 
 /* wlan_mbss_stop_ap_vdevs() - stop all the AP vdevs
  *
- * @vdev: vdev object
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
  * return: QDF_STATUS
  */
-QDF_STATUS wlan_mbss_stop_ap_vdevs(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS
+wlan_mbss_stop_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
 
 /* wlan_mbss_stop_sta_vdevs() - stop all the STA vdevs
  *
- * @vdev: vdev object
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
  * return: QDF_STATUS
  */
-QDF_STATUS wlan_mbss_stop_sta_vdevs(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS
+wlan_mbss_stop_sta_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
+
+/* wlan_mbss_stop_ap_monitor_vdevs() - stop all the AP and monitor vdevs
+ *
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_stop_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
+
+/* wlan_mbss_start_ap_monitor_vdevs() - start all the AP and monitor vdevs
+ *
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_start_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
+
+/* wlan_mbss_stop_start_ap_vdevs() - stop and start all the AP vdevs
+ *
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_stop_start_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg);
+
+/* wlan_mbss_stop_start_ap_monitor_vdevs() - stop and start AP/monitor vdevs
+ *
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_stop_start_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev,
+				      void *arg);
+
+/* wlan_mbss_start_restart_ap_monitor_vdevs() - start/restart all the AP vdevs
+ *
+ * @pdev: pdev object
+ * @arg: argument to vdev start/stop function
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_start_restart_ap_monitor_vdevs(struct wlan_objmgr_pdev *vdev,
+					 void *arg);
+
 
 #if defined WLAN_MBSS_DEBUG
 /* wlan_mbss_debug_print_history() - Print MBSS framework history

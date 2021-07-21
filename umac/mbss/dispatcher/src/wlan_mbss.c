@@ -285,46 +285,95 @@ uint8_t wlan_mbss_num_vdev(struct wlan_objmgr_pdev *pdev)
 
 qdf_export_symbol(wlan_mbss_num_vdev);
 
-QDF_STATUS wlan_mbss_start_vdevs(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS
+wlan_mbss_start_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	return status;
+	return mbss_start_vdevs(pdev, arg);
 }
 
-QDF_STATUS wlan_mbss_start_ap_vdevs(struct wlan_objmgr_vdev *vdev)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+qdf_export_symbol(wlan_mbss_start_vdevs);
 
-	return status;
+QDF_STATUS
+wlan_mbss_start_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	return mbss_start_ap_vdevs(pdev, arg);
 }
 
-QDF_STATUS wlan_mbss_start_sta_vdevs(struct wlan_objmgr_vdev *vdev)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+qdf_export_symbol(wlan_mbss_start_ap_vdevs);
 
-	return status;
+QDF_STATUS
+wlan_mbss_start_sta_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	return mbss_start_sta_vdevs(pdev, arg);
 }
 
-QDF_STATUS wlan_mbss_stop_vdevs(struct wlan_objmgr_vdev *vdev)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+qdf_export_symbol(wlan_mbss_start_sta_vdevs);
 
-	return status;
+QDF_STATUS
+wlan_mbss_stop_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	return mbss_stop_vdevs(pdev, arg);
 }
 
-QDF_STATUS wlan_mbss_stop_ap_vdevs(struct wlan_objmgr_vdev *vdev)
+qdf_export_symbol(wlan_mbss_stop_vdevs);
+
+QDF_STATUS
+wlan_mbss_stop_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	return status;
+	return mbss_stop_ap_vdevs(pdev, arg);
 }
 
-QDF_STATUS wlan_mbss_stop_sta_vdevs(struct wlan_objmgr_vdev *vdev)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+qdf_export_symbol(wlan_mbss_stop_ap_vdevs);
 
-	return status;
+QDF_STATUS
+wlan_mbss_stop_sta_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	return mbss_stop_sta_vdevs(pdev, arg);
 }
+
+qdf_export_symbol(wlan_mbss_stop_sta_vdevs);
+
+QDF_STATUS
+wlan_mbss_stop_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	return mbss_stop_ap_monitor_vdevs(pdev, arg);
+}
+
+qdf_export_symbol(wlan_mbss_stop_ap_monitor_vdevs);
+
+QDF_STATUS
+wlan_mbss_start_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	return mbss_start_ap_monitor_vdevs(pdev, arg);
+}
+
+qdf_export_symbol(wlan_mbss_start_ap_monitor_vdevs);
+
+QDF_STATUS
+wlan_mbss_stop_start_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	return mbss_stop_start_ap_vdevs(pdev, arg);
+}
+
+qdf_export_symbol(wlan_mbss_stop_start_ap_vdevs);
+
+QDF_STATUS
+wlan_mbss_stop_start_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev,
+				      void *arg)
+{
+	return mbss_stop_start_ap_monitor_vdevs(pdev, arg);
+}
+
+qdf_export_symbol(wlan_mbss_stop_start_ap_monitor_vdevs);
+
+QDF_STATUS
+wlan_mbss_start_restart_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev,
+					 void *arg)
+{
+	return mbss_start_restart_ap_monitor_vdevs(pdev, arg);
+}
+
+qdf_export_symbol(wlan_mbss_start_restart_ap_monitor_vdevs);
 
 #ifdef WLAN_MBSS_DEBUG
 void wlan_mbss_debug_print_history(struct wlan_objmgr_pdev *pdev)

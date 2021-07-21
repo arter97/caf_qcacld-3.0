@@ -157,7 +157,6 @@ uint8_t mbss_num_sta(struct wlan_objmgr_pdev *pdev)
 	num = mbss_ctx->num_sta_vdev;
 	mbss_unlock(mbss_ctx);
 exit:
-
 	return num;
 }
 
@@ -176,7 +175,6 @@ uint8_t mbss_num_ap(struct wlan_objmgr_pdev *pdev)
 	num = mbss_ctx->num_ap_vdev;
 	mbss_unlock(mbss_ctx);
 exit:
-
 	return num;
 }
 
@@ -216,45 +214,333 @@ exit:
 	return num;
 }
 
-QDF_STATUS mbss_start_vdevs(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS
+mbss_start_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
 
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_start_vdevs_cb)
+		handler = ext_ops->mbss_start_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
 	return status;
 }
 
-QDF_STATUS mbss_start_ap_vdevs(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS
+mbss_start_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
 
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_start_ap_vdevs_cb)
+		handler = ext_ops->mbss_start_ap_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
 	return status;
 }
 
-QDF_STATUS mbss_start_sta_vdevs(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS
+mbss_start_sta_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
 
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_start_sta_vdevs_cb)
+		handler = ext_ops->mbss_start_sta_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
 	return status;
 }
 
-QDF_STATUS mbss_stop_vdevs(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS
+mbss_stop_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
 
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_stop_vdevs_cb)
+		handler = ext_ops->mbss_stop_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
 	return status;
 }
 
-QDF_STATUS mbss_stop_ap_vdevs(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS
+mbss_stop_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
 
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_stop_ap_vdevs_cb)
+		handler = ext_ops->mbss_stop_ap_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
 	return status;
 }
 
-QDF_STATUS mbss_stop_sta_vdevs(struct wlan_objmgr_vdev *vdev)
+QDF_STATUS
+mbss_stop_sta_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
 
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_stop_sta_vdevs_cb)
+		handler = ext_ops->mbss_stop_sta_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
+	return status;
+}
+
+QDF_STATUS
+mbss_stop_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
+
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_stop_ap_monitor_vdevs_cb)
+		handler = ext_ops->mbss_stop_ap_monitor_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
+	return status;
+}
+
+QDF_STATUS
+mbss_start_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
+
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_start_ap_monitor_vdevs_cb)
+		handler = ext_ops->mbss_start_ap_monitor_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
+	return status;
+}
+
+QDF_STATUS
+mbss_stop_start_ap_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
+
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_stop_start_ap_vdevs_cb)
+		handler = ext_ops->mbss_stop_start_ap_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
+	return status;
+}
+
+QDF_STATUS
+mbss_stop_start_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
+
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_stop_start_ap_monitor_vdevs_cb)
+		handler = ext_ops->mbss_stop_start_ap_monitor_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
+	return status;
+}
+
+QDF_STATUS
+mbss_start_restart_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev, void *arg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
+
+	mbss_ctx = mbss_get_pdev_ctx(pdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_start_restart_ap_monitor_vdevs_cb)
+		handler = ext_ops->mbss_start_restart_ap_monitor_vdevs_cb;
+	else
+		goto err;
+
+	return wlan_objmgr_pdev_iterate_obj_list(pdev,
+						   WLAN_VDEV_OP,
+						   handler,
+						   arg, 0,
+						   WLAN_MBSS_ID);
+err:
+	status = QDF_STATUS_E_FAILURE;
 	return status;
 }
 
