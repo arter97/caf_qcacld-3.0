@@ -703,4 +703,107 @@ wlan_rptr_update_extender_info(struct wlan_objmgr_vdev *vdev,
 			       ieee80211_scan_entry_t scan_entry,
 			       u8 *disconnect_sec_stavap, u8 *bssid);
 #endif
+
+/**
+ * Repeater move state
+ * WLAN_REPEATER_MOVE_STOP- Repeater move stopped
+ * WLAN_REPEATER_MOVE_START- Repeater move started
+ * WLAN_REPEATER_MOVE_IN_PROGRESS- Repater move in progress
+ * WLAN_REPEATER_MOVE_MAX- Repeater move max
+ */
+enum wlan_rptr_move_state {
+	WLAN_REPEATER_MOVE_STOP = 0,
+	WLAN_REPEATER_MOVE_START = 1,
+	WLAN_REPEATER_MOVE_IN_PROGRESS = 2,
+	WLAN_REPEATER_MOVE_MAX = 3
+};
+
+/**
+ * wlan_rptr_move_get_state- get repeater move state
+ * @pdev- pdev object manager
+ * return state
+ */
+enum wlan_rptr_move_state
+wlan_rptr_move_get_state(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_rptr_move_get_ssid- get repeater move SSID
+ * @pdev- pdev object manager
+ * return ssid
+ */
+struct wlan_ssid *
+wlan_rptr_move_get_ssid(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_rptr_move_get_channel- get repeater move channel
+ * @pdev- pdev object manager
+ * return channel
+ */
+uint32_t wlan_rptr_move_get_channel(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_rptr_move_get_same_channel - get repeater move same channel
+ * @pdev- pdev object manager
+ * return true or false
+ */
+bool wlan_rptr_move_get_same_channel(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_rptr_move_get_bssid - get repeater move BSSID
+ * @pdev- pdev object manager
+ * return bssid
+ */
+struct qdf_mac_addr *
+wlan_rptr_move_get_bssid(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_rptr_move_set_state- set repeater move state
+ * @pdev- pdev object manager
+ * @state- state
+ * return QDF_STATUS
+ */
+QDF_STATUS
+wlan_rptr_move_set_state(struct wlan_objmgr_pdev *pdev,
+			 enum wlan_rptr_move_state state);
+
+/**
+ * wlan_rptr_move_set_ssid- set repeater move ssid
+ * @pdev- pdev object manager
+ * @ssid- ssid
+ * return QDF_STATUS
+ */
+QDF_STATUS
+wlan_rptr_move_set_ssid(struct wlan_objmgr_pdev *pdev,
+			struct wlan_ssid *ssid);
+
+/**
+ * wlan_rptr_move_set_channel- set repeater move channel
+ * @pdev- pdev object manager
+ * @chan- channel
+ * return QDF_STATUS
+ */
+QDF_STATUS
+wlan_rptr_move_set_channel(struct wlan_objmgr_pdev *pdev,
+			   uint32_t chan);
+
+/**
+ * wlan_rptr_move_set_same_channel- set repeater move same channel
+ * @pdev- pdev object manager
+ * @same_chan- true or false
+ * return QDF_STATUS
+ */
+QDF_STATUS
+wlan_rptr_move_set_same_channel(struct wlan_objmgr_pdev *pdev,
+				bool same_chan);
+
+/**
+ * wlan_rptr_move_set_bssid- set repeater move bssid
+ * @pdev- pdev object manager
+ * @bssid- bssid
+ * return QDF_STATUS
+ */
+QDF_STATUS
+wlan_rptr_move_set_bssid(struct wlan_objmgr_pdev *pdev,
+			 struct qdf_mac_addr *bssid);
+
 #endif

@@ -24,6 +24,7 @@
 #include "mbss_sta.h"
 #include "mbss_ap.h"
 #include "wlan_if_mgr_ap.h"
+#include "mbss_scan.h"
 #include "mbss_events.h"
 #include "wlan_if_mgr_ap.h"
 
@@ -72,49 +73,49 @@ if_mgr_ap_stop_bss_complete(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS if_mgr_ap_start_acs(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
 {
-	return QDF_STATUS_SUCCESS;
+	return  mbss_ap_start_acs(vdev, event_data);
 }
 
 QDF_STATUS if_mgr_ap_stop_acs(struct wlan_objmgr_vdev *vdev,
 			      struct if_mgr_event_data *event_data)
 {
-	return QDF_STATUS_SUCCESS;
+	return mbss_ap_stop_acs(vdev, event_data);
 }
 
 QDF_STATUS if_mgr_ap_done_acs(struct wlan_objmgr_vdev *vdev,
 			      struct if_mgr_event_data *event_data)
 {
-	return QDF_STATUS_SUCCESS;
+	return mbss_ap_done_acs(vdev, event_data);
 }
 
 QDF_STATUS if_mgr_ap_cancel_acs(struct wlan_objmgr_vdev *vdev,
 				struct if_mgr_event_data *event_data)
 {
-	return QDF_STATUS_SUCCESS;
+	return mbss_ap_cancel_acs(vdev, event_data);
 }
 
 QDF_STATUS if_mgr_ap_start_ht40(struct wlan_objmgr_vdev *vdev,
 				struct if_mgr_event_data *event_data)
 {
-	return QDF_STATUS_SUCCESS;
+	return mbss_ap_start_ht40(vdev, event_data);
 }
 
 QDF_STATUS if_mgr_ap_stop_ht40(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
 {
-	return QDF_STATUS_SUCCESS;
+	return mbss_ap_stop_ht40(vdev, event_data);
 }
 
 QDF_STATUS if_mgr_ap_done_ht40(struct wlan_objmgr_vdev *vdev,
 			       struct if_mgr_event_data *event_data)
 {
-	return QDF_STATUS_SUCCESS;
+	return mbss_ap_done_ht40(vdev, event_data);
 }
 
 QDF_STATUS if_mgr_ap_cancel_ht40(struct wlan_objmgr_vdev *vdev,
 				 struct if_mgr_event_data *event_data)
 {
-	return QDF_STATUS_SUCCESS;
+	return mbss_ap_cancel_ht40(vdev, event_data);
 }
 
 QDF_STATUS if_mgr_connect_start(struct wlan_objmgr_vdev *vdev,

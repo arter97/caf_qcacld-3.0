@@ -27,6 +27,7 @@
 #include <qdf_lock.h>
 #include <qdf_util.h>
 #include <qdf_status.h>
+#include <qdf_types.h>
 #include "wlan_if_mgr_api.h"
 #include "wlan_if_mgr_ap.h"
 #include "wlan_if_mgr_sta.h"
@@ -180,6 +181,10 @@ struct mbss_ht40_ctx {
  * @vdev_bitmaps: MBSS bitmaps
  * @mbss_acs: MBSS ACS context
  * @mbss_ht40: MBSS HT40 context
+ * @num_ap_vdev: number of AP vdevs
+ * @num_sta_vdev: number of STA vdevs
+ * @num_monitor_vdev: number of monitor vdevs
+ * @num_vdev: number of total vdevs
  * @acs_in_progress: indicates ACS in progress
  * @ht40_scan_in_progress: indicated HT40 scan in progres
  * @start_vdevs_in_progress: indicates all vdevs start in progress
@@ -188,6 +193,7 @@ struct mbss_ht40_ctx {
  * @stop_ap_vdevs_in_progress: inidcates AP vdevs stop in progress
  * @start_sta_vdevs_in_progress: indicates STA vdevs start in progress
  * @stop_sta_vdevs_in_progress: inidcates STA vdevs down in progress
+ * @mbss_dbg: MBSS debug data
  */
 struct mbss_pdev {
 	qdf_spinlock_t mbss_lock;
@@ -195,6 +201,11 @@ struct mbss_pdev {
 	struct mbss_vdev_bitmaps vdev_bitmaps;
 	struct mbss_acs_ctx mbss_acs;
 	struct mbss_ht40_ctx mbss_ht40;
+
+	uint8_t num_ap_vdev;
+	uint8_t num_sta_vdev;
+	uint8_t num_monitor_vdev;
+	uint8_t num_vdev;
 
 	uint32_t acs_in_progress:1;
 	uint32_t ht40_in_progress:1;
@@ -207,6 +218,9 @@ struct mbss_pdev {
 
 	uint32_t start_sta_vdevs_in_progress:1;
 	uint32_t stop_sta_vdevs_in_progress:1;
+#if defined WLAN_MBSS_DEBUG
+	struct mbss_dbg_data mbss_dbg;
+#endif
 };
 
 /* wlan_mbss_pdev_create_handler() - MBSS pdev create handler

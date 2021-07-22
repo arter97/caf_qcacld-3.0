@@ -140,16 +140,8 @@ QDF_STATUS mbss_vdev_create_handler(struct wlan_objmgr_vdev *vdev,
 				    void *arg_list)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	mbss_debug("Attached MBSS vdev:%d comp", wlan_vdev_get_id(vdev));
-	return status;
-}
-
-QDF_STATUS mbss_vdev_destroy_handler(struct wlan_objmgr_vdev *vdev,
-				     void *arg_list)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mbss_pdev *mbss_pdev_ctx;
+	enum QDF_OPMODE opmode;
 
 	mbss_pdev_ctx = mbss_get_ctx(vdev);
 	if (!mbss_pdev_ctx) {
@@ -158,12 +150,75 @@ QDF_STATUS mbss_vdev_destroy_handler(struct wlan_objmgr_vdev *vdev,
 		goto exit;
 	}
 
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	mbss_lock(mbss_pdev_ctx);
+
+	mbss_pdev_ctx->num_vdev++;
+	switch (opmode) {
+	case QDF_SAP_MODE:
+		mbss_pdev_ctx->num_ap_vdev++;
+		break;
+	case QDF_STA_MODE:
+		mbss_pdev_ctx->num_sta_vdev++;
+		break;
+	case QDF_MONITOR_MODE:
+		mbss_pdev_ctx->num_monitor_vdev++;
+		break;
+	default:
+		mbss_err("Mode not accounted");
+		break;
+	}
+
+	mbss_unlock(mbss_pdev_ctx);
+
+	mbss_debug("Attached MBSS vdev:%d comp", wlan_vdev_get_id(vdev));
+exit:
+	return status;
+}
+
+QDF_STATUS mbss_vdev_destroy_handler(struct wlan_objmgr_vdev *vdev,
+				     void *arg_list)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_pdev_ctx;
+	enum QDF_OPMODE opmode;
+
+	mbss_pdev_ctx = mbss_get_ctx(vdev);
+	if (!mbss_pdev_ctx) {
+		mbss_err("MBSS ctx is null");
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	mbss_lock(mbss_pdev_ctx);
+
+	mbss_pdev_ctx->num_vdev--;
+	switch (opmode) {
+	case QDF_SAP_MODE:
+		mbss_pdev_ctx->num_ap_vdev--;
+		break;
+	case QDF_STA_MODE:
+		mbss_pdev_ctx->num_sta_vdev--;
+		break;
+	case QDF_MONITOR_MODE:
+		mbss_pdev_ctx->num_monitor_vdev--;
+		break;
+	default:
+		mbss_err("Mode not accounted");
+		break;
+	}
+
 	status = mbss_check_vdev_all_bitmap(mbss_pdev_ctx,
 					    wlan_vdev_get_id(vdev));
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mbss_debug_print_history(wlan_vdev_get_pdev(vdev));
 		QDF_ASSERT(0);
 	}
+
+	mbss_unlock(mbss_pdev_ctx);
 exit:
 	mbss_debug("Detached MBSS vdev:%d comp", wlan_vdev_get_id(vdev));
 	return status;
