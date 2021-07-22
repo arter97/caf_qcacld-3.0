@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -148,6 +148,23 @@ enum monitor_mode_concurrency {
 		"g11dSupportEnabled", \
 		1, \
 		"11d Enable Flag")
+
+/*
+ * rf_test_mode_enabled - Enable rf test mode support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This cfg is used to set rf test mode support flag
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ */
+#define CFG_RF_TEST_MODE_SUPP_ENABLED CFG_BOOL( \
+		"rf_test_mode_enabled", \
+		1, \
+		"rf test mode Enable Flag")
 
 /*
  * <ini>
@@ -601,9 +618,14 @@ enum monitor_mode_concurrency {
  * gRemoveTimeStampSyncCmd - Enable/Disable to remove time stamp sync cmd
  * @Min: 0
  * @Max: 1
- * @Default: 1
+ * @Default: 0
  *
- * This ini is used to enable/disable the removal of time stamp sync cmd
+ * This ini is used to enable/disable the removal of time stamp sync cmd.
+ * If we disable this periodic time sync update to firmware then roaming
+ * timestamp updates to kmsg will have invalid timestamp as firmware will
+ * use this timestamp to capture when roaming has happened with respect
+ * to host timestamp.
+ *
  *
  * Usage: External
  *
@@ -611,18 +633,23 @@ enum monitor_mode_concurrency {
  */
 #define CFG_REMOVE_TIME_STAMP_SYNC_CMD CFG_INI_BOOL( \
 	"gRemoveTimeStampSyncCmd", \
-	1, \
+	0, \
 	"Enable to remove time stamp sync cmd")
 
 /*
  * <ini>
  * disable_4way_hs_offload - Enable/Disable 4 way handshake offload to firmware
  * @Min: 0
- * @Max: 1
- * @Default: 0
+ * @Max: 0x2
+ * @Default: 0x2
  *
- * 0  4-way HS to be handled in firmware
- * 1  4-way HS to be handled in supplicant
+ * 0x0 - 4-way HS to be handled in firmware for the AKMs except for SAE and
+ * OWE roaming the 4way HS is handled in supplicant by default
+ * 0x1 - 4-way HS to be handled in supplicant
+ * 0x2 - 4-way HS to be handled in firmware for the AKMs including the SAE
+ * Roam except for OWE roaming the 4way HS is handled in supplicant
+ *
+ * Based on the requirement the Max value can be increased per AKM.
  *
  * Related: None
  *
@@ -632,9 +659,13 @@ enum monitor_mode_concurrency {
  *
  * </ini>
  */
-#define CFG_DISABLE_4WAY_HS_OFFLOAD CFG_INI_BOOL("disable_4way_hs_offload", \
-						 0, \
-						 "Enable/disable 4 way handshake offload to firmware")
+#define CFG_DISABLE_4WAY_HS_OFFLOAD CFG_INI_UINT( \
+		"disable_4way_hs_offload", \
+		0, \
+		0x2, \
+		0x2, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Enable/disable 4 way handshake offload to firmware")
 
 /*
  * <ini>
@@ -735,13 +766,14 @@ enum monitor_mode_concurrency {
  * timeout to same AP and auth retries during roaming
  * @Min: 0x0
  * @Max: 0x53
- * @Default: 0x49
+ * @Default: 0x52
  *
  * This ini is used to set max auth retry in auth phase of roaming and initial
  * connection and max connection retry in case of assoc timeout. MAX Auth
  * retries are capped to 3, connection retries are capped to 2 and roam Auth
  * retry is capped to 1.
- * Default is 0x49 i.e. 1 retry each.
+ * Default is 0x52 i.e. 1 roam auth retry, 2 auth retry and 2 full connection
+ * retry.
  *
  * Bits       Retry Type
  * BIT[0:2]   AUTH retries
@@ -769,7 +801,7 @@ enum monitor_mode_concurrency {
  * </ini>
  */
 #define CFG_SAE_CONNECION_RETRIES CFG_INI_UINT("sae_connect_retries", \
-				0, 0x53, 0x49, CFG_VALUE_OR_DEFAULT, \
+				0, 0x53, 0x52, CFG_VALUE_OR_DEFAULT, \
 				"Bit mask to retry Auth and full connection on assoc timeout to same AP for SAE connection")
 
 /*
@@ -849,6 +881,7 @@ enum monitor_mode_concurrency {
 	CFG(CFG_ENABLE_BEACON_RECEPTION_STATS) \
 	CFG(CFG_REMOVE_TIME_STAMP_SYNC_CMD) \
 	CFG(CFG_MGMT_RETRY_MAX) \
+	CFG(CFG_RF_TEST_MODE_SUPP_ENABLED) \
 	CFG(CFG_BMISS_SKIP_FULL_SCAN) \
 	CFG(CFG_ENABLE_RING_BUFFER) \
 	CFG(CFG_DFS_CHAN_AGEOUT_TIME) \

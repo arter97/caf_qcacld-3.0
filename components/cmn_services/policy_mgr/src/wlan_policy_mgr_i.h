@@ -41,8 +41,6 @@
 #define PM_5_GHZ_CH_FREQ_36   (5180)
 #define CHANNEL_SWITCH_COMPLETE_TIMEOUT   (2000)
 
-#define DUAL_MAC_CONFIG_TIMEOUT   (POLICY_MGR_SER_CMD_TIMEOUT + 1000)
-
 /**
  * Policy Mgr hardware mode list bit-mask definitions.
  * Bits 4:0, 31:29 are unused.
@@ -298,6 +296,8 @@ struct policy_mgr_cfg {
  * interaction with Policy Manager
  * @cdp_cbacks: callbacks to be registered by SME for
  * interaction with Policy Manager
+ * @conc_cbacks: callbacks to be registered by lim for
+ * interaction with Policy Manager
  * @sap_mandatory_channels: The user preferred master list on
  *                        which SAP can be brought up. This
  *                        mandatory channel freq list would be as per
@@ -331,8 +331,6 @@ struct policy_mgr_cfg {
  * @cfg: Policy manager config data
  * @dynamic_mcc_adaptive_sched: disable/enable mcc adaptive scheduler feature
  * @dynamic_dfs_master_disabled: current state of dynamic dfs master
- * @dual_mac_configuration_complete_evt: qdf event to synchronize dual mac
- *					 configuration setting
  */
 struct policy_mgr_psoc_priv_obj {
 	struct wlan_objmgr_psoc *psoc;
@@ -346,6 +344,7 @@ struct policy_mgr_psoc_priv_obj {
 	struct policy_mgr_tdls_cbacks tdls_cbacks;
 	struct policy_mgr_cdp_cbacks cdp_cbacks;
 	struct policy_mgr_dp_cbacks dp_cbacks;
+	struct policy_mgr_conc_cbacks conc_cbacks;
 	uint32_t sap_mandatory_channels[NUM_CHANNELS];
 	uint32_t sap_mandatory_channels_len;
 	bool do_sap_unsafe_ch_check;
@@ -374,7 +373,6 @@ struct policy_mgr_psoc_priv_obj {
 	uint32_t valid_ch_freq_list_count;
 	bool dynamic_mcc_adaptive_sched;
 	bool dynamic_dfs_master_disabled;
-	qdf_event_t dual_mac_configuration_complete_evt;
 };
 
 /**

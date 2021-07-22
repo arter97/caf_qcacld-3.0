@@ -187,7 +187,7 @@ static void lim_handle_sme_reaasoc_result(struct mac_context *mac,
 				eLIM_JOIN_FAILURE;
 			sta->mlmStaContext.resultCode = resultCode;
 			sta->mlmStaContext.protStatusCode = protStatusCode;
-			lim_cleanup_rx_path(mac, sta, pe_session);
+			lim_cleanup_rx_path(mac, sta, pe_session, true);
 			/* Cleanup if add bss failed */
 			if (pe_session->add_bss_failed) {
 				dph_delete_hash_entry(mac,
@@ -600,7 +600,7 @@ void lim_process_mlm_ft_reassoc_req(struct mac_context *mac,
 	else
 		val = mac->mlme_cfg->sap_cfg.listen_interval;
 
-	status = wma_add_bss_peer_sta(session->vdev_id, session->bssId);
+	status = wma_add_bss_peer_sta(session->vdev_id, session->bssId, false);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(reassoc_req);
 		return;

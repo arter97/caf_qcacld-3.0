@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,6 +42,7 @@
 #include "wlan_reg_services_api.h"
 #include "wma.h"
 #include "wlan_pkt_capture_ucfg_api.h"
+#include "wlan_lmac_if_def.h"
 
 #define MAX_SUPPORTED_PEERS_WEP 16
 
@@ -443,8 +444,15 @@ void lim_pmf_comeback_timer_callback(void *context)
 		return;
 	}
 
-	pe_info("comeback later timer expired. sending MLM ASSOC req for vdev %d",
-		session->vdev_id);
+	if (session->limMlmState != eLIM_MLM_WT_ASSOC_RSP_STATE) {
+		pe_debug("Don't send assoc req, timer expire when limMlmState %d vdev id %d",
+			 session->limMlmState, session->vdev_id);
+		return;
+	}
+
+	pe_info("comeback later timer expired. sending MLM ASSOC req for vdev %d, session limMlmState %d, info lim_mlm_state %d",
+		session->vdev_id, session->limMlmState, info->lim_mlm_state);
+
 	/* set MLM state such that ASSOC REQ packet will be sent out */
 	session->limPrevMlmState = info->lim_prev_mlm_state;
 	session->limMlmState = info->lim_mlm_state;
@@ -1281,7 +1289,7 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param)
 		 * make sure PE is sending eWNI_SME_JOIN_RSP
 		 * to SME
 		 */
-		lim_cleanup_rx_path(mac_ctx, sta_ds, session);
+		lim_cleanup_rx_path(mac_ctx, sta_ds, session, true);
 		qdf_mem_free(session->lim_join_req);
 		session->lim_join_req = NULL;
 		/* Cleanup if add bss failed */
@@ -1977,7 +1985,14 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 	 * 2) PE receives eWNI_SME_ASSOC_CNF from SME
 	 * 3) BTAMP-AP sends Re/Association Response to BTAMP-STA
 	 */
-	lim_send_mlm_assoc_ind(mac, sta, pe_session);
+	if (lim_send_mlm_assoc_ind(mac, sta, pe_session) != QDF_STATUS_SUCCESS)
+		lim_reject_association(mac, sta->staAddr,
+				       sta->mlmStaContext.subType,
+				       true, sta->mlmStaContext.authType,
+				       sta->assocId, true,
+				       STATUS_UNSPECIFIED_FAILURE,
+				       pe_session);
+
 	/* fall though to reclaim the original Add STA Response message */
 end:
 	if (0 != limMsgQ->bodyptr) {
@@ -2271,9 +2286,11 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 	tLimMlmStartCnf mlm_start_cnf;
 	struct pe_session *session_entry;
 	enum bss_type bss_type;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	struct vdev_mlme_obj *mlme_obj;
 
 	if (!add_bss_rsp) {
-		pe_err("add_bss_rspis NULL");
+		pe_err("add_bss_rsp is NULL");
 		return;
 	}
 
@@ -2293,7 +2310,25 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 		       add_bss_rsp->vdev_id);
 		goto err;
 	}
+	if (LIM_IS_AP_ROLE(session_entry)) {
+		if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc)) {
+			mlme_obj =
+			wlan_vdev_mlme_get_cmpt_obj(session_entry->vdev);
+			if (!mlme_obj) {
+				pe_err("vdev component object is NULL");
+				goto err;
+			}
+			tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
+			lim_calculate_tpc(mac_ctx, session_entry, false, 0,
+					  false);
+
+			if (tx_ops->set_tpc_power)
+				tx_ops->set_tpc_power(mac_ctx->psoc,
+						      session_entry->vdev_id,
+						      &mlme_obj->reg_tpc_obj);
+		}
+	}
 	bss_type = session_entry->bssType;
 	/* update PE session Id */
 	mlm_start_cnf.sessionId = session_entry->peSessionId;
@@ -2656,6 +2691,9 @@ static void lim_process_switch_channel_join_req(
 	tLimMlmJoinCnf join_cnf;
 	uint8_t nontx_bss_id = 0;
 	struct bss_description *bss;
+	struct vdev_mlme_obj *mlme_obj;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	bool tpe_change = false;
 
 	if (status != QDF_STATUS_SUCCESS) {
 		pe_err("Change channel failed!!");
@@ -2756,6 +2794,25 @@ static void lim_process_switch_channel_join_req(
 		goto error;
 	}
 
+	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc)) {
+		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
+
+		lim_process_tpe_ie_from_beacon(mac_ctx, session_entry, bss,
+					       &tpe_change);
+
+		mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session_entry->vdev);
+		if (!mlme_obj) {
+			pe_err("vdev component object is NULL");
+			goto error;
+		}
+
+		lim_calculate_tpc(mac_ctx, session_entry, false, 0, false);
+
+		if (tx_ops->set_tpc_power)
+			tx_ops->set_tpc_power(mac_ctx->psoc,
+					      session_entry->vdev_id,
+					      &mlme_obj->reg_tpc_obj);
+	}
 	/* include additional IE if there is */
 	lim_send_probe_req_mgmt_frame(mac_ctx, &ssId,
 		session_entry->pLimMlmJoinReq->bssDescription.bssId,
@@ -2802,10 +2859,17 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 		return;
 
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("Set channel failed for monitor mode");
-		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
-					      WLAN_VDEV_SM_EV_START_REQ_FAIL,
-					      0, NULL);
+		enum wlan_vdev_sm_evt event = WLAN_VDEV_SM_EV_START_REQ_FAIL;
+
+		pe_err("Set channel failed for monitor mode vdev substate %d",
+			wlan_vdev_mlme_get_substate(session->vdev));
+
+		if (QDF_IS_STATUS_SUCCESS(
+		    wlan_vdev_is_restart_progress(session->vdev)))
+			event = WLAN_VDEV_SM_EV_RESTART_REQ_FAIL;
+
+		wlan_vdev_mlme_sm_deliver_evt(session->vdev, event, 0, NULL);
+
 		return;
 	}
 

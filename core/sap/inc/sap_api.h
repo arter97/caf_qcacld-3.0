@@ -67,6 +67,8 @@ extern "C" {
 #define SAP_DEFAULT_5GHZ_CHANNEL      (40)
 #define SAP_CHANNEL_NOT_SELECTED (0)
 
+#define SAP_PRE_CAC_IFNAME "precac"
+
 /*--------------------------------------------------------------------------
  * reasonCode taken from 802.11 standard.
  * ------------------------------------------------------------------------*/
@@ -832,6 +834,7 @@ QDF_STATUS wlan_sap_update_next_channel(struct sap_context *sap_ctx,
 					uint8_t channel,
 					enum phy_ch_width chan_bw);
 
+#ifdef FEATURE_SAP_COND_CHAN_SWITCH
 /**
  * wlan_sap_set_pre_cac_status() - Set the pre cac status
  * @sap_ctx: SAP context
@@ -845,16 +848,31 @@ QDF_STATUS wlan_sap_set_pre_cac_status(struct sap_context *sap_ctx,
 				       bool status);
 
 /**
- * wlan_sap_set_chan_before_pre_cac() - Save the channel before pre cac
+ * wlan_sap_set_chan_freq_before_pre_cac() - Save the channel before pre cac
  * @sap_ctx: SAP context
- * @chan_before_pre_cac: Channel before pre cac
+ * @freq_before_pre_cac: Channel frequency before pre cac
  *
- * Saves the channel that was in use before pre cac operation
+ * Saves the channel frequency that was in use before pre cac operation
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS wlan_sap_set_chan_before_pre_cac(struct sap_context *sap_ctx,
-					    uint8_t chan_before_pre_cac);
+QDF_STATUS
+wlan_sap_set_chan_freq_before_pre_cac(struct sap_context *sap_ctx,
+				      qdf_freq_t freq_before_pre_cac);
+#else
+static inline QDF_STATUS
+wlan_sap_set_pre_cac_status(struct sap_context *sap_ctx, bool status)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_sap_set_chan_freq_before_pre_cac(struct sap_context *sap_ctx,
+				      qdf_freq_t freq_before_pre_cac)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * wlan_sap_set_pre_cac_complete_status() - Sets pre cac complete status
@@ -1156,12 +1174,14 @@ QDF_STATUS wlansap_get_dfs_cac_state(mac_handle_t mac_handle,
  * channel width from user configured phymode for csa
  * @sap_context: sap adapter context
  * @chan_freq: target channel frequency (MHz)
+ * @tgt_ch_params: target new channel bw parameters to be updated
  *
  * Return: phy_ch_width
  */
 enum phy_ch_width
 wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
-				       uint32_t chan_freq);
+				       uint32_t chan_freq,
+				       struct ch_params *tgt_ch_params);
 
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 QDF_STATUS
@@ -1400,6 +1420,17 @@ void sap_undo_acs(struct sap_context *sap_context, struct sap_config *sap_cfg);
  */
 uint32_t wlansap_get_chan_width(struct sap_context *sap_ctx);
 
+/**
+ * wlansap_get_max_bw_by_phymode() - get max channel width based on phymode
+ * @sap_ctx: pointer to the SAP context
+ *
+ * This function get max channel width of sap based on phymode.
+ *
+ * Return: channel width
+ */
+enum phy_ch_width
+wlansap_get_max_bw_by_phymode(struct sap_context *sap_ctx);
+
 /*
  * wlansap_set_invalid_session() - set session ID to invalid
  * @sap_ctx: pointer to the SAP context
@@ -1432,6 +1463,17 @@ void sap_get_cac_dur_dfs_region(struct sap_context *sap_ctx,
 				uint32_t *cac_duration_ms,
 				uint32_t *dfs_region);
 
+/**
+ * sap_clear_global_dfs_param() - Reset global dfs param of sap ctx
+ * @mac_handle: pointer to mac handle
+ * @sap_ctx: sap context
+ *
+ * This API resets global dfs param of sap ctx.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sap_clear_global_dfs_param(mac_handle_t mac_handle,
+				      struct sap_context *sap_ctx);
 
 /**
  * sap_dfs_set_current_channel() - Set current channel params in dfs component

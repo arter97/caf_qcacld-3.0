@@ -53,6 +53,30 @@ struct wlan_mlme_nss_chains *mlme_get_dynamic_vdev_config(
 	return &mlme_priv->dynamic_cfg;
 }
 
+uint32_t mlme_get_vdev_he_ops(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	struct vdev_mlme_obj *mlme_obj;
+	uint32_t he_ops = 0;
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_NB_ID);
+	if (!vdev)
+		return he_ops;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!mlme_obj) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+		mlme_legacy_err("Failed to get vdev MLME Obj");
+		return he_ops;
+	}
+
+	he_ops = mlme_obj->proto.he_ops_info.he_ops;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
+
+	return he_ops;
+}
+
 struct wlan_mlme_nss_chains *mlme_get_ini_vdev_config(
 				struct wlan_objmgr_vdev *vdev)
 {
@@ -392,7 +416,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	gen->wls_6ghz_capable = cfg_get(psoc, CFG_WLS_6GHZ_CAPABLE);
 	mlme_init_pmf_cfg(psoc, gen);
 	mlme_init_lpass_support_cfg(psoc, gen);
-
+	gen->enabled_rf_test_mode = cfg_default(CFG_RF_TEST_MODE_SUPP_ENABLED);
 	gen->enabled_11h = cfg_get(psoc, CFG_11H_SUPPORT_ENABLED);
 	gen->enabled_11d = cfg_get(psoc, CFG_11D_SUPPORT_ENABLED);
 	gen->enable_beacon_reception_stats =
@@ -767,6 +791,8 @@ static void mlme_init_qos_cfg(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_SAP_MAX_INACTIVITY_OVERRIDE);
 	qos_aggr_params->sap_uapsd_enabled =
 				cfg_get(psoc, CFG_SAP_QOS_UAPSD);
+	qos_aggr_params->reject_addba_req =
+				cfg_get(psoc, CFG_REJECT_ADDBA_REQ);
 }
 
 static void mlme_init_mbo_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1001,8 +1027,19 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlme_he_caps *he_caps = &mlme_cfg->he_caps;
 
 	he_caps->dot11_he_cap.htc_he = cfg_default(CFG_HE_CONTROL);
-	he_caps->dot11_he_cap.twt_request = cfg_default(CFG_HE_TWT_REQUESTOR);
-	he_caps->dot11_he_cap.twt_responder = cfg_default(CFG_HE_TWT_RESPONDER);
+	he_caps->dot11_he_cap.twt_request =
+			cfg_get(psoc, CFG_TWT_REQUESTOR);
+	he_caps->dot11_he_cap.twt_responder =
+			cfg_get(psoc, CFG_TWT_RESPONDER);
+	/*
+	 * Broadcast TWT capability will be filled in
+	 * populate_dot11f_he_caps() based on STA/SAP
+	 * role and "twt_bcast_req_resp_config" ini
+	 */
+	he_caps->dot11_he_cap.broadcast_twt = 0;
+	if (mlme_is_twt_enabled(psoc))
+		he_caps->dot11_he_cap.flex_twt_sched =
+				cfg_default(CFG_HE_FLEX_TWT_SCHED);
 	he_caps->dot11_he_cap.fragmentation =
 			cfg_default(CFG_HE_FRAGMENTATION);
 	he_caps->dot11_he_cap.max_num_frag_msdu_amsdu_exp =
@@ -1018,7 +1055,6 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	he_caps->dot11_he_cap.trigd_rsp_sched =
 			cfg_default(CFG_HE_TRIGD_RSP_SCHEDULING);
 	he_caps->dot11_he_cap.a_bsr = cfg_default(CFG_HE_BUFFER_STATUS_RPT);
-	he_caps->dot11_he_cap.broadcast_twt = cfg_default(CFG_HE_BCAST_TWT);
 	he_caps->dot11_he_cap.ba_32bit_bitmap = cfg_default(CFG_HE_BA_32BIT);
 	he_caps->dot11_he_cap.mu_cascade = cfg_default(CFG_HE_MU_CASCADING);
 	he_caps->dot11_he_cap.ack_enabled_multitid =
@@ -1028,8 +1064,7 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	he_caps->dot11_he_cap.max_ampdu_len_exp_ext =
 			cfg_default(CFG_HE_MAX_AMPDU_LEN);
 	he_caps->dot11_he_cap.amsdu_frag = cfg_default(CFG_HE_AMSDU_FRAG);
-	he_caps->dot11_he_cap.flex_twt_sched =
-			cfg_default(CFG_HE_FLEX_TWT_SCHED);
+
 	he_caps->dot11_he_cap.rx_ctrl_frame = cfg_default(CFG_HE_RX_CTRL);
 	he_caps->dot11_he_cap.bsrp_ampdu_aggr =
 			cfg_default(CFG_HE_BSRP_AMPDU_AGGR);
@@ -1194,11 +1229,13 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 static void mlme_init_twt_cfg(struct wlan_objmgr_psoc *psoc,
 			      struct wlan_mlme_cfg_twt *twt_cfg)
 {
-	twt_cfg->is_twt_bcast_enabled = cfg_get(psoc, CFG_BCAST_TWT);
+	uint32_t bcast_conf = cfg_get(psoc, CFG_BCAST_TWT_REQ_RESP);
+
 	twt_cfg->is_twt_enabled = cfg_get(psoc, CFG_ENABLE_TWT);
-	twt_cfg->is_twt_responder_enabled = cfg_get(psoc, CFG_TWT_RESPONDER);
-	twt_cfg->is_twt_requestor_enabled = cfg_get(psoc, CFG_TWT_REQUESTOR);
 	twt_cfg->twt_congestion_timeout = cfg_get(psoc, CFG_TWT_CONGESTION_TIMEOUT);
+	twt_cfg->enable_twt_24ghz = cfg_get(psoc, CFG_ENABLE_TWT_24GHZ);
+	twt_cfg->is_bcast_requestor_enabled = CFG_TWT_GET_BCAST_REQ(bcast_conf);
+	twt_cfg->is_bcast_responder_enabled = CFG_TWT_GET_BCAST_RES(bcast_conf);
 }
 
 #ifdef WLAN_FEATURE_SAE
@@ -1298,6 +1335,8 @@ static void mlme_init_obss_ht40_cfg(struct wlan_objmgr_psoc *psoc,
 		(bool)cfg_default(CFG_OBSS_DETECTION_OFFLOAD);
 	obss_ht40->obss_color_collision_offload_enabled =
 		(bool)cfg_default(CFG_OBSS_COLOR_COLLISION_OFFLOAD);
+	obss_ht40->bss_color_collision_det_sta =
+		cfg_get(psoc, CFG_BSS_CLR_COLLISION_DETCN_STA);
 }
 
 static void mlme_init_threshold_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1829,6 +1868,8 @@ static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
 			(uint8_t)cfg_default(CFG_CURRENT_TX_POWER_LEVEL);
 	power->local_power_constraint =
 			(uint8_t)cfg_default(CFG_LOCAL_POWER_CONSTRAINT);
+	power->use_local_tpe = cfg_get(psoc, CFG_USE_LOCAL_TPE);
+	power->skip_tpe = cfg_get(psoc, CFG_SKIP_TPE_CONSIDERATION);
 }
 
 static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2147,6 +2188,12 @@ mlme_init_roam_score_config(struct wlan_objmgr_psoc *psoc,
 	min_rssi_param->min_rssi =
 		cfg_get(psoc, CFG_BMISS_ROAM_MIN_RSSI);
 	min_rssi_param->trigger_reason = ROAM_TRIGGER_REASON_BMISS;
+
+	min_rssi_param = &mlme_cfg->trig_min_rssi[MIN_RSSI_2G_TO_5G_ROAM];
+	min_rssi_param->min_rssi =
+		cfg_get(psoc, CFG_2G_TO_5G_ROAM_MIN_RSSI);
+	min_rssi_param->trigger_reason = ROAM_TRIGGER_REASON_HIGH_RSSI;
+
 }
 
 /**
@@ -2281,6 +2328,9 @@ static void mlme_init_reg_cfg(struct wlan_objmgr_psoc *psoc,
 	reg->retain_nol_across_regdmn_update =
 		cfg_get(psoc, CFG_RETAIN_NOL_ACROSS_REG_DOMAIN);
 
+	reg->enable_nan_on_indoor_channels =
+		cfg_get(psoc, CFG_INDOOR_CHANNEL_SUPPORT_FOR_NAN);
+
 	mlme_init_acs_avoid_freq_list(psoc, reg);
 }
 
@@ -2319,13 +2369,13 @@ QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	mlme_init_chainmask_cfg(psoc, &mlme_cfg->chainmask_cfg);
 	mlme_init_sap_cfg(psoc, &mlme_cfg->sap_cfg);
 	mlme_init_nss_chains(psoc, &mlme_cfg->nss_chains_ini_cfg);
+	mlme_init_twt_cfg(psoc, &mlme_cfg->twt_cfg);
 	mlme_init_he_cap_in_cfg(psoc, mlme_cfg);
 	mlme_init_obss_ht40_cfg(psoc, &mlme_cfg->obss_ht40);
 	mlme_init_product_details_cfg(&mlme_cfg->product_details);
 	mlme_init_powersave_params(psoc, &mlme_cfg->ps_params);
 	mlme_init_sta_cfg(psoc, &mlme_cfg->sta);
 	mlme_init_stats_cfg(psoc, &mlme_cfg->stats);
-	mlme_init_twt_cfg(psoc, &mlme_cfg->twt_cfg);
 	mlme_init_lfr_cfg(psoc, &mlme_cfg->lfr);
 	mlme_init_feature_flag_in_cfg(psoc, &mlme_cfg->feature_flags);
 	mlme_init_roam_scoring_cfg(psoc, &mlme_cfg->roam_scoring);
@@ -2639,6 +2689,26 @@ void mlme_set_discon_reason_n_from_ap(struct wlan_objmgr_psoc *psoc,
 	mlme_priv->disconnect_info.from_ap = from_ap;
 	mlme_priv->disconnect_info.discon_reason = reason_code;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
+
+enum QDF_OPMODE wlan_get_opmode_from_vdev_id(struct wlan_objmgr_pdev *pdev,
+					     uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE opmode = QDF_MAX_NO_OF_MODE;
+
+	if (!pdev)
+		return opmode;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev)
+		return opmode;
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+
+	return opmode;
 }
 
 void mlme_get_discon_reason_n_from_ap(struct wlan_objmgr_psoc *psoc,

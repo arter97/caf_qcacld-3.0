@@ -250,9 +250,6 @@ QDF_STATUS csr_roam_issue_disassociate_cmd(struct mac_context *mac,
 					   uint32_t sessionId,
 					   eCsrRoamDisconnectReason reason,
 					   enum wlan_reason_code mac_reason);
-QDF_STATUS csr_roam_disconnect_internal(struct mac_context *mac, uint32_t sessionId,
-					eCsrRoamDisconnectReason reason,
-					enum wlan_reason_code mac_reason);
 /* pCommand may be NULL */
 void csr_roam_remove_duplicate_command(struct mac_context *mac, uint32_t sessionId,
 				       tSmeCmd *pCommand,
@@ -1054,16 +1051,9 @@ bool csr_is_pmkid_found_for_peer(struct mac_context *mac,
 #ifdef WLAN_FEATURE_11AX
 void csr_update_session_he_cap(struct mac_context *mac_ctx,
 			struct csr_roam_session *session);
-void csr_init_session_twt_cap(struct csr_roam_session *session,
-			      uint32_t type_of_persona);
 #else
 static inline void csr_update_session_he_cap(struct mac_context *mac_ctx,
 			struct csr_roam_session *session)
-{
-}
-
-static inline void csr_init_session_twt_cap(struct csr_roam_session *session,
-					    uint32_t type_of_persona)
 {
 }
 #endif

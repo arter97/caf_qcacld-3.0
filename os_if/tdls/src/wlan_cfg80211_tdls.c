@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +35,7 @@
 #include <wlan_reg_services_api.h>
 #include "wlan_cfg80211_mc_cp_stats.h"
 #include "sir_api.h"
-
+#include "wlan_tdls_ucfg_api.h"
 
 #define TDLS_MAX_NO_OF_2_4_CHANNELS 14
 
@@ -291,9 +291,44 @@ tdls_calc_channels_from_staparams(struct tdls_update_peer_params *req_info,
 		   req_info->supported_channels_len);
 }
 
+#ifdef WLAN_FEATURE_11AX
+static void
+wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
+				     struct station_parameters *params)
+{
+	if (params->he_capa_len < MIN_TDLS_HE_CAP_LEN) {
+		osif_debug("he_capa_len %d less than MIN_TDLS_HE_CAP_LEN",
+			   params->he_capa_len);
+		return;
+	}
+
+	if (!params->he_capa) {
+		osif_debug("he_capa not present");
+		return;
+	}
+
+	req_info->he_cap_len = params->he_capa_len;
+	if (req_info->he_cap_len > MAX_TDLS_HE_CAP_LEN)
+		req_info->he_cap_len = MAX_TDLS_HE_CAP_LEN;
+
+	qdf_mem_copy(&req_info->he_cap, params->he_capa,
+		     req_info->he_cap_len);
+
+	return;
+}
+
+#else
+static void
+wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
+				     struct station_parameters *params)
+{
+}
+#endif
+
 static void
 wlan_cfg80211_tdls_extract_params(struct tdls_update_peer_params *req_info,
-				  struct station_parameters *params)
+				  struct station_parameters *params,
+				  bool tdls_11ax_support)
 {
 	int i;
 
@@ -373,6 +408,11 @@ wlan_cfg80211_tdls_extract_params(struct tdls_update_peer_params *req_info,
 		osif_debug("TDLS peer pmf capable");
 		req_info->is_pmf = 1;
 	}
+
+	if (tdls_11ax_support)
+		wlan_cfg80211_tdls_extract_he_params(req_info, params);
+	else
+		osif_debug("tdls ax disabled");
 }
 
 int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
@@ -384,6 +424,8 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 	struct vdev_osif_priv *osif_priv;
 	struct osif_tdls_vdev *tdls_priv;
 	unsigned long rc;
+	struct wlan_objmgr_psoc *psoc;
+	bool tdls_11ax_support = false;
 
 	status = wlan_cfg80211_tdls_validate_mac_addr(mac);
 
@@ -397,7 +439,14 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 	if (!req_info)
 		return -EINVAL;
 
-	wlan_cfg80211_tdls_extract_params(req_info, params);
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("Invalid psoc");
+		return -EINVAL;
+	}
+
+	tdls_11ax_support = ucfg_tdls_is_fw_11ax_capable(psoc);
+	wlan_cfg80211_tdls_extract_params(req_info, params, tdls_11ax_support);
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (!osif_priv || !osif_priv->osif_tdls) {

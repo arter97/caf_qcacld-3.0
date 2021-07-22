@@ -254,6 +254,7 @@
 
 /* Association/Reassociation offsets */
 #define SIR_MAC_REASSOC_REQ_SSID_OFFSET      10
+#define SIR_MAC_ASSOC_RSP_STATUS_CODE_OFFSET 2
 
 /* Association Request offsets */
 #define SIR_MAC_ASSOC_REQ_SSID_OFFSET        4
@@ -336,6 +337,9 @@
 
 #define SIR_MAC_VENDOR_AP_4_OUI             "\x8C\xFD\xF0"
 #define SIR_MAC_VENDOR_AP_4_OUI_LEN         3
+
+#define SIR_MAC_BA_2K_JUMP_AP_VENDOR_OUI             "\x00\x14\x6C"
+#define SIR_MAC_BA_2K_JUMP_AP_VENDOR_OUI_LEN         3
 
 /* Maximum allowable size of a beacon and probe rsp frame */
 #define SIR_MAX_BEACON_SIZE    512
