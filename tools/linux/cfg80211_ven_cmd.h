@@ -773,6 +773,9 @@ enum {
 	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743,   /* Switch between RTT intiator/responder modes */
 	IEEE80211_PARAM_SPL_VAP_SCAN               = 744,   /* Scan on cur_chan for special VAP */
 	IEEE80211_PARAM_DSCP_ACTION_POLICY         = 745,   /* Enable DSCP Action Policy protocol */
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_PUNCTURE_BITMAP            = 746,   /* get 11be puncture bitmap */
+#endif /* WLAN_FEATURE_11BE */
 
 };
 
@@ -2273,6 +2276,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_rxmcsmap",     IEEE80211_PARAM_EHT_RX_MCSMAP, GET_PARAM, 0},
 	{"eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	SET_PARAM, 1},
 	{"g_eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	GET_PARAM, 0},
+	{"get_puncture_bitmap",	 IEEE80211_PARAM_PUNCTURE_BITMAP, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 	{"vap_diff_mode",        IEEE80211_PARAM_VAP_DIFF_MODE, SET_PARAM, 1},
 	{"g_vap_diff_mode",      IEEE80211_PARAM_VAP_DIFF_MODE, GET_PARAM, 0},
