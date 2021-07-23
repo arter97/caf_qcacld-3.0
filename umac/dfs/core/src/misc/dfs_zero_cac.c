@@ -1703,7 +1703,8 @@ dfs_is_rcac_chan_valid(struct wlan_dfs *dfs, enum phy_ch_width chwidth,
 	struct dfs_channel rcac_chan;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
-	if (chwidth == CH_WIDTH_80P80MHZ) {
+	if (chwidth == CH_WIDTH_80P80MHZ &&
+	    !dfs_is_restricted_80p80mhz_supported(dfs)) {
 		dfs_err(dfs, WLAN_DEBUG_DFS_AGILE,
 			"RCAC cannot be started for 80P80MHz with single chan");
 		return false;
@@ -1805,10 +1806,26 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 	 */
 
 	/* Check if user configured RCAC frequency is valid */
-	if (dfs->dfs_agile_rcac_freq_ucfg)
+	if (dfs->dfs_agile_rcac_freq_ucfg) {
+		/*
+		 * If the user configured RCAC channel is falling under the
+		 * restricted 165MHz channel and current mode is 160MHz,
+		 * start RCAC on the 165MHz channel and update chwidth
+		 * to 80p80MHz.
+		 */
+		if (agile_chwidth == CH_WIDTH_160MHZ &&
+		    dfs_is_restricted_80p80mhz_supported(dfs) &&
+		    IS_WITHIN_RANGE(dfs->dfs_agile_rcac_freq_ucfg,
+				    RESTRICTED_80P80_CHAN_CENTER_FREQ,
+				    VHT160_FREQ_OFFSET)) {
+			dfs->dfs_precac_chwidth = CH_WIDTH_80P80MHZ;
+			agile_chwidth = CH_WIDTH_80P80MHZ;
+		}
+
 		is_user_rcac_chan_valid =
 		    dfs_is_rcac_chan_valid(dfs, agile_chwidth,
 					   dfs->dfs_agile_rcac_freq_ucfg);
+	}
 
 	if (is_user_rcac_chan_valid) {
 		rcac_freq = dfs->dfs_agile_rcac_freq_ucfg;
@@ -1818,6 +1835,10 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 			goto exit;
 
 		nxt_chan_params.ch_width = agile_chwidth;
+		nxt_chan_params.mhz_freq_seg1 = dfs_chan.dfs_ch_mhz_freq_seg2;
+		nxt_chan_params.center_freq_seg1 =
+			dfs_chan.dfs_ch_vhtop_ch_freq_seg2;
+
 		/* Get the ch_params from regulatory. ch_width and rcac_freq
 		 * are the input given to fetch other params of struct
 		 * ch_params.
