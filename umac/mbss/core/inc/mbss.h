@@ -35,9 +35,7 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include "wlan_if_mgr_public_struct.h"
 #include "wlan_mbss.h"
-#if defined WLAN_MBSS_DEBUG
 #include "mbss_dbg.h"
-#endif
 
 #define mbss_alert(params...) \
 	QDF_TRACE_FATAL(QDF_MODULE_ID_MBSS, params)

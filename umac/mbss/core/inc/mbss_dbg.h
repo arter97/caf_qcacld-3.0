@@ -124,7 +124,9 @@ void mbss_debug_print_bitmap(struct wlan_objmgr_pdev *pdev);
 #else
 #define mbss_debug_add_entry(vdev, ev_type, event)
 #define mbss_debug_print_history(pdev)
-#define mbss_debug_print_bitmap(struct wlan_objmgr_pdev *pdev)
+#define mbss_debug_print_bitmap(pdev)
+#define mbss_debug_add_if_event_entry(vdev, event)
+#define mbss_debug_add_vdev_sm_entry(vdev, state)
 #endif
 
 #endif /* _MBSS_DBG_H_ */
