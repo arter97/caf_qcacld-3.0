@@ -1269,6 +1269,12 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_DISPLAY_AP_PWR_TYPE = 473,
 	/* Set 6G AP power type */
 	OL_ATH_PARAM_SET_AP_PWR_TYPE = 474,
+#ifdef CONFIG_AFC_SUPPORT
+	/* Control DCS/ACS random channel selection for AFC */
+	OL_ATH_PARAM_DCS_AFC_RANDOM_CHAN_EN = 475,
+	/* Enable/disable DCS/ACS channel selection for AFC */
+	OL_ATH_PARAM_DCS_AFC_CHAN_SEL_CONFIG = 476,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3324,6 +3330,20 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"ap_power_mode",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_AP_PWR_TYPE,
 		SET_PARAM, 1},
+#ifdef CONFIG_AFC_SUPPORT
+	{"dcs_afc_random_chan_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_RANDOM_CHAN_EN,
+		SET_PARAM, 1},
+	{"g_dcs_afc_random_chan_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_RANDOM_CHAN_EN,
+		GET_PARAM, 0},
+	{"dcs_afc_chan_sel_config",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_CHAN_SEL_CONFIG,
+		SET_PARAM, 1},
+	{"g_dcs_afc_chan_sel_config",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_CHAN_SEL_CONFIG,
+		GET_PARAM, 0},
+#endif
 };
 #endif
 #endif
