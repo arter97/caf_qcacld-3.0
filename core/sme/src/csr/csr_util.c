@@ -1956,7 +1956,8 @@ static bool csr_get_phy_mode_in_use(tpAniSirGlobal mac_ctx,
 		break;
 
 	case eCSR_DOT11_MODE_11n_ONLY:
-		if (eCSR_DOT11_MODE_11n == bssPhyMode) {
+		if (eCSR_DOT11_MODE_11n == bssPhyMode ||
+			bssPhyMode >= eCSR_DOT11_MODE_11ac) {
 			fMatch = true;
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
 
