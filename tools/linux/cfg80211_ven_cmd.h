@@ -817,6 +817,8 @@ enum {
 	OL_SPECIAL_PARAM_ENABLE_OL_STATSv2,
 	OL_SPECIAL_PARAM_ENABLE_OL_STATSv3,
 	OL_SPECIAL_PARAM_BSTA_FIXED_IDMASK,
+	OL_SPECIAL_PARAM_SET_TX_LATENCY,
+	OL_SPECIAL_PARAM_SET_TX_LATENCY_PKTLOG
 };
 
 enum _ol_ath_param_t {
@@ -3376,6 +3378,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_mbss_active_ngroups",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MBSS_GET_ACTIVE_NGROUPS,
 		GET_PARAM, 0},
+	{"set_tx_latency",
+		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_SET_TX_LATENCY, SET_PARAM, 1},
+	{"set_tx_latency_pktlog_threshold",
+		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_SET_TX_LATENCY_PKTLOG, SET_PARAM, 1},
 };
 #endif
 #endif
