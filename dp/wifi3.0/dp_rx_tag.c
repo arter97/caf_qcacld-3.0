@@ -27,6 +27,10 @@
 #ifndef DP_BE_WAR_DISABLED
 #include "li/hal_li_rx.h" /* Currently build dp_rx_tag for Lithium only */
 #endif
+#ifdef WIFI_MONITOR_SUPPORT
+#include "dp_htt.h"
+#include <dp_mon.h>
+#endif
 
 #define DP_RX_CCE_DROP 0xDEAD
 
@@ -172,7 +176,8 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 	 * therefore, cannot check decap_type for monitor mode.
 	 * We will call this only for eth frames from dp_rx_mon_dest.c.
 	 */
-	if (qdf_likely(!(pdev->monitor_vdev && pdev->monitor_vdev == vdev) &&
+	if (qdf_likely(!(monitor_get_monitor_vdev_from_pdev(pdev) &&
+			 monitor_get_monitor_vdev_from_pdev(pdev) == vdev) &&
 		       (vdev->rx_decap_type !=  htt_cmn_pkt_type_ethernet)))
 		return;
 
@@ -390,9 +395,8 @@ void dp_rx_mon_update_protocol_flow_tag(struct dp_soc *soc,
 					struct dp_pdev *dp_pdev,
 					qdf_nbuf_t msdu, void *rx_desc)
 {
-	uint32_t msdu_ppdu_id = 0;
 	struct mon_rx_status *mon_recv_status;
-	struct cdp_mon_status *rs;
+	struct dp_vdev *mvdev;
 
 	bool is_mon_protocol_flow_tag_enabled =
 		wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(soc->wlan_cfg_ctx);
@@ -400,29 +404,18 @@ void dp_rx_mon_update_protocol_flow_tag(struct dp_soc *soc,
 	if (qdf_likely(!is_mon_protocol_flow_tag_enabled))
 		return;
 
-	if (qdf_likely(!dp_pdev->monitor_vdev))
+	mvdev = monitor_get_monitor_vdev_from_pdev(dp_pdev);
+
+	if (qdf_likely(!mvdev))
 		return;
 
-	if (qdf_likely(1 != dp_pdev->ppdu_info.rx_status.rxpcu_filter_pass))
+	if (qdf_likely(monitor_check_com_info_ppdu_id(dp_pdev, rx_desc) !=
+		       QDF_STATUS_SUCCESS))
 		return;
 
-	rs = &dp_pdev->rx_mon_recv_status;
-	if (rs->cdp_rs_rxdma_err)
-		return;
+	mon_recv_status = monitor_get_rx_status(dp_pdev);
 
-	msdu_ppdu_id = hal_rx_get_ppdu_id(soc->hal_soc, rx_desc);
-
-	if (msdu_ppdu_id != dp_pdev->ppdu_info.com_info.ppdu_id) {
-		QDF_TRACE(QDF_MODULE_ID_DP,
-			  QDF_TRACE_LEVEL_ERROR,
-			  "msdu_ppdu_id=%x,com_info.ppdu_id=%x",
-			  msdu_ppdu_id,
-			  dp_pdev->ppdu_info.com_info.ppdu_id);
-		return;
-	}
-
-	mon_recv_status = &dp_pdev->ppdu_info.rx_status;
-	if (mon_recv_status->frame_control_info_valid &&
+	if (mon_recv_status && mon_recv_status->frame_control_info_valid &&
 	    ((mon_recv_status->frame_control & IEEE80211_FC0_TYPE_MASK) ==
 	      IEEE80211_FC0_TYPE_DATA)) {
 		/*
@@ -431,15 +424,18 @@ void dp_rx_mon_update_protocol_flow_tag(struct dp_soc *soc,
 		 * received count.
 		 */
 		dp_rx_update_protocol_tag(soc,
-					  dp_pdev->monitor_vdev,
+					  mvdev,
 					  msdu, rx_desc,
 					  MAX_REO_DEST_RINGS,
 					  false, false);
 		/* Update the flow tag in SKB based on FSE metadata */
-		dp_rx_update_flow_tag(soc, dp_pdev->monitor_vdev,
+		dp_rx_update_flow_tag(soc,
+				      mvdev,
 				      msdu, rx_desc, false);
 	}
 }
+
+qdf_export_symbol(dp_rx_mon_update_protocol_flow_tag);
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG || WLAN_SUPPORT_RX_FLOW_TAG */
 
 #ifdef WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG

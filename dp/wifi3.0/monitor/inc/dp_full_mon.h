@@ -34,7 +34,6 @@ struct dp_mon_mpdu {
 	qdf_nbuf_t head;
 	qdf_nbuf_t tail;
 	TAILQ_ENTRY(dp_mon_mpdu) mpdu_list_elem;
-
 	uint8_t  rs_flags;
 	uint8_t  ant_signal_db;
 	uint8_t  is_stbc;
