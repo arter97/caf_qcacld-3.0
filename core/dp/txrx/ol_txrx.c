@@ -1951,15 +1951,6 @@ ol_txrx_pdev_post_attach(ol_txrx_pdev_handle pdev)
 	 */
 	qdf_mem_set(&pdev->rx_pn[0], sizeof(pdev->rx_pn), 0);
 
-	/* WEP: 24-bit PN */
-	pdev->rx_pn[htt_sec_type_wep40].len =
-		pdev->rx_pn[htt_sec_type_wep104].len =
-			pdev->rx_pn[htt_sec_type_wep128].len = 24;
-
-	pdev->rx_pn[htt_sec_type_wep40].cmp =
-		pdev->rx_pn[htt_sec_type_wep104].cmp =
-			pdev->rx_pn[htt_sec_type_wep128].cmp = ol_rx_pn_cmp24;
-
 	/* TKIP: 48-bit TSC, CCMP: 48-bit PN */
 	pdev->rx_pn[htt_sec_type_tkip].len =
 		pdev->rx_pn[htt_sec_type_tkip_nomic].len =
