@@ -1337,6 +1337,7 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 #ifdef WLAN_FEATURE_HOST_ROAM
 QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 {
+	QDF_STATUS status;
 	struct cm_host_roam_start_ind *req;
 	struct qdf_mac_addr bssid = QDF_MAC_ADDR_ZERO_INIT;
 
@@ -1344,8 +1345,11 @@ QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 		return QDF_STATUS_E_FAILURE;
 
 	req = msg->bodyptr;
-	return wlan_cm_roam_invoke(req->pdev, req->vdev_id, &bssid, 0,
-				   CM_ROAMING_FW);
+	status = wlan_cm_roam_invoke(req->pdev, req->vdev_id, &bssid, 0,
+				     CM_ROAMING_FW);
+	qdf_mem_free(req);
+
+	return status;
 }
 #endif
 
