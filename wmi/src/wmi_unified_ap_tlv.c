@@ -1341,7 +1341,8 @@ static QDF_STATUS send_multiple_vdev_set_param_cmd_tlv(
 	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
 								wmi_handle,
 								param->pdev_id);
-	cmd->param_id = param->param_id;
+	cmd->param_id = wmi_handle->ops->convert_host_vdev_param_tlv(
+			param->param_id);
 	cmd->param_value = param->param_value;
 
 	buf_ptr += sizeof(*cmd);
