@@ -58,7 +58,6 @@ struct s_ssid_info {
 	struct wlan_objmgr_vdev *vdev;
 	u8 *ssid;
 	u8 ssid_len;
-	bool son_enabled;
 	bool ssid_match;
 };
 
@@ -603,6 +602,8 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 	struct wlan_objmgr_psoc *psoc = NULL;
 	u8 vdev_id;
 	cdp_config_param_type val = {0};
+	struct wlan_vdev_state_event event;
+	struct wlan_lmac_if_rx_ops *rx_ops = NULL;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
@@ -675,8 +676,10 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 				ext_cb->vdev_set_powersave(vdev, IEEE80211_PWRSAVE_NONE);
 				ext_cb->vdev_pwrsave_force_sleep(vdev, 0);
 			}
+			event.state = VDEV_STATE_WDS_ENABLED;
 		} else {
 			wlan_rptr_vdev_clear_wds(vdev);
+			event.state = VDEV_STATE_WDS_DISABLED;
 		}
 
 		retv = ext_cb->send_wds_cmd(vdev, value);
@@ -702,6 +705,10 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 				ext_cb->vdev_nss_ol_set_cfg(vdev,
 							    OSIF_NSS_VDEV_WDS_CFG);
 #endif
+			}
+			rx_ops = wlan_psoc_get_lmac_if_rxops(psoc);
+			if (rx_ops && rx_ops->son_rx_ops.deliver_event) {
+				rx_ops->son_rx_ops.deliver_event(vdev, NULL, MLME_EVENT_VDEV_STATE, &event);
 			}
 		}
 		break;
@@ -1279,7 +1286,6 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
 	struct s_ssid_info *s_ssid_msg;
-	struct wlan_objmgr_pdev *pdev;
 	u8 ssid[WLAN_SSID_MAX_LEN + 1] = {0};
 	u8 len = 0;
 
@@ -1292,13 +1298,7 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 			wlan_vdev_mlme_get_ssid(vdev, ssid, &len))
 		return;
 
-	pdev = wlan_vdev_get_pdev(vdev);
-
 	s_ssid_msg = ((struct s_ssid_info *)arg);
-	if (wlan_son_is_pdev_enabled(pdev)) {
-		s_ssid_msg->son_enabled = 1;
-		return;
-	}
 
 	if (wlan_vdev_mlme_get_opmode(vdev) != wlan_vdev_mlme_get_opmode(
 							s_ssid_msg->vdev)) {
@@ -1324,7 +1324,6 @@ void
 wlan_rptr_same_ssid_check(struct wlan_objmgr_vdev *vdev,
 			  u8 *ssid, u32 ssid_len)
 {
-	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct iterate_info iterate_msg;
 	struct s_ssid_info s_ssid_msg;
 	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
@@ -1338,8 +1337,6 @@ wlan_rptr_same_ssid_check(struct wlan_objmgr_vdev *vdev,
 	}
 
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
-	if (wlan_son_is_pdev_enabled(pdev))
-		return;
 
 	if (wlan_rptr_is_psta_vdev(vdev))
 		return;
@@ -1351,17 +1348,14 @@ wlan_rptr_same_ssid_check(struct wlan_objmgr_vdev *vdev,
 	s_ssid_msg.vdev = vdev;
 	s_ssid_msg.ssid = ssid;
 	s_ssid_msg.ssid_len = ssid_len;
-	s_ssid_msg.son_enabled = 0;
 	s_ssid_msg.ssid_match = 0;
 
 	wlan_objmgr_iterate_psoc_list(wlan_rptr_psoc_iterate_list,
 				      &iterate_msg, WLAN_MLME_NB_ID);
 	if (s_ssid_msg.ssid_match) {
-		if (!s_ssid_msg.son_enabled) {
-			wlan_rptr_global_set_s_ssid();
-			RPTR_LOGI("RPTR Enable same_ssid_support ssid:%s g_caps:%x\n",
-				  ssid, g_priv->global_feature_caps);
-		}
+		wlan_rptr_global_set_s_ssid();
+		RPTR_LOGI("RPTR Enable same_ssid_support ssid:%s g_caps:%x\n",
+			  ssid, g_priv->global_feature_caps);
 	}
 }
 

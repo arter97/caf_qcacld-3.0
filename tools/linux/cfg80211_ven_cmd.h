@@ -391,6 +391,9 @@ enum {
 	IEEE80211_PARAM_MGMT_RATE               = 384, /* Set mgmt rate, will set mcast/bcast/ucast to same rate*/
 	IEEE80211_PARAM_NO_VAP_RESET            = 385, /* Disable the VAP reset in NSS */
 	IEEE80211_PARAM_STA_COUNT               = 386, /* TO get number of station associated*/
+#if QCA_SUPPORT_SSID_STEERING
+	IEEE80211_PARAM_VAP_SSID_CONFIG         = 387, /* Vap SSID Steering configuration  */
+#endif
 #if ATH_SUPPORT_DSCP_OVERRIDE
 	IEEE80211_PARAM_DSCP_MAP_ID             = 388,
 	IEEE80211_PARAM_DSCP_TID_MAP            = 389,
@@ -444,7 +447,6 @@ enum {
 	IEEE80211_PARAM_11N_TX_AMSDU            = 425, /* Enable/Disable HT Tx AMSDU only */
 	IEEE80211_PARAM_BSS_CHAN_INFO           = 426,
 	IEEE80211_PARAM_LCR_ENABLE              = 427,
-	IEEE80211_PARAM_SON                     = 429, /* Mark/query AP as SON enabled */
 	IEEE80211_PARAM_CTSPROT_DTIM_BCN        = 430, /* Enable/Disable CTS2SELF protection for DTIM Beacons */
 	IEEE80211_PARAM_RAWMODE_PKT_SIM         = 431, /* Enable/Disable RAWMODE_PKT_SIM*/
 	IEEE80211_PARAM_CONFIG_RAW_DWEP_IND     = 432, /* Enable/disable indication to WLAN driver that
@@ -516,7 +518,6 @@ enum {
 	IEEE80211_PARAM_ASSOC_REACHED              = 479,
 	IEEE80211_PARAM_DISABLE_SELECTIVE_LEGACY_RATE_FOR_VAP = 480,      /* Enable/Disable selective Legacy Rates for this vap. */
 	IEEE80211_PARAM_RTSCTS_RATE                = 481,   /* Set rts and cts rate*/
-	IEEE80211_PARAM_REPT_MULTI_SPECIAL         = 482,
 	IEEE80211_PARAM_VSP_ENABLE                 = 483,   /* Video Stream Protection */
 	IEEE80211_PARAM_ENABLE_VENDOR_IE           = 484,    /* Enable/ disable Vendor ie advertise in Beacon/ proberesponse*/
 	IEEE80211_PARAM_CONFIG_MON_DECODER         = 488,  /* Monitor VAP decoder format radiotap/prism */
@@ -651,7 +652,6 @@ enum {
 	IEEE80211_PARAM_SAE_AUTH_ATTEMPTS          = 610,   /* To set/get sae maximum auth attempts */
 #endif
 	IEEE80211_PARAM_GET_FREQUENCY              = 612,   /* Get Frequency */
-	IEEE80211_PARAM_SON_NUM_VAP                = 613,   /* To get the number of SON enabled Vaps */
 	IEEE80211_PARAM_GET_OPMODE                 = 616,   /* Get operation mode of VAP*/
 	IEEE80211_PARAM_HE_BSR_SUPPORT             = 617,   /* HE BSR Support */
 	IEEE80211_PARAM_SET_VLAN_TYPE              = 618,   /* enable/disable VLAN configuration on VAP in NSS offload mode */
@@ -777,6 +777,7 @@ enum {
 	IEEE80211_PARAM_PUNCTURE_BITMAP            = 746,   /* get 11be puncture bitmap */
 #endif /* WLAN_FEATURE_11BE */
 
+	IEEE80211_PARAM_MBO_BSTM_REQ               = 747,   /* Enable MBO IE in BSTM req. */
 };
 
 enum {
@@ -1770,6 +1771,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"novap_reset",         IEEE80211_PARAM_NO_VAP_RESET, SET_PARAM, 1},
 	{"get_novap_reset",     IEEE80211_PARAM_NO_VAP_RESET, GET_PARAM, 0},
 	{"get_sta_count",       IEEE80211_PARAM_STA_COUNT, GET_PARAM, 0},
+#if QCA_SUPPORT_SSID_STEERING
+	{"ssid_config",         IEEE80211_PARAM_VAP_SSID_CONFIG, SET_PARAM, 1},
+	{"get_ssid_config",     IEEE80211_PARAM_VAP_SSID_CONFIG, GET_PARAM, 0},
+#endif
 #if ATH_SUPPORT_DSCP_OVERRIDE
 	{"set_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, SET_PARAM, 1},
 	{"get_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, GET_PARAM, 0},
@@ -1817,8 +1822,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 #endif
 	{"bss_chan_info",       IEEE80211_PARAM_BSS_CHAN_INFO, SET_PARAM, 1},
 	{"enable_lcr",          IEEE80211_PARAM_LCR_ENABLE, SET_PARAM, 1},
-	{"son",                 IEEE80211_PARAM_SON, SET_PARAM, 1},
-	{"get_son",             IEEE80211_PARAM_SON, GET_PARAM, 0},
 	{"rmode_pktsim",        IEEE80211_PARAM_RAWMODE_PKT_SIM, SET_PARAM, 1},
 	{"g_rmode_pktsim",      IEEE80211_PARAM_RAWMODE_PKT_SIM, GET_PARAM, 0},
 	{"rawdwepind",          IEEE80211_PARAM_CONFIG_RAW_DWEP_IND, SET_PARAM, 1},
@@ -1885,8 +1888,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 		IEEE80211_PARAM_DISABLE_SELECTIVE_LEGACY_RATE_FOR_VAP, SET_PARAM, 1},
 	{"g_dis_legacy",
 		IEEE80211_PARAM_DISABLE_SELECTIVE_LEGACY_RATE_FOR_VAP, GET_PARAM, 0},
-	{"rept_spl",            IEEE80211_PARAM_REPT_MULTI_SPECIAL, SET_PARAM, 1},
-	{"g_rept_spl",          IEEE80211_PARAM_REPT_MULTI_SPECIAL, GET_PARAM, 0},
 	{"vie_ena",             IEEE80211_PARAM_ENABLE_VENDOR_IE, SET_PARAM, 1},
 	{"g_vie_ena",           IEEE80211_PARAM_ENABLE_VENDOR_IE, GET_PARAM, 0},
 	{"mon_decoder",         IEEE80211_PARAM_CONFIG_MON_DECODER, SET_PARAM, 1},
@@ -2070,7 +2071,6 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"set_sae_auth",    IEEE80211_PARAM_SAE_AUTH_ATTEMPTS, SET_PARAM, 1},
 	{"get_sae_auth",	 IEEE80211_PARAM_SAE_AUTH_ATTEMPTS, GET_PARAM, 0},
 #endif /* UMAC_SUPPORT_WPA3_STA */
-	{"get_son_num_vap",     IEEE80211_PARAM_SON_NUM_VAP, GET_PARAM, 0},
 	{"he_bsr_supp",         IEEE80211_PARAM_HE_BSR_SUPPORT, SET_PARAM, 1},
 	{"get_he_bsr_supp",     IEEE80211_PARAM_HE_BSR_SUPPORT, GET_PARAM, 0},
 	{"display_me_info",     IEEE80211_PARAM_DUMP_RA_TABLE, GET_PARAM, 0},
