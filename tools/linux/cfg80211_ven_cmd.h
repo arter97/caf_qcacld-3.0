@@ -405,6 +405,9 @@ enum {
 	IEEE80211_PARAM_SET_MHDR                = 394,
 	IEEE80211_PARAM_ALLOW_DATA              = 395,
 	IEEE80211_PARAM_SET_MESHDBG             = 396,
+	/* Enable/Disable RTT initiator/responder modes for a single vap with
+	 * the vap restart.
+	 */
 	IEEE80211_PARAM_RTT_ENABLE              = 397,
 	IEEE80211_PARAM_LCI_ENABLE              = 398,
 	IEEE80211_PARAM_VAP_ENHIND              = 399, /* Independent VAP mode for Repeater and AP-STA config */
@@ -770,7 +773,10 @@ enum {
 #endif /* WLAN_FEATURE_11BE */
 	IEEE80211_PARAM_ENABLE_SCS                 = 741,   /* Enable SCS Procedures */
 	IEEE80211_PARAM_VAP_DIFF_MODE              = 742,   /* Enable different mode for the vap */
-	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743,   /* Switch between RTT intiator/responder modes */
+	/* Switch between RTT intiator/responder modes for a single vap without
+	 * the vap restart.
+	 */
+	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743,
 	IEEE80211_PARAM_SPL_VAP_SCAN               = 744,   /* Scan on cur_chan for special VAP */
 	IEEE80211_PARAM_DSCP_ACTION_POLICY         = 745,   /* Enable DSCP Action Policy protocol */
 #ifdef WLAN_FEATURE_11BE
@@ -1276,6 +1282,14 @@ enum _ol_ath_param_t {
 	/* Enable/disable DCS/ACS channel selection for AFC */
 	OL_ATH_PARAM_DCS_AFC_CHAN_SEL_CONFIG = 476,
 #endif
+	/* Enable/disable RTT initiator/responder modes for all the vaps with
+	 * the vap restart.
+	 */
+	OL_ATH_PARAM_RTT_ENABLE = 477,
+	/* Switch between RTT intiator/responder modes for all the vaps without
+	 * the vap resatrt.
+	 */
+	OL_ATH_PARAM_SWITCH_RTT_ROLE = 478,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3344,6 +3358,11 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_CHAN_SEL_CONFIG,
 		GET_PARAM, 0},
 #endif
+	{"enable_rtt",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RTT_ENABLE, SET_PARAM, 1},
+	{"switch_rtt_role",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SWITCH_RTT_ROLE,
+		SET_PARAM, 1},
 };
 #endif
 #endif
