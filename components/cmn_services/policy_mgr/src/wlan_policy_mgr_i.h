@@ -31,8 +31,6 @@
 
 #define POLICY_MGR_SER_CMD_TIMEOUT 4000
 
-#define SAP_MANDATORY_5G_CH_FREQ 5745
-
 #ifdef QCA_WIFI_3_0_EMU
 #define CONNECTION_UPDATE_TIMEOUT (POLICY_MGR_SER_CMD_TIMEOUT + 3000)
 #else
@@ -296,6 +294,8 @@ struct policy_mgr_cfg {
  * interaction with Policy Manager
  * @cdp_cbacks: callbacks to be registered by SME for
  * interaction with Policy Manager
+ * @conc_cbacks: callbacks to be registered by lim for
+ * interaction with Policy Manager
  * @sap_mandatory_channels: The user preferred master list on
  *                        which SAP can be brought up. This
  *                        mandatory channel freq list would be as per
@@ -342,6 +342,7 @@ struct policy_mgr_psoc_priv_obj {
 	struct policy_mgr_tdls_cbacks tdls_cbacks;
 	struct policy_mgr_cdp_cbacks cdp_cbacks;
 	struct policy_mgr_dp_cbacks dp_cbacks;
+	struct policy_mgr_conc_cbacks conc_cbacks;
 	uint32_t sap_mandatory_channels[NUM_CHANNELS];
 	uint32_t sap_mandatory_channels_len;
 	bool do_sap_unsafe_ch_check;
@@ -725,28 +726,4 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       enum policy_mgr_con_mode mode,
 				       uint32_t ch_freq,
 				       enum hw_mode_bandwidth bw);
-
-#ifdef WLAN_FEATURE_11BE_MLO
-/**
- * policy_mgr_is_mlo_sap_concurrency_allowed() - Check for mlo sap allowed
- *                                               concurrency combination
- * @psoc: PSOC object information
- *
- * When a new connection is about to come up check if current
- * concurrency combination including the new connection is
- * allowed or not. Currently no concurrency support for mlo sap
- *
- * Return: True if concurrency is supported, otherwise false.
- */
-bool policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
-					       bool is_new_vdev_mlo);
-#else
-
-static inline bool policy_mgr_is_mlo_sap_concurrency_allowed(
-			struct wlan_objmgr_psoc *psoc,
-			bool is_new_vdev_mlo)
-{
-	return true;
-}
-#endif
 #endif

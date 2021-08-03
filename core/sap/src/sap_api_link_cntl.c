@@ -82,6 +82,18 @@
  * Function Declarations and Documentation
  * -------------------------------------------------------------------------*/
 
+#ifdef WLAN_FEATURE_11BE
+static inline bool sap_acs_cfg_is_chwidth_320mhz(uint16_t width)
+{
+	return width == CH_WIDTH_320MHZ;
+}
+#else
+static inline bool sap_acs_cfg_is_chwidth_320mhz(uint16_t width)
+{
+	return false;
+}
+#endif
+
 /**
  * sap_config_acs_result : Generate ACS result params based on ch constraints
  * @sap_ctx: pointer to SAP context data struct
@@ -114,7 +126,8 @@ void sap_config_acs_result(mac_handle_t mac_handle,
 		sap_ctx->acs_cfg->vht_seg0_center_ch_freq = 0;
 
 	if (sap_ctx->acs_cfg->ch_width == CH_WIDTH_80P80MHZ ||
-	   (sap_ctx->acs_cfg->ch_width == CH_WIDTH_160MHZ))
+	   (sap_ctx->acs_cfg->ch_width == CH_WIDTH_160MHZ) ||
+	   sap_acs_cfg_is_chwidth_320mhz(sap_ctx->acs_cfg->ch_width))
 		sap_ctx->acs_cfg->vht_seg1_center_ch_freq =
 						ch_params.mhz_freq_seg1;
 	else
@@ -580,9 +593,6 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	    policy_mgr_is_current_hwmode_dbs(mac_ctx->psoc) ||
 	    sap_ctx->csa_reason == CSA_REASON_DCS ||
 	    !sap_scc_dfs) {
-		sap_get_cac_dur_dfs_region(sap_ctx,
-			&sap_ctx->csr_roamProfile.cac_duration_ms,
-			&sap_ctx->csr_roamProfile.dfs_regdomain);
 		/*
 		 * Most likely, radar has been detected and SAP wants to
 		 * change the channel
@@ -628,9 +638,6 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 		sap_context = mac_ctx->sap.sapCtxList[intf].sap_context;
 		sap_debug("sapdfs:issue chnl change for sapctx[%pK]",
 			  sap_context);
-		sap_get_cac_dur_dfs_region(sap_context,
-			&sap_context->csr_roamProfile.cac_duration_ms,
-			&sap_context->csr_roamProfile.dfs_regdomain);
 		/*
 		 * Most likely, radar has been detected and SAP wants to
 		 * change the channel

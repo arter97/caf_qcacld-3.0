@@ -155,7 +155,8 @@ struct wlan_ipa_iface_context *
 wlan_ipa_get_iface_by_mode_netdev(struct wlan_ipa_priv *ipa_ctx,
 				  qdf_netdev_t ndev, uint8_t mode);
 
-#ifndef CONFIG_IPA_WDI_UNIFIED_API
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)) && \
+	!defined(CONFIG_IPA_WDI_UNIFIED_API)
 
 /**
  * wlan_ipa_is_rm_enabled() - Is IPA RM enabled?
@@ -746,13 +747,14 @@ static inline void wlan_ipa_mcc_work_handler(void *data)
  * @session_id: session id for the event
  * @type: event enum of type ipa_wlan_event
  * @mac_address: MAC address associated with the event
+ * @is_2g_iface: true if interface is operating on 2G band, otherwise false
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			     uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
-			     uint8_t *mac_addr);
+			     uint8_t *mac_addr, bool is_2g_iface);
 
 /**
  * wlan_ipa_uc_smmu_map() - Map / Unmap DMA buffer to IPA UC

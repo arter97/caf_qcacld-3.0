@@ -256,6 +256,35 @@ QDF_STATUS ucfg_mlme_set_band_capability(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
+ * ucfg_mlme_set_dual_sta_policy() - Configures the Concurrent STA policy
+ * value
+ * @psoc: pointer to psoc object
+ * @dual_sta_config: Concurrent STA policy configuration value
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_set_dual_sta_policy(struct wlan_objmgr_psoc *psoc,
+					 uint8_t dual_sta_config)
+{
+	return wlan_mlme_set_dual_sta_policy(psoc, dual_sta_config);
+}
+
+/**
+ * ucfg_mlme_get_dual_sta_policy() - Get the Concurrent STA policy value
+ * @psoc: pointer to psoc object
+ * @dual_sta_config: Pointer to the variable from caller
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_get_dual_sta_policy(struct wlan_objmgr_psoc *psoc,
+					 uint8_t *dual_sta_config)
+{
+	return wlan_mlme_get_dual_sta_policy(psoc, dual_sta_config);
+}
+
+/**
  * ucfg_mlme_get_prevent_link_down() - Get the prevent link down config
  * @psoc: pointer to psoc object
  * @prevent_link_down: Pointer to the variable from caller
@@ -1170,6 +1199,24 @@ ucfg_mlme_get_roam_bmiss_final_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val);
 
 /**
+ * ucfg_mlme_validate_roam_bmiss_final_bcnt() - Validate roam bmiss final bcnt
+ * @bmiss_final_bcnt: Roam bmiss final bcnt
+ *
+ * Return: True if bmiss_final_bcnt is in expected range, false otherwise.
+ */
+bool
+ucfg_mlme_validate_roam_bmiss_final_bcnt(uint32_t bmiss_final_bcnt);
+
+/**
+ * ucfg_mlme_get_dual_sta_roaming_enabled() - Get dual sta roaming enable flag
+ * @psoc: pointer to psoc object
+ *
+ * Return: true if dual sta roaming allowed in fw
+ */
+bool
+ucfg_mlme_get_dual_sta_roaming_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_mlme_get_roam_bmiss_first_bcnt() - Get roam bmiss final count
  * @psoc: pointer to psoc object
  * @val:  Pointer to the value which will be filled for the caller
@@ -1944,6 +1991,47 @@ QDF_STATUS ucfg_mlme_set_fils_enabled_info(struct wlan_objmgr_psoc *psoc,
 					   bool value)
 {
 	return wlan_mlme_set_fils_enabled_info(psoc, value);
+}
+
+/**
+ * ucfg_mlme_set_primary_interface() - Set primary STA iface id
+ *
+ * @psoc: pointer to psoc object
+ * @value: value that needs to be set from the caller
+ *
+ * When a vdev is set as primary then based on the dual sta policy
+ * "qca_wlan_concurrent_sta_policy_config" mcc preference and roaming has
+ * to be enabled on the primary vdev
+ *
+ * Return: QDF_STATUS_SUCCESS or QDF_STATUS_FAILURE
+ */
+static inline
+QDF_STATUS ucfg_mlme_set_primary_interface(struct wlan_objmgr_psoc *psoc,
+					   uint8_t value)
+{
+	return wlan_mlme_set_primary_interface(psoc, value);
+}
+
+/**
+ * ucfg_mlme_get_mcc_duty_cycle_percentage() - Get primary STA iface MCC
+ * duty-cycle
+ *
+ * @psoc: pointer to psoc object
+ * @value: value that needs to be set from the caller
+ *
+ * primary and secondary STA iface MCC duty-cycle value in below format
+ * ******************************************************
+ * |bit 31-24 | bit 23-16 | bits 15-8   |bits 7-0   |
+ * | Unused   | Quota for | chan. # for |chan. # for|
+ * |          | 1st chan  | 1st chan.   |2nd chan.  |
+ * *****************************************************
+ *
+ * Return: primary iface MCC duty-cycle value
+ */
+static inline
+int ucfg_mlme_get_mcc_duty_cycle_percentage(struct wlan_objmgr_pdev *pdev)
+{
+	return wlan_mlme_get_mcc_duty_cycle_percentage(pdev);
 }
 
 /**
@@ -3955,6 +4043,18 @@ ucfg_mlme_set_obss_color_collision_offload_enabled(
 		struct wlan_objmgr_psoc *psoc, uint8_t value);
 
 /**
+ * ucfg_mlme_set_bss_color_collision_det_sta() - Enable bss color
+ * collision detection offload for STA mode
+ * @psoc:   pointer to psoc object
+ * @value:  enable or disable
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+ucfg_mlme_set_bss_color_collision_det_sta(struct wlan_objmgr_psoc *psoc,
+					  uint8_t value);
+
+/**
  * ucfg_mlme_set_restricted_80p80_bw_supp() - Set the restricted 80p80 support
  * @psoc: pointer to psoc object
  * @restricted_80p80_supp: Value to be set from the caller
@@ -4074,27 +4174,6 @@ QDF_STATUS ucfg_mlme_get_peer_unmap_conf(struct wlan_objmgr_psoc *psoc)
 	return wlan_mlme_get_peer_unmap_conf(psoc);
 }
 
-/**
- * ucfg_mlme_get_discon_reason_n_from_ap() - Get disconnect reason and from ap
- * @psoc: PSOC pointer
- * @vdev_id: vdev id
- * @from_ap: Get the from_ap cached through mlme_set_discon_reason_n_from_ap
- *           and copy to this buffer.
- * @reason_code: Get the reason_code cached through
- *               mlme_set_discon_reason_n_from_ap and copy to this buffer.
- *
- * Fetch the contents of from_ap and reason_codes.
- *
- * Return: void
- */
-static inline void
-ucfg_mlme_get_discon_reason_n_from_ap(struct wlan_objmgr_psoc *psoc,
-				      uint8_t vdev_id, bool *from_ap,
-				      uint32_t *reason_code)
-{
-	mlme_get_discon_reason_n_from_ap(psoc, vdev_id, from_ap, reason_code);
-}
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * ucfg_mlme_get_roam_reason_vsie_status() - Get roam reason vsie is
@@ -4131,6 +4210,21 @@ ucfg_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * ucfg_mlme_set_ft_over_ds() - update ft_over_ds status with user configured
+ * value
+ * @psoc: pointer to psoc object
+ * @ft_over_ds_enable: value of ft_over_ds
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_ft_over_ds(struct wlan_objmgr_psoc *psoc,
+			 uint8_t ft_over_ds_enable)
+{
+	return wlan_mlme_set_ft_over_ds(psoc, ft_over_ds_enable);
+}
+
+/**
  * ucfg_mlme_is_sta_mon_conc_supported() - Check if STA + Monitor mode
  * concurrency is supported
  * @psoc: pointer to psoc object
@@ -4155,5 +4249,26 @@ QDF_STATUS ucfg_mlme_cfg_get_eht_caps(struct wlan_objmgr_psoc *psoc,
 				      tDot11fIEeht_cap *eht_cap)
 {
 	return mlme_cfg_get_eht_caps(psoc, eht_cap);
+}
+
+static inline QDF_STATUS
+ucfg_mlme_cfg_get_vht_ampdu_len_exp(struct wlan_objmgr_psoc *psoc,
+				    uint8_t *value)
+{
+	return wlan_mlme_cfg_get_vht_ampdu_len_exp(psoc, value);
+}
+
+static inline QDF_STATUS
+ucfg_mlme_cfg_get_vht_max_mpdu_len(struct wlan_objmgr_psoc *psoc,
+				   uint8_t *value)
+{
+	return wlan_mlme_cfg_get_vht_max_mpdu_len(psoc, value);
+}
+
+static inline QDF_STATUS
+ucfg_mlme_cfg_get_ht_smps(struct wlan_objmgr_psoc *psoc,
+			  uint8_t *value)
+{
+	return wlan_mlme_cfg_get_ht_smps(psoc, value);
 }
 #endif /* _WLAN_MLME_UCFG_API_H_ */

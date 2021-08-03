@@ -92,6 +92,7 @@
 #include "wmi_unified_vdev_api.h"
 #include <wlan_cm_api.h>
 #include <../../core/src/wlan_cm_vdev_api.h>
+#include "wlan_nan_api.h"
 #ifdef DCS_INTERFERENCE_DETECTION
 #include <wlan_dcs_ucfg_api.h>
 #endif
@@ -99,6 +100,14 @@
 #ifdef FEATURE_STA_MODE_VOTE_LINK
 #include "wlan_ipa_ucfg_api.h"
 #endif
+
+/*
+ * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
+ * and hence host needs to hold a wake lock after 9th client connects
+ * and release the wake lock when 9th client disconnects
+ */
+#define SAP_D3_WOW_MAX_CLIENT_HOLD_WAKE_LOCK (9)
+#define SAP_D3_WOW_MAX_CLIENT_RELEASE_WAKE_LOCK (8)
 
 QDF_STATUS wma_find_vdev_id_by_addr(tp_wma_handle wma, uint8_t *addr,
 				    uint8_t *vdev_id)
@@ -1097,7 +1106,8 @@ static void wma_dcs_wlan_interference_mitigation_enable(
 		ucfg_config_dcs_event_data(mac_ctx->psoc, mac_id, true);
 
 	if (rsp->resp_type == WMI_HOST_VDEV_START_RESP_EVENT) {
-		ucfg_config_dcs_enable(mac_ctx->psoc, mac_id, CAP_DCS_WLANIM);
+		ucfg_config_dcs_enable(mac_ctx->psoc, mac_id,
+				       WLAN_HOST_DCS_WLANIM);
 		ucfg_wlan_dcs_cmd(mac_ctx->psoc, mac_id, true);
 	}
 }
@@ -2220,7 +2230,6 @@ void wma_send_vdev_down(tp_wma_handle wma, struct del_bss_resp *resp)
 				      sizeof(*resp), resp);
 }
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * wma_send_vdev_down_req() - handle vdev down req
  * @wma: wma handle
@@ -2247,17 +2256,6 @@ static void wma_send_vdev_down_req(tp_wma_handle wma,
 				      WLAN_VDEV_SM_EV_MLME_DOWN_REQ,
 				      sizeof(*resp), resp);
 }
-#else
-static void wma_send_vdev_down_req(tp_wma_handle wma,
-				   struct del_bss_resp *resp)
-{
-	struct wma_txrx_node *iface = &wma->interfaces[resp->vdev_id];
-
-	wlan_vdev_mlme_sm_deliver_evt(iface->vdev,
-				      WLAN_VDEV_SM_EV_MLME_DOWN_REQ,
-				      sizeof(*resp), resp);
-}
-#endif
 
 static QDF_STATUS
 wma_delete_peer_on_vdev_stop(tp_wma_handle wma, uint8_t vdev_id)
@@ -2331,7 +2329,6 @@ free_params:
 	return status;
 }
 
-#ifdef FEATURE_CM_ENABLE
 QDF_STATUS
 cm_send_bss_peer_delete_req(struct wlan_objmgr_vdev *vdev)
 {
@@ -2393,39 +2390,7 @@ __wma_handle_vdev_stop_rsp(struct vdev_stop_response *resp_event)
 
 	return wma_delete_peer_on_vdev_stop(wma, resp_event->vdev_id);
 }
-#else
-QDF_STATUS
-__wma_handle_vdev_stop_rsp(struct vdev_stop_response *resp_event)
-{
-	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
-	struct wma_txrx_node *iface;
 
-	if (!wma)
-		return QDF_STATUS_E_INVAL;
-
-	/* Ignore stop_response in Monitor mode */
-	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
-		return  QDF_STATUS_SUCCESS;
-
-	iface = &wma->interfaces[resp_event->vdev_id];
-
-	/* vdev in stopped state, no more waiting for key */
-	iface->is_waiting_for_key = false;
-
-	/*
-	 * Reset the rmfEnabled as there might be MGMT action frames
-	 * sent on this vdev before the next session is established.
-	 */
-	if (iface->rmfEnabled) {
-		iface->rmfEnabled = 0;
-		wma_debug("Reset rmfEnabled for vdev %d",
-			 resp_event->vdev_id);
-	}
-
-	return wma_delete_peer_on_vdev_stop(wma, resp_event->vdev_id);
-}
-
-#endif
 /**
  * wma_handle_vdev_stop_rsp() - handle vdev stop resp
  * @wma: wma handle
@@ -2611,6 +2576,16 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 				 status);
 	}
 
+	wma_debug("Setting WMI_VDEV_PARAM_WMM_TXOP_ENABLE: %d",
+		  mac->mlme_cfg->edca_params.enable_wmm_txop);
+
+	status  = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
+				WMI_VDEV_PARAM_WMM_TXOP_ENABLE,
+				mac->mlme_cfg->edca_params.enable_wmm_txop);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("failed to set WMM TXOP (status = %d)", status);
+
 	wma_debug("Setting WMI_VDEV_PARAM_DISCONNECT_TH: %d",
 		 mac->mlme_cfg->gen.dropped_pkt_disconnect_thresh);
 	status  = wma_vdev_set_param(
@@ -2673,7 +2648,9 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	wma_set_vdev_mgmt_rate(wma_handle, vdev_id);
 	if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 		wma_set_he_txbf_cfg(mac, vdev_id);
-	wma_set_vht_txbf_cfg(mac, vdev_id);
+
+	if (wlan_nan_is_beamforming_supported(mac->psoc))
+		wma_set_vht_txbf_cfg(mac, vdev_id);
 
 	/* Initialize roaming offload state */
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
@@ -4552,6 +4529,9 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 				  WMA_VHT_PPS_DELIM_CRC_FAIL, 1);
 	if (wmi_service_enabled(wma->wmi_handle,
 				wmi_service_listen_interval_offload_support)) {
+		struct wlan_objmgr_vdev *vdev;
+		uint32_t moddtim;
+
 		wma_debug("listen interval offload enabled, setting params");
 		status = wma_vdev_set_param(wma->wmi_handle,
 					    params->smesessionId,
@@ -4569,15 +4549,37 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			wma_err("can't set DYNDTIM_CNT for session: %d",
 				params->smesessionId);
 		}
-		status  = wma_vdev_set_param(wma->wmi_handle,
-					     params->smesessionId,
-					     WMI_VDEV_PARAM_MODDTIM_CNT,
-					     wma->staModDtim);
-		if (status != QDF_STATUS_SUCCESS) {
-			wma_err("can't set DTIM_CNT for session: %d",
-				params->smesessionId);
-		}
 
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+							params->smesessionId,
+							WLAN_LEGACY_WMA_ID);
+		if (!vdev || !ucfg_pmo_get_moddtim_user_enable(vdev)) {
+			moddtim = wma->staModDtim;
+			status = wma_vdev_set_param(wma->wmi_handle,
+						    params->smesessionId,
+						    WMI_VDEV_PARAM_MODDTIM_CNT,
+						    moddtim);
+			if (status != QDF_STATUS_SUCCESS) {
+				wma_err("can't set DTIM_CNT for session: %d",
+					params->smesessionId);
+			}
+
+			if (vdev)
+				wlan_objmgr_vdev_release_ref(vdev,
+							WLAN_LEGACY_WMA_ID);
+		} else if (vdev && ucfg_pmo_get_moddtim_user_enable(vdev) &&
+			   !ucfg_pmo_get_moddtim_user_active(vdev)) {
+			moddtim = ucfg_pmo_get_moddtim_user(vdev);
+			status = wma_vdev_set_param(wma->wmi_handle,
+						    params->smesessionId,
+						    WMI_VDEV_PARAM_MODDTIM_CNT,
+						    moddtim);
+			if (status != QDF_STATUS_SUCCESS) {
+				wma_err("can't set DTIM_CNT for session: %d",
+					params->smesessionId);
+			}
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+		}
 	} else {
 		wma_debug("listen interval offload is not set");
 	}
@@ -4737,6 +4739,20 @@ static void wma_delete_sta_req_sta_mode(tp_wma_handle wma,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wma_txrx_node *iface;
 
+	if (wmi_service_enabled(wma->wmi_handle,
+		wmi_service_listen_interval_offload_support)) {
+		struct wlan_objmgr_vdev *vdev;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+							params->smesessionId,
+							WLAN_LEGACY_WMA_ID);
+		if (vdev) {
+			if (ucfg_pmo_get_moddtim_user_enable(vdev))
+				ucfg_pmo_set_moddtim_user_enable(vdev, false);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+		}
+	}
+
 	iface = &wma->interfaces[params->smesessionId];
 	iface->uapsd_cached_val = 0;
 #ifdef FEATURE_WLAN_TDLS
@@ -4813,6 +4829,58 @@ static bool wma_is_vdev_in_go_mode(tp_wma_handle wma, uint8_t vdev_id)
 	return false;
 }
 
+static void wma_sap_d3_wow_client_connect(tp_wma_handle wma)
+{
+	uint32_t num_clients;
+
+	num_clients = qdf_atomic_inc_return(&wma->sap_num_clients_connected);
+	wmi_debug("sap d3 wow %d client connected", num_clients);
+	if (num_clients == SAP_D3_WOW_MAX_CLIENT_HOLD_WAKE_LOCK) {
+		wmi_info("max clients connected acquire sap d3 wow wake lock");
+		qdf_wake_lock_acquire(&wma->sap_d3_wow_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_SAP_D3_WOW);
+	}
+}
+
+static void wma_sap_d3_wow_client_disconnect(tp_wma_handle wma)
+{
+	uint32_t num_clients;
+
+	num_clients = qdf_atomic_dec_return(&wma->sap_num_clients_connected);
+	wmi_debug("sap d3 wow %d client connected", num_clients);
+	if (num_clients == SAP_D3_WOW_MAX_CLIENT_RELEASE_WAKE_LOCK) {
+		wmi_info("max clients disconnected release sap d3 wow wake lock");
+		qdf_wake_lock_release(&wma->sap_d3_wow_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_SAP_D3_WOW);
+	}
+}
+
+static void wma_go_d3_wow_client_connect(tp_wma_handle wma)
+{
+	uint32_t num_clients;
+
+	num_clients = qdf_atomic_inc_return(&wma->go_num_clients_connected);
+	wmi_debug("go d3 wow %d client connected", num_clients);
+	if (num_clients == SAP_D3_WOW_MAX_CLIENT_HOLD_WAKE_LOCK) {
+		wmi_info("max clients connected acquire go d3 wow wake lock");
+		qdf_wake_lock_acquire(&wma->go_d3_wow_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_GO_D3_WOW);
+	}
+}
+
+static void wma_go_d3_wow_client_disconnect(tp_wma_handle wma)
+{
+	uint32_t num_clients;
+
+	num_clients = qdf_atomic_dec_return(&wma->go_num_clients_connected);
+	wmi_debug("go d3 wow %d client connected", num_clients);
+	if (num_clients == SAP_D3_WOW_MAX_CLIENT_RELEASE_WAKE_LOCK) {
+		wmi_info("max clients disconnected release go d3 wow wake lock");
+		qdf_wake_lock_release(&wma->go_d3_wow_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_GO_D3_WOW);
+	}
+}
+
 void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 {
 	uint8_t oper_mode = BSS_OPERATIONAL_MODE_STA;
@@ -4852,10 +4920,11 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 				wmi_service_enabled(wma->wmi_handle,
 					wmi_service_sap_connected_d3_wow));
 		if (!is_bus_suspend_allowed_in_sap_mode) {
-			htc_vote_link_up(htc_handle);
+			htc_vote_link_up(htc_handle, HTC_LINK_VOTE_SAP_USER_ID);
 			wmi_info("sap d0 wow");
 		} else {
 			wmi_info("sap d3 wow");
+			wma_sap_d3_wow_client_connect(wma);
 		}
 		wma_sap_prevent_runtime_pm(wma);
 
@@ -4869,10 +4938,11 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 				wmi_service_enabled(wma->wmi_handle,
 					wmi_service_go_connected_d3_wow));
 		if (!is_bus_suspend_allowed_in_go_mode) {
-			htc_vote_link_up(htc_handle);
+			htc_vote_link_up(htc_handle, HTC_LINK_VOTE_GO_USER_ID);
 			wmi_info("p2p go d0 wow");
 		} else {
 			wmi_info("p2p go d3 wow");
+			wma_go_d3_wow_client_connect(wma);
 		}
 		wma_sap_prevent_runtime_pm(wma);
 
@@ -4882,18 +4952,18 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 	/* handle wow for nan with 1 or more peer in same way */
 	if (BSS_OPERATIONAL_MODE_NDI == oper_mode) {
 		wma_debug("disable runtime pm and vote for link up");
-		htc_vote_link_up(htc_handle);
+		htc_vote_link_up(htc_handle, HTC_LINK_VOTE_NDP_USER_ID);
 		wma_sap_prevent_runtime_pm(wma);
 	} else if (wma_add_sta_allow_sta_mode_vote_link(oper_mode)) {
 		wma_debug("vote for link up");
-		htc_vote_link_up(htc_handle);
+		htc_vote_link_up(htc_handle, HTC_LINK_VOTE_STA_USER_ID);
 	}
 }
 
 void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 {
 	uint8_t oper_mode = BSS_OPERATIONAL_MODE_STA;
-	uint8_t smesession_id = del_sta->smesessionId;
+	uint8_t vdev_id = del_sta->smesessionId;
 	bool rsp_requested = del_sta->respReqd;
 	void *htc_handle;
 
@@ -4903,18 +4973,17 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 		return;
 	}
 
-	if (wma_is_vdev_in_ap_mode(wma, smesession_id))
+	if (wma_is_vdev_in_ap_mode(wma, vdev_id))
 		oper_mode = BSS_OPERATIONAL_MODE_AP;
 	if (del_sta->staType == STA_ENTRY_NDI_PEER)
 		oper_mode = BSS_OPERATIONAL_MODE_NDI;
 
-	wma_debug("vdev %d oper_mode %d", del_sta->smesessionId, oper_mode);
+	wma_debug("vdev %d oper_mode %d", vdev_id, oper_mode);
 
 	switch (oper_mode) {
 	case BSS_OPERATIONAL_MODE_STA:
-		if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma->psoc, smesession_id)) {
-			wma_debug("LFR3: Del STA on vdev_id %d",
-				  del_sta->smesessionId);
+		if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id)) {
+			wma_debug("LFR3: Del STA on vdev_id %d", vdev_id);
 			qdf_mem_free(del_sta);
 			return;
 		}
@@ -4943,32 +5012,36 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 		qdf_mem_free(del_sta);
 	}
 
-	if (wma_is_vdev_in_sap_mode(wma, del_sta->smesessionId)) {
+	if (wma_is_vdev_in_sap_mode(wma, vdev_id)) {
 		bool is_bus_suspend_allowed_in_sap_mode =
 			(wlan_pmo_get_sap_mode_bus_suspend(wma->psoc) &&
 				wmi_service_enabled(wma->wmi_handle,
 					wmi_service_sap_connected_d3_wow));
 		if (!is_bus_suspend_allowed_in_sap_mode) {
-			htc_vote_link_down(htc_handle);
+			htc_vote_link_down(htc_handle,
+					   HTC_LINK_VOTE_SAP_USER_ID);
 			wmi_info("sap d0 wow");
 		} else {
 			wmi_info("sap d3 wow");
+			wma_sap_d3_wow_client_disconnect(wma);
 		}
 		wma_sap_allow_runtime_pm(wma);
 
 		return;
 	}
 
-	if (wma_is_vdev_in_go_mode(wma, del_sta->smesessionId)) {
+	if (wma_is_vdev_in_go_mode(wma, vdev_id)) {
 		bool is_bus_suspend_allowed_in_go_mode =
 			(wlan_pmo_get_go_mode_bus_suspend(wma->psoc) &&
 				wmi_service_enabled(wma->wmi_handle,
 					wmi_service_go_connected_d3_wow));
 		if (!is_bus_suspend_allowed_in_go_mode) {
-			htc_vote_link_down(htc_handle);
+			htc_vote_link_down(htc_handle,
+					   HTC_LINK_VOTE_GO_USER_ID);
 			wmi_info("p2p go d0 wow");
 		} else {
 			wmi_info("p2p go d3 wow");
+			wma_go_d3_wow_client_disconnect(wma);
 		}
 		wma_sap_allow_runtime_pm(wma);
 
@@ -4977,11 +5050,11 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 
 	if (BSS_OPERATIONAL_MODE_NDI == oper_mode) {
 		wma_debug("allow runtime pm and vote for link down");
-		htc_vote_link_down(htc_handle);
+		htc_vote_link_down(htc_handle, HTC_LINK_VOTE_NDP_USER_ID);
 		wma_sap_allow_runtime_pm(wma);
 	} else if (wma_add_sta_allow_sta_mode_vote_link(oper_mode)) {
 		wma_debug("vote for link down");
-		htc_vote_link_down(htc_handle);
+		htc_vote_link_down(htc_handle, HTC_LINK_VOTE_STA_USER_ID);
 	}
 }
 
@@ -5405,8 +5478,8 @@ QDF_STATUS wma_add_bss_peer_sta(uint8_t vdev_id, uint8_t *bssid,
 						      WMI_PEER_TYPE_DEFAULT,
 						      vdev_id);
 	else
-		status = wma_add_peer(wma, bssid, WMI_PEER_TYPE_DEFAULT,
-				      vdev_id);
+		status = wma_create_peer(wma, bssid, WMI_PEER_TYPE_DEFAULT,
+					 vdev_id);
 err:
 	return status;
 }

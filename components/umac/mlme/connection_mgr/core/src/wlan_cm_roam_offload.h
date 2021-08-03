@@ -109,7 +109,6 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  */
 void cm_dump_freq_list(struct rso_chan_info *chan_info);
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * cm_start_roam_invoke() - Validate and send Roam invoke req to CM
  * @pdev: Pdev pointer
@@ -126,7 +125,6 @@ cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 		     struct qdf_mac_addr *bssid,
 		     uint32_t chan_freq,
 		     enum wlan_cm_source source);
-#endif
 #endif
 
 #ifdef FEATURE_WLAN_ESE
@@ -200,16 +198,6 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 cm_roam_send_disable_config(struct wlan_objmgr_psoc *psoc,
 			    uint8_t vdev_id, uint8_t cfg);
-
-/**
- * cm_roam_start_init_on_connect() - init roaming
- * @pdev: pdev pointer
- * @vdev_id: vdev_id
- *
- * Return: void
- */
-void cm_roam_start_init_on_connect(struct wlan_objmgr_pdev *pdev,
-				   uint8_t vdev_id);
 
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 void

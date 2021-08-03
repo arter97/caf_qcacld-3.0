@@ -106,7 +106,8 @@ QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 						dp_rx_refill_thread_schedule);
 	}
 
-	num_dp_rx_threads = cdp_get_num_rx_contexts(soc);
+	/* Get num Rx thread config from INI? */
+	num_dp_rx_threads = 3;
 
 	if (dp_ext_hdl->config.enable_rx_threads) {
 		qdf_status = dp_rx_tm_init(&dp_ext_hdl->rx_tm_hdl,
@@ -192,20 +193,27 @@ int dp_rx_tm_get_pending(ol_txrx_soc_handle soc)
 
 #ifdef DP_MEM_PRE_ALLOC
 
+/* Max entries in FISA Flow table */
+#define FISA_RX_FT_SIZE 128
+
 /* Num elements in REO ring */
 #define REO_DST_RING_SIZE 1024
 
 /* Num elements in TCL Data ring */
-#define TCL_DATA_RING_SIZE 3072
+#define TCL_DATA_RING_SIZE 5120
 
 /* Num elements in WBM2SW ring */
-#define WBM2SW_RELEASE_RING_SIZE 4096
+#define WBM2SW_RELEASE_RING_SIZE 8192
 
 /* Num elements in WBM Idle Link */
 #define WBM_IDLE_LINK_RING_SIZE (32 * 1024)
 
 /* Num TX desc in TX desc pool */
-#define DP_TX_DESC_POOL_SIZE 4096
+#define DP_TX_DESC_POOL_SIZE 6144
+
+#define DP_TX_RX_DESC_MAX_NUM \
+		(WLAN_CFG_NUM_TX_DESC_MAX * MAX_TXDESC_POOLS + \
+			WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX * MAX_RXDESC_POOLS)
 
 /**
  * struct dp_consistent_prealloc - element representing DP pre-alloc memory
@@ -269,41 +277,68 @@ struct dp_consistent_prealloc_unaligned {
  * @ctxt_type: DP context type
  * @size: size of pre-alloc memory
  * @in_use: check if element is being used
+ * @is_critical: critical prealloc failure would cause prealloc_init to fail
  * @addr: address of memory allocated
  */
 struct dp_prealloc_context {
 	enum dp_ctxt_type ctxt_type;
 	uint32_t size;
 	bool in_use;
+	bool is_critical;
 	void *addr;
 };
 
 static struct dp_prealloc_context g_dp_context_allocs[] = {
-	{DP_PDEV_TYPE, (sizeof(struct dp_pdev)), false,  NULL},
+	{DP_PDEV_TYPE, (sizeof(struct dp_pdev)), false,  true, NULL},
 #ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
 	/* 4 Rx ring history */
-	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, NULL},
-	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, NULL},
-	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, NULL},
-	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, NULL},
+	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
+	 NULL},
+	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
+	 NULL},
+	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
+	 NULL},
+	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
+	 NULL},
 	/* 1 Rx error ring history */
 	{DP_RX_ERR_RING_HIST_TYPE, sizeof(struct dp_rx_err_history),
-	 false, NULL},
+	 false, false, NULL},
 #ifndef RX_DEFRAG_DO_NOT_REINJECT
 	/* 1 Rx reinject ring history */
 	{DP_RX_REINJECT_RING_HIST_TYPE, sizeof(struct dp_rx_reinject_history),
-	 false, NULL},
+	 false, false, NULL},
 #endif	/* RX_DEFRAG_DO_NOT_REINJECT */
+	/* 1 Rx refill ring history */
+	{DP_RX_REFILL_RING_HIST_TYPE, sizeof(struct dp_rx_refill_history),
+	false, false, NULL},
 #endif	/* WLAN_FEATURE_DP_RX_RING_HISTORY */
+#ifdef DP_TX_HW_DESC_HISTORY
+	{DP_TX_HW_DESC_HIST_TYPE, sizeof(struct dp_tx_hw_desc_history),
+	false, false, NULL},
+#endif
+#ifdef WLAN_FEATURE_DP_TX_DESC_HISTORY
+	{DP_TX_TCL_HIST_TYPE, sizeof(struct dp_tx_tcl_history),
+	 false, false, NULL},
+	{DP_TX_COMP_HIST_TYPE, sizeof(struct dp_tx_comp_history),
+	 false, false, NULL},
+#endif	/* WLAN_FEATURE_DP_TX_DESC_HISTORY */
+#ifdef WLAN_SUPPORT_RX_FISA
+	{DP_FISA_RX_FT_TYPE, sizeof(struct dp_fisa_rx_sw_ft) * FISA_RX_FT_SIZE,
+	 false, true, NULL},
+#endif
 };
 
 static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
-	/* 5 REO DST rings */
 	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
 	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
 	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
 	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
+#ifdef CONFIG_BERYLLIUM
 	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
+#endif
 	/* 3 TCL data rings */
 	{TCL_DATA, (sizeof(struct tlv_32_hdr) + sizeof(struct tcl_data_cmd)) * TCL_DATA_RING_SIZE, 0, NULL, NULL, 0, 0},
 	{TCL_DATA, (sizeof(struct tlv_32_hdr) + sizeof(struct tcl_data_cmd)) * TCL_DATA_RING_SIZE, 0, NULL, NULL, 0, 0},
@@ -390,7 +425,11 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 #endif
 	/* DP HW Link DESCs pools */
 	{DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0, NON_CACHEABLE, { 0 } },
-
+#ifdef CONFIG_BERYLLIUM
+	{DP_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
+	 ((DP_TX_RX_DESC_MAX_NUM * sizeof(uint64_t)) / qdf_page_size),
+	 0, NON_CACHEABLE, { 0 } },
+#endif
 };
 
 static struct dp_consistent_prealloc_unaligned
@@ -489,7 +528,7 @@ void dp_prealloc_deinit(void)
 
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_context_allocs); i++) {
 		cp = &g_dp_context_allocs[i];
-		if (qdf_unlikely(up->in_use))
+		if (qdf_unlikely(cp->in_use))
 			dp_warn("i %d: context in use while free", i);
 
 		if (cp->addr) {
@@ -518,7 +557,7 @@ QDF_STATUS dp_prealloc_init(void)
 		cp = &g_dp_context_allocs[i];
 		cp->addr = qdf_mem_malloc(cp->size);
 
-		if (qdf_unlikely(!cp->addr)) {
+		if (qdf_unlikely(!cp->addr) && cp->is_critical) {
 			dp_warn("i %d: unable to preallocate %d bytes memory!",
 				i, cp->size);
 			break;
@@ -619,7 +658,8 @@ void *dp_prealloc_get_context_memory(uint32_t ctxt_type)
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_context_allocs); i++) {
 		cp = &g_dp_context_allocs[i];
 
-		if ((ctxt_type == cp->ctxt_type) && !cp->in_use) {
+		if ((ctxt_type == cp->ctxt_type) && !cp->in_use &&
+		    cp->addr) {
 			cp->in_use = true;
 			return cp->addr;
 		}
@@ -632,6 +672,9 @@ QDF_STATUS dp_prealloc_put_context_memory(uint32_t ctxt_type, void *vaddr)
 {
 	int i;
 	struct dp_prealloc_context *cp;
+
+	if (!vaddr)
+		return QDF_STATUS_E_FAILURE;
 
 	for (i = 0; i < QDF_ARRAY_SIZE(g_dp_context_allocs); i++) {
 		cp = &g_dp_context_allocs[i];
@@ -667,8 +710,8 @@ void *dp_prealloc_get_coherent(uint32_t *size, void **base_vaddr_unaligned,
 			va_aligned = p->va_aligned;
 			*size = p->size;
 			dp_debug("index %i -> ring type %s va-aligned %pK", i,
-				dp_srng_get_str_from_hal_ring_type(ring_type),
-				va_aligned);
+				 dp_srng_get_str_from_hal_ring_type(ring_type),
+				 va_aligned);
 			break;
 		}
 	}

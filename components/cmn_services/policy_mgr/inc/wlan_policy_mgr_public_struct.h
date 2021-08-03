@@ -893,7 +893,6 @@ enum policy_mgr_band {
  * @POLICY_MGR_UPDATE_REASON_UT: Unit test related
  * @POLICY_MGR_UPDATE_REASON_START_AP: Start AP
  * @POLICY_MGR_UPDATE_REASON_NORMAL_STA: Connection to Normal STA
- * @POLICY_MGR_UPDATE_REASON_HIDDEN_STA: Connection to Hidden STA
  * @POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC: Opportunistic HW mode update
  * @POLICY_MGR_UPDATE_REASON_NSS_UPDATE: NSS update
  * @POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH: After Channel switch
@@ -912,7 +911,6 @@ enum policy_mgr_conn_update_reason {
 	POLICY_MGR_UPDATE_REASON_UT,
 	POLICY_MGR_UPDATE_REASON_START_AP,
 	POLICY_MGR_UPDATE_REASON_NORMAL_STA,
-	POLICY_MGR_UPDATE_REASON_HIDDEN_STA,
 	POLICY_MGR_UPDATE_REASON_OPPORTUNISTIC,
 	POLICY_MGR_UPDATE_REASON_NSS_UPDATE,
 	POLICY_MGR_UPDATE_REASON_AFTER_CHANNEL_SWITCH,
@@ -936,6 +934,7 @@ enum policy_mgr_conn_update_reason {
  * @HW_MODE_80_MHZ: 80 Mhz bandwidth
  * @HW_MODE_80_PLUS_80_MHZ: 80 Mhz plus 80 Mhz bandwidth
  * @HW_MODE_160_MHZ: 160 Mhz bandwidth
+ * @HW_MODE_320_MHZ: 320 Mhz bandwidth
  * @HW_MODE_MAX_BANDWIDTH: Max place holder
  *
  * These are generic IDs that identify the various roles
@@ -950,6 +949,7 @@ enum hw_mode_bandwidth {
 	HW_MODE_80_MHZ,
 	HW_MODE_80_PLUS_80_MHZ,
 	HW_MODE_160_MHZ,
+	HW_MODE_320_MHZ,
 	HW_MODE_MAX_BANDWIDTH
 };
 
@@ -1246,6 +1246,16 @@ enum policy_mgr_pri_id {
 struct policy_mgr_user_cfg {
 	bool enable2x2;
 	bool sub_20_mhz_enabled;
+};
+
+/**
+ * struct dbs_bw - Max BW supported in DBS mode
+ * @mac0_bw: BW of MAC0
+ * @mac1_bw: BW of MAC1
+ */
+struct dbs_bw {
+	enum hw_mode_bandwidth mac0_bw;
+	enum hw_mode_bandwidth mac1_bw;
 };
 
 /**

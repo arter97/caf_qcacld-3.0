@@ -104,7 +104,7 @@ void wma_update_target_ext_eht_cap(struct target_psoc_info *tgt_hdl,
 					    mac_cap->eht_cap_phy_info_2G);
 			wma_convert_eht_cap(eht_cap_2g,
 					    mac_cap->eht_cap_info_2G,
-					    mac_cap->eht_cap_info_2G,
+					    mac_cap->eht_cap_phy_info_2G);
 		}
 
 		if (supported_bands & WLAN_5G_CAPABILITY) {
@@ -163,6 +163,18 @@ void wma_populate_peer_eht_cap(struct peer_assoc_params *peer,
 	else
 		return;
 
+	qdf_mem_copy(peer->peer_eht_cap_macinfo, peer->peer_he_cap_macinfo,
+		     sizeof(mac_cap));
+	qdf_mem_copy(peer->peer_he_cap_phyinfo, peer->peer_he_cap_phyinfo,
+		     sizeof(peer->peer_he_cap_phyinfo));
+
+	qdf_mem_copy(peer->peer_eht_rx_mcs_set, peer->peer_he_rx_mcs_set,
+		     sizeof(peer->peer_he_rx_mcs_set));
+	qdf_mem_copy(peer->peer_eht_tx_mcs_set, peer->peer_he_tx_mcs_set,
+		     sizeof(peer->peer_he_tx_mcs_set));
+
+	peer->peer_eht_mcs_count = peer->peer_he_mcs_count;
+
 	wma_print_eht_cap(eht_cap);
 	wma_debug("Peer EHT Capabilities:");
 	wma_print_eht_phy_cap(phy_cap);
@@ -190,4 +202,11 @@ QDF_STATUS wma_get_eht_capabilities(struct eht_capability *eht_cap)
 		     WMI_MAX_EHTCAP_PHY_SIZE);
 	eht_cap->mac_cap = wma_handle->eht_cap.mac_cap;
 	return QDF_STATUS_SUCCESS;
+}
+
+void wma_set_peer_assoc_params_bw_320(struct peer_assoc_params *params,
+				      enum phy_ch_width ch_width)
+{
+	if (ch_width == CH_WIDTH_320MHZ)
+		params->bw_320 = 1;
 }

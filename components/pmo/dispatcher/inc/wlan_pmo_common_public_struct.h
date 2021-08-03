@@ -59,12 +59,14 @@
  * @pmo_vdev_param_listen_interval: vdev listen interval param id
  * @pmo_vdev_param_dtim_policy: vdev param dtim policy
  * @pmo_vdev_param_forced_dtim_count: vdev param forced dtim count
+ * @pmo_vdev_param_moddtim: vdev param moddtim
  * @pmo_vdev_max_param: Max vdev param id
  */
 enum pmo_vdev_param_id {
 	pmo_vdev_param_listen_interval = 0,
 	pmo_vdev_param_dtim_policy,
 	pmo_vdev_param_forced_dtim_count,
+	pmo_vdev_param_moddtim,
 	pmo_vdev_max_param
 };
 
@@ -165,6 +167,18 @@ enum pmo_wow_enable_type {
 enum powersave_mode {
 	PMO_PS_ADVANCED_POWER_SAVE_DISABLE = 0,
 	PMO_PS_ADVANCED_POWER_SAVE_ENABLE = 1
+};
+
+/**
+ * enum pmo_suspend_mode - suspend_mode
+ * @PMO_SUSPEND_NONE: Does not support suspend
+ * @PMO_SUSPEND_LEGENCY: Legency PDEV suspend mode
+ * @PMO_SUSPEND_WOW: WoW suspend mode
+ */
+enum pmo_suspend_mode {
+	PMO_SUSPEND_NONE = 0,
+	PMO_SUSPEND_LEGENCY,
+	PMO_SUSPEND_WOW
 };
 
 #define PMO_TARGET_SUSPEND_TIMEOUT   (4000)
@@ -299,6 +313,7 @@ enum pmo_gpio_wakeup_mode {
  * @sta_forced_dtim: station forced DTIM value
  * @wow_enable: enable wow with majic pattern match or pattern byte match
  * @power_save_mode: power save mode for psoc
+ * @suspend_mode: suspend mode for psoc
  * @runtime_pm_delay: set runtime pm's inactivity timer
  * @extwow_goto_suspend: true when extended WoW enabled else false
  * @extwow_app1_wakeup_pin_num: set wakeup1 PIN number
@@ -333,6 +348,7 @@ enum pmo_gpio_wakeup_mode {
  * @gpio_wakeup_mode: gpio wakeup mode
  * @igmp_version_support: igmp version support
  * @igmp_offload_enable: enable/disable igmp offload feature to fw
+ * @disconnect_sap_tdls_in_wow: sap/p2p_go disconnect or teardown tdls link
  */
 struct pmo_psoc_cfg {
 	bool ptrn_match_enable_all_vdev;
@@ -363,6 +379,7 @@ struct pmo_psoc_cfg {
 	enum pmo_wow_enable_type wow_enable;
 	enum powersave_mode power_save_mode;
 	enum powersave_mode default_power_save_mode;
+	enum pmo_suspend_mode suspend_mode;
 #ifdef FEATURE_RUNTIME_PM
 	uint32_t runtime_pm_delay;
 #endif
@@ -399,6 +416,7 @@ struct pmo_psoc_cfg {
 	bool is_mod_dtim_on_sys_suspend_enabled;
 	bool is_bus_suspend_enabled_in_sap_mode;
 	bool is_bus_suspend_enabled_in_go_mode;
+	bool is_dynamic_pcie_gen_speed_change_enabled;
 #ifdef WLAN_ENABLE_GPIO_WAKEUP
 	bool enable_gpio_wakeup;
 	uint32_t gpio_wakeup_pin;
@@ -408,6 +426,7 @@ struct pmo_psoc_cfg {
 	uint32_t igmp_version_support;
 	bool igmp_offload_enable;
 #endif
+	bool disconnect_sap_tdls_in_wow;
 };
 
 /**

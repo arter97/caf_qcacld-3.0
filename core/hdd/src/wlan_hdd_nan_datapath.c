@@ -253,21 +253,16 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter,
 	roam_profile->SSIDs.numOfSSIDs = 1;
 	roam_profile->SSIDs.SSIDList->SSID.length = 0;
 
-	roam_profile->phyMode = eCSR_DOT11_MODE_11ac;
+	roam_profile->phyMode = eCSR_DOT11_MODE_AUTO;
 	roam_profile->BSSType = eCSR_BSS_TYPE_NDI;
 	roam_profile->BSSIDs.numOfBSSIDs = 1;
 	qdf_mem_copy((void *)(roam_profile->BSSIDs.bssid),
 		&adapter->mac_addr.bytes[0],
 		QDF_MAC_ADDR_SIZE);
 
-	roam_profile->AuthType.numEntries = 1;
-	roam_profile->AuthType.authType[0] = eCSR_AUTH_TYPE_OPEN_SYSTEM;
-	roam_profile->EncryptionType.numEntries = 1;
-	roam_profile->EncryptionType.encryptionType[0] = eCSR_ENCRYPT_TYPE_NONE;
-
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
-	status = sme_roam_connect(mac_handle, adapter->vdev_id,
-				  roam_profile, &roam_id);
+	status = sme_bss_start(mac_handle, adapter->vdev_id,
+			       roam_profile, &roam_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("NDI sme_RoamConnect session %d failed with status %d -> NotConnected",
 			adapter->vdev_id, status);
@@ -885,13 +880,15 @@ void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 
 /**
  * hdd_ndp_new_peer_handler() - NDP new peer indication handler
- * @adapter: pointer to adapter context
- * @ind_params: indication parameters
+ * @vdev_id: vdev id
+ * @sta_id: station id
+ * @peer_mac_addr: peer mac address
+ * @first_peer: first peer
  *
  * Return: none
  */
 int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
-			struct qdf_mac_addr *peer_mac_addr, bool fist_peer)
+			struct qdf_mac_addr *peer_mac_addr, bool first_peer)
 {
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
@@ -930,7 +927,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 			      roam_info->fAuthRequired);
 
 	/* perform following steps for first new peer ind */
-	if (fist_peer) {
+	if (first_peer) {
 		hdd_debug("Set ctx connection state to connected");
 		/* Disable LRO/GRO for NDI Mode */
 		if (hdd_ctx->ol_enable &&
@@ -953,6 +950,8 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		 */
 		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
 			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 1);
+
+		wlan_twt_concurrency_update(hdd_ctx);
 	}
 	qdf_mem_free(roam_info);
 	return 0;
@@ -1031,5 +1030,7 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 		 */
 		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
 			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 0);
+
+		wlan_twt_concurrency_update(hdd_ctx);
 	}
 }

@@ -628,16 +628,6 @@ struct wma_version_info {
 	u_int32_t revision;
 };
 
-struct roam_synch_frame_ind {
-	uint32_t bcn_probe_rsp_len;
-	uint8_t *bcn_probe_rsp;
-	uint8_t is_beacon;
-	uint32_t reassoc_req_len;
-	uint8_t *reassoc_req;
-	uint32_t reassoc_rsp_len;
-	uint8_t *reassoc_rsp;
-};
-
 /* Max number of invalid peer entries */
 #define INVALID_PEER_MAX_NUM 5
 
@@ -826,7 +816,6 @@ struct wma_wlm_stats_data {
  * @last_umac_data_ota_timestamp: timestamp when OTA of last umac data
  *   was done
  * @last_umac_data_nbuf: cache nbuf ptr for the last umac data buf
- * @needShutdown: is shutdown needed or not
  * @tgt_cfg_update_cb: configuration update callback
  * @reg_cap: regulatory capablities
  * @scan_id: scan id
@@ -949,7 +938,6 @@ typedef struct {
 	wma_tx_ota_comp_callback umac_data_ota_ack_cb;
 	unsigned long last_umac_data_ota_timestamp;
 	qdf_nbuf_t last_umac_data_nbuf;
-	bool needShutdown;
 	wma_tgt_cfg_cb tgt_cfg_update_cb;
 	HAL_REG_CAPABILITIES reg_cap;
 	uint32_t scan_id;
@@ -1001,12 +989,6 @@ typedef struct {
 	bool tx_chain_mask_cck;
 	qdf_mc_timer_t service_ready_ext_timer;
 
-#ifndef FEATURE_CM_ENABLE
-	QDF_STATUS (*csr_roam_synch_cb)(struct mac_context *mac,
-		struct roam_offload_synch_ind *roam_synch_data,
-		struct bss_description *bss_desc_ptr,
-		enum sir_roam_op_code reason);
-#endif
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
 						    struct qdf_mac_addr bssid);
@@ -1019,8 +1001,6 @@ typedef struct {
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
 					uint16_t reason_code);
-	QDF_STATUS (*csr_roam_pmkid_req_cb)(uint8_t vdev_id,
-		struct roam_pmkid_req_event *bss_list);
 	qdf_wake_lock_t wmi_cmd_rsp_wake_lock;
 	qdf_runtime_lock_t wmi_cmd_rsp_runtime_lock;
 	qdf_runtime_lock_t sap_prevent_runtime_pm_lock;
@@ -1054,6 +1034,10 @@ typedef struct {
 #ifdef WLAN_FEATURE_11BE
 	struct eht_capability eht_cap;
 #endif
+	qdf_atomic_t sap_num_clients_connected;
+	qdf_atomic_t go_num_clients_connected;
+	qdf_wake_lock_t sap_d3_wow_wake_lock;
+	qdf_wake_lock_t go_d3_wow_wake_lock;
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -1500,6 +1484,16 @@ int wma_mgmt_tx_completion_handler(void *handle, uint8_t *cmpl_event_params,
 int wma_mgmt_tx_bundle_completion_handler(void *handle,
 	uint8_t *cmpl_event_params, uint32_t len);
 uint32_t wma_get_vht_ch_width(void);
+
+#ifdef WLAN_FEATURE_11BE
+uint32_t wma_get_eht_ch_width(void);
+#else
+static inline uint32_t wma_get_eht_ch_width(void)
+{
+	return 0;
+}
+#endif
+
 QDF_STATUS
 wma_config_debug_module_cmd(wmi_unified_t wmi_handle, A_UINT32 param,
 		A_UINT32 val, A_UINT32 *module_id_bitmap,
@@ -2312,13 +2306,15 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh);
  * @peer_macaddr: peer mac address
  * @tid: tid of rx
  * @reason_code: reason code
+ * @cdp_rcode: CDP reason code for sending DELBA
  *
  * Return: 0 for success or non-zero on failure
  */
 int wma_dp_send_delba_ind(uint8_t vdev_id,
 			  uint8_t *peer_macaddr,
 			  uint8_t tid,
-			  uint8_t reason_code);
+			  uint8_t reason_code,
+			  enum cdp_delba_rcode cdp_rcode);
 
 /**
  * is_roam_inprogress() - Is vdev in progress
