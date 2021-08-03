@@ -160,6 +160,7 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 	bool     cce_match = false;
 	struct   dp_pdev *pdev;
 	uint16_t protocol_tag = 0;
+	struct   dp_vdev *mvdev;
 
 	if (qdf_unlikely(!vdev))
 		return;
@@ -176,8 +177,8 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 	 * therefore, cannot check decap_type for monitor mode.
 	 * We will call this only for eth frames from dp_rx_mon_dest.c.
 	 */
-	if (qdf_likely(!(monitor_get_monitor_vdev_from_pdev(pdev) &&
-			 monitor_get_monitor_vdev_from_pdev(pdev) == vdev) &&
+	mvdev = dp_monitor_get_monitor_vdev_from_pdev(pdev);
+	if (qdf_likely(!(mvdev && mvdev == vdev) &&
 		       (vdev->rx_decap_type !=  htt_cmn_pkt_type_ethernet)))
 		return;
 
@@ -404,16 +405,16 @@ void dp_rx_mon_update_protocol_flow_tag(struct dp_soc *soc,
 	if (qdf_likely(!is_mon_protocol_flow_tag_enabled))
 		return;
 
-	mvdev = monitor_get_monitor_vdev_from_pdev(dp_pdev);
+	mvdev = dp_monitor_get_monitor_vdev_from_pdev(dp_pdev);
 
 	if (qdf_likely(!mvdev))
 		return;
 
-	if (qdf_likely(monitor_check_com_info_ppdu_id(dp_pdev, rx_desc) !=
+	if (qdf_likely(dp_monitor_check_com_info_ppdu_id(dp_pdev, rx_desc) !=
 		       QDF_STATUS_SUCCESS))
 		return;
 
-	mon_recv_status = monitor_get_rx_status(dp_pdev);
+	mon_recv_status = dp_monitor_get_rx_status(dp_pdev);
 
 	if (mon_recv_status && mon_recv_status->frame_control_info_valid &&
 	    ((mon_recv_status->frame_control & IEEE80211_FC0_TYPE_MASK) ==

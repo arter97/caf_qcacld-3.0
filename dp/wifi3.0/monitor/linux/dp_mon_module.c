@@ -68,13 +68,13 @@ int monitor_mod_init(void)
 
 		soc = wlan_psoc_get_dp_handle(psoc);
 		if (!soc) {
-			qdf_err("dp_soc is NULL, psoc = %pK", psoc);
+			dp_mon_err("dp_soc is NULL, psoc = %pK", psoc);
 			continue;
 		}
 
 		mon_soc = (struct dp_mon_soc *)qdf_mem_malloc(sizeof(*mon_soc));
 		if (!mon_soc) {
-			qdf_err("%pK: mem allocation failed", soc);
+			dp_mon_err("%pK: mem allocation failed", soc);
 			continue;
 		}
 		soc->monitor_soc = mon_soc;
@@ -89,13 +89,13 @@ int monitor_mod_init(void)
 
 			status = dp_mon_pdev_attach(pdev);
 			if (status != QDF_STATUS_SUCCESS) {
-				qdf_err("mon pdev attach failed, dp pdev = %pK",
+				dp_mon_err("mon pdev attach failed, dp pdev = %pK",
 					pdev);
 				continue;
 			}
 			status = dp_mon_pdev_init(pdev);
 			if (status != QDF_STATUS_SUCCESS) {
-				qdf_err("mon pdev init failed, dp pdev = %pK",
+				dp_mon_err("mon pdev init failed, dp pdev = %pK",
 					pdev);
 				dp_mon_pdev_detach(pdev);
 				continue;
@@ -103,16 +103,17 @@ int monitor_mod_init(void)
 
 			status = dp_mon_ring_config(soc, pdev, pdev_id);
 			if (status != QDF_STATUS_SUCCESS) {
-				qdf_err("mon ring config failed, dp pdev = %pK",
+				dp_mon_err("mon ring config failed, dp pdev = %pK",
 					pdev);
 				dp_mon_pdev_deinit(pdev);
 				dp_mon_pdev_detach(pdev);
 				continue;
 			}
+			dp_tx_capture_debugfs_init(pdev);
 			pdev_attach_success = true;
 		}
 		if (!pdev_attach_success) {
-			qdf_err("mon attach failed for all, dp soc = %pK",
+			dp_mon_err("mon attach failed for all, dp soc = %pK",
 				soc);
 			soc->monitor_soc = NULL;
 			qdf_mem_free(mon_soc);
@@ -154,7 +155,7 @@ void monitor_mod_exit(void)
 
 		soc = wlan_psoc_get_dp_handle(psoc);
 		if (!soc) {
-			qdf_err("dp_soc is NULL");
+			dp_mon_err("dp_soc is NULL");
 			continue;
 		}
 

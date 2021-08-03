@@ -34,6 +34,7 @@
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
 #include <osif_nss_wifiol_if.h>
 #endif
+#include <dp_mon.h>
 
 #define _HT_SGI_PRESENT 0x80
 
@@ -357,7 +358,7 @@ static void ol_ath_process_tx_frames(void *pdev_hdl, enum WDI_EVENT event,
 
 	if (!ic) {
 		qdf_nbuf_free(ptr_tx_info->mpdu_nbuf);
-		qdf_debug("ic is NULL");
+		dp_mon_debug("ic is NULL");
 		return;
 	}
 
@@ -365,9 +366,7 @@ static void ol_ath_process_tx_frames(void *pdev_hdl, enum WDI_EVENT event,
 	if (!vap) {
 		qdf_nbuf_free(ptr_tx_info->mpdu_nbuf);
 		ptr_tx_info->mpdu_nbuf = NULL;
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "%s: No monitor vap created, to dump skb\n",
-			  __func__);
+		dp_mon_debug("No monitor vap created, to dump skb");
 		return;
 	}
 
@@ -384,9 +383,7 @@ static void ol_ath_process_tx_frames(void *pdev_hdl, enum WDI_EVENT event,
 
 	osifp = (osif_dev *)vap->iv_ifp;
 
-	QDF_TRACE(QDF_MODULE_ID_DP_TX_CAPTURE, QDF_TRACE_LEVEL_INFO,
-		  "%s: %d ppdu_id[%d] frm_type[%d] [%p]sending to stack!!!!\n",
-		  __func__, __LINE__,
+	dp_mon_info("ppdu_id[%d] frm_type[%d] [%p]sending to stack!!!!",
 		  ptr_tx_info->mpdu_info.ppdu_id,
 		  ptr_tx_info->mpdu_info.frame_type,
 		  ptr_tx_info->mpdu_nbuf);
@@ -394,8 +391,7 @@ static void ol_ath_process_tx_frames(void *pdev_hdl, enum WDI_EVENT event,
 	skb = ptr_tx_info->mpdu_nbuf;
 
 	if (!ptr_tx_info->mpdu_nbuf) {
-		QDF_TRACE(QDF_MODULE_ID_DP_TX_CAPTURE, QDF_TRACE_LEVEL_ERROR,
-			  "mpdu_nbuf is NULL!!!!\n");
+		dp_mon_err("mpdu_nbuf is NULL!!!!");
 		return;
 	}
 
@@ -443,10 +439,19 @@ ol_ath_ucfg_set_peer_pkt_capture(void *vscn,
 	ol_txrx_soc_handle soc_handle;
 	QDF_STATUS status;
 
+#ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
+	uint32_t nss_soc_cfg = cfg_get(scn->soc->psoc_obj, CFG_NSS_WIFI_OL);
+
+	if (nss_soc_cfg) {
+		dp_mon_info("Rx/Tx Packet Capture not supported when NSS offload is enabled");
+		return 0;
+	}
+#endif /* QCA_NSS_WIFI_OFFLOAD_SUPPORT */
+
 	soc_handle =
 		(ol_txrx_soc_handle)wlan_psoc_get_dp_handle(scn->soc->psoc_obj);
 	if (!soc_handle) {
-		qdf_err("psoc handle is NULL");
+		dp_mon_err("psoc handle is NULL");
 		return -EFAULT;
 	}
 
@@ -459,7 +464,7 @@ ol_ath_ucfg_set_peer_pkt_capture(void *vscn,
 	if (status != QDF_STATUS_SUCCESS)
 		return -EINVAL;
 
-	qdf_info("Set Rx & TX packet capture [%d, %d] for peer %02x:%02x:%02x:%02x:%02x:%02x",
+	dp_mon_info("Set Rx & TX packet capture [%d, %d] for peer %02x:%02x:%02x:%02x:%02x:%02x",
 		 peer_info->rx_pkt_cap_enable, peer_info->tx_pkt_cap_enable,
 		 peer_info->peer_mac[0], peer_info->peer_mac[1],
 		 peer_info->peer_mac[2], peer_info->peer_mac[3],
@@ -620,31 +625,31 @@ ol_ath_config_full_mon_support(struct ol_ath_soc_softc *soc, uint8_t val)
 	int target_type = lmac_get_tgt_type(soc->psoc_obj);
 
 	if (target_type != TARGET_TYPE_QCN9000) {
-		qdf_err("Full mon mode is not supported for target_type: %d",
+		dp_mon_err("Full mon mode is not supported for target_type: %d",
 			target_type);
 		return QDF_STATUS_SUCCESS;
 	}
 
 	if (!cfg_get(soc->psoc_obj, CFG_DP_FULL_MON_MODE)) {
-		qdf_err("Full monitor is not supported");
+		dp_mon_err("Full monitor is not supported");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (val) {
 		if (soc->full_mon_mode_support) {
-			qdf_debug("Full monitor mode support is already enabled");
+			dp_mon_debug("Full monitor mode support is already enabled");
 			return QDF_STATUS_E_FAILURE;
 		}
 	} else {
 		if (!soc->full_mon_mode_support) {
-			qdf_debug("Full monitor mode support is already disabled");
+			dp_mon_debug("Full monitor mode support is already disabled");
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
 	soc->full_mon_mode_support = val;
 	cdp_soc_config_full_mon_mode(wlan_psoc_get_dp_handle(soc->psoc_obj),
 				     val);
-	qdf_info("Full monitor mode configured for qcn9000 target_type: %d val: %d ",
+	dp_mon_info("Full monitor mode configured for qcn9000 target_type: %d val: %d ",
 		 target_type, val);
 
 	return QDF_STATUS_SUCCESS;
@@ -825,14 +830,14 @@ QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc)
 	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
 
 	if (!tgt_hdl) {
-		qdf_err("%s: target_psoc_info is null", __func__);
+		dp_mon_err("target_psoc_info is null");
 		return status;
 	}
 
 	soc = (ol_ath_soc_softc_t *)target_psoc_get_feature_ptr(tgt_hdl);
 
 	if (!soc) {
-		qdf_err("%s: feature ptr is null", __func__);
+		dp_mon_err("feature ptr is null");
 		return status;
 	}
 	soc->soc_mon_ops = &monitor_ops;
@@ -840,16 +845,13 @@ QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc)
 	for (i = 0; i < WMI_HOST_MAX_PDEV; i++) {
 		pdev = wlan_objmgr_get_pdev_by_id(psoc, i, WLAN_MLME_NB_ID);
 		if (!pdev) {
-			QDF_TRACE(QDF_MODULE_ID_DYNAMIC_MODE_CHG,
-				  QDF_TRACE_LEVEL_ERROR,
-				  FL("pdev object (id: %d) is NULL"), i);
+			dp_mon_err("pdev object (id: %d) is NULL", i);
 			continue;
 		}
 		scn = (struct ol_ath_softc_net80211 *)
 				lmac_get_pdev_feature_ptr(pdev);
 		if (!scn) {
-			QDF_TRACE(QDF_MODULE_ID_DYNAMIC_MODE_CHG,
-				  QDF_TRACE_LEVEL_ERROR, FL("scn is NULL"));
+			dp_mon_err("scn is NULL");
 
 			wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 			continue;
@@ -887,30 +889,27 @@ void mon_soc_ol_detach(struct wlan_objmgr_psoc *psoc)
 	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
 
 	if (!tgt_hdl) {
-		qdf_err("%s: target_psoc_info is null", __func__);
+		dp_mon_err("target_psoc_info is null");
 		return;
 	}
 
 	soc = (ol_ath_soc_softc_t *)target_psoc_get_feature_ptr(tgt_hdl);
 
 	if (!soc) {
-		qdf_err("%s: feature ptr is null", __func__);
+		dp_mon_err("feature ptr is null");
 		return;
 	}
 
 	for (i = 0; i < WMI_HOST_MAX_PDEV; i++) {
 		pdev = wlan_objmgr_get_pdev_by_id(psoc, i, WLAN_MLME_NB_ID);
 		if (!pdev) {
-			QDF_TRACE(QDF_MODULE_ID_DYNAMIC_MODE_CHG,
-				  QDF_TRACE_LEVEL_ERROR,
-				  FL("pdev object (id: %d) is NULL"), i);
+			dp_mon_err("pdev object (id: %d) is NULL", i);
 			continue;
 		}
 		scn = (struct ol_ath_softc_net80211 *)
 				lmac_get_pdev_feature_ptr(pdev);
 		if (!scn) {
-			QDF_TRACE(QDF_MODULE_ID_DYNAMIC_MODE_CHG,
-				  QDF_TRACE_LEVEL_ERROR, FL("scn is NULL"));
+			dp_mon_err("scn is NULL");
 
 			wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 			continue;

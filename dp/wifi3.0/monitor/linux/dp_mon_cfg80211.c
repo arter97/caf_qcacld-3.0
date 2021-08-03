@@ -14,6 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <ieee80211_cfg80211.h>
+#include <dp_mon.h>
 
 void *extract_command(struct ieee80211com *ic, struct wireless_dev *wdev,
 		      int *cmd_type);
@@ -39,30 +40,30 @@ int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
 	cfg_ctx = (struct cfg80211_context *)wiphy_priv(wiphy);
 
 	if (!cfg_ctx) {
-		qdf_err("Invalid context");
+		dp_mon_err("Invalid context");
 		return -EINVAL;
 	}
 
 	ic = cfg_ctx->ic;
 	if (!ic) {
-		qdf_err("Invalid interface");
+		dp_mon_err("Invalid interface");
 		return -EINVAL;
 	}
 
 	cmd = extract_command(ic, wdev, &cmd_type);
 	if (!cmd_type) {
-		qdf_err("Command on invalid interface");
+		dp_mon_err("Command on invalid interface");
 		return -EINVAL;
 	}
 
 	if (!params->data || (!params->data_len)) {
-		qdf_err("%s: Invalid data length %d ", __func__,
+		dp_mon_err("%s: Invalid data length %d ", __func__,
 			params->data_len);
 		return -EINVAL;
 	}
 
 	if (params->data_len != QDF_MAC_ADDR_SIZE) {
-		qdf_err("Invalid MAC address!");
+		dp_mon_err("Invalid MAC address!");
 		return -EINVAL;
 	}
 
@@ -70,7 +71,7 @@ int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
 	peer_info.rx_pkt_cap_enable = !!params->value;
 	peer_info.tx_pkt_cap_enable = params->length;
 
-	qdf_debug("Peer Pkt Capture: rx_enable = %u, "
+	dp_mon_debug("Peer Pkt Capture: rx_enable = %u, "
 		  "tx_enable = %u, mac = %02x:%02x:%02x:%02x:%02x:%02x\n",
 		  peer_info.rx_pkt_cap_enable, peer_info.tx_pkt_cap_enable,
 		  peer_info.peer_mac[0], peer_info.peer_mac[1],
