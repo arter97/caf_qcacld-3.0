@@ -86,17 +86,17 @@ struct wlan_objmgr_pdev *wlan_gbl_6ghz_pdev_get(void)
 
 qdf_export_symbol(wlan_gbl_6ghz_pdev_get);
 
-void wlan_rnr_set_bss_idx(uint32_t bss_idx)
+void wlan_rnr_set_bss_idx(uint32_t bss_idx, uint8_t group_id)
 {
-	g_rnr_info.rnr_mbss_idx_map |= (1 << (bss_idx-1));
+	g_rnr_info.rnr_mbss_idx_map[group_id] |= (1 << (bss_idx-1));
 }
 
-uint32_t wlan_rnr_get_bss_idx(void)
+uint32_t wlan_rnr_get_bss_idx(uint8_t group_id)
 {
-	return g_rnr_info.rnr_mbss_idx_map;
+	return g_rnr_info.rnr_mbss_idx_map[group_id];
 }
 
-void  wlan_rnr_clear_bss_idx(void)
+void  wlan_rnr_clear_bss_idx(uint8_t group_id)
 {
-	g_rnr_info.rnr_mbss_idx_map = 0;
+	g_rnr_info.rnr_mbss_idx_map[group_id] = 0;
 }

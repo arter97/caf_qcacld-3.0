@@ -26,9 +26,10 @@
  * @pdev_6ghz_ctx:          6Ghz pdev context
  */
 struct rnr_global_info {
+#define EMA_AP_MAX_GROUPS 8
 	qdf_atomic_t vdev_lower_band_cnt;
 	qdf_atomic_t vdev_6ghz_band_cnt;
-	uint32_t rnr_mbss_idx_map;
+	uint32_t rnr_mbss_idx_map[EMA_AP_MAX_GROUPS];
 	struct wlan_objmgr_pdev *pdev_6ghz_ctx;
 };
 
@@ -132,7 +133,7 @@ struct wlan_objmgr_pdev *wlan_gbl_6ghz_pdev_get(void);
  *
  * Return: void
  */
-void wlan_rnr_set_bss_idx(uint32_t bss_idx);
+void wlan_rnr_set_bss_idx(uint32_t bss_idx, uint8_t group_id);
 
 /**
  * wlan_rnr_get_bss_idx - Get bit corresponding to bss index
@@ -142,7 +143,7 @@ void wlan_rnr_set_bss_idx(uint32_t bss_idx);
  *
  * Return: void
  */
-uint32_t wlan_rnr_get_bss_idx(void);
+uint32_t wlan_rnr_get_bss_idx(uint8_t group_id);
 
 /**
  * wlan_rnr_clear_bss_idx - Clear bits corresponding to bss index map
@@ -152,6 +153,6 @@ uint32_t wlan_rnr_get_bss_idx(void);
  *
  * Return: void
  */
-void wlan_rnr_clear_bss_idx(void);
+void wlan_rnr_clear_bss_idx(uint8_t group_id);
 
 #endif /* End of _WLAN_RNR_H_ */
