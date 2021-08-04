@@ -1612,28 +1612,6 @@ static void hdd_clear_roam_profile_ie(struct hdd_adapter *adapter)
 }
 
 /**
- * hdd_roam_deregister_sta() - deregister station
- * @adapter: pointer to adapter
- * @sta_id: station identifier
- *
- * Return: QDF_STATUS enumeration
- */
-QDF_STATUS hdd_roam_deregister_sta(struct hdd_adapter *adapter, uint8_t sta_id)
-{
-	QDF_STATUS qdf_status;
-
-	qdf_status = cdp_clear_peer(cds_get_context(QDF_MODULE_ID_SOC),
-			(struct cdp_pdev *)cds_get_context(QDF_MODULE_ID_TXRX),
-			sta_id);
-	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
-		hdd_err("cdp_clear_peer() failed for sta_id %d. Status(%d) [0x%08X]",
-			sta_id, qdf_status, qdf_status);
-	}
-
-	return qdf_status;
-}
-
-/**
  * hdd_print_bss_info() - print bss info
  * @hdd_sta_ctx: pointer to hdd station context
  *
@@ -1700,7 +1678,6 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 					  eCsrRoamResult roam_result)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	QDF_STATUS vstatus;
 	struct net_device *dev = adapter->dev;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
@@ -1823,47 +1800,7 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 							 true);
 		}
 	}
-
-	if (eCSR_ROAM_IBSS_LEAVE == roam_status) {
-		uint8_t i;
-
-		sta_id = sta_ctx->broadcast_sta_id;
-		vstatus = hdd_roam_deregister_sta(adapter, sta_id);
-		if (!QDF_IS_STATUS_SUCCESS(vstatus)) {
-			hdd_err("hdd_roam_deregister_sta() failed for staID %d Status: %d [0x%x]",
-					sta_id, status, status);
-			status = QDF_STATUS_E_FAILURE;
-		}
-		if (sta_id < HDD_MAX_ADAPTERS)
-			hdd_ctx->sta_to_adapter[sta_id] = NULL;
-		else
-			hdd_debug("invalid sta id %d", sta_id);
-		/* Clear all the peer sta register with TL. */
-		for (i = 0; i < MAX_PEERS; i++) {
-			if (HDD_WLAN_INVALID_STA_ID ==
-				sta_ctx->conn_info.sta_id[i])
-				continue;
-			sta_id = sta_ctx->conn_info.sta_id[i];
-			hdd_debug("Deregister StaID %d", sta_id);
-			vstatus = hdd_roam_deregister_sta(adapter, sta_id);
-			if (!QDF_IS_STATUS_SUCCESS(vstatus)) {
-				hdd_err("hdd_roam_deregister_sta() failed to for staID %d Status: %d [0x%x]",
-					sta_id, status, status);
-				status = QDF_STATUS_E_FAILURE;
-			}
-			/* set the sta_id and peer mac as 0, all other
-			 * reset are done in hdd_connRemoveConnectInfo.
-			 */
-			sta_ctx->conn_info.sta_id[i] =
-						HDD_WLAN_INVALID_STA_ID;
-			qdf_mem_zero(&sta_ctx->conn_info.peer_macaddr[i],
-				sizeof(struct qdf_mac_addr));
-			if (sta_id < HDD_MAX_ADAPTERS)
-				hdd_ctx->sta_to_adapter[sta_id] = NULL;
-			else
-				hdd_debug("invalid sta_id %d", sta_id);
-		}
-	} else {
+	if (eCSR_ROAM_IBSS_LEAVE != roam_status) {
 		sta_id = sta_ctx->conn_info.sta_id[0];
 		hdd_debug("roam_result: %d", roam_result);
 
@@ -4056,8 +3993,6 @@ roam_roam_connect_status_update_handler(struct hdd_adapter *adapter,
 			 QDF_MAC_ADDR_ARRAY(sta_ctx->conn_info.bssid.bytes),
 			 roam_info->staId);
 
-		hdd_roam_deregister_sta(adapter, roam_info->staId);
-
 		if (roam_info->staId < HDD_MAX_ADAPTERS)
 			hdd_ctx->sta_to_adapter[roam_info->staId] = NULL;
 		else
@@ -4175,6 +4110,7 @@ inline QDF_STATUS hdd_roam_deregister_tdlssta(struct hdd_adapter *adapter,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
 #endif
 
 #ifdef WLAN_FEATURE_11W
@@ -4747,7 +4683,6 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 	QDF_STATUS qdf_ret_status = QDF_STATUS_SUCCESS;
 	struct hdd_adapter *adapter = context;
 	struct hdd_station_ctx *sta_ctx = NULL;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct cfg80211_bss *bss_status;
 	struct hdd_context *hdd_ctx;
 
@@ -4801,10 +4736,6 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 		wlan_hdd_netif_queue_control(adapter,
 				WLAN_STOP_ALL_NETIF_QUEUE,
 				WLAN_CONTROL_PATH);
-		status = hdd_roam_deregister_sta(adapter,
-					sta_ctx->conn_info.sta_id[0]);
-		if (!QDF_IS_STATUS_SUCCESS(status))
-			qdf_ret_status = QDF_STATUS_E_FAILURE;
 		sta_ctx->ft_carrier_on = true;
 		sta_ctx->hdd_reassoc_scenario = true;
 		hdd_debug("hdd_reassoc_scenario set to: %d, due to eCSR_ROAM_FT_START, session: %d",
