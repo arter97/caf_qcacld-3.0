@@ -45,7 +45,6 @@ dp_mon_ring_config(struct dp_soc *soc, struct dp_pdev *pdev,
 	return status;
 }
 
-
 #ifndef QCA_SINGLE_WIFI_3_0
 static int __init monitor_mod_init(void)
 #else
@@ -161,6 +160,11 @@ void monitor_mod_exit(void)
 
 		if (!soc->monitor_soc)
 			continue;
+
+		dp_soc_reset_mon_intr_mask(soc);
+		/* add delay before proceeding to allow any pending
+		 * mon process to complete */
+		qdf_mdelay(500);
 
 		mon_soc_ol_detach(psoc);
 		dp_mon_cdp_ops_deregister(soc);
