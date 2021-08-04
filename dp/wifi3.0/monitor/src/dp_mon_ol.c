@@ -31,6 +31,9 @@
 #include <cfg_ucfg_api.h>
 #include <target_type.h>
 #include <target_if.h>
+#ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
+#include <osif_nss_wifiol_if.h>
+#endif
 
 #define _HT_SGI_PRESENT 0x80
 
@@ -440,15 +443,6 @@ ol_ath_ucfg_set_peer_pkt_capture(void *vscn,
 	ol_txrx_soc_handle soc_handle;
 	QDF_STATUS status;
 
-#ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
-	uint32_t nss_soc_cfg = cfg_get(scn->soc->psoc_obj, CFG_NSS_WIFI_OL);
-
-	if (nss_soc_cfg) {
-		qdf_info("Rx/Tx Packet Capture not supported when NSS offload is enabled");
-		return 0;
-	}
-#endif /* QCA_NSS_WIFI_OFFLOAD_SUPPORT */
-
 	soc_handle =
 		(ol_txrx_soc_handle)wlan_psoc_get_dp_handle(scn->soc->psoc_obj);
 	if (!soc_handle) {
@@ -470,6 +464,21 @@ ol_ath_ucfg_set_peer_pkt_capture(void *vscn,
 		 peer_info->peer_mac[0], peer_info->peer_mac[1],
 		 peer_info->peer_mac[2], peer_info->peer_mac[3],
 		 peer_info->peer_mac[4], peer_info->peer_mac[5]);
+
+#ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
+	if (scn->sc_ic.nss_radio_ops) {
+		if (peer_info->tx_pkt_cap_enable) {
+			status = scn->sc_ic.nss_radio_ops->ic_nss_ol_peer_cfg_tx_capture(scn,
+					peer_info->tx_pkt_cap_enable, peer_info->peer_mac);
+		}
+	}
+	if (status != QDF_STATUS_SUCCESS) {
+		qdf_err("Peer Tx capture enable for NSS offload failed for peer = " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_info->peer_mac));
+		return -EINVAL;
+	}
+#endif  /* QCA_NSS_WIFI_OFFLOAD_SUPPORT */
+
 	return 0;
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
