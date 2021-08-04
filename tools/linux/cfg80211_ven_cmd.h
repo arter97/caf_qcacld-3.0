@@ -782,8 +782,8 @@ enum {
 #ifdef WLAN_FEATURE_11BE
 	IEEE80211_PARAM_PUNCTURE_BITMAP            = 746,   /* get 11be puncture bitmap */
 #endif /* WLAN_FEATURE_11BE */
-
 	IEEE80211_PARAM_MBO_BSTM_REQ               = 747,   /* Enable MBO IE in BSTM req. */
+	IEEE80211_PARAM_MCAST_STEER                = 748,   /* Enable Mcast Steering */
 };
 
 enum {
@@ -2168,6 +2168,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_he_min_frag_size",    IEEE80211_PARAM_HE_MIN_FRAG_SIZE, GET_PARAM, 0},
 	{"he_omi",              IEEE80211_PARAM_HE_OMI, SET_PARAM, 1},
 	{"get_he_omi",          IEEE80211_PARAM_HE_OMI, GET_PARAM, 0},
+	{"mcast_steering_en",     IEEE80211_PARAM_MCAST_STEER, SET_PARAM, 1},
+	{"get_mcast_steering_en", IEEE80211_PARAM_MCAST_STEER, GET_PARAM, 0},
 	{"he_ndp_4x_ltf_3200ns_gi",
 		IEEE80211_PARAM_HE_NDP_4X_LTF_3200NS_GI, SET_PARAM, 1},
 	{"get_he_ndp_4x_ltf_3200ns_gi",
