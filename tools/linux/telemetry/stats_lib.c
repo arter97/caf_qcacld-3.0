@@ -1667,6 +1667,70 @@ static void free_advance_ap(struct stats_ap *ap, enum stats_type_e type)
 		STATS_ERR("Unexpected Type %d!\n", type);
 	}
 }
+
+static void aggr_advance_pdev_ctrl(struct advance_pdev_ctrl *pdev_ctrl,
+				   struct advance_vdev_ctrl *vdev_ctrl)
+{
+	if (pdev_ctrl->tx && vdev_ctrl->tx)
+		pdev_ctrl->tx->cs_tx_beacon +=
+					vdev_ctrl->tx->cs_tx_bcn_success +
+					vdev_ctrl->tx->cs_tx_bcn_outage;
+}
+
+static void aggregate_radio_stats(struct reply_buffer *reply,
+				  enum stats_type_e type)
+{
+	struct stats_radio *radio;
+	struct stats_vap *vap;
+
+	if (!reply)
+		return;
+
+	radio = reply->obj_list.radio_list;
+	while (radio) {
+		vap = radio->mgr.child_root;
+		while (vap) {
+			if (vap->mgr.parent != radio)
+				break;
+			switch (type) {
+			case STATS_TYPE_DATA:
+				break;
+			case STATS_TYPE_CTRL:
+				aggr_advance_pdev_ctrl(&radio->u_advance.ctrl,
+						       &vap->u_advance.ctrl);
+				break;
+			}
+			vap = vap->mgr.next;
+		}
+		radio = radio->mgr.next;
+	}
+}
+
+static void libstats_accumulate(struct stats_command *cmd)
+{
+	if (!cmd->recursive)
+		return;
+
+	/**
+	 * Aggregation should be handled in each lower node of hierarchy first
+	 * and then in top node. That should be handled in each object level
+	 * aggreagation functions.
+	 *
+	 * In STA, aggregation is not required. So, treated as default case.
+	 **/
+	switch (cmd->obj) {
+	case STATS_OBJ_AP:
+		break;
+	case STATS_OBJ_RADIO:
+		aggregate_radio_stats(cmd->reply, cmd->type);
+		break;
+	case STATS_OBJ_VAP:
+		break;
+	case STATS_OBJ_STA:
+	default:
+		break;
+	}
+}
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
 static void free_sta(struct stats_sta *sta, struct stats_command *cmd)
@@ -1838,6 +1902,10 @@ int32_t libstats_request_handle(struct stats_command *cmd)
 	ret = libstats_send(cmd);
 
 	libstats_deinit();
+
+#if WLAN_ADVANCE_TELEMETRY
+	libstats_accumulate(cmd);
+#endif /* WLAN_ADVANCE_TELEMETRY */
 
 	return ret;
 }

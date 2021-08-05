@@ -311,16 +311,18 @@ void print_basic_radio_data_rx(struct basic_pdev_data_rx *rx)
 
 void print_basic_radio_ctrl_tx(struct basic_pdev_ctrl_tx *tx)
 {
+	STATS_32(stdout, "Lithium_cycle_counts: Tx Frame Count",
+		 tx->cs_tx_frame_count);
 	STATS_32(stdout, "Tx Management", tx->cs_tx_mgmt);
-	STATS_32(stdout, "Tx Frame Count", tx->cs_tx_frame_count);
 }
 
 void print_basic_radio_ctrl_rx(struct basic_pdev_ctrl_rx *rx)
 {
+	STATS_32(stdout, "Lithium_cycle_counts: Rx Frame Count",
+		 rx->cs_rx_frame_count);
 	STATS_32(stdout, "Rx Management", rx->cs_rx_mgmt);
 	STATS_32(stdout, "Rx Number of Mnagement", rx->cs_rx_num_mgmt);
 	STATS_32(stdout, "Rx Number of Control", rx->cs_rx_num_ctl);
-	STATS_32(stdout, "Rx Frame Count", rx->cs_rx_frame_count);
 	STATS_32(stdout, "Rx Error Sum", rx->cs_rx_error_sum);
 }
 
