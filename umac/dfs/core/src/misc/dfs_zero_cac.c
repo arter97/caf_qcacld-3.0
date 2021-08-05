@@ -419,6 +419,17 @@ void dfs_zero_cac_timer_detach(struct dfs_soc_priv_obj *dfs_soc_obj)
 }
 #endif
 
+#if defined(QCA_SUPPORT_AGILE_DFS) || defined(ATH_SUPPORT_ZERO_CAC_DFS)
+bool dfs_is_precac_domain(struct wlan_dfs *dfs)
+{
+	enum dfs_reg dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
+
+	if (dfsdomain == DFS_ETSI_REGION)
+		return true;
+	return false;
+}
+#endif
+
 #ifdef QCA_SUPPORT_AGILE_DFS
 bool dfs_is_agile_precac_enabled(struct wlan_dfs *dfs)
 {
@@ -1526,6 +1537,19 @@ static void dfs_fill_des_rcac_chan_params(struct wlan_dfs *dfs,
 	ch_params->mhz_freq_seg1 = chan->dfs_ch_mhz_freq_seg2;
 }
 
+#if defined(QCA_SUPPORT_ADFS_RCAC)
+bool dfs_is_rcac_domain(struct wlan_dfs *dfs)
+{
+	enum dfs_reg dfsdomain = utils_get_dfsdomain(dfs->dfs_pdev_obj);
+
+	if (dfsdomain == DFS_FCC_REGION ||
+	    dfsdomain == DFS_MKK_REGION ||
+	    dfsdomain == DFS_MKKN_REGION)
+		return true;
+
+	return false;
+}
+#endif
 
 bool dfs_is_agile_rcac_enabled(struct wlan_dfs *dfs)
 {

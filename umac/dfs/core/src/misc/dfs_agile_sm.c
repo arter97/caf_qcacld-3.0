@@ -565,9 +565,9 @@ static bool dfs_agile_state_running_event(void *ctx,
 		status = true;
 		break;
 	case DFS_AGILE_SM_EV_AGILE_STOP:
-		if (dfs_is_agile_rcac_enabled(dfs))
+		if (dfs_is_rcac_domain(dfs))
 			dfs_abort_agile_rcac(dfs);
-		else if (dfs_is_agile_precac_enabled(dfs))
+		else if (dfs_is_precac_domain(dfs))
 			dfs_abort_agile_precac(dfs);
 
 		dfs_agile_sm_transition_to(dfs_soc, DFS_AGILE_S_INIT);
