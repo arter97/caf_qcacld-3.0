@@ -387,12 +387,14 @@ UCFG_VDEV_CP_STATS_SET_FUNCS(fils_frames_sent);
 UCFG_VDEV_CP_STATS_SET_FUNCS(fils_frames_sent_fail);
 UCFG_VDEV_CP_STATS_SET_FUNCS(tx_offload_prb_resp_succ_cnt);
 UCFG_VDEV_CP_STATS_SET_FUNCS(tx_offload_prb_resp_fail_cnt);
+#ifdef QCA_SUPPORT_SCAN_SPCL_VAP_STATS
 UCFG_VDEV_CP_STATS_SET_FUNCS(tx_mgmt_ok_cnt);
 UCFG_VDEV_CP_STATS_SET_FUNCS(tx_mgmt_ok_bytes);
 UCFG_VDEV_CP_STATS_SET_FUNCS(tx_mgmt_retry_cnt);
 UCFG_VDEV_CP_STATS_SET_FUNCS(tx_mgmt_retry_bytes);
 UCFG_VDEV_CP_STATS_SET_FUNCS(tx_mgmt_err_cnt);
 UCFG_VDEV_CP_STATS_SET_FUNCS(tx_mgmt_err_bytes);
+#endif
 
 #define UCFG_VDEV_CP_STATS_GET_FUNCS(field) \
 	static inline uint64_t \
@@ -415,12 +417,14 @@ UCFG_VDEV_CP_STATS_GET_FUNCS(peer_delete_req);
 UCFG_VDEV_CP_STATS_GET_FUNCS(peer_delete_resp);
 UCFG_VDEV_CP_STATS_GET_FUNCS(peer_delete_all_req);
 UCFG_VDEV_CP_STATS_GET_FUNCS(peer_delete_all_resp);
+#ifdef QCA_SUPPORT_SCAN_SPCL_VAP_STATS
 UCFG_VDEV_CP_STATS_GET_FUNCS(tx_mgmt_ok_cnt);
 UCFG_VDEV_CP_STATS_GET_FUNCS(tx_mgmt_ok_bytes);
 UCFG_VDEV_CP_STATS_GET_FUNCS(tx_mgmt_retry_cnt);
 UCFG_VDEV_CP_STATS_GET_FUNCS(tx_mgmt_retry_bytes);
 UCFG_VDEV_CP_STATS_GET_FUNCS(tx_mgmt_err_cnt);
 UCFG_VDEV_CP_STATS_GET_FUNCS(tx_mgmt_err_bytes);
+#endif
 
 #define UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(field) \
 	static inline void \

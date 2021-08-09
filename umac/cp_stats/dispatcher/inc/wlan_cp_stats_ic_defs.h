@@ -386,12 +386,14 @@ struct vdev_80211_stats {
 	uint64_t cs_fils_frames_sent_fail;
 	uint64_t cs_tx_offload_prb_resp_succ_cnt;
 	uint64_t cs_tx_offload_prb_resp_fail_cnt;
+#ifdef QCA_SUPPORT_SCAN_SPCL_VAP_STATS
 	uint64_t cs_tx_mgmt_ok_cnt;
 	uint64_t cs_tx_mgmt_ok_bytes;
 	uint64_t cs_tx_mgmt_retry_cnt;
 	uint64_t cs_tx_mgmt_retry_bytes;
 	uint64_t cs_tx_mgmt_err_cnt;
 	uint64_t cs_tx_mgmt_err_bytes;
+#endif
 };
 
 /**
