@@ -32,10 +32,10 @@
 #include "wlan_serialization_api.h"
 #include "wlan_cm_roam_api.h"
 #include <wlan_cfg80211_scan.h>
-#ifdef FEATURE_CM_ENABLE
 #include "connection_mgr/core/src/wlan_cm_roam.h"
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include "connection_mgr/core/src/wlan_cm_main_api.h"
+
 #define FW_ROAM_SYNC_TIMEOUT 7000
 
 static QDF_STATUS
@@ -89,6 +89,7 @@ QDF_STATUS cm_abort_fw_roam(struct cnx_mgr *cm_ctx,
 {
 	QDF_STATUS status;
 
+	mlme_cm_osif_roam_abort_ind(cm_ctx->vdev);
 	status = cm_sm_deliver_event(cm_ctx->vdev,
 				     WLAN_CM_SM_EV_ROAM_ABORT,
 				     sizeof(wlan_cm_id), &cm_id);
@@ -296,9 +297,9 @@ QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_vdev *vdev;
 	struct cnx_mgr *cm_ctx;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct cm_roam_req *roam_req = NULL;
-	wlan_cm_id cm_id;
+	wlan_cm_id cm_id = CM_ID_INVALID;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_SB_ID);
@@ -307,36 +308,144 @@ QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	cm_ctx = cm_get_cm_ctx(vdev);
-	roam_req = cm_get_first_roam_command(vdev);
-	if (!roam_req) {
-		mlme_err("Failed to find roam req from list");
-		cm_id = CM_ID_INVALID;
-		status = QDF_STATUS_E_FAILURE;
-		goto end;
-	}
-
-	cm_id = roam_req->cm_id;
 	pdev = wlan_vdev_get_pdev(vdev);
 	if (!pdev) {
 		mlme_err("Failed to find pdev for vdev id %d",
-			 roam_req->req.vdev_id);
-		status = QDF_STATUS_E_FAILURE;
-		goto end;
+			 vdev_id);
+		goto rel_ref;
 	}
 
-	mlme_cm_osif_roam_abort_ind(cm_ctx->vdev);
-	status = wlan_cm_roam_state_change(pdev,
-					   roam_req->req.vdev_id,
-					   WLAN_ROAM_RSO_ENABLED,
+	cm_ctx = cm_get_cm_ctx(vdev);
+	if (!cm_ctx)
+		goto rel_ref;
+
+	roam_req = cm_get_first_roam_command(vdev);
+	if (roam_req)
+		cm_id = roam_req->cm_id;
+
+	/* continue even if no roam command is found */
+	status = wlan_cm_roam_state_change(pdev, vdev_id, WLAN_ROAM_RSO_ENABLED,
 					   REASON_ROAM_ABORT);
 
-	if (QDF_IS_STATUS_ERROR(status))
-		goto end;
-end:
 	cm_abort_fw_roam(cm_ctx, cm_id);
+rel_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 
 	return status;
 }
-#endif /*FEATURE_CM_ENABLE */
+
+#ifdef ROAM_TARGET_IF_CONVERGENCE
+QDF_STATUS
+cm_roam_sync_event_handler(struct wlan_objmgr_psoc *psoc,
+			   uint8_t *event,
+			   uint32_t len,
+			   uint8_t vdev_id)
+{
+	return cm_fw_roam_sync_req(psoc, vdev_id, event, len);
+}
+
+QDF_STATUS
+cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
+				 struct roam_synch_frame_ind *frame_ind)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct rso_config *rso_cfg;
+	struct roam_synch_frame_ind *sync_frame_ind = frame_ind;
+	struct roam_synch_frame_ind *roam_synch_frame_ind;
+	uint8_t vdev_id;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!sync_frame_ind)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	vdev_id = sync_frame_ind->vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	rso_cfg = wlan_cm_get_rso_config(vdev);
+	if (!rso_cfg) {
+		status = QDF_STATUS_E_FAILURE;
+		goto err;
+	}
+
+	roam_synch_frame_ind = &rso_cfg->roam_sync_frame_ind;
+
+	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id)) {
+		mlme_err("Ignoring this event as it is unexpected");
+		cm_free_roam_synch_frame_ind(rso_cfg);
+		status = QDF_STATUS_E_FAILURE;
+		goto err;
+	}
+
+	if (sync_frame_ind->bcn_probe_rsp_len) {
+		roam_synch_frame_ind->bcn_probe_rsp_len =
+			sync_frame_ind->bcn_probe_rsp_len;
+
+		roam_synch_frame_ind->is_beacon =
+			sync_frame_ind->is_beacon;
+
+		if (roam_synch_frame_ind->bcn_probe_rsp)
+			qdf_mem_free(roam_synch_frame_ind->bcn_probe_rsp);
+
+		roam_synch_frame_ind->bcn_probe_rsp =
+			qdf_mem_malloc(roam_synch_frame_ind->bcn_probe_rsp_len);
+		if (!roam_synch_frame_ind->bcn_probe_rsp) {
+			QDF_ASSERT(roam_synch_frame_ind->bcn_probe_rsp);
+			cm_free_roam_synch_frame_ind(rso_cfg);
+			status = QDF_STATUS_E_NOMEM;
+			goto err;
+		}
+		qdf_mem_copy(roam_synch_frame_ind->bcn_probe_rsp,
+			     sync_frame_ind->bcn_probe_rsp,
+			     roam_synch_frame_ind->bcn_probe_rsp_len);
+	}
+
+	if (sync_frame_ind->reassoc_req_len) {
+		roam_synch_frame_ind->reassoc_req_len =
+				sync_frame_ind->reassoc_req_len;
+
+		if (roam_synch_frame_ind->reassoc_req)
+			qdf_mem_free(roam_synch_frame_ind->reassoc_req);
+		roam_synch_frame_ind->reassoc_req =
+			qdf_mem_malloc(roam_synch_frame_ind->reassoc_req_len);
+		if (!roam_synch_frame_ind->reassoc_req) {
+			QDF_ASSERT(roam_synch_frame_ind->reassoc_req);
+			cm_free_roam_synch_frame_ind(rso_cfg);
+			status = QDF_STATUS_E_NOMEM;
+			goto err;
+		}
+		qdf_mem_copy(roam_synch_frame_ind->reassoc_req,
+			     sync_frame_ind->reassoc_req,
+			     roam_synch_frame_ind->reassoc_req_len);
+	}
+
+	if (sync_frame_ind->reassoc_rsp_len) {
+		roam_synch_frame_ind->reassoc_rsp_len =
+				sync_frame_ind->reassoc_rsp_len;
+
+		if (roam_synch_frame_ind->reassoc_rsp)
+			qdf_mem_free(roam_synch_frame_ind->reassoc_rsp);
+
+		roam_synch_frame_ind->reassoc_rsp =
+			qdf_mem_malloc(roam_synch_frame_ind->reassoc_rsp_len);
+		if (!roam_synch_frame_ind->reassoc_rsp) {
+			QDF_ASSERT(roam_synch_frame_ind->reassoc_rsp);
+			cm_free_roam_synch_frame_ind(rso_cfg);
+			status = QDF_STATUS_E_NOMEM;
+			goto err;
+		}
+		qdf_mem_copy(roam_synch_frame_ind->reassoc_rsp,
+			     sync_frame_ind->reassoc_rsp,
+			     roam_synch_frame_ind->reassoc_rsp_len);
+	}
+
+err:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+	return status;
+}
+#endif /* ROAM_TARGET_IF_CONVERGENCE */

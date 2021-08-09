@@ -240,10 +240,13 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_ENABLE_BUS_SUSPEND_IN_SAP_MODE);
 	psoc_cfg->is_bus_suspend_enabled_in_go_mode =
 		cfg_get(psoc, CFG_ENABLE_BUS_SUSPEND_IN_GO_MODE);
+	psoc_cfg->is_dynamic_pcie_gen_speed_change_enabled =
+		cfg_get(psoc, CFG_ENABLE_DYNAMIC_PCIE_GEN_SPEED_SWITCH);
 	psoc_cfg->default_power_save_mode = psoc_cfg->power_save_mode;
 	psoc_cfg->max_ps_poll = cfg_get(psoc, CFG_PMO_MAX_PS_POLL);
 
 	psoc_cfg->wow_enable = cfg_get(psoc, CFG_PMO_WOW_ENABLE);
+	psoc_cfg->suspend_mode = cfg_get(psoc, CFG_PMO_SUSPEND_MODE);
 
 	wlan_extwow_init_cfg(psoc, psoc_cfg);
 	psoc_cfg->apf_enable = cfg_get(psoc, CFG_PMO_APF_ENABLE);
@@ -264,6 +267,8 @@ static void wlan_pmo_init_cfg(struct wlan_objmgr_psoc *psoc,
 	wlan_pmo_ra_filtering_init_cfg(psoc, psoc_cfg);
 	wlan_pmo_gpio_wakeup_init_cfg(psoc, psoc_cfg);
 	wlan_pmo_get_igmp_offload_enable_cfg(psoc, psoc_cfg);
+	psoc_cfg->disconnect_sap_tdls_in_wow =
+			cfg_get(psoc, CFG_DISCONNECT_SAP_TDLS_IN_WOW);
 }
 
 QDF_STATUS pmo_psoc_open(struct wlan_objmgr_psoc *psoc)

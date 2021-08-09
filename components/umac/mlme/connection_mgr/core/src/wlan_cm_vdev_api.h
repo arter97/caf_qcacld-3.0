@@ -26,13 +26,13 @@
 
 #include <wlan_cm_public_struct.h>
 #include "scheduler_api.h"
-#ifdef FEATURE_CM_ENABLE
 #include "connection_mgr/core/src/wlan_cm_main.h"
 #include "connection_mgr/core/src/wlan_cm_main_api.h"
-#endif
 #include <wlan_cm_roam_api.h>
+#ifdef WLAN_FEATURE_11BE_MLO
+#include "wlan_mlo_mgr_public_structs.h"
+#endif
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * struct cm_vdev_join_req - connect req from legacy CM to vdev manager
  * @vdev_id: vdev id
@@ -47,6 +47,7 @@
  * @assoc_ie: assoc ie to be used in assoc req
  * @scan_ie: Default scan ie to be used in the uncast probe req
  * @entry: scan entry for the candidate
+ * @partner_info: Partner link information for an ML connection
  */
 struct cm_vdev_join_req {
 	uint8_t vdev_id;
@@ -58,6 +59,9 @@ struct cm_vdev_join_req {
 	struct element_info assoc_ie;
 	struct element_info scan_ie;
 	struct scan_cache_entry *entry;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct mlo_partner_info partner_info;
+#endif
 };
 
 /**
@@ -142,7 +146,6 @@ struct cm_host_roam_start_ind {
 struct cm_ext_obj {
 	struct rso_config rso_cfg;
 };
-#endif
 
 #ifdef WLAN_FEATURE_FILS_SK
 /**
@@ -246,26 +249,27 @@ void cm_csr_set_joining(uint8_t vdev_id);
 void cm_csr_set_joined(uint8_t vdev_id);
 void cm_csr_set_idle(uint8_t vdev_id);
 
-#ifndef FEATURE_CM_ENABLE
 /**
- * cm_csr_is_handoff_in_progress() - CM CSR API to check handoff in progress
- * @vdev_id: vdev_id
+ * cm_get_rssi_snr_by_bssid() - get rssi and snr by bssid
+ * @pdev: Pointer to pdev
+ * @bssid: bssid to get rssi and snr
+ * @rssi: pointer to fill rssi
+ * @snr: poiter to fill snr
  *
- * Return: true if handoff is in progress, else false
+ * Return: none
  */
-bool cm_csr_is_handoff_in_progress(uint8_t vdev_id);
+QDF_STATUS cm_get_rssi_snr_by_bssid(struct wlan_objmgr_pdev *pdev,
+				    struct qdf_mac_addr *bssid,
+				    int8_t *rssi, int8_t *snr);
 
 /**
- * cm_csr_disconnect_on_wait_key_timeout() - CM CSR API to issue disconnect on
- * wait for key timeout
- * @vdev_id: vdev_id
+ * cm_csr_send_set_ie()  - CM wrapper to send the set IE request
+ * @vdev: Object manager VDEV
  *
  * Return: None
  */
-void cm_csr_disconnect_on_wait_key_timeout(uint8_t vdev_id);
-#endif
+void cm_csr_send_set_ie(struct wlan_objmgr_vdev *vdev);
 
-#ifdef FEATURE_CM_ENABLE
 static inline QDF_STATUS
 cm_ext_hdl_create(struct wlan_objmgr_vdev *vdev, cm_ext_t **ext_cm_ptr)
 {
@@ -302,11 +306,12 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 				struct wlan_cm_connect_req *req);
 
 /**
- * cm_csr_handle_connect_req() - Connection manager cb to csr to fill csr
+ * cm_csr_handle_join_req() - Connection manager cb to csr to fill csr
  * session and update join req from legacy structures
  * @vdev: VDEV object
  * @req: Vdev connect request
  * @join_req: join req to be sent to LIM
+ * @reassoc: if reassoc
  *
  * This API is to update legacy struct and should be removed once
  * CSR is cleaned up fully. No new params should be added to CSR, use
@@ -314,10 +319,10 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-cm_csr_handle_connect_req(struct wlan_objmgr_vdev *vdev,
-			  struct wlan_cm_vdev_connect_req *req,
-			  struct cm_vdev_join_req *join_req);
+QDF_STATUS cm_csr_handle_join_req(struct wlan_objmgr_vdev *vdev,
+				  struct wlan_cm_vdev_connect_req *req,
+				  struct cm_vdev_join_req *join_req,
+				  bool reassoc);
 
 /**
  * cm_handle_connect_req() - Connection manager ext connect request to start
@@ -342,22 +347,6 @@ cm_handle_connect_req(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
 			    struct qdf_mac_addr *peer_mac);
-
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-/**
- * cm_csr_roam_sync_rsp() - Connection manager ext roam sync resp indication
- * @vdev: VDEV object
- * @rsp: Connection vdev response
- *
- * This API is to update legacy struct and should be removed once
- * CSR is cleaned up fully. No new params should be added to CSR, use
- * vdev/pdev/psoc instead.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS cm_csr_roam_sync_rsp(struct wlan_objmgr_vdev *vdev,
-				struct cm_vdev_join_rsp *rsp);
-#endif
 
 /**
  * cm_csr_connect_rsp() - Connection manager ext connect resp indication
@@ -513,6 +502,14 @@ QDF_STATUS cm_send_vdev_down_req(struct wlan_objmgr_vdev *vdev);
 void cm_free_join_req(struct cm_vdev_join_req *join_req);
 
 /**
+ * cm_flush_join_req() - Process join req flush
+ * @msg: scheduler message
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg);
+
+/**
  * cm_process_join_req() - Process vdev join req
  * @msg: scheduler message
  *
@@ -521,6 +518,82 @@ void cm_free_join_req(struct cm_vdev_join_req *join_req);
  * Return: QDF_STATUS
  */
 QDF_STATUS cm_process_join_req(struct scheduler_msg *msg);
+
+#ifdef WLAN_FEATURE_HOST_ROAM
+/**
+ * cm_process_preauth_req() - Process preauth request
+ * @msg: scheduler message
+ *
+ * Process preauth request in LIM.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_process_preauth_req(struct scheduler_msg *msg);
+
+/**
+ * cm_process_reassoc_req() - Process vdev reassoc req
+ * @msg: scheduler message
+ *
+ * Process reassoc request in LIM and copy all reassoc req params.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS cm_process_reassoc_req(struct scheduler_msg *msg);
+
+/**
+ * cm_handle_reassoc_req() - Connection manager ext reassoc request to start
+ * vdev and peer assoc state machine
+ * @vdev: VDEV object
+ * @req: Vdev reassoc request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_handle_reassoc_req(struct wlan_objmgr_vdev *vdev,
+		      struct wlan_cm_vdev_reassoc_req *req);
+
+/**
+ * cm_handle_roam_start() - roam start indication
+ * @vdev: VDEV object
+ * @req: Connection manager roam request
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_handle_roam_start(struct wlan_objmgr_vdev *vdev,
+		     struct wlan_cm_roam_req *req);
+
+/**
+ * cm_csr_preauth_done() - Process preauth done from csr part
+ * @vdev: vdev object pointer
+ *
+ * Return: void
+ */
+void cm_csr_preauth_done(struct wlan_objmgr_vdev *vdev);
+#else
+static inline QDF_STATUS cm_process_preauth_req(struct scheduler_msg *msg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS cm_process_reassoc_req(struct scheduler_msg *msg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+cm_handle_reassoc_req(struct wlan_objmgr_vdev *vdev,
+		      struct wlan_cm_vdev_reassoc_req *req)
+{
+	return QDF_STATUS_SUCCESS;
+}
+static inline QDF_STATUS
+cm_handle_roam_start(struct wlan_objmgr_vdev *vdev,
+		     struct wlan_cm_roam_req *req)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * cm_process_peer_create() - Process bss peer create req
@@ -599,6 +672,4 @@ QDF_STATUS wlan_cm_send_connect_rsp(struct scheduler_msg *msg);
  * Return: void
  */
 void wlan_cm_free_connect_rsp(struct cm_vdev_join_rsp *rsp);
-
-#endif /* FEATURE_CM_ENABLE */
 #endif /* __WLAN_CM_VDEV_API_H__ */

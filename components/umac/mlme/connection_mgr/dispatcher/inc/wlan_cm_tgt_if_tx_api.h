@@ -46,6 +46,9 @@ wlan_cm_roam_send_set_vdev_pcl(struct wlan_objmgr_psoc *psoc,
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
+
+#define CFG_DISABLE_4WAY_HS_OFFLOAD_DEFAULT BIT(0)
+
 /**
  * wlan_cm_tgt_send_roam_offload_init()  - Send WMI_VDEV_PARAM_ROAM_FW_OFFLOAD
  * to init/deinit roaming module at firmware
@@ -128,7 +131,6 @@ QDF_STATUS wlan_cm_tgt_send_roam_triggers(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id,
 					  struct wlan_roam_triggers *req);
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * wlan_cm_tgt_send_roam_triggers()  - Send roam trigger command to FW
  * @psoc: psoc pointer
@@ -150,7 +152,6 @@ wlan_cm_tgt_send_roam_invoke_req(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 wlan_cm_tgt_send_roam_sync_complete_cmd(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id);
-#endif
 #endif
 
 /**

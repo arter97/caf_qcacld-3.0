@@ -575,19 +575,12 @@ QDF_STATUS ipa_uc_ol_deinit(struct wlan_objmgr_pdev *pdev)
 	struct wlan_ipa_priv *ipa_obj;
 	QDF_STATUS status;
 
-	ipa_obj = ipa_pdev_get_priv_obj(pdev);
-	if (!ipa_obj) {
-		ipa_err("IPA object is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	qdf_mutex_acquire(&ipa_obj->init_deinit_lock);
-
 	if (!ipa_config_is_enabled()) {
 		ipa_debug("ipa is disabled");
-		status = QDF_STATUS_SUCCESS;
-		goto out;
+		return QDF_STATUS_SUCCESS;
 	}
+
+	ipa_init_deinit_lock();
 
 	if (!ipa_cb_is_ready()) {
 		ipa_debug("ipa is not ready");
@@ -595,10 +588,17 @@ QDF_STATUS ipa_uc_ol_deinit(struct wlan_objmgr_pdev *pdev)
 		goto out;
 	}
 
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		status = QDF_STATUS_E_FAILURE;
+		goto out;
+	}
+
 	status = wlan_ipa_uc_ol_deinit(ipa_obj);
 
 out:
-	qdf_mutex_release(&ipa_obj->init_deinit_lock);
+	ipa_init_deinit_unlock();
 	return status;
 }
 
@@ -627,7 +627,7 @@ QDF_STATUS ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS ipa_wlan_evt(struct wlan_objmgr_pdev *pdev, qdf_netdev_t net_dev,
 			uint8_t device_mode, uint8_t session_id,
 			enum wlan_ipa_wlan_event ipa_event_type,
-			uint8_t *mac_addr)
+			uint8_t *mac_addr, bool is_2g_iface)
 {
 	struct wlan_ipa_priv *ipa_obj;
 
@@ -641,7 +641,7 @@ QDF_STATUS ipa_wlan_evt(struct wlan_objmgr_pdev *pdev, qdf_netdev_t net_dev,
 	}
 
 	return wlan_ipa_wlan_evt(net_dev, device_mode, session_id,
-				 ipa_event_type, mac_addr);
+				 ipa_event_type, mac_addr, is_2g_iface);
 }
 
 int ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)

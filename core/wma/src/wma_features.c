@@ -78,6 +78,12 @@
  */
 #define WMA_SET_VDEV_IE_SOURCE_HOST 0x0
 
+/*
+ * Max AMPDU Tx Aggr supported size
+ */
+#define ADDBA_TXAGGR_SIZE_HELIUM 64
+#define ADDBA_TXAGGR_SIZE_LITHIUM 256
+
 static bool is_wakeup_event_console_logs_enabled = false;
 
 void wma_set_wakeup_logs_to_console(bool value)
@@ -303,6 +309,24 @@ end:
 }
 
 #ifdef WLAN_FEATURE_TSF
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+static void wma_vdev_tsf_set_mac_id(struct stsf *ptsf, uint32_t mac_id,
+				    uint32_t mac_id_valid)
+{
+	ptsf->mac_id = mac_id;
+	ptsf->mac_id_valid = mac_id_valid;
+
+	wma_nofl_debug("mac_id %d mac_id_valid %d", ptsf->mac_id,
+		       ptsf->mac_id_valid);
+}
+#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY */
+static inline void wma_vdev_tsf_set_mac_id(struct stsf *ptsf, uint32_t mac_id,
+					   uint32_t mac_id_valid)
+{
+}
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+
 /**
  * wma_vdev_tsf_handler() - handle tsf event indicated by FW
  * @handle: wma context
@@ -342,6 +366,10 @@ int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len)
 	wma_nofl_debug("g_tsf: %d %d; soc_timer: %d %d",
 		       ptsf->global_tsf_low, ptsf->global_tsf_high,
 			   ptsf->soc_timer_low, ptsf->soc_timer_high);
+
+	wma_vdev_tsf_set_mac_id(ptsf, tsf_event->mac_id,
+				tsf_event->mac_id_valid);
+
 	tsf_msg.type = eWNI_SME_TSF_EVENT;
 	tsf_msg.bodyptr = ptsf;
 	tsf_msg.bodyval = 0;
@@ -470,6 +498,53 @@ QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle, uint32_t vdev_id,
+				   uint32_t param_id, bool ena)
+{
+	wmi_vdev_tsf_tstamp_action_cmd_fixed_param *cmd;
+	tp_wma_handle wma = (tp_wma_handle)handle;
+	struct wmi_unified *wmi_handle;
+	int len = sizeof(*cmd);
+	QDF_STATUS status;
+	uint8_t *buf_ptr;
+	wmi_buf_t buf;
+
+	if (param_id != GEN_PARAM_TSF_AUTO_REPORT_ENABLE &&
+	    param_id != GEN_PARAM_TSF_AUTO_REPORT_DISABLE)
+		return QDF_STATUS_E_FAILURE;
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_vdev_tsf_tstamp_action_cmd_fixed_param *)buf_ptr;
+	cmd->vdev_id = vdev_id;
+	cmd->tsf_action = ena ? TSF_TSTAMP_AUTO_REPORT_ENABLE :
+			  TSF_TSTAMP_AUTO_REPORT_DISABLE;
+
+	wma_debug("vdev_id %u tsf_action %d", cmd->vdev_id, cmd->tsf_action);
+
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_vdev_tsf_tstamp_action_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+				wmi_vdev_tsf_tstamp_action_cmd_fixed_param));
+
+	status = wmi_unified_cmd_send(wmi_handle, buf, len,
+				      WMI_VDEV_TSF_TSTAMP_ACTION_CMDID);
+	if (QDF_IS_STATUS_ERROR(status))
+		wmi_buf_free(buf);
+
+	return status;
+}
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
 #endif
 
 /**
@@ -557,6 +632,44 @@ QDF_STATUS wma_process_dhcp_ind(WMA_HANDLE handle,
 					    &peer_set_param_fp);
 }
 
+#ifdef WLAN_FEATURE_11BE
+static enum wlan_phymode
+wma_eht_chan_phy_mode(uint32_t freq, uint8_t dot11_mode, uint16_t bw_val,
+		      enum phy_ch_width chan_width)
+{
+	if((dot11_mode == MLME_DOT11_MODE_11BE) ||
+		(dot11_mode == MLME_DOT11_MODE_11BE_ONLY))
+	{
+		if (wlan_reg_is_24ghz_ch_freq(freq)) {
+			if (bw_val == 20)
+				return WLAN_PHYMODE_11BEG_EHT20;
+			else if (bw_val == 40)
+				return WLAN_PHYMODE_11BEG_EHT40;
+		} else {
+			if (bw_val == 20)
+				return WLAN_PHYMODE_11BEA_EHT20;
+			else if (bw_val == 40)
+				return WLAN_PHYMODE_11BEA_EHT40;
+			else if (bw_val == 80)
+				return WLAN_PHYMODE_11BEA_EHT80;
+			else if (chan_width == CH_WIDTH_160MHZ)
+				return WLAN_PHYMODE_11BEA_EHT160;
+			else if (chan_width == CH_WIDTH_320MHZ)
+				return WLAN_PHYMODE_11BEA_EHT320;
+		}
+	}
+
+	return WLAN_PHYMODE_AUTO;
+}
+#else
+static enum wlan_phymode
+wma_eht_chan_phy_mode(uint32_t freq, uint8_t dot11_mode, uint16_t bw_val,
+		      enum phy_ch_width chan_width)
+{
+	return WLAN_PHYMODE_AUTO;
+}
+#endif
+
 enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 				    uint8_t dot11_mode)
 {
@@ -619,6 +732,10 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 					phymode = WLAN_PHYMODE_11AXG_HE40;
 				break;
 			default:
+				phymode = wma_eht_chan_phy_mode(freq,
+								dot11_mode,
+								bw_val,
+								chan_width);
 				break;
 			}
 		}
@@ -674,6 +791,10 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 					phymode = WLAN_PHYMODE_11AXA_HE80_80;
 				break;
 			default:
+				phymode = wma_eht_chan_phy_mode(freq,
+								dot11_mode,
+								bw_val,
+								chan_width);
 				break;
 			}
 		}
@@ -1504,6 +1625,8 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "GENERIC_WAKE";
 	case WOW_REASON_TWT:
 		return "TWT Event";
+	case WOW_REASON_DCS_INT_DET:
+		return "DCS_INT_DET";
 	default:
 		return "unknown";
 	}
@@ -1919,7 +2042,7 @@ wma_wow_get_pkt_proto_subtype(uint8_t *data, uint32_t len)
 				return QDF_PROTO_IPV4_UDP;
 
 			if (!qdf_nbuf_data_is_ipv4_dhcp_pkt(data))
-				return QDF_PROTO_INVALID;
+				return QDF_PROTO_IPV4_UDP;
 
 			if (len < WMA_DHCP_SUBTYPE_GET_MIN_LEN)
 				return QDF_PROTO_INVALID;
@@ -4048,17 +4171,26 @@ QDF_STATUS wma_set_tx_rx_aggr_size(uint8_t vdev_id,
 		WMITLV_GET_STRUCT_TLVLEN(
 			wmi_vdev_set_custom_aggr_size_cmd_fixed_param));
 
+	if (wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_ampdu_tx_buf_size_256_support)) {
+		cmd->enable_bitmap |= (0x1 << 6);
+		if (!(tx_size <= ADDBA_TXAGGR_SIZE_LITHIUM)) {
+			wma_err("Invalid AMPDU Size");
+			return QDF_STATUS_E_INVAL;
+		}
+	} else if (tx_size == ADDBA_TXAGGR_SIZE_LITHIUM) {
+		tx_size = ADDBA_TXAGGR_SIZE_HELIUM;
+	} else if (!(tx_size <= ADDBA_TXAGGR_SIZE_HELIUM)) {
+		wma_err("Invalid AMPDU Size");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	cmd->vdev_id = vdev_id;
 	cmd->tx_aggr_size = tx_size;
 	cmd->rx_aggr_size = rx_size;
 	/* bit 2 (aggr_type): TX Aggregation Type (0=A-MPDU, 1=A-MSDU) */
 	if (aggr_type == WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU)
 		cmd->enable_bitmap |= 0x04;
-	/* bit 3 (tx_aggr_size_disable):  If set tx_aggr_size is invalid */
-	if (rx_size == 0)
-		cmd->enable_bitmap |= (0x1 << 3);
-
-	cmd->enable_bitmap |= (0x1 << 6);
 
 	wma_debug("tx aggr: %d rx aggr: %d vdev: %d enable_bitmap %d",
 		 cmd->tx_aggr_size, cmd->rx_aggr_size, cmd->vdev_id,
@@ -4117,14 +4249,26 @@ QDF_STATUS wma_set_tx_rx_aggr_size_per_ac(WMA_HANDLE handle,
 		cmd->vdev_id = vdev_id;
 		cmd->rx_aggr_size = qos_aggr->rx_aggregation_size;
 		cmd->tx_aggr_size = tx_aggr_size[queue_num];
+
+		if (wmi_service_enabled(wma_handle->wmi_handle,
+					wmi_service_ampdu_tx_buf_size_256_support)) {
+			cmd->enable_bitmap |= (0x1 << 6);
+			if (!(tx_aggr_size[queue_num] <= ADDBA_TXAGGR_SIZE_LITHIUM)) {
+				wma_err("Invalid AMPDU Size");
+				return QDF_STATUS_E_INVAL;
+			}
+		} else if (tx_aggr_size[queue_num] == ADDBA_TXAGGR_SIZE_LITHIUM) {
+			tx_aggr_size[queue_num] = ADDBA_TXAGGR_SIZE_HELIUM;
+		} else if (!(tx_aggr_size[queue_num] <= ADDBA_TXAGGR_SIZE_HELIUM)) {
+			wma_err("Invalid AMPDU Size");
+			return QDF_STATUS_E_INVAL;
+		}
+
 		/* bit 5: tx_ac_enable, if set, ac bitmap is valid. */
-		if (cmd->rx_aggr_size != 0)
-			cmd->enable_bitmap = 0x20 | queue_num;
+		cmd->enable_bitmap |= 0x20 | queue_num;
 		/* bit 2 (aggr_type): TX Aggregation Type (0=A-MPDU, 1=A-MSDU) */
 		if (aggr_type == WMI_VDEV_CUSTOM_AGGR_TYPE_AMSDU)
 			cmd->enable_bitmap |= 0x04;
-
-		cmd->enable_bitmap |= (0x1 << 6);
 
 		wma_debug("queue_num: %d, tx aggr: %d rx aggr: %d vdev: %d, bitmap: %d",
 			 queue_num, cmd->tx_aggr_size,
@@ -4184,6 +4328,35 @@ static QDF_STATUS wma_set_sw_retry_by_qos(
 	if (ret) {
 		wmi_buf_free(buf);
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wma_set_vdev_sw_retry_th(uint8_t vdev_id, uint8_t sw_retry_count,
+				    wmi_vdev_custom_sw_retry_type_t retry_type)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	tp_wma_handle wma_handle;
+	uint32_t queue_num;
+
+	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	if (!wma_handle)
+		return QDF_STATUS_E_FAILURE;
+
+
+	for (queue_num = 0; queue_num < WMI_AC_MAX; queue_num++) {
+		if (sw_retry_count == 0)
+			continue;
+
+		status = wma_set_sw_retry_by_qos(wma_handle,
+						 vdev_id,
+						 retry_type,
+						 queue_num,
+						 sw_retry_count);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			return status;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -4573,8 +4746,8 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 
 	param_buf = (wmi_pdev_chip_power_stats_event_fixed_param *)
 		param_tlvs->fixed_param;
-	if (!mac || !mac->sme.power_stats_resp_callback) {
-		wma_debug("NULL mac ptr or HDD callback is null");
+	if (!mac) {
+		wma_debug("NULL mac ptr");
 		return -EINVAL;
 	}
 
@@ -4625,12 +4798,9 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 
 	qdf_mem_copy(power_stats_results->debug_registers,
 			debug_registers, stats_registers_len);
-
-	mac->sme.power_stats_resp_callback(power_stats_results,
-			mac->sme.power_debug_stats_context);
-
-	mac->sme.power_stats_resp_callback = NULL;
-	mac->sme.power_debug_stats_context = NULL;
+	if (mac->sme.sme_power_debug_stats_callback)
+		mac->sme.sme_power_debug_stats_callback(mac,
+							power_stats_results);
 
 	qdf_mem_free(power_stats_results);
 	return 0;

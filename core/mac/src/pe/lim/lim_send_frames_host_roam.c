@@ -81,7 +81,6 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t vdev_id = 0;
 	bool vht_enabled = false;
 	tpSirMacMgmtHdr mac_hdr;
-	tftSMEContext *ft_sme_context;
 	struct mlme_legacy_priv *mlme_priv;
 
 	if (!pe_session)
@@ -267,8 +266,8 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 			else
 				rate = TSRS_11B_RATE_5_5MBPS;
 
-			if (pe_session->pLimReAssocReq->eseTspecInfo.
-			    numTspecs) {
+			if (mlme_priv->connect_info.ese_tspec_info.numTspecs)
+			{
 				struct ese_tsrs_ie tsrs_ie;
 
 				tsrs_ie.tsid = 0;
@@ -281,13 +280,12 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 #endif
 	}
 
-	ft_sme_context = &mac_ctx->roam.roamSession[vdev_id].ftSmeContext;
 	if (pe_session->htCapability &&
 	    mac_ctx->lim.htCapabilityPresentInBeacon) {
 		populate_dot11f_ht_caps(mac_ctx, pe_session, &frm->HTCaps);
 	}
 	if (pe_session->pLimReAssocReq->bssDescription.mdiePresent &&
-	    (ft_sme_context->addMDIE == true)
+	    (mlme_priv->connect_info.ft_info.add_mdie)
 #if defined FEATURE_WLAN_ESE
 	    && !pe_session->isESEconnection
 #endif
@@ -341,10 +339,10 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	bytes = payload + sizeof(tSirMacMgmtHdr) + add_ie_len;
 
 	pe_debug("FT IE Reassoc Req %d",
-		ft_sme_context->reassoc_ft_ies_length);
+		 mlme_priv->connect_info.ft_info.reassoc_ie_len);
 
 	if (pe_session->is11Rconnection)
-		ft_ies_length = ft_sme_context->reassoc_ft_ies_length;
+		ft_ies_length = mlme_priv->connect_info.ft_info.reassoc_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes + ft_ies_length,
 				 (void **)&frame, (void **)&packet);
@@ -380,37 +378,23 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	pe_debug("*** Sending Re-Assoc Request length: %d %d to",
 		       bytes, payload);
 
-	if (pe_session->assoc_req) {
-		qdf_mem_free(pe_session->assoc_req);
-		pe_session->assoc_req = NULL;
-		pe_session->assocReqLen = 0;
-	}
-
 	if (add_ie_len) {
 		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     add_ie, add_ie_len);
 		payload += add_ie_len;
 	}
 
-	pe_session->assoc_req = qdf_mem_malloc(payload);
-	if (pe_session->assoc_req) {
-		/*
-		 * Store the Assoc request. This is sent to csr/hdd in
-		 * join cnf response.
-		 */
-		qdf_mem_copy(pe_session->assoc_req,
-			     frame + sizeof(tSirMacMgmtHdr), payload);
-		pe_session->assocReqLen = payload;
-	}
-
-	if (pe_session->is11Rconnection && ft_sme_context->reassoc_ft_ies) {
+	if (pe_session->is11Rconnection &&
+	    mlme_priv->connect_info.ft_info.reassoc_ie_len) {
 		int i = 0;
 
 		body = frame + bytes;
 		for (i = 0; i < ft_ies_length; i++) {
-			*body = ft_sme_context->reassoc_ft_ies[i];
+			*body =
+			   mlme_priv->connect_info.ft_info.reassoc_ft_ie[i];
 			body++;
 		}
+		payload += ft_ies_length;
 	}
 	pe_debug("Re-assoc Req Frame is:");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
@@ -430,23 +414,16 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		pe_session->assoc_req = NULL;
 		pe_session->assocReqLen = 0;
 	}
-	if (ft_ies_length) {
-		pe_session->assoc_req = qdf_mem_malloc(ft_ies_length);
-		if (!pe_session->assoc_req) {
-			pe_session->assocReqLen = 0;
-		} else {
-			/*
-			 * Store the FT IEs. This is sent to csr/hdd in
-			 * join cnf response.
-			 */
-			qdf_mem_copy(pe_session->assoc_req,
-				     ft_sme_context->reassoc_ft_ies,
-				     ft_ies_length);
-			pe_session->assocReqLen = ft_ies_length;
-		}
-	} else {
-		pe_debug("FT IEs not present");
-		pe_session->assocReqLen = 0;
+
+	pe_session->assoc_req = qdf_mem_malloc(payload);
+	if (pe_session->assoc_req) {
+		/*
+		 * Store the Assoc request. This is sent to csr/hdd in
+		 * join cnf response.
+		 */
+		qdf_mem_copy(pe_session->assoc_req,
+			     frame + sizeof(tSirMacMgmtHdr), payload);
+		pe_session->assocReqLen = payload;
 	}
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,

@@ -43,6 +43,7 @@
 #include "wma.h"
 #include "wlan_pkt_capture_ucfg_api.h"
 #include "wlan_lmac_if_def.h"
+#include <lim_mlo.h>
 
 #define MAX_SUPPORTED_PEERS_WEP 16
 
@@ -443,8 +444,15 @@ void lim_pmf_comeback_timer_callback(void *context)
 		return;
 	}
 
-	pe_info("comeback later timer expired. sending MLM ASSOC req for vdev %d",
-		session->vdev_id);
+	if (session->limMlmState != eLIM_MLM_WT_ASSOC_RSP_STATE) {
+		pe_debug("Don't send assoc req, timer expire when limMlmState %d vdev id %d",
+			 session->limMlmState, session->vdev_id);
+		return;
+	}
+
+	pe_info("comeback later timer expired. sending MLM ASSOC req for vdev %d, session limMlmState %d, info lim_mlm_state %d",
+		session->vdev_id, session->limMlmState, info->lim_mlm_state);
+
 	/* set MLM state such that ASSOC REQ packet will be sent out */
 	session->limPrevMlmState = info->lim_prev_mlm_state;
 	session->limMlmState = info->lim_mlm_state;
@@ -1925,9 +1933,11 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 {
 	tpAddStaParams pAddStaParams = (tpAddStaParams) limMsgQ->bodyptr;
 	tpDphHashNode sta = NULL;
+	bool add_sta_rsp_status = true;
 
 	if (!pAddStaParams) {
 		pe_err("Invalid body pointer in message");
+		add_sta_rsp_status = false;
 		goto end;
 	}
 
@@ -1936,12 +1946,14 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 				   &pe_session->dph.dphHashTable);
 	if (!sta) {
 		pe_err("DPH Entry for STA %X missing", pAddStaParams->assocId);
+		add_sta_rsp_status = false;
 		goto end;
 	}
 
 	if (eLIM_MLM_WT_ADD_STA_RSP_STATE != sta->mlmStaContext.mlmState) {
 		pe_err("Received unexpected WMA_ADD_STA_RSP in state %X",
 			sta->mlmStaContext.mlmState);
+		add_sta_rsp_status = false;
 		goto end;
 	}
 	if (QDF_STATUS_SUCCESS != pAddStaParams->status) {
@@ -1953,6 +1965,7 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 				       sta->assocId, true,
 				       STATUS_UNSPECIFIED_FAILURE,
 				       pe_session);
+		add_sta_rsp_status = false;
 		goto end;
 	}
 	sta->nss = pAddStaParams->nss;
@@ -1968,16 +1981,22 @@ void lim_process_ap_mlm_add_sta_rsp(struct mac_context *mac,
 	 * 2) PE receives eWNI_SME_ASSOC_CNF from SME
 	 * 3) BTAMP-AP sends Re/Association Response to BTAMP-STA
 	 */
-	if (lim_send_mlm_assoc_ind(mac, sta, pe_session) != QDF_STATUS_SUCCESS)
+	if (!lim_is_mlo_conn(pe_session, sta) &&
+	    lim_send_mlm_assoc_ind(mac, sta, pe_session) !=
+	    QDF_STATUS_SUCCESS) {
 		lim_reject_association(mac, sta->staAddr,
 				       sta->mlmStaContext.subType,
 				       true, sta->mlmStaContext.authType,
 				       sta->assocId, true,
 				       STATUS_UNSPECIFIED_FAILURE,
 				       pe_session);
-
+		add_sta_rsp_status = false;
+	}
 	/* fall though to reclaim the original Add STA Response message */
 end:
+	if (lim_is_mlo_conn(pe_session, sta))
+		lim_ap_mlo_sta_peer_ind(mac, pe_session, sta,
+					add_sta_rsp_status);
 	if (0 != limMsgQ->bodyptr) {
 		qdf_mem_free(pAddStaParams);
 		limMsgQ->bodyptr = NULL;
@@ -2303,7 +2322,8 @@ void lim_handle_add_bss_rsp(struct mac_context *mac_ctx,
 			}
 			tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
-			lim_calculate_tpc(mac_ctx, session_entry, false);
+			lim_calculate_tpc(mac_ctx, session_entry, false, 0,
+					  false);
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,
@@ -2786,7 +2806,7 @@ static void lim_process_switch_channel_join_req(
 			goto error;
 		}
 
-		lim_calculate_tpc(mac_ctx, session_entry, false);
+		lim_calculate_tpc(mac_ctx, session_entry, false, 0, false);
 
 		if (tx_ops->set_tpc_power)
 			tx_ops->set_tpc_power(mac_ctx->psoc,
@@ -2839,10 +2859,17 @@ static void lim_handle_mon_switch_channel_rsp(struct pe_session *session,
 		return;
 
 	if (QDF_IS_STATUS_ERROR(status)) {
-		pe_err("Set channel failed for monitor mode");
-		wlan_vdev_mlme_sm_deliver_evt(session->vdev,
-					      WLAN_VDEV_SM_EV_START_REQ_FAIL,
-					      0, NULL);
+		enum wlan_vdev_sm_evt event = WLAN_VDEV_SM_EV_START_REQ_FAIL;
+
+		pe_err("Set channel failed for monitor mode vdev substate %d",
+			wlan_vdev_mlme_get_substate(session->vdev));
+
+		if (QDF_IS_STATUS_SUCCESS(
+		    wlan_vdev_is_restart_progress(session->vdev)))
+			event = WLAN_VDEV_SM_EV_RESTART_REQ_FAIL;
+
+		wlan_vdev_mlme_sm_deliver_evt(session->vdev, event, 0, NULL);
+
 		return;
 	}
 

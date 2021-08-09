@@ -36,6 +36,8 @@
 
 #define POLICY_MGR_MAX_CON_STRING_LEN   100
 
+static const uint16_t sap_mand_5g_freq_list[] = {5745, 5765, 5785, 5805};
+
 struct policy_mgr_conc_connection_info
 	pm_conc_connection_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
@@ -630,6 +632,9 @@ void policy_mgr_update_conc_list(struct wlan_objmgr_psoc *psoc,
 		if (pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb)
 			pm_ctx->dp_cbacks.hdd_ipa_set_mcc_mode_cb(mcc_mode);
 	}
+
+	if (pm_ctx->conc_cbacks.connection_info_update)
+		pm_ctx->conc_cbacks.connection_info_update();
 }
 
 /**
@@ -820,7 +825,7 @@ void policy_mgr_restore_deleted_conn_info(struct wlan_objmgr_psoc *psoc,
 	uint32_t conn_index;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 
-	if (MAX_NUMBER_OF_CONC_CONNECTIONS <= num_cxn_del || 0 == num_cxn_del) {
+	if (MAX_NUMBER_OF_CONC_CONNECTIONS < num_cxn_del || 0 == num_cxn_del) {
 		policy_mgr_err("Failed to restore %d/%d deleted information",
 				num_cxn_del, MAX_NUMBER_OF_CONC_CONNECTIONS);
 		return;
@@ -1405,7 +1410,21 @@ void policy_mgr_set_pcl_for_connected_vdev(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id, bool clear_pcl)
 {
 	struct policy_mgr_pcl_list msg = { {0} };
+	struct wlan_objmgr_vdev *vdev;
 	uint8_t roam_enabled_vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev is NULL");
+		return;
+	}
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_STA_MODE) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+		return;
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
 
 	/*
 	 * Get the vdev id of the STA on which roaming is already
@@ -1743,6 +1762,11 @@ enum hw_mode_bandwidth policy_mgr_get_bw(enum phy_ch_width chan_width)
 	case CH_WIDTH_10MHZ:
 		bw = HW_MODE_10_MHZ;
 		break;
+#ifdef WLAN_FEATURE_11BE
+	case CH_WIDTH_320MHZ:
+		bw = HW_MODE_320_MHZ;
+		break;
+#endif
 	default:
 		policy_mgr_err("Unknown channel BW type %d", chan_width);
 		break;
@@ -1777,6 +1801,11 @@ enum phy_ch_width policy_mgr_get_ch_width(enum hw_mode_bandwidth bw)
 	case HW_MODE_10_MHZ:
 		ch_width = CH_WIDTH_10MHZ;
 		break;
+#ifdef WLAN_FEATURE_11BE
+	case HW_MODE_320_MHZ:
+		ch_width = CH_WIDTH_320MHZ;
+		break;
+#endif
 	default:
 		policy_mgr_err("Invalid phy_ch_width type %d", ch_width);
 		break;
@@ -3015,9 +3044,10 @@ static void policy_mgr_nss_update_cb(struct wlan_objmgr_psoc *psoc,
 						next_action, reason,
 						request_id);
 	} else {
-		if (reason == POLICY_MGR_UPDATE_REASON_STA_CONNECT) {
-			sme_debug("Continue connect on vdev %d request_id %x",
-				  vdev_id, request_id);
+		if (reason == POLICY_MGR_UPDATE_REASON_STA_CONNECT ||
+		    reason == POLICY_MGR_UPDATE_REASON_LFR2_ROAM) {
+			sme_debug("Continue connect/reassoc on vdev %d request_id %x reason %d",
+				  vdev_id, request_id, reason);
 			wlan_cm_hw_mode_change_resp(pm_ctx->pdev, vdev_id,
 						    request_id,
 						    QDF_STATUS_SUCCESS);
@@ -3598,8 +3628,9 @@ policy_mgr_init_sap_mandatory_chan_by_band(struct wlan_objmgr_psoc *psoc,
 		}
 	}
 	if (band_bitmap & BIT(REG_BAND_5G))
-		policy_mgr_add_sap_mandatory_chan(psoc,
-						  SAP_MANDATORY_5G_CH_FREQ);
+		for (i = 0; i < ARRAY_SIZE(sap_mand_5g_freq_list); i++)
+			policy_mgr_add_sap_mandatory_chan(
+				psoc, sap_mand_5g_freq_list[i]);
 	if (band_bitmap & BIT(REG_BAND_6G))
 		policy_mgr_add_sap_mandatory_6ghz_chan(psoc);
 }

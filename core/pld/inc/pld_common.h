@@ -35,6 +35,7 @@
 #define PLD_SETUP_FILE               "athsetup.bin"
 #define PLD_EPPING_FILE              "epping.bin"
 #define PLD_EVICTED_FILE             ""
+#define PLD_MHI_STATE_L0	1
 
 #define TOTAL_DUMP_SIZE         0x00200000
 
@@ -143,18 +144,36 @@ struct pld_platform_cap {
  * @PLD_FW_DOWN: firmware is down
  * @PLD_FW_CRASHED: firmware has crashed
  * @PLD_FW_RECOVERY_START: firmware is starting recovery
+ * @PLD_FW_HANG_EVENT: firmware update hang event
+ * @PLD_BUS_EVENT: update bus/link event
  */
 enum pld_uevent {
 	PLD_FW_DOWN,
 	PLD_FW_CRASHED,
 	PLD_FW_RECOVERY_START,
 	PLD_FW_HANG_EVENT,
+	PLD_BUS_EVENT,
+	PLD_SMMU_FAULT,
+};
+
+/**
+ * enum pld_bus_event - PLD bus event types
+ * @PLD_BUS_EVENT_PCIE_LINK_DOWN: PCIe link is down
+ * @PLD_BUS_EVENT_INVALID: invalid event type
+ */
+
+enum pld_bus_event {
+	PLD_BUS_EVENT_PCIE_LINK_DOWN = 0,
+
+	PLD_BUS_EVENT_INVALID = 0xFFFF,
 };
 
 /**
  * struct pld_uevent_data - uevent status received from platform driver
  * @uevent: uevent type
  * @fw_down: FW down info
+ * @hang_data: FW hang data
+ * @bus_event: bus related data
  */
 struct pld_uevent_data {
 	enum pld_uevent uevent;
@@ -166,6 +185,10 @@ struct pld_uevent_data {
 			void *hang_event_data;
 			u16 hang_event_data_len;
 		} hang_data;
+		struct {
+			enum pld_bus_event etype;
+			void *event_data;
+		} bus_data;
 	};
 };
 
@@ -307,7 +330,20 @@ struct pld_device_version {
 	u32 minor_version;
 };
 
+/**
+ * struct pld_dev_mem_info - WLAN device memory info
+ * @start: start address of the memory block
+ * @size: size of the memory block
+ *
+ * pld_dev_mem_info is used to store WLAN device memory info
+ */
+struct pld_dev_mem_info {
+	u64 start;
+	u64 size;
+};
+
 #define PLD_MAX_TIMESTAMP_LEN 32
+#define PLD_MAX_DEV_MEM_NUM 4
 
 /**
  * struct pld_soc_info - SOC information
@@ -320,6 +356,7 @@ struct pld_device_version {
  * @fw_version: FW version
  * @fw_build_timestamp: FW build timestamp
  * @device_version: WLAN device version info
+ * @dev_mem_info: WLAN device memory info
  *
  * pld_soc_info is used to store WLAN SOC information.
  */
@@ -333,6 +370,7 @@ struct pld_soc_info {
 	u32 fw_version;
 	char fw_build_timestamp[PLD_MAX_TIMESTAMP_LEN + 1];
 	struct pld_device_version device_version;
+	struct pld_dev_mem_info dev_mem_info[PLD_MAX_DEV_MEM_NUM];
 };
 
 /**
@@ -704,6 +742,8 @@ int pld_ce_free_irq(struct device *dev, unsigned int ce_id, void *ctx);
 void pld_enable_irq(struct device *dev, unsigned int ce_id);
 void pld_disable_irq(struct device *dev, unsigned int ce_id);
 int pld_get_soc_info(struct device *dev, struct pld_soc_info *info);
+int pld_get_mhi_state(struct device *dev);
+int pld_is_pci_ep_awake(struct device *dev);
 int pld_get_ce_id(struct device *dev, int irq);
 int pld_get_irq(struct device *dev, int ce_id);
 void pld_lock_pm_sem(struct device *dev);
