@@ -37,6 +37,8 @@
 #include "dp_rx_mon.h"
 #include "dp_tx_capture.h"
 
+#include <dp_rx_mon_1.0.h>
+
 #define NUM_BITS_DWORD 32
 
 #define MAX_MONITOR_HEADER (512)

@@ -38,9 +38,12 @@ dp_mon_ring_config(struct dp_soc *soc, struct dp_pdev *pdev,
 {
 	int lmac_id;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dp_mon_ops *mon_ops = dp_mon_ops_get(soc);
 
 	lmac_id = dp_get_lmac_id_for_pdev_id(soc, 0, mac_for_pdev);
-	status = dp_mon_htt_srng_setup(soc, pdev, lmac_id, mac_for_pdev);
+	if (mon_ops && mon_ops->mon_htt_srng_setup)
+		status = mon_ops->mon_htt_srng_setup(soc, pdev,
+						     lmac_id, mac_for_pdev);
 
 	return status;
 }
@@ -60,6 +63,7 @@ int monitor_mod_init(void)
 	uint8_t pdev_id = 0;
 	uint8_t pdev_count = 0;
 	bool pdev_attach_success;
+	struct dp_mon_ops *mon_ops = NULL;
 
 	for (index = 0; index < WLAN_OBJMGR_MAX_DEVICES; index++) {
 		psoc = g_umac_glb_obj->psoc[index];
@@ -80,6 +84,20 @@ int monitor_mod_init(void)
 		soc->monitor_soc = mon_soc;
 		dp_mon_soc_cfg_init(soc);
 		pdev_attach_success = false;
+		dp_mon_cdp_ops_register(soc);
+		dp_mon_ops_register(soc);
+		mon_ops = dp_mon_ops_get(soc);
+		if (!mon_ops) {
+			qdf_err("%pK: mem allocation failed", soc);
+			qdf_mem_free(mon_soc);
+			soc->monitor_soc = NULL;
+			continue;
+		}
+
+		if (mon_ops->mon_soc_attach && !mon_ops->mon_soc_attach(soc)) {
+			if (mon_ops->mon_soc_init)
+				mon_ops->mon_soc_init(soc);
+		}
 
 		pdev_count = psoc->soc_objmgr.wlan_pdev_count;
 		for (pdev_id = 0; pdev_id < pdev_count; pdev_id++) {
@@ -119,8 +137,6 @@ int monitor_mod_init(void)
 			qdf_mem_free(mon_soc);
 			continue;
 		}
-		dp_mon_cdp_ops_register(soc);
-		dp_mon_ops_register(mon_soc);
 		mon_soc_ol_attach(psoc);
 	}
 	return 0;
@@ -147,6 +163,7 @@ void monitor_mod_exit(void)
 	uint8_t index = 0;
 	uint8_t pdev_id = 0;
 	uint8_t pdev_count = 0;
+	struct dp_mon_ops *mon_ops;
 
 	for (index = 0; index < WLAN_OBJMGR_MAX_DEVICES; index++) {
 		psoc = g_umac_glb_obj->psoc[index];
@@ -178,6 +195,14 @@ void monitor_mod_exit(void)
 			dp_mon_pdev_deinit(pdev);
 			dp_mon_pdev_detach(pdev);
 		}
+
+		mon_ops = dp_mon_ops_get(soc);
+		if (mon_ops && mon_ops->mon_soc_deinit)
+			 mon_ops->mon_soc_deinit(soc);
+
+		if (mon_ops && mon_ops->mon_soc_detach)
+			mon_ops->mon_soc_detach(soc);
+
 		mon_soc = soc->monitor_soc;
 		soc->monitor_soc = NULL;
 		qdf_mem_free(mon_soc);

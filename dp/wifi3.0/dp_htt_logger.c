@@ -153,6 +153,7 @@ int htt_command_record(struct htt_logger *h, uint8_t msg_type,
 	qdf_spin_unlock(&cmd_log_buf->record_lock);
 	return 0;
 }
+qdf_export_symbol(htt_command_record);
 
 /**
  * htt_event_record() - Record Event
