@@ -177,7 +177,8 @@ QDF_STATUS osif_disconnect_handler(struct wlan_objmgr_vdev *vdev,
 	osif_cm_disconnect_comp_ind(vdev, rsp, OSIF_PRE_USERSPACE_UPDATE);
 	osif_cm_indicate_disconnect(osif_priv->wdev->netdev, ieee80211_reason,
 				    locally_generated, rsp->ap_discon_ie.ptr,
-				    rsp->ap_discon_ie.len, GFP_KERNEL);
+				    rsp->ap_discon_ie.len,
+				    qdf_mem_malloc_flags());
 
 	osif_cm_disconnect_comp_ind(vdev, rsp, OSIF_POST_USERSPACE_UPDATE);
 
