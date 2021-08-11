@@ -22,6 +22,48 @@
 #include <wlan_stats_define.h>
 
 /**
+ * Deriving feature indexes corresponding to feature attributes defined in
+ * qca_wlan_vendor_attr_feat dynamically.
+ * Feature attribute values starts from 2. So, Deduction of 2 is required to
+ * start the index from 0.
+ **/
+#define DEF_INX(_x) \
+	INX_FEAT_##_x = (QCA_WLAN_VENDOR_ATTR_FEAT_##_x - 2)
+/**
+ * QCA_WLAN_VENDOR_ATTR_RECURSIVE attribute is the last attribute
+ * in qca_wlan_vendor_attr_feat. So the Maximum index should hold
+ * the count of feature index.
+ */
+#define DEF_INX_MAX() \
+	INX_FEAT_MAX = (QCA_WLAN_VENDOR_ATTR_RECURSIVE - 2)
+/**
+ * This is to get qca_wlan_vendor_attr_feat attributes from feat_index_e.
+ * So, the addition of 2 is required to get corresponding attribute.
+ */
+#define GET_ATTR(_x) ((_x) + 2)
+
+/**
+ * enum stats_feat_index_e: Defines stats feature indexes
+ * This will auto generate each index value corresponding to that feature
+ * attribute defined in qca_wlan_vendor_attr_feat.
+ */
+enum stats_feat_index_e {
+	DEF_INX(ME),
+	DEF_INX(TX),
+	DEF_INX(RX),
+	DEF_INX(FWD),
+	DEF_INX(RAW),
+	DEF_INX(TSO),
+	DEF_INX(TWT),
+	DEF_INX(IGMP),
+	DEF_INX(LINK),
+	DEF_INX(MESH),
+	DEF_INX(RATE),
+	DEF_INX(NAWDS),
+	DEF_INX_MAX(),
+};
+
+/**
  * struct stats_config: Structure to hold user configurations
  * @wiphy:  Pointer to wiphy structure which came as part of User request
  * @feat:  Feat flag set to dedicated bit of this field
@@ -48,30 +90,8 @@ struct stats_config {
  * This can hold Basic or Advance or Debug structures independently.
  */
 struct unified_stats {
-	void *me;
-	void *rx;
-	void *tx;
-	void *fwd;
-	void *raw;
-	void *tso;
-	void *twt;
-	void *igmp;
-	void *link;
-	void *mesh;
-	void *rate;
-	void *nawds;
-	u_int32_t me_size;
-	u_int32_t rx_size;
-	u_int32_t tx_size;
-	u_int32_t fwd_size;
-	u_int32_t raw_size;
-	u_int32_t tso_size;
-	u_int32_t twt_size;
-	u_int32_t igmp_size;
-	u_int32_t link_size;
-	u_int32_t mesh_size;
-	u_int32_t rate_size;
-	u_int32_t nawds_size;
+	void *feat[INX_FEAT_MAX];
+	u_int32_t size[INX_FEAT_MAX];
 };
 
 /**

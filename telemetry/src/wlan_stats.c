@@ -25,6 +25,7 @@
 #include <wlan_cfg80211_ic_cp_stats.h>
 #include <qdf_event.h>
 #include <ieee80211_var.h>
+#include <ieee80211_cfg80211.h>
 #include <wlan_stats.h>
 
 static void fill_basic_peer_data_tx(struct basic_peer_data_tx *data,
@@ -287,8 +288,8 @@ static QDF_STATUS get_basic_peer_data_tx(struct unified_stats *stats,
 	}
 	fill_basic_peer_data_tx(data, &peer_stats->tx);
 
-	stats->tx = data;
-	stats->tx_size = sizeof(struct basic_peer_data_tx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct basic_peer_data_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -309,8 +310,8 @@ static QDF_STATUS get_basic_peer_ctrl_tx(struct unified_stats *stats,
 	}
 	fill_basic_peer_ctrl_tx(ctrl, peer_cp_stats);
 
-	stats->tx = ctrl;
-	stats->tx_size = sizeof(struct basic_peer_ctrl_tx);
+	stats->feat[INX_FEAT_TX] = ctrl;
+	stats->size[INX_FEAT_TX] = sizeof(struct basic_peer_ctrl_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -331,8 +332,8 @@ static QDF_STATUS get_basic_peer_data_rx(struct unified_stats *stats,
 	}
 	fill_basic_peer_data_rx(data, &peer_stats->rx);
 
-	stats->rx = data;
-	stats->rx_size = sizeof(struct basic_peer_data_rx);
+	stats->feat[INX_FEAT_RX] = data;
+	stats->size[INX_FEAT_RX] = sizeof(struct basic_peer_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -353,8 +354,8 @@ static QDF_STATUS get_basic_peer_ctrl_rx(struct unified_stats *stats,
 	}
 	fill_basic_peer_ctrl_rx(ctrl, peer_cp_stats);
 
-	stats->rx = ctrl;
-	stats->rx_size = sizeof(struct basic_peer_ctrl_rx);
+	stats->feat[INX_FEAT_RX] = ctrl;
+	stats->size[INX_FEAT_RX] = sizeof(struct basic_peer_ctrl_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -375,8 +376,8 @@ static QDF_STATUS get_basic_peer_data_link(struct unified_stats *stats,
 	}
 	fill_basic_peer_data_link(data, &peer_stats->rx);
 
-	stats->link = data;
-	stats->link_size = sizeof(struct basic_peer_data_link);
+	stats->feat[INX_FEAT_LINK] = data;
+	stats->size[INX_FEAT_LINK] = sizeof(struct basic_peer_data_link);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -397,8 +398,8 @@ static QDF_STATUS get_basic_peer_ctrl_link(struct unified_stats *stats,
 	}
 	fill_basic_peer_ctrl_link(ctrl, cp_stats);
 
-	stats->link = ctrl;
-	stats->link_size = sizeof(struct basic_peer_ctrl_link);
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct basic_peer_ctrl_link);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -419,8 +420,8 @@ static QDF_STATUS get_basic_peer_data_rate(struct unified_stats *stats,
 	}
 	fill_basic_peer_data_rate(data, peer_stats);
 
-	stats->rate = data;
-	stats->rate_size = sizeof(struct basic_peer_data_rate);
+	stats->feat[INX_FEAT_RATE] = data;
+	stats->size[INX_FEAT_RATE] = sizeof(struct basic_peer_data_rate);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -441,8 +442,8 @@ static QDF_STATUS get_basic_peer_ctrl_rate(struct unified_stats *stats,
 	}
 	fill_basic_peer_ctrl_rate(ctrl, cp_stats);
 
-	stats->rate = ctrl;
-	stats->rate_size = sizeof(struct basic_peer_ctrl_rate);
+	stats->feat[INX_FEAT_RATE] = ctrl;
+	stats->size[INX_FEAT_RATE] = sizeof(struct basic_peer_ctrl_rate);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -467,8 +468,8 @@ static QDF_STATUS get_basic_vdev_data_tx(struct unified_stats *stats,
 	}
 	fill_basic_vdev_data_tx(data, vdev_stats);
 
-	stats->tx = data;
-	stats->tx_size = sizeof(struct basic_vdev_data_tx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct basic_vdev_data_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -489,8 +490,8 @@ static QDF_STATUS get_basic_vdev_ctrl_tx(struct unified_stats *stats,
 	}
 	fill_basic_vdev_ctrl_tx(ctrl, cp_stats);
 
-	stats->tx = ctrl;
-	stats->tx_size = sizeof(struct basic_vdev_ctrl_tx);
+	stats->feat[INX_FEAT_TX] = ctrl;
+	stats->size[INX_FEAT_TX] = sizeof(struct basic_vdev_ctrl_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -511,8 +512,8 @@ static QDF_STATUS get_basic_vdev_data_rx(struct unified_stats *stats,
 	}
 	fill_basic_vdev_data_rx(data, &vdev_stats->rx);
 
-	stats->rx = data;
-	stats->rx_size = sizeof(struct basic_vdev_data_rx);
+	stats->feat[INX_FEAT_RX] = data;
+	stats->size[INX_FEAT_RX] = sizeof(struct basic_vdev_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -533,8 +534,8 @@ static QDF_STATUS get_basic_vdev_ctrl_rx(struct unified_stats *stats,
 	}
 	fill_basic_vdev_ctrl_rx(ctrl, cp_stats);
 
-	stats->rx = ctrl;
-	stats->rx_size = sizeof(struct basic_vdev_ctrl_rx);
+	stats->feat[INX_FEAT_RX] = ctrl;
+	stats->size[INX_FEAT_RX] = sizeof(struct basic_vdev_ctrl_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -555,8 +556,8 @@ static QDF_STATUS get_basic_pdev_data_tx(struct unified_stats *stats,
 	}
 	fill_basic_pdev_data_tx(data, pdev_stats);
 
-	stats->tx = data;
-	stats->tx_size = sizeof(struct basic_pdev_data_tx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct basic_pdev_data_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -577,8 +578,8 @@ static QDF_STATUS get_basic_pdev_data_rx(struct unified_stats *stats,
 	}
 	fill_basic_pdev_data_rx(data, pdev_stats);
 
-	stats->rx = data;
-	stats->rx_size = sizeof(struct basic_pdev_data_rx);
+	stats->feat[INX_FEAT_RX] = data;
+	stats->size[INX_FEAT_RX] = sizeof(struct basic_pdev_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -599,8 +600,8 @@ static QDF_STATUS get_basic_pdev_ctrl_tx(struct unified_stats *stats,
 	}
 	fill_basic_pdev_ctrl_tx(ctrl, pdev_cp_stats);
 
-	stats->tx = ctrl;
-	stats->tx_size = sizeof(struct basic_pdev_ctrl_tx);
+	stats->feat[INX_FEAT_TX] = ctrl;
+	stats->size[INX_FEAT_TX] = sizeof(struct basic_pdev_ctrl_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -621,8 +622,8 @@ static QDF_STATUS get_basic_pdev_ctrl_rx(struct unified_stats *stats,
 	}
 	fill_basic_pdev_ctrl_rx(ctrl, pdev_cp_stats);
 
-	stats->rx = ctrl;
-	stats->rx_size = sizeof(struct basic_pdev_ctrl_rx);
+	stats->feat[INX_FEAT_RX] = ctrl;
+	stats->size[INX_FEAT_RX] = sizeof(struct basic_pdev_ctrl_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -643,8 +644,8 @@ static QDF_STATUS get_basic_pdev_ctrl_link(struct unified_stats *stats,
 	}
 	fill_basic_pdev_ctrl_link(ctrl, cp_stats);
 
-	stats->link = ctrl;
-	stats->link_size = sizeof(struct basic_pdev_ctrl_link);
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct basic_pdev_ctrl_link);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -665,8 +666,8 @@ static QDF_STATUS get_basic_psoc_data_tx(struct unified_stats *stats,
 	}
 	fill_basic_psoc_data_tx(data, soc_stats);
 
-	stats->tx = data;
-	stats->tx_size = sizeof(struct basic_psoc_data_tx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct basic_psoc_data_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -687,8 +688,8 @@ static QDF_STATUS get_basic_psoc_data_rx(struct unified_stats *stats,
 	}
 	fill_basic_psoc_data_rx(data, soc_stats);
 
-	stats->rx = data;
-	stats->rx_size = sizeof(struct basic_psoc_data_rx);
+	stats->feat[INX_FEAT_RX] = data;
+	stats->size[INX_FEAT_RX] = sizeof(struct basic_psoc_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1032,8 +1033,8 @@ static QDF_STATUS get_advance_peer_data_tx(struct unified_stats *stats,
 	data->ampdu_cnt = tx->ampdu_cnt;
 	data->non_ampdu_cnt = tx->non_ampdu_cnt;
 
-	stats->tx = data;
-	stats->tx_size = sizeof(struct advance_peer_data_tx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct advance_peer_data_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1087,8 +1088,8 @@ static QDF_STATUS get_advance_peer_data_rx(struct unified_stats *stats,
 	data->rx_retries = rx->rx_retries;
 	data->multipass_rx_pkt_drop = rx->multipass_rx_pkt_drop;
 
-	stats->rx = data;
-	stats->rx_size = sizeof(struct advance_peer_data_rx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct advance_peer_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1113,8 +1114,8 @@ static QDF_STATUS get_advance_peer_data_link(struct unified_stats *stats,
 
 	data->rx_snr_measured_time = rx->rx_snr_measured_time;
 
-	stats->link = data;
-	stats->link_size = sizeof(struct advance_peer_data_link);
+	stats->feat[INX_FEAT_LINK] = data;
+	stats->size[INX_FEAT_LINK] = sizeof(struct advance_peer_data_link);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1144,8 +1145,8 @@ static QDF_STATUS get_advance_peer_data_rate(struct unified_stats *stats,
 	data->rnd_avg_tx_rate = tx->rnd_avg_tx_rate;
 	data->avg_tx_rate = tx->avg_tx_rate;
 
-	stats->rate = data;
-	stats->rate_size = sizeof(struct advance_peer_data_rate);
+	stats->feat[INX_FEAT_RATE] = data;
+	stats->size[INX_FEAT_RATE] = sizeof(struct advance_peer_data_rate);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1169,8 +1170,8 @@ static QDF_STATUS get_advance_peer_data_raw(struct unified_stats *stats,
 	data->raw.num = rx->raw.num;
 	data->raw.bytes = rx->raw.bytes;
 
-	stats->raw = data;
-	stats->raw_size = sizeof(struct advance_peer_data_raw);
+	stats->feat[INX_FEAT_RAW] = data;
+	stats->size[INX_FEAT_RAW] = sizeof(struct advance_peer_data_raw);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1197,8 +1198,8 @@ static QDF_STATUS get_advance_peer_data_fwd(struct unified_stats *stats,
 	data->fail.bytes = rx->intra_bss.fail.bytes;
 	data->mdns_no_fwd = rx->intra_bss.mdns_no_fwd;
 
-	stats->fwd = data;
-	stats->fwd_size = sizeof(struct advance_peer_data_fwd);
+	stats->feat[INX_FEAT_FWD] = data;
+	stats->size[INX_FEAT_FWD] = sizeof(struct advance_peer_data_fwd);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1226,8 +1227,8 @@ static QDF_STATUS get_advance_peer_data_twt(struct unified_stats *stats,
 	data->tx_success_twt.num = tx->tx_success_twt.num;
 	data->tx_success_twt.bytes = tx->tx_success_twt.bytes;
 
-	stats->twt = data;
-	stats->twt_size = sizeof(struct advance_peer_data_twt);
+	stats->feat[INX_FEAT_TWT] = data;
+	stats->size[INX_FEAT_TWT] = sizeof(struct advance_peer_data_twt);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1255,8 +1256,8 @@ static QDF_STATUS get_advance_peer_data_nawds(struct unified_stats *stats,
 	data->nawds_mcast_tx_drop = tx->nawds_mcast_drop;
 	data->nawds_mcast_rx_drop = rx->nawds_mcast_drop;
 
-	stats->nawds = data;
-	stats->nawds_size = sizeof(struct advance_peer_data_nawds);
+	stats->feat[INX_FEAT_NAWDS] = data;
+	stats->size[INX_FEAT_NAWDS] = sizeof(struct advance_peer_data_nawds);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1280,8 +1281,8 @@ static QDF_STATUS get_advance_peer_ctrl_tx(struct unified_stats *stats,
 	ctrl->cs_tx_assoc = cp_stats->cs_tx_assoc;
 	ctrl->cs_tx_assoc_fail = cp_stats->cs_tx_assoc_fail;
 
-	stats->tx = ctrl;
-	stats->tx_size = sizeof(struct advance_peer_ctrl_tx);
+	stats->feat[INX_FEAT_TX] = ctrl;
+	stats->size[INX_FEAT_TX] = sizeof(struct advance_peer_ctrl_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1302,8 +1303,8 @@ static QDF_STATUS get_advance_peer_ctrl_rx(struct unified_stats *stats,
 	}
 	fill_basic_peer_ctrl_rx(&ctrl->b_rx, cp_stats);
 
-	stats->rx = ctrl;
-	stats->rx_size = sizeof(struct advance_peer_ctrl_rx);
+	stats->feat[INX_FEAT_RX] = ctrl;
+	stats->size[INX_FEAT_RX] = sizeof(struct advance_peer_ctrl_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1332,8 +1333,8 @@ static QDF_STATUS get_advance_peer_ctrl_twt(struct unified_stats *stats,
 	ctrl->cs_twt_wake_intvl_us = cp_stats->cs_twt_wake_intvl_us;
 	ctrl->cs_twt_sp_offset_us = cp_stats->cs_twt_sp_offset_us;
 
-	stats->twt = ctrl;
-	stats->twt_size = sizeof(struct advance_peer_ctrl_twt);
+	stats->feat[INX_FEAT_TWT] = ctrl;
+	stats->size[INX_FEAT_TWT] = sizeof(struct advance_peer_ctrl_twt);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1354,8 +1355,8 @@ static QDF_STATUS get_advance_peer_ctrl_link(struct unified_stats *stats,
 	}
 	fill_basic_peer_ctrl_link(&ctrl->b_link, cp_stats);
 
-	stats->link = ctrl;
-	stats->link_size = sizeof(struct advance_peer_ctrl_link);
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct advance_peer_ctrl_link);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1376,8 +1377,8 @@ static QDF_STATUS get_advance_peer_ctrl_rate(struct unified_stats *stats,
 	}
 	fill_basic_peer_ctrl_rate(&ctrl->b_rate, cp_stats);
 
-	stats->rate = ctrl;
-	stats->rate_size = sizeof(struct advance_peer_ctrl_rate);
+	stats->feat[INX_FEAT_RATE] = ctrl;
+	stats->size[INX_FEAT_RATE] = sizeof(struct advance_peer_ctrl_rate);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1551,8 +1552,8 @@ static QDF_STATUS get_advance_vdev_data_tx(struct unified_stats *stats,
 	data->non_ampdu_cnt = tx->non_ampdu_cnt;
 	data->cce_classified = tx_i->cce_classified;
 
-	stats->tx = data;
-	stats->tx_size = sizeof(struct advance_vdev_data_tx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct advance_vdev_data_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1606,8 +1607,8 @@ static QDF_STATUS get_advance_vdev_data_rx(struct unified_stats *stats,
 	data->rx_retries = rx->rx_retries;
 	data->multipass_rx_pkt_drop = rx->multipass_rx_pkt_drop;
 
-	stats->rx = data;
-	stats->rx_size = sizeof(struct advance_vdev_data_rx);
+	stats->feat[INX_FEAT_RX] = data;
+	stats->size[INX_FEAT_RX] = sizeof(struct advance_vdev_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1632,8 +1633,8 @@ static QDF_STATUS get_advance_vdev_data_me(struct unified_stats *stats,
 	data->mcast_pkt.bytes = tx_i->mcast_en.mcast_pkt.bytes;
 	data->ucast = tx_i->mcast_en.ucast;
 
-	stats->me = data;
-	stats->me_size = sizeof(struct advance_vdev_data_me);
+	stats->feat[INX_FEAT_ME] = data;
+	stats->size[INX_FEAT_ME] = sizeof(struct advance_vdev_data_me);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1662,8 +1663,8 @@ static QDF_STATUS get_advance_vdev_data_raw(struct unified_stats *stats,
 	data->tx_raw_pkt.bytes = tx_i->raw.raw_pkt.bytes;
 	data->cce_classified_raw = tx_i->cce_classified_raw;
 
-	stats->raw = data;
-	stats->raw_size = sizeof(struct advance_vdev_data_raw);
+	stats->feat[INX_FEAT_RAW] = data;
+	stats->size[INX_FEAT_RAW] = sizeof(struct advance_vdev_data_raw);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1693,8 +1694,8 @@ static QDF_STATUS get_advance_vdev_data_tso(struct unified_stats *stats,
 	data->num_tso_pkts.num = tso->num_tso_pkts.num;
 	data->num_tso_pkts.bytes = tso->num_tso_pkts.bytes;
 
-	stats->tso = data;
-	stats->tso_size = sizeof(struct advance_vdev_data_tso);
+	stats->feat[INX_FEAT_TSO] = data;
+	stats->size[INX_FEAT_TSO] = sizeof(struct advance_vdev_data_tso);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1718,8 +1719,8 @@ static QDF_STATUS get_advance_vdev_data_igmp(struct unified_stats *stats,
 	data->igmp_rcvd = tx_i->igmp_mcast_en.igmp_rcvd;
 	data->igmp_ucast_converted = tx_i->igmp_mcast_en.igmp_ucast_converted;
 
-	stats->igmp = data;
-	stats->igmp_size = sizeof(struct advance_vdev_data_igmp);
+	stats->feat[INX_FEAT_IGMP] = data;
+	stats->size[INX_FEAT_IGMP] = sizeof(struct advance_vdev_data_igmp);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1743,8 +1744,8 @@ static QDF_STATUS get_advance_vdev_data_mesh(struct unified_stats *stats,
 	data->exception_fw = tx_i->mesh.exception_fw;
 	data->completion_fw = tx_i->mesh.completion_fw;
 
-	stats->mesh = data;
-	stats->mesh_size = sizeof(struct advance_vdev_data_mesh);
+	stats->feat[INX_FEAT_MESH] = data;
+	stats->size[INX_FEAT_MESH] = sizeof(struct advance_vdev_data_mesh);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1772,8 +1773,8 @@ static QDF_STATUS get_advance_vdev_data_nawds(struct unified_stats *stats,
 	data->nawds_mcast_tx_drop = tx->nawds_mcast_drop;
 	data->nawds_mcast_rx_drop = rx->nawds_mcast_drop;
 
-	stats->nawds = data;
-	stats->nawds_size = sizeof(struct advance_vdev_data_nawds);
+	stats->feat[INX_FEAT_NAWDS] = data;
+	stats->size[INX_FEAT_NAWDS] = sizeof(struct advance_vdev_data_nawds);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1807,8 +1808,8 @@ static QDF_STATUS get_advance_vdev_ctrl_tx(struct unified_stats *stats,
 	ctrl->cs_tx_offload_prb_resp_fail_cnt =
 		cp_stats->stats.cs_tx_offload_prb_resp_fail_cnt;
 
-	stats->tx = ctrl;
-	stats->tx_size = sizeof(struct advance_vdev_ctrl_tx);
+	stats->feat[INX_FEAT_TX] = ctrl;
+	stats->size[INX_FEAT_TX] = sizeof(struct advance_vdev_ctrl_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1840,8 +1841,8 @@ static QDF_STATUS get_advance_vdev_ctrl_rx(struct unified_stats *stats,
 	ctrl->cs_sta_xceed_rlim = cp_stats->stats.cs_sta_xceed_rlim;
 	ctrl->cs_sta_xceed_vlim = cp_stats->stats.cs_sta_xceed_vlim;
 
-	stats->rx = ctrl;
-	stats->rx_size = sizeof(struct advance_vdev_ctrl_rx);
+	stats->feat[INX_FEAT_RX] = ctrl;
+	stats->size[INX_FEAT_RX] = sizeof(struct advance_vdev_ctrl_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2050,8 +2051,8 @@ static QDF_STATUS get_advance_pdev_data_tx(struct unified_stats *stats,
 	data->tx_hist.pkts_101_200 = hist->pkts_101_200;
 	data->tx_hist.pkts_201_plus = hist->pkts_201_plus;
 
-	stats->tx = data;
-	stats->tx_size = sizeof(struct advance_pdev_data_tx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct advance_pdev_data_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2115,8 +2116,8 @@ static QDF_STATUS get_advance_pdev_data_rx(struct unified_stats *stats,
 	data->rx_hist.pkts_101_200 = hist->pkts_101_200;
 	data->rx_hist.pkts_201_plus = hist->pkts_201_plus;
 
-	stats->rx = data;
-	stats->rx_size = sizeof(struct advance_pdev_data_rx);
+	stats->feat[INX_FEAT_RX] = data;
+	stats->size[INX_FEAT_RX] = sizeof(struct advance_pdev_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2141,8 +2142,8 @@ static QDF_STATUS get_advance_pdev_data_me(struct unified_stats *stats,
 	data->mcast_pkt.bytes = tx_i->mcast_en.mcast_pkt.bytes;
 	data->ucast = tx_i->mcast_en.ucast;
 
-	stats->me = data;
-	stats->me_size = sizeof(struct advance_pdev_data_me);
+	stats->feat[INX_FEAT_ME] = data;
+	stats->size[INX_FEAT_ME] = sizeof(struct advance_pdev_data_me);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2172,8 +2173,8 @@ static QDF_STATUS get_advance_pdev_data_raw(struct unified_stats *stats,
 	data->cce_classified_raw = tx_i->cce_classified_raw;
 	data->rx_raw_pkts = pdev_stats->rx_raw_pkts;
 
-	stats->raw = data;
-	stats->raw_size = sizeof(struct advance_pdev_data_raw);
+	stats->feat[INX_FEAT_RAW] = data;
+	stats->size[INX_FEAT_RAW] = sizeof(struct advance_pdev_data_raw);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2212,8 +2213,8 @@ static QDF_STATUS get_advance_pdev_data_tso(struct unified_stats *stats,
 	data->segs_20_plus = tso->seg_histogram.segs_20_plus;
 #endif /* FEATURE_TSO_STATS */
 
-	stats->tso = data;
-	stats->tso_size = sizeof(struct advance_pdev_data_tso);
+	stats->feat[INX_FEAT_TSO] = data;
+	stats->size[INX_FEAT_TSO] = sizeof(struct advance_pdev_data_tso);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2237,8 +2238,8 @@ static QDF_STATUS get_advance_pdev_data_igmp(struct unified_stats *stats,
 	data->igmp_rcvd = tx_i->igmp_mcast_en.igmp_rcvd;
 	data->igmp_ucast_converted = tx_i->igmp_mcast_en.igmp_ucast_converted;
 
-	stats->igmp = data;
-	stats->igmp_size = sizeof(struct advance_pdev_data_igmp);
+	stats->feat[INX_FEAT_IGMP] = data;
+	stats->size[INX_FEAT_IGMP] = sizeof(struct advance_pdev_data_igmp);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2262,8 +2263,8 @@ static QDF_STATUS get_advance_pdev_data_mesh(struct unified_stats *stats,
 	data->exception_fw = tx_i->mesh.exception_fw;
 	data->completion_fw = tx_i->mesh.completion_fw;
 
-	stats->mesh = data;
-	stats->mesh_size = sizeof(struct advance_pdev_data_mesh);
+	stats->feat[INX_FEAT_MESH] = data;
+	stats->size[INX_FEAT_MESH] = sizeof(struct advance_pdev_data_mesh);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2291,8 +2292,8 @@ static QDF_STATUS get_advance_pdev_data_nawds(struct unified_stats *stats,
 	data->nawds_mcast_tx_drop = tx->nawds_mcast_drop;
 	data->nawds_mcast_rx_drop = rx->nawds_mcast_drop;
 
-	stats->nawds = data;
-	stats->nawds_size = sizeof(struct advance_pdev_data_nawds);
+	stats->feat[INX_FEAT_NAWDS] = data;
+	stats->size[INX_FEAT_NAWDS] = sizeof(struct advance_pdev_data_nawds);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2347,8 +2348,8 @@ static QDF_STATUS get_advance_pdev_ctrl_tx(struct wlan_objmgr_pdev *pdev,
 						  aggregate_vdev_stats, ctrl,
 						  1, WLAN_MLME_SB_ID);
 
-	stats->tx = ctrl;
-	stats->tx_size = sizeof(struct advance_pdev_ctrl_tx);
+	stats->feat[INX_FEAT_TX] = ctrl;
+	stats->size[INX_FEAT_TX] = sizeof(struct advance_pdev_ctrl_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2371,8 +2372,8 @@ static QDF_STATUS get_advance_pdev_ctrl_rx(struct unified_stats *stats,
 
 	ctrl->cs_rx_mgmt_rssi_drop = cp_stats->stats.cs_rx_mgmt_rssi_drop;
 
-	stats->rx = ctrl;
-	stats->rx_size = sizeof(struct advance_pdev_ctrl_rx);
+	stats->feat[INX_FEAT_RX] = ctrl;
+	stats->size[INX_FEAT_RX] = sizeof(struct advance_pdev_ctrl_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2438,8 +2439,8 @@ static QDF_STATUS get_advance_pdev_ctrl_link(struct unified_stats *stats,
 	ctrl->rx_rssi_chain3_sec80 =
 		cp_stats->stats.cs_rx_rssi_chain3.rx_rssi_sec80;
 
-	stats->link = ctrl;
-	stats->link_size = sizeof(struct advance_pdev_ctrl_link);
+	stats->feat[INX_FEAT_LINK] = ctrl;
+	stats->size[INX_FEAT_LINK] = sizeof(struct advance_pdev_ctrl_link);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2575,8 +2576,8 @@ static QDF_STATUS get_advance_psoc_data_tx(struct unified_stats *stats,
 	}
 	fill_basic_psoc_data_tx(&data->b_tx, soc_stats);
 
-	stats->tx = data;
-	stats->tx_size = sizeof(struct advance_psoc_data_tx);
+	stats->feat[INX_FEAT_TX] = data;
+	stats->size[INX_FEAT_TX] = sizeof(struct advance_psoc_data_tx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2604,8 +2605,8 @@ static QDF_STATUS get_advance_psoc_data_rx(struct unified_stats *stats,
 	data->rejected = soc_stats->rx.err.rx_rejected;
 	data->raw_frm_drop = soc_stats->rx.err.rx_raw_frm_drop;
 
-	stats->rx = data;
-	stats->rx_size = sizeof(struct advance_psoc_data_rx);
+	stats->feat[INX_FEAT_RX] = data;
+	stats->size[INX_FEAT_RX] = sizeof(struct advance_psoc_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2885,40 +2886,12 @@ bool wlan_stats_is_recursive_valid(struct stats_config *cfg,
 
 void wlan_stats_free_unified_stats(struct unified_stats *stats)
 {
-	if (stats->rx)
-		qdf_mem_free(stats->rx);
-	if (stats->tx)
-		qdf_mem_free(stats->tx);
-	if (stats->me)
-		qdf_mem_free(stats->me);
-	if (stats->fwd)
-		qdf_mem_free(stats->fwd);
-	if (stats->tso)
-		qdf_mem_free(stats->tso);
-	if (stats->twt)
-		qdf_mem_free(stats->twt);
-	if (stats->raw)
-		qdf_mem_free(stats->raw);
-	if (stats->igmp)
-		qdf_mem_free(stats->igmp);
-	if (stats->link)
-		qdf_mem_free(stats->link);
-	if (stats->mesh)
-		qdf_mem_free(stats->mesh);
-	if (stats->rate)
-		qdf_mem_free(stats->rate);
-	if (stats->nawds)
-		qdf_mem_free(stats->nawds);
-	stats->tx_size = 0;
-	stats->rx_size = 0;
-	stats->me_size = 0;
-	stats->fwd_size = 0;
-	stats->tso_size = 0;
-	stats->twt_size = 0;
-	stats->raw_size = 0;
-	stats->mesh_size = 0;
-	stats->igmp_size = 0;
-	stats->link_size = 0;
-	stats->rate_size = 0;
-	stats->nawds_size = 0;
+	u_int8_t inx = 0;
+
+	for (inx = 0; inx < INX_FEAT_MAX; inx++) {
+		if (stats->feat[inx])
+			qdf_mem_free(stats->feat[inx]);
+		stats->feat[inx] = NULL;
+		stats->size[inx] = 0;
+	}
 }
