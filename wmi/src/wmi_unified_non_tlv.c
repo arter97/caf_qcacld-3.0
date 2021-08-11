@@ -364,6 +364,7 @@ static QDF_STATUS send_vdev_create_cmd_non_tlv(wmi_unified_t wmi_handle,
 	cmd->vdev_type = param->type;
 	cmd->vdev_subtype = param->subtype;
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(macaddr, &cmd->vdev_macaddr);
+	WMI_VDEV_FLAG_SCAN_MODE_VAP_SET(cmd->flags, param->special_vdev_mode);
 	wmi_debug("ID = %d Type = %d, Subtype = %d VAP Addr = %02x:%02x:%02x:%02x:%02x:%02x:",
 		  param->vdev_id, param->type, param->subtype,
 		  macaddr[0], macaddr[1], macaddr[2],
