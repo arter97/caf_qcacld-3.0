@@ -826,12 +826,13 @@ qdf_export_symbol(qca_multi_link_ap_rx);
  *	   QCA_MULTI_LINK_PKT_CONSUMED: frame is consumed.
  */
 static qca_multi_link_status_t qca_multi_link_secondary_sta_rx(struct net_device *net_dev,
-							      qdf_nbuf_t nbuf)
+							      qdf_nbuf_t nbuf, struct net_device **prim_dev)
 {
 	uint8_t is_mcast;
 	qca_multi_link_tbl_entry_t qca_ml_entry;
 	struct wiphy *sta_wiphy = NULL;
 	struct net_device *sta_dev = net_dev;
+	struct net_device *prim_sta_dev = NULL;
 	struct net_device *ap_dev = NULL;
 	QDF_STATUS qal_status = QDF_STATUS_E_FAILURE;
 	qdf_ether_header_t *eh = (qdf_ether_header_t *) qdf_nbuf_data(nbuf);
@@ -952,16 +953,19 @@ static qca_multi_link_status_t qca_multi_link_secondary_sta_rx(struct net_device
 			 */
 			if ((qca_ml_entry.qal_fdb_ieee80211_ptr->iftype == NL80211_IFTYPE_AP)
 				&& (qca_ml_entry.qal_fdb_ieee80211_ptr->wiphy == sta_wiphy)) {
-				QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Unicast Sec STA to AP direct enq for\
+				QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Unicast Sec STA enqueue to bridge through primary for\
 					shost %pM dhost %pM \n"), eh->ether_shost, eh->ether_dhost);
 				/*
-				 * Holding the AP dev so that it cannot be brought down
-				 * while we are enqueueing.
+				 * Find the primary station vap corresponding to the radio
 				 */
-				dev_hold(qca_ml_entry.qal_fdb_dev);
-				qca_ml_entry.qal_fdb_dev->netdev_ops->ndo_start_xmit(nbuf, qca_ml_entry.qal_fdb_dev);
-				dev_put(qca_ml_entry.qal_fdb_dev);
-				return QCA_MULTI_LINK_PKT_CONSUMED;
+				prim_sta_dev = qca_multi_link_get_station_vap(qca_multi_link_cfg.primary_wiphy);
+				if (!prim_sta_dev) {
+					QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_WARN,
+							FL("Null STA device found %pM - Give to bridge\n"), eh->ether_shost);
+					return QCA_MULTI_LINK_PKT_ALLOW;
+				}
+				*prim_dev = prim_sta_dev;
+				return QCA_MULTI_LINK_PKT_ALLOW;
 			}
 
 			qca_multi_link_cfg.qca_ml_stats.sta_rx_sec_sta_ucast_src_dif_band++;
@@ -1125,7 +1129,7 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_rx(struct net_device *
  * Return: false: frame not consumed and should be processed further by caller
  *	   true: frame dropped/enqueued.
  */
-bool qca_multi_link_sta_rx(struct net_device *net_dev, qdf_nbuf_t nbuf)
+bool qca_multi_link_sta_rx(struct net_device *net_dev, qdf_nbuf_t nbuf, struct net_device **prim_dev)
 {
 	uint8_t is_eapol;
 	bool is_primary = false;
@@ -1156,7 +1160,7 @@ bool qca_multi_link_sta_rx(struct net_device *net_dev, qdf_nbuf_t nbuf)
 	if (is_primary) {
 		status = qca_multi_link_primary_sta_rx(sta_dev, nbuf);
 	} else {
-		status = qca_multi_link_secondary_sta_rx(sta_dev, nbuf);
+		status = qca_multi_link_secondary_sta_rx(sta_dev, nbuf, prim_dev);
 	}
 	dev_put(sta_dev);
 
@@ -1278,6 +1282,7 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_tx(struct net_device *
 {
 	struct wiphy *sta_wiphy = NULL;
 	struct net_device *sta_dev = net_dev;
+	struct net_device *sec_sta_dev = NULL;
 	qca_multi_link_tbl_entry_t qca_ml_entry;
 	QDF_STATUS qal_status = QDF_STATUS_E_FAILURE;
 	qdf_ether_header_t *eh = (qdf_ether_header_t *) qdf_nbuf_data(nbuf);
@@ -1338,10 +1343,26 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_tx(struct net_device *
 	 * on the same radio.
 	 */
 	if (qca_ml_entry.qal_fdb_ieee80211_ptr->wiphy != sta_dev->ieee80211_ptr->wiphy) {
-		QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("STA TX: Diff Band Primary drop\
+		QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("STA TX: Diff Band \
 			shost %pM dhost %pM \n"), eh->ether_shost, eh->ether_dhost);
-		qca_multi_link_cfg.qca_ml_stats.sta_tx_pri_sta_drop_dif_band++;
-		return QCA_MULTI_LINK_PKT_DROP;
+
+		/*
+		 * Find the station vap corresponding to the AP vap.
+		 */
+		sec_sta_dev = qca_multi_link_get_station_vap(qca_ml_entry.qal_fdb_ieee80211_ptr->wiphy);
+		if (!sec_sta_dev) {
+			QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_WARN,
+				FL("Null STA device found %pM - Give to bridge\n"), eh->ether_shost);
+			return QCA_MULTI_LINK_PKT_DROP;
+		}
+		dev_hold(sec_sta_dev);
+
+		/*
+		 * Perform Tx on secondary sta for packets arriving from the secondary ap vap.
+		 */
+		sec_sta_dev->netdev_ops->ndo_start_xmit(nbuf, sec_sta_dev);
+		dev_put(sec_sta_dev);
+		return QCA_MULTI_LINK_PKT_CONSUMED;
 	}
 
 	return QCA_MULTI_LINK_PKT_ALLOW;
@@ -1424,4 +1445,3 @@ void qca_multi_link_set_dbdc_loop_detection_cb(
 }
 
 qdf_export_symbol(qca_multi_link_set_dbdc_loop_detection_cb);
-
