@@ -12384,6 +12384,9 @@ static QDF_STATUS extract_fips_event_data_tlv(wmi_unified_t wmi_handle,
 	if (event->data_len > param_buf->num_data)
 		return QDF_STATUS_E_FAILURE;
 
+	if (event->data_len > param_buf->num_data)
+		return QDF_STATUS_E_FAILURE;
+
 	if (fips_conv_data_be(event->data_len, param_buf->data) !=
 							QDF_STATUS_SUCCESS)
 		return QDF_STATUS_E_FAILURE;
