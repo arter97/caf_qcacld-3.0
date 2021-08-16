@@ -1277,8 +1277,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	 *    to stack.
 	 */
 	if (qdf_unlikely(dp_rx_err_cce_drop(soc, vdev, nbuf, rx_tlv_hdr))) {
-		qdf_nbuf_free(nbuf);
-		return QDF_STATUS_E_FAILURE;
+		goto drop_nbuf;
 	}
 
 	if (qdf_unlikely(vdev->rx_decap_type == htt_cmn_pkt_type_raw)) {
