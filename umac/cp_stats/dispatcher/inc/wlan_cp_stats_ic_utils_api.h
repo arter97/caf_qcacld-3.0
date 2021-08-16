@@ -281,12 +281,14 @@ VDEV_CP_STATS_SET_FUNCS(fils_frames_sent);
 VDEV_CP_STATS_SET_FUNCS(fils_frames_sent_fail);
 VDEV_CP_STATS_SET_FUNCS(tx_offload_prb_resp_succ_cnt);
 VDEV_CP_STATS_SET_FUNCS(tx_offload_prb_resp_fail_cnt);
+#ifdef QCA_SUPPORT_SCAN_SPCL_VAP_STATS
 VDEV_CP_STATS_SET_FUNCS(tx_mgmt_ok_cnt);
 VDEV_CP_STATS_SET_FUNCS(tx_mgmt_ok_bytes);
 VDEV_CP_STATS_SET_FUNCS(tx_mgmt_retry_cnt);
 VDEV_CP_STATS_SET_FUNCS(tx_mgmt_retry_bytes);
 VDEV_CP_STATS_SET_FUNCS(tx_mgmt_err_cnt);
 VDEV_CP_STATS_SET_FUNCS(tx_mgmt_err_bytes);
+#endif
 
 
 #define VDEV_CP_STATS_GET_FUNCS(field) \
@@ -303,12 +305,14 @@ VDEV_CP_STATS_GET_FUNCS(peer_delete_req);
 VDEV_CP_STATS_GET_FUNCS(peer_delete_resp);
 VDEV_CP_STATS_GET_FUNCS(peer_delete_all_req);
 VDEV_CP_STATS_GET_FUNCS(peer_delete_all_resp);
+#ifdef QCA_SUPPORT_SCAN_SPCL_VAP_STATS
 VDEV_CP_STATS_GET_FUNCS(tx_mgmt_ok_cnt);
 VDEV_CP_STATS_GET_FUNCS(tx_mgmt_ok_bytes);
 VDEV_CP_STATS_GET_FUNCS(tx_mgmt_retry_cnt);
 VDEV_CP_STATS_GET_FUNCS(tx_mgmt_retry_bytes);
 VDEV_CP_STATS_GET_FUNCS(tx_mgmt_err_cnt);
 VDEV_CP_STATS_GET_FUNCS(tx_mgmt_err_bytes);
+#endif
 
 static inline void vdev_cp_stats_reset(struct wlan_objmgr_vdev *vdev)
 {
