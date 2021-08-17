@@ -199,6 +199,7 @@ QDF_STATUS lim_send_switch_chnl_params(struct mac_context *mac,
 		return QDF_STATUS_E_FAILURE;
 	}
 	pe_session->ch_switch_in_progress = true;
+	mac->roam.roamSession[peSessionId].ch_switch_in_progress = true;
 
 	return QDF_STATUS_SUCCESS;
 }
