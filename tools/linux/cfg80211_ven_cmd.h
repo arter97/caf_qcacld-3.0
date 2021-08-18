@@ -796,6 +796,7 @@ enum {
 	IEEE80211_PARAM_WLAN_SCHED_TIMEOUT         = 735,
 	IEEE80211_PARAM_AP_MAX_AUTH_FAIL           = 736,   /* Set max continuous auth failures to be sent auth response within 15 seconds */
 	IEEE80211_PARAM_VAP_PROFILE_CONFIG         = 737,   /* Per vap resource profile size for EMA non tx vap */
+	IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE = 738,  /* Discovery frame override with OOB */
 };
 
 enum {
@@ -2308,6 +2309,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"max_auth_fail",          IEEE80211_PARAM_AP_MAX_AUTH_FAIL, SET_PARAM, 1},
 	{"g_max_auth_fail",        IEEE80211_PARAM_AP_MAX_AUTH_FAIL, GET_PARAM, 0},
 	{"vap_resource_profile ",     IEEE80211_PARAM_VAP_PROFILE_CONFIG, SET_PARAM, 2},
+	{"discfrm_6g_clear_usr_override", IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE, SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
