@@ -784,6 +784,7 @@ enum {
 	IEEE80211_PARAM_PRB_RETRY                  = 723,   /* Set/Get probe-response frame retry limit */
 	IEEE80211_PARAM_PEER_AUTHORIZE             = 724, /* Enable port authorization */
 	IEEE80211_PARAM_RTS                        = 725,   /* Vdev specific minimum packet size setting for which RTS/CTS is used */
+	IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE = 726,  /* Discovery frame override with OOB */
 };
 
 enum {
@@ -2255,6 +2256,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_peer_authorize ",     IEEE80211_PARAM_PEER_AUTHORIZE, GET_PARAM, 0},
 	{"rts",                       IEEE80211_PARAM_RTS, SET_PARAM, 1},
 	{"get_rts",                   IEEE80211_PARAM_RTS, GET_PARAM, 0},
+	{"discfrm_6g_clear_usr_override", IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE, SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
