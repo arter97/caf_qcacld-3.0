@@ -4339,8 +4339,8 @@ static void dp_pdev_deinit(struct cdp_pdev *txrx_pdev, int force)
 	dp_rx_pdev_buffers_free(pdev);
 	dp_rx_pdev_mon_desc_pool_deinit(pdev);
 	dp_rx_pdev_desc_pool_deinit(pdev);
-	dp_htt_ppdu_stats_detach(pdev);
 	dp_tx_ppdu_stats_detach(pdev);
+	dp_htt_ppdu_stats_detach(pdev);
 	qdf_event_destroy(&pdev->fw_peer_stats_event);
 	dp_cal_client_detach(&pdev->cal_client_ctx);
 	if (pdev->sojourn_buf)
