@@ -144,6 +144,11 @@ static void wlan_ipa_uc_loaded_uc_cb(void *priv_ctxt)
 	struct op_msg_type *msg;
 	struct uc_op_work_struct *uc_op_work;
 
+	if (!ipa_cb_is_ready()) {
+		ipa_info("IPA is not READY");
+		return;
+	}
+
 	if (!priv_ctxt) {
 		ipa_err("Invalid IPA context");
 		return;
@@ -1902,6 +1907,11 @@ bool wlan_ipa_is_tx_pending(struct wlan_ipa_priv *ipa_ctx)
 	bool ret = false;
 	uint64_t diff_ms = 0;
 	uint64_t current_ticks = 0;
+
+	if (!ipa_ctx) {
+		ipa_err("IPA private context is NULL");
+		return false;
+	}
 
 	if (!qdf_atomic_read(&ipa_ctx->waiting_on_pending_tx)) {
 		ipa_debug("nothing pending");

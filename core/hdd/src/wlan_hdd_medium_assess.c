@@ -142,10 +142,11 @@ static void hdd_cca_notification_cb(uint8_t vdev_id,
 		return;
 	}
 
-	event = cfg80211_vendor_event_alloc(hdd_ctx->wiphy, NULL,
-				  get_cca_report_len(),
-				  QCA_NL80211_VENDOR_SUBCMD_MEDIUM_ASSESS_INDEX,
-				  GFP_KERNEL);
+	event = cfg80211_vendor_event_alloc(
+				hdd_ctx->wiphy, &adapter->wdev,
+				get_cca_report_len(),
+				QCA_NL80211_VENDOR_SUBCMD_MEDIUM_ASSESS_INDEX,
+				GFP_KERNEL);
 	if (!event) {
 		hdd_err("cfg80211_vendor_event_alloc failed");
 		return;
@@ -201,7 +202,7 @@ static int hdd_medium_assess_cca(struct hdd_context *hdd_ctx,
 	}
 
 	dcs_enable = ucfg_get_dcs_enable(hdd_ctx->psoc, mac_id);
-	if (!(dcs_enable & CAP_DCS_WLANIM)) {
+	if (!(dcs_enable & WLAN_HOST_DCS_WLANIM)) {
 		hdd_err_rl("DCS_WLANIM is not enabled");
 		errno = -EINVAL;
 		goto out;

@@ -83,11 +83,13 @@
 #include "wlan_cm_public_struct.h"
 #include "osif_cm_util.h"
 #include "wlan_hdd_cm_api.h"
+#include "cm_utf.h"
 
 #include "wlan_hdd_bootup_marker.h"
 #include "wlan_roam_debug.h"
 
 #include "wlan_hdd_twt.h"
+#include "wlan_cm_roam_ucfg_api.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -2055,24 +2057,15 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 }
 
 #ifdef WLAN_FEATURE_HOST_ROAM
-void
-wlan_hdd_ft_set_key_delay(mac_handle_t mac_handle, struct hdd_adapter *adapter)
+void wlan_hdd_ft_set_key_delay(struct wlan_objmgr_vdev *vdev)
 {
 	int errno = 0;
-	uint32_t session_id = adapter->vdev_id;
-	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
-	if (!vdev)
-		return;
-
-	if (sme_ft_key_ready_for_install(mac_handle, session_id))
+	if (ucfg_cm_ft_key_ready_for_install(vdev))
 		errno =
 		wlan_cfg80211_crypto_add_key(vdev,
 					     WLAN_CRYPTO_KEY_TYPE_UNICAST,
 					     0, false);
-	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-
 	if (errno)
 		hdd_err("ft set key failed");
 }
@@ -2129,10 +2122,6 @@ hdd_sme_roam_callback(void *context, struct csr_roam_info *roam_info,
 			hdd_debug("set key complete, session: %d",
 				  adapter->vdev_id);
 	}
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-		if (roam_info)
-			roam_info->roamSynchInProgress = false;
-#endif
 		break;
 	case eCSR_ROAM_UNPROT_MGMT_FRAME_IND:
 		if (roam_info)
@@ -2443,9 +2432,15 @@ struct osif_cm_ops osif_ops = {
 
 QDF_STATUS hdd_cm_register_cb(void)
 {
+	QDF_STATUS status;
 	osif_cm_set_legacy_cb(&osif_ops);
 
-	return osif_cm_register_cb();
+	status = osif_cm_register_cb();
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	/* Overwrite with UTF cb if UTF enabled */
+	return cm_utf_register_os_if_cb();
 }
 
 void hdd_cm_unregister_cb(void)

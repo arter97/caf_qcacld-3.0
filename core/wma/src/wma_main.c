@@ -377,6 +377,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 		ucfg_pmo_get_sap_mode_bus_suspend(wma_handle->psoc);
 	tgt_cfg->is_go_connected_d3wow_enabled =
 		ucfg_pmo_get_go_mode_bus_suspend(wma_handle->psoc);
+	tgt_cfg->dynamic_pcie_gen_speed_change =
+		ucfg_pmo_get_dynamic_pcie_gen_switch_cfg(wma_handle->psoc);
 
 	cfg_nan_get_max_ndi(wma_handle->psoc,
 			    &tgt_cfg->max_ndi);
@@ -1033,7 +1035,13 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			ret = wma_reset_tsf_gpio(wma, privcmd->param_value);
 			break;
 		default:
-			wma_err("Invalid param id 0x%x", privcmd->param_id);
+			ret = wma_set_tsf_auto_report(wma,
+						      privcmd->param_vdev_id,
+						      privcmd->param_id,
+						      privcmd->param_value);
+			if (ret == QDF_STATUS_E_FAILURE)
+				wma_err("Invalid param id 0x%x",
+					privcmd->param_id);
 			break;
 		}
 		break;
@@ -3008,6 +3016,10 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 				     "wlan_roam_preauth_wl");
 		qdf_wake_lock_create(&wma_handle->probe_req_wps_wl,
 				     "wlan_probe_req_wps_wl");
+		qdf_wake_lock_create(&wma_handle->sap_d3_wow_wake_lock,
+				     "wlan_sap_d3_wow_wake_lock");
+		qdf_wake_lock_create(&wma_handle->go_d3_wow_wake_lock,
+				     "wlan_go_d3_wow_wake_lock");
 	}
 
 	qdf_status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_LEGACY_WMA_ID);
@@ -3191,6 +3203,8 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 		      MAX_ENTRY_HOLD_REQ_QUEUE);
 	qdf_spinlock_create(&wma_handle->wma_hold_req_q_lock);
 	qdf_atomic_init(&wma_handle->is_wow_bus_suspended);
+	qdf_atomic_init(&wma_handle->sap_num_clients_connected);
+	qdf_atomic_init(&wma_handle->go_num_clients_connected);
 
 	/* register for STA kickout function */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -3320,6 +3334,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 #endif /* WLAN_FEATURE_STATS_EXT */
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifndef ROAM_TARGET_IF_CONVERGENCE
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   wmi_roam_synch_event_id,
 					   wma_roam_synch_event_handler,
@@ -3328,7 +3343,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 				   wmi_roam_synch_frame_event_id,
 				   wma_roam_synch_frame_event_handler,
 				   WMA_RX_SERIALIZER_CTX);
-
+#endif /* ROAM_TARGET_IF_CONVERGENCE */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 					   wmi_roam_auth_offload_event_id,
 					   wma_roam_auth_offload_event_handler,
@@ -3495,6 +3510,8 @@ err_wma_handle:
 err_get_psoc_ref:
 	target_if_free_psoc_tgt_info(psoc);
 	if (cds_get_conparam() != QDF_GLOBAL_FTM_MODE) {
+		qdf_wake_lock_destroy(&wma_handle->go_d3_wow_wake_lock);
+		qdf_wake_lock_destroy(&wma_handle->sap_d3_wow_wake_lock);
 #ifdef FEATURE_WLAN_EXTSCAN
 		qdf_wake_lock_destroy(&wma_handle->extscan_wake_lock);
 #endif /* FEATURE_WLAN_EXTSCAN */
@@ -4463,6 +4480,9 @@ QDF_STATUS wma_close(void)
 	if (wmi_validate_handle(wmi_handle))
 		return QDF_STATUS_E_INVAL;
 
+	qdf_atomic_set(&wma_handle->sap_num_clients_connected, 0);
+	qdf_atomic_set(&wma_handle->go_num_clients_connected, 0);
+
 	/* Free DBS list */
 	if (wma_handle->hw_mode.hw_mode_list) {
 		qdf_mem_free(wma_handle->hw_mode.hw_mode_list);
@@ -4471,6 +4491,8 @@ QDF_STATUS wma_close(void)
 	}
 
 	if (cds_get_conparam() != QDF_GLOBAL_FTM_MODE) {
+		qdf_wake_lock_destroy(&wma_handle->go_d3_wow_wake_lock);
+		qdf_wake_lock_destroy(&wma_handle->sap_d3_wow_wake_lock);
 #ifdef FEATURE_WLAN_EXTSCAN
 		qdf_wake_lock_destroy(&wma_handle->extscan_wake_lock);
 #endif /* FEATURE_WLAN_EXTSCAN */

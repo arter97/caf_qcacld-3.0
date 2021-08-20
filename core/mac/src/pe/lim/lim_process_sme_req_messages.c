@@ -64,6 +64,7 @@
 #include <wlan_reg_ucfg_api.h>
 #include "wlan_lmac_if_def.h"
 #include "wlan_reg_services_api.h"
+#include <lim_mlo.h>
 
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
@@ -708,6 +709,7 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	int32_t ucast_cipher;
 	int32_t auth_mode;
 	int32_t akm;
+	int32_t rsn_caps;
 
 /* FEATURE_WLAN_DIAG_SUPPORT */
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM
@@ -859,8 +861,12 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 
 		session->txLdpcIniFeatureEnabled =
 			sme_start_bss_req->txLdpcIniFeatureEnabled;
-		session->limRmfEnabled = sme_start_bss_req->pmfCapable ? 1 : 0;
-		pe_debug("RMF enabled: %d", session->limRmfEnabled);
+		rsn_caps = wlan_crypto_get_param(session->vdev,
+						 WLAN_CRYPTO_PARAM_RSN_CAP);
+		session->limRmfEnabled =
+			rsn_caps & WLAN_CRYPTO_RSN_CAP_MFP_ENABLED ? 1 : 0;
+		pe_debug("RMF enabled: %d rsn_caps 0x%x",
+			 session->limRmfEnabled, rsn_caps);
 
 		qdf_mem_copy((void *)&session->rateSet,
 			     (void *)&sme_start_bss_req->operationalRateSet,
@@ -1176,6 +1182,17 @@ static QDF_STATUS lim_send_join_req(struct pe_session *session,
 {
 	QDF_STATUS status;
 
+	/* Continue connect only if Vdev is in INIT state */
+	status = wlan_vdev_mlme_is_init_state(session->vdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pe_err("Vdev %d not in int state cur state %d substate %d",
+			session->vdev_id,
+			wlan_vdev_mlme_get_state(session->vdev),
+			wlan_vdev_mlme_get_substate(session->vdev));
+		qdf_trigger_self_recovery(session->mac_ctx->psoc,
+					  QDF_VDEV_SM_OUT_OF_SYNC);
+		return status;
+	}
 	status = mlme_set_assoc_type(session->vdev, VDEV_ASSOC);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
@@ -1729,6 +1746,12 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	lim_handle_iot_ap_no_common_he_rates(mac_ctx, session, ie_struct);
 	lim_update_he_caps_mcs(mac_ctx, session);
 	lim_update_eht_caps_mcs(mac_ctx, session);
+
+	is_vendor_ap_present = wlan_get_vendor_ie_ptr_from_oui(
+				SIR_MAC_BA_2K_JUMP_AP_VENDOR_OUI,
+				SIR_MAC_BA_2K_JUMP_AP_VENDOR_OUI_LEN,
+				vendor_ap_search_attr.ie_data, ie_len);
+	wlan_mlme_set_ba_2k_jump_iot_ap(session->vdev, is_vendor_ap_present);
 }
 
 static enum mlme_dot11_mode
@@ -2638,6 +2661,8 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 				&ps_global_info->ps_params[session->vdev_id];
 	uint32_t join_timeout;
 	uint8_t programmed_country[REG_ALPHA2_LEN + 1];
+	enum reg_6g_ap_type power_type_6g;
+	bool ctry_code_match;
 
 	/*
 	 * Update the capability here itself as this is used in
@@ -2714,29 +2739,17 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 			pe_debug("Channel is 6G but country IE not present");
 		wlan_reg_read_current_country(mac_ctx->psoc,
 					      programmed_country);
-		if (qdf_mem_cmp(ie_struct->Country.country, programmed_country,
-				REG_ALPHA2_LEN)) {
-			pe_debug("Country IE:%c%c, STA country:%c%c",
-				  ie_struct->Country.country[0],
-				  ie_struct->Country.country[1],
-				  programmed_country[0],
-				  programmed_country[1]);
-			session->same_ctry_code = false;
-			if (wlan_reg_is_us(programmed_country)) {
-				pe_err("US VLP not in place yet, connection not allowed");
-				qdf_mem_free(ie_struct);
-				return QDF_STATUS_E_NOSUPPORT;
-			}
-			if (wlan_reg_is_etsi(programmed_country)) {
-				pe_debug("STA ctry:%c%c, doesn't match with AP ctry, switch to VLP",
-					  programmed_country[0],
-					  programmed_country[1]);
-				session->ap_power_type_6g =
-							REG_VERY_LOW_POWER_AP;
-			}
-		} else {
-			session->same_ctry_code = true;
+		status = wlan_reg_get_6g_power_type_for_ctry(
+					ie_struct->Country.country,
+					programmed_country, &power_type_6g,
+					&ctry_code_match);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			qdf_mem_free(ie_struct);
+			return QDF_STATUS_E_NOSUPPORT;
 		}
+		session->ap_power_type_6g = power_type_6g;
+		session->same_ctry_code = ctry_code_match;
+
 		lim_iterate_triplets(ie_struct->Country);
 
 		if (!ie_struct->num_transmit_power_env ||
@@ -3065,6 +3078,9 @@ lim_cm_create_session(struct mac_context *mac_ctx, struct cm_vdev_join_req *req)
 		       pe_session->vdev_id,
 		       QDF_MAC_ADDR_REF(req->entry->bssid.bytes),
 		       pe_session->limSmeState);
+
+		qdf_trigger_self_recovery(mac_ctx->psoc,
+					  QDF_VDEV_SM_OUT_OF_SYNC);
 		return NULL;
 	}
 
@@ -4663,7 +4679,9 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
 
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute)
+		       bool is_pwr_constraint_absolute,
+		       uint8_t ap_pwr_type,
+		       bool ctry_code_match)
 {
 	bool is_psd_power = false;
 	bool is_tpe_present = false, is_6ghz_freq = false;
@@ -4677,11 +4695,6 @@ void lim_calculate_tpc(struct mac_context *mac,
 	struct vdev_mlme_obj *mlme_obj;
 	uint8_t tpe_power;
 	bool skip_tpe = false;
-
-	if (LIM_IS_STA_ROLE(session) && !session->lim_join_req) {
-		pe_err("Join Request is NULL");
-		return;
-	}
 
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
 	if (!mlme_obj) {
@@ -4708,11 +4721,17 @@ void lim_calculate_tpc(struct mac_context *mac,
 	} else {
 		is_6ghz_freq = true;
 		is_psd_power = wlan_reg_is_6g_psd_power(mac->pdev);
+		/* Power mode calculation for 6G*/
+		ap_power_type_6g = session->ap_power_type;
 		if (LIM_IS_STA_ROLE(session)) {
-			if (session->same_ctry_code)
-				ap_power_type_6g = session->ap_power_type;
-			else
-				ap_power_type_6g = session->ap_power_type_6g;
+			if (!session->lim_join_req) {
+				if (!ctry_code_match)
+					ap_power_type_6g = ap_pwr_type;
+			} else {
+				if (!session->same_ctry_code)
+					ap_power_type_6g =
+						session->ap_power_type_6g;
+			}
 		}
 	}
 
@@ -5165,6 +5184,8 @@ void __lim_process_sme_disassoc_cnf(struct mac_context *mac, uint32_t *msg_buf)
 			return;
 		}
 
+		lim_mlo_notify_peer_disconn(pe_session, sta);
+
 		/* Delete FT session if there exists one */
 		lim_ft_cleanup_pre_auth_info(mac, pe_session);
 		lim_cleanup_rx_path(mac, sta, pe_session, true);
@@ -5424,11 +5445,18 @@ void lim_delete_all_peers(struct pe_session *session)
 					    &session->dph.dphHashTable);
 		if (!sta_ds)
 			continue;
+		lim_mlo_notify_peer_disconn(session, sta_ds);
 		status = lim_del_sta(mac_ctx, sta_ds, true, session);
 		if (QDF_STATUS_SUCCESS == status) {
 			lim_delete_dph_hash_entry(mac_ctx, sta_ds->staAddr,
 						  sta_ds->assocId, session);
-			lim_release_peer_idx(mac_ctx, sta_ds->assocId, session);
+			if (lim_is_mlo_conn(session, sta_ds))
+				lim_release_mlo_conn_idx(mac_ctx,
+							 sta_ds->assocId,
+							 session, false);
+			else
+				lim_release_peer_idx(mac_ctx, sta_ds->assocId,
+						     session);
 		} else {
 			pe_err("lim_del_sta failed with Status: %d", status);
 			QDF_ASSERT(0);
@@ -5772,10 +5800,7 @@ end:
 		!assoc_cnf.need_assoc_rsp_tx_cb) {
 		assoc_req = (tpSirAssocReq)
 			session_entry->parsedAssocReq[sta_ds->assocId];
-		if (assoc_req->assocReqFrame) {
-			qdf_mem_free(assoc_req->assocReqFrame);
-			assoc_req->assocReqFrame = NULL;
-		}
+		lim_free_assoc_req_frm_buf(assoc_req);
 		qdf_mem_free(session_entry->parsedAssocReq[sta_ds->assocId]);
 		session_entry->parsedAssocReq[sta_ds->assocId] = NULL;
 	}
@@ -8536,10 +8561,11 @@ static void lim_process_set_ie_req(struct mac_context *mac_ctx, uint32_t *msg_bu
 
 	pe_session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
 	if (pe_session) {
-		add_ie_len = pe_session->lim_join_req->addIEAssoc.length;
-		if (!add_ie_len)
+		if (!pe_session->lim_join_req ||
+		    !pe_session->lim_join_req->addIEAssoc.length)
 			goto send_ie;
 
+		add_ie_len = pe_session->lim_join_req->addIEAssoc.length;
 		add_ie = qdf_mem_malloc(add_ie_len);
 		if (!add_ie)
 			goto send_ie;

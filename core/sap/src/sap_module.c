@@ -319,9 +319,6 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 	sap_ctx->csr_roamProfile.csrPersona = mode;
 	qdf_mem_copy(sap_ctx->self_mac_addr, addr, QDF_MAC_ADDR_SIZE);
 
-	/* Now configure the auth type in the roaming profile. To open. */
-	sap_ctx->csr_roamProfile.negotiatedAuthType = eCSR_AUTH_TYPE_OPEN_SYSTEM;        /* open is the default */
-
 	mac = sap_get_mac_context();
 	if (!mac) {
 		sap_err("Invalid MAC context");
@@ -703,24 +700,6 @@ void wlan_sap_set_sap_ctx_acs_cfg(struct sap_context *sap_ctx,
 	sap_ctx->acs_cfg = &sap_config->acs_cfg;
 }
 
-#ifdef WLAN_CONV_CRYPTO_SUPPORTED
-static inline QDF_STATUS
-wlansap_set_vdev_crypto_prarams_from_ie(struct wlan_objmgr_vdev *vdev,
-					uint8_t *ie_ptr,
-					uint16_t ie_len)
-{
-	return wlan_set_vdev_crypto_prarams_from_ie(vdev, ie_ptr, ie_len);
-}
-#else
-static inline QDF_STATUS
-wlansap_set_vdev_crypto_prarams_from_ie(struct wlan_objmgr_vdev *vdev,
-					uint8_t *ie_ptr,
-					uint16_t ie_len)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 			     sap_event_cb sap_event_cb,
 			     struct sap_config *config, void *user_context)
@@ -748,7 +727,7 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 
 	sap_ctx->fsm_state = SAP_INIT;
 
-	qdf_status = wlansap_set_vdev_crypto_prarams_from_ie(
+	qdf_status = wlan_set_vdev_crypto_prarams_from_ie(
 			sap_ctx->vdev,
 			config->RSNWPAReqIE,
 			config->RSNWPAReqIELength);
@@ -1245,7 +1224,6 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 				       uint32_t chan_freq,
 				       struct ch_params *tgt_ch_params)
 {
-	uint32_t max_fw_bw;
 	enum phy_ch_width ch_width, concurrent_bw = 0;
 	struct mac_context *mac;
 	struct ch_params ch_params = {0};
@@ -1264,41 +1242,13 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 		 */
 		ch_width = CH_WIDTH_20MHZ;
 	} else {
-		if (sap_context->csr_roamProfile.phyMode ==
-		    eCSR_DOT11_MODE_11ac ||
-		    sap_context->csr_roamProfile.phyMode ==
-		    eCSR_DOT11_MODE_11ac_ONLY ||
-		    sap_context->csr_roamProfile.phyMode ==
-		    eCSR_DOT11_MODE_11ax ||
-		    sap_context->csr_roamProfile.phyMode ==
-		    eCSR_DOT11_MODE_11ax_ONLY ||
-		    CSR_IS_DOT11_PHY_MODE_11BE(
-			sap_context->csr_roamProfile.phyMode) ||
-		    CSR_IS_DOT11_PHY_MODE_11BE_ONLY(
-			sap_context->csr_roamProfile.phyMode)) {
-			max_fw_bw = sme_get_vht_ch_width();
-			if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
-				ch_width = CH_WIDTH_160MHZ;
-			else
-				ch_width = CH_WIDTH_80MHZ;
-
-			ch_width = QDF_MAX(
-					wlansap_get_target_eht_phy_ch_width(),
-					ch_width);
-		} else if (sap_context->csr_roamProfile.phyMode ==
-			   eCSR_DOT11_MODE_11n ||
-			   sap_context->csr_roamProfile.phyMode ==
-			   eCSR_DOT11_MODE_11n_ONLY) {
-			ch_width = CH_WIDTH_40MHZ;
-		} else {
-			/* For legacy 11a mode return 20MHz */
-			ch_width = CH_WIDTH_20MHZ;
-		}
+		ch_width = wlansap_get_max_bw_by_phymode(sap_context);
 		concurrent_bw = wlan_sap_get_concurrent_bw(
 				mac->pdev, mac->psoc, chan_freq,
 				ch_width);
 		ch_width = QDF_MIN(ch_width, concurrent_bw);
-		ch_width = QDF_MIN(ch_width, sap_context->ch_width_orig);
+		if (tgt_ch_params)
+			ch_width = QDF_MIN(ch_width, tgt_ch_params->ch_width);
 	}
 	ch_params.ch_width = ch_width;
 	wlan_reg_set_channel_params_for_freq(mac->pdev, chan_freq, 0,
@@ -1306,11 +1256,11 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	ch_width = ch_params.ch_width;
 	if (tgt_ch_params)
 		*tgt_ch_params = ch_params;
-	sap_nofl_debug("freq %d bw %d (orig bw %d phymode %d, con bw %d)",
+	sap_nofl_debug("freq %d bw %d (phymode %d, con bw %d, tgt bw %d)",
 		       chan_freq, ch_width,
-		       sap_context->ch_width_orig,
 		       sap_context->csr_roamProfile.phyMode,
-		       concurrent_bw);
+		       concurrent_bw,
+		       tgt_ch_params ? tgt_ch_params->ch_width : CH_WIDTH_MAX);
 
 	return ch_width;
 }
@@ -1384,10 +1334,13 @@ wlansap_set_chan_params_for_csa(struct mac_context *mac,
 				uint32_t target_chan_freq,
 				enum phy_ch_width target_bw)
 {
+	struct ch_params tmp_ch_params = {0};
+
+	tmp_ch_params.ch_width = target_bw;
 	mac->sap.SapDfsInfo.new_chanWidth =
 		wlansap_get_csa_chanwidth_from_phymode(sap_ctx,
 						       target_chan_freq,
-						       NULL);
+						       &tmp_ch_params);
 	/*
 	 * Copy the requested target channel
 	 * to sap context.
@@ -1479,10 +1432,10 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 	sta_sap_scc_on_dfs_chan =
 		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(mac->psoc);
 
-	tmp_ch_params.ch_width =
-		wlansap_get_csa_chanwidth_from_phymode(sap_ctx,
-						       target_chan_freq,
-						       NULL);
+	tmp_ch_params.ch_width = target_bw;
+	wlansap_get_csa_chanwidth_from_phymode(sap_ctx,
+					       target_chan_freq,
+					       &tmp_ch_params);
 	if (target_bw != CH_WIDTH_MAX) {
 		tmp_ch_params.ch_width =
 			QDF_MIN(tmp_ch_params.ch_width, target_bw);
@@ -1838,6 +1791,14 @@ wlansap_set_cac_required_for_chan(struct mac_context *mac_ctx,
 		}
 	}
 
+	/* Update cac_duration_ms & dfs_region in sap_ctx for new channel,
+	 * no matter CAC required or not.
+	 * For ETSI, CAC duration is different between DFS and weather channel.
+	 */
+	sap_get_cac_dur_dfs_region(sap_ctx,
+				   &sap_ctx->csr_roamProfile.cac_duration_ms,
+				   &sap_ctx->csr_roamProfile.dfs_regdomain);
+
 	mlme_set_cac_required(sap_ctx->vdev, cac_required);
 }
 
@@ -1907,6 +1868,7 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 
 	status = sme_roam_channel_change_req(MAC_HANDLE(mac_ctx),
 					     sap_ctx->bssid,
+					     sap_ctx->sessionId,
 					     ch_params,
 					     &sap_ctx->csr_roamProfile);
 
@@ -2638,6 +2600,51 @@ void wlan_sap_set_dfs_pri_multiplier(mac_handle_t mac_handle)
 uint32_t wlansap_get_chan_width(struct sap_context *sap_ctx)
 {
 	return wlan_sap_get_vht_ch_width(sap_ctx);
+}
+
+enum phy_ch_width
+wlansap_get_max_bw_by_phymode(struct sap_context *sap_ctx)
+{
+	uint32_t max_fw_bw;
+	enum phy_ch_width ch_width;
+
+	if (!sap_ctx) {
+		sap_err("Invalid SAP pointer");
+		return CH_WIDTH_20MHZ;
+	}
+
+	if (sap_ctx->csr_roamProfile.phyMode ==
+	    eCSR_DOT11_MODE_11ac ||
+	    sap_ctx->csr_roamProfile.phyMode ==
+	    eCSR_DOT11_MODE_11ac_ONLY ||
+	    sap_ctx->csr_roamProfile.phyMode ==
+	    eCSR_DOT11_MODE_11ax ||
+	    sap_ctx->csr_roamProfile.phyMode ==
+	    eCSR_DOT11_MODE_11ax_ONLY ||
+	    CSR_IS_DOT11_PHY_MODE_11BE(
+		sap_ctx->csr_roamProfile.phyMode) ||
+	    CSR_IS_DOT11_PHY_MODE_11BE_ONLY(
+		sap_ctx->csr_roamProfile.phyMode)) {
+		max_fw_bw = sme_get_vht_ch_width();
+		if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
+			ch_width = CH_WIDTH_160MHZ;
+		else
+			ch_width = CH_WIDTH_80MHZ;
+
+		ch_width = QDF_MAX(
+				wlansap_get_target_eht_phy_ch_width(),
+				ch_width);
+	} else if (sap_ctx->csr_roamProfile.phyMode ==
+		   eCSR_DOT11_MODE_11n ||
+		   sap_ctx->csr_roamProfile.phyMode ==
+		   eCSR_DOT11_MODE_11n_ONLY) {
+		ch_width = CH_WIDTH_40MHZ;
+	} else {
+		/* For legacy 11a mode return 20MHz */
+		ch_width = CH_WIDTH_20MHZ;
+	}
+
+	return ch_width;
 }
 
 QDF_STATUS wlansap_set_invalid_session(struct sap_context *sap_ctx)

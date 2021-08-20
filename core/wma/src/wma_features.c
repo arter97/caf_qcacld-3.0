@@ -309,6 +309,24 @@ end:
 }
 
 #ifdef WLAN_FEATURE_TSF
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+static void wma_vdev_tsf_set_mac_id(struct stsf *ptsf, uint32_t mac_id,
+				    uint32_t mac_id_valid)
+{
+	ptsf->mac_id = mac_id;
+	ptsf->mac_id_valid = mac_id_valid;
+
+	wma_nofl_debug("mac_id %d mac_id_valid %d", ptsf->mac_id,
+		       ptsf->mac_id_valid);
+}
+#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY */
+static inline void wma_vdev_tsf_set_mac_id(struct stsf *ptsf, uint32_t mac_id,
+					   uint32_t mac_id_valid)
+{
+}
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+
 /**
  * wma_vdev_tsf_handler() - handle tsf event indicated by FW
  * @handle: wma context
@@ -348,6 +366,10 @@ int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len)
 	wma_nofl_debug("g_tsf: %d %d; soc_timer: %d %d",
 		       ptsf->global_tsf_low, ptsf->global_tsf_high,
 			   ptsf->soc_timer_low, ptsf->soc_timer_high);
+
+	wma_vdev_tsf_set_mac_id(ptsf, tsf_event->mac_id,
+				tsf_event->mac_id_valid);
+
 	tsf_msg.type = eWNI_SME_TSF_EVENT;
 	tsf_msg.bodyptr = ptsf;
 	tsf_msg.bodyval = 0;
@@ -476,6 +498,53 @@ QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+QDF_STATUS wma_set_tsf_auto_report(WMA_HANDLE handle, uint32_t vdev_id,
+				   uint32_t param_id, bool ena)
+{
+	wmi_vdev_tsf_tstamp_action_cmd_fixed_param *cmd;
+	tp_wma_handle wma = (tp_wma_handle)handle;
+	struct wmi_unified *wmi_handle;
+	int len = sizeof(*cmd);
+	QDF_STATUS status;
+	uint8_t *buf_ptr;
+	wmi_buf_t buf;
+
+	if (param_id != GEN_PARAM_TSF_AUTO_REPORT_ENABLE &&
+	    param_id != GEN_PARAM_TSF_AUTO_REPORT_DISABLE)
+		return QDF_STATUS_E_FAILURE;
+
+	wmi_handle = wma->wmi_handle;
+	if (wmi_validate_handle(wmi_handle))
+		return QDF_STATUS_E_INVAL;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_vdev_tsf_tstamp_action_cmd_fixed_param *)buf_ptr;
+	cmd->vdev_id = vdev_id;
+	cmd->tsf_action = ena ? TSF_TSTAMP_AUTO_REPORT_ENABLE :
+			  TSF_TSTAMP_AUTO_REPORT_DISABLE;
+
+	wma_debug("vdev_id %u tsf_action %d", cmd->vdev_id, cmd->tsf_action);
+
+	WMITLV_SET_HDR(
+		&cmd->tlv_header,
+		WMITLV_TAG_STRUC_wmi_vdev_tsf_tstamp_action_cmd_fixed_param,
+		WMITLV_GET_STRUCT_TLVLEN(
+				wmi_vdev_tsf_tstamp_action_cmd_fixed_param));
+
+	status = wmi_unified_cmd_send(wmi_handle, buf, len,
+				      WMI_VDEV_TSF_TSTAMP_ACTION_CMDID);
+	if (QDF_IS_STATUS_ERROR(status))
+		wmi_buf_free(buf);
+
+	return status;
+}
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
 #endif
 
 /**

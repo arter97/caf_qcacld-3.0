@@ -101,6 +101,14 @@
 #include "wlan_ipa_ucfg_api.h"
 #endif
 
+/*
+ * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
+ * and hence host needs to hold a wake lock after 9th client connects
+ * and release the wake lock when 9th client disconnects
+ */
+#define SAP_D3_WOW_MAX_CLIENT_HOLD_WAKE_LOCK (9)
+#define SAP_D3_WOW_MAX_CLIENT_RELEASE_WAKE_LOCK (8)
+
 QDF_STATUS wma_find_vdev_id_by_addr(tp_wma_handle wma, uint8_t *addr,
 				    uint8_t *vdev_id)
 {
@@ -1098,7 +1106,8 @@ static void wma_dcs_wlan_interference_mitigation_enable(
 		ucfg_config_dcs_event_data(mac_ctx->psoc, mac_id, true);
 
 	if (rsp->resp_type == WMI_HOST_VDEV_START_RESP_EVENT) {
-		ucfg_config_dcs_enable(mac_ctx->psoc, mac_id, CAP_DCS_WLANIM);
+		ucfg_config_dcs_enable(mac_ctx->psoc, mac_id,
+				       WLAN_HOST_DCS_WLANIM);
 		ucfg_wlan_dcs_cmd(mac_ctx->psoc, mac_id, true);
 	}
 }
@@ -4520,6 +4529,9 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 				  WMA_VHT_PPS_DELIM_CRC_FAIL, 1);
 	if (wmi_service_enabled(wma->wmi_handle,
 				wmi_service_listen_interval_offload_support)) {
+		struct wlan_objmgr_vdev *vdev;
+		uint32_t moddtim;
+
 		wma_debug("listen interval offload enabled, setting params");
 		status = wma_vdev_set_param(wma->wmi_handle,
 					    params->smesessionId,
@@ -4537,15 +4549,37 @@ static void wma_add_sta_req_sta_mode(tp_wma_handle wma, tpAddStaParams params)
 			wma_err("can't set DYNDTIM_CNT for session: %d",
 				params->smesessionId);
 		}
-		status  = wma_vdev_set_param(wma->wmi_handle,
-					     params->smesessionId,
-					     WMI_VDEV_PARAM_MODDTIM_CNT,
-					     wma->staModDtim);
-		if (status != QDF_STATUS_SUCCESS) {
-			wma_err("can't set DTIM_CNT for session: %d",
-				params->smesessionId);
-		}
 
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+							params->smesessionId,
+							WLAN_LEGACY_WMA_ID);
+		if (!vdev || !ucfg_pmo_get_moddtim_user_enable(vdev)) {
+			moddtim = wma->staModDtim;
+			status = wma_vdev_set_param(wma->wmi_handle,
+						    params->smesessionId,
+						    WMI_VDEV_PARAM_MODDTIM_CNT,
+						    moddtim);
+			if (status != QDF_STATUS_SUCCESS) {
+				wma_err("can't set DTIM_CNT for session: %d",
+					params->smesessionId);
+			}
+
+			if (vdev)
+				wlan_objmgr_vdev_release_ref(vdev,
+							WLAN_LEGACY_WMA_ID);
+		} else if (vdev && ucfg_pmo_get_moddtim_user_enable(vdev) &&
+			   !ucfg_pmo_get_moddtim_user_active(vdev)) {
+			moddtim = ucfg_pmo_get_moddtim_user(vdev);
+			status = wma_vdev_set_param(wma->wmi_handle,
+						    params->smesessionId,
+						    WMI_VDEV_PARAM_MODDTIM_CNT,
+						    moddtim);
+			if (status != QDF_STATUS_SUCCESS) {
+				wma_err("can't set DTIM_CNT for session: %d",
+					params->smesessionId);
+			}
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+		}
 	} else {
 		wma_debug("listen interval offload is not set");
 	}
@@ -4705,6 +4739,20 @@ static void wma_delete_sta_req_sta_mode(tp_wma_handle wma,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wma_txrx_node *iface;
 
+	if (wmi_service_enabled(wma->wmi_handle,
+		wmi_service_listen_interval_offload_support)) {
+		struct wlan_objmgr_vdev *vdev;
+
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc,
+							params->smesessionId,
+							WLAN_LEGACY_WMA_ID);
+		if (vdev) {
+			if (ucfg_pmo_get_moddtim_user_enable(vdev))
+				ucfg_pmo_set_moddtim_user_enable(vdev, false);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+		}
+	}
+
 	iface = &wma->interfaces[params->smesessionId];
 	iface->uapsd_cached_val = 0;
 #ifdef FEATURE_WLAN_TDLS
@@ -4781,6 +4829,58 @@ static bool wma_is_vdev_in_go_mode(tp_wma_handle wma, uint8_t vdev_id)
 	return false;
 }
 
+static void wma_sap_d3_wow_client_connect(tp_wma_handle wma)
+{
+	uint32_t num_clients;
+
+	num_clients = qdf_atomic_inc_return(&wma->sap_num_clients_connected);
+	wmi_debug("sap d3 wow %d client connected", num_clients);
+	if (num_clients == SAP_D3_WOW_MAX_CLIENT_HOLD_WAKE_LOCK) {
+		wmi_info("max clients connected acquire sap d3 wow wake lock");
+		qdf_wake_lock_acquire(&wma->sap_d3_wow_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_SAP_D3_WOW);
+	}
+}
+
+static void wma_sap_d3_wow_client_disconnect(tp_wma_handle wma)
+{
+	uint32_t num_clients;
+
+	num_clients = qdf_atomic_dec_return(&wma->sap_num_clients_connected);
+	wmi_debug("sap d3 wow %d client connected", num_clients);
+	if (num_clients == SAP_D3_WOW_MAX_CLIENT_RELEASE_WAKE_LOCK) {
+		wmi_info("max clients disconnected release sap d3 wow wake lock");
+		qdf_wake_lock_release(&wma->sap_d3_wow_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_SAP_D3_WOW);
+	}
+}
+
+static void wma_go_d3_wow_client_connect(tp_wma_handle wma)
+{
+	uint32_t num_clients;
+
+	num_clients = qdf_atomic_inc_return(&wma->go_num_clients_connected);
+	wmi_debug("go d3 wow %d client connected", num_clients);
+	if (num_clients == SAP_D3_WOW_MAX_CLIENT_HOLD_WAKE_LOCK) {
+		wmi_info("max clients connected acquire go d3 wow wake lock");
+		qdf_wake_lock_acquire(&wma->go_d3_wow_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_GO_D3_WOW);
+	}
+}
+
+static void wma_go_d3_wow_client_disconnect(tp_wma_handle wma)
+{
+	uint32_t num_clients;
+
+	num_clients = qdf_atomic_dec_return(&wma->go_num_clients_connected);
+	wmi_debug("go d3 wow %d client connected", num_clients);
+	if (num_clients == SAP_D3_WOW_MAX_CLIENT_RELEASE_WAKE_LOCK) {
+		wmi_info("max clients disconnected release go d3 wow wake lock");
+		qdf_wake_lock_release(&wma->go_d3_wow_wake_lock,
+				      WIFI_POWER_EVENT_WAKELOCK_GO_D3_WOW);
+	}
+}
+
 void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 {
 	uint8_t oper_mode = BSS_OPERATIONAL_MODE_STA;
@@ -4824,6 +4924,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 			wmi_info("sap d0 wow");
 		} else {
 			wmi_info("sap d3 wow");
+			wma_sap_d3_wow_client_connect(wma);
 		}
 		wma_sap_prevent_runtime_pm(wma);
 
@@ -4841,6 +4942,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 			wmi_info("p2p go d0 wow");
 		} else {
 			wmi_info("p2p go d3 wow");
+			wma_go_d3_wow_client_connect(wma);
 		}
 		wma_sap_prevent_runtime_pm(wma);
 
@@ -4921,6 +5023,7 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 			wmi_info("sap d0 wow");
 		} else {
 			wmi_info("sap d3 wow");
+			wma_sap_d3_wow_client_disconnect(wma);
 		}
 		wma_sap_allow_runtime_pm(wma);
 
@@ -4938,6 +5041,7 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 			wmi_info("p2p go d0 wow");
 		} else {
 			wmi_info("p2p go d3 wow");
+			wma_go_d3_wow_client_disconnect(wma);
 		}
 		wma_sap_allow_runtime_pm(wma);
 

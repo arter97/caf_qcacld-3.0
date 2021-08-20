@@ -1199,6 +1199,15 @@ ucfg_mlme_get_roam_bmiss_final_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val);
 
 /**
+ * ucfg_mlme_validate_roam_bmiss_final_bcnt() - Validate roam bmiss final bcnt
+ * @bmiss_final_bcnt: Roam bmiss final bcnt
+ *
+ * Return: True if bmiss_final_bcnt is in expected range, false otherwise.
+ */
+bool
+ucfg_mlme_validate_roam_bmiss_final_bcnt(uint32_t bmiss_final_bcnt);
+
+/**
  * ucfg_mlme_get_dual_sta_roaming_enabled() - Get dual sta roaming enable flag
  * @psoc: pointer to psoc object
  *
@@ -4165,27 +4174,6 @@ QDF_STATUS ucfg_mlme_get_peer_unmap_conf(struct wlan_objmgr_psoc *psoc)
 	return wlan_mlme_get_peer_unmap_conf(psoc);
 }
 
-/**
- * ucfg_mlme_get_discon_reason_n_from_ap() - Get disconnect reason and from ap
- * @psoc: PSOC pointer
- * @vdev_id: vdev id
- * @from_ap: Get the from_ap cached through mlme_set_discon_reason_n_from_ap
- *           and copy to this buffer.
- * @reason_code: Get the reason_code cached through
- *               mlme_set_discon_reason_n_from_ap and copy to this buffer.
- *
- * Fetch the contents of from_ap and reason_codes.
- *
- * Return: void
- */
-static inline void
-ucfg_mlme_get_discon_reason_n_from_ap(struct wlan_objmgr_psoc *psoc,
-				      uint8_t vdev_id, bool *from_ap,
-				      uint32_t *reason_code)
-{
-	mlme_get_discon_reason_n_from_ap(psoc, vdev_id, from_ap, reason_code);
-}
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * ucfg_mlme_get_roam_reason_vsie_status() - Get roam reason vsie is
@@ -4220,6 +4208,21 @@ ucfg_mlme_set_roam_reason_vsie_status(struct wlan_objmgr_psoc *psoc,
 }
 
 #endif
+
+/**
+ * ucfg_mlme_set_ft_over_ds() - update ft_over_ds status with user configured
+ * value
+ * @psoc: pointer to psoc object
+ * @ft_over_ds_enable: value of ft_over_ds
+ *
+ * Return: QDF Status
+ */
+static inline QDF_STATUS
+ucfg_mlme_set_ft_over_ds(struct wlan_objmgr_psoc *psoc,
+			 uint8_t ft_over_ds_enable)
+{
+	return wlan_mlme_set_ft_over_ds(psoc, ft_over_ds_enable);
+}
 
 /**
  * ucfg_mlme_is_sta_mon_conc_supported() - Check if STA + Monitor mode

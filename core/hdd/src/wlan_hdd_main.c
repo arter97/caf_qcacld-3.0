@@ -7387,11 +7387,8 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 			/* For NDI do not use roam_profile */
 			if (adapter->device_mode == QDF_NDI_MODE) {
 				hdd_peer_cleanup(hdd_ctx, adapter);
-				status = sme_roam_disconnect(
-					mac_handle,
-					adapter->vdev_id,
-					eCSR_DISCONNECT_REASON_NDI_DELETE,
-					reason);
+				status = sme_roam_ndi_stop(mac_handle,
+							   adapter->vdev_id);
 				if (QDF_IS_STATUS_SUCCESS(status)) {
 					rc = wait_for_completion_timeout(
 						&adapter->disconnect_comp_var,
@@ -8056,7 +8053,8 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 	adapter->monitor_mode_vdev_up_in_progress = true;
 
 	status = sme_roam_channel_change_req(hdd_ctx->mac_handle,
-					     bssid, &roam_profile.ch_params,
+					     bssid, adapter->vdev_id,
+					     &roam_profile.ch_params,
 					     &roam_profile);
 	if (status) {
 		hdd_err("Status: %d Failed to set sme_roam Channel for monitor mode",
@@ -9360,6 +9358,9 @@ static void hdd_display_periodic_stats(struct hdd_context *hdd_ctx,
 					  CDP_RX_RING_STATS,
 					  QDF_STATS_VERBOSITY_LEVEL_LOW);
 			cdp_display_stats(soc,
+					  CDP_DP_NAPI_STATS,
+					  QDF_STATS_VERBOSITY_LEVEL_LOW);
+			cdp_display_stats(soc,
 					  CDP_TXRX_PATH_STATS,
 					  QDF_STATS_VERBOSITY_LEVEL_LOW);
 			cdp_display_stats(soc,
@@ -9639,6 +9640,7 @@ void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
  * hdd_low_tput_gro_flush_skip_handler() - adjust GRO flush for low tput
  * @hdd_ctx: handle to hdd context
  * @next_vote_level: next bus bandwidth level
+ * @legacy_client: legacy connection mode active
  *
  * If bus bandwidth level is PLD_BUS_WIDTH_LOW consistently and hit
  * the bus_low_cnt_threshold, set flag to skip GRO flush.
@@ -9649,13 +9651,14 @@ void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
  */
 static inline void hdd_low_tput_gro_flush_skip_handler(
 			struct hdd_context *hdd_ctx,
-			enum pld_bus_width_type next_vote_level)
+			enum pld_bus_width_type next_vote_level,
+			bool legacy_client)
 {
 	uint32_t threshold = hdd_ctx->config->bus_low_cnt_threshold;
 	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
 	int i;
 
-	if (next_vote_level == PLD_BUS_WIDTH_LOW) {
+	if (next_vote_level == PLD_BUS_WIDTH_LOW && legacy_client) {
 		if (++hdd_ctx->bus_low_vote_cnt >= threshold)
 			qdf_atomic_set(&hdd_ctx->low_tput_gro_enable, 1);
 	} else {
@@ -9711,6 +9714,7 @@ static void hdd_pld_request_bus_bandwidth(struct hdd_context *hdd_ctx,
 	bool is_tx_pm_qos_high = false;
 	enum tput_level tput_level;
 	struct bbm_params param = {0};
+	bool legacy_client = false;
 
 	cpumask_clear(&pm_qos_cpu_mask);
 
@@ -9740,7 +9744,12 @@ static void hdd_pld_request_bus_bandwidth(struct hdd_context *hdd_ctx,
 
 	dptrace_high_tput_req =
 			next_vote_level > PLD_BUS_WIDTH_IDLE ? true : false;
-	hdd_low_tput_gro_flush_skip_handler(hdd_ctx, next_vote_level);
+
+	if (qdf_atomic_read(&hdd_ctx->num_latency_critical_clients))
+		legacy_client = true;
+
+	hdd_low_tput_gro_flush_skip_handler(hdd_ctx, next_vote_level,
+					    legacy_client);
 
 	if (hdd_ctx->cur_vote_level != next_vote_level) {
 		hdd_debug("tx_packets: %lld, rx_packets: %lld",
@@ -10078,12 +10087,22 @@ static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 	uint32_t ipa_tx_packets = 0, ipa_rx_packets = 0;
 	uint64_t sta_tx_bytes = 0, sap_tx_bytes = 0;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_BUS_BW_WORK_HANDLER;
+	uint64_t diff_us;
+	uint64_t curr_time_us;
+	uint32_t bw_interval_us;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		goto stop_work;
 
 	if (hdd_ctx->is_wiphy_suspended)
 		return;
+
+	bw_interval_us = hdd_ctx->config->bus_bw_compute_interval * 1000;
+
+	curr_time_us = qdf_get_log_timestamp();
+	diff_us = qdf_log_timestamp_to_usecs(
+			curr_time_us - hdd_ctx->bw_vote_time);
+	hdd_ctx->bw_vote_time = curr_time_us;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
@@ -10185,6 +10204,12 @@ static void __hdd_bus_bw_work_handler(struct hdd_context *hdd_ctx)
 		con_sap_adapter->stats.tx_packets += ipa_tx_packets;
 		con_sap_adapter->stats.rx_packets += ipa_rx_packets;
 	}
+
+	tx_packets = tx_packets * bw_interval_us;
+	tx_packets = qdf_do_div(tx_packets, (uint32_t)diff_us);
+
+	rx_packets = rx_packets * bw_interval_us;
+	rx_packets = qdf_do_div(rx_packets, (uint32_t)diff_us);
 
 	hdd_pld_request_bus_bandwidth(hdd_ctx, tx_packets, rx_packets);
 
@@ -15566,6 +15591,7 @@ static void __hdd_bus_bw_compute_timer_start(struct hdd_context *hdd_ctx)
 {
 	qdf_periodic_work_start(&hdd_ctx->bus_bw_work,
 				hdd_ctx->config->bus_bw_compute_interval);
+	hdd_ctx->bw_vote_time = qdf_get_log_timestamp();
 }
 
 void hdd_bus_bw_compute_timer_start(struct hdd_context *hdd_ctx)
@@ -15600,6 +15626,7 @@ static void __hdd_bus_bw_compute_timer_stop(struct hdd_context *hdd_ctx)
 				      OL_TXRX_PDEV_ID);
 	cdp_pdev_reset_bundle_require_flag(cds_get_context(QDF_MODULE_ID_SOC),
 					   OL_TXRX_PDEV_ID);
+	hdd_ctx->bw_vote_time = 0;
 
 exit:
 	/**

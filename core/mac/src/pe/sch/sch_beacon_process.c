@@ -383,6 +383,9 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 	    (bcn->edcaPresent && session->limQosEnabled)) {
 		if (bcn->edcaParams.qosInfo.count !=
 		    session->gLimEdcaParamSetCount) {
+			qdf_mem_copy(&sta->qos.peer_edca_params,
+				     &bcn->edcaParams,
+				     sizeof(bcn->edcaParams));
 			status = sch_beacon_edca_process(mac_ctx,
 							 &bcn->edcaParams,
 							 session);
@@ -395,6 +398,7 @@ sch_bcn_process_sta(struct mac_context *mac_ctx,
 				lim_send_edca_params(mac_ctx,
 					session->gLimEdcaParamsActive,
 					session->vdev_id, false);
+				sch_qos_concurrency_update();
 			} else {
 				pe_err("Self Entry missing in Hash Table");
 			}
@@ -713,6 +717,9 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 	int8_t regMax = 0, maxTxPower = 0;
 	QDF_STATUS status;
 	bool skip_tpe = false;
+	uint8_t programmed_country[REG_ALPHA2_LEN + 1];
+	enum reg_6g_ap_type pwr_type_6g = REG_INDOOR_AP;
+	bool ctry_code_match = false;
 
 	qdf_mem_zero(&beaconParams, sizeof(tUpdateBeaconParams));
 	beaconParams.paramChangeBitmap = 0;
@@ -744,8 +751,22 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		return;
 	}
 
-	if (!wlan_reg_is_6ghz_chan_freq(bcn->chan_freq))
+	if (!wlan_reg_is_6ghz_chan_freq(bcn->chan_freq)) {
 		skip_tpe = wlan_mlme_skip_tpe(mac_ctx->psoc);
+	} else {
+		if (!bcn->countryInfoParam.countryString[0]) {
+			pe_err("Channel is 6G but country IE not present");
+			return;
+		}
+		wlan_reg_read_current_country(mac_ctx->psoc,
+					      programmed_country);
+		status = wlan_reg_get_6g_power_type_for_ctry(
+					bcn->countryInfoParam.countryString,
+					programmed_country, &pwr_type_6g,
+					&ctry_code_match);
+		if (QDF_IS_STATUS_ERROR(status))
+			return;
+	}
 
 	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc)) {
 		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
@@ -773,7 +794,8 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 
 		if ((ap_constraint_change && local_constraint) ||
 		    (tpe_change && !skip_tpe)) {
-			lim_calculate_tpc(mac_ctx, session, false);
+			lim_calculate_tpc(mac_ctx, session, false, pwr_type_6g,
+					  ctry_code_match);
 
 			if (tx_ops->set_tpc_power)
 				tx_ops->set_tpc_power(mac_ctx->psoc,

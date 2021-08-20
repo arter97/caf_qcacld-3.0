@@ -615,7 +615,7 @@ QDF_STATUS ucfg_pmo_flush_gtk_offload_req(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS ucfg_pmo_enable_gtk_offload_in_fwr(struct wlan_objmgr_vdev *vdev);
 
-#ifdef WLAN_FEATURE_BIG_DATA_STATS
+#ifdef WLAN_FEATURE_IGMP_OFFLOAD
 /**
  * ucfg_pmo_enable_igmp_offload(): enable igmp request in fwr
  * @vdev: objmgr vdev handle
@@ -1241,6 +1241,49 @@ QDF_STATUS ucfg_pmo_core_txrx_suspend(struct wlan_objmgr_psoc *psoc);
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
 QDF_STATUS ucfg_pmo_core_txrx_resume(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_moddtim_user_enable() - Get moddtim user enable
+ * @vdev: objmgr vdev handle
+ *
+ * Return: moddtim user enabled or not
+ */
+bool ucfg_pmo_get_moddtim_user_enable(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_pmo_set_moddtim_user_enable() - Set moddtim user enable
+ * @vdev: objmgr vdev handle
+ * @value: moddtim user enable or not
+ *
+ * Return: none
+ */
+void ucfg_pmo_set_moddtim_user_enable(struct wlan_objmgr_vdev *vdev,
+				      bool value);
+/**
+ * ucfg_pmo_get_moddtim_user_active() - Get moddtim user active
+ * @vdev: objmgr vdev handle
+ *
+ * Return: moddtim user active
+ */
+bool ucfg_pmo_get_moddtim_user_active(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * ucfg_pmo_get_moddtim_user() - Get moddtim user value
+ * @vdev: objmgr vdev handle
+ *
+ * Return: moddtim user value
+ */
+uint32_t ucfg_pmo_get_moddtim_user(struct wlan_objmgr_vdev *vdev);
+
+/*
+ * ucfg_pmo_get_disconnect_sap_tdls_in_wow: get if disconnect sap/p2p_go
+ * or tdls in wow
+ * @psoc: objmgr psoc
+ *
+ * Return: true in case support else false
+ */
+bool
+ucfg_pmo_get_disconnect_sap_tdls_in_wow(struct wlan_objmgr_psoc *psoc);
 #else /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 static inline QDF_STATUS
 ucfg_pmo_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -1919,6 +1962,36 @@ QDF_STATUS ucfg_pmo_core_txrx_resume(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline bool
+ucfg_pmo_get_moddtim_user_enable(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline void
+ucfg_pmo_set_moddtim_user_enable(struct wlan_objmgr_vdev *vdev,
+				 bool value)
+{
+}
+
+static inline bool
+ucfg_pmo_get_moddtim_user_active(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline uint32_t
+ucfg_pmo_get_moddtim_user(struct wlan_objmgr_vdev *vdev)
+{
+	return 0;
+}
+
+static inline bool
+ucfg_pmo_get_disconnect_sap_tdls_in_wow(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
 
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
@@ -2143,6 +2216,16 @@ ucfg_pmo_get_go_mode_bus_suspend(struct wlan_objmgr_psoc *psoc);
  */
 enum pmo_suspend_mode
 ucfg_pmo_get_suspend_mode(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_dynamic_pcie_gen_switch_cfg() - get PMO config for
+ * dynamic PCIe gen speed change
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool
+ */
+bool
+ucfg_pmo_get_dynamic_pcie_gen_switch_cfg(struct wlan_objmgr_psoc *psoc);
 
 #ifdef SYSTEM_PM_CHECK
 /**

@@ -2413,6 +2413,52 @@ static QDF_STATUS sap_validate_dfs_nol(struct sap_context *sap_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+static void sap_validate_chanmode_and_chwidth(struct mac_context *mac_ctx,
+					      struct sap_context *sap_ctx)
+{
+	uint32_t orig_phymode;
+	enum phy_ch_width orig_ch_width;
+
+	orig_ch_width = sap_ctx->ch_params.ch_width;
+	orig_phymode = sap_ctx->csr_roamProfile.phyMode;
+
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(sap_ctx->chan_freq) &&
+	    (sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_11g ||
+	     sap_ctx->csr_roamProfile.phyMode ==
+					eCSR_DOT11_MODE_11g_ONLY)) {
+		sap_ctx->csr_roamProfile.phyMode = eCSR_DOT11_MODE_11a;
+	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(sap_ctx->chan_freq) &&
+		   (sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_11a)) {
+		sap_ctx->csr_roamProfile.phyMode = eCSR_DOT11_MODE_11g;
+	}
+
+	if (sap_ctx->ch_params.ch_width > CH_WIDTH_20MHZ &&
+	    (sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_abg ||
+	     sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_11a ||
+	     sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_11g ||
+	     sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_11b)) {
+		sap_ctx->ch_params.ch_width = CH_WIDTH_20MHZ;
+		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+					       sap_ctx->chan_freq,
+					       sap_ctx->ch_params.sec_ch_offset,
+					       &sap_ctx->ch_params);
+	} else if (sap_ctx->ch_params.ch_width > CH_WIDTH_40MHZ &&
+		   sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_11n) {
+		sap_ctx->ch_params.ch_width = CH_WIDTH_40MHZ;
+		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+					       sap_ctx->chan_freq,
+					       sap_ctx->ch_params.sec_ch_offset,
+					       &sap_ctx->ch_params);
+	}
+
+	if (orig_ch_width != sap_ctx->ch_params.ch_width ||
+	    orig_phymode != sap_ctx->csr_roamProfile.phyMode)
+		sap_info("Freq %d Updated BW %d -> %d , phymode %d -> %d",
+			 sap_ctx->chan_freq, orig_ch_width,
+			 sap_ctx->ch_params.ch_width,
+			 orig_phymode, sap_ctx->csr_roamProfile.phyMode);
+}
+
 /**
  * sap_goto_starting() - Trigger softap start
  * @sap_ctx: SAP context
@@ -2471,22 +2517,13 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 						    &sap_ctx->ch_params);
 		}
 	}
-	if (WLAN_REG_IS_5GHZ_CH_FREQ(sap_ctx->chan_freq) &&
-	    (sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_11g ||
-	     sap_ctx->csr_roamProfile.phyMode ==
-					eCSR_DOT11_MODE_11g_ONLY))
-		sap_ctx->csr_roamProfile.phyMode = eCSR_DOT11_MODE_11a;
-	else if (WLAN_REG_IS_24GHZ_CH_FREQ(sap_ctx->chan_freq) &&
-		 (sap_ctx->csr_roamProfile.phyMode == eCSR_DOT11_MODE_11a))
-		sap_ctx->csr_roamProfile.phyMode = eCSR_DOT11_MODE_11g;
 
-	/*
-	 * Transition from SAP_INIT to SAP_STARTING
-	 * (both without substates)
-	 */
-	sap_debug("from state %s => %s", "SAP_INIT", "SAP_STARTING");
+	sap_validate_chanmode_and_chwidth(mac_ctx, sap_ctx);
 	/* Channel selected. Now can sap_goto_starting */
 	sap_ctx->fsm_state = SAP_STARTING;
+	sap_debug("from state %s => %s phyMode %d, bw %d",
+		  "SAP_INIT", "SAP_STARTING", sap_ctx->csr_roamProfile.phyMode,
+		  sap_ctx->ch_params.ch_width);
 	/* Specify the channel */
 	sap_ctx->csr_roamProfile.ChannelInfo.numOfChannels =
 					1;
@@ -2509,9 +2546,9 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 
 	sap_debug("session: %d", sap_ctx->sessionId);
 
-	qdf_status = sme_roam_connect(mac_handle, sap_ctx->sessionId,
-				      &sap_ctx->csr_roamProfile,
-				      &sap_ctx->csr_roamId);
+	qdf_status = sme_bss_start(mac_handle, sap_ctx->sessionId,
+				   &sap_ctx->csr_roamProfile,
+				   &sap_ctx->csr_roamId);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 		sap_err("Failed to issue sme_roam_connect");
 
@@ -2732,6 +2769,38 @@ static void sap_propagate_cac_events(struct sap_context *sap_ctx)
 	}
 }
 
+static void sap_check_and_update_vdev_ch_params(struct sap_context *sap_ctx)
+{
+	struct wlan_channel *chan;
+	enum phy_ch_width orig_ch_width;
+
+	chan = wlan_vdev_get_active_channel(sap_ctx->vdev);
+	if (!chan) {
+		sap_debug("Couldn't get vdev active channel");
+		return;
+	}
+	if (sap_ctx->ch_params.ch_width == chan->ch_width)
+		return;
+
+	orig_ch_width = sap_ctx->ch_params.ch_width;
+
+	sap_ctx->ch_params.ch_width = chan->ch_width;
+	sap_ctx->ch_params.center_freq_seg0 = chan->ch_freq_seg1;
+	sap_ctx->ch_params.center_freq_seg1 = chan->ch_freq_seg2;
+	sap_ctx->ch_params.mhz_freq_seg0 = chan->ch_cfreq1;
+	sap_ctx->ch_params.mhz_freq_seg1 = chan->ch_cfreq2;
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(sap_ctx->chan_freq) &&
+	    (chan->ch_width == CH_WIDTH_40MHZ)) {
+		if (sap_ctx->chan_freq < chan->ch_freq_seg1)
+			sap_ctx->ch_params.sec_ch_offset = LOW_PRIMARY_CH;
+		else
+			sap_ctx->ch_params.sec_ch_offset = HIGH_PRIMARY_CH;
+	}
+	sap_debug("updated BW %d -> %d", orig_ch_width,
+		  sap_ctx->ch_params.ch_width);
+}
+
 /**
  * sap_fsm_state_starting() - utility function called from sap fsm
  * @sap_ctx: SAP context
@@ -2759,6 +2828,12 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 	enum reg_wifi_band band;
 
 	if (msg == eSAP_MAC_START_BSS_SUCCESS) {
+		/*
+		 * Update sap_ctx->ch_params from vdev to make up with any BW
+		 * change in lower layer
+		 */
+		sap_check_and_update_vdev_ch_params(sap_ctx);
+
 		/*
 		 * Transition from SAP_STARTING to SAP_STARTED
 		 * (both without substates)
@@ -3132,32 +3207,6 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 		     config->SSIDinfo.ssid.ssId,
 		     sizeof(config->SSIDinfo.ssid.ssId));
 
-	profile->negotiatedAuthType = eCSR_AUTH_TYPE_OPEN_SYSTEM;
-
-	if (config->authType == eSAP_OPEN_SYSTEM) {
-		profile->negotiatedAuthType = eCSR_AUTH_TYPE_OPEN_SYSTEM;
-	} else if (config->authType == eSAP_SHARED_KEY) {
-		profile->negotiatedAuthType = eCSR_AUTH_TYPE_SHARED_KEY;
-	} else {
-		profile->negotiatedAuthType = eCSR_AUTH_TYPE_AUTOSWITCH;
-	}
-
-	profile->AuthType.numEntries = 1;
-	profile->AuthType.authType[0] = eCSR_AUTH_TYPE_OPEN_SYSTEM;
-
-	/* Always set the Encryption Type */
-	profile->EncryptionType.numEntries = 1;
-	profile->EncryptionType.encryptionType[0] =
-		config->RSNEncryptType;
-
-	profile->mcEncryptionType.numEntries = 1;
-	profile->mcEncryptionType.encryptionType[0] =
-		config->mcRSNEncryptType;
-
-	if (config->privacy & eSAP_SHARED_KEY) {
-		profile->AuthType.authType[0] = eCSR_AUTH_TYPE_SHARED_KEY;
-	}
-
 	profile->privacy = config->privacy;
 	profile->fwdWPSPBCProbeReq = config->fwdWPSPBCProbeReq;
 
@@ -3219,13 +3268,8 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		sap_err("Get ap protection mode failed using default value");
 	profile->cfg_protection = ap_prot;
-	profile->ieee80211d = config->ieee80211d;
 	/* wps config info */
 	profile->wps_state = config->wps_state;
-
-	/* MFP capable/required */
-	profile->MFPCapable = config->mfpCapable ? 1 : 0;
-	profile->MFPRequired = config->mfpRequired ? 1 : 0;
 
 	if (config->probeRespIEsBufferLen > 0 &&
 	    config->pProbeRespIEsBuffer) {

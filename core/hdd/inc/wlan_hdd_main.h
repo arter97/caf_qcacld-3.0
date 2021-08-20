@@ -1370,6 +1370,10 @@ struct hdd_adapter {
 	qdf_work_t gpio_tsf_sync_work;
 #endif
 #endif /* WLAN_FEATURE_TSF_PLUS */
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+	/* to indicate if TSF auto report is enabled or not */
+	qdf_atomic_t tsf_auto_report;
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
 #endif
 
 	struct hdd_multicast_addr_list mc_addr_list;
@@ -1721,7 +1725,7 @@ enum RX_OFFLOAD {
 /**
  * struct hdd_cache_channel_info - Structure of the channel info
  * which needs to be cached
- * @channel_num: channel number
+ * @freq: frequency
  * @reg_status: Current regulatory status of the channel
  * Enable
  * Disable
@@ -1730,7 +1734,7 @@ enum RX_OFFLOAD {
  * @wiphy_status: Current wiphy status
  */
 struct hdd_cache_channel_info {
-	uint32_t channel_num;
+	qdf_freq_t freq;
 	enum channel_state reg_status;
 	uint32_t wiphy_status;
 };
@@ -2205,6 +2209,7 @@ struct hdd_context {
 #endif
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
+	qdf_time_t bw_vote_time;
 };
 
 /**
@@ -2903,8 +2908,7 @@ hdd_add_latency_critical_client(struct hdd_adapter *adapter,
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
 	case QCA_WLAN_802_11_MODE_11G:
-		if (adapter->device_mode == QDF_STA_MODE)
-			qdf_atomic_inc(&hdd_ctx->num_latency_critical_clients);
+		qdf_atomic_inc(&hdd_ctx->num_latency_critical_clients);
 
 		hdd_debug("Adding latency critical connection for vdev %d",
 			  adapter->vdev_id);
@@ -2937,8 +2941,7 @@ hdd_del_latency_critical_client(struct hdd_adapter *adapter,
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
 	case QCA_WLAN_802_11_MODE_11G:
-		if (adapter->device_mode == QDF_STA_MODE)
-			qdf_atomic_dec(&hdd_ctx->num_latency_critical_clients);
+		qdf_atomic_dec(&hdd_ctx->num_latency_critical_clients);
 
 		hdd_info("Removing latency critical connection for vdev %d",
 			 adapter->vdev_id);

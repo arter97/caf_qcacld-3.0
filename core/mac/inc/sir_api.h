@@ -744,9 +744,6 @@ struct start_bss_req {
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */
-	bool pmfCapable;
-	bool pmfRequired;
-
 	struct add_ie_params add_ie_params;
 
 	bool obssEnabled;
@@ -2265,13 +2262,6 @@ typedef struct sSirSmeDfsChannelList {
 	/* Ch num including bonded channels on which the RADAR is present */
 	uint8_t channels[SIR_DFS_MAX_20M_SUB_CH];
 } tSirSmeDfsChannelList, *tpSirSmeDfsChannelList;
-
-typedef struct sSirSmeDfsEventInd {
-	uint32_t sessionId;
-	tSirSmeDfsChannelList chan_list;
-	uint32_t dfs_radar_status;
-	int use_nol;
-} tSirSmeDfsEventInd, *tpSirSmeDfsEventInd;
 
 typedef struct sSirChanChangeRequest {
 	uint16_t messageType;
@@ -3865,6 +3855,7 @@ struct sir_nss_update_request {
  * @REASON_SET_HT2040: HT2040 update
  * @REASON_COLOR_CHANGE: Color change
  * @REASON_CHANNEL_SWITCH: channel switch
+ * @REASON_MLO_IE_UPDATE: mlo ie update
  */
 enum sir_bcn_update_reason {
 	REASON_DEFAULT = 0,
@@ -3873,6 +3864,7 @@ enum sir_bcn_update_reason {
 	REASON_SET_HT2040 = 3,
 	REASON_COLOR_CHANGE = 4,
 	REASON_CHANNEL_SWITCH = 5,
+	REASON_MLO_IE_UPDATE = 6,
 };
 
 /**
@@ -3933,6 +3925,8 @@ struct sir_sme_ext_cng_chan_ind {
  * @soc_timer_high: high 32bits of synced SOC timer value
  * @global_tsf_low: low 32bits of tsf64
  * @global_tsf_high: high 32bits of tsf64
+ * @mac_id: MAC identifier
+ * @mac_id_valid: Indicate if mac_id is valid or not
  *
  * driver use this struct to store the tsf info
  */
@@ -3944,6 +3938,10 @@ struct stsf {
 	uint32_t soc_timer_high;
 	uint32_t global_tsf_low;
 	uint32_t global_tsf_high;
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+	uint32_t mac_id;
+	uint32_t mac_id_valid;
+#endif
 };
 
 #define SIR_BCN_FLT_MAX_ELEMS_IE_LIST 8
@@ -4957,6 +4955,9 @@ struct he_capability {
 
 #define EHT_OP_OUI_TYPE "\xfe"
 #define EHT_OP_OUI_SIZE 1
+
+#define MLO_IE_OUI_TYPE "\x5e"
+#define MLO_IE_OUI_SIZE 1
 
 /**
  * struct eht_capability - to store 11be EHT capabilities

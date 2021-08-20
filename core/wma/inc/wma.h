@@ -628,16 +628,6 @@ struct wma_version_info {
 	u_int32_t revision;
 };
 
-struct roam_synch_frame_ind {
-	uint32_t bcn_probe_rsp_len;
-	uint8_t *bcn_probe_rsp;
-	uint8_t is_beacon;
-	uint32_t reassoc_req_len;
-	uint8_t *reassoc_req;
-	uint32_t reassoc_rsp_len;
-	uint8_t *reassoc_rsp;
-};
-
 /* Max number of invalid peer entries */
 #define INVALID_PEER_MAX_NUM 5
 
@@ -1044,6 +1034,10 @@ typedef struct {
 #ifdef WLAN_FEATURE_11BE
 	struct eht_capability eht_cap;
 #endif
+	qdf_atomic_t sap_num_clients_connected;
+	qdf_atomic_t go_num_clients_connected;
+	qdf_wake_lock_t sap_d3_wow_wake_lock;
+	qdf_wake_lock_t go_d3_wow_wake_lock;
 } t_wma_handle, *tp_wma_handle;
 
 /**
@@ -2312,13 +2306,15 @@ uint8_t wma_rx_invalid_peer_ind(uint8_t vdev_id, void *wh);
  * @peer_macaddr: peer mac address
  * @tid: tid of rx
  * @reason_code: reason code
+ * @cdp_rcode: CDP reason code for sending DELBA
  *
  * Return: 0 for success or non-zero on failure
  */
 int wma_dp_send_delba_ind(uint8_t vdev_id,
 			  uint8_t *peer_macaddr,
 			  uint8_t tid,
-			  uint8_t reason_code);
+			  uint8_t reason_code,
+			  enum cdp_delba_rcode cdp_rcode);
 
 /**
  * is_roam_inprogress() - Is vdev in progress

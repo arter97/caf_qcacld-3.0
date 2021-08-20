@@ -29,19 +29,6 @@
 #include "cds_reg_service.h"
 #include "wlan_objmgr_vdev_obj.h"
 
-#ifdef QCA_WIFI_3_0_EMU
-#define CSR_ACTIVE_SCAN_LIST_CMD_TIMEOUT (1000*30*20)
-#else
-#define CSR_ACTIVE_SCAN_LIST_CMD_TIMEOUT (1000*30)
-#endif
-/* ***************************************************************************
- * The MAX BSSID Count should be lower than the command timeout value.
- * As in some case auth timeout can take upto 5 sec (in case of SAE auth) try
- * (command timeout/5000 - 1) candidates.
- * ***************************************************************************/
-#define CSR_MAX_BSSID_COUNT     (SME_ACTIVE_LIST_CMD_TIMEOUT_VALUE/5000) - 1
-#define CSR_CUSTOM_CONC_GO_BI    100
-extern uint8_t csr_wpa_oui[][CSR_WPA_OUI_SIZE];
 bool csr_is_supported_channel(struct mac_context *mac, uint32_t chan_freq);
 
 enum csr_roamcomplete_result {
@@ -76,26 +63,9 @@ struct scan_result_list {
 	tListElem *pCurEntry;
 };
 
-#define CSR_IS_ENC_TYPE_STATIC(encType) ((eCSR_ENCRYPT_TYPE_NONE == (encType)) \
-			|| (eCSR_ENCRYPT_TYPE_WEP40_STATICKEY == (encType)) || \
-			(eCSR_ENCRYPT_TYPE_WEP104_STATICKEY == (encType)))
-
-#define CSR_IS_AUTH_TYPE_FILS(auth_type) \
-		((eCSR_AUTH_TYPE_FILS_SHA256 == auth_type) || \
-		(eCSR_AUTH_TYPE_FILS_SHA384 == auth_type) || \
-		(eCSR_AUTH_TYPE_FT_FILS_SHA256 == auth_type) || \
-		(eCSR_AUTH_TYPE_FT_FILS_SHA384 == auth_type))
 #define CSR_IS_WAIT_FOR_KEY(mac, sessionId) \
 		 (CSR_IS_ROAM_JOINED(mac, sessionId) && \
 		  CSR_IS_ROAM_SUBSTATE_WAITFORKEY(mac, sessionId))
-/* WIFI has a test case for not using HT rates with TKIP as encryption */
-/* We may need to add WEP but for now, TKIP only. */
-
-#define CSR_IS_11n_ALLOWED(encType) ((eCSR_ENCRYPT_TYPE_TKIP != (encType)) && \
-			(eCSR_ENCRYPT_TYPE_WEP40_STATICKEY != (encType)) && \
-			(eCSR_ENCRYPT_TYPE_WEP104_STATICKEY != (encType)) && \
-				     (eCSR_ENCRYPT_TYPE_WEP40 != (encType)) && \
-				       (eCSR_ENCRYPT_TYPE_WEP104 != (encType)))
 
 enum csr_roam_state csr_roam_state_change(struct mac_context *mac,
 					  enum csr_roam_state NewRoamState,
@@ -122,11 +92,9 @@ QDF_STATUS csr_roam_call_callback(struct mac_context *mac, uint32_t sessionId,
 				  struct csr_roam_info *roam_info,
 				  uint32_t roamId,
 				  eRoamCmdStatus u1, eCsrRoamResult u2);
-QDF_STATUS csr_roam_issue_connect(struct mac_context *mac, uint32_t sessionId,
-				  struct csr_roam_profile *pProfile,
-				  tScanResultHandle hBSSList,
-				  enum csr_roam_reason reason, uint32_t roamId,
-				  bool fImediate, bool fClearScan);
+QDF_STATUS csr_issue_bss_start(struct mac_context *mac, uint8_t vdev_id,
+			       struct csr_roam_profile *pProfile,
+			       uint32_t roamId);
 void csr_roam_complete(struct mac_context *mac, enum csr_roamcomplete_result Result,
 		       void *Context, uint8_t session_id);
 
@@ -134,7 +102,6 @@ void csr_roam_complete(struct mac_context *mac, enum csr_roamcomplete_result Res
  * csr_issue_set_context_req_helper  - Function to fill unicast/broadcast keys
  * request to set the keys to fw
  * @mac:         Poiner to mac context
- * @profile:     Pointer to connected profile
  * @vdev_id:     vdev id
  * @bssid:       Connected BSSID
  * @addkey:      Is add key request to crypto
@@ -148,34 +115,20 @@ void csr_roam_complete(struct mac_context *mac, enum csr_roamcomplete_result Res
  */
 QDF_STATUS
 csr_issue_set_context_req_helper(struct mac_context *mac,
-				 struct csr_roam_profile *profile,
 				 uint32_t session_id,
 				 tSirMacAddr *bssid, bool addkey,
 				 bool unicast, tAniKeyDirection key_direction,
 				 uint8_t key_id, uint16_t key_length,
 				 uint8_t *key);
-QDF_STATUS
-csr_roam_save_connected_information(struct mac_context *mac,
-				    uint32_t sessionId,
-				    struct csr_roam_profile *pProfile,
-				    struct bss_description *pSirBssDesc,
-				    tDot11fBeaconIEs *pIes);
-
 void csr_roam_check_for_link_status_change(struct mac_context *mac,
 					tSirSmeRsp *pSirMsg);
 
 QDF_STATUS csr_roam_issue_start_bss(struct mac_context *mac, uint32_t sessionId,
 				    struct csr_roamstart_bssparams *pParam,
 				    struct csr_roam_profile *pProfile,
-				    struct bss_description *bss_desc,
-					uint32_t roamId);
+				    uint32_t roamId);
 QDF_STATUS csr_roam_issue_stop_bss(struct mac_context *mac, uint32_t sessionId,
 				   enum csr_roam_substate NewSubstate);
-/* pBand can be NULL if caller doesn't need to get it */
-QDF_STATUS csr_roam_issue_disassociate_cmd(struct mac_context *mac,
-					   uint32_t sessionId,
-					   eCsrRoamDisconnectReason reason,
-					   enum wlan_reason_code mac_reason);
 QDF_STATUS csr_send_mb_disassoc_req_msg(struct mac_context *mac, uint32_t sessionId,
 					tSirMacAddr bssId, uint16_t reasonCode);
 QDF_STATUS csr_send_mb_deauth_req_msg(struct mac_context *mac, uint32_t sessionId,
@@ -191,22 +144,9 @@ QDF_STATUS csr_send_assoc_cnf_msg(struct mac_context *mac,
 QDF_STATUS csr_send_mb_start_bss_req_msg(struct mac_context *mac,
 					 uint32_t sessionId,
 					 eCsrRoamBssType bssType,
-					 struct csr_roamstart_bssparams *pParam,
-					 struct bss_description *bss_desc);
+					 struct csr_roamstart_bssparams *pParam);
 QDF_STATUS csr_send_mb_stop_bss_req_msg(struct mac_context *mac,
 					uint32_t sessionId);
-
-/* Caller should put the BSS' ssid to fiedl bssSsid when
- * comparing SSID for a BSS.
- */
-bool csr_is_ssid_match(struct mac_context *mac, uint8_t *ssid1, uint8_t ssid1Len,
-		       uint8_t *bssSsid, uint8_t bssSsidLen,
-			bool fSsidRequired);
-bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
-			   struct bss_description *pSirBssDesc,
-			   struct csr_roam_profile *pProfile,
-			   enum csr_cfgdot11mode *pReturnCfgDot11Mode,
-			   tDot11fBeaconIEs *pIes);
 
 /**
  * csr_get_cfg_valid_channels() - Get valid channel frequency list
@@ -221,11 +161,6 @@ bool csr_is_phy_mode_match(struct mac_context *mac, uint32_t phyMode,
 QDF_STATUS csr_get_cfg_valid_channels(struct mac_context *mac,
 				      uint32_t *ch_freq_list,
 				      uint32_t *num_ch_freq);
-
-int8_t csr_get_cfg_max_tx_power(struct mac_context *mac, uint32_t ch_freq);
-
-/* To free the last roaming profile */
-void csr_free_roam_profile(struct mac_context *mac, uint32_t sessionId);
 
 /* to free memory allocated inside the profile structure */
 void csr_release_profile(struct mac_context *mac,
@@ -274,22 +209,18 @@ void csr_cleanup_vdev_session(struct mac_context *mac, uint8_t vdev_id);
 QDF_STATUS csr_roam_get_session_id_from_bssid(struct mac_context *mac,
 						struct qdf_mac_addr *bssid,
 					      uint32_t *pSessionId);
-enum csr_cfgdot11mode csr_find_best_phy_mode(struct mac_context *mac,
-							uint32_t phyMode);
 
 /*
  * csr_scan_get_result() - Return scan results based on filter
  * @mac: Pointer to Global MAC structure
  * @filter: If pFilter is NULL, all cached results are returned
  * @phResult: an object for the result.
- * @scoring_required: if scoding is required for AP
  *
  * Return QDF_STATUS
  */
 QDF_STATUS csr_scan_get_result(struct mac_context *mac,
 			       struct scan_filter *filter,
-			       tScanResultHandle *phResult,
-			       bool scoring_required);
+			       tScanResultHandle *phResult);
 
 /**
  * csr_scan_get_result_for_bssid - gets the scan result from scan cache for the
@@ -332,24 +263,6 @@ tCsrScanResultInfo *csr_scan_result_get_first(struct mac_context *mac,
  */
 tCsrScanResultInfo *csr_scan_result_get_next(struct mac_context *mac,
 					     tScanResultHandle hScanResult);
-
-/*
- * csr_get_regulatory_domain_for_country() -
- * This function is to get the regulatory domain for a country.
- * This function must be called after CFG is downloaded and all the band/mode
- * setting already passed into CSR.
- *
- * pCountry - Caller allocated buffer with at least 3 bytes specifying the
- * country code
- * pDomainId - Caller allocated buffer to get the return domain ID upon
- * success return. Can be NULL.
- * source - the source of country information.
- * Return QDF_STATUS
- */
-QDF_STATUS csr_get_regulatory_domain_for_country(struct mac_context *mac,
-						 uint8_t *pCountry,
-						 v_REGDOMAIN_t *pDomainId,
-						 enum country_src source);
 
 /* some support functions */
 bool csr_is11h_supported(struct mac_context *mac);
@@ -442,16 +355,17 @@ QDF_STATUS csr_scan_result_purge(struct mac_context *mac,
 
 /* /////////////////////////////////////////Common Scan ends */
 
-/*
- * csr_roam_connect() -
- * To inititiate an association
- * pProfile - can be NULL to join to any open ones
- * pRoamId - to get back the request ID
+/**
+ * csr_bss_start() - A wrapper function to request CSR to inititiate start bss
+ * @mac: mac ctx
+ * @vdev_id: the vdev id.
+ * @profile: description of bss to start
+ * @roam_id: to get back the request ID
+ *
  * Return QDF_STATUS
  */
-QDF_STATUS csr_roam_connect(struct mac_context *mac, uint32_t sessionId,
-			    struct csr_roam_profile *pProfile,
-			    uint32_t *pRoamId);
+QDF_STATUS csr_bss_start(struct mac_context *mac, uint32_t vdev_id,
+			 struct csr_roam_profile *profile, uint32_t *roam_id);
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /*
@@ -482,9 +396,19 @@ void csr_get_pmk_info(struct mac_context *mac_ctx, uint8_t session_id,
 QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac, uint8_t vdev_id,
 				uint8_t *psk_pmk, size_t pmk_len,
 				bool update_to_fw);
-#endif
 
-void csr_roam_free_connect_profile(tCsrRoamConnectedProfile *profile);
+/**
+ * csr_set_pmk_cache_ft() - store MDID in PMK cache
+ *
+ * @mac  - pointer to global structure for MAC
+ * @session_id - Sme session id
+ * @pmk_cache: pointer to a structure of PMK
+ *
+ * Return QDF_STATUS - usually it succeed unless session_id is not found
+ */
+QDF_STATUS csr_set_pmk_cache_ft(struct mac_context *mac, uint32_t session_id,
+				struct wlan_crypto_pmksa *pmk_cache);
+#endif
 
 /*
  * csr_apply_channel_and_power_list() -
@@ -497,24 +421,21 @@ void csr_roam_free_connect_profile(tCsrRoamConnectedProfile *profile);
 QDF_STATUS csr_apply_channel_and_power_list(struct mac_context *mac);
 
 /*
- * csr_roam_disconnect() - To disconnect from a network
+ * csr_roam_ndi_stop() - stop ndi
  * @mac: pointer to mac context
- * @session_id: Session ID
- * @reason: CSR disconnect reason code as per @enum eCsrRoamDisconnectReason
- * @mac_reason: Mac Disconnect reason code as per @enum wlan_reason_code
+ * @vdev_id: vdev ID
  *
  * Return QDF_STATUS
  */
-QDF_STATUS csr_roam_disconnect(struct mac_context *mac, uint32_t session_id,
-			       eCsrRoamDisconnectReason reason,
-			       enum wlan_reason_code mac_reason);
+QDF_STATUS csr_roam_ndi_stop(struct mac_context *mac, uint8_t vdev_id);
 
 /* This function is used to stop a BSS. It is similar of csr_roamIssueDisconnect
  * but this function doesn't have any logic other than blindly trying to stop
  * BSS
  */
-QDF_STATUS csr_roam_issue_stop_bss_cmd(struct mac_context *mac, uint32_t sessionId,
-				       bool fHighPriority);
+QDF_STATUS csr_roam_issue_stop_bss_cmd(struct mac_context *mac, uint8_t vdev_id,
+				       eCsrRoamBssType bss_type,
+				       bool high_priority);
 
 /**
  * csr_roam_issue_disassociate_sta_cmd() - disassociate a associated station
@@ -610,21 +531,16 @@ QDF_STATUS csr_sta_continue_csa(struct mac_context *mac_ctx,
 QDF_STATUS csr_set_ht2040_mode(struct mac_context *mac, uint32_t sessionId,
 			       ePhyChanBondState cbMode, bool obssEnabled);
 #endif
-struct bss_description*
-csr_get_fst_bssdescr_ptr(tScanResultHandle result_handle);
-
 QDF_STATUS
 csr_roam_prepare_bss_config_from_profile(struct mac_context *mac_ctx,
 					 struct csr_roam_profile *profile,
-					 struct bss_config_param *bss_cfg,
-					 struct bss_description *bss_desc);
+					 uint8_t vdev_id,
+					 struct bss_config_param *bss_cfg);
 
 void
 csr_roam_prepare_bss_params(struct mac_context *mac_ctx, uint32_t session_id,
 			    struct csr_roam_profile *profile,
-			    struct bss_description *bss_desc,
-			    struct bss_config_param *bss_cfg,
-			    tDot11fBeaconIEs *ies);
+			    struct bss_config_param *bss_cfg);
 
 /**
  * csr_remove_bssid_from_scan_list() - remove the bssid from
@@ -642,9 +558,7 @@ void csr_remove_bssid_from_scan_list(struct mac_context *mac_ctx,
 QDF_STATUS
 csr_roam_set_bss_config_cfg(struct mac_context *mac_ctx, uint32_t session_id,
 			    struct csr_roam_profile *profile,
-			    struct bss_description *bss_desc,
-			    struct bss_config_param *bss_cfg,
-			    tDot11fBeaconIEs *ies, bool reset_country);
+			    struct bss_config_param *bss_cfg);
 
 void csr_prune_channel_list_for_mode(struct mac_context *mac,
 				     struct csr_channel *pChannelList);

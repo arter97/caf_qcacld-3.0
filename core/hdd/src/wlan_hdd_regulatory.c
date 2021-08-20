@@ -37,7 +37,6 @@
 #include "wlan_hdd_hostapd.h"
 #include "osif_psoc_sync.h"
 #include "sap_internal.h"
-#include "lim_utils.h"
 
 #define REG_RULE_2412_2462    REG_RULE(2412-10, 2462+10, 40, 0, 20, 0)
 
@@ -1467,6 +1466,60 @@ static void hdd_regulatory_chanlist_dump(struct regulatory_channel *chan_list)
 	hdd_debug("end total_count %d", count);
 }
 
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+/**
+ * hdd_country_change_bw_check() - Check if bandwidth changed
+ * @hdd_ctx: Global HDD context
+ * @adapter: HDD vdev context
+ * @oper_freq: current frequency of adapter
+ *
+ * Return: true if bandwidth changed otherwise false.
+ */
+static bool
+hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
+			    struct hdd_adapter *adapter,
+			    qdf_freq_t oper_freq)
+{
+	bool width_changed = false;
+	enum phy_ch_width width;
+	uint16_t org_bw = 0;
+	struct regulatory_channel *cur_chan_list = NULL;
+	int i;
+
+	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
+	if (!cur_chan_list)
+		return false;
+
+	ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
+				       cur_chan_list);
+
+	width = hdd_get_adapter_width(adapter);
+	org_bw = wlan_reg_get_bw_value(width);
+
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		if (cur_chan_list[i].state ==
+			CHANNEL_STATE_DISABLE)
+			continue;
+
+		if (cur_chan_list[i].center_freq == oper_freq &&
+		    org_bw > cur_chan_list[i].max_bw) {
+			width_changed = true;
+			break;
+		}
+	}
+	qdf_mem_free(cur_chan_list);
+	return width_changed;
+}
+#else
+static inline bool
+hdd_country_change_bw_check(struct hdd_context *hdd_ctx,
+			    struct hdd_adapter *adapter,
+			    qdf_freq_t oper_freq)
+{
+	return false;
+}
+#endif
+
 /**
  * hdd_country_change_update_sta() - handle country code change for STA
  * @hdd_ctx: Global HDD context
@@ -1486,19 +1539,8 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 	qdf_freq_t oper_freq;
 	eCsrPhyMode csr_phy_mode;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_COUNTRY_CHANGE_UPDATE_STA;
-	struct regulatory_channel *cur_chan_list = NULL;
-	int i;
-	enum phy_ch_width width;
-	uint16_t org_bw = 0;
 
 	pdev = hdd_ctx->pdev;
-
-	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
-	if (!cur_chan_list)
-		return;
-
-	ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
-				       cur_chan_list);
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
@@ -1525,20 +1567,10 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 				csr_convert_from_reg_phy_mode(new_phy_mode);
 			phy_changed = (sta_ctx->reg_phymode != csr_phy_mode);
 
-			width = hdd_get_adapter_width(adapter);
-			org_bw = ch_width_in_mhz(width);
+			width_changed = hdd_country_change_bw_check(hdd_ctx,
+								    adapter,
+								    oper_freq);
 
-			for (i = 0; i < NUM_CHANNELS; i++) {
-				if (cur_chan_list[i].state ==
-				    CHANNEL_STATE_DISABLE)
-					continue;
-
-				if (cur_chan_list[i].center_freq == oper_freq &&
-				    org_bw > cur_chan_list[i].max_bw) {
-					width_changed = true;
-					break;
-				}
-			}
 			if (phy_changed || freq_changed || width_changed) {
 				wlan_hdd_cm_issue_disconnect(adapter,
 							 REASON_UNSPEC_FAILURE,
@@ -1552,7 +1584,6 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 		/* dev_put has to be done here */
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
-	qdf_mem_free(cur_chan_list);
 }
 
 /**

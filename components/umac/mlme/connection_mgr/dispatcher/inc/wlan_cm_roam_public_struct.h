@@ -275,6 +275,17 @@ struct reassoc_timer_ctx {
 };
 #endif
 
+struct roam_synch_frame_ind {
+	uint32_t bcn_probe_rsp_len;
+	uint8_t *bcn_probe_rsp;
+	uint8_t is_beacon;
+	uint32_t reassoc_req_len;
+	uint8_t *reassoc_req;
+	uint32_t reassoc_rsp_len;
+	uint8_t *reassoc_rsp;
+	uint8_t vdev_id;
+};
+
 /**
  * struct rso_config - connect config to be used to send info in
  * RSO. This is the info we dont have in VDEV or CM ctx
@@ -322,6 +333,7 @@ struct reassoc_timer_ctx {
  * @roam_invoke_fail_reason: One of reason id from enum
  * wmi_roam_invoke_status_error in case of forced roam
  * @lost_link_rssi: lost link RSSI
+ * @roam_sync_frame_ind: roam sync frame ind
  */
 struct rso_config {
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -364,6 +376,7 @@ struct rso_config {
 	uint32_t roam_trigger_reason;
 	uint32_t roam_invoke_fail_reason;
 	int32_t lost_link_rssi;
+	struct roam_synch_frame_ind roam_sync_frame_ind;
 };
 
 /**
@@ -393,6 +406,7 @@ struct rso_roam_policy_params {
 };
 
 #define DEFAULT_RSSI_DB_GAP     30  /* every 30 dbm for one category */
+#define ENABLE_FT_OVER_DS      1   /* enable ft_over_ds */
 
 /**
  * struct rso_params - global RSO params
@@ -1228,6 +1242,7 @@ struct wlan_rso_11i_params {
  * @rokh_id_length: r0kh id length
  * @rokh_id: r0kh id
  * @mdid: mobility domain info
+ * @enable_ft_over_ds: Flag to enable/disable FT-over-DS
  */
 struct wlan_rso_11r_params {
 	bool is_11r_assoc;
@@ -1238,6 +1253,7 @@ struct wlan_rso_11r_params {
 	uint32_t r0kh_id_length;
 	uint8_t r0kh_id[WMI_ROAM_R0KH_ID_MAX_LEN];
 	struct mobility_domain_info mdid;
+	bool enable_ft_over_ds;
 };
 
 /**
@@ -1732,12 +1748,18 @@ struct wlan_cm_roam_tx_ops {
 };
 
 /**
- * wlan_cm_roam_rx_ops  - structure of tx function pointers for
+ * wlan_cm_roam_rx_ops  - structure of rx function pointers for
  * roaming related commands
- * @roam_sync_event_rx: RX ops function pointer for roam sync event
+ * @roam_sync_event: RX ops function pointer for roam sync event
+ * @roam_sync_frame_event: Rx ops function pointer for roam sync frame event
  */
 struct wlan_cm_roam_rx_ops {
-	QDF_STATUS (*roam_sync_event_rx)(struct wlan_objmgr_vdev *vdev);
+	QDF_STATUS (*roam_sync_event)(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *event,
+				      uint32_t len,
+				      uint8_t vdev_id);
+	QDF_STATUS (*roam_sync_frame_event)(struct wlan_objmgr_psoc *psoc,
+					    struct roam_synch_frame_ind *frm);
 };
 
 /**
