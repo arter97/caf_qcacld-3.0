@@ -170,7 +170,7 @@ QDF_STATUS mbss_ap_stop_acs_ht40(struct wlan_objmgr_vdev *vdev,
 		mbss_ht40 = &mbss_pdev->mbss_ht40;
 
 		/* Clear the bit of the vdev requesting ACS stop */
-		for (index = 0; index < MBSS_ACS_SRC_MAX; index++) {
+		for (index = 0; index < MBSS_HT40_SRC_MAX; index++) {
 			ht40_data = &mbss_ht40->data[index];
 			ht40_bitmap = ht40_data->vdevs_waiting_ht40;
 			if (mbss_check_vdev_bit(vdev_id, ht40_bitmap)) {

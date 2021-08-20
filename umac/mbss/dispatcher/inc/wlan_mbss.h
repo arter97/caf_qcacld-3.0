@@ -251,6 +251,16 @@ bool wlan_mbss_ht40_in_progress(struct wlan_objmgr_vdev *vdev);
 bool wlan_mbss_vdev_acs_in_progress(struct wlan_objmgr_vdev *vdev,
 				    enum wlan_mbss_acs_source acs_src);
 
+/*
+ * wlan_mbss_vdev_ht40_in_progress() - check if ht40 in progress for a vdev
+ *
+ * @vdev: vdev object
+ * @ht40_source: ht40 source
+ * return: return true or false
+ */
+bool wlan_mbss_vdev_ht40_in_progress(struct wlan_objmgr_vdev *vdev,
+				     enum wlan_mbss_ht40_source ht40_src);
+
 /* wlan_mbss_num_sta_up() - find number of STA vdevs UP
  *
  * @pdev: pdev object
