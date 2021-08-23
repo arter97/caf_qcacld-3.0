@@ -2642,6 +2642,8 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 	hdd_ctx->dfs_cac_offload = cfg->dfs_cac_offload;
 	hdd_ctx->lte_coex_ant_share = cfg->services.lte_coex_ant_share;
 	hdd_ctx->obss_scan_offload = cfg->services.obss_scan_offload;
+	ucfg_scan_set_obss_scan_offload(hdd_ctx->psoc,
+					hdd_ctx->obss_scan_offload);
 	status = ucfg_mlme_set_obss_detection_offload_enabled(
 			hdd_ctx->psoc, cfg->obss_detection_offloaded);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -3974,6 +3976,8 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		return 0;
 	}
 
+	cds_set_driver_state_module_stop(false);
+
 	switch (hdd_ctx->driver_status) {
 	case DRIVER_MODULES_UNINITIALIZED:
 		hdd_nofl_debug("Wlan transitioning (UNINITIALIZED -> CLOSED)");
@@ -4248,6 +4252,7 @@ release_lock:
 	cds_shutdown_notifier_purge();
 	hdd_check_for_leaks(hdd_ctx, reinit);
 	hdd_debug_domain_set(QDF_DEBUG_DOMAIN_INIT);
+	cds_set_driver_state_module_stop(true);
 
 	hdd_exit();
 
@@ -9599,23 +9604,26 @@ static int hdd_wiphy_init(struct hdd_context *hdd_ctx)
 		return ret_val;
 	}
 
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_WOW) {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0))
-	wiphy->wowlan = &wowlan_support_reg_init;
+		wiphy->wowlan = &wowlan_support_reg_init;
 #else
-	wiphy->wowlan.flags = WIPHY_WOWLAN_ANY |
-			      WIPHY_WOWLAN_MAGIC_PKT |
-			      WIPHY_WOWLAN_DISCONNECT |
-			      WIPHY_WOWLAN_SUPPORTS_GTK_REKEY |
-			      WIPHY_WOWLAN_GTK_REKEY_FAILURE |
-			      WIPHY_WOWLAN_EAP_IDENTITY_REQ |
-			      WIPHY_WOWLAN_4WAY_HANDSHAKE |
-			      WIPHY_WOWLAN_RFKILL_RELEASE;
+		wiphy->wowlan.flags = WIPHY_WOWLAN_ANY |
+				      WIPHY_WOWLAN_MAGIC_PKT |
+				      WIPHY_WOWLAN_DISCONNECT |
+				      WIPHY_WOWLAN_SUPPORTS_GTK_REKEY |
+				      WIPHY_WOWLAN_GTK_REKEY_FAILURE |
+				      WIPHY_WOWLAN_EAP_IDENTITY_REQ |
+				      WIPHY_WOWLAN_4WAY_HANDSHAKE |
+				      WIPHY_WOWLAN_RFKILL_RELEASE;
 
-	wiphy->wowlan.n_patterns = (WOW_MAX_FILTER_LISTS *
+		wiphy->wowlan.n_patterns = (WOW_MAX_FILTER_LISTS *
 				    WOW_MAX_FILTERS_PER_LIST);
-	wiphy->wowlan.pattern_min_len = WOW_MIN_PATTERN_SIZE;
-	wiphy->wowlan.pattern_max_len = WOW_MAX_PATTERN_SIZE;
+		wiphy->wowlan.pattern_min_len = WOW_MIN_PATTERN_SIZE;
+		wiphy->wowlan.pattern_max_len = WOW_MAX_PATTERN_SIZE;
 #endif
+	}
+
 	ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
 					    &channel_bonding_mode);
 	if (hdd_ctx->obss_scan_offload) {
@@ -14351,7 +14359,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	if (!qdf_ctx)
 		return -EINVAL;
 
-	cds_set_module_stop_in_progress(true);
+	cds_set_driver_state_module_stop(true);
 
 	debugfs_threads = hdd_return_debugfs_threads_count();
 
@@ -14361,7 +14369,7 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 
 		if (IS_IDLE_STOP && !ftm_mode) {
 			hdd_psoc_idle_timer_start(hdd_ctx);
-			cds_set_module_stop_in_progress(false);
+			cds_set_driver_state_module_stop(false);
 
 			hdd_bus_bw_compute_timer_stop(hdd_ctx);
 			return -EAGAIN;
@@ -14535,8 +14543,6 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 	hdd_debug("Wlan transitioned (now CLOSED)");
 
 done:
-	cds_set_module_stop_in_progress(false);
-
 	hdd_exit();
 
 	return ret;

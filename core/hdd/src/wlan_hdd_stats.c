@@ -1892,6 +1892,20 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 
 	hdd_enter_dev(adapter->dev);
 
+	/*
+	 * FW can send radio stats with multiple events and for the first event
+	 * host allocates memory in wma and processes the events, there is a
+	 * possibility that host receives first event and gets timed out, on
+	 * time out host frees the allocated memory. now if host receives
+	 * remaining events it will again allocate memory and processes the
+	 * stats, since this is not an allocation for new command, this will
+	 * lead to out of order processing of the next event and this memory
+	 * might not be freed, so free the already allocated memory from WMA
+	 * before issuing any new ll stats request free memory allocated for
+	 * previous command
+	 */
+	sme_radio_tx_mem_free();
+
 	status = wlan_hdd_set_station_stats_request_pending(adapter);
 	if (status == QDF_STATUS_E_ALREADY)
 		return qdf_status_to_os_return(status);
@@ -1923,7 +1937,6 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	if (ret) {
 		hdd_err("Target response timed out request id %d request bitmap 0x%x",
 			priv->request_id, priv->request_bitmap);
-		sme_radio_tx_mem_free();
 		qdf_spin_lock(&priv->ll_stats_lock);
 		priv->request_bitmap = 0;
 		qdf_spin_unlock(&priv->ll_stats_lock);
@@ -1931,6 +1944,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	} else {
 		hdd_update_station_stats_cached_timestamp(adapter);
 	}
+	sme_radio_tx_mem_free();
 	qdf_spin_lock(&priv->ll_stats_lock);
 	status = qdf_list_remove_front(&priv->ll_stats_q, &ll_node);
 	qdf_spin_unlock(&priv->ll_stats_lock);
