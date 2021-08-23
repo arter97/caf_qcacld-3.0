@@ -74,7 +74,7 @@ bool mbss_vdev_acs_in_progress(struct wlan_objmgr_vdev *vdev,
 		goto err;
 	}
 
-	if (acs_src >= MBSS_ACS_SRC_MAX)
+	if (acs_src > MBSS_ACS_SRC_MAX)
 		goto err;
 
 	mbss_lock(mbss_ctx);
@@ -93,6 +93,50 @@ bool mbss_vdev_acs_in_progress(struct wlan_objmgr_vdev *vdev,
 
 	data = &mbss_ctx->mbss_acs.data[acs_src];
 	bitmap = data->vdevs_waiting_acs;
+
+	if (mbss_check_vdev_bit(vdev_id, bitmap))
+		status = true;
+exit:
+	mbss_unlock(mbss_ctx);
+err:
+	return status;
+}
+
+bool mbss_vdev_ht40_in_progress(struct wlan_objmgr_vdev *vdev,
+				enum wlan_mbss_ht40_source ht40_src)
+{
+	bool status = false;
+	struct mbss_pdev *mbss_ctx;
+	struct mbss_ht40_data *data;
+	mbss_bitmap_type *bitmap;
+	uint8_t index = 0;
+	uint8_t vdev_id;
+
+	mbss_ctx = mbss_get_ctx(vdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	if (ht40_src > MBSS_HT40_SRC_MAX)
+		goto err;
+
+	mbss_lock(mbss_ctx);
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	if (ht40_src == MBSS_HT40_SRC_MAX) {
+		for (index = 0; index < MBSS_HT40_SRC_MAX; index++) {
+			data = &mbss_ctx->mbss_ht40.data[index];
+			bitmap = data->vdevs_waiting_ht40;
+			if (mbss_check_vdev_bit(vdev_id, bitmap)) {
+				status = true;
+				goto exit;
+			}
+		}
+	}
+
+	data = &mbss_ctx->mbss_ht40.data[ht40_src];
+	bitmap = data->vdevs_waiting_ht40;
 
 	if (mbss_check_vdev_bit(vdev_id, bitmap))
 		status = true;

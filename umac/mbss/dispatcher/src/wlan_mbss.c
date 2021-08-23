@@ -229,6 +229,14 @@ bool wlan_mbss_vdev_acs_in_progress(struct wlan_objmgr_vdev *vdev,
 
 qdf_export_symbol(wlan_mbss_vdev_acs_in_progress);
 
+bool wlan_mbss_vdev_ht40_in_progress(struct wlan_objmgr_vdev *vdev,
+				     enum wlan_mbss_ht40_source ht40_src)
+{
+	return mbss_vdev_ht40_in_progress(vdev, ht40_src);
+}
+
+qdf_export_symbol(wlan_mbss_vdev_ht40_in_progress);
+
 bool wlan_mbss_sta_connecting(struct wlan_objmgr_vdev *vdev)
 {
 	return mbss_sta_connecting(vdev);
