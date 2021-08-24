@@ -951,8 +951,16 @@ sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 
 		/* set requestType to full scan */
 		req->scan_req.chan_list.num_chan = 1;
-		chan_num = sme_rrm_ctx->channelList.ChannelList[
-			   sme_rrm_ctx->currentIndex];
+
+		chan_list = sme_rrm_ctx->channelList.ChannelList;
+		if (!chan_list) {
+			sme_err("[802.11 RRM]: Global channel list is null");
+			status = QDF_STATUS_E_FAILURE;
+			qdf_mem_free(req);
+			goto send_ind;
+		}
+
+		chan_num = chan_list[sme_rrm_ctx->currentIndex];
 		req->scan_req.chan_list.chan[0].freq =
 			wlan_chan_to_freq(chan_num);
 		sme_debug("active duration %d passive %d On channel %d freq %d",
@@ -1025,6 +1033,7 @@ send_ind:
 	sme_rrm_send_beacon_report_xmit_ind(mac_ctx, idx, NULL, true, 0);
 free_ch_lst:
 	qdf_mem_free(sme_rrm_ctx->channelList.ChannelList);
+	sme_rrm_ctx->channelList.numOfChannels = 0;
 	sme_rrm_ctx->channelList.ChannelList = NULL;
 	return status;
 }
