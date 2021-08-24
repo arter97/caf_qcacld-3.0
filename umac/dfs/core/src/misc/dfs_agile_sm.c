@@ -345,6 +345,7 @@ static void dfs_abort_agile_precac(struct wlan_dfs *dfs)
 	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
 
 	dfs_cancel_precac_timer(dfs);
+	dfs->dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
 	dfs_agile_precac_cleanup(dfs);
 	/*Send the abort to F/W as well */
 	if (dfs_tx_ops && dfs_tx_ops->dfs_ocac_abort_cmd)
@@ -397,12 +398,11 @@ static bool  dfs_init_agile_start_evt_handler(struct wlan_dfs *dfs,
 		 * is valid, if those are true, send appropriate WMIs to FW
 		 * and only then transition to the state as follows.
 		 */
+		dfs_soc->cur_agile_dfs_index = dfs->dfs_psoc_idx;
 		dfs_prepare_agile_rcac_channel(dfs, &is_chan_found);
 	}
 	/*For PreCAC */
 	else if (dfs_is_agile_precac_enabled(dfs)) {
-		dfs_soc->dfs_priv[dfs->dfs_psoc_idx].agile_precac_active
-			= true;
 		if (!dfs_soc->precac_state_started &&
 		    !dfs_soc->dfs_precac_timer_running) {
 			dfs_soc->precac_state_started = true;
@@ -443,13 +443,9 @@ static bool dfs_agile_state_init_event(void *ctx,
 	switch (event) {
 	case DFS_AGILE_SM_EV_AGILE_START:
 
-		if (dfs_soc->cur_agile_dfs_index != DFS_PSOC_NO_IDX)
-			return true;
-
 		is_chan_found = dfs_init_agile_start_evt_handler(dfs,
 								 dfs_soc);
 		if (is_chan_found) {
-			dfs_soc->cur_agile_dfs_index = dfs->dfs_psoc_idx;
 			dfs_agile_sm_transition_to(dfs_soc,
 						   DFS_AGILE_S_RUNNING);
 		} else {
@@ -457,6 +453,7 @@ static bool dfs_agile_state_init_event(void *ctx,
 			 * This happens when there is no preCAC chan
 			 * in any of the radios
 			 */
+			dfs_soc->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
 			dfs_cancel_precac_timer(dfs);
 			dfs_agile_precac_cleanup(dfs);
 			/* Cleanup and wait */

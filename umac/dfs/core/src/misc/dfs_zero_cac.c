@@ -525,7 +525,6 @@ void dfs_agile_precac_cleanup(struct wlan_dfs *dfs)
 	dfs_soc_obj->precac_state_started = 0;
 	dfs->dfs_agile_precac_freq_mhz = 0;
 	dfs->dfs_precac_chwidth = CH_WIDTH_INVALID;
-	dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
 }
 
 /*
@@ -559,8 +558,9 @@ void  dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs, bool *is_chan_found)
 		dfs_soc_obj->cur_agile_dfs_index = cur_agile_dfs_idx;
 		temp_dfs = dfs_soc_obj->dfs_priv[cur_agile_dfs_idx].dfs;
 		pdev = temp_dfs->dfs_pdev_obj;
-		if (!dfs_soc_obj->dfs_priv[cur_agile_dfs_idx].agile_precac_active)
+		if (!dfs_soc_obj->dfs_priv[cur_agile_dfs_idx].agile_precac_active) {
 			continue;
+		}
 
 		vhtop_ch_freq_seg1 =
 			temp_dfs->dfs_curchan->dfs_ch_mhz_freq_seg1;
@@ -605,6 +605,7 @@ void  dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs, bool *is_chan_found)
 		*is_chan_found = true;
 	} else {
 		dfs_cancel_precac_timer(dfs);
+		dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
 		dfs_agile_precac_cleanup(dfs);
 		*is_chan_found = false;
 	}
