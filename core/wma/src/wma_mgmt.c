@@ -2365,14 +2365,14 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 		tmpl_len = bcn_info->beaconLength;
 
 	if (tmpl_len > WMI_BEACON_TX_BUFFER_SIZE) {
-		wma_err("tmpl_len: %d > %d. Invalid tmpl len", tmpl_len,
+		WMA_LOGE("tmpl_len: %d > %d. Invalid tmpl len", tmpl_len,
 			WMI_BEACON_TX_BUFFER_SIZE);
 		return -EINVAL;
 	}
 
 	if (p2p_ie_len) {
 		if (tmpl_len <= p2p_ie_len) {
-			wma_err("tmpl_len %d <= p2p_ie_len %d, Invalid",
+			WMA_LOGE("tmpl_len %d <= p2p_ie_len %d, Invalid",
 				tmpl_len, p2p_ie_len);
 			return -EINVAL;
 		}
