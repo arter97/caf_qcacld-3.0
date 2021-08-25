@@ -1332,7 +1332,10 @@ enum _ol_ath_param_t {
 	/* Force primary UMAC SOC ID */
 	OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID = 486,
 #endif
-
+#ifdef IPA_OFFLOAD
+	/* Display IPA stats */
+	OL_ATH_PARAM_IPA_UC_STATS = 487,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3495,6 +3498,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"mlo_forced_umac_soc",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID,
 		SET_PARAM, 1},
+#endif
+#ifdef IPA_OFFLOAD
+	{"ipaucstats",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_IPA_UC_STATS, SET_PARAM, 1},
 #endif
 };
 #endif
