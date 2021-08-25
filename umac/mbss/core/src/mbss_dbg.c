@@ -146,7 +146,8 @@ void mbss_debug_print_history(struct wlan_objmgr_pdev *pdev)
 	/*
 	 * Update the print offset for vdevs
 	 */
-	for (idx = 0; idx < MBSS_BITMAP_SIZE; idx++) {
+	for (idx = 0; idx < MBSS_BITMAP_SIZE &&
+	     offset < WLAN_UMAC_PDEV_MAX_VDEVS; idx++) {
 		if (qdf_test_bit(idx, dbg_format.debug_entry_bitmap)) {
 			dbg_format.vdev_offset[offset].vdev_id = idx;
 			dbg_format.vdev_offset[offset].print_offset = offset;
