@@ -209,7 +209,7 @@ QDF_STATUS mbss_ap_stop_acs_ht40(struct wlan_objmgr_vdev *vdev,
 	}
 	if (ht40_running) {
 		mbss_debug("HT40 Stop received for vdev: %d", vdev_id);
-		mbss_debug("HT40 vdev-id:%d", mbss_acs->acs_vdev_id);
+		mbss_debug("HT40 vdev-id:%d", mbss_ht40->ht40_vdev_id);
 
 		src_vdev_id = mbss_ht40->ht40_vdev_id;
 		if (src_vdev_id == vdev_id && mbss_pdev->ht40_in_progress) {
@@ -418,11 +418,12 @@ QDF_STATUS mbss_ap_cancel_acs_ht40(struct wlan_objmgr_vdev *vdev,
 		new_src_vdev = wlan_objmgr_get_vdev_by_id_from_pdev(
 				pdev, src_vdev_id, WLAN_MBSS_ID);
 		mbss_debug("Trigger ACS handoff for %d", src_vdev_id);
-		if (mbss_ops->ext_ops.mbss_start_acs)
+		if (mbss_ops->ext_ops.mbss_start_acs) {
 			mbss_unlock(mbss_pdev);
 			mbss_ops->ext_ops.mbss_start_acs(new_src_vdev,
 							 NULL);
 			mbss_lock(mbss_pdev);
+		}
 		wlan_objmgr_vdev_release_ref(new_src_vdev, WLAN_MBSS_ID);
 		goto done;
 	}
@@ -438,10 +439,11 @@ QDF_STATUS mbss_ap_cancel_acs_ht40(struct wlan_objmgr_vdev *vdev,
 		new_src_vdev = wlan_objmgr_get_vdev_by_id_from_pdev(
 				pdev, ht40_vdev_id, WLAN_MBSS_ID);
 		mbss_debug("Trigger HT40 handoff for %d", src_vdev_id);
-		if (mbss_ops->ext_ops.mbss_start_ht40)
+		if (mbss_ops->ext_ops.mbss_start_ht40) {
 			mbss_unlock(mbss_pdev);
 			mbss_ops->ext_ops.mbss_start_ht40(new_src_vdev, NULL);
 			mbss_lock(mbss_pdev);
+		}
 		wlan_objmgr_vdev_release_ref(new_src_vdev, WLAN_MBSS_ID);
 		goto done;
 	}
