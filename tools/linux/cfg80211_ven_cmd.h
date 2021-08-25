@@ -1301,6 +1301,10 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MBSS_GET_MAX_NGROUPS = 479,
 	OL_ATH_PARAM_MBSS_GET_ACTIVE_NGROUPS = 480,
 	OL_ATH_PARAM_SET_CATEGORY_VERBOSE = 481,
+#ifdef IPA_OFFLOAD
+	/* Display IPA stats */
+	OL_ATH_PARAM_IPA_UC_STATS = 482,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3398,6 +3402,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CATEGORY_VERBOSE, SET_PARAM, 1},
 	{"g_radio_qdf_cv_lvl",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CATEGORY_VERBOSE, GET_PARAM, 0},
+#ifdef IPA_OFFLOAD
+	{"ipaucstats",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_IPA_UC_STATS, SET_PARAM, 1},
+#endif
 };
 #endif
 
