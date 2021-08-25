@@ -6013,10 +6013,15 @@ void dp_tx_ppdu_stats_process(void *context)
 							WDI_NO_VAL,
 							pdev->pdev_id);
 				} else {
-					if (ppdu_desc->num_mpdu != 0 &&
+					if ((ppdu_desc->num_mpdu != 0 ||
+					     ppdu_desc->delayed_ba) &&
 					    ppdu_desc->num_users != 0 &&
-					    (ppdu_desc->frame_ctrl &
-					     HTT_FRAMECTRL_DATATYPE) &&
+					    ((ppdu_desc->frame_ctrl &
+					      HTT_FRAMECTRL_DATATYPE) ||
+					     (ppdu_desc->htt_frame_type ==
+					      HTT_STATS_FTYPE_SGEN_MU_BAR) ||
+					     (ppdu_desc->htt_frame_type ==
+					      HTT_STATS_FTYPE_SGEN_BAR)) &&
 					    (tlv_bitmap & 1 <<
 					     HTT_PPDU_STATS_USR_RATE_TLV)) {
 						dp_wdi_event_handler(
