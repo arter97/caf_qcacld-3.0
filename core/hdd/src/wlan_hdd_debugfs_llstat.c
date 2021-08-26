@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -232,8 +232,8 @@ void hdd_debugfs_process_radio_stats(hdd_adapter_t *adapter,
 
 	buffer = ll_stats.result;
 	buffer += ll_stats.len;
-	len = scnprintf(buffer, DEBUGFS_LLSTATS_BUF_SIZE,
-			 "\n\n===LL_STATS_RADIO: number of radios: %u===",
+	len = scnprintf(buffer, DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
+			"\n\n===LL_STATS_RADIO: number of radios: %u===",
 			  num_radio);
 
 	for (i = 0; i < num_radio; i++) {
