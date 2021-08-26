@@ -1358,6 +1358,7 @@ typedef struct tagCsrConfigParam {
 	uint32_t sta_disable_roam;
 #ifdef WLAN_FEATURE_SAE
 	uint32_t sae_connect_retries;
+	uint32_t sae_auth_failure_timeout;
 #endif
 } tCsrConfigParam;
 

@@ -79,7 +79,6 @@ struct mlme_roam_invoke_entity_param {
 	bool roam_invoke_in_progress;
 };
 
-#define WLAN_SAE_AUTH_TIMEOUT 1000
 #define NUM_RETRY_BITS 3
 #define ROAM_AUTH_INDEX 2
 #define ASSOC_INDEX 1

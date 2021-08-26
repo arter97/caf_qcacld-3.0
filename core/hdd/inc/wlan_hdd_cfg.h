@@ -13804,6 +13804,24 @@ enum hdd_external_acs_policy {
 #define CFG_SAE_CONNECION_RETRIES_DEFAULT	(0x52)
 
 /*
+ * <ini>
+ * sae_auth_failure_timeout - SAE Auth failure timeout value in msec
+ * @Min: 500
+ * @Max: 1000
+ * @Default: 1000
+ *
+ * This cfg is used to configure the SAE auth failure timeout.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAE_AUTH_FAILURE_TIMEOUT          "sae_auth_failure_timeout"
+#define CFG_SAE_AUTH_FAILURE_TIMEOUT_MIN      (500)
+#define CFG_SAE_AUTH_FAILURE_TIMEOUT_MAX      (1000)
+#define CFG_SAE_AUTH_FAILURE_TIMEOUT_DEFAULT  (1000)
+
+/*
  * Type declarations
  */
 #define CFG_CHAN_BAND_WEIGHTAGE_NAME    "chan_band_weightage"
@@ -18698,6 +18716,7 @@ struct hdd_config {
 	bool is_sae_enabled;
 	bool sap_sae_enabled;
 	uint32_t sae_connect_retries;
+	uint32_t sae_auth_failure_timeout;
 #endif
 	uint32_t btm_solicited_timeout;
 	uint32_t btm_max_attempt_cnt;

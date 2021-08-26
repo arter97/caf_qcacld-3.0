@@ -906,6 +906,7 @@ typedef struct sAniSirGlobal {
 #endif
 #ifdef WLAN_FEATURE_SAE
 	uint32_t sae_connect_retries;
+	uint32_t sae_auth_failure_timeout;
 #endif
 } tAniSirGlobal;
 

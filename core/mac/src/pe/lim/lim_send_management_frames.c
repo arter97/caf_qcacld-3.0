@@ -5300,7 +5300,7 @@ lim_handle_sae_auth_retry(tpAniSirGlobal mac_ctx, uint8_t vdev_id,
 
 	tx_timer_change(
 		&mac_ctx->lim.limTimers.g_lim_periodic_auth_retry_timer,
-		SYS_MS_TO_TICKS(WLAN_SAE_AUTH_TIMEOUT), 0);
+		SYS_MS_TO_TICKS(mac_ctx->sae_auth_failure_timeout), 0);
 	/* Activate Auth Retry timer */
 	if (tx_timer_activate(
 		&mac_ctx->lim.limTimers.g_lim_periodic_auth_retry_timer) !=

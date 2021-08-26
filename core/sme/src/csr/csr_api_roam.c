@@ -2926,9 +2926,18 @@ csr_update_sae_connect_retries(tpAniSirGlobal mac, tCsrConfigParam *param)
 {
 	mac->sae_connect_retries = param->sae_connect_retries;
 }
+static void
+csr_update_sae_auth_failure_timeout(tpAniSirGlobal mac, tCsrConfigParam *param)
+{
+	mac->sae_auth_failure_timeout = param->sae_auth_failure_timeout;
+}
 #else
 static void
 csr_update_sae_connect_retries(tpAniSirGlobal mac, tCsrConfigParam *param)
+{
+}
+static void
+csr_update_sae_auth_failure_timeout(tpAniSirGlobal mac, tCsrConfigParam *param)
 {
 }
 #endif
@@ -3501,6 +3510,7 @@ QDF_STATUS csr_change_default_config_param(tpAniSirGlobal pMac,
 		pMac->roam.configParam.sta_disable_roam =
 					pParam->sta_disable_roam;
 		csr_update_sae_connect_retries(pMac, pParam);
+		csr_update_sae_auth_failure_timeout(pMac, pParam);
 	}
 	return status;
 }
@@ -3569,8 +3579,17 @@ static void csr_get_sae_reties_count(tpAniSirGlobal mac, tCsrConfigParam *param)
 {
 	param->sae_connect_retries = mac->sae_connect_retries;
 }
+static void
+csr_get_sae_auth_failure_timeout(tpAniSirGlobal mac, tCsrConfigParam *param)
+{
+	param->sae_auth_failure_timeout = mac->sae_auth_failure_timeout;
+}
 #else
 static void csr_get_sae_reties_count(tpAniSirGlobal mac, tCsrConfigParam *param)
+{
+}
+static void
+csr_get_sae_auth_failure_timeout(tpAniSirGlobal mac, tCsrConfigParam *param)
 {
 }
 #endif
@@ -3913,6 +3932,7 @@ QDF_STATUS csr_get_config_param(tpAniSirGlobal pMac, tCsrConfigParam *pParam)
 	csr_get_sae_single_pmk_config(pMac, pParam);
 	csr_get_he_config_param(pParam, pMac);
 	csr_get_sae_reties_count(pMac, pParam);
+	csr_get_sae_auth_failure_timeout(pMac, pParam);
 
 	csr_get_11k_offload_config_param(&pMac->roam.configParam, pParam);
 
