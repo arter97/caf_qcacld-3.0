@@ -150,6 +150,8 @@ void dp_rx_update_proto_tag(qdf_nbuf_t nbuf, uint16_t protocol_tag)
 }
 #endif
 
+#if defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG) ||\
+	defined(WLAN_SUPPORT_RX_FLOW_TAG)
 void
 dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 			  qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
@@ -233,6 +235,7 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 						   ring_index);
 	}
 }
+#endif
 
 bool dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
 			qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)

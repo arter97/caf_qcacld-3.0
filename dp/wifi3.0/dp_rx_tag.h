@@ -46,24 +46,6 @@ dp_update_pdev_rx_protocol_tag(struct cdp_soc_t  *soc, uint8_t pdev_id,
 			       uint16_t protocol_type,
 			       uint16_t tag);
 
-/**
- * dp_rx_update_protocol_tag() - Reads CCE metadata from the RX MSDU end TLV
- *                              and set the corresponding tag in QDF packet
- * @soc: core txrx main context
- * @vdev: vdev on which the packet is received
- * @nbuf: QDF pkt buffer on which the protocol tag should be set
- * @rx_tlv_hdr: rBbase address where the RX TLVs starts
- * @ring_index: REO ring number, not used for error & monitor ring
- * @is_reo_exception: flag to indicate if rx from REO ring or exception ring
- * @is_update_stats: flag to indicate whether to update stats or not
- * Return: void
- */
-void
-dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
-			  qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
-			  uint16_t ring_index,
-			  bool is_reo_exception, bool is_update_stats);
-
 bool
 dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
 		   qdf_nbuf_t nbuf, uint8_t *rx_hdr_tlv);
@@ -143,6 +125,25 @@ dp_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev,
 
 #if defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG) ||\
 	defined(WLAN_SUPPORT_RX_FLOW_TAG)
+/**
+ * dp_rx_update_protocol_tag() - Reads CCE metadata from the RX MSDU end TLV
+ *                              and set the corresponding tag in QDF packet
+ * @soc: core txrx main context
+ * @vdev: vdev on which the packet is received
+ * @nbuf: QDF pkt buffer on which the protocol tag should be set
+ * @rx_tlv_hdr: rBbase address where the RX TLVs starts
+ * @ring_index: REO ring number, not used for error & monitor ring
+ * @is_reo_exception: flag to indicate if rx from REO ring or exception ring
+ * @is_update_stats: flag to indicate whether to update stats or not
+ * Return: void
+ */
+void
+dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
+			  qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr,
+			  uint16_t ring_index,
+			  bool is_reo_exception, bool is_update_stats);
+
+
 /**
  * dp_rx_mon_update_protocol_flow_tag() - Performs necessary checks for monitor
  *                                       mode and then tags appropriate packets
