@@ -532,29 +532,6 @@ struct bss_description;
 struct roam_offload_synch_ind;
 struct roam_pmkid_req_event;
 
-#ifndef FEATURE_CM_ENABLE
-/**
- * typedef csr_roam_synch_fn_t - CSR roam synch callback routine pointer
- * @mac: Global MAC context
- * @roam_synch_data: Structure with roam synch parameters
- * @bss_desc_ptr: BSS descriptor pointer
- * @reason: Reason for calling the callback
- *
- * This type is for callbacks registered with WMA and used after roaming
- * in firmware. The call to this routine completes the roam synch
- * propagation at both CSR and HDD levels. The HDD level propagation
- * is achieved through the already defined callback for assoc completion
- * handler.
- *
- * Return: Success or Failure.
- */
-typedef QDF_STATUS
-(*csr_roam_synch_fn_t)(struct mac_context *mac,
-		       struct roam_offload_synch_ind *roam_synch_data,
-		       struct bss_description *bss_desc_ptr,
-		       enum sir_roam_op_code reason);
-#endif
-
 /**
  * typedef pe_roam_synch_fn_t - PE roam synch callback routine pointer
  * @mac_ctx: Global MAC context
@@ -592,27 +569,10 @@ typedef QDF_STATUS
 		     uint8_t session_id, uint8_t reason,
 		     enum wlan_cm_rso_control_requestor requestor);
 
-/**
- * typedef csr_roam_pmkid_req_fn_t - pmkid generation fallback event pointer
- * @vdev_id: Vdev id
- * @bss_list: candidate AP bssid list
- *
- * This type is for callbacks registered with CSR to handle roam event from
- * firmware for pmkid generation fallback
- *
- * Return: Success or Failure.
- */
-typedef QDF_STATUS
-(*csr_roam_pmkid_req_fn_t)(uint8_t vdev_id,
-			   struct roam_pmkid_req_event *bss_list);
-
 /* / Definition for indicating all modules ready on STA */
 struct sme_ready_req {
 	uint16_t messageType;   /* eWNI_SME_SYS_READY_IND */
 	uint16_t length;
-#ifndef FEATURE_CM_ENABLE
-	csr_roam_synch_fn_t csr_roam_synch_cb;
-#endif
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
 						    struct qdf_mac_addr bssid);
@@ -625,7 +585,6 @@ struct sme_ready_req {
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
 					uint16_t reason_code);
-	csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb;
 };
 
 /**
@@ -785,9 +744,6 @@ struct start_bss_req {
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */
-	bool pmfCapable;
-	bool pmfRequired;
-
 	struct add_ie_params add_ie_params;
 
 	bool obssEnabled;
@@ -1031,21 +987,6 @@ typedef struct sEsePEContext {
 
 /* Warning Do not add any new param in this struct */
 struct join_req {
-#ifndef FEATURE_CM_ENABLE
-	uint16_t messageType;   /* eWNI_SME_JOIN_REQ */
-	uint16_t length;
-	uint8_t vdev_id;
-	tSirMacSSid ssId;
-	tAniEdType UCEncryptionType;
-	enum ani_akm_type akm;
-	bool wps_registration;
-	bool isOSENConnection;
-	bool force_24ghz_in_ht20;
-#ifdef FEATURE_WLAN_ESE
-	tESETspecInfo eseTspecInfo;
-#endif
-	bool force_rsne_override;
-#endif /* FEATURE_CM_ENABLE */
 	tSirRSNie rsnIE;
 	tSirAddie addIEScan;
 	tSirAddie addIEAssoc;
@@ -1058,61 +999,6 @@ struct join_req {
 	 * description. Adding a variable after this corrupts the ieFields
 	 */
 };
-
-#ifndef FEATURE_CM_ENABLE
-/* / Definition for response message to previously issued join request */
-/* / MAC ---> */
-struct join_rsp {
-	uint16_t messageType;   /* eWNI_SME_JOIN_RSP */
-	uint16_t length;
-	uint8_t vdev_id;      /* Session ID */
-	tSirResultCodes status_code;
-	uint32_t vht_channel_width;
-	/* It holds reasonCode when join fails due to deauth/disassoc frame.
-	 * Otherwise it holds status code.
-	 */
-	uint16_t protStatusCode;
-	uint32_t beaconLength;
-	uint32_t assocReqLength;
-	uint32_t assocRspLength;
-	uint32_t parsedRicRspLen;
-	uint8_t uapsd_mask;
-#ifdef FEATURE_WLAN_ESE
-	uint32_t tspecIeLen;
-#endif
-	uint32_t staId;         /* Station ID for peer */
-
-	/*Timing measurement capability */
-	uint8_t timingMeasCap;
-
-#ifdef FEATURE_WLAN_TDLS
-	/* TDLS prohibited and TDLS channel switch prohibited are set as
-	 * per ExtCap IE in received assoc/re-assoc response from AP
-	 */
-	bool tdls_prohibited;
-	bool tdls_chan_swit_prohibited;
-#endif
-	uint8_t nss;
-	uint32_t max_rate_flags;
-	tDot11fIEHTCaps ht_caps;
-	tDot11fIEVHTCaps vht_caps;
-	tDot11fIEHTInfo ht_operation;
-	tDot11fIEVHTOperation vht_operation;
-#ifdef WLAN_FEATURE_11AX
-	tDot11fIEhe_op he_operation;
-#endif
-	tDot11fIEhs20vendor_ie hs20vendor_ie;
-	bool is_fils_connection;
-	uint16_t fils_seq_num;
-#ifdef WLAN_FEATURE_FILS_SK
-	struct fils_join_rsp_params *fils_join_rsp;
-#endif
-	uint8_t frames[1];
-#ifdef WLAN_FEATURE_11BE
-	tDot11fIEeht_op eht_operation;
-#endif
-};
-#endif
 
 struct oem_channel_info {
 	uint32_t mhz;
@@ -2197,15 +2083,6 @@ struct sir_antenna_mode_resp {
 	enum set_antenna_mode_status status;
 };
 
-#ifndef FEATURE_CM_ENABLE
-/* / Definition for Candidate found indication from FW */
-typedef struct sSirSmeCandidateFoundInd {
-	uint16_t messageType;   /* eWNI_SME_CANDIDATE_FOUND_IND */
-	uint16_t length;
-	uint8_t sessionId;      /* Session Identifier */
-} tSirSmeCandidateFoundInd, *tpSirSmeCandidateFoundInd;
-#endif
-
 typedef struct sSirWlanExcludeUnencryptParam {
 	bool excludeUnencrypt;
 	struct qdf_mac_addr bssid;
@@ -2385,13 +2262,6 @@ typedef struct sSirSmeDfsChannelList {
 	/* Ch num including bonded channels on which the RADAR is present */
 	uint8_t channels[SIR_DFS_MAX_20M_SUB_CH];
 } tSirSmeDfsChannelList, *tpSirSmeDfsChannelList;
-
-typedef struct sSirSmeDfsEventInd {
-	uint32_t sessionId;
-	tSirSmeDfsChannelList chan_list;
-	uint32_t dfs_radar_status;
-	int use_nol;
-} tSirSmeDfsEventInd, *tpSirSmeDfsEventInd;
 
 typedef struct sSirChanChangeRequest {
 	uint16_t messageType;
@@ -2579,19 +2449,6 @@ typedef struct {
 	uint32_t event_data_len;
 	uint8_t event_data[];
 } tSirStatsExtEvent, *tpSirStatsExtEvent;
-#endif
-
-#ifndef FEATURE_CM_ENABLE
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-struct handoff_failure_ind {
-	uint8_t vdev_id;
-	struct qdf_mac_addr bssid;
-};
-
-struct roam_offload_synch_fail {
-	uint8_t session_id;
-};
-#endif
 #endif
 
 /**
@@ -3998,6 +3855,7 @@ struct sir_nss_update_request {
  * @REASON_SET_HT2040: HT2040 update
  * @REASON_COLOR_CHANGE: Color change
  * @REASON_CHANNEL_SWITCH: channel switch
+ * @REASON_MLO_IE_UPDATE: mlo ie update
  */
 enum sir_bcn_update_reason {
 	REASON_DEFAULT = 0,
@@ -4006,6 +3864,7 @@ enum sir_bcn_update_reason {
 	REASON_SET_HT2040 = 3,
 	REASON_COLOR_CHANGE = 4,
 	REASON_CHANNEL_SWITCH = 5,
+	REASON_MLO_IE_UPDATE = 6,
 };
 
 /**
@@ -4066,6 +3925,8 @@ struct sir_sme_ext_cng_chan_ind {
  * @soc_timer_high: high 32bits of synced SOC timer value
  * @global_tsf_low: low 32bits of tsf64
  * @global_tsf_high: high 32bits of tsf64
+ * @mac_id: MAC identifier
+ * @mac_id_valid: Indicate if mac_id is valid or not
  *
  * driver use this struct to store the tsf info
  */
@@ -4077,6 +3938,10 @@ struct stsf {
 	uint32_t soc_timer_high;
 	uint32_t global_tsf_low;
 	uint32_t global_tsf_high;
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+	uint32_t mac_id;
+	uint32_t mac_id_valid;
+#endif
 };
 
 #define SIR_BCN_FLT_MAX_ELEMS_IE_LIST 8
@@ -5090,6 +4955,9 @@ struct he_capability {
 
 #define EHT_OP_OUI_TYPE "\xfe"
 #define EHT_OP_OUI_SIZE 1
+
+#define MLO_IE_OUI_TYPE "\x5e"
+#define MLO_IE_OUI_SIZE 1
 
 /**
  * struct eht_capability - to store 11be EHT capabilities

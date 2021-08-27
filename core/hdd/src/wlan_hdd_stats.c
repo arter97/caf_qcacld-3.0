@@ -395,12 +395,14 @@ struct hdd_ll_stats {
  * @request_id: userspace-assigned link layer stats request id
  * @request_bitmap: userspace-assigned link layer stats request bitmap
  * @ll_stats_lock: Lock to serially access request_bitmap
+ * @vdev_id: id of vdev handle
  */
 struct hdd_ll_stats_priv {
 	qdf_list_t ll_stats_q;
 	uint32_t request_id;
 	uint32_t request_bitmap;
 	qdf_spinlock_t ll_stats_lock;
+	uint8_t vdev_id;
 };
 
 /*
@@ -976,6 +978,33 @@ hdd_link_layer_process_iface_stats(struct hdd_adapter *adapter,
 }
 
 /**
+ * put_channel_stats_chload - put chload of channel stats
+ * @vendor_event: vendor event
+ * @channel_stats: Pointer to channel stats
+ *
+ * Return: bool
+ */
+static bool put_channel_stats_chload(struct sk_buff *vendor_event,
+				     struct wifi_channel_stats *channel_stats)
+{
+	uint64_t txrx_time;
+	uint32_t chload;
+
+	if (!channel_stats->on_time)
+		return true;
+
+	txrx_time = (channel_stats->tx_time + channel_stats->rx_time) * 100;
+	chload = qdf_do_div(txrx_time, channel_stats->on_time);
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_LOAD_PERCENTAGE,
+		       chload))
+		return false;
+
+	return true;
+}
+
+/**
  * hdd_llstats_radio_fill_channels() - radio stats fill channels
  * @adapter: Pointer to device adapter
  * @radiostat: Pointer to stats data
@@ -1046,6 +1075,13 @@ static int hdd_llstats_radio_fill_channels(struct hdd_adapter *adapter,
 				QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_RX_TIME,
 				channel_stats->rx_time)) {
 				hdd_err("nla_put failed for tx time (%u, %d)",
+					radiostat->num_channels, i);
+				return -EINVAL;
+			}
+
+			if (!put_channel_stats_chload(vendor_event,
+						      channel_stats)) {
+				hdd_err("nla_put failed for chload (%u, %d)",
 					radiostat->num_channels, i);
 				return -EINVAL;
 			}
@@ -1457,15 +1493,6 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 	if (status)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-					   results->ifaceId);
-
-	if (!adapter) {
-		hdd_err("vdev_id %d does not exist with host",
-			results->ifaceId);
-		return;
-	}
-
 	switch (indication_type) {
 	case SIR_HAL_LL_STATS_RESULTS_RSP:
 	{
@@ -1488,6 +1515,12 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 				priv->request_id, results->rspId,
 				priv->request_bitmap, results->paramId);
 			osif_request_put(request);
+			return;
+		}
+
+		adapter = hdd_get_adapter_by_vdev(hdd_ctx, priv->vdev_id);
+		if (!adapter) {
+			hdd_err("invalid vdev %d", priv->vdev_id);
 			return;
 		}
 
@@ -1919,6 +1952,20 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 
 	hdd_enter_dev(adapter->dev);
 
+	/*
+	 * FW can send radio stats with multiple events and for the first event
+	 * host allocates memory in wma and processes the events, there is a
+	 * possibility that host receives first event and gets timed out, on
+	 * time out host frees the allocated memory. now if host receives
+	 * remaining events it will again allocate memory and processes the
+	 * stats, since this is not an allocation for new command, this will
+	 * lead to out of order processing of the next event and this memory
+	 * might not be freed, so free the already allocated memory from WMA
+	 * before issuing any new ll stats request free memory allocated for
+	 * previous command
+	 */
+	sme_radio_tx_mem_free();
+
 	status = wlan_hdd_set_station_stats_request_pending(adapter);
 	if (status == QDF_STATUS_E_ALREADY)
 		return qdf_status_to_os_return(status);
@@ -1937,6 +1984,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 
 	priv->request_id = req->reqId;
 	priv->request_bitmap = req->paramIdMask;
+	priv->vdev_id = adapter->vdev_id;
 	qdf_spinlock_create(&priv->ll_stats_lock);
 	qdf_list_create(&priv->ll_stats_q, HDD_LINK_STATS_MAX);
 
@@ -1950,7 +1998,6 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	if (ret) {
 		hdd_err("Target response timed out request id %d request bitmap 0x%x",
 			priv->request_id, priv->request_bitmap);
-		sme_radio_tx_mem_free();
 		qdf_spin_lock(&priv->ll_stats_lock);
 		priv->request_bitmap = 0;
 		qdf_spin_unlock(&priv->ll_stats_lock);
@@ -1958,6 +2005,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	} else {
 		hdd_update_station_stats_cached_timestamp(adapter);
 	}
+	sme_radio_tx_mem_free();
 	qdf_spin_lock(&priv->ll_stats_lock);
 	status = qdf_list_remove_front(&priv->ll_stats_q, &ll_node);
 	qdf_spin_unlock(&priv->ll_stats_lock);

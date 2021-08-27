@@ -133,7 +133,8 @@ enum eLimDisassocTrigger {
 	eLIM_LINK_MONITORING_DEAUTH,
 	eLIM_JOIN_FAILURE,
 	eLIM_REASSOC_REJECT,
-	eLIM_DUPLICATE_ENTRY
+	eLIM_DUPLICATE_ENTRY,
+	eLIM_MLO_PARTNER_PEER
 };
 
 /**
@@ -405,6 +406,64 @@ void lim_process_auth_frame(struct mac_context *, uint8_t *, struct pe_session *
  */
 QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 					     uint8_t *bd, void *body);
+
+/**
+ * lim_check_assoc_req() - check session and peer info before handling it
+ * @mac_ctx: pointer to Global MAC structure
+ * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
+ * @sa: Mac address of requesting peer
+ * @session: pointer to pe session entry
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
+			       uint8_t sub_type, tSirMacAddr sa,
+			       struct pe_session *session);
+
+/**
+ * lim_proc_assoc_req_frm_cmn() - process assoc req frame
+ * @mac_ctx: pointer to Global MAC structure
+ * @frm_body: frame body
+ * @frame_len: frame len
+ * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
+ * @session: pointer to pe session entry
+ * @sa: Mac address of requesting peer
+ * @assoc_req: assoc req
+ * @peer_aid: association id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
+				      uint8_t *frm_body, uint32_t frame_len,
+				      uint8_t sub_type,
+				      struct pe_session *session,
+				      tSirMacAddr sa,
+				      tpSirAssocReq assoc_req,
+				      uint16_t peer_aid);
+
+/**
+ * lim_mlo_partner_assoc_req_parse() - checks for error in assoc req frame
+ *                                     parsing for mlo partner link
+ * @mac_ctx: pointer to Global MAC structure
+ * @sa: Mac address of requesting peer
+ * @session: pointer to pe session entry
+ * @assoc_req: pointer to ASSOC/REASSOC Request frame
+ * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
+ * @frm_body: frame body
+ * @frame_len: frame len
+ *
+ * Checks for error in frame parsing
+ *
+ * Return: QDF_STATUS
+ */
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS lim_mlo_partner_assoc_req_parse(struct mac_context *mac_ctx,
+					   tSirMacAddr sa,
+					   struct pe_session *session,
+					   tpSirAssocReq assoc_req,
+					   uint8_t sub_type, uint8_t *frm_body,
+					   uint32_t frame_len);
+#endif
 
 void lim_process_assoc_req_frame(struct mac_context *, uint8_t *, uint8_t, struct pe_session *);
 
@@ -1145,7 +1204,6 @@ QDF_STATUS lim_deauth_tx_complete_cnf(void *context,
 				      uint32_t txCompleteSuccess,
 				      void *params);
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * lim_cm_send_disconnect_rsp() - To send disconnect rsp to CM
  * @ctx: pointer to mac structure
@@ -1154,7 +1212,6 @@ QDF_STATUS lim_deauth_tx_complete_cnf(void *context,
  * return: None
  */
 void lim_cm_send_disconnect_rsp(struct mac_context *mac_ctx, uint8_t vdev_id);
-#endif
 
 void lim_send_sme_disassoc_deauth_ntf(struct mac_context *mac_ctx,
 				QDF_STATUS status, uint32_t *ctx);
@@ -1217,6 +1274,7 @@ typedef enum sHalBitVal         /* For Bit operations */
  * @addba_extn_present: ADDBA extension present flag
  * @amsdu_support: amsdu in ampdu support
  * @is_wep: protected bit in fc
+ * @calc_buff_size: Calculated buf size from peer and self capabilities
  *
  * This function is called when ADDBA request is successful. ADDBA response is
  * setup by calling addba_response_setup API and frame is then sent out OTA.
@@ -1227,7 +1285,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 					 tSirMacAddr peer_mac, uint16_t tid,
 					 struct pe_session *session,
 					 uint8_t addba_extn_present,
-					 uint8_t amsdu_support, uint8_t is_wep);
+					 uint8_t amsdu_support, uint8_t is_wep,
+					 uint16_t calc_buff_size);
 
 /**
  * lim_send_delba_action_frame() - Send delba to peer
@@ -1436,25 +1495,27 @@ void lim_process_assoc_cleanup(struct mac_context *mac_ctx,
  * @session: pe session entry
  * @sub_type: Indicates whether it is Association Request(=0) or Reassociation
  *            Request(=1) frame
- * @hdr: A pointer to the MAC header
+ * @sa: Mac address of requesting peer
  * @assoc_req: pointer to ASSOC/REASSOC Request frame
  * @akm_type: AKM type
  * @pmf_connection: flag indicating pmf connection
  * @assoc_req_copied: boolean to indicate if assoc req was copied to tmp above
  * @dup_entry: flag indicating if duplicate entry found
  * @force_1x1: flag to indicate if the STA nss needs to be downgraded to 1x1
+ * @partner_peer_idx: peer_idx which is already allocated by partner link
  *
  * Return: void
  */
 bool lim_send_assoc_ind_to_sme(struct mac_context *mac_ctx,
 			       struct pe_session *session,
 			       uint8_t sub_type,
-			       tpSirMacMgmtHdr hdr,
+			       tSirMacAddr sa,
 			       tpSirAssocReq assoc_req,
 			       enum ani_akm_type akm_type,
 			       bool pmf_connection,
 			       bool *assoc_req_copied,
-			       bool dup_entry, bool force_1x1);
+			       bool dup_entry, bool force_1x1,
+			       uint16_t partner_peer_idx);
 
 /**
  * lim_process_sta_add_bss_rsp_pre_assoc - Processes handoff request

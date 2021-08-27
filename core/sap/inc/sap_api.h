@@ -474,23 +474,17 @@ struct sap_config {
 	eCsrPhyMode SapHw_mode;         /* Wireless Mode */
 	eSapMacAddrACL SapMacaddr_acl;
 	struct qdf_mac_addr accept_mac[MAX_ACL_MAC_ADDRESS]; /* MAC filtering */
-	bool ieee80211d;      /* Specify if 11D is enabled or disabled */
 	struct qdf_mac_addr deny_mac[MAX_ACL_MAC_ADDRESS];  /* MAC filtering */
 	struct qdf_mac_addr self_macaddr;       /* self macaddress or BSSID */
 	uint32_t chan_freq;          /* Operation channel frequency */
 	uint32_t sec_ch_freq;
 	struct ch_params ch_params;
 	uint32_t ch_width_orig;
-	uint8_t max_num_sta;      /* maximum number of STAs in station table */
 	uint8_t dtim_period;      /* dtim interval */
 	uint16_t num_accept_mac;
 	uint16_t num_deny_mac;
 	/* Max ie length 255 * 2(WPA+RSN) + 2 bytes(vendor specific ID) * 2 */
 	uint8_t RSNWPAReqIE[(WLAN_MAX_IE_LEN * 2) + 4];
-	/* it is ignored if [0] is 0. */
-	uint8_t countryCode[REG_ALPHA2_LEN + 1];
-	uint8_t RSNEncryptType;
-	uint8_t mcRSNEncryptType;
 	eSapAuthType authType;
 	tCsrAuthList akm_list;
 	bool privacy;
@@ -501,8 +495,6 @@ struct sap_config {
 	uint32_t beacon_int;            /* Beacon Interval */
 	enum QDF_OPMODE persona; /* Tells us which persona, GO or AP */
 	bool enOverLapCh;
-	bool mfpRequired;
-	bool mfpCapable;
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 	uint8_t cc_switch_mode;
 #endif
@@ -518,10 +510,6 @@ struct sap_config {
 	void *pProbeRespBcnIEsBuffer;
 	uint16_t beacon_tx_rate;
 	uint8_t *vendor_ie;
-	uint16_t sta_inactivity_timeout;
-	uint16_t tx_pkt_fail_cnt_threshold;
-	uint8_t short_retry_limit;
-	uint8_t long_retry_limit;
 	tSirMacRateSet supported_rates;
 	tSirMacRateSet extended_rates;
 	enum sap_acs_dfs_mode acs_dfs_mode;
@@ -614,6 +602,35 @@ typedef struct sSapDfsInfo {
 	uint8_t sap_ch_switch_mode;
 	uint16_t reduced_beacon_interval;
 } tSapDfsInfo;
+
+/* MAX number of CAC channels to be recorded */
+#define MAX_NUM_OF_CAC_HISTORY 8
+
+/**
+ * struct prev_cac_result - previous cac result
+ * @ap_start_time: ap start timestamp
+ * @ap_end_time: ap stop or cac end timestamp
+ * @cac_complete: cac complete without found radar event
+ * @cac_ch_param: ap channel parameters
+ */
+struct prev_cac_result {
+	uint64_t ap_start_time;
+	uint64_t ap_end_time;
+	bool cac_complete;
+	struct ch_params cac_ch_param;
+};
+
+/**
+ * struct dfs_radar_history - radar found history element
+ * @time: timestamp in us from system boot
+ * @radar_found: radar found or not
+ * @ch_freq: channel frequency in Mhz
+ */
+struct dfs_radar_history {
+	uint64_t time;
+	bool radar_found;
+	uint16_t ch_freq;
+};
 
 #ifdef DCS_INTERFERENCE_DETECTION
 /**
@@ -768,13 +785,13 @@ bool wlansap_is_channel_in_nol_list(struct sap_context *sap_ctx,
  * wlansap_is_channel_leaking_in_nol() - This API checks if channel is leaking
  * in nol list
  * @sap_ctx: SAP context pointer
- * @channel: channel
+ * @chan_freq: channel frequency
  * @chan_bw: channel bandwidth
  *
  * Return: True/False
  */
 bool wlansap_is_channel_leaking_in_nol(struct sap_context *sap_ctx,
-				       uint8_t channel,
+				       uint16_t chan_freq,
 				       uint8_t chan_bw);
 
 /**
@@ -1412,6 +1429,17 @@ void sap_undo_acs(struct sap_context *sap_context, struct sap_config *sap_cfg);
  */
 uint32_t wlansap_get_chan_width(struct sap_context *sap_ctx);
 
+/**
+ * wlansap_get_max_bw_by_phymode() - get max channel width based on phymode
+ * @sap_ctx: pointer to the SAP context
+ *
+ * This function get max channel width of sap based on phymode.
+ *
+ * Return: channel width
+ */
+enum phy_ch_width
+wlansap_get_max_bw_by_phymode(struct sap_context *sap_ctx);
+
 /*
  * wlansap_set_invalid_session() - set session ID to invalid
  * @sap_ctx: pointer to the SAP context
@@ -1444,6 +1472,17 @@ void sap_get_cac_dur_dfs_region(struct sap_context *sap_ctx,
 				uint32_t *cac_duration_ms,
 				uint32_t *dfs_region);
 
+/**
+ * sap_clear_global_dfs_param() - Reset global dfs param of sap ctx
+ * @mac_handle: pointer to mac handle
+ * @sap_ctx: sap context
+ *
+ * This API resets global dfs param of sap ctx.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sap_clear_global_dfs_param(mac_handle_t mac_handle,
+				      struct sap_context *sap_ctx);
 
 /**
  * sap_dfs_set_current_channel() - Set current channel params in dfs component
@@ -1545,6 +1584,24 @@ uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx);
  */
 qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 					  enum sap_csa_reason_code *csa_reason);
+
+#ifdef FEATURE_RADAR_HISTORY
+/**
+ * wlansap_query_radar_history() -  get radar history info
+ * @mac_handle: mac context
+ * @radar_history: radar history buffer to be returned
+ * @count: total history count
+ *
+ * The API will return the dfs nol list(Radar found history) and
+ * CAC history (no Radar found).
+ *
+ * Return - QDF_STATUS
+ */
+QDF_STATUS
+wlansap_query_radar_history(mac_handle_t mac_handle,
+			    struct dfs_radar_history **radar_history,
+			    uint32_t *count);
+#endif
 
 #ifdef DCS_INTERFERENCE_DETECTION
 /**

@@ -30,6 +30,12 @@
 
 #define DPU_FEEDBACK_UNPROTECTED_ERROR 0x0F
 
+#define WMA_GET_QDF_NBUF(pRxMeta) \
+	(((t_packetmeta *)pRxMeta)->pkt_qdf_buf)
+
+#define WMA_GET_RX_MAC_HEADER_LEN(pRxMeta) \
+	(((t_packetmeta *)pRxMeta)->mpdu_hdr_len)
+
 #define WMA_GET_RX_MAC_HEADER(pRxMeta) \
 	(tpSirMacMgmtHdr)(((t_packetmeta *)pRxMeta)->mpdu_hdr_ptr)
 
@@ -220,11 +226,6 @@ enum wmamsgtype {
 
 	WMA_ROAM_PRE_AUTH_STATUS = SIR_HAL_ROAM_PRE_AUTH_STATUS_IND,
 
-#ifndef FEATURE_CM_ENABLE
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-	WMA_ROAM_OFFLOAD_SYNCH_FAIL = SIR_HAL_ROAM_OFFLOAD_SYNCH_FAIL,
-#endif
-#endif
 	WMA_8023_MULTICAST_LIST_REQ = SIR_HAL_8023_MULTICAST_LIST_REQ,
 
 #ifdef WLAN_FEATURE_PACKET_FILTERING
@@ -726,9 +727,6 @@ QDF_STATUS wma_register_mgmt_frm_client(void);
 QDF_STATUS wma_de_register_mgmt_frm_client(void);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS wma_register_roaming_callbacks(
-#ifndef FEATURE_CM_ENABLE
-		csr_roam_synch_fn_t csr_roam_synch_cb,
-#endif
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
 			struct mac_context *mac,
 			uint8_t vdev_id,
@@ -738,13 +736,9 @@ QDF_STATUS wma_register_roaming_callbacks(
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
 			uint16_t deauth_disassoc_frame_len,
-			uint16_t reason_code),
-		csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb);
+			uint16_t reason_code));
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(
-#ifndef FEATURE_CM_ENABLE
-		csr_roam_synch_fn_t csr_roam_synch_cb,
-#endif
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
 			struct mac_context *mac,
 			uint8_t vdev_id,
@@ -754,8 +748,7 @@ static inline QDF_STATUS wma_register_roaming_callbacks(
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
 			uint16_t deauth_disassoc_frame_len,
-			uint16_t reason_code),
-		csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb)
+			uint16_t reason_code))
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

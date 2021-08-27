@@ -829,45 +829,6 @@ void wma_set_sta_keep_alive(tp_wma_handle wma, uint8_t vdev_id,
 	wmi_unified_set_sta_keep_alive_cmd(wma->wmi_handle, &params);
 }
 
-/**
- * wma_vdev_install_key_complete_event_handler() - install key complete handler
- * @handle: wma handle
- * @event: event data
- * @len: data length
- *
- * This event is sent by fw once WPA/WPA2 keys are installed in fw.
- *
- * Return: 0 for success or error code
- */
-int wma_vdev_install_key_complete_event_handler(void *handle,
-						uint8_t *event,
-						uint32_t len)
-{
-	WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID_param_tlvs *param_buf = NULL;
-	wmi_vdev_install_key_complete_event_fixed_param *key_fp = NULL;
-
-	if (!event) {
-		wma_err("event param null");
-		return -EINVAL;
-	}
-
-	param_buf = (WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID_param_tlvs *) event;
-	if (!param_buf) {
-		wma_err("received null buf from target");
-		return -EINVAL;
-	}
-
-	key_fp = param_buf->fixed_param;
-	if (!key_fp) {
-		wma_err("received null event data from target");
-		return -EINVAL;
-	}
-	/*
-	 * Do nothing for now. Completion of set key is already indicated to lim
-	 */
-	wma_debug("WMI_VDEV_INSTALL_KEY_COMPLETE_EVENTID");
-	return 0;
-}
 /*
  * 802.11n D2.0 defined values for "Minimum MPDU Start Spacing":
  *   0 for no restriction
@@ -1303,6 +1264,54 @@ static void wma_objmgr_set_peer_mlme_type(tp_wma_handle wma,
 	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wma_set_mlo_capability() - set MLO caps to the peer assoc request
+ * @wma: wma handle
+ * @vdev: vdev object
+ * @req: peer assoc request parameters
+ *
+ * Return: None
+ */
+static void wma_set_mlo_capability(tp_wma_handle wma,
+				   struct wlan_objmgr_vdev *vdev,
+				   struct peer_assoc_params *req)
+{
+	uint8_t pdev_id;
+	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_psoc *psoc = wma->psoc;
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(wma->pdev);
+	peer = wlan_objmgr_get_peer(psoc, pdev_id, req->peer_mac,
+				    WLAN_LEGACY_WMA_ID);
+
+	if (!peer) {
+		wma_err("peer not valid");
+		return;
+	}
+
+	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)peer->mldaddr)) {
+		req->mlo_params.mlo_enabled = true;
+		req->mlo_params.mlo_assoc_link =
+					wlan_peer_mlme_get_assoc_peer(peer);
+		WLAN_ADDR_COPY(req->mlo_params.mld_mac, peer->mldaddr);
+		wma_debug("assoc_link %d " QDF_MAC_ADDR_FMT,
+			  req->mlo_params.mlo_assoc_link,
+			  QDF_MAC_ADDR_REF(peer->mldaddr));
+	} else {
+		wma_debug("Peer MLO context is NULL");
+		req->mlo_params.mlo_enabled = false;
+	}
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+}
+#else
+static inline void wma_set_mlo_capability(tp_wma_handle wma,
+					  struct wlan_objmgr_vdev *vdev,
+					  struct peer_assoc_params *req)
+{
+}
+#endif
+
 /**
  * wmi_unified_send_peer_assoc() - send peer assoc command to fw
  * @wma: wma handle
@@ -1641,6 +1650,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 				  cmd->peer_bw_rxnss_override);
 		}
 	}
+
+	wma_set_mlo_capability(wma, intr->vdev, cmd);
 
 	wma_debug("rx_max_rate %d, rx_mcs %x, tx_max_rate %d, tx_mcs: %x num rates %d need 4 way %d",
 		  cmd->rx_max_rate, cmd->rx_mcs_set, cmd->tx_max_rate,
@@ -3504,6 +3515,7 @@ int wma_form_rx_packet(qdf_nbuf_t buf,
 					 rx_pkt->pkt_meta.mpdu_hdr_len;
 	rx_pkt->pkt_meta.tsf_delta = mgmt_rx_params->tsf_delta;
 	rx_pkt->pkt_buf = buf;
+	rx_pkt->pkt_meta.pkt_qdf_buf = buf;
 
 	/* If it is a beacon/probe response, save it for future use */
 	mgt_type = (wh)->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
@@ -3758,10 +3770,8 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wma_register_roaming_callbacks() - Register roaming callbacks
- * @csr_roam_synch_cb: CSR roam synch callback routine pointer
- * @pe_roam_synch_cb: PE roam synch callback routine pointer
  * @csr_roam_auth_event_handle_cb: CSR callback routine pointer
- * @csr_roam_pmkid_req_cb: CSR roam pmkid callback routine pointer
+ * @pe_roam_synch_cb: PE roam synch callback routine pointer
  *
  * Register the SME and PE callback routines with WMA for
  * handling roaming
@@ -3769,9 +3779,6 @@ QDF_STATUS wma_de_register_mgmt_frm_client(void)
  * Return: Success or Failure Status
  */
 QDF_STATUS wma_register_roaming_callbacks(
-#ifndef FEATURE_CM_ENABLE
-	csr_roam_synch_fn_t csr_roam_synch_cb,
-#endif
 	QDF_STATUS (*csr_roam_auth_event_handle_cb)(struct mac_context *mac,
 						    uint8_t vdev_id,
 						    struct qdf_mac_addr bssid),
@@ -3780,8 +3787,7 @@ QDF_STATUS wma_register_roaming_callbacks(
 					uint8_t vdev_id,
 					uint8_t *deauth_disassoc_frame,
 					uint16_t deauth_disassoc_frame_len,
-					uint16_t reason_code),
-	csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb)
+					uint16_t reason_code))
 {
 
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
@@ -3789,15 +3795,11 @@ QDF_STATUS wma_register_roaming_callbacks(
 	if (!wma)
 		return QDF_STATUS_E_FAILURE;
 
-#ifndef FEATURE_CM_ENABLE
-	wma->csr_roam_synch_cb = csr_roam_synch_cb;
-#endif
 	wma->csr_roam_auth_event_handle_cb = csr_roam_auth_event_handle_cb;
 	wma->pe_roam_synch_cb = pe_roam_synch_cb;
 	wma->pe_disconnect_cb = pe_disconnect_cb;
 	wma_debug("Registered roam synch callbacks with WMA successfully");
 
-	wma->csr_roam_pmkid_req_cb = csr_roam_pmkid_req_cb;
 	return QDF_STATUS_SUCCESS;
 }
 #endif

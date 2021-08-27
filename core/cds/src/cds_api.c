@@ -36,7 +36,7 @@
 #include "wlan_hdd_power.h"
 #include "wlan_hdd_tsf.h"
 #include <linux/vmalloc.h>
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)) && defined(MSM_PLATFORM)
 #include <linux/qcom-iommu-util.h>
 #endif
 #include <scheduler_core.h>
@@ -109,9 +109,11 @@ struct cds_hang_event_fixed_param {
 static inline int
 cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
 	       uint8_t vdev_id, uint8_t *peer_macaddr,
-	       uint8_t tid, uint8_t reason_code)
+	       uint8_t tid, uint8_t reason_code,
+	       uint8_t cdp_reason_code)
 {
-	return wma_dp_send_delba_ind(vdev_id, peer_macaddr, tid, reason_code);
+	return wma_dp_send_delba_ind(vdev_id, peer_macaddr, tid,
+				     reason_code, cdp_reason_code);
 }
 
 static struct ol_if_ops  dp_ol_if_ops = {
@@ -645,7 +647,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS status;
 	struct cds_config_info *cds_cfg;
 	qdf_device_t qdf_ctx;
-	struct htc_init_info htcInfo;
+	struct htc_init_info htcInfo = { 0 };
 	struct ol_context *ol_ctx;
 	struct hif_opaque_softc *scn;
 	void *HTCHandle;

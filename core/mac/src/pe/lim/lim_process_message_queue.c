@@ -169,12 +169,13 @@ static void lim_process_sae_msg_ap(struct mac_context *mac,
 		assoc_ind_sent =
 			lim_send_assoc_ind_to_sme(mac, session,
 						  assoc_req->sub_type,
-						  &assoc_req->hdr,
+						  assoc_req->sa,
 						  assoc_req->assoc_req,
 						  ANI_AKM_TYPE_SAE,
 						  assoc_req->pmf_connection,
 						  &assoc_req_copied,
-						  assoc_req->dup_entry, false);
+						  assoc_req->dup_entry, false,
+						  assoc_req->partner_peer_idx);
 		if (!assoc_ind_sent)
 			lim_process_assoc_cleanup(mac, session,
 						  assoc_req->assoc_req,
@@ -1750,9 +1751,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #if defined FEATURE_WLAN_ESE
 	case eWNI_SME_ESE_ADJACENT_AP_REPORT:
 #endif
-#ifndef FEATURE_CM_ENABLE
-	case eWNI_SME_FT_PRE_AUTH_REQ:
-#endif
 	case eWNI_SME_FT_AGGR_QOS_REQ:
 	case eWNI_SME_REGISTER_MGMT_FRAME_REQ:
 #ifdef FEATURE_WLAN_ESE
@@ -1760,9 +1758,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #endif  /* FEATURE_WLAN_ESE */
 	case eWNI_SME_REGISTER_MGMT_FRAME_CB:
 	case eWNI_SME_EXT_CHANGE_CHANNEL:
-#ifndef FEATURE_CM_ENABLE
-	case eWNI_SME_ROAM_INVOKE:
-#endif
 		/* fall through */
 	case eWNI_SME_ROAM_SEND_SET_PCL_REQ:
 	case eWNI_SME_SET_ADDBA_ACCEPT:
@@ -1894,6 +1889,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		lim_handle_delete_bss_rsp(mac_ctx, msg->bodyptr);
 		break;
 	case WMA_CSA_OFFLOAD_EVENT:
+	case eWNI_SME_CSA_REQ:
 		lim_handle_csa_offload_msg(mac_ctx, msg);
 		break;
 	case WMA_SET_BSSKEY_RSP:
@@ -2099,7 +2095,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		break;
 	case SIR_LIM_PROCESS_DEFERRED_QUEUE:
 		break;
-#ifdef FEATURE_CM_ENABLE
 	case CM_BSS_PEER_CREATE_REQ:
 		cm_process_peer_create(msg);
 		break;
@@ -2115,7 +2110,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case CM_PREAUTH_REQ:
 		cm_process_preauth_req(msg);
 		break;
-#endif
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;

@@ -56,6 +56,7 @@
 #include <wlan_mlme_api.h>
 #include <wlan_mlme_main.h>
 #include "wlan_crypto_global_api.h"
+#include "lim_mlo.h"
 
 /**
  *
@@ -1357,10 +1358,7 @@ static QDF_STATUS lim_assoc_rsp_tx_complete(
 	qdf_mem_free(lim_assoc_ind);
 
 free_buffers:
-	if (assoc_req->assocReqFrame) {
-		qdf_mem_free(assoc_req->assocReqFrame);
-		assoc_req->assocReqFrame = NULL;
-	}
+	lim_free_assoc_req_frm_buf(assoc_req);
 	qdf_mem_free(session_entry->parsedAssocReq[sta_ds->assocId]);
 	session_entry->parsedAssocReq[sta_ds->assocId] = NULL;
 	qdf_nbuf_free(buf);
@@ -1370,10 +1368,7 @@ free_buffers:
 lim_assoc_ind:
 	qdf_mem_free(lim_assoc_ind);
 free_assoc_req:
-	if (assoc_req->assocReqFrame) {
-		qdf_mem_free(assoc_req->assocReqFrame);
-		assoc_req->assocReqFrame = NULL;
-	}
+	lim_free_assoc_req_frm_buf(assoc_req);
 	qdf_mem_free(session_entry->parsedAssocReq[sta_ds->assocId]);
 	session_entry->parsedAssocReq[sta_ds->assocId] = NULL;
 end:
@@ -1414,6 +1409,13 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
+		return;
+	}
+	if (sta && lim_is_mlo_conn(pe_session, sta) &&
+	    !lim_is_mlo_recv_assoc(sta)) {
+		pe_err("Do not send assoc rsp in mlo partner peer "
+		       QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(sta->staAddr));
 		return;
 	}
 
@@ -2325,6 +2327,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
 	}
 
+#ifdef WLAN_FEATURE_11BE_MLO
+	populate_dot11f_assoc_req_mlo_ie(mac_ctx, pe_session, frm);
+#endif
 	if (pe_session->is11Rconnection) {
 		struct bss_description *bssdescr;
 
@@ -3195,6 +3200,7 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 	tLimMlmDeauthCnf deauth_cnf;
 	struct pe_session *session_entry;
 	QDF_STATUS qdf_status;
+	uint32_t i;
 
 	deauth_req = mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq;
 	if (deauth_req) {
@@ -3213,6 +3219,22 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 		}
 		if (qdf_is_macaddr_broadcast(&deauth_req->peer_macaddr) &&
 		    mac_ctx->mlme_cfg->sap_cfg.is_sap_bcast_deauth_enabled) {
+			if (wlan_vdev_mlme_is_mlo_ap(session_entry->vdev)) {
+				for (i = 1;
+				     i < session_entry->dph.dphHashTable.size;
+				     i++) {
+					sta_ds = dph_get_hash_entry(
+					    mac_ctx, i,
+					    &session_entry->dph.dphHashTable);
+					if (!sta_ds)
+						continue;
+					if (lim_is_mlo_conn(session_entry,
+							    sta_ds))
+						lim_mlo_notify_peer_disconn(
+								session_entry,
+								sta_ds);
+				}
+			}
 			qdf_status = lim_del_sta_all(mac_ctx, session_entry);
 			qdf_mem_free(deauth_req);
 			mac_ctx->lim.limDisassocDeauthCnfReq.pMlmDeauthReq =
@@ -3230,6 +3252,8 @@ QDF_STATUS lim_send_deauth_cnf(struct mac_context *mac_ctx)
 			deauth_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 			goto end;
 		}
+
+		lim_mlo_notify_peer_disconn(session_entry, sta_ds);
 
 		/* / Receive path cleanup with dummy packet */
 		lim_ft_cleanup_pre_auth_info(mac_ctx, session_entry);
@@ -3335,6 +3359,9 @@ QDF_STATUS lim_send_disassoc_cnf(struct mac_context *mac_ctx)
 			disassoc_cnf.resultCode = eSIR_SME_INVALID_PARAMETERS;
 			goto end;
 		}
+
+		lim_mlo_notify_peer_disconn(pe_session, sta_ds);
+
 		/* Receive path cleanup with dummy packet */
 		if (QDF_STATUS_SUCCESS !=
 		    lim_cleanup_rx_path(mac_ctx, sta_ds, pe_session, true)) {
@@ -5346,7 +5373,7 @@ returnAfterError:
 QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		tSirMacAddr peer_mac, uint16_t tid,
 		struct pe_session *session, uint8_t addba_extn_present,
-		uint8_t amsdu_support, uint8_t is_wep)
+		uint8_t amsdu_support, uint8_t is_wep, uint16_t calc_buff_size)
 {
 
 	tDot11faddba_rsp frm;
@@ -5390,7 +5417,9 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	if (sta_ds && lim_is_session_he_capable(session))
 		he_cap = lim_is_sta_he_capable(sta_ds);
 
-	if (he_cap)
+	if (sta_ds && sta_ds->staType == STA_ENTRY_NDI_PEER)
+		frm.addba_param_set.buff_size = calc_buff_size;
+	else if (he_cap)
 		frm.addba_param_set.buff_size = MAX_BA_BUFF_SIZE;
 	else
 		frm.addba_param_set.buff_size = SIR_MAC_BA_DEFAULT_BUFF_SIZE;

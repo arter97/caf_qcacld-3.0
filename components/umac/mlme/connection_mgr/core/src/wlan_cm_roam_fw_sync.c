@@ -40,7 +40,6 @@
 #include "cds_utils.h"
 #include "wlan_roam_debug.h"
 #include "wlan_mlme_twt_api.h"
-#ifdef FEATURE_CM_ENABLE
 #include "connection_mgr/core/src/wlan_cm_roam.h"
 #include "connection_mgr/core/src/wlan_cm_main.h"
 #include "connection_mgr/core/src/wlan_cm_sm.h"
@@ -336,6 +335,49 @@ cm_copy_tspec_ie(struct cm_vdev_join_rsp *rsp,
 }
 #endif
 
+#ifdef WLAN_FEATURE_FILS_SK
+static void
+cm_fils_update_erp_seq_num(struct wlan_objmgr_vdev *vdev,
+			   uint16_t next_erp_seq_num,
+			   wlan_cm_id cm_id)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_fils_connection_info *fils_info;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		mlme_err(CM_PREFIX_FMT "Failed to find pdev",
+			 CM_PREFIX_REF(vdev_id, cm_id));
+		return;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		mlme_err(CM_PREFIX_FMT "Failed to find psoc",
+			 CM_PREFIX_REF(vdev_id, cm_id));
+		return;
+	}
+
+	fils_info = wlan_cm_get_fils_connection_info(psoc, vdev_id);
+	if (!fils_info)
+		return;
+
+	/*
+	 * update the erp sequence number to the vdev level
+	 * FILS cache. This will be sent in the next RSO
+	 * command.
+	 */
+	fils_info->erp_sequence_number = next_erp_seq_num;
+}
+#else
+static inline void
+cm_fils_update_erp_seq_num(struct wlan_objmgr_vdev *vdev,
+			   uint16_t next_erp_seq_num, wlan_cm_id cm_id)
+{}
+#endif
+
 static QDF_STATUS
 cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 		  struct roam_offload_synch_ind *roam_synch_data,
@@ -408,6 +450,8 @@ cm_fill_roam_info(struct wlan_objmgr_vdev *vdev,
 	roaming_info->update_erp_next_seq_num =
 			roam_synch_data->update_erp_next_seq_num;
 	roaming_info->next_erp_seq_num = roam_synch_data->next_erp_seq_num;
+
+	cm_fils_update_erp_seq_num(vdev, roaming_info->next_erp_seq_num, cm_id);
 
 	return status;
 }
@@ -655,10 +699,11 @@ static QDF_STATUS cm_process_roam_keys(struct wlan_objmgr_vdev *vdev,
 		}
 		qdf_mem_zero(pmkid_cache, sizeof(*pmkid_cache));
 		qdf_mem_free(pmkid_cache);
-	} else {
+	}
+
+	if (roaming_info->auth_status != ROAM_AUTH_STATUS_AUTHENTICATED)
 		cm_update_wait_for_key_timer(vdev, vdev_id,
 					     WAIT_FOR_KEY_TIMEOUT_PERIOD);
-	}
 end:
 	return status;
 }
@@ -922,15 +967,15 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_INVOKE_FAIL,
 				     sizeof(wlan_cm_id), &cm_id);
 
+	if (QDF_IS_STATUS_ERROR(status))
+		cm_remove_cmd(cm_ctx, &cm_id);
+
 	if (source == CM_ROAMING_HOST ||
 	    source == CM_ROAMING_NUD_FAILURE)
 		status = cm_disconnect(psoc, vdev_id,
 				       CM_ROAM_DISCONNECT,
 				       REASON_USER_TRIGGERED_ROAM_FAILURE,
 				       NULL);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		cm_remove_cmd(cm_ctx, &cm_id);
 
 error:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
@@ -1073,4 +1118,70 @@ void cm_fw_ho_fail_req(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 }
-#endif // FEATURE_CM_ENABLE
+
+#ifdef WLAN_FEATURE_FIPS
+QDF_STATUS cm_roam_pmkid_req_ind(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id,
+				 struct roam_pmkid_req_event *src_lst)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr *dst_list;
+	uint32_t num_entries, i;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_SB_ID);
+	if (!vdev) {
+		mlme_err("vdev object is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	num_entries = src_lst->num_entries;
+	mlme_debug("Num entries %d", num_entries);
+	for (i = 0; i < num_entries; i++) {
+		dst_list = &src_lst->ap_bssid[i];
+		status = mlme_cm_osif_pmksa_candidate_notify(vdev, dst_list,
+							     1, false);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			mlme_err("Number %d Notify failed for " QDF_MAC_ADDR_FMT,
+				 i, QDF_MAC_ADDR_REF(dst_list->bytes));
+			goto rel_ref;
+		}
+	}
+
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
+
+	return status;
+}
+#endif /* WLAN_FEATURE_FIPS */
+
+#ifdef ROAM_TARGET_IF_CONVERGENCE
+QDF_STATUS cm_free_roam_synch_frame_ind(struct rso_config *rso_cfg)
+{
+	struct roam_synch_frame_ind *frame_ind;
+
+	if (!rso_cfg)
+		return QDF_STATUS_E_FAILURE;
+
+	frame_ind = &rso_cfg->roam_sync_frame_ind;
+
+	if (frame_ind->bcn_probe_rsp) {
+		qdf_mem_free(frame_ind->bcn_probe_rsp);
+		frame_ind->bcn_probe_rsp_len = 0;
+		frame_ind->bcn_probe_rsp = NULL;
+	}
+	if (frame_ind->reassoc_req) {
+		qdf_mem_free(frame_ind->reassoc_req);
+		frame_ind->reassoc_req_len = 0;
+		frame_ind->reassoc_req = NULL;
+	}
+	if (frame_ind->reassoc_rsp) {
+		qdf_mem_free(frame_ind->reassoc_rsp);
+		frame_ind->reassoc_rsp_len = 0;
+		frame_ind->reassoc_rsp = NULL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* ROAM_TARGET_IF_CONVERGENCE */
