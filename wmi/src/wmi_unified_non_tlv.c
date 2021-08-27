@@ -8447,13 +8447,22 @@ wmi_thermal_level_to_host_non_tlv(uint32_t level)
  * @param evt_buf: Pointer to event buffer
  * @param temp: Pointer to hold extracted temperature
  * @param level: Pointer to hold extracted level
+ * @param therm_throt_levels: Pointer to hold extracted thermal throttle temp
+ *                            range
+ * @param tt_temp_range_stats_event: Pointer to hold extracted thermal stats for
+ *                                   every level
+ * @param pdev_id: pdev id
  *
  * Return: 0 for success or error code
  */
-static QDF_STATUS extract_thermal_stats_non_tlv(wmi_unified_t wmi_handle,
+static QDF_STATUS extract_thermal_stats_non_tlv(
+		wmi_unified_t wmi_handle,
 		void *evt_buf,
 		uint32_t *temp,
-		enum thermal_throttle_level *level, uint32_t *pdev_id)
+		enum thermal_throttle_level *level,
+		uint32_t *therm_throt_levels,
+		struct thermal_throt_level_stats *tt_temp_range_stats_event,
+		uint32_t *pdev_id)
 {
 	tt_stats_t *tt_stats_event = NULL;
 
