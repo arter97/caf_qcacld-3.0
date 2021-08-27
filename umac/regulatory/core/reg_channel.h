@@ -161,6 +161,8 @@ enum {
 #define WIRELESS_160_MODES   (HOST_REGDMN_MODE_11AC_VHT160 \
 			      | HOST_REGDMN_MODE_11AXA_HE160)
 
+#define HALF_RATE_BW  BW_10_MHZ
+
 /**
  * reg_is_chan_disabled() - In the regulatory channel list, a channel
  * may be disabled by the regulatory/device or by radar. Radar is temporary
@@ -308,4 +310,24 @@ void reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 			    qdf_freq_t freq,
 			    qdf_freq_t sec_ch_2g_freq,
 			    struct ch_params *ch_params);
+/**
+ * reg_is_freq_full_rate_supported () - Verifies if the given freq
+ * supports full rate.
+ * @pdev: Pointer to pdev
+ * @freq: Channel center frequency.
+ *
+ * Return: True if the freq supports full rate, false otherwise
+ */
+#ifdef CONFIG_HALF_QUARTER_RATE_FOR_ALL_CHANS
+bool
+reg_is_freq_full_rate_supported(struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq);
+#else
+static inline bool
+reg_is_freq_full_rate_supported(struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq)
+{
+	return true;
+}
+#endif
 #endif /* __REG_CHANNEL_H_ */
