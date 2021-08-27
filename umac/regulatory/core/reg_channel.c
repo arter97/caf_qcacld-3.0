@@ -24,6 +24,7 @@
 #include <wlan_cmn.h>
 #include <reg_services_public_struct.h>
 #include <wlan_objmgr_psoc_obj.h>
+#include <wlan_objmgr_pdev_obj.h>
 #include <reg_priv_objs.h>
 #include <reg_services_common.h>
 #include "reg_channel.h"
@@ -614,6 +615,166 @@ reg_is_freq_band_dfs(struct wlan_objmgr_pdev *pdev,
 	}
 
 	return is_dfs;
+}
+
+static
+void reg_intersect_chan_list_power(struct wlan_objmgr_pdev *pdev,
+				   struct regulatory_channel *pri_chan_list,
+				   struct regulatory_channel *sec_chan_list,
+				   uint32_t chan_list_size)
+{
+	bool chan_found_in_sec_list;
+	uint32_t i, j;
+
+	if (!pdev) {
+		reg_err_rl("invalid pdev");
+		return;
+	}
+
+	if (!pri_chan_list) {
+		reg_err_rl("invalid pri_chan_list");
+		return;
+	}
+
+	if (!sec_chan_list) {
+		reg_err_rl("invalid sec_chan_list");
+		return;
+	}
+
+	for (i = 0; i < chan_list_size; i++) {
+		if ((pri_chan_list[i].state == CHANNEL_STATE_DISABLE) ||
+		    (pri_chan_list[i].chan_flags & REGULATORY_CHAN_DISABLED)) {
+			continue;
+		}
+
+		chan_found_in_sec_list = false;
+		for (j = 0; j < chan_list_size; j++) {
+			if ((sec_chan_list[j].state ==
+						CHANNEL_STATE_DISABLE) ||
+			    (sec_chan_list[j].chan_flags &
+						REGULATORY_CHAN_DISABLED)) {
+				continue;
+			}
+
+			if (pri_chan_list[i].center_freq ==
+				sec_chan_list[j].center_freq) {
+				chan_found_in_sec_list = true;
+				break;
+			}
+		}
+
+		if (!chan_found_in_sec_list) {
+			pri_chan_list[i].state = CHANNEL_STATE_DISABLE;
+			continue;
+		}
+
+		pri_chan_list[i].psd_flag = pri_chan_list[i].psd_flag &
+						sec_chan_list[j].psd_flag;
+		pri_chan_list[i].tx_power = QDF_MIN(
+						pri_chan_list[i].tx_power,
+						sec_chan_list[j].tx_power);
+		pri_chan_list[i].psd_eirp = QDF_MIN(
+					(int16_t)pri_chan_list[i].psd_eirp,
+					(int16_t)sec_chan_list[j].psd_eirp);
+	}
+}
+
+QDF_STATUS reg_get_ap_chan_list(struct wlan_objmgr_pdev *pdev,
+				struct regulatory_channel *chan_list,
+				bool get_cur_chan_list,
+				enum reg_6g_ap_type ap_pwr_type)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t i;
+
+	if (!pdev) {
+		reg_err_rl("invalid pdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!chan_list) {
+		reg_err_rl("invalid chanlist");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	if (get_cur_chan_list) {
+		qdf_mem_copy(chan_list, pdev_priv_obj->cur_chan_list,
+			NUM_CHANNELS * sizeof(struct regulatory_channel));
+	} else {
+		/* Get the current channel list for 2.4GHz and 5GHz */
+		qdf_mem_copy(chan_list, pdev_priv_obj->cur_chan_list,
+			NUM_CHANNELS * sizeof(struct regulatory_channel));
+
+		/*
+		 * If 6GHz channel list is present, populate it with desired
+		 * power type
+		 */
+		if (pdev_priv_obj->is_6g_channel_list_populated) {
+			if (ap_pwr_type >= REG_CURRENT_MAX_AP_TYPE) {
+				reg_debug("invalid 6G AP power type");
+				return QDF_STATUS_E_INVAL;
+			}
+
+			qdf_mem_copy(&chan_list[MIN_6GHZ_CHANNEL],
+				pdev_priv_obj->mas_chan_list_6g_ap[ap_pwr_type],
+				NUM_6GHZ_CHANNELS *
+					sizeof(struct regulatory_channel));
+
+#ifdef CONFIG_AFC_SUPPORT
+			if (ap_pwr_type == REG_STANDARD_POWER_AP) {
+				/*
+				 * If the AP type is standard power, intersect
+				 * the SP channel list with the AFC master
+				 * channel list
+				 */
+				reg_intersect_chan_list_power(
+					pdev,
+					&chan_list[MIN_6GHZ_CHANNEL],
+					pdev_priv_obj->mas_chan_list_6g_afc,
+					NUM_6GHZ_CHANNELS);
+			}
+#endif
+
+			/*
+			 * Intersect the hardware frequency range with the
+			 * 6GHz channels.
+			 */
+			for (i = 0; i < NUM_6GHZ_CHANNELS; i++) {
+				if ((chan_list[MIN_6GHZ_CHANNEL+i].center_freq <
+					pdev_priv_obj->range_5g_low) ||
+				    (chan_list[MIN_6GHZ_CHANNEL+i].center_freq >
+					pdev_priv_obj->range_5g_high)) {
+					chan_list[MIN_6GHZ_CHANNEL+i].chan_flags
+						|= REGULATORY_CHAN_DISABLED;
+					chan_list[MIN_6GHZ_CHANNEL+i].state =
+						CHANNEL_STATE_DISABLE;
+				}
+			}
+
+			/*
+			 * Check for edge channels
+			 */
+			if (!reg_is_lower_6g_edge_ch_supp(psoc)) {
+				chan_list[CHAN_ENUM_5935].state =
+						CHANNEL_STATE_DISABLE;
+				chan_list[CHAN_ENUM_5935].chan_flags |=
+						REGULATORY_CHAN_DISABLED;
+			}
+
+			if (reg_is_upper_6g_edge_ch_disabled(psoc)) {
+				chan_list[CHAN_ENUM_7115].state =
+						CHANNEL_STATE_DISABLE;
+				chan_list[CHAN_ENUM_7115].chan_flags |=
+						REGULATORY_CHAN_DISABLED;
+			}
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 bool reg_is_freq_width_dfs(struct wlan_objmgr_pdev *pdev,

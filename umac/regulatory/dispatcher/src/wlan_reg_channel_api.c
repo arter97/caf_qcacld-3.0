@@ -206,6 +206,16 @@ bool wlan_reg_is_nol_hist_for_freq(struct wlan_objmgr_pdev *pdev,
 	return reg_is_nol_hist_for_freq(pdev, freq);
 }
 
+QDF_STATUS wlan_reg_get_ap_chan_list(struct wlan_objmgr_pdev *pdev,
+				     struct regulatory_channel *chan_list,
+				     bool get_cur_chan_list,
+				     enum reg_6g_ap_type ap_pwr_type)
+{
+	return reg_get_ap_chan_list(pdev, chan_list, get_cur_chan_list,
+					ap_pwr_type);
+}
+qdf_export_symbol(wlan_reg_get_ap_chan_list);
+
 bool wlan_reg_is_freq_width_dfs(struct wlan_objmgr_pdev *pdev,
 				qdf_freq_t freq,
 				enum phy_ch_width ch_width)
