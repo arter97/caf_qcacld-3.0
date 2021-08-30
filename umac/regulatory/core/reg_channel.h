@@ -515,6 +515,24 @@ bool reg_is_nol_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
 bool reg_is_nol_hist_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
 
 /**
+ * reg_get_ap_chan_list() - Get the AP master channel list
+ * @pdev     : Pointer to pdev
+ * @chan_list: Pointer to the channel list
+ * @get_cur_chan_list: Flag to pull the current channel list
+ * @ap_pwr_type: Type of AP power for 6GHz
+ *
+ * NOTE: If get_cur_chan_list is true, then ap_pwr_type is ignored.
+ *
+ * Return:
+ * QDF_STATUS_SUCCESS: Success
+ * QDF_STATUS_E_INVAL: Failed to get channel list
+ */
+QDF_STATUS reg_get_ap_chan_list(struct wlan_objmgr_pdev *pdev,
+				struct regulatory_channel *chan_list,
+				bool get_cur_chan_list,
+				enum reg_6g_ap_type ap_pwr_type);
+
+/**
  * reg_is_freq_width_dfs()- Check if a channel is DFS, given the channel
  * frequency and width combination.
  * @pdev: Pointer to pdev.
