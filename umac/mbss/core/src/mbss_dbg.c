@@ -40,7 +40,7 @@ void mbss_debug_add_entry(struct wlan_objmgr_vdev *vdev,
 	struct mbss_dbg_data *mbss_dbg;
 	struct mbss_dbg_entry *entry;
 	struct wlan_mbss_ev_data *ev_data = NULL;
-	enum wlan_if_mgr_evt event;
+	enum wlan_if_mgr_evt event = WLAN_IF_MGR_EV_MAX;;
 
 	if (ev_type == MBSS_EV_IF_MGR && if_ev_data) {
 		ev_data = (struct wlan_mbss_ev_data *)(if_ev_data->data);
@@ -159,6 +159,12 @@ void mbss_debug_print_history(struct wlan_objmgr_pdev *pdev)
 		goto exit;
 
 	buf = qdf_mem_malloc(MAX_DBG_TXT_SIZE * WLAN_UMAC_PDEV_MAX_VDEVS);
+	if (!buf) {
+		mbss_nofl_err("Allocation failed [PSOC: %d |PDEV: %d]",
+			      wlan_psoc_get_id(wlan_pdev_get_psoc(pdev)),
+			      wlan_objmgr_pdev_get_pdev_id(pdev));
+		goto exit;
+	}
 	buf_head = buf;
 
 	mbss_nofl_debug(MBSS_DBG_LINE);
