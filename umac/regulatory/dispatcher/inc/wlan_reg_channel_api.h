@@ -364,4 +364,24 @@ void wlan_reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 				    uint64_t *mode_select,
 				    bool include_nol_chan);
 
+/**
+ * wlan_reg_get_client_power_for_rep_ap() - Get the client power for the
+ * repeater AP
+ * @pdev: Pointer to pdev.
+ * @ap_pwr_type: AP power type
+ * @client_type: Client type
+ * @chan_freq: Channel frequency
+ * @is_psd: Pointer to is_psd
+ * @reg_eirp: Pointer to EIRP power
+ * @reg_psd: Pointer to PSD
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
+				     enum reg_6g_ap_type ap_pwr_type,
+				     enum reg_6g_client_type client_type,
+				     qdf_freq_t chan_freq,
+				     bool *is_psd, uint16_t *reg_eirp,
+				     uint16_t *reg_psd);
 #endif /* __WLAN_REG_CHANNEL_API_H */

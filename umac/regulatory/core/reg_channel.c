@@ -1287,3 +1287,37 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 	reg_remove_320mhz_modes(max_bw, &in_wireless_modes);
 	*mode_select = in_wireless_modes;
 }
+
+QDF_STATUS
+reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
+				enum reg_6g_ap_type ap_pwr_type,
+				enum reg_6g_client_type client_type,
+				qdf_freq_t chan_freq,
+				bool *is_psd, uint16_t *reg_eirp,
+				uint16_t *reg_psd)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *master_chan_list;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	master_chan_list = pdev_priv_obj->
+			mas_chan_list_6g_client[ap_pwr_type][client_type];
+
+	reg_find_txpower_from_6g_list(chan_freq, master_chan_list,
+				      reg_eirp);
+
+	*is_psd = reg_is_6g_psd_power(pdev);
+	if (*is_psd)
+		status = reg_get_6g_chan_psd_eirp_power(chan_freq,
+							master_chan_list,
+							reg_psd);
+
+	return status;
+}
