@@ -132,4 +132,5 @@ else
 	QCA_WIFI_FTM_NL80211 :=n
 endif
 CONFIG_LINUX_QCMBR :=y
+CONFIG_OL_TX_MSDU_CACHED := y
 ###################################

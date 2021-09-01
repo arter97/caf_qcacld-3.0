@@ -82,6 +82,7 @@
 #define ETHERTYPE_OCB_RX   0x8152
 
 #define OL_TXRX_MAX_PDEV_CNT	1
+#define NUM_FREE_MSDU_LISTS 1000
 
 struct ol_txrx_pdev_t;
 struct ol_txrx_vdev_t;
@@ -1112,6 +1113,11 @@ struct ol_txrx_pdev_t {
 	/* Current noise-floor reading for the pdev channel */
 	int16_t chan_noise_floor;
 	uint32_t total_bundle_queue_length;
+#ifdef OL_TX_MSDU_CACHED
+	qdf_nbuf_t free_msdu_list[NUM_FREE_MSDU_LISTS];
+	OL_TX_MUTEX_TYPE free_msdu_list_lock;
+	uint16_t idle_list;
+#endif
 };
 
 #define OL_TX_HL_DEL_ACK_HASH_SIZE    256
