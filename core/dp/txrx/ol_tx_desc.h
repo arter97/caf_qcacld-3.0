@@ -172,6 +172,8 @@ ol_tx_desc_find_check(struct ol_txrx_pdev_t *pdev, u_int16_t tx_desc_id)
 void ol_tx_desc_frame_list_free(struct ol_txrx_pdev_t *pdev,
 				ol_tx_desc_list *tx_descs, int had_error);
 
+void unmap_free_msdus(struct ol_txrx_pdev_t *pdev, qdf_nbuf_t old_msdus);
+
 /**
  * @brief Free a non-standard tx frame and its tx descriptor.
  * @details
