@@ -5629,6 +5629,15 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 		goto error;
 	}
 
+	ret = wma_cli_set_command(adapter->session_id,
+				  WMI_PDEV_PARAM_DISABLE_HW_ASSIST,
+				  hdd_ctx->config->disable_hw_assist,
+				  PDEV_CMD);
+	if (ret != 0) {
+		hdd_err("WMI_PDEV_PARAM_DISABLE_HW_ASSIST set failed %d", ret);
+		goto error;
+	}
+
 	hdd_set_fw_log_params(hdd_ctx, adapter);
 
 	ret = hdd_send_coex_config_params(hdd_ctx, adapter);
