@@ -114,6 +114,22 @@
 /* Defines the BIT position of HE caps is support mode field of stainfo */
 #define HDD_HE_CAPS_PRESENT 2
 
+#ifndef BSS_MEMBERSHIP_SELECTOR_HT_PHY
+#define BSS_MEMBERSHIP_SELECTOR_HT_PHY  127
+#endif
+
+#ifndef BSS_MEMBERSHIP_SELECTOR_VHT_PHY
+#define BSS_MEMBERSHIP_SELECTOR_VHT_PHY 126
+#endif
+
+#ifndef BSS_MEMBERSHIP_SELECTOR_SAE_H2E
+#define BSS_MEMBERSHIP_SELECTOR_SAE_H2E 123
+#endif
+
+#ifndef BSS_MEMBERSHIP_SELECTOR_HE_PHY
+#define BSS_MEMBERSHIP_SELECTOR_HE_PHY  122
+#endif
+
 /*
  * 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
@@ -6864,12 +6880,33 @@ static void wlan_hdd_check_11gmode(const u8 *pIe, u8 *require_ht,
 			}
 		} else {
 			if ((BASIC_RATE_MASK |
-				WLAN_BSS_MEMBERSHIP_SELECTOR_HT_PHY) == pIe[i])
+			     BSS_MEMBERSHIP_SELECTOR_HT_PHY) == pIe[i])
 				*require_ht = true;
 			else if ((BASIC_RATE_MASK |
-				WLAN_BSS_MEMBERSHIP_SELECTOR_VHT_PHY) == pIe[i])
+				  BSS_MEMBERSHIP_SELECTOR_VHT_PHY) == pIe[i])
 				*require_vht = true;
 		}
+	}
+}
+
+/**
+ * wlan_hdd_check_h2e() - check SAE/H2E require flag from support rate sets
+ * @rs: support rate or extended support rate set
+ * @require_h2e: pointer to store require h2e flag
+ *
+ * Return: none
+ */
+static void wlan_hdd_check_h2e(const tSirMacRateSet *rs, bool *require_h2e)
+{
+	uint8_t i;
+
+	if (!rs || !require_h2e)
+		return;
+
+	for (i = 0; i < rs->numRates; i++) {
+		if (rs->rate[i] == (BASIC_RATE_MASK |
+				    BSS_MEMBERSHIP_SELECTOR_SAE_H2E))
+			*require_h2e = true;
 	}
 }
 
@@ -8321,6 +8358,12 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 				}
 			}
 		}
+
+		pConfig->require_h2e = false;
+		wlan_hdd_check_h2e(&pConfig->supported_rates,
+				   &pConfig->require_h2e);
+		wlan_hdd_check_h2e(&pConfig->extended_rates,
+				   &pConfig->require_h2e);
 	}
 
 	if (!cds_is_sub_20_mhz_enabled())
