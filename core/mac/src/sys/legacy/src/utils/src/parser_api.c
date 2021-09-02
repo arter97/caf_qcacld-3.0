@@ -559,7 +559,8 @@ populate_dot11f_ext_supp_rates(tpAniSirGlobal pMac, uint8_t nChannelNum,
 	}
 
 	if (0 != nRates) {
-		pDot11f->num_rates = (uint8_t) nRates;
+		pe_debug("ext supp rates present, num %d", (uint8_t)nRates);
+		pDot11f->num_rates = (uint8_t)nRates;
 		qdf_mem_copy(pDot11f->rates, rates, nRates);
 		pDot11f->present = 1;
 	}
