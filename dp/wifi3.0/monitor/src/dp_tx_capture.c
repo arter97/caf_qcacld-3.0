@@ -5565,14 +5565,15 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 			peer_id = user->peer_id;
 			peer = DP_TX_PEER_GET_REF(pdev, peer_id);
 
-			mon_peer = peer->monitor_peer;
 			/**
 			 * peer can be NULL
 			 */
-			if (!peer || !mon_peer->tx_capture.is_tid_initialized) {
+			if (!peer ||
+			    !(peer->monitor_peer->tx_capture.is_tid_initialized)) {
 				user->skip = 1;
 				goto free_nbuf_dec_ref;
 			}
+			mon_peer = peer->monitor_peer;
 
 			/**
 			 * check whether it is bss peer,
