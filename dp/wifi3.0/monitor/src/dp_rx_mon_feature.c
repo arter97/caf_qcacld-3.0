@@ -417,6 +417,9 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 	struct msdu_list *msdu_list;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
+	if (!mon_pdev)
+		return QDF_STATUS_E_NULL_VALUE;
+
 	user = 0;
 	mpdu_q = &mon_pdev->mpdu_q[user];
 
@@ -432,8 +435,7 @@ dp_rx_handle_enh_capture(struct dp_soc *soc, struct dp_pdev *pdev,
 		} else {
 			mpdu_ind = &mon_pdev->mpdu_ind;
 			mpdu_info = &mpdu_ind->mpdu_info;
-			if (mon_pdev)
-				dp_rx_populate_cdp_indication_mpdu_info(
+			dp_rx_populate_cdp_indication_mpdu_info(
 					pdev, &mon_pdev->ppdu_info,
 					mpdu_info, user);
 
