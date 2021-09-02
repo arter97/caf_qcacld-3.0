@@ -785,6 +785,7 @@ enum {
 	IEEE80211_PARAM_MBO_BSTM_REQ               = 747,   /* Enable MBO IE in BSTM req. */
 	IEEE80211_PARAM_MCAST_STEER                = 748,   /* Enable Mcast Steering */
 	IEEE80211_PARAM_MBSS_GROUP                 = 749,
+	IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE = 750,  /* Discovery frame override with OOB */
 };
 
 enum {
@@ -2313,6 +2314,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_vap_diff_mode",      IEEE80211_PARAM_VAP_DIFF_MODE, GET_PARAM, 0},
 	{"spl_vap_scan",        IEEE80211_PARAM_SPL_VAP_SCAN, SET_PARAM, 1},
 	{"g_spl_vap_scan",      IEEE80211_PARAM_SPL_VAP_SCAN, GET_PARAM, 0},
+	{"discfrm_6g_clear_usr_override", IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE, SET_PARAM, 1},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
