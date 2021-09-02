@@ -674,6 +674,7 @@ struct csr_roam_profile {
 	struct mobility_domain_info mdid;
 	struct qdf_mac_addr bssid_hint;
 	bool force_24ghz_in_ht20;
+	bool require_h2e;
 	bool force_rsne_override;
 #endif /* FEATURE_CM_ENABLE */
 };
