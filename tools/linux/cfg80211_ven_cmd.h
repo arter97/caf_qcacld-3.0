@@ -1299,6 +1299,7 @@ enum _ol_ath_param_t {
 	/* Query the number of supported MBSSID-groups in the radio */
 	OL_ATH_PARAM_MBSS_GET_MAX_NGROUPS = 479,
 	OL_ATH_PARAM_MBSS_GET_ACTIVE_NGROUPS = 480,
+	OL_ATH_PARAM_SET_CATEGORY_VERBOSE = 481,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3390,6 +3391,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_SET_V3_TID, SET_PARAM, 1},
 	{"set_tx_drop_threshold",
 		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_SET_TX_DROP_THRESHOLD, SET_PARAM, 1},
+	{"radio_qdf_cv_lvl",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CATEGORY_VERBOSE, SET_PARAM, 1},
+	{"g_radio_qdf_cv_lvl",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CATEGORY_VERBOSE, GET_PARAM, 0},
 };
 #endif
 
