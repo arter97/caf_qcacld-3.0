@@ -3070,6 +3070,8 @@ sapconvert_to_csr_profile(tsap_config_t *pconfig_params, eCsrRoamBssType bssType
 			pconfig_params->extended_rates.numRates;
 	}
 
+	profile->require_h2e = pconfig_params->require_h2e;
+
 	profile->chan_switch_hostapd_rate_enabled =
 		pconfig_params->chan_switch_hostapd_rate_enabled;
 
