@@ -1232,8 +1232,14 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 				       struct ch_params *tgt_ch_params)
 {
 	enum phy_ch_width ch_width, concurrent_bw = 0;
-	struct mac_context *mac = sap_get_mac_context();
+	struct mac_context *mac;
 	struct ch_params ch_params = {0};
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return CH_WIDTH_20MHZ;
+	}
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
 		/*
@@ -2909,7 +2915,7 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx)
 	uint32_t pcl_freqs[NUM_CHANNELS];
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
-	uint32_t pcl_len = 0;
+	uint32_t pcl_len = 0, i;
 
 	if (!sap_ctx) {
 		sap_err("NULL parameter");
@@ -2942,16 +2948,23 @@ wlansap_get_safe_channel(struct sap_context *sap_ctx)
 							       pcl_freqs,
 							       &pcl_len,
 							       PM_SAP_MODE);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			sap_err("failed to get valid channel: %d", status);
+		if (QDF_IS_STATUS_ERROR(status) || !pcl_len) {
+			sap_err("failed to get valid channel: %d len %d",
+				status, pcl_len);
 			return INVALID_CHANNEL_ID;
 		}
 
-		if (pcl_len) {
-			sap_debug("select %d from valid channel list",
-				  pcl_freqs[0]);
-			return pcl_freqs[0];
+		for (i = 0; i < pcl_len; i++) {
+			if (WLAN_REG_IS_SAME_BAND_FREQS(sap_ctx->chan_freq,
+							pcl_freqs[i])) {
+				sap_debug("select %d from valid channel list",
+					  pcl_freqs[i]);
+				return pcl_freqs[i];
+			}
 		}
+		sap_debug("select first %d from valid channel list",
+			  pcl_freqs[0]);
+		return pcl_freqs[0];
 	}
 
 	return INVALID_CHANNEL_ID;

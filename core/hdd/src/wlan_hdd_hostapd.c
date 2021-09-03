@@ -4878,6 +4878,10 @@ static struct ieee80211_channel *wlan_hdd_get_wiphy_channel(
 	struct ieee80211_channel *wiphy_channel = NULL;
 
 	for (band_num = 0; band_num < HDD_NUM_NL80211_BANDS; band_num++) {
+		if (!wiphy->bands[band_num]) {
+			hdd_debug("Band %d not part of wiphy", band_num);
+			continue;
+		}
 		for (channel_num = 0; channel_num <
 				wiphy->bands[band_num]->n_channels;
 				channel_num++) {
@@ -6418,7 +6422,13 @@ static void
 wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
 			      struct cfg80211_ap_settings *params)
 {
-	ucfg_mlme_set_twt_responder(hdd_ctx->psoc, params->twt_responder);
+	bool twt_res_svc_cap, enable_twt;
+
+	enable_twt = ucfg_mlme_is_twt_enabled(hdd_ctx->psoc);
+	ucfg_mlme_get_twt_res_service_cap(hdd_ctx->psoc, &twt_res_svc_cap);
+	ucfg_mlme_set_twt_responder(hdd_ctx->psoc, QDF_MIN(
+					twt_res_svc_cap,
+					(enable_twt && params->twt_responder)));
 	if (params->twt_responder)
 		hdd_send_twt_responder_enable_cmd(hdd_ctx);
 	else

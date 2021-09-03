@@ -5393,6 +5393,9 @@ void lim_send_conc_params_update(void)
 	uint8_t i;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
+	if (!mac)
+		return;
+
 	if (!mac->mlme_cfg->edca_params.enable_edca_params ||
 	    (policy_mgr_get_connection_count(mac->psoc) >
 	     MAX_NUMBER_OF_SINGLE_PORT_CONC_CONNECTIONS)) {
@@ -7061,6 +7064,11 @@ void lim_intersect_ap_he_caps(struct pe_session *session, struct bss_params *add
 
 	lim_intersect_he_caps(rcvd_he, peer_he, session);
 	add_bss->staContext.he_capable = true;
+
+	if (wlan_mlme_is_bad_htc_he_iot_ap(session->vdev)) {
+		peer_he->htc_he = 0;
+		pe_debug("disable ht control in he cap for iot ap");
+	}
 }
 
 void lim_add_bss_he_cap(struct bss_params *add_bss, tpSirAssocRsp assoc_rsp)
@@ -7511,7 +7519,6 @@ void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops,
 				 he_ops->oper_info_6g.info.dup_bcon,
 				 he_ops->oper_info_6g.info.min_rate);
 	}
-
 }
 
 void lim_log_he_6g_cap(struct mac_context *mac,
@@ -7606,7 +7613,14 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 		session->vhtCapability = 0;
 	else if (wlan_reg_is_5ghz_ch_freq(new_chan_freq))
 		session->vhtCapability = 1;
+	/*
+	 * Re-initialize color bss parameters during channel change
+	 */
 
+	session->he_op.bss_col_disabled = 1;
+	session->bss_color_changing = 1;
+	session->he_bss_color_change.new_color = session->he_op.bss_color;
+	session->he_bss_color_change.countdown = BSS_COLOR_SWITCH_COUNTDOWN;
 	pe_debug("he_capable: %d ht %d vht %d 6ghz_band %d new freq %d vht in 2.4gh %d",
 		 session->he_capable, session->htCapability,
 		 session->vhtCapability, session->he_6ghz_band, new_chan_freq,
