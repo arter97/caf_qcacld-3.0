@@ -17,7 +17,7 @@
 #ifndef _CFG80211_VEN_CMD_
 #define _CFG80211_VEN_CMD_
 
-#ifdef CONFIG_SUPPORT_LIBROXML
+#ifdef CONFIG_SUPPORT_VENCMDTABLE
 #include <ieee80211_external_config.h>
 #endif
 
@@ -1301,7 +1301,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_MBSS_GET_ACTIVE_NGROUPS = 480,
 };
 
-#ifdef CONFIG_SUPPORT_LIBROXML
+#ifdef CONFIG_SUPPORT_VENCMDTABLE
 struct vendor_commands vap_vendor_cmds[] = {
 	{"turbo",               IEEE80211_PARAM_TURBO, SET_PARAM, 1},
 	{"get_turbo",           IEEE80211_PARAM_TURBO, GET_PARAM, 0},
@@ -3392,4 +3392,5 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_SET_TX_DROP_THRESHOLD, SET_PARAM, 1},
 };
 #endif
+
 #endif
