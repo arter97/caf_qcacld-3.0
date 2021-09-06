@@ -276,7 +276,8 @@ QDF_STATUS mbss_ap_done_acs_ht40(struct wlan_objmgr_vdev *vdev,
 			iter_vdev = wlan_objmgr_get_vdev_by_id_from_pdev(
 					pdev, vdev_id, WLAN_MBSS_ID);
 			mbss_unlock(mbss_pdev);
-			acs_data->acs_cb(iter_vdev, mbss_ev->arg);
+			if (acs_data->acs_cb)
+				acs_data->acs_cb(iter_vdev, mbss_ev->arg);
 			mbss_lock(mbss_pdev);
 			mbss_clear_vdev_bit(vdev_id, acs_bitmap);
 			wlan_objmgr_vdev_release_ref(iter_vdev, WLAN_MBSS_ID);
