@@ -1383,6 +1383,7 @@ bool qca_multi_link_sta_tx(struct net_device *net_dev, qdf_nbuf_t nbuf)
 	struct wiphy *sta_wiphy = NULL;
 	struct net_device *sta_dev = net_dev;
 	qdf_ether_header_t *eh = (qdf_ether_header_t *) qdf_nbuf_data(nbuf);
+	uint8_t is_mcast = IEEE80211_IS_MULTICAST(eh->ether_dhost);
 	qca_multi_link_status_t status = QCA_MULTI_LINK_PKT_NONE;
 
 	if (!qca_multi_link_need_procesing()) {
@@ -1390,7 +1391,12 @@ bool qca_multi_link_sta_tx(struct net_device *net_dev, qdf_nbuf_t nbuf)
 	}
 
 	if (!qca_multi_link_cfg.loop_detected) {
-		goto end;
+		if (!qca_multi_link_cfg.force_client_mcast_traffic) {
+			goto end;
+		}
+		if (qca_multi_link_cfg.force_client_mcast_traffic && !is_mcast) {
+			goto end;
+		}
 	}
 
 	if (qca_multi_link_pktfrom_ownsrc(sta_dev, nbuf)) {
