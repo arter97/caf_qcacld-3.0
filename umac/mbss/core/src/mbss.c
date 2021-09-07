@@ -112,6 +112,7 @@ QDF_STATUS mbss_pdev_destroy_handler(struct wlan_objmgr_pdev *pdev,
 	mbss_pdev_ctx = mbss_get_pdev_ctx(pdev);
 	if (!mbss_pdev_ctx) {
 		mbss_err("Invalid ctx");
+		status = QDF_STATUS_E_NULL_VALUE;
 		goto error;
 	}
 
