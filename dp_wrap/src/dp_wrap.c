@@ -882,7 +882,7 @@ struct net_device *
 dp_wrap_vdev_get_netdev(struct wlan_objmgr_vdev *vdev)
 {
 	struct dp_wrap_vdev *wvdev;
-	struct net_device *dev;
+	struct net_device *dev = NULL;
 
 	if (vdev) {
 		wvdev = dp_wrap_get_vdev_handle(vdev);
