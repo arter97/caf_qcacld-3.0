@@ -26,9 +26,6 @@
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
 #include "osif_nss_wifiol_vdev_if.h"
 #endif
-#if QCA_SUPPORT_SON
-#include <wlan_son_pub.h>
-#endif
 #include <cdp_txrx_ctrl.h>
 #if DBDC_REPEATER_SUPPORT
 #include <qca_multi_link_tbl.h>
