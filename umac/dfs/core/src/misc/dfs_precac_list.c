@@ -36,8 +36,9 @@
 #include <dfs_internal.h>
 #include <wlan_reg_channel_api.h>
 
-/* dfs_init_precac_tree_node() - Initialise the preCAC BSTree node with the
- *                               provided values.
+/* dfs_init_precac_tree_node_for_freq() - Initialise the preCAC BSTree node
+ * with the provided values.
+ *
  * @node:      Precac_tree_node to be filled.
  * @freq:      IEEE channel freq value.
  * @bandwidth: Bandwidth of the channel.
@@ -47,7 +48,7 @@
 static inline void
 dfs_init_precac_tree_node_for_freq(struct precac_tree_node *node,
 				   uint16_t freq,
-				   uint8_t bandwidth,
+				   uint16_t bandwidth,
 				   uint8_t depth)
 {
 	node->left_child = NULL;
@@ -56,7 +57,8 @@ dfs_init_precac_tree_node_for_freq(struct precac_tree_node *node,
 	node->ch_ieee = utils_dfs_freq_to_chan(freq);
 	node->n_caced_subchs = 0;
 	node->n_nol_subchs = 0;
-	node->n_valid_subchs = N_SUBCHS_FOR_BANDWIDTH(bandwidth);
+	node->n_valid_subchs = dfs_get_num_subchans_for_bw(depth, freq,
+							   bandwidth);
 	node->bandwidth = bandwidth;
 	node->depth = depth;
 
@@ -98,7 +100,7 @@ dfs_descend_precac_tree_for_freq(struct precac_tree_node *node,
 static QDF_STATUS
 dfs_insert_node_into_bstree_for_freq(struct precac_tree_node **root,
 				     uint16_t chan_freq,
-				     uint8_t bandwidth,
+				     uint16_t bandwidth,
 				     uint8_t depth,
 				     struct wlan_dfs *dfs)
 {
@@ -346,48 +348,92 @@ dfs_is_cac_needed_for_bst_node_for_freq(struct wlan_dfs *dfs,
 	return true;
 }
 
+/*
+ * check_if_freq_is_allowed - API to check if frequencies should be a part
+ * of precac tree. To be removed soon.
+ *
+ * @chan_freq: channel frequency
+ *
+ * Return: true if channel frequency is allowed in precac tree.
+ */
+static bool
+check_if_freq_is_allowed(uint16_t chan_freq)
+{
+	uint16_t not_allowed_list[] = {5740, 5760, 5780, 5800, 5750, 5770,
+				       5790};
+	uint8_t i = 0;
+
+	for (i = 0; i < QDF_ARRAY_SIZE(not_allowed_list); i++) {
+		if (chan_freq == not_allowed_list[i])
+			return false;
+	}
+
+	return true;
+}
+
+/*
+ * struct max_bw_to_ch_width - Structure containing max bandwidth from
+ * regulatory, corresponding enum phy chanwidth and offset array.
+ *
+ * @max_bw: Maximum channel width
+ * @ch_width: Phy Channel width
+ * @current_mode: Mode corresponding to channel width
+ */
+struct max_bw_to_ch_width {
+	uint16_t max_bw;
+	enum phy_ch_width ch_width;
+	const struct precac_tree_offset_for_different_bw *current_mode;
+};
+
+/* Mapping max bandwidth to chanwidth enum and offset array */
+static const struct max_bw_to_ch_width max_bw_to_chwidth_mode_map[] = {
+	{DFS_CHWIDTH_20_VAL,  CH_WIDTH_20MHZ,  &offset20},
+	{DFS_CHWIDTH_40_VAL,  CH_WIDTH_40MHZ,  &offset40},
+	{DFS_CHWIDTH_80_VAL,  CH_WIDTH_80MHZ,  &offset80},
+	{DFS_CHWIDTH_160_VAL, CH_WIDTH_160MHZ, &offset160},
+#ifdef WLAN_FEATURE_11BE
+	{DFS_CHWIDTH_320_VAL, CH_WIDTH_320MHZ, &offset320},
+#endif
+};
+
 /* dfs_create_precac_tree_for_freq() - Fill precac entry tree (level insertion).
  * @dfs:       WLAN DFS structure
  * @ch_freq:   root_node freq.
  * @root:      Pointer to the node that will be filled and inserted as tree
  *             root.
  * @bandwidth: Bandwidth value of the root.
+ * @is_node_part_of_165_tree: Indicates if the root node is a subtree of the
+ *             165 MHz tree
+ *
+ * Return: EOK if new node is allocated, else return ENOMEM.
  */
 static QDF_STATUS
 dfs_create_precac_tree_for_freq(struct wlan_dfs *dfs,
 				uint16_t ch_freq,
 				struct precac_tree_node **root,
-				int bandwidth)
+				int bandwidth,
+				bool is_node_part_of_165_tree)
 {
 	int chan_freq, i;
 	QDF_STATUS status = EOK;
-	struct precac_tree_offset_for_different_bw current_mode;
-	uint8_t top_lvl_step;
-	bool is_node_part_of_165_tree = false;
+	const struct precac_tree_offset_for_different_bw *current_mode;
+	uint16_t top_lvl_step, num_bws;
+	bool is_node_part_of_tree = false;
 
-	if (ch_freq == RESTRICTED_80P80_LEFT_80_CENTER_FREQ ||
-	    ch_freq == RESTRICTED_80P80_RIGHT_80_CENTER_FREQ)
-		is_node_part_of_165_tree = true;
-
-	switch (bandwidth) {
-	case DFS_CHWIDTH_160_VAL:
-			current_mode = offset160;
+	num_bws = QDF_ARRAY_SIZE(max_bw_to_chwidth_mode_map);
+	for (i = 0; i < num_bws; i++) {
+		if (bandwidth == max_bw_to_chwidth_mode_map[i].max_bw) {
+			current_mode =
+				max_bw_to_chwidth_mode_map[i].current_mode;
 			break;
-	case DFS_CHWIDTH_80_VAL:
-			current_mode = offset80;
-			break;
-	case DFS_CHWIDTH_40_VAL:
-			current_mode = offset40;
-			break;
-	case DFS_CHWIDTH_20_VAL:
-			current_mode = offset20;
-			break;
-	default:
-			current_mode = default_offset;
-			break;
+		}
 	}
-	top_lvl_step = current_mode.initial_and_next_offsets[0][1];
-	for (i = 0; i < current_mode.tree_depth; i++) {
+
+	if (i == num_bws)
+		current_mode = &default_offset;
+
+	top_lvl_step = (*current_mode).initial_and_next_offsets[0][1];
+	for (i = 0; i < (*current_mode).tree_depth; i++) {
 		/* In offset array,
 		 * column 0 is initial chan offset,
 		 * column 1 is next chan offset.
@@ -395,19 +441,26 @@ dfs_create_precac_tree_for_freq(struct wlan_dfs *dfs,
 		 * of root level (since root level can have only 1 node)
 		 */
 		int offset =
-		    current_mode.initial_and_next_offsets[i][START_INDEX];
-		int step = current_mode.initial_and_next_offsets[i][STEP_INDEX];
+		    (*current_mode).initial_and_next_offsets[i][START_INDEX];
+		int step =
+			(*current_mode).initial_and_next_offsets[i][STEP_INDEX];
 		int boundary_offset = offset + top_lvl_step;
 		uint8_t depth = is_node_part_of_165_tree ? i + 1 : i;
 
 		for (; offset < boundary_offset; offset += step) {
 			chan_freq = (int)ch_freq + offset;
+			is_node_part_of_tree =
+				check_if_freq_is_allowed(chan_freq);
+
+			if (!is_node_part_of_tree)
+				continue;
+
 			status =
-			    dfs_insert_node_into_bstree_for_freq(root,
-								 chan_freq,
-								 bandwidth,
-								 depth,
-								 dfs);
+			dfs_insert_node_into_bstree_for_freq(root,
+							     chan_freq,
+							     bandwidth,
+							     depth,
+							     dfs);
 			if (status) {
 				dfs_free_precac_tree_nodes(dfs, *root, NULL);
 				*root = NULL;
@@ -437,21 +490,23 @@ dfs_precac_create_165mhz_precac_entry(struct wlan_dfs *dfs,
 	dfs_insert_node_into_bstree_for_freq(&precac_entry->tree_root,
 					     RESTRICTED_80P80_CHAN_CENTER_FREQ,
 					     DFS_CHWIDTH_160_VAL,
-					     DEPTH_160_ROOT,
+					     TREE_DEPTH_0,
 					     dfs);
 	status =
 		dfs_create_precac_tree_for_freq
-		(dfs,
+					(dfs,
 					RESTRICTED_80P80_LEFT_80_CENTER_FREQ,
 					&precac_entry->tree_root->left_child,
-					DFS_CHWIDTH_80_VAL);
+					DFS_CHWIDTH_80_VAL,
+					true);
 	if (!status)
 		status =
 		    dfs_create_precac_tree_for_freq(
 			    dfs,
 			    RESTRICTED_80P80_RIGHT_80_CENTER_FREQ,
 			    &precac_entry->tree_root->right_child,
-			    DFS_CHWIDTH_80_VAL);
+			    DFS_CHWIDTH_80_VAL,
+			    true);
 	TAILQ_INSERT_TAIL(
 			&dfs->dfs_precac_list,
 			precac_entry, pe_list);
@@ -515,6 +570,29 @@ dfs_unmark_tree_node_as_nol_for_freq(struct wlan_dfs *dfs,
 }
 
 /**
+ * dfs_is_freq_within_range() - API to check if frequency is within
+ * range.
+ * @frequency: Frequency to be checked.
+ * @primary_center_freq: Center frequency of the range.
+ * @bandwidth: Bandwidth of the range.
+ *
+ * Return: True if frequency is within range. Else return false.
+ */
+static bool dfs_is_freq_within_range(qdf_freq_t frequency,
+				     qdf_freq_t primary_center_freq,
+				     uint16_t bandwidth)
+{
+	qdf_freq_t left_edge = primary_center_freq - bandwidth / 2;
+	qdf_freq_t right_edge = primary_center_freq + bandwidth / 2;
+
+	if (primary_center_freq == CENTER_OF_320_MHZ)
+		right_edge = primary_center_freq + DFS_CHWIDTH_80_VAL;
+	if (IS_WITHIN_RANGE_ASYM_STRICT(frequency, left_edge, right_edge))
+		return true;
+	return false;
+}
+
+/**
  * dfs_update_non_dfs_subchannel_count() - API to update the preCAC entry
  * with the given non DFS subchannel count.
  * @dfs:       Pointer to DFS object.
@@ -533,9 +611,9 @@ dfs_update_non_dfs_subchannel_count(struct wlan_dfs *dfs,
 			   &dfs->dfs_precac_list,
 			   pe_list,
 			   tmp_precac_entry) {
-		if (IS_WITHIN_RANGE_STRICT(frequency,
-					   precac_entry->center_ch_freq,
-					   (precac_entry->bw/2))) {
+		if (dfs_is_freq_within_range(frequency,
+					     precac_entry->center_ch_freq,
+					     precac_entry->bw)) {
 			precac_entry->non_dfs_subch_count = count;
 			break;
 		}
@@ -607,7 +685,8 @@ dfs_precac_create_precac_entry(struct wlan_dfs *dfs,
 	    dfs_create_precac_tree_for_freq(dfs,
 					    precac_entry->center_ch_freq,
 					    &precac_entry->tree_root,
-					    precac_entry->bw);
+					    precac_entry->bw,
+					    false);
 	if (status)
 		dfs_debug(dfs, WLAN_DEBUG_DFS,
 			  "PreCAC entry for channel %d not created",
@@ -657,7 +736,9 @@ dfs_mark_tree_node_as_cac_done_for_freq(struct wlan_dfs *dfs,
 		 * if it's less than maximum subchannels, else return.
 		 */
 		if (curr_node->n_caced_subchs <
-		    N_SUBCHS_FOR_BANDWIDTH(curr_node->bandwidth))
+		    dfs_get_num_subchans_for_bw(curr_node->depth,
+						curr_node->ch_freq,
+						curr_node->bandwidth))
 			curr_node->n_caced_subchs++;
 		curr_node = dfs_descend_precac_tree_for_freq(curr_node,
 							     chan_freq);
@@ -771,26 +852,22 @@ dfs_is_freq_needed_in_precac_list(struct wlan_dfs *dfs,
 	/* Center of  secondary 80 in the 80_80/165MHz  channel */
 	qdf_freq_t sec_band_cen_freq = 0;
 	bool is_dfs;
+	uint16_t i, num_bws;
 
+	num_bws = QDF_ARRAY_SIZE(max_bw_to_chwidth_mode_map);
 	if (reg_chan.chan_flags & REGULATORY_CHAN_RADAR)
 		return true;
 
-	switch (reg_chan.max_bw) {
-	case DFS_CHWIDTH_20_VAL:
-		ch_width = CH_WIDTH_20MHZ;
-		break;
-	case DFS_CHWIDTH_40_VAL:
-		ch_width = CH_WIDTH_40MHZ;
-		break;
-	case DFS_CHWIDTH_80_VAL:
-		ch_width = CH_WIDTH_80MHZ;
-		break;
-	case DFS_CHWIDTH_160_VAL:
-		ch_width = CH_WIDTH_160MHZ;
-		break;
-	default:
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
-			"Invalid channel width %d", reg_chan.max_bw);
+	for (i = 0; i < num_bws; i++) {
+		if (reg_chan.max_bw == max_bw_to_chwidth_mode_map[i].max_bw) {
+			ch_width =  max_bw_to_chwidth_mode_map[i].ch_width;
+			break;
+		}
+	}
+
+	if (i == num_bws) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "Invalid channel width %d",
+			reg_chan.max_bw);
 		return false;
 	}
 
@@ -910,12 +987,16 @@ static void dfs_fill_max_bw_for_chan(struct wlan_dfs *dfs,
 
 		dfs_max_bw_info[j].dfs_pri_ch_freq =
 			cur_chan_list[i].center_freq;
-		dfs_max_bw_info[j].dfs_max_bw =
-			cur_chan_list[i].max_bw;
+		if (cur_chan_list[i].max_bw == DFS_CHWIDTH_240_VAL)
+			dfs_max_bw_info[j].dfs_max_bw =
+				DFS_CHWIDTH_320_VAL;
+		else
+			dfs_max_bw_info[j].dfs_max_bw =
+				cur_chan_list[i].max_bw;
 		dfs_max_bw_info[j].dfs_center_ch_freq =
 			cur_chan_list[i].center_freq -
 			HALF_20MHZ_BW +
-			(cur_chan_list[i].max_bw) / 2;
+			(dfs_max_bw_info[j].dfs_max_bw) / 2;
 		j++;
 	}
 
@@ -1315,7 +1396,6 @@ dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(struct wlan_dfs *dfs,
 {
 	struct dfs_precac_entry *precac_entry;
 	bool ret_val = 0;
-
 	/*
 	 * A is within B-C and B+C
 	 * (B-C) <= A <= (B+C)
@@ -1328,9 +1408,9 @@ dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(struct wlan_dfs *dfs,
 			/* Find if the channel frequency is
 			 * in this precac_list.
 			 */
-			if (IS_WITHIN_RANGE_STRICT(chan_freq,
-					precac_entry->center_ch_freq,
-					(precac_entry->bw/2))) {
+			if (dfs_is_freq_within_range(chan_freq,
+						precac_entry->center_ch_freq,
+						precac_entry->bw)) {
 				ret_val = dfs_find_cac_status_for_chan_for_freq(
 						precac_entry, chan_freq);
 				break;
@@ -1447,9 +1527,9 @@ void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
 				   &dfs->dfs_precac_list,
 				   pe_list,
 				   tmp_precac_entry) {
-			if (IS_WITHIN_RANGE_STRICT(channels[i],
-					precac_entry->center_ch_freq,
-					(precac_entry->bw/2))) {
+			if (dfs_is_freq_within_range(channels[i],
+						precac_entry->center_ch_freq,
+						precac_entry->bw)) {
 				dfs_mark_tree_node_as_cac_done_for_freq
 					(dfs, precac_entry, channels[i]);
 				utils_dfs_deliver_event(dfs->dfs_pdev_obj,
@@ -1511,9 +1591,9 @@ void dfs_mark_precac_nol_for_freq(struct wlan_dfs *dfs,
 				   &dfs->dfs_precac_list,
 				   pe_list,
 				   tmp_precac_entry) {
-			if (IS_WITHIN_RANGE_STRICT(freq_lst[i],
-					precac_entry->center_ch_freq,
-					(precac_entry->bw/2))) {
+			if (dfs_is_freq_within_range(freq_lst[i],
+						precac_entry->center_ch_freq,
+						precac_entry->bw)) {
 				dfs_mark_tree_node_as_nol_for_freq(dfs,
 								   precac_entry,
 								   freq_lst[i]);
@@ -1605,22 +1685,28 @@ static void dfs_print_node_data(struct wlan_dfs *dfs,
 	char inv[4] = "inv";
 
 	switch (node->depth) {
-	case DEPTH_160_ROOT:
+	case TREE_DEPTH_0:
 		break;
-	case DEPTH_80_ROOT:
+	case TREE_DEPTH_1:
 		qdf_str_lcopy(prev_line_prefix, "|", MAX_PREFIX_CHAR);
 		qdf_str_lcopy(prefix, "|------- ", MAX_PREFIX_CHAR);
 		break;
-	case DEPTH_40_ROOT:
+	case TREE_DEPTH_2:
 		qdf_str_lcopy(prev_line_prefix, "|        |", MAX_PREFIX_CHAR);
 		qdf_str_lcopy(prefix, "|        |------- ", MAX_PREFIX_CHAR);
 		break;
-	case DEPTH_20_ROOT:
+	case TREE_DEPTH_3:
+		qdf_str_lcopy(prev_line_prefix, "|        |        |",
+			      MAX_PREFIX_CHAR);
+		qdf_str_lcopy(prefix, "|        |        |------- ",
+			      MAX_PREFIX_CHAR);
+		break;
+	case TREE_DEPTH_4:
 		qdf_str_lcopy(prev_line_prefix,
-			      "|        |        |",
+			      "|        |        |        |",
 			      MAX_PREFIX_CHAR);
 		qdf_str_lcopy(prefix,
-			      "|        |        |------- ",
+			      "|        |        |        |------- ",
 			      MAX_PREFIX_CHAR);
 		break;
 	default:
@@ -1628,8 +1714,12 @@ static void dfs_print_node_data(struct wlan_dfs *dfs,
 	}
 
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "%s", prev_line_prefix);
+
 	/* if current node is not a valid ic channel, print invalid */
-	if (node->n_valid_subchs != N_SUBCHS_FOR_BANDWIDTH(node->bandwidth))
+	if (node->n_valid_subchs !=
+	    dfs_get_num_subchans_for_bw(node->depth,
+					node->ch_freq,
+					node->bandwidth))
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "%s%s", prefix, inv);
 	else
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "%s%u(%u,%u)",
