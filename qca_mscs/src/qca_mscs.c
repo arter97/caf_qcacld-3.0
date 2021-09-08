@@ -22,6 +22,20 @@ static int mscs_soc_attached_count;
 extern ol_ath_soc_softc_t *ol_global_soc[GLOBAL_SOC_SIZE];
 
 /**
+ * qca_mscs_peer_lookup_status - mscs lookup status
+ * @QCA_MSCS_PEER_LOOKUP_STATUS_ALLOW_MSCS_QOS_TAG_UPDATE
+ * @QCA_MSCS_PEER_LOOKUP_STATUS_DENY_QOS_TAG_UPDATE
+ * @QCA_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE
+ * @QCA_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND
+ */
+enum qca_mscs_peer_lookup_status {
+	QCA_MSCS_PEER_LOOKUP_STATUS_ALLOW_MSCS_QOS_TAG_UPDATE,
+	QCA_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE,
+	QCA_MSCS_PEER_LOOKUP_STATUS_DENY_QOS_TAG_UPDATE,
+	QCA_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND,
+};
+
+/**
  * qca_mscs_peer_lookup_n_get_priority() - Find MSCS enabled peer and priority
  * @src_mac - src mac address to be used for peer lookup
  * @nbuf - network buffer
@@ -33,7 +47,7 @@ int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, uint8_t *dst_mac, stru
 {
 	uint8_t i = 0;
 	ol_ath_soc_softc_t *soc = NULL;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	int status = QDF_STATUS_SUCCESS;
 	ol_txrx_soc_handle soc_txrx_handle = NULL;
 	qdf_nbuf_t nbuf = (qdf_nbuf_t)skb;
 
@@ -57,7 +71,7 @@ int qca_mscs_peer_lookup_n_get_priority(uint8_t *src_mac, uint8_t *dst_mac, stru
 		 * 3. peer has active MSCS session and priority is valid.
 		 * return the status to ECM classifier.
 		 */
-		if (status >= QDF_STATUS_SUCCESS)
+		if (status != QCA_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND)
 			return status;
 		/*
 		 * no wifi peer exists in this soc with given src mac address

@@ -47,7 +47,7 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 	if (!dpsoc) {
 		QDF_TRACE(QDF_MODULE_ID_MSCS, QDF_TRACE_LEVEL_ERROR,
 				"%s: Invalid soc\n", __func__);
-		return DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE;
+		return DP_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND;
 	}
 
 	/*
@@ -69,13 +69,16 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 			dp_peer_unref_delete(dst_peer, DP_MOD_ID_MSCS);
 			return DP_MSCS_PEER_LOOKUP_STATUS_DENY_QOS_TAG_UPDATE;
 		} else {
-			if (dst_peer)
+			if (dst_peer) {
 				dp_peer_unref_delete(dst_peer, DP_MOD_ID_MSCS);
+				return DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE;
+			}
 
 			/*
-			 * No WLAN client peer found with this peer mac
+			 * No WLAN client peer found with src/dst mac in this soc
 			 */
-			return DP_MSCS_PEER_LOOKUP_STATUS_ALLOW_INVALID_QOS_TAG_UPDATE;
+			return DP_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND;
+
 		}
 	}
 
