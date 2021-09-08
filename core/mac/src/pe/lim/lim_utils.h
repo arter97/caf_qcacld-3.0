@@ -176,6 +176,8 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  * @session: PE Session Entry
  * @is_pwr_constraint_absolute: If local power constraint is an absolute
  * value or an offset value.
+ * @ap_pwr_type: Ap power type for 6G
+ * @ctry_code_match: check for country IE and sta programmed ctry match
  *
  * This function is used to get the maximum possible tx power from the list
  * of tx powers mentioned in @attr.
@@ -184,11 +186,100 @@ uint8_t lim_get_max_tx_power(struct mac_context *mac,
  */
 void lim_calculate_tpc(struct mac_context *mac,
 		       struct pe_session *session,
-		       bool is_pwr_constraint_absolute);
+		       bool is_pwr_constraint_absolute,
+		       uint8_t ap_pwr_type,
+		       bool ctry_code_match);
 
 /* AID pool management functions */
+
+/**
+ * lim_init_peer_idxpool() -- initializes peer index pool
+ * @mac: mac context
+ * @pe_session: session entry
+ *
+ * This function is called while starting a BSS at AP
+ * to initialize AID pool.
+ *
+ * Return: None
+ */
 void lim_init_peer_idxpool(struct mac_context *, struct pe_session *);
 uint16_t lim_assign_peer_idx(struct mac_context *, struct pe_session *);
+
+/**
+ * lim_create_peer_idxpool() - api to create aid pool
+ * @pe_session: pe session
+ * @idx_pool_size: aid pool size
+ *
+ * Return: true if pool is created successfully
+ */
+bool lim_create_peer_idxpool(struct pe_session *pe_session,
+			     uint8_t idx_pool_size);
+
+/**
+ * lim_free_peer_idxpool() - api to free aid pool
+ * @pe_session: pe session
+ *
+ * Return: Void
+ */
+void lim_free_peer_idxpool(struct pe_session *pe_session);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_assign_mlo_conn_idx() - api to assign mlo peer station index with given
+ *                             partner peer station index
+ * @mac: mac context
+ * @pe_session: session entry
+ * @partner_peer_idx: partner peer station index
+ *
+ * Return: peer station index
+ */
+uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
+				 struct pe_session *pe_session,
+				 uint16_t partner_peer_idx);
+
+/**
+ * lim_release_mlo_conn_idx() - api to release mlo peer AID
+ * @mac: mac context
+ * @peer_idx: given aid
+ * @pe_session: session entry
+ * @free_aid: trigger mlo mgr to free AID or not. It only can be
+ *            true before mlo peer is created. Once mlo peer is
+ *            created, AID is freed in mlo peer context.
+ *
+ * Return: Void
+ */
+void
+lim_release_mlo_conn_idx(struct mac_context *mac, uint16_t peer_idx,
+			 struct pe_session *pe_session, bool free_aid);
+
+/**
+ * lim_update_sta_mlo_info() - update sta mlo information
+ * @add_sta_params: pointer to tpAddStaParams
+ * @sta_ds: pointer tpDphHashNode
+ *
+ * Return: Void
+ */
+void lim_update_sta_mlo_info(tpAddStaParams add_sta_params,
+			     tpDphHashNode sta_ds);
+#else
+static inline uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
+					       struct pe_session *pe_session,
+					       uint16_t partner_peer_idx)
+{
+	return 0;
+}
+
+static inline void
+lim_release_mlo_conn_idx(struct mac_context *mac, uint16_t peer_idx,
+			 struct pe_session *pe_session, bool free_aid)
+{
+}
+
+static inline void lim_update_sta_mlo_info(tpAddStaParams add_sta_params,
+					   tpDphHashNode sta_ds)
+{
+}
+#endif
 
 void lim_enable_overlap11g_protection(struct mac_context *mac,
 		tpUpdateBeaconParams pBeaconParams,
@@ -2608,4 +2699,14 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
 				    struct pe_session *session,
 				    struct bss_description *bss_desc,
 				    bool *has_tpe_updated);
+
+/**
+ * lim_send_conc_params_update() - Function to check and update params based on
+ *                                  STA/SAP concurrency.such as EDCA params
+ *                                  and RTS profile. If updated, it will also
+ *                                  also send the updated parameters to FW.
+ *
+ * Return: void
+ */
+void lim_send_conc_params_update(void);
 #endif /* __LIM_UTILS_H */

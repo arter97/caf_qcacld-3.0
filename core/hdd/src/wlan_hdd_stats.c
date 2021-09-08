@@ -395,12 +395,14 @@ struct hdd_ll_stats {
  * @request_id: userspace-assigned link layer stats request id
  * @request_bitmap: userspace-assigned link layer stats request bitmap
  * @ll_stats_lock: Lock to serially access request_bitmap
+ * @vdev_id: id of vdev handle
  */
 struct hdd_ll_stats_priv {
 	qdf_list_t ll_stats_q;
 	uint32_t request_id;
 	uint32_t request_bitmap;
 	qdf_spinlock_t ll_stats_lock;
+	uint8_t vdev_id;
 };
 
 /*
@@ -976,6 +978,33 @@ hdd_link_layer_process_iface_stats(struct hdd_adapter *adapter,
 }
 
 /**
+ * put_channel_stats_chload - put chload of channel stats
+ * @vendor_event: vendor event
+ * @channel_stats: Pointer to channel stats
+ *
+ * Return: bool
+ */
+static bool put_channel_stats_chload(struct sk_buff *vendor_event,
+				     struct wifi_channel_stats *channel_stats)
+{
+	uint64_t txrx_time;
+	uint32_t chload;
+
+	if (!channel_stats->on_time)
+		return true;
+
+	txrx_time = (channel_stats->tx_time + channel_stats->rx_time) * 100;
+	chload = qdf_do_div(txrx_time, channel_stats->on_time);
+
+	if (nla_put_u8(vendor_event,
+		       QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_LOAD_PERCENTAGE,
+		       chload))
+		return false;
+
+	return true;
+}
+
+/**
  * hdd_llstats_radio_fill_channels() - radio stats fill channels
  * @adapter: Pointer to device adapter
  * @radiostat: Pointer to stats data
@@ -1046,6 +1075,13 @@ static int hdd_llstats_radio_fill_channels(struct hdd_adapter *adapter,
 				QCA_WLAN_VENDOR_ATTR_LL_STATS_CHANNEL_RX_TIME,
 				channel_stats->rx_time)) {
 				hdd_err("nla_put failed for tx time (%u, %d)",
+					radiostat->num_channels, i);
+				return -EINVAL;
+			}
+
+			if (!put_channel_stats_chload(vendor_event,
+						      channel_stats)) {
+				hdd_err("nla_put failed for chload (%u, %d)",
 					radiostat->num_channels, i);
 				return -EINVAL;
 			}
@@ -1457,15 +1493,6 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 	if (status)
 		return;
 
-	adapter = hdd_get_adapter_by_vdev(hdd_ctx,
-					   results->ifaceId);
-
-	if (!adapter) {
-		hdd_err("vdev_id %d does not exist with host",
-			results->ifaceId);
-		return;
-	}
-
 	switch (indication_type) {
 	case SIR_HAL_LL_STATS_RESULTS_RSP:
 	{
@@ -1488,6 +1515,12 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 				priv->request_id, results->rspId,
 				priv->request_bitmap, results->paramId);
 			osif_request_put(request);
+			return;
+		}
+
+		adapter = hdd_get_adapter_by_vdev(hdd_ctx, priv->vdev_id);
+		if (!adapter) {
+			hdd_err("invalid vdev %d", priv->vdev_id);
 			return;
 		}
 
@@ -1579,7 +1612,9 @@ __wlan_hdd_cfg80211_ll_stats_set(struct wiphy *wiphy,
 	if (hdd_validate_adapter(adapter))
 		return -EINVAL;
 
-	if (adapter->device_mode != QDF_STA_MODE) {
+	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_P2P_CLIENT_MODE &&
+	    adapter->device_mode != QDF_P2P_GO_MODE) {
 		hdd_debug("Cannot set LL_STATS for device mode %d",
 			  adapter->device_mode);
 		return -EINVAL;
@@ -1951,6 +1986,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 
 	priv->request_id = req->reqId;
 	priv->request_bitmap = req->paramIdMask;
+	priv->vdev_id = adapter->vdev_id;
 	qdf_spinlock_create(&priv->ll_stats_lock);
 	qdf_list_create(&priv->ll_stats_q, HDD_LINK_STATS_MAX);
 
@@ -1964,7 +2000,6 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	if (ret) {
 		hdd_err("Target response timed out request id %d request bitmap 0x%x",
 			priv->request_id, priv->request_bitmap);
-		sme_radio_tx_mem_free();
 		qdf_spin_lock(&priv->ll_stats_lock);
 		priv->request_bitmap = 0;
 		qdf_spin_unlock(&priv->ll_stats_lock);
@@ -1972,6 +2007,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	} else {
 		hdd_update_station_stats_cached_timestamp(adapter);
 	}
+	sme_radio_tx_mem_free();
 	qdf_spin_lock(&priv->ll_stats_lock);
 	status = qdf_list_remove_front(&priv->ll_stats_q, &ll_node);
 	qdf_spin_unlock(&priv->ll_stats_lock);
@@ -4924,6 +4960,50 @@ static void wlan_hdd_fill_os_rate_info(enum tx_rate_info rate_flags,
 		os_rate->flags |= RATE_INFO_FLAGS_SHORT_GI;
 }
 
+/**
+ * hdd_get_current_mcs_set() - Get current MCS rate set from connection info
+ * @adapter: Pointer to STA adapter
+ * @buf: pointer to buffer for holding the output mcs rate set
+ * @len: length of the buffer
+ *
+ * Return: number of elements in mcs rate set, 0 for failure.
+ */
+static qdf_size_t
+hdd_get_current_mcs_set(struct hdd_adapter *adapter, uint8_t *buf,
+			qdf_size_t len)
+{
+	struct hdd_station_ctx *hdd_sta_ctx;
+	qdf_size_t ret = 0;
+	int i;
+	uint32_t *mcs_set;
+	uint8_t *dst_rate = buf;
+
+	if (!adapter || !buf || !len)
+		return 0;
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	if (!hdd_sta_ctx) {
+		hdd_err("Invalid sta ctx");
+		return 0;
+	}
+
+	if (!hdd_sta_ctx->conn_info.conn_flag.ht_present) {
+		hdd_err("No HT cap");
+		return 0;
+	}
+
+	mcs_set = (uint32_t *)hdd_sta_ctx->conn_info.ht_caps.mcs.rx_mask;
+	for (i = 0; i < VALID_MAX_MCS_INDEX && ret < len; i++) {
+		if (!QDF_GET_BITS(*mcs_set, i, 1))
+			continue;
+
+		*dst_rate++ = i;
+		ret++;
+	}
+
+	return ret;
+}
+
 bool hdd_report_max_rate(struct hdd_adapter *adapter,
 			 mac_handle_t mac_handle,
 			 struct rate_info *rate,
@@ -4943,7 +5023,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 	uint8_t extended_rates[CSR_DOT11_EXTENDED_SUPPORTED_RATES_MAX];
 	qdf_size_t er_leng = CSR_DOT11_EXTENDED_SUPPORTED_RATES_MAX;
 	uint8_t mcs_rates[SIZE_OF_BASIC_MCS_SET];
-	qdf_size_t mcs_leng = SIZE_OF_BASIC_MCS_SET;
+	qdf_size_t mcs_len;
 	struct index_data_rate_type *supported_mcs_rate;
 	enum data_rate_11ac_max_mcs vht_max_mcs;
 	uint8_t max_mcs_idx = 0;
@@ -5044,15 +5124,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 	 * actual speed
 	 */
 	if ((3 != rssidx) && !(rate_flags & TX_RATE_LEGACY)) {
-		if (0 != ucfg_mlme_get_current_mcs_set(hdd_ctx->psoc,
-						       mcs_rates,
-						       &mcs_leng)) {
-			hdd_err("cfg get returned failure");
-			/*To keep GUI happy */
-			return false;
-		}
 		rate_flag = 0;
-
 		if (rate_flags & (TX_RATE_VHT80 | TX_RATE_HE80 |
 				TX_RATE_HE160 | TX_RATE_VHT160))
 			mode = 2;
@@ -5116,6 +5188,15 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 			max_mcs_idx = (max_mcs_idx > mcs_index) ?
 				max_mcs_idx : mcs_index;
 		} else {
+			mcs_len =
+				hdd_get_current_mcs_set(adapter, mcs_rates,
+							SIZE_OF_BASIC_MCS_SET);
+			if (!mcs_len) {
+				hdd_err("Failed to get current mcs rate set");
+				/*To keep GUI happy */
+				return false;
+			}
+
 			if (rate_flags & TX_RATE_HT40)
 				rate_flag |= 1;
 			if (rate_flags & TX_RATE_SGI)
@@ -5136,7 +5217,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 				}
 			}
 
-			for (i = 0; i < mcs_leng; i++) {
+			for (i = 0; i < mcs_len; i++) {
 				for (j = 0; j < max_ht_idx; j++) {
 					if (supported_mcs_rate[j].
 						beacon_rate_index ==

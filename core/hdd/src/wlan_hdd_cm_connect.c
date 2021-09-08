@@ -48,7 +48,6 @@
 #include "wlan_roam_debug.h"
 #include <wlan_hdd_regulatory.h>
 
-#ifdef FEATURE_CM_ENABLE
 bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -74,6 +73,33 @@ bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
 
 	return is_vdev_active;
+}
+
+bool hdd_cm_is_vdev_connected(struct hdd_adapter *adapter)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool is_vdev_connected;
+	enum QDF_OPMODE opmode;
+	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+	if (adapter->device_mode == QDF_NDI_MODE)
+		return (sta_ctx->conn_info.conn_state ==
+			eConnectionState_NdiConnected);
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
+	if (!vdev)
+		return false;
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+		return false;
+	}
+	is_vdev_connected = ucfg_cm_is_vdev_connected(vdev);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_CM_ID);
+
+	return is_vdev_connected;
 }
 
 bool hdd_cm_is_connecting(struct hdd_adapter *adapter)
@@ -164,44 +190,6 @@ bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter)
 
 	return is_vdev_roaming;
 }
-
-#else
-bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
-{
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
-	return (sta_ctx->conn_info.conn_state == eConnectionState_Associated ||
-		sta_ctx->conn_info.conn_state == eConnectionState_NdiConnected);
-}
-
-bool hdd_cm_is_connecting(struct hdd_adapter *adapter)
-{
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
-	return sta_ctx->conn_info.conn_state == eConnectionState_Connecting;
-}
-
-bool hdd_cm_is_disconnected(struct hdd_adapter *adapter)
-{
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
-	return sta_ctx->conn_info.conn_state == eConnectionState_NotConnected;
-}
-
-bool hdd_cm_is_disconnecting(struct hdd_adapter *adapter)
-{
-	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
-	return sta_ctx->conn_info.conn_state == eConnectionState_Disconnecting;
-}
-
-bool hdd_cm_is_vdev_roaming(struct hdd_adapter *adapter)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
-	return sme_roaming_in_progress(hdd_ctx->mac_handle, adapter->vdev_id);
-}
-#endif
 
 void hdd_cm_set_peer_authenticate(struct hdd_adapter *adapter,
 				  struct qdf_mac_addr *bssid,
@@ -308,8 +296,6 @@ void hdd_cm_save_connect_status(struct hdd_adapter *adapter,
 {
 	adapter->connect_req_status = reason_code;
 }
-
-#ifdef FEATURE_CM_ENABLE
 
 #ifdef FEATURE_WLAN_WAPI
 static bool hdd_cm_is_wapi_sta(enum csr_akm_type auth_type)
@@ -521,7 +507,7 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 	}
 
 	hdd_clear_roam_profile_ie(adapter);
-	sme_reset_key(hdd_ctx->mac_handle, adapter->vdev_id);
+	ucfg_cm_reset_key(hdd_ctx->pdev, adapter->vdev_id);
 	hdd_wmm_dscp_initial_state(adapter);
 	hdd_debug("Disabling queues");
 	wlan_hdd_netif_queue_control(adapter,
@@ -646,6 +632,13 @@ static bool hdd_is_ese_assoc(enum csr_akm_type auth_type,
 }
 #endif
 
+static const uint8_t acm_mask_bit[WLAN_MAX_AC] = {
+	0x4,                    /* SME_AC_BK */
+	0x8,                    /* SME_AC_BE */
+	0x2,                    /* SME_AC_VI */
+	0x1                     /* SME_AC_VO */
+};
+
 static void hdd_wmm_cm_connect(struct wlan_objmgr_vdev *vdev,
 			       struct hdd_adapter *adapter,
 			       tDot11fBeaconIEs *bcn_ie,
@@ -751,6 +744,8 @@ static void hdd_cm_save_connect_info(struct hdd_adapter *adapter,
 				   crypto_params->authmodeset,
 				   crypto_params->key_mgmt,
 				   crypto_params->ucastcipherset);
+		sta_ctx->conn_info.last_auth_type =
+					sta_ctx->conn_info.auth_type;
 	}
 	des_chan = wlan_vdev_mlme_get_des_chan(adapter->vdev);
 
@@ -882,7 +877,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 
-	wlan_hdd_ft_set_key_delay(mac_handle, adapter);
+	wlan_hdd_ft_set_key_delay(vdev);
 	hdd_cm_update_rssi_snr_by_bssid(adapter);
 	hdd_cm_save_connect_status(adapter, rsp->status_code);
 
@@ -1386,7 +1381,7 @@ QDF_STATUS hdd_cm_ft_preauth_complete(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	sme_set_ft_pre_auth_state(mac_handle, wlan_vdev_get_id(vdev), true);
+	ucfg_cm_set_ft_pre_auth_state(vdev, true);
 
 	ft_event.target_ap = ft_ie;
 	ft_event.ies = (u8 *)(ft_ie + QDF_MAC_ADDR_SIZE);
@@ -1517,4 +1512,3 @@ QDF_STATUS hdd_cm_cckm_preauth_complete(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* FEATURE_WLAN_ESE */
 #endif /* WLAN_FEATURE_PREAUTH_ENABLE */
-#endif

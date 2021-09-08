@@ -39,6 +39,7 @@
 #include <wlan_reg_services_api.h>
 #include <wlan_utility.h>
 #include <../../core/src/wlan_cm_vdev_api.h>
+#include "rrm_api.h"
 
 /* Roam score for a neighbor AP will be calculated based on the below
  * definitions. The calculated roam score will be used to select the
@@ -504,7 +505,7 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 	if (QDF_STATUS_E_FAILURE == csr_roam_get_session_id_from_bssid(mac_ctx,
 			&rrm_ctx->sessionBssId, &session_id)) {
 		sme_debug("BSSID mismatch, using current session_id");
-		session_id = mac_ctx->roam.roamSession->sessionId;
+		session_id = mac_ctx->roam.roamSession->vdev_id;
 	}
 	status = sme_scan_get_result(mac_handle, (uint8_t)session_id,
 				     filter, &result_handle);
@@ -580,20 +581,11 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		goto rrm_send_scan_results_done;
 	}
 
-	/* This is temp ifdef will be removed in near future */
-#ifdef FEATURE_CM_ENABLE
 	if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id)) {
 		sme_err("Invaild session");
 		status = QDF_STATUS_E_FAILURE;
 		goto rrm_send_scan_results_done;
 	}
-#else
-	if (!csr_is_conn_state_connected_infra(mac_ctx, session_id)) {
-		sme_err("Invaild session");
-		status = QDF_STATUS_E_FAILURE;
-		goto rrm_send_scan_results_done;
-	}
-#endif
 
 	while (scan_results) {
 		/*
@@ -807,6 +799,13 @@ QDF_STATUS sme_rrm_issue_scan_req(struct mac_context *mac_ctx, uint8_t idx)
 		struct wlan_objmgr_vdev *vdev;
 		uint16_t i;
 		char *chan_buff = NULL;
+
+		if (!sme_rrm_ctx->channelList.numOfChannels ||
+		    !sme_rrm_ctx->channelList.freq_list) {
+			sme_err("[802.11 RRM]: Global freq list is null");
+			status = QDF_STATUS_E_FAILURE;
+			goto send_ind;
+		}
 
 		req = qdf_mem_malloc(sizeof(*req));
 		if (!req) {
@@ -1104,10 +1103,7 @@ QDF_STATUS sme_rrm_process_beacon_report_req_ind(struct mac_context *mac,
 		goto cleanup;
 	}
 
-	qdf_mem_zero(country, WNI_CFG_COUNTRY_CODE_LEN);
-	wlan_reg_read_current_country(mac->psoc, country);
-	if (!country[0])
-		country[2] = OP_CLASS_GLOBAL;
+	rrm_get_country_code_from_connected_profile(mac, session_id, country);
 
 	if (wlan_reg_is_6ghz_op_class(mac->pdev,
 				      beacon_req->channel_info.reg_class))

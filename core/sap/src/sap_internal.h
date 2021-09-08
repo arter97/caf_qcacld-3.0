@@ -171,6 +171,7 @@ struct sap_context {
 	uint32_t nStaWPARSnReqIeLength;
 	uint8_t pStaWpaRsnReqIE[MAX_ASSOC_IND_IE_LEN];
 
+	eCsrPhyMode phyMode;
 	uint32_t *freq_list;
 	uint8_t num_of_channel;
 	uint16_t ch_width_orig;
@@ -193,7 +194,9 @@ struct sap_context {
 	bool isCacEndNotified;
 	bool isCacStartNotified;
 	bool is_sap_ready_for_chnl_chng;
-
+#ifdef FEATURE_RADAR_HISTORY
+	struct prev_cac_result cac_result;
+#endif
 #ifdef FEATURE_AP_MCC_CH_AVOIDANCE
 	/*
 	 * In a setup having two MDM both operating in AP+AP MCC scenario

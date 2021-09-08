@@ -169,12 +169,13 @@ static void lim_process_sae_msg_ap(struct mac_context *mac,
 		assoc_ind_sent =
 			lim_send_assoc_ind_to_sme(mac, session,
 						  assoc_req->sub_type,
-						  &assoc_req->hdr,
+						  assoc_req->sa,
 						  assoc_req->assoc_req,
 						  ANI_AKM_TYPE_SAE,
 						  assoc_req->pmf_connection,
 						  &assoc_req_copied,
-						  assoc_req->dup_entry, false);
+						  assoc_req->dup_entry, false,
+						  assoc_req->partner_peer_idx);
 		if (!assoc_ind_sent)
 			lim_process_assoc_cleanup(mac, session,
 						  assoc_req->assoc_req,
@@ -1539,7 +1540,7 @@ void lim_process_abort_scan_ind(struct mac_context *mac_ctx,
 	req->cancel_req.vdev_id = vdev_id;
 	req->cancel_req.req_type = WLAN_SCAN_CANCEL_SINGLE;
 
-	status = ucfg_scan_cancel(req);
+	status = wlan_scan_cancel(req);
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("Cancel scan request failed");
 
@@ -1558,25 +1559,15 @@ static void lim_process_sme_obss_scan_ind(struct mac_context *mac_ctx,
 	session = pe_find_session_by_bssid(mac_ctx,
 			ht40_scanind->mac_addr.bytes, &session_id);
 	if (!session) {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			"OBSS Scan not started: session id is NULL");
+		pe_err("OBSS Scan not started: session id is NULL");
 		return;
 	}
+	pe_debug("OBSS Scan Req: vdev %d (pe session %d) htSupportedChannelWidthSet %d",
+		 session->vdev_id, session->peSessionId,
+		 session->htSupportedChannelWidthSet);
 	if (session->htSupportedChannelWidthSet ==
-			WNI_CFG_CHANNEL_BONDING_MODE_ENABLE) {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			"OBSS Scan Start Req: session id %d"
-			"htSupportedChannelWidthSet %d",
-			session->peSessionId,
-			session->htSupportedChannelWidthSet);
+	    WNI_CFG_CHANNEL_BONDING_MODE_ENABLE)
 		lim_send_ht40_obss_scanind(mac_ctx, session);
-	} else {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			"OBSS Scan not started: channel width - %d session %d",
-			session->htSupportedChannelWidthSet,
-			session->peSessionId);
-	}
-	return;
 }
 
 /**
@@ -1750,9 +1741,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #if defined FEATURE_WLAN_ESE
 	case eWNI_SME_ESE_ADJACENT_AP_REPORT:
 #endif
-#ifndef FEATURE_CM_ENABLE
-	case eWNI_SME_FT_PRE_AUTH_REQ:
-#endif
 	case eWNI_SME_FT_AGGR_QOS_REQ:
 	case eWNI_SME_REGISTER_MGMT_FRAME_REQ:
 #ifdef FEATURE_WLAN_ESE
@@ -1760,9 +1748,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #endif  /* FEATURE_WLAN_ESE */
 	case eWNI_SME_REGISTER_MGMT_FRAME_CB:
 	case eWNI_SME_EXT_CHANGE_CHANNEL:
-#ifndef FEATURE_CM_ENABLE
-	case eWNI_SME_ROAM_INVOKE:
-#endif
 		/* fall through */
 	case eWNI_SME_ROAM_SEND_SET_PCL_REQ:
 	case eWNI_SME_SET_ADDBA_ACCEPT:
@@ -1894,6 +1879,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		lim_handle_delete_bss_rsp(mac_ctx, msg->bodyptr);
 		break;
 	case WMA_CSA_OFFLOAD_EVENT:
+	case eWNI_SME_CSA_REQ:
 		lim_handle_csa_offload_msg(mac_ctx, msg);
 		break;
 	case WMA_SET_BSSKEY_RSP:
@@ -2090,6 +2076,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
+#ifndef ROAM_TARGET_IF_CONVERGENCE
 	case WMA_ROAM_BLACKLIST_MSG:
 		lim_add_roam_blacklist_ap(mac_ctx,
 					  (struct roam_blacklist_event *)
@@ -2097,9 +2084,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
+#endif
 	case SIR_LIM_PROCESS_DEFERRED_QUEUE:
 		break;
-#ifdef FEATURE_CM_ENABLE
 	case CM_BSS_PEER_CREATE_REQ:
 		cm_process_peer_create(msg);
 		break;
@@ -2115,7 +2102,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case CM_PREAUTH_REQ:
 		cm_process_preauth_req(msg);
 		break;
-#endif
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;

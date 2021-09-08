@@ -3331,7 +3331,7 @@ void hdd_send_rps_disable_ind(struct hdd_adapter *adapter)
 	cds_cfg->rps_enabled = false;
 }
 
-#ifdef IPA_LAN_RX_NAPI_SUPPORT
+#ifdef QCA_CONFIG_RPS
 void hdd_adapter_set_rps(uint8_t vdev_id, bool enable)
 {
 	struct hdd_context *hdd_ctx;
@@ -3411,18 +3411,16 @@ void hdd_reset_tcp_delack(struct hdd_context *hdd_ctx)
 
 void hdd_reset_tcp_adv_win_scale(struct hdd_context *hdd_ctx)
 {
-	enum wlan_tp_level next_level = WLAN_SVC_TP_LOW;
+	enum wlan_tp_level next_level = WLAN_SVC_TP_NONE;
 	struct wlan_rx_tp_data rx_tp_data = {0};
 
 	if (!hdd_ctx->config->enable_tcp_adv_win_scale)
 		return;
 
-	if (hdd_ctx->cur_rx_level != next_level) {
-		rx_tp_data.rx_tp_flags |= TCP_ADV_WIN_SCL;
-		rx_tp_data.level = next_level;
-		hdd_ctx->cur_rx_level = next_level;
-		wlan_hdd_update_tcp_rx_param(hdd_ctx, &rx_tp_data);
-	}
+	rx_tp_data.rx_tp_flags |= TCP_ADV_WIN_SCL;
+	rx_tp_data.level = next_level;
+	hdd_ctx->cur_rx_level = WLAN_SVC_TP_NONE;
+	wlan_hdd_update_tcp_rx_param(hdd_ctx, &rx_tp_data);
 }
 
 /**

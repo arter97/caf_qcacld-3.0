@@ -36,7 +36,7 @@
 #include "wlan_hdd_power.h"
 #include "wlan_hdd_tsf.h"
 #include <linux/vmalloc.h>
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)) && defined(MSM_PLATFORM)
 #include <linux/qcom-iommu-util.h>
 #endif
 #include <scheduler_core.h>
@@ -109,9 +109,11 @@ struct cds_hang_event_fixed_param {
 static inline int
 cds_send_delba(struct cdp_ctrl_objmgr_psoc *psoc,
 	       uint8_t vdev_id, uint8_t *peer_macaddr,
-	       uint8_t tid, uint8_t reason_code)
+	       uint8_t tid, uint8_t reason_code,
+	       uint8_t cdp_reason_code)
 {
-	return wma_dp_send_delba_ind(vdev_id, peer_macaddr, tid, reason_code);
+	return wma_dp_send_delba_ind(vdev_id, peer_macaddr, tid,
+				     reason_code, cdp_reason_code);
 }
 
 static struct ol_if_ops  dp_ol_if_ops = {
@@ -1038,7 +1040,8 @@ static bool cds_should_suspend_target(void)
 	if (target_type == TARGET_TYPE_AR6320 ||
 	    target_type == TARGET_TYPE_AR6320V1 ||
 	    target_type == TARGET_TYPE_AR6320V2 ||
-	    target_type == TARGET_TYPE_AR6320V3)
+	    target_type == TARGET_TYPE_AR6320V3 ||
+	    target_type == TARGET_TYPE_QCN7605)
 		return false;
 
 	/* target should support suspend in FTM mode */
@@ -1108,13 +1111,13 @@ QDF_STATUS cds_pre_enable(void)
 	status = wma_pre_start();
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Failed to WMA prestart");
-		return QDF_STATUS_E_FAILURE;
+		goto exit_pkt_log;
 	}
 
 	status = htc_start(gp_cds_context->htc_ctx);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		cds_err("Failed to Start HTC");
-		goto exit_with_status;
+		goto exit_pkt_log;
 	}
 
 	status = wma_wait_for_ready_event(gp_cds_context->wma_context);
@@ -1151,7 +1154,12 @@ stop_wmi:
 	htc_stop(gp_cds_context->htc_ctx);
 
 	wma_wmi_work_close();
-exit_with_status:
+
+exit_pkt_log:
+	if (QDF_GLOBAL_FTM_MODE != cds_get_conparam() &&
+	    QDF_GLOBAL_EPPING_MODE != cds_get_conparam())
+		cdp_pkt_log_exit(soc, OL_TXRX_PDEV_ID);
+
 	return status;
 }
 

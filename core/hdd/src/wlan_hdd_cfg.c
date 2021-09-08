@@ -752,16 +752,16 @@ QDF_STATUS hdd_set_policy_mgr_user_cfg(struct hdd_context *hdd_ctx)
 	return status;
 }
 
-eCsrRoamWmmUserModeType hdd_to_csr_wmm_mode(uint8_t mode)
+enum wmm_user_mode hdd_to_csr_wmm_mode(uint8_t mode)
 {
 	switch (mode) {
 	case HDD_WMM_USER_MODE_QBSS_ONLY:
-		return eCsrRoamWmmQbssOnly;
+		return WMM_USER_MODE_QBSS_ONLY;
 	case HDD_WMM_USER_MODE_NO_QOS:
-		return eCsrRoamWmmNoQos;
+		return WMM_USER_MODE_NO_QOS;
 	case HDD_WMM_USER_MODE_AUTO:
 	default:
-		return eCsrRoamWmmAuto;
+		return WMM_USER_MODE_AUTO;
 	}
 }
 
@@ -941,9 +941,7 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 	 */
 	sme_config->csr_config.phyMode =
 		hdd_cfg_xlate_to_csr_phy_mode(config->dot11Mode);
-#ifndef FEATURE_CM_ENABLE
-	sme_update_nud_config(mac_handle, config->enable_nud_tracking);
-#endif
+
 	if (config->dot11Mode == eHDD_DOT11_MODE_abg ||
 	    config->dot11Mode == eHDD_DOT11_MODE_11b ||
 	    config->dot11Mode == eHDD_DOT11_MODE_11g ||

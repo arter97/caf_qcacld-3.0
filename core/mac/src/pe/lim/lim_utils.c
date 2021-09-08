@@ -72,6 +72,9 @@
 #ifdef WLAN_FEATURE_11BE
 #include "wma_eht.h"
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+#include <lim_mlo.h>
+#endif
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -5187,6 +5190,263 @@ void lim_set_vht_caps(struct mac_context *p_mac, struct pe_session *p_session_en
 	}
 }
 
+/*
+ * Firmware will send RTS for every frame and also will disable SIFS bursting
+ * if value 0x11 is sent for RTS profile.
+ */
+#define A_EDCA_SCC_RTS_PROFILE_VALUE 0x11
+#define MAX_NUMBER_OF_SINGLE_PORT_CONC_CONNECTIONS 2
+
+static void lim_update_sta_edca_params(struct mac_context *mac,
+				       struct pe_session *sta_session)
+{
+	uint8_t i;
+
+	for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
+		sta_session->gLimEdcaParamsActive[i] =
+						sta_session->gLimEdcaParams[i];
+	}
+	lim_send_edca_params(mac,
+			     sta_session->gLimEdcaParamsActive,
+			     sta_session->vdev_id, false);
+}
+
+/**
+ * lim_check_conc_and_send_edca() - Function to check and update EDCA params
+ *                                  and RTS profile based on STA/SAP
+ *                                  concurrency. If updated, it will also send
+ *                                  the updated parameters to FW. It will update
+ * EDCA params and RTS profile such that:
+ *       1) For STA and SAP concurrency, send STA's AP EDCA params to fw.
+ *          Also, for SAP or P2P Go, update the value in Broadcast EDCA params
+ *          as well so that it should be broadcasted to other stations connected
+ *          to that BSS. Also, update the RTS profile value to 0x11 for which
+ *          FW will send RTS for every frame and will also disable SIFS
+ *          bursting.
+ *
+ *       2) For standalone STA (can even happen after SAP/P2P Go
+ *          disconnects), if the parameters are updated, reset them to original
+ *          parameters and send them to FW. Also, update the RTS profile
+ *          value to which it was set before.
+ *
+ *       3) For standalone SAP (can even happen after STA disconnects),
+ *          if the parameters are updated, reset them to original
+ *          parameters and send them to FW and reset the  Broadcast EDCA params
+ *          as well so that it should be broadcasted to other stations connected
+ *          to that BSS Also, update the RTS profile value to which it was set
+ *          before.
+ *
+ * This update is needed because throughput drop was seen because of
+ * inconsistency in the EDCA params used in STA-SAP or STA-P2P_GO concurrency.
+ *
+ * Return: void
+ */
+
+static void lim_check_conc_and_send_edca(struct mac_context *mac,
+					 struct pe_session *sta_session,
+					 struct pe_session *sap_session)
+{
+	bool params_update_required = false;
+	uint8_t i;
+	tpDphHashNode sta_ds = NULL;
+	QDF_STATUS status;
+	uint16_t assoc_id;
+
+	if (sta_session && sap_session &&
+	    (sta_session->curr_op_freq ==
+	     sap_session->curr_op_freq)) {
+	/* RTS profile update to FW */
+		wma_cli_set_command(sap_session->vdev_id,
+				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    A_EDCA_SCC_RTS_PROFILE_VALUE,
+				    VDEV_CMD);
+		wma_cli_set_command(sta_session->vdev_id,
+				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    A_EDCA_SCC_RTS_PROFILE_VALUE,
+				    VDEV_CMD);
+
+		sta_ds = dph_lookup_hash_entry(mac,
+					       sta_session->bssId,
+					       &assoc_id,
+					       &sta_session->dph.dphHashTable);
+
+		if (!sta_ds) {
+			pe_debug("No STA DS entry found for " QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(sta_session->bssId));
+			return;
+		}
+
+		if (!sta_ds->qos.peer_edca_params.length) {
+			pe_debug("No sta_ds edca_params present");
+			return;
+		}
+
+	/*
+	 * Here what we do is disable A-EDCA by sending the edca params of
+	 * connected AP which we got as part of assoc resp So as these EDCA
+	 * params are updated per mac , its fine to send for SAP which will
+	 * be used for STA as well on the same channel. No need to send for
+	 * both SAP and STA.
+	 */
+
+		sap_session->gLimEdcaParamsBC[QCA_WLAN_AC_BE] =
+				sta_ds->qos.peer_edca_params.acbe;
+		sap_session->gLimEdcaParamsBC[QCA_WLAN_AC_BK] =
+				sta_ds->qos.peer_edca_params.acbk;
+		sap_session->gLimEdcaParamsBC[QCA_WLAN_AC_VI] =
+				sta_ds->qos.peer_edca_params.acvi;
+		sap_session->gLimEdcaParamsBC[QCA_WLAN_AC_VO] =
+				sta_ds->qos.peer_edca_params.acvo;
+
+		sap_session->gLimEdcaParamsActive[QCA_WLAN_AC_BE] =
+				sta_ds->qos.peer_edca_params.acbe;
+		sap_session->gLimEdcaParamsActive[QCA_WLAN_AC_BK] =
+				sta_ds->qos.peer_edca_params.acbk;
+		sap_session->gLimEdcaParamsActive[QCA_WLAN_AC_VI] =
+				sta_ds->qos.peer_edca_params.acvi;
+		sap_session->gLimEdcaParamsActive[QCA_WLAN_AC_VO] =
+				sta_ds->qos.peer_edca_params.acvo;
+
+		for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
+			sta_session->gLimEdcaParamsActive[i] =
+				sap_session->gLimEdcaParamsActive[i];
+		}
+		/* For AP, the bssID is stored in LIM Global context. */
+		lim_send_edca_params(mac, sap_session->gLimEdcaParamsActive,
+				     sap_session->vdev_id, false);
+
+		sap_session->gLimEdcaParamSetCount++;
+		status = sch_set_fixed_beacon_fields(mac, sap_session);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_debug("Unable to set beacon fields!");
+
+	} else if (!sap_session && sta_session) {
+	/*
+	 * Enable A-EDCA for standalone STA. The original EDCA parameters are
+	 * stored in gLimEdcaParams (computed by sch_beacon_edca_process()),
+	 * if active parameters are not equal that means they have been updated
+	 * because of conncurrency and are need to be restored now
+	 */
+
+		wma_cli_set_command(sta_session->vdev_id,
+				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    cfg_get(mac->psoc,
+					    CFG_ENABLE_FW_RTS_PROFILE),
+				    VDEV_CMD);
+		for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
+			if (qdf_mem_cmp(&sta_session->gLimEdcaParamsActive[i],
+					&sta_session->gLimEdcaParams[i],
+					sizeof(tSirMacEdcaParamRecord))) {
+				pe_debug("local sta EDCA params are not equal to Active EDCA params, hence update required");
+				params_update_required = true;
+				break;
+			}
+		}
+
+		if (params_update_required) {
+			lim_update_sta_edca_params(mac,
+						   sta_session);
+		}
+	} else {
+	/*
+	 * For STA+SAP/GO DBS, STA+SAP/GO MCC or standalone SAP/GO
+	 */
+
+		wma_cli_set_command(sap_session->vdev_id,
+				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    cfg_get(mac->psoc,
+					    CFG_ENABLE_FW_RTS_PROFILE),
+				    VDEV_CMD);
+		if (sta_session)
+			wma_cli_set_command(sta_session->vdev_id,
+					    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+					    cfg_get(mac->psoc,
+						    CFG_ENABLE_FW_RTS_PROFILE),
+					    VDEV_CMD);
+
+		for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
+			if (qdf_mem_cmp(&sap_session->gLimEdcaParamsActive[i],
+					&sap_session->gLimEdcaParams[i],
+					sizeof(tSirMacEdcaParamRecord))) {
+				pe_debug("local sap EDCA params are not equal to Active EDCA params, hence update required");
+				params_update_required = true;
+				break;
+			}
+		}
+
+		if (params_update_required) {
+			for (i = QCA_WLAN_AC_BE; i < QCA_WLAN_AC_ALL; i++) {
+				sap_session->gLimEdcaParamsActive[i] =
+					sap_session->gLimEdcaParams[i];
+			}
+			lim_send_edca_params(mac,
+					     sap_session->gLimEdcaParamsActive,
+					     sap_session->vdev_id, false);
+			sch_qos_update_broadcast(mac, sap_session);
+
+	/*
+	 * In case of mcc, where cb can come from scc to mcc swtich where we
+	 * need to restore the default parameters
+	 */
+			if (sta_session) {
+				lim_update_sta_edca_params(mac,
+							   sta_session);
+				}
+		}
+	}
+}
+
+void lim_send_conc_params_update(void)
+{
+	struct pe_session *sta_session = NULL;
+	struct pe_session *sap_session = NULL;
+	uint8_t i;
+	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
+
+	if (!mac)
+		return;
+
+	if (!mac->mlme_cfg->edca_params.enable_edca_params ||
+	    (policy_mgr_get_connection_count(mac->psoc) >
+	     MAX_NUMBER_OF_SINGLE_PORT_CONC_CONNECTIONS)) {
+		pe_debug("A-EDCA not enabled or max number of connections: %d",
+			 policy_mgr_get_connection_count(mac->psoc));
+		return;
+	}
+
+	for (i = 0; i < mac->lim.maxBssId; i++) {
+		/*
+		 * Finding whether STA or Go session exists
+		 */
+		if (sta_session && sap_session)
+			break;
+
+		if ((mac->lim.gpSession[i].valid) &&
+		    (mac->lim.gpSession[i].limSystemRole ==
+		     eLIM_STA_ROLE)) {
+			sta_session = &mac->lim.gpSession[i];
+			continue;
+		}
+		if ((mac->lim.gpSession[i].valid) &&
+		    ((mac->lim.gpSession[i].limSystemRole == eLIM_AP_ROLE) ||
+		    (mac->lim.gpSession[i].limSystemRole ==
+		     eLIM_P2P_DEVICE_GO))) {
+			sap_session = &mac->lim.gpSession[i];
+			continue;
+		}
+	}
+
+	if (!(sta_session || sap_session)) {
+		pe_debug("No sta or sap or P2P go session");
+		return;
+	}
+
+	pe_debug("Valid STA session: %d Valid SAP session: %d",
+		 (sta_session ? sta_session->valid : 0),
+		 (sap_session ? sap_session->valid : 0));
+	lim_check_conc_and_send_edca(mac, sta_session, sap_session);
+}
+
 /**
  * lim_validate_received_frame_a1_addr() - To validate received frame's A1 addr
  * @mac_ctx: pointer to mac context
@@ -6039,6 +6299,10 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 	if (!src->present)
 		return;
 
+	pe_debug("source extended capabilities length:%d", src->num_bytes);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   src, src->num_bytes);
+
 	/* Return if strip the capabilities from @dst which not present */
 	if (!dst->present && !add)
 		return;
@@ -6053,10 +6317,15 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 		tempsrc++;
 	}
 	dst->num_bytes = lim_compute_ext_cap_ie_length(dst);
-	if (dst->num_bytes == 0)
+	if (dst->num_bytes == 0) {
 		dst->present = 0;
-	else
+	} else {
 		dst->present = 1;
+		pe_debug("destination extended capabilities length: %d",
+			 dst->num_bytes);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   dst, dst->num_bytes);
+	}
 }
 
 /**
@@ -6645,6 +6914,12 @@ static void lim_intersect_he_caps(tDot11fIEhe_cap *rcvd_he,
 	else
 		peer_he->tb_ppdu_tx_stbc_gt_80mhz = 0;
 
+	if (session_he->htc_he && peer_he->htc_he)
+		peer_he->htc_he = 1;
+	else
+		peer_he->htc_he = 0;
+	pe_debug("intersected htc he is: %d", peer_he->htc_he);
+
 	/* Tx Doppler is first bit and Rx Doppler is second bit */
 	if (session_he->doppler) {
 		val = 0;
@@ -7168,7 +7443,6 @@ void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops,
 				 he_ops->oper_info_6g.info.dup_bcon,
 				 he_ops->oper_info_6g.info.min_rate);
 	}
-
 }
 
 void lim_log_he_6g_cap(struct mac_context *mac,
@@ -7263,7 +7537,14 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 		session->vhtCapability = 0;
 	else if (wlan_reg_is_5ghz_ch_freq(new_chan_freq))
 		session->vhtCapability = 1;
+	/*
+	 * Re-initialize color bss parameters during channel change
+	 */
 
+	session->he_op.bss_col_disabled = 1;
+	session->bss_color_changing = 1;
+	session->he_bss_color_change.new_color = session->he_op.bss_color;
+	session->he_bss_color_change.countdown = BSS_COLOR_SWITCH_COUNTDOWN;
 	pe_debug("he_capable: %d ht %d vht %d 6ghz_band %d new freq %d vht in 2.4gh %d",
 		 session->he_capable, session->htCapability,
 		 session->vhtCapability, session->he_6ghz_band, new_chan_freq,
@@ -7694,6 +7975,21 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 		 rates->rx_he_mcs_map_80_80, rates->tx_he_mcs_map_80_80);
 
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void lim_update_sta_mlo_info(tpAddStaParams add_sta_params,
+			     tpDphHashNode sta_ds)
+{
+	if (add_sta_params->eht_capable) {
+		WLAN_ADDR_COPY(add_sta_params->mld_mac_addr, sta_ds->mld_addr);
+		add_sta_params->is_assoc_peer = lim_is_mlo_recv_assoc(sta_ds);
+	}
+	pe_debug("eht_capable: %d mld mac " QDF_MAC_ADDR_FMT " assoc peer %d",
+		 add_sta_params->eht_capable,
+		 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
+		 add_sta_params->is_assoc_peer);
 }
 #endif
 
@@ -8897,8 +9193,8 @@ QDF_STATUS lim_get_capability_info(struct mac_context *mac, uint16_t *pcap,
 		pcap_info->shortPreamble =
 			mac->mlme_cfg->ht_caps.short_preamble;
 
-	/* PBCC bit */
-	pcap_info->pbcc = 0;
+	/* criticalUpdateFlag bit */
+	pcap_info->criticalUpdateFlag = 0;
 
 	/* Channel agility bit */
 	pcap_info->channelAgility = 0;

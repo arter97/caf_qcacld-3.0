@@ -102,6 +102,19 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				struct wlan_roam_rssi_change_params *params);
 
 /**
+ * cm_roam_is_change_in_band_allowed  - Check whether change in roam band is
+ * allowed in FW or not
+ * @psoc: psoc pointer
+ * @vdev_id: VDEV id
+ * @roam_band_mask: band mask to check
+ *
+ * Return: return true if change in band allowed
+ */
+bool
+cm_roam_is_change_in_band_allowed(struct wlan_objmgr_psoc *psoc,
+				  uint8_t vdev_id, uint32_t roam_band_mask);
+
+/**
  * cm_dump_freq_list() - dump chan list
  * @chan_info: chan info to dump
  *
@@ -109,7 +122,6 @@ cm_roam_fill_rssi_change_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  */
 void cm_dump_freq_list(struct rso_chan_info *chan_info);
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * cm_start_roam_invoke() - Validate and send Roam invoke req to CM
  * @pdev: Pdev pointer
@@ -126,7 +138,6 @@ cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 		     struct qdf_mac_addr *bssid,
 		     uint32_t chan_freq,
 		     enum wlan_cm_source source);
-#endif
 #endif
 
 #ifdef FEATURE_WLAN_ESE

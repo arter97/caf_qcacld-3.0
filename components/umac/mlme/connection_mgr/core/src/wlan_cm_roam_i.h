@@ -31,7 +31,7 @@
 #include "wlan_objmgr_vdev_obj.h"
 #include "connection_mgr/core/src/wlan_cm_main.h"
 #include "wlan_cm_roam_public_struct.h"
-#ifdef FEATURE_CM_ENABLE
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * cm_add_fw_roam_dummy_ser_cb() - Add dummy blocking command
@@ -110,12 +110,12 @@ QDF_STATUS cm_abort_fw_roam(struct cnx_mgr *cm_ctx,
  * Return: QDF_STATUS
  */
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			       uint8_t *event, uint32_t event_data_len);
+			       void *event, uint32_t event_data_len);
 
 /**
  * cm_fw_roam_sync_start_ind() - Handle roam sync req
  * @vdev: Vdev objmgr
- * @roam_synch_data: Roam sync data ptr
+ * @roam_reason: Roam reason
  *
  * This function handles roam sync event to connection manager
  * state machine
@@ -124,7 +124,7 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  */
 QDF_STATUS
 cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
-			  struct roam_offload_synch_ind *roam_synch_data);
+			  uint8_t roam_reason);
 
 /**
  * cm_fw_roam_sync_propagation() - Post roam sync propagation to CM SM
@@ -167,25 +167,6 @@ void cm_fw_ho_fail_req(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 				  uint8_t vdev_id);
-#ifdef WLAN_FEATURE_FIPS
-/**
- * cm_roam_pmkid_req_ind() - Function to handle
- * roam event from firmware for pmkid generation.
- * @psoc: psoc pointer
- * @vdev_id: Vdev id
- * @bss_list: candidate AP bssid list
- */
-QDF_STATUS
-cm_roam_pmkid_req_ind(struct wlan_objmgr_psoc *psoc,
-		      uint8_t vdev_id, struct roam_pmkid_req_event *bss_list);
-#else /* WLAN_FEATURE_FIPS */
-static inline QDF_STATUS
-cm_roam_pmkid_req_ind(struct wlan_objmgr_psoc *psoc,
-		      uint8_t vdev_id, struct roam_pmkid_req_event *bss_list)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* WLAN_FEATURE_FIPS */
 #else /*WLAN_FEATURE_ROAM_OFFLOAD */
 static inline
 QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
@@ -193,6 +174,5 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
-#endif /*WLAN_FEATURE_ROAM_OFFLOAD */
-#endif /* FEATURE_CM_ENABLE */
+#endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 #endif /* _WLAN_CM_ROAM_I_H_ */

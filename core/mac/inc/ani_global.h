@@ -30,7 +30,6 @@
 #include "sir_api.h"
 
 #include "csr_api.h"
-#include "sme_ft_api.h"
 #include "csr_support.h"
 #include "sme_internal.h"
 #include "sap_api.h"
@@ -746,9 +745,6 @@ struct mac_context {
 	struct wlan_mlme_chain_cfg fw_chain_cfg;
 	struct wlan_mlme_cfg *mlme_cfg;
 	tAniSirLim lim;
-#ifndef FEATURE_CM_ENABLE
-	uint8_t nud_fail_behaviour;
-#endif
 	struct sch_context sch;
 	tAniSirSys sys;
 
@@ -789,6 +785,7 @@ struct mac_context {
 	uint32_t rx_mc_bc_cnt;
 	/* 11k Offload Support */
 	bool is_11k_offload_supported;
+	uint8_t reject_addba_req;
 	bool usr_cfg_ps_enable;
 	uint16_t usr_cfg_ba_buff_size;
 	bool is_usr_cfg_amsdu_enabled;

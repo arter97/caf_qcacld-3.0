@@ -24,15 +24,8 @@
 #ifndef __CFG_MLME_QOS_H
 #define __CFG_MLME_QOS_H
 
-#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-	defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
-
 #define ADDBA_TXAGGR_SIZE 256
-#else
-#define ADDBA_TXAGGR_SIZE 64
-#endif
 
-#ifdef TX_AGGREGATION_SIZE_ENABLE
 /*
  * <ini>
  * gTxAggregationSize - Gives an option to configure Tx aggregation size
@@ -172,22 +165,12 @@
 			CFG_VALUE_OR_DEFAULT, \
 			"Tx Aggregation size value for VO")
 
-#define CFG_QOS_TX_AGGREGATION \
-	CFG(CFG_TX_AGGREGATION_SIZE) \
-	CFG(CFG_TX_AGGREGATION_SIZEBE) \
-	CFG(CFG_TX_AGGREGATION_SIZEBK) \
-	CFG(CFG_TX_AGGREGATION_SIZEVI) \
-	CFG(CFG_TX_AGGREGATION_SIZEVO)
-#else
-#define CFG_QOS_TX_AGGREGATION
-#endif
-
 /*
  * <ini>
  * gRxAggregationSize - Gives an option to configure Rx aggregation size
  * in no of MPDUs
  * @Min: 1
- * @Max: 64
+ * @Max: 256
  * @Default: 64
  *
  * gRxAggregationSize gives an option to configure Rx aggregation size
@@ -204,32 +187,11 @@
 #define CFG_RX_AGGREGATION_SIZE CFG_INI_UINT( \
 			"gRxAggregationSize", \
 			1, \
-			64, \
+			256, \
 			64, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Rx Aggregation size value")
 
-/*
- * <ini>
- * reject_addba_req - Configure Rx ADDBA Req reject for PEER AP
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * reject_addba_req gives an option to reject ADDBA Req from PEER AP
- *
- * Related: None
- *
- * Supported Feature: STA
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_REJECT_ADDBA_REQ CFG_INI_BOOL( \
-			"reject_addba_req", \
-			0, \
-			"Addba Req Reject")
 /*
  * <ini>
  * gTxAggSwRetryBE - Configure Tx aggregation sw retry for BE
@@ -582,8 +544,12 @@
 		"Used to configure OUI based tx aggr size for msdu/mpdu")
 
 #define CFG_QOS_ALL \
-	CFG_QOS_TX_AGGREGATION \
 	CFG(CFG_SAP_MAX_INACTIVITY_OVERRIDE) \
+	CFG(CFG_TX_AGGREGATION_SIZE) \
+	CFG(CFG_TX_AGGREGATION_SIZEBE) \
+	CFG(CFG_TX_AGGREGATION_SIZEBK) \
+	CFG(CFG_TX_AGGREGATION_SIZEVI) \
+	CFG(CFG_TX_AGGREGATION_SIZEVO) \
 	CFG(CFG_RX_AGGREGATION_SIZE) \
 	CFG(CFG_TX_AGGR_SW_RETRY_BE) \
 	CFG(CFG_TX_AGGR_SW_RETRY_BK) \
@@ -596,7 +562,6 @@
 	CFG(CFG_TX_NON_AGGR_SW_RETRY_VO) \
 	CFG(CFG_TX_NON_AGGR_SW_RETRY) \
 	CFG(CFG_SAP_QOS_UAPSD) \
-	CFG(CFG_TX_IOT_AGGR) \
-	CFG(CFG_REJECT_ADDBA_REQ)
+	CFG(CFG_TX_IOT_AGGR)
 
 #endif /* __CFG_MLME_QOS_H */

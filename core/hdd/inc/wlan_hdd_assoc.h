@@ -264,6 +264,14 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 void hdd_abort_ongoing_sta_connection(struct hdd_context *hdd_ctx);
 
 /**
+ * hdd_is_any_sta_connected() - check if any sta in connected state
+ * @hdd_ctx: hdd context
+ *
+ * Return: true if any connected sta
+ */
+bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx);
+
+/**
  * hdd_sme_roam_callback() - hdd sme roam callback
  * @context: pointer to adapter context
  * @roam_info: pointer to roam info
@@ -279,28 +287,6 @@ QDF_STATUS hdd_sme_roam_callback(void *context,
 				 eRoamCmdStatus roam_status,
 				 eCsrRoamResult roam_result);
 
-#ifndef FEATURE_CM_ENABLE
-/**
- * hdd_set_genie_to_csr() - set genie to csr
- * @adapter: pointer to adapter
- * @rsn_auth_type: pointer to auth type
- *
- * Return: 0 on success, error number otherwise
- */
-int hdd_set_genie_to_csr(struct hdd_adapter *adapter,
-			 enum csr_akm_type *rsn_auth_type);
-
-
-/**
- * hdd_set_csr_auth_type() - set csr auth type
- * @adapter: pointer to adapter
- * @rsn_auth_type: auth type
- *
- * Return: 0 on success, error number otherwise
- */
-int hdd_set_csr_auth_type(struct hdd_adapter *adapter,
-			  enum csr_akm_type rsn_auth_type);
-#endif
 #ifdef FEATURE_WLAN_TDLS
 /**
  * hdd_roam_register_tdlssta() - register new TDLS station
@@ -397,37 +383,6 @@ bool hdd_save_peer(struct hdd_station_ctx *sta_ctx,
 void hdd_delete_peer(struct hdd_station_ctx *sta_ctx,
 		     struct qdf_mac_addr *peer_mac_addr);
 
-#ifndef FEATURE_CM_ENABLE
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-QDF_STATUS
-hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
-			     const tSirMacAddr bssid, uint32_t ch_freq);
-
-/**
- * hdd_save_gtk_params() - Save GTK offload params
- * @adapter: HDD adapter
- * @csr_roam_info: CSR roam info
- * @is_reassoc: boolean to indicate roaming
- *
- * Return: None
- */
-void hdd_save_gtk_params(struct hdd_adapter *adapter,
-			 struct csr_roam_info *csr_roam_info, bool is_reassoc);
-#else
-static inline void hdd_save_gtk_params(struct hdd_adapter *adapter,
-				       struct csr_roam_info *csr_roam_info,
-				       bool is_reassoc)
-{
-}
-static inline QDF_STATUS
-hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
-			     const tSirMacAddr bssid, uint32_t ch_freq)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-#endif
-
 /**
  * hdd_copy_ht_caps()- copy ht caps info from roam ht caps
  * info to source ht_cap info of type ieee80211_ht_cap.
@@ -481,7 +436,6 @@ void hdd_roam_profile_init(struct hdd_adapter *adapter);
  */
 bool hdd_any_valid_peer_present(struct hdd_adapter *adapter);
 
-#ifdef FEATURE_CM_ENABLE
 /**
  * hdd_cm_register_cb() - Sets legacy callbacks to osif
  *
@@ -500,19 +454,7 @@ QDF_STATUS hdd_cm_register_cb(void);
  *
  * Return: QDF_STATUS
  */
-
 void hdd_cm_unregister_cb(void);
-
-#else
-static inline QDF_STATUS hdd_cm_register_cb(void)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline void hdd_cm_unregister_cb(void)
-{
-}
-#endif
 
 /**
  * hdd_conn_remove_connect_info() - remove connection info
@@ -591,16 +533,14 @@ bool hdd_is_roam_sync_in_progress(struct hdd_context *hdd_ctx, uint8_t vdev_id);
 #ifdef WLAN_FEATURE_HOST_ROAM
 /**
  * wlan_hdd_ft_set_key_delay() - hdd set key delayed for FT mode
- * @mac_handle: mac handler
- * @adapter: pointer to adapter context
+ * @vdev: vdev
  *
  * Return: void
  */
-void
-wlan_hdd_ft_set_key_delay(mac_handle_t mac_handle, struct hdd_adapter *adapter);
+void wlan_hdd_ft_set_key_delay(struct wlan_objmgr_vdev *vdev);
 #else
 static inline void
-wlan_hdd_ft_set_key_delay(mac_handle_t mac_handle, struct hdd_adapter *adapter)
+wlan_hdd_ft_set_key_delay(struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif

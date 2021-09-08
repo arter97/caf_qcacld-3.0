@@ -33,7 +33,6 @@
 #include "wlan_objmgr_global_obj.h"
 #include "wlan_utility.h"
 #include "wlan_mlme_ucfg_api.h"
-#include "csr_neighbor_roam.h"
 
 /**
  * first_connection_pcl_table - table which provides PCL for the
@@ -1020,8 +1019,8 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 	/* once the PCL enum is obtained find out the exact channel list with
 	 * help from sme_get_cfg_valid_channels
 	 */
-	status = policy_mgr_get_channel_list(psoc, pcl, pcl_channels, len, mode,
-					pcl_weight, weight_len);
+	status = policy_mgr_get_channel_list(psoc, pcl, mode, pcl_channels,
+					     pcl_weight, weight_len, len);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get channel list:%d", status);
 		return status;
@@ -1184,9 +1183,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_P2P_CLI_SAP_MCC_24_1x1;
 			else
 				index = PM_P2P_CLI_SAP_MCC_24_2x2;
-		} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[0].freq)) &&
-			(WLAN_REG_IS_5GHZ_CH_FREQ(
+			!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 			pm_conc_connection_list[0].chain_mask)
@@ -1204,13 +1203,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_P2P_CLI_SAP_SBS_5_1x1;
+			else
+				index = PM_P2P_CLI_SAP_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==
@@ -1256,9 +1257,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_STA_SAP_MCC_24_1x1;
 			else
 				index = PM_STA_SAP_MCC_24_2x2;
-		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!WLAN_REG_IS_24GHZ_CH_FREQ(
 			   pm_conc_connection_list[0].freq) &&
-			   WLAN_REG_IS_5GHZ_CH_FREQ(
+			   !WLAN_REG_IS_24GHZ_CH_FREQ(
 			   pm_conc_connection_list[1].freq)) {
 			if (POLICY_MGR_ONE_ONE ==
 			pm_conc_connection_list[0].chain_mask)
@@ -1276,13 +1277,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_STA_SAP_SBS_5_1x1;
+			else
+				index = PM_STA_SAP_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==
@@ -1328,9 +1331,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_SAP_SAP_MCC_24_1x1;
 			else
 				index = PM_SAP_SAP_MCC_24_2x2;
-		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!WLAN_REG_IS_24GHZ_CH_FREQ(
 			   pm_conc_connection_list[0].freq) &&
-			   WLAN_REG_IS_5GHZ_CH_FREQ(
+			   !WLAN_REG_IS_24GHZ_CH_FREQ(
 			   pm_conc_connection_list[1].freq)) {
 			if (POLICY_MGR_ONE_ONE ==
 			pm_conc_connection_list[0].chain_mask)
@@ -1348,13 +1351,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq) &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq)) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_SAP_SAP_SBS_5_1x1;
+			else
+				index = PM_SAP_SAP_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==
@@ -1400,9 +1405,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_STA_P2P_GO_MCC_24_1x1;
 			else
 				index = PM_STA_P2P_GO_MCC_24_2x2;
-		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!WLAN_REG_IS_24GHZ_CH_FREQ(
 			   pm_conc_connection_list[0].freq) &&
-			   WLAN_REG_IS_5GHZ_CH_FREQ(
+			   !WLAN_REG_IS_24GHZ_CH_FREQ(
 			   pm_conc_connection_list[1].freq)) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
@@ -1420,13 +1425,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_STA_P2P_GO_SBS_5_1x1;
+			else
+				index = PM_STA_P2P_GO_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==
@@ -1472,9 +1479,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_STA_P2P_CLI_MCC_24_1x1;
 			else
 				index = PM_STA_P2P_CLI_MCC_24_2x2;
-		} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[0].freq)) &&
-			(WLAN_REG_IS_5GHZ_CH_FREQ(
+			!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
@@ -1492,13 +1499,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_STA_P2P_CLI_SBS_5_1x1;
+			else
+				index = PM_STA_P2P_CLI_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==
@@ -1544,9 +1553,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_P2P_GO_P2P_CLI_MCC_24_1x1;
 			else
 				index = PM_P2P_GO_P2P_CLI_MCC_24_2x2;
-		} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[0].freq)) &&
-			(WLAN_REG_IS_5GHZ_CH_FREQ(
+			!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
@@ -1564,13 +1573,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_P2P_GO_P2P_CLI_SBS_5_1x1;
+			else
+				index = PM_P2P_GO_P2P_CLI_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==
@@ -1616,9 +1627,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_P2P_GO_SAP_MCC_24_1x1;
 			else
 				index = PM_P2P_GO_SAP_MCC_24_2x2;
-		} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[0].freq)) &&
-			(WLAN_REG_IS_5GHZ_CH_FREQ(
+			!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
@@ -1636,13 +1647,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_P2P_GO_SAP_SBS_5_1x1;
+			else
+				index = PM_P2P_GO_SAP_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==
@@ -1688,9 +1701,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_STA_STA_MCC_24_1x1;
 			else
 				index = PM_STA_STA_MCC_24_2x2;
-		} else if (WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!WLAN_REG_IS_24GHZ_CH_FREQ(
 			   pm_conc_connection_list[0].freq) &&
-			   WLAN_REG_IS_5GHZ_CH_FREQ(
+			   !WLAN_REG_IS_24GHZ_CH_FREQ(
 			   pm_conc_connection_list[1].freq)) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
@@ -1708,13 +1721,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_STA_STA_SBS_5_1x1;
+			else
+				index = PM_STA_STA_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==
@@ -1760,9 +1775,9 @@ static enum policy_mgr_two_connection_mode
 				index = PM_P2P_GO_P2P_GO_MCC_24_1x1;
 			else
 				index = PM_P2P_GO_P2P_GO_MCC_24_2x2;
-		} else if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		} else if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[0].freq)) &&
-			(WLAN_REG_IS_5GHZ_CH_FREQ(
+			!(WLAN_REG_IS_24GHZ_CH_FREQ(
 			pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
@@ -1780,13 +1795,15 @@ static enum policy_mgr_two_connection_mode
 	} else if (pm_conc_connection_list[0].mac !=
 			pm_conc_connection_list[1].mac) {
 		/* SBS */
-		if ((WLAN_REG_IS_5GHZ_CH_FREQ(
+		if (!(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[0].freq)) &&
-		    (WLAN_REG_IS_5GHZ_CH_FREQ(
+		    !(WLAN_REG_IS_24GHZ_CH_FREQ(
 		    pm_conc_connection_list[1].freq))) {
 			if (POLICY_MGR_ONE_ONE ==
 				pm_conc_connection_list[0].chain_mask)
 				index = PM_P2P_GO_P2P_GO_SBS_5_1x1;
+			else
+				index = PM_P2P_GO_P2P_GO_SBS_5_2x2;
 		} else {
 		/* DBS */
 			if (POLICY_MGR_ONE_ONE ==

@@ -264,28 +264,6 @@ struct wlan_mlme_dot11_mode {
 	uint32_t vdev_type_dot11_mode;
 };
 
-#ifndef FEATURE_CM_ENABLE
-/**
- * enum roam_invoke_source_entity - Source of invoking roam invoke command.
- * @USERSPACE_INITIATED: Userspace (supplicant)
- * @CONNECTION_MGR_INITIATED: connection mgr initiated.
- */
-enum roam_invoke_source_entity {
-	USERSPACE_INITIATED,
-	CONNECTION_MGR_INITIATED,
-};
-
-/**
- * struct mlme_roam_after_data_stall - roam invoke entity params
- * @roam_invoke_in_progress: is roaming already in progress.
- * @source: source of the roam invoke command.
- */
-struct mlme_roam_after_data_stall {
-	bool roam_invoke_in_progress;
-	enum roam_invoke_source_entity source;
-};
-#endif
-
 /**
  * struct mlme_edca_ac_vi - cwmin, cwmax and  aifs value for edca_ac_vi
  *
@@ -1017,7 +995,6 @@ struct wlan_vht_config {
  * @sap_max_inactivity_override: Override updating ap_sta_inactivity from
  * hostapd.conf
  * @sap_uapsd_enabled: Flag to enable/disable UAPSD for SAP
- * @reject_addba_req: Flag to decline ADDBA Req from SAP
  */
 struct wlan_mlme_qos {
 	uint32_t tx_aggregation_size;
@@ -1038,7 +1015,6 @@ struct wlan_mlme_qos {
 	uint32_t tx_non_aggr_sw_retry_threshold;
 	bool sap_max_inactivity_override;
 	bool sap_uapsd_enabled;
-	bool reject_addba_req;
 };
 
 #ifdef WLAN_FEATURE_11AX
@@ -1471,10 +1447,12 @@ struct wlan_mlme_acs {
  * @is_all_twt_tgt_cap_enabled: support for all twt enable/disable
  * @is_twt_statistics_tgt_cap_enabled: support for twt statistics
  * @twt_congestion_timeout: congestion timeout value
+ * @disable_btwt_usr_cfg: User config param to enable/disable the BTWT support
  * @enable_twt_24ghz: Enable/disable host TWT when STA is connected in
  * 2.4Ghz
  * @req_flag: requestor flag enable/disable
  * @res_flag: responder flag enable/disable
+ * @twt_res_svc_cap: responder service capability
  */
 struct wlan_mlme_cfg_twt {
 	bool is_twt_enabled;
@@ -1487,9 +1465,11 @@ struct wlan_mlme_cfg_twt {
 	bool is_all_twt_tgt_cap_enabled;
 	bool is_twt_statistics_tgt_cap_enabled;
 	uint32_t twt_congestion_timeout;
+	bool disable_btwt_usr_cfg;
 	bool enable_twt_24ghz;
 	bool req_flag;
 	bool res_flag;
+	bool twt_res_svc_cap;
 };
 
 /**
@@ -1504,6 +1484,7 @@ struct wlan_mlme_cfg_twt {
  * @is_override_ht20_40_24g: use channel bonding in 2.4 GHz
  * @obss_detection_offload_enabled:       Enable OBSS detection offload
  * @obss_color_collision_offload_enabled: Enable obss color collision
+ * @bss_color_collision_det_sta: STA BSS color collision detection offload
  */
 struct wlan_mlme_obss_ht40 {
 	uint32_t active_dwelltime;
@@ -1516,6 +1497,7 @@ struct wlan_mlme_obss_ht40 {
 	bool is_override_ht20_40_24g;
 	bool obss_detection_offload_enabled;
 	bool obss_color_collision_offload_enabled;
+	bool bss_color_collision_det_sta;
 };
 
 /**
@@ -1575,6 +1557,7 @@ enum station_keepalive_method {
 /**
  * struct wlan_mlme_sta_cfg - MLME STA configuration items
  * @sta_keep_alive_period:          Sends NULL frame to AP period
+ * @bss_max_idle_period:            BSS max idle period
  * @tgt_gtx_usr_cfg:                Target gtx user config
  * @pmkid_modes:                    Enable PMKID modes
  * @wait_cnf_timeout:               Wait assoc cnf timeout
@@ -1593,9 +1576,11 @@ enum station_keepalive_method {
  * @single_tid:                     Set replay counter for all TID
  * @allow_tpc_from_ap:              Support for AP power constraint
  * @usr_disabled_roaming:           User config for roaming disable
+ * @usr_scan_probe_unicast_ra:      User config unicast probe req in scan
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
+	uint32_t bss_max_idle_period;
 	uint32_t tgt_gtx_usr_cfg;
 	uint32_t pmkid_modes;
 	uint32_t wait_cnf_timeout;
@@ -1614,6 +1599,7 @@ struct wlan_mlme_sta_cfg {
 	bool allow_tpc_from_ap;
 	enum station_keepalive_method sta_keepalive_method;
 	bool usr_disabled_roaming;
+	bool usr_scan_probe_unicast_ra;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 	host_event_wlan_status_payload_type event_payload;
 #endif
@@ -1925,6 +1911,7 @@ struct wlan_mlme_lfr_cfg {
 	bool sae_single_pmk_feature_enabled;
 #endif
 	struct rso_config_params rso_user_config;
+	bool enable_ft_over_ds;
 };
 
 /**
@@ -2240,6 +2227,7 @@ struct wlan_mlme_power {
  * @ap_keep_alive_timeout: AP keep alive timeout value
  * @ap_link_monitor_timeout: AP link monitor timeout value
  * @wmi_wq_watchdog_timeout: timeout period for wmi watchdog bite
+ * @sae_auth_failure_timeout: SAE authentication failure timeout
  */
 struct wlan_mlme_timeout {
 	uint32_t join_failure_timeout;
@@ -2255,6 +2243,7 @@ struct wlan_mlme_timeout {
 	uint32_t ap_keep_alive_timeout;
 	uint32_t ap_link_monitor_timeout;
 	uint32_t wmi_wq_watchdog_timeout;
+	uint32_t sae_auth_failure_timeout;
 };
 
 /**
@@ -2355,12 +2344,14 @@ struct wlan_mlme_btm {
 /**
  * struct wlan_mlme_fe_wlm - WLM related configs
  * @latency_enable: Flag to check if latency is enabled
+ * @latency_reset: Flag to check if latency reset is enabled
  * @latency_level: WLM latency level
  * @latency_flags: WLM latency flags setting
  * @latency_host_flags: WLM latency host flags setting
  */
 struct wlan_mlme_fe_wlm {
 	bool latency_enable;
+	bool latency_reset;
 	uint8_t latency_level;
 	uint32_t latency_flags[MLME_NUM_WLM_LATENCY_LEVEL];
 	uint32_t latency_host_flags[MLME_NUM_WLM_LATENCY_LEVEL];

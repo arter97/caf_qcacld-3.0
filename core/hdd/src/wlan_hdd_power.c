@@ -87,6 +87,7 @@
 #include "wlan_hdd_object_manager.h"
 #include <linux/igmp.h>
 #include "qdf_types.h"
+#include <linux/cpuidle.h>
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
 #define HDD_SSR_BRING_UP_TIME 3000000
@@ -982,16 +983,7 @@ static int hdd_populate_ipv4_addr(struct hdd_adapter *adapter,
 	return 0;
 }
 
-/**
- * hdd_set_grat_arp_keepalive() - Enable grat APR keepalive
- * @adapter: the HDD adapter to configure
- *
- * This configures gratuitous APR keepalive based on the adapter's current
- * connection information, specifically IPv4 address and BSSID
- *
- * return: zero for success, non-zero for failure
- */
-static int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
+int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
 	int exit_code;
@@ -1183,6 +1175,7 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 	struct hdd_context *hdd_ctx = container_of(nb, struct hdd_context,
 						   pm_qos_notifier);
 	void *hif_ctx;
+	bool is_any_sta_connected = false;
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug_rl("Driver Module closed; skipping pm qos notify");
@@ -1193,11 +1186,15 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 	if (!hif_ctx)
 		return -EINVAL;
 
-	hdd_debug("PM QOS update: runtime_pm_prevented %d Current value: %ld",
-		  hdd_ctx->runtime_pm_prevented, curr_val);
+	is_any_sta_connected = hdd_is_any_sta_connected(hdd_ctx);
+
+	hdd_debug("PM QOS update: runtime_pm_prevented %d Current value: %ld, is_any_sta_connected %d",
+		  hdd_ctx->runtime_pm_prevented, curr_val,
+		  is_any_sta_connected);
 	qdf_spin_lock_irqsave(&hdd_ctx->pm_qos_lock);
 
 	if (!hdd_ctx->runtime_pm_prevented &&
+	    is_any_sta_connected &&
 	    curr_val != wlan_hdd_get_pm_qos_cpu_latency()) {
 		hif_pm_runtime_get_noresume(hif_ctx, RTPM_ID_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = true;
@@ -1211,6 +1208,28 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 
 	return NOTIFY_DONE;
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+bool wlan_hdd_is_cpu_pm_qos_in_progress(void)
+{
+	unsigned long pm_qos_cpu_latency;
+	long long curr_val;
+	int max_cpu_num;
+
+	max_cpu_num  = nr_cpu_ids - 1;
+	pm_qos_cpu_latency = wlan_hdd_get_pm_qos_cpu_latency() * NSEC_PER_USEC;
+
+	/* Get PM QoS vote from last cpu, as no device votes on that cpu
+	 * so by default we get global PM QoS vote from last cpu.
+	 */
+	curr_val = cpuidle_governor_latency_req(max_cpu_num);
+	if (curr_val != pm_qos_cpu_latency) {
+		hdd_debug("PM QoS current value: %lld", curr_val);
+		return true;
+	}
+	return false;
+}
+#endif
 #endif
 
 /**
@@ -1622,6 +1641,9 @@ QDF_STATUS hdd_wlan_shutdown(void)
 		scheduler_resume();
 		hdd_ctx->is_scheduler_suspended = false;
 		hdd_ctx->is_wiphy_suspended = false;
+		hdd_ctx->hdd_wlan_suspended = false;
+		ucfg_pmo_resume_all_components(hdd_ctx->psoc,
+					       QDF_SYSTEM_SUSPEND);
 	}
 
 	wlan_hdd_rx_thread_resume(hdd_ctx);
@@ -1673,6 +1695,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 
 	hdd_lpass_notify_stop(hdd_ctx);
 
+	qdf_set_smmu_fault_state(false);
 	hdd_info("WLAN driver shutdown complete");
 
 	return QDF_STATUS_SUCCESS;
@@ -1700,6 +1723,36 @@ static inline void hdd_wlan_ssr_reinit_event(void)
 
 }
 #endif
+
+/**
+ * hdd_restore_dual_sta_config() - Restore dual sta configuration
+ * @hdd_ctx: pointer to struct hdd_context
+ *
+ * Return: None
+ */
+static void hdd_restore_dual_sta_config(struct hdd_context *hdd_ctx)
+{
+	QDF_STATUS status;
+	struct hdd_dual_sta_policy *sta_policy;
+
+	sta_policy = &hdd_ctx->dual_sta_policy;
+
+	hdd_debug("Restore dual sta config: Primary vdev_id:%d, sta policy:%d",
+		  sta_policy->primary_vdev_id,
+		  sta_policy->dual_sta_policy);
+
+	status =
+		ucfg_mlme_set_primary_interface(hdd_ctx->psoc,
+						sta_policy->primary_vdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("could not set primary interface, %d", status);
+
+	status =
+		ucfg_mlme_set_dual_sta_policy(hdd_ctx->psoc,
+					      sta_policy->dual_sta_policy);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("failed to set mlme dual sta config");
+}
 
 /**
  * hdd_send_default_scan_ies - send default scan ies to fw
@@ -1840,10 +1893,6 @@ QDF_STATUS hdd_wlan_re_init(void)
 	hdd_start_all_adapters(hdd_ctx);
 
 	hdd_init_scan_reject_params(hdd_ctx);
-
-#ifndef FEATURE_CM_ENABLE
-	complete(&adapter->roaming_comp_var);
-#endif
 	hdd_ctx->bt_coex_mode_set = false;
 
 	/* Allow the phone to go to sleep */
@@ -1856,12 +1905,20 @@ QDF_STATUS hdd_wlan_re_init(void)
 	hdd_restore_sar_config(hdd_ctx);
 
 	hdd_send_default_scan_ies(hdd_ctx);
+	hdd_restore_dual_sta_config(hdd_ctx);
 	hdd_info("WLAN host driver reinitiation completed!");
 
 	ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc, &value);
 	if (value)
 		hdd_ssr_restart_sap(hdd_ctx);
 	hdd_wlan_ssr_reinit_event();
+
+	if (hdd_ctx->is_wiphy_suspended)
+		hdd_ctx->is_wiphy_suspended = false;
+
+	if (hdd_ctx->hdd_wlan_suspended)
+		hdd_ctx->hdd_wlan_suspended = false;
+
 	return QDF_STATUS_SUCCESS;
 
 err_re_init:
@@ -1882,6 +1939,7 @@ int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	bool is_bmps_enabled;
+	struct hdd_station_ctx *hdd_sta_ctx = NULL;
 
 	if (!adapter) {
 		hdd_err("Adapter NULL");
@@ -1891,6 +1949,12 @@ int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	if (!hdd_ctx) {
 		hdd_err("hdd context is NULL");
+		return -EINVAL;
+	}
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	if (!hdd_sta_ctx) {
+		hdd_err("hdd_sta_context is NULL");
 		return -EINVAL;
 	}
 
@@ -1959,10 +2023,19 @@ int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 			goto end;
 
 		ucfg_mlme_is_bmps_enabled(hdd_ctx->psoc, &is_bmps_enabled);
-		if (is_bmps_enabled)
+		if (is_bmps_enabled) {
 			status = sme_ps_enable_disable(mac_handle,
 						       adapter->vdev_id,
 						       SME_PS_DISABLE);
+			if (status != QDF_STATUS_SUCCESS)
+				goto end;
+		}
+
+		if (adapter->device_mode == QDF_STA_MODE) {
+			hdd_twt_del_dialog_in_ps_disable(hdd_ctx,
+						&hdd_sta_ctx->conn_info.bssid,
+						adapter->vdev_id);
+		}
 	}
 
 end:
@@ -2192,6 +2265,12 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	struct wlan_objmgr_vdev *vdev;
 	int rc;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CFG80211_SUSPEND_WLAN;
+	struct hdd_hostapd_state *hapd_state;
+	struct csr_del_sta_params params = {
+		.peerMacAddr = QDF_MAC_ADDR_BCAST_INIT,
+		.reason_code = REASON_DEAUTH_NETWORK_LEAVING,
+		.subtype = SIR_MAC_MGMT_DEAUTH,
+	};
 
 	hdd_enter();
 
@@ -2254,6 +2333,14 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 					hdd_adapter_dev_put_debug(next_adapter,
 								  dbgid);
 				return -EOPNOTSUPP;
+			} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
+				   hdd_ctx->psoc)) {
+				hapd_state =
+					WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+				if (hapd_state)
+					hdd_softap_deauth_all_sta(adapter,
+								  hapd_state,
+								  &params);
 			}
 		} else if (QDF_P2P_GO_MODE == adapter->device_mode) {
 			if (!ucfg_pmo_get_enable_sap_suspend(
@@ -2267,7 +2354,19 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 					hdd_adapter_dev_put_debug(next_adapter,
 								  dbgid);
 				return -EOPNOTSUPP;
+			} else if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
+				   hdd_ctx->psoc)) {
+				hapd_state =
+					WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
+				if (hapd_state)
+					hdd_softap_deauth_all_sta(adapter,
+								  hapd_state,
+								  &params);
 			}
+		} else if (QDF_TDLS_MODE == adapter->device_mode) {
+			if (ucfg_pmo_get_disconnect_sap_tdls_in_wow(
+								hdd_ctx->psoc))
+				ucfg_tdls_teardown_links_sync(hdd_ctx->psoc);
 		}
 		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
@@ -3186,7 +3285,8 @@ cfg80211_resume:
 	QDF_BUG(!wlan_hdd_cfg80211_resume_wlan(wiphy));
 
 link_down:
-	hif_vote_link_down(hif_ctx);
+	if (resume_setting == WOW_RESUME_TRIGGER_HTC_WAKEUP)
+		hif_vote_link_down(hif_ctx);
 
 	clear_bit(HDD_FA_SUSPENDED_BIT, &fake_apps_state);
 	hdd_err("Unit-test suspend failed: %d", errno);

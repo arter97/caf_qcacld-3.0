@@ -270,7 +270,7 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 		ap_pwr_constraint = mlme_obj->reg_tpc_obj.ap_constraint_power;
 		mlme_obj->reg_tpc_obj.ap_constraint_power =
 				pLinkReq->MaxTxPower.maxTxPower;
-		lim_calculate_tpc(mac, pe_session, true);
+		lim_calculate_tpc(mac, pe_session, true, 0, false);
 
 		LinkReport.txPower =
 			mlme_obj->reg_tpc_obj.chan_power_info[0].tx_power;
@@ -517,37 +517,26 @@ rrm_process_neighbor_report_req(struct mac_context *mac,
 	return status;
 }
 
-/**
- * rrm_get_country_code_from_connected_profile() - Get country code
- * from connected profile
- * @mac: Mac context
- * @pe_session: pe session
- * @country_code: country code
- *
- * Return: void
- */
-static inline void
-rrm_get_country_code_from_connected_profile(
-				struct mac_context *mac,
-				struct pe_session *pe_session,
-				uint8_t country_code[WNI_CFG_COUNTRY_CODE_LEN])
+void rrm_get_country_code_from_connected_profile(struct mac_context *mac,
+						 uint8_t vdev_id,
+						 uint8_t *country_code)
 {
-	uint8_t id;
+	QDF_STATUS status;
 
-	qdf_mem_zero(country_code, sizeof(country_code[0]) *
-					WNI_CFG_COUNTRY_CODE_LEN);
-	if (!pe_session) {
-		pe_err("pe_session is NULL");
-		return;
-	}
-	id = pe_session->smeSessionId;
-	if (!CSR_IS_SESSION_VALID(mac, id)) {
-		pe_err("smeSessionId %d is invalid", id);
-		return;
-	}
-	wlan_reg_read_current_country(mac->psoc, country_code);
-	if (!country_code[0])
+	status = wlan_cm_get_country_code(mac->pdev, vdev_id, country_code);
+
+	pe_debug("Country info from bcn:%c%c 0x%x", country_code[0],
+		 country_code[1], country_code[2]);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		qdf_mem_zero(country_code, REG_ALPHA2_LEN + 1);
+
+	if (!country_code[0]) {
+		wlan_reg_read_current_country(mac->psoc, country_code);
 		country_code[2] = OP_CLASS_GLOBAL;
+		pe_debug("Current country info %c%c 0x%x", country_code[0],
+			 country_code[1], country_code[2]);
+	}
 }
 
 #define ABS(x)      ((x < 0) ? -x : x)
@@ -722,7 +711,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		return eRRM_FAILURE;
 	}
 
-	rrm_get_country_code_from_connected_profile(mac, pe_session,
+	rrm_get_country_code_from_connected_profile(mac, pe_session->vdev_id,
 						    country);
 	psbrr->channel_info.chan_num =
 		pBeaconReq->measurement_request.Beacon.channel;

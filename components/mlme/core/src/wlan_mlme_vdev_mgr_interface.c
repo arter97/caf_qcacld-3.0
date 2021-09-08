@@ -33,11 +33,22 @@
 #include "target_if_wfa_testcmd.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include "csr_api.h"
+#include <cm_utf.h>
+#include "target_if_cm_roam_event.h"
+#include "wlan_cm_roam_api.h"
+#ifdef WLAN_FEATURE_11BE_MLO
+#include <wlan_mlo_mgr_public_structs.h>
+#include <wlan_mlo_mgr_cmn.h>
+#include <lim_mlo.h>
+#endif
 
 static struct vdev_mlme_ops sta_mlme_ops;
 static struct vdev_mlme_ops ap_mlme_ops;
 static struct vdev_mlme_ops mon_mlme_ops;
 static struct mlme_ext_ops ext_ops;
+#ifdef WLAN_FEATURE_11BE_MLO
+static struct mlo_mlme_ext_ops mlo_ext_ops;
+#endif
 
 bool mlme_is_vdev_in_beaconning_mode(enum QDF_OPMODE vdev_opmode)
 {
@@ -65,9 +76,43 @@ static struct mlme_ext_ops *mlme_get_global_ops(void)
 QDF_STATUS mlme_register_mlme_ext_ops(void)
 {
 	mlme_set_ops_register_cb(mlme_get_global_ops);
+
+	/* Overwrite with UTF cb if UTF enabled */
+	cm_utf_set_mlme_ops(mlme_get_global_ops());
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS mlme_register_mlo_ext_ops(void)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (mlo_ctx)
+		mlo_reg_mlme_ext_cb(mlo_ctx, &mlo_ext_ops);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_unregister_mlo_ext_ops(void)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (mlo_ctx)
+		mlo_unreg_mlme_ext_cb(mlo_ctx);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+QDF_STATUS mlme_register_mlo_ext_ops(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_unregister_mlo_ext_ops(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 /**
  * mlme_register_vdev_mgr_ops() - Register vdev mgr ops
  * @vdev_mlme: vdev mlme object
@@ -258,8 +303,13 @@ QDF_STATUS sta_mlme_vdev_notify_roam_start(struct vdev_mlme_obj *vdev_mlme,
 {
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+#ifdef ROAM_TARGET_IF_CONVERGENCE
+	return wlan_cm_sta_mlme_vdev_roam_notify(vdev_mlme, event_data_len,
+						 event_data);
+#else
 	return wma_sta_mlme_vdev_roam_notify(vdev_mlme, event_data_len,
 					     event_data);
+#endif
 }
 
 /**
@@ -1211,11 +1261,6 @@ static void mlme_ext_handler_destroy(struct vdev_mlme_obj *vdev_mlme)
 	mlme_free_self_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_peer_disconnect_ies(vdev_mlme->vdev);
 	mlme_free_sae_auth_retry(vdev_mlme->vdev);
-	/* This is temp ifdef will be removed in near future */
-#ifndef FEATURE_CM_ENABLE
-	wlan_cm_rso_config_deinit(vdev_mlme->vdev,
-				  &vdev_mlme->ext_vdev_ptr->rso_cfg);
-#endif
 	mlme_deinit_wait_for_key_timer(&vdev_mlme->ext_vdev_ptr->wait_key_timer);
 	mlme_free_fils_info(&vdev_mlme->ext_vdev_ptr->connect_info);
 	qdf_mem_free(vdev_mlme->ext_vdev_ptr);
@@ -1241,11 +1286,6 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 
 	mlme_init_rate_config(vdev_mlme);
 	vdev_mlme->ext_vdev_ptr->connect_info.fils_con_info = NULL;
-	/* This is temp ifdef will be removed in near future */
-#ifndef FEATURE_CM_ENABLE
-	wlan_cm_rso_config_init(vdev_mlme->vdev,
-				&vdev_mlme->ext_vdev_ptr->rso_cfg);
-#endif
 	mlme_init_wait_for_key_timer(vdev_mlme->vdev,
 				     &vdev_mlme->ext_vdev_ptr->wait_key_timer);
 
@@ -1493,6 +1533,8 @@ QDF_STATUS psoc_mlme_ext_hdl_create(struct psoc_mlme_obj *psoc_mlme)
 
 	target_if_wfatestcmd_register_tx_ops(
 			&psoc_mlme->ext_psoc_ptr->wfa_testcmd.tx_ops);
+	target_if_cm_roam_register_rx_ops(
+			&psoc_mlme->ext_psoc_ptr->rso_rx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1808,7 +1850,6 @@ static struct mlme_ext_ops ext_ops = {
 	.mlme_vdev_ext_hdl_destroy = vdevmgr_mlme_ext_hdl_destroy,
 	.mlme_vdev_ext_hdl_post_create = vdevmgr_mlme_ext_post_hdl_create,
 	.mlme_vdev_ext_delete_rsp = vdevmgr_vdev_delete_rsp_handle,
-#ifdef FEATURE_CM_ENABLE
 	.mlme_cm_ext_hdl_create_cb = cm_ext_hdl_create,
 	.mlme_cm_ext_hdl_destroy_cb = cm_ext_hdl_destroy,
 	.mlme_cm_ext_connect_start_ind_cb = cm_connect_start_ind,
@@ -1822,5 +1863,13 @@ static struct mlme_ext_ops ext_ops = {
 	.mlme_cm_ext_vdev_down_req_cb = cm_send_vdev_down_req,
 	.mlme_cm_ext_reassoc_req_cb = cm_handle_reassoc_req,
 	.mlme_cm_ext_roam_start_ind_cb = cm_handle_roam_start,
-#endif
 };
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static struct mlo_mlme_ext_ops mlo_ext_ops = {
+	.mlo_mlme_ext_peer_create = lim_mlo_proc_assoc_req_frm,
+	.mlo_mlme_ext_peer_delete = lim_mlo_cleanup_partner_peer,
+	.mlo_mlme_ext_peer_assoc_fail = lim_mlo_ap_sta_assoc_fail,
+	.mlo_mlme_ext_assoc_resp = lim_mlo_ap_sta_assoc_suc,
+};
+#endif

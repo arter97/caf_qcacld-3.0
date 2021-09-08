@@ -144,6 +144,11 @@ static void wlan_ipa_uc_loaded_uc_cb(void *priv_ctxt)
 	struct op_msg_type *msg;
 	struct uc_op_work_struct *uc_op_work;
 
+	if (!ipa_cb_is_ready()) {
+		ipa_info("IPA is not READY");
+		return;
+	}
+
 	if (!priv_ctxt) {
 		ipa_err("Invalid IPA context");
 		return;
@@ -1819,7 +1824,7 @@ end:
     defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
     defined(QCA_WIFI_WCN7850)
 
-#ifdef IPA_LAN_RX_NAPI_SUPPORT
+#ifdef QCA_CONFIG_RPS
 void ipa_set_rps(struct wlan_ipa_priv *ipa_ctx, enum QDF_OPMODE mode,
 		 bool enable)
 {
@@ -1838,6 +1843,7 @@ void ipa_set_rps(struct wlan_ipa_priv *ipa_ctx, enum QDF_OPMODE mode,
 }
 #endif
 
+#ifdef QCA_CONFIG_RPS
 /**
  * wlan_ipa_uc_handle_first_con() - Handle first uC IPA connection
  * @ipa_ctx: IPA context
@@ -1865,6 +1871,21 @@ static QDF_STATUS wlan_ipa_uc_handle_first_con(struct wlan_ipa_priv *ipa_ctx)
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS wlan_ipa_uc_handle_first_con(struct wlan_ipa_priv *ipa_ctx)
+{
+	ipa_debug("enter");
+
+	if (wlan_ipa_uc_enable_pipes(ipa_ctx) != QDF_STATUS_SUCCESS) {
+		ipa_err("IPA WDI Pipe activation failed");
+		return QDF_STATUS_E_BUSY;
+	}
+
+	ipa_debug("exit");
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 static
 void wlan_ipa_uc_handle_last_discon(struct wlan_ipa_priv *ipa_ctx,
@@ -1902,6 +1923,11 @@ bool wlan_ipa_is_tx_pending(struct wlan_ipa_priv *ipa_ctx)
 	bool ret = false;
 	uint64_t diff_ms = 0;
 	uint64_t current_ticks = 0;
+
+	if (!ipa_ctx) {
+		ipa_err("IPA private context is NULL");
+		return false;
+	}
 
 	if (!qdf_atomic_read(&ipa_ctx->waiting_on_pending_tx)) {
 		ipa_debug("nothing pending");
@@ -2208,7 +2234,7 @@ static QDF_STATUS wlan_ipa_send_msg(qdf_netdev_t net_dev,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef IPA_LAN_RX_NAPI_SUPPORT
+#ifdef QCA_CONFIG_RPS
 void wlan_ipa_handle_multiple_sap_evt(struct wlan_ipa_priv *ipa_ctx,
 				      qdf_ipa_wlan_event type)
 {
@@ -2959,6 +2985,33 @@ wlan_host_to_ipa_wlan_event(enum wlan_ipa_wlan_event wlan_ipa_event_type)
 	return ipa_event;
 }
 
+#ifdef IPA_P2P_SUPPORT
+/**
+ * wlan_ipa_device_mode_switch() - Switch P2p GO/CLI to SAP/STA mode
+ * @device_mode: device mode
+ *
+ * Return: New device mode after switching
+ */
+static uint8_t wlan_ipa_device_mode_switch(uint8_t device_mode)
+{
+	switch (device_mode) {
+	case QDF_P2P_CLIENT_MODE:
+		return QDF_STA_MODE;
+	case QDF_P2P_GO_MODE:
+		return QDF_SAP_MODE;
+	default:
+		break;
+	}
+
+	return device_mode;
+}
+#else
+static uint8_t wlan_ipa_device_mode_switch(uint8_t device_mode)
+{
+	return device_mode;
+}
+#endif
+
 /**
  * wlan_ipa_wlan_evt() - SSR wrapper for __wlan_ipa_wlan_evt
  * @net_dev: Interface net device
@@ -2977,6 +3030,8 @@ QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 {
 	qdf_ipa_wlan_event type = wlan_host_to_ipa_wlan_event(ipa_event_type);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	device_mode = wlan_ipa_device_mode_switch(device_mode);
 
 	/* Data path offload only support for STA and SAP mode */
 	if ((device_mode == QDF_STA_MODE) ||
