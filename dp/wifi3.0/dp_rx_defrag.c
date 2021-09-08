@@ -906,12 +906,16 @@ dp_rx_construct_fraglist(struct dp_peer *peer, int tid, qdf_nbuf_t head,
 	int out_of_order = 0;
 	int index;
 	int needs_pn_check = 0;
+	enum cdp_sec_type sec_type;
 
 	prev_pn128[0] = rx_tid->pn128[0];
 	prev_pn128[1] = rx_tid->pn128[1];
 
 	index = hal_rx_msdu_is_wlan_mcast(msdu) ? dp_sec_mcast : dp_sec_ucast;
-	if (qdf_likely(peer->security[index].sec_type != cdp_sec_type_none))
+	sec_type = peer->security[index].sec_type;
+
+	if (!(sec_type == cdp_sec_type_none || sec_type == cdp_sec_type_wep128 ||
+		sec_type == cdp_sec_type_wep104 || sec_type == cdp_sec_type_wep40))
 		needs_pn_check = 1;
 
 	while (msdu) {
@@ -929,6 +933,17 @@ dp_rx_construct_fraglist(struct dp_peer *peer, int tid, qdf_nbuf_t head,
 
 		prev_pn128[0] = cur_pn128[0];
 		prev_pn128[1] = cur_pn128[1];
+
+		/*
+		 * Broadcast and multicast frames should never be fragmented.
+		 * Iterating through all msdus and dropping fragments if even
+		 * one of them has mcast/bcast destination address.
+		 */
+		if (hal_rx_msdu_is_wlan_mcast(msdu)) {
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+				  "Dropping multicast/broadcast fragments");
+			return QDF_STATUS_E_FAILURE;
+		}
 
 		dp_rx_frag_pull_hdr(msdu, hdrsize);
 		len += qdf_nbuf_len(msdu);
