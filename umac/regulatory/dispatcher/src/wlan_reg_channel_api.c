@@ -196,3 +196,12 @@ void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 {
     reg_get_channel_params(pdev, freq, sec_ch_2g_freq, ch_params);
 }
+
+#ifdef CONFIG_HALF_QUARTER_RATE_FOR_ALL_CHANS
+bool
+wlan_reg_is_freq_full_rate_supptd(struct wlan_objmgr_pdev *pdev,
+				  qdf_freq_t freq)
+{
+	return reg_is_freq_full_rate_supported(pdev, freq);
+}
+#endif

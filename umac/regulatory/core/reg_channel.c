@@ -748,3 +748,29 @@ void reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 	reg_set_2g_channel_params_for_freq(pdev, freq, ch_params,
 					   sec_ch_2g_freq);
 }
+
+#ifdef CONFIG_HALF_QUARTER_RATE_FOR_ALL_CHANS
+bool reg_is_freq_full_rate_supported(struct wlan_objmgr_pdev *pdev,
+				     qdf_freq_t freq)
+{
+	enum channel_enum ch_idx;
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	ch_idx = reg_get_chan_enum_for_freq(freq);
+
+	if (ch_idx == INVALID_CHANNEL)
+		return false;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg obj is NULL");
+		return false;
+	}
+
+	if (pdev_priv_obj->cur_chan_list[ch_idx].max_bw > HALF_RATE_BW)
+		return true;
+
+	return false;
+}
+#endif
