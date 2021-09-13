@@ -247,7 +247,7 @@ int wma_roam_auth_offload_event_handler(WMA_HANDLE handle, uint8_t *event,
  */
 int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 				 uint32_t len);
-
+#ifndef ROAM_TARGET_IF_CONVERGENCE
 /**
  * wma_mlme_roam_synch_event_handler_cb() - roam synch event handler
  * @handle: wma handle
@@ -262,7 +262,6 @@ int wma_roam_stats_event_handler(WMA_HANDLE handle, uint8_t *event,
 int wma_mlme_roam_synch_event_handler_cb(void *handle, uint8_t *event,
 					 uint32_t len);
 
-#ifndef ROAM_TARGET_IF_CONVERGENCE
 /**
  * wma_roam_synch_frame_event_handler() - roam synch frame event handler
  * @handle: wma handle
@@ -1113,13 +1112,14 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
 
 /**
  * wma_rso_cmd_status_event_handler() - RSO Command status event handler
- * @wmi_event: WMI event
+ * @vdev_id: VDEV id
+ * @notif: roam notification
  *
  * This function is used to send RSO command status to upper layer
  *
  * Return: 0 for success
  */
-int wma_rso_cmd_status_event_handler(wmi_roam_event_fixed_param *wmi_event);
+int wma_rso_cmd_status_event_handler(uint8_t vdev_id, uint32_t notif);
 
 int wma_stats_event_handler(void *handle, uint8_t *cmd_param_info,
 			    uint32_t len);

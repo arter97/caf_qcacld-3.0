@@ -57,6 +57,39 @@ target_if_cm_roam_sync_frame_event(ol_scn_t scn,
 				   uint32_t len);
 
 /**
+ * target_if_cm_roam_event() - Target IF handler for roam events
+ * @scn: target handle
+ * @event: event buffer
+ * @len: event buffer length
+ *
+ * Return: int for success or error code
+ */
+int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len);
+
+/**
+ * target_if_cm_roam_stats_event() - Target IF handler for roam stats event
+ * @scn: target handle
+ * @event: event buffer
+ * @len: event buffer length
+ *
+ * Return: int for success or error code
+ */
+int
+target_if_cm_roam_stats_event(ol_scn_t scn, uint8_t *event, uint32_t len);
+
+/**
+ * target_if_cm_roam_auth_offload_event - auth roam offload event handler
+ * @scn: target handle
+ * @event: event buffer
+ * @len: event buffer length
+ *
+ * Return: int for success or error code
+ */
+int
+target_if_cm_roam_auth_offload_event(ol_scn_t scn, uint8_t *event,
+				     uint32_t len);
+
+/**
  * target_if_roam_offload_register_events() - register roam events
  * @psoc: pointer to psoc object
  *
@@ -64,6 +97,42 @@ target_if_cm_roam_sync_frame_event(ol_scn_t scn,
  */
 QDF_STATUS
 target_if_roam_offload_register_events(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * target_if_cm_roam_vdev_disconnect_event_handler - vdev disconnect evt handler
+ * @scn: target handle
+ * @event: event buffer
+ * @len: event buffer length
+ *
+ * Return: int for success or error code
+ */
+int
+target_if_cm_roam_vdev_disconnect_event_handler(ol_scn_t scn, uint8_t *event,
+						uint32_t len);
+
+/**
+ * target_if_cm_roam_scan_chan_list_event_handler - roam scan ch evt handler
+ * @scn: target handle
+ * @event: event buffer
+ * @len: event buffer length
+ *
+ * Return: int for success or error code
+ */
+int
+target_if_cm_roam_scan_chan_list_event_handler(ol_scn_t scn, uint8_t *event,
+					       uint32_t len);
+
+/**
+ * target_if_pmkid_request_event_handler - pmkid request event handler
+ * @scn: target handle
+ * @event: event buffer
+ * @len: event buffer length
+ *
+ * Return: int for success or error code
+ */
+int
+target_if_pmkid_request_event_handler(ol_scn_t scn, uint8_t *event,
+				      uint32_t len);
 #endif /* ROAM_TARGET_IF_CONVERGENCE */
 
 /**
@@ -75,7 +144,6 @@ target_if_roam_offload_register_events(struct wlan_objmgr_psoc *psoc);
  */
 void
 target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops);
-
 #else /* WLAN_FEATURE_ROAM_OFFLOAD */
 static inline
 void
@@ -89,6 +157,33 @@ QDF_STATUS
 target_if_roam_offload_register_events(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline int
+target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
+{
+	return 0;
+}
+
+static inline int
+target_if_cm_roam_vdev_disconnect_event_handler(ol_scn_t scn, uint8_t *event,
+						uint32_t len)
+{
+	return 0;
+}
+
+static inline int
+target_if_cm_roam_scan_chan_list_event_handler(ol_scn_t scn, uint8_t *event,
+					       uint32_t len)
+{
+	return 0;
+}
+
+static inline int
+target_if_pmkid_request_event_handler(ol_scn_t scn, uint8_t *event,
+				      uint32_t len)
+{
+	return 0;
 }
 #endif /* ROAM_TARGET_IF_CONVERGENCE */
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */

@@ -341,13 +341,13 @@ QDF_STATUS wmi_unified_set_roam_triggers(wmi_unified_t wmi_handle,
 #ifdef ROAM_TARGET_IF_CONVERGENCE
 QDF_STATUS wmi_extract_roam_sync_event(wmi_unified_t wmi_handle, void *evt_buf,
 				       uint32_t len,
-				       uint8_t *vdev_id)
+				       struct roam_offload_synch_ind **sync_ind)
 {
 	if (wmi_handle->ops->extract_roam_sync_event)
 		return wmi_handle->ops->extract_roam_sync_event(wmi_handle,
 								evt_buf,
 								len,
-								vdev_id);
+								sync_ind);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -362,6 +362,129 @@ wmi_extract_roam_sync_frame_event(wmi_unified_t wmi_handle, void *event,
 								      event,
 								      len,
 								      frame_ptr);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_roam_event(wmi_unified_t wmi_handle, uint8_t *event,
+		       uint32_t data_len,
+		       struct roam_offload_roam_event *roam_event)
+{
+	if (wmi_handle->ops->extract_roam_event)
+		return wmi_handle->ops->extract_roam_event(wmi_handle, event,
+							   data_len,
+							   roam_event);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_btm_blacklist_event(wmi_unified_t wmi_handle,
+				uint8_t *event, uint32_t data_len,
+				struct roam_blacklist_event **dst_list)
+{
+	if (wmi_handle->ops->extract_btm_bl_event)
+		return wmi_handle->ops->extract_btm_bl_event(wmi_handle,
+							     event,
+							     data_len,
+							     dst_list);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_vdev_disconnect_event(wmi_unified_t wmi_handle,
+				  uint8_t *event, uint32_t data_len,
+				  struct vdev_disconnect_event_data *data)
+{
+	if (wmi_handle->ops->extract_vdev_disconnect_event)
+		return wmi_handle->ops->extract_vdev_disconnect_event(
+				wmi_handle, event, data_len, data);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_roam_scan_chan_list(wmi_unified_t wmi_handle,
+				uint8_t *event, uint32_t data_len,
+				struct cm_roam_scan_ch_resp **data)
+{
+	if (wmi_handle->ops->extract_roam_scan_chan_list)
+		return wmi_handle->ops->extract_roam_scan_chan_list(
+				wmi_handle, event, data_len, data);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_extract_roam_btm_response(wmi_unified_t wmi, void *evt_buf,
+				      struct roam_btm_response_data *dst,
+				      uint8_t idx)
+{
+	if (wmi->ops->extract_roam_btm_response_stats)
+		return wmi->ops->extract_roam_btm_response_stats(wmi, evt_buf,
+								 dst, idx);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_extract_roam_initial_info(wmi_unified_t wmi, void *evt_buf,
+				      struct roam_initial_data *dst,
+				      uint8_t idx)
+{
+	if (wmi->ops->extract_roam_initial_info)
+		return wmi->ops->extract_roam_initial_info(wmi, evt_buf,
+							   dst, idx);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_extract_roam_msg_info(wmi_unified_t wmi, void *evt_buf,
+				  struct roam_msg_info *dst, uint8_t idx)
+{
+	if (wmi->ops->extract_roam_msg_info)
+		return wmi->ops->extract_roam_msg_info(wmi, evt_buf, dst, idx);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_roam_stats_event(wmi_unified_t wmi_handle,
+			     uint8_t *event, uint32_t data_len,
+			     struct roam_stats_event **stats_info)
+{
+	if (wmi_handle->ops->extract_roam_stats_event)
+		return wmi_handle->ops->extract_roam_stats_event(wmi_handle,
+								 event,
+								 data_len,
+								 stats_info);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_auth_offload_event(wmi_unified_t wmi_handle,
+			       uint8_t *event, uint32_t data_len,
+			       struct auth_offload_event *auth_event)
+{
+	if (wmi_handle->ops->extract_auth_offload_event)
+		return wmi_handle->ops->extract_auth_offload_event(wmi_handle,
+								   event,
+								   data_len,
+								   auth_event);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_roam_pmkid_request(wmi_unified_t wmi_handle,
+			       uint8_t *event, uint32_t data_len,
+			       struct roam_pmkid_req_event **list)
+{
+	if (wmi_handle->ops->extract_roam_pmkid_request)
+		return wmi_handle->ops->extract_roam_pmkid_request(wmi_handle,
+								   event,
+								   data_len,
+								   list);
 
 	return QDF_STATUS_E_FAILURE;
 }

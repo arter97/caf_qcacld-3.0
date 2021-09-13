@@ -68,8 +68,10 @@
 #include "target_if_nan.h"
 #endif
 #include "wlan_scan_api.h"
+#include "wlan_cm_api.h"
 #include <wlan_crypto_global_api.h>
 #include "cdp_txrx_host_stats.h"
+#include "target_if_cm_roam_event.h"
 
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
@@ -77,6 +79,7 @@
  * MCL platform.
  */
 #define WMA_SET_VDEV_IE_SOURCE_HOST 0x0
+#define CH_WR_IE_MAX_LEN 20
 
 /*
  * Max AMPDU Tx Aggr supported size
@@ -1172,7 +1175,8 @@ wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id)
 
 	ele = (struct ie_header *)ch_wr_ie;
 	if (ele->ie_id != WLAN_ELEMID_CHAN_SWITCH_WRAP ||
-	    ele->ie_len == 0)
+	    ele->ie_len == 0 || ele->ie_len > (CH_WR_IE_MAX_LEN -
+					       sizeof(struct ie_header)))
 		return NULL;
 
 	len = ele->ie_len;
@@ -1180,6 +1184,11 @@ wma_parse_ch_switch_wrapper_ie(uint8_t *ch_wr_ie, uint8_t sub_ele_id)
 
 	while (len > 0) {
 		sub_ele_len = sizeof(struct ie_header) + ele->ie_len;
+		if (sub_ele_len > len) {
+			wma_debug("invalid sub element len :%d id:%d ie len:%d",
+				  sub_ele_len, ele->ie_id, ele->ie_len);
+			return NULL;
+		}
 		len -= sub_ele_len;
 		if (ele->ie_id == sub_ele_id)
 			return (uint8_t *)ele;
@@ -1233,8 +1242,8 @@ int wma_csa_offload_handler(void *handle, uint8_t *event, uint32_t len)
 	if (!csa_offload_event)
 		return -EINVAL;
 
-	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma->psoc, vdev_id) ||
-	    wma->interfaces[vdev_id].roaming_in_progress) {
+	if (intr[vdev_id].vdev &&
+	    wlan_cm_is_vdev_roaming(intr[vdev_id].vdev)) {
 		wma_err("Roaming in progress for vdev %d, ignore csa event",
 			 vdev_id);
 		qdf_mem_free(csa_offload_event);
@@ -2734,8 +2743,13 @@ static int wma_wake_event_piggybacked(
 				    NULL, NULL, wake_reason,
 				    pb_event_len);
 		if (pb_event_len > 0) {
+#ifdef ROAM_TARGET_IF_CONVERGENCE
+			errno = target_if_cm_roam_event(wma, pb_event,
+							pb_event_len);
+#else
 			errno = wma_roam_event_callback(wma, pb_event,
 							pb_event_len);
+#endif
 		} else {
 			/*
 			 * No wow_packet_buffer means a better AP beacon
@@ -2798,13 +2812,23 @@ static int wma_wake_event_piggybacked(
 		break;
 	case WOW_REASON_ROAM_PMKID_REQUEST:
 		wma_debug("Host woken up because of PMKID request event");
+#ifndef ROAM_TARGET_IF_CONVERGENCE
 		errno = wma_roam_pmkid_request_event_handler(wma, pb_event,
 							     pb_event_len);
+#else
+		errno = target_if_pmkid_request_event_handler(wma,
+					pb_event, pb_event_len);
+#endif
 		break;
 	case WOW_REASON_VDEV_DISCONNECT:
 		wma_debug("Host woken up because of vdev disconnect event");
+#ifndef ROAM_TARGET_IF_CONVERGENCE
 		errno = wma_roam_vdev_disconnect_event_handler(wma, pb_event,
 							       pb_event_len);
+#else
+		errno = target_if_cm_roam_vdev_disconnect_event_handler(wma,
+					pb_event, pb_event_len);
+#endif
 		break;
 	default:
 		wma_err("Wake reason %s(%u) is not a piggybacked event",
