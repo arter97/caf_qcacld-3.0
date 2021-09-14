@@ -616,8 +616,7 @@ wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 	switch (param) {
 	case IEEE80211_PARAM_EXTAP:
 #ifdef QCA_SUPPORT_WDS_EXTENDED
-		if (wlan_psoc_nif_feat_cap_get(wlan_vdev_get_psoc(vdev),
-					       WLAN_SOC_F_WDS_EXTENDED)) {
+		if (wlan_psoc_nif_feat_cap_get(psoc, WLAN_SOC_F_WDS_EXTENDED)) {
 			RPTR_LOGE("RPTR EXTAP can't coexist with WDSEXT mode");
 			break;
 		}
@@ -939,6 +938,9 @@ wlan_rptr_pdev_ucfg_config_get(struct wlan_objmgr_pdev *pdev, int param)
 	case OL_ATH_PARAM_RECONFIGURATION_TIMEOUT:
 		wlan_rptr_core_global_reconfig_timeout_get(&value);
 		break;
+	default:
+		value = 0;
+		break;
 	}
 	return value;
 }
@@ -1030,11 +1032,11 @@ wlan_rptr_psta_validate_chan(struct wlan_objmgr_vdev *vdev, uint16_t freq)
 			if (mpsta_vdev) {
 				chan = wlan_vdev_mlme_get_bss_chan(mpsta_vdev);
 				mpsta_freq = chan->ch_freq;
-			}
-			if (mpsta_freq != freq) {
-				RPTR_LOGE("RPTR psta freq %d mpsta_freq %d not matching\n",
-					  freq, mpsta_freq);
-				return QDF_STATUS_E_FAILURE;
+				if (mpsta_freq != freq) {
+					RPTR_LOGE("RPTR psta freq %d mpsta_freq %d not matching\n",
+						  freq, mpsta_freq);
+					return QDF_STATUS_E_FAILURE;
+				}
 			}
 		}
 	}
