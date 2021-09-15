@@ -5115,6 +5115,8 @@ typedef enum {
 	wmi_service_disable_upper_6g_edge_ch_supp,
 #endif
 	wmi_service_dcs_awgn_int_support,
+	wmi_service_ema_multiple_group_supported,
+	wmi_service_large_beacon_supported,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

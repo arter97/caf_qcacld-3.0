@@ -354,6 +354,8 @@ struct vdev_mlme_beacon_info {
  * @mbssid-flags: MBSS IE flags indicating vdev type
  * @vdevid_trans: id of transmitting vdev for MBSS IE
  * @trans_bssid: bssid of transmitted AP (MBSS IE case)
+ * @is_multi_mbssid: Flag to identify multi group mbssid support
+ * @grp_id: Group id of current vdev
  */
 struct vdev_mlme_mbss_11ax {
 	uint32_t profile_idx;
@@ -361,6 +363,8 @@ struct vdev_mlme_mbss_11ax {
 	uint32_t mbssid_flags;
 	uint8_t vdevid_trans;
 	uint8_t trans_bssid[QDF_MAC_ADDR_SIZE];
+	bool is_multi_mbssid;
+	uint32_t grp_id;
 };
 
 /**

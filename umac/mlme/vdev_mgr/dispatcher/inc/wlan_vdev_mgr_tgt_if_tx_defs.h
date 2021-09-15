@@ -459,6 +459,8 @@ struct vdev_scan_nac_rssi_params {
  * @ldpc_rx_enabled: Enable/Disable LDPC RX for this vdev
  * @mbssid_flags: MBSSID flags to FW
  * @vdevid_trans: Tx VDEV ID
+ * @mbssid_multi_group_flag: Flag to identify multi group mbssid support
+ * @mbssid_multi_group_id: Group id of current vdev
  */
 struct vdev_start_params {
 	uint8_t vdev_id;
@@ -480,6 +482,8 @@ struct vdev_start_params {
 	bool ldpc_rx_enabled;
 	uint32_t mbssid_flags;
 	uint8_t vdevid_trans;
+	uint8_t mbssid_multi_group_flag;
+	uint32_t mbssid_multi_group_id;
 };
 
 /**

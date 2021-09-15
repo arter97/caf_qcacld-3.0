@@ -15812,6 +15812,12 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_dcs_awgn_int_support] =
 			WMI_SERVICE_DCS_AWGN_INT_SUPPORT;
+#ifdef TBD_FR69640
+	wmi_service[wmi_service_ema_multiple_group_supported] =
+			WMI_SERVICE_EMA_MULTIPLE_GROUP_SUPPORT;
+	wmi_service[wmi_service_large_beacon_supported] =
+			WMI_SERVICE_LARGE_BEACON_SUPPORT;
+#endif
 }
 
 /**
