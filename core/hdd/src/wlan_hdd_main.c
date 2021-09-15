@@ -2586,6 +2586,8 @@ int hdd_update_tgt_cfg(hdd_handle_t hdd_handle, struct wma_tgt_cfg *cfg)
 
 	hdd_update_tgt_ht_cap(hdd_ctx, &cfg->ht_cap);
 
+	sme_update_bfer_caps_as_per_nss_chains(hdd_ctx->mac_handle, cfg);
+
 	hdd_update_tgt_vht_cap(hdd_ctx, &cfg->vht_cap);
 	if (cfg->services.en_11ax  &&
 	    (hdd_ctx->config->dot11Mode == eHDD_DOT11_MODE_AUTO ||
@@ -8390,9 +8392,7 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 	roam_profile.ChannelInfo.numOfChannels = 1;
 	roam_profile.phyMode = ch_info->phy_mode;
 	roam_profile.ch_params.ch_width = bandwidth;
-	hdd_select_cbmode(adapter, freq,
-			  &roam_profile.ch_params);
-
+	hdd_select_cbmode(adapter, freq, 0, &roam_profile.ch_params);
 	qdf_mem_copy(bssid.bytes, adapter->mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
 
