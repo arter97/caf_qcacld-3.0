@@ -379,6 +379,15 @@ dfs_create_precac_tree_for_freq(struct wlan_dfs *dfs,
 			current_mode = default_offset;
 			break;
 	}
+
+	if (!current_mode.bandwidth || !current_mode.tree_depth) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS,
+			  "PreCAC entry for channel %d, BW: %d is not"
+			  "created as bw/depth is 0",
+			  ch_freq, bandwidth);
+		return -EINVAL;
+	}
+
 	top_lvl_step = current_mode.initial_and_next_offsets[0][1];
 	for (i = 0; i < current_mode.tree_depth; i++) {
 		/* In offset array,
@@ -863,6 +872,10 @@ static void dfs_fill_max_bw_for_chan(struct wlan_dfs *dfs,
 			continue;
 
 		if (cur_chan_list[i].center_freq <= right_edge_freq)
+			continue;
+
+		/* Do not add 5/10MHZ channels to the precac tree */
+		if (cur_chan_list[i].max_bw < DFS_CHWIDTH_20_VAL)
 			continue;
 
 		/* Check if the channel is DFS, else skip. */
