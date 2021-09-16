@@ -2376,6 +2376,7 @@ void policy_mgr_check_concurrent_intf_and_restart_sap(
 	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 	uint32_t cc_count = 0;
+	uint32_t timeout_ms = 0;
 	bool restart_sap = false;
 	uint32_t sap_freq;
 	/*
@@ -2455,16 +2456,73 @@ sap_restart:
 	if (restart_sap ||
 	    ((mcc_to_scc_switch != QDF_MCC_TO_SCC_SWITCH_DISABLE) &&
 	    (sta_check || gc_check))) {
-		if (pm_ctx->sta_ap_intf_check_work_info) {
-			qdf_sched_work(0, &pm_ctx->sta_ap_intf_check_work);
-			policy_mgr_debug(
-				"Checking for Concurrent Change interference");
+		if (!pm_ctx->sta_ap_intf_check_work_info) {
+			policy_mgr_err("invalid sta_ap_intf_check_work_info");
+			return;
+		}
+
+		policy_mgr_debug("Checking for Concurrent Change interference");
+
+		if (policy_mgr_mode_specific_connection_count(
+					psoc, PM_P2P_GO_MODE, NULL))
+			timeout_ms = MAX_NOA_TIME;
+
+		if (!qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
+					    timeout_ms)) {
+			policy_mgr_err("change interface request failure");
+			return;
 		}
 	}
 }
-#endif /* FEATURE_WLAN_MCC_TO_SCC_SWITCH */
 
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
+/**
+ * policy_mgr_check_bw_with_unsafe_chan_freq() - valid SAP channel bw against
+ *						 unsafe channel list
+ * @psoc: PSOC object information
+ * @center_freq: SAP channel center frequency
+ * @ch_width: SAP channel width
+ *
+ * Return: true if no unsafe channel fall in SAP channel bandwidth range,
+ *	   false otherwise
+ */
+static bool
+policy_mgr_check_bw_with_unsafe_chan_freq(struct wlan_objmgr_psoc *psoc,
+					  qdf_freq_t center_freq,
+					  enum phy_ch_width ch_width)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t freq_start, freq_end, bw, i, unsafe_chan_freq;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return true;
+	}
+
+	if (ch_width <= CH_WIDTH_20MHZ || !center_freq)
+		return true;
+
+	if (!pm_ctx->unsafe_channel_count)
+		return true;
+
+	bw = wlan_reg_get_bw_value(ch_width);
+	freq_start = center_freq - bw / 2;
+	freq_end = center_freq + bw / 2;
+
+	for (i = 0; i < pm_ctx->unsafe_channel_count; i++) {
+		unsafe_chan_freq = pm_ctx->unsafe_channel_list[i];
+		if (unsafe_chan_freq > freq_start &&
+		    unsafe_chan_freq < freq_end) {
+			policy_mgr_debug("unsafe ch freq %d is in range %d-%d",
+					 unsafe_chan_freq,
+					 freq_start,
+					 freq_end);
+			return false;
+		}
+	}
+	return true;
+}
+
 /**
  * policy_mgr_change_sap_channel_with_csa() - Move SAP channel using (E)CSA
  * @psoc: PSOC object information
@@ -2499,13 +2557,20 @@ void policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 			ch_width = ch_params.ch_width;
 	}
 
+	if (!policy_mgr_check_bw_with_unsafe_chan_freq(psoc,
+						       ch_params.mhz_freq_seg0,
+						       ch_width)) {
+		policy_mgr_info("SAP bw shrink to 20M for unsafe");
+		ch_width = CH_WIDTH_20MHZ;
+	}
+
 	if (pm_ctx->hdd_cbacks.sap_restart_chan_switch_cb) {
 		policy_mgr_info("SAP change change without restart");
 		pm_ctx->hdd_cbacks.sap_restart_chan_switch_cb(psoc,
 				vdev_id, ch_freq, ch_width, forced);
 	}
 }
-#endif
+#endif /* FEATURE_WLAN_MCC_TO_SCC_SWITCH */
 
 QDF_STATUS policy_mgr_wait_for_connection_update(struct wlan_objmgr_psoc *psoc)
 {

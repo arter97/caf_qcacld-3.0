@@ -655,6 +655,8 @@ static void mlme_init_timeout_cfg(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_AP_LINK_MONITOR_TIMEOUT);
 	timeouts->wmi_wq_watchdog_timeout =
 			cfg_get(psoc, CFG_WMI_WQ_WATCHDOG);
+	timeouts->sae_auth_failure_timeout =
+			cfg_get(psoc, CFG_SAE_AUTH_FAILURE_TIMEOUT);
 }
 
 static void mlme_init_ht_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
@@ -769,8 +771,6 @@ static void mlme_init_qos_cfg(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_SAP_MAX_INACTIVITY_OVERRIDE);
 	qos_aggr_params->sap_uapsd_enabled =
 				cfg_get(psoc, CFG_SAP_QOS_UAPSD);
-	qos_aggr_params->reject_addba_req =
-				cfg_get(psoc, CFG_REJECT_ADDBA_REQ);
 }
 
 static void mlme_init_mbo_cfg(struct wlan_objmgr_psoc *psoc,
@@ -1460,6 +1460,8 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 {
 	sta->sta_keep_alive_period =
 		cfg_get(psoc, CFG_INFRA_STA_KEEP_ALIVE_PERIOD);
+	sta->bss_max_idle_period =
+		(uint32_t)cfg_default(CFG_STA_BSS_MAX_IDLE_PERIOD);
 	sta->tgt_gtx_usr_cfg =
 		cfg_get(psoc, CFG_TGT_GTX_USR_CFG);
 	sta->pmkid_modes =
@@ -1752,7 +1754,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	lfr->neighbor_scan_min_timer_period =
 		cfg_get(psoc, CFG_LFR_NEIGHBOR_SCAN_MIN_TIMER_PERIOD);
 	lfr->neighbor_lookup_rssi_threshold =
-		cfg_get(psoc, CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD);
+		abs(cfg_get(psoc, CFG_LFR_NEIGHBOR_LOOKUP_RSSI_THRESHOLD));
 	lfr->opportunistic_scan_threshold_diff =
 		cfg_get(psoc, CFG_LFR_OPPORTUNISTIC_SCAN_THRESHOLD_DIFF);
 	lfr->roam_rescan_rssi_diff =
@@ -2165,6 +2167,7 @@ static void mlme_init_fe_wlm_in_cfg(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_mlme_fe_wlm *wlm_config)
 {
 	wlm_config->latency_enable = cfg_get(psoc, CFG_LATENCY_ENABLE);
+	wlm_config->latency_reset = cfg_get(psoc, CFG_LATENCY_RESET);
 	wlm_config->latency_level = cfg_get(psoc, CFG_LATENCY_LEVEL);
 	wlm_config->latency_flags[0] = cfg_get(psoc, CFG_LATENCY_FLAGS_NORMAL);
 	wlm_config->latency_flags[1] = cfg_get(psoc, CFG_LATENCY_FLAGS_MOD);
@@ -2422,16 +2425,18 @@ mlme_init_iot_cfg(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * mlme_init_primary_iface - Initialize primary iface
+ * mlme_init_dual_sta_config - Initialize dual sta configuratons
  *
  * @gen: Generic CFG config items
  *
  * Return: None
  */
 static void
-mlme_init_primary_iface(struct wlan_mlme_generic *gen)
+mlme_init_dual_sta_config(struct wlan_mlme_generic *gen)
 {
 	gen->dual_sta_policy.primary_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	gen->dual_sta_policy.concurrent_sta_policy =
+				QCA_WLAN_CONCURRENT_STA_POLICY_UNBIASED;
 }
 
 QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
@@ -2488,7 +2493,7 @@ QDF_STATUS mlme_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	mlme_init_roam_score_config(psoc, mlme_cfg);
 	mlme_init_ratemask_cfg(psoc, &mlme_cfg->ratemask_cfg);
 	mlme_init_iot_cfg(psoc, &mlme_cfg->iot);
-	mlme_init_primary_iface(&mlme_cfg->gen);
+	mlme_init_dual_sta_config(&mlme_cfg->gen);
 
 	return status;
 }
@@ -2956,13 +2961,14 @@ bool wlan_vdev_id_is_11n_allowed(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 					     WLAN_CRYPTO_PARAM_UCAST_CIPHER);
 
 	if (ucast_cipher == -1)
-		return is_11n_allowed;
+		goto err;
 	if (QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_TKIP) ||
 	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP) ||
 	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP_40) ||
 	    QDF_HAS_PARAM(ucast_cipher, WLAN_CRYPTO_CIPHER_WEP_104))
 		is_11n_allowed = false;
 
+err:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 	return is_11n_allowed;
@@ -3434,6 +3440,34 @@ mlme_clear_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 
 	mlme_priv->mlme_roam.roam_sm.mlme_operations_bitmap = 0;
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+}
+
+QDF_STATUS mlme_get_cfg_wlm_level(struct wlan_objmgr_psoc *psoc,
+				  uint8_t *level)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*level = mlme_obj->cfg.wlm_config.latency_level;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS mlme_get_cfg_wlm_reset(struct wlan_objmgr_psoc *psoc,
+				  bool *reset)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*reset = mlme_obj->cfg.wlm_config.latency_reset;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 enum roam_offload_state

@@ -170,6 +170,8 @@ struct sAniProbeRspStruct {
  * @eht_capable: is EHT capabale or not
  * @eht_config: EHT capability
  * @eht_op: EHT operation
+ * @mld_mac_addr: mld mac address
+ * @is_assoc_peer: is assoc peer or not
  *
  * This structure contains parameter required for
  * add sta request of upper layer.
@@ -255,6 +257,10 @@ typedef struct {
 	bool eht_capable;
 	tDot11fIEeht_cap eht_config;
 	tDot11fIEeht_op eht_op;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	uint8_t mld_mac_addr[QDF_MAC_ADDR_SIZE];
+	bool is_assoc_peer;
 #endif
 } tAddStaParams, *tpAddStaParams;
 
@@ -772,6 +778,7 @@ typedef struct sStatsExtRequest {
 } tStatsExtRequest, *tpStatsExtRequest;
 #endif /* WLAN_FEATURE_STATS_EXT */
 
+#ifndef ROAM_TARGET_IF_CONVERGENCE
 /*
  * struct roam_blacklist_timeout - BTM blacklist entry
  * @bssid - bssid that is to be blacklisted
@@ -801,4 +808,5 @@ struct roam_blacklist_event {
 	uint32_t num_entries;
 	struct roam_blacklist_timeout roam_blacklist[];
 };
+#endif
 #endif /* _HALMSGAPI_H_ */

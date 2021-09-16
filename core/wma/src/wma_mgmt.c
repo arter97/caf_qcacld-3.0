@@ -86,6 +86,7 @@
 #include <wlan_logging_sock_svc.h>
 #endif
 #include "wlan_cm_roam_api.h"
+#include "wlan_cm_api.h"
 
 /**
  * wma_send_bcn_buf_ll() - prepare and send beacon buffer to fw for LL
@@ -343,6 +344,10 @@ int wma_peer_sta_kickout_event_handler(void *handle, uint8_t *event,
 			 QDF_MAC_ADDR_REF(macaddr));
 		return -EINVAL;
 	}
+
+	if (!wma_is_vdev_valid(vdev_id))
+		return -EINVAL;
+
 	vdev = wma->interfaces[vdev_id].vdev;
 	if (!vdev) {
 		wma_err("Not able to find vdev for VDEV_%d", vdev_id);
@@ -354,11 +359,12 @@ int wma_peer_sta_kickout_event_handler(void *handle, uint8_t *event,
 		      QDF_MAC_ADDR_REF(macaddr), QDF_MAC_ADDR_REF(addr),
 		      vdev_id, kickout_event->reason);
 
-	if (wma->interfaces[vdev_id].roaming_in_progress) {
-		wma_err("Ignore STA kick out since roaming is in progress");
+	if (wma_is_roam_in_progress(vdev_id)) {
+		wma_err("vdev_id %d: Ignore STA kick out since roaming is in progress",
+			vdev_id);
 		return -EINVAL;
 	}
-	bssid = wma_get_vdev_bssid(wma->interfaces[vdev_id].vdev);
+	bssid = wma_get_vdev_bssid(vdev);
 	if (!bssid) {
 		wma_err("Failed to get bssid for vdev_%d", vdev_id);
 		return -ENOMEM;
@@ -815,8 +821,11 @@ void wma_set_sta_keep_alive(tp_wma_handle wma, uint8_t vdev_id,
 	params.method = method;
 	params.timeperiod = timeperiod;
 	if (intr) {
-		if (intr->bss_max_idle_period)
+		if (intr->bss_max_idle_period) {
 			params.timeperiod = intr->bss_max_idle_period;
+			if (method == WMI_KEEP_ALIVE_NULL_PKT)
+				params.method = WMI_KEEP_ALIVE_MGMT_FRAME;
+		}
 	}
 
 	if (hostv4addr)
@@ -1293,7 +1302,7 @@ static void wma_set_mlo_capability(tp_wma_handle wma,
 	if (!qdf_is_macaddr_zero((struct qdf_mac_addr *)peer->mldaddr)) {
 		req->mlo_params.mlo_enabled = true;
 		req->mlo_params.mlo_assoc_link =
-					wlan_peer_mlme_get_assoc_peer(peer);
+					wlan_peer_mlme_is_assoc_peer(peer);
 		WLAN_ADDR_COPY(req->mlo_params.mld_mac, peer->mldaddr);
 		wma_debug("assoc_link %d " QDF_MAC_ADDR_FMT,
 			  req->mlo_params.mlo_assoc_link,
@@ -1378,7 +1387,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		phymode = vdev_phymode;
 	}
 
-	if (!mac->mlme_cfg->rates.disable_abg_rate_txdata) {
+	if (!mac->mlme_cfg->rates.disable_abg_rate_txdata &&
+	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(des_chan->ch_freq)) {
 		/* Legacy Rateset */
 		rate_pos = (uint8_t *) peer_legacy_rates.rates;
 		for (i = 0; i < SIR_NUM_11B_RATES; i++) {

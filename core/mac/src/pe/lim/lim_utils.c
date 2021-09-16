@@ -72,6 +72,9 @@
 #ifdef WLAN_FEATURE_11BE
 #include "wma_eht.h"
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+#include <lim_mlo.h>
+#endif
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -5400,6 +5403,9 @@ void lim_send_conc_params_update(void)
 	uint8_t i;
 	struct mac_context *mac = cds_get_context(QDF_MODULE_ID_PE);
 
+	if (!mac)
+		return;
+
 	if (!mac->mlme_cfg->edca_params.enable_edca_params ||
 	    (policy_mgr_get_connection_count(mac->psoc) >
 	     MAX_NUMBER_OF_SINGLE_PORT_CONC_CONNECTIONS)) {
@@ -6293,6 +6299,10 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 	if (!src->present)
 		return;
 
+	pe_debug("source extended capabilities length:%d", src->num_bytes);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   src, src->num_bytes);
+
 	/* Return if strip the capabilities from @dst which not present */
 	if (!dst->present && !add)
 		return;
@@ -6307,10 +6317,15 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 		tempsrc++;
 	}
 	dst->num_bytes = lim_compute_ext_cap_ie_length(dst);
-	if (dst->num_bytes == 0)
+	if (dst->num_bytes == 0) {
 		dst->present = 0;
-	else
+	} else {
 		dst->present = 1;
+		pe_debug("destination extended capabilities length: %d",
+			 dst->num_bytes);
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+				   dst, dst->num_bytes);
+	}
 }
 
 /**
@@ -6899,6 +6914,12 @@ static void lim_intersect_he_caps(tDot11fIEhe_cap *rcvd_he,
 	else
 		peer_he->tb_ppdu_tx_stbc_gt_80mhz = 0;
 
+	if (session_he->htc_he && peer_he->htc_he)
+		peer_he->htc_he = 1;
+	else
+		peer_he->htc_he = 0;
+	pe_debug("intersected htc he is: %d", peer_he->htc_he);
+
 	/* Tx Doppler is first bit and Rx Doppler is second bit */
 	if (session_he->doppler) {
 		val = 0;
@@ -7422,7 +7443,6 @@ void lim_log_he_op(struct mac_context *mac, tDot11fIEhe_op *he_ops,
 				 he_ops->oper_info_6g.info.dup_bcon,
 				 he_ops->oper_info_6g.info.min_rate);
 	}
-
 }
 
 void lim_log_he_6g_cap(struct mac_context *mac,
@@ -7517,7 +7537,14 @@ void lim_update_session_he_capable_chan_switch(struct mac_context *mac,
 		session->vhtCapability = 0;
 	else if (wlan_reg_is_5ghz_ch_freq(new_chan_freq))
 		session->vhtCapability = 1;
+	/*
+	 * Re-initialize color bss parameters during channel change
+	 */
 
+	session->he_op.bss_col_disabled = 1;
+	session->bss_color_changing = 1;
+	session->he_bss_color_change.new_color = session->he_op.bss_color;
+	session->he_bss_color_change.countdown = BSS_COLOR_SWITCH_COUNTDOWN;
 	pe_debug("he_capable: %d ht %d vht %d 6ghz_band %d new freq %d vht in 2.4gh %d",
 		 session->he_capable, session->htCapability,
 		 session->vhtCapability, session->he_6ghz_band, new_chan_freq,
@@ -7948,6 +7975,21 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 		 rates->rx_he_mcs_map_80_80, rates->tx_he_mcs_map_80_80);
 
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void lim_update_sta_mlo_info(tpAddStaParams add_sta_params,
+			     tpDphHashNode sta_ds)
+{
+	if (add_sta_params->eht_capable) {
+		WLAN_ADDR_COPY(add_sta_params->mld_mac_addr, sta_ds->mld_addr);
+		add_sta_params->is_assoc_peer = lim_is_mlo_recv_assoc(sta_ds);
+	}
+	pe_debug("eht_capable: %d mld mac " QDF_MAC_ADDR_FMT " assoc peer %d",
+		 add_sta_params->eht_capable,
+		 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
+		 add_sta_params->is_assoc_peer);
 }
 #endif
 

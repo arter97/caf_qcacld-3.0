@@ -81,6 +81,7 @@
 #include "wlan_roam_debug.h"
 #include "wlan_cm_roam_public_struct.h"
 #include "wlan_mlme_twt_api.h"
+#include <wlan_serialization_api.h>
 
 #define RSN_AUTH_KEY_MGMT_SAE           WLAN_RSN_SEL(WLAN_AKM_SAE)
 #define MAX_PWR_FCC_CHAN_12 8
@@ -718,7 +719,7 @@ QDF_STATUS csr_update_channel_list(struct mac_context *mac)
 		return lock_status;
 
 	if (mac->mlme_cfg->reg.enable_pending_chan_list_req) {
-		scan_status = ucfg_scan_get_pdev_status(mac->pdev);
+		scan_status = wlan_get_pdev_status(mac->pdev);
 		if (scan_status == SCAN_IS_ACTIVE ||
 		    scan_status == SCAN_IS_ACTIVE_AND_PENDING) {
 			mac->scan.pending_channel_list_req = true;
@@ -938,7 +939,7 @@ QDF_STATUS csr_stop(struct mac_context *mac)
 		ucfg_scan_unregister_event_handler(mac->pdev,
 						   csr_scan_event_handler,
 						   mac);
-	ucfg_scan_psoc_set_disable(mac->psoc, REASON_SYSTEM_DOWN);
+	wlan_scan_psoc_set_disable(mac->psoc, REASON_SYSTEM_DOWN);
 
 	/*
 	 * purge all serialization commnad if there are any pending to make
@@ -1241,7 +1242,7 @@ static void init_config_param(struct mac_context *mac)
 	mac->roam.configParam.uCfgDot11Mode = eCSR_CFG_DOT11_MODE_AUTO;
 	mac->roam.configParam.HeartbeatThresh50 = 40;
 	mac->roam.configParam.Is11eSupportEnabled = true;
-	mac->roam.configParam.WMMSupportMode = eCsrRoamWmmAuto;
+	mac->roam.configParam.WMMSupportMode = WMM_USER_MODE_AUTO;
 	mac->roam.configParam.ProprietaryRatesEnabled = true;
 
 	mac->roam.configParam.nVhtChannelWidth =
@@ -1643,7 +1644,7 @@ QDF_STATUS csr_change_default_config_param(struct mac_context *mac,
 			pParam->is_force_1x1;
 		mac->roam.configParam.WMMSupportMode = pParam->WMMSupportMode;
 		mac->mlme_cfg->wmm_params.wme_enabled =
-			(pParam->WMMSupportMode == eCsrRoamWmmNoQos) ? 0 : 1;
+			(pParam->WMMSupportMode == WMM_USER_MODE_NO_QOS) ? 0 : 1;
 		mac->roam.configParam.Is11eSupportEnabled =
 			pParam->Is11eSupportEnabled;
 
@@ -2301,7 +2302,6 @@ QDF_STATUS csr_roam_prepare_bss_config_from_profile(struct mac_context *mac,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint32_t bss_op_ch_freq = 0;
-	uint8_t qAPisEnabled = false;
 	enum reg_wifi_band band;
 
 	/* SSID */
@@ -2329,28 +2329,6 @@ QDF_STATUS csr_roam_prepare_bss_config_from_profile(struct mac_context *mac,
 						mac, vdev_id, pProfile,
 						bss_op_ch_freq,
 						&band);
-	/* QOS */
-	/* Is this correct to always set to this // *** */
-	if (pBssConfig->BssCap.ess == 1) {
-		/*For Softap case enable WMM */
-		if (CSR_IS_INFRA_AP(pProfile)
-		    && (eCsrRoamWmmNoQos !=
-			mac->roam.configParam.WMMSupportMode)) {
-			qAPisEnabled = true;
-		} else {
-			qAPisEnabled = false;
-		}
-	} else {
-		qAPisEnabled = true;
-	}
-	if ((eCsrRoamWmmNoQos != mac->roam.configParam.WMMSupportMode &&
-	     qAPisEnabled) ||
-	    ((eCSR_CFG_DOT11_MODE_11N == pBssConfig->uCfgDot11Mode &&
-	      qAPisEnabled))) {
-		pBssConfig->qosType = eCSR_MEDIUM_ACCESS_WMM_eDCF_DSCP;
-	} else {
-		pBssConfig->qosType = eCSR_MEDIUM_ACCESS_DCF;
-	}
 
 	/* short slot time */
 	if (WNI_CFG_PHY_MODE_11B != pBssConfig->uCfgDot11Mode) {
@@ -2360,48 +2338,6 @@ QDF_STATUS csr_roam_prepare_bss_config_from_profile(struct mac_context *mac,
 		mac->mlme_cfg->feature_flags.enable_short_slot_time_11g = 0;
 	}
 
-	return status;
-}
-
-static QDF_STATUS csr_set_qos_to_cfg(struct mac_context *mac, uint32_t sessionId,
-				     eCsrMediaAccessType qosType)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t QoSEnabled;
-	uint32_t WmeEnabled;
-	/* set the CFG enable/disable variables based on the
-	 * qosType being configured.
-	 */
-	switch (qosType) {
-	case eCSR_MEDIUM_ACCESS_WMM_eDCF_802dot1p:
-		QoSEnabled = false;
-		WmeEnabled = true;
-		break;
-	case eCSR_MEDIUM_ACCESS_WMM_eDCF_DSCP:
-		QoSEnabled = false;
-		WmeEnabled = true;
-		break;
-	case eCSR_MEDIUM_ACCESS_WMM_eDCF_NoClassify:
-		QoSEnabled = false;
-		WmeEnabled = true;
-		break;
-	case eCSR_MEDIUM_ACCESS_11e_eDCF:
-		QoSEnabled = true;
-		WmeEnabled = false;
-		break;
-	case eCSR_MEDIUM_ACCESS_11e_HCF:
-		QoSEnabled = true;
-		WmeEnabled = false;
-		break;
-	default:
-	case eCSR_MEDIUM_ACCESS_DCF:
-		QoSEnabled = false;
-		WmeEnabled = false;
-		break;
-	}
-	/* save the WMM setting for later use */
-	mac->roam.roamSession[sessionId].fWMMConnection = (bool) WmeEnabled;
-	mac->roam.roamSession[sessionId].fQOSConnection = (bool) QoSEnabled;
 	return status;
 }
 
@@ -2537,8 +2473,6 @@ QDF_STATUS csr_roam_set_bss_config_cfg(struct mac_context *mac, uint32_t session
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/* Qos */
-	csr_set_qos_to_cfg(mac, sessionId, pBssConfig->qosType);
 	/* CB */
 	if (CSR_IS_INFRA_AP(pProfile))
 		chan_freq = pProfile->op_freq;
@@ -3906,6 +3840,11 @@ csr_roam_chk_lnk_set_ctx_rsp(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 							 sessionId);
 	wlan_mlme_get_bssid_vdev_id(mac_ctx->pdev, sessionId,
 				    &connected_bssid);
+	sme_debug("vdev %d, Status %d, peer_macaddr "QDF_MAC_ADDR_FMT " obss offload %d freq %d opmode %d",
+		  pRsp->sessionId, pRsp->status_code,
+		  QDF_MAC_ADDR_REF(pRsp->peer_macaddr.bytes),
+		  mac_ctx->obss_scan_offload, chan_freq,
+		  wlan_get_opmode_vdev_id(mac_ctx->pdev, sessionId));
 
 	if (CSR_IS_WAIT_FOR_KEY(mac_ctx, sessionId)) {
 		/* We are done with authentication, whethere succeed or not */
@@ -5661,11 +5600,42 @@ void csr_get_pmk_info(struct mac_context *mac_ctx, uint8_t session_id,
 			    &pmk_cache->pmk_len);
 }
 
-QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac, uint8_t vdev_id,
-				uint8_t *psk_pmk, size_t pmk_len,
-				bool update_to_fw)
+QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac,
+				struct wlan_crypto_pmksa *pmksa,
+				uint8_t vdev_id, bool update_to_fw)
 {
-	wlan_cm_set_psk_pmk(mac->pdev, vdev_id, psk_pmk, pmk_len);
+	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr connected_bssid = {0};
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
+						    WLAN_LEGACY_SME_ID);
+	if (!vdev) {
+		sme_err("vdev is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wlan_mlme_get_bssid_vdev_id(mac->pdev, vdev_id, &connected_bssid);
+
+	/*
+	 * If the set_pmksa is received from the userspace in
+	 * connected state and if the connected BSSID is not
+	 * same as the PMKSA entry bssid, then reject this
+	 * global cache updation.
+	 *
+	 * Also for FILS connection, the set_pmksa will not have
+	 * the BSSID. So avoid this check for FILS connection.
+	 */
+	if (wlan_vdev_mlme_get_state(vdev) == WLAN_VDEV_S_UP &&
+	    !pmksa->ssid_len &&
+	    !qdf_is_macaddr_equal(&connected_bssid, &pmksa->bssid)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+		sme_debug("Set pmksa received for non-connected bss");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
+	wlan_cm_set_psk_pmk(mac->pdev, vdev_id, pmksa->pmk, pmksa->pmk_len);
 	if (update_to_fw)
 		wlan_roam_update_cfg(mac->psoc, vdev_id,
 				     REASON_ROAM_PSK_PMK_CHANGED);
@@ -5692,7 +5662,9 @@ QDF_STATUS csr_set_pmk_cache_ft(struct mac_context *mac, uint32_t session_id,
 	}
 
 	akm = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
+
 	if (QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_CCKM)) {
 		sme_debug("PMK update is not required for ESE");
 		return QDF_STATUS_SUCCESS;
@@ -5980,10 +5952,6 @@ QDF_STATUS cm_csr_handle_join_req(struct wlan_objmgr_vdev *vdev,
 				      SME_QOS_CSR_JOIN_REQ, NULL);
 	}
 
-	csr_set_qos_to_cfg(mac_ctx, vdev_id,
-			   csr_get_qos_from_bss_desc(mac_ctx, bss_desc,
-						     ie_struct));
-
 	if ((wlan_reg_11d_enabled_on_host(mac_ctx->psoc)) &&
 	     !ie_struct->Country.present)
 		csr_apply_channel_power_info_wrapper(mac_ctx);
@@ -6190,6 +6158,7 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 	sme_QosAssocInfo assoc_info;
 	struct cm_roam_values_copy src_cfg;
 	bool is_ese = false;
+	uint8_t country_code[REG_ALPHA2_LEN + 1];
 
 	session->modifyProfileFields.uapsd_mask = rsp->uapsd_mask;
 	filter = qdf_mem_malloc(sizeof(*filter));
@@ -6263,6 +6232,13 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 		csr_qos_send_assoc_ind(mac_ctx, vdev_id, &assoc_info);
 	}
 
+	if (bcn_ies->Country.present)
+		qdf_mem_copy(country_code, bcn_ies->Country.country,
+			     REG_ALPHA2_LEN + 1);
+	else
+		qdf_mem_zero(country_code, REG_ALPHA2_LEN + 1);
+	wlan_cm_set_country_code(mac_ctx->pdev, vdev_id, country_code);
+
 	qdf_mem_free(bcn_ies);
 
 purge_list:
@@ -6314,6 +6290,45 @@ QDF_STATUS cm_csr_connect_rsp(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+static void
+cm_update_rsn_ocv_cap(int32_t *rsn_cap,
+		      struct wlan_cm_connect_resp *rsp)
+{
+	struct wlan_crypto_params crypto_params;
+	uint8_t *ie_ptr;
+	uint32_t ie_len;
+	QDF_STATUS status;
+
+	/* no need to do anything if OCV is not set */
+	if (!(*rsn_cap & WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED))
+		return;
+
+	if (!rsp->connect_ies.bcn_probe_rsp.ptr ||
+	    !rsp->connect_ies.bcn_probe_rsp.len ||
+	    (rsp->connect_ies.bcn_probe_rsp.len <
+		(sizeof(struct wlan_frame_hdr) +
+		offsetof(struct wlan_bcn_frame, ie)))) {
+		sme_err("invalid beacon probe rsp len %d",
+			rsp->connect_ies.bcn_probe_rsp.len);
+		return;
+	}
+
+	ie_len = (rsp->connect_ies.bcn_probe_rsp.len -
+			sizeof(struct wlan_frame_hdr) -
+			offsetof(struct wlan_bcn_frame, ie));
+	ie_ptr = (uint8_t *)(rsp->connect_ies.bcn_probe_rsp.ptr +
+			     sizeof(struct wlan_frame_hdr) +
+			     offsetof(struct wlan_bcn_frame, ie));
+
+	status = wlan_get_crypto_params_from_rsn_ie(&crypto_params, ie_ptr,
+						    ie_len);
+	if (QDF_IS_STATUS_ERROR(status))
+		return;
+
+	if (!(crypto_params.rsn_caps & WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED))
+		*rsn_cap &= ~WLAN_CRYPTO_RSN_CAP_OCV_SUPPORTED;
+}
+
 QDF_STATUS
 cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 			struct wlan_cm_connect_resp *rsp)
@@ -6326,6 +6341,7 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 	struct dual_sta_policy *dual_sta_policy;
 	bool enable_mcc_adaptive_sch = false;
+	struct qdf_mac_addr bc_mac = QDF_MAC_ADDR_BCAST_INIT;
 
 	/*
 	 * This API is to update legacy struct and should be removed once
@@ -6404,13 +6420,15 @@ cm_csr_connect_done_ind(struct wlan_objmgr_vdev *vdev,
 		install_key_rsp.length = sizeof(install_key_rsp);
 		install_key_rsp.status_code = eSIR_SME_SUCCESS;
 		install_key_rsp.sessionId = vdev_id;
-		qdf_copy_macaddr(&install_key_rsp.peer_macaddr, &rsp->bssid);
+		/* use BC mac to enable OBSS scan */
+		qdf_copy_macaddr(&install_key_rsp.peer_macaddr, &bc_mac);
 		csr_roam_chk_lnk_set_ctx_rsp(mac_ctx,
 					     (tSirSmeRsp *)&install_key_rsp);
 	}
 
 	rsn_cap = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_RSN_CAP);
 	if (rsn_cap >= 0) {
+		cm_update_rsn_ocv_cap(&rsn_cap, rsp);
 		if (wma_cli_set2_command(vdev_id, WMI_VDEV_PARAM_RSN_CAPABILITY,
 					 rsn_cap, 0, VDEV_CMD))
 			sme_err("Failed to update WMI_VDEV_PARAM_RSN_CAPABILITY for vdev id %d",

@@ -244,6 +244,7 @@ QDF_STATUS wlan_mlme_set_dual_sta_policy(struct wlan_objmgr_psoc *psoc,
 
 	mlme_obj->cfg.gen.dual_sta_policy.concurrent_sta_policy =
 								dual_sta_config;
+	mlme_debug("Set dual_sta_config to :%d", dual_sta_config);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2604,6 +2605,39 @@ wlan_mlme_get_sta_miracast_mcc_rest_time(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 
 	*value = mlme_obj->cfg.sta.sta_miracast_mcc_rest_time;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_scan_probe_unicast_ra(struct wlan_objmgr_psoc *psoc,
+				    bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.sta.usr_scan_probe_unicast_ra;
+
+	mlme_legacy_debug("scan_probe_unicast_ra %d", *value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_set_scan_probe_unicast_ra(struct wlan_objmgr_psoc *psoc,
+				    bool value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_legacy_debug("scan_probe_unicast_ra %d", value);
+	mlme_obj->cfg.sta.usr_scan_probe_unicast_ra = value;
 
 	return QDF_STATUS_SUCCESS;
 }

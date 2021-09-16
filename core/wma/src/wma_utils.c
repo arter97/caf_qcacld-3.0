@@ -1767,7 +1767,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 		for (count = 0; count < peer_stats->num_rates; count++) {
 			mcs_index = RATE_STAT_GET_MCS_INDEX(rate_stats->rate);
 			if (QDF_IS_STATUS_SUCCESS(status)) {
-				if (rate_stats->rate && mcs_index < MAX_MCS)
+				if (mcs_index < MAX_MCS)
 					rate_stats->rx_mpdu =
 					    dp_stats->rx.rx_mpdu_cnt[mcs_index];
 				else
@@ -2179,7 +2179,6 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 		 * events may be spoofed. Drop all of them and report error.
 		 */
 		wma_err("Invalid following WMI_RADIO_LINK_STATS_EVENTID. Discarding this set");
-		wma_unified_radio_tx_mem_free(handle);
 		return -EINVAL;
 	}
 
@@ -2236,10 +2235,8 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 		channels_in_this_event = qdf_mem_malloc(
 					radio_stats->num_channels *
 					chan_stats_size);
-		if (!channels_in_this_event) {
-			wma_unified_radio_tx_mem_free(handle);
+		if (!channels_in_this_event)
 			return -ENOMEM;
-		}
 
 		chn_results =
 			(struct wifi_channel_stats *)&channels_in_this_event[0];
@@ -2273,7 +2270,7 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 					     channels_in_this_event,
 					     rs_results);
 		if (status) {
-			wma_unified_radio_tx_mem_free(handle);
+			wma_err("Failed to copy channel stats");
 			return status;
 		}
 	}
@@ -2543,7 +2540,8 @@ wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
 {
 	if (!(cfg_get(wma_handle->psoc, CFG_CLUB_LL_STA_AND_GET_STATION) &&
 	      wmi_service_enabled(wma_handle->wmi_handle,
-				  wmi_service_get_station_in_ll_stats_req)))
+				  wmi_service_get_station_in_ll_stats_req) &&
+	      wma_handle->interfaces[cmd->vdev_id].type == WMI_VDEV_TYPE_STA))
 		return wmi_unified_process_ll_stats_get_cmd(
 						wma_handle->wmi_handle, cmd);
 
@@ -3036,7 +3034,7 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
 	return 0;
 }
 
-int wma_rso_cmd_status_event_handler(wmi_roam_event_fixed_param *wmi_event)
+int wma_rso_cmd_status_event_handler(uint8_t vdev_id, enum cm_roam_notif notif)
 {
 	struct rso_cmd_status *rso_status;
 	struct scheduler_msg sme_msg = {0};
@@ -3046,10 +3044,10 @@ int wma_rso_cmd_status_event_handler(wmi_roam_event_fixed_param *wmi_event)
 	if (!rso_status)
 		return -ENOMEM;
 
-	rso_status->vdev_id = wmi_event->vdev_id;
-	if (WMI_ROAM_NOTIF_SCAN_MODE_SUCCESS == wmi_event->notif)
+	rso_status->vdev_id = vdev_id;
+	if (notif == CM_ROAM_NOTIF_SCAN_MODE_SUCCESS)
 		rso_status->status = true;
-	else if (WMI_ROAM_NOTIF_SCAN_MODE_FAIL == wmi_event->notif)
+	else if (notif == CM_ROAM_NOTIF_SCAN_MODE_FAIL)
 		rso_status->status = false;
 	sme_msg.type = eWNI_SME_RSO_CMD_STATUS_IND;
 	sme_msg.bodyptr = rso_status;
@@ -3961,8 +3959,6 @@ QDF_STATUS wma_send_vdev_down_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 		return status;
 	}
 
-	wma->interfaces[vdev_id].roaming_in_progress = false;
-
 	status = vdev_mgr_down_send(vdev_mlme);
 
 	return status;
@@ -4287,6 +4283,7 @@ QDF_STATUS wma_sta_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifndef ROAM_TARGET_IF_CONVERGENCE
 QDF_STATUS wma_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
 					 uint16_t data_len, void *data)
 {
@@ -4306,6 +4303,7 @@ QDF_STATUS wma_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
 
 	return status;
 }
+#endif
 
 QDF_STATUS wma_ap_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 					   uint16_t data_len, void *data)
