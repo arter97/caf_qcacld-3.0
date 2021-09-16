@@ -243,6 +243,7 @@ struct sap_context {
  */
 	bool is_forcescc_restart_required;
 #endif
+	qdf_freq_t candidate_freq;
 };
 
 /*----------------------------------------------------------------------------
