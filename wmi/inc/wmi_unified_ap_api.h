@@ -852,4 +852,26 @@ QDF_STATUS wmi_unified_config_peer_latency_info_cmd_send(
 		struct wmi_peer_latency_config_params
 		*param);
 #endif
+/**
+ * wmi_unified_vdev_set_intra_bss_cmd_send() - Set inta bss params
+ * @wmi_handle: wmi handle
+ * @param: params received in wmi_intra_bss_params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_vdev_set_intra_bss_cmd_send(struct wmi_unified *wmi_handle,
+					struct wmi_intra_bss_params *param);
+
+/**
+ * wmi_unified_peer_set_intra_bss_cmd_send() - set cmd to config intra_bss
+ * @wmi_handle: wmi handle
+ * @param: params needed for intr_bss config
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_peer_set_intra_bss_cmd_send(struct wmi_unified *wmi_handle,
+					struct wmi_intra_bss_params *param);
+
 #endif /* _WMI_UNIFIED_AP_API_H_ */
