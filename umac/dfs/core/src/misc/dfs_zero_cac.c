@@ -1630,6 +1630,13 @@ dfs_compute_agile_and_curchan_width(struct wlan_dfs *dfs,
 				    enum phy_ch_width *agile_ch_width,
 				    enum phy_ch_width *cur_ch_width)
 {
+	if (dfs->dfs_curchan->dfs_ch_flags & WLAN_CHAN_HALF ||
+	    dfs->dfs_curchan->dfs_ch_flags & WLAN_CHAN_QUARTER) {
+	    dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		    "aDFS during 5/10MHz operation not supported");
+		return;
+	}
+
 	/*
 	 * Agile detector's band of operation depends on current pdev.
 	 * Find the current channel's width and apply the translate rules
