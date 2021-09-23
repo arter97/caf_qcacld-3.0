@@ -157,7 +157,8 @@
 
 /*
  * <ini>
- * gEnableModulatedDTIM - Enable/Disable modulated DTIM feature
+ * gEnableModulatedDTIM/ConDTIMSkipping_Number - Enable/Disable modulated DTIM
+ * feature
  * @Min: 0
  * @Max: 10
  * @Default: 0
@@ -179,7 +180,7 @@
  * </ini>
  */
 #define CFG_PMO_ENABLE_MODULATED_DTIM CFG_INI_UINT( \
-	"gEnableModulatedDTIM", \
+	"gEnableModulatedDTIM ConDTIMSkipping_Number", \
 	0, \
 	10, \
 	0, \
@@ -592,6 +593,25 @@
 		0, \
 		"disconnect sap tdls in wow")
 
+/*
+ * <ini>
+ * gEnableIcmpOffload - Enable/disable ICMP offload
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable firmware's capability of sending ICMP
+ * response to clients.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_ICMP_OFFLOAD CFG_INI_BOOL( \
+	"gEnableIcmpOffload", \
+	0, \
+	"enable/disable ICMP offload")
+
 #define CFG_PMO_COMMON_ALL \
 	CFG(CFG_ENABLE_SAP_SUSPEND) \
 	CFG(CFG_PMO_ENABLE_HOST_ARPOFFLOAD) \
@@ -616,6 +636,7 @@
 	CFG(CFG_ENABLE_BUS_SUSPEND_IN_GO_MODE)\
 	CFG(CFG_DISCONNECT_SAP_TDLS_IN_WOW) \
 	CFG(CFG_ENABLE_DYNAMIC_PCIE_GEN_SPEED_SWITCH) \
-	CFG(CFG_IGMP_VERSION_SUPPORT)
+	CFG(CFG_IGMP_VERSION_SUPPORT) \
+	CFG(CFG_ENABLE_ICMP_OFFLOAD)
 
 #endif /* WLAN_PMO_COMMON_CFG_H__ */

@@ -49,6 +49,9 @@ struct mac_context;
 #include "wlan_tdls_public_structs.h"
 #include "qca_vendor.h"
 #include "wlan_cp_stats_mc_defs.h"
+#ifdef WLAN_FEATURE_11BE_MLO
+#include "wlan_mlo_mgr_public_structs.h"
+#endif
 
 /* The ini gDataInactivityTimeout is deprecated. So, definng a new macro
  * PS_DATA_INACTIVITY_TIMEOUT with the ini's default value.
@@ -120,12 +123,8 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define SIR_SAP_MAX_NUM_PEERS 32
 #endif
 
-#define KCK_192BIT_KEY_LEN 24
-#define KCK_256BIT_KEY_LEN 32
-
 #define SIR_KEK_KEY_LEN 16
 #define SIR_KEK_KEY_LEN_FILS 64
-#define KEK_256BIT_KEY_LEN 32
 
 #define SIR_REPLAY_CTR_LEN 8
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -536,8 +535,7 @@ struct roam_pmkid_req_event;
  * typedef pe_roam_synch_fn_t - PE roam synch callback routine pointer
  * @mac_ctx: Global MAC context
  * @roam_sync_ind_ptr: Structure with roam synch parameters
- * @bss_desc_ptr: bss_description pointer for new bss to which the firmware has
- * started roaming
+ * @ie_len: ie length
  * @reason: Reason for calling the callback
  *
  * This type is for callbacks registered with WMA to complete the roam synch
@@ -549,7 +547,7 @@ struct roam_pmkid_req_event;
 typedef QDF_STATUS
 (*pe_roam_synch_fn_t)(struct mac_context *mac_ctx,
 		      struct roam_offload_synch_ind *roam_sync_ind_ptr,
-		      struct bss_description *bss_desc_ptr,
+		      uint16_t ie_len,
 		      enum sir_roam_op_code reason);
 
 /**
@@ -990,6 +988,10 @@ struct join_req {
 	tSirRSNie rsnIE;
 	tSirAddie addIEScan;
 	tSirAddie addIEAssoc;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct mlo_partner_info partner_info;
+	uint8_t assoc_link_id;
+#endif
 	/* Warning:::::::::::: Do not add any new param in this struct */
 	/* Pls make this as last variable in struct */
 	struct bss_description bssDescription;
@@ -1790,6 +1792,7 @@ struct sir_host_offload_req {
 /* Packet Types. */
 #define SIR_KEEP_ALIVE_NULL_PKT              1
 #define SIR_KEEP_ALIVE_UNSOLICIT_ARP_RSP     2
+#define SIR_KEEP_ALIVE_MGMT_FRAME            5
 
 /* Keep Alive request. */
 struct keep_alive_req {

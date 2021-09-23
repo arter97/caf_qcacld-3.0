@@ -2225,7 +2225,7 @@ sme_process_sta_twt_del_dialog_event(
 		struct wmi_twt_del_dialog_complete_event_param *param)
 {
 	twt_del_dialog_cb callback;
-	bool is_evt_allowed;
+	bool is_evt_allowed, usr_cfg_ps_enable;
 	enum wlan_twt_commands active_cmd = WLAN_TWT_NONE;
 
 	is_evt_allowed = mlme_twt_is_command_in_progress(
@@ -2243,6 +2243,11 @@ sme_process_sta_twt_del_dialog_event(
 
 		return;
 	}
+
+	usr_cfg_ps_enable = mlme_get_user_ps(mac->psoc, param->vdev_id);
+	if (!usr_cfg_ps_enable &&
+	    param->status == WMI_HOST_DEL_TWT_STATUS_OK)
+		param->status = WMI_HOST_DEL_TWT_STATUS_PS_DISABLE_TEARDOWN;
 
 	callback = mac->sme.twt_del_dialog_cb;
 	if (callback)
@@ -3436,29 +3441,26 @@ void sme_get_pmk_info(mac_handle_t mac_handle, uint8_t session_id,
  * sme_roam_set_psk_pmk() - a wrapper function to request CSR to save PSK/PMK
  * This is a synchronous call.
  * @mac_handle:  Global structure
- * @sessionId:   SME sessionId
- * @pPSK_PMK:    pointer to an array of Psk[]/Pmk
- * @pmk_len:     Length could be only 16 bytes in case if LEAP
- *               connections. Need to pass this information to
- *               firmware.
+ * @vdev_id:  vdev id
+ * @pmksa : PMK entry
  * @update_to_fw: True - send RSO update to firmware after updating
  *                       session->psk_pmk.
  *                False - Copy the pmk to session->psk_pmk and return
  *
- * Return: QDF_STATUS -status whether PSK/PMK is set or not
+ * Return: QDF_STATUS - status whether PSK/PMK is set or not
  */
-QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle, uint8_t sessionId,
-				uint8_t *psk_pmk, size_t pmk_len,
-				bool update_to_fw)
+QDF_STATUS sme_roam_set_psk_pmk(mac_handle_t mac_handle,
+				struct wlan_crypto_pmksa *pmksa,
+				uint8_t vdev_id, bool update_to_fw)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
-		if (CSR_IS_SESSION_VALID(mac, sessionId))
-			status = csr_roam_set_psk_pmk(mac, sessionId, psk_pmk,
-						      pmk_len, update_to_fw);
+		if (CSR_IS_SESSION_VALID(mac, vdev_id))
+			status = csr_roam_set_psk_pmk(mac, pmksa, vdev_id,
+						      update_to_fw);
 		else
 			status = QDF_STATUS_E_INVAL;
 		sme_release_global_lock(&mac->sme);
@@ -4580,6 +4582,64 @@ release_ref:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11AX
+static void sme_update_bfer_he_cap(struct wma_tgt_cfg *cfg)
+{
+	cfg->he_cap_5g.su_beamformer = 0;
+}
+#else
+static void sme_update_bfer_he_cap(struct wma_tgt_cfg *cfg)
+{
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE
+static void sme_update_bfer_eht_cap(struct wma_tgt_cfg *cfg)
+{
+	cfg->eht_cap_5g.su_beamformer = 0;
+}
+#else
+static void sme_update_bfer_eht_cap(struct wma_tgt_cfg *cfg)
+{
+}
+#endif
+
+void sme_update_bfer_caps_as_per_nss_chains(mac_handle_t mac_handle,
+					    struct wma_tgt_cfg *cfg)
+{
+	uint8_t max_supported_tx_chains = MAX_VDEV_CHAINS;
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
+					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
+	uint8_t ini_tx_chains;
+
+	ini_tx_chains = GET_VDEV_NSS_CHAIN(
+			nss_chains_ini_cfg->num_tx_chains[NSS_CHAINS_BAND_5GHZ],
+			SAP_NSS_CHAINS_SHIFT);
+
+	max_supported_tx_chains =
+			mac_ctx->fw_chain_cfg.max_tx_chains_5g;
+
+	max_supported_tx_chains = QDF_MIN(ini_tx_chains,
+					  max_supported_tx_chains);
+	if (!max_supported_tx_chains)
+		return;
+
+	if (max_supported_tx_chains == 1) {
+		sme_debug("ini support %d and firmware support %d",
+			  ini_tx_chains,
+			  mac_ctx->fw_chain_cfg.max_tx_chains_5g);
+		if (mac_ctx->fw_chain_cfg.max_tx_chains_5g == 1) {
+			cfg->vht_cap.vht_su_bformer = 0;
+			sme_update_bfer_he_cap(cfg);
+			sme_update_bfer_eht_cap(cfg);
+		}
+		mac_ctx->mlme_cfg->vht_caps.vht_cap_info.su_bformer = 0;
+		mac_ctx->mlme_cfg->vht_caps.vht_cap_info.num_soundingdim = 0;
+		mac_ctx->mlme_cfg->vht_caps.vht_cap_info.mu_bformer = 0;
+	}
+}
+
 QDF_STATUS sme_vdev_post_vdev_create_setup(mac_handle_t mac_handle,
 					   struct wlan_objmgr_vdev *vdev)
 {
@@ -4695,7 +4755,7 @@ QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle,
 {
 	QDF_STATUS status;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	uint8_t *self_peer_macaddr, vdev_id = wlan_vdev_get_id(vdev);
 	struct scheduler_msg self_peer_delete_msg = {0};
 	struct del_vdev_params *del_self_peer;
 
@@ -4735,10 +4795,14 @@ QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle,
 	if (!del_self_peer)
 		return QDF_STATUS_E_NOMEM;
 
+	self_peer_macaddr = wlan_vdev_mlme_get_mldaddr(vdev);
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)self_peer_macaddr))
+		self_peer_macaddr = wlan_vdev_mlme_get_macaddr(vdev);
+
 	del_self_peer->vdev = vdev;
 	del_self_peer->vdev_id = wlan_vdev_get_id(vdev);
-	qdf_mem_copy(del_self_peer->self_mac_addr,
-		     wlan_vdev_mlme_get_macaddr(vdev), sizeof(tSirMacAddr));
+	qdf_mem_copy(del_self_peer->self_mac_addr, self_peer_macaddr,
+		     sizeof(tSirMacAddr));
 
 	self_peer_delete_msg.bodyptr = del_self_peer;
 	self_peer_delete_msg.callback = mlme_vdev_self_peer_delete;
@@ -6201,8 +6265,7 @@ QDF_STATUS sme_set_roam_scan_control(mac_handle_t mac_handle, uint8_t sessionId,
 	sme_debug("LFR runtime successfully set roam scan control to %d - old value is %d",
 		  roamScanControl,
 		  mac->mlme_cfg->lfr.rso_user_config.roam_scan_control);
-	if (!roamScanControl &&
-	    mac->mlme_cfg->lfr.rso_user_config.roam_scan_control) {
+	if (!roamScanControl) {
 		/**
 		 * Clear the specific channel info cache when roamScanControl
 		 * is set to 0. If any preffered channel list is configured,
@@ -7026,35 +7089,6 @@ static bool sme_validate_freq_list(mac_handle_t mac_handle,
 	return true;
 }
 
-/**
- * sme_change_roam_scan_channel_list() - to change scan channel list
- * @mac_handle: Opaque handle to the global MAC context
- * @sessionId: sme session id
- * @channel_freq_list: Output channel list
- * @numChannels: Output number of channels
- *
- * This routine is called to Change roam scan channel list.
- * This is a synchronous call
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_change_roam_scan_channel_list(mac_handle_t mac_handle,
-					     uint8_t sessionId,
-					     uint32_t *channel_freq_list,
-					     uint8_t numChannels)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct cm_roam_values_copy src_config;
-
-	src_config.chan_info.freq_list = channel_freq_list;
-	src_config.chan_info.num_chan = numChannels;
-
-	mac->mlme_cfg->lfr.rso_user_config.roam_scan_control = true;
-	return wlan_cm_roam_cfg_set_value(mac->psoc, sessionId,
-					  ROAM_SPECIFIC_CHAN,
-					  &src_config);
-}
-
 QDF_STATUS
 sme_update_roam_scan_freq_list(mac_handle_t mac_handle, uint8_t vdev_id,
 			       uint32_t *freq_list, uint8_t num_chan,
@@ -7071,11 +7105,11 @@ sme_update_roam_scan_freq_list(mac_handle_t mac_handle, uint8_t vdev_id,
 	src_config.chan_info.freq_list = freq_list;
 	src_config.chan_info.num_chan = num_chan;
 	if (freq_list_type == QCA_PREFERRED_SCAN_FREQ_LIST) {
+		sme_set_roam_scan_control(mac_handle, vdev_id, false);
 		return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
 						  ROAM_PREFERRED_CHAN,
 						  &src_config);
 	} else {
-		mac->mlme_cfg->lfr.rso_user_config.roam_scan_control = true;
 		return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
 						  ROAM_SPECIFIC_CHAN,
 						  &src_config);
@@ -10893,6 +10927,56 @@ void sme_set_he_mu_edca_def_cfg(mac_handle_t mac_handle)
 	}
 }
 
+int sme_update_he_capabilities(mac_handle_t mac_handle, uint8_t session_id,
+			       uint8_t cfg_val, uint8_t cfg_id)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+	tDot11fIEhe_cap *cfg_he_cap;
+	tDot11fIEhe_cap *he_cap_orig;
+
+	session = CSR_GET_SESSION(mac_ctx, session_id);
+
+	if (!session) {
+		sme_err("No session for id %d", session_id);
+		return -EINVAL;
+	}
+	cfg_he_cap = &mac_ctx->mlme_cfg->he_caps.dot11_he_cap;
+	he_cap_orig = &mac_ctx->mlme_cfg->he_caps.he_cap_orig;
+
+	switch (cfg_id) {
+	case QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_BCAST_TWT_SUPPORT:
+		if (cfg_val) {
+			mac_ctx->mlme_cfg->twt_cfg.disable_btwt_usr_cfg = false;
+			cfg_he_cap->broadcast_twt = he_cap_orig->broadcast_twt;
+		} else {
+			cfg_he_cap->broadcast_twt = 0;
+			mac_ctx->mlme_cfg->twt_cfg.disable_btwt_usr_cfg = true;
+		}
+		break;
+	case QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_RX_CTRL_FRAME_TO_MBSS:
+		if (cfg_val)
+			cfg_he_cap->rx_ctrl_frame = he_cap_orig->rx_ctrl_frame;
+		else
+			cfg_he_cap->rx_ctrl_frame = 0;
+		break;
+	case QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_PUNCTURED_PREAMBLE_RX:
+		if (cfg_val)
+			cfg_he_cap->rx_pream_puncturing =
+				he_cap_orig->rx_pream_puncturing;
+		else
+			cfg_he_cap->rx_pream_puncturing = 0;
+		break;
+	default:
+		sme_debug("default: Unhandled cfg %d", cfg_id);
+		return -EINVAL;
+	}
+
+	sme_debug("HE cap: cfg id %d, cfg val %d", cfg_id, cfg_val);
+	csr_update_session_he_cap(mac_ctx, session);
+	return 0;
+}
+
 int sme_update_he_tx_bfee_supp(mac_handle_t mac_handle, uint8_t session_id,
 			       uint8_t cfg_val)
 {
@@ -13455,12 +13539,19 @@ QDF_STATUS sme_add_dialog_cmd(mac_handle_t mac_handle,
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct scheduler_msg twt_msg = {0};
 	bool is_twt_cmd_in_progress, is_twt_notify_in_progress;
+	bool usr_cfg_ps_enable;
 	QDF_STATUS status;
 	void *wma_handle;
 	struct wmi_twt_add_dialog_param *cmd_params;
 	enum wlan_twt_commands active_cmd = WLAN_TWT_NONE;
 
 	SME_ENTER();
+
+	usr_cfg_ps_enable = mlme_get_user_ps(mac->psoc, twt_params->vdev_id);
+	if (!usr_cfg_ps_enable) {
+		sme_debug("Power save mode disable");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	is_twt_notify_in_progress = mlme_is_twt_notify_in_progress(
 			mac->psoc, twt_params->vdev_id);
@@ -14642,6 +14733,12 @@ void sme_set_amsdu(mac_handle_t mac_handle, bool enable)
 	mac_ctx->is_usr_cfg_amsdu_enabled = enable;
 }
 
+void sme_set_bss_max_idle_period(mac_handle_t mac_handle, uint16_t cfg_val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	mac_ctx->mlme_cfg->sta.bss_max_idle_period = cfg_val;
+}
+
 #ifdef WLAN_FEATURE_11AX
 void sme_check_enable_ru_242_tx(mac_handle_t mac_handle, uint8_t vdev_id)
 {
@@ -14670,6 +14767,7 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
 	QDF_STATUS status;
+	uint32_t prevent_pm[] = {29, 1};
 
 	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 
@@ -14680,6 +14778,9 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	sme_debug("set HE testbed defaults");
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.amsdu_in_ampdu = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request = 0;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.broadcast_twt = 0;
+	mac_ctx->mlme_cfg->twt_cfg.disable_btwt_usr_cfg = true;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_ctrl_frame = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.omi_a_ctrl = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.he_ppdu_20_in_160_80p80Mhz = 0;
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.he_ppdu_20_in_40Mhz_2G = 0;
@@ -14726,12 +14827,15 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_pream_puncturing = 0;
 	csr_update_session_he_cap(mac_ctx, session);
 
-	wlan_cm_set_check_6ghz_security(mac_ctx->psoc, true);
 	status = ucfg_mlme_set_enable_bcast_probe_rsp(mac_ctx->psoc, false);
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed not set enable bcast probe resp info, %d",
 			status);
 
+	status = sme_send_unit_test_cmd(vdev_id, 77, 2, prevent_pm);
+
+	if (QDF_STATUS_SUCCESS != status)
+		sme_err("prevent pm cmd send failed");
 	status = wma_cli_set_command(vdev_id,
 				     WMI_VDEV_PARAM_ENABLE_BCAST_PROBE_RESPONSE,
 				     0, VDEV_CMD);
@@ -14740,6 +14844,7 @@ void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 			status);
 
 	mac_ctx->mlme_cfg->sta.usr_disabled_roaming = true;
+	mac_ctx->mlme_cfg->sta.bss_max_idle_period = 0;
 }
 
 void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
@@ -14747,6 +14852,7 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct csr_roam_session *session;
 	QDF_STATUS status;
+	uint32_t prevent_pm[] = {29, 0};
 
 	session = CSR_GET_SESSION(mac_ctx, vdev_id);
 
@@ -14759,7 +14865,13 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		mac_ctx->mlme_cfg->he_caps.he_cap_orig;
 	csr_update_session_he_cap(mac_ctx, session);
 
-	wlan_cm_reset_check_6ghz_security(mac_ctx->psoc);
+	wlan_cm_set_check_6ghz_security(mac_ctx->psoc, true);
+	status = sme_send_unit_test_cmd(vdev_id, 77, 2, prevent_pm);
+
+	if (QDF_STATUS_SUCCESS != status)
+		sme_err("prevent PM reset cmd send failed");
+
+	mac_ctx->mlme_cfg->twt_cfg.disable_btwt_usr_cfg = false;
 	status = ucfg_mlme_set_enable_bcast_probe_rsp(mac_ctx->psoc, true);
 	if (QDF_IS_STATUS_ERROR(status))
 		sme_err("Failed not set enable bcast probe resp info, %d",
@@ -14772,6 +14884,8 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		sme_err("Failed to set enable bcast probe resp in FW, %d",
 			status);
 	mac_ctx->is_usr_cfg_pmf_wep = PMF_CORRECT_KEY;
+	mac_ctx->mlme_cfg->sta.bss_max_idle_period =
+			mac_ctx->mlme_cfg->sta.sta_keep_alive_period;
 
 	if (mac_ctx->usr_cfg_disable_rsp_tx)
 		sme_set_cfg_disable_tx(mac_handle, vdev_id, 0);

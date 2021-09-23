@@ -26,7 +26,7 @@
 #include "qdf_defer.h"
 #include "wlan_reg_services_api.h"
 #include "cds_ieee80211_common_i.h"
-
+#include "qdf_delayed_work.h"
 #define DBS_OPPORTUNISTIC_TIME   5
 
 #define POLICY_MGR_SER_CMD_TIMEOUT 4000
@@ -40,6 +40,7 @@
 #define PM_24_GHZ_CH_FREQ_6   (2437)
 #define PM_5_GHZ_CH_FREQ_36   (5180)
 #define CHANNEL_SWITCH_COMPLETE_TIMEOUT   (2000)
+#define MAX_NOA_TIME (3000)
 
 /**
  * Policy Mgr hardware mode list bit-mask definitions.
@@ -235,7 +236,6 @@ extern enum policy_mgr_conc_next_action
  * @conc_rule1: concurrency rule1
  * @conc_rule2: concurrency rule2
  * @allow_mcc_go_diff_bi: Allow GO and STA diff beacon interval in MCC
- * @enable_overlap_chnl: Enable overlap channels for SAP's channel selection
  * @dual_mac_feature: To enable/disable dual mac features
  * @is_force_1x1_enable: Is 1x1 forced for connection
  * @sta_sap_scc_on_dfs_chnl: STA-SAP SCC on DFS channel
@@ -259,7 +259,6 @@ struct policy_mgr_cfg {
 	uint8_t conc_rule2;
 	bool enable_mcc_adaptive_sch;
 	uint8_t allow_mcc_go_diff_bi;
-	uint8_t enable_overlap_chnl;
 	uint8_t dual_mac_feature;
 	enum force_1x1_type is_force_1x1_enable;
 	uint8_t sta_sap_scc_on_dfs_chnl;
@@ -349,7 +348,7 @@ struct policy_mgr_psoc_priv_obj {
 	uint32_t concurrency_mode;
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
 	uint8_t no_of_active_sessions[QDF_MAX_NO_OF_MODE];
-	qdf_work_t sta_ap_intf_check_work;
+	struct qdf_delayed_work sta_ap_intf_check_work;
 	qdf_work_t nan_sap_conc_work;
 	uint32_t num_dbs_hw_modes;
 	struct dbs_hw_mode_info hw_mode;
@@ -575,11 +574,24 @@ enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
  */
 enum hw_mode_bandwidth policy_mgr_get_bw(enum phy_ch_width chan_width);
 
+/**
+ * policy_mgr_get_channel_list() - Get channel list based on PCL and mode
+ * @psoc: psoc object
+ * @pcl: pcl type
+ * @mode: interface mode
+ * @pcl_channels: pcl channel list buffer
+ * @pcl_weights: pcl weight buffer
+ * @pcl_sz: pcl channel list buffer size
+ * @len: pcl channel number returned from API
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
-			enum policy_mgr_pcl_type pcl,
-			uint32_t *pcl_channels, uint32_t *len,
-			enum policy_mgr_con_mode mode,
-			uint8_t *pcl_weights, uint32_t weight_len);
+				       enum policy_mgr_pcl_type pcl,
+				       enum policy_mgr_con_mode mode,
+				       uint32_t *pcl_channels,
+				       uint8_t *pcl_weights,
+				       uint32_t pcl_sz, uint32_t *len);
 
 /**
  * policy_mgr_allow_new_home_channel() - Check for allowed number of

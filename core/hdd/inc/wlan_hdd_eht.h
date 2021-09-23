@@ -72,14 +72,12 @@ void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
 /**
  * hdd_update_wiphy_eht_cap() - update the wiphy with eht capabilities
  * @hdd_ctx: HDD context
- * @cfg: WMA target configuration
  *
  * update wiphy with the eht capabilties.
  *
  * Return: None
  */
-void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx,
-			      struct wma_tgt_cfg *cfg);
+void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx);
 
 /**
  * wlan_hdd_get_mlo_link_id() - get link id and number of links
@@ -91,6 +89,31 @@ void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx,
  */
 void wlan_hdd_get_mlo_link_id(struct hdd_beacon_data *beacon,
 			      uint8_t *link_id, uint8_t *num_link);
+
+/**
+ * hdd_set_11be_rate_code() - set 11be rate code
+ * @adapter: net device adapter
+ * @rate_code: new 11be rate code
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_set_11be_rate_code(struct hdd_adapter *adapter, uint16_t rate_code);
+
+/**
+ * hdd_sysfs_11be_rate_create() - Create sysfs entry to configure 11be rate
+ * @adapter: net device adapter
+ *
+ * Return: None
+ */
+void hdd_sysfs_11be_rate_create(struct hdd_adapter *adapter);
+
+/**
+ * hdd_sysfs_11be_rate_destroy() - Destroy sysfs entry to configure 11be rate
+ * @adapter: net device adapter
+ *
+ * Return: None
+ */
+void hdd_sysfs_11be_rate_destroy(struct hdd_adapter *adapter);
 #else
 static inline
 void hdd_update_tgt_eht_cap(struct hdd_context *hdd_ctx,
@@ -104,8 +127,21 @@ static inline void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
 }
 
 static inline
-void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx,
-			      struct wma_tgt_cfg *cfg)
+void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline int
+hdd_set_11be_rate_code(struct hdd_adapter *adapter, uint16_t rate_code)
+{
+	return 0;
+}
+
+static inline void hdd_sysfs_11be_rate_create(struct hdd_adapter *adapter)
+{
+}
+
+static inline void hdd_sysfs_11be_rate_destroy(struct hdd_adapter *adapter)
 {
 }
 #endif

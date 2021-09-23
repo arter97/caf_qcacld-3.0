@@ -45,7 +45,7 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 
 QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
-			       uint8_t *event, uint32_t event_data_len)
+			       void *event, uint32_t event_data_len)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
@@ -117,7 +117,7 @@ error:
 
 QDF_STATUS
 cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
-			  struct roam_offload_synch_ind *roam_synch_data)
+			  uint8_t roam_reason)
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_pdev *pdev;
@@ -138,7 +138,7 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 	wlan_blm_update_bssid_connect_params(pdev,
 					     connected_bssid,
 					     BLM_AP_DISCONNECTED);
-	if (IS_ROAM_REASON_STA_KICKOUT(roam_synch_data->roam_reason)) {
+	if (IS_ROAM_REASON_STA_KICKOUT(roam_reason)) {
 		struct reject_ap_info ap_info;
 
 		ap_info.bssid = connected_bssid;
@@ -901,16 +901,18 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	if (ucfg_pkt_capture_get_pktcap_mode(psoc))
 		ucfg_pkt_capture_record_channel(cm_ctx->vdev);
 
-	if (WLAN_REG_IS_5GHZ_CH_FREQ(roam_synch_data->chan_freq)) {
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(roam_synch_data->chan_freq)) {
+		wlan_cm_set_disable_hi_rssi(pdev,
+					    vdev_id, false);
+	} else {
 		wlan_cm_set_disable_hi_rssi(pdev,
 					    vdev_id, true);
 		mlme_debug("Disabling HI_RSSI, AP freq=%d rssi %d",
 			   roam_synch_data->chan_freq, roam_synch_data->rssi);
-	} else {
-		wlan_cm_set_disable_hi_rssi(pdev,
-					    vdev_id, false);
 	}
+	policy_mgr_check_n_start_opportunistic_timer(psoc);
 
+	policy_mgr_check_concurrent_intf_and_restart_sap(psoc);
 	if (roam_synch_data->auth_status == ROAM_AUTH_STATUS_AUTHENTICATED)
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_ENABLED,
@@ -919,12 +921,18 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		/*
 		 * STA is just in associated state here, RSO
 		 * enable will be sent once EAP & EAPOL will be done by
-		 * user-space and after set key response
-		 * is received.
+		 * user-space and after set key response is received.
+		 *
+		 * When firmware roaming state is connected, EAP/EAPOL will be
+		 * done at the supplicant. If EAP/EAPOL fails and supplicant
+		 * sends disconnect, then the RSO state machine sends
+		 * deinit directly to firmware without RSO stop with roam
+		 * scan mode value 0. So to avoid this move state to RSO
+		 * stop.
 		 */
 		wlan_cm_roam_state_change(pdev, vdev_id,
-					  WLAN_ROAM_INIT,
-					  REASON_CONNECT);
+					  WLAN_ROAM_RSO_STOPPED,
+					  REASON_DISCONNECTED);
 end:
 	return status;
 }
@@ -1119,45 +1127,8 @@ void cm_fw_ho_fail_req(struct wlan_objmgr_psoc *psoc,
 	}
 }
 
-#ifdef WLAN_FEATURE_FIPS
-QDF_STATUS cm_roam_pmkid_req_ind(struct wlan_objmgr_psoc *psoc,
-				 uint8_t vdev_id,
-				 struct roam_pmkid_req_event *src_lst)
-{
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct wlan_objmgr_vdev *vdev;
-	struct qdf_mac_addr *dst_list;
-	uint32_t num_entries, i;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						    WLAN_MLME_SB_ID);
-	if (!vdev) {
-		mlme_err("vdev object is NULL");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	num_entries = src_lst->num_entries;
-	mlme_debug("Num entries %d", num_entries);
-	for (i = 0; i < num_entries; i++) {
-		dst_list = &src_lst->ap_bssid[i];
-		status = mlme_cm_osif_pmksa_candidate_notify(vdev, dst_list,
-							     1, false);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			mlme_err("Number %d Notify failed for " QDF_MAC_ADDR_FMT,
-				 i, QDF_MAC_ADDR_REF(dst_list->bytes));
-			goto rel_ref;
-		}
-	}
-
-rel_ref:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
-
-	return status;
-}
-#endif /* WLAN_FEATURE_FIPS */
-
 #ifdef ROAM_TARGET_IF_CONVERGENCE
-QDF_STATUS cm_free_roam_synch_frame_ind(struct rso_config *rso_cfg)
+QDF_STATUS wlan_cm_free_roam_synch_frame_ind(struct rso_config *rso_cfg)
 {
 	struct roam_synch_frame_ind *frame_ind;
 

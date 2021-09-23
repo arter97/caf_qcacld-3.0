@@ -302,7 +302,7 @@ typedef struct sSirProbeRespBeacon {
 	uint8_t num_transmit_power_env;
 	tDot11fIEtransmit_power_env transmit_power_env[MAX_TPE_IES];
 	uint8_t ap_power_type;
-	tpSirMultiLink_IE mlo_ie;
+	tSirMultiLink_IE mlo_ie;
 } tSirProbeRespBeacon, *tpSirProbeRespBeacon;
 
 /* probe Request structure */
@@ -684,11 +684,35 @@ sir_convert_qos_map_configure_frame2_struct(struct mac_context *mac,
 #ifdef WLAN_FEATURE_11BE_MLO
 QDF_STATUS
 mlo_ie_convert_assoc_rsp_frame2_struct(tDot11fAssocResponse *ar,
-				       tpSirMultiLink_IE pMloIe);
+				     tpSirMultiLink_IE pMloIe);
+
+QDF_STATUS
+populate_dot11f_probe_req_mlo_ie(struct mac_context *mac_ctx,
+				 struct pe_session *session,
+				 tDot11fIEmlo_ie *mlo_ie);
+
+QDF_STATUS
+sir_convert_mlo_probe_rsp_frame2_struct(tDot11fProbeResponse *pr,
+					tpSirMultiLink_IE mlo_ie_ptr);
 #else
 static inline QDF_STATUS
 mlo_ie_convert_assoc_rsp_frame2_struct(tDot11fAssocResponse *ar,
 				       tpSirMultiLink_IE pMloIe)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+populate_dot11f_probe_req_mlo_ie(struct mac_context *mac_ctx,
+				 struct pe_session *session,
+				 tDot11fIEmlo_ie *mlo_ie)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+sir_convert_mlo_probe_rsp_frame2_struct(tDot11fProbeResponse *pr,
+					tpSirMultiLink_IE mlo_ie_ptr)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -1131,6 +1155,10 @@ void populate_dot11f_qcn_ie(struct mac_context *mac,
 			    struct pe_session *pe_session,
 			    tDot11fIEqcn_ie *qcn_ie,
 			    uint8_t attr_id);
+
+void populate_dot11f_bss_max_idle(struct mac_context *mac,
+				  struct pe_session *session,
+				  tDot11fIEbss_max_idle_period *max_idle_ie);
 
 #ifdef WLAN_FEATURE_FILS_SK
 /**

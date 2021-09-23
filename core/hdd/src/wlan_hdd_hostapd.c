@@ -4640,18 +4640,10 @@ QDF_STATUS wlan_hdd_config_acs(struct hdd_context *hdd_ctx,
 	struct sap_config *sap_config;
 	struct hdd_config *ini_config;
 	mac_handle_t mac_handle;
-	uint8_t is_overlap_enable = 0;
-	QDF_STATUS status;
 
 	mac_handle = hdd_ctx->mac_handle;
 	sap_config = &adapter->session.ap.sap_config;
 	ini_config = hdd_ctx->config;
-
-	status = ucfg_policy_mgr_get_enable_overlap_chnl(hdd_ctx->psoc,
-							 &is_overlap_enable);
-	if (status != QDF_STATUS_SUCCESS)
-		hdd_err("can't get overlap channel INI value, using default");
-	sap_config->enOverLapCh = !!is_overlap_enable;
 
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 	hdd_debug("HDD_ACS_SKIP_STATUS = %d", hdd_ctx->skip_acs_scan_status);
@@ -5308,7 +5300,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	uint16_t prev_rsn_length = 0;
 	enum dfs_mode mode;
 	bool ignore_cac = 0;
-	uint8_t is_overlap_enable = 0;
 	uint8_t beacon_fixed_len, indoor_chnl_marking = 0;
 	bool sap_force_11n_for_11ac = 0;
 	bool go_force_11n_for_11ac = 0;
@@ -5424,13 +5415,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 	config->beacon_int = mgmt_frame->u.beacon.beacon_int;
 	config->dfs_cac_offload = hdd_ctx->dfs_cac_offload;
-
-	status = ucfg_policy_mgr_get_enable_overlap_chnl(hdd_ctx->psoc,
-							 &is_overlap_enable);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("can't get overlap channel INI value, using default");
-	config->enOverLapCh = is_overlap_enable;
-
 	config->dtim_period = beacon->dtim_period;
 
 	if (config->acs_cfg.acs_mode == true) {
@@ -5807,13 +5791,13 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	 * may not be good with non QOS 11N AP
 	 * Default: enable QOS for SAP unless WMM IE not present for 11bga
 	 */
-	sme_config->csr_config.WMMSupportMode = eCsrRoamWmmAuto;
+	sme_config->csr_config.WMMSupportMode = WMM_USER_MODE_AUTO;
 	ie = wlan_get_vendor_ie_ptr_from_oui(WMM_OUI_TYPE, WMM_OUI_TYPE_SIZE,
 					     beacon->tail, beacon->tail_len);
 	if (!ie && (config->SapHw_mode == eCSR_DOT11_MODE_11a ||
 		config->SapHw_mode == eCSR_DOT11_MODE_11g ||
 		config->SapHw_mode == eCSR_DOT11_MODE_11b))
-		sme_config->csr_config.WMMSupportMode = eCsrRoamWmmNoQos;
+		sme_config->csr_config.WMMSupportMode = WMM_USER_MODE_NO_QOS;
 	sme_update_config(mac_handle, sme_config);
 
 	if (!((adapter->device_mode == QDF_SAP_MODE) &&
@@ -6138,7 +6122,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		status = wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
 		if (QDF_IS_STATUS_SUCCESS(status)) {
 			qdf_status =
-				qdf_wait_for_event_completion(&hostapd_state->
+				qdf_wait_single_event(&hostapd_state->
 					qdf_stop_bss_event,
 					SME_CMD_STOP_BSS_TIMEOUT);
 
@@ -6521,7 +6505,13 @@ static void
 wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
 			      struct cfg80211_ap_settings *params)
 {
-	ucfg_mlme_set_twt_responder(hdd_ctx->psoc, params->twt_responder);
+	bool twt_res_svc_cap, enable_twt;
+
+	enable_twt = ucfg_mlme_is_twt_enabled(hdd_ctx->psoc);
+	ucfg_mlme_get_twt_res_service_cap(hdd_ctx->psoc, &twt_res_svc_cap);
+	ucfg_mlme_set_twt_responder(hdd_ctx->psoc, QDF_MIN(
+					twt_res_svc_cap,
+					(enable_twt && params->twt_responder)));
 	if (params->twt_responder)
 		hdd_send_twt_responder_enable_cmd(hdd_ctx);
 	else

@@ -79,6 +79,7 @@
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_crypto_global_api.h>
 #include <wlan_mlme_main.h>
+#include <wlan_cm_api.h>
 #include "wlan_pkt_capture_ucfg_api.h"
 
 struct wma_search_rate {
@@ -3165,9 +3166,17 @@ int wma_dp_send_delba_ind(uint8_t vdev_id, uint8_t *peer_macaddr,
 bool wma_is_roam_in_progress(uint32_t vdev_id)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	enum QDF_OPMODE opmode;
 
-	if (!wma)
+	if (!wma_is_vdev_valid(vdev_id))
 		return false;
 
-	return wma->interfaces[vdev_id].roaming_in_progress;
+	if (!wma || !wma->interfaces[vdev_id].vdev)
+		return false;
+
+	opmode = wlan_vdev_mlme_get_opmode(wma->interfaces[vdev_id].vdev);
+	if (opmode != QDF_STA_MODE && opmode != QDF_P2P_CLIENT_MODE)
+		return false;
+
+	return wlan_cm_is_vdev_roaming(wma->interfaces[vdev_id].vdev);
 }

@@ -1767,7 +1767,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 		for (count = 0; count < peer_stats->num_rates; count++) {
 			mcs_index = RATE_STAT_GET_MCS_INDEX(rate_stats->rate);
 			if (QDF_IS_STATUS_SUCCESS(status)) {
-				if (rate_stats->rate && mcs_index < MAX_MCS)
+				if (mcs_index < MAX_MCS)
 					rate_stats->rx_mpdu =
 					    dp_stats->rx.rx_mpdu_cnt[mcs_index];
 				else
@@ -1830,19 +1830,9 @@ void wma_unified_link_stats_results_mem_free(
 	}
 }
 
-/**
- * wma_unified_radio_tx_mem_free() - Free radio tx power stats memory
- * @handle: WMI handle
- *
- * Return: 0 on success, error number otherwise.
- */
-int wma_unified_radio_tx_mem_free(void *handle)
+
+static int __wma_unified_radio_tx_mem_free(tp_wma_handle wma_handle)
 {
-	tp_wma_handle wma_handle = (tp_wma_handle) handle;
-
-	if (!wma_handle->link_stats_results)
-		return 0;
-
 	wma_unified_link_stats_results_mem_free(wma_handle->link_stats_results);
 
 	qdf_mem_free(wma_handle->link_stats_results);
@@ -1852,20 +1842,30 @@ int wma_unified_radio_tx_mem_free(void *handle)
 }
 
 /**
- * wma_unified_radio_tx_power_level_stats_event_handler() - tx power level stats
+ * wma_unified_radio_tx_mem_free() - Free radio tx power stats memory
  * @handle: WMI handle
- * @cmd_param_info: command param info
- * @len: Length of @cmd_param_info
- *
- * This is the WMI event handler function to receive radio stats tx
- * power level stats.
  *
  * Return: 0 on success, error number otherwise.
  */
-static int wma_unified_radio_tx_power_level_stats_event_handler(void *handle,
-			u_int8_t *cmd_param_info, u_int32_t len)
+int wma_unified_radio_tx_mem_free(void *handle)
 {
 	tp_wma_handle wma_handle = (tp_wma_handle) handle;
+	int ret;
+
+	if (!wma_handle->link_stats_results)
+		return 0;
+	qdf_mutex_acquire(&wma_handle->radio_stats_lock);
+	ret = __wma_unified_radio_tx_mem_free(wma_handle);
+	qdf_mutex_release(&wma_handle->radio_stats_lock);
+
+	return ret;
+}
+
+static int __wma_unified_radio_tx_power_level_stats_event_handler(
+						tp_wma_handle wma_handle,
+						u_int8_t *cmd_param_info,
+						u_int32_t len)
+{
 	WMI_RADIO_TX_POWER_LEVEL_STATS_EVENTID_param_tlvs *param_tlvs;
 	wmi_tx_power_level_stats_evt_fixed_param *fixed_param;
 	uint8_t *tx_power_level_values;
@@ -2012,6 +2012,35 @@ post_stats:
 	return 0;
 }
 
+/**
+ * wma_unified_radio_tx_power_level_stats_event_handler() - tx power level stats
+ * @handle: WMI handle
+ * @cmd_param_info: command param info
+ * @len: Length of @cmd_param_info
+ *
+ * This is the WMI event handler function to receive radio stats tx
+ * power level stats.
+ *
+ * Return: 0 on success, error number otherwise.
+ */
+static int wma_unified_radio_tx_power_level_stats_event_handler(
+						void *handle,
+						u_int8_t *cmd_param_info,
+						u_int32_t len)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+	int ret;
+
+	qdf_mutex_acquire(&wma_handle->radio_stats_lock);
+	ret = __wma_unified_radio_tx_power_level_stats_event_handler(
+								wma_handle,
+								cmd_param_info,
+								len);
+	qdf_mutex_release(&wma_handle->radio_stats_lock);
+
+	return ret;
+}
+
 static int wma_copy_chan_stats(uint32_t num_chan,
 			       struct wifi_channel_stats *channels,
 			       struct wifi_radio_stats *rs_results)
@@ -2020,6 +2049,7 @@ static int wma_copy_chan_stats(uint32_t num_chan,
 	struct wifi_channel_stats *channels_in_prev_event =
 							rs_results->channels;
 	if (!rs_results->channels) {
+		wma_debug("Num of channels in first event %d", num_chan);
 		/* It means this is the first event for this radio */
 		rs_results->num_channels = num_chan;
 		rs_results->channels = channels;
@@ -2033,6 +2063,7 @@ static int wma_copy_chan_stats(uint32_t num_chan,
 		return 0;
 	}
 
+	wma_debug("Num of channels in Second event %d", num_chan);
 	rs_results->num_channels += num_chan;
 	rs_results->channels = qdf_mem_malloc(rs_results->num_channels *
 					      sizeof(*channels));
@@ -2055,19 +2086,11 @@ static int wma_copy_chan_stats(uint32_t num_chan,
 	return 0;
 }
 
-/**
- * wma_unified_link_radio_stats_event_handler() - radio link stats event handler
- * @handle:          wma handle
- * @cmd_param_info:  data received with event from fw
- * @len:             length of data
- *
- * Return: 0 for success or error code
- */
-static int wma_unified_link_radio_stats_event_handler(void *handle,
-						      uint8_t *cmd_param_info,
-						      uint32_t len)
+static int
+__wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
+					     uint8_t *cmd_param_info,
+					     uint32_t len)
 {
-	tp_wma_handle wma_handle = (tp_wma_handle) handle;
 	WMI_RADIO_LINK_STATS_EVENTID_param_tlvs *param_tlvs;
 	wmi_radio_link_stats_event_fixed_param *fixed_param;
 	wmi_radio_link_stats *radio_stats;
@@ -2179,7 +2202,6 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 		 * events may be spoofed. Drop all of them and report error.
 		 */
 		wma_err("Invalid following WMI_RADIO_LINK_STATS_EVENTID. Discarding this set");
-		wma_unified_radio_tx_mem_free(handle);
 		return -EINVAL;
 	}
 
@@ -2236,10 +2258,8 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 		channels_in_this_event = qdf_mem_malloc(
 					radio_stats->num_channels *
 					chan_stats_size);
-		if (!channels_in_this_event) {
-			wma_unified_radio_tx_mem_free(handle);
+		if (!channels_in_this_event)
 			return -ENOMEM;
-		}
 
 		chn_results =
 			(struct wifi_channel_stats *)&channels_in_this_event[0];
@@ -2273,7 +2293,7 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 					     channels_in_this_event,
 					     rs_results);
 		if (status) {
-			wma_unified_radio_tx_mem_free(handle);
+			wma_err("Failed to copy channel stats");
 			return status;
 		}
 	}
@@ -2315,6 +2335,29 @@ link_radio_stats_cb:
 				     mac->sme.ll_stats_context);
 
 	return 0;
+}
+
+/**
+ * wma_unified_link_radio_stats_event_handler() - radio link stats event handler
+ * @handle:          wma handle
+ * @cmd_param_info:  data received with event from fw
+ * @len:             length of data
+ *
+ * Return: 0 for success or error code
+ */
+static int wma_unified_link_radio_stats_event_handler(void *handle,
+						      uint8_t *cmd_param_info,
+						      uint32_t len)
+{
+	tp_wma_handle wma_handle = (tp_wma_handle)handle;
+	int ret;
+
+	qdf_mutex_acquire(&wma_handle->radio_stats_lock);
+	ret = __wma_unified_link_radio_stats_event_handler(wma_handle,
+							   cmd_param_info, len);
+	qdf_mutex_release(&wma_handle->radio_stats_lock);
+
+	return ret;
 }
 
 #ifdef WLAN_PEER_PS_NOTIFICATION
@@ -2543,7 +2586,8 @@ wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
 {
 	if (!(cfg_get(wma_handle->psoc, CFG_CLUB_LL_STA_AND_GET_STATION) &&
 	      wmi_service_enabled(wma_handle->wmi_handle,
-				  wmi_service_get_station_in_ll_stats_req)))
+				  wmi_service_get_station_in_ll_stats_req) &&
+	      wma_handle->interfaces[cmd->vdev_id].type == WMI_VDEV_TYPE_STA))
 		return wmi_unified_process_ll_stats_get_cmd(
 						wma_handle->wmi_handle, cmd);
 
@@ -3036,7 +3080,7 @@ int wma_link_status_event_handler(void *handle, uint8_t *cmd_param_info,
 	return 0;
 }
 
-int wma_rso_cmd_status_event_handler(wmi_roam_event_fixed_param *wmi_event)
+int wma_rso_cmd_status_event_handler(uint8_t vdev_id, enum cm_roam_notif notif)
 {
 	struct rso_cmd_status *rso_status;
 	struct scheduler_msg sme_msg = {0};
@@ -3046,10 +3090,10 @@ int wma_rso_cmd_status_event_handler(wmi_roam_event_fixed_param *wmi_event)
 	if (!rso_status)
 		return -ENOMEM;
 
-	rso_status->vdev_id = wmi_event->vdev_id;
-	if (WMI_ROAM_NOTIF_SCAN_MODE_SUCCESS == wmi_event->notif)
+	rso_status->vdev_id = vdev_id;
+	if (notif == CM_ROAM_NOTIF_SCAN_MODE_SUCCESS)
 		rso_status->status = true;
-	else if (WMI_ROAM_NOTIF_SCAN_MODE_FAIL == wmi_event->notif)
+	else if (notif == CM_ROAM_NOTIF_SCAN_MODE_FAIL)
 		rso_status->status = false;
 	sme_msg.type = eWNI_SME_RSO_CMD_STATUS_IND;
 	sme_msg.bodyptr = rso_status;
@@ -3961,8 +4005,6 @@ QDF_STATUS wma_send_vdev_down_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 		return status;
 	}
 
-	wma->interfaces[vdev_id].roaming_in_progress = false;
-
 	status = vdev_mgr_down_send(vdev_mlme);
 
 	return status;
@@ -4287,6 +4329,7 @@ QDF_STATUS wma_sta_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifndef ROAM_TARGET_IF_CONVERGENCE
 QDF_STATUS wma_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
 					 uint16_t data_len, void *data)
 {
@@ -4306,6 +4349,7 @@ QDF_STATUS wma_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
 
 	return status;
 }
+#endif
 
 QDF_STATUS wma_ap_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 					   uint16_t data_len, void *data)
