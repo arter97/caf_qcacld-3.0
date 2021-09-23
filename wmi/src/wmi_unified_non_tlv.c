@@ -6970,7 +6970,7 @@ static QDF_STATUS extract_hal_reg_cap_non_tlv(wmi_unified_t wmi_handle,
 			sizeof(struct wlan_psoc_hal_reg_capability));
 
 	/* Convert REGDMN_MODE values sent by target to host internal
-	 * WMI_HOST_REGDMN_MODE values.
+	 * HOST_REGDMN_MODE values.
 	 *
 	 * REGULATORY TODO :
 	 * REGDMN_MODE_11AC_VHT*_2G values are not used by the
@@ -6980,70 +6980,70 @@ static QDF_STATUS extract_hal_reg_cap_non_tlv(wmi_unified_t wmi_handle,
 	cap->wireless_modes = 0;
 
 	if (wireless_modes_orig & REGDMN_MODE_11A)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11A;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11A;
 
 	if (wireless_modes_orig & REGDMN_MODE_TURBO)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_TURBO;
+		cap->wireless_modes |= HOST_REGDMN_MODE_TURBO;
 
 	if (wireless_modes_orig & REGDMN_MODE_11B)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11B;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11B;
 
 	if (wireless_modes_orig & REGDMN_MODE_PUREG)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_PUREG;
+		cap->wireless_modes |= HOST_REGDMN_MODE_PUREG;
 
 	if (wireless_modes_orig & REGDMN_MODE_11G)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11G;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11G;
 
 	if (wireless_modes_orig & REGDMN_MODE_108G)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_108G;
+		cap->wireless_modes |= HOST_REGDMN_MODE_108G;
 
 	if (wireless_modes_orig & REGDMN_MODE_108A)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_108A;
+		cap->wireless_modes |= HOST_REGDMN_MODE_108A;
 
 	if (wireless_modes_orig & REGDMN_MODE_XR)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_XR;
+		cap->wireless_modes |= HOST_REGDMN_MODE_XR;
 
 	if (wireless_modes_orig & REGDMN_MODE_11A_HALF_RATE)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11A_HALF_RATE;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11A_HALF_RATE;
 
 	if (wireless_modes_orig & REGDMN_MODE_11A_QUARTER_RATE)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11A_QUARTER_RATE;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11A_QUARTER_RATE;
 
 	if (wireless_modes_orig & REGDMN_MODE_11NG_HT20)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11NG_HT20;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11NG_HT20;
 
 	if (wireless_modes_orig & REGDMN_MODE_11NA_HT20)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11NA_HT20;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11NA_HT20;
 
 	if (wireless_modes_orig & REGDMN_MODE_11NG_HT40PLUS)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11NG_HT40PLUS;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11NG_HT40PLUS;
 
 	if (wireless_modes_orig & REGDMN_MODE_11NG_HT40MINUS)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11NG_HT40MINUS;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11NG_HT40MINUS;
 
 	if (wireless_modes_orig & REGDMN_MODE_11NA_HT40PLUS)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11NA_HT40PLUS;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11NA_HT40PLUS;
 
 	if (wireless_modes_orig & REGDMN_MODE_11NA_HT40MINUS)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11NA_HT40MINUS;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11NA_HT40MINUS;
 
 	if (wireless_modes_orig & REGDMN_MODE_11AC_VHT20)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11AC_VHT20;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11AC_VHT20;
 
 	if (wireless_modes_orig & REGDMN_MODE_11AC_VHT40PLUS)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11AC_VHT40PLUS;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11AC_VHT40PLUS;
 
 	if (wireless_modes_orig & REGDMN_MODE_11AC_VHT40MINUS)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11AC_VHT40MINUS;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11AC_VHT40MINUS;
 
 	if (wireless_modes_orig & REGDMN_MODE_11AC_VHT80)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11AC_VHT80;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11AC_VHT80;
 
 	if (wireless_modes_orig & REGDMN_MODE_11AC_VHT160)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11AC_VHT160;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11AC_VHT160;
 
 	if (wireless_modes_orig & REGDMN_MODE_11AC_VHT80_80)
-		cap->wireless_modes |= WMI_HOST_REGDMN_MODE_11AC_VHT80_80;
+		cap->wireless_modes |= HOST_REGDMN_MODE_11AC_VHT80_80;
 
 	return QDF_STATUS_SUCCESS;
 }
