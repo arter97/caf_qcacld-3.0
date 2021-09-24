@@ -39,6 +39,7 @@
 #include <dp_wrap.h>
 #endif
 #endif
+#include <wlan_mlme_if.h>
 
 #define IE_CONTENT_SIZE 1
 
@@ -1732,8 +1733,8 @@ wlan_rptr_validate_stavap_connection(struct wlan_objmgr_vdev *vdev,
 							      &iterate_msg, WLAN_MLME_NB_ID);
 				if (ext_con_msg.disconnect_sta_vdev) {
 					if (wlan_cm_is_vdev_connected(ext_con_msg.disconnect_sta_vdev)) {
-						wlan_cm_disconnect(ext_con_msg.disconnect_sta_vdev, CM_SB_DISCONNECT,
-								   REASON_DISASSOC_NETWORK_LEAVING, NULL);
+						wlan_mlme_cm_stop(ext_con_msg.disconnect_sta_vdev, CM_SB_DISCONNECT,
+								  REASON_DISASSOC_NETWORK_LEAVING, NULL);
 					}
 				}
 				if (ext_con_msg.disconnect_rptr_clients) {
@@ -1912,8 +1913,8 @@ wlan_rptr_disconnect_sec_stavap_cb(struct wlan_objmgr_psoc *psoc,
 	wiphy = pdev_ospriv->wiphy;
 	if (wlan_cm_is_vdev_connected(sta_vdev) &&
 	    !(qca_multi_link_is_primary_radio(wiphy))) {
-		wlan_cm_disconnect(sta_vdev, CM_SB_DISCONNECT,
-				   REASON_DISASSOC_NETWORK_LEAVING, NULL);
+		wlan_mlme_cm_stop(sta_vdev, CM_SB_DISCONNECT,
+				  REASON_DISASSOC_NETWORK_LEAVING, NULL);
 	}
 #endif
 }
