@@ -845,6 +845,46 @@ static inline void ol_txrx_debugfs_exit(ol_txrx_pdev_handle pdev)
 }
 #endif
 
+#ifdef OL_TX_MSDU_CACHED
+static void tx_msdu_cache_init(struct ol_txrx_pdev_t *pdev)
+{
+	int i;
+
+	qdf_spinlock_create(&pdev->free_msdu_list_lock);
+	for (i = 0; i < NUM_FREE_MSDU_LISTS; i++) {
+		pdev->free_msdu_list[i] = NULL;
+	}
+	pdev->idle_list = 0;
+}
+
+static void tx_msdu_cache_deinit(struct ol_txrx_pdev_t *pdev)
+{
+	qdf_nbuf_t old_msdus;
+	int i;
+
+	qdf_spin_lock(&pdev->free_msdu_list_lock);
+	for (i = 0; i < NUM_FREE_MSDU_LISTS; i++) {
+		old_msdus = pdev->free_msdu_list[i];
+		pdev->free_msdu_list[i] = NULL;
+		if (old_msdus)
+			unmap_free_msdus(pdev, old_msdus);
+	}
+	pdev->idle_list = 0;
+	qdf_spin_unlock(&pdev->free_msdu_list_lock);
+	qdf_spinlock_destroy(&pdev->free_msdu_list_lock);
+}
+#else
+static void tx_msdu_cache_init(struct ol_txrx_pdev_t *pdev)
+{
+
+}
+
+static void tx_msdu_cache_deinit(struct ol_txrx_pdev_t *pdev)
+{
+
+}
+#endif
+
 /**
  * ol_txrx_pdev_attach() - allocate txrx pdev
  * @soc_hdl: datapath soc handle
@@ -975,7 +1015,7 @@ ol_txrx_pdev_attach(ol_txrx_soc_handle soc,
 		pdev->chan_noise_floor = NORMALIZED_TO_NOISE_FLOOR;
 
 	ol_txrx_debugfs_init(pdev);
-
+	tx_msdu_cache_init(pdev);
 	return QDF_STATUS_SUCCESS;
 
 fail3:
@@ -1862,8 +1902,9 @@ static QDF_STATUS ol_txrx_pdev_detach(struct cdp_soc_t *soc_hdl, uint8_t pdev_id
 
 	ol_txrx_pdev_txq_log_destroy(pdev);
 	ol_txrx_pdev_grp_stat_destroy(pdev);
-
+	tx_msdu_cache_deinit(pdev);
 	ol_txrx_debugfs_exit(pdev);
+
 	ol_unregister_peer_recovery_notifier();
 
 	soc->pdev_list[pdev->id] = NULL;

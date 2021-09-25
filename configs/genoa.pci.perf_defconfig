@@ -133,4 +133,5 @@ CONFIG_CFG_NUM_RX_IND_RECORD := 1024
 ifeq ($(CONFIG_FEATURE_ROAM_DEBUG), y)
 CONFIG_CFG_NUM_ROAM_DEBUG_RECORD := 64
 endif
+CONFIG_OL_TX_MSDU_CACHED := y
 ###################################

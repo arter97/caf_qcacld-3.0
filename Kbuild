@@ -2901,6 +2901,8 @@ cppflags-y += \
 	-DWLAN_PERIODIC_WORK_DEBUG
 endif
 
+cppflags-$(CONFIG_OL_TX_MSDU_CACHED) += -DOL_TX_MSDU_CACHED
+
 cppflags-y += -DWLAN_FEATURE_P2P
 cppflags-y += -DWLAN_FEATURE_WFD
 
