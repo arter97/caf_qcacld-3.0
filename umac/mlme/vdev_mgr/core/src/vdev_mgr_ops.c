@@ -94,7 +94,7 @@ QDF_STATUS vdev_mgr_create_send(struct vdev_mlme_obj *mlme_obj)
 	return status;
 }
 
-#ifdef QCA_MCL_DFS_SUPPORT
+#ifdef MOBILE_DFS_SUPPORT
 static bool vdev_mgr_is_opmode_sap_or_p2p_go(enum QDF_OPMODE op_mode)
 {
 	return (op_mode == QDF_SAP_MODE || op_mode == QDF_P2P_GO_MODE);
@@ -238,6 +238,8 @@ static QDF_STATUS vdev_mgr_start_param_update(
 
 	mbss = &mlme_obj->mgmt.mbss_11ax;
 	param->mbssid_flags = mbss->mbssid_flags;
+	param->mbssid_multi_group_flag = mbss->is_multi_mbssid;
+	param->mbssid_multi_group_id   = mbss->grp_id;
 	param->vdevid_trans = mbss->vdevid_trans;
 
 	if (mlme_obj->mgmt.generic.type == WLAN_VDEV_MLME_TYPE_AP) {
