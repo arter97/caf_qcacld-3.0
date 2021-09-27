@@ -206,11 +206,28 @@ static void wlan_vdev_start_fw_send(struct wlan_objmgr_pdev *pdev,
 	wlan_util_change_map_index(send_array, wlan_vdev_get_id(vdev), 0);
 }
 
+static void wlan_vdev_get_up_ap_mon_vdev(struct wlan_objmgr_pdev *pdev,
+					     void *object, void *arg)
+{
+	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)object;
+	bool *vdev_up = (bool *)arg;
+	enum QDF_OPMODE opmode;
+
+	if (*vdev_up)
+		return;
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (wlan_vdev_is_up(vdev) == QDF_STATUS_SUCCESS &&
+	    (opmode == QDF_SAP_MODE || opmode == QDF_MONITOR_MODE))
+		*vdev_up = true;
+}
+
 static QDF_STATUS mlme_stop_pending_restart(struct wlan_objmgr_pdev *pdev,
 					    struct wlan_objmgr_vdev *vdev)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct pdev_mlme_obj *pdev_mlme;
+	bool up_vdev = false;
 
 	pdev_mlme = wlan_pdev_mlme_get_cmpt_obj(pdev);
 	if (!pdev_mlme) {
@@ -256,6 +273,22 @@ static QDF_STATUS mlme_stop_pending_restart(struct wlan_objmgr_pdev *pdev,
 			}
 		}
 
+	} else if (wlan_pdev_mlme_op_get(pdev, WLAN_PDEV_OP_MBSSID_RESTART)) {
+		/* In case of CSA without serialisation, there is a possibillity
+		 * that vdevs are brought down even before restart is triggered
+		 * in vdev sm. Hence, clear the WLAN_PDEV_OP_MBSSID_RESTART flag
+		 * in such scenarios
+		 */
+		wlan_objmgr_pdev_iterate_obj_list(
+				pdev, WLAN_VDEV_OP,
+				wlan_vdev_get_up_ap_mon_vdev,
+				&up_vdev, 0, WLAN_MLME_SB_ID);
+		if (!up_vdev) {
+			mlme_err("Clear MVR bit for Pdev %d",
+				 wlan_objmgr_pdev_get_pdev_id(pdev));
+			wlan_pdev_mlme_op_clear(pdev,
+						WLAN_PDEV_OP_MBSSID_RESTART);
+		}
 	}
 	qdf_spin_unlock_bh(&pdev_mlme->vdev_restart_lock);
 
