@@ -2888,6 +2888,100 @@ static QDF_STATUS send_lci_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
+/**
+ * send_vdev_set_intra_bss_cmd_tlv() - enable/disable intra_bss wmi command
+ * @wmi_handle: wmi handle
+ * @param: param buffer passed by upper layers
+ *
+ * Copy the buffer passed by the upper layers and send it
+ * down to the firmware.
+ *
+ * Return: None
+ */
+static QDF_STATUS
+send_vdev_set_intra_bss_cmd_tlv(struct wmi_unified *wmi_handle,
+				struct wmi_intra_bss_params *param)
+{
+	wmi_vdev_enable_disable_intra_bss_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	int32_t len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("wmi_buf_alloc failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	cmd = (wmi_vdev_enable_disable_intra_bss_cmd_fixed_param *)
+	       wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_vdev_enable_disable_intra_bss_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+		       wmi_vdev_enable_disable_intra_bss_cmd_fixed_param));
+
+	cmd->vdev_id = param->vdev_id;
+	cmd->enable = param->enable;
+
+	wmi_mtrace(WMI_VDEV_ENABLE_DISABLE_INTRA_BSS_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_VDEV_ENABLE_DISABLE_INTRA_BSS_CMDID)) {
+		wmi_err("Failed to set intra-bss param");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * send_peer_set_intra_bss_cmd_tlv() - enable/disable intra_bss wmi command
+ * @wmi_handle: wmi handle
+ * @param: param buffer passed by upper layers
+ *
+ * Copy the buffer passed by the upper layers and send it
+ * down to the firmware.
+ *
+ * Return: None
+ */
+static
+QDF_STATUS send_peer_set_intra_bss_cmd_tlv(wmi_unified_t wmi_handle,
+					   struct wmi_intra_bss_params *param)
+{
+	wmi_peer_enable_disable_intra_bss_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	int32_t len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_peer_enable_disable_intra_bss_cmd_fixed_param *)
+		wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_peer_enable_disable_intra_bss_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_peer_enable_disable_intra_bss_cmd_fixed_param));
+
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->peer_macaddr, &cmd->mac_addr);
+	cmd->vdev_id = param->vdev_id;
+	cmd->enable = param->enable;
+
+	wmi_mtrace(WMI_PEER_ENABLE_DISABLE_INTRA_BSS_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_PEER_ENABLE_DISABLE_INTRA_BSS_CMDID)) {
+		wmi_err("Fail to send WMI_PEER_INTRA_BSS_ENABLE_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	wmi_debug("peer_macaddr " QDF_MAC_ADDR_FMT " vdev_id %d",
+		  QDF_MAC_ADDR_REF(param->peer_macaddr), param->vdev_id);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_SUPPORT_MESH_LATENCY
 /**
  * config_vdev_tid_latency_info_cmd_tlv() - enable vdev tid latency command
@@ -3126,4 +3220,6 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->config_peer_latency_info_cmd = config_peer_latency_info_cmd_tlv;
 #endif
 	ops->send_get_halphy_cal_status_cmd = send_get_halphy_cal_status_cmd_tlv;
+	ops->send_peer_set_intra_bss_cmd = send_peer_set_intra_bss_cmd_tlv;
+	ops->send_vdev_set_intra_bss_cmd = send_vdev_set_intra_bss_cmd_tlv;
 }
