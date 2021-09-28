@@ -276,7 +276,7 @@ QDF_STATUS wlan_cm_abort_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) ||
 	    wlan_cm_host_roam_in_progress(psoc, vdev_id)) {
 		cm_roam_release_lock(vdev);
-		status = QDF_STATUS_E_FAILURE;
+		status = QDF_STATUS_E_BUSY;
 		goto release_ref;
 	}
 
@@ -290,7 +290,7 @@ QDF_STATUS wlan_cm_abort_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 release_ref:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 bool wlan_cm_roaming_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
@@ -1337,6 +1337,7 @@ wlan_cm_roam_invoke(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 #ifdef WLAN_FEATURE_HOST_ROAM
 QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 {
+	QDF_STATUS status;
 	struct cm_host_roam_start_ind *req;
 	struct qdf_mac_addr bssid = QDF_MAC_ADDR_ZERO_INIT;
 
@@ -1344,8 +1345,11 @@ QDF_STATUS wlan_cm_host_roam_start(struct scheduler_msg *msg)
 		return QDF_STATUS_E_FAILURE;
 
 	req = msg->bodyptr;
-	return wlan_cm_roam_invoke(req->pdev, req->vdev_id, &bssid, 0,
-				   CM_ROAMING_FW);
+	status = wlan_cm_roam_invoke(req->pdev, req->vdev_id, &bssid, 0,
+				     CM_ROAMING_FW);
+	qdf_mem_free(req);
+
+	return status;
 }
 #endif
 

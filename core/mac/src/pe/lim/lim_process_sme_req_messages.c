@@ -2206,7 +2206,9 @@ lim_verify_dot11_mode_with_crypto(struct pe_session *session)
 		return;
 
 	if (!((ucast_cipher & (1 << WLAN_CRYPTO_CIPHER_TKIP)) ||
-	      (ucast_cipher & (1 << WLAN_CRYPTO_CIPHER_WEP))))
+	      (ucast_cipher & (1 << WLAN_CRYPTO_CIPHER_WEP)) ||
+	      (ucast_cipher & (1 << WLAN_CRYPTO_CIPHER_WEP_40)) ||
+	      (ucast_cipher & (1 << WLAN_CRYPTO_CIPHER_WEP_104))))
 		return;
 
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq))
@@ -3700,7 +3702,7 @@ QDF_STATUS cm_process_peer_create(struct scheduler_msg *msg)
 
 	req = msg->bodyptr;
 
-	status = wma_add_bss_peer_sta(req->vdev_id, req->peer_mac.bytes);
+	status = wma_add_bss_peer_sta(req->vdev_id, req->peer_mac.bytes, true);
 
 	qdf_mem_free(req);
 
