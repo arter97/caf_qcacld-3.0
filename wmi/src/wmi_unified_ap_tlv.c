@@ -1171,6 +1171,12 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	if (tchan_info->dfs_set)
 		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_DFS);
 
+	/* Set half/quarter channel flag */
+	if (tchan_info->half_rate)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_HALF_RATE);
+	else if (tchan_info->quarter_rate)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_QUARTER_RATE);
+
 	if (tchan_info->dfs_set_cfreq2)
 		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_DFS_CFREQ2);
 
@@ -1194,13 +1200,20 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 		 "tchan_info->phy_mode: %d ,tchan_info->minpower: %d,"
 		 "tchan_info->maxpower: %d ,tchan_info->maxregpower: %d ,"
 		 "tchan_info->reg_class_id: %d ,"
-		 "tchan_info->maxregpower : %d ",
+		 "tchan_info->maxregpower : %d ,"
+		 "tchan_info->half_rate: %u , tchan_info->quarter_rate: %u ",
 		 tchan_info->is_chan_passive, tchan_info->dfs_set,
 		 tchan_info->allow_vht, tchan_info->allow_ht,
 		 tchan_info->antennamax, tchan_info->phy_mode,
 		 tchan_info->minpower, tchan_info->maxpower,
 		 tchan_info->maxregpower, tchan_info->reg_class_id,
-		 tchan_info->maxregpower);
+		 tchan_info->maxregpower, tchan_info->half_rate,
+		 tchan_info->quarter_rate);
+
+	qdf_info("Freq: %u, dfs_set: %u, phymode: %d, is_half: %u, "
+		 "is_quarter: %u\n", chan_info->mhz,
+		 tchan_info->dfs_set, tchan_info->phy_mode,
+		 tchan_info->half_rate, tchan_info->quarter_rate);
 
 	buf_ptr += sizeof(*chan_info);
 	WMITLV_SET_HDR(buf_ptr,
