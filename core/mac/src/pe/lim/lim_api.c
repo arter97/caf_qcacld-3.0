@@ -712,6 +712,17 @@ static void lim_nan_register_callbacks(tpAniSirGlobal mac_ctx)
 }
 #endif
 
+#ifdef WLAN_FEATURE_11W
+void lim_stop_pmfcomeback_timer(struct sPESession *session)
+{
+	if (session->pePersona != QDF_STA_MODE)
+		return;
+
+	qdf_mc_timer_stop(&session->pmf_retry_timer);
+	session->pmf_retry_timer_info.retried = false;
+}
+#endif
+
 /*
  * pe_shutdown_notifier_cb - Shutdown notifier callback
  * @ctx: Pointer to Global MAC structure
@@ -731,6 +742,7 @@ static void pe_shutdown_notifier_cb(void *ctx)
 			if (LIM_IS_AP_ROLE(session))
 				qdf_mc_timer_stop(&session->
 						 protection_fields_reset_timer);
+			lim_stop_pmfcomeback_timer(session);
 		}
 	}
 }
@@ -1292,7 +1304,7 @@ static bool pe_filter_bcn_probe_frame(tpAniSirGlobal mac_ctx,
 
 		ssid_ie = wlan_get_ie_ptr_from_eid(SIR_MAC_SSID_EID,
 				body + SIR_MAC_B_PR_SSID_OFFSET,
-				frame_len);
+				frame_len - SIR_MAC_B_PR_SSID_OFFSET);
 
 		if (!ssid_ie)
 			return false;
