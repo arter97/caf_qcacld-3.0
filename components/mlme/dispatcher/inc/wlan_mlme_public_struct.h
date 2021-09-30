@@ -35,6 +35,13 @@
 #define OWE_TRANSITION_OUI_TYPE "\x50\x6f\x9a\x1c"
 #define OWE_TRANSITION_OUI_SIZE 4
 
+/**
+ * EID_VENDOR| IE_LEN | OUI |OUI_TYPE| OWE transition BSSID|SSID_LEN|   SSID   |
+ *   (1)     |  (1)   | (3) |   (1)  |         (6)         |   (1)  |(SSID_LEN)|
+*/
+#define OWE_SSID_LEN_OFFSET 12
+#define OWE_SSID_OFFSET     13
+
 #define CFG_PMKID_MODES_OKC                        (0x1)
 #define CFG_PMKID_MODES_PMKSA_CACHING              (0x2)
 
@@ -2596,6 +2603,7 @@ struct wlan_mlme_sae_single_pmk {
 	struct mlme_pmk_info pmk_info;
 };
 
+#define ROAM_FRAME_INFO_FRAME_TYPE_EXT 3
 /**
  * struct mlme_roam_debug_info - Roam debug information storage structure.
  * @trigger:            Roam trigger related data
@@ -2605,6 +2613,8 @@ struct wlan_mlme_sae_single_pmk {
  * @btm_rsp:            BTM response information
  * @roam_init_info:     Roam initial info
  * @roam_msg_info:      roam related message information
+ * @frame_info:         Information related to mgmt/eapol frames exchanged
+ *                      during roaming.
  */
 struct mlme_roam_debug_info {
 	struct wmi_roam_trigger_info trigger;
@@ -2614,6 +2624,7 @@ struct mlme_roam_debug_info {
 	struct roam_btm_response_data btm_rsp;
 	struct roam_initial_data roam_init_info;
 	struct roam_msg_info roam_msg_info;
+	struct roam_frame_info frame_info[WLAN_ROAM_MAX_FRAME_INFO];
 };
 
 /**

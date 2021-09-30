@@ -281,6 +281,7 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	tDot11fIEVHTCaps vht_caps;
 	tSirMacCapabilityInfo capability_info;
 	bool he_caps_present;
+	struct qdf_mac_addr sta_mld;
 } tSap_StationAssocReassocCompleteEvent;
 
 typedef struct sap_StationDisassocCompleteEvent_s {
@@ -512,6 +513,7 @@ struct sap_config {
 	uint8_t *vendor_ie;
 	tSirMacRateSet supported_rates;
 	tSirMacRateSet extended_rates;
+	bool require_h2e;
 	enum sap_acs_dfs_mode acs_dfs_mode;
 	struct hdd_channel_info *channel_info;
 	uint32_t channel_info_count;

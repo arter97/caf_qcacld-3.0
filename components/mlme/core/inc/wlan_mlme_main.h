@@ -22,6 +22,7 @@
 #ifndef _WLAN_MLME_MAIN_H_
 #define _WLAN_MLME_MAIN_H_
 
+#include "qdf_periodic_work.h"
 #include <wlan_mlme_public_struct.h>
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_objmgr_global_obj.h>

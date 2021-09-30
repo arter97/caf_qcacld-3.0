@@ -746,6 +746,12 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 					    &frm->he_6ghz_band_cap);
 	}
 
+	if (wlan_vdev_mlme_is_mlo_ap(pe_session->vdev)) {
+		populate_dot11f_bcn_mlo_ie(mac_ctx, pe_session,
+					   &frm->mlo_ie);
+		populate_dot11f_mlo_rnr(mac_ctx, pe_session,
+					&frm->reduced_neighbor_report);
+	}
 	if (lim_is_session_eht_capable(pe_session)) {
 		pe_debug("Populate EHT IEs");
 		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
@@ -1587,11 +1593,6 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 						      &frm.eht_op);
 		}
 
-#ifdef WLAN_FEATURE_11BE_MLO
-		populate_dot11f_assoc_rsp_mlo_ie(mac_ctx, pe_session,
-						 sta, &frm);
- #endif
-
 		if (status_code == STATUS_ASSOC_REJECTED_TEMPORARILY) {
 			max_retries =
 			mac_ctx->mlme_cfg->gen.pmf_sa_query_max_retries;
@@ -1684,6 +1685,14 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	if (extracted_flag)
 		lim_merge_extcap_struct(&(frm.ExtCap), &extracted_ext_cap,
 					true);
+
+	if (sta && lim_is_sta_eht_capable(sta) &&
+	    lim_is_session_eht_capable(pe_session) &&
+	    wlan_vdev_mlme_is_mlo_ap(pe_session->vdev)) {
+		pe_debug("Populate mlo IEs");
+		populate_dot11f_assoc_rsp_mlo_ie(mac_ctx, pe_session,
+						 sta, &frm);
+	}
 
 	/* Allocate a buffer for this frame: */
 	status = dot11f_get_packed_assoc_response_size(mac_ctx, &frm, &payload);

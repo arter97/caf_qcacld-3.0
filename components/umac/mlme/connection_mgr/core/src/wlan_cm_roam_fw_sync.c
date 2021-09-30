@@ -141,6 +141,7 @@ cm_fw_roam_sync_start_ind(struct wlan_objmgr_vdev *vdev,
 	if (IS_ROAM_REASON_STA_KICKOUT(roam_reason)) {
 		struct reject_ap_info ap_info;
 
+		qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
 		ap_info.bssid = connected_bssid;
 		ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
 		ap_info.reject_reason = REASON_STA_KICKOUT;
@@ -798,6 +799,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	cm_if_mgr_inform_connect_complete(cm_ctx->vdev,
 					  connect_rsp->connect_status);
 	cm_inform_blm_connect_complete(cm_ctx->vdev, connect_rsp);
+	cm_update_owe_info(vdev, connect_rsp, vdev_id);
 	cm_connect_info(vdev, true, &connect_rsp->bssid, &connect_rsp->ssid,
 			connect_rsp->freq);
 	wlan_tdls_notify_sta_connect(vdev_id,
@@ -1067,6 +1069,7 @@ static QDF_STATUS cm_handle_ho_fail(struct scheduler_msg *msg)
 	cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_HO_FAIL,
 			    sizeof(wlan_cm_id), &cm_id);
 
+	qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
 	ap_info.bssid = ind->bssid;
 	ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
 	ap_info.reject_reason = REASON_ROAM_HO_FAILURE;

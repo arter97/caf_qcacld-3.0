@@ -854,7 +854,7 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac, uint8_t nChannelNum,
 			       struct pe_session *pe_session)
 {
 	QDF_STATUS nsir_status;
-	qdf_size_t nRates = 0;
+	qdf_size_t n_rates = 0;
 	uint8_t rates[SIR_MAC_MAX_NUMBER_OF_RATES];
 
 	/* Use the ext rates present in session entry whenever nChannelNum is set to OPERATIONAL
@@ -863,9 +863,9 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac, uint8_t nChannelNum,
 	 */
 	if (POPULATE_DOT11F_RATES_OPERATIONAL == nChannelNum) {
 		if (pe_session) {
-			nRates = pe_session->extRateSet.numRates;
+			n_rates = pe_session->extRateSet.numRates;
 			qdf_mem_copy(rates, pe_session->extRateSet.rate,
-				     nRates);
+				     n_rates);
 		} else {
 			pe_err("no session context exists while populating Operational Rate Set");
 		}
@@ -874,20 +874,21 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac, uint8_t nChannelNum,
 			pe_err("null pe_session");
 			return QDF_STATUS_E_INVAL;
 		}
-		nRates = SIR_MAC_MAX_NUMBER_OF_RATES;
+		n_rates = SIR_MAC_MAX_NUMBER_OF_RATES;
 		nsir_status = mlme_get_ext_opr_rate(pe_session->vdev, rates,
-						    &nRates);
+						    &n_rates);
 		if (QDF_IS_STATUS_ERROR(nsir_status)) {
-			nRates = 0;
+			n_rates = 0;
 			pe_err("Failed to retrieve nItem from CFG status: %d",
 			       (nsir_status));
 			return nsir_status;
 		}
 	}
 
-	if (0 != nRates) {
-		pDot11f->num_rates = (uint8_t) nRates;
-		qdf_mem_copy(pDot11f->rates, rates, nRates);
+	if (0 != n_rates) {
+		pe_debug("ext supp rates present, num %d", (uint8_t)n_rates);
+		pDot11f->num_rates = (uint8_t)n_rates;
+		qdf_mem_copy(pDot11f->rates, rates, n_rates);
 		pDot11f->present = 1;
 	}
 
@@ -1300,6 +1301,9 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			pDot11f->present = 0;
 			return QDF_STATUS_SUCCESS;
 		}
+
+		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq))
+			pDot11f->supportedChannelWidthSet = 0;
 
 		if (pe_session->ht_config.adv_coding_cap)
 			pDot11f->ldpcCodingCap =
@@ -7533,23 +7537,41 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 	uint16_t vdev_count;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
 	struct pe_session *link_session;
+	uint16_t tmp_offset = 0;
+	struct ml_sch_partner_info *tmp_info;
+	struct mlo_sch_partner_links *sch_info;
 
+	qdf_mem_zero(&mac_ctx->sch.sch_mlo_partner,
+		     sizeof(mac_ctx->sch.sch_mlo_partner));
+	sch_info = &mac_ctx->sch.sch_mlo_partner;
 	mlo_ie->present = 1;
 	mlo_ie->mld_mac_addr_present = 1;
 	mlo_ie->type = 0;
+	tmp_offset += 1; /* Element ID */
+	tmp_offset += 1; /* length */
+	tmp_offset += 1; /* Element ID extension */
+	tmp_offset += 2; /* Multi-link control */
 	qdf_mem_copy(mlo_ie->mld_mac_addr.info.mld_mac_addr,
 		     session->vdev->mlo_dev_ctx->mld_addr.bytes,
 		     sizeof(mlo_ie->mld_mac_addr.info.mld_mac_addr));
+	tmp_offset += 6; /* mld mac addr */
 	mlo_ie->link_id_info_present = 1;
 	mlo_ie->link_id_info.info.link_id = wlan_vdev_get_link_id(
 						session->vdev);
+	tmp_offset += 1; /* link id */
 	mlo_ie->bss_param_change_cnt_present = 1;
 	mlo_ie->bss_param_change_cnt.info.bss_param_change_count =
 		session->mlo_link_info.link_ie.bss_param_change_cnt;
+	tmp_offset += 1; /* bss parameters change count */
+	mlo_ie->mld_capab_present = 1;
+	tmp_offset += 2; /* mld capabilities */
+	sch_info->num_links = 0;
 
 	lim_get_mlo_vdev_list(session, &vdev_count, wlan_vdev_list);
+	mlo_ie->mld_capabilities.info.max_simultaneous_link_num =
+							vdev_count - 1;
+	sch_info->mlo_ie_link_info_ofst = tmp_offset;
 	for (link = 0; link < vdev_count; link++) {
-		pe_err("on link %d", link);
 		if (!wlan_vdev_list[link])
 			continue;
 		if (wlan_vdev_list[link] == session->vdev) {
@@ -7562,20 +7584,32 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 		}
 		link_session = pe_find_session_by_vdev_id(
 			mac_ctx, wlan_vdev_list[link]->vdev_objmgr.vdev_id);
+		if (!link_session) {
+			lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
+			continue;
+		}
 		sta_pro = &mlo_ie->sta_profile[num_sta_pro];
 		link_ie = &link_session->mlo_link_info.link_ie;
+		tmp_info = &sch_info->partner_info[sch_info->num_links++];
+		tmp_info->vdev_id = wlan_vdev_get_id(wlan_vdev_list[link]);
+		tmp_info->beacon_interval =
+			link_session->beaconParams.beaconInterval;
 		sta_pro->present = 0;
+		tmp_offset = 1; /* sub element id */
+		tmp_offset += 1; /* length */
 		if (link_ie->link_csa.present) {
 			qdf_mem_copy(&sta_pro->ChanSwitchAnn,
 				     &link_ie->link_csa,
 				     sizeof(sta_pro->ChanSwitchAnn));
 			sta_pro->present = 1;
+			tmp_info->csa_ext_csa_exist = true;
 		}
 		if (link_ie->link_ecsa.present) {
 			qdf_mem_copy(&sta_pro->ext_chan_switch_ann,
 				     &link_ie->link_ecsa,
 				     sizeof(sta_pro->ext_chan_switch_ann));
 			sta_pro->present = 1;
+			tmp_info->csa_ext_csa_exist = true;
 		}
 		if (link_ie->link_quiet.present) {
 			qdf_mem_copy(&sta_pro->Quiet,
@@ -7593,13 +7627,10 @@ QDF_STATUS populate_dot11f_bcn_mlo_ie(struct mac_context *mac_ctx,
 			sta_pro->link_id = wlan_vdev_get_link_id(
 							link_session->vdev);
 			sta_pro->complete_profile = 0;
-			sta_pro->sta_mac_addr_present = 1;
-			qdf_mem_copy(sta_pro->sta_mac_addr.info.sta_mac_addr,
-				     link_session->self_mac_addr,
-				     sizeof(tSirMacAddr));
 			num_sta_pro++;
+			tmp_offset += 2; /* sta control */
+			tmp_info->link_info_sta_prof_ofst = tmp_offset;
 		}
-		pe_err("copied data for link %d", link);
 		lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
 	}
 	mlo_ie->num_sta_profile = num_sta_pro;
@@ -7699,7 +7730,7 @@ populate_dot11f_probe_req_mlo_ie(struct mac_context *mac_ctx,
 	mld_addr = wlan_vdev_mlme_get_mldaddr(session->vdev);
 	qdf_mem_copy(&mlo_ie->mld_mac_addr.info.mld_mac_addr, mld_addr,
 		     sizeof(mlo_ie->mld_mac_addr.info.mld_mac_addr));
-	mlo_ie->link_id_info_present = 1;
+	mlo_ie->link_id_info_present = 0;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -8544,9 +8575,16 @@ wlan_get_ielen_from_bss_description(struct bss_description *bss_desc)
 
 	ieFields_offset = GET_FIELD_OFFSET(struct bss_description, ieFields);
 
-	if ((!bss_desc || !bss_desc->length) ||
-	    (bss_desc->length - sizeof(bss_desc->length) <= ieFields_offset))
+	if (!bss_desc) {
+		pe_err_rl("Bss_desc is NULL");
 		return 0;
+	}
+
+	if (bss_desc->length <= (ieFields_offset - sizeof(bss_desc->length))) {
+		pe_err_rl("Invalid bss_desc len:%d ie_fields_offset:%d",
+			  bss_desc->length, ieFields_offset);
+		return 0;
+	}
 
 	/*
 	 * Length of BSS desription is without length of
@@ -8774,9 +8812,8 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 			       QDF_MAC_ADDR_REF(link_info->link_addr.bytes));
 			continue;
 		}
-		//chan_freq = wlan_reg_chan_opclass_to_freq(chan, op_class,
-		//					  false);
-		chan_freq = wlan_reg_legacy_chan_to_freq(mac_ctx->pdev, chan);
+		chan_freq = wlan_reg_chan_opclass_to_freq(chan, op_class,
+							  true);
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
 			wlan_populate_basic_rates(&b_rates, false, true);
 			wlan_populate_basic_rates(&e_rates, true, false);

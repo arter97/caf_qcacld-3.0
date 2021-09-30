@@ -40,6 +40,7 @@
 #include <dbglog_host.h>
 #include <wlan_logging_sock_svc.h>
 #include <wlan_roam_debug.h>
+#include <wlan_hdd_connectivity_logging.h>
 #include "osif_sync.h"
 #include <wlan_hdd_wowl.h>
 #include <wlan_hdd_misc.h>
@@ -4247,11 +4248,6 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 
 	cds_set_driver_state_module_stop(false);
 
-	qdf_event_reset(&hdd_ctx->regulatory_update_event);
-	qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
-	hdd_ctx->is_regulatory_update_in_progress = true;
-	qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
-
 	switch (hdd_ctx->driver_status) {
 	case DRIVER_MODULES_UNINITIALIZED:
 		hdd_nofl_debug("Wlan transitioning (UNINITIALIZED -> CLOSED)");
@@ -4449,6 +4445,8 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 
 		hdd_set_hif_init_phase(hif_ctx, false);
 		hdd_hif_set_enable_detection(hif_ctx, true);
+
+		wlan_hdd_start_connectivity_logging();
 
 		break;
 
@@ -11908,6 +11906,11 @@ int hdd_trigger_psoc_idle_restart(struct hdd_context *hdd_ctx)
 		hdd_ctx->current_pcie_gen_speed = 0;
 	}
 
+	qdf_event_reset(&hdd_ctx->regulatory_update_event);
+	qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
+	hdd_ctx->is_regulatory_update_in_progress = true;
+	qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
+
 	ret = pld_idle_restart(hdd_ctx->parent_dev, hdd_psoc_idle_restart);
 	hdd_soc_idle_restart_unlock();
 
@@ -13704,6 +13707,10 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 		wlan_cm_set_check_6ghz_security(hdd_ctx->psoc, true);
 		wlan_cm_set_6ghz_key_mgmt_mask(hdd_ctx->psoc,
 					       ALLOWED_KEYMGMT_6G_MASK);
+	} else {
+		wlan_cm_set_check_6ghz_security(hdd_ctx->psoc, false);
+		wlan_cm_set_6ghz_key_mgmt_mask(hdd_ctx->psoc,
+					       DEFAULT_KEYMGMT_6G_MASK);
 	}
 	hdd_thermal_stats_cmd_init(hdd_ctx);
 
@@ -14278,6 +14285,8 @@ int hdd_wlan_stop_modules(struct hdd_context *hdd_ctx, bool ftm_mode)
 		epping_disable();
 		epping_close();
 	}
+
+	wlan_connectivity_logging_stop();
 
 	ucfg_ipa_component_config_free();
 	hdd_hif_close(hdd_ctx, hif_ctx);
@@ -16892,6 +16901,11 @@ static int __hdd_driver_mode_change(struct hdd_context *hdd_ctx,
 	hdd_cleanup_present_mode(hdd_ctx, curr_mode);
 
 	hdd_set_conparam(next_mode);
+
+	qdf_event_reset(&hdd_ctx->regulatory_update_event);
+	qdf_mutex_acquire(&hdd_ctx->regulatory_status_lock);
+	hdd_ctx->is_regulatory_update_in_progress = true;
+	qdf_mutex_release(&hdd_ctx->regulatory_status_lock);
 
 	errno = pld_idle_restart(hdd_ctx->parent_dev,
 				 hdd_mode_change_psoc_idle_restart);

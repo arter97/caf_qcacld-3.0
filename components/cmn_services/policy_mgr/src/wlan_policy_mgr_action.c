@@ -147,6 +147,11 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (!pm_ctx->sme_cbacks.sme_pdev_set_hw_mode) {
+		policy_mgr_debug("NOT supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
 	/*
 	 * if HW is not capable of doing 2x2 or ini config disabled 2x2, don't
 	 * allow to request FW for 2x2
@@ -213,6 +218,11 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 	struct policy_mgr_hw_mode_params hw_mode;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		return upgrade;
+	}
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -540,6 +550,11 @@ bool policy_mgr_is_hwmode_set_for_given_chnl(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_band band;
 	bool is_hwmode_dbs, dbs_required_for_2g;
 
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		return true;
+	}
+
 	if (policy_mgr_is_hw_dbs_capable(psoc) == false)
 		return true;
 
@@ -822,6 +837,12 @@ policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		*next_action = PM_NOP;
+		return QDF_STATUS_SUCCESS;
+	}
+
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
@@ -944,6 +965,11 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 	uint32_t ch_freq = 0;
 	struct scan_cache_entry *entry;
 
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		goto end;
+	}
+
 	if (!scan_list || !qdf_list_size(scan_list)) {
 		policy_mgr_debug("Scan list is NULL or No BSSIDs present");
 		goto end;
@@ -984,6 +1010,7 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 			break;
 		}
 
+		ch_freq = 0;
 		cur_node = next_node;
 		next_node = NULL;
 	}
@@ -1982,52 +2009,53 @@ end:
 	pm_ctx->do_sap_unsafe_ch_check = false;
 }
 
-static void __policy_mgr_check_sta_ap_concurrent_ch_intf(void *data)
+static void __policy_mgr_check_sta_ap_concurrent_ch_intf(
+				struct policy_mgr_psoc_priv_obj *pm_ctx)
 {
-	struct wlan_objmgr_psoc *psoc;
-	struct policy_mgr_psoc_priv_obj *pm_ctx = NULL;
-	struct sta_ap_intf_check_work_ctx *work_info = NULL;
 	uint32_t mcc_to_scc_switch, cc_count = 0, i;
 	QDF_STATUS status;
 	uint32_t ch_freq;
 	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
-	work_info = data;
-	if (!work_info) {
-		policy_mgr_err("Invalid work_info");
-		return;
-	}
-
-	psoc = work_info->psoc;
-	if (!psoc) {
-		policy_mgr_err("Invalid psoc");
-		return;
-	}
-
-	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
 		return;
 	}
+	/*
+	 * Check if force scc is required for GO + GO case. vdev id will be
+	 * valid in case of GO+GO force scc only. So, for valid vdev id move
+	 * first GO to newly formed GO channel.
+	 */
+	policy_mgr_debug("p2p go vdev id: %d",
+			 pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.vdev_id);
+	if (pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.vdev_id <
+	    WLAN_UMAC_VDEV_ID_MAX) {
+		policy_mgr_do_go_plus_go_force_scc(
+			pm_ctx->psoc, pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.vdev_id,
+			pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.ch_freq,
+			pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.ch_width);
+		pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+		return;
+	}
 
 	mcc_to_scc_switch =
-		policy_mgr_get_mcc_to_scc_switch_mode(psoc);
+		policy_mgr_get_mcc_to_scc_switch_mode(pm_ctx->psoc);
 
 	policy_mgr_debug("Concurrent open sessions running: %d",
-			 policy_mgr_concurrent_open_sessions_running(psoc));
+			 policy_mgr_concurrent_open_sessions_running(pm_ctx->psoc));
 
-	if (!policy_mgr_is_sap_go_existed(psoc))
+	if (!policy_mgr_is_sap_go_existed(pm_ctx->psoc))
 		goto end;
 
 	cc_count = policy_mgr_get_mode_specific_conn_info(
-				psoc, &op_ch_freq_list[cc_count],
+				pm_ctx->psoc, &op_ch_freq_list[cc_count],
 				&vdev_id[cc_count], PM_SAP_MODE);
 	policy_mgr_debug("Number of concurrent SAP: %d", cc_count);
 	if (cc_count < MAX_NUMBER_OF_CONC_CONNECTIONS)
 		cc_count = cc_count +
 				policy_mgr_get_mode_specific_conn_info(
-					psoc, &op_ch_freq_list[cc_count],
+					pm_ctx->psoc, &op_ch_freq_list[cc_count],
 					&vdev_id[cc_count], PM_P2P_GO_MODE);
 	policy_mgr_debug("Number of beaconing entities (SAP + GO):%d",
 							cc_count);
@@ -2054,7 +2082,7 @@ static void __policy_mgr_check_sta_ap_concurrent_ch_intf(void *data)
 		for (i = 0; i < cc_count; i++) {
 			status = pm_ctx->hdd_cbacks.
 				wlan_hdd_get_channel_for_sap_restart
-					(psoc, vdev_id[i], &ch_freq);
+					(pm_ctx->psoc, vdev_id[i], &ch_freq);
 			if (status == QDF_STATUS_SUCCESS) {
 				policy_mgr_debug("SAP vdev id %d restarts due to MCC->SCC switch, old ch freq :%d new ch freq: %d",
 						 vdev_id[i],
@@ -2469,7 +2497,7 @@ sap_restart:
 
 		if (!qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
 					    timeout_ms)) {
-			policy_mgr_err("change interface request failure");
+			policy_mgr_debug("change interface request already queued");
 			return;
 		}
 	}
@@ -2571,6 +2599,56 @@ void policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 	}
 }
 #endif /* FEATURE_WLAN_MCC_TO_SCC_SWITCH */
+
+#ifdef WLAN_FEATURE_P2P_P2P_STA
+void policy_mgr_do_go_plus_go_force_scc(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint32_t ch_freq,
+					uint32_t ch_width)
+{
+	uint8_t total_connection;
+
+	total_connection = policy_mgr_mode_specific_connection_count(
+						psoc, PM_P2P_GO_MODE, NULL);
+
+	policy_mgr_debug("Total p2p go connection %d", total_connection);
+
+	/* If any p2p disconnected, don't do csa */
+	if (total_connection > 1) {
+		policy_mgr_change_sap_channel_with_csa(psoc, vdev_id,
+						       ch_freq, ch_width, true);
+	}
+}
+
+void policy_mgr_process_forcescc_for_go(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id, uint32_t ch_freq,
+					uint32_t ch_width)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return;
+	}
+	if (!pm_ctx->sta_ap_intf_check_work_info) {
+		policy_mgr_err("invalid work info");
+		return;
+	}
+	pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.vdev_id =
+								vdev_id;
+	pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.ch_freq =
+								ch_freq;
+	pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.ch_width =
+								ch_width;
+
+	if (!qdf_delayed_work_start(&pm_ctx->sta_ap_intf_check_work,
+				    WAIT_BEFORE_GO_FORCESCC_RESTART)) {
+		policy_mgr_err("change interface request failure");
+		pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.vdev_id =
+						WLAN_UMAC_VDEV_ID_MAX;
+	}
+}
+#endif
 
 QDF_STATUS policy_mgr_wait_for_connection_update(struct wlan_objmgr_psoc *psoc)
 {
@@ -2741,6 +2819,11 @@ QDF_STATUS policy_mgr_restart_opportunistic_timer(
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *policy_mgr_ctx;
 
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
 	policy_mgr_ctx = policy_mgr_get_context(psoc);
 	if (!policy_mgr_ctx) {
 		policy_mgr_err("Invalid context");
@@ -2771,6 +2854,11 @@ QDF_STATUS policy_mgr_set_hw_mode_on_channel_switch(
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE, qdf_status;
 	enum policy_mgr_conc_next_action action;
+
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
 		policy_mgr_rl_debug("PM/DBS is disabled");

@@ -2917,6 +2917,17 @@ lim_convert_channel_width_enum(enum phy_ch_width ch_width)
 	return eHT_CHANNEL_WIDTH_20MHZ;
 }
 
+static void lim_fill_assoc_ind_he_bw_info(tpLimMlmAssocInd assoc_ind,
+					  tpDphHashNode sta_ds,
+					  struct pe_session *session_entry)
+{
+	if (lim_is_sta_he_capable(sta_ds) &&
+	    lim_is_session_he_capable(session_entry)) {
+		assoc_ind->ch_width =
+			lim_convert_channel_width_enum(sta_ds->ch_width);
+	}
+}
+
 bool lim_fill_lim_assoc_ind_params(
 		tpLimMlmAssocInd assoc_ind,
 		struct mac_context *mac_ctx,
@@ -2951,6 +2962,10 @@ bool lim_fill_lim_assoc_ind_params(
 
 	qdf_mem_copy((uint8_t *)assoc_ind->peerMacAddr,
 		     (uint8_t *)sta_ds->staAddr, sizeof(tSirMacAddr));
+#ifdef WLAN_FEATURE_11BE_MLO
+	qdf_mem_copy((uint8_t *)assoc_ind->peer_mld_addr,
+		     (uint8_t *)sta_ds->mld_addr, sizeof(tSirMacAddr));
+#endif
 	assoc_ind->aid = sta_ds->assocId;
 	qdf_mem_copy((uint8_t *)&assoc_ind->ssId,
 		     (uint8_t *)&assoc_req->ssId,
@@ -3138,9 +3153,7 @@ bool lim_fill_lim_assoc_ind_params(
 	assoc_ind->is_sae_authenticated =
 				assoc_req->is_sae_authenticated;
 	/* updates HE bandwidth in assoc indication */
-	if (wlan_reg_is_6ghz_chan_freq(session_entry->curr_op_freq))
-		assoc_ind->ch_width =
-			lim_convert_channel_width_enum(sta_ds->ch_width);
+	lim_fill_assoc_ind_he_bw_info(assoc_ind, sta_ds, session_entry);
 
 	vdev = session_entry->vdev;
 	if (!vdev)
