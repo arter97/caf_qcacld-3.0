@@ -43,6 +43,7 @@
 #include "cds_utils.h"
 #include "lim_send_messages.h"
 #include "lim_process_fils.h"
+#include "wlan_mlme_main.h"
 
 /**
  * is_auth_valid
@@ -315,6 +316,66 @@ static void lim_external_auth_add_pre_auth_node(tpAniSirGlobal mac_ctx,
 	lim_add_pre_auth_node(mac_ctx, auth_node);
 }
 
+void lim_sae_auth_cleanup_retry(tpAniSirGlobal mac_ctx, uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+						    vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("vdev is NULL for vdev id %d", vdev_id);
+		return;
+	}
+
+	pe_debug("sae auth cleanup for vdev_id %d", vdev_id);
+	lim_deactivate_and_change_timer(mac_ctx, eLIM_AUTH_RETRY_TIMER);
+	mlme_free_sae_auth_retry(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
+
+#define SAE_AUTH_ALGO_BYTES 2
+#define SAE_AUTH_SEQ_NUM_BYTES 2
+#define SAE_AUTH_SEQ_OFFSET 1
+
+/**
+ * lim_is_sae_auth_algo_match()- Match SAE auth seq in queued SAE auth and
+ * SAE auth rx frame
+ * @queued_frame: Pointer to queued SAE auth retry frame
+ * @q_len: length of queued sae auth retry frame
+ * @rx_pkt_info: Rx packet
+ *
+ * Return: True if SAE auth seq is mached else false
+ */
+static bool lim_is_sae_auth_algo_match(uint8_t *queued_frame, uint16_t q_len,
+				       uint8_t *rx_pkt_info)
+{
+	tpSirMacMgmtHdr qmac_hdr = (tpSirMacMgmtHdr)queued_frame;
+	uint16_t *rxbody_ptr, *qbody_ptr, rxframe_len, min_len;
+
+	min_len = sizeof(tSirMacMgmtHdr) + SAE_AUTH_ALGO_BYTES +
+			SAE_AUTH_SEQ_NUM_BYTES;
+
+	rxframe_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+	if (rxframe_len < min_len || q_len < min_len) {
+		pe_debug("rxframe_len %d, queued_frame_len %d, min_len %d",
+			 rxframe_len, q_len, min_len);
+		return false;
+	}
+
+	rxbody_ptr = (uint16_t *)WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	qbody_ptr = (uint16_t *)((uint8_t *)qmac_hdr + sizeof(tSirMacMgmtHdr));
+
+	pe_debug("sae_auth : rx pkt auth seq %d queued pkt auth seq %d",
+		 rxbody_ptr[SAE_AUTH_SEQ_OFFSET],
+		 qbody_ptr[SAE_AUTH_SEQ_OFFSET]);
+	if (rxbody_ptr[SAE_AUTH_SEQ_OFFSET] ==
+	    qbody_ptr[SAE_AUTH_SEQ_OFFSET])
+		return true;
+
+	return false;
+}
+
 /**
  * lim_process_sae_auth_frame()-Process SAE authentication frame
  * @mac_ctx: MAC context
@@ -329,6 +390,8 @@ static void lim_process_sae_auth_frame(tpAniSirGlobal mac_ctx,
 	tpSirMacMgmtHdr mac_hdr;
 	uint32_t frame_len;
 	uint8_t *body_ptr;
+	struct sae_auth_retry *sae_retry;
+	struct wlan_objmgr_vdev *vdev;
 	enum rxmgmt_flags rx_flags = RXMGMT_FLAG_NONE;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
@@ -364,6 +427,23 @@ static void lim_process_sae_auth_frame(tpAniSirGlobal mac_ctx,
 						eLIM_MLM_WT_SAE_AUTH_STATE);
 		}
 	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac_ctx->psoc,
+			pe_session->smeSessionId, WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("vdev is NULL for vdev id %d", pe_session->smeSessionId);
+		return;
+	}
+	sae_retry = mlme_get_sae_auth_retry(vdev);
+	if (LIM_IS_STA_ROLE(pe_session) && sae_retry &&
+	    sae_retry->sae_auth.ptr) {
+		if (lim_is_sae_auth_algo_match(
+		    sae_retry->sae_auth.ptr, sae_retry->sae_auth.len,
+		    rx_pkt_info))
+			lim_sae_auth_cleanup_retry(mac_ctx,
+					   pe_session->smeSessionId);
+	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
 				    (uint8_t *)mac_hdr,
@@ -1570,7 +1650,8 @@ bool lim_process_sae_preauth_frame(tpAniSirGlobal mac, uint8_t *rx_pkt)
 {
 	tpSirMacMgmtHdr dot11_hdr;
 	uint16_t auth_alg, frm_len;
-	uint8_t *frm_body;
+	uint8_t *frm_body, pdev_id;
+	struct wlan_objmgr_vdev *vdev;
 
 	dot11_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt);
 	frm_body = WMA_GET_RX_MPDU_DATA(rx_pkt);
@@ -1589,6 +1670,14 @@ bool lim_process_sae_preauth_frame(tpAniSirGlobal mac, uint8_t *rx_pkt)
 		 ((dot11_hdr->seqControl.seqNumHi << 8) |
 		  (dot11_hdr->seqControl.seqNumLo << 4) |
 		  (dot11_hdr->seqControl.fragNum)), *(uint16_t *)(frm_body + 2));
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_psoc(
+			mac->psoc, pdev_id, dot11_hdr->da, WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		lim_sae_auth_cleanup_retry(mac, vdev->vdev_objmgr.vdev_id);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
 
 	lim_send_sme_mgmt_frame_ind(mac, dot11_hdr->fc.subType,
 				    (uint8_t *)dot11_hdr,

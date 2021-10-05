@@ -1356,6 +1356,10 @@ typedef struct tagCsrConfigParam {
 	bool enable_pending_list_req;
 	uint32_t disable_4way_hs_offload;
 	uint32_t sta_disable_roam;
+#ifdef WLAN_FEATURE_SAE
+	uint32_t sae_connect_retries;
+	uint32_t sae_auth_failure_timeout;
+#endif
 } tCsrConfigParam;
 
 /* Tush */
