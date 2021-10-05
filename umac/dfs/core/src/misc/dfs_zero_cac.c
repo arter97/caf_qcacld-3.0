@@ -987,6 +987,31 @@ bool dfs_is_pcac_required_for_freq(struct precac_tree_node *node, uint16_t freq)
 	return false;
 }
 
+uint8_t dfs_get_num_subchans_for_bw(uint8_t depth,
+				    uint16_t freq,
+				    uint16_t bandwidth)
+{
+	uint8_t  n_subchans;
+
+	if (freq == CENTER_OF_320_MHZ && bandwidth == DFS_CHWIDTH_320_VAL)
+		/* For the 240MHz node the bandwidth is 320MHz but
+		 * the number of sub-channels is 12
+		 */
+		n_subchans = N_SUBCHS_FOR_BANDWIDTH(DFS_CHWIDTH_240_VAL);
+	else if (freq == CENTER_OF_PSEUDO_160 &&
+		 bandwidth == DFS_CHWIDTH_160_VAL &&
+		 depth == TREE_DEPTH_1)
+		/* For the right 160MHz child of the  240MHz node the
+		 * bandwidth is 160MHz but the number of sub-channels
+		 * is 4
+		 */
+		n_subchans = N_SUBCHS_FOR_BANDWIDTH(DFS_CHWIDTH_80_VAL);
+	else
+		n_subchans = N_SUBCHS_FOR_BANDWIDTH(bandwidth);
+
+	return n_subchans;
+}
+
 #define DFS_160MHZ_SECSEG_CHAN_FREQ_OFFSET 40
 #ifdef WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT
 #ifdef CONFIG_CHAN_FREQ_API

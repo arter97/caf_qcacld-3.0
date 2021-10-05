@@ -36,6 +36,12 @@
 #include <wlan_lmac_if_def.h>
 #define N_OFFSETS 2
 
+#define TREE_DEPTH_0 0
+#define TREE_DEPTH_1 1
+#define TREE_DEPTH_2 2
+#define TREE_DEPTH_3 3
+#define TREE_DEPTH_4 4
+
 /**
  * struct dfs_channel_bw - Structure to store the information about precac
  * root's primary channel frequency, maximum bandwidth and the center frequency.
@@ -108,6 +114,25 @@ struct precac_tree_offset_for_different_bw offset160 = {DFS_CHWIDTH_160_VAL,
 	}
 };
 
+#ifdef WLAN_FEATURE_11BE
+#define INITIAL_320_CHAN_FREQ_OFFSET_320    (0)
+#define INITIAL_160_CHAN_FREQ_OFFSET_320  (-80)
+#define INITIAL_80_CHAN_FREQ_OFFSET_320  (-120)
+#define INITIAL_40_CHAN_FREQ_OFFSET_320  (-140)
+#define INITIAL_20_CHAN_FREQ_OFFSET_320  (-150)
+static const
+struct precac_tree_offset_for_different_bw offset320 = {DFS_CHWIDTH_320_VAL,
+	TREE_DEPTH_320,
+	{
+		{INITIAL_320_CHAN_FREQ_OFFSET_320, NEXT_320_CHAN_FREQ_OFFSET},
+		{INITIAL_160_CHAN_FREQ_OFFSET_320, NEXT_160_CHAN_FREQ_OFFSET},
+		{INITIAL_80_CHAN_FREQ_OFFSET_320, NEXT_80_CHAN_FREQ_OFFSET},
+		{INITIAL_40_CHAN_FREQ_OFFSET_320, NEXT_40_CHAN_FREQ_OFFSET},
+		{INITIAL_20_CHAN_FREQ_OFFSET_320, NEXT_20_CHAN_FREQ_OFFSET}
+	}
+};
+#endif
+
 static const
 struct precac_tree_offset_for_different_bw default_offset = {0, 0};
 
@@ -130,7 +155,10 @@ struct precac_tree_offset_for_different_bw default_offset = {0, 0};
 #define IS_WITHIN_RANGE_STRICT(_A, _B, _C)  \
 	(((_A) > ((_B)-(_C))) && ((_A) < ((_B)+(_C))))
 
-#define MAX_PREFIX_CHAR 28
+#define IS_WITHIN_RANGE_ASYM_STRICT(_freq, _left_edge, _right_edge)\
+	(((_freq) > (_left_edge) && (_freq) < (_right_edge)))
+
+#define MAX_PREFIX_CHAR 40
 
 #ifdef WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT
 #ifdef CONFIG_CHAN_FREQ_API
@@ -160,6 +188,19 @@ dfs_configure_deschan_for_precac(struct wlan_dfs *dfs)
  */
 bool dfs_is_pcac_required_for_freq(struct precac_tree_node *node,
 				   uint16_t freq);
+
+/* dfs_get_num_subchans_for_bw() - Find the number of subchannels for given
+ * bandwidth and channel.
+ *
+ * @depth: Depth of the node
+ * @freq: Frequency of the node.
+ * @bandwidth: bandwidth for which sub channels are needed.
+ *
+ * Return: Number of subchannels.
+ */
+uint8_t dfs_get_num_subchans_for_bw(uint8_t depth,
+				    uint16_t freq,
+				    uint16_t bandwidth);
 
 /**
  * dfs_find_subchannels_for_center_freq() - API to find the subchannels given
