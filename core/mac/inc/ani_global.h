@@ -904,6 +904,10 @@ typedef struct sAniSirGlobal {
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 	struct ani_level_params ani_params;
 #endif
+#ifdef WLAN_FEATURE_SAE
+	uint32_t sae_connect_retries;
+	uint32_t sae_auth_failure_timeout;
+#endif
 } tAniSirGlobal;
 
 #ifdef FEATURE_WLAN_TDLS

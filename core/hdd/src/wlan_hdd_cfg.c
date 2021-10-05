@@ -5680,6 +5680,20 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_IS_SAP_SAE_ENABLED_DEFAULT,
 		     CFG_IS_SAP_SAE_ENABLED_MIN,
 		     CFG_IS_SAP_SAE_ENABLED_MAX),
+
+	REG_VARIABLE(CFG_SAE_CONNECION_RETRIES, WLAN_PARAM_Integer,
+		     struct hdd_config, sae_connect_retries,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_SAE_CONNECION_RETRIES_DEFAULT,
+		     CFG_SAE_CONNECION_RETRIES_MIN,
+		     CFG_SAE_CONNECION_RETRIES_MAX),
+
+	REG_VARIABLE(CFG_SAE_AUTH_FAILURE_TIMEOUT, WLAN_PARAM_Integer,
+		     struct hdd_config, sae_auth_failure_timeout,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_SAE_AUTH_FAILURE_TIMEOUT_DEFAULT,
+		     CFG_SAE_AUTH_FAILURE_TIMEOUT_MIN,
+		     CFG_SAE_AUTH_FAILURE_TIMEOUT_MAX),
 #endif
 
 	REG_VARIABLE(CFG_BTM_SOLICITED_TIMEOUT, WLAN_PARAM_Integer,
@@ -7303,6 +7317,12 @@ static void hdd_cfg_print_sae(struct hdd_context *hdd_ctx)
 	hdd_debug("Name = [%s] value = [%u]",
 		  CFG_IS_SAP_SAE_ENABLED_NAME,
 		  hdd_ctx->config->sap_sae_enabled);
+	hdd_debug("Name = [%s] Value = [%u]",
+		  CFG_SAE_CONNECION_RETRIES,
+		  hdd_ctx->config->sae_connect_retries);
+	hdd_debug("Name = [%s] value = [%u]",
+		  CFG_SAE_AUTH_FAILURE_TIMEOUT,
+		  hdd_ctx->config->sae_auth_failure_timeout);
 }
 #else
 static void hdd_cfg_print_sae(struct hdd_context *hdd_ctx)
@@ -9894,6 +9914,29 @@ sme_update_sae_single_pmk_cfg(tSmeConfigParams *sme_config,
 }
 #endif
 
+#ifdef WLAN_FEATURE_SAE
+static void sme_update_sae_connect_retries(tSmeConfigParams *smeConfig,
+					   struct hdd_config *pConfig)
+{
+	smeConfig->csrConfig.sae_connect_retries = pConfig->sae_connect_retries;
+}
+static void sme_update_sae_auth_failure_timeout(tSmeConfigParams *smeConfig,
+						struct hdd_config *pConfig)
+{
+	smeConfig->csrConfig.sae_auth_failure_timeout =
+					pConfig->sae_auth_failure_timeout;
+}
+#else
+static void sme_update_sae_connect_retries(tSmeConfigParams *smeConfig,
+					   struct hdd_config *pConfig)
+{
+}
+static void sme_update_sae_auth_failure_timeout(tSmeConfigParams *smeConfig,
+						struct hdd_config *pConfig)
+{
+}
+#endif
+
 /**
  * hdd_set_sme_config() -initializes the sme configuration parameters
  *
@@ -10467,6 +10510,8 @@ QDF_STATUS hdd_set_sme_config(struct hdd_context *hdd_ctx)
 
 	sme_update_beacon_stats(mac_handle,
 				hdd_ctx->config->enable_beacon_reception_stats);
+	sme_update_sae_connect_retries(smeConfig, pConfig);
+	sme_update_sae_auth_failure_timeout(smeConfig, pConfig);
 	status = sme_update_config(mac_handle, smeConfig);
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("sme_update_config() failure: %d", status);
