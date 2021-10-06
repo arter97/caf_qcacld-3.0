@@ -1600,7 +1600,7 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 {
 	tSirMacRateSet tempRateSet;
 	tSirMacRateSet tempRateSet2;
-	uint32_t i, j, val, min, isArate = 0;
+	uint32_t i, j, val, min;
 	qdf_size_t val_len;
 	uint8_t aRateIndex = 0;
 	uint8_t bRateIndex = 0;
@@ -1689,15 +1689,34 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 		 * response rate table whenever basic rate set is changed.
 		 */
 		if (basicOnly && !(tempRateSet.rate[min] & 0x80)) {
-			tempRateSet.rate[min] = 0xff;
-			continue;
+			pe_debug("Invalid basic rate");
+		} else if (sirIsArate(tempRateSet.rate[min] & 0x7f)) {
+			if (aRateIndex >= SIR_NUM_11A_RATES) {
+				pe_debug("OOB, aRateIndex: %d", aRateIndex);
+			} else if (aRateIndex >= 1 && (tempRateSet.rate[min] ==
+				   pRates->llaRates[aRateIndex - 1])) {
+				pe_debug("Duplicate 11a rate: %d",
+					 tempRateSet.rate[min]);
+			} else {
+				pRates->llaRates[aRateIndex++] =
+						tempRateSet.rate[min];
+			}
+		} else if (sirIsBrate(tempRateSet.rate[min] & 0x7f)) {
+			if (bRateIndex >= SIR_NUM_11B_RATES) {
+				pe_debug("OOB, bRateIndex: %d", bRateIndex);
+			} else if (bRateIndex >= 1 && (tempRateSet.rate[min] ==
+				   pRates->llbRates[bRateIndex - 1])) {
+				pe_debug("Duplicate 11b rate: %d",
+					 tempRateSet.rate[min]);
+			} else {
+				pRates->llbRates[bRateIndex++] =
+						tempRateSet.rate[min];
+			}
+		} else {
+			pe_debug("%d is neither 11a nor 11b rate",
+				 tempRateSet.rate[min]);
 		}
-		if (isArate && aRateIndex < SIR_NUM_11A_RATES)
-			pRates->llaRates[aRateIndex++] =
-					tempRateSet.rate[min];
-		else if (bRateIndex < SIR_NUM_11B_RATES)
-			pRates->llbRates[bRateIndex++] =
-					tempRateSet.rate[min];
+
 		tempRateSet.rate[min] = 0xff;
 	}
 
