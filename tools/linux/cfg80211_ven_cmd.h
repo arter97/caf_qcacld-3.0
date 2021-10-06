@@ -786,6 +786,11 @@ enum {
 	IEEE80211_PARAM_MCAST_STEER                = 748,   /* Enable Mcast Steering */
 	IEEE80211_PARAM_MBSS_GROUP                 = 749,
 	IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE = 750,  /* Discovery frame override with OOB */
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_NSEP_PRIORITY_ACCESS       = 751, /* EHT NSEP Priority access support */
+	IEEE80211_PARAM_OM_CONTROL                 = 752, /* EHT OM control support */
+	IEEE80211_PARAM_TRIGGERED_TXOP_SHARING     = 753, /* EHT triggered TX op sharing support */
+#endif /* WLAN_FEATURE_11BE */
 };
 
 enum {
@@ -2316,6 +2321,14 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"spl_vap_scan",        IEEE80211_PARAM_SPL_VAP_SCAN, SET_PARAM, 1},
 	{"g_spl_vap_scan",      IEEE80211_PARAM_SPL_VAP_SCAN, GET_PARAM, 0},
 	{"discfrm_6g_clear_usr_override", IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE, SET_PARAM, 1},
+#ifdef WLAN_FEATURE_11BE
+	{"set_eht_nsep_pri_access",   IEEE80211_PARAM_NSEP_PRIORITY_ACCESS, SET_PARAM, 1},
+	{"get_eht_nsep_pri_access",   IEEE80211_PARAM_NSEP_PRIORITY_ACCESS, GET_PARAM, 0},
+	{"set_eht_om_ctrl",           IEEE80211_PARAM_OM_CONTROL, SET_PARAM, 1},
+	{"get_eht_om_ctrl",           IEEE80211_PARAM_OM_CONTROL, GET_PARAM, 0},
+	{"set_eht_trig_txop_sharing", IEEE80211_PARAM_TRIGGERED_TXOP_SHARING, SET_PARAM, 1},
+	{"get_eht_trig_txop_sharing", IEEE80211_PARAM_TRIGGERED_TXOP_SHARING, GET_PARAM, 0},
+#endif /* WLAN_FEATURE_11BE */
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
