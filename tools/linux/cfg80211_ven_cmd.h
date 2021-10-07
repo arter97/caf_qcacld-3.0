@@ -1311,6 +1311,13 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_ACS_PUNCTURE_NOFDMA_WEIGHTAGE = 483,
 	OL_ATH_PARAM_ACS_PUNCTURE_OFDMA_WEIGHTAGE  = 484,
 #endif /* WLAN_FEATURE_11BE */
+#ifdef WLAN_FEATURE_11BE_MLO
+	/* Force primary UMAC */
+	OL_ATH_PARAM_FORCE_PRIMARY_UMAC = 485,
+	/* Force primary UMAC SOC ID */
+	OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID = 486,
+#endif
+
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3430,6 +3437,20 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"get_acs_puncture_ofdma_weightage",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_PUNCTURE_OFDMA_WEIGHTAGE, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"g_mlo_forced_umac_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC,
+		GET_PARAM, 0},
+	{"mlo_forced_umac_mode",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC,
+		SET_PARAM, 1},
+	{"g_mlo_forced_umac_soc",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID,
+		GET_PARAM, 0},
+	{"mlo_forced_umac_soc",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID,
+		SET_PARAM, 1},
+#endif
 };
 #endif
 
