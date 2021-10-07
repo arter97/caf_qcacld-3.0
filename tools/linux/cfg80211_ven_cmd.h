@@ -791,6 +791,7 @@ enum {
 	IEEE80211_PARAM_OM_CONTROL                 = 752, /* EHT OM control support */
 	IEEE80211_PARAM_TRIGGERED_TXOP_SHARING     = 753, /* EHT triggered TX op sharing support */
 #endif /* WLAN_FEATURE_11BE */
+	IEEE80211_PARAM_MAX_CAP_AP                 = 754,   /* Advertise Maximum capability of AP */
 };
 
 enum {
@@ -2099,6 +2100,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_da_wds_war",        IEEE80211_PARAM_DA_WAR_ENABLE, GET_PARAM, 0},
 	{"advertise_sta_maxcap",    IEEE80211_PARAM_STA_MAX_CH_CAP, SET_PARAM, 1},
 	{"g_advertise_sta_maxcap",  IEEE80211_PARAM_STA_MAX_CH_CAP, GET_PARAM, 0},
+	{"advertise_ap_maxcap",    IEEE80211_PARAM_MAX_CAP_AP, SET_PARAM, 1},
+	{"g_advertise_ap_maxcap",  IEEE80211_PARAM_MAX_CAP_AP, GET_PARAM, 0},
 	{"rawmode_open_war",    IEEE80211_PARAM_RAWMODE_OPEN_WAR, SET_PARAM, 1},
 	{"g_rawmode_open_war",  IEEE80211_PARAM_RAWMODE_OPEN_WAR, GET_PARAM, 0},
 #if UMAC_SUPPORT_WPA3_STA
