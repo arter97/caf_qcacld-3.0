@@ -854,7 +854,7 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac, uint8_t nChannelNum,
 			       struct pe_session *pe_session)
 {
 	QDF_STATUS nsir_status;
-	qdf_size_t n_rates = 0;
+	qdf_size_t nRates = 0;
 	uint8_t rates[SIR_MAC_MAX_NUMBER_OF_RATES];
 
 	/* Use the ext rates present in session entry whenever nChannelNum is set to OPERATIONAL
@@ -863,9 +863,9 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac, uint8_t nChannelNum,
 	 */
 	if (POPULATE_DOT11F_RATES_OPERATIONAL == nChannelNum) {
 		if (pe_session) {
-			n_rates = pe_session->extRateSet.numRates;
+			nRates = pe_session->extRateSet.numRates;
 			qdf_mem_copy(rates, pe_session->extRateSet.rate,
-				     n_rates);
+				     nRates);
 		} else {
 			pe_err("no session context exists while populating Operational Rate Set");
 		}
@@ -874,21 +874,20 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac, uint8_t nChannelNum,
 			pe_err("null pe_session");
 			return QDF_STATUS_E_INVAL;
 		}
-		n_rates = SIR_MAC_MAX_NUMBER_OF_RATES;
+		nRates = SIR_MAC_MAX_NUMBER_OF_RATES;
 		nsir_status = mlme_get_ext_opr_rate(pe_session->vdev, rates,
-						    &n_rates);
+						    &nRates);
 		if (QDF_IS_STATUS_ERROR(nsir_status)) {
-			n_rates = 0;
+			nRates = 0;
 			pe_err("Failed to retrieve nItem from CFG status: %d",
 			       (nsir_status));
 			return nsir_status;
 		}
 	}
 
-	if (0 != n_rates) {
-		pe_debug("ext supp rates present, num %d", (uint8_t)n_rates);
-		pDot11f->num_rates = (uint8_t)n_rates;
-		qdf_mem_copy(pDot11f->rates, rates, n_rates);
+	if (0 != nRates) {
+		pDot11f->num_rates = (uint8_t) nRates;
+		qdf_mem_copy(pDot11f->rates, rates, nRates);
 		pDot11f->present = 1;
 	}
 
