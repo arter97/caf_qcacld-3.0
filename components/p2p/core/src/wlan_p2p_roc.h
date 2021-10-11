@@ -90,7 +90,7 @@ struct p2p_roc_context {
 	uint32_t vdev_id;
 	uint32_t scan_id;
 	void *tx_ctx;
-	qdf_freq_t chan;
+	uint8_t chan;
 	uint8_t phy_mode;
 	uint32_t duration;
 	enum roc_type roc_type;

@@ -285,16 +285,15 @@ wlan_hdd_validate_and_override_offchan(struct hdd_adapter *adapter,
 				       struct ieee80211_channel *chan,
 				       bool *offchan)
 {
-	qdf_freq_t home_ch_freq;
+	uint8_t home_ch;
 
 	if (!offchan || !chan || !(*offchan))
 		return;
 
-	home_ch_freq = hdd_get_adapter_home_channel(adapter);
+	home_ch = hdd_get_adapter_home_channel(adapter);
 
-	if (chan->center_freq == home_ch_freq) {
-		hdd_debug("override offchan to 0 at home channel %d",
-			  home_ch_freq);
+	if (ieee80211_frequency_to_channel(chan->center_freq) == home_ch) {
+		hdd_debug("override offchan to 0 at home channel %d", home_ch);
 		*offchan = false;
 	}
 }
