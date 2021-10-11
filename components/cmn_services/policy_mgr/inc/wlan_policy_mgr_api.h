@@ -3771,4 +3771,30 @@ static inline bool policy_mgr_is_mlo_sap_concurrency_allowed(
 	return true;
 }
 #endif
+
+/**
+ * policy_mgr_is_hwmode_offload_enabled() - Check for HW mode selection offload
+ *  support
+ * @psoc: PSOC object information
+ *
+ * Check if target supports HW mode selection offload or not
+ *
+ * Return: True if the target supports HW mode selection offload,
+ *         False otherwise.
+ */
+bool policy_mgr_is_hwmode_offload_enabled(struct wlan_objmgr_psoc *psoc);
+/**
+ * policy_mgr_is_3rd_conn_on_same_band_allowed() - Check the third connection
+ * on same band allowed or not
+ * list for third connection
+ * @psoc: PSOC object information
+ * @mode: Device mode
+ *
+ * This function checks whether to allow third connection on same band or not
+ * based on pcl table
+ *
+ * Return: TRUE/FALSE
+ */
+bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
+						 enum policy_mgr_con_mode mode);
 #endif /* __WLAN_POLICY_MGR_API_H */

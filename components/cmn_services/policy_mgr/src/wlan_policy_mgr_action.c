@@ -147,6 +147,11 @@ QDF_STATUS policy_mgr_pdev_set_hw_mode(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (!pm_ctx->sme_cbacks.sme_pdev_set_hw_mode) {
+		policy_mgr_debug("NOT supported");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
 	/*
 	 * if HW is not capable of doing 2x2 or ini config disabled 2x2, don't
 	 * allow to request FW for 2x2
@@ -213,6 +218,11 @@ enum policy_mgr_conc_next_action policy_mgr_need_opportunistic_upgrade(
 	struct policy_mgr_hw_mode_params hw_mode;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		return upgrade;
+	}
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -540,6 +550,11 @@ bool policy_mgr_is_hwmode_set_for_given_chnl(struct wlan_objmgr_psoc *psoc,
 	enum policy_mgr_band band;
 	bool is_hwmode_dbs, dbs_required_for_2g;
 
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		return true;
+	}
+
 	if (policy_mgr_is_hw_dbs_capable(psoc) == false)
 		return true;
 
@@ -822,6 +837,12 @@ policy_mgr_get_next_action(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		*next_action = PM_NOP;
+		return QDF_STATUS_SUCCESS;
+	}
+
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
@@ -944,6 +965,11 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 	uint32_t ch_freq = 0;
 	struct scan_cache_entry *entry;
 
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		goto end;
+	}
+
 	if (!scan_list || !qdf_list_size(scan_list)) {
 		policy_mgr_debug("Scan list is NULL or No BSSIDs present");
 		goto end;
@@ -984,6 +1010,7 @@ policy_mgr_check_for_hw_mode_change(struct wlan_objmgr_psoc *psoc,
 			break;
 		}
 
+		ch_freq = 0;
 		cur_node = next_node;
 		next_node = NULL;
 	}
@@ -2172,17 +2199,29 @@ static QDF_STATUS policy_mgr_check_6ghz_sap_conc(
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	uint32_t ch_freq = *con_ch_freq;
+	bool find_alternate = false;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid context");
 		return QDF_STATUS_E_FAILURE;
 	}
-
+	if (ch_freq && WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) &&
+	    !policy_mgr_sta_sap_scc_on_lte_coex_chan(psoc) &&
+	    !policy_mgr_is_safe_channel(psoc, ch_freq)) {
+		find_alternate = true;
+		policymgr_nofl_debug("con ch_freq %d unsafe", ch_freq);
+	}
 	if (ch_freq && WLAN_REG_IS_6GHZ_CHAN_FREQ(ch_freq) &&
 	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_ch_freq) &&
 	    !policy_mgr_get_ap_6ghz_capable(psoc, sap_vdev_id, NULL)) {
-		policy_mgr_debug("sap %d not support 6ghz freq %d",
+		find_alternate = true;
+		policymgr_nofl_debug("sap not capable on con ch_freq %d",
+				     ch_freq);
+	}
+
+	if (find_alternate) {
+		policy_mgr_debug("sap %d not support 6ghz freq %d to find alternate",
 				 sap_vdev_id, ch_freq);
 		if (policy_mgr_is_hw_dbs_capable(psoc)) {
 			ch_freq = policy_mgr_select_2g_chan(psoc);
@@ -2741,6 +2780,11 @@ QDF_STATUS policy_mgr_restart_opportunistic_timer(
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *policy_mgr_ctx;
 
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
 	policy_mgr_ctx = policy_mgr_get_context(psoc);
 	if (!policy_mgr_ctx) {
 		policy_mgr_err("Invalid context");
@@ -2771,6 +2815,11 @@ QDF_STATUS policy_mgr_set_hw_mode_on_channel_switch(
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE, qdf_status;
 	enum policy_mgr_conc_next_action action;
+
+	if (policy_mgr_is_hwmode_offload_enabled(psoc)) {
+		policy_mgr_debug("HW mode selection offload is enabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
 
 	if (!policy_mgr_is_hw_dbs_capable(psoc)) {
 		policy_mgr_rl_debug("PM/DBS is disabled");
