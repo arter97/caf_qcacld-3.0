@@ -41,8 +41,8 @@ dp_mon_ring_config(struct dp_soc *soc, struct dp_pdev *pdev,
 	struct dp_mon_ops *mon_ops = dp_mon_ops_get(soc);
 
 	lmac_id = dp_get_lmac_id_for_pdev_id(soc, 0, mac_for_pdev);
-	if (mon_ops && mon_ops->mon_htt_srng_setup)
-		status = mon_ops->mon_htt_srng_setup(soc, pdev,
+	if (mon_ops && mon_ops->mon_pdev_htt_srng_setup)
+		status = mon_ops->mon_pdev_htt_srng_setup(soc, pdev,
 						     lmac_id, mac_for_pdev);
 
 	return status;
