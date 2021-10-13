@@ -459,6 +459,11 @@ wlan_hdd_runtime_pm_wow_disconnect_handler(struct hdd_context *hdd_ctx)
 		return;
 	}
 
+	if (hdd_ctx->config->runtime_pm != hdd_runtime_pm_dynamic) {
+		hdd_debug("Dynamic Runtime PM disabled");
+		return;
+	}
+
 	hdd_debug("Runtime allowed : %d", hdd_ctx->runtime_pm_prevented);
 	qdf_spin_lock_irqsave(&hdd_ctx->pm_qos_lock);
 	if (hdd_ctx->runtime_pm_prevented) {
