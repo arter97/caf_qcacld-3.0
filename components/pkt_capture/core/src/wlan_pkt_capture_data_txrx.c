@@ -21,6 +21,7 @@
  * internally in pkt_capture component only.
  */
 
+#include <net/ieee80211_radiotap.h>
 #include <wlan_pkt_capture_data_txrx.h>
 #include <wlan_pkt_capture_main.h>
 #include <enet.h>
@@ -112,6 +113,7 @@ static unsigned char pkt_capture_get_tx_rate(
 		case 0x0:
 			ret = 0x16;
 			*preamble = LONG_PREAMBLE;
+			break;
 		case 0x1:
 			ret = 0xB;
 			*preamble = LONG_PREAMBLE;
