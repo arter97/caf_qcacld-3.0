@@ -1505,12 +1505,18 @@ void ppdu_desc_dbg_queue_deinit(struct tx_cap_debug_log_info *ptr_log_info)
 static void dp_tx_capture_work_q_timer_handler(void *arg)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)arg;
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_pdev *mon_pdev;
 
+	if (!pdev || !pdev->monitor_pdev)
+		return;
+
+	mon_pdev = pdev->monitor_pdev;
 	qdf_queue_work(0, mon_pdev->tx_capture.ppdu_stats_workqueue,
 		       &mon_pdev->tx_capture.ppdu_stats_work);
-	qdf_timer_mod(&mon_pdev->tx_capture.work_q_timer,
-		      TX_CAPTURE_WORK_Q_TIMER_MS);
+	if (!mon_pdev->stop_tx_capture_work_q_timer) {
+		qdf_timer_mod(&mon_pdev->tx_capture.work_q_timer,
+			      TX_CAPTURE_WORK_Q_TIMER_MS);
+	}
 }
 
 /**
@@ -1550,6 +1556,7 @@ void dp_tx_ppdu_stats_attach(struct dp_pdev *pdev)
 		       dp_tx_capture_work_q_timer_handler,
 		       (void *)pdev,
 		       QDF_TIMER_TYPE_WAKE_APPS);
+	mon_pdev->stop_tx_capture_work_q_timer = FALSE;
 
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
@@ -1609,6 +1616,7 @@ void dp_tx_ppdu_stats_detach(struct dp_pdev *pdev)
 
 	ptr_log_info = &mon_pdev->tx_capture.log_info;
 
+	mon_pdev->stop_tx_capture_work_q_timer = TRUE;
 	qdf_timer_sync_cancel(&mon_pdev->tx_capture.work_q_timer);
 	qdf_timer_free(&mon_pdev->tx_capture.work_q_timer);
 
@@ -6206,8 +6214,10 @@ void dp_ppdu_desc_deliver(struct dp_pdev *pdev,
 			       &mon_pdev->tx_capture.ppdu_stats_work);
 	}
 
-	qdf_timer_mod(&mon_pdev->tx_capture.work_q_timer,
-		      TX_CAPTURE_WORK_Q_TIMER_MS);
+	if (!mon_pdev->stop_tx_capture_work_q_timer) {
+		qdf_timer_mod(&mon_pdev->tx_capture.work_q_timer,
+			      TX_CAPTURE_WORK_Q_TIMER_MS);
+	}
 }
 
 static void set_mpdu_info(
