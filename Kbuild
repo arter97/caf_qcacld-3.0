@@ -499,6 +499,10 @@ ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_connectivity_logging.o
 endif
 
+ifeq ($(CONFIG_FEATURE_WDS), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_wds.o
+endif
+
 $(call add-wlan-objs,hdd,$(HDD_OBJS))
 
 ###### OSIF_SYNC ########
@@ -1903,6 +1907,11 @@ endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_11be_tlv.o
+endif
+
+ifeq ($(CONFIG_FEATURE_WDS), y)
+WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_wds_api.o
+WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_wds_tlv.o
 endif
 
 $(call add-wlan-objs,wmi,$(WMI_OBJS))
@@ -4212,6 +4221,8 @@ endif
 cppflags-$(CONFIG_FEATURE_WDS) += -DFEATURE_WDS
 cppflags-$(CONFIG_FEATURE_MEC) += -DFEATURE_MEC
 cppflags-$(CONFIG_FEATURE_MCL_REPEATER) += -DFEATURE_MCL_REPEATER
+cppflags-$(CONFIG_WDS_CONV_TARGET_IF_OPS_ENABLE) += -DWDS_CONV_TARGET_IF_OPS_ENABLE
+cppflags-$(CONFIG_BYPASS_WDS_OL_OPS) += -DBYPASS_OL_OPS
 
 ccflags-$(CONFIG_IPA_WDI3_TX_TWO_PIPES) += -DIPA_WDI3_TX_TWO_PIPES
 ccflags-$(CONFIG_IPA_STATIC_VOTING) += -DIPA_STATIC_VOTING

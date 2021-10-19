@@ -48,6 +48,7 @@
 #include "wlan_hdd_sta_info.h"
 #include "ol_defines.h"
 #include <wlan_hdd_sar_limits.h>
+#include "wlan_hdd_wds.h"
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -639,6 +640,13 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 					   mac_addr->bytes,
 					   STA_INFO_SOFTAP_HARD_START_XMIT);
 
+	/* Find wds node behind a directly associated station */
+	if (!sta_info) {
+		hdd_wds_replace_peer_mac(soc, adapter, mac_addr->bytes);
+		sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
+				mac_addr->bytes,
+				STA_INFO_SOFTAP_HARD_START_XMIT);
+	}
 	if (!QDF_NBUF_CB_GET_IS_BCAST(skb) && !QDF_NBUF_CB_GET_IS_MCAST(skb)) {
 		if (!sta_info) {
 			QDF_TRACE_DEBUG_RL(QDF_MODULE_ID_HDD_SAP_DATA,
