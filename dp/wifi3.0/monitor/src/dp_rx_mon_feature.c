@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -380,7 +381,7 @@ dp_rx_enh_capture_is_peer_enabled(struct dp_soc *soc,
 	struct dp_peer *peer;
 	struct dp_ast_entry *ast_entry;
 	uint32_t ast_index;
-	bool rx_cap_enabled;
+	bool rx_cap_enabled = false;
 
 	ast_index = ppdu_info->rx_user_status[user_id].ast_index;
 	if (ast_index < wlan_cfg_get_max_ast_idx(soc->wlan_cfg_ctx)) {
@@ -389,7 +390,9 @@ dp_rx_enh_capture_is_peer_enabled(struct dp_soc *soc,
 			peer = dp_peer_get_ref_by_id(soc, ast_entry->peer_id,
 						     DP_MOD_ID_AST);
 			if (peer) {
-				rx_cap_enabled = peer->rx_cap_enabled;
+				if (peer->monitor_peer)
+					rx_cap_enabled =
+						peer->monitor_peer->rx_cap_enabled;
 				dp_peer_unref_delete(peer, DP_MOD_ID_AST);
 				return rx_cap_enabled;
 			}
@@ -695,14 +698,14 @@ QDF_STATUS
 dp_peer_set_rx_capture_enabled(struct dp_pdev *pdev, struct dp_peer *peer,
 			       bool value, uint8_t *mac_addr)
 {
-	if (!peer) {
+	if (!peer || !peer->monitor_peer) {
 		dp_err("Invalid Peer");
 		if (value)
 			return QDF_STATUS_E_FAILURE;
 		return QDF_STATUS_SUCCESS;
 	}
 
-	peer->rx_cap_enabled = value;
+	peer->monitor_peer->rx_cap_enabled = value;
 
 	return QDF_STATUS_SUCCESS;
 }
