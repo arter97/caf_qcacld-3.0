@@ -206,7 +206,7 @@ static void wlan_vdev_start_fw_send(struct wlan_objmgr_pdev *pdev,
 	wlan_util_change_map_index(send_array, wlan_vdev_get_id(vdev), 0);
 }
 
-static void wlan_vdev_get_up_ap_mon_vdev(struct wlan_objmgr_pdev *pdev,
+static void wlan_vdev_get_active_ap_mon_vdev(struct wlan_objmgr_pdev *pdev,
 					     void *object, void *arg)
 {
 	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)object;
@@ -217,7 +217,7 @@ static void wlan_vdev_get_up_ap_mon_vdev(struct wlan_objmgr_pdev *pdev,
 		return;
 
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
-	if (wlan_vdev_is_up(vdev) == QDF_STATUS_SUCCESS &&
+	if (wlan_vdev_chan_config_valid(vdev) == QDF_STATUS_SUCCESS &&
 	    (opmode == QDF_SAP_MODE || opmode == QDF_MONITOR_MODE))
 		*vdev_up = true;
 }
@@ -281,10 +281,10 @@ static QDF_STATUS mlme_stop_pending_restart(struct wlan_objmgr_pdev *pdev,
 		 */
 		wlan_objmgr_pdev_iterate_obj_list(
 				pdev, WLAN_VDEV_OP,
-				wlan_vdev_get_up_ap_mon_vdev,
+				wlan_vdev_get_active_ap_mon_vdev,
 				&up_vdev, 0, WLAN_MLME_SB_ID);
 		if (!up_vdev) {
-			mlme_err("Clear MVR bit for Pdev %d",
+			mlme_err("Clear MVR flag for Pdev %d",
 				 wlan_objmgr_pdev_get_pdev_id(pdev));
 			wlan_pdev_mlme_op_clear(pdev,
 						WLAN_PDEV_OP_MBSSID_RESTART);
