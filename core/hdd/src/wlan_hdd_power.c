@@ -87,6 +87,7 @@
 #include "wlan_hdd_object_manager.h"
 #include <linux/igmp.h>
 #include "qdf_types.h"
+#include <linux/cpuidle.h>
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
 #define HDD_SSR_BRING_UP_TIME 3000000
@@ -281,7 +282,7 @@ static void hdd_enable_igmp_offload(struct hdd_adapter *adapter)
 	}
 	status = hdd_send_igmp_offload_params(adapter, true);
 	if (status != QDF_STATUS_SUCCESS)
-		hdd_debug("Failed to enable gtk offload");
+		hdd_debug("Failed to enable igmp offload");
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 }
 
@@ -600,7 +601,7 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	/* cache ns request */
 	status = ucfg_pmo_cache_ns_offload_req(ns_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to cache ns request; status:%d", status);
+		hdd_debug("Failed to cache ns request; status:%d", status);
 		goto free_req;
 	}
 
@@ -612,7 +613,7 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	/* enable ns request */
 	status = ucfg_pmo_enable_ns_offload_in_fwr(vdev, trigger);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("Failed to enable ns offload; status:%d", status);
+		hdd_debug("Failed to enable ns offload; status:%d", status);
 		goto put_vdev;
 	}
 
@@ -678,16 +679,16 @@ out:
  */
 static void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
 {
-	struct mac_context *mac_ctx;
 	struct hdd_context *hdd_ctx;
+	bool usr_ps_cfg;
 
 	if (hdd_validate_adapter(adapter))
 		return;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	mac_ctx  = MAC_CONTEXT(hdd_ctx->mac_handle);
 
-	if (mac_ctx->usr_cfg_ps_enable)
+	usr_ps_cfg = ucfg_mlme_get_user_ps(hdd_ctx->psoc, adapter->vdev_id);
+	if (usr_ps_cfg)
 		sme_ps_enable_disable(hdd_ctx->mac_handle, adapter->vdev_id,
 				      SME_PS_ENABLE);
 	else
@@ -723,6 +724,7 @@ static void __hdd_ipv6_notifier_work_queue(struct hdd_adapter *adapter)
 		goto exit;
 
 	hdd_enable_ns_offload(adapter, pmo_ipv6_change_notify);
+	hdd_enable_icmp_offload(adapter, pmo_ipv6_change_notify);
 
 	hdd_send_ps_config_to_fw(adapter);
 exit:
@@ -982,16 +984,7 @@ static int hdd_populate_ipv4_addr(struct hdd_adapter *adapter,
 	return 0;
 }
 
-/**
- * hdd_set_grat_arp_keepalive() - Enable grat APR keepalive
- * @adapter: the HDD adapter to configure
- *
- * This configures gratuitous APR keepalive based on the adapter's current
- * connection information, specifically IPv4 address and BSSID
- *
- * return: zero for success, non-zero for failure
- */
-static int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
+int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
 	int exit_code;
@@ -1078,6 +1071,7 @@ static void __hdd_ipv4_notifier_work_queue(struct hdd_adapter *adapter)
 		goto exit;
 
 	hdd_enable_arp_offload(adapter, pmo_ipv4_change_notify);
+	hdd_enable_icmp_offload(adapter, pmo_ipv4_change_notify);
 
 	status = ucfg_mlme_get_sta_keepalive_method(hdd_ctx->psoc, &val);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -1177,12 +1171,27 @@ int wlan_hdd_ipv4_changed(struct notifier_block *nb,
 }
 
 #ifdef FEATURE_RUNTIME_PM
+/* For CPU, the enter & exit latency of the deepest LPM mode(CXPC)
+ * is about ~10ms. so long as required QoS latency is longer than 10ms,
+ * CPU can enter CXPC mode.
+ * The vote value is in microseconds.
+ */
+#define HDD_CPU_CXPC_THRESHOLD (10000)
+static bool wlan_hdd_is_cpu_cxpc_allowed(unsigned long vote)
+{
+	if (vote >= HDD_CPU_CXPC_THRESHOLD)
+		return true;
+	else
+		return false;
+}
+
 int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 			   void *context)
 {
 	struct hdd_context *hdd_ctx = container_of(nb, struct hdd_context,
 						   pm_qos_notifier);
 	void *hif_ctx;
+	bool is_any_sta_connected = false;
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug_rl("Driver Module closed; skipping pm qos notify");
@@ -1193,16 +1202,20 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 	if (!hif_ctx)
 		return -EINVAL;
 
-	hdd_debug("PM QOS update: runtime_pm_prevented %d Current value: %ld",
-		  hdd_ctx->runtime_pm_prevented, curr_val);
+	is_any_sta_connected = hdd_is_any_sta_connected(hdd_ctx);
+
+	hdd_debug("PM QOS update: runtime_pm_prevented %d Current value: %ld, is_any_sta_connected %d",
+		  hdd_ctx->runtime_pm_prevented, curr_val,
+		  is_any_sta_connected);
 	qdf_spin_lock_irqsave(&hdd_ctx->pm_qos_lock);
 
 	if (!hdd_ctx->runtime_pm_prevented &&
-	    curr_val != wlan_hdd_get_pm_qos_cpu_latency()) {
+	    is_any_sta_connected &&
+	    !wlan_hdd_is_cpu_cxpc_allowed(curr_val)) {
 		hif_pm_runtime_get_noresume(hif_ctx, RTPM_ID_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = true;
 	} else if (hdd_ctx->runtime_pm_prevented &&
-		   curr_val == wlan_hdd_get_pm_qos_cpu_latency()) {
+		   wlan_hdd_is_cpu_cxpc_allowed(curr_val)) {
 		hif_pm_runtime_put(hif_ctx, RTPM_ID_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = false;
 	}
@@ -1211,6 +1224,33 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 
 	return NOTIFY_DONE;
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
+{
+	long long curr_val_ns;
+	long long curr_val_us;
+	int max_cpu_num;
+
+	if (!hdd_is_any_sta_connected(hdd_ctx)) {
+		hdd_debug("No active wifi connections. Ignore PM QOS vote");
+		return false;
+	}
+
+	max_cpu_num  = nr_cpu_ids - 1;
+
+	/* Get PM QoS vote from last cpu, as no device votes on that cpu
+	 * so by default we get global PM QoS vote from last cpu.
+	 */
+	curr_val_ns = cpuidle_governor_latency_req(max_cpu_num);
+	curr_val_us = curr_val_ns / NSEC_PER_USEC;
+	hdd_debug("PM QoS current value: %lld", curr_val_us);
+	if (!wlan_hdd_is_cpu_cxpc_allowed(curr_val_us))
+		return true;
+	else
+		return false;
+}
+#endif
 #endif
 
 /**
@@ -1301,6 +1341,161 @@ put_vdev:
 free_req:
 	qdf_mem_free(arp_req);
 }
+
+#ifdef WLAN_FEATURE_ICMP_OFFLOAD
+/**
+ * hdd_fill_ipv4_addr() - fill IPv4 addresses
+ * @adapter: Adapter context for which ICMP offload is to be configured
+ * @pmo_icmp_req: pointer to ICMP offload request params
+ *
+ * This is the IPv4 utility function to populate address.
+ *
+ * Return: 0 on success, error number otherwise.
+ */
+static int hdd_fill_ipv4_addr(struct hdd_adapter *adapter,
+			      struct pmo_icmp_offload *pmo_icmp_req)
+{
+	struct in_ifaddr *ifa;
+	uint8_t ipv4_addr_array[QDF_IPV4_ADDR_SIZE];
+	int i;
+
+	ifa = hdd_get_ipv4_local_interface(adapter);
+	if (!ifa || !ifa->ifa_local) {
+		hdd_debug("IP Address is not assigned");
+		return -EINVAL;
+	}
+
+	/* converting u32 to IPv4 address */
+	for (i = 0; i < QDF_IPV4_ADDR_SIZE; i++)
+		ipv4_addr_array[i] = (ifa->ifa_local >> i * 8) & 0xff;
+
+	qdf_mem_copy(pmo_icmp_req->ipv4_addr, &ipv4_addr_array,
+		     QDF_IPV4_ADDR_SIZE);
+
+	return 0;
+}
+
+/**
+ * hdd_fill_ipv6_addr() - fill IPv6 addresses
+ * @adapter: Adapter context for which ICMP offload is to be configured
+ * @pmo_icmp_req: pointer to ICMP offload request params
+ *
+ * This is the IPv6 utility function to populate addresses.
+ *
+ * Return: 0 on success, error number otherwise.
+ */
+static int hdd_fill_ipv6_addr(struct hdd_adapter *adapter,
+			      struct pmo_icmp_offload *pmo_icmp_req)
+{
+	struct inet6_dev *in6_dev;
+	struct pmo_ns_req *ns_req;
+	int i, errno;
+
+	in6_dev = __in6_dev_get(adapter->dev);
+	if (!in6_dev) {
+		hdd_err_rl("IPv6 dev does not exist");
+		return -EINVAL;
+	}
+
+	ns_req = qdf_mem_malloc(sizeof(*ns_req));
+	if (!ns_req)
+		return -ENOMEM;
+
+	ns_req->count = 0;
+	/* Unicast Addresses */
+	errno = hdd_fill_ipv6_uc_addr(in6_dev, ns_req->ipv6_addr,
+				      ns_req->ipv6_addr_type, ns_req->scope,
+				      &ns_req->count);
+	if (errno) {
+		hdd_debug("Reached Max IPv6 supported address %d",
+			  ns_req->count);
+		goto free_req;
+	}
+	/* Anycast Addresses */
+	errno = hdd_fill_ipv6_ac_addr(in6_dev, ns_req->ipv6_addr,
+				      ns_req->ipv6_addr_type, ns_req->scope,
+				      &ns_req->count);
+	if (errno) {
+		hdd_debug("Reached Max IPv6 supported address %d",
+			  ns_req->count);
+		goto free_req;
+	}
+
+	pmo_icmp_req->ipv6_count = ns_req->count;
+	for (i = 0; i < pmo_icmp_req->ipv6_count; i++) {
+		qdf_mem_copy(&pmo_icmp_req->ipv6_addr[i], &ns_req->ipv6_addr[i],
+			     QDF_IPV6_ADDR_SIZE);
+	}
+
+free_req:
+	qdf_mem_free(ns_req);
+	return errno;
+}
+
+void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
+			     enum pmo_offload_trigger trigger)
+{
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	struct pmo_icmp_offload *pmo_icmp_req;
+	struct wlan_objmgr_vdev *vdev;
+	bool is_icmp_enable;
+	QDF_STATUS status;
+
+	is_icmp_enable = ucfg_pmo_is_icmp_offload_enabled(psoc);
+	if (!is_icmp_enable) {
+		hdd_debug("ICMP Offload not enabled");
+		return;
+	}
+
+	pmo_icmp_req = qdf_mem_malloc(sizeof(*pmo_icmp_req));
+	if (!pmo_icmp_req)
+		return;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		goto free_req;
+	}
+
+	status = ucfg_pmo_check_icmp_offload(psoc, adapter->vdev_id);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto put_vdev;
+
+	pmo_icmp_req->vdev_id = adapter->vdev_id;
+	pmo_icmp_req->enable = is_icmp_enable;
+	pmo_icmp_req->trigger = trigger;
+
+	switch (trigger) {
+	case pmo_ipv4_change_notify:
+		if (hdd_fill_ipv4_addr(adapter, pmo_icmp_req)) {
+			hdd_debug("Unable to populate IPv4 Address");
+			goto put_vdev;
+		}
+		break;
+	case pmo_ipv6_change_notify:
+		if (hdd_fill_ipv6_addr(adapter, pmo_icmp_req)) {
+			hdd_debug("Unable to populate IPv6 Address");
+			goto put_vdev;
+		}
+		break;
+	default:
+		QDF_DEBUG_PANIC("The trigger %d is not supported", trigger);
+		goto put_vdev;
+	}
+
+	status = ucfg_pmo_config_icmp_offload(psoc, pmo_icmp_req);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err_rl("icmp offload config in fw failed: %d", status);
+		goto put_vdev;
+	}
+
+put_vdev:
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+free_req:
+	qdf_mem_free(pmo_icmp_req);
+}
+#endif
 
 void hdd_disable_arp_offload(struct hdd_adapter *adapter,
 		enum pmo_offload_trigger trigger)
@@ -1420,14 +1615,6 @@ flush_mc_list:
 static void hdd_update_conn_state_mask(struct hdd_adapter *adapter,
 				       uint32_t *conn_state_mask)
 {
-
-	eConnectionState conn_state;
-	struct hdd_station_ctx *sta_ctx;
-
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
-	conn_state = sta_ctx->conn_info.conn_state;
-
 	if (hdd_cm_is_vdev_associated(adapter))
 		*conn_state_mask |= (1 << adapter->vdev_id);
 }
@@ -1623,6 +1810,8 @@ QDF_STATUS hdd_wlan_shutdown(void)
 		hdd_ctx->is_scheduler_suspended = false;
 		hdd_ctx->is_wiphy_suspended = false;
 		hdd_ctx->hdd_wlan_suspended = false;
+		ucfg_pmo_resume_all_components(hdd_ctx->psoc,
+					       QDF_SYSTEM_SUSPEND);
 	}
 
 	wlan_hdd_rx_thread_resume(hdd_ctx);
@@ -1895,6 +2084,9 @@ QDF_STATUS hdd_wlan_re_init(void)
 	if (hdd_ctx->is_wiphy_suspended)
 		hdd_ctx->is_wiphy_suspended = false;
 
+	if (hdd_ctx->hdd_wlan_suspended)
+		hdd_ctx->hdd_wlan_suspended = false;
+
 	return QDF_STATUS_SUCCESS;
 
 err_re_init:
@@ -1959,7 +2151,7 @@ int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 				goto end;
 		}
 
-		sme_save_usr_ps_cfg(mac_handle, true);
+		ucfg_mlme_set_user_ps(hdd_ctx->psoc, adapter->vdev_id, true);
 		ucfg_mlme_is_bmps_enabled(hdd_ctx->psoc, &is_bmps_enabled);
 		if (is_bmps_enabled) {
 			hdd_debug("Wlan driver Entering Power save");
@@ -1987,7 +2179,7 @@ int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 	} else {
 		hdd_debug("Wlan driver Entering Full Power");
 
-		sme_save_usr_ps_cfg(mac_handle, false);
+		ucfg_mlme_set_user_ps(hdd_ctx->psoc, adapter->vdev_id, false);
 		/*
 		 * Enter Full power command received from GUI
 		 * this means we are disconnected

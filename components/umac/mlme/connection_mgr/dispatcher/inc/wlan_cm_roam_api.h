@@ -27,9 +27,7 @@
 #include "../../core/src/wlan_cm_roam_offload.h"
 #include "wlan_mlme_main.h"
 #include "wlan_mlme_api.h"
-
-/* Default value of reason code */
-#define DISABLE_VENDOR_BTM_CONFIG 2
+#include "wlan_reg_ucfg_api.h"
 
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
@@ -753,6 +751,31 @@ wlan_cm_roam_extract_roam_msg_info(wmi_unified_t wmi, void *evt_buf,
 				   struct roam_msg_info *dst, uint8_t idx);
 
 /**
+ * wlan_cm_get_roam_band_value  - Get roam band value from RSO config
+ * @psoc: psoc pointer
+ * @vdev: Pointer to vdev
+ *
+ * Return: Roam Band
+ */
+uint32_t wlan_cm_get_roam_band_value(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_cm_roam_extract_frame_info  - Extract the roam frame info TLV
+ * @wmi: wmi handle
+ * @evt_buf: Pointer to the event buffer
+ * @dst: Destination buffer
+ * @idx: TLV index
+ * @num_frames: Number of frame info TLVs
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_roam_extract_frame_info(wmi_unified_t wmi, void *evt_buf,
+				struct roam_frame_info *dst, uint8_t idx,
+				uint8_t num_frames);
+
+/**
  * wlan_cm_roam_activate_pcl_per_vdev() - Set the PCL command to be sent per
  * vdev instead of pdev.
  * @psoc: PSOC pointer
@@ -824,15 +847,6 @@ wlan_cm_roam_set_vendor_btm_params(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_cm_roam_vendor_btm_params
 								*param);
 /**
- * wlan_cm_roam_disable_vendor_btm() - API to disable vendor btm by default
- * reason
- * @psoc: PSOC pointer
- *
- * Return: none
- */
-void wlan_cm_roam_disable_vendor_btm(struct wlan_objmgr_psoc *psoc);
-
-/**
  * wlan_cm_roam_get_vendor_btm_params() - API to get vendor btm param
  * @psoc: PSOC pointer
  * @param: vendor configured roam trigger param
@@ -879,6 +893,29 @@ QDF_STATUS
 wlan_cm_update_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id,
 				       uint32_t roam_scan_scheme_bitmap);
+
+/**
+ * wlan_cm_set_roam_band_bitmask() - Set roam band bitmask for vdev
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @roam_band_bitmask: bitmask of roam band for which roam scan needs to be
+ * enabled in fw
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id,
+					 uint32_t roam_band_bitmask);
+
+/**
+ * wlan_cm_set_roam_band_update() - send rso update on set band
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_set_roam_band_update(struct wlan_objmgr_psoc *psoc,
+					uint8_t vdev_id);
 
 /**
  * wlan_cm_get_roam_scan_scheme_bitmap() - Get roam scan scheme bitmap value
@@ -936,7 +973,6 @@ QDF_STATUS
 cm_akm_roam_allowed(struct wlan_objmgr_psoc *psoc,
 		    struct wlan_objmgr_vdev *vdev);
 
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 /**
  * cm_invalid_roam_reason_handler() - Handler for invalid roam reason
  * @vdev_id: vdev id
@@ -1029,14 +1065,23 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 					 uint8_t *event,
 					 uint32_t len);
-#endif /* ROAM_TARGET_IF_CONVERGENCE */
-
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
 					uint8_t vdev_id,
 					bool pcl_per_vdev)
 {}
+
+static inline
+uint32_t wlan_cm_get_roam_band_value(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_vdev *vdev)
+{
+	uint32_t current_band;
+
+	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
+
+	return current_band;
+}
 
 static inline
 bool wlan_cm_roam_is_pcl_per_vdev_active(struct wlan_objmgr_psoc *psoc,
@@ -1066,6 +1111,13 @@ wlan_cm_roam_extract_btm_response(wmi_unified_t wmi, void *evt_buf,
 }
 
 static inline QDF_STATUS
+wlan_cm_roam_extract_frame_info(wmi_unified_t wmi, void *evt_buf,
+				struct roam_frame_info *dst, uint8_t idx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
 wlan_cm_roam_extract_roam_initial_info(wmi_unified_t wmi, void *evt_buf,
 				       struct roam_initial_data *dst,
 				       uint8_t idx)
@@ -1090,11 +1142,6 @@ wlan_cm_roam_set_vendor_btm_params(struct wlan_objmgr_psoc *psoc,
 {}
 
 static inline void
-wlan_cm_roam_get_vendor_btm_params(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_cm_roam_vendor_btm_params *param)
-{}
-
-static inline void
 wlan_cm_roam_get_score_delta_params(struct wlan_objmgr_psoc *psoc,
 				    uint8_t vdev_id,
 				    struct roam_trigger_score_delta *param)
@@ -1109,6 +1156,13 @@ static inline QDF_STATUS
 wlan_cm_update_roam_scan_scheme_bitmap(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id,
 				       uint32_t roam_scan_scheme_bitmap)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			      uint32_t roam_band_bitmask)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -1146,7 +1200,6 @@ cm_akm_roam_allowed(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 static inline void
 cm_handle_roam_reason_ho_failed(uint8_t vdev_id, struct qdf_mac_addr bssid,
 				struct cm_hw_mode_trans_ind *hw_mode_trans_ind)
@@ -1157,8 +1210,27 @@ cm_handle_scan_ch_list_data(struct cm_roam_scan_ch_resp *data)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
-#endif
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
+
+#ifdef WLAN_FEATURE_FIPS
+/**
+ * cm_roam_pmkid_req_ind() - Function to handle
+ * roam event from firmware for pmkid generation.
+ * @psoc: psoc pointer
+ * @vdev_id: Vdev id
+ * @bss_list: candidate AP bssid list
+ */
+QDF_STATUS
+cm_roam_pmkid_req_ind(struct wlan_objmgr_psoc *psoc,
+		      uint8_t vdev_id, struct roam_pmkid_req_event *bss_list);
+#else /* WLAN_FEATURE_FIPS */
+static inline QDF_STATUS
+cm_roam_pmkid_req_ind(struct wlan_objmgr_psoc *psoc,
+		      uint8_t vdev_id, struct roam_pmkid_req_event *bss_list)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_FIPS */
 
 /**
  * wlan_get_chan_by_bssid_from_rnr: get chan from rnr through bssid
@@ -1192,7 +1264,6 @@ QDF_STATUS wlan_get_chan_by_link_id_from_rnr(struct wlan_objmgr_vdev *vdev,
 					     uint8_t *chan, uint8_t *op_class);
 #endif
 
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 /**
  * cm_rso_cmd_status_event_handler() - Handler for rso cmd status
  * @vdev_id: vdev id
@@ -1269,7 +1340,7 @@ void cm_handle_roam_reason_suitable_ap(uint8_t vdev_id, uint32_t rssi);
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_roam_event_handler(struct roam_offload_roam_event roam_event);
+cm_roam_event_handler(struct roam_offload_roam_event *roam_event);
 
 /**
  * cm_btm_blacklist_event_handler() - Black list the given BSSID due to btm
@@ -1308,6 +1379,44 @@ cm_handle_disconnect_reason(struct vdev_disconnect_event_data *data);
  */
 QDF_STATUS
 cm_roam_scan_ch_list_event_handler(struct cm_roam_scan_ch_resp *data);
+
+/**
+ * cm_roam_stats_event_handler() - Carries extracted roam stats info
+ * @psoc: PSOC pointer
+ * @stats_info: stats data carried by roam_stats_event
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
+			    struct roam_stats_event *stats_info);
+
+/**
+ * cm_handle_auth_offload() - auth offload evt wrapper for wma
+ * @auth_event: auth offload event data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_handle_auth_offload(struct auth_offload_event *auth_event);
+
+/**
+ * cm_roam_auth_offload_event_handler() - Handler for auth offload event
+ * @auth_event: Authentication event
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_auth_offload_event_handler(struct auth_offload_event *auth_event);
+
+/*
+ * cm_roam_pmkid_request_handler() - Carries extracted pmkid list info
+ * @data: Pmkid event with entries
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_pmkid_request_handler(struct roam_pmkid_req_event *data);
 
 /**
  * cm_roam_update_vdev() - Update the STA and BSS
@@ -1375,12 +1484,4 @@ wlan_cm_fw_to_host_phymode(WMI_HOST_WLAN_PHY_MODE phymode);
 QDF_STATUS
 wlan_cm_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
 				  uint16_t data_len, void *data);
-#else
-static inline QDF_STATUS
-wlan_cm_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
-				  uint16_t data_len, void *data)
-{
-	return QDF_STATUS_E_NOSUPPORT;
-}
-#endif /* ROAM_TARGET_IF_CONVERGENCE */
 #endif  /* WLAN_CM_ROAM_API_H__ */

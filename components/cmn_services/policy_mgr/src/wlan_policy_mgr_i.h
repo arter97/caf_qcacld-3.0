@@ -538,7 +538,9 @@ void policy_mgr_restore_deleted_conn_info(struct wlan_objmgr_psoc *psoc,
 void policy_mgr_update_hw_mode_conn_info(struct wlan_objmgr_psoc *psoc,
 				uint32_t num_vdev_mac_entries,
 				struct policy_mgr_vdev_mac_map *vdev_mac_map,
-				struct policy_mgr_hw_mode_params hw_mode);
+				struct policy_mgr_hw_mode_params hw_mode,
+				uint32_t num_mac_freq,
+				struct policy_mgr_pdev_mac_freq_map *freq_info);
 void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 				uint32_t cfgd_hw_mode_index,
 				uint32_t num_vdev_mac_entries,
@@ -574,11 +576,24 @@ enum policy_mgr_con_mode policy_mgr_get_mode(uint8_t type,
  */
 enum hw_mode_bandwidth policy_mgr_get_bw(enum phy_ch_width chan_width);
 
+/**
+ * policy_mgr_get_channel_list() - Get channel list based on PCL and mode
+ * @psoc: psoc object
+ * @pcl: pcl type
+ * @mode: interface mode
+ * @pcl_channels: pcl channel list buffer
+ * @pcl_weights: pcl weight buffer
+ * @pcl_sz: pcl channel list buffer size
+ * @len: pcl channel number returned from API
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS policy_mgr_get_channel_list(struct wlan_objmgr_psoc *psoc,
-			enum policy_mgr_pcl_type pcl,
-			uint32_t *pcl_channels, uint32_t *len,
-			enum policy_mgr_con_mode mode,
-			uint8_t *pcl_weights, uint32_t weight_len);
+				       enum policy_mgr_pcl_type pcl,
+				       enum policy_mgr_con_mode mode,
+				       uint32_t *pcl_channels,
+				       uint8_t *pcl_weights,
+				       uint32_t pcl_sz, uint32_t *len);
 
 /**
  * policy_mgr_allow_new_home_channel() - Check for allowed number of
@@ -665,6 +680,68 @@ enum policy_mgr_conc_next_action
 
 QDF_STATUS policy_mgr_reset_sap_mandatory_channels(
 		struct policy_mgr_psoc_priv_obj *pm_ctx);
+
+/**
+ * policy_mgr_update_hw_mode_list() - Function to print frequency range
+ * for both MAC 0 and MAC1 for given Hw mode
+ *
+ * @freq_range: Policy Mgr context
+ * @hw_mode: HW mode
+ *
+ * This Function will print frequency range for both MAC 0 and MAC1 for given
+ * Hw mode
+ *
+ * Return: void
+ *
+ */
+void
+policy_mgr_dump_freq_range_per_mac(struct policy_mgr_freq_range *freq_range,
+				   enum policy_mgr_mode hw_mode);
+
+/**
+ * policy_mgr_fill_curr_mac_freq_by_hwmode() - Fill Current Mac frequency with
+ * the frequency range of the given Hw Mode
+ *
+ * @pm_ctx: Policy Mgr context
+ * @mode_hw: Policy Mgr Hw mode
+ *
+ * Fill Current Mac frequency with the frequency range of the given Hw Mode
+ *
+ * Return: None
+ */
+void
+policy_mgr_fill_curr_mac_freq_by_hwmode(struct policy_mgr_psoc_priv_obj *pm_ctx,
+					enum policy_mgr_mode mode_hw);
+
+/**
+ * policy_mgr_update_hw_mode_list() - Function to print every frequency range
+ * for both MAC 0 and MAC1 for every Hw mode
+ *
+ * @pm_ctx: Policy Mgr context
+ *
+ * This function will print every frequency range
+ * for both MAC 0 and MAC1 for every Hw mode
+ *
+ * Return: void
+ *
+ */
+void
+policy_mgr_dump_freq_range(struct policy_mgr_psoc_priv_obj *pm_ctx);
+
+/**
+ * policy_mgr_dump_curr_freq_range() - Function to print current frequency range
+ * for both MAC 0 and MAC1
+ *
+ * @pm_ctx: Policy Mgr context
+ *
+ * This function will print current frequency range
+ * for both MAC 0 and MAC1 for every Hw mode
+ *
+ * Return: void
+ *
+ */
+void
+policy_mgr_dump_curr_freq_range(struct policy_mgr_psoc_priv_obj *pm_ctx);
 
 /**
  * policy_mgr_reg_chan_change_callback() - Callback to be

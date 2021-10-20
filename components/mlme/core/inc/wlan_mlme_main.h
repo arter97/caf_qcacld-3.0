@@ -22,6 +22,7 @@
 #ifndef _WLAN_MLME_MAIN_H_
 #define _WLAN_MLME_MAIN_H_
 
+#include "qdf_periodic_work.h"
 #include <wlan_mlme_public_struct.h>
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_objmgr_global_obj.h>
@@ -392,6 +393,7 @@ struct wait_for_key_timer {
  * @hb_failure_rssi: heartbeat failure AP RSSI
  * @opr_rate_set: operational rates set
  * @ext_opr_rate_set: extended operational rates set
+ * @mcs_rate_set: MCS Based rates set
  * @mscs_req_info: Information related to mscs request
  * @he_config: he config
  * @he_sta_obsspd: he_sta_obsspd
@@ -404,6 +406,7 @@ struct wait_for_key_timer {
  * @last_delba_sent_time: Last delba sent time to handle back to back delba
  *			  requests from some IOT APs
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
+ * @is_usr_ps_enabled: Is Power save enabled
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -427,6 +430,7 @@ struct mlme_legacy_priv {
 	uint32_t hb_failure_rssi;
 	struct mlme_cfg_str opr_rate_set;
 	struct mlme_cfg_str ext_opr_rate_set;
+	struct mlme_cfg_str mcs_rate_set;
 	bool twt_wait_for_notify;
 #ifdef WLAN_FEATURE_MSCS
 	struct mscs_req_info mscs_req_info;
@@ -442,6 +446,7 @@ struct mlme_legacy_priv {
 #endif
 	qdf_time_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
+	bool is_usr_ps_enabled;
 };
 
 /**

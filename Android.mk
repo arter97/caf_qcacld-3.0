@@ -17,6 +17,10 @@ ENABLE_QCACLD := true
 endif
 endif
 
+ifeq ($(BOARD_COMMON_DIR),)
+    BOARD_COMMON_DIR := device/qcom/common
+endif
+
 ifeq  ($(ENABLE_QCACLD), true)
 
 # Assume no targets will be supported
@@ -96,7 +100,7 @@ endif
 
 # DLKM_DIR was moved for JELLY_BEAN (PLATFORM_SDK 16)
 ifeq ($(call is-platform-sdk-version-at-least,16),true)
-	DLKM_DIR := $(TOP)/device/qcom/common/dlkm
+	DLKM_DIR := $(TOP)/$(BOARD_COMMON_DIR)/dlkm
 else
 	DLKM_DIR := build/dlkm
 endif # platform-sdk-version
@@ -147,6 +151,20 @@ else
 TARGET_FW_PATH := $(TARGET_OUT_ETC)/$(TARGET_FW_DIR)
 endif
 
+# WLAN_PLATFORM_KBUILD_OPTIONS should be passed from upper level Makefiles
+# like wlan.mk. It indicates sources of CNSS family drivers (cnss2, cnss_nl,
+# cnss_prealloc and cnss_utils etc.) are built out of kernel tree and it
+# should also include all necessary config flags (e.g. CONFIG_CNSS2) which
+# are originally defined from kernel Kconfig/defconfig. KBUILD_EXTRA_SYMBOLS
+# is also needed to indicate all the symbols from these drivers.
+ifneq ($(WLAN_PLATFORM_KBUILD_OPTIONS),)
+KBUILD_OPTIONS += $(foreach wlan_platform_kbuild_option, \
+		   $(WLAN_PLATFORM_KBUILD_OPTIONS), \
+		   $(wlan_platform_kbuild_option))
+
+KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(shell pwd)/$(call intermediates-dir-for,DLKM,wlan-platform-module-symvers)/Module.symvers
+endif
+
 include $(CLEAR_VARS)
 
 # Create the module
@@ -191,6 +209,12 @@ $(call symlink-file,,$(TARGET_CFG_PATH)/WCNSS_qcom_cfg.ini,$(TARGET_FW_PATH)/WCN
 LOCAL_ADDITIONAL_DEPENDENCIES += $(TARGET_FW_PATH)/WCNSS_qcom_cfg.ini
 $(call wlog,"generate soft link because GENERIC_ODM_IMAGE not true")
 endif
+endif
+
+# Set dependencies so that CNSS family drivers can be compiled ahead.
+ifneq ($(WLAN_PLATFORM_KBUILD_OPTIONS),)
+LOCAL_REQUIRED_MODULES := wlan-platform-module-symvers
+LOCAL_ADDITIONAL_DEPENDENCIES += $(call intermediates-dir-for,DLKM,wlan-platform-module-symvers)/Module.symvers
 endif
 
 $(call wlog,TARGET_USES_KERNEL_PLATFORM=$(TARGET_USES_KERNEL_PLATFORM))

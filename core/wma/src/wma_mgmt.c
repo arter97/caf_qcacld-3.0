@@ -344,6 +344,10 @@ int wma_peer_sta_kickout_event_handler(void *handle, uint8_t *event,
 			 QDF_MAC_ADDR_REF(macaddr));
 		return -EINVAL;
 	}
+
+	if (!wma_is_vdev_valid(vdev_id))
+		return -EINVAL;
+
 	vdev = wma->interfaces[vdev_id].vdev;
 	if (!vdev) {
 		wma_err("Not able to find vdev for VDEV_%d", vdev_id);
@@ -1383,7 +1387,8 @@ QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 		phymode = vdev_phymode;
 	}
 
-	if (!mac->mlme_cfg->rates.disable_abg_rate_txdata) {
+	if (!mac->mlme_cfg->rates.disable_abg_rate_txdata &&
+	    !WLAN_REG_IS_6GHZ_CHAN_FREQ(des_chan->ch_freq)) {
 		/* Legacy Rateset */
 		rate_pos = (uint8_t *) peer_legacy_rates.rates;
 		for (i = 0; i < SIR_NUM_11B_RATES; i++) {
@@ -2070,6 +2075,49 @@ static int wmi_unified_probe_rsp_tmpl_send(tp_wma_handle wma,
 						   &params);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wma_upt_mlo_partner_info() - update mlo info in beacon template
+ * @params: beacon template params
+ * @bcn_param: beacon params
+ * @bytes_to_strip: bytes to strip
+ *
+ * Return: Void
+ */
+static void wma_upt_mlo_partner_info(struct beacon_tmpl_params *params,
+				     const tpSendbeaconParams bcn_param,
+				     uint8_t bytes_to_strip)
+{
+	struct ml_bcn_partner_info *bcn_info;
+	struct ml_bcn_partner_info *info;
+	int link;
+
+	params->mlo_partner.num_links = bcn_param->mlo_partner.num_links;
+	for (link = 0; link < params->mlo_partner.num_links; link++) {
+		bcn_info = &bcn_param->mlo_partner.partner_info[link];
+		info = &params->mlo_partner.partner_info[link];
+		info->vdev_id = bcn_info->vdev_id;
+		info->beacon_interval = bcn_info->beacon_interval;
+		if (bcn_info->csa_switch_count_offset &&
+		    bcn_info->csa_switch_count_offset > bytes_to_strip)
+			info->csa_switch_count_offset =
+				bcn_info->csa_switch_count_offset -
+					bytes_to_strip;
+		if (bcn_info->ext_csa_switch_count_offset &&
+		    bcn_info->ext_csa_switch_count_offset > bytes_to_strip)
+			info->ext_csa_switch_count_offset =
+				bcn_info->ext_csa_switch_count_offset -
+					bytes_to_strip;
+	}
+}
+#else
+static void wma_upt_mlo_partner_info(struct beacon_tmpl_params *params,
+				     const tpSendbeaconParams bcn_param,
+				     uint8_t bytes_to_strip)
+{
+}
+#endif
+
 /**
  * wma_unified_bcn_tmpl_send() - send beacon template to fw
  * @wma:wma handle
@@ -2160,6 +2208,8 @@ static QDF_STATUS wma_unified_bcn_tmpl_send(tp_wma_handle wma,
 	    (bcn_info->ecsa_count_offset > bytes_to_strip))
 		params.ext_csa_switch_count_offset =
 			bcn_info->ecsa_count_offset - bytes_to_strip;
+
+	wma_upt_mlo_partner_info(&params, bcn_info, bytes_to_strip);
 
 	ret = wmi_unified_beacon_tmpl_send_cmd(wma->wmi_handle,
 				 &params);
@@ -2592,6 +2642,7 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 					  uint32_t desc_id, uint32_t status)
 {
 	struct wlan_objmgr_pdev *pdev;
+	void *frame_data;
 	qdf_nbuf_t buf = NULL;
 	QDF_STATUS ret;
 #if !defined(REMOVE_PKT_LOG)
@@ -2630,8 +2681,13 @@ static int wma_process_mgmt_tx_completion(tp_wma_handle wma_handle,
 			      buf, pktdump_status, TX_MGMT_PKT);
 #endif
 
+	if (wma_handle->is_mgmt_data_valid)
+		frame_data = &wma_handle->mgmt_data;
+	else
+		frame_data = &mgmt_params;
+
 	ret = mgmt_txrx_tx_completion_handler(pdev, desc_id, status,
-					      &mgmt_params);
+					      frame_data);
 
 	if (ret != QDF_STATUS_SUCCESS) {
 		wma_err("Failed to process mgmt tx completion");

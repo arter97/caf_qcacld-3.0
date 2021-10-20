@@ -27,12 +27,14 @@
 /* Maximum number of REO rings supported (for stats tracking) */
 #ifdef CONFIG_BERYLLIUM
 #define DP_RX_TM_MAX_REO_RINGS 8
-#else
-#define DP_RX_TM_MAX_REO_RINGS 4
-#endif
-
 /* Number of DP RX threads supported */
 #define DP_MAX_RX_THREADS 3
+#else
+#define DP_RX_TM_MAX_REO_RINGS 4
+#define DP_MAX_RX_THREADS DP_RX_TM_MAX_REO_RINGS
+#endif
+
+#define DP_REDUCED_NUM_RX_THREADS 3
 
 /*
  * struct dp_rx_tm_handle_cmn - Opaque handle for rx_threads to store
@@ -57,6 +59,7 @@ struct dp_rx_tm_handle_cmn;
  * @dropped_invalid_peer: packets(nbuf_list) dropped due to no peer
  * @dropped_others: packets dropped due to other reasons
  * @dropped_enq_fail: packets dropped due to pending queue full
+ * @rx_nbufq_loop_yield: rx loop yield counter
  */
 struct dp_rx_thread_stats {
 	unsigned int nbuf_queued[DP_RX_TM_MAX_REO_RINGS];
@@ -72,6 +75,7 @@ struct dp_rx_thread_stats {
 	unsigned int dropped_invalid_os_rx_handles;
 	unsigned int dropped_others;
 	unsigned int dropped_enq_fail;
+	unsigned int rx_nbufq_loop_yield;
 };
 
 /**

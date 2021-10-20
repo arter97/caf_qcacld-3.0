@@ -631,7 +631,10 @@ static bool put_wifi_interface_info(struct wifi_interface_info *stats,
 		    REG_ALPHA2_LEN + 1, stats->apCountryStr) ||
 	    nla_put(vendor_event,
 		    QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_COUNTRY_STR,
-		    REG_ALPHA2_LEN + 1, stats->countryStr)) {
+		    REG_ALPHA2_LEN + 1, stats->countryStr) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_TS_DUTY_CYCLE,
+			stats->time_slice_duty_cycle)) {
 		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
 		return false;
 	}
@@ -1299,8 +1302,12 @@ static void hdd_process_ll_stats(tSirLLStatsResults *results,
 	struct hdd_ll_stats *stats = NULL;
 	size_t stat_size = 0;
 
-	if (!(priv->request_bitmap & results->paramId))
+	qdf_spin_lock(&priv->ll_stats_lock);
+
+	if (!(priv->request_bitmap & results->paramId)) {
+		qdf_spin_unlock(&priv->ll_stats_lock);
 		return;
+	}
 
 	if (results->paramId & WMI_LINK_STATS_RADIO) {
 		struct wifi_radio_stats *rs_results, *stat_result;
@@ -1434,9 +1441,20 @@ static void hdd_process_ll_stats(tSirLLStatsResults *results,
 	if (stats)
 		qdf_list_insert_back(&priv->ll_stats_q, &stats->ll_stats_node);
 
-	if (!priv->request_bitmap)
+	if (!priv->request_bitmap) {
 exit:
+		qdf_spin_unlock(&priv->ll_stats_lock);
+
+		/* Thread which invokes this function has allocated memory in
+		 * WMA for radio stats, that memory should be freed from the
+		 * same thread to avoid any race conditions between two threads
+		 */
+		sme_radio_tx_mem_free();
 		osif_request_complete(request);
+		return;
+	}
+
+	qdf_spin_unlock(&priv->ll_stats_lock);
 }
 
 static void hdd_debugfs_process_ll_stats(struct hdd_adapter *adapter,
@@ -1474,8 +1492,15 @@ static void hdd_debugfs_process_ll_stats(struct hdd_adapter *adapter,
 		hdd_err("INVALID LL_STATS_NOTIFY RESPONSE");
 	}
 
-	if (!priv->request_bitmap)
+	if (!priv->request_bitmap) {
+		/* Thread which invokes this function has allocated memory in
+		 * WMA for radio stats, that memory should be freed from the
+		 * same thread to avoid any race conditions between two threads
+		 */
+		sme_radio_tx_mem_free();
 		osif_request_complete(request);
+	}
+
 }
 
 void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
@@ -1527,10 +1552,7 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 		if (results->rspId == DEBUGFS_LLSTATS_REQID) {
 			hdd_debugfs_process_ll_stats(adapter, results, request);
 		 } else {
-			qdf_spin_lock(&priv->ll_stats_lock);
-			if (priv->request_bitmap)
-				hdd_process_ll_stats(results, request);
-			qdf_spin_unlock(&priv->ll_stats_lock);
+			hdd_process_ll_stats(results, request);
 		}
 
 		osif_request_put(request);
@@ -2003,11 +2025,12 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 		qdf_spin_lock(&priv->ll_stats_lock);
 		priv->request_bitmap = 0;
 		qdf_spin_unlock(&priv->ll_stats_lock);
+		sme_radio_tx_mem_free();
 		ret = -ETIMEDOUT;
 	} else {
 		hdd_update_station_stats_cached_timestamp(adapter);
 	}
-	sme_radio_tx_mem_free();
+
 	qdf_spin_lock(&priv->ll_stats_lock);
 	status = qdf_list_remove_front(&priv->ll_stats_q, &ll_node);
 	qdf_spin_unlock(&priv->ll_stats_lock);
@@ -2091,7 +2114,7 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 	struct net_device *dev = wdev->netdev;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
-	/* ENTER() intentionally not used in a frequently invoked API */
+	hdd_enter_dev(dev);
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
 		hdd_err("Command not allowed in FTM mode");
@@ -2240,8 +2263,10 @@ int wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 		return errno;
 
 	errno = wlan_hdd_qmi_get_sync_resume(hdd_ctx, qdf_ctx->dev);
-	if (errno)
+	if (errno) {
+		hdd_err("qmi sync resume failed: %d", errno);
 		goto end;
+	}
 
 	errno = __wlan_hdd_cfg80211_ll_stats_get(wiphy, wdev, data, data_len);
 
@@ -4974,12 +4999,12 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 	bool is_vht20_mcs9 = false;
 	uint16_t he_mcs_12_13_map = 0;
 	uint16_t current_rate = 0;
-	qdf_size_t or_leng = CSR_DOT11_SUPPORTED_RATES_MAX;
+	qdf_size_t or_leng;
 	uint8_t operational_rates[CSR_DOT11_SUPPORTED_RATES_MAX];
 	uint8_t extended_rates[CSR_DOT11_EXTENDED_SUPPORTED_RATES_MAX];
-	qdf_size_t er_leng = CSR_DOT11_EXTENDED_SUPPORTED_RATES_MAX;
+	qdf_size_t er_leng;
 	uint8_t mcs_rates[SIZE_OF_BASIC_MCS_SET];
-	qdf_size_t mcs_leng = SIZE_OF_BASIC_MCS_SET;
+	qdf_size_t mcs_len;
 	struct index_data_rate_type *supported_mcs_rate;
 	enum data_rate_11ac_max_mcs vht_max_mcs;
 	uint8_t max_mcs_idx = 0;
@@ -5027,14 +5052,8 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 	}
 
 	/* Get Basic Rate Set */
-	if (0 != ucfg_mlme_get_opr_rate(vdev, operational_rates,
-					&or_leng)) {
-		hdd_err("cfg get returned failure");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-		/*To keep GUI happy */
-		return false;
-	}
-
+	or_leng = ucfg_mlme_get_opr_rate(vdev, operational_rates,
+					 sizeof(operational_rates));
 	for (i = 0; i < or_leng; i++) {
 		for (j = 0;
 			 j < ARRAY_SIZE(supported_data_rate); j++) {
@@ -5052,14 +5071,8 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 	}
 
 	/* Get Extended Rate Set */
-	if (0 != ucfg_mlme_get_ext_opr_rate(vdev, extended_rates,
-					    &er_leng)) {
-		hdd_err("cfg get returned failure");
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-		/*To keep GUI happy */
-		return false;
-	}
-
+	er_leng = ucfg_mlme_get_ext_opr_rate(vdev, extended_rates,
+					     sizeof(extended_rates));
 	he_mcs_12_13_map = wlan_vdev_mlme_get_he_mcs_12_13_map(vdev);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
@@ -5080,15 +5093,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 	 * actual speed
 	 */
 	if ((3 != rssidx) && !(rate_flags & TX_RATE_LEGACY)) {
-		if (0 != ucfg_mlme_get_current_mcs_set(hdd_ctx->psoc,
-						       mcs_rates,
-						       &mcs_leng)) {
-			hdd_err("cfg get returned failure");
-			/*To keep GUI happy */
-			return false;
-		}
 		rate_flag = 0;
-
 		if (rate_flags & (TX_RATE_VHT80 | TX_RATE_HE80 |
 				TX_RATE_HE160 | TX_RATE_VHT160))
 			mode = 2;
@@ -5152,6 +5157,15 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 			max_mcs_idx = (max_mcs_idx > mcs_index) ?
 				max_mcs_idx : mcs_index;
 		} else {
+			mcs_len = ucfg_mlme_get_mcs_rate(adapter->vdev,
+							 mcs_rates,
+							 sizeof(mcs_rates));
+			if (!mcs_len) {
+				hdd_err("Failed to get current mcs rate set");
+				/*To keep GUI happy */
+				return false;
+			}
+
 			if (rate_flags & TX_RATE_HT40)
 				rate_flag |= 1;
 			if (rate_flags & TX_RATE_SGI)
@@ -5172,7 +5186,7 @@ bool hdd_report_max_rate(struct hdd_adapter *adapter,
 				}
 			}
 
-			for (i = 0; i < mcs_leng; i++) {
+			for (i = 0; i < mcs_len; i++) {
 				for (j = 0; j < max_ht_idx; j++) {
 					if (supported_mcs_rate[j].
 						beacon_rate_index ==
@@ -5669,8 +5683,10 @@ static int _wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 
 	if (get_station_fw_request_needed) {
 		errno = wlan_hdd_qmi_get_sync_resume(hdd_ctx, qdf_ctx->dev);
-		if (errno)
+		if (errno) {
+			hdd_err("qmi sync resume failed: %d", errno);
 			return errno;
+		}
 	}
 
 	errno = __wlan_hdd_cfg80211_get_station(wiphy, dev, mac, sinfo);

@@ -56,6 +56,24 @@ static void dp_rx_refill_thread_schedule(ol_txrx_soc_handle soc)
 }
 #endif
 
+/**
+ * dp_get_rx_threads_num() - Get number of threads in use
+ * @soc: ol_txrx_soc_handle object
+ *
+ * Return: number of threads
+ */
+#ifdef WLAN_FEATURE_REDUCE_RX_THREADS
+static uint8_t dp_get_rx_threads_num(ol_txrx_soc_handle soc)
+{
+	return DP_REDUCED_NUM_RX_THREADS;
+}
+#else
+static uint8_t dp_get_rx_threads_num(ol_txrx_soc_handle soc)
+{
+	return cdp_get_num_rx_contexts(soc);
+}
+#endif
+
 QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 			struct dp_txrx_config *config)
 {
@@ -106,8 +124,8 @@ QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
 						dp_rx_refill_thread_schedule);
 	}
 
-	/* Get num Rx thread config from INI? */
-	num_dp_rx_threads = 3;
+	num_dp_rx_threads = dp_get_rx_threads_num(soc);
+	dp_info("%d RX threads in use", num_dp_rx_threads);
 
 	if (dp_ext_hdl->config.enable_rx_threads) {
 		qdf_status = dp_rx_tm_init(&dp_ext_hdl->rx_tm_hdl,
@@ -955,5 +973,21 @@ void dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned)
 
 	if (i == QDF_ARRAY_SIZE(g_dp_consistent_unaligned_allocs))
 		dp_err("unable to find vaddr %pK", va_unaligned);
+}
+#endif
+
+#ifdef FEATURE_RUNTIME_PM
+uint32_t dp_get_tx_inqueue(ol_txrx_soc_handle soc)
+{
+	struct dp_soc *dp_soc;
+
+	dp_soc = cdp_soc_t_to_dp_soc(soc);
+
+	return qdf_atomic_read(&dp_soc->tx_pending_rtpm);
+}
+#else
+uint32_t dp_get_tx_inqueue(ol_txrx_soc_handle soc)
+{
+	return 0;
 }
 #endif

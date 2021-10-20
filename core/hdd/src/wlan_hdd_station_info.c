@@ -744,6 +744,11 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
+	if (hdd_cm_is_vdev_connected(adapter)) {
+		hdd_err("Station is connected, command is not supported");
+		return -EINVAL;
+	}
+
 	nl_buf_len = NLMSG_HDRLEN;
 	nl_buf_len += sizeof(hdd_sta_ctx->
 				cache_conn_info.last_ssid.SSID.length) +
@@ -2239,7 +2244,7 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 	if (!stainfo) {
 		hdd_err_rl("Failed to get peer STA " QDF_MAC_ADDR_FMT,
 			   QDF_MAC_ADDR_REF(mac_addr.bytes));
-		return -EINVAL;
+		return -ENXIO;
 	}
 
 	is_associated = hdd_is_peer_associated(adapter, &mac_addr);
