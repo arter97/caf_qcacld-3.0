@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -233,46 +233,6 @@ int hdd_start_tsf_sync(struct hdd_adapter *adapter);
 int hdd_stop_tsf_sync(struct hdd_adapter *adapter);
 
 /**
- * hdd_tsf_notify_wlan_state_change() -
- *     notify tsf module of wlan connection state
- * @old_state: old wlan state
- * @new_state: new wlan state
- *
- * This function check the old and new connection state, determine whether
- * to start or stop tsf sync
- *
- * Return: nothing
- */
-void hdd_tsf_notify_wlan_state_change(struct hdd_adapter *adapter,
-				      eConnectionState old_state,
-				      eConnectionState new_state);
-
-/**
- * hdd_tx_timestamp() - time stamp TX netbuf
- *
- * @netbuf: pointer to a TX netbuf
- * @target_time: TX time for the netbuf
- *
- * This function  get corresponding host time from target time,
- * and time stamp the TX netbuf with this time
- *
- * Return: Describe the execute result of this routine
- */
-int hdd_tx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
-
-/**
- * hdd_rx_timestamp() - time stamp RX netbuf
- *
- * @netbuf: pointer to a RX netbuf
- * @target_time: RX time for the netbuf
- *
- * This function get corresponding host time from target time,
- * and time stamp the RX netbuf with this time
- *
- * Return: Describe the execute result of this routine
- */
-int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
-/**
  * hdd_capture_req_timer_expired_handler() - capture req timer handler
  * @arg: pointer to a adapter
  *
@@ -292,6 +252,21 @@ void hdd_capture_req_timer_expired_handler(void *arg);
  * Return: true on enable, false on disable
  */
 bool hdd_tsf_is_tsf64_tx_set(struct hdd_context *hdd);
+
+#ifdef WLAN_FEATURE_TSF_PLUS_SOCK_TS
+/**
+ * hdd_rx_timestamp() - time stamp RX netbuf
+ *
+ * @netbuf: pointer to a RX netbuf
+ * @target_time: RX time for the netbuf
+ *
+ * This function get corresponding host time from target time,
+ * and time stamp the RX netbuf with this time
+ *
+ * Return: Describe the execute result of this routine
+ */
+int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
+#endif
 #else
 static inline int hdd_start_tsf_sync(struct hdd_adapter *adapter)
 {
@@ -299,26 +274,6 @@ static inline int hdd_start_tsf_sync(struct hdd_adapter *adapter)
 }
 
 static inline int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
-{
-	return -ENOTSUPP;
-}
-
-static inline
-void hdd_tsf_notify_wlan_state_change(struct hdd_adapter *adapter,
-				      eConnectionState old_state,
-				      eConnectionState new_state)
-
-{
-}
-
-static inline
-int hdd_tx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time)
-{
-	return -ENOTSUPP;
-}
-
-static inline
-int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time)
 {
 	return -ENOTSUPP;
 }

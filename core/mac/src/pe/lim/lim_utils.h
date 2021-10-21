@@ -39,6 +39,16 @@
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_qct_sys.h"
 
+#define LIM_QOS_AP_SUPPORTS_UAPSD         0x80
+
+#define LIM_IS_QOS_BSS(ie_struct)  \
+		(ie_struct->WMMParams.present || ie_struct->WMMInfoAp.present)
+
+#define LIM_IS_UAPSD_BSS(ie_struct) \
+	((ie_struct->WMMParams.present && \
+	 (ie_struct->WMMParams.qosInfo & LIM_QOS_AP_SUPPORTS_UAPSD)) || \
+	 (ie_struct->WMMInfoAp.present && ie_struct->WMMInfoAp.uapsd))
+
 #define LIM_AID_MASK                              0xC000
 #define LIM_SPECTRUM_MANAGEMENT_BIT_MASK          0x0100
 #define LIM_RRM_BIT_MASK                          0x1000
@@ -326,6 +336,19 @@ void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type
  * Return: None
  */
 void lim_deactivate_timers(struct mac_context *mac_ctx);
+
+/*
+ * lim_deactivate_timers_for_vdev() - Deactivate lim connection timers
+ * @mac_ctx: Pointer to global mac structure
+ * @vdev_id: vdev id
+ *
+ * This function is used to trigger timeout of lim connection timers to abort
+ * connect request.
+ *
+ * Return: None
+ */
+void lim_deactivate_timers_for_vdev(struct mac_context *mac_ctx,
+				    uint8_t vdev_id);
 
 /*
  * The below 'product' check tobe removed if 'Association' is

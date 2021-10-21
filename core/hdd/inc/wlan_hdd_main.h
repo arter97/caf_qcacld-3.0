@@ -246,6 +246,7 @@ static inline bool in_compat_syscall(void) { return is_compat_task(); }
  * @DEVICE_IFACE_OPENED: Adapter has been "opened" via the kernel
  * @SOFTAP_INIT_DONE: Software Access Point (SAP) is initialized
  * @VENDOR_ACS_RESPONSE_PENDING: Waiting for event for vendor acs
+ * @WDEV_ONLY_REGISTERED: Only WDEV is registered
  */
 enum hdd_adapter_flags {
 	NET_DEVICE_REGISTERED,
@@ -256,6 +257,7 @@ enum hdd_adapter_flags {
 	DEVICE_IFACE_OPENED,
 	SOFTAP_INIT_DONE,
 	VENDOR_ACS_RESPONSE_PENDING,
+	WDEV_ONLY_REGISTERED,
 };
 
 /**
@@ -268,8 +270,6 @@ enum hdd_nb_cmd_id {
 	INTERFACE_DOWN
 };
 
-#define WLAN_WAIT_DISCONNECT_ALREADY_IN_PROGRESS  1000
-#define WLAN_WAIT_TIME_STOP_ROAM  4000
 #define WLAN_WAIT_TIME_STATS       800
 #define WLAN_WAIT_TIME_LINK_STATUS 800
 
@@ -1218,6 +1218,7 @@ struct hdd_context;
  * @delete_in_progress: Flag to indicate that the adapter delete is in
  *			progress, and any operation using rtnl lock inside
  *			the driver can be avoided/skipped.
+ * @mon_adapter: hdd_adapter of monitor mode.
  */
 struct hdd_adapter {
 	/* Magic cookie for adapter sanity verification.  Note that this
@@ -1260,6 +1261,8 @@ struct hdd_adapter {
 
 	/** Current MAC Address for the adapter  */
 	struct qdf_mac_addr mac_addr;
+	/* MLD address for adapter */
+	struct qdf_mac_addr mld_addr;
 
 #ifdef WLAN_NUD_TRACKING
 	struct hdd_nud_tracking_info nud_tracking;
@@ -1531,6 +1534,12 @@ struct hdd_adapter {
 	bool delete_in_progress;
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 	struct big_data_stats_event big_data_stats;
+#endif
+#ifdef WLAN_FEATURE_PKT_CAPTURE
+	struct hdd_adapter *mon_adapter;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct hdd_mlo_adapter_info mlo_adapter_info;
 #endif
 };
 
@@ -2224,7 +2233,7 @@ struct hdd_context {
 #endif
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
-	qdf_time_t bw_vote_time;
+	uint64_t bw_vote_time;
 	struct hdd_dual_sta_policy dual_sta_policy;
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct hdd_mld_mac_info mld_mac_info;
@@ -2609,25 +2618,26 @@ void hdd_adapter_dev_put_debug(struct hdd_adapter *adapter,
 							next_adapter, dbgid))
 
 /**
- * wlan_hdd_get_adapter_by_vdev_id_from_objmgr() - Fetch adapter from objmgr
- * using vdev_id.
- * @hdd_ctx: the global HDD context
- * @adapter: an hdd_adapter double pointer to store the address of the adapter
+ * wlan_hdd_get_adapter_from_objmgr() - Fetch adapter from objmgr
  * @vdev: the vdev whose corresponding adapter has to be fetched
  *
- * Return: QDF_STATUS
+ * Return: the address of the adapter
  */
-QDF_STATUS
-wlan_hdd_get_adapter_by_vdev_id_from_objmgr(struct hdd_context *hdd_ctx,
-					    struct hdd_adapter **adapter,
-					    struct wlan_objmgr_vdev *vdev);
+struct hdd_adapter *
+wlan_hdd_get_adapter_from_objmgr(struct wlan_objmgr_vdev *vdev);
 
 struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 				     uint8_t session_type,
 				     const char *name, tSirMacAddr mac_addr,
 				     unsigned char name_assign_type,
-				     bool rtnl_held);
+				     bool rtnl_held,
+				     struct hdd_adapter_create_param *params);
 
+QDF_STATUS hdd_open_adapter_no_trans(struct hdd_context *hdd_ctx,
+				     enum QDF_OPMODE op_mode,
+				     const char *iface_name,
+				     uint8_t *mac_addr_bytes,
+				     struct hdd_adapter_create_param *params);
 /**
  * hdd_close_adapter() - remove and free @adapter from the adapter list
  * @hdd_ctx: The Hdd context containing the adapter list
@@ -4625,6 +4635,13 @@ int hdd_psoc_idle_shutdown(struct device *dev);
 int hdd_psoc_idle_restart(struct device *dev);
 
 /**
+ * hdd_adapter_is_ap() - whether adapter is ap or not
+ * @adapter: adapter to check
+ * Return: true if it is AP
+ */
+bool hdd_adapter_is_ap(struct hdd_adapter *adapter);
+
+/**
  * hdd_common_roam_callback() - common sme roam callback
  * @psoc: Object Manager Psoc
  * @session_id: session id for which callback is called
@@ -4675,6 +4692,22 @@ void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
 void
 wlan_hdd_del_p2p_interface(struct hdd_context *hdd_ctx);
 
+/**
+ * hdd_reset_monitor_interface() - reset monitor interface flags
+ * @sta_adapter: station adapter
+ *
+ * Return: void
+ */
+void hdd_reset_monitor_interface(struct hdd_adapter *sta_adapter);
+
+/**
+ * hdd_is_pkt_capture_mon_enable() - Is packet capture monitor mode enable
+ * @sta_adapter: station adapter
+ *
+ * Return: status of packet capture monitor adapter
+ */
+struct hdd_adapter *
+hdd_is_pkt_capture_mon_enable(struct hdd_adapter *sta_adapter);
 #else
 static inline
 void wlan_hdd_del_monitor(struct hdd_context *hdd_ctx,
@@ -4691,6 +4724,15 @@ bool wlan_hdd_is_mon_concurrency(void)
 static inline
 void wlan_hdd_del_p2p_interface(struct hdd_context *hdd_ctx)
 {
+}
+
+static inline void hdd_reset_monitor_interface(struct hdd_adapter *sta_adapter)
+{
+}
+
+static inline int hdd_is_pkt_capture_mon_enable(struct hdd_adapter *adapter)
+{
+	return 0;
 }
 #endif /* WLAN_FEATURE_PKT_CAPTURE */
 /**
@@ -4958,4 +5000,23 @@ uint8_t *hdd_ch_width_str(enum phy_ch_width ch_width);
  */
 int hdd_we_set_ch_width(struct hdd_adapter *adapter, int ch_width);
 
+/**
+ * hdd_stop_adapter_ext: close/delete the vdev session in host/fw.
+ * @hdd_context: HDD context
+ * @adapter: Pointer to hdd_adapter
+ *
+ * Close/delete the vdev session in host/firmware.
+ */
+QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
+				struct hdd_adapter *adapter);
+
+/**
+ * hdd_check_for_net_dev_ref_leak: check for vdev reference leak in driver
+ * @adapter: Pointer to hdd_adapter
+ *
+ * various function take netdev reference to get protected against netdev
+ * getting deleted in parallel, check if all those references are cleanly
+ * released.
+ */
+void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

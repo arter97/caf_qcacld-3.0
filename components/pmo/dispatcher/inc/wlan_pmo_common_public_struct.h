@@ -285,6 +285,30 @@ enum pmo_gpio_wakeup_mode {
 	PMO_GPIO_WAKEUP_MODE_LOW,
 };
 
+#ifdef WLAN_FEATURE_ICMP_OFFLOAD
+#define ICMP_MAX_IPV6_ADDRESS 16
+
+/**
+ * pmo_icmp_offload - structure to hold icmp param
+ *
+ * @vdev_id: vdev id
+ * @enable: enable/disable
+ * @trigger: icmp offload trigger information
+ * @ipv6_count: number of host ipv6 address
+ * @ipv4_addr: host interface ipv4 address
+ * @ipv6_addr: array of host ipv6 address
+ *
+ **/
+struct pmo_icmp_offload {
+	uint8_t vdev_id;
+	bool enable;
+	enum pmo_offload_trigger trigger;
+	uint8_t ipv6_count;
+	uint8_t ipv4_addr[QDF_IPV4_ADDR_SIZE];
+	uint8_t ipv6_addr[ICMP_MAX_IPV6_ADDRESS][QDF_IPV6_ADDR_SIZE];
+};
+#endif
+
 /**
  * struct pmo_psoc_cfg - user configuration required for pmo
  * @ptrn_match_enable_all_vdev: true when pattern match is enable for all vdev
@@ -349,6 +373,8 @@ enum pmo_gpio_wakeup_mode {
  * @igmp_version_support: igmp version support
  * @igmp_offload_enable: enable/disable igmp offload feature to fw
  * @disconnect_sap_tdls_in_wow: sap/p2p_go disconnect or teardown tdls link
+ * @is_icmp_offload_enable: true if icmp offload is supported
+ *	for psoc else false
  */
 struct pmo_psoc_cfg {
 	bool ptrn_match_enable_all_vdev;
@@ -427,6 +453,9 @@ struct pmo_psoc_cfg {
 	bool igmp_offload_enable;
 #endif
 	bool disconnect_sap_tdls_in_wow;
+#ifdef WLAN_FEATURE_ICMP_OFFLOAD
+	bool is_icmp_offload_enable;
+#endif
 };
 
 /**

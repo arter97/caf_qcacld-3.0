@@ -57,6 +57,9 @@ void hdd_nud_flush_work(struct hdd_adapter *adapter)
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
+	if (hdd_adapter_is_link_adapter(adapter))
+		return;
+
 	if (adapter->device_mode == QDF_STA_MODE &&
 	    hdd_ctx->config->enable_nud_tracking) {
 		hdd_debug("Flush the NUD work");
@@ -245,6 +248,7 @@ hdd_handle_nud_fail_sta(struct hdd_context *hdd_ctx,
 	hdd_debug("nud fail detected, try roaming to better BSSID, vdev id: %d",
 		  adapter->vdev_id);
 
+	qdf_mem_zero(&ap_info, sizeof(struct reject_ap_info));
 	ap_info.bssid = sta_ctx->conn_info.bssid;
 	ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
 	ap_info.reject_reason = REASON_NUD_FAILURE;

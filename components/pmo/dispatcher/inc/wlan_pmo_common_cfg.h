@@ -554,7 +554,7 @@
  * igmp_version_support - Configure igmp version
  * @Min: 0x00000000
  * @Max: 0x7
- * @Default: 0x0000000
+ * @Default: 0x7
  *
  * This ini is used to configure version while offloading igmp
  *
@@ -593,6 +593,27 @@
 		0, \
 		"disconnect sap tdls in wow")
 
+/*
+ * <ini>
+ * gEnableIcmpOffload - Enable/disable ICMP offload
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used to enable/disable firmware's capability of sending ICMP
+ * response to clients.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_ICMP_OFFLOAD CFG_INI_BOOL( \
+	"gEnableIcmpOffload", \
+	0, \
+	"enable/disable ICMP offload")
+
 #define CFG_PMO_COMMON_ALL \
 	CFG(CFG_ENABLE_SAP_SUSPEND) \
 	CFG(CFG_PMO_ENABLE_HOST_ARPOFFLOAD) \
@@ -617,6 +638,7 @@
 	CFG(CFG_ENABLE_BUS_SUSPEND_IN_GO_MODE)\
 	CFG(CFG_DISCONNECT_SAP_TDLS_IN_WOW) \
 	CFG(CFG_ENABLE_DYNAMIC_PCIE_GEN_SPEED_SWITCH) \
-	CFG(CFG_IGMP_VERSION_SUPPORT)
+	CFG(CFG_IGMP_VERSION_SUPPORT) \
+	CFG(CFG_ENABLE_ICMP_OFFLOAD)
 
 #endif /* WLAN_PMO_COMMON_CFG_H__ */

@@ -31,6 +31,7 @@
 #include "wlan_policy_mgr_tables_2x2_dbs_i.h"
 #include "wlan_policy_mgr_tables_2x2_5g_1x1_2g.h"
 #include "wlan_policy_mgr_tables_2x2_2g_1x1_5g.h"
+#include "wlan_policy_mgr_tables_2x2_dbs_sbs_i.h"
 #include "wlan_policy_mgr_i.h"
 #include "qdf_types.h"
 #include "qdf_trace.h"
@@ -338,6 +339,8 @@ QDF_STATUS policy_mgr_psoc_open(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 	pm_ctx->sta_ap_intf_check_work_info->psoc = psoc;
+	pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.vdev_id =
+						WLAN_UMAC_VDEV_ID_MAX;
 	if (QDF_IS_STATUS_ERROR(qdf_delayed_work_create(
 				&pm_ctx->sta_ap_intf_check_work,
 				policy_mgr_check_sta_ap_concurrent_ch_intf,
@@ -485,7 +488,11 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_get_current_pref_hw_mode_ptr =
 		policy_mgr_get_current_pref_hw_mode_dbs_1x1;
 
-	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
+	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+	    policy_mgr_is_hw_sbs_capable(psoc))
+		second_connection_pcl_dbs_table =
+		&pm_second_connection_pcl_dbs_sbs_2x2_table;
+	else if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
 	    policy_mgr_is_hw_dbs_required_for_band(psoc,
 						   HW_MODE_MAC_BAND_2G) ||
 	    policy_mgr_is_2x2_1x1_dbs_capable(psoc))
@@ -495,7 +502,11 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		second_connection_pcl_dbs_table =
 		&pm_second_connection_pcl_dbs_1x1_table;
 
-	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
+	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+	    policy_mgr_is_hw_sbs_capable(psoc))
+		third_connection_pcl_dbs_table =
+		&pm_third_connection_pcl_dbs_sbs_2x2_table;
+	else if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
 	    policy_mgr_is_hw_dbs_required_for_band(psoc,
 						   HW_MODE_MAC_BAND_2G) ||
 	    policy_mgr_is_2x2_1x1_dbs_capable(psoc))
@@ -650,8 +661,9 @@ QDF_STATUS policy_mgr_register_sme_cb(struct wlan_objmgr_psoc *psoc,
 		sme_cbacks->sme_get_nss_for_vdev;
 	pm_ctx->sme_cbacks.sme_nss_update_request =
 		sme_cbacks->sme_nss_update_request;
-	pm_ctx->sme_cbacks.sme_pdev_set_hw_mode =
-		sme_cbacks->sme_pdev_set_hw_mode;
+	if (!policy_mgr_is_hwmode_offload_enabled(psoc))
+		pm_ctx->sme_cbacks.sme_pdev_set_hw_mode =
+			sme_cbacks->sme_pdev_set_hw_mode;
 	pm_ctx->sme_cbacks.sme_soc_set_dual_mac_config =
 		sme_cbacks->sme_soc_set_dual_mac_config;
 	pm_ctx->sme_cbacks.sme_change_mcc_beacon_interval =

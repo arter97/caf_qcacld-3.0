@@ -1077,6 +1077,7 @@ struct assoc_ind {
 	uint32_t owe_ie_len;
 	uint16_t owe_status;
 	bool need_assoc_rsp_tx_cb;
+	tSirMacAddr peer_mld_addr;
 };
 
 /**
@@ -2994,6 +2995,7 @@ struct wifi_interface_info {
 	uint8_t apCountryStr[REG_ALPHA2_LEN + 1];
 	/* country string for this association */
 	uint8_t countryStr[REG_ALPHA2_LEN + 1];
+	uint8_t time_slice_duty_cycle;
 };
 
 /**
