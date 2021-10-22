@@ -798,8 +798,15 @@ enum {
 	IEEE80211_PARAM_EHT_MAX_NC                              = 759, /* EHT Max Nc */
 	IEEE80211_PARAM_EHT_RX_1024_AND_4096_QAM_LS_242_TONE_RU = 760, /* EHT Rx 1024-QAM And 4096-QAM < 242-tone RU Support */
 	IEEE80211_PARAM_EHT_MU_BFMR                             = 761, /* EHT MU Beamformer */
+	IEEE80211_PARAM_EHT_MU_BFEE                             = 762, /* EHT MU Beamformee */
+	IEEE80211_PARAM_EHT_DL_MU_OFDMA                         = 763, /* EHT DL Multi user OFDMA */
+	IEEE80211_PARAM_EHT_UL_MU_OFDMA                         = 764, /* EHT UL Multi user OFDMA */
+	IEEE80211_PARAM_EHT_MU_MIMO                             = 765, /* EHT Multi user MIMO */
+	IEEE80211_PARAM_EHT_DL_OFDMA_TXBF                       = 766, /* EHT DL ODFMA Tx beamformer */
+	IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO                     = 767, /* EHT DL ODFMA Multi user MIMO */
+	IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO                     = 768, /* EHT UL ODFMA Multi user MIMO */
 #endif /* WLAN_FEATURE_11BE */
-	IEEE80211_PARAM_MAX_CAP_AP                 = 762,   /* Advertise Maximum capability of AP */
+	IEEE80211_PARAM_MAX_CAP_AP                 = 769,   /* Advertise Maximum capability of AP */
 };
 
 enum {
@@ -2360,6 +2367,20 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_rx_1024_and_4096_qam_ls_242_tone_ru", IEEE80211_PARAM_EHT_RX_1024_AND_4096_QAM_LS_242_TONE_RU, GET_PARAM, 0},
 	{"set_eht_mu_bfmr", IEEE80211_PARAM_EHT_MU_BFMR, SET_PARAM, 1},
 	{"get_eht_mu_bfmr", IEEE80211_PARAM_EHT_MU_BFMR, GET_PARAM, 0},
+	{"set_eht_mubfee", IEEE80211_PARAM_EHT_MU_BFEE, SET_PARAM, 1},
+	{"get_eht_mubfee", IEEE80211_PARAM_EHT_MU_BFEE, GET_PARAM, 0},
+	{"set_eht_ulofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, SET_PARAM, 1},
+	{"get_eht_ulofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, GET_PARAM, 0},
+	{"set_eht_dlofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, SET_PARAM, 1},
+	{"get_eht_dlofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, GET_PARAM, 0},
+	{"set_eht_ulmumimo", IEEE80211_PARAM_EHT_MU_MIMO, SET_PARAM, 1},
+	{"get_eht_ulmumimo", IEEE80211_PARAM_EHT_MU_MIMO, GET_PARAM, 0},
+	{"set_eht_dlofdma_bf", IEEE80211_PARAM_EHT_DL_OFDMA_TXBF, SET_PARAM, 1},
+	{"get_eht_dlofdma_bf", IEEE80211_PARAM_EHT_DL_OFDMA_TXBF, GET_PARAM, 0},
+	{"set_eht_dlofdma_mumimo", IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO, SET_PARAM, 1},
+	{"get_eht_dlofdma_mumimo", IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO, GET_PARAM, 0},
+	{"set_eht_ulofdma_mumimo", IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO, SET_PARAM, 1},
+	{"get_eht_ulofdma_mumimo", IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 };
 
