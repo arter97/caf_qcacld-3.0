@@ -866,6 +866,43 @@ ol_tx_desc_hl(
 	return tx_desc;
 }
 
+void unmap_free_msdus(struct ol_txrx_pdev_t *pdev, qdf_nbuf_t old_msdus)
+{
+	qdf_nbuf_t msdu = old_msdus;
+	while (msdu) {
+		/*
+		 * In MCC IPA tx context, IPA driver provides skb with
+		 * directly DMA mapped address. In such case, there's
+		 * no need for WLAN driver to DMA unmap the skb.
+		 */
+		if (qdf_nbuf_get_users(msdu) <= 1) {
+			if (!qdf_nbuf_ipa_owned_get(msdu)) {
+				qdf_nbuf_unmap(pdev->osdev, msdu,
+					       QDF_DMA_TO_DEVICE);
+			}
+		}
+		msdu = msdu->next;
+	}
+
+	/* free the netbufs as a batch */
+	qdf_nbuf_tx_free(old_msdus, 0);
+}
+
+#ifdef OL_TX_MSDU_CACHED
+static void unmap_free_msdus_cached(struct ol_txrx_pdev_t *pdev, qdf_nbuf_t msdus)
+{
+	qdf_nbuf_t old_msdus = NULL;
+
+	qdf_spin_lock(&pdev->free_msdu_list_lock);
+	old_msdus = pdev->free_msdu_list[pdev->idle_list];
+	if (old_msdus)
+		unmap_free_msdus(pdev, old_msdus);
+	pdev->free_msdu_list[pdev->idle_list] = msdus;
+	pdev->idle_list = (pdev->idle_list + 1) % NUM_FREE_MSDU_LISTS;
+	qdf_spin_unlock(&pdev->free_msdu_list_lock);
+}
+#endif
+
 void ol_tx_desc_frame_list_free(struct ol_txrx_pdev_t *pdev,
 				ol_tx_desc_list *tx_descs, int had_error)
 {
@@ -874,32 +911,24 @@ void ol_tx_desc_frame_list_free(struct ol_txrx_pdev_t *pdev,
 
 	TAILQ_FOREACH_SAFE(tx_desc, tx_descs, tx_desc_list_elem, tmp) {
 		qdf_nbuf_t msdu = tx_desc->netbuf;
+		tx_desc->netbuf = NULL;
 
 		qdf_atomic_init(&tx_desc->ref_cnt);   /* clear the ref cnt */
 #ifdef QCA_SUPPORT_SW_TXRX_ENCAP
 		/* restore original hdr offset */
 		OL_TX_RESTORE_HDR(tx_desc, msdu);
 #endif
-
-		/*
-		 * In MCC IPA tx context, IPA driver provides skb with directly
-		 * DMA mapped address. In such case, there's no need for WLAN
-		 * driver to DMA unmap the skb.
-		 */
-		if (qdf_nbuf_get_users(msdu) <= 1) {
-			if (!qdf_nbuf_ipa_owned_get(msdu))
-				qdf_nbuf_unmap(pdev->osdev, msdu,
-					       QDF_DMA_TO_DEVICE);
-		}
-
 		/* free the tx desc */
 		ol_tx_desc_free(pdev, tx_desc);
 		/* link the netbuf into a list to free as a batch */
 		qdf_nbuf_set_next(msdu, msdus);
 		msdus = msdu;
 	}
-	/* free the netbufs as a batch */
-	qdf_nbuf_tx_free(msdus, had_error);
+#ifdef OL_TX_MSDU_CACHED
+	unmap_free_msdus_cached(pdev, msdus);
+#else
+	unmap_free_msdus(pdev, msdus);
+#endif
 }
 
 void ol_tx_desc_frame_free_nonstd(struct ol_txrx_pdev_t *pdev,
