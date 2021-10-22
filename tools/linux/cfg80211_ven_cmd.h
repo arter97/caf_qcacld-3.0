@@ -790,8 +790,16 @@ enum {
 	IEEE80211_PARAM_NSEP_PRIORITY_ACCESS       = 751, /* EHT NSEP Priority access support */
 	IEEE80211_PARAM_OM_CONTROL                 = 752, /* EHT OM control support */
 	IEEE80211_PARAM_TRIGGERED_TXOP_SHARING     = 753, /* EHT triggered TX op sharing support */
+	IEEE80211_PARAM_EHT_NDP_4X_EHT_LTF_AND_320NSGI          = 754, /* NDP With 4x EHT-LTF And 3.2 usGI */
+	IEEE80211_PARAM_EHT_SU_BFMR                             = 755, /* EHT SU Beamformer */
+	IEEE80211_PARAM_EHT_SU_BFME                             = 756, /* EHT SU Beamformee */
+	IEEE80211_PARAM_EHT_BFME_SS                             = 757, /* EHT Beamformee Spatial streams */
+	IEEE80211_PARAM_EHT_4X_EHT_LTF_AND_800NS_GI             = 758, /* EHT MU PPDU With 4x EHT-LTF And 0.8us GI */
+	IEEE80211_PARAM_EHT_MAX_NC                              = 759, /* EHT Max Nc */
+	IEEE80211_PARAM_EHT_RX_1024_AND_4096_QAM_LS_242_TONE_RU = 760, /* EHT Rx 1024-QAM And 4096-QAM < 242-tone RU Support */
+	IEEE80211_PARAM_EHT_MU_BFMR                             = 761, /* EHT MU Beamformer */
 #endif /* WLAN_FEATURE_11BE */
-	IEEE80211_PARAM_MAX_CAP_AP                 = 754,   /* Advertise Maximum capability of AP */
+	IEEE80211_PARAM_MAX_CAP_AP                 = 762,   /* Advertise Maximum capability of AP */
 };
 
 enum {
@@ -2336,6 +2344,22 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_om_ctrl",           IEEE80211_PARAM_OM_CONTROL, GET_PARAM, 0},
 	{"set_eht_trig_txop_sharing", IEEE80211_PARAM_TRIGGERED_TXOP_SHARING, SET_PARAM, 1},
 	{"get_eht_trig_txop_sharing", IEEE80211_PARAM_TRIGGERED_TXOP_SHARING, GET_PARAM, 0},
+	{"set_eht_ndp_4x_eht_ltf_and_320nsgi", IEEE80211_PARAM_EHT_NDP_4X_EHT_LTF_AND_320NSGI, SET_PARAM, 1},
+	{"get_eht_ndp_4x_eht_ltf_and_320nsgi", IEEE80211_PARAM_EHT_NDP_4X_EHT_LTF_AND_320NSGI, GET_PARAM, 0},
+	{"set_eht_su_bfmr", IEEE80211_PARAM_EHT_SU_BFMR, SET_PARAM, 1},
+	{"get_eht_su_bfmr", IEEE80211_PARAM_EHT_SU_BFMR, GET_PARAM, 0},
+	{"set_eht_su_bfme", IEEE80211_PARAM_EHT_SU_BFME, SET_PARAM, 1},
+	{"get_eht_su_bfme", IEEE80211_PARAM_EHT_SU_BFME, GET_PARAM, 0},
+	{"set_eht_bfme_ss", IEEE80211_PARAM_EHT_BFME_SS, SET_PARAM, 3},
+	{"get_eht_bfme_ss", IEEE80211_PARAM_EHT_BFME_SS, GET_PARAM, 0},
+	{"set_eht_4x_eht_ltf_and_800ns_gi", IEEE80211_PARAM_EHT_4X_EHT_LTF_AND_800NS_GI, SET_PARAM, 1},
+	{"get_eht_4x_eht_ltf_and_800ns_gi", IEEE80211_PARAM_EHT_4X_EHT_LTF_AND_800NS_GI, GET_PARAM, 0},
+	{"set_eht_max_nc", IEEE80211_PARAM_EHT_MAX_NC, SET_PARAM, 1},
+	{"get_eht_max_nc", IEEE80211_PARAM_EHT_MAX_NC, GET_PARAM, 0},
+	{"set_eht_rx_1024_and_4096_qam_ls_242_tone_ru", IEEE80211_PARAM_EHT_RX_1024_AND_4096_QAM_LS_242_TONE_RU, SET_PARAM, 1},
+	{"get_eht_rx_1024_and_4096_qam_ls_242_tone_ru", IEEE80211_PARAM_EHT_RX_1024_AND_4096_QAM_LS_242_TONE_RU, GET_PARAM, 0},
+	{"set_eht_mu_bfmr", IEEE80211_PARAM_EHT_MU_BFMR, SET_PARAM, 1},
+	{"get_eht_mu_bfmr", IEEE80211_PARAM_EHT_MU_BFMR, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 };
 
