@@ -1818,7 +1818,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 #endif
 	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 1},
 	{"get_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, GET_PARAM, 0},
-	{"addlocalpeer",        IEEE80211_PARAM_ADD_LOCAL_PEER, SET_PARAM, 2},
+	{"addlocalpeer",        IEEE80211_PARAM_ADD_LOCAL_PEER, SET_PARAM, 3},
 	{"setmhdr",             IEEE80211_PARAM_SET_MHDR, SET_PARAM, 1},
 	{"allowdata",           IEEE80211_PARAM_ALLOW_DATA, SET_PARAM, 2},
 	{"meshdbg",             IEEE80211_PARAM_SET_MESHDBG, SET_PARAM, 1},
