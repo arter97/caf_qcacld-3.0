@@ -308,7 +308,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 			if (bd_id_filename[i]) {
 				BMI_DBG("%s: Trying to load %s",
 					 __func__, bd_id_filename[i]);
-				status = request_firmware(&fw_entry,
+				status = request_firmware_direct(&fw_entry,
 							  bd_id_filename[i],
 							  qdf_dev->dev);
 				if (!status)
@@ -321,7 +321,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 			/* bd.board_id not exits, using bd.bin */
 			BMI_DBG("%s: Trying to load default %s",
 				 __func__, bd_filename[i]);
-			status = request_firmware(&fw_entry, bd_filename[i],
+			status = request_firmware_direct(&fw_entry, bd_filename[i],
 						  qdf_dev->dev);
 			if (!status)
 				break;
@@ -329,7 +329,7 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 				__func__, bd_filename[i], status);
 		}
 	} else {
-		status = request_firmware(&fw_entry, filename, qdf_dev->dev);
+		status = request_firmware_direct(&fw_entry, filename, qdf_dev->dev);
 	}
 
 	if (status) {
