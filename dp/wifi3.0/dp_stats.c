@@ -6051,6 +6051,8 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 			       pdev->soc->stats.rx.err.invalid_rbm);
 		DP_PRINT_STATS("hal ring access fail: %u msdus",
 			       pdev->soc->stats.rx.err.hal_ring_access_fail);
+		DP_PRINT_STATS("invalid buffer type: %u msdus",
+			       pdev->soc->stats.rx.err.reo_invalid_buf_type);
 
 		DP_PRINT_STATS("hal ring access full fail: %u msdus",
 			       pdev->soc->stats.rx.err.hal_ring_access_full_fail);
@@ -6645,6 +6647,8 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 		       soc->stats.rx.rxdma2rel_route_drop);
 	DP_PRINT_STATS("Reo2rel route drop:%d",
 		       soc->stats.rx.reo2rel_route_drop);
+	DP_PRINT_STATS("invalid buffer type: %u msdus",
+		       soc->stats.rx.err.reo_invalid_buf_type);
 }
 
 #ifdef FEATURE_TSO_STATS

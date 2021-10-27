@@ -978,6 +978,8 @@ struct dp_soc_stats {
 			uint32_t msdu_continuation_err;
 			/* Non Eapol packet drop count due to peer not authorized  */
 			uint32_t peer_unauth_rx_pkt_drop;
+			/* reo error - invalid buffer type */
+			uint32_t reo_invalid_buf_type;
 		} err;
 
 		/* packet count per core - per ring */

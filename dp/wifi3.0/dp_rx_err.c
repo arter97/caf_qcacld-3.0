@@ -1617,10 +1617,61 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		qdf_assert(error == HAL_REO_ERROR_DETECTED);
 
 		buf_type = HAL_RX_REO_BUF_TYPE_GET(ring_desc);
+
 		/*
 		 * For REO error ring, expect only MSDU LINK DESC
 		 */
-		qdf_assert_always(buf_type == HAL_RX_REO_MSDU_LINK_DESC_TYPE);
+		if (buf_type != HAL_RX_REO_MSDU_LINK_DESC_TYPE) {
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+				  "%s: %d REO ERROR_(STATUS[%d] CODE[%d]) BUF_TYPE[%d]\n",
+				  __func__, __LINE__, error,
+				  HAL_RX_REO_ERROR_GET(ring_desc), buf_type);
+			print_hex_dump(KERN_ERR, "\t ring_desc:", DUMP_PREFIX_NONE, 32, 4,
+				       ring_desc,
+				       sizeof(struct reo_destination_ring),
+				       false);
+
+			cookie = HAL_RX_REO_BUF_COOKIE_GET(ring_desc);
+			rx_desc = dp_rx_cookie_2_va_rxdma_buf(soc, cookie);
+
+			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+				  "nbuf:%p cookie:0x%x pool_id:%d in_use:%d unmapped:%d\n",
+				  rx_desc->nbuf, rx_desc->cookie,
+				  rx_desc->pool_id, rx_desc->in_use,
+				  rx_desc->unmapped);
+
+			print_hex_dump(KERN_ERR, "nbuf_data: ", DUMP_PREFIX_NONE, 32, 4,
+				       rx_desc->nbuf->data,
+				       448, false);
+			print_hex_dump(KERN_ERR, "cb: ", DUMP_PREFIX_NONE, 32, 4,
+				       rx_desc->nbuf->cb,
+				       sizeof(rx_desc->nbuf->cb),
+				       false);
+
+			if (rx_desc && rx_desc->nbuf) {
+				mac_id = rx_desc->pool_id;
+				/* increment @pdev level */
+				dp_pdev = dp_get_pdev_for_mac_id(soc, mac_id);
+				/* if dp_pdev is null assert always */
+				if (!dp_pdev)
+					qdf_assert_always(0);
+
+				DP_STATS_INC(soc, rx.err.reo_invalid_buf_type, 1);
+
+				qdf_nbuf_unmap_single(soc->osdev,
+						      rx_desc->nbuf,
+						      QDF_DMA_FROM_DEVICE);
+				rx_desc->unmapped = 1;
+
+				qdf_nbuf_free(rx_desc->nbuf);
+				rx_bufs_reaped[rx_desc->pool_id]++;
+				dp_rx_add_to_free_desc_list(&dp_pdev->free_list_head,
+							    &dp_pdev->free_list_tail,
+							    rx_desc);
+			}
+
+			continue;
+		}
 
 		cookie = HAL_RX_REO_BUF_COOKIE_GET(ring_desc);
 		/*
