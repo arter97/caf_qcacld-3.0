@@ -630,7 +630,7 @@ struct dhcp_server {
  * gNumVdevs - max number of VDEVs supported
  *
  * @Min: 0x1
- * @Max: 0x4
+ * @Max: 0x5
  * @Default: CFG_TGT_NUM_VDEV
  *
  * Usage: External
@@ -640,7 +640,7 @@ struct dhcp_server {
 #define CFG_NUM_VDEV_ENABLE CFG_INI_UINT( \
 		"gNumVdevs", \
 		1, \
-		4, \
+		5, \
 		CFG_TGT_NUM_VDEV, \
 		CFG_VALUE_OR_DEFAULT, \
 		"Number of VDEVs")
