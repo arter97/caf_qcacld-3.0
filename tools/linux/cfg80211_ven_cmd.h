@@ -814,6 +814,7 @@ enum {
 	IEEE80211_PARAM_EHT_UL_LTF        = 775, /* LTF configuration in UL Trigger for EHT mode */
 #endif /* WLAN_FEATURE_11BE */
 	IEEE80211_PARAM_MAX_CAP_AP                 = 776,   /* Advertise Maximum capability of AP */
+        IEEE80211_PARAM_NEIG_RPT          = 777,   /* disable/enable inclusion of Neighbor Report bit in Beacon/Probe-Rsp */
 };
 
 enum {
@@ -1606,6 +1607,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_rnr_tbtt",          IEEE80211_PARAM_RNR_TBTT, GET_PARAM, 0},
 	{"apchanrpt",           IEEE80211_PARAM_AP_CHAN_RPT, SET_PARAM, 1},
 	{"g_apchanrpt",         IEEE80211_PARAM_AP_CHAN_RPT, GET_PARAM, 0},
+	{"disable_neigrpt",     IEEE80211_PARAM_NEIG_RPT, SET_PARAM, 1},
+	{"g_disable_neigrpt",   IEEE80211_PARAM_NEIG_RPT, GET_PARAM, 0},
 	{"mgmt_rate",           IEEE80211_PARAM_MGMT_RATE, SET_PARAM, 1},
 	{"g_mgmt_rate",         IEEE80211_PARAM_MGMT_RATE, GET_PARAM, 0},
 	{"rtscts_rate",         IEEE80211_PARAM_RTSCTS_RATE, SET_PARAM, 1},
