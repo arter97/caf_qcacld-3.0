@@ -1374,6 +1374,25 @@ void dfs_set_precac_preferred_channel(struct wlan_dfs *dfs,
 	}
 }
 
+/**
+ * dfs_is_autoswitchchan_already_set() - If the given user_des_freq
+ * is same as autoswitch chan's freq, return true. Else return false.
+ *
+ * @dfs: Pointer to struct wlan_dfs
+ * @usr_des_freq: User desired frequency in MHZ
+ */
+static bool
+dfs_is_autoswitchchan_already_set(struct wlan_dfs *dfs,
+				  qdf_freq_t usr_des_freq)
+{
+
+	if (dfs->dfs_autoswitch_chan &&
+	    usr_des_freq == dfs->dfs_autoswitch_chan->dfs_ch_freq)
+		return true;
+
+	return false;
+}
+
 bool
 dfs_decide_precac_preferred_chan_for_freq(struct wlan_dfs *dfs,
 					  uint16_t *pref_chan_freq,
@@ -1413,8 +1432,35 @@ dfs_decide_precac_preferred_chan_for_freq(struct wlan_dfs *dfs,
 	     (WLAN_IS_CHAN_MODE_160(chan) &&
 	      WLAN_IS_CHAN_DFS_CFREQ2(chan))) &&
 	    !dfs_is_precac_done(dfs, chan)) {
+
+	    qdf_freq_t usr_des_freq = *pref_chan_freq;
+	    *pref_chan_freq = dfs->dfs_precac_inter_chan_freq;
+
+	    /*
+	     * If preCAC is requested on a 160MHZ channel and the agile detector
+	     * can support a max channel width of 80MHZ, we do agile twice, one
+	     * on each 80MHZ channel and then mark 160MHZ chan as pre-CAC done.
+	     * If interCAC freq is configured, we come up on interCAC chan in
+	     * HT80 mode, vap->iv_des_mode is set to HT80 though
+	     * dfs_autoswitch_des_mode is HT160. For the second vap that
+	     * comes up, since desmode is HT80, it alters
+	     * dfs_autoswitch_des_mode also as HT80 and hence we fail
+	     * to come up desired 160MHZ channel.
+	     * If the desired frequency is already a dfs_autoswitch_chan's freq,
+	     * do not update the dfs_autoswitch_des_mode as interCAC chan's
+	     * phymode.
+	     */
+
+	    if (dfs_is_autoswitchchan_already_set(dfs, usr_des_freq)) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS, "Preferred freq %d is"
+			  "already the autoswitch freq %d"
+			  "autoswitch_mode: %d, not updating"
+			  "mode again\n",
+			  usr_des_freq, *pref_chan_freq,
+			  dfs->dfs_autoswitch_des_mode);
+			return true;
+		}
 		dfs->dfs_autoswitch_des_mode = mode;
-		*pref_chan_freq = dfs->dfs_precac_inter_chan_freq;
 		dfs_debug(dfs, WLAN_DEBUG_DFS,
 			  "des_chan=%d, des_mode=%d. Current operating channel=%d",
 			  chan->dfs_ch_freq,
