@@ -22,8 +22,8 @@
 
 #include <wlan_cm_ucfg_api.h>
 #include <wlan_objmgr_vdev_obj.h>
-#include <wlan_mlo_mgr_cmn.h>
 #ifdef WLAN_FEATURE_11BE_MLO
+#include <wlan_mlo_mgr_cmn.h>
 #include <wlan_mlo_mgr_public_structs.h>
 
 /**
