@@ -30,7 +30,9 @@
 #include "wlan_cfg80211.h"
 #include "wlan_cfg80211_scan.h"
 #include "wlan_mlo_mgr_sta.h"
+#ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_cmn.h"
+#endif
 
 #ifdef CONN_MGR_ADV_FEATURE
 void osif_cm_get_assoc_req_ie_data(struct element_info *assoc_req,
