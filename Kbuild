@@ -958,8 +958,13 @@ WLAN_CFR_OBJS := $(WLAN_CFR_CORE_DIR)/cfr_common.o \
                 $(WLAN_CFR_DISP_DIR)/wlan_cfr_ucfg_api.o \
                 $(WLAN_CFR_DISP_DIR)/wlan_cfr_utils_api.o \
 		$(WLAN_COMMON_ROOT)/target_if/cfr/src/target_if_cfr.o \
-		$(WLAN_COMMON_ROOT)/target_if/cfr/src/target_if_cfr_enh.o \
 		$(WLAN_COMMON_ROOT)/target_if/cfr/src/target_if_cfr_6490.o
+ifeq ($(CONFIG_WLAN_ENH_CFR_ENABLE),y)
+WLAN_CFR_OBJS += $(WLAN_COMMON_ROOT)/target_if/cfr/src/target_if_cfr_enh.o
+endif
+ifeq ($(CONFIG_WLAN_CFR_ADRASTEA),y)
+WLAN_CFR_OBJS += $(WLAN_COMMON_ROOT)/target_if/cfr/src/target_if_cfr_adrastea.o
+endif
 endif
 ############# GPIO_CFG ############
 UMAC_GPIO_DIR := gpio
@@ -2618,6 +2623,7 @@ cppflags-$(CONFIG_HDD_INIT_WITH_RTNL_LOCK) += -DCONFIG_HDD_INIT_WITH_RTNL_LOCK
 cppflags-$(CONFIG_WLAN_CONV_SPECTRAL_ENABLE) += -DWLAN_CONV_SPECTRAL_ENABLE
 cppflags-$(CONFIG_WLAN_CFR_ENABLE) += -DWLAN_CFR_ENABLE
 cppflags-$(CONFIG_WLAN_ENH_CFR_ENABLE) += -DWLAN_ENH_CFR_ENABLE
+cppflags-$(CONFIG_WLAN_CFR_ADRASTEA) += -DWLAN_CFR_ADRASTEA
 cppflags-$(CONFIG_WLAN_CFR_ENABLE) += -DCFR_USE_FIXED_FOLDER
 cppflags-$(CONFIG_WLAN_FEATURE_MEDIUM_ASSESS) += -DWLAN_FEATURE_MEDIUM_ASSESS
 cppflags-$(CONFIG_DIRECT_BUF_RX_ENABLE) += -DDIRECT_BUF_RX_ENABLE
