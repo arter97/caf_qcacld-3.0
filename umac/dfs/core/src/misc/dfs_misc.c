@@ -350,22 +350,31 @@ void dfs_reinit_nol_from_psoc_copy(struct wlan_dfs *dfs,
 #endif
 
 #ifdef CONFIG_HOST_FIND_CHAN
+
 bool wlan_is_chan_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 {
-	qdf_freq_t sub_freq_list[NUM_CHANNELS_160MHZ];
-	uint8_t n_subchans, i;
+	struct dfs_freq_range cur_freq_range;
+	qdf_freq_t cfreq = chan->dfs_ch_mhz_freq_seg1;
+	uint8_t i, nchans = 1;
 
 	if (!chan || !WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(chan))
 		return false;
 
-	n_subchans = dfs_get_bonding_channel_without_seg_info_for_freq(
-				chan,
-				sub_freq_list);
+	if (WLAN_IS_CHAN_MODE_80_80(chan))
+		nchans = 2;
 
-	for (i = 0; i < n_subchans; i++) {
-		if (wlan_reg_is_nol_for_freq(dfs->dfs_pdev_obj,
-					     sub_freq_list[i]))
+	for (i = 0; i < nchans; i++) {
+		dfs_convert_chan_to_freq_ranges(dfs,
+						chan,
+						cfreq,
+						&cur_freq_range,
+						0);
+
+		if (dfs_is_chan_range_in_nol(dfs,
+					     cur_freq_range.start_freq,
+					     cur_freq_range.end_freq))
 			return true;
+		cfreq = chan->dfs_ch_mhz_freq_seg2;
 	}
 
 	return false;

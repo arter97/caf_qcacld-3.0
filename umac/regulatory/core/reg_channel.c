@@ -28,6 +28,7 @@
 #include <reg_services_common.h>
 #include "reg_channel.h"
 #include <wlan_reg_channel_api.h>
+#include <wlan_dfs_utils_api.h>
 
 #ifdef CONFIG_HOST_FIND_CHAN
 
@@ -348,23 +349,13 @@ bool reg_is_chan_disabled(struct regulatory_channel *chan)
 
 bool reg_is_nol_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
 {
-	enum channel_enum chan_enum;
-	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	qdf_freq_t start_freq = freq - BW_20_MHZ/2;
+	qdf_freq_t end_freq = freq + BW_20_MHZ/2;
 
-	chan_enum = reg_get_chan_enum_for_freq(freq);
-	if (chan_enum == INVALID_CHANNEL) {
-		reg_err("chan freq is not valid");
-		return false;
-	}
+	if (utils_dfs_is_chan_range_in_nol(pdev, start_freq, end_freq))
+		return true;
 
-	pdev_priv_obj = reg_get_pdev_obj(pdev);
-
-	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
-		reg_err("pdev reg obj is NULL");
-		return false;
-	}
-
-	return pdev_priv_obj->cur_chan_list[chan_enum].nol_chan;
+	return false;
 }
 
 bool reg_is_nol_hist_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
