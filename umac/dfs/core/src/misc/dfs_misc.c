@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2002-2006, Atheros Communications Inc.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -352,7 +353,7 @@ void dfs_reinit_nol_from_psoc_copy(struct wlan_dfs *dfs,
 #ifdef CONFIG_HOST_FIND_CHAN
 bool wlan_is_chan_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 {
-	qdf_freq_t sub_freq_list[NUM_CHANNELS_160MHZ];
+	qdf_freq_t sub_freq_list[MAX_20MHZ_SUBCHANS];
 	uint8_t n_subchans, i;
 
 	if (!chan || !WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(chan))
@@ -373,7 +374,7 @@ bool wlan_is_chan_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 
 bool wlan_is_chan_history_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 {
-	qdf_freq_t sub_freq_list[NUM_CHANNELS_160MHZ];
+	qdf_freq_t sub_freq_list[MAX_20MHZ_SUBCHANS];
 	uint8_t n_subchans, i;
 
 	if (!chan || !WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(chan))
