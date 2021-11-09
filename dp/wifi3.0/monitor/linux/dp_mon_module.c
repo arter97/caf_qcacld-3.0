@@ -138,6 +138,7 @@ int monitor_mod_init(void)
 			continue;
 		}
 		mon_soc_ol_attach(psoc);
+		dp_mon_register_intr_ops(soc);
 	}
 	return 0;
 }
