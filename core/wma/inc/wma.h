@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -62,6 +63,7 @@
 #define WMA_WAKE_LOCK_TIMEOUT              1000
 #define WMA_RESUME_TIMEOUT                 6000
 #define MAX_MEM_CHUNKS                     32
+#define NDP_APP_INFO_LEN                   255
 
 #define WMA_CRASH_INJECT_TIMEOUT           5000
 
