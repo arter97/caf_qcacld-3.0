@@ -441,9 +441,13 @@ static bool dfs_agile_state_init_event(void *ctx,
 
 	switch (event) {
 	case DFS_AGILE_SM_EV_AGILE_START:
-
 		if (dfs_soc->cur_agile_dfs_index != DFS_PSOC_NO_IDX)
 			return true;
+
+#if UMAC_SUPPORT_SBS
+		if (dfs->dfs_agile_rcac_sbs)
+			return true;
+#endif
 
 		is_chan_found = dfs_init_agile_start_evt_handler(dfs,
 								 dfs_soc);
@@ -567,6 +571,13 @@ static bool dfs_agile_state_running_event(void *ctx,
 			dfs_abort_agile_rcac(dfs);
 		else if (dfs_is_agile_precac_enabled(dfs))
 			dfs_abort_agile_precac(dfs);
+#if UMAC_SUPPORT_SBS
+	       else
+		       /* Force aborting agile rcac, avoid dfs_set_rcac_enable(false)
+			* without abort.
+			*/
+		       dfs_abort_agile_rcac(dfs);
+#endif
 
 		dfs_agile_sm_transition_to(dfs_soc, DFS_AGILE_S_INIT);
 		status = true;
