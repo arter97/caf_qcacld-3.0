@@ -2888,8 +2888,6 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EXT_NSS_CAPABLE, SET_PARAM, 1},
 	{"g_ext_nss",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EXT_NSS_CAPABLE, GET_PARAM, 0},
-	{"acktimeout",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TXACKTIMEOUT, SET_PARAM, 1},
 	{"get_acktimeout",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TXACKTIMEOUT, GET_PARAM, 0},
 	{"set_icm_active",
