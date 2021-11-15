@@ -435,6 +435,10 @@ ifeq ($(CONFIG_WLAN_CFR_ENABLE), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_cfr.o
 endif
 
+ifeq ($(CONFIG_DP_HW_TX_DELAY_STATS_ENABLE), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dp_tx_delay_stats.o
+endif
+
 $(call add-wlan-objs,hdd,$(HDD_OBJS))
 
 ###### OSIF_SYNC ########
@@ -3768,6 +3772,10 @@ cppflags-y += -DHIF_DETECTION_LATENCY_ENABLE
 cppflags-y += -DDETECTION_TIMER_TIMEOUT=4000
 cppflags-y += -DDETECTION_LATENCY_THRESHOLD=3900
 endif
+endif
+
+ifeq ($(CONFIG_DP_HW_TX_DELAY_STATS_ENABLE), y)
+cppflags-y += -DHW_TX_DELAY_STATS_ENABLE
 endif
 
 KBUILD_CPPFLAGS += $(cppflags-y)

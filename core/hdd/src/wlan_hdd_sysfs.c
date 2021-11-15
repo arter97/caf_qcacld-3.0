@@ -78,6 +78,7 @@
 #include <wlan_hdd_sysfs_swlm.h>
 #include <wlan_hdd_sysfs_add_timestamp.h>
 #include "wma_api.h"
+#include <wlan_hdd_sysfs_dp_tx_delay_stats.h>
 
 #define MAX_PSOC_ID_SIZE 10
 
@@ -728,11 +729,13 @@ hdd_sysfs_create_sta_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_motion_detection_create(adapter);
 	hdd_sysfs_range_ext_create(adapter);
 	hdd_sysfs_dl_modes_create(adapter);
+	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sta_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_dl_modes_destroy(adapter);
 	hdd_sysfs_range_ext_destroy(adapter);
 	hdd_sysfs_motion_detection_destroy(adapter);
@@ -782,11 +785,13 @@ hdd_sysfs_create_sap_adapter_root_obj(struct hdd_adapter *adapter)
 	hdd_sysfs_range_ext_create(adapter);
 	hdd_sysfs_ipa_create(adapter);
 	hdd_sysfs_dl_modes_create(adapter);
+	hdd_sysfs_dp_tx_delay_stats_create(adapter);
 }
 
 static void
 hdd_sysfs_destroy_sap_adapter_root_obj(struct hdd_adapter *adapter)
 {
+	hdd_sysfs_dp_tx_delay_stats_destroy(adapter);
 	hdd_sysfs_dl_modes_destroy(adapter);
 	hdd_sysfs_ipa_destroy(adapter);
 	hdd_sysfs_range_ext_destroy(adapter);
