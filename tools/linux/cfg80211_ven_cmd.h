@@ -1286,6 +1286,10 @@ enum _ol_ath_param_t {
 	 *the radio
 	 */
 	OL_ATH_PARAM_CURCHAN_REG_TXPOWER = 472,
+	OL_ATH_PARAM_TX_RX_SWITCH_OVER,
+	OL_ATH_PARAM_PREAMBLE_PWR,
+	OL_ATH_PARAM_STOMPER_THRSHOLD,
+	OL_ATH_PARAM_AGC_GAIN_VALUE = 476,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3318,6 +3322,14 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_reg_txpower",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_CURCHAN_REG_TXPOWER,
 		GET_PARAM, 0},
+	{"txrx_switch_over",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TX_RX_SWITCH_OVER, SET_PARAM, 1},
+	{"preamble_pwr",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PREAMBLE_PWR, SET_PARAM, 1},
+	{"stomper_th",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_STOMPER_THRSHOLD, SET_PARAM, 1},
+	{"agc_gain_value",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_AGC_GAIN_VALUE, SET_PARAM, 1},
 };
 #endif
 #endif
