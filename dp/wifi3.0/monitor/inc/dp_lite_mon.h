@@ -18,8 +18,34 @@
 #define _DP_LITE_MON_H_
 
 #include <dp_types.h>
+#include "cdp_txrx_mon_struct.h"
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
+
+#define DP_LITE_MON_RTAP_HDR_BITMASK 0x01
+#define DP_LITE_MON_META_HDR_BITMASK 0x02
+
+#define DP_LITE_MON_META_HDR_TLV_PPDUID 1
+#define DP_LITE_MON_META_HDR_TLV_PFTAG  2
+#define DP_LITE_MON_MAX_META_HDR_TLVS 2
+
+#define DP_LITE_MON_PPDU_ID_LEN (4)
+
+#define DP_LITE_MON_META_TLV_ID_SIZE (1)
+#define DP_LITE_MON_META_TLV_LEN_SIZE (2)
+#define DP_LITE_MON_META_TLV_MIN_SIZE \
+	((DP_LITE_MON_META_TLV_ID_SIZE) + (DP_LITE_MON_META_TLV_LEN_SIZE))
+
+#define DP_LITE_MON_META_HDR_MARKER_SIZE (2)
+#define DP_LITE_MON_META_HDR_LEN_SIZE (4)
+#define DP_LITE_MON_META_HDR_MARKER_LEN_SIZE \
+	((DP_LITE_MON_META_HDR_MARKER_SIZE) + (DP_LITE_MON_META_HDR_LEN_SIZE))
+
+#define DP_LITE_MON_TOTAL_META_HDR_LEN \
+	((DP_LITE_MON_META_HDR_MARKER_LEN_SIZE) + \
+	 ((DP_LITE_MON_MAX_META_HDR_TLVS) * (DP_LITE_MON_META_TLV_MIN_SIZE)) + \
+	 ((DP_LITE_MON_PPDU_ID_LEN)))
+
 /**
  * dp_lite_mon_peer - lite mon peer structure
  * @peer_mac: mac addr of peer
@@ -42,6 +68,10 @@ struct dp_lite_mon_peer {
  * @ctrl_filter: ctrl pkt filter
  * @data_filter: data pkt filter
  * @len: mgmt/ctrl/data pkt len
+ * @fp_enabled: inidicates lite mon fp mode enabled
+ * @md_enabled: inidicates lite mon md mode enabled
+ * @mo_enabled: inidicates lite mon mo mode enabled
+ * @fpmo_enabled: inidicates lite mon fpmo mode enabled
  * @metadata: meta info to be updated
  * @debug: debug info
  * @lite_mon_vdev: output vdev ctx
@@ -55,6 +85,10 @@ struct dp_lite_mon_config {
 	uint16_t ctrl_filter[CDP_LITE_MON_MODE_MAX];
 	uint16_t data_filter[CDP_LITE_MON_MODE_MAX];
 	uint16_t len[CDP_LITE_MON_FRM_TYPE_MAX];
+	bool fp_enabled;
+	bool md_enabled;
+	bool mo_enabled;
+	bool fpmo_enabled;
 	uint8_t metadata;
 	uint8_t debug;
 	struct dp_vdev *lite_mon_vdev;
@@ -83,6 +117,26 @@ struct dp_lite_mon_rx_config {
 	/* add rx lite mon specific fields below */
 	qdf_spinlock_t lite_mon_rx_lock;
 };
+
+static inline int
+dp_lite_mon_is_full_len_configured(int len1, int len2, int len3) {
+	return (len1 == CDP_LITE_MON_LEN_FULL ||
+		len2 == CDP_LITE_MON_LEN_FULL ||
+		len3 == CDP_LITE_MON_LEN_FULL);
+}
+
+static inline int
+dp_lite_mon_get_max_custom_len(int len1, int len2, int len3) {
+	/* do not consider full len while
+	 * calculating max custom len
+	 */
+	len1 = (len1 == CDP_LITE_MON_LEN_FULL) ? 0 : len1;
+	len2 = (len2 == CDP_LITE_MON_LEN_FULL) ? 0 : len2;
+	len3 = (len3 == CDP_LITE_MON_LEN_FULL) ? 0 : len3;
+	return ((len1 > len2) ?
+		((len1 > len3) ? len1 : len3) :
+		((len2 > len3) ? len2 : len3));
+}
 
 /**
  * dp_lite_mon_set_config - set lite mon filter config
@@ -135,6 +189,22 @@ QDF_STATUS
 dp_lite_mon_get_peer_config(struct cdp_soc_t *soc_hdl,
 			    struct cdp_lite_mon_peer_info *peer_info,
 			    uint8_t pdev_id);
+
+/**
+ * dp_lite_mon_disable_rx - disables rx lite mon
+ * @pdev: dp pdev
+ *
+ * Return: void
+ */
+void dp_lite_mon_disable_rx(struct dp_pdev *pdev);
+
+/**
+ * dp_lite_mon_is_level_msdu - check if level is msdu
+ * @mon_pdev: monitor pdev handle
+ *
+ * Return: 0 if level is not msdu else return 1
+ */
+int dp_lite_mon_is_level_msdu(struct dp_mon_pdev *mon_pdev);
 
 /**
  * dp_lite_mon_is_rx_enabled - get lite mon rx enable status
