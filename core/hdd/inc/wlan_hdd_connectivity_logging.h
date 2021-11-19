@@ -39,11 +39,10 @@
 /**
  * wlan_hdd_start_connectivity_logging()  - Initialize logging callbacks
  * and allocate global buffers
- * @hdd_ctx: Pointer to hdd context
  *
  * Return: None
  */
-void wlan_hdd_start_connectivity_logging(struct hdd_context *hdd_ctx);
+void wlan_hdd_start_connectivity_logging(void);
 
 /**
  * wlan_hdd_connectivity_event_connecting() - Queue the connecting event to
@@ -67,7 +66,7 @@ void wlan_hdd_connectivity_fail_event(struct wlan_objmgr_vdev *vdev,
 				      struct wlan_cm_connect_resp *rsp);
 #else
 static inline
-void wlan_hdd_start_connectivity_logging(struct hdd_context *hdd_ctx)
+void wlan_hdd_start_connectivity_logging(void)
 {}
 
 static inline

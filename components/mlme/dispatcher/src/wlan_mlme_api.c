@@ -4142,72 +4142,72 @@ void wlan_mlme_clear_sae_single_pmk_info(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
-char *mlme_get_roam_fail_reason_str(enum wlan_roam_failure_reason_code result)
+char *mlme_get_roam_fail_reason_str(uint32_t result)
 {
 	switch (result) {
-	case ROAM_FAIL_REASON_NO_SCAN_START:
+	case WMI_ROAM_FAIL_REASON_NO_SCAN_START:
 		return "SCAN NOT STARTED";
-	case ROAM_FAIL_REASON_NO_AP_FOUND:
+	case WMI_ROAM_FAIL_REASON_NO_AP_FOUND:
 		return "NO AP FOUND";
-	case ROAM_FAIL_REASON_NO_CAND_AP_FOUND:
+	case WMI_ROAM_FAIL_REASON_NO_CAND_AP_FOUND:
 		return "NO CANDIDATE FOUND";
-	case ROAM_FAIL_REASON_HOST:
+	case WMI_ROAM_FAIL_REASON_HOST:
 		return "HOST ABORTED";
-	case ROAM_FAIL_REASON_AUTH_SEND:
+	case WMI_ROAM_FAIL_REASON_AUTH_SEND:
 		return "Send AUTH Failed";
-	case ROAM_FAIL_REASON_AUTH_RECV:
+	case WMI_ROAM_FAIL_REASON_AUTH_RECV:
 		return "Received AUTH with FAILURE Status";
-	case ROAM_FAIL_REASON_NO_AUTH_RESP:
+	case WMI_ROAM_FAIL_REASON_NO_AUTH_RESP:
 		return "No Auth response from AP";
-	case ROAM_FAIL_REASON_REASSOC_SEND:
+	case WMI_ROAM_FAIL_REASON_REASSOC_SEND:
 		return "Send Re-assoc request failed";
-	case ROAM_FAIL_REASON_REASSOC_RECV:
+	case WMI_ROAM_FAIL_REASON_REASSOC_RECV:
 		return "Received Re-Assoc resp with Failure status";
-	case ROAM_FAIL_REASON_NO_REASSOC_RESP:
+	case WMI_ROAM_FAIL_REASON_NO_REASSOC_RESP:
 		return "No Re-assoc response from AP";
-	case ROAM_FAIL_REASON_EAPOL_TIMEOUT:
+	case WMI_ROAM_FAIL_REASON_EAPOL_M1_TIMEOUT:
 		return "EAPOL M1 timed out";
-	case ROAM_FAIL_REASON_MLME:
+	case WMI_ROAM_FAIL_REASON_MLME:
 		return "MLME error";
-	case ROAM_FAIL_REASON_INTERNAL_ABORT:
+	case WMI_ROAM_FAIL_REASON_INTERNAL_ABORT:
 		return "Fw aborted roam";
-	case ROAM_FAIL_REASON_SCAN_START:
+	case WMI_ROAM_FAIL_REASON_SCAN_START:
 		return "Unable to start roam scan";
-	case ROAM_FAIL_REASON_AUTH_NO_ACK:
+	case WMI_ROAM_FAIL_REASON_AUTH_NO_ACK:
 		return "No ACK for Auth req";
-	case ROAM_FAIL_REASON_AUTH_INTERNAL_DROP:
+	case WMI_ROAM_FAIL_REASON_AUTH_INTERNAL_DROP:
 		return "Auth req dropped internally";
-	case ROAM_FAIL_REASON_REASSOC_NO_ACK:
+	case WMI_ROAM_FAIL_REASON_REASSOC_NO_ACK:
 		return "No ACK for Re-assoc req";
-	case ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP:
+	case WMI_ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP:
 		return "Re-assoc dropped internally";
-	case ROAM_FAIL_REASON_EAPOL_M2_SEND:
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_SEND:
 		return "Unable to send M2 frame";
-	case ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP:
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP:
 		return "M2 Frame dropped internally";
-	case ROAM_FAIL_REASON_EAPOL_M2_NO_ACK:
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_NO_ACK:
 		return "No ACK for M2 frame";
-	case ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT:
+	case WMI_ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT:
 		return "EAPOL M3 timed out";
-	case ROAM_FAIL_REASON_EAPOL_M4_SEND:
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_SEND:
 		return "Unable to send M4 frame";
-	case ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP:
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP:
 		return "M4 frame dropped internally";
-	case ROAM_FAIL_REASON_EAPOL_M4_NO_ACK:
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_NO_ACK:
 		return "No ACK for M4 frame";
-	case ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS:
+	case WMI_ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS:
 		return "No scan on final BMISS";
-	case ROAM_FAIL_REASON_DISCONNECT:
+	case WMI_ROAM_FAIL_REASON_DISCONNECT:
 		return "Disconnect received during handoff";
-	case ROAM_FAIL_REASON_SYNC:
+	case WMI_ROAM_FAIL_REASON_SYNC:
 		return "Previous roam sync pending";
-	case ROAM_FAIL_REASON_SAE_INVALID_PMKID:
+	case WMI_ROAM_FAIL_REASON_SAE_INVALID_PMKID:
 		return "Reason assoc reject - invalid PMKID";
-	case ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT:
+	case WMI_ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT:
 		return "SAE preauth timed out";
-	case ROAM_FAIL_REASON_SAE_PREAUTH_FAIL:
+	case WMI_ROAM_FAIL_REASON_SAE_PREAUTH_FAIL:
 		return "SAE preauth failed";
-	case ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:
+	case WMI_ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:
 		return "Start handoff failed- internal error";
 	default:
 		return "UNKNOWN";

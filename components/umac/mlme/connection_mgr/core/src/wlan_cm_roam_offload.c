@@ -4759,19 +4759,18 @@ void cm_roam_scan_info_event(struct wmi_roam_scan_data *scan, uint8_t vdev_id)
 		return;
 
 	log_record->vdev_id = vdev_id;
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
-	log_record->fw_timestamp_us = scan->ap->timestamp * 1000;
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
+	log_record->fw_timestamp_us = scan->ap->timestamp;
 	log_record->log_subtype = WLAN_ROAM_SCAN_DONE;
 
 	qdf_copy_macaddr(&log_record->bssid, &ap->bssid);
 
 	log_record->roam_scan.cand_ap_count = scan->num_ap;
-	if (scan->num_chan > MAX_ROAM_SCAN_CHAN)
-		scan->num_chan = MAX_ROAM_SCAN_CHAN;
-
+	if (scan->num_chan > WLAN_MAX_LOGGING_FREQ)
+		scan->num_chan = WLAN_MAX_LOGGING_FREQ;
 	log_record->roam_scan.num_scanned_freq = scan->num_chan;
-	qdf_mem_copy(&log_record->roam_scan.scan_freq, &scan->chan_freq[0],
-		     scan->num_chan * sizeof(scan->chan_freq[0]));
+	qdf_mem_copy(&log_record->roam_scan.scan_freq, &scan->chan_freq,
+		     scan->num_chan);
 
 	wlan_connectivity_log_enqueue(log_record);
 	qdf_mem_free(log_record);
@@ -4787,12 +4786,12 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 		return;
 
 	log_record->vdev_id = vdev_id;
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
 	log_record->log_subtype = WLAN_ROAM_SCAN_START;
 
 	log_record->roam_trig.trigger_reason  = data->trigger_reason;
 	log_record->roam_trig.trigger_sub_reason = data->trigger_sub_reason;
-	log_record->roam_trig.current_rssi = (-1) * data->current_rssi;
+	log_record->roam_trig.current_rssi = data->current_rssi;
 	log_record->roam_trig.cu_load = data->cu_trig_data.cu_load;
 	log_record->roam_trig.rssi_threshold = data->rssi_trig_data.threshold;
 
@@ -4800,8 +4799,7 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 	qdf_mem_free(log_record);
 }
 
-void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
-				  uint8_t cand_ap_idx)
+void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap)
 {
 	struct wlan_log_record *log_record = NULL;
 
@@ -4809,22 +4807,20 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 	if (!log_record)
 		return;
 
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
-	log_record->fw_timestamp_us = ap->timestamp * 1000;
-
-	log_record->ap.is_current_ap = (ap->type == 2);
-	if (log_record->ap.is_current_ap)
-		log_record->log_subtype = WLAN_ROAM_SCORE_CURR_AP;
-	else
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
+	log_record->fw_timestamp_us = ap->timestamp;
+	if (!ap->type)
 		log_record->log_subtype = WLAN_ROAM_SCORE_CAND_AP;
+	else
+		log_record->log_subtype = WLAN_ROAM_SCORE_CURR_AP;
 
+	log_record->ap.is_current_ap = ap->type;
 	qdf_copy_macaddr(&log_record->ap.cand_bssid, &ap->bssid);
 
-	log_record->ap.rssi  = (-1) * ap->rssi;
+	log_record->ap.rssi  = ap->rssi;
 	log_record->ap.cu_load = ap->cu_load;
 	log_record->ap.total_score = ap->total_score;
 	log_record->ap.etp = ap->etp;
-	log_record->ap.idx = cand_ap_idx;
 
 	wlan_connectivity_log_enqueue(log_record);
 	qdf_mem_free(log_record);
@@ -4840,15 +4836,15 @@ void cm_roam_result_info_event(struct wmi_roam_result *res, uint8_t vdev_id,
 		return;
 
 	log_record->vdev_id = vdev_id;
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
 	if (roam_abort) {
 		log_record->log_subtype = WLAN_ROAM_CANCEL;
 		log_record->fw_timestamp_us = log_record->timestamp_us;
 	} else {
 		log_record->log_subtype = WLAN_ROAM_RESULT;
-		log_record->fw_timestamp_us = res->timestamp * 1000;
+		log_record->fw_timestamp_us = res->timestamp;
 		log_record->roam_result.roam_fail_reason = res->fail_reason;
-		log_record->roam_result.is_roam_successful = res->status;
+		log_record->roam_result.roam_status = res->status;
 	}
 
 	wlan_connectivity_log_enqueue(log_record);
@@ -5111,7 +5107,7 @@ cm_roam_btm_query_event(struct wmi_neighbor_report_data *btm_data,
 		return QDF_STATUS_E_NOMEM;
 
 	log_record->log_subtype = WLAN_BTM_QUERY;
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
 	log_record->fw_timestamp_us = btm_data->timestamp * 1000;
 	log_record->vdev_id = vdev_id;
 
@@ -5137,7 +5133,7 @@ cm_roam_btm_resp_event(struct roam_btm_response_data *btm_data,
 	else
 		log_record->log_subtype = WLAN_BTM_RESP;
 
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
 	log_record->fw_timestamp_us = btm_data->timestamp * 1000;
 	log_record->vdev_id = vdev_id;
 
@@ -5175,7 +5171,7 @@ cm_roam_btm_candidate_event(struct wmi_btm_req_candidate_info *btm_data,
 		return QDF_STATUS_E_NOMEM;
 
 	log_record->log_subtype = WLAN_BTM_REQ_CANDI;
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
 	log_record->fw_timestamp_us = btm_data->timestamp * 1000;
 	log_record->vdev_id = vdev_id;
 	log_record->btm_cand.preference = btm_data->preference;
@@ -5200,7 +5196,7 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 		return QDF_STATUS_E_NOMEM;
 
 	log_record->log_subtype = WLAN_BTM_REQ;
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
 	log_record->fw_timestamp_us = btm_data->timestamp * 1000;
 	log_record->vdev_id = vdev_id;
 
@@ -5230,12 +5226,12 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data, uint8_t vdev_id)
 	if (!log_record)
 		return QDF_STATUS_E_NOMEM;
 
-	log_record->timestamp_us = qdf_get_time_of_the_day_us();
+	log_record->timestamp_us = qdf_get_time_of_the_day_ms() * 1000;
 	log_record->fw_timestamp_us = frame_data->timestamp * 1000;
 	log_record->vdev_id = vdev_id;
 
 	log_record->pkt_info.seq_num = frame_data->seq_num;
-	log_record->pkt_info.rssi = (-1) * frame_data->rssi;
+	log_record->pkt_info.rssi = frame_data->rssi;
 	log_record->pkt_info.tx_status = frame_data->tx_status;
 	log_record->pkt_info.frame_status_code = frame_data->status_code;
 
