@@ -495,6 +495,15 @@ static void lim_process_hw_mode_trans_ind(struct mac_context *mac, void *body)
 			ind->vdev_mac_map[i].mac_id;
 	}
 
+	param->num_freq_map = ind->num_freq_map;
+	for (i = 0; i < param->num_freq_map; i++) {
+		param->mac_freq_map[i].pdev_id =
+			ind->mac_freq_map[i].pdev_id;
+		param->mac_freq_map[i].start_freq =
+			ind->mac_freq_map[i].start_freq;
+		param->mac_freq_map[i].end_freq =
+			ind->mac_freq_map[i].end_freq;
+	}
 	/* TODO: Update this HW mode info in any UMAC params, if needed */
 
 	msg.type = eWNI_SME_HW_MODE_TRANS_IND;
@@ -2076,15 +2085,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
-#ifndef ROAM_TARGET_IF_CONVERGENCE
-	case WMA_ROAM_BLACKLIST_MSG:
-		lim_add_roam_blacklist_ap(mac_ctx,
-					  (struct roam_blacklist_event *)
-					  msg->bodyptr);
-		qdf_mem_free((void *)msg->bodyptr);
-		msg->bodyptr = NULL;
-		break;
-#endif
 	case SIR_LIM_PROCESS_DEFERRED_QUEUE:
 		break;
 	case CM_BSS_PEER_CREATE_REQ:

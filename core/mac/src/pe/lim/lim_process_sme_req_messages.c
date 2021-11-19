@@ -66,16 +66,6 @@
 #include "wlan_reg_services_api.h"
 #include <lim_mlo.h>
 
-#define LIM_QOS_AP_SUPPORTS_UAPSD         0x80
-
-#define LIM_IS_QOS_BSS(ie_struct)  \
-		(ie_struct->WMMParams.present || ie_struct->WMMInfoAp.present)
-
-#define LIM_IS_UAPSD_BSS(ie_struct) \
-	((ie_struct->WMMParams.present && \
-	 (ie_struct->WMMParams.qosInfo & LIM_QOS_AP_SUPPORTS_UAPSD)) || \
-	 (ie_struct->WMMInfoAp.present && ie_struct->WMMInfoAp.uapsd))
-
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
 static bool __lim_process_sme_start_bss_req(struct mac_context *,
@@ -2869,20 +2859,18 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 
 	session->enable_session_twt_support =
 					lim_enable_twt(mac_ctx, ie_struct);
-
-	cb_mode = wlan_get_cb_mode(mac_ctx, session->curr_op_freq, ie_struct);
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
-	    session->force_24ghz_in_ht20) {
-		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
-		pe_debug("force_24ghz_in_ht20 is set so set cbmode to 0");
-	}
-
 	status = lim_fill_dot11_mode(mac_ctx, session, ie_struct);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		status = QDF_STATUS_E_FAILURE;
 		goto send;
 	}
-
+	cb_mode = wlan_get_cb_mode(mac_ctx, session->curr_op_freq, ie_struct,
+				   session);
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
+	    session->force_24ghz_in_ht20) {
+		cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
+		pe_debug("force_24ghz_in_ht20 is set so set cbmode to 0");
+	}
 	status = wlan_get_rate_set(mac_ctx, ie_struct, session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Get rate failed vdev id %d", session->vdev_id);
@@ -4322,7 +4310,8 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	session_entry->lim_reassoc_chan_freq = req->entry->channel.chan_freq;
 	cb_mode = wlan_get_cb_mode(mac_ctx,
 				  session_entry->lim_reassoc_chan_freq,
-				  ie_struct);
+				  ie_struct,
+				  session_entry);
 	session_entry->reAssocHtSupportedChannelWidthSet = cb_mode ? 1 : 0;
 	session_entry->reAssocHtRecommendedTxWidthSet =
 		session_entry->reAssocHtSupportedChannelWidthSet;
@@ -9224,43 +9213,3 @@ void lim_continue_sta_csa_req(struct mac_context *mac_ctx, uint8_t vdev_id)
 	pe_info("Continue CSA for STA vdev id %d", vdev_id);
 	lim_process_channel_switch(mac_ctx, vdev_id);
 }
-
-#ifndef ROAM_TARGET_IF_CONVERGENCE
-void lim_add_roam_blacklist_ap(struct mac_context *mac_ctx,
-			       struct roam_blacklist_event *src_lst)
-{
-	uint32_t i;
-	struct sir_rssi_disallow_lst entry;
-	struct roam_blacklist_timeout *blacklist;
-
-	pe_debug("Received Blacklist event from FW num entries %d",
-		 src_lst->num_entries);
-	blacklist = &src_lst->roam_blacklist[0];
-	for (i = 0; i < src_lst->num_entries; i++) {
-
-		entry.bssid = blacklist->bssid;
-		entry.time_during_rejection = blacklist->received_time;
-		entry.reject_reason = blacklist->reject_reason;
-		entry.source = blacklist->source ? blacklist->source :
-						   ADDED_BY_TARGET;
-		entry.original_timeout = blacklist->original_timeout;
-		entry.received_time = blacklist->received_time;
-		/* If timeout = 0 and rssi = 0 ignore the entry */
-		if (!blacklist->timeout && !blacklist->rssi) {
-			continue;
-		} else if (blacklist->timeout) {
-			entry.retry_delay = blacklist->timeout;
-			/* set 0dbm as expected rssi */
-			entry.expected_rssi = LIM_MIN_RSSI;
-		} else {
-			/* blacklist timeout as 0 */
-			entry.retry_delay = blacklist->timeout;
-			entry.expected_rssi = blacklist->rssi;
-		}
-
-		/* Add this bssid to the rssi reject ap type in blacklist mgr */
-		lim_add_bssid_to_reject_list(mac_ctx->pdev, &entry);
-		blacklist++;
-	}
-}
-#endif

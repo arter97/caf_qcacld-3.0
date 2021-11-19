@@ -853,7 +853,6 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac, uint8_t nChannelNum,
 			       tDot11fIEExtSuppRates *pDot11f,
 			       struct pe_session *pe_session)
 {
-	QDF_STATUS nsir_status;
 	qdf_size_t n_rates = 0;
 	uint8_t rates[SIR_MAC_MAX_NUMBER_OF_RATES];
 
@@ -874,15 +873,9 @@ populate_dot11f_ext_supp_rates(struct mac_context *mac, uint8_t nChannelNum,
 			pe_err("null pe_session");
 			return QDF_STATUS_E_INVAL;
 		}
-		n_rates = SIR_MAC_MAX_NUMBER_OF_RATES;
-		nsir_status = mlme_get_ext_opr_rate(pe_session->vdev, rates,
-						    &n_rates);
-		if (QDF_IS_STATUS_ERROR(nsir_status)) {
-			n_rates = 0;
-			pe_err("Failed to retrieve nItem from CFG status: %d",
-			       (nsir_status));
-			return nsir_status;
-		}
+
+		n_rates = mlme_get_ext_opr_rate(pe_session->vdev, rates,
+						sizeof(rates));
 	}
 
 	if (0 != n_rates) {
@@ -1100,7 +1093,8 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 
 ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 				   qdf_freq_t ch_freq,
-				   tDot11fBeaconIEs *ie_struct)
+				   tDot11fBeaconIEs *ie_struct,
+				   struct pe_session *pe_session)
 {
 	ePhyChanBondState cb_mode = PHY_SINGLE_CHANNEL_CENTERED;
 	uint32_t sec_ch_freq = 0;
@@ -1116,6 +1110,11 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 	}
 
 	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE)
+		return PHY_SINGLE_CHANNEL_CENTERED;
+
+	if (pe_session->dot11mode == MLME_DOT11_MODE_11A ||
+	    pe_session->dot11mode == MLME_DOT11_MODE_11G ||
+	    pe_session->dot11mode == MLME_DOT11_MODE_11B)
 		return PHY_SINGLE_CHANNEL_CENTERED;
 
 	if (!(ie_struct->HTCaps.present && (eHT_CHANNEL_WIDTH_40MHZ ==
@@ -1302,8 +1301,12 @@ populate_dot11f_vht_caps(struct mac_context *mac,
 			return QDF_STATUS_SUCCESS;
 		}
 
-		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq))
+		if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)) {
 			pDot11f->supportedChannelWidthSet = 0;
+		} else {
+			if (pe_session->ch_width <= CH_WIDTH_80MHZ)
+				pDot11f->supportedChannelWidthSet = 0;
+		}
 
 		if (pe_session->ht_config.adv_coding_cap)
 			pDot11f->ldpcCodingCap =
@@ -6558,6 +6561,16 @@ QDF_STATUS populate_dot11f_he_caps(struct mac_context *mac_ctx, struct pe_sessio
 	}
 	populate_dot11f_twt_he_cap(mac_ctx, session, he_cap);
 
+	if (wlan_reg_is_5ghz_ch_freq(session->curr_op_freq) ||
+	    wlan_reg_is_6ghz_chan_freq(session->curr_op_freq)) {
+		if (session->ch_width <= CH_WIDTH_80MHZ) {
+			he_cap->chan_width_2 = 0;
+			he_cap->chan_width_3 = 0;
+		} else if (session->ch_width == CH_WIDTH_160MHZ) {
+			he_cap->chan_width_3 = 0;
+		}
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -7739,7 +7752,6 @@ QDF_STATUS
 sir_convert_mlo_probe_rsp_frame2_struct(tDot11fProbeResponse *pr,
 					tpSirMultiLink_IE mlo_ie_ptr)
 {
-	tDot11fIEmlo_ie *mlo_ie;
 	tDot11fIEsta_profile *sta_prof, *pStaProf;
 
 	if (!pr)
@@ -7749,10 +7761,6 @@ sir_convert_mlo_probe_rsp_frame2_struct(tDot11fProbeResponse *pr,
 		pe_err("MLO IE not present");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-
-	mlo_ie = qdf_mem_malloc(sizeof(*mlo_ie));
-	if (!mlo_ie)
-		return QDF_STATUS_E_FAILURE;
 
 	qdf_mem_zero((uint8_t *)mlo_ie_ptr, sizeof(tSirMultiLink_IE));
 
@@ -7903,13 +7911,16 @@ QDF_STATUS wlan_parse_bss_description_ies(struct mac_context *mac_ctx,
 {
 	int ie_len = wlan_get_ielen_from_bss_description(bss_desc);
 
-	if (ie_len <= 0 || !ie_struct)
+	if (ie_len <= 0 || !ie_struct) {
+		pe_err("BSS description has invalid IE : %d", ie_len);
 		return QDF_STATUS_E_FAILURE;
-
+	}
 	if (DOT11F_FAILED(dot11f_unpack_beacon_i_es
 			  (mac_ctx, (uint8_t *)bss_desc->ieFields,
-			  ie_len, ie_struct, false)))
+			  ie_len, ie_struct, false))) {
+		pe_err("Beacon IE parsing failed");
 		return QDF_STATUS_E_FAILURE;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

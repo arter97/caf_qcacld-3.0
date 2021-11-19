@@ -396,9 +396,6 @@ enum wmamsgtype {
 	WMA_POWER_DEBUG_STATS_REQ = SIR_HAL_POWER_DEBUG_STATS_REQ,
 	WMA_BEACON_DEBUG_STATS_REQ = SIR_HAL_BEACON_DEBUG_STATS_REQ,
 	WMA_GET_RCPI_REQ = SIR_HAL_GET_RCPI_REQ,
-#ifndef ROAM_TARGET_IF_CONVERGENCE
-	WMA_ROAM_BLACKLIST_MSG = SIR_HAL_ROAM_BLACKLIST_MSG,
-#endif
 	WMA_SET_DBS_SCAN_SEL_CONF_PARAMS = SIR_HAL_SET_DBS_SCAN_SEL_PARAMS,
 
 	WMA_SET_WOW_PULSE_CMD = SIR_HAL_SET_WOW_PULSE_CMD,
@@ -459,6 +456,7 @@ enum wmamsgtype {
 		      (pCompFunc), \
 		      (pData), \
 		      (NULL), \
+		      (NULL), \
 		      (txFlag), \
 		      (sessionid), \
 		      (false), \
@@ -467,8 +465,8 @@ enum wmamsgtype {
 		      (peer_rssi)))
 
 #define wma_tx_frameWithTxComplete(hHal, pFrmBuf, frmLen, frmType, txDir, tid, \
-	 pCompFunc, pData, pCBackFnTxComp, txFlag, sessionid, tdlsflag, \
-	 channel_freq, rid, peer_rssi) \
+	 pCompFunc, pData, pCBackFnTxComp, ota_comp_data, txFlag, sessionid, \
+	 tdlsflag, channel_freq, rid, peer_rssi) \
 	(QDF_STATUS)( wma_tx_packet( \
 		      cds_get_context(QDF_MODULE_ID_WMA), \
 		      (pFrmBuf), \
@@ -479,6 +477,7 @@ enum wmamsgtype {
 		      (pCompFunc), \
 		      (pData), \
 		      (pCBackFnTxComp), \
+		      (ota_comp_data), \
 		      (txFlag), \
 		      (sessionid), \
 		      (tdlsflag), \
@@ -671,7 +670,8 @@ void wma_tx_abort(uint8_t vdev_id);
  * @tid: TID
  * @tx_frm_download_comp_cb: tx download callback handler
  * @pData: tx packet
- * @tx_frm_ota_comp_cb: OTA complition handler
+ * @tx_frm_ota_comp_cb: OTA completion handler
+ * @ota_comp_data: OTA completion data
  * @tx_flag: tx flag
  * @vdev_id: vdev id
  * @tdls_flag: tdls flag
@@ -690,6 +690,7 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_dwnld_comp_callback tx_frm_download_comp_cb,
 			 void *pData,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
+			 struct mgmt_frame_data *ota_comp_data,
 			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
 			 uint16_t channel_freq, enum rateid rid,
 			 int8_t peer_rssi);

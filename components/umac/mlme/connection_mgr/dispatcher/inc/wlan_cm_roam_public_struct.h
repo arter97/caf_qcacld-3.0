@@ -109,6 +109,9 @@
 #define MAX_BSSID_FAVORED      16
 #define WLAN_MAX_BTM_CANDIDATES      8
 
+/* Default value of WTC reason code */
+#define DISABLE_VENDOR_BTM_CONFIG 2
+
 #ifdef WLAN_FEATURE_HOST_ROAM
 #define MAX_FTIE_SIZE CM_MAX_FTIE_SIZE
 #else
@@ -316,6 +319,88 @@ enum roam_fail_params {
 	ROAM_TRIGGER_REASON,
 	ROAM_INVOKE_FAIL_REASON,
 	ROAM_FAIL_REASON,
+};
+
+/**
+ * enum wlan_roam_failure_reason_code - Roaming failure reason codes
+ * @ROAM_FAIL_REASON_NO_SCAN_START: Scan start failed
+ * @ROAM_FAIL_REASON_NO_AP_FOUND: No roamable AP found
+ * @ROAM_FAIL_REASON_NO_CAND_AP_FOUND: No candidate AP found
+ * @ROAM_FAIL_REASON_HOST: Host aborted roaming due to vdev stop from
+ * host
+ * @ROAM_FAIL_REASON_AUTH_SEND: Auth TX failure
+ * @ROAM_FAIL_REASON_NO_AUTH_RESP: No Authentication response received
+ * @ROAM_FAIL_REASON_AUTH_RECV: Authentication response received with
+ * error status code
+ * @ROAM_FAIL_REASON_REASSOC_SEND: Reassoc request TX failed
+ * @ROAM_FAIL_REASON_REASSOC_RECV: Reassoc response frame not received
+ * @ROAM_FAIL_REASON_NO_REASSOC_RESP: No reassociation response received
+ * @ROAM_FAIL_REASON_EAPOL_TIMEOUT: EAPoL timedout
+ * @ROAM_FAIL_REASON_MLME: MLME internal error
+ * @ROAM_FAIL_REASON_INTERNAL_ABORT: Abort due to internal firmware error
+ * @ROAM_FAIL_REASON_SCAN_START: Not able to start roam scan
+ * @ROAM_FAIL_REASON_AUTH_NO_ACK: No ack received for Auth request frame
+ * @ROAM_FAIL_REASON_AUTH_INTERNAL_DROP: Auth request dropped internally
+ * @ROAM_FAIL_REASON_REASSOC_NO_ACK: No ack received for reassoc request frame
+ * @ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP: Reassoc frame dropped internally
+ * at firmware
+ * @ROAM_FAIL_REASON_EAPOL_M2_SEND: EAPoL M2 send failed
+ * @ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP: EAPoL M2 frame dropped internally
+ * at firmware
+ * @ROAM_FAIL_REASON_EAPOL_M2_NO_ACK: No ack received for EAPoL M2 frame
+ * @ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT: EAPoL M3 not received from AP
+ * @ROAM_FAIL_REASON_EAPOL_M4_SEND: EAPoL M4 frame TX failed
+ * @ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP: EAPoL M4 frame dropped internally
+ * @ROAM_FAIL_REASON_EAPOL_M4_NO_ACK: No ack received for EAPoL M4 frame
+ * @ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS: Roam scan start failed for final
+ * bmiss case
+ * @ROAM_FAIL_REASON_DISCONNECT: Deauth/Disassoc frame received from AP during
+ * roaming
+ * @ROAM_FAIL_REASON_SYNC: Roam failure due to host wake-up during roaming in
+ * progress
+ * @ROAM_FAIL_REASON_SAE_INVALID_PMKID: Invalid PMKID during SAE roaming
+ * @ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT: SAE roaming preauthentication
+ * timedout
+ * @ROAM_FAIL_REASON_SAE_PREAUTH_FAIL: SAE preauthentication failure
+ * @ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO: Start handoff failed
+ * @ROAM_FAIL_REASON_UNKNOWN: Default reason
+ */
+enum wlan_roam_failure_reason_code {
+	ROAM_FAIL_REASON_NO_SCAN_START = 1,
+	ROAM_FAIL_REASON_NO_AP_FOUND,
+	ROAM_FAIL_REASON_NO_CAND_AP_FOUND,
+
+	/* Failure reasons after roam scan is complete */
+	ROAM_FAIL_REASON_HOST,
+	ROAM_FAIL_REASON_AUTH_SEND,
+	ROAM_FAIL_REASON_NO_AUTH_RESP,
+	ROAM_FAIL_REASON_AUTH_RECV,
+	ROAM_FAIL_REASON_REASSOC_SEND,
+	ROAM_FAIL_REASON_REASSOC_RECV,
+	ROAM_FAIL_REASON_NO_REASSOC_RESP,
+	ROAM_FAIL_REASON_EAPOL_TIMEOUT,
+	ROAM_FAIL_REASON_MLME,
+	ROAM_FAIL_REASON_INTERNAL_ABORT,
+	ROAM_FAIL_REASON_SCAN_START,
+	ROAM_FAIL_REASON_AUTH_NO_ACK,
+	ROAM_FAIL_REASON_AUTH_INTERNAL_DROP,
+	ROAM_FAIL_REASON_REASSOC_NO_ACK,
+	ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP,
+	ROAM_FAIL_REASON_EAPOL_M2_SEND,
+	ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP,
+	ROAM_FAIL_REASON_EAPOL_M2_NO_ACK,
+	ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT,
+	ROAM_FAIL_REASON_EAPOL_M4_SEND,
+	ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP,
+	ROAM_FAIL_REASON_EAPOL_M4_NO_ACK,
+	ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS,
+	ROAM_FAIL_REASON_DISCONNECT,
+	ROAM_FAIL_REASON_SYNC,
+	ROAM_FAIL_REASON_SAE_INVALID_PMKID,
+	ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT,
+	ROAM_FAIL_REASON_SAE_PREAUTH_FAIL,
+	ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO,
+	ROAM_FAIL_REASON_UNKNOWN = 255,
 };
 
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -1894,7 +1979,6 @@ enum roam_reason {
 	ROAM_REASON_DEAUTH,
 };
 
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 /*
  * struct roam_blacklist_timeout - BTM blacklist entry
  * @bssid: bssid that is to be blacklisted
@@ -1976,7 +2060,6 @@ enum roam_dispatcher_events {
 	ROAM_PMKID_REQ_EVENT,
 	ROAM_VDEV_DISCONNECT_EVENT,
 };
-#endif
 
 /**
  * struct roam_offload_roam_event: Data carried by roam event
@@ -2147,6 +2230,11 @@ struct cm_roam_values_copy {
 #define MAX_PN_LEN 8
 #define MAX_KEY_LEN 32
 
+/* MAX_FREQ_RANGE_NUM shouldn't exceed as only in case od SBS there will be 3
+ * frequency ranges, For DBS, it will be 2. For SMM, it will be 1
+ */
+#define MAX_FREQ_RANGE_NUM 3
+
 /**
  * struct cm_ho_fail_ind - ho fail indication to CM
  * @vdev_id: vdev id
@@ -2170,6 +2258,18 @@ struct policy_mgr_vdev_mac_map {
 };
 
 /**
+ * struct policy_mgr_pdev_mac_freq_map - vdev id-mac id map
+ * @pdev_id: Pdev id, macros starting with WMI_PDEV_ID_
+ * @start_freq: Start Frequency in Mhz
+ * @end_freq: End Frequency in Mhz
+ */
+struct policy_mgr_pdev_mac_freq_map {
+	uint32_t pdev_id;
+	qdf_freq_t start_freq;
+	qdf_freq_t end_freq;
+};
+
+/**
  * struct cm_hw_mode_trans_ind - HW mode transition indication
  * @old_hw_mode_index: Index of old HW mode
  * @new_hw_mode_index: Index of new HW mode
@@ -2181,6 +2281,8 @@ struct cm_hw_mode_trans_ind {
 	uint32_t new_hw_mode_index;
 	uint32_t num_vdev_mac_entries;
 	struct policy_mgr_vdev_mac_map vdev_mac_map[MAX_VDEV_SUPPORTED];
+	uint32_t num_freq_map;
+	struct policy_mgr_pdev_mac_freq_map mac_freq_map[MAX_FREQ_RANGE_NUM];
 };
 
 /*
@@ -2224,6 +2326,7 @@ struct roam_offload_synch_ind {
 	uint8_t isBeacon;
 	uint8_t roamed_vdev_id;
 	struct qdf_mac_addr bssid;
+	struct wlan_ssid ssid;
 	struct qdf_mac_addr self_mac;
 	int8_t txMgmtPower;
 	uint32_t auth_status;
@@ -2287,7 +2390,6 @@ struct wlan_cm_roam_rx_ops {
 	QDF_STATUS (*roam_sync_frame_event)(struct wlan_objmgr_psoc *psoc,
 					    struct roam_synch_frame_ind *frm);
 	QDF_STATUS (*roam_event_rx)(struct roam_offload_roam_event *roam_event);
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 	QDF_STATUS (*btm_blacklist_event)(struct wlan_objmgr_psoc *psoc,
 					  struct roam_blacklist_event *list);
 	QDF_STATUS
@@ -2301,6 +2403,5 @@ struct wlan_cm_roam_rx_ops {
 	(*roam_auth_offload_event)(struct auth_offload_event *auth_event);
 	QDF_STATUS
 	(*roam_pmkid_request_event_rx)(struct roam_pmkid_req_event *list);
-#endif
 };
 #endif

@@ -24,20 +24,23 @@
 #include "wlan_mlme_main.h"
 #include "wlan_connectivity_logging.h"
 
-#ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 static struct wlan_connectivity_log_buf_data global_cl;
 
 static void
-wlan_connectivity_logging_register_callbacks(struct wlan_cl_hdd_cbks *hdd_cbks)
+wlan_connectivity_logging_register_callbacks(
+				struct wlan_cl_osif_cbks *osif_cbks,
+				void *osif_cb_context)
 {
-	global_cl.hdd_cbks.wlan_connectivity_log_send_to_usr =
-			hdd_cbks->wlan_connectivity_log_send_to_usr;
+	global_cl.osif_cbks.wlan_connectivity_log_send_to_usr =
+			osif_cbks->wlan_connectivity_log_send_to_usr;
+	global_cl.osif_cb_context = osif_cb_context;
 }
 
-void wlan_connectivity_logging_start(struct wlan_cl_hdd_cbks *hdd_cbks)
+void wlan_connectivity_logging_start(struct wlan_cl_osif_cbks *osif_cbks,
+				     void *osif_cb_context)
 {
-	global_cl.head = vzalloc(sizeof(*global_cl.head) *
-					 WLAN_MAX_LOG_RECORDS);
+	global_cl.head = qdf_mem_valloc(sizeof(*global_cl.head) *
+					WLAN_MAX_LOG_RECORDS);
 	if (!global_cl.head) {
 		QDF_BUG(0);
 		return;
@@ -53,7 +56,8 @@ void wlan_connectivity_logging_start(struct wlan_cl_hdd_cbks *hdd_cbks)
 	global_cl.write_ptr = global_cl.head;
 	global_cl.max_records = WLAN_MAX_LOG_RECORDS;
 
-	wlan_connectivity_logging_register_callbacks(hdd_cbks);
+	wlan_connectivity_logging_register_callbacks(osif_cbks,
+						     osif_cb_context);
 	qdf_atomic_set(&global_cl.is_active, 1);
 }
 
@@ -62,6 +66,9 @@ void wlan_connectivity_logging_stop(void)
 	if (!qdf_atomic_read(&global_cl.is_active))
 		return;
 
+	global_cl.osif_cb_context = NULL;
+	global_cl.osif_cbks.wlan_connectivity_log_send_to_usr = NULL;
+
 	qdf_atomic_set(&global_cl.is_active, 0);
 	global_cl.read_ptr = NULL;
 	global_cl.write_ptr = NULL;
@@ -69,10 +76,45 @@ void wlan_connectivity_logging_stop(void)
 	global_cl.read_idx = 0;
 	global_cl.write_idx = 0;
 
-	vfree(global_cl.head);
+	qdf_mem_vfree(global_cl.head);
 	global_cl.head = NULL;
 }
-#endif
+
+void
+wlan_connectivity_mgmt_event(struct wlan_frame_hdr *mac_hdr,
+			     uint8_t vdev_id, uint16_t status_code,
+			     enum qdf_dp_tx_rx_status tx_status,
+			     int8_t peer_rssi,
+			     uint8_t auth_algo, uint8_t auth_type,
+			     uint8_t auth_seq, enum wlan_main_tag tag)
+{
+	struct wlan_log_record *new_rec;
+
+	new_rec = qdf_mem_malloc(sizeof(*new_rec));
+	if (!new_rec)
+		return;
+
+	new_rec->timestamp_us = qdf_get_time_of_the_day_us();
+	new_rec->vdev_id = vdev_id;
+	new_rec->log_subtype = tag;
+	qdf_copy_macaddr(&new_rec->bssid,
+			 (struct qdf_mac_addr *)&mac_hdr->i_addr3[0]);
+
+	new_rec->pkt_info.tx_status = tx_status;
+	new_rec->pkt_info.rssi = peer_rssi;
+	new_rec->pkt_info.seq_num =
+		(le16toh(*(uint16_t *)mac_hdr->i_seq) >> WLAN_SEQ_SEQ_SHIFT);
+	new_rec->pkt_info.frame_status_code = status_code;
+	new_rec->pkt_info.auth_algo = auth_algo;
+	new_rec->pkt_info.auth_type = auth_type;
+	new_rec->pkt_info.auth_seq_num = auth_seq;
+	new_rec->pkt_info.is_retry_frame =
+		(mac_hdr->i_fc[1] & IEEE80211_FC1_RETRY);
+
+	wlan_connectivity_log_enqueue(new_rec);
+
+	qdf_mem_free(new_rec);
+}
 
 static bool wlan_logging_is_queue_empty(void)
 {
@@ -97,8 +139,19 @@ wlan_connectivity_log_enqueue(struct wlan_log_record *new_record)
 {
 	struct wlan_log_record *write_block;
 
+	if (!new_record) {
+		logging_debug("NULL entry");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (new_record->log_subtype >= WLAN_TAG_MAX) {
+		logging_debug("Enqueue failed subtype:%d",
+			      new_record->log_subtype);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	/*
-	 * This API writes to the logging buffer if the buffer is empty.
+	 * This API writes to the logging buffer if the buffer is not full.
 	 * 1. Acquire the write spinlock.
 	 * 2. Copy the record to the write block.
 	 * 3. Update the write pointer
@@ -107,14 +160,14 @@ wlan_connectivity_log_enqueue(struct wlan_log_record *new_record)
 	qdf_spin_lock_bh(&global_cl.write_ptr_lock);
 
 	write_block = global_cl.write_ptr;
-	/* If the buffer is not empty, increment the dropped msgs counter and
+	/* If the buffer is full, increment the dropped msgs counter and
 	 * return
 	 */
 	if (global_cl.read_ptr == global_cl.write_ptr &&
 	    write_block->is_record_filled) {
 		qdf_spin_unlock_bh(&global_cl.write_ptr_lock);
 		qdf_atomic_inc(&global_cl.dropped_msgs);
-		logging_debug("vdev:%d dropping msg sub-type:%d total drpd:%d",
+		logging_debug("vdev:%d dropping msg sub-type:%d total dropped:%d",
 			      new_record->vdev_id, new_record->log_subtype,
 			      qdf_atomic_read(&global_cl.dropped_msgs));
 		wlan_logging_set_connectivity_log();
@@ -142,6 +195,8 @@ QDF_STATUS
 wlan_connectivity_log_dequeue(void)
 {
 	struct wlan_log_record *data;
+	struct wlan_cl_osif_cbks *osif_cbk;
+	void *osif_cb_context;
 	uint8_t idx = 0;
 	uint64_t current_timestamp, time_delta;
 
@@ -176,6 +231,12 @@ wlan_connectivity_log_dequeue(void)
 		global_cl.sent_msgs_count %= WLAN_RECORDS_PER_SEC;
 		data[idx] = *global_cl.read_ptr;
 
+		/*
+		 * Reset the read block after copy. This will set the
+		 * is_record_filled to false.
+		 */
+		qdf_mem_zero(global_cl.read_ptr, sizeof(*global_cl.read_ptr));
+
 		global_cl.read_idx++;
 		global_cl.read_idx %= global_cl.max_records;
 
@@ -184,12 +245,19 @@ wlan_connectivity_log_dequeue(void)
 
 		global_cl.sent_msgs_count++;
 		idx++;
-		if (idx >= MAX_RECORD_IN_SINGLE_EVT)
+
+		if (idx >= MAX_RECORD_IN_SINGLE_EVT) {
+			wlan_logging_set_connectivity_log();
 			break;
+		}
 	}
 
-	if (global_cl.hdd_cbks.wlan_connectivity_log_send_to_usr)
-		global_cl.hdd_cbks.wlan_connectivity_log_send_to_usr(data, idx);
+	osif_cbk = &global_cl.osif_cbks;
+	osif_cb_context = global_cl.osif_cb_context;
+	if (osif_cbk->wlan_connectivity_log_send_to_usr)
+		osif_cbk->wlan_connectivity_log_send_to_usr(data,
+							   osif_cb_context,
+							   idx);
 
 	qdf_mem_free(data);
 

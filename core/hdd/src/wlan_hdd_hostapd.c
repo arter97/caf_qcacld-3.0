@@ -687,6 +687,29 @@ QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS hdd_get_sap_ht2040_mode(struct hdd_adapter *adapter,
+				   enum eSirMacHTChannelType *channel_type)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	mac_handle_t mac_handle;
+
+	hdd_debug("get HT20/40 mode vdev_id %d", adapter->vdev_id);
+
+	if (adapter->device_mode == QDF_SAP_MODE) {
+		mac_handle = adapter->hdd_ctx->mac_handle;
+		if (!mac_handle) {
+			hdd_err("mac handle is null");
+			return status;
+		}
+		status = sme_get_ht2040_mode(mac_handle, adapter->vdev_id,
+					     channel_type);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_err("Failed to get HT20/40 mode");
+	}
+
+	return status;
+}
 #endif
 
 /**
@@ -5288,10 +5311,18 @@ static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
 		wlan_hdd_get_mlo_link_id(beacon, &link_id, &num_link);
 		hdd_debug("MLO SAP vdev id %d, link id %d total link %d",
 			  adapter->vdev_id, link_id, num_link);
-		if (!num_link)
+		if (!num_link) {
+			hdd_debug("start 11be AP without mlo");
+			return QDF_STATUS_SUCCESS;
+		}
+		if (!mlo_ap_vdev_attach(adapter->vdev, link_id, num_link)) {
+			hdd_err("MLO SAP attach fails");
 			return QDF_STATUS_E_INVAL;
-		if (!mlo_ap_vdev_attach(adapter->vdev, link_id, num_link))
-			return QDF_STATUS_E_INVAL;
+		}
+
+		config->mlo_sap = true;
+		config->link_id = link_id;
+		config->num_link = num_link;
 	}
 
 	if (!policy_mgr_is_mlo_sap_concurrency_allowed(
@@ -5303,16 +5334,14 @@ static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_hdd_mlo_reset() - reset mlo configuration if start bss fails
- * @adapter: Pointer to hostapd adapter
- *
- * Return: void
- */
-static void wlan_hdd_mlo_reset(struct hdd_adapter *adapter)
+void wlan_hdd_mlo_reset(struct hdd_adapter *adapter)
 {
-	if (wlan_vdev_mlme_is_mlo_ap(adapter->vdev))
+	if (wlan_vdev_mlme_is_mlo_ap(adapter->vdev)) {
+		adapter->session.ap.sap_config.mlo_sap = false;
+		adapter->session.ap.sap_config.link_id = 0;
+		adapter->session.ap.sap_config.num_link = 0;
 		mlo_ap_vdev_detach(adapter->vdev);
+	}
 }
 #else
 static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
@@ -5321,10 +5350,6 @@ static QDF_STATUS wlan_hdd_mlo_update(struct hdd_context *hdd_ctx,
 				      struct hdd_beacon_data *beacon)
 {
 	return QDF_STATUS_SUCCESS;
-}
-
-static void wlan_hdd_mlo_reset(struct hdd_adapter *adapter)
-{
 }
 #endif
 

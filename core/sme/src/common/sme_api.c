@@ -76,6 +76,7 @@
 #include <wlan_mlme_twt_api.h>
 #include "wlan_cm_roam_ucfg_api.h"
 #include <cm_utf.h>
+#include <wlan_mlo_mgr_sta.h>
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -268,7 +269,8 @@ static QDF_STATUS sme_process_hw_mode_trans_ind(struct mac_context *mac,
 	policy_mgr_hw_mode_transition_cb(param->old_hw_mode_index,
 		param->new_hw_mode_index,
 		param->num_vdev_mac_entries,
-		param->vdev_mac_map, mac->psoc);
+		param->vdev_mac_map, param->num_freq_map, param->mac_freq_map,
+		mac->psoc);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1918,7 +1920,7 @@ static QDF_STATUS sme_process_antenna_mode_resp(struct mac_context *mac,
  * to iterate through the list of all peers and check for any given @dialog_id
  * if the command @cmd is in progress.
  * Note: If @peer_mac is broadcast MAC address then @dialog_id shall always
- * be WLAN_ALL_SESSIONS_DIALOG_ID.
+ * be TWT_ALL_SESSIONS_DIALOG_ID.
  * For ex: If TWT teardown command is issued on a particular @dialog_id and
  * non-broadcast peer mac and FW response is not yet received then for that
  * particular @dialog_id and @peer_mac, TWT teardown is the active command,
@@ -1959,7 +1961,7 @@ sme_sap_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
  * If the input @peer_mac is a broadcast MAC address then there is nothing
  * to do, because the initialized structure is already in the expected format
  * Note: If @peer_mac is broadcast MAC address then @dialog_id shall always
- * be WLAN_ALL_SESSIONS_DIALOG_ID.
+ * be TWT_ALL_SESSIONS_DIALOG_ID.
  *
  * If the input @peer_mac is a non-broadcast MAC address then
  * mlme_add_twt_session() shall add the @dialog_id to the @peer_mac
@@ -1990,7 +1992,7 @@ sme_sap_add_twt_session(struct wlan_objmgr_psoc *psoc,
  * to iterate through the list of all peers and set the active command to @cmd
  * for the given @dialog_id
  * Note: If @peer_mac is broadcast MAC address then @dialog_id shall always
- * be WLAN_ALL_SESSIONS_DIALOG_ID.
+ * be TWT_ALL_SESSIONS_DIALOG_ID.
  * For ex: If TWT teardown command is issued on broadcast @peer_mac, then
  * it is same as issuing TWT teardown for all the peers (all TWT sessions).
  * Invoking mlme_sap_set_twt_all_peers_cmd_in_progress() shall iterate through
@@ -2032,7 +2034,7 @@ sme_sap_set_twt_command_in_progress(struct wlan_objmgr_psoc *psoc,
  * to iterate through the list of all peers and initialize the TWT session
  * context
  * Note: If @peer_mac is broadcast MAC address then @dialog_id shall always
- * be WLAN_ALL_SESSIONS_DIALOG_ID.
+ * be TWT_ALL_SESSIONS_DIALOG_ID.
  * For ex: If TWT teardown command is issued on broadcast @peer_mac, then
  * it is same as issuing TWT teardown for all the peers (all TWT sessions).
  * Then active command for all the peers is set to @WLAN_TWT_TERMINATE.
@@ -2234,7 +2236,7 @@ sme_process_sta_twt_del_dialog_event(
 					WLAN_TWT_TERMINATE, &active_cmd);
 
 	if (!is_evt_allowed &&
-	    param->dialog_id != WLAN_ALL_SESSIONS_DIALOG_ID &&
+	    param->dialog_id != TWT_ALL_SESSIONS_DIALOG_ID &&
 	    param->status != WMI_HOST_DEL_TWT_STATUS_ROAMING &&
 	    param->status != WMI_HOST_DEL_TWT_STATUS_PEER_INIT_TEARDOWN &&
 	    param->status != WMI_HOST_DEL_TWT_STATUS_CONCURRENCY) {
@@ -2424,7 +2426,7 @@ sme_process_twt_nudge_dialog_event(struct mac_context *mac,
 					param->peer_macaddr, param->dialog_id,
 					WLAN_TWT_NUDGE, &active_cmd);
 		if (!is_evt_allowed &&
-		    param->dialog_id != WLAN_ALL_SESSIONS_DIALOG_ID) {
+		    param->dialog_id != TWT_ALL_SESSIONS_DIALOG_ID) {
 			sme_debug("Nudge event dropped active_cmd:%d",
 				  active_cmd);
 			goto fail;
@@ -5593,6 +5595,7 @@ static void sme_disconnect_connected_sessions(struct mac_context *mac_ctx,
 	uint8_t vdev_id, found = false;
 	qdf_freq_t chan_freq;
 	enum QDF_OPMODE op_mode;
+	struct wlan_objmgr_vdev *vdev;
 
 	for (vdev_id = 0; vdev_id < WLAN_MAX_VDEVS; vdev_id++) {
 		op_mode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
@@ -5612,8 +5615,17 @@ static void sme_disconnect_connected_sessions(struct mac_context *mac_ctx,
 		if (!found) {
 			sme_debug("Disconnect Session: %d", vdev_id);
 			/* do not call cm disconnect while holding Sme lock */
-			cm_disconnect(mac_ctx->psoc, vdev_id,
-				      CM_MLME_DISCONNECT, reason, NULL);
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+							mac_ctx->psoc,
+							vdev_id,
+							WLAN_LEGACY_SME_ID);
+			if (!vdev) {
+				sme_err("vdev object is NULL for vdev_id %d",
+					vdev_id);
+				return;
+			}
+			mlo_disconnect(vdev, CM_MLME_DISCONNECT, reason, NULL);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 		}
 	}
 }
@@ -7698,6 +7710,38 @@ QDF_STATUS sme_set_ht2040_mode(mac_handle_t mac_handle, uint8_t sessionId,
 		sme_release_global_lock(&mac->sme);
 	}
 	return status;
+}
+
+QDF_STATUS sme_get_ht2040_mode(mac_handle_t mac_handle, uint8_t vdev_id,
+			       enum eSirMacHTChannelType *channel_type)
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	if (!CSR_IS_SESSION_VALID(mac, vdev_id)) {
+		sme_err("Session not valid for session id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	session = CSR_GET_SESSION(mac, vdev_id);
+	sme_debug("Get HT operation beacon IE, channel_type=%d cur cbmode %d",
+		  *channel_type, session->bssParams.cbMode);
+
+	switch (session->bssParams.cbMode) {
+	case PHY_SINGLE_CHANNEL_CENTERED:
+		*channel_type = eHT_CHAN_HT20;
+		break;
+	case PHY_DOUBLE_CHANNEL_HIGH_PRIMARY:
+		*channel_type = eHT_CHAN_HT40MINUS;
+		break;
+	case PHY_DOUBLE_CHANNEL_LOW_PRIMARY:
+		*channel_type = eHT_CHAN_HT40PLUS;
+		break;
+	default:
+		sme_err("Error!!! Invalid HT20/40 mode !");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 #endif

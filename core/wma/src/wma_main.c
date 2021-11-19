@@ -3083,9 +3083,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	/* Register Converged Event handlers */
 	init_deinit_register_tgt_psoc_ev_handlers(psoc);
 
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 	target_if_roam_offload_register_events(psoc);
-#endif /* ROAM_TARGET_IF_CONVERGENCE */
 
 	/* Initialize max_no_of_peers for wma_get_number_of_peers_supported() */
 	cds_cfg->max_station = wma_init_max_no_of_peers(wma_handle,
@@ -3345,45 +3343,6 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_register_extscan_event_handler(wma_handle);
 #endif /* WLAN_FEATURE_STATS_EXT */
 
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-#ifndef ROAM_TARGET_IF_CONVERGENCE
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					   wmi_roam_synch_event_id,
-					   wma_roam_synch_event_handler,
-					   WMA_RX_SERIALIZER_CTX);
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-				   wmi_roam_synch_frame_event_id,
-				   wma_roam_synch_frame_event_handler,
-				   WMA_RX_SERIALIZER_CTX);
-
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					   wmi_roam_blacklist_event_id,
-					   wma_handle_btm_blacklist_event,
-					   WMA_RX_SERIALIZER_CTX);
-
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					wmi_vdev_disconnect_event_id,
-					wma_roam_vdev_disconnect_event_handler,
-					WMA_RX_SERIALIZER_CTX);
-
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					wmi_roam_scan_chan_list_id,
-					wma_roam_scan_chan_list_event_handler,
-					WMA_RX_SERIALIZER_CTX);
-
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					   wmi_roam_stats_event_id,
-					   wma_roam_stats_event_handler,
-					   WMA_RX_SERIALIZER_CTX);
-
-	wmi_unified_register_event_handler(wma_handle->wmi_handle,
-					   wmi_roam_auth_offload_event_id,
-					   wma_roam_auth_offload_event_handler,
-					   WMA_RX_SERIALIZER_CTX);
-	wma_register_pmkid_req_event_handler(wma_handle);
-#endif /* ROAM_TARGET_IF_CONVERGENCE */
-
-#endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
 				wmi_rssi_breach_event_id,
 				wma_rssi_breached_event_handler,
@@ -3393,6 +3352,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 					"wlan_fw_rsp_wakelock");
 	qdf_runtime_lock_init(&wma_handle->wmi_cmd_rsp_runtime_lock);
 	qdf_runtime_lock_init(&wma_handle->sap_prevent_runtime_pm_lock);
+	qdf_runtime_lock_init(&wma_handle->ndp_prevent_runtime_pm_lock);
 
 	/* Register peer assoc conf event handler */
 	wmi_unified_register_event_handler(wma_handle->wmi_handle,
@@ -3504,6 +3464,7 @@ err_dbglog_init:
 		wma_err("Failed to destroy radio stats mutex");
 
 	qdf_wake_lock_destroy(&wma_handle->wmi_cmd_rsp_wake_lock);
+	qdf_runtime_lock_deinit(&wma_handle->ndp_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->sap_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->wmi_cmd_rsp_runtime_lock);
 	qdf_spinlock_destroy(&wma_handle->wma_hold_req_q_lock);
@@ -3897,6 +3858,37 @@ void wma_process_pdev_hw_mode_trans_ind(void *handle,
 		 wma->old_hw_mode_index, wma->new_hw_mode_index);
 }
 
+static void
+wma_process_mac_freq_mapping(struct cm_hw_mode_trans_ind *hw_mode_trans_ind,
+		WMI_PDEV_HW_MODE_TRANSITION_EVENTID_param_tlvs *param_buf)
+{
+	uint32_t i, num_mac_freq;
+	wmi_pdev_band_to_mac *mac_freq;
+
+	mac_freq = param_buf->mac_freq_mapping;
+	num_mac_freq = param_buf->num_mac_freq_mapping;
+
+	if (!mac_freq) {
+		wma_debug("mac_freq Null");
+		return;
+	}
+
+	if (!num_mac_freq || num_mac_freq > MAX_FREQ_RANGE_NUM) {
+		wma_debug("num mac freq invalid %d", num_mac_freq);
+		return;
+	}
+
+	hw_mode_trans_ind->num_freq_map = num_mac_freq;
+	for (i = 0; i < num_mac_freq; i++) {
+		hw_mode_trans_ind->mac_freq_map[i].pdev_id =
+							mac_freq[i].pdev_id;
+		hw_mode_trans_ind->mac_freq_map[i].start_freq =
+							mac_freq[i].start_freq;
+		hw_mode_trans_ind->mac_freq_map[i].end_freq =
+							mac_freq[i].end_freq;
+	}
+}
+
 /**
  * wma_pdev_hw_mode_transition_evt_handler() - HW mode transition evt handler
  * @handle: WMI handle
@@ -3953,8 +3945,10 @@ static int wma_pdev_hw_mode_transition_evt_handler(void *handle,
 		qdf_mem_free(hw_mode_trans_ind);
 		return -EINVAL;
 	}
+
 	wma_process_pdev_hw_mode_trans_ind(wma, wmi_event, vdev_mac_entry,
 		hw_mode_trans_ind);
+	wma_process_mac_freq_mapping(hw_mode_trans_ind, param_buf);
 	/* Pass the message to PE */
 	wma_send_msg(wma, SIR_HAL_PDEV_HW_MODE_TRANS_IND,
 		     (void *) hw_mode_trans_ind, 0);
@@ -4104,18 +4098,6 @@ QDF_STATUS wma_start(void)
 		qdf_status = QDF_STATUS_E_INVAL;
 		goto end;
 	}
-
-#ifndef ROAM_TARGET_IF_CONVERGENCE
-	qdf_status = wmi_unified_register_event_handler(wmi_handle,
-						    wmi_roam_event_id,
-						    wma_roam_event_callback,
-						    WMA_RX_SERIALIZER_CTX);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		wma_err("Failed to register Roam callback");
-		qdf_status = QDF_STATUS_E_FAILURE;
-		goto end;
-	}
-#endif
 
 	qdf_status = wmi_unified_register_event_handler(wmi_handle,
 						    wmi_wow_wakeup_host_event_id,
@@ -4542,6 +4524,7 @@ QDF_STATUS wma_close(void)
 	qdf_event_destroy(&wma_handle->tx_queue_empty_event);
 	wma_cleanup_hold_req(wma_handle);
 	qdf_wake_lock_destroy(&wma_handle->wmi_cmd_rsp_wake_lock);
+	qdf_runtime_lock_deinit(&wma_handle->ndp_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->sap_prevent_runtime_pm_lock);
 	qdf_runtime_lock_deinit(&wma_handle->wmi_cmd_rsp_runtime_lock);
 	qdf_spinlock_destroy(&wma_handle->wma_hold_req_q_lock);

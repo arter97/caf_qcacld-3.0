@@ -52,10 +52,12 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 /**
  * cm_roam_candidate_info_event() - send trigger info to userspace
  * @ap: roam candidate info
+ * @cand_ap_idx: Candidate AP index
  *
  * Return: void
  */
-void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap);
+void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
+				  uint8_t cand_ap_idx);
 
 /**
  * cm_roam_result_info_event() - send scan results info to userspace
@@ -80,7 +82,8 @@ cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data, uint8_t vdev_id,
 }
 
 static inline void
-cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap)
+cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
+			     uint8_t cand_idx)
 {
 }
 
@@ -343,6 +346,7 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 
 /**
  * cm_roam_btm_resp_event() - Send BTM response logging event
+ * @trigger_info: Roam trigger related data
  * @btm_data: BTM response data
  * @vdev_id: Vdev id
  * @is_wtc: Is WTC or BTM response
@@ -350,7 +354,8 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_roam_btm_resp_event(struct roam_btm_response_data *btm_data,
+cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
+		       struct roam_btm_response_data *btm_data,
 		       uint8_t vdev_id, bool is_wtc);
 
 /**
@@ -379,7 +384,8 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 }
 
 static inline QDF_STATUS
-cm_roam_btm_resp_event(struct roam_btm_response_data *btm_data,
+cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
+		       struct roam_btm_response_data *btm_data,
 		       uint8_t vdev_id, bool is_wtc)
 {
 	return QDF_STATUS_E_NOSUPPORT;

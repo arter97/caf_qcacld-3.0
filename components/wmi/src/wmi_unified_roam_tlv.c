@@ -1798,7 +1798,6 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 static void
 wmi_extract_pdev_hw_mode_trans_ind(
 	wmi_pdev_hw_mode_transition_event_fixed_param *fixed_param,
@@ -2026,7 +2025,7 @@ wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
 			  WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf)
 {
 	wmi_roam_synch_event_fixed_param *synch_event;
-	wmi_channel *chan;
+	wmi_channel *chan = NULL;
 	wmi_key_material *key;
 	wmi_key_material_ext *key_ft;
 	wmi_roam_fils_synch_tlv_param *fils_info;
@@ -2034,11 +2033,7 @@ wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	uint8_t kck_len;
 	uint8_t kek_len;
-#ifdef WLAN_FEATURE_11BE_MLO
-	uint8_t i;
-	wmi_roam_ml_setup_links_param *setup_links;
-	wmi_roam_ml_key_material_param *ml_key_param;
-#endif
+
 	synch_event = param_buf->fixed_param;
 	roam_sync_ind->roamed_vdev_id = synch_event->vdev_id;
 	roam_sync_ind->auth_status = synch_event->auth_status;
@@ -2089,10 +2084,10 @@ wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
 		roam_sync_ind->chan_freq = chan->mhz;
 		roam_sync_ind->phy_mode =
 			wlan_cm_fw_to_host_phymode(WMI_GET_CHANNEL_MODE(chan));
+		roam_sync_ind->chan = *chan;
 	} else {
 		roam_sync_ind->phy_mode = WLAN_PHYMODE_AUTO;
 	}
-	roam_sync_ind->chan = *chan;
 
 	key = param_buf->key;
 	key_ft = param_buf->key_ext;
@@ -2653,9 +2648,7 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 end:
 	return status;
 }
-#endif
 
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 static enum blm_reject_ap_reason wmi_get_reject_reason(uint32_t reason)
 {
 	switch (reason) {
@@ -3249,7 +3242,6 @@ extract_roam_pmkid_request_tlv(wmi_unified_t wmi_handle, uint8_t *evt_buf,
 
 	return QDF_STATUS_SUCCESS;
 }
-#endif
 
 void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 {
@@ -3260,7 +3252,6 @@ void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 	ops->extract_roam_initial_info = extract_roam_initial_info_tlv;
 	ops->extract_roam_msg_info = extract_roam_msg_info_tlv;
 	ops->extract_roam_frame_info = extract_roam_frame_info_tlv;
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 	ops->extract_roam_sync_event = extract_roam_sync_event_tlv;
 	ops->extract_roam_sync_frame_event = extract_roam_sync_frame_event_tlv;
 	ops->extract_roam_event = extract_roam_event_tlv;
@@ -3270,7 +3261,6 @@ void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 	ops->extract_roam_stats_event = extract_roam_stats_event_tlv;
 	ops->extract_auth_offload_event = extract_auth_offload_event_tlv;
 	ops->extract_roam_pmkid_request = extract_roam_pmkid_request_tlv;
-#endif /* ROAM_TARGET_IF_CONVERGENCE */
 	ops->send_set_ric_req_cmd = send_set_ric_req_cmd_tlv;
 	ops->send_process_roam_synch_complete_cmd =
 			send_process_roam_synch_complete_cmd_tlv;
@@ -3301,7 +3291,6 @@ extract_roam_msg_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
-#ifdef ROAM_TARGET_IF_CONVERGENCE
 static inline QDF_STATUS
 extract_roam_sync_event(wmi_unified_t wmi_handle, void *evt_buf,
 			uint32_t len,
@@ -3323,7 +3312,6 @@ extract_roam_event(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
-#endif /* ROAM_TARGET_IF_CONVERGENCE */
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 #define ROAM_OFFLOAD_PMK_EXT_BYTES 16
