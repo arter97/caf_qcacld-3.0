@@ -1665,22 +1665,6 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 				min = j;
 			}
 		}
-		if (sirIsArate(tempRateSet.rate[min] & 0x7f)) {
-			isArate = 1;
-		} else if (sirIsBrate(tempRateSet.rate[min] & 0x7f)) {
-			isArate = 0;
-		} else {
-			pe_debug("%d is neither 11a nor 11b rate",
-				 tempRateSet.rate[min]);
-			tempRateSet.rate[min] = 0xff;
-			continue;
-		}
-		if (tempRateSet.rate[min] == pRates->llaRates[aRateIndex] ||
-		    tempRateSet.rate[min] == pRates->llbRates[bRateIndex]) {
-			pe_debug("Duplicate rate: %d", tempRateSet.rate[min]);
-			tempRateSet.rate[min] = 0xff;
-			continue;
-		}
 		/*
 		 * HAL needs to know whether the rate is basic rate or not,
 		 * as it needs to update the response rate table accordingly.
