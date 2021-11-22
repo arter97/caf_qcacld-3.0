@@ -3222,6 +3222,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_ENABLE_OL_STATSv3, SET_PARAM, 1},
 	{"bsta_fixed_idmask",
 		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_BSTA_FIXED_IDMASK, SET_PARAM, 1},
+	{"set_mgmtretrylimit",
+		OL_SPECIAL_PARAM_SHIFT | OL_SPECIAL_PARAM_RADIO_MGMT_RETRY_LIMIT, SET_PARAM, 1},
 	{"setHALparam",         35808, SET_PARAM, 1},
 	{"getHALparam",         35809, GET_PARAM, 0},
 	{"get_aggr_burst",      35821, GET_PARAM, 0},
