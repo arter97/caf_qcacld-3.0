@@ -3596,6 +3596,12 @@ void dp_send_data_to_stack(struct dp_pdev *pdev,
 	tx_capture_info.ppdu_desc = ppdu_desc;
 	tx_capture_info.mpdu_info.channel_num = pdev->operating_channel.num;
 
+	/* update the chan flag for half/qtr rate */
+	if(pdev->mon_chan_flags & IEEE80211_CHAN_HALF)
+		mpdu_info->chan_flags |= TX_CAP_HALF_RATE_CHANNEL;
+	else if(pdev->mon_chan_flags & IEEE80211_CHAN_QUARTER)
+		mpdu_info->chan_flags |= TX_CAP_QUARTER_RATE_CHANNEL;
+
 	if (ppdu_desc->mprot_type && (usr_idx == 0))
 		dp_send_dummy_rts_cts_frame(pdev, ppdu_desc, usr_idx);
 
@@ -4380,6 +4386,12 @@ dp_update_tx_cap_info(struct dp_pdev *pdev,
 	mpdu_info->ppdu_start_timestamp = ppdu_desc->ppdu_start_timestamp;
 	mpdu_info->ppdu_end_timestamp = ppdu_desc->ppdu_end_timestamp;
 	mpdu_info->tx_duration = ppdu_desc->tx_duration;
+
+	/* update the chan flag for half/qtr rate */
+	if(pdev->mon_chan_flags & IEEE80211_CHAN_HALF)
+		mpdu_info->chan_flags |= TX_CAP_HALF_RATE_CHANNEL;
+	else if(pdev->mon_chan_flags & IEEE80211_CHAN_QUARTER)
+		mpdu_info->chan_flags |= TX_CAP_QUARTER_RATE_CHANNEL;
 
 	/* update cdp_tx_indication_mpdu_info */
 	dp_tx_update_user_mpdu_info(ppdu_desc->ppdu_id,
