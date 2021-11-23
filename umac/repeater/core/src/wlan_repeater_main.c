@@ -567,7 +567,7 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 			ucfg_scan_db_iterate(pdev, wlan_rptr_get_rootap_bssid,
 					     (void *)vdev);
 			if (!IS_NULL_ADDR(pdev_priv->preferred_bssid)) {
-				RPTR_LOGI("RPTR sending event with preferred RootAP bssid:%s vdev_id:%d\n",
+				RPTR_LOGI("RPTR sending event with preferred RootAP bssid:%s vdev_id:%d",
 					  ether_sprintf(pdev_priv->preferred_bssid),
 					  wlan_vdev_get_id(vdev));
 				ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
@@ -593,7 +593,7 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 				RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 				ucfg_scan_db_iterate(pdev, wlan_rptr_process_scan_entries, (void *)vdev);
 				if (!IS_NULL_ADDR(pdev_priv->preferred_bssid)) {
-					RPTR_LOGI("RPTR sending event with preferred Repeater bssid:%s vdev_id:%d\n",
+					RPTR_LOGI("RPTR sending event with preferred Repeater bssid:%s vdev_id:%d",
 						  ether_sprintf(pdev_priv->preferred_bssid),
 						  wlan_vdev_get_id(vdev));
 					ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
@@ -657,7 +657,7 @@ wlan_rptr_core_pdev_pref_uplink_set(struct wlan_objmgr_pdev *pdev,
 		pdev_priv->preferredUplink = value;
 		RPTR_PDEV_UNLOCK(&pdev_priv->rptr_pdev_lock);
 	}
-	RPTR_LOGI("Preferred uplink set as %d for pdev_id: %d\n",
+	RPTR_LOGI("Preferred uplink set as %d for pdev_id: %d",
 		  value, pdev_id);
 }
 
@@ -683,7 +683,7 @@ void wlan_rptr_core_global_disconnect_timeout_set(u32 value)
 	if (g_priv) {
 		RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 		g_priv->disconnect_timeout = (u_int16_t)value;
-		RPTR_LOGI("RPTR disconnect_timeout:%d\n",
+		RPTR_LOGI("RPTR disconnect_timeout:%d",
 			  g_priv->disconnect_timeout);
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 	}
@@ -709,7 +709,7 @@ void wlan_rptr_core_global_reconfig_timeout_set(u32 value)
 	if (g_priv) {
 		RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 		g_priv->reconfiguration_timeout = (u_int16_t)value;
-		RPTR_LOGI("RPTR reconfiguration_timeout:%d\n",
+		RPTR_LOGI("RPTR reconfiguration_timeout:%d",
 			  g_priv->reconfiguration_timeout);
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 	}
@@ -742,7 +742,7 @@ void wlan_rptr_core_global_same_ssid_disable(u32 value)
 			g_priv->global_feature_caps &=
 				~wlan_rptr_global_f_s_ssid;
 		}
-		RPTR_LOGI("RPTR Same ssid disable:%d\n",
+		RPTR_LOGI("RPTR Same ssid disable:%d",
 			  ss_info->same_ssid_disable);
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 	}
