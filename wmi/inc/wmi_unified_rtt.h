@@ -26,11 +26,21 @@
  */
 #define CIVIC_INFO_MAX_LENGTH   64
 
+/* Size of WMIRTT_TLV_TAG_STRUC_loop_start */
+#define RTT_TLV_HDR_SIZE   (1 * sizeof(A_UINT32))
+
 /* TLV Helper macro to set the TLV Header given the pointer to the TLV buffer */
 #define WMIRTT_TLV_SET_HDR(tlv_buf, tag, len) \
 	((((A_UINT32 *)(tlv_buf))[0]) = ((tag << 16) | (len & 0x0000FFFF)))
 
+/** TLV Helper macro to get the TLV Tag given the TLV header. */
+#define WMIRTT_TLV_GET_TLVTAG(tlv_header)  ((A_UINT32)((tlv_header) >> 16))
+
 #define WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_req_head 32
+#define WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_head 37
+#define WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_channel_info 38
+#define WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_per_channel_info 39
+#define WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_peer_info 40
 #define WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_lcr_cfg_head 46
 #define WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_lci_cfg_head 47
 
@@ -86,6 +96,18 @@
 #define WMI_RTT_LOC_CIVIC_LENGTH_GET(x) WMI_F_MS(x, WMI_RTT_LOC_CIVIC_LENGTH)
 #define WMI_RTT_LOC_CIVIC_LENGTH_SET(x, z) \
 	WMI_F_RMW(x, z, WMI_RTT_LOC_CIVIC_LENGTH)
+
+#define RTT_PHY_MODE_MASK 0xFFFFFFC0
+
+#define WMI_RTT_NUM_STA_S 0
+#define WMI_RTT_NUM_STA (0xff << WMI_RTT_NUM_STA_S)
+#define WMI_RTT_NUM_STA_GET(x) WMI_F_MS(x, WMI_RTT_NUM_STA)
+#define WMI_RTT_NUM_STA_SET(x, z) WMI_F_RMW(x, z, WMI_RTT_NUM_STA)
+
+#define WMI_RTT_BW_S 12
+#define WMI_RTT_BW (0x7 << WMI_RTT_BW_S)
+#define WMI_RTT_BW_GET(x) WMI_F_MS(x, WMI_RTT_BW)
+#define WMI_RTT_BW_SET(x, z) WMI_F_RMW(x, z, WMI_RTT_BW)
 
 /**
  * WMIRTT_OEM_MSG_SUBTYPE - RTT message subtype definitions
@@ -152,6 +174,106 @@ struct wmi_rtt_oem_req_head {
 	A_UINT32 sub_type;
 	A_UINT32 req_id;
 	A_UINT32 pdev_id;
+};
+
+/**
+ * wmi_rtt_oem_measreq_head - RTT OEM measurement request head structure
+ * @tlv_header: TLV tag and len; tag equals
+ *              WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_head
+ * @channel_cnt: How many number of channels in this RTT requirement
+ *               bit 7:0   number of measurement channels
+ *               bit 31:8  reserved
+ */
+struct wmi_rtt_oem_measreq_head {
+	A_UINT32 tlv_header;
+	A_UINT32 channel_cnt;
+};
+
+/**
+ * wmi_rtt_oem_channel_info - RTT OEM channel info structure
+ * @tlv_header: TLV tag and len; tag equals
+ *              WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_channel_info
+ * @mhz: primary 20 MHz channel frequency in mhz
+ * @band_center_freq1: Center frequency 1 in MHz
+ * @band_center_freq2: Center frequency 2 in MHz
+ *                     - valid only for 11acvht 80plus80 mode
+ * @info: channel info described below
+ * @reg_info_1: contains min power, max power, reg power and reg class id.
+ * @reg_info_2: contains antennamax
+ */
+struct wmi_rtt_oem_channel_info {
+	A_UINT32 tlv_header;
+	A_UINT32 mhz;
+	A_UINT32 band_center_freq1;
+	A_UINT32 band_center_freq2;
+	A_UINT32 info;
+	A_UINT32 reg_info_1;
+	A_UINT32 reg_info_2;
+};
+
+/**
+ * wmi_rtt_oem_measreq_per_channel_info - RTT OEM measurement request per
+ * per channel info.
+ * @tlv_header: TLV tag and len; tag equals
+ *              WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_per_channel_info
+ * @sta_num: how many number of STA for this channel in this RTT requirement
+ *          bit 7:0        # of measurement peers
+ *          bit 23:8       if  sps, time delay for SPS (ms)
+ *          bit 31:24      reserved
+ */
+struct wmi_rtt_oem_measreq_per_channel_info {
+	A_UINT32 tlv_header;
+	A_UINT32 sta_num;
+};
+
+/**
+ * wmi_rtt_oem_measreq_peer_info - RTT OEM measurement request peer info
+ * @tlv_header: TLV tag and len; tag equals
+ *              WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_peer_info
+ * @control_flag: some control information here
+ *                Bits 2:0:   802.11 Frame Type to measure RTT
+ *                            000: NULL, 001: Qos NULL, 010: TMR-TM
+ *                Bits 6:3:   Tx chain mask used for transmission 0000 - 1111
+ *                Bits 10:7:  Receive chainmask to use for reception 0000 - 1111
+ *                Bits 11:11  peer is qca chip or not
+ *                Bits 14:12: BW 0- 20MHz 1- 40MHz 2- 80MHz 3 - 160 MHz
+ *                Bits 16:15: Preamble 0- Legacy 2- HT 3-VHT
+ *                Bits 20:17: Retry times
+ *                Bits 28:21: MCS
+ *                Bit  29:    ack type in FTM transactions
+ *                            0 - default, use high speed acks with QTI peers
+ *                            1 - use only legacy acks regardless of peer
+ *                Bits 31:30  Reserved
+ * @measure_info:
+ *                Bit 3:0:   vdev_type vdev used for RTT
+ *                Bit 11:4:  num_meas #of measurements of each peer
+ *                Bit 19:12: timeout for this rtt mesurement for one burst (ms)
+ *                Bit 23:20: report_type
+ *                Bit 31:24: Reserved
+ * @dest_mac: destination mac address for measurement
+ * @spoof_bssid: spoof BSSID for measurement with unassociated STA
+ * @measure_params_1:
+ *                Bit 0:       ASAP = 0/1
+ *                Bit 1:       LCI Req = True/False
+ *                Bit 2:       Location Civic Req = True/False
+ *                Bit 3:       PTSF timer no preference. Used in iFTMR to
+ *                             indicate validity of PTSF timer field in the
+ *                             frame
+ *                Bits 7:4:    Number of Bursts Exponent
+ *                Bits 11:8:   Burst Duration (Maximum 128ms)
+ *                Bits 27:12:  Burst Period (time between Burst starts)
+ *                Bits 31:28:  Reserved
+ * @measure_params_2:
+ *                Bits 31:0:   Reserved
+ */
+struct wmi_rtt_oem_measreq_peer_info {
+	A_UINT32 tlv_header;
+	A_UINT32 control_flag;
+	A_UINT32 measure_info;
+	wmi_mac_addr dest_mac;
+	wmi_mac_addr spoof_bssid;
+	A_UINT32 measure_params_1;
+	A_UINT32 measure_params_2;
 };
 
 /**
