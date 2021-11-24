@@ -3892,7 +3892,9 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 		return;
 	}
 
-	if (pe_session->ftPEContext.ftPreAuthSession) {
+	if (pe_session->ftPEContext.ftPreAuthSession ||
+	    pe_find_session_by_vdev_id_and_smestate(mac, pe_session->vdev_id,
+	    eLIM_SME_WT_REASSOC_STATE)) {
 		pe_err("FT PREAUTH channel change is in progress");
 		return;
 	}

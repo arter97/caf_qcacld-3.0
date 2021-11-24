@@ -653,6 +653,24 @@ struct pe_session *pe_find_session_by_vdev_id(struct mac_context *mac,
 					      uint8_t vdev_id);
 
 /**
+ * pe_find_session_by_vdev_id_and_smestate() - Find PE session by vdev_id and
+ * sme state.
+ * @mac:             pointer to global adapter context
+ * @vdev_id:         vdev id the session
+ * @lim_state:       SME state
+ *
+ * During LFR2 roaming, new pe session is created before old pe session
+ * deleted, the 2 pe sessions have different pe session id, but same vdev id,
+ * can't get correct pe session by vdev id at this time.
+ *
+ * Return: pointer to the session context or NULL if session is not found.
+ */
+struct pe_session
+*pe_find_session_by_vdev_id_and_smestate(struct mac_context *mac,
+				      uint8_t vdev_id,
+				      enum eLimSmeStates lim_state);
+
+/**
  * pe_find_session_by_vdev_id_and_state() - Find PE session by vdev_id and
  * mlm state.
  * @mac:             pointer to global adapter context
