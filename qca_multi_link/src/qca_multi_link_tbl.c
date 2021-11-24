@@ -19,8 +19,18 @@
 #include "qdf_module.h"
 #include "qdf_trace.h"
 #include "qal_vbus_dev.h"
+#if !defined (DISABLE_QAL_BRIDGE)
 #include "qal_bridge.h"
+#endif
 
+#if DISABLE_QAL_BRIDGE
+int qca_multi_link_tbl_get_eth_entries(struct net_device *net_dev,
+					void *fill_buff, int buff_size)
+{
+	qdf_err("bridge function disabled in this SP\n");
+	return 0;
+}
+#else
 int qca_multi_link_tbl_get_eth_entries(struct net_device *net_dev,
 					void *fill_buff, int buff_size)
 {
@@ -80,9 +90,18 @@ int qca_multi_link_tbl_get_eth_entries(struct net_device *net_dev,
 
 	return num_of_entries;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_get_eth_entries);
 
+#if DISABLE_QAL_BRIDGE
+struct net_device *qca_multi_link_tbl_find_sta_or_ap(struct net_device *net_dev,
+					uint8_t dev_type)
+{
+	qdf_err("bridge function disabled in this SP\n");
+	return NULL;
+}
+#else
 struct net_device *qca_multi_link_tbl_find_sta_or_ap(struct net_device *net_dev,
 					uint8_t dev_type)
 {
@@ -129,9 +148,19 @@ struct net_device *qca_multi_link_tbl_find_sta_or_ap(struct net_device *net_dev,
 	qal_vbus_rcu_read_unlock();
 	return NULL;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_find_sta_or_ap);
 
+#if DISABLE_QAL_BRIDGE
+QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, uint8_t *addr,
+							qca_multi_link_entry_type_t entry_type)
+{
+	qdf_err("bridge function disabled in this SP, should not call this function!\n");
+	BUG_ON(1);
+	return QDF_STATUS_E_FAILURE;
+}
+#else
 QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, uint8_t *addr,
 							qca_multi_link_entry_type_t entry_type)
 {
@@ -158,9 +187,18 @@ QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, u
 #endif
 	return QDF_STATUS_SUCCESS;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_add_or_refresh_entry);
 
+#if DISABLE_QAL_BRIDGE
+QDF_STATUS qca_multi_link_tbl_delete_entry(struct net_device *net_dev, uint8_t *addr)
+{
+	qdf_err("bridge function disabled in this SP, should not call this function!\n");
+	BUG_ON(1);
+	return QDF_STATUS_E_FAILURE;
+}
+#else
 QDF_STATUS qca_multi_link_tbl_delete_entry(struct net_device *net_dev, uint8_t *addr)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 24)
@@ -206,9 +244,20 @@ QDF_STATUS qca_multi_link_tbl_delete_entry(struct net_device *net_dev, uint8_t *
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_delete_entry);
 
+#if DISABLE_QAL_BRIDGE
+QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
+				const char *addr, uint16_t vlan_id,
+				qca_multi_link_tbl_entry_t *qca_ml_entry)
+{
+	qdf_err("bridge function disabled in this SP, should not call this function!\n");
+	BUG_ON(1);
+	return QDF_STATUS_E_FAILURE;
+}
+#else
 QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 				const char *addr, uint16_t vlan_id,
 				qca_multi_link_tbl_entry_t *qca_ml_entry)
@@ -241,9 +290,18 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 	qca_ml_entry->qal_fdb_is_local = fdb_entry->is_local;
 	return QDF_STATUS_SUCCESS;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_has_entry);
 
+#if DISABLE_QAL_BRIDGE
+QDF_STATUS qca_multi_link_tbl_register_update_notifier(void *nb)
+{
+	qdf_err("bridge function disabled in this SP, should not call this function!\n");
+	BUG_ON(1);
+	return QDF_STATUS_E_FAILURE;
+}
+#else
 QDF_STATUS qca_multi_link_tbl_register_update_notifier(void *nb)
 {
 	struct notifier_block *notifier = (struct notifier_block *)nb;
@@ -257,9 +315,18 @@ QDF_STATUS qca_multi_link_tbl_register_update_notifier(void *nb)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_register_update_notifier);
 
+#if DISABLE_QAL_BRIDGE
+QDF_STATUS qca_multi_link_tbl_unregister_update_notifier(void *nb)
+{
+	qdf_err("bridge function disabled in this SP, should not call this function!\n");
+	BUG_ON(1);
+	return QDF_STATUS_E_FAILURE;
+}
+#else
 QDF_STATUS qca_multi_link_tbl_unregister_update_notifier(void *nb)
 {
 	struct notifier_block *notifier = (struct notifier_block *)nb;
@@ -273,8 +340,19 @@ QDF_STATUS qca_multi_link_tbl_unregister_update_notifier(void *nb)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_unregister_update_notifier);
+
+#if DISABLE_QAL_BRIDGE
+QDF_STATUS qca_multi_link_tbl_register_notifier(void *nb)
+{
+	qdf_err("bridge function disabled in this SP, should not call this function!\n");
+	BUG_ON(1);
+	return QDF_STATUS_E_FAILURE;
+}
+
+#else
 
 QDF_STATUS qca_multi_link_tbl_register_notifier(void *nb)
 {
@@ -289,9 +367,18 @@ QDF_STATUS qca_multi_link_tbl_register_notifier(void *nb)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_register_notifier);
 
+#if DISABLE_QAL_BRIDGE
+QDF_STATUS qca_multi_link_tbl_unregister_notifier(void *nb)
+{
+	qdf_err("bridge function disabled in this SP, should not call this function!\n");
+	BUG_ON(1);
+	return QDF_STATUS_E_FAILURE;
+}
+#else
 QDF_STATUS qca_multi_link_tbl_unregister_notifier(void *nb)
 {
 	struct notifier_block *notifier = (struct notifier_block *)nb;
@@ -305,9 +392,18 @@ QDF_STATUS qca_multi_link_tbl_unregister_notifier(void *nb)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_unregister_notifier);
 
+#if DISABLE_QAL_BRIDGE
+struct net_device *qca_multi_link_tbl_get_bridge_dev(struct net_device *port_dev)
+{
+	qdf_err("bridge function disabled in this SP\n");
+	return NULL;
+}
+
+#else
 struct net_device *qca_multi_link_tbl_get_bridge_dev(struct net_device *port_dev)
 {
 	struct net_bridge_port *fdb_port = NULL;
@@ -332,5 +428,6 @@ struct net_device *qca_multi_link_tbl_get_bridge_dev(struct net_device *port_dev
 
 	return br->dev;
 }
+#endif //end of DISABLE_QAL_BRIDGE
 
 qdf_export_symbol(qca_multi_link_tbl_get_bridge_dev);
