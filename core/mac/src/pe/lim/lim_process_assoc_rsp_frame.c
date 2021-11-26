@@ -44,6 +44,8 @@
 #include "wlan_blm_api.h"
 #include "wlan_mlme_twt_api.h"
 #include "wlan_mlme_ucfg_api.h"
+#include "wlan_connectivity_logging.h"
+#include <lim_mlo.h>
 
 /**
  * lim_update_stads_htcap() - Updates station Descriptor HT capability
@@ -752,10 +754,12 @@ static void lim_update_ml_partner_info(struct pe_session *session_entry,
 	if (!assoc_rsp || !session_entry)
 		return;
 
+	session_entry->ml_partner_info.num_partner_links =
+				     assoc_rsp->mlo_ie.mlo_ie.num_sta_profile;
 	ie = assoc_rsp->mlo_ie.mlo_ie;
 	partner_info = session_entry->ml_partner_info;
 
-	partner_info.num_partner_links = mlo_ie.num_sta_profile;
+	partner_info.num_partner_links = ie.num_sta_profile;
 	pe_err("copying partner info from join req to join rsp, num_partner_links %d",
 	       partner_info.num_partner_links);
 
@@ -768,6 +772,69 @@ static void lim_update_ml_partner_info(struct pe_session *session_entry,
 	}
 }
 #endif
+
+/**
+ * hdd_cm_update_mcs_rate_set() - Update MCS rate set from HT capability
+ * @vdev: Pointer to vdev boject
+ * @ht_cap: pointer to parsed HT capablity
+ *
+ * Return: None.
+ */
+static inline void
+lim_update_mcs_rate_set(struct wlan_objmgr_vdev *vdev, tDot11fIEHTCaps *ht_cap)
+{
+	qdf_size_t len = 0;
+	int i;
+	uint32_t *mcs_set;
+	uint8_t dst_rate[VALID_MAX_MCS_INDEX] = {0};
+
+	mcs_set = (uint32_t *)ht_cap->supportedMCSSet;
+	for (i = 0; i < VALID_MAX_MCS_INDEX; i++) {
+		if (!QDF_GET_BITS(*mcs_set, i, 1))
+			continue;
+
+		dst_rate[len++] = i;
+	}
+
+	mlme_set_mcs_rate(vdev, dst_rate, len);
+}
+
+/**
+ * hdd_cm_update_rate_set() - Update rate set according to assoc resp
+ * @psoc: Pointer to psoc object
+ * @vdev_id: vdev id
+ * @assoc_resp: pointer to parsed associate response
+ *
+ * Return: None.
+ */
+static void
+lim_update_vdev_rate_set(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			 tpSirAssocRsp assoc_resp)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_LEGACY_MAC_ID);
+	if (!vdev) {
+		pe_err("vdev not found for id: %d", vdev_id);
+		return;
+	}
+
+	if (assoc_resp->suppRatesPresent && assoc_resp->supportedRates.numRates)
+		mlme_set_opr_rate(vdev, assoc_resp->supportedRates.rate,
+				  assoc_resp->supportedRates.numRates);
+
+	if (assoc_resp->extendedRatesPresent &&
+	    assoc_resp->extendedRates.numRates)
+		mlme_set_ext_opr_rate(vdev,
+				      assoc_resp->extendedRates.rate,
+				      assoc_resp->extendedRates.numRates);
+
+	if (assoc_resp->HTCaps.present)
+		lim_update_mcs_rate_set(vdev, &assoc_resp->HTCaps);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+}
 
 /**
  * lim_process_assoc_rsp_frame() - Processes assoc response
@@ -1080,6 +1147,13 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			      (assoc_rsp->status_code ? QDF_STATUS_E_FAILURE :
 			       QDF_STATUS_SUCCESS), assoc_rsp->status_code);
 
+	if (subtype != LIM_REASSOC)
+		wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)hdr,
+					     session_entry->vdev_id,
+					     assoc_rsp->status_code, 0, rssi,
+					     0, 0, 0,
+					     WLAN_ASSOC_RSP);
+
 	ap_nss = lim_get_nss_supported_by_ap(&assoc_rsp->VHTCaps,
 					     &assoc_rsp->HTCaps,
 					     &assoc_rsp->he_cap);
@@ -1126,6 +1200,9 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		lim_objmgr_update_vdev_nss(mac_ctx->psoc,
 					   session_entry->smeSessionId,
 					   session_entry->nss);
+		lim_update_vdev_rate_set(mac_ctx->psoc,
+					 session_entry->smeSessionId,
+					 assoc_rsp);
 
 		if ((session_entry->limMlmState ==
 		     eLIM_MLM_WT_FT_REASSOC_RSP_STATE) ||
@@ -1178,6 +1255,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			session_entry->gUapsdPerAcDeliveryEnableMask = 0;
 			session_entry->gUapsdPerAcTriggerEnableMask = 0;
 
+			lim_mlo_notify_peer_disconn(session_entry, sta_ds);
 			if (lim_cleanup_rx_path(mac_ctx, sta_ds, session_entry,
 						true) != QDF_STATUS_SUCCESS) {
 				pe_err("Could not cleanup the rx path");
@@ -1223,6 +1301,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	lim_objmgr_update_vdev_nss(mac_ctx->psoc,
 				   session_entry->smeSessionId,
 				   session_entry->nss);
+	lim_update_vdev_rate_set(mac_ctx->psoc, session_entry->smeSessionId,
+				 assoc_rsp);
 
 	/*
 	 * Extract the AP capabilities from the beacon that
@@ -1289,13 +1369,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			beacon,
 			&session_entry->lim_join_req->bssDescription, true,
 			 session_entry)) {
-#ifdef WLAN_FEATURE_11BE_MLO
-		if (wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
-			pe_err("sending assoc cnf for MLO link vdev");
-			lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
-					     (uint32_t *)&assoc_cnf);
-		}
-#endif
 		clean_up_ft_sha384(assoc_rsp, sha384_akm);
 		qdf_mem_free(assoc_rsp);
 		qdf_mem_free(beacon);

@@ -32,6 +32,7 @@
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
 #include "dp_internal.h"
 #include "cds_utils.h"
+#include "htt_ppdu_stats.h"
 #endif
 
 #define RESERVE_BYTES (100)
@@ -262,8 +263,12 @@ pkt_capture_update_tx_status(
 			struct pkt_capture_tx_hdr_elem_t *pktcapture_hdr)
 {
 	struct connection_info info[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	struct pkt_capture_vdev_priv *vdev_priv;
 	struct wlan_objmgr_vdev *vdev = context;
+	htt_ppdu_stats_for_smu_tlv *smu;
 	struct wlan_objmgr_psoc *psoc;
+	struct pkt_capture_ppdu_stats_q_node *q_node;
+	qdf_list_node_t *node;
 	uint32_t conn_count;
 	uint8_t vdev_id;
 	int i;
@@ -286,6 +291,36 @@ pkt_capture_update_tx_status(
 		}
 	}
 
+	vdev_priv = pkt_capture_vdev_get_priv(vdev);
+	if (qdf_unlikely(!vdev_priv))
+		goto skip_ppdu_stats;
+
+	/* Fill the nss received from ppdu_stats */
+	pktcapture_hdr->nss = vdev_priv->tx_nss;
+
+	/* Remove the ppdu stats from front of list and fill it in tx_status */
+	qdf_spin_lock(&vdev_priv->lock_q);
+	if (QDF_STATUS_SUCCESS ==
+	    qdf_list_remove_front(&vdev_priv->ppdu_stats_q, &node)) {
+		q_node = qdf_container_of(
+			node, struct pkt_capture_ppdu_stats_q_node, node);
+		smu = (htt_ppdu_stats_for_smu_tlv *)(q_node->buf);
+		tx_status->prev_ppdu_id = smu->ppdu_id;
+		tx_status->start_seq = smu->start_seq;
+		tx_status->tid = smu->tid_num;
+
+		if (smu->win_size == 8)
+			qdf_mem_copy(tx_status->ba_bitmap, smu->ba_bitmap,
+				     8 * sizeof(uint32_t));
+		else if (smu->win_size == 2)
+			qdf_mem_copy(tx_status->ba_bitmap, smu->ba_bitmap,
+				     2 * sizeof(uint32_t));
+
+		qdf_mem_free(q_node);
+	}
+	qdf_spin_unlock(&vdev_priv->lock_q);
+
+skip_ppdu_stats:
 	pkt_capture_tx_get_phy_info(pktcapture_hdr, tx_status);
 
 	tx_status->tsft = (u_int64_t)(pktcapture_hdr->timestamp);
@@ -293,7 +328,9 @@ pkt_capture_update_tx_status(
 	tx_status->rssi_comb = pktcapture_hdr->rssi_comb;
 	tx_status->tx_status = pktcapture_hdr->status;
 	tx_status->tx_retry_cnt = pktcapture_hdr->tx_retry_cnt;
+	tx_status->ppdu_id = pktcapture_hdr->ppdu_id;
 	tx_status->add_rtap_ext = true;
+	tx_status->add_rtap_ext2 = true;
 }
 #endif
 
@@ -737,7 +774,6 @@ uint8_t pkt_capture_get_rx_rtap_flags(struct hal_rx_pkt_capture_flags *flags)
 	return rtap_flags;
 }
 
-#define CHANNEL_FREQ_5150 5150
 /**
  * pkt_capture_rx_mon_get_rx_status() - Get rx status
  * @context: objmgr vdev
@@ -755,7 +791,6 @@ static void pkt_capture_rx_mon_get_rx_status(void *context, void *dp_soc,
 	struct dp_soc *soc = dp_soc;
 	struct hal_rx_pkt_capture_flags flags = {0};
 	struct wlan_objmgr_vdev *vdev = context;
-	struct pkt_capture_vdev_priv *vdev_priv;
 	uint8_t primary_chan_num;
 	uint32_t center_chan_freq;
 	struct wlan_objmgr_psoc *psoc;
@@ -789,17 +824,6 @@ static void pkt_capture_rx_mon_get_rx_status(void *context, void *dp_soc,
 	rx_status->chan_freq =
 		wlan_reg_chan_band_to_freq(pdev, primary_chan_num, BIT(band));
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_PKT_CAPTURE_ID);
-
-	vdev_priv = pkt_capture_vdev_get_priv(vdev);
-	if (qdf_unlikely(!vdev))
-		return;
-
-	rx_status->rssi_comb = vdev_priv->rx_avg_rssi;
-
-	if (rx_status->chan_freq > CHANNEL_FREQ_5150)
-		rx_status->ofdm_flag = 1;
-	else
-		rx_status->cck_flag = 1;
 
 	pkt_capture_rx_get_phy_info(context, dp_soc, desc, rx_status);
 }

@@ -111,7 +111,6 @@
 #define ROAMING_OFFLOAD_TIMER_STOP	2
 #define CSR_ROAMING_OFFLOAD_TIMEOUT_PERIOD    (5 * QDF_MC_TIMER_TO_SEC_UNIT)
 
-
 #ifdef WLAN_FEATURE_SAE
 /**
  * csr_sae_callback - Update SAE info to CSR roam session
@@ -3092,6 +3091,7 @@ QDF_STATUS csr_roam_copy_profile(struct mac_context *mac,
 		pDstProfile->extended_rates.numRates =
 			pSrcProfile->extended_rates.numRates;
 	}
+	pDstProfile->require_h2e = pSrcProfile->require_h2e;
 	pDstProfile->cac_duration_ms = pSrcProfile->cac_duration_ms;
 	pDstProfile->dfs_regdomain   = pSrcProfile->dfs_regdomain;
 	pDstProfile->chan_switch_hostapd_rate_enabled  =
@@ -3661,6 +3661,11 @@ void csr_roam_joined_state_msg_processor(struct mac_context *mac, void *msg_buf)
 		qdf_mem_copy(roam_info->peerMac.bytes,
 			     pUpperLayerAssocCnf->peerMacAddr,
 			     sizeof(tSirMacAddr));
+#ifdef WLAN_FEATURE_11BE_MLO
+		qdf_mem_copy(roam_info->peer_mld.bytes,
+			     pUpperLayerAssocCnf->peer_mld_addr,
+			     sizeof(tSirMacAddr));
+#endif
 		qdf_mem_copy(&roam_info->bssid,
 			     pUpperLayerAssocCnf->bssId,
 			     sizeof(struct qdf_mac_addr));
@@ -4190,6 +4195,10 @@ csr_send_assoc_ind_to_upper_layer_cnf_msg(struct mac_context *mac,
 	qdf_mem_copy(&cnf->bssId, &ind->bssId, sizeof(cnf->bssId));
 	qdf_mem_copy(&cnf->peerMacAddr, &ind->peerMacAddr,
 		     sizeof(cnf->peerMacAddr));
+#ifdef WLAN_FEATURE_11BE_MLO
+	qdf_mem_copy(&cnf->peer_mld_addr, &ind->peer_mld_addr,
+		     sizeof(cnf->peer_mld_addr));
+#endif
 	cnf->aid = ind->staId;
 	cnf->wmmEnabledSta = ind->wmmEnabledSta;
 	cnf->rsnIE = ind->rsnIE;
@@ -4406,7 +4415,6 @@ csr_roam_chk_lnk_disassoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 {
 	struct csr_roam_session *session;
 	uint32_t sessionId = WLAN_UMAC_VDEV_ID_MAX;
-	QDF_STATUS status;
 	struct disassoc_ind *pDisassocInd;
 
 	/*
@@ -4415,11 +4423,14 @@ csr_roam_chk_lnk_disassoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 	 * the WmStatusChange requests is pushed and processed
 	 */
 	pDisassocInd = (struct disassoc_ind *)msg_ptr;
-	status = csr_roam_get_session_id_from_bssid(mac_ctx,
-				&pDisassocInd->bssid, &sessionId);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		sme_err("Session Id not found for BSSID "QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(pDisassocInd->bssid.bytes));
+	sessionId = pDisassocInd->vdev_id;
+	sme_debug("Disassoc Indication from MAC for vdev_id %d bssid " QDF_MAC_ADDR_FMT,
+		  pDisassocInd->vdev_id,
+		  QDF_MAC_ADDR_REF(pDisassocInd->bssid.bytes));
+
+	if (!CSR_IS_SESSION_VALID(mac_ctx, sessionId)) {
+		sme_err("vdev:%d Invalid session. BSSID: " QDF_MAC_ADDR_FMT,
+			sessionId, QDF_MAC_ADDR_REF(pDisassocInd->bssid.bytes));
 
 		return;
 	}
@@ -4451,7 +4462,6 @@ csr_roam_chk_lnk_deauth_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 {
 	struct csr_roam_session *session;
 	uint32_t sessionId = WLAN_UMAC_VDEV_ID_MAX;
-	QDF_STATUS status;
 	struct deauth_ind *pDeauthInd;
 
 	pDeauthInd = (struct deauth_ind *)msg_ptr;
@@ -4459,11 +4469,13 @@ csr_roam_chk_lnk_deauth_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 		  pDeauthInd->vdev_id,
 		  QDF_MAC_ADDR_REF(pDeauthInd->bssid.bytes));
 
-	status = csr_roam_get_session_id_from_bssid(mac_ctx,
-						   &pDeauthInd->bssid,
-						   &sessionId);
-	if (!QDF_IS_STATUS_SUCCESS(status))
+	sessionId = pDeauthInd->vdev_id;
+	if (!CSR_IS_SESSION_VALID(mac_ctx, sessionId)) {
+		sme_err("vdev %d: Invalid session BSSID: " QDF_MAC_ADDR_FMT,
+			pDeauthInd->vdev_id,
+			QDF_MAC_ADDR_REF(pDeauthInd->bssid.bytes));
 		return;
+	}
 
 	if (csr_is_deauth_disassoc_already_active(mac_ctx, sessionId,
 	    pDeauthInd->peer_macaddr))
@@ -5352,6 +5364,7 @@ csr_roam_get_bss_start_parms(struct mac_context *mac,
 	uint32_t opr_ch_freq = 0;
 	tSirNwType nw_type;
 	uint32_t tmp_opr_ch_freq = 0;
+	uint8_t h2e;
 	tSirMacRateSet *opr_rates = &pParam->operationalRateSet;
 	tSirMacRateSet *ext_rates = &pParam->extendedRateSet;
 
@@ -5439,6 +5452,22 @@ csr_roam_get_bss_start_parms(struct mac_context *mac,
 			break;
 		}
 		pParam->operation_chan_freq = opr_ch_freq;
+	}
+
+	if (pProfile->require_h2e) {
+		h2e = WLAN_BASIC_RATE_MASK |
+			WLAN_BSS_MEMBERSHIP_SELECTOR_SAE_H2E;
+		if (ext_rates->numRates < SIR_MAC_MAX_NUMBER_OF_RATES) {
+			ext_rates->rate[ext_rates->numRates] = h2e;
+			ext_rates->numRates++;
+			sme_debug("H2E bss membership add to ext support rate");
+		} else if (opr_rates->numRates < SIR_MAC_MAX_NUMBER_OF_RATES) {
+			opr_rates->rate[opr_rates->numRates] = h2e;
+			opr_rates->numRates++;
+			sme_debug("H2E bss membership add to support rate");
+		} else {
+			sme_err("rates full, can not add H2E bss membership");
+		}
 	}
 
 	pParam->sirNwType = nw_type;
@@ -5643,18 +5672,18 @@ QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS csr_set_pmk_cache_ft(struct mac_context *mac, uint32_t session_id,
+QDF_STATUS csr_set_pmk_cache_ft(struct mac_context *mac, uint8_t vdev_id,
 				struct wlan_crypto_pmksa *pmk_cache)
 {
 	struct wlan_objmgr_vdev *vdev;
 	int32_t akm;
 
-	if (!CSR_IS_SESSION_VALID(mac, session_id)) {
-		sme_err("session %d not found", session_id);
+	if (!CSR_IS_SESSION_VALID(mac, vdev_id)) {
+		sme_err("session %d not found", vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, session_id,
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, vdev_id,
 						    WLAN_LEGACY_SME_ID);
 	if (!vdev) {
 		sme_err("vdev is NULL");
@@ -5675,31 +5704,47 @@ QDF_STATUS csr_set_pmk_cache_ft(struct mac_context *mac, uint32_t session_id,
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FILS_SHA384) ||
 	    QDF_HAS_PARAM(akm, WLAN_CRYPTO_KEY_MGMT_FT_IEEE8021X_SHA384)) {
 		sme_debug("Auth type: %x update the MDID in cache", akm);
-		cm_update_pmk_cache_ft(mac->psoc, session_id);
+		cm_update_pmk_cache_ft(mac->psoc, vdev_id);
 	} else {
 		struct cm_roam_values_copy src_cfg;
-		QDF_STATUS status = QDF_STATUS_E_FAILURE;
-		tCsrScanResultInfo *scan_res;
+		struct scan_filter *scan_filter;
+		qdf_list_t *list = NULL;
+		struct scan_cache_node *first_node = NULL;
+		struct rsn_mdie *mdie = NULL;
+		qdf_list_node_t *cur_node = NULL;
 
-		scan_res = qdf_mem_malloc(sizeof(tCsrScanResultInfo));
-		if (!scan_res)
+		scan_filter = qdf_mem_malloc(sizeof(*scan_filter));
+		if (!scan_filter)
 			return QDF_STATUS_E_NOMEM;
-
-		status = csr_scan_get_result_for_bssid(mac, &pmk_cache->bssid,
-						       scan_res);
-		if (QDF_IS_STATUS_SUCCESS(status) &&
-		    scan_res->BssDescriptor.mdiePresent) {
+		scan_filter->num_of_bssid = 1;
+		qdf_mem_copy(scan_filter->bssid_list[0].bytes,
+			     &pmk_cache->bssid, sizeof(struct qdf_mac_addr));
+		list = wlan_scan_get_result(mac->pdev, scan_filter);
+		qdf_mem_free(scan_filter);
+		if (!list || (list && !qdf_list_size(list))) {
+			sme_debug("Scan list is empty");
+			goto err;
+		}
+		qdf_list_peek_front(list, &cur_node);
+		first_node = qdf_container_of(cur_node,
+					      struct scan_cache_node,
+					      node);
+		if (first_node && first_node->entry)
+			mdie = (struct rsn_mdie *)
+					util_scan_entry_mdie(first_node->entry);
+		if (mdie) {
 			sme_debug("Update MDID in cache from scan_res");
 			src_cfg.bool_value = true;
 			src_cfg.uint_value =
-				(scan_res->BssDescriptor.mdie[0] |
-				 (scan_res->BssDescriptor.mdie[1] << 8));
-			wlan_cm_roam_cfg_set_value(mac->psoc, session_id,
+				(mdie->mobility_domain[0] |
+				 (mdie->mobility_domain[1] << 8));
+			wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
 						   MOBILITY_DOMAIN, &src_cfg);
-			cm_update_pmk_cache_ft(mac->psoc, session_id);
+			cm_update_pmk_cache_ft(mac->psoc, vdev_id);
 		}
-		qdf_mem_free(scan_res);
-		scan_res = NULL;
+err:
+		if (list)
+			wlan_scan_purge_results(list);
 	}
 	return QDF_STATUS_SUCCESS;
 }

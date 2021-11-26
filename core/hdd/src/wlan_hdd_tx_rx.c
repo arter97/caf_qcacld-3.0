@@ -72,6 +72,7 @@
 #include "nan_ucfg_api.h"
 #include <wlan_hdd_sar_limits.h>
 #include "wlan_hdd_object_manager.h"
+#include "wlan_hdd_mlo.h"
 
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
 /*
@@ -2079,7 +2080,7 @@ void hdd_disable_rx_ol_for_low_tput(struct hdd_context *hdd_ctx, bool disable)
 }
 #endif /* RECEIVE_OFFLOAD */
 
-#ifdef WLAN_FEATURE_TSF_PLUS
+#ifdef WLAN_FEATURE_TSF_PLUS_SOCK_TS
 static inline void hdd_tsf_timestamp_rx(struct hdd_context *hdd_ctx,
 					qdf_nbuf_t netbuf,
 					uint64_t target_time)
@@ -2497,7 +2498,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 	bool track_arp = false;
 	struct wlan_objmgr_vdev *vdev;
 	enum qdf_proto_subtype subtype = QDF_PROTO_INVALID;
-	bool is_eapol;
+	bool is_eapol, send_over_nl;
 	bool is_dhcp;
 
 	/* Sanity check on inputs */
@@ -2532,6 +2533,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 		skb->next = NULL;
 		is_eapol = false;
 		is_dhcp = false;
+		send_over_nl = false;
 
 		if (qdf_nbuf_is_ipv4_arp_pkt(skb)) {
 			if (qdf_nbuf_data_is_arp_rsp(skb) &&
@@ -2547,6 +2549,7 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 			}
 		} else if (qdf_nbuf_is_ipv4_eapol_pkt(skb)) {
 			subtype = qdf_nbuf_get_eapol_subtype(skb);
+			send_over_nl = true;
 			if (subtype == QDF_PROTO_EAPOL_M1) {
 				++adapter->hdd_stats.hdd_eapol_stats.
 						eapol_m1_count;
@@ -2653,7 +2656,15 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 
 		hdd_tsf_timestamp_rx(hdd_ctx, skb, ktime_to_us(skb->tstamp));
 
-		qdf_status = hdd_rx_deliver_to_stack(adapter, skb);
+		if (send_over_nl && SEND_EAPOL_OVER_NL) {
+			if(cfg80211_rx_control_port(adapter->dev, skb, false))
+				qdf_status = QDF_STATUS_SUCCESS;
+			else
+				qdf_status = QDF_STATUS_E_INVAL;
+			dev_kfree_skb(skb);
+		} else {
+			qdf_status = hdd_rx_deliver_to_stack(adapter, skb);
+		}
 
 		if (QDF_IS_STATUS_SUCCESS(qdf_status)) {
 			++adapter->hdd_stats.tx_rx_stats.
@@ -2971,10 +2982,13 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 	struct hdd_netif_queue_history *txq_hist_ptr;
 
 	if ((!adapter) || (WLAN_HDD_ADAPTER_MAGIC != adapter->magic) ||
-		 (!adapter->dev)) {
+	    (!adapter->dev)) {
 		hdd_err("adapter is invalid");
 		return;
 	}
+
+	if (hdd_adapter_is_link_adapter(adapter))
+		return;
 
 	switch (action) {
 

@@ -30,7 +30,9 @@
 #include <wlan_hdd_softap_tx_rx.h>
 #include <linux/inetdevice.h>
 #include <qdf_trace.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+/* Test against msm kernel version */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)) && \
+	IS_ENABLED(CONFIG_SCHED_WALT)
 #include <linux/sched/walt.h>
 #endif
 
@@ -361,6 +363,7 @@ static void hdd_ipa_set_wake_up_idle(bool wake_up_idle)
 }
 #endif
 
+#ifdef QCA_CONFIG_SMP
 /**
  * hdd_ipa_send_to_nw_stack() - Check if IPA supports NAPI
  * polling during RX
@@ -382,6 +385,15 @@ static int hdd_ipa_send_to_nw_stack(qdf_nbuf_t skb)
 		result = netif_rx_ni(skb);
 	return result;
 }
+#else
+static int hdd_ipa_send_to_nw_stack(qdf_nbuf_t skb)
+{
+	int result;
+
+	result = netif_rx_ni(skb);
+	return result;
+}
+#endif
 
 #ifdef QCA_CONFIG_SMP
 

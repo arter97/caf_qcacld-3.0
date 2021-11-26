@@ -120,9 +120,6 @@ enum mlmmsgtype {
 #define MGMT_TX_USE_INCORRECT_KEY   BIT(0)
 
 #define LIM_DOS_PROTECTION_TIME 1000 //1000ms
-#ifndef ROAM_TARGET_IF_CONVERGENCE
-#define LIM_MIN_RSSI 0 /* 0dbm */
-#endif
 /* enums used by LIM are as follows */
 
 enum eLimDisassocTrigger {
@@ -245,6 +242,9 @@ typedef struct sLimMlmAssocInd {
 	tDot11fIEVHTCaps vht_caps;
 	bool he_caps_present;
 	bool is_sae_authenticated;
+#ifdef WLAN_FEATURE_11BE_MLO
+	tSirMacAddr peer_mld_addr;
+#endif
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
 
 typedef struct sLimMlmReassocReq {
@@ -1238,19 +1238,6 @@ QDF_STATUS lim_process_sme_del_all_tdls_peers(struct mac_context *p_mac,
  */
 void lim_send_bcn_rsp(struct mac_context *mac_ctx, tpSendbeaconParams rsp);
 
-#ifndef ROAM_TARGET_IF_CONVERGENCE
-/**
- * lim_add_roam_blacklist_ap() - handle the blacklist bssid list received from
- * firmware
- * @mac_ctx: Pointer to Global MAC structure
- * @list: roam blacklist ap list
- *
- * Return: None
- */
-void lim_add_roam_blacklist_ap(struct mac_context *mac_ctx,
-			       struct roam_blacklist_event *src_lst);
-#endif
-
 /**
  * lim_process_rx_channel_status_event() - processes
  * event WDA_RX_CHN_STATUS_EVENT
@@ -1343,6 +1330,15 @@ void lim_process_auth_failure_timeout(struct mac_context *mac_ctx);
  */
 void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 				       uint32_t msg_type);
+
+/**
+ * lim_process_sae_auth_timeout() - This function is called to process sae
+ * auth timeout
+ * @mac_ctx: Pointer to Global MAC structure
+ *
+ * @Return: None
+ */
+void lim_process_sae_auth_timeout(struct mac_context *mac_ctx);
 
 /**
  * lim_send_frame() - API to send frame

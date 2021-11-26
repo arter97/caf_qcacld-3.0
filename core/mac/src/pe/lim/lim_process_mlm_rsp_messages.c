@@ -506,6 +506,8 @@ void lim_process_mlm_auth_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 
 	if (auth_cnf->resultCode == eSIR_SME_SUCCESS) {
 		if (session_entry->limSmeState == eLIM_SME_WT_AUTH_STATE) {
+			lim_deactivate_and_change_timer(mac_ctx,
+							eLIM_ASSOC_FAIL_TIMER);
 			lim_send_mlm_assoc_req(mac_ctx, session_entry);
 		} else {
 			/*
@@ -722,7 +724,10 @@ lim_fill_sme_assoc_ind_params(
 	/* Fill in peerMacAddr */
 	qdf_mem_copy(sme_assoc_ind->peerMacAddr, assoc_ind->peerMacAddr,
 		sizeof(tSirMacAddr));
-
+#ifdef WLAN_FEATURE_11BE_MLO
+	qdf_mem_copy(sme_assoc_ind->peer_mld_addr, assoc_ind->peer_mld_addr,
+		     sizeof(tSirMacAddr));
+#endif
 	/* Fill in aid */
 	sme_assoc_ind->aid = assoc_ind->aid;
 	/* Fill in bssId */
@@ -1286,6 +1291,7 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param)
 		 * make sure PE is sending eWNI_SME_JOIN_RSP
 		 * to SME
 		 */
+		lim_mlo_notify_peer_disconn(session, sta_ds);
 		lim_cleanup_rx_path(mac_ctx, sta_ds, session, true);
 		qdf_mem_free(session->lim_join_req);
 		session->lim_join_req = NULL;
@@ -1297,6 +1303,8 @@ QDF_STATUS lim_sta_handle_connect_fail(join_params *param)
 			goto error;
 		}
 		return QDF_STATUS_SUCCESS;
+	} else {
+		lim_mlo_sta_notify_peer_disconn(session);
 	}
 	qdf_mem_free(session->lim_join_req);
 	session->lim_join_req = NULL;
@@ -1503,6 +1511,15 @@ void lim_process_sta_mlm_add_sta_rsp(struct mac_context *mac_ctx,
 		MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE,
 			session_entry->peSessionId,
 			session_entry->limMlmState));
+#ifdef WLAN_FEATURE_11BE_MLO
+		if (wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
+			pe_err("sending assoc cnf for MLO link vdev");
+			mlm_assoc_cnf.resultCode = eSIR_SME_SUCCESS;
+			mlm_assoc_cnf.sessionId = session_entry->peSessionId;
+			lim_post_sme_message(mac_ctx, LIM_MLM_ASSOC_CNF,
+					     (uint32_t *)&mlm_assoc_cnf);
+		}
+#endif
 
 #ifdef WLAN_DEBUG
 		mac_ctx->lim.gLimNumLinkEsts++;
@@ -2729,22 +2746,22 @@ static void lim_process_switch_channel_join_req(
  */
 #ifdef WLAN_FEATURE_11BE_MLO
 	if (wlan_vdev_mlme_is_mlo_link_vdev(session_entry->vdev)) {
-		struct element_info *assoc_rsp = NULL;
+		struct element_info assoc_rsp;
 		struct qdf_mac_addr sta_link_addr;
 
+		pe_err("sta_link_addr" QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(&sta_link_addr));
+		assoc_rsp.len = 0;
 		mlo_get_assoc_rsp(session_entry->vdev, &assoc_rsp);
-		if (!assoc_rsp)
-			goto error;
 
-		if (!session_entry->ml_partner_info.num_partner_links) {
+		if (!session_entry->lim_join_req->
+					partner_info.num_partner_links) {
 			pe_debug("MLO: num_partner_links is 0");
 			goto error;
 		}
 		/* Todo: update the sta addr by matching link id */
 		qdf_mem_copy(&sta_link_addr, session_entry->self_mac_addr,
 			     QDF_MAC_ADDR_SIZE);
-
-		pe_debug("MLO: assoc rsp len %d ", assoc_rsp.len);
 
 		if (assoc_rsp.len) {
 			struct element_info link_assoc_rsp;
@@ -2764,20 +2781,24 @@ static void lim_process_switch_channel_join_req(
 			link_assoc_rsp.ptr = qdf_mem_malloc(assoc_rsp.len);
 			if (!link_assoc_rsp.ptr)
 				return;
-			link_assoc_rsp.len = assoc_rsp.len;
+
+			link_assoc_rsp.len = assoc_rsp.len + 24;
 			session_entry->limMlmState = eLIM_MLM_WT_ASSOC_RSP_STATE;
 			pe_debug("MLO: Generate and process assoc rsp for link vdev");
 
-			if (QDF_IS_STATUS_SUCCESS(util_gen_link_assoc_rsp(assoc_rsp.ptr,
-									  assoc_rsp.len,
-									  sta_link_addr,
-									  link_assoc_rsp.ptr)))
+			if (QDF_IS_STATUS_SUCCESS(
+				util_gen_link_assoc_rsp(assoc_rsp.ptr,
+							assoc_rsp.len,
+							sta_link_addr,
+							link_assoc_rsp.ptr))) {
+				pe_debug("MLO: process assoc rsp for link vdev");
 				lim_process_assoc_rsp_frame(mac_ctx,
 							    link_assoc_rsp.ptr,
 							    link_assoc_rsp.len,
 							    LIM_ASSOC,
 							    session_entry);
-			qdf_mem_free(link_assoc_rsp.ptr);
+				qdf_mem_free(link_assoc_rsp.ptr);
+			}
 		}
 		return;
 	}

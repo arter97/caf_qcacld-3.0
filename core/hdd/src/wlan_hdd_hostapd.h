@@ -250,6 +250,29 @@ void hdd_sap_context_destroy(struct hdd_context *hdd_ctx);
 #ifdef QCA_HT_2040_COEX
 QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
 				   uint8_t channel_type);
+
+/**
+ * hdd_get_sap_ht2040_mode() - get ht2040 mode
+ * @adapter: pointer to adapter
+ * @channel_type: given channel type
+ *
+ * Return: QDF_STATUS_SUCCESS if successfully
+ */
+QDF_STATUS hdd_get_sap_ht2040_mode(struct hdd_adapter *adapter,
+				   enum eSirMacHTChannelType *channel_type);
+#else
+static inline QDF_STATUS hdd_set_sap_ht2040_mode(struct hdd_adapter *adapter,
+						 uint8_t channel_type)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS hdd_get_sap_ht2040_mode(
+				struct hdd_adapter *adapter,
+				enum eSirMacHTChannelType *channel_type)
+{
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
 
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
@@ -345,4 +368,18 @@ void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
  * Return: true if any sta is connecting
  */
 bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_hdd_mlo_reset() - reset mlo configuration if start bss fails
+ * @adapter: Pointer to hostapd adapter
+ *
+ * Return: void
+ */
+void wlan_hdd_mlo_reset(struct hdd_adapter *adapter);
+#else
+static inline void wlan_hdd_mlo_reset(struct hdd_adapter *adapter)
+{
+}
+#endif /* end WLAN_FEATURE_11BE_MLO */
 #endif /* end #if !defined(WLAN_HDD_HOSTAPD_H) */

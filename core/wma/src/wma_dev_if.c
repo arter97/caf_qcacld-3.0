@@ -93,6 +93,7 @@
 #include <wlan_cm_api.h>
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include "wlan_nan_api.h"
+#include "wlan_mlo_mgr_peer.h"
 #ifdef DCS_INTERFERENCE_DETECTION
 #include <wlan_dcs_ucfg_api.h>
 #endif
@@ -1843,6 +1844,26 @@ static QDF_STATUS wma_cdp_peer_create(ol_txrx_soc_handle dp_soc,
 #endif
 
 /**
+ * wma_update_mlo_peer_create() - update mlo parameter for peer creation
+ * @param: peer create param
+ * @mlo_enable: mlo enable or not
+ *
+ * Return: Void
+ */
+#ifdef WLAN_FEATURE_11BE_MLO
+static void wma_update_mlo_peer_create(struct peer_create_params *param,
+				       bool mlo_enable)
+{
+	param->mlo_enabled = mlo_enable;
+}
+#else
+static void wma_update_mlo_peer_create(struct peer_create_params *param,
+				       bool mlo_enable)
+{
+}
+#endif
+
+/**
  * wma_add_peer() - send peer create command to fw
  * @wma: wma handle
  * @peer_addr: peer mac addr
@@ -1905,11 +1926,13 @@ QDF_STATUS wma_add_peer(tp_wma_handle wma,
 	 */
 	if (peer_mld_addr &&
 	    !qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_mld_addr)) {
+		wlan_peer_mlme_flag_ext_set(obj_peer, WLAN_PEER_FEXT_MLO);
 		wma_debug("peer " QDF_MAC_ADDR_FMT "is_assoc_peer%d mld mac " QDF_MAC_ADDR_FMT,
 			  QDF_MAC_ADDR_REF(peer_addr), is_assoc_peer,
 			  QDF_MAC_ADDR_REF(peer_mld_addr));
 		wlan_peer_mlme_set_mldaddr(obj_peer, peer_mld_addr);
 		wlan_peer_mlme_set_assoc_peer(obj_peer, is_assoc_peer);
+		wma_update_mlo_peer_create(&param, true);
 	}
 	status = wma_cdp_peer_create(dp_soc, vdev_id, peer_addr, obj_peer);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -2363,10 +2386,12 @@ wma_delete_peer_on_vdev_stop(tp_wma_handle wma, uint8_t vdev_id)
 	}
 
 #ifdef WLAN_FEATURE_11BE_MLO
-	peer = wlan_objmgr_get_peer_by_mac(wma.psoc, &bssid.bytes,
+	peer = wlan_objmgr_get_peer_by_mac(wma->psoc, bssid.bytes,
 					   WLAN_LEGACY_WMA_ID);
-	if (peer)
+	if (peer) {
 		wlan_mlo_link_peer_delete(peer);
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_WMA_ID);
+	}
 #endif
 
 	vdev_stop_resp = qdf_mem_malloc(sizeof(*vdev_stop_resp));
@@ -3145,8 +3170,8 @@ int wma_peer_create_confirm_handler(void *handle, uint8_t *evt_param_info,
 	req_msg = wma_find_remove_req_msgtype(wma, peer_create_rsp->vdev_id,
 					      WMA_PEER_CREATE_REQ);
 	if (!req_msg) {
-		wma_err("vdev:%d Failed to lookup peer create request message",
-			peer_create_rsp->vdev_id);
+		wma_debug("vdev:%d Failed to lookup peer create request msg",
+			  peer_create_rsp->vdev_id);
 		return -EINVAL;
 	}
 
@@ -4925,6 +4950,15 @@ static void wma_sap_allow_runtime_pm(tp_wma_handle wma)
 	qdf_runtime_pm_allow_suspend(&wma->sap_prevent_runtime_pm_lock);
 }
 
+static void wma_ndp_prevent_runtime_pm(tp_wma_handle wma)
+{
+	qdf_runtime_pm_prevent_suspend(&wma->ndp_prevent_runtime_pm_lock);
+}
+
+static void wma_ndp_allow_runtime_pm(tp_wma_handle wma)
+{
+	qdf_runtime_pm_allow_suspend(&wma->ndp_prevent_runtime_pm_lock);
+}
 #ifdef FEATURE_STA_MODE_VOTE_LINK
 static bool wma_add_sta_allow_sta_mode_vote_link(uint8_t oper_mode)
 {
@@ -5098,7 +5132,7 @@ void wma_add_sta(tp_wma_handle wma, tpAddStaParams add_sta)
 	if (BSS_OPERATIONAL_MODE_NDI == oper_mode) {
 		wma_debug("disable runtime pm and vote for link up");
 		htc_vote_link_up(htc_handle, HTC_LINK_VOTE_NDP_USER_ID);
-		wma_sap_prevent_runtime_pm(wma);
+		wma_ndp_prevent_runtime_pm(wma);
 	} else if (wma_add_sta_allow_sta_mode_vote_link(oper_mode)) {
 		wma_debug("vote for link up");
 		htc_vote_link_up(htc_handle, HTC_LINK_VOTE_STA_USER_ID);
@@ -5196,7 +5230,7 @@ void wma_delete_sta(tp_wma_handle wma, tpDeleteStaParams del_sta)
 	if (BSS_OPERATIONAL_MODE_NDI == oper_mode) {
 		wma_debug("allow runtime pm and vote for link down");
 		htc_vote_link_down(htc_handle, HTC_LINK_VOTE_NDP_USER_ID);
-		wma_sap_allow_runtime_pm(wma);
+		wma_ndp_allow_runtime_pm(wma);
 	} else if (wma_add_sta_allow_sta_mode_vote_link(oper_mode)) {
 		wma_debug("vote for link down");
 		htc_vote_link_down(htc_handle, HTC_LINK_VOTE_STA_USER_ID);

@@ -452,13 +452,16 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
  *
  * This function check for PM QoS global vote.
  *
+ * @hdd_ctx: hdd_context pointer
+ *
  * Return: true if there is PM QoS global vote,
  *	   or an false otherwise
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
-bool wlan_hdd_is_cpu_pm_qos_in_progress(void);
+bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx);
 #else
-static inline bool wlan_hdd_is_cpu_pm_qos_in_progress(void)
+static inline bool
+wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 {
 	return false;
 }
@@ -633,4 +636,22 @@ QDF_STATUS wlan_hdd_get_ani_level(struct hdd_adapter *adapter,
 				  uint32_t *parsed_freqs,
 				  uint8_t num_freqs);
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
+
+#ifdef WLAN_FEATURE_ICMP_OFFLOAD
+/**
+ * hdd_enable_icmp_offload() - API to enable ICMP offload
+ * @adapter: Adapter context for which ICMP offload is to be configured
+ * @trigger: trigger reason for request
+ *
+ * Return: None
+ */
+void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
+			     enum pmo_offload_trigger trigger);
+#else
+static inline
+void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
+			     enum pmo_offload_trigger trigger)
+{}
+#endif /* FEATURE_ICMP_OFFLOAD */
+
 #endif /* __WLAN_HDD_POWER_H */
