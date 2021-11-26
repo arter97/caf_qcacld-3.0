@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -70,26 +71,6 @@ struct dp_tx_desc_s;
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_TX_CAPTURE, params)
 
 /* stats */
-enum CDP_PEER_MSDU_DESC {
-	PEER_MSDU_SUCC,
-	PEER_MSDU_ENQ,
-	PEER_MSDU_DEQ,
-	PEER_MSDU_FLUSH,
-	PEER_MSDU_DROP,
-	PEER_MSDU_XRETRY,
-	PEER_MSDU_DESC_MAX,
-};
-
-enum CDP_PEER_MPDU_DESC {
-	PEER_MPDU_TRI,
-	PEER_MPDU_SUCC,
-	PEER_MPDU_RESTITCH,
-	PEER_MPDU_ARR,
-	PEER_MPDU_CLONE,
-	PEER_MPDU_TO_STACK,
-	PEER_MPDU_DESC_MAX,
-};
-
 #ifdef WLAN_TX_PKT_CAPTURE_ENH_DEBUG
 struct dp_peer_tx_capture_stats {
 	/* mpdu success and restich count */
@@ -582,5 +563,27 @@ void dp_tx_capture_debugfs_deinit(struct dp_pdev *pdev);
  * return: void
  */
 void tx_cap_debugfs_log_ppdu_desc(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu);
+
+/**
+ * dp_get_peer_tx_capture_stats() - to get peer tx capture stats
+ * @peer: DP PEER handle
+ * @stats: pointer to peer tx capture stats
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_peer_tx_capture_stats(struct dp_peer *peer,
+			     struct cdp_peer_tx_capture_stats *stats);
+
+/**
+ * dp_get_pdev_tx_capture_stats() - to get pdev tx capture stats
+ * @pdev: DP PDEV handle
+ * @stats: pointer to pdev tx capture stats
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+dp_get_pdev_tx_capture_stats(struct dp_pdev *pdev,
+			     struct cdp_pdev_tx_capture_stats *stats);
 #endif
 #endif

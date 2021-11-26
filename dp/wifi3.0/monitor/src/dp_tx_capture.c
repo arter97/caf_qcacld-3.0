@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -7731,5 +7732,132 @@ void dp_tx_capture_debugfs_deinit(struct dp_pdev *pdev)
 	ptr_log_info = &ptr_tx_cap->log_info;
 
 	tx_cap_debugfs_remove(ptr_log_info);
+}
+
+#ifdef WLAN_TX_PKT_CAPTURE_ENH_DEBUG
+static void
+dp_get_peer_tx_capture_debug_stats(struct cdp_peer_tx_capture_stats *stats,
+				   struct dp_peer_tx_capture *tx_capture)
+{
+	struct dp_peer_tx_capture_stats *tx_cap_stats = &tx_capture->stats;
+
+	stats->msdu[PEER_MSDU_SUCC] = tx_cap_stats->msdu[PEER_MSDU_SUCC];
+	stats->msdu[PEER_MSDU_ENQ] = tx_cap_stats->msdu[PEER_MSDU_ENQ];
+	stats->msdu[PEER_MSDU_DEQ] = tx_cap_stats->msdu[PEER_MSDU_DEQ];
+	stats->msdu[PEER_MSDU_FLUSH] = tx_cap_stats->msdu[PEER_MSDU_FLUSH];
+	stats->msdu[PEER_MSDU_DROP] = tx_cap_stats->msdu[PEER_MSDU_DROP];
+	stats->msdu[PEER_MSDU_XRETRY] = tx_cap_stats->msdu[PEER_MSDU_XRETRY];
+	stats->mpdu[PEER_MPDU_TRI] = tx_cap_stats->mpdu[PEER_MPDU_TRI];
+	stats->mpdu[PEER_MPDU_SUCC] = tx_cap_stats->mpdu[PEER_MPDU_SUCC];
+	stats->mpdu[PEER_MPDU_RESTITCH] =
+					tx_cap_stats->mpdu[PEER_MPDU_RESTITCH];
+	stats->mpdu[PEER_MPDU_ARR] = tx_cap_stats->mpdu[PEER_MPDU_ARR];
+	stats->mpdu[PEER_MPDU_CLONE] = tx_cap_stats->mpdu[PEER_MPDU_CLONE];
+	stats->mpdu[PEER_MPDU_TO_STACK] =
+					tx_cap_stats->mpdu[PEER_MPDU_TO_STACK];
+}
+#else /* WLAN_TX_PKT_CAPTURE_ENH_DEBUG */
+static void
+dp_get_peer_tx_capture_debug_stats(struct cdp_peer_tx_capture_stats *stats,
+				   struct dp_peer_tx_capture *tx_capture)
+{
+}
+#endif /* WLAN_TX_PKT_CAPTURE_ENH_DEBUG */
+
+QDF_STATUS
+dp_get_peer_tx_capture_stats(struct dp_peer *peer,
+			     struct cdp_peer_tx_capture_stats *stats)
+{
+	struct dp_peer_tx_capture *tx_capture;
+	int tid;
+
+	if (!peer || !peer->monitor_peer)
+		return QDF_STATUS_E_FAILURE;
+
+	tx_capture = &peer->monitor_peer->tx_capture;
+	dp_get_peer_tx_capture_debug_stats(stats, tx_capture);
+
+	for (tid = 0; tid < DP_MAX_TIDS; tid++) {
+		stats->len_stats[tid].defer_msdu_len =
+		qdf_nbuf_queue_len(&tx_capture->tx_tid[tid].defer_msdu_q);
+		stats->len_stats[tid].tasklet_msdu_len =
+		qdf_nbuf_queue_len(&tx_capture->tx_tid[tid].msdu_comp_q);
+		stats->len_stats[tid].pending_q_len =
+		qdf_nbuf_queue_len(&tx_capture->tx_tid[tid].pending_ppdu_q);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void dp_peer_consolidate_tid_qlen(struct dp_soc *soc,
+					 struct dp_peer *peer,
+					 void *arg)
+{
+	int tid;
+	struct dp_tx_tid *tx_tid;
+	struct cdp_tid_q_len *tid_q_len = (struct cdp_tid_q_len *)arg;
+
+	if (!tid_q_len || !peer || !peer->monitor_peer)
+		return;
+
+	for (tid = 0; tid < DP_MAX_TIDS; tid++) {
+		tx_tid = &peer->monitor_peer->tx_capture.tx_tid[tid];
+		tid_q_len->defer_msdu_len +=
+				qdf_nbuf_queue_len(&tx_tid->defer_msdu_q);
+		tid_q_len->tasklet_msdu_len +=
+				qdf_nbuf_queue_len(&tx_tid->msdu_comp_q);
+		tid_q_len->pending_q_len +=
+				qdf_nbuf_queue_len(&tx_tid->pending_ppdu_q);
+	}
+}
+
+QDF_STATUS
+dp_get_pdev_tx_capture_stats(struct dp_pdev *pdev,
+			     struct cdp_pdev_tx_capture_stats *stats)
+{
+	struct dp_pdev_tx_capture *ptr_tx_cap;
+	uint8_t i = 0, j = 0;
+	uint32_t ppdu_stats_ms = 0;
+	uint32_t now_ms = 0;
+	struct dp_mon_pdev *mon_pdev;
+
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
+	mon_pdev = pdev->monitor_pdev;
+	if (!mon_pdev)
+		return QDF_STATUS_E_FAILURE;
+
+	ptr_tx_cap = &mon_pdev->tx_capture;
+	ppdu_stats_ms = ptr_tx_cap->ppdu_stats_ms;
+	now_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
+
+	stats->last_rcv_ppdu = now_ms - ppdu_stats_ms;
+	stats->ppdu_stats_queue_depth = ptr_tx_cap->ppdu_stats_queue_depth;
+	stats->ppdu_stats_defer_queue_depth =
+				ptr_tx_cap->ppdu_stats_defer_queue_depth;
+	stats->ppdu_dropped = ptr_tx_cap->ppdu_dropped;
+	stats->pend_ppdu_dropped = ptr_tx_cap->pend_ppdu_dropped;
+	stats->peer_mismatch = ptr_tx_cap->peer_mismatch;
+	stats->ppdu_flush_count = ptr_tx_cap->ppdu_flush_count;
+	stats->msdu_threshold_drop = ptr_tx_cap->msdu_threshold_drop;
+	for (i = 0; i < CDP_TXCAP_MAX_TYPE; i++) {
+		for (j = 0; j < CDP_TXCAP_MAX_SUBTYPE; j++) {
+			if (ptr_tx_cap->ctl_mgmt_q[i][j].qlen)
+				stats->ctl_mgmt_q_len[i][j] =
+					ptr_tx_cap->ctl_mgmt_q[i][j].qlen;
+			if (ptr_tx_cap->retries_ctl_mgmt_q[i][j].qlen)
+				stats->retries_ctl_mgmt_q_len[i][j] =
+				ptr_tx_cap->retries_ctl_mgmt_q[i][j].qlen;
+		}
+	}
+	for (i = 0; i < qdf_min((uint32_t)TX_CAP_HTT_MAX_FTYPE,
+				(uint32_t)CDP_TX_CAP_HTT_MAX_FTYPE); i++)
+		stats->htt_frame_type[i] = ptr_tx_cap->htt_frame_type[i];
+
+	dp_pdev_iterate_peer(pdev, dp_peer_consolidate_tid_qlen,
+			     &stats->len_stats, DP_MOD_ID_TX_CAPTURE);
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif
