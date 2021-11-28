@@ -463,12 +463,29 @@ int pld_set_mode(u8 mode);
  *         Non zero failure code for errors
  */
 int pld_set_suspend_mode(enum pld_suspend_mode mode);
+
 /**
  * pld_is_full_power_down_enable() - check full power down is enabled or not
  *
  * Return: true if full power down is enabled else false
  */
 bool pld_is_full_power_down_enable(void);
+
+/**
+ * pld_set_full_power_down_state() - set full power down state in PLD module
+ * @triggered: true if full power down is triggered, otherwise false
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_set_full_power_down_state(bool triggered);
+
+/**
+ * pld_is_full_power_down_triggered() - check full power down state
+ *
+ * Return: true if full power down is triggered, otherwise false
+ */
+bool pld_is_full_power_down_triggered(void);
 #else
 static inline int pld_set_suspend_mode(enum pld_suspend_mode mode)
 {
@@ -476,6 +493,16 @@ static inline int pld_set_suspend_mode(enum pld_suspend_mode mode)
 }
 
 static inline bool pld_is_full_power_down_enable(void)
+{
+	return false;
+}
+
+static inline int pld_set_full_power_down_state(bool triggered)
+{
+	return 0;
+}
+
+static inline bool pld_is_full_power_down_triggered(void)
 {
 	return false;
 }

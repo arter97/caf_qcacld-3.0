@@ -16652,6 +16652,33 @@ int hdd_set_suspend_mode(struct hdd_context *hdd_ctx)
 
 	return errno;
 }
+
+QDF_STATUS hdd_set_pld_full_power_down_state(bool triggered)
+{
+	int errno;
+
+	errno = pld_set_full_power_down_state(triggered);
+	if (errno == 0)
+		return QDF_STATUS_SUCCESS;
+	else
+		return QDF_STATUS_E_INVAL;
+}
+
+bool hdd_is_pld_full_power_down_triggered(void)
+{
+	return pld_is_full_power_down_triggered();
+}
+
+QDF_STATUS wlan_hdd_ipa_wdi_reset(void)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (hdd_is_pld_full_power_down_triggered()) {
+		status = ucfg_ipa_wdi_disconn_cleanup();
+	}
+
+	return status;
+}
 #endif
 
 int hdd_driver_load(void)
@@ -16716,6 +16743,10 @@ int hdd_driver_load(void)
 	errno = pld_set_mode(con_mode);
 	if (errno)
 		hdd_err("Failed to set mode in PLD; errno:%d", errno);
+
+	errno = pld_set_full_power_down_state(false);
+	if (errno)
+		hdd_err("Failed to init full power down state in PLD");
 
 	hdd_driver_mode_change_register();
 

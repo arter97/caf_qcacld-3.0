@@ -157,6 +157,32 @@ bool pld_is_full_power_down_enable(void)
 out:
 	return false;
 }
+
+int pld_set_full_power_down_state(bool triggered)
+{
+	struct pld_context *pld_context;
+
+	pld_context = pld_get_global_context();
+	if (!pld_context)
+		return -ENOMEM;
+
+	pld_context->is_full_power_down_triggered = triggered;
+
+	return 0;
+}
+
+bool pld_is_full_power_down_triggered(void)
+{
+	struct pld_context *pld_context;
+
+	pld_context = pld_get_global_context();
+	if (!pld_context) {
+		pr_err("%s: pld context is null\n", __func__);
+		return false;
+	}
+
+	return pld_context->is_full_power_down_triggered;
+}
 #endif
 
 /**

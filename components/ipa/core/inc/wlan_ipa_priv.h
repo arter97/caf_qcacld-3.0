@@ -712,6 +712,9 @@ struct wlan_ipa_priv {
 	bool is_smmu_enabled;	/* IPA caps returned from ipa_wdi_init */
 	qdf_atomic_t stats_quota;
 	uint8_t curr_bw_level;
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+	bool is_full_power_down_triggered;
+#endif
 };
 
 #define WLAN_IPA_WLAN_FRAG_HEADER        sizeof(struct frag_header)

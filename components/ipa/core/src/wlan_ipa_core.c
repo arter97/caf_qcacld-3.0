@@ -3286,6 +3286,7 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 {
 	int ret, i;
 	struct wlan_ipa_iface_context *iface_context = NULL;
+	struct wlan_objmgr_pdev *pdev = ipa_ctx->pdev;
 	QDF_STATUS status;
 
 	ipa_debug("enter");
@@ -3376,6 +3377,11 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 
 	qdf_event_create(&ipa_ctx->ipa_resource_comp);
 
+	status = ipa_set_full_power_down_state(pdev, false);
+	if (status != QDF_STATUS_SUCCESS)
+		ipa_err("IPA set Full Power Down state failed");
+
+
 	ipa_debug("exit: success");
 
 	return QDF_STATUS_SUCCESS;
@@ -3430,6 +3436,20 @@ void wlan_ipa_flush(struct wlan_ipa_priv *ipa_ctx)
 	qdf_spin_unlock_bh(&ipa_ctx->pm_lock);
 }
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+static bool
+wlan_ipa_is_full_power_down_triggered(struct wlan_ipa_priv *ipa_ctx)
+{
+	return ipa_ctx->is_full_power_down_triggered;
+}
+#else
+static bool
+wlan_ipa_is_full_power_down_triggered(struct wlan_ipa_priv *ipa_ctx)
+{
+	return false;
+}
+#endif
+
 QDF_STATUS wlan_ipa_cleanup(struct wlan_ipa_priv *ipa_ctx)
 {
 	struct wlan_ipa_iface_context *iface_context;
@@ -3462,7 +3482,8 @@ QDF_STATUS wlan_ipa_cleanup(struct wlan_ipa_priv *ipa_ctx)
 	}
 
 	if (wlan_ipa_uc_is_enabled(ipa_ctx->config)) {
-		wlan_ipa_wdi_cleanup();
+		if (!wlan_ipa_is_full_power_down_triggered(ipa_ctx))
+			wlan_ipa_wdi_cleanup();
 		qdf_mutex_destroy(&ipa_ctx->event_lock);
 		qdf_mutex_destroy(&ipa_ctx->ipa_lock);
 		qdf_list_destroy(&ipa_ctx->pending_event);
@@ -4070,3 +4091,24 @@ void wlan_ipa_flush_pending_vdev_events(struct wlan_ipa_priv *ipa_ctx,
 
 	qdf_mutex_release(&ipa_ctx->ipa_lock);
 }
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+QDF_STATUS wlan_ipa_wdi_disconn_cleanup(void)
+{
+	int ret;
+
+	ret = qdf_ipa_wdi_disconn_pipes();
+	if (ret) {
+		ipa_err("ipa wdi disconnect pipes failed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ret = wlan_ipa_wdi_cleanup();
+	if (ret) {
+		ipa_err("ipa wdi cleanup failed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

@@ -913,7 +913,7 @@ static void __hdd_soc_recovery_shutdown(void)
 		return;
 	}
 
-	if (wlan_hdd_is_full_power_down_enable(hdd_ctx))
+	if (hdd_is_pld_full_power_down_triggered())
 		cds_set_driver_state(CDS_DRIVER_STATE_RECOVERING);
 
 	/* recovery starts via firmware down indication; ensure we got one */
@@ -1747,6 +1747,7 @@ static void wlan_hdd_pld_shutdown(struct device *dev,
 	hdd_exit();
 }
 
+
 /**
  * wlan_hdd_pld_reinit() - reinit function registered to PLD
  * @dev: device
@@ -1767,6 +1768,15 @@ static int wlan_hdd_pld_reinit(struct device *dev,
 		hdd_err("Invalid bus type %d->%d", pld_bus_type, bus_type);
 		return -EINVAL;
 	}
+
+	/* wdi disconnect ipa pipes will wakeup system if the feature of
+	 * full power down is triggered when do suspend, so skip to IPA pipes
+	 * disconnect and IPA cleanup when wlan driver shutdown when suspend,
+         * and adding it at here when system resume if the feature of full
+	 * power down is triggered.
+	 */
+	if (QDF_STATUS_SUCCESS != wlan_hdd_ipa_wdi_reset())
+		hdd_err("ipa wdi disconnect and cleanup failed");
 
 	return hdd_soc_recovery_reinit(dev, bdev, id, bus_type);
 }

@@ -421,6 +421,25 @@ void ucfg_ipa_update_tx_stats(struct wlan_objmgr_pdev *pdev, uint64_t sta_tx,
  */
 void ucfg_ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
 					uint8_t vdev_id);
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+/**
+ * ucfg_ipa_set_full_power_down_state() - set full power down state to IPA
+ * @pdev: pdev obj
+ * @triggered: true if full power down is triggered, otherwise false
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS ucfg_ipa_set_full_power_down_state(struct wlan_objmgr_pdev *pdev,
+					bool triggered);
+
+/**
+ * ucfg_ipa_wdi_disconn_cleanup() - disconnect wdi pipes and cleanup wdi
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS ucfg_ipa_wdi_disconn_cleanup(void);
+#endif
 #else
 
 static inline bool ucfg_ipa_is_present(void)
@@ -659,5 +678,19 @@ void ucfg_ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
 					uint8_t vdev_id)
 {
 }
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+static inline
+QDF_STATUS ucfg_ipa_set_full_power_down_state(struct wlan_objmgr_pdev *pdev,
+					bool triggered)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ucfg_ipa_wdi_disconn_cleanup(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* IPA_OFFLOAD */
 #endif /* _WLAN_IPA_UCFG_API_H_ */
