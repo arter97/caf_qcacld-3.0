@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -68,6 +69,7 @@
 
 #include <ol_defines.h>
 #include "wlan_pkt_capture_ucfg_api.h"
+#include <wlan_serialization_api.h>
 
 #define RSN_AUTH_KEY_MGMT_SAE           WLAN_RSN_SEL(WLAN_AKM_SAE)
 #define MAX_PWR_FCC_CHAN_12 8
@@ -17184,11 +17186,8 @@ QDF_STATUS csr_roam_vdev_delete(struct mac_context *mac_ctx,
 					 vdev_id);
 	}
 
-	/*
-	 * Flush only scan commands. Non scan commands should go in sequence
-	 * as expected by firmware and should not be flushed.
-	 */
-	csr_purge_vdev_all_scan_ser_cmd_list(mac_ctx, vdev_id);
+	/* Flush all the commands for vdev */
+	wlan_serialization_purge_all_cmd_by_vdev_id(mac_ctx->pdev, vdev_id);
 	if (!mac_ctx->session_close_cb) {
 		sme_err("no close session callback registered");
 		return QDF_STATUS_E_FAILURE;
