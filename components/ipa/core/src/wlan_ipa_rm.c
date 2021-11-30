@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -96,6 +97,37 @@ QDF_STATUS wlan_ipa_init_perf_level(struct wlan_ipa_priv *ipa_ctx)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef IPA_STATIC_VOTING
+QDF_STATUS
+wlan_ipa_set_bandwidth(struct wlan_ipa_priv *ipa_ctx,  uint32_t bandwidth)
+{
+	int ret;
+
+	if (wlan_ipa_is_clk_scaling_enabled(ipa_ctx->config))
+		return wlan_ipa_set_perf_level(ipa_ctx, 0, 0);
+
+	ipa_debug("Set perf level to maximum %d", bandwidth);
+
+	ret = cdp_ipa_set_perf_level(ipa_ctx->dp_soc,
+				     QDF_IPA_CLIENT_WLAN1_CONS,
+				     bandwidth);
+	if (ret) {
+		ipa_err("CONS set perf profile failed: %d", ret);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ret = cdp_ipa_set_perf_level(ipa_ctx->dp_soc,
+				     QDF_IPA_CLIENT_WLAN1_PROD,
+				     bandwidth);
+	if (ret) {
+		ipa_err("PROD set perf profile failed: %d", ret);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #ifdef FEATURE_METERING
 void wlan_ipa_init_metering(struct wlan_ipa_priv *ipa_ctx)
