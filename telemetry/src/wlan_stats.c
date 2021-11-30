@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,18 +29,39 @@
 #include <ieee80211_cfg80211.h>
 #include <wlan_stats.h>
 
+static void fill_basic_data_tx_stats(struct basic_data_tx_stats *tx,
+				     struct cdp_tx_stats *cdp_tx)
+{
+	tx->tx_success.num = cdp_tx->tx_success.num;
+	tx->tx_success.bytes = cdp_tx->tx_success.bytes;
+	tx->comp_pkt.num = cdp_tx->comp_pkt.num;
+	tx->comp_pkt.bytes = cdp_tx->comp_pkt.bytes;
+	tx->tx_failed = cdp_tx->tx_failed;
+	tx->dropped_count = cdp_tx->dropped.fw_rem.num +
+			    cdp_tx->dropped.fw_rem_notx +
+			    cdp_tx->dropped.fw_rem_tx +
+			    cdp_tx->dropped.age_out +
+			    cdp_tx->dropped.fw_reason1 +
+			    cdp_tx->dropped.fw_reason2 +
+			    cdp_tx->dropped.fw_reason3;
+}
+
+static void fill_basic_data_rx_stats(struct basic_data_rx_stats *rx,
+				     struct cdp_rx_stats *cdp_rx)
+{
+	rx->to_stack.num = cdp_rx->to_stack.num;
+	rx->to_stack.bytes = cdp_rx->to_stack.bytes;
+	rx->total_rcvd.num = cdp_rx->unicast.num + cdp_rx->multicast.num;
+	rx->total_rcvd.bytes = cdp_rx->unicast.bytes + cdp_rx->multicast.bytes;
+	rx->rx_error_count = cdp_rx->err.mic_err + cdp_rx->err.decrypt_err +
+			     cdp_rx->err.fcserr + cdp_rx->err.pn_err +
+			     cdp_rx->err.oor_err;
+}
+
 static void fill_basic_peer_data_tx(struct basic_peer_data_tx *data,
 				    struct cdp_tx_stats *tx)
 {
-	data->tx_success.num = tx->tx_success.num;
-	data->tx_success.bytes = tx->tx_success.bytes;
-	data->comp_pkt.num = tx->comp_pkt.num;
-	data->comp_pkt.bytes = tx->comp_pkt.bytes;
-	data->tx_failed = tx->tx_failed;
-	data->dropped_count = tx->dropped.fw_rem.num + tx->dropped.fw_rem_notx +
-			      tx->dropped.fw_rem_tx + tx->dropped.age_out +
-			      tx->dropped.fw_reason1 + tx->dropped.fw_reason2 +
-			      tx->dropped.fw_reason3;
+	fill_basic_data_tx_stats(&data->tx, tx);
 }
 
 static void fill_basic_peer_ctrl_tx(struct basic_peer_ctrl_tx *ctrl,
@@ -52,13 +74,7 @@ static void fill_basic_peer_ctrl_tx(struct basic_peer_ctrl_tx *ctrl,
 static void fill_basic_peer_data_rx(struct basic_peer_data_rx *data,
 				    struct cdp_rx_stats *rx)
 {
-	data->to_stack.num = rx->to_stack.num;
-	data->to_stack.bytes = rx->to_stack.bytes;
-	data->total_rcvd.num = rx->unicast.num + rx->multicast.num;
-	data->total_rcvd.bytes = rx->unicast.bytes + rx->multicast.bytes;
-	data->rx_error_count = rx->err.mic_err + rx->err.decrypt_err +
-			       rx->err.fcserr + rx->err.pn_err +
-			       rx->err.oor_err;
+	fill_basic_data_rx_stats(&data->rx, rx);
 }
 
 static void fill_basic_peer_ctrl_rx(struct basic_peer_ctrl_rx *ctrl,
@@ -107,23 +123,14 @@ static void fill_basic_vdev_data_tx(struct basic_vdev_data_tx *data,
 				    struct cdp_vdev_stats *vdev_stats)
 {
 	struct cdp_tx_ingress_stats *tx_i = &vdev_stats->tx_i;
-	struct cdp_tx_stats *tx = &vdev_stats->tx;
 
+	fill_basic_data_tx_stats(&data->tx, &vdev_stats->tx);
 	data->ingress.num = tx_i->rcvd.num;
 	data->ingress.bytes = tx_i->rcvd.bytes;
 	data->processed.num = tx_i->processed.num;
 	data->processed.bytes = tx_i->processed.bytes;
 	data->dropped.num = tx_i->dropped.dropped_pkt.num;
 	data->dropped.bytes = tx_i->dropped.dropped_pkt.bytes;
-	data->tx_success.num = tx->tx_success.num;
-	data->tx_success.bytes = tx->tx_success.bytes;
-	data->comp_pkt.num = tx->comp_pkt.num;
-	data->comp_pkt.bytes = tx->comp_pkt.bytes;
-	data->tx_failed = tx->tx_failed;
-	data->dropped_count = tx->dropped.fw_rem.num + tx->dropped.fw_rem_notx +
-			      tx->dropped.fw_rem_tx + tx->dropped.age_out +
-			      tx->dropped.fw_reason1 + tx->dropped.fw_reason2 +
-			      tx->dropped.fw_reason3;
 }
 
 static void fill_basic_vdev_ctrl_tx(struct basic_vdev_ctrl_tx *ctrl,
@@ -144,13 +151,7 @@ static void fill_basic_vdev_ctrl_tx(struct basic_vdev_ctrl_tx *ctrl,
 static void fill_basic_vdev_data_rx(struct basic_vdev_data_rx *data,
 				    struct cdp_rx_stats *rx)
 {
-	data->to_stack.num = rx->to_stack.num;
-	data->to_stack.bytes = rx->to_stack.bytes;
-	data->total_rcvd.num = rx->unicast.num + rx->multicast.num;
-	data->total_rcvd.bytes = rx->unicast.bytes + rx->multicast.bytes;
-	data->rx_error_count = rx->err.mic_err + rx->err.decrypt_err +
-			       rx->err.fcserr + rx->err.pn_err +
-			       rx->err.oor_err;
+	fill_basic_data_rx_stats(&data->rx, rx);
 }
 
 static void fill_basic_vdev_ctrl_rx(struct basic_vdev_ctrl_rx *ctrl,
@@ -179,23 +180,14 @@ static void fill_basic_pdev_data_tx(struct basic_pdev_data_tx *data,
 				    struct cdp_pdev_stats *pdev_stats)
 {
 	struct cdp_tx_ingress_stats *tx_i = &pdev_stats->tx_i;
-	struct cdp_tx_stats *tx = &pdev_stats->tx;
 
+	fill_basic_data_tx_stats(&data->tx, &pdev_stats->tx);
 	data->ingress.num = tx_i->rcvd.num;
 	data->ingress.bytes = tx_i->rcvd.bytes;
 	data->processed.num = tx_i->processed.num;
 	data->processed.bytes = tx_i->processed.bytes;
 	data->dropped.num = tx_i->dropped.dropped_pkt.num;
 	data->dropped.bytes = tx_i->dropped.dropped_pkt.bytes;
-	data->tx_success.num = tx->tx_success.num;
-	data->tx_success.bytes = tx->tx_success.bytes;
-	data->comp_pkt.num = tx->comp_pkt.num;
-	data->comp_pkt.bytes = tx->comp_pkt.bytes;
-	data->tx_failed = tx->tx_failed;
-	data->dropped_count = tx->dropped.fw_rem.num + tx->dropped.fw_rem_notx +
-			      tx->dropped.fw_rem_tx + tx->dropped.age_out +
-			      tx->dropped.fw_reason1 + tx->dropped.fw_reason2 +
-			      tx->dropped.fw_reason3;
 }
 
 static void fill_basic_pdev_ctrl_tx(struct basic_pdev_ctrl_tx *ctrl,
@@ -208,15 +200,7 @@ static void fill_basic_pdev_ctrl_tx(struct basic_pdev_ctrl_tx *ctrl,
 static void fill_basic_pdev_data_rx(struct basic_pdev_data_rx *data,
 				    struct cdp_pdev_stats *pdev_stats)
 {
-	struct cdp_rx_stats *rx = &pdev_stats->rx;
-
-	data->to_stack.num = rx->to_stack.num;
-	data->to_stack.bytes = rx->to_stack.bytes;
-	data->total_rcvd.num = rx->unicast.num + rx->multicast.num;
-	data->total_rcvd.bytes = rx->unicast.bytes + rx->multicast.bytes;
-	data->rx_error_count = rx->err.mic_err + rx->err.decrypt_err +
-			       rx->err.fcserr + rx->err.pn_err +
-			       rx->err.oor_err;
+	fill_basic_data_rx_stats(&data->rx, &pdev_stats->rx);
 	data->dropped_count = pdev_stats->dropped.msdu_not_done +
 			      pdev_stats->dropped.mec +
 			      pdev_stats->dropped.mesh_filter +
@@ -996,42 +980,83 @@ get_failed:
 }
 
 #if WLAN_ADVANCE_TELEMETRY
+static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
+				       struct cdp_tx_stats *cdp_tx)
+{
+	uint8_t inx = 0;
+
+	tx->ucast.num = cdp_tx->ucast.num;
+	tx->ucast.bytes = cdp_tx->ucast.bytes;
+	tx->mcast.num = cdp_tx->mcast.num;
+	tx->mcast.bytes = cdp_tx->mcast.bytes;
+	tx->bcast.num = cdp_tx->bcast.num;
+	tx->bcast.bytes = cdp_tx->bcast.bytes;
+	for (inx = 0; inx < MAX_GI; inx++)
+		tx->sgi_count[inx] = cdp_tx->sgi_count[inx];
+	for (inx = 0; inx < SS_COUNT; inx++)
+		tx->nss[inx] = cdp_tx->nss[inx];
+	for (inx = 0; inx < MAX_BW; inx++)
+		tx->bw[inx] = cdp_tx->bw[inx];
+	tx->retries = cdp_tx->retries;
+	tx->non_amsdu_cnt = cdp_tx->non_amsdu_cnt;
+	tx->amsdu_cnt = cdp_tx->amsdu_cnt;
+	tx->ampdu_cnt = cdp_tx->ampdu_cnt;
+	tx->non_ampdu_cnt = cdp_tx->non_ampdu_cnt;
+}
+
+static void fill_advance_data_rx_stats(struct advance_data_rx_stats *rx,
+				       struct cdp_rx_stats *cdp_rx)
+{
+	uint8_t inx = 0;
+
+	rx->unicast.num = cdp_rx->unicast.num;
+	rx->unicast.bytes = cdp_rx->unicast.bytes;
+	rx->multicast.num = cdp_rx->multicast.num;
+	rx->multicast.bytes = cdp_rx->multicast.bytes;
+	rx->bcast.num = cdp_rx->bcast.num;
+	rx->bcast.bytes = cdp_rx->bcast.bytes;
+	for (inx = 0; inx < MAX_MCS; inx++)
+		rx->su_ax_ppdu_cnt[inx] =
+			cdp_rx->su_ax_ppdu_cnt.mcs_count[inx];
+	for (inx = 0; inx < WME_AC_MAX; inx++)
+		rx->wme_ac_type[inx] = cdp_rx->wme_ac_type[inx];
+	for (inx = 0; inx < MAX_GI; inx++)
+		rx->sgi_count[inx] = cdp_rx->sgi_count[inx];
+	for (inx = 0; inx < SS_COUNT; inx++)
+		rx->nss[inx] = cdp_rx->nss[inx];
+	for (inx = 0; inx < SS_COUNT; inx++)
+		rx->ppdu_nss[inx] = cdp_rx->ppdu_nss[inx];
+	for (inx = 0; inx < MAX_BW; inx++)
+		rx->bw[inx] = cdp_rx->bw[inx];
+	for (inx = 0; inx < MAX_MCS; inx++)
+		rx->rx_mpdu_cnt[inx] = cdp_rx->rx_mpdu_cnt[inx];
+	rx->mpdu_cnt_fcs_ok = cdp_rx->mpdu_cnt_fcs_ok;
+	rx->mpdu_cnt_fcs_err = cdp_rx->mpdu_cnt_fcs_err;
+	rx->non_amsdu_cnt = cdp_rx->non_amsdu_cnt;
+	rx->non_ampdu_cnt = cdp_rx->non_ampdu_cnt;
+	rx->ampdu_cnt = cdp_rx->ampdu_cnt;
+	rx->amsdu_cnt = cdp_rx->amsdu_cnt;
+	rx->bar_recv_cnt = cdp_rx->bar_recv_cnt;
+	rx->rx_retries = cdp_rx->rx_retries;
+	rx->multipass_rx_pkt_drop = cdp_rx->multipass_rx_pkt_drop;
+}
+
 static QDF_STATUS get_advance_peer_data_tx(struct unified_stats *stats,
 					   struct cdp_peer_stats *peer_stats)
 {
 	struct advance_peer_data_tx *data = NULL;
-	struct cdp_tx_stats *tx = NULL;
-	uint8_t inx = 0;
 
 	if (!stats || !peer_stats) {
 		qdf_err("Invalid Input!");
 		return QDF_STATUS_E_INVAL;
 	}
-	tx = &peer_stats->tx;
 	data = qdf_mem_malloc(sizeof(struct advance_peer_data_tx));
 	if (!data) {
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_peer_data_tx(&data->b_tx, tx);
-
-	data->ucast.num = tx->ucast.num;
-	data->ucast.bytes = tx->ucast.bytes;
-	data->mcast.num = tx->mcast.num;
-	data->mcast.bytes = tx->mcast.bytes;
-	data->bcast.num = tx->bcast.num;
-	data->bcast.bytes = tx->bcast.bytes;
-	for (inx = 0; inx < MAX_GI; inx++)
-		data->sgi_count[inx] = tx->sgi_count[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->nss[inx] = tx->nss[inx];
-	for (inx = 0; inx < MAX_BW; inx++)
-		data->bw[inx] = tx->bw[inx];
-	data->retries = tx->retries;
-	data->non_amsdu_cnt = tx->non_amsdu_cnt;
-	data->amsdu_cnt = tx->amsdu_cnt;
-	data->ampdu_cnt = tx->ampdu_cnt;
-	data->non_ampdu_cnt = tx->non_ampdu_cnt;
+	fill_basic_peer_data_tx(&data->b_tx, &peer_stats->tx);
+	fill_advance_data_tx_stats(&data->adv_tx, &peer_stats->tx);
 
 	stats->feat[INX_FEAT_TX] = data;
 	stats->size[INX_FEAT_TX] = sizeof(struct advance_peer_data_tx);
@@ -1043,8 +1068,6 @@ static QDF_STATUS get_advance_peer_data_rx(struct unified_stats *stats,
 					   struct cdp_peer_stats *peer_stats)
 {
 	struct advance_peer_data_rx *data = NULL;
-	struct cdp_rx_stats *rx = NULL;
-	uint8_t inx = 0;
 
 	if (!stats || !peer_stats) {
 		qdf_err("Invalid Input!");
@@ -1055,41 +1078,11 @@ static QDF_STATUS get_advance_peer_data_rx(struct unified_stats *stats,
 		qdf_err("Failed Allocation");
 		return QDF_STATUS_E_NOMEM;
 	}
-	rx = &peer_stats->rx;
-	fill_basic_peer_data_rx(&data->b_rx, rx);
+	fill_basic_peer_data_rx(&data->b_rx, &peer_stats->rx);
+	fill_advance_data_rx_stats(&data->adv_rx, &peer_stats->rx);
 
-	data->unicast.num = rx->unicast.num;
-	data->unicast.bytes = rx->unicast.bytes;
-	data->multicast.num = rx->multicast.num;
-	data->multicast.bytes = rx->multicast.bytes;
-	data->bcast.num = rx->bcast.num;
-	data->bcast.bytes = rx->bcast.bytes;
-	for (inx = 0; inx < MAX_MCS; inx++)
-		data->su_ax_ppdu_cnt[inx] = rx->su_ax_ppdu_cnt.mcs_count[inx];
-	for (inx = 0; inx < WME_AC_MAX; inx++)
-		data->wme_ac_type[inx] = rx->wme_ac_type[inx];
-	for (inx = 0; inx < MAX_GI; inx++)
-		data->sgi_count[inx] = rx->sgi_count[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->nss[inx] = rx->nss[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->ppdu_nss[inx] = rx->ppdu_nss[inx];
-	for (inx = 0; inx < MAX_BW; inx++)
-		data->bw[inx] = rx->bw[inx];
-	for (inx = 0; inx < MAX_MCS; inx++)
-		data->rx_mpdu_cnt[inx] = rx->rx_mpdu_cnt[inx];
-	data->mpdu_cnt_fcs_ok = rx->mpdu_cnt_fcs_ok;
-	data->mpdu_cnt_fcs_err = rx->mpdu_cnt_fcs_err;
-	data->non_amsdu_cnt = rx->non_amsdu_cnt;
-	data->non_ampdu_cnt = rx->non_ampdu_cnt;
-	data->ampdu_cnt = rx->ampdu_cnt;
-	data->amsdu_cnt = rx->amsdu_cnt;
-	data->bar_recv_cnt = rx->bar_recv_cnt;
-	data->rx_retries = rx->rx_retries;
-	data->multipass_rx_pkt_drop = rx->multipass_rx_pkt_drop;
-
-	stats->feat[INX_FEAT_TX] = data;
-	stats->size[INX_FEAT_TX] = sizeof(struct advance_peer_data_rx);
+	stats->feat[INX_FEAT_RX] = data;
+	stats->size[INX_FEAT_RX] = sizeof(struct advance_peer_data_rx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1512,44 +1505,25 @@ static QDF_STATUS get_advance_vdev_data_tx(struct unified_stats *stats,
 					   struct cdp_vdev_stats *vdev_stats)
 {
 	struct advance_vdev_data_tx *data = NULL;
-	struct cdp_tx_stats *tx = NULL;
 	struct cdp_tx_ingress_stats *tx_i = NULL;
-	uint8_t inx = 0;
 
 	if (!stats || !vdev_stats) {
 		qdf_err("Invalid Input!");
 		return QDF_STATUS_E_INVAL;
 	}
 	tx_i = &vdev_stats->tx_i;
-	tx = &vdev_stats->tx;
 	data = qdf_mem_malloc(sizeof(struct advance_vdev_data_tx));
 	if (!data) {
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
 	fill_basic_vdev_data_tx(&data->b_tx, vdev_stats);
+	fill_advance_data_tx_stats(&data->adv_tx, &vdev_stats->tx);
 
 	data->reinject_pkts.num = tx_i->reinject_pkts.num;
 	data->reinject_pkts.bytes = tx_i->reinject_pkts.bytes;
 	data->inspect_pkts.num = tx_i->inspect_pkts.num;
 	data->inspect_pkts.bytes = tx_i->inspect_pkts.bytes;
-	data->ucast.num = tx->ucast.num;
-	data->ucast.bytes = tx->ucast.bytes;
-	data->mcast.num = tx->mcast.num;
-	data->mcast.bytes = tx->mcast.bytes;
-	data->bcast.num = tx_i->bcast.num;
-	data->bcast.bytes = tx_i->bcast.bytes;
-	for (inx = 0; inx < MAX_GI; inx++)
-		data->sgi_count[inx] = tx->sgi_count[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->nss[inx] = tx->nss[inx];
-	for (inx = 0; inx < MAX_BW; inx++)
-		data->bw[inx] = tx->bw[inx];
-	data->retries = tx->retries;
-	data->non_amsdu_cnt = tx->non_amsdu_cnt;
-	data->amsdu_cnt = tx->amsdu_cnt;
-	data->ampdu_cnt = tx->ampdu_cnt;
-	data->non_ampdu_cnt = tx->non_ampdu_cnt;
 	data->cce_classified = tx_i->cce_classified;
 
 	stats->feat[INX_FEAT_TX] = data;
@@ -1562,50 +1536,18 @@ static QDF_STATUS get_advance_vdev_data_rx(struct unified_stats *stats,
 					   struct cdp_vdev_stats *vdev_stats)
 {
 	struct advance_vdev_data_rx *data = NULL;
-	struct cdp_rx_stats *rx = NULL;
-	uint8_t inx = 0;
 
 	if (!stats || !vdev_stats) {
 		qdf_err("Invalid Input!");
 		return QDF_STATUS_E_INVAL;
 	}
-	rx = &vdev_stats->rx;
 	data = qdf_mem_malloc(sizeof(struct advance_vdev_data_rx));
 	if (!data) {
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_vdev_data_rx(&data->b_rx, rx);
-
-	data->unicast.num = rx->unicast.num;
-	data->unicast.bytes = rx->unicast.bytes;
-	data->multicast.num = rx->multicast.num;
-	data->multicast.bytes = rx->multicast.bytes;
-	data->bcast.num = rx->bcast.num;
-	data->bcast.bytes = rx->bcast.bytes;
-	for (inx = 0; inx < MAX_MCS; inx++)
-		data->su_ax_ppdu_cnt[inx] = rx->su_ax_ppdu_cnt.mcs_count[inx];
-	for (inx = 0; inx < WME_AC_MAX; inx++)
-		data->wme_ac_type[inx] = rx->wme_ac_type[inx];
-	for (inx = 0; inx < MAX_GI; inx++)
-		data->sgi_count[inx] = rx->sgi_count[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->nss[inx] = rx->nss[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->ppdu_nss[inx] = rx->ppdu_nss[inx];
-	for (inx = 0; inx < MAX_BW; inx++)
-		data->bw[inx] = rx->bw[inx];
-	for (inx = 0; inx < MAX_MCS; inx++)
-		data->rx_mpdu_cnt[inx] = rx->rx_mpdu_cnt[inx];
-	data->mpdu_cnt_fcs_ok = rx->mpdu_cnt_fcs_ok;
-	data->mpdu_cnt_fcs_err = rx->mpdu_cnt_fcs_err;
-	data->non_amsdu_cnt = rx->non_amsdu_cnt;
-	data->non_ampdu_cnt = rx->non_ampdu_cnt;
-	data->ampdu_cnt = rx->ampdu_cnt;
-	data->amsdu_cnt = rx->amsdu_cnt;
-	data->bar_recv_cnt = rx->bar_recv_cnt;
-	data->rx_retries = rx->rx_retries;
-	data->multipass_rx_pkt_drop = rx->multipass_rx_pkt_drop;
+	fill_basic_vdev_data_rx(&data->b_rx, &vdev_stats->rx);
+	fill_advance_data_rx_stats(&data->adv_rx, &vdev_stats->rx);
 
 	stats->feat[INX_FEAT_RX] = data;
 	stats->size[INX_FEAT_RX] = sizeof(struct advance_vdev_data_rx);
@@ -2002,16 +1944,13 @@ static QDF_STATUS get_advance_pdev_data_tx(struct unified_stats *stats,
 {
 	struct advance_pdev_data_tx *data = NULL;
 	struct cdp_tx_ingress_stats *tx_i = NULL;
-	struct cdp_tx_stats *tx = NULL;
 	struct cdp_hist_tx_comp *hist = NULL;
-	uint8_t inx = 0;
 
 	if (!stats || !pdev_stats) {
 		qdf_err("Invalid Input!");
 		return QDF_STATUS_E_INVAL;
 	}
 	tx_i = &pdev_stats->tx_i;
-	tx = &pdev_stats->tx;
 	hist = &pdev_stats->tx_comp_histogram;
 	data = qdf_mem_malloc(sizeof(struct advance_pdev_data_tx));
 	if (!data) {
@@ -2019,28 +1958,12 @@ static QDF_STATUS get_advance_pdev_data_tx(struct unified_stats *stats,
 		return QDF_STATUS_E_NOMEM;
 	}
 	fill_basic_pdev_data_tx(&data->b_tx, pdev_stats);
+	fill_advance_data_tx_stats(&data->adv_tx, &pdev_stats->tx);
 
 	data->reinject_pkts.num = tx_i->reinject_pkts.num;
 	data->reinject_pkts.bytes = tx_i->reinject_pkts.bytes;
 	data->inspect_pkts.num = tx_i->inspect_pkts.num;
 	data->inspect_pkts.bytes = tx_i->inspect_pkts.bytes;
-	data->ucast.num = tx->ucast.num;
-	data->ucast.bytes = tx->ucast.bytes;
-	data->mcast.num = tx->mcast.num;
-	data->mcast.bytes = tx->mcast.bytes;
-	data->bcast.num = tx_i->bcast.num;
-	data->bcast.bytes = tx_i->bcast.bytes;
-	for (inx = 0; inx < MAX_GI; inx++)
-		data->sgi_count[inx] = tx->sgi_count[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->nss[inx] = tx->nss[inx];
-	for (inx = 0; inx < MAX_BW; inx++)
-		data->bw[inx] = tx->bw[inx];
-	data->retries = tx->retries;
-	data->non_amsdu_cnt = tx->non_amsdu_cnt;
-	data->amsdu_cnt = tx->amsdu_cnt;
-	data->ampdu_cnt = tx->ampdu_cnt;
-	data->non_ampdu_cnt = tx->non_ampdu_cnt;
 	data->cce_classified = tx_i->cce_classified;
 	data->tx_hist.pkts_1 = hist->pkts_1;
 	data->tx_hist.pkts_2_20 = hist->pkts_2_20;
@@ -2061,15 +1984,12 @@ static QDF_STATUS get_advance_pdev_data_rx(struct unified_stats *stats,
 					   struct cdp_pdev_stats *pdev_stats)
 {
 	struct advance_pdev_data_rx *data = NULL;
-	struct cdp_rx_stats *rx = NULL;
 	struct cdp_hist_rx_ind *hist = NULL;
-	uint8_t inx = 0;
 
 	if (!stats || !pdev_stats) {
 		qdf_err("Invalid Input!");
 		return QDF_STATUS_E_INVAL;
 	}
-	rx = &pdev_stats->rx;
 	hist = &pdev_stats->rx_ind_histogram;
 	data = qdf_mem_malloc(sizeof(struct advance_pdev_data_rx));
 	if (!data) {
@@ -2077,36 +1997,8 @@ static QDF_STATUS get_advance_pdev_data_rx(struct unified_stats *stats,
 		return QDF_STATUS_E_NOMEM;
 	}
 	fill_basic_pdev_data_rx(&data->b_rx, pdev_stats);
+	fill_advance_data_rx_stats(&data->adv_rx, &pdev_stats->rx);
 
-	data->unicast.num = rx->unicast.num;
-	data->unicast.bytes = rx->unicast.bytes;
-	data->multicast.num = rx->multicast.num;
-	data->multicast.bytes = rx->multicast.bytes;
-	data->bcast.num = rx->bcast.num;
-	data->bcast.bytes = rx->bcast.bytes;
-	for (inx = 0; inx < MAX_MCS; inx++)
-		data->su_ax_ppdu_cnt[inx] = rx->su_ax_ppdu_cnt.mcs_count[inx];
-	for (inx = 0; inx < WME_AC_MAX; inx++)
-		data->wme_ac_type[inx] = rx->wme_ac_type[inx];
-	for (inx = 0; inx < MAX_GI; inx++)
-		data->sgi_count[inx] = rx->sgi_count[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->nss[inx] = rx->nss[inx];
-	for (inx = 0; inx < SS_COUNT; inx++)
-		data->ppdu_nss[inx] = rx->ppdu_nss[inx];
-	for (inx = 0; inx < MAX_BW; inx++)
-		data->bw[inx] = rx->bw[inx];
-	for (inx = 0; inx < MAX_MCS; inx++)
-		data->rx_mpdu_cnt[inx] = rx->rx_mpdu_cnt[inx];
-	data->mpdu_cnt_fcs_ok = rx->mpdu_cnt_fcs_ok;
-	data->mpdu_cnt_fcs_err = rx->mpdu_cnt_fcs_err;
-	data->non_amsdu_cnt = rx->non_amsdu_cnt;
-	data->non_ampdu_cnt = rx->non_ampdu_cnt;
-	data->ampdu_cnt = rx->ampdu_cnt;
-	data->amsdu_cnt = rx->amsdu_cnt;
-	data->bar_recv_cnt = rx->bar_recv_cnt;
-	data->rx_retries = rx->rx_retries;
-	data->multipass_rx_pkt_drop = rx->multipass_rx_pkt_drop;
 	data->rx_hist.pkts_1 = hist->pkts_1;
 	data->rx_hist.pkts_2_20 = hist->pkts_2_20;
 	data->rx_hist.pkts_21_40 = hist->pkts_21_40;

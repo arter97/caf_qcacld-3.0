@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -165,18 +166,26 @@ struct pkt_info {
 	u_int64_t bytes;
 };
 
-/* Basic Peer Data */
-struct basic_peer_data_tx {
+struct basic_data_tx_stats {
 	struct pkt_info tx_success;
 	struct pkt_info comp_pkt;
 	u_int64_t dropped_count;
 	u_int64_t tx_failed;
 };
 
-struct basic_peer_data_rx {
+struct basic_data_rx_stats {
 	struct pkt_info to_stack;
 	struct pkt_info total_rcvd;
 	u_int64_t rx_error_count;
+};
+
+/* Basic Peer Data */
+struct basic_peer_data_tx {
+	struct basic_data_tx_stats tx;
+};
+
+struct basic_peer_data_rx {
+	struct basic_data_rx_stats rx;
 };
 
 struct basic_peer_data_rate {
@@ -214,19 +223,14 @@ struct basic_peer_ctrl_link {
 
 /* Basic vdev Data */
 struct basic_vdev_data_tx {
+	struct basic_data_tx_stats tx;
 	struct pkt_info ingress;
 	struct pkt_info processed;
 	struct pkt_info dropped;
-	struct pkt_info tx_success;
-	struct pkt_info comp_pkt;
-	u_int64_t dropped_count;
-	u_int64_t tx_failed;
 };
 
 struct basic_vdev_data_rx {
-	struct pkt_info to_stack;
-	struct pkt_info total_rcvd;
-	u_int64_t rx_error_count;
+	struct basic_data_rx_stats rx;
 };
 
 /* Basic vdev Ctrl */
@@ -247,19 +251,14 @@ struct basic_vdev_ctrl_rx {
 
 /* Basic Pdev Data */
 struct basic_pdev_data_tx {
+	struct basic_data_tx_stats tx;
 	struct pkt_info ingress;
 	struct pkt_info processed;
 	struct pkt_info dropped;
-	struct pkt_info tx_success;
-	struct pkt_info comp_pkt;
-	u_int64_t dropped_count;
-	u_int64_t tx_failed;
 };
 
 struct basic_pdev_data_rx {
-	struct pkt_info to_stack;
-	struct pkt_info total_rcvd;
-	u_int64_t rx_error_count;
+	struct basic_data_rx_stats rx;
 	u_int64_t dropped_count;
 	u_int64_t err_count;
 };
@@ -295,10 +294,8 @@ struct basic_psoc_data_rx {
 	struct pkt_info ingress;
 };
 
-/* Advance Peer Data */
 #if WLAN_ADVANCE_TELEMETRY
-struct advance_peer_data_tx {
-	struct basic_peer_data_tx b_tx;
+struct advance_data_tx_stats {
 	struct pkt_info ucast;
 	struct pkt_info mcast;
 	struct pkt_info bcast;
@@ -312,8 +309,7 @@ struct advance_peer_data_tx {
 	u_int32_t non_ampdu_cnt;
 };
 
-struct advance_peer_data_rx {
-	struct basic_peer_data_rx b_rx;
+struct advance_data_rx_stats {
 	struct pkt_info unicast;
 	struct pkt_info multicast;
 	struct pkt_info bcast;
@@ -333,6 +329,17 @@ struct advance_peer_data_rx {
 	u_int32_t bar_recv_cnt;
 	u_int32_t rx_retries;
 	u_int32_t multipass_rx_pkt_drop;
+};
+
+/* Advance Peer Data */
+struct advance_peer_data_tx {
+	struct basic_peer_data_tx b_tx;
+	struct advance_data_tx_stats adv_tx;
+};
+
+struct advance_peer_data_rx {
+	struct basic_peer_data_rx b_rx;
+	struct advance_data_rx_stats adv_rx;
 };
 
 struct advance_peer_data_raw {
@@ -413,43 +420,15 @@ struct advance_peer_ctrl_link {
 /* Advance Vdev Data */
 struct advance_vdev_data_tx {
 	struct basic_vdev_data_tx b_tx;
+	struct advance_data_tx_stats adv_tx;
 	struct pkt_info reinject_pkts;
 	struct pkt_info inspect_pkts;
-	struct pkt_info ucast;
-	struct pkt_info mcast;
-	struct pkt_info bcast;
-	u_int32_t nss[SS_COUNT];
-	u_int32_t sgi_count[MAX_GI];
-	u_int32_t bw[MAX_BW];
-	u_int32_t retries;
-	u_int32_t non_amsdu_cnt;
-	u_int32_t amsdu_cnt;
-	u_int32_t ampdu_cnt;
-	u_int32_t non_ampdu_cnt;
 	u_int32_t cce_classified;
 };
 
 struct advance_vdev_data_rx {
 	struct basic_vdev_data_rx b_rx;
-	struct pkt_info unicast;
-	struct pkt_info multicast;
-	struct pkt_info bcast;
-	u_int32_t su_ax_ppdu_cnt[MAX_MCS];
-	u_int32_t rx_mpdu_cnt[MAX_MCS];
-	u_int32_t nss[SS_COUNT];
-	u_int32_t ppdu_nss[SS_COUNT];
-	u_int32_t bw[MAX_BW];
-	u_int32_t sgi_count[MAX_GI];
-	u_int32_t wme_ac_type[WME_AC_MAX];
-	u_int32_t mpdu_cnt_fcs_ok;
-	u_int32_t mpdu_cnt_fcs_err;
-	u_int32_t non_amsdu_cnt;
-	u_int32_t non_ampdu_cnt;
-	u_int32_t ampdu_cnt;
-	u_int32_t amsdu_cnt;
-	u_int32_t bar_recv_cnt;
-	u_int32_t rx_retries;
-	u_int32_t multipass_rx_pkt_drop;
+	struct advance_data_rx_stats adv_rx;
 };
 
 struct advance_vdev_data_me {
@@ -527,45 +506,17 @@ struct histogram_stats {
 
 struct advance_pdev_data_tx {
 	struct basic_pdev_data_tx b_tx;
+	struct advance_data_tx_stats adv_tx;
 	struct pkt_info reinject_pkts;
 	struct pkt_info inspect_pkts;
-	struct pkt_info ucast;
-	struct pkt_info mcast;
-	struct pkt_info bcast;
 	struct histogram_stats tx_hist;
-	u_int32_t sgi_count[MAX_GI];
-	u_int32_t nss[SS_COUNT];
-	u_int32_t bw[MAX_BW];
-	u_int32_t retries;
-	u_int32_t non_amsdu_cnt;
-	u_int32_t amsdu_cnt;
-	u_int32_t ampdu_cnt;
-	u_int32_t non_ampdu_cnt;
 	u_int32_t cce_classified;
 };
 
 struct advance_pdev_data_rx {
 	struct basic_pdev_data_rx b_rx;
-	struct pkt_info unicast;
-	struct pkt_info multicast;
-	struct pkt_info bcast;
+	struct advance_data_rx_stats adv_rx;
 	struct histogram_stats rx_hist;
-	u_int32_t su_ax_ppdu_cnt[MAX_MCS];
-	u_int32_t rx_mpdu_cnt[MAX_MCS];
-	u_int32_t nss[SS_COUNT];
-	u_int32_t ppdu_nss[SS_COUNT];
-	u_int32_t bw[MAX_BW];
-	u_int32_t sgi_count[MAX_GI];
-	u_int32_t wme_ac_type[WME_AC_MAX];
-	u_int32_t mpdu_cnt_fcs_ok;
-	u_int32_t mpdu_cnt_fcs_err;
-	u_int32_t non_amsdu_cnt;
-	u_int32_t non_ampdu_cnt;
-	u_int32_t ampdu_cnt;
-	u_int32_t amsdu_cnt;
-	u_int32_t bar_recv_cnt;
-	u_int32_t rx_retries;
-	u_int32_t multipass_rx_pkt_drop;
 };
 
 struct advance_pdev_data_me {
