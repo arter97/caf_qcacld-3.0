@@ -1344,6 +1344,7 @@ enum _ol_ath_param_t {
 	/* Display IPA stats */
 	OL_ATH_PARAM_IPA_UC_STATS = 487,
 #endif
+	OL_ATH_PARAM_TQM_RESET = 488,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3527,6 +3528,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"ipaucstats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_IPA_UC_STATS, SET_PARAM, 1},
 #endif
+	{"tqm_reset",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, SET_PARAM, 1},
+	{"get_tqm_reset",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, GET_PARAM, 0},
 };
 #endif
 
