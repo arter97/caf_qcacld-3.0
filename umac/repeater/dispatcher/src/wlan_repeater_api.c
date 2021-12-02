@@ -493,7 +493,7 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 #endif
 		ext_cb->vdev_set_powersave(vdev, IEEE80211_PWRSAVE_NONE);
 	}
-	RPTR_LOGI("RPTR vdev flags:%x pdev flags:%x vdev_id:%d pdev_id:%d\n",
+	RPTR_LOGI("RPTR vdev flags:%x pdev flags:%x vdev_id:%d pdev_id:%d",
 		  vdev_priv->vdev_feature_caps, pdev_priv->pdev_feature_caps,
 		  wlan_vdev_get_id(vdev), wlan_objmgr_pdev_get_pdev_id(pdev));
 }
@@ -831,7 +831,7 @@ wlan_rptr_pdev_ucfg_config_set(struct wlan_objmgr_pdev *pdev,
 					qca_multi_link_set_primary_radio(NULL);
 			}
 		}
-		RPTR_LOGI("multi_link set primary radio flag as %d for pdev_id: %d\n",
+		RPTR_LOGI("multi_link set primary radio flag as %d for pdev_id: %d",
 			  value, pdev_id);
 
 		val.cdp_pdev_param_primary_radio = value;
@@ -844,7 +844,7 @@ wlan_rptr_pdev_ucfg_config_set(struct wlan_objmgr_pdev *pdev,
 		else
 			qca_multi_link_set_dbdc_enable(false);
 
-		RPTR_LOGI("multi_link set dbdc_enable flag as %d\n", value);
+		RPTR_LOGI("multi_link set dbdc_enable flag as %d", value);
 		break;
 	case OL_ATH_PARAM_CLIENT_MCAST:
 		if (value)
@@ -852,7 +852,7 @@ wlan_rptr_pdev_ucfg_config_set(struct wlan_objmgr_pdev *pdev,
 		else
 			qca_multi_link_set_force_client_mcast(false);
 
-		RPTR_LOGI("multi_link set force_client_mcast flag as %d\n",
+		RPTR_LOGI("multi_link set force_client_mcast flag as %d",
 			  value);
 		break;
 #endif
@@ -863,7 +863,7 @@ wlan_rptr_pdev_ucfg_config_set(struct wlan_objmgr_pdev *pdev,
 		else
 			qca_multi_link_set_always_primary(false);
 
-		RPTR_LOGI("multi_link set always primary flag as %d\n", value);
+		RPTR_LOGI("multi_link set always primary flag as %d", value);
 #endif
 		break;
 	case OL_ATH_PARAM_FAST_LANE:
@@ -873,7 +873,7 @@ wlan_rptr_pdev_ucfg_config_set(struct wlan_objmgr_pdev *pdev,
 		else
 			qca_multi_link_remove_fastlane_radio(wiphy);
 
-		RPTR_LOGI("multi_link set fastlane flag as %d for pdev_id: %d\n",
+		RPTR_LOGI("multi_link set fastlane flag as %d for pdev_id: %d",
 			  value, pdev_id);
 #endif
 		break;
@@ -954,7 +954,7 @@ bool wlan_rptr_vdev_is_scan_allowed(struct wlan_objmgr_vdev *vdev)
 	if (wlan_rptr_vdev_is_no_event(vdev))
 		return 0;
 
-	RPTR_LOGD("RPTR scan allowed on vdev:%d\n", wlan_vdev_get_id(vdev));
+	RPTR_LOGD("RPTR scan allowed on vdev:%d", wlan_vdev_get_id(vdev));
 	return 1;
 }
 
@@ -1031,7 +1031,7 @@ wlan_rptr_psta_validate_chan(struct wlan_objmgr_vdev *vdev, uint16_t freq)
 				chan = wlan_vdev_mlme_get_bss_chan(mpsta_vdev);
 				mpsta_freq = chan->ch_freq;
 				if (mpsta_freq != freq) {
-					RPTR_LOGE("RPTR psta freq %d mpsta_freq %d not matching\n",
+					RPTR_LOGE("RPTR psta freq %d mpsta_freq %d not matching",
 						  freq, mpsta_freq);
 					return QDF_STATUS_E_FAILURE;
 				}
@@ -1175,7 +1175,7 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	if (g_priv->num_stavaps_up > 1) {
 		RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 		if (flags.delay_stavap_connection) {
-			RPTR_LOGI("\nSetting drop_secondary_mcast and starting timer");
+			RPTR_LOGI("Setting drop_secondary_mcast and starting timer");
 			dp_lag_soc_set_drop_secondary_mcast(pdev, 1);
 			ext_cb->delay_stavap_conn_process_up(vdev);
 		}
@@ -1269,7 +1269,7 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 		ext_cb->nss_dbdc_process_mac_db_down(vdev);
 #endif
 		if (flags.delay_stavap_connection) {
-			RPTR_LOGI("\nclearing drop_secondary_mcast and starting timer");
+			RPTR_LOGI("clearing drop_secondary_mcast and starting timer");
 			qca_multi_link_set_drop_sec_mcast(false);
 			dp_lag_soc_set_drop_secondary_mcast(pdev, 0);
 			ext_cb->delay_stavap_conn_process_down(vdev);
@@ -1357,7 +1357,7 @@ wlan_rptr_same_ssid_check(struct wlan_objmgr_vdev *vdev,
 				      &iterate_msg, WLAN_MLME_NB_ID);
 	if (s_ssid_msg.ssid_match) {
 		wlan_rptr_global_set_s_ssid();
-		RPTR_LOGI("RPTR Enable same_ssid_support ssid:%s g_caps:%x\n",
+		RPTR_LOGI("RPTR Enable same_ssid_support ssid:%s g_caps:%x",
 			  ssid, g_priv->global_feature_caps);
 	}
 }

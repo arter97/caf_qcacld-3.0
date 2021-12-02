@@ -2982,6 +2982,125 @@ QDF_STATUS send_peer_set_intra_bss_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if !defined(CNSS_GENL) && defined(WLAN_RTT_MEASUREMENT_NOTIFICATION)
+static QDF_STATUS extract_measreq_chan_info_tlv(
+		uint32_t data_len, uint8_t *data,
+		struct rtt_channel_info *chinfo)
+{
+	struct wmi_rtt_oem_req_head *req_head = NULL;
+	struct wmi_rtt_oem_channel_info *oem_chan_info = NULL;
+	uint16_t oem_chaninfo_offset = 0;
+	struct wmi_rtt_oem_measreq_per_channel_info *per_channel_info = NULL;
+	uint16_t per_channel_info_offset = 0;
+	struct wmi_rtt_oem_measreq_peer_info *peer_info = NULL;
+	uint16_t peer_info_offset = 0;
+	int i = 0;
+	char *peer_msg = NULL;
+
+	/* RTT measurement request buffer has the following TLVs
+	 * WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_req_head
+	 * WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_head
+	 * WMIRTT_TLV_TAG_STRUC_loop_start
+	 * WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_channel_info
+	 * WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_per_channel_info
+	 * WMIRTT_TLV_TAG_STRUC_loop_start
+	 * WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_peer_info
+	 */
+	req_head = (struct wmi_rtt_oem_req_head *)data;
+
+	if (WMIRTT_TLV_GET_TLVTAG(req_head->tlv_header) !=
+			WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_req_head) {
+		wmi_err("wrong tag(%u), expected wmi_rtt_oem_req_head tag",
+			WMIRTT_TLV_GET_TLVTAG(req_head->tlv_header));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (req_head->sub_type != RTT_MSG_SUBTYPE_MEASUREMENT_REQ) {
+		wmi_debug("Not a measurement request, skip channel info extraction functions");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* Read freq, cfreq1, cfreq2 and phymode from wmi_rtt_oem_channel_info
+	 * TLV.
+	 */
+	oem_chaninfo_offset = sizeof(struct wmi_rtt_oem_req_head) +
+		sizeof(struct wmi_rtt_oem_measreq_head) + RTT_TLV_HDR_SIZE;
+
+	if ((oem_chaninfo_offset + sizeof(struct wmi_rtt_oem_channel_info)) >
+			data_len) {
+		wmi_err("wmi_rtt_oem_channel_info structure is not present in the data buffer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	oem_chan_info = (struct wmi_rtt_oem_channel_info *)(data +
+			oem_chaninfo_offset);
+
+	if (WMIRTT_TLV_GET_TLVTAG(oem_chan_info->tlv_header) !=
+			WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_channel_info) {
+		wmi_err("wrong tag(%u), expected wmi_rtt_oem_channel_info tag",
+			WMIRTT_TLV_GET_TLVTAG(oem_chan_info->tlv_header));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	chinfo->freq = oem_chan_info->mhz;
+	chinfo->cfreq1 = oem_chan_info->band_center_freq1;
+	chinfo->cfreq2 = oem_chan_info->band_center_freq2;
+	chinfo->phymode = oem_chan_info->info & ~(RTT_PHY_MODE_MASK);
+
+	/* Read number of bssids present in the measurement request buffer */
+	per_channel_info_offset = oem_chaninfo_offset +
+		sizeof(struct wmi_rtt_oem_channel_info);
+	if ((per_channel_info_offset +
+	     sizeof(struct wmi_rtt_oem_measreq_per_channel_info)) > data_len) {
+		wmi_err("wmi_rtt_oem_measreq_per_channel_info structure is not present in the data buffer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	per_channel_info = (struct wmi_rtt_oem_measreq_per_channel_info *)(
+			data + per_channel_info_offset);
+
+	if (WMIRTT_TLV_GET_TLVTAG(per_channel_info->tlv_header) !=
+			WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_per_channel_info) {
+		wmi_err("wrong tag(%u), expected wmi_rtt_oem_measreq_per_channel_info tag",
+			WMIRTT_TLV_GET_TLVTAG(per_channel_info->tlv_header));
+		return QDF_STATUS_E_INVAL;
+	}
+
+	chinfo->num_bssids = WMI_RTT_NUM_STA_GET(per_channel_info->sta_num);
+
+	/* Read dest_macaddr and BW */
+	peer_info_offset = per_channel_info_offset +
+		sizeof(struct wmi_rtt_oem_measreq_per_channel_info) +
+		RTT_TLV_HDR_SIZE;
+	if ((peer_info_offset + (chinfo->num_bssids *
+					sizeof(struct wmi_rtt_oem_measreq_peer_info)
+					)) > data_len) {
+		wmi_err("wmi_rtt_oem_measreq_peer_info structure is not present in the data buffer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer_msg = data + peer_info_offset;
+
+	for (i = 0; i < chinfo->num_bssids; i++) {
+		peer_info = (struct wmi_rtt_oem_measreq_peer_info *)(peer_msg);
+		if (WMIRTT_TLV_GET_TLVTAG(peer_info->tlv_header) !=
+				WMIRTT_TLV_TAG_STRUC_wmi_rtt_oem_measreq_peer_info) {
+			wmi_err("wrong tag(%u), expected wmi_rtt_oem_measreq_peer_info tag",
+				WMIRTT_TLV_GET_TLVTAG(peer_info->tlv_header));
+			return QDF_STATUS_E_INVAL;
+		}
+
+		chinfo->bssid_info[i].bw =
+			WMI_RTT_BW_GET(peer_info->control_flag);
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&peer_info->dest_mac,
+					   chinfo->bssid_info[i].macaddr);
+		peer_msg += sizeof(struct wmi_rtt_oem_measreq_peer_info);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_RTT_MEASUREMENT_NOTIFICATION */
+
 #ifdef WLAN_SUPPORT_MESH_LATENCY
 /**
  * config_vdev_tid_latency_info_cmd_tlv() - enable vdev tid latency command
@@ -3215,6 +3334,9 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->set_radio_tx_mode_select_cmd = set_radio_tx_mode_select_cmd_tlv;
 	ops->send_lcr_cmd = send_lcr_cmd_tlv;
 	ops->send_lci_cmd = send_lci_cmd_tlv;
+#if !defined(CNSS_GENL) && defined(WLAN_RTT_MEASUREMENT_NOTIFICATION)
+	ops->extract_measreq_chan_info = extract_measreq_chan_info_tlv;
+#endif
 #ifdef WLAN_SUPPORT_MESH_LATENCY
 	ops->config_vdev_tid_latency_info_cmd = config_vdev_tid_latency_info_cmd_tlv;
 	ops->config_peer_latency_info_cmd = config_peer_latency_info_cmd_tlv;
