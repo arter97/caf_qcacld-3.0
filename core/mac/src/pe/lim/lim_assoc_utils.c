@@ -1742,7 +1742,6 @@ QDF_STATUS lim_populate_peer_rate_set(struct mac_context *mac,
 		for (i = 0; i < tempRateSet.numRates; i++) {
 			min = 0;
 			val = 0xff;
-			isArate = 0;
 			for (j = 0;
 			     (j < tempRateSet.numRates)
 			     && (j < WLAN_SUPPORTED_RATES_IE_MAX_LEN); j++) {
