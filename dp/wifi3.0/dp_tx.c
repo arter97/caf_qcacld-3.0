@@ -5170,7 +5170,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 							      desc->tx_status,
 							      false);
 			qdf_nbuf_free(desc->nbuf);
-			dp_tx_desc_free(soc, desc, desc->pool_id);
+			dp_ppeds_tx_desc_free(soc, desc);
 			desc = next;
 			continue;
 		}

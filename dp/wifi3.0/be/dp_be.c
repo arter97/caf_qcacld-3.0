@@ -503,6 +503,16 @@ static QDF_STATUS dp_soc_ppe_detach_be(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 #else
+static QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS dp_ppeds_deinit_soc_be(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline QDF_STATUS dp_soc_ppe_attach_be(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;
@@ -624,7 +634,8 @@ static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
 	int i = 0;
 
 	max_tx_rx_desc_num = WLAN_CFG_NUM_TX_DESC_MAX * MAX_TXDESC_POOLS +
-		WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX * MAX_RXDESC_POOLS;
+		WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX * MAX_RXDESC_POOLS +
+		WLAN_CFG_NUM_PPEDS_TX_DESC_MAX * MAX_PPE_TXDESC_POOLS;
 	/* estimate how many SPT DDR pages needed */
 	num_spt_pages = max_tx_rx_desc_num / DP_CC_SPT_PAGE_MAX_ENTRIES;
 	num_spt_pages = num_spt_pages <= DP_CC_PPT_MAX_ENTRIES ?
@@ -696,6 +707,8 @@ static QDF_STATUS dp_soc_deinit_be(struct dp_soc *soc)
 		dp_hw_cookie_conversion_deinit(be_soc,
 					       &be_soc->rx_cc_ctx[i]);
 
+	dp_ppeds_deinit_soc_be(soc);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -704,6 +717,8 @@ static QDF_STATUS dp_soc_init_be(struct dp_soc *soc)
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	int i = 0;
+
+	dp_ppeds_init_soc_be(soc);
 
 	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
 		qdf_status =
