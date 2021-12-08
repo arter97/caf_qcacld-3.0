@@ -26,6 +26,97 @@
 #include "wlan_dfs_mlme_api.h"
 #include "wlan_dfs_tgt_api.h"
 #include "dfs_internal.h"
+#include <dfs_process_radar_found_ind.h>
+
+/**
+ * dfs_is_320mhz_offset_invalid() - Check if the frequency offset is within the
+ * bounds of the 5G 320MHz channel. The allowed frequency offset is within the
+ * range [-160MHz, 80MHz].
+ * @freq_offset: Radar frequency offset.
+ *
+ * @Return: Checks for invalid frequency offset. So if the frequency offset is
+ * within the range then returns false, if not returns true.
+ */
+static inline
+bool dfs_is_320mhz_offset_invalid(int32_t freq_offset)
+{
+	return ((freq_offset < -BW_160) || (freq_offset > BW_80));
+}
+
+/**
+ * dfs_is_below320mhz_offset_invalid() - Check if the frequency offset is within
+ * the bounds of the given channel width. The allowed frequency offset is
+ * within the range [-(ch_width/2)MHz, (ch_width)MHz].
+ * @freq_offset: Radar frequency offset.
+ * @ch_width: Channel width of the channel on which radar is hit.
+ *
+ * @Return: Checks for invalid frequency offset. So if the frequency offset is
+ * within the range then returns false, if not returns true.
+ */
+static inline
+bool dfs_is_below320mhz_offset_invalid(int32_t freq_offset, uint16_t ch_width)
+{
+	uint16_t half_bw = ch_width / 2;
+
+	return ((freq_offset < -half_bw) || (freq_offset > half_bw));
+}
+
+static
+bool dfs_is_offset_invalid_for_bw(int32_t freq_offset, uint16_t ch_width)
+{
+	switch (ch_width) {
+	case BW_320:
+		return dfs_is_320mhz_offset_invalid(freq_offset);
+	case BW_160:
+	case BW_80:
+	case BW_40:
+	case BW_20:
+		return dfs_is_below320mhz_offset_invalid(freq_offset, ch_width);
+	default:
+		dfs_debug(NULL, WLAN_DEBUG_DFS_ALWAYS,
+			"Invalid channel width");
+		return true;
+	}
+}
+
+/**
+ * dfs_check_bangradar_sanity_for_11be() - Check the sanity of bangradar for
+ * 11BE chispets
+ * @dfs: Pointer to wlan_dfs structure.
+ * @bangradar_params: Parameters of the radar to be simulated.
+ */
+static QDF_STATUS
+dfs_check_bangradar_sanity_for_11be(struct wlan_dfs *dfs,
+				    struct dfs_bangradar_params *brdr_prm)
+{
+	struct dfs_channel *chan = dfs->dfs_curchan;
+	uint16_t width;
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+
+	if (brdr_prm->detector_id == DETECTOR_ID_0) {
+		chan = dfs->dfs_curchan;
+	} else {
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			  "Invalid Detector ID");
+		return status;
+	}
+
+	if (brdr_prm->seg_id != SEG_ID_PRIMARY) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			  "Invalid seg id");
+		return status;
+	}
+
+	width = dfs_chan_to_ch_width(chan);
+
+	if (dfs_is_offset_invalid_for_bw(brdr_prm->freq_offset, width)) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			  "Invalid freq offset");
+		return status;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 
 /**
  * dfs_check_bangradar_sanity() - Check the sanity of bangradar
@@ -40,6 +131,14 @@ dfs_check_bangradar_sanity(struct wlan_dfs *dfs,
 		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			  "bangradar params is NULL");
 		return -EINVAL;
+	}
+
+	if (dfs->dfs_is_radar_found_chan_freq_eq_center_freq) {
+		if (dfs_check_bangradar_sanity_for_11be(dfs,
+							bangradar_params)) {
+			return -EINVAL;
+		}
+		return QDF_STATUS_SUCCESS;
 	}
 	if (dfs_is_true_160mhz_supported(dfs)) {
 		if (abs(bangradar_params->freq_offset) >
