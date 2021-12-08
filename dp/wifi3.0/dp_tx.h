@@ -61,6 +61,12 @@
 #define DP_TX_DESC_FLAG_FLUSH		0x2000
 #define DP_TX_DESC_FLAG_TRAFFIC_END_IND	0x4000
 #define DP_TX_DESC_FLAG_FAST		0x8000
+/*
+ * Since the Tx descriptor flag is of only 16-bit and no more bit is free for
+ * any new flag, therefore for time being overloading PPEDS flag with that of
+ * FLUSH flag.
+ */
+#define DP_TX_DESC_FLAG_PPEDS		0x2000
 
 #define DP_TX_EXT_DESC_FLAG_METADATA_VALID 0x1
 

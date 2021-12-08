@@ -118,11 +118,6 @@ enum CMEM_MEM_CLIENTS {
 #define DP_CMEM_OFFSET_TO_PPT_ID(offset) \
 	((offset) / DP_CC_PPT_ENTRY_SIZE_4K_ALIGNED)
 
-/* The MAX PPE PRI2TID */
-#ifdef WLAN_SUPPORT_PPEDS
-#define DP_TX_INT_PRI2TID_MAX 15
-#endif
-
 /**
  * struct dp_spt_page_desc - secondary page table page descriptors
  * @next: pointer to next linked SPT page Desc
@@ -236,6 +231,7 @@ struct dp_ppe_vp_profile {
  * @ppe_vp_tbl: PPE VP table
  * @ppe_vp_tbl_lock: PPE VP table lock
  * @num_ppe_vp_entries : Number of PPE VP entries
+ * @ppeds_handle: PPEDS soc instance handle
  */
 struct dp_soc_be {
 	struct dp_soc soc;
@@ -255,6 +251,7 @@ struct dp_soc_be {
 	struct dp_srng ppe2tcl_ring;
 	struct dp_srng ppe_release_ring;
 	struct dp_ppe_vp_tbl_entry *ppe_vp_tbl;
+	void *ppeds_handle;
 	qdf_mutex_t ppe_vp_tbl_lock;
 	uint8_t num_ppe_vp_entries;
 #endif
