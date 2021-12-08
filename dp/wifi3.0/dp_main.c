@@ -6231,6 +6231,9 @@ static void dp_soc_deinit(void *txrx_soc)
 
 	qdf_atomic_set(&soc->cmn_init_done, 0);
 
+	if (soc->arch_ops.txrx_soc_ppeds_stop)
+		soc->arch_ops.txrx_soc_ppeds_stop(soc);
+
 	soc->arch_ops.txrx_soc_deinit(soc);
 
 	dp_monitor_soc_deinit(soc);
@@ -11035,6 +11038,10 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_UMAC_RST_SKEL_ENABLE:
 		val->cdp_umac_rst_skel = dp_umac_rst_skel_enable_get(soc);
 		break;
+	case CDP_PPEDS_ENABLE:
+		val->cdp_psoc_param_ppeds_enabled =
+			wlan_cfg_get_dp_soc_is_ppe_enabled(soc->wlan_cfg_ctx);
+		break;
 	default:
 		dp_warn("Invalid param");
 		break;
@@ -15432,6 +15439,13 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 		goto fail6;
 	}
 
+	if (soc->arch_ops.txrx_soc_ppeds_start) {
+		if (soc->arch_ops.txrx_soc_ppeds_start(soc)) {
+			dp_init_err("%pK: ppeds start failed", soc);
+			goto fail7;
+		}
+	}
+
 	wlan_cfg_set_rx_hash(soc->wlan_cfg_ctx,
 			     cfg_get(soc->ctrl_psoc, CFG_DP_RX_HASH));
 	soc->cce_disable = false;
@@ -15517,6 +15531,8 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	soc->vdev_stats_id_map = 0;
 
 	return soc;
+fail7:
+	dp_soc_tx_desc_sw_pools_deinit(soc);
 fail6:
 	htt_soc_htc_dealloc(soc->htt_handle);
 fail5:

@@ -30,6 +30,9 @@
 #include "dp_mon.h"
 #endif
 #include <hal_be_api.h>
+#ifdef WLAN_SUPPORT_PPEDS
+#include "be/dp_ppeds.h"
+#endif
 
 /* Generic AST entry aging timer value */
 #define DP_AST_AGING_TIMER_DEFAULT_MS	5000
@@ -62,6 +65,15 @@ static struct wlan_cfg_tcl_wbm_ring_num_map g_tcl_wbm_map_array[MAX_TCL_DATA_RIN
 #endif
 
 #ifdef WLAN_SUPPORT_PPEDS
+static struct cdp_ppe_txrx_ops dp_ops_ppe_be = {
+	.ppeds_entry_attach = dp_ppeds_attach_vdev_be,
+	.ppeds_entry_detach = dp_ppeds_detach_vdev_be,
+	.ppeds_set_int_pri2tid = dp_ppeds_set_int_pri2tid_be,
+	.ppeds_update_int_pri2tid = dp_ppeds_update_int_pri2tid_be,
+	.ppeds_entry_dump = dp_ppeds_dump_ppe_vp_tbl_be,
+	.ppeds_enable_pri2tid = dp_ppeds_vdev_enable_pri2tid_be,
+};
+
 static void dp_ppeds_rings_status(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
@@ -456,11 +468,58 @@ dp_hw_cookie_conversion_deinit(struct dp_soc_be *be_soc,
 }
 #endif
 
+#ifdef WLAN_SUPPORT_PPEDS
+static QDF_STATUS dp_soc_ppe_attach_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct cdp_ops *cdp_ops = soc->cdp_soc.ops;
+
+	/*
+	 * Check if PPE DS is enabled.
+	 */
+	if (!wlan_cfg_get_dp_soc_is_ppe_enabled(soc->wlan_cfg_ctx))
+		return QDF_STATUS_SUCCESS;
+
+	if (dp_ppeds_attach_soc_be(be_soc) != QDF_STATUS_SUCCESS)
+		return QDF_STATUS_SUCCESS;
+
+	cdp_ops->ppe_ops = &dp_ops_ppe_be;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS dp_soc_ppe_detach_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct cdp_ops *cdp_ops = soc->cdp_soc.ops;
+
+	if (!wlan_cfg_get_dp_soc_is_ppe_enabled(soc->wlan_cfg_ctx))
+		return QDF_STATUS_E_FAILURE;
+
+	dp_ppeds_detach_soc_be(be_soc);
+
+	cdp_ops->ppe_ops = NULL;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS dp_soc_ppe_attach_be(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS dp_soc_ppe_detach_be(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_SUPPORT_PPEDS */
+
 static QDF_STATUS dp_soc_detach_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	int i = 0;
 
+	dp_soc_ppe_detach_be(soc);
 
 	for (i = 0; i < MAX_TXDESC_POOLS; i++)
 		dp_hw_cookie_conversion_detach(be_soc,
@@ -585,6 +644,10 @@ static QDF_STATUS dp_soc_attach_be(struct dp_soc *soc,
 		goto fail;
 
 	dp_soc_mlo_fill_params(soc, params);
+
+	qdf_status = dp_soc_ppe_attach_be(soc);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+		goto fail;
 
 	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
 		num_entries = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
@@ -1262,6 +1325,12 @@ static QDF_STATUS dp_soc_ppe_srng_init(struct dp_soc *soc)
 			  soc->ctrl_psoc,
 			  WLAN_MD_DP_SRNG_PPE_RELEASE,
 			  "ppe_release_ring");
+#ifdef WLAN_SUPPORT_PPEDS
+	if (dp_ppeds_register_soc_be(be_soc)) {
+		dp_err("%pK: ppeds registration failed", soc);
+		goto fail;
+	}
+#endif
 
 	return QDF_STATUS_SUCCESS;
 fail:
@@ -2063,8 +2132,12 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 
 #ifdef WLAN_SUPPORT_PPEDS
 	arch_ops->dp_txrx_ppeds_rings_status = dp_ppeds_rings_status;
+	arch_ops->txrx_soc_ppeds_start = dp_ppeds_start_soc_be;
+	arch_ops->txrx_soc_ppeds_stop = dp_ppeds_stop_soc_be;
 #else
 	arch_ops->dp_txrx_ppeds_rings_status = NULL;
+	arch_ops->txrx_soc_ppeds_start = NULL;
+	arch_ops->txrx_soc_ppeds_stop = NULL;
 #endif
 
 	dp_init_near_full_arch_ops_be(arch_ops);
