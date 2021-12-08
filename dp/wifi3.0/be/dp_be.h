@@ -97,8 +97,27 @@ enum CMEM_MEM_CLIENTS {
 #define WBM2SW_REL_ERR_RING_NUM 5
 #endif
 
+#ifdef WLAN_SUPPORT_PPEDS
+/* The MAX PPE PRI2TID */
+#define DP_TX_INT_PRI2TID_MAX 15
+
+#define DP_TX_PPEDS_POOL_ID 0
+
+/* size of CMEM needed for a ppeds tx desc pool */
+#define DP_TX_PPEDS_DESC_POOL_CMEM_SIZE \
+	((WLAN_CFG_NUM_PPEDS_TX_DESC_MAX / DP_CC_SPT_PAGE_MAX_ENTRIES) * \
+	 DP_CC_PPT_ENTRY_SIZE_4K_ALIGNED)
+
+/* Offset of ppeds tx descripotor pool */
+#define DP_TX_PPEDS_DESC_CMEM_OFFSET 0
+#else
+#define DP_TX_PPEDS_DESC_CMEM_OFFSET 0
+#define DP_TX_PPEDS_DESC_POOL_CMEM_SIZE 0
+#endif
+
 /* tx descriptor are programmed at start of CMEM region*/
-#define DP_TX_DESC_CMEM_OFFSET	0
+#define DP_TX_DESC_CMEM_OFFSET \
+	(DP_TX_PPEDS_DESC_CMEM_OFFSET + DP_TX_PPEDS_DESC_POOL_CMEM_SIZE)
 
 /* size of CMEM needed for a tx desc pool*/
 #define DP_TX_DESC_POOL_CMEM_SIZE \
@@ -206,6 +225,26 @@ struct dp_ppe_vp_profile {
 	uint8_t to_fw;
 	uint8_t use_ppe_int_pri;
 };
+
+/**
+ * struct dp_ppe_tx_desc_pool_s - PPEDS Tx Descriptor Pool
+ * @elem_size: Size of each descriptor
+ * @num_allocated: Number of used descriptors
+ * @freelist: Chain of free descriptors
+ * @desc_pages: multiple page allocation information for actual descriptors
+ * @elem_count: Number of descriptors in the pool
+ * @num_free: Number of free descriptors
+ * @lock- Lock for descriptor allocation/free from/to the pool
+ */
+struct dp_ppe_tx_desc_pool_s {
+	uint16_t elem_size;
+	uint32_t num_allocated;
+	struct dp_tx_desc_s *freelist;
+	struct qdf_mem_multi_page_t desc_pages;
+	uint16_t elem_count;
+	uint32_t num_free;
+	qdf_spinlock_t lock;
+};
 #endif
 
 /**
@@ -232,6 +271,8 @@ struct dp_ppe_vp_profile {
  * @ppe_vp_tbl_lock: PPE VP table lock
  * @num_ppe_vp_entries : Number of PPE VP entries
  * @ipa_bank_id: TCL bank id used by IPA
+ * @ppeds_tx_cc_ctx: Cookie conversion context for ppeds tx desc pool
+ * @ppeds_tx_desc: PPEDS tx desc pool
  * @ppeds_handle: PPEDS soc instance handle
  */
 struct dp_soc_be {
@@ -252,6 +293,8 @@ struct dp_soc_be {
 	struct dp_srng ppe2tcl_ring;
 	struct dp_srng ppe_release_ring;
 	struct dp_ppe_vp_tbl_entry *ppe_vp_tbl;
+	struct dp_hw_cookie_conversion_t ppeds_tx_cc_ctx;
+	struct dp_ppe_tx_desc_pool_s ppeds_tx_desc;
 	void *ppeds_handle;
 	qdf_mutex_t ppe_vp_tbl_lock;
 	uint8_t num_ppe_vp_entries;
@@ -749,6 +792,8 @@ uint32_t dp_desc_pool_get_cmem_base(uint8_t chip_id, uint8_t desc_pool_id,
 		return (DP_RX_DESC_CMEM_OFFSET +
 			((chip_id * MAX_RXDESC_POOLS) + desc_pool_id) *
 			DP_RX_DESC_POOL_CMEM_SIZE);
+	case DP_TX_PPEDS_DESC_TYPE:
+		return DP_TX_PPEDS_DESC_CMEM_OFFSET;
 	default:
 			QDF_BUG(0);
 	}

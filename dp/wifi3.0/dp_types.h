@@ -82,6 +82,7 @@
 #endif
 
 #define MAX_RXDESC_POOLS 4
+#define MAX_PPE_TXDESC_POOLS 1
 
 /* Max no. of VDEV per PSOC */
 #ifdef WLAN_PSOC_MAX_VDEVS

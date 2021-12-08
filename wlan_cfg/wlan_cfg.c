@@ -2502,6 +2502,7 @@ wlan_soc_ppe_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 	wlan_cfg_ctx->ppe2tcl_ring = cfg_get(psoc, CFG_DP_PPE2TCL_RING);
 	wlan_cfg_ctx->ppe_release_ring = cfg_get(psoc,
 						 CFG_DP_PPE_RELEASE_RING);
+	wlan_cfg_ctx->ppe_num_tx_desc = cfg_get(psoc, CFG_DP_PPEDS_TX_DESC);
 }
 #else
 static inline void
@@ -3919,6 +3920,12 @@ int
 wlan_cfg_get_dp_soc_ppe_release_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->ppe_release_ring;
+}
+
+int
+wlan_cfg_get_dp_soc_ppe_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->ppe_num_tx_desc;
 }
 #endif
 
