@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18022,6 +18023,29 @@ enum hdd_external_acs_policy {
 #define CFG_DISABLE_HW_ASSIST_MAX       (1)
 #define CFG_DISABLE_HW_ASSIST_DEFAULT   (0)
 
+#ifdef FEATURE_COEX_TPUT_SHAPING_CONFIG
+/*
+ * coex_tput_shaping_enable : Ini to enable wifi configure traffic shaping
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * 0 - traffic shaping is disable
+ * 1 - traffic shaping is enable
+ *
+ * This ini is used to enable and disable wifi traffic shaping
+ *
+ * Usage:
+ *
+ * <ini>
+ */
+#define CFG_TPUT_SHAPING_ENABLE_NAME		"coex_tput_shaping_enable"
+#define CFG_TPUT_SHAPING_ENABLE_MIN		(0)
+#define CFG_TPUT_SHAPING_ENABLE_MAX		(1)
+#define CFG_TPUT_SHAPING_ENABLE_DEFAULT		(0)
+
+#endif /* FEATURE_COEX_TPUT_SHAPING_CONFIG */
+
 /*
  * Type declarations
  */
@@ -19081,6 +19105,10 @@ struct hdd_config {
 
 	bool enable_nan_indoor_channel;
 	bool disable_hw_assist;
+#ifdef FEATURE_COEX_TPUT_SHAPING_CONFIG
+	/* Tput Shaping enable */
+	bool coex_tput_shaping_enable;
+#endif
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -6469,6 +6470,15 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_DISABLE_HW_ASSIST_DEFAULT,
 		     CFG_DISABLE_HW_ASSIST_MIN,
 		     CFG_DISABLE_HW_ASSIST_MAX),
+
+#ifdef FEATURE_COEX_TPUT_SHAPING_CONFIG
+	REG_VARIABLE(CFG_TPUT_SHAPING_ENABLE_NAME, WLAN_PARAM_Integer,
+		     struct hdd_config, coex_tput_shaping_enable,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_TPUT_SHAPING_ENABLE_DEFAULT,
+		     CFG_TPUT_SHAPING_ENABLE_MIN,
+		     CFG_TPUT_SHAPING_ENABLE_MAX),
+#endif
 };
 
 /**
@@ -7552,6 +7562,11 @@ static void hdd_cfg_print_btc_params(struct hdd_context *hdd_ctx)
 	hdd_debug("Name = [%s] value = [%d]",
 		  CFG_SET_BT_INTERFERENCE_HIGH_UL_NAME,
 		  hdd_ctx->config->set_bt_interference_high_ul);
+#ifdef FEATURE_COEX_TPUT_SHAPING_CONFIG
+	hdd_debug("Name = [%s] value = [%d]",
+		  CFG_TPUT_SHAPING_ENABLE_NAME,
+		  hdd_ctx->config->coex_tput_shaping_enable);
+#endif
 }
 
 /**
