@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4207,4 +4208,53 @@ ucfg_mlme_is_sta_mon_conc_supported(struct wlan_objmgr_psoc *psoc)
 	return wlan_mlme_is_sta_mon_conc_supported(psoc);
 }
 
+/**
+ * ucfg_mlme_set_user_mcc_quota() - Store the user set mcc quota in mlme
+ * value
+ * @psoc: pointer to psoc object
+ * @quota: pointer to user mcc quota object
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_set_user_mcc_quota(struct wlan_objmgr_psoc *psoc,
+					struct wlan_user_mcc_quota *quota)
+{
+	return wlan_mlme_set_user_mcc_quota(psoc, quota);
+}
+
+/**
+ * ucfg_mlme_get_user_mcc_quota() - Get the user set mcc quota from mlme
+ * value
+ * @psoc: pointer to psoc object
+ * @quota: pointer to user mcc quota object
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_get_user_mcc_quota(struct wlan_objmgr_psoc *psoc,
+					struct wlan_user_mcc_quota *quota)
+{
+	return wlan_mlme_get_user_mcc_quota(psoc, quota);
+}
+
+/**
+ * ucfg_mlme_get_user_mcc_quota_percentage() - Get user mcc quota percentage
+ * duty-cycle for a i/f type or mode
+ * @psoc: pointer to psoc object
+ *
+ * MCC duty-cycle value in below format
+ * ******************************************************
+ * |bit 31-24 | bit 23-16 | bits 15-8   |bits 7-0   |
+ * | Unused   | Quota for | chan. # for |chan. # for|
+ * |          | 1st chan  | 1st chan.   |2nd chan.  |
+ * *****************************************************
+ *
+ * Return: primary iface MCC duty-cycle value
+ */
+static inline
+uint32_t ucfg_mlme_get_user_mcc_quota_percentage(struct wlan_objmgr_psoc *psoc)
+{
+	return  wlan_mlme_get_user_mcc_duty_cycle_percentage(psoc);
+}
 #endif /* _WLAN_MLME_UCFG_API_H_ */
