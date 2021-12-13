@@ -40,6 +40,7 @@ target_if_spectral_fill_samp_msg(struct target_if_spectral *spectral,
 	QDF_STATUS ret;
 	uint16_t dest_det_idx;
 	enum spectral_scan_mode spectral_mode;
+	uint16_t pwr_format;
 
 	if (!spectral) {
 		spectral_err_rl("Spectral LMAC object is null");
@@ -70,6 +71,8 @@ target_if_spectral_fill_samp_msg(struct target_if_spectral *spectral,
 		spectral_err_rl("Invalid spectral msg type");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	pwr_format = spectral->params[spectral_mode].ss_pwr_format;
 
 	qdf_spin_lock_bh(&spectral->session_det_map_lock);
 
@@ -177,33 +180,25 @@ target_if_spectral_fill_samp_msg(struct target_if_spectral *spectral,
 				     idx++) {
 				/* Read only the first 2 bytes of the DWORD */
 					pwr_16 = *((uint16_t *)binptr_32++);
-					if (qdf_unlikely(pwr_16 >
-					    MAX_FFTBIN_VALUE))
-						pwr_16 = MAX_FFTBIN_VALUE;
 					spec_samp_msg->bin_pwr
 					  [lb_edge_bins->start_bin_idx + idx]
-					  = pwr_16;
+					  = clamp_fft_bin_value(pwr_16, pwr_format);
 				}
 			}
 			for (idx = 0; idx < pwr_count; idx++) {
 				/* Read only the first 2 bytes of the DWORD */
 				pwr_16 = *((uint16_t *)binptr_32++);
-				if (qdf_unlikely(pwr_16 > MAX_FFTBIN_VALUE))
-					pwr_16 = MAX_FFTBIN_VALUE;
 				spec_samp_msg->bin_pwr[start_bin_index + idx]
-							= pwr_16;
+					= clamp_fft_bin_value(pwr_16, pwr_format);
 			}
 			if (rb_edge_bins->num_bins > 0) {
 				for (idx = 0; idx < rb_edge_bins->num_bins;
 				     idx++) {
 				/* Read only the first 2 bytes of the DWORD */
 					pwr_16 = *((uint16_t *)binptr_32++);
-					if (qdf_unlikely(pwr_16 >
-					    MAX_FFTBIN_VALUE))
-						pwr_16 = MAX_FFTBIN_VALUE;
 					spec_samp_msg->bin_pwr
 					  [rb_edge_bins->start_bin_idx + idx]
-					  = pwr_16;
+					  = clamp_fft_bin_value(pwr_16, pwr_format);
 				}
 			}
 		} else if (swar->fftbin_size_war ==
@@ -213,31 +208,23 @@ target_if_spectral_fill_samp_msg(struct target_if_spectral *spectral,
 				for (idx = 0; idx < lb_edge_bins->num_bins;
 				     idx++) {
 					pwr_16 = *(binptr_16++);
-					if (qdf_unlikely(pwr_16 >
-					    MAX_FFTBIN_VALUE))
-						pwr_16 = MAX_FFTBIN_VALUE;
 					spec_samp_msg->bin_pwr
 					  [lb_edge_bins->start_bin_idx + idx]
-					  = pwr_16;
+					  = clamp_fft_bin_value(pwr_16, pwr_format);
 				}
 			}
 			for (idx = 0; idx < pwr_count; idx++) {
 				pwr_16 = *(binptr_16++);
-				if (qdf_unlikely(pwr_16 > MAX_FFTBIN_VALUE))
-					pwr_16 = MAX_FFTBIN_VALUE;
 				spec_samp_msg->bin_pwr[start_bin_index + idx]
-							= pwr_16;
+					= clamp_fft_bin_value(pwr_16, pwr_format);
 			}
 			if (rb_edge_bins->num_bins > 0) {
 				for (idx = 0; idx < rb_edge_bins->num_bins;
 				     idx++) {
 					pwr_16 = *(binptr_16++);
-					if (qdf_unlikely(pwr_16 >
-					    MAX_FFTBIN_VALUE))
-						pwr_16 = MAX_FFTBIN_VALUE;
 					spec_samp_msg->bin_pwr
 					  [rb_edge_bins->start_bin_idx + idx]
-					  = pwr_16;
+					  = clamp_fft_bin_value(pwr_16, pwr_format);
 				}
 			}
 		} else {
