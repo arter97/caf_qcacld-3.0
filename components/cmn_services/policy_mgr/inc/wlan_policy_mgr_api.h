@@ -2441,6 +2441,16 @@ uint32_t policy_mgr_mode_specific_connection_count(
 		uint32_t *list);
 
 /**
+ * policy_mgr_get_connection_channel_width() - Get max channel width
+ * of all connections
+ * @psoc: PSOC object information
+ *
+ * Return: Max channel width of all connections
+ */
+enum hw_mode_bandwidth
+policy_mgr_get_connection_channel_width(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_check_conn_with_mode_and_vdev_id() - checks if any active
  * session with specific mode and vdev_id
  * @psoc: PSOC object information
