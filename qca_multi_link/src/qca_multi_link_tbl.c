@@ -27,7 +27,7 @@
 int qca_multi_link_tbl_get_eth_entries(struct net_device *net_dev,
 					void *fill_buff, int buff_size)
 {
-	qdf_err("bridge function disabled in this SP\n");
+	qdf_debug("bridge function disabled in this SP\n");
 	return 0;
 }
 #else
@@ -98,7 +98,7 @@ qdf_export_symbol(qca_multi_link_tbl_get_eth_entries);
 struct net_device *qca_multi_link_tbl_find_sta_or_ap(struct net_device *net_dev,
 					uint8_t dev_type)
 {
-	qdf_err("bridge function disabled in this SP\n");
+	qdf_debug("bridge function disabled in this SP\n");
 	return NULL;
 }
 #else
@@ -156,8 +156,7 @@ qdf_export_symbol(qca_multi_link_tbl_find_sta_or_ap);
 QDF_STATUS qca_multi_link_tbl_add_or_refresh_entry(struct net_device *net_dev, uint8_t *addr,
 							qca_multi_link_entry_type_t entry_type)
 {
-	qdf_err("bridge function disabled in this SP, should not call this function!\n");
-	BUG_ON(1);
+	qdf_debug("bridge function disabled in this SP, should not call this function!\n");
 	return QDF_STATUS_E_FAILURE;
 }
 #else
@@ -194,8 +193,7 @@ qdf_export_symbol(qca_multi_link_tbl_add_or_refresh_entry);
 #if DISABLE_QAL_BRIDGE
 QDF_STATUS qca_multi_link_tbl_delete_entry(struct net_device *net_dev, uint8_t *addr)
 {
-	qdf_err("bridge function disabled in this SP, should not call this function!\n");
-	BUG_ON(1);
+	qdf_debug("bridge function disabled in this SP, should not call this function!\n");
 	return QDF_STATUS_E_FAILURE;
 }
 #else
@@ -253,8 +251,7 @@ QDF_STATUS qca_multi_link_tbl_has_entry(struct net_device *net_dev,
 				const char *addr, uint16_t vlan_id,
 				qca_multi_link_tbl_entry_t *qca_ml_entry)
 {
-	qdf_err("bridge function disabled in this SP, should not call this function!\n");
-	BUG_ON(1);
+	qdf_debug("bridge function disabled in this SP, should not call this function!\n");
 	return QDF_STATUS_E_FAILURE;
 }
 #else
@@ -297,8 +294,7 @@ qdf_export_symbol(qca_multi_link_tbl_has_entry);
 #if DISABLE_QAL_BRIDGE
 QDF_STATUS qca_multi_link_tbl_register_update_notifier(void *nb)
 {
-	qdf_err("bridge function disabled in this SP, should not call this function!\n");
-	BUG_ON(1);
+	qdf_debug("bridge function disabled in this SP, should not call this function!\n");
 	return QDF_STATUS_E_FAILURE;
 }
 #else
@@ -322,8 +318,7 @@ qdf_export_symbol(qca_multi_link_tbl_register_update_notifier);
 #if DISABLE_QAL_BRIDGE
 QDF_STATUS qca_multi_link_tbl_unregister_update_notifier(void *nb)
 {
-	qdf_err("bridge function disabled in this SP, should not call this function!\n");
-	BUG_ON(1);
+	qdf_debug("bridge function disabled in this SP, should not call this function!\n");
 	return QDF_STATUS_E_FAILURE;
 }
 #else
@@ -347,8 +342,7 @@ qdf_export_symbol(qca_multi_link_tbl_unregister_update_notifier);
 #if DISABLE_QAL_BRIDGE
 QDF_STATUS qca_multi_link_tbl_register_notifier(void *nb)
 {
-	qdf_err("bridge function disabled in this SP, should not call this function!\n");
-	BUG_ON(1);
+	qdf_debug("bridge function disabled in this SP, should not call this function!\n");
 	return QDF_STATUS_E_FAILURE;
 }
 
@@ -374,8 +368,7 @@ qdf_export_symbol(qca_multi_link_tbl_register_notifier);
 #if DISABLE_QAL_BRIDGE
 QDF_STATUS qca_multi_link_tbl_unregister_notifier(void *nb)
 {
-	qdf_err("bridge function disabled in this SP, should not call this function!\n");
-	BUG_ON(1);
+	qdf_debug("bridge function disabled in this SP, should not call this function!\n");
 	return QDF_STATUS_E_FAILURE;
 }
 #else
@@ -399,7 +392,7 @@ qdf_export_symbol(qca_multi_link_tbl_unregister_notifier);
 #if DISABLE_QAL_BRIDGE
 struct net_device *qca_multi_link_tbl_get_bridge_dev(struct net_device *port_dev)
 {
-	qdf_err("bridge function disabled in this SP\n");
+	qdf_debug("bridge function disabled in this SP\n");
 	return NULL;
 }
 
