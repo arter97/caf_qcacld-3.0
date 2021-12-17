@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2026,42 +2027,41 @@ static void hdd_update_tgt_vht_cap(struct hdd_context *hdd_ctx,
 		hdd_err("unable to get vht_enable2x2");
 
 	if (vht_enable_2x2) {
-		if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
-			/* Update 2x2 Highest Short GI data rate */
+		tx_highest_data_rate =
+				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
+		rx_highest_data_rate =
+				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
+	} else {
+		tx_highest_data_rate =
+				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+		rx_highest_data_rate =
+				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+	}
+
+	status = ucfg_mlme_cfg_set_vht_rx_supp_data_rate(hdd_ctx->psoc,
+							 rx_highest_data_rate);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("Failed to set rx_supp_data_rate");
+
+	status = ucfg_mlme_cfg_set_vht_tx_supp_data_rate(hdd_ctx->psoc,
+							 tx_highest_data_rate);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("Failed to set tx_supp_data_rate");
+
+	/* Update the real highest data rate to wiphy */
+	if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
+		if (vht_enable_2x2) {
 			tx_highest_data_rate =
 				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80;
 			rx_highest_data_rate =
 				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2_SGI80;
 		} else {
-			/* Update 2x2 Rx Highest Long GI data Rate */
 			tx_highest_data_rate =
-					VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
-			rx_highest_data_rate =
-					VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_2_2;
-		}
-	} else if (cfg->vht_short_gi_80 & WMI_VHT_CAP_SGI_80MHZ) {
-		/* Update 1x1 Highest Short GI data rate */
-		tx_highest_data_rate =
 				VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80;
-		rx_highest_data_rate =
+			rx_highest_data_rate =
 				VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1_SGI80;
-	} else {
-		/* Update 1x1 Highest Long GI data rate */
-		tx_highest_data_rate = VHT_TX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
-		rx_highest_data_rate = VHT_RX_HIGHEST_SUPPORTED_DATA_RATE_1_1;
+		}
 	}
-
-	status = ucfg_mlme_cfg_set_vht_rx_supp_data_rate(
-			hdd_ctx->psoc,
-			rx_highest_data_rate);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("Failed to set rx_supp_data_rate");
-
-	status = ucfg_mlme_cfg_set_vht_tx_supp_data_rate(
-			hdd_ctx->psoc,
-			tx_highest_data_rate);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("Failed to set tx_supp_data_rate");
 
 	if (WMI_VHT_CAP_MAX_MPDU_LEN_11454 == cfg->vht_max_mpdu)
 		band_5g->vht_cap.cap |= IEEE80211_VHT_CAP_MAX_MPDU_LENGTH_11454;
@@ -4893,6 +4893,54 @@ void wlan_hdd_release_intf_addr(struct hdd_context *hdd_ctx,
 }
 
 /**
+ * hdd_set_derived_multicast_list(): Add derived peer multicast address list in
+ *                                   multicast list request to the FW
+ * @psoc: Pointer to psoc
+ * @adapter: Pointer to hdd adapter
+ * @mc_list_request: Multicast list request to the FW
+ * @mc_count: number of multicast addresses received from the kernel
+ *
+ * Return: None
+ */
+static void
+hdd_set_derived_multicast_list(struct wlan_objmgr_psoc *psoc,
+			       struct hdd_adapter *adapter,
+			       struct pmo_mc_addr_list_params *mc_list_request,
+			       int *mc_count)
+{
+	int i = 0, j = 0, list_count = *mc_count;
+	struct qdf_mac_addr *peer_mc_addr_list = NULL;
+	uint8_t  driver_mc_cnt = 0;
+	uint32_t max_ndp_sessions = 0;
+
+	cfg_nan_get_ndp_max_sessions(psoc, &max_ndp_sessions);
+
+	ucfg_nan_get_peer_mc_list(adapter->vdev, &peer_mc_addr_list);
+
+	for (j = 0; j < max_ndp_sessions; j++) {
+		for (i = 0; i < list_count; i++) {
+			if (qdf_is_macaddr_zero(&peer_mc_addr_list[j]) ||
+			    qdf_is_macaddr_equal(&mc_list_request->mc_addr[i],
+						 &peer_mc_addr_list[j]))
+				break;
+		}
+		if (i == list_count) {
+			qdf_mem_copy(
+			   &(mc_list_request->mc_addr[list_count +
+						driver_mc_cnt].bytes),
+			   peer_mc_addr_list[j].bytes, ETH_ALEN);
+			hdd_debug("mlist[%d] = " QDF_MAC_ADDR_FMT,
+				  list_count + driver_mc_cnt,
+				  QDF_MAC_ADDR_REF(
+					mc_list_request->mc_addr[list_count +
+					driver_mc_cnt].bytes));
+			driver_mc_cnt++;
+		}
+	}
+	*mc_count += driver_mc_cnt;
+}
+
+/**
  * __hdd_set_multicast_list() - set the multicast address list
  * @dev:	Pointer to the WLAN device.
  * @skb:	Pointer to OS packet (sk_buff).
@@ -4967,6 +5015,11 @@ static void __hdd_set_multicast_list(struct net_device *dev)
 				  QDF_MAC_ADDR_REF(mc_list_request->mc_addr[i].bytes));
 			i++;
 		}
+
+		if (adapter->device_mode == QDF_NDI_MODE)
+			hdd_set_derived_multicast_list(psoc, adapter,
+						       mc_list_request,
+						       &mc_count);
 	}
 
 	adapter->mc_addr_list.mc_cnt = mc_count;
@@ -11389,6 +11442,30 @@ void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
 		hdd_ap_ctx->sap_config.ch_width_orig, forced);
 }
 
+void hdd_switch_sap_chan_freq(struct hdd_adapter *adapter, qdf_freq_t chan_freq,
+			      bool forced)
+{
+	struct hdd_ap_ctx *hdd_ap_ctx;
+	struct hdd_context *hdd_ctx;
+
+	if (hdd_validate_adapter(adapter))
+		return;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if(wlan_hdd_validate_context(hdd_ctx))
+		return;
+
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+
+	hdd_debug("chan freq:%d width:%d",
+		  chan_freq, hdd_ap_ctx->sap_config.ch_width_orig);
+
+	policy_mgr_change_sap_channel_with_csa(
+		hdd_ctx->psoc, adapter->vdev_id, chan_freq,
+		hdd_ap_ctx->sap_config.ch_width_orig, forced);
+}
+
 int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason)
 {
 	struct hdd_external_acs_timer_context *timer_context;
@@ -11430,7 +11507,7 @@ int hdd_update_acs_timer_reason(struct hdd_adapter *adapter, uint8_t reason)
  * Return - none
  */
 static void
-hdd_store_sap_restart_channel(uint8_t restart_chan, uint8_t *restart_chan_store)
+hdd_store_sap_restart_channel(qdf_freq_t restart_chan, qdf_freq_t *restart_chan_store)
 {
 	uint8_t i;
 
@@ -11461,8 +11538,7 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	uint32_t i;
 	bool found = false;
-	uint8_t restart_chan_store[SAP_MAX_NUM_SESSION] = {0};
-	uint8_t restart_chan, ap_chan;
+	qdf_freq_t restart_chan_store[SAP_MAX_NUM_SESSION] = {0};
 	uint8_t scc_on_lte_coex = 0;
 	uint32_t restart_freq, ap_chan_freq;
 	bool value;
@@ -11483,9 +11559,6 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 			continue;
 		}
 
-		ap_chan = wlan_reg_freq_to_chan(
-				hdd_ctxt->pdev,
-				adapter->session.ap.operating_chan_freq);
 		ap_chan_freq = adapter->session.ap.operating_chan_freq;
 
 		found = false;
@@ -11519,10 +11592,10 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 		}
 		if (!found) {
 			hdd_store_sap_restart_channel(
-				ap_chan,
+				ap_chan_freq,
 				restart_chan_store);
-			hdd_debug("ch:%d is safe. no need to change channel",
-				  ap_chan);
+			hdd_debug("ch freq:%d is safe. no need to change channel",
+				  ap_chan_freq);
 			hdd_adapter_dev_put_debug(adapter, dbgid);
 			continue;
 		}
@@ -11546,27 +11619,25 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 			continue;
 		}
 
-		restart_chan = 0;
+		restart_freq = 0;
 		for (i = 0; i < SAP_MAX_NUM_SESSION; i++) {
 			if (!restart_chan_store[i])
 				continue;
 
 			if (policy_mgr_is_force_scc(hdd_ctxt->psoc) &&
-			    WLAN_REG_IS_SAME_BAND_CHANNELS(
+			    WLAN_REG_IS_SAME_BAND_FREQS(
 					restart_chan_store[i],
-					ap_chan)) {
-				restart_chan = restart_chan_store[i];
+					ap_chan_freq)) {
+				restart_freq = restart_chan_store[i];
 				break;
 			}
 		}
-		if (!restart_chan) {
+		if (!restart_freq) {
 			restart_freq =
 				wlansap_get_safe_channel_from_pcl_and_acs_range(
 					WLAN_HDD_GET_SAP_CTX_PTR(adapter));
-			restart_chan = wlan_reg_freq_to_chan(hdd_ctxt->pdev,
-							     restart_freq);
 		}
-		if (!restart_chan) {
+		if (!restart_freq) {
 			hdd_err("fail to restart SAP");
 		} else {
 			/*
@@ -11584,8 +11655,8 @@ void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctxt)
 				wlan_hdd_set_sap_csa_reason(hdd_ctxt->psoc,
 						adapter->vdev_id,
 						CSA_REASON_UNSAFE_CHANNEL);
-				hdd_switch_sap_channel(adapter, restart_chan,
-						       true);
+				hdd_switch_sap_chan_freq(adapter, restart_freq,
+							 true);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
 					hdd_adapter_dev_put_debug(next_adapter,
@@ -13562,6 +13633,7 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 	int ret;
 	uint8_t val = 0;
 	uint8_t max_retry = 0;
+	uint32_t tx_retry_multiplier;
 	QDF_STATUS status;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
@@ -13609,6 +13681,16 @@ static int hdd_pre_enable_configure(struct hdd_context *hdd_ctx)
 				  PDEV_CMD);
 	if (0 != ret) {
 		hdd_err("WMI_PDEV_PARAM_MGMT_RETRY_LIMIT failed %d", ret);
+		goto out;
+	}
+
+	wlan_mlme_get_tx_retry_multiplier(hdd_ctx->psoc,
+					  &tx_retry_multiplier);
+	ret = sme_cli_set_command(0, WMI_PDEV_PARAM_PDEV_STATS_TX_XRETRY_EXT,
+				  tx_retry_multiplier, PDEV_CMD);
+	if (0 != ret) {
+		hdd_err("WMI_PDEV_PARAM_PDEV_STATS_TX_XRETRY_EXT failed %d",
+			ret);
 		goto out;
 	}
 
@@ -15445,6 +15527,9 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	sme_stats_ext2_register_callback(mac_handle,
 					wlan_hdd_cfg80211_stats_ext2_callback);
 
+	sme_roam_events_register_callback(mac_handle,
+					wlan_hdd_cfg80211_roam_events_callback);
+
 	sme_set_rssi_threshold_breached_cb(mac_handle,
 					   hdd_rssi_threshold_breached);
 
@@ -15554,6 +15639,7 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 		hdd_err("Failed to de-register data stall detect event callback");
 
 	sme_deregister_oem_data_rsp_callback(mac_handle);
+	sme_roam_events_deregister_callback(mac_handle);
 
 	hdd_exit();
 }
