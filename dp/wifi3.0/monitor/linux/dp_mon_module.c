@@ -22,6 +22,7 @@
 #include <dp_internal.h>
 #include <dp_htt.h>
 #include <dp_mon.h>
+#include <dp_types.h>
 
 #ifndef EXPORT_SYMTAB
 #define EXPORT_SYMTAB
@@ -31,6 +32,18 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc);
 void mon_soc_ol_detach(struct wlan_objmgr_psoc *psoc);
+
+static inline QDF_STATUS
+dp_mon_soc_ring_config(struct dp_soc *soc)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dp_mon_ops *mon_ops = dp_mon_ops_get(soc);
+
+	if (mon_ops && mon_ops->mon_soc_htt_srng_setup)
+		status = mon_ops->mon_soc_htt_srng_setup(soc);
+
+	return status;
+}
 
 static inline QDF_STATUS
 dp_mon_ring_config(struct dp_soc *soc, struct dp_pdev *pdev,
@@ -64,6 +77,7 @@ int monitor_mod_init(void)
 	uint8_t pdev_count = 0;
 	bool pdev_attach_success;
 	struct dp_mon_ops *mon_ops = NULL;
+	qdf_size_t soc_context_size;
 
 	for (index = 0; index < WLAN_OBJMGR_MAX_DEVICES; index++) {
 		psoc = g_umac_glb_obj->psoc[index];
@@ -76,11 +90,18 @@ int monitor_mod_init(void)
 			continue;
 		}
 
-		mon_soc = (struct dp_mon_soc *)qdf_mem_malloc(sizeof(*mon_soc));
+		if (soc->arch_ops.txrx_get_mon_context_size) {
+			soc_context_size = soc->arch_ops.txrx_get_mon_context_size(DP_CONTEXT_TYPE_MON_SOC);
+			mon_soc = dp_context_alloc_mem(soc, DP_MON_SOC_TYPE, soc_context_size);
+		} else {
+			mon_soc = (struct dp_mon_soc *)qdf_mem_malloc(sizeof(*mon_soc));
+		}
+
 		if (!mon_soc) {
 			dp_mon_err("%pK: mem allocation failed", soc);
 			continue;
 		}
+
 		soc->monitor_soc = mon_soc;
 		dp_mon_soc_cfg_init(soc);
 		pdev_attach_success = false;
@@ -93,9 +114,18 @@ int monitor_mod_init(void)
 			continue;
 		}
 
-		if (mon_ops->mon_soc_attach && !mon_ops->mon_soc_attach(soc)) {
-			if (mon_ops->mon_soc_init)
-				mon_ops->mon_soc_init(soc);
+		if (mon_ops->mon_soc_attach) {
+			if (mon_ops->mon_soc_attach(soc)) {
+				dp_mon_err("%pK: monitor soc attach failed", soc);
+			}
+		}
+
+		status = dp_mon_soc_ring_config(soc);
+		if (status != QDF_STATUS_SUCCESS) {
+			dp_mon_err("%pK: monitor soc ring config failed", soc);
+			qdf_mem_free(mon_soc);
+			soc->monitor_soc = NULL;
+			continue;
 		}
 
 		pdev_count = psoc->soc_objmgr.wlan_pdev_count;
@@ -202,9 +232,6 @@ void monitor_mod_exit(void)
 		}
 
 		mon_ops = dp_mon_ops_get(soc);
-		if (mon_ops && mon_ops->mon_soc_deinit)
-			 mon_ops->mon_soc_deinit(soc);
-
 		if (mon_ops && mon_ops->mon_soc_detach)
 			mon_ops->mon_soc_detach(soc);
 
