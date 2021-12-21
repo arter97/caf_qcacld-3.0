@@ -2258,6 +2258,7 @@ uint8_t *wlan_crypto_add_mmie(struct wlan_objmgr_vdev *vdev,
 	return bfrm + len;
 }
 
+#define MAX_MIC_LEN 16
 /**
  * wlan_crypto_is_mmie_valid - called by mgmt txrx to check mmie of the frame
  * @vdev: vdev
@@ -2364,7 +2365,7 @@ bool wlan_crypto_is_mmie_valid(struct wlan_objmgr_vdev *vdev,
 	 */
 	qdf_mem_copy(buf + 20, frm + hdrlen, len - hdrlen);
 	qdf_mem_zero(buf + (len - hdrlen + 20 - mic_len), mic_len);
-	mic = qdf_mem_malloc(mic_len);
+	mic = qdf_mem_malloc(MAX_MIC_LEN);
 	if (!mic) {
 		qdf_mem_free(buf);
 		return false;
