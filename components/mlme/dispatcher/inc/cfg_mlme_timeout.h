@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,8 +26,8 @@
 /*
  * <ini>
  * join_failure_timeout - Join failure timeout value
- * @Min: 0
- * @Max: 65535
+ * @Min: 500
+ * @Max: 3000
  * @Default: 3000
  *
  * This cfg is used to configure the join failure timeout.
@@ -38,8 +38,8 @@
  */
 #define CFG_JOIN_FAILURE_TIMEOUT CFG_INI_UINT( \
 		"join_failure_timeout", \
-		0, \
-		65535, \
+		500, \
+		3000, \
 		3000, \
 		CFG_VALUE_OR_DEFAULT, \
 		"Join failure timeout")
@@ -47,8 +47,8 @@
 /*
  * <ini>
  * auth_failure_timeout - Auth failure timeout value
- * @Min: 0
- * @Max: 65535
+ * @Min: 500
+ * @Max: 5000
  * @Default: 1000
  *
  * This cfg is used to configure the auth failure timeout.
@@ -89,8 +89,8 @@
 /*
  * <ini>
  * assoc_failure_timeout - Assoc failure timeout value
- * @Min: 0
- * @Max: 65535
+ * @Min: 500
+ * @Max: 3000
  * @Default: 2000
  *
  * This cfg is used to configure the assoc failure timeout.
@@ -101,8 +101,8 @@
  */
 #define CFG_ASSOC_FAILURE_TIMEOUT CFG_INI_UINT( \
 		"assoc_failure_timeout", \
-		0, \
-		65535, \
+		500, \
+		3000, \
 		2000, \
 		CFG_VALUE_OR_DEFAULT, \
 		"assoc failure timeout")
@@ -264,30 +264,6 @@
 
 /*
  * <ini>
- * gDataInactivityTimeout - Data inactivity timeout for non wow mode.
- * @Min: 1
- * @Max: 255
- * @Default: 200
- *
- * This ini is used to set data inactivity timeout value, in milliseconds, of
- * non wow mode.
- *
- * Supported Feature: inactivity timeout in non wow mode
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_PS_DATA_INACTIVITY_TIMEOUT CFG_INI_UINT( \
-		"gDataInactivityTimeout", \
-		1, \
-		255, \
-		200, \
-		CFG_VALUE_OR_DEFAULT, \
-		"PS data inactivity timeout")
-
-/*
- * <ini>
  * wmi_wq_watchdog - Sets timeout period for wmi watchdog bite.
  * @Min: 0
  * @Max: 30
@@ -312,6 +288,27 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"timeout period for wmi watchdog bite")
 
+/*
+ * <ini>
+ * sae_auth_failure_timeout - SAE Auth failure timeout value in msec
+ * @Min: 500
+ * @Max: 1000
+ * @Default: 1000
+ *
+ * This cfg is used to configure the SAE auth failure timeout.
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAE_AUTH_FAILURE_TIMEOUT CFG_INI_UINT( \
+		"sae_auth_failure_timeout", \
+		500, \
+		1000, \
+		1000, \
+		CFG_VALUE_OR_DEFAULT, \
+		"SAE auth failure timeout")
+
 #define CFG_TIMEOUT_ALL \
 	CFG(CFG_JOIN_FAILURE_TIMEOUT) \
 	CFG(CFG_AUTH_FAILURE_TIMEOUT) \
@@ -325,6 +322,6 @@
 	CFG(CFG_AP_KEEP_ALIVE_TIMEOUT) \
 	CFG(CFG_AP_LINK_MONITOR_TIMEOUT) \
 	CFG(CFG_WMI_WQ_WATCHDOG) \
-	CFG(CFG_PS_DATA_INACTIVITY_TIMEOUT)
+	CFG(CFG_SAE_AUTH_FAILURE_TIMEOUT)
 
 #endif /* __CFG_MLME_TIMEOUT_H */

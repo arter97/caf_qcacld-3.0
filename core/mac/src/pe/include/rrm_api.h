@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2012, 2014-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -91,6 +91,18 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 			       tpSirBeaconReportXmitInd beacon_xmit_ind);
 
 /**
+ * rrm_get_country_code_from_connected_profile() - get country code
+ * from connected profile
+ * @mac: Mac context
+ * @vdev_id: vdev_id or csr session id
+ * @country_code: country code
+ *
+ * Return: None
+ */
+void rrm_get_country_code_from_connected_profile(struct mac_context *mac,
+						 uint8_t vdev_id,
+						 uint8_t *country_code);
+/**
  * rrm_reject_req - Reject rrm request
  * @radiomes_report: radio measurement report
  * @rrm_req: Array of Measurement request IEs
@@ -108,6 +120,5 @@ QDF_STATUS rrm_reject_req(tpSirMacRadioMeasureReport *radiomes_report,
 			  uint8_t *num_report, uint8_t index,
 			  uint8_t measurement_type);
 
-void lim_update_rrm_capability(struct mac_context *mac_ctx,
-			       struct join_req *join_req);
+void lim_update_rrm_capability(struct mac_context *mac_ctx);
 #endif

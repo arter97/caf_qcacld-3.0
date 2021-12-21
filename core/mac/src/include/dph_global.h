@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,17 +44,17 @@
 /* DPH Hash Index for BSS(STA's Peer) on station. */
 #define DPH_STA_HASH_INDEX_PEER   1
 
-#ifdef WLAN_FEATURE_11W
 /* DPH PMF SA Query state for station */
 #define DPH_SA_QUERY_NOT_IN_PROGRESS      1
 #define DPH_SA_QUERY_IN_PROGRESS          2
 #define DPH_SA_QUERY_TIMED_OUT            3
-#endif
 
 typedef struct sDphQosParams {
 	uint8_t addtsPresent;
 	tSirAddtsReqInfo addts;
 	tSirMacQosCapabilityStaIE capability;
+	/*AP EDCA params, extracted from assoc resp*/
+	tSirMacEdcaParamSetIE peer_edca_params;
 } tDphQosParams;
 
 /**
@@ -79,6 +79,9 @@ struct parsed_ies {
 	tDot11fIEhs20vendor_ie hs20vendor_ie;
 #ifdef WLAN_FEATURE_11AX
 	tDot11fIEhe_op he_operation;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	tDot11fIEeht_op eht_operation;
 #endif
 };
 
@@ -158,13 +161,11 @@ typedef struct sDphHashNode {
 	uint8_t vht_160mhz_nss;
 	uint8_t vht_80p80mhz_nss;
 	uint8_t vht_extended_nss_bw_cap;
-#ifdef WLAN_FEATURE_11W
 	TX_TIMER pmfSaQueryTimer;
 	uint16_t pmfSaQueryCurrentTransId;
 	uint16_t pmfSaQueryStartTransId;
 	uint8_t pmfSaQueryState;
 	uint8_t pmfSaQueryRetryCount;
-#endif
 	uint8_t htLdpcCapable;
 	uint8_t vhtLdpcCapable;
 #ifdef FEATURE_WLAN_TDLS
@@ -186,7 +187,13 @@ typedef struct sDphHashNode {
 #ifdef WLAN_FEATURE_11AX
 	tDot11fIEhe_cap he_config;
 	uint16_t he_mcs_12_13_map;
+	tDot11fIEhe_6ghz_band_cap he_6g_band_cap;
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+	tDot11fIEeht_cap eht_config;
+#endif
+
 	/* Peer operation class, extracted from ASSOC request frame*/
 	tDot11fIESuppOperatingClasses supp_operating_classes;
 	/*
@@ -196,6 +203,11 @@ typedef struct sDphHashNode {
 	 * end of the structure.
 	 */
 	struct sDphHashNode *next;
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool recv_assoc_frm;
+	uint8_t mld_addr[QDF_MAC_ADDR_SIZE];
+	struct mlo_partner_info mlo_info;
+#endif
 } tDphHashNode, *tpDphHashNode;
 
 #include "dph_hash_table.h"

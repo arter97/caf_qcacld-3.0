@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,11 @@
 #include <wlan_objmgr_psoc_obj.h>
 #include <cdp_txrx_handle.h>
 
+/* The ini gReorderOffloadSupported is deprecated. So, defining a new macro
+ * DP_REORDER_OFFLOAD_SUPPORT with the ini's default value.
+ */
+#define DP_REORDER_OFFLOAD_SUPPORT (1)
+
 /* Amount of time to wait for WMA to perform an asynchronous activity.
  * This value should be larger than the timeout used by WMI to wait for
  * a response from target
@@ -60,7 +65,7 @@
  * CDS_DRIVER_STATE_UNLOADING: Driver remove is in progress.
  * CDS_DRIVER_STATE_RECOVERING: Recovery in progress.
  * CDS_DRIVER_STATE_BAD: Driver in bad state.
- * CDS_DRIVER_STATE_MODULE_STOPPING: Module stop in progress.
+ * CDS_DRIVER_STATE_MODULE_STOP: Module stop in progress or done.
  * CDS_DRIVER_STATE_ASSERTING_TARGET: Driver assert target in progress.
  */
 enum cds_driver_state {
@@ -71,7 +76,7 @@ enum cds_driver_state {
 	CDS_DRIVER_STATE_RECOVERING             = BIT(3),
 	CDS_DRIVER_STATE_BAD                    = BIT(4),
 	CDS_DRIVER_STATE_FW_READY               = BIT(5),
-	CDS_DRIVER_STATE_MODULE_STOPPING        = BIT(6),
+	CDS_DRIVER_STATE_MODULE_STOP            = BIT(6),
 	CDS_DRIVER_STATE_ASSERTING_TARGET       = BIT(7),
 };
 
@@ -164,6 +169,18 @@ static inline bool cds_is_target_ready(void)
 }
 
 /**
+ * cds_is_driver_state_module_stop - Is module stop is in-progress or done
+ *
+ * Return: true if driver state is module stop and false otherwise.
+ */
+static inline bool cds_is_driver_state_module_stop(void)
+{
+	enum cds_driver_state state = cds_get_driver_state();
+
+	return __CDS_IS_DRIVER_STATE(state, CDS_DRIVER_STATE_MODULE_STOP);
+}
+
+/**
  * cds_set_recovery_in_progress() - Set recovery in progress
  * @value: value to set
  *
@@ -248,18 +265,18 @@ static inline void cds_set_unload_in_progress(uint8_t value)
 }
 
 /**
- * cds_set_module_stop_in_progress() - Setting module stop in progress
+ * cds_set_driver_state_module_stop() - Setting module stop in progress or done
  *
  * @value: value to set
  *
  * Return: none
  */
-static inline void cds_set_module_stop_in_progress(bool value)
+static inline void cds_set_driver_state_module_stop(bool value)
 {
 	if (value)
-		cds_set_driver_state(CDS_DRIVER_STATE_MODULE_STOPPING);
+		cds_set_driver_state(CDS_DRIVER_STATE_MODULE_STOP);
 	else
-		cds_clear_driver_state(CDS_DRIVER_STATE_MODULE_STOPPING);
+		cds_clear_driver_state(CDS_DRIVER_STATE_MODULE_STOP);
 }
 
 /**
@@ -354,7 +371,21 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc);
 
-void *cds_get_context(QDF_MODULE_ID module_id);
+/**
+ * cds_get_context() - get context data area
+ * @module_id: ID of the module who's context data is being retrieved.
+ *
+ * Each module in the system has a context/data area that is allocated
+ * and managed by CDS.  This API allows any user to get a pointer to its
+ * allocated context data area from the CDS global context.
+ *
+ * Return: pointer to the context data area of the module ID
+ *	   specified, or NULL if the context data is not allocated for
+ *	   the module ID specified.
+ */
+#define cds_get_context(module_id) \
+	__cds_get_context(module_id, __func__)
+void *__cds_get_context(QDF_MODULE_ID module_id, const char *func);
 
 void *cds_get_global_context(void);
 
@@ -425,7 +456,7 @@ void cds_get_and_reset_log_completion(uint32_t *is_fatal,
 bool cds_is_log_report_in_progress(void);
 bool cds_is_fatal_event_enabled(void);
 
-#ifdef WLAN_FEATURE_TSF_PLUS
+#ifdef WLAN_FEATURE_TSF_PLUS_SOCK_TS
 bool cds_is_ptp_rx_opt_enabled(void);
 bool cds_is_ptp_tx_opt_enabled(void);
 #else

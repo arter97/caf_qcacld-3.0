@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -164,18 +164,6 @@ ucfg_fwol_get_coex_config_params(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_fwol_get_thermal_temp(struct wlan_objmgr_psoc *psoc,
 			   struct wlan_fwol_thermal_temp *thermal_temp);
-
-/**
- * ucfg_fwol_get_neighbor_report_cfg() - Get neighbor report config params
- * @psoc: Pointer to psoc object
- * @fwol_neighbor_report_cfg: Pointer to return neighbor report config
- *
- * Return: QDF Status
- */
-QDF_STATUS
-ucfg_fwol_get_neighbor_report_cfg(struct wlan_objmgr_psoc *psoc,
-				  struct wlan_fwol_neighbor_report_cfg
-				  *fwol_neighbor_report_cfg);
 
 /**
  * ucfg_fwol_get_neighbor_report_req() - Get neighbor report request bit
@@ -343,7 +331,7 @@ QDF_STATUS ucfg_fwol_get_enable_fw_log_type(struct wlan_objmgr_psoc *psoc,
  * @enable_fw_module_log_level:
  * pointer to enable_fw_module_log_level array
  * @enable_fw_module_log_level_num:
- * pointer to enable_fw_module_log_leve array element num
+ * pointer to enable_fw_module_log_level array element num
  *
  * Return: QDF Status
  */
@@ -351,6 +339,23 @@ QDF_STATUS ucfg_fwol_get_enable_fw_module_log_level(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t **enable_fw_module_log_level,
 				uint8_t *enable_fw_module_log_level_num);
+
+/**
+ * ucfg_fwol_wow_get_enable_fw_module_log_level() - Assigns
+ * enable_fw_module_log_level string
+ *
+ * @psoc: pointer to the psoc object
+ * @enable_fw_wow_module_log_level:
+ * pointer to enable_fw_wow_module_log_level array
+ * @enable_fw_wow_module_log_level_num:
+ * pointer to enable_fw_wow_module_log_level array element num
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_fwol_wow_get_enable_fw_module_log_level(
+				struct wlan_objmgr_psoc *psoc,
+				uint8_t **enable_fw_wow_module_log_level,
+				uint8_t *enable_fw_wow_module_log_level_num);
 
 /**
  * ucfg_fwol_get_sap_xlna_bypass() - Assigns sap_xlna_bypass value
@@ -441,6 +446,16 @@ QDF_STATUS ucfg_fwol_get_dhcp_max_num_clients(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * ucfg_fwol_get_tsf_sync_enable() - Get TSF sync enabled
+ * @psoc: pointer to the psoc object
+ * @tsf_sync_enable: Pointer to tsf sync enabled
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_fwol_get_tsf_sync_enable(struct wlan_objmgr_psoc *psoc,
+					 bool *tsf_sync_enable);
+
+/**
  * ucfg_fwol_get_tsf_ptp_options() - Get TSF Plus feature options
  * @psoc: pointer to the psoc object
  * @tsf_ptp_options: Pointer to return tsf ptp options
@@ -449,15 +464,6 @@ QDF_STATUS ucfg_fwol_get_dhcp_max_num_clients(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS ucfg_fwol_get_tsf_ptp_options(struct wlan_objmgr_psoc *psoc,
 					 uint32_t *tsf_ptp_options);
-/**
- * ucfg_fwol_get_lprx_enable() - Get LPRx feature enable status
- * @psoc: pointer to the psoc object
- * @lprx_enable: Pointer to return LPRX feature enable status
- *
- * Return: QDF Status
- */
-QDF_STATUS ucfg_fwol_get_lprx_enable(struct wlan_objmgr_psoc *psoc,
-				     bool *lprx_enable);
 
 /**
  * ucfg_fwol_get_sae_enable() - Get SAE feature enable status
@@ -651,6 +657,38 @@ QDF_STATUS ucfg_fwol_send_dscp_up_map_to_fw(
 }
 #endif
 
+#ifdef WLAN_FEATURE_MDNS_OFFLOAD
+/**
+ * ucfg_fwol_set_mdns_config() - set mdns config
+ * @psoc: pointer to psoc object
+ * @mdns_info: mdns config info pointer
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS ucfg_fwol_set_mdns_config(struct wlan_objmgr_psoc *psoc,
+				     struct mdns_config_info *mdns_info);
+#endif /* WLAN_FEATURE_MDNS_OFFLOAD */
+
+/**
+ * ucfg_fwol_update_fw_cap_info - API to update fwol capability info
+ * @psoc: pointer to psoc object
+ * @caps: pointer to wlan_fwol_capability_info struct
+ *
+ * Used to update fwol capability info.
+ *
+ * Return: void
+ */
+void ucfg_fwol_update_fw_cap_info(struct wlan_objmgr_psoc *psoc,
+				  struct wlan_fwol_capability_info *caps);
+
+#ifdef THERMAL_STATS_SUPPORT
+QDF_STATUS ucfg_fwol_send_get_thermal_stats_cmd(struct wlan_objmgr_psoc *psoc,
+				      enum thermal_stats_request_type req_type,
+				      void (*callback)(void *context,
+				      struct thermal_throttle_info *response),
+				      void *context);
+#endif /* THERMAL_STATS_SUPPORT */
+
 /**
  * ucfg_fwol_configure_global_params - API to configure global params
  * @psoc: pointer to psoc object
@@ -738,14 +776,6 @@ ucfg_fwol_get_coex_config_params(struct wlan_objmgr_psoc *psoc,
 static inline QDF_STATUS
 ucfg_fwol_get_thermal_temp(struct wlan_objmgr_psoc *psoc,
 			   struct wlan_fwol_thermal_temp *thermal_temp)
-{
-	return QDF_STATUS_E_FAILURE;
-}
-
-static inline QDF_STATUS
-ucfg_fwol_get_neighbor_report_cfg(struct wlan_objmgr_psoc *psoc,
-				  struct wlan_fwol_neighbor_report_cfg
-				  *fwol_neighbor_report_cfg)
 {
 	return QDF_STATUS_E_FAILURE;
 }
@@ -886,13 +916,6 @@ ucfg_fwol_get_tsf_gpio_pin(struct wlan_objmgr_psoc *psoc,
 static inline QDF_STATUS
 ucfg_fwol_get_tsf_ptp_options(struct wlan_objmgr_psoc *psoc,
 			      uint32_t *tsf_ptp_options)
-{
-	return QDF_STATUS_E_FAILURE;
-}
-
-static inline QDF_STATUS
-ucfg_fwol_get_lprx_enable(struct wlan_objmgr_psoc *psoc,
-			  bool *lprx_enable)
 {
 	return QDF_STATUS_E_FAILURE;
 }

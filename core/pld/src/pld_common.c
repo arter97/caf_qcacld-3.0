@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,7 +29,11 @@
 #include <net/cnss.h>
 #endif
 #ifdef CONFIG_PLD_PCIE_CNSS
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss2.h"
+#else
 #include <net/cnss2.h>
+#endif
 #endif
 #ifdef CONFIG_PLD_SNOC_ICNSS
 #ifdef CONFIG_PLD_SNOC_ICNSS2
@@ -622,6 +626,16 @@ int pld_prevent_l1(struct device *dev)
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_prevent_l1(dev);
 		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_prevent_l1(dev);
+		break;
 	default:
 		ret = -EINVAL;
 		pr_err("Invalid device type\n");
@@ -645,10 +659,52 @@ void pld_allow_l1(struct device *dev)
 	case PLD_BUS_TYPE_PCIE:
 		pld_pcie_allow_l1(dev);
 		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		pld_ipci_allow_l1(dev);
+		break;
 	default:
 		pr_err("Invalid device type\n");
 		break;
 	}
+}
+
+/**
+ * pld_get_mhi_state() - Get MHI state Info
+ * @dev: device
+ *
+ * MHI state can be determined by reading this address.
+ *
+ * Return: MHI state
+ */
+int pld_get_mhi_state(struct device *dev)
+{
+	int ret = 0;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		ret = PLD_MHI_STATE_L0;
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_mhi_state(dev);
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+	return ret;
 }
 
 int pld_set_pcie_gen_speed(struct device *dev, u8 pcie_gen_speed)
@@ -682,6 +738,34 @@ void pld_is_pci_link_down(struct device *dev)
 		break;
 	case PLD_BUS_TYPE_PCIE:
 		pld_pcie_link_down(dev);
+		break;
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+}
+
+/**
+ * pld_get_bus_reg_dump() - Get bus reg dump
+ * @dev: device
+ * @buffer: buffer for hang data
+ * @len: len of hang data
+ *
+ * Get pci reg dump for hang data.
+ *
+ * Return: void
+ */
+void pld_get_bus_reg_dump(struct device *dev, uint8_t *buf, uint32_t len)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+		break;
+	case PLD_BUS_TYPE_PCIE:
+		pld_pcie_get_reg_dump(dev, buf, len);
 		break;
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_SNOC:
@@ -1237,11 +1321,13 @@ int pld_exit_power_save(struct device *dev)
 	switch (type) {
 	case PLD_BUS_TYPE_PCIE:
 	case PLD_BUS_TYPE_PCIE_FW_SIM:
-	case PLD_BUS_TYPE_IPCI_FW_SIM:
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_SNOC:
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
+		break;
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+		ret = pld_pcie_fw_sim_exit_power_save(dev);
 		break;
 	case PLD_BUS_TYPE_IPCI:
 		ret = pld_ipci_exit_power_save(dev);
@@ -1281,6 +1367,41 @@ int pld_is_device_awake(struct device *dev)
 		break;
 	case PLD_BUS_TYPE_IPCI:
 		ret = pld_ipci_is_device_awake(dev);
+		break;
+	default:
+		pr_err("Invalid device type %d\n", type);
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+/**
+ * pld_is_pci_ep_awake() - Check if PCI EP is L0 state
+ * @dev: device
+ *
+ * Return: True for PCI EP awake
+ *         False for PCI EP not awake
+ *         Negative failure code for errors
+ */
+int pld_is_pci_ep_awake(struct device *dev)
+{
+	int ret = true;
+	enum pld_bus_type type = pld_get_bus_type(dev);
+
+	switch (type) {
+	case PLD_BUS_TYPE_PCIE:
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+		ret = -ENOTSUPP;
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_is_pci_ep_awake(dev);
 		break;
 	default:
 		pr_err("Invalid device type %d\n", type);
@@ -1472,6 +1593,7 @@ void pld_disable_irq(struct device *dev, unsigned int ce_id)
 int pld_get_soc_info(struct device *dev, struct pld_soc_info *info)
 {
 	int ret = 0;
+	memset(info, 0, sizeof(*info));
 
 	switch (pld_get_bus_type(dev)) {
 	case PLD_BUS_TYPE_SNOC:
@@ -1875,7 +1997,7 @@ void *pld_smmu_get_domain(struct device *dev)
 	case PLD_BUS_TYPE_SNOC_FW_SIM:
 		break;
 	case PLD_BUS_TYPE_IPCI:
-		pld_ipci_smmu_get_domain(dev);
+		ptr = pld_ipci_smmu_get_domain(dev);
 		break;
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
@@ -1984,9 +2106,12 @@ int pld_smmu_unmap(struct device *dev,
 	case PLD_BUS_TYPE_PCIE:
 		ret = pld_pcie_smmu_unmap(dev, iova_addr, size);
 		break;
-	case PLD_BUS_TYPE_PCIE_FW_SIM:
-	case PLD_BUS_TYPE_SNOC_FW_SIM:
 	case PLD_BUS_TYPE_IPCI:
+		ret = pld_ipci_smmu_unmap(dev, iova_addr, size);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
 		pr_err("Not supported on type %d\n", type);
 		break;
 	default:
@@ -2202,6 +2327,35 @@ void pld_srng_disable_irq(struct device *dev, int irq)
 		break;
 	case PLD_BUS_TYPE_IPCI:
 		disable_irq_nosync(irq);
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		break;
+	}
+}
+
+/**
+ * pld_srng_disable_irq_sync() - Synchronouus disable IRQ for SRNG
+ * @dev: device
+ * @irq: IRQ number
+ *
+ * Return: void
+ */
+void pld_srng_disable_irq_sync(struct device *dev, int irq)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+		pld_pcie_fw_sim_disable_irq(dev, irq);
+		break;
+	case PLD_BUS_TYPE_PCIE:
+	case PLD_BUS_TYPE_IPCI:
+		disable_irq(irq);
+		break;
+	case PLD_BUS_TYPE_SDIO:
 		break;
 	default:
 		pr_err("Invalid device type\n");
@@ -2579,13 +2733,17 @@ int pld_is_fw_down(struct device *dev)
 }
 
 /**
- * pld_force_assert_target() - Send a force assert to FW.
- * This can use various sideband requests available at platform to
- * initiate a FW assert.
- * @dev: device
+ * pld_force_assert_target() - Send a force assert request to FW.
+ * @dev: device pointer
  *
- *  Return: 0 if force assert of target was triggered successfully
- *          Non zero failure code for errors
+ * This can use various sideband requests available at platform driver to
+ * initiate a FW assert.
+ *
+ * Context: Any context
+ * Return:
+ * 0 - force assert of FW is triggered successfully.
+ * -EOPNOTSUPP - force assert is not supported.
+ * Other non-zero codes - other failures or errors
  */
 int pld_force_assert_target(struct device *dev)
 {
@@ -2611,14 +2769,20 @@ int pld_force_assert_target(struct device *dev)
 }
 
 /**
- * pld_collect_rddm() - Collect ramdump before FW assert.
- * This can used to collect ramdump before FW assert.
- * @dev: device
+ * pld_force_collect_target_dump() - Collect FW dump after asserting FW.
+ * @dev: device pointer
  *
- *  Return: 0 if ramdump is collected successfully
- *          Non zero failure code for errors
+ * This API will send force assert request to FW and wait till FW dump has
+ * been collected.
+ *
+ * Context: Process context only since this is a blocking call.
+ * Return:
+ * 0 - FW dump is collected successfully.
+ * -EOPNOTSUPP - forcing assert and collecting FW dump is not supported.
+ * -ETIMEDOUT - FW dump collection is timed out for any reason.
+ * Other non-zero codes - other failures or errors
  */
-int pld_collect_rddm(struct device *dev)
+int pld_force_collect_target_dump(struct device *dev)
 {
 	enum pld_bus_type type = pld_get_bus_type(dev);
 
@@ -2632,7 +2796,7 @@ int pld_collect_rddm(struct device *dev)
 	case PLD_BUS_TYPE_SDIO:
 	case PLD_BUS_TYPE_USB:
 	case PLD_BUS_TYPE_IPCI:
-		return 0;
+		return -EOPNOTSUPP;
 	default:
 		pr_err("Invalid device type %d\n", type);
 		return -EINVAL;

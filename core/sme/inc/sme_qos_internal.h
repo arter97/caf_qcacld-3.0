@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -58,6 +58,7 @@ typedef enum {
 	SME_QOS_CSR_HANDOFF_COMPLETE,
 	SME_QOS_CSR_PREAUTH_SUCCESS_IND,
 	SME_QOS_CSR_SET_KEY_SUCCESS_IND,
+	SME_QOS_CSR_DISCONNECT_ROAM_COMPLETE,
 } sme_qos_csr_event_indType;
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
@@ -84,7 +85,7 @@ typedef enum {
   ---------------------------------------------------------------------------*/
 typedef struct {
 	struct bss_description *bss_desc;
-	struct csr_roam_profile *pProfile;
+	uint8_t uapsd_mask;
 } sme_QosAssocInfo;
 
 /*--------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -126,6 +126,9 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 
 	header = WMA_GET_RX_MAC_HEADER(rx_Packet_info);
 
+	mac_ctx->lim.bss_rssi = (int8_t)
+				WMA_GET_RX_RSSI_NORMALIZED(rx_Packet_info);
+
 	/* Validate IE information before processing Probe Response Frame */
 	if (lim_validate_ie_information_in_probe_rsp_frame(mac_ctx,
 				rx_Packet_info) !=
@@ -139,8 +142,7 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 	pe_debug("Probe Resp(len %d): " QDF_MAC_ADDR_FMT " RSSI %d",
 		 WMA_GET_RX_MPDU_LEN(rx_Packet_info),
 		 QDF_MAC_ADDR_REF(header->bssId),
-		 (uint)abs((int8_t)
-		 WMA_GET_RX_RSSI_NORMALIZED(rx_Packet_info)));
+		 (uint)abs(mac_ctx->lim.bss_rssi));
 	/* Get pointer to Probe Response frame body */
 	body = WMA_GET_RX_MPDU_DATA(rx_Packet_info);
 		/* Enforce Mandatory IEs */
@@ -164,18 +166,18 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 			session_entry->bcnLen = 0;
 		}
 		session_entry->bcnLen =
-			WMA_GET_RX_PAYLOAD_LEN(rx_Packet_info);
+			WMA_GET_RX_MPDU_LEN(rx_Packet_info);
 			session_entry->beacon =
 			qdf_mem_malloc(session_entry->bcnLen);
 		if (!session_entry->beacon) {
 			pe_err("No Memory to store beacon");
 		} else {
 			/*
-			 * Store the Beacon/ProbeRsp.
+			 * Store the whole ProbeRsp frame.
 			 * This is sent to csr/hdd in join cnf response.
 			 */
 			qdf_mem_copy(session_entry->beacon,
-				     WMA_GET_RX_MPDU_DATA
+				     WMA_GET_RX_MAC_HEADER
 					     (rx_Packet_info),
 				     session_entry->bcnLen);
 		}
@@ -242,6 +244,9 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 				session_entry) != QDF_STATUS_SUCCESS) {
 				pe_err("EDCA param process error");
 			} else if (sta_ds) {
+				qdf_mem_copy(&sta_ds->qos.peer_edca_params,
+					     &probe_rsp->edcaParams,
+					     sizeof(probe_rsp->edcaParams));
 				/*
 				 * If needed, downgrade the
 				 * EDCA parameters
@@ -253,6 +258,7 @@ lim_process_probe_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_Packet_info
 				lim_send_edca_params(mac_ctx,
 					session_entry->gLimEdcaParamsActive,
 					session_entry->vdev_id, false);
+				sch_qos_concurrency_update();
 			} else {
 				pe_err("SelfEntry missing in Hash");
 			}

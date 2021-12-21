@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -120,7 +120,6 @@ enum mlmmsgtype {
 #define MGMT_TX_USE_INCORRECT_KEY   BIT(0)
 
 #define LIM_DOS_PROTECTION_TIME 1000 //1000ms
-#define LIM_MIN_RSSI 0 /* 0dbm */
 /* enums used by LIM are as follows */
 
 enum eLimDisassocTrigger {
@@ -133,7 +132,7 @@ enum eLimDisassocTrigger {
 	eLIM_LINK_MONITORING_DEAUTH,
 	eLIM_JOIN_FAILURE,
 	eLIM_REASSOC_REJECT,
-	eLIM_DUPLICATE_ENTRY
+	eLIM_DUPLICATE_ENTRY,
 };
 
 /**
@@ -223,8 +222,6 @@ typedef struct sLimMlmAssocInd {
 	bool WmmStaInfoPresent;
 
 	/* Required for indicating the frames to upper layer */
-	uint32_t beaconLength;
-	uint8_t *beaconPtr;
 	uint32_t assocReqLength;
 	uint8_t *assocReqPtr;
 	struct oem_channel_info chan_info;
@@ -245,6 +242,9 @@ typedef struct sLimMlmAssocInd {
 	tDot11fIEVHTCaps vht_caps;
 	bool he_caps_present;
 	bool is_sae_authenticated;
+#ifdef WLAN_FEATURE_11BE_MLO
+	tSirMacAddr peer_mld_addr;
+#endif
 } tLimMlmAssocInd, *tpLimMlmAssocInd;
 
 typedef struct sLimMlmReassocReq {
@@ -407,6 +407,64 @@ void lim_process_auth_frame(struct mac_context *, uint8_t *, struct pe_session *
  */
 QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 					     uint8_t *bd, void *body);
+
+/**
+ * lim_check_assoc_req() - check session and peer info before handling it
+ * @mac_ctx: pointer to Global MAC structure
+ * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
+ * @sa: Mac address of requesting peer
+ * @session: pointer to pe session entry
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
+			       uint8_t sub_type, tSirMacAddr sa,
+			       struct pe_session *session);
+
+/**
+ * lim_proc_assoc_req_frm_cmn() - process assoc req frame
+ * @mac_ctx: pointer to Global MAC structure
+ * @frm_body: frame body
+ * @frame_len: frame len
+ * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
+ * @session: pointer to pe session entry
+ * @sa: Mac address of requesting peer
+ * @assoc_req: assoc req
+ * @peer_aid: association id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
+				      uint8_t *frm_body, uint32_t frame_len,
+				      uint8_t sub_type,
+				      struct pe_session *session,
+				      tSirMacAddr sa,
+				      tpSirAssocReq assoc_req,
+				      uint16_t peer_aid);
+
+/**
+ * lim_mlo_partner_assoc_req_parse() - checks for error in assoc req frame
+ *                                     parsing for mlo partner link
+ * @mac_ctx: pointer to Global MAC structure
+ * @sa: Mac address of requesting peer
+ * @session: pointer to pe session entry
+ * @assoc_req: pointer to ASSOC/REASSOC Request frame
+ * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
+ * @frm_body: frame body
+ * @frame_len: frame len
+ *
+ * Checks for error in frame parsing
+ *
+ * Return: QDF_STATUS
+ */
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS lim_mlo_partner_assoc_req_parse(struct mac_context *mac_ctx,
+					   tSirMacAddr sa,
+					   struct pe_session *session,
+					   tpSirAssocReq assoc_req,
+					   uint8_t sub_type, uint8_t *frm_body,
+					   uint32_t frame_len);
+#endif
 
 void lim_process_assoc_req_frame(struct mac_context *, uint8_t *, uint8_t, struct pe_session *);
 
@@ -969,7 +1027,6 @@ QDF_STATUS lim_sta_reassoc_error_handler(struct reassoc_params *param)
 }
 #endif
 
-#ifdef WLAN_FEATURE_11W
 /* 11w send SA query request action frame */
 QDF_STATUS lim_send_sa_query_request_frame(struct mac_context *mac, uint8_t *transId,
 					      tSirMacAddr peer,
@@ -978,8 +1035,6 @@ QDF_STATUS lim_send_sa_query_request_frame(struct mac_context *mac, uint8_t *tra
 QDF_STATUS lim_send_sa_query_response_frame(struct mac_context *mac,
 					       uint8_t *transId, tSirMacAddr peer,
 					       struct pe_session *pe_session);
-#endif
-
 /* Inline functions */
 
 /**
@@ -1095,28 +1150,7 @@ lim_post_mlm_message(struct mac_context *mac, uint32_t msgType,
 static inline uint16_t
 lim_get_ielen_from_bss_description(struct bss_description *pBssDescr)
 {
-	uint16_t ielen;
-
-	if (!pBssDescr)
-		return 0;
-
-	/*
-	 * Length of BSS desription is without length of
-	 * length itself and length of pointer
-	 * that holds ieFields
-	 *
-	 * <------------sizeof(struct bss_description)-------------------->
-	 * +--------+---------------------------------+---------------+
-	 * | length | other fields                    | pointer to IEs|
-	 * +--------+---------------------------------+---------------+
-	 *                                            ^
-	 *                                            ieFields
-	 */
-
-	ielen = (uint16_t)(pBssDescr->length + sizeof(pBssDescr->length) -
-			   GET_FIELD_OFFSET(struct bss_description, ieFields));
-
-	return ielen;
+	return wlan_get_ielen_from_bss_description(pBssDescr);
 } /*** end lim_get_ielen_from_bss_description() ***/
 
 /**
@@ -1171,6 +1205,15 @@ QDF_STATUS lim_deauth_tx_complete_cnf(void *context,
 				      uint32_t txCompleteSuccess,
 				      void *params);
 
+/**
+ * lim_cm_send_disconnect_rsp() - To send disconnect rsp to CM
+ * @ctx: pointer to mac structure
+ * @vdev_id: vdev id
+ *
+ * return: None
+ */
+void lim_cm_send_disconnect_rsp(struct mac_context *mac_ctx, uint8_t vdev_id);
+
 void lim_send_sme_disassoc_deauth_ntf(struct mac_context *mac_ctx,
 				QDF_STATUS status, uint32_t *ctx);
 
@@ -1194,17 +1237,6 @@ QDF_STATUS lim_process_sme_del_all_tdls_peers(struct mac_context *p_mac,
  * Return: None
  */
 void lim_send_bcn_rsp(struct mac_context *mac_ctx, tpSendbeaconParams rsp);
-
-/**
- * lim_add_roam_blacklist_ap() - handle the blacklist bssid list received from
- * firmware
- * @mac_ctx: Pointer to Global MAC structure
- * @list: roam blacklist ap list
- *
- * Return: None
- */
-void lim_add_roam_blacklist_ap(struct mac_context *mac_ctx,
-			       struct roam_blacklist_event *src_lst);
 
 /**
  * lim_process_rx_channel_status_event() - processes
@@ -1232,6 +1264,7 @@ typedef enum sHalBitVal         /* For Bit operations */
  * @addba_extn_present: ADDBA extension present flag
  * @amsdu_support: amsdu in ampdu support
  * @is_wep: protected bit in fc
+ * @calc_buff_size: Calculated buf size from peer and self capabilities
  *
  * This function is called when ADDBA request is successful. ADDBA response is
  * setup by calling addba_response_setup API and frame is then sent out OTA.
@@ -1242,7 +1275,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 					 tSirMacAddr peer_mac, uint16_t tid,
 					 struct pe_session *session,
 					 uint8_t addba_extn_present,
-					 uint8_t amsdu_support, uint8_t is_wep);
+					 uint8_t amsdu_support, uint8_t is_wep,
+					 uint16_t calc_buff_size);
 
 /**
  * lim_send_delba_action_frame() - Send delba to peer
@@ -1296,6 +1330,15 @@ void lim_process_auth_failure_timeout(struct mac_context *mac_ctx);
  */
 void lim_process_assoc_failure_timeout(struct mac_context *mac_ctx,
 				       uint32_t msg_type);
+
+/**
+ * lim_process_sae_auth_timeout() - This function is called to process sae
+ * auth timeout
+ * @mac_ctx: Pointer to Global MAC structure
+ *
+ * @Return: None
+ */
+void lim_process_sae_auth_timeout(struct mac_context *mac_ctx);
 
 /**
  * lim_send_frame() - API to send frame
@@ -1380,6 +1423,24 @@ void lim_process_mlm_start_req(struct mac_context *mac_ctx,
 void lim_process_mlm_join_req(struct mac_context *mac_ctx,
 			      tLimMlmJoinReq *mlm_join_req);
 
+/**
+ * lim_post_join_set_link_state_callback()- registered callback to perform post
+ * peer creation operations
+ * @mac: pointer to global mac structure
+ * @callback_arg: registered callback argument
+ * @status: peer creation status
+ *
+ * This is registered callback function during association to perform
+ * post peer creation operation based on the peer creation status
+ *
+ * Return: none
+ */
+void
+lim_post_join_set_link_state_callback(struct mac_context *mac, uint32_t vdev_id,
+				      QDF_STATUS status);
+
+void lim_send_peer_create_resp(struct mac_context *mac, uint8_t vdev_id,
+			       QDF_STATUS status, uint8_t *peer_mac);
 /*
  * lim_process_mlm_deauth_req() - This function is called to process
  * MLM_DEAUTH_REQ message from SME
@@ -1433,25 +1494,27 @@ void lim_process_assoc_cleanup(struct mac_context *mac_ctx,
  * @session: pe session entry
  * @sub_type: Indicates whether it is Association Request(=0) or Reassociation
  *            Request(=1) frame
- * @hdr: A pointer to the MAC header
+ * @sa: Mac address of requesting peer
  * @assoc_req: pointer to ASSOC/REASSOC Request frame
  * @akm_type: AKM type
  * @pmf_connection: flag indicating pmf connection
  * @assoc_req_copied: boolean to indicate if assoc req was copied to tmp above
  * @dup_entry: flag indicating if duplicate entry found
  * @force_1x1: flag to indicate if the STA nss needs to be downgraded to 1x1
+ * @partner_peer_idx: peer_idx which is already allocated by partner link
  *
  * Return: void
  */
 bool lim_send_assoc_ind_to_sme(struct mac_context *mac_ctx,
 			       struct pe_session *session,
 			       uint8_t sub_type,
-			       tpSirMacMgmtHdr hdr,
+			       tSirMacAddr sa,
 			       tpSirAssocReq assoc_req,
 			       enum ani_akm_type akm_type,
 			       bool pmf_connection,
 			       bool *assoc_req_copied,
-			       bool dup_entry, bool force_1x1);
+			       bool dup_entry, bool force_1x1,
+			       uint16_t partner_peer_idx);
 
 /**
  * lim_process_sta_add_bss_rsp_pre_assoc - Processes handoff request

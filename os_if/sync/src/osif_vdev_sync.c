@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -25,19 +25,8 @@
 #include "qdf_status.h"
 #include "qdf_types.h"
 
-/**
- * struct osif_vdev_sync - a vdev synchronization context
- * @net_dev: the net_device used as a lookup key
- * @dsc_vdev: the dsc_vdev used for synchronization
- * @in_use: indicates if the context is being used
- */
-struct osif_vdev_sync {
-	struct net_device *net_dev;
-	struct dsc_vdev *dsc_vdev;
-	bool in_use;
-};
-
-static struct osif_vdev_sync __osif_vdev_sync_arr[WLAN_MAX_VDEVS];
+static struct osif_vdev_sync __osif_vdev_sync_arr[WLAN_MAX_VDEVS +
+						  WLAN_MAX_ML_VDEVS];
 static qdf_spinlock_t __osif_vdev_sync_lock;
 
 #define osif_vdev_sync_lock_create() qdf_spinlock_create(&__osif_vdev_sync_lock)
@@ -45,14 +34,10 @@ static qdf_spinlock_t __osif_vdev_sync_lock;
 	qdf_spinlock_destroy(&__osif_vdev_sync_lock)
 #define osif_vdev_sync_lock() qdf_spin_lock_bh(&__osif_vdev_sync_lock)
 #define osif_vdev_sync_unlock() qdf_spin_unlock_bh(&__osif_vdev_sync_lock)
-#define osif_vdev_sync_lock_assert() \
-	QDF_BUG(qdf_spin_is_locked(&__osif_vdev_sync_lock))
 
 static struct osif_vdev_sync *osif_vdev_sync_lookup(struct net_device *net_dev)
 {
 	int i;
-
-	osif_vdev_sync_lock_assert();
 
 	for (i = 0; i < QDF_ARRAY_SIZE(__osif_vdev_sync_arr); i++) {
 		struct osif_vdev_sync *vdev_sync = __osif_vdev_sync_arr + i;
@@ -67,11 +52,14 @@ static struct osif_vdev_sync *osif_vdev_sync_lookup(struct net_device *net_dev)
 	return NULL;
 }
 
+struct osif_vdev_sync *osif_get_vdev_sync_arr(void)
+{
+	return __osif_vdev_sync_arr;
+}
+
 static struct osif_vdev_sync *osif_vdev_sync_get(void)
 {
 	int i;
-
-	osif_vdev_sync_lock_assert();
 
 	for (i = 0; i < QDF_ARRAY_SIZE(__osif_vdev_sync_arr); i++) {
 		struct osif_vdev_sync *vdev_sync = __osif_vdev_sync_arr + i;
@@ -87,8 +75,6 @@ static struct osif_vdev_sync *osif_vdev_sync_get(void)
 
 static void osif_vdev_sync_put(struct osif_vdev_sync *vdev_sync)
 {
-	osif_vdev_sync_lock_assert();
-
 	qdf_mem_zero(vdev_sync, sizeof(*vdev_sync));
 }
 
@@ -208,19 +194,17 @@ __osif_vdev_sync_start_callback(struct net_device *net_dev,
 	QDF_STATUS status;
 	struct osif_vdev_sync *vdev_sync;
 
-	osif_vdev_sync_lock_assert();
-
 	*out_vdev_sync = NULL;
 
 	vdev_sync = osif_vdev_sync_lookup(net_dev);
 	if (!vdev_sync)
 		return -EAGAIN;
 
+	*out_vdev_sync = vdev_sync;
+
 	status = vdev_start_cb(vdev_sync->dsc_vdev, desc);
 	if (QDF_IS_STATUS_ERROR(status))
 		return qdf_status_to_os_return(status);
-
-	*out_vdev_sync = vdev_sync;
 
 	return 0;
 }
@@ -331,5 +315,15 @@ void osif_vdev_sync_init(void)
 void osif_vdev_sync_deinit(void)
 {
 	osif_vdev_sync_lock_destroy();
+}
+
+uint8_t osif_vdev_get_cached_cmd(struct osif_vdev_sync *vdev_sync)
+{
+	return dsc_vdev_get_cached_cmd(vdev_sync->dsc_vdev);
+}
+
+void osif_vdev_cache_command(struct osif_vdev_sync *vdev_sync, uint8_t cmd_id)
+{
+	dsc_vdev_cache_command(vdev_sync->dsc_vdev, cmd_id);
 }
 

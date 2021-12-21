@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -57,21 +57,19 @@ static uint8_t
 lim_is_rsn_ie_valid_in_sme_req_message(struct mac_context *mac_ctx,
 				       tpSirRSNie rsn_ie)
 {
-	uint8_t start = 0, privacy;
+	uint8_t start = 0;
 	uint32_t val;
 	int len;
 
-	privacy = mac_ctx->mlme_cfg->wep_params.is_privacy_enabled;
-
 	val = mac_ctx->mlme_cfg->feature_flags.enable_rsn;
-	if (rsn_ie->length && (!privacy || !val)) {
+	if (rsn_ie->length && !val) {
 		/* Privacy & RSN not enabled in CFG.
 		 * In order to allow mixed mode for Guest access
 		 * allow BSS creation/join with no Privacy capability
 		 * yet advertising WPA IE
 		 */
-		pe_debug("RSN ie len: %d PRIVACY: %d RSN: %d",
-			       rsn_ie->length, privacy, val);
+		pe_debug("RSN ie len: %d RSN: %d",
+			       rsn_ie->length, val);
 	}
 
 	if (!rsn_ie->length) {
@@ -153,53 +151,6 @@ lim_is_rsn_ie_valid_in_sme_req_message(struct mac_context *mac_ctx,
 	} /* end while loop */
 	return true;
 } /*** end lim_is_rs_nie_valid_in_sme_req_message() ***/
-
-/**
- * lim_is_addie_valid_in_sme_req_message()
- *
- ***FUNCTION:
- * This function is called to verify if the Add IE
- * received in various SME_REQ messages is valid or not
- *
- ***LOGIC:
- * Add IE validity checks are performed on only length
- *
- ***ASSUMPTIONS:
- *
- ***NOTE:
- *
- * @param  mac   Pointer to Global MAC structure
- * @param  pWSCie Pointer to received WSC IE
- * @return true when WSC IE is valid, false otherwise
- */
-
-static uint8_t
-lim_is_addie_valid_in_sme_req_message(struct mac_context *mac, tpSirAddie pAddie)
-{
-	int left = pAddie->length;
-	uint8_t *ptr = pAddie->addIEdata;
-	uint8_t elem_id, elem_len;
-
-	if (left == 0)
-		return true;
-
-	while (left >= 2) {
-		elem_id = ptr[0];
-		elem_len = ptr[1];
-		left -= 2;
-		if (elem_len > left) {
-			pe_err("Invalid Add IEs eid: %d elem_len: %d left: %d",
-				elem_id, elem_len, left);
-			return false;
-		}
-
-		left -= elem_len;
-		ptr += (elem_len + 2);
-	}
-	/* there shouldn't be any left byte */
-
-	return true;
-} /*** end lim_is_addie_valid_in_sme_req_message() ***/
 
 /**
  * lim_set_rs_nie_wp_aiefrom_sme_start_bss_req_message() - to set rsnie/wpaie
@@ -323,37 +274,6 @@ lim_set_rs_nie_wp_aiefrom_sme_start_bss_req_message(struct mac_context *mac_ctx,
 	return true;
 }
 
-/**
- * lim_is_bss_descr_valid_in_sme_req_message()
- *
- ***FUNCTION:
- * This function is called to verify if the BSS Descr
- * received in various SME_REQ messages is valid or not
- *
- ***LOGIC:
- * BSS Descritipion validity checks are performed in this function
- *
- ***ASSUMPTIONS:
- *
- ***NOTE:
- *
- * @param  mac      Pointer to Global MAC structure
- * @param  pBssDescr Pointer to received Bss Descritipion
- * @return true when BSS description is valid, false otherwise
- */
-
-static uint8_t
-lim_is_bss_descr_valid_in_sme_req_message(struct mac_context *mac,
-					  struct bss_description *pBssDescr)
-{
-	uint8_t valid = true;
-
-	if (QDF_IS_ADDR_BROADCAST(pBssDescr->bssId) || !pBssDescr->chan_freq)
-		valid = false;
-
-	return valid;
-} /*** end lim_is_bss_descr_valid_in_sme_req_message() ***/
-
 bool lim_is_sme_start_bss_req_valid(struct mac_context *mac_ctx,
 				    struct start_bss_req *start_bss_req)
 {
@@ -436,62 +356,6 @@ bool lim_is_sme_start_bss_req_valid(struct mac_context *mac_ctx,
 	}
 	return true;
 }
-
-uint8_t lim_is_sme_join_req_valid(struct mac_context *mac,
-				  struct join_req *pJoinReq)
-{
-	uint8_t valid = true;
-
-	/*
-	 * If force_rsne_override is enabled that mean User has provided the
-	 * test RSNIE which need to be send as it is in assoc req and thus RSNIE
-	 * validity is not required.
-	 */
-	if (!pJoinReq->force_rsne_override &&
-	    !lim_is_rsn_ie_valid_in_sme_req_message(mac, &pJoinReq->rsnIE)) {
-		pe_err("received SME_JOIN_REQ with invalid RSNIE");
-		valid = false;
-		goto end;
-	}
-
-	if (!lim_is_addie_valid_in_sme_req_message(mac, &pJoinReq->addIEScan)) {
-		pe_err("received SME_JOIN_REQ with invalid additional IE for scan");
-		valid = false;
-		goto end;
-	}
-
-	if (!lim_is_addie_valid_in_sme_req_message(mac, &pJoinReq->addIEAssoc)) {
-		pe_err("received SME_JOIN_REQ with invalid additional IE for assoc");
-		valid = false;
-		goto end;
-	}
-
-	if (!lim_is_bss_descr_valid_in_sme_req_message(mac, &pJoinReq->bssDescription)) {
-		/* / Received eWNI_SME_JOIN_REQ with invalid BSS Info */
-		/* Log the event */
-		pe_err("received SME_JOIN_REQ with invalid bssInfo");
-
-		valid = false;
-		goto end;
-	}
-
-	/*
-	   Reject Join Req if the Self Mac Address and
-	   the Ap's Mac Address is same
-	 */
-	if (!qdf_mem_cmp((uint8_t *)pJoinReq->self_mac_addr,
-			 (uint8_t *)pJoinReq->bssDescription.bssId,
-			 (uint8_t) (sizeof(tSirMacAddr)))) {
-		/* Log the event */
-		pe_err("received SME_JOIN_REQ with Self Mac and BSSID Same");
-
-		valid = false;
-		goto end;
-	}
-
-end:
-	return valid;
-} /*** end lim_is_sme_join_req_valid() ***/
 
 bool lim_is_sme_disassoc_req_valid(struct mac_context *mac,
 				   struct disassoc_req *disassoc_req,

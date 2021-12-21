@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -271,7 +271,7 @@ QDF_STATUS tdls_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev,
 	tdls_vdev_obj = qdf_mem_malloc(sizeof(*tdls_vdev_obj));
 	if (!tdls_vdev_obj) {
 		status = QDF_STATUS_E_NOMEM;
-		goto err;
+		goto err_attach;
 	}
 
 	status = wlan_objmgr_vdev_component_obj_attach(vdev,
@@ -280,12 +280,16 @@ QDF_STATUS tdls_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev,
 						       QDF_STATUS_SUCCESS);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		tdls_err("Failed to attach vdev tdls component");
-		goto err;
+		goto err_attach;
 	}
 	tdls_vdev_obj->vdev = vdev;
 	status = tdls_vdev_init(tdls_vdev_obj);
 	if (QDF_IS_STATUS_ERROR(status))
-		goto err;
+		goto err_vdev_init;
+
+	status = qdf_event_create(&tdls_vdev_obj->tdls_teardown_comp);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto err_event_create;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 
@@ -295,19 +299,28 @@ QDF_STATUS tdls_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev,
 
 	if (QDF_STATUS_SUCCESS != status) {
 		tdls_err("scan event register failed ");
-		tdls_vdev_deinit(tdls_vdev_obj);
-		goto err;
+		goto err_register;
 	}
 
 	tdls_debug("tdls object attach to vdev successfully");
 	return status;
-err:
+
+err_register:
+	qdf_event_destroy(&tdls_vdev_obj->tdls_teardown_comp);
+err_event_create:
+	tdls_vdev_deinit(tdls_vdev_obj);
+err_vdev_init:
+	wlan_objmgr_vdev_component_obj_detach(vdev,
+					      WLAN_UMAC_COMP_TDLS,
+					      (void *)tdls_vdev_obj);
+err_attach:
 	if (tdls_soc_obj->tdls_osif_deinit_cb)
 		tdls_soc_obj->tdls_osif_deinit_cb(vdev);
 	if (tdls_vdev_obj) {
 		qdf_mem_free(tdls_vdev_obj);
 		tdls_vdev_obj = NULL;
 	}
+
 	return status;
 }
 
@@ -315,7 +328,7 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 					      void *arg)
 {
 	QDF_STATUS status;
-	void *tdls_vdev_obj;
+	struct tdls_vdev_priv_obj *tdls_vdev_obj;
 	struct tdls_soc_priv_obj *tdls_soc_obj;
 	uint32_t tdls_feature_flags;
 
@@ -343,16 +356,18 @@ QDF_STATUS tdls_vdev_obj_destroy_notification(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	qdf_event_destroy(&tdls_vdev_obj->tdls_teardown_comp);
+	tdls_vdev_deinit(tdls_vdev_obj);
+
 	status = wlan_objmgr_vdev_component_obj_detach(vdev,
 						       WLAN_UMAC_COMP_TDLS,
 						       tdls_vdev_obj);
 	if (QDF_IS_STATUS_ERROR(status))
 		tdls_err("Failed to detach vdev tdls component");
 
-	tdls_vdev_deinit(tdls_vdev_obj);
-	qdf_mem_free(tdls_vdev_obj);
 	if (tdls_soc_obj->tdls_osif_deinit_cb)
 		tdls_soc_obj->tdls_osif_deinit_cb(vdev);
+	qdf_mem_free(tdls_vdev_obj);
 
 	return status;
 }
@@ -539,6 +554,7 @@ static QDF_STATUS tdls_reset_all_peers(
 
 	if (!delete_all_peers_ind || !delete_all_peers_ind->vdev) {
 		tdls_err("invalid param");
+		qdf_mem_free(delete_all_peers_ind);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1171,6 +1187,15 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	tdls_info_to_fw->tdls_discovery_wake_timeout =
 		tdls_soc_obj->tdls_configs.tdls_discovery_wake_timeout;
 
+	/**
+	 * set_state_cnt should always decrement in case of sta disconnection.
+	 * If it is not, then in case where STA disconnection happens due to
+	 * SSR where tdls_update_fw_tdls_state() will return failure,
+	 * tdls count has to be decremented irrepective of success or failure
+	 */
+	if (!sta_connect_event)
+		tdls_soc_obj->set_state_info.set_state_cnt--;
+
 	status = tdls_update_fw_tdls_state(tdls_soc_obj, tdls_info_to_fw);
 	if (QDF_STATUS_SUCCESS != status)
 		goto done;
@@ -1178,8 +1203,6 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
 	if (sta_connect_event) {
 		tdls_soc_obj->set_state_info.set_state_cnt++;
 		tdls_soc_obj->set_state_info.vdev_id = session_id;
-	} else {
-		tdls_soc_obj->set_state_info.set_state_cnt--;
 	}
 
 	tdls_debug("TDLS Set state cnt %d",
@@ -1228,8 +1251,14 @@ QDF_STATUS tdls_notify_sta_connect(struct tdls_sta_notify_params *notify)
 {
 	QDF_STATUS status;
 
-	if (!notify || !notify->vdev) {
+	if (!notify) {
 		tdls_err("invalid param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!notify->vdev) {
+		tdls_err("invalid param");
+		qdf_mem_free(notify);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1318,8 +1347,14 @@ QDF_STATUS tdls_notify_sta_disconnect(struct tdls_sta_notify_params *notify)
 {
 	QDF_STATUS status;
 
-	if (!notify || !notify->vdev) {
+	if (!notify) {
 		tdls_err("invalid param");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!notify->vdev) {
+		tdls_err("invalid param");
+		qdf_mem_free(notify);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1605,8 +1640,13 @@ QDF_STATUS tdls_set_operation_mode(struct tdls_set_mode_params *tdls_set_mode)
 	struct tdls_vdev_priv_obj *tdls_vdev;
 	QDF_STATUS status;
 
-	if (!tdls_set_mode || !tdls_set_mode->vdev)
+	if (!tdls_set_mode)
 		return QDF_STATUS_E_INVAL;
+
+	if (!tdls_set_mode->vdev) {
+		qdf_mem_free(tdls_set_mode);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	status = tdls_get_vdev_objects(tdls_set_mode->vdev,
 				       &tdls_vdev, &tdls_soc);

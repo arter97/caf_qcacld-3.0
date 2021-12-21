@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -221,7 +221,6 @@ static int hdd_ocb_register_sta(struct hdd_adapter *adapter)
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	struct ol_txrx_ops txrx_ops;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
-	struct cdp_pdev *pdev = cds_get_context(QDF_MODULE_ID_TXRX);
 
 	qdf_status = cdp_peer_register_ocb_peer(soc,
 				adapter->mac_addr.bytes);
@@ -383,7 +382,7 @@ static int hdd_ocb_set_config_req(struct hdd_adapter *adapter,
 	}
 	cookie = osif_request_cookie(request);
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto end;
@@ -397,7 +396,7 @@ static int hdd_ocb_set_config_req(struct hdd_adapter *adapter,
 	status = ucfg_ocb_set_channel_config(vdev, config,
 					     hdd_ocb_set_config_callback,
 					     cookie);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to set channel config.");
 		rc = qdf_status_to_os_return(status);
@@ -1033,7 +1032,7 @@ static int __wlan_hdd_cfg80211_ocb_set_utc_time(struct wiphy *wiphy,
 	qdf_mem_copy(utc->time_error, nla_data(time_error_attr),
 		SIZE_UTC_TIME_ERROR);
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto out;
@@ -1046,7 +1045,7 @@ static int __wlan_hdd_cfg80211_ocb_set_utc_time(struct wiphy *wiphy,
 	} else {
 		rc = 0;
 	}
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 out:
 	qdf_mem_free(utc);
 	return rc;
@@ -1159,7 +1158,7 @@ __wlan_hdd_cfg80211_ocb_start_timing_advert(struct wiphy *wiphy,
 		goto fail;
 	}
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto fail;
@@ -1172,7 +1171,7 @@ __wlan_hdd_cfg80211_ocb_start_timing_advert(struct wiphy *wiphy,
 	} else {
 		rc = 0;
 	}
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 
 fail:
 	if (timing_advert->template_value)
@@ -1270,7 +1269,7 @@ __wlan_hdd_cfg80211_ocb_stop_timing_advert(struct wiphy *wiphy,
 	timing_advert->chan_freq = nla_get_u32(
 		tb[QCA_WLAN_VENDOR_ATTR_OCB_STOP_TIMING_ADVERT_CHANNEL_FREQ]);
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto fail;
@@ -1283,7 +1282,7 @@ __wlan_hdd_cfg80211_ocb_stop_timing_advert(struct wiphy *wiphy,
 	} else {
 		rc = 0;
 	}
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 
 fail:
 	qdf_mem_free(timing_advert);
@@ -1449,7 +1448,7 @@ __wlan_hdd_cfg80211_ocb_get_tsf_timer(struct wiphy *wiphy,
 	}
 	cookie = osif_request_cookie(request);
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto end;
@@ -1459,7 +1458,7 @@ __wlan_hdd_cfg80211_ocb_get_tsf_timer(struct wiphy *wiphy,
 	status = ucfg_ocb_get_tsf_timer(vdev, &tsf_request,
 					hdd_ocb_get_tsf_timer_callback,
 					cookie);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to get tsf timer.");
 		rc = qdf_status_to_os_return(status);
@@ -1718,7 +1717,7 @@ static int __wlan_hdd_cfg80211_dcc_get_stats(struct wiphy *wiphy,
 	dcc_request.request_array_len = request_array_len;
 	dcc_request.request_array = request_array;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto end;
@@ -1727,7 +1726,7 @@ static int __wlan_hdd_cfg80211_dcc_get_stats(struct wiphy *wiphy,
 	status = ucfg_ocb_dcc_get_stats(vdev, &dcc_request,
 					hdd_dcc_get_stats_callback,
 					cookie);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to get DCC stats.");
 		rc = qdf_status_to_os_return(status);
@@ -1840,7 +1839,7 @@ static int __wlan_hdd_cfg80211_dcc_clear_stats(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
 	if (!vdev)
 		return -EINVAL;
 
@@ -1850,10 +1849,10 @@ static int __wlan_hdd_cfg80211_dcc_clear_stats(struct wiphy *wiphy,
 			tb[QCA_WLAN_VENDOR_ATTR_DCC_CLEAR_STATS_BITMAP])) !=
 			QDF_STATUS_SUCCESS) {
 		hdd_err("Failed to clear DCC stats.");
-		hdd_objmgr_put_vdev(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 		return -EINVAL;
 	}
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 
 	return 0;
 }
@@ -2017,7 +2016,7 @@ static int __wlan_hdd_cfg80211_dcc_update_ndl(struct wiphy *wiphy,
 	dcc_request.dcc_ndl_active_state_list_len = ndl_active_state_array_len;
 	dcc_request.dcc_ndl_active_state_list = ndl_active_state_array;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_OCB_ID);
 	if (!vdev) {
 		rc = -EINVAL;
 		goto end;
@@ -2026,7 +2025,7 @@ static int __wlan_hdd_cfg80211_dcc_update_ndl(struct wiphy *wiphy,
 	status = ucfg_ocb_dcc_update_ndl(vdev, &dcc_request,
 					 hdd_dcc_update_ndl_callback,
 					 cookie);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_OCB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("Failed to update NDL.");
 		rc = qdf_status_to_os_return(status);

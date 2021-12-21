@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -169,12 +169,13 @@ static void lim_process_sae_msg_ap(struct mac_context *mac,
 		assoc_ind_sent =
 			lim_send_assoc_ind_to_sme(mac, session,
 						  assoc_req->sub_type,
-						  &assoc_req->hdr,
+						  assoc_req->sa,
 						  assoc_req->assoc_req,
 						  ANI_AKM_TYPE_SAE,
 						  assoc_req->pmf_connection,
 						  &assoc_req_copied,
-						  assoc_req->dup_entry, false);
+						  assoc_req->dup_entry, false,
+						  assoc_req->partner_peer_idx);
 		if (!assoc_ind_sent)
 			lim_process_assoc_cleanup(mac, session,
 						  assoc_req->assoc_req,
@@ -207,7 +208,9 @@ static void lim_process_sae_msg(struct mac_context *mac, struct sir_sae_msg *bod
 	}
 
 	if (session->opmode != QDF_STA_MODE &&
-	    session->opmode != QDF_SAP_MODE) {
+	    session->opmode != QDF_SAP_MODE &&
+	    session->opmode != QDF_P2P_GO_MODE &&
+	    session->opmode != QDF_P2P_CLIENT_MODE) {
 		pe_err("SAE:Not supported in this mode %d",
 				session->opmode);
 		return;
@@ -455,7 +458,7 @@ scan_ie_send_fail:
 /**
  * lim_process_hw_mode_trans_ind() - Process set HW mode transition indication
  * @mac: Global MAC pointer
- * @body: Set HW mode response in sir_hw_mode_trans_ind format
+ * @body: Set HW mode response in cm_hw_mode_trans_ind format
  *
  * Process the set HW mode transition indication and post the message
  * to SME to invoke the HDD callback
@@ -465,11 +468,11 @@ scan_ie_send_fail:
  */
 static void lim_process_hw_mode_trans_ind(struct mac_context *mac, void *body)
 {
-	struct sir_hw_mode_trans_ind *ind, *param;
+	struct cm_hw_mode_trans_ind *ind, *param;
 	uint32_t len, i;
 	struct scheduler_msg msg = {0};
 
-	ind = (struct sir_hw_mode_trans_ind *)body;
+	ind = (struct cm_hw_mode_trans_ind *)body;
 	if (!ind) {
 		pe_err("Set HW mode trans ind param is NULL");
 		return;
@@ -492,6 +495,15 @@ static void lim_process_hw_mode_trans_ind(struct mac_context *mac, void *body)
 			ind->vdev_mac_map[i].mac_id;
 	}
 
+	param->num_freq_map = ind->num_freq_map;
+	for (i = 0; i < param->num_freq_map; i++) {
+		param->mac_freq_map[i].pdev_id =
+			ind->mac_freq_map[i].pdev_id;
+		param->mac_freq_map[i].start_freq =
+			ind->mac_freq_map[i].start_freq;
+		param->mac_freq_map[i].end_freq =
+			ind->mac_freq_map[i].end_freq;
+	}
 	/* TODO: Update this HW mode info in any UMAC params, if needed */
 
 	msg.type = eWNI_SME_HW_MODE_TRANS_IND;
@@ -523,8 +535,7 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 	if (mac_ctx->lim.gLimSmeState == eLIM_SME_OFFLINE_STATE) {
 		/* Defer processing this message */
 		if (lim_defer_msg(mac_ctx, lim_msg) != TX_SUCCESS) {
-			QDF_TRACE(QDF_MODULE_ID_PE, LOGE,
-					FL("Unable to Defer Msg"));
+			pe_err_rl("Unable to Defer Msg");
 			lim_log_session_states(mac_ctx);
 			lim_handle_defer_msg_error(mac_ctx, lim_msg);
 		}
@@ -939,10 +950,8 @@ void lim_handle_sap_beacon(struct wlan_objmgr_pdev *pdev,
 		return;
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
-	if (!mac_ctx) {
-		pe_err("Failed to get mac_ctx");
+	if (!mac_ctx)
 		return;
-	}
 
 	filter = &mac_ctx->bcn_filter;
 
@@ -1011,7 +1020,8 @@ uint32_t lim_defer_msg(struct mac_context *mac, struct scheduler_msg *pMsg)
 			(mac, NO_SESSION,
 			LIM_TRACE_MAKE_RXMSG(pMsg->type, LIM_MSG_DEFERRED)));
 	} else {
-		pe_err("Dropped lim message (0x%X) Message %s", pMsg->type, lim_msg_str(pMsg->type));
+		pe_err_rl("Dropped lim message (0x%X) Message %s", pMsg->type,
+			  lim_msg_str(pMsg->type));
 		MTRACE(mac_trace_msg_rx
 			(mac, NO_SESSION,
 			LIM_TRACE_MAKE_RXMSG(pMsg->type, LIM_MSG_DROPPED)));
@@ -1539,7 +1549,7 @@ void lim_process_abort_scan_ind(struct mac_context *mac_ctx,
 	req->cancel_req.vdev_id = vdev_id;
 	req->cancel_req.req_type = WLAN_SCAN_CANCEL_SINGLE;
 
-	status = ucfg_scan_cancel(req);
+	status = wlan_scan_cancel(req);
 	if (QDF_IS_STATUS_ERROR(status))
 		pe_err("Cancel scan request failed");
 
@@ -1558,25 +1568,15 @@ static void lim_process_sme_obss_scan_ind(struct mac_context *mac_ctx,
 	session = pe_find_session_by_bssid(mac_ctx,
 			ht40_scanind->mac_addr.bytes, &session_id);
 	if (!session) {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			"OBSS Scan not started: session id is NULL");
+		pe_err("OBSS Scan not started: session id is NULL");
 		return;
 	}
+	pe_debug("OBSS Scan Req: vdev %d (pe session %d) htSupportedChannelWidthSet %d",
+		 session->vdev_id, session->peSessionId,
+		 session->htSupportedChannelWidthSet);
 	if (session->htSupportedChannelWidthSet ==
-			WNI_CFG_CHANNEL_BONDING_MODE_ENABLE) {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			"OBSS Scan Start Req: session id %d"
-			"htSupportedChannelWidthSet %d",
-			session->peSessionId,
-			session->htSupportedChannelWidthSet);
+	    WNI_CFG_CHANNEL_BONDING_MODE_ENABLE)
 		lim_send_ht40_obss_scanind(mac_ctx, session);
-	} else {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			"OBSS Scan not started: channel width - %d session %d",
-			session->htSupportedChannelWidthSet,
-			session->peSessionId);
-	}
-	return;
 }
 
 /**
@@ -1717,7 +1717,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_TDLS_DEL_STA_REQ:
 	case eWNI_SME_TDLS_LINK_ESTABLISH_REQ:
 #endif
-	case eWNI_SME_RESET_AP_CAPS_CHANGED:
 	case eWNI_SME_SET_HW_MODE_REQ:
 	case eWNI_SME_SET_DUAL_MAC_CFG_REQ:
 	case eWNI_SME_SET_ANTENNA_MODE_REQ:
@@ -1751,7 +1750,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #if defined FEATURE_WLAN_ESE
 	case eWNI_SME_ESE_ADJACENT_AP_REPORT:
 #endif
-	case eWNI_SME_FT_PRE_AUTH_REQ:
 	case eWNI_SME_FT_AGGR_QOS_REQ:
 	case eWNI_SME_REGISTER_MGMT_FRAME_REQ:
 #ifdef FEATURE_WLAN_ESE
@@ -1759,15 +1757,8 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #endif  /* FEATURE_WLAN_ESE */
 	case eWNI_SME_REGISTER_MGMT_FRAME_CB:
 	case eWNI_SME_EXT_CHANGE_CHANNEL:
-	case eWNI_SME_ROAM_INVOKE:
 		/* fall through */
 	case eWNI_SME_ROAM_SEND_SET_PCL_REQ:
-#ifndef ROAM_OFFLOAD_V1
-	case eWNI_SME_ROAM_INIT_PARAM:
-	case eWNI_SME_ROAM_DISABLE_CFG:
-	case eWNI_SME_ROAM_SEND_PER_REQ:
-	case eWNI_SME_ROAM_SCAN_OFFLOAD_REQ:
-#endif
 	case eWNI_SME_SET_ADDBA_ACCEPT:
 	case eWNI_SME_UPDATE_EDCA_PROFILE:
 	case WNI_SME_UPDATE_MU_EDCA_PARAMS:
@@ -1837,11 +1828,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case WMA_ADD_TS_RSP:
 		lim_process_hal_add_ts_rsp(mac_ctx, msg);
 		break;
-	case SIR_LIM_BEACON_GEN_IND:
-		if (mac_ctx->lim.gLimSystemRole != eLIM_AP_ROLE)
-			sch_process_pre_beacon_ind(mac_ctx,
-						   msg, REASON_DEFAULT);
-		break;
 	case SIR_LIM_DELETE_STA_CONTEXT_IND:
 		lim_delete_sta_context(mac_ctx, msg);
 		break;
@@ -1902,6 +1888,7 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		lim_handle_delete_bss_rsp(mac_ctx, msg->bodyptr);
 		break;
 	case WMA_CSA_OFFLOAD_EVENT:
+	case eWNI_SME_CSA_REQ:
 		lim_handle_csa_offload_msg(mac_ctx, msg);
 		break;
 	case WMA_SET_BSSKEY_RSP:
@@ -1976,11 +1963,10 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 			 *    restart, in such a case, beacon params will be
 			 *    reset and thus will not contain Q2Q IE, by default
 			 */
-			if (wlan_reg_get_channel_state(
+			if (wlan_reg_get_channel_state_for_freq(
 				mac_ctx->pdev,
-				wlan_reg_freq_to_chan(
-				mac_ctx->pdev, session_entry->curr_op_freq))
-					!= CHANNEL_STATE_DFS) {
+				session_entry->curr_op_freq) !=
+				CHANNEL_STATE_DFS) {
 				beacon_params.bss_idx = session_entry->vdev_id;
 				beacon_params.beaconInterval =
 					session_entry->beaconParams.beaconInterval;
@@ -2099,14 +2085,25 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
-	case WMA_ROAM_BLACKLIST_MSG:
-		lim_add_roam_blacklist_ap(mac_ctx,
-					  (struct roam_blacklist_event *)
-					  msg->bodyptr);
-		qdf_mem_free((void *)msg->bodyptr);
-		msg->bodyptr = NULL;
-		break;
 	case SIR_LIM_PROCESS_DEFERRED_QUEUE:
+		break;
+	case CM_BSS_PEER_CREATE_REQ:
+		cm_process_peer_create(msg);
+		break;
+	case CM_CONNECT_REQ:
+		cm_process_join_req(msg);
+		break;
+	case CM_REASSOC_REQ:
+		cm_process_reassoc_req(msg);
+		break;
+	case CM_DISCONNECT_REQ:
+		cm_process_disconnect_req(msg);
+		break;
+	case CM_PREAUTH_REQ:
+		cm_process_preauth_req(msg);
+		break;
+	case CM_ABORT_CONN_TIMER:
+		lim_deactivate_timers_for_vdev(mac_ctx, msg->bodyval);
 		break;
 	default:
 		qdf_mem_free((void *)msg->bodyptr);
