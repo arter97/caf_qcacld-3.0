@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -51,6 +52,8 @@ extern "C" {
 #define       MAX_ACL_MAC_ADDRESS          32
 #define       AUTO_CHANNEL_SELECT          0
 #define       MAX_ASSOC_IND_IE_LEN         255
+#define       MAX_ASSOC_REQ_IE_LEN         2000
+#define       ASSOC_REQ_IE_OFFSET          4
 
 /* defines for WPS config states */
 #define       SAP_WPS_DISABLED             0
@@ -258,8 +261,8 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	struct qdf_mac_addr staMac;
 	uint8_t staId;
 	uint8_t status;
-	uint8_t ies[MAX_ASSOC_IND_IE_LEN];
-	uint16_t iesLen;
+	uint8_t *ies;
+	uint32_t ies_len;
 	uint32_t statusCode;
 	eSapAuthType SapAuthType;
 	bool wmmEnabled;

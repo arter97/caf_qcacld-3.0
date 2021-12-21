@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -3024,28 +3025,17 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 				 &csr_roaminfo->peerMac);
 		reassoc_complete->staId = csr_roaminfo->staId;
 		reassoc_complete->statusCode = csr_roaminfo->statusCode;
-		reassoc_complete->iesLen = csr_roaminfo->rsnIELen;
-		qdf_mem_copy(reassoc_complete->ies, csr_roaminfo->prsnIE,
-			     csr_roaminfo->rsnIELen);
 
-#ifdef FEATURE_WLAN_WAPI
-		if (csr_roaminfo->wapiIELen) {
-			uint8_t len = reassoc_complete->iesLen;
-
-			reassoc_complete->iesLen += csr_roaminfo->wapiIELen;
-			qdf_mem_copy(&reassoc_complete->ies[len],
-				     csr_roaminfo->pwapiIE,
-				     csr_roaminfo->wapiIELen);
+		if (csr_roaminfo->assocReqLength < ASSOC_REQ_IE_OFFSET) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+				  FL("Invalid assoc request length:%d"),
+				  csr_roaminfo->assocReqLength);
+			return QDF_STATUS_E_INVAL;
 		}
-#endif
-		if (csr_roaminfo->addIELen) {
-			uint8_t len = reassoc_complete->iesLen;
-
-			reassoc_complete->iesLen += csr_roaminfo->addIELen;
-			qdf_mem_copy(&reassoc_complete->ies[len],
-				     csr_roaminfo->paddIE,
-				     csr_roaminfo->addIELen);
-		}
+		reassoc_complete->ies_len = csr_roaminfo->assocReqLength -
+					    ASSOC_REQ_IE_OFFSET;
+		reassoc_complete->ies = csr_roaminfo->assocReqPtr +
+					ASSOC_REQ_IE_OFFSET;
 
 		/* also fill up the channel info from the csr_roamInfo */
 		chaninfo = &reassoc_complete->chan_info;

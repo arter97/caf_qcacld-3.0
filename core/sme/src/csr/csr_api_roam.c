@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -10788,6 +10789,11 @@ void csr_roam_joined_state_msg_processor(tpAniSirGlobal pMac, void *pMsgBuf)
 					pUpperLayerAssocCnf->capability_info;
 
 		if (CSR_IS_INFRA_AP(pRoamInfo->u.pConnectedProfile)) {
+
+			if (pUpperLayerAssocCnf->ies_len > 0) {
+				pRoamInfo->assocReqLength = pUpperLayerAssocCnf->ies_len;
+				pRoamInfo->assocReqPtr = pUpperLayerAssocCnf->ies;
+			}
 			pMac->roam.roamSession[sessionId].connectState =
 				eCSR_ASSOC_STATE_TYPE_INFRA_CONNECTED;
 			pRoamInfo->fReassocReq =
@@ -10797,6 +10803,10 @@ void csr_roam_joined_state_msg_processor(tpAniSirGlobal pMac, void *pMsgBuf)
 						       eCSR_ROAM_INFRA_IND,
 					eCSR_ROAM_RESULT_INFRA_ASSOCIATION_CNF);
 		}
+
+		if (pUpperLayerAssocCnf->ies)
+			qdf_mem_free(pUpperLayerAssocCnf->ies);
+
 	}
 	break;
 	default:
@@ -17339,6 +17349,21 @@ QDF_STATUS csr_send_assoc_ind_to_upper_layer_cnf_msg(tpAniSirGlobal pMac,
 		if (pAssocInd->VHTCaps.present)
 			pMsg->VHTCaps = pAssocInd->VHTCaps;
 		pMsg->capability_info = pAssocInd->capability_info;
+
+		if (pAssocInd->assocReqPtr) {
+			if (pAssocInd->assocReqLength < MAX_ASSOC_REQ_IE_LEN) {
+				pMsg->ies = qdf_mem_malloc(pAssocInd->assocReqLength);
+				if (!pMsg->ies) {
+					qdf_mem_free(pMsg);
+					return QDF_STATUS_E_NOMEM;
+				}
+				pMsg->ies_len = pAssocInd->assocReqLength;
+				qdf_mem_copy(pMsg->ies, pAssocInd->assocReqPtr,
+					     pMsg->ies_len);
+			} else {
+				sme_err("Assoc IE length is too long");
+			}
+		}
 
 		msgQ.type = eWNI_SME_UPPER_LAYER_ASSOC_CNF;
 		msgQ.bodyptr = pMsg;

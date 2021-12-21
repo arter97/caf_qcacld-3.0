@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -2246,32 +2247,28 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					      HDD_SAP_WAKE_LOCK_DURATION);
 		{
 			struct station_info *sta_info;
-			uint16_t iesLen = event->iesLen;
+			uint32_t iesLen = event->ies_len;
 
 			sta_info = qdf_mem_malloc(sizeof(*sta_info));
 			if (!sta_info) {
 				hdd_err("Failed to allocate station info");
 				return QDF_STATUS_E_FAILURE;
 			}
-			if (iesLen <= MAX_ASSOC_IND_IE_LEN) {
-				sta_info->assoc_req_ies =
-					(const u8 *)&event->ies[0];
-				sta_info->assoc_req_ies_len = iesLen;
+			memset(sta_info, 0, sizeof(*sta_info));
+			sta_info->assoc_req_ies = event->ies;
+			sta_info->assoc_req_ies_len = iesLen;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
-				/*
-				 * After Kernel 4.0, it's no longer need to set
-				 * STATION_INFO_ASSOC_REQ_IES flag, as it
-				 * changed to use assoc_req_ies_len length to
-				 * check the existance of request IE.
-				 */
-				sta_info->filled |= STATION_INFO_ASSOC_REQ_IES;
+			/*
+			 * After Kernel 4.0, it's no longer need to set
+			 * STATION_INFO_ASSOC_REQ_IES flag, as it
+			 * changed to use assoc_req_ies_len length to
+			 * check the existance of request IE.
+			 */
+			sta_info->filled |= STATION_INFO_ASSOC_REQ_IES;
 #endif
-				cfg80211_new_sta(dev,
-					(const u8 *)&event->staMac.bytes[0],
-					sta_info, GFP_KERNEL);
-			} else {
-				hdd_err("Assoc Ie length is too long");
-			}
+			cfg80211_new_sta(dev,
+				(const u8 *)&event->staMac.bytes[0],
+				sta_info, GFP_KERNEL);
 			qdf_mem_free(sta_info);
 		}
 		pScanInfo = &pHostapdAdapter->scan_info;
