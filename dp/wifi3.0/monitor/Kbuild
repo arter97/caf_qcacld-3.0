@@ -71,6 +71,12 @@ INCS += -I$(obj)/$(DEPTH)/include \
         -I$(obj)/$(DEPTH)/cmn_dev/qal/linux/src/ \
         -I$(obj)/$(DEPTH)/cmn_dev/wmi/inc/ \
         -I$(obj)/$(DEPTH)/dp/ \
+        -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/core/inc \
+        -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/core/src \
+        -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/dispatcher/inc \
+        -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/dispatcher/src \
+        -I$(obj)/$(DEPTH)/cmn_dev/target_if/ipa/inc \
+        -I$(obj)/$(DEPTH)/cmn_dev/target_if/ipa/src \
         -I$(obj)/$(DEPTH)/pld/inc  \
         -I$(obj)/$(HOST_CMN_CONVG_SRC)/umac/mlo_mgr/inc \
         -I$(obj)/$(DEPTH)/cmn_dev/fw_hdr/fw/
