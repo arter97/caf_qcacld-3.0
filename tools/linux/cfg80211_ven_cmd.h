@@ -805,8 +805,15 @@ enum {
 	IEEE80211_PARAM_EHT_DL_OFDMA_TXBF                       = 766, /* EHT DL ODFMA Tx beamformer */
 	IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO                     = 767, /* EHT DL ODFMA Multi user MIMO */
 	IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO                     = 768, /* EHT UL ODFMA Multi user MIMO */
+	IEEE80211_PARAM_EHT_UL_NSS        = 769, /* Maximum NSS allowed in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_PPDU_BW    = 770, /* EHT UL Channel width*/
+	IEEE80211_PARAM_EHT_UL_SHORTGI    = 771, /* Shortgi configuration in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_LDPC       = 772, /* Enable/Disable LDPC in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_STBC       = 773, /* Enable/Disable STBC in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_FIXED_RATE = 774, /* Control UL fixed rate for EHT mode */
+	IEEE80211_PARAM_EHT_UL_LTF        = 775, /* LTF configuration in UL Trigger for EHT mode */
 #endif /* WLAN_FEATURE_11BE */
-	IEEE80211_PARAM_MAX_CAP_AP                 = 769,   /* Advertise Maximum capability of AP */
+	IEEE80211_PARAM_MAX_CAP_AP                 = 776,   /* Advertise Maximum capability of AP */
 };
 
 enum {
@@ -2391,6 +2398,20 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_dlofdma_mumimo", IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO, GET_PARAM, 0},
 	{"set_eht_ulofdma_mumimo", IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO, SET_PARAM, 1},
 	{"get_eht_ulofdma_mumimo", IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO, GET_PARAM, 0},
+	{"eht_ul_nss",           IEEE80211_PARAM_EHT_UL_NSS, SET_PARAM, 1},
+	{"get_eht_ul_nss",       IEEE80211_PARAM_EHT_UL_NSS, GET_PARAM, 0},
+	{"eht_ul_ppdu_bw",       IEEE80211_PARAM_EHT_UL_PPDU_BW, SET_PARAM, 1},
+	{"get_eht_ul_ppdu_bw",   IEEE80211_PARAM_EHT_UL_PPDU_BW, GET_PARAM, 0},
+	{"eht_ul_shortgi",       IEEE80211_PARAM_EHT_UL_SHORTGI, SET_PARAM, 1},
+	{"get_eht_ul_shortgi",   IEEE80211_PARAM_EHT_UL_SHORTGI, GET_PARAM, 0},
+	{"eht_ul_ldpc",          IEEE80211_PARAM_EHT_UL_LDPC, SET_PARAM, 1},
+	{"get_eht_ul_ldpc",      IEEE80211_PARAM_EHT_UL_LDPC, GET_PARAM, 0},
+	{"eht_ul_stbc",          IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
+	{"get_eht_ul_stbc",      IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
+	{"eht_ul_mcs",           IEEE80211_PARAM_EHT_UL_FIXED_RATE, SET_PARAM, 1},
+	{"get_eht_ul_mcs",       IEEE80211_PARAM_EHT_UL_FIXED_RATE, GET_PARAM, 0},
+	{"eht_ul_ltf",           IEEE80211_PARAM_EHT_UL_LTF, SET_PARAM, 1},
+	{"get_eht_ul_ltf",       IEEE80211_PARAM_EHT_UL_LTF, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 };
 
