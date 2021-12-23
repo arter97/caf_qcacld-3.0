@@ -255,6 +255,8 @@ typedef struct sap_StationAssocIndication_s {
 	eCsrEncryptionType negotiatedMCEncryptionType;
 	bool fAuthRequired;
 	uint8_t      ecsa_capable;
+	uint32_t owe_ie_len;
+	uint8_t *owe_ie;
 } tSap_StationAssocIndication;
 
 typedef struct sap_StationAssocReassocCompleteEvent_s {
@@ -897,7 +899,7 @@ typedef QDF_STATUS (*tpWLAN_SAPEventCB)(tpSap_Event pSapEvent,
 					void *pUsrContext);
 QDF_STATUS wlansap_start(void *p_cds_gctx, tpWLAN_SAPEventCB pSapEventCallback,
 			 enum tQDF_ADAPTER_MODE mode, uint8_t *addr,
-			 uint32_t *session_id, void *pUsrContext);
+			 uint32_t *session_id, void *pUsrContext, bool reinit);
 uint8_t wlansap_get_state(void *p_cds_gctx);
 
 QDF_STATUS wlansap_start_bss(void *p_cds_gctx,

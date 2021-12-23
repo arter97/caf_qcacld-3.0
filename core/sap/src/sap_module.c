@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -287,6 +288,69 @@ void *wlansap_open(void *p_cds_gctx)
 	return pSapCtx;
 } /* wlansap_open */
 
+static QDF_STATUS wlansap_owe_init(ptSapContext sap_ctx)
+{
+	qdf_list_create(&sap_ctx->owe_pending_assoc_ind_list, 0);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void wlansap_owe_cleanup(ptSapContext sap_ctx)
+{
+	tHalHandle hal;
+	tpAniSirGlobal mac;
+	struct owe_assoc_ind *owe_assoc_ind;
+	tSirSmeAssocInd *assoc_ind = NULL;
+	qdf_list_node_t *node = NULL, *next_node = NULL;
+	QDF_STATUS status;
+
+	if (!sap_ctx) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid SAP context");
+		return;
+	}
+
+	hal = CDS_GET_HAL_CB();
+	mac = (tpAniSirGlobal)hal;
+	if (!mac) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid MAC context");
+		return;
+	}
+
+	if (QDF_STATUS_SUCCESS !=
+	    qdf_list_peek_front(&sap_ctx->owe_pending_assoc_ind_list,
+				&node)) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			  "Failed to find assoc ind list");
+		return;
+	}
+
+	while (node) {
+		qdf_list_peek_next(&sap_ctx->owe_pending_assoc_ind_list,
+				   node, &next_node);
+		owe_assoc_ind = qdf_container_of(node, struct owe_assoc_ind,
+						 node);
+		status = qdf_list_remove_node(
+					   &sap_ctx->owe_pending_assoc_ind_list,
+					   node);
+		if (status == QDF_STATUS_SUCCESS) {
+			assoc_ind = owe_assoc_ind->assoc_ind;
+			qdf_mem_free(owe_assoc_ind);
+			/* TODO: disassoc OWE STA */
+			qdf_mem_free(assoc_ind);
+		} else {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+					"Failed to remove assoc ind");
+		}
+		node = next_node;
+		next_node = NULL;
+	}
+}
+
+static void wlansap_owe_deinit(ptSapContext sap_ctx)
+{
+	qdf_list_destroy(&sap_ctx->owe_pending_assoc_ind_list);
+}
+
 /**
  * wlansap_start() - wlan start SAP.
  * @pCtx: Pointer to the global cds context; a handle to SAP's
@@ -309,7 +373,7 @@ void *wlansap_open(void *p_cds_gctx)
  */
 QDF_STATUS wlansap_start(void *pCtx, tpWLAN_SAPEventCB pSapEventCallback,
 			 enum tQDF_ADAPTER_MODE mode, uint8_t *addr,
-			 uint32_t *session_id, void *pUsrContext)
+			 uint32_t *session_id, void *pUsrContext, bool reinit)
 {
 	ptSapContext pSapCtx = NULL;
 	QDF_STATUS qdf_ret_status;
@@ -329,6 +393,15 @@ QDF_STATUS wlansap_start(void *pCtx, tpWLAN_SAPEventCB pSapEventCallback,
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 			  "%s: Invalid SAP pointer from pCtx", __func__);
 		return QDF_STATUS_E_FAULT;
+	}
+
+	if (!reinit) {
+		qdf_ret_status = wlansap_owe_init(pSapCtx);
+		if (QDF_STATUS_SUCCESS != qdf_ret_status) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+				  "SAP OWE init fail");
+			return QDF_STATUS_E_FAILURE;
+		}
 	}
 
 	/*------------------------------------------------------------------------
@@ -453,6 +526,9 @@ QDF_STATUS wlansap_close(void *pCtx)
 			  "%s: Invalid SAP pointer from pCtx", __func__);
 		return QDF_STATUS_E_FAULT;
 	}
+
+	wlansap_owe_cleanup(pSapCtx);
+	wlansap_owe_deinit(pSapCtx);
 
 	/* Cleanup SAP control block */
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
