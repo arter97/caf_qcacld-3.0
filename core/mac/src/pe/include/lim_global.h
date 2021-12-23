@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -355,7 +356,8 @@ typedef struct tLimPreAuthTable {
 /* / Per STA context structure definition */
 typedef struct sLimMlmStaContext {
 	tLimMlmStates mlmState;
-	tAniAuthType authType;
+	tAniAuthType authType;		/* auth algo in auth frame */
+	enum ani_akm_type akm_type;	/* akm in rsn/wpa ie */
 	uint16_t listenInterval;
 	tSirMacCapabilityInfo capabilityInfo;
 	tSirMacPropRateSet propRateSet;

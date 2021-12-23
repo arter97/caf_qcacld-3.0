@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -702,6 +703,8 @@ lim_fill_assoc_ind_params(tpAniSirGlobal mac_ctx,
 		sizeof(tSirMacAddr));
 	/* Fill in authType */
 	sme_assoc_ind->authType = assoc_ind->authType;
+	/* Fill in rsn_akm_type */
+	sme_assoc_ind->akm_type = assoc_ind->akm_type;
 	/* Fill in ssId */
 	qdf_mem_copy((uint8_t *) &sme_assoc_ind->ssId,
 		(uint8_t *) &(assoc_ind->ssId), assoc_ind->ssId.length + 1);
