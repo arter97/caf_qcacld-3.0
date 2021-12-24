@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,7 +18,6 @@
  */
 
 #include <qcatools_lib.h>
-#include <cdp_txrx_stats_struct.h>
 #include <wlan_stats_define.h>
 #include <stats_lib.h>
 #if UMAC_SUPPORT_CFG80211
