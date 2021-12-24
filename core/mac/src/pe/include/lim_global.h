@@ -374,6 +374,8 @@ typedef struct sLimMlmStaContext {
 	uint8_t htCapability:1;
 	uint8_t vhtCapability:1;
 	bool force_1x1;
+	uint8_t *owe_ie;
+	uint32_t owe_ie_len;
 } tLimMlmStaContext, *tpLimMlmStaContext;
 
 /* Structure definition to hold deferred messages queue parameters */

@@ -21991,6 +21991,72 @@ void wlan_hdd_deinit_chan_info(hdd_context_t *hdd_ctx)
 }
 
 #ifdef CFG80211_EXTERNAL_DH_UPDATE_SUPPORT
+/**
+ * __wlan_hdd_cfg80211_update_owe_info() - update OWE info
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to network device
+ * @owe_info: Pointer to OWE info
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+static int
+__wlan_hdd_cfg80211_update_owe_info(struct wiphy *wiphy,
+				    struct net_device *dev,
+				    struct cfg80211_update_owe_info *owe_info)
+{
+	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+	hdd_adapter_t *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	QDF_STATUS status;
+	int errno;
+
+	ENTER();
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
+	hdd_debug("owe_status %d", owe_info->status);
+
+	status = wlansap_update_owe_info(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+					 owe_info->peer, owe_info->ie,
+					 owe_info->ie_len, owe_info->status);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_err("Failed to update OWE info");
+		errno = qdf_status_to_os_return(status);
+	}
+
+	EXIT();
+	return errno;
+}
+
+/**
+ * wlan_hdd_cfg80211_update_owe_info() - update OWE info
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to network device
+ * @owe_info: Pointer to OWE info
+ *
+ * Return: 0 for success, non-zero for failure
+ */
+static int
+wlan_hdd_cfg80211_update_owe_info(struct wiphy *wiphy,
+				  struct net_device *net_dev,
+				  struct cfg80211_update_owe_info *owe_info)
+{
+	int errno;
+
+	cds_ssr_protect(__func__);
+	errno = __wlan_hdd_cfg80211_update_owe_info(wiphy, net_dev, owe_info);
+	cds_ssr_unprotect(__func__);
+
+	return errno;
+}
+
+
 void hdd_send_update_owe_info_event(hdd_adapter_t *adapter,
 				    uint8_t sta_addr[],
 				    uint8_t *owe_ie,
@@ -22104,6 +22170,9 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.flush_pmksa = wlan_hdd_cfg80211_flush_pmksa,
 #if defined(KERNEL_SUPPORT_11R_CFG80211)
 	.update_ft_ies = wlan_hdd_cfg80211_update_ft_ies,
+#endif
+#ifdef CFG80211_EXTERNAL_DH_UPDATE_SUPPORT
+     .update_owe_info = wlan_hdd_cfg80211_update_owe_info,
 #endif
 #ifdef FEATURE_WLAN_TDLS
 	.tdls_mgmt = wlan_hdd_cfg80211_tdls_mgmt,

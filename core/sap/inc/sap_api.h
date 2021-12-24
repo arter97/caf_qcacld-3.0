@@ -1082,6 +1082,20 @@ QDF_STATUS wlansap_filter_ch_based_acs(void *sap_ctx,
 uint8_t wlansap_get_safe_channel_from_pcl_and_acs_range(void *cds_ctx);
 #endif
 
+/*
+ * wlansap_update_owe_info() - Update OWE info
+ * @sap_ctx: sap context
+ * @peer: peer mac
+ * @ie: IE from hostapd
+ * @ie_len: IE length
+ * @owe_status: status from hostapd
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlansap_update_owe_info(void *sap_ctx,
+				   uint8_t *peer, const uint8_t *ie,
+				   uint32_t ie_len, uint16_t owe_status);
+
 #ifdef __cplusplus
 }
 #endif
