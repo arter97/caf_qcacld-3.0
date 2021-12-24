@@ -1848,7 +1848,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"s_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, SET_PARAM, 2},
 	{"g_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, GET_PARAM, 0},
 #endif
-	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 1},
+	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 2},
 	{"get_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, GET_PARAM, 0},
 	{"addlocalpeer",        IEEE80211_PARAM_ADD_LOCAL_PEER, SET_PARAM, 3},
 	{"setmhdr",             IEEE80211_PARAM_SET_MHDR, SET_PARAM, 1},
