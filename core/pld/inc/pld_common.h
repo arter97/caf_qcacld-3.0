@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -85,6 +86,7 @@ enum pld_bus_type {
  * @PLD_BUS_WIDTH_MEDIUM: vote for medium bus bandwidth
  * @PLD_BUS_WIDTH_HIGH: vote for high bus bandwidth
  * @PLD_BUS_WIDTH_VERY_HIGH: vote for very high bus bandwidth
+ * @PLD_BUS_WIDTH_ULTRA_HIGH: vote for ultra high bus bandwidth
  * @PLD_BUS_WIDTH_LOW_LATENCY: vote for low latency bus bandwidth
  */
 enum pld_bus_width_type {
@@ -94,6 +96,8 @@ enum pld_bus_width_type {
 	PLD_BUS_WIDTH_MEDIUM,
 	PLD_BUS_WIDTH_HIGH,
 	PLD_BUS_WIDTH_VERY_HIGH,
+	PLD_BUS_WIDTH_ULTRA_HIGH,
+	PLD_BUS_WIDTH_MAX,
 	PLD_BUS_WIDTH_LOW_LATENCY,
 };
 
@@ -322,6 +326,16 @@ enum pld_driver_mode {
 };
 
 /**
+ * enum pld_suspend_mode - WLAN suspend mode
+ * @PLD_SUSPEND: suspend
+ * @PLD_FULL_POWER_DOWN: full power down while suspend
+ */
+enum pld_suspend_mode {
+	PLD_SUSPEND,
+	PLD_FULL_POWER_DOWN,
+};
+
+/**
  * struct pld_device_version - WLAN device version info
  * @family_number: family number of WLAN SOC HW
  * @device_number: device number of WLAN SOC HW
@@ -402,6 +416,30 @@ enum pld_wlan_time_sync_trigger_type {
 	PLD_TRIGGER_NEGATIVE_EDGE
 };
 #endif /* FEATURE_WLAN_TIME_SYNC_FTM */
+
+/* MAX channel avoid ranges supported in PLD */
+#define PLD_CH_AVOID_MAX_RANGE   4
+
+/**
+ * struct pld_ch_avoid_freq_type
+ * @start_freq: start freq (MHz)
+ * @end_freq: end freq (Mhz)
+ */
+struct pld_ch_avoid_freq_type {
+	uint32_t start_freq;
+	uint32_t end_freq;
+};
+
+/**
+ * struct pld_ch_avoid_ind_type
+ * @ch_avoid_range_cnt: count
+ * @avoid_freq_range: avoid freq range array
+ */
+struct pld_ch_avoid_ind_type {
+	uint32_t ch_avoid_range_cnt;
+	struct pld_ch_avoid_freq_type
+		avoid_freq_range[PLD_CH_AVOID_MAX_RANGE];
+};
 
 /**
  * struct pld_driver_ops - driver callback functions
@@ -490,6 +528,33 @@ void pld_deinit(void);
  */
 int pld_set_mode(u8 mode);
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+/**
+ * pld_set_suspend_mode() - set suspend mode in PLD module
+ * @mode: pld suspend mode
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_set_suspend_mode(enum pld_suspend_mode mode);
+/**
+ * pld_is_full_power_down_enable() - check full power down is enabled or not
+ *
+ * Return: true if full power down is enabled else false
+ */
+bool pld_is_full_power_down_enable(void);
+#else
+static inline int pld_set_suspend_mode(enum pld_suspend_mode mode)
+{
+	return 0;
+}
+
+static inline bool pld_is_full_power_down_enable(void)
+{
+	return false;
+}
+#endif
+
 int pld_register_driver(struct pld_driver_ops *ops);
 void pld_unregister_driver(void);
 
@@ -527,7 +592,29 @@ int pld_get_audio_wlan_timestamp(struct device *dev,
 				 uint64_t *ts);
 #endif /* FEATURE_WLAN_TIME_SYNC_FTM */
 
-#if IS_ENABLED(CONFIG_CNSS_UTILS)
+#ifdef CNSS_UTILS
+#ifdef CNSS_UTILS_VENDOR_UNSAFE_CHAN_API_SUPPORT
+/**
+ * pld_get_wlan_unsafe_channel_sap() - Get vendor unsafe ch freq ranges
+ * @dev: device
+ * @ch_avoid_ranges: unsafe freq channel ranges
+ *
+ * Get vendor specific unsafe channel frequency ranges
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_get_wlan_unsafe_channel_sap(
+	struct device *dev, struct pld_ch_avoid_ind_type *ch_avoid_ranges);
+#else
+static inline
+int pld_get_wlan_unsafe_channel_sap(
+	struct device *dev, struct pld_ch_avoid_ind_type *ch_avoid_ranges)
+{
+	return 0;
+}
+#endif
+
 /**
  * pld_set_wlan_unsafe_channel() - Set unsafe channel
  * @dev: device
@@ -653,6 +740,12 @@ static inline int pld_get_driver_load_cnt(struct device *dev)
 	return cnss_utils_get_driver_load_cnt(dev);
 }
 #else
+static inline int pld_get_wlan_unsafe_channel_sap(
+	struct device *dev, struct pld_ch_avoid_ind_type *ch_avoid_ranges)
+{
+	return 0;
+}
+
 static inline int pld_set_wlan_unsafe_channel(struct device *dev,
 					      u16 *unsafe_ch_list,
 					      u16 ch_count)
@@ -849,6 +942,25 @@ int pld_idle_shutdown(struct device *dev,
  */
 int pld_idle_restart(struct device *dev,
 		     int (*restart_cb)(struct device *dev));
+
+/**
+ * pld_srng_devm_request_irq() - Register IRQ for SRNG
+ * @dev: device
+ * @irq: IRQ number
+ * @handler: IRQ callback function
+ * @irqflags: IRQ flags
+ * @name: IRQ name
+ * @ctx: IRQ context
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_srng_devm_request_irq(struct device *dev, int irq,
+			      irq_handler_t handler,
+			      unsigned long irqflags,
+			      const char *name,
+			      void *ctx);
+
 /**
  * pld_srng_request_irq() - Register IRQ for SRNG
  * @dev: device
@@ -865,6 +977,7 @@ int pld_srng_request_irq(struct device *dev, int irq, irq_handler_t handler,
 			 unsigned long irqflags,
 			 const char *name,
 			 void *ctx);
+
 /**
  * pld_srng_free_irq() - Free IRQ for SRNG
  * @dev: device
@@ -967,6 +1080,15 @@ int pld_thermal_register(struct device *dev, unsigned long state, int mon_id);
 void pld_thermal_unregister(struct device *dev, int mon_id);
 
 /**
+ * pld_bus_width_type_to_str() - Helper function to convert PLD bandwidth level
+ *				 to string
+ * @level: PLD bus width level
+ *
+ * Return: String corresponding to input "level"
+ */
+const char *pld_bus_width_type_to_str(enum pld_bus_width_type level);
+
+/**
  * pld_get_thermal_state() - Get the current thermal state from the PLD
  * @dev: The device structure
  * @thermal_state: param to store the current thermal state
@@ -1022,6 +1144,14 @@ static inline int pld_nbuf_pre_alloc_free(struct sk_buff *skb)
  * Return: PLD bus type
  */
 enum pld_bus_type pld_get_bus_type(struct device *dev);
+
+static inline int pfrm_devm_request_irq(struct device *dev, unsigned int ce_id,
+					irqreturn_t (*handler)(int, void *),
+					unsigned long flags, const char *name,
+					void *ctx)
+{
+	return pld_srng_devm_request_irq(dev, ce_id, handler, flags, name, ctx);
+}
 
 static inline int pfrm_request_irq(struct device *dev, unsigned int ce_id,
 				   irqreturn_t (*handler)(int, void *),

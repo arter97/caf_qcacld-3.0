@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5360,7 +5361,8 @@ uint32_t sme_get_beaconing_concurrent_operation_channel(mac_handle_t mac_handle,
 uint16_t sme_check_concurrent_channel_overlap(mac_handle_t mac_handle,
 					      uint16_t sap_ch_freq,
 					      eCsrPhyMode sapPhyMode,
-					      uint8_t cc_switch_mode)
+					      uint8_t cc_switch_mode,
+					      uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -5369,7 +5371,7 @@ uint16_t sme_check_concurrent_channel_overlap(mac_handle_t mac_handle,
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		intf_ch_freq = csr_check_concurrent_channel_overlap(
-			mac, sap_ch_freq, sapPhyMode, cc_switch_mode);
+			mac, sap_ch_freq, sapPhyMode, cc_switch_mode, vdev_id);
 		sme_release_global_lock(&mac->sme);
 	}
 
@@ -7114,18 +7116,37 @@ sme_update_roam_scan_freq_list(mac_handle_t mac_handle, uint8_t vdev_id,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	/*
+	 * NCHO Frequency configurations:
+	 * If ADDROAMSCANFREQUENCIES command is given, then freq_list_type is
+	 * QCA_PREFERRED_SCAN_FREQ_LIST.
+	 * If SETROAMSCANFREQUENCIES command is given, then freq_list_type is
+	 * QCA_SPECIFIC_SCAN_FREQ_LIST.
+	 *
+	 * If new channels are configured with type as STATIC(specific freq
+	 * list):
+	 * - FW clears both static & dynamic list.
+	 * - FW adds new channels to static & dynamic lists(both list contains
+	 *   only new channels)
+	 *
+	 * If Host configures new channels with type as DYNAMIC(preferred freq
+	 * list):
+	 * - FW clears the static list and adds new channels(Static list
+	 *   contains only new channels)
+	 * - FW will not clear dynamic list. New channels will be
+	 *   appended(Dynamic list contains old+new channels)
+	 */
+
 	src_config.chan_info.freq_list = freq_list;
 	src_config.chan_info.num_chan = num_chan;
-	if (freq_list_type == QCA_PREFERRED_SCAN_FREQ_LIST) {
-		sme_set_roam_scan_control(mac_handle, vdev_id, false);
+	if (freq_list_type == QCA_PREFERRED_SCAN_FREQ_LIST)
 		return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
 						  ROAM_PREFERRED_CHAN,
 						  &src_config);
-	} else {
+	else
 		return wlan_cm_roam_cfg_set_value(mac->psoc, vdev_id,
 						  ROAM_SPECIFIC_CHAN,
 						  &src_config);
-	}
 }
 
 /**
@@ -10333,7 +10354,7 @@ QDF_STATUS sme_enable_dfs_chan_scan(mac_handle_t mac_handle, uint8_t dfs_flag)
  * @sap_ch - channel to switch
  * @sap_phy_mode - phy mode of SAP
  * @cc_switch_mode - concurreny switch mode
- * @session_id - sme session id.
+ * @vdev_id - vdev id.
  *
  * Return: true if there is no channel interference else return false
  */
@@ -10341,11 +10362,11 @@ bool sme_validate_sap_channel_switch(mac_handle_t mac_handle,
 				     uint32_t sap_ch_freq,
 				     eCsrPhyMode sap_phy_mode,
 				     uint8_t cc_switch_mode,
-				     uint8_t session_id)
+				     uint8_t vdev_id)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct csr_roam_session *session = CSR_GET_SESSION(mac, session_id);
+	struct csr_roam_session *session = CSR_GET_SESSION(mac, vdev_id);
 	uint16_t intf_channel_freq = 0;
 
 	if (!session)
@@ -10355,7 +10376,8 @@ bool sme_validate_sap_channel_switch(mac_handle_t mac_handle,
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		intf_channel_freq = csr_check_concurrent_channel_overlap(
-			mac, sap_ch_freq, sap_phy_mode, cc_switch_mode);
+			mac, sap_ch_freq, sap_phy_mode, cc_switch_mode,
+			vdev_id);
 		sme_release_global_lock(&mac->sme);
 	} else {
 		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
@@ -10808,6 +10830,33 @@ void sme_update_tgt_he_cap(mac_handle_t mac_handle,
 	mac_ctx->he_cap_5g.bfee_sts_lt_80 =
 			QDF_MIN(cfg->he_cap_5g.bfee_sts_lt_80,
 				he_cap_ini->bfee_sts_lt_80);
+
+	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
+		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = HE_SET_MCS_4_NSS(
+				mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80,
+				HE_MCS_DISABLE, 2);
+		mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = HE_SET_MCS_4_NSS(
+				mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80,
+				HE_MCS_DISABLE, 2);
+		mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = HE_SET_MCS_4_NSS(
+				mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80,
+				HE_MCS_DISABLE, 2);
+		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = HE_SET_MCS_4_NSS(
+				mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80,
+				HE_MCS_DISABLE, 2);
+	}
+	mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
+		mac_ctx->he_cap_2g.rx_he_mcs_map_lt_80,
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80);
+	mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
+		mac_ctx->he_cap_2g.tx_he_mcs_map_lt_80,
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80);
+	mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
+		mac_ctx->he_cap_5g.rx_he_mcs_map_lt_80,
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80);
+	mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80 = HE_INTERSECT_MCS(
+		mac_ctx->he_cap_5g.tx_he_mcs_map_lt_80,
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80);
 }
 
 void sme_update_he_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
@@ -15996,4 +16045,26 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+void sme_roam_events_register_callback(mac_handle_t mac_handle,
+				       void (*roam_rt_stats_cb)(
+				hdd_handle_t hdd_handle, uint8_t idx,
+				struct roam_stats_event *roam_stats))
+{
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	if (!mac) {
+		sme_err("Invalid mac context");
+		return;
+	}
+
+	mac->sme.roam_rt_stats_cb = roam_rt_stats_cb;
+}
+
+void sme_roam_events_deregister_callback(mac_handle_t mac_handle)
+{
+	sme_roam_events_register_callback(mac_handle, NULL);
+}
+#endif
 

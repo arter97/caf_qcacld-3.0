@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3026,14 +3027,29 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 	uint32_t len = 0;
 	uint32_t total_rx_pkt = 0, total_rx_dropped = 0;
 	uint32_t total_rx_delv = 0, total_rx_refused = 0;
+	uint32_t total_tx_pkt = 0;
+	uint32_t total_tx_dropped = 0;
+	uint32_t total_tx_orphaned = 0;
+	uint32_t total_tx_classified_ac[WLAN_MAX_AC] = {0};
+	uint32_t total_tx_dropped_ac[WLAN_MAX_AC] = {0};
 	int i = 0;
+	uint8_t ac;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 
 	for (; i < NUM_CPUS; i++) {
-		total_rx_pkt += stats->rx_packets[i];
-		total_rx_dropped += stats->rx_dropped[i];
-		total_rx_delv += stats->rx_delivered[i];
-		total_rx_refused += stats->rx_refused[i];
+		total_rx_pkt += stats->per_cpu[i].rx_packets;
+		total_rx_dropped += stats->per_cpu[i].rx_dropped;
+		total_rx_delv += stats->per_cpu[i].rx_delivered;
+		total_rx_refused += stats->per_cpu[i].rx_refused;
+		total_tx_pkt += stats->per_cpu[i].tx_called;
+		total_tx_dropped += stats->per_cpu[i].tx_dropped;
+		total_tx_orphaned += stats->per_cpu[i].tx_orphaned;
+		for (ac = 0; ac < WLAN_MAX_AC; ac++) {
+			total_tx_classified_ac[ac] +=
+					 stats->per_cpu[i].tx_classified_ac[ac];
+			total_tx_dropped_ac[ac] +=
+					    stats->per_cpu[i].tx_dropped_ac[ac];
+		}
 	}
 
 	len = scnprintf(buffer, buf_len,
@@ -3045,17 +3061,17 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 			"packets %u, dropped %u, unsolict_arp_n_mcast_drp %u, delivered %u, refused %u\n"
 			"GRO - agg %u non-agg %u flush_skip %u low_tput_flush %u disabled(conc %u low-tput %u)\n",
 			qdf_system_ticks(),
-			stats->tx_called,
-			stats->tx_dropped,
-			stats->tx_orphaned,
-			stats->tx_dropped_ac[SME_AC_BK],
-			stats->tx_dropped_ac[SME_AC_BE],
-			stats->tx_dropped_ac[SME_AC_VI],
-			stats->tx_dropped_ac[SME_AC_VO],
-			stats->tx_classified_ac[SME_AC_BK],
-			stats->tx_classified_ac[SME_AC_BE],
-			stats->tx_classified_ac[SME_AC_VI],
-			stats->tx_classified_ac[SME_AC_VO],
+			total_tx_pkt,
+			total_tx_dropped,
+			total_tx_orphaned,
+			total_tx_dropped_ac[SME_AC_BK],
+			total_tx_dropped_ac[SME_AC_BE],
+			total_tx_dropped_ac[SME_AC_VI],
+			total_tx_dropped_ac[SME_AC_VO],
+			total_tx_classified_ac[SME_AC_BK],
+			total_tx_classified_ac[SME_AC_BE],
+			total_tx_classified_ac[SME_AC_VI],
+			total_tx_classified_ac[SME_AC_VO],
 			qdf_system_ticks(),
 			total_rx_pkt, total_rx_dropped,
 			qdf_atomic_read(&stats->rx_usolict_arp_n_mcast_drp),
@@ -3068,13 +3084,15 @@ void hdd_wlan_get_stats(struct hdd_adapter *adapter, uint16_t *length,
 			qdf_atomic_read(&hdd_ctx->disable_rx_ol_in_low_tput));
 
 	for (i = 0; i < NUM_CPUS; i++) {
-		if (stats->rx_packets[i] == 0)
+		if (stats->per_cpu[i].rx_packets == 0)
 			continue;
 		len += scnprintf(buffer + len, buf_len - len,
 				 "Rx CPU[%d]:"
 				 "packets %u, dropped %u, delivered %u, refused %u\n",
-				 i, stats->rx_packets[i], stats->rx_dropped[i],
-				 stats->rx_delivered[i], stats->rx_refused[i]);
+				 i, stats->per_cpu[i].rx_packets,
+				 stats->per_cpu[i].rx_dropped,
+				 stats->per_cpu[i].rx_delivered,
+				 stats->per_cpu[i].rx_refused);
 	}
 
 	len += scnprintf(buffer + len, buf_len - len,
@@ -4743,7 +4761,7 @@ static int hdd_we_set_modulated_dtim(struct hdd_adapter *adapter, int value)
 	if (!hdd_ctx->psoc)
 		return -EINVAL;
 
-	if ((value < cfg_max(CFG_PMO_ENABLE_MODULATED_DTIM)) ||
+	if ((value < cfg_min(CFG_PMO_ENABLE_MODULATED_DTIM)) ||
 	    (value > cfg_max(CFG_PMO_ENABLE_MODULATED_DTIM))) {
 		hdd_err("Invalid value %d", value);
 		return -EINVAL;
@@ -5796,7 +5814,7 @@ static int hdd_set_fwtest(int argc, int cmd, int value)
 	struct set_fwtest_params *fw_test;
 
 	/* check for max number of arguments */
-	if (argc > (WMA_MAX_NUM_ARGS) ||
+	if (argc > WMI_UNIT_TEST_MAX_NUM_ARGS ||
 	    argc != HDD_FWTEST_PARAMS) {
 		hdd_err("Too Many args %d", argc);
 		return -EINVAL;
@@ -6760,10 +6778,11 @@ static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
 	{
 		hdd_debug("<iwpriv wlan0 pm_dbs> is called");
 		if (apps_args[0] == 0)
-			wma_set_dbs_capability_ut(0);
+			policy_mgr_set_dbs_cap_ut(hdd_ctx->psoc, 0);
 		else
-			wma_set_dbs_capability_ut(1);
+			policy_mgr_set_dbs_cap_ut(hdd_ctx->psoc, 1);
 
+		wma_enable_dbs_service_ut();
 		if (apps_args[1] >= PM_THROUGHPUT &&
 			apps_args[1] <= PM_LATENCY) {
 			hdd_debug("setting system pref to [%d]\n",
@@ -6832,7 +6851,9 @@ static int iw_get_policy_manager_ut_ops(struct hdd_context *hdd_ctx,
 				hdd_ctx->psoc, apps_args[0],
 				wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev,
 							     apps_args[1]),
-							     apps_args[2]);
+				apps_args[2],
+				policy_mgr_get_conc_ext_flags(adapter->vdev,
+							      false));
 		hdd_debug("allow %d {0 = don't allow, 1 = allow}", allow);
 	}
 	break;
@@ -7174,8 +7195,8 @@ static int __iw_set_var_ints_getnone(struct net_device *dev,
 			hdd_err_rl("Invalid MODULE ID %d", apps_args[0]);
 			return -EINVAL;
 		}
-		if ((apps_args[1] > (WMA_MAX_NUM_ARGS)) ||
-		    (apps_args[1] < 0)) {
+		if (apps_args[1] > WMI_UNIT_TEST_MAX_NUM_ARGS ||
+		    apps_args[1] < 0) {
 			hdd_err_rl("Too Many/Few args %d", apps_args[1]);
 			return -EINVAL;
 		}
@@ -8425,8 +8446,17 @@ static int iw_get_statistics(struct net_device *dev,
 	if (errno)
 		return errno;
 
+	errno = wlan_hdd_qmi_get_sync_resume();
+	if (errno) {
+		hdd_err("qmi sync resume failed: %d", errno);
+		goto end;
+	}
+
 	errno = __iw_get_statistics(dev, info, wrqu, extra);
 
+	wlan_hdd_qmi_put_suspend();
+
+end:
 	osif_vdev_sync_op_stop(vdev_sync);
 
 	return errno;

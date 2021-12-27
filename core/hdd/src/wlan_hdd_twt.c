@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1770,12 +1771,11 @@ int hdd_send_twt_add_dialog_cmd(struct hdd_context *hdd_ctx,
 			ret = -ENOMEM;
 			break;
 		default:
-			ret = -EINVAL;
+			ret = -EAGAIN;
 			break;
 		}
 	}
 
-	ret = qdf_status_to_os_return(status);
 cleanup:
 	osif_request_put(request);
 	hdd_exit();
@@ -1840,6 +1840,13 @@ static int hdd_twt_setup_session(struct hdd_adapter *adapter,
 					     qca_wlan_vendor_twt_add_dialog_policy);
 	if (ret)
 		return ret;
+
+	if (!ucfg_mlme_get_twt_peer_responder_capabilities(
+					adapter->hdd_ctx->psoc,
+					&hdd_sta_ctx->conn_info.bssid)) {
+		hdd_err_rl("TWT setup reject: TWT responder not supported");
+		return -EOPNOTSUPP;
+	}
 
 	ret = hdd_twt_get_add_dialog_values(tb2, &params);
 	if (ret)
@@ -2159,12 +2166,10 @@ int hdd_send_twt_del_dialog_cmd(struct hdd_context *hdd_ctx,
 			ret = -EAGAIN;
 			break;
 		default:
-			ret = -EINVAL;
+			ret = -EAGAIN;
 			break;
 		}
 	}
-
-	ret = qdf_status_to_os_return(status);
 cleanup:
 	osif_request_put(request);
 	hdd_exit();
@@ -2701,12 +2706,10 @@ int hdd_send_twt_pause_dialog_cmd(struct hdd_context *hdd_ctx,
 			ret = -EBUSY;
 			break;
 		default:
-			ret = -EINVAL;
+			ret = -EAGAIN;
 			break;
 		}
 	}
-
-	ret = qdf_status_to_os_return(status);
 cleanup:
 	osif_request_put(request);
 	hdd_exit();
@@ -2862,12 +2865,10 @@ int hdd_send_twt_nudge_dialog_cmd(struct hdd_context *hdd_ctx,
 			ret = -EBUSY;
 			break;
 		default:
-			ret = -EINVAL;
+			ret = -EAGAIN;
 			break;
 		}
 	}
-
-	ret = qdf_status_to_os_return(status);
 cleanup:
 	osif_request_put(request);
 	hdd_exit();
@@ -3150,7 +3151,7 @@ hdd_send_twt_resume_dialog_cmd(struct hdd_context *hdd_ctx,
 			break;
 		case WMI_HOST_RESUME_TWT_STATUS_DIALOG_ID_NOT_EXIST:
 		case WMI_HOST_RESUME_TWT_STATUS_NOT_PAUSED:
-			ret = EAGAIN;
+			ret = -EAGAIN;
 			break;
 		case WMI_HOST_RESUME_TWT_STATUS_DIALOG_ID_BUSY:
 			ret = -EINPROGRESS;
@@ -3164,12 +3165,10 @@ hdd_send_twt_resume_dialog_cmd(struct hdd_context *hdd_ctx,
 			ret = -EBUSY;
 			break;
 		default:
-			ret = -EINVAL;
+			ret = -EAGAIN;
 			break;
 		}
 	}
-
-	ret = qdf_status_to_os_return(status);
 cleanup:
 	osif_request_put(request);
 	hdd_exit();

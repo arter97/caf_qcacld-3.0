@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -400,8 +401,6 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	gen->enabled_11d = cfg_get(psoc, CFG_11D_SUPPORT_ENABLED);
 	gen->enable_beacon_reception_stats =
 		cfg_get(psoc, CFG_ENABLE_BEACON_RECEPTION_STATS);
-	gen->enable_remove_time_stamp_sync_cmd =
-		cfg_get(psoc, CFG_REMOVE_TIME_STAMP_SYNC_CMD);
 	gen->disable_4way_hs_offload =
 		cfg_get(psoc, CFG_DISABLE_4WAY_HS_OFFLOAD);
 	gen->mgmt_retry_max = cfg_get(psoc, CFG_MGMT_RETRY_MAX);
@@ -415,6 +414,7 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_SAE_CONNECION_RETRIES);
 	gen->monitor_mode_concurrency =
 		cfg_get(psoc, CFG_MONITOR_MODE_CONCURRENCY);
+	gen->tx_retry_multiplier = cfg_get(psoc, CFG_TX_RETRY_MULTIPLIER);
 	mlme_init_wds_config_cfg(psoc, gen);
 }
 
@@ -1594,6 +1594,7 @@ static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 	lfr->idle_roam_band = cfg_get(psoc, CFG_LFR_IDLE_ROAM_BAND);
 	lfr->sta_roam_disable = cfg_get(psoc, CFG_STA_DISABLE_ROAM);
 	mlme_init_sae_single_pmk_cfg(psoc, lfr);
+	qdf_mem_zero(&lfr->roam_rt_stats, sizeof(lfr->roam_rt_stats));
 }
 
 #else

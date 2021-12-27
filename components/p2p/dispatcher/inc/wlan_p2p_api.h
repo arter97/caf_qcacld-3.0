@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,4 +61,32 @@ QDF_STATUS wlan_p2p_cleanup_roc_by_vdev(struct wlan_objmgr_vdev *vdev);
  */
 QDF_STATUS wlan_p2p_status_connect(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * wlan_p2p_abort_scan() - Abort on going scan on p2p interfaces
+ * @pdev: pdev object
+ *
+ * This function triggers an abort scan request to scan component to abort the
+ * ongoing scan request on p2p vdevs.
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS wlan_p2p_abort_scan(struct wlan_objmgr_pdev *pdev);
+
+#ifdef WLAN_FEATURE_P2P_P2P_STA
+/**
+ * wlan_p2p_check_and_force_scc_go_plus_go() - Check and do force scc for
+ * go plus go
+ * @psoc: psoc object
+ * @vdev: vdev object
+ *
+ * This function checks whether force scc is enabled or not. If it
+ * is enabled then it will do force scc to remaining p2p go vdev if
+ * user has initiated CSA to current vdev.
+ *
+ * Return: status
+ */
+QDF_STATUS
+wlan_p2p_check_and_force_scc_go_plus_go(struct wlan_objmgr_psoc *psoc,
+					struct wlan_objmgr_vdev *vdev);
+#endif
 #endif

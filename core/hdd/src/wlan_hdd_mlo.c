@@ -222,7 +222,7 @@ void hdd_update_dynamic_mld_mac_addr(struct hdd_context *hdd_ctx,
 			continue;
 		if (!qdf_mem_cmp(curr_mac_addr->bytes,
 				 mac_info->mld_mac_list[i].mld_addr.bytes,
-				 sizeof(struct qdf_mac_addr)))
+				 sizeof(struct qdf_mac_addr))) {
 			qdf_mem_copy(mac_info->mld_mac_list[i].mld_addr.bytes,
 				     new_mac_addr->bytes,
 				     sizeof(struct qdf_mac_addr));
@@ -268,6 +268,11 @@ hdd_populate_mld_vdev_params(struct hdd_adapter *adapter,
 	uint8_t *mld_addr;
 	QDF_STATUS qdf_status;
 	uint8_t device_mode = adapter->device_mode;
+
+	if (device_mode != QDF_SAP_MODE &&
+	    !adapter->mlo_adapter_info.is_ml_adapter &&
+	    !adapter->mlo_adapter_info.is_link_adapter)
+		return;
 
 	mld_addr = wlan_hdd_get_mld_addr(adapter->hdd_ctx,
 					 adapter->device_mode);

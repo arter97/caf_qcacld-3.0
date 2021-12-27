@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -637,6 +638,10 @@ static int __hdd_soc_probe(struct device *dev,
 	hdd_start_complete(0);
 	hdd_thermal_mitigation_register(hdd_ctx, dev);
 
+	errno = hdd_set_suspend_mode(hdd_ctx);
+	if (errno)
+		hdd_err("Failed to set suspend mode in PLD; errno:%d", errno);
+
 	hdd_soc_load_unlock(dev);
 
 	return 0;
@@ -745,7 +750,6 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	}
 
 	hdd_soc_load_unlock(dev);
-	hdd_start_complete(0);
 
 	return 0;
 
@@ -802,6 +806,7 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 
 
 	osif_psoc_sync_trans_stop(psoc_sync);
+	hdd_start_complete(0);
 
 	return errno;
 }
@@ -969,13 +974,16 @@ static void __hdd_soc_recovery_shutdown(void)
 	struct hdd_context *hdd_ctx;
 	void *hif_ctx;
 
-	/* recovery starts via firmware down indication; ensure we got one */
-	QDF_BUG(cds_is_driver_recovering());
-	hdd_init_start_completion();
-
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return;
+
+	if (wlan_hdd_is_full_power_down_enable(hdd_ctx))
+		cds_set_driver_state(CDS_DRIVER_STATE_RECOVERING);
+
+	/* recovery starts via firmware down indication; ensure we got one */
+	QDF_BUG(cds_is_driver_recovering());
+	hdd_init_start_completion();
 
 	/*
 	 * Perform SSR related cleanup if it has not already been done as a
@@ -1031,6 +1039,7 @@ static void hdd_soc_recovery_shutdown(struct device *dev)
 	if (errno)
 		return;
 
+	hdd_wait_for_dp_tx();
 	osif_psoc_sync_wait_for_ops(psoc_sync);
 
 	__hdd_soc_recovery_shutdown();

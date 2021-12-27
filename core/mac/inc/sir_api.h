@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1278,6 +1279,7 @@ struct missed_beacon_ind {
 	uint16_t messageType;   /* eWNI_SME_MISSED_BEACON_IND */
 	uint16_t length;
 	uint8_t bss_idx;
+	int32_t rssi;
 };
 
 /* / Definition for Set Context request */
@@ -4955,14 +4957,14 @@ struct he_capability {
 
 #ifdef WLAN_FEATURE_11BE
 #define EHT_MAX_PHY_CAP_SIZE 3
-#define EHT_CAP_OUI_TYPE "\xfd"
-#define EHT_CAP_OUI_SIZE 1
-
-#define EHT_OP_OUI_TYPE "\xfe"
+#define EHT_OP_OUI_TYPE "\x6a"
 #define EHT_OP_OUI_SIZE 1
 
-#define MLO_IE_OUI_TYPE "\x5e"
+#define MLO_IE_OUI_TYPE "\x6b"
 #define MLO_IE_OUI_SIZE 1
+
+#define EHT_CAP_OUI_TYPE "\x6c"
+#define EHT_CAP_OUI_SIZE 1
 
 /**
  * struct eht_capability - to store 11be EHT capabilities

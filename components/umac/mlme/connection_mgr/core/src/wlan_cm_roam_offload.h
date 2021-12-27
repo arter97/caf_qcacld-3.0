@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,7 +29,8 @@
 #include "qdf_str.h"
 #include "wlan_cm_roam_public_struct.h"
 
-#ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
+#if defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) && \
+    defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
  * cm_roam_scan_info_event() - send scan info to userspace
  * @scan: roam scan data
@@ -62,13 +64,14 @@ void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 /**
  * cm_roam_result_info_event() - send scan results info to userspace
  * @res: roam result data
+ * @scan_data: Roam scan info
  * @vdev_id: vdev id
- * @roam_abort: Is roam abort
  *
  * Return: void
  */
-void cm_roam_result_info_event(struct wmi_roam_result *res, uint8_t vdev_id,
-			       bool roam_abort);
+void cm_roam_result_info_event(struct wmi_roam_result *res,
+			       struct wmi_roam_scan_data *scan_data,
+			       uint8_t vdev_id);
 #else
 static inline void
 cm_roam_scan_info_event(struct wmi_roam_scan_data *scan, uint8_t vdev_id)
@@ -87,9 +90,10 @@ cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
 {
 }
 
-static inline void
-cm_roam_result_info_event(struct wmi_roam_result *res, uint8_t vdev_id,
-			  bool roam_abort)
+static inline
+void cm_roam_result_info_event(struct wmi_roam_result *res,
+			       struct wmi_roam_scan_data *scan_data,
+			       uint8_t vdev_id)
 {
 }
 #endif /* WLAN_FEATURE_CONNECTIVITY_LOGGING */
@@ -112,6 +116,23 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		     uint8_t vdev_id,
 		     enum roam_offload_state requested_state,
 		     uint8_t reason);
+
+/**
+ * cm_handle_sta_sta_roaming_enablement() - To handle roaming in case
+ * of STA + STA
+ * @psoc: psoc common object
+ * @curr_vdev_id: Vdev id
+ *
+ * This function is to process STA + STA concurrency scenarios after roaming
+ * and take care of following:
+ * 1. Set PCL to vdev/pdev as per DBS, SCC or MCC
+ * 2. Enable/disable roaming based on the concurrency (DBS vs SCC/MCC) after
+ * roaming
+ *
+ * Return: none
+ */
+void cm_handle_sta_sta_roaming_enablement(struct wlan_objmgr_psoc *psoc,
+					  uint8_t curr_vdev_id);
 
 /**
  * cm_roam_send_rso_cmd() - send rso command
@@ -278,6 +299,27 @@ QDF_STATUS
 cm_roam_send_disable_config(struct wlan_objmgr_psoc *psoc,
 			    uint8_t vdev_id, uint8_t cfg);
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * cm_roam_send_rt_stats_config() - Send roam event stats cfg value to FW
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev id
+ * @param_value: roam stats enable/disable cfg
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_send_rt_stats_config(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id, uint8_t param_value);
+#else
+static inline QDF_STATUS
+cm_roam_send_rt_stats_config(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id, uint8_t param_value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 void
 cm_store_sae_single_pmk_to_global_cache(struct wlan_objmgr_psoc *psoc,
@@ -369,6 +411,18 @@ QDF_STATUS
 cm_roam_btm_query_event(struct wmi_neighbor_report_data *btm_data,
 			uint8_t vdev_id);
 
+/**
+ * cm_roam_beacon_loss_disconnect_event() - Send BMISS disconnection logging
+ * event
+ * @bssid: BSSID
+ * @rssi: RSSI
+ * @vdev_id: Vdev id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_beacon_loss_disconnect_event(struct qdf_mac_addr bssid, int32_t rssi,
+				     uint8_t vdev_id);
 #else
 static inline QDF_STATUS
 cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data, uint8_t vdev_id)
@@ -394,6 +448,13 @@ cm_roam_btm_resp_event(struct wmi_roam_trigger_info *trigger_info,
 static inline QDF_STATUS
 cm_roam_btm_query_event(struct wmi_neighbor_report_data *btm_data,
 			uint8_t vdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+cm_roam_beacon_loss_disconnect_event(struct qdf_mac_addr bssid, int32_t rssi,
+				     uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

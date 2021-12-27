@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -125,6 +126,13 @@
  * Preprocessor definitions and constants
  */
 
+static qdf_atomic_t dp_protect_entry_count;
+/* Milli seconds to delay SSR thread when an packet is getting processed */
+#define SSR_WAIT_SLEEP_TIME 200
+/* MAX iteration count to wait for dp tx to complete */
+#define MAX_SSR_WAIT_ITERATIONS 100
+#define MAX_SSR_PROTECT_LOG (16)
+
 #ifdef FEATURE_WLAN_APF
 /**
  * struct hdd_apf_context - hdd Context for apf
@@ -150,14 +158,25 @@ struct hdd_apf_context {
 };
 #endif /* FEATURE_WLAN_APF */
 
+#ifdef TX_MULTIQ_PER_AC
+#define TX_GET_QUEUE_IDX(ac, off) (((ac) * TX_QUEUES_PER_AC) + (off))
+#define TX_QUEUES_PER_AC 4
+#else
+#define TX_GET_QUEUE_IDX(ac, off) (ac)
+#define TX_QUEUES_PER_AC 1
+#endif
+
 /** Number of Tx Queues */
 #if defined(QCA_LL_TX_FLOW_CONTROL_V2) || \
 	defined(QCA_HL_NETDEV_FLOW_CONTROL) || \
 	defined(QCA_LL_PDEV_TX_FLOW_CONTROL)
-#define NUM_TX_QUEUES 5
+/* Only one HI_PRIO queue */
+#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC + 1)
 #else
-#define NUM_TX_QUEUES 4
+#define NUM_TX_QUEUES (4 * TX_QUEUES_PER_AC)
 #endif
+
+#define NUM_RX_QUEUES 5
 
 /*
  * Number of DPTRACE records to dump when a cfg80211 disconnect with reason
@@ -315,9 +334,6 @@ enum hdd_nb_cmd_id {
 
 #define P2P_OUI_TYPE   "\x50\x6f\x9a\x09"
 #define P2P_OUI_TYPE_SIZE  4
-
-#define HS20_OUI_TYPE   "\x50\x6f\x9a\x10"
-#define HS20_OUI_TYPE_SIZE  4
 
 #define OSEN_OUI_TYPE   "\x50\x6f\x9a\x12"
 #define OSEN_OUI_TYPE_SIZE  4
@@ -567,18 +583,30 @@ struct hdd_tx_rx_histogram {
 };
 
 struct hdd_tx_rx_stats {
-	/* start_xmit stats */
-	__u32    tx_called;
-	__u32    tx_dropped;
-	__u32    tx_orphaned;
-	__u32    tx_classified_ac[NUM_TX_QUEUES];
-	__u32    tx_dropped_ac[NUM_TX_QUEUES];
+	struct {
+		/* start_xmit stats */
+		__u32    tx_called;
+		__u32    tx_dropped;
+		__u32    tx_orphaned;
+		__u32    tx_classified_ac[WLAN_MAX_AC];
+		__u32    tx_dropped_ac[WLAN_MAX_AC];
+#ifdef TX_MULTIQ_PER_AC
+		/* Neither valid socket nor skb->hash */
+		uint32_t inv_sk_and_skb_hash;
+		/* skb->hash already calculated */
+		uint32_t qselect_existing_skb_hash;
+		/* valid tx queue id in socket */
+		uint32_t qselect_sk_tx_map;
+		/* skb->hash calculated in select queue */
+		uint32_t qselect_skb_hash_calc;
+#endif
+		/* rx stats */
+		__u32 rx_packets;
+		__u32 rx_dropped;
+		__u32 rx_delivered;
+		__u32 rx_refused;
+	} per_cpu[NUM_CPUS];
 
-	/* rx stats */
-	__u32 rx_packets[NUM_CPUS];
-	__u32 rx_dropped[NUM_CPUS];
-	__u32 rx_delivered[NUM_CPUS];
-	__u32 rx_refused[NUM_CPUS];
 	qdf_atomic_t rx_usolict_arp_n_mcast_drp;
 
 	/* rx gro */
@@ -1446,6 +1474,7 @@ struct hdd_adapter {
 
 	/* BITMAP indicating pause reason */
 	uint32_t pause_map;
+	uint32_t subqueue_pause_map;
 	spinlock_t pause_map_lock;
 	qdf_time_t start_time;
 	qdf_time_t last_time;
@@ -1523,6 +1552,8 @@ struct hdd_adapter {
 	uint8_t gro_disallowed[DP_MAX_RX_THREADS];
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 	bool handle_feature_update;
+	/* Indicate if TSO and checksum offload features are enabled or not */
+	bool tso_csum_feature_enabled;
 	bool runtime_disable_rx_thread;
 	ol_txrx_rx_fp rx_stack;
 
@@ -1851,6 +1882,35 @@ struct hdd_dual_sta_policy {
 	uint8_t primary_vdev_id;
 };
 
+#if defined(WLAN_FEATURE_DP_BUS_BANDWIDTH) && defined(FEATURE_RUNTIME_PM)
+/**
+ * enum hdd_rtpm_tput_policy_state - states to track runtime_pm tput policy
+ * @RTPM_TPUT_POLICY_STATE_INVALID: invalid state
+ * @RTPM_TPUT_POLICY_STATE_REQUIRED: state indicating runtime_pm is required
+ * @RTPM_TPUT_POLICY_STATE_NOT_REQUIRE: state indicating runtime_pm is NOT
+ * required
+ */
+enum hdd_rtpm_tput_policy_state {
+	RTPM_TPUT_POLICY_STATE_INVALID,
+	RTPM_TPUT_POLICY_STATE_REQUIRED,
+	RTPM_TPUT_POLICY_STATE_NOT_REQUIRED
+};
+
+/**
+ * struct hdd_rtpm_tput_policy_context - RTPM throughput policy context
+ * @curr_state: current state of throughput policy (RTPM require or not)
+ * @wake_lock: wakelock for QDF wake_lock acquire/release APIs
+ * @rtpm_lock: lock use for QDF rutime PM prevent/allow APIs
+ * @high_tput_vote: atomic variable to keep track of voting
+ */
+struct hdd_rtpm_tput_policy_context {
+	enum hdd_rtpm_tput_policy_state curr_state;
+	qdf_wake_lock_t wake_lock;
+	qdf_runtime_lock_t rtpm_lock;
+	qdf_atomic_t high_tput_vote;
+};
+#endif
+
 /**
  * struct hdd_context - hdd shared driver and psoc/device context
  * @psoc: object manager psoc context
@@ -1866,6 +1926,7 @@ struct hdd_dual_sta_policy {
  * @country_change_work: work for updating vdev when country changes
  * @rx_aggregation: rx aggregation enable or disable state
  * @gro_force_flush: gro force flushed indication flag
+ * @force_gro_enable: force GRO enable or disable flag
  * @current_pcie_gen_speed: current pcie gen speed
  * @pm_qos_req: pm_qos request for all cpu cores
  * @qos_cpu_mask: voted cpu core mask
@@ -1878,6 +1939,7 @@ struct hdd_dual_sta_policy {
  * @twt_en_dis_work: work to send twt enable/disable cmd on MCC/SCC concurrency
  * @dump_in_progress: Stores value of dump in progress
  * @hdd_dual_sta_policy: Concurrent STA policy configuration
+ * @rx_skip_qdisc_chk_conc: flag to skip ingress qdisc check in concurrency
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1969,6 +2031,9 @@ struct hdd_context {
 	uint64_t prev_tx;
 	qdf_atomic_t low_tput_gro_enable;
 	uint32_t bus_low_vote_cnt;
+#ifdef FEATURE_RUNTIME_PM
+	struct hdd_rtpm_tput_policy_context rtpm_tput_policy_ctx;
+#endif
 #endif /*WLAN_FEATURE_DP_BUS_BANDWIDTH*/
 
 	struct completion ready_to_suspend;
@@ -2126,6 +2191,7 @@ struct hdd_context {
 #endif
 	uint8_t bt_a2dp_active:1;
 	uint8_t bt_vo_active:1;
+	uint8_t bt_profile_con:1;
 	enum band_info curr_band;
 	bool imps_enabled;
 #ifdef WLAN_FEATURE_PACKET_FILTERING
@@ -2208,6 +2274,7 @@ struct hdd_context {
 	struct {
 		qdf_atomic_t rx_aggregation;
 		uint8_t gro_force_flush[DP_MAX_RX_THREADS];
+		bool force_gro_enable;
 	} dp_agg_param;
 	int current_pcie_gen_speed;
 	qdf_workqueue_t *adapter_ops_wq;
@@ -2241,6 +2308,7 @@ struct hdd_context {
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
 #endif
+	qdf_atomic_t rx_skip_qdisc_chk_conc;
 };
 
 /**
@@ -4807,6 +4875,35 @@ hdd_monitor_mode_qdf_create_event(struct hdd_adapter *adapter,
 }
 #endif
 
+static inline bool hdd_is_mac_addr_same(uint8_t *addr1, uint8_t *addr2)
+{
+	return !qdf_mem_cmp(addr1, addr2, QDF_MAC_ADDR_SIZE);
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline bool hdd_nbuf_dst_addr_is_mld_addr(struct hdd_adapter *adapter,
+						 struct sk_buff *nbuf)
+{
+	return hdd_is_mac_addr_same(adapter->mld_addr.bytes,
+				    qdf_nbuf_data(nbuf) +
+				    QDF_NBUF_DEST_MAC_OFFSET);
+}
+#else
+static inline bool hdd_nbuf_dst_addr_is_mld_addr(struct hdd_adapter *adapter,
+						 struct sk_buff *nbuf)
+{
+	return false;
+}
+#endif
+
+static inline bool hdd_nbuf_dst_addr_is_self_addr(struct hdd_adapter *adapter,
+						  struct sk_buff *nbuf)
+{
+	return hdd_is_mac_addr_same(adapter->mac_addr.bytes,
+				    qdf_nbuf_data(nbuf) +
+				    QDF_NBUF_DEST_MAC_OFFSET);
+}
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
      defined(WLAN_FEATURE_11AX)
 /**
@@ -4895,16 +4992,16 @@ static inline void hdd_beacon_latency_event_cb(uint32_t latency_level)
 #if defined(CLD_PM_QOS) || defined(FEATURE_RUNTIME_PM)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
 /**
- * wlan_hdd_get_pm_qos_cpu_latency() - get PM QOS CPU latency
+ * wlan_hdd_get_default_pm_qos_cpu_latency() - get default PM QOS CPU latency
  *
  * Return: PM QOS CPU latency value
  */
-static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
+static inline unsigned long wlan_hdd_get_default_pm_qos_cpu_latency(void)
 {
 	return PM_QOS_CPU_LATENCY_DEFAULT_VALUE;
 }
 #else
-static inline unsigned long wlan_hdd_get_pm_qos_cpu_latency(void)
+static inline unsigned long wlan_hdd_get_default_pm_qos_cpu_latency(void)
 {
 	return PM_QOS_CPU_DMA_LAT_DEFAULT_VALUE;
 }
@@ -5019,4 +5116,40 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
  * released.
  */
 void hdd_check_for_net_dev_ref_leak(struct hdd_adapter *adapter);
+
+/**
+ * hdd_wait_for_dp_tx: Wait for packet tx to complete
+ *
+ * This function waits for dp packet tx to complete
+ *
+ * Return: None
+ */
+void hdd_wait_for_dp_tx(void);
+
+static inline void hdd_dp_ssr_protect(void)
+{
+	qdf_atomic_inc_return(&dp_protect_entry_count);
+}
+
+static inline void hdd_dp_ssr_unprotect(void)
+{
+	qdf_atomic_dec(&dp_protect_entry_count);
+}
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+/**
+ * hdd_set_suspend_mode: set the suspend_mode state to pld based on the
+ *                       configuration option from INI file
+ * @hdd_ctx: HDD context
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int hdd_set_suspend_mode(struct hdd_context *hdd_ctx);
+#else
+static inline int hdd_set_suspend_mode(struct hdd_context *hdd_ctx)
+{
+	return 0;
+}
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */
