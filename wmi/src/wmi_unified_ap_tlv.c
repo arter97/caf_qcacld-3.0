@@ -3258,6 +3258,49 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 }
 #endif
 
+/**
+ * send_soc_tqm_reset_enable_disable_cmd_tlv() - This API to send the
+ * WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID to FW
+ * @wmi_handle: wmi handle
+ * @enable: Enable/Disable configuration
+ *
+ * Return: Success if the cmd is sent successfully to the firmware
+ */
+static
+QDF_STATUS send_soc_tqm_reset_enable_disable_cmd_tlv(wmi_unified_t wmi_handle,
+						     uint32_t enable)
+{
+	wmi_soc_tqm_reset_enable_disable_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_soc_tqm_reset_enable_disable_cmd_fixed_param *)
+			wmi_buf_data(buf);
+	WMITLV_SET_HDR
+		(&cmd->tlv_header,
+		 WMITLV_TAG_STRUC_wmi_soc_tqm_reset_enable_disable_cmd_fixed_param,
+		 WMITLV_GET_STRUCT_TLVLEN(wmi_soc_tqm_reset_enable_disable_cmd_fixed_param));
+
+	cmd->enable = !!enable;
+	wmi_debug("TQM reset enable:%d", cmd->enable);
+
+	wmi_mtrace(WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID)) {
+		wmi_err("Failed to send WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -3344,4 +3387,6 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_get_halphy_cal_status_cmd = send_get_halphy_cal_status_cmd_tlv;
 	ops->send_peer_set_intra_bss_cmd = send_peer_set_intra_bss_cmd_tlv;
 	ops->send_vdev_set_intra_bss_cmd = send_vdev_set_intra_bss_cmd_tlv;
+	ops->send_soc_tqm_reset_enable_disable_cmd =
+				send_soc_tqm_reset_enable_disable_cmd_tlv;
 }

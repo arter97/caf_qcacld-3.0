@@ -734,3 +734,21 @@ wmi_unified_peer_set_intra_bss_cmd_send(struct wmi_unified *wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
+
+/**
+ * wmi_unified_soc_tqm_reset_enable_disable_cmd() - Send tqm reset command to FW
+ * @wmi_handle: wmi handle
+ * @enable: enable or disable configuration from user
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
+					     uint32_t enable)
+{
+	if (wmi_handle->ops->send_soc_tqm_reset_enable_disable_cmd)
+		return wmi_handle->ops->send_soc_tqm_reset_enable_disable_cmd
+			(wmi_handle, enable);
+
+	return QDF_STATUS_E_FAILURE;
+}
