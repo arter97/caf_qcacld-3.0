@@ -163,8 +163,8 @@ monitor-objs := \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_mon_ol.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_rx_mon_feature.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_tx_capture.o \
-	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/linux/dp_mon_osif.o \
-	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/linux/dp_mon_cfg80211.o \
+	$(HOST_CMN_CONVG_SRC)/../component_dev/os_if/linux/dp/src/dp_mon_osif.o \
+	$(HOST_CMN_CONVG_SRC)/../component_dev/os_if/linux/dp/src/dp_mon_cfg80211.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/linux/dp_mon_module.o
 
 monitor-objs += \
