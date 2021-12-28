@@ -973,7 +973,6 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_BLK_REPORT_FLOOD,
 	OL_ATH_PARAM_DROP_STA_QUERY,
 #endif
-	OL_ATH_PARAM_QBOOST,
 	OL_ATH_PARAM_SIFS_FRMTYPE,
 	OL_ATH_PARAM_SIFS_UAPSD = 185,
 	OL_ATH_PARAM_FW_RECOVERY_ID,
@@ -2660,8 +2659,6 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"getDropSTAQuery",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DROP_STA_QUERY, GET_PARAM, 0},
 #endif
-	{"qboost_enable",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_QBOOST, SET_PARAM, 1},
 	{"sifs_frmtype",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SIFS_FRMTYPE, SET_PARAM, 1},
 	{"sifs_uapsd",

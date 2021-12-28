@@ -4142,44 +4142,6 @@ send_singleamsdu_cmd_non_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- * send_set_qboost_param_cmd_non_tlv() - send set qboost command to fw
- * @wmi_handle: wmi handle
- * @param: pointer to qboost params
- * @macaddr: vdev mac address
- * Return: 0 for success or error code
- */
-static QDF_STATUS
-send_set_qboost_param_cmd_non_tlv(wmi_unified_t wmi_handle,
-				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
-				struct set_qboost_params *param)
-{
-
-	WMI_QBOOST_CFG_CMD *cmd;
-	wmi_buf_t buf;
-	int ret;
-
-	buf = wmi_buf_alloc(wmi_handle, sizeof(*cmd));
-	if (!buf) {
-		wmi_err("wmi_buf_alloc failed");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	cmd = (WMI_QBOOST_CFG_CMD *)wmi_buf_data(buf);
-	cmd->vdev_id = param->vdev_id;
-	WMI_CHAR_ARRAY_TO_MAC_ADDR(macaddr, &cmd->peer_macaddr);
-	cmd->qb_enable = param->value;
-
-	ret = wmi_unified_cmd_send(wmi_handle, buf, sizeof(*cmd),
-			WMI_QBOOST_CFG_CMDID);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		wmi_err("Failed to send WMI_QBOOST_CFG_CMDID");
-		wmi_buf_free(buf);
-	}
-
-	return ret;
-}
-
-/**
  * send_mu_scan_cmd_non_tlv() - send mu scan command to fw
  * @wmi_handle: wmi handle
  * @param: pointer to mu scan params
@@ -10370,7 +10332,6 @@ struct wmi_ops non_tlv_ops =  {
 	.send_delba_send_cmd = send_delba_send_cmd_non_tlv,
 	.send_addba_setresponse_cmd = send_addba_setresponse_cmd_non_tlv,
 	.send_singleamsdu_cmd = send_singleamsdu_cmd_non_tlv,
-	.send_set_qboost_param_cmd = send_set_qboost_param_cmd_non_tlv,
 	.send_mu_scan_cmd = send_mu_scan_cmd_non_tlv,
 	.send_lteu_config_cmd = send_lteu_config_cmd_non_tlv,
 	.send_set_ps_mode_cmd = send_set_ps_mode_cmd_non_tlv,
