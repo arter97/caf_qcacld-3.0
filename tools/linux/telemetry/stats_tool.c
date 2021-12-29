@@ -753,7 +753,7 @@ void print_advance_ap_data_rx(struct advance_psoc_data_rx *rx)
 	print_basic_ap_data_rx(&rx->b_rx);
 	STATS_32(stdout, "Rx Ring Error Packets", rx->err_ring_pkts);
 	STATS_32(stdout, "Rx Fragments", rx->rx_frags);
-	STATS_32(stdout, "Rx REO Reinject", rx->reo_reinject);
+	STATS_32(stdout, "Rx HW Reinject", rx->rx_hw_reinject);
 	STATS_32(stdout, "Rx BAR Frames", rx->bar_frame);
 	STATS_32(stdout, "Rx Rejected", rx->rejected);
 	STATS_32(stdout, "Rx RAW Frame Drop", rx->raw_frm_drop);

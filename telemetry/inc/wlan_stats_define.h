@@ -676,7 +676,7 @@ struct advance_psoc_data_rx {
 	struct basic_psoc_data_rx b_rx;
 	u_int32_t err_ring_pkts;
 	u_int32_t rx_frags;
-	u_int32_t reo_reinject;
+	u_int32_t rx_hw_reinject;
 	u_int32_t bar_frame;
 	u_int32_t rejected;
 	u_int32_t raw_frm_drop;
