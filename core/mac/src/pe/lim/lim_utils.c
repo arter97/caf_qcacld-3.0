@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -75,6 +76,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <lim_mlo.h>
 #endif
+#include <wlan_vdev_mgr_utils_api.h>
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
