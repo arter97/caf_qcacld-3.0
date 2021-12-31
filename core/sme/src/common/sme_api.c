@@ -75,6 +75,7 @@
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include <wlan_mlme_twt_api.h>
 #include "wlan_cm_roam_ucfg_api.h"
+#include "wlan_mlme_cmn.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 

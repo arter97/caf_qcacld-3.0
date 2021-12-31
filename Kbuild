@@ -1345,6 +1345,7 @@ $(call add-wlan-objs,umac_sm,$(UMAC_SM_OBJS))
 
 ######## COMMON MLME ##############
 UMAC_MLME_INC := -I$(WLAN_COMMON_INC)/umac/mlme \
+		-I$(WLAN_COMMON_INC)/umac/mlme/include \
 		-I$(WLAN_COMMON_INC)/umac/mlme/mlme_objmgr/dispatcher/inc \
 		-I$(WLAN_COMMON_INC)/umac/mlme/vdev_mgr/dispatcher/inc \
 		-I$(WLAN_COMMON_INC)/umac/mlme/pdev_mgr/dispatcher/inc \
