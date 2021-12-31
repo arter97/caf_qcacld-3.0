@@ -231,6 +231,7 @@ static const uint32_t pdev_param_non_tlv[] = {
 		WMI_PDEV_PARAM_ENABLE_PEER_RETRY_STATS,
 	[wmi_pdev_param_per_peer_prd_cfr_enable] =
 		WMI_PDEV_PARAM_PER_PEER_PERIODIC_CFR_ENABLE,
+	[wmi_pdev_param_en_probe_all_bw] = WMI_UNAVAILABLE_PARAM,
 };
 
 /**

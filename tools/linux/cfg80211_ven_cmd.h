@@ -1345,6 +1345,8 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_IPA_UC_STATS = 487,
 #endif
 	OL_ATH_PARAM_TQM_RESET = 488,
+	/* Enable/disable probing all bandwidth */
+	OL_ATH_PARAM_EN_PROBE_ALL_BW = 489,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3532,6 +3534,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, SET_PARAM, 1},
 	{"get_tqm_reset",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, GET_PARAM, 0},
+	{"probe_all_bw",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_PROBE_ALL_BW, SET_PARAM, 1},
+	{"g_probe_all_bw",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_PROBE_ALL_BW, GET_PARAM, 0},
 };
 #endif
 
