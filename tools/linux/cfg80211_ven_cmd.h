@@ -2412,7 +2412,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"eht_ul_ldpc",          IEEE80211_PARAM_EHT_UL_LDPC, SET_PARAM, 1},
 	{"get_eht_ul_ldpc",      IEEE80211_PARAM_EHT_UL_LDPC, GET_PARAM, 0},
 	{"eht_ul_stbc",          IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
-	{"get_eht_ul_stbc",      IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
+	{"get_eht_ul_stbc",      IEEE80211_PARAM_EHT_UL_STBC, GET_PARAM, 0},
 	{"eht_ul_mcs",           IEEE80211_PARAM_EHT_UL_FIXED_RATE, SET_PARAM, 1},
 	{"get_eht_ul_mcs",       IEEE80211_PARAM_EHT_UL_FIXED_RATE, GET_PARAM, 0},
 	{"eht_ul_ltf",           IEEE80211_PARAM_EHT_UL_LTF, SET_PARAM, 1},
