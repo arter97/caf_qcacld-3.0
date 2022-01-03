@@ -3279,6 +3279,32 @@ send_set_rate_upper_cap_cmd_tlv(struct wmi_unified *wmi_handle, uint8_t pdev_id,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+static QDF_STATUS
+send_set_rate_retry_mcs_drop_cmd_tlv(struct wmi_unified *wmi_handle,
+				     uint8_t pdev_id,
+				     struct wmi_rc_params *param)
+{
+	struct pdev_params pparam;
+	uint32_t value = 0;
+
+	WMI_PDEV_RATE_DROP_NUM_MCS_SET(value, param->mcs_drop);
+	WMI_PDEV_RATE_DROP_RETRY_THRSH_SET(value, param->retry_thresh);
+	WMI_PDEV_RATE_DROP_NUM_MCS_VALID_SET(value, param->en_mcs_drop);
+	WMI_PDEV_RATE_DROP_RETRY_THRSH_VALID_SET(value, param->en_retry_thresh);
+
+	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
+
+	qdf_mem_set(&pparam, sizeof(pparam), 0);
+	pparam.param_id = wmi_pdev_param_rate_retry_mcs_drop;
+	pparam.param_value = value;
+
+	if (wmi_handle->ops->send_pdev_param_cmd)
+		return wmi_handle->ops->send_pdev_param_cmd(wmi_handle, &pparam,
+							    pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
 
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
@@ -3370,5 +3396,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 				send_soc_tqm_reset_enable_disable_cmd_tlv;
 #if CONFIG_SAWF_DEF_QUEUES
 	ops->send_set_rate_upper_cap_cmd = send_set_rate_upper_cap_cmd_tlv;
+	ops->send_set_rate_retry_mcs_drop_cmd =
+		send_set_rate_retry_mcs_drop_cmd_tlv;
 #endif
 }

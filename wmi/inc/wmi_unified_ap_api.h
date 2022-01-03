@@ -885,5 +885,18 @@ QDF_STATUS
 wmi_unified_set_rate_upper_cap_cmd_send(struct wmi_unified *wmi_handle,
 					uint8_t pdev_id,
 					struct wmi_rc_params *param);
+
+/**
+ * wmi_unified_set_rate_retry_mcs_drop_cmd_send() - set rate retry and mcs drop
+ * @wmi_handle: wmi handle
+ * @pdev_id: pdev id
+ * @param: rate retry and mcs drop parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_rate_retry_mcs_drop_cmd_send(struct wmi_unified *wmi_handle,
+					     uint8_t pdev_id,
+					     struct wmi_rc_params *param);
 #endif
 #endif /* _WMI_UNIFIED_AP_API_H_ */

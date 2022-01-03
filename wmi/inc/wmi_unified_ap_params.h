@@ -906,12 +906,20 @@ struct wmi_peer_latency_config_params {
  * @upper_cap_mcs: Max MCS
  * @en_nss_cap: Enable NSS upper cap
  * @en_mcc_cap: Enable MCS upper cap
+ * @retry_thresh: Retry threshold
+ * @mcs_drop: number of MCS to drop
+ * @en_retry_thresh: Enable rate retry threshold
+ * @en_mcs_drop: Enable mcs drop number
  */
 struct wmi_rc_params {
 	uint8_t upper_cap_nss;
 	uint8_t upper_cap_mcs;
 	uint8_t en_nss_cap;
 	uint8_t en_mcs_cap;
+	uint8_t retry_thresh;
+	uint8_t mcs_drop;
+	uint8_t en_retry_thresh;
+	uint8_t en_mcs_drop;
 };
 #endif
 #endif
