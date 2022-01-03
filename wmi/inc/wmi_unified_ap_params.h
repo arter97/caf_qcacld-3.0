@@ -910,6 +910,10 @@ struct wmi_peer_latency_config_params {
  * @mcs_drop: number of MCS to drop
  * @en_retry_thresh: Enable rate retry threshold
  * @en_mcs_drop: Enable mcs drop number
+ * @min_mcs_probe_intvl: min mcs probe interval
+ * @max_mcs_probe_intvl: max mcs probe interval
+ * @min_nss_probe_intvl: min nss probe interval
+ * @max_nss_probe_intvl: max nss probe interval
  */
 struct wmi_rc_params {
 	uint8_t upper_cap_nss;
@@ -920,6 +924,10 @@ struct wmi_rc_params {
 	uint8_t mcs_drop;
 	uint8_t en_retry_thresh;
 	uint8_t en_mcs_drop;
+	uint16_t min_mcs_probe_intvl;
+	uint16_t max_mcs_probe_intvl;
+	uint16_t min_nss_probe_intvl;
+	uint16_t max_nss_probe_intvl;
 };
 #endif
 #endif

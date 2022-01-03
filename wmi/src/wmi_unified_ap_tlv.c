@@ -3305,6 +3305,56 @@ send_set_rate_retry_mcs_drop_cmd_tlv(struct wmi_unified *wmi_handle,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+static QDF_STATUS
+send_set_mcs_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
+				 uint8_t pdev_id, struct wmi_rc_params *param)
+{
+	struct pdev_params pparam;
+	uint32_t value = 0;
+
+	WMI_PDEV_RATE_MIN_MCS_PROBE_INTERVAL_SET(value,
+			param->min_mcs_probe_intvl);
+	WMI_PDEV_RATE_MAX_MCS_PROBE_INTERVAL_SET(value,
+			param->max_mcs_probe_intvl);
+
+	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
+
+	qdf_mem_set(&pparam, sizeof(pparam), 0);
+	pparam.param_id = wmi_pdev_param_mcs_probe_intvl;
+	pparam.param_value = value;
+
+	if (wmi_handle->ops->send_pdev_param_cmd)
+		return wmi_handle->ops->send_pdev_param_cmd(wmi_handle, &pparam,
+							    pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+send_set_nss_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
+				 uint8_t pdev_id, struct wmi_rc_params *param)
+{
+	struct pdev_params pparam;
+	uint32_t value = 0;
+
+	WMI_PDEV_RATE_MIN_NSS_PROBE_INTERVAL_SET(value,
+			param->min_nss_probe_intvl);
+	WMI_PDEV_RATE_MAX_NSS_PROBE_INTERVAL_SET(value,
+			param->max_nss_probe_intvl);
+
+	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
+
+	qdf_mem_set(&pparam, sizeof(pparam), 0);
+	pparam.param_id = wmi_pdev_param_nss_probe_intvl;
+	pparam.param_value = value;
+
+	if (wmi_handle->ops->send_pdev_param_cmd)
+		return wmi_handle->ops->send_pdev_param_cmd(wmi_handle, &pparam,
+							    pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
 
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
@@ -3398,5 +3448,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_set_rate_upper_cap_cmd = send_set_rate_upper_cap_cmd_tlv;
 	ops->send_set_rate_retry_mcs_drop_cmd =
 		send_set_rate_retry_mcs_drop_cmd_tlv;
+	ops->send_set_mcs_probe_intvl_cmd = send_set_mcs_probe_intvl_cmd_tlv;
+	ops->send_set_nss_probe_intvl_cmd = send_set_nss_probe_intvl_cmd_tlv;
 #endif
 }
