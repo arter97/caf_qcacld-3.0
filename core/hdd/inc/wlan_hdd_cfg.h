@@ -18002,6 +18002,27 @@ enum hdd_external_acs_policy {
 #define CFG_DFS_CHAN_AGEOUT_TIME_DEFAULT	(0)
 
 /*
+ * <ini>
+ * g_disable_hw_assist - Flag to disable HW assist feature
+ * @Default: 0
+ *
+ * This ini is used to enable/disable the HW assist feature in FW
+ *
+ * Related: none
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: External
+ *
+ * <ini>
+ */
+
+#define CFG_DISABLE_HW_ASSIST           "g_disable_hw_assist"
+#define CFG_DISABLE_HW_ASSIST_MIN       (0)
+#define CFG_DISABLE_HW_ASSIST_MAX       (1)
+#define CFG_DISABLE_HW_ASSIST_DEFAULT   (0)
+
+/*
  * Type declarations
  */
 
@@ -19059,6 +19080,7 @@ struct hdd_config {
 	uint8_t dfs_chan_ageout_time;
 
 	bool enable_nan_indoor_channel;
+	bool disable_hw_assist;
 };
 
 #define VAR_OFFSET(_Struct, _Var) (offsetof(_Struct, _Var))
