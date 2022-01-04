@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1340,10 +1341,8 @@ enum _ol_ath_param_t {
 	/* Force primary UMAC SOC ID */
 	OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID = 486,
 #endif
-#ifdef IPA_OFFLOAD
 	/* Display IPA stats */
 	OL_ATH_PARAM_IPA_UC_STATS = 487,
-#endif
 	OL_ATH_PARAM_TQM_RESET = 488,
 };
 
@@ -3524,10 +3523,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID,
 		SET_PARAM, 1},
 #endif
-#ifdef IPA_OFFLOAD
 	{"ipaucstats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_IPA_UC_STATS, SET_PARAM, 1},
-#endif
 	{"tqm_reset",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, SET_PARAM, 1},
 	{"get_tqm_reset",
