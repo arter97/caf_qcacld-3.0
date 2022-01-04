@@ -2353,9 +2353,9 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_max_auth_fail",        IEEE80211_PARAM_AP_MAX_AUTH_FAIL, GET_PARAM, 0},
 	{"vap_resource_profile ",     IEEE80211_PARAM_VAP_PROFILE_CONFIG, SET_PARAM, 2},
 #ifdef WLAN_FEATURE_11BE
-	{"eht_txmcsmap",         IEEE80211_PARAM_EHT_TX_MCSMAP, SET_PARAM, 1},
+	{"eht_txmcsmap",         IEEE80211_PARAM_EHT_TX_MCSMAP, SET_PARAM, 3},
 	{"get_eht_txmcsmap",     IEEE80211_PARAM_EHT_TX_MCSMAP, GET_PARAM, 0},
-	{"eht_rxmcsmap",         IEEE80211_PARAM_EHT_RX_MCSMAP, SET_PARAM, 1},
+	{"eht_rxmcsmap",         IEEE80211_PARAM_EHT_RX_MCSMAP, SET_PARAM, 3},
 	{"get_eht_rxmcsmap",     IEEE80211_PARAM_EHT_RX_MCSMAP, GET_PARAM, 0},
 	{"eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	SET_PARAM, 1},
 	{"g_eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	GET_PARAM, 0},
