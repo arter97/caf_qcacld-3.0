@@ -302,7 +302,7 @@ struct basic_psoc_data_rx {
 #endif
 #define STATS_IF_SS_COUNT            8
 #define STATS_IF_MAX_GI              (4 + 1)
-#define STATS_IF_MAX_BW              7
+#define STATS_IF_MAX_BW              8
 #define STATS_IF_MAX_DATA_TIDS       9
 #define STATS_IF_MAX_RX_CTX          8
 #define STATS_IF_WME_AC_BE           0
