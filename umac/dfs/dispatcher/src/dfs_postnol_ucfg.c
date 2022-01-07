@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -335,7 +336,7 @@ bool tgt_dfs_is_stadfs_enabled(struct wlan_objmgr_pdev *pdev)
 void utils_dfs_get_nol_history_chan_list(struct wlan_objmgr_pdev *pdev,
 					 void *clist, uint32_t *num_chan)
 {
-	int i, j = 0;
+	uint32_t i, j = 0;
 	struct regulatory_channel *cur_chan_list;
 	struct wlan_dfs *dfs;
 	struct dfs_channel *chan_list = (struct dfs_channel *)clist;

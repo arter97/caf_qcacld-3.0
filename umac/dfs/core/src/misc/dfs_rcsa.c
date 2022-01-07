@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,7 +41,7 @@ dfs_prepare_nol_ie_bitmap_for_freq(struct wlan_dfs *dfs,
 				   uint16_t *in_sub_channels,
 				   uint8_t n_in_sub_channels)
 {
-	uint16_t cur_subchans[NUM_CHANNELS_160MHZ];
+	uint16_t cur_subchans[MAX_20MHZ_SUBCHANS];
 	uint8_t n_cur_subchans;
 	uint8_t i;
 	uint8_t j;
@@ -110,8 +111,8 @@ bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
 {
 	uint8_t num_subchans;
 	uint8_t bits = 0x01;
-	uint16_t radar_subchans[NUM_CHANNELS_160MHZ];
-	uint16_t nol_freq_list[NUM_CHANNELS_160MHZ];
+	uint16_t radar_subchans[MAX_20MHZ_SUBCHANS];
+	uint16_t nol_freq_list[MAX_20MHZ_SUBCHANS];
 	bool should_nol_ie_be_sent = true;
 
 	qdf_mem_zero(radar_subchans, sizeof(radar_subchans));
@@ -136,7 +137,7 @@ bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
 		dfs->dfs_nol_ie_bandwidth = nol_ie_bandwidth;
 		dfs->dfs_nol_ie_startfreq = nol_ie_startfreq;
 		dfs->dfs_nol_ie_bitmap = nol_ie_bitmap;
-		for (num_subchans = 0; num_subchans < NUM_CHANNELS_160MHZ;
+		for (num_subchans = 0; num_subchans < MAX_20MHZ_SUBCHANS;
 			num_subchans++) {
 			if (nol_ie_bitmap & bits) {
 				radar_subchans[num_subchans] = frequency;

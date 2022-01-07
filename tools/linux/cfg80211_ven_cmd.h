@@ -805,8 +805,16 @@ enum {
 	IEEE80211_PARAM_EHT_DL_OFDMA_TXBF                       = 766, /* EHT DL ODFMA Tx beamformer */
 	IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO                     = 767, /* EHT DL ODFMA Multi user MIMO */
 	IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO                     = 768, /* EHT UL ODFMA Multi user MIMO */
+	IEEE80211_PARAM_EHT_UL_NSS        = 769, /* Maximum NSS allowed in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_PPDU_BW    = 770, /* EHT UL Channel width*/
+	IEEE80211_PARAM_EHT_UL_SHORTGI    = 771, /* Shortgi configuration in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_LDPC       = 772, /* Enable/Disable LDPC in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_STBC       = 773, /* Enable/Disable STBC in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_FIXED_RATE = 774, /* Control UL fixed rate for EHT mode */
+	IEEE80211_PARAM_EHT_UL_LTF        = 775, /* LTF configuration in UL Trigger for EHT mode */
 #endif /* WLAN_FEATURE_11BE */
-	IEEE80211_PARAM_MAX_CAP_AP                 = 769,   /* Advertise Maximum capability of AP */
+	IEEE80211_PARAM_MAX_CAP_AP                 = 776,   /* Advertise Maximum capability of AP */
+        IEEE80211_PARAM_NEIG_RPT          = 777,   /* disable/enable inclusion of Neighbor Report bit in Beacon/Probe-Rsp */
 };
 
 enum {
@@ -1336,6 +1344,7 @@ enum _ol_ath_param_t {
 	/* Display IPA stats */
 	OL_ATH_PARAM_IPA_UC_STATS = 487,
 #endif
+	OL_ATH_PARAM_TQM_RESET = 488,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -1599,6 +1608,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_rnr_tbtt",          IEEE80211_PARAM_RNR_TBTT, GET_PARAM, 0},
 	{"apchanrpt",           IEEE80211_PARAM_AP_CHAN_RPT, SET_PARAM, 1},
 	{"g_apchanrpt",         IEEE80211_PARAM_AP_CHAN_RPT, GET_PARAM, 0},
+	{"disable_neigrpt",     IEEE80211_PARAM_NEIG_RPT, SET_PARAM, 1},
+	{"g_disable_neigrpt",   IEEE80211_PARAM_NEIG_RPT, GET_PARAM, 0},
 	{"mgmt_rate",           IEEE80211_PARAM_MGMT_RATE, SET_PARAM, 1},
 	{"g_mgmt_rate",         IEEE80211_PARAM_MGMT_RATE, GET_PARAM, 0},
 	{"rtscts_rate",         IEEE80211_PARAM_RTSCTS_RATE, SET_PARAM, 1},
@@ -1841,9 +1852,9 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"s_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, SET_PARAM, 2},
 	{"g_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, GET_PARAM, 0},
 #endif
-	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 1},
+	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 2},
 	{"get_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, GET_PARAM, 0},
-	{"addlocalpeer",        IEEE80211_PARAM_ADD_LOCAL_PEER, SET_PARAM, 2},
+	{"addlocalpeer",        IEEE80211_PARAM_ADD_LOCAL_PEER, SET_PARAM, 3},
 	{"setmhdr",             IEEE80211_PARAM_SET_MHDR, SET_PARAM, 1},
 	{"allowdata",           IEEE80211_PARAM_ALLOW_DATA, SET_PARAM, 2},
 	{"meshdbg",             IEEE80211_PARAM_SET_MESHDBG, SET_PARAM, 1},
@@ -2379,10 +2390,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_mu_bfmr", IEEE80211_PARAM_EHT_MU_BFMR, GET_PARAM, 0},
 	{"set_eht_mubfee", IEEE80211_PARAM_EHT_MU_BFEE, SET_PARAM, 1},
 	{"get_eht_mubfee", IEEE80211_PARAM_EHT_MU_BFEE, GET_PARAM, 0},
-	{"set_eht_ulofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, SET_PARAM, 1},
-	{"get_eht_ulofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, GET_PARAM, 0},
-	{"set_eht_dlofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, SET_PARAM, 1},
-	{"get_eht_dlofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, GET_PARAM, 0},
+	{"set_eht_ulofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, SET_PARAM, 1},
+	{"get_eht_ulofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, GET_PARAM, 0},
+	{"set_eht_dlofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, SET_PARAM, 1},
+	{"get_eht_dlofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, GET_PARAM, 0},
 	{"set_eht_ulmumimo", IEEE80211_PARAM_EHT_MU_MIMO, SET_PARAM, 1},
 	{"get_eht_ulmumimo", IEEE80211_PARAM_EHT_MU_MIMO, GET_PARAM, 0},
 	{"set_eht_dlofdma_bf", IEEE80211_PARAM_EHT_DL_OFDMA_TXBF, SET_PARAM, 1},
@@ -2391,6 +2402,20 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_dlofdma_mumimo", IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO, GET_PARAM, 0},
 	{"set_eht_ulofdma_mumimo", IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO, SET_PARAM, 1},
 	{"get_eht_ulofdma_mumimo", IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO, GET_PARAM, 0},
+	{"eht_ul_nss",           IEEE80211_PARAM_EHT_UL_NSS, SET_PARAM, 1},
+	{"get_eht_ul_nss",       IEEE80211_PARAM_EHT_UL_NSS, GET_PARAM, 0},
+	{"eht_ul_ppdu_bw",       IEEE80211_PARAM_EHT_UL_PPDU_BW, SET_PARAM, 1},
+	{"get_eht_ul_ppdu_bw",   IEEE80211_PARAM_EHT_UL_PPDU_BW, GET_PARAM, 0},
+	{"eht_ul_shortgi",       IEEE80211_PARAM_EHT_UL_SHORTGI, SET_PARAM, 1},
+	{"get_eht_ul_shortgi",   IEEE80211_PARAM_EHT_UL_SHORTGI, GET_PARAM, 0},
+	{"eht_ul_ldpc",          IEEE80211_PARAM_EHT_UL_LDPC, SET_PARAM, 1},
+	{"get_eht_ul_ldpc",      IEEE80211_PARAM_EHT_UL_LDPC, GET_PARAM, 0},
+	{"eht_ul_stbc",          IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
+	{"get_eht_ul_stbc",      IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
+	{"eht_ul_mcs",           IEEE80211_PARAM_EHT_UL_FIXED_RATE, SET_PARAM, 1},
+	{"get_eht_ul_mcs",       IEEE80211_PARAM_EHT_UL_FIXED_RATE, GET_PARAM, 0},
+	{"eht_ul_ltf",           IEEE80211_PARAM_EHT_UL_LTF, SET_PARAM, 1},
+	{"get_eht_ul_ltf",       IEEE80211_PARAM_EHT_UL_LTF, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 };
 
@@ -3503,6 +3528,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"ipaucstats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_IPA_UC_STATS, SET_PARAM, 1},
 #endif
+	{"tqm_reset",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, SET_PARAM, 1},
+	{"get_tqm_reset",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, GET_PARAM, 0},
 };
 #endif
 

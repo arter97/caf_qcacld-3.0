@@ -49,19 +49,21 @@ int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
  * these values could be for FP, MO, or both by using first 16 bits.
  * i.e. 0x10004 (FP only enable with filter 4 on)
  */
-static int ol_ath_set_rx_monitor_filter(struct ieee80211com *ic, uint32_t val)
+static int ol_ath_set_rx_monitor_filter(struct ieee80211com *ic)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(ic->ic_pdev_obj);
 	struct cdp_monitor_filter filter_val;
 	ol_txrx_soc_handle soc_txrx_handle;
-	uint32_t shift_val = FILTER_MODE(val);
+	uint64_t val = ic->ic_os_monrxfilter;
+	uint32_t filter_mode;
 
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 	filter_val.mode = RX_MON_FILTER_PASS | RX_MON_FILTER_OTHER;
 
-	if (shift_val == FILTER_PASS_ONLY)
+	filter_mode = FILTER_MODE(val);
+	if (filter_mode == FILTER_PASS_ONLY)
 		filter_val.mode = RX_MON_FILTER_PASS;
-	else if (shift_val == MONITOR_OTHER_ONLY)
+	else if (filter_mode == MONITOR_OTHER_ONLY)
 		filter_val.mode = RX_MON_FILTER_OTHER;
 
 	if (filter_val.mode & RX_MON_FILTER_PASS) {

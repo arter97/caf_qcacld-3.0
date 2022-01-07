@@ -84,7 +84,6 @@ int monitor_mod_init(void)
 		soc->monitor_soc = mon_soc;
 		dp_mon_soc_cfg_init(soc);
 		pdev_attach_success = false;
-		dp_mon_cdp_ops_register(soc);
 		dp_mon_ops_register(soc);
 		mon_ops = dp_mon_ops_get(soc);
 		if (!mon_ops) {
@@ -140,6 +139,7 @@ int monitor_mod_init(void)
 		mon_soc_ol_attach(psoc);
 		dp_mon_register_feature_ops(soc);
 		dp_mon_register_intr_ops(soc);
+		dp_mon_cdp_ops_register(soc);
 	}
 	return 0;
 }
@@ -188,6 +188,9 @@ void monitor_mod_exit(void)
 
 		mon_soc_ol_detach(psoc);
 		dp_mon_cdp_ops_deregister(soc);
+		dp_mon_intr_ops_deregister(soc);
+		dp_mon_feature_ops_deregister(soc);
+
 		pdev_count = psoc->soc_objmgr.wlan_pdev_count;
 		for (pdev_id = 0; pdev_id < pdev_count; pdev_id++) {
 			pdev = soc->pdev_list[pdev_id];
@@ -204,6 +207,8 @@ void monitor_mod_exit(void)
 
 		if (mon_ops && mon_ops->mon_soc_detach)
 			mon_ops->mon_soc_detach(soc);
+
+		dp_mon_ops_free(soc);
 
 		mon_soc = soc->monitor_soc;
 		soc->monitor_soc = NULL;
