@@ -1137,8 +1137,6 @@ static void dp_tx_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 	soc->ipa_uc_tx_rsc.tx_buf_pool_vaddr_unaligned = NULL;
 
 	ipa_res = &pdev->ipa_resource;
-	if (!ipa_res->is_db_ddr_mapped)
-		iounmap(ipa_res->tx_comp_doorbell_vaddr);
 
 	qdf_mem_free_sgtable(&ipa_res->tx_ring.sgtable);
 	qdf_mem_free_sgtable(&ipa_res->tx_comp_ring.sgtable);
@@ -1603,6 +1601,29 @@ QDF_STATUS dp_ipa_set_doorbell_paddr(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS dp_ipa_iounmap_doorbell_vaddr(struct cdp_soc_t *soc_hdl,
+					 uint8_t pdev_id)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+	struct dp_ipa_resources *ipa_res;
+
+	if (!wlan_cfg_is_ipa_enabled(soc->wlan_cfg_ctx))
+		return QDF_STATUS_SUCCESS;
+
+	if (!pdev) {
+		dp_err("Invalid instance");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ipa_res = &pdev->ipa_resource;
+	if (!ipa_res->is_db_ddr_mapped)
+		iounmap(ipa_res->tx_comp_doorbell_vaddr);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS dp_ipa_op_response(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			      uint8_t *op_msg)
 {
@@ -1812,15 +1833,16 @@ QDF_STATUS dp_ipa_disable_autonomy(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)) || \
 	defined(CONFIG_IPA_WDI_UNIFIED_API)
 
-#ifndef QCA_LL_TX_FLOW_CONTROL_V2
+#if !defined(QCA_LL_TX_FLOW_CONTROL_V2) && !defined(QCA_IPA_LL_TX_FLOW_CONTROL)
 static inline void dp_setup_mcc_sys_pipes(
 		qdf_ipa_sys_connect_params_t *sys_in,
 		qdf_ipa_wdi_conn_in_params_t *pipe_in)
 {
+	int i = 0;
 	/* Setup MCC sys pipe */
 	QDF_IPA_WDI_CONN_IN_PARAMS_NUM_SYS_PIPE_NEEDED(pipe_in) =
 			DP_IPA_MAX_IFACE;
-	for (int i = 0; i < DP_IPA_MAX_IFACE; i++)
+	for (i = 0; i < DP_IPA_MAX_IFACE; i++)
 		memcpy(&QDF_IPA_WDI_CONN_IN_PARAMS_SYS_IN(pipe_in)[i],
 		       &sys_in[i], sizeof(qdf_ipa_sys_connect_params_t));
 }

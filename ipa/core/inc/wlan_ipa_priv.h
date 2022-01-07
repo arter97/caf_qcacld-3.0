@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -57,7 +58,7 @@
 
 #define WLAN_IPA_WLAN_HDR_DES_MAC_OFFSET    0
 #define WLAN_IPA_MAX_IFACE                  MAX_IPA_IFACE
-#define WLAN_IPA_CLIENT_MAX_IFACE           3
+#define WLAN_IPA_CLIENT_MAX_IFACE           MAX_IPA_IFACE
 #define WLAN_IPA_MAX_SYSBAM_PIPE            4
 #define WLAN_IPA_MAX_SESSION                5
 #ifdef WLAN_MAX_CLIENTS_ALLOWED
@@ -76,7 +77,11 @@
 #define WLAN_IPA_UC_STA_ENABLE_MASK         BIT(6)
 #define WLAN_IPA_REAL_TIME_DEBUGGING        BIT(8)
 
+#ifdef QCA_IPA_LL_TX_FLOW_CONTROL
+#define WLAN_IPA_MAX_BANDWIDTH              4800
+#else
 #define WLAN_IPA_MAX_BANDWIDTH              800
+#endif
 
 #define WLAN_IPA_MAX_PENDING_EVENT_COUNT    20
 
@@ -196,7 +201,7 @@ struct wlan_ipa_tx_hdr {
  */
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
     defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
-    defined(QCA_WIFI_WCN7850)
+    defined(QCA_WIFI_WCN7850) || defined(QCA_WIFI_QCN9000)
 struct frag_header {
 	uint8_t reserved[0];
 };
@@ -223,7 +228,7 @@ struct frag_header {
 
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
     defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
-    defined(QCA_WIFI_WCN7850)
+    defined(QCA_WIFI_WCN7850) || defined(QCA_WIFI_QCN9000)
 struct ipa_header {
 	uint8_t reserved[0];
 };
@@ -598,6 +603,7 @@ struct wlan_ipa_tx_desc {
 
 typedef QDF_STATUS (*wlan_ipa_softap_xmit)(qdf_nbuf_t nbuf, qdf_netdev_t dev);
 typedef void (*wlan_ipa_send_to_nw)(qdf_nbuf_t nbuf, qdf_netdev_t dev);
+typedef bool (*wlan_ipa_driver_unloading)(void);
 
 /**
  * typedef wlan_ipa_rps_enable - Enable/disable RPS for adapter using vdev id
@@ -711,14 +717,12 @@ struct wlan_ipa_priv {
 
 	wlan_ipa_softap_xmit softap_xmit;
 	wlan_ipa_send_to_nw send_to_nw;
-	ipa_uc_offload_control_req ipa_tx_op;
-	ipa_intrabss_control_req ipa_intrabss_op;
 
 #ifdef QCA_CONFIG_RPS
 	/*Callback to enable RPS for STA in STA+SAP scenario*/
 	wlan_ipa_rps_enable rps_enable;
 #endif
-
+	wlan_ipa_driver_unloading driver_is_unloading;
 	qdf_event_t ipa_resource_comp;
 
 	uint32_t wdi_version;

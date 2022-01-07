@@ -411,14 +411,13 @@ enum cdp_peer_type {
 /**
  * struct cdp_peer_setup_info: MLO connection info for cdp_peer_setup()
  * @mld_peer_mac: mld peer mac address pointer
- * @is_assoc_link: set true for first MLO link peer association
- * @is_primary_link: for MCC, the first link will always be primary link,
- *		     for WIN,  other link might be primary link.
+ * @is_first_link: set true for first MLO link peer
+ * @is_primary_link: set true for MLO primary link peer
  * @primary_umac_id: primary umac_id
  */
 struct cdp_peer_setup_info {
 	uint8_t *mld_peer_mac;
-	uint8_t is_assoc_link:1,
+	uint8_t is_first_link:1,
 		is_primary_link:1;
 	uint8_t primary_umac_id;
 };
@@ -1244,6 +1243,7 @@ enum cdp_pdev_param_type {
  * @cdp_vdev_param_peer_tid_latency_enable: set peer tid latency enable flag
  * @cdp_vdev_param_mesh_tid: config tatency tid on vdev
  * @cdp_vdev_param_dscp_tid_map_id: set dscp to tid map id
+ * @cdp_vdev_param_mcast_vdev: set mcast vdev params
  *
  * @cdp_pdev_param_dbg_snf: Enable debug sniffer feature
  * @cdp_pdev_param_bpr_enable: Enable bcast probe feature
@@ -1315,6 +1315,7 @@ typedef union cdp_config_param_t {
 	uint8_t cdp_vdev_param_peer_tid_latency_enable;
 	uint8_t cdp_vdev_param_mesh_tid;
 	uint8_t cdp_vdev_param_dscp_tid_map_id;
+	bool cdp_vdev_param_mcast_vdev;
 
 	/* pdev params */
 	bool cdp_pdev_param_cptr_latcy;
@@ -1434,6 +1435,7 @@ enum cdp_pdev_bpr_param {
  * @CDP_ENABLE_PEER_TID_LATENCY: set peer tid latency enable flag
  * @CDP_SET_VAP_MESH_TID : Set latency tid in vap
  * @CDP_UPDATE_DSCP_TO_TID_MAP: Set DSCP to TID map id
+ * @CDP_SET_MCAST_VDEV : Set primary mcast vdev
  */
 enum cdp_vdev_param_type {
 	CDP_ENABLE_NAWDS,
@@ -1471,7 +1473,8 @@ enum cdp_vdev_param_type {
 #ifdef WLAN_VENDOR_SPECIFIC_BAR_UPDATE
 	CDP_SKIP_BAR_UPDATE_AP,
 #endif
-	CDP_UPDATE_DSCP_TO_TID_MAP
+	CDP_UPDATE_DSCP_TO_TID_MAP,
+	CDP_SET_MCAST_VDEV,
 };
 
 /*
@@ -2248,6 +2251,7 @@ struct cdp_tx_completion_msdu {
  * @mpdu_fcs_ok_bitmap - MPDU with fcs ok bitmap
  * @retries - number of retries
  * @rx_ratekpbs - rx rate in kbps
+ * @mpdu_retries - retries of mpdu in rx
  */
 struct cdp_rx_stats_ppdu_user {
 	uint16_t peer_id;
@@ -2285,6 +2289,7 @@ struct cdp_rx_stats_ppdu_user {
 	uint32_t mpdu_err_byte_count;
 	uint32_t retries;
 	uint32_t rx_ratekbps;
+	uint32_t mpdu_retries;
 };
 
 /**
@@ -2334,6 +2339,7 @@ struct cdp_rx_stats_ppdu_user {
  * @user: per user stats in MU-user case
  * @nf: noise floor
  * @per_chain_rssi: rssi per antenna
+ * @punc_bw: puncered bw
  */
 struct cdp_rx_indication_ppdu {
 	uint32_t ppdu_id;
@@ -2394,6 +2400,7 @@ struct cdp_rx_indication_ppdu {
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 	struct cdp_rx_ppdu_cfr_info cfr_info;
 #endif
+	uint8_t punc_bw;
 };
 
 /**

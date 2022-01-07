@@ -1289,17 +1289,6 @@ static inline void hal_cmem_write_7850(hal_soc_handle_t hal_soc_hdl,
 	hal_write32_mb(hal, offset, value);
 }
 
-/**
- * hal_get_idle_link_bm_id_7850() - Get idle link BM id from chid_id
- * @chip_id: mlo chip_id
- *
- * Returns: RBM ID
- */
-static uint8_t hal_get_idle_link_bm_id_7850(uint8_t chip_id)
-{
-	return WBM_IDLE_DESC_LIST;
-}
-
 static void hal_hw_txrx_ops_attach_wcn7850(struct hal_soc *hal_soc)
 {
 	/* init and setup */
@@ -1422,6 +1411,8 @@ static void hal_hw_txrx_ops_attach_wcn7850(struct hal_soc *hal_soc)
 					hal_rx_msdu_flow_idx_timeout_be;
 	hal_soc->ops->hal_rx_msdu_fse_metadata_get =
 					hal_rx_msdu_fse_metadata_get_be;
+	hal_soc->ops->hal_rx_msdu_cce_match_get =
+					hal_rx_msdu_cce_match_get_be;
 	hal_soc->ops->hal_rx_msdu_cce_metadata_get =
 					hal_rx_msdu_cce_metadata_get_be;
 	hal_soc->ops->hal_rx_msdu_get_flow_params =
@@ -1462,6 +1453,11 @@ static void hal_hw_txrx_ops_attach_wcn7850(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_pkt_tlv_offset_get =
 					hal_rx_pkt_tlv_offset_get_generic;
 	hal_soc->ops->hal_rx_flow_setup_fse = hal_rx_flow_setup_fse_7850;
+	hal_soc->ops->hal_rx_flow_get_tuple_info =
+					hal_rx_flow_get_tuple_info_be;
+	 hal_soc->ops->hal_rx_flow_delete_entry =
+					hal_rx_flow_delete_entry_be;
+	hal_soc->ops->hal_rx_fst_get_fse_size = hal_rx_fst_get_fse_size_be;
 	hal_soc->ops->hal_compute_reo_remap_ix2_ix3 =
 					hal_compute_reo_remap_ix2_ix3_7850;
 	hal_soc->ops->hal_rx_flow_setup_cmem_fse = NULL;
@@ -1520,7 +1516,6 @@ static void hal_hw_txrx_ops_attach_wcn7850(struct hal_soc *hal_soc)
 				hal_rx_get_qdesc_addr_be;
 	hal_soc->ops->hal_set_reo_ent_desc_reo_dest_ind =
 				hal_set_reo_ent_desc_reo_dest_ind_be;
-	hal_soc->ops->hal_get_idle_link_bm_id = hal_get_idle_link_bm_id_7850;
 };
 
 struct hal_hw_srng_config hw_srng_table_7850[] = {

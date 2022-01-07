@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,6 +29,9 @@
 #include <wlan_reg_services_api.h>
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 #include <wlan_mlme_api.h>
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+#include <wlan_utility.h>
 #endif
 
 #define MAX_IE_LEN 1024
@@ -393,6 +397,19 @@ util_scan_get_phymode_6g(struct wlan_objmgr_pdev *pdev,
 
 	return phymode;
 }
+
+uint8_t
+util_scan_get_6g_oper_channel(uint8_t *he_op_ie)
+{
+	struct he_oper_6g_param *he_6g_params;
+
+	he_6g_params = util_scan_get_he_6g_params(he_op_ie);
+	if (!he_6g_params)
+		return 0;
+
+	return he_6g_params->primary_channel;
+}
+
 #else
 static QDF_STATUS
 util_scan_get_chan_from_he_6g_params(struct wlan_objmgr_pdev *pdev,
@@ -1787,6 +1804,10 @@ static void util_get_partner_link_info(struct scan_cache_entry *scan_entry)
 	uint8_t *ml_ie = scan_entry->ie_list.multi_link;
 	uint8_t offset = util_get_link_info_offset(ml_ie);
 	uint16_t sta_ctrl;
+	uint8_t *stactrl_offset = NULL;
+	uint8_t perstaprof_len = 0;
+	struct partner_link_info *link_info = NULL;
+	uint8_t eid = 0;
 
 	/* Update partner info  from RNR IE */
 	qdf_mem_copy(&scan_entry->ml_info.link_info[0].link_addr,
@@ -1802,8 +1823,12 @@ static void util_get_partner_link_info(struct scan_cache_entry *scan_entry)
 
 	/* Sub element ID 0 represents Per-STA Profile */
 	if (ml_ie[offset] == 0) {
+		perstaprof_len = ml_ie[offset + 1];
+		stactrl_offset = &ml_ie[offset + 2];
+
 		/* Skip sub element ID and length fields */
 		offset += 2;
+
 		sta_ctrl = *(uint16_t *)(ml_ie + offset);
 		/* Skip STA control field */
 		offset += 2;
@@ -1814,8 +1839,24 @@ static void util_get_partner_link_info(struct scan_cache_entry *scan_entry)
 				&scan_entry->ml_info.link_info[0].link_addr,
 				ml_ie + offset, 6);
 			scm_debug("Found partner info in ML IE");
-			return;
 		}
+
+		/* Get the pointers to CSA, ECSA, Max Channel Switch Time IE. */
+		link_info = &scan_entry->ml_info.link_info[0];
+
+		link_info->csa_ie = wlan_get_ie_ptr_from_eid
+			(WLAN_ELEMID_CHANSWITCHANN, stactrl_offset,
+			 perstaprof_len);
+
+		link_info->ecsa_ie = wlan_get_ie_ptr_from_eid
+			(WLAN_ELEMID_EXTCHANSWITCHANN, stactrl_offset,
+			 perstaprof_len);
+
+		eid = WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME;
+		link_info->max_cst_ie = wlan_get_ext_ie_ptr_from_ext_id
+			(&eid, 1, stactrl_offset, perstaprof_len);
+
+		scan_entry->ml_info.num_links++;
 	}
 }
 
@@ -2260,6 +2301,16 @@ static void util_parse_noninheritance_list(uint8_t *extn_elem,
 	}
 }
 
+static size_t util_oui_header_len(uint8_t *ie)
+{
+	/* Cisco Vendor Specific IEs doesn't have subtype in
+	 * their VSIE header, therefore skip subtype
+	 */
+	if (ie[0] == 0x00 && ie[1] == 0x40 && ie[2] == 0x96)
+		return OUI_LEN - 1;
+	return OUI_LEN;
+}
+
 static uint32_t util_gen_new_ie(uint8_t *ie, uint32_t ielen,
 				uint8_t *subelement,
 				size_t subie_len, uint8_t *new_ie)
@@ -2349,16 +2400,18 @@ static uint32_t util_gen_new_ie(uint8_t *ie, uint32_t ielen,
 		} else {
 			/* ie in transmitting ie also in subelement,
 			 * copy from subelement and flag the ie in subelement
-			 * as copied (by setting eid field to 0xff). For
-			 * vendor ie, compare OUI + type + subType to
-			 * determine if they are the same ie.
+			 * as copied (by setting eid field to 0xff).
+			 * To determine if the vendor ies are same:
+			 * 1. For Cisco OUI, compare only OUI + type
+			 * 2. For other OUI, compare OUI + type + subType
 			 */
 			tmp_rem_len = subie_len - (tmp - sub_copy);
 			if (tmp_old[0] == WLAN_ELEMID_VENDOR &&
 			    tmp_rem_len >= MIN_VENDOR_TAG_LEN) {
 				if (!qdf_mem_cmp(tmp_old + PAYLOAD_START_POS,
 						 tmp + PAYLOAD_START_POS,
-						 OUI_LEN)) {
+						 util_oui_header_len(tmp +
+								     PAYLOAD_START_POS))) {
 					/* same vendor ie, copy from
 					 * subelement
 					 */

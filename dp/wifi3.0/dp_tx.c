@@ -65,6 +65,42 @@
 
 #define DP_RETRY_COUNT 7
 
+#ifdef WLAN_MCAST_MLO
+#define DP_TX_TCL_METADATA_PDEV_ID_SET(_var, _val)\
+	HTT_TX_TCL_METADATA_V2_PDEV_ID_SET(_var, _val)
+#define DP_TX_TCL_METADATA_VALID_HTT_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_V2_VALID_HTT_SET(_var, _val)
+#define DP_TX_TCL_METADATA_TYPE_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_TYPE_V2_SET(_var, _val)
+#define DP_TX_TCL_METADATA_HOST_INSPECTED_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_V2_HOST_INSPECTED_SET(_var, _val)
+#define DP_TX_TCL_METADATA_PEER_ID_SET(_var, _val) \
+	 HTT_TX_TCL_METADATA_V2_PEER_ID_SET(_var, _val)
+#define DP_TX_TCL_METADATA_VDEV_ID_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_V2_VDEV_ID_SET(_var, _val)
+#define DP_TCL_METADATA_TYPE_PEER_BASED \
+	HTT_TCL_METADATA_V2_TYPE_PEER_BASED
+#define DP_TCL_METADATA_TYPE_VDEV_BASED \
+	HTT_TCL_METADATA_V2_TYPE_VDEV_BASED
+#else
+#define DP_TX_TCL_METADATA_PDEV_ID_SET(_var, _val)\
+	HTT_TX_TCL_METADATA_PDEV_ID_SET(_var, _val)
+#define DP_TX_TCL_METADATA_VALID_HTT_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_VALID_HTT_SET(_var, _val)
+#define DP_TX_TCL_METADATA_TYPE_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_TYPE_SET(_var, _val)
+#define DP_TX_TCL_METADATA_HOST_INSPECTED_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_HOST_INSPECTED_SET(_var, _val)
+#define DP_TX_TCL_METADATA_PEER_ID_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_PEER_ID_SET(_var, _val)
+#define DP_TX_TCL_METADATA_VDEV_ID_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_VDEV_ID_SET(_var, _val)
+#define DP_TCL_METADATA_TYPE_PEER_BASED \
+	HTT_TCL_METADATA_TYPE_PEER_BASED
+#define DP_TCL_METADATA_TYPE_VDEV_BASED \
+	HTT_TCL_METADATA_TYPE_VDEV_BASED
+#endif
+
 /*mapping between hal encrypt type and cdp_sec_type*/
 uint8_t sec_type_map[MAX_CDP_SEC_TYPE] = {HAL_TX_ENCRYPT_TYPE_NO_CIPHER,
 					  HAL_TX_ENCRYPT_TYPE_WEP_128,
@@ -486,7 +522,7 @@ static void dp_tx_tso_desc_release(struct dp_soc *soc,
  *
  * Return:
  */
-static void
+void
 dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id)
 {
 	struct dp_pdev *pdev = tx_desc->pdev;
@@ -1479,7 +1515,13 @@ dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 				 RTPM_ID_DW_TX_HW_ENQUEUE, true);
 	switch (ret) {
 	case 0:
-		dp_tx_ring_access_end(soc, hal_ring_hdl, coalesce);
+		if (hif_system_pm_state_check(soc->hif_handle)) {
+			dp_tx_hal_ring_access_end_reap(soc, hal_ring_hdl);
+			hal_srng_set_event(hal_ring_hdl, HAL_SRNG_FLUSH_EVENT);
+			hal_srng_inc_flush_cnt(hal_ring_hdl);
+		} else {
+			dp_tx_ring_access_end(soc, hal_ring_hdl, coalesce);
+		}
 		hif_pm_runtime_put(soc->hif_handle,
 				   RTPM_ID_DW_TX_HW_ENQUEUE);
 		break;
@@ -1514,6 +1556,23 @@ dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 	}
 }
 #else
+
+#ifdef DP_POWER_SAVE
+void
+dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
+			      hal_ring_handle_t hal_ring_hdl,
+			      int coalesce)
+{
+	if (hif_system_pm_state_check(soc->hif_handle)) {
+		dp_tx_hal_ring_access_end_reap(soc, hal_ring_hdl);
+		hal_srng_set_event(hal_ring_hdl, HAL_SRNG_FLUSH_EVENT);
+		hal_srng_inc_flush_cnt(hal_ring_hdl);
+	} else {
+		dp_tx_ring_access_end(soc, hal_ring_hdl, coalesce);
+	}
+}
+#endif
+
 static inline int dp_get_rtpm_tput_policy_requirement(struct dp_soc *soc)
 {
 	return 0;
@@ -1885,6 +1944,41 @@ int dp_tx_frame_is_drop(struct dp_vdev *vdev, uint8_t *srcmac, uint8_t *dstmac)
 	return 0;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
+	defined(WLAN_MCAST_MLO)
+/* MLO peer id for reinject*/
+#define DP_MLO_MCAST_REINJECT_PEER_ID 0XFFFD
+/* MLO vdev id inc offset */
+#define DP_MLO_VDEV_ID_OFFSET 0x80
+
+static inline void
+dp_tx_update_mcast_param(uint16_t peer_id,
+			 uint16_t *htt_tcl_metadata,
+			 struct dp_vdev *vdev,
+			 struct dp_tx_msdu_info_s *msdu_info)
+{
+	if (peer_id == DP_MLO_MCAST_REINJECT_PEER_ID) {
+		*htt_tcl_metadata = 0;
+		DP_TX_TCL_METADATA_TYPE_SET(
+				*htt_tcl_metadata,
+				HTT_TCL_METADATA_V2_TYPE_GLOBAL_SEQ_BASED);
+		HTT_TX_TCL_METADATA_GLBL_SEQ_NO_SET(*htt_tcl_metadata,
+						    msdu_info->gsn);
+
+		msdu_info->vdev_id = vdev->vdev_id + DP_MLO_VDEV_ID_OFFSET;
+	} else {
+		msdu_info->vdev_id = vdev->vdev_id;
+	}
+}
+#else
+static inline void
+dp_tx_update_mcast_param(uint16_t peer_id,
+			 uint16_t *htt_tcl_metadata,
+			 struct dp_vdev *vdev,
+			 struct dp_tx_msdu_info_s *msdu_info)
+{
+}
+#endif
 /**
  * dp_tx_send_msdu_single() - Setup descriptor and enqueue single MSDU to TCL
  * @vdev: DP vdev handle
@@ -1927,17 +2021,17 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	if (qdf_unlikely(peer_id == DP_INVALID_PEER)) {
 		htt_tcl_metadata = vdev->htt_tcl_metadata;
-		HTT_TX_TCL_METADATA_HOST_INSPECTED_SET(htt_tcl_metadata, 1);
+		DP_TX_TCL_METADATA_HOST_INSPECTED_SET(htt_tcl_metadata, 1);
 	} else if (qdf_unlikely(peer_id != HTT_INVALID_PEER)) {
-		HTT_TX_TCL_METADATA_TYPE_SET(htt_tcl_metadata,
-				HTT_TCL_METADATA_TYPE_PEER_BASED);
-		HTT_TX_TCL_METADATA_PEER_ID_SET(htt_tcl_metadata,
-				peer_id);
+		DP_TX_TCL_METADATA_TYPE_SET(htt_tcl_metadata,
+					    DP_TCL_METADATA_TYPE_PEER_BASED);
+		DP_TX_TCL_METADATA_PEER_ID_SET(htt_tcl_metadata,
+					       peer_id);
 	} else
 		htt_tcl_metadata = vdev->htt_tcl_metadata;
 
 	if (msdu_info->exception_fw)
-		HTT_TX_TCL_METADATA_VALID_HTT_SET(htt_tcl_metadata, 1);
+		DP_TX_TCL_METADATA_VALID_HTT_SET(htt_tcl_metadata, 1);
 
 	dp_tx_desc_update_fast_comp_flag(soc, tx_desc,
 					 !pdev->enhanced_stats_en);
@@ -1956,6 +2050,7 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	tx_desc->dma_addr = qdf_nbuf_mapped_paddr_get(tx_desc->nbuf);
 	dp_tx_desc_history_add(soc, tx_desc->dma_addr, nbuf,
 			       tx_desc->id, DP_TX_DESC_MAP);
+	dp_tx_update_mcast_param(peer_id, &htt_tcl_metadata, vdev, msdu_info);
 	/* Enqueue the Tx MSDU descriptor to HW for transmit */
 	status = soc->arch_ops.tx_hw_enqueue(soc, vdev, tx_desc,
 					     htt_tcl_metadata,
@@ -1993,8 +2088,7 @@ fail_return:
  *
  * Return: none
  */
-static inline void dp_tx_comp_free_buf(struct dp_soc *soc,
-				       struct dp_tx_desc_s *desc)
+void dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 {
 	qdf_nbuf_t nbuf = desc->nbuf;
 	enum dp_tx_event_type type = dp_tx_get_event_type(desc->flags);
@@ -2154,7 +2248,7 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 		htt_tcl_metadata = vdev->htt_tcl_metadata;
 		if (msdu_info->exception_fw) {
-			HTT_TX_TCL_METADATA_VALID_HTT_SET(htt_tcl_metadata, 1);
+			DP_TX_TCL_METADATA_VALID_HTT_SET(htt_tcl_metadata, 1);
 		}
 
 		/*
@@ -2181,6 +2275,10 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 			}
 		}
 
+		dp_tx_update_mcast_param(DP_INVALID_PEER,
+					 &htt_tcl_metadata,
+					 vdev,
+					 msdu_info);
 		/*
 		 * Enqueue the Tx MSDU descriptor to HW for transmit
 		 */
@@ -3203,17 +3301,18 @@ int dp_tx_proxy_arp(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
  * @vdev: datapath vdev handle
  * @tx_desc: software descriptor head pointer
  * @status : Tx completion status from HTT descriptor
+ * @reinject_reason : reinject reason from HTT descriptor
  *
  * This function reinjects frames back to Target.
  * Todo - Host queue needs to be added
  *
  * Return: none
  */
-static
 void dp_tx_reinject_handler(struct dp_soc *soc,
 			    struct dp_vdev *vdev,
 			    struct dp_tx_desc_s *tx_desc,
-			    uint8_t *status)
+			    uint8_t *status,
+			    uint8_t reinject_reason)
 {
 	struct dp_peer *peer = NULL;
 	uint32_t peer_id = HTT_INVALID_PEER;
@@ -3229,14 +3328,22 @@ void dp_tx_reinject_handler(struct dp_soc *soc,
 
 	qdf_assert(vdev);
 
-	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
-
-	dp_tx_get_queue(vdev, nbuf, &msdu_info.tx_queue);
-
 	dp_tx_debug("Tx reinject path");
 
 	DP_STATS_INC_PKT(vdev, tx_i.reinject_pkts, 1,
 			qdf_nbuf_len(tx_desc->nbuf));
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+#ifdef WLAN_MCAST_MLO
+	if (reinject_reason == HTT_TX_FW2WBM_REINJECT_REASON_MLO_MCAST) {
+		if (soc->arch_ops.dp_tx_mcast_handler)
+			soc->arch_ops.dp_tx_mcast_handler(soc, vdev, nbuf);
+
+		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+		return;
+	}
+#endif
+#endif
 
 #ifdef WDS_VENDOR_EXTENSION
 	if (qdf_unlikely(vdev->tx_encap_type != htt_cmn_pkt_type_raw)) {
@@ -3295,6 +3402,9 @@ void dp_tx_reinject_handler(struct dp_soc *soc,
 					dp_tx_debug("nbuf copy failed");
 					break;
 				}
+				qdf_mem_zero(&msdu_info, sizeof(msdu_info));
+				dp_tx_get_queue(vdev, nbuf,
+						&msdu_info.tx_queue);
 
 				nbuf_copy = dp_tx_send_msdu_single(vdev,
 						nbuf_copy,
@@ -3328,10 +3438,10 @@ void dp_tx_reinject_handler(struct dp_soc *soc,
  *
  * Return: none
  */
-static void dp_tx_inspect_handler(struct dp_soc *soc,
-				  struct dp_vdev *vdev,
-				  struct dp_tx_desc_s *tx_desc,
-				  uint8_t *status)
+void dp_tx_inspect_handler(struct dp_soc *soc,
+			   struct dp_vdev *vdev,
+			   struct dp_tx_desc_s *tx_desc,
+			   uint8_t *status)
 {
 
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
@@ -3466,9 +3576,8 @@ static inline void dp_tx_update_peer_ext_stats(struct dp_peer *peer,
  * @ring_id: TCL or WBM ring number for transmit path
  * Return: none
  */
-static void dp_tx_compute_delay(struct dp_vdev *vdev,
-				struct dp_tx_desc_s *tx_desc,
-				uint8_t tid, uint8_t ring_id)
+void dp_tx_compute_delay(struct dp_vdev *vdev, struct dp_tx_desc_s *tx_desc,
+			 uint8_t tid, uint8_t ring_id)
 {
 	int64_t current_timestamp, timestamp_ingress, timestamp_hw_enqueue;
 	uint32_t sw_enqueue_delay, fwhw_transmit_delay, interframe_delay;
@@ -3840,7 +3949,7 @@ void dp_send_completion_to_pkt_capture(struct dp_soc *soc,
  *
  * Return: none
  */
-static inline void
+void
 dp_tx_comp_process_desc(struct dp_soc *soc,
 			struct dp_tx_desc_s *desc,
 			struct hal_tx_completion_status *ts,
@@ -3858,6 +3967,12 @@ dp_tx_comp_process_desc(struct dp_soc *soc,
 	}
 
 	dp_send_completion_to_pkt_capture(soc, desc, ts);
+
+	if (dp_tx_pkt_tracepoints_enabled())
+		qdf_trace_dp_packet(desc->nbuf, QDF_TX,
+				    desc->msdu_ext_desc ?
+				    desc->msdu_ext_desc->tso_desc : NULL,
+				    desc->timestamp);
 
 	if (!(desc->msdu_ext_desc)) {
 		dp_tx_enh_unmap(soc, desc);
@@ -4072,7 +4187,6 @@ void dp_tx_update_uplink_delay(struct dp_soc *soc, struct dp_vdev *vdev,
  *
  * Return: none
  */
-static inline
 void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 				  struct dp_tx_desc_s *tx_desc,
 				  struct hal_tx_completion_status *ts,
@@ -4195,7 +4309,6 @@ out:
  *
  * Return: none
  */
-static inline
 void dp_tx_update_peer_basic_stats(struct dp_peer *peer, uint32_t length,
 				   uint8_t tx_status, bool update)
 {
@@ -4206,7 +4319,6 @@ void dp_tx_update_peer_basic_stats(struct dp_peer *peer, uint32_t length,
 	}
 }
 #elif defined(QCA_VDEV_STATS_HW_OFFLOAD_SUPPORT)
-static inline
 void dp_tx_update_peer_basic_stats(struct dp_peer *peer, uint32_t length,
 				   uint8_t tx_status, bool update)
 {
@@ -4218,7 +4330,6 @@ void dp_tx_update_peer_basic_stats(struct dp_peer *peer, uint32_t length,
 }
 
 #else
-static inline
 void dp_tx_update_peer_basic_stats(struct dp_peer *peer, uint32_t length,
 				   uint8_t tx_status, bool update)
 {
@@ -4309,192 +4420,6 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 	}
 	if (peer)
 		dp_peer_unref_delete(peer, DP_MOD_ID_TX_COMP);
-}
-
-/**
- * dp_tx_process_htt_completion() - Tx HTT Completion Indication Handler
- * @soc: Handle to DP soc structure
- * @tx_desc: software descriptor head pointer
- * @status : Tx completion status from HTT descriptor
- * @ring_id: ring number
- *
- * This function will process HTT Tx indication messages from Target
- *
- * Return: none
- */
-static
-void dp_tx_process_htt_completion(struct dp_soc *soc,
-				  struct dp_tx_desc_s *tx_desc, uint8_t *status,
-				  uint8_t ring_id)
-{
-	uint8_t tx_status;
-	struct dp_pdev *pdev;
-	struct dp_vdev *vdev;
-	struct hal_tx_completion_status ts = {0};
-	uint32_t *htt_desc = (uint32_t *)status;
-	struct dp_peer *peer;
-	struct cdp_tid_tx_stats *tid_stats = NULL;
-	struct htt_soc *htt_handle;
-	uint8_t vdev_id;
-
-	tx_status = HTT_TX_WBM_COMPLETION_V2_TX_STATUS_GET(htt_desc[0]);
-	htt_handle = (struct htt_soc *)soc->htt_handle;
-	htt_wbm_event_record(htt_handle->htt_logger_handle, tx_status, status);
-
-	/*
-	 * There can be scenario where WBM consuming descriptor enqueued
-	 * from TQM2WBM first and TQM completion can happen before MEC
-	 * notification comes from FW2WBM. Avoid access any field of tx
-	 * descriptor in case of MEC notify.
-	 */
-	if (tx_status == HTT_TX_FW2WBM_TX_STATUS_MEC_NOTIFY) {
-		if (soc->mec_fw_offload)
-			return;
-
-		/*
-		 * Get vdev id from HTT status word in case of MEC
-		 * notification
-		 */
-		vdev_id = HTT_TX_WBM_COMPLETION_V2_VDEV_ID_GET(htt_desc[3]);
-		if (qdf_unlikely(vdev_id >= MAX_VDEV_CNT))
-			return;
-
-		vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
-				DP_MOD_ID_HTT_COMP);
-		if (!vdev)
-			return;
-		dp_tx_mec_handler(vdev, status);
-		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT_COMP);
-		return;
-	}
-
-	/*
-	 * If the descriptor is already freed in vdev_detach,
-	 * continue to next descriptor
-	 */
-	if (qdf_unlikely(!tx_desc->flags)) {
-		dp_tx_comp_info_rl("Descriptor freed in vdev_detach %d", tx_desc->id);
-		return;
-	}
-
-	if (qdf_unlikely(tx_desc->vdev_id == DP_INVALID_VDEV_ID)) {
-		dp_tx_comp_info_rl("Invalid vdev_id %d", tx_desc->id);
-		tx_desc->flags |= DP_TX_DESC_FLAG_TX_COMP_ERR;
-		dp_tx_comp_free_buf(soc, tx_desc);
-		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
-		return;
-	}
-
-	pdev = tx_desc->pdev;
-
-	if (qdf_unlikely(tx_desc->pdev->is_pdev_down)) {
-		dp_tx_comp_info_rl("pdev in down state %d", tx_desc->id);
-		tx_desc->flags |= DP_TX_DESC_FLAG_TX_COMP_ERR;
-		dp_tx_comp_free_buf(soc, tx_desc);
-		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
-		return;
-	}
-
-	qdf_assert(tx_desc->pdev);
-
-	vdev_id = tx_desc->vdev_id;
-	vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
-			DP_MOD_ID_HTT_COMP);
-
-	if (qdf_unlikely(!vdev)) {
-		dp_tx_comp_info_rl("Unable to get vdev ref  %d", tx_desc->id);
-		tx_desc->flags |= DP_TX_DESC_FLAG_TX_COMP_ERR;
-		dp_tx_comp_free_buf(soc, tx_desc);
-		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
-		return;
-	}
-
-	switch (tx_status) {
-	case HTT_TX_FW2WBM_TX_STATUS_OK:
-	case HTT_TX_FW2WBM_TX_STATUS_DROP:
-	case HTT_TX_FW2WBM_TX_STATUS_TTL:
-	{
-		uint8_t tid;
-		if (HTT_TX_WBM_COMPLETION_V2_VALID_GET(htt_desc[2])) {
-			ts.peer_id =
-				HTT_TX_WBM_COMPLETION_V2_SW_PEER_ID_GET(
-						htt_desc[2]);
-			ts.tid =
-				HTT_TX_WBM_COMPLETION_V2_TID_NUM_GET(
-						htt_desc[2]);
-		} else {
-			ts.peer_id = HTT_INVALID_PEER;
-			ts.tid = HTT_INVALID_TID;
-		}
-		ts.release_src = HAL_TX_COMP_RELEASE_SOURCE_FW;
-		ts.ppdu_id =
-			HTT_TX_WBM_COMPLETION_V2_SCH_CMD_ID_GET(
-					htt_desc[1]);
-		ts.ack_frame_rssi =
-			HTT_TX_WBM_COMPLETION_V2_ACK_FRAME_RSSI_GET(
-					htt_desc[1]);
-
-		ts.tsf = htt_desc[3];
-		ts.first_msdu = 1;
-		ts.last_msdu = 1;
-		tid = ts.tid;
-		if (qdf_unlikely(tid >= CDP_MAX_DATA_TIDS))
-			tid = CDP_MAX_DATA_TIDS - 1;
-
-		tid_stats = &pdev->stats.tid_stats.tid_tx_stats[ring_id][tid];
-
-		if (qdf_unlikely(pdev->delay_stats_flag))
-			dp_tx_compute_delay(vdev, tx_desc, tid, ring_id);
-		if (tx_status < CDP_MAX_TX_HTT_STATUS) {
-			tid_stats->htt_status_cnt[tx_status]++;
-		}
-
-		peer = dp_peer_get_ref_by_id(soc, ts.peer_id,
-					     DP_MOD_ID_HTT_COMP);
-
-		if (qdf_likely(peer))
-			dp_tx_update_peer_basic_stats(peer,
-						      qdf_nbuf_len(tx_desc->nbuf),
-						      tx_status,
-						      pdev->enhanced_stats_en);
-
-		dp_tx_comp_process_tx_status(soc, tx_desc, &ts, peer, ring_id);
-		dp_tx_comp_process_desc(soc, tx_desc, &ts, peer);
-		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
-
-		if (qdf_likely(peer))
-			dp_peer_unref_delete(peer, DP_MOD_ID_HTT_COMP);
-
-		break;
-	}
-	case HTT_TX_FW2WBM_TX_STATUS_REINJECT:
-	{
-		dp_tx_reinject_handler(soc, vdev, tx_desc, status);
-		break;
-	}
-	case HTT_TX_FW2WBM_TX_STATUS_INSPECT:
-	{
-		dp_tx_inspect_handler(soc, vdev, tx_desc, status);
-		break;
-	}
-	case HTT_TX_FW2WBM_TX_STATUS_VDEVID_MISMATCH:
-	{
-		DP_STATS_INC(vdev, tx_i.dropped.fail_per_pkt_vdev_id_check, 1);
-		goto release_tx_desc;
-	}
-	default:
-		dp_tx_comp_err("Invalid HTT tx_status %d\n",
-			       tx_status);
-		goto release_tx_desc;
-	}
-
-	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT_COMP);
-	return;
-
-release_tx_desc:
-	dp_tx_comp_free_buf(soc, tx_desc);
-	dp_tx_desc_release(tx_desc, tx_desc->pool_id);
-	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT_COMP);
 }
 
 #ifdef WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
@@ -4671,8 +4596,11 @@ more_data:
 			uint8_t htt_tx_status[HAL_TX_COMP_HTT_STATUS_LEN];
 			hal_tx_comp_get_htt_desc(tx_comp_hal_desc,
 					htt_tx_status);
-			dp_tx_process_htt_completion(soc, tx_desc,
-					htt_tx_status, ring_id);
+			soc->arch_ops.dp_tx_process_htt_completion(
+							soc,
+							tx_desc,
+							htt_tx_status,
+							ring_id);
 		} else {
 			tx_desc->tx_status =
 				hal_tx_comp_get_tx_status(tx_comp_hal_desc);
@@ -4814,21 +4742,21 @@ QDF_STATUS dp_tx_vdev_attach(struct dp_vdev *vdev)
 	/*
 	 * Fill HTT TCL Metadata with Vdev ID and MAC ID
 	 */
-	HTT_TX_TCL_METADATA_TYPE_SET(vdev->htt_tcl_metadata,
-				     HTT_TCL_METADATA_TYPE_VDEV_BASED);
+	DP_TX_TCL_METADATA_TYPE_SET(vdev->htt_tcl_metadata,
+				    DP_TCL_METADATA_TYPE_VDEV_BASED);
 
-	HTT_TX_TCL_METADATA_VDEV_ID_SET(vdev->htt_tcl_metadata,
-					vdev->vdev_id);
+	DP_TX_TCL_METADATA_VDEV_ID_SET(vdev->htt_tcl_metadata,
+				       vdev->vdev_id);
 
 	pdev_id =
 		dp_get_target_pdev_id_for_host_pdev_id(vdev->pdev->soc,
 						       vdev->pdev->pdev_id);
-	HTT_TX_TCL_METADATA_PDEV_ID_SET(vdev->htt_tcl_metadata, pdev_id);
+	DP_TX_TCL_METADATA_PDEV_ID_SET(vdev->htt_tcl_metadata, pdev_id);
 
 	/*
 	 * Set HTT Extension Valid bit to 0 by default
 	 */
-	HTT_TX_TCL_METADATA_VALID_HTT_SET(vdev->htt_tcl_metadata, 0);
+	DP_TX_TCL_METADATA_VALID_HTT_SET(vdev->htt_tcl_metadata, 0);
 
 	dp_tx_vdev_update_search_flags(vdev);
 

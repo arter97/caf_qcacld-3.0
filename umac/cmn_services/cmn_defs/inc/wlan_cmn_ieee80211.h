@@ -192,6 +192,9 @@
 #define OUI_TYPE_BITS           24
 #define MAX_ADAPTIVE_11R_IE_LEN 8
 
+/* Minimum length of Non-Inheritance element (inclusive of the IE header) */
+#define MIN_NONINHERITANCEELEM_LEN 5
+
 /*
  * sae single pmk vendor specific IE details
  * Category     Data
@@ -253,6 +256,7 @@
 #define WLAN_REQUEST_IE_MAX_LEN                  255
 #define WLAN_RM_CAPABILITY_IE_MAX_LEN            5
 #define WLAN_RNR_IE_MIN_LEN                      5
+#define WLAN_RNR_TBTT_OFFSET_INVALID             255
 #define WLAN_TPE_IE_MIN_LEN                      2
 #define WLAN_MAX_NUM_TPE_IE                      8
 
@@ -271,6 +275,8 @@
 #define WLAN_MAX_MUEDCA_IE_LEN                   14
 #define WLAN_MAX_HE_6G_CAP_IE_LEN                3
 #define WLAN_MAX_HEOP_IE_LEN                     16
+#define WLAN_HEOP_OUI_TYPE                       "\x24"
+#define WLAN_HEOP_OUI_SIZE                       1
 
 /* HT capability flags */
 #define WLAN_HTCAP_C_ADVCODING             0x0001
@@ -569,23 +575,23 @@ enum element_ie {
 
 /**
  * enum extn_element_ie :- extended management information element
- * @WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME: Maximum Channel Switch Time IE
  * @WLAN_EXTN_ELEMID_HECAP:  HE capabilities IE
  * @WLAN_EXTN_ELEMID_HEOP:   HE Operation IE
  * @WLAN_EXTN_ELEMID_MUEDCA: MU-EDCA IE
  * @WLAN_EXTN_ELEMID_HE_6G_CAP: HE 6GHz Band Capabilities IE
  * @WLAN_EXTN_ELEMID_SRP:    spatial reuse parameter IE
+ * @WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME: Maximum Channel Switch Time IE
  * @WLAN_EXTN_ELEMID_NONINHERITANCE: Non inheritance IE
  * @WLAN_EXTN_ELEMID_EHTOP: EHT Operation IE
  * @WLAN_EXTN_ELEMID_MULTI_LINK: Multi-Link IE
  * @WLAN_EXTN_ELEMID_EHTCAP: EHT Capabilities IE
  */
 enum extn_element_ie {
-	WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME = 34,
 	WLAN_EXTN_ELEMID_HECAP       = 35,
 	WLAN_EXTN_ELEMID_HEOP        = 36,
 	WLAN_EXTN_ELEMID_MUEDCA      = 38,
 	WLAN_EXTN_ELEMID_SRP         = 39,
+	WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME = 52,
 	WLAN_EXTN_ELEMID_NONINHERITANCE = 56,
 	WLAN_EXTN_ELEMID_HE_6G_CAP   = 59,
 	WLAN_EXTN_ELEMID_ESP         = 11,
@@ -1622,6 +1628,8 @@ struct wlan_ie_hecaps {
 #define EHTCAP_PHY_MUBFMR320MHZ_IDX                     62
 #define EHTCAP_PHY_MUBFMR320MHZ_BITS                    1
 
+#define MAX_EHT_MCS_NSS_MAP_LEN 9
+
 /**
  * struct wlan_ie_ehtcaps - EHT capabilities
  * @elem_id: EHT caps IE
@@ -1647,10 +1655,20 @@ struct wlan_ie_ehtcaps {
 			uint32_t supported_ch_width_set:7;
 		} qdf_packed;
 	} qdf_packed eht_phy_cap;
-	struct {
-		uint16_t rx_mcs_map;
-		uint16_t tx_mcs_map;
-	} qdf_packed mcs_bw_map[WLAN_EHT_MAX_MCS_MAPS];
+	union {
+		struct {
+			uint8_t max_nss_mcs_0_9;
+			uint8_t max_nss_mcs_10_11;
+			uint8_t max_nss_mcs_12_13;
+		} qdf_packed mcs_bw_map[WLAN_EHT_MAX_MCS_MAPS];
+		struct {
+			uint8_t max_nss_mcs_0_7;
+			uint8_t max_nss_mcs_8_9;
+			uint8_t max_nss_mcs_10_11;
+			uint8_t max_nss_mcs_12_13;
+		} qdf_packed mcs_bw_map_20_sta;
+		uint8_t mcs_nss_map_bytes[MAX_EHT_MCS_NSS_MAP_LEN];
+	} qdf_packed;
 } qdf_packed;
 
 /**
@@ -2462,6 +2480,54 @@ struct wlan_eht_cap_info {
 	uint8_t num_eht_mcs_map_160;
 	uint32_t eht_mcs_map_160;
 	uint32_t eht_mcs_map_320;
+#endif
+} qdf_packed;
+
+/**
+ * struct wlan_mlo_ie_info - struct for mlo IE information
+ * mld_mac_addr: MLD MAC address
+ * reserved_1: reserved bits
+ * mld_capab_present: MLD capability present
+ * eml_capab_present: EML capability present
+ * medium_sync_delay_info_present: Medium sync delay information present
+ * bss_param_change_cnt_present: BSS parameter change count present
+ * link_id_info_present: Link ID information present
+ * mld_mac_addr_present: MLD MAC address present
+ * reserved: reserved bit
+ * type: Type bits
+ */
+
+struct wlan_mlo_ie_info {
+#ifndef ANI_LITTLE_BIT_ENDIAN
+	union {
+		struct {
+			uint8_t mld_mac_addr[6];
+		} info; /* mld_mac_addr_present = 1 */
+	} mld_mac_addr;
+	uint16_t reserved_1:6;
+	uint16_t mld_capab_present:1;
+	uint16_t eml_capab_present:1;
+	uint16_t medium_sync_delay_info_present:1;
+	uint16_t bss_param_change_cnt_present:1;
+	uint16_t link_id_info_present:1;
+	uint16_t mld_mac_addr_present:1;
+	uint16_t reserved:1;
+	uint16_t type:3;
+#else
+	uint16_t type:3;
+	uint16_t reserved:1;
+	uint16_t mld_mac_addr_present:1;
+	uint16_t link_id_info_present:1;
+	uint16_t bss_param_change_cnt_present:1;
+	uint16_t medium_sync_delay_info_present:1;
+	uint16_t eml_capab_present:1;
+	uint16_t mld_capab_present:1;
+	uint16_t reserved_1:6;
+	union {
+		struct {
+			uint8_t mld_mac_addr[6];
+		} info; /* mld_mac_addr_present = 1 */
+	} mld_mac_addr;
 #endif
 } qdf_packed;
 

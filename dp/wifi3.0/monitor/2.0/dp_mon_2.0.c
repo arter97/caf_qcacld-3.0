@@ -332,6 +332,62 @@ QDF_STATUS dp_vdev_set_monitor_mode_rings_2_0(struct dp_pdev *pdev,
 }
 #endif
 
+#if defined(QCA_ENHANCED_STATS_SUPPORT) && defined(WLAN_FEATURE_11BE)
+void
+dp_mon_tx_stats_update_2_0(struct dp_peer *peer,
+			   struct cdp_tx_completion_ppdu_user *ppdu)
+{
+	uint8_t preamble;
+	uint8_t mcs;
+
+	preamble = ppdu->preamble;
+	mcs = ppdu->mcs;
+
+	DP_STATS_INCC(peer,
+		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
+		      ((mcs >= (MAX_MCS - 1)) && (preamble == DOT11_BE)));
+	DP_STATS_INCC(peer,
+		      tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
+		      ((mcs < (MAX_MCS - 1)) && (preamble == DOT11_BE)));
+	DP_STATS_INCC(peer,
+		      tx.su_be_ppdu_cnt.mcs_count[MAX_MCS - 1], 1,
+		      ((mcs >= (MAX_MCS - 1)) && (preamble == DOT11_BE) &&
+		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_SU)));
+	DP_STATS_INCC(peer,
+		      tx.su_be_ppdu_cnt.mcs_count[mcs], 1,
+		      ((mcs < (MAX_MCS - 1)) && (preamble == DOT11_BE) &&
+		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_SU)));
+	DP_STATS_INCC(peer,
+		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].ppdu.mcs_count[MAX_MCS - 1],
+		      1, ((mcs >= (MAX_MCS - 1)) &&
+		      (preamble == DOT11_BE) &&
+		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_OFDMA)));
+	DP_STATS_INCC(peer,
+		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].ppdu.mcs_count[mcs],
+		      1, ((mcs < (MAX_MCS - 1)) &&
+		      (preamble == DOT11_BE) &&
+		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_OFDMA)));
+	DP_STATS_INCC(peer,
+		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].ppdu.mcs_count[MAX_MCS - 1],
+		      1, ((mcs >= (MAX_MCS - 1)) &&
+		      (preamble == DOT11_BE) &&
+		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_MIMO)));
+	DP_STATS_INCC(peer,
+		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].ppdu.mcs_count[mcs],
+		      1, ((mcs < (MAX_MCS - 1)) &&
+		      (preamble == DOT11_BE) &&
+		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_MIMO)));
+}
+#endif
+
+#if defined(QCA_ENHANCED_STATS_SUPPORT) && !defined(WLAN_FEATURE_11BE)
+void
+dp_mon_tx_stats_update_2_0(struct dp_peer *peer,
+			   struct cdp_tx_completion_ppdu_user *ppdu)
+{
+}
+#endif
+
 #ifdef QCA_SUPPORT_BPR
 static QDF_STATUS
 dp_set_bpr_enable_2_0(struct dp_pdev *pdev, int val)
@@ -401,6 +457,69 @@ QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
 	return status;
 }
 
+QDF_STATUS dp_tx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
+{
+	struct dp_soc *soc  = int_ctx->soc;
+	union dp_mon_desc_list_elem_t *desc_list = NULL;
+	union dp_mon_desc_list_elem_t *tail = NULL;
+	struct dp_srng *tx_mon_buf_ring;
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mon_soc_be *mon_soc_be = be_soc->monitor_soc_be;
+	struct dp_intr_stats *intr_stats = &int_ctx->intr_stats;
+	uint32_t num_entries_avail;
+	int sync_hw_ptr = 1;
+	void *hal_srng;
+
+	tx_mon_buf_ring = &be_soc->monitor_soc_be->tx_mon_buf_ring;
+	hal_srng = tx_mon_buf_ring->hal_srng;
+
+	intr_stats->num_host2txmon_ring__masks++;
+	mon_soc_be->tx_low_thresh_intrs++;
+	hal_srng_access_start(soc->hal_soc, hal_srng);
+	num_entries_avail = hal_srng_src_num_avail(soc->hal_soc,
+						   hal_srng,
+						   sync_hw_ptr);
+	hal_srng_access_end(soc->hal_soc, hal_srng);
+
+	dp_mon_buffers_replenish(soc, tx_mon_buf_ring,
+				 &be_soc->monitor_soc_be->tx_desc_mon,
+				 num_entries_avail, &desc_list, &tail);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
+{
+	struct dp_soc *soc  = int_ctx->soc;
+	union dp_mon_desc_list_elem_t *desc_list = NULL;
+	union dp_mon_desc_list_elem_t *tail = NULL;
+	struct dp_srng *rx_mon_buf_ring;
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mon_soc_be *mon_soc_be = be_soc->monitor_soc_be;
+	struct dp_intr_stats *intr_stats = &int_ctx->intr_stats;
+	uint32_t num_entries_avail;
+	int sync_hw_ptr = 1;
+	void *hal_srng;
+
+	rx_mon_buf_ring = &soc->rxdma_mon_buf_ring[0];
+	hal_srng = rx_mon_buf_ring->hal_srng;
+
+	intr_stats->num_host2rxdma_ring_masks++;
+	mon_soc_be->rx_low_thresh_intrs++;
+	hal_srng_access_start(soc->hal_soc, hal_srng);
+	num_entries_avail = hal_srng_src_num_avail(soc->hal_soc,
+						   hal_srng,
+						   sync_hw_ptr);
+	hal_srng_access_end(soc->hal_soc, hal_srng);
+
+	dp_mon_buffers_replenish(soc, rx_mon_buf_ring,
+				 &be_soc->monitor_soc_be->rx_desc_mon,
+				 num_entries_avail, &desc_list, &tail);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifndef DISABLE_MON_CONFIG
 static uint32_t
 dp_rx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 		      uint32_t mac_id, uint32_t quota)
@@ -801,7 +920,7 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 #endif
 #if defined(WDI_EVENT_ENABLE) &&\
 	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG))
-	mon_ops->mon_ppdu_stats_ind_handler = NULL;
+	mon_ops->mon_ppdu_stats_ind_handler = dp_ppdu_stats_ind_handler;
 #endif
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 	mon_ops->mon_config_enh_rx_capture = NULL;
@@ -830,6 +949,7 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 				dp_mon_filter_setup_enhanced_stats_2_0;
 	mon_ops->mon_filter_reset_enhanced_stats =
 				dp_mon_filter_reset_enhanced_stats_2_0;
+	mon_ops->mon_tx_stats_update = dp_mon_tx_stats_update_2_0;
 #endif
 #if defined(ATH_SUPPORT_NAC_RSSI) || defined(ATH_SUPPORT_NAC)
 	mon_ops->mon_filter_setup_smart_monitor =
@@ -869,6 +989,12 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 				dp_vdev_set_monitor_mode_buf_rings_2_0;
 	mon_ops->mon_vdev_set_monitor_mode_rings =
 				dp_vdev_set_monitor_mode_rings_2_0;
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+	mon_ops->mon_rx_stats_update = dp_mon_rx_stats_update_2_0;
+	mon_ops->mon_rx_populate_ppdu_usr_info =
+			dp_mon_populate_ppdu_usr_info_2_0;
+	mon_ops->mon_rx_populate_ppdu_info = dp_mon_populate_ppdu_info_2_0;
+#endif
 }
 
 struct dp_mon_ops monitor_ops_2_0 = {
@@ -929,7 +1055,7 @@ struct dp_mon_ops monitor_ops_2_0 = {
 #ifndef DISABLE_MON_CONFIG
 	.mon_register_intr_ops = dp_mon_register_intr_ops_2_0,
 #endif
-	.mon_register_feature_ops = dp_mon_register_feature_ops_1_0,
+	.mon_register_feature_ops = dp_mon_register_feature_ops_2_0,
 };
 
 struct cdp_mon_ops dp_ops_mon_2_0 = {
@@ -941,12 +1067,52 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 	.soc_config_full_mon_mode = NULL,
 };
 
-struct dp_mon_ops *dp_mon_ops_get_2_0(void)
+#ifdef QCA_MONITOR_OPS_PER_SOC_SUPPORT
+void dp_mon_ops_register_2_0(struct dp_mon_soc *mon_soc)
 {
-	return &monitor_ops_2_0;
+	struct dp_mon_ops *mon_ops = NULL;
+
+	if (mon_soc->mon_ops) {
+		dp_mon_err("monitor ops is allocated");
+		return;
+	}
+
+	mon_ops = qdf_mem_malloc(sizeof(struct dp_mon_ops));
+	if (!mon_ops) {
+		dp_mon_err("Failed to allocate memory for mon ops");
+		return;
+	}
+
+	qdf_mem_copy(mon_ops, &monitor_ops_2_0, sizeof(struct dp_mon_ops));
+	mon_soc->mon_ops = mon_ops;
 }
 
-struct cdp_mon_ops *dp_mon_cdp_ops_get_2_0(void)
+void dp_mon_cdp_ops_register_2_0(struct cdp_ops *ops)
 {
-	return &dp_ops_mon_2_0;
+	struct cdp_mon_ops *mon_ops = NULL;
+
+	if (ops->mon_ops) {
+		dp_mon_err("cdp monitor ops is allocated");
+		return;
+	}
+
+	mon_ops = qdf_mem_malloc(sizeof(struct cdp_mon_ops));
+	if (!mon_ops) {
+		dp_mon_err("Failed to allocate memory for mon ops");
+		return;
+	}
+
+	qdf_mem_copy(mon_ops, &dp_ops_mon_2_0, sizeof(struct cdp_mon_ops));
+	ops->mon_ops = mon_ops;
 }
+#else
+void dp_mon_ops_register_2_0(struct dp_mon_soc *mon_soc)
+{
+	mon_soc->mon_ops = &monitor_ops_2_0;
+}
+
+void dp_mon_cdp_ops_register_2_0(struct cdp_ops *ops)
+{
+	ops->mon_ops = &dp_ops_mon_2_0;
+}
+#endif

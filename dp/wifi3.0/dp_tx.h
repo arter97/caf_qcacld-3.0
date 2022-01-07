@@ -27,6 +27,7 @@
 #endif
 #include "dp_internal.h"
 #include "hal_tx.h"
+#include <qdf_tracepoint.h>
 
 #define DP_INVALID_VDEV_ID 0xFF
 
@@ -178,6 +179,8 @@ struct dp_tx_queue {
  * @exception_fw: Duplicate frame to be sent to firmware
  * @ppdu_cookie: 16-bit ppdu_cookie that has to be replayed back in completions
  * @ix_tx_sniffer: Indicates if the packet has to be sniffed
+ * @gsn: global sequence for reinjected mcast packets
+ * @vdev_id : vdev_id for reinjected mcast packets
  *
  * This structure holds the complete MSDU information needed to program the
  * Hardware TCL and MSDU extension descriptors for different frame types
@@ -196,6 +199,12 @@ struct dp_tx_msdu_info_s {
 	} u;
 	uint32_t meta_data[DP_TX_MSDU_INFO_META_DATA_DWORDS];
 	uint16_t ppdu_cookie;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+#ifdef WLAN_MCAST_MLO
+	uint16_t gsn;
+	uint8_t vdev_id;
+#endif
+#endif
 };
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -231,6 +240,29 @@ QDF_STATUS dp_tx_tso_cmn_desc_pool_alloc(struct dp_soc *soc,
 QDF_STATUS dp_tx_tso_cmn_desc_pool_init(struct dp_soc *soc,
 					uint8_t num_pool,
 					uint16_t num_desc);
+void dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc);
+void dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id);
+void dp_tx_compute_delay(struct dp_vdev *vdev, struct dp_tx_desc_s *tx_desc,
+			 uint8_t tid, uint8_t ring_id);
+void dp_tx_comp_process_tx_status(struct dp_soc *soc,
+				  struct dp_tx_desc_s *tx_desc,
+				  struct hal_tx_completion_status *ts,
+				  struct dp_peer *peer, uint8_t ring_id);
+void dp_tx_comp_process_desc(struct dp_soc *soc,
+			     struct dp_tx_desc_s *desc,
+			     struct hal_tx_completion_status *ts,
+			     struct dp_peer *peer);
+void dp_tx_reinject_handler(struct dp_soc *soc,
+			    struct dp_vdev *vdev,
+			    struct dp_tx_desc_s *tx_desc,
+			    uint8_t *status,
+			    uint8_t reinject_reason);
+void dp_tx_inspect_handler(struct dp_soc *soc,
+			   struct dp_vdev *vdev,
+			   struct dp_tx_desc_s *tx_desc,
+			   uint8_t *status);
+void dp_tx_update_peer_basic_stats(struct dp_peer *peer, uint32_t length,
+				   uint8_t tx_status, bool update);
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 /**
@@ -760,6 +792,12 @@ dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 			      hal_ring_handle_t hal_ring_hdl,
 			      int coalesce);
 #else
+#ifdef DP_POWER_SAVE
+void
+dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
+			      hal_ring_handle_t hal_ring_hdl,
+			      int coalesce);
+#else
 static inline void
 dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 			      hal_ring_handle_t hal_ring_hdl,
@@ -767,6 +805,7 @@ dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 {
 	dp_tx_ring_access_end(soc, hal_ring_hdl, coalesce);
 }
+#endif
 
 static inline void
 dp_set_rtpm_tput_policy_requirement(struct cdp_soc_t *soc_hdl,
@@ -841,4 +880,16 @@ QDF_STATUS dp_get_uplink_delay(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			       uint32_t *val);
 #endif /* WLAN_FEATURE_TSF_UPLINK_TSF */
 
+/**
+ * dp_tx_pkt_tracepoints_enabled() - Get the state of tx pkt tracepoint
+ *
+ * Return: True if any tx pkt tracepoint is enabled else false
+ */
+static inline
+bool dp_tx_pkt_tracepoints_enabled(void)
+{
+	return (qdf_trace_dp_tx_comp_tcp_pkt_enabled() ||
+		qdf_trace_dp_tx_comp_udp_pkt_enabled() ||
+		qdf_trace_dp_tx_comp_pkt_enabled());
+}
 #endif

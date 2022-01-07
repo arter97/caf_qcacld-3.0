@@ -186,7 +186,7 @@ static QDF_STATUS dp_peer_find_map_attach(struct dp_soc *soc)
 {
 	uint32_t max_peers, peer_map_size;
 
-	max_peers = soc->max_peers;
+	max_peers = soc->max_peer_id;
 	/* allocate the peer ID -> peer object map */
 	dp_peer_info("\n%pK:<=== cfg max peer id %d ====>", soc, max_peers);
 	peer_map_size = max_peers * sizeof(soc->peer_id_to_obj_map[0]);
@@ -714,7 +714,7 @@ void dp_peer_find_id_to_obj_add(struct dp_soc *soc,
 				struct dp_peer *peer,
 				uint16_t peer_id)
 {
-	QDF_ASSERT(peer_id <= soc->max_peers);
+	QDF_ASSERT(peer_id <= soc->max_peer_id);
 
 	qdf_spin_lock_bh(&soc->peer_map_lock);
 
@@ -731,6 +731,7 @@ void dp_peer_find_id_to_obj_add(struct dp_soc *soc,
 		/* Peer map event came for peer_id which
 		 * is already mapped, this is not expected
 		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
 		QDF_ASSERT(0);
 	}
 	qdf_spin_unlock_bh(&soc->peer_map_lock);
@@ -747,7 +748,7 @@ void dp_peer_find_id_to_obj_remove(struct dp_soc *soc,
 				   uint16_t peer_id)
 {
 	struct dp_peer *peer = NULL;
-	QDF_ASSERT(peer_id <= soc->max_peers);
+	QDF_ASSERT(peer_id <= soc->max_peer_id);
 
 	qdf_spin_lock_bh(&soc->peer_map_lock);
 	peer = soc->peer_id_to_obj_map[peer_id];
@@ -2460,7 +2461,7 @@ static inline struct dp_peer *dp_peer_find_add_id(struct dp_soc *soc,
 {
 	struct dp_peer *peer;
 
-	QDF_ASSERT(peer_id <= soc->max_peers);
+	QDF_ASSERT(peer_id <= soc->max_peer_id);
 	/* check if there's already a peer object with this MAC address */
 	peer = dp_peer_find_hash_find(soc, peer_mac_addr,
 		0 /* is aligned */, vdev_id, DP_MOD_ID_CONFIG);
@@ -2853,7 +2854,7 @@ static bool dp_get_peer_vdev_roaming_in_progress(struct dp_peer *peer)
 static inline
 bool dp_rx_tid_setup_allow(struct dp_peer *peer)
 {
-	if (IS_MLO_DP_LINK_PEER(peer) && !peer->assoc_link)
+	if (IS_MLO_DP_LINK_PEER(peer) && !peer->first_link)
 		return false;
 
 	return true;
@@ -3712,7 +3713,7 @@ static void dp_peer_rx_tids_init(struct dp_peer *peer)
 	/* if not first assoc link peer or MLD peer,
 	 * not to initialize rx_tids again.
 	 */
-	if ((IS_MLO_DP_LINK_PEER(peer) && !peer->assoc_link) ||
+	if ((IS_MLO_DP_LINK_PEER(peer) && !peer->first_link) ||
 	    IS_MLO_DP_MLD_PEER(peer))
 		return;
 
@@ -4745,7 +4746,7 @@ QDF_STATUS dp_register_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	if (!IS_MLO_DP_LINK_PEER(peer))
 		dp_rx_flush_rx_cached(peer, false);
 
-	if (IS_MLO_DP_LINK_PEER(peer) && peer->assoc_link) {
+	if (IS_MLO_DP_LINK_PEER(peer) && peer->first_link) {
 		dp_peer_info("register for mld peer" QDF_MAC_ADDR_FMT,
 			     QDF_MAC_ADDR_REF(peer->mld_peer->mac_addr.raw));
 		qdf_spin_lock_bh(&peer->mld_peer->peer_info_lock);
@@ -4779,7 +4780,7 @@ QDF_STATUS dp_peer_state_update(struct cdp_soc_t *soc_hdl, uint8_t *peer_mac,
 		     QDF_MAC_ADDR_REF(peer->mac_addr.raw),
 		     peer->state);
 
-	if (IS_MLO_DP_LINK_PEER(peer) && peer->assoc_link) {
+	if (IS_MLO_DP_LINK_PEER(peer) && peer->first_link) {
 		peer->mld_peer->state = peer->state;
 		peer->mld_peer->authorize = peer->authorize;
 		dp_peer_info("mld peer" QDF_MAC_ADDR_FMT "state %d",
@@ -5380,3 +5381,30 @@ void dp_peer_flush_frags(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 }
+
+/*
+ * dp_peer_find_by_id_valid - check if peer exists for given id
+ * @soc: core DP soc context
+ * @peer_id: peer id from peer object can be retrieved
+ *
+ * Return: true if peer exists of false otherwise
+ */
+bool dp_peer_find_by_id_valid(struct dp_soc *soc, uint16_t peer_id)
+{
+	struct dp_peer *peer = dp_peer_get_ref_by_id(soc, peer_id,
+						     DP_MOD_ID_HTT);
+
+	if (peer) {
+		/*
+		 * Decrement the peer ref which is taken as part of
+		 * dp_peer_get_ref_by_id if PEER_LOCK_REF_PROTECT is enabled
+		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_HTT);
+
+		return true;
+	}
+
+	return false;
+}
+
+qdf_export_symbol(dp_peer_find_by_id_valid);

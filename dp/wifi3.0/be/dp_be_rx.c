@@ -1072,6 +1072,72 @@ struct dp_rx_desc *dp_rx_desc_cookie_2_va_be(struct dp_soc *soc,
 	return (struct dp_rx_desc *)dp_cc_desc_find(soc, cookie);
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO)
+#if defined(WLAN_MLO_MULTI_CHIP) && defined(WLAN_MCAST_MLO)
+static inline void dp_rx_dummy_src_mac(qdf_nbuf_t nbuf)
+{
+	qdf_ether_header_t *eh =
+			(qdf_ether_header_t *)qdf_nbuf_data(nbuf);
+
+	eh->ether_shost[0] = 0x4d;	/* M */
+	eh->ether_shost[1] = 0x4c;	/* L */
+	eh->ether_shost[2] = 0x4d;	/* M */
+	eh->ether_shost[3] = 0x43;	/* C */
+	eh->ether_shost[4] = 0x41;	/* A */
+	eh->ether_shost[5] = 0x53;	/* S */
+}
+
+bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
+			    struct dp_vdev *vdev,
+			    struct dp_peer *peer,
+			    qdf_nbuf_t nbuf)
+{
+	struct dp_vdev *mcast_primary_vdev = NULL;
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (!(qdf_nbuf_is_ipv4_igmp_pkt(buf) ||
+	      qdf_nbuf_is_ipv6_igmp_pkt(buf)))
+		return false;
+
+	if (vdev->mcast_enhancement_en || be_vdev->mcast_primary)
+		goto send_pkt;
+
+	mcast_primary_vdev = dp_mlo_get_mcast_primary_vdev(be_soc, be_vdev,
+							   DP_MOD_ID_RX);
+	if (!mcast_primary_vdev) {
+		dp_rx_debug("Non mlo vdev");
+		goto send_pkt;
+	}
+	dp_rx_dummy_src_mac(nbuf);
+	dp_rx_deliver_to_stack(mcast_primary_vdev->pdev->soc,
+			       mcast_primary_vdev,
+			       peer,
+			       nbuf,
+			       NULL);
+	dp_vdev_unref_delete(mcast_primary_vdev->pdev->soc,
+			     mcast_primary_vdev,
+			     DP_MOD_ID_RX);
+	return true;
+send_pkt:
+	dp_rx_deliver_to_stack(be_vdev->vdev.pdev->soc,
+			       &be_vdev->vdev,
+			       peer,
+			       nbuf,
+			       NULL);
+	return true;
+}
+#else
+bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
+			    struct dp_vdev *vdev,
+			    struct dp_peer *peer,
+			    qdf_nbuf_t nbuf)
+{
+	return false;
+}
+#endif
+#endif
+
 #ifdef WLAN_FEATURE_NEAR_FULL_IRQ
 uint32_t dp_rx_nf_process(struct dp_intr *int_ctx,
 			  hal_ring_handle_t hal_ring_hdl,
@@ -1143,10 +1209,10 @@ dp_rx_intrabss_fwd_mlo_allow(struct dp_peer *ta_peer,
 	   false - not allow
  */
 static bool
-dp_rx_intrabss_ucast_check_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
+dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 			      struct dp_peer *ta_peer,
 			      struct hal_rx_msdu_metadata *msdu_metadata,
-			      uint8_t *p_tx_vdev_id)
+			      struct dp_be_intrabss_params *params)
 {
 	uint16_t da_peer_id;
 	struct dp_peer *da_peer;
@@ -1155,22 +1221,96 @@ dp_rx_intrabss_ucast_check_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		return false;
 
 	da_peer_id = dp_rx_peer_metadata_peer_id_get_be(
-						soc,
+						params->dest_soc,
 						msdu_metadata->da_idx);
-	da_peer = dp_peer_get_ref_by_id(soc, da_peer_id, DP_MOD_ID_RX);
+	da_peer = dp_peer_get_ref_by_id(params->dest_soc, da_peer_id,
+					DP_MOD_ID_RX);
 	if (!da_peer)
 		return false;
-	*p_tx_vdev_id = da_peer->vdev->vdev_id;
+	params->tx_vdev_id = da_peer->vdev->vdev_id;
 	dp_peer_unref_delete(da_peer, DP_MOD_ID_RX);
 
 	return true;
 }
 #else
+#ifdef WLAN_MLO_MULTI_CHIP
 static bool
-dp_rx_intrabss_ucast_check_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
+dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 			      struct dp_peer *ta_peer,
 			      struct hal_rx_msdu_metadata *msdu_metadata,
-			      uint8_t *p_tx_vdev_id)
+			      struct dp_be_intrabss_params *params)
+{
+	uint16_t da_peer_id;
+	struct dp_peer *da_peer;
+	bool ret = false;
+	uint8_t dest_chip_id;
+	uint8_t soc_idx;
+	struct dp_vdev_be *be_vdev =
+		dp_get_be_vdev_from_dp_vdev(ta_peer->vdev);
+
+	if (!(qdf_nbuf_is_da_valid(nbuf) || qdf_nbuf_is_da_mcbc(nbuf)))
+		return false;
+
+	dest_chip_id = HAL_RX_DEST_CHIP_ID_GET(msdu_metadata);
+	qdf_assert_always(dest_chip_id <= (DP_MLO_MAX_DEST_CHIP_ID - 1));
+
+	/* validate chip_id, get a ref, and re-assign soc */
+	params->dest_soc = dp_mlo_get_soc_ref_by_chip_id(
+					dp_mlo_get_peer_hash_obj(params->dest_soc),
+					dest_chip_id);
+	if (!params->dest_soc)
+		return false;
+
+	da_peer_id = dp_rx_peer_metadata_peer_id_get_be(params->dest_soc,
+							msdu_metadata->da_idx);
+	da_peer = dp_peer_get_ref_by_id(params->dest_soc, da_peer_id,
+					DP_MOD_ID_RX);
+	if (!da_peer)
+		return false;
+	/* soc unref if needed */
+
+	params->tx_vdev_id = da_peer->vdev->vdev_id;
+
+	/* If the source or destination peer in the isolation
+	 * list then dont forward instead push to bridge stack.
+	 */
+	if (dp_get_peer_isolation(ta_peer) ||
+	    dp_get_peer_isolation(da_peer))
+		goto rel_da_peer;
+
+	if (da_peer->bss_peer || da_peer == ta_peer)
+		goto rel_da_peer;
+
+	/* Same vdev, support Inra-BSS */
+	if (da_peer->vdev == ta_peer->vdev) {
+		ret = true;
+		goto rel_da_peer;
+	}
+
+	/* MLO specific Intra-BSS check */
+	if (dp_rx_intrabss_fwd_mlo_allow(ta_peer, da_peer)) {
+		/* index of soc in the array */
+		soc_idx = dest_chip_id << DP_MLO_DEST_CHIP_ID_SHIFT;
+		if (!(be_vdev->partner_vdev_list[soc_idx][0] ==
+		      params->tx_vdev_id) &&
+		    !(be_vdev->partner_vdev_list[soc_idx][1] ==
+		      params->tx_vdev_id)) {
+			/*dp_soc_unref_delete(soc);*/
+			goto rel_da_peer;
+		}
+		ret = true;
+	}
+
+rel_da_peer:
+	dp_peer_unref_delete(da_peer, DP_MOD_ID_RX);
+	return ret;
+}
+#else
+static bool
+dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
+			      struct dp_peer *ta_peer,
+			      struct hal_rx_msdu_metadata *msdu_metadata,
+			      struct dp_be_intrabss_params *params)
 {
 	uint16_t da_peer_id;
 	struct dp_peer *da_peer;
@@ -1180,14 +1320,15 @@ dp_rx_intrabss_ucast_check_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		return false;
 
 	da_peer_id = dp_rx_peer_metadata_peer_id_get_be(
-						soc,
+						params->dest_soc,
 						msdu_metadata->da_idx);
-	da_peer = dp_peer_get_ref_by_id(soc, da_peer_id,
+
+	da_peer = dp_peer_get_ref_by_id(params->dest_soc, da_peer_id,
 					DP_MOD_ID_RX);
 	if (!da_peer)
 		return false;
 
-	*p_tx_vdev_id = da_peer->vdev->vdev_id;
+	params->tx_vdev_id = da_peer->vdev->vdev_id;
 	/* If the source or destination peer in the isolation
 	 * list then dont forward instead push to bridge stack.
 	 */
@@ -1214,7 +1355,9 @@ rel_da_peer:
 	dp_peer_unref_delete(da_peer, DP_MOD_ID_RX);
 	return ret;
 }
-#endif
+#endif /* WLAN_MLO_MULTI_CHIP */
+#endif /* INTRA_BSS_FWD_OFFLOAD */
+
 /*
  * dp_rx_intrabss_fwd_be() - API for intrabss fwd. For EAPOL
  *  pkt with DA not equal to vdev mac addr, fwd is not allowed.
@@ -1230,11 +1373,12 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_peer *ta_peer,
 			   uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
 			   struct hal_rx_msdu_metadata msdu_metadata)
 {
-	uint8_t tx_vdev_id;
 	uint8_t tid = qdf_nbuf_get_tid_val(nbuf);
 	uint8_t ring_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
 	struct cdp_tid_rx_stats *tid_stats = &ta_peer->vdev->pdev->stats.
 					tid_stats.tid_rx_stats[ring_id][tid];
+	bool ret = false;
+	struct dp_be_intrabss_params params;
 
 	/* if it is a broadcast pkt (eg: ARP) and it is not its own
 	 * source, then clone the pkt and send the cloned pkt for
@@ -1244,15 +1388,23 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_peer *ta_peer,
 	 * like igmpsnoop decide whether to forward or not with
 	 * Mcast enhancement.
 	 */
-	if (qdf_nbuf_is_da_mcbc(nbuf) && !ta_peer->bss_peer)
+	if (qdf_nbuf_is_da_mcbc(nbuf) && !ta_peer->bss_peer) {
 		return dp_rx_intrabss_mcbc_fwd(soc, ta_peer, rx_tlv_hdr,
 					       nbuf, tid_stats);
+	}
 
-	if (dp_rx_intrabss_ucast_check_be(soc, nbuf, ta_peer,
-					  &msdu_metadata, &tx_vdev_id))
-		return dp_rx_intrabss_ucast_fwd(soc, ta_peer, tx_vdev_id,
-						rx_tlv_hdr, nbuf, tid_stats);
+	if (dp_rx_intrabss_eapol_drop_check(soc, ta_peer, rx_tlv_hdr,
+					    nbuf))
+		return true;
 
-	return false;
+	params.dest_soc = soc;
+	if (dp_rx_intrabss_ucast_check_be(nbuf, ta_peer,
+					  &msdu_metadata, &params)) {
+		ret = dp_rx_intrabss_ucast_fwd(params.dest_soc, ta_peer,
+					       params.tx_vdev_id,
+					       rx_tlv_hdr, nbuf, tid_stats);
+	}
+
+	return ret;
 }
 #endif

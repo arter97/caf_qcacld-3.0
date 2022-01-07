@@ -291,6 +291,8 @@
  * @WLAN_UMAC_COMP_MLO_MGR:       MLO manager
  * @WLAN_UMAC_COMP_REPEATER:      Repeater component
  * @WLAN_UMAC_COMP_MBSS:          MBSS Framework
+ * @WLAN_UMAC_COMP_WIFI_RADAR:    WIFI RADAR component
+ * @WLAN_UMAC_COMP_TWT:           Target Wake Time (TWT) Component
  * @WLAN_UMAC_COMP_ID_MAX:        Maximum components in UMAC
  *
  * This id is static.
@@ -340,6 +342,8 @@ enum wlan_umac_comp_id {
 	WLAN_UMAC_COMP_MLO_MGR            = 40,
 	WLAN_UMAC_COMP_REPEATER           = 41,
 	WLAN_UMAC_COMP_MBSS               = 42,
+	WLAN_UMAC_COMP_WIFI_RADAR         = 43,
+	WLAN_UMAC_COMP_TWT                = 44,
 	WLAN_UMAC_COMP_ID_MAX,
 };
 
@@ -695,6 +699,8 @@ struct wlan_ssid {
 #ifdef WLAN_FEATURE_11BE
 #define PSOC_HOST_MAX_EHT_MAC_SIZE 1
 #define PSOC_HOST_MAX_EHT_PHY_SIZE 2
+#define PSOC_HOST_EHT_MCS_NSS_MAP_2G_SIZE 2
+#define PSOC_HOST_EHT_MCS_NSS_MAP_5G_SIZE 4
 #endif
 
 #endif /* _WLAN_OBJMGR_CMN_H_*/

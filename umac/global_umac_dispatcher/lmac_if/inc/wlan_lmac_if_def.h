@@ -54,6 +54,10 @@
 #endif
 #include <wlan_mgmt_txrx_rx_reo_public_structs.h>
 
+#ifdef IPA_OFFLOAD
+#include <wlan_ipa_public_struct.h>
+#endif
+
 /* Number of dev type: Direct attach and Offload */
 #define MAX_DEV_TYPE 2
 
@@ -81,6 +85,10 @@ struct dbr_module_config;
 
 #ifdef DCS_INTERFERENCE_DETECTION
 #include <wlan_dcs_tgt_api.h>
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+#include "wlan_mlo_mgr_public_structs.h"
 #endif
 
 #ifdef QCA_SUPPORT_CP_STATS
@@ -400,6 +408,7 @@ enum wlan_mlme_cfg_id;
  * @psoc_wake_lock_init: Initialize psoc wake lock for vdev response timer
  * @psoc_wake_lock_deinit: De-Initialize psoc wake lock for vdev response timer
  * @get_hw_link_id: Get hw_link_id for pdev
+ * @vdev_send_set_mac_addr: API to send set MAC address request to FW
  */
 struct wlan_lmac_if_mlme_tx_ops {
 	uint32_t (*get_wifi_iface_id) (struct wlan_objmgr_pdev *pdev);
@@ -489,6 +498,11 @@ struct wlan_lmac_if_mlme_tx_ops {
 					      uint8_t grp_id);
 	QDF_STATUS (*target_if_mlo_ready)(struct wlan_objmgr_pdev **pdev,
 					  uint8_t num_pdevs);
+#endif
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+QDF_STATUS (*vdev_send_set_mac_addr)(struct qdf_mac_addr mac_addr,
+				     struct qdf_mac_addr mld_addr,
+				     struct wlan_objmgr_vdev *vdev);
 #endif
 };
 
@@ -1202,6 +1216,16 @@ struct wlan_lmac_if_gpio_tx_ops {
 };
 #endif
 
+#ifdef IPA_OFFLOAD
+struct wlan_lmac_if_ipa_tx_ops {
+	QDF_STATUS (*ipa_uc_offload_control_req)(
+				struct wlan_objmgr_psoc *psoc,
+				struct ipa_uc_offload_control_params *req);
+	QDF_STATUS (*ipa_intrabss_control_req)(
+				struct wlan_objmgr_psoc *psoc,
+				struct ipa_intrabss_control_params *req);
+};
+#endif
 /**
  * wlan_lmac_if_son_tx_ops: son tx operations
  * son_send_null: send null packet
@@ -1254,6 +1278,31 @@ struct wlan_lmac_if_son_rx_ops {
 				  void *req,
 				  void *wri);
 };
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * struct wlan_lmac_if_mlo_tx_ops - south bound tx function pointers for mlo
+ * @register_events: function to register event handlers with FW
+ * @unregister_events: function to de-register event handlers with FW
+ * @link_set_active: function to send mlo link set active command to FW
+ */
+struct wlan_lmac_if_mlo_tx_ops {
+	QDF_STATUS (*register_events)(struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*unregister_events)(struct wlan_objmgr_psoc *psoc);
+	QDF_STATUS (*link_set_active)(struct wlan_objmgr_psoc *psoc,
+		struct mlo_link_set_active_param *param);
+};
+
+/**
+ * struct wlan_lmac_if_mlo_rx_ops - defines southbound rx callbacks for mlo
+ * @process_link_set_active_resp: function pointer to rx FW events
+ */
+struct wlan_lmac_if_mlo_rx_ops {
+	QDF_STATUS
+	(*process_link_set_active_resp)(struct wlan_objmgr_psoc *psoc,
+		struct mlo_link_set_active_resp *event);
+};
+#endif
 
 /**
  * struct wlan_lmac_if_tx_ops - south bound tx function pointers
@@ -1345,6 +1394,14 @@ struct wlan_lmac_if_tx_ops {
 
 #ifdef WLAN_FEATURE_GPIO_CFG
 	struct wlan_lmac_if_gpio_tx_ops gpio_ops;
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct wlan_lmac_if_mlo_tx_ops mlo_ops;
+#endif
+
+#ifdef IPA_OFFLOAD
+	struct wlan_lmac_if_ipa_tx_ops ipa_ops;
 #endif
 };
 
@@ -1961,6 +2018,8 @@ struct wlan_lmac_if_dfs_rx_ops {
  * @psoc_get_vdev_response_timer_info: function to get vdev response timer
  * structure for a specific vdev id
  * @vdev_mgr_multi_vdev_restart_resp: function to handle mvr response
+ * @vdev_mgr_set_mac_addr_response: Callback to get response for set MAC address
+ *                                  command
  */
 struct wlan_lmac_if_mlme_rx_ops {
 	QDF_STATUS (*vdev_mgr_start_response)(
@@ -1991,6 +2050,9 @@ struct wlan_lmac_if_mlme_rx_ops {
 	struct vdev_response_timer *(*psoc_get_vdev_response_timer_info)(
 						struct wlan_objmgr_psoc *psoc,
 						uint8_t vdev_id);
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+	void (*vdev_mgr_set_mac_addr_response)(uint8_t vdev_id, uint8_t status);
+#endif
 };
 
 #ifdef WLAN_SUPPORT_GREEN_AP
@@ -2072,6 +2134,9 @@ struct wlan_lmac_if_rx_ops {
 
 	struct wlan_lmac_if_ftm_rx_ops ftm_rx_ops;
 	struct wlan_lmac_if_son_rx_ops son_rx_ops;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct wlan_lmac_if_mlo_rx_ops mlo_rx_ops;
+#endif
 };
 
 /* Function pointer to call legacy tx_ops registration in OL/WMA.

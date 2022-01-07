@@ -71,6 +71,7 @@ struct dp_peer *dp_peer_find_hash_find(struct dp_soc *soc,
 				       int mac_addr_is_aligned,
 				       uint8_t vdev_id,
 				       enum dp_mod_id id);
+bool dp_peer_find_by_id_valid(struct dp_soc *soc, uint16_t peer_id);
 
 /**
  * dp_peer_get_ref() - Returns peer object given the peer id
@@ -114,7 +115,7 @@ __dp_peer_get_ref_by_id(struct dp_soc *soc,
 	struct dp_peer *peer;
 
 	qdf_spin_lock_bh(&soc->peer_map_lock);
-	peer = (peer_id >= soc->max_peers) ? NULL :
+	peer = (peer_id >= soc->max_peer_id) ? NULL :
 				soc->peer_id_to_obj_map[peer_id];
 	if (!peer ||
 	    (dp_peer_get_ref(soc, peer, mod_id) != QDF_STATUS_SUCCESS)) {
@@ -144,7 +145,7 @@ struct dp_peer *dp_peer_get_ref_by_id(struct dp_soc *soc,
 	struct dp_peer *peer;
 
 	qdf_spin_lock_bh(&soc->peer_map_lock);
-	peer = (peer_id >= soc->max_peers) ? NULL :
+	peer = (peer_id >= soc->max_peer_id) ? NULL :
 				soc->peer_id_to_obj_map[peer_id];
 
 	if (!peer || peer->peer_state >= DP_PEER_STATE_LOGICAL_DELETE ||

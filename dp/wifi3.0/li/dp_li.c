@@ -108,7 +108,7 @@ static QDF_STATUS dp_vdev_detach_li(struct dp_soc *soc, struct dp_vdev *vdev)
 }
 
 #ifdef AST_OFFLOAD_ENABLE
-static void dp_peer_detach_li(struct dp_soc *soc)
+static void dp_peer_map_detach_li(struct dp_soc *soc)
 {
 	dp_soc_wds_detach(soc);
 	dp_peer_ast_table_detach(soc);
@@ -116,9 +116,11 @@ static void dp_peer_detach_li(struct dp_soc *soc)
 	dp_peer_mec_hash_detach(soc);
 }
 
-static QDF_STATUS dp_peer_attach_li(struct dp_soc *soc)
+static QDF_STATUS dp_peer_map_attach_li(struct dp_soc *soc)
 {
 	QDF_STATUS status;
+
+	soc->max_peer_id = soc->max_peers;
 
 	status = dp_peer_ast_table_attach(soc);
 	if (!QDF_IS_STATUS_SUCCESS(status))
@@ -142,6 +144,17 @@ ast_table_detach:
 	dp_peer_ast_table_detach(soc);
 
 	return status;
+}
+#else
+static void dp_peer_map_detach_li(struct dp_soc *soc)
+{
+}
+
+static QDF_STATUS dp_peer_map_attach_li(struct dp_soc *soc)
+{
+	soc->max_peer_id = soc->max_peers;
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -376,6 +389,8 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_rx_process = dp_rx_process_li;
 	arch_ops->tx_comp_get_params_from_hal_desc =
 		dp_tx_comp_get_params_from_hal_desc_li;
+	arch_ops->dp_tx_process_htt_completion =
+			dp_tx_process_htt_completion_li;
 	arch_ops->dp_wbm_get_rx_desc_from_hal_desc =
 			dp_wbm_get_rx_desc_from_hal_desc_li;
 	arch_ops->dp_tx_desc_pool_init = dp_tx_desc_pool_init_li;
@@ -399,10 +414,8 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_pdev_detach = dp_pdev_detach_li;
 	arch_ops->txrx_vdev_attach = dp_vdev_attach_li;
 	arch_ops->txrx_vdev_detach = dp_vdev_detach_li;
-#ifdef AST_OFFLOAD_ENABLE
-	arch_ops->txrx_peer_attach = dp_peer_attach_li;
-	arch_ops->txrx_peer_detach = dp_peer_detach_li;
-#endif
+	arch_ops->txrx_peer_map_attach = dp_peer_map_attach_li;
+	arch_ops->txrx_peer_map_detach = dp_peer_map_detach_li;
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_li;
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_li;
@@ -413,5 +426,6 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_li;
 	arch_ops->reo_remap_config = dp_reo_remap_config_li;
 	arch_ops->txrx_set_vdev_param = dp_txrx_set_vdev_param_li;
+	arch_ops->txrx_print_peer_stats = dp_print_peer_txrx_stats_li;
 }
 

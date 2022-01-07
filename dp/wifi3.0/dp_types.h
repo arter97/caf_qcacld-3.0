@@ -74,10 +74,7 @@
 #define DP_VDEV_ALL 0xff
 
 #if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
-#define MAX_PDEV_CNT 1
 #define WLAN_DP_RESET_MON_BUF_RING_FILTER
-#else
-#define MAX_PDEV_CNT 3
 #endif
 
 /* Max no. of VDEV per PSOC */
@@ -163,9 +160,6 @@
 #ifdef WLAN_VENDOR_SPECIFIC_BAR_UPDATE
 #define DP_SKIP_BAR_UPDATE_TIMEOUT 5000
 #endif
-
-#define DP_MAX_VDEV_STATS_ID        CDP_MAX_VDEV_STATS_ID
-#define DP_INVALID_VDEV_STATS_ID    CDP_INVALID_VDEV_STATS_ID
 
 enum rx_pktlog_mode {
 	DP_RX_PKTLOG_DISABLED = 0,
@@ -861,6 +855,7 @@ struct dp_rx_tid {
  * @num_reo_status_ring_masks: interrupts with reo_status_ring_mask set
  * @num_rxdma2host_ring_masks: interrupts with rxdma2host_ring_mask set
  * @num_host2rxdma_ring_masks: interrupts with host2rxdma_ring_mask set
+ * @num_host2rxdma_mon_ring_masks: interrupts with host2rxdma_ring_mask set
  * @num_rx_ring_near_full_masks: Near-full interrupts for REO DST ring
  * @num_tx_comp_ring_near_full_masks: Near-full interrupts for TX completion
  * @num_rx_wbm_rel_ring_near_full_masks: total number of times the wbm rel ring
@@ -870,6 +865,9 @@ struct dp_rx_tid {
  * @num_near_full_masks: total number of times the near full interrupt
  *                       was received
  * @num_masks: total number of times the interrupt was received
+ * @num_host2txmon_ring_masks: interrupts with host2txmon_ring_mask set
+ * @num_near_full_masks: total number of times the interrupt was received
+ * @num_masks: total number of times the near full interrupt was received
  * @num_tx_mon_ring_masks: interrupts with num_tx_mon_ring_masks set
  *
  * Counter for individual masks are incremented only if there are any packets
@@ -884,10 +882,12 @@ struct dp_intr_stats {
 	uint32_t num_reo_status_ring_masks;
 	uint32_t num_rxdma2host_ring_masks;
 	uint32_t num_host2rxdma_ring_masks;
+	uint32_t num_host2rxdma_mon_ring_masks;
 	uint32_t num_rx_ring_near_full_masks[MAX_REO_DEST_RINGS];
 	uint32_t num_tx_comp_ring_near_full_masks[MAX_TCL_DATA_RINGS];
 	uint32_t num_rx_wbm_rel_ring_near_full_masks;
 	uint32_t num_reo_status_ring_near_full_masks;
+	uint32_t num_host2txmon_ring__masks;
 	uint32_t num_near_full_masks;
 	uint32_t num_masks;
 	uint32_t num_tx_mon_ring_masks;
@@ -900,7 +900,6 @@ struct dp_intr {
 	uint8_t rx_ring_mask;   /* Rx REO rings (0-3) associated
 				with this interrupt context */
 	uint8_t rx_mon_ring_mask;  /* Rx monitor ring mask (0-2) */
-	uint8_t tx_mon_ring_mask;  /* Tx monitor ring mask (0-2) */
 	uint8_t rx_err_ring_mask; /* REO Exception Ring */
 	uint8_t rx_wbm_rel_ring_mask; /* WBM2SW Rx Release Ring */
 	uint8_t reo_status_ring_mask; /* REO command response ring */
@@ -914,6 +913,8 @@ struct dp_intr {
 	uint8_t rx_near_full_grp_2_mask;
 	/* WBM TX completion rings near full interrupt mask */
 	uint8_t tx_ring_near_full_mask;
+	uint8_t host2txmon_ring_mask; /* Tx monitor buffer ring */
+	uint8_t tx_mon_ring_mask;  /* Tx monitor ring mask (0-2) */
 	struct dp_soc *soc;    /* Reference to SoC structure ,
 				to get DMA ring handles */
 	qdf_lro_ctx_t lro_ctx;
@@ -1649,8 +1650,8 @@ struct dp_arch_ops {
 				       struct dp_vdev *vdev);
 	QDF_STATUS (*txrx_vdev_detach)(struct dp_soc *soc,
 				       struct dp_vdev *vdev);
-	QDF_STATUS (*txrx_peer_attach)(struct dp_soc *soc);
-	void (*txrx_peer_detach)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_peer_map_attach)(struct dp_soc *soc);
+	void (*txrx_peer_map_detach)(struct dp_soc *soc);
 	QDF_STATUS (*dp_rxdma_ring_sel_cfg)(struct dp_soc *soc);
 	void (*soc_cfg_attach)(struct dp_soc *soc);
 	void (*peer_get_reo_hash)(struct dp_vdev *vdev,
@@ -1671,6 +1672,10 @@ struct dp_arch_ops {
 	 void (*tx_comp_get_params_from_hal_desc)(struct dp_soc *soc,
 						  void *tx_comp_hal_desc,
 						  struct dp_tx_desc_s **desc);
+	void (*dp_tx_process_htt_completion)(struct dp_soc *soc,
+					     struct dp_tx_desc_s *tx_desc,
+					     uint8_t *status,
+					     uint8_t ring_id);
 	uint32_t (*dp_rx_process)(struct dp_intr *int_ctx,
 				  hal_ring_handle_t hal_ring_hdl,
 				  uint8_t reo_ring_num, uint32_t quota);
@@ -1719,6 +1724,12 @@ struct dp_arch_ops {
 
 	/* MLO ops */
 #ifdef WLAN_FEATURE_11BE_MLO
+#ifdef WLAN_MCAST_MLO
+	void (*dp_tx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
+				    qdf_nbuf_t nbuf);
+	bool (*dp_rx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
+				    struct dp_peer *peer, qdf_nbuf_t nbuf);
+#endif
 	void (*mlo_peer_find_hash_detach)(struct dp_soc *soc);
 	QDF_STATUS (*mlo_peer_find_hash_attach)(struct dp_soc *soc);
 	void (*mlo_peer_find_hash_add)(struct dp_soc *soc,
@@ -1730,6 +1741,8 @@ struct dp_arch_ops {
 						   int mac_addr_is_aligned,
 						   enum dp_mod_id mod_id);
 #endif
+	void (*txrx_print_peer_stats)(struct dp_peer *peer,
+				      enum peer_stats_type stats_type);
 };
 
 /**
@@ -2007,11 +2020,15 @@ struct dp_soc {
 	/* Protect peer_id_to_objmap */
 	DP_MUTEX_TYPE peer_map_lock;
 
-	/* maximum value for peer_id */
+	/* maximum number of suppoerted peers */
 	uint32_t max_peers;
+	/* maximum value for peer_id */
+	uint32_t max_peer_id;
 
+#ifdef DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
 	uint32_t peer_id_shift;
 	uint32_t peer_id_mask;
+#endif
 
 	/* SoC level data path statistics */
 	struct dp_soc_stats stats;
@@ -3337,7 +3354,7 @@ struct dp_peer {
 		hw_txrx_stats_en:1; /*Indicate HW offload vdev stats */
 
 #ifdef WLAN_FEATURE_11BE_MLO
-	uint8_t assoc_link:1, /* first assoc link peer for MLO */
+	uint8_t first_link:1, /* first link peer for MLO */
 		primary_link:1; /* primary link for MLO */
 #endif
 
@@ -3680,6 +3697,10 @@ QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng,
 			int ring_type, int ring_num, int mac_id);
 void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 		    int ring_type, int ring_num);
+void dp_print_peer_txrx_stats_be(struct dp_peer *peer,
+				 enum peer_stats_type stats_type);
+void dp_print_peer_txrx_stats_li(struct dp_peer *peer,
+				 enum peer_stats_type stats_type);
 
 enum timer_yield_status
 dp_should_timer_irq_yield(struct dp_soc *soc, uint32_t work_done,

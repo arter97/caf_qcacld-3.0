@@ -50,6 +50,28 @@ struct dp_peer_tx_capture {
 };
 #endif
 
+#ifndef WLAN_TX_PKT_CAPTURE_ENH
+static inline void
+dp_process_ppdu_stats_update_failed_bitmap(struct dp_pdev *pdev,
+					   void *data,
+					   uint32_t ppdu_id,
+					   uint32_t size)
+{
+}
+#endif
+
+#ifdef DP_CON_MON_MSI_ENABLED
+static inline bool dp_is_monitor_mode_using_poll(struct dp_soc *soc)
+{
+	return false;
+}
+#else
+static inline bool dp_is_monitor_mode_using_poll(struct dp_soc *soc)
+{
+	return true;
+}
+#endif
+
 /*
  * dp_mon_soc_attach() - DP monitor soc attach
  * @soc: Datapath SOC handle
@@ -172,6 +194,27 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc);
 void dp_mon_cdp_ops_deregister(struct dp_soc *soc);
 
 /*
+ * dp_mon_intr_ops_deregister() - deregister monitor interrupt ops
+ * @soc: Datapath soc handle
+ *
+ */
+void dp_mon_intr_ops_deregister(struct dp_soc *soc);
+
+/*
+ * dp_mon_feature_ops_deregister() - deregister monitor feature ops
+ * @soc: Datapath soc handle
+ *
+ */
+void dp_mon_feature_ops_deregister(struct dp_soc *soc);
+
+/*
+ * dp_mon_ops_free() - free monitor ops
+ * @soc: Datapath soc handle
+ *
+ */
+void dp_mon_ops_free(struct dp_soc *soc);
+
+/*
  * dp_mon_ops_register() - Register monitor ops
  * @soc: Datapath soc handle
  *
@@ -180,6 +223,9 @@ void dp_mon_ops_register(struct dp_soc *soc);
 
 #ifndef DISABLE_MON_CONFIG
 void dp_mon_register_intr_ops(struct dp_soc *soc);
+#else
+static inline void dp_mon_register_intr_ops(struct dp_soc *soc)
+{}
 #endif
 
 /*
@@ -351,6 +397,21 @@ dp_vdev_set_monitor_mode_rings(struct dp_pdev *pdev,
 }
 #endif
 
+#if defined(WDI_EVENT_ENABLE) &&\
+	(defined(QCA_ENHANCED_STATS_SUPPORT) || !defined(REMOVE_PKT_LOG))
+/*
+ * dp_ppdu_stats_ind_handler() - PPDU stats msg handler
+ * @htt_soc:	 HTT SOC handle
+ * @msg_word:    Pointer to payload
+ * @htt_t2h_msg: HTT msg nbuf
+ *
+ * Return: True if buffer should be freed by caller.
+ */
+bool dp_ppdu_stats_ind_handler(struct htt_soc *soc,
+			       uint32_t *msg_word,
+			       qdf_nbuf_t htt_t2h_msg);
+#endif
+
 struct dp_mon_ops {
 	QDF_STATUS (*mon_soc_cfg_init)(struct dp_soc *soc);
 	QDF_STATUS (*mon_soc_attach)(struct dp_soc *soc);
@@ -484,6 +545,8 @@ struct dp_mon_ops {
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 	void (*mon_filter_setup_enhanced_stats)(struct dp_pdev *pdev);
 	void (*mon_filter_reset_enhanced_stats)(struct dp_pdev *pdev);
+	void (*mon_tx_stats_update)(struct dp_peer *peer,
+				    struct cdp_tx_completion_ppdu_user *ppdu);
 #endif
 #ifdef QCA_MCOPY_SUPPORT
 	void (*mon_filter_setup_mcopy_mode)(struct dp_pdev *pdev);
@@ -538,6 +601,18 @@ struct dp_mon_ops {
 	void (*mon_register_intr_ops)(struct dp_soc *soc);
 #endif
 	void (*mon_register_feature_ops)(struct dp_soc *soc);
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+	void (*mon_rx_stats_update)(struct dp_peer *peer,
+				    struct cdp_rx_indication_ppdu *ppdu,
+				    struct cdp_rx_stats_ppdu_user *ppdu_user);
+	void (*mon_rx_populate_ppdu_usr_info)(struct mon_rx_user_status *rx_user_status,
+					      struct cdp_rx_stats_ppdu_user *ppdu_user);
+	void (*mon_rx_populate_ppdu_info)(struct hal_rx_ppdu_info *hal_ppdu_info,
+					  struct cdp_rx_indication_ppdu *ppdu);
+#endif
+	QDF_STATUS (*rx_mon_refill_buf_ring)(struct dp_intr *int_ctx);
+	QDF_STATUS (*tx_mon_refill_buf_ring)(struct dp_intr *int_ctx);
+
 };
 
 struct dp_mon_soc {
@@ -756,6 +831,7 @@ struct  dp_mon_pdev {
 	/* enable spcl vap stats reset on ch change */
 	bool reset_scan_spcl_vap_stats_enable;
 #endif
+	bool is_tlv_hdr_64_bit;
 };
 
 struct  dp_mon_vdev {
@@ -1786,7 +1862,7 @@ void dp_monitor_service_mon_rings(struct dp_soc *soc, uint32_t quota)
 #endif
 
 /*
- * dp_monitor_process() - Process monitor
+ * dp_rx_monitor_process() - Process monitor
  * @soc: point to soc
  * @int_ctx: interrupt ctx
  * @mac_id: lma
@@ -1797,7 +1873,7 @@ void dp_monitor_service_mon_rings(struct dp_soc *soc, uint32_t quota)
 #ifndef DISABLE_MON_CONFIG
 static inline
 uint32_t dp_monitor_process(struct dp_soc *soc, struct dp_intr *int_ctx,
-			    uint32_t mac_id, uint32_t quota)
+			       uint32_t mac_id, uint32_t quota)
 {
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 
@@ -1814,16 +1890,58 @@ uint32_t dp_monitor_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 	return mon_soc->mon_rx_process(soc, int_ctx, mac_id, quota);
 }
 
-static inline uint32_t
-dp_tx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
-		  uint32_t mac_id, uint32_t quota)
+static inline
+uint32_t dp_tx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
+			   uint32_t mac_id, uint32_t quota)
 {
 	return 0;
+}
+
+static inline
+uint32_t dp_tx_mon_buf_refill(struct dp_intr *int_ctx)
+{
+	struct dp_soc *soc = int_ctx->soc;
+	struct dp_mon_ops *monitor_ops;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+
+	if (!mon_soc) {
+		dp_mon_debug("monitor soc is NULL");
+		return 0;
+	}
+
+	monitor_ops = mon_soc->mon_ops;
+	if (!monitor_ops || !monitor_ops->tx_mon_refill_buf_ring) {
+		dp_mon_debug("callback not registered");
+		return 0;
+	}
+
+	return monitor_ops->tx_mon_refill_buf_ring(int_ctx);
+}
+
+static inline
+uint32_t dp_rx_mon_buf_refill(struct dp_intr *int_ctx)
+{
+	struct dp_soc *soc = int_ctx->soc;
+	struct dp_mon_ops *monitor_ops;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+
+	if (!mon_soc) {
+		dp_mon_debug("monitor soc is NULL");
+		return 0;
+	}
+
+	monitor_ops = mon_soc->mon_ops;
+	if (!monitor_ops || !monitor_ops->rx_mon_refill_buf_ring) {
+		dp_mon_debug("callback not registered");
+		return 0;
+	}
+
+	return monitor_ops->rx_mon_refill_buf_ring(int_ctx);
 }
 #else
 static inline
 uint32_t dp_monitor_process(struct dp_soc *soc, struct dp_intr *int_ctx,
-			    uint32_t mac_id, uint32_t quota)
+			       uint32_t mac_id, uint32_t quota)
 {
 	return 0;
 }
@@ -1833,6 +1951,16 @@ dp_tx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 		  uint32_t mac_id, uint32_t quota)
 {
 	return 0;
+}
+
+static inline
+uint32_t dp_tx_mon_buf_refill(struct dp_intr *int_ctx)
+{
+}
+
+static inline
+uint32_t dp_rx_mon_buf_refill(struct dp_intr *int_ctx)
+{
 }
 #endif
 
@@ -3223,34 +3351,38 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 #endif /* QCA_ENHANCED_STATS_SUPPORT */
 
 /**
- * dp_mon_ops_get_1_0(): Get legacy monitor ops
+ * dp_mon_ops_register_1_0(): register legacy monitor ops
+ * @mon_soc: monitor soc handle
  *
- * return: Pointer to dp_mon_ops
+ * return: void
  */
-struct dp_mon_ops *dp_mon_ops_get_1_0(void);
+void dp_mon_ops_register_1_0(struct dp_mon_soc *mon_soc);
 
 /**
- * dp_mon_cdp_ops_get_1_0(): Get legacy monitor cdp ops
+ * dp_mon_cdp_ops_register_1_0(): register legacy monitor cdp ops
+ * @ops: cdp ops handle
  *
- * return: Pointer to dp_mon_cdp_ops
+ * return: void
  */
-struct cdp_mon_ops *dp_mon_cdp_ops_get_1_0(void);
+void dp_mon_cdp_ops_register_1_0(struct cdp_ops *ops);
 
 #ifdef QCA_MONITOR_2_0_SUPPORT
 /**
- * dp_mon_ops_get_2_0(): Get BE monitor ops
+ * dp_mon_ops_register_2_0(): register monitor ops
+ * @mon_soc: monitor soc handle
  *
- * return: Pointer to dp_mon_ops
+ * return: void
  */
-struct dp_mon_ops *dp_mon_ops_get_2_0(void);
+void dp_mon_ops_register_2_0(struct dp_mon_soc *mon_soc);
 
 /**
- * dp_mon_cdp_ops_get_2_0(): Get BE monitor cdp ops
+ * dp_mon_cdp_ops_register_2_0(): register monitor cdp ops
+ * @ops: cdp ops handle
  *
- * return: Pointer to dp_mon_cdp_ops
+ * return: void
  */
-struct cdp_mon_ops *dp_mon_cdp_ops_get_2_0(void);
-#endif
+void dp_mon_cdp_ops_register_2_0(struct cdp_ops *ops);
+#endif /* QCA_MONITOR_2_0_SUPPORT */
 
 /**
  * dp_mon_register_feature_ops(): Register mon feature ops

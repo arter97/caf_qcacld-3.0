@@ -36,6 +36,8 @@
 /** slot time short */
 #define WLAN_MLME_VDEV_SLOT_TIME_SHORT  0x2
 
+#define WLAN_MU_SNIF_MAX_AIDS 4
+
 /**
  * enum MLME_bcn_tx_rate_code - beacon tx rate code
  */
@@ -204,6 +206,11 @@ struct tbttoffset_params {
  * @beacon_interval: Beacon interval
  * @csa_switch_count_offset: CSA swith count offset in beacon frame
  * @ext_csa_switch_count_offset: ECSA switch count offset in beacon frame
+ * @per_sta_profile_offset: Pointer to per-STA profile info
+ * @quiet_ie_offset: Quiet IE offset
+ * @is_other_ie_present: Set true if other IEs are present in per-STA profile.
+ *                       If the flag is set to false, FW will remove per-STA
+ *                       profile IE when Quiet count reaches to 0.
  */
 struct ml_bcn_partner_info {
 	uint32_t vdev_id;
@@ -211,6 +218,9 @@ struct ml_bcn_partner_info {
 	uint32_t beacon_interval;
 	uint32_t csa_switch_count_offset;
 	uint32_t ext_csa_switch_count_offset;
+	uint32_t per_sta_profile_offset;
+	uint32_t quiet_ie_offset;
+	uint32_t is_other_ie_present;
 };
 
 /**
@@ -609,6 +619,23 @@ struct vdev_set_params {
 	uint32_t vdev_id;
 	uint32_t param_id;
 	uint32_t param_value;
+};
+
+/**
+ * struct vdev_set_mu_snif_params - vdev set mu sniffer cmd parameter
+ * @vdev_id: vdev id
+ * @mode: mu snif mode
+ * @num_user: max number of user
+ * @num_aid: number of set sta aid
+ * @aid: sta aids
+ */
+
+struct vdev_set_mu_snif_param {
+	uint32_t vdev_id;
+	uint32_t mode;
+	uint32_t num_user;
+	uint32_t num_aid;
+	uint32_t aid[WLAN_MU_SNIF_MAX_AIDS];
 };
 
 /**
