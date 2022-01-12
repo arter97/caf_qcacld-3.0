@@ -2104,53 +2104,6 @@ send_fils_discovery_send_cmd_tlv(wmi_unified_t wmi_handle,
 #endif /* WLAN_SUPPORT_FILS */
 
 /**
- * send_set_qboost_param_cmd_tlv() - send set qboost command to fw
- * @wmi_handle: wmi handle
- * @param: pointer to qboost params
- * @macaddr: vdev mac address
- *
- *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
- */
-static QDF_STATUS
-send_set_qboost_param_cmd_tlv(wmi_unified_t wmi_handle,
-			      uint8_t macaddr[QDF_MAC_ADDR_SIZE],
-			      struct set_qboost_params *param)
-{
-	WMI_QBOOST_CFG_CMD_fixed_param *cmd;
-	wmi_buf_t buf;
-	int32_t len;
-	QDF_STATUS ret;
-
-	len = sizeof(*cmd);
-
-	buf = wmi_buf_alloc(wmi_handle, len);
-	if (!buf) {
-		wmi_err("wmi_buf_alloc failed");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	cmd = (WMI_QBOOST_CFG_CMD_fixed_param *)wmi_buf_data(buf);
-	WMITLV_SET_HDR(&cmd->tlv_header,
-		       WMITLV_TAG_STRUC_WMI_QBOOST_CFG_CMD_fixed_param,
-		       WMITLV_GET_STRUCT_TLVLEN(
-				WMI_QBOOST_CFG_CMD_fixed_param));
-	cmd->vdev_id = param->vdev_id;
-	WMI_CHAR_ARRAY_TO_MAC_ADDR(macaddr, &cmd->peer_macaddr);
-	cmd->qb_enable = param->value;
-
-	wmi_mtrace(WMI_QBOOST_CFG_CMDID, cmd->vdev_id, 0);
-	ret = wmi_unified_cmd_send(wmi_handle, buf, sizeof(*cmd),
-			WMI_QBOOST_CFG_CMDID);
-
-	if (ret != 0) {
-		wmi_err("Setting qboost cmd failed");
-		wmi_buf_free(buf);
-	}
-
-	return ret;
-}
-
-/**
  * send_mcast_group_update_cmd_tlv() - send mcast group update cmd to fw
  * @wmi_handle: wmi handle
  * @param: pointer to hold mcast update param
@@ -3357,7 +3310,6 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->extract_swfda_vdev_id = extract_swfda_vdev_id_tlv;
 	ops->send_fils_discovery_send_cmd = send_fils_discovery_send_cmd_tlv;
 #endif /* WLAN_SUPPORT_FILS */
-	ops->send_set_qboost_param_cmd = send_set_qboost_param_cmd_tlv;
 	ops->send_mcast_group_update_cmd = send_mcast_group_update_cmd_tlv;
 	ops->send_pdev_qvit_cmd = send_pdev_qvit_cmd_tlv;
 	ops->send_wmm_update_cmd = send_wmm_update_cmd_tlv;

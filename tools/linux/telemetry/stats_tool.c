@@ -18,7 +18,6 @@
  */
 
 #include <qcatools_lib.h>
-#include <cdp_txrx_stats_struct.h>
 #include <wlan_stats_define.h>
 #include <stats_lib.h>
 
@@ -350,8 +349,8 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 	STATS_PRINT("\tTx SGI = 0.8us %u, 0.4us %u, 1.6us %u, 3.2us %u\n",
 		    tx->sgi_count[0], tx->sgi_count[1],
 		    tx->sgi_count[2], tx->sgi_count[3]);
-	STATS_PRINT("\tTx NSS (1-%d)\n\t", SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+	STATS_PRINT("\tTx NSS (1-%d)\n\t", STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), tx->nss[inx]);
 	STATS_PRINT("\n\tTx BW Counts = 20MHZ %u 40MHZ %u 80MHZ %u 160MHZ %u\n",
 		    tx->bw[0], tx->bw[1], tx->bw[2], tx->bw[3]);
@@ -381,30 +380,34 @@ void print_advance_data_rx_stats(struct advance_data_rx_stats *rx)
 	STATS_32(stdout, "Rx MPDU FCS Ok Count", rx->mpdu_cnt_fcs_ok);
 	STATS_32(stdout, "Rx MPDU FCS Error Count", rx->mpdu_cnt_fcs_err);
 	STATS_PRINT("\tRx PPDU Counts\n");
-	for (inx = 0; inx < MAX_MCS; inx++) {
-		if (!cdp_rate_string[DOT11_AX][inx].valid)
+	for (inx = 0; inx < STATS_IF_MAX_MCS; inx++) {
+		if (!rate_string[STATS_IF_DOT11_AX][inx].valid)
 			continue;
 		STATS_PRINT("\t\t%s = %u\n",
-			    cdp_rate_string[DOT11_AX][inx].mcs_type,
+			    rate_string[STATS_IF_DOT11_AX][inx].mcs_type,
 			    rx->su_ax_ppdu_cnt[inx]);
 	}
 	STATS_PRINT("\tRx SGI = 0.8us %u, 0.4us %u, 1.6us %u, 3.2us %u\n",
 		    rx->sgi_count[0], rx->sgi_count[1],
 		    rx->sgi_count[2], rx->sgi_count[3]);
-	STATS_PRINT("\tRx MSDU Counts for NSS (1-%u)\n\t", SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+	STATS_PRINT("\tRx MSDU Counts for NSS (1-%u)\n\t", STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), rx->nss[inx]);
 	STATS_PRINT("\n\tRx PPDU Counts for NSS (1-%u) in SU mode\n\t",
-		    SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+		    STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), rx->ppdu_nss[inx]);
 	STATS_PRINT("\n\tRx BW Counts = 20MHZ %u 40MHZ %u 80MHZ %u 160MHZ %u\n",
 		    rx->bw[0], rx->bw[1], rx->bw[2], rx->bw[3]);
 	STATS_PRINT("\tRx Data Packets per AC\n");
-	STATS_32(stdout, "     Best effort", rx->wme_ac_type[WME_AC_BE]);
-	STATS_32(stdout, "      Background", rx->wme_ac_type[WME_AC_BK]);
-	STATS_32(stdout, "           Video", rx->wme_ac_type[WME_AC_VI]);
-	STATS_32(stdout, "           Voice", rx->wme_ac_type[WME_AC_VO]);
+	STATS_32(stdout, "     Best effort",
+		 rx->wme_ac_type[STATS_IF_WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 rx->wme_ac_type[STATS_IF_WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 rx->wme_ac_type[STATS_IF_WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 rx->wme_ac_type[STATS_IF_WME_AC_VO]);
 	STATS_PRINT("\tRx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", rx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",

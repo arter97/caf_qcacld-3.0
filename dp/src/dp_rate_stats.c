@@ -347,7 +347,7 @@ wlan_peer_flush_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 	qdf_mem_zero(rx_stats->stats, WLANSTATS_CACHE_SIZE *
 		     sizeof(struct wlan_rx_rate_stats));
 	for (idx = 0; idx < WLANSTATS_CACHE_SIZE; idx++)
-		rx_stats->stats[idx].rix = INVALID_CACHE_IDX;
+		rx_stats->stats[idx].ratecode = INVALID_CACHE_IDX;
 }
 
 static void
@@ -407,7 +407,7 @@ wlan_peer_flush_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 		tx_stats->sojourn.num_msdus[tid] = 0;
 	}
 	for (idx = 0; idx < WLANSTATS_CACHE_SIZE; idx++)
-		tx_stats->stats[idx].rix = INVALID_CACHE_IDX;
+		tx_stats->stats[idx].ratecode = INVALID_CACHE_IDX;
 }
 
 static void
@@ -570,9 +570,9 @@ __wlan_peer_update_rx_rate_stats(struct wlan_rx_rate_stats *__rx_stats,
 	uint8_t ant, ht;
 
 	if (cdp_rx_ppdu->rix == -1) {
-		__rx_stats->rix = cdp_rx_ppdu->rix;
+		__rx_stats->ratecode = cdp_rx_ppdu->rix;
 	} else {
-		__rx_stats->rix = ASSEMBLE_STATS_CODE(cdp_rx_ppdu->rix,
+		__rx_stats->ratecode = ASSEMBLE_STATS_CODE(cdp_rx_ppdu->rix,
 						      cdp_rx_ppdu->u.nss,
 						      cdp_rx_ppdu->u.mcs,
 						      cdp_rx_ppdu->u.bw);
@@ -815,8 +815,8 @@ wlan_peer_update_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 		/* check if cache is available */
 		for (cache_idx = 0; cache_idx < WLANSTATS_CACHE_SIZE; cache_idx++) {
 			__rx_stats = &rx_stats->stats[cache_idx];
-			if ((__rx_stats->rix == INVALID_CACHE_IDX) ||
-			    (__rx_stats->rix == cdp_rx_ppdu->rix)) {
+			if ((__rx_stats->ratecode == INVALID_CACHE_IDX) ||
+			    (GET_DP_PEER_STATS_RIX(__rx_stats->ratecode) == cdp_rx_ppdu->rix)) {
 				idx_match = true;
 				break;
 			}
@@ -858,9 +858,9 @@ __wlan_peer_update_tx_rate_stats(struct wlan_tx_rate_stats *__tx_stats,
 	mpdu_attempts = num_ppdus * ppdu_user->mpdu_tried_ucast;
 	mpdu_success = ppdu_user->mpdu_tried_ucast - ppdu_user->mpdu_failed;
 	if (ppdu_user->rix == -1) {
-		__tx_stats->rix = ppdu_user->rix;
+		__tx_stats->ratecode = ppdu_user->rix;
 	} else {
-		__tx_stats->rix = ASSEMBLE_STATS_CODE(ppdu_user->rix,
+		__tx_stats->ratecode = ASSEMBLE_STATS_CODE(ppdu_user->rix,
 						      ppdu_user->nss,
 						      ppdu_user->mcs,
 						      ppdu_user->bw);
@@ -928,8 +928,8 @@ wlan_peer_update_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 					cache_idx++) {
 			__tx_stats = &tx_stats->stats[cache_idx];
 
-			if ((__tx_stats->rix == INVALID_CACHE_IDX) ||
-			    (__tx_stats->rix == ppdu_user->rix)) {
+			if ((__tx_stats->ratecode == INVALID_CACHE_IDX) ||
+			    (GET_DP_PEER_STATS_RIX(__tx_stats->ratecode) == ppdu_user->rix)) {
 				idx_match = true;
 				break;
 			}
@@ -1072,9 +1072,9 @@ void wlan_peer_create_event_handler(void *ctx, enum WDI_EVENT event,
 			goto peer_create_fail1;
 		}
 		for (idx = 0; idx < WLANSTATS_CACHE_SIZE; idx++) {
-			stats->rate_stats->tx.stats[idx].rix =
+			stats->rate_stats->tx.stats[idx].ratecode =
 							INVALID_CACHE_IDX;
-			stats->rate_stats->rx.stats[idx].rix =
+			stats->rate_stats->rx.stats[idx].ratecode =
 							INVALID_CACHE_IDX;
 		}
 	}

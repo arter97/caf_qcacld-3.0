@@ -973,7 +973,6 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_BLK_REPORT_FLOOD,
 	OL_ATH_PARAM_DROP_STA_QUERY,
 #endif
-	OL_ATH_PARAM_QBOOST,
 	OL_ATH_PARAM_SIFS_FRMTYPE,
 	OL_ATH_PARAM_SIFS_UAPSD = 185,
 	OL_ATH_PARAM_FW_RECOVERY_ID,
@@ -1345,6 +1344,8 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_IPA_UC_STATS = 487,
 #endif
 	OL_ATH_PARAM_TQM_RESET = 488,
+	/* Enable/disable probing all bandwidth */
+	OL_ATH_PARAM_EN_PROBE_ALL_BW = 489,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2352,9 +2353,9 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_max_auth_fail",        IEEE80211_PARAM_AP_MAX_AUTH_FAIL, GET_PARAM, 0},
 	{"vap_resource_profile ",     IEEE80211_PARAM_VAP_PROFILE_CONFIG, SET_PARAM, 2},
 #ifdef WLAN_FEATURE_11BE
-	{"eht_txmcsmap",         IEEE80211_PARAM_EHT_TX_MCSMAP, SET_PARAM, 1},
+	{"eht_txmcsmap",         IEEE80211_PARAM_EHT_TX_MCSMAP, SET_PARAM, 3},
 	{"get_eht_txmcsmap",     IEEE80211_PARAM_EHT_TX_MCSMAP, GET_PARAM, 0},
-	{"eht_rxmcsmap",         IEEE80211_PARAM_EHT_RX_MCSMAP, SET_PARAM, 1},
+	{"eht_rxmcsmap",         IEEE80211_PARAM_EHT_RX_MCSMAP, SET_PARAM, 3},
 	{"get_eht_rxmcsmap",     IEEE80211_PARAM_EHT_RX_MCSMAP, GET_PARAM, 0},
 	{"eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	SET_PARAM, 1},
 	{"g_eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	GET_PARAM, 0},
@@ -2411,7 +2412,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"eht_ul_ldpc",          IEEE80211_PARAM_EHT_UL_LDPC, SET_PARAM, 1},
 	{"get_eht_ul_ldpc",      IEEE80211_PARAM_EHT_UL_LDPC, GET_PARAM, 0},
 	{"eht_ul_stbc",          IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
-	{"get_eht_ul_stbc",      IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
+	{"get_eht_ul_stbc",      IEEE80211_PARAM_EHT_UL_STBC, GET_PARAM, 0},
 	{"eht_ul_mcs",           IEEE80211_PARAM_EHT_UL_FIXED_RATE, SET_PARAM, 1},
 	{"get_eht_ul_mcs",       IEEE80211_PARAM_EHT_UL_FIXED_RATE, GET_PARAM, 0},
 	{"eht_ul_ltf",           IEEE80211_PARAM_EHT_UL_LTF, SET_PARAM, 1},
@@ -2661,8 +2662,6 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"getDropSTAQuery",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DROP_STA_QUERY, GET_PARAM, 0},
 #endif
-	{"qboost_enable",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_QBOOST, SET_PARAM, 1},
 	{"sifs_frmtype",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SIFS_FRMTYPE, SET_PARAM, 1},
 	{"sifs_uapsd",
@@ -3532,6 +3531,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, SET_PARAM, 1},
 	{"get_tqm_reset",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, GET_PARAM, 0},
+	{"probe_all_bw",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_PROBE_ALL_BW, SET_PARAM, 1},
+	{"g_probe_all_bw",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_PROBE_ALL_BW, GET_PARAM, 0},
 };
 #endif
 
