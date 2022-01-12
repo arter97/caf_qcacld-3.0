@@ -80,6 +80,33 @@ static const struct option long_opts[] = {
 	{ NULL, no_argument, NULL, 0 },
 };
 
+const char *stats_if_fw_to_hw_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 10 ms", "11 to 20 ms",
+	"21 to 30 ms", "31 to 40 ms",
+	"41 to 50 ms", "51 to 60 ms",
+	"61 to 70 ms", "71 to 80 ms",
+	"81 to 90 ms", "91 to 100 ms",
+	"101 to 250 ms", "251 to 500 ms", "500+ ms"
+};
+
+const char *stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 1 ms", "1 to 2 ms",
+	"2 to 3 ms", "3 to 4 ms",
+	"4 to 5 ms", "5 to 6 ms",
+	"6 to 7 ms", "7 to 8 ms",
+	"8 to 9 ms", "9 to 10 ms",
+	"10 to 11 ms", "11 to 12 ms", "12+ ms"
+};
+
+const char *stats_if_intfrm_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 5 ms", "6 to 10 ms",
+	"11 to 15 ms", "16 to 20 ms",
+	"21 to 25 ms", "26 to 30 ms",
+	"31 to 35 ms", "36 to 40 ms",
+	"41 to 45 ms", "46 to 50 ms",
+	"51 to 55 ms", "56 to 60 ms", "60+ ms"
+};
+
 static void display_help(void)
 {
 	STATS_PRINT("\nstats : Displays Statistics of Access Point\n");
@@ -475,6 +502,89 @@ void print_advance_sta_data_nawds(struct advance_peer_data_nawds *nawds)
 	STATS_32(stdout, "NAWDS Rx Drop Count", nawds->nawds_mcast_rx_drop);
 }
 
+static void print_advance_hist_stats(struct stats_if_hist_stats *hstats,
+				     enum stats_if_hist_types hist_type)
+{
+	uint8_t index = 0;
+	uint64_t count = 0;
+
+	for (index = 0; index < STATS_IF_HIST_BUCKET_MAX; index++) {
+		count = hstats->hist.freq[index];
+		if (!count)
+			continue;
+		if (index > STATS_IF_DELAY_BUCKET_MAX) {
+			STATS_PRINT("%s: Packets = %ju ",
+				    "Invalid index", count);
+			continue;
+		}
+		switch (hist_type) {
+		case STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY:
+			STATS_PRINT("%s: Packets = %ju ",
+				    stats_if_sw_enq_delay_bucket[index],
+				    count);
+			break;
+		case STATS_IF_HIST_TYPE_HW_COMP_DELAY:
+			STATS_PRINT("%s: Packets = %ju ",
+				    stats_if_fw_to_hw_delay_bucket[index],
+				    count);
+			break;
+		case STATS_IF_HIST_TYPE_REAP_STACK:
+			STATS_PRINT("%s: Packets = %ju ",
+				    stats_if_intfrm_delay_bucket[index],
+				    count);
+			break;
+		default:
+			break;
+		}
+	}
+
+	STATS_PRINT("Min = %d ", hstats->min);
+	STATS_PRINT("Max = %d ", hstats->max);
+	STATS_PRINT("Avg = %d\n", hstats->avg);
+}
+
+static void print_advance_sta_data_delay(struct advance_peer_data_delay *delay)
+{
+	uint8_t tid;
+
+	STATS_PRINT("Tx Delay Stats:\n");
+	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
+		STATS_PRINT("----TID: %d----", tid);
+		STATS_PRINT(" Software Enqueue Delay: ");
+		print_advance_hist_stats(&delay->delay_stats[tid].tx_delay.tx_swq_delay,
+					 STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY);
+		STATS_PRINT("\t\tHardware Transmission Delay: ");
+		print_advance_hist_stats(&delay->delay_stats[tid].tx_delay.hwtx_delay,
+					 STATS_IF_HIST_TYPE_HW_COMP_DELAY);
+	}
+	STATS_PRINT("\nRx Delay Stats:\n");
+	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
+		STATS_PRINT("----TID: %d---- ", tid);
+		STATS_PRINT("Reap2stack Deliver Delay: ");
+		print_advance_hist_stats(&delay->delay_stats[tid].rx_delay
+					 .to_stack_delay,
+					 STATS_IF_HIST_TYPE_REAP_STACK);
+	}
+}
+
+static void
+print_advance_sta_data_jitter(struct advance_peer_data_jitter *jitter)
+{
+	uint8_t tid;
+
+	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
+		STATS_PRINT("----TID: %d---- ", tid);
+		STATS_PRINT("avg_jitter = %u ",
+			    jitter->jitter_stats[tid].tx_avg_jitter);
+		STATS_PRINT("avg_delay  = %u ",
+			    jitter->jitter_stats[tid].tx_avg_delay);
+		STATS_PRINT("avg_err  = %ju ",
+			    jitter->jitter_stats[tid].tx_avg_err);
+		STATS_PRINT("total_success = %ju ",
+			    jitter->jitter_stats[tid].tx_total_success);
+		STATS_PRINT("drop  = %ju\n", jitter->jitter_stats[tid].tx_drop);
+	}
+}
 void print_advance_sta_ctrl_tx(struct advance_peer_ctrl_tx *tx)
 {
 	print_basic_sta_ctrl_tx(&tx->b_tx);
@@ -929,6 +1039,14 @@ void print_advance_sta_data(struct stats_obj *sta)
 	if (data->nawds) {
 		STATS_PRINT("NAWDS Stats\n");
 		print_advance_sta_data_nawds(data->nawds);
+	}
+	if (data->delay) {
+		STATS_PRINT("DELAY Stats\n");
+		print_advance_sta_data_delay(data->delay);
+	}
+	if (data->jitter) {
+		STATS_PRINT("JITTER Stats\n");
+		print_advance_sta_data_jitter(data->jitter);
 	}
 }
 

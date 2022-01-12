@@ -42,6 +42,23 @@ enum stats_if_packet_type {
 	STATS_IF_DOT11_MAX,
 };
 
+enum stats_if_delay_bucket_index {
+	STATS_IF_DELAY_BUCKET_0,
+	STATS_IF_DELAY_BUCKET_1,
+	STATS_IF_DELAY_BUCKET_2,
+	STATS_IF_DELAY_BUCKET_3,
+	STATS_IF_DELAY_BUCKET_4,
+	STATS_IF_DELAY_BUCKET_5,
+	STATS_IF_DELAY_BUCKET_6,
+	STATS_IF_DELAY_BUCKET_7,
+	STATS_IF_DELAY_BUCKET_8,
+	STATS_IF_DELAY_BUCKET_9,
+	STATS_IF_DELAY_BUCKET_10,
+	STATS_IF_DELAY_BUCKET_11,
+	STATS_IF_DELAY_BUCKET_12,
+	STATS_IF_DELAY_BUCKET_MAX,
+};
+
 struct stats_if_rate_debug {
 	char mcs_type[STATS_IF_MAX_MCS_STRING_LEN];
 	uint8_t valid;
@@ -319,6 +336,8 @@ struct advance_peer_data {
 	struct advance_peer_data_link *link;
 	struct advance_peer_data_rate *rate;
 	struct advance_peer_data_nawds *nawds;
+	struct advance_peer_data_delay *delay;
+	struct advance_peer_data_jitter *jitter;
 };
 
 /* Advance peer control stats holder */

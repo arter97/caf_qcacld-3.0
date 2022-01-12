@@ -72,6 +72,8 @@ enum stats_feat_index_e {
 	DEF_INX(MESH),
 	DEF_INX(RATE),
 	DEF_INX(NAWDS),
+	DEF_INX(DELAY),
+	DEF_INX(JITTER),
 	DEF_INX_MAX(),
 };
 

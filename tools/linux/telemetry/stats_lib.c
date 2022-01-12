@@ -86,6 +86,7 @@ static struct feat_parser_t g_feat[] = {
 	{ "MESH", STATS_FEAT_FLG_MESH },
 	{ "RATE", STATS_FEAT_FLG_RATE },
 	{ "DELAY", STATS_FEAT_FLG_DELAY },
+	{ "JITTER", STATS_FEAT_FLG_JITTER },
 	{ "ME", STATS_FEAT_FLG_ME },
 	{ "NAWDS", STATS_FEAT_FLG_NAWDS },
 	{ "TXCAP", STATS_FEAT_FLG_TXCAP },
@@ -106,6 +107,8 @@ struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_FEAT_MESH] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_RATE] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_FEAT_DELAY] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_FEAT_JITTER] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_RECURSIVE] = { .type = NLA_FLAG },
 };
 
@@ -835,6 +838,22 @@ static void *parse_advance_sta(struct nlattr *rattr, enum stats_type_e type)
 				memcpy(data->nawds, nla_data(attr),
 				       sizeof(struct advance_peer_data_nawds));
 		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_DELAY]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_DELAY];
+			data->delay =
+				malloc(sizeof(struct advance_peer_data_delay));
+			if (data->delay)
+				memcpy(data->delay, nla_data(attr),
+				       sizeof(struct advance_peer_data_delay));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_JITTER]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_JITTER];
+			data->jitter =
+				malloc(sizeof(struct advance_peer_data_jitter));
+			if (data->jitter)
+				memcpy(data->jitter, nla_data(attr),
+				       sizeof(struct advance_peer_data_jitter));
+		}
 		dest = data;
 		break;
 	case STATS_TYPE_CTRL:
@@ -1537,6 +1556,10 @@ static void free_advance_sta(struct stats_obj *sta)
 				free(data->rate);
 			if (data->nawds)
 				free(data->nawds);
+			if (data->delay)
+				free(data->delay);
+			if (data->jitter)
+				free(data->jitter);
 		}
 		break;
 	case STATS_TYPE_CTRL:

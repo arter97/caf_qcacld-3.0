@@ -980,6 +980,77 @@ get_failed:
 }
 
 #if WLAN_ADVANCE_TELEMETRY
+static void
+fill_advance_peer_if_delay_stats(struct advance_peer_data_delay *data,
+				 struct cdp_delay_tid_stats *cdp_delay)
+{
+	uint8_t inx = 0, tidx = 0, max, max_bucket;
+	struct stats_if_delay_tid_stats *delay_stats;
+	struct cdp_delay_tid_stats *peer_delay;
+
+	max = qdf_min((uint8_t)STATS_IF_MAX_DATA_TIDS, (uint8_t)CDP_MAX_DATA_TIDS);
+	max_bucket = qdf_min((uint8_t)STATS_IF_HIST_BUCKET_MAX, (uint8_t)CDP_HIST_BUCKET_MAX);
+	for (tidx = 0; tidx < max; tidx++) {
+		delay_stats = &data->delay_stats[tidx];
+		peer_delay = &cdp_delay[tidx];
+
+		delay_stats->tx_delay.tx_swq_delay.max =
+			peer_delay->tx_delay.tx_swq_delay.max;
+		delay_stats->tx_delay.tx_swq_delay.min =
+			peer_delay->tx_delay.tx_swq_delay.min;
+		delay_stats->tx_delay.tx_swq_delay.avg =
+			peer_delay->tx_delay.tx_swq_delay.avg;
+
+		delay_stats->tx_delay.tx_swq_delay.hist.hist_type =
+			peer_delay->tx_delay.tx_swq_delay.hist.hist_type;
+		delay_stats->tx_delay.hwtx_delay.max =
+			peer_delay->tx_delay.hwtx_delay.max;
+		delay_stats->tx_delay.hwtx_delay.min =
+			peer_delay->tx_delay.hwtx_delay.min;
+		delay_stats->tx_delay.hwtx_delay.avg =
+			peer_delay->tx_delay.hwtx_delay.avg;
+
+		delay_stats->tx_delay.hwtx_delay.hist.hist_type =
+			peer_delay->tx_delay.hwtx_delay.hist.hist_type;
+		delay_stats->rx_delay.to_stack_delay.max =
+			peer_delay->rx_delay.to_stack_delay.max;
+		delay_stats->rx_delay.to_stack_delay.min =
+			peer_delay->rx_delay.to_stack_delay.min;
+
+		delay_stats->rx_delay.to_stack_delay.avg =
+			peer_delay->rx_delay.to_stack_delay.avg;
+		delay_stats->rx_delay.to_stack_delay.hist.hist_type =
+			peer_delay->rx_delay.to_stack_delay.hist.hist_type;
+
+		for (inx = 0; inx < max_bucket; inx++) {
+			delay_stats->tx_delay.tx_swq_delay.hist.freq[inx] =
+				peer_delay->tx_delay.tx_swq_delay.hist.freq[inx];
+
+			delay_stats->tx_delay.hwtx_delay.hist.freq[inx] =
+				peer_delay->tx_delay.hwtx_delay.hist.freq[inx];
+
+			delay_stats->rx_delay.to_stack_delay.hist.freq[inx] =
+				peer_delay->rx_delay.to_stack_delay.hist.freq[inx];
+		}
+	}
+}
+
+static void
+fill_advance_peer_jitter_stats(struct advance_peer_data_jitter *data,
+			       struct cdp_peer_tid_stats *cdp_jitter)
+{
+	uint8_t tidx = 0, max;
+	struct stats_if_jitter_tid_stats *jitter_stats;
+
+	max = qdf_min((uint8_t)STATS_IF_MAX_DATA_TIDS, (uint8_t)CDP_MAX_DATA_TIDS);
+	for (tidx = 0; tidx < max; tidx++) {
+		jitter_stats = &data->jitter_stats[tidx];
+		jitter_stats->tx_avg_delay = cdp_jitter[tidx].tx_avg_delay;
+		jitter_stats->tx_avg_err = cdp_jitter[tidx].tx_avg_err;
+		jitter_stats->tx_total_success = cdp_jitter[tidx].tx_total_success;
+		jitter_stats->tx_drop = cdp_jitter[tidx].tx_drop;
+	}
+}
 static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
 				       struct cdp_tx_stats *cdp_tx)
 {
@@ -1039,6 +1110,42 @@ static void fill_advance_data_rx_stats(struct advance_data_rx_stats *rx,
 	rx->bar_recv_cnt = cdp_rx->bar_recv_cnt;
 	rx->rx_retries = cdp_rx->rx_retries;
 	rx->multipass_rx_pkt_drop = cdp_rx->multipass_rx_pkt_drop;
+}
+
+static QDF_STATUS
+get_advance_peer_data_delay(struct cdp_delay_tid_stats *delay,
+			    struct unified_stats *stats)
+{
+	struct advance_peer_data_delay *data = NULL;
+
+	data = qdf_mem_malloc(sizeof(struct advance_peer_data_delay));
+	if (!data) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	fill_advance_peer_if_delay_stats(data, delay);
+	stats->feat[INX_FEAT_DELAY] = data;
+	stats->size[INX_FEAT_DELAY] = sizeof(struct advance_peer_data_delay);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+get_advance_peer_jitter_stats(struct cdp_peer_tid_stats *jitter,
+			      struct unified_stats *stats)
+{
+	struct advance_peer_data_jitter *data = NULL;
+
+	data = qdf_mem_malloc(sizeof(struct advance_peer_data_jitter));
+	if (!data) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	fill_advance_peer_jitter_stats(data, jitter);
+	stats->feat[INX_FEAT_JITTER] = data;
+	stats->size[INX_FEAT_JITTER] = sizeof(struct advance_peer_data_jitter);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS get_advance_peer_data_tx(struct unified_stats *stats,
@@ -1383,20 +1490,35 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct cdp_peer_stats *peer_stats = NULL;
+	struct wlan_objmgr_vdev *vdev = NULL;
+	uint8_t *peer_mac = NULL;
 	uint8_t vdev_id = 0;
+	struct cdp_delay_tid_stats *delay = NULL;
+	struct cdp_peer_tid_stats *jitter = NULL;
+	uint32_t size;
+
 
 	if (!psoc || !peer) {
 		qdf_err("Invalid Psoc or Peer!");
 		return QDF_STATUS_E_INVAL;
 	}
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev) {
+		qdf_err("Invalid vdev!");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	peer_stats = qdf_mem_malloc(sizeof(struct cdp_peer_stats));
 	if (!peer_stats) {
 		qdf_err("Failed allocation!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	vdev_id = wlan_vdev_get_id(peer->peer_objmgr.vdev);
+
+	peer_mac = wlan_peer_get_macaddr(peer);
+	vdev_id = wlan_vdev_get_id(vdev);
 	ret = cdp_host_get_peer_stats(wlan_psoc_get_dp_handle(psoc), vdev_id,
-				      peer->macaddr, peer_stats);
+				      peer_mac, peer_stats);
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to fetch stats!");
 		goto get_failed;
@@ -1441,9 +1563,54 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 		if (ret != QDF_STATUS_SUCCESS)
 			goto get_failed;
 	}
+	if (feat & STATS_FEAT_FLG_DELAY) {
+		size = sizeof(struct cdp_delay_tid_stats) * CDP_MAX_DATA_TIDS;
+		delay = qdf_mem_malloc(size);
+		if (!delay) {
+			qdf_err("Allocation failed");
+			ret = QDF_STATUS_E_NOMEM;
+			goto get_failed;
+		}
+		ret = cdp_get_peer_delay_stats(wlan_psoc_get_dp_handle(psoc),
+					       vdev_id, peer_mac, delay);
+		if (ret != QDF_STATUS_SUCCESS) {
+			qdf_err("Unable to fetch Delay stats!");
+			goto get_failed;
+		}
+		ret = get_advance_peer_data_delay(delay, stats);
+		if (ret != QDF_STATUS_SUCCESS)
+			goto get_failed;
+	}
+	if (feat & STATS_FEAT_FLG_JITTER) {
+		uint8_t pdev_id = 0;
+
+		size = sizeof(struct cdp_peer_tid_stats) * CDP_MAX_DATA_TIDS;
+		jitter = qdf_mem_malloc(size);
+		if (!jitter) {
+			qdf_err("Allocation failed");
+			ret = QDF_STATUS_E_NOMEM;
+			goto get_failed;
+		}
+		pdev_id = wlan_peer_get_pdev_id(peer);
+		ret = cdp_get_peer_jitter_stats(wlan_psoc_get_dp_handle(psoc),
+						pdev_id, vdev_id, peer_mac,
+						jitter);
+		if (ret != QDF_STATUS_SUCCESS) {
+			qdf_err("Unable to fetch Jitter Stats!");
+			goto get_failed;
+		}
+		ret = get_advance_peer_jitter_stats(jitter, stats);
+		if (ret != QDF_STATUS_SUCCESS)
+			goto get_failed;
+	}
 
 get_failed:
 	qdf_mem_free(peer_stats);
+
+	if (delay)
+		qdf_mem_free(delay);
+	if (jitter)
+		qdf_mem_free(jitter);
 
 	return ret;
 }
