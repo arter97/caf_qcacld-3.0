@@ -915,6 +915,7 @@ QDF_STATUS wlan_crypto_setkey(struct wlan_objmgr_vdev *vdev,
 					return QDF_STATUS_E_NOMEM;
 			}
 			key = crypto_priv->key[req_key->keyix];
+			crypto_priv->def_tx_keyid = req_key->keyix;
 		}
 		if (vdev_mode == QDF_STA_MODE) {
 			peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
@@ -1112,18 +1113,55 @@ QDF_STATUS wlan_crypto_setkey(struct wlan_objmgr_vdev *vdev,
 
 	if ((req_key->flags & WLAN_CRYPTO_KEY_DEFAULT) &&
 	    (req_key->keyix != WLAN_CRYPTO_KEYIX_NONE) &&
-	    (!IS_MGMT_CIPHER(req_key->type))) {
+	    (!IS_MGMT_CIPHER(req_key->type)) && isbcast) {
 		/* default xmit key */
 		wlan_crypto_default_key(vdev,
 					req_key->macaddr,
 					req_key->keyix,
 					!isbcast);
+		/*Iterate through the peer list on this vdev
+		 *and store the keyix in the peer's crypto_priv
+		 */
+		wlan_objmgr_iterate_peerobj_list(vdev, store_def_keyix_peer,
+						 (void *)&req_key->keyix,
+						 WLAN_CRYPTO_ID);
+
 		}
 err:
 	if (peer)
 		wlan_objmgr_peer_release_ref(peer, WLAN_CRYPTO_ID);
 	return status;
 }
+
+/**
+ * store_def_keyix_peer - store default keyix
+ * @vdev: vdev
+ * @object: Peer object
+ * @arg: Argument passed by caller
+ *
+ * This function gets called from wlan_crypto_setkey
+ *
+ * Return: None
+ */
+void store_def_keyix_peer(struct wlan_objmgr_vdev *vdev, void *object,
+			  void *arg)
+{
+	struct wlan_objmgr_peer *peer = NULL;
+	struct wlan_crypto_comp_priv *crypto_priv;
+	struct wlan_crypto_params *crypto_params;
+
+	uint16_t kid = *(uint16_t *)arg;
+
+	peer = (struct wlan_objmgr_peer *)object;
+	crypto_params = wlan_crypto_peer_get_comp_params(peer, &crypto_priv);
+	if (!crypto_priv) {
+		crypto_err("crypto_priv NULL");
+		return;
+	}
+	crypto_priv->def_tx_keyid = kid;
+}
+
+qdf_export_symbol(store_def_keyix_peer);
 
 /**
  * wlan_crypto_get_keytype - get keytype
@@ -2281,6 +2319,7 @@ uint8_t *wlan_crypto_add_mmie(struct wlan_objmgr_vdev *vdev,
 	return bfrm + len;
 }
 
+#define MAX_MIC_LEN 16
 /**
  * wlan_crypto_is_mmie_valid - called by mgmt txrx to check mmie of the frame
  * @vdev: vdev
@@ -2387,7 +2426,7 @@ bool wlan_crypto_is_mmie_valid(struct wlan_objmgr_vdev *vdev,
 	 */
 	qdf_mem_copy(buf + 20, frm + hdrlen, len - hdrlen);
 	qdf_mem_zero(buf + (len - hdrlen + 20 - mic_len), mic_len);
-	mic = qdf_mem_malloc(mic_len);
+	mic = qdf_mem_malloc(MAX_MIC_LEN);
 	if (!mic) {
 		qdf_mem_free(buf);
 		return false;

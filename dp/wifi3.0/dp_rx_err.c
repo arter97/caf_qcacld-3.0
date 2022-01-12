@@ -1104,7 +1104,7 @@ free_nbuf:
 }
 
 #if defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-    defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_WCN7850)
+    defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_KIWI)
 /**
  * dp_rx_null_q_handle_invalid_peer_id_exception() - to find exception
  * @soc: pointer to dp_soc struct
@@ -2896,6 +2896,15 @@ done:
 					DP_STATS_INC_PKT(peer, rx.mec_drop, 1,
 							 qdf_nbuf_len(nbuf));
 					qdf_nbuf_free(nbuf);
+					break;
+				case HAL_RXDMA_UNAUTHORIZED_WDS:
+					pool_id = wbm_err_info.pool_id;
+					err_code = wbm_err_info.rxdma_err_code;
+					tlv_hdr = rx_tlv_hdr;
+					dp_rx_process_rxdma_err(soc, nbuf,
+								tlv_hdr, NULL,
+								err_code,
+								pool_id);
 					break;
 				default:
 					qdf_nbuf_free(nbuf);

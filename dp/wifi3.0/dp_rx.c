@@ -545,6 +545,8 @@ bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc, struct dp_peer *ta_peer,
 		return false;
 
 	len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
+	qdf_nbuf_set_tx_fctx_type(nbuf_copy, &ta_peer->peer_id,
+				  CB_FTYPE_INTRABSS_FWD);
 	if (dp_tx_send((struct cdp_soc_t *)soc,
 		       ta_peer->vdev->vdev_id, nbuf_copy)) {
 		DP_STATS_INC_PKT(ta_peer, rx.intra_bss.fail, 1, len);
@@ -1719,7 +1721,7 @@ void dp_rx_msdu_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	peer->stats.rx.last_rx_ts = qdf_system_ticks();
 
 	/*
-	 * TODO - For WCN7850 this field is present in ring_desc
+	 * TODO - For KIWI this field is present in ring_desc
 	 * Try to use ring desc instead of tlv.
 	 */
 	is_ampdu = hal_rx_mpdu_info_ampdu_flag_get(soc->hal_soc, rx_tlv_hdr);

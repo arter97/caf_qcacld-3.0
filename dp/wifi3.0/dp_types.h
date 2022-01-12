@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -214,30 +214,31 @@ enum dp_peer_state {
  * enum for modules ids of
  */
 enum dp_mod_id {
-	DP_MOD_ID_TX_COMP = 0,
-	DP_MOD_ID_RX = 1,
-	DP_MOD_ID_HTT_COMP = 2,
-	DP_MOD_ID_RX_ERR = 3,
-	DP_MOD_ID_TX_PPDU_STATS = 4,
-	DP_MOD_ID_RX_PPDU_STATS = 5,
-	DP_MOD_ID_CDP = 6,
-	DP_MOD_ID_GENERIC_STATS = 7,
-	DP_MOD_ID_TX_MULTIPASS = 8,
-	DP_MOD_ID_TX_CAPTURE = 9,
-	DP_MOD_ID_NSS_OFFLOAD = 10,
-	DP_MOD_ID_CONFIG = 11,
-	DP_MOD_ID_HTT = 12,
-	DP_MOD_ID_IPA = 13,
-	DP_MOD_ID_AST = 14,
-	DP_MOD_ID_MCAST2UCAST = 15,
-	DP_MOD_ID_CHILD = 16,
-	DP_MOD_ID_MESH = 17,
-	DP_MOD_ID_TX_EXCEPTION = 18,
-	DP_MOD_ID_TDLS = 19,
-	DP_MOD_ID_MISC = 20,
-	DP_MOD_ID_MSCS = 21,
-	DP_MOD_ID_TX = 22,
-	DP_MOD_ID_MAX = 23,
+	DP_MOD_ID_TX_RX,
+	DP_MOD_ID_TX_COMP,
+	DP_MOD_ID_RX,
+	DP_MOD_ID_HTT_COMP,
+	DP_MOD_ID_RX_ERR,
+	DP_MOD_ID_TX_PPDU_STATS,
+	DP_MOD_ID_RX_PPDU_STATS,
+	DP_MOD_ID_CDP,
+	DP_MOD_ID_GENERIC_STATS,
+	DP_MOD_ID_TX_MULTIPASS,
+	DP_MOD_ID_TX_CAPTURE,
+	DP_MOD_ID_NSS_OFFLOAD,
+	DP_MOD_ID_CONFIG,
+	DP_MOD_ID_HTT,
+	DP_MOD_ID_IPA,
+	DP_MOD_ID_AST,
+	DP_MOD_ID_MCAST2UCAST,
+	DP_MOD_ID_CHILD,
+	DP_MOD_ID_MESH,
+	DP_MOD_ID_TX_EXCEPTION,
+	DP_MOD_ID_TDLS,
+	DP_MOD_ID_MISC,
+	DP_MOD_ID_MSCS,
+	DP_MOD_ID_TX,
+	DP_MOD_ID_MAX,
 };
 
 #define DP_PDEV_ITERATE_VDEV_LIST(_pdev, _vdev) \
@@ -1676,6 +1677,7 @@ struct dp_arch_ops {
 					     struct dp_tx_desc_s *tx_desc,
 					     uint8_t *status,
 					     uint8_t ring_id);
+
 	uint32_t (*dp_rx_process)(struct dp_intr *int_ctx,
 				  hal_ring_handle_t hal_ring_hdl,
 				  uint8_t reo_ring_num, uint32_t quota);
@@ -3310,8 +3312,24 @@ struct dp_mld_link_peers {
 };
 #endif
 
+typedef void *dp_txrx_ref_handle;
+
+struct dp_txrx_peer {
+	/* Core TxRx Peer */
+
+	/* VDEV to which this peer is associated */
+	struct dp_vdev *vdev;
+
+	/* peer ID for this peer */
+	uint16_t peer_id;
+};
+
 /* Peer structure for data path state */
 struct dp_peer {
+	struct dp_txrx_peer *txrx_peer;
+#ifdef WIFI_MONITOR_SUPPORT
+	struct dp_mon_peer *monitor_peer;
+#endif
 	/* VDEV to which this peer is associated */
 	struct dp_vdev *vdev;
 
@@ -3439,9 +3457,6 @@ struct dp_peer {
 
 #ifdef WLAN_SUPPORT_MESH_LATENCY
 	struct dp_peer_mesh_latency_parameter mesh_latency_params[DP_MAX_TIDS];
-#endif
-#ifdef WIFI_MONITOR_SUPPORT
-	struct dp_mon_peer *monitor_peer;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	/* peer type */
@@ -3737,4 +3752,19 @@ void dp_vdev_get_default_reo_hash(struct dp_vdev *vdev,
 
 bool dp_reo_remap_config(struct dp_soc *soc, uint32_t *remap0,
 			 uint32_t *remap1, uint32_t *remap2);
+
+#ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH
+/**
+ * dp_tx_comp_get_prefetched_params_from_hal_desc() - Get prefetched TX desc
+ * @soc: DP soc handle
+ * @tx_comp_hal_desc: HAL TX Comp Descriptor
+ * @r_tx_desc: SW Tx Descriptor retrieved from HAL desc.
+ *
+ * Return: None
+ */
+void dp_tx_comp_get_prefetched_params_from_hal_desc(
+					struct dp_soc *soc,
+					void *tx_comp_hal_desc,
+					struct dp_tx_desc_s **r_tx_desc);
+#endif
 #endif /* _DP_TYPES_H_ */

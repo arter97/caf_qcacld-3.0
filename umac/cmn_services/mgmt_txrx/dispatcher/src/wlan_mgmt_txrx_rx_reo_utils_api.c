@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,8 @@
 #include <wlan_mgmt_txrx_rx_reo_utils_api.h>
 #include "../../core/src/wlan_mgmt_txrx_rx_reo_i.h"
 #include <cfg_ucfg_api.h>
+#include <wlan_mgmt_txrx_tgt_api.h>
+#include<wlan_mgmt_txrx_rx_reo_tgt_api.h>
 
 QDF_STATUS
 wlan_mgmt_rx_reo_deinit(void)
@@ -74,12 +76,14 @@ qdf_export_symbol(wlan_get_mlo_link_id_from_pdev);
  * wlan_get_pdev_from_mlo_link_id() - Helper API to get the pdev
  * object from the MLO HW link id.
  * @mlo_link_id: MLO HW link id
+ * @refdbgid: Reference debug id
  *
  * Return: On success returns the pdev object from the MLO HW link_id.
  * On failure returns NULL.
  */
 struct wlan_objmgr_pdev *
-wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id)
+wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id,
+			       wlan_objmgr_ref_dbgid refdbgid)
 {
 	return NULL;
 }
@@ -135,14 +139,16 @@ qdf_export_symbol(wlan_get_mlo_link_id_from_pdev);
  * wlan_get_pdev_from_mlo_link_id() - Helper API to get the pdev
  * object from the MLO HW link id.
  * @mlo_link_id: MLO HW link id
+ * @refdbgid: Reference debug id
  *
  * Return: On success returns the pdev object from the MLO HW link_id.
  * On failure returns NULL.
  */
 struct wlan_objmgr_pdev *
-wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id)
+wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id,
+			       wlan_objmgr_ref_dbgid refdbgid)
 {
-	return mgmt_rx_reo_sim_get_pdev_from_mlo_link_id(mlo_link_id);
+	return mgmt_rx_reo_sim_get_pdev_from_mlo_link_id(mlo_link_id, refdbgid);
 }
 
 qdf_export_symbol(wlan_get_pdev_from_mlo_link_id);
@@ -206,7 +212,6 @@ wlan_mgmt_rx_reo_is_feature_enabled_at_pdev(struct wlan_objmgr_pdev *pdev)
 {
 	return true;
 }
-#endif /* WLAN_MGMT_RX_REO_SIM_SUPPORT */
 
 QDF_STATUS
 wlan_mgmt_rx_reo_sim_start(void)
@@ -223,3 +228,10 @@ wlan_mgmt_rx_reo_sim_stop(void)
 }
 
 qdf_export_symbol(wlan_mgmt_rx_reo_sim_stop);
+#endif /* WLAN_MGMT_RX_REO_SIM_SUPPORT */
+
+bool
+wlan_mgmt_rx_reo_is_simulation_in_progress(void)
+{
+	return mgmt_rx_reo_is_simulation_in_progress();
+}

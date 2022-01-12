@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1299,6 +1299,9 @@ void dp_peer_vdev_list_remove(struct dp_soc *soc, struct dp_vdev *vdev,
 void dp_peer_find_id_to_obj_add(struct dp_soc *soc,
 				struct dp_peer *peer,
 				uint16_t peer_id);
+void dp_txrx_peer_attach_add(struct dp_soc *soc,
+			     struct dp_peer *peer,
+			     struct dp_txrx_peer *txrx_peer);
 void dp_peer_find_id_to_obj_remove(struct dp_soc *soc,
 				   uint16_t peer_id);
 void dp_vdev_unref_delete(struct dp_soc *soc, struct dp_vdev *vdev,
@@ -2190,7 +2193,9 @@ static inline void dp_srng_dst_inv_cached_descs(struct dp_soc *dp_soc,
 }
 #endif /* QCA_CACHED_RING_DESC */
 
-#if defined(QCA_CACHED_RING_DESC) && defined(QCA_DP_RX_HW_SW_NBUF_DESC_PREFETCH)
+#if defined(QCA_CACHED_RING_DESC) && \
+	(defined(QCA_DP_RX_HW_SW_NBUF_DESC_PREFETCH) || \
+	 defined(QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH))
 /**
  * dp_srng_dst_prefetch() - Wrapper function to prefetch descs from dest ring
  * @hal_soc_hdl: HAL SOC handle

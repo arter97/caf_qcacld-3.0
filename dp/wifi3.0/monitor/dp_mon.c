@@ -1,11 +1,11 @@
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
-
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
-
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -48,7 +48,6 @@ dp_pdev_disable_mcopy_code(struct dp_pdev *pdev)
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
 	mon_pdev->mcopy_mode = M_COPY_DISABLED;
-	mon_pdev->monitor_configured = false;
 	mon_pdev->mvdev = NULL;
 }
 
@@ -157,7 +156,6 @@ QDF_STATUS dp_reset_monitor_mode(struct cdp_soc_t *soc_hdl,
 		cdp_ops->soc_config_full_mon_mode((struct cdp_pdev *)pdev,
 						  DP_FULL_MON_DISABLE);
 	mon_pdev->mvdev = NULL;
-	mon_pdev->monitor_configured = false;
 
 	/*
 	 * Lite monitor mode, smart monitor mode and monitor
@@ -181,6 +179,8 @@ QDF_STATUS dp_reset_monitor_mode(struct cdp_soc_t *soc_hdl,
 		dp_rx_mon_dest_err("%pK: Failed to reset monitor filters",
 				   soc);
 	}
+
+	mon_pdev->monitor_configured = false;
 
 	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
 	return QDF_STATUS_SUCCESS;
@@ -2211,6 +2211,7 @@ dp_tx_rate_stats_update(struct dp_peer *peer,
 				   ppdu->nss,
 				   ppdu->preamble,
 				   ppdu->bw,
+				   NO_PUNCTURE,
 				   &rix,
 				   &ratecode);
 
@@ -4455,7 +4456,7 @@ QDF_STATUS dp_mon_soc_cfg_init(struct dp_soc *soc)
 	case TARGET_TYPE_QCA6390:
 	case TARGET_TYPE_QCA6490:
 	case TARGET_TYPE_QCA6750:
-	case TARGET_TYPE_WCN7850:
+	case TARGET_TYPE_KIWI:
 		/* do nothing */
 		break;
 	case TARGET_TYPE_QCA8074:
@@ -4516,7 +4517,7 @@ static void dp_mon_pdev_per_target_config(struct dp_pdev *pdev)
 
 	target_type = hal_get_target_type(soc->hal_soc);
 	switch (target_type) {
-	case TARGET_TYPE_WCN7850:
+	case TARGET_TYPE_KIWI:
 		mon_pdev->is_tlv_hdr_64_bit = true;
 		break;
 	default:
@@ -4843,7 +4844,7 @@ void dp_mon_ops_register(struct dp_soc *soc)
 	case TARGET_TYPE_QCA6390:
 	case TARGET_TYPE_QCA6490:
 	case TARGET_TYPE_QCA6750:
-	case TARGET_TYPE_WCN7850:
+	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_QCA8074:
 	case TARGET_TYPE_QCA8074V2:
 	case TARGET_TYPE_QCA6018:
@@ -4901,7 +4902,7 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 	case TARGET_TYPE_QCA6390:
 	case TARGET_TYPE_QCA6490:
 	case TARGET_TYPE_QCA6750:
-	case TARGET_TYPE_WCN7850:
+	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_QCA8074:
 	case TARGET_TYPE_QCA8074V2:
 	case TARGET_TYPE_QCA6018:

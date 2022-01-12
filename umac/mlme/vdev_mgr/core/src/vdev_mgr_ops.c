@@ -208,7 +208,7 @@ vdev_mgr_start_param_update_11be(struct vdev_mlme_obj *mlme_obj,
 				 struct wlan_channel *des_chan)
 {
 	param->eht_ops = mlme_obj->proto.eht_ops_info.eht_ops;
-	param->channel.puncture_pattern = des_chan->puncture_bitmap;
+	param->channel.puncture_pattern = ~des_chan->puncture_bitmap;
 }
 
 static inline void
@@ -635,6 +635,12 @@ QDF_STATUS vdev_mgr_up_send(struct vdev_mlme_obj *mlme_obj)
 	status = tgt_vdev_mgr_up_send(mlme_obj, &param);
 	if (QDF_IS_STATUS_ERROR(status))
 		return status;
+
+	/* Reset the max channel switch time and last beacon sent time as the
+	 * VDEV UP command sent to FW.
+	 */
+	mlme_obj->mgmt.ap.max_chan_switch_time = 0;
+	mlme_obj->mgmt.ap.last_bcn_ts_ms = 0;
 
 	is_6g_sap_fd_enabled = wlan_vdev_mlme_feat_ext_cap_get(vdev,
 					WLAN_VDEV_FEXT_FILS_DISC_6G_SAP);
