@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1052,10 +1053,11 @@ static int __wlan_hdd_bus_resume(void)
 
 out:
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state() ||
-		cds_is_fw_down())
+	    cds_is_fw_down())
 		return 0;
 
-	QDF_BUG(false);
+	if (status != -ETIMEDOUT)
+		QDF_BUG(false);
 
 	return status;
 }
