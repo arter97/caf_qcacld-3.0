@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -135,6 +136,7 @@ bool qca_multi_link_is_dbdc_processing_reqd(struct net_device *net_dev);
 void qca_multi_link_set_drop_sec_mcast(bool val);
 void qca_multi_link_set_force_client_mcast(bool val);
 void qca_multi_link_set_always_primary(bool val);
+bool qca_multi_link_get_always_primary(void);
 void qca_multi_link_set_dbdc_enable(bool val);
 struct wiphy *qca_multi_link_get_primary_radio(void);
 void qca_multi_link_set_primary_radio(struct wiphy *primary_wiphy);

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,7 +19,6 @@
 #define _DP_WRAP_STRUCT_H_
 
 #if ATH_SUPPORT_WRAP
-#if !WLAN_QWRAP_LEGACY
 
 #include <wbuf.h>
 
@@ -82,6 +82,5 @@ typedef struct dp_wrap_vdev {
 	LIST_ENTRY(dp_wrap_vdev)   wrap_dev_hash_vma;  /*wrap vma hash list */
 	void (*wlan_vdev_xmit_queue)(struct net_device *dev, wbuf_t wbuf);
 } dp_vdev_wrap_t;
-#endif
 #endif
 #endif
