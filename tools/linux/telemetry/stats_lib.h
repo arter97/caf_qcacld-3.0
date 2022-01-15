@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,16 +30,80 @@
 #define STATS_IF_MCS_INVALID         0
 #define STATS_IF_MAX_MCS_STRING_LEN  34
 
-enum stats_if_packet_type {
-	STATS_IF_DOT11_A = 0,
-	STATS_IF_DOT11_B = 1,
-	STATS_IF_DOT11_N = 2,
-	STATS_IF_DOT11_AC = 3,
-	STATS_IF_DOT11_AX = 4,
 #ifdef WLAN_FEATURE_11BE
-	STATS_IF_DOT11_BE = 5,
+enum stats_if_ru_index {
+	STATS_IF_RU_26_INDEX = 0,
+	STATS_IF_RU_52_INDEX,
+	STATS_IF_RU_52_26_INDEX,
+	STATS_IF_RU_106_INDEX,
+	STATS_IF_RU_106_26_INDEX,
+	STATS_IF_RU_242_INDEX,
+	STATS_IF_RU_484_INDEX,
+	STATS_IF_RU_484_242_INDEX,
+	STATS_IF_RU_996_INDEX,
+	STATS_IF_RU_996_484_INDEX,
+	STATS_IF_RU_996_484_242_INDEX,
+	STATS_IF_RU_2X996_INDEX,
+	STATS_IF_RU_2X996_484_INDEX,
+	STATS_IF_RU_3X996_INDEX,
+	STATS_IF_RU_3X996_484_INDEX,
+	STATS_IF_RU_4X996_INDEX,
+	STATS_IF_RU_INDEX_MAX,
+};
+#else
+enum stats_if_ru_index {
+	STATS_IF_RU_26_INDEX = 0,
+	STATS_IF_RU_52_INDEX,
+	STATS_IF_RU_106_INDEX,
+	STATS_IF_RU_242_INDEX,
+	STATS_IF_RU_484_INDEX,
+	STATS_IF_RU_996_INDEX,
+	STATS_IF_RU_INDEX_MAX,
+};
 #endif
-	STATS_IF_DOT11_MAX,
+
+enum stats_if_proto_subtype {
+	STATS_IF_PROTO_INVALID,
+	STATS_IF_PROTO_EAPOL_M1,
+	STATS_IF_PROTO_EAPOL_M2,
+	STATS_IF_PROTO_EAPOL_M3,
+	STATS_IF_PROTO_EAPOL_M4,
+	STATS_IF_PROTO_DHCP_DISCOVER,
+	STATS_IF_PROTO_DHCP_REQUEST,
+	STATS_IF_PROTO_DHCP_OFFER,
+	STATS_IF_PROTO_DHCP_ACK,
+	STATS_IF_PROTO_DHCP_NACK,
+	STATS_IF_PROTO_DHCP_RELEASE,
+	STATS_IF_PROTO_DHCP_INFORM,
+	STATS_IF_PROTO_DHCP_DECLINE,
+	STATS_IF_PROTO_ARP_REQ,
+	STATS_IF_PROTO_ARP_RES,
+	STATS_IF_PROTO_ICMP_REQ,
+	STATS_IF_PROTO_ICMP_RES,
+	STATS_IF_PROTO_ICMPV6_REQ,
+	STATS_IF_PROTO_ICMPV6_RES,
+	STATS_IF_PROTO_ICMPV6_RS,
+	STATS_IF_PROTO_ICMPV6_RA,
+	STATS_IF_PROTO_ICMPV6_NS,
+	STATS_IF_PROTO_ICMPV6_NA,
+	STATS_IF_PROTO_IPV4_UDP,
+	STATS_IF_PROTO_IPV4_TCP,
+	STATS_IF_PROTO_IPV6_UDP,
+	STATS_IF_PROTO_IPV6_TCP,
+	STATS_IF_PROTO_MGMT_ASSOC,
+	STATS_IF_PROTO_MGMT_DISASSOC,
+	STATS_IF_PROTO_MGMT_AUTH,
+	STATS_IF_PROTO_MGMT_DEAUTH,
+	STATS_IF_ROAM_SYNCH,
+	STATS_IF_ROAM_COMPLETE,
+	STATS_IF_ROAM_EVENTID,
+	STATS_IF_PROTO_DNS_QUERY,
+	STATS_IF_PROTO_DNS_RES,
+	STATS_IF_PROTO_SUBTYPE_MAX
+};
+
+struct stats_if_ru_debug {
+	char *ru_type;
 };
 
 enum stats_if_delay_bucket_index {
@@ -63,206 +127,6 @@ struct stats_if_rate_debug {
 	char mcs_type[STATS_IF_MAX_MCS_STRING_LEN];
 	uint8_t valid;
 };
-
-#ifdef WLAN_FEATURE_11BE
-static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
-						   [STATS_IF_MAX_MCS] = {
-	{
-		{"OFDM 48 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 24 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 12 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 6 Mbps ", STATS_IF_MCS_VALID},
-		{"OFDM 54 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 36 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 18 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 9 Mbps ", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"CCK 11 Mbps Long  ", STATS_IF_MCS_VALID},
-		{"CCK 5.5 Mbps Long ", STATS_IF_MCS_VALID},
-		{"CCK 2 Mbps Long   ", STATS_IF_MCS_VALID},
-		{"CCK 1 Mbps Long   ", STATS_IF_MCS_VALID},
-		{"CCK 11 Mbps Short ", STATS_IF_MCS_VALID},
-		{"CCK 5.5 Mbps Short", STATS_IF_MCS_VALID},
-		{"CCK 2 Mbps Short  ", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"HT MCS 0 (BPSK 1/2)  ", STATS_IF_MCS_VALID},
-		{"HT MCS 1 (QPSK 1/2)  ", STATS_IF_MCS_VALID},
-		{"HT MCS 2 (QPSK 3/4)  ", STATS_IF_MCS_VALID},
-		{"HT MCS 3 (16-QAM 1/2)", STATS_IF_MCS_VALID},
-		{"HT MCS 4 (16-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"HT MCS 5 (64-QAM 2/3)", STATS_IF_MCS_VALID},
-		{"HT MCS 6 (64-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"HT MCS 7 (64-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"VHT MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"VHT MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"VHT MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
-		{"VHT MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
-		{"VHT MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
-		{"VHT MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"VHT MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"HE MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"HE MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"HE MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
-		{"HE MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
-		{"HE MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
-		{"HE MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"HE MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"HE MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"HE MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"EHT MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"EHT MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"EHT MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
-		{"EHT MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
-		{"EHT MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"EHT MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
-		{"EHT MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"EHT MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
-		{"EHT MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
-		{"EHT MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
-		{"EHT MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"EHT MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"EHT MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"EHT MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"EHT MCS 14 (BPSK-DCM 1/2)", STATS_IF_MCS_VALID},
-		{"EHT MCS 15 (BPSK-DCM 1/2)", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	}
-};
-#else
-static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
-						   [STATS_IF_MAX_MCS] = {
-	{
-		{"OFDM 48 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 24 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 12 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 6 Mbps ", STATS_IF_MCS_VALID},
-		{"OFDM 54 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 36 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 18 Mbps", STATS_IF_MCS_VALID},
-		{"OFDM 9 Mbps ", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"CCK 11 Mbps Long  ", STATS_IF_MCS_VALID},
-		{"CCK 5.5 Mbps Long ", STATS_IF_MCS_VALID},
-		{"CCK 2 Mbps Long   ", STATS_IF_MCS_VALID},
-		{"CCK 1 Mbps Long   ", STATS_IF_MCS_VALID},
-		{"CCK 11 Mbps Short ", STATS_IF_MCS_VALID},
-		{"CCK 5.5 Mbps Short", STATS_IF_MCS_VALID},
-		{"CCK 2 Mbps Short  ", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"HT MCS 0 (BPSK 1/2)  ", STATS_IF_MCS_VALID},
-		{"HT MCS 1 (QPSK 1/2)  ", STATS_IF_MCS_VALID},
-		{"HT MCS 2 (QPSK 3/4)  ", STATS_IF_MCS_VALID},
-		{"HT MCS 3 (16-QAM 1/2)", STATS_IF_MCS_VALID},
-		{"HT MCS 4 (16-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"HT MCS 5 (64-QAM 2/3)", STATS_IF_MCS_VALID},
-		{"HT MCS 6 (64-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"HT MCS 7 (64-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"VHT MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"VHT MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"VHT MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
-		{"VHT MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
-		{"VHT MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
-		{"VHT MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
-		{"VHT MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"VHT MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	},
-	{
-		{"HE MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"HE MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
-		{"HE MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
-		{"HE MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
-		{"HE MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
-		{"HE MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
-		{"HE MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"HE MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"HE MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
-		{"HE MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
-		{"INVALID ", STATS_IF_MCS_INVALID},
-	}
-};
-#endif
 
 /**
  * struct interface_list: Structure to hold interfaces for Driver Communication
@@ -392,6 +256,71 @@ struct advance_psoc_data {
 	struct advance_psoc_data_rx *rx;
 };
 #endif /* WLAN_ADVANCE_TELEMETRY */
+
+#if WLAN_DEBUG_TELEMETRY
+/* Debug peer data stats holder */
+struct debug_peer_data {
+	struct debug_peer_data_tx *tx;
+	struct debug_peer_data_rx *rx;
+	struct debug_peer_data_link *link;
+	struct debug_peer_data_rate *rate;
+	struct debug_peer_data_txcap *txcap;
+};
+
+/* Debug peer control stats holder */
+struct debug_peer_ctrl {
+	struct debug_peer_ctrl_tx *tx;
+	struct debug_peer_ctrl_rx *rx;
+	struct debug_peer_ctrl_link *link;
+	struct debug_peer_ctrl_rate *rate;
+};
+
+/* Debug vdev data stats holder */
+struct debug_vdev_data {
+	struct debug_vdev_data_tx *tx;
+	struct debug_vdev_data_rx *rx;
+	struct debug_vdev_data_me *me;
+	struct debug_vdev_data_raw *raw;
+	struct debug_vdev_data_tso *tso;
+};
+
+/* Debug vdev control stats holder */
+struct debug_vdev_ctrl {
+	struct debug_vdev_ctrl_tx *tx;
+	struct debug_vdev_ctrl_rx *rx;
+	struct debug_vdev_ctrl_wmi *wmi;
+};
+
+/* Debug pdev data stats holder */
+struct debug_pdev_data {
+	struct debug_pdev_data_tx *tx;
+	struct debug_pdev_data_rx *rx;
+	struct debug_pdev_data_me *me;
+	struct debug_pdev_data_raw *raw;
+	struct debug_pdev_data_tso *tso;
+	struct debug_pdev_data_cfr *cfr;
+	struct debug_pdev_data_htt *htt;
+	struct debug_pdev_data_wdi *wdi;
+	struct debug_pdev_data_mesh *mesh;
+	struct debug_pdev_data_txcap *txcap;
+	struct debug_pdev_data_monitor *monitor;
+};
+
+/* Debug pdev control stats holder */
+struct debug_pdev_ctrl {
+	struct debug_pdev_ctrl_tx *tx;
+	struct debug_pdev_ctrl_rx *rx;
+	struct debug_pdev_ctrl_wmi *wmi;
+	struct debug_pdev_ctrl_link *link;
+};
+
+/* Debug psoc data stats holder */
+struct debug_psoc_data {
+	struct debug_psoc_data_tx *tx;
+	struct debug_psoc_data_rx *rx;
+	struct debug_psoc_data_ast *ast;
+};
+#endif /* WLAN_DEBUG_TELEMETRY */
 
 /**
  * struct stats_obj: Declares structure to hold Stats
