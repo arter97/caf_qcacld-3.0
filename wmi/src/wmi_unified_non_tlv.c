@@ -4877,7 +4877,6 @@ send_set_ctl_table_cmd_non_tlv(wmi_unified_t wmi_handle,
 	/* CTL array length check for Beeliner family */
 	if (param->target_type == TARGET_TYPE_AR900B ||
 			param->target_type == TARGET_TYPE_QCA9984 ||
-			param->target_type == TARGET_TYPE_IPQ4019 ||
 			param->target_type == TARGET_TYPE_QCA9888) {
 		if (param->is_2g) {
 			/* For 2G, CTL array length should be 688*/
