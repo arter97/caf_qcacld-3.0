@@ -362,7 +362,7 @@ populate_dot11f_chan_switch_wrapper(struct mac_context *mac,
 		populate_dot11f_vht_tx_power_env(mac,
 				&pDot11f->vht_transmit_power_env,
 				pe_session->gLimChannelSwitch.ch_width,
-				pe_session->gLimChannelSwitch.primaryChannel);
+				pe_session->gLimChannelSwitch.sw_target_freq);
 	}
 }
 
