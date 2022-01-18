@@ -8815,6 +8815,10 @@ static QDF_STATUS dp_get_vdev_param(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 		val->cdp_vdev_param_hlos_tid_override =
 			    dp_vdev_get_hlos_tid_override((struct cdp_vdev *)vdev);
 		break;
+	case CDP_ENABLE_PEER_AUTHORIZE:
+		val->cdp_vdev_param_peer_authorize =
+			    vdev->peer_authorize;
+		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  "param value %d is wrong\n",
@@ -8946,6 +8950,9 @@ dp_set_vdev_param(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 		vdev->wds_ext_enabled = val.cdp_vdev_param_wds_ext;
 		break;
 #endif
+	case CDP_ENABLE_PEER_AUTHORIZE:
+		vdev->peer_authorize = val.cdp_vdev_param_peer_authorize;
+		break;
 	default:
 		break;
 	}
