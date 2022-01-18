@@ -2410,9 +2410,34 @@ enum hal_rx_wbm_rxdma_push_reason {
 	WBM_RELEASE_RING_4_LAST_MSDU_MASK) >>		\
 	WBM_RELEASE_RING_4_LAST_MSDU_LSB)
 
+#define HAL_RX_WBM_BUF_ADDR_39_32_GET(wbm_desc)	\
+	(HAL_RX_BUFFER_ADDR_39_32_GET(&			\
+	(((struct wbm_release_ring *) \
+	wbm_desc)->released_buff_or_desc_addr_info)))
+
+#define HAL_RX_WBM_BUF_ADDR_31_0_GET(wbm_desc)	\
+	(HAL_RX_BUFFER_ADDR_31_0_GET(&			\
+	(((struct wbm_release_ring *) \
+	wbm_desc)->released_buff_or_desc_addr_info)))
+
 #define HAL_RX_WBM_BUF_COOKIE_GET(wbm_desc) \
 	HAL_RX_BUF_COOKIE_GET(&((struct wbm_release_ring *) \
 	wbm_desc)->released_buff_or_desc_addr_info)
+
+static inline
+void hal_rx_wbm_rel_buf_paddr_get(hal_ring_desc_t rx_desc,
+			      struct hal_buf_info *buf_info)
+{
+	struct wbm_release_ring *wbm_rel_ring =
+		 (struct wbm_release_ring *)rx_desc;
+
+	buf_info->paddr =
+	 (HAL_RX_WBM_BUF_ADDR_31_0_GET(wbm_rel_ring) |
+	  ((uint64_t)(HAL_RX_WBM_BUF_ADDR_39_32_GET(wbm_rel_ring)) << 32));
+
+
+	buf_info->sw_cookie = HAL_RX_WBM_BUF_COOKIE_GET(wbm_rel_ring);
+}
 
 /**
  * hal_rx_dump_rx_attention_tlv: dump RX attention TLV in structured

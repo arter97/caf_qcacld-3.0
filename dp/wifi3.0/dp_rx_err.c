@@ -1853,6 +1853,38 @@ dp_rx_is_sg_formation_required(struct hal_wbm_err_desc_info *info)
 	return false;
 }
 
+#ifdef RX_DESC_DEBUG_CHECK
+/**
+ * dp_rx_desc_nbuf_sanity_check - Add sanity check to catch REO rx_desc paddr
+ *				  corruption
+ *
+ * @ring_desc: REO ring descriptor
+ * @rx_desc: Rx descriptor
+ *
+ * Return: NONE
+ */
+static inline
+QDF_STATUS dp_rx_desc_nbuf_sanity_check(hal_ring_desc_t ring_desc,
+					struct dp_rx_desc *rx_desc)
+{
+	struct hal_buf_info hbi;
+
+	hal_rx_wbm_rel_buf_paddr_get(ring_desc, &hbi);
+	/* Sanity check for possible buffer paddr corruption */
+	if (dp_rx_desc_paddr_sanity_check(rx_desc, (&hbi)->paddr))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_FAILURE;
+}
+#else
+static inline
+QDF_STATUS dp_rx_desc_nbuf_sanity_check(hal_ring_desc_t ring_desc,
+					struct dp_rx_desc *rx_desc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 uint32_t
 dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		      hal_ring_handle_t hal_ring_hdl, uint32_t quota)
@@ -1879,6 +1911,7 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 	uint8_t tid = 0;
 	uint8_t msdu_continuation = 0;
 	bool process_sg_buf = false;
+	QDF_STATUS status;
 
 	/* Debug -- Remove later */
 	qdf_assert(soc && hal_ring_hdl);
@@ -1959,6 +1992,20 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 
 		hal_rx_wbm_err_info_get(ring_desc, &wbm_err_info, hal_soc);
 		nbuf = rx_desc->nbuf;
+
+		status = dp_rx_desc_nbuf_sanity_check(ring_desc, rx_desc);
+		if (qdf_likely(QDF_IS_STATUS_ERROR(status))) {
+			DP_STATS_INC(soc, rx.err.nbuf_sanity_fail, 1);
+			dp_info_rl("Rx error Nbuf sanity check failure!");
+			rx_desc->in_err_state = 1;
+			rx_desc->unmapped = 1;
+			rx_bufs_reaped[rx_desc->pool_id]++;
+			dp_rx_add_to_free_desc_list(&head[rx_desc->pool_id],
+						    &tail[rx_desc->pool_id],
+						    rx_desc);
+			continue;
+		}
+
 		rx_desc_pool = &soc->rx_desc_buf[rx_desc->pool_id];
 		dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf,
 						  rx_desc_pool->buf_size,
