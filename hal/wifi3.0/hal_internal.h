@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -246,7 +246,6 @@ enum hal_srng_ring_id {
 	/* 163-167 unused */
 	HAL_SRNG_SW2RXMON_BUF0 = 168,
 	/* 169-175 unused */
-	HAL_SRNG_SW2TXMON_BUF0 = 176,
 	/* 177-183 unused */
 	HAL_SRNG_DMAC_CMN_ID_END = 183,
 	/* LMAC rings - The following set will be replicated for each LMAC */
@@ -273,7 +272,8 @@ enum hal_srng_ring_id {
 	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING,
 #endif
 	HAL_SRNG_WMAC1_TXMON2SW0,
-	HAL_SRNG_LMAC1_ID_END = (HAL_SRNG_WMAC1_TXMON2SW0 + 3),
+	HAL_SRNG_SW2TXMON_BUF0,
+	HAL_SRNG_LMAC1_ID_END = (HAL_SRNG_SW2TXMON_BUF0 + 2),
 };
 
 #define HAL_RXDMA_MAX_RING_SIZE 0xFFFF

@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
@@ -416,8 +417,6 @@ struct dp_mon_ops {
 	QDF_STATUS (*mon_soc_cfg_init)(struct dp_soc *soc);
 	QDF_STATUS (*mon_soc_attach)(struct dp_soc *soc);
 	QDF_STATUS (*mon_soc_detach)(struct dp_soc *soc);
-	QDF_STATUS (*mon_soc_init)(struct dp_soc *soc);
-	QDF_STATUS (*mon_soc_deinit)(struct dp_soc *soc);
 	QDF_STATUS (*mon_pdev_alloc)(struct dp_pdev *pdev);
 	void (*mon_pdev_free)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_pdev_attach)(struct dp_pdev *pdev);
@@ -560,8 +559,10 @@ struct dp_mon_ops {
 	void (*mon_filter_setup_rx_enh_capture)(struct dp_pdev *pdev);
 	void (*mon_filter_reset_rx_enh_capture)(struct dp_pdev *pdev);
 #endif
-	void (*mon_filter_setup_mon_mode)(struct dp_pdev *pdev);
-	void (*mon_filter_reset_mon_mode)(struct dp_pdev *pdev);
+	void (*mon_filter_setup_rx_mon_mode)(struct dp_pdev *pdev);
+	void (*mon_filter_reset_rx_mon_mode)(struct dp_pdev *pdev);
+	void (*mon_filter_setup_tx_mon_mode)(struct dp_pdev *pdev);
+	void (*mon_filter_reset_tx_mon_mode)(struct dp_pdev *pdev);
 #ifdef WDI_EVENT_ENABLE
 	void (*mon_filter_setup_rx_pkt_log_full)(struct dp_pdev *pdev);
 	void (*mon_filter_reset_rx_pkt_log_full)(struct dp_pdev *pdev);
@@ -574,8 +575,11 @@ struct dp_mon_ops {
 	void (*mon_filter_reset_pktlog_hybrid)(struct dp_pdev *pdev);
 #endif
 #endif
-	QDF_STATUS (*mon_filter_update)(struct dp_pdev *pdev);
+	QDF_STATUS (*rx_mon_filter_update)(struct dp_pdev *pdev);
+	QDF_STATUS (*tx_mon_filter_update)(struct dp_pdev *pdev);
 
+	QDF_STATUS (*tx_mon_filter_alloc)(struct dp_pdev *pdev);
+	void (*tx_mon_filter_dealloc)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_rings_alloc)(struct dp_pdev *pdev);
 	void (*mon_rings_free)(struct dp_pdev *pdev);
 	QDF_STATUS (*mon_rings_init)(struct dp_pdev *pdev);
@@ -1894,7 +1898,21 @@ static inline
 uint32_t dp_tx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 			   uint32_t mac_id, uint32_t quota)
 {
-	return 0;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_ops *monitor_ops;
+
+	if (!mon_soc) {
+		dp_mon_debug("monitor soc is NULL");
+		return 0;
+	}
+
+	monitor_ops = mon_soc->mon_ops;
+	if (!monitor_ops || !monitor_ops->mon_tx_process) {
+		dp_mon_debug("callback not registered");
+		return 0;
+	}
+
+	return monitor_ops->mon_tx_process(soc, int_ctx, mac_id, quota);
 }
 
 static inline

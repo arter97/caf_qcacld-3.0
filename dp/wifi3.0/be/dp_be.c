@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -23,6 +23,9 @@
 #include "dp_be.h"
 #include "dp_be_tx.h"
 #include "dp_be_rx.h"
+#if !defined(DISABLE_MON_CONFIG) && defined(QCA_MONITOR_2_0_SUPPORT)
+#include "dp_mon_2.0.h"
+#endif
 #include <hal_be_api.h>
 
 /* Generic AST entry aging timer value */
@@ -77,6 +80,32 @@ qdf_size_t dp_get_context_size_be(enum dp_context_type context_type)
 		return 0;
 	}
 }
+
+#if !defined(DISABLE_MON_CONFIG) && defined(QCA_MONITOR_2_0_SUPPORT)
+qdf_size_t dp_mon_get_context_size_be(enum dp_context_type context_type)
+{
+	switch (context_type) {
+	case DP_CONTEXT_TYPE_MON_SOC:
+		return sizeof(struct dp_mon_soc_be);
+	case DP_CONTEXT_TYPE_MON_PDEV:
+		return sizeof(struct dp_mon_pdev_be);
+	default:
+		return 0;
+	}
+}
+#else
+qdf_size_t dp_mon_get_context_size_be(enum dp_context_type context_type)
+{
+	switch (context_type) {
+	case DP_CONTEXT_TYPE_MON_SOC:
+		return sizeof(struct dp_mon_soc);
+	case DP_CONTEXT_TYPE_MON_PDEV:
+		return sizeof(struct dp_mon_pdev);
+	default:
+		return 0;
+	}
+}
+#endif
 
 #ifdef DP_FEATURE_HW_COOKIE_CONVERSION
 #if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
@@ -1451,6 +1480,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 				dp_wbm_get_rx_desc_from_hal_desc_be;
 #endif
 	arch_ops->txrx_get_context_size = dp_get_context_size_be;
+	arch_ops->txrx_get_mon_context_size = dp_mon_get_context_size_be;
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_be;
 

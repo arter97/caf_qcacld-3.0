@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,7 +29,7 @@
  *         QDF_STATUS_E_FAILURE: Error
  */
 QDF_STATUS
-dp_tx_mon_buffers_alloc(struct dp_soc *soc);
+dp_tx_mon_buffers_alloc(struct dp_soc *soc, uint32_t size);
 
 /*
  * dp_tx_mon_buffers_free() - free tx monitor buffers
@@ -85,5 +86,17 @@ void dp_tx_mon_process_status_tlv(struct dp_soc *soc,
 				  struct dp_pdev *pdev,
 				  struct hal_mon_desc *mon_ring_desc,
 				  qdf_dma_addr_t addr);
+
+/*
+ * dp_tx_mon_process_2_0() - tx monitor interrupt process
+ * @soc: dp soc handle
+ * @int_ctx: interrupt context
+ * @mac_id: mac id
+ * @quota: quota to process
+ *
+ */
+uint32_t
+dp_tx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
+		      uint32_t mac_id, uint32_t quota);
 
 #endif /* _DP_TX_MON_2_0_H_ */

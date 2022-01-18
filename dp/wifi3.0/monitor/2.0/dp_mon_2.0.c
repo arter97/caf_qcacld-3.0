@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,15 +28,7 @@
 #include <dp_tx_mon_2.0.h>
 #include <hal_be_api_mon.h>
 #include <dp_be.h>
-
-extern QDF_STATUS dp_srng_alloc(struct dp_soc *soc, struct dp_srng *srng,
-				int ring_type, uint32_t num_entries,
-				bool cached);
-extern void dp_srng_free(struct dp_soc *soc, struct dp_srng *srng);
-extern QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng,
-			       int ring_type, int ring_num, int mac_id);
-extern void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
-			   int ring_type, int ring_num);
+#include <htt_ppdu_stats.h>
 
 #if !defined(DISABLE_MON_CONFIG)
 /*
@@ -48,7 +40,7 @@ extern void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
  * @tail: attach the point to last desc of local desc list
  * @mon_desc_pool: monitor descriptor pool pointer
  */
-static void
+void
 dp_mon_add_desc_list_to_free_list(struct dp_soc *soc,
 				  union dp_mon_desc_list_elem_t **local_desc_list,
 				  union dp_mon_desc_list_elem_t **tail,
@@ -120,8 +112,8 @@ void dp_mon_pool_frag_unmap_and_free(struct dp_soc *soc,
 
 			if (!(mon_desc_pool->array[desc_id].mon_desc.unmapped)) {
 				qdf_mem_unmap_page(soc->osdev, paddr,
-						   QDF_DMA_FROM_DEVICE,
-						   mon_desc_pool->buf_size);
+						   mon_desc_pool->buf_size,
+						   QDF_DMA_FROM_DEVICE);
 				mon_desc_pool->array[desc_id].mon_desc.unmapped = 1;
 				mon_desc_pool->array[desc_id].mon_desc.cookie = desc_id;
 			}
@@ -192,7 +184,7 @@ dp_mon_buffers_replenish(struct dp_soc *dp_soc,
 							   tail);
 
 		if (!num_alloc_desc) {
-			dp_mon_err("%pK: no free rx_descs in freelist", dp_soc);
+			dp_mon_debug("%pK: no free rx_descs in freelist", dp_soc);
 			return QDF_STATUS_E_NOMEM;
 		}
 
@@ -211,7 +203,7 @@ dp_mon_buffers_replenish(struct dp_soc *dp_soc,
 		num_req_buffers = num_entries_avail;
 	}
 
-	while (count <= num_req_buffers) {
+	while (count <= num_req_buffers - 1) {
 		ret = dp_mon_frag_alloc_and_map(dp_soc,
 						&mon_desc,
 						mon_desc_pool);
@@ -232,6 +224,8 @@ dp_mon_buffers_replenish(struct dp_soc *dp_soc,
 
 		(*desc_list)->mon_desc.in_use = 1;
 		(*desc_list)->mon_desc.unmapped = 0;
+		(*desc_list)->mon_desc.buf_addr = mon_desc.buf_addr;
+		(*desc_list)->mon_desc.paddr = mon_desc.paddr;
 
 		hal_mon_buff_addr_info_set(dp_soc->hal_soc,
 					   mon_ring_entry,
@@ -310,6 +304,37 @@ QDF_STATUS dp_mon_desc_pool_alloc(uint32_t pool_size,
 static
 void dp_vdev_set_monitor_mode_buf_rings_2_0(struct dp_pdev *pdev)
 {
+	int tx_mon_max_entries, rx_mon_max_entries;
+	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
+	struct dp_soc *soc = pdev->soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	if (!mon_soc_be) {
+		dp_mon_err("DP MON SOC is NULL");
+		return;
+	}
+
+	soc_cfg_ctx = soc->wlan_cfg_ctx;
+	rx_mon_max_entries = wlan_cfg_get_dp_soc_rx_mon_buf_ring_size(soc_cfg_ctx);
+
+	if (dp_rx_mon_buffers_alloc(soc,
+				    (rx_mon_max_entries - mon_soc_be->tx_mon_ring_fill_level))) {
+		dp_mon_err("%pK: Rx mon buffers allocation failed", soc);
+		return;
+	}
+
+	tx_mon_max_entries = wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
+	if (dp_tx_mon_buffers_alloc(soc,
+				    (tx_mon_max_entries - mon_soc_be->tx_mon_ring_fill_level))) {
+		dp_mon_err("%pK: Tx mon buffers allocation failed", soc);
+		return;
+	}
+
+	mon_soc_be->tx_mon_ring_fill_level +=
+				(tx_mon_max_entries - mon_soc_be->tx_mon_ring_fill_level);
+	mon_soc_be->rx_mon_ring_fill_level +=
+				(rx_mon_max_entries - mon_soc_be->rx_mon_ring_fill_level);
 }
 
 static
@@ -318,19 +343,6 @@ QDF_STATUS dp_vdev_set_monitor_mode_rings_2_0(struct dp_pdev *pdev,
 {
 	return QDF_STATUS_SUCCESS;
 }
-#else
-static inline
-void dp_vdev_set_monitor_mode_buf_rings_2_0(struct dp_pdev *pdev)
-{
-}
-
-static inline
-QDF_STATUS dp_vdev_set_monitor_mode_rings_2_0(struct dp_pdev *pdev,
-					      uint8_t delayed_replenish)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 #if defined(QCA_ENHANCED_STATS_SUPPORT) && defined(WLAN_FEATURE_11BE)
 void
@@ -344,10 +356,12 @@ dp_mon_tx_stats_update_2_0(struct dp_peer *peer,
 	mcs = ppdu->mcs;
 
 	DP_STATS_INCC(peer,
-		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1], num_msdu,
+		      tx.pkt_type[preamble].mcs_count[MAX_MCS - 1],
+		      ppdu->num_msdu,
 		      ((mcs >= (MAX_MCS - 1)) && (preamble == DOT11_BE)));
 	DP_STATS_INCC(peer,
-		      tx.pkt_type[preamble].mcs_count[mcs], num_msdu,
+		      tx.pkt_type[preamble].mcs_count[mcs],
+		      ppdu->num_msdu,
 		      ((mcs < (MAX_MCS - 1)) && (preamble == DOT11_BE)));
 	DP_STATS_INCC(peer,
 		      tx.su_be_ppdu_cnt.mcs_count[MAX_MCS - 1], 1,
@@ -358,22 +372,22 @@ dp_mon_tx_stats_update_2_0(struct dp_peer *peer,
 		      ((mcs < (MAX_MCS - 1)) && (preamble == DOT11_BE) &&
 		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_SU)));
 	DP_STATS_INCC(peer,
-		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].ppdu.mcs_count[MAX_MCS - 1],
+		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].mcs_count[MAX_MCS - 1],
 		      1, ((mcs >= (MAX_MCS - 1)) &&
 		      (preamble == DOT11_BE) &&
 		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_OFDMA)));
 	DP_STATS_INCC(peer,
-		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].ppdu.mcs_count[mcs],
+		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_OFDMA].mcs_count[mcs],
 		      1, ((mcs < (MAX_MCS - 1)) &&
 		      (preamble == DOT11_BE) &&
 		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_OFDMA)));
 	DP_STATS_INCC(peer,
-		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].ppdu.mcs_count[MAX_MCS - 1],
+		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].mcs_count[MAX_MCS - 1],
 		      1, ((mcs >= (MAX_MCS - 1)) &&
 		      (preamble == DOT11_BE) &&
 		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_MIMO)));
 	DP_STATS_INCC(peer,
-		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].ppdu.mcs_count[mcs],
+		      tx.mu_be_ppdu_cnt[TXRX_TYPE_MU_MIMO].mcs_count[mcs],
 		      1, ((mcs < (MAX_MCS - 1)) &&
 		      (preamble == DOT11_BE) &&
 		      (ppdu->ppdu_type == HTT_PPDU_STATS_PPDU_TYPE_MU_MIMO)));
@@ -386,7 +400,7 @@ dp_mon_tx_stats_update_2_0(struct dp_peer *peer,
 			   struct cdp_tx_completion_ppdu_user *ppdu)
 {
 }
-#endif
+#endif /* QCA_ENHANCED_STATS_SUPPORT && WLAN_FEATURE_11BE */
 
 #ifdef QCA_SUPPORT_BPR
 static QDF_STATUS
@@ -394,14 +408,13 @@ dp_set_bpr_enable_2_0(struct dp_pdev *pdev, int val)
 {
 	return QDF_STATUS_SUCCESS;
 }
-#endif
+#endif /* QCA_SUPPORT_BPR */
 
-#ifndef DISABLE_MON_CONFIG
 static
 QDF_STATUS dp_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc)
 {
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
 	QDF_STATUS status;
 
@@ -415,7 +428,7 @@ QDF_STATUS dp_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc)
 	}
 
 	status = htt_srng_setup(soc->htt_handle, 0,
-				mon_soc->tx_mon_buf_ring.hal_srng,
+				mon_soc_be->tx_mon_buf_ring.hal_srng,
 				TX_MONITOR_BUF);
 
 	if (status != QDF_STATUS_SUCCESS) {
@@ -429,11 +442,11 @@ QDF_STATUS dp_mon_soc_htt_srng_setup_2_0(struct dp_soc *soc)
 static
 QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
 					  struct dp_pdev *pdev,
-				     int mac_id,
-				     int mac_for_pdev)
+					  int mac_id,
+					  int mac_for_pdev)
 {
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	QDF_STATUS status;
 
 	status = htt_srng_setup(soc->htt_handle, mac_for_pdev,
@@ -446,7 +459,7 @@ QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
 	}
 
 	status = htt_srng_setup(soc->htt_handle, mac_for_pdev,
-				mon_soc->tx_mon_dst_ring[mac_id].hal_srng,
+				mon_soc_be->tx_mon_dst_ring[mac_id].hal_srng,
 				TX_MONITOR_DST);
 
 	if (status != QDF_STATUS_SUCCESS) {
@@ -460,17 +473,17 @@ QDF_STATUS dp_mon_pdev_htt_srng_setup_2_0(struct dp_soc *soc,
 QDF_STATUS dp_tx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 {
 	struct dp_soc *soc  = int_ctx->soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	union dp_mon_desc_list_elem_t *desc_list = NULL;
 	union dp_mon_desc_list_elem_t *tail = NULL;
 	struct dp_srng *tx_mon_buf_ring;
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc_be = be_soc->monitor_soc_be;
 	struct dp_intr_stats *intr_stats = &int_ctx->intr_stats;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	uint32_t num_entries_avail;
 	int sync_hw_ptr = 1;
 	void *hal_srng;
 
-	tx_mon_buf_ring = &be_soc->monitor_soc_be->tx_mon_buf_ring;
+	tx_mon_buf_ring = &mon_soc_be->tx_mon_buf_ring;
 	hal_srng = tx_mon_buf_ring->hal_srng;
 
 	intr_stats->num_host2txmon_ring__masks++;
@@ -481,9 +494,10 @@ QDF_STATUS dp_tx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 						   sync_hw_ptr);
 	hal_srng_access_end(soc->hal_soc, hal_srng);
 
-	dp_mon_buffers_replenish(soc, tx_mon_buf_ring,
-				 &be_soc->monitor_soc_be->tx_desc_mon,
-				 num_entries_avail, &desc_list, &tail);
+	if (num_entries_avail)
+		dp_mon_buffers_replenish(soc, tx_mon_buf_ring,
+					 &mon_soc_be->tx_desc_mon,
+					 num_entries_avail, &desc_list, &tail);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -491,12 +505,12 @@ QDF_STATUS dp_tx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 {
 	struct dp_soc *soc  = int_ctx->soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	union dp_mon_desc_list_elem_t *desc_list = NULL;
 	union dp_mon_desc_list_elem_t *tail = NULL;
 	struct dp_srng *rx_mon_buf_ring;
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc_be = be_soc->monitor_soc_be;
 	struct dp_intr_stats *intr_stats = &int_ctx->intr_stats;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	uint32_t num_entries_avail;
 	int sync_hw_ptr = 1;
 	void *hal_srng;
@@ -512,37 +526,31 @@ QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 						   sync_hw_ptr);
 	hal_srng_access_end(soc->hal_soc, hal_srng);
 
-	dp_mon_buffers_replenish(soc, rx_mon_buf_ring,
-				 &be_soc->monitor_soc_be->rx_desc_mon,
-				 num_entries_avail, &desc_list, &tail);
+	if (num_entries_avail)
+		dp_mon_buffers_replenish(soc, rx_mon_buf_ring,
+					 &mon_soc_be->rx_desc_mon,
+					 num_entries_avail, &desc_list, &tail);
 
 	return QDF_STATUS_SUCCESS;
-}
-
-#ifndef DISABLE_MON_CONFIG
-static uint32_t
-dp_rx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
-		      uint32_t mac_id, uint32_t quota)
-{
-	return 0;
 }
 
 static
 QDF_STATUS dp_mon_soc_detach_2_0(struct dp_soc *soc)
 {
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+
+	if (!mon_soc_be) {
+		dp_mon_err("DP MON SOC NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	dp_tx_mon_buffers_free(soc);
 	dp_rx_mon_buffers_free(soc);
 	dp_tx_mon_buf_desc_pool_free(soc);
 	dp_rx_mon_buf_desc_pool_free(soc);
-
-	if (mon_soc) {
-		dp_srng_free(soc, &soc->rxdma_mon_buf_ring[0]);
-		dp_srng_free(soc, &mon_soc->tx_mon_buf_ring);
-		qdf_mem_free(be_soc->monitor_soc_be);
-	}
+	dp_srng_free(soc, &soc->rxdma_mon_buf_ring[0]);
+	dp_srng_free(soc, &mon_soc_be->tx_mon_buf_ring);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -550,21 +558,23 @@ QDF_STATUS dp_mon_soc_detach_2_0(struct dp_soc *soc)
 static
 QDF_STATUS dp_mon_soc_attach_2_0(struct dp_soc *soc)
 {
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = NULL;
+	struct dp_mon_soc_be *mon_soc_be = NULL;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	int entries;
 	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 
 	soc_cfg_ctx = soc->wlan_cfg_ctx;
-	mon_soc = (struct dp_mon_soc_be *)qdf_mem_malloc(sizeof(*mon_soc));
-	if (!mon_soc) {
-		dp_mon_err("%pK: mem allocation failed", soc);
-		return QDF_STATUS_E_NOMEM;
+	mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+	if (!mon_soc_be) {
+		dp_mon_err("DP MON SOC is NULL");
+		return QDF_STATUS_E_FAILURE;
 	}
-	qdf_mem_zero(mon_soc, sizeof(*mon_soc));
-	be_soc->monitor_soc_be = mon_soc;
+
+	mon_soc_be->tx_mon_ring_fill_level = DP_MON_RING_FILL_LEVEL_DEFAULT;
+	mon_soc_be->rx_mon_ring_fill_level = DP_MON_RING_FILL_LEVEL_DEFAULT;
 
 	entries = wlan_cfg_get_dp_soc_rx_mon_buf_ring_size(soc_cfg_ctx);
+	qdf_print("%s:%d rx mon buf entries: %d", __func__, __LINE__, entries);
 	if (dp_srng_alloc(soc, &soc->rxdma_mon_buf_ring[0],
 			  RXDMA_MONITOR_BUF, entries, 0)) {
 		dp_mon_err("%pK: " RNG_ERR "rx_mon_buf_ring", soc);
@@ -572,13 +582,26 @@ QDF_STATUS dp_mon_soc_attach_2_0(struct dp_soc *soc)
 	}
 
 	entries = wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
-	if (dp_srng_alloc(soc, &be_soc->monitor_soc_be->tx_mon_buf_ring,
+	qdf_print("%s:%d tx mon buf entries: %d", __func__, __LINE__, entries);
+	if (dp_srng_alloc(soc, &mon_soc_be->tx_mon_buf_ring,
 			  TX_MONITOR_BUF, entries, 0)) {
 		dp_mon_err("%pK: " RNG_ERR "tx_mon_buf_ring", soc);
 		goto fail;
 	}
 
-	/* sw desc pool for src ring */
+	if (dp_srng_init(soc, &soc->rxdma_mon_buf_ring[0],
+			 RXDMA_MONITOR_BUF, 0, 0)) {
+		dp_mon_err("%pK: " RNG_ERR "rx_mon_buf_ring", soc);
+		goto fail;
+	}
+
+	if (dp_srng_init(soc, &mon_soc_be->tx_mon_buf_ring,
+			 TX_MONITOR_BUF, 0, 0)) {
+		dp_mon_err("%pK: " RNG_ERR "tx_mon_buf_ring", soc);
+		goto fail;
+	}
+
+	/* allocate sw desc pool */
 	if (dp_rx_mon_buf_desc_pool_alloc(soc)) {
 		dp_mon_err("%pK: Rx mon desc pool allocation failed", soc);
 		goto fail;
@@ -589,13 +612,24 @@ QDF_STATUS dp_mon_soc_attach_2_0(struct dp_soc *soc)
 		goto fail;
 	}
 
+	/* initialize sw desc pool */
+	if (dp_tx_mon_buf_desc_pool_init(soc)) {
+		dp_mon_err("%pK: " RNG_ERR "tx mon desc pool init", soc);
+		goto fail;
+	}
+
+	if (dp_rx_mon_buf_desc_pool_init(soc)) {
+		dp_mon_err("%pK: " RNG_ERR "rx mon desc pool init", soc);
+		goto fail;
+	}
+
 	/* monitor buffers for src */
-	if (dp_rx_mon_buffers_alloc(soc)) {
+	if (dp_rx_mon_buffers_alloc(soc, DP_MON_RING_FILL_LEVEL_DEFAULT)) {
 		dp_mon_err("%pK: Rx mon buffers allocation failed", soc);
 		goto fail;
 	}
 
-	if (dp_tx_mon_buffers_alloc(soc)) {
+	if (dp_tx_mon_buffers_alloc(soc, DP_MON_RING_FILL_LEVEL_DEFAULT)) {
 		dp_mon_err("%pK: Tx mon buffers allocation failed", soc);
 		goto fail;
 	}
@@ -607,63 +641,12 @@ fail:
 }
 
 static
-QDF_STATUS dp_mon_soc_deinit_2_0(struct dp_soc *soc)
-{
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
-
-	dp_tx_mon_buf_desc_pool_deinit(soc);
-	dp_rx_mon_buf_desc_pool_deinit(soc);
-
-	dp_srng_deinit(soc, &soc->rxdma_mon_buf_ring[0],
-		       RXDMA_MONITOR_BUF, 0);
-
-	dp_srng_deinit(soc, &mon_soc->tx_mon_buf_ring,
-		       TX_MONITOR_BUF, 0);
-	return QDF_STATUS_SUCCESS;
-}
-
-static
-QDF_STATUS dp_mon_soc_init_2_0(struct dp_soc *soc)
-{
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
-
-	if (dp_srng_init(soc, &soc->rxdma_mon_buf_ring[0],
-			 RXDMA_MONITOR_BUF, 0, 0)) {
-		dp_mon_err("%pK: " RNG_ERR "rx_mon_buf_ring", soc);
-		goto fail;
-	}
-
-	if (dp_srng_init(soc, &mon_soc->tx_mon_buf_ring,
-			 TX_MONITOR_BUF, 0, 0)) {
-		dp_mon_err("%pK: " RNG_ERR "tx_mon_buf_ring", soc);
-		goto fail;
-	}
-
-	if (dp_tx_mon_buf_desc_pool_init(soc)) {
-		dp_mon_err("%pK: " RNG_ERR "tx mon desc pool init", soc);
-		goto fail;
-	}
-
-	if (dp_rx_mon_buf_desc_pool_init(soc)) {
-		dp_mon_err("%pK: " RNG_ERR "rx mon desc pool init", soc);
-		goto fail;
-	}
-
-	return QDF_STATUS_SUCCESS;
-fail:
-	dp_mon_soc_deinit_2_0(soc);
-	return QDF_STATUS_E_FAILURE;
-}
-
-static
 void dp_pdev_mon_rings_deinit_2_0(struct dp_pdev *pdev)
 {
 	int mac_id = 0;
 	struct dp_soc *soc = pdev->soc;
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
 	for (mac_id = 0; mac_id < DP_NUM_MACS_PER_PDEV; mac_id++) {
 		int lmac_id = dp_get_lmac_id_for_pdev_id(soc, mac_id,
@@ -671,7 +654,7 @@ void dp_pdev_mon_rings_deinit_2_0(struct dp_pdev *pdev)
 
 		dp_srng_deinit(soc, &soc->rxdma_mon_dst_ring[lmac_id],
 			       RXDMA_MONITOR_DST, 0);
-		dp_srng_deinit(soc, &mon_soc->tx_mon_dst_ring[lmac_id],
+		dp_srng_deinit(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id],
 			       TX_MONITOR_DST, 0);
 	}
 }
@@ -681,8 +664,8 @@ QDF_STATUS dp_pdev_mon_rings_init_2_0(struct dp_pdev *pdev)
 {
 	struct dp_soc *soc = pdev->soc;
 	int mac_id = 0;
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
 	for (mac_id = 0; mac_id < DP_NUM_MACS_PER_PDEV; mac_id++) {
 		int lmac_id = dp_get_lmac_id_for_pdev_id(soc, mac_id,
@@ -694,7 +677,7 @@ QDF_STATUS dp_pdev_mon_rings_init_2_0(struct dp_pdev *pdev)
 			goto fail;
 		}
 
-		if (dp_srng_init(soc, &mon_soc->tx_mon_dst_ring[lmac_id],
+		if (dp_srng_init(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id],
 				 TX_MONITOR_DST, 0, lmac_id)) {
 			dp_mon_err("%pK: " RNG_ERR "tx_mon_dst_ring", soc);
 			goto fail;
@@ -712,15 +695,15 @@ void dp_pdev_mon_rings_free_2_0(struct dp_pdev *pdev)
 {
 	int mac_id = 0;
 	struct dp_soc *soc = pdev->soc;
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
 	for (mac_id = 0; mac_id < DP_NUM_MACS_PER_PDEV; mac_id++) {
 		int lmac_id = dp_get_lmac_id_for_pdev_id(soc, mac_id,
 							 pdev->pdev_id);
 
 		dp_srng_free(soc, &soc->rxdma_mon_dst_ring[lmac_id]);
-		dp_srng_free(soc, &mon_soc->tx_mon_dst_ring[lmac_id]);
+		dp_srng_free(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id]);
 	}
 }
 
@@ -731,8 +714,8 @@ QDF_STATUS dp_pdev_mon_rings_alloc_2_0(struct dp_pdev *pdev)
 	int mac_id = 0;
 	int entries;
 	struct wlan_cfg_dp_pdev_ctxt *pdev_cfg_ctx;
-	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_mon_soc_be *mon_soc = be_soc->monitor_soc_be;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
 	pdev_cfg_ctx = pdev->wlan_cfg_ctx;
 
@@ -748,7 +731,7 @@ QDF_STATUS dp_pdev_mon_rings_alloc_2_0(struct dp_pdev *pdev)
 		}
 
 		entries = wlan_cfg_get_dma_tx_mon_dest_ring_size(pdev_cfg_ctx);
-		if (dp_srng_alloc(soc, &mon_soc->tx_mon_dst_ring[lmac_id],
+		if (dp_srng_alloc(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id],
 				  TX_MONITOR_DST, entries, 0)) {
 			dp_err("%pK: " RNG_ERR "tx_mon_dst_ring", pdev);
 			goto fail;
@@ -764,25 +747,19 @@ fail:
 static
 void dp_mon_pdev_free_2_0(struct dp_pdev *pdev)
 {
-	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev(pdev);
-
-	qdf_mem_free(be_pdev->monitor_pdev_be);
-	be_pdev->monitor_pdev_be = NULL;
 }
 
 static
 QDF_STATUS dp_mon_pdev_alloc_2_0(struct dp_pdev *pdev)
 {
-	struct dp_mon_pdev_be *mon_pdev = NULL;
-	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev(pdev);
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_pdev_be *mon_pdev_be =
+			dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 
-	mon_pdev = (struct dp_mon_pdev_be *)qdf_mem_malloc(sizeof(*mon_pdev));
-	if (!mon_pdev) {
-		dp_mon_err("%pK: mem allocation failed", pdev);
-		return QDF_STATUS_E_NOMEM;
+	if (!mon_pdev_be) {
+		dp_mon_err("DP MON PDEV is NULL");
+		return QDF_STATUS_E_FAILURE;
 	}
-	qdf_mem_zero(mon_pdev, sizeof(*mon_pdev));
-	be_pdev->monitor_pdev_be = mon_pdev;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -797,15 +774,8 @@ QDF_STATUS dp_mon_htt_srng_setup_2_0(struct dp_soc *soc,
 }
 
 static uint32_t
-dp_rx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
+dp_tx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 		      uint32_t mac_id, uint32_t quota)
-{
-	return 0;
-}
-
-static uint32_t
-dp_tx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
-		  uint32_t mac_id, uint32_t quota)
 {
 	return 0;
 }
@@ -818,18 +788,6 @@ QDF_STATUS dp_mon_soc_attach_2_0(struct dp_soc *soc)
 
 static inline
 QDF_STATUS dp_mon_soc_detach_2_0(struct dp_soc *soc)
-{
-	return status;
-}
-
-static inline
-QDF_STATUS dp_mon_soc_init_2_0(struct dp_soc *soc)
-{
-	return status;
-}
-
-static inline
-QDF_STATUS dp_mon_soc_deinit_2_0(struct dp_soc *soc)
 {
 	return status;
 }
@@ -866,12 +824,28 @@ QDF_STATUS dp_mon_pdev_alloc_2_0(struct dp_pdev *pdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline
+void dp_vdev_set_monitor_mode_buf_rings_2_0(struct dp_pdev *pdev)
+{
+}
+
+static inline
+QDF_STATUS dp_vdev_set_monitor_mode_rings_2_0(struct dp_pdev *pdev,
+					      uint8_t delayed_replenish)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 static void dp_mon_register_intr_ops_2_0(struct dp_soc *soc)
 {
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 
+	mon_soc->mon_ops->rx_mon_refill_buf_ring =
+			dp_rx_mon_refill_buf_ring_2_0,
+	mon_soc->mon_ops->tx_mon_refill_buf_ring =
+			dp_tx_mon_refill_buf_ring_2_0,
 	mon_soc->mon_rx_process = dp_rx_mon_process_2_0;
 }
 
@@ -906,7 +880,7 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 	mon_ops->mon_pdev_get_filter_non_data = dp_pdev_get_filter_non_data;
 	mon_ops->mon_neighbour_peer_add_ast = NULL;
 #ifndef DISABLE_MON_CONFIG
-	mon_ops->mon_tx_process = dp_tx_mon_process;
+	mon_ops->mon_tx_process = dp_tx_mon_process_2_0;
 #endif
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
 	mon_ops->mon_peer_tid_peer_id_update = NULL;
@@ -990,10 +964,10 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 	mon_ops->mon_vdev_set_monitor_mode_rings =
 				dp_vdev_set_monitor_mode_rings_2_0;
 #ifdef QCA_ENHANCED_STATS_SUPPORT
-	mon_ops->mon_rx_stats_update = dp_mon_rx_stats_update_2_0;
+	mon_ops->mon_rx_stats_update = dp_rx_mon_stats_update_2_0;
 	mon_ops->mon_rx_populate_ppdu_usr_info =
-			dp_mon_populate_ppdu_usr_info_2_0;
-	mon_ops->mon_rx_populate_ppdu_info = dp_mon_populate_ppdu_info_2_0;
+			dp_rx_mon_populate_ppdu_usr_info_2_0;
+	mon_ops->mon_rx_populate_ppdu_info = dp_rx_mon_populate_ppdu_info_2_0;
 #endif
 }
 
@@ -1001,8 +975,6 @@ struct dp_mon_ops monitor_ops_2_0 = {
 	.mon_soc_cfg_init = dp_mon_soc_cfg_init,
 	.mon_soc_attach = dp_mon_soc_attach_2_0,
 	.mon_soc_detach = dp_mon_soc_detach_2_0,
-	.mon_soc_init = dp_mon_soc_init_2_0,
-	.mon_soc_deinit = dp_mon_soc_deinit_2_0,
 	.mon_pdev_alloc = dp_mon_pdev_alloc_2_0,
 	.mon_pdev_free = dp_mon_pdev_free_2_0,
 	.mon_pdev_attach = dp_mon_pdev_attach,
@@ -1035,9 +1007,14 @@ struct dp_mon_ops monitor_ops_2_0 = {
 	.mon_reap_timer_start = NULL,
 	.mon_reap_timer_stop = NULL,
 	.mon_reap_timer_deinit = NULL,
-	.mon_filter_setup_mon_mode = dp_mon_filter_setup_mon_mode_2_0,
-	.mon_filter_reset_mon_mode = dp_mon_filter_reset_mon_mode_2_0,
-	.mon_filter_update = dp_mon_filter_update_2_0,
+	.mon_filter_setup_rx_mon_mode = dp_mon_filter_setup_rx_mon_mode_2_0,
+	.mon_filter_reset_rx_mon_mode = dp_mon_filter_reset_rx_mon_mode_2_0,
+	.mon_filter_setup_tx_mon_mode = dp_mon_filter_setup_tx_mon_mode_2_0,
+	.mon_filter_reset_tx_mon_mode = dp_mon_filter_reset_tx_mon_mode_2_0,
+	.tx_mon_filter_update = dp_tx_mon_filter_update_2_0,
+	.rx_mon_filter_update = dp_rx_mon_filter_update_2_0,
+	.tx_mon_filter_alloc = dp_mon_filter_alloc_2_0,
+	.tx_mon_filter_dealloc = dp_mon_filter_dealloc_2_0,
 	.mon_rings_alloc = dp_pdev_mon_rings_alloc_2_0,
 	.mon_rings_free = dp_pdev_mon_rings_free_2_0,
 	.mon_rings_init = dp_pdev_mon_rings_init_2_0,

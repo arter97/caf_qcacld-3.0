@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -338,7 +338,7 @@
 #define WLAN_CFG_RXDMA_MONITOR_BUF_RING_SIZE_MIN 16
 #define WLAN_CFG_RXDMA_MONITOR_BUF_RING_SIZE_MAX 8192
 
-#define WLAN_CFG_TX_MONITOR_BUF_RING_SIZE 4096
+#define WLAN_CFG_TX_MONITOR_BUF_RING_SIZE 8192
 #define WLAN_CFG_TX_MONITOR_BUF_RING_SIZE_MIN 16
 #define WLAN_CFG_TX_MONITOR_BUF_RING_SIZE_MAX 8192
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -550,7 +550,8 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 			(uint64_t)tp_addr);
 		break;
 	case RXDMA_MONITOR_BUF:
-		htt_ring_id = HTT_RXDMA_MONITOR_BUF_RING;
+		htt_ring_id = dp_htt_get_mon_htt_ring_id(soc->dp_soc,
+							 RXDMA_MONITOR_BUF);
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_STATUS:
@@ -558,7 +559,8 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_DST:
-		htt_ring_id = HTT_RXDMA_MONITOR_DEST_RING;
+		htt_ring_id = dp_htt_get_mon_htt_ring_id(soc->dp_soc,
+							 RXDMA_MONITOR_DST);
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
 	case RXDMA_MONITOR_DESC:
@@ -569,8 +571,6 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		htt_ring_id = HTT_RXDMA_NON_MONITOR_DEST_RING;
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
-#ifdef QCA_MONITOR_2_0_SUPPORT_WAR
-	// WAR till fw htt.h changes are merged
 	case TX_MONITOR_BUF:
 		htt_ring_id = HTT_TX_MON_HOST2MON_BUF_RING;
 		htt_ring_type = HTT_SW_TO_HW_RING;
@@ -579,7 +579,6 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		htt_ring_id = HTT_TX_MON_MON2HOST_DEST_RING;
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
-#endif
 
 	default:
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
@@ -908,7 +907,8 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_BUF:
-		htt_ring_id = HTT_RXDMA_MONITOR_BUF_RING;
+		htt_ring_id = dp_htt_get_mon_htt_ring_id(soc->dp_soc,
+							 RXDMA_MONITOR_BUF);
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_STATUS:
@@ -916,7 +916,8 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_DST:
-		htt_ring_id = HTT_RXDMA_MONITOR_DEST_RING;
+		htt_ring_id = dp_htt_get_mon_htt_ring_id(soc->dp_soc,
+							 RXDMA_MONITOR_DST);
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
 	case RXDMA_MONITOR_DESC:

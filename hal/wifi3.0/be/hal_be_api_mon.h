@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +17,8 @@
 
 #ifndef _HAL_BE_API_MON_H_
 #define _HAL_BE_API_MON_H_
+
+#ifdef QCA_MONITOR_2_0_SUPPORT
 
 #include <mon_ingress_ring.h>
 #include <mon_destination_ring.h>
@@ -97,6 +100,30 @@ struct hal_mon_desc {
 };
 
 /**
+ * hal_be_get_mon_dest_status() - Get monitor descriptor
+ * @hal_soc_hdl: HAL Soc handle
+ * @desc: HAL monitor descriptor
+ *
+ * Return: none
+ */
+static inline void
+hal_be_get_mon_dest_status(hal_soc_handle_t hal_soc,
+			   void *hw_desc,
+			   struct hal_mon_desc *status)
+{
+	struct mon_destination_ring *desc = hw_desc;
+
+	status->buf_addr = ((u64)desc->stat_buf_virt_addr_31_0 |
+				((u64)desc->stat_buf_virt_addr_63_32 << 32));
+	status->ppdu_id = desc->ppdu_id;
+	status->end_offset = desc->end_offset;
+	status->end_reason = desc->end_reason;
+	status->initiator = desc->initiator;
+	status->empty_descriptor = desc->empty_descriptor;
+	status->looping_count = desc->looping_count;
+}
+
+/**
  * hal_mon_buff_addr_info_set() - set desc address in cookie
  * @hal_soc_hdl: HAL Soc handle
  * @mon_entry: monitor srng
@@ -121,31 +148,5 @@ void hal_mon_buff_addr_info_set(hal_soc_handle_t hal_soc_hdl,
 	HAL_MON_VADDR_HI_SET(mon_entry, vaddr_hi);
 }
 
-/**
- * hal_mon_buf_get() - Get monitor descriptor
- * @hal_soc_hdl: HAL Soc handle
- * @desc: HAL monitor descriptor
- *
- * Return: none
- */
-static inline
-void hal_mon_buf_get(hal_soc_handle_t hal_soc_hdl,
-		     void *dst_ring_desc,
-		     struct hal_mon_desc *mon_desc)
-{
-	struct mon_destination_ring *hal_dst_ring =
-			(struct mon_destination_ring *)dst_ring_desc;
-
-	mon_desc->buf_addr =
-		((u64)hal_dst_ring->stat_buf_virt_addr_31_0 |
-		 ((u64)hal_dst_ring->stat_buf_virt_addr_63_32 << 32));
-	mon_desc->ppdu_id = hal_dst_ring->ppdu_id;
-	mon_desc->end_offset = hal_dst_ring->end_offset;
-	mon_desc->end_reason = hal_dst_ring->end_reason;
-	mon_desc->initiator = hal_dst_ring->initiator;
-	mon_desc->ring_id = hal_dst_ring->ring_id;
-	mon_desc->empty_descriptor = hal_dst_ring->empty_descriptor;
-	mon_desc->looping_count = hal_dst_ring->looping_count;
-}
-
+#endif /* QCA_MONITOR_2_0_SUPPORT */
 #endif /* _HAL_BE_API_MON_H_ */

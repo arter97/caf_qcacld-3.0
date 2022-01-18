@@ -5117,7 +5117,9 @@ QDF_STATUS dp_pdev_attach_wifi3(struct cdp_soc_t *txrx_soc,
 
 	pdev_context_size =
 		soc->arch_ops.txrx_get_context_size(DP_CONTEXT_TYPE_PDEV);
-	pdev = dp_context_alloc_mem(soc, DP_PDEV_TYPE, pdev_context_size);
+	if (pdev_context_size)
+		pdev = dp_context_alloc_mem(soc, DP_PDEV_TYPE, pdev_context_size);
+
 	if (!pdev) {
 		dp_init_err("%pK: DP PDEV memory allocation failed",
 			    soc);
@@ -5197,9 +5199,6 @@ fail0:
 	return QDF_STATUS_E_FAILURE;
 }
 
-
-
-#ifdef WLAN_DP_PENDING_MEM_FLUSH
 /**
  * dp_pdev_flush_pending_vdevs() - Flush all delete pending vdevs in pdev
  * @pdev: Datapath PDEV handle
@@ -5212,33 +5211,33 @@ fail0:
  */
 static void dp_pdev_flush_pending_vdevs(struct dp_pdev *pdev)
 {
-	struct dp_vdev *vdev = NULL;
 	struct dp_soc *soc = pdev->soc;
+	struct dp_vdev *vdev_arr[MAX_VDEV_CNT] = {0};
+	uint32_t i = 0;
+	uint32_t num_vdevs = 0;
+	struct dp_vdev *vdev = NULL;
 
 	if (TAILQ_EMPTY(&soc->inactive_vdev_list))
 		return;
 
-	while (true) {
-		qdf_spin_lock_bh(&soc->inactive_vdev_list_lock);
-		TAILQ_FOREACH(vdev, &soc->inactive_vdev_list,
-			      inactive_list_elem) {
-			if (vdev->pdev == pdev)
-				break;
-		}
-		qdf_spin_unlock_bh(&soc->inactive_vdev_list_lock);
+	qdf_spin_lock_bh(&soc->inactive_vdev_list_lock);
+	TAILQ_FOREACH(vdev, &soc->inactive_vdev_list,
+		      inactive_list_elem) {
+		if (vdev->pdev != pdev)
+			continue;
 
-		/* vdev will be freed when all peers get cleanup */
-		if (vdev)
-			dp_vdev_flush_peers((struct cdp_vdev *)vdev, 0);
-		else
-			break;
+		vdev_arr[num_vdevs] = vdev;
+		num_vdevs++;
+		/* take reference to free */
+		dp_vdev_get_ref(soc, vdev, DP_MOD_ID_CDP);
+	}
+	qdf_spin_unlock_bh(&soc->inactive_vdev_list_lock);
+
+	for (i = 0; i < num_vdevs; i++) {
+		dp_vdev_flush_peers((struct cdp_vdev *)vdev_arr[i], 0);
+		dp_vdev_unref_delete(soc, vdev_arr[i], DP_MOD_ID_CDP);
 	}
 }
-#else
-static void dp_pdev_flush_pending_vdevs(struct dp_pdev *pdev)
-{
-}
-#endif
 
 #ifdef QCA_VDEV_STATS_HW_OFFLOAD_SUPPORT
 /**
@@ -8091,7 +8090,7 @@ static QDF_STATUS dp_peer_delete_wifi3(struct cdp_soc_t *soc_hdl,
 
 	dp_peer_vdev_list_remove(soc, vdev, peer);
 
-	dp_peer_mlo_delete(soc, peer);
+	dp_peer_mlo_delete(peer);
 
 	qdf_spin_lock_bh(&soc->inactive_peer_list_lock);
 	TAILQ_INSERT_TAIL(&soc->inactive_peer_list, peer,
@@ -12927,7 +12926,7 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 		goto fail0;
 	}
 
-	dp_info("soc memory allocated %pk", soc);
+	dp_info("soc memory allocated %pK", soc);
 	soc->hif_handle = hif_handle;
 	soc->hal_soc = hif_get_hal_handle(soc->hif_handle);
 	if (!soc->hal_soc)
