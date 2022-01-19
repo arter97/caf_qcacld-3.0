@@ -23,8 +23,8 @@
 
 #include <wlan_cm_ucfg_api.h>
 #include <wlan_objmgr_vdev_obj.h>
-#include <wlan_mlo_mgr_cmn.h>
 #ifdef WLAN_FEATURE_11BE_MLO
+#include <wlan_mlo_mgr_cmn.h>
 #include <wlan_mlo_mgr_public_structs.h>
 
 /**
@@ -462,6 +462,13 @@ ucfg_mlo_get_assoc_link_vdev(struct wlan_objmgr_vdev *vdev)
 static inline void
 mlo_update_connect_req_links(struct wlan_objmgr_vdev *vdev, uint8_t value)
 { }
+
+/* Dummy defines to avoid compilation errors when MLO is disabled */
+struct wlan_mlo_dev_context {
+};
+
+struct mlo_partner_info {
+};
 
 static inline void
 mlo_update_connected_links_bmap(struct wlan_mlo_dev_context *mlo_dev_ctx,
