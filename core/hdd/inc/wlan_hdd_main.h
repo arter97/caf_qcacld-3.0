@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1451,6 +1452,7 @@ struct hdd_adapter {
 
 	/* BITMAP indicating pause reason */
 	uint32_t pause_map;
+	uint32_t subqueue_pause_map;
 	spinlock_t pause_map_lock;
 	qdf_time_t start_time;
 	qdf_time_t last_time;
@@ -2167,7 +2169,7 @@ struct hdd_context {
 	struct sar_limit_cmd_params *sar_cmd_params;
 #ifdef SAR_SAFETY_FEATURE
 	qdf_mc_timer_t sar_safety_timer;
-	qdf_mc_timer_t sar_safety_unsolicited_timer;
+	struct qdf_delayed_work sar_safety_unsolicited_work;
 	qdf_event_t sar_safety_req_resp_event;
 	qdf_atomic_t sar_safety_req_resp_event_in_progress;
 #endif
