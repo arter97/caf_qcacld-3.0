@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -406,6 +407,7 @@ struct vdev_80211_stats {
  *
  * @cs_rx_badkeyid: rx bad keyid
  * @cs_rx_decryptok: rx decrypt success
+ * @cs_rx_decryptcrc: rx decrypt error
  * @cs_rx_wepfail: rx wep failures
  * @cs_rx_tkipreplay: rx tkip replays
  * @cs_rx_tkipformat: rx tkip format
@@ -424,6 +426,7 @@ struct vdev_80211_stats {
 struct vdev_80211_mac_stats {
 	uint64_t cs_rx_badkeyid;
 	uint64_t cs_rx_decryptok;
+	uint64_t cs_rx_decryptcrc;
 	uint64_t cs_rx_wepfail;
 	uint64_t cs_rx_tkipreplay;
 	uint64_t cs_rx_tkipformat;
