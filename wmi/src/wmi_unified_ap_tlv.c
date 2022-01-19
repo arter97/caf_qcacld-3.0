@@ -3254,6 +3254,33 @@ QDF_STATUS send_soc_tqm_reset_enable_disable_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if CONFIG_SAWF_DEF_QUEUES
+static QDF_STATUS
+send_set_rate_upper_cap_cmd_tlv(struct wmi_unified *wmi_handle, uint8_t pdev_id,
+				struct wmi_rc_params *param)
+{
+	struct pdev_params pparam;
+	uint32_t value = 0;
+
+	WMI_PDEV_UPPER_CAP_NSS_SET(value, param->upper_cap_nss);
+	WMI_PDEV_UPPER_CAP_MCS_SET(value, param->upper_cap_mcs);
+	WMI_PDEV_UPPER_CAP_NSS_VALID_SET(value, param->en_nss_cap);
+	WMI_PDEV_UPPER_CAP_MCS_VALID_SET(value, param->en_mcs_cap);
+
+	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
+
+	qdf_mem_set(&pparam, sizeof(pparam), 0);
+	pparam.param_id = wmi_pdev_param_rate_upper_cap;
+	pparam.param_value = value;
+
+	if (wmi_handle->ops->send_pdev_param_cmd)
+		return wmi_handle->ops->send_pdev_param_cmd(wmi_handle, &pparam,
+							    pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -3341,4 +3368,7 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_vdev_set_intra_bss_cmd = send_vdev_set_intra_bss_cmd_tlv;
 	ops->send_soc_tqm_reset_enable_disable_cmd =
 				send_soc_tqm_reset_enable_disable_cmd_tlv;
+#if CONFIG_SAWF_DEF_QUEUES
+	ops->send_set_rate_upper_cap_cmd = send_set_rate_upper_cap_cmd_tlv;
+#endif
 }
