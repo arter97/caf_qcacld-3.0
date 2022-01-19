@@ -22,11 +22,11 @@
 #define _WLAN_UTILS_MLO_H_
 
 #include <wlan_cmn_ieee80211.h>
-#include "wlan_mlo_mgr_public_structs.h"
 #include <wlan_cm_ucfg_api.h>
 #include <wlan_objmgr_vdev_obj.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
+#include "wlan_mlo_mgr_public_structs.h"
 
 /**
  * util_gen_link_assoc_req() - Generate link specific assoc request
@@ -220,6 +220,7 @@ util_get_bvmlie_persta_partner_info(uint8_t *mlieseq,
 				    qdf_size_t mlieseqlen,
 				    struct mlo_partner_info *partner_info);
 #else
+#include "wlan_mlo_mgr_sta.h"
 static inline QDF_STATUS
 util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
 			struct qdf_mac_addr link_addr,
