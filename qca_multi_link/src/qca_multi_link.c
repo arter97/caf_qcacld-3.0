@@ -1287,6 +1287,10 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_tx(struct net_device *
 	QDF_STATUS qal_status = QDF_STATUS_E_FAILURE;
 	qdf_ether_header_t *eh = (qdf_ether_header_t *) qdf_nbuf_data(nbuf);
 
+	if (qca_multi_link_cfg.always_primary) {
+		return QCA_MULTI_LINK_PKT_ALLOW;
+	}
+
 	sta_wiphy = sta_dev->ieee80211_ptr->wiphy;
 
 	QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG, FL("Primary STA Tx: always_primary=%d, loop_detected=%d,\
