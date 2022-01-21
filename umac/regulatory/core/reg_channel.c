@@ -1218,8 +1218,9 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	uint64_t in_wireless_modes = *mode_select;
-	struct regulatory_channel *cur_chan_list;
-	int i, max_bw = 20;
+	struct regulatory_channel *chan_list;
+	enum supported_6g_pwr_types pwr_mode;
+	int i, max_bw = BW_20_MHZ;
 	uint64_t band_modes = 0;
 
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
@@ -1229,41 +1230,55 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 		return;
 	}
 
-	cur_chan_list = pdev_priv_obj->cur_chan_list;
+	chan_list = qdf_mem_malloc(NUM_CHANNELS * sizeof(*chan_list));
+	if (!chan_list)
+		return;
 
-	for (i = 0; i < NUM_CHANNELS; i++) {
-		qdf_freq_t freq = cur_chan_list[i].center_freq;
-		uint16_t cur_bw = cur_chan_list[i].max_bw;
+	for (pwr_mode = REG_AP_LPI; pwr_mode <= REG_CLI_SUB_VLP; pwr_mode++) {
 
-		if (reg_is_chan_disabled_and_not_nol(&cur_chan_list[i]))
-			continue;
-
-		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq))
-			band_modes |= WIRELESS_2G_MODES;
-
-		if (WLAN_REG_IS_49GHZ_FREQ(freq))
-			band_modes |= WIRELESS_49G_MODES;
-
-		if (WLAN_REG_IS_5GHZ_CH_FREQ(freq))
-			band_modes |= WIRELESS_5G_MODES;
-
-		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(freq))
-			band_modes |= WIRELESS_6G_MODES;
-
-		if (!include_nol_chan &&
-		    WLAN_REG_IS_5GHZ_CH_FREQ(freq)) {
-			enum phy_ch_width in_chwidth, out_chwidth;
-
-			in_chwidth = reg_find_chwidth_from_bw(cur_bw);
-			out_chwidth =
-				reg_get_max_channel_width_without_radar(pdev,
-						freq, in_chwidth);
-			cur_bw = chwd_2_contbw_lst[out_chwidth];
+		qdf_mem_zero(chan_list, NUM_CHANNELS * sizeof(*chan_list));
+		if (reg_get_pwrmode_chan_list(pdev, chan_list, pwr_mode)) {
+			qdf_mem_free(chan_list);
+			return;
 		}
 
-		if (max_bw < cur_bw)
-			max_bw = cur_bw;
+		for (i = 0; i < NUM_CHANNELS; i++) {
+			qdf_freq_t freq = chan_list[i].center_freq;
+			uint16_t cur_bw = chan_list[i].max_bw;
+
+			if (reg_is_chan_disabled_and_not_nol(&chan_list[i]))
+				continue;
+
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(freq))
+				band_modes |= WIRELESS_2G_MODES;
+
+			if (WLAN_REG_IS_49GHZ_FREQ(freq))
+				band_modes |= WIRELESS_49G_MODES;
+
+			if (WLAN_REG_IS_5GHZ_CH_FREQ(freq))
+				band_modes |= WIRELESS_5G_MODES;
+
+			if (WLAN_REG_IS_6GHZ_CHAN_FREQ(freq))
+				band_modes |= WIRELESS_6G_MODES;
+
+			if (!include_nol_chan &&
+			    WLAN_REG_IS_5GHZ_CH_FREQ(freq)) {
+				enum phy_ch_width in_chwidth, out_chwidth;
+
+				in_chwidth = reg_find_chwidth_from_bw(cur_bw);
+				out_chwidth =
+				    reg_get_max_channel_width_without_radar(
+								pdev,
+								freq,
+								in_chwidth);
+				cur_bw = chwd_2_contbw_lst[out_chwidth];
+			}
+
+			if (max_bw < cur_bw)
+				max_bw = cur_bw;
+		}
 	}
+	qdf_mem_free(chan_list);
 
 	in_wireless_modes &= band_modes;
 
