@@ -43,6 +43,19 @@ QDF_STATUS wmi_unified_peer_del_wds_entry_cmd_send(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef WLAN_FEATURE_MULTI_AST_DEL
+QDF_STATUS wmi_unified_peer_del_multi_wds_entries_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct peer_del_multi_wds_entry_params *param)
+{
+	if (wmi_handle->ops->send_peer_del_multi_wds_entries_cmd)
+		return wmi_handle->ops->send_peer_del_multi_wds_entries_cmd(
+				wmi_handle, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_FEATURE_MULTI_AST_DEL */
+
 QDF_STATUS wmi_unified_peer_update_wds_entry_cmd_send(
 		wmi_unified_t wmi_handle,
 		struct peer_update_wds_entry_params *param)

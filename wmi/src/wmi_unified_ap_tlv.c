@@ -112,6 +112,99 @@ static QDF_STATUS send_peer_del_wds_entry_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_MULTI_AST_DEL
+/**
+ * send_peer_del_wds_entry_cmd_tlv() - send peer ast delete command to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer holding wds entries details
+ *
+ * Return: QDF_STATUS_SUCCESS on sending wmi cmd to FW, else error value
+ */
+static QDF_STATUS send_peer_del_multi_wds_entries_cmd_tlv(
+		wmi_unified_t wmi_handle,
+		struct peer_del_multi_wds_entry_params *param)
+{
+	int i;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	wmi_vdev_multiple_peer_group_cmd_fixed_param *cmd;
+	uint32_t len = sizeof(*cmd);
+	wmi_mac_addr *mac_addr;
+	uint32_t max_macs_per_cmd, max_macs_cnt;
+	uint32_t pending_cnt = param->num_entries;
+	uint32_t num_macs = 0;
+	struct peer_del_multi_wds_entry_val *param_list = param->dest_list;
+
+	max_macs_per_cmd = (wmi_get_max_msg_len(wmi_handle) -
+			    sizeof(*cmd) - WMI_TLV_HDR_SIZE) /
+			    sizeof(wmi_mac_addr);
+
+	if (param->num_entries &&
+	    param->num_entries <= max_macs_per_cmd)
+		max_macs_cnt = param->num_entries;
+	else
+		max_macs_cnt = max_macs_per_cmd;
+
+	wmi_debug("Setting max macs limit as %u", max_macs_cnt);
+	while (pending_cnt > 0) {
+		len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+		if (pending_cnt >= max_macs_cnt)
+			num_macs = max_macs_cnt;
+		else
+			num_macs = pending_cnt;
+
+		len += num_macs * sizeof(wmi_mac_addr);
+		buf = wmi_buf_alloc(wmi_handle, len);
+		if (!buf) {
+			wmi_err("Failed to allocate memory");
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		buf_ptr = (uint8_t *)wmi_buf_data(buf);
+		cmd = (wmi_vdev_multiple_peer_group_cmd_fixed_param *)
+						wmi_buf_data(buf);
+		WMITLV_SET_HDR(
+			&cmd->tlv_header,
+			WMITLV_TAG_STRUC_wmi_vdev_multiple_peer_group_cmd_fixed_param,
+			WMITLV_GET_STRUCT_TLVLEN
+			(wmi_vdev_multiple_peer_group_cmd_fixed_param));
+
+		cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+					wmi_handle, param->pdev_id);
+		cmd->vdev_id = param->vdev_id;
+		cmd->sub_cmd_id = WMI_PEER_REMOVE_WDS_ENTRY_CMDID;
+
+		buf_ptr += sizeof(*cmd);
+		WMITLV_SET_HDR(buf_ptr,
+			       WMITLV_TAG_ARRAY_FIXED_STRUC,
+			       num_macs * sizeof(wmi_mac_addr));
+
+		mac_addr = (wmi_mac_addr *)(buf_ptr + WMI_TLV_HDR_SIZE);
+		wmi_debug("send vdev_id %d num_macs:%d!",
+			  param->vdev_id, num_macs);
+		for (i = 0; i < num_macs; i++)
+			WMI_CHAR_ARRAY_TO_MAC_ADDR(param_list[i].dest_addr,
+						   &mac_addr[i]);
+
+		pending_cnt -= num_macs;
+		param_list += num_macs;
+
+		wmi_mtrace(WMI_VDEV_MULTIPLE_PEER_GROUP_CMDID, cmd->vdev_id, 0);
+
+		if (wmi_unified_cmd_send(wmi_handle, buf, len,
+					 WMI_VDEV_MULTIPLE_PEER_GROUP_CMDID)) {
+			wmi_err("vdev_id %d num_entries:%d failed!",
+				param->vdev_id, param->num_entries);
+			wmi_buf_free(buf);
+			return QDF_STATUS_E_FAILURE;
+		}
+		wmi_debug("vdev_id %d num_entries:%d done!",
+			  param->vdev_id, num_macs);
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * send_peer_update_wds_entry_cmd_tlv() - send peer update command to fw
  * @wmi_handle: wmi handle
@@ -3257,9 +3350,12 @@ QDF_STATUS send_soc_tqm_reset_enable_disable_cmd_tlv(wmi_unified_t wmi_handle,
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
-
 	ops->send_peer_add_wds_entry_cmd = send_peer_add_wds_entry_cmd_tlv;
 	ops->send_peer_del_wds_entry_cmd = send_peer_del_wds_entry_cmd_tlv;
+#ifdef WLAN_FEATURE_MULTI_AST_DEL
+	ops->send_peer_del_multi_wds_entries_cmd =
+					send_peer_del_multi_wds_entries_cmd_tlv;
+#endif
 	ops->send_peer_update_wds_entry_cmd =
 					send_peer_update_wds_entry_cmd_tlv;
 	ops->send_pdev_get_tpc_config_cmd = send_pdev_get_tpc_config_cmd_tlv;

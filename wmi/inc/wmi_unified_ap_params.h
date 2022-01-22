@@ -113,6 +113,57 @@ struct peer_del_wds_entry_params {
 };
 
 /**
+ * struct peer_del_multi_wds_entry_val - List element of the wds del param
+ * @dest_addr: destination macaddr
+ * @type: AST type
+ */
+struct peer_del_multi_wds_entry_val {
+	uint8_t dest_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t type;
+};
+
+/**
+ * struct peer_del_multi_wds_entry_params - multi WDS peer entry del params
+ * to be sent to WMI
+ * @vdev_id: vdev id for FW reference
+ * @pdev_id: pdev id for which multi ast delete is sent
+ * @num_entries: Number of entries in the dest list
+ * @dest_list: List to hold the mac addresses to be deleted
+ */
+struct peer_del_multi_wds_entry_params {
+	uint8_t vdev_id;
+	uint8_t pdev_id;
+	uint16_t num_entries;
+	struct peer_del_multi_wds_entry_val *dest_list;
+};
+
+/**
+ * struct peer_wds_entry_list - multi WDS peer entry del list
+ * @dest_addr: destination macaddr
+ * @type: AST type
+ * @delete_in_fw: Set if this mac is supposed to be deleted at FW
+ * @ase_list_elem: List element to hold list entries.
+ */
+struct peer_wds_entry_list {
+	uint8_t *dest_addr;
+	uint8_t type;
+	uint8_t delete_in_fw;
+	TAILQ_ENTRY(peer_wds_entry_list) ase_list_elem;
+};
+
+/**
+ * struct peer_del_multi_wds_entries - multi WDS peer entry del params
+ * @vdev_id: vdev id
+ * @num_entries: Number of entries in the ase list
+ * @ase_list: List to hold the AST entries to be deleted
+ */
+struct peer_del_multi_wds_entries {
+	uint8_t vdev_id;
+	uint16_t num_entries;
+	TAILQ_HEAD(, peer_wds_entry_list) ase_list;
+};
+
+/**
  * struct peer_update_wds_entry_params - WDS peer entry update params
  * @wds_macaddr: Pointer to destination macaddr
  * @peer_add: Pointer to peer mac addr
