@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2007-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
@@ -1559,7 +1558,11 @@ void dfs_mark_precac_nol_for_freq(struct wlan_dfs *dfs,
 				  uint8_t num_channels)
 {
 	struct dfs_precac_entry *precac_entry = NULL, *tmp_precac_entry = NULL;
+	struct wlan_objmgr_psoc *psoc;
 	uint8_t i;
+	struct dfs_soc_priv_obj *dfs_soc_obj;
+	struct wlan_lmac_if_dfs_tx_ops *dfs_tx_ops;
+	struct wlan_objmgr_pdev *pdev;
 
 	dfs_debug(dfs, WLAN_DEBUG_DFS,
 		  "is_radar_found_on_secondary_seg = %u subchannel_marking = %u detector_id = %u",
@@ -1599,6 +1602,42 @@ void dfs_mark_precac_nol_for_freq(struct wlan_dfs *dfs,
 		}
 	}
 	PRECAC_LIST_UNLOCK(dfs);
+
+	psoc = wlan_pdev_get_psoc(dfs->dfs_pdev_obj);
+	dfs_soc_obj = dfs->dfs_soc_obj;
+
+	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
+	pdev = dfs->dfs_pdev_obj;
+	/* PreCAC timer is not running, no need to restart preCAC */
+	if (!dfs_soc_obj->dfs_precac_timer_running)
+		return;
+
+	if (dfs_is_legacy_precac_enabled(dfs)) {
+		qdf_timer_sync_cancel(&dfs_soc_obj->dfs_precac_timer);
+		dfs_soc_obj->dfs_precac_timer_running = 0;
+		/*
+		 * If radar is found on primary channel, no need to
+		 * restart VAP's channels since channel change will happen
+		 * after RANDOM channel selection anyway.
+		 */
+		if (is_radar_found_on_secondary_seg) {
+			/*
+			 * Change the channel
+			 * case 1:-  No  VHT80 channel for precac is available
+			 * so bring it back to VHT80.
+			 * case 2:-  pick a new VHT80 channel for precac.
+			 */
+			if (dfs_is_ap_cac_timer_running(dfs)) {
+				dfs->dfs_defer_precac_channel_change = 1;
+				dfs_debug(dfs, WLAN_DEBUG_DFS,
+					  "Primary CAC is running, defer the channel change"
+					  );
+			} else {
+				dfs_mlme_channel_change_by_precac(
+						dfs->dfs_pdev_obj);
+			}
+		}
+	}
 }
 
 #ifdef ATH_SUPPORT_ZERO_CAC_DFS
@@ -1882,6 +1921,7 @@ void dfs_unmark_precac_nol_for_freq(struct wlan_dfs *dfs, uint16_t chan_freq)
 {
 	struct dfs_precac_entry *pcac_entry = NULL,
 				*tmp_precac_entry = NULL;
+	uint16_t pri_ch_freq = 0, chwidth_80 = DFS_CHWIDTH_80_VAL;
 
 	PRECAC_LIST_LOCK(dfs);
 	if (!TAILQ_EMPTY(&dfs->dfs_precac_list)) {
@@ -1905,6 +1945,28 @@ void dfs_unmark_precac_nol_for_freq(struct wlan_dfs *dfs, uint16_t chan_freq)
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 		 "NOL expired for chan_freq %u, trying to start preCAC",
 		 chan_freq);
+	if (!dfs->dfs_soc_obj->dfs_precac_timer_running) {
+		if (dfs_is_legacy_precac_enabled(dfs)) {
+			if (dfs_is_ap_cac_timer_running(dfs)) {
+				dfs->dfs_defer_precac_channel_change = 1;
+				dfs_debug(dfs, WLAN_DEBUG_DFS,
+					  "Primary CAC is running, deferred"
+					  );
+			} else if (WLAN_IS_CHAN_11AC_VHT80(dfs->dfs_curchan)) {
+				pri_ch_freq = dfs->dfs_curchan->
+						dfs_ch_mhz_freq_seg1;
+
+				/* Check if there is a new channel to preCAC
+				 * and only then do vdev restart.
+				 */
+				if (!dfs_get_ieeechan_for_precac_for_freq
+				    (dfs, pri_ch_freq, 0, chwidth_80))
+					return;
+				dfs_mlme_channel_change_by_precac(
+						dfs->dfs_pdev_obj);
+			}
+		}
+	}
 }
 
 #ifdef QCA_SUPPORT_ADFS_RCAC
