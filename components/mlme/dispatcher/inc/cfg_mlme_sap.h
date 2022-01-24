@@ -722,28 +722,6 @@
 					1, \
 					"Enable/Disable fils discovery for SAP")
 
-/*
- * <ini>
- * sap_disable_mcs13_160mhz - Disable mcs13 if SAP works on 160MHZ.
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to disable mcs13 if SAP works on 160MHZ.
- *
- * Related: None.
- *
- * Supported Feature: Concurrency
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_SAP_DISABLE_MCS13_160MHZ CFG_INI_BOOL( \
-			"sap_disable_mcs13_160mhz", \
-			0, \
-			"Disable mcs13 for 160Mhz SAP")
-
 #define CFG_SAP_ALL \
 	CFG_SAP_SAE \
 	CFG(CFG_AP_ENABLE_RANDOM_BSSID) \
@@ -777,7 +755,6 @@
 	CFG(CFG_GO_FORCE_11N_FOR_11AC) \
 	CFG(CFG_GO_11AC_OVERRIDE) \
 	CFG(CFG_IS_SAP_BCAST_DEAUTH_ENABLED) \
-	CFG(CFG_6G_SAP_FILS_DISCOVERY_ENABLED) \
-	CFG(CFG_SAP_DISABLE_MCS13_160MHZ)
+	CFG(CFG_6G_SAP_FILS_DISCOVERY_ENABLED)
 
 #endif /* __CFG_MLME_SAP_H */

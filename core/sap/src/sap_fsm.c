@@ -1216,70 +1216,6 @@ QDF_STATUS sap_clear_session_param(mac_handle_t mac_handle,
 }
 
 /**
- * sap_update_mcs_rate() - Update SAP MCS rate
- * @sap_ctx: pointer to sap Context
- * @is_start: Start or stop SAP
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS
-sap_update_mcs_rate(struct sap_context *sap_ctx, bool is_start)
-{
-	uint32_t default_mcs[] = {26, 0x3fff};
-	uint32_t fixed_mcs[] = {26, 0x1fff};
-	bool is_usr_disable_mcs13 = false;
-	struct mac_context *mac_ctx;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-
-	mac_ctx = sap_get_mac_context();
-	if (!mac_ctx) {
-		sap_err("Invalid MAC context");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	is_usr_disable_mcs13 = cfg_get(mac_ctx->psoc,
-				       CFG_SAP_DISABLE_MCS13_160MHZ);
-	sap_debug("session id %d, usr %d, he_mcs_12_13_supp_5g %d, start %d, disabled_mcs13_160mhz %d, ch width %d",
-		  sap_ctx->sessionId, is_usr_disable_mcs13,
-		  mac_ctx->mlme_cfg->he_caps.he_mcs_12_13_supp_5g,
-		  is_start, sap_ctx->disabled_mcs13_160mhz,
-		  sap_ctx->ch_params.ch_width);
-
-	if (!is_usr_disable_mcs13 ||
-	    !mac_ctx->mlme_cfg->he_caps.he_mcs_12_13_supp_5g)
-		return status;
-
-	if (!is_start && !sap_ctx->disabled_mcs13_160mhz)
-		return status;
-
-	if ((sap_ctx->ch_params.ch_width != CH_WIDTH_160MHZ) &&
-	    (sap_ctx->ch_params.ch_width != CH_WIDTH_80P80MHZ))
-		return status;
-
-	if (is_start) {
-		status = sme_send_unit_test_cmd(sap_ctx->sessionId,
-						10, 2, fixed_mcs);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			sap_err("Set fixed mcs rate failed, session %d",
-				sap_ctx->sessionId);
-		} else {
-			sap_ctx->disabled_mcs13_160mhz = true;
-		}
-	} else {
-		status = sme_send_unit_test_cmd(sap_ctx->sessionId,
-						10, 2, default_mcs);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			sap_err("Set default mcs rate failed, session %d",
-				sap_ctx->sessionId);
-		} else {
-			sap_ctx->disabled_mcs13_160mhz = false;
-		}
-	}
-
-	return status;
-}
-
-/**
  * sap_goto_stopping() - Processing of SAP FSM stopping state
  * @sap_ctx: pointer to sap Context
  *
@@ -1297,7 +1233,6 @@ static QDF_STATUS sap_goto_stopping(struct sap_context *sap_ctx)
 		return QDF_STATUS_E_FAULT;
 	}
 
-	sap_update_mcs_rate(sap_ctx, false);
 	sap_free_roam_profile(&sap_ctx->csr_roamProfile);
 	status = sme_roam_stop_bss(MAC_HANDLE(mac_ctx), sap_ctx->sessionId);
 	if (status != QDF_STATUS_SUCCESS) {
@@ -1804,11 +1739,9 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 
 		bss_complete->operating_chan_freq = sap_ctx->chan_freq;
 		bss_complete->ch_width = sap_ctx->ch_params.ch_width;
-		if (QDF_IS_STATUS_SUCCESS(bss_complete->status)) {
+		if (QDF_IS_STATUS_SUCCESS(bss_complete->status))
 			sap_update_cac_history(mac_ctx, sap_ctx,
 					       sap_hddevent);
-			sap_update_mcs_rate(sap_ctx, true);
-		}
 		break;
 	case eSAP_DFS_CAC_START:
 	case eSAP_DFS_CAC_INTERRUPTED:
