@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -378,6 +379,7 @@
 #define SIR_MAC_WPA_EID_MAX                255
 
 #define SIR_MAC_EID_VENDOR                221
+#define SIR_MAC_EID_EXT			  255
 
 #define SIR_MAC_WAPI_EID                68
 /* reserved                            222-254 */

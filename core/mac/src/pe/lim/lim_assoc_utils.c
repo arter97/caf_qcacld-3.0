@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -361,6 +362,26 @@ lim_check_rx_rsn_ie_match(tpAniSirGlobal mac_ctx, tDot11fIERSN rx_rsn_ie,
 	/* RSN IE should be received from PE */
 	rsn_ie = &session_entry->gStartBssRSNIe;
 
+
+	/* We should have only one AKM in assoc/reassoc request */
+	if (rx_rsn_ie.akm_suite_cnt != 1) {
+		pe_debug("Invalid RX akm_suite_cnt %d",
+			 rx_rsn_ie.akm_suite_cnt);
+		return eSIR_MAC_INVALID_AKMP_STATUS;
+	}
+	/* Check if we support the received AKM */
+	for (i = 0; i < rsn_ie->akm_suite_cnt; i++)
+		if (!qdf_mem_cmp(&rx_rsn_ie.akm_suite[0],
+				 &rsn_ie->akm_suite[i],
+				 sizeof(rsn_ie->akm_suite[i]))) {
+			match = 1;
+			break;
+		}
+	if (!match) {
+		pe_debug("Invalid RX akm_suite");
+		return eSIR_MAC_INVALID_AKMP_STATUS;
+	}
+
 	/* Check groupwise cipher suite */
 	for (i = 0; i < sizeof(rx_rsn_ie.gp_cipher_suite); i++)
 		if (rsn_ie->gp_cipher_suite[i] !=
@@ -465,6 +486,25 @@ lim_check_rx_wpa_ie_match(tpAniSirGlobal mac, tDot11fIEWPA rx_wpaie,
 
 	/* WPA IE should be received from PE */
 	wpa_ie = &session_entry->gStartBssWPAIe;
+
+	/* We should have only one AKM in assoc/reassoc request */
+	if (rx_wpaie.auth_suite_count != 1) {
+		pe_debug("Invalid RX auth_suite_count %d",
+			 rx_wpaie.auth_suite_count);
+		return eSIR_MAC_INVALID_AKMP_STATUS;
+	}
+	/* Check if we support the received AKM */
+	for (i = 0; i < wpa_ie->auth_suite_count; i++)
+		if (!qdf_mem_cmp(&rx_wpaie.auth_suites[0],
+				 &wpa_ie->auth_suites[i],
+				 sizeof(wpa_ie->auth_suites[i]))) {
+			match = 1;
+			break;
+		}
+	if (!match) {
+		pe_debug("Invalid RX auth_suites");
+		return eSIR_MAC_INVALID_AKMP_STATUS;
+	}
 
 	/* Check groupwise cipher suite */
 	for (i = 0; i < 4; i++) {
@@ -1653,9 +1693,9 @@ lim_populate_peer_rate_set(tpAniSirGlobal pMac,
 {
 	tSirMacRateSet tempRateSet;
 	tSirMacRateSet tempRateSet2;
-	uint32_t i, j, val, min, isArate;
-
-	isArate = 0;
+	uint32_t i, j, val, min;
+	uint8_t aRateIndex = 0;
+	uint8_t bRateIndex = 0;
 
 	/* copy operational rate set from psessionEntry */
 	if (psessionEntry->rateSet.numRates <= SIR_MAC_RATESET_EID_MAX) {
@@ -1700,51 +1740,54 @@ lim_populate_peer_rate_set(tpAniSirGlobal pMac,
 	 * Sort rates in tempRateSet (they are likely to be already sorted)
 	 * put the result in pSupportedRates
 	 */
-	{
-		uint8_t aRateIndex = 0;
-		uint8_t bRateIndex = 0;
 
-		qdf_mem_set((uint8_t *) pRates, sizeof(tSirSupportedRates), 0);
-		for (i = 0; i < tempRateSet.numRates; i++) {
-			min = 0;
-			val = 0xff;
-			isArate = 0;
-			for (j = 0;
-			     (j < tempRateSet.numRates)
-			     && (j < SIR_MAC_RATESET_EID_MAX); j++) {
-				if ((uint32_t) (tempRateSet.rate[j] & 0x7f) <
-				    val) {
-					val = tempRateSet.rate[j] & 0x7f;
-					min = j;
-				}
+	qdf_mem_zero(pRates, sizeof(*pRates));
+	for (i = 0; i < tempRateSet.numRates; i++) {
+		min = 0;
+		val = 0xff;
+		for (j = 0; (j < tempRateSet.numRates) &&
+		     (j < SIR_MAC_MAX_NUMBER_OF_RATES); j++) {
+			if ((uint32_t)(tempRateSet.rate[j] & 0x7f) <
+					val) {
+				val = tempRateSet.rate[j] & 0x7f;
+				min = j;
 			}
-			if (sirIsArate(tempRateSet.rate[min] & 0x7f))
-				isArate = 1;
-			/*
-			 * HAL needs to know whether the rate is basic rate or not, as it needs to
-			 * update the response rate table accordingly. e.g. if one of the 11a rates is
-			 * basic rate, then that rate can be used for sending control frames.
-			 * HAL updates the response rate table whenever basic rate set is changed.
-			 */
-			if (basicOnly) {
-				if (tempRateSet.rate[min] & 0x80) {
-					if (isArate)
-						pRates->llaRates[aRateIndex++] =
-							tempRateSet.rate[min];
-					else
-						pRates->llbRates[bRateIndex++] =
-							tempRateSet.rate[min];
-				}
-			} else {
-				if (isArate)
-					pRates->llaRates[aRateIndex++] =
-						tempRateSet.rate[min];
-				else
-					pRates->llbRates[bRateIndex++] =
-						tempRateSet.rate[min];
-			}
-			tempRateSet.rate[min] = 0xff;
 		}
+		/*
+		 * HAL needs to know whether the rate is basic rate or not, as it needs to
+		 * update the response rate table accordingly. e.g. if one of the 11a rates is
+		 * basic rate, then that rate can be used for sending control frames.
+		 * HAL updates the response rate table whenever basic rate set is changed.
+		 */
+		if (basicOnly && !(tempRateSet.rate[min] & 0x80)) {
+			pe_debug("Invalid basic rate");
+		} else if (sirIsArate(tempRateSet.rate[min] & 0x7f)) {
+			if (aRateIndex >= SIR_NUM_11A_RATES) {
+				pe_debug("OOB, aRateIndex: %d", aRateIndex);
+			} else if (aRateIndex >= 1 && (tempRateSet.rate[min] ==
+				   pRates->llaRates[aRateIndex - 1])) {
+				pe_debug("Duplicate 11a rate: %d",
+					 tempRateSet.rate[min]);
+			} else {
+				pRates->llaRates[aRateIndex++] =
+						tempRateSet.rate[min];
+			}
+		} else if (sirIsBrate(tempRateSet.rate[min] & 0x7f)) {
+			if (bRateIndex >= SIR_NUM_11B_RATES) {
+				pe_debug("OOB, bRateIndex: %d", bRateIndex);
+			} else if (bRateIndex >= 1 && (tempRateSet.rate[min] ==
+				   pRates->llbRates[bRateIndex - 1])) {
+				pe_debug("Duplicate 11b rate: %d",
+					 tempRateSet.rate[min]);
+			} else {
+				pRates->llbRates[bRateIndex++] =
+						tempRateSet.rate[min];
+			}
+		} else {
+			pe_debug("%d is neither 11a nor 11b rate",
+				 tempRateSet.rate[min]);
+		}
+		tempRateSet.rate[min] = 0xff;
 	}
 
 	if (IS_DOT11_MODE_HT(psessionEntry->dot11mode)) {
