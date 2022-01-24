@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -133,20 +132,6 @@ QDF_STATUS wlan_ipa_set_perf_level(struct wlan_ipa_priv *ipa_ctx,
  * Return: QDF STATUS
  */
 QDF_STATUS wlan_ipa_init_perf_level(struct wlan_ipa_priv *ipa_ctx);
-
-#ifdef IPA_STATIC_VOTING
-/**
- * wlan_ipa_set_bandwidth() - Set IPA CLK bandwidth
- * @ipa_ctx: IPA context
- *
- * If IPA clock scaling is disabled, set IPA CLK bandwidth
- * Else set the lowest level to start with.
- *
- * Return: QDF STATUS
- */
-QDF_STATUS
-wlan_ipa_set_bandwidth(struct wlan_ipa_priv *ipa_ctx,  uint32_t bandwidth);
-#endif
 
 /**
  * wlan_ipa_get_iface() - Get IPA interface

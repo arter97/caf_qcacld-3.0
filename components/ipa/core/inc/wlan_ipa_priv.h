@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -78,7 +77,6 @@
 #define WLAN_IPA_REAL_TIME_DEBUGGING        BIT(8)
 
 #define WLAN_IPA_MAX_BANDWIDTH              800
-#define WLAN_IPA_NOMINAL_BANDWIDTH	    2500
 
 #define WLAN_IPA_MAX_PENDING_EVENT_COUNT    20
 

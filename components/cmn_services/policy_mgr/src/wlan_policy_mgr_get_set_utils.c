@@ -1480,30 +1480,6 @@ uint32_t policy_mgr_mode_specific_connection_count(
 	return count;
 }
 
-enum hw_mode_bandwidth
-policy_mgr_get_connection_channel_width(struct wlan_objmgr_psoc *psoc)
-{
-	uint32_t conn_index = 0;
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	enum hw_mode_bandwidth bw = HW_MODE_20_MHZ;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return HW_MODE_20_MHZ;
-	}
-	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	for (conn_index = 0; conn_index < MAX_NUMBER_OF_CONC_CONNECTIONS;
-		conn_index++) {
-		if (pm_conc_connection_list[conn_index].in_use &&
-		    pm_conc_connection_list[conn_index].bw > bw)
-			bw = pm_conc_connection_list[conn_index].bw;
-	}
-	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-
-	return bw;
-}
-
 QDF_STATUS policy_mgr_check_conn_with_mode_and_vdev_id(
 		struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode,
 		uint32_t vdev_id)
