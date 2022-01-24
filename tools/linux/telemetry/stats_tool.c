@@ -18,7 +18,6 @@
  */
 
 #include <qcatools_lib.h>
-#include <cdp_txrx_stats_struct.h>
 #include <wlan_stats_define.h>
 #include <stats_lib.h>
 
@@ -350,8 +349,8 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 	STATS_PRINT("\tTx SGI = 0.8us %u, 0.4us %u, 1.6us %u, 3.2us %u\n",
 		    tx->sgi_count[0], tx->sgi_count[1],
 		    tx->sgi_count[2], tx->sgi_count[3]);
-	STATS_PRINT("\tTx NSS (1-%d)\n\t", SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+	STATS_PRINT("\tTx NSS (1-%d)\n\t", STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), tx->nss[inx]);
 	STATS_PRINT("\n\tTx BW Counts = 20MHZ %u 40MHZ %u 80MHZ %u 160MHZ %u\n",
 		    tx->bw[0], tx->bw[1], tx->bw[2], tx->bw[3]);
@@ -381,30 +380,34 @@ void print_advance_data_rx_stats(struct advance_data_rx_stats *rx)
 	STATS_32(stdout, "Rx MPDU FCS Ok Count", rx->mpdu_cnt_fcs_ok);
 	STATS_32(stdout, "Rx MPDU FCS Error Count", rx->mpdu_cnt_fcs_err);
 	STATS_PRINT("\tRx PPDU Counts\n");
-	for (inx = 0; inx < MAX_MCS; inx++) {
-		if (!cdp_rate_string[DOT11_AX][inx].valid)
+	for (inx = 0; inx < STATS_IF_MAX_MCS; inx++) {
+		if (!rate_string[STATS_IF_DOT11_AX][inx].valid)
 			continue;
 		STATS_PRINT("\t\t%s = %u\n",
-			    cdp_rate_string[DOT11_AX][inx].mcs_type,
+			    rate_string[STATS_IF_DOT11_AX][inx].mcs_type,
 			    rx->su_ax_ppdu_cnt[inx]);
 	}
 	STATS_PRINT("\tRx SGI = 0.8us %u, 0.4us %u, 1.6us %u, 3.2us %u\n",
 		    rx->sgi_count[0], rx->sgi_count[1],
 		    rx->sgi_count[2], rx->sgi_count[3]);
-	STATS_PRINT("\tRx MSDU Counts for NSS (1-%u)\n\t", SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+	STATS_PRINT("\tRx MSDU Counts for NSS (1-%u)\n\t", STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), rx->nss[inx]);
 	STATS_PRINT("\n\tRx PPDU Counts for NSS (1-%u) in SU mode\n\t",
-		    SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+		    STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), rx->ppdu_nss[inx]);
 	STATS_PRINT("\n\tRx BW Counts = 20MHZ %u 40MHZ %u 80MHZ %u 160MHZ %u\n",
 		    rx->bw[0], rx->bw[1], rx->bw[2], rx->bw[3]);
 	STATS_PRINT("\tRx Data Packets per AC\n");
-	STATS_32(stdout, "     Best effort", rx->wme_ac_type[WME_AC_BE]);
-	STATS_32(stdout, "      Background", rx->wme_ac_type[WME_AC_BK]);
-	STATS_32(stdout, "           Video", rx->wme_ac_type[WME_AC_VI]);
-	STATS_32(stdout, "           Voice", rx->wme_ac_type[WME_AC_VO]);
+	STATS_32(stdout, "     Best effort",
+		 rx->wme_ac_type[STATS_IF_WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 rx->wme_ac_type[STATS_IF_WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 rx->wme_ac_type[STATS_IF_WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 rx->wme_ac_type[STATS_IF_WME_AC_VO]);
 	STATS_PRINT("\tRx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", rx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
@@ -750,593 +753,369 @@ void print_advance_ap_data_rx(struct advance_psoc_data_rx *rx)
 	print_basic_ap_data_rx(&rx->b_rx);
 	STATS_32(stdout, "Rx Ring Error Packets", rx->err_ring_pkts);
 	STATS_32(stdout, "Rx Fragments", rx->rx_frags);
-	STATS_32(stdout, "Rx REO Reinject", rx->reo_reinject);
+	STATS_32(stdout, "Rx HW Reinject", rx->rx_hw_reinject);
 	STATS_32(stdout, "Rx BAR Frames", rx->bar_frame);
 	STATS_32(stdout, "Rx Rejected", rx->rejected);
 	STATS_32(stdout, "Rx RAW Frame Drop", rx->raw_frm_drop);
 }
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
-void print_basic_sta_data(struct stats_sta *sta, u_int8_t parent_id)
+void print_basic_sta_data(struct stats_obj *sta)
 {
-	struct stats_vap *parent = NULL;
-	bool reprint = true;
+	struct basic_peer_data *data = sta->stats;
 
-	while (sta) {
-		parent = sta->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic STA Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For STA %s\n",
-			    macaddr_to_str(sta->mac_addr));
-		if (sta->u_basic.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_sta_data_tx(sta->u_basic.data.tx);
-		}
-		if (sta->u_basic.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_sta_data_rx(sta->u_basic.data.rx);
-		}
-		if (sta->u_basic.data.link) {
-			STATS_PRINT("Link Stats\n");
-			print_basic_sta_data_link(sta->u_basic.data.link);
-		}
-		if (sta->u_basic.data.rate) {
-			STATS_PRINT("Rate Stats\n");
-			print_basic_sta_data_rate(sta->u_basic.data.rate);
-		}
-		sta = sta->mgr.next;
+	STATS_PRINT("Basic Data STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_sta_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_sta_data_rx(data->rx);
+	}
+	if (data->link) {
+		STATS_PRINT("Link Stats\n");
+		print_basic_sta_data_link(data->link);
+	}
+	if (data->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_basic_sta_data_rate(data->rate);
 	}
 }
 
-void print_basic_sta_ctrl(struct stats_sta *sta, u_int8_t parent_id)
+void print_basic_sta_ctrl(struct stats_obj *sta)
 {
-	struct stats_vap *parent = NULL;
-	bool reprint = true;
+	struct basic_peer_ctrl *ctrl = sta->stats;
 
-	while (sta) {
-		parent = sta->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic STA Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For STA %s\n",
-			    macaddr_to_str(sta->mac_addr));
-		if (sta->u_basic.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_sta_ctrl_tx(sta->u_basic.ctrl.tx);
-		}
-		if (sta->u_basic.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_sta_ctrl_rx(sta->u_basic.ctrl.rx);
-		}
-		if (sta->u_basic.ctrl.link) {
-			STATS_PRINT("Link Stats\n");
-			print_basic_sta_ctrl_link(sta->u_basic.ctrl.link);
-		}
-		if (sta->u_basic.ctrl.rate) {
-			STATS_PRINT("Rate Stats\n");
-			print_basic_sta_ctrl_rate(sta->u_basic.ctrl.rate);
-		}
-		sta = sta->mgr.next;
+	STATS_PRINT("Basic Control STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_sta_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_sta_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_basic_sta_ctrl_link(ctrl->link);
+	}
+	if (ctrl->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_basic_sta_ctrl_rate(ctrl->rate);
 	}
 }
 
-void print_basic_vap_data(struct stats_vap *vap, u_int8_t parent_id)
+void print_basic_vap_data(struct stats_obj *vap)
 {
-	struct stats_radio *parent = NULL;
-	bool reprint = true;
+	struct basic_vdev_data *data = vap->stats;
 
-	while (vap) {
-		parent = vap->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic VAP Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For VAP %s\n", vap->vap_name);
-		if (vap->u_basic.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_vap_data_tx(vap->u_basic.data.tx);
-		}
-		if (vap->u_basic.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_vap_data_rx(vap->u_basic.data.rx);
-		}
-		if (vap->recursive) {
-			print_basic_sta_data(vap->mgr.child_root, vap->id);
-			reprint = true;
-		}
-		vap = vap->mgr.next;
+	STATS_PRINT("Basic Data STATS For VAP %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_vap_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_vap_data_rx(data->rx);
 	}
 }
 
-void print_basic_vap_ctrl(struct stats_vap *vap, u_int8_t parent_id)
+void print_basic_vap_ctrl(struct stats_obj *vap)
 {
-	struct stats_radio *parent = NULL;
-	bool reprint = true;
+	struct basic_vdev_ctrl *ctrl = vap->stats;
 
-	while (vap) {
-		parent = vap->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic VAP Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For VAP %s\n", vap->vap_name);
-		if (vap->u_basic.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_vap_ctrl_tx(vap->u_basic.ctrl.tx);
-		}
-		if (vap->u_basic.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_vap_ctrl_rx(vap->u_basic.ctrl.rx);
-		}
-		if (vap->recursive) {
-			print_basic_sta_ctrl(vap->mgr.child_root, vap->id);
-			reprint = true;
-		}
-		vap = vap->mgr.next;
+	STATS_PRINT("Basic Control STATS For VAP %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_vap_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_vap_ctrl_rx(ctrl->rx);
 	}
 }
 
-void print_basic_radio_data(struct stats_radio *radio, u_int8_t parent_id)
+void print_basic_radio_data(struct stats_obj *radio)
 {
-	struct stats_ap *parent = NULL;
-	bool reprint = true;
+	struct basic_pdev_data *data = radio->stats;
 
-	while (radio) {
-		parent = radio->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic Radio Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Radio %s\n", radio->radio_name);
-		if (radio->u_basic.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_radio_data_tx(radio->u_basic.data.tx);
-		}
-		if (radio->u_basic.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_radio_data_rx(radio->u_basic.data.rx);
-		}
-		if (radio->recursive) {
-			print_basic_vap_data(radio->mgr.child_root, radio->id);
-			reprint = true;
-		}
-		radio = radio->mgr.next;
+	STATS_PRINT("Basic Data STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_radio_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_radio_data_rx(data->rx);
 	}
 }
 
-void print_basic_radio_ctrl(struct stats_radio *radio, u_int8_t parent_id)
+void print_basic_radio_ctrl(struct stats_obj *radio)
 {
-	struct stats_ap *parent = NULL;
-	bool reprint = true;
+	struct basic_pdev_ctrl *ctrl = radio->stats;
 
-	while (radio) {
-		parent = radio->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic Radio Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Radio %s\n", radio->radio_name);
-		if (radio->u_basic.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_radio_ctrl_tx(radio->u_basic.ctrl.tx);
-		}
-		if (radio->u_basic.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_radio_ctrl_rx(radio->u_basic.ctrl.rx);
-		}
-		if (radio->u_basic.ctrl.link) {
-			STATS_PRINT("Link Stats\n");
-			print_basic_radio_ctrl_link(radio->u_basic.ctrl.link);
-		}
-		if (radio->recursive) {
-			print_basic_vap_ctrl(radio->mgr.child_root, radio->id);
-			reprint = true;
-		}
-		radio = radio->mgr.next;
+	STATS_PRINT("Basic Control STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_radio_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_radio_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_basic_radio_ctrl_link(ctrl->link);
 	}
 }
 
-void print_basic_ap_data(struct stats_ap *ap)
+void print_basic_ap_data(struct stats_obj *ap)
 {
-	bool reprint = true;
+	struct basic_psoc_data *data = ap->stats;
 
-	while (ap) {
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic AP Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for AP %s\n", ap->ap_name);
-		if (ap->u.b_data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_ap_data_tx(ap->u.b_data.tx);
-		}
-		if (ap->u.b_data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_ap_data_rx(ap->u.b_data.rx);
-		}
-		if (ap->recursive) {
-			print_basic_radio_data(ap->mgr.child_root, ap->id);
-			reprint = true;
-		}
-		ap = ap->mgr.next;
+	STATS_PRINT("Basic Data STATS for AP %s\n", ap->u_id.if_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_ap_data_tx(data->tx);
 	}
-}
-
-void print_basic_ap_ctrl(struct stats_ap *ap)
-{
-	bool reprint = true;
-
-	while (ap) {
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic AP Control Stats");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for AP %s\n", ap->ap_name);
-		if (ap->recursive) {
-			print_basic_radio_ctrl(ap->mgr.child_root, ap->id);
-			reprint = true;
-		}
-		ap = ap->mgr.next;
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_ap_data_rx(data->rx);
 	}
 }
 
 #if WLAN_ADVANCE_TELEMETRY
-void print_advance_sta_data(struct stats_sta *sta, u_int8_t parent_id)
+void print_advance_sta_data(struct stats_obj *sta)
 {
-	struct stats_vap *parent = NULL;
-	bool reprint = true;
+	struct advance_peer_data *data = sta->stats;
 
-	while (sta) {
-		parent = sta->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance STA Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For STA %s\n",
-			    macaddr_to_str(sta->mac_addr));
-		if (sta->u_advance.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_sta_data_tx(sta->u_advance.data.tx);
-		}
-		if (sta->u_advance.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_sta_data_rx(sta->u_advance.data.rx);
-		}
-		if (sta->u_advance.data.fwd) {
-			STATS_PRINT("Intra Bss (FWD) Stats\n");
-			print_advance_sta_data_fwd(sta->u_advance.data.fwd);
-		}
-		if (sta->u_advance.data.raw) {
-			STATS_PRINT("RAW Stats\n");
-			print_advance_sta_data_raw(sta->u_advance.data.raw);
-		}
-		if (sta->u_advance.data.twt) {
-			STATS_PRINT("TWT Stats\n");
-			print_advance_sta_data_twt(sta->u_advance.data.twt);
-		}
-		if (sta->u_advance.data.link) {
-			STATS_PRINT("Link Stats\n");
-			print_advance_sta_data_link(sta->u_advance.data.link);
-		}
-		if (sta->u_advance.data.rate) {
-			STATS_PRINT("Rate Stats\n");
-			print_advance_sta_data_rate(sta->u_advance.data.rate);
-		}
-		if (sta->u_advance.data.nawds) {
-			STATS_PRINT("NAWDS Stats\n");
-			print_advance_sta_data_nawds(sta->u_advance.data.nawds);
-		}
-		sta = sta->mgr.next;
+	STATS_PRINT("Advance Data STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_sta_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_sta_data_rx(data->rx);
+	}
+	if (data->fwd) {
+		STATS_PRINT("Intra Bss (FWD) Stats\n");
+		print_advance_sta_data_fwd(data->fwd);
+	}
+	if (data->raw) {
+		STATS_PRINT("RAW Stats\n");
+		print_advance_sta_data_raw(data->raw);
+	}
+	if (data->twt) {
+		STATS_PRINT("TWT Stats\n");
+		print_advance_sta_data_twt(data->twt);
+	}
+	if (data->link) {
+		STATS_PRINT("Link Stats\n");
+		print_advance_sta_data_link(data->link);
+	}
+	if (data->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_advance_sta_data_rate(data->rate);
+	}
+	if (data->nawds) {
+		STATS_PRINT("NAWDS Stats\n");
+		print_advance_sta_data_nawds(data->nawds);
 	}
 }
 
-void print_advance_sta_ctrl(struct stats_sta *sta, u_int8_t parent_id)
+void print_advance_sta_ctrl(struct stats_obj *sta)
 {
-	struct stats_vap *parent = NULL;
-	bool reprint = true;
+	struct advance_peer_ctrl *ctrl = sta->stats;
 
-	while (sta) {
-		parent = sta->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance STA Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For STA %s\n",
-			    macaddr_to_str(sta->mac_addr));
-		if (sta->u_advance.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_sta_ctrl_tx(sta->u_advance.ctrl.tx);
-		}
-		if (sta->u_advance.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_sta_ctrl_rx(sta->u_advance.ctrl.rx);
-		}
-		if (sta->u_advance.ctrl.twt) {
-			STATS_PRINT("TWT Stats\n");
-			print_advance_sta_ctrl_twt(sta->u_advance.ctrl.twt);
-		}
-		if (sta->u_advance.ctrl.link) {
-			STATS_PRINT("Link Stats\n");
-			print_advance_sta_ctrl_link(sta->u_advance.ctrl.link);
-		}
-		if (sta->u_advance.ctrl.rate) {
-			STATS_PRINT("Rate Stats\n");
-			print_advance_sta_ctrl_rate(sta->u_advance.ctrl.rate);
-		}
-		sta = sta->mgr.next;
+	STATS_PRINT("Advance Control STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_sta_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_sta_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->twt) {
+		STATS_PRINT("TWT Stats\n");
+		print_advance_sta_ctrl_twt(ctrl->twt);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_advance_sta_ctrl_link(ctrl->link);
+	}
+	if (ctrl->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_advance_sta_ctrl_rate(ctrl->rate);
 	}
 }
 
-void print_advance_vap_data(struct stats_vap *vap, u_int8_t parent_id)
+void print_advance_vap_data(struct stats_obj *vap)
 {
-	struct stats_radio *parent = NULL;
-	bool reprint = true;
+	struct advance_vdev_data *data = vap->stats;
 
-	while (vap) {
-		parent = vap->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance VAP Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Vap %s\n", vap->vap_name);
-		if (vap->u_advance.data.me) {
-			STATS_PRINT("ME Stats\n");
-			print_advance_vap_data_me(vap->u_advance.data.me);
-		}
-		if (vap->u_advance.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_vap_data_tx(vap->u_advance.data.tx);
-		}
-		if (vap->u_advance.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_vap_data_rx(vap->u_advance.data.rx);
-		}
-		if (vap->u_advance.data.raw) {
-			STATS_PRINT("RAW Stats\n");
-			print_advance_vap_data_raw(vap->u_advance.data.raw);
-		}
-		if (vap->u_advance.data.tso) {
-			STATS_PRINT("TSO Stats\n");
-			print_advance_vap_data_tso(vap->u_advance.data.tso);
-		}
-		if (vap->u_advance.data.igmp) {
-			STATS_PRINT("IGMP Stats\n");
-			print_advance_vap_data_igmp(vap->u_advance.data.igmp);
-		}
-		if (vap->u_advance.data.mesh) {
-			STATS_PRINT("MESH Stats\n");
-			print_advance_vap_data_mesh(vap->u_advance.data.mesh);
-		}
-		if (vap->u_advance.data.nawds) {
-			STATS_PRINT("NAWDS Stats\n");
-			print_advance_vap_data_nawds(vap->u_advance.data.nawds);
-		}
-		if (vap->recursive) {
-			print_advance_sta_data(vap->mgr.child_root, vap->id);
-			reprint = true;
-		}
-		vap = vap->mgr.next;
+	STATS_PRINT("Advance Data STATS for Vap %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (data->me) {
+		STATS_PRINT("ME Stats\n");
+		print_advance_vap_data_me(data->me);
+	}
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_vap_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_vap_data_rx(data->rx);
+	}
+	if (data->raw) {
+		STATS_PRINT("RAW Stats\n");
+		print_advance_vap_data_raw(data->raw);
+	}
+	if (data->tso) {
+		STATS_PRINT("TSO Stats\n");
+		print_advance_vap_data_tso(data->tso);
+	}
+	if (data->igmp) {
+		STATS_PRINT("IGMP Stats\n");
+		print_advance_vap_data_igmp(data->igmp);
+	}
+	if (data->mesh) {
+		STATS_PRINT("MESH Stats\n");
+		print_advance_vap_data_mesh(data->mesh);
+	}
+	if (data->nawds) {
+		STATS_PRINT("NAWDS Stats\n");
+		print_advance_vap_data_nawds(data->nawds);
 	}
 }
 
-void print_advance_vap_ctrl(struct stats_vap *vap, u_int8_t parent_id)
+void print_advance_vap_ctrl(struct stats_obj *vap)
 {
-	struct stats_radio *parent = NULL;
-	bool reprint = true;
+	struct advance_vdev_ctrl *ctrl = vap->stats;
 
-	while (vap) {
-		parent = vap->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance VAP Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Vap %s\n", vap->vap_name);
-		if (vap->u_advance.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_vap_ctrl_tx(vap->u_advance.ctrl.tx);
-		}
-		if (vap->u_advance.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_vap_ctrl_rx(vap->u_advance.ctrl.rx);
-		}
-		if (vap->recursive) {
-			print_advance_sta_ctrl(vap->mgr.child_root, vap->id);
-			reprint = true;
-		}
-		vap = vap->mgr.next;
+	STATS_PRINT("Advance Control STATS for Vap %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_vap_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_vap_ctrl_rx(ctrl->rx);
 	}
 }
 
-void print_advance_radio_data(struct stats_radio *radio, u_int8_t parent_id)
+void print_advance_radio_data(struct stats_obj *radio)
 {
-	struct stats_ap *parent = NULL;
-	struct advance_pdev_data *data = NULL;
-	bool reprint = true;
+	struct advance_pdev_data *data = radio->stats;
 
-	while (radio) {
-		parent = radio->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance Radio Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Radio %s\n", radio->radio_name);
-		data = &radio->u_advance.data;
-		if (data->me) {
-			STATS_PRINT("ME Stats\n");
-			print_advance_radio_data_me(data->me);
-		}
-		if (data->tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_radio_data_tx(data->tx);
-		}
-		if (data->rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_radio_data_rx(data->rx);
-		}
-		if (data->raw) {
-			STATS_PRINT("RAW Stats\n");
-			print_advance_radio_data_raw(data->raw);
-		}
-		if (data->tso) {
-			STATS_PRINT("TSO Stats\n");
-			print_advance_radio_data_tso(data->tso);
-		}
-		if (data->igmp) {
-			STATS_PRINT("IGMP Stats\n");
-			print_advance_radio_data_igmp(data->igmp);
-		}
-		if (data->mesh) {
-			STATS_PRINT("MESH Stats\n");
-			print_advance_radio_data_mesh(data->mesh);
-		}
-		if (data->nawds) {
-			STATS_PRINT("NAWDS Stats\n");
-			print_advance_radio_data_nawds(data->nawds);
-		}
-		if (radio->recursive) {
-			print_advance_vap_data(radio->mgr.child_root,
-					       radio->id);
-			reprint = true;
-		}
-		radio = radio->mgr.next;
+	STATS_PRINT("Advance Data STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (data->me) {
+		STATS_PRINT("ME Stats\n");
+		print_advance_radio_data_me(data->me);
+	}
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_radio_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_radio_data_rx(data->rx);
+	}
+	if (data->raw) {
+		STATS_PRINT("RAW Stats\n");
+		print_advance_radio_data_raw(data->raw);
+	}
+	if (data->tso) {
+		STATS_PRINT("TSO Stats\n");
+		print_advance_radio_data_tso(data->tso);
+	}
+	if (data->igmp) {
+		STATS_PRINT("IGMP Stats\n");
+		print_advance_radio_data_igmp(data->igmp);
+	}
+	if (data->mesh) {
+		STATS_PRINT("MESH Stats\n");
+		print_advance_radio_data_mesh(data->mesh);
+	}
+	if (data->nawds) {
+		STATS_PRINT("NAWDS Stats\n");
+		print_advance_radio_data_nawds(data->nawds);
 	}
 }
 
-void print_advance_radio_ctrl(struct stats_radio *radio, u_int8_t parent_id)
+void print_advance_radio_ctrl(struct stats_obj *radio)
 {
-	struct stats_ap *parent = NULL;
-	struct advance_pdev_ctrl *ctrl = NULL;
-	bool reprint = true;
+	struct advance_pdev_ctrl *ctrl = radio->stats;
 
-	while (radio) {
-		parent = radio->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance Radio Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Radio %s\n", radio->radio_name);
-		ctrl = &radio->u_advance.ctrl;
-		if (ctrl->tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_radio_ctrl_tx(ctrl->tx);
-		}
-		if (ctrl->rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_radio_ctrl_rx(ctrl->rx);
-		}
-		if (ctrl->link) {
-			STATS_PRINT("Link Stats\n");
-			print_advance_radio_ctrl_link(ctrl->link);
-		}
-		if (radio->recursive) {
-			print_advance_vap_ctrl(radio->mgr.child_root,
-					       radio->id);
-			reprint = true;
-		}
-		radio = radio->mgr.next;
+	STATS_PRINT("Advance Control STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_radio_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_radio_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_advance_radio_ctrl_link(ctrl->link);
 	}
 }
 
-void print_advance_ap_data(struct stats_ap *ap)
+void print_advance_ap_data(struct stats_obj *ap)
 {
-	bool reprint = true;
+	struct advance_psoc_data *data = ap->stats;
 
-	while (ap) {
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance AP Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for AP %s\n", ap->ap_name);
-		if (ap->u.a_data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_ap_data_tx(ap->u.a_data.tx);
-		}
-		if (ap->u.a_data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_ap_data_rx(ap->u.a_data.rx);
-		}
-		if (ap->recursive) {
-			print_advance_radio_data(ap->mgr.child_root, ap->id);
-			reprint = true;
-		}
-		ap = ap->mgr.next;
+	STATS_PRINT("Advance Data STATS for AP %s\n", ap->u_id.if_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_ap_data_tx(data->tx);
 	}
-}
-
-void print_advance_ap_ctrl(struct stats_ap *ap)
-{
-	bool reprint = true;
-
-	while (ap) {
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance AP Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for AP %s\n", ap->ap_name);
-		if (ap->recursive) {
-			print_advance_radio_ctrl(ap->mgr.child_root, ap->id);
-			reprint = true;
-		}
-		ap = ap->mgr.next;
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_ap_data_rx(data->rx);
 	}
 }
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
-void print_basic_stats(struct stats_command *cmd)
+void print_basic_stats(struct stats_obj *obj)
 {
-	struct reply_buffer *reply = cmd->reply;
-
-	switch (cmd->obj) {
+	switch (obj->obj_type) {
 	case STATS_OBJ_STA:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_basic_sta_data(reply->obj_list.sta_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_basic_sta_data(obj);
 		else
-			print_basic_sta_ctrl(reply->obj_list.sta_list, 0);
+			print_basic_sta_ctrl(obj);
 		break;
 	case STATS_OBJ_VAP:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_basic_vap_data(reply->obj_list.vap_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_basic_vap_data(obj);
 		else
-			print_basic_vap_ctrl(reply->obj_list.vap_list, 0);
+			print_basic_vap_ctrl(obj);
 		break;
 	case STATS_OBJ_RADIO:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_basic_radio_data(reply->obj_list.radio_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_basic_radio_data(obj);
 		else
-			print_basic_radio_ctrl(reply->obj_list.radio_list, 0);
+			print_basic_radio_ctrl(obj);
 		break;
 	case STATS_OBJ_AP:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_basic_ap_data(reply->obj_list.ap_list);
-		else
-			print_basic_ap_ctrl(reply->obj_list.ap_list);
+		if (obj->type == STATS_TYPE_DATA)
+			print_basic_ap_data(obj);
 		break;
 	default:
 		STATS_ERR("Invalid object option\n");
@@ -1344,34 +1123,30 @@ void print_basic_stats(struct stats_command *cmd)
 }
 
 #if WLAN_ADVANCE_TELEMETRY
-void print_advance_stats(struct stats_command *cmd)
+void print_advance_stats(struct stats_obj *obj)
 {
-	struct reply_buffer *reply = cmd->reply;
-
-	switch (cmd->obj) {
+	switch (obj->obj_type) {
 	case STATS_OBJ_STA:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_advance_sta_data(reply->obj_list.sta_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_advance_sta_data(obj);
 		else
-			print_advance_sta_ctrl(reply->obj_list.sta_list, 0);
+			print_advance_sta_ctrl(obj);
 		break;
 	case STATS_OBJ_VAP:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_advance_vap_data(reply->obj_list.vap_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_advance_vap_data(obj);
 		else
-			print_advance_vap_ctrl(reply->obj_list.vap_list, 0);
+			print_advance_vap_ctrl(obj);
 		break;
 	case STATS_OBJ_RADIO:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_advance_radio_data(reply->obj_list.radio_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_advance_radio_data(obj);
 		else
-			print_advance_radio_ctrl(reply->obj_list.radio_list, 0);
+			print_advance_radio_ctrl(obj);
 		break;
 	case STATS_OBJ_AP:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_advance_ap_data(reply->obj_list.ap_list);
-		else
-			print_advance_ap_ctrl(reply->obj_list.ap_list);
+		if (obj->type == STATS_TYPE_DATA)
+			print_advance_ap_data(obj);
 		break;
 	default:
 		STATS_ERR("Invalid object option\n");
@@ -1379,23 +1154,28 @@ void print_advance_stats(struct stats_command *cmd)
 }
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
-void print_response(struct stats_command *cmd)
+void print_response(struct reply_buffer *reply)
 {
-	switch (cmd->lvl) {
-	case STATS_LVL_BASIC:
-		print_basic_stats(cmd);
-		break;
+	struct stats_obj *obj = reply->obj_head;
+
+	while (obj) {
+		switch (obj->lvl) {
+		case STATS_LVL_BASIC:
+			print_basic_stats(obj);
+			break;
 #if WLAN_ADVANCE_TELEMETRY
-	case STATS_LVL_ADVANCE:
-		print_advance_stats(cmd);
-		break;
+		case STATS_LVL_ADVANCE:
+			print_advance_stats(obj);
+			break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
-	case STATS_LVL_DEBUG:
-		break;
+		case STATS_LVL_DEBUG:
+			break;
 #endif /* WLAN_DEBUG_TELEMETRY */
-	default:
-		STATS_ERR("Invalid Level!\n");
+		default:
+			STATS_ERR("Invalid Level!\n");
+		}
+		obj = obj->next;
 	}
 }
 
@@ -1774,7 +1554,7 @@ int main(int argc, char *argv[])
 
 	/* Print Output */
 	if (!ret)
-		print_response(&cmd);
+		print_response(cmd.reply);
 
 	/* Cleanup */
 	free_interface_list(&if_list);

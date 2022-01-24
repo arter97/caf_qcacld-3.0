@@ -552,11 +552,42 @@ void dp_extap_mitbl_purge(dp_pdev_extap_t *extap)
 	OS_RWLOCK_WRITE_UNLOCK(&extap->mi_lock, &lock_state);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
 int dp_extap_tx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff **skb,
 					   uint8_t mhdr_len, struct dp_extap_nssol *extap_nssol)
 {
 	qdf_ether_header_t *eh;
-	uint8_t vdev_mac[ETH_ALEN];
+	uint8_t mac[ETH_ALEN];
+
+	if (qdf_unlikely(wlan_rptr_vdev_is_extap(vdev) &&
+			 wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
+		*skb = qdf_nbuf_unshare(*skb);
+		if (!(*skb))
+			return 1;
+
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+			wlan_vdev_obj_lock(vdev);
+			qdf_mem_copy(mac, wlan_vdev_mlme_get_mldaddr(vdev), ETH_ALEN);
+			wlan_vdev_obj_unlock(vdev);
+		} else {
+			wlan_vdev_obj_lock(vdev);
+			qdf_mem_copy(mac, wlan_vdev_mlme_get_macaddr(vdev), ETH_ALEN);
+			wlan_vdev_obj_unlock(vdev);
+		}
+		eh = (qdf_ether_header_t *)((*skb)->data + mhdr_len);
+
+		if (dp_extap_output(dp_get_extap_handle(vdev),
+						   mac, eh, extap_nssol))
+			return 1;
+	}
+	return 0;
+}
+#else
+int dp_extap_tx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff **skb,
+					   uint8_t mhdr_len, struct dp_extap_nssol *extap_nssol)
+{
+	qdf_ether_header_t *eh;
+	uint8_t mac[ETH_ALEN];
 
 	if (qdf_unlikely(wlan_rptr_vdev_is_extap(vdev) &&
 			 wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)) {
@@ -565,17 +596,17 @@ int dp_extap_tx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff **skb,
 			return 1;
 
 		wlan_vdev_obj_lock(vdev);
-		qdf_mem_copy(vdev_mac, wlan_vdev_mlme_get_macaddr(vdev), ETH_ALEN);
+		qdf_mem_copy(mac, wlan_vdev_mlme_get_macaddr(vdev), ETH_ALEN);
 		wlan_vdev_obj_unlock(vdev);
 		eh = (qdf_ether_header_t *)((*skb)->data + mhdr_len);
 
 		if (dp_extap_output(dp_get_extap_handle(vdev),
-						   vdev_mac, eh, extap_nssol))
+						   mac, eh, extap_nssol))
 			return 1;
 	}
 	return 0;
 }
-
+#endif
 qdf_export_symbol(dp_extap_tx_process);
 
 int dp_extap_rx_process(struct wlan_objmgr_vdev *vdev, struct sk_buff *skb)

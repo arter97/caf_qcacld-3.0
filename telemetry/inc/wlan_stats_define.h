@@ -295,13 +295,76 @@ struct basic_psoc_data_rx {
 };
 
 #if WLAN_ADVANCE_TELEMETRY
+#ifdef WLAN_FEATURE_11BE
+#define STATS_IF_MAX_MCS             (16 + 1)
+#else
+#define STATS_IF_MAX_MCS             (14 + 1)
+#endif
+#define STATS_IF_SS_COUNT            8
+#define STATS_IF_MAX_GI              (4 + 1)
+#define STATS_IF_MAX_BW              8
+#define STATS_IF_MAX_DATA_TIDS       9
+#define STATS_IF_MAX_RX_CTX          8
+#define STATS_IF_WME_AC_BE           0
+#define STATS_IF_WME_AC_BK           1
+#define STATS_IF_WME_AC_VI           2
+#define STATS_IF_WME_AC_VO           3
+#define STATS_IF_WME_AC_MAX          4
+
+enum stats_if_hist_bucket_index {
+	STATS_IF_HIST_BUCKET_0,
+	STATS_IF_HIST_BUCKET_1,
+	STATS_IF_HIST_BUCKET_2,
+	STATS_IF_HIST_BUCKET_3,
+	STATS_IF_HIST_BUCKET_4,
+	STATS_IF_HIST_BUCKET_5,
+	STATS_IF_HIST_BUCKET_6,
+	STATS_IF_HIST_BUCKET_7,
+	STATS_IF_HIST_BUCKET_8,
+	STATS_IF_HIST_BUCKET_9,
+	STATS_IF_HIST_BUCKET_MAX,
+};
+
+enum stats_if_hist_types {
+	STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY,
+	STATS_IF_HIST_TYPE_HW_COMP_DELAY,
+	STATS_IF_HIST_TYPE_REAP_STACK,
+	STATS_IF_HIST_TYPE_MAX,
+};
+
+struct stats_if_hist_bucket {
+	enum stats_if_hist_types hist_type;
+	uint64_t freq[STATS_IF_HIST_BUCKET_MAX];
+};
+
+struct stats_if_hist_stats {
+	struct stats_if_hist_bucket hist;
+	int32_t max;
+	int32_t min;
+	int32_t avg;
+};
+
+struct stats_if_delay_tx_stats {
+	struct stats_if_hist_stats tx_swq_delay;
+	struct stats_if_hist_stats hwtx_delay;
+};
+
+struct stats_if_delay_rx_stats {
+	struct stats_if_hist_stats to_stack_delay;
+};
+
+struct stats_if_delay_tid_stats {
+	struct stats_if_delay_tx_stats  tx_delay;
+	struct stats_if_delay_rx_stats  rx_delay;
+};
+
 struct advance_data_tx_stats {
 	struct pkt_info ucast;
 	struct pkt_info mcast;
 	struct pkt_info bcast;
-	u_int32_t nss[SS_COUNT];
-	u_int32_t sgi_count[MAX_GI];
-	u_int32_t bw[MAX_BW];
+	u_int32_t nss[STATS_IF_SS_COUNT];
+	u_int32_t sgi_count[STATS_IF_MAX_GI];
+	u_int32_t bw[STATS_IF_MAX_BW];
 	u_int32_t retries;
 	u_int32_t non_amsdu_cnt;
 	u_int32_t amsdu_cnt;
@@ -313,13 +376,13 @@ struct advance_data_rx_stats {
 	struct pkt_info unicast;
 	struct pkt_info multicast;
 	struct pkt_info bcast;
-	u_int32_t su_ax_ppdu_cnt[MAX_MCS];
-	u_int32_t rx_mpdu_cnt[MAX_MCS];
-	u_int32_t wme_ac_type[WME_AC_MAX];
-	u_int32_t sgi_count[MAX_GI];
-	u_int32_t nss[SS_COUNT];
-	u_int32_t ppdu_nss[SS_COUNT];
-	u_int32_t bw[MAX_BW];
+	u_int32_t su_ax_ppdu_cnt[STATS_IF_MAX_MCS];
+	u_int32_t rx_mpdu_cnt[STATS_IF_MAX_MCS];
+	u_int32_t wme_ac_type[STATS_IF_WME_AC_MAX];
+	u_int32_t sgi_count[STATS_IF_MAX_GI];
+	u_int32_t nss[STATS_IF_SS_COUNT];
+	u_int32_t ppdu_nss[STATS_IF_SS_COUNT];
+	u_int32_t bw[STATS_IF_MAX_BW];
 	u_int32_t mpdu_cnt_fcs_ok;
 	u_int32_t mpdu_cnt_fcs_err;
 	u_int32_t non_amsdu_cnt;
@@ -377,8 +440,8 @@ struct advance_peer_data_nawds {
 };
 
 struct advance_peer_data_delay {
-	struct cdp_delay_tid_stats delay_stats[CDP_MAX_DATA_TIDS]
-					       [CDP_MAX_TXRX_CTX];
+	struct stats_if_delay_tid_stats delay_stats[STATS_IF_MAX_DATA_TIDS]
+						   [STATS_IF_MAX_RX_CTX];
 	u_int32_t tx_avg_jitter;
 	u_int32_t tx_avg_delay;
 	u_int64_t tx_avg_err;
@@ -613,7 +676,7 @@ struct advance_psoc_data_rx {
 	struct basic_psoc_data_rx b_rx;
 	u_int32_t err_ring_pkts;
 	u_int32_t rx_frags;
-	u_int32_t reo_reinject;
+	u_int32_t rx_hw_reinject;
 	u_int32_t bar_frame;
 	u_int32_t rejected;
 	u_int32_t raw_frm_drop;

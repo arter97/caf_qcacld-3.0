@@ -2492,7 +2492,7 @@ static QDF_STATUS get_advance_psoc_data_rx(struct unified_stats *stats,
 
 	data->err_ring_pkts = soc_stats->rx.err_ring_pkts;
 	data->rx_frags = soc_stats->rx.rx_frags;
-	data->reo_reinject = soc_stats->rx.reo_reinject;
+	data->rx_hw_reinject = soc_stats->rx.rx_hw_reinject;
 	data->bar_frame = soc_stats->rx.bar_frame;
 	data->rejected = soc_stats->rx.err.rx_rejected;
 	data->raw_frm_drop = soc_stats->rx.err.rx_raw_frm_drop;

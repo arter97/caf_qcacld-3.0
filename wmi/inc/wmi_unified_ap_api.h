@@ -590,19 +590,6 @@ QDF_STATUS wmi_unified_fils_discovery_send_cmd(wmi_unified_t wmi_handle,
 #endif /* WLAN_SUPPORT_FILS */
 
 /**
- *  wmi_unified_set_qboost_param_cmd_send() - WMI set_qboost function
- *  @wmi_handle: handle to WMI.
- *  @macaddr: MAC address
- *  @param: pointer to hold set_qboost parameter
- *
- *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS
-wmi_unified_set_qboost_param_cmd_send(wmi_unified_t wmi_handle,
-				      uint8_t macaddr[QDF_MAC_ADDR_SIZE],
-				      struct set_qboost_params *param);
-
-/**
  *  wmi_unified_mcast_group_update_cmd_send() - WMI mcast grp update cmd function
  *  @wmi_handle: handle to WMI.
  *  @param: pointer to hold mcast grp param
@@ -873,5 +860,16 @@ wmi_unified_vdev_set_intra_bss_cmd_send(struct wmi_unified *wmi_handle,
 QDF_STATUS
 wmi_unified_peer_set_intra_bss_cmd_send(struct wmi_unified *wmi_handle,
 					struct wmi_intra_bss_params *param);
+
+/**
+ * wmi_unified_soc_tqm_reset_enable_disable_cmd() - Send tqm reset command to FW
+ * @wmi_handle: wmi handle
+ * @enable: enable or disable configuration from user
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
+					     uint32_t enable);
 
 #endif /* _WMI_UNIFIED_AP_API_H_ */

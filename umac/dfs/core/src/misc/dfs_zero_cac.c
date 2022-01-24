@@ -2,6 +2,7 @@
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2007-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -2361,8 +2362,8 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 	uint32_t radarfound_freq;
 	QDF_STATUS status;
 	uint8_t num_channels;
-	uint16_t freq_list[NUM_CHANNELS_160MHZ];
-	uint16_t nol_freq_list[NUM_CHANNELS_160MHZ];
+	uint16_t freq_list[MAX_20MHZ_SUBCHANS];
+	uint16_t nol_freq_list[MAX_20MHZ_SUBCHANS];
 	bool is_radar_source_agile =
 		(radar_found->detector_id == dfs_get_agile_detector_id(dfs));
 

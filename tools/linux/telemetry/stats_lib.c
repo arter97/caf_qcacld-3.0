@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,7 +18,6 @@
  */
 
 #include <qcatools_lib.h>
-#include <cdp_txrx_stats_struct.h>
 #include <wlan_stats_define.h>
 #include <stats_lib.h>
 #if UMAC_SUPPORT_CFG80211
@@ -94,7 +94,6 @@ static struct feat_parser_t g_feat[] = {
 };
 
 struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
-	[QCA_WLAN_VENDOR_ATTR_OBJ_ID] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_ME] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_TX] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_RX] = { .type = NLA_UNSPEC },
@@ -110,7 +109,7 @@ struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_RECURSIVE] = { .type = NLA_FLAG },
 };
 
-static int libstats_is_radio_ifname_valid(const char *ifname)
+static int is_radio_ifname_valid(const char *ifname)
 {
 	int i;
 
@@ -140,7 +139,7 @@ static int libstats_is_radio_ifname_valid(const char *ifname)
 	return 1;
 }
 
-static int libstats_is_vap_ifname_valid(const char *ifname)
+static int is_vap_ifname_valid(const char *ifname)
 {
 	char path[100];
 	FILE *fp;
@@ -163,7 +162,7 @@ static int libstats_is_vap_ifname_valid(const char *ifname)
 	return 0;
 }
 
-static int libstats_is_cfg80211_mode_enabled(void)
+static int is_cfg80211_mode_enabled(void)
 {
 	FILE *fp;
 	char filename[32] = {0};
@@ -183,22 +182,22 @@ static int libstats_is_cfg80211_mode_enabled(void)
 	return ret;
 }
 
-static int libstats_socket_init(void)
+static int stats_lib_socket_init(void)
 {
 	return init_socket_context(&g_sock_ctx, STATS_NL80211_CMD_SOCK_ID,
 				   STATS_NL80211_EVENT_SOCK_ID);
 }
 
-static int libstats_init(void)
+static int stats_lib_init(void)
 {
-	g_sock_ctx.cfg80211 = libstats_is_cfg80211_mode_enabled();
+	g_sock_ctx.cfg80211 = is_cfg80211_mode_enabled();
 
 	if (!g_sock_ctx.cfg80211) {
 		STATS_ERR("CFG80211 mode is disabled!\n");
 		return -EINVAL;
 	}
 
-	if (libstats_socket_init()) {
+	if (stats_lib_socket_init()) {
 		STATS_ERR("Failed to initialise socket\n");
 		return -EIO;
 	}
@@ -212,7 +211,7 @@ static int libstats_init(void)
 	return 0;
 }
 
-static void libstats_deinit(void)
+static void stats_lib_deinit(void)
 {
 	if (!g_sock_ctx.cfg80211)
 		return;
@@ -395,7 +394,7 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("Radio Interface name not configured.\n");
 			return -EINVAL;
 		}
-		if (!libstats_is_radio_ifname_valid(cmd->if_name)) {
+		if (!is_radio_ifname_valid(cmd->if_name)) {
 			STATS_ERR("Radio Interface name invalid.\n");
 			return -EINVAL;
 		}
@@ -407,7 +406,7 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("VAP Interface name not configured.\n");
 			return -EINVAL;
 		}
-		if (!libstats_is_vap_ifname_valid(cmd->if_name)) {
+		if (!is_vap_ifname_valid(cmd->if_name)) {
 			STATS_ERR("VAP Interface name invalid.\n");
 			return -EINVAL;
 		}
@@ -432,8 +431,7 @@ static int is_valid_cmd(struct stats_command *cmd)
 	return 0;
 }
 
-static int32_t libstats_prepare_request(struct nl_msg *nlmsg,
-					struct stats_command *cmd)
+static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 {
 	int32_t ret = 0;
 
@@ -473,841 +471,699 @@ static int32_t libstats_prepare_request(struct nl_msg *nlmsg,
 	return ret;
 }
 
-static struct stats_vap *find_parent_vap(struct reply_buffer *reply)
+static struct stats_obj *add_stats_obj(struct reply_buffer *reply)
 {
-	struct stats_vap *vap = reply->obj_list.vap_list;
+	struct stats_obj *obj;
 
-	if (!vap)
+	obj = (struct stats_obj *)malloc(sizeof(struct stats_obj));
+	if (!obj) {
+		STATS_ERR("Unable to allocate stats_obj!\n");
 		return NULL;
-	while (vap->mgr.next)
-		vap = vap->mgr.next;
+	}
+	memset(obj, 0, sizeof(struct stats_obj));
+	if (!reply->obj_head) {
+		reply->obj_head = obj;
+		reply->obj_last = obj;
+	} else {
+		reply->obj_last->next = obj;
+		reply->obj_last = obj;
+	}
 
-	return vap;
+	return obj;
 }
 
-static struct stats_radio *find_parent_radio(struct reply_buffer *reply)
+static void *parse_basic_sta(struct nlattr *rattr, enum stats_type_e type)
 {
-	struct stats_radio *radio = reply->obj_list.radio_list;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
+	struct nlattr *attr = NULL;
+	struct basic_peer_data *data = NULL;
+	struct basic_peer_ctrl *ctrl = NULL;
+	void *dest = NULL;
 
-	if (!radio)
+	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
+				       rattr, g_policy)) {
+		STATS_ERR("NLA Parsing failed\n");
 		return NULL;
-	while (radio->mgr.next)
-		radio = radio->mgr.next;
-
-	return radio;
-}
-
-static struct stats_ap *find_parent_ap(struct reply_buffer *reply)
-{
-	struct stats_ap *ap = reply->obj_list.ap_list;
-
-	if (!ap)
-		return NULL;
-	while (ap->mgr.next)
-		ap = ap->mgr.next;
-
-	return ap;
-}
-
-static struct stats_sta *add_stats_sta(struct reply_buffer *reply)
-{
-	struct stats_sta *sta = NULL;
-	struct stats_sta *temp = NULL;
-	struct stats_vap *vap = NULL;
-
-	if (STATS_OBJ_STA != reply->root_obj) {
-		vap = find_parent_vap(reply);
-		if (!vap) {
-			STATS_ERR("Unable to find Parent vap\n");
+	}
+	switch (type) {
+	case STATS_TYPE_DATA:
+		data = malloc(sizeof(struct basic_peer_data));
+		if (!data)
 			return NULL;
+		memset(data, 0, sizeof(struct basic_peer_data));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			data->tx = malloc(sizeof(struct basic_peer_data_tx));
+			if (data->tx)
+				memcpy(data->tx, nla_data(attr),
+				       sizeof(struct basic_peer_data_tx));
 		}
-	}
-	sta = (struct stats_sta *)malloc(sizeof(struct stats_sta));
-	if (!sta) {
-		STATS_ERR("Unable to allocate stats_sta!\n");
-		return NULL;
-	}
-	memset(sta, 0, sizeof(struct stats_sta));
-	sta->mgr.parent = vap;
-	if (vap && !vap->mgr.child_root)
-		vap->mgr.child_root = sta;
-	if (!reply->obj_list.sta_list) {
-		reply->obj_list.sta_list = sta;
-	} else {
-		temp = reply->obj_list.sta_list;
-		while (temp->mgr.next)
-			temp = temp->mgr.next;
-		temp->mgr.next = sta;
-	}
-
-	return sta;
-}
-
-static struct stats_vap *add_stats_vap(struct reply_buffer *reply)
-{
-	struct stats_vap *vap = NULL;
-	struct stats_vap *temp = NULL;
-	struct stats_radio *radio = NULL;
-
-	if (STATS_OBJ_VAP != reply->root_obj) {
-		radio = find_parent_radio(reply);
-		if (!radio) {
-			STATS_ERR("Unable to find Parent radio\n");
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			data->rx = malloc(sizeof(struct basic_peer_data_rx));
+			if (data->rx)
+				memcpy(data->rx, nla_data(attr),
+				       sizeof(struct basic_peer_data_rx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK];
+			data->link =
+				malloc(sizeof(struct basic_peer_data_link));
+			if (data->link)
+				memcpy(data->link, nla_data(attr),
+				       sizeof(struct basic_peer_data_link));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE];
+			data->rate =
+				malloc(sizeof(struct basic_peer_data_rate));
+			if (data->rate)
+				memcpy(data->rate, nla_data(attr),
+				       sizeof(struct basic_peer_data_rate));
+		}
+		dest = data;
+		break;
+	case STATS_TYPE_CTRL:
+		ctrl = malloc(sizeof(struct basic_peer_ctrl));
+		if (!ctrl)
 			return NULL;
+		memset(ctrl, 0, sizeof(struct basic_peer_ctrl));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			ctrl->tx = malloc(sizeof(struct basic_peer_ctrl_tx));
+			if (ctrl->tx)
+				memcpy(ctrl->tx, nla_data(attr),
+				       sizeof(struct basic_peer_ctrl_tx));
 		}
-	}
-	vap = (struct stats_vap *)malloc(sizeof(struct stats_vap));
-	if (!vap) {
-		STATS_ERR("Unable to allocate stats_vap!\n");
-		return NULL;
-	}
-	memset(vap, 0, sizeof(struct stats_vap));
-	vap->id = reply->vap_count;
-	reply->vap_count++;
-	vap->mgr.parent = radio;
-	if (radio && !radio->mgr.child_root)
-		radio->mgr.child_root = vap;
-	if (!reply->obj_list.vap_list) {
-		reply->obj_list.vap_list = vap;
-	} else {
-		temp = reply->obj_list.vap_list;
-		while (temp->mgr.next)
-			temp = temp->mgr.next;
-		temp->mgr.next = vap;
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			ctrl->rx = malloc(sizeof(struct basic_peer_ctrl_rx));
+			if (ctrl->rx)
+				memcpy(ctrl->rx, nla_data(attr),
+				       sizeof(struct basic_peer_ctrl_rx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK];
+			ctrl->link =
+				malloc(sizeof(struct basic_peer_ctrl_link));
+			if (ctrl->link)
+				memcpy(ctrl->link, nla_data(attr),
+				       sizeof(struct basic_peer_ctrl_link));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE];
+			ctrl->rate =
+				malloc(sizeof(struct basic_peer_ctrl_rate));
+			if (ctrl->rate)
+				memcpy(ctrl->rate, nla_data(attr),
+				       sizeof(struct basic_peer_ctrl_rate));
+		}
+		dest = ctrl;
+		break;
 	}
 
-	return vap;
+	return dest;
 }
 
-static struct stats_radio *add_stats_radio(struct reply_buffer *reply)
+static void *parse_basic_vap(struct nlattr *rattr, enum stats_type_e type)
 {
-	struct stats_radio *radio = NULL;
-	struct stats_radio *temp = NULL;
-	struct stats_ap *ap = NULL;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
+	struct nlattr *attr = NULL;
+	struct basic_vdev_data *data = NULL;
+	struct basic_vdev_ctrl *ctrl = NULL;
+	void *dest = NULL;
 
-	if (STATS_OBJ_RADIO != reply->root_obj) {
-		ap = find_parent_ap(reply);
-		if (!ap) {
-			STATS_ERR("Unable to find Parent ap\n");
+	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
+				       rattr, g_policy)) {
+		STATS_ERR("NLA Parsing failed\n");
+		return NULL;
+	}
+
+	switch (type) {
+	case STATS_TYPE_DATA:
+		data = malloc(sizeof(struct basic_vdev_data));
+		if (!data)
 			return NULL;
+		memset(data, 0, sizeof(struct basic_vdev_data));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			data->tx = malloc(sizeof(struct basic_vdev_data_tx));
+			if (data->tx)
+				memcpy(data->tx, nla_data(attr),
+				       sizeof(struct basic_vdev_data_tx));
 		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			data->rx = malloc(sizeof(struct basic_vdev_data_rx));
+			if (data->rx)
+				memcpy(data->rx, nla_data(attr),
+				       sizeof(struct basic_vdev_data_rx));
+		}
+		dest = data;
+		break;
+	case STATS_TYPE_CTRL:
+		ctrl = malloc(sizeof(struct basic_vdev_ctrl));
+		if (!ctrl)
+			return NULL;
+		memset(ctrl, 0, sizeof(struct basic_vdev_ctrl));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			ctrl->tx = malloc(sizeof(struct basic_vdev_ctrl_tx));
+			if (ctrl->tx)
+				memcpy(ctrl->tx, nla_data(attr),
+				       sizeof(struct basic_vdev_ctrl_tx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			ctrl->rx = malloc(sizeof(struct basic_vdev_ctrl_rx));
+			if (ctrl->rx)
+				memcpy(ctrl->rx, nla_data(attr),
+				       sizeof(struct basic_vdev_ctrl_rx));
+		}
+		dest = ctrl;
+		break;
 	}
-	radio = (struct stats_radio *)malloc(sizeof(struct stats_radio));
-	if (!radio) {
-		STATS_ERR("Unable to allocate stats_radio!\n");
+
+	return dest;
+}
+
+static void *parse_basic_radio(struct nlattr *rattr, enum stats_type_e type)
+{
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
+	struct nlattr *attr = NULL;
+	struct basic_pdev_data *data = NULL;
+	struct basic_pdev_ctrl *ctrl = NULL;
+	void *dest = NULL;
+
+	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
+				       rattr, g_policy)) {
+		STATS_ERR("NLA Parsing failed\n");
 		return NULL;
 	}
-	memset(radio, 0, sizeof(struct stats_radio));
-	radio->id = reply->radio_count;
-	reply->radio_count++;
-	radio->mgr.parent = ap;
-	if (ap && !ap->mgr.child_root)
-		ap->mgr.child_root = radio;
-	if (!reply->obj_list.radio_list) {
-		reply->obj_list.radio_list = radio;
-	} else {
-		temp = reply->obj_list.radio_list;
-		while (temp->mgr.next)
-			temp = temp->mgr.next;
-		temp->mgr.next = radio;
+	switch (type) {
+	case STATS_TYPE_DATA:
+		data = malloc(sizeof(struct basic_pdev_data));
+		if (!data)
+			return NULL;
+		memset(data, 0, sizeof(struct basic_pdev_data));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			data->tx = malloc(sizeof(struct basic_pdev_data_tx));
+			if (data->tx)
+				memcpy(data->tx, nla_data(attr),
+				       sizeof(struct basic_pdev_data_tx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			data->rx = malloc(sizeof(struct basic_pdev_data_rx));
+			if (data->rx)
+				memcpy(data->rx, nla_data(attr),
+				       sizeof(struct basic_pdev_data_rx));
+		}
+		dest = data;
+		break;
+	case STATS_TYPE_CTRL:
+		ctrl = malloc(sizeof(struct basic_pdev_ctrl));
+		if (!ctrl)
+			return NULL;
+		memset(ctrl, 0, sizeof(struct basic_pdev_ctrl));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			ctrl->tx = malloc(sizeof(struct basic_pdev_ctrl_tx));
+			if (ctrl->tx)
+				memcpy(ctrl->tx, nla_data(attr),
+				       sizeof(struct basic_pdev_ctrl_tx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			ctrl->rx = malloc(sizeof(struct basic_pdev_ctrl_rx));
+			if (ctrl->rx)
+				memcpy(ctrl->rx, nla_data(attr),
+				       sizeof(struct basic_pdev_ctrl_rx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK];
+			ctrl->link =
+				malloc(sizeof(struct basic_pdev_ctrl_link));
+			if (ctrl->link)
+				memcpy(ctrl->link, nla_data(attr),
+				       sizeof(struct basic_pdev_ctrl_link));
+		}
+		dest = ctrl;
+		break;
 	}
 
-	return radio;
+	return dest;
 }
 
-static struct stats_ap *add_stats_ap(struct reply_buffer *reply)
+static void *parse_basic_ap(struct nlattr *rattr, enum stats_type_e type)
 {
-	struct stats_ap *ap = NULL;
-	struct stats_ap *temp = NULL;
+	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
+	struct basic_psoc_data *data = NULL;
 
-	if (STATS_OBJ_AP != reply->root_obj) {
-		STATS_ERR("Invalid Request\n");
+	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
+				       rattr, g_policy)) {
+		STATS_ERR("NLA Parsing failed\n");
 		return NULL;
 	}
-	ap = (struct stats_ap *)malloc(sizeof(struct stats_ap));
-	if (!ap) {
-		STATS_ERR("Unable to allocate stats_ap!\n");
+	if (type == STATS_TYPE_CTRL)
 		return NULL;
-	}
-	memset(ap, 0, sizeof(struct stats_ap));
-	ap->id = reply->ap_count;
-	reply->ap_count++;
-	if (!reply->obj_list.ap_list) {
-		reply->obj_list.ap_list = ap;
-	} else {
-		temp = reply->obj_list.ap_list;
-		while (temp->mgr.next)
-			temp = temp->mgr.next;
-		temp->mgr.next = ap;
-	}
 
-	return ap;
-}
+	data = malloc(sizeof(struct basic_psoc_data));
+	if (!data)
+		return NULL;
+	memset(data, 0, sizeof(struct basic_psoc_data));
 
-static void libstats_parse_basic_sta(struct cfg80211_data *buffer,
-				     enum stats_type_e type,
-				     struct nlattr *rattr,
-				     struct reply_buffer *reply)
-{
-	u_int32_t size = 0;
-	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
-	struct stats_sta *sta = NULL;
-	void *dest = NULL;
-
-	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
-				       rattr, g_policy)) {
-		STATS_ERR("NLA Parsing failed\n");
-		return;
-	}
-	sta = add_stats_sta(reply);
-	if (!sta)
-		return;
-
-	if (tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID])
-		memcpy(sta->mac_addr,
-		       nla_data(tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID]),
-		       ETH_ALEN);
 	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct basic_peer_data_tx);
-			dest = malloc(size);
-			sta->u_basic.data.tx = dest;
-		} else {
-			size = sizeof(struct basic_peer_ctrl_tx);
-			dest = malloc(size);
-			sta->u_basic.ctrl.tx = dest;
-		}
-		if (dest)
-			memcpy(dest,
+		data->tx = malloc(sizeof(struct basic_psoc_data_tx));
+		if (data->tx)
+			memcpy(data->tx,
 			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]),
-			       size);
+			       sizeof(struct basic_psoc_data_tx));
 	}
 	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct basic_peer_data_rx);
-			dest = malloc(size);
-			sta->u_basic.data.rx = dest;
-		} else {
-			size = sizeof(struct basic_peer_ctrl_rx);
-			dest = malloc(size);
-			sta->u_basic.ctrl.rx = dest;
-		}
-		if (dest)
-			memcpy(dest,
+		data->rx = malloc(sizeof(struct basic_psoc_data_rx));
+		if (data->rx)
+			memcpy(data->rx,
 			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]),
-			       size);
+			       sizeof(struct basic_psoc_data_rx));
 	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct basic_peer_data_link);
-			dest = malloc(size);
-			sta->u_basic.data.link = dest;
-		} else {
-			size = sizeof(struct basic_peer_ctrl_link);
-			dest = malloc(size);
-			sta->u_basic.ctrl.link = dest;
-		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct basic_peer_data_rate);
-			dest = malloc(size);
-			sta->u_basic.data.rate = dest;
-		} else {
-			size = sizeof(struct basic_peer_ctrl_rate);
-			dest = malloc(size);
-			sta->u_basic.ctrl.rate = dest;
-		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE]),
-			       size);
-	}
-}
 
-static void libstats_parse_basic_vap(struct cfg80211_data *buffer,
-				     enum stats_type_e type,
-				     struct nlattr *rattr,
-				     struct reply_buffer *reply)
-{
-	u_int32_t size = 0;
-	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
-	struct stats_vap *vap = NULL;
-	void *dest = NULL;
-
-	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
-				       rattr, g_policy)) {
-		STATS_ERR("NLA Parsing failed\n");
-		return;
-	}
-	vap = add_stats_vap(reply);
-	if (!vap)
-		return;
-
-	if (tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID])
-		strlcpy(vap->vap_name,
-			nla_get_string(tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID]),
-			IFNAME_LEN);
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct basic_vdev_data_tx);
-			dest = malloc(size);
-			vap->u_basic.data.tx = dest;
-		} else {
-			size = sizeof(struct basic_vdev_ctrl_tx);
-			dest = malloc(size);
-			vap->u_basic.ctrl.tx = dest;
-		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct basic_vdev_data_rx);
-			dest = malloc(size);
-			vap->u_basic.data.rx = dest;
-		} else {
-			size = sizeof(struct basic_vdev_ctrl_rx);
-			dest = malloc(size);
-			vap->u_basic.ctrl.rx = dest;
-		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_RECURSIVE])
-		vap->recursive = true;
-}
-
-static void libstats_parse_basic_radio(struct cfg80211_data *buffer,
-				       enum stats_type_e type,
-				       struct nlattr *rattr,
-				       struct reply_buffer *reply)
-{
-	u_int32_t size = 0;
-	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
-	struct stats_radio *radio = NULL;
-	void *dest = NULL;
-
-	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
-				       rattr, g_policy)) {
-		STATS_ERR("NLA Parsing failed\n");
-		return;
-	}
-	radio = add_stats_radio(reply);
-	if (!radio)
-		return;
-
-	if (tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID])
-		snprintf(radio->radio_name, IFNAME_LEN, "wifi%d",
-			 nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID]));
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct basic_pdev_data_tx);
-			dest = malloc(size);
-			radio->u_basic.data.tx = dest;
-		} else {
-			size = sizeof(struct basic_pdev_ctrl_tx);
-			dest = malloc(size);
-			radio->u_basic.ctrl.tx = dest;
-		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct basic_pdev_data_rx);
-			dest = malloc(size);
-			radio->u_basic.data.rx = dest;
-		} else {
-			size = sizeof(struct basic_pdev_ctrl_rx);
-			dest = malloc(size);
-			radio->u_basic.ctrl.rx = dest;
-		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
-		size = sizeof(struct basic_pdev_ctrl_link);
-		dest = malloc(size);
-		radio->u_basic.ctrl.link = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_RECURSIVE])
-		radio->recursive = true;
-}
-
-static void libstats_parse_basic_ap(struct cfg80211_data *buffer,
-				    enum stats_type_e type,
-				    struct nlattr *rattr,
-				    struct reply_buffer *reply)
-{
-	u_int32_t size = 0;
-	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
-	struct stats_ap *ap = NULL;
-	void *dest = NULL;
-
-	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
-				       rattr, g_policy)) {
-		STATS_ERR("NLA Parsing failed\n");
-		return;
-	}
-	ap = add_stats_ap(reply);
-	if (!ap)
-		return;
-
-	if (tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID])
-		snprintf(ap->ap_name, IFNAME_LEN, "Soc%d",
-			 nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID]));
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
-		size = sizeof(struct basic_psoc_data_tx);
-		dest = malloc(size);
-		ap->u.b_data.tx = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
-		size = sizeof(struct basic_psoc_data_rx);
-		dest = malloc(size);
-		ap->u.b_data.rx = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_RECURSIVE])
-		ap->recursive = true;
+	return data;
 }
 
 #if WLAN_ADVANCE_TELEMETRY
-static void libstats_parse_advance_sta(struct cfg80211_data *buffer,
-				       enum stats_type_e type,
-				       struct nlattr *rattr,
-				       struct reply_buffer *reply)
+static void *parse_advance_sta(struct nlattr *rattr, enum stats_type_e type)
 {
-	u_int32_t size = 0;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
-	struct stats_sta *sta = NULL;
+	struct nlattr *attr = NULL;
+	struct advance_peer_data *data = NULL;
+	struct advance_peer_ctrl *ctrl = NULL;
 	void *dest = NULL;
 
 	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
 				       rattr, g_policy)) {
 		STATS_ERR("NLA Parsing failed\n");
-		return;
+		return NULL;
 	}
-	sta = add_stats_sta(reply);
-	if (!sta)
-		return;
 
-	if (tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID])
-		memcpy(sta->mac_addr,
-		       nla_data(tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID]),
-		       ETH_ALEN);
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_peer_data_tx);
-			dest = malloc(size);
-			sta->u_advance.data.tx = dest;
-		} else {
-			size = sizeof(struct advance_peer_ctrl_tx);
-			dest = malloc(size);
-			sta->u_advance.ctrl.tx = dest;
+	switch (type) {
+	case STATS_TYPE_DATA:
+		data = malloc(sizeof(struct advance_peer_data));
+		if (!data)
+			return NULL;
+		memset(data, 0, sizeof(struct advance_peer_data));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			data->tx = malloc(sizeof(struct advance_peer_data_tx));
+			if (data->tx)
+				memcpy(data->tx, nla_data(attr),
+				       sizeof(struct advance_peer_data_tx));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_peer_data_rx);
-			dest = malloc(size);
-			sta->u_advance.data.rx = dest;
-		} else {
-			size = sizeof(struct advance_peer_ctrl_rx);
-			dest = malloc(size);
-			sta->u_advance.ctrl.rx = dest;
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			data->rx = malloc(sizeof(struct advance_peer_data_rx));
+			if (data->rx)
+				memcpy(data->rx, nla_data(attr),
+				       sizeof(struct advance_peer_data_rx));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_FWD]) {
-		size = sizeof(struct advance_peer_data_fwd);
-		dest = malloc(size);
-		sta->u_advance.data.fwd = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_FWD]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]) {
-		size = sizeof(struct advance_peer_data_raw);
-		dest = malloc(size);
-		sta->u_advance.data.raw = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TWT]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_peer_data_twt);
-			dest = malloc(size);
-			sta->u_advance.data.twt = dest;
-		} else {
-			size = sizeof(struct advance_peer_ctrl_twt);
-			dest = malloc(size);
-			sta->u_advance.ctrl.twt = dest;
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW];
+			data->raw =
+				malloc(sizeof(struct advance_peer_data_raw));
+			if (data->raw)
+				memcpy(data->raw, nla_data(attr),
+				       sizeof(struct advance_peer_data_raw));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TWT]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_peer_data_link);
-			dest = malloc(size);
-			sta->u_advance.data.link = dest;
-		} else {
-			size = sizeof(struct advance_peer_ctrl_link);
-			dest = malloc(size);
-			sta->u_advance.ctrl.link = dest;
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_FWD]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_FWD];
+			data->fwd =
+				malloc(sizeof(struct advance_peer_data_fwd));
+			if (data->fwd)
+				memcpy(data->fwd, nla_data(attr),
+				       sizeof(struct advance_peer_data_fwd));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_peer_data_rate);
-			dest = malloc(size);
-			sta->u_advance.data.rate = dest;
-		} else {
-			size = sizeof(struct advance_peer_ctrl_rate);
-			dest = malloc(size);
-			sta->u_advance.ctrl.rate = dest;
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TWT]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TWT];
+			data->twt =
+				malloc(sizeof(struct advance_peer_data_twt));
+			if (data->twt)
+				memcpy(data->twt, nla_data(attr),
+				       sizeof(struct advance_peer_data_twt));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE]),
-			       size);
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK];
+			data->link =
+				malloc(sizeof(struct advance_peer_data_link));
+			if (data->link)
+				memcpy(data->link, nla_data(attr),
+				       sizeof(struct advance_peer_data_link));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE];
+			data->rate =
+				malloc(sizeof(struct advance_peer_data_rate));
+			if (data->rate)
+				memcpy(data->rate, nla_data(attr),
+				       sizeof(struct advance_peer_data_rate));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS];
+			data->nawds =
+				malloc(sizeof(struct advance_peer_data_nawds));
+			if (data->nawds)
+				memcpy(data->nawds, nla_data(attr),
+				       sizeof(struct advance_peer_data_nawds));
+		}
+		dest = data;
+		break;
+	case STATS_TYPE_CTRL:
+		ctrl = malloc(sizeof(struct advance_peer_ctrl));
+		if (!ctrl)
+			return NULL;
+		memset(ctrl, 0, sizeof(struct advance_peer_ctrl));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			ctrl->tx = malloc(sizeof(struct advance_peer_ctrl_tx));
+			if (ctrl->tx)
+				memcpy(ctrl->tx, nla_data(attr),
+				       sizeof(struct advance_peer_ctrl_tx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			ctrl->rx = malloc(sizeof(struct advance_peer_ctrl_rx));
+			if (ctrl->rx)
+				memcpy(ctrl->rx, nla_data(attr),
+				       sizeof(struct advance_peer_ctrl_rx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TWT]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TWT];
+			ctrl->twt =
+				malloc(sizeof(struct advance_peer_ctrl_twt));
+			if (ctrl->twt)
+				memcpy(ctrl->twt, nla_data(attr),
+				       sizeof(struct advance_peer_ctrl_twt));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK];
+			ctrl->link =
+				malloc(sizeof(struct advance_peer_ctrl_link));
+			if (ctrl->link)
+				memcpy(ctrl->link, nla_data(attr),
+				       sizeof(struct advance_peer_ctrl_link));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RATE];
+			ctrl->rate =
+				malloc(sizeof(struct advance_peer_ctrl_rate));
+			if (ctrl->rate)
+				memcpy(ctrl->rate, nla_data(attr),
+				       sizeof(struct advance_peer_ctrl_rate));
+		}
+		dest = ctrl;
+		break;
 	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]) {
-		size = sizeof(struct advance_peer_data_nawds);
-		dest = malloc(size);
-		sta->u_advance.data.nawds = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]),
-			       size);
-	}
+
+	return dest;
 }
 
-static void libstats_parse_advance_vap(struct cfg80211_data *buffer,
-				       enum stats_type_e type,
-				       struct nlattr *rattr,
-				       struct reply_buffer *reply)
+static void *parse_advance_vap(struct nlattr *rattr, enum stats_type_e type)
 {
-	u_int32_t size = 0;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
-	struct stats_vap *vap = NULL;
+	struct nlattr *attr = NULL;
+	struct advance_vdev_data *data = NULL;
+	struct advance_vdev_ctrl *ctrl = NULL;
 	void *dest = NULL;
 
 	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
 				       rattr, g_policy)) {
 		STATS_ERR("NLA Parsing failed\n");
-		return;
+		return NULL;
 	}
-	vap = add_stats_vap(reply);
-	if (!vap)
-		return;
 
-	if (tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID])
-		strlcpy(vap->vap_name,
-			nla_get_string(
-			tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID]),
-			IFNAME_LEN);
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_ME]) {
-		size = sizeof(struct advance_vdev_data_me);
-		dest = malloc(size);
-		vap->u_advance.data.me = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_ME]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_vdev_data_tx);
-			dest = malloc(size);
-			vap->u_advance.data.tx = dest;
-		} else {
-			size = sizeof(struct advance_vdev_ctrl_tx);
-			dest = malloc(size);
-			vap->u_advance.ctrl.tx = dest;
+	switch (type) {
+	case STATS_TYPE_DATA:
+		data = malloc(sizeof(struct advance_vdev_data));
+		if (!data)
+			return NULL;
+		memset(data, 0, sizeof(struct advance_vdev_data));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			data->tx = malloc(sizeof(struct advance_vdev_data_tx));
+			if (data->tx)
+				memcpy(data->tx, nla_data(attr),
+				       sizeof(struct advance_vdev_data_tx));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_vdev_data_rx);
-			dest = malloc(size);
-			vap->u_advance.data.rx = dest;
-		} else {
-			size = sizeof(struct advance_vdev_ctrl_rx);
-			dest = malloc(size);
-			vap->u_advance.ctrl.rx = dest;
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			data->rx = malloc(sizeof(struct advance_vdev_data_rx));
+			if (data->rx)
+				memcpy(data->rx, nla_data(attr),
+				       sizeof(struct advance_vdev_data_rx));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]),
-			       size);
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_ME]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_ME];
+			data->me = malloc(sizeof(struct advance_vdev_data_me));
+			if (data->me)
+				memcpy(data->me, nla_data(attr),
+				       sizeof(struct advance_vdev_data_me));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW];
+			data->raw =
+				malloc(sizeof(struct advance_vdev_data_raw));
+			if (data->raw)
+				memcpy(data->raw, nla_data(attr),
+				       sizeof(struct advance_vdev_data_raw));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO];
+			data->tso =
+				malloc(sizeof(struct advance_vdev_data_tso));
+			if (data->tso)
+				memcpy(data->tso, nla_data(attr),
+				       sizeof(struct advance_vdev_data_tso));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP];
+			data->igmp =
+				malloc(sizeof(struct advance_vdev_data_igmp));
+			if (data->igmp)
+				memcpy(data->igmp, nla_data(attr),
+				       sizeof(struct advance_vdev_data_igmp));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_MESH]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_MESH];
+			data->mesh =
+				malloc(sizeof(struct advance_vdev_data_mesh));
+			if (data->mesh)
+				memcpy(data->mesh, nla_data(attr),
+				       sizeof(struct advance_vdev_data_mesh));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS];
+			data->nawds =
+				malloc(sizeof(struct advance_vdev_data_nawds));
+			if (data->nawds)
+				memcpy(data->nawds, nla_data(attr),
+				       sizeof(struct advance_vdev_data_nawds));
+		}
+		dest = data;
+		break;
+	case STATS_TYPE_CTRL:
+		ctrl = malloc(sizeof(struct advance_vdev_ctrl));
+		if (!ctrl)
+			return NULL;
+		memset(ctrl, 0, sizeof(struct advance_vdev_ctrl));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			ctrl->tx = malloc(sizeof(struct advance_vdev_ctrl_tx));
+			if (ctrl->tx)
+				memcpy(ctrl->tx, nla_data(attr),
+				       sizeof(struct advance_vdev_ctrl_tx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			ctrl->rx = malloc(sizeof(struct advance_vdev_ctrl_rx));
+			if (ctrl->rx)
+				memcpy(ctrl->rx, nla_data(attr),
+				       sizeof(struct advance_vdev_ctrl_rx));
+		}
+		dest = ctrl;
+		break;
 	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]) {
-		size = sizeof(struct advance_vdev_data_raw);
-		dest = malloc(size);
-		vap->u_advance.data.raw = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO]) {
-		size = sizeof(struct advance_vdev_data_tso);
-		dest = malloc(size);
-		vap->u_advance.data.tso = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP]) {
-		size = sizeof(struct advance_vdev_data_igmp);
-		dest = malloc(size);
-		vap->u_advance.data.igmp = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_MESH]) {
-		size = sizeof(struct advance_vdev_data_mesh);
-		dest = malloc(size);
-		vap->u_advance.data.mesh = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_MESH]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]) {
-		size = sizeof(struct advance_vdev_data_nawds);
-		dest = malloc(size);
-		vap->u_advance.data.nawds = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_RECURSIVE])
-		vap->recursive = true;
+
+	return dest;
 }
 
-static void libstats_parse_advance_radio(struct cfg80211_data *buffer,
-					 enum stats_type_e type,
-					 struct nlattr *rattr,
-					 struct reply_buffer *reply)
+static void *parse_advance_radio(struct nlattr *rattr, enum stats_type_e type)
 {
-	u_int32_t size = 0;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
-	struct stats_radio *radio = NULL;
+	struct nlattr *attr = NULL;
+	struct advance_pdev_data *data = NULL;
+	struct advance_pdev_ctrl *ctrl = NULL;
 	void *dest = NULL;
 
 	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
 				       rattr, g_policy)) {
 		STATS_ERR("NLA Parsing failed\n");
-		return;
+		return NULL;
 	}
-	radio = add_stats_radio(reply);
-	if (!radio)
-		return;
 
-	if (tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID])
-		snprintf(radio->radio_name, IFNAME_LEN, "wifi%d",
-			 nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID]));
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_pdev_data_tx);
-			dest = malloc(size);
-			radio->u_advance.data.tx = dest;
-		} else {
-			size = sizeof(struct advance_pdev_ctrl_tx);
-			dest = malloc(size);
-			radio->u_advance.ctrl.tx = dest;
+	switch (type) {
+	case STATS_TYPE_DATA:
+		data = malloc(sizeof(struct advance_pdev_data));
+		if (!data)
+			return NULL;
+		memset(data, 0, sizeof(struct advance_pdev_data));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			data->tx = malloc(sizeof(struct advance_pdev_data_tx));
+			if (data->tx)
+				memcpy(data->tx, nla_data(attr),
+				       sizeof(struct advance_pdev_data_tx));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
-		if (type == STATS_TYPE_DATA) {
-			size = sizeof(struct advance_pdev_data_rx);
-			dest = malloc(size);
-			radio->u_advance.data.rx = dest;
-		} else {
-			size = sizeof(struct advance_pdev_ctrl_rx);
-			dest = malloc(size);
-			radio->u_advance.ctrl.rx = dest;
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			data->rx = malloc(sizeof(struct advance_pdev_data_rx));
+			if (data->rx)
+				memcpy(data->rx, nla_data(attr),
+				       sizeof(struct advance_pdev_data_rx));
 		}
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]),
-			       size);
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_ME]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_ME];
+			data->me = malloc(sizeof(struct advance_pdev_data_me));
+			if (data->me)
+				memcpy(data->me, nla_data(attr),
+				       sizeof(struct advance_pdev_data_me));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW];
+			data->raw =
+				malloc(sizeof(struct advance_pdev_data_raw));
+			if (data->raw)
+				memcpy(data->raw, nla_data(attr),
+				       sizeof(struct advance_pdev_data_raw));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO];
+			data->tso =
+				malloc(sizeof(struct advance_pdev_data_tso));
+			if (data->tso)
+				memcpy(data->tso, nla_data(attr),
+				       sizeof(struct advance_pdev_data_tso));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP];
+			data->igmp =
+				malloc(sizeof(struct advance_pdev_data_igmp));
+			if (data->igmp)
+				memcpy(data->igmp, nla_data(attr),
+				       sizeof(struct advance_pdev_data_igmp));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_MESH]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_MESH];
+			data->mesh =
+				malloc(sizeof(struct advance_pdev_data_mesh));
+			if (data->mesh)
+				memcpy(data->mesh, nla_data(attr),
+				       sizeof(struct advance_pdev_data_mesh));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS];
+			data->nawds =
+				malloc(sizeof(struct advance_pdev_data_nawds));
+			if (data->nawds)
+				memcpy(data->nawds, nla_data(attr),
+				       sizeof(struct advance_pdev_data_nawds));
+		}
+		dest = data;
+		break;
+	case STATS_TYPE_CTRL:
+		ctrl = malloc(sizeof(struct advance_pdev_ctrl));
+		if (!ctrl)
+			return NULL;
+		memset(ctrl, 0, sizeof(struct advance_pdev_ctrl));
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX];
+			ctrl->tx = malloc(sizeof(struct advance_pdev_ctrl_tx));
+			if (ctrl->tx)
+				memcpy(ctrl->tx, nla_data(attr),
+				       sizeof(struct advance_pdev_ctrl_tx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX];
+			ctrl->rx = malloc(sizeof(struct advance_pdev_ctrl_rx));
+			if (ctrl->rx)
+				memcpy(ctrl->rx, nla_data(attr),
+				       sizeof(struct advance_pdev_ctrl_rx));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK];
+			ctrl->link =
+				malloc(sizeof(struct advance_pdev_ctrl_link));
+			if (ctrl->link)
+				memcpy(ctrl->link, nla_data(attr),
+				       sizeof(struct advance_pdev_ctrl_link));
+		}
+		dest = ctrl;
+		break;
 	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_ME]) {
-		size = sizeof(struct advance_pdev_data_me);
-		dest = malloc(size);
-		radio->u_advance.data.me = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_ME]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]) {
-		size = sizeof(struct advance_pdev_data_raw);
-		dest = malloc(size);
-		radio->u_advance.data.raw = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RAW]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO]) {
-		size = sizeof(struct advance_pdev_data_tso);
-		dest = malloc(size);
-		radio->u_advance.data.tso = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP]) {
-		size = sizeof(struct advance_pdev_data_igmp);
-		dest = malloc(size);
-		radio->u_advance.data.igmp = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_MESH]) {
-		size = sizeof(struct advance_pdev_data_mesh);
-		dest = malloc(size);
-		radio->u_advance.data.mesh = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_MESH]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]) {
-		size = sizeof(struct advance_pdev_data_nawds);
-		dest = malloc(size);
-		radio->u_advance.data.nawds = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_NAWDS]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]) {
-		size = sizeof(struct advance_pdev_ctrl_link);
-		dest = malloc(size);
-		radio->u_advance.ctrl.link = dest;
-		if (dest)
-			memcpy(dest,
-			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_LINK]),
-			       size);
-	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_RECURSIVE])
-		radio->recursive = true;
+
+	return dest;
 }
 
-static void libstats_parse_advance_ap(struct cfg80211_data *buffer,
-				      enum stats_type_e type,
-				      struct nlattr *rattr,
-				      struct reply_buffer *reply)
+static void *parse_advance_ap(struct nlattr *rattr, enum stats_type_e type)
 {
-	u_int32_t size = 0;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_FEAT_MAX + 1] = {0};
-	struct stats_ap *ap = NULL;
-	void *dest = NULL;
+	struct advance_psoc_data *data = NULL;
 
 	if (!rattr || nla_parse_nested(tb, QCA_WLAN_VENDOR_ATTR_FEAT_MAX,
 				       rattr, g_policy)) {
 		STATS_ERR("NLA Parsing failed\n");
-		return;
+		return NULL;
 	}
-	ap = add_stats_ap(reply);
-	if (!ap)
-		return;
 
-	if (tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID])
-		snprintf(ap->ap_name, IFNAME_LEN, "Soc%d",
-			 nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_OBJ_ID]));
+	if (type == STATS_TYPE_CTRL)
+		return NULL;
+
+	data = malloc(sizeof(struct advance_psoc_data));
+	if (!data)
+		return NULL;
+	memset(data, 0, sizeof(struct advance_psoc_data));
+
 	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]) {
-		size = sizeof(struct advance_psoc_data_tx);
-		dest = malloc(size);
-		ap->u.a_data.tx = dest;
-		if (dest)
-			memcpy(dest,
+		data->tx = malloc(sizeof(struct advance_psoc_data_tx));
+		if (data->tx)
+			memcpy(data->tx,
 			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TX]),
-			       size);
+			       sizeof(struct advance_psoc_data_tx));
 	}
 	if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]) {
-		size = sizeof(struct advance_psoc_data_rx);
-		dest = malloc(size);
-		ap->u.a_data.rx = dest;
-		if (dest)
-			memcpy(dest,
+		data->rx = malloc(sizeof(struct advance_psoc_data_rx));
+		if (data->rx)
+			memcpy(data->rx,
 			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_RX]),
-			       size);
+			       sizeof(struct advance_psoc_data_rx));
 	}
-	if (tb[QCA_WLAN_VENDOR_ATTR_RECURSIVE])
-		ap->recursive = true;
+
+	return data;
 }
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
-static void libstats_response_handler(struct cfg80211_data *buffer)
+static void stats_response_handler(struct cfg80211_data *buffer)
 {
-	struct stats_command *cmd = NULL;
-	struct reply_buffer *reply = NULL;
-	struct nlattr *attr = NULL;
+	struct stats_command *cmd;
+	struct reply_buffer *reply;
+	struct nlattr *attr;
+	struct stats_obj *obj;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_STATS_MAX + 1] = {0};
-	u_int8_t obj = 0;
 	struct nla_policy policy[QCA_WLAN_VENDOR_ATTR_STATS_MAX] = {
+	[QCA_WLAN_VENDOR_ATTR_STATS_LEVEL] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_OBJECT] = { .type = NLA_U8 },
+	[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_STATS_PARENT_IF] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_STATS_TYPE] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_RECURSIVE] = { .type = NLA_NESTED },
 	};
 
@@ -1329,62 +1185,84 @@ static void libstats_response_handler(struct cfg80211_data *buffer)
 		STATS_ERR("User reply buffer in null\n");
 		return;
 	}
-	reply->root_obj = cmd->obj;
 	if (nla_parse(tb, QCA_WLAN_VENDOR_ATTR_STATS_MAX,
 		      buffer->nl_vendordata, buffer->nl_vendordata_len,
 		      policy)) {
 		STATS_ERR("NLA Parsing failed\n");
 		return;
 	}
+	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_LEVEL]) {
+		STATS_ERR("NLA Parsing failed for Stats Object\n");
+		return;
+	}
 	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJECT]) {
 		STATS_ERR("NLA Parsing failed for Stats Object\n");
+		return;
+	}
+	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID]) {
+		STATS_ERR("NLA Parsing failed for Stats Object ID\n");
+		return;
+	}
+	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_TYPE]) {
+		STATS_ERR("NLA Parsing failed for Stats Type\n");
 		return;
 	}
 	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_RECURSIVE]) {
 		STATS_ERR("NLA Parsing failed for Stats Recursive\n");
 		return;
 	}
-	obj = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJECT]);
+	obj = add_stats_obj(reply);
+	if (!obj)
+		return;
+	obj->lvl = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_LEVEL]);
+	obj->obj_type = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJECT]);
+	obj->type = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_TYPE]);
+	if (tb[QCA_WLAN_VENDOR_ATTR_STATS_PARENT_IF])
+		strlcpy(obj->pif_name, nla_get_string(
+			tb[QCA_WLAN_VENDOR_ATTR_STATS_PARENT_IF]),
+			IFNAME_LEN);
+	if (tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID]) {
+		if (obj->obj_type == STATS_OBJ_STA)
+			memcpy(obj->u_id.mac_addr,
+			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID]),
+			       ETH_ALEN);
+		else
+			memcpy(obj->u_id.if_name,
+			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID]),
+			       IFNAME_LEN);
+	}
 	attr = tb[QCA_WLAN_VENDOR_ATTR_STATS_RECURSIVE];
-	if (cmd->lvl == STATS_LVL_BASIC) {
-		switch (obj) {
+	if (obj->lvl == STATS_LVL_BASIC) {
+		switch (obj->obj_type) {
 		case STATS_OBJ_STA:
-			libstats_parse_basic_sta(buffer, cmd->type,
-						 attr, reply);
+			obj->stats = parse_basic_sta(attr, obj->type);
 			break;
 		case STATS_OBJ_VAP:
-			libstats_parse_basic_vap(buffer, cmd->type,
-						 attr, reply);
+			obj->stats = parse_basic_vap(attr, obj->type);
 			break;
 		case STATS_OBJ_RADIO:
-			libstats_parse_basic_radio(buffer, cmd->type,
-						   attr, reply);
+			obj->stats = parse_basic_radio(attr, obj->type);
 			break;
 		case STATS_OBJ_AP:
-			libstats_parse_basic_ap(buffer, cmd->type,
-						attr, reply);
+			obj->stats = parse_basic_ap(attr, obj->type);
 			break;
 		default:
 			STATS_ERR("Unexpected Object\n");
 		}
 #if WLAN_ADVANCE_TELEMETRY
-	} else if (cmd->lvl == STATS_LVL_ADVANCE) {
-		switch (obj) {
+	} else if (obj->lvl == STATS_LVL_ADVANCE) {
+		switch (obj->obj_type) {
 		case STATS_OBJ_STA:
-			libstats_parse_advance_sta(buffer, cmd->type,
-						   attr, reply);
+			obj->stats = parse_advance_sta(attr, obj->type);
 			break;
 		case STATS_OBJ_VAP:
-			libstats_parse_advance_vap(buffer, cmd->type,
-						   attr, reply);
+			obj->stats = parse_advance_vap(attr, obj->type);
 			break;
 		case STATS_OBJ_RADIO:
-			libstats_parse_advance_radio(buffer, cmd->type,
-						     attr, reply);
+			obj->stats = parse_advance_radio(attr, obj->type);
 			break;
 		case STATS_OBJ_AP:
-			libstats_parse_advance_ap(buffer, cmd->type,
-						  attr, reply);
+			obj->stats = parse_advance_ap(attr, obj->type);
 			break;
 		default:
 			STATS_ERR("Unexpected Object\n");
@@ -1398,9 +1276,9 @@ static void libstats_response_handler(struct cfg80211_data *buffer)
 	}
 }
 
-static int32_t libstats_send_nl_command(struct stats_command *cmd,
-					struct cfg80211_data *buffer,
-					const char *ifname)
+static int32_t send_nl_command(struct stats_command *cmd,
+			       struct cfg80211_data *buffer,
+			       const char *ifname)
 {
 	struct nl_msg *nlmsg = NULL;
 	struct nlattr *nl_ven_data = NULL;
@@ -1415,7 +1293,7 @@ static int32_t libstats_send_nl_command(struct stats_command *cmd,
 			nlmsg_free(nlmsg);
 			return -EIO;
 		}
-		ret = libstats_prepare_request(nlmsg, cmd);
+		ret = prepare_request(nlmsg, cmd);
 		if (ret) {
 			STATS_ERR("failed to prepare stats request\n");
 			nlmsg_free(nlmsg);
@@ -1434,7 +1312,7 @@ static int32_t libstats_send_nl_command(struct stats_command *cmd,
 	return ret;
 }
 
-static int32_t libstats_send(struct stats_command *cmd)
+static int32_t process_and_send_stats_request(struct stats_command *cmd)
 {
 	struct cfg80211_data buffer;
 	int32_t ret = 0;
@@ -1452,261 +1330,166 @@ static int32_t libstats_send(struct stats_command *cmd)
 	memset(&buffer, 0, sizeof(struct cfg80211_data));
 	buffer.data = cmd;
 	buffer.length = sizeof(*cmd);
-	buffer.callback = libstats_response_handler;
+	buffer.callback = stats_response_handler;
 	buffer.parse_data = 1;
 
 	if (is_interface_active(cmd->if_name, cmd->obj))
-		ret = libstats_send_nl_command(cmd, &buffer, cmd->if_name);
+		ret = send_nl_command(cmd, &buffer, cmd->if_name);
 
 	return ret;
 }
 
-static void free_basic_sta(struct stats_sta *sta, enum stats_type_e type)
+static void free_basic_sta(struct stats_obj *sta)
 {
-	switch (type) {
+	switch (sta->type) {
 	case STATS_TYPE_DATA:
-		if (sta->u_basic.data.tx)
-			free(sta->u_basic.data.tx);
-		if (sta->u_basic.data.rx)
-			free(sta->u_basic.data.rx);
-		if (sta->u_basic.data.link)
-			free(sta->u_basic.data.link);
-		if (sta->u_basic.data.rate)
-			free(sta->u_basic.data.rate);
+		{
+			struct basic_peer_data *data = sta->stats;
+
+			if (data->tx)
+				free(data->tx);
+			if (data->rx)
+				free(data->rx);
+			if (data->link)
+				free(data->link);
+			if (data->rate)
+				free(data->rate);
+		}
 		break;
 	case STATS_TYPE_CTRL:
-		if (sta->u_basic.ctrl.tx)
-			free(sta->u_basic.ctrl.tx);
-		if (sta->u_basic.ctrl.rx)
-			free(sta->u_basic.ctrl.rx);
-		if (sta->u_basic.ctrl.link)
-			free(sta->u_basic.ctrl.link);
-		if (sta->u_basic.ctrl.rate)
-			free(sta->u_basic.ctrl.rate);
+		{
+			struct basic_peer_ctrl *ctrl = sta->stats;
+
+			if (ctrl->tx)
+				free(ctrl->tx);
+			if (ctrl->rx)
+				free(ctrl->rx);
+			if (ctrl->link)
+				free(ctrl->link);
+			if (ctrl->rate)
+				free(ctrl->rate);
+		}
 		break;
 	default:
-		STATS_ERR("Unexpected Type %d!\n", type);
+		STATS_ERR("Unexpected Type %d!\n", sta->type);
 	}
+
+	free(sta->stats);
 }
 
-static void free_basic_vap(struct stats_vap *vap, enum stats_type_e type)
+static void free_basic_vap(struct stats_obj *vap)
 {
-	switch (type) {
+	switch (vap->type) {
 	case STATS_TYPE_DATA:
-		if (vap->u_basic.data.tx)
-			free(vap->u_basic.data.tx);
-		if (vap->u_basic.data.rx)
-			free(vap->u_basic.data.rx);
+		{
+			struct basic_vdev_data *data = vap->stats;
+
+			if (data->tx)
+				free(data->tx);
+			if (data->rx)
+				free(data->rx);
+		}
 		break;
 	case STATS_TYPE_CTRL:
-		if (vap->u_basic.ctrl.tx)
-			free(vap->u_basic.ctrl.tx);
-		if (vap->u_basic.ctrl.rx)
-			free(vap->u_basic.ctrl.rx);
+		{
+			struct basic_vdev_ctrl *ctrl = vap->stats;
+
+			if (ctrl->tx)
+				free(ctrl->tx);
+			if (ctrl->rx)
+				free(ctrl->rx);
+		}
 		break;
 	default:
-		STATS_ERR("Unexpected Type %d!\n", type);
+		STATS_ERR("Unexpected Type %d!\n", vap->type);
 	}
+
+	free(vap->stats);
 }
 
-static void free_basic_radio(struct stats_radio *radio, enum stats_type_e type)
+static void free_basic_radio(struct stats_obj *radio)
 {
-	switch (type) {
+	switch (radio->type) {
 	case STATS_TYPE_DATA:
-		if (radio->u_basic.data.tx)
-			free(radio->u_basic.data.tx);
-		if (radio->u_basic.data.rx)
-			free(radio->u_basic.data.rx);
+		{
+			struct basic_pdev_data *data = radio->stats;
+
+			if (data->tx)
+				free(data->tx);
+			if (data->rx)
+				free(data->rx);
+		}
 		break;
 	case STATS_TYPE_CTRL:
-		if (radio->u_basic.ctrl.tx)
-			free(radio->u_basic.ctrl.tx);
-		if (radio->u_basic.ctrl.rx)
-			free(radio->u_basic.ctrl.rx);
-		if (radio->u_basic.ctrl.link)
-			free(radio->u_basic.ctrl.link);
+		{
+			struct basic_pdev_ctrl *ctrl = radio->stats;
+
+			if (ctrl->tx)
+				free(ctrl->tx);
+			if (ctrl->rx)
+				free(ctrl->rx);
+			if (ctrl->link)
+				free(ctrl->link);
+		}
 		break;
 	default:
-		STATS_ERR("Unexpected Type %d!\n", type);
+		STATS_ERR("Unexpected Type %d!\n", radio->type);
 	}
+
+	free(radio->stats);
 }
 
-static void free_basic_ap(struct stats_ap *ap, enum stats_type_e type)
+static void free_basic_ap(struct stats_obj *ap)
 {
-	switch (type) {
-	case STATS_TYPE_DATA:
-		if (ap->u.b_data.tx)
-			free(ap->u.b_data.tx);
-		if (ap->u.b_data.rx)
-			free(ap->u.b_data.rx);
-		break;
-	case STATS_TYPE_CTRL:
-		break;
-	default:
-		STATS_ERR("Unexpected Type %d!\n", type);
-	}
+	struct basic_psoc_data *data = ap->stats;
+
+	if (!data)
+		return;
+
+	if (data->tx)
+		free(data->tx);
+	if (data->rx)
+		free(data->rx);
+
+	free(ap->stats);
 }
 
 #if WLAN_ADVANCE_TELEMETRY
-static void free_advance_sta(struct stats_sta *sta, enum stats_type_e type)
-{
-	switch (type) {
-	case STATS_TYPE_DATA:
-		if (sta->u_advance.data.tx)
-			free(sta->u_advance.data.tx);
-		if (sta->u_advance.data.rx)
-			free(sta->u_advance.data.rx);
-		if (sta->u_advance.data.fwd)
-			free(sta->u_advance.data.fwd);
-		if (sta->u_advance.data.raw)
-			free(sta->u_advance.data.raw);
-		if (sta->u_advance.data.twt)
-			free(sta->u_advance.data.twt);
-		if (sta->u_advance.data.link)
-			free(sta->u_advance.data.link);
-		if (sta->u_advance.data.rate)
-			free(sta->u_advance.data.rate);
-		if (sta->u_advance.data.nawds)
-			free(sta->u_advance.data.nawds);
-		break;
-	case STATS_TYPE_CTRL:
-		if (sta->u_advance.ctrl.tx)
-			free(sta->u_advance.ctrl.tx);
-		if (sta->u_advance.ctrl.rx)
-			free(sta->u_advance.ctrl.rx);
-		if (sta->u_advance.ctrl.twt)
-			free(sta->u_advance.ctrl.twt);
-		if (sta->u_advance.ctrl.link)
-			free(sta->u_advance.ctrl.link);
-		if (sta->u_advance.ctrl.rate)
-			free(sta->u_advance.ctrl.rate);
-		break;
-	default:
-		STATS_ERR("Unexpected Type %d!\n", type);
-	}
-}
-
-static void free_advance_vap(struct stats_vap *vap, enum stats_type_e type)
-{
-	switch (type) {
-	case STATS_TYPE_DATA:
-		if (vap->u_advance.data.tx)
-			free(vap->u_advance.data.tx);
-		if (vap->u_advance.data.rx)
-			free(vap->u_advance.data.rx);
-		if (vap->u_advance.data.me)
-			free(vap->u_advance.data.me);
-		if (vap->u_advance.data.raw)
-			free(vap->u_advance.data.raw);
-		if (vap->u_advance.data.tso)
-			free(vap->u_advance.data.tso);
-		if (vap->u_advance.data.igmp)
-			free(vap->u_advance.data.igmp);
-		if (vap->u_advance.data.mesh)
-			free(vap->u_advance.data.mesh);
-		if (vap->u_advance.data.nawds)
-			free(vap->u_advance.data.nawds);
-		break;
-	case STATS_TYPE_CTRL:
-		if (vap->u_advance.ctrl.tx)
-			free(vap->u_advance.ctrl.tx);
-		if (vap->u_advance.ctrl.rx)
-			free(vap->u_advance.ctrl.rx);
-		break;
-	default:
-		STATS_ERR("Unexpected Type %d!\n", type);
-	}
-}
-
-static void free_advance_radio(struct stats_radio *ra, enum stats_type_e type)
-{
-	switch (type) {
-	case STATS_TYPE_DATA:
-		if (ra->u_advance.data.tx)
-			free(ra->u_advance.data.tx);
-		if (ra->u_advance.data.rx)
-			free(ra->u_advance.data.rx);
-		if (ra->u_advance.data.me)
-			free(ra->u_advance.data.me);
-		if (ra->u_advance.data.raw)
-			free(ra->u_advance.data.raw);
-		if (ra->u_advance.data.tso)
-			free(ra->u_advance.data.tso);
-		if (ra->u_advance.data.igmp)
-			free(ra->u_advance.data.igmp);
-		if (ra->u_advance.data.mesh)
-			free(ra->u_advance.data.mesh);
-		if (ra->u_advance.data.nawds)
-			free(ra->u_advance.data.nawds);
-		break;
-	case STATS_TYPE_CTRL:
-		if (ra->u_advance.ctrl.tx)
-			free(ra->u_advance.ctrl.tx);
-		if (ra->u_advance.ctrl.rx)
-			free(ra->u_advance.ctrl.rx);
-		if (ra->u_advance.ctrl.link)
-			free(ra->u_advance.ctrl.link);
-		break;
-	default:
-		STATS_ERR("Unexpected Type %d!\n", type);
-	}
-}
-
-static void free_advance_ap(struct stats_ap *ap, enum stats_type_e type)
-{
-	switch (type) {
-	case STATS_TYPE_DATA:
-		if (ap->u.a_data.tx)
-			free(ap->u.a_data.tx);
-		if (ap->u.a_data.rx)
-			free(ap->u.a_data.rx);
-		break;
-	case STATS_TYPE_CTRL:
-		break;
-	default:
-		STATS_ERR("Unexpected Type %d!\n", type);
-	}
-}
-
 static void aggr_advance_pdev_ctrl(struct advance_pdev_ctrl *pdev_ctrl,
 				   struct advance_vdev_ctrl *vdev_ctrl)
 {
+	if (!pdev_ctrl || !vdev_ctrl)
+		return;
+
 	if (pdev_ctrl->tx && vdev_ctrl->tx)
 		pdev_ctrl->tx->cs_tx_beacon +=
 					vdev_ctrl->tx->cs_tx_bcn_success +
 					vdev_ctrl->tx->cs_tx_bcn_outage;
 }
 
-static void aggregate_radio_stats(struct reply_buffer *reply,
-				  enum stats_type_e type)
+static void aggregate_advance_stats(struct stats_obj *obj)
 {
-	struct stats_radio *radio;
-	struct stats_vap *vap;
+	struct stats_obj *radio = NULL;
 
-	if (!reply)
-		return;
+	while (obj) {
+		if (obj->obj_type == STATS_OBJ_RADIO)
+			radio = obj;
 
-	radio = reply->obj_list.radio_list;
-	while (radio) {
-		vap = radio->mgr.child_root;
-		while (vap) {
-			if (vap->mgr.parent != radio)
-				break;
-			switch (type) {
+		if ((obj->obj_type == STATS_OBJ_VAP) && (radio)) {
+			switch (obj->type) {
 			case STATS_TYPE_DATA:
 				break;
 			case STATS_TYPE_CTRL:
-				aggr_advance_pdev_ctrl(&radio->u_advance.ctrl,
-						       &vap->u_advance.ctrl);
+				aggr_advance_pdev_ctrl(radio->stats,
+						       obj->stats);
 				break;
 			}
-			vap = vap->mgr.next;
 		}
-		radio = radio->mgr.next;
+		obj = obj->next;
 	}
 }
 
-static void libstats_accumulate(struct stats_command *cmd)
+static void accumulate_advance_stats(struct stats_command *cmd)
 {
 	if (!cmd->recursive)
 		return;
@@ -1720,9 +1503,8 @@ static void libstats_accumulate(struct stats_command *cmd)
 	 **/
 	switch (cmd->obj) {
 	case STATS_OBJ_AP:
-		break;
 	case STATS_OBJ_RADIO:
-		aggregate_radio_stats(cmd->reply, cmd->type);
+		aggregate_advance_stats(cmd->reply->obj_head);
 		break;
 	case STATS_OBJ_VAP:
 		break;
@@ -1731,17 +1513,166 @@ static void libstats_accumulate(struct stats_command *cmd)
 		break;
 	}
 }
+
+static void free_advance_sta(struct stats_obj *sta)
+{
+	switch (sta->type) {
+	case STATS_TYPE_DATA:
+		{
+			struct advance_peer_data *data = sta->stats;
+
+			if (data->tx)
+				free(data->tx);
+			if (data->rx)
+				free(data->rx);
+			if (data->fwd)
+				free(data->fwd);
+			if (data->raw)
+				free(data->raw);
+			if (data->twt)
+				free(data->twt);
+			if (data->link)
+				free(data->link);
+			if (data->rate)
+				free(data->rate);
+			if (data->nawds)
+				free(data->nawds);
+		}
+		break;
+	case STATS_TYPE_CTRL:
+		{
+			struct advance_peer_ctrl *ctrl = sta->stats;
+
+			if (ctrl->tx)
+				free(ctrl->tx);
+			if (ctrl->rx)
+				free(ctrl->rx);
+			if (ctrl->twt)
+				free(ctrl->twt);
+			if (ctrl->link)
+				free(ctrl->link);
+			if (ctrl->rate)
+				free(ctrl->rate);
+		}
+		break;
+	default:
+		STATS_ERR("Unexpected Type %d!\n", sta->type);
+	}
+
+	free(sta->stats);
+}
+
+static void free_advance_vap(struct stats_obj *vap)
+{
+	switch (vap->type) {
+	case STATS_TYPE_DATA:
+		{
+			struct advance_vdev_data *data = vap->stats;
+
+			if (data->tx)
+				free(data->tx);
+			if (data->rx)
+				free(data->rx);
+			if (data->me)
+				free(data->me);
+			if (data->raw)
+				free(data->raw);
+			if (data->tso)
+				free(data->tso);
+			if (data->igmp)
+				free(data->igmp);
+			if (data->mesh)
+				free(data->mesh);
+			if (data->nawds)
+				free(data->nawds);
+		}
+		break;
+	case STATS_TYPE_CTRL:
+		{
+			struct advance_vdev_ctrl *ctrl = vap->stats;
+
+			if (ctrl->tx)
+				free(ctrl->tx);
+			if (ctrl->rx)
+				free(ctrl->rx);
+		}
+		break;
+	default:
+		STATS_ERR("Unexpected Type %d!\n", vap->type);
+	}
+
+	free(vap->stats);
+}
+
+static void free_advance_radio(struct stats_obj *radio)
+{
+	switch (radio->type) {
+	case STATS_TYPE_DATA:
+		{
+			struct advance_pdev_data *data = radio->stats;
+
+			if (data->tx)
+				free(data->tx);
+			if (data->rx)
+				free(data->rx);
+			if (data->me)
+				free(data->me);
+			if (data->raw)
+				free(data->raw);
+			if (data->tso)
+				free(data->tso);
+			if (data->igmp)
+				free(data->igmp);
+			if (data->mesh)
+				free(data->mesh);
+			if (data->nawds)
+				free(data->nawds);
+		}
+		break;
+	case STATS_TYPE_CTRL:
+		{
+			struct advance_pdev_ctrl *ctrl = radio->stats;
+
+			if (ctrl->tx)
+				free(ctrl->tx);
+			if (ctrl->rx)
+				free(ctrl->rx);
+			if (ctrl->link)
+				free(ctrl->link);
+		}
+		break;
+	default:
+		STATS_ERR("Unexpected Type %d!\n", radio->type);
+	}
+
+	free(radio->stats);
+}
+
+static void free_advance_ap(struct stats_obj *ap)
+{
+	struct advance_psoc_data *data = ap->stats;
+
+	if (!data)
+		return;
+
+	if (data->tx)
+		free(data->tx);
+	if (data->rx)
+		free(data->rx);
+
+	free(ap->stats);
+}
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
-static void free_sta(struct stats_sta *sta, struct stats_command *cmd)
+static void free_sta(struct stats_obj *sta)
 {
-	switch (cmd->lvl) {
+	switch (sta->lvl) {
 	case STATS_LVL_BASIC:
-		free_basic_sta(sta, cmd->type);
+		free_basic_sta(sta);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
-		free_advance_sta(sta, cmd->type);
+		free_advance_sta(sta);
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
@@ -1749,20 +1680,20 @@ static void free_sta(struct stats_sta *sta, struct stats_command *cmd)
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:
-		STATS_ERR("Unexpected Level %d!\n", cmd->lvl);
+		STATS_ERR("Unexpected Level %d!\n", sta->lvl);
 	}
 	free(sta);
 }
 
-static void free_vap(struct stats_vap *vap, struct stats_command *cmd)
+static void free_vap(struct stats_obj *vap)
 {
-	switch (cmd->lvl) {
+	switch (vap->lvl) {
 	case STATS_LVL_BASIC:
-		free_basic_vap(vap, cmd->type);
+		free_basic_vap(vap);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
-		free_advance_vap(vap, cmd->type);
+		free_advance_vap(vap);
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
@@ -1770,20 +1701,20 @@ static void free_vap(struct stats_vap *vap, struct stats_command *cmd)
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:
-		STATS_ERR("Unexpected Level %d!\n", cmd->lvl);
+		STATS_ERR("Unexpected Level %d!\n", vap->lvl);
 	}
 	free(vap);
 }
 
-static void free_radio(struct stats_radio *radio, struct stats_command *cmd)
+static void free_radio(struct stats_obj *radio)
 {
-	switch (cmd->lvl) {
+	switch (radio->lvl) {
 	case STATS_LVL_BASIC:
-		free_basic_radio(radio, cmd->type);
+		free_basic_radio(radio);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
-		free_advance_radio(radio, cmd->type);
+		free_advance_radio(radio);
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
@@ -1791,20 +1722,20 @@ static void free_radio(struct stats_radio *radio, struct stats_command *cmd)
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:
-		STATS_ERR("Unexpected Level %d!\n", cmd->lvl);
+		STATS_ERR("Unexpected Level %d!\n", radio->lvl);
 	}
 	free(radio);
 }
 
-static void free_ap(struct stats_ap *ap, struct stats_command *cmd)
+static void free_ap(struct stats_obj *ap)
 {
-	switch (cmd->lvl) {
+	switch (ap->lvl) {
 	case STATS_LVL_BASIC:
-		free_basic_ap(ap, cmd->type);
+		free_basic_ap(ap);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
-		free_advance_ap(ap, cmd->type);
+		free_advance_ap(ap);
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
@@ -1812,49 +1743,40 @@ static void free_ap(struct stats_ap *ap, struct stats_command *cmd)
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:
-		STATS_ERR("Unexpected Level %d!\n", cmd->lvl);
+		STATS_ERR("Unexpected Level %d!\n", ap->lvl);
 	}
 	free(ap);
 }
 
 void libstats_free_reply_buffer(struct stats_command *cmd)
 {
-	struct stats_sta *sta = NULL;
-	struct stats_vap *vap = NULL;
-	struct stats_radio *radio = NULL;
-	struct stats_ap *ap = NULL;
+	struct stats_obj *obj;
 	struct reply_buffer *reply = cmd->reply;
 
-	if (!reply)
+	if (!reply || !reply->obj_head)
 		return;
-	while (reply->obj_list.sta_list) {
-		sta = reply->obj_list.sta_list;
-		reply->obj_list.sta_list = sta->mgr.next;
-		sta->mgr.next = NULL;
-		free_sta(sta, cmd);
+
+	while (reply->obj_head) {
+		obj = reply->obj_head;
+		reply->obj_head = obj->next;
+		switch (obj->obj_type) {
+		case STATS_OBJ_STA:
+			free_sta(obj);
+			break;
+		case STATS_OBJ_VAP:
+			free_vap(obj);
+			break;
+		case STATS_OBJ_RADIO:
+			free_radio(obj);
+			break;
+		case STATS_OBJ_AP:
+			free_ap(obj);
+			break;
+		}
 	}
-	while (reply->obj_list.vap_list) {
-		vap = reply->obj_list.vap_list;
-		reply->obj_list.vap_list = vap->mgr.next;
-		vap->mgr.next = NULL;
-		free_vap(vap, cmd);
-	}
-	while (reply->obj_list.radio_list) {
-		radio = reply->obj_list.radio_list;
-		reply->obj_list.radio_list = radio->mgr.next;
-		radio->mgr.next = NULL;
-		free_radio(radio, cmd);
-	}
-	while (reply->obj_list.ap_list) {
-		ap = reply->obj_list.ap_list;
-		reply->obj_list.ap_list = ap->mgr.next;
-		ap->mgr.next = NULL;
-		free_ap(ap, cmd);
-	}
-	if (reply) {
-		free(reply);
-		cmd->reply = NULL;
-	}
+	reply->obj_last = NULL;
+	free(reply);
+	cmd->reply = NULL;
 }
 
 u_int64_t libstats_get_feature_flag(char *feat_flags)
@@ -1895,16 +1817,16 @@ int32_t libstats_request_handle(struct stats_command *cmd)
 		return -EINVAL;
 	}
 
-	ret = libstats_init();
+	ret = stats_lib_init();
 	if (ret)
 		return ret;
 
-	ret = libstats_send(cmd);
+	ret = process_and_send_stats_request(cmd);
 
-	libstats_deinit();
+	stats_lib_deinit();
 
 #if WLAN_ADVANCE_TELEMETRY
-	libstats_accumulate(cmd);
+	accumulate_advance_stats(cmd);
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
 	return ret;

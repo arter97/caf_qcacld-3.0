@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2002-2006, Atheros Communications Inc.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -352,7 +353,7 @@ void dfs_reinit_nol_from_psoc_copy(struct wlan_dfs *dfs,
 #ifdef CONFIG_HOST_FIND_CHAN
 bool wlan_is_chan_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 {
-	qdf_freq_t sub_freq_list[NUM_CHANNELS_160MHZ];
+	qdf_freq_t sub_freq_list[MAX_20MHZ_SUBCHANS];
 	uint8_t n_subchans, i;
 
 	if (!chan || !WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(chan))
@@ -373,7 +374,7 @@ bool wlan_is_chan_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 
 bool wlan_is_chan_history_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 {
-	qdf_freq_t sub_freq_list[NUM_CHANNELS_160MHZ];
+	qdf_freq_t sub_freq_list[MAX_20MHZ_SUBCHANS];
 	uint8_t n_subchans, i;
 
 	if (!chan || !WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(chan))
@@ -392,3 +393,41 @@ bool wlan_is_chan_history_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 	return false;
 }
 #endif /* CONFIG_HOST_FIND_CHAN */
+
+#if defined(WLAN_DISP_CHAN_INFO)
+void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
+{
+	qdf_freq_t freq_list [NUM_CHANNELS_320MHZ];
+	uint8_t nchannels = 0, i;
+	struct dfs_channel *chan;
+
+	chan = dfs->dfs_curchan;
+	nchannels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(chan,
+								  freq_list);
+	for (i = 0; i < nchannels; i++)
+		utils_dfs_deliver_event(dfs->dfs_pdev_obj,
+					freq_list[i],
+					WLAN_EV_CAC_STARTED);
+
+	/* The current channel has started CAC, so the CAC_DONE state of the
+	 * previous channel has to reset. So deliver the CAC_RESET event on
+	 * all the sub-channels of previous dfs channel. If the previous
+	 * channel was non-dfs channel the CAC_RESET event need not be
+	 * delivered. Since in the case of ETSI domains retain the CAC_DONE
+	 * state CAC_RESET event need not be delivered for this case too.
+	 */
+	if (!WLAN_IS_PRIMARY_OR_SECONDARY_CHAN_DFS(dfs->dfs_prevchan) ||
+	    utils_get_dfsdomain(dfs->dfs_pdev_obj) == DFS_ETSI_DOMAIN)
+		return;
+
+	chan = dfs->dfs_prevchan;
+	nchannels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(chan,
+								  freq_list);
+	for (i = 0; i < nchannels; i++)
+		utils_dfs_deliver_event(dfs->dfs_pdev_obj,
+					freq_list[i],
+					WLAN_EV_CAC_RESET);
+}
+#endif

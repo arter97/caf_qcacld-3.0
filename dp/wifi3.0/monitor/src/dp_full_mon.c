@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -179,7 +180,8 @@ dp_rx_mon_status_buf_validate(struct dp_pdev *pdev,
 		rx_desc->unmapped = 1;
 	}
 
-	rx_tlv = hal_rx_status_get_next_tlv(rx_tlv);
+	rx_tlv = hal_rx_status_get_next_tlv(rx_tlv,
+					    mon_pdev->is_tlv_hdr_64_bit);
 
 	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(rx_tlv);
 
