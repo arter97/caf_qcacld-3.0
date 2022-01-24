@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,6 +22,204 @@
 #include <dp_rx_mon.h>
 #include <dp_mon_filter.h>
 #include <dp_mon.h>
+
+/**
+ * dp_mon_filter_mode_type_to_str
+ *  Monitor Filter mode to string
+ */
+int8_t *dp_mon_filter_mode_type_to_str[DP_MON_FILTER_MAX_MODE] = {
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+	"DP MON FILTER ENHACHED STATS MODE",
+#endif /* QCA_ENHANCED_STATS_SUPPORT */
+#ifdef QCA_MCOPY_SUPPORT
+	"DP MON FILTER MCOPY MODE",
+#endif /* QCA_MCOPY_SUPPORT */
+#if defined(ATH_SUPPORT_NAC_RSSI) || defined(ATH_SUPPORT_NAC)
+	"DP MON FILTER SMART MONITOR MODE",
+#endif /* ATH_SUPPORT_NAC_RSSI || ATH_SUPPORT_NAC */
+	"DP_MON FILTER MONITOR MODE",
+#ifdef WLAN_RX_PKT_CAPTURE_ENH
+	"DP MON FILTER RX CAPTURE MODE",
+#endif /* WLAN_RX_PKT_CAPTURE_ENH */
+#ifdef WDI_EVENT_ENABLE
+	"DP MON FILTER PKT LOG FULL MODE",
+	"DP MON FILTER PKT LOG LITE MODE",
+	"DP MON FILTER PKT LOG CBF MODE",
+#ifdef QCA_WIFI_QCN9224
+	"DP MON FILTER PKT LOG HYBRID MODE",
+#endif
+#endif /* WDI_EVENT_ENABLE */
+};
+
+void dp_mon_filter_show_filter(struct dp_mon_pdev *mon_pdev,
+			       enum dp_mon_filter_mode mode,
+			       struct dp_mon_filter *filter)
+{
+	struct htt_rx_ring_tlv_filter *tlv_filter = &filter->tlv_filter;
+
+	DP_MON_FILTER_PRINT("[%s]: Valid: %d",
+			    dp_mon_filter_mode_type_to_str[mode],
+			    filter->valid);
+	DP_MON_FILTER_PRINT("mpdu_start: %d", tlv_filter->mpdu_start);
+	DP_MON_FILTER_PRINT("msdu_start: %d", tlv_filter->msdu_start);
+	DP_MON_FILTER_PRINT("packet: %d", tlv_filter->packet);
+	DP_MON_FILTER_PRINT("msdu_end: %d", tlv_filter->msdu_end);
+	DP_MON_FILTER_PRINT("mpdu_end: %d", tlv_filter->mpdu_end);
+	DP_MON_FILTER_PRINT("packet_header: %d",
+			    tlv_filter->packet_header);
+	DP_MON_FILTER_PRINT("attention: %d", tlv_filter->attention);
+	DP_MON_FILTER_PRINT("ppdu_start: %d", tlv_filter->ppdu_start);
+	DP_MON_FILTER_PRINT("ppdu_end: %d", tlv_filter->ppdu_end);
+	DP_MON_FILTER_PRINT("ppdu_end_user_stats: %d",
+			    tlv_filter->ppdu_end_user_stats);
+	DP_MON_FILTER_PRINT("ppdu_end_user_stats_ext: %d",
+			    tlv_filter->ppdu_end_user_stats_ext);
+	DP_MON_FILTER_PRINT("ppdu_end_status_done: %d",
+			    tlv_filter->ppdu_end_status_done);
+	DP_MON_FILTER_PRINT("header_per_msdu: %d", tlv_filter->header_per_msdu);
+	DP_MON_FILTER_PRINT("enable_fp: %d", tlv_filter->enable_fp);
+	DP_MON_FILTER_PRINT("enable_md: %d", tlv_filter->enable_md);
+	DP_MON_FILTER_PRINT("enable_mo: %d", tlv_filter->enable_mo);
+	DP_MON_FILTER_PRINT("fp_mgmt_filter: 0x%x", tlv_filter->fp_mgmt_filter);
+	DP_MON_FILTER_PRINT("mo_mgmt_filter: 0x%x", tlv_filter->mo_mgmt_filter);
+	DP_MON_FILTER_PRINT("fp_ctrl_filter: 0x%x", tlv_filter->fp_ctrl_filter);
+	DP_MON_FILTER_PRINT("mo_ctrl_filter: 0x%x", tlv_filter->mo_ctrl_filter);
+	DP_MON_FILTER_PRINT("fp_data_filter: 0x%x", tlv_filter->fp_data_filter);
+	DP_MON_FILTER_PRINT("mo_data_filter: 0x%x", tlv_filter->mo_data_filter);
+	DP_MON_FILTER_PRINT("md_data_filter: 0x%x", tlv_filter->md_data_filter);
+	DP_MON_FILTER_PRINT("md_mgmt_filter: 0x%x", tlv_filter->md_mgmt_filter);
+	DP_MON_FILTER_PRINT("md_ctrl_filter: 0x%x", tlv_filter->md_ctrl_filter);
+}
+
+/**
+ * dp_mon_filter_h2t_setup() - Setup the filter for the Target setup
+ * @soc: DP soc handle
+ * @pdev: DP pdev handle
+ * @srng_type: The srng type for which filter wll be set
+ * @tlv_filter: tlv filter
+ */
+void dp_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
+			     enum dp_mon_filter_srng_type srng_type,
+			     struct dp_mon_filter *filter)
+{
+	int32_t current_mode = 0;
+	struct htt_rx_ring_tlv_filter *tlv_filter = &filter->tlv_filter;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+
+	/*
+	 * Loop through all the modes.
+	 */
+	for (current_mode = 0; current_mode < DP_MON_FILTER_MAX_MODE;
+						current_mode++) {
+		struct dp_mon_filter *mon_filter =
+			&mon_pdev->filter[current_mode][srng_type];
+		uint32_t src_filter = 0, dst_filter = 0;
+
+		/*
+		 * Check if the correct mode is enabled or not.
+		 */
+		if (!mon_filter->valid)
+			continue;
+
+		filter->valid = true;
+
+		/*
+		 * Set the super bit fields
+		 */
+		src_filter =
+			DP_MON_FILTER_GET(&mon_filter->tlv_filter, FILTER_TLV);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter, FILTER_TLV);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter, FILTER_TLV, dst_filter);
+
+		/*
+		 * Set the filter management filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_FP_MGMT);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter, FILTER_FP_MGMT);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter, FILTER_FP_MGMT, dst_filter);
+
+		/*
+		 * Set the monitor other management filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_MO_MGMT);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter, FILTER_MO_MGMT);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter, FILTER_MO_MGMT, dst_filter);
+
+		/*
+		 * Set the filter pass control filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_FP_CTRL);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter, FILTER_FP_CTRL);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter, FILTER_FP_CTRL, dst_filter);
+
+		/*
+		 * Set the monitor other control filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_MO_CTRL);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter, FILTER_MO_CTRL);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter, FILTER_MO_CTRL, dst_filter);
+
+		/*
+		 * Set the filter pass data filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_FP_DATA);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter,
+					       FILTER_FP_DATA);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter,
+				  FILTER_FP_DATA, dst_filter);
+
+		/*
+		 * Set the monitor other data filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_MO_DATA);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter, FILTER_MO_DATA);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter, FILTER_MO_DATA, dst_filter);
+
+		/*
+		 * Set the monitor direct data filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_MD_DATA);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter,
+					       FILTER_MD_DATA);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter,
+				  FILTER_MD_DATA, dst_filter);
+
+		/*
+		 * Set the monitor direct management filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_MD_MGMT);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter, FILTER_MD_MGMT);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter, FILTER_MD_MGMT, dst_filter);
+
+		/*
+		 * Set the monitor direct management filter.
+		 */
+		src_filter = DP_MON_FILTER_GET(&mon_filter->tlv_filter,
+					       FILTER_MD_CTRL);
+		dst_filter = DP_MON_FILTER_GET(tlv_filter, FILTER_MD_CTRL);
+		dst_filter |= src_filter;
+		DP_MON_FILTER_SET(tlv_filter, FILTER_MD_CTRL, dst_filter);
+	}
+
+	dp_mon_filter_show_filter(mon_pdev, 0, filter);
+}
 
 QDF_STATUS
 dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
@@ -87,9 +286,18 @@ dp_mon_ht2_rx_ring_cfg(struct dp_soc *soc,
 			ring_buf_size = RX_DATA_BUFFER_SIZE;
 			break;
 
+		case DP_MON_FILTER_SRNG_TYPE_RXMON_DEST:
+			hal_ring_hdl =
+				soc->rxdma_mon_dst_ring[lmac_id].hal_srng;
+			hal_ring_type = RXDMA_MONITOR_DST;
+			ring_buf_size = RX_DATA_BUFFER_SIZE;
+			break;
 		default:
 			return QDF_STATUS_E_FAILURE;
 		}
+
+		if (!hal_ring_hdl)
+			continue;
 
 		status = htt_h2t_rx_ring_cfg(soc->htt_handle, mac_for_pdev,
 					     hal_ring_hdl, hal_ring_type,
@@ -187,8 +395,10 @@ void dp_mon_filter_setup_mon_mode(struct dp_pdev *pdev)
 	struct dp_mon_ops *mon_ops = NULL;
 
 	mon_ops = dp_mon_ops_get(pdev->soc);
-	if (mon_ops && mon_ops->mon_filter_setup_mon_mode)
-		mon_ops->mon_filter_setup_mon_mode(pdev);
+	if (mon_ops && mon_ops->mon_filter_setup_rx_mon_mode)
+		mon_ops->mon_filter_setup_rx_mon_mode(pdev);
+	if (mon_ops && mon_ops->mon_filter_setup_tx_mon_mode)
+		mon_ops->mon_filter_setup_tx_mon_mode(pdev);
 }
 
 void dp_mon_filter_reset_mon_mode(struct dp_pdev *pdev)
@@ -196,8 +406,10 @@ void dp_mon_filter_reset_mon_mode(struct dp_pdev *pdev)
 	struct dp_mon_ops *mon_ops = NULL;
 
 	mon_ops = dp_mon_ops_get(pdev->soc);
-	if (mon_ops && mon_ops->mon_filter_reset_mon_mode)
-		mon_ops->mon_filter_reset_mon_mode(pdev);
+	if (mon_ops && mon_ops->mon_filter_reset_rx_mon_mode)
+		mon_ops->mon_filter_reset_rx_mon_mode(pdev);
+	if (mon_ops && mon_ops->mon_filter_reset_tx_mon_mode)
+		mon_ops->mon_filter_reset_tx_mon_mode(pdev);
 }
 
 #ifdef WDI_EVENT_ENABLE
@@ -281,11 +493,32 @@ QDF_STATUS dp_mon_filter_update(struct dp_pdev *pdev)
 	struct dp_mon_ops *mon_ops = NULL;
 
 	mon_ops = dp_mon_ops_get(pdev->soc);
-	if (mon_ops && mon_ops->mon_filter_update)
-		return mon_ops->mon_filter_update(pdev);
+	if (!mon_ops) {
+		dp_mon_filter_err("Mon ops uninitialized");
+		return QDF_STATUS_E_FAILURE;
+	}
 
-	return QDF_STATUS_E_FAILURE;
+	if (mon_ops && mon_ops->tx_mon_filter_update)
+		mon_ops->tx_mon_filter_update(pdev);
+
+	if (mon_ops && mon_ops->rx_mon_filter_update)
+		mon_ops->rx_mon_filter_update(pdev);
+
+	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+void dp_mon_filters_reset(struct dp_pdev *pdev)
+{
+	dp_mon_filter_reset_enhanced_stats(pdev);
+	dp_mon_filter_reset_mon_mode(pdev);
+	dp_mon_filter_update(pdev);
+}
+#else
+void dp_mon_filters_reset(struct dp_pdev *pdev)
+{
+}
+#endif
 
 void
 dp_mon_filter_reset_mon_srng(struct dp_soc *soc, struct dp_pdev *pdev,

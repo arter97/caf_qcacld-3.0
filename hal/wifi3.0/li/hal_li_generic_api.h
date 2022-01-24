@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -907,6 +908,7 @@ hal_rx_status_get_tlv_info_generic_li(void *rx_tlv_hdr, void *ppduinfo,
 #ifdef QCA_WIFI_QCA6390
 		case TARGET_TYPE_QCA6390:
 #endif
+		case TARGET_TYPE_QCA6490:
 			ppdu_info->rx_status.is_stbc =
 				HAL_RX_GET(vht_sig_a_info,
 					   VHT_SIG_A_INFO_0, STBC);
@@ -935,7 +937,6 @@ hal_rx_status_get_tlv_info_generic_li(void *rx_tlv_hdr, void *ppduinfo,
 			ppdu_info->rx_status.nss = 0;
 #endif
 			break;
-		case TARGET_TYPE_QCA6490:
 		case TARGET_TYPE_QCA6750:
 			ppdu_info->rx_status.nss = 0;
 			break;
@@ -2384,4 +2385,127 @@ void hal_tx_desc_set_cache_set_num_generic_li(void *desc, uint8_t cache_num)
 {
 }
 #endif
+
+#ifdef WLAN_SUPPORT_RX_FISA
+/**
+ * hal_rx_flow_get_tuple_info_li() - Setup a flow search entry in HW FST
+ * @fst: Pointer to the Rx Flow Search Table
+ * @hal_hash: HAL 5 tuple hash
+ * @tuple_info: 5-tuple info of the flow returned to the caller
+ *
+ * Return: Success/Failure
+ */
+static void *
+hal_rx_flow_get_tuple_info_li(uint8_t *rx_fst, uint32_t hal_hash,
+			      uint8_t *flow_tuple_info)
+{
+	struct hal_rx_fst *fst = (struct hal_rx_fst *)rx_fst;
+	void *hal_fse = NULL;
+	struct hal_flow_tuple_info *tuple_info
+		= (struct hal_flow_tuple_info *)flow_tuple_info;
+
+	hal_fse = (uint8_t *)fst->base_vaddr +
+		(hal_hash * HAL_RX_FST_ENTRY_SIZE);
+
+	if (!hal_fse || !tuple_info)
+		return NULL;
+
+	if (!HAL_GET_FLD(hal_fse, RX_FLOW_SEARCH_ENTRY_9, VALID))
+		return NULL;
+
+	tuple_info->src_ip_127_96 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY_0,
+						      SRC_IP_127_96));
+	tuple_info->src_ip_95_64 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY_1,
+						      SRC_IP_95_64));
+	tuple_info->src_ip_63_32 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY_2,
+						      SRC_IP_63_32));
+	tuple_info->src_ip_31_0 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY_3,
+						      SRC_IP_31_0));
+	tuple_info->dest_ip_127_96 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY_4,
+						      DEST_IP_127_96));
+	tuple_info->dest_ip_95_64 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY_5,
+						      DEST_IP_95_64));
+	tuple_info->dest_ip_63_32 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY_6,
+						      DEST_IP_63_32));
+	tuple_info->dest_ip_31_0 =
+			qdf_ntohl(HAL_GET_FLD(hal_fse,
+					      RX_FLOW_SEARCH_ENTRY_7,
+					      DEST_IP_31_0));
+	tuple_info->dest_port = HAL_GET_FLD(hal_fse,
+					    RX_FLOW_SEARCH_ENTRY_8,
+					    DEST_PORT);
+	tuple_info->src_port = HAL_GET_FLD(hal_fse,
+					   RX_FLOW_SEARCH_ENTRY_8,
+					   SRC_PORT);
+	tuple_info->l4_protocol = HAL_GET_FLD(hal_fse,
+					      RX_FLOW_SEARCH_ENTRY_9,
+					      L4_PROTOCOL);
+
+	return hal_fse;
+}
+
+/**
+ * hal_rx_flow_delete_entry_li() - Setup a flow search entry in HW FST
+ * @fst: Pointer to the Rx Flow Search Table
+ * @hal_rx_fse: Pointer to the Rx Flow that is to be deleted from the FST
+ *
+ * Return: Success/Failure
+ */
+static QDF_STATUS
+hal_rx_flow_delete_entry_li(uint8_t *rx_fst, void *hal_rx_fse)
+{
+	uint8_t *fse = (uint8_t *)hal_rx_fse;
+
+	if (!HAL_GET_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, VALID))
+		return QDF_STATUS_E_NOENT;
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY_9, VALID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hal_rx_fst_get_fse_size_li() - Retrieve the size of each entry
+ *
+ * Return: size of each entry/flow in Rx FST
+ */
+static inline uint32_t
+hal_rx_fst_get_fse_size_li(void)
+{
+	return HAL_RX_FST_ENTRY_SIZE;
+}
+#else
+static inline void *
+hal_rx_flow_get_tuple_info_li(uint8_t *rx_fst, uint32_t hal_hash,
+			      uint8_t *flow_tuple_info)
+{
+	return NULL;
+}
+
+static inline QDF_STATUS
+hal_rx_flow_delete_entry_li(uint8_t *rx_fst, void *hal_rx_fse)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline uint32_t
+hal_rx_fst_get_fse_size_li(void)
+{
+	return 0;
+}
+#endif /* WLAN_SUPPORT_RX_FISA */
 #endif /* _HAL_LI_GENERIC_API_H_ */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -22,6 +22,17 @@
 
 #include <dp_types.h>
 #include "dp_be.h"
+
+/*
+ * dp_be_intrabss_params
+ *
+ * @dest_soc: dest soc to forward the packet to
+ * @tx_vdev_id: vdev id retrieved from dest peer
+ */
+struct dp_be_intrabss_params {
+	struct dp_soc *dest_soc;
+	uint8_t tx_vdev_id;
+};
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 
@@ -198,4 +209,21 @@ dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t reo_ring_num)
 	return soc;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * dp_rx_mlo_igmp_handler() - Rx handler for Mcast packets
+ * @soc: Handle to DP Soc structure
+ * @vdev: DP vdev handle
+ * @peer: DP peer handle
+ * @nbuf: nbuf to be enqueued
+ *
+ * Return: true when packet sent to stack, false failure
+ */
+bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
+			    struct dp_vdev *vdev,
+			    struct dp_peer *peer,
+			    qdf_nbuf_t nbuf);
+#endif
+
 #endif

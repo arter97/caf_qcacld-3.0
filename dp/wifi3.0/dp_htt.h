@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -63,6 +64,11 @@ int htt_wbm_event_record(struct htt_logger *h, uint8_t tx_status,
 }
 
 #endif
+
+#define HTT_MGMT_CTRL_TLV_HDR_RESERVERD_LEN 16
+#define HTT_TLV_HDR_LEN HTT_T2H_EXT_STATS_CONF_TLV_HDR_SIZE
+#define HTT_SHIFT_UPPER_TIMESTAMP 32
+#define HTT_MASK_UPPER_TIMESTAMP 0xFFFFFFFF00000000
 
 void htt_htc_pkt_pool_free(struct htt_soc *soc);
 
@@ -147,12 +153,12 @@ void htt_htc_pkt_pool_free(struct htt_soc *soc);
 #define HTT_VDEV_STATS_TLV_RX_PKT_CNT_OFFSET          4
 #define HTT_VDEV_STATS_TLV_TX_SUCCESS_BYTE_CNT_OFFSET 6
 #define HTT_VDEV_STATS_TLV_TX_SUCCESS_PKT_CNT_OFFSET  8
-#define HTT_VDEV_STATS_TLV_TX_RETRY_BYTE_CNT_OFFSET   10
-#define HTT_VDEV_STATS_TLV_TX_RETRY_PKT_CNT_OFFSET    12
-#define HTT_VDEV_STATS_TLV_TX_DROP_BYTE_CNT_OFFSET    14
-#define HTT_VDEV_STATS_TLV_TX_DROP_PKT_CNT_OFFSET     16
-#define HTT_VDEV_STATS_TLV_TX_AGE_OUT_BYTE_CNT_OFFSET 18
-#define HTT_VDEV_STATS_TLV_TX_AGE_OUT_PKT_CNT_OFFSET  20
+#define HTT_VDEV_STATS_TLV_TX_RETRY_PKT_CNT_OFFSET    10
+#define HTT_VDEV_STATS_TLV_TX_DROP_PKT_CNT_OFFSET     12
+#define HTT_VDEV_STATS_TLV_TX_AGE_OUT_PKT_CNT_OFFSET  14
+#define HTT_VDEV_STATS_TLV_TX_RETRY_BYTE_CNT_OFFSET   16
+#define HTT_VDEV_STATS_TLV_TX_DROP_BYTE_CNT_OFFSET    18
+#define HTT_VDEV_STATS_TLV_TX_AGE_OUT_BYTE_CNT_OFFSET 20
 
 #define HTT_VDEV_STATS_GET_INDEX(index) \
 	HTT_VDEV_STATS_TLV_##index##_OFFSET
@@ -497,7 +503,7 @@ struct dp_tx_mon_wordmask_config {
 	uint16_t tx_queue_ext;
 	uint16_t tx_msdu_start;
 	uint16_t tx_mpdu_start;
-	uint16_t pcu_ppdu_setup_init;
+	uint32_t pcu_ppdu_setup_init;
 	uint16_t rxpcu_user_setup;
 };
 
@@ -929,4 +935,39 @@ int htt_h2t_full_mon_cfg(struct htt_soc *htt_soc,
 QDF_STATUS dp_h2t_hw_vdev_stats_config_send(struct dp_soc *dpsoc,
 					    uint8_t pdev_id, bool enable,
 					    bool reset, uint64_t reset_bitmask);
+
+static inline enum htt_srng_ring_id
+dp_htt_get_mon_htt_ring_id(struct dp_soc *soc,
+			   enum hal_ring_type hal_ring_type)
+{
+	enum htt_srng_ring_id htt_srng_id = 0;
+
+	if (wlan_cfg_get_txmon_hw_support(soc->wlan_cfg_ctx)) {
+		switch (hal_ring_type) {
+		case RXDMA_MONITOR_BUF:
+			htt_srng_id = HTT_RX_MON_HOST2MON_BUF_RING;
+			break;
+		case RXDMA_MONITOR_DST:
+			htt_srng_id = HTT_RX_MON_MON2HOST_DEST_RING;
+			break;
+		default:
+			dp_err("Invalid ring type %d ", hal_ring_type);
+			break;
+		}
+	} else {
+		switch (hal_ring_type) {
+		case RXDMA_MONITOR_BUF:
+			htt_srng_id = HTT_RXDMA_MONITOR_BUF_RING;
+			break;
+		case RXDMA_MONITOR_DST:
+			htt_srng_id = HTT_RXDMA_MONITOR_DEST_RING;
+			break;
+		default:
+			dp_err("Invalid ring type %d ", hal_ring_type);
+			break;
+		}
+	}
+
+	return htt_srng_id;
+}
 #endif /* _DP_HTT_H_ */

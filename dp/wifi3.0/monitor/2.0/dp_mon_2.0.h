@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,6 +21,10 @@
 #if !defined(DISABLE_MON_CONFIG)
 #include <qdf_lock.h>
 #include <dp_types.h>
+#include <dp_mon.h>
+#include <dp_mon_filter.h>
+#include <dp_htt.h>
+#include <dp_mon.h>
 
 #define DP_MON_RING_FILL_LEVEL_DEFAULT 2048
 #define DP_MON_DATA_BUFFER_SIZE     2048
@@ -32,7 +37,9 @@
  */
 struct dp_mon_filter_be {
 	struct dp_mon_filter rx_tlv_filter;
+#ifdef QCA_MONITOR_2_0_SUPPORT
 	struct htt_tx_ring_tlv_filter tx_tlv_filter;
+#endif
 	bool tx_valid;
 };
 
@@ -86,12 +93,12 @@ struct dp_mon_desc_pool {
 
 /**
  * struct dp_mon_pdev_be - BE specific monitor pdev object
- * @filter_be: Monitor Filter pointer
  * @mon_pdev: monitor pdev structure
+ * @filter_be: filters sent to fw
  */
 struct dp_mon_pdev_be {
-	struct dp_mon_filter_be **filter_be;
 	struct dp_mon_pdev mon_pdev;
+	struct dp_mon_filter_be **filter_be;
 };
 
 /**
@@ -103,6 +110,8 @@ struct dp_mon_pdev_be {
  * @rx_desc_mon: descriptor pool for rx mon src ring
  * @rx_mon_ring_fill_level: rx mon ring refill level
  * @tx_mon_ring_fill_level: tx mon ring refill level
+ * @tx_low_thresh_intrs: number of tx mon low threshold interrupts received
+ * @rx_low_thresh_intrs: number of rx mon low threshold interrupts received
  */
 struct dp_mon_soc_be {
 	struct dp_mon_soc mon_soc;
@@ -117,6 +126,8 @@ struct dp_mon_soc_be {
 
 	uint16_t rx_mon_ring_fill_level;
 	uint16_t tx_mon_ring_fill_level;
+	uint32_t tx_low_thresh_intrs;
+	uint32_t rx_low_thresh_intrs;
 };
 #endif
 
@@ -195,7 +206,54 @@ QDF_STATUS dp_mon_buffers_replenish(struct dp_soc *dp_soc,
  * @mode: The filter modes
  * @tlv_filter: tlv filter
  */
-void dp_mon_filter_show_filter_be(struct dp_mon_pdev *mon_pdev,
+void dp_mon_filter_show_filter_be(struct dp_mon_pdev_be *mon_pdev,
 				  enum dp_mon_filter_mode mode,
 				  struct dp_mon_filter_be *filter);
+
+/**
+ * dp_rx_add_to_free_desc_list() - Adds to a local free descriptor list
+ *
+ * @head: pointer to the head of local free list
+ * @tail: pointer to the tail of local free list
+ * @new: new descriptor that is added to the free list
+ * @func_name: caller func name
+ *
+ * Return: void
+ */
+static inline
+void __dp_mon_add_to_free_desc_list(union dp_mon_desc_list_elem_t **head,
+				    union dp_mon_desc_list_elem_t **tail,
+				    struct dp_mon_desc *new,
+				    const char *func_name)
+{
+	qdf_assert(head && new);
+
+	new->buf_addr = NULL;
+	new->in_use = 0;
+
+	((union dp_mon_desc_list_elem_t *)new)->next = *head;
+	*head = (union dp_mon_desc_list_elem_t *)new;
+	 /* reset tail if head->next is NULL */
+	if (!*tail || !(*head)->next)
+		*tail = *head;
+}
+
+#define dp_mon_add_to_free_desc_list(head, tail, new) \
+	__dp_mon_add_to_free_desc_list(head, tail, new, __func__)
+
+/*
+ * dp_mon_add_desc_list_to_free_list() - append unused desc_list back to
+ * freelist.
+ *
+ * @soc: core txrx main context
+ * @local_desc_list: local desc list provided by the caller
+ * @tail: attach the point to last desc of local desc list
+ * @mon_desc_pool: monitor descriptor pool pointer
+ */
+
+void
+dp_mon_add_desc_list_to_free_list(struct dp_soc *soc,
+				  union dp_mon_desc_list_elem_t **local_desc_list,
+				  union dp_mon_desc_list_elem_t **tail,
+				  struct dp_mon_desc_pool *mon_desc_pool);
 #endif /* _DP_MON_2_0_H_ */

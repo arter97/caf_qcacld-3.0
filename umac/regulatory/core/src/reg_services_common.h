@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -35,6 +36,7 @@
 #define FREQ_TO_CHAN_SCALE     5
 /* The distance between the 80Mhz center and the nearest 20Mhz channel */
 #define NEAREST_20MHZ_CHAN_FREQ_OFFSET     10
+#define NUM_20_MHZ_CHAN_IN_40_MHZ_CHAN     2
 #define NUM_20_MHZ_CHAN_IN_80_MHZ_CHAN     4
 #define NUM_20_MHZ_CHAN_IN_160_MHZ_CHAN    8
 
@@ -153,7 +155,7 @@ extern const struct chan_map channel_map_china[];
 extern const struct chan_map channel_map_global[];
 
 #ifdef WLAN_FEATURE_11BE
-#define ALL_SCHANS_PUNC 0x0000 /* all subchannels punctured */
+#define ALL_SCHANS_PUNC 0xFFFF /* all subchannels punctured */
 #endif
 
 #ifdef CONFIG_AFC_SUPPORT
@@ -998,15 +1000,6 @@ void reg_update_nol_history_ch_for_freq(struct wlan_objmgr_pdev *pdev,
  * Return: true if both the frequencies has the same band.
  */
 bool reg_is_same_band_freqs(qdf_freq_t freq1, qdf_freq_t freq2);
-
-/**
- * reg_is_frequency_valid_5g_sbs() Check if the given frequency is 5G SBS.
- * @curfreq: current channel frequency
- * @newfreq: new channel center frequency
- *
- * Return: true if the given center frequency is a valid 5G SBS
- */
-bool reg_is_frequency_valid_5g_sbs(qdf_freq_t curfreq, qdf_freq_t newfreq);
 
 /**
  * reg_freq_to_band() - Get band from channel frequency

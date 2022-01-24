@@ -176,6 +176,10 @@ dp_rx_intrabss_fwd_li(struct dp_soc *soc,
 		return dp_rx_intrabss_mcbc_fwd(soc, ta_peer, rx_tlv_hdr,
 					       nbuf, tid_stats);
 
+	if (dp_rx_intrabss_eapol_drop_check(soc, ta_peer, rx_tlv_hdr,
+					    nbuf))
+		return true;
+
 	if (dp_rx_intrabss_ucast_check_li(soc, nbuf, ta_peer,
 					  &msdu_metadata, &tx_vdev_id))
 		return dp_rx_intrabss_ucast_fwd(soc, ta_peer, tx_vdev_id,
@@ -308,6 +312,10 @@ more_data:
 	 */
 	while (qdf_likely(num_pending)) {
 		ring_desc = dp_srng_dst_get_next(soc, hal_ring_hdl);
+
+		if (qdf_unlikely(!ring_desc))
+			break;
+
 		error = HAL_RX_ERROR_STATUS_GET(ring_desc);
 		if (qdf_unlikely(error == HAL_REO_ERROR_DETECTED)) {
 			dp_rx_err("%pK: HAL RING 0x%pK:error %d",
@@ -656,7 +664,8 @@ done:
 		DP_RX_TID_SAVE(nbuf, tid);
 		if (qdf_unlikely(rx_pdev->delay_stats_flag) ||
 		    qdf_unlikely(wlan_cfg_is_peer_ext_stats_enabled(
-				 soc->wlan_cfg_ctx)))
+				 soc->wlan_cfg_ctx)) ||
+		    dp_rx_pkt_tracepoints_enabled())
 			qdf_nbuf_set_timestamp(nbuf);
 
 		tid_stats =

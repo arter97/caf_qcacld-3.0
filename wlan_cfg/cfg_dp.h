@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,15 +48,6 @@
 #define WLAN_CFG_PER_PDEV_TX_RING_MIN 0
 #define WLAN_CFG_PER_PDEV_TX_RING_MAX 1
 
-#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
-#define WLAN_CFG_PER_PDEV_RX_RING 0
-#define WLAN_CFG_PER_PDEV_LMAC_RING 0
-#define WLAN_LRO_ENABLE 0
-#ifdef QCA_WIFI_QCA6750
-#define WLAN_CFG_MAC_PER_TARGET 1
-#else
-#define WLAN_CFG_MAC_PER_TARGET 2
-#endif
 #ifdef IPA_OFFLOAD
 /* Size of TCL TX Ring */
 #if defined(TX_TO_NPEERS_INC_TX_DESCS)
@@ -89,10 +80,24 @@
 #define WLAN_CFG_IPA_UC_RX_IND_RING_COUNT 1024
 #else
 #define WLAN_CFG_TX_RING_SIZE 512
+#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
 #define WLAN_CFG_PER_PDEV_TX_RING 1
+#else
+#define WLAN_CFG_PER_PDEV_TX_RING 0
+#endif
 #define WLAN_CFG_IPA_UC_TX_BUF_SIZE 0
 #define WLAN_CFG_IPA_UC_TX_PARTITION_BASE 0
 #define WLAN_CFG_IPA_UC_RX_IND_RING_COUNT 0
+#endif /* IPA_OFFLOAD */
+
+#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
+#define WLAN_CFG_PER_PDEV_RX_RING 0
+#define WLAN_CFG_PER_PDEV_LMAC_RING 0
+#define WLAN_LRO_ENABLE 0
+#ifdef QCA_WIFI_QCA6750
+#define WLAN_CFG_MAC_PER_TARGET 1
+#else
+#define WLAN_CFG_MAC_PER_TARGET 2
 #endif
 
 #if defined(TX_TO_NPEERS_INC_TX_DESCS)
@@ -126,7 +131,7 @@
 #define WLAN_CFG_INT_BATCH_THRESHOLD_RX 1
 #define WLAN_CFG_INT_TIMER_THRESHOLD_RX 8
 #endif
-#endif
+#endif /* WLAN_MAX_PDEVS */
 
 #ifdef NBUF_MEMORY_DEBUG
 #define WLAN_CFG_RX_PENDING_THRESHOLD_DEFAULT 0xFFFF
@@ -283,7 +288,7 @@
 #define WLAN_CFG_RX_RELEASE_RING_SIZE 1024
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MIN 8
 #if defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-    defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_WCN7850)
+    defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_KIWI)
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MAX 1024
 #else
 #define WLAN_CFG_RX_RELEASE_RING_SIZE_MAX 8192
@@ -333,7 +338,7 @@
 #define WLAN_CFG_RXDMA_MONITOR_BUF_RING_SIZE_MIN 16
 #define WLAN_CFG_RXDMA_MONITOR_BUF_RING_SIZE_MAX 8192
 
-#define WLAN_CFG_TX_MONITOR_BUF_RING_SIZE 4096
+#define WLAN_CFG_TX_MONITOR_BUF_RING_SIZE 8192
 #define WLAN_CFG_TX_MONITOR_BUF_RING_SIZE_MIN 16
 #define WLAN_CFG_TX_MONITOR_BUF_RING_SIZE_MAX 8192
 
@@ -344,10 +349,6 @@
 #define WLAN_CFG_TX_MONITOR_DST_RING_SIZE 2048
 #define WLAN_CFG_TX_MONITOR_DST_RING_SIZE_MIN 48
 #define WLAN_CFG_TX_MONITOR_DST_RING_SIZE_MAX 4096
-
-#define WLAN_CFG_TX_MONITOR_BUF_SIZE 2048
-#define WLAN_CFG_TX_MONITOR_BUF_SIZE_MIN 48
-#define WLAN_CFG_TX_MONITOR_BUF_SIZE_MAX 8192
 
 #define WLAN_CFG_RXDMA_MONITOR_STATUS_RING_SIZE 1024
 #define WLAN_CFG_RXDMA_MONITOR_STATUS_RING_SIZE_MIN 16
@@ -413,7 +414,7 @@
 #define WLAN_CFG_PKTLOG_MIN_BUFFER_SIZE 1
 #define WLAN_CFG_PKTLOG_MAX_BUFFER_SIZE 10
 
-#ifdef QCA_WIFI_WCN7850
+#ifdef QCA_WIFI_KIWI
 #define WLAN_CFG_NUM_REO_RINGS_MAP 0x7
 #else
 #define WLAN_CFG_NUM_REO_RINGS_MAP 0xF

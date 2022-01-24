@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +40,8 @@
 #include <wbm_release_ring_tx.h>
 #include <wbm_release_ring_rx.h>
 #include <phyrx_location.h>
+#include <mon_ingress_ring.h>
+#include <mon_destination_ring.h>
 
 #include <hal_be_rx.h>
 
@@ -1472,7 +1474,7 @@ static inline void hal_rx_dump_pkt_hdr_tlv_9224(struct rx_pkt_tlvs *pkt_tlvs,
 }
 
 /**
- * hal_rx_dump_pkt_tlvs_9224(): API to print RX Pkt TLVS for 7850
+ * hal_rx_dump_pkt_tlvs_9224(): API to print RX Pkt TLVS QCN9224
  * @hal_soc_hdl: hal_soc handle
  * @buf: pointer the pkt buffer
  * @dbg_level: log level
@@ -1537,18 +1539,7 @@ static uint8_t hal_tx_get_num_tcl_banks_9224(void)
 	return HAL_NUM_TCL_BANKS_9224;
 }
 
-/**
- * hal_get_idle_link_bm_id_9224() - Get idle link BM id from chid_id
- * @chip_id: mlo chip_id
- *
- * Returns: RBM ID
- */
-static uint8_t hal_get_idle_link_bm_id_9224(uint8_t chip_id)
-{
-	return (WBM_IDLE_DESC_LIST + chip_id);
-}
-
-static void hal_reo_setup_generic_9224(struct hal_soc *soc, void *reoparams)
+static void hal_reo_setup_9224(struct hal_soc *soc, void *reoparams)
 {
 	uint32_t reg_val;
 	struct hal_reo_params *reo_params = (struct hal_reo_params *)reoparams;
@@ -1750,6 +1741,8 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_rx_msdu_flow_idx_timeout_be;
 	hal_soc->ops->hal_rx_msdu_fse_metadata_get =
 					hal_rx_msdu_fse_metadata_get_be;
+	hal_soc->ops->hal_rx_msdu_cce_match_get =
+					hal_rx_msdu_cce_match_get_be;
 	hal_soc->ops->hal_rx_msdu_cce_metadata_get =
 					hal_rx_msdu_cce_metadata_get_be;
 	hal_soc->ops->hal_rx_msdu_get_flow_params =
@@ -1782,6 +1775,12 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_rx_pkt_tlv_offset_get_generic;
 #endif
 	hal_soc->ops->hal_rx_flow_setup_fse = hal_rx_flow_setup_fse_9224;
+
+	hal_soc->ops->hal_rx_flow_get_tuple_info =
+					hal_rx_flow_get_tuple_info_be;
+	 hal_soc->ops->hal_rx_flow_delete_entry =
+					hal_rx_flow_delete_entry_be;
+	hal_soc->ops->hal_rx_fst_get_fse_size = hal_rx_fst_get_fse_size_be;
 	hal_soc->ops->hal_compute_reo_remap_ix2_ix3 =
 					hal_compute_reo_remap_ix2_ix3_9224;
 
@@ -1828,8 +1827,7 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_priv_info_get_from_tlv =
 			hal_rx_priv_info_get_from_tlv_be;
 	hal_soc->ops->hal_rx_pkt_hdr_get = hal_rx_pkt_hdr_get_be;
-	hal_soc->ops->hal_get_idle_link_bm_id = hal_get_idle_link_bm_id_9224;
-	hal_soc->ops->hal_reo_setup = hal_reo_setup_generic_9224;
+	hal_soc->ops->hal_reo_setup = hal_reo_setup_9224;
 };
 
 struct hal_hw_srng_config hw_srng_table_9224[] = {
@@ -2177,7 +2175,7 @@ struct hal_hw_srng_config hw_srng_table_9224[] = {
 	{ /* RXDMA_MONITOR_BUF */
 		.start_ring_id = HAL_SRNG_WMAC1_SW2RXDMA2_BUF,
 		.max_rings = 1,
-		.entry_size = sizeof(struct wbm_buffer_ring) >> 2,
+		.entry_size = sizeof(struct mon_ingress_ring) >> 2,
 		.lmac_ring = TRUE,
 		.ring_dir = HAL_SRNG_SRC_RING,
 		/* reg_start is not set because LMAC rings are not accessed
@@ -2203,7 +2201,7 @@ struct hal_hw_srng_config hw_srng_table_9224[] = {
 	{ /* RXDMA_MONITOR_DST */
 		.start_ring_id = HAL_SRNG_WMAC1_RXMON2SW0,
 		.max_rings = 1,
-		.entry_size = sizeof(struct sw_monitor_ring) >> 2,
+		.entry_size = sizeof(struct mon_destination_ring) >> 2,
 		.lmac_ring = TRUE,
 		.ring_dir = HAL_SRNG_DST_RING,
 		/* reg_start is not set because LMAC rings are not accessed
@@ -2351,7 +2349,7 @@ struct hal_hw_srng_config hw_srng_table_9224[] = {
 
 /**
  * hal_srng_hw_reg_offset_init_qcn9224() - Initialize the HW srng reg offset
- *				applicable only for WCN7850
+ *				applicable only for QCN9224
  * @hal_soc: HAL Soc handle
  *
  * Return: None

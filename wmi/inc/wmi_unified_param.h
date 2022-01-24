@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -354,6 +354,106 @@
 	WMI_HOST_F_MS(x, WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE)
 #define WMI_HOST_HE_VHT_SU_MU_SOUNDING_MODE_SET(x, z) \
 	WMI_HOST_F_RMW(x, z, WMI_HOST_TRIG_NONTRIG_SOUNDING_MODE)
+
+#ifdef WLAN_FEATURE_11BE
+/* EHT BF capabilities mask */
+#define WMI_HOST_EHT_BF_CONF_SU_BFEE_S 0
+#define WMI_HOST_EHT_BF_CONF_SU_BFEE_M 0x1
+#define WMI_HOST_EHT_BF_CONF_SU_BFEE \
+	(WMI_HOST_EHT_BF_CONF_SU_BFEE_M << WMI_HOST_EHT_BF_CONF_SU_BFEE_S)
+#define WMI_HOST_EHT_BF_CONF_SU_BFEE_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_SU_BFEE)
+#define WMI_HOST_EHT_BF_CONF_SU_BFEE_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_SU_BFEE)
+
+#define WMI_HOST_EHT_BF_CONF_SU_BFER_S 1
+#define WMI_HOST_EHT_BF_CONF_SU_BFER_M 0x1
+#define WMI_HOST_EHT_BF_CONF_SU_BFER \
+	(WMI_HOST_EHT_BF_CONF_SU_BFER_M << WMI_HOST_EHT_BF_CONF_SU_BFER_S)
+#define WMI_HOST_EHT_BF_CONF_SU_BFER_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_SU_BFER)
+#define WMI_HOST_EHT_BF_CONF_SU_BFER_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_SU_BFER)
+
+#define WMI_HOST_EHT_BF_CONF_MU_BFEE_S 2
+#define WMI_HOST_EHT_BF_CONF_MU_BFEE_M 0x1
+#define WMI_HOST_EHT_BF_CONF_MU_BFEE \
+	(WMI_HOST_EHT_BF_CONF_MU_BFEE_M << WMI_HOST_EHT_BF_CONF_MU_BFEE_S)
+#define WMI_HOST_EHT_BF_CONF_MU_BFEE_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_MU_BFEE)
+#define WMI_HOST_EHT_BF_CONF_MU_BFEE_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_MU_BFEE)
+
+#define WMI_HOST_EHT_BF_CONF_MU_BFER_S 3
+#define WMI_HOST_EHT_BF_CONF_MU_BFER_M 0x1
+#define WMI_HOST_EHT_BF_CONF_MU_BFER \
+	(WMI_HOST_EHT_BF_CONF_MU_BFER_M << WMI_HOST_EHT_BF_CONF_MU_BFER_S)
+#define WMI_HOST_EHT_BF_CONF_MU_BFER_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_MU_BFER)
+#define WMI_HOST_EHT_BF_CONF_MU_BFER_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_MU_BFER)
+
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_S 4
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_M 0x1
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA \
+	(WMI_HOST_EHT_BF_CONF_DL_OFDMA_M << WMI_HOST_EHT_BF_CONF_DL_OFDMA_S)
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_DL_OFDMA)
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_DL_OFDMA)
+
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_S 5
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_M 0x1
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA \
+	(WMI_HOST_EHT_BF_CONF_UL_OFDMA_M << WMI_HOST_EHT_BF_CONF_UL_OFDMA_S)
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_UL_OFDMA)
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_UL_OFDMA)
+
+#define WMI_HOST_EHT_BF_CONF_MUMIMO_S 6
+#define WMI_HOST_EHT_BF_CONF_MUMIMO_M 0x1
+#define WMI_HOST_EHT_BF_CONF_MUMIMO \
+	(WMI_HOST_EHT_BF_CONF_MUMIMO_M << WMI_HOST_EHT_BF_CONF_MUMIMO_S)
+#define WMI_HOST_EHT_BF_CONF_MUMIMO_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_MUMIMO)
+#define WMI_HOST_EHT_BF_CONF_MUMIMO_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_MUMIMO)
+
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF_S 7
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF_M 0x1
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF \
+	(WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF_M << \
+		WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF_S)
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF)
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_DL_OFDMA_TXBF)
+
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO_S 8
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO_M 0x1
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO \
+	(WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO_M << \
+		 WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO_S)
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO)
+#define WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_DL_OFDMA_MUMIMO)
+
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO_S 9
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO_M 0x1
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO \
+	(WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO_M << \
+		WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO_S)
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO_GET(x) \
+	WMI_HOST_F_MS(x, WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO)
+#define WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO_SET(x, z) \
+	WMI_HOST_F_RMW(x, z, WMI_HOST_EHT_BF_CONF_UL_OFDMA_MUMIMO)
+
+/* Firmware uses most significant 4 bits to differentiate */
+/* some of vdev params between HE and EHT */
+#define WMI_HOST_VDEV_PARAM_EHT_MODE 0x10000000
+#endif
 
 #define WMI_HOST_TPC_RATE_MAX	160
 #define WMI_HOST_TPC_TX_NUM_CHAIN	4
@@ -1325,6 +1425,10 @@ struct seg_hdr_info {
  *              0:disable 1:enable
  * @en_beamforming: flag to enable tx beamforming
  *              0:disable 1:enable
+ * @retry_limit_ext: 3 bits of extended retry limit.
+ *              Combined with 4 bits "retry_limit"
+ *              to create 7 bits hw retry count.
+ *              Maximum 127 retries for specific frames.
  */
 struct tx_send_params {
 	uint32_t pwr:8,
@@ -1337,7 +1441,8 @@ struct tx_send_params {
 		 frame_type:1,
 		 cfr_enable:1,
 		 en_beamforming:1,
-		 reserved:9;
+		 retry_limit_ext:3,
+		 reserved:6;
 };
 
 /**
@@ -3000,6 +3105,46 @@ struct spectral_session_det_info {
 	uint8_t det_id;
 	qdf_freq_t start_freq;
 	qdf_freq_t end_freq;
+};
+
+/**
+ * struct spectral_capabilities_event_params - parameters related to Spectral
+ * capabilities event
+ * @num_sscan_bw_caps: Number of spectral_scan_bw_capabilities TLVs
+ * @num_fft_size_caps: Number of spectral_fft_size_capabilities TLVs
+ */
+struct spectral_capabilities_event_params {
+	uint8_t num_sscan_bw_caps;
+	uint8_t num_fft_size_caps;
+};
+
+/**
+ * struct spectral_scan_bw_capabilities - Spectral scan bandwidth caps
+ * that are extracted from Spectral capabilities WMI event
+ * @pdev_id: pdev ID
+ * @smode: Spectral scan mode
+ * @operating_bw: Operating bandwidth
+ * @supported_bws: Supported sscan bandwidths bitmap for given @pdev_id,
+ * @operating_bw, and @smode
+ */
+struct spectral_scan_bw_capabilities {
+	uint8_t pdev_id;
+	enum spectral_scan_mode smode;
+	enum phy_ch_width operating_bw;
+	uint32_t supported_bws;
+};
+
+/**
+ * struct spectral_fft_size_capabilities - Spectral scan FFT size caps
+ * that are extracted from Spectral capabilities WMI event
+ * @pdev_id: pdev ID
+ * @sscan_bw: Spectral scan bandwidth
+ * @sscan_bw: Supported FFT sizes bitmap for given @pdev_id and @sscan_bw
+ */
+struct spectral_fft_size_capabilities {
+	uint8_t pdev_id;
+	enum phy_ch_width sscan_bw;
+	uint32_t supports_fft_sizes;
 };
 #endif
 
@@ -4721,6 +4866,10 @@ typedef enum {
 	wmi_mlo_link_set_active_resp_eventid,
 #endif
 	wmi_pdev_fips_extend_event_id,
+	wmi_roam_frame_event_id,
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+	wmi_vdev_update_mac_addr_conf_eventid,
+#endif
 	wmi_events_max,
 } wmi_conv_event_id;
 
@@ -4895,6 +5044,7 @@ typedef enum {
 	wmi_pdev_param_mpd_userpd_ssr,
 	wmi_pdev_param_low_latency_mode,
 	wmi_pdev_param_scan_radio_tx_on_dfs,
+	wmi_pdev_param_en_probe_all_bw,
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
 
@@ -5334,6 +5484,11 @@ typedef enum {
 	wmi_service_mgmt_rx_reo_supported,
 	wmi_service_phy_dma_byte_swap_support,
 	wmi_service_spectral_session_info_support,
+	wmi_service_mu_snif,
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+	wmi_service_dynamic_update_vdev_macaddr_support,
+#endif
+	wmi_service_probe_all_bw_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
@@ -8296,6 +8451,20 @@ struct set_mec_timer_params {
 	uint32_t pdev_id;
 	uint32_t vdev_id;
 	uint32_t mec_aging_timer_threshold;
+};
+#endif
+
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+/**
+ * struct set_mac_addr_params - Set MAC address command parameter
+ * @vdev_id: vdev id
+ * @mac_addr: VDEV MAC address
+ * @mmld_addr: MLD address of the vdev
+ */
+struct set_mac_addr_params {
+	uint8_t vdev_id;
+	struct qdf_mac_addr mac_addr;
+	struct qdf_mac_addr mld_addr;
 };
 #endif
 

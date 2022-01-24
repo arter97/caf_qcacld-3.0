@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -326,6 +327,105 @@ dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 
 #endif /* ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST */
 
+#ifdef WLAN_MCAST_MLO
+/*
+ * dp_htt_h2t_add_tcl_metadata_verg() - Add tcl_metadata verion
+ * @htt_soc:	HTT SOC handle
+ * @msg:	Pointer to nbuf
+ *
+ * Return: 0 on success; error code on failure
+ */
+static int dp_htt_h2t_add_tcl_metadata_ver(struct htt_soc *soc, qdf_nbuf_t *msg)
+{
+	uint32_t *msg_word;
+
+	*msg = qdf_nbuf_alloc(
+		soc->osdev,
+		HTT_MSG_BUF_SIZE(HTT_VER_REQ_BYTES + HTT_TCL_METADATA_VER_SZ),
+		/* reserve room for the HTC header */
+		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+	if (!*msg)
+		return QDF_STATUS_E_NOMEM;
+
+	/*
+	 * Set the length of the message.
+	 * The contribution from the HTC_HDR_ALIGNMENT_PADDING is added
+	 * separately during the below call to qdf_nbuf_push_head.
+	 * The contribution from the HTC header is added separately inside HTC.
+	 */
+	if (!qdf_nbuf_put_tail(*msg,
+			       HTT_VER_REQ_BYTES + HTT_TCL_METADATA_VER_SZ)) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Failed to expand head for HTT_H2T_MSG_TYPE_VERSION_REQ msg",
+			  __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* fill in the message contents */
+	msg_word = (u_int32_t *)qdf_nbuf_data(*msg);
+
+	/* rewind beyond alignment pad to get to the HTC header reserved area */
+	qdf_nbuf_push_head(*msg, HTC_HDR_ALIGNMENT_PADDING);
+
+	*msg_word = 0;
+	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_VERSION_REQ);
+
+	/* word 1 */
+	msg_word++;
+	*msg_word = 0;
+	HTT_OPTION_TLV_TAG_SET(*msg_word, HTT_OPTION_TLV_TAG_TCL_METADATA_VER);
+	HTT_OPTION_TLV_LENGTH_SET(*msg_word, HTT_TCL_METADATA_VER_SZ);
+	HTT_OPTION_TLV_TCL_METADATA_VER_SET(*msg_word,
+					    HTT_OPTION_TLV_TCL_METADATA_V2);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+/*
+ * dp_htt_h2t_add_tcl_metadata_verg() - Add tcl_metadata verion
+ * @htt_soc:	HTT SOC handle
+ * @msg:	Pointer to nbuf
+ *
+ * Return: 0 on success; error code on failure
+ */
+static int dp_htt_h2t_add_tcl_metadata_ver(struct htt_soc *soc, qdf_nbuf_t *msg)
+{
+	uint32_t *msg_word;
+
+	*msg = qdf_nbuf_alloc(
+		soc->osdev,
+		HTT_MSG_BUF_SIZE(HTT_VER_REQ_BYTES),
+		/* reserve room for the HTC header */
+		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+	if (!*msg)
+		return QDF_STATUS_E_NOMEM;
+
+	/*
+	 * Set the length of the message.
+	 * The contribution from the HTC_HDR_ALIGNMENT_PADDING is added
+	 * separately during the below call to qdf_nbuf_push_head.
+	 * The contribution from the HTC header is added separately inside HTC.
+	 */
+	if (!qdf_nbuf_put_tail(*msg, HTT_VER_REQ_BYTES)) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Failed to expand head for HTT_H2T_MSG_TYPE_VERSION_REQ msg",
+			  __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* fill in the message contents */
+	msg_word = (u_int32_t *)qdf_nbuf_data(*msg);
+
+	/* rewind beyond alignment pad to get to the HTC header reserved area */
+	qdf_nbuf_push_head(*msg, HTC_HDR_ALIGNMENT_PADDING);
+
+	*msg_word = 0;
+	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_VERSION_REQ);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /*
  * htt_h2t_ver_req_msg() - Send HTT version request message to target
  * @htt_soc:	HTT SOC handle
@@ -335,39 +435,12 @@ dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 static int htt_h2t_ver_req_msg(struct htt_soc *soc)
 {
 	struct dp_htt_htc_pkt *pkt;
-	qdf_nbuf_t msg;
-	uint32_t *msg_word;
+	qdf_nbuf_t msg = NULL;
 	QDF_STATUS status;
 
-	msg = qdf_nbuf_alloc(
-		soc->osdev,
-		HTT_MSG_BUF_SIZE(HTT_VER_REQ_BYTES),
-		/* reserve room for the HTC header */
-		HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
-	if (!msg)
-		return QDF_STATUS_E_NOMEM;
-
-	/*
-	 * Set the length of the message.
-	 * The contribution from the HTC_HDR_ALIGNMENT_PADDING is added
-	 * separately during the below call to qdf_nbuf_push_head.
-	 * The contribution from the HTC header is added separately inside HTC.
-	 */
-	if (qdf_nbuf_put_tail(msg, HTT_VER_REQ_BYTES) == NULL) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			"%s: Failed to expand head for HTT_H2T_MSG_TYPE_VERSION_REQ msg",
-			__func__);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	/* fill in the message contents */
-	msg_word = (u_int32_t *) qdf_nbuf_data(msg);
-
-	/* rewind beyond alignment pad to get to the HTC header reserved area */
-	qdf_nbuf_push_head(msg, HTC_HDR_ALIGNMENT_PADDING);
-
-	*msg_word = 0;
-	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_VERSION_REQ);
+	status = dp_htt_h2t_add_tcl_metadata_ver(soc, &msg);
+	if (status != QDF_STATUS_SUCCESS)
+		return status;
 
 	pkt = htt_htc_pkt_alloc(soc);
 	if (!pkt) {
@@ -477,7 +550,8 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 			(uint64_t)tp_addr);
 		break;
 	case RXDMA_MONITOR_BUF:
-		htt_ring_id = HTT_RXDMA_MONITOR_BUF_RING;
+		htt_ring_id = dp_htt_get_mon_htt_ring_id(soc->dp_soc,
+							 RXDMA_MONITOR_BUF);
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_STATUS:
@@ -485,7 +559,8 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_DST:
-		htt_ring_id = HTT_RXDMA_MONITOR_DEST_RING;
+		htt_ring_id = dp_htt_get_mon_htt_ring_id(soc->dp_soc,
+							 RXDMA_MONITOR_DST);
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
 	case RXDMA_MONITOR_DESC:
@@ -496,8 +571,6 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		htt_ring_id = HTT_RXDMA_NON_MONITOR_DEST_RING;
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
-#ifdef QCA_MONITOR_2_0_SUPPORT_WAR
-	// WAR till fw htt.h changes are merged
 	case TX_MONITOR_BUF:
 		htt_ring_id = HTT_TX_MON_HOST2MON_BUF_RING;
 		htt_ring_type = HTT_SW_TO_HW_RING;
@@ -506,7 +579,6 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 		htt_ring_id = HTT_TX_MON_MON2HOST_DEST_RING;
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
-#endif
 
 	default:
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
@@ -835,7 +907,8 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_BUF:
-		htt_ring_id = HTT_RXDMA_MONITOR_BUF_RING;
+		htt_ring_id = dp_htt_get_mon_htt_ring_id(soc->dp_soc,
+							 RXDMA_MONITOR_BUF);
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_STATUS:
@@ -843,7 +916,8 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case RXDMA_MONITOR_DST:
-		htt_ring_id = HTT_RXDMA_MONITOR_DEST_RING;
+		htt_ring_id = dp_htt_get_mon_htt_ring_id(soc->dp_soc,
+							 RXDMA_MONITOR_DST);
 		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
 	case RXDMA_MONITOR_DESC:
@@ -2174,27 +2248,27 @@ static void dp_vdev_txrx_hw_stats_handler(struct htt_soc *soc,
 			tag_buf = tlv_buf_temp +
 				HTT_VDEV_STATS_GET_INDEX(TX_SUCCESS_PKT_CNT);
 			pkt_count = HTT_VDEV_GET_STATS_U64(tag_buf);
-			tx_comp.num += pkt_count;
+			tx_comp.num = pkt_count;
 
 			/* Extract tx success packet byte count from buffer */
 			tag_buf = tlv_buf_temp +
 				HTT_VDEV_STATS_GET_INDEX(TX_SUCCESS_BYTE_CNT);
 			byte_count = HTT_VDEV_GET_STATS_U64(tag_buf);
-			tx_comp.bytes += byte_count;
+			tx_comp.bytes = byte_count;
 
 			/* Extract tx retry packet count from buffer */
 			tag_buf = tlv_buf_temp +
 				HTT_VDEV_STATS_GET_INDEX(TX_RETRY_PKT_CNT);
 			pkt_count = HTT_VDEV_GET_STATS_U64(tag_buf);
 			tx_comp.num += pkt_count;
-			tx_failed.num += pkt_count;
+			tx_failed.num = pkt_count;
 
 			/* Extract tx retry packet byte count from buffer */
 			tag_buf = tlv_buf_temp +
 				HTT_VDEV_STATS_GET_INDEX(TX_RETRY_BYTE_CNT);
-			pkt_count = HTT_VDEV_GET_STATS_U64(tag_buf);
+			byte_count = HTT_VDEV_GET_STATS_U64(tag_buf);
 			tx_comp.bytes += byte_count;
-			tx_failed.bytes += byte_count;
+			tx_failed.bytes = byte_count;
 
 			/* Extract tx drop packet count from buffer */
 			tag_buf = tlv_buf_temp +
@@ -2206,7 +2280,7 @@ static void dp_vdev_txrx_hw_stats_handler(struct htt_soc *soc,
 			/* Extract tx drop packet byte count from buffer */
 			tag_buf = tlv_buf_temp +
 				HTT_VDEV_STATS_GET_INDEX(TX_DROP_BYTE_CNT);
-			pkt_count = HTT_VDEV_GET_STATS_U64(tag_buf);
+			byte_count = HTT_VDEV_GET_STATS_U64(tag_buf);
 			tx_comp.bytes += byte_count;
 			tx_failed.bytes += byte_count;
 
@@ -2220,7 +2294,7 @@ static void dp_vdev_txrx_hw_stats_handler(struct htt_soc *soc,
 			/* Extract tx age-out packet byte count from buffer */
 			tag_buf = tlv_buf_temp +
 				HTT_VDEV_STATS_GET_INDEX(TX_AGE_OUT_BYTE_CNT);
-			pkt_count = HTT_VDEV_GET_STATS_U64(tag_buf);
+			byte_count = HTT_VDEV_GET_STATS_U64(tag_buf);
 			tx_comp.bytes += byte_count;
 			tx_failed.bytes += byte_count;
 
@@ -2379,6 +2453,7 @@ static void dp_queue_ring_stats(struct dp_pdev *pdev)
 	int mac_id;
 	int lmac_id;
 	uint32_t j = 0;
+	struct dp_soc *soc = pdev->soc;
 	struct dp_soc_srngs_state * soc_srngs_state = NULL;
 	struct dp_soc_srngs_state *drop_srngs_state = NULL;
 	QDF_STATUS status;
@@ -2526,7 +2601,9 @@ static void dp_queue_ring_stats(struct dp_pdev *pdev)
 			qdf_assert_always(++j < DP_MAX_SRNGS);
 	}
 
-	for (mac_id = 0; mac_id < NUM_RXDMA_RINGS_PER_PDEV; mac_id++) {
+	for (mac_id = 0;
+	     mac_id  < soc->wlan_cfg_ctx->num_rxdma_status_rings_per_pdev;
+	     mac_id++) {
 		lmac_id = dp_get_lmac_id_for_pdev_id(pdev->soc,
 						     mac_id, pdev->pdev_id);
 
@@ -2543,7 +2620,7 @@ static void dp_queue_ring_stats(struct dp_pdev *pdev)
 			qdf_assert_always(++j < DP_MAX_SRNGS);
 	}
 
-	for (i = 0; i < NUM_RXDMA_RINGS_PER_PDEV; i++)	{
+	for (i = 0; i < soc->wlan_cfg_ctx->num_rxdma_dst_rings_per_pdev; i++) {
 		lmac_id = dp_get_lmac_id_for_pdev_id(pdev->soc,
 						     i, pdev->pdev_id);
 

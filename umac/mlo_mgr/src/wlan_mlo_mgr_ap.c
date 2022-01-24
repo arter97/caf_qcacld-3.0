@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +23,56 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include <wlan_mlo_mgr_main.h>
 #include <wlan_utility.h>
+#ifdef WLAN_MLO_MULTI_CHIP
+#include "cdp_txrx_mlo.h"
+#endif
 
+#ifdef WLAN_MLO_MULTI_CHIP
+bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
+			uint8_t link_id,
+			uint16_t vdev_count)
+{
+	struct wlan_mlo_dev_context *dev_ctx;
+	uint8_t pr_vdev_ids[WLAN_UMAC_MLO_MAX_VDEVS] = { CDP_INVALID_VDEV_ID };
+	struct wlan_objmgr_psoc *psoc;
+	int i;
+
+	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->ap_ctx) {
+		mlo_err("Invalid input");
+		return false;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return false;
+
+	dev_ctx = vdev->mlo_dev_ctx;
+	wlan_vdev_set_link_id(vdev, link_id);
+	wlan_vdev_mlme_feat_ext2_cap_set(vdev, WLAN_VDEV_FEXT2_MLO);
+
+	/**
+	 * every link will trigger mlo_ap_vdev_attach,
+	 * and they should provide the same vdev_count.
+	 */
+	mlo_dev_lock_acquire(dev_ctx);
+	dev_ctx->ap_ctx->num_ml_vdevs = vdev_count;
+	mlo_dev_lock_release(dev_ctx);
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (dev_ctx->wlan_vdev_list[i])
+			pr_vdev_ids[i] = wlan_vdev_get_id(dev_ctx->wlan_vdev_list[i]);
+	}
+
+	if (cdp_update_mlo_ptnr_list(wlan_psoc_get_dp_handle(psoc),
+				pr_vdev_ids, WLAN_UMAC_MLO_MAX_VDEVS,
+				wlan_vdev_get_id(vdev) != QDF_STATUS_SUCCESS)) {
+		mlo_debug("Failed to add vdev to partner vdev list, vdev id:%d",
+			 wlan_vdev_get_id(vdev));
+	}
+
+	return true;
+}
+#else
 bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
 			uint8_t link_id,
 			uint16_t vdev_count)
@@ -48,6 +98,7 @@ bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
 
 	return true;
 }
+#endif
 
 void mlo_ap_get_vdev_list(struct wlan_objmgr_vdev *vdev,
 			  uint16_t *vdev_count,
@@ -85,6 +136,33 @@ void mlo_ap_get_vdev_list(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
+ * mlo_ap_vdev_is_start_resp_rcvd() - Is start response received on this vdev
+ * @vdev: vdev pointer
+ *
+ * Return: SUCCESS if start response is received, ERROR otherwise.
+ */
+static QDF_STATUS mlo_ap_vdev_is_start_resp_rcvd(struct wlan_objmgr_vdev *vdev)
+{
+	enum wlan_vdev_state state;
+
+	if (!vdev) {
+		mlme_err("vdev is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!wlan_vdev_mlme_is_mlo_ap(vdev))
+		return QDF_STATUS_E_FAILURE;
+
+	state = wlan_vdev_mlme_get_state(vdev);
+	if ((state == WLAN_VDEV_S_UP) ||
+	    (state == WLAN_VDEV_S_DFS_CAC_WAIT) ||
+	    (state == WLAN_VDEV_S_SUSPEND))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  * mlo_is_ap_vdev_up_allowed() - Is mlo ap allowed to come up
  * @vdev: vdev pointer
  *
@@ -106,10 +184,8 @@ static bool mlo_is_ap_vdev_up_allowed(struct wlan_objmgr_vdev *vdev)
 
 	mlo_dev_lock_acquire(dev_ctx);
 	for (i = 0; i < QDF_ARRAY_SIZE(dev_ctx->wlan_vdev_list); i++) {
-		if (dev_ctx->wlan_vdev_list[i] &&
-		    wlan_vdev_mlme_is_mlo_ap(dev_ctx->wlan_vdev_list[i]) &&
-		    QDF_IS_STATUS_SUCCESS(
-		    wlan_vdev_chan_config_valid(dev_ctx->wlan_vdev_list[i])))
+		if (QDF_IS_STATUS_SUCCESS(
+		    mlo_ap_vdev_is_start_resp_rcvd(dev_ctx->wlan_vdev_list[i])))
 			vdev_count++;
 	}
 
@@ -227,6 +303,8 @@ uint16_t mlo_ap_ml_peerid_alloc(void)
 	if (i == mlo_ctx->max_mlo_peer_id)
 		return MLO_INVALID_PEER_ID;
 
+	mlo_debug(" ML peee id %d is allocated", i + 1);
+
 	return i + 1;
 }
 
@@ -242,6 +320,8 @@ void mlo_ap_ml_peerid_free(uint16_t mlo_peer_id)
 		qdf_clear_bit(mlo_peer_id - 1, mlo_ctx->mlo_peer_id_bmap);
 
 	ml_peerid_lock_release(mlo_ctx);
+
+	mlo_debug(" ML peee id %d is freed", mlo_peer_id);
 }
 
 void mlo_ap_vdev_quiet_set(struct wlan_objmgr_vdev *vdev)
@@ -295,3 +375,65 @@ bool mlo_ap_vdev_quiet_is_any_idx_set(struct wlan_objmgr_vdev *vdev)
 			mld_ctx->ap_ctx->mlo_vdev_quiet_bmap,
 			sizeof(mld_ctx->ap_ctx->mlo_vdev_quiet_bmap));
 }
+
+#ifdef UMAC_SUPPORT_MLNAWDS
+QDF_STATUS
+mlo_peer_create_get_frm_buf(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct peer_create_notif_s *peer_create,
+		qdf_nbuf_t frm_buf)
+{
+	if (ml_peer->is_nawds_ml_peer) {
+		peer_create->frm_buf = NULL;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	peer_create->frm_buf = qdf_nbuf_clone(frm_buf);
+	if (!peer_create->frm_buf)
+		return QDF_STATUS_E_NOMEM;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void mlo_peer_populate_nawds_params(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct mlo_partner_info *ml_info)
+{
+	uint8_t i;
+	uint8_t null_mac[QDF_MAC_ADDR_SIZE] = {0x00, 0x00, 0x00,
+					       0x00, 0x00, 0x00};
+	struct mlnawds_config nawds_config;
+
+	mlo_peer_lock_acquire(ml_peer);
+	ml_peer->is_nawds_ml_peer = false;
+	for (i = 0; i < ml_info->num_partner_links; i++) {
+		nawds_config = ml_info->partner_link_info[i].nawds_config;
+		/**
+		 * if ml_info->partner_link_info[i].nawds_config has valid
+		 * config(check for non-null mac or non-0 caps), then mark
+		 * ml_peer's is_nawds_ml_peer true & copy the config
+		 */
+		if ((nawds_config.caps) ||
+		    (qdf_mem_cmp(null_mac,
+				 nawds_config.mac,
+				 sizeof(null_mac)))) {
+			ml_peer->is_nawds_ml_peer = true;
+			ml_peer->nawds_config[i] = nawds_config;
+		}
+	}
+	mlo_peer_lock_release(ml_peer);
+}
+#else
+QDF_STATUS
+mlo_peer_create_get_frm_buf(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct peer_create_notif_s *peer_create,
+		qdf_nbuf_t frm_buf)
+{
+	peer_create->frm_buf = qdf_nbuf_clone(frm_buf);
+	if (!peer_create->frm_buf)
+		return QDF_STATUS_E_NOMEM;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

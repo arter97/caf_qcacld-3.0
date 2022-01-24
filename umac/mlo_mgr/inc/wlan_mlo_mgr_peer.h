@@ -343,6 +343,19 @@ void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 				  struct mlo_tgt_partner_info *ml_links);
 
 /**
+ * wlan_mlo_peer_get_partner_links_info() - get MLO peer partner links info
+ * @peer: Link peer
+ * @ml_links: structure to be filled with partner link info
+ *
+ * This function retrieves partner link info of link peer such as link id,
+ * mac address
+ *
+ * Return: void
+ */
+void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
+					  struct mlo_partner_info *ml_links);
+
+/**
  ** APIs to operations on ML peer object
  */
 typedef QDF_STATUS (*wlan_mlo_op_handler)(struct wlan_mlo_dev_context *ml_dev,
@@ -505,4 +518,20 @@ static inline void wlan_peer_clear_mlo(struct wlan_objmgr_peer *peer)
 {
 	return wlan_peer_mlme_flag_ext_clear(peer, WLAN_PEER_FEXT_MLO);
 }
+
+#ifdef UMAC_SUPPORT_MLNAWDS
+/**
+ * wlan_mlo_peer_is_nawds() - Check if ml_peer is configured to operate as NAWDS
+ * @ml_peer: MLO peer
+ *
+ * Return TRUE if ml peer is configured as NAWDS
+ */
+bool wlan_mlo_peer_is_nawds(struct wlan_mlo_peer_context *ml_peer);
+#else
+static inline
+bool wlan_mlo_peer_is_nawds(struct wlan_mlo_peer_context *ml_peer)
+{
+	return false;
+}
+#endif
 #endif

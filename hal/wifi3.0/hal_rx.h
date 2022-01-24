@@ -585,6 +585,9 @@ enum hal_reo_error_code {
  * @ HAL_RXDMA_AMSDU_FRAGMENT    : Rx PCU reported A-MSDU
  *                                 present as well as a fragmented MPDU
  * @ HAL_RXDMA_MULTICAST_ECHO    : RX OLE reported a multicast echo
+ * @ HAL_RXDMA_AMSDU_ADDR_MISMATCH : RX OLE reported AMSDU address mismatch
+ * @ HAL_RXDMA_UNAUTHORIZED_WDS  : RX PCU reported unauthorized wds
+ * @ HAL_RXDMA_GROUPCAST_AMSDU_OR_WDS :RX PCU reported group cast AMSDU or WDS
  * @ HAL_RXDMA_ERR_WAR           : RxDMA WAR dummy errors
  */
 enum hal_rxdma_error_code {
@@ -604,6 +607,9 @@ enum hal_rxdma_error_code {
 	HAL_RXDMA_ERR_FLUSH_REQUEST,
 	HAL_RXDMA_AMSDU_FRAGMENT,
 	HAL_RXDMA_MULTICAST_ECHO,
+	HAL_RXDMA_AMSDU_ADDR_MISMATCH,
+	HAL_RXDMA_UNAUTHORIZED_WDS,
+	HAL_RXDMA_GROUPCAST_AMSDU_OR_WDS,
 	HAL_RXDMA_ERR_WAR = 31,
 	HAL_RXDMA_ERR_MAX
 };
@@ -1150,6 +1156,21 @@ hal_rx_msdu_end_last_msdu_get(hal_soc_handle_t hal_soc_hdl,
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	return hal_soc->ops->hal_rx_msdu_end_last_msdu_get(buf);
+}
+
+/**
+ * hal_rx_msdu_cce_match_get: API to get CCE match
+ * from rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
+ * Return: cce_meta_data
+ */
+static inline bool
+hal_rx_msdu_cce_match_get(hal_soc_handle_t hal_soc_hdl,
+			  uint8_t *buf)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	return hal_soc->ops->hal_rx_msdu_cce_match_get(buf);
 }
 
 /**
@@ -2583,7 +2604,7 @@ hal_get_reo_ent_desc_qdesc_addr(hal_soc_handle_t hal_soc_hdl, uint8_t *desc)
 	return NULL;
 }
 
-static inline uint8_t *
+static inline uint64_t
 hal_rx_get_qdesc_addr(hal_soc_handle_t hal_soc_hdl, uint8_t *dst_ring_desc,
 		      uint8_t *buf)
 {
@@ -2592,7 +2613,7 @@ hal_rx_get_qdesc_addr(hal_soc_handle_t hal_soc_hdl, uint8_t *dst_ring_desc,
 	if (hal_soc->ops->hal_rx_get_qdesc_addr)
 		return hal_soc->ops->hal_rx_get_qdesc_addr(dst_ring_desc, buf);
 
-	return NULL;
+	return 0;
 }
 
 static inline void

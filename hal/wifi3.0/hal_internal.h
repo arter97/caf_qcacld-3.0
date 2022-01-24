@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -246,7 +246,6 @@ enum hal_srng_ring_id {
 	/* 163-167 unused */
 	HAL_SRNG_SW2RXMON_BUF0 = 168,
 	/* 169-175 unused */
-	HAL_SRNG_SW2TXMON_BUF0 = 176,
 	/* 177-183 unused */
 	HAL_SRNG_DMAC_CMN_ID_END = 183,
 	/* LMAC rings - The following set will be replicated for each LMAC */
@@ -273,7 +272,8 @@ enum hal_srng_ring_id {
 	HAL_SRNG_DIR_BUF_RX_SRC_DMA_RING,
 #endif
 	HAL_SRNG_WMAC1_TXMON2SW0,
-	HAL_SRNG_LMAC1_ID_END = (HAL_SRNG_WMAC1_TXMON2SW0 + 3),
+	HAL_SRNG_SW2TXMON_BUF0,
+	HAL_SRNG_LMAC1_ID_END = (HAL_SRNG_SW2TXMON_BUF0 + 2),
 };
 
 #define HAL_RXDMA_MAX_RING_SIZE 0xFFFF
@@ -860,6 +860,7 @@ struct hal_hw_txrx_ops {
 	bool (*hal_rx_msdu_flow_idx_invalid)(uint8_t *buf);
 	bool (*hal_rx_msdu_flow_idx_timeout)(uint8_t *buf);
 	uint32_t (*hal_rx_msdu_fse_metadata_get)(uint8_t *buf);
+	bool (*hal_rx_msdu_cce_match_get)(uint8_t *buf);
 	uint16_t (*hal_rx_msdu_cce_metadata_get)(uint8_t *buf);
 	void
 	    (*hal_rx_msdu_get_flow_params)(
@@ -892,6 +893,12 @@ struct hal_hw_txrx_ops {
 	void * (*hal_rx_flow_setup_fse)(uint8_t *rx_fst,
 					uint32_t table_offset,
 					uint8_t *rx_flow);
+	void * (*hal_rx_flow_get_tuple_info)(uint8_t *rx_fst,
+					     uint32_t hal_hash,
+					     uint8_t *tuple_info);
+	QDF_STATUS (*hal_rx_flow_delete_entry)(uint8_t *fst,
+					       void *fse);
+	uint32_t (*hal_rx_fst_get_fse_size)(void);
 	void (*hal_compute_reo_remap_ix2_ix3)(uint32_t *ring,
 					      uint32_t num_rings,
 					      uint32_t *remap1,
@@ -1000,7 +1007,7 @@ struct hal_hw_txrx_ops {
 	void (*hal_rx_tlv_populate_mpdu_desc_info)(uint8_t *buf,
 						   void *mpdu_desc_info_hdl);
 	uint8_t *(*hal_get_reo_ent_desc_qdesc_addr)(uint8_t *desc);
-	uint8_t *(*hal_rx_get_qdesc_addr)(uint8_t *dst_ring_desc,
+	uint64_t (*hal_rx_get_qdesc_addr)(uint8_t *dst_ring_desc,
 					  uint8_t *buf);
 	void (*hal_set_reo_ent_desc_reo_dest_ind)(uint8_t *desc,
 						  uint32_t dst_ind);
@@ -1176,7 +1183,7 @@ void hal_qca6490_attach(struct hal_soc *hal_soc);
 void hal_qca6390_attach(struct hal_soc *hal_soc);
 void hal_qca6290_attach(struct hal_soc *hal_soc);
 void hal_qca8074_attach(struct hal_soc *hal_soc);
-void hal_wcn7850_attach(struct hal_soc *hal_soc);
+void hal_kiwi_attach(struct hal_soc *hal_soc);
 void hal_qcn9224_attach(struct hal_soc *hal_soc);
 /*
  * hal_soc_to_dp_hal_roc - API to convert hal_soc to opaque

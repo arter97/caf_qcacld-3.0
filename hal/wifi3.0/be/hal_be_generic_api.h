@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -328,7 +329,7 @@ static inline uint32_t
 hal_rx_update_rssi_chain(struct hal_rx_ppdu_info *ppdu_info,
 			 uint8_t *rssi_info_tlv)
 {
-	// TODO - Find all these registers for wcn7850
+	// TODO - Find all these registers for kiwi
 #if 0
 	HAL_RX_PPDU_UPDATE_RSSI(ppdu_info, rssi_info_tlv)
 #endif
@@ -414,11 +415,11 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 	struct hal_rx_ppdu_info *ppdu_info =
 			(struct hal_rx_ppdu_info *)ppduinfo;
 
-	tlv_tag = HAL_RX_GET_USER_TLV32_TYPE(rx_tlv_hdr);
-	user_id = HAL_RX_GET_USER_TLV32_USERID(rx_tlv_hdr);
-	tlv_len = HAL_RX_GET_USER_TLV32_LEN(rx_tlv_hdr);
+	tlv_tag = HAL_RX_GET_USER_TLV64_TYPE(rx_tlv_hdr);
+	user_id = HAL_RX_GET_USER_TLV64_USERID(rx_tlv_hdr);
+	tlv_len = HAL_RX_GET_USER_TLV64_LEN(rx_tlv_hdr);
 
-	rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV32_HDR_SIZE;
+	rx_tlv = (uint8_t *)rx_tlv_hdr + HAL_RX_TLV64_HDR_SIZE;
 
 	qdf_trace_hex_dump(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 			   rx_tlv, tlv_len);
@@ -454,12 +455,10 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 				ppdu_info->rx_status.chan_num,
 				 ppdu_info->rx_status.chan_freq);
 		}
-#ifdef DP_BE_NOTYET_WAR
-		// TODO -  timestamp is changed to 64-bit for wcn7850
+
 		ppdu_info->com_info.ppdu_timestamp =
 			HAL_RX_GET(rx_tlv, RX_PPDU_START,
-				PPDU_START_TIMESTAMP);
-#endif
+				PPDU_START_TIMESTAMP_31_0);
 		ppdu_info->rx_status.ppdu_timestamp =
 			ppdu_info->com_info.ppdu_timestamp;
 		ppdu_info->rx_state = HAL_RX_MON_PPDU_START;
@@ -814,7 +813,7 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 			break;
 		case TARGET_TYPE_QCA6490:
 		case TARGET_TYPE_QCA6750:
-		case TARGET_TYPE_WCN7850:
+		case TARGET_TYPE_KIWI:
 			ppdu_info->rx_status.nss = 0;
 			break;
 		default:
@@ -1345,7 +1344,7 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 			  "RSSI_PRI20_CHAIN3: %d\n", rssi_value);
 
 #ifdef DP_BE_NOTYET_WAR
-		// TODO - this is not preset for wcn7850
+		// TODO - this is not preset for kiwi
 		rssi_value = HAL_RX_GET(rssi_info_tlv,
 					RECEIVE_RSSI_INFO, RSSI_PRI20_CHAIN4);
 		ppdu_info->rx_status.rssi[4] = rssi_value;
@@ -1414,10 +1413,10 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		uint8_t filter_category = 0;
 
 		ppdu_info->nac_info.fc_valid =
-				HAL_RX_GET_FC_VALID(rx_tlv);
+				HAL_RX_MON_GET_FC_VALID(rx_tlv);
 
 		ppdu_info->nac_info.to_ds_flag =
-				HAL_RX_GET_TO_DS_FLAG(rx_tlv);
+				HAL_RX_MON_GET_TO_DS_FLAG(rx_tlv);
 
 		ppdu_info->nac_info.frame_control =
 			HAL_RX_GET(rx_mpdu_start,
@@ -1444,7 +1443,7 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 				  ppdu_info);
 
 		ppdu_info->nac_info.mac_addr2_valid =
-				HAL_RX_TLV_MPDU_MAC_ADDR_AD2_VALID_GET(rx_tlv);
+				HAL_RX_MON_GET_MAC_ADDR2_VALID(rx_mpdu_start);
 
 		*(uint16_t *)&ppdu_info->nac_info.mac_addr2[0] =
 			HAL_RX_GET(rx_mpdu_start,
@@ -1617,5 +1616,107 @@ static void hal_rx_get_tlv_size_generic_be(uint16_t *rx_pkt_tlv_size,
 	*rx_pkt_tlv_size = RX_PKT_TLVS_LEN;
 	/* For now mon pkt tlv is same as rx pkt tlv */
 	*rx_mon_pkt_tlv_size = RX_PKT_TLVS_LEN;
+}
+
+/**
+ * hal_rx_flow_get_tuple_info_be() - Setup a flow search entry in HW FST
+ * @fst: Pointer to the Rx Flow Search Table
+ * @hal_hash: HAL 5 tuple hash
+ * @tuple_info: 5-tuple info of the flow returned to the caller
+ *
+ * Return: Success/Failure
+ */
+static void *
+hal_rx_flow_get_tuple_info_be(uint8_t *rx_fst, uint32_t hal_hash,
+			      uint8_t *flow_tuple_info)
+{
+	struct hal_rx_fst *fst = (struct hal_rx_fst *)rx_fst;
+	void *hal_fse = NULL;
+	struct hal_flow_tuple_info *tuple_info
+		= (struct hal_flow_tuple_info *)flow_tuple_info;
+
+	hal_fse = (uint8_t *)fst->base_vaddr +
+		(hal_hash * HAL_RX_FST_ENTRY_SIZE);
+
+	if (!hal_fse || !tuple_info)
+		return NULL;
+
+	if (!HAL_GET_FLD(hal_fse, RX_FLOW_SEARCH_ENTRY, VALID))
+		return NULL;
+
+	tuple_info->src_ip_127_96 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY,
+						      SRC_IP_127_96));
+	tuple_info->src_ip_95_64 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY,
+						      SRC_IP_95_64));
+	tuple_info->src_ip_63_32 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY,
+						      SRC_IP_63_32));
+	tuple_info->src_ip_31_0 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY,
+						      SRC_IP_31_0));
+	tuple_info->dest_ip_127_96 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY,
+						      DEST_IP_127_96));
+	tuple_info->dest_ip_95_64 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY,
+						      DEST_IP_95_64));
+	tuple_info->dest_ip_63_32 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY,
+						      DEST_IP_63_32));
+	tuple_info->dest_ip_31_0 =
+				qdf_ntohl(HAL_GET_FLD(hal_fse,
+						      RX_FLOW_SEARCH_ENTRY,
+						      DEST_IP_31_0));
+	tuple_info->dest_port = HAL_GET_FLD(hal_fse,
+					    RX_FLOW_SEARCH_ENTRY,
+					    DEST_PORT);
+	tuple_info->src_port = HAL_GET_FLD(hal_fse,
+					   RX_FLOW_SEARCH_ENTRY,
+					   SRC_PORT);
+	tuple_info->l4_protocol = HAL_GET_FLD(hal_fse,
+					      RX_FLOW_SEARCH_ENTRY,
+					      L4_PROTOCOL);
+
+	return hal_fse;
+}
+
+/**
+ * hal_rx_flow_delete_entry_be() - Setup a flow search entry in HW FST
+ * @fst: Pointer to the Rx Flow Search Table
+ * @hal_rx_fse: Pointer to the Rx Flow that is to be deleted from the FST
+ *
+ * Return: Success/Failure
+ */
+static QDF_STATUS
+hal_rx_flow_delete_entry_be(uint8_t *rx_fst, void *hal_rx_fse)
+{
+	uint8_t *fse = (uint8_t *)hal_rx_fse;
+
+	if (!HAL_GET_FLD(fse, RX_FLOW_SEARCH_ENTRY, VALID))
+		return QDF_STATUS_E_NOENT;
+
+	HAL_CLR_FLD(fse, RX_FLOW_SEARCH_ENTRY, VALID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hal_rx_fst_get_fse_size_be() - Retrieve the size of each entry in Rx FST
+ *
+ * Return: size of each entry/flow in Rx FST
+ */
+static inline uint32_t
+hal_rx_fst_get_fse_size_be(void)
+{
+	return HAL_RX_FST_ENTRY_SIZE;
 }
 #endif /* _HAL_BE_GENERIC_API_H_ */

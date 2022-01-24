@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -380,7 +380,7 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_CFR: CFR module ID
  * @QDF_MODULE_ID_DP_TX_CAPTURE: Tx capture enhancement feature ID
  * @QDF_MODULE_ID_INTEROP_ISSUES_AP: interop issues ap module ID
- * @QDF_MODULE_ID_BLACKLIST_MGR: Blacklist Manager module
+ * @QDF_MODULE_ID_DENYLIST_MGR: Denylist Manager module
  * @QDF_MODULE_ID_QLD: QCA Live Debug module ID
  * @QDF_MODULE_ID_DYNAMIC_MODE_CHG: Dynamic mode change module ID
  * @QDF_MODULE_ID_COEX: Coex related config module ID
@@ -420,6 +420,8 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_MON: Monitor module ID
  * @QDF_MODULE_ID_MGMT_RX_REO: Management rx-reorder module ID
  * @QDF_MODULE_ID_AFC: AFC module ID
+ * @QDF_MODULE_ID_WIFI_RADAR: WIFI RADAR module ID
+ * @QDF_MODULE_ID_TWT: TWT module ID
  * @QDF_MODULE_ID_ANY: anything
  * @QDF_MODULE_ID_MAX: Max place holder module ID
  *
@@ -536,7 +538,7 @@ typedef enum {
 	QDF_MODULE_ID_CFR,
 	QDF_MODULE_ID_DP_TX_CAPTURE,
 	QDF_MODULE_ID_INTEROP_ISSUES_AP,
-	QDF_MODULE_ID_BLACKLIST_MGR,
+	QDF_MODULE_ID_DENYLIST_MGR,
 	QDF_MODULE_ID_QLD,
 	QDF_MODULE_ID_DYNAMIC_MODE_CHG,
 	QDF_MODULE_ID_COEX,
@@ -576,6 +578,8 @@ typedef enum {
 	QDF_MODULE_ID_MON,
 	QDF_MODULE_ID_MGMT_RX_REO,
 	QDF_MODULE_ID_AFC,
+	QDF_MODULE_ID_WIFI_RADAR,
+	QDF_MODULE_ID_TWT,
 	QDF_MODULE_ID_ANY,
 	QDF_MODULE_ID_MAX,
 } QDF_MODULE_ID;
@@ -1407,6 +1411,7 @@ enum qdf_suspend_type {
  * @QDF_RX_REG_PKT_ROUTE_ERR: MSDU buf errors exceed thresh in REO err path
  * @QDF_VDEV_SM_OUT_OF_SYNC: Vdev SM is out of sync and connect req received
  * when already connected
+ * @QDF_STATS_REQ_TIMEDOUT: Stats request timedout
  */
 enum qdf_hang_reason {
 	QDF_REASON_UNSPECIFIED,
@@ -1436,6 +1441,7 @@ enum qdf_hang_reason {
 	QDF_TASKLET_CREDIT_LATENCY_DETECT,
 	QDF_RX_REG_PKT_ROUTE_ERR,
 	QDF_VDEV_SM_OUT_OF_SYNC,
+	QDF_STATS_REQ_TIMEDOUT,
 };
 
 /**

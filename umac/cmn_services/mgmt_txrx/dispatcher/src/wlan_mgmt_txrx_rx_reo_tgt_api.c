@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -62,7 +63,7 @@ tgt_mgmt_rx_reo_enter_algo_without_buffer(
 				enum mgmt_rx_reo_frame_descriptor_type type)
 {
 	struct mgmt_rx_event_params mgmt_rx_params;
-	struct mgmt_rx_reo_frame_descriptor desc;
+	struct mgmt_rx_reo_frame_descriptor desc = {0};
 	bool is_frm_queued;
 	QDF_STATUS status;
 
@@ -82,6 +83,8 @@ tgt_mgmt_rx_reo_enter_algo_without_buffer(
 	desc.rx_params = &mgmt_rx_params;
 	desc.type = type;
 	desc.ingress_timestamp = qdf_get_log_timestamp();
+	desc.list_size_rx = -1;
+	desc.list_insertion_pos = -1;
 
 	/** If REO is not required for this descriptor,
 	 *  no need to proceed further
@@ -161,7 +164,7 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 				struct mgmt_rx_event_params *mgmt_rx_params)
 {
 	QDF_STATUS status;
-	struct mgmt_rx_reo_frame_descriptor desc;
+	struct mgmt_rx_reo_frame_descriptor desc = {0};
 	bool is_queued;
 
 	if (!pdev) {
@@ -170,7 +173,7 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 		goto cleanup;
 	}
 
-	if (!buf) {
+	if (!wlan_mgmt_rx_reo_is_simulation_in_progress() && !buf) {
 		mgmt_rx_reo_err("nbuf is NULL");
 		status = QDF_STATUS_E_NULL_VALUE;
 		goto cleanup;
@@ -187,6 +190,8 @@ QDF_STATUS tgt_mgmt_rx_reo_frame_handler(
 	desc.nbuf = buf;
 	desc.rx_params = mgmt_rx_params;
 	desc.ingress_timestamp = qdf_get_log_timestamp();
+	desc.list_size_rx = -1;
+	desc.list_insertion_pos = -1;
 
 	/* If REO is not required for this frame, process it right away */
 	if (!is_mgmt_rx_reo_required(pdev, &desc)) {

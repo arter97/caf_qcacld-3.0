@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -264,6 +264,85 @@ static void reg_update_max_bw_per_rule(uint32_t num_reg_rules,
 			min(reg_rule_start[count].max_bw, max_bw);
 }
 
+#ifdef CONFIG_REG_CLIENT
+/**
+ * reg_bw_floor() - Calculate floor of a given bandwidth. Find the nearest
+ * bandwidth, from the set = {5, 10, 20, 40, 80, 160, 320}, which is less
+ * than or  equal to the given bandwidth. Any input bandwidth less than 5MHz
+ * is converted to 0.
+ * @in_bw: A positive bandwidth value
+ *
+ * Return: The floor of the given bandwidth.
+ */
+static uint16_t reg_bw_floor(uint16_t in_bw)
+{
+	static const uint16_t chwidth_array[] = {5, 10, 20, 40, 80, 160, 320};
+	int16_t i;
+
+	for (i = QDF_ARRAY_SIZE(chwidth_array) - 1; i >= 0; i--) {
+		if (in_bw >= chwidth_array[i])
+			return chwidth_array[i];
+	}
+	return 0;
+}
+
+/**
+ * reg_find_enhanced_bw() - Given two adjacent reg rules, it first finds the
+ * coalesced bandwidth limited by the country/regulatory domain bandwidth. Then
+ * it finds the nearest discrete bandwidth from the discrete
+ * set = {5, 10, 20, 40, 80, 160, 320} of bandwidths.
+ * @reg_rule_ptr: Pointer to reg rule
+ * @cur_idx: Current index to be considered
+ * @max_reg_bw: Maximum bandwidth of the country/regulatory domain
+ *
+ * Return: Return enhanced bandwidth of the coalesced band
+ */
+static uint16_t reg_find_enhanced_bw(struct cur_reg_rule *reg_rule_ptr,
+				     uint32_t cur_idx,
+				     uint16_t max_reg_bw)
+{
+	uint16_t cur_rule_diff_freq;
+	uint16_t next_rule_diff_freq;
+	uint16_t new_bw;
+	uint16_t enhanced_bw;
+
+	cur_rule_diff_freq = reg_rule_ptr[cur_idx].end_freq -
+			reg_rule_ptr[cur_idx].start_freq;
+	next_rule_diff_freq = reg_rule_ptr[cur_idx + 1].end_freq -
+			reg_rule_ptr[cur_idx + 1].start_freq;
+
+	new_bw = QDF_MIN(max_reg_bw, cur_rule_diff_freq + next_rule_diff_freq);
+	enhanced_bw = reg_bw_floor(new_bw);
+
+	return enhanced_bw;
+}
+
+/**
+ * reg_do_auto_bw_correction() - Calculate and update the maximum bandwidth
+ * value.
+ * @num_reg_rules: Number of regulatory rules.
+ * @reg_rule_ptr: Pointer to regulatory rules.
+ * @max_bw: Maximum bandwidth
+ */
+static void reg_do_auto_bw_correction(uint32_t num_reg_rules,
+				      struct cur_reg_rule *reg_rule_ptr,
+				      uint16_t max_bw)
+{
+	uint32_t count;
+	uint16_t enhanced_bw;
+
+	for (count = 0; count < num_reg_rules - 1; count++) {
+		if (reg_rule_ptr[count].end_freq ==
+		    reg_rule_ptr[count + 1].start_freq) {
+			enhanced_bw = reg_find_enhanced_bw(reg_rule_ptr,
+							   count,
+							   max_bw);
+			reg_rule_ptr[count].max_bw = enhanced_bw;
+			reg_rule_ptr[count + 1].max_bw = enhanced_bw;
+		}
+	}
+}
+#else
 /**
  * reg_do_auto_bw_correction() - Calculate and update the maximum bandwidth
  * value.
@@ -288,6 +367,7 @@ static void reg_do_auto_bw_correction(uint32_t num_reg_rules,
 		}
 	}
 }
+#endif
 
 /**
  * reg_modify_chan_list_for_dfs_channels() - disable the DFS channels if
@@ -1052,12 +1132,118 @@ reg_modify_disable_chan_list_for_unii1_and_unii2a(
 
 #ifdef CONFIG_BAND_6GHZ
 #ifdef CONFIG_REG_CLIENT
+
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * reg_append_mas_chan_list_for_6g_sp() - Append SP channels to the master
+ * channel list
+ * @pdev_priv_obj: Pointer to pdev private object
+ *
+ * This function appends SP channels to the master channel list
+ *
+ * Return: void.
+ */
+static void
+reg_append_mas_chan_list_for_6g_sp(struct wlan_regulatory_pdev_priv_obj
+			       *pdev_priv_obj)
+{
+	struct regulatory_channel *master_chan_list_6g_client_sp;
+
+	master_chan_list_6g_client_sp = pdev_priv_obj->afc_chan_list;
+
+	qdf_mem_copy(&pdev_priv_obj->mas_chan_list[MIN_6GHZ_CHANNEL],
+		     master_chan_list_6g_client_sp,
+		     NUM_6GHZ_CHANNELS *
+		     sizeof(struct regulatory_channel));
+}
+#else
+static inline void
+reg_append_mas_chan_list_for_6g_sp(struct wlan_regulatory_pdev_priv_obj
+			       *pdev_priv_obj)
+{
+}
+#endif
+
+/**
+ * reg_append_mas_chan_list_for_6g_lpi() - Append LPI channels to the master
+ * channel list
+ * @pdev_priv_obj: Pointer to pdev private object
+ *
+ * This function appends LPI channels to the master channel list
+ *
+ * Return: void.
+ */
+static void
+reg_append_mas_chan_list_for_6g_lpi(struct wlan_regulatory_pdev_priv_obj
+			       *pdev_priv_obj)
+{
+	struct regulatory_channel *master_chan_list_6g_client_lpi;
+	uint8_t i, j;
+
+	if (!pdev_priv_obj->reg_rules.num_of_6g_ap_reg_rules[REG_INDOOR_AP]) {
+		reg_debug("No LPI reg rules");
+		return;
+	}
+
+	master_chan_list_6g_client_lpi =
+		pdev_priv_obj->mas_chan_list_6g_client[REG_INDOOR_AP]
+			[pdev_priv_obj->reg_cur_6g_client_mobility_type];
+
+	for (i = MIN_6GHZ_CHANNEL, j = 0;
+	     i <= MAX_6GHZ_CHANNEL && j < NUM_6GHZ_CHANNELS; i++, j++) {
+		if ((pdev_priv_obj->mas_chan_list[i].state ==
+			CHANNEL_STATE_DISABLE) ||
+			(pdev_priv_obj->mas_chan_list[i].chan_flags &
+			REGULATORY_CHAN_DISABLED)) {
+			qdf_mem_copy(&pdev_priv_obj->mas_chan_list[i],
+				     &master_chan_list_6g_client_lpi[j],
+				     sizeof(struct regulatory_channel));
+		}
+	}
+}
+
+/**
+ * reg_append_mas_chan_list_for_6g_VLP() - Append VLP channels to the master
+ * channel list
+ * @pdev_priv_obj: Pointer to pdev private object
+ *
+ * This function appends VLP channels to the master channel list
+ *
+ * Return: void.
+ */
+static void
+reg_append_mas_chan_list_for_6g_vlp(struct wlan_regulatory_pdev_priv_obj
+			       *pdev_priv_obj)
+{
+	struct regulatory_channel *master_chan_list_6g_client_vlp;
+	uint8_t i, j;
+
+	if (!pdev_priv_obj->reg_rules.num_of_6g_ap_reg_rules[REG_VERY_LOW_POWER_AP]) {
+		reg_debug("No VLP reg rules");
+		return;
+	}
+
+	master_chan_list_6g_client_vlp =
+		pdev_priv_obj->mas_chan_list_6g_client[REG_VERY_LOW_POWER_AP]
+			[pdev_priv_obj->reg_cur_6g_client_mobility_type];
+
+	for (i = MIN_6GHZ_CHANNEL, j = 0;
+	     i <= MAX_6GHZ_CHANNEL && j < NUM_6GHZ_CHANNELS; i++, j++) {
+		if ((pdev_priv_obj->mas_chan_list[i].state ==
+			CHANNEL_STATE_DISABLE) ||
+		    (pdev_priv_obj->mas_chan_list[i].chan_flags &
+		      REGULATORY_CHAN_DISABLED)) {
+			qdf_mem_copy(&pdev_priv_obj->mas_chan_list[i],
+				     &master_chan_list_6g_client_vlp[j],
+				     sizeof(struct regulatory_channel));
+		}
+	}
+}
+
 static void
 reg_append_mas_chan_list_for_6g(struct wlan_regulatory_pdev_priv_obj
 				*pdev_priv_obj)
 {
-	struct regulatory_channel *master_chan_list_6g_client;
-
 	if (pdev_priv_obj->reg_cur_6g_ap_pwr_type >= REG_CURRENT_MAX_AP_TYPE ||
 	    pdev_priv_obj->reg_cur_6g_client_mobility_type >=
 	    REG_MAX_CLIENT_TYPE) {
@@ -1065,14 +1251,20 @@ reg_append_mas_chan_list_for_6g(struct wlan_regulatory_pdev_priv_obj
 		return;
 	}
 
-	master_chan_list_6g_client =
-		pdev_priv_obj->mas_chan_list_6g_client[REG_INDOOR_AP]
-			[pdev_priv_obj->reg_cur_6g_client_mobility_type];
+	/* Client should be able to scan all types of APs, so prepare the
+	 * client list which has all the enabled channels, first priority is
+	 * given to AFC power type and then second priority is decided based on
+	 * gindoor_channel_support ini value
+	 */
+	reg_append_mas_chan_list_for_6g_sp(pdev_priv_obj);
 
-	qdf_mem_copy(&pdev_priv_obj->mas_chan_list[MIN_6GHZ_CHANNEL],
-		     master_chan_list_6g_client,
-		     NUM_6GHZ_CHANNELS *
-		     sizeof(struct regulatory_channel));
+	if (pdev_priv_obj->indoor_chan_enabled) {
+		reg_append_mas_chan_list_for_6g_lpi(pdev_priv_obj);
+		reg_append_mas_chan_list_for_6g_vlp(pdev_priv_obj);
+	} else {
+		reg_append_mas_chan_list_for_6g_vlp(pdev_priv_obj);
+		reg_append_mas_chan_list_for_6g_lpi(pdev_priv_obj);
+	}
 }
 
 static void
@@ -2463,6 +2655,30 @@ QDF_STATUS reg_process_master_chan_list_ext(
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS reg_get_6g_ap_master_chan_list(struct wlan_objmgr_pdev *pdev,
+					  enum reg_6g_ap_type ap_pwr_type,
+					  struct regulatory_channel *chan_list)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *master_chan_list_6g;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev private obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (ap_pwr_type >= REG_CURRENT_MAX_AP_TYPE)
+		return QDF_STATUS_E_FAILURE;
+
+	master_chan_list_6g = pdev_priv_obj->mas_chan_list_6g_ap[ap_pwr_type];
+	qdf_mem_copy(chan_list, master_chan_list_6g,
+		     NUM_6GHZ_CHANNELS * sizeof(struct regulatory_channel));
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef CONFIG_AFC_SUPPORT
 static void reg_disable_afc_mas_chan_list_channels(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
@@ -3307,30 +3523,6 @@ reg_get_secondary_current_chan_list(struct wlan_objmgr_pdev *pdev,
 #endif
 
 #if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
-QDF_STATUS reg_get_6g_ap_master_chan_list(struct wlan_objmgr_pdev *pdev,
-					  enum reg_6g_ap_type ap_pwr_type,
-					  struct regulatory_channel *chan_list)
-{
-	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
-	struct regulatory_channel *master_chan_list_6g;
-
-	pdev_priv_obj = reg_get_pdev_obj(pdev);
-
-	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
-		reg_err("reg pdev private obj is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (ap_pwr_type >= REG_CURRENT_MAX_AP_TYPE)
-		return QDF_STATUS_E_FAILURE;
-
-	master_chan_list_6g = pdev_priv_obj->mas_chan_list_6g_ap[ap_pwr_type];
-	qdf_mem_copy(chan_list, master_chan_list_6g,
-		     NUM_6GHZ_CHANNELS * sizeof(struct regulatory_channel));
-
-	return QDF_STATUS_SUCCESS;
-}
-
 QDF_STATUS reg_get_6g_afc_chan_list(struct wlan_objmgr_pdev *pdev,
 				    struct regulatory_channel *chan_list)
 {

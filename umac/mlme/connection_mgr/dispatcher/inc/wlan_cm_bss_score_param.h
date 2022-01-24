@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -139,7 +140,7 @@ struct per_slot_score {
 	uint32_t score_pcnt15_to_12;
 };
 
-#ifndef WLAN_FEATURE_11BE_MLO
+#ifndef WLAN_FEATURE_11BE
 #define CM_20MHZ_BW_INDEX                  0
 #define CM_40MHZ_BW_INDEX                  1
 #define CM_80MHZ_BW_INDEX                  2
@@ -153,21 +154,44 @@ struct per_slot_score {
 #define CM_MAX_NSS_INDEX                   4
 #else
 enum cm_bw_idx {
-	CM_20MHZ_BW_INDEX,
-	CM_40MHZ_BW_INDEX,
-	CM_80MHZ_BW_INDEX,
-	CM_160MHZ_BW_INDEX,
-	CM_MLO_20_PLUS_20MHZ_BW_INDEX,
-	CM_MLO_20_PLUS_40MHZ_BW_INDEX,
-	CM_MLO_40_PLUS_40MHZ_BW_INDEX,
-	CM_MLO_20_PLUS_80MHZ_BW_INDEX,
-	CM_MLO_40_PLUS_80MHZ_BW_INDEX,
-	CM_MLO_80_PLUS_80MHZ_BW_INDEX,
-	CM_MLO_20_PLUS_160HZ_BW_INDEX,
-	CM_MLO_40_PLUS_160HZ_BW_INDEX,
-	CM_MLO_80_PLUS_160HZ_BW_INDEX,
-	CM_MLO_160_PLUS_160HZ_BW_INDEX,
-	CM_320MHZ_BW_INDEX,
+	CM_20MHZ_BW_INDEX = 0,
+	CM_40MHZ_BW_INDEX = 1,
+	CM_80MHZ_BW_INDEX = 2,
+	CM_160MHZ_BW_INDEX = 3,
+	CM_320MHZ_BW_INDEX = 4,
+	CM_80MHZ_BW_20MHZ_PUNCTURE_INDEX = 5,
+	CM_160MHZ_BW_40MHZ_PUNCTURE_INDEX = 6,
+	CM_160MHZ_BW_20MHZ_PUNCTURE_INDEX = 7,
+	CM_320MHZ_BW_40MHZ_80MHZ_PUNCTURE_INDEX = 8,
+	CM_320MHZ_BW_80MHZ_PUNCTURE_INDEX = 9,
+	CM_320MHZ_BW_40MHZ_PUNCTURE_INDEX = 10,
+#ifdef WLAN_FEATURE_11BE_MLO
+	CM_MLO_20_PLUS_20MHZ_BW_INDEX = 11,
+	CM_MLO_20_PLUS_40MHZ_BW_INDEX = 12,
+	CM_MLO_40_PLUS_40MHZ_BW_INDEX = 13,
+	CM_MLO_20_PLUS_80MHZ_BW_20MHZ_PUNCTURE_INDEX = 14,
+	CM_MLO_20_PLUS_80MHZ_BW_INDEX = 15,
+	CM_MLO_40_PLUS_80MHZ_BW_20MHZ_PUNCTURE_INDEX = 16,
+	CM_MLO_40_PLUS_80MHZ_BW_INDEX = 17,
+	CM_MLO_80_PLUS_80MHZ_BW_40MHZ_PUNCTURE_INDEX = 18,
+	CM_MLO_80_PLUS_80MHZ_BW_20MHZ_PUNCTURE_INDEX = 19,
+	CM_MLO_80_PLUS_80MHZ_BW_INDEX = 20,
+	CM_MLO_20_PLUS_160HZ_BW_40MHZ_PUNCTURE_INDEX = 21,
+	CM_MLO_20_PLUS_160HZ_BW_20MHZ_PUNCTURE_INDEX = 22,
+	CM_MLO_20_PLUS_160HZ_BW_INDEX = 23,
+	CM_MLO_40_PLUS_160HZ_BW_40MHZ_PUNCTURE_INDEX = 24,
+	CM_MLO_40_PLUS_160HZ_BW_20MHZ_PUNCTURE_INDEX = 25,
+	CM_MLO_40_PLUS_160HZ_BW_INDEX = 26,
+	CM_MLO_80_PLUS_160HZ_BW_60MHZ_PUNCTURE_INDEX = 27,
+	CM_MLO_80_PLUS_160HZ_BW_40MHZ_PUNCTURE_INDEX = 28,
+	CM_MLO_80_PLUS_160HZ_BW_20MHZ_PUNCTURE_INDEX = 29,
+	CM_MLO_80_PLUS_160HZ_BW_INDEX = 30,
+	CM_MLO_160_PLUS_160HZ_BW_80MHZ_PUNCTURE_INDEX = 31,
+	CM_MLO_160_PLUS_160HZ_BW_60MHZ_PUNCTURE_INDEX = 32,
+	CM_MLO_160_PLUS_160HZ_BW_40MHZ_PUNCTURE_INDEX = 33,
+	CM_MLO_160_PLUS_160HZ_BW_20MHZ_PUNCTURE_INDEX = 34,
+	CM_MLO_160_PLUS_160HZ_BW_INDEX = 35,
+#endif
 	CM_MAX_BW_INDEX
 };
 
@@ -176,8 +200,10 @@ enum cm_nss_idx {
 	CM_NSS_2x2_INDEX,
 	CM_NSS_3x3_INDEX,
 	CM_NSS_4x4_INDEX,
+#ifdef WLAN_FEATURE_11BE_MLO
 	CM_NSS_2x2_PLUS_2x2_INDEX,
 	CM_NSS_4x4_PLUS_4x4_INDEX,
+#endif
 	CM_MAX_NSS_INDEX
 };
 #endif
@@ -229,24 +255,24 @@ struct pcl_freq_weight_list {
 };
 
 /**
- * enum cm_blacklist_action - action taken by blacklist manager for the bssid
- * @CM_BLM_NO_ACTION: No operation to be taken for the BSSID in the scan list.
- * @CM_BLM_REMOVE: Remove the BSSID from the scan list (AP is blacklisted)
- * This param is a way to inform the caller that this BSSID is blacklisted
- * but it is a driver blacklist and we can connect to them if required.
- * @CM_BLM_FORCE_REMOVE: Forcefully remove the BSSID from scan list.
+ * enum cm_denylist_action - action taken by denylist manager for the bssid
+ * @CM_DLM_NO_ACTION: No operation to be taken for the BSSID in the scan list.
+ * @CM_DLM_REMOVE: Remove the BSSID from the scan list (AP is denylisted)
+ * This param is a way to inform the caller that this BSSID is denylisted
+ * but it is a driver denylist and we can connect to them if required.
+ * @CM_DLM_FORCE_REMOVE: Forcefully remove the BSSID from scan list.
  * This param is introduced as we want to differentiate between optional
- * mandatory blacklisting. Driver blacklisting is optional and won't
+ * mandatory denylisting. Driver denylisting is optional and won't
  * fail any CERT or protocol violations as it is internal implementation.
  * hence FORCE_REMOVE will mean that driver cannot connect to this BSSID
  * in any situation.
- * @CM_BLM_AVOID: Add the Ap at last of the scan list (AP to Avoid)
+ * @CM_DLM_AVOID: Add the Ap at last of the scan list (AP to Avoid)
  */
-enum cm_blacklist_action {
-	CM_BLM_NO_ACTION,
-	CM_BLM_REMOVE,
-	CM_BLM_FORCE_REMOVE,
-	CM_BLM_AVOID,
+enum cm_denylist_action {
+	CM_DLM_NO_ACTION,
+	CM_DLM_REMOVE,
+	CM_DLM_FORCE_REMOVE,
+	CM_DLM_AVOID,
 };
 
 /**
@@ -261,16 +287,16 @@ struct etp_params {
 	uint32_t ba_window_size;
 };
 
-#ifdef FEATURE_BLACKLIST_MGR
-enum cm_blacklist_action
-wlan_blacklist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
-			       struct scan_cache_entry *entry);
+#ifdef FEATURE_DENYLIST_MGR
+enum cm_denylist_action
+wlan_denylist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
+			      struct scan_cache_entry *entry);
 #else
-static inline enum cm_blacklist_action
-wlan_blacklist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
-			       struct scan_cache_entry *entry)
+static inline enum cm_denylist_action
+wlan_denylist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
+			      struct scan_cache_entry *entry)
 {
-	return CM_BLM_NO_ACTION;
+	return CM_DLM_NO_ACTION;
 }
 #endif
 

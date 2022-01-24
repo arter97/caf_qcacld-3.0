@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,6 +27,7 @@
 #endif
 #include "dp_internal.h"
 #include "hal_tx.h"
+#include <qdf_tracepoint.h>
 
 #define DP_INVALID_VDEV_ID 0xFF
 
@@ -178,6 +179,8 @@ struct dp_tx_queue {
  * @exception_fw: Duplicate frame to be sent to firmware
  * @ppdu_cookie: 16-bit ppdu_cookie that has to be replayed back in completions
  * @ix_tx_sniffer: Indicates if the packet has to be sniffed
+ * @gsn: global sequence for reinjected mcast packets
+ * @vdev_id : vdev_id for reinjected mcast packets
  *
  * This structure holds the complete MSDU information needed to program the
  * Hardware TCL and MSDU extension descriptors for different frame types
@@ -196,6 +199,12 @@ struct dp_tx_msdu_info_s {
 	} u;
 	uint32_t meta_data[DP_TX_MSDU_INFO_META_DATA_DWORDS];
 	uint16_t ppdu_cookie;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+#ifdef WLAN_MCAST_MLO
+	uint16_t gsn;
+	uint8_t vdev_id;
+#endif
+#endif
 };
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -231,6 +240,29 @@ QDF_STATUS dp_tx_tso_cmn_desc_pool_alloc(struct dp_soc *soc,
 QDF_STATUS dp_tx_tso_cmn_desc_pool_init(struct dp_soc *soc,
 					uint8_t num_pool,
 					uint16_t num_desc);
+void dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc);
+void dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id);
+void dp_tx_compute_delay(struct dp_vdev *vdev, struct dp_tx_desc_s *tx_desc,
+			 uint8_t tid, uint8_t ring_id);
+void dp_tx_comp_process_tx_status(struct dp_soc *soc,
+				  struct dp_tx_desc_s *tx_desc,
+				  struct hal_tx_completion_status *ts,
+				  struct dp_peer *peer, uint8_t ring_id);
+void dp_tx_comp_process_desc(struct dp_soc *soc,
+			     struct dp_tx_desc_s *desc,
+			     struct hal_tx_completion_status *ts,
+			     struct dp_peer *peer);
+void dp_tx_reinject_handler(struct dp_soc *soc,
+			    struct dp_vdev *vdev,
+			    struct dp_tx_desc_s *tx_desc,
+			    uint8_t *status,
+			    uint8_t reinject_reason);
+void dp_tx_inspect_handler(struct dp_soc *soc,
+			   struct dp_vdev *vdev,
+			   struct dp_tx_desc_s *tx_desc,
+			   uint8_t *status);
+void dp_tx_update_peer_basic_stats(struct dp_peer *peer, uint32_t length,
+				   uint8_t tx_status, bool update);
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 /**
@@ -356,6 +388,56 @@ static inline QDF_STATUS dp_tx_pdev_init(struct dp_pdev *pdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * dp_tx_prefetch_hw_sw_nbuf_desc() - function to prefetch HW and SW desc
+ * @soc: Handle to HAL Soc structure
+ * @hal_soc: HAL SOC handle
+ * @num_avail_for_reap: descriptors available for reap
+ * @hal_ring_hdl: ring pointer
+ * @last_prefetched_hw_desc: pointer to the last prefetched HW descriptor
+ * @last_prefetched_sw_desc: pointer to last prefetch SW desc
+ *
+ * Return: None
+ */
+#ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH
+static inline
+void dp_tx_prefetch_hw_sw_nbuf_desc(struct dp_soc *soc,
+				    hal_soc_handle_t hal_soc,
+				    uint32_t num_avail_for_reap,
+				    hal_ring_handle_t hal_ring_hdl,
+				    void **last_prefetched_hw_desc,
+				    struct dp_tx_desc_s
+				    **last_prefetched_sw_desc)
+{
+	if (*last_prefetched_sw_desc) {
+		qdf_prefetch((uint8_t *)(*last_prefetched_sw_desc)->nbuf);
+		qdf_prefetch((uint8_t *)(*last_prefetched_sw_desc)->nbuf + 64);
+	}
+
+	if (num_avail_for_reap && *last_prefetched_hw_desc) {
+		dp_tx_comp_get_prefetched_params_from_hal_desc(
+						soc,
+						*last_prefetched_hw_desc,
+						last_prefetched_sw_desc);
+		*last_prefetched_hw_desc =
+			hal_srng_dst_prefetch_next_cached_desc(
+					hal_soc,
+					hal_ring_hdl,
+					(uint8_t *)*last_prefetched_hw_desc);
+	}
+}
+#else
+static inline
+void dp_tx_prefetch_hw_sw_nbuf_desc(struct dp_soc *soc,
+				    hal_soc_handle_t hal_soc,
+				    uint32_t num_avail_for_reap,
+				    hal_ring_handle_t hal_ring_hdl,
+				    void **last_prefetched_hw_desc,
+				    struct dp_tx_desc_s
+				    **last_prefetched_sw_desc)
+{
+}
+#endif
 
 #ifndef FEATURE_WDS
 static inline void dp_tx_mec_handler(struct dp_vdev *vdev, uint8_t *status)
@@ -760,6 +842,12 @@ dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 			      hal_ring_handle_t hal_ring_hdl,
 			      int coalesce);
 #else
+#ifdef DP_POWER_SAVE
+void
+dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
+			      hal_ring_handle_t hal_ring_hdl,
+			      int coalesce);
+#else
 static inline void
 dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 			      hal_ring_handle_t hal_ring_hdl,
@@ -767,6 +855,7 @@ dp_tx_ring_access_end_wrapper(struct dp_soc *soc,
 {
 	dp_tx_ring_access_end(soc, hal_ring_hdl, coalesce);
 }
+#endif
 
 static inline void
 dp_set_rtpm_tput_policy_requirement(struct cdp_soc_t *soc_hdl,
@@ -841,4 +930,16 @@ QDF_STATUS dp_get_uplink_delay(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			       uint32_t *val);
 #endif /* WLAN_FEATURE_TSF_UPLINK_TSF */
 
+/**
+ * dp_tx_pkt_tracepoints_enabled() - Get the state of tx pkt tracepoint
+ *
+ * Return: True if any tx pkt tracepoint is enabled else false
+ */
+static inline
+bool dp_tx_pkt_tracepoints_enabled(void)
+{
+	return (qdf_trace_dp_tx_comp_tcp_pkt_enabled() ||
+		qdf_trace_dp_tx_comp_udp_pkt_enabled() ||
+		qdf_trace_dp_tx_comp_pkt_enabled());
+}
 #endif

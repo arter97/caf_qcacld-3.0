@@ -330,10 +330,10 @@ struct rx_pkt_tlvs {
 #define HAL_RX_TLV_MPDU_QOS_CONTROL_VALID_GET(_rx_pkt_tlv)	\
 	HAL_RX_MPDU_START(_rx_pkt_tlv).mpdu_qos_control_valid
 
-#define HAL_RX_GET_FC_VALID(_rx_pkt_tlv)	\
+#define HAL_RX_TLV_GET_FC_VALID(_rx_pkt_tlv)	\
 	HAL_RX_MPDU_START(_rx_pkt_tlv).mpdu_frame_control_valid
 
-#define HAL_RX_GET_TO_DS_FLAG(_rx_pkt_tlv)	\
+#define HAL_RX_TLV_GET_TO_DS_FLAG(_rx_pkt_tlv)	\
 	HAL_RX_MPDU_START(_rx_pkt_tlv).to_ds
 
 #define HAL_RX_MPDU_GET_FRAME_CONTROL_FIELD(_rx_pkt_tlv)	\
@@ -383,6 +383,22 @@ struct rx_pkt_tlvs {
 
 #define HAL_RX_MSDU_END_SA_SW_PEER_ID_GET(_rx_pkt_tlv)	\
 	HAL_RX_MSDU_END(_rx_pkt_tlv).sa_sw_peer_id
+
+#define HAL_RX_REO_QUEUE_DESC_ADDR_31_0_GET(_rx_pkt_tlv)	\
+	HAL_RX_MPDU_START(_rx_pkt_tlv).rx_reo_queue_desc_addr_31_0
+
+#define HAL_RX_REO_QUEUE_DESC_ADDR_39_32_GET(_rx_pkt_tlv)	\
+	HAL_RX_MPDU_START(_rx_pkt_tlv).rx_reo_queue_desc_addr_39_32
+
+/* used by monitor mode for parsing from full TLV */
+#define HAL_RX_MON_GET_FC_VALID(_rx_mpdu_start)	\
+	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO, MPDU_FRAME_CONTROL_VALID)
+
+#define HAL_RX_MON_GET_TO_DS_FLAG(_rx_mpdu_start)	\
+	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO, TO_DS)
+
+#define HAL_RX_MON_GET_MAC_ADDR2_VALID(_rx_mpdu_start) \
+	HAL_RX_GET(rx_mpdu_start, RX_MPDU_INFO, MAC_ADDR_AD2_VALID)
 
 static inline
 uint32_t hal_rx_tlv_decap_format_get_be(void *hw_desc_addr)
@@ -718,13 +734,12 @@ static inline uint8_t *hal_get_reo_ent_desc_qdesc_addr_be(uint8_t *desc)
  * @buf: pointer to the start of RX PKT TLV headers
  * Return: qdesc adrress in reo destination ring buffer
  */
-static inline uint8_t *hal_rx_get_qdesc_addr_be(uint8_t *dst_ring_desc,
+static inline uint64_t hal_rx_get_qdesc_addr_be(uint8_t *dst_ring_desc,
 						uint8_t *buf)
 {
 	struct rx_pkt_tlvs *rx_pkt_tlvs = (struct rx_pkt_tlvs *)buf;
 
-	return (uint8_t *)(&HAL_RX_MPDU_START(rx_pkt_tlvs) +
-			RX_MPDU_INFO_RX_REO_QUEUE_DESC_ADDR_31_0_OFFSET);
+	return (uint64_t)HAL_RX_REO_QUEUE_DESC_ADDR_31_0_GET(rx_pkt_tlvs);
 }
 
 /**
@@ -779,7 +794,7 @@ hal_rx_msdu_packet_metadata_get_generic_be(uint8_t *buf,
 }
 
 /*
- * hal_rx_msdu_start_nss_get_7850(): API to get the NSS
+ * hal_rx_msdu_start_nss_get_kiwi(): API to get the NSS
  * Interval from rx_msdu_start
  *
  * @buf: pointer to the start of RX PKT TLV header
@@ -1322,14 +1337,14 @@ uint8_t hal_rx_get_fc_valid_be(uint8_t *buf)
 {
 	struct rx_pkt_tlvs *rx_pkt_tlvs = (struct rx_pkt_tlvs *)buf;
 
-	return HAL_RX_GET_FC_VALID(rx_pkt_tlvs);
+	return HAL_RX_TLV_GET_FC_VALID(rx_pkt_tlvs);
 }
 
 static inline uint8_t hal_rx_get_to_ds_flag_be(uint8_t *buf)
 {
 	struct rx_pkt_tlvs *rx_pkt_tlvs = (struct rx_pkt_tlvs *)buf;
 
-	return HAL_RX_GET_TO_DS_FLAG(rx_pkt_tlvs);
+	return HAL_RX_TLV_GET_TO_DS_FLAG(rx_pkt_tlvs);
 }
 
 static inline uint8_t hal_rx_get_mac_addr2_valid_be(uint8_t *buf)

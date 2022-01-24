@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,7 +47,7 @@
 #include "hal_rx.h"
 //#include "hal_rx_flow.h"
 
-#define MAX_BW 7
+#define MAX_BW 8
 #define MAX_RETRIES 4
 #define MAX_RECEPTION_TYPES 4
 
@@ -74,10 +74,7 @@
 #define DP_VDEV_ALL 0xff
 
 #if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
-#define MAX_PDEV_CNT 1
 #define WLAN_DP_RESET_MON_BUF_RING_FILTER
-#else
-#define MAX_PDEV_CNT 3
 #endif
 
 /* Max no. of VDEV per PSOC */
@@ -164,9 +161,6 @@
 #define DP_SKIP_BAR_UPDATE_TIMEOUT 5000
 #endif
 
-#define DP_MAX_VDEV_STATS_ID        CDP_MAX_VDEV_STATS_ID
-#define DP_INVALID_VDEV_STATS_ID    CDP_INVALID_VDEV_STATS_ID
-
 enum rx_pktlog_mode {
 	DP_RX_PKTLOG_DISABLED = 0,
 	DP_RX_PKTLOG_FULL,
@@ -220,30 +214,31 @@ enum dp_peer_state {
  * enum for modules ids of
  */
 enum dp_mod_id {
-	DP_MOD_ID_TX_COMP = 0,
-	DP_MOD_ID_RX = 1,
-	DP_MOD_ID_HTT_COMP = 2,
-	DP_MOD_ID_RX_ERR = 3,
-	DP_MOD_ID_TX_PPDU_STATS = 4,
-	DP_MOD_ID_RX_PPDU_STATS = 5,
-	DP_MOD_ID_CDP = 6,
-	DP_MOD_ID_GENERIC_STATS = 7,
-	DP_MOD_ID_TX_MULTIPASS = 8,
-	DP_MOD_ID_TX_CAPTURE = 9,
-	DP_MOD_ID_NSS_OFFLOAD = 10,
-	DP_MOD_ID_CONFIG = 11,
-	DP_MOD_ID_HTT = 12,
-	DP_MOD_ID_IPA = 13,
-	DP_MOD_ID_AST = 14,
-	DP_MOD_ID_MCAST2UCAST = 15,
-	DP_MOD_ID_CHILD = 16,
-	DP_MOD_ID_MESH = 17,
-	DP_MOD_ID_TX_EXCEPTION = 18,
-	DP_MOD_ID_TDLS = 19,
-	DP_MOD_ID_MISC = 20,
-	DP_MOD_ID_MSCS = 21,
-	DP_MOD_ID_TX = 22,
-	DP_MOD_ID_MAX = 23,
+	DP_MOD_ID_TX_RX,
+	DP_MOD_ID_TX_COMP,
+	DP_MOD_ID_RX,
+	DP_MOD_ID_HTT_COMP,
+	DP_MOD_ID_RX_ERR,
+	DP_MOD_ID_TX_PPDU_STATS,
+	DP_MOD_ID_RX_PPDU_STATS,
+	DP_MOD_ID_CDP,
+	DP_MOD_ID_GENERIC_STATS,
+	DP_MOD_ID_TX_MULTIPASS,
+	DP_MOD_ID_TX_CAPTURE,
+	DP_MOD_ID_NSS_OFFLOAD,
+	DP_MOD_ID_CONFIG,
+	DP_MOD_ID_HTT,
+	DP_MOD_ID_IPA,
+	DP_MOD_ID_AST,
+	DP_MOD_ID_MCAST2UCAST,
+	DP_MOD_ID_CHILD,
+	DP_MOD_ID_MESH,
+	DP_MOD_ID_TX_EXCEPTION,
+	DP_MOD_ID_TDLS,
+	DP_MOD_ID_MISC,
+	DP_MOD_ID_MSCS,
+	DP_MOD_ID_TX,
+	DP_MOD_ID_MAX,
 };
 
 #define DP_PDEV_ITERATE_VDEV_LIST(_pdev, _vdev) \
@@ -417,6 +412,8 @@ struct dp_rx_nbuf_frag_info {
  * @DP_RX_REINJECT_RING_HIST_TYPE: Datapath reinject ring history
  * @DP_RX_REFILL_RING_HIST_TYPE: Datapath rx refill ring history
  * @DP_TX_HW_DESC_HIST_TYPE: Datapath TX HW descriptor history
+ * @DP_MON_SOC_TYPE: Datapath monitor soc context
+ * @DP_MON_PDEV_TYPE: Datapath monitor pdev context
  */
 enum dp_ctxt_type {
 	DP_PDEV_TYPE,
@@ -428,6 +425,8 @@ enum dp_ctxt_type {
 	DP_FISA_RX_FT_TYPE,
 	DP_RX_REFILL_RING_HIST_TYPE,
 	DP_TX_HW_DESC_HIST_TYPE,
+	DP_MON_SOC_TYPE,
+	DP_MON_PDEV_TYPE,
 };
 
 /**
@@ -861,6 +860,7 @@ struct dp_rx_tid {
  * @num_reo_status_ring_masks: interrupts with reo_status_ring_mask set
  * @num_rxdma2host_ring_masks: interrupts with rxdma2host_ring_mask set
  * @num_host2rxdma_ring_masks: interrupts with host2rxdma_ring_mask set
+ * @num_host2rxdma_mon_ring_masks: interrupts with host2rxdma_ring_mask set
  * @num_rx_ring_near_full_masks: Near-full interrupts for REO DST ring
  * @num_tx_comp_ring_near_full_masks: Near-full interrupts for TX completion
  * @num_rx_wbm_rel_ring_near_full_masks: total number of times the wbm rel ring
@@ -870,6 +870,9 @@ struct dp_rx_tid {
  * @num_near_full_masks: total number of times the near full interrupt
  *                       was received
  * @num_masks: total number of times the interrupt was received
+ * @num_host2txmon_ring_masks: interrupts with host2txmon_ring_mask set
+ * @num_near_full_masks: total number of times the interrupt was received
+ * @num_masks: total number of times the near full interrupt was received
  * @num_tx_mon_ring_masks: interrupts with num_tx_mon_ring_masks set
  *
  * Counter for individual masks are incremented only if there are any packets
@@ -884,10 +887,12 @@ struct dp_intr_stats {
 	uint32_t num_reo_status_ring_masks;
 	uint32_t num_rxdma2host_ring_masks;
 	uint32_t num_host2rxdma_ring_masks;
+	uint32_t num_host2rxdma_mon_ring_masks;
 	uint32_t num_rx_ring_near_full_masks[MAX_REO_DEST_RINGS];
 	uint32_t num_tx_comp_ring_near_full_masks[MAX_TCL_DATA_RINGS];
 	uint32_t num_rx_wbm_rel_ring_near_full_masks;
 	uint32_t num_reo_status_ring_near_full_masks;
+	uint32_t num_host2txmon_ring__masks;
 	uint32_t num_near_full_masks;
 	uint32_t num_masks;
 	uint32_t num_tx_mon_ring_masks;
@@ -900,7 +905,6 @@ struct dp_intr {
 	uint8_t rx_ring_mask;   /* Rx REO rings (0-3) associated
 				with this interrupt context */
 	uint8_t rx_mon_ring_mask;  /* Rx monitor ring mask (0-2) */
-	uint8_t tx_mon_ring_mask;  /* Tx monitor ring mask (0-2) */
 	uint8_t rx_err_ring_mask; /* REO Exception Ring */
 	uint8_t rx_wbm_rel_ring_mask; /* WBM2SW Rx Release Ring */
 	uint8_t reo_status_ring_mask; /* REO command response ring */
@@ -914,6 +918,8 @@ struct dp_intr {
 	uint8_t rx_near_full_grp_2_mask;
 	/* WBM TX completion rings near full interrupt mask */
 	uint8_t tx_ring_near_full_mask;
+	uint8_t host2txmon_ring_mask; /* Tx monitor buffer ring */
+	uint8_t tx_mon_ring_mask;  /* Tx monitor ring mask (0-2) */
 	struct dp_soc *soc;    /* Reference to SoC structure ,
 				to get DMA ring handles */
 	qdf_lro_ctx_t lro_ctx;
@@ -1608,6 +1614,8 @@ struct dp_tx_msdu_info_s;
  * @DP_CONTEXT_TYPE_PDEV: Context type DP PDEV
  * @DP_CONTEXT_TYPE_VDEV: Context type DP VDEV
  * @DP_CONTEXT_TYPE_PEER: Context type DP PEER
+ * @DP_CONTEXT_TYPE_MON_SOC: Context type DP MON SOC
+ * @DP_CONTEXT_TYPE_MON_PDEV: Context type DP MON PDEV
  *
  * Helper enums to be used to retrieve the size of the corresponding
  * data structure by passing the type.
@@ -1616,7 +1624,9 @@ enum dp_context_type {
 	DP_CONTEXT_TYPE_SOC,
 	DP_CONTEXT_TYPE_PDEV,
 	DP_CONTEXT_TYPE_VDEV,
-	DP_CONTEXT_TYPE_PEER
+	DP_CONTEXT_TYPE_PEER,
+	DP_CONTEXT_TYPE_MON_SOC,
+	DP_CONTEXT_TYPE_MON_PDEV
 };
 
 /*
@@ -1649,8 +1659,8 @@ struct dp_arch_ops {
 				       struct dp_vdev *vdev);
 	QDF_STATUS (*txrx_vdev_detach)(struct dp_soc *soc,
 				       struct dp_vdev *vdev);
-	QDF_STATUS (*txrx_peer_attach)(struct dp_soc *soc);
-	void (*txrx_peer_detach)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_peer_map_attach)(struct dp_soc *soc);
+	void (*txrx_peer_map_detach)(struct dp_soc *soc);
 	QDF_STATUS (*dp_rxdma_ring_sel_cfg)(struct dp_soc *soc);
 	void (*soc_cfg_attach)(struct dp_soc *soc);
 	void (*peer_get_reo_hash)(struct dp_vdev *vdev,
@@ -1671,6 +1681,11 @@ struct dp_arch_ops {
 	 void (*tx_comp_get_params_from_hal_desc)(struct dp_soc *soc,
 						  void *tx_comp_hal_desc,
 						  struct dp_tx_desc_s **desc);
+	void (*dp_tx_process_htt_completion)(struct dp_soc *soc,
+					     struct dp_tx_desc_s *tx_desc,
+					     uint8_t *status,
+					     uint8_t ring_id);
+
 	uint32_t (*dp_rx_process)(struct dp_intr *int_ctx,
 				  hal_ring_handle_t hal_ring_hdl,
 				  uint8_t reo_ring_num, uint32_t quota);
@@ -1713,12 +1728,19 @@ struct dp_arch_ops {
 
 	/* Misc Arch Ops */
 	qdf_size_t (*txrx_get_context_size)(enum dp_context_type);
+	qdf_size_t (*txrx_get_mon_context_size)(enum dp_context_type);
 	int (*dp_srng_test_and_update_nf_params)(struct dp_soc *soc,
 						 struct dp_srng *dp_srng,
 						 int *max_reap_limit);
 
 	/* MLO ops */
 #ifdef WLAN_FEATURE_11BE_MLO
+#ifdef WLAN_MCAST_MLO
+	void (*dp_tx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
+				    qdf_nbuf_t nbuf);
+	bool (*dp_rx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
+				    struct dp_peer *peer, qdf_nbuf_t nbuf);
+#endif
 	void (*mlo_peer_find_hash_detach)(struct dp_soc *soc);
 	QDF_STATUS (*mlo_peer_find_hash_attach)(struct dp_soc *soc);
 	void (*mlo_peer_find_hash_add)(struct dp_soc *soc,
@@ -1730,6 +1752,8 @@ struct dp_arch_ops {
 						   int mac_addr_is_aligned,
 						   enum dp_mod_id mod_id);
 #endif
+	void (*txrx_print_peer_stats)(struct dp_peer *peer,
+				      enum peer_stats_type stats_type);
 };
 
 /**
@@ -2007,11 +2031,15 @@ struct dp_soc {
 	/* Protect peer_id_to_objmap */
 	DP_MUTEX_TYPE peer_map_lock;
 
-	/* maximum value for peer_id */
+	/* maximum number of suppoerted peers */
 	uint32_t max_peers;
+	/* maximum value for peer_id */
+	uint32_t max_peer_id;
 
+#ifdef DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
 	uint32_t peer_id_shift;
 	uint32_t peer_id_mask;
+#endif
 
 	/* SoC level data path statistics */
 	struct dp_soc_stats stats;
@@ -2269,6 +2297,7 @@ struct dp_soc {
 	qdf_atomic_t ref_count;
 
 	unsigned long vdev_stats_id_map;
+	bool txmon_hw_support;
 };
 
 #ifdef IPA_OFFLOAD
@@ -3293,8 +3322,24 @@ struct dp_mld_link_peers {
 };
 #endif
 
+typedef void *dp_txrx_ref_handle;
+
+struct dp_txrx_peer {
+	/* Core TxRx Peer */
+
+	/* VDEV to which this peer is associated */
+	struct dp_vdev *vdev;
+
+	/* peer ID for this peer */
+	uint16_t peer_id;
+};
+
 /* Peer structure for data path state */
 struct dp_peer {
+	struct dp_txrx_peer *txrx_peer;
+#ifdef WIFI_MONITOR_SUPPORT
+	struct dp_mon_peer *monitor_peer;
+#endif
 	/* VDEV to which this peer is associated */
 	struct dp_vdev *vdev;
 
@@ -3337,7 +3382,7 @@ struct dp_peer {
 		hw_txrx_stats_en:1; /*Indicate HW offload vdev stats */
 
 #ifdef WLAN_FEATURE_11BE_MLO
-	uint8_t assoc_link:1, /* first assoc link peer for MLO */
+	uint8_t first_link:1, /* first link peer for MLO */
 		primary_link:1; /* primary link for MLO */
 #endif
 
@@ -3422,9 +3467,6 @@ struct dp_peer {
 
 #ifdef WLAN_SUPPORT_MESH_LATENCY
 	struct dp_peer_mesh_latency_parameter mesh_latency_params[DP_MAX_TIDS];
-#endif
-#ifdef WIFI_MONITOR_SUPPORT
-	struct dp_mon_peer *monitor_peer;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	/* peer type */
@@ -3680,6 +3722,10 @@ QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng,
 			int ring_type, int ring_num, int mac_id);
 void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 		    int ring_type, int ring_num);
+void dp_print_peer_txrx_stats_be(struct dp_peer *peer,
+				 enum peer_stats_type stats_type);
+void dp_print_peer_txrx_stats_li(struct dp_peer *peer,
+				 enum peer_stats_type stats_type);
 
 enum timer_yield_status
 dp_should_timer_irq_yield(struct dp_soc *soc, uint32_t work_done,
@@ -3716,4 +3762,19 @@ void dp_vdev_get_default_reo_hash(struct dp_vdev *vdev,
 
 bool dp_reo_remap_config(struct dp_soc *soc, uint32_t *remap0,
 			 uint32_t *remap1, uint32_t *remap2);
+
+#ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH
+/**
+ * dp_tx_comp_get_prefetched_params_from_hal_desc() - Get prefetched TX desc
+ * @soc: DP soc handle
+ * @tx_comp_hal_desc: HAL TX Comp Descriptor
+ * @r_tx_desc: SW Tx Descriptor retrieved from HAL desc.
+ *
+ * Return: None
+ */
+void dp_tx_comp_get_prefetched_params_from_hal_desc(
+					struct dp_soc *soc,
+					void *tx_comp_hal_desc,
+					struct dp_tx_desc_s **r_tx_desc);
+#endif
 #endif /* _DP_TYPES_H_ */

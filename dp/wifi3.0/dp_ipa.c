@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -215,7 +215,7 @@ static void dp_ipa_set_reo_ctx_mapping_lock_required(struct dp_soc *soc,
 	hal_ring_handle_t hal_ring_hdl;
 	int ring;
 
-	for (ring = 0; ring < MAX_REO_DEST_RINGS; ring++) {
+	for (ring = 0; ring < soc->num_reo_dest_rings; ring++) {
 		hal_ring_hdl = soc->reo_dest_ring[ring].hal_srng;
 		hal_srng_lock(hal_ring_hdl);
 		soc->ipa_reo_ctx_lock_required[ring] = lock_required;
@@ -1137,8 +1137,6 @@ static void dp_tx_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 	soc->ipa_uc_tx_rsc.tx_buf_pool_vaddr_unaligned = NULL;
 
 	ipa_res = &pdev->ipa_resource;
-	if (!ipa_res->is_db_ddr_mapped)
-		iounmap(ipa_res->tx_comp_doorbell_vaddr);
 
 	qdf_mem_free_sgtable(&ipa_res->tx_ring.sgtable);
 	qdf_mem_free_sgtable(&ipa_res->tx_comp_ring.sgtable);
@@ -1266,7 +1264,7 @@ static int dp_tx_ipa_uc_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 		qdf_mem_dp_tx_skb_inc(qdf_nbuf_get_end_offset(nbuf));
 
 		/*
-		 * TODO - WCN7850 code can directly call the be handler
+		 * TODO - KIWI code can directly call the be handler
 		 * instead of hal soc ops.
 		 */
 		hal_rxdma_buff_addr_info_set(soc->hal_soc, ring_entry,
@@ -1603,6 +1601,29 @@ QDF_STATUS dp_ipa_set_doorbell_paddr(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS dp_ipa_iounmap_doorbell_vaddr(struct cdp_soc_t *soc_hdl,
+					 uint8_t pdev_id)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+	struct dp_ipa_resources *ipa_res;
+
+	if (!wlan_cfg_is_ipa_enabled(soc->wlan_cfg_ctx))
+		return QDF_STATUS_SUCCESS;
+
+	if (!pdev) {
+		dp_err("Invalid instance");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ipa_res = &pdev->ipa_resource;
+	if (!ipa_res->is_db_ddr_mapped)
+		iounmap(ipa_res->tx_comp_doorbell_vaddr);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS dp_ipa_op_response(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			      uint8_t *op_msg)
 {
@@ -1812,15 +1833,16 @@ QDF_STATUS dp_ipa_disable_autonomy(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)) || \
 	defined(CONFIG_IPA_WDI_UNIFIED_API)
 
-#ifndef QCA_LL_TX_FLOW_CONTROL_V2
+#if !defined(QCA_LL_TX_FLOW_CONTROL_V2) && !defined(QCA_IPA_LL_TX_FLOW_CONTROL)
 static inline void dp_setup_mcc_sys_pipes(
 		qdf_ipa_sys_connect_params_t *sys_in,
 		qdf_ipa_wdi_conn_in_params_t *pipe_in)
 {
+	int i = 0;
 	/* Setup MCC sys pipe */
 	QDF_IPA_WDI_CONN_IN_PARAMS_NUM_SYS_PIPE_NEEDED(pipe_in) =
 			DP_IPA_MAX_IFACE;
-	for (int i = 0; i < DP_IPA_MAX_IFACE; i++)
+	for (i = 0; i < DP_IPA_MAX_IFACE; i++)
 		memcpy(&QDF_IPA_WDI_CONN_IN_PARAMS_SYS_IN(pipe_in)[i],
 		       &sys_in[i], sizeof(qdf_ipa_sys_connect_params_t));
 }
@@ -1881,7 +1903,7 @@ static void dp_ipa_wdi_tx_params(struct dp_soc *soc,
 		(uint8_t *)QDF_IPA_WDI_SETUP_INFO_DESC_FORMAT_TEMPLATE(tx);
 	desc_size = sizeof(struct tcl_data_cmd);
 #ifndef DP_BE_WAR
-	/* TODO - WCN7850 does not have these fields */
+	/* TODO - KIWI does not have these fields */
 	HAL_TX_DESC_SET_TLV_HDR(desc_addr, HAL_TX_TCL_DATA_TAG, desc_size);
 #endif
 	tcl_desc_ptr = (struct tcl_data_cmd *)
@@ -1889,7 +1911,7 @@ static void dp_ipa_wdi_tx_params(struct dp_soc *soc,
 	tcl_desc_ptr->buf_addr_info.return_buffer_manager =
 		HAL_RX_BUF_RBM_SW2_BM(soc->wbm_sw0_bm_id);
 #ifndef DP_BE_WAR
-	/* TODO - WCN7850 does not have these fields */
+	/* TODO - KIWI does not have these fields */
 	tcl_desc_ptr->addrx_en = 1;	/* Address X search enable in ASE */
 	tcl_desc_ptr->encap_type = HAL_TX_ENCAP_TYPE_ETHERNET;
 	tcl_desc_ptr->packet_offset = 2;	/* padding for alignment */
@@ -1984,7 +2006,7 @@ dp_ipa_wdi_tx_smmu_params(struct dp_soc *soc,
 			tx_smmu);
 	desc_size = sizeof(struct tcl_data_cmd);
 #ifndef DP_BE_WAR
-	/* TODO - WCN7850 does not have these fields */
+	/* TODO - KIWI does not have these fields */
 	HAL_TX_DESC_SET_TLV_HDR(desc_addr, HAL_TX_TCL_DATA_TAG, desc_size);
 #endif
 	tcl_desc_ptr = (struct tcl_data_cmd *)
@@ -1992,7 +2014,7 @@ dp_ipa_wdi_tx_smmu_params(struct dp_soc *soc,
 	tcl_desc_ptr->buf_addr_info.return_buffer_manager =
 		HAL_RX_BUF_RBM_SW2_BM(soc->wbm_sw0_bm_id);
 #ifndef DP_BE_WAR
-	/* TODO - WCN7850 does not have these fields */
+	/* TODO - KIWI does not have these fields */
 	tcl_desc_ptr->addrx_en = 1;	/* Address X search enable in ASE */
 	tcl_desc_ptr->encap_type = HAL_TX_ENCAP_TYPE_ETHERNET;
 	tcl_desc_ptr->packet_offset = 2;	/* padding for alignment */

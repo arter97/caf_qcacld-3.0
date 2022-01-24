@@ -195,7 +195,7 @@ void *hal_rx_msdu_ext_desc_info_get_ptr_be(void *msdu_details_ptr)
 	return HAL_RX_MSDU_EXT_DESC_INFO_GET(msdu_details_ptr);
 }
 
-#ifdef QCA_WIFI_WCN7850
+#ifdef QCA_WIFI_KIWI
 static inline uint32_t
 hal_wbm2sw_release_source_get(void *hal_desc, enum hal_be_wbm_release_dir dir)
 {
@@ -868,6 +868,44 @@ void hal_cookie_conversion_reg_cfg_be(hal_soc_handle_t hal_soc_hdl,
 }
 qdf_export_symbol(hal_cookie_conversion_reg_cfg_be);
 
+static inline void
+hal_msdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
+			  void *msdu_desc, uint32_t dst_ind,
+			  uint32_t nbuf_len)
+{
+	struct rx_msdu_desc_info *msdu_desc_info =
+		(struct rx_msdu_desc_info *)msdu_desc;
+
+	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
+				  FIRST_MSDU_IN_MPDU_FLAG, 1);
+	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
+				  LAST_MSDU_IN_MPDU_FLAG, 1);
+	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
+				  MSDU_CONTINUATION, 0x0);
+	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
+				  MSDU_LENGTH, nbuf_len);
+	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
+				  SA_IS_VALID, 1);
+	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
+				  DA_IS_VALID, 1);
+}
+
+static inline void
+hal_mpdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
+			  void *mpdu_desc, uint32_t seq_no)
+{
+	struct rx_mpdu_desc_info *mpdu_desc_info =
+			(struct rx_mpdu_desc_info *)mpdu_desc;
+
+	HAL_RX_MPDU_DESC_INFO_SET(mpdu_desc_info,
+				  MSDU_COUNT, 0x1);
+	/* unset frag bit */
+	HAL_RX_MPDU_DESC_INFO_SET(mpdu_desc_info,
+				  FRAGMENT_FLAG, 0x0);
+	HAL_RX_MPDU_DESC_INFO_SET(mpdu_desc_info,
+				  RAW_MPDU, 0x0);
+}
+
 /**
  * hal_rx_msdu_reo_dst_ind_get: Gets the REO
  * destination ring ID from the msdu desc info
@@ -950,6 +988,11 @@ uint8_t hal_reo_ring_remap_value_get_be(uint8_t rx_ring_id)
 
 qdf_export_symbol(hal_reo_ring_remap_value_get_be);
 
+uint8_t hal_get_idle_link_bm_id_be(uint8_t chip_id)
+{
+	return (WBM_IDLE_DESC_LIST + chip_id);
+}
+
 /**
  * hal_hw_txrx_default_ops_attach_be() - Attach the default hal ops for
  *		beryllium chipsets.
@@ -1000,4 +1043,9 @@ void hal_hw_txrx_default_ops_attach_be(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_get_tlv_hdr_size = hal_get_tlv_hdr_size_be;
 	hal_soc->ops->hal_rx_msdu_reo_dst_ind_get =
 						hal_rx_msdu_reo_dst_ind_get_be;
+	hal_soc->ops->hal_get_idle_link_bm_id = hal_get_idle_link_bm_id_be;
+	hal_soc->ops->hal_rx_msdu_ext_desc_info_get_ptr =
+					hal_rx_msdu_ext_desc_info_get_ptr_be;
+	hal_soc->ops->hal_msdu_desc_info_set = hal_msdu_desc_info_set_be;
+	hal_soc->ops->hal_mpdu_desc_info_set = hal_mpdu_desc_info_set_be;
 }

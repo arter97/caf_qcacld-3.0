@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -25,6 +25,43 @@
 #include "hal_tx.h"
 #include <hal_be_api.h>
 #include <hal_be_tx.h>
+#include <dp_htt.h>
+#ifdef FEATURE_WDS
+#include "dp_txrx_wds.h"
+#endif
+
+#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
+#define DP_TX_BANK_LOCK_CREATE(lock) qdf_mutex_create(lock)
+#define DP_TX_BANK_LOCK_DESTROY(lock) qdf_mutex_destroy(lock)
+#define DP_TX_BANK_LOCK_ACQUIRE(lock) qdf_mutex_acquire(lock)
+#define DP_TX_BANK_LOCK_RELEASE(lock) qdf_mutex_release(lock)
+#else
+#define DP_TX_BANK_LOCK_CREATE(lock) qdf_spinlock_create(lock)
+#define DP_TX_BANK_LOCK_DESTROY(lock) qdf_spinlock_destroy(lock)
+#define DP_TX_BANK_LOCK_ACQUIRE(lock) qdf_spin_lock_bh(lock)
+#define DP_TX_BANK_LOCK_RELEASE(lock) qdf_spin_unlock_bh(lock)
+#endif
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+#ifdef WLAN_MCAST_MLO
+/* MLO peer id for reinject*/
+#define DP_MLO_MCAST_REINJECT_PEER_ID 0XFFFD
+#define MAX_GSN_NUM 0x0FFF
+#endif
+#endif
+
+#define DP_TX_WBM_COMPLETION_V3_VDEV_ID_GET(_var) \
+	HTT_TX_WBM_COMPLETION_V2_VDEV_ID_GET(_var)
+#define DP_TX_WBM_COMPLETION_V3_VALID_GET(_var) \
+	HTT_TX_WBM_COMPLETION_V2_VALID_GET(_var)
+#define DP_TX_WBM_COMPLETION_V3_SW_PEER_ID_GET(_var) \
+	HTT_TX_WBM_COMPLETION_V2_SW_PEER_ID_GET(_var)
+#define DP_TX_WBM_COMPLETION_V3_TID_NUM_GET(_var) \
+	HTT_TX_WBM_COMPLETION_V2_TID_NUM_GET(_var)
+#define DP_TX_WBM_COMPLETION_V3_SCH_CMD_ID_GET(_var) \
+	HTT_TX_WBM_COMPLETION_V2_SCH_CMD_ID_GET(_var)
+#define DP_TX_WBM_COMPLETION_V3_ACK_FRAME_RSSI_GET(_var) \
+	HTT_TX_WBM_COMPLETION_V2_ACK_FRAME_RSSI_GET(_var)
 
 extern uint8_t sec_type_map[MAX_CDP_SEC_TYPE];
 
@@ -110,6 +147,190 @@ void dp_tx_comp_get_params_from_hal_desc_be(struct dp_soc *soc,
 }
 #endif /* DP_FEATURE_HW_COOKIE_CONVERSION */
 
+static inline
+void dp_tx_process_mec_notify_be(struct dp_soc *soc, uint8_t *status)
+{
+	struct dp_vdev *vdev;
+	uint8_t vdev_id;
+	uint32_t *htt_desc = (uint32_t *)status;
+
+	qdf_assert_always(!soc->mec_fw_offload);
+
+	/*
+	 * Get vdev id from HTT status word in case of MEC
+	 * notification
+	 */
+	vdev_id = DP_TX_WBM_COMPLETION_V3_VDEV_ID_GET(htt_desc[4]);
+	if (qdf_unlikely(vdev_id >= MAX_VDEV_CNT))
+		return;
+
+	vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+				     DP_MOD_ID_HTT_COMP);
+	if (!vdev)
+		return;
+	dp_tx_mec_handler(vdev, status);
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT_COMP);
+}
+
+void dp_tx_process_htt_completion_be(struct dp_soc *soc,
+				     struct dp_tx_desc_s *tx_desc,
+				     uint8_t *status,
+				     uint8_t ring_id)
+{
+	uint8_t tx_status;
+	struct dp_pdev *pdev;
+	struct dp_vdev *vdev = NULL;
+	struct hal_tx_completion_status ts = {0};
+	uint32_t *htt_desc = (uint32_t *)status;
+	struct dp_peer *peer;
+	struct cdp_tid_tx_stats *tid_stats = NULL;
+	struct htt_soc *htt_handle;
+	uint8_t vdev_id;
+
+	tx_status = HTT_TX_WBM_COMPLETION_V3_TX_STATUS_GET(htt_desc[0]);
+	htt_handle = (struct htt_soc *)soc->htt_handle;
+	htt_wbm_event_record(htt_handle->htt_logger_handle, tx_status, status);
+
+	/*
+	 * There can be scenario where WBM consuming descriptor enqueued
+	 * from TQM2WBM first and TQM completion can happen before MEC
+	 * notification comes from FW2WBM. Avoid access any field of tx
+	 * descriptor in case of MEC notify.
+	 */
+	if (tx_status == HTT_TX_FW2WBM_TX_STATUS_MEC_NOTIFY)
+		return dp_tx_process_mec_notify_be(soc, status);
+
+	/*
+	 * If the descriptor is already freed in vdev_detach,
+	 * continue to next descriptor
+	 */
+	if (qdf_unlikely(!tx_desc->flags)) {
+		dp_tx_comp_info_rl("Descriptor freed in vdev_detach %d",
+				   tx_desc->id);
+		return;
+	}
+
+	if (qdf_unlikely(tx_desc->vdev_id == DP_INVALID_VDEV_ID)) {
+		dp_tx_comp_info_rl("Invalid vdev_id %d", tx_desc->id);
+		tx_desc->flags |= DP_TX_DESC_FLAG_TX_COMP_ERR;
+		goto release_tx_desc;
+	}
+
+	pdev = tx_desc->pdev;
+
+	if (qdf_unlikely(tx_desc->pdev->is_pdev_down)) {
+		dp_tx_comp_info_rl("pdev in down state %d", tx_desc->id);
+		tx_desc->flags |= DP_TX_DESC_FLAG_TX_COMP_ERR;
+		goto release_tx_desc;
+	}
+
+	qdf_assert(tx_desc->pdev);
+
+	vdev_id = tx_desc->vdev_id;
+	vdev = dp_vdev_get_ref_by_id(soc, vdev_id,
+				     DP_MOD_ID_HTT_COMP);
+
+	if (qdf_unlikely(!vdev)) {
+		dp_tx_comp_info_rl("Unable to get vdev ref  %d", tx_desc->id);
+		tx_desc->flags |= DP_TX_DESC_FLAG_TX_COMP_ERR;
+		goto release_tx_desc;
+	}
+
+	switch (tx_status) {
+	case HTT_TX_FW2WBM_TX_STATUS_OK:
+	case HTT_TX_FW2WBM_TX_STATUS_DROP:
+	case HTT_TX_FW2WBM_TX_STATUS_TTL:
+	{
+		uint8_t tid;
+
+		if (DP_TX_WBM_COMPLETION_V3_VALID_GET(htt_desc[3])) {
+			ts.peer_id =
+				DP_TX_WBM_COMPLETION_V3_SW_PEER_ID_GET(
+						htt_desc[3]);
+			ts.tid =
+				DP_TX_WBM_COMPLETION_V3_TID_NUM_GET(
+						htt_desc[3]);
+		} else {
+			ts.peer_id = HTT_INVALID_PEER;
+			ts.tid = HTT_INVALID_TID;
+		}
+		ts.release_src = HAL_TX_COMP_RELEASE_SOURCE_FW;
+		ts.ppdu_id =
+			DP_TX_WBM_COMPLETION_V3_SCH_CMD_ID_GET(
+					htt_desc[2]);
+		ts.ack_frame_rssi =
+			DP_TX_WBM_COMPLETION_V3_ACK_FRAME_RSSI_GET(
+					htt_desc[2]);
+
+		ts.tsf = htt_desc[4];
+		ts.first_msdu = 1;
+		ts.last_msdu = 1;
+		tid = ts.tid;
+		if (qdf_unlikely(tid >= CDP_MAX_DATA_TIDS))
+			tid = CDP_MAX_DATA_TIDS - 1;
+
+		tid_stats = &pdev->stats.tid_stats.tid_tx_stats[ring_id][tid];
+
+		if (qdf_unlikely(pdev->delay_stats_flag))
+			dp_tx_compute_delay(vdev, tx_desc, tid, ring_id);
+		if (tx_status < CDP_MAX_TX_HTT_STATUS)
+			tid_stats->htt_status_cnt[tx_status]++;
+
+		peer = dp_peer_get_ref_by_id(soc, ts.peer_id,
+					     DP_MOD_ID_HTT_COMP);
+		if (qdf_likely(peer))
+			dp_tx_update_peer_basic_stats(
+						peer,
+						qdf_nbuf_len(tx_desc->nbuf),
+						tx_status,
+						pdev->enhanced_stats_en);
+
+		dp_tx_comp_process_tx_status(soc, tx_desc, &ts, peer, ring_id);
+		dp_tx_comp_process_desc(soc, tx_desc, &ts, peer);
+		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+
+		if (qdf_likely(peer))
+			dp_peer_unref_delete(peer, DP_MOD_ID_HTT_COMP);
+
+		break;
+	}
+	case HTT_TX_FW2WBM_TX_STATUS_REINJECT:
+	{
+		uint8_t reinject_reason;
+
+		reinject_reason =
+			HTT_TX_WBM_COMPLETION_V3_REINJECT_REASON_GET(
+								htt_desc[1]);
+		dp_tx_reinject_handler(soc, vdev, tx_desc,
+				       status, reinject_reason);
+		break;
+	}
+	case HTT_TX_FW2WBM_TX_STATUS_INSPECT:
+	{
+		dp_tx_inspect_handler(soc, vdev, tx_desc, status);
+		break;
+	}
+	case HTT_TX_FW2WBM_TX_STATUS_VDEVID_MISMATCH:
+	{
+		DP_STATS_INC(vdev, tx_i.dropped.fail_per_pkt_vdev_id_check, 1);
+		goto release_tx_desc;
+	}
+	default:
+		dp_tx_comp_err("Invalid HTT tx_status %d\n",
+			       tx_status);
+		goto release_tx_desc;
+	}
+
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT_COMP);
+	return;
+
+release_tx_desc:
+	dp_tx_comp_free_buf(soc, tx_desc);
+	dp_tx_desc_release(tx_desc, tx_desc->pool_id);
+	if (vdev)
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT_COMP);
+}
+
 #ifdef QCA_OL_TX_MULTIQ_SUPPORT
 #ifdef DP_TX_IMPLICIT_RBM_MAPPING
 /*
@@ -141,6 +362,93 @@ static inline uint8_t dp_tx_get_rbm_id_be(struct dp_soc *soc,
 	rbm = wlan_cfg_get_rbm_id_for_index(soc->wlan_cfg_ctx, tcl_index);
 	dp_verbose_debug("tcl_id %u rbm %u", tcl_index, rbm);
 	return rbm;
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
+	defined(WLAN_MCAST_MLO)
+void
+dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
+			 struct dp_vdev *ptnr_vdev,
+			 void *arg)
+{
+	qdf_nbuf_t  nbuf = (qdf_nbuf_t)arg;
+	qdf_nbuf_t  nbuf_clone;
+	struct dp_vdev_be *be_ptnr_vdev = NULL;
+	struct dp_tx_msdu_info_s msdu_info;
+
+	be_ptnr_vdev = dp_get_be_vdev_from_dp_vdev(ptnr_vdev);
+	if (be_vdev != be_ptnr_vdev) {
+		nbuf_clone = qdf_nbuf_clone(nbuf);
+		if (qdf_unlikely(!nbuf_clone)) {
+			dp_tx_debug("nbuf clone failed");
+			return;
+		}
+	} else {
+		nbuf_clone = nbuf;
+	}
+
+	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
+	dp_tx_get_queue(ptnr_vdev, nbuf_clone, &msdu_info.tx_queue);
+	msdu_info.gsn = be_vdev->seq_num;
+	be_ptnr_vdev->seq_num = be_vdev->seq_num;
+
+	nbuf_clone = dp_tx_send_msdu_single(
+					ptnr_vdev,
+					nbuf_clone,
+					&msdu_info,
+					DP_MLO_MCAST_REINJECT_PEER_ID,
+					NULL);
+	if (qdf_unlikely(nbuf_clone)) {
+		dp_info("pkt send failed");
+		qdf_nbuf_free(nbuf_clone);
+		return;
+	}
+}
+
+static inline void
+dp_tx_vdev_id_set_hal_tx_desc(uint32_t *hal_tx_desc_cached,
+			      struct dp_vdev *vdev,
+			      struct dp_tx_msdu_info_s *msdu_info)
+{
+	hal_tx_desc_set_vdev_id(hal_tx_desc_cached, msdu_info->vdev_id);
+}
+
+void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
+				struct dp_vdev *vdev,
+				qdf_nbuf_t nbuf)
+{
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	/* send frame on partner vdevs */
+	dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+				    dp_tx_mlo_mcast_pkt_send,
+				    nbuf, DP_MOD_ID_TX);
+
+	/* send frame on mcast primary vdev */
+	dp_tx_mlo_mcast_pkt_send(be_vdev, vdev, nbuf);
+
+	if (qdf_unlikely(be_vdev->seq_num > MAX_GSN_NUM))
+		be_vdev->seq_num = 0;
+	else
+		be_vdev->seq_num++;
+}
+#else
+static inline void
+dp_tx_vdev_id_set_hal_tx_desc(uint32_t *hal_tx_desc_cached,
+			      struct dp_vdev *vdev,
+			      struct dp_tx_msdu_info_s *msdu_info)
+{
+	hal_tx_desc_set_vdev_id(hal_tx_desc_cached, vdev->vdev_id);
+}
+#endif
+#if defined(WLAN_FEATURE_11BE_MLO) && !defined(WLAN_MLO_MULTI_CHIP) && \
+	!defined(WLAN_MCAST_MLO)
+void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
+				struct dp_vdev *vdev,
+				qdf_nbuf_t nbuf)
+{
 }
 #endif
 
@@ -217,13 +525,14 @@ dp_tx_hw_enqueue_be(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	hal_tx_desc_set_bank_id(hal_tx_desc_cached, be_vdev->bank_id);
 
-	hal_tx_desc_set_vdev_id(hal_tx_desc_cached, vdev->vdev_id);
+	dp_tx_vdev_id_set_hal_tx_desc(hal_tx_desc_cached, vdev, msdu_info);
 
 	if (tid != HTT_TX_EXT_TID_INVALID)
 		hal_tx_desc_set_hlos_tid(hal_tx_desc_cached, tid);
 
 	if (qdf_unlikely(vdev->pdev->delay_stats_flag) ||
-	    qdf_unlikely(wlan_cfg_is_peer_ext_stats_enabled(soc->wlan_cfg_ctx)))
+		qdf_unlikely(wlan_cfg_is_peer_ext_stats_enabled(soc->wlan_cfg_ctx)) ||
+		qdf_unlikely(soc->rdkstats_enabled))
 		tx_desc->timestamp = qdf_ktime_to_ms(qdf_ktime_real_get());
 
 	dp_verbose_debug("length:%d , type = %d, dma_addr %llx, offset %d desc id %u",
@@ -286,7 +595,7 @@ QDF_STATUS dp_tx_init_bank_profiles(struct dp_soc_be *be_soc)
 		return QDF_STATUS_E_NOMEM;
 	}
 
-	qdf_spinlock_create(&be_soc->tx_bank_lock);
+	DP_TX_BANK_LOCK_CREATE(&be_soc->tx_bank_lock);
 
 	for (i = 0; i < num_tcl_banks; i++) {
 		be_soc->bank_profiles[i].is_configured = false;
@@ -299,7 +608,7 @@ QDF_STATUS dp_tx_init_bank_profiles(struct dp_soc_be *be_soc)
 void dp_tx_deinit_bank_profiles(struct dp_soc_be *be_soc)
 {
 	qdf_mem_free(be_soc->bank_profiles);
-	qdf_spinlock_destroy(&be_soc->tx_bank_lock);
+	DP_TX_BANK_LOCK_DESTROY(&be_soc->tx_bank_lock);
 }
 
 static
@@ -364,7 +673,7 @@ int dp_tx_get_bank_profile(struct dp_soc_be *be_soc,
 	/* convert vdev params into hal_tx_bank_config */
 	dp_tx_get_vdev_bank_config(be_vdev, &vdev_config);
 
-	qdf_spin_lock_bh(&be_soc->tx_bank_lock);
+	DP_TX_BANK_LOCK_ACQUIRE(&be_soc->tx_bank_lock);
 	/* go over all banks and find a matching/unconfigured/unsed bank */
 	for (i = 0; i < be_soc->num_bank_profiles; i++) {
 		if (be_soc->bank_profiles[i].is_configured &&
@@ -410,7 +719,7 @@ configure_and_return:
 				      bank_id);
 inc_ref_and_return:
 	qdf_atomic_inc(&be_soc->bank_profiles[bank_id].ref_count);
-	qdf_spin_unlock_bh(&be_soc->tx_bank_lock);
+	DP_TX_BANK_LOCK_RELEASE(&be_soc->tx_bank_lock);
 
 	dp_info("found %s slot at index %d, input:0x%x match:0x%x ref_count %u",
 		temp_str, bank_id, vdev_config.val,
@@ -436,9 +745,9 @@ inc_ref_and_return:
 void dp_tx_put_bank_profile(struct dp_soc_be *be_soc,
 			    struct dp_vdev_be *be_vdev)
 {
-	qdf_spin_lock_bh(&be_soc->tx_bank_lock);
+	DP_TX_BANK_LOCK_ACQUIRE(&be_soc->tx_bank_lock);
 	qdf_atomic_dec(&be_soc->bank_profiles[be_vdev->bank_id].ref_count);
-	qdf_spin_unlock_bh(&be_soc->tx_bank_lock);
+	DP_TX_BANK_LOCK_RELEASE(&be_soc->tx_bank_lock);
 }
 
 void dp_tx_update_bank_profile(struct dp_soc_be *be_soc,

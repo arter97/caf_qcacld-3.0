@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,6 +26,7 @@
 #else
 #include <dp_peer.h>
 #endif
+#include <dp_mon.h>
 
 /* maximum number of entries in one page of secondary page table */
 #define DP_CC_SPT_PAGE_MAX_ENTRIES 512
@@ -187,7 +188,11 @@ struct dp_tx_bank_profile {
 struct dp_soc_be {
 	struct dp_soc soc;
 	uint8_t num_bank_profiles;
+#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
+	qdf_mutex_t tx_bank_lock;
+#else
 	qdf_spinlock_t tx_bank_lock;
+#endif
 	struct dp_tx_bank_profile *bank_profiles;
 	struct dp_spt_page_desc *page_desc_base;
 	uint32_t cc_cmem_base;
@@ -197,9 +202,6 @@ struct dp_soc_be {
 	struct dp_srng reo2ppe_ring;
 	struct dp_srng ppe2tcl_ring;
 	struct dp_srng ppe_release_ring;
-#endif
-#if !defined(DISABLE_MON_CONFIG)
-	struct dp_mon_soc_be *monitor_soc_be;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_MLO_MULTI_CHIP
@@ -230,9 +232,6 @@ struct dp_soc_be {
  */
 struct dp_pdev_be {
 	struct dp_pdev pdev;
-#if !defined(DISABLE_MON_CONFIG)
-	struct dp_mon_pdev_be *monitor_pdev_be;
-#endif
 #ifdef WLAN_MLO_MULTI_CHIP
 	uint8_t mlo_link_id;
 #endif
@@ -248,6 +247,19 @@ struct dp_vdev_be {
 	struct dp_vdev vdev;
 	int8_t bank_id;
 	uint8_t vdev_id_check_en;
+
+#ifdef WLAN_MLO_MULTI_CHIP
+	/* partner list used for Intra-BSS */
+	uint8_t partner_vdev_list[WLAN_MAX_MLO_CHIPS][WLAN_MAX_MLO_LINKS_PER_SOC];
+#ifdef WLAN_FEATURE_11BE_MLO
+#ifdef WLAN_MCAST_MLO
+	/* DP MLO seq number */
+	uint16_t seq_num;
+	/* MLO Mcast primary vdev */
+	bool mcast_primary;
+#endif
+#endif
+#endif
 };
 
 /**
@@ -282,6 +294,14 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops);
 qdf_size_t dp_get_context_size_be(enum dp_context_type context_type);
 
 /**
+ * dp_mon_get_context_size_be() - get BE specific size for mon pdev/soc
+ * @arch_ops: arch ops pointer
+ *
+ * Return: size in bytes for the context_type
+ */
+qdf_size_t dp_mon_get_context_size_be(enum dp_context_type context_type);
+
+/**
  * dp_get_be_soc_from_dp_soc() - get dp_soc_be from dp_soc
  * @soc: dp_soc pointer
  *
@@ -290,6 +310,18 @@ qdf_size_t dp_get_context_size_be(enum dp_context_type context_type);
 static inline struct dp_soc_be *dp_get_be_soc_from_dp_soc(struct dp_soc *soc)
 {
 	return (struct dp_soc_be *)soc;
+}
+
+/**
+ * dp_get_be_mon_soc_from_dp_mon_soc() - get dp_mon_soc_be from dp_mon_soc
+ * @soc: dp_mon_soc pointer
+ *
+ * Return: dp_mon_soc_be pointer
+ */
+static inline
+struct dp_mon_soc_be *dp_get_be_mon_soc_from_dp_mon_soc(struct dp_mon_soc *soc)
+{
+	return (struct dp_mon_soc_be *)soc;
 }
 
 #ifdef WLAN_MLO_MULTI_CHIP
@@ -310,6 +342,40 @@ dp_mlo_get_peer_hash_obj(struct dp_soc *soc)
 	return be_soc->ml_ctxt;
 }
 
+void  dp_clr_mlo_ptnr_list(struct dp_soc *soc, struct dp_vdev *vdev);
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MCAST_MLO)
+typedef void dp_ptnr_vdev_iter_func(struct dp_vdev_be *be_vdev,
+				    struct dp_vdev *ptnr_vdev,
+				    void *arg);
+/*
+ * dp_mcast_mlo_iter_ptnr_vdev - API to iterate through ptnr vdev list
+ * @be_soc: dp_soc_be pointer
+ * @be_vdev: dp_vdev_be pointer
+ * @func        : function to be called for each peer
+ * @arg         : argument need to be passed to func
+ * @mod_id: module id
+ *
+ * Return: None
+ */
+void dp_mcast_mlo_iter_ptnr_vdev(struct dp_soc_be *be_soc,
+				 struct dp_vdev_be *be_vdev,
+				 dp_ptnr_vdev_iter_func func,
+				 void *arg,
+				 enum dp_mod_id mod_id);
+/*
+ * dp_mlo_get_mcast_primary_vdev- get ref to mcast primary vdev
+ * @be_soc: dp_soc_be pointer
+ * @be_vdev: dp_vdev_be pointer
+ * @mod_id: module id
+ *
+ * Return: mcast primary DP VDEV handle on success, NULL on failure
+ */
+struct dp_vdev *dp_mlo_get_mcast_primary_vdev(struct dp_soc_be *be_soc,
+					      struct dp_vdev_be *be_vdev,
+					      enum dp_mod_id mod_id);
+#endif
+
 #else
 typedef struct dp_soc_be *dp_mld_peer_hash_obj_t;
 
@@ -317,6 +383,11 @@ static inline dp_mld_peer_hash_obj_t
 dp_mlo_get_peer_hash_obj(struct dp_soc *soc)
 {
 	return dp_get_be_soc_from_dp_soc(soc);
+}
+
+static inline void  dp_clr_mlo_ptnr_list(struct dp_soc *soc,
+					 struct dp_vdev *vdev)
+{
 }
 #endif
 
@@ -352,6 +423,20 @@ struct dp_pdev_be *dp_get_be_pdev_from_dp_pdev(struct dp_pdev *pdev)
 {
 	return (struct dp_pdev_be *)pdev;
 }
+
+#ifdef QCA_MONITOR_2_0_SUPPORT
+/**
+ * dp_get_be_mon_pdev_from_dp_mon_pdev() - get dp_mon_pdev_be from dp_mon_pdev
+ * @pdev: dp_mon_pdev pointer
+ *
+ * Return: dp_mon_pdev_be pointer
+ */
+static inline
+struct dp_mon_pdev_be *dp_get_be_mon_pdev_from_dp_mon_pdev(struct dp_mon_pdev *mon_pdev)
+{
+	return (struct dp_mon_pdev_be *)mon_pdev;
+}
+#endif
 
 /**
  * dp_get_be_vdev_from_dp_vdev() - get dp_vdev_be from dp_vdev

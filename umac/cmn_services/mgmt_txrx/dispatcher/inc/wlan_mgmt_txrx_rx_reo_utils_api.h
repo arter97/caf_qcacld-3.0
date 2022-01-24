@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,12 +44,15 @@ wlan_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev);
 /**
  * wlan_get_pdev_from_mlo_link_id() - Helper API to get the pdev
  * object from the link id.
+ * @mlo_link_id: MLO HW link id
+ * @refdbgid: Reference debug id
  *
  * Return: On success returns the pdev object from the link_id.
  * On failure returns NULL.
  */
 struct wlan_objmgr_pdev *
-wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id);
+wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id,
+			       wlan_objmgr_ref_dbgid refdbgid);
 
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
 
@@ -64,6 +68,19 @@ wlan_get_pdev_from_mlo_link_id(uint8_t mlo_link_id);
 	QDF_TRACE_INFO(QDF_MODULE_ID_MGMT_RX_REO, params)
 #define mgmt_rx_reo_debug(params...) \
 	QDF_TRACE_DEBUG(QDF_MODULE_ID_MGMT_RX_REO, params)
+
+#define mgmt_rx_reo_alert_no_fl(params...) \
+	QDF_TRACE_FATAL_NO_FL(QDF_MODULE_ID_MGMT_RX_REO, params)
+#define mgmt_rx_reo_err_no_fl(params...) \
+	QDF_TRACE_ERROR_NO_FL(QDF_MODULE_ID_MGMT_RX_REO, params)
+#define mgmt_rx_reo_warn_no_fl(params...) \
+	QDF_TRACE_WARN_NO_FL(QDF_MODULE_ID_MGMT_RX_REO, params)
+#define mgmt_rx_reo_notice_no_fl(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_MGMT_RX_REO, params)
+#define mgmt_rx_reo_info_no_fl(params...) \
+	QDF_TRACE_INFO_NO_FL(QDF_MODULE_ID_MGMT_RX_REO, params)
+#define mgmt_rx_reo_debug_no_fl(params...) \
+	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_MGMT_RX_REO, params)
 
 #define mgmt_rx_reo_alert_rl(params...) \
 	QDF_TRACE_FATAL_RL(QDF_MODULE_ID_MGMT_RX_REO, params)
@@ -243,6 +260,15 @@ wlan_mgmt_rx_reo_is_feature_enabled_at_psoc(struct wlan_objmgr_psoc *psoc);
  */
 bool
 wlan_mgmt_rx_reo_is_feature_enabled_at_pdev(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * wlan_mgmt_rx_reo_is_simulation_in_progress() - API to check whether
+ * simulation is in progress
+ *
+ * Return: true if simulation is in progress, else false
+ */
+bool
+wlan_mgmt_rx_reo_is_simulation_in_progress(void);
 #else
 /**
  * wlan_mgmt_rx_reo_pdev_obj_create_notification() - pdev create handler for

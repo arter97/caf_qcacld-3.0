@@ -545,6 +545,8 @@ bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc, struct dp_peer *ta_peer,
 		return false;
 
 	len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
+	qdf_nbuf_set_tx_fctx_type(nbuf_copy, &ta_peer->peer_id,
+				  CB_FTYPE_INTRABSS_FWD);
 	if (dp_tx_send((struct cdp_soc_t *)soc,
 		       ta_peer->vdev->vdev_id, nbuf_copy)) {
 		DP_STATS_INC_PKT(ta_peer, rx.intra_bss.fail, 1, len);
@@ -575,10 +577,6 @@ bool dp_rx_intrabss_ucast_fwd(struct dp_soc *soc, struct dp_peer *ta_peer,
 			      struct cdp_tid_rx_stats *tid_stats)
 {
 	uint16_t len;
-
-	if (dp_rx_intrabss_eapol_drop_check(soc, ta_peer, rx_tlv_hdr,
-					    nbuf))
-		return true;
 
 	len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
 
@@ -1723,7 +1721,7 @@ void dp_rx_msdu_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	peer->stats.rx.last_rx_ts = qdf_system_ticks();
 
 	/*
-	 * TODO - For WCN7850 this field is present in ring_desc
+	 * TODO - For KIWI this field is present in ring_desc
 	 * Try to use ring desc instead of tlv.
 	 */
 	is_ampdu = hal_rx_mpdu_info_ampdu_flag_get(soc->hal_soc, rx_tlv_hdr);
@@ -1866,7 +1864,7 @@ void dp_rx_deliver_to_stack_no_peer(struct dp_soc *soc, qdf_nbuf_t nbuf)
 				FRAME_MASK_IPV4_EAPOL | FRAME_MASK_IPV6_DHCP;
 
 	peer_id = QDF_NBUF_CB_RX_PEER_ID(nbuf);
-	if (peer_id > soc->max_peers)
+	if (peer_id > soc->max_peer_id)
 		goto deliver_fail;
 
 	vdev_id = QDF_NBUF_CB_RX_VDEV_ID(nbuf);

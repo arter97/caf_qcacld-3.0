@@ -1104,7 +1104,7 @@ free_nbuf:
 }
 
 #if defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-    defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_WCN7850)
+    defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_KIWI)
 /**
  * dp_rx_null_q_handle_invalid_peer_id_exception() - to find exception
  * @soc: pointer to dp_soc struct
@@ -1764,6 +1764,29 @@ dp_rx_deliver_to_osif_stack(struct dp_soc *soc,
 #endif
 
 #ifdef WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
+	defined(WLAN_MCAST_MLO)
+static bool dp_rx_igmp_handler(struct dp_soc *soc,
+			       struct dp_vdev *vdev,
+			       struct dp_peer *peer,
+			       qdf_nbuf_t nbuf)
+{
+	if (soc->arch_ops.dp_rx_mcast_handler) {
+		if (soc->arch_ops.dp_rx_mcast_handler(soc, vdev, peer, nbuf))
+			return true;
+	}
+	return false;
+}
+#else
+static bool dp_rx_igmp_handler(struct dp_soc *soc,
+			       struct dp_vdev *vdev,
+			       struct dp_peer *peer,
+			       qdf_nbuf_t nbuf)
+{
+	return false;
+}
+#endif
+
 /**
  * dp_rx_err_route_hdl() - Function to send EAPOL frames to stack
  *                            Free any other packet which comes in
@@ -1835,6 +1858,9 @@ dp_rx_err_route_hdl(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	else
 		qdf_nbuf_pull_head(nbuf, (msdu_metadata.l3_hdr_pad +
 				   soc->rx_pkt_tlv_size));
+
+	if (dp_rx_igmp_handler(soc, vdev, peer, nbuf))
+		return;
 
 	dp_vdev_peer_stats_update_protocol_cnt(vdev, nbuf, NULL, 0, 1);
 
@@ -2229,7 +2255,7 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		if (qdf_unlikely((msdu_list.rbm[0] !=
 					dp_rx_get_rx_bm_id(soc)) &&
 				 (msdu_list.rbm[0] !=
-				  HAL_RX_BUF_RBM_WBM_CHIP0_IDLE_DESC_LIST) &&
+				  soc->idle_link_bm_id) &&
 				 (msdu_list.rbm[0] !=
 					dp_rx_get_defrag_bm_id(soc)))) {
 			/* TODO */
@@ -2870,6 +2896,15 @@ done:
 					DP_STATS_INC_PKT(peer, rx.mec_drop, 1,
 							 qdf_nbuf_len(nbuf));
 					qdf_nbuf_free(nbuf);
+					break;
+				case HAL_RXDMA_UNAUTHORIZED_WDS:
+					pool_id = wbm_err_info.pool_id;
+					err_code = wbm_err_info.rxdma_err_code;
+					tlv_hdr = rx_tlv_hdr;
+					dp_rx_process_rxdma_err(soc, nbuf,
+								tlv_hdr, NULL,
+								err_code,
+								pool_id);
 					break;
 				default:
 					qdf_nbuf_free(nbuf);

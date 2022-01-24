@@ -23,6 +23,7 @@
 #include "target_type.h"
 #include "qdf_module.h"
 #include "wcss_version.h"
+#include <qdf_tracepoint.h>
 
 #ifdef QCA_WIFI_QCA8074
 void hal_qca6290_attach(struct hal_soc *hal);
@@ -55,8 +56,8 @@ void hal_qca6750_attach(struct hal_soc *hal);
 #ifdef QCA_WIFI_QCA5018
 void hal_qca5018_attach(struct hal_soc *hal);
 #endif
-#ifdef QCA_WIFI_WCN7850
-void hal_wcn7850_attach(struct hal_soc *hal);
+#ifdef QCA_WIFI_KIWI
+void hal_kiwi_attach(struct hal_soc *hal);
 #endif
 
 #ifdef ENABLE_VERBOSE_DEBUG
@@ -422,11 +423,10 @@ static void hal_target_based_configure(struct hal_soc *hal)
 			hal_qca6750_attach(hal);
 		break;
 #endif
-#ifdef QCA_WIFI_WCN7850
-	case TARGET_TYPE_WCN7850:
+#ifdef QCA_WIFI_KIWI
+	case TARGET_TYPE_KIWI:
 		hal->use_register_windowing = true;
-		hal_wcn7850_attach(hal);
-		hal->init_phase = false;
+		hal_kiwi_attach(hal);
 		break;
 #endif
 #if defined(QCA_WIFI_QCA8074) && defined(WIFI_TARGET_TYPE_3_0)
@@ -777,6 +777,11 @@ static void hal_reg_write_work(void *arg)
 		write_val = hal_process_reg_write_q_elem(hal, q_elem);
 		hal_verbose_debug("read_idx %u srng 0x%x, addr 0x%pK dequeue_val %u sched delay %llu us",
 				  hal->read_idx, ring_id, addr, write_val, delta_us);
+
+		qdf_trace_dp_del_reg_write(ring_id, q_elem->enqueue_val,
+					   q_elem->dequeue_val,
+					   q_elem->enqueue_time,
+					   q_elem->dequeue_time);
 
 		num_processed++;
 		hal->read_idx = (hal->read_idx + 1) &

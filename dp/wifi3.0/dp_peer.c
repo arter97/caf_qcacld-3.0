@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -186,7 +186,7 @@ static QDF_STATUS dp_peer_find_map_attach(struct dp_soc *soc)
 {
 	uint32_t max_peers, peer_map_size;
 
-	max_peers = soc->max_peers;
+	max_peers = soc->max_peer_id;
 	/* allocate the peer ID -> peer object map */
 	dp_peer_info("\n%pK:<=== cfg max peer id %d ====>", soc, max_peers);
 	peer_map_size = max_peers * sizeof(soc->peer_id_to_obj_map[0]);
@@ -703,6 +703,34 @@ void dp_peer_vdev_list_remove(struct dp_soc *soc, struct dp_vdev *vdev,
 }
 
 /*
+ * dp_txrx_peer_attach_add() - Attach txrx_peer and add it to peer_id table
+ * @soc: SoC handle
+ * @peer: peer handle
+ * @txrx_peer: txrx peer handle
+ *
+ * Return: None
+ */
+void dp_txrx_peer_attach_add(struct dp_soc *soc,
+			     struct dp_peer *peer,
+			     struct dp_txrx_peer *txrx_peer)
+{
+	qdf_spin_lock_bh(&soc->peer_map_lock);
+
+	peer->txrx_peer = txrx_peer;
+
+	if (peer->peer_id == HTT_INVALID_PEER) {
+		qdf_spin_unlock_bh(&soc->peer_map_lock);
+		return;
+	}
+
+	txrx_peer->peer_id = peer->peer_id;
+
+	QDF_ASSERT(soc->peer_id_to_obj_map[peer->peer_id]);
+
+	qdf_spin_unlock_bh(&soc->peer_map_lock);
+}
+
+/*
  * dp_peer_find_id_to_obj_add() - Add peer into peer_id table
  * @soc: SoC handle
  * @peer: peer handle
@@ -714,9 +742,11 @@ void dp_peer_find_id_to_obj_add(struct dp_soc *soc,
 				struct dp_peer *peer,
 				uint16_t peer_id)
 {
-	QDF_ASSERT(peer_id <= soc->max_peers);
+	QDF_ASSERT(peer_id <= soc->max_peer_id);
 
 	qdf_spin_lock_bh(&soc->peer_map_lock);
+
+	peer->peer_id = peer_id;
 
 	if (QDF_IS_STATUS_ERROR(dp_peer_get_ref(soc, peer, DP_MOD_ID_CONFIG))) {
 		dp_err("unable to get peer ref at MAP mac: "QDF_MAC_ADDR_FMT" peer_id %u",
@@ -727,10 +757,13 @@ void dp_peer_find_id_to_obj_add(struct dp_soc *soc,
 
 	if (!soc->peer_id_to_obj_map[peer_id]) {
 		soc->peer_id_to_obj_map[peer_id] = peer;
+		if (peer->txrx_peer)
+			peer->txrx_peer->peer_id = peer_id;
 	} else {
 		/* Peer map event came for peer_id which
 		 * is already mapped, this is not expected
 		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
 		QDF_ASSERT(0);
 	}
 	qdf_spin_unlock_bh(&soc->peer_map_lock);
@@ -747,10 +780,13 @@ void dp_peer_find_id_to_obj_remove(struct dp_soc *soc,
 				   uint16_t peer_id)
 {
 	struct dp_peer *peer = NULL;
-	QDF_ASSERT(peer_id <= soc->max_peers);
+	QDF_ASSERT(peer_id <= soc->max_peer_id);
 
 	qdf_spin_lock_bh(&soc->peer_map_lock);
 	peer = soc->peer_id_to_obj_map[peer_id];
+	peer->peer_id = HTT_INVALID_PEER;
+	if (peer->txrx_peer)
+		peer->txrx_peer->peer_id = HTT_INVALID_PEER;
 	soc->peer_id_to_obj_map[peer_id] = NULL;
 	dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
 	qdf_spin_unlock_bh(&soc->peer_map_lock);
@@ -2460,7 +2496,7 @@ static inline struct dp_peer *dp_peer_find_add_id(struct dp_soc *soc,
 {
 	struct dp_peer *peer;
 
-	QDF_ASSERT(peer_id <= soc->max_peers);
+	QDF_ASSERT(peer_id <= soc->max_peer_id);
 	/* check if there's already a peer object with this MAC address */
 	peer = dp_peer_find_hash_find(soc, peer_mac_addr,
 		0 /* is aligned */, vdev_id, DP_MOD_ID_CONFIG);
@@ -2486,15 +2522,17 @@ static inline struct dp_peer *dp_peer_find_add_id(struct dp_soc *soc,
 				 vdev_id);
 			return NULL;
 		}
+
+		if (peer->peer_id == HTT_INVALID_PEER) {
+			dp_monitor_peer_tid_peer_id_update(soc, peer,
+							   peer_id);
+		} else {
+			dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
+			QDF_ASSERT(0);
+			return NULL;
+		}
 		dp_peer_find_id_to_obj_add(soc, peer, peer_id);
 		dp_mlo_partner_chips_map(soc, peer, peer_id);
-		if (peer->peer_id == HTT_INVALID_PEER) {
-			peer->peer_id = peer_id;
-			dp_monitor_peer_tid_peer_id_update(soc, peer,
-							   peer->peer_id);
-		} else {
-			QDF_ASSERT(0);
-		}
 
 		dp_peer_update_state(soc, peer, DP_PEER_STATE_ACTIVE);
 		return peer;
@@ -2853,7 +2891,7 @@ static bool dp_get_peer_vdev_roaming_in_progress(struct dp_peer *peer)
 static inline
 bool dp_rx_tid_setup_allow(struct dp_peer *peer)
 {
-	if (IS_MLO_DP_LINK_PEER(peer) && !peer->assoc_link)
+	if (IS_MLO_DP_LINK_PEER(peer) && !peer->first_link)
 		return false;
 
 	return true;
@@ -2898,6 +2936,10 @@ static QDF_STATUS dp_peer_rx_reorder_queue_setup(struct dp_soc *soc,
 	struct dp_rx_tid *rx_tid;
 	struct dp_soc *link_peer_soc;
 
+	rx_tid = &peer->rx_tid[tid];
+	if (!rx_tid->hw_qdesc_paddr)
+		return QDF_STATUS_E_INVAL;
+
 	if (IS_MLO_DP_MLD_PEER(peer)) {
 		/* get link peers with reference */
 		dp_get_link_peers_ref_from_mld_peer(soc, peer,
@@ -2906,7 +2948,6 @@ static QDF_STATUS dp_peer_rx_reorder_queue_setup(struct dp_soc *soc,
 		/* send WMI cmd to each link peers */
 		for (i = 0; i < link_peers_info.num_links; i++) {
 			link_peer = link_peers_info.link_peers[i];
-			rx_tid = &link_peer->rx_tid[tid];
 			link_peer_soc = link_peer->vdev->pdev->soc;
 			if (link_peer_soc->cdp_soc.ol_ops->
 					peer_rx_reorder_queue_setup) {
@@ -2928,7 +2969,6 @@ static QDF_STATUS dp_peer_rx_reorder_queue_setup(struct dp_soc *soc,
 		/* release link peers reference */
 		dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_CDP);
 	} else if (peer->peer_type == CDP_LINK_PEER_TYPE) {
-			rx_tid = &peer->rx_tid[tid];
 			if (soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup) {
 				if (soc->cdp_soc.ol_ops->
 					peer_rx_reorder_queue_setup(
@@ -2970,6 +3010,9 @@ static QDF_STATUS dp_peer_rx_reorder_queue_setup(struct dp_soc *soc,
 						 uint32_t ba_window_size)
 {
 	struct dp_rx_tid *rx_tid = &peer->rx_tid[tid];
+
+	if (!rx_tid->hw_qdesc_paddr)
+		return QDF_STATUS_E_INVAL;
 
 	if (soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup) {
 		if (soc->cdp_soc.ol_ops->peer_rx_reorder_queue_setup(
@@ -3336,12 +3379,12 @@ try_desc_alloc:
 		}
 	}
 
+send_wmi_reo_cmd:
 	if (dp_get_peer_vdev_roaming_in_progress(peer)) {
 		status = QDF_STATUS_E_PERM;
 		goto error;
 	}
 
-send_wmi_reo_cmd:
 	status = dp_peer_rx_reorder_queue_setup(soc, peer,
 						tid, ba_window_size);
 	if (QDF_IS_STATUS_SUCCESS(status))
@@ -3358,6 +3401,7 @@ error:
 				rx_tid->hw_qdesc_alloc_size);
 		qdf_mem_free(rx_tid->hw_qdesc_vaddr_unaligned);
 		rx_tid->hw_qdesc_vaddr_unaligned = NULL;
+		rx_tid->hw_qdesc_paddr = 0;
 	}
 	return status;
 }
@@ -3712,7 +3756,7 @@ static void dp_peer_rx_tids_init(struct dp_peer *peer)
 	/* if not first assoc link peer or MLD peer,
 	 * not to initialize rx_tids again.
 	 */
-	if ((IS_MLO_DP_LINK_PEER(peer) && !peer->assoc_link) ||
+	if ((IS_MLO_DP_LINK_PEER(peer) && !peer->first_link) ||
 	    IS_MLO_DP_MLD_PEER(peer))
 		return;
 
@@ -4745,7 +4789,7 @@ QDF_STATUS dp_register_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	if (!IS_MLO_DP_LINK_PEER(peer))
 		dp_rx_flush_rx_cached(peer, false);
 
-	if (IS_MLO_DP_LINK_PEER(peer) && peer->assoc_link) {
+	if (IS_MLO_DP_LINK_PEER(peer) && peer->first_link) {
 		dp_peer_info("register for mld peer" QDF_MAC_ADDR_FMT,
 			     QDF_MAC_ADDR_REF(peer->mld_peer->mac_addr.raw));
 		qdf_spin_lock_bh(&peer->mld_peer->peer_info_lock);
@@ -4779,7 +4823,7 @@ QDF_STATUS dp_peer_state_update(struct cdp_soc_t *soc_hdl, uint8_t *peer_mac,
 		     QDF_MAC_ADDR_REF(peer->mac_addr.raw),
 		     peer->state);
 
-	if (IS_MLO_DP_LINK_PEER(peer) && peer->assoc_link) {
+	if (IS_MLO_DP_LINK_PEER(peer) && peer->first_link) {
 		peer->mld_peer->state = peer->state;
 		peer->mld_peer->authorize = peer->authorize;
 		dp_peer_info("mld peer" QDF_MAC_ADDR_FMT "state %d",
@@ -5380,3 +5424,30 @@ void dp_peer_flush_frags(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 }
+
+/*
+ * dp_peer_find_by_id_valid - check if peer exists for given id
+ * @soc: core DP soc context
+ * @peer_id: peer id from peer object can be retrieved
+ *
+ * Return: true if peer exists of false otherwise
+ */
+bool dp_peer_find_by_id_valid(struct dp_soc *soc, uint16_t peer_id)
+{
+	struct dp_peer *peer = dp_peer_get_ref_by_id(soc, peer_id,
+						     DP_MOD_ID_HTT);
+
+	if (peer) {
+		/*
+		 * Decrement the peer ref which is taken as part of
+		 * dp_peer_get_ref_by_id if PEER_LOCK_REF_PROTECT is enabled
+		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_HTT);
+
+		return true;
+	}
+
+	return false;
+}
+
+qdf_export_symbol(dp_peer_find_by_id_valid);

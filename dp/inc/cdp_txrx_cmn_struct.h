@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -411,14 +411,13 @@ enum cdp_peer_type {
 /**
  * struct cdp_peer_setup_info: MLO connection info for cdp_peer_setup()
  * @mld_peer_mac: mld peer mac address pointer
- * @is_assoc_link: set true for first MLO link peer association
- * @is_primary_link: for MCC, the first link will always be primary link,
- *		     for WIN,  other link might be primary link.
+ * @is_first_link: set true for first MLO link peer
+ * @is_primary_link: set true for MLO primary link peer
  * @primary_umac_id: primary umac_id
  */
 struct cdp_peer_setup_info {
 	uint8_t *mld_peer_mac;
-	uint8_t is_assoc_link:1,
+	uint8_t is_first_link:1,
 		is_primary_link:1;
 	uint8_t primary_umac_id;
 };
@@ -1211,6 +1210,7 @@ enum cdp_pdev_param_type {
 	CDP_SET_ATF_STATS_ENABLE,
 	CDP_CONFIG_SPECIAL_VAP,
 	CDP_RESET_SCAN_SPCL_VAP_STATS_ENABLE,
+	CDP_CONFIG_ENHANCED_STATS_ENABLE,
 };
 
 /*
@@ -1244,6 +1244,7 @@ enum cdp_pdev_param_type {
  * @cdp_vdev_param_peer_tid_latency_enable: set peer tid latency enable flag
  * @cdp_vdev_param_mesh_tid: config tatency tid on vdev
  * @cdp_vdev_param_dscp_tid_map_id: set dscp to tid map id
+ * @cdp_vdev_param_mcast_vdev: set mcast vdev params
  *
  * @cdp_pdev_param_dbg_snf: Enable debug sniffer feature
  * @cdp_pdev_param_bpr_enable: Enable bcast probe feature
@@ -1315,6 +1316,7 @@ typedef union cdp_config_param_t {
 	uint8_t cdp_vdev_param_peer_tid_latency_enable;
 	uint8_t cdp_vdev_param_mesh_tid;
 	uint8_t cdp_vdev_param_dscp_tid_map_id;
+	bool cdp_vdev_param_mcast_vdev;
 
 	/* pdev params */
 	bool cdp_pdev_param_cptr_latcy;
@@ -1347,6 +1349,7 @@ typedef union cdp_config_param_t {
 	bool cdp_pdev_param_atf_stats_enable;
 	bool cdp_pdev_param_config_special_vap;
 	bool cdp_pdev_param_reset_scan_spcl_vap_stats_enable;
+	bool cdp_pdev_param_enhanced_stats_enable;
 
 	/* psoc params */
 	bool cdp_psoc_param_en_rate_stats;
@@ -1434,6 +1437,7 @@ enum cdp_pdev_bpr_param {
  * @CDP_ENABLE_PEER_TID_LATENCY: set peer tid latency enable flag
  * @CDP_SET_VAP_MESH_TID : Set latency tid in vap
  * @CDP_UPDATE_DSCP_TO_TID_MAP: Set DSCP to TID map id
+ * @CDP_SET_MCAST_VDEV : Set primary mcast vdev
  */
 enum cdp_vdev_param_type {
 	CDP_ENABLE_NAWDS,
@@ -1471,7 +1475,8 @@ enum cdp_vdev_param_type {
 #ifdef WLAN_VENDOR_SPECIFIC_BAR_UPDATE
 	CDP_SKIP_BAR_UPDATE_AP,
 #endif
-	CDP_UPDATE_DSCP_TO_TID_MAP
+	CDP_UPDATE_DSCP_TO_TID_MAP,
+	CDP_SET_MCAST_VDEV,
 };
 
 /*
@@ -1831,6 +1836,7 @@ struct cdp_delayed_tx_completion_ppdu_user {
  * @debug_copied: flag to indicate bar frame copied
  * @peer_last_delayed_ba: flag to indicate peer last delayed ba
  * @phy_tx_time_us: Phy TX duration for the User
+ * @mpdu_bytes: accumulated bytes per mpdu for mem limit feature
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -1932,6 +1938,7 @@ struct cdp_tx_completion_ppdu_user {
 	bool peer_last_delayed_ba;
 
 	uint16_t phy_tx_time_us;
+	uint32_t mpdu_bytes;
 };
 
 /**
@@ -2086,6 +2093,7 @@ struct cdp_tx_mgmt_comp_info {
  * @tlv_bitmap: tlv_bitmap for the PPDU
  * @sched_cmdid: schedule command id
  * @phy_ppdu_tx_time_us: Phy per PPDU TX duration
+ * @ppdu_bytes: accumulated bytes per ppdu for mem limit feature
  * @user: per-User stats (array of per-user structures)
  */
 struct cdp_tx_completion_ppdu {
@@ -2130,6 +2138,7 @@ struct cdp_tx_completion_ppdu {
 	uint32_t tlv_bitmap;
 	uint16_t sched_cmdid;
 	uint16_t phy_ppdu_tx_time_us;
+	uint32_t ppdu_bytes;
 	struct cdp_tx_completion_ppdu_user user[];
 };
 
@@ -2248,6 +2257,7 @@ struct cdp_tx_completion_msdu {
  * @mpdu_fcs_ok_bitmap - MPDU with fcs ok bitmap
  * @retries - number of retries
  * @rx_ratekpbs - rx rate in kbps
+ * @mpdu_retries - retries of mpdu in rx
  */
 struct cdp_rx_stats_ppdu_user {
 	uint16_t peer_id;
@@ -2285,6 +2295,7 @@ struct cdp_rx_stats_ppdu_user {
 	uint32_t mpdu_err_byte_count;
 	uint32_t retries;
 	uint32_t rx_ratekbps;
+	uint32_t mpdu_retries;
 };
 
 /**
@@ -2334,6 +2345,7 @@ struct cdp_rx_stats_ppdu_user {
  * @user: per user stats in MU-user case
  * @nf: noise floor
  * @per_chain_rssi: rssi per antenna
+ * @punc_bw: puncered bw
  */
 struct cdp_rx_indication_ppdu {
 	uint32_t ppdu_id;
@@ -2394,6 +2406,7 @@ struct cdp_rx_indication_ppdu {
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 	struct cdp_rx_ppdu_cfr_info cfr_info;
 #endif
+	uint8_t punc_bw;
 };
 
 /**

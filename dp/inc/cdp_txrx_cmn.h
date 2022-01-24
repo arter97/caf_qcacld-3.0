@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -127,6 +127,12 @@ enum {
 	DP_VDEV_STATS_PKT_CNT_ONLY,
 	DP_VDEV_STATS_TX_ME,
 };
+
+/*
+ * typedef ipa_uc_op_cb_type - Register OP handler function
+ */
+typedef void (*ipa_uc_op_cb_type)(uint8_t *op_msg,
+				  void *osif_ctxt);
 
 static inline QDF_STATUS
 cdp_soc_attach_target(ol_txrx_soc_handle soc)
@@ -372,22 +378,22 @@ static inline QDF_STATUS cdp_peer_create
 			peer_mac_addr, CDP_LINK_PEER_TYPE);
 }
 
-static inline void cdp_peer_setup
+static inline  QDF_STATUS cdp_peer_setup
 	(ol_txrx_soc_handle soc, uint8_t vdev_id, uint8_t *peer_mac,
 	 struct cdp_peer_setup_info *setup_info)
 {
 	if (!soc || !soc->ops) {
 		dp_cdp_debug("Invalid Instance:");
 		QDF_BUG(0);
-		return;
+		return  QDF_STATUS_E_FAILURE;
 	}
 
 	if (!soc->ops->cmn_drv_ops ||
 	    !soc->ops->cmn_drv_ops->txrx_peer_setup)
-		return;
+		return QDF_STATUS_E_FAILURE;
 
-	soc->ops->cmn_drv_ops->txrx_peer_setup(soc, vdev_id,
-			peer_mac, setup_info);
+	return soc->ops->cmn_drv_ops->txrx_peer_setup(soc, vdev_id,
+						      peer_mac, setup_info);
 }
 
 /*
