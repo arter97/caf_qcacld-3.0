@@ -120,6 +120,12 @@ int monitor_mod_init(void)
 			}
 		}
 
+		if (mon_ops->mon_soc_init) {
+			if (mon_ops->mon_soc_init(soc)) {
+				dp_mon_err("%pK: monitor soc init failed", soc);
+			}
+		}
+
 		status = dp_mon_soc_ring_config(soc);
 		if (status != QDF_STATUS_SUCCESS) {
 			dp_mon_err("%pK: monitor soc ring config failed", soc);
