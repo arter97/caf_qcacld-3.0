@@ -1351,6 +1351,10 @@ enum _ol_ath_param_t {
 	/* Enable/disable strict puncturing for 802.11be */
 	OL_ATH_PARAM_STRICT_PUNCTURING = 491,
 #endif /* WLAN_FEATURE_11BE */
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+	/* Enable/disable undecoded frame capture */
+	OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE = 492,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3546,6 +3550,14 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_ONLY_PSC, SET_PARAM, 1},
 	{"get_acs_6g_only_psc",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_ONLY_PSC, GET_PARAM, 0},
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+	{"undecoded_metadata_capture",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE,
+		SET_PARAM, 1},
+	{"g_undecoded_metadata_capture",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE,
+		GET_PARAM, 0},
+#endif
 };
 #endif
 
