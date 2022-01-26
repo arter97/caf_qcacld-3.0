@@ -43,6 +43,7 @@
 #define STATS_FEAT_FLG_NAWDS           0x00080000
 #define STATS_FEAT_FLG_TXCAP           0x00100000
 #define STATS_FEAT_FLG_MONITOR         0x00200000
+#define STATS_FEAT_FLG_JITTER          0x00400000
 /* Add new feature flag above and update STATS_FEAT_FLG_ALL */
 #define STATS_FEAT_FLG_ALL             \
 	(STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX | STATS_FEAT_FLG_AST | \
@@ -52,7 +53,7 @@
 	 STATS_FEAT_FLG_WMI | STATS_FEAT_FLG_IGMP | STATS_FEAT_FLG_LINK | \
 	 STATS_FEAT_FLG_MESH | STATS_FEAT_FLG_RATE | STATS_FEAT_FLG_DELAY | \
 	 STATS_FEAT_FLG_ME | STATS_FEAT_FLG_NAWDS | STATS_FEAT_FLG_TXCAP | \
-	 STATS_FEAT_FLG_MONITOR)
+	 STATS_FEAT_FLG_MONITOR | STATS_FEAT_FLG_JITTER)
 
 #define STATS_BASIC_AP_CTRL_MASK       0
 #define STATS_BASIC_AP_DATA_MASK       (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
@@ -90,7 +91,8 @@
 	(STATS_BASIC_STA_DATA_MASK |                   \
 	 STATS_FEAT_FLG_FWD | STATS_FEAT_FLG_TWT |     \
 	 STATS_FEAT_FLG_RAW | STATS_FEAT_FLG_RDK |     \
-	 STATS_FEAT_FLG_NAWDS | STATS_FEAT_FLG_DELAY)
+	 STATS_FEAT_FLG_NAWDS | STATS_FEAT_FLG_DELAY | \
+	 STATS_FEAT_FLG_JITTER)
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
 #if WLAN_DEBUG_TELEMETRY
@@ -353,6 +355,14 @@ struct stats_if_delay_rx_stats {
 	struct stats_if_hist_stats to_stack_delay;
 };
 
+struct stats_if_jitter_tid_stats {
+	u_int32_t tx_avg_jitter;
+	u_int32_t tx_avg_delay;
+	u_int64_t tx_avg_err;
+	u_int64_t tx_total_success;
+	u_int64_t tx_drop;
+};
+
 struct stats_if_delay_tid_stats {
 	struct stats_if_delay_tx_stats  tx_delay;
 	struct stats_if_delay_rx_stats  rx_delay;
@@ -439,14 +449,12 @@ struct advance_peer_data_nawds {
 	u_int32_t nawds_mcast_rx_drop;
 };
 
+struct advance_peer_data_jitter {
+	struct stats_if_jitter_tid_stats jitter_stats[STATS_IF_MAX_DATA_TIDS];
+};
+
 struct advance_peer_data_delay {
-	struct stats_if_delay_tid_stats delay_stats[STATS_IF_MAX_DATA_TIDS]
-						   [STATS_IF_MAX_RX_CTX];
-	u_int32_t tx_avg_jitter;
-	u_int32_t tx_avg_delay;
-	u_int64_t tx_avg_err;
-	u_int64_t tx_total_success;
-	u_int64_t tx_drop;
+	struct stats_if_delay_tid_stats delay_stats[STATS_IF_MAX_DATA_TIDS];
 };
 
 /* Advance Peer Ctrl */
