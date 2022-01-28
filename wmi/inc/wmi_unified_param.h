@@ -5045,6 +5045,9 @@ typedef enum {
 	wmi_pdev_param_low_latency_mode,
 	wmi_pdev_param_scan_radio_tx_on_dfs,
 	wmi_pdev_param_en_probe_all_bw,
+	wmi_pdev_param_obss_min_duration_check_for_sr,
+	wmi_pdev_param_truncate_sr,
+	wmi_pdev_param_ctrl_frame_obss_pd_threshold,
 	wmi_pdev_param_max,
 } wmi_conv_pdev_params_id;
 
@@ -5489,6 +5492,7 @@ typedef enum {
 	wmi_service_dynamic_update_vdev_macaddr_support,
 #endif
 	wmi_service_probe_all_bw_support,
+	wmi_service_pno_scan_conf_per_ch_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

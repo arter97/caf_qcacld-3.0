@@ -1551,7 +1551,9 @@ reg_modify_5g_maxbw(struct regulatory_channel *chan,
 		    struct ch_avoid_freq_type *avoid_freq)
 {
 	int i;
-	qdf_freq_t start, end, cur;
+	qdf_freq_t start = 0;
+	qdf_freq_t end = 0;
+	qdf_freq_t cur;
 	bool found = false;
 
 	for (i = 0; i < MAX_5G_CHAN_NUM; i++) {
@@ -1655,6 +1657,9 @@ reg_modify_chan_list_for_avoid_chan_ext(struct wlan_regulatory_pdev_priv_obj
 
 	psoc = wlan_pdev_get_psoc(pdev_priv_obj->pdev_ptr);
 	if (!psoc)
+		return;
+
+	if (reg_check_coex_unsafe_nb_user_prefer(psoc))
 		return;
 
 	psoc_priv_obj = reg_get_psoc_obj(psoc);
@@ -2654,6 +2659,22 @@ QDF_STATUS reg_process_master_chan_list_ext(
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef CONFIG_REG_CLIENT
+const char *reg_get_power_string(enum reg_6g_ap_type power_type)
+{
+	switch (power_type) {
+	case REG_INDOOR_AP:
+		return "LP";
+	case REG_STANDARD_POWER_AP:
+		return "SP";
+	case REG_VERY_LOW_POWER_AP:
+		return "VLP";
+	default:
+		return "INVALID";
+	}
+}
+#endif
 
 QDF_STATUS reg_get_6g_ap_master_chan_list(struct wlan_objmgr_pdev *pdev,
 					  enum reg_6g_ap_type ap_pwr_type,

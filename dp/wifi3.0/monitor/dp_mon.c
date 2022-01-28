@@ -2219,6 +2219,7 @@ dp_tx_rate_stats_update(struct dp_peer *peer,
 	uint64_t ppdu_tx_rate = 0;
 	uint32_t rix;
 	uint16_t ratecode = 0;
+	enum PUNCTURED_MODES punc_mode = NO_PUNCTURE;
 
 	if (!peer || !ppdu)
 		return;
@@ -2231,7 +2232,7 @@ dp_tx_rate_stats_update(struct dp_peer *peer,
 				   ppdu->nss,
 				   ppdu->preamble,
 				   ppdu->bw,
-				   NO_PUNCTURE,
+				   punc_mode,
 				   &rix,
 				   &ratecode);
 
@@ -5007,6 +5008,23 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 	return;
 }
 
+#ifdef QCA_MONITOR_OPS_PER_SOC_SUPPORT
+static inline void
+dp_mon_cdp_mon_ops_deregister(struct cdp_ops *ops)
+{
+	if (ops->mon_ops) {
+		qdf_mem_free(ops->mon_ops);
+		ops->mon_ops = NULL;
+	}
+}
+#else
+static inline void
+dp_mon_cdp_mon_ops_deregister(struct cdp_ops *ops)
+{
+	ops->mon_ops = NULL;
+}
+#endif
+
 void dp_mon_cdp_ops_deregister(struct dp_soc *soc)
 {
 	struct cdp_ops *ops = soc->cdp_soc.ops;
@@ -5016,7 +5034,8 @@ void dp_mon_cdp_ops_deregister(struct dp_soc *soc)
 		return;
 	}
 
-	ops->mon_ops = NULL;
+	dp_mon_cdp_mon_ops_deregister(ops);
+
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 	ops->cfr_ops->txrx_cfr_filter = NULL;
 	ops->cfr_ops->txrx_enable_mon_reap_timer = NULL;

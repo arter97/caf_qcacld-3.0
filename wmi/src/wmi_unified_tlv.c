@@ -355,6 +355,11 @@ static const uint32_t pdev_param_tlv[] = {
 					WMI_PDEV_PARAM_SCAN_RADIO_TX_ON_DFS,
 	[wmi_pdev_param_en_probe_all_bw] =
 			WMI_PDEV_PARAM_EN_PROBE_ALL_BW,
+	[wmi_pdev_param_obss_min_duration_check_for_sr] =
+			WMI_PDEV_PARAM_OBSS_MIN_DURATION_CHECK_FOR_SR,
+	[wmi_pdev_param_truncate_sr] = WMI_PDEV_PARAM_TRUNCATE_SR,
+	[wmi_pdev_param_ctrl_frame_obss_pd_threshold] =
+			WMI_PDEV_PARAM_CTRL_FRAME_OBSS_PD_THRESHOLD,
 };
 
 /**
@@ -18294,6 +18299,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_probe_all_bw_support] =
 			WMI_SERVICE_PROBE_ALL_BW_SUPPORT;
+	wmi_service[wmi_service_pno_scan_conf_per_ch_support] =
+			WMI_SERVICE_PNO_SCAN_CONFIG_PER_CHANNEL;
 }
 
 /**

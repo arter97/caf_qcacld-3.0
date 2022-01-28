@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1852,6 +1852,49 @@ static inline QDF_STATUS dp_tx_msdu_single_map(struct dp_vdev *vdev,
 }
 #endif
 
+#if defined(QCA_DP_TX_NBUF_NO_MAP_UNMAP) && !defined(BUILD_X86)
+static inline
+qdf_dma_addr_t dp_tx_nbuf_map(struct dp_vdev *vdev,
+			      struct dp_tx_desc_s *tx_desc,
+			      qdf_nbuf_t nbuf)
+{
+	qdf_nbuf_dma_clean_range((void *)nbuf->data,
+				 (void *)(nbuf->data + nbuf->len));
+	return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
+}
+
+static inline
+void dp_tx_nbuf_unmap(struct dp_soc *soc,
+		      struct dp_tx_desc_s *desc)
+{
+}
+#else
+static inline
+qdf_dma_addr_t dp_tx_nbuf_map(struct dp_vdev *vdev,
+			      struct dp_tx_desc_s *tx_desc,
+			      qdf_nbuf_t nbuf)
+{
+	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
+
+	ret = dp_tx_msdu_single_map(vdev, tx_desc, nbuf);
+	if (qdf_unlikely(QDF_IS_STATUS_ERROR(ret)))
+		return 0;
+
+	return qdf_nbuf_mapped_paddr_get(nbuf);
+}
+
+static inline
+void dp_tx_nbuf_unmap(struct dp_soc *soc,
+		      struct dp_tx_desc_s *desc)
+{
+	qdf_nbuf_unmap_nbytes_single_paddr(soc->osdev,
+					   desc->nbuf,
+					   desc->dma_addr,
+					   QDF_DMA_TO_DEVICE,
+					   desc->length);
+}
+#endif
+
 #ifdef MESH_MODE_SUPPORT
 /**
  * dp_tx_update_mesh_flags() - Update descriptor flags for mesh VAP
@@ -2006,6 +2049,7 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	enum cdp_tx_sw_drop drop_code = TX_MAX_DROP;
 	uint8_t tid = msdu_info->tid;
 	struct cdp_tid_tx_stats *tid_stats = NULL;
+	qdf_dma_addr_t paddr;
 
 	/* Setup Tx descriptor for an MSDU, and MSDU extension descriptor */
 	tx_desc = dp_tx_prepare_desc_single(vdev, nbuf, tx_q->desc_pool_id,
@@ -2038,8 +2082,8 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	dp_tx_update_mesh_flags(soc, vdev, tx_desc);
 
-	if (qdf_unlikely(QDF_STATUS_SUCCESS !=
-			 dp_tx_msdu_single_map(vdev, tx_desc, nbuf))) {
+	paddr =  dp_tx_nbuf_map(vdev, tx_desc, nbuf);
+	if (!paddr) {
 		/* Handle failure */
 		dp_err("qdf_nbuf_map failed");
 		DP_STATS_INC(vdev, tx_i.dropped.dma_error, 1);
@@ -2047,7 +2091,7 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		goto release_desc;
 	}
 
-	tx_desc->dma_addr = qdf_nbuf_mapped_paddr_get(tx_desc->nbuf);
+	tx_desc->dma_addr = paddr;
 	dp_tx_desc_history_add(soc, tx_desc->dma_addr, nbuf,
 			       tx_desc->id, DP_TX_DESC_MAP);
 	dp_tx_update_mcast_param(peer_id, &htt_tcl_metadata, vdev, msdu_info);
@@ -2119,6 +2163,31 @@ void dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 			qdf_nbuf_free(nbuf);
 			return;
 		}
+
+		if (qdf_unlikely(desc->frm_type == dp_tx_frm_sg)) {
+			void *msdu_ext_desc = desc->msdu_ext_desc->vaddr;
+			qdf_dma_addr_t iova;
+			uint32_t frag_len;
+			uint32_t i;
+
+			qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf,
+						     QDF_DMA_TO_DEVICE,
+						     qdf_nbuf_headlen(nbuf));
+
+			for (i = 1; i < DP_TX_MAX_NUM_FRAGS; i++) {
+				hal_tx_ext_desc_get_frag_info(msdu_ext_desc, i,
+							      &iova,
+							      &frag_len);
+				if (!iova || !frag_len)
+					break;
+
+				qdf_mem_unmap_page(soc->osdev, iova, frag_len,
+						   QDF_DMA_TO_DEVICE);
+			}
+
+			qdf_nbuf_free(nbuf);
+			return;
+		}
 	}
 	/* If it's ME frame, dont unmap the cloned nbuf's */
 	if ((desc->flags & DP_TX_DESC_FLAG_ME) && qdf_nbuf_is_cloned(nbuf))
@@ -2131,6 +2200,32 @@ void dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 		return dp_mesh_tx_comp_free_buff(soc, desc);
 nbuf_free:
 	qdf_nbuf_free(nbuf);
+}
+
+/**
+ * dp_tx_sg_unmap_buf() - Unmap scatter gather fragments
+ * @soc: DP soc handle
+ * @nbuf: skb
+ * @msdu_info: MSDU info
+ *
+ * Return: None
+ */
+static inline void
+dp_tx_sg_unmap_buf(struct dp_soc *soc, qdf_nbuf_t nbuf,
+		   struct dp_tx_msdu_info_s *msdu_info)
+{
+	uint32_t cur_idx;
+	struct dp_tx_seg_info_s *seg = msdu_info->u.sg_info.curr_seg;
+
+	qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf, QDF_DMA_TO_DEVICE,
+				     qdf_nbuf_headlen(nbuf));
+
+	for (cur_idx = 1; cur_idx < seg->frag_cnt; cur_idx++)
+		qdf_mem_unmap_page(soc->osdev, (qdf_dma_addr_t)
+				   (seg->frags[cur_idx].paddr_lo | ((uint64_t)
+				    seg->frags[cur_idx].paddr_hi) << 32),
+				   seg->frags[cur_idx].len,
+				   QDF_DMA_TO_DEVICE);
 }
 
 /**
@@ -2233,6 +2328,9 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 				}
 			}
 
+			if (msdu_info->frm_type == dp_tx_frm_sg)
+				dp_tx_sg_unmap_buf(soc, nbuf, msdu_info);
+
 			goto done;
 		}
 
@@ -2287,8 +2385,8 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 						     NULL, msdu_info);
 
 		if (status != QDF_STATUS_SUCCESS) {
-			dp_info("Tx_hw_enqueue Fail tx_desc %pK queue %d",
-				tx_desc, tx_q->ring_id);
+			dp_info_rl("Tx_hw_enqueue Fail tx_desc %pK queue %d",
+				   tx_desc, tx_q->ring_id);
 
 			dp_tx_get_tid(vdev, nbuf, msdu_info);
 			tid_stats = &pdev->stats.tid_stats.
@@ -2344,6 +2442,9 @@ qdf_nbuf_t dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 				dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 				continue;
 			}
+
+			if (msdu_info->frm_type == dp_tx_frm_sg)
+				dp_tx_sg_unmap_buf(soc, nbuf, msdu_info);
 
 			dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
 			goto done;
@@ -2406,7 +2507,6 @@ static qdf_nbuf_t dp_tx_prepare_sg(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 					   qdf_nbuf_headlen(nbuf))) {
 		dp_tx_err("dma map error");
 		DP_STATS_INC(vdev, tx_i.sg.dma_map_error, 1);
-
 		qdf_nbuf_free(nbuf);
 		return NULL;
 	}
@@ -2418,8 +2518,10 @@ static qdf_nbuf_t dp_tx_prepare_sg(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	seg_info->frags[0].vaddr = (void *) nbuf;
 
 	for (cur_frag = 0; cur_frag < nr_frags; cur_frag++) {
-		if (QDF_STATUS_E_FAILURE == qdf_nbuf_frag_map(vdev->osdev,
-					nbuf, 0, QDF_DMA_TO_DEVICE, cur_frag)) {
+		if (QDF_STATUS_SUCCESS != qdf_nbuf_frag_map(vdev->osdev,
+							    nbuf, 0,
+							    QDF_DMA_TO_DEVICE,
+							    cur_frag)) {
 			dp_tx_err("frag dma map error");
 			DP_STATS_INC(vdev, tx_i.sg.dma_map_error, 1);
 			goto map_err;
@@ -3168,18 +3270,24 @@ qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 	/* SG */
 	if (qdf_unlikely(qdf_nbuf_is_nonlinear(nbuf))) {
-		struct dp_tx_seg_info_s seg_info = {0};
+		if (qdf_nbuf_get_nr_frags(nbuf) > DP_TX_MAX_NUM_FRAGS - 1) {
+			if (qdf_unlikely(qdf_nbuf_linearize(nbuf)))
+				return nbuf;
+		} else {
+			struct dp_tx_seg_info_s seg_info = {0};
 
-		nbuf = dp_tx_prepare_sg(vdev, nbuf, &seg_info, &msdu_info);
-		if (!nbuf)
-			return NULL;
+			nbuf = dp_tx_prepare_sg(vdev, nbuf, &seg_info,
+						&msdu_info);
+			if (!nbuf)
+				return NULL;
 
-		dp_verbose_debug("non-TSO SG frame %pK", vdev);
+			dp_verbose_debug("non-TSO SG frame %pK", vdev);
 
-		DP_STATS_INC_PKT(vdev, tx_i.sg.sg_pkt, 1,
-				qdf_nbuf_len(nbuf));
+			DP_STATS_INC_PKT(vdev, tx_i.sg.sg_pkt, 1,
+					 qdf_nbuf_len(nbuf));
 
-		goto send_multiple;
+			goto send_multiple;
+		}
 	}
 
 	if (qdf_unlikely(!dp_tx_mcast_enhance(vdev, nbuf)))
@@ -3739,9 +3847,14 @@ dp_tx_update_peer_stats(struct dp_tx_desc_s *tx_desc,
 	}
 
 	if (ts->status != HAL_TX_TQM_RR_FRAME_ACKED) {
+		DP_STATS_INCC(peer, tx.failed_retry_count, 1,
+			      ts->transmit_cnt > DP_RETRY_COUNT);
 		dp_update_no_ack_stats(tx_desc->nbuf, peer);
 		return;
 	}
+	DP_STATS_INCC(peer, tx.retry_count, 1, ts->transmit_cnt > 1);
+
+	DP_STATS_INCC(peer, tx.multiple_retry_count, 1, ts->transmit_cnt > 2);
 
 	DP_STATS_INCC(peer, tx.ofdma, 1, ts->ofdma);
 
@@ -4443,11 +4556,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			 */
 			dp_tx_desc_history_add(soc, desc->dma_addr, desc->nbuf,
 					       desc->id, DP_TX_COMP_UNMAP);
-			qdf_nbuf_unmap_nbytes_single_paddr(soc->osdev,
-							   desc->nbuf,
-							   desc->dma_addr,
-							   QDF_DMA_TO_DEVICE,
-							   desc->length);
+			dp_tx_nbuf_unmap(soc, desc);
 			qdf_nbuf_free(desc->nbuf);
 			dp_tx_desc_free(soc, desc, desc->pool_id);
 			desc = next;
@@ -4532,6 +4641,17 @@ dp_srng_test_and_update_nf_params(struct dp_soc *soc, struct dp_srng *dp_srng,
 				  int *max_reap_limit)
 {
 	return 0;
+}
+#endif
+
+#ifdef DP_TX_TRACKING
+void dp_tx_desc_check_corruption(struct dp_tx_desc_s *tx_desc)
+{
+	if ((tx_desc->magic != DP_TX_MAGIC_PATTERN_INUSE) &&
+	    (tx_desc->magic != DP_TX_MAGIC_PATTERN_FREE)) {
+		dp_err_rl("tx_desc %u is corrupted", tx_desc->id);
+		qdf_trigger_self_recovery(NULL, QDF_TX_DESC_LEAK);
+	}
 }
 #endif
 
@@ -4680,6 +4800,7 @@ more_data:
 				dp_tx_comp_info_rl("Descriptor freed in vdev_detach %d",
 						   tx_desc->id);
 				DP_STATS_INC(soc, tx.tx_comp_exception, 1);
+				dp_tx_desc_check_corruption(tx_desc);
 				continue;
 			}
 

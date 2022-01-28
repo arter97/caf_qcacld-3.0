@@ -1795,6 +1795,22 @@ dp_srng_configure_interrupt_thresholds(struct dp_soc *soc,
 			wlan_cfg_get_int_batch_threshold_other(soc->wlan_cfg_ctx);
 	}
 
+	/* These rings donot require interrupt to host. Make them zero */
+	switch (ring_type) {
+	case REO_REINJECT:
+	case REO_CMD:
+	case TCL_DATA:
+	case TCL_CMD_CREDIT:
+	case TCL_STATUS:
+	case WBM_IDLE_LINK:
+	case SW2WBM_RELEASE:
+	case PPE2TCL:
+	case SW2RXDMA_NEW:
+		ring_params->intr_timer_thres_us = 0;
+		ring_params->intr_batch_cntr_thres_entries = 0;
+		break;
+	}
+
 	/* Enable low threshold interrupts for rx buffer rings (regular and
 	 * monitor buffer rings.
 	 * TODO: See if this is required for any other ring
@@ -2410,7 +2426,9 @@ static int dp_process_lmac_rings(struct dp_intr *int_ctx, int total_budget)
 			union dp_rx_desc_list_elem_t *desc_list = NULL;
 			union dp_rx_desc_list_elem_t *tail = NULL;
 			struct dp_srng *rx_refill_buf_ring;
+			struct rx_desc_pool *rx_desc_pool;
 
+			rx_desc_pool = &soc->rx_desc_buf[mac_for_pdev];
 			if (wlan_cfg_per_pdev_lmac_ring(soc->wlan_cfg_ctx))
 				rx_refill_buf_ring =
 					&soc->rx_refill_buf_ring[mac_for_pdev];
@@ -2419,11 +2437,12 @@ static int dp_process_lmac_rings(struct dp_intr *int_ctx, int total_budget)
 					&soc->rx_refill_buf_ring[pdev->lmac_id];
 
 			intr_stats->num_host2rxdma_ring_masks++;
-			DP_STATS_INC(pdev, replenish.low_thresh_intrs, 1);
-			dp_rx_buffers_replenish(soc, mac_for_pdev,
-						rx_refill_buf_ring,
-						&soc->rx_desc_buf[mac_for_pdev],
-						0, &desc_list, &tail);
+			dp_rx_buffers_lt_replenish_simple(soc, mac_for_pdev,
+							  rx_refill_buf_ring,
+							  rx_desc_pool,
+							  0,
+							  &desc_list,
+							  &tail);
 		}
 
 	}
@@ -5615,10 +5634,15 @@ static void dp_soc_deinit(void *txrx_soc)
 {
 	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
 	struct htt_soc *htt_soc = soc->htt_handle;
+	struct dp_mon_ops *mon_ops;
 
 	qdf_atomic_set(&soc->cmn_init_done, 0);
 
 	soc->arch_ops.txrx_soc_deinit(soc);
+
+	mon_ops = dp_mon_ops_get(soc);
+	if (mon_ops && mon_ops->mon_soc_deinit)
+		mon_ops->mon_soc_deinit(soc);
 
 	/* free peer tables & AST tables allocated during peer_map_attach */
 	if (soc->peer_map_attach_success) {
@@ -9404,6 +9428,9 @@ static QDF_STATUS dp_set_pdev_param(struct cdp_soc_t *cdp_soc, uint8_t pdev_id,
 	case CDP_CONFIG_ENHANCED_STATS_ENABLE:
 		pdev->enhanced_stats_en = val.cdp_pdev_param_enhanced_stats_enable;
 		break;
+	case CDP_ISOLATION:
+		pdev->isolation = val.cdp_pdev_param_isolation;
+		break;
 	default:
 		return QDF_STATUS_E_INVAL;
 	}
@@ -9820,9 +9847,10 @@ static int dp_txrx_get_ratekbps(int preamb, int mcs,
 {
 	uint32_t rix;
 	uint16_t ratecode;
+	enum PUNCTURED_MODES punc_mode = NO_PUNCTURE;
 
 	return dp_getrateindex((uint32_t)gintval, (uint16_t)mcs, 1,
-			       (uint8_t)preamb, 1, NO_PUNCTURE,
+			       (uint8_t)preamb, 1, punc_mode,
 			       &rix, &ratecode);
 }
 #else
@@ -11949,6 +11977,10 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 	.txrx_alloc_vdev_stats_id = dp_txrx_alloc_vdev_stats_id,
 	.txrx_reset_vdev_stats_id = dp_txrx_reset_vdev_stats_id,
 #endif
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+	.get_peer_tx_capture_stats = dp_peer_get_tx_capture_stats,
+	.get_pdev_tx_capture_stats = dp_pdev_get_tx_capture_stats,
+#endif /* WLAN_TX_PKT_CAPTURE_ENH */
 	/* TODO */
 };
 
@@ -12012,6 +12044,91 @@ void dp_flush_ring_hptp(struct dp_soc *soc, hal_ring_handle_t hal_srng)
 }
 #endif
 
+#ifdef DP_TX_TRACKING
+
+#define DP_TX_COMP_MAX_LATENCY_MS 120000
+/**
+ * dp_tx_comp_delay() - calculate time latency for tx completion per pkt
+ * @timestamp - tx descriptor timestamp
+ *
+ * Calculate time latency for tx completion per pkt and trigger self recovery
+ * when the delay is more than threshold value.
+ *
+ * Return: None.
+ */
+static void dp_tx_comp_delay(uint64_t timestamp)
+{
+	uint64_t time_latency;
+
+	if (dp_tx_pkt_tracepoints_enabled())
+		time_latency = qdf_ktime_to_ms(qdf_ktime_real_get()) -
+								timestamp;
+	else
+		time_latency = qdf_system_ticks_to_msecs(qdf_system_ticks() -
+								timestamp);
+
+	if (time_latency >= DP_TX_COMP_MAX_LATENCY_MS) {
+		dp_err_rl("tx completion not rcvd for %llu ms.", time_latency);
+		qdf_trigger_self_recovery(NULL, QDF_TX_DESC_LEAK);
+	}
+}
+
+/**
+ * dp_find_missing_tx_comp() - check for leaked descriptor in tx path
+ * @soc - DP SOC context
+ *
+ * Parse through descriptors in all pools and validate magic number and
+ * completion time. Trigger self recovery if magic value is corrupted.
+ *
+ * Return: None.
+ */
+static void dp_find_missing_tx_comp(struct dp_soc *soc)
+{
+	uint8_t i;
+	uint32_t j;
+	uint32_t num_desc, page_id, offset;
+	uint16_t num_desc_per_page;
+	struct dp_tx_desc_s *tx_desc = NULL;
+	struct dp_tx_desc_pool_s *tx_desc_pool = NULL;
+
+	for (i = 0; i < MAX_TXDESC_POOLS; i++) {
+		tx_desc_pool = &soc->tx_desc[i];
+		if (!(tx_desc_pool->pool_size) ||
+		    IS_TX_DESC_POOL_STATUS_INACTIVE(tx_desc_pool) ||
+		    !(tx_desc_pool->desc_pages.cacheable_pages))
+			continue;
+
+		num_desc = tx_desc_pool->pool_size;
+		num_desc_per_page =
+			tx_desc_pool->desc_pages.num_element_per_page;
+		for (j = 0; j < num_desc; j++) {
+			page_id = j / num_desc_per_page;
+			offset = j % num_desc_per_page;
+
+			if (qdf_unlikely(!(tx_desc_pool->
+					 desc_pages.cacheable_pages)))
+				break;
+
+			tx_desc = dp_tx_desc_find(soc, i, page_id, offset);
+			if (tx_desc->magic == DP_TX_MAGIC_PATTERN_FREE) {
+				continue;
+			} else if (tx_desc->magic ==
+						DP_TX_MAGIC_PATTERN_INUSE) {
+				dp_tx_comp_delay(tx_desc->timestamp);
+			} else {
+				dp_err("tx desc %d corrupted", tx_desc->id);
+				qdf_trigger_self_recovery(NULL,
+							  QDF_TX_DESC_LEAK);
+			}
+		}
+	}
+}
+#else
+static inline void dp_find_missing_tx_comp(struct dp_soc *soc)
+{
+}
+#endif
+
 #ifdef FEATURE_RUNTIME_PM
 /**
  * dp_runtime_suspend() - ensure DP is ready to runtime suspend
@@ -12038,9 +12155,9 @@ static QDF_STATUS dp_runtime_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 	/* Abort if there are any pending TX packets */
 	tx_pending = dp_get_tx_pending(dp_pdev_to_cdp_pdev(pdev));
 	if (tx_pending) {
-		dp_init_info("%pK: Abort suspend due to pending TX packets %d",
-			     soc, tx_pending);
-
+		dp_info_rl("%pK: Abort suspend due to pending TX packets %d",
+			   soc, tx_pending);
+		dp_find_missing_tx_comp(soc);
 		/* perform a force flush if tx is pending */
 		for (i = 0; i < soc->num_tcl_data_rings; i++) {
 			hal_srng_set_event(soc->tcl_data_ring[i].hal_srng,
@@ -12532,6 +12649,7 @@ static QDF_STATUS dp_bus_suspend(struct cdp_soc_t *soc_hdl, uint8_t pdev_id)
 		if (timeout <= 0) {
 			dp_info("TX frames are pending %d, abort suspend",
 				tx_pending);
+			dp_find_missing_tx_comp(soc);
 			return QDF_STATUS_E_TIMEOUT;
 		}
 		timeout = timeout - drain_wait_delay;
@@ -12924,6 +13042,7 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	struct hal_reo_params reo_params;
 	uint8_t i;
 	int num_dp_msi;
+	struct dp_mon_ops *mon_ops;
 
 	wlan_minidump_log(soc, sizeof(*soc), soc->ctrl_psoc,
 			  WLAN_MD_DP_SOC, "dp_soc");
@@ -13083,6 +13202,10 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	hal_reo_set_err_dst_remap(soc->hal_soc);
 
 	soc->features.pn_in_reo_dest = hal_reo_enable_pn_in_dest(soc->hal_soc);
+
+	mon_ops = dp_mon_ops_get(soc);
+	if (mon_ops && mon_ops->mon_soc_init)
+		mon_ops->mon_soc_init(soc);
 
 	qdf_atomic_set(&soc->cmn_init_done, 1);
 

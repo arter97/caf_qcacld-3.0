@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021,2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -686,6 +686,7 @@ static inline void dp_rx_rate_stats_update(struct dp_peer *peer,
 	uint32_t rix;
 	uint16_t ratecode;
 	struct cdp_rx_stats_ppdu_user *ppdu_user = NULL;
+	enum PUNCTURED_MODES punc_mode = NO_PUNCTURE;
 
 	if (!peer || !ppdu)
 		return;
@@ -712,7 +713,7 @@ static inline void dp_rx_rate_stats_update(struct dp_peer *peer,
 				   nss,
 				   ppdu->u.preamble,
 				   ppdu->u.bw,
-				   NO_PUNCTURE,
+				   punc_mode,
 				   &rix,
 				   &ratecode);
 
