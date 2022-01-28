@@ -398,9 +398,13 @@ static void ol_ath_process_tx_frames(void *pdev_hdl, enum WDI_EVENT event,
 	}
 
 	ptr_tx_info->mpdu_nbuf = NULL;
-	/* update radiotap header */
-	convert_tx_to_rx_stats(ptr_tx_info, &rx_status);
-	qdf_nbuf_update_radiotap(&rx_status, skb, RX_PADDING_SIZE);
+
+	/* differentiate Lithium and Beryllium */
+	if (!ptr_tx_info->radiotap_done) {
+		/* update radiotap header */
+		convert_tx_to_rx_stats(ptr_tx_info, &rx_status);
+		qdf_nbuf_update_radiotap(&rx_status, skb, RX_PADDING_SIZE);
+	}
 
 	monitor_osif_deliver_tx_capture_data(osifp, skb);
 }
