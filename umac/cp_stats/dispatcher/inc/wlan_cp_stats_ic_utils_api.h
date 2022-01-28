@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -161,6 +162,7 @@ VDEV_UCAST_CP_STATS_GET_FUNCS(rx_ccmpreplay);
 	}
 
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_badkeyid);
+VDEV_MCAST_CP_STATS_SET_FUNCS(rx_decryptcrc);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_decryptok);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_wepfail);
 VDEV_MCAST_CP_STATS_SET_FUNCS(rx_tkipicv);

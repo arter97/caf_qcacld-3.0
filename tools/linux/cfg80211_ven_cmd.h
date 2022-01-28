@@ -1345,6 +1345,12 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_TQM_RESET = 488,
 	/* Enable/disable probing all bandwidth */
 	OL_ATH_PARAM_EN_PROBE_ALL_BW = 489,
+	/* Configuration to honor ACS 6GHz PSC only for selection */
+	OL_ATH_PARAM_ACS_6G_ONLY_PSC = 490,
+#ifdef WLAN_FEATURE_11BE
+	/* Enable/disable strict puncturing for 802.11be */
+	OL_ATH_PARAM_STRICT_PUNCTURING = 491,
+#endif /* WLAN_FEATURE_11BE */
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3507,6 +3513,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_PUNCTURE_OFDMA_WEIGHTAGE, SET_PARAM, 1},
 	{"get_acs_puncture_ofdma_weightage",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_PUNCTURE_OFDMA_WEIGHTAGE, GET_PARAM, 0},
+	{"puncture_strict",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_STRICT_PUNCTURING, SET_PARAM, 1},
+	{"g_puncture_strict",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_STRICT_PUNCTURING, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 #ifdef WLAN_FEATURE_11BE_MLO
 	{"g_mlo_forced_umac_mode",
@@ -3532,6 +3542,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_PROBE_ALL_BW, SET_PARAM, 1},
 	{"g_probe_all_bw",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_PROBE_ALL_BW, GET_PARAM, 0},
+	{"acs_6g_only_psc",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_ONLY_PSC, SET_PARAM, 1},
+	{"get_acs_6g_only_psc",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_ONLY_PSC, GET_PARAM, 0},
 };
 #endif
 

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -229,8 +230,6 @@ static const uint32_t pdev_param_non_tlv[] = {
 		WMI_PDEV_PARAM_ANTENNA_GAIN_HALF_DB,
 	[wmi_pdev_param_enable_peer_retry_stats] =
 		WMI_PDEV_PARAM_ENABLE_PEER_RETRY_STATS,
-	[wmi_pdev_param_per_peer_prd_cfr_enable] =
-		WMI_PDEV_PARAM_PER_PEER_PERIODIC_CFR_ENABLE,
 	[wmi_pdev_param_en_probe_all_bw] = WMI_UNAVAILABLE_PARAM,
 };
 
@@ -803,47 +802,6 @@ static QDF_STATUS send_setup_install_key_cmd_non_tlv(wmi_unified_t wmi_handle,
 	return ret;
 
 }
-
-#ifdef WLAN_CFR_ENABLE
-/**
- * send_peer_cfr_capture_cmd_non_tlv() - configure cfr params in fw
- * @wmi_handle: wmi handle
- * @param: pointer to hold peer cfr config parameter
- *
- * Return: 0 for success or error code
- */
-static QDF_STATUS send_peer_cfr_capture_cmd_non_tlv(wmi_unified_t wmi_handle,
-					struct peer_cfr_params *param)
-{
-	wmi_peer_cfr_capture_cmd *cmd;
-	wmi_buf_t buf;
-	int len = sizeof(wmi_peer_cfr_capture_cmd);
-	int ret;
-
-	buf = wmi_buf_alloc(wmi_handle, len);
-	if (!buf) {
-		qdf_print("%s:wmi_buf_alloc failed\n", __func__);
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	cmd = (wmi_peer_cfr_capture_cmd *)wmi_buf_data(buf);
-	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->macaddr, &cmd->mac_addr);
-	cmd->request = param->request;
-	cmd->vdev_id = param->vdev_id;
-	cmd->periodicity = param->periodicity;
-	cmd->bandwidth = param->bandwidth;
-	cmd->capture_method = param->capture_method;
-
-	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
-				   WMI_PEER_CFR_CAPTURE_CMDID);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		wmi_err("Failed to send WMI_PEER_CFR_CAPTURE_CMDID");
-		wmi_buf_free(buf);
-	}
-
-	return ret;
-}
-#endif
 
 /**
  * send_peer_flush_tids_cmd_non_tlv() - flush peer tids packets in fw
@@ -4877,7 +4835,6 @@ send_set_ctl_table_cmd_non_tlv(wmi_unified_t wmi_handle,
 	/* CTL array length check for Beeliner family */
 	if (param->target_type == TARGET_TYPE_AR900B ||
 			param->target_type == TARGET_TYPE_QCA9984 ||
-			param->target_type == TARGET_TYPE_IPQ4019 ||
 			param->target_type == TARGET_TYPE_QCA9888) {
 		if (param->is_2g) {
 			/* For 2G, CTL array length should be 688*/
@@ -10217,9 +10174,6 @@ struct wmi_ops non_tlv_ops =  {
 	.send_vdev_delete_cmd = send_vdev_delete_cmd_non_tlv,
 	.send_vdev_down_cmd = send_vdev_down_cmd_non_tlv,
 	.send_peer_flush_tids_cmd = send_peer_flush_tids_cmd_non_tlv,
-#ifdef WLAN_CFR_ENABLE
-	.send_peer_cfr_capture_cmd = send_peer_cfr_capture_cmd_non_tlv,
-#endif
 	.send_peer_param_cmd = send_peer_param_cmd_non_tlv,
 	.send_vdev_up_cmd = send_vdev_up_cmd_non_tlv,
 	.send_peer_create_cmd = send_peer_create_cmd_non_tlv,
