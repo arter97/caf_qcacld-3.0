@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -23,6 +24,7 @@
 
 #include <wlan_cmn.h>
 #include <reg_services_public_struct.h>
+#include <reg_build_chan_list.h>
 #include <wlan_objmgr_psoc_obj.h>
 #include <wlan_objmgr_pdev_obj.h>
 #include <reg_priv_objs.h>
@@ -491,7 +493,7 @@ static bool reg_is_band_found_internal(enum channel_enum start_idx,
 	uint8_t i;
 
 	for (i = start_idx; i <= end_idx; i++)
-		if (!(reg_is_chan_disabled(&cur_chan_list[i])))
+		if (!(reg_is_chan_disabled_and_not_nol(&cur_chan_list[i])))
 			return true;
 
 	return false;
@@ -532,13 +534,6 @@ bool reg_is_band_present(struct wlan_objmgr_pdev *pdev,
 
 	return reg_is_band_found_internal(min_chan_idx, max_chan_idx,
 					  cur_chan_list);
-}
-
-bool reg_is_chan_disabled(struct regulatory_channel *chan)
-{
-	return ((chan->chan_flags & REGULATORY_CHAN_DISABLED) &&
-		(chan->state == CHANNEL_STATE_DISABLE) &&
-		(!chan->nol_chan) && (!chan->nol_history));
 }
 
 #endif /* CONFIG_HOST_FIND_CHAN */
@@ -1240,7 +1235,7 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 		qdf_freq_t freq = cur_chan_list[i].center_freq;
 		uint16_t cur_bw = cur_chan_list[i].max_bw;
 
-		if (reg_is_chan_disabled(&cur_chan_list[i]))
+		if (reg_is_chan_disabled_and_not_nol(&cur_chan_list[i]))
 			continue;
 
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq))

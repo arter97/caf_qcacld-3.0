@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -189,10 +190,6 @@ bool wlan_reg_is_band_present(struct wlan_objmgr_pdev *pdev,
 
 qdf_export_symbol(wlan_reg_is_band_present);
 
-bool wlan_reg_is_chan_disabled(struct regulatory_channel *chan)
-{
-	return reg_is_chan_disabled(chan);
-}
 #endif /* CONFIG_HOST_FIND_CHAN */
 
 bool wlan_reg_is_nol_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
