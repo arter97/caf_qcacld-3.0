@@ -146,11 +146,6 @@
 				     _pdev_id_);			\
 	}
 
-static inline int dp_get_tx_capt_max_mem(void)
-{
-	return 0;
-}
-
 static inline bool dp_tx_capt_mem_check(struct dp_pdev *pdev, int buf_size)
 {
 	struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
@@ -158,7 +153,7 @@ static inline bool dp_tx_capt_mem_check(struct dp_pdev *pdev, int buf_size)
 	if ((qdf_atomic_read(&mon_soc->dp_soc_tx_capt.ppdu_bytes) +
 		 qdf_atomic_read(&mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes) +
 		 buf_size) >=
-	    dp_get_tx_capt_max_mem()) {
+	    wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 		return false;
 	} else {
 		return true;
@@ -560,7 +555,7 @@ free_ppdu_desc_mpdu_q:
 
 	user->mpdus = NULL;
 
-	if (dp_get_tx_capt_max_mem()) {
+	if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 
 		/* in case of multiple users or a cloned ppdu,
 		 * decrement the single user's mpdu bytes.
@@ -642,8 +637,9 @@ void dp_print_pdev_tx_capture_stats_1_0(struct dp_pdev *pdev)
 
 	dp_print_tid_qlen_per_peer(pdev, 0);
 
-	if (dp_get_tx_capt_max_mem()) {
-		DP_PRINT_STATS(" max mem limit: %u", dp_get_tx_capt_max_mem());
+	if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
+		DP_PRINT_STATS("mem limit: %u",
+			       wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx));
 		DP_PRINT_STATS(" DATA ppdu bytes used: %u",
 					   qdf_atomic_read(&mon_soc->dp_soc_tx_capt.ppdu_bytes));
 		DP_PRINT_STATS(" MGMT ppdu bytes used: %u",
@@ -1282,7 +1278,7 @@ void dp_deliver_mgmt_frm(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 
 		/* if adding the new buffer goes beyond the allowed limit,
 		 * drop the buffer */
-		if (dp_get_tx_capt_max_mem()) {
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 			if (!dp_tx_capt_mem_check(pdev, qdf_nbuf_get_truesize(nbuf))) {
 				qdf_nbuf_free(nbuf);
 				mon_soc->dp_soc_tx_capt.mem_limit_drops++;
@@ -1708,7 +1704,6 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 	struct dp_mon_pdev *mon_pdev;
 	int i, j;
 	void *buf;
-	bool mem_limit_flag = false;
 
 	if (!pdev || !pdev->monitor_pdev ||
 	    !pdev->monitor_pdev->tx_capture.ppdu_stats_workqueue)
@@ -1716,8 +1711,6 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 
 	mon_pdev = pdev->monitor_pdev;
 	ptr_log_info = &mon_pdev->tx_capture.log_info;
-
-	mem_limit_flag = dp_get_tx_capt_max_mem();
 
 	mon_pdev->stop_tx_capture_work_q_timer = TRUE;
 	qdf_timer_sync_cancel(&mon_pdev->tx_capture.work_q_timer);
@@ -1750,7 +1743,7 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
 			qdf_nbuf_queue_t *retries_q;
 
-			if (mem_limit_flag) {
+			if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 				dp_tx_capt_decr_ppdu_mgmt_bytes(pdev,
 						&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
 			}
@@ -1768,7 +1761,7 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 				&mon_pdev->tx_capture.retries_ctl_mgmt_q[i][j];
 
 			if (!qdf_nbuf_is_queue_empty(retries_q)) {
-				if (mem_limit_flag) {
+				if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 					dp_tx_capt_decr_ppdu_mgmt_bytes(pdev, retries_q);
 				}
 				TX_CAP_NBUF_QUEUE_FREE(retries_q);
@@ -1949,7 +1942,7 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 
 	/* drop MSDUs of the same PPDU when adding the new buffer goes
 	 * beyond the allowed limit */
-	if (dp_get_tx_capt_max_mem()) {
+	if (wlan_cfg_get_tx_capt_max_mem(soc->wlan_cfg_ctx)) {
 		if ((mon_soc->dp_soc_tx_capt.last_dropped_id == ts->ppdu_id) ||
 			(!dp_tx_capt_mem_check(pdev, qdf_nbuf_get_truesize(netbuf)))) {
 			mon_soc->dp_soc_tx_capt.last_dropped_id = ts->ppdu_id;
@@ -2339,9 +2332,8 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 {
 	int i, j;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
-	bool mem_limit_flag = false;
-
-	mem_limit_flag = dp_get_tx_capt_max_mem();
+	bool mem_limit_flag =
+		wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx);
 
 	dp_peer_tx_cap_del_all_filter(pdev);
 	mon_pdev->tx_capture_enabled = CDP_TX_ENH_CAPTURE_DISABLED;
@@ -2409,6 +2401,7 @@ dp_enh_tx_capture_enable(struct dp_pdev *pdev, uint8_t user_mode)
 		dp_h2t_cfg_stats_msg_send(pdev,
 					  DP_PPDU_STATS_CFG_SNIFFER,
 					  pdev->pdev_id);
+
 	mon_pdev->tx_capture.msdu_threshold_drop = 0;
 	mon_pdev->tx_capture_enabled = user_mode;
 	dp_tx_capture_info("%pK: Mode change request done cur mode - %d user_mode - %d\n",
@@ -2978,7 +2971,7 @@ dp_tx_mon_restitch_mpdu(struct dp_pdev *pdev, struct dp_peer *peer,
 
 		frag_list_sum_len += qdf_nbuf_len(curr_nbuf);
 
-		if (dp_get_tx_capt_max_mem()) {
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 			msdu_bytes += qdf_nbuf_get_truesize(curr_nbuf);
 		}
 
@@ -3012,7 +3005,7 @@ dp_tx_mon_restitch_mpdu(struct dp_pdev *pdev, struct dp_peer *peer,
 						       is_amsdu);
 			}
 
-			if (dp_get_tx_capt_max_mem()) {
+			if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 				struct cdp_tx_completion_ppdu_user *user;
 
 				user = &ppdu_desc->user[usr_idx];
@@ -4100,7 +4093,7 @@ dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 
 		/* if last element is NULL, then increment global count by
 		   xretry user mpdu bytes */
-		if (dp_get_tx_capt_max_mem()) {
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 			if (!qdf_nbuf_queue_next(ppdu_nbuf)) {
 				qdf_atomic_add(xretry_user->mpdu_bytes,
 					       &mon_soc->dp_soc_tx_capt.ppdu_bytes);
@@ -4124,7 +4117,7 @@ dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 
 	TX_CAP_NBUF_QUEUE_FREE(&xretry_user->mpdu_q);
 
-	if (dp_get_tx_capt_max_mem()) {
+	if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 		qdf_atomic_sub(xretry_user->mpdu_bytes,
 			       &mon_soc->dp_soc_tx_capt.ppdu_bytes);
 		xretry_user->mpdu_bytes = 0;
@@ -4700,9 +4693,8 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 	struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
-	bool mem_limit_flag = false;
-
-	mem_limit_flag = dp_get_tx_capt_max_mem();
+	bool mem_limit_flag =
+		wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx);
 
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)
 		qdf_nbuf_data(nbuf_ppdu_desc);
@@ -4817,7 +4809,7 @@ get_mgmt_pkt_from_queue:
 	if (mgmt_ctl_nbuf) {
 		qdf_nbuf_t tmp_mgmt_ctl_nbuf;
 
-		if (dp_get_tx_capt_max_mem()) {
+		if (mem_limit_flag) {
 			qdf_atomic_sub(qdf_nbuf_get_truesize(mgmt_ctl_nbuf),
 				       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 		}
@@ -4895,7 +4887,7 @@ get_mgmt_pkt_from_queue:
 				nbuf_retry_ppdu =
 					qdf_nbuf_queue_remove(retries_q);
 
-				if (dp_get_tx_capt_max_mem()) {
+				if (mem_limit_flag) {
 					if (qdf_likely(nbuf_retry_ppdu)) {
 						qdf_atomic_sub(qdf_nbuf_get_truesize(nbuf_retry_ppdu),
 								   &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
@@ -4907,7 +4899,7 @@ get_mgmt_pkt_from_queue:
 			/* if adding the new buffer goes beyond the allowed limit,
 			 * drop the buffer
 			 */
-			if (dp_get_tx_capt_max_mem()) {
+			if (mem_limit_flag) {
 				if (!dp_tx_capt_mem_check(pdev,
 							  qdf_nbuf_get_truesize(mgmt_ctl_nbuf))) {
 					mon_soc->dp_soc_tx_capt.mem_limit_drops++;
@@ -4940,7 +4932,7 @@ get_mgmt_pkt_from_queue:
 
 insert_mgmt_buf_to_queue:
 
-			if (dp_get_tx_capt_max_mem()) {
+			if (mem_limit_flag) {
 				if (!dp_tx_capt_mem_check(pdev,
 						qdf_nbuf_get_truesize(mgmt_ctl_nbuf))) {
 					mon_soc->dp_soc_tx_capt.mem_limit_drops++;
@@ -5026,7 +5018,7 @@ insert_mgmt_buf_to_queue:
 					break;
 				}
 
-				if (dp_get_tx_capt_max_mem()) {
+				if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 					qdf_atomic_sub(qdf_nbuf_get_truesize(nbuf_retry_ppdu),
 							&mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 				}
@@ -5124,7 +5116,7 @@ insert_mgmt_buf_to_queue:
 			nbuf_retry_ppdu =
 				qdf_nbuf_queue_remove(retries_q);
 
-			if (dp_get_tx_capt_max_mem()) {
+			if (mem_limit_flag) {
 				if (qdf_likely(nbuf_retry_ppdu)) {
 					qdf_atomic_sub(qdf_nbuf_get_truesize(nbuf_retry_ppdu),
 						&mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
@@ -5136,7 +5128,7 @@ insert_mgmt_buf_to_queue:
 		/* if adding the new buffer goes beyond the allowed limit,
 		 * drop the buffer
 		 */
-		if (dp_get_tx_capt_max_mem()) {
+		if (mem_limit_flag) {
 			if (!dp_tx_capt_mem_check(pdev,
 							qdf_nbuf_get_truesize(nbuf_ppdu_desc))) {
 				mon_soc->dp_soc_tx_capt.mem_limit_drops++;
@@ -5710,7 +5702,8 @@ dp_check_ppdu_and_deliver(struct dp_pdev *pdev,
 			pending_ppdus =
 				qdf_nbuf_queue_len(&tx_tid->pending_ppdu_q);
 			if ((pending_ppdus > MAX_PENDING_PPDUS) ||
-			    (pending_ppdus && dp_get_tx_capt_max_mem() &&
+			    (pending_ppdus &&
+			     wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx) &&
 			     !dp_tx_capt_mem_check(pdev, 0))) {
 				struct cdp_tx_completion_ppdu *tmp_ppdu_desc;
 				uint8_t tmp_usr_idx;
@@ -5768,7 +5761,6 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 	bool is_bar_frm_with_data = false;
 	uint8_t usr_type;
 	uint8_t usr_subtype;
-	bool mem_limit_flag = false;
 
 	qdf_nbuf_queue_init(&head_msdu);
 	qdf_nbuf_queue_init(&head_xretries);
@@ -5805,8 +5797,6 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 	end_tsf = ppdu_desc->ppdu_end_timestamp;
 	bar_start_tsf = ppdu_desc->bar_ppdu_start_timestamp;
 	bar_end_tsf = ppdu_desc->bar_ppdu_end_timestamp;
-
-	mem_limit_flag = dp_get_tx_capt_max_mem();
 
 	if (((ppdu_desc->frame_type == CDP_PPDU_FTYPE_DATA) &&
 	     (ppdu_desc->htt_frame_type !=
@@ -5974,7 +5964,7 @@ dequeue_msdu_again:
 				goto free_nbuf_dec_ref;
 			}
 
-			if (mem_limit_flag) {
+			if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 				ppdu_desc->ppdu_bytes += user->mpdu_bytes;
 			}
 
@@ -6026,7 +6016,7 @@ free_nbuf_dec_ref:
 		dp_tx_cap_nbuf_list_update_ref(ptr_nbuf_list, ref_cnt);
 		ppdu_desc_cnt++;
 
-		if (mem_limit_flag) {
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
 
 			qdf_size_t desc_size = sizeof(*ppdu_desc) +
 				(ppdu_desc->max_users *	sizeof(struct cdp_tx_completion_ppdu_user));
@@ -6040,7 +6030,7 @@ free_nbuf_dec_ref:
 			 * in dp_tx_ppdu_queue_free
 			 */
 			ppdu_desc->ppdu_bytes = desc_size;
-		} /* mem_limit_flag */
+		}
 	} else {
 		/*
 		 * other packet frame also added to
@@ -6087,7 +6077,7 @@ dp_pdev_tx_cap_flush(struct dp_pdev *pdev, bool is_stats_queue_empty)
 	uint32_t i = 0, j = 0;
 	bool mem_limit_flag = false;
 
-	mem_limit_flag = dp_get_tx_capt_max_mem();
+	mem_limit_flag = wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx);
 
 	now_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
 	delta_ms = now_ms - ptr_tx_cap->last_processed_ms;
