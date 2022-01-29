@@ -225,7 +225,6 @@ void monitor_mod_exit(void)
 		mon_soc_ol_detach(psoc);
 		dp_mon_cdp_ops_deregister(soc);
 		dp_mon_intr_ops_deregister(soc);
-		dp_mon_feature_ops_deregister(soc);
 
 		pdev_count = psoc->soc_objmgr.wlan_pdev_count;
 		for (pdev_id = 0; pdev_id < pdev_count; pdev_id++) {
@@ -236,6 +235,7 @@ void monitor_mod_exit(void)
 			dp_mon_pdev_deinit(pdev);
 			dp_mon_pdev_detach(pdev);
 		}
+		dp_mon_feature_ops_deregister(soc);
 
 		mon_ops = dp_mon_ops_get(soc);
 		if (mon_ops && mon_ops->mon_soc_detach)
