@@ -1503,8 +1503,12 @@ qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf)
 			next = nbuf->next;
 			nbuf->next = NULL;
 			break;
+		} else if (qdf_nbuf_is_rx_chfrag_end(nbuf)) {
+			dp_err("Invalid packet length\n");
+			next = nbuf->next;
+			nbuf->next = NULL;
+			break;
 		}
-
 		nbuf = nbuf->next;
 	} while (!last_nbuf);
 
