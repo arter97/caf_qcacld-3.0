@@ -2940,6 +2940,33 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 }
 #endif
 
+static QDF_STATUS pack_rate_upper_cap_tlv(wmi_unified_t wmi_handle,
+		uint32_t *pdev_param, struct wmi_rc_params *param)
+{
+	uint32_t value = 0;
+
+	WMI_PDEV_UPPER_CAP_NSS_SET(value, param->upper_cap_nss);
+	WMI_PDEV_UPPER_CAP_MCS_SET(value, param->upper_cap_mcs);
+	WMI_PDEV_UPPER_CAP_NSS_VALID_SET(value, param->en_nss_cap);
+	WMI_PDEV_UPPER_CAP_MCS_VALID_SET(value, param->en_mcs_cap);
+
+	*pdev_param = value;
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS unpack_rate_upper_cap_tlv(wmi_unified_t wmi_handle,
+	      uint32_t *pdev_param, struct wmi_rc_params *param)
+{
+	uint32_t value = *pdev_param;
+
+	param->upper_cap_nss = WMI_PDEV_UPPER_CAP_NSS_GET(value);
+	param->upper_cap_mcs = WMI_PDEV_UPPER_CAP_MCS_GET(value);
+	param->en_nss_cap = WMI_PDEV_UPPER_CAP_NSS_VALID_GET(value);
+	param->en_mcs_cap = WMI_PDEV_UPPER_CAP_MCS_VALID_GET(value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -3018,4 +3045,6 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->config_vdev_tid_latency_info_cmd = config_vdev_tid_latency_info_cmd_tlv;
 	ops->config_peer_latency_info_cmd = config_peer_latency_info_cmd_tlv;
 #endif
+ops->pack_rate_upper_cap = pack_rate_upper_cap_tlv;
+ops->unpack_rate_upper_cap = unpack_rate_upper_cap_tlv;
 }

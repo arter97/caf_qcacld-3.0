@@ -870,4 +870,18 @@ struct wmi_peer_latency_config_params {
 	struct wmi_peer_latency_info_params latency_info[1];
 };
 #endif
+
+/**
+ * struct wmi_rc_params- rate control parameters
+ * @upper_cap_nss: Max NSS
+ * @upper_cap_mcs: Max MCS
+ * @en_nss_cap: Enable NSS upper cap
+ * @en_mcc_cap: Enable MCS upper cap
+ */
+struct wmi_rc_params {
+	uint8_t upper_cap_nss;
+	uint8_t upper_cap_mcs;
+	uint8_t en_nss_cap;
+	uint8_t en_mcs_cap;
+};
 #endif

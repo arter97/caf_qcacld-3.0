@@ -686,4 +686,24 @@ QDF_STATUS wmi_unified_config_peer_latency_info_cmd_send(
 				wmi_handle, param);
 	return QDF_STATUS_E_FAILURE;
 }
+
+	QDF_STATUS
+wmi_pack_rate_upper_cap(struct wmi_unified *wmi_handle, uint32_t *pdev_param,
+			struct wmi_rc_params *param)
+{
+	if (wmi_handle->ops->pack_rate_upper_cap) {
+		return wmi_handle->ops->pack_rate_upper_cap(wmi_handle, pdev_param, param);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+
+	QDF_STATUS
+wmi_unpack_rate_upper_cap(struct wmi_unified *wmi_handle, uint32_t *pdev_param,
+			  struct wmi_rc_params *param)
+{
+	if (wmi_handle->ops->unpack_rate_upper_cap) {
+		return wmi_handle->ops->unpack_rate_upper_cap(wmi_handle, pdev_param, param);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
 #endif

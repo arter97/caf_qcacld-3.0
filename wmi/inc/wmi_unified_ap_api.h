@@ -828,4 +828,29 @@ QDF_STATUS wmi_unified_config_peer_latency_info_cmd_send(
 		struct wmi_peer_latency_config_params
 		*param);
 #endif
+
+/**
+ * wmi_pack_rate_upper_cap() - create rate upper cap bitmask
+ * @wmi_handle: wmi handle
+ * @pdev_param: pdev paramter
+ * @param: rate control parameters to pack
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_pack_rate_upper_cap(struct wmi_unified *wmi_handle, uint32_t *pdev_param,
+		struct wmi_rc_params *param);
+
+/**
+ * wmi_unpack_rate_upper_cap() - extract rate upper cap parameters from bitmask
+ * @wmi_handle: wmi handle
+ * @pdev_param: pdev paramter
+ * @param: rate control parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unpack_rate_upper_cap(struct wmi_unified *wmi_handle, uint32_t *pdev_param,
+		struct wmi_rc_params *param);
+
 #endif /* _WMI_UNIFIED_AP_API_H_ */
