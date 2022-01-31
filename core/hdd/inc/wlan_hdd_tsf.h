@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -20,6 +21,7 @@
 #define WLAN_HDD_TSF_H
 #include "wlan_hdd_cfg.h"
 #include "wlan_hdd_main.h"
+#include <ol_txrx_htt_api.h>
 
 /**
  * enum hdd_tsf_get_state - status of get tsf action
@@ -254,7 +256,8 @@ void hdd_tsf_notify_wlan_state_change(struct hdd_adapter *adapter,
  *
  * Return: Describe the execute result of this routine
  */
-int hdd_tx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time);
+int hdd_tx_timestamp(enum htt_tx_status status,
+		     qdf_nbuf_t netbuf, uint64_t target_time);
 
 /**
  * hdd_rx_timestamp() - time stamp RX netbuf
@@ -308,7 +311,8 @@ void hdd_tsf_notify_wlan_state_change(struct hdd_adapter *adapter,
 }
 
 static inline
-int hdd_tx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time)
+int hdd_tx_timestamp(enum htt_tx_status status,
+		     qdf_nbuf_t netbuf, uint64_t target_time)
 {
 	return -ENOTSUPP;
 }

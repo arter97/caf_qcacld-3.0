@@ -1689,7 +1689,7 @@ lim_populate_peer_rate_set(tpAniSirGlobal pMac,
 {
 	tSirMacRateSet tempRateSet;
 	tSirMacRateSet tempRateSet2;
-	uint32_t i, j, val, min, isArate = 0;
+	uint32_t i, j, val, min;
 
 	/* copy operational rate set from psessionEntry */
 	if (psessionEntry->rateSet.numRates <= SIR_MAC_RATESET_EID_MAX) {
@@ -1742,7 +1742,6 @@ lim_populate_peer_rate_set(tpAniSirGlobal pMac,
 		for (i = 0; i < tempRateSet.numRates; i++) {
 			min = 0;
 			val = 0xff;
-			isArate = 0;
 			for (j = 0;
 			     (j < tempRateSet.numRates)
 			     && (j < SIR_MAC_RATESET_EID_MAX); j++) {
@@ -1752,30 +1751,39 @@ lim_populate_peer_rate_set(tpAniSirGlobal pMac,
 					min = j;
 				}
 			}
-			if (sirIsArate(tempRateSet.rate[min] & 0x7f))
-				isArate = 1;
 			/*
 			 * HAL needs to know whether the rate is basic rate or not, as it needs to
 			 * update the response rate table accordingly. e.g. if one of the 11a rates is
 			 * basic rate, then that rate can be used for sending control frames.
 			 * HAL updates the response rate table whenever basic rate set is changed.
 			 */
-			if (basicOnly) {
-				if (tempRateSet.rate[min] & 0x80) {
-					if (isArate)
-						pRates->llaRates[aRateIndex++] =
+			if (basicOnly && !(tempRateSet.rate[min] & 0x80)) {
+				pe_debug("Invalid basic rate");
+			} else if (sirIsArate(tempRateSet.rate[min] & 0x7f)) {
+				if (aRateIndex >= SIR_NUM_11A_RATES) {
+					pe_debug("OOB, aRateIndex: %d", aRateIndex);
+				} else if (aRateIndex >= 1 && (tempRateSet.rate[min] ==
+					   pRates->llaRates[aRateIndex - 1])) {
+					pe_debug("Duplicate 11a rate: %d",
+						 tempRateSet.rate[min]);
+				} else {
+					pRates->llaRates[aRateIndex++] =
 							tempRateSet.rate[min];
-					else
-						pRates->llbRates[bRateIndex++] =
+				}
+			} else if (sirIsBrate(tempRateSet.rate[min] & 0x7f)) {
+				if (bRateIndex >= SIR_NUM_11B_RATES) {
+					pe_debug("OOB, bRateIndex: %d", bRateIndex);
+				} else if (bRateIndex >= 1 && (tempRateSet.rate[min] ==
+					   pRates->llbRates[bRateIndex - 1])) {
+					pe_debug("Duplicate 11b rate: %d",
+						 tempRateSet.rate[min]);
+				} else {
+					pRates->llbRates[bRateIndex++] =
 							tempRateSet.rate[min];
 				}
 			} else {
-				if (isArate)
-					pRates->llaRates[aRateIndex++] =
-						tempRateSet.rate[min];
-				else
-					pRates->llbRates[bRateIndex++] =
-						tempRateSet.rate[min];
+				pe_debug("%d is neither 11a nor 11b rate",
+					 tempRateSet.rate[min]);
 			}
 			tempRateSet.rate[min] = 0xff;
 		}
