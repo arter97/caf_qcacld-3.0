@@ -129,13 +129,17 @@ void wlan_reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev);
  * @pdev: pdev pointer.
  * @phy_in: phymode that the user requested.
  * @ch_width: Channel width that the user requested.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
  *
  * Return: true if phymode is allowed, else false.
  */
 bool wlan_reg_is_phymode_chwidth_allowed(struct wlan_objmgr_pdev *pdev,
 					 enum reg_phymode phy_in,
 					 enum phy_ch_width ch_width,
-					 qdf_freq_t primary_freq);
+					 qdf_freq_t primary_freq,
+					 enum supported_6g_pwr_types
+					 in_6g_pwr_mode);
 
 /**
  * wlan_reg_get_max_phymode_and_chwidth() - Find the maximum regmode and
@@ -157,12 +161,15 @@ QDF_STATUS wlan_reg_get_max_phymode_and_chwidth(struct wlan_objmgr_pdev *pdev,
  * @freq: Given frequency.
  * @txpower: tx power to be filled.
  * @ant_gain: Antenna gain to be filled.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
  *
  */
 void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
 				 qdf_freq_t freq,
 				 uint32_t *txpower,
-				 uint8_t *ant_gain);
+				 uint8_t *ant_gain,
+				 enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
  * wlan_reg_get_chan_flags() - Find the channel flags for freq1 and freq2.
@@ -171,13 +178,16 @@ void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
  * @freq2: Frequency in secondary segment.
  * @sec_flags: Secondary flags to be filled.
  * @pri_flags: Primary flags to be filled.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
  *
  */
 void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 			     qdf_freq_t freq1,
 			     qdf_freq_t freq2,
 			     uint16_t *sec_flags,
-			     uint64_t *pri_flags);
+			     uint64_t *pri_flags,
+			     enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
  * wlan_reg_is_band_present() - Check if input band channels are present
@@ -328,13 +338,16 @@ bool wlan_reg_is_freq_width_dfs(struct wlan_objmgr_pdev *pdev,
  * @freq: channel center frequency.
  * @sec_ch_2g_freq: Secondary channel center frequency.
  * @ch_params: pointer to the channel parameters.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
  *
  * Return: None
  */
 void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 				 qdf_freq_t freq,
 				 qdf_freq_t sec_ch_2g_freq,
-				 struct ch_params *ch_params);
+				 struct ch_params *ch_params,
+				 enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
  * wlan_reg_filter_wireless_modes() - Filter out the wireless modes
