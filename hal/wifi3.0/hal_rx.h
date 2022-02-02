@@ -2395,6 +2395,7 @@ enum hal_rx_wbm_reo_push_reason {
 enum hal_rx_wbm_rxdma_push_reason {
 	HAL_RX_WBM_RXDMA_PSH_RSN_ERROR = 0,
 	HAL_RX_WBM_RXDMA_PSH_RSN_ROUTE,
+	HAL_RX_WBM_RXDMA_PSH_RSN_FLUSH,
 };
 
 

@@ -980,6 +980,8 @@ struct dp_soc_stats {
 			uint32_t peer_unauth_rx_pkt_drop;
 			/* reo error - invalid buffer type */
 			uint32_t reo_invalid_buf_type;
+			/* Rx flush count */
+			uint32_t rx_flush_count;
 		} err;
 
 		/* packet count per core - per ring */
