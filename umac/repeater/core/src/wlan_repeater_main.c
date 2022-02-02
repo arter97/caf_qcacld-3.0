@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,7 +26,9 @@
 #include <wlan_repeater_internal.h>
 #include <wlan_repeater_api.h>
 #if ATH_SUPPORT_WRAP
+#if !WLAN_QWRAP_LEGACY
 #include <dp_wrap.h>
+#endif
 #endif
 
 #define SKIP_SCAN_ENTRIES 10000
@@ -39,11 +40,22 @@ bool
 wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev)
 {
 #if ATH_SUPPORT_WRAP
+#if WLAN_QWRAP_LEGACY
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+	struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
+#else
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+#endif
 
+#if WLAN_QWRAP_LEGACY
+	if (ext_cb->get_mpsta_vdev(vdev)) {
+		if (!ext_cb->vdev_is_mpsta(vdev) &&
+		    ext_cb->vdev_is_psta(vdev)) {
+#else
 	if (wlan_rptr_pdev_is_qwrap(pdev)) {
 		if (!wlan_rptr_vdev_is_mpsta(vdev) &&
 		    wlan_rptr_vdev_is_psta(vdev)) {
+#endif
 			return 1;
 		}
 	}
@@ -62,7 +74,14 @@ wlan_rptr_get_mpsta_bssid(struct wlan_objmgr_vdev *vdev,
 			  struct qdf_mac_addr *mpsta_bssid)
 {
 	struct wlan_objmgr_vdev *mpsta_vdev = NULL;
+#if WLAN_QWRAP_LEGACY
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+	struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
+
+	mpsta_vdev = ext_cb->get_mpsta_vdev(vdev);
+#else
 	mpsta_vdev = dp_wrap_get_mpsta_vdev(wlan_vdev_get_pdev(vdev));
+#endif
 	if (mpsta_vdev) {
 		wlan_vdev_get_bss_peer_mac(mpsta_vdev, mpsta_bssid);
 		return QDF_STATUS_SUCCESS;
@@ -172,6 +191,8 @@ wlan_rptr_core_register_ext_cb(struct rptr_ext_cbacks *ext_cbacks)
 				ext_cbacks->dbdc_process_mac_db_up;
 		g_priv->ext_cbacks.act_update_force_cli_mcast_process_up =
 				ext_cbacks->act_update_force_cli_mcast_process_up;
+		g_priv->ext_cbacks.legacy_dbdc_rootap_set =
+				ext_cbacks->legacy_dbdc_rootap_set;
 		g_priv->ext_cbacks.max_pri_stavap_process_down =
 				ext_cbacks->max_pri_stavap_process_down;
 		g_priv->ext_cbacks.delay_stavap_conn_process_down =
@@ -191,6 +212,13 @@ wlan_rptr_core_register_ext_cb(struct rptr_ext_cbacks *ext_cbacks)
 				ext_cbacks->nss_dbdc_process_mac_db_down;
 		g_priv->ext_cbacks.nss_prep_mac_db_store_stavap =
 				ext_cbacks->nss_prep_mac_db_store_stavap;
+#endif
+#if ATH_SUPPORT_WRAP
+#if WLAN_QWRAP_LEGACY
+		g_priv->ext_cbacks.vdev_is_psta = ext_cbacks->vdev_is_psta;
+		g_priv->ext_cbacks.vdev_is_mpsta = ext_cbacks->vdev_is_mpsta;
+		g_priv->ext_cbacks.get_mpsta_vdev = ext_cbacks->get_mpsta_vdev;
+#endif
 #endif
 		return QDF_STATUS_SUCCESS;
 	}
@@ -777,6 +805,7 @@ wlan_rptr_vdev_attach(
 	if (flags & IEEE80211_WRAP_WIRED_STA)
 		wlan_rptr_vdev_set_wired_psta(vdev);
 
+#if !WLAN_QWRAP_LEGACY
 	dp_wrap_vdev_attach(vdev);
 
 	if ((wlan_rptr_vdev_is_wrap(vdev)) ||
@@ -784,6 +813,7 @@ wlan_rptr_vdev_attach(
 		if (dp_wrap_vdev_get_nwrapvaps(pdev))
 			wlan_rptr_pdev_set_eir(pdev);
 	}
+#endif
 }
 
 static
@@ -1195,6 +1225,7 @@ QDF_STATUS wlan_repeater_init(void)
 	rptr_ext_cbacks.dbdc_process_mac_db_up = wlan_dbdc_process_mac_db_up;
 	rptr_ext_cbacks.act_update_force_cli_mcast_process_up =
 		wlan_act_update_force_cli_mcast_process_up;
+	rptr_ext_cbacks.legacy_dbdc_rootap_set = wlan_legacy_dbdc_rootap_set;
 	rptr_ext_cbacks.max_pri_stavap_process_down =
 		wlan_max_pri_stavap_process_down;
 	rptr_ext_cbacks.delay_stavap_conn_process_down =
@@ -1211,6 +1242,13 @@ QDF_STATUS wlan_repeater_init(void)
 		wlan_nss_dbdc_process_mac_db_down;
 	rptr_ext_cbacks.nss_prep_mac_db_store_stavap =
 		wlan_nss_prep_mac_db_store_stavap;
+#endif
+#if ATH_SUPPORT_WRAP
+#if WLAN_QWRAP_LEGACY
+	rptr_ext_cbacks.vdev_is_psta = wlan_vdev_is_psta;
+	rptr_ext_cbacks.vdev_is_mpsta = wlan_vdev_is_mpsta;
+	rptr_ext_cbacks.get_mpsta_vdev = wlan_get_mpsta_vdev;
+#endif
 #endif
 	wlan_rptr_core_register_ext_cb(&rptr_ext_cbacks);
 	qdf_spinlock_create(&gp_rptr_ctx->rptr_global_lock);

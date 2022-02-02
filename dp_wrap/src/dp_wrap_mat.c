@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +15,7 @@
  */
 
 #if ATH_SUPPORT_WRAP
+#if !WLAN_QWRAP_LEGACY
 /*WRAP includes for MAT*/
 #include <linux/udp.h>
 #include <linux/ip.h>
@@ -589,4 +589,5 @@ int dp_wrap_mat_rx(struct dp_wrap_vdev *wvdev, wbuf_t buf)
 
 	return 0;
 }
+#endif
 #endif

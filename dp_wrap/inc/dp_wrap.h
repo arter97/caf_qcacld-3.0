@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +18,7 @@
 #define _DP_WRAP_H__
 
 #if ATH_SUPPORT_WRAP
+#if !WLAN_QWRAP_LEGACY
 
 #include "dp_wrap_struct.h"
 #include <dp_txrx.h>
@@ -316,5 +316,6 @@ void dp_wrap_register_xmit_handler(struct wlan_objmgr_vdev *vdev,
 				    void (*wlan_vdev_xmit_queue)
 				    (struct net_device *dev, wbuf_t wbuf));
 struct net_device *dp_wrap_vdev_get_netdev(struct wlan_objmgr_vdev *vdev);
+#endif
 #endif
 #endif
