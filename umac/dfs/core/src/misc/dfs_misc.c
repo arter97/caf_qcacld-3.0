@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  * Copyright (c) 2002-2006, Atheros Communications Inc.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -396,7 +397,7 @@ bool wlan_is_chan_history_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 #if defined(WLAN_DISP_CHAN_INFO)
 void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 {
-	qdf_freq_t freq_list [NUM_CHANNELS_320MHZ];
+	qdf_freq_t freq_list [NUM_CHANNELS_160MHZ];
 	uint8_t nchannels = 0, i;
 	struct dfs_channel *chan;
 
