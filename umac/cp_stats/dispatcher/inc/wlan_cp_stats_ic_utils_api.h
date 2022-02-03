@@ -57,6 +57,7 @@ PEER_CP_STATS_SET_FUNCS(is_tx_not_ok);
 PEER_CP_STATS_SET_FUNCS(rx_noprivacy);
 PEER_CP_STATS_SET_FUNCS(rx_wepfail);
 PEER_CP_STATS_SET_FUNCS(rx_tkipicv);
+PEER_CP_STATS_SET_FUNCS(rx_pnerr);
 PEER_CP_STATS_SET_FUNCS(rx_wpimic);
 PEER_CP_STATS_SET_FUNCS(rx_ccmpmic);
 PEER_CP_STATS_SET_FUNCS(ps_discard);
@@ -90,6 +91,7 @@ PEER_CP_STATS_GET_FUNCS(rx_mgmt_rate);
 PEER_CP_STATS_GET_FUNCS(tx_dropblock);
 #endif
 PEER_CP_STATS_GET_FUNCS(rx_decryptcrc);
+PEER_CP_STATS_GET_FUNCS(rx_pnerr);
 
 static inline void
 peer_cp_stats_rx_mgmt_snr_update(struct wlan_objmgr_peer *peer,
@@ -122,6 +124,7 @@ VDEV_UCAST_CP_STATS_SET_FUNCS(rx_badkeyid);
 VDEV_UCAST_CP_STATS_SET_FUNCS(rx_decryptok);
 VDEV_UCAST_CP_STATS_SET_FUNCS(rx_wepfail);
 VDEV_UCAST_CP_STATS_SET_FUNCS(rx_tkipicv);
+VDEV_UCAST_CP_STATS_SET_FUNCS(rx_pnerr);
 VDEV_UCAST_CP_STATS_SET_FUNCS(rx_tkipreplay);
 VDEV_UCAST_CP_STATS_SET_FUNCS(rx_tkipformat);
 VDEV_UCAST_CP_STATS_SET_FUNCS(rx_ccmpmic);
@@ -146,6 +149,7 @@ VDEV_UCAST_CP_STATS_GET_FUNCS(rx_wepfail);
 VDEV_UCAST_CP_STATS_GET_FUNCS(rx_decryptok);
 VDEV_UCAST_CP_STATS_GET_FUNCS(rx_ccmpmic);
 VDEV_UCAST_CP_STATS_GET_FUNCS(rx_ccmpreplay);
+VDEV_UCAST_CP_STATS_GET_FUNCS(rx_pnerr);
 
 #define VDEV_MCAST_CP_STATS_SET_FUNCS(field) \
 	static inline void \
