@@ -260,8 +260,7 @@ bool dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
 	 * can leak from here and reach bridge. This code will come into picture
 	 * if first packet received is eapol and tidq is not yet setup.
 	 */
-	if (qdf_mem_cmp(eh->ether_dhost, &vdev->mac_addr.raw[0],
-			QDF_MAC_ADDR_SIZE) != 0)
+	if (!dp_rx_err_match_dhost(eh, vdev))
 		return true;
 
 	return false;
