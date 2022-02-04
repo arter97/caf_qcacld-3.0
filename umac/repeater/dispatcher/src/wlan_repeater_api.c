@@ -1288,31 +1288,27 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 			       void *obj, void *arg)
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
-	struct s_ssid_info *s_ssid_msg;
-	u8 ssid[WLAN_SSID_MAX_LEN + 1] = {0};
-	u8 len = 0;
+	struct s_ssid_info *s_ssid_msg = NULL;
 
 	vdev = (struct wlan_objmgr_vdev *)obj;
 	if (!vdev) {
 		RPTR_LOGE("RPTR VDEV is null");
 		return;
 	}
-	if (QDF_STATUS_SUCCESS !=
-			wlan_vdev_mlme_get_ssid(vdev, ssid, &len))
-		return;
 
 	s_ssid_msg = ((struct s_ssid_info *)arg);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) != wlan_vdev_mlme_get_opmode(
 							s_ssid_msg->vdev)) {
+		struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+		struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
+
 		if (wlan_rptr_is_psta_vdev(vdev))
 			return;
 
-		if (s_ssid_msg->ssid_len != len ||
-		    qdf_mem_cmp(s_ssid_msg->ssid, ssid, len)) {
-			return;
+		if (ext_cb->dessired_ssid_found(vdev, s_ssid_msg->ssid, s_ssid_msg->ssid_len)) {
+			s_ssid_msg->ssid_match = 1;
 		}
-		s_ssid_msg->ssid_match = 1;
 	}
 }
 
