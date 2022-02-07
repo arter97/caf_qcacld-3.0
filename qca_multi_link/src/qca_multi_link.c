@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -401,6 +402,17 @@ struct wiphy *qca_multi_link_get_primary_radio(void)
 }
 
 qdf_export_symbol(qca_multi_link_get_primary_radio);
+
+/**
+ * qca_multi_link_get_always_primary() - get the flag for always primary flag
+ *
+ */
+bool qca_multi_link_get_always_primary(void)
+{
+	return qca_multi_link_cfg.always_primary;
+}
+
+qdf_export_symbol(qca_multi_link_get_always_primary);
 
 /**
  * qca_multi_link_set_primary_radio() - set the primary radio
