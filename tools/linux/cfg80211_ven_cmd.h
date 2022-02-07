@@ -1304,6 +1304,8 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_SET_CATEGORY_VERBOSE = 481,
 	/* Display IPA stats */
 	OL_ATH_PARAM_IPA_UC_STATS = 482,
+	/* Configuration to honor ACS 6GHz PSC only for selection */
+	OL_ATH_PARAM_ACS_6G_ONLY_PSC = 483,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3403,6 +3405,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_CATEGORY_VERBOSE, GET_PARAM, 0},
 	{"ipaucstats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_IPA_UC_STATS, SET_PARAM, 1},
+	{"acs_6g_only_psc",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_ONLY_PSC, SET_PARAM, 1},
+	{"get_acs_6g_only_psc",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_ONLY_PSC, GET_PARAM, 0},
 };
 #endif
 
