@@ -1550,36 +1550,55 @@ void print_advance_stats(struct stats_obj *obj)
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
 #if WLAN_DEBUG_TELEMETRY
-#ifdef WLAN_FEATURE_11BE
-static void stats_if_print_ru_loc(struct debug_data_tx_stats *tx)
+#ifdef VDEV_PEER_PROTOCOL_COUNT
+static void stats_if_print_tx_proto_trace(struct debug_data_tx_stats *tx)
 {
-	uint8_t i;
+	STATS_PRINT("\tTx Data Packets PROTOCOL Based:\n");
+	STATS_16(stdout, "ICMP tx ingress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].ingress_cnt);
+	STATS_16(stdout, "ICMP tx egress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].egress_cnt);
+	STATS_16(stdout, "ARP tx ingress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_ARP].ingress_cnt);
+	STATS_16(stdout, "ARP tx egress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_ARP].egress_cnt);
+	STATS_16(stdout, "EAP tx ingress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_EAP].ingress_cnt);
+	STATS_16(stdout, "EAP tx egress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_EAP].egress_cnt);
+}
 
-	STATS_PRINT("\tRU Locations RU[26 52 52_26 106 106_26 242 484 484_242");
-	STATS_PRINT(" 996 996_484 996_484_242 2X996 2X996_484 3X996 3X996_484");
-	STATS_PRINT(" 4X996]:\n");
-	STATS_PRINT("\t\tMSDU:\n");
-	for (i = 0; i < STATS_IF_RU_INDEX_MAX; i++) {
-		STATS_PRINT("\t\t%s:  %u\n", ru_string[i].ru_type,
-			    tx->ru_loc[i].num_msdu);
-	}
-	STATS_PRINT("\t\tMPDU:\n");
-	for (i = 0; i < STATS_IF_RU_INDEX_MAX; i++) {
-		STATS_PRINT("\t\t%s:  %u\n", ru_string[i].ru_type,
-			    tx->ru_loc[i].num_mpdu);
-	}
-	STATS_PRINT("\t\tMPDU Tried:\n");
-	for (i = 0; i < STATS_IF_RU_INDEX_MAX; i++) {
-		STATS_PRINT("\t\t%s:  %u\n", ru_string[i].ru_type,
-			    tx->ru_loc[i].mpdu_tried);
-	}
+static void stats_if_print_rx_proto_trace(struct debug_data_rx_stats *rx)
+{
+	STATS_PRINT("\tRx Data Packets PROTOCOL Based:\n");
+	STATS_16(stdout, "ICMP rx ingress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].ingress_cnt);
+	STATS_16(stdout, "ICMP rx egress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].egress_cnt);
+	STATS_16(stdout, "ARP rx ingress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_ARP].ingress_cnt);
+	STATS_16(stdout, "ARP rx egress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_ARP].egress_cnt);
+	STATS_16(stdout, "EAP rx ingress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_EAP].ingress_cnt);
+	STATS_16(stdout, "EAP rx egress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_EAP].egress_cnt);
 }
 #else
+static void stats_if_print_tx_proto_trace(struct debug_data_tx_stats *tx)
+{
+}
+
+static void stats_if_print_rx_proto_trace(struct debug_data_rx_stats *rx)
+{
+}
+#endif /* VDEV_PEER_PROTOCOL_COUNT */
+
 static void stats_if_print_ru_loc(struct debug_data_tx_stats *tx)
 {
 	uint8_t i;
 
-	STATS_PRINT("\tRU Locations RU[26 52 106 242 484 996]:\n");
+	STATS_PRINT("\tRU Locations:\n");
 	STATS_PRINT("\t\tMSDU:\n");
 	for (i = 0; i < STATS_IF_RU_INDEX_MAX; i++) {
 		STATS_PRINT("\t\t%s:  %u\n", ru_string[i].ru_type,
@@ -1596,7 +1615,6 @@ static void stats_if_print_ru_loc(struct debug_data_tx_stats *tx)
 			    tx->ru_loc[i].mpdu_tried);
 	}
 }
-#endif /* WLAN_FEATURE_11BE */
 
 void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 {
@@ -1694,20 +1712,8 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 	}
 
 	stats_if_print_ru_loc(tx);
+	stats_if_print_tx_proto_trace(tx);
 
-	STATS_PRINT("\tTx Data Packets PROTOCOL Based:\n");
-	STATS_16(stdout, "ICMP tx ingress",
-		 tx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].ingress_cnt);
-	STATS_16(stdout, "ICMP tx egress",
-		 tx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].egress_cnt);
-	STATS_16(stdout, "ARP tx ingress",
-		 tx->protocol_trace_cnt[STATS_IF_TRACE_ARP].ingress_cnt);
-	STATS_16(stdout, "ARP tx egress",
-		 tx->protocol_trace_cnt[STATS_IF_TRACE_ARP].egress_cnt);
-	STATS_16(stdout, "EAP tx ingress",
-		 tx->protocol_trace_cnt[STATS_IF_TRACE_EAP].ingress_cnt);
-	STATS_16(stdout, "EAP tx egress",
-		 tx->protocol_trace_cnt[STATS_IF_TRACE_EAP].egress_cnt);
 	STATS_PRINT("\tTx Ack not recevied counter:\n");
 	for (ptype = STATS_IF_PROTO_EAPOL_M1;
 	     ptype < STATS_IF_PROTO_SUBTYPE_MAX; ptype++) {
@@ -1770,19 +1776,9 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 		STATS_PRINT("\t\t\tMPDU OK = %u, MPDU Fail = %u\n",
 			    rx_mu->mpdu_cnt_fcs_ok, rx_mu->mpdu_cnt_fcs_err);
 	}
-	STATS_PRINT("\tRx Data Packets PROTOCOL Based:\n");
-	STATS_16(stdout, "ICMP rx ingress",
-		 rx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].ingress_cnt);
-	STATS_16(stdout, "ICMP rx egress",
-		 rx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].egress_cnt);
-	STATS_16(stdout, "ARP rx ingress",
-		 rx->protocol_trace_cnt[STATS_IF_TRACE_ARP].ingress_cnt);
-	STATS_16(stdout, "ARP rx egress",
-		 rx->protocol_trace_cnt[STATS_IF_TRACE_ARP].egress_cnt);
-	STATS_16(stdout, "EAP rx ingress",
-		 rx->protocol_trace_cnt[STATS_IF_TRACE_EAP].ingress_cnt);
-	STATS_16(stdout, "EAP rx egress",
-		 rx->protocol_trace_cnt[STATS_IF_TRACE_EAP].egress_cnt);
+
+	stats_if_print_rx_proto_trace(rx);
+
 	for (i = 0; i <  STATS_IF_MAX_RX_RINGS; i++) {
 		STATS_PRINT("\tRing Id = %u", i);
 		STATS_64(stdout, "Packets Received", rx->rcvd_reo[i].num);

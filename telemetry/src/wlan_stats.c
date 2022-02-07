@@ -4426,7 +4426,7 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 			goto get_failed;
 		}
 		ret = get_pdev_tx_capture_stats(dp_soc, pdev_id, cap);
-		if (ret != QDF_STATUS_SUCCESS)
+		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_pdev_data_txcap(stats, pdev_stats, cap);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch pdev Debug TXCAP Stats!");
@@ -4440,7 +4440,7 @@ static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 			goto get_failed;
 		}
 		ret = cdp_mon_pdev_get_rx_stats(dp_soc, pdev_id, mon);
-		if (ret != QDF_STATUS_SUCCESS)
+		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_pdev_data_monitor(stats,
 							  pdev_stats, mon);
 		if (ret != QDF_STATUS_SUCCESS)
