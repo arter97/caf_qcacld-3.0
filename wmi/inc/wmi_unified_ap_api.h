@@ -872,4 +872,18 @@ QDF_STATUS
 wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
 					     uint32_t enable);
 
+#if CONFIG_SAWF_DEF_QUEUES
+/**
+ * wmi_unified_set_rate_upper_cap_cmd_send() - set rate upper cap cmd
+ * @wmi_handle: wmi handle
+ * @pdev_id: pdev id
+ * @param: rate upper cap parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_rate_upper_cap_cmd_send(struct wmi_unified *wmi_handle,
+					uint8_t pdev_id,
+					struct wmi_rc_params *param);
+#endif
 #endif /* _WMI_UNIFIED_AP_API_H_ */

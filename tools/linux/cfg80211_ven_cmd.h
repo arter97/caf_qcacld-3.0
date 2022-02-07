@@ -1355,6 +1355,11 @@ enum _ol_ath_param_t {
 	/* Enable/disable undecoded frame capture */
 	OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE = 492,
 #endif
+#if CONFIG_SAWF_DEF_QUEUES
+	OL_ATH_PARAM_RC_UPPER_CAP_NSS = 493,
+	OL_ATH_PARAM_RC_UPPER_CAP_MCS = 494,
+	OL_ATH_PARAM_DISABLE_RATE_UPPER_CAP = 495,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3557,6 +3562,17 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_undecoded_metadata_capture",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE,
 		GET_PARAM, 0},
+#endif
+#if CONFIG_SAWF_DEF_QUEUES
+	{"get_rate_upper_cap_nss",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_UPPER_CAP_NSS,
+		GET_PARAM, 0},
+	{"get_rate_upper_cap_mcs",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_UPPER_CAP_MCS,
+		GET_PARAM, 0},
+	{"disable_rate_upper_cap",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_RATE_UPPER_CAP,
+		SET_PARAM, 1},
 #endif
 };
 #endif
