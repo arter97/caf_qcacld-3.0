@@ -34,6 +34,7 @@
 #ifdef QCA_SUPPORT_AGILE_DFS
 #include <wlan_sm_engine.h> /* for struct wlan_sm */
 #endif
+#include <wlan_dfs_mlme_api.h>
 
 #ifdef QCA_SUPPORT_AGILE_DFS
 /* dfs_start_agile_engine() - Prepare ADFS params and program the agile
@@ -495,6 +496,9 @@ static void dfs_agile_state_running_entry(void *ctx)
 		dfs_start_agile_rcac_timer(dfs);
 		dfs_start_agile_engine(dfs);
 	}
+
+	dfs_mlme_send_adfs_update_action(dfs->dfs_pdev_obj,
+					 ADFS_STARTED);
 }
 
 /**
@@ -531,11 +535,14 @@ static bool dfs_agile_state_running_event(void *ctx,
 	bool status;
 	struct wlan_dfs *dfs;
 	bool is_cac_done_on_des_chan;
+	bool is_agile_running_on_sta;
 
 	if (!event_data)
 		return false;
 
 	dfs = (struct wlan_dfs *)event_data;
+
+	is_agile_running_on_sta = dfs->dfs_is_agile_running_for_sta;
 
 	if (dfs->dfs_psoc_idx != dfs_soc->cur_agile_dfs_index)
 		return false;
@@ -559,10 +566,15 @@ static bool dfs_agile_state_running_event(void *ctx,
 			dfs_abort_agile_precac(dfs);
 
 		dfs_agile_sm_transition_to(dfs_soc, DFS_AGILE_S_INIT);
-		dfs_agile_sm_deliver_event(dfs_soc,
-					   DFS_AGILE_SM_EV_AGILE_START,
-					   event_data_len,
-					   event_data);
+
+		/* Do not start ADFS for STA. Instead let rootAP select the
+		 * next channel and inform the STA.
+		 */
+		if (!is_agile_running_on_sta)
+			dfs_agile_sm_deliver_event(dfs_soc,
+						   DFS_AGILE_SM_EV_AGILE_START,
+						   event_data_len,
+						   event_data);
 
 		status = true;
 		break;
@@ -587,8 +599,20 @@ static bool dfs_agile_state_running_event(void *ctx,
 			if (dfs_soc->ocac_status == OCAC_SUCCESS) {
 				dfs_soc->ocac_status = OCAC_RESET;
 				dfs_mark_adfs_chan_as_cac_done(dfs);
+
+				dfs_mlme_send_adfs_update_action(
+					dfs->dfs_pdev_obj,
+					ADFS_COMPLETED);
 			}
 			dfs_agile_sm_transition_to(dfs_soc, DFS_AGILE_S_INIT);
+
+			/* Do not start ADFS for STA. Instead let rootAP
+			 * select the next channel and inform the STA.
+			 */
+			if (dfs->dfs_is_agile_running_for_sta) {
+				dfs_agile_precac_cleanup(dfs);
+				break;
+			}
 			dfs_agile_precac_cleanup(dfs);
 			is_cac_done_on_des_chan =
 				dfs_precac_check_home_chan_change(dfs);

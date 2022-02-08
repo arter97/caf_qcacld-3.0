@@ -24,6 +24,8 @@
 #include <dfs.h>
 #include <dfs_process_radar_found_ind.h>
 #include <wlan_dfs_mlme_api.h>
+#include <wlan_dfs_utils_api.h>
+#include "../dfs_precac_forest.h"
 
 #if defined(QCA_DFS_RCSA_SUPPORT)
 /* dfs_prepare_nol_ie_bitmap: Create a Bitmap from the radar found subchannels
@@ -113,6 +115,7 @@ bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
 	uint16_t radar_subchans[NUM_CHANNELS_160MHZ];
 	uint16_t nol_freq_list[NUM_CHANNELS_160MHZ];
 	bool should_nol_ie_be_sent = true;
+	bool is_radar_on_precac_chan = false;
 
 	qdf_mem_zero(radar_subchans, sizeof(radar_subchans));
 	if (!dfs->dfs_use_nol_subchannel_marking) {
@@ -140,6 +143,11 @@ bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
 			num_subchans++) {
 			if (nol_ie_bitmap & bits) {
 				radar_subchans[num_subchans] = frequency;
+				if (IS_WITHIN_RANGE(
+					frequency,
+					dfs->dfs_agile_precac_freq_mhz,
+					dfs->dfs_precac_chwidth))
+					is_radar_on_precac_chan = true;
 			}
 			bits <<= 1;
 			frequency += nol_ie_bandwidth;
@@ -149,6 +157,17 @@ bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
 	dfs_radar_add_channel_list_to_nol_for_freq(dfs, radar_subchans,
 						   nol_freq_list,
 						   &num_subchans);
+
+	if (is_radar_on_precac_chan) {
+		dfs_mark_precac_nol_for_freq(dfs,
+					     0,
+					     0,
+					     nol_freq_list,
+					     num_subchans);
+		utils_dfs_agile_sm_deliver_evt(dfs->dfs_pdev_obj,
+					       DFS_AGILE_SM_EV_ADFS_RADAR);
+	}
+
 	return should_nol_ie_be_sent;
 }
 #endif

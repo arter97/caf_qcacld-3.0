@@ -512,6 +512,7 @@ void dfs_agile_precac_cleanup(struct wlan_dfs *dfs)
 	dfs->dfs_agile_precac_freq_mhz = 0;
 	dfs->dfs_precac_chwidth = CH_WIDTH_INVALID;
 	dfs_soc_obj->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
+	dfs->dfs_is_agile_running_for_sta = false;
 }
 
 /*
@@ -539,6 +540,12 @@ void  dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs, bool *is_chan_found)
 	dfs_tx_ops = wlan_psoc_get_dfs_txops(psoc);
 
 	pdev = dfs->dfs_pdev_obj;
+
+	if (dfs->dfs_is_agile_running_for_sta) {
+		ch_freq = dfs->dfs_agile_precac_freq_mhz;
+		temp_dfs = dfs;
+		goto chan_found;
+	}
 
 	for (i = 0; i < dfs_soc_obj->num_dfs_privs; i++) {
 		dfs_find_pdev_for_agile_precac(pdev, &cur_agile_dfs_idx);
@@ -574,6 +581,7 @@ void  dfs_prepare_agile_precac_chan(struct wlan_dfs *dfs, bool *is_chan_found)
 		}
 	}
 
+chan_found:
 	if (ch_freq) {
 		dfs_fill_adfs_chan_params(temp_dfs, &adfs_param);
 		dfs_start_agile_precac_timer(temp_dfs,
@@ -870,7 +878,8 @@ static os_timer_func(dfs_precac_timeout)
 		dfs_pcac_cfreq2 = dfs->dfs_precac_secondary_freq_mhz;
 		dfs_mark_precac_done_for_freq(dfs,
 					      dfs_pcac_cfreq2, 0,
-					      dfs->dfs_precac_chwidth);
+					      dfs->dfs_precac_chwidth,
+					      false);
 		current_time = qdf_system_ticks_to_msecs(qdf_system_ticks());
 		dfs_debug(dfs, WLAN_DEBUG_DFS,
 			  "Pre-cac expired, Precac Secondary chan %u curr time %d",
@@ -1134,6 +1143,14 @@ void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
 
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 		 "precactimeout = %d ms", (min_precac_timeout));
+
+	/*
+	 * Add 2 extra seconds to minimum timeout to process all station
+	 * completion events in AP preCAC.
+	 */
+	if (!dfs->dfs_is_agile_running_for_sta)
+		min_precac_timeout += EXTRA_TIME_IN_MS;
+
 	/* Add the preCAC timeout in the params to be sent to FW. */
 	adfs_param->min_precac_timeout = min_precac_timeout;
 	adfs_param->max_precac_timeout = max_precac_timeout;
@@ -2254,6 +2271,7 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 	uint16_t nol_freq_list[NUM_CHANNELS_160MHZ];
 	bool is_radar_source_agile =
 		(radar_found->detector_id == dfs_get_agile_detector_id(dfs));
+	bool wait_for_csa = false;
 
 	dfs_compute_radar_found_cfreq(dfs, radar_found, &freq_center);
 	radarfound_freq = freq_center + radar_found->freq_offset;
@@ -2328,6 +2346,12 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 		 dfs_reset_radarq(dfs);
 	 }
 
+	dfs_send_nol_ie_and_rcsa(dfs,
+				 radar_found,
+				 nol_freq_list,
+				 num_channels,
+				 &wait_for_csa);
+
 	if (is_radar_source_agile)
 		utils_dfs_agile_sm_deliver_evt(dfs->dfs_pdev_obj,
 					       DFS_AGILE_SM_EV_ADFS_RADAR);
@@ -2336,6 +2360,35 @@ exit:
 	return status;
 }
 #endif
+
+void dfs_get_agile_info(struct wlan_dfs *dfs,
+			qdf_freq_t *agile_cfreq,
+			uint8_t *agile_chwidth)
+{
+	*agile_cfreq = dfs->dfs_agile_precac_freq_mhz;
+	*agile_chwidth = dfs->dfs_precac_chwidth;
+}
+
+void dfs_start_adfs_for_sta(struct wlan_dfs *dfs,
+			    qdf_freq_t agile_cfreq,
+			    uint8_t agile_chwidth)
+{
+	if (dfs->dfs_precac_chwidth == CH_WIDTH_80P80MHZ &&
+	    !dfs_is_restricted_80p80mhz_supported(dfs)) {
+		dfs_mlme_send_adfs_update_action(dfs->dfs_pdev_obj,
+						 ADFS_FAILED);
+		return;
+	}
+
+	dfs->dfs_soc_obj->ocac_status = OCAC_RESET;
+	dfs->dfs_agile_precac_freq_mhz = agile_cfreq;
+	dfs->dfs_precac_chwidth = agile_chwidth;
+	dfs->dfs_is_agile_running_for_sta = true;
+
+	dfs_agile_sm_deliver_evt(dfs->dfs_soc_obj,
+				 DFS_AGILE_SM_EV_AGILE_START,
+				 0, (void *)dfs);
+}
 
 #if (defined(QCA_SUPPORT_AGILE_DFS) || defined(QCA_SUPPORT_ADFS_RCAC)) && \
      defined(WLAN_DFS_TRUE_160MHZ_SUPPORT) && defined(WLAN_DFS_FULL_OFFLOAD)

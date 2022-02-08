@@ -570,7 +570,8 @@ dfs_mark_non_dfs_as_precac_done(struct wlan_dfs *dfs,
 		dfs_mark_precac_done_for_freq(dfs,
 					      ichan->dfs_ch_mhz_freq_seg1,
 					      0,
-					      CH_WIDTH_80MHZ);
+					      CH_WIDTH_80MHZ,
+					      true);
 		dfs_update_non_dfs_subchannel_count(dfs,
 						    ichan->dfs_ch_mhz_freq_seg1,
 						    N_SUBCHANS_FOR_80BW);
@@ -580,7 +581,8 @@ dfs_mark_non_dfs_as_precac_done(struct wlan_dfs *dfs,
 		dfs_mark_precac_done_for_freq(dfs,
 					      ichan->dfs_ch_mhz_freq_seg2,
 					      0,
-					      CH_WIDTH_80MHZ);
+					      CH_WIDTH_80MHZ,
+					      true);
 		dfs_update_non_dfs_subchannel_count(dfs,
 						    ichan->dfs_ch_mhz_freq_seg2,
 						    N_SUBCHANS_FOR_80BW);
@@ -620,18 +622,27 @@ dfs_precac_create_precac_entry(struct wlan_dfs *dfs,
 	return status;
 }
 
+static inline bool
+dfs_is_allsubchans_cac_done(struct precac_tree_node *curr_node)
+{
+	return (curr_node->n_caced_subchs ==
+		N_SUBCHS_FOR_BANDWIDTH(curr_node->bandwidth));
+}
+
 /* dfs_mark_tree_node_as_cac_done_for_freq() - Mark the preCAC BSTree node as
  * CAC done.
  * @dfs:          Pointer to WLAN DFS structure.
  * @precac_entry: Precac_list entry pointer.
  * @chan_freq:    IEEE channel freq to be marked.
+ * @is_adfs_completed_by_all_stas: ADFS completion status of clients.
  *
  * Note: The input channel is always of 20MHz bandwidth.
  */
 static void
 dfs_mark_tree_node_as_cac_done_for_freq(struct wlan_dfs *dfs,
 					struct dfs_precac_entry *precac_entry,
-					uint16_t chan_freq)
+					uint16_t chan_freq,
+					bool is_adfs_completed_by_all_stas)
 {
 	struct precac_tree_node *curr_node;
 
@@ -661,6 +672,9 @@ dfs_mark_tree_node_as_cac_done_for_freq(struct wlan_dfs *dfs,
 		if (curr_node->n_caced_subchs <
 		    N_SUBCHS_FOR_BANDWIDTH(curr_node->bandwidth))
 			curr_node->n_caced_subchs++;
+		if (dfs_is_allsubchans_cac_done(curr_node) &&
+		    is_adfs_completed_by_all_stas)
+			curr_node->is_adfs_completed_by_all_stas = true;
 		curr_node = dfs_descend_precac_tree_for_freq(curr_node,
 							     chan_freq);
 	}
@@ -1404,6 +1418,7 @@ void dfs_mark_adfs_chan_as_cac_done(struct wlan_dfs *dfs)
 {
 	qdf_freq_t pri_chan_freq, sec_chan_freq;
 	enum phy_ch_width chan_width;
+	bool is_adfs_completed_by_all_stas = false;
 
 	if (dfs->dfs_agile_precac_freq_mhz ==
 		RESTRICTED_80P80_CHAN_CENTER_FREQ) {
@@ -1415,8 +1430,11 @@ void dfs_mark_adfs_chan_as_cac_done(struct wlan_dfs *dfs)
 		sec_chan_freq = 0;
 		chan_width =  dfs->dfs_precac_chwidth;
 	}
+	dfs_mlme_fetch_adfs_status_of_all_vaps(dfs->dfs_pdev_obj,
+					       &is_adfs_completed_by_all_stas);
 	dfs_mark_precac_done_for_freq(dfs, pri_chan_freq, sec_chan_freq,
-				      chan_width);
+				      chan_width,
+				      is_adfs_completed_by_all_stas);
 }
 
 /*
@@ -1425,11 +1443,14 @@ void dfs_mark_adfs_chan_as_cac_done(struct wlan_dfs *dfs)
  * @pri_ch_freq: Primary 80MHZ center frequency.
  * @sec_ch_freq: Secondary 80MHZ center frequency.
  * @ch_width: Channel width.
+ * @is_adfs_completed_by_all_stas: boolean to represent ADFS completion by
+ * all connected clients.
  */
 void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
 				   uint16_t pri_ch_freq,
 				   uint16_t sec_ch_freq,
-				   enum phy_ch_width ch_width)
+				   enum phy_ch_width ch_width,
+				   bool is_adfs_completed_by_all_stas)
 {
 	struct dfs_precac_entry *precac_entry = NULL, *tmp_precac_entry = NULL;
 	uint16_t channels[NUM_CHANNELS_160MHZ];
@@ -1459,7 +1480,8 @@ void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
 					precac_entry->center_ch_freq,
 					(precac_entry->bw/2))) {
 				dfs_mark_tree_node_as_cac_done_for_freq
-					(dfs, precac_entry, channels[i]);
+					(dfs, precac_entry, channels[i],
+					 is_adfs_completed_by_all_stas);
 				utils_dfs_deliver_event(dfs->dfs_pdev_obj,
 							channels[i],
 							WLAN_EV_PCAC_COMPLETED);
