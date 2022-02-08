@@ -136,8 +136,7 @@ static void fill_basic_vdev_data_tx(struct basic_vdev_data_tx *data,
 static void fill_basic_vdev_ctrl_tx(struct basic_vdev_ctrl_tx *ctrl,
 				    struct vdev_ic_cp_stats *cp_stats)
 {
-	ctrl->cs_tx_mgmt = cp_stats->ucast_stats.cs_tx_mgmt +
-			   cp_stats->mcast_stats.cs_tx_mgmt;
+	ctrl->cs_tx_mgmt = cp_stats->ucast_stats.cs_tx_mgmt;
 	ctrl->cs_tx_error_counter = cp_stats->stats.cs_tx_nodefkey +
 				    cp_stats->stats.cs_tx_noheadroom +
 				    cp_stats->stats.cs_tx_nobuf +
@@ -157,8 +156,7 @@ static void fill_basic_vdev_data_rx(struct basic_vdev_data_rx *data,
 static void fill_basic_vdev_ctrl_rx(struct basic_vdev_ctrl_rx *ctrl,
 				    struct vdev_ic_cp_stats *cp_stats)
 {
-	ctrl->cs_rx_mgmt = cp_stats->ucast_stats.cs_rx_mgmt +
-			   cp_stats->mcast_stats.cs_rx_mgmt;
+	ctrl->cs_rx_mgmt = cp_stats->ucast_stats.cs_rx_mgmt;
 	ctrl->cs_rx_error_counter = cp_stats->stats.cs_rx_wrongbss +
 				    cp_stats->stats.cs_rx_tooshort +
 				    cp_stats->stats.cs_rx_ssid_mismatch;
@@ -893,6 +891,114 @@ get_failed:
 	return ret;
 }
 
+static QDF_STATUS get_vdev_cp_stats(struct wlan_objmgr_vdev *vdev,
+				    struct vdev_ic_cp_stats *cp_stats)
+{
+	qdf_event_t wait_event;
+	struct ieee80211vap *vap;
+
+	vap = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!vap) {
+		qdf_err("vap is NULL!");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (vap->get_vdev_bcn_stats &&
+	    (CONVERT_SYSTEM_TIME_TO_MS(OS_GET_TICKS() -
+	    vap->vap_bcn_stats_time) > 2000)) {
+		qdf_mem_zero(&wait_event, sizeof(wait_event));
+		qdf_event_create(&wait_event);
+		qdf_event_reset(&wait_event);
+		vap->get_vdev_bcn_stats(vap);
+		/* give enough delay in ms (50ms) to get beacon stats */
+		qdf_wait_single_event(&wait_event, 50);
+		if (qdf_atomic_read(&vap->vap_bcn_event) != 1)
+			qdf_debug("VAP BCN STATS FAILED");
+		qdf_event_destroy(&wait_event);
+	}
+	if (vap->get_vdev_prb_fils_stats) {
+		qdf_mem_zero(&wait_event, sizeof(wait_event));
+		qdf_event_create(&wait_event);
+		qdf_event_reset(&wait_event);
+		qdf_atomic_init(&vap->vap_prb_fils_event);
+		vap->get_vdev_prb_fils_stats(vap);
+		/* give enough delay in ms (50ms) to get fils stats */
+		qdf_wait_single_event(&wait_event, 50);
+		if (qdf_atomic_read(&vap->vap_prb_fils_event) != 1)
+			qdf_debug("VAP PRB and FILS STATS FAILED");
+		qdf_event_destroy(&wait_event);
+	}
+
+	return wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
+}
+
+static void aggregate_basic_pdev_ctrl_tx(struct basic_pdev_ctrl_tx *tx,
+					 struct vdev_ic_cp_stats *cp_stats)
+{
+	tx->cs_tx_mgmt += cp_stats->ucast_stats.cs_tx_mgmt;
+}
+
+static void aggregate_basic_pdev_ctrl_rx(struct basic_pdev_ctrl_rx *rx,
+					 struct vdev_ic_cp_stats *cp_stats)
+{
+	rx->cs_rx_mgmt += cp_stats->ucast_stats.cs_rx_mgmt;
+}
+
+static void aggr_basic_pdev_ctrl_stats(struct wlan_objmgr_pdev *pdev,
+				       void *object, void *arg)
+{
+	struct wlan_objmgr_vdev *vdev = object;
+	struct iterator_ctx *ctx = arg;
+	struct unified_stats *stats;
+	struct vdev_ic_cp_stats *cp_stats;
+
+	if (!vdev || !ctx || !ctx->pvt || !ctx->stats)
+		return;
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE)
+		return;
+	cp_stats = ctx->pvt;
+	stats = ctx->stats;
+	qdf_mem_zero(cp_stats, sizeof(struct vdev_ic_cp_stats));
+	get_vdev_cp_stats(vdev, cp_stats);
+
+	if (stats->feat[INX_FEAT_TX])
+		aggregate_basic_pdev_ctrl_tx(stats->feat[INX_FEAT_TX],
+					     cp_stats);
+	if (stats->feat[INX_FEAT_RX])
+		aggregate_basic_pdev_ctrl_rx(stats->feat[INX_FEAT_RX],
+					     cp_stats);
+}
+
+static void aggregate_basic_pdev_stats(struct wlan_objmgr_pdev *pdev,
+				       struct unified_stats *stats,
+				       enum stats_type_e type)
+{
+	struct iterator_ctx ctx;
+	struct vdev_ic_cp_stats *cp_stats;
+
+	cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+	if (!cp_stats) {
+		qdf_debug("Allocation Failed!");
+		return;
+	}
+	ctx.pvt = cp_stats;
+	ctx.stats = stats;
+
+	switch (type) {
+	case STATS_TYPE_DATA:
+		break;
+	case STATS_TYPE_CTRL:
+		wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
+						  aggr_basic_pdev_ctrl_stats,
+						  &ctx, 1, WLAN_MLME_SB_ID);
+		break;
+	default:
+		qdf_err("Invalid type %d!", type);
+	}
+
+	qdf_mem_free(cp_stats);
+}
+
 static QDF_STATUS get_basic_pdev_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_pdev *pdev,
 				      struct unified_stats *stats,
@@ -943,7 +1049,7 @@ get_failed:
 
 static QDF_STATUS get_basic_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 				      struct unified_stats *stats,
-				      uint32_t feat)
+				      uint32_t feat, bool aggregate)
 {
 	struct pdev_ic_cp_stats *pdev_cp_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
@@ -984,6 +1090,9 @@ static QDF_STATUS get_basic_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 		else
 			stats_collected = true;
 	}
+
+	if (stats_collected && aggregate)
+		aggregate_basic_pdev_stats(pdev, stats, STATS_TYPE_CTRL);
 
 get_failed:
 	qdf_mem_free(pdev_cp_stats);
@@ -1037,49 +1146,6 @@ get_failed:
 
 	return ret;
 }
-
-#if WLAN_ADVANCE_TELEMETRY || WLAN_DEBUG_TELEMETRY
-static QDF_STATUS get_vdev_cp_stats(struct wlan_objmgr_vdev *vdev,
-				    struct vdev_ic_cp_stats *cp_stats)
-{
-	qdf_event_t wait_event;
-	struct ieee80211vap *vap;
-
-	vap = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!vap) {
-		qdf_err("vap is NULL!");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	if (vap->get_vdev_bcn_stats &&
-	    (CONVERT_SYSTEM_TIME_TO_MS(OS_GET_TICKS() -
-	    vap->vap_bcn_stats_time) > 2000)) {
-		qdf_mem_zero(&wait_event, sizeof(wait_event));
-		qdf_event_create(&wait_event);
-		qdf_event_reset(&wait_event);
-		vap->get_vdev_bcn_stats(vap);
-		/* give enough delay in ms (50ms) to get beacon stats */
-		qdf_wait_single_event(&wait_event, 50);
-		if (qdf_atomic_read(&vap->vap_bcn_event) != 1)
-			qdf_debug("VAP BCN STATS FAILED");
-		qdf_event_destroy(&wait_event);
-	}
-	if (vap->get_vdev_prb_fils_stats) {
-		qdf_mem_zero(&wait_event, sizeof(wait_event));
-		qdf_event_create(&wait_event);
-		qdf_event_reset(&wait_event);
-		qdf_atomic_init(&vap->vap_prb_fils_event);
-		vap->get_vdev_prb_fils_stats(vap);
-		/* give enough delay in ms (50ms) to get fils stats */
-		qdf_wait_single_event(&wait_event, 50);
-		if (qdf_atomic_read(&vap->vap_prb_fils_event) != 1)
-			qdf_debug("VAP PRB and FILS STATS FAILED");
-		qdf_event_destroy(&wait_event);
-	}
-
-	return wlan_cfg80211_get_vdev_cp_stats(vdev, cp_stats);
-}
-#endif
 
 #if WLAN_ADVANCE_TELEMETRY
 static void
@@ -2494,34 +2560,8 @@ static QDF_STATUS get_advance_pdev_data_nawds(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
-static void aggregate_vdev_stats(struct wlan_objmgr_pdev *pdev,
-				 void *object, void *arg)
-{
-	struct wlan_objmgr_vdev *vdev = object;
-	struct advance_pdev_ctrl_tx *ctrl = arg;
-	struct vdev_ic_cp_stats *cp_stats;
-
-	if (!vdev || !ctrl)
-		return;
-
-	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE)
-		return;
-
-	cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
-	if (!cp_stats) {
-		qdf_debug("Allocation Failed!");
-		return;
-	}
-	get_vdev_cp_stats(vdev, cp_stats);
-	ctrl->cs_tx_beacon += cp_stats->stats.cs_tx_bcn_success +
-			      cp_stats->stats.cs_tx_bcn_outage;
-	qdf_mem_free(cp_stats);
-}
-
-static QDF_STATUS get_advance_pdev_ctrl_tx(struct wlan_objmgr_pdev *pdev,
-					   struct unified_stats *stats,
-					   struct pdev_ic_cp_stats *cp_stats,
-					   bool aggregate)
+static QDF_STATUS get_advance_pdev_ctrl_tx(struct unified_stats *stats,
+					   struct pdev_ic_cp_stats *cp_stats)
 {
 	struct advance_pdev_ctrl_tx *ctrl = NULL;
 
@@ -2538,11 +2578,6 @@ static QDF_STATUS get_advance_pdev_ctrl_tx(struct wlan_objmgr_pdev *pdev,
 
 	ctrl->cs_tx_beacon = cp_stats->stats.cs_tx_beacon;
 	ctrl->cs_tx_retries = cp_stats->stats.cs_tx_retries;
-
-	if (aggregate)
-		wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
-						  aggregate_vdev_stats, ctrl,
-						  1, WLAN_MLME_SB_ID);
 
 	stats->feat[INX_FEAT_TX] = ctrl;
 	stats->size[INX_FEAT_TX] = sizeof(struct advance_pdev_ctrl_tx);
@@ -2639,6 +2674,75 @@ static QDF_STATUS get_advance_pdev_ctrl_link(struct unified_stats *stats,
 	stats->size[INX_FEAT_LINK] = sizeof(struct advance_pdev_ctrl_link);
 
 	return QDF_STATUS_SUCCESS;
+}
+
+static void aggregate_advance_pdev_ctrl_tx(struct advance_pdev_ctrl_tx *tx,
+					   struct vdev_ic_cp_stats *cp_stats)
+{
+	aggregate_basic_pdev_ctrl_tx(&tx->b_tx, cp_stats);
+	tx->cs_tx_beacon += cp_stats->stats.cs_tx_bcn_success +
+			    cp_stats->stats.cs_tx_bcn_outage;
+}
+
+static void aggregate_advance_pdev_ctrl_rx(struct advance_pdev_ctrl_rx *rx,
+					   struct vdev_ic_cp_stats *cp_stats)
+{
+	aggregate_basic_pdev_ctrl_rx(&rx->b_rx, cp_stats);
+}
+
+static void aggr_advance_pdev_ctrl_stats(struct wlan_objmgr_pdev *pdev,
+					 void *object, void *arg)
+{
+	struct wlan_objmgr_vdev *vdev = object;
+	struct iterator_ctx *ctx = arg;
+	struct unified_stats *stats;
+	struct vdev_ic_cp_stats *cp_stats;
+
+	if (!vdev || !ctx || !ctx->pvt || !ctx->stats)
+		return;
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE)
+		return;
+	cp_stats = ctx->pvt;
+	stats = ctx->stats;
+	qdf_mem_zero(cp_stats, sizeof(struct vdev_ic_cp_stats));
+	get_vdev_cp_stats(vdev, cp_stats);
+
+	if (stats->feat[INX_FEAT_TX])
+		aggregate_advance_pdev_ctrl_tx(stats->feat[INX_FEAT_TX],
+					       cp_stats);
+	if (stats->feat[INX_FEAT_RX])
+		aggregate_advance_pdev_ctrl_rx(stats->feat[INX_FEAT_RX],
+					       cp_stats);
+}
+
+static void aggregate_advance_pdev_stats(struct wlan_objmgr_pdev *pdev,
+					 struct unified_stats *stats,
+					 enum stats_type_e type)
+{
+	struct iterator_ctx ctx;
+	struct vdev_ic_cp_stats *cp_stats;
+
+	cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+	if (!cp_stats) {
+		qdf_debug("Allocation Failed!");
+		return;
+	}
+	ctx.pvt = cp_stats;
+	ctx.stats = stats;
+
+	switch (type) {
+	case STATS_TYPE_DATA:
+		break;
+	case STATS_TYPE_CTRL:
+		wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
+						  aggr_advance_pdev_ctrl_stats,
+						  &ctx, 1, WLAN_MLME_SB_ID);
+		break;
+	default:
+		qdf_err("Invalid type %d!", type);
+	}
+
+	qdf_mem_free(cp_stats);
 }
 
 static QDF_STATUS get_advance_pdev_data(struct wlan_objmgr_psoc *psoc,
@@ -2754,8 +2858,7 @@ static QDF_STATUS get_advance_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 		goto get_failed;
 	}
 	if (feat & STATS_FEAT_FLG_TX) {
-		ret = get_advance_pdev_ctrl_tx(pdev, stats, pdev_cp_stats,
-					       aggregate);
+		ret = get_advance_pdev_ctrl_tx(stats, pdev_cp_stats);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch pdev Advance TX Stats!");
 		else
@@ -2775,6 +2878,9 @@ static QDF_STATUS get_advance_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 		else
 			stats_collected = true;
 	}
+
+	if (stats_collected && aggregate)
+		aggregate_advance_pdev_stats(pdev, stats, STATS_TYPE_CTRL);
 
 get_failed:
 	qdf_mem_free(pdev_cp_stats);
@@ -4331,6 +4437,73 @@ static QDF_STATUS get_debug_pdev_ctrl_link(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static void aggregate_debug_pdev_ctrl_tx(struct debug_pdev_ctrl_tx *tx,
+					 struct vdev_ic_cp_stats *cp_stats)
+{
+	aggregate_basic_pdev_ctrl_tx(&tx->b_tx, cp_stats);
+}
+
+static void aggregate_debug_pdev_ctrl_rx(struct debug_pdev_ctrl_rx *rx,
+					 struct vdev_ic_cp_stats *cp_stats)
+{
+	aggregate_basic_pdev_ctrl_rx(&rx->b_rx, cp_stats);
+}
+
+static void aggr_debug_pdev_ctrl_stats(struct wlan_objmgr_pdev *pdev,
+				       void *object, void *arg)
+{
+	struct wlan_objmgr_vdev *vdev = object;
+	struct iterator_ctx *ctx = arg;
+	struct unified_stats *stats;
+	struct vdev_ic_cp_stats *cp_stats;
+
+	if (!vdev || !ctx || !ctx->pvt || !ctx->stats)
+		return;
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE)
+		return;
+	cp_stats = ctx->pvt;
+	stats = ctx->stats;
+	qdf_mem_zero(cp_stats, sizeof(struct vdev_ic_cp_stats));
+	get_vdev_cp_stats(vdev, cp_stats);
+
+	if (stats->feat[INX_FEAT_TX])
+		aggregate_debug_pdev_ctrl_tx(stats->feat[INX_FEAT_TX],
+					     cp_stats);
+	if (stats->feat[INX_FEAT_RX])
+		aggregate_debug_pdev_ctrl_rx(stats->feat[INX_FEAT_RX],
+					     cp_stats);
+}
+
+static void aggregate_debug_pdev_stats(struct wlan_objmgr_pdev *pdev,
+				       struct unified_stats *stats,
+				       enum stats_type_e type)
+{
+	struct iterator_ctx ctx;
+	struct vdev_ic_cp_stats *cp_stats;
+
+	cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+	if (!cp_stats) {
+		qdf_debug("Allocation Failed!");
+		return;
+	}
+	ctx.pvt = cp_stats;
+	ctx.stats = stats;
+
+	switch (type) {
+	case STATS_TYPE_DATA:
+		break;
+	case STATS_TYPE_CTRL:
+		wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
+						  aggr_debug_pdev_ctrl_stats,
+						  &ctx, 1, WLAN_MLME_SB_ID);
+		break;
+	default:
+		qdf_err("Invalid type %d!", type);
+	}
+
+	qdf_mem_free(cp_stats);
+}
+
 static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_objmgr_pdev *pdev,
 				      struct unified_stats *stats,
@@ -4512,6 +4685,9 @@ static QDF_STATUS get_debug_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 		else
 			stats_collected = true;
 	}
+
+	if (stats_collected && aggregate)
+		aggregate_debug_pdev_stats(pdev, stats, STATS_TYPE_CTRL);
 
 get_failed:
 	qdf_mem_free(pdev_cp_stats);
@@ -4847,7 +5023,8 @@ QDF_STATUS wlan_stats_get_pdev_stats(struct wlan_objmgr_psoc *psoc,
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_basic_pdev_data(psoc, pdev, stats, cfg->feat);
 		else
-			ret = get_basic_pdev_ctrl(pdev, stats, cfg->feat);
+			ret = get_basic_pdev_ctrl(pdev, stats, cfg->feat,
+						  !cfg->recursive);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
