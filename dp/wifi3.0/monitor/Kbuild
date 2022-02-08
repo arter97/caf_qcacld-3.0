@@ -106,23 +106,7 @@ PERF_PWR_OFFLOAD_INC :=  \
 MONITOR_2_0_INC += -I$(obj)/$(DEPTH)/cmn_dev/dp/wifi3.0/monitor/2.0/
 MONITOR_1_0_INC += -I$(obj)/$(DEPTH)/cmn_dev/dp/wifi3.0/monitor/1.0/
 
-FW_HDRS_QCN9224_INC_PATH += -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/reg_header/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/include/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/common/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/datastruct/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/datastruct_16/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/tlv_32/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/tlv_64/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/user_ctlv_76/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/user_tlv_32/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/user_tlv_64/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/common/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/datastruct/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/datastruct_16/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/tlv_64/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/user_tlv_64
+FW_HDRS_QCN9224_INC_PATH += -I$(PERF_PWR_OFFLOAD_DIR_PATH)/../cmn_dev/fw_hdr/hw/qcn9224
 
 PERF_PWR_OFFLOAD_HW_LI_INC += -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qca8074/v1/
 
