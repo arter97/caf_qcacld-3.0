@@ -81,6 +81,8 @@ INCS += -I$(obj)/$(DEPTH)/include \
         -I$(obj)/$(HOST_CMN_CONVG_SRC)/umac/mlo_mgr/inc \
         -I$(obj)/$(DEPTH)/cmn_dev/fw_hdr/fw/
 
+INCS += -I$(obj)/$(DEPTH)/cmn_dev/umac/twt/dispatcher/inc
+
 PERF_PWR_OFFLOAD_INC :=  \
         -I$(PERF_PWR_OFFLOAD_DIR_PATH)/wlan/include \
         -I$(PERF_PWR_OFFLOAD_DIR_PATH)/wlan/ath_pktlog/include \
