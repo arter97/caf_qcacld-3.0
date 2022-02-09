@@ -121,6 +121,20 @@ QDF_STATUS wmi_unified_peer_del_wds_entry_cmd_send(
 		wmi_unified_t wmi_handle,
 		struct peer_del_wds_entry_params *param);
 
+#ifdef WLAN_FEATURE_MULTI_AST_DEL
+/**
+ *  wmi_unified_peer_del_multi_wds_entries_cmd_send() -
+ *  WMI del multi wds entry cmd function
+ *  @wmi_handle: handle to WMI.
+ *  @param: pointer to hold wds entry param
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_peer_del_multi_wds_entries_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct peer_del_multi_wds_entry_params *param);
+#endif /* WLAN_FEATURE_MULTI_AST_DEL */
+
 /**
  *  wmi_unified_peer_update_wds_entry_cmd_send() - WMI update wds entry
  *  cmd function
