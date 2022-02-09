@@ -1359,6 +1359,9 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_RC_UPPER_CAP_NSS = 493,
 	OL_ATH_PARAM_RC_UPPER_CAP_MCS = 494,
 	OL_ATH_PARAM_DISABLE_RATE_UPPER_CAP = 495,
+	OL_ATH_PARAM_RC_RATE_RETRY_THRESH = 496,
+	OL_ATH_PARAM_RC_MCS_DROP = 497,
+	OL_ATH_PARAM_DISABLE_RATE_RETRY_MCS_DROP = 498,
 #endif
 };
 
@@ -3572,6 +3575,15 @@ struct vendor_commands radio_vendor_cmds[] = {
 		GET_PARAM, 0},
 	{"disable_rate_upper_cap",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_RATE_UPPER_CAP,
+		SET_PARAM, 1},
+	{"get_rate_retry_thresh",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_RATE_RETRY_THRESH,
+		GET_PARAM, 0},
+	{"get_mcs_drop",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_MCS_DROP,
+		GET_PARAM, 0},
+	{"disable_rate_retry_mcs_drop",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_RATE_RETRY_MCS_DROP,
 		SET_PARAM, 1},
 #endif
 };

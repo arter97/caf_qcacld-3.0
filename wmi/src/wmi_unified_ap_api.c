@@ -753,4 +753,15 @@ wmi_unified_set_rate_upper_cap_cmd_send(struct wmi_unified *wmi_handle,
 								    param);
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS
+wmi_unified_set_rate_retry_mcs_drop_cmd_send(struct wmi_unified *wmi_handle,
+					     uint8_t pdev_id,
+					     struct wmi_rc_params *param)
+{
+	if (wmi_handle->ops->send_set_rate_retry_mcs_drop_cmd)
+		return wmi_handle->ops->send_set_rate_retry_mcs_drop_cmd
+			(wmi_handle, pdev_id, param);
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
