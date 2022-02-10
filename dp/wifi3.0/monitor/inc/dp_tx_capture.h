@@ -353,14 +353,14 @@ dp_update_msdu_to_list(struct dp_soc *soc,
  * @soc: DP Soc handle
  * @tx_desc: software Tx descriptor
  * @ts : Tx completion status from HAL/HTT descriptor
- * @peer: DP peer
+ * @peer_id: DP peer id
  *
  * Return: none
  */
 QDF_STATUS dp_tx_add_to_comp_queue_1_0(struct dp_soc *soc,
 				       struct dp_tx_desc_s *desc,
 				       struct hal_tx_completion_status *ts,
-				       struct dp_peer *peer);
+				       uint16_t peer_id);
 
 /*
  * dp_config_enh_tx_capture_1_0()- API to enable/disable enhanced tx capture
