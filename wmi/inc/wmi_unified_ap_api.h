@@ -912,5 +912,31 @@ QDF_STATUS
 wmi_unified_set_rate_retry_mcs_drop_cmd_send(struct wmi_unified *wmi_handle,
 					     uint8_t pdev_id,
 					     struct wmi_rc_params *param);
+
+/**
+ * wmi_unified_set_mcs_probe_intvl_cmd_send() - set mcs probe interval
+ * @wmi_handle: wmi handle
+ * @pdev_id: pdev id
+ * @param: mcs probe interval parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_mcs_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
+					 uint8_t pdev_id,
+					 struct wmi_rc_params *param);
+
+/**
+ * wmi_unified_set_nss_probe_intvl_cmd_send() - set nss probe interval
+ * @wmi_handle: wmi handle
+ * @pdev_id: pdev id
+ * @param: nss probe interval parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_nss_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
+					 uint8_t pdev_id,
+					 struct wmi_rc_params *param);
 #endif
 #endif /* _WMI_UNIFIED_AP_API_H_ */
