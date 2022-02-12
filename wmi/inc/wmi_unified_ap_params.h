@@ -950,7 +950,7 @@ struct wmi_peer_latency_config_params {
 };
 #endif
 
-#if CONFIG_SAWF_DEF_QUEUES
+#ifdef CONFIG_SAWF_DEF_QUEUES
 /**
  * struct wmi_rc_params- rate control parameters
  * @upper_cap_nss: Max NSS
@@ -979,6 +979,32 @@ struct wmi_rc_params {
 	uint16_t max_mcs_probe_intvl;
 	uint16_t min_nss_probe_intvl;
 	uint16_t max_nss_probe_intvl;
+};
+
+/**
+ * struct wmi_sawf_params - Service Class Parameters
+ * @svc_id: Service ID
+ * @min_thruput_rate: min throughput in kilobits per second
+ * @max_thruput_rate: max throughput in kilobits per second
+ * @burst_size:  burst size in bytes
+ * @service_interval: service interval
+ * @delay_bound: delay bound in in milli seconds
+ * @msdu_ttl: MSDU Time-To-Live
+ * @priority: Priority
+ * @tid: TID
+ * @msdu_rate_loss: MSDU loss rate in parts per million
+ */
+struct wmi_sawf_params {
+	uint32_t svc_id;
+	uint32_t min_thruput_rate;
+	uint32_t max_thruput_rate;
+	uint32_t burst_size;
+	uint32_t service_interval;
+	uint32_t delay_bound;
+	uint32_t msdu_ttl;
+	uint32_t priority;
+	uint32_t tid;
+	uint32_t msdu_rate_loss;
 };
 #endif
 #endif

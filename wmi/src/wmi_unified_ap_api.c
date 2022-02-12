@@ -754,7 +754,7 @@ wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-#if CONFIG_SAWF_DEF_QUEUES
+#ifdef CONFIG_SAWF_DEF_QUEUES
 QDF_STATUS
 wmi_unified_set_rate_upper_cap_cmd_send(struct wmi_unified *wmi_handle,
 					uint8_t pdev_id,
@@ -799,6 +799,25 @@ wmi_unified_set_nss_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
 		return wmi_handle->ops->send_set_nss_probe_intvl_cmd(wmi_handle,
 								     pdev_id,
 								     param);
+}
+
+QDF_STATUS wmi_sawf_create_send(struct wmi_unified *wmi_handle,
+				struct wmi_sawf_params *param)
+{
+	if (wmi_handle->ops->send_sawf_create_cmd) {
+		return wmi_handle->ops->send_sawf_create_cmd(wmi_handle,
+							     param);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
+				 uint8_t svc_id)
+{
+	if (wmi_handle->ops->send_sawf_disable_cmd) {
+		return wmi_handle->ops->send_sawf_disable_cmd(wmi_handle,
+							      svc_id);
+	}
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
