@@ -36,3 +36,16 @@ void monitor_osif_deliver_tx_capture_data(osif_dev *osifp, struct sk_buff *skb)
 	nbuf_debug_del_record(skb);
 	netif_rx(skb);
 }
+
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+void monitor_osif_deliver_rx_capture_undecoded_metadata(osif_dev *osifp,
+							struct sk_buff *skb)
+{
+	skb->dev = osifp->netdev;
+	skb->pkt_type = PACKET_USER;
+	skb->ip_summed = CHECKSUM_UNNECESSARY;
+	skb->protocol = eth_type_trans(skb, osifp->netdev);
+	nbuf_debug_del_record(skb);
+	netif_rx(skb);
+}
+#endif

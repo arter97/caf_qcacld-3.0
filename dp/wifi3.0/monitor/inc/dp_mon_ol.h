@@ -39,7 +39,34 @@ struct mon_ops {
 	int (*mon_set_tx_sniffer_mode)(struct ol_ath_softc_net80211 *scn,
 				       uint8_t pdev_id,
 				       ol_txrx_soc_handle soc_txrx_handle);
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+	int (*mon_set_undeocded_metadata_capture)
+		(struct ol_ath_softc_net80211 *scn, uint8_t pdev_id,
+		 ol_txrx_soc_handle soc_txrx_handle, int val);
+#endif
 };
+
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+static inline int
+monitor_ol_ath_set_undeocded_metadata_capture(struct ol_ath_softc_net80211 *scn,
+					      uint8_t pdev_id,
+					      ol_txrx_soc_handle soc_txrx_handle,
+					      int val)
+{
+	ol_ath_soc_softc_t *soc;
+
+	if (!scn || !scn->soc)
+		return -EOPNOTSUPP;
+
+	soc = scn->soc;
+	if (!soc->soc_mon_ops ||
+	    !soc->soc_mon_ops->mon_set_undeocded_metadata_capture)
+		return -EOPNOTSUPP;
+
+	return soc->soc_mon_ops->mon_set_undeocded_metadata_capture(scn,
+			pdev_id, soc_txrx_handle, val);
+}
+#endif
 
 static inline
 int monitor_ol_ath_set_tx_sniffer_mode(struct ol_ath_softc_net80211 *scn,
