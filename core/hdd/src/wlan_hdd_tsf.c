@@ -1731,10 +1731,10 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_deinit(struct hdd_context *hdd_ctx)
 	status = ucfg_fwol_get_tsf_sync_host_gpio_pin(hdd_ctx->psoc,
 						      &tsf_sync_gpio_pin);
 	if (QDF_IS_STATUS_ERROR(status))
-		return QDF_STATUS_E_INVAL;
+		return HDD_TSF_OP_FAIL;
 
 	if (tsf_sync_gpio_pin == TSF_GPIO_PIN_INVALID)
-		return QDF_STATUS_E_INVAL;
+		return HDD_TSF_OP_FAIL;
 
 	if (hdd_tsf_is_tx_set(hdd_ctx))
 		ol_deregister_timestamp_callback();

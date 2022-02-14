@@ -31,7 +31,8 @@ ifneq ($(ANDROID_BUILD_TOP),)
 endif
 endif
 
-include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
+#include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
+include $(WLAN_ROOT)/configs/genoa.usb.perf_defconfig
 
 ############ UAPI ############
 UAPI_DIR :=	uapi
@@ -2958,3 +2959,8 @@ OBJS_DIRS := $(dir $(OBJS)) \
 CLEAN_DIRS := $(addsuffix *.o,$(sort $(OBJS_DIRS))) \
 	      $(addsuffix .*.o.cmd,$(sort $(OBJS_DIRS)))
 clean-files := $(CLEAN_DIRS)
+
+ifeq ($(CONFIG_KERNEL_4_19_SUPPORT), y)
+cppflags-y += -DKERNEL_4_19_SUPPORT
+endif
+

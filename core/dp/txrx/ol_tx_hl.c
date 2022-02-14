@@ -168,8 +168,8 @@ bool ol_tx_desc_is_high_prio(qdf_nbuf_t msdu)
 	} else if (QDF_NBUF_CB_GET_PACKET_TYPE(msdu) ==
 		   QDF_NBUF_CB_PACKET_TYPE_ARP) {
 		high_prio = true;
-	} else if ((QDF_NBUF_CB_GET_PACKET_TYPE(msdu) ==
-		   QDF_NBUF_CB_PACKET_TYPE_ICMPv6)) {
+	} else if (QDF_NBUF_CB_GET_PACKET_TYPE(msdu) ==
+                   QDF_NBUF_CB_PACKET_TYPE_ICMPv6) {
 		proto_subtype = qdf_nbuf_get_icmpv6_subtype(msdu);
 		switch (proto_subtype) {
 		case QDF_PROTO_ICMPV6_NA:

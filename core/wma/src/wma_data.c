@@ -1514,6 +1514,9 @@ static void wma_process_vdev_tx_pause_evt(void *soc,
 					  wmi_event->pause_type);
 		} else {
 #endif
+#if defined(KERNEL_4_19_SUPPORT) && !defined(CONFIG_HL_SUPPORT)
+                {
+#endif
 			/*
 			 * Now only support per-dev pause so it is not
 			 * necessary to pause a paused queue again.
@@ -1528,7 +1531,7 @@ static void wma_process_vdev_tx_pause_evt(void *soc,
 					       wmi_event->pause_type);
 		}
 	}
-	/* UNPAUSE action, clean bitmap */
+        /* UNPAUSE action, clean bitmap */
 	else if (ACTION_UNPAUSE == wmi_event->action) {
 #ifdef CONFIG_HL_SUPPORT
 		/* Exclude TDLS_OFFCHAN_CHOP from vdev based pauses */
@@ -1538,6 +1541,9 @@ static void wma_process_vdev_tx_pause_evt(void *soc,
 					    OL_TXQ_PAUSE_REASON_FW,
 					    wmi_event->pause_type);
 		} else {
+#endif
+#if defined(KERNEL_4_19_SUPPORT) && !defined(CONFIG_HL_SUPPORT)
+                {
 #endif
 			/* Handle unpause only if already paused */
 			if (wma_vdev_get_pause_bitmap(vdev_id)) {
