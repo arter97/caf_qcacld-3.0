@@ -44,6 +44,12 @@ int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
 					      struct wireless_dev *wdev,
 					      struct wlan_cfg8011_genric_params *params);
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
+int wlan_cfg80211_set_phyrx_error_mask(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       struct wlan_cfg8011_genric_params *params);
+int wlan_cfg80211_get_phyrx_error_mask(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       struct wlan_cfg8011_genric_params *params);
 void monitor_osif_deliver_rx_capture_undecoded_metadata(osif_dev *osifp,
 							struct sk_buff *skb);
 #define DEBUG_SNIFFER_TEST_RX_UNDEOCDED_FRAME_CAPTURE     "UNDECO"
@@ -499,6 +505,62 @@ ol_ath_ucfg_set_peer_pkt_capture(void *vscn,
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
 
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+int ol_ath_set_phyrx_error_mask(void *vscn, uint32_t mask, uint32_t mask_cont)
+{
+	struct ol_ath_softc_net80211 *scn =
+			(struct ol_ath_softc_net80211 *)vscn;
+	ol_txrx_soc_handle soc_txrx_handle;
+	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(scn->sc_pdev);
+	QDF_STATUS status;
+
+	soc_txrx_handle =
+		(ol_txrx_soc_handle)wlan_psoc_get_dp_handle(scn->soc->psoc_obj);
+	if (!soc_txrx_handle) {
+		dp_mon_err("psoc handle is NULL");
+		return -EFAULT;
+	}
+
+	status =
+		cdp_txrx_set_pdev_phyrx_error_mask(soc_txrx_handle, pdev_id,
+						   mask, mask_cont);
+	if (status != QDF_STATUS_SUCCESS) {
+		dp_mon_err("Phyrx error mask configuration failed");
+		return -EINVAL;
+	}
+	dp_mon_info("mask(0 to 31):0x%x mask(32 to 64):0x%x", mask, mask_cont);
+
+	return 0;
+}
+
+int
+ol_ath_get_phyrx_error_mask(void *vscn, uint32_t *mask, uint32_t *mask_cont)
+{
+	struct ol_ath_softc_net80211 *scn =
+			(struct ol_ath_softc_net80211 *)vscn;
+	ol_txrx_soc_handle soc_txrx_handle;
+	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(scn->sc_pdev);
+	QDF_STATUS status;
+
+	soc_txrx_handle =
+		(ol_txrx_soc_handle)wlan_psoc_get_dp_handle(scn->soc->psoc_obj);
+	if (!soc_txrx_handle) {
+		dp_mon_err("psoc handle is NULL");
+		return -EFAULT;
+	}
+
+	status =
+		cdp_txrx_get_pdev_phyrx_error_mask(soc_txrx_handle, pdev_id,
+						   mask, mask_cont);
+	if (status != QDF_STATUS_SUCCESS) {
+		dp_mon_err("Get configured phyrx error mask failed");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+#endif /* QCA_UNDECODED_METADATA_SUPPORT */
+
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 QDF_STATUS
 convert_mpdu_info_to_stats(struct cdp_rx_indication_mpdu_info *mpdu_info,
@@ -952,6 +1014,16 @@ ol_set_undeocded_metadata_capture(struct ol_ath_softc_net80211 *scn,
 			return -EINVAL;
 		}
 		ic->ic_undecoded_metadata_enable = val;
+
+		if (cdp_txrx_set_pdev_phyrx_error_mask(soc_txrx_handle,
+						       pdev_id,
+						       ic->ic_phyrx_error_mask,
+						       ic->ic_phyrx_error_mask_cont)) {
+			dp_mon_err("Phyrx error mask configuration failed");
+		}
+		dp_mon_info("mask(0 to 31):0x%x mask(32 to 64):0x%x",
+			    ic->ic_phyrx_error_mask,
+			    ic->ic_phyrx_error_mask_cont);
 	} else {
 		if (!ic->ic_undecoded_metadata_enable) {
 			qdf_info("Undecoded metadata capture already disabled");
@@ -985,6 +1057,10 @@ static struct mon_ops monitor_ops = {
 	.mon_set_tx_sniffer_mode = ol_set_tx_sniffer_mode,
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
 	.mon_set_undeocded_metadata_capture = ol_set_undeocded_metadata_capture,
+	.mon_cfg80211_set_phyrx_error_mask =
+		wlan_cfg80211_set_phyrx_error_mask,
+	.mon_cfg80211_get_phyrx_error_mask =
+		wlan_cfg80211_get_phyrx_error_mask,
 #endif
 };
 
