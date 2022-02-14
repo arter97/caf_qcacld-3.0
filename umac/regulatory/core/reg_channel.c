@@ -210,10 +210,10 @@ reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 	uint16_t i, max_bw = 0;
 	enum phy_ch_width output_width = CH_WIDTH_INVALID;
 
-	wlan_reg_fill_channel_list(pdev, freq, 0,
-				   g_max_width, 0,
-				   &chan_list,
-				   in_6g_pwr_mode);
+	wlan_reg_fill_channel_list_for_pwrmode(pdev, freq, 0,
+					       g_max_width, 0,
+					       &chan_list,
+					       in_6g_pwr_mode);
 
 	for (i = 0; i < chan_list.num_ch_params; i++) {
 		struct ch_params *ch_param = &chan_list.chan_param[i];
@@ -241,7 +241,7 @@ reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
-void reg_modify_chan_list_for_max_chwidth(
+void reg_modify_chan_list_for_max_chwidth_for_pwrmode(
 		struct wlan_objmgr_pdev *pdev,
 		struct regulatory_channel *cur_chan_list,
 		enum supported_6g_pwr_types in_6g_pwr_mode)
@@ -608,8 +608,8 @@ reg_is_freq_band_dfs(struct wlan_objmgr_pdev *pdev,
 	chan_cfreq =  bonded_chan_ptr->start_freq;
 	while (chan_cfreq <= bonded_chan_ptr->end_freq) {
 		/* If any of the channel is disabled by regulatory, return. */
-		if (reg_is_disable_for_freq(pdev, chan_cfreq,
-					    REG_CURRENT_PWR_MODE) &&
+		if (reg_is_disable_for_pwrmode(pdev, chan_cfreq,
+					       REG_CURRENT_PWR_MODE) &&
 		    !reg_is_nol_for_freq(pdev, chan_cfreq))
 			return false;
 		if (reg_is_dfs_for_freq(pdev, chan_cfreq))
@@ -1215,10 +1215,10 @@ reg_get_max_channel_width_without_radar(struct wlan_objmgr_pdev *pdev,
 	uint16_t i, max_bw = 0;
 	enum phy_ch_width output_width = CH_WIDTH_INVALID;
 
-	wlan_reg_fill_channel_list(pdev, freq, 0,
-				   g_max_width, 0,
-				   &chan_list,
-				   REG_CURRENT_PWR_MODE);
+	wlan_reg_fill_channel_list_for_pwrmode(pdev, freq, 0,
+					       g_max_width, 0,
+					       &chan_list,
+					       REG_CURRENT_PWR_MODE);
 
 	for (i = 0; i < chan_list.num_ch_params; i++) {
 		struct ch_params *ch_param = &chan_list.chan_param[i];
@@ -1242,8 +1242,8 @@ reg_get_max_channel_width_without_radar(struct wlan_objmgr_pdev *pdev,
 
 	reg_get_cur_6g_ap_pwr_type(pdev, &in_6g_pwr_mode);
 	chan_params.ch_width = g_max_width;
-	reg_set_channel_params_for_freq(pdev, freq, 0, &chan_params,
-					in_6g_pwr_mode);
+	reg_set_channel_params_for_pwrmode(pdev, freq, 0, &chan_params,
+					   in_6g_pwr_mode);
 	return chan_params.ch_width;
 }
 #endif

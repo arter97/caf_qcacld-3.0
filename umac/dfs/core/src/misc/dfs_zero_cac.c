@@ -1897,10 +1897,10 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 		 * ch_params.
 		 */
 
-		wlan_reg_set_channel_params_for_freq(dfs->dfs_pdev_obj,
-						     rcac_freq, 0,
-						     &nxt_chan_params,
-						     REG_CURRENT_PWR_MODE);
+		wlan_reg_set_channel_params_for_pwrmode(dfs->dfs_pdev_obj,
+							rcac_freq, 0,
+							&nxt_chan_params,
+							REG_CURRENT_PWR_MODE);
 	} else {
 		/* Invoke Random channel selection and select only
 		 * DFS channels.
