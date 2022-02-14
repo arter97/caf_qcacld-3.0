@@ -19,7 +19,7 @@
 #define __PLD_USB_H__
 
 #ifdef CONFIG_PLD_USB_CNSS
-#include <net/cnss2.h>
+#include "cnss2.h"
 #endif
 #include "pld_common.h"
 

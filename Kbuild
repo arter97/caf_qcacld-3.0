@@ -34,6 +34,13 @@ endif
 #include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig
 include $(WLAN_ROOT)/configs/genoa.usb.perf_defconfig
 
+############ CNSS2 ############
+CNSS2_SRC_DIR := wlan-cnss-core/cnss2
+CNSS2_INC_DIR := wlan-cnss-core/inc/
+CNSS2_INC := \
+        -I$(WLAN_ROOT)/../$(CNSS2_INC_DIR) \
+        -I$(WLAN_ROOT)/../$(CNSS2_SRC_DIR) 
+
 ############ UAPI ############
 UAPI_DIR :=	uapi
 UAPI_INC :=	-I$(WLAN_ROOT)/$(UAPI_DIR)/linux
@@ -1823,6 +1830,10 @@ INCS +=		$(HIF_INC) \
 ifeq ($(CONFIG_LITHIUM), y)
 INCS += 	$(HAL_INC) \
 		$(DP_INC)
+endif
+
+ifeq ($(CONFIG_PLD_USB_CNSS), y)
+INCS +=         $(CNSS2_INC)
 endif
 
 ################ WIFI POS ################
