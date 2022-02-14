@@ -7194,9 +7194,7 @@ void wmi_copy_resource_config(wmi_resource_config *resource_cfg,
 	resource_cfg->ema_max_vap_cnt = tgt_res_cfg->ema_max_vap_cnt;
 	resource_cfg->ema_max_profile_period =
 			tgt_res_cfg->ema_max_profile_period;
-#ifdef TBD_FR69640
 	resource_cfg->ema_init_config = tgt_res_cfg->ema_init_config;
-#endif
 
 	if (tgt_res_cfg->max_ndp_sessions)
 		resource_cfg->max_ndp_sessions =
@@ -15812,12 +15810,10 @@ static void populate_tlv_service(uint32_t *wmi_service)
 #endif
 	wmi_service[wmi_service_dcs_awgn_int_support] =
 			WMI_SERVICE_DCS_AWGN_INT_SUPPORT;
-#ifdef TBD_FR69640
 	wmi_service[wmi_service_ema_multiple_group_supported] =
 			WMI_SERVICE_EMA_MULTIPLE_GROUP_SUPPORT;
 	wmi_service[wmi_service_large_beacon_supported] =
 			WMI_SERVICE_LARGE_BEACON_SUPPORT;
-#endif
 }
 
 /**
