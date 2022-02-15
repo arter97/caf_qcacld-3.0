@@ -82,6 +82,8 @@ enum stats_feat_index_e {
 	DEF_INX(JITTER),
 	DEF_INX(TXCAP),
 	DEF_INX(MONITOR),
+	DEF_INX(SAWFDELAY),
+	DEF_INX(SAWFTX),
 	DEF_INX_MAX(),
 };
 
@@ -93,6 +95,7 @@ enum stats_feat_index_e {
  * @obj:  Requested stats for object (i.e. AP, Radio, Vap or STA)
  * @type:  Requested stats category
  * @recursive:  Flag for Recursiveness of request
+ * @serviceid: service id for checking the level of sawf stats
  */
 struct stats_config {
 	struct wiphy           *wiphy;
@@ -101,6 +104,7 @@ struct stats_config {
 	enum stats_object_e    obj;
 	enum stats_type_e      type;
 	bool                   recursive;
+	u_int8_t               serviceid;
 };
 
 /**

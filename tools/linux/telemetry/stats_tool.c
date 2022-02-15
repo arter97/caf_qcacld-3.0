@@ -339,7 +339,7 @@ const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
 };
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static const char *opt_string = "BADarvsdcf:i:m:Rh?";
+static const char *opt_string = "BADarvsdcf:i:m:t:Rh?";
 
 static const struct option long_opts[] = {
 	{ "basic", no_argument, NULL, 'B' },
@@ -354,6 +354,7 @@ static const struct option long_opts[] = {
 	{ "feature", required_argument, NULL, 'f' },
 	{ "ifname", required_argument, NULL, 'i' },
 	{ "stamacaddr", required_argument, NULL, 'm' },
+	{ "serviceid", no_argument, NULL, 't' },
 	{ "recursive", no_argument, NULL, 'R' },
 	{ "help", no_argument, NULL, 'h' },
 	{ NULL, no_argument, NULL, 0 },
@@ -406,7 +407,7 @@ static void display_help(void)
 		    "\n"
 		    "Feature flag specifies various specific feature for which Stats is to be displayed. By default ALL will\n"
 		    "be selected. List of feature flags are as follows:\n"
-		    "ALL,RX,TX,AST,CFR,FWD,HTT,RAW,RDK,TSO,TWT,VOW,WDI,WMI,IGMP,LINK,MESH,RATE,DELAY,ME,NAWDS,TXCAP and MONITOR.\n"
+		    "ALL,RX,TX,AST,CFR,FWD,HTT,RAW,RDK,TSO,TWT,VOW,WDI,WMI,IGMP,LINK,MESH,RATE,DELAY,JITTER,ME,NAWDS,TXCAP,MONITOR,SAWFDELAY and SAWFTX.\n"
 		    "\n"
 		    "Levels:\n"
 		    "\n"
@@ -452,6 +453,9 @@ static void display_help(void)
 		    "\n"
 		    "Required if STA object is selected:\n"
 		    "-m xx:xx:xx:xx:xx:xx or --stamacaddr xx:xx:xx:xx:xx:xx\n"
+		    "\n"
+		    "Can be set only in STA mode for SAWFDELAY and SWFATX features:\n"
+		    "-t <serviceid>\n"
 		    "\n"
 		    "OTHER OPTIONS:\n"
 		    "-R or --recursive\n"
@@ -862,6 +866,139 @@ print_advance_sta_data_jitter(struct advance_peer_data_jitter *jitter)
 		STATS_PRINT("total_success = %ju ",
 			    jitter->jitter_stats[tid].tx_total_success);
 		STATS_PRINT("drop  = %ju\n", jitter->jitter_stats[tid].tx_drop);
+	}
+}
+
+static void
+print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
+				  uint8_t svc_id)
+{
+	uint8_t idx = 0;
+
+	if (svc_id > 0) {
+		STATS_PRINT("sliding_window_sum = %u   ",
+			    data->delay[0][0].avg.sum);
+		STATS_PRINT("sliding_window_count = %u   ",
+			    data->delay[0][0].avg.count);
+		STATS_PRINT("current_window_index = %u   ",
+			    data->delay[0][0].cur_win);
+		STATS_PRINT("data_for_each_window");
+		for (idx = 0; idx < STATS_IF_NUM_AVG_WINDOWS; idx++) {
+			STATS_PRINT("----WINDOW: %d----   ", idx);
+			STATS_PRINT("sum = %u   ",
+				    data->delay[0][0].win_avgs[idx].sum);
+			STATS_PRINT("count = %u   ",
+				    data->delay[0][0].win_avgs[idx].count);
+		}
+		print_advance_hist_stats(&data->delay[0][0].delay_hist,
+					 STATS_IF_HIST_TYPE_HW_COMP_DELAY);
+	} else {
+		uint8_t tidx = 0, queues = 0;
+		uint8_t max_queue = STATS_IF_MAX_SAWF_DATA_QUEUE;
+		struct stats_if_sawf_delay_stats *dly = NULL;
+		uint32_t hw_comp = STATS_IF_HIST_TYPE_HW_COMP_DELAY;
+
+		for (tidx = 0; tidx < STATS_IF_MAX_SAWF_DATA_TIDS; tidx++) {
+			for (queues = 0; queues < max_queue; queues++) {
+				dly = &data->delay[tidx][queues];
+				STATS_PRINT("----TID: %d----   ", tidx);
+				STATS_PRINT("----QUEUES: %d----\n", queues);
+
+				STATS_PRINT("sliding_window_sum = %u\n",
+					    dly->avg.sum);
+				STATS_PRINT("sliding_window_count = %u\n",
+					    dly->avg.count);
+				STATS_PRINT("current_window_index = %u\n",
+					    dly->cur_win);
+				STATS_PRINT("data_for_each_window\n");
+				for (idx = 0; idx < STATS_IF_NUM_AVG_WINDOWS;
+				     idx++) {
+					STATS_PRINT("----WINDOW: %d---- ", idx);
+					STATS_PRINT("sum = %u    ",
+						    dly->win_avgs[idx].sum);
+					STATS_PRINT("count = %u\n",
+						    dly->win_avgs[idx].count);
+				}
+				print_advance_hist_stats(&dly->delay_hist,
+							 hw_comp);
+			}
+		}
+	}
+}
+
+static void
+print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
+			       uint8_t svc_id)
+{
+	if (svc_id > 0) {
+		STATS_PRINT("Tx_info_success_num = %u   ",
+			    data->tx[0][0].tx_success.num);
+		STATS_PRINT("Tx_info_success_bytes = %ju   ",
+			    data->tx[0][0].tx_success.bytes);
+		STATS_PRINT("Tx_info_dropped_num = %u   ",
+			    data->tx[0][0].dropped.fw_rem.num);
+
+
+		STATS_PRINT("Tx_info_dropped_bytes = %ju   ",
+			    data->tx[0][0].dropped.fw_rem.bytes);
+		STATS_PRINT("Tx_info_dropped_Tx_fw_rem_notx = %u   ",
+			    data->tx[0][0].dropped.fw_rem_notx);
+		STATS_PRINT("Tx_info_dropped_Tx_fw_rem_tx = %u   ",
+			    data->tx[0][0].dropped.fw_rem_tx);
+		STATS_PRINT("Tx_info_dropped_Tx_age_out = %u   ",
+			    data->tx[0][0].dropped.age_out);
+
+
+		STATS_PRINT("Tx_info_dropped_Tx_fw_reason1 = %u   ",
+			    data->tx[0][0].dropped.fw_reason1);
+		STATS_PRINT("Tx_info_dropped_Tx_fw_reason2 = %u   ",
+			    data->tx[0][0].dropped.fw_reason2);
+		STATS_PRINT("Tx_info_dropped_Tx_fw_reason3 = %u   ",
+			    data->tx[0][0].dropped.fw_reason3);
+		STATS_PRINT("Tx_info_tx_failed = %u   ",
+			    data->tx[0][0].tx_failed);
+		STATS_PRINT("Tx_info_queue_depth = %u",
+			    data->tx[0][0].queue_depth);
+	} else {
+		uint8_t tidx = 0, queues = 0;
+		uint8_t max_queue = STATS_IF_MAX_SAWF_DATA_QUEUE;
+		struct stats_if_sawf_tx_stats *sawftx;
+
+		for (tidx = 0; tidx < STATS_IF_MAX_SAWF_DATA_TIDS; tidx++) {
+			for (queues = 0; queues < max_queue; queues++) {
+				sawftx = &data->tx[tidx][queues];
+				STATS_PRINT("----TIDX: %d----   ", tidx);
+				STATS_PRINT("----QUEUE: %d---- \n", queues);
+				STATS_PRINT("Tx_info_success_num = %u\n",
+					    sawftx->tx_success.num);
+				STATS_PRINT("Tx_info_success_bytes = %ju\n",
+					    sawftx->tx_success.bytes);
+
+
+				STATS_PRINT("Tx_info_drop_num = %u\n",
+					    sawftx->dropped.fw_rem.num);
+				STATS_PRINT("Tx_info_drop_bytes = %ju\n",
+					    sawftx->dropped.fw_rem.bytes);
+				STATS_PRINT("Tx_info_drop_fw_rem_notx = %u\n",
+					    sawftx->dropped.fw_rem_notx);
+				STATS_PRINT("Tx_info_drop_Tx_fw_rem_tx= %u\n",
+					    sawftx->dropped.fw_rem_tx);
+				STATS_PRINT("Tx_info_drop_Tx_age_out = %u\n",
+					    sawftx->dropped.age_out);
+
+
+				STATS_PRINT("Tx_info_drop_fw_reason1 = %u \n",
+					    sawftx->dropped.fw_reason1);
+				STATS_PRINT("Tx_inf_drop_Tx_fw_reason2 = %u \n",
+					    sawftx->dropped.fw_reason2);
+				STATS_PRINT("Tx_info_drop_Tx_fw_reason3 = %u\n",
+					    sawftx->dropped.fw_reason3);
+				STATS_PRINT("Tx_info_tx_failed = %u\n",
+					    sawftx->tx_failed);
+				STATS_PRINT("Tx_info_queue_depth = %u \n",
+					    sawftx->queue_depth);
+			}
+		}
 	}
 }
 void print_advance_sta_ctrl_tx(struct advance_peer_ctrl_tx *tx)
@@ -1356,6 +1493,14 @@ void print_advance_sta_data(struct stats_obj *sta)
 	if (data->jitter) {
 		STATS_PRINT("JITTER Stats\n");
 		print_advance_sta_data_jitter(data->jitter);
+	}
+	if (data->sawfdelay) {
+		STATS_PRINT("SAWFDELAY Stats\n");
+		print_advance_sta_data_sawf_delay(data->sawfdelay, sta->serviceid);
+	}
+	if (data->sawftx) {
+		STATS_PRINT("SAWFTX Stats\n");
+		print_advance_sta_data_sawf_tx(data->sawftx, sta->serviceid);
 	}
 }
 
@@ -2868,6 +3013,7 @@ int main(int argc, char *argv[])
 	u_int8_t is_level_set = 0;
 	u_int8_t is_ifname_set = 0;
 	u_int8_t is_stamacaddr_set = 0;
+	u_int8_t is_serviceid_set = 0;
 	u_int8_t is_option_selected = 0;
 	u_int8_t inx = 0;
 	bool recursion_temp = false;
@@ -2876,6 +3022,7 @@ int main(int argc, char *argv[])
 	char stamacaddr_temp[USER_MAC_ADDR_LEN] = {0};
 	struct ether_addr *ret_eth_addr = NULL;
 	struct interface_list if_list;
+	u_int8_t servid_temp = 0;
 
 	memset(&cmd, 0, sizeof(struct stats_command));
 	memset(&if_list, 0, sizeof(struct interface_list));
@@ -2984,6 +3131,16 @@ int main(int argc, char *argv[])
 			is_stamacaddr_set  = 1;
 			is_option_selected = 1;
 			break;
+		case 't':
+			if (is_serviceid_set) {
+				STATS_ERR("Multiple Serviceid Arguments\n");
+				display_help();
+				return -EINVAL;
+			}
+			servid_temp = atoi(optarg);
+			is_serviceid_set = 1;
+			is_option_selected = 1;
+			break;
 		case 'f':
 			if (is_feat_set) {
 				STATS_ERR("Multiple Feature flag Arguments\n");
@@ -3051,6 +3208,7 @@ int main(int argc, char *argv[])
 	cmd.type = type_temp;
 	cmd.feat_flag = feat_temp;
 	cmd.recursive = recursion_temp;
+	cmd.serviceid = servid_temp;
 
 	if (ifname_temp[0])
 		strlcpy(cmd.if_name, ifname_temp, IFNAME_LEN);

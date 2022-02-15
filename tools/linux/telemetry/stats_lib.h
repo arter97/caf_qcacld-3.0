@@ -202,6 +202,8 @@ struct advance_peer_data {
 	struct advance_peer_data_nawds *nawds;
 	struct advance_peer_data_delay *delay;
 	struct advance_peer_data_jitter *jitter;
+	struct advance_peer_data_sawfdelay *sawfdelay;
+	struct advance_peer_data_sawftx *sawftx;
 };
 
 /* Advance peer control stats holder */
@@ -328,6 +330,7 @@ struct debug_psoc_data {
  * @obj_type: Stats object STA/VAP/RADIO/AP
  * @type: Stats type data or control
  * @pif_name: Parent interface name
+ * @serviceid: serviceid for level of sawf stats
  * @u_id.mac_addr: MAC address for STA object
  * @u_id.if_name: Interface name for VAP/RADIO/AP objects
  * @stats: Stats based on above meta information
@@ -338,6 +341,7 @@ struct stats_obj {
 	enum stats_object_e obj_type;
 	enum stats_type_e type;
 	char pif_name[IFNAME_LEN];
+	uint8_t serviceid;
 	union {
 		u_int8_t mac_addr[ETH_ALEN];
 		char if_name[IFNAME_LEN];
@@ -362,6 +366,7 @@ struct reply_buffer {
  * @obj:       Stats object
  * @type:      Stats traffic type
  * @recursive: Stats recursiveness
+ * @serviceid: Stats serviceid
  * @feat_flag: Stats requested for combination of Features
  * @sta_mac:   Station MAC address if Stats requested for STA object
  * @if_name:   Interface name on which Stats is requested
@@ -372,6 +377,7 @@ struct stats_command {
 	enum stats_object_e obj;
 	enum stats_type_e type;
 	bool recursive;
+	uint8_t serviceid;
 	char if_name[IFNAME_LEN];
 	u_int64_t feat_flag;
 	struct ether_addr sta_mac;

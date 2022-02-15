@@ -91,6 +91,8 @@ static struct feat_parser_t g_feat[] = {
 	{ "JITTER", STATS_FEAT_FLG_JITTER },
 	{ "TXCAP", STATS_FEAT_FLG_TXCAP },
 	{ "MONITOR", STATS_FEAT_FLG_MONITOR },
+	{ "SAWFDELAY", STATS_FEAT_FLG_SAWFDELAY },
+	{ "SAWFTX", STATS_FEAT_FLG_SAWFTX },
 	{ NULL, 0 },
 };
 
@@ -116,6 +118,8 @@ struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_FEAT_JITTER] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_TXCAP] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_MONITOR] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFDELAY] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFTX] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_RECURSIVE] = { .type = NLA_FLAG },
 };
 
@@ -475,6 +479,11 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 		if (nla_put(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_STA_MAC,
 			    ETH_ALEN, cmd->sta_mac.ether_addr_octet)) {
 			STATS_ERR("failed to put sta MAC\n");
+			return -EIO;
+		}
+		if (nla_put_u8(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_SERVICEID,
+			       cmd->serviceid)) {
+			STATS_ERR("failed to put serviceid\n");
 			return -EIO;
 		}
 	}
@@ -883,6 +892,22 @@ static void parse_advance_sta(struct nlattr *rattr, struct stats_obj *obj)
 			if (data->jitter)
 				memcpy(data->jitter, nla_data(attr),
 				       sizeof(struct advance_peer_data_jitter));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFDELAY]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFDELAY];
+			data->sawfdelay =
+				malloc(sizeof(struct advance_peer_data_sawfdelay));
+			if (data->sawfdelay)
+				memcpy(data->sawfdelay, nla_data(attr),
+				       sizeof(struct advance_peer_data_sawfdelay));
+		}
+		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFTX]) {
+			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFTX];
+			data->sawftx =
+				malloc(sizeof(struct advance_peer_data_sawftx));
+			if (data->sawftx)
+				memcpy(data->sawftx, nla_data(attr),
+				       sizeof(struct advance_peer_data_sawftx));
 		}
 		obj->stats = data;
 		break;
@@ -1635,6 +1660,7 @@ static void stats_response_handler(struct cfg80211_data *buffer)
 	[QCA_WLAN_VENDOR_ATTR_STATS_TYPE] = { .type = NLA_U8 },
 	[QCA_WLAN_VENDOR_ATTR_STATS_RECURSIVE] = { .type = NLA_NESTED },
 	[QCA_WLAN_VENDOR_ATTR_STATS_MULTI_REPLY] = { .type = NLA_FLAG },
+	[QCA_WLAN_VENDOR_ATTR_STATS_SERVICEID] = { .type = NLA_U8 },
 	};
 
 	if (!buffer) {
@@ -1695,14 +1721,17 @@ static void stats_response_handler(struct cfg80211_data *buffer)
 			tb[QCA_WLAN_VENDOR_ATTR_STATS_PARENT_IF]),
 			IFNAME_LEN);
 	if (tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID]) {
-		if (obj->obj_type == STATS_OBJ_STA)
+		if (obj->obj_type == STATS_OBJ_STA) {
 			memcpy(obj->u_id.mac_addr,
 			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID]),
 			       ETH_ALEN);
-		else
+			if (tb[QCA_WLAN_VENDOR_ATTR_STATS_SERVICEID])
+				obj->serviceid = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_SERVICEID]);
+		} else {
 			memcpy(obj->u_id.if_name,
 			       nla_data(tb[QCA_WLAN_VENDOR_ATTR_STATS_OBJ_ID]),
 			       IFNAME_LEN);
+		}
 	}
 	attr = tb[QCA_WLAN_VENDOR_ATTR_STATS_RECURSIVE];
 	if (obj->lvl == STATS_LVL_BASIC) {
@@ -2033,6 +2062,10 @@ static void free_advance_sta(struct stats_obj *sta)
 				free(data->delay);
 			if (data->jitter)
 				free(data->jitter);
+			if (data->sawfdelay)
+				free(data->sawfdelay);
+			if (data->sawftx)
+				free(data->sawftx);
 		}
 		break;
 	case STATS_TYPE_CTRL:
