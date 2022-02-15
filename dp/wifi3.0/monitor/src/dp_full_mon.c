@@ -863,11 +863,15 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 						     &tail_msdu, &head_desc,
 						     &tail_desc);
 
-		/* Assert if end_of_ppdu is zero and number of reaped buffers
-		 * are zero.
+		/* if end_of_ppdu is zero and number of reaped buffers
+		 * are zero, move to next descriptor
 		 */
-		if (qdf_unlikely(!desc_info->end_of_ppdu && !rx_bufs_reaped))
-			qdf_err("end_of_ppdu and rx_bufs_reaped are zero");
+		if (qdf_unlikely(!desc_info->end_of_ppdu && !rx_bufs_reaped)) {
+			qdf_debug("end_of_ppdu and rx_bufs_reaped are zero");
+			ring_desc = hal_srng_dst_get_next(hal_soc,
+							  mon_dest_srng);
+			continue;
+		}
 
 		rx_mon_stats->mon_rx_bufs_reaped_dest += rx_bufs_reaped;
 
