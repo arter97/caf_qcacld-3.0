@@ -886,7 +886,7 @@ QDF_STATUS
 wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
 					     uint32_t enable);
 
-#if CONFIG_SAWF_DEF_QUEUES
+#ifdef CONFIG_SAWF_DEF_QUEUES
 /**
  * wmi_unified_set_rate_upper_cap_cmd_send() - set rate upper cap cmd
  * @wmi_handle: wmi handle
@@ -938,5 +938,25 @@ QDF_STATUS
 wmi_unified_set_nss_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
 					 uint8_t pdev_id,
 					 struct wmi_rc_params *param);
+
+/**
+ * wmi_sawf_create_send() - Send create SAWF service class command to FW
+ * @wmi_handle: wmi handle
+ * @param: SAWF WMI params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_sawf_create_send(struct wmi_unified *wmi_handle,
+				struct wmi_sawf_params *param);
+
+/**
+ * wmi_sawf_disable_send() - Send disable service class command to FW
+ * @wmi_handle: wmi handle
+ * @svc_id: Service class identifier
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
+				 uint8_t svc_id);
 #endif
 #endif /* _WMI_UNIFIED_AP_API_H_ */

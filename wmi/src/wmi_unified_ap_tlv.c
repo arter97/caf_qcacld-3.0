@@ -3347,7 +3347,7 @@ QDF_STATUS send_soc_tqm_reset_enable_disable_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
-#if CONFIG_SAWF_DEF_QUEUES
+#ifdef CONFIG_SAWF_DEF_QUEUES
 static QDF_STATUS
 send_set_rate_upper_cap_cmd_tlv(struct wmi_unified *wmi_handle, uint8_t pdev_id,
 				struct wmi_rc_params *param)
@@ -3448,6 +3448,86 @@ send_set_nss_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
+				    struct wmi_sawf_params *param)
+{
+	QDF_STATUS ret;
+	wmi_sawf_svc_class_cfg_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint16_t len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_sawf_svc_class_cfg_cmd_fixed_param *)wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_sawf_svc_class_cfg_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_sawf_svc_class_cfg_cmd_fixed_param));
+
+	cmd->svc_class_id = param->svc_id;
+	cmd->min_thruput_kbps = param->min_thruput_rate;
+	cmd->max_thruput_kbps = param->max_thruput_rate;
+	cmd->burst_size_bytes = param->burst_size;
+	cmd->svc_interval_ms = param->service_interval;
+	cmd->delay_bound_ms = param->delay_bound;
+	cmd->time_to_live_ms = param->msdu_ttl;
+	cmd->priority = param->priority;
+	cmd->tid = param->tid;
+	cmd->msdu_loss_rate_ppm = param->msdu_rate_loss;
+
+	qdf_info("Setting sawf svc_id %d min_thrput_rate %d max_thrput_rate %d"
+		 "burst_size %d service_interval %d delay_bound %d msdu_ttl %d"
+		 "priority %d tid %d msdu_rate_loss %d \n",
+		 cmd->svc_class_id, cmd->min_thruput_kbps,
+		 cmd->max_thruput_kbps, cmd->burst_size_bytes,
+		 cmd->svc_interval_ms, cmd->delay_bound_ms,
+		 cmd->time_to_live_ms, cmd->priority, cmd->tid,
+		 cmd->msdu_loss_rate_ppm);
+	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
+				   WMI_SAWF_SVC_CLASS_CFG_CMDID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wmi_err("Failed to send set param command ret = %d", ret);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
+
+QDF_STATUS send_sawf_disable_cmd_tlv(wmi_unified_t wmi_handle,
+				     uint32_t svc_id)
+{
+	QDF_STATUS ret;
+	wmi_sawf_svc_class_disable_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint16_t len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_sawf_svc_class_disable_cmd_fixed_param *)wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_sawf_svc_class_disable_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_sawf_svc_class_disable_cmd_fixed_param));
+
+	cmd->svc_class_id = svc_id;
+
+	qdf_info("Disabling svc id:%d", cmd->svc_class_id);
+	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
+			WMI_SAWF_SVC_CLASS_DISABLE_CMDID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wmi_err("Failed to send set param command ret = %d", ret);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
 #endif
 
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
@@ -3540,11 +3620,13 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_vdev_set_intra_bss_cmd = send_vdev_set_intra_bss_cmd_tlv;
 	ops->send_soc_tqm_reset_enable_disable_cmd =
 				send_soc_tqm_reset_enable_disable_cmd_tlv;
-#if CONFIG_SAWF_DEF_QUEUES
+#ifdef CONFIG_SAWF_DEF_QUEUES
 	ops->send_set_rate_upper_cap_cmd = send_set_rate_upper_cap_cmd_tlv;
 	ops->send_set_rate_retry_mcs_drop_cmd =
 		send_set_rate_retry_mcs_drop_cmd_tlv;
 	ops->send_set_mcs_probe_intvl_cmd = send_set_mcs_probe_intvl_cmd_tlv;
 	ops->send_set_nss_probe_intvl_cmd = send_set_nss_probe_intvl_cmd_tlv;
+	ops->send_sawf_create_cmd = send_sawf_create_cmd_tlv;
+	ops->send_sawf_disable_cmd = send_sawf_disable_cmd_tlv;
 #endif
 }
