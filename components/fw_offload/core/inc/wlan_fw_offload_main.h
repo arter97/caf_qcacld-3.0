@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 - 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012 - 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -51,16 +51,18 @@
 /**
  * enum wlan_fwol_southbound_event - fw offload south bound event type
  * @WLAN_FWOL_EVT_GET_ELNA_BYPASS_RESPONSE: get eLNA bypass response
+ * @WLAN_FWOL_EVT_GET_THERMAL_STATS_RESPONSE: get Thermal Stats response
  */
 enum wlan_fwol_southbound_event {
 	WLAN_FWOL_EVT_INVALID = 0,
 	WLAN_FWOL_EVT_GET_ELNA_BYPASS_RESPONSE,
+	WLAN_FWOL_EVT_GET_THERMAL_STATS_RESPONSE,
 	WLAN_FWOL_EVT_LAST,
 	WLAN_FWOL_EVT_MAX = WLAN_FWOL_EVT_LAST - 1
 };
 
 /**
- * struct wlan_fwol_three_antenna_btc - Three antenna BTC config items
+ * struct wlan_fwol_coex_config - BTC config items
  * @btc_mode: Config BTC mode
  * @antenna_isolation: Antenna isolation
  * @max_tx_power_for_btc: Max wlan tx power in co-ex scenario
@@ -77,6 +79,8 @@ enum wlan_fwol_southbound_event {
  *                             BT SCO connection is on
  * @btc_three_way_coex_config_legacy_enable: Enable/Disable tri-radio coex
  *                             config legacy feature
+ * @ble_scan_coex_policy: BLE Scan policy, true - better BLE scan result, false
+ *                        better wlan throughput
  */
 struct wlan_fwol_coex_config {
 	uint8_t btc_mode;
@@ -97,6 +101,7 @@ struct wlan_fwol_coex_config {
 #ifdef FEATURE_COEX_CONFIG
 	bool    btc_three_way_coex_config_legacy_enable;
 #endif
+	bool ble_scan_coex_policy;
 };
 
 #define FWOL_THERMAL_LEVEL_MAX 4
@@ -113,6 +118,7 @@ struct wlan_fwol_coex_config {
  * @priority_apps: Priority of the apps mitigation to consider by fw
  * @priority_wpps: Priority of the wpps mitigation to consider by fw
  * @thermal_action: thermal action as defined enum thermal_mgmt_action_code
+ * @therm_stats_offset: thermal temp offset as set in gThermalStatsTempOffset
  */
 struct wlan_fwol_thermal_temp {
 	bool     thermal_mitigation_enable;
@@ -125,6 +131,9 @@ struct wlan_fwol_thermal_temp {
 	uint8_t priority_apps;
 	uint8_t priority_wpps;
 	enum thermal_mgmt_action_code thermal_action;
+#ifdef THERMAL_STATS_SUPPORT
+	uint8_t therm_stats_offset;
+#endif
 };
 
 /**
@@ -197,14 +206,16 @@ struct wlan_fwol_neighbor_report_cfg {
  * @enable_fw_log_level: Set the FW log level
  * @enable_fw_log_type: Set the FW log type
  * @enable_fw_module_log_level: enable fw module log level
- * @enable_fw_module_log_level_num: enablefw module log level num
+ * @enable_fw_module_log_level_num: enable fw module log level num
+ * @enable_fw_mod_wow_log_level: enable fw wow module log level
+ * @enable_fw_mod_wow_log_level_num: enable fw wow module log level num
  * @sap_xlna_bypass: bypass SAP xLNA
  * @is_rate_limit_enabled: Enable/disable RA rate limited
  * @tsf_gpio_pin: TSF GPIO Pin config
  * @tsf_irq_host_gpio_pin: TSF GPIO Pin config
  * @tsf_sync_host_gpio_pin: TSF Sync GPIO Pin config
  * @tsf_ptp_options: TSF Plus feature options config
- * @lprx_enable: LPRx feature enable config
+ * @tsf_sync_enable: TSF sync feature enable/disable
  * @sae_enable: SAE feature enable config
  * @gcmp_enable: GCMP feature enable config
  * @enable_tx_sch_delay: Enable TX SCH delay value config
@@ -213,6 +224,8 @@ struct wlan_fwol_neighbor_report_cfg {
  * @dhcp_max_num_clients: Max number of DHCP client supported
  * @dwelltime_params: adaptive dwell time parameters
  * @enable_ilp: ILP HW block configuration
+ * @sap_sho: SAP SHO HW offload configuration
+ * @disable_hw_assist: Flag to configure HW assist feature in FW
  */
 struct wlan_fwol_cfg {
 	/* Add CFG and INI items here */
@@ -235,6 +248,8 @@ struct wlan_fwol_cfg {
 	uint16_t enable_fw_log_type;
 	uint8_t enable_fw_module_log_level[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
 	uint8_t enable_fw_module_log_level_num;
+	uint8_t enable_fw_mod_wow_log_level[FW_MODULE_LOG_LEVEL_STRING_LENGTH];
+	uint8_t enable_fw_mod_wow_log_level_num;
 	bool sap_xlna_bypass;
 #ifdef FEATURE_WLAN_RA_FILTERING
 	bool is_rate_limit_enabled;
@@ -243,6 +258,7 @@ struct wlan_fwol_cfg {
 	uint32_t tsf_gpio_pin;
 #ifdef WLAN_FEATURE_TSF_PLUS
 	uint32_t tsf_ptp_options;
+	bool tsf_sync_enable;
 #ifdef WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ
 	uint32_t tsf_irq_host_gpio_pin;
 #endif
@@ -251,7 +267,6 @@ struct wlan_fwol_cfg {
 #endif
 #endif
 #endif
-	bool lprx_enable;
 #ifdef WLAN_FEATURE_SAE
 	bool sae_enable;
 #endif
@@ -263,7 +278,29 @@ struct wlan_fwol_cfg {
 	uint32_t dhcp_max_num_clients;
 #endif
 	struct adaptive_dwelltime_params dwelltime_params;
-	bool enable_ilp;
+	uint32_t enable_ilp;
+	uint32_t sap_sho;
+	bool disable_hw_assist;
+};
+
+/**
+ * struct wlan_fwol_thermal_throttle_info - FW offload thermal throttle info
+ * @level: thermal throttle level
+ * @pdev_id: pdev id
+ */
+struct wlan_fwol_thermal_throttle_info {
+	enum thermal_throttle_level level;
+	uint32_t pdev_id;
+};
+
+/**
+ * struct wlan_fwol_capability_info - FW offload capability component
+ * @fw_thermal_stats_cap: Thermal Stats Fw capability
+ **/
+struct wlan_fwol_capability_info {
+#ifdef THERMAL_STATS_SUPPORT
+	bool fw_thermal_stats_cap;
+#endif
 };
 
 /**
@@ -272,12 +309,20 @@ struct wlan_fwol_cfg {
  * @cbs:     callback functions
  * @tx_ops: tx operations for target interface
  * @rx_ops: rx operations for target interface
+ * @thermal_throttle: cached target thermal stats information
+ * @thermal_cbs: thermal notification callbacks to hdd layer
+ * @capability_info: fwol capability info
  */
 struct wlan_fwol_psoc_obj {
 	struct wlan_fwol_cfg cfg;
 	struct wlan_fwol_callbacks cbs;
 	struct wlan_fwol_tx_ops tx_ops;
 	struct wlan_fwol_rx_ops rx_ops;
+#ifdef FW_THERMAL_THROTTLE_SUPPORT
+	struct wlan_fwol_thermal_throttle_info thermal_throttle;
+	struct fwol_thermal_callbacks thermal_cbs;
+#endif
+	struct wlan_fwol_capability_info capability_info;
 };
 
 /**
@@ -285,6 +330,7 @@ struct wlan_fwol_psoc_obj {
  * @psoc: psoc handle
  * @event_id: event ID
  * @get_elna_bypass_response: get eLNA bypass response
+ * @get_thermal_stats_response: get thermal stats response
  */
 struct wlan_fwol_rx_event {
 	struct wlan_objmgr_psoc *psoc;
@@ -292,6 +338,9 @@ struct wlan_fwol_rx_event {
 	union {
 #ifdef WLAN_FEATURE_ELNA
 		struct get_elna_bypass_response get_elna_bypass_response;
+#endif
+#ifdef THERMAL_STATS_SUPPORT
+		struct thermal_throttle_info get_thermal_stats_response;
 #endif
 	};
 };
@@ -379,10 +428,34 @@ fwol_set_adaptive_dwelltime_config(
 /**
  * fwol_set_ilp_config() - API to set ILP HW block config
  * @pdev: pointer to the pdev object
- * @enable_ilp: enable/disable config for ILP
+ * @enable_ilp: ILP HW block configuration with various options
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS fwol_set_ilp_config(struct wlan_objmgr_pdev *pdev,
-			       bool enable_ilp);
+			       uint32_t enable_ilp);
+
+/**
+ * fwol_set_sap_sho() - API to set SAP SHO config
+ * @psoc: pointer to the psoc object
+ * @vdev_id: vdev id
+ * @sap_sho: enable/disable config for SAP SHO
+ * SHO- SoftAP hardware offload – When enabled the beacon/probe resp
+ * will be offloaded to HW.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS fwol_set_sap_sho(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    uint32_t sap_sho);
+
+/**
+ * fwol_configure_hw_assist() - API to configure HW assist feature in FW
+ * @pdev: pointer to the pdev object
+ * @disable_he_assist: Flag to enable/disable HW assist feature
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS fwol_configure_hw_assist(struct wlan_objmgr_pdev *pdev,
+				    bool disable_hw_assist);
+
 #endif

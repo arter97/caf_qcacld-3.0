@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,6 +29,12 @@
 				wma_get_fw_wlan_feat_caps(feat_enum_value)
 
 #define DPU_FEEDBACK_UNPROTECTED_ERROR 0x0F
+
+#define WMA_GET_QDF_NBUF(pRxMeta) \
+	(((t_packetmeta *)pRxMeta)->pkt_qdf_buf)
+
+#define WMA_GET_RX_MAC_HEADER_LEN(pRxMeta) \
+	(((t_packetmeta *)pRxMeta)->mpdu_hdr_len)
 
 #define WMA_GET_RX_MAC_HEADER(pRxMeta) \
 	(tpSirMacMgmtHdr)(((t_packetmeta *)pRxMeta)->mpdu_hdr_ptr)
@@ -108,7 +114,6 @@
 
 
 /* WMA Messages */
-
 enum wmamsgtype {
 	WMA_MSG_TYPES_BEGIN = SIR_HAL_MSG_TYPES_BEGIN,
 	WMA_ITC_MSG_TYPES_BEGIN = SIR_HAL_ITC_MSG_TYPES_BEGIN,
@@ -126,7 +131,6 @@ enum wmamsgtype {
 	WMA_SEND_BEACON_REQ = SIR_HAL_SEND_BEACON_REQ,
 	WMA_SEND_BCN_RSP = SIR_HAL_SEND_BCN_RSP,
 	WMA_SEND_PROBE_RSP_TMPL = SIR_HAL_SEND_PROBE_RSP_TMPL,
-	WMA_ROAM_BLACLIST_MSG = SIR_HAL_ROAM_BLACKLIST_MSG,
 	WMA_SEND_PEER_UNMAP_CONF = SIR_HAL_SEND_PEER_UNMAP_CONF,
 
 	WMA_SET_BSSKEY_RSP = SIR_HAL_SET_BSSKEY_RSP,
@@ -155,10 +159,7 @@ enum wmamsgtype {
 	WMA_TIMER_TRAFFIC_ACTIVITY_REQ = SIR_HAL_TIMER_TRAFFIC_ACTIVITY_REQ,
 	WMA_TIMER_ADC_RSSI_STATS = SIR_HAL_TIMER_ADC_RSSI_STATS,
 	WMA_TIMER_TRAFFIC_STATS_IND = SIR_HAL_TRAFFIC_STATS_IND,
-
-#ifdef WLAN_FEATURE_11W
 	WMA_EXCLUDE_UNENCRYPTED_IND = SIR_HAL_EXCLUDE_UNENCRYPTED_IND,
-#endif
 
 #ifdef FEATURE_WLAN_ESE
 	WMA_TSM_STATS_REQ = SIR_HAL_TSM_STATS_REQ,
@@ -175,7 +176,6 @@ enum wmamsgtype {
 	WMA_SET_TX_POWER_REQ = SIR_HAL_SET_TX_POWER_REQ,
 	WMA_SET_TX_POWER_RSP = SIR_HAL_SET_TX_POWER_RSP,
 	WMA_GET_TX_POWER_REQ = SIR_HAL_GET_TX_POWER_REQ,
-	WMA_SEND_MAX_TX_POWER = SIR_HAL_SEND_MAX_TX_POWER,
 
 	WMA_ENABLE_UAPSD_REQ = SIR_HAL_ENABLE_UAPSD_REQ,
 	WMA_DISABLE_UAPSD_REQ = SIR_HAL_DISABLE_UAPSD_REQ,
@@ -223,15 +223,7 @@ enum wmamsgtype {
 	WMA_SET_PLM_REQ = SIR_HAL_SET_PLM_REQ,
 #endif
 
-#ifndef ROAM_OFFLOAD_V1
-	WMA_ROAM_SCAN_OFFLOAD_REQ = SIR_HAL_ROAM_SCAN_OFFLOAD_REQ,
-#endif
 	WMA_ROAM_PRE_AUTH_STATUS = SIR_HAL_ROAM_PRE_AUTH_STATUS_IND,
-
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-	WMA_ROAM_OFFLOAD_SYNCH_IND = SIR_HAL_ROAM_OFFLOAD_SYNCH_IND,
-	WMA_ROAM_OFFLOAD_SYNCH_FAIL = SIR_HAL_ROAM_OFFLOAD_SYNCH_FAIL,
-#endif
 
 	WMA_8023_MULTICAST_LIST_REQ = SIR_HAL_8023_MULTICAST_LIST_REQ,
 
@@ -404,14 +396,9 @@ enum wmamsgtype {
 	WMA_POWER_DEBUG_STATS_REQ = SIR_HAL_POWER_DEBUG_STATS_REQ,
 	WMA_BEACON_DEBUG_STATS_REQ = SIR_HAL_BEACON_DEBUG_STATS_REQ,
 	WMA_GET_RCPI_REQ = SIR_HAL_GET_RCPI_REQ,
-	WMA_ROAM_BLACKLIST_MSG = SIR_HAL_ROAM_BLACKLIST_MSG,
 	WMA_SET_DBS_SCAN_SEL_CONF_PARAMS = SIR_HAL_SET_DBS_SCAN_SEL_PARAMS,
 
 	WMA_SET_WOW_PULSE_CMD = SIR_HAL_SET_WOW_PULSE_CMD,
-
-#ifndef ROAM_OFFLOAD_V1
-	WMA_SET_PER_ROAM_CONFIG_CMD = SIR_HAL_SET_PER_ROAM_CONFIG_CMD,
-#endif
 
 	WMA_SEND_AP_VDEV_UP = SIR_HAL_SEND_AP_VDEV_UP,
 
@@ -444,25 +431,21 @@ enum wmamsgtype {
 	WMA_GET_MWS_COEX_INFO_REQ = SIR_HAL_GET_MWS_COEX_INFO_REQ,
 #endif
 
-#ifndef ROAM_OFFLOAD_V1
-	WMA_SET_ROAM_TRIGGERS = SIR_HAL_SET_ROAM_TRIGGERS,
-	WMA_ROAM_INIT_PARAM = SIR_HAL_INIT_ROAM_OFFLOAD_PARAM,
-	WMA_ROAM_DISABLE_CFG = SIR_HAL_INIT_ROAM_DISABLE_CFG,
-
-#endif
 	WMA_TWT_ADD_DIALOG_REQUEST = SIR_HAL_TWT_ADD_DIALOG_REQUEST,
 	WMA_TWT_DEL_DIALOG_REQUEST = SIR_HAL_TWT_DEL_DIALOG_REQUEST,
 	WMA_TWT_PAUSE_DIALOG_REQUEST = SIR_HAL_TWT_PAUSE_DIALOG_REQUEST,
 	WMA_TWT_RESUME_DIALOG_REQUEST =  SIR_HAL_TWT_RESUME_DIALOG_REQUEST,
+	WMA_PEER_CREATE_REQ = SIR_HAL_PEER_CREATE_REQ,
+	WMA_TWT_NUDGE_DIALOG_REQUEST = SIR_HAL_TWT_NUDGE_DIALOG_REQUEST,
 };
 
-#define WMA_DATA_STALL_TRIGGER 6
+#define WMA_DATA_STALL_TRIGGER 0x1006
 
 /* Bit 6 will be used to control BD rate for Management frames */
 #define HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME 0x40
 
 #define wma_tx_frame(hHal, pFrmBuf, frmLen, frmType, txDir, tid, pCompFunc, \
-		   pData, txFlag, sessionid, channel_freq, rid) \
+		   pData, txFlag, sessionid, channel_freq, rid, peer_rssi) \
 	(QDF_STATUS)( wma_tx_packet( \
 		      cds_get_context(QDF_MODULE_ID_WMA), \
 		      (pFrmBuf), \
@@ -473,15 +456,17 @@ enum wmamsgtype {
 		      (pCompFunc), \
 		      (pData), \
 		      (NULL), \
+		      (NULL), \
 		      (txFlag), \
 		      (sessionid), \
 		      (false), \
 		      (channel_freq), \
-		      (rid)))
+		      (rid), \
+		      (peer_rssi)))
 
 #define wma_tx_frameWithTxComplete(hHal, pFrmBuf, frmLen, frmType, txDir, tid, \
-	 pCompFunc, pData, pCBackFnTxComp, txFlag, sessionid, tdlsflag, \
-	 channel_freq, rid) \
+	 pCompFunc, pData, pCBackFnTxComp, ota_comp_data, txFlag, sessionid, \
+	 tdlsflag, channel_freq, rid, peer_rssi) \
 	(QDF_STATUS)( wma_tx_packet( \
 		      cds_get_context(QDF_MODULE_ID_WMA), \
 		      (pFrmBuf), \
@@ -492,11 +477,13 @@ enum wmamsgtype {
 		      (pCompFunc), \
 		      (pData), \
 		      (pCBackFnTxComp), \
+		      (ota_comp_data), \
 		      (txFlag), \
 		      (sessionid), \
 		      (tdlsflag), \
 		      (channel_freq), \
-		      (rid)))
+		      (rid), \
+		      (peer_rssi)))
 
 /**
  * struct sUapsd_Params - Powersave Offload Changes
@@ -683,12 +670,14 @@ void wma_tx_abort(uint8_t vdev_id);
  * @tid: TID
  * @tx_frm_download_comp_cb: tx download callback handler
  * @pData: tx packet
- * @tx_frm_ota_comp_cb: OTA complition handler
+ * @tx_frm_ota_comp_cb: OTA completion handler
+ * @ota_comp_data: OTA completion data
  * @tx_flag: tx flag
  * @vdev_id: vdev id
  * @tdls_flag: tdls flag
  * @channel_freq: channel frequency
  * @rid: rate id
+ * @peer_rssi: peer RSSI value
  *
  * This function sends the frame corresponding to the
  * given vdev id.
@@ -701,8 +690,10 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_dwnld_comp_callback tx_frm_download_comp_cb,
 			 void *pData,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
+			 struct mgmt_frame_data *ota_comp_data,
 			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
-			 uint16_t channel_freq, enum rateid rid);
+			 uint16_t channel_freq, enum rateid rid,
+			 int8_t peer_rssi);
 
 /**
  * wma_open() - Allocate wma context and initialize it.
@@ -738,7 +729,6 @@ QDF_STATUS wma_register_mgmt_frm_client(void);
 QDF_STATUS wma_de_register_mgmt_frm_client(void);
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS wma_register_roaming_callbacks(
-		csr_roam_synch_fn_t csr_roam_synch_cb,
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
 			struct mac_context *mac,
 			uint8_t vdev_id,
@@ -748,11 +738,9 @@ QDF_STATUS wma_register_roaming_callbacks(
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
 			uint16_t deauth_disassoc_frame_len,
-			uint16_t reason_code),
-		csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb);
+			uint16_t reason_code));
 #else
 static inline QDF_STATUS wma_register_roaming_callbacks(
-		csr_roam_synch_fn_t csr_roam_synch_cb,
 		QDF_STATUS (*csr_roam_auth_event_handle_cb)(
 			struct mac_context *mac,
 			uint8_t vdev_id,
@@ -762,8 +750,7 @@ static inline QDF_STATUS wma_register_roaming_callbacks(
 			uint8_t vdev_id,
 			uint8_t *deauth_disassoc_frame,
 			uint16_t deauth_disassoc_frame_len,
-			uint16_t reason_code),
-		csr_roam_pmkid_req_fn_t csr_roam_pmkid_req_cb)
+			uint16_t reason_code))
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

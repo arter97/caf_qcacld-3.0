@@ -26,7 +26,11 @@
 
 #ifdef IPA_OFFLOAD
 
-#ifdef CONFIG_IPA_WDI_UNIFIED_API
+#include <linux/version.h>
+#include <linux/kernel.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)) || \
+	defined(CONFIG_IPA_WDI_UNIFIED_API)
 #include <qdf_ipa_wdi3.h>
 #else
 #include <qdf_ipa.h>
@@ -191,7 +195,8 @@ struct wlan_ipa_tx_hdr {
  * @reserved2: Reserved not used
  */
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
+    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
+    defined(QCA_WIFI_WCN7850)
 struct frag_header {
 	uint8_t reserved[0];
 };
@@ -217,7 +222,8 @@ struct frag_header {
  */
 
 #if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
+    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750) || \
+    defined(QCA_WIFI_WCN7850)
 struct ipa_header {
 	uint8_t reserved[0];
 };
@@ -335,6 +341,9 @@ struct wlan_ipa_iface_context {
 	uint8_t iface_id;       /* This iface ID */
 	qdf_netdev_t dev;
 	enum QDF_OPMODE device_mode;
+	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
+	qdf_atomic_t conn_count;
+	qdf_atomic_t disconn_count;
 	uint8_t session_id;
 	qdf_spinlock_t interface_lock;
 	uint32_t ifa_address;
@@ -359,6 +368,7 @@ struct wlan_ipa_iface_context {
  * @num_tx_dequeued: Number of TX dequeued
  * @num_max_pm_queue: Number of packets in PM queue
  * @num_rx_excep: Number of RX IPA exception packets
+ * @num_rx_no_iface_eapol: No of EAPOL pkts before iface setup
  * @num_tx_fwd_ok: Number of TX forward packet success
  * @num_tx_fwd_err: Number of TX forward packet failures
  */
@@ -379,6 +389,7 @@ struct wlan_ipa_stats {
 	uint64_t num_tx_dequeued;
 	uint64_t num_max_pm_queue;
 	uint64_t num_rx_excep;
+	uint64_t num_rx_no_iface_eapol;
 	uint64_t num_tx_fwd_ok;
 	uint64_t num_tx_fwd_err;
 };
@@ -468,6 +479,7 @@ struct ipa_uc_fw_stats {
  * @session_id: Session ID
  * @mac_addr: Mac address
  * @is_loading: Driver loading flag
+ * @is_2g_iface: true if interface is operating on 2G band, otherwise false
  */
 struct wlan_ipa_uc_pending_event {
 	qdf_list_node_t node;
@@ -477,6 +489,7 @@ struct wlan_ipa_uc_pending_event {
 	uint8_t session_id;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
 	bool is_loading;
+	bool is_2g_iface;
 };
 
 /**
@@ -701,7 +714,7 @@ struct wlan_ipa_priv {
 	ipa_uc_offload_control_req ipa_tx_op;
 	ipa_intrabss_control_req ipa_intrabss_op;
 
-#ifdef IPA_LAN_RX_NAPI_SUPPORT
+#ifdef QCA_CONFIG_RPS
 	/*Callback to enable RPS for STA in STA+SAP scenario*/
 	wlan_ipa_rps_enable rps_enable;
 #endif
@@ -712,6 +725,7 @@ struct wlan_ipa_priv {
 	bool is_smmu_enabled;	/* IPA caps returned from ipa_wdi_init */
 	qdf_atomic_t stats_quota;
 	uint8_t curr_bw_level;
+	qdf_atomic_t deinit_in_prog;
 };
 
 #define WLAN_IPA_WLAN_FRAG_HEADER        sizeof(struct frag_header)

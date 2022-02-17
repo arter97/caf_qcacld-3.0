@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -155,7 +155,8 @@ struct wlan_ipa_iface_context *
 wlan_ipa_get_iface_by_mode_netdev(struct wlan_ipa_priv *ipa_ctx,
 				  qdf_netdev_t ndev, uint8_t mode);
 
-#ifndef CONFIG_IPA_WDI_UNIFIED_API
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)) && \
+	!defined(CONFIG_IPA_WDI_UNIFIED_API)
 
 /**
  * wlan_ipa_is_rm_enabled() - Is IPA RM enabled?
@@ -554,7 +555,7 @@ void wlan_ipa_reg_send_to_nw_cb(struct wlan_ipa_priv *ipa_ctx,
 	ipa_ctx->send_to_nw = cb;
 }
 
-#ifdef IPA_LAN_RX_NAPI_SUPPORT
+#ifdef QCA_CONFIG_RPS
 /**
  * wlan_ipa_reg_rps_enable_cb() - Register callback to enable RPS
  * @ipa_ctx: IPA context
@@ -592,7 +593,8 @@ static inline
 void ipa_set_rps_per_vdev(struct wlan_ipa_priv *ipa_ctx, uint8_t vdev_id,
 			  bool enable)
 {
-	ipa_ctx->rps_enable(vdev_id, enable);
+	if (ipa_ctx->rps_enable)
+		ipa_ctx->rps_enable(vdev_id, enable);
 }
 
 /**
@@ -745,13 +747,14 @@ static inline void wlan_ipa_mcc_work_handler(void *data)
  * @session_id: session id for the event
  * @type: event enum of type ipa_wlan_event
  * @mac_address: MAC address associated with the event
+ * @is_2g_iface: true if interface is operating on 2G band, otherwise false
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			     uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
-			     uint8_t *mac_addr);
+			     uint8_t *mac_addr, bool is_2g_iface);
 
 /**
  * wlan_ipa_uc_smmu_map() - Map / Unmap DMA buffer to IPA UC

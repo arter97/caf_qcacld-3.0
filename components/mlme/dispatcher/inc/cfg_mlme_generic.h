@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -23,13 +24,35 @@
 #ifndef __CFG_MLME_GENERIC_H
 #define __CFG_MLME_GENERIC_H
 
-#ifdef WLAN_FEATURE_11W
 #define CFG_PMF_SA_QUERY_MAX_RETRIES_TYPE	CFG_INI_UINT
 #define CFG_PMF_SA_QUERY_RETRY_INTERVAL_TYPE	CFG_INI_UINT
-#else
-#define CFG_PMF_SA_QUERY_MAX_RETRIES_TYPE	CFG_UINT
-#define CFG_PMF_SA_QUERY_RETRY_INTERVAL_TYPE	CFG_UINT
-#endif /*WLAN_FEATURE_11W*/
+
+/**
+ * enum monitor_mode_concurrency - Monitor mode concurrency
+ * @MONITOR_MODE_CONC_NO_SUPPORT: No concurrency supported with monitor mode
+ * @MONITOR_MODE_CONC_STA_SCAN_MON: STA + monitor mode concurrency is supported
+ */
+enum monitor_mode_concurrency {
+	MONITOR_MODE_CONC_NO_SUPPORT,
+	MONITOR_MODE_CONC_STA_SCAN_MON,
+	MONITOR_MODE_CONC_AFTER_LAST,
+	MONITOR_MODE_CONC_MAX = MONITOR_MODE_CONC_AFTER_LAST - 1,
+};
+
+/**
+ * enum wds_mode_type: wds mode
+ * @WLAN_WDS_MODE_DISABLED: WDS is disabled
+ * @WLAN_WDS_MODE_REPEATER: WDS repeater mode
+ *
+ * This is used for 'type' values in wds_mode
+ */
+enum wlan_wds_mode {
+	WLAN_WDS_MODE_DISABLED  =  0,
+	WLAN_WDS_MODE_REPEATER  =  1,
+	/* keep this last */
+	WLAN_WDS_MODE_LAST,
+	WLAN_WDS_MODE_MAX = WLAN_WDS_MODE_LAST - 1,
+};
 
 /*
  * pmfSaQueryMaxRetries - Control PMF SA query retries for SAP
@@ -78,7 +101,7 @@
  * enable_rtt_mac_randomization - Enable/Disable rtt mac randomization
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * Usage: External
  *
@@ -86,7 +109,7 @@
  */
 #define CFG_ENABLE_RTT_MAC_RANDOMIZATION CFG_INI_BOOL( \
 	"enable_rtt_mac_randomization", \
-	0, \
+	1, \
 	"Enable RTT MAC randomization")
 
 #define CFG_RTT3_ENABLE CFG_BOOL( \
@@ -139,8 +162,25 @@
 		"11d Enable Flag")
 
 /*
+ * rf_test_mode_enabled - Enable rf test mode support
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This cfg is used to set rf test mode support flag
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ */
+#define CFG_RF_TEST_MODE_SUPP_ENABLED CFG_BOOL( \
+		"rf_test_mode_enabled", \
+		1, \
+		"rf test mode Enable Flag")
+
+/*
  * <ini>
- * BandCapability - Preferred band (0: Both 2.4G and 5G,
+ * BandCapability - Preferred band (0: 2.4G, 5G, and 6G,
  *				    1: 2.4G only,
  *				    2: 5G only,
  *				    3: Both 2.4G and 5G,
@@ -190,7 +230,7 @@
  *
  * </ini>
  */
-#if defined(QCA_WIFI_NAPIER_EMULATION) || defined(QCA_WIFI_QCA6290)
+#if defined(QCA_WIFI_EMULATION) || defined(QCA_WIFI_QCA6290)
 #define CFG_PREVENT_LINK_DOWN CFG_INI_BOOL( \
 	"gPreventLinkDown", \
 	1, \
@@ -200,7 +240,7 @@
 	"gPreventLinkDown", \
 	0, \
 	"Prevent Bus Link Down")
-#endif /* QCA_WIFI_NAPIER_EMULATION */
+#endif /* QCA_WIFI_EMULATION */
 
 /*
  * <ini>
@@ -305,7 +345,7 @@
  * gEnableLpassSupport - Enable/disable LPASS Support
  * @Min: 0 (disabled)
  * @Max: 1 (enabled)
- * @Default: 0 (disabled)
+ * @Default: 1 (disabled) if WLAN_FEATURE_LPSS is defined, 0 otherwise
  *
  * Related: None
  *
@@ -318,7 +358,7 @@
 #ifdef WLAN_FEATURE_LPSS
 #define CFG_ENABLE_LPASS_SUPPORT CFG_INI_BOOL( \
 	"gEnableLpassSupport", \
-	0, \
+	1, \
 	"Enable LPASS Support")
 #else
 #define CFG_ENABLE_LPASS_SUPPORT CFG_BOOL( \
@@ -592,7 +632,12 @@
  * @Max: 1
  * @Default: 1
  *
- * This ini is used to enable/disable the removal of time stamp sync cmd
+ * This ini is used to enable/disable the removal of time stamp sync cmd.
+ * If we disable this periodic time sync update to firmware then roaming
+ * timestamp updates to kmsg will have invalid timestamp as firmware will
+ * use this timestamp to capture when roaming has happened with respect
+ * to host timestamp.
+ *
  *
  * Usage: External
  *
@@ -607,11 +652,16 @@
  * <ini>
  * disable_4way_hs_offload - Enable/Disable 4 way handshake offload to firmware
  * @Min: 0
- * @Max: 1
- * @Default: 0
+ * @Max: 0x2
+ * @Default: 0x2
  *
- * 0  4-way HS to be handled in firmware
- * 1  4-way HS to be handled in supplicant
+ * 0x0 - 4-way HS to be handled in firmware for the AKMs except for SAE and
+ * OWE roaming the 4way HS is handled in supplicant by default
+ * 0x1 - 4-way HS to be handled in supplicant
+ * 0x2 - 4-way HS to be handled in firmware for the AKMs including the SAE
+ * Roam except for OWE roaming the 4way HS is handled in supplicant
+ *
+ * Based on the requirement the Max value can be increased per AKM.
  *
  * Related: None
  *
@@ -621,9 +671,13 @@
  *
  * </ini>
  */
-#define CFG_DISABLE_4WAY_HS_OFFLOAD CFG_INI_BOOL("disable_4way_hs_offload", \
-						 0, \
-						 "Enable/disable 4 way handshake offload to firmware")
+#define CFG_DISABLE_4WAY_HS_OFFLOAD CFG_INI_UINT( \
+		"disable_4way_hs_offload", \
+		0, \
+		0x2, \
+		0x2, \
+		CFG_VALUE_OR_DEFAULT, \
+		"Enable/disable 4 way handshake offload to firmware")
 
 /*
  * <ini>
@@ -724,13 +778,14 @@
  * timeout to same AP and auth retries during roaming
  * @Min: 0x0
  * @Max: 0x53
- * @Default: 0x49
+ * @Default: 0x52
  *
  * This ini is used to set max auth retry in auth phase of roaming and initial
  * connection and max connection retry in case of assoc timeout. MAX Auth
  * retries are capped to 3, connection retries are capped to 2 and roam Auth
  * retry is capped to 1.
- * Default is 0x49 i.e. 1 retry each.
+ * Default is 0x52 i.e. 1 roam auth retry, 2 auth retry and 2 full connection
+ * retry.
  *
  * Bits       Retry Type
  * BIT[0:2]   AUTH retries
@@ -758,7 +813,7 @@
  * </ini>
  */
 #define CFG_SAE_CONNECION_RETRIES CFG_INI_UINT("sae_connect_retries", \
-				0, 0x53, 0x49, CFG_VALUE_OR_DEFAULT, \
+				0, 0x53, 0x52, CFG_VALUE_OR_DEFAULT, \
 				"Bit mask to retry Auth and full connection on assoc timeout to same AP for SAE connection")
 
 /*
@@ -781,6 +836,68 @@
 	"wls_6ghz_capable", \
 	0, \
 	"WiFi Location Service(WLS) is 6Ghz capable or not")
+
+/*
+ * <ini>
+ *
+ * monitor_mode_conc - Monitor mode concurrency supported
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: None
+ *
+ * Monitor mode concurrency supported
+ * 0 - No concurrency supported
+ * 1 - Allow STA scan + Monitor mode concurrency
+ *
+ * Supported Feature: General
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MONITOR_MODE_CONCURRENCY CFG_INI_UINT( \
+	"monitor_mode_concurrency", \
+	MONITOR_MODE_CONC_NO_SUPPORT, \
+	MONITOR_MODE_CONC_MAX, \
+	MONITOR_MODE_CONC_NO_SUPPORT, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Monitor mode concurrency supported")
+
+#ifdef FEATURE_WDS
+/*
+ * <ini>
+ *
+ * wds_mode - wds mode supported
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Related: None
+ *
+ * wds mode supported
+ * 0 - wds mode disabled
+ * 1 - wds repeater mode
+ *
+ * Supported Feature: General
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_WDS_MODE CFG_INI_UINT( \
+	"wds_mode", \
+	WLAN_WDS_MODE_DISABLED, \
+	WLAN_WDS_MODE_MAX, \
+	WLAN_WDS_MODE_DISABLED, \
+	CFG_VALUE_OR_DEFAULT, \
+	"wds mode supported")
+
+#define CFG_WDS_MODE_ALL CFG(CFG_WDS_MODE)
+#else
+#define CFG_WDS_MODE_ALL
+#endif
 
 #define CFG_GENERIC_ALL \
 	CFG(CFG_ENABLE_DEBUG_PACKET_LOG) \
@@ -814,5 +931,8 @@
 	CFG(CFG_ENABLE_RING_BUFFER) \
 	CFG(CFG_DFS_CHAN_AGEOUT_TIME) \
 	CFG(CFG_SAE_CONNECION_RETRIES) \
-	CFG(CFG_WLS_6GHZ_CAPABLE)
+	CFG(CFG_WLS_6GHZ_CAPABLE) \
+	CFG(CFG_MONITOR_MODE_CONCURRENCY) \
+	CFG(CFG_RF_TEST_MODE_SUPP_ENABLED) \
+	CFG_WDS_MODE_ALL
 #endif /* __CFG_MLME_GENERIC_H */

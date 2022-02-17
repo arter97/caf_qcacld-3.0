@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,7 +27,6 @@
 #include "wlan_crypto_global_api.h"
 #include "wlan_mlme_main.h"
 
-#if defined(WLAN_FEATURE_ROAM_OFFLOAD) || defined(ROAM_OFFLOAD_V1)
 static struct wmi_unified
 *target_if_cm_roam_get_wmi_handle_from_vdev(struct wlan_objmgr_vdev *vdev)
 {
@@ -48,7 +47,6 @@ static struct wmi_unified
 
 	return wmi_handle;
 }
-#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
@@ -76,10 +74,51 @@ target_if_cm_roam_send_vdev_set_pcl_cmd(struct wlan_objmgr_vdev *vdev,
 	return wmi_unified_vdev_set_pcl_cmd(wmi_handle, &params);
 }
 
+/**
+ * target_if_cm_roam_send_roam_invoke_cmd  - Send roam invoke command to wmi.
+ * @vdev: VDEV object pointer
+ * @req:  Pointer to the roam invoke request msg
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_cm_roam_send_roam_invoke_cmd(struct wlan_objmgr_vdev *vdev,
+				       struct roam_invoke_req *req)
+{
+	wmi_unified_t wmi_handle;
+
+	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	return wmi_unified_roam_invoke_cmd(wmi_handle, req);
+}
+
+/**
+ * target_if_cm_roam_send_roam_sync_complete  - Send roam sync complete to wmi.
+ * @vdev: VDEV object pointer
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_cm_roam_send_roam_sync_complete(struct wlan_objmgr_vdev *vdev)
+{
+	wmi_unified_t wmi_handle;
+
+	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	return wmi_unified_roam_synch_complete_cmd(wmi_handle,
+						   wlan_vdev_get_id(vdev));
+}
+
 static void
 target_if_cm_roam_register_lfr3_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 {
 	tx_ops->send_vdev_set_pcl_cmd = target_if_cm_roam_send_vdev_set_pcl_cmd;
+	tx_ops->send_roam_invoke_cmd = target_if_cm_roam_send_roam_invoke_cmd;
+	tx_ops->send_roam_sync_complete_cmd = target_if_cm_roam_send_roam_sync_complete;
 }
 #else
 static inline void
@@ -87,7 +126,6 @@ target_if_cm_roam_register_lfr3_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 {}
 #endif
 
-#ifdef ROAM_OFFLOAD_V1
 /**
  * target_if_is_vdev_valid - vdev id is valid or not
  * @vdev_id: vdev id
@@ -307,8 +345,6 @@ target_if_cm_roam_idle_params(wmi_unified_t wmi_handle, uint8_t command,
 	switch (command) {
 	case ROAM_SCAN_OFFLOAD_START:
 	case ROAM_SCAN_OFFLOAD_UPDATE_CFG:
-		if (!req->enable)
-			return;
 		break;
 	case ROAM_SCAN_OFFLOAD_STOP:
 		req->enable = false;
@@ -516,65 +552,6 @@ target_if_cm_roam_scan_offload_scan_period(
 	return wmi_unified_roam_scan_offload_scan_period(wmi_handle, req);
 }
 
-#ifdef WLAN_FEATURE_11W
-/**
- * target_if_roam_fill_11w_params() - Fill the 11w related parameters
- * for ap profile
- * @vdev: vdev object
- * @req: roam ap profile parameters
- *
- * Return: None
- */
-static void
-target_if_cm_roam_fill_11w_params(struct wlan_objmgr_vdev *vdev,
-				  struct ap_profile_params *req)
-{
-	uint32_t group_mgmt_cipher;
-	uint16_t rsn_caps;
-	bool peer_rmf_capable = false;
-	uint32_t keymgmt;
-
-	if (!vdev) {
-		target_if_err("Invalid vdev");
-		return;
-	}
-
-	rsn_caps = (uint16_t)wlan_crypto_get_param(vdev,
-						   WLAN_CRYPTO_PARAM_RSN_CAP);
-	if (wlan_crypto_vdev_has_mgmtcipher(
-					vdev,
-					(1 << WLAN_CRYPTO_CIPHER_AES_GMAC) |
-					(1 << WLAN_CRYPTO_CIPHER_AES_GMAC_256) |
-					(1 << WLAN_CRYPTO_CIPHER_AES_CMAC)) &&
-					(rsn_caps &
-					 WLAN_CRYPTO_RSN_CAP_MFP_ENABLED))
-		peer_rmf_capable = true;
-
-	keymgmt = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_MGMT_CIPHER);
-
-	if (keymgmt & (1 << WLAN_CRYPTO_CIPHER_AES_CMAC))
-		group_mgmt_cipher = WMI_CIPHER_AES_CMAC;
-	else if (keymgmt & (1 << WLAN_CRYPTO_CIPHER_AES_GMAC))
-		group_mgmt_cipher = WMI_CIPHER_AES_GMAC;
-	else if (keymgmt & (1 << WLAN_CRYPTO_CIPHER_AES_GMAC_256))
-		group_mgmt_cipher = WMI_CIPHER_BIP_GMAC_256;
-	 else
-		group_mgmt_cipher = WMI_CIPHER_NONE;
-
-	if (peer_rmf_capable) {
-		req->profile.rsn_mcastmgmtcipherset = group_mgmt_cipher;
-		req->profile.flags |= WMI_AP_PROFILE_FLAG_PMF;
-	} else {
-		req->profile.rsn_mcastmgmtcipherset = WMI_CIPHER_NONE;
-	}
-}
-#else
-static inline
-void target_if_cm_roam_fill_11w_params(struct wlan_objmgr_vdev *vdev,
-				       struct ap_profile_params *req)
-{}
-#endif
-
 /**
  * target_if_cm_roam_scan_offload_ap_profile() - send roam ap profile to
  * firmware
@@ -606,8 +583,6 @@ target_if_cm_roam_scan_offload_ap_profile(
 		req->profile.rsn_authmode =
 		target_if_cm_roam_scan_get_cckm_mode(vdev, rsn_authmode);
 
-	target_if_cm_roam_fill_11w_params(vdev, req);
-
 	db2dbm_enabled = wmi_service_enabled(wmi_handle,
 					     wmi_service_hw_db2dbm_support);
 	if (!req->profile.rssi_abs_thresh) {
@@ -627,6 +602,12 @@ target_if_cm_roam_scan_offload_ap_profile(
 		req->min_rssi_params[BMISS_MIN_RSSI].min_rssi -=
 						NOISE_FLOOR_DBM_DEFAULT;
 		req->min_rssi_params[BMISS_MIN_RSSI].min_rssi &= 0x000000ff;
+
+		req->min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM].min_rssi -=
+						NOISE_FLOOR_DBM_DEFAULT;
+		req->min_rssi_params[MIN_RSSI_2G_TO_5G_ROAM].min_rssi &=
+						0x000000ff;
+
 	}
 
 	return wmi_unified_send_roam_scan_offload_ap_cmd(wmi_handle, req);
@@ -740,14 +721,14 @@ target_if_cm_roam_offload_11k_params(wmi_unified_t wmi_handle,
 	if (!wmi_service_enabled(wmi_handle,
 				 wmi_service_11k_neighbour_report_support)) {
 		target_if_err("FW doesn't support 11k offload");
-		return QDF_STATUS_E_NOSUPPORT;
+		return QDF_STATUS_SUCCESS;
 	}
 
 	/* If 11k enable command and ssid length is 0, drop it */
 	if (req->offload_11k_bitmask &&
 	    !req->neighbor_report_params.ssid.length) {
 		target_if_debug("SSID Len 0");
-		return QDF_STATUS_E_INVAL;
+		return QDF_STATUS_SUCCESS;
 	}
 
 	status = wmi_unified_offload_11k_cmd(wmi_handle, req);
@@ -811,6 +792,10 @@ target_if_get_wmi_roam_offload_flag(uint32_t flag)
 
 	if (flag & WLAN_ROAM_BMISS_FINAL_SCAN_TYPE)
 		roam_offload_flag |= WMI_ROAM_BMISS_FINAL_SCAN_TYPE_FLAG;
+
+	if (flag & WLAN_ROAM_SKIP_SAE_ROAM_4WAY_HANDSHAKE)
+		roam_offload_flag |=
+			WMI_VDEV_PARAM_SKIP_SAE_ROAM_4WAY_HANDSHAKE;
 
 	return roam_offload_flag;
 }
@@ -1037,8 +1022,6 @@ target_if_cm_roam_send_stop(struct wlan_objmgr_vdev *vdev,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	wmi_unified_t wmi_handle;
-	uint32_t mode = 0;
-	bool is_roam_offload_enabled = false;
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t vdev_id;
 
@@ -1067,20 +1050,6 @@ target_if_cm_roam_send_stop(struct wlan_objmgr_vdev *vdev,
 	if (!psoc) {
 		target_if_err("psoc handle is NULL");
 		return QDF_STATUS_E_INVAL;
-	}
-
-	wlan_mlme_get_roaming_offload(psoc, &is_roam_offload_enabled);
-	if (req->reason == REASON_ROAM_STOP_ALL ||
-	    req->reason == REASON_DISCONNECTED ||
-	    req->reason == REASON_ROAM_SYNCH_FAILED ||
-	    req->reason == REASON_SUPPLICANT_DISABLED_ROAMING) {
-		mode = WMI_ROAM_SCAN_MODE_NONE;
-	} else {
-		if (is_roam_offload_enabled)
-			mode = WMI_ROAM_SCAN_MODE_NONE |
-				WMI_ROAM_SCAN_MODE_ROAMOFFLOAD;
-		else
-			mode = WMI_ROAM_SCAN_MODE_NONE;
 	}
 
 	status = target_if_cm_roam_scan_offload_mode(wmi_handle,
@@ -1125,7 +1094,7 @@ target_if_cm_roam_send_stop(struct wlan_objmgr_vdev *vdev,
 	 * disconnect
 	 */
 	vdev_id = wlan_vdev_get_id(vdev);
-	if (mode == WMI_ROAM_SCAN_MODE_NONE) {
+	if (req->rso_config.rso_mode_info.roam_scan_mode == WMI_ROAM_SCAN_MODE_NONE) {
 		req->roam_triggers.vdev_id = vdev_id;
 		req->roam_triggers.trigger_bitmap = 0;
 		req->roam_triggers.roam_scan_scheme_bitmap = 0;
@@ -1350,12 +1319,6 @@ target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 	tx_ops->send_roam_disable_config =
 					target_if_cm_roam_send_disable_config;
 }
-#else
-static void
-target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
-{
-}
-#endif
 
 QDF_STATUS target_if_cm_roam_register_tx_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 {

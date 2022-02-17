@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,12 +48,19 @@
 #define RX_VDEV_DEL_EVENT           0x004
 #define RX_SHUTDOWN_EVENT           0x010
 
+#define RX_REFILL_POST_EVENT           0x001
+#define RX_REFILL_SUSPEND_EVENT        0x002
+#define RX_REFILL_SHUTDOWN_EVENT       0x004
+
 #ifdef QCA_CONFIG_SMP
 /*
 ** Maximum number of cds messages to be allocated for
 ** OL Rx thread.
 */
 #define CDS_MAX_OL_RX_PKT 4000
+
+#define CDS_ACTIVE_STAID_CLEANUP_DELAY	10
+#define CDS_ACTIVE_STAID_CLEANUP_TIMEOUT	200
 #endif
 
 typedef void (*cds_ol_rx_thread_cb)(void *context,
@@ -140,6 +147,9 @@ typedef struct _cds_sched_context {
 	/* affinity requied during uplink traffic*/
 	bool rx_affinity_required;
 	uint8_t conf_rx_thread_ul_affinity;
+
+	/* sta id packets under processing in thread context*/
+	uint16_t active_staid;
 #endif
 } cds_sched_context, *p_cds_sched_context;
 
@@ -172,8 +182,6 @@ struct cds_context {
 	void *mac_context;
 
 	uint32_t driver_state;
-
-	qdf_event_t wma_complete_event;
 
 	/* WMA Context */
 	void *wma_context;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,7 @@
 #include "sir_common.h"
 #include "sir_api.h"
 #include "sir_mac_prot_def.h"
+#include <../../core/src/wlan_cm_vdev_api.h>
 
 /* Functions for sending responses up the stack */
 
@@ -92,6 +93,26 @@ void lim_send_sme_join_reassoc_rsp(struct mac_context *mac_ctx,
 				   uint16_t prot_status_code,
 				   struct pe_session *session_entry,
 				   uint8_t vdev_id);
+
+/**
+ * lim_cm_send_connect_rsp() - Send Response to Upper Layers
+ * @mac_ctx: Pointer to Global MAC structure
+ * @pe_session: PE Session Info
+ * @req: connect req if pe session is NULL
+ * @reason: reason of failure, valid only if status is failure
+ * @connect_status: Indicates the staus of the req
+ * @status_code: Protocol Status Code
+ * @is_reassoc: if reassoc resp
+ *
+ * Return: None
+ */
+void lim_cm_send_connect_rsp(struct mac_context *mac_ctx,
+			     struct pe_session *pe_session,
+			     struct cm_vdev_join_req *req,
+			     enum wlan_cm_connect_fail_reason reason,
+			     QDF_STATUS connect_status,
+			     enum wlan_status_code status_code,
+			     bool is_reassoc);
 
 /**
  * lim_prepare_disconnect_done_ind() - Prepares the disconnect done ind message
@@ -155,9 +176,6 @@ void lim_send_sme_deauth_ntf(struct mac_context *mac, tSirMacAddr peerMacAddr,
 void lim_send_sme_disassoc_ind(struct mac_context *, tpDphHashNode, struct pe_session *);
 void lim_send_sme_deauth_ind(struct mac_context *, tpDphHashNode,
 			     struct pe_session *pe_session);
-void lim_send_sme_wm_status_change_ntf(struct mac_context *, tSirSmeStatusChangeCode,
-				       uint32_t *, uint16_t, uint8_t);
-
 /**
  * lim_send_sme_set_context_rsp() - Send set context response to upper layer
  * @mac: Pointer to Global MAC structure

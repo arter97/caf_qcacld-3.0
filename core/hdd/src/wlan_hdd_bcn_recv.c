@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -280,7 +280,7 @@ static int hdd_handle_beacon_reporting_stop_op(struct hdd_context *hdd_ctx,
 		return errno;
 	}
 
-	if (hdd_adapter_is_connected_sta(adapter))
+	if (hdd_cm_is_vdev_associated(adapter))
 		/* Add beacon filter */
 		if (hdd_add_beacon_filter(adapter)) {
 			hdd_err("Beacon filter addition failed");
@@ -330,17 +330,17 @@ static int __wlan_hdd_cfg80211_bcn_rcv_op(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	if (!hdd_conn_is_connected(WLAN_HDD_GET_STATION_CTX_PTR(adapter))) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_err("STA not in connected state");
 		return -EINVAL;
 	}
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SCAN_ID);
 	if (!vdev)
 		return -EINVAL;
 
 	scan_req_status = ucfg_scan_get_pdev_status(wlan_vdev_get_pdev(vdev));
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_SCAN_ID);
 
 	if (scan_req_status != SCAN_NOT_IN_PROGRESS) {
 		hdd_debug("Scan in progress: %d, bcn rpt start OP not allowed",
@@ -486,7 +486,7 @@ void hdd_beacon_recv_pause_indication(hdd_handle_t hdd_handle,
 							    adapter);
 
 		switch (type) {
-		case SCAN_EVENT_TYPE_FOREIGN_CHANNEL:
+		case SCAN_EVENT_TYPE_STARTED:
 			abort_reason =
 		     QCA_WLAN_VENDOR_BEACON_REPORTING_PAUSE_REASON_SCAN_STARTED;
 			break;

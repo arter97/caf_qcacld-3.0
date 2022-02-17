@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,8 +24,12 @@
 #include <linux/pm.h>
 #include <osapi_linux.h>
 
-#if IS_ENABLED(CONFIG_CNSS_UTILS)
+#ifdef CNSS_UTILS
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss_utils.h"
+#else
 #include <net/cnss_utils.h>
+#endif
 #endif
 
 #define PLD_IMAGE_FILE               "athwlan.bin"
@@ -35,11 +39,16 @@
 #define PLD_SETUP_FILE               "athsetup.bin"
 #define PLD_EPPING_FILE              "epping.bin"
 #define PLD_EVICTED_FILE             ""
+#define PLD_MHI_STATE_L0	1
 
 #define TOTAL_DUMP_SIZE         0x00200000
 
-#if IS_ENABLED(CONFIG_WCNSS_MEM_PRE_ALLOC)
+#ifdef CNSS_MEM_PRE_ALLOC
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss_prealloc.h"
+#else
 #include <net/cnss_prealloc.h>
+#endif
 #endif
 
 /**
@@ -143,18 +152,36 @@ struct pld_platform_cap {
  * @PLD_FW_DOWN: firmware is down
  * @PLD_FW_CRASHED: firmware has crashed
  * @PLD_FW_RECOVERY_START: firmware is starting recovery
+ * @PLD_FW_HANG_EVENT: firmware update hang event
+ * @PLD_BUS_EVENT: update bus/link event
  */
 enum pld_uevent {
 	PLD_FW_DOWN,
 	PLD_FW_CRASHED,
 	PLD_FW_RECOVERY_START,
 	PLD_FW_HANG_EVENT,
+	PLD_BUS_EVENT,
+	PLD_SMMU_FAULT,
+};
+
+/**
+ * enum pld_bus_event - PLD bus event types
+ * @PLD_BUS_EVENT_PCIE_LINK_DOWN: PCIe link is down
+ * @PLD_BUS_EVENT_INVALID: invalid event type
+ */
+
+enum pld_bus_event {
+	PLD_BUS_EVENT_PCIE_LINK_DOWN = 0,
+
+	PLD_BUS_EVENT_INVALID = 0xFFFF,
 };
 
 /**
  * struct pld_uevent_data - uevent status received from platform driver
  * @uevent: uevent type
  * @fw_down: FW down info
+ * @hang_data: FW hang data
+ * @bus_event: bus related data
  */
 struct pld_uevent_data {
 	enum pld_uevent uevent;
@@ -166,6 +193,10 @@ struct pld_uevent_data {
 			void *hang_event_data;
 			u16 hang_event_data_len;
 		} hang_data;
+		struct {
+			enum pld_bus_event etype;
+			void *event_data;
+		} bus_data;
 	};
 };
 
@@ -307,7 +338,20 @@ struct pld_device_version {
 	u32 minor_version;
 };
 
+/**
+ * struct pld_dev_mem_info - WLAN device memory info
+ * @start: start address of the memory block
+ * @size: size of the memory block
+ *
+ * pld_dev_mem_info is used to store WLAN device memory info
+ */
+struct pld_dev_mem_info {
+	u64 start;
+	u64 size;
+};
+
 #define PLD_MAX_TIMESTAMP_LEN 32
+#define PLD_MAX_DEV_MEM_NUM 4
 
 /**
  * struct pld_soc_info - SOC information
@@ -320,6 +364,7 @@ struct pld_device_version {
  * @fw_version: FW version
  * @fw_build_timestamp: FW build timestamp
  * @device_version: WLAN device version info
+ * @dev_mem_info: WLAN device memory info
  *
  * pld_soc_info is used to store WLAN SOC information.
  */
@@ -333,6 +378,7 @@ struct pld_soc_info {
 	u32 fw_version;
 	char fw_build_timestamp[PLD_MAX_TIMESTAMP_LEN + 1];
 	struct pld_device_version device_version;
+	struct pld_dev_mem_info dev_mem_info[PLD_MAX_DEV_MEM_NUM];
 };
 
 /**
@@ -470,6 +516,7 @@ void pld_allow_l1(struct device *dev);
 int pld_set_pcie_gen_speed(struct device *dev, u8 pcie_gen_speed);
 
 void pld_is_pci_link_down(struct device *dev);
+void pld_get_bus_reg_dump(struct device *dev, uint8_t *buf, uint32_t len);
 int pld_shadow_control(struct device *dev, bool enable);
 void pld_schedule_recovery_work(struct device *dev,
 				enum pld_recovery_reason reason);
@@ -703,6 +750,8 @@ int pld_ce_free_irq(struct device *dev, unsigned int ce_id, void *ctx);
 void pld_enable_irq(struct device *dev, unsigned int ce_id);
 void pld_disable_irq(struct device *dev, unsigned int ce_id);
 int pld_get_soc_info(struct device *dev, struct pld_soc_info *info);
+int pld_get_mhi_state(struct device *dev);
+int pld_is_pci_ep_awake(struct device *dev);
 int pld_get_ce_id(struct device *dev, int irq);
 int pld_get_irq(struct device *dev, int ce_id);
 void pld_lock_pm_sem(struct device *dev);
@@ -743,7 +792,7 @@ unsigned int pld_socinfo_get_serial_number(struct device *dev);
 int pld_is_qmi_disable(struct device *dev);
 int pld_is_fw_down(struct device *dev);
 int pld_force_assert_target(struct device *dev);
-int pld_collect_rddm(struct device *dev);
+int pld_force_collect_target_dump(struct device *dev);
 int pld_qmi_send_get(struct device *dev);
 int pld_qmi_send_put(struct device *dev);
 int pld_qmi_send(struct device *dev, int type, void *cmd,
@@ -846,6 +895,15 @@ void pld_srng_enable_irq(struct device *dev, int irq);
 void pld_srng_disable_irq(struct device *dev, int irq);
 
 /**
+ * pld_srng_disable_irq_sync() - Synchronouus disable IRQ for SRNG
+ * @dev: device
+ * @irq: IRQ number
+ *
+ * Return: void
+ */
+void pld_srng_disable_irq_sync(struct device *dev, int irq);
+
+/**
  * pld_pci_read_config_word() - Read PCI config
  * @pdev: pci device
  * @offset: Config space offset
@@ -919,7 +977,7 @@ void pld_thermal_unregister(struct device *dev, int mon_id);
 int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 			  int mon_id);
 
-#if IS_ENABLED(CONFIG_WCNSS_MEM_PRE_ALLOC) && defined(FEATURE_SKB_PRE_ALLOC)
+#if defined(CNSS_MEM_PRE_ALLOC) && defined(FEATURE_SKB_PRE_ALLOC)
 
 /**
  * pld_nbuf_pre_alloc() - get allocated nbuf from platform driver.
@@ -986,6 +1044,11 @@ static inline void pfrm_enable_irq(struct device *dev, int irq)
 static inline void pfrm_disable_irq_nosync(struct device *dev, int irq)
 {
 	pld_srng_disable_irq(dev, irq);
+}
+
+static inline void pfrm_disable_irq(struct device *dev, int irq)
+{
+	pld_srng_disable_irq_sync(dev, irq);
 }
 
 static inline int pfrm_read_config_word(struct pci_dev *pdev, int offset,

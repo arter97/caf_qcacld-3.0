@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,78 +40,30 @@ QDF_STATUS csr_roam_start_ndi(struct mac_context *mac_ctx, uint32_t session,
 			struct csr_roam_profile *profile)
 {
 	QDF_STATUS status;
-	struct bss_config_param bss_cfg = {0};
+	struct bss_config_param bss_cfg;
 
+	qdf_mem_zero(&bss_cfg, sizeof(struct bss_config_param));
 	/* Build BSS configuration from profile */
 	status = csr_roam_prepare_bss_config_from_profile(mac_ctx, profile,
-						    &bss_cfg, NULL);
+							  session,
+							  &bss_cfg);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		mac_ctx->roam.roamSession[session].bssParams.uCfgDot11Mode
 			= bss_cfg.uCfgDot11Mode;
 		/* Copy profile parameters to PE session */
-		csr_roam_prepare_bss_params(mac_ctx, session, profile, NULL,
-			&bss_cfg, NULL);
+		csr_roam_prepare_bss_params(mac_ctx, session, profile,
+					    &bss_cfg);
 		/*
 		 * Following routine will eventually call
 		 * csrRoamIssueStartBss through csrRoamCcmCfgSetCallback
 		 */
 		status = csr_roam_set_bss_config_cfg(mac_ctx, session, profile,
-						NULL, &bss_cfg, NULL, false);
+						     &bss_cfg);
 	}
 
 	sme_debug("profile config validity: %d", status);
 
 	return status;
-}
-
-/**
- * csr_roam_save_ndi_connected_info() - Save connected profile parameters
- * @mac_ctx: Global MAC context
- * @session_id: Session ID
- * @roam_profile: Profile given for starting BSS
- * @bssdesc: BSS description from start BSS response
- *
- * Saves NDI profile parameters into session's connected profile.
- *
- * Return: None
- */
-void csr_roam_save_ndi_connected_info(struct mac_context *mac_ctx,
-				      uint32_t session_id,
-				      struct csr_roam_profile *roam_profile,
-				      struct bss_description *bssdesc)
-{
-	struct csr_roam_session *roam_session;
-	tCsrRoamConnectedProfile *connect_profile;
-
-	roam_session = CSR_GET_SESSION(mac_ctx, session_id);
-	if (!roam_session) {
-		sme_err("session %d not found", session_id);
-		return;
-	}
-
-	connect_profile = &roam_session->connectedProfile;
-	qdf_mem_zero(connect_profile, sizeof(*connect_profile));
-	connect_profile->AuthType = roam_profile->negotiatedAuthType;
-		connect_profile->AuthInfo = roam_profile->AuthType;
-	connect_profile->EncryptionType =
-		roam_profile->negotiatedUCEncryptionType;
-		connect_profile->EncryptionInfo = roam_profile->EncryptionType;
-	connect_profile->mcEncryptionType =
-		roam_profile->negotiatedMCEncryptionType;
-		connect_profile->mcEncryptionInfo =
-			roam_profile->mcEncryptionType;
-	connect_profile->BSSType = roam_profile->BSSType;
-	connect_profile->modifyProfileFields.uapsd_mask =
-		roam_profile->uapsd_mask;
-	connect_profile->op_freq = bssdesc->chan_freq;
-	connect_profile->beaconInterval = 0;
-	qdf_mem_copy(&connect_profile->Keys, &roam_profile->Keys,
-		     sizeof(roam_profile->Keys));
-	csr_get_bss_id_bss_desc(bssdesc, &connect_profile->bssid);
-	connect_profile->SSID.length = 0;
-	csr_free_connect_bss_desc(mac_ctx, session_id);
-	connect_profile->qap = false;
-	connect_profile->qosConnection = false;
 }
 
 /**

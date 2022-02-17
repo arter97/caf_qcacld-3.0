@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -23,7 +23,11 @@
 #include <linux/slab.h>
 
 #ifdef CONFIG_PLD_PCIE_CNSS
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss2.h"
+#else
 #include <net/cnss2.h>
+#endif
 #endif
 
 #include "pld_internal.h"
@@ -266,6 +270,33 @@ out:
 	return;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+/**
+ * pld_bus_event_type_convert() - Convert enum cnss_bus_event_type
+ *		to enum pld_bus_event
+ * @etype: enum cnss_bus_event_type value
+ *
+ * This function will convert enum cnss_bus_event_type to
+ * enum pld_bus_event.
+ *
+ * Return: enum pld_bus_event
+ */
+static inline
+enum pld_bus_event pld_bus_event_type_convert(enum cnss_bus_event_type etype)
+{
+	enum pld_bus_event pld_etype = PLD_BUS_EVENT_INVALID;
+
+	switch (etype) {
+	case BUS_EVENT_PCI_LINK_DOWN:
+		pld_etype = PLD_BUS_EVENT_PCIE_LINK_DOWN;
+		break;
+	default:
+		break;
+	}
+
+	return pld_etype;
+}
+
 /**
  * pld_pcie_update_event() - update wlan driver status callback function
  * @pdev: PCIE device
@@ -274,9 +305,8 @@ out:
  * This function will be called when platform driver wants to update wlan
  * driver's status.
  *
- * Return: void
+ * Return: 0 for success, non zero for error code
  */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 static int pld_pcie_update_event(struct pci_dev *pdev,
 				 struct cnss_uevent_data *uevent_data)
 {
@@ -299,14 +329,28 @@ static int pld_pcie_update_event(struct pci_dev *pdev,
 		data.hang_data.hang_event_data_len =
 					hang_event->hang_event_data_len;
 		break;
+	case CNSS_BUS_EVENT:
+	{
+		struct cnss_bus_event *bus_evt = uevent_data->data;
+
+		if (!bus_evt)
+			return -EINVAL;
+
+		data.uevent = PLD_BUS_EVENT;
+
+		/* Process uevent_data->data if any */
+		data.bus_data.etype =
+			pld_bus_event_type_convert(bus_evt->etype);
+		data.bus_data.event_data = bus_evt->event_data;
+		break;
+	}
 	default:
-		goto out;
+		return 0;
 	}
 
 	if (pld_context->ops->uevent)
 		pld_context->ops->uevent(&pdev->dev, &data);
 
-out:
 	return 0;
 }
 #endif
@@ -588,6 +632,8 @@ static struct pci_device_id pld_pcie_id_table[] = {
 	{ 0x17cb, 0x1101, PCI_ANY_ID, PCI_ANY_ID },
 #elif defined(QCA_WIFI_QCA6490)
 	{ 0x17cb, 0x1103, PCI_ANY_ID, PCI_ANY_ID },
+#elif defined(QCA_WIFI_WCN7850)
+	{ 0x17cb, 0x1107, PCI_ANY_ID, PCI_ANY_ID },
 #elif defined(QCN7605_SUPPORT)
 	{ 0x17cb, 0x1102, PCI_ANY_ID, PCI_ANY_ID },
 #else
@@ -864,7 +910,7 @@ int pld_pcie_get_platform_cap(struct device *dev, struct pld_platform_cap *cap)
  */
 int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 {
-	int ret = 0;
+	int ret = 0, i;
 	struct cnss_soc_info cnss_info = {0};
 
 	if (!info)
@@ -891,6 +937,10 @@ int pld_pcie_get_soc_info(struct device *dev, struct pld_soc_info *info)
 		cnss_info.device_version.major_version;
 	info->device_version.minor_version =
 		cnss_info.device_version.minor_version;
+	for (i = 0; i < PLD_MAX_DEV_MEM_NUM; i++) {
+		info->dev_mem_info[i].start = cnss_info.dev_mem_info[i].start;
+		info->dev_mem_info[i].size = cnss_info.dev_mem_info[i].size;
+	}
 
 	return 0;
 }

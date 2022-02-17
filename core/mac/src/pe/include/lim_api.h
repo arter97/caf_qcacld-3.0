@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -146,7 +146,6 @@ QDF_STATUS lim_start(struct mac_context *mac);
 QDF_STATUS pe_start(struct mac_context *mac);
 void pe_stop(struct mac_context *mac);
 
-#ifdef WLAN_FEATURE_11W
 /**
  * lim_stop_pmfcomeback_timer() - stop pmf comeback timer
  * @session: Pointer to PE session
@@ -154,11 +153,6 @@ void pe_stop(struct mac_context *mac);
  * Return: None
  */
 void lim_stop_pmfcomeback_timer(struct pe_session *session);
-#else
-static inline void lim_stop_pmfcomeback_timer(struct pe_session *session)
-{
-}
-#endif
 
 /**
  * pe_register_mgmt_rx_frm_callback() - registers callback for receiving
@@ -251,25 +245,6 @@ void lim_trigger_sta_deletion(struct mac_context *mac, tpDphHashNode sta,
 void lim_send_sme_tdls_del_sta_ind(struct mac_context *mac, tpDphHashNode sta,
 				   struct pe_session *pe_session,
 				   uint16_t reasonCode);
-
-/**
- * lim_set_tdls_flags() - update tdls flags based on newer STA connection
- * information
- * @roam_sync_ind_ptr: pointer to roam offload structure
- * @ft_session_ptr: pointer to PE session
- *
- * Set TDLS flags as per new STA connection capabilities.
- *
- * Return: None
- */
-void lim_set_tdls_flags(struct roam_offload_synch_ind *roam_sync_ind_ptr,
-			struct pe_session *ft_session_ptr);
-#else
-static inline
-void lim_set_tdls_flags(struct roam_offload_synch_ind *roam_sync_ind_ptr,
-			struct pe_session *ft_session_ptr)
-{
-}
 #endif
 
 /* / Function that checks for change in AP's capabilties on STA */
@@ -305,8 +280,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
  * ROAM SYNCH event is received from firmware
  * @mac_ctx: global mac context
  * @roam_sync_ind_ptr: Structure with roam synch parameters
- * @bss_desc_ptr: bss_description pointer for new bss to which the firmware has
- * started roaming
+ * @ie_len: ie length
  * @reason: Operation to be done by the callback
  *
  * This is a PE level callback called from WMA to complete the roam synch
@@ -318,7 +292,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 QDF_STATUS
 pe_roam_synch_callback(struct mac_context *mac_ctx,
 		       struct roam_offload_synch_ind *roam_sync_ind_ptr,
-		       struct bss_description *bss_desc_ptr,
+		       uint16_t ie_len,
 		       enum sir_roam_op_code reason);
 
 void
@@ -347,7 +321,7 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 static inline QDF_STATUS
 pe_roam_synch_callback(struct mac_context *mac_ctx,
 		       struct roam_offload_synch_ind *roam_sync_ind_ptr,
-		       struct bss_description *bss_desc_ptr,
+		       uint16_t ie_len,
 		       enum sir_roam_op_code reason)
 {
 	return QDF_STATUS_E_NOSUPPORT;
@@ -464,15 +438,6 @@ void __lim_process_sme_assoc_cnf_new(struct mac_context *, uint32_t, uint32_t *)
  * Return: None
  */
 void lim_process_sme_addts_rsp_timeout(struct mac_context *mac, uint32_t param);
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-void lim_fill_join_rsp_ht_caps(struct pe_session *session,
-			       struct join_rsp *rsp);
-#else
-static inline
-void lim_fill_join_rsp_ht_caps(struct pe_session *session,
-			       struct join_rsp *rsp)
-{}
-#endif
 QDF_STATUS lim_update_ext_cap_ie(struct mac_context *mac_ctx, uint8_t *ie_data,
 				 uint8_t *local_ie_buf, uint16_t *local_ie_len,
 				 struct pe_session *session);
@@ -499,6 +464,24 @@ void lim_handle_sap_beacon(struct wlan_objmgr_pdev *pdev,
  * Return: AKM type
  */
 enum ani_akm_type lim_translate_rsn_oui_to_akm_type(uint8_t auth_suite[4]);
+
+#ifdef WLAN_SUPPORT_TWT
+/**
+ * lim_fill_roamed_peer_twt_caps() - Update Peer TWT capabilities
+ * @mac_ctx: Pointer to mac context
+ * @vdev_id: vdev id
+ * @roam_synch: Pointer to roam synch indication
+ *
+ * Return: None
+ */
+void lim_fill_roamed_peer_twt_caps(struct mac_context *mac_ctx, uint8_t vdev_id,
+				   struct roam_offload_synch_ind *roam_synch);
+#else
+static inline
+void lim_fill_roamed_peer_twt_caps(struct mac_context *mac_ctx, uint8_t vdev_id,
+				   struct roam_offload_synch_ind *roam_synch)
+{}
+#endif
 
 /************************************************************/
 #endif /* __LIM_API_H */

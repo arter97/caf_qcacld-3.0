@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -37,11 +37,17 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_hdd_sta_info.h"
 #include "wlan_hdd_object_manager.h"
+#include "wlan_ipa_ucfg_api.h"
 
 #include <cdp_txrx_handle.h>
 #include <cdp_txrx_stats_struct.h>
 #include <cdp_txrx_peer_ops.h>
 #include <cdp_txrx_host_stats.h>
+#include <osif_cm_util.h>
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+#include <cdp_txrx_ctrl.h>
+#endif
 
 /*
  * define short names for the global vendor params
@@ -68,6 +74,8 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BEACON_MIC_ERROR_COUNT
 #define STA_INFO_BEACON_REPLAY_COUNT \
 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_BEACON_REPLAY_COUNT
+#define STA_INFO_CONNECT_FAIL_REASON_CODE \
+	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_CONNECT_FAIL_REASON_CODE
 #define STA_INFO_MAX \
 	QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_MAX
 
@@ -160,13 +168,13 @@ static int hdd_get_sta_congestion(struct hdd_adapter *adapter,
 	struct cca_stats cca_stats;
 	struct wlan_objmgr_vdev *vdev;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
 	if (!vdev) {
 		hdd_err("vdev is NULL");
 		return -EINVAL;
 	}
 	status = ucfg_mc_cp_stats_cca_stats_get(vdev, &cca_stats);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	if (QDF_IS_STATUS_ERROR(status))
 		return -EINVAL;
 
@@ -292,6 +300,33 @@ static int hdd_convert_auth_type(uint32_t auth_type)
 	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
 		ret_val = QCA_WLAN_AUTH_TYPE_FT_SUITEB_EAP_SHA384;
 		break;
+	case eCSR_AUTH_TYPE_SAE:
+		ret_val = QCA_WLAN_AUTH_TYPE_SAE;
+		break;
+	case eCSR_AUTH_TYPE_FILS_SHA256:
+		ret_val = QCA_WLAN_AUTH_TYPE_FILS_SHA256;
+		break;
+	case eCSR_AUTH_TYPE_FILS_SHA384:
+		ret_val = QCA_WLAN_AUTH_TYPE_FILS_SHA384;
+		break;
+	case eCSR_AUTH_TYPE_FT_FILS_SHA256:
+		ret_val = QCA_WLAN_AUTH_TYPE_FT_FILS_SHA256;
+		break;
+	case eCSR_AUTH_TYPE_FT_FILS_SHA384:
+		ret_val = QCA_WLAN_AUTH_TYPE_FT_FILS_SHA384;
+		break;
+	case eCSR_AUTH_TYPE_DPP_RSN:
+		ret_val = QCA_WLAN_AUTH_TYPE_DPP_RSN;
+		break;
+	case eCSR_AUTH_TYPE_OWE:
+		ret_val = QCA_WLAN_AUTH_TYPE_OWE;
+		break;
+	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA256:
+		ret_val = QCA_WLAN_AUTH_TYPE_SUITEB_EAP_SHA256;
+		break;
+	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA384:
+		ret_val = QCA_WLAN_AUTH_TYPE_SUITEB_EAP_SHA384;
+		break;
 	case eCSR_NUM_OF_SUPPORT_AUTH_TYPE:
 	case eCSR_AUTH_TYPE_FAILED:
 	case eCSR_AUTH_TYPE_NONE:
@@ -346,11 +381,12 @@ static int hdd_convert_dot11mode(uint32_t dot11mode)
  * Return: Success(0) or reason code for failure
  */
 static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
-				  struct hdd_station_ctx *hdd_sta_ctx,
+				  struct hdd_adapter *adapter,
 				  int idx)
 {
 	struct nlattr *nla_attr;
 	uint32_t bitrate, bitrate_compat;
+	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	nla_attr = nla_nest_start(skb, idx);
 	if (!nla_attr) {
@@ -359,12 +395,12 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 	}
 
 	/* cfg80211_calculate_bitrate will return 0 for mcs >= 32 */
-	if (hdd_conn_is_connected(hdd_sta_ctx))
+	if (hdd_cm_is_vdev_associated(adapter))
 		bitrate = cfg80211_calculate_bitrate(
-				&hdd_sta_ctx->cache_conn_info.max_tx_bitrate);
+				&sta_ctx->cache_conn_info.max_tx_bitrate);
 	else
 		bitrate = cfg80211_calculate_bitrate(
-					&hdd_sta_ctx->cache_conn_info.txrate);
+					&sta_ctx->cache_conn_info.txrate);
 	/* report 16-bit bitrate only if we can */
 	bitrate_compat = bitrate < (1UL << 16) ? bitrate : 0;
 
@@ -388,11 +424,17 @@ static int32_t hdd_add_tx_bitrate(struct sk_buff *skb,
 	}
 
 	if (nla_put_u8(skb, NL80211_RATE_INFO_VHT_NSS,
-		       hdd_sta_ctx->cache_conn_info.txrate.nss)) {
+		      sta_ctx->cache_conn_info.txrate.nss)) {
 		hdd_err("put fail");
 		goto fail;
 	}
 	nla_nest_end(skb, nla_attr);
+
+	hdd_nofl_debug(
+		"STA Tx rate info:: bitrate:%d, bitrate_compat:%d, NSS:%d",
+		bitrate, bitrate_compat,
+		sta_ctx->cache_conn_info.txrate.nss);
+
 	return 0;
 fail:
 	return -EINVAL;
@@ -416,6 +458,7 @@ static void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 	uint8_t tx_mcs_index, tx_nss = 1;
 	uint16_t my_tx_rate;
 	struct hdd_station_ctx *hdd_sta_ctx;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
@@ -427,15 +470,25 @@ static void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 	my_tx_rate = adapter->hdd_stats.class_a_stat.tx_rate;
 
 	if (!(tx_rate_flags & TX_RATE_LEGACY)) {
-		tx_nss = adapter->hdd_stats.class_a_stat.tx_nss;
-		if (tx_nss > 1 &&
-		    policy_mgr_is_current_hwmode_dbs(hdd_ctx->psoc) &&
-		    !policy_mgr_is_hw_dbs_2x2_capable(hdd_ctx->psoc)) {
-			hdd_debug("Hw mode is DBS, Reduce nss(%d) to 1",
-				  tx_nss);
-			tx_nss--;
+		vdev = hdd_objmgr_get_vdev_by_user(adapter,
+						   WLAN_OSIF_STATS_ID);
+		if (vdev) {
+			/*
+			 * Take static NSS for reporting max rates.
+			 * NSS from FW is not reliable as it changes
+			 * as per the environment quality.
+			 */
+			tx_nss = wlan_vdev_mlme_get_nss(vdev);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
+		} else {
+			tx_nss = adapter->hdd_stats.class_a_stat.tx_nss;
 		}
+		hdd_check_and_update_nss(hdd_ctx, &tx_nss, NULL);
+
+		if (tx_mcs_index == INVALID_MCS_IDX)
+			tx_mcs_index = 0;
 	}
+
 	if (hdd_report_max_rate(adapter, hdd_ctx->mac_handle, &sinfo.txrate,
 				sinfo.signal, tx_rate_flags, tx_mcs_index,
 				my_tx_rate, tx_nss)) {
@@ -479,10 +532,10 @@ static int32_t hdd_add_sta_info(struct sk_buff *skb,
 		hdd_err("put fail");
 		goto fail;
 	}
-	if (hdd_conn_is_connected(hdd_sta_ctx))
+	if (hdd_cm_is_vdev_associated(adapter))
 		hdd_get_max_tx_bitrate(hdd_ctx, adapter);
 
-	if (hdd_add_tx_bitrate(skb, hdd_sta_ctx, NL80211_STA_INFO_TX_BITRATE)) {
+	if (hdd_add_tx_bitrate(skb, adapter, NL80211_STA_INFO_TX_BITRATE)) {
 		hdd_err("hdd_add_tx_bitrate failed");
 		goto fail;
 	}
@@ -591,24 +644,36 @@ hdd_add_ap_standard_info(struct sk_buff *skb,
 			 struct hdd_station_ctx *hdd_sta_ctx, int idx)
 {
 	struct nlattr *nla_attr;
+	struct hdd_connection_info *conn_info;
 
+	conn_info = &hdd_sta_ctx->cache_conn_info;
 	nla_attr = nla_nest_start(skb, idx);
 	if (!nla_attr)
 		goto fail;
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_present)
+	if (conn_info->conn_flag.vht_present) {
 		if (nla_put(skb, NL80211_ATTR_VHT_CAPABILITY,
-			    sizeof(hdd_sta_ctx->cache_conn_info.vht_caps),
-			    &hdd_sta_ctx->cache_conn_info.vht_caps)) {
+			    sizeof(conn_info->vht_caps),
+			    &conn_info->vht_caps)) {
 			hdd_err("put fail");
 			goto fail;
 		}
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_present)
+		hdd_nofl_debug("STA VHT capabilities:");
+		qdf_trace_hex_dump(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   (uint8_t *)&conn_info->vht_caps,
+				   sizeof(conn_info->vht_caps));
+	}
+	if (conn_info->conn_flag.ht_present) {
 		if (nla_put(skb, NL80211_ATTR_HT_CAPABILITY,
-			    sizeof(hdd_sta_ctx->cache_conn_info.ht_caps),
-			    &hdd_sta_ctx->cache_conn_info.ht_caps)) {
+			    sizeof(conn_info->ht_caps),
+			    &conn_info->ht_caps)) {
 			hdd_err("put fail");
 			goto fail;
 		}
+		hdd_nofl_debug("STA HT capabilities:");
+		qdf_trace_hex_dump(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   (uint8_t *)&conn_info->ht_caps,
+				   sizeof(conn_info->ht_caps));
+	}
 	nla_nest_end(skb, nla_attr);
 	return 0;
 fail:
@@ -617,20 +682,25 @@ fail:
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)) && \
      defined(WLAN_FEATURE_11AX)
-static int32_t hdd_add_he_oper_info(
-				struct sk_buff *skb,
-				struct hdd_station_ctx *hdd_sta_ctx)
+static int32_t hdd_add_he_oper_info(struct sk_buff *skb,
+				    struct hdd_station_ctx *hdd_sta_ctx)
 {
 	int32_t ret = 0;
+	struct hdd_connection_info *conn_info;
 
-	if (!hdd_sta_ctx->cache_conn_info.he_oper_len ||
-	    !hdd_sta_ctx->cache_conn_info.he_operation)
+	conn_info = &hdd_sta_ctx->cache_conn_info;
+	if (!conn_info->he_oper_len || !conn_info->he_operation)
 		return ret;
 
-	if (nla_put(skb, HE_OPERATION,
-		    hdd_sta_ctx->cache_conn_info.he_oper_len,
-		     hdd_sta_ctx->cache_conn_info.he_operation))
+	if (nla_put(skb, HE_OPERATION, conn_info->he_oper_len,
+		    conn_info->he_operation)) {
 		ret = -EINVAL;
+	} else {
+		hdd_nofl_debug("STA HE operation:");
+		qdf_trace_hex_dump(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   (uint8_t *)&conn_info->he_operation,
+				   conn_info->he_oper_len);
+	}
 
 	qdf_mem_free(hdd_sta_ctx->cache_conn_info.he_operation);
 	hdd_sta_ctx->cache_conn_info.he_operation = NULL;
@@ -673,6 +743,11 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+	if (hdd_cm_is_vdev_connected(adapter)) {
+		hdd_err("Station is connected, command is not supported");
+		return -EINVAL;
+	}
 
 	nl_buf_len = NLMSG_HDRLEN;
 	nl_buf_len += sizeof(hdd_sta_ctx->
@@ -739,14 +814,20 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 		hdd_err("put fail");
 		goto fail;
 	}
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_op_present)
+	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_op_present) {
 		if (nla_put(skb, HT_OPERATION,
 			    (sizeof(hdd_sta_ctx->cache_conn_info.ht_operation)),
 			    &hdd_sta_ctx->cache_conn_info.ht_operation)) {
 			hdd_err("put fail");
 			goto fail;
 		}
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_op_present)
+		hdd_nofl_debug("STA HT operation:");
+		qdf_trace_hex_dump(
+			QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			(uint8_t *)&hdd_sta_ctx->cache_conn_info.ht_operation,
+			sizeof(hdd_sta_ctx->cache_conn_info.ht_operation));
+	}
+	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_op_present) {
 		if (nla_put(skb, VHT_OPERATION,
 			    (sizeof(hdd_sta_ctx->
 					cache_conn_info.vht_operation)),
@@ -754,11 +835,17 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 			hdd_err("put fail");
 			goto fail;
 		}
+		hdd_nofl_debug("STA VHT operation:");
+		qdf_trace_hex_dump(
+			QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			(uint8_t *)&hdd_sta_ctx->cache_conn_info.vht_operation,
+			sizeof(hdd_sta_ctx->cache_conn_info.vht_operation));
+	}
 	if (hdd_add_he_oper_info(skb, hdd_sta_ctx)) {
 		hdd_err("put fail");
 		goto fail;
 	}
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.hs20_present)
+	if (hdd_sta_ctx->cache_conn_info.conn_flag.hs20_present) {
 		if (nla_put(skb, AP_INFO_HS20_INDICATION,
 			    (sizeof(hdd_sta_ctx->cache_conn_info.hs20vendor_ie)
 			     - 1),
@@ -766,6 +853,12 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 			hdd_err("put fail");
 			goto fail;
 		}
+		hdd_nofl_debug("STA hs20 vendor IE:");
+		qdf_trace_hex_dump(
+			QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			(uint8_t *)(tmp_hs20 + 1),
+			sizeof(hdd_sta_ctx->cache_conn_info.hs20vendor_ie) - 1);
+	}
 
 	if (nla_put_u32(skb, DISCONNECT_REASON,
 			adapter->last_disconnect_reason)) {
@@ -779,8 +872,26 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 				skb_tailroom(skb), ie_len, nl_buf_len);
 			goto fail;
 		}
+
+		hdd_nofl_debug("Beacon IEs len: %u", ie_len);
+
 		qdf_mem_free(ies);
 	}
+
+	hdd_nofl_debug(
+		"STA Info:: SSID:%s, BSSID:" QDF_MAC_ADDR_FMT ", freq:%d, "
+		"Noise:%d, signal:%d, roam_count:%d, last_auth_type:%d, "
+		"dot11mode:%d, disconnect_reason:%d, ",
+		hdd_sta_ctx->cache_conn_info.last_ssid.SSID.ssId,
+		QDF_MAC_ADDR_REF(hdd_sta_ctx->cache_conn_info.bssid.bytes),
+		hdd_sta_ctx->cache_conn_info.chan_freq,
+		(hdd_sta_ctx->cache_conn_info.noise + 100),
+		(hdd_sta_ctx->cache_conn_info.signal + 100),
+		hdd_sta_ctx->cache_conn_info.roam_count,
+		hdd_convert_auth_type(
+			hdd_sta_ctx->cache_conn_info.last_auth_type),
+		hdd_convert_dot11mode(hdd_sta_ctx->cache_conn_info.dot11mode),
+		adapter->last_disconnect_reason);
 
 	return cfg80211_vendor_cmd_reply(skb);
 fail:
@@ -844,6 +955,7 @@ static int32_t hdd_add_survey_info_sap(struct sk_buff *skb,
 		goto fail;
 	}
 	nla_nest_end(skb, nla_attr);
+	hdd_nofl_debug("Remote STA freq: %d", stainfo->freq);
 	return 0;
 fail:
 	return -EINVAL;
@@ -893,6 +1005,7 @@ static int hdd_add_tx_bitrate_sap(struct sk_buff *skb,
 		goto fail;
 	}
 	nla_nest_end(skb, nla_attr);
+	hdd_nofl_debug("Remote STA VHT NSS: %d", stainfo->nss);
 	return 0;
 fail:
 	return -EINVAL;
@@ -941,6 +1054,7 @@ static int32_t hdd_add_sta_info_sap(struct sk_buff *skb, int8_t rssi,
 		goto fail;
 
 	nla_nest_end(skb, nla_attr);
+	hdd_nofl_debug("Remote STA RSSI: %d", rssi - HDD_NOISE_FLOOR_DBM);
 	return 0;
 fail:
 	return -EINVAL;
@@ -1053,6 +1167,9 @@ static int hdd_add_ap_standard_info_sap(struct sk_buff *skb,
 			hdd_err("put fail");
 			goto fail;
 		}
+
+		hdd_nofl_debug("Remote STA VHT capabilities len:%u",
+			       (uint32_t)sizeof(stainfo->vht_caps));
 	}
 	if (stainfo->ht_present) {
 		if (nla_put(skb, NL80211_ATTR_HT_CAPABILITY,
@@ -1061,6 +1178,9 @@ static int hdd_add_ap_standard_info_sap(struct sk_buff *skb,
 			hdd_err("put fail");
 			goto fail;
 		}
+
+		hdd_nofl_debug("Remote STA HT capabilities len:%u",
+			       (uint32_t)sizeof(stainfo->ht_caps));
 	}
 	nla_nest_end(skb, nla_attr);
 	return 0;
@@ -1186,13 +1306,15 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 
 	if (!(stainfo->rx_mc_bc_cnt & HDD_STATION_INFO_RX_MC_BC_COUNT)) {
 		hdd_debug("rx mc bc count is not supported by FW");
-	}
-
-	else if (nla_put_u32(skb, REMOTE_RX_BC_MC_COUNT,
-			     (stainfo->rx_mc_bc_cnt &
-			      (~HDD_STATION_INFO_RX_MC_BC_COUNT)))) {
+	} else if (nla_put_u32(skb, REMOTE_RX_BC_MC_COUNT,
+			       (stainfo->rx_mc_bc_cnt &
+			       (~HDD_STATION_INFO_RX_MC_BC_COUNT)))) {
 		hdd_err("rx mc bc put fail");
 		goto fail;
+	} else {
+		hdd_nofl_debug("Remote STA RX mc_bc_count: %d",
+			       (stainfo->rx_mc_bc_cnt &
+			       (~HDD_STATION_INFO_RX_MC_BC_COUNT)));
 	}
 
 	/* Currently rx_retry count is not supported */
@@ -1202,15 +1324,29 @@ static int hdd_get_cached_station_remote(struct hdd_context *hdd_ctx,
 			hdd_err("rx retry count put fail");
 			goto fail;
 		}
+		hdd_nofl_debug("Remote STA retry count: %d",
+			       stainfo->rx_retry_cnt);
 	}
 
 	if (stainfo->assoc_req_ies.len) {
 		if (nla_put(skb, ASSOC_REQ_IES, stainfo->assoc_req_ies.len,
-			    stainfo->assoc_req_ies.data)) {
+			    stainfo->assoc_req_ies.ptr)) {
 			hdd_err("Failed to put assoc req IEs");
 			goto fail;
 		}
+		hdd_nofl_debug("Remote STA assoc req IE len: %d",
+			       stainfo->assoc_req_ies.len);
 	}
+
+	hdd_nofl_debug(
+		"Remote STA Info:: freq:%d, RSSI:%d, Tx NSS:%d, Reason code:%d,"
+		"capability:0x%x, Supported mode:%d, chan_width:%d, Tx rate:%d,"
+		"Rx rate:%d, dot11mode:%d",
+		stainfo->freq, stainfo->rssi - HDD_NOISE_FLOOR_DBM,
+		stainfo->nss, stainfo->reason_code, stainfo->capability,
+		stainfo->support_mode, channel_width, stainfo->tx_rate,
+		stainfo->rx_rate, stainfo->dot11_mode);
+
 	hdd_sta_info_detach(&adapter->cache_sta_info_list, &stainfo);
 	hdd_put_sta_info_ref(&adapter->cache_sta_info_list, &stainfo, true,
 			     STA_INFO_GET_CACHED_STATION_REMOTE);
@@ -1501,7 +1637,12 @@ int32_t hdd_cfg80211_get_station_cmd(struct wiphy *wiphy,
  * @adapter: pointer to adapter
  * @stainfo: station information
  *
- * This function gets peer statistics information
+ * This function gets peer statistics information. If IPA is
+ * enabled the Rx bcast/mcast count is updated in the
+ * exception callback invoked by the IPA driver. In case of
+ * back pressure the packets may get routed to the sw path and
+ * where eventually the peer mcast/bcast pkt counts are updated in
+ * dp rx process handling.
  *
  * Return : 0 on success and errno on failure
  */
@@ -1522,12 +1663,17 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 					 stainfo->sta_mac.bytes, peer_stats);
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("cdp_host_get_peer_stats failed");
+		qdf_mem_free(peer_stats);
 		return -EINVAL;
 	}
 
 	stainfo->rx_retry_cnt = peer_stats->rx.rx_retries;
-	stainfo->rx_mc_bc_cnt = peer_stats->rx.multicast.num +
-				peer_stats->rx.bcast.num;
+	if (!ucfg_ipa_is_enabled())
+		stainfo->rx_mc_bc_cnt = peer_stats->rx.multicast.num +
+					peer_stats->rx.bcast.num;
+	else
+		stainfo->rx_mc_bc_cnt += peer_stats->rx.multicast.num +
+					 peer_stats->rx.bcast.num;
 
 	qdf_mem_free(peer_stats);
 	peer_stats = NULL;
@@ -1610,7 +1756,16 @@ hdd_get_pmf_bcn_protect_stats_len(struct hdd_adapter *adapter)
 		return 0;
 
 	/* 4 pmf becon protect counters each of 32 bit */
-	return nla_attr_size(sizeof(uint32_t) * 4);
+	return nla_total_size(sizeof(uint32_t)) * 4;
+}
+
+static uint32_t
+hdd_get_connect_fail_reason_code_len(struct hdd_adapter *adapter)
+{
+	if (adapter->connect_req_status == STATUS_SUCCESS)
+		return 0;
+
+	return nla_total_size(sizeof(uint32_t));
 }
 
 /**
@@ -1637,6 +1792,201 @@ static int hdd_add_pmf_bcn_protect_stats(struct sk_buff *skb,
 			adapter->hdd_stats.bcn_protect_stats.bcn_mic_fail_cnt) ||
 	    nla_put_u32(skb, STA_INFO_BEACON_REPLAY_COUNT,
 			adapter->hdd_stats.bcn_protect_stats.bcn_replay_cnt)) {
+		hdd_err("put fail");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+#ifdef WLAN_FEATURE_BIG_DATA_STATS
+/**
+ * hdd_get_big_data_stats_len - get data length used in
+ * hdd_big_data_pack_resp_nlmsg()
+ * @adapter: hdd adapter
+ *
+ * This function calculates the data length used in
+ * hdd_big_data_pack_resp_nlmsg()
+ *
+ * Return: total data length used in hdd_big_data_pack_resp_nlmsg()
+ */
+static uint32_t
+hdd_get_big_data_stats_len(struct hdd_adapter *adapter)
+{
+	uint32_t len;
+
+	len =
+	nla_total_size(sizeof(adapter->big_data_stats.last_tx_data_rate_kbps)) +
+	nla_total_size(sizeof(adapter->big_data_stats.target_power_ofdm)) +
+	nla_total_size(sizeof(adapter->big_data_stats.target_power_dsss)) +
+	nla_total_size(sizeof(adapter->big_data_stats.last_tx_data_rix)) +
+	nla_total_size(sizeof(adapter->big_data_stats.tsf_out_of_sync)) +
+	nla_total_size(sizeof(adapter->big_data_stats.ani_level)) +
+	nla_total_size(sizeof(adapter->big_data_stats.last_data_tx_pwr));
+
+	/** Add len of roam params **/
+	len += nla_total_size(sizeof(uint32_t)) * 3;
+
+	return len;
+}
+
+/**
+ * hdd_big_data_pack_resp_nlmsg() - pack big data nl resp msg
+ * @skb: pointer to response skb buffer
+ * @adapter: adapter holding big data stats
+ * @hdd_ctx: hdd context
+ *
+ * This function adds big data stats in response.
+ *
+ * Return: 0 on success
+ */
+static int
+hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
+			     struct hdd_adapter *adapter,
+			     struct hdd_context *hdd_ctx)
+{
+	struct hdd_station_ctx *hdd_sta_ctx;
+
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	if (!hdd_sta_ctx) {
+		hdd_err("Invalid station context");
+		return -EINVAL;
+	}
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_LATEST_TX_RATE,
+			adapter->big_data_stats.last_tx_data_rate_kbps)){
+		hdd_err("latest tx rate put fail");
+		return -EINVAL;
+	}
+
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(hdd_sta_ctx->cache_conn_info.chan_freq)) {
+		if (nla_put_u32(
+			skb,
+			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TARGET_POWER_5G_6MBPS,
+			adapter->big_data_stats.target_power_ofdm)){
+			hdd_err("5G ofdm power put fail");
+			return -EINVAL;
+		}
+	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(
+				hdd_sta_ctx->cache_conn_info.chan_freq)){
+		if (nla_put_u32(
+		       skb,
+		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TARGET_POWER_24G_6MBPS,
+		       adapter->big_data_stats.target_power_ofdm)){
+			hdd_err("2.4G ofdm power put fail");
+			return -EINVAL;
+		}
+		if (nla_put_u32(
+		       skb,
+		       QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TARGET_POWER_24G_1MBPS,
+		       adapter->big_data_stats.target_power_dsss)){
+			hdd_err("target power dsss put fail");
+			return -EINVAL;
+		}
+	}
+
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_LATEST_RIX,
+			adapter->big_data_stats.last_tx_data_rix)){
+		hdd_err("last rix rate put fail");
+		return -EINVAL;
+	}
+	if (nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_TSF_OUT_OF_SYNC_COUNT,
+			adapter->big_data_stats.tsf_out_of_sync)){
+		hdd_err("tsf out of sync put fail");
+		return -EINVAL;
+	}
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ANI_LEVEL,
+			adapter->big_data_stats.ani_level)){
+		hdd_err("ani level put fail");
+		return -EINVAL;
+	}
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_LATEST_TX_POWER,
+			adapter->big_data_stats.last_data_tx_pwr)){
+		hdd_err("last data tx power put fail");
+		return -EINVAL;
+	}
+	if (nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_TRIGGER_REASON,
+			wlan_cm_get_roam_states(hdd_ctx->psoc, adapter->vdev_id,
+						ROAM_TRIGGER_REASON))){
+		hdd_err("roam trigger reason put fail");
+		return -EINVAL;
+	}
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_FAIL_REASON,
+			wlan_cm_get_roam_states(hdd_ctx->psoc, adapter->vdev_id,
+						ROAM_FAIL_REASON))){
+		hdd_err("roam fail reason put fail");
+		return -EINVAL;
+	}
+	if (nla_put_u32(
+		      skb,
+		      QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_ROAM_INVOKE_FAIL_REASON,
+		      wlan_cm_get_roam_states(hdd_ctx->psoc, adapter->vdev_id,
+					      ROAM_INVOKE_FAIL_REASON))){
+		hdd_err("roam invoke fail reason put fail");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/**
+ * hdd_reset_roam_params() - reset roam params
+ * @psoc: psoc
+ * @vdev_id: vdev id
+ *
+ * This function resets big data roam params
+ *
+ * Return: None
+ */
+static void
+hdd_reset_roam_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	wlan_cm_update_roam_states(psoc, vdev_id,
+				   0, ROAM_TRIGGER_REASON);
+	wlan_cm_update_roam_states(psoc, vdev_id,
+				   0, ROAM_FAIL_REASON);
+	wlan_cm_update_roam_states(psoc, vdev_id,
+				   0, ROAM_INVOKE_FAIL_REASON);
+}
+#else
+static int
+hdd_big_data_pack_resp_nlmsg(struct sk_buff *skb,
+			     struct hdd_adapter *adapter,
+			     struct hdd_context *hdd_ctx)
+{
+	return 0;
+}
+
+static uint32_t
+hdd_get_big_data_stats_len(struct hdd_adapter *adapter)
+{
+	return 0;
+}
+
+static void
+hdd_reset_roam_params(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{}
+#endif
+
+/**
+ * hdd_add_connect_fail_reason_code() - Fills connect fail reason code
+ * @skb: pointer to skb
+ * @adapter: pointer to hdd adapter
+ *
+ * Return: on success 0 else error code
+ */
+static int hdd_add_connect_fail_reason_code(struct sk_buff *skb,
+					    struct hdd_adapter *adapter)
+{
+	uint32_t reason;
+
+	reason = osif_cm_mac_to_qca_connect_fail_reason(
+					adapter->connect_req_status);
+	if (!reason)
+		return 0;
+
+	if (nla_put_u32(skb, STA_INFO_CONNECT_FAIL_REASON_CODE, reason)) {
 		hdd_err("put fail");
 		return -EINVAL;
 	}
@@ -1711,6 +2061,52 @@ static int hdd_add_peer_stats(struct sk_buff *skb,
 fail:
 	return -EINVAL;
 }
+
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+static uint32_t hdd_get_uplink_delay_len(struct hdd_adapter *adapter)
+{
+	if (adapter->device_mode != QDF_STA_MODE)
+		return 0;
+
+	return nla_total_size(sizeof(uint32_t));
+}
+
+static QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
+				       struct sk_buff *skb)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_STATUS status;
+	uint32_t ul_delay;
+
+	if (adapter->device_mode != QDF_STA_MODE)
+		return QDF_STATUS_SUCCESS;
+
+	if (qdf_atomic_read(&adapter->tsf_auto_report)) {
+		status = cdp_get_uplink_delay(soc, adapter->vdev_id, &ul_delay);
+		if (QDF_IS_STATUS_ERROR(status))
+			ul_delay = 0;
+	} else {
+		ul_delay = 0;
+	}
+
+	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_UPLINK_DELAY,
+			ul_delay))
+		return QDF_STATUS_E_FAILURE;
+
+	return QDF_STATUS_SUCCESS;
+}
+#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY */
+static inline uint32_t hdd_get_uplink_delay_len(struct hdd_adapter *adapter)
+{
+	return 0;
+}
+
+static inline QDF_STATUS hdd_add_uplink_delay(struct hdd_adapter *adapter,
+					      struct sk_buff *skb)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
 
 /**
  * hdd_get_connected_station_info_ex() - get connected peer's info
@@ -1848,7 +2244,7 @@ static int hdd_get_station_remote_ex(struct hdd_context *hdd_ctx,
 	if (!stainfo) {
 		hdd_err_rl("Failed to get peer STA " QDF_MAC_ADDR_FMT,
 			   QDF_MAC_ADDR_REF(mac_addr.bytes));
-		return -EINVAL;
+		return -ENXIO;
 	}
 
 	is_associated = hdd_is_peer_associated(adapter, &mac_addr);
@@ -1878,21 +2274,41 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 				   struct hdd_adapter *adapter)
 {
 	struct sk_buff *skb;
-	uint32_t nl_buf_len;
+	uint32_t nl_buf_len = 0, connect_fail_rsn_len;
 	struct hdd_station_ctx *hdd_sta_ctx;
+	bool big_data_stats_req = false;
+	bool big_data_fw_support = false;
+	int ret;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	ucfg_mc_cp_get_big_data_fw_support(hdd_ctx->psoc, &big_data_fw_support);
 
-	if (wlan_hdd_get_station_stats(adapter)) {
+	if (hdd_cm_is_disconnected(adapter) &&
+	    big_data_fw_support)
+		big_data_stats_req = true;
+
+	if (wlan_hdd_get_station_stats(adapter))
 		hdd_err_rl("wlan_hdd_get_station_stats fail");
-		return -EINVAL;
+
+	if (big_data_stats_req) {
+		if (wlan_hdd_get_big_data_station_stats(adapter)) {
+			hdd_err_rl("wlan_hdd_get_big_data_station_stats fail");
+			return -EINVAL;
+		}
+		nl_buf_len = hdd_get_big_data_stats_len(adapter);
 	}
 
-	nl_buf_len = hdd_get_pmf_bcn_protect_stats_len(adapter);
+	nl_buf_len += hdd_get_pmf_bcn_protect_stats_len(adapter);
+	connect_fail_rsn_len = hdd_get_connect_fail_reason_code_len(adapter);
+	nl_buf_len += connect_fail_rsn_len;
+
+	nl_buf_len += hdd_get_uplink_delay_len(adapter);
+
 	if (!nl_buf_len) {
 		hdd_err_rl("Failed to get bcn pmf stats");
 		return -EINVAL;
 	}
+
 	nl_buf_len += NLMSG_HDRLEN;
 
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
@@ -1907,7 +2323,29 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	return cfg80211_vendor_cmd_reply(skb);
+	if (connect_fail_rsn_len) {
+		if (hdd_add_connect_fail_reason_code(skb, adapter)) {
+			hdd_err_rl("hdd_add_connect_fail_reason_code fail");
+			return -ENOMEM;
+		}
+	}
+
+	if (big_data_stats_req) {
+		if (hdd_big_data_pack_resp_nlmsg(skb, adapter, hdd_ctx)) {
+			kfree_skb(skb);
+			return -EINVAL;
+		}
+	}
+
+	if (QDF_IS_STATUS_ERROR(hdd_add_uplink_delay(adapter, skb))) {
+		hdd_err_rl("hdd_add_uplink_delay fail");
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	ret = cfg80211_vendor_cmd_reply(skb);
+	hdd_reset_roam_params(hdd_ctx->psoc, adapter->vdev_id);
+	return ret;
 }
 
 /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -31,6 +31,9 @@
 #include "wlan_pkt_capture_priv.h"
 #include "wlan_pkt_capture_objmgr.h"
 #include "wlan_objmgr_vdev_obj.h"
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V2
+#include "cdp_txrx_stats_struct.h"
+#endif
 
 #define pkt_capture_log(level, args...) \
 	QDF_TRACE(QDF_MODULE_ID_PKT_CAPTURE, level, ## args)
@@ -170,6 +173,25 @@ enum pkt_capture_mode
 pkt_capture_get_pktcap_mode(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * pkt_capture_set_pktcap_config - Set packet capture config
+ * @vdev: pointer to vdev object
+ * @config: config to be set
+ *
+ * Return: None
+ */
+void pkt_capture_set_pktcap_config(struct wlan_objmgr_vdev *vdev,
+				   enum pkt_capture_config config);
+
+/**
+ * pkt_capture_get_pktcap_config - Get packet capture config
+ * @vdev: pointer to vdev object
+ *
+ * Return: config value
+ */
+enum pkt_capture_config
+pkt_capture_get_pktcap_config(struct wlan_objmgr_vdev *vdev);
+
+/**
  * pkt_capture_drop_nbuf_list() - drop an nbuf list
  * @buf_list: buffer list to be dropepd
  *
@@ -198,4 +220,44 @@ void pkt_capture_record_channel(struct wlan_objmgr_vdev *vdev);
 void pkt_capture_mon(struct pkt_capture_cb_context *cb_ctx, qdf_nbuf_t msdu,
 		     struct wlan_objmgr_vdev *vdev, uint16_t ch_freq);
 
+/**
+ * pkt_capture_set_filter - Set packet capture frame filter
+ * @frame_filter: pkt capture frame filter data
+ * @vdev: pointer to vdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS pkt_capture_set_filter(struct pkt_capture_frame_filter frame_filter,
+				  struct wlan_objmgr_vdev *vdev);
+
+/**
+ * pkt_capture_is_tx_mgmt_enable - Check if tx mgmt frames enabled
+ * @pdev: pointer to pdev
+ *
+ * Return: bool
+ */
+bool pkt_capture_is_tx_mgmt_enable(struct wlan_objmgr_pdev *pdev);
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V2
+/**
+ * pkt_capture_get_pktcap_mode_v2 - Get packet capture mode
+ *
+ * Return: enum pkt_capture_mode
+ */
+enum pkt_capture_mode
+pkt_capture_get_pktcap_mode_v2(void);
+
+/**
+ * pkt_capture_callback() - callback function for dp wdi events
+ * @soc: dp_soc handle
+ * @event: wdi event
+ * @log_data: nbuf data
+ * @peer_id: peer id
+ * @status: status
+ *
+ * Return: None
+ */
+void pkt_capture_callback(void *soc, enum WDI_EVENT event, void *log_data,
+			  u_int16_t peer_id, uint32_t status);
+#endif
 #endif /* end of _WLAN_PKT_CAPTURE_MAIN_H_ */

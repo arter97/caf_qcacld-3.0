@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -29,7 +29,17 @@
 
 #include "cdp_txrx_cmn_struct.h"
 #include <qdf_nbuf.h>
+#ifndef WLAN_FEATURE_PKT_CAPTURE_V2
 #include <htt_internal.h>
+#endif
+
+#ifdef WLAN_FEATURE_PKT_CAPTURE_V2
+#define IEEE80211_RADIOTAP_HE_DATA1_DATA_MCS_KNOWN 0x0020
+#define IEEE80211_RADIOTAP_HE_DATA1_BW_RU_ALLOC_KNOWN 0x4000
+#define IEEE80211_RADIOTAP_HE_DATA2_GI_KNOWN 0x0002
+#define IEEE80211_RADIOTAP_HE_DATA1_CODING_KNOWN 0x0080
+#define IEEE80211_RADIOTAP_HE_DATA1_STBC_KNOWN 0x0200
+#endif
 
 /**
  * pkt_capture_data_process_type - data pkt types to process
@@ -70,8 +80,10 @@ void pkt_capture_datapkt_process(
 			qdf_nbuf_t mon_buf_list,
 			enum pkt_capture_data_process_type type,
 			uint8_t tid, uint8_t status, bool pktformat,
-			uint8_t *bssid, htt_pdev_handle pdev,
+			uint8_t *bssid, void *pdev,
 			uint8_t tx_retry_cnt);
+
+#ifndef WLAN_FEATURE_PKT_CAPTURE_V2
 /**
  * pkt_capture_msdu_process_pkts() - process data rx pkts
  * @bssid: bssid
@@ -85,7 +97,14 @@ void pkt_capture_msdu_process_pkts(
 			uint8_t *bssid,
 			qdf_nbuf_t head_msdu,
 			uint8_t vdev_id,
-			htt_pdev_handle pdev);
+			htt_pdev_handle pdev, uint16_t status);
+#else
+void pkt_capture_msdu_process_pkts(
+			uint8_t *bssid,
+			qdf_nbuf_t head_msdu,
+			uint8_t vdev_id,
+			void *psoc, uint16_t status);
+#endif
 
 /**
  * pkt_capture_rx_in_order_drop_offload_pkt() - drop offload packets
@@ -104,6 +123,7 @@ void pkt_capture_rx_in_order_drop_offload_pkt(qdf_nbuf_t head_msdu);
  */
 bool pkt_capture_rx_in_order_offloaded_pkt(qdf_nbuf_t rx_ind_msg);
 
+#ifndef WLAN_FEATURE_PKT_CAPTURE_V2
 /**
  * pkt_capture_offload_deliver_indication_handler() - Handle offload data pkts
  * @msg: offload netbuf msg
@@ -116,6 +136,20 @@ bool pkt_capture_rx_in_order_offloaded_pkt(qdf_nbuf_t rx_ind_msg);
 void pkt_capture_offload_deliver_indication_handler(
 					void *msg, uint8_t vdev_id,
 					uint8_t *bssid, htt_pdev_handle pdev);
+#else
+/**
+ * pkt_capture_offload_deliver_indication_handler() - Handle offload data pkts
+ * @msg: offload netbuf msg
+ * @vdev_id: vdev id
+ * @bssid: bssid
+ * @soc: dp_soc handle
+ *
+ * Return: none
+ */
+void pkt_capture_offload_deliver_indication_handler(
+					void *msg, uint8_t vdev_id,
+					uint8_t *bssid, void *soc);
+#endif
 
 /**
  * pkt_capture_tx_hdr_elem_t - tx packets header struture to
@@ -134,6 +168,7 @@ void pkt_capture_offload_deliver_indication_handler(
  * @dir: direction rx: 0 and tx: 1
  * @status: tx status
  * @tx_retry_cnt: tx retry count
+ * @ppdu_id: ppdu_id of msdu
  */
 struct pkt_capture_tx_hdr_elem_t {
 	uint32_t timestamp;
@@ -150,6 +185,20 @@ struct pkt_capture_tx_hdr_elem_t {
 	bool dir; /* rx:0 , tx:1 */
 	uint8_t status; /* tx status */
 	uint8_t tx_retry_cnt;
+	uint16_t framectrl;
+	uint16_t seqno;
+	uint32_t ppdu_id;
+};
+
+/**
+ * pkt_capture_ppdu_stats_q_node - node structure to be enqueued
+ * in ppdu_stats_q
+ * @node: list node
+ * @buf: buffer data received from ppdu_stats
+ */
+struct pkt_capture_ppdu_stats_q_node {
+	qdf_list_node_t node;
+	uint32_t buf[];
 };
 
 /**

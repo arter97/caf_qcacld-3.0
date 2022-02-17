@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012, 2014-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -187,6 +187,16 @@ QDF_STATUS hdd_wlan_shutdown(void);
 QDF_STATUS hdd_wlan_re_init(void);
 
 /**
+ * hdd_handle_cached_commands() - Handle north bound commands during SSR
+ *
+ * This api will be invoked afte SSR re-initialization to execute the north
+ * bound commands received during SSR.
+ *
+ * Return: None
+ */
+void hdd_handle_cached_commands(void);
+
+/**
  * hdd_enable_arp_offload() - API to enable ARP offload
  * @adapter: Adapter context for which ARP offload is to be configured
  * @trigger: trigger reason for request
@@ -229,6 +239,17 @@ void hdd_enable_host_offloads(struct hdd_adapter *adapter,
  */
 void hdd_disable_host_offloads(struct hdd_adapter *adapter,
 			       enum pmo_offload_trigger trigger);
+
+/**
+ * hdd_set_grat_arp_keepalive() - Enable grat APR keepalive
+ * @adapter: the HDD adapter to configure
+ *
+ * This configures gratuitous APR keepalive based on the adapter's current
+ * connection information, specifically IPv4 address and BSSID
+ *
+ * return: zero for success, non-zero for failure
+ */
+int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter);
 
 /**
  * hdd_enable_mc_addr_filtering() - enable MC address list in FW
@@ -425,6 +446,26 @@ int wlan_hdd_ipv4_changed(struct notifier_block *nb,
  */
 int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 			   void *context);
+
+/**
+ * wlan_hdd_is_cpu_pm_qos_in_progress() - WLAN HDD PM QoS Status Function
+ *
+ * This function check for PM QoS global vote.
+ *
+ * @hdd_ctx: hdd_context pointer
+ *
+ * Return: true if there is PM QoS global vote,
+ *	   or an false otherwise
+ */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
+bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx);
+#else
+static inline bool
+wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+#endif
 #endif
 /**
  * wlan_hdd_ipv6_changed() - IPv6 change notifier callback
@@ -595,4 +636,22 @@ QDF_STATUS wlan_hdd_get_ani_level(struct hdd_adapter *adapter,
 				  uint32_t *parsed_freqs,
 				  uint8_t num_freqs);
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
+
+#ifdef WLAN_FEATURE_ICMP_OFFLOAD
+/**
+ * hdd_enable_icmp_offload() - API to enable ICMP offload
+ * @adapter: Adapter context for which ICMP offload is to be configured
+ * @trigger: trigger reason for request
+ *
+ * Return: None
+ */
+void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
+			     enum pmo_offload_trigger trigger);
+#else
+static inline
+void hdd_enable_icmp_offload(struct hdd_adapter *adapter,
+			     enum pmo_offload_trigger trigger)
+{}
+#endif /* FEATURE_ICMP_OFFLOAD */
+
 #endif /* __WLAN_HDD_POWER_H */

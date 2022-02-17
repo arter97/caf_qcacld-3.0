@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -27,16 +27,6 @@
 				"he_control", \
 				0, \
 				"HE Control")
-
-#define CFG_HE_TWT_REQUESTOR CFG_BOOL( \
-				"he_twt_requestor", \
-				0, \
-				"HE Twt Requestor")
-
-#define CFG_HE_TWT_RESPONDER CFG_BOOL( \
-				"he_twt_responder", \
-				0, \
-				"HE Twt Responder")
 
 #define CFG_HE_FRAGMENTATION CFG_UINT( \
 				"he_fragmentation", \
@@ -100,11 +90,6 @@
 				"he_buffer_status_rpt", \
 				0, \
 				"HE Buffer Status Rpt")
-
-#define CFG_HE_BCAST_TWT CFG_BOOL( \
-				"he_bcast_twt", \
-				0, \
-				"HE Bcast twt")
 
 #define CFG_HE_BA_32BIT CFG_BOOL( \
 				"he_ba_32bit", \
@@ -507,35 +492,158 @@
 				0, \
 				"He Rx Full Bw Mu Non Cmpr Sigb")
 
-#define CFG_HE_RX_MCS_MAP_LT_80 CFG_UINT( \
+/* 11AX related INI configuration */
+/*
+ * <ini>
+ * he_rx_mcs_map_lt_80 - configure Rx HE-MCS Map for ≤ 80 MHz
+ * @Min: 0
+ * @Max: 0xFFFF
+ * @Default: 0xFFFA
+ *
+ * This ini is used to configure Rx HE-MCS Map for ≤ 80 MHz
+ * 0:1 Max HE-MCS For 1 SS
+ * 2:3 Max HE-MCS For 2 SS
+ * 4:5 Max HE-MCS For 3 SS
+ * 6:7 Max HE-MCS For 4 SS
+ * 8:9 Max HE-MCS For 5 SS
+ * 10:11 Max HE-MCS For 6 SS
+ * 12:13 Max HE-MCS For 7 SS
+ * 14:15 Max HE-MCS For 8 SS
+ *
+ * 0 indicates support for HE-MCS 0-7 for n spatial streams
+ * 1 indicates support for HE-MCS 0-9 for n spatial streams
+ * 2 indicates support for HE-MCS 0-11 for n spatial streams
+ * 3 indicates that n spatial streams is not supported for HE PPDUs
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HE_RX_MCS_MAP_LT_80 CFG_INI_UINT( \
 				"he_rx_mcs_map_lt_80", \
 				0, \
 				0xFFFF, \
-				0xFFF0, \
+				0xFFFA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Rx Mcs Map Lt 80")
 
-#define CFG_HE_TX_MCS_MAP_LT_80 CFG_UINT( \
+/* 11AX related INI configuration */
+/*
+ * <ini>
+ * he_tx_mcs_map_lt_80 - configure Tx HE-MCS Map for ≤ 80 MHz
+ * @Min: 0
+ * @Max: 0xFFFF
+ * @Default: 0xFFFA
+ *
+ * This ini is used to configure Tx HE-MCS Map for ≤ 80 MHz
+ * 0:1 Max HE-MCS For 1 SS
+ * 2:3 Max HE-MCS For 2 SS
+ * 4:5 Max HE-MCS For 3 SS
+ * 6:7 Max HE-MCS For 4 SS
+ * 8:9 Max HE-MCS For 5 SS
+ * 10:11 Max HE-MCS For 6 SS
+ * 12:13 Max HE-MCS For 7 SS
+ * 14:15 Max HE-MCS For 8 SS
+ *
+ * 0 indicates support for HE-MCS 0-7 for n spatial streams
+ * 1 indicates support for HE-MCS 0-9 for n spatial streams
+ * 2 indicates support for HE-MCS 0-11 for n spatial streams
+ * 3 indicates that n spatial streams is not supported for HE PPDUs
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HE_TX_MCS_MAP_LT_80 CFG_INI_UINT( \
 				"he_tx_mcs_map_lt_80", \
 				0, \
 				0xFFFF, \
-				0xFFF0, \
+				0xFFFA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Tx Mcs Map Lt 80")
-
-#define CFG_HE_RX_MCS_MAP_160 CFG_UINT( \
+/* 11AX related INI configuration */
+/*
+ * <ini>
+ * he_rx_mcs_map_160 - configure Rx HE-MCS Map for 160 MHz
+ * @Min: 0
+ * @Max: 0xFFFF
+ * @Default: 0xFFFA
+ *
+ * This ini is used to configure Rx HE-MCS Map for 160 MHz
+ * 0:1 Max HE-MCS For 1 SS
+ * 2:3 Max HE-MCS For 2 SS
+ * 4:5 Max HE-MCS For 3 SS
+ * 6:7 Max HE-MCS For 4 SS
+ * 8:9 Max HE-MCS For 5 SS
+ * 10:11 Max HE-MCS For 6 SS
+ * 12:13 Max HE-MCS For 7 SS
+ * 14:15 Max HE-MCS For 8 SS
+ *
+ * 0 indicates support for HE-MCS 0-7 for n spatial streams
+ * 1 indicates support for HE-MCS 0-9 for n spatial streams
+ * 2 indicates support for HE-MCS 0-11 for n spatial streams
+ * 3 indicates that n spatial streams is not supported for HE PPDUs
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HE_RX_MCS_MAP_160 CFG_INI_UINT( \
 				"he_rx_mcs_map_160", \
 				0, \
 				0xFFFF, \
-				0xFFF0, \
+				0xFFFA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Rx Mcs Map 160")
 
-#define CFG_HE_TX_MCS_MAP_160 CFG_UINT( \
+/* 11AX related INI configuration */
+/*
+ * <ini>
+ * he_tx_mcs_map_160 - configure Tx HE-MCS Map for 160 MHz
+ * @Min: 0
+ * @Max: 0xFFFF
+ * @Default: 0xFFFA
+ *
+ * This ini is used to configure Tx HE-MCS Map for 160 MHz
+ * 0:1 Max HE-MCS For 1 SS
+ * 2:3 Max HE-MCS For 2 SS
+ * 4:5 Max HE-MCS For 3 SS
+ * 6:7 Max HE-MCS For 4 SS
+ * 8:9 Max HE-MCS For 5 SS
+ * 10:11 Max HE-MCS For 6 SS
+ * 12:13 Max HE-MCS For 7 SS
+ * 14:15 Max HE-MCS For 8 SS
+ *
+ * 0 indicates support for HE-MCS 0-7 for n spatial streams
+ * 1 indicates support for HE-MCS 0-9 for n spatial streams
+ * 2 indicates support for HE-MCS 0-11 for n spatial streams
+ * 3 indicates that n spatial streams is not supported for HE PPDUs
+ *
+ * Related: NA
+ *
+ * Supported Feature: 11AX
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_HE_TX_MCS_MAP_160 CFG_INI_UINT( \
 				"he_tx_mcs_map_160", \
 				0, \
 				0xFFFF, \
-				0xFFF0, \
+				0xFFFA, \
 				CFG_VALUE_OR_DEFAULT, \
 				"He Tx Mcs Map 160")
 
@@ -748,8 +856,6 @@
 
 #define CFG_HE_CAPS_ALL \
 	CFG(CFG_HE_CONTROL) \
-	CFG(CFG_HE_TWT_REQUESTOR) \
-	CFG(CFG_HE_TWT_RESPONDER) \
 	CFG(CFG_HE_FRAGMENTATION) \
 	CFG(CFG_HE_MAX_FRAG_MSDU) \
 	CFG(CFG_HE_MIN_FRAG_SIZE) \
@@ -759,7 +865,6 @@
 	CFG(CFG_HE_ALL_ACK) \
 	CFG(CFG_HE_TRIGD_RSP_SCHEDULING) \
 	CFG(CFG_HE_BUFFER_STATUS_RPT) \
-	CFG(CFG_HE_BCAST_TWT) \
 	CFG(CFG_HE_BA_32BIT) \
 	CFG(CFG_HE_MU_CASCADING) \
 	CFG(CFG_HE_MULTI_TID) \
