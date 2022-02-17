@@ -75,6 +75,7 @@
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include <wlan_mlme_twt_api.h>
 #include "wlan_cm_roam_ucfg_api.h"
+#include "wlan_mlme_cmn.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -15049,6 +15050,7 @@ void sme_update_score_config(mac_handle_t mac_handle, eCsrPhyMode phy_mode,
 	ucfg_mlme_get_channel_bonding_5ghz(mac_ctx->psoc,
 					   &channel_bonding_mode);
 	config.bw_above_20_5ghz = channel_bonding_mode;
+	config.max_chan_switch_ie = mlme_max_chan_switch_is_set(mac_ctx->psoc);
 
 	wlan_psoc_set_phy_config(mac_ctx->psoc, &config);
 }

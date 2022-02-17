@@ -1345,6 +1345,7 @@ $(call add-wlan-objs,umac_sm,$(UMAC_SM_OBJS))
 
 ######## COMMON MLME ##############
 UMAC_MLME_INC := -I$(WLAN_COMMON_INC)/umac/mlme \
+		-I$(WLAN_COMMON_INC)/umac/mlme/include \
 		-I$(WLAN_COMMON_INC)/umac/mlme/mlme_objmgr/dispatcher/inc \
 		-I$(WLAN_COMMON_INC)/umac/mlme/vdev_mgr/dispatcher/inc \
 		-I$(WLAN_COMMON_INC)/umac/mlme/pdev_mgr/dispatcher/inc \
@@ -2952,6 +2953,7 @@ cppflags-$(CONFIG_WLAN_MWS_INFO_DEBUGFS) += -DWLAN_MWS_INFO_DEBUGFS
 cppflags-$(CONFIG_WLAN_OBJMGR_DEBUG) += -DWLAN_OBJMGR_DEBUG
 cppflags-$(CONFIG_WLAN_OBJMGR_DEBUG) += -DWLAN_OBJMGR_REF_ID_DEBUG
 cppflags-$(CONFIG_WLAN_OBJMGR_REF_ID_TRACE) += -DWLAN_OBJMGR_REF_ID_TRACE
+cppflags-$(CONFIG_FEATURE_DELAYED_PEER_OBJ_DESTROY) += -DFEATURE_DELAYED_PEER_OBJ_DESTROY
 
 cppflags-$(CONFIG_WLAN_FEATURE_SAE) += -DWLAN_FEATURE_SAE
 

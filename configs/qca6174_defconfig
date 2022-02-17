@@ -1,3 +1,5 @@
+CONFIG_RX_PERFORMANCE := y
+
 CONFIG_AR6320_SUPPORT := y
 ifeq ($(CONFIG_CLD_HL_SDIO_CORE), y)
 	CONFIG_QCA_WIFI_SDIO := y
@@ -639,6 +641,9 @@ CONFIG_WMI_STA_SUPPORT := y
 
 #Flag to enable LTE COEX feature
 CONFIG_LTE_COEX := y
+
+#Flag to enable delayed peer obj free
+CONFIG_FEATURE_DELAYED_PEER_OBJ_DESTROY := y
 
 #Flag to enable/disable TARGET 11d scan
 CONFIG_TARGET_11D_SCAN := y
