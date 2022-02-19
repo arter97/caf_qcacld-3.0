@@ -35,8 +35,9 @@
 #include <dp_wrap.h>
 #endif
 #include <wlan_mlme_if.h>
-
+#include <wlan_pdev_mlme.h>
 #define IE_CONTENT_SIZE 1
+#include <ieee80211_api.h>
 
 extern bool
 wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev);
@@ -1015,16 +1016,16 @@ wlan_rptr_psta_validate_chan(struct wlan_objmgr_vdev *vdev, uint16_t freq)
 uint8_t wlan_rptr_get_qwrap_vdevs_for_pdev_id(struct wlan_objmgr_psoc *psoc,
 					      uint16_t pdev_id)
 {
-	switch (pdev_id) {
-	case 0:
-		return cfg_get(psoc, CFG_OL_QWRAP_VDEVS_PDEV0);
-	case 1:
-		return cfg_get(psoc, CFG_OL_QWRAP_VDEVS_PDEV1);
-	case 2:
-		return cfg_get(psoc, CFG_OL_QWRAP_VDEVS_PDEV2);
-	default:
-		return 0;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	uint32_t num_vdevs = 0;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, WLAN_MLME_NB_ID);
+	if (pdev) {
+		num_vdevs = wlan_pdev_get_config_params(pdev, WLAN_CONFIG_NUM_QWRAP_VDEVS);
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 	}
+
+	return num_vdevs;
 }
 
 qdf_export_symbol(wlan_rptr_get_qwrap_vdevs_for_pdev_id);
@@ -1045,16 +1046,16 @@ qdf_export_symbol(wlan_rptr_get_qwrap_vdevs_for_pdev_id);
 uint8_t wlan_rptr_get_qwrap_peers_for_pdev_id(struct wlan_objmgr_psoc *psoc,
 					      uint16_t pdev_id)
 {
-	switch (pdev_id) {
-	case 0:
-		return cfg_get(psoc, CFG_OL_QWRAP_PEERS_PDEV0);
-	case 1:
-		return cfg_get(psoc, CFG_OL_QWRAP_PEERS_PDEV1);
-	case 2:
-		return cfg_get(psoc, CFG_OL_QWRAP_PEERS_PDEV2);
-	default:
-		return 0;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	uint32_t num_peers = 0;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, WLAN_MLME_NB_ID);
+	if (pdev) {
+		num_peers = wlan_pdev_get_config_params(pdev, WLAN_CONFIG_NUM_QWRAP_PEERS);
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 	}
+
+	return num_peers;
 }
 
 qdf_export_symbol(wlan_rptr_get_qwrap_peers_for_pdev_id);
