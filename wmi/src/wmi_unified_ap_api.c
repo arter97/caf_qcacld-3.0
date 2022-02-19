@@ -799,6 +799,7 @@ wmi_unified_set_nss_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
 		return wmi_handle->ops->send_set_nss_probe_intvl_cmd(wmi_handle,
 								     pdev_id,
 								     param);
+	return QDF_STATUS_E_FAILURE;
 }
 
 QDF_STATUS wmi_sawf_create_send(struct wmi_unified *wmi_handle,
