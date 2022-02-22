@@ -23,16 +23,13 @@
 #ifndef _WLAN_SAWF_H_
 #define _WLAN_SAWF_H_
 
-#include <qdf_util.h>
 #include <qdf_status.h>
-#include <qdf_types.h>
-#include <qdf_mem.h>
-#include <qdf_trace.h>
 
 #define SAWF_SVC_CLASS_MIN 1
 #define SAWF_SVC_CLASS_MAX 128
-#define WLAN_MAX_SVC_CLASS_NAME 32
+#define WLAN_MAX_SVC_CLASS_NAME 64
 
+#define SAWF_LINE_FORMAT "================================================"
 /**
  * struct wlan_sawf_scv_class_params- Service Class Parameters
  * @svc_id: Service ID
@@ -50,7 +47,7 @@
  */
 
 struct wlan_sawf_scv_class_params {
-	uint32_t svc_id;
+	uint8_t svc_id;
 	char app_name[WLAN_MAX_SVC_CLASS_NAME];
 	uint32_t min_thruput_rate;
 	uint32_t max_thruput_rate;

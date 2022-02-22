@@ -20,6 +20,11 @@
  */
 
 #include "wlan_sawf.h"
+#include <qdf_util.h>
+#include <qdf_types.h>
+#include <qdf_mem.h>
+#include <qdf_trace.h>
+#include <qdf_module.h>
 
 static struct sawf_ctx *g_wlan_sawf_ctx;
 
@@ -56,9 +61,11 @@ struct sawf_ctx *wlan_get_sawf_ctx(void)
 {
 	return g_wlan_sawf_ctx;
 }
+qdf_export_symbol(wlan_get_sawf_ctx);
 
 void wlan_print_service_class(struct wlan_sawf_scv_class_params *params)
 {
+	qdf_info(SAWF_LINE_FORMAT);
 	qdf_info("Service ID       :%d", params->svc_id);
 	qdf_info("App Name         :%s", params->app_name);
 	qdf_info("Min througput    :%d", params->min_thruput_rate);
@@ -72,6 +79,8 @@ void wlan_print_service_class(struct wlan_sawf_scv_class_params *params)
 	qdf_info("MSDU Loss Rate   :%d", params->msdu_rate_loss);
 }
 
+qdf_export_symbol(wlan_print_service_class);
+
 bool wlan_service_id_valid(uint8_t svc_id)
 {
 	if (svc_id <  SAWF_SVC_CLASS_MIN || svc_id > SAWF_SVC_CLASS_MAX)
@@ -79,6 +88,8 @@ bool wlan_service_id_valid(uint8_t svc_id)
 	else
 		return true;
 }
+
+qdf_export_symbol(wlan_service_id_valid);
 
 bool wlan_service_id_configured(uint8_t svc_id)
 {
@@ -90,9 +101,11 @@ bool wlan_service_id_configured(uint8_t svc_id)
 		return false;
 	}
 
-	if (!(sawf->svc_classes[svc_id].configured))
+	if (!(sawf->svc_classes[svc_id - 1].configured))
 		return false;
 
 	return true;
 }
+
+qdf_export_symbol(wlan_service_id_configured);
 
