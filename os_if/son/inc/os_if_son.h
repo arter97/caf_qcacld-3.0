@@ -56,6 +56,8 @@
  * @os_if_kickout_mac: kickout sta with given mac
  * @os_if_set_chwidth: set chan width
  * @os_if_get_chwidth: get chan width
+ * @os_if_get_sta_list: get sta list
+ * @os_if_get_sta_space: get sta space
  * @os_if_deauth_sta: Deauths the target peer
  * @os_if_modify_acl: Add/Del target peer in ACL
  */
@@ -96,6 +98,10 @@ struct son_callbacks {
 				 enum ieee80211_cwm_width son_chwidth);
 	enum ieee80211_cwm_width (*os_if_get_chwidth)(
 				struct wlan_objmgr_vdev *vdev);
+	void (*os_if_get_sta_list)(struct wlan_objmgr_vdev *vdev,
+				   struct ieee80211req_sta_info *req,
+				   uint32_t *space);
+	uint32_t (*os_if_get_sta_space)(struct wlan_objmgr_vdev *vdev);
 	void (*os_if_deauth_sta)(struct wlan_objmgr_vdev *vdev,
 				 uint8_t *peer_mac,
 				 bool ignore_frame);
@@ -450,6 +456,25 @@ int os_if_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 			  struct qdf_mac_addr *acl_mac);
 
 /**
+ * os_if_son_get_sta_space() - get sta space
+ * @vdev: target vdev
+ *
+ * Return: bytes which is needed to fill sta information
+ */
+uint32_t os_if_son_get_sta_space(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * os_if_son_get_sta_list() - get sta list
+ * @vdev: target vdev
+ * @si: pointer to ieee80211req_sta_info
+ * @space: space left
+ *
+ * Return: void
+ */
+void os_if_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
+			    struct ieee80211req_sta_info *si, uint32_t *space);
+
+/**
  * os_if_son_del_acl_mac() - del mac from acl
  * @vdev: vdev
  * @acl_mac: mac to del
@@ -510,4 +535,18 @@ void os_if_son_deauth_peer_sta(struct wlan_objmgr_vdev *vdev,
 void os_if_son_modify_acl(struct wlan_objmgr_vdev *vdev,
 			  uint8_t *peer_mac,
 			  bool allow_auth);
+
+/**
+ * os_if_son_deliver_ald_event() - deliver ald events to son
+ * @adapter: adapter object
+ * @peer: peer object
+ * @event: Name of the event
+ * @event_data: event data
+ *
+ * Return: 0 on success
+ */
+int os_if_son_deliver_ald_event(struct hdd_adapter *adapter,
+				struct wlan_objmgr_peer *peer,
+				enum ieee80211_event_type event,
+				void *event_data);
 #endif

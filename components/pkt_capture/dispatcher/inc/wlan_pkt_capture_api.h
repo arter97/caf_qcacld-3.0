@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,34 +17,20 @@
  */
 
 /**
- * DOC: Declare various api/struct which shall be used
- * by ipa component for wmi cmd (tx path)
+ * DOC: Contains pkt_capture public API declarations
  */
 
-#ifndef _TARGET_IF_IPA_H_
-#define _TARGET_IF_IPA_H_
+#ifndef _WLAN_PKT_CAPTURE_API_H_
+#define _WLAN_PKT_CAPTURE_API_H_
 
-#ifdef IPA_OFFLOAD
-
-#include "wlan_ipa_public_struct.h"
+#include "wlan_pkt_capture_objmgr.h"
 
 /**
- * target_if_ipa_register_tx_ops() - Register IPA component TX OPS
- * @ipa_tx_op: IPA if transmit op
+ * wlan_pkt_capture_is_tx_mgmt_enable() - Check if tx mgmt frames filter
+ * is enabled
+ * @pdev: pointer to pdev
  *
- * Return: None
+ * Return: bool
  */
-void target_if_ipa_register_tx_ops(ipa_uc_offload_control_req *ipa_tx_op);
-
-/**
- * target_if_ipa_register_intrabss_ops() - Register IPA component INTRABSS OPS
- * @ipa_intrabss_op: IPA if intrabss transmit op
- *
- * Return: None
- */
-void
-target_if_ipa_register_intrabss_ops(ipa_intrabss_control_req *ipa_intrabss_op);
-
-#endif /* IPA_OFFLOAD */
-#endif /* _TARGET_IF_IPA_H_ */
-
+bool wlan_pkt_capture_is_tx_mgmt_enable(struct wlan_objmgr_pdev *pdev);
+#endif /* _WLAN_PKT_CAPTURE_API_H_ */

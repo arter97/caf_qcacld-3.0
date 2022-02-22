@@ -231,35 +231,6 @@ static bool lim_chk_sa_da(struct mac_context *mac_ctx, tpSirMacMgmtHdr hdr,
 	return false;
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
-QDF_STATUS lim_mlo_partner_assoc_req_parse(struct mac_context *mac_ctx,
-					   tSirMacAddr sa,
-					   struct pe_session *session,
-					   tpSirAssocReq assoc_req,
-					   uint8_t sub_type, uint8_t *frm_body,
-					   uint32_t frame_len)
-{
-	QDF_STATUS status;
-	uint8_t link_id;
-
-	link_id = wlan_vdev_get_link_id(session->vdev);
-	if (sub_type == LIM_ASSOC)
-		status = sir_convert_mlo_assoc_req_frame2_struct(mac_ctx,
-								 frm_body,
-								 frame_len,
-								 assoc_req,
-								 link_id);
-	else
-		status = sir_convert_mlo_reassoc_req_frame2_struct(mac_ctx,
-								   frm_body,
-								   frame_len,
-								   assoc_req,
-								   link_id);
-
-	return status;
-}
-#endif
-
 /**
  * lim_chk_assoc_req_parse_error() - checks for error in frame parsing
  * @mac_ctx: pointer to Global MAC structure
@@ -2377,7 +2348,6 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 }
 
 QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
-				      uint8_t *frm_body, uint32_t frame_len,
 				      uint8_t sub_type,
 				      struct pe_session *session,
 				      tSirMacAddr sa,
@@ -2393,7 +2363,11 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 	tpDphHashNode sta_ds = NULL;
 	bool dup_entry = false, force_1x1 = false;
 	QDF_STATUS status;
+	uint8_t *frm_body;
+	uint32_t frame_len;
 
+	frm_body = assoc_req->assocReqFrame;
+	frame_len = assoc_req->assocReqFrameLength;
 	lim_get_phy_mode(mac_ctx, &phy_mode, session);
 	limGetQosMode(session, &qos_mode);
 
@@ -2438,6 +2412,11 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 			goto error;
 		}
 	}
+
+	if (!lim_chk_assoc_req_parse_error(mac_ctx, sa, session,
+					   assoc_req, sub_type,
+					   frm_body, frame_len))
+		goto error;
 
 	if (!lim_chk_capab(mac_ctx, sa, session, assoc_req,
 			   sub_type, &local_cap))
@@ -2691,20 +2670,14 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 	if (!assoc_req)
 		return;
 
-	/* Parse Assoc Request frame */
-	if (!lim_chk_assoc_req_parse_error(mac_ctx, hdr->sa, session,
-					   assoc_req, sub_type,
-					   frm_body, frame_len))
-		goto error;
-
 	if (!lim_alloc_assoc_req_frm_buf(assoc_req,
 					 WMA_GET_QDF_NBUF(rx_pkt_info),
 					 WMA_GET_RX_MAC_HEADER_LEN(rx_pkt_info),
 					 frame_len))
 		goto error;
 
-	lim_proc_assoc_req_frm_cmn(mac_ctx, frm_body, frame_len, sub_type,
-				   session, hdr->sa, assoc_req, 0);
+	lim_proc_assoc_req_frm_cmn(mac_ctx, sub_type, session, hdr->sa,
+				   assoc_req, 0);
 
 	return;
 error:
@@ -2765,14 +2738,16 @@ static bool lim_fill_assoc_he_info(struct mac_context *mac_ctx,
 			else if (session_entry->ch_width == CH_WIDTH_40MHZ &&
 				 assoc_req->he_cap.chan_width_0 == 1)
 				assoc_ind->chan_info.info = MODE_11AX_HE40;
+			else
+				assoc_ind->chan_info.info = MODE_11AX_HE20;
 		} else {
 			if (session_entry->ch_width == CH_WIDTH_160MHZ &&
 				assoc_req->he_cap.chan_width_2 == 1)
 				assoc_ind->chan_info.info = MODE_11AX_HE160;
-			else if (session_entry->ch_width == CH_WIDTH_80MHZ &&
+			else if (session_entry->ch_width >= CH_WIDTH_80MHZ &&
 				 assoc_req->he_cap.chan_width_1 == 1)
 				assoc_ind->chan_info.info = MODE_11AX_HE80;
-			else if (session_entry->ch_width == CH_WIDTH_40MHZ &&
+			else if (session_entry->ch_width >= CH_WIDTH_40MHZ &&
 				 assoc_req->he_cap.chan_width_1 == 1)
 				assoc_ind->chan_info.info = MODE_11AX_HE40;
 			else
@@ -3000,6 +2975,8 @@ bool lim_fill_lim_assoc_ind_params(
 	bool wme_enable;
 	struct wlan_objmgr_vdev *vdev;
 	struct vdev_mlme_obj *mlme_obj;
+	uint8_t country_iso[REG_ALPHA2_LEN + 1];
+	tDot11fIESuppOperatingClasses *oper_class;
 
 	if (!session_entry->parsedAssocReq) {
 		pe_err(" Parsed Assoc req is NULL");
@@ -3193,9 +3170,30 @@ bool lim_fill_lim_assoc_ind_params(
 		assoc_ind->max_mcs_idx = maxidx;
 	}
 	fill_mlm_assoc_ind_vht(assoc_req, sta_ds, assoc_ind);
-	if (assoc_req->ExtCap.present)
+	if (assoc_req->ExtCap.present) {
 		assoc_ind->ecsa_capable =
 		((struct s_ext_cap *)assoc_req->ExtCap.bytes)->ext_chan_switch;
+		if (assoc_req->ExtCap.num_bytes >= sizeof(assoc_ind->ext_cap))
+			qdf_mem_copy(&assoc_ind->ext_cap,
+				     assoc_req->ExtCap.bytes,
+				     sizeof(assoc_ind->ext_cap));
+		else
+			qdf_mem_copy(&assoc_ind->ext_cap,
+				     assoc_req->ExtCap.bytes,
+				     assoc_req->ExtCap.num_bytes);
+	}
+
+	if (assoc_req->supp_operating_classes.present) {
+		oper_class = &assoc_req->supp_operating_classes;
+		qdf_mem_zero(country_iso, sizeof(country_iso));
+		country_iso[2] = OP_CLASS_GLOBAL;
+		assoc_ind->supported_band =
+				wlan_reg_get_band_cap_from_op_class(
+						country_iso,
+						oper_class->num_classes,
+						oper_class->classes);
+	}
+
 	/* updates VHT information in assoc indication */
 	if (assoc_req->VHTCaps.present)
 		qdf_mem_copy(&assoc_ind->vht_caps, &assoc_req->VHTCaps,

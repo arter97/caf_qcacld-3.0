@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -179,14 +179,12 @@ struct mlo_link_ie {
 /**
  * struct mlo_link_ie_info - information per link to populate mlo ie
  * @upt_bcn_mlo_ie: notify partner links to update their mlo ie of bcn temp
- * @mlo_rnr_updated: link already notified partner link to update rnr
  * @bss_param_change: bss param changed
  * @bcn_tmpl_exist: bcn template is generated or not
  * @link_ie: IEs which will be used for generating partner mlo IE
  */
 struct mlo_link_ie_info {
 	bool upt_bcn_mlo_ie;
-	bool mlo_rnr_updated;
 	bool bss_param_change;
 	bool bcn_tmpl_exist;
 	struct mlo_link_ie link_ie;
@@ -573,7 +571,7 @@ struct pe_session {
 #ifdef FEATURE_WLAN_ESE
 	uint8_t is_ese_version_ie_present;
 #endif
-	uint8_t sap_dot11mc;
+	bool sap_dot11mc;
 	bool is_vendor_specific_vhtcaps;
 	uint8_t vendor_specific_vht_ie_sub_type;
 	bool vendor_vht_sap;

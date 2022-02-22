@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1001,6 +1002,120 @@ static enum ieee80211_phymode hdd_son_get_phymode(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
+ * hdd_son_per_sta_len() - get sta information length
+ * @sta_info: pointer to hdd_station_info
+ *
+ * TD: Certain IE may be provided for sta info
+ *
+ * Return: the size which is needed for given sta info
+ */
+static uint32_t hdd_son_per_sta_len(struct hdd_station_info *sta_info)
+{
+	return qdf_roundup(sizeof(struct ieee80211req_sta_info),
+			   sizeof(uint32_t));
+}
+
+/**
+ * hdd_son_get_sta_space() - how many space are needed for given vdev
+ * @vdev: vdev
+ *
+ * Return: space needed for given vdev to provide sta info
+ */
+static uint32_t hdd_son_get_sta_space(struct wlan_objmgr_vdev *vdev)
+{
+	struct hdd_adapter *adapter;
+	struct hdd_station_info *sta_info = NULL;
+	uint32_t space = 0;
+
+	if (!vdev) {
+		hdd_err("null vdev");
+		return space;
+	}
+	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	if (!adapter) {
+		hdd_err("null adapter");
+		return space;
+	}
+
+	hdd_for_each_sta_ref(adapter->sta_info_list, sta_info,
+			     STA_INFO_SOFTAP_GET_STA_INFO) {
+		if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac))
+			space += hdd_son_per_sta_len(sta_info);
+
+		hdd_put_sta_info_ref(&adapter->sta_info_list,
+				     &sta_info, true,
+				     STA_INFO_SOFTAP_GET_STA_INFO);
+	}
+	hdd_debug("sta list space %u", space);
+
+	return space;
+}
+
+/**
+ * hdd_son_get_stalist() - get connected station list
+ * @vdev: vdev
+ * @si: pointer to ieee80211req_sta_info
+ * @space: space left
+ *
+ * Return: void
+ */
+static void hdd_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
+				 struct ieee80211req_sta_info *si,
+				 uint32_t *space)
+{
+	struct hdd_adapter *adapter;
+	struct hdd_station_info *sta_info = NULL;
+	uint32_t len;
+
+	if (!vdev) {
+		hdd_err("null vdev");
+		return;
+	}
+	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	if (!adapter) {
+		hdd_err("null adapter");
+		return;
+	}
+
+	hdd_for_each_sta_ref(adapter->sta_info_list, sta_info,
+			     STA_INFO_SOFTAP_GET_STA_INFO) {
+		if (!qdf_is_macaddr_broadcast(&sta_info->sta_mac)) {
+			len = hdd_son_per_sta_len(sta_info);
+
+			if (len > *space) {
+				/* no more space if left */
+				hdd_put_sta_info_ref(
+					&adapter->sta_info_list,
+					&sta_info, true,
+					STA_INFO_SOFTAP_GET_STA_INFO);
+				hdd_err("space %u, length %u", *space, len);
+
+				return;
+			}
+
+			qdf_mem_copy(si->isi_macaddr, &sta_info->sta_mac,
+				     QDF_MAC_ADDR_SIZE);
+			si->isi_ext_cap = sta_info->ext_cap;
+			si->isi_operating_bands = sta_info->supported_band;
+			si->isi_assoc_time = sta_info->assoc_ts;
+			si->isi_rssi = sta_info->rssi;
+			si->isi_len = len;
+			si->isi_ie_len = 0;
+			si = (struct ieee80211req_sta_info *)(((uint8_t *)si) +
+			     len);
+			*space -= len;
+			hdd_debug("sta " QDF_MAC_ADDR_FMT " ext_cap %u op band %u rssi %d len %u",
+				  QDF_MAC_ADDR_REF(si->isi_macaddr),
+				  si->isi_ext_cap, si->isi_operating_bands,
+				  si->isi_rssi, si->isi_len);
+		}
+		hdd_put_sta_info_ref(&adapter->sta_info_list,
+				     &sta_info, true,
+				     STA_INFO_SOFTAP_GET_STA_INFO);
+	}
+}
+
+/**
  * hdd_son_set_acl_policy() - set son acl policy
  * @vdev: vdev
  * @son_acl_policy: enum ieee80211_acl_cmd
@@ -1311,6 +1426,83 @@ static void hdd_son_modify_acl(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
+static int hdd_son_send_cfg_event(struct wlan_objmgr_vdev *vdev,
+				  uint32_t event_id,
+				  uint32_t event_len,
+				  const uint8_t *event_buf)
+{
+	struct hdd_adapter *adapter;
+	uint32_t len;
+	uint32_t idx;
+	struct sk_buff *skb;
+
+	if (!event_buf) {
+		hdd_err("invalid event buf");
+		return -EINVAL;
+	}
+
+	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	if (!adapter) {
+		hdd_err("null adapter");
+		return -EINVAL;
+	}
+
+	len = nla_total_size(sizeof(event_id)) +
+			nla_total_size(event_len) +
+			NLMSG_HDRLEN;
+	idx = QCA_NL80211_VENDOR_SUBCMD_GET_WIFI_CONFIGURATION_INDEX;
+	skb = cfg80211_vendor_event_alloc(adapter->hdd_ctx->wiphy,
+					  &adapter->wdev,
+					  len,
+					  idx,
+					  GFP_KERNEL);
+	if (!skb) {
+		hdd_err("failed to alloc cfg80211 vendor event");
+		return -EINVAL;
+	}
+
+	if (nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND,
+			event_id)) {
+		hdd_err("failed to put attr config generic command");
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	if (nla_put(skb,
+		    QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA,
+		    event_len,
+		    event_buf)) {
+		hdd_err("failed to put attr config generic data");
+		kfree_skb(skb);
+		return -EINVAL;
+	}
+
+	cfg80211_vendor_event(skb, GFP_KERNEL);
+
+	return 0;
+}
+
+static int hdd_son_deliver_opmode(struct wlan_objmgr_vdev *vdev,
+				  uint32_t event_len,
+				  const uint8_t *event_buf)
+{
+	return hdd_son_send_cfg_event(vdev,
+				      QCA_NL80211_VENDOR_SUBCMD_OPMODE_UPDATE,
+				      event_len,
+				      event_buf);
+}
+
+static int hdd_son_deliver_smps(struct wlan_objmgr_vdev *vdev,
+				uint32_t event_len,
+				const uint8_t *event_buf)
+{
+	return hdd_son_send_cfg_event(vdev,
+				      QCA_NL80211_VENDOR_SUBCMD_SMPS_UPDATE,
+				      event_len,
+				      event_buf);
+}
+
 void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct son_callbacks cb_obj = {0};
@@ -1336,6 +1528,76 @@ void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.os_if_get_chwidth = hdd_son_get_chwidth;
 	cb_obj.os_if_deauth_sta = hdd_son_deauth_sta;
 	cb_obj.os_if_modify_acl = hdd_son_modify_acl;
+	cb_obj.os_if_get_sta_list = hdd_son_get_sta_list;
+	cb_obj.os_if_get_sta_space = hdd_son_get_sta_space;
 
 	os_if_son_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
+
+	ucfg_son_register_deliver_opmode_cb(hdd_ctx->psoc,
+					    hdd_son_deliver_opmode);
+	ucfg_son_register_deliver_smps_cb(hdd_ctx->psoc,
+					  hdd_son_deliver_smps);
+}
+
+int hdd_son_deliver_acs_complete_event(struct hdd_adapter *adapter)
+{
+	int ret;
+
+	ret = os_if_son_deliver_ald_event(adapter, NULL,
+					  MLME_EVENT_ACS_COMPLETE, NULL);
+	return ret;
+}
+
+int hdd_son_deliver_cac_status_event(struct hdd_adapter *adapter,
+				     bool radar_detected)
+{
+	int ret;
+
+	ret = os_if_son_deliver_ald_event(adapter, NULL,
+					  MLME_EVENT_CAC_STATUS,
+					  &radar_detected);
+	return ret;
+}
+
+int hdd_son_deliver_assoc_disassoc_event(struct hdd_adapter *adapter,
+					 struct qdf_mac_addr sta_mac,
+					 uint32_t reason_code,
+					 enum assoc_disassoc_event flag)
+{
+	int ret;
+	struct son_ald_assoc_event_info info;
+
+	qdf_mem_zero(&info, sizeof(info));
+	memcpy(info.macaddr, &sta_mac.bytes, QDF_MAC_ADDR_SIZE);
+	info.flag = flag;
+	info.reason = reason_code;
+	ret = os_if_son_deliver_ald_event(adapter, NULL,
+					  MLME_EVENT_ASSOC_DISASSOC, &info);
+	return ret;
+}
+
+void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
+					  uint8_t *peer_mac)
+{
+	struct wlan_objmgr_peer *peer;
+	int ret;
+
+	if (adapter->device_mode != QDF_SAP_MODE) {
+		osif_err("Non SAP vdev");
+		return;
+	}
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_UMAC_COMP_SON);
+	if (!peer) {
+		osif_err("No peer object for sta" QDF_FULL_MAC_FMT,
+			 QDF_FULL_MAC_REF(peer_mac));
+		return;
+	}
+
+	ret = os_if_son_deliver_ald_event(adapter, peer,
+					  MLME_EVENT_CLIENT_ASSOCIATED, NULL);
+	if (ret)
+		osif_err("ALD ASSOCIATED Event failed for" QDF_FULL_MAC_FMT,
+			 QDF_FULL_MAC_REF(peer_mac));
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_UMAC_COMP_SON);
 }

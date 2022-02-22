@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -265,43 +265,6 @@ bool wlan_cm_host_roam_in_progress(struct wlan_objmgr_psoc *psoc,
 	return host_roam_in_progress;
 }
 
-QDF_STATUS wlan_cm_abort_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
-{
-	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
-	QDF_STATUS status;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-						    WLAN_MLME_CM_ID);
-	if (!vdev) {
-		mlme_err("vdev object is NULL");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	status = cm_roam_acquire_lock(vdev);
-	if (QDF_IS_STATUS_ERROR(status))
-		goto release_ref;
-
-	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) ||
-	    wlan_cm_host_roam_in_progress(psoc, vdev_id)) {
-		cm_roam_release_lock(vdev);
-		status = QDF_STATUS_E_BUSY;
-		goto release_ref;
-	}
-
-	/* RSO stop cmd will be issued with lock held to avoid
-	 * any racing conditions with wma/csr layer
-	 */
-	wlan_cm_disable_rso(pdev, vdev_id, REASON_DRIVER_DISABLED,
-			    RSO_INVALID_REQUESTOR);
-
-	cm_roam_release_lock(vdev);
-release_ref:
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
-
-	return status;
-}
-
 bool wlan_cm_roaming_in_progress(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 {
 	bool roaming_in_progress = false;
@@ -329,6 +292,25 @@ QDF_STATUS wlan_cm_roam_stop_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				 uint8_t reason)
 {
 	return cm_roam_stop_req(psoc, vdev_id, reason);
+}
+
+bool wlan_cm_same_band_sta_allowed(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	struct dual_sta_policy *dual_sta_policy;
+
+	if (!wlan_mlme_get_dual_sta_roaming_enabled(psoc))
+		return true;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return true;
+
+	dual_sta_policy = &mlme_obj->cfg.gen.dual_sta_policy;
+	if (dual_sta_policy->primary_vdev_id != WLAN_UMAC_VDEV_ID_MAX)
+		return true;
+
+	return false;
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -451,55 +433,34 @@ bool wlan_cm_roam_is_pcl_per_vdev_active(struct wlan_objmgr_psoc *psoc,
 	return mlme_priv->cm_roam.pcl_vdev_cmd_active;
 }
 
-bool
+/**
+ * wlan_cm_dual_sta_is_freq_allowed() - This API is used to check if the
+ * provided frequency is allowed for the 2nd STA vdev for connection.
+ * @psoc: Pointer to PSOC object
+ * @freq: Frequency in the given frequency list for the STA that is about to
+ * connect
+ * @connected_sta_freq: 1st connected sta freq
+ * @opmode: Operational mode
+ *
+ * Make sure to validate the STA+STA condition before calling this
+ *
+ * Return: True if this channel is allowed for connection when dual sta roaming
+ * is enabled
+ */
+static bool
 wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc,
-				 uint32_t freq,
+				 uint32_t freq, qdf_freq_t connected_sta_freq,
 				 enum QDF_OPMODE opmode)
 {
-	uint32_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
-	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	enum reg_wifi_band band;
-	uint32_t count, connected_sta_freq;
-	struct wlan_mlme_psoc_ext_obj *mlme_obj;
-	struct dual_sta_policy *dual_sta_policy;
 
-	mlme_obj = mlme_get_psoc_ext_obj(psoc);
-	if (!mlme_obj)
-		return QDF_STATUS_E_FAILURE;
-
-	/*
-	 * Check if primary iface is configured. If yes,
-	 * then allow further STA connection to all
-	 * available bands/channels irrespective of first
-	 * STA connection band, which allow driver to
-	 * connect with the best available AP present in
-	 * environment, so that user can switch to second
-	 * connection and mark it as primary.
-	 */
-	dual_sta_policy = &mlme_obj->cfg.gen.dual_sta_policy;
-	if (dual_sta_policy->primary_vdev_id != WLAN_UMAC_VDEV_ID_MAX) {
-		mlme_debug("primary iface is configured, vdev_id: %d",
-			   dual_sta_policy->primary_vdev_id);
-		return true;
-	}
-
-	/*
-	 * Check if already there is 1 STA connected. If this API is
-	 * called for 2nd STA and if dual sta roaming is enabled, then
-	 * don't allow the intra band frequencies of the 1st sta for
-	 * connection on 2nd STA.
-	 */
-	count = policy_mgr_get_mode_specific_conn_info(psoc, op_ch_freq_list,
-						       vdev_id_list,
-						       PM_STA_MODE);
-	if (!count || !wlan_mlme_get_dual_sta_roaming_enabled(psoc) ||
-	    opmode != QDF_STA_MODE)
+	if (opmode != QDF_STA_MODE || !connected_sta_freq)
 		return true;
 
-	connected_sta_freq = op_ch_freq_list[0];
 	band = wlan_reg_freq_to_band(connected_sta_freq);
+	/* Reject if both are 2.4Ghz or both are not 2.4Ghz (5Ghz or 6Ghz) */
 	if ((band == REG_BAND_2G && WLAN_REG_IS_24GHZ_CH_FREQ(freq)) ||
-	    (band == REG_BAND_5G && !WLAN_REG_IS_24GHZ_CH_FREQ(freq)))
+	    (band != REG_BAND_2G && !WLAN_REG_IS_24GHZ_CH_FREQ(freq)))
 		return false;
 
 	return true;
@@ -519,10 +480,14 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 	char *chan_buff;
 	uint32_t len = 0;
 	uint32_t sta_count;
+	bool mlo_sta_present, sbs_mlo_sta_present = false;
+	qdf_freq_t op_ch_freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
 
 	filter->num_of_channels = 0;
-	sta_count = policy_mgr_mode_specific_connection_count(psoc,
-							PM_STA_MODE, NULL);
+	sta_count = policy_mgr_get_mode_specific_conn_info(psoc, op_ch_freq_list,
+							   vdev_id_list,
+							   PM_STA_MODE);
 
 	/* No need to fill freq list, if no other STA is in conencted state */
 	if (!sta_count)
@@ -553,6 +518,26 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 	if (dual_sta_policy->primary_vdev_id != WLAN_UMAC_VDEV_ID_MAX)
 		return;
 
+	mlo_sta_present = policy_mgr_is_mlo_sta_present(psoc);
+	/* check for SBS mlo if MLO sta is present and sta cnt > 1 */
+	if (mlo_sta_present && sta_count > 1)
+		sbs_mlo_sta_present =
+			policy_mgr_is_mlo_in_mode_sbs(psoc, PM_STA_MODE,
+						      NULL, NULL);
+
+	mlme_debug("mlo_sta_present %d sbs_mlo_sta_present %d",
+		   mlo_sta_present, sbs_mlo_sta_present);
+
+	/*
+	 * For ML STA (non-SBS) scenario, allow further STA connections to
+	 * all available bands/channels irrespective of existing STA
+	 * connection band.
+	 * But if ML STA is SBS (both link 5Ghz), allow only 2.4Ghz STA
+	 * connection
+	 */
+	if (mlo_sta_present && !sbs_mlo_sta_present)
+		return;
+
 	/*
 	 * Get Reg domain valid channels and update to the scan filter
 	 * if already 1st sta is in connected state. Don't allow channels
@@ -574,6 +559,7 @@ wlan_cm_dual_sta_roam_update_connect_channels(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < num_channels; i++) {
 		is_ch_allowed =
 			wlan_cm_dual_sta_is_freq_allowed(psoc, channel_list[i],
+							 op_ch_freq_list[0],
 							 QDF_STA_MODE);
 		if (!is_ch_allowed)
 			continue;
@@ -2537,8 +2523,8 @@ cm_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
 	ap_info.source = entry->source;
 	ap_info.rssi_reject_params.received_time = entry->received_time;
 	ap_info.rssi_reject_params.original_timeout = entry->original_timeout;
-	/* Add this ap info to the rssi reject ap type in blacklist manager */
-	wlan_blm_add_bssid_to_reject_list(pdev, &ap_info);
+	/* Add this ap info to the rssi reject ap type in denylist manager */
+	wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 }
 
 QDF_STATUS
@@ -3286,3 +3272,9 @@ rel_ref:
 	return status;
 }
 #endif /* WLAN_FEATURE_FIPS */
+
+QDF_STATUS
+cm_cleanup_mlo_link(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -238,20 +238,6 @@ QDF_STATUS wlan_cm_disable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 QDF_STATUS wlan_cm_enable_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			      enum wlan_cm_rso_control_requestor requestor,
 			      uint8_t reason);
-
-/**
- * wlan_cm_abort_rso() - Enable roam scan offload to firmware
- * @pdev: Pointer to pdev
- * @vdev_id: vdev id
- *
- * Returns:
- * QDF_STATUS_E_BUSY if roam_synch is in progress and upper layer has to wait
- *                   before RSO stop cmd can be issued;
- * QDF_STATUS_SUCCESS if roam_synch is not outstanding. RSO stop cmd will be
- *                    issued with the global SME lock held in this case, and
- *                    uppler layer doesn't have to do any wait.
- */
-QDF_STATUS wlan_cm_abort_rso(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /**
  * wlan_cm_roaming_in_progress() - check if roaming is in progress
@@ -827,23 +813,6 @@ bool wlan_cm_roam_is_pcl_per_vdev_active(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id);
 
 /**
- * wlan_cm_dual_sta_is_freq_allowed() - This API is used to check if the
- * provided frequency is allowed for the 2nd STA vdev for connection.
- * @psoc:   Pointer to PSOC object
- * @freq:   Frequency in the given frequency list for the STA that is about to
- * connect
- * @opmode: Operational mode
- *
- * This API will be called while filling scan filter channels during connection.
- *
- * Return: True if this channel is allowed for connection when dual sta roaming
- * is enabled
- */
-bool
-wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc, uint32_t freq,
-				 enum QDF_OPMODE opmode);
-
-/**
  * wlan_cm_dual_sta_roam_update_connect_channels() - Fill the allowed channels
  * for connection of the 2nd STA based on the 1st STA connected band if dual
  * sta roaming is enabled.
@@ -1162,13 +1131,6 @@ bool wlan_cm_roam_is_pcl_per_vdev_active(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id)
 {
 	return false;
-}
-
-static inline bool
-wlan_cm_dual_sta_is_freq_allowed(struct wlan_objmgr_psoc *psoc, uint32_t freq,
-				 enum QDF_OPMODE opmode)
-{
-	return true;
 }
 
 static inline void
@@ -1586,4 +1548,26 @@ wlan_cm_fw_to_host_phymode(WMI_HOST_WLAN_PHY_MODE phymode);
 QDF_STATUS
 wlan_cm_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
 				  uint16_t data_len, void *data);
+
+/**
+ * wlan_cm_same_band_sta_allowed() - check if same band STA +STA is allowed
+ *
+ * @psoc: psoc ptr
+ *
+ * Return: true if same band STA+STA is allowed
+ */
+bool wlan_cm_same_band_sta_allowed(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * cm_cleanup_mlo_link() - Cleanup the MLO link
+ *
+ * @vdev: MLO link vdev
+ *
+ * This posts the event WLAN_CM_SM_EV_ROAM_LINK_DOWN to CM to cleanup the
+ * resources allocated for MLO link e.g. vdev, pe_session, etc..
+ * This gets called when MLO to non-MLO roaming happens
+ *
+ * Return: qdf_status
+ */
+QDF_STATUS cm_cleanup_mlo_link(struct wlan_objmgr_vdev *vdev);
 #endif  /* WLAN_CM_ROAM_API_H__ */

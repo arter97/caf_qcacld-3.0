@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -106,6 +106,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_ap.h>
 #endif
+#include "wlan_hdd_son.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -768,6 +769,13 @@ static int __hdd_hostapd_set_mac_address(struct net_device *dev, void *addr)
 	hdd_debug("Changing MAC to " QDF_MAC_ADDR_FMT " of interface %s ",
 		  QDF_MAC_ADDR_REF(mac_addr.bytes),
 		  dev->name);
+
+	if (adapter->vdev) {
+		ret = hdd_dynamic_mac_address_set(hdd_ctx, adapter, mac_addr);
+		if (ret)
+			return ret;
+	}
+
 	hdd_update_dynamic_mac(hdd_ctx, &adapter->mac_addr, &mac_addr);
 	memcpy(&adapter->mac_addr, psta_mac_addr->sa_data, ETH_ALEN);
 	memcpy(dev->dev_addr, psta_mac_addr->sa_data, ETH_ALEN);
@@ -1597,6 +1605,8 @@ static void hdd_fill_station_info(struct hdd_adapter *adapter,
 	 */
 	is_dot11_mode_abgn = true;
 	stainfo->ecsa_capable = event->ecsa_capable;
+	stainfo->ext_cap = event->ext_cap;
+	stainfo->supported_band = event->supported_band;
 
 	if (event->vht_caps.present) {
 		stainfo->vht_present = true;
@@ -1920,6 +1930,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	uint8_t pdev_id;
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct wlan_objmgr_peer *peer;
+	uint8_t *mld;
 #endif
 	bool notify_new_sta = true;
 
@@ -2215,6 +2226,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		} else {
 			hdd_debug("Sent CAC end (interrupted) to user space");
 		}
+		hdd_son_deliver_cac_status_event(adapter, true);
 		break;
 	case eSAP_DFS_CAC_END:
 		wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
@@ -2232,6 +2244,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		} else {
 			hdd_debug("Sent CAC end to user space");
 		}
+		hdd_son_deliver_cac_status_event(adapter, false);
 		break;
 	case eSAP_DFS_RADAR_DETECT:
 	{
@@ -2258,6 +2271,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		} else {
 			hdd_debug("Sent radar detected to user space");
 		}
+		hdd_son_deliver_cac_status_event(adapter, true);
 		break;
 	}
 	case eSAP_DFS_RADAR_DETECT_DURING_PRE_CAC:
@@ -2270,6 +2284,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				wlan_hdd_sap_pre_cac_failure,
 				(void *)adapter);
 		qdf_sched_work(0, &hdd_ctx->sap_pre_cac_work);
+		hdd_son_deliver_cac_status_event(adapter, true);
 		break;
 	case eSAP_DFS_PRE_CAC_END:
 		hdd_debug("pre cac end notification received:%d",
@@ -2418,10 +2433,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				return QDF_STATUS_E_INVAL;
 			}
 
-			if (!wlan_peer_mlme_is_assoc_peer(peer)) {
+			mld = wlan_peer_mlme_get_mldaddr(peer);
+			if (!wlan_peer_mlme_is_assoc_peer(peer) &&
+			    !qdf_is_macaddr_zero((struct qdf_mac_addr *)mld)) {
 				hdd_err("skip userspace notification");
 				notify_new_sta = false;
 			}
+
+			wlan_objmgr_peer_release_ref(peer, WLAN_OSIF_ID);
 #endif
 		} else {
 			qdf_status = hdd_softap_register_sta(
@@ -2550,6 +2569,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		}
 
 		hdd_green_ap_add_sta(hdd_ctx);
+		hdd_son_deliver_assoc_disassoc_event(adapter,
+						     event->staMac,
+						     event->status,
+						     ALD_ASSOC_EVENT);
 		break;
 
 	case eSAP_STA_DISASSOC_EVENT:
@@ -2713,7 +2736,10 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			hdd_bus_bw_compute_reset_prev_txrx_stats(adapter);
 			hdd_bus_bw_compute_timer_try_stop(hdd_ctx);
 		}
-
+		hdd_son_deliver_assoc_disassoc_event(adapter,
+						     disassoc_comp->staMac,
+						     disassoc_comp->reason_code,
+						     ALD_DISASSOC_EVENT);
 		hdd_green_ap_del_sta(hdd_ctx);
 		break;
 
@@ -2827,6 +2853,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		return hdd_handle_acs_scan_event(sap_event, adapter);
 
 	case eSAP_ACS_CHANNEL_SELECTED:
+		hdd_son_deliver_acs_complete_event(adapter);
 		ap_ctx->sap_config.acs_cfg.pri_ch_freq =
 			sap_event->sapevt.sap_ch_selected.pri_ch_freq;
 		ap_ctx->sap_config.acs_cfg.ht_sec_ch_freq =
@@ -3150,6 +3177,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	struct hdd_station_ctx *sta_ctx;
 	struct sap_context *sap_ctx;
 	uint8_t conc_rule1 = 0;
+	uint8_t  sta_sap_scc_on_dfs_chnl;
 	bool is_p2p_go_session = false;
 	struct wlan_objmgr_vdev *vdev;
 	bool strict;
@@ -3204,9 +3232,16 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 							    NULL);
 	/*
 	 * For non-dbs HW, don't allow Channel switch on DFS channel if STA is
-	 * not connected.
+	 * not connected and sta_sap_scc_on_dfs_chnl is enabled.
 	 */
+	status = policy_mgr_get_sta_sap_scc_on_dfs_chnl(
+				hdd_ctx->psoc, &sta_sap_scc_on_dfs_chnl);
+	if (QDF_STATUS_SUCCESS != status) {
+		return status;
+	}
+
 	if (!sta_cnt && !policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
+	    !!sta_sap_scc_on_dfs_chnl &&
 	    (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, target_chan_freq) ||
 	    (wlan_reg_is_5ghz_ch_freq(target_chan_freq) &&
 	     target_bw == CH_WIDTH_160MHZ))) {
@@ -5720,8 +5755,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	} else {
 		config->wps_state = SAP_WPS_DISABLED;
 	}
-	/* Forward WPS PBC probe request frame up */
-	config->fwdWPSPBCProbeReq = 1;
 	(WLAN_HDD_GET_AP_CTX_PTR(adapter))->encryption_type =
 		eCSR_ENCRYPT_TYPE_NONE;
 
@@ -6106,7 +6139,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		goto error;
 	}
 
-	qdf_status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
+	qdf_status = qdf_wait_single_event(&hostapd_state->qdf_event,
 					SME_CMD_START_BSS_TIMEOUT);
 
 	wlansap_reset_sap_config_add_ie(config, eUPDATE_IE_ALL);
@@ -6123,7 +6156,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		hdd_set_connection_in_progress(false);
 		sme_get_command_q_status(mac_handle);
 		wlansap_stop_bss(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
-		QDF_ASSERT(0);
+		if (!cds_is_driver_recovering())
+			QDF_ASSERT(0);
 		ret = -EINVAL;
 		goto error;
 	}
@@ -6596,8 +6630,8 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 			continue;
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
 			break;
-		if (wlan_reg_is_same_band_freqs(freq,
-						op_freq[i]))
+		if (wlan_reg_is_same_band_freqs(freq, op_freq[i]) &&
+		    !policy_mgr_are_sbs_chan(hdd_ctx->psoc, freq, op_freq[i]))
 			break;
 	}
 	if (i >= cc_count)
@@ -6692,7 +6726,8 @@ hdd_sap_nan_check_and_disable_unsupported_ndi(struct wlan_objmgr_psoc *psoc,
 #endif
 
 #if defined(WLAN_SUPPORT_TWT) && \
-	(LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0))
+	((LINUX_VERSION_CODE >= KERNEL_VERSION(5, 3, 0)) || \
+	  defined(CFG80211_TWT_RESPONDER_SUPPORT))
 static void
 wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
 			      struct cfg80211_ap_settings *params)
@@ -6704,7 +6739,8 @@ wlan_hdd_update_twt_responder(struct hdd_context *hdd_ctx,
 	ucfg_mlme_set_twt_responder(hdd_ctx->psoc, QDF_MIN(
 					twt_res_svc_cap,
 					(enable_twt && params->twt_responder)));
-	if (params->twt_responder)
+	hdd_debug("cfg80211 TWT responder:%d", params->twt_responder);
+	if (enable_twt && params->twt_responder)
 		hdd_send_twt_responder_enable_cmd(hdd_ctx);
 	else
 		hdd_send_twt_responder_disable_cmd(hdd_ctx);

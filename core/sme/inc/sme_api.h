@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -988,25 +988,6 @@ QDF_STATUS sme_start_roaming(mac_handle_t mac_handle, uint8_t sessionId,
 			     enum wlan_cm_rso_control_requestor requestor);
 
 /**
- * sme_abort_roaming() - Try to stop RSO if conditions allowable
- * This function checks if the current roaming state machine allows RSO stop
- * cmd to be issued, and stops roaming if allowed, otherwise, indicate to
- * the caller that a wait is required.
- *
- * @mac_handle - The handle returned by mac_open
- * @session_id - Session identifier
- *
- * Returns:
- * QDF_STATUS_E_BUSY if roam_synch is in progress and upper layer has to wait
- *                   before RSO stop cmd can be issued;
- * QDF_STATUS_SUCCESS if roam_synch is not outstanding. RSO stop cmd will be
- *                    issued with the global SME lock held in this case, and
- *                    uppler layer doesn't have to do any wait.
- */
-QDF_STATUS sme_abort_roaming(mac_handle_t mac_handle, uint8_t vdev_id);
-
-
-/**
  * sme_roaming_in_progress() - check if roaming is in progress
  * @mac_handle - The handle returned by mac_open
  * @vdev_id: vdev id
@@ -1324,6 +1305,8 @@ QDF_STATUS sme_roam_start_beacon_req(mac_handle_t mac_handle,
 				     struct qdf_mac_addr bssid,
 				     uint8_t dfsCacWaitStatus);
 
+QDF_STATUS sme_csa_restart(struct mac_context *mac_ctx, uint8_t session_id);
+
 /**
  * sme_roam_csa_ie_request() - request CSA IE transmission from PE
  * @mac_handle: handle returned by mac_open
@@ -1331,15 +1314,15 @@ QDF_STATUS sme_roam_start_beacon_req(mac_handle_t mac_handle,
  * @target_chan_freq: target channel frequency information
  * @csaIeReqd: CSA IE Request
  * @ch_params: channel information
+ * @new_cac_ms: cac duration of new channel
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_csa_restart(struct mac_context *mac_ctx, uint8_t session_id);
-
 QDF_STATUS sme_roam_csa_ie_request(mac_handle_t mac_handle,
 				   struct qdf_mac_addr bssid,
 				   uint32_t target_chan_freq, uint8_t csaIeReqd,
-				   struct ch_params *ch_params);
+				   struct ch_params *ch_params,
+				   uint32_t new_cac_ms);
 
 /**
  * sme_set_addba_accept() - Allow/Reject the ADDBA req session
@@ -2434,6 +2417,27 @@ sme_set_del_peers_ind_callback(mac_handle_t mac_handle,
  */
 void sme_set_chan_info_callback(mac_handle_t mac_handle,
 			void (*callback)(struct scan_chan_info *chan_info));
+
+#ifdef WLAN_FEATURE_CAL_FAILURE_TRIGGER
+/**
+ * sme_set_cal_failure_event_cb() - Register calibration failure event callback
+ * @mac_handle - MAC global handle
+ * @callback   - calibration failure event callback from HDD
+ *
+ * This API is invoked by HDD to register its callback to mac
+ *
+ * Return: None
+ */
+void sme_set_cal_failure_event_cb(
+			mac_handle_t mac_handle,
+			void (*callback)(uint8_t cal_type, uint8_t reason));
+#else
+static inline void
+sme_set_cal_failure_event_cb(mac_handle_t mac_handle,
+			     void (*callback)(uint8_t cal_type, uint8_t reason))
+{
+}
+#endif
 
 /**
  * sme_get_rssi_snr_by_bssid() - gets the rssi and snr by bssid from scan cache
@@ -4477,4 +4481,40 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
 			      struct qdf_mac_addr *bssid,
 			      qdf_freq_t chan_freq,
 			      enum phy_ch_width chan_width);
+
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+/**
+ * sme_send_set_mac_addr() - Send set MAC address command to FW
+ * @mac_addr: VDEV MAC address
+ * @mld_addr: VDEV MLD address
+ * @vdev: Pointer to object manager VDEV
+ *
+ * API to send set MAC address request command to FW
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
+				 struct qdf_mac_addr mld_addr,
+				 struct wlan_objmgr_vdev *vdev);
+
+/**
+ * sme_update_vdev_mac_addr() - Update VDEV MAC address
+ * @psoc: Pointer to PSOC structure
+ * @mac_addr: VDEV MAC address
+ * @vdev: Pointer to object manager VDEV
+ * @update_sta_self_peer: Flag to check self peer MAC address or not.
+ * @req_status: Status of the set MAC address request to the FW
+ *
+ * API to update MLME structures with new MAC address. This will be invoked
+ * after receiving success status form the FW for the set MAC address request
+ * command.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
+				    struct qdf_mac_addr mac_addr,
+				    struct wlan_objmgr_vdev *vdev,
+				    bool update_sta_self_peer, int req_status);
+#endif
+
 #endif /* #if !defined( __SME_API_H ) */

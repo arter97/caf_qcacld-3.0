@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,6 +90,7 @@
 #endif /* kernel version less than 4.0.0 && no_backport */
 
 #define HDD_LINK_STATS_MAX		5
+#define HDD_MAX_ALLOWED_LL_STATS_FAILURE	5
 
 /* 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
@@ -2050,6 +2051,10 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 
 	hdd_enter_dev(adapter->dev);
 
+	status = wlan_hdd_set_station_stats_request_pending(adapter);
+	if (status == QDF_STATUS_E_ALREADY)
+		return qdf_status_to_os_return(status);
+
 	/*
 	 * FW can send radio stats with multiple events and for the first event
 	 * host allocates memory in wma and processes the events, there is a
@@ -2063,10 +2068,6 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	 * previous command
 	 */
 	sme_radio_tx_mem_free();
-
-	status = wlan_hdd_set_station_stats_request_pending(adapter);
-	if (status == QDF_STATUS_E_ALREADY)
-		return qdf_status_to_os_return(status);
 
 	request = osif_request_alloc(&params);
 	if (!request) {
@@ -2094,8 +2095,10 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	}
 	ret = osif_request_wait_for_response(request);
 	if (ret) {
-		hdd_err("Target response timed out request id %d request bitmap 0x%x",
-			priv->request_id, priv->request_bitmap);
+		adapter->ll_stats_failure_count++;
+		hdd_err("Target response timed out request id %d request bitmap 0x%x ll_stats failure count %d",
+			priv->request_id, priv->request_bitmap,
+			adapter->ll_stats_failure_count);
 		qdf_spin_lock(&priv->ll_stats_lock);
 		priv->request_bitmap = 0;
 		qdf_spin_unlock(&priv->ll_stats_lock);
@@ -2103,6 +2106,7 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 		ret = -ETIMEDOUT;
 	} else {
 		hdd_update_station_stats_cached_timestamp(adapter);
+		adapter->ll_stats_failure_count = 0;
 	}
 
 	qdf_spin_lock(&priv->ll_stats_lock);
@@ -2123,6 +2127,12 @@ exit:
 	wlan_hdd_reset_station_stats_request_pending(hdd_ctx->psoc, adapter);
 	hdd_exit();
 	osif_request_put(request);
+
+	if (adapter->ll_stats_failure_count >=
+					HDD_MAX_ALLOWED_LL_STATS_FAILURE) {
+		cds_trigger_recovery(QDF_STATS_REQ_TIMEDOUT);
+		adapter->ll_stats_failure_count = 0;
+	}
 
 	return ret;
 }
@@ -2202,6 +2212,11 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 	if (!adapter->is_link_layer_stats_set) {
 		hdd_nofl_debug("is_link_layer_stats_set: %d",
 			       adapter->is_link_layer_stats_set);
+		return -EINVAL;
+	}
+
+	if (adapter->device_mode == QDF_SAP_MODE) {
+		hdd_nofl_debug("LL_STATS get is not supported for SAP mode");
 		return -EINVAL;
 	}
 
@@ -4265,7 +4280,7 @@ static void wlan_hdd_fill_summary_stats(tCsrSummaryStatsInfo *stats,
 	if (cds_dp_get_vdev_stats(vdev_id, &dp_stats)) {
 		orig_cnt = info->tx_retries;
 		orig_fail_cnt = info->tx_failed;
-		info->tx_retries = dp_stats.tx_retries;
+		info->tx_retries = dp_stats.tx_retries_mpdu;
 		info->tx_failed += dp_stats.tx_mpdu_success_with_retries;
 		hdd_debug("vdev %d tx retries adjust from %d to %d",
 			  vdev_id, orig_cnt, info->tx_retries);
@@ -5182,7 +5197,7 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
  * wlan_hdd_get_station_remote() - NL80211_CMD_GET_STATION handler for SoftAP
  * @wiphy: pointer to wiphy
  * @dev: pointer to net_device structure
- * @mac: request peer mac address
+ * @stainfo: request peer station info
  * @sinfo: pointer to station_info struct
  *
  * This function will get remote peer info from fw and fill sinfo struct
@@ -5191,36 +5206,19 @@ static void wlan_hdd_fill_rate_info(struct hdd_fw_txrx_stats *txrx_stats,
  */
 static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 				       struct net_device *dev,
-				       const u8 *mac,
+				       struct hdd_station_info *stainfo,
 				       struct station_info *sinfo)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hddctx = wiphy_priv(wiphy);
-	struct hdd_station_info *stainfo = NULL;
 	struct stats_event *stats;
 	struct hdd_fw_txrx_stats txrx_stats;
 	int i, status;
 
-	status = wlan_hdd_validate_context(hddctx);
-	if (status != 0)
-		return status;
-
-	hdd_debug("Peer "QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac));
-
-	stainfo = hdd_get_sta_info_by_mac(&adapter->sta_info_list, mac,
-					  STA_INFO_WLAN_HDD_GET_STATION_REMOTE);
-	if (!stainfo) {
-		hdd_err("peer "QDF_MAC_ADDR_FMT" not found",
-			QDF_MAC_ADDR_REF(mac));
-		return -EINVAL;
-	}
-
 	stats = wlan_cfg80211_mc_cp_stats_get_peer_stats(adapter->vdev,
-							 mac, &status);
+					stainfo->sta_mac.bytes, &status);
 	if (status || !stats) {
 		wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
-		hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo, true,
-				     STA_INFO_WLAN_HDD_GET_STATION_REMOTE);
 		hdd_err("fail to get peer info from fw");
 		return -EPERM;
 	}
@@ -5244,8 +5242,6 @@ static int wlan_hdd_get_station_remote(struct wiphy *wiphy,
 	wlan_hdd_fill_station_info(hddctx->psoc, adapter,
 				   sinfo, stainfo, &txrx_stats);
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
-	hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo, true,
-			     STA_INFO_WLAN_HDD_GET_STATION_REMOTE);
 
 	return status;
 }
@@ -5986,9 +5982,10 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 					   const uint8_t *mac,
 					   struct station_info *sinfo)
 {
-	int status;
+	int errno;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_station_info *stainfo;
 	bool get_peer_info_enable;
 	QDF_STATUS qdf_status;
 
@@ -5999,9 +5996,8 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	status = wlan_hdd_validate_context(hdd_ctx);
-	if (status)
-		return status;
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
 
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
@@ -6011,9 +6007,22 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 		qdf_status = ucfg_mlme_get_sap_get_peer_info(
 				hdd_ctx->psoc, &get_peer_info_enable);
 		if (qdf_status == QDF_STATUS_SUCCESS && get_peer_info_enable) {
-			status = wlan_hdd_get_station_remote(wiphy, dev,
-							     mac, sinfo);
-			if (!status)
+			stainfo = hdd_get_sta_info_by_mac(
+					&adapter->sta_info_list, mac,
+					STA_INFO_WLAN_HDD_CFG80211_GET_STATION);
+			if (!stainfo) {
+				hdd_debug("Peer " QDF_MAC_ADDR_FMT " not found",
+					  QDF_MAC_ADDR_REF(mac));
+				return -EINVAL;
+			}
+
+			errno = wlan_hdd_get_station_remote(wiphy, dev,
+							    stainfo, sinfo);
+			hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo,
+					     true,
+					STA_INFO_WLAN_HDD_CFG80211_GET_STATION
+					);
+			if (!errno)
 				return 0;
 		}
 		return wlan_hdd_get_sap_stats(adapter, sinfo);
@@ -6106,7 +6115,7 @@ int wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
  * __wlan_hdd_cfg80211_dump_station() - dump station statistics
  * @wiphy: Pointer to wiphy
  * @dev: Pointer to network device
- * @idx: variable to determine whether to get stats or not
+ * @idx: variable to station index, kernel iterate all stations over idx
  * @mac: Pointer to mac
  * @sinfo: Pointer to station info
  *
@@ -6117,11 +6126,59 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 				int idx, u8 *mac,
 				struct station_info *sinfo)
 {
+	int errno;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	struct hdd_station_info *stainfo;
+	bool get_peer_info_enable;
+	QDF_STATUS qdf_status;
+
 	hdd_debug("idx: %d", idx);
-	if (idx != 0)
-		return -ENOENT;
-	qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
-	return __wlan_hdd_cfg80211_get_station(wiphy, dev, mac, sinfo);
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EINVAL;
+	}
+
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return -EINVAL;
+
+	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
+		return -EINVAL;
+
+	if (adapter->device_mode == QDF_SAP_MODE ||
+	    adapter->device_mode == QDF_P2P_GO_MODE) {
+		qdf_status = ucfg_mlme_get_sap_get_peer_info(
+				hdd_ctx->psoc, &get_peer_info_enable);
+		if (qdf_status == QDF_STATUS_SUCCESS && get_peer_info_enable) {
+			stainfo = hdd_get_sta_info_by_id(
+					&adapter->sta_info_list,
+					idx,
+					STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION
+					);
+			if (!stainfo) {
+				hdd_err("peer idx %d NOT FOUND", idx);
+				return -ENOENT;
+			}
+
+			qdf_mem_copy(mac, &stainfo->sta_mac.bytes,
+				     QDF_MAC_ADDR_SIZE);
+			errno = wlan_hdd_get_station_remote(wiphy, dev,
+							    stainfo, sinfo);
+			hdd_put_sta_info_ref(&adapter->sta_info_list, &stainfo,
+					     true,
+					STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION
+					);
+		} else {
+			errno = -EINVAL;
+			hdd_err("sap get peer info disabled!");
+		}
+	} else {
+		qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
+		errno = wlan_hdd_get_sta_stats(wiphy, adapter, mac, sinfo);
+	}
+
+	return errno;
 }
 
 /**

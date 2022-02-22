@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -240,6 +241,8 @@ typedef struct sLimMlmAssocInd {
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	uint8_t ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 
 	tDot11fIEHTCaps ht_caps;
 	tDot11fIEVHTCaps vht_caps;
@@ -427,8 +430,6 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 /**
  * lim_proc_assoc_req_frm_cmn() - process assoc req frame
  * @mac_ctx: pointer to Global MAC structure
- * @frm_body: frame body
- * @frame_len: frame len
  * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
  * @session: pointer to pe session entry
  * @sa: Mac address of requesting peer
@@ -438,36 +439,11 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
  * Return: QDF_STATUS
  */
 QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
-				      uint8_t *frm_body, uint32_t frame_len,
 				      uint8_t sub_type,
 				      struct pe_session *session,
 				      tSirMacAddr sa,
 				      tpSirAssocReq assoc_req,
 				      uint16_t peer_aid);
-
-/**
- * lim_mlo_partner_assoc_req_parse() - checks for error in assoc req frame
- *                                     parsing for mlo partner link
- * @mac_ctx: pointer to Global MAC structure
- * @sa: Mac address of requesting peer
- * @session: pointer to pe session entry
- * @assoc_req: pointer to ASSOC/REASSOC Request frame
- * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
- * @frm_body: frame body
- * @frame_len: frame len
- *
- * Checks for error in frame parsing
- *
- * Return: QDF_STATUS
- */
-#ifdef WLAN_FEATURE_11BE_MLO
-QDF_STATUS lim_mlo_partner_assoc_req_parse(struct mac_context *mac_ctx,
-					   tSirMacAddr sa,
-					   struct pe_session *session,
-					   tpSirAssocReq assoc_req,
-					   uint8_t sub_type, uint8_t *frm_body,
-					   uint32_t frame_len);
-#endif
 
 void lim_process_assoc_req_frame(struct mac_context *, uint8_t *, uint8_t, struct pe_session *);
 
@@ -1425,22 +1401,6 @@ void lim_process_mlm_start_req(struct mac_context *mac_ctx,
  */
 void lim_process_mlm_join_req(struct mac_context *mac_ctx,
 			      tLimMlmJoinReq *mlm_join_req);
-
-/**
- * lim_post_join_set_link_state_callback()- registered callback to perform post
- * peer creation operations
- * @mac: pointer to global mac structure
- * @callback_arg: registered callback argument
- * @status: peer creation status
- *
- * This is registered callback function during association to perform
- * post peer creation operation based on the peer creation status
- *
- * Return: none
- */
-void
-lim_post_join_set_link_state_callback(struct mac_context *mac, uint32_t vdev_id,
-				      QDF_STATUS status);
 
 void lim_send_peer_create_resp(struct mac_context *mac, uint8_t vdev_id,
 			       QDF_STATUS status, uint8_t *peer_mac);

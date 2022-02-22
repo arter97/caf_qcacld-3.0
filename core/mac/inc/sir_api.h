@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -707,48 +707,25 @@ struct start_bss_req {
 	uint16_t messageType;   /* eWNI_SME_START_BSS_REQ */
 	uint16_t length;
 	uint8_t vdev_id;
-	struct qdf_mac_addr bssid;
-	struct qdf_mac_addr self_macaddr;
 	uint16_t beaconInterval;
 	uint8_t dot11mode;
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-	uint8_t cc_switch_mode;
-#endif
-	enum bss_type bssType;
 	tSirMacSSid ssId;
 	uint32_t oper_ch_freq;
-	ePhyChanBondState cbMode;
 	uint8_t vht_channel_width;
 	uint8_t center_freq_seg0;
 	uint8_t center_freq_seg1;
 	uint8_t sec_ch_offset;
-
 	uint8_t privacy;
-	uint8_t apUapsdEnable;
 	uint8_t ssidHidden;
-	bool fwdWPSPBCProbeReq;
-	bool protEnabled;
-	bool obssProtEnabled;
-	uint16_t ht_capab;
 	tAniAuthType authType;
 	uint32_t dtimPeriod;
 	uint8_t wps_state;
-	enum QDF_OPMODE bssPersona;
-
-	uint8_t txLdpcIniFeatureEnabled;
-
 	tSirRSNie rsnIE;        /* RSN IE to be sent in */
-	/* Beacon and Probe */
-	/* Response frames */
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */
 	struct add_ie_params add_ie_params;
-
-	bool obssEnabled;
-	uint8_t sap_dot11mc;
 	uint16_t beacon_tx_rate;
-	bool vendor_vht_sap;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
 
@@ -1069,6 +1046,8 @@ struct assoc_ind {
 	uint8_t tx_mcs_map;
 	/* Extended CSA capability of station */
 	uint8_t ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 	tDot11fIEHTCaps HTCaps;
 	tDot11fIEVHTCaps VHTCaps;
 	bool he_caps_present;
@@ -2367,6 +2346,7 @@ typedef struct sSirDfsCsaIeRequest {
 	uint8_t  ch_switch_beacon_cnt;
 	uint8_t  ch_switch_mode;
 	uint8_t  dfs_ch_switch_disable;
+	uint32_t new_chan_cac_ms;
 } tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
 
 /* Indication from lower layer indicating the completion of first beacon send
@@ -3863,6 +3843,7 @@ struct sir_nss_update_request {
  * @REASON_COLOR_CHANGE: Color change
  * @REASON_CHANNEL_SWITCH: channel switch
  * @REASON_MLO_IE_UPDATE: mlo ie update
+ * @REASON_RNR_UPDATE: SAP is changed, notify co-located SAP
  */
 enum sir_bcn_update_reason {
 	REASON_DEFAULT = 0,
@@ -3872,6 +3853,7 @@ enum sir_bcn_update_reason {
 	REASON_COLOR_CHANGE = 4,
 	REASON_CHANNEL_SWITCH = 5,
 	REASON_MLO_IE_UPDATE = 6,
+	REASON_RNR_UPDATE = 7,
 };
 
 /**
@@ -5120,8 +5102,8 @@ struct sir_peer_set_rx_blocksize {
  * @retry_delay: Retry delay received during last rejection in ms
  * @ expected_rssi: RSSI at which STA can initate
  * @time_during_rejection: Timestamp during last rejection in millisec
- * @reject_reason: reason to add the BSSID to BLM
- * @source: Source of adding the BSSID to BLM
+ * @reject_reason: reason to add the BSSID to DLM
+ * @source: Source of adding the BSSID to DLM
  * @original_timeout: original timeout sent by the AP
  * @received_time: Timestamp when the AP was added to the Blacklist
  */
@@ -5131,8 +5113,8 @@ struct sir_rssi_disallow_lst {
 	uint32_t retry_delay;
 	int8_t expected_rssi;
 	qdf_time_t time_during_rejection;
-	enum blm_reject_ap_reason reject_reason;
-	enum blm_reject_ap_source source;
+	enum dlm_reject_ap_reason reject_reason;
+	enum dlm_reject_ap_source source;
 	uint32_t original_timeout;
 	qdf_time_t received_time;
 };

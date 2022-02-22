@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -100,6 +100,7 @@
 
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_misc.h>
+#include <cdp_txrx_ctrl.h>
 #include <qca_vendor.h>
 #include "wlan_pmo_ucfg_api.h"
 #include "os_if_wifi_pos.h"
@@ -3921,6 +3922,9 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 	if (hdd_is_wlm_latency_manager_supported(hdd_ctx))
 		fset |= WIFI_FEATURE_SET_LATENCY_MODE;
 
+	if (hdd_dynamic_mac_addr_supported(hdd_ctx))
+		fset |= WIFI_FEATURE_DYNAMIC_SET_MAC;
+
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(fset) +
 						  NLMSG_HDRLEN);
 	if (!skb) {
@@ -4583,24 +4587,24 @@ static int hdd_set_blacklist_bssid(struct hdd_context *hdd_ctx,
 	uint8_t j = 0;
 	struct nlattr *tb2[MAX_ROAMING_PARAM + 1];
 	struct nlattr *curr_attr = NULL;
-	struct qdf_mac_addr *black_list_bssid;
+	struct qdf_mac_addr *deny_list_bssid;
 	mac_handle_t mac_handle;
 
-	/* Parse and fetch number of blacklist BSSID */
+	/* Parse and fetch number of denylist BSSID */
 	if (!tb[PARAMS_NUM_BSSID]) {
-		hdd_err("attr num of blacklist bssid failed");
+		hdd_err("attr num of denylist bssid failed");
 		goto fail;
 	}
 	count = nla_get_u32(tb[PARAMS_NUM_BSSID]);
 	if (count > MAX_BSSID_AVOID_LIST) {
-		hdd_err("Blacklist BSSID count %u exceeds max %u",
+		hdd_err("Denylist BSSID count %u exceeds max %u",
 			count, MAX_BSSID_AVOID_LIST);
 		goto fail;
 	}
-	hdd_debug("Num of blacklist BSSID (%d)", count);
-	black_list_bssid = qdf_mem_malloc(sizeof(*black_list_bssid) *
+	hdd_debug("Num of denylist BSSID (%d)", count);
+	deny_list_bssid = qdf_mem_malloc(sizeof(*deny_list_bssid) *
 					  MAX_BSSID_AVOID_LIST);
-	if (!black_list_bssid)
+	if (!deny_list_bssid)
 		goto fail;
 
 	i = 0;
@@ -4609,7 +4613,7 @@ static int hdd_set_blacklist_bssid(struct hdd_context *hdd_ctx,
 			tb[PARAM_BSSID_PARAMS],
 			rem) {
 			if (i == count) {
-				hdd_warn("Ignoring excess Blacklist BSSID");
+				hdd_warn("Ignoring excess Denylist BSSID");
 				break;
 			}
 
@@ -4619,13 +4623,13 @@ static int hdd_set_blacklist_bssid(struct hdd_context *hdd_ctx,
 					 nla_len(curr_attr),
 					 wlan_hdd_set_roam_param_policy)) {
 				hdd_err("nla_parse failed");
-				qdf_mem_free(black_list_bssid);
+				qdf_mem_free(deny_list_bssid);
 				goto fail;
 			}
 			/* Parse and fetch MAC address */
 			if (!tb2[PARAM_SET_BSSID]) {
-				hdd_err("attr blacklist addr failed");
-				qdf_mem_free(black_list_bssid);
+				hdd_err("attr denylist addr failed");
+				qdf_mem_free(deny_list_bssid);
 				goto fail;
 			}
 			if (tb2[PARAM_SET_BSSID_HINT]) {
@@ -4641,28 +4645,28 @@ static int hdd_set_blacklist_bssid(struct hdd_context *hdd_ctx,
 						REASON_USERSPACE_AVOID_LIST;
 				ap_info.source = ADDED_BY_DRIVER;
 
-				/* This BSSID is avoided and not blacklisted */
-				ucfg_blm_add_bssid_to_reject_list(hdd_ctx->pdev,
+				/* This BSSID is avoided and not denylisted */
+				ucfg_dlm_add_bssid_to_reject_list(hdd_ctx->pdev,
 								  &ap_info);
 				i++;
 				continue;
 			}
-			nla_memcpy(black_list_bssid[j].bytes,
+			nla_memcpy(deny_list_bssid[j].bytes,
 				   tb2[PARAM_SET_BSSID], QDF_MAC_ADDR_SIZE);
 			hdd_debug(QDF_MAC_ADDR_FMT,
-				  QDF_MAC_ADDR_REF(black_list_bssid[j].bytes));
+				  QDF_MAC_ADDR_REF(deny_list_bssid[j].bytes));
 			i++;
 			j++;
 		}
 	}
 
 	if (i < count)
-		hdd_warn("Num Blacklist BSSID %u less than expected %u",
+		hdd_warn("Num Denylist BSSID %u less than expected %u",
 			 i, count);
 
-	/* Send the blacklist to the blacklist mgr component */
-	ucfg_blm_add_userspace_black_list(hdd_ctx->pdev, black_list_bssid, j);
-	qdf_mem_free(black_list_bssid);
+	/* Send the denylist to the denylist mgr component */
+	ucfg_dlm_add_userspace_deny_list(hdd_ctx->pdev, deny_list_bssid, j);
+	qdf_mem_free(deny_list_bssid);
 	mac_handle = hdd_ctx->mac_handle;
 	sme_update_roam_params(mac_handle, vdev_id,
 			       rso_config, REASON_ROAM_SET_BLACKLIST_BSSID);
@@ -7849,6 +7853,13 @@ static int hdd_config_vdev_chains(struct hdd_adapter *adapter,
 	if (!tx_attr && !rx_attr)
 		return 0;
 
+	/* if one is present, both must be present */
+	if (!tx_attr || !rx_attr) {
+		hdd_err("Missing attribute for %s",
+			tx_attr ? "RX" : "TX");
+		return -EINVAL;
+	}
+
 	tx_chains = nla_get_u8(tx_attr);
 	rx_chains = nla_get_u8(rx_attr);
 
@@ -7871,6 +7882,13 @@ static int hdd_config_tx_rx_nss(struct hdd_adapter *adapter,
 
 	if (!tx_attr && !rx_attr)
 		return 0;
+
+	/* if one is present, both must be present */
+	if (!tx_attr || !rx_attr) {
+		hdd_err("Missing attribute for %s",
+			tx_attr ? "RX" : "TX");
+		return -EINVAL;
+	}
 
 	tx_nss = nla_get_u8(tx_attr);
 	rx_nss = nla_get_u8(rx_attr);
@@ -18539,6 +18557,8 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 	int ret = 0;
 	QDF_STATUS qdf_ret_status;
 	mac_handle_t mac_handle;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	cdp_config_param_type vdev_param;
 
 	hdd_enter();
 
@@ -18588,6 +18608,12 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 					 adapter->vdev_id,
 					 adapter->session.ap.
 					 disable_intrabss_fwd);
+
+		vdev_param.cdp_vdev_param_ap_brdg_en =
+			!adapter->session.ap.disable_intrabss_fwd;
+		cdp_txrx_set_vdev_param(soc, adapter->vdev_id,
+					CDP_ENABLE_AP_BRIDGE,
+					vdev_param);
 	}
 
 	hdd_exit();
@@ -19793,6 +19819,20 @@ void hdd_mon_select_cbmode(struct hdd_adapter *adapter,
 	hdd_debug("Dot11Mode is %u", ini_dot11_mode);
 	switch (ini_dot11_mode) {
 	case eHDD_DOT11_MODE_AUTO:
+#ifdef WLAN_FEATURE_11BE
+	case eHDD_DOT11_MODE_11be:
+	case eHDD_DOT11_MODE_11be_ONLY:
+		if (sme_is_feature_supported_by_fw(DOT11BE))
+			hdd_dot11_mode = eHDD_DOT11_MODE_11be;
+		else
+#endif
+		if (sme_is_feature_supported_by_fw(DOT11AX))
+			hdd_dot11_mode = eHDD_DOT11_MODE_11ax;
+		else if (sme_is_feature_supported_by_fw(DOT11AC))
+			hdd_dot11_mode = eHDD_DOT11_MODE_11ac;
+		else
+			hdd_dot11_mode = eHDD_DOT11_MODE_11n;
+		break;
 	case eHDD_DOT11_MODE_11ax:
 	case eHDD_DOT11_MODE_11ax_ONLY:
 		if (sme_is_feature_supported_by_fw(DOT11AX))
@@ -23138,7 +23178,10 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 	uint8_t rate_index;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	uint8_t vdev_id;
-	bool is_bitmask_configured = false;
+	uint8_t gi_val;
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0))
+	uint8_t auto_rate_he_gi = 0;
+#endif
 
 	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam() ||
 	    QDF_GLOBAL_MONITOR_MODE == hdd_get_conparam()) {
@@ -23159,15 +23202,15 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 	for (band = NL80211_BAND_2GHZ; band <= NL80211_BAND_5GHZ; band++) {
 		/* Support configuring only one bitrate */
 		if (!hdd_check_bitmask_for_single_rate(band, mask)) {
-			hdd_err_rl("Multiple bitrate set not supported for band %u",
-				   band);
+			hdd_err("Multiple bitrate set not supported for band %u",
+				band);
 			errno = -EINVAL;
 			continue;
 		}
 
 		if (!hweight32(mask->control[band].legacy)) {
-			hdd_err_rl("Legacy bit rate setting not supported for band %u",
-				   band);
+			hdd_err("Legacy bit rate setting not supported for band %u",
+				band);
 			errno = -EINVAL;
 			continue;
 		}
@@ -23201,49 +23244,71 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 		}
 
 configure_fw:
+		if (bit_rate != -1) {
+			hdd_debug("WMI_VDEV_PARAM_FIXED_RATE val %d", bit_rate);
 
-		if (bit_rate == -1) {
-			errno = -EINVAL;
-			continue;
+			errno = wma_cli_set_command(adapter->vdev_id,
+						    WMI_VDEV_PARAM_FIXED_RATE,
+						    bit_rate, VDEV_CMD);
+
+			if (errno)
+				hdd_err("Failed to set firmware, errno %d",
+					errno);
 		}
 
-		hdd_debug("WMI_VDEV_PARAM_FIXED_RATE val %d", bit_rate);
 
-		errno = wma_cli_set_command(adapter->vdev_id,
-					    WMI_VDEV_PARAM_FIXED_RATE,
-					    bit_rate, VDEV_CMD);
-
-		if (errno) {
-			hdd_err_rl("Failed to set firmware, errno %d", errno);
-			continue;
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0))
+		if (NL80211_RATE_INFO_HE_GI_0_8 == mask->control[band].he_gi) {
+			auto_rate_he_gi = AUTO_RATE_GI_800NS;
+			gi_val = 1;
+		} else if (NL80211_RATE_INFO_HE_GI_1_6 ==
+			   mask->control[band].he_gi) {
+			auto_rate_he_gi = AUTO_RATE_GI_1600NS;
+			gi_val = 2;
+		} else if (NL80211_RATE_INFO_HE_GI_3_2 ==
+			   mask->control[band].he_gi) {
+			auto_rate_he_gi = AUTO_RATE_GI_3200NS;
+			gi_val = 3;
 		}
+		if (auto_rate_he_gi) {
+			errno = sme_set_auto_rate_he_sgi(hdd_ctx->mac_handle,
+							 adapter->vdev_id,
+							 auto_rate_he_gi);
+			if (errno)
+				hdd_err("auto rate GI %d set fail, status %d",
+					auto_rate_he_gi, errno);
 
-		if (mask->control[band].gi) {
-			if (mask->control[band].gi & HDD_AUTO_RATE_SGI)
-				errno = sme_set_auto_rate_he_sgi(
-							hdd_ctx->mac_handle,
-							adapter->vdev_id,
-							mask->control[band].gi);
-			else
-				errno = sme_update_ht_config(
+			errno = sme_update_ht_config(
 					hdd_ctx->mac_handle,
 					adapter->vdev_id,
 					WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ,
-					mask->control[band].gi);
+					gi_val);
 
 			if (errno) {
 				hdd_err("cfg set failed, value %d status %d",
-					mask->control[band].gi, errno);
-				continue;
+					gi_val, errno);
 			}
+		} else
+#endif
+		if (mask->control[band].gi) {
+			if (NL80211_TXRATE_FORCE_SGI == mask->control[band].gi)
+				gi_val = 0;
+			else
+				gi_val = 1;
+
+			errno = sme_update_ht_config(
+					hdd_ctx->mac_handle,
+					adapter->vdev_id,
+					WNI_CFG_HT_CAP_INFO_SHORT_GI_20MHZ,
+					gi_val);
+
+			if (errno)
+				hdd_err("cfg set failed, value %d status %d",
+					mask->control[band].gi, errno);
 		}
-		is_bitmask_configured = true;
 	}
 
-	if (is_bitmask_configured)
-		return 0;
-	else
-		return errno;
+	return errno;
 }
 
 static int wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
@@ -23255,8 +23320,10 @@ static int wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 	struct osif_vdev_sync *vdev_sync;
 
 	errno = osif_vdev_sync_op_start(netdev, &vdev_sync);
-	if (errno)
+	if (errno) {
+		hdd_err("vdev_sync_op_start failure");
 		return errno;
+	}
 
 	errno = __wlan_hdd_cfg80211_set_bitrate_mask(wiphy, netdev, peer,
 						     mask);

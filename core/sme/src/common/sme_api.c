@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -78,6 +78,7 @@
 #include "wlan_cm_roam_ucfg_api.h"
 #include <cm_utf.h>
 #include <wlan_mlo_mgr_sta.h>
+#include <wlan_mlo_mgr_main.h>
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -526,10 +527,6 @@ QDF_STATUS sme_ser_handle_active_cmd(struct wlan_serialization_command *cmd)
 	case eSmeCommandWmStatusChange:
 		csr_roam_process_wm_status_change_command(mac_ctx,
 					sme_cmd);
-		break;
-	case eSmeCommandGetdisconnectStats:
-		csr_roam_process_get_disconnect_stats_command(mac_ctx,
-							      sme_cmd);
 		break;
 
 	case eSmeCommandAddTs:
@@ -6459,20 +6456,6 @@ QDF_STATUS sme_start_roaming(mac_handle_t mac_handle, uint8_t vdev_id,
 	return wlan_cm_enable_rso(mac->pdev, vdev_id, requestor, reason);
 }
 
-QDF_STATUS sme_abort_roaming(mac_handle_t mac_handle, uint8_t vdev_id)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-	struct csr_roam_session *session;
-
-	session = CSR_GET_SESSION(mac, vdev_id);
-	if (!session) {
-		sme_err("ROAM: incorrect vdev ID %d", vdev_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	return wlan_cm_abort_rso(mac->pdev, vdev_id);
-}
-
 bool sme_roaming_in_progress(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -8588,7 +8571,8 @@ QDF_STATUS sme_csa_restart(struct mac_context *mac_ctx, uint8_t session_id)
 QDF_STATUS sme_roam_csa_ie_request(mac_handle_t mac_handle,
 				   struct qdf_mac_addr bssid,
 				   uint32_t target_chan_freq, uint8_t csaIeReqd,
-				   struct ch_params *ch_params)
+				   struct ch_params *ch_params,
+				   uint32_t new_cac_ms)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -8596,7 +8580,9 @@ QDF_STATUS sme_roam_csa_ie_request(mac_handle_t mac_handle,
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		status = csr_roam_send_chan_sw_ie_request(mac, bssid,
-				target_chan_freq, csaIeReqd, ch_params);
+							  target_chan_freq,
+							  csaIeReqd, ch_params,
+							  new_cac_ms);
 		sme_release_global_lock(&mac->sme);
 	}
 	return status;
@@ -12621,6 +12607,30 @@ void sme_set_chan_info_callback(mac_handle_t mac_handle,
 	mac->chan_info_cb = callback;
 }
 
+#ifdef WLAN_FEATURE_CAL_FAILURE_TRIGGER
+void sme_set_cal_failure_event_cb(
+			mac_handle_t mac_handle,
+			void (*callback)(uint8_t cal_type, uint8_t reason))
+{
+	struct mac_context *mac;
+	QDF_STATUS status   = QDF_STATUS_SUCCESS;
+
+	if (!mac_handle) {
+		QDF_ASSERT(0);
+		return;
+	}
+	mac = MAC_CONTEXT(mac_handle);
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		mac->cal_failure_event_cb = callback;
+		sme_release_global_lock(&mac->sme);
+	} else {
+		sme_err("sme_acquire_global_lock failed");
+	}
+}
+#endif
+
 void sme_set_vdev_ies_per_band(mac_handle_t mac_handle, uint8_t vdev_id,
 			       enum QDF_OPMODE device_mode)
 {
@@ -15160,6 +15170,7 @@ void sme_update_score_config(mac_handle_t mac_handle, eCsrPhyMode phy_mode,
 	ucfg_mlme_get_channel_bonding_5ghz(mac_ctx->psoc,
 					   &channel_bonding_mode);
 	config.bw_above_20_5ghz = channel_bonding_mode;
+	config.max_chan_switch_ie = mlme_max_chan_switch_is_set(mac_ctx->psoc);
 
 	wlan_psoc_set_phy_config(mac_ctx->psoc, &config);
 }
@@ -16045,6 +16056,158 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+
+#ifdef WLAN_FEATURE_11BE
+static inline bool sme_is_11be_capable(void)
+{
+	return sme_is_feature_supported_by_fw(DOT11BE);
+}
+#else
+static inline bool sme_is_11be_capable(void)
+{
+	return false;
+}
+#endif
+
+QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
+				 struct qdf_mac_addr mld_addr,
+				 struct wlan_objmgr_vdev *vdev)
+{
+	enum QDF_OPMODE vdev_opmode;
+	struct qdf_mac_addr vdev_mac_addr = mac_addr;
+	QDF_STATUS qdf_ret_status;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	if (!vdev) {
+		sme_err("Invalid VDEV");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {
+		qdf_ret_status = wma_p2p_self_peer_remove(vdev);
+		if (QDF_IS_STATUS_ERROR(qdf_ret_status))
+			return qdf_ret_status;
+	}
+
+	if (sme_is_11be_capable() && (vdev_opmode == QDF_STA_MODE)) {
+		/* Set new MAC addr as MLD address incase of MLO */
+		mld_addr = mac_addr;
+		qdf_mem_copy(&vdev_mac_addr, wlan_vdev_mlme_get_linkaddr(vdev),
+			     sizeof(struct qdf_mac_addr));
+	}
+
+	qdf_ret_status = wlan_vdev_mlme_send_set_mac_addr(vdev_mac_addr,
+							  mld_addr, vdev);
+
+	if (QDF_IS_STATUS_SUCCESS(qdf_ret_status))
+		return qdf_ret_status;
+
+	/**
+	 * Failed to send set MAC address command to FW. Create P2P self peer
+	 * again with old MAC address
+	 */
+	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {
+		vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+		if (!vdev_mlme) {
+			sme_err("Invalid vdev MLME context");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		qdf_ret_status = wma_vdev_self_peer_create(vdev_mlme);
+		if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
+			sme_nofl_err("Failed to create self peer for P2P device mode. Status:%d",
+				     qdf_ret_status);
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+
+	return QDF_STATUS_E_INVAL;
+}
+
+QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
+				    struct qdf_mac_addr mac_addr,
+				    struct wlan_objmgr_vdev *vdev,
+				    bool update_sta_self_peer, int req_status)
+{
+	enum QDF_OPMODE vdev_opmode;
+	uint8_t *old_mac_addr_bytes;
+	QDF_STATUS qdf_ret_status;
+	struct wlan_objmgr_peer *peer;
+	struct vdev_mlme_obj *vdev_mlme;
+
+	if (!vdev) {
+		sme_err("Invalid VDEV");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	if (req_status)
+		goto p2p_self_peer_create;
+
+	if ((vdev_opmode == QDF_STA_MODE) && update_sta_self_peer) {
+		if (sme_is_11be_capable())
+			old_mac_addr_bytes = wlan_vdev_mlme_get_mldaddr(vdev);
+		else
+			old_mac_addr_bytes = wlan_vdev_mlme_get_macaddr(vdev);
+
+		/* Update self peer MAC address */
+		peer = wlan_objmgr_get_peer_by_mac(psoc, old_mac_addr_bytes,
+						   WLAN_MLME_NB_ID);
+		if (peer) {
+			qdf_ret_status = wlan_peer_update_macaddr(
+							peer, mac_addr.bytes);
+			wlan_objmgr_peer_release_ref(peer, WLAN_MLME_NB_ID);
+			if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
+				sme_nofl_err("Failed to update self peer MAC address. Status:%d",
+					     qdf_ret_status);
+				return qdf_ret_status;
+			}
+		} else {
+			sme_err("Self peer not found with MAC addr:"
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(old_mac_addr_bytes));
+				return QDF_STATUS_E_INVAL;
+		}
+	}
+
+	/* Update VDEV MAC address */
+	if ((vdev_opmode == QDF_STA_MODE) && sme_is_11be_capable()) {
+		if (update_sta_self_peer) {
+			qdf_ret_status = wlan_mlo_mgr_update_mld_addr(
+					    (struct qdf_mac_addr *)
+					       wlan_vdev_mlme_get_mldaddr(vdev),
+					    &mac_addr);
+			if (QDF_IS_STATUS_ERROR(qdf_ret_status))
+				return qdf_ret_status;
+		}
+		wlan_vdev_mlme_set_mldaddr(vdev, mac_addr.bytes);
+	} else {
+		wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
+	}
+
+p2p_self_peer_create:
+	if (vdev_opmode == QDF_P2P_DEVICE_MODE) {
+		vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+		if (!vdev_mlme) {
+			sme_err("Invalid vdev MLME context");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		qdf_ret_status = wma_vdev_self_peer_create(vdev_mlme);
+		if (QDF_IS_STATUS_ERROR(qdf_ret_status)) {
+			sme_nofl_err("Failed to create self peer for P2P device mode. Status:%d",
+				     qdf_ret_status);
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 void sme_roam_events_register_callback(mac_handle_t mac_handle,

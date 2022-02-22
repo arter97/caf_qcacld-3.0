@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -77,6 +77,8 @@
 #include <lim_mlo.h>
 #endif
 #include "wlan_cmn_ieee80211.h"
+#include <wlan_cm_api.h>
+#include <wlan_vdev_mgr_utils_api.h>
 
 /** -------------------------------------------------------------
    \fn lim_delete_dialogue_token_list
@@ -3787,8 +3789,8 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 		return;
 	}
 
-	if (pe_session->ftPEContext.ftPreAuthSession) {
-		pe_err("FT PREAUTH channel change is in progress");
+	if (wlan_cm_is_vdev_roaming(pe_session->vdev)) {
+		pe_err("Roaming is in progress");
 		return;
 	}
 
@@ -3809,11 +3811,6 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 	if (pHTInfo->primaryChannel != wlan_reg_freq_to_chan(
 			mac->pdev, pe_session->curr_op_freq)) {
 		pe_debug("Current channel doesnt match HT info ignore");
-		return;
-	}
-
-	if (lim_is_roam_synch_in_progress(mac->psoc, pe_session)) {
-		pe_debug("Roaming in progress, ignore HT IE BW update");
 		return;
 	}
 
@@ -6355,7 +6352,7 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 
 	pe_debug("source extended capabilities length:%d", src->num_bytes);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   src, src->num_bytes);
+			   src->bytes, src->num_bytes);
 
 	/* Return if strip the capabilities from @dst which not present */
 	if (!dst->present && !add)
@@ -6378,7 +6375,7 @@ void lim_merge_extcap_struct(tDot11fIEExtCap *dst,
 		pe_debug("destination extended capabilities length: %d",
 			 dst->num_bytes);
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-				   dst, dst->num_bytes);
+				   dst->bytes, dst->num_bytes);
 	}
 }
 
@@ -8079,6 +8076,79 @@ void lim_update_sta_mlo_info(tpAddStaParams add_sta_params,
 		 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
 		 add_sta_params->is_assoc_peer);
 }
+
+void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
+		      uint8_t *ie_start, uint32_t num_bytes)
+{
+	const uint8_t *ie = NULL;
+	tDot11fIEmlo_ie dot11_cap;
+	struct wlan_mlo_ie_info *mlo_ie_info;
+
+	populate_dot11f_mlo_caps(mac, session, &dot11_cap);
+
+	if (!dot11_cap.present)
+		return;
+
+	ie = wlan_get_ext_ie_ptr_from_ext_id(MLO_IE_OUI_TYPE,
+					     MLO_IE_OUI_SIZE,
+					     ie_start, num_bytes);
+
+	if (ie) {
+		/* convert from unpacked to packed structure */
+		mlo_ie_info = (struct wlan_mlo_ie_info *)&ie[2 + MLO_IE_OUI_SIZE];
+
+		mlo_ie_info->type = dot11_cap.type;
+		mlo_ie_info->reserved = dot11_cap.reserved;
+		mlo_ie_info->mld_mac_addr_present =
+				dot11_cap.mld_mac_addr_present;
+		mlo_ie_info->link_id_info_present =
+				dot11_cap.link_id_info_present;
+		mlo_ie_info->bss_param_change_cnt_present =
+				dot11_cap.bss_param_change_cnt_present;
+		mlo_ie_info->medium_sync_delay_info_present =
+				dot11_cap.medium_sync_delay_info_present;
+		mlo_ie_info->eml_capab_present = dot11_cap.eml_capab_present;
+		mlo_ie_info->mld_capab_present = dot11_cap.mld_capab_present;
+		mlo_ie_info->reserved_1 = dot11_cap.reserved_1;
+		qdf_mem_copy(&mlo_ie_info->mld_mac_addr.info.mld_mac_addr,
+			     &dot11_cap.mld_mac_addr.info.mld_mac_addr,
+			     QDF_MAC_ADDR_SIZE);
+		ie_start[1] += QDF_MAC_ADDR_SIZE;
+	}
+}
+
+QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
+				struct pe_session *session,
+				enum QDF_OPMODE device_mode,
+				uint8_t vdev_id)
+{
+	uint8_t mlo_cap_total_len = DOT11F_IE_MLO_IE_MIN_LEN +
+				    EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE;
+	QDF_STATUS status_2g, status_5g;
+	uint8_t mlo_caps[DOT11F_IE_MLO_IE_MIN_LEN +
+			 EHT_CAP_OUI_LEN + QDF_MAC_ADDR_SIZE] = {0};
+
+	mlo_caps[0] = DOT11F_EID_MLO_IE;
+	mlo_caps[1] = DOT11F_IE_MLO_IE_MIN_LEN + 1;
+
+	qdf_mem_copy(&mlo_caps[2], MLO_IE_OUI_TYPE, MLO_IE_OUI_SIZE);
+	lim_set_mlo_caps(mac_ctx, session, mlo_caps, mlo_cap_total_len);
+
+	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_MLO_IE,
+				CDS_BAND_2GHZ, &mlo_caps[2],
+				mlo_cap_total_len);
+
+	status_5g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_MLO_IE,
+				CDS_BAND_5GHZ, &mlo_caps[2],
+				mlo_cap_total_len);
+
+	if (QDF_IS_STATUS_SUCCESS(status_2g) &&
+	    QDF_IS_STATUS_SUCCESS(status_5g)) {
+		return QDF_STATUS_SUCCESS;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif
 
 #ifdef WLAN_FEATURE_11BE
@@ -8604,7 +8674,7 @@ lim_add_bssid_to_reject_list(struct wlan_objmgr_pdev *pdev,
 	ap_info.rssi_reject_params.received_time = entry->received_time;
 	ap_info.rssi_reject_params.original_timeout = entry->original_timeout;
 	/* Add this ap info to the rssi reject ap type in blacklist manager */
-	wlan_blm_add_bssid_to_reject_list(pdev, &ap_info);
+	wlan_dlm_add_bssid_to_reject_list(pdev, &ap_info);
 }
 
 void lim_decrement_pending_mgmt_count(struct mac_context *mac_ctx)
@@ -9249,6 +9319,63 @@ QDF_STATUS lim_ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	return status;
 }
 
+QDF_STATUS lim_ap_mlme_vdev_rnr_notify(struct pe_session *session)
+{
+	struct mac_context *mac_ctx;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	qdf_freq_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_num;
+	uint8_t i;
+	struct pe_session *co_session;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac_ctx) {
+		pe_err("mac ctx is null");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (!session) {
+		pe_err("session is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (!mlme_is_notify_co_located_ap_update_rnr(session->vdev))
+		return status;
+	mlme_set_notify_co_located_ap_update_rnr(session->vdev, false);
+	// Only 6G SAP need to notify co-located SAP to add RNR
+	if (!wlan_reg_is_6ghz_chan_freq(session->curr_op_freq))
+		return status;
+	pe_debug("vdev id %d non mlo 6G AP notify co-located AP to update RNR",
+		 wlan_vdev_get_id(session->vdev));
+	vdev_num = policy_mgr_get_mode_specific_conn_info(
+			mac_ctx->psoc, freq_list, vdev_id_list,
+			PM_SAP_MODE);
+	for (i = 0; i < vdev_num; i++) {
+		if (vdev_id_list[i] == session->vdev_id)
+			continue;
+		if (wlan_reg_is_6ghz_chan_freq(freq_list[i]))
+			continue;
+		co_session = pe_find_session_by_vdev_id(mac_ctx,
+							vdev_id_list[i]);
+		if (!co_session)
+			continue;
+
+		status = sch_set_fixed_beacon_fields(mac_ctx, co_session);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Unable to update 6g co located RNR in beacon");
+			return status;
+		}
+
+		status = lim_send_beacon_ind(mac_ctx, co_session,
+					     REASON_RNR_UPDATE);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Unable to send beacon indication");
+			return status;
+		}
+	}
+
+	return status;
+}
+
 QDF_STATUS lim_ap_mlme_vdev_disconnect_peers(struct vdev_mlme_obj *vdev_mlme,
 					     uint16_t data_len, void *data)
 {
@@ -9287,6 +9414,10 @@ QDF_STATUS lim_ap_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	if (!wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev)) {
+		mlme_set_notify_co_located_ap_update_rnr(vdev_mlme->vdev, true);
+		lim_ap_mlme_vdev_rnr_notify(session);
+	}
 	status =  lim_send_vdev_stop(session);
 
 	return status;
@@ -9721,7 +9852,8 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 				session->beaconParams.beaconInterval;
 	if (mlme_obj->mgmt.generic.type == WLAN_VDEV_MLME_TYPE_AP) {
 		mlme_obj->mgmt.ap.hidden_ssid = session->ssidHidden;
-		mlme_obj->mgmt.ap.cac_duration_ms = session->cac_duration_ms;
+		wlan_util_vdev_mgr_set_cac_timeout_for_vdev(
+				mlme_obj->vdev, session->cac_duration_ms);
 	}
 	mlme_obj->proto.generic.dtim_period = session->dtimPeriod;
 	mlme_obj->proto.generic.slot_time = session->shortSlotTimeSupported;

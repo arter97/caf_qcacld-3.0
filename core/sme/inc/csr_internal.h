@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -125,17 +126,11 @@ struct bss_config_param {
 	tSirMacSSid SSID;
 	enum csr_cfgdot11mode uCfgDot11Mode;
 	tSirMacCapabilityInfo BssCap;
-	ePhyChanBondState cbMode;
 };
 
 struct csr_roamstart_bssparams {
 	tSirMacSSid ssId;
 
-	/*
-	 * This is the BSSID for the party we want to
-	 * join (only use for WDS).
-	 */
-	struct qdf_mac_addr bssid;
 	tSirNwType sirNwType;
 	ePhyChanBondState cbMode;
 	tSirMacRateSet operationalRateSet;
@@ -144,23 +139,16 @@ struct csr_roamstart_bssparams {
 	struct ch_params ch_params;
 	enum csr_cfgdot11mode uCfgDot11Mode;
 	uint8_t privacy;
-	bool fwdWPSPBCProbeReq;
-	bool protEnabled;
-	bool obssProtEnabled;
 	tAniAuthType authType;
 	uint16_t beaconInterval; /* If this is 0, SME'll fill in for caller */
-	uint16_t ht_protection;
 	uint32_t dtimPeriod;
-	uint8_t ApUapsdEnable;
 	uint8_t ssidHidden;
 	uint8_t wps_state;
-	enum QDF_OPMODE bssPersona;
 	uint16_t nRSNIELength;  /* If 0, pRSNIE is ignored. */
 	uint8_t *pRSNIE;        /* If not null, it has IE byte stream for RSN */
 	/* Flag used to indicate update beaconInterval */
 	bool updatebeaconInterval;
 	struct add_ie_params add_ie_params;
-	uint8_t sap_dot11mc;
 	uint16_t beacon_tx_rate;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
@@ -582,11 +570,27 @@ QDF_STATUS csr_roam_channel_change_req(struct mac_context *mac,
 QDF_STATUS csr_roam_start_beacon_req(struct mac_context *mac,
 		struct qdf_mac_addr bssid, uint8_t dfsCacWaitStatus);
 
+/**
+ * csr_roam_send_chan_sw_ie_request() - Request to transmit CSA IE
+ * @mac_ctx:        Global MAC context
+ * @bssid:          BSSID
+ * @target_chan_freq: Channel frequency on which to send the IE
+ * @csa_ie_reqd:    Include/Exclude CSA IE.
+ * @ch_params:  operating Channel related information
+ * @new_cac_ms: cac duration of new channel
+ *
+ * This function sends request to transmit channel switch announcement
+ * IE to lower layers
+ *
+ * Return: success or failure
+ **/
 QDF_STATUS csr_roam_send_chan_sw_ie_request(struct mac_context *mac,
 					    struct qdf_mac_addr bssid,
 					    uint32_t target_chan_freq,
 					    uint8_t csaIeReqd,
-					    struct ch_params *ch_params);
+					    struct ch_params *ch_params,
+					    uint32_t new_cac_ms);
+
 QDF_STATUS csr_roam_modify_add_ies(struct mac_context *mac,
 					tSirModifyIE *pModifyIE,
 				   eUpdateIEsType updateType);

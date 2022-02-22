@@ -947,6 +947,47 @@ bool os_if_son_vdev_is_wds(struct wlan_objmgr_vdev *vdev)
 
 qdf_export_symbol(os_if_son_vdev_is_wds);
 
+uint32_t os_if_son_get_sta_space(struct wlan_objmgr_vdev *vdev)
+{
+	uint32_t sta_space;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return 0;
+	}
+
+	sta_space = g_son_os_if_cb.os_if_get_sta_space(vdev);
+	osif_debug("need space %u", sta_space);
+
+	return sta_space;
+}
+
+qdf_export_symbol(os_if_son_get_sta_space);
+
+void os_if_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
+			    struct ieee80211req_sta_info *si, uint32_t *space)
+{
+	if (!vdev) {
+		osif_err("null vdev");
+		return;
+	}
+
+	if (!si) {
+		osif_err("null si");
+		return;
+	}
+	if (!space || *space == 0) {
+		osif_err("invalid input space");
+		return;
+	}
+
+	g_son_os_if_cb.os_if_get_sta_list(vdev, si, space);
+
+	osif_debug("left space %u", *space);
+}
+
+qdf_export_symbol(os_if_son_get_sta_list);
+
 void os_if_son_deauth_peer_sta(struct wlan_objmgr_vdev *vdev,
 			       uint8_t *peer_mac,
 			       bool ignore_frame)
@@ -1252,3 +1293,36 @@ QDF_STATUS os_if_son_pdev_ops(struct wlan_objmgr_pdev *pdev,
 }
 
 qdf_export_symbol(os_if_son_pdev_ops);
+
+int os_if_son_deliver_ald_event(struct hdd_adapter *adapter,
+				struct wlan_objmgr_peer *peer,
+				enum ieee80211_event_type event,
+				void *event_data)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_rx_ops *rx_ops;
+	int ret;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_SON_ID);
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("null posc");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SON_ID);
+		return -EINVAL;
+	}
+	rx_ops = wlan_psoc_get_lmac_if_rxops(psoc);
+	if (rx_ops && rx_ops->son_rx_ops.deliver_event)
+		ret = rx_ops->son_rx_ops.deliver_event(vdev, peer, event,
+							event_data);
+	else
+		ret = -EINVAL;
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SON_ID);
+	return ret;
+}
+
+qdf_export_symbol(os_if_son_deliver_ald_event);
