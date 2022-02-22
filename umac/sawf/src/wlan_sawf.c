@@ -109,3 +109,101 @@ bool wlan_service_id_configured(uint8_t svc_id)
 
 qdf_export_symbol(wlan_service_id_configured);
 
+void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params)
+{
+	struct sawf_ctx *sawf;
+	struct wlan_sawf_scv_class_params *new_param;
+
+	sawf = wlan_get_sawf_ctx();
+	if (!sawf) {
+		qdf_err("SAWF ctx is invalid");
+		return;
+	}
+
+	new_param = &sawf->svc_classes[params->svc_id - 1];
+	new_param->svc_id = params->svc_id;
+	new_param->min_thruput_rate = params->min_thruput_rate;
+	new_param->max_thruput_rate = params->max_thruput_rate;
+	new_param->burst_size = params->burst_size;
+	new_param->service_interval = params->service_interval;
+	new_param->delay_bound = params->delay_bound;
+	new_param->msdu_ttl = params->msdu_ttl;
+	new_param->priority = params->priority;
+	new_param->tid = params->tid;
+	new_param->msdu_rate_loss = params->msdu_rate_loss;
+}
+
+qdf_export_symbol(wlan_update_sawf_params);
+
+QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_scv_class_params *params)
+{
+	uint32_t value;
+
+	value = params->min_thruput_rate;
+	if (value != SAWF_DEF_PARAM_VAL && value < SAWF_MIN_MIN_THROUGHPUT &&
+	    value > SAWF_MAX_MIN_THROUGHPUT) {
+		qdf_err("Invalid Min throughput: %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = params->max_thruput_rate;
+	if (value != SAWF_DEF_PARAM_VAL && value < SAWF_MIN_MAX_THROUGHPUT &&
+	    value > SAWF_MAX_MAX_THROUGHPUT) {
+		qdf_err("Invalid Max througput: %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = params->burst_size;
+	if (value != SAWF_DEF_PARAM_VAL && value < SAWF_MIN_BURST_SIZE &&
+	    value > SAWF_MAX_BURST_SIZE) {
+		qdf_err("Invalid Burst Size: %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = params->delay_bound;
+	if (value != SAWF_DEF_PARAM_VAL && value < SAWF_MIN_DELAY_BOUND
+	    && value > SAWF_MAX_DELAY_BOUND) {
+		qdf_err("Invalid Delay Bound: %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = params->service_interval;
+	if (value != SAWF_DEF_PARAM_VAL &&  value < SAWF_MIN_SVC_INTERVAL &&
+	    value > SAWF_MAX_SVC_INTERVAL) {
+		qdf_err("Invalid Service Interval: %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = params->msdu_ttl;
+	if (value != SAWF_DEF_PARAM_VAL && value < SAWF_MIN_MSDU_TTL &&
+	    value > SAWF_MAX_MSDU_TTL) {
+		qdf_err("Invalid MSDU TTL: %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = params->priority;
+	if (value != SAWF_DEF_PARAM_VAL && value < SAWF_MIN_PRIORITY &&
+	    value > SAWF_MAX_PRIORITY) {
+		qdf_err("Invalid Priority: %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = params->tid;
+	if (value != SAWF_DEF_PARAM_VAL &&  value < SAWF_MIN_TID &&
+	    value > SAWF_MAX_TID) {
+		qdf_err("Invalid TID %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	value = params->msdu_rate_loss;
+	if (value != SAWF_DEF_PARAM_VAL &&  value < SAWF_MIN_MSDU_LOSS_RATE &&
+	    value > SAWF_MIN_MSDU_LOSS_RATE) {
+		qdf_err("Invalid MSDU Loss rate: %d", value);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(wlan_validate_sawf_params);
+

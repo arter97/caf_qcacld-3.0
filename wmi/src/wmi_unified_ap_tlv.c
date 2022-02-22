@@ -3449,6 +3449,39 @@ send_set_nss_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
+#define SAWF_CONFIG_PARAM_MAX 0xFFFFFFFF
+
+static void sawf_create_set_defaults(struct wmi_sawf_params *param)
+{
+	if (param->min_thruput_rate == SAWF_CONFIG_PARAM_MAX)
+		param->min_thruput_rate = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_MIN_THRUPUT;
+
+	if (param->max_thruput_rate == SAWF_CONFIG_PARAM_MAX)
+		param->max_thruput_rate = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_MAX_THRUPUT;
+
+	if (param->burst_size == SAWF_CONFIG_PARAM_MAX)
+		param->burst_size = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_BURST_SIZE;
+
+	if (param->service_interval == SAWF_CONFIG_PARAM_MAX)
+		param->service_interval = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_SVC_INTERVAL;
+
+	if (param->delay_bound == SAWF_CONFIG_PARAM_MAX)
+		param->delay_bound = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_DELAY_BOUND;
+
+	if (param->msdu_ttl == SAWF_CONFIG_PARAM_MAX)
+		param->msdu_ttl = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_TIME_TO_LIVE;
+
+	if (param->priority == SAWF_CONFIG_PARAM_MAX)
+		param->priority = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_PRIORITY;
+
+	if (param->tid == SAWF_CONFIG_PARAM_MAX)
+		param->tid = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_TID;
+
+	if (param->msdu_rate_loss == SAWF_CONFIG_PARAM_MAX)
+		param->msdu_rate_loss = WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_MSDU_LOSS_RATE;
+}
+
+
 QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 				    struct wmi_sawf_params *param)
 {
@@ -3467,6 +3500,8 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 		       WMITLV_TAG_STRUC_wmi_sawf_svc_class_cfg_cmd_fixed_param,
 		       WMITLV_GET_STRUCT_TLVLEN
 		       (wmi_sawf_svc_class_cfg_cmd_fixed_param));
+
+	sawf_create_set_defaults(param);
 
 	cmd->svc_class_id = param->svc_id;
 	cmd->min_thruput_kbps = param->min_thruput_rate;

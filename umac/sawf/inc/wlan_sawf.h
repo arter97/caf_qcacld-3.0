@@ -30,6 +30,69 @@
 #define WLAN_MAX_SVC_CLASS_NAME 64
 
 #define SAWF_LINE_FORMAT "================================================"
+
+#define SAWF_DEF_PARAM_VAL 0xFFFFFFFF
+/*
+ * Min throughput limit 0 - 10gbps
+ * Granularity: 1Kbps
+ */
+#define SAWF_MIN_MIN_THROUGHPUT 0
+#define SAWF_MAX_MIN_THROUGHPUT (10 * 1204 * 1024)
+
+/*
+ * Max throughput limit 0 - 10gbps.
+ * Granularity: 1Kbps
+ */
+#define SAWF_MIN_MAX_THROUGHPUT 0
+#define SAWF_MAX_MAX_THROUGHPUT (10 * 1204 * 1024)
+
+/*
+ * Service interval limit 0 - 10secs.
+ * Granularity: 100µs
+ */
+#define SAWF_MIN_SVC_INTERVAL 0
+#define SAWF_MAX_SVC_INTERVAL (10 * 1000 * 1000)
+
+/*
+ * Burst size 0 - 16Mbytes.
+ * Granularity: 1byte
+ */
+#define SAWF_MIN_BURST_SIZE 0
+#define SAWF_MAX_BURST_SIZE (16 * 1024 * 1024)
+
+/*
+ * Delay bound limit 0 - 10secs
+ * Granularity: 100µs
+ */
+#define SAWF_MIN_DELAY_BOUND 0
+#define SAWF_MAX_DELAY_BOUND (10 * 1000 * 1000)
+
+/*
+ * Msdu TTL limit 0 - 10secs.
+ * Granularity: 100µs
+ */
+#define SAWF_MIN_MSDU_TTL 0
+#define SAWF_MAX_MSDU_TTL (10 * 1024 * 1024)
+
+/*
+ * Priority limit 0 - 127.
+ */
+#define SAWF_MIN_PRIORITY 0
+#define SAWF_MAX_PRIORITY 127
+
+/*
+ * TID limit 0 - 7
+ */
+#define SAWF_MIN_TID 0
+#define SAWF_MAX_TID 7
+
+/*
+ * MSDU Loss Rate limit 0 - 1000.
+ * Granularity: 0.01%
+ */
+#define SAWF_MIN_MSDU_LOSS_RATE 0
+#define SAWF_MAX_MSDU_LOSS_RATE 1000
+
 /**
  * struct wlan_sawf_scv_class_params- Service Class Parameters
  * @svc_id: Service ID
@@ -117,5 +180,22 @@ bool wlan_service_id_configured(uint8_t svc_id);
  * Return: none
  */
 void wlan_print_service_class(struct wlan_sawf_scv_class_params *params);
+
+/* wlan_update_sawf_params() - Update service class params
+ *
+ * Update service class params
+ *
+ * Return: none
+ */
+void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params);
+
+/* wlan_validate_sawf_params() - Validate service class params
+ *
+ * Validate service class params
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_scv_class_params *params);
+
 #endif
 
