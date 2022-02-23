@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -335,7 +336,7 @@ bool tgt_dfs_is_stadfs_enabled(struct wlan_objmgr_pdev *pdev)
 void utils_dfs_get_nol_history_chan_list(struct wlan_objmgr_pdev *pdev,
 					 void *clist, uint32_t *num_chan)
 {
-	int i, j = 0;
+	uint32_t i, j = 0;
 	struct regulatory_channel *cur_chan_list;
 	struct wlan_dfs *dfs;
 	struct dfs_channel *chan_list = (struct dfs_channel *)clist;
@@ -372,5 +373,22 @@ void utils_dfs_get_nol_history_chan_list(struct wlan_objmgr_pdev *pdev,
 void utils_dfs_get_nol_history_chan_list(struct wlan_objmgr_pdev *pdev,
 					 void *clist, uint32_t *num_chan)
 {
+}
+#endif
+
+#ifdef WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT
+void utils_dfs_reset_intercac(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "NULL dfs");
+		return;
+	}
+
+	dfs->dfs_precac_inter_chan_freq = 0;
+	dfs->dfs_autoswitch_des_mode = WLAN_PHYMODE_AUTO;
+	dfs->dfs_autoswitch_chan = NULL;
 }
 #endif

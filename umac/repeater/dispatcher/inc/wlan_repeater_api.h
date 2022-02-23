@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -147,7 +147,6 @@ struct rptr_ext_cbacks {
 	void (*dbdc_process_mac_db_up)(struct wlan_objmgr_vdev *vdev,
 				       u8 num_sta);
 	void (*act_update_force_cli_mcast_process_up)(struct wlan_objmgr_vdev *vdev);
-	void (*legacy_dbdc_rootap_set)(struct wlan_objmgr_pdev *pdev, int value);
 	void (*max_pri_stavap_process_down)(struct wlan_objmgr_vdev *vdev,
 					    bool *max_priority_stavap_disconnected);
 	void (*delay_stavap_conn_process_down)(struct wlan_objmgr_vdev *vdev);
@@ -163,14 +162,6 @@ struct rptr_ext_cbacks {
 	void (*nss_dbdc_process_mac_db_down)(struct wlan_objmgr_vdev *vdev);
 	void (*nss_prep_mac_db_store_stavap)(struct wlan_objmgr_vdev *vdev,
 					     u8 num_sta);
-#endif
-#if ATH_SUPPORT_WRAP
-#if WLAN_QWRAP_LEGACY
-	bool (*vdev_is_psta)(struct wlan_objmgr_vdev *vdev);
-	bool (*vdev_is_mpsta)(struct wlan_objmgr_vdev *vdev);
-	struct wlan_objmgr_vdev *
-		(*get_mpsta_vdev)(struct wlan_objmgr_vdev *vdev);
-#endif
 #endif
 };
 

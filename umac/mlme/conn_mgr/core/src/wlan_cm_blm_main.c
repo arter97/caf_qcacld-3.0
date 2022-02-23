@@ -45,8 +45,8 @@ static void blm_filter_vdev_mac_cmp(struct wlan_objmgr_pdev *pdev,
 	}
 }
 
-enum cm_blacklist_action
-wlan_blacklist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
+enum cm_denylist_action
+wlan_denylist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
 			       struct scan_cache_entry *entry)
 {
 	struct blm_entry_iter_obj blm_iter_obj = {0};
@@ -72,11 +72,11 @@ wlan_blacklist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
 
 	if (blm_iter_obj.match) {
 		qdf_info("Ignore entry %pM match vdev mac", entry->bssid.bytes);
-		return CM_BLM_FORCE_REMOVE;
+		return CM_DLM_FORCE_REMOVE;
 	}
 
 	if (!blm_iter_obj.sta_vdev)
-		return CM_BLM_NO_ACTION;
+		return CM_DLM_NO_ACTION;
 
 	sta_vdev = blm_iter_obj.sta_vdev;
 
@@ -94,7 +94,7 @@ wlan_blacklist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
 							 AP_STATE_GOOD);
 		} else {
 			qdf_info("Ignore bssid entry %pM", entry->bssid.bytes);
-			return CM_BLM_FORCE_REMOVE;
+			return CM_DLM_FORCE_REMOVE;
 		}
 	}
 
@@ -106,9 +106,9 @@ wlan_blacklist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
 						       &num_exc_mac);
 	if (exc_mac_status == CM_BLM_EXC_MAC_ALL) {
 		qdf_info("Ignore bssid entry %pM", entry->bssid.bytes);
-		return CM_BLM_FORCE_REMOVE;
+		return CM_DLM_FORCE_REMOVE;
 	} else if (exc_mac_status == CM_BLM_EXC_MAC_NONE) {
-		return CM_BLM_NO_ACTION;
+		return CM_DLM_NO_ACTION;
 	}
 
 	scan_entry_mac = util_scan_entry_macaddr(entry);
@@ -117,9 +117,9 @@ wlan_blacklist_action_on_bssid(struct wlan_objmgr_pdev *pdev,
 				exc_mac_list[idx],
 				QDF_MAC_ADDR_SIZE) == 0) {
 			qdf_info("Ignore bssid entry %pM", entry->bssid.bytes);
-			return CM_BLM_FORCE_REMOVE;
+			return CM_DLM_FORCE_REMOVE;
 		}
 	}
 
-	return CM_BLM_NO_ACTION;
+	return CM_DLM_NO_ACTION;
 }

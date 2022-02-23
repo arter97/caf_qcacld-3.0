@@ -188,7 +188,7 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 	 * Check whether HW has filled in the CCE metadata in
 	 * this packet, if not filled, just return
 	 */
-	if (qdf_likely(!hal_rx_msdu_cce_match_get(rx_tlv_hdr)))
+	if (qdf_likely(!hal_rx_msdu_cce_match_get(soc->hal_soc, rx_tlv_hdr)))
 		return;
 
 	cce_match = true;
@@ -243,7 +243,7 @@ bool dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
 	uint16_t cce_metadata = RX_PROTOCOL_TAG_START_OFFSET;
 	qdf_ether_header_t *eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
 
-	if (qdf_likely(!hal_rx_msdu_cce_match_get(rx_tlv_hdr)))
+	if (qdf_likely(!hal_rx_msdu_cce_match_get(soc->hal_soc, rx_tlv_hdr)))
 		return false;
 
 	/* Get the cce_metadata from RX MSDU TLV */
@@ -260,8 +260,7 @@ bool dp_rx_err_cce_drop(struct dp_soc *soc, struct dp_vdev *vdev,
 	 * can leak from here and reach bridge. This code will come into picture
 	 * if first packet received is eapol and tidq is not yet setup.
 	 */
-	if (qdf_mem_cmp(eh->ether_dhost, &vdev->mac_addr.raw[0],
-			QDF_MAC_ADDR_SIZE) != 0)
+	if (!dp_rx_err_match_dhost(eh, vdev))
 		return true;
 
 	return false;
@@ -354,6 +353,7 @@ dp_rx_update_flow_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 	flow_idx_invalid = hal_rx_msdu_flow_idx_invalid(soc->hal_soc, rx_tlv_hdr);
 	hal_rx_msdu_get_flow_params(soc->hal_soc, rx_tlv_hdr, &flow_idx_invalid,
 				    &flow_idx_timeout, &flow_idx);
+
 	if (qdf_unlikely(flow_idx_invalid))
 		return;
 

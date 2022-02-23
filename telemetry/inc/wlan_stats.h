@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -22,25 +23,37 @@
 #include <wlan_stats_define.h>
 
 /**
+ * Length of SoC interface name passed to user space as soc<psoc_id>
+ * including null caracter.
+ **/
+#define SOC_IF_LEN 5
+
+/**
+ * Length of Radio interface name passed to user space as wifi<pdev_id>
+ * including null caracter.
+ **/
+#define RADIO_IF_LEN 6
+
+/**
  * Deriving feature indexes corresponding to feature attributes defined in
  * qca_wlan_vendor_attr_feat dynamically.
- * Feature attribute values starts from 2. So, Deduction of 2 is required to
+ * Feature attribute values starts from 1. So, Deduction of 1 is required to
  * start the index from 0.
  **/
 #define DEF_INX(_x) \
-	INX_FEAT_##_x = (QCA_WLAN_VENDOR_ATTR_FEAT_##_x - 2)
+	INX_FEAT_##_x = (QCA_WLAN_VENDOR_ATTR_FEAT_##_x - 1)
 /**
  * QCA_WLAN_VENDOR_ATTR_RECURSIVE attribute is the last attribute
  * in qca_wlan_vendor_attr_feat. So the Maximum index should hold
  * the count of feature index.
  */
 #define DEF_INX_MAX() \
-	INX_FEAT_MAX = (QCA_WLAN_VENDOR_ATTR_RECURSIVE - 2)
+	INX_FEAT_MAX = (QCA_WLAN_VENDOR_ATTR_RECURSIVE - 1)
 /**
  * This is to get qca_wlan_vendor_attr_feat attributes from feat_index_e.
- * So, the addition of 2 is required to get corresponding attribute.
+ * So, the addition of 1 is required to get corresponding attribute.
  */
-#define GET_ATTR(_x) ((_x) + 2)
+#define GET_ATTR(_x) ((_x) + 1)
 
 /**
  * enum stats_feat_index_e: Defines stats feature indexes
@@ -49,17 +62,26 @@
  */
 enum stats_feat_index_e {
 	DEF_INX(ME),
-	DEF_INX(TX),
 	DEF_INX(RX),
+	DEF_INX(TX),
+	DEF_INX(AST),
+	DEF_INX(CFR),
 	DEF_INX(FWD),
+	DEF_INX(HTT),
 	DEF_INX(RAW),
 	DEF_INX(TSO),
 	DEF_INX(TWT),
+	DEF_INX(WDI),
+	DEF_INX(WMI),
 	DEF_INX(IGMP),
 	DEF_INX(LINK),
 	DEF_INX(MESH),
 	DEF_INX(RATE),
 	DEF_INX(NAWDS),
+	DEF_INX(DELAY),
+	DEF_INX(JITTER),
+	DEF_INX(TXCAP),
+	DEF_INX(MONITOR),
 	DEF_INX_MAX(),
 };
 
@@ -70,7 +92,6 @@ enum stats_feat_index_e {
  * @lvl:  Requested level of Stats (i.e. Basic, Advance or Debug)
  * @obj:  Requested stats for object (i.e. AP, Radio, Vap or STA)
  * @type:  Requested stats category
- * @status:  Status of Stats acumulation in recursive call
  * @recursive:  Flag for Recursiveness of request
  */
 struct stats_config {
@@ -79,8 +100,17 @@ struct stats_config {
 	enum stats_level_e     lvl;
 	enum stats_object_e    obj;
 	enum stats_type_e      type;
-	QDF_STATUS             status;
 	bool                   recursive;
+};
+
+/**
+ * struct multi_reply_ctx: Structure to manage multi reply message
+ * @pending: Flag to detect pending data from previous reply
+ * @start_inx: Index from which the stats will be processed
+ **/
+struct multi_reply_ctx {
+	bool pending;
+	uint8_t start_inx;
 };
 
 /**

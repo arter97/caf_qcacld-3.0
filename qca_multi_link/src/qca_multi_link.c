@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -210,6 +211,51 @@ static inline bool qca_multi_link_drop_always_primary(bool is_primary, qdf_nbuf_
 }
 
 /**
+ * qca_multi_link_get_fast_lane_station_vap() - get the radio station vap pointer for a radio
+ * @primary_wiphy: wiphy pointer of radio device
+ *
+ * Return: station vap netdevice pointer
+ */
+static struct net_device *qca_multi_link_get_fast_lane_station_vap(struct wiphy *wiphy)
+{
+	qca_multi_link_radio_node_t *radio_node = NULL;
+	qdf_list_node_t *next_node = NULL, *node = NULL;
+	struct net_device *sta_dev = NULL;
+
+	qdf_spin_lock(&qca_multi_link_cfg.radio_lock);
+	if (qdf_list_empty(&qca_multi_link_cfg.radio_list)) {
+		qdf_spin_unlock(&qca_multi_link_cfg.radio_lock);
+		QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_DEBUG,
+			 FL(" Radio list is empty\n"));
+		return NULL;
+	}
+
+	qdf_list_peek_front(&qca_multi_link_cfg.radio_list,
+			   (qdf_list_node_t **)&next_node);
+	while (next_node) {
+		radio_node
+		= (qca_multi_link_radio_node_t *)next_node;
+		if (radio_node->wiphy != wiphy && radio_node->is_fast_lane) {
+			sta_dev = radio_node->sta_dev;
+			qdf_spin_unlock(&qca_multi_link_cfg.radio_lock);
+			return sta_dev;
+		} else {
+			node = next_node;
+			next_node = NULL;
+			if ((qdf_list_peek_next(&qca_multi_link_cfg.radio_list,
+					       node, (qdf_list_node_t **)&next_node))
+						!= QDF_STATUS_SUCCESS) {
+				qdf_spin_unlock(&qca_multi_link_cfg.radio_lock);
+				return NULL;
+			}
+		}
+	}
+	qdf_spin_unlock(&qca_multi_link_cfg.radio_lock);
+
+	return NULL;
+}
+
+/**
  * qca_multi_link_get_station_vap() - get the radio station vap pointer for a radio
  * @primary_wiphy: wiphy pointer of radio device
  *
@@ -401,6 +447,17 @@ struct wiphy *qca_multi_link_get_primary_radio(void)
 }
 
 qdf_export_symbol(qca_multi_link_get_primary_radio);
+
+/**
+ * qca_multi_link_get_always_primary() - get the flag for always primary flag
+ *
+ */
+bool qca_multi_link_get_always_primary(void)
+{
+	return qca_multi_link_cfg.always_primary;
+}
+
+qdf_export_symbol(qca_multi_link_get_always_primary);
 
 /**
  * qca_multi_link_set_primary_radio() - set the primary radio
@@ -960,10 +1017,18 @@ static qca_multi_link_status_t qca_multi_link_secondary_sta_rx(struct net_device
 				 */
 				prim_sta_dev = qca_multi_link_get_station_vap(qca_multi_link_cfg.primary_wiphy);
 				if (!prim_sta_dev) {
+					if (is_fast_lane_radio(qca_multi_link_cfg.primary_wiphy)) {
+						prim_sta_dev = qca_multi_link_get_fast_lane_station_vap(qca_multi_link_cfg.primary_wiphy);
+						if (prim_sta_dev) {
+							goto set_prim_dev;
+						}
+					}
+
 					QDF_TRACE(QDF_MODULE_ID_RPTR, QDF_TRACE_LEVEL_WARN,
 							FL("Null STA device found %pM - Give to bridge\n"), eh->ether_shost);
-					return QCA_MULTI_LINK_PKT_ALLOW;
+					return QCA_MULTI_LINK_PKT_DROP;
 				}
+set_prim_dev:
 				*prim_dev = prim_sta_dev;
 				return QCA_MULTI_LINK_PKT_ALLOW;
 			}
@@ -1286,6 +1351,10 @@ static qca_multi_link_status_t qca_multi_link_primary_sta_tx(struct net_device *
 	qca_multi_link_tbl_entry_t qca_ml_entry;
 	QDF_STATUS qal_status = QDF_STATUS_E_FAILURE;
 	qdf_ether_header_t *eh = (qdf_ether_header_t *) qdf_nbuf_data(nbuf);
+
+	if (qca_multi_link_cfg.always_primary) {
+		return QCA_MULTI_LINK_PKT_ALLOW;
+	}
 
 	sta_wiphy = sta_dev->ieee80211_ptr->wiphy;
 

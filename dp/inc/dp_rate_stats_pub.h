@@ -90,7 +90,7 @@ enum wlan_peer_rate_stats_cmd {
 };
 
 /** struct wlan_tx_rate_stats - Tx packet rate info
- * @rix: Rate index derived from nss, mcs, preamble, ht, sgi
+ * @ratecode: Rate code derived from nss, mcs, preamble, ht, sgi
  * @rate: Data rate in kbps
  * @mpdu_success: success mpdus count
  * @mpdu_attempts: attempt mpdus count
@@ -100,7 +100,7 @@ enum wlan_peer_rate_stats_cmd {
  * @num_retries: retires count
  */
 struct wlan_tx_rate_stats {
-	uint32_t rix;
+	uint32_t ratecode;
 	uint32_t rate;
 	uint32_t mpdu_success;
 	uint32_t mpdu_attempts;
@@ -111,7 +111,7 @@ struct wlan_tx_rate_stats {
 };
 
 /** struct wlan_rx_rate_stats - Rx rate packet info
- * @rix: Rate index derived from nss, mcs, preamble, ht, sgi
+ * @ratecode: Rate code derived from nss, mcs, preamble, ht, sgi
  * @rate: Data rate in kbps
  * @num_bytes: num of bytes
  * @num_msdus: num of msdus
@@ -121,7 +121,7 @@ struct wlan_tx_rate_stats {
  * @num_sgi: num of short guard interval
  */
 struct wlan_rx_rate_stats {
-	uint32_t rix;
+	uint32_t ratecode;
 	uint32_t rate;
 	uint32_t num_bytes;
 	uint32_t num_msdus;

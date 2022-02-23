@@ -113,6 +113,57 @@ struct peer_del_wds_entry_params {
 };
 
 /**
+ * struct peer_del_multi_wds_entry_val - List element of the wds del param
+ * @dest_addr: destination macaddr
+ * @type: AST type
+ */
+struct peer_del_multi_wds_entry_val {
+	uint8_t dest_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t type;
+};
+
+/**
+ * struct peer_del_multi_wds_entry_params - multi WDS peer entry del params
+ * to be sent to WMI
+ * @vdev_id: vdev id for FW reference
+ * @pdev_id: pdev id for which multi ast delete is sent
+ * @num_entries: Number of entries in the dest list
+ * @dest_list: List to hold the mac addresses to be deleted
+ */
+struct peer_del_multi_wds_entry_params {
+	uint8_t vdev_id;
+	uint8_t pdev_id;
+	uint16_t num_entries;
+	struct peer_del_multi_wds_entry_val *dest_list;
+};
+
+/**
+ * struct peer_wds_entry_list - multi WDS peer entry del list
+ * @dest_addr: destination macaddr
+ * @type: AST type
+ * @delete_in_fw: Set if this mac is supposed to be deleted at FW
+ * @ase_list_elem: List element to hold list entries.
+ */
+struct peer_wds_entry_list {
+	uint8_t *dest_addr;
+	uint8_t type;
+	uint8_t delete_in_fw;
+	TAILQ_ENTRY(peer_wds_entry_list) ase_list_elem;
+};
+
+/**
+ * struct peer_del_multi_wds_entries - multi WDS peer entry del params
+ * @vdev_id: vdev id
+ * @num_entries: Number of entries in the ase list
+ * @ase_list: List to hold the AST entries to be deleted
+ */
+struct peer_del_multi_wds_entries {
+	uint8_t vdev_id;
+	uint16_t num_entries;
+	TAILQ_HEAD(, peer_wds_entry_list) ase_list;
+};
+
+/**
  * struct peer_update_wds_entry_params - WDS peer entry update params
  * @wds_macaddr: Pointer to destination macaddr
  * @peer_add: Pointer to peer mac addr
@@ -896,6 +947,64 @@ struct wmi_peer_latency_config_params {
 	uint32_t num_peer;
 	uint32_t pdev_id;
 	struct wmi_peer_latency_info_params latency_info[2];
+};
+#endif
+
+#ifdef CONFIG_SAWF_DEF_QUEUES
+/**
+ * struct wmi_rc_params- rate control parameters
+ * @upper_cap_nss: Max NSS
+ * @upper_cap_mcs: Max MCS
+ * @en_nss_cap: Enable NSS upper cap
+ * @en_mcc_cap: Enable MCS upper cap
+ * @retry_thresh: Retry threshold
+ * @mcs_drop: number of MCS to drop
+ * @en_retry_thresh: Enable rate retry threshold
+ * @en_mcs_drop: Enable mcs drop number
+ * @min_mcs_probe_intvl: min mcs probe interval
+ * @max_mcs_probe_intvl: max mcs probe interval
+ * @min_nss_probe_intvl: min nss probe interval
+ * @max_nss_probe_intvl: max nss probe interval
+ */
+struct wmi_rc_params {
+	uint8_t upper_cap_nss;
+	uint8_t upper_cap_mcs;
+	uint8_t en_nss_cap;
+	uint8_t en_mcs_cap;
+	uint8_t retry_thresh;
+	uint8_t mcs_drop;
+	uint8_t en_retry_thresh;
+	uint8_t en_mcs_drop;
+	uint16_t min_mcs_probe_intvl;
+	uint16_t max_mcs_probe_intvl;
+	uint16_t min_nss_probe_intvl;
+	uint16_t max_nss_probe_intvl;
+};
+
+/**
+ * struct wmi_sawf_params - Service Class Parameters
+ * @svc_id: Service ID
+ * @min_thruput_rate: min throughput in kilobits per second
+ * @max_thruput_rate: max throughput in kilobits per second
+ * @burst_size:  burst size in bytes
+ * @service_interval: service interval
+ * @delay_bound: delay bound in in milli seconds
+ * @msdu_ttl: MSDU Time-To-Live
+ * @priority: Priority
+ * @tid: TID
+ * @msdu_rate_loss: MSDU loss rate in parts per million
+ */
+struct wmi_sawf_params {
+	uint32_t svc_id;
+	uint32_t min_thruput_rate;
+	uint32_t max_thruput_rate;
+	uint32_t burst_size;
+	uint32_t service_interval;
+	uint32_t delay_bound;
+	uint32_t msdu_ttl;
+	uint32_t priority;
+	uint32_t tid;
+	uint32_t msdu_rate_loss;
 };
 #endif
 #endif

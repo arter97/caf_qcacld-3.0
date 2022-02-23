@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -805,8 +806,16 @@ enum {
 	IEEE80211_PARAM_EHT_DL_OFDMA_TXBF                       = 766, /* EHT DL ODFMA Tx beamformer */
 	IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO                     = 767, /* EHT DL ODFMA Multi user MIMO */
 	IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO                     = 768, /* EHT UL ODFMA Multi user MIMO */
+	IEEE80211_PARAM_EHT_UL_NSS        = 769, /* Maximum NSS allowed in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_PPDU_BW    = 770, /* EHT UL Channel width*/
+	IEEE80211_PARAM_EHT_UL_SHORTGI    = 771, /* Shortgi configuration in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_LDPC       = 772, /* Enable/Disable LDPC in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_STBC       = 773, /* Enable/Disable STBC in UL Trigger for EHT mode */
+	IEEE80211_PARAM_EHT_UL_FIXED_RATE = 774, /* Control UL fixed rate for EHT mode */
+	IEEE80211_PARAM_EHT_UL_LTF        = 775, /* LTF configuration in UL Trigger for EHT mode */
 #endif /* WLAN_FEATURE_11BE */
-	IEEE80211_PARAM_MAX_CAP_AP                 = 769,   /* Advertise Maximum capability of AP */
+	IEEE80211_PARAM_MAX_CAP_AP                 = 776,   /* Advertise Maximum capability of AP */
+        IEEE80211_PARAM_NEIG_RPT          = 777,   /* disable/enable inclusion of Neighbor Report bit in Beacon/Probe-Rsp */
 };
 
 enum {
@@ -965,7 +974,6 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_BLK_REPORT_FLOOD,
 	OL_ATH_PARAM_DROP_STA_QUERY,
 #endif
-	OL_ATH_PARAM_QBOOST,
 	OL_ATH_PARAM_SIFS_FRMTYPE,
 	OL_ATH_PARAM_SIFS_UAPSD = 185,
 	OL_ATH_PARAM_FW_RECOVERY_ID,
@@ -1332,9 +1340,34 @@ enum _ol_ath_param_t {
 	/* Force primary UMAC SOC ID */
 	OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID = 486,
 #endif
-#ifdef IPA_OFFLOAD
 	/* Display IPA stats */
 	OL_ATH_PARAM_IPA_UC_STATS = 487,
+	OL_ATH_PARAM_TQM_RESET = 488,
+	/* Enable/disable probing all bandwidth */
+	OL_ATH_PARAM_EN_PROBE_ALL_BW = 489,
+	/* Configuration to honor ACS 6GHz PSC only for selection */
+	OL_ATH_PARAM_ACS_6G_ONLY_PSC = 490,
+#ifdef WLAN_FEATURE_11BE
+	/* Enable/disable strict puncturing for 802.11be */
+	OL_ATH_PARAM_STRICT_PUNCTURING = 491,
+#endif /* WLAN_FEATURE_11BE */
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+	/* Enable/disable undecoded frame capture */
+	OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE = 492,
+#endif
+#if CONFIG_SAWF_DEF_QUEUES
+	OL_ATH_PARAM_RC_UPPER_CAP_NSS = 493,
+	OL_ATH_PARAM_RC_UPPER_CAP_MCS = 494,
+	OL_ATH_PARAM_DISABLE_RATE_UPPER_CAP = 495,
+	OL_ATH_PARAM_RC_RATE_RETRY_THRESH = 496,
+	OL_ATH_PARAM_RC_MCS_DROP = 497,
+	OL_ATH_PARAM_DISABLE_RATE_RETRY_MCS_DROP = 498,
+	OL_ATH_PARAM_RC_MCS_PROBE_INTVL_MIN = 499,
+	OL_ATH_PARAM_RC_MCS_PROBE_INTVL_MAX = 500,
+	OL_ATH_PARAM_DISABLE_MCS_PROBE_INTVL = 501,
+	OL_ATH_PARAM_RC_NSS_PROBE_INTVL_MIN = 502,
+	OL_ATH_PARAM_RC_NSS_PROBE_INTVL_MAX = 503,
+	OL_ATH_PARAM_DISABLE_NSS_PROBE_INTVL = 504,
 #endif
 };
 
@@ -1599,6 +1632,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_rnr_tbtt",          IEEE80211_PARAM_RNR_TBTT, GET_PARAM, 0},
 	{"apchanrpt",           IEEE80211_PARAM_AP_CHAN_RPT, SET_PARAM, 1},
 	{"g_apchanrpt",         IEEE80211_PARAM_AP_CHAN_RPT, GET_PARAM, 0},
+	{"disable_neigrpt",     IEEE80211_PARAM_NEIG_RPT, SET_PARAM, 1},
+	{"g_disable_neigrpt",   IEEE80211_PARAM_NEIG_RPT, GET_PARAM, 0},
 	{"mgmt_rate",           IEEE80211_PARAM_MGMT_RATE, SET_PARAM, 1},
 	{"g_mgmt_rate",         IEEE80211_PARAM_MGMT_RATE, GET_PARAM, 0},
 	{"rtscts_rate",         IEEE80211_PARAM_RTSCTS_RATE, SET_PARAM, 1},
@@ -1841,9 +1876,9 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"s_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, SET_PARAM, 2},
 	{"g_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, GET_PARAM, 0},
 #endif
-	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 1},
+	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 2},
 	{"get_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, GET_PARAM, 0},
-	{"addlocalpeer",        IEEE80211_PARAM_ADD_LOCAL_PEER, SET_PARAM, 2},
+	{"addlocalpeer",        IEEE80211_PARAM_ADD_LOCAL_PEER, SET_PARAM, 3},
 	{"setmhdr",             IEEE80211_PARAM_SET_MHDR, SET_PARAM, 1},
 	{"allowdata",           IEEE80211_PARAM_ALLOW_DATA, SET_PARAM, 2},
 	{"meshdbg",             IEEE80211_PARAM_SET_MESHDBG, SET_PARAM, 1},
@@ -2341,9 +2376,9 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_max_auth_fail",        IEEE80211_PARAM_AP_MAX_AUTH_FAIL, GET_PARAM, 0},
 	{"vap_resource_profile ",     IEEE80211_PARAM_VAP_PROFILE_CONFIG, SET_PARAM, 2},
 #ifdef WLAN_FEATURE_11BE
-	{"eht_txmcsmap",         IEEE80211_PARAM_EHT_TX_MCSMAP, SET_PARAM, 1},
+	{"eht_txmcsmap",         IEEE80211_PARAM_EHT_TX_MCSMAP, SET_PARAM, 3},
 	{"get_eht_txmcsmap",     IEEE80211_PARAM_EHT_TX_MCSMAP, GET_PARAM, 0},
-	{"eht_rxmcsmap",         IEEE80211_PARAM_EHT_RX_MCSMAP, SET_PARAM, 1},
+	{"eht_rxmcsmap",         IEEE80211_PARAM_EHT_RX_MCSMAP, SET_PARAM, 3},
 	{"get_eht_rxmcsmap",     IEEE80211_PARAM_EHT_RX_MCSMAP, GET_PARAM, 0},
 	{"eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	SET_PARAM, 1},
 	{"g_eht_mcs",		 IEEE80211_PARAM_EHT_MCS,	GET_PARAM, 0},
@@ -2379,10 +2414,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_mu_bfmr", IEEE80211_PARAM_EHT_MU_BFMR, GET_PARAM, 0},
 	{"set_eht_mubfee", IEEE80211_PARAM_EHT_MU_BFEE, SET_PARAM, 1},
 	{"get_eht_mubfee", IEEE80211_PARAM_EHT_MU_BFEE, GET_PARAM, 0},
-	{"set_eht_ulofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, SET_PARAM, 1},
-	{"get_eht_ulofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, GET_PARAM, 0},
-	{"set_eht_dlofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, SET_PARAM, 1},
-	{"get_eht_dlofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, GET_PARAM, 0},
+	{"set_eht_ulofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, SET_PARAM, 1},
+	{"get_eht_ulofdma", IEEE80211_PARAM_EHT_UL_MU_OFDMA, GET_PARAM, 0},
+	{"set_eht_dlofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, SET_PARAM, 1},
+	{"get_eht_dlofdma", IEEE80211_PARAM_EHT_DL_MU_OFDMA, GET_PARAM, 0},
 	{"set_eht_ulmumimo", IEEE80211_PARAM_EHT_MU_MIMO, SET_PARAM, 1},
 	{"get_eht_ulmumimo", IEEE80211_PARAM_EHT_MU_MIMO, GET_PARAM, 0},
 	{"set_eht_dlofdma_bf", IEEE80211_PARAM_EHT_DL_OFDMA_TXBF, SET_PARAM, 1},
@@ -2391,6 +2426,20 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_dlofdma_mumimo", IEEE80211_PARAM_EHT_DL_OFDMA_MUMIMO, GET_PARAM, 0},
 	{"set_eht_ulofdma_mumimo", IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO, SET_PARAM, 1},
 	{"get_eht_ulofdma_mumimo", IEEE80211_PARAM_EHT_UL_OFDMA_MUMIMO, GET_PARAM, 0},
+	{"eht_ul_nss",           IEEE80211_PARAM_EHT_UL_NSS, SET_PARAM, 1},
+	{"get_eht_ul_nss",       IEEE80211_PARAM_EHT_UL_NSS, GET_PARAM, 0},
+	{"eht_ul_ppdu_bw",       IEEE80211_PARAM_EHT_UL_PPDU_BW, SET_PARAM, 1},
+	{"get_eht_ul_ppdu_bw",   IEEE80211_PARAM_EHT_UL_PPDU_BW, GET_PARAM, 0},
+	{"eht_ul_shortgi",       IEEE80211_PARAM_EHT_UL_SHORTGI, SET_PARAM, 1},
+	{"get_eht_ul_shortgi",   IEEE80211_PARAM_EHT_UL_SHORTGI, GET_PARAM, 0},
+	{"eht_ul_ldpc",          IEEE80211_PARAM_EHT_UL_LDPC, SET_PARAM, 1},
+	{"get_eht_ul_ldpc",      IEEE80211_PARAM_EHT_UL_LDPC, GET_PARAM, 0},
+	{"eht_ul_stbc",          IEEE80211_PARAM_EHT_UL_STBC, SET_PARAM, 1},
+	{"get_eht_ul_stbc",      IEEE80211_PARAM_EHT_UL_STBC, GET_PARAM, 0},
+	{"eht_ul_mcs",           IEEE80211_PARAM_EHT_UL_FIXED_RATE, SET_PARAM, 1},
+	{"get_eht_ul_mcs",       IEEE80211_PARAM_EHT_UL_FIXED_RATE, GET_PARAM, 0},
+	{"eht_ul_ltf",           IEEE80211_PARAM_EHT_UL_LTF, SET_PARAM, 1},
+	{"get_eht_ul_ltf",       IEEE80211_PARAM_EHT_UL_LTF, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 };
 
@@ -2636,8 +2685,6 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"getDropSTAQuery",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DROP_STA_QUERY, GET_PARAM, 0},
 #endif
-	{"qboost_enable",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_QBOOST, SET_PARAM, 1},
 	{"sifs_frmtype",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SIFS_FRMTYPE, SET_PARAM, 1},
 	{"sifs_uapsd",
@@ -3484,6 +3531,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_PUNCTURE_OFDMA_WEIGHTAGE, SET_PARAM, 1},
 	{"get_acs_puncture_ofdma_weightage",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_PUNCTURE_OFDMA_WEIGHTAGE, GET_PARAM, 0},
+	{"puncture_strict",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_STRICT_PUNCTURING, SET_PARAM, 1},
+	{"g_puncture_strict",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_STRICT_PUNCTURING, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 #ifdef WLAN_FEATURE_11BE_MLO
 	{"g_mlo_forced_umac_mode",
@@ -3499,9 +3550,65 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_FORCE_PRIMARY_UMAC_SOC_ID,
 		SET_PARAM, 1},
 #endif
-#ifdef IPA_OFFLOAD
 	{"ipaucstats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_IPA_UC_STATS, SET_PARAM, 1},
+	{"tqm_reset",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, SET_PARAM, 1},
+	{"get_tqm_reset",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_TQM_RESET, GET_PARAM, 0},
+	{"probe_all_bw",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_PROBE_ALL_BW, SET_PARAM, 1},
+	{"g_probe_all_bw",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_PROBE_ALL_BW, GET_PARAM, 0},
+	{"acs_6g_only_psc",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_ONLY_PSC, SET_PARAM, 1},
+	{"get_acs_6g_only_psc",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_ONLY_PSC, GET_PARAM, 0},
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+	{"undecoded_metadata_capture",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE,
+		SET_PARAM, 1},
+	{"g_undecoded_metadata_capture",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE,
+		GET_PARAM, 0},
+#endif
+#if CONFIG_SAWF_DEF_QUEUES
+	{"get_rate_upper_cap_nss",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_UPPER_CAP_NSS,
+		GET_PARAM, 0},
+	{"get_rate_upper_cap_mcs",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_UPPER_CAP_MCS,
+		GET_PARAM, 0},
+	{"disable_rate_upper_cap",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_RATE_UPPER_CAP,
+		SET_PARAM, 1},
+	{"get_rate_retry_thresh",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_RATE_RETRY_THRESH,
+		GET_PARAM, 0},
+	{"get_mcs_drop",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_MCS_DROP,
+		GET_PARAM, 0},
+	{"disable_rate_retry_mcs_drop",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_RATE_RETRY_MCS_DROP,
+		SET_PARAM, 1},
+	{"get_mcs_probe_intvl_min",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_MCS_PROBE_INTVL_MIN,
+		GET_PARAM, 0},
+	{"get_mcs_probe_intvl_max",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_MCS_PROBE_INTVL_MAX,
+		GET_PARAM, 0},
+	{"disable_mcs_probe_intvl",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_MCS_PROBE_INTVL,
+		SET_PARAM, 1},
+	{"get_nss_probe_intvl_min",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_NSS_PROBE_INTVL_MIN,
+		GET_PARAM, 0},
+	{"get_nss_probe_intvl_max",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_NSS_PROBE_INTVL_MAX,
+		GET_PARAM, 0},
+	{"disable_nss_probe_intvl",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_NSS_PROBE_INTVL,
+		SET_PARAM, 1},
 #endif
 };
 #endif

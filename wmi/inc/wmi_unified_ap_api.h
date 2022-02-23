@@ -121,6 +121,20 @@ QDF_STATUS wmi_unified_peer_del_wds_entry_cmd_send(
 		wmi_unified_t wmi_handle,
 		struct peer_del_wds_entry_params *param);
 
+#ifdef WLAN_FEATURE_MULTI_AST_DEL
+/**
+ *  wmi_unified_peer_del_multi_wds_entries_cmd_send() -
+ *  WMI del multi wds entry cmd function
+ *  @wmi_handle: handle to WMI.
+ *  @param: pointer to hold wds entry param
+ *
+ *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_unified_peer_del_multi_wds_entries_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct peer_del_multi_wds_entry_params *param);
+#endif /* WLAN_FEATURE_MULTI_AST_DEL */
+
 /**
  *  wmi_unified_peer_update_wds_entry_cmd_send() - WMI update wds entry
  *  cmd function
@@ -590,19 +604,6 @@ QDF_STATUS wmi_unified_fils_discovery_send_cmd(wmi_unified_t wmi_handle,
 #endif /* WLAN_SUPPORT_FILS */
 
 /**
- *  wmi_unified_set_qboost_param_cmd_send() - WMI set_qboost function
- *  @wmi_handle: handle to WMI.
- *  @macaddr: MAC address
- *  @param: pointer to hold set_qboost parameter
- *
- *  Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS
-wmi_unified_set_qboost_param_cmd_send(wmi_unified_t wmi_handle,
-				      uint8_t macaddr[QDF_MAC_ADDR_SIZE],
-				      struct set_qboost_params *param);
-
-/**
  *  wmi_unified_mcast_group_update_cmd_send() - WMI mcast grp update cmd function
  *  @wmi_handle: handle to WMI.
  *  @param: pointer to hold mcast grp param
@@ -874,4 +875,88 @@ QDF_STATUS
 wmi_unified_peer_set_intra_bss_cmd_send(struct wmi_unified *wmi_handle,
 					struct wmi_intra_bss_params *param);
 
+/**
+ * wmi_unified_soc_tqm_reset_enable_disable_cmd() - Send tqm reset command to FW
+ * @wmi_handle: wmi handle
+ * @enable: enable or disable configuration from user
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
+					     uint32_t enable);
+
+#ifdef CONFIG_SAWF_DEF_QUEUES
+/**
+ * wmi_unified_set_rate_upper_cap_cmd_send() - set rate upper cap cmd
+ * @wmi_handle: wmi handle
+ * @pdev_id: pdev id
+ * @param: rate upper cap parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_rate_upper_cap_cmd_send(struct wmi_unified *wmi_handle,
+					uint8_t pdev_id,
+					struct wmi_rc_params *param);
+
+/**
+ * wmi_unified_set_rate_retry_mcs_drop_cmd_send() - set rate retry and mcs drop
+ * @wmi_handle: wmi handle
+ * @pdev_id: pdev id
+ * @param: rate retry and mcs drop parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_rate_retry_mcs_drop_cmd_send(struct wmi_unified *wmi_handle,
+					     uint8_t pdev_id,
+					     struct wmi_rc_params *param);
+
+/**
+ * wmi_unified_set_mcs_probe_intvl_cmd_send() - set mcs probe interval
+ * @wmi_handle: wmi handle
+ * @pdev_id: pdev id
+ * @param: mcs probe interval parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_mcs_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
+					 uint8_t pdev_id,
+					 struct wmi_rc_params *param);
+
+/**
+ * wmi_unified_set_nss_probe_intvl_cmd_send() - set nss probe interval
+ * @wmi_handle: wmi handle
+ * @pdev_id: pdev id
+ * @param: nss probe interval parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS
+wmi_unified_set_nss_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
+					 uint8_t pdev_id,
+					 struct wmi_rc_params *param);
+
+/**
+ * wmi_sawf_create_send() - Send create SAWF service class command to FW
+ * @wmi_handle: wmi handle
+ * @param: SAWF WMI params
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_sawf_create_send(struct wmi_unified *wmi_handle,
+				struct wmi_sawf_params *param);
+
+/**
+ * wmi_sawf_disable_send() - Send disable service class command to FW
+ * @wmi_handle: wmi handle
+ * @svc_id: Service class identifier
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
+				 uint8_t svc_id);
+#endif
 #endif /* _WMI_UNIFIED_AP_API_H_ */

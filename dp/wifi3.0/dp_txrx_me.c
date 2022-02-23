@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -263,72 +264,78 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
 /**
  * dp_tx_me_send_dms_pkt: function to send dms packet
  * @soc: Datapath soc handle
- * @vdev_id: vdev id
- * @nbuf: Multicast nbuf
- * @newmac: Table of the clients to which packets have to be sent
- * @new_mac_cnt: No of clients
- * @vdev: DP vdev handler
+ * @peer: Datapath peer handle
+ * @arg: argument to iter function
+ *
+ * return void
  */
-static uint16_t dp_tx_me_send_dms_pkt(struct cdp_soc_t *soc_hdl,
-				      uint8_t vdev_id,
-				      qdf_nbuf_t nbuf,
-				      uint8_t newmac[][QDF_MAC_ADDR_SIZE],
-				      uint8_t new_mac_cnt,
-				      struct dp_vdev *vdev)
+static void
+dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
+{
+	qdf_nbuf_t  nbuf_ref;
+	dp_vdev_dms_me_t *dms_me = (dp_vdev_dms_me_t *)arg;
+
+	if (peer->bss_peer)
+		return;
+
+	dms_me->tx_exc_metadata->peer_id = peer->peer_id;
+	/* Update the ref count for each peer */
+	qdf_nbuf_ref(dms_me->nbuf);
+	nbuf_ref = dms_me->nbuf;
+	nbuf_ref = dp_tx_send_exception(dms_me->soc_hdl,
+					dms_me->vdev->vdev_id,
+					nbuf_ref,
+					dms_me->tx_exc_metadata);
+	if (nbuf_ref) {
+		qdf_nbuf_free(nbuf_ref);
+		DP_STATS_INC(dms_me->vdev, tx_i.mcast_en.dropped_send_fail, 1);
+	}
+}
+
+/**
+ * dp_tx_me_dms_pkt_handler: function to send dms packet
+ * @soc: Datapath soc handle
+ * @vdev: DP vdev handler
+ * @nbuf: Multicast nbuf
+ *
+ * return: no of converted packets
+ */
+static uint16_t
+dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
+			 struct dp_vdev *vdev,
+			 qdf_nbuf_t nbuf)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
-	qdf_ether_header_t *eh;
+	struct cdp_tx_exception_metadata tx_exc_param = {0};
+	uint8_t count = vdev->num_peers;
+	dp_vdev_dms_me_t dms_me;
 
-	/* reference to frame dst addr */
-	uint8_t *dstmac;
-	/* copy of original frame src addr */
-	uint8_t srcmac[QDF_MAC_ADDR_SIZE];
+	tx_exc_param.sec_type = vdev->sec_type;
+	tx_exc_param.tx_encap_type = vdev->tx_encap_type;
+	tx_exc_param.peer_id = HTT_INVALID_PEER;
+	/*
+	 * We are taking one extra reference to make sure
+	 * buffer won't freed before sending all the frames.
+	 */
+	qdf_nbuf_ref(nbuf);
+	dms_me.soc_hdl = soc_hdl;
+	dms_me.vdev = vdev;
+	dms_me.nbuf = nbuf;
+	dms_me.tx_exc_metadata = &tx_exc_param;
 
-	/* local index into newmac */
-	uint8_t new_mac_idx = 0;
-	qdf_nbuf_t  nbuf_ref;
-	uint8_t empty_entry_mac[QDF_MAC_ADDR_SIZE] = {0};
+	dp_vdev_iterate_peer(vdev, dp_tx_me_send_dms_pkt,
+			     &dms_me, DP_MOD_ID_MCAST2UCAST);
 
-	eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
-	qdf_mem_copy(srcmac, eh->ether_shost, QDF_MAC_ADDR_SIZE);
-
-	for (new_mac_idx = 0; new_mac_idx < new_mac_cnt; new_mac_idx++) {
-		struct dp_peer *peer;
-		struct cdp_tx_exception_metadata tx_exc_param = {0};
-
-		dstmac = newmac[new_mac_idx];
-
-		/* Check for NULL Mac Address */
-		if (!qdf_mem_cmp(dstmac, empty_entry_mac, QDF_MAC_ADDR_SIZE))
-			continue;
-
-		/* frame to self mac. skip */
-		if (!qdf_mem_cmp(dstmac, srcmac, QDF_MAC_ADDR_SIZE))
-			continue;
-		peer = dp_peer_find_hash_find(soc, dstmac, 0, vdev_id,
-					      DP_MOD_ID_MCAST2UCAST);
-		if (!peer)
-			continue;
-
-		tx_exc_param.sec_type = vdev->sec_type;
-		tx_exc_param.tx_encap_type = vdev->tx_encap_type;
-		tx_exc_param.peer_id = peer->peer_id;
-		dp_peer_unref_delete(peer, DP_MOD_ID_MCAST2UCAST);
-
-		/*
-		 * We are taking one extra reference to make sure
-		 * buffer won't freed before sending all the frames.
-		 */
-		qdf_nbuf_ref(nbuf);
-		nbuf_ref = nbuf;
-		nbuf_ref = dp_tx_send_exception(soc_hdl, vdev_id, nbuf_ref, &tx_exc_param);
-		if (nbuf_ref != NULL) {
-			qdf_nbuf_free(nbuf_ref);
-		}
-	}
 	qdf_nbuf_free(nbuf);
+	DP_STATS_INC(vdev, tx_i.mcast_en.ucast, count - 1);
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_MCAST2UCAST);
-	return new_mac_idx ? new_mac_idx: 1;
+
+	/* only bss peer is present, free the buffer*/
+	if (count == 1) {
+		qdf_nbuf_free(nbuf);
+		return count;
+	}
+	return count - 1;
 }
 
 /**
@@ -387,8 +394,7 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		goto free_return;
 
 	if (is_dms_pkt)
-		return dp_tx_me_send_dms_pkt(soc_hdl, vdev_id, nbuf,
-					     newmac,new_mac_cnt, vdev);
+		return dp_tx_me_dms_pkt_handler(soc_hdl, vdev, nbuf);
 
 	qdf_mem_zero(&msdu_info, sizeof(msdu_info));
 

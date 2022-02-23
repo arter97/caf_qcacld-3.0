@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -29,17 +30,6 @@
 #define NEXT_20_CH_OFFSET 20
 
 #ifdef CONFIG_HOST_FIND_CHAN
-
-/**
- * reg_is_chan_disabled() - In the regulatory channel list, a channel
- * may be disabled by the regulatory/device or by radar. Radar is temporary
- * and a radar disabled channel does not mean that the channel is permanently
- * disabled. The API checks if the channel is disabled, but not due to radar.
- * @chan - Regulatory channel object
- *
- * Return - True,  the channel is disabled, but not due to radar, else false.
- */
-bool reg_is_chan_disabled(struct regulatory_channel *chan);
 
 /**
  * reg_is_phymode_chwidth_allowed() - Check if requested phymode is allowed
@@ -142,11 +132,6 @@ void reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev);
 bool reg_is_band_present(struct wlan_objmgr_pdev *pdev,
 			 enum reg_wifi_band reg_band);
 #else
-static inline bool reg_is_chan_disabled(struct regulatory_channel *chan)
-{
-	return false;
-}
-
 static inline bool reg_is_phymode_chwidth_allowed(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
 		enum reg_phymode phy_in,

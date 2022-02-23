@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -17,6 +18,13 @@
  */
 #ifndef _DP_TXRX_ME_H_
 #define _DP_TXRX_ME_H_
+
+typedef struct dp_vdev_dms_me {
+	struct cdp_soc_t                 *soc_hdl;
+	struct dp_vdev                   *vdev;
+	qdf_nbuf_t                       nbuf;
+	struct cdp_tx_exception_metadata *tx_exc_metadata;
+} dp_vdev_dms_me_t;
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 

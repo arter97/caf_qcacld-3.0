@@ -36,11 +36,6 @@
 #include <dp_ratetable.h>
 #include <dp_rate_stats_pub.h>
 
-#define RATE_STATS_LOCK_CREATE(lock) qdf_spinlock_create(lock)
-#define RATE_STATS_LOCK_DESTROY(lock) qdf_spinlock_destroy(lock)
-#define RATE_STATS_LOCK_ACQUIRE(lock) qdf_spin_lock_bh(lock)
-#define RATE_STATS_LOCK_RELEASE(lock) qdf_spin_unlock_bh(lock)
-
 #define STATS_CTX_LOCK_CREATE(lock) qdf_spinlock_create(lock)
 #define STATS_CTX_LOCK_DESTROY(lock) qdf_spinlock_destroy(lock)
 #define STATS_CTX_LOCK_ACQUIRE(lock) qdf_spin_lock_bh(lock)
@@ -74,7 +69,6 @@ struct wlan_peer_tx_rate_stats {
 	struct wlan_tx_sojourn_stats sojourn;
 	uint32_t cur_rix;
 	uint8_t cur_cache_idx;
-	qdf_spinlock_t lock;
 };
 
 /**
@@ -87,7 +81,6 @@ struct wlan_peer_rx_rate_stats {
 	struct wlan_rx_rate_stats stats[WLANSTATS_CACHE_SIZE];
 	uint32_t cur_rix;
 	uint32_t cur_cache_idx;
-	qdf_spinlock_t lock;
 };
 
 /**
@@ -97,7 +90,6 @@ struct wlan_peer_rx_rate_stats {
  */
 struct wlan_peer_avg_rate_stats {
 	struct wlan_avg_rate_stats stats;
-	qdf_spinlock_t lock;
 };
 
 /**
@@ -107,7 +99,6 @@ struct wlan_peer_avg_rate_stats {
  */
 struct wlan_peer_rx_link_stats {
 	struct wlan_rx_link_stats stats;
-	qdf_spinlock_t lock;
 };
 
 /**
@@ -117,7 +108,6 @@ struct wlan_peer_rx_link_stats {
  */
 struct wlan_peer_tx_link_stats {
 	struct wlan_tx_link_stats stats;
-	qdf_spinlock_t lock;
 };
 
 /**
