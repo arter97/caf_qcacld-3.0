@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -205,6 +205,37 @@ static QDF_STATUS reg_set_non_offload_country(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_REG_PARTIAL_OFFLOAD
+/**
+ * reg_restore_def_country_for_po() - API to restore country code to default
+ * value if given country is invalid for Partial Offload
+ * @offload_enabled: Is offload enabled
+ * @country: Country code
+ * @cc_country: Country code array
+ * Return- void
+ */
+static void reg_restore_def_country_for_po(bool offload_enabled,
+					   uint8_t *country,
+					   uint8_t cc_country[]){
+	if (!offload_enabled && !reg_is_world_alpha2(country)) {
+		QDF_STATUS status;
+
+		status = reg_is_country_code_valid(country);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			reg_err("Unable to set country code: %s\n", country);
+			reg_err("Restoring to world domain");
+			qdf_mem_copy(cc_country, REG_WORLD_ALPHA2,
+				     REG_ALPHA2_LEN + 1);
+		}
+	}
+}
+#else
+static void reg_restore_def_country_for_po(bool offload_enabled,
+					   uint8_t *country,
+					   uint8_t cc_country[]){
+}
+#endif
+
 QDF_STATUS reg_set_country(struct wlan_objmgr_pdev *pdev,
 			   uint8_t *country)
 {
@@ -254,18 +285,9 @@ QDF_STATUS reg_set_country(struct wlan_objmgr_pdev *pdev,
 	qdf_mem_copy(cc.country, country, REG_ALPHA2_LEN + 1);
 	cc.pdev_id = pdev_id;
 
-	if (!psoc_reg->offload_enabled && !reg_is_world_alpha2(country)) {
-		QDF_STATUS status;
-
-		status = reg_is_country_code_valid(country);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			reg_err("Unable to set country code: %s\n", country);
-			reg_err("Restoring to world domain");
-			qdf_mem_copy(cc.country, REG_WORLD_ALPHA2,
-				     REG_ALPHA2_LEN + 1);
-		}
-	}
-
+	reg_restore_def_country_for_po(psoc_reg->offload_enabled,
+				       country,
+				       cc.country);
 
 	if (reg_is_world_alpha2(cc.country))
 		psoc_reg->world_country_pending[phy_id] = true;
@@ -330,7 +352,8 @@ QDF_STATUS
 reg_get_6g_power_type_for_ctry(struct wlan_objmgr_psoc *psoc,
 			       uint8_t *ap_ctry, uint8_t *sta_ctry,
 			       enum reg_6g_ap_type *pwr_type_6g,
-			       bool *ctry_code_match)
+			       bool *ctry_code_match,
+			       enum reg_6g_ap_type ap_pwr_type)
 {
 	*pwr_type_6g = REG_INDOOR_AP;
 
@@ -351,16 +374,62 @@ reg_get_6g_power_type_for_ctry(struct wlan_objmgr_psoc *psoc,
 			return QDF_STATUS_E_NOSUPPORT;
 		}
 
-		if (wlan_reg_is_etsi(sta_ctry)) {
-			reg_debug("STA ctry:%c%c, doesn't match with AP ctry, switch to VLP",
-				  sta_ctry[0], sta_ctry[1]);
-			*pwr_type_6g = REG_VERY_LOW_POWER_AP;
+		if (wlan_reg_is_etsi(sta_ctry) &&
+		    ap_pwr_type != REG_MAX_AP_TYPE) {
+			if (!(wlan_reg_is_us(ap_ctry) &&
+			      ap_pwr_type == REG_INDOOR_AP)) {
+				reg_debug("STA ctry:%c%c, doesn't match with AP ctry, switch to VLP",
+					  sta_ctry[0], sta_ctry[1]);
+				*pwr_type_6g = REG_VERY_LOW_POWER_AP;
+			}
+		}
+
+		if (wlan_reg_is_us(ap_ctry) && ap_pwr_type == REG_INDOOR_AP) {
+			reg_debug("AP ctry:%c%c, AP power type:%d, allow STA IN LPI",
+				  ap_ctry[0], ap_ctry[1], ap_pwr_type);
+			*pwr_type_6g = REG_INDOOR_AP;
 		}
 	} else {
 		*ctry_code_match = true;
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+static inline
+void reg_get_coex_unsafe_chan_nb_user_prefer(
+		struct wlan_regulatory_psoc_priv_obj
+		*psoc_priv_obj,
+		 struct reg_config_vars config_vars)
+{
+	psoc_priv_obj->coex_unsafe_chan_nb_user_prefer =
+		config_vars.coex_unsafe_chan_nb_user_prefer;
+}
+
+static inline
+void reg_get_coex_unsafe_chan_reg_disable(
+		struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj,
+		struct reg_config_vars config_vars)
+{
+	psoc_priv_obj->coex_unsafe_chan_reg_disable =
+		config_vars.coex_unsafe_chan_reg_disable;
+}
+#else
+static inline
+void reg_get_coex_unsafe_chan_nb_user_prefer(
+		struct wlan_regulatory_psoc_priv_obj
+		*psoc_priv_obj,
+		struct reg_config_vars config_vars)
+{
+}
+
+static inline
+void reg_get_coex_unsafe_chan_reg_disable(
+		struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj,
+		struct reg_config_vars config_vars)
+{
 }
 #endif
 
@@ -694,11 +763,18 @@ enum reg_6g_ap_type reg_decide_6g_ap_pwr_type(struct wlan_objmgr_pdev *pdev)
 		return REG_VERY_LOW_POWER_AP;
 	}
 
-	if (reg_is_afc_available(pdev))
+	if (reg_is_afc_available(pdev)) {
 		ap_pwr_type = REG_STANDARD_POWER_AP;
-	else if (pdev_priv_obj->reg_6g_superid != FCC1_6G_01 &&
-		 pdev_priv_obj->reg_6g_superid != FCC1_6G_05)
+	} else if (pdev_priv_obj->indoor_chan_enabled) {
+		if (pdev_priv_obj->reg_rules.num_of_6g_ap_reg_rules[REG_INDOOR_AP])
+			ap_pwr_type = REG_INDOOR_AP;
+		else
+			ap_pwr_type = REG_VERY_LOW_POWER_AP;
+	} else if (pdev_priv_obj->reg_rules.num_of_6g_ap_reg_rules[REG_VERY_LOW_POWER_AP]) {
 		ap_pwr_type = REG_VERY_LOW_POWER_AP;
+	}
+	reg_debug("indoor_chan_enabled %d ap_pwr_type %d",
+		  pdev_priv_obj->indoor_chan_enabled, ap_pwr_type);
 
 	reg_set_ap_pwr_and_update_chan_list(pdev, ap_pwr_type);
 
@@ -775,6 +851,8 @@ QDF_STATUS reg_set_config_vars(struct wlan_objmgr_psoc *psoc,
 		config_vars.enable_5dot9_ghz_chan_in_master_mode;
 	psoc_priv_obj->retain_nol_across_regdmn_update =
 		config_vars.retain_nol_across_regdmn_update;
+	reg_get_coex_unsafe_chan_nb_user_prefer(psoc_priv_obj, config_vars);
+	reg_get_coex_unsafe_chan_reg_disable(psoc_priv_obj, config_vars);
 
 	status = wlan_objmgr_psoc_try_get_ref(psoc, WLAN_REGULATORY_SB_ID);
 	if (QDF_IS_STATUS_ERROR(status)) {

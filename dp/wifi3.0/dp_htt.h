@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -63,6 +64,11 @@ int htt_wbm_event_record(struct htt_logger *h, uint8_t tx_status,
 }
 
 #endif
+
+#define HTT_MGMT_CTRL_TLV_HDR_RESERVERD_LEN 16
+#define HTT_TLV_HDR_LEN HTT_T2H_EXT_STATS_CONF_TLV_HDR_SIZE
+#define HTT_SHIFT_UPPER_TIMESTAMP 32
+#define HTT_MASK_UPPER_TIMESTAMP 0xFFFFFFFF00000000
 
 void htt_htc_pkt_pool_free(struct htt_soc *soc);
 
@@ -147,12 +153,12 @@ void htt_htc_pkt_pool_free(struct htt_soc *soc);
 #define HTT_VDEV_STATS_TLV_RX_PKT_CNT_OFFSET          4
 #define HTT_VDEV_STATS_TLV_TX_SUCCESS_BYTE_CNT_OFFSET 6
 #define HTT_VDEV_STATS_TLV_TX_SUCCESS_PKT_CNT_OFFSET  8
-#define HTT_VDEV_STATS_TLV_TX_RETRY_BYTE_CNT_OFFSET   10
-#define HTT_VDEV_STATS_TLV_TX_RETRY_PKT_CNT_OFFSET    12
-#define HTT_VDEV_STATS_TLV_TX_DROP_BYTE_CNT_OFFSET    14
-#define HTT_VDEV_STATS_TLV_TX_DROP_PKT_CNT_OFFSET     16
-#define HTT_VDEV_STATS_TLV_TX_AGE_OUT_BYTE_CNT_OFFSET 18
-#define HTT_VDEV_STATS_TLV_TX_AGE_OUT_PKT_CNT_OFFSET  20
+#define HTT_VDEV_STATS_TLV_TX_RETRY_PKT_CNT_OFFSET    10
+#define HTT_VDEV_STATS_TLV_TX_DROP_PKT_CNT_OFFSET     12
+#define HTT_VDEV_STATS_TLV_TX_AGE_OUT_PKT_CNT_OFFSET  14
+#define HTT_VDEV_STATS_TLV_TX_RETRY_BYTE_CNT_OFFSET   16
+#define HTT_VDEV_STATS_TLV_TX_DROP_BYTE_CNT_OFFSET    18
+#define HTT_VDEV_STATS_TLV_TX_AGE_OUT_BYTE_CNT_OFFSET 20
 
 #define HTT_VDEV_STATS_GET_INDEX(index) \
 	HTT_VDEV_STATS_TLV_##index##_OFFSET
@@ -186,6 +192,7 @@ void htt_htc_pkt_pool_free(struct htt_soc *soc);
 	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP_HTT_TX_STATS, ## params)
 #define dp_htt_tx_stats_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_HTT_TX_STATS, params)
 
+#define RXMON_GLOBAL_EN_SHIFT 28
 /**
  * enum dp_full_mon_config - enum to enable/disable full monitor mode
  *
@@ -497,7 +504,7 @@ struct dp_tx_mon_wordmask_config {
 	uint16_t tx_queue_ext;
 	uint16_t tx_msdu_start;
 	uint16_t tx_mpdu_start;
-	uint16_t pcu_ppdu_setup_init;
+	uint32_t pcu_ppdu_setup_init;
 	uint16_t rxpcu_user_setup;
 };
 
@@ -528,6 +535,7 @@ struct dp_tx_mon_wordmask_config {
  * @mgmt_mpdu_log: enable mgmt mpdu level logging
  * @ctrl_mpdu_log: enable ctrl mpdu level logging
  * @data_mpdu_log: enable data mpdu level logging
+ * @enable: enable tx monitor
  *
  * NOTE: Do not change the layout of this structure
  */
@@ -556,6 +564,7 @@ struct htt_tx_ring_tlv_filter {
 	uint8_t  mgmt_mpdu_log:1,
 		 ctrl_mpdu_log:1,
 		 data_mpdu_log:1;
+	uint8_t  enable:1;
 };
 #endif /* QCA_MONITOR_2_0_SUPPORT */
 
@@ -588,6 +597,13 @@ struct htt_tx_ring_tlv_filter {
  * @rx_msdu_end_offset: Offset of rx_msdu_end tlv
  * @rx_msdu_start_offset: Offset of rx_msdu_start tlv
  * @rx_attn_offset: Offset of rx_attention tlv
+ * @fp_phy_err: Flag to indicate FP PHY status tlv
+ * @fp_phy_err_buf_src: source ring selection for the FP PHY ERR status tlv
+ * @fp_phy_err_buf_dest: dest ring selection for the FP PHY ERR status tlv
+ * @phy_err_mask: select the phy errors defined in phyrx_abort_request_reason
+ *  enums 0 to 31.
+ * @phy_err_mask_cont: select the fp phy errors defined in
+ *  phyrx_abort_request_reason enums 32 to 63
  * @rx_mpdu_start_wmask: word mask for mpdu start tlv
  * @rx_mpdu_end_wmask: word mask for mpdu end tlv
  * @rx_msdu_end_tlv: word mask for msdu end tlv
@@ -598,6 +614,7 @@ struct htt_tx_ring_tlv_filter {
  * @mgmt_mpdu_log: enable mgmt mpdu level logging
  * @ctrl_mpdu_log: enable ctrl mpdu level logging
  * @data_mpdu_log: enable data mpdu level logging
+ * @enable: enable rx monitor
  *
  * NOTE: Do not change the layout of this structure
  */
@@ -635,6 +652,14 @@ struct htt_rx_ring_tlv_filter {
 	uint16_t rx_msdu_end_offset;
 	uint16_t rx_msdu_start_offset;
 	uint16_t rx_attn_offset;
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+	u_int32_t fp_phy_err:1,
+		fp_phy_err_buf_src:2,
+		fp_phy_err_buf_dest:2,
+		phy_err_filter_valid:1;
+	u_int32_t phy_err_mask;
+	u_int32_t phy_err_mask_cont;
+#endif
 #ifdef QCA_MONITOR_2_0_SUPPORT
 	uint16_t rx_mpdu_start_wmask;
 	uint16_t rx_mpdu_end_wmask;
@@ -642,11 +667,13 @@ struct htt_rx_ring_tlv_filter {
 	uint16_t rx_pkt_tlv_offset;
 	uint16_t mgmt_dma_length:3,
 		 ctrl_dma_length:3,
-		 data_dma_lepngth:3,
+		 data_dma_length:3,
 		 mgmt_mpdu_log:1,
 		 ctrl_mpdu_log:1,
-		 data_mpdu_log:1;
+		 data_mpdu_log:1,
+		 enable:1;
 #endif
+	uint8_t rx_mon_global_en;
 };
 
 /**
@@ -929,4 +956,39 @@ int htt_h2t_full_mon_cfg(struct htt_soc *htt_soc,
 QDF_STATUS dp_h2t_hw_vdev_stats_config_send(struct dp_soc *dpsoc,
 					    uint8_t pdev_id, bool enable,
 					    bool reset, uint64_t reset_bitmask);
+
+static inline enum htt_srng_ring_id
+dp_htt_get_mon_htt_ring_id(struct dp_soc *soc,
+			   enum hal_ring_type hal_ring_type)
+{
+	enum htt_srng_ring_id htt_srng_id = 0;
+
+	if (wlan_cfg_get_txmon_hw_support(soc->wlan_cfg_ctx)) {
+		switch (hal_ring_type) {
+		case RXDMA_MONITOR_BUF:
+			htt_srng_id = HTT_RX_MON_HOST2MON_BUF_RING;
+			break;
+		case RXDMA_MONITOR_DST:
+			htt_srng_id = HTT_RX_MON_MON2HOST_DEST_RING;
+			break;
+		default:
+			dp_err("Invalid ring type %d ", hal_ring_type);
+			break;
+		}
+	} else {
+		switch (hal_ring_type) {
+		case RXDMA_MONITOR_BUF:
+			htt_srng_id = HTT_RXDMA_MONITOR_BUF_RING;
+			break;
+		case RXDMA_MONITOR_DST:
+			htt_srng_id = HTT_RXDMA_MONITOR_DEST_RING;
+			break;
+		default:
+			dp_err("Invalid ring type %d ", hal_ring_type);
+			break;
+		}
+	}
+
+	return htt_srng_id;
+}
 #endif /* _DP_HTT_H_ */

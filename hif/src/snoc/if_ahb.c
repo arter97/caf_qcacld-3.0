@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -43,7 +44,7 @@
 #endif
 
 #define HIF_IC_CE0_IRQ_OFFSET 4
-#define HIF_IC_MAX_IRQ 52
+#define HIF_IC_MAX_IRQ 53
 
 static uint16_t ic_irqnum[HIF_IC_MAX_IRQ];
 /* integrated chip irq names */
@@ -96,6 +97,7 @@ const char *ic_irqname[HIF_IC_MAX_IRQ] = {
 "host2tcl-input-ring3",
 "host2tcl-input-ring2",
 "host2tcl-input-ring1",
+"wbm2host-tx-completions-ring4",
 "wbm2host-tx-completions-ring3",
 "wbm2host-tx-completions-ring2",
 "wbm2host-tx-completions-ring1",
@@ -198,62 +200,6 @@ QDF_STATUS hif_ahb_open(struct hif_softc *hif_ctx, enum qdf_bus_type bus_type)
 int hif_ahb_bus_configure(struct hif_softc *scn)
 {
 	return hif_pci_bus_configure(scn);
-}
-
-/**
- * hif_configure_msi_ahb - Configure MSI interrupts
- * @sc : pointer to the hif context
- *
- * return: 0 for success. nonzero for failure.
- */
-
-int hif_configure_msi_ahb(struct hif_pci_softc *sc)
-{
-	return 0;
-}
-
-/**
- * hif_ahb_configure_legacy_irq() - Configure Legacy IRQ
- * @sc: pointer to the hif context.
- *
- * This function registers the irq handler and enables legacy interrupts
- *
- * return: 0 for success. nonzero for failure.
- */
-int hif_ahb_configure_legacy_irq(struct hif_pci_softc *sc)
-{
-	int ret = 0;
-	struct hif_softc *scn = HIF_GET_SOFTC(sc);
-	struct platform_device *pdev = (struct platform_device *)sc->pdev;
-	int irq = 0;
-
-	/* do not support MSI or MSI IRQ failed */
-	tasklet_init(&sc->intr_tq, wlan_tasklet, (unsigned long)sc);
-	qal_vbus_get_irq((struct qdf_pfm_hndl *)pdev, "legacy", &irq);
-	if (irq < 0) {
-		dev_err(&pdev->dev, "Unable to get irq\n");
-		ret = -EFAULT;
-		goto end;
-	}
-	ret = request_irq(irq, hif_pci_legacy_ce_interrupt_handler,
-				IRQF_DISABLED, "wlan_ahb", sc);
-	if (ret) {
-		dev_err(&pdev->dev, "ath_request_irq failed\n");
-		ret = -EFAULT;
-		goto end;
-	}
-	sc->irq = irq;
-
-	/* Use Legacy PCI Interrupts */
-	hif_write32_mb(sc, sc->mem + (SOC_CORE_BASE_ADDRESS |
-				PCIE_INTR_ENABLE_ADDRESS),
-			PCIE_INTR_FIRMWARE_MASK | PCIE_INTR_CE_MASK_ALL);
-	/* read once to flush */
-	hif_read32_mb(sc, sc->mem + (SOC_CORE_BASE_ADDRESS |
-				PCIE_INTR_ENABLE_ADDRESS));
-
-end:
-	return ret;
 }
 
 static void hif_ahb_get_soc_info_pld(struct hif_pci_softc *sc,
@@ -427,63 +373,6 @@ irqreturn_t hif_ahb_interrupt_handler(int irq, void *context)
 }
 
 /**
- * hif_target_sync() : ensure the target is ready
- * @scn: hif control structure
- *
- * Informs fw that we plan to use legacy interupts so that
- * it can begin booting. Ensures that the fw finishes booting
- * before continuing. Should be called before trying to write
- * to the targets other registers for the first time.
- *
- * Return: none
- */
-int hif_target_sync_ahb(struct hif_softc *scn)
-{
-	int val = 0;
-	int limit = 0;
-
-	while (limit < 50) {
-		hif_write32_mb(scn, scn->mem +
-			(SOC_CORE_BASE_ADDRESS | PCIE_INTR_ENABLE_ADDRESS),
-			PCIE_INTR_FIRMWARE_MASK | PCIE_INTR_CE_MASK_ALL);
-		qdf_mdelay(10);
-		val = hif_read32_mb(scn, scn->mem +
-			(SOC_CORE_BASE_ADDRESS | PCIE_INTR_ENABLE_ADDRESS));
-		if (val == 0)
-			break;
-		limit++;
-	}
-	hif_write32_mb(scn, scn->mem +
-		(SOC_CORE_BASE_ADDRESS | PCIE_INTR_ENABLE_ADDRESS),
-		PCIE_INTR_FIRMWARE_MASK | PCIE_INTR_CE_MASK_ALL);
-	hif_write32_mb(scn, scn->mem + FW_INDICATOR_ADDRESS, FW_IND_HOST_READY);
-	if (HAS_FW_INDICATOR) {
-		int wait_limit = 500;
-		int fw_ind = 0;
-
-		while (1) {
-			fw_ind = hif_read32_mb(scn, scn->mem +
-					FW_INDICATOR_ADDRESS);
-			if (fw_ind & FW_IND_INITIALIZED)
-				break;
-			if (wait_limit-- < 0)
-				break;
-			hif_write32_mb(scn, scn->mem + (SOC_CORE_BASE_ADDRESS |
-				PCIE_INTR_ENABLE_ADDRESS),
-				PCIE_INTR_FIRMWARE_MASK);
-			qdf_mdelay(10);
-		}
-		if (wait_limit < 0) {
-			hif_info("FW signal timed out");
-			return -EIO;
-		}
-		hif_info("Got FW signal, retries = %x", 500-wait_limit);
-	}
-
-	return 0;
-}
-
-/**
  * hif_disable_bus() - Disable the bus
  * @scn : pointer to the hif context
  *
@@ -517,17 +406,6 @@ void hif_ahb_disable_bus(struct hif_softc *scn)
 		if (memres)
 			mem_pa_size = memres->end - memres->start + 1;
 
-		/* Should not be executed on 8074 platform */
-		if ((tgt_info->target_type != TARGET_TYPE_QCA8074) &&
-		    (tgt_info->target_type != TARGET_TYPE_QCA8074V2) &&
-		    (tgt_info->target_type != TARGET_TYPE_QCA9574) &&
-		    (tgt_info->target_type != TARGET_TYPE_QCA5018) &&
-		    (tgt_info->target_type != TARGET_TYPE_QCN6122) &&
-		    (tgt_info->target_type != TARGET_TYPE_QCA6018)) {
-			hif_ahb_clk_enable_disable(&pdev->dev, 0);
-
-			hif_ahb_device_reset(scn);
-		}
 		if (tgt_info->target_type == TARGET_TYPE_QCA5018) {
 			iounmap(sc->mem_ce);
 			sc->mem_ce = NULL;
@@ -539,6 +417,7 @@ void hif_ahb_disable_bus(struct hif_softc *scn)
 			pfrm_devm_release_mem_region(&pdev->dev, scn->mem_pa,
 						     mem_pa_size);
 			sc->mem = NULL;
+			pld_set_bar_addr(&pdev->dev, NULL);
 		}
 	}
 	scn->mem = NULL;
@@ -623,6 +502,7 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 		}
 
 		sc->mem = mem;
+		pld_set_bar_addr(dev, mem);
 		ol_sc->mem = mem;
 		ol_sc->mem_pa = memres->start;
 	}
@@ -664,57 +544,13 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 		ol_sc->mem_ce = sc->mem_ce;
 	}
 
-	if ((tgt_info->target_type != TARGET_TYPE_QCA8074) &&
-			(tgt_info->target_type != TARGET_TYPE_QCA8074V2) &&
-			(tgt_info->target_type != TARGET_TYPE_QCA9574) &&
-			(tgt_info->target_type != TARGET_TYPE_QCA5018) &&
-			(tgt_info->target_type != TARGET_TYPE_QCN6122) &&
-			(tgt_info->target_type != TARGET_TYPE_QCA6018)) {
-		if (hif_ahb_enable_radio(sc, pdev, id) != 0) {
-			hif_err("error in enabling soc");
-			return QDF_STATUS_E_IO;
-		}
-
-		if (hif_target_sync_ahb(ol_sc) < 0) {
-			status = QDF_STATUS_E_IO;
-			goto err_target_sync;
-		}
-	}
 	hif_info("X - hif_type = 0x%x, target_type = 0x%x",
 		hif_type, target_type);
 
 	return QDF_STATUS_SUCCESS;
-err_target_sync:
-	if ((tgt_info->target_type != TARGET_TYPE_QCA8074) &&
-	    (tgt_info->target_type != TARGET_TYPE_QCA8074V2) &&
-	    (tgt_info->target_type != TARGET_TYPE_QCA9574) &&
-	    (tgt_info->target_type != TARGET_TYPE_QCN6122) &&
-	    (tgt_info->target_type != TARGET_TYPE_QCA5018) &&
-	    (tgt_info->target_type != TARGET_TYPE_QCA6018)) {
-		hif_err("Disabling target");
-		hif_ahb_disable_bus(ol_sc);
-	}
 err_cleanup1:
 	return status;
 }
-
-
-/**
- * hif_reset_soc() - reset soc
- *
- * @hif_ctx: HIF context
- *
- * This function resets soc and helds the
- * target in reset state
- *
- * Return: void
- */
-/* Function to reset SoC */
-void hif_ahb_reset_soc(struct hif_softc *hif_ctx)
-{
-	hif_ahb_device_reset(hif_ctx);
-}
-
 
 /**
  * hif_nointrs() - disable IRQ

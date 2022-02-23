@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,11 +48,15 @@ static uint16_t wlan_mlo_peer_alloc_aid(
 	uint16_t start_aid;
 	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
 
-	if (!mlo_mgr_ctx)
+	if (!mlo_mgr_ctx) {
+		mlo_err(" MLO mgr context is NULL, assoc id alloc failed");
 		return assoc_id;
+	}
 
-	if (!is_mlo_peer && link_ix == MLO_INVALID_LINK_IDX)
+	if (!is_mlo_peer && link_ix == MLO_INVALID_LINK_IDX) {
+		mlo_err(" is MLO peer %d, link_ix %d", is_mlo_peer, link_ix);
 		return assoc_id;
+	}
 	/* TODO check locking strategy */
 	ml_aid_lock_acquire(mlo_mgr_ctx);
 
@@ -273,9 +277,15 @@ QDF_STATUS wlan_mlo_peer_free_aid(
 			}
 		}
 	} else {
-		vdev_aid_mgr = ml_aid_mgr->aid_mgr[link_ix];
-		if (vdev_aid_mgr)
-			qdf_clear_bit(assoc_id_ix, vdev_aid_mgr->aid_bitmap);
+		if ((link_ix != 0xff) && (link_ix < WLAN_UMAC_MLO_MAX_VDEVS)) {
+			vdev_aid_mgr = ml_aid_mgr->aid_mgr[link_ix];
+			if (vdev_aid_mgr)
+				qdf_clear_bit(assoc_id_ix,
+					      vdev_aid_mgr->aid_bitmap);
+		} else {
+			mlo_err("AID free failed, link ix(%d) is invalid for assoc_id %d",
+				link_ix, assoc_id);
+		}
 	}
 
 	ml_aid_lock_release(mlo_mgr_ctx);
@@ -348,18 +358,28 @@ QDF_STATUS mlo_peer_allocate_aid(
 	struct wlan_mlo_ap *ap_ctx;
 
 	ap_ctx = ml_dev->ap_ctx;
-	if (!ap_ctx)
+	if (!ap_ctx) {
+		mlo_err("MLD ID %d ap_ctx is NULL", ml_dev->mld_id);
 		return QDF_STATUS_E_INVAL;
+	}
 
 	ml_aid_mgr = ap_ctx->ml_aid_mgr;
-	if (!ml_aid_mgr)
+	if (!ml_aid_mgr) {
+		mlo_err("MLD ID %d aid mgr is NULL", ml_dev->mld_id);
 		return QDF_STATUS_E_INVAL;
+	}
 
 	assoc_id = wlan_mlo_peer_alloc_aid(ml_aid_mgr, true, 0xff);
-	if (assoc_id == (uint16_t)-1)
+	if (assoc_id == (uint16_t)-1) {
+		mlo_err("MLD ID %d aid mgr is NULL", ml_dev->mld_id);
 		return QDF_STATUS_E_NOENT;
+	}
 
 	ml_peer->assoc_id = assoc_id;
+
+	mlo_debug("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT " ML assoc id %d",
+		  ml_dev->mld_id,
+		  QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes), assoc_id);
 
 	return QDF_STATUS_SUCCESS;
 }

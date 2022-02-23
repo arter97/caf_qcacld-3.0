@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,6 +31,7 @@ QDF_STATUS mlo_msgq_post(enum mlo_msg_type type,
 	struct peer_assoc_fail_notify_s *peer_assoc_fail;
 	struct peer_discon_notify_s *peer_disconn;
 	struct peer_deauth_notify_s *peer_deauth;
+	struct peer_auth_process_notif_s *peer_auth;
 
 	switch (type) {
 	case MLO_PEER_CREATE:
@@ -71,6 +72,11 @@ QDF_STATUS mlo_msgq_post(enum mlo_msg_type type,
 		mlo_mlme_peer_deauth(peer_deauth->peer);
 		wlan_objmgr_peer_release_ref(peer_deauth->peer,
 					     WLAN_MLO_MGR_ID);
+		break;
+
+	case MLO_PEER_PENDING_AUTH:
+		peer_auth = (struct peer_auth_process_notif_s *)payload;
+		mlo_mlme_peer_process_auth(peer_auth->auth_params);
 		break;
 
 	default:
@@ -136,6 +142,8 @@ QDF_STATUS mlo_msgq_post(enum mlo_msg_type type,
 	struct peer_assoc_notify_s *peer_assoc, *peer_assoc_l;
 	struct peer_assoc_fail_notify_s *peer_assoc_fail, *peer_assoc_fail_l;
 	struct peer_discon_notify_s *peer_disconn, *peer_disconn_l;
+	struct peer_deauth_notify_s *peer_deauth, *peer_deauth_l;
+	struct peer_auth_process_notif_s *peer_auth, *peer_auth_l;
 	struct ctxt_switch_mgr *msgq_ctx;
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
@@ -188,6 +196,12 @@ QDF_STATUS mlo_msgq_post(enum mlo_msg_type type,
 		peer_deauth->peer = peer_deauth_l->peer;
 		break;
 
+	case MLO_PEER_PENDING_AUTH:
+		peer_auth = &msg->m.peer_auth;
+		peer_auth_l = (struct peer_auth_process_notif_s *)payload;
+		peer_auth->auth_params = peer_auth_l->auth_params;
+		break;
+
 	default:
 		break;
 	}
@@ -207,6 +221,8 @@ static void mlo_msgq_msg_process_hdlr(struct mlo_ctxt_switch_msg_s *msg)
 	struct peer_assoc_notify_s *peer_assoc;
 	struct peer_assoc_fail_notify_s *peer_assoc_fail;
 	struct peer_discon_notify_s *peer_disconn;
+	struct peer_deauth_notify_s *peer_deauth;
+	struct peer_auth_process_notif_s *peer_auth;
 
 	type = msg->type;
 	switch (type) {
@@ -249,6 +265,11 @@ static void mlo_msgq_msg_process_hdlr(struct mlo_ctxt_switch_msg_s *msg)
 					     WLAN_MLO_MGR_ID);
 		break;
 
+	case MLO_PEER_PENDING_AUTH:
+		peer_auth = &msg->m.peer_auth;
+		mlo_mlme_peer_process_auth(peer_auth->auth_params);
+		break;
+
 	default:
 		break;
 	}
@@ -262,6 +283,7 @@ static void mlo_msgq_msg_flush_hdlr(struct mlo_ctxt_switch_msg_s *msg)
 	struct peer_assoc_notify_s *peer_assoc;
 	struct peer_assoc_fail_notify_s *peer_assoc_fail;
 	struct peer_discon_notify_s *peer_disconn;
+	struct peer_deauth_notify_s *peer_deauth;
 
 	type = msg->type;
 	switch (type) {
@@ -295,6 +317,11 @@ static void mlo_msgq_msg_flush_hdlr(struct mlo_ctxt_switch_msg_s *msg)
 		peer_deauth = &msg->m.peer_deauth;
 		wlan_objmgr_peer_release_ref(peer_deauth->peer,
 					     WLAN_MLO_MGR_ID);
+		break;
+
+	case MLO_PEER_PENDING_AUTH:
+		peer_auth = &msg->m.peer_auth;
+		mlo_peer_free_auth_param(peer_auth->auth_params);
 		break;
 
 	default:
@@ -356,7 +383,7 @@ static void mlo_msgq_msg_handler(void *arg)
 					     &msgbuf_node);
 		if (status != QDF_STATUS_E_EMPTY) {
 			qdf_list_remove_node(&msgq_ctx->msgq_list,
-					     &msgbuf_node);
+					     msgbuf_node);
 			msg = qdf_container_of(msgbuf_node,
 					       struct mlo_ctxt_switch_msg_s,
 					       node);

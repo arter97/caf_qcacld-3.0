@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +20,17 @@
 
 #include <dp_htt.h>
 
+#define DEFAULT_DMA_LENGTH 7
+
+/**
+ * dp_rx_mon_enable_set() - Setup rx monitor feature
+ * @msg_word: msg word
+ * @htt_tlv_filter: rx ring filter configuration
+ */
+void
+dp_rx_mon_enable_set(uint32_t *msg_word,
+		     struct htt_rx_ring_tlv_filter *tlv_filter);
+
 /**
  * dp_rx_mon_packet_length_set() - Setup rx monitor per packet type length
  * @msg_word: msg word
@@ -26,7 +38,7 @@
  */
 void
 dp_rx_mon_packet_length_set(uint32_t *msg_word,
-			    struct htt_rx_ring_tlv_filter *tlvi_filter);
+			    struct htt_rx_ring_tlv_filter *tlv_filter);
 
 /**
  * dp_rx_mon_word_mask_subscribe() - Setup rx monitor word mask subscription
@@ -66,6 +78,32 @@ dp_mon_filter_setup_enhanced_stats_2_0(struct dp_pdev *pdev)
 
 static inline void
 dp_mon_filter_reset_enhanced_stats_2_0(struct dp_pdev *pdev)
+{
+}
+#endif
+
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+/*
+ * dp_mon_filter_setup_undecoded_metadata_capture() - Setup the filter
+ * for undecoded metadata capture
+ * @pdev: DP pdev handle
+ */
+void dp_mon_filter_setup_undecoded_metadata_capture_2_0(struct dp_pdev *pdev);
+
+/*
+ * dp_mon_filter_reset_undecoded_metadata_capture() - Reset the filter
+ * for undecoded metadata capture
+ * @pdev: DP pdev handle
+ */
+void dp_mon_filter_reset_undecoded_metadata_capture_2_0(struct dp_pdev *pdev);
+#else
+static inline void
+dp_mon_filter_setup_undecoded_metadata_capture_2_0(struct dp_pdev *pdev)
+{
+}
+
+static inline void
+dp_mon_filter_reset_undecoded_metadata_capture_2_0(struct dp_pdev *pdev)
 {
 }
 #endif
@@ -143,16 +181,28 @@ dp_mon_filter_reset_rx_enh_capture_2_0(struct dp_pdev *pdev)
 #endif
 
 /**
- * dp_mon_filter_setup_mon_mode() - Setup the Rx monitor mode filter
+ * dp_mon_filter_setup_rx_mon_mode() - Setup the Rx monitor mode filter
  * @pdev: DP pdev handle
  */
-void dp_mon_filter_setup_mon_mode_2_0(struct dp_pdev *pdev);
+void dp_mon_filter_setup_rx_mon_mode_2_0(struct dp_pdev *pdev);
 
 /**
  * dp_mon_filter_reset_mon_mode() - Reset the Rx monitor mode filter
  * @pdev: DP pdev handle
  */
-void dp_mon_filter_reset_mon_mode_2_0(struct dp_pdev *pdev);
+void dp_mon_filter_reset_rx_mon_mode_2_0(struct dp_pdev *pdev);
+
+/**
+ * dp_mon_filter_setup_tx_mon_mode() - Setup the Tx monitor mode filter
+ * @pdev: DP pdev handle
+ */
+void dp_mon_filter_setup_tx_mon_mode_2_0(struct dp_pdev *pdev);
+
+/**
+ * dp_mon_filter_reset_tx_mon_mode() - Reset the Tx monitor mode filter
+ * @pdev: DP pdev handle
+ */
+void dp_mon_filter_reset_tx_mon_mode_2_0(struct dp_pdev *pdev);
 
 #ifdef WDI_EVENT_ENABLE
 /**
@@ -247,11 +297,35 @@ dp_mon_filter_reset_pktlog_hybrid_2_0(struct dp_pdev *pdev)
 #endif
 
 /**
- * dp_mon_filter_update_2_0() - Update monitor filter configuration
+ * dp_tx_mon_filter_update_2_0() - Update monitor filter configuration
  * @pdev: physical device handle
  *
  * Return: non-zero for failure, zero for success
  */
-QDF_STATUS dp_mon_filter_update_2_0(struct dp_pdev *pdev);
+QDF_STATUS dp_tx_mon_filter_update_2_0(struct dp_pdev *pdev);
+
+/**
+ * dp_rx_mon_filter_update_2_0() - Update monitor filter configuration
+ * @pdev: physical device handle
+ *
+ * Return: non-zero for failure, zero for success
+ */
+QDF_STATUS dp_rx_mon_filter_update_2_0(struct dp_pdev *pdev);
+
+/**
+ * dp_mon_filter_dealloc_2_0() - free tx monitor filter memory
+ * @pdev: physical device handle
+ *
+ * Return: non-zero for failure, zero for success
+ */
+void dp_mon_filter_dealloc_2_0(struct dp_pdev *pdev);
+
+/**
+ * dp_mon_filter_alloc_2_0() - tx monitor filter allocation
+ * @pdev: physical device handle
+ *
+ * Return: non-zero for failure, zero for success
+ */
+QDF_STATUS dp_mon_filter_alloc_2_0(struct dp_pdev *pdev);
 
 #endif /* _DP_MON_FILTER_2_0_H_ */

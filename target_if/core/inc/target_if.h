@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -233,7 +233,6 @@ struct tgt_info {
  * @mesh_support_enable: Mesh support enable
  * @smart_antenna_enable: Smart antenna enable
  * @atf_config_enable: ATF config enable
- * @qwrap_config_enable: QWRAP config enable
  * @btcoex_config_enable: BTCOEX config enable
  * @lteu_ext_support_enable: LTE-U Ext config enable
  * @set_init_cmd_dev_based_params: Sets Init command params
@@ -264,9 +263,6 @@ struct target_ops {
 		(struct wlan_objmgr_psoc *psoc,
 		 struct target_psoc_info *tgt_info, uint8_t *event);
 	void (*atf_config_enable)
-		(struct wlan_objmgr_psoc *psoc,
-		 struct target_psoc_info *tgt_info, uint8_t *event);
-	void (*qwrap_config_enable)
 		(struct wlan_objmgr_psoc *psoc,
 		 struct target_psoc_info *tgt_info, uint8_t *event);
 	void (*btcoex_config_enable)
@@ -314,6 +310,9 @@ struct target_ops {
 	int (*csa_switch_count_status)(
 		struct wlan_objmgr_psoc *psoc,
 		struct pdev_csa_switch_count_status csa_status);
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+	bool (*mlo_capable)(struct wlan_objmgr_psoc *psoc);
+#endif
 };
 
 
@@ -505,14 +504,6 @@ QDF_STATUS target_if_free_psoc_tgt_info(struct wlan_objmgr_psoc *psoc);
  * Return: true if the target_type is AR900B, else false.
  */
 bool target_is_tgt_type_ar900b(uint32_t target_type);
-
-/**
- * target_is_tgt_type_ipq4019() - Check if the target type is IPQ4019
- * @target_type: target type to be checked.
- *
- * Return: true if the target_type is IPQ4019, else false.
- */
-bool target_is_tgt_type_ipq4019(uint32_t target_type);
 
 /**
  * target_is_tgt_type_qca9984() - Check if the target type is QCA9984
@@ -2036,24 +2027,6 @@ static inline void target_if_atf_cfg_enable(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * target_if_qwrap_cfg_enable - Enable QWRAP config
- * @psoc:  psoc object
- * @tgt_hdl: target_psoc_info pointer
- * @evt_buf: Event buffer received from FW
- *
- * API to enable QWRAP config
- *
- * Return: none
- */
-static inline void target_if_qwrap_cfg_enable(struct wlan_objmgr_psoc *psoc,
-			struct target_psoc_info *tgt_hdl, uint8_t *evt_buf)
-{
-	if ((tgt_hdl->tif_ops) &&
-		(tgt_hdl->tif_ops->qwrap_config_enable))
-		tgt_hdl->tif_ops->qwrap_config_enable(psoc, tgt_hdl, evt_buf);
-}
-
-/**
  * target_if_btcoex_cfg_enable - Enable BT coex config
  * @psoc:  psoc object
  * @tgt_hdl: target_psoc_info pointer
@@ -2786,6 +2759,17 @@ QDF_STATUS target_if_mlo_setup_req(struct wlan_objmgr_pdev **pdev,
  */
 QDF_STATUS target_if_mlo_ready(struct wlan_objmgr_pdev **pdev,
 			       uint8_t num_pdevs);
+
+/**
+ * target_if_mlo_teardown_req - API to trigger MLO teardown sequence
+ * @pdev: Array of pointers to pdev object that are part of ML group
+ * @num_pdevs: Number of pdevs in above array
+ * @reason: Reason for triggering teardown
+ *
+ * Return: QDF_STATUS codes
+ */
+QDF_STATUS target_if_mlo_teardown_req(struct wlan_objmgr_pdev **pdev,
+				      uint8_t num_pdevs, uint32_t reason);
 #endif /*WLAN_FEATURE_11BE_MLO && WLAN_MLO_MULTI_CHIP*/
 
 #endif

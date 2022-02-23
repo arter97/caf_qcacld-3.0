@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2019, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -160,15 +161,15 @@ QDF_STATUS wlan_vdev_mlme_is_csa_restart(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS wlan_vdev_is_going_down(struct wlan_objmgr_vdev *vdev);
 
 /**
- * wlan_vdev_is_peer_create_allowed() - Checks whether PEER can be created
+ * wlan_vdev_is_mlo_peer_create_allowed() - Checks whether PEER can be created
  * @vdev: Object manager VDEV object
  *
- * API to check the VDEV MLME SM state to allow PEER association
+ * API to check the VDEV MLME SM state to allow PEER association in MLD
  *
  * Return: SUCCESS: if peer create can be allowed
  *         FAILURE: otherwise failure
  */
-QDF_STATUS wlan_vdev_is_peer_create_allowed(struct wlan_objmgr_vdev *vdev);
+QDF_STATUS wlan_vdev_is_mlo_peer_create_allowed(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_vdev_is_restart_progress() - Checks VDEV restart is in progress
@@ -242,4 +243,42 @@ QDF_STATUS wlan_vdev_mlme_is_init_state(struct wlan_objmgr_vdev *vdev);
  *         FAILURE: otherwise failure
  */
 QDF_STATUS wlan_vdev_is_up_active_state(struct wlan_objmgr_vdev *vdev);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_vdev_mlme_get_is_mlo_link() - check if its mlo link vdev
+ * @psoc: PSOC object
+ * @vdev_id: VDEV Id
+ *
+ * Return: True if it is mlo link, otherwise false.
+ */
+bool
+wlan_vdev_mlme_get_is_mlo_link(struct wlan_objmgr_psoc *psoc,
+			       uint8_t vdev_id);
+
+/**
+ * wlan_vdev_mlme_get_is_mlo_vdev() - check if its mlo assoc vdev
+ * @psoc: PSOC object
+ * @vdev_id: VDEV Id
+ *
+ * Return: True if it is mlo link, otherwise false.
+ */
+bool
+wlan_vdev_mlme_get_is_mlo_vdev(struct wlan_objmgr_psoc *psoc,
+			       uint8_t vdev_id);
+#else
+static inline bool
+wlan_vdev_mlme_get_is_mlo_link(struct wlan_objmgr_psoc *psoc,
+			       uint8_t vdev_id)
+{
+	return false;
+}
+
+static inline bool
+wlan_vdev_mlme_get_is_mlo_vdev(struct wlan_objmgr_psoc *psoc,
+			       uint8_t vdev_id)
+{
+	return false;
+}
+#endif
 #endif

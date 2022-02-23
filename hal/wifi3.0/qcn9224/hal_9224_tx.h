@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -15,6 +16,9 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
+#ifndef _HAL_9224_TX_H_
+#define _HAL_9224_TX_H_
+
 #include "tcl_data_cmd.h"
 #include "phyrx_rssi_legacy.h"
 #include "hal_internal.h"
@@ -25,6 +29,7 @@
 
 #define DSCP_TID_TABLE_SIZE 24
 #define NUM_WORDS_PER_DSCP_TID_TABLE (DSCP_TID_TABLE_SIZE / 4)
+#define HAL_TX_NUM_DSCP_REGISTER_SIZE 32
 
 /**
  * hal_tx_set_dscp_tid_map_9224() - Configure default DSCP to TID map table
@@ -47,7 +52,7 @@ static void hal_tx_set_dscp_tid_map_9224(struct hal_soc *hal_soc, uint8_t *map,
 
 	struct hal_soc *soc = (struct hal_soc *)hal_soc;
 
-	if (id >= HAL_MAX_HW_DSCP_TID_MAPS_11AX)
+	if (id >= HAL_MAX_HW_DSCP_TID_V2_MAPS)
 		return;
 
 	cmn_reg_addr = HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_ADDR(
@@ -105,27 +110,74 @@ static void hal_tx_set_dscp_tid_map_9224(struct hal_soc *hal_soc, uint8_t *map,
  *
  * Return: void
  */
-static void hal_tx_update_dscp_tid_9224(struct hal_soc *hal_soc, uint8_t tid,
+static void hal_tx_update_dscp_tid_9224(struct hal_soc *soc, uint8_t tid,
 					uint8_t id, uint8_t dscp)
 {
-	int index;
-	uint32_t addr;
-	uint32_t value;
+	uint32_t addr, addr1, cmn_reg_addr;
+	uint32_t start_value = 0, end_value = 0;
 	uint32_t regval;
-	struct hal_soc *soc = (struct hal_soc *)hal_soc;
+	uint8_t end_bits = 0;
+	uint8_t start_bits = 0;
+	uint32_t start_index, end_index;
+
+	cmn_reg_addr = HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_ADDR(
+					MAC_TCL_REG_REG_BASE);
 
 	addr = HWIO_TCL_R0_DSCP_TID_MAP_n_ADDR(
-			MAC_TCL_REG_REG_BASE, id);
+				MAC_TCL_REG_REG_BASE,
+				id * NUM_WORDS_PER_DSCP_TID_TABLE);
 
-	index = dscp % HAL_TX_NUM_DSCP_PER_REGISTER;
-	addr += 4 * (dscp / HAL_TX_NUM_DSCP_PER_REGISTER);
-	value = tid << (HAL_TX_BITS_PER_TID * index);
+	start_index = dscp * HAL_TX_BITS_PER_TID;
+	end_index = (start_index + (HAL_TX_BITS_PER_TID - 1))
+		    % HAL_TX_NUM_DSCP_REGISTER_SIZE;
+	start_index = start_index % HAL_TX_NUM_DSCP_REGISTER_SIZE;
+	addr += (4 * ((dscp * HAL_TX_BITS_PER_TID) /
+			HAL_TX_NUM_DSCP_REGISTER_SIZE));
+
+	if (end_index < start_index) {
+		end_bits = end_index + 1;
+		start_bits = HAL_TX_BITS_PER_TID - end_bits;
+		start_value = tid << start_index;
+		end_value = tid >> start_bits;
+		addr1 = addr + 4;
+	} else {
+		start_bits = HAL_TX_BITS_PER_TID - end_bits;
+		start_value = tid << start_index;
+		addr1 = 0;
+	}
+
+	/* Enable read/write access */
+	regval = HAL_REG_READ(soc, cmn_reg_addr);
+	regval |=
+	(1 << HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_DSCP_TID_MAP_PROGRAM_EN_SHFT);
+
+	HAL_REG_WRITE(soc, cmn_reg_addr, regval);
 
 	regval = HAL_REG_READ(soc, addr);
-	regval &= ~(HAL_TX_TID_BITS_MASK << (HAL_TX_BITS_PER_TID * index));
-	regval |= value;
+
+	if (end_index < start_index)
+		regval &= (~0) >> start_bits;
+	else
+		regval &= ~(7 << start_index);
+
+	regval |= start_value;
 
 	HAL_REG_WRITE(soc, addr, (regval & HWIO_TCL_R0_DSCP_TID_MAP_n_RMSK));
+
+	if (addr1) {
+		regval = HAL_REG_READ(soc, addr1);
+		regval &= (~0) << end_bits;
+		regval |= end_value;
+
+		HAL_REG_WRITE(soc, addr1, (regval &
+			     HWIO_TCL_R0_DSCP_TID_MAP_n_RMSK));
+	}
+
+	/* Diasble read/write access */
+	regval = HAL_REG_READ(soc, cmn_reg_addr);
+	regval &=
+	~(HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_DSCP_TID_MAP_PROGRAM_EN_BMSK);
+	HAL_REG_WRITE(soc, cmn_reg_addr, regval);
 }
 
 /**
@@ -140,3 +192,38 @@ hal_tx_init_cmd_credit_ring_9224(hal_soc_handle_t hal_soc_hdl,
 				 hal_ring_handle_t hal_ring_hdl)
 {
 }
+
+/* TX MONITOR */
+#ifdef QCA_MONITOR_2_0_SUPPORT
+
+#if defined(TX_MONITOR_WORD_MASK)
+typedef struct tx_fes_setup_compact_9224 hal_tx_fes_setup_t;
+struct tx_fes_setup_compact_9224 {
+	/* DWORD - 0 */
+	uint32_t schedule_id;
+	/* DWORD - 1 */
+	uint32_t reserved_1a			: 7,  // [0: 6]
+		transmit_start_reason		: 3,  // [7: 9]
+		reserved_1b			: 13, // [10: 22]
+		number_of_users			: 6,  // [28: 23]
+		MU_type				: 1,  // [29]
+		reserved_1c			: 2;  // [30]
+	/* DWORD - 2 */
+	uint32_t reserved_2a			: 4,  // [0: 3]
+		ndp_frame			: 2,  // [4: 5]
+		txbf				: 1,  // [6]
+		reserved_2b			: 3,  // [7: 9]
+		static_bandwidth		: 3,  // [12: 10]
+		reserved_2c			: 1,  // [13]
+		transmission_contains_MU_RTS	: 1,  // [14]
+		reserved_2d			: 17; // [15: 31]
+	/* DWORD - 3 */
+	uint32_t reserved_3a			: 15, // [0: 14]
+		mu_ndp				: 1,  // [15]
+		reserved_3b			: 11, // [16: 26]
+		ndpa				: 1,  // [27]
+		reserved_3c			: 4;  // [28: 31]
+};
+#endif
+#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* _HAL_9224_TX_H_ */

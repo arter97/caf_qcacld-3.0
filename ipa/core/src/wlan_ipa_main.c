@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,6 +25,7 @@
 #include "wlan_ipa_core.h"
 #include "wlan_ipa_tgt_api.h"
 #include "cfg_ucfg_api.h"
+#include "wlan_ipa_obj_mgmt_api.h"
 
 static struct wlan_ipa_config *g_ipa_config;
 static bool g_ipa_hw_support;
@@ -378,6 +380,28 @@ void ipa_reg_rps_enable_cb(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
+void ipa_reg_is_driver_unloading_cb(struct wlan_objmgr_pdev *pdev,
+				    wlan_ipa_driver_unloading cb)
+{
+	struct wlan_ipa_priv *ipa_obj;
+
+	if (!ipa_config_is_enabled()) {
+		ipa_debug("ipa is disabled");
+		return;
+	}
+
+	if (!ipa_cb_is_ready())
+		return;
+
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		return;
+	}
+
+	return wlan_ipa_reg_is_driver_unloading_cb(ipa_obj, cb);
+}
+
 void ipa_set_mcc_mode(struct wlan_objmgr_pdev *pdev, bool mcc_mode)
 {
 	struct wlan_ipa_priv *ipa_obj;
@@ -596,6 +620,9 @@ QDF_STATUS ipa_uc_ol_deinit(struct wlan_objmgr_pdev *pdev)
 	}
 
 	status = wlan_ipa_uc_ol_deinit(ipa_obj);
+	ipa_obj_cleanup(ipa_obj);
+	if (!g_instances_added)
+		ipa_disable_register_cb();
 
 out:
 	ipa_init_deinit_unlock();
@@ -641,7 +668,8 @@ QDF_STATUS ipa_wlan_evt(struct wlan_objmgr_pdev *pdev, qdf_netdev_t net_dev,
 	}
 
 	return wlan_ipa_wlan_evt(net_dev, device_mode, session_id,
-				 ipa_event_type, mac_addr, is_2g_iface);
+				 ipa_event_type, mac_addr, is_2g_iface,
+				 ipa_obj);
 }
 
 int ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr)

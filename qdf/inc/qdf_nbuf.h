@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -74,6 +75,7 @@
 #define QDF_NBUF_TRAC_IPV6_OFFSET		14
 #define QDF_NBUF_TRAC_IPV6_HEADER_SIZE   40
 #define QDF_NBUF_TRAC_ICMP_TYPE         1
+#define QDF_NBUF_TRAC_IGMP_TYPE         2
 #define QDF_NBUF_TRAC_TCP_TYPE          6
 #define QDF_NBUF_TRAC_TCP_FLAGS_OFFSET       (47 - 34)
 #define QDF_NBUF_TRAC_TCP_ACK_OFFSET         (42 - 34)
@@ -83,6 +85,7 @@
 #define QDF_NBUF_TRAC_TCP_DPORT_OFFSET       (36 - 34)
 #define QDF_NBUF_TRAC_UDP_TYPE          17
 #define QDF_NBUF_TRAC_ICMPV6_TYPE       0x3a
+#define QDF_NBUF_TRAC_HOPOPTS_TYPE      0
 #define QDF_NBUF_TRAC_DHCP6_SRV_PORT		547
 #define QDF_NBUF_TRAC_DHCP6_CLI_PORT		546
 #define QDF_NBUF_TRAC_MDNS_SRC_N_DST_PORT	5353
@@ -194,6 +197,11 @@
 #define QDF_MON_STATUS_MPDU_FCS_BMAP_NWORDS 8
 
 /**
+ * @qdf_nbuf_queue_t - Platform independent packet queue abstraction
+ */
+typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
+
+/**
  * This is the length for radiotap, combined length
  * (Mandatory part struct ieee80211_radiotap_header + RADIOTAP_HEADER_LEN)
  * cannot be more than available headroom_sz.
@@ -204,6 +212,8 @@
 #define RADIOTAP_HE_FLAGS_LEN (12 + 1)
 #define RADIOTAP_HE_MU_FLAGS_LEN (8 + 1)
 #define RADIOTAP_HE_MU_OTHER_FLAGS_LEN (18 + 1)
+#define RADIOTAP_U_SIG_FLAGS_LEN (12 + 3)
+#define RADIOTAP_EHT_FLAGS_LEN (32 + 3)
 #define RADIOTAP_FIXED_HEADER_LEN 17
 #define RADIOTAP_HT_FLAGS_LEN 3
 #define RADIOTAP_AMPDU_STATUS_LEN (8 + 3)
@@ -226,7 +236,9 @@
 				RADIOTAP_HE_MU_OTHER_FLAGS_LEN + \
 				RADIOTAP_VENDOR_NS_LEN + \
 				RADIOTAP_HEADER_EXT_LEN + \
-				RADIOTAP_HEADER_EXT2_LEN)
+				RADIOTAP_HEADER_EXT2_LEN + \
+				RADIOTAP_U_SIG_FLAGS_LEN + \
+				RADIOTAP_EHT_FLAGS_LEN)
 
 /**
  * struct mon_rx_status - This will have monitor mode rx_status extracted from
@@ -244,12 +256,15 @@
  * @he_flags: HE (11ax) flags, only present in HE frames
  * @he_mu_flags: HE-MU (11ax) flags, only present in HE frames
  * @he_mu_other_flags: HE-MU-OTHER (11ax) flags, only present in HE frames
+ * @usig_flags: USIG flags, only present in 802.11BE and subsequent protocol
+ * @eht_flags: EHT (11be) flags, only present in EHT frames
  * @he_sig_A1_known: HE (11ax) sig A1 known field
  * @he_sig_A2_known: HE (11ax) sig A2 known field
  * @he_sig_b_common: HE (11ax) sig B common field
  * @he_sig_b_common_known: HE (11ax) sig B common known field
  * @l_sig_a_info: L_SIG_A value coming in Rx descriptor
  * @l_sig_b_info: L_SIG_B value coming in Rx descriptor
+ * @num_eht_user_info_valid: Number of valid EHT user info
  * @rate: Rate in terms 500Kbps
  * @rtap_flags: Bit map of available fields in the radiotap
  * @ant_signal_db: Rx packet RSSI
@@ -307,6 +322,31 @@
  * @start_seq: starting sequence number
  * @ba_bitmap: 256 bit block ack bitmap
  * @add_rtap_ext2: add radiotap extension2
+ * @mpdu_retry_cnt: Rx mpdu retry count
+ * @punctured_bw: puntured bw
+ * @rx_user_status: pointer to mon_rx_user_status, when set update
+ * radiotap header will use userinfo from this structure.
+ * @usig_common: U-SIG property of received frame
+ * @usig_value: U-SIG property of received frame
+ * @usig_mask: U-SIG property of received frame
+ * @eht_known: EHT property of received frame
+ * @eht_data: EHT property of received frame
+ * @eht_user_info: EHT USER property of received frame
+ * @phyrx_abort: phy aborted undecoded frame indication
+ * @phyrx_abort_reason: abort reason in phyrx_abort_request_info
+ * @vht_crc: vht crc
+ * @vht_no_txop_ps: TXOP power save mode
+ * @he_crc: he crc
+ * @l_sig_length: L SIG A length
+ * @l_sig_a_parity: L SIG A parity
+ * @l_sig_a_pkt_type: L SIG A info pkt type
+ * @l_sig_a_implicit_sounding: L SIG A info captured implicit sounding
+ * @ht_length: num of bytes in PSDU
+ * @smoothing: Indicate smoothing
+ * @not_sounding: Indicate sounding
+ * @aggregation: Indicate A-MPDU format
+ * @ht_stbc: Indicate stbc
+ * @ht_crc: ht crc
  */
 struct mon_rx_status {
 	uint64_t tsft;
@@ -321,12 +361,15 @@ struct mon_rx_status {
 	uint16_t he_flags;
 	uint16_t he_mu_flags;
 	uint16_t he_mu_other_flags;
+	uint16_t usig_flags;
+	uint16_t eht_flags;
 	uint16_t he_sig_A1_known;
 	uint16_t he_sig_A2_known;
 	uint16_t he_sig_b_common;
 	uint16_t he_sig_b_common_known;
 	uint32_t l_sig_a_info;
 	uint32_t l_sig_b_info;
+	uint8_t  num_eht_user_info_valid;
 	uint8_t  rate;
 	uint8_t  rtap_flags;
 	uint8_t  ant_signal_db;
@@ -394,6 +437,34 @@ struct mon_rx_status {
 	uint16_t start_seq;
 	uint32_t ba_bitmap[8];
 	bool add_rtap_ext2;
+	uint32_t mpdu_retry_cnt;
+#ifdef WLAN_FEATURE_11BE
+	uint8_t punctured_bw;
+#endif
+	struct mon_rx_user_status *rx_user_status;
+	uint32_t usig_common;
+	uint32_t usig_value;
+	uint32_t usig_mask;
+	uint32_t eht_known;
+	uint32_t eht_data[6];
+	uint32_t eht_user_info[4];
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+	uint32_t phyrx_abort:1,
+		 phyrx_abort_reason:8,
+		 vht_crc:8,
+		 vht_no_txop_ps:1,
+		 he_crc:4;
+	uint32_t l_sig_length:12,
+		l_sig_a_parity:1,
+		l_sig_a_pkt_type:4,
+		l_sig_a_implicit_sounding:1;
+	uint32_t ht_length:16,
+		smoothing:1,
+		not_sounding:1,
+		aggregation:1,
+		ht_stbc:2,
+		ht_crc:8;
+#endif
 };
 
 /**
@@ -405,6 +476,7 @@ struct mon_rx_status {
  * @ofdma_ru_start_index: OFDMA RU start index
  * @ofdma_ru_width: OFDMA total RU width
  * @ofdma_ru_size: OFDMA RU size index
+ * @is_ampdu: AMPDU flag
  * @mu_ul_user_v0_word0: MU UL user info word 0
  * @mu_ul_user_v0_word1: MU UL user info word 1
  * @ast_index: AST table hash index
@@ -417,9 +489,24 @@ struct mon_rx_status {
  * @data_sequence_control_info_valid: field to indicate validity of seq control
  * @first_data_seq_ctrl: Sequence ctrl field of first data frame
  * @preamble_type: Preamble type in radio header
+ * @duration: 802.11 Duration
  * @ht_flags: HT flags, only present for HT frames.
  * @vht_flags: VHT flags, only present for VHT frames.
+ * @vht_flag_values1-5: Contains corresponding data for flags field
  * @he_flags: HE (11ax) flags, only present in HE frames
+ * @he_flags1: HE flags
+ * @he_flags2: HE flags
+ * @he_RU[4]: HE RU assignment index
+ * @he_data1: HE property of received frame
+ * @he_data2: HE property of received frame
+ * @he_data3: HE property of received frame
+ * @he_data4: HE property of received frame
+ * @he_data5: HE property of received frame
+ * @he_data6: HE property of received frame
+ * @he_per_user_1: HE per user info1
+ * @he_per_user_2: HE per user info2
+ * @he_per_user_position: HE per user position info
+ * @he_per_user_known: HE per user known info
  * @rtap_flags: Bit map of available fields in the radiotap
  * @rs_flags: Flags to indicate AMPDU or AMSDU aggregation
  * @mpdu_cnt_fcs_ok: mpdu count received with fcs ok
@@ -428,6 +515,12 @@ struct mon_rx_status {
  * @mpdu_ok_byte_count: mpdu byte count with fcs ok
  * @mpdu_err_byte_count: mpdu byte count with fcs err
  * @sw_peer_id: software peer id
+ * @retry_mpdu: mpdu retry count
+ * @start_seq: starting sequence number
+ * @ba_control: Block ack control
+ * @ba_bitmap: 256 bit block ack bitmap
+ * @tid: QoS traffic tid number
+ * @mpdu_q: user mpdu_queue used for monitor
  */
 struct mon_rx_user_status {
 	uint32_t mcs:4,
@@ -435,7 +528,8 @@ struct mon_rx_user_status {
 		 mu_ul_info_valid:1,
 		 ofdma_ru_start_index:7,
 		 ofdma_ru_width:7,
-		 ofdma_ru_size:8;
+		 ofdma_ru_size:8,
+		 is_ampdu:1;
 	uint32_t mu_ul_user_v0_word0;
 	uint32_t mu_ul_user_v0_word1;
 	uint32_t ast_index;
@@ -448,9 +542,29 @@ struct mon_rx_user_status {
 	uint8_t data_sequence_control_info_valid;
 	uint16_t first_data_seq_ctrl;
 	uint32_t preamble_type;
+	uint16_t duration;
 	uint16_t ht_flags;
 	uint16_t vht_flags;
+	uint8_t  vht_flag_values1;
+	uint8_t  vht_flag_values2;
+	uint8_t  vht_flag_values3[4];
+	uint8_t  vht_flag_values4;
+	uint8_t  vht_flag_values5;
+	uint16_t vht_flag_values6;
 	uint16_t he_flags;
+	uint16_t he_flags1;
+	uint16_t he_flags2;
+	uint8_t he_RU[4];
+	uint16_t he_data1;
+	uint16_t he_data2;
+	uint16_t he_data3;
+	uint16_t he_data4;
+	uint16_t he_data5;
+	uint16_t he_data6;
+	uint16_t he_per_user_1;
+	uint16_t he_per_user_2;
+	uint8_t he_per_user_position;
+	uint8_t he_per_user_known;
 	uint8_t rtap_flags;
 	uint8_t rs_flags;
 	uint32_t mpdu_cnt_fcs_ok;
@@ -459,6 +573,13 @@ struct mon_rx_user_status {
 	uint32_t mpdu_ok_byte_count;
 	uint32_t mpdu_err_byte_count;
 	uint16_t sw_peer_id;
+	uint32_t retry_mpdu;
+	uint16_t start_seq;
+	uint16_t ba_control;
+	uint32_t ba_bitmap[32];
+	uint32_t ba_bitmap_sz;
+	uint16_t aid;
+	qdf_nbuf_queue_t mpdu_q;
 };
 
 /**
@@ -673,6 +794,145 @@ struct qdf_radiotap_ext2 {
 #define QDF_MON_STATUS_STA_DCM_KNOWN 0x40
 #define QDF_MON_STATUS_STA_CODING_KNOWN 0x80
 
+/* U-SIG Common Mask */
+#define QDF_MON_STATUS_USIG_PHY_VERSION_KNOWN		0x00000001
+#define QDF_MON_STATUS_USIG_BW_KNOWN			0x00000002
+#define QDF_MON_STATUS_USIG_UL_DL_KNOWN			0x00000004
+#define QDF_MON_STATUS_USIG_BSS_COLOR_KNOWN		0x00000008
+#define QDF_MON_STATUS_USIG_TXOP_KNOWN			0x00000010
+
+#define QDF_MON_STATUS_USIG_PHY_VERSION_SHIFT		12
+#define QDF_MON_STATUS_USIG_BW_SHIFT			15
+#define QDF_MON_STATUS_USIG_UL_DL_SHIFT			18
+#define QDF_MON_STATUS_USIG_BSS_COLOR_SHIFT		19
+#define QDF_MON_STATUS_USIG_TXOP_SHIFT			25
+
+/* U-SIG MU/TB Value */
+#define QDF_MON_STATUS_USIG_DISREGARD_SHIFT			0
+#define QDF_MON_STATUS_USIG_PPDU_TYPE_N_COMP_MODE_SHIFT		6
+#define QDF_MON_STATUS_USIG_VALIDATE_SHIFT			8
+
+#define QDF_MON_STATUS_USIG_MU_VALIDATE1_SHIFT			5
+#define QDF_MON_STATUS_USIG_MU_PUNCTURE_CH_INFO_SHIFT		9
+#define QDF_MON_STATUS_USIG_MU_VALIDATE2_SHIFT			12
+#define QDF_MON_STATUS_USIG_MU_EHT_SIG_MCS_SHIFT		15
+#define QDF_MON_STATUS_USIG_MU_NUM_EHT_SIG_SYM_SHIFT		17
+
+#define QDF_MON_STATUS_USIG_TB_SPATIAL_REUSE_1_SHIFT		9
+#define QDF_MON_STATUS_USIG_TB_SPATIAL_REUSE_2_SHIFT		13
+#define QDF_MON_STATUS_USIG_TB_DISREGARD1_SHIFT			17
+
+#define QDF_MON_STATUS_USIG_CRC_SHIFT				22
+#define QDF_MON_STATUS_USIG_TAIL_SHIFT				26
+
+/* U-SIG MU/TB Mask */
+#define QDF_MON_STATUS_USIG_DISREGARD_KNOWN			0x00000001
+#define QDF_MON_STATUS_USIG_PPDU_TYPE_N_COMP_MODE_KNOWN		0x00000004
+#define QDF_MON_STATUS_USIG_VALIDATE_KNOWN			0x00000008
+
+#define QDF_MON_STATUS_USIG_MU_VALIDATE1_KNOWN			0x00000002
+#define QDF_MON_STATUS_USIG_MU_PUNCTURE_CH_INFO_KNOWN		0x00000010
+#define QDF_MON_STATUS_USIG_MU_VALIDATE2_KNOWN			0x00000020
+#define QDF_MON_STATUS_USIG_MU_EHT_SIG_MCS_KNOWN		0x00000040
+#define QDF_MON_STATUS_USIG_MU_NUM_EHT_SIG_SYM_KNOWN		0x00000080
+
+#define QDF_MON_STATUS_USIG_TB_SPATIAL_REUSE_1_KNOWN		0x00000010
+#define QDF_MON_STATUS_USIG_TB_SPATIAL_REUSE_2_KNOWN		0x00000020
+#define QDF_MON_STATUS_USIG_TB_DISREGARD1_KNOWN			0x00000040
+
+#define QDF_MON_STATUS_USIG_CRC_KNOWN				0x00000100
+#define QDF_MON_STATUS_USIG_TAIL_KNOWN				0x00000200
+
+/* EHT known Mask */
+#define QDF_MON_STATUS_EHT_CONTENT_CH_INDEX_KNOWN		0x00000001
+#define QDF_MON_STATUS_EHT_SPATIAL_REUSE_KNOWN			0x00000002
+#define QDF_MON_STATUS_EHT_GUARD_INTERVAL_KNOWN			0x00000004
+#define QDF_MON_STATUS_EHT_LTF_KNOWN				0x00000008
+#define QDF_MON_STATUS_EHT_EHT_LTF_KNOWN			0x00000010
+#define QDF_MON_STATUS_EHT_LDPC_EXTRA_SYMBOL_SEG_KNOWN		0x00000020
+#define QDF_MON_STATUS_EHT_PRE_FEC_PADDING_FACTOR_KNOWN		0x00000040
+#define QDF_MON_STATUS_EHT_PE_DISAMBIGUITY_KNOWN		0x00000080
+#define QDF_MON_STATUS_EHT_DISREARD_KNOWN			0x00000100
+#define QDF_MON_STATUS_EHT_CRC1_KNOWN				0x00002000
+#define QDF_MON_STATUS_EHT_TAIL1_KNOWN				0x00004000
+#define QDF_MON_STATUS_EHT_CRC2_KNOWN				0x00008000
+#define QDF_MON_STATUS_EHT_TAIL2_KNOWN				0x00010000
+#define QDF_MON_STATUS_EHT_RU_MRU_SIZE_KNOWN			0x00400000
+#define QDF_MON_STATUS_EHT_RU_MRU_INDEX_KNOWN			0x00800000
+#define QDF_MON_STATUS_EHT_TB_RU_ALLOCATION_KNOWN		0x01000000
+
+#define QDF_MON_STATUS_EHT_NUM_NON_OFDMA_USERS_KNOWN		0x00080000
+#define QDF_MON_STATUS_EHT_USER_ENC_BLOCK_CRC_KNOWN		0x00100000
+#define QDF_MON_STATUS_EHT_USER_ENC_BLOCK_TAIL_KNOWN		0x00200000
+
+#define QDF_MON_STATUS_EHT_NDP_DISREGARD_KNOWN			0x00000200
+#define QDF_MON_STATUS_EHT_NDP_NSS_KNOWN			0x00020000
+#define QDF_MON_STATUS_EHT_NDP_BEAMFORMED_KNOWN			0x00040000
+
+#define QDF_MON_STATUS_EHT_NUM_KNOWN_RU_ALLOCATIONS_SHIFT	10
+
+/* EHT data0 Mask/SHIFT */
+#define QDF_MON_STATUS_EHT_CONTENT_CH_INDEX_SHIFT		0
+#define QDF_MON_STATUS_EHT_SPATIAL_REUSE_SHIFT			3
+#define QDF_MON_STATUS_EHT_GI_SHIFT				7
+#define QDF_MON_STATUS_EHT_LTF_SHIFT				9
+#define QDF_MON_STATUS_EHT_EHT_LTF_SHIFT			11
+#define QDF_MON_STATUS_EHT_LDPC_EXTRA_SYMBOL_SEG_SHIFT		14
+#define QDF_MON_STATUS_EHT_PRE_FEC_PADDING_FACTOR_SHIFT		15
+#define QDF_MON_STATUS_EHT_PE_DISAMBIGUITY_SHIFT		17
+#define QDF_MON_STATUS_EHT_NDP_DISREGARD_SHIFT			18
+#define QDF_MON_STATUS_EHT_DISREGARD_SHIFT			18
+#define QDF_MON_STATUS_EHT_CRC1_SHIFT				22
+#define QDF_MON_STATUS_EHT_TAIL1_SHIFT				26
+
+/* EHT data1 Mask/SHIFT */
+#define QDF_MON_STATUS_EHT_RU_MRU_SIZE_SHIFT			0
+#define QDF_MON_STATUS_EHT_RU_MRU_INDEX_SHIFT			5
+#define QDF_MON_STATUS_EHT_RU_ALLOCATION1_1_SHIFT		13
+#define QDF_MON_STATUS_EHT_RU_ALLOCATION1_2_SHIFT		22
+
+/* EHT data2 Mask/SHIFT */
+#define QDF_MON_STATUS_EHT_RU_ALLOCATION2_1_SHIFT		0
+#define QDF_MON_STATUS_EHT_RU_ALLOCATION2_2_SHIFT		9
+#define QDF_MON_STATUS_EHT_RU_ALLOCATION2_3_SHIFT		18
+
+/* EHT data3 Mask/SHIFT */
+#define QDF_MON_STATUS_EHT_RU_ALLOCATION2_4_SHIFT		0
+#define QDF_MON_STATUS_EHT_RU_ALLOCATION2_5_SHIFT		9
+#define QDF_MON_STATUS_EHT_RU_ALLOCATION2_6_SHIFT		18
+
+/* EHT data4 Mask/SHIFT */
+#define QDF_MON_STATUS_EHT_CRC2_SHIFT				0
+#define QDF_MON_STATUS_EHT_TAIL2_SHIFT				4
+#define QDF_MON_STATUS_EHT_NDP_NSS_SHIFT			12
+#define QDF_MON_STATUS_EHT_NDP_BEAMFORMED_SHIFT			16
+#define QDF_MON_STATUS_EHT_NUM_NON_OFDMA_USERS_SHIFT		17
+#define QDF_MON_STATUS_EHT_USER_ENC_BLOCK_CRC_SHIFT		20
+#define QDF_MON_STATUS_EHT_USER_ENC_BLOCK_TAIL_SHIFT		24
+
+/* EHT data5 Mask/SHIFT */
+#define QDF_MON_STATUS_EHT_TB_RU_PS160_SHIFT			0
+#define QDF_MON_STATUS_EHT_TB_RU_PS80_SHIFT			1
+#define QDF_MON_STATUS_EHT_TB_RU_B7_B1_SHIFT			2
+
+/* EHT user info Mask/SHIFT */
+#define QDF_MON_STATUS_EHT_USER_STA_ID_KNOWN			0x00000001
+#define QDF_MON_STATUS_EHT_USER_MCS_KNOWN			0x00000002
+#define QDF_MON_STATUS_EHT_USER_CODING_KNOWN			0x00000004
+#define QDF_MON_STATUS_EHT_USER_RESERVED_KNOWN			0x00000008
+#define QDF_MON_STATUS_EHT_USER_NSS_KNOWN			0x00000010
+#define QDF_MON_STATUS_EHT_USER_BEAMFORMING_KNOWN		0x00000020
+#define QDF_MON_STATUS_EHT_USER_SPATIAL_CONFIG_KNOWN		0x00000040
+
+#define QDF_MON_STATUS_EHT_USER_DATA_FOR_THIS_USER_SHIFT	7
+#define QDF_MON_STATUS_EHT_USER_STA_ID_SHIFT			8
+#define QDF_MON_STATUS_EHT_USER_CODING_SHIFT			19
+#define QDF_MON_STATUS_EHT_USER_MCS_SHIFT			20
+#define QDF_MON_STATUS_EHT_USER_NSS_SHIFT			24
+#define QDF_MON_STATUS_EHT_USER_RESERVED_SHIFT			28
+#define QDF_MON_STATUS_EHT_USER_BEAMFORMING_SHIFT		29
+#define QDF_MON_STATUS_EHT_USER_SPATIAL_CONFIG_SHIFT		24
+
 /**
  * enum qdf_proto_type - protocol type
  * @QDF_PROTO_TYPE_DHCP - DHCP
@@ -782,11 +1042,6 @@ typedef __qdf_nbuf_queue_head_t qdf_nbuf_queue_head_t;
  */
 typedef void (*qdf_dma_map_cb_t)(void *arg, qdf_nbuf_t buf,
 				 qdf_dma_map_t dmap);
-
-/**
- * @qdf_nbuf_queue_t - Platform independent packet queue abstraction
- */
-typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
 
 /* BUS/DMA mapping routines */
 
@@ -1083,9 +1338,56 @@ qdf_nbuf_dma_inv_range(const void *buf_start, const void *buf_end)
 	__qdf_nbuf_dma_inv_range(buf_start, buf_end);
 }
 
+/**
+ * qdf_nbuf_dma_inv_range_no_dsb() - barrierless Invalidate the specified
+ *				     virtual address range
+ * @buf_start: start address
+ * @buf_end: end address
+ *
+ * Return: none
+ */
+static inline void
+qdf_nbuf_dma_inv_range_no_dsb(const void *buf_start, const void *buf_end)
+{
+	__qdf_nbuf_dma_inv_range_no_dsb(buf_start, buf_end);
+}
+
+/**
+ * qdf_nbuf_dma_clean_range_no_dsb() - barrierless clean the specified
+ *				       virtual address range
+ * @buf_start: start address
+ * @buf_end: end address
+ *
+ * Return: none
+ */
+static inline void
+qdf_nbuf_dma_clean_range_no_dsb(const void *buf_start, const void *buf_end)
+{
+	__qdf_nbuf_dma_clean_range_no_dsb(buf_start, buf_end);
+}
+
+static inline void
+qdf_dsb(void)
+{
+	__qdf_dsb();
+}
+
 static inline int qdf_nbuf_get_num_frags(qdf_nbuf_t buf)
 {
 	return __qdf_nbuf_get_num_frags(buf);
+}
+
+/**
+ * qdf_nbuf_dma_clean_range() - Clean the specified virtual address range
+ * @buf_start: start address
+ * @buf_end: end address
+ *
+ * Return: none
+ */
+static inline void
+qdf_nbuf_dma_clean_range(const void *buf_start, const void *buf_end)
+{
+	__qdf_nbuf_dma_clean_range(buf_start, buf_end);
 }
 
 /**
@@ -1652,6 +1954,9 @@ void qdf_net_buf_debug_release_skb(qdf_nbuf_t net_buf);
 
 /* nbuf allocation rouines */
 
+#define qdf_nbuf_alloc_simple(d, s) \
+	__qdf_nbuf_alloc_simple(d, s)
+
 #define qdf_nbuf_alloc(d, s, r, a, p) \
 	qdf_nbuf_alloc_debug(d, s, r, a, p, __func__, __LINE__)
 
@@ -1677,6 +1982,9 @@ qdf_nbuf_t qdf_nbuf_alloc_debug(qdf_device_t osdev, qdf_size_t size,
 
 qdf_nbuf_t qdf_nbuf_alloc_no_recycler_debug(size_t size, int reserve, int align,
 					    const char *func, uint32_t line);
+
+#define qdf_nbuf_free_simple(d) \
+	__qdf_nbuf_free(d)
 
 #define qdf_nbuf_free(d) \
 	qdf_nbuf_free_debug(d, __func__, __LINE__)
@@ -1784,6 +2092,9 @@ qdf_net_buf_debug_update_unmap_node(qdf_nbuf_t net_buf,
 {
 }
 /* Nbuf allocation rouines */
+
+#define qdf_nbuf_alloc_simple(d, s) \
+	__qdf_nbuf_alloc_simple(d, s)
 
 #define qdf_nbuf_alloc(osdev, size, reserve, align, prio) \
 	qdf_nbuf_alloc_fl(osdev, size, reserve, align, prio, \
@@ -2878,6 +3189,34 @@ bool qdf_nbuf_is_ipv4_wapi_pkt(qdf_nbuf_t buf)
 }
 
 /**
+ * qdf_nbuf_is_ipv4_igmp_pkt() - check if packet is a igmp packet or not
+ * @buf:  buffer
+ *
+ * This api is for ipv4 packet.
+ *
+ * Return: true if packet is igmp packet
+ */
+static inline
+bool qdf_nbuf_is_ipv4_igmp_pkt(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_data_is_ipv4_igmp_pkt(qdf_nbuf_data(buf));
+}
+
+/**
+ * qdf_nbuf_is_ipv6_igmp_pkt() - check if packet is a igmp packet or not
+ * @buf:  buffer
+ *
+ * This api is for ipv6 packet.
+ *
+ * Return: true if packet is igmp packet
+ */
+static inline
+bool qdf_nbuf_is_ipv6_igmp_pkt(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_data_is_ipv6_igmp_pkt(qdf_nbuf_data(buf));
+}
+
+/**
  * qdf_nbuf_is_ipv4_tdls_pkt() - check if packet is a tdls packet or not
  * @buf:  buffer
  *
@@ -3922,6 +4261,18 @@ static inline qdf_size_t qdf_nbuf_get_end_offset(qdf_nbuf_t nbuf)
 	return __qdf_nbuf_get_end_offset(nbuf);
 }
 
+/**
+ * qdf_nbuf_get_truesize() - Return the true size of the nbuf
+ * including the header and variable data area
+ * @nbuf: qdf_nbuf_t
+ *
+ * Return: size of network buffer
+ */
+static inline qdf_size_t qdf_nbuf_get_truesize(qdf_nbuf_t nbuf)
+{
+	return __qdf_nbuf_get_truesize(nbuf);
+}
+
 #ifdef NBUF_FRAG_MEMORY_DEBUG
 
 #define qdf_nbuf_move_frag_page_offset(f, i, o) \
@@ -3969,6 +4320,19 @@ void qdf_nbuf_add_rx_frag_debug(qdf_frag_t buf, qdf_nbuf_t nbuf,
 				int offset, int frag_len,
 				unsigned int truesize, bool take_frag_ref,
 				const char *func, uint32_t line);
+
+#define qdf_nbuf_ref_frag(f) \
+	qdf_nbuf_ref_frag_debug(f, __func__, __LINE__)
+
+/**
+ * qdf_nbuf_ref_frag_debug() - get frag reference
+ * @buf: Frag pointer needs to be taken reference.
+ * @func: Caller function name
+ * @line: Caller function line no.
+ *
+ * Return: none
+ */
+void qdf_nbuf_ref_frag_debug(qdf_frag_t buf, const char *func, uint32_t line);
 
 /**
  * qdf_net_buf_debug_acquire_frag() - Add frag nodes to frag debug tracker
@@ -4053,6 +4417,17 @@ static inline void qdf_nbuf_add_rx_frag(qdf_frag_t buf, qdf_nbuf_t nbuf,
 			       frag_len, truesize, take_frag_ref);
 }
 
+/**
+ * qdf_nbuf_ref_frag() - get frag reference
+ * @buf: Frag pointer needs to be taken reference.
+ *
+ * Return: void
+ */
+static inline void qdf_nbuf_ref_frag(qdf_frag_t buf)
+{
+	__qdf_nbuf_ref_frag(buf);
+}
+
 static inline void qdf_net_buf_debug_acquire_frag(qdf_nbuf_t buf,
 						  const char *func,
 						  uint32_t line)
@@ -4074,6 +4449,41 @@ static inline void qdf_nbuf_frag_count_dec(qdf_nbuf_t buf)
 }
 
 #endif /* NBUF_FRAG_MEMORY_DEBUG */
+
+#define qdf_nbuf_add_frag(dev, f, n, o, f_l, t_sz, f_r, sz) \
+	qdf_nbuf_add_frag_debug(dev, f, n, o, f_l, t_sz,	\
+				f_r, sz, __func__, __LINE__)
+
+/**
+ * qdf_nbuf_add_frag_debug() - Add frag to nbuf
+ * @osdev: Device handle
+ * @buf: Frag pointer needs to be added in nbuf frag
+ * @nbuf: qdf_nbuf_t where frag will be added
+ * @offset: Offset in frag to be added to nbuf_frags
+ * @frag_len: Frag length
+ * @truesize: truesize
+ * @take_frag_ref: Whether to take ref for frag or not
+ *      This bool must be set as per below comdition:
+ *      1. False: If this frag is being added in any nbuf
+ *              for the first time after allocation
+ *      2. True: If frag is already attached part of any
+ *              nbuf
+ * @minsize: Minimum size to allocate
+ * @func: Caller function name
+ * @line: Caller function line no.
+ *
+ * if number of frag exceed maximum frag array. A new nbuf is allocated
+ * with minimum headroom and frag it added to that nbuf.
+ * new nbuf is added as frag_list to the master nbuf.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+qdf_nbuf_add_frag_debug(qdf_device_t osdev, qdf_frag_t buf,
+			qdf_nbuf_t nbuf, int offset,
+			int frag_len, unsigned int truesize,
+			bool take_frag_ref, unsigned int minsize,
+			const char *func, uint32_t line);
 
 #ifdef MEMORY_DEBUG
 /**
@@ -4218,4 +4628,13 @@ static inline void qdf_set_smmu_fault_state(bool smmu_fault_state)
 #else
 #include <i_qdf_nbuf_api_m.h>
 #endif
+
+/**
+ * qdf_nbuf_stop_replenish_timer - Stop alloc fail replenish timer
+ *
+ * This function stops the alloc fail replenish timer.
+ *
+ * Return: void
+ */
+void qdf_nbuf_stop_replenish_timer(void);
 #endif /* _QDF_NBUF_H */

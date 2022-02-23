@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -453,13 +453,13 @@ hal_rx_attn_ip_cksum_fail_get(uint8_t *buf)
 		RX_ATTENTION_1_CCE_MATCH_LSB))
 
 /*
- * hal_rx_msdu_cce_match_get(): get CCE match bit
+ * hal_rx_msdu_cce_match_get_li(): get CCE match bit
  * from rx attention
  * @buf: pointer to rx_pkt_tlvs
  * Return: CCE match value
  */
 static inline bool
-hal_rx_msdu_cce_match_get(uint8_t *buf)
+hal_rx_msdu_cce_match_get_li(uint8_t *buf)
 {
 	struct rx_pkt_tlvs *pkt_tlvs = (struct rx_pkt_tlvs *)buf;
 	struct rx_attention *rx_attn = &pkt_tlvs->attn_tlv.rx_attn;
@@ -799,6 +799,16 @@ void hal_rx_msdu_link_desc_reinject(struct hal_soc *soc,
 #define HAL_RX_WBM_BUF_COOKIE_GET(wbm_desc) \
 	HAL_RX_BUF_COOKIE_GET(&((struct wbm_release_ring *) \
 	wbm_desc)->released_buff_or_desc_addr_info)
+
+#define HAL_RX_WBM_BUF_ADDR_39_32_GET(wbm_desc)	\
+	(HAL_RX_BUFFER_ADDR_39_32_GET(&			\
+	(((struct wbm_release_ring *) \
+	wbm_desc)->released_buff_or_desc_addr_info)))
+
+#define HAL_RX_WBM_BUF_ADDR_31_0_GET(wbm_desc)	\
+	(HAL_RX_BUFFER_ADDR_31_0_GET(&			\
+	(((struct wbm_release_ring *) \
+	wbm_desc)->released_buff_or_desc_addr_info)))
 
 static inline
 uint32_t

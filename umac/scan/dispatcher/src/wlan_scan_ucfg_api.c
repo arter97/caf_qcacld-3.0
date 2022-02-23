@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -152,6 +153,12 @@ QDF_STATUS ucfg_scan_deinit(void)
 }
 
 #ifdef FEATURE_WLAN_SCAN_PNO
+bool
+ucfg_is_6ghz_pno_scan_optimization_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_psoc_nif_fw_ext_cap_get(psoc,
+					WLAN_SOC_PNO_SCAN_CONFIG_PER_CHANNEL);
+}
 
 QDF_STATUS ucfg_scan_pno_start(struct wlan_objmgr_vdev *vdev,
 	struct pno_scan_req_params *req)
@@ -176,6 +183,22 @@ QDF_STATUS ucfg_scan_pno_start(struct wlan_objmgr_vdev *vdev,
 		scan_vdev_obj->pno_in_progress = true;
 
 	return status;
+}
+
+void ucfg_scan_pno_add_all_valid_6g_channels(struct wlan_objmgr_vdev *vdev,
+					     struct pno_scan_req_params *req,
+					     uint8_t *num_scan_ch)
+{
+	struct wlan_objmgr_pdev *pdev;
+	struct chan_list *pno_chan_list = &req->networks_list[0].pno_chan_list;
+	bool is_colocated_6ghz = req->scan_policy_colocated_6ghz;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return;
+
+	scm_add_all_valid_6g_channels(pdev, pno_chan_list, num_scan_ch,
+				      is_colocated_6ghz);
 }
 
 QDF_STATUS ucfg_scan_pno_stop(struct wlan_objmgr_vdev *vdev)
@@ -734,6 +757,8 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 			cfg_get(psoc, CFG_MIN_REST_TIME_CONC);
 	scan_obj->scan_def.conc_idle_time =
 			cfg_get(psoc, CFG_IDLE_TIME_CONC);
+	scan_obj->scan_def.conc_chlist_trim =
+			cfg_get(psoc, CFG_CHAN_LIST_TRIM_CONC);
 	scan_obj->scan_def.repeat_probe_time =
 			cfg_get(psoc, CFG_SCAN_PROBE_REPEAT_TIME);
 	scan_obj->scan_def.probe_spacing_time = SCAN_PROBE_SPACING_TIME;
@@ -1229,11 +1254,9 @@ ucfg_scan_suspend_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 		pdev = wlan_objmgr_get_pdev_by_id(psoc, i, WLAN_SCAN_ID);
 		if (!pdev)
 			continue;
-		if (wlan_get_pdev_status(pdev) !=
-		    SCAN_NOT_IN_PROGRESS) {
+		if (wlan_get_pdev_status(pdev) != SCAN_NOT_IN_PROGRESS)
 			status = scan_cancel_pdev_scan(pdev);
-			scm_disable_obss_pdev_scan(psoc, pdev);
-		}
+		scm_disable_obss_pdev_scan(psoc, pdev);
 		wlan_objmgr_pdev_release_ref(pdev, WLAN_SCAN_ID);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			scm_err("failed to cancel scan for pdev_id %d", i);

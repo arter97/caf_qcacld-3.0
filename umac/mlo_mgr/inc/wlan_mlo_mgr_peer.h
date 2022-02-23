@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -335,12 +335,26 @@ void wlan_mlo_peer_free_all_link_assoc_resp_buf(struct wlan_objmgr_peer *peer);
  * @peer: Link peer
  * @ml_links: structure to be filled with partner link info
  *
- * This function retrieves partner link info of link peer
+ * This function retrieves partner link info of link peer such as hw link id,
+ * vdev id
  *
  * Return: void
  */
 void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 				  struct mlo_tgt_partner_info *ml_links);
+
+/**
+ * wlan_mlo_peer_get_partner_links_info() - get MLO peer partner links info
+ * @peer: Link peer
+ * @ml_links: structure to be filled with partner link info
+ *
+ * This function retrieves partner link info of link peer such as link id,
+ * mac address
+ *
+ * Return: void
+ */
+void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
+					  struct mlo_partner_info *ml_links);
 
 /**
  ** APIs to operations on ML peer object
@@ -505,4 +519,51 @@ static inline void wlan_peer_clear_mlo(struct wlan_objmgr_peer *peer)
 {
 	return wlan_peer_mlme_flag_ext_clear(peer, WLAN_PEER_FEXT_MLO);
 }
+
+#ifdef UMAC_SUPPORT_MLNAWDS
+/**
+ * wlan_mlo_peer_is_nawds() - Check if ml_peer is configured to operate as NAWDS
+ * @ml_peer: MLO peer
+ *
+ * Return TRUE if ml peer is configured as NAWDS
+ */
+bool wlan_mlo_peer_is_nawds(struct wlan_mlo_peer_context *ml_peer);
+#else
+static inline
+bool wlan_mlo_peer_is_nawds(struct wlan_mlo_peer_context *ml_peer)
+{
+	return false;
+}
+#endif
+#ifdef UMAC_MLO_AUTH_DEFER
+/**
+ * mlo_peer_link_auth_defer() - Auth request defer for MLO peer
+ * @ml_peer: ML peer
+ * @link_mac:  Link peer MAC address
+ * @auth_params: Defer Auth param
+ *
+ * This function saves Auth request params in MLO peer
+ *
+ * Return: SUCCESS if MAC address matches one of the link peers
+ *         FAILURE, if MAC address doesn't match
+ */
+QDF_STATUS mlo_peer_link_auth_defer(struct wlan_mlo_peer_context *ml_peer,
+				    struct qdf_mac_addr *link_mac,
+				    struct mlpeer_auth_params *auth_params);
+
+/**
+ * mlo_peer_free_auth_param() - Free deferred Auth request params
+ * @auth_params: Defer Auth param
+ *
+ * This function frees Auth request params
+ *
+ * Return: void
+ */
+void mlo_peer_free_auth_param(struct mlpeer_auth_params *auth_params);
+#else
+static inline void
+mlo_peer_free_auth_param(struct mlpeer_auth_params *auth_params)
+{
+}
+#endif
 #endif

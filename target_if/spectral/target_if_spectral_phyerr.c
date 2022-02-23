@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011,2017-2021 The Linux Foundation. All rights reserved.
- *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1123,8 +1123,10 @@ target_if_populate_fft_bins_info(struct target_if_spectral *spectral,
 		}
 		dest_det_info->dest_start_bin_idx = start_bin;
 		dest_det_info->dest_end_bin_idx =
-					dest_det_info->dest_start_bin_idx +
-					num_fft_bins - 1;
+					dest_det_info->dest_start_bin_idx;
+		if (num_fft_bins > 0)
+			dest_det_info->dest_end_bin_idx += (num_fft_bins - 1);
+
 		if (dest_det_info->lb_extrabins_num) {
 			if (is_ch_width_160_or_80p80(ch_width)) {
 				dest_det_info->lb_extrabins_start_idx =
@@ -2220,7 +2222,16 @@ target_if_spectral_copy_fft_bins(struct target_if_spectral *spectral,
 	for (dword_idx = 0; dword_idx < num_dwords; dword_idx++) {
 		dword = *dword_ptr++; /* Read a DWORD */
 		for (idx = 0; idx < num_bins_per_dword; idx++) {
-			fft_bin_val = (uint16_t)QDF_GET_BITS(
+			/**
+			 * If we use QDF_GET_BITS, when hw_fft_bin_width_bits is
+			 * 32, on certain platforms, we could end up doing a
+			 * 32-bit left shift operation on 32-bit constant
+			 * integer '1'. As per C standard, result of shifting an
+			 * operand by a count greater than or equal to width
+			 * (in bits) of the operand is undefined.
+			 * If we use QDF_GET_BITS_64, we can avoid that.
+			 */
+			fft_bin_val = (uint16_t)QDF_GET_BITS64(
 					dword,
 					idx * hw_fft_bin_width_bits,
 					hw_fft_bin_width_bits);

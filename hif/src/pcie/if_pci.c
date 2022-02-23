@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,7 +45,7 @@
 #include "hif_debug.h"
 
 #if (defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-	defined(QCA_WIFI_WCN7850))
+	defined(QCA_WIFI_KIWI))
 #include "hal_api.h"
 #endif
 
@@ -72,7 +72,7 @@
  * use TargetCPU warm reset * instead of SOC_GLOBAL_RESET
  */
 #define CPU_WARM_RESET_WAR
-#define WLAN_CFG_MAX_PCIE_GROUPS 2
+#define WLAN_CFG_MAX_PCIE_GROUPS 4
 #ifdef QCA_WIFI_QCN9224
 #define WLAN_CFG_MAX_CE_COUNT 16
 #else
@@ -82,16 +82,6 @@
 char dp_irqname[WLAN_CFG_MAX_PCIE_GROUPS][WLAN_CFG_INT_NUM_CONTEXTS][DP_IRQ_NAME_LEN] = {};
 char ce_irqname[WLAN_CFG_MAX_PCIE_GROUPS][WLAN_CFG_MAX_CE_COUNT][DP_IRQ_NAME_LEN] = {};
 
-#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
-static inline int hif_get_pci_slot(struct hif_softc *scn)
-{
-	/*
-	 * If WLAN_MAX_PDEVS is defined as 1, always return pci slot 0
-	 * since there is only one pci device attached.
-	 */
-	return 0;
-}
-#else
 static inline int hif_get_pci_slot(struct hif_softc *scn)
 {
 	int pci_slot = pld_get_pci_slot(scn->qdf_dev->dev);
@@ -104,7 +94,6 @@ static inline int hif_get_pci_slot(struct hif_softc *scn)
 		return pci_slot;
 	}
 }
-#endif
 
 /*
  * Top-level interrupt handler for all PCI interrupts from a Target.
@@ -1947,8 +1936,7 @@ static int hif_pci_configure_legacy_irq(struct hif_pci_softc *sc)
 	hif_write32_mb(sc, sc->mem + PCIE_LOCAL_BASE_ADDRESS +
 		      PCIE_SOC_WAKE_ADDRESS, PCIE_SOC_WAKE_RESET);
 
-	if ((target_type == TARGET_TYPE_IPQ4019) ||
-			(target_type == TARGET_TYPE_AR900B)  ||
+	if ((target_type == TARGET_TYPE_AR900B)  ||
 			(target_type == TARGET_TYPE_QCA9984) ||
 			(target_type == TARGET_TYPE_AR9888) ||
 			(target_type == TARGET_TYPE_QCA9888) ||
@@ -2781,12 +2769,6 @@ void hif_target_dump_access_log(void)
 #endif
 
 #ifndef HIF_AHB
-int hif_ahb_configure_legacy_irq(struct hif_pci_softc *sc)
-{
-	QDF_BUG(0);
-	return -EINVAL;
-}
-
 int hif_ahb_configure_irq(struct hif_pci_softc *sc)
 {
 	QDF_BUG(0);
@@ -3239,7 +3221,7 @@ void hif_pci_set_grp_intr_affinity(struct hif_softc *scn,
 #endif
 
 #if (defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
-	defined(QCA_WIFI_WCN7850))
+	defined(QCA_WIFI_KIWI))
 uint32_t hif_pci_reg_read32(struct hif_softc *hif_sc,
 			    uint32_t offset)
 {
@@ -3297,9 +3279,6 @@ int hif_configure_irq(struct hif_softc *scn)
 	}
 
 	switch (scn->target_info.target_type) {
-	case TARGET_TYPE_IPQ4019:
-		ret = hif_ahb_configure_legacy_irq(sc);
-		break;
 	case TARGET_TYPE_QCA8074:
 	case TARGET_TYPE_QCA8074V2:
 	case TARGET_TYPE_QCA6018:
@@ -3457,7 +3436,7 @@ static bool hif_is_pld_based_target(struct hif_pci_softc *sc,
 	case QCA6490_DEVICE_ID:
 	case AR6320_DEVICE_ID:
 	case QCN7605_DEVICE_ID:
-	case WCN7850_DEVICE_ID:
+	case KIWI_DEVICE_ID:
 		return true;
 	}
 	return false;
@@ -3485,6 +3464,7 @@ static void hif_pci_init_reg_windowing_support(struct hif_pci_softc *sc,
 	case TARGET_TYPE_QCN7605:
 	case TARGET_TYPE_QCA6490:
 	case TARGET_TYPE_QCA6390:
+	case TARGET_TYPE_KIWI:
 		sc->use_register_windowing = true;
 		qdf_spinlock_create(&sc->register_access_lock);
 		sc->register_window = 0;
@@ -3706,7 +3686,7 @@ int hif_pci_addr_in_boundary(struct hif_softc *scn, uint32_t offset)
 	    tgt_info->target_type == TARGET_TYPE_QCA6490 ||
 	    tgt_info->target_type == TARGET_TYPE_QCN7605 ||
 	    tgt_info->target_type == TARGET_TYPE_QCA8074 ||
-	    tgt_info->target_type == TARGET_TYPE_WCN7850) {
+	    tgt_info->target_type == TARGET_TYPE_KIWI) {
 		/*
 		 * Need to consider offset's memtype for QCA6290/QCA8074,
 		 * also mem_len and DRAM_BASE_ADDRESS/DRAM_SIZE need to be
@@ -3739,7 +3719,7 @@ bool hif_pci_needs_bmi(struct hif_softc *scn)
 }
 
 #ifdef FORCE_WAKE
-#ifdef DEVICE_FORCE_WAKE_ENABLE
+#if defined(DEVICE_FORCE_WAKE_ENABLE) && !defined(CONFIG_PLD_PCIE_FW_SIM)
 
 /**
  * HIF_POLL_UMAC_WAKE poll value to indicate if UMAC is powered up

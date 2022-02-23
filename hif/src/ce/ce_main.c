@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -54,7 +55,7 @@
 
 #if (defined(QCA_WIFI_QCA8074) || defined(QCA_WIFI_QCA6290) || \
 	defined(QCA_WIFI_QCA6018) || defined(QCA_WIFI_QCA5018) || \
-	defined(QCA_WIFI_WCN7850) || defined(QCA_WIFI_QCA9574)) && \
+	defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_QCA9574)) && \
 	!defined(QCA_WIFI_SUPPORT_SRNG)
 #define QCA_WIFI_SUPPORT_SRNG
 #endif
@@ -1091,8 +1092,8 @@ static struct service_to_pipe target_service_to_ce_map_qca6750[] = {
 };
 #endif
 
-#if (defined(QCA_WIFI_WCN7850))
-static struct service_to_pipe target_service_to_ce_map_wcn7850[] = {
+#if (defined(QCA_WIFI_KIWI))
+static struct service_to_pipe target_service_to_ce_map_kiwi[] = {
 	{ WMI_DATA_VO_SVC, PIPEDIR_OUT, 3, },
 	{ WMI_DATA_VO_SVC, PIPEDIR_IN, 2, },
 	{ WMI_DATA_BK_SVC, PIPEDIR_OUT, 3, },
@@ -1108,13 +1109,13 @@ static struct service_to_pipe target_service_to_ce_map_wcn7850[] = {
 	{ HTT_DATA_MSG_SVC, PIPEDIR_OUT, 4, },
 	{ HTT_DATA_MSG_SVC, PIPEDIR_IN, 1, },
 #ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7
-	{ PACKET_LOG_SVC, PIPEDIR_IN, 5, },
+	{ WMI_CONTROL_DIAG_SVC, PIPEDIR_IN, 7, },
 #endif
 	/* (Additions here) */
 	{ 0, 0, 0, },
 };
 #else
-static struct service_to_pipe target_service_to_ce_map_wcn7850[] = {
+static struct service_to_pipe target_service_to_ce_map_kiwi[] = {
 };
 #endif
 
@@ -1328,7 +1329,6 @@ static void hif_select_service_to_pipe_map(struct hif_softc *scn,
 			break;
 		case TARGET_TYPE_AR900B:
 		case TARGET_TYPE_QCA9984:
-		case TARGET_TYPE_IPQ4019:
 		case TARGET_TYPE_QCA9888:
 		case TARGET_TYPE_AR9888:
 		case TARGET_TYPE_AR9888V2:
@@ -1356,10 +1356,10 @@ static void hif_select_service_to_pipe_map(struct hif_softc *scn,
 			*sz_tgt_svc_map_to_use =
 				sizeof(target_service_to_ce_map_qca6750);
 			break;
-		case TARGET_TYPE_WCN7850:
-			*tgt_svc_map_to_use = target_service_to_ce_map_wcn7850;
+		case TARGET_TYPE_KIWI:
+			*tgt_svc_map_to_use = target_service_to_ce_map_kiwi;
 			*sz_tgt_svc_map_to_use =
-				sizeof(target_service_to_ce_map_wcn7850);
+				sizeof(target_service_to_ce_map_kiwi);
 			break;
 		case TARGET_TYPE_QCA8074:
 			*tgt_svc_map_to_use = target_service_to_ce_map_qca8074;
@@ -1447,6 +1447,43 @@ static bool ce_mark_datapath(struct CE_state *ce_state)
 		}
 	}
 	return rc;
+}
+
+/**
+ * hif_get_max_wmi_ep() - Get max WMI EPs configured in target svc map
+ * @hif_ctx: hif opaque handle
+ *
+ * Description:
+ *   Gets number of WMI EPs configured in target svc map. Since EP map
+ *   include IN and OUT direction pipes, count only OUT pipes to get EPs
+ *   configured for WMI service.
+ *
+ * Return:
+ *  uint8_t: count for WMI eps in target svc map
+ */
+uint8_t hif_get_max_wmi_ep(struct hif_opaque_softc *hif_ctx)
+{
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ctx);
+	struct service_to_pipe *svc_map;
+	uint32_t map_sz, map_len;
+	int    i;
+	uint8_t   wmi_ep_count = 0;
+
+	hif_select_service_to_pipe_map(scn, &svc_map,
+				       &map_sz);
+	map_len = map_sz / sizeof(struct service_to_pipe);
+
+	for (i = 0; i < map_len; i++) {
+		/* Count number of WMI EPs based on out direction */
+		if ((svc_map[i].pipedir == PIPEDIR_OUT) &&
+		    ((svc_map[i].service_id == WMI_CONTROL_SVC)  ||
+		    (svc_map[i].service_id == WMI_CONTROL_SVC_WMAC1) ||
+		    (svc_map[i].service_id == WMI_CONTROL_SVC_WMAC2))) {
+			wmi_ep_count++;
+		}
+	}
+
+	return wmi_ep_count;
 }
 
 /**
@@ -1628,7 +1665,7 @@ bool ce_srng_based(struct hif_softc *scn)
 	case TARGET_TYPE_QCN9000:
 	case TARGET_TYPE_QCN6122:
 	case TARGET_TYPE_QCA5018:
-	case TARGET_TYPE_WCN7850:
+	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA9574:
 		return true;
@@ -1904,6 +1941,7 @@ QDF_STATUS alloc_mem_ce_debug_hist_data(struct hif_softc *scn, uint32_t ce_id)
 			(uint8_t *)qdf_mem_malloc(CE_DEBUG_MAX_DATA_BUF_SIZE);
 		if (!event->data) {
 			hif_err_rl("ce debug data alloc failed");
+			scn->hif_ce_desc_hist.data_enable[ce_id] = false;
 			return QDF_STATUS_E_NOMEM;
 		}
 	}
@@ -1943,7 +1981,72 @@ void free_mem_ce_debug_hist_data(struct hif_softc *scn, uint32_t ce_id)
 
 #ifndef HIF_CE_DEBUG_DATA_DYNAMIC_BUF
 #if defined(HIF_CONFIG_SLUB_DEBUG_ON) || defined(HIF_CE_DEBUG_DATA_BUF)
-struct hif_ce_desc_event hif_ce_desc_history[CE_COUNT_MAX][HIF_CE_HISTORY_MAX];
+struct hif_ce_desc_event *hif_ce_desc_history[CE_COUNT_MAX];
+
+/* define this variable for crashscope parse */
+uint32_t hif_ce_history_max = HIF_CE_HISTORY_MAX;
+
+/**
+ * hif_ce_debug_only_enable_ce2_ce3() - if only enable ce2/ce3 debug
+ * This is different config for perf/debug buid version.
+ * for debug build, it will enable ce history for all ce, but for
+ * perf build(if CONFIG_SLUB_DEBUG_ON is N), it only enable for
+ * ce2(wmi event) & ce3(wmi cmd) history.
+ *
+ * Return: true if only enable ce2/ce3 debug, otherwise false.
+ */
+#if defined(CONFIG_SLUB_DEBUG_ON)
+static inline bool hif_ce_debug_only_enable_ce2_ce3(void)
+{
+	return false;
+}
+#else
+static inline bool hif_ce_debug_only_enable_ce2_ce3(void)
+{
+	return true;
+}
+#endif
+
+QDF_STATUS hif_ce_debug_history_prealloc_deinit(void)
+{
+	int ce_id;
+
+	for (ce_id = 0; ce_id < CE_COUNT_MAX; ce_id++) {
+		if (hif_ce_desc_history[ce_id]) {
+			qdf_mem_free(hif_ce_desc_history[ce_id]);
+			hif_ce_desc_history[ce_id] = NULL;
+		}
+	}
+	hif_debug("ce debug memory freed");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS hif_ce_debug_history_prealloc_init(void)
+{
+	int ce_id;
+
+	hif_debug("alloc ce debug memory, only_ce2/ce3 %d",
+		  hif_ce_debug_only_enable_ce2_ce3());
+	for (ce_id = 0; ce_id < CE_COUNT_MAX; ce_id++) {
+		if (hif_ce_debug_only_enable_ce2_ce3() &&
+		    ce_id != CE_ID_2 &&
+		    ce_id != CE_ID_3) {
+			hif_ce_desc_history[ce_id] = NULL;
+			continue;
+		}
+
+		hif_ce_desc_history[ce_id] =
+			qdf_mem_malloc(HIF_CE_HISTORY_MAX *
+				       sizeof(struct hif_ce_desc_event));
+		if (!hif_ce_desc_history[ce_id]) {
+			hif_ce_debug_history_prealloc_deinit();
+			return QDF_STATUS_E_NOMEM;
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 
 /**
  * alloc_mem_ce_debug_history() - Allocate CE descriptor history
@@ -1958,13 +2061,29 @@ alloc_mem_ce_debug_history(struct hif_softc *scn, unsigned int ce_id,
 {
 	struct ce_desc_hist *ce_hist = &scn->hif_ce_desc_hist;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (hif_ce_debug_only_enable_ce2_ce3() &&
+	    ce_id != CE_ID_2 &&
+	    ce_id != CE_ID_3) {
+		ce_hist->enable[ce_id] = false;
+		ce_hist->data_enable[ce_id] = false;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (!hif_ce_desc_history[ce_id]) {
+		hif_err("prealloc memory failed");
+		return QDF_STATUS_E_NOMEM;
+	}
 	ce_hist->hist_ev[ce_id] = hif_ce_desc_history[ce_id];
-	ce_hist->enable[ce_id] = 1;
+	ce_hist->enable[ce_id] = true;
 
 	if (src_nentries) {
 		status = alloc_mem_ce_debug_hist_data(scn, ce_id);
-		if (status != QDF_STATUS_SUCCESS)
+		if (status != QDF_STATUS_SUCCESS) {
+			ce_hist->enable[ce_id] = false;
+			ce_hist->hist_ev[ce_id] = NULL;
 			return status;
+		}
 	} else {
 		ce_hist->data_enable[ce_id] = false;
 	}
@@ -1983,7 +2102,10 @@ static void free_mem_ce_debug_history(struct hif_softc *scn, unsigned int ce_id)
 {
 	struct ce_desc_hist *ce_hist = &scn->hif_ce_desc_hist;
 
-	ce_hist->enable[ce_id] = 0;
+	if (!ce_hist->enable[ce_id])
+		return;
+
+	ce_hist->enable[ce_id] = false;
 	if (ce_hist->data_enable[ce_id]) {
 		ce_hist->data_enable[ce_id] = false;
 		free_mem_ce_debug_hist_data(scn, ce_id);
@@ -2033,7 +2155,7 @@ static void free_mem_ce_debug_history(struct hif_softc *scn, unsigned int CE_id)
 		free_mem_ce_debug_hist_data(scn, CE_id);
 	}
 
-	ce_hist->enable[CE_id] = 0;
+	ce_hist->enable[CE_id] = false;
 	qdf_mem_free(ce_hist->hist_ev[CE_id]);
 	ce_hist->hist_ev[CE_id] = NULL;
 }
@@ -3799,7 +3921,6 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 		break;
 	case TARGET_TYPE_AR900B:
 	case TARGET_TYPE_QCA9984:
-	case TARGET_TYPE_IPQ4019:
 	case TARGET_TYPE_QCA9888:
 		if (hif_is_attribute_set(scn, HIF_LOWDESC_CE_NO_PKTLOG_CFG)) {
 			hif_state->host_ce_config =
@@ -3913,12 +4034,12 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 
 		scn->ce_count = QCA_6750_CE_COUNT;
 		break;
-	case TARGET_TYPE_WCN7850:
-		hif_state->host_ce_config = host_ce_config_wlan_wcn7850;
-		hif_state->target_ce_config = target_ce_config_wlan_wcn7850;
+	case TARGET_TYPE_KIWI:
+		hif_state->host_ce_config = host_ce_config_wlan_kiwi;
+		hif_state->target_ce_config = target_ce_config_wlan_kiwi;
 		hif_state->target_ce_config_sz =
-					sizeof(target_ce_config_wlan_wcn7850);
-		scn->ce_count = WCN_7850_CE_COUNT;
+					sizeof(target_ce_config_wlan_kiwi);
+		scn->ce_count = KIWI_CE_COUNT;
 		break;
 	case TARGET_TYPE_ADRASTEA:
 		if (hif_is_attribute_set(scn, HIF_LOWDESC_CE_NO_PKTLOG_CFG)) {
