@@ -920,13 +920,6 @@ struct per_cpu_packets {
 };
 
 struct debug_data_tx_stats {
-	uint32_t last_per;
-	uint32_t tx_bytes_success_last;
-	uint32_t tx_data_success_last;
-	uint32_t tx_byte_rate;
-	uint32_t tx_data_rate;
-	uint32_t tx_data_ucast_last;
-	uint32_t tx_data_ucast_rate;
 	uint32_t inactive_time;
 	uint32_t ofdma;
 	uint32_t stbc;
@@ -953,10 +946,6 @@ struct debug_data_tx_stats {
 };
 
 struct debug_data_rx_stats {
-	uint32_t rx_bytes_success_last;
-	uint32_t rx_data_success_last;
-	uint32_t rx_byte_rate;
-	uint32_t rx_data_rate;
 	uint32_t rx_discard;
 	uint32_t mic_err;
 	uint32_t decrypt_err;
@@ -976,11 +965,22 @@ struct debug_data_rx_stats {
 struct debug_peer_data_tx {
 	struct basic_peer_data_tx b_tx;
 	struct debug_data_tx_stats dbg_tx;
+	uint32_t last_per;
+	uint32_t tx_bytes_success_last;
+	uint32_t tx_data_success_last;
+	uint32_t tx_byte_rate;
+	uint32_t tx_data_rate;
+	uint32_t tx_data_ucast_last;
+	uint32_t tx_data_ucast_rate;
 };
 
 struct debug_peer_data_rx {
 	struct basic_peer_data_rx b_rx;
 	struct debug_data_rx_stats dbg_rx;
+	uint32_t rx_bytes_success_last;
+	uint32_t rx_data_success_last;
+	uint32_t rx_byte_rate;
+	uint32_t rx_data_rate;
 };
 
 struct debug_peer_data_link {

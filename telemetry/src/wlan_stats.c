@@ -2928,13 +2928,6 @@ static void fill_debug_data_tx_stats(struct debug_data_tx_stats *tx,
 	uint8_t inx = 0;
 	uint8_t loop_cnt;
 
-	tx->last_per = cdp_tx->last_per;
-	tx->tx_bytes_success_last = cdp_tx->tx_bytes_success_last;
-	tx->tx_data_success_last = cdp_tx->tx_data_success_last;
-	tx->tx_byte_rate = cdp_tx->tx_byte_rate;
-	tx->tx_data_rate = cdp_tx->tx_data_rate;
-	tx->tx_data_ucast_last = cdp_tx->tx_data_ucast_last;
-	tx->tx_data_ucast_rate = cdp_tx->tx_data_ucast_rate;
 	tx->inactive_time = cdp_tx->inactive_time;
 	tx->ofdma = cdp_tx->ofdma;
 	tx->stbc = cdp_tx->stbc;
@@ -2994,10 +2987,6 @@ static void fill_debug_data_rx_stats(struct debug_data_rx_stats *rx,
 	uint8_t inx;
 	uint8_t loop_cnt, max_ss, cnt;
 
-	rx->rx_bytes_success_last = cdp_rx->rx_bytes_success_last;
-	rx->rx_data_success_last = cdp_rx->rx_data_success_last;
-	rx->rx_byte_rate = cdp_rx->rx_byte_rate;
-	rx->rx_data_rate = cdp_rx->rx_data_rate;
 	rx->rx_discard = cdp_rx->rx_discard;
 	rx->mic_err = cdp_rx->err.mic_err;
 	rx->decrypt_err = cdp_rx->err.decrypt_err;
@@ -3045,6 +3034,7 @@ static QDF_STATUS get_debug_peer_data_tx(struct unified_stats *stats,
 					 struct cdp_peer_stats *peer_stats)
 {
 	struct debug_peer_data_tx *data = NULL;
+	struct cdp_tx_stats *cdp_tx = NULL;
 
 	if (!stats || !peer_stats) {
 		qdf_err("Invalid Input!");
@@ -3055,8 +3045,16 @@ static QDF_STATUS get_debug_peer_data_tx(struct unified_stats *stats,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_peer_data_tx(&data->b_tx, &peer_stats->tx);
-	fill_debug_data_tx_stats(&data->dbg_tx, &peer_stats->tx);
+	cdp_tx = &peer_stats->tx;
+	fill_basic_peer_data_tx(&data->b_tx, cdp_tx);
+	fill_debug_data_tx_stats(&data->dbg_tx, cdp_tx);
+	data->last_per = cdp_tx->last_per;
+	data->tx_bytes_success_last = cdp_tx->tx_bytes_success_last;
+	data->tx_data_success_last = cdp_tx->tx_data_success_last;
+	data->tx_byte_rate = cdp_tx->tx_byte_rate;
+	data->tx_data_rate = cdp_tx->tx_data_rate;
+	data->tx_data_ucast_last = cdp_tx->tx_data_ucast_last;
+	data->tx_data_ucast_rate = cdp_tx->tx_data_ucast_rate;
 
 	stats->feat[INX_FEAT_TX] = data;
 	stats->size[INX_FEAT_TX] = sizeof(struct debug_peer_data_tx);
@@ -3068,6 +3066,7 @@ static QDF_STATUS get_debug_peer_data_rx(struct unified_stats *stats,
 					 struct cdp_peer_stats *peer_stats)
 {
 	struct debug_peer_data_rx *data = NULL;
+	struct cdp_rx_stats *cdp_rx = NULL;
 
 	if (!stats || !peer_stats) {
 		qdf_err("Invalid Input!");
@@ -3078,8 +3077,13 @@ static QDF_STATUS get_debug_peer_data_rx(struct unified_stats *stats,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	fill_basic_peer_data_rx(&data->b_rx, &peer_stats->rx);
-	fill_debug_data_rx_stats(&data->dbg_rx, &peer_stats->rx);
+	cdp_rx = &peer_stats->rx;
+	fill_basic_peer_data_rx(&data->b_rx, cdp_rx);
+	fill_debug_data_rx_stats(&data->dbg_rx, cdp_rx);
+	data->rx_bytes_success_last = cdp_rx->rx_bytes_success_last;
+	data->rx_data_success_last = cdp_rx->rx_data_success_last;
+	data->rx_byte_rate = cdp_rx->rx_byte_rate;
+	data->rx_data_rate = cdp_rx->rx_data_rate;
 
 	stats->feat[INX_FEAT_RX] = data;
 	stats->size[INX_FEAT_RX] = sizeof(struct debug_peer_data_rx);

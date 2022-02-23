@@ -1622,15 +1622,6 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 	uint8_t i, mcs, ptype;
 	uint32_t j, index;
 
-	STATS_PRINT("\tTx Stats in Last One Second:\n");
-	STATS_32(stdout, "Tx success packets", tx->tx_data_success_last);
-	STATS_32(stdout, "Tx success bytes", tx->tx_bytes_success_last);
-	STATS_32(stdout, "Tx packets", tx->tx_data_rate);
-	STATS_32(stdout, "Tx bytes", tx->tx_byte_rate);
-	STATS_32(stdout, "Tx Packet Error Rate (PER)", tx->last_per);
-	STATS_32(stdout, "Tx unicast data", tx->tx_data_ucast_last);
-	STATS_32(stdout, "Tx unicast data rate", tx->tx_data_ucast_rate);
-	STATS_PRINT("\n");
 	STATS_32(stdout, "Inactive time in seconds", tx->inactive_time);
 	STATS_32(stdout, "Total packets as Ofdma", tx->ofdma);
 	STATS_32(stdout, "Total packets in STBC", tx->stbc);
@@ -1733,12 +1724,6 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 	uint8_t i;
 	uint32_t index;
 
-	STATS_PRINT("\tRx Stats in Last One Second:\n");
-	STATS_32(stdout, "Rx packets", rx->rx_data_success_last);
-	STATS_32(stdout, "Rx bytes", rx->rx_bytes_success_last);
-	STATS_32(stdout, "Rx packets", rx->rx_data_rate);
-	STATS_32(stdout, "Rx bytes", rx->rx_byte_rate);
-	STATS_PRINT("\n");
 	STATS_32(stdout, "Rx Dropped", rx->rx_discard);
 	STATS_32(stdout, "Rx MIC Error", rx->mic_err);
 	STATS_32(stdout, "Rx Decrypt Error", rx->decrypt_err);
@@ -1789,12 +1774,27 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 void print_debug_sta_data_tx(struct debug_peer_data_tx *tx)
 {
 	print_basic_sta_data_tx(&tx->b_tx);
+	STATS_PRINT("\tTx Stats in Last One Second:\n");
+	STATS_32(stdout, "Tx success packets", tx->tx_data_success_last);
+	STATS_32(stdout, "Tx success bytes", tx->tx_bytes_success_last);
+	STATS_32(stdout, "Tx packets", tx->tx_data_rate);
+	STATS_32(stdout, "Tx bytes", tx->tx_byte_rate);
+	STATS_32(stdout, "Tx Packet Error Rate (PER)", tx->last_per);
+	STATS_32(stdout, "Tx unicast data", tx->tx_data_ucast_last);
+	STATS_32(stdout, "Tx unicast data rate", tx->tx_data_ucast_rate);
+	STATS_PRINT("\n");
 	print_debug_data_tx_stats(&tx->dbg_tx);
 }
 
 void print_debug_sta_data_rx(struct debug_peer_data_rx *rx)
 {
 	print_basic_sta_data_rx(&rx->b_rx);
+	STATS_PRINT("\tRx Stats in Last One Second:\n");
+	STATS_32(stdout, "Rx packets", rx->rx_data_success_last);
+	STATS_32(stdout, "Rx bytes", rx->rx_bytes_success_last);
+	STATS_32(stdout, "Rx packets", rx->rx_data_rate);
+	STATS_32(stdout, "Rx bytes", rx->rx_byte_rate);
+	STATS_PRINT("\n");
 	print_debug_data_rx_stats(&rx->dbg_rx);
 }
 
