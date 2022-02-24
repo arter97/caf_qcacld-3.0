@@ -238,6 +238,10 @@ void monitor_mod_exit(void)
 		dp_mon_feature_ops_deregister(soc);
 
 		mon_ops = dp_mon_ops_get(soc);
+
+		if (mon_ops && mon_ops->mon_soc_deinit)
+			mon_ops->mon_soc_deinit(soc);
+
 		if (mon_ops && mon_ops->mon_soc_detach)
 			mon_ops->mon_soc_detach(soc);
 
