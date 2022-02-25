@@ -816,6 +816,7 @@ enum {
 #endif /* WLAN_FEATURE_11BE */
 	IEEE80211_PARAM_MAX_CAP_AP                 = 776,   /* Advertise Maximum capability of AP */
         IEEE80211_PARAM_NEIG_RPT          = 777,   /* disable/enable inclusion of Neighbor Report bit in Beacon/Probe-Rsp */
+	IEEE80211_PARAM_VDEV_TSF          = 778,
 };
 
 enum {
