@@ -19,9 +19,25 @@
 #ifndef _DP_SAWF_H_
 #define _DP_SAWF_H_
 
+#include <qdf_lock.h>
+#include <dp_types.h>
 #include "cdp_txrx_cmn_struct.h"
+#include "cdp_txrx_hist_struct.h"
+#include "cdp_txrx_extd_struct.h"
 
-#define DP_SAWF_MAX_TIDS 8
+#define MSDU_QUEUE_LATENCY_WIN_MIN_SAMPLES 20
+#define WLAN_TX_DELAY_UNITS_US 10
+#define WLAN_TX_DELAY_MASK 0x1FFFFFFF
+
+struct sawf_stats {
+	struct sawf_delay_stats delay[DP_SAWF_MAX_TIDS][DP_SAWF_MAX_QUEUES];
+	struct sawf_tx_stats tx_stats[DP_SAWF_MAX_TIDS][DP_SAWF_MAX_QUEUES];
+	struct qdf_spinlock lock;
+};
+
+struct dp_peer_sawf_stats {
+	struct sawf_stats stats;
+};
 
 struct sawf_def_queue_report {
 	uint8_t svc_class_id;
@@ -54,4 +70,27 @@ dp_peer_sawf_ctx_free(struct dp_soc *soc,
 
 struct dp_peer_sawf *dp_peer_sawf_ctx_get(struct dp_peer *peer);
 
+QDF_STATUS
+dp_peer_sawf_stats_ctx_alloc(struct dp_soc *soc,
+			     struct dp_txrx_peer *txrx_peer);
+
+QDF_STATUS
+dp_peer_sawf_stats_ctx_free(struct dp_soc *soc,
+			    struct dp_txrx_peer *txrx_peer);
+
+struct dp_peer_sawf_stats *
+dp_peer_sawf_stats_ctx_get(struct dp_txrx_peer *txrx_peer);
+
+QDF_STATUS
+dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
+				   struct dp_vdev *vdev,
+				   struct dp_txrx_peer *txrx_peer,
+				   struct dp_tx_desc_s *tx_desc,
+				   struct hal_tx_completion_status *ts,
+				   uint8_t tid);
+
+QDF_STATUS
+dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
+			      struct dp_tx_desc_s *tx_desc,
+			      uint8_t tid);
 #endif /* DP_SAWF_H*/

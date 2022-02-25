@@ -180,4 +180,44 @@ struct ol_ath_radiostats {
 enum _ol_hal_param_t {
 	OL_HAL_CONFIG_DMA_BEACON_RESPONSE_TIME = 0
 };
+
+#ifdef CONFIG_SAWF
+#define DP_SAWF_MAX_TIDS	8
+#define DP_SAWF_MAX_QUEUES	2
+#define DP_SAWF_NUM_AVG_WINDOWS	5
+
+struct sawf_delay_stats {
+	struct cdp_hist_stats delay_hist;
+
+	/* Sliding Window Average */
+	struct {
+		u_int32_t sum;
+		u_int32_t count;
+	} avg;
+
+	/* Data for each windows */
+	struct {
+		u_int32_t sum;
+		u_int32_t count;
+	} win_avgs[DP_SAWF_NUM_AVG_WINDOWS];
+
+	/*Index for the current window*/
+	uint8_t cur_win;
+};
+
+struct sawf_tx_stats {
+	struct cdp_pkt_info tx_success;
+	struct {
+		struct cdp_pkt_info fw_rem;
+		uint32_t fw_rem_notx;
+		uint32_t fw_rem_tx;
+		uint32_t age_out;
+		uint32_t fw_reason1;
+		uint32_t fw_reason2;
+		uint32_t fw_reason3;
+	} dropped;
+	uint32_t tx_failed;
+	uint32_t queue_depth;
+};
+#endif
 #endif /* _CDP_TXRX_EXTD_STRUCT_H_ */
