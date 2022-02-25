@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -212,8 +213,6 @@ uint32_t hif_hia_item_address(uint32_t target_type, uint32_t item_offset)
 		return QCA9984_HOST_INTEREST_ADDRESS + item_offset;
 	case TARGET_TYPE_QCA9888:
 		return QCA9888_HOST_INTEREST_ADDRESS + item_offset;
-	case TARGET_TYPE_IPQ4019:
-		return IPQ4019_HOST_INTEREST_ADDRESS + item_offset;
 
 	default:
 		ASSERT(0);
@@ -360,9 +359,9 @@ static const struct qwlan_hw qwlan_hw_list[] = {
 		.name = "QCA9379_REV1_1",
 	},
 	{
-		.id = WCN7850_V1,
+		.id = KIWI_V1,
 		.subid = 0xE,
-		.name = "WCN7850_V1",
+		.name = "KIWI_V1",
 	}
 };
 
@@ -1029,7 +1028,7 @@ static inline int hif_get_num_active_grp_tasklets(struct hif_softc *scn)
 	defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
 	defined(QCA_WIFI_QCN9000) || defined(QCA_WIFI_QCA6490) || \
 	defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_QCA5018) || \
-	defined(QCA_WIFI_WCN7850) || defined(QCA_WIFI_QCN9224) || \
+	defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_QCN9224) || \
 	defined(QCA_WIFI_QCA9574))
 /**
  * hif_get_num_pending_work() - get the number of entries in
@@ -1165,7 +1164,7 @@ uint8_t hif_get_ep_vote_access(struct hif_opaque_softc *hif_ctx,
 	defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
 	defined(QCA_WIFI_QCN9000) || defined(QCA_WIFI_QCA6490) || \
 	defined(QCA_WIFI_QCA6750) || defined(QCA_WIFI_QCA5018) || \
-	defined(QCA_WIFI_WCN7850) || defined(QCA_WIFI_QCN9224) || \
+	defined(QCA_WIFI_KIWI) || defined(QCA_WIFI_QCN9224) || \
 	defined(QCA_WIFI_QCA9574))
 static QDF_STATUS hif_hal_attach(struct hif_softc *scn)
 {
@@ -1515,12 +1514,6 @@ int hif_get_device_type(uint32_t device_id,
 		hif_info(" *********** AR900B *************");
 		break;
 
-	case IPQ4019_DEVICE_ID:
-		*hif_type = HIF_TYPE_IPQ4019;
-		*target_type = TARGET_TYPE_IPQ4019;
-		hif_info(" *********** IPQ4019  *************");
-		break;
-
 	case QCA8074_DEVICE_ID:
 		*hif_type = HIF_TYPE_QCA8074;
 		*target_type = TARGET_TYPE_QCA8074;
@@ -1583,10 +1576,10 @@ int hif_get_device_type(uint32_t device_id,
 		hif_info(" *********** QCA6750 *************");
 		break;
 
-	case WCN7850_DEVICE_ID:
-		*hif_type = HIF_TYPE_WCN7850;
-		*target_type = TARGET_TYPE_WCN7850;
-		hif_info(" *********** WCN7850 *************");
+	case KIWI_DEVICE_ID:
+		*hif_type = HIF_TYPE_KIWI;
+		*target_type = TARGET_TYPE_KIWI;
+		hif_info(" *********** KIWI *************");
 		break;
 
 	case QCA8074V2_DEVICE_ID:

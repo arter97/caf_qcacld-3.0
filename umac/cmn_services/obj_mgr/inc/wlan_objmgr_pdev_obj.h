@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +26,7 @@
 #include <wlan_objmgr_cmn.h>
 #include "wlan_objmgr_psoc_obj.h"
 #include <target_if_pub.h>
+#include <qdf_defer.h>
 
 /* STATUS: scanning */
 #define WLAN_PDEV_F_SCAN                    0x00000001
@@ -109,6 +111,8 @@
 #define WLAN_PDEV_FEXT_AGILE_SPECTRAL_SCAN_80P80_DIS     0x00000080
 /* agile Spectral scan support disable for 320 MHz */
 #define WLAN_PDEV_FEXT_AGILE_SPECTRAL_SCAN_320_DIS     0x00000100
+/* WiFi Radar support enabled */
+#define WLAN_PDEV_FEXT_WIFI_RADAR_ENABLE               0x00000200
 
 /* PDEV op flags */
    /* Enable htrate for wep and tkip */
@@ -218,6 +222,10 @@ struct wlan_objmgr_pdev_objmgr {
  * @obj_state:         object state
  * @tgt_if_handle:     Target interface handle
  * @pdev_lock:         lock to protect object
+ * @peer_free_lock:    lock to protect peer object free
+ * @peer_free_list:    list to hold freed peer
+ * @peer_obj_free_work:delayed work to be queued into workqueue
+ * @active_work_cnt:   active work counts
 */
 struct wlan_objmgr_pdev {
 	struct wlan_chan_list *current_chan_list;
@@ -229,6 +237,12 @@ struct wlan_objmgr_pdev {
 	WLAN_OBJ_STATE obj_state;
 	target_pdev_info_t *tgt_if_handle;
 	qdf_spinlock_t pdev_lock;
+#ifdef FEATURE_DELAYED_PEER_OBJ_DESTROY
+	qdf_spinlock_t peer_free_lock;
+	qdf_list_t peer_free_list;
+	qdf_work_t peer_obj_free_work;
+	uint32_t active_work_cnt;
+#endif
 };
 
 /**

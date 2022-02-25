@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -61,6 +61,20 @@ struct dp_ipa_uc_rx_hdr {
 #define DP_IPA_UC_WLAN_RX_HDR_LEN      sizeof(struct dp_ipa_uc_rx_hdr)
 #define DP_IPA_UC_WLAN_HDR_DES_MAC_OFFSET	0
 
+#define DP_IPA_HDL_INVALID	0xFF
+#define DP_IPA_HDL_FIRST	0
+#define DP_IPA_HDL_SECOND	1
+/**
+ * wlan_ipa_get_hdl() - Get ipa handle from IPA component
+ * @psoc - control psoc object
+ * @pdev_id - pdev id
+ *
+ * IPA componenet will return the IPA handle based on pdev_id
+ *
+ * Return: IPA handle
+ */
+qdf_ipa_wdi_hdl_t wlan_ipa_get_hdl(void *psoc, uint8_t pdev_id);
+
 /**
  * dp_ipa_get_resource() - Client request resource information
  * @soc_hdl - data path soc handle
@@ -86,6 +100,17 @@ QDF_STATUS dp_ipa_get_resource(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
  */
 QDF_STATUS dp_ipa_set_doorbell_paddr(struct cdp_soc_t *soc_hdl,
 				     uint8_t pdev_id);
+
+/**
+ * dp_ipa_iounmap_doorbell_vaddr() - unmap ipa RX db vaddr
+ * @soc_hdl - data path soc handle
+ * @pdev_id - device instance id
+ *
+ * Return: none
+ */
+QDF_STATUS dp_ipa_iounmap_doorbell_vaddr(struct cdp_soc_t *soc_hdl,
+					 uint8_t pdev_id);
+
 QDF_STATUS dp_ipa_uc_set_active(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 				bool uc_active, bool is_tx);
 
@@ -178,6 +203,7 @@ QDF_STATUS dp_ipa_disable_autonomy(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
  * @rx_pipe_handle: pointer to Rx pipe handle
  * @is_smmu_enabled: Is SMMU enabled or not
  * @sys_in: parameters to setup sys pipe in mcc mode
+ * @hdl: IPA handle
  *
  * Return: QDF_STATUS
  */
@@ -188,7 +214,8 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			bool is_rm_enabled, uint32_t *tx_pipe_handle,
 			uint32_t *rx_pipe_handle,
 			bool is_smmu_enabled,
-			qdf_ipa_sys_connect_params_t *sys_in, bool over_gsi);
+			qdf_ipa_sys_connect_params_t *sys_in, bool over_gsi,
+			qdf_ipa_wdi_hdl_t hdl);
 #else /* CONFIG_IPA_WDI_UNIFIED_API */
 /**
  * dp_ipa_setup() - Setup and connect IPA pipes
@@ -202,6 +229,7 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
  * @is_rm_enabled: Is IPA RM enabled or not
  * @tx_pipe_handle: pointer to Tx pipe handle
  * @rx_pipe_handle: pointer to Rx pipe handle
+ * @hdl: IPA handle
  *
  * Return: QDF_STATUS
  */
@@ -214,7 +242,7 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 #endif /* CONFIG_IPA_WDI_UNIFIED_API */
 QDF_STATUS dp_ipa_cleanup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			  uint32_t tx_pipe_handle,
-			  uint32_t rx_pipe_handle);
+			  uint32_t rx_pipe_handle, qdf_ipa_wdi_hdl_t hdl);
 QDF_STATUS dp_ipa_remove_header(char *name);
 int dp_ipa_add_header_info(char *ifname, uint8_t *mac_addr,
 		uint8_t session_id, bool is_ipv6_enabled);
@@ -222,28 +250,34 @@ int dp_ipa_register_interface(char *ifname, bool is_ipv6_enabled);
 QDF_STATUS dp_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 		qdf_ipa_client_type_t prod_client,
 		qdf_ipa_client_type_t cons_client,
-		uint8_t session_id, bool is_ipv6_enabled);
-QDF_STATUS dp_ipa_cleanup_iface(char *ifname, bool is_ipv6_enabled);
+		uint8_t session_id, bool is_ipv6_enabled,
+		qdf_ipa_wdi_hdl_t hdl);
+QDF_STATUS dp_ipa_cleanup_iface(char *ifname, bool is_ipv6_enabled,
+				qdf_ipa_wdi_hdl_t hdl);
 
 /**
  * dp_ipa_uc_enable_pipes() - Enable and resume traffic on Tx/Rx pipes
  * @soc_hdl - handle to the soc
  * @pdev_id - pdev id number, to get the handle
+ * @hdl: IPA handle
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS dp_ipa_enable_pipes(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
+QDF_STATUS dp_ipa_enable_pipes(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			       qdf_ipa_wdi_hdl_t hdl);
 
 /**
  * dp_ipa_disable_pipes() – Suspend traffic and disable Tx/Rx pipes
  * @soc_hdl - handle to the soc
  * @pdev_id - pdev id number, to get the handle
+ * @hdl: IPA handle
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS dp_ipa_disable_pipes(struct cdp_soc_t *soc_hdl, uint8_t pdev_id);
-QDF_STATUS dp_ipa_set_perf_level(int client,
-		uint32_t max_supported_bw_mbps);
+QDF_STATUS dp_ipa_disable_pipes(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+				qdf_ipa_wdi_hdl_t hdl);
+QDF_STATUS dp_ipa_set_perf_level(int client, uint32_t max_supported_bw_mbps,
+				 qdf_ipa_wdi_hdl_t hdl);
 
 /**
  * dp_ipa_rx_intrabss_fwd() - Perform intra-bss fwd for IPA RX path

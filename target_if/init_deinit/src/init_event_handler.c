@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,6 +38,7 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include <wlan_mlo_mgr_setup.h>
 #endif
+#include <target_if_twt.h>
 
 static void init_deinit_set_send_init_cmd(struct wlan_objmgr_psoc *psoc,
 					  struct target_psoc_info *tgt_hdl)
@@ -195,9 +196,6 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 		wlan_psoc_nif_fw_ext_cap_set(psoc,
 					     WLAN_SOC_F_MGMT_RX_REO_CAPABLE);
 
-	if (!wmi_service_enabled(wmi_handle, wmi_service_ext_msg))
-		target_if_qwrap_cfg_enable(psoc, tgt_hdl, event);
-
 	target_if_lteu_cfg_enable(psoc, tgt_hdl, event);
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_rx_fse_support))
@@ -208,6 +206,11 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 				wmi_service_scan_conf_per_ch_support))
 		wlan_psoc_nif_fw_ext_cap_set(psoc,
 					     WLAN_SOC_CEXT_SCAN_PER_CH_CONFIG);
+
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_pno_scan_conf_per_ch_support))
+		wlan_psoc_nif_fw_ext_cap_set(psoc,
+					WLAN_SOC_PNO_SCAN_CONFIG_PER_CHANNEL);
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_csa_beacon_template))
 		wlan_psoc_nif_fw_ext_cap_set(psoc,
@@ -250,6 +253,7 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	target_if_reg_set_offloaded_info(psoc);
 	target_if_reg_set_6ghz_info(psoc);
 	target_if_reg_set_5dot9_ghz_info(psoc);
+	target_if_twt_fill_tgt_caps(psoc, wmi_handle);
 
 	/* Send num_msdu_desc to DP layer */
 	cdp_soc_set_param(wlan_psoc_get_dp_handle(psoc),
@@ -260,6 +264,12 @@ static int init_deinit_service_ready_event_handler(ol_scn_t scn_handle,
 	if (wmi_service_enabled(wmi_handle, wmi_service_fse_cmem_alloc_support))
 		cdp_soc_set_param(wlan_psoc_get_dp_handle(psoc),
 				  DP_SOC_PARAM_CMEM_FSE_SUPPORT, 1);
+
+	/* Send multi_peer_group support to DP layer */
+	if (wmi_service_enabled(wmi_handle,
+				wmi_service_multi_peer_group_cmd_support))
+		cdp_soc_set_param(wlan_psoc_get_dp_handle(psoc),
+				  DP_SOC_PARAM_MULTI_PEER_GRP_CMD_SUPPORT, 1);
 
 	if (wmi_service_enabled(wmi_handle, wmi_service_ext_msg)) {
 		target_if_debug("Wait for EXT message");
@@ -481,8 +491,6 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 		legacy_callback(wmi_service_ready_ext_event_id,
 				scn_handle, event, data_len);
 
-	target_if_qwrap_cfg_enable(psoc, tgt_hdl, event);
-
 	target_if_set_twt_ap_pdev_count(info, tgt_hdl);
 
 	info->wlan_res_cfg.max_bssid_indicator =
@@ -536,15 +544,36 @@ static int init_deinit_service_available_handler(ol_scn_t scn_handle,
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+static bool init_deinit_mlo_capable(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *tgt_hdl;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		target_if_err("target_psoc_info is null");
+		return false;
+	}
+
+	if ((tgt_hdl->tif_ops) &&
+	    (tgt_hdl->tif_ops->mlo_capable))
+		return tgt_hdl->tif_ops->mlo_capable(psoc);
+
+	return false;
+}
+
 static void init_deinit_mlo_update_soc_ready(struct wlan_objmgr_psoc *psoc)
 {
-	mlo_setup_update_soc_ready(psoc);
+	if (init_deinit_mlo_capable(psoc))
+		mlo_setup_update_soc_ready(psoc);
 }
 
 static void init_deinit_send_ml_link_ready(struct wlan_objmgr_psoc *psoc,
 					   void *object, void *arg)
 {
 	struct wlan_objmgr_pdev *pdev = object;
+
+	if (!init_deinit_mlo_capable(psoc))
+		return;
 
 	qdf_assert_always(psoc);
 	qdf_assert_always(pdev);
@@ -555,6 +584,9 @@ static void init_deinit_send_ml_link_ready(struct wlan_objmgr_psoc *psoc,
 static void init_deinit_mlo_update_pdev_ready(struct wlan_objmgr_psoc *psoc,
 					      uint8_t num_radios)
 {
+	if (!init_deinit_mlo_capable(psoc))
+		return;
+
 	wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
 				     init_deinit_send_ml_link_ready,
 				     NULL, 0, WLAN_INIT_DEINIT_ID);
@@ -764,10 +796,10 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 			wlan_psoc_set_hw_macaddr(psoc, myaddr);
 	}
 
-	init_deinit_mlo_update_pdev_ready(psoc, num_radios);
 out:
 	target_if_btcoex_cfg_enable(psoc, tgt_hdl, event);
 	tgt_hdl->info.wmi_ready = TRUE;
+	init_deinit_mlo_update_pdev_ready(psoc, num_radios);
 exit:
 	init_deinit_wakeup_host_wait(psoc, tgt_hdl);
 

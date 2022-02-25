@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -65,7 +65,6 @@ typedef void *hif_handle_t;
 #define HIF_TYPE_ADRASTEA 10
 #define HIF_TYPE_AR900B 11
 #define HIF_TYPE_QCA9984 12
-#define HIF_TYPE_IPQ4019 13
 #define HIF_TYPE_QCA9888 14
 #define HIF_TYPE_QCA8074 15
 #define HIF_TYPE_QCA6290 16
@@ -78,7 +77,7 @@ typedef void *hif_handle_t;
 #define HIF_TYPE_QCA6750 23
 #define HIF_TYPE_QCA5018 24
 #define HIF_TYPE_QCN6122 25
-#define HIF_TYPE_WCN7850 26
+#define HIF_TYPE_KIWI 26
 #define HIF_TYPE_QCN9224 27
 #define HIF_TYPE_QCA9574 28
 
@@ -124,6 +123,7 @@ enum hif_ic_irq {
 	host2tcl_input_ring3,
 	host2tcl_input_ring2,
 	host2tcl_input_ring1,
+	wbm2host_tx_completions_ring4,
 	wbm2host_tx_completions_ring3,
 	wbm2host_tx_completions_ring2,
 	wbm2host_tx_completions_ring1,
@@ -1064,6 +1064,7 @@ hif_pm_wake_irq_type hif_pm_get_wake_irq_type(struct hif_opaque_softc *hif_ctx);
  * @RTPM_ID_DRIVER_UNLOAD: operation in driver unload
  * @RTPM_ID_CE_INTR_HANDLER: operation from ce interrupt handler
  * @RTPM_ID_WAKE_INTR_HANDLER: operation from wake interrupt handler
+ * @RTPM_ID_SOC_IDLE_SHUTDOWN: operation in soc idle shutdown
  */
 /* New value added to the enum must also be reflected in function
  *  rtpm_string_from_dbgid()
@@ -1085,6 +1086,7 @@ typedef enum {
 	RTPM_ID_DRIVER_UNLOAD,
 	RTPM_ID_CE_INTR_HANDLER,
 	RTPM_ID_WAKE_INTR_HANDLER,
+	RTPM_ID_SOC_IDLE_SHUTDOWN,
 
 	RTPM_ID_MAX,
 } wlan_rtpm_dbgid;
@@ -1115,6 +1117,7 @@ static inline char *rtpm_string_from_dbgid(wlan_rtpm_dbgid id)
 					"RTPM_ID_DRIVER_UNLOAD",
 					"RTPM_ID_CE_INTR_HANDLER",
 					"RTPM_ID_WAKE_INTR_HANDLER",
+					"RTPM_ID_SOC_IDLE_SHUTDOWN",
 					"RTPM_ID_MAX"};
 
 	return (char *)strings[id];
@@ -1712,6 +1715,36 @@ ssize_t hif_ce_en_desc_hist(struct hif_softc *scn,
 				const char *buf, size_t size);
 ssize_t hif_disp_ce_enable_desc_data_hist(struct hif_softc *scn, char *buf);
 ssize_t hif_dump_desc_event(struct hif_softc *scn, char *buf);
+/**
+ * hif_ce_debug_history_prealloc_init() - alloc ce debug history memory
+ *
+ * alloc ce debug history memory with driver init, so such memory can
+ * be existed even after stop module.
+ * on ini value.
+ *
+ * Return: QDF_STATUS_SUCCESS for success, other for fail.
+ */
+QDF_STATUS hif_ce_debug_history_prealloc_init(void);
+/**
+ * hif_ce_debug_history_prealloc_deinit() - free ce debug history memory
+ *
+ * free ce debug history memory when driver deinit.
+ *
+ * Return: QDF_STATUS_SUCCESS for success, other for fail.
+ */
+QDF_STATUS hif_ce_debug_history_prealloc_deinit(void);
+#else
+static inline
+QDF_STATUS hif_ce_debug_history_prealloc_init(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS hif_ce_debug_history_prealloc_deinit(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif/*#if defined(HIF_CONFIG_SLUB_DEBUG_ON)||defined(HIF_CE_DEBUG_DATA_BUF)*/
 
 /**
@@ -2112,4 +2145,17 @@ void hif_set_grp_intr_affinity(struct hif_opaque_softc *scn,
 {
 }
 #endif
+/**
+ * hif_get_max_wmi_ep() - Get max WMI EPs configured in target svc map
+ * @hif_ctx: hif opaque handle
+ *
+ * Description:
+ *   Gets number of WMI EPs configured in target svc map. Since EP map
+ *   include IN and OUT direction pipes, count only OUT pipes to get EPs
+ *   configured for WMI service.
+ *
+ * Return:
+ *  uint8_t: count for WMI eps in target svc map
+ */
+uint8_t hif_get_max_wmi_ep(struct hif_opaque_softc *scn);
 #endif /* _HIF_H_ */

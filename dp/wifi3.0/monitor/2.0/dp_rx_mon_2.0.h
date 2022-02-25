@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,7 +29,7 @@
  *         QDF_STATUS_E_FAILURE: Error
  */
 QDF_STATUS
-dp_rx_mon_buffers_alloc(struct dp_soc *soc);
+dp_rx_mon_buffers_alloc(struct dp_soc *soc, uint32_t size);
 
 /*
  * dp_rx_mon_buffers_free() - free rx monitor buffers
@@ -86,4 +87,76 @@ void dp_rx_mon_process_status_tlv(struct dp_soc *soc,
 				  struct hal_mon_desc *mon_ring_desc,
 				  qdf_dma_addr_t addr);
 
+/**
+ * dp_rx_mon_stats_update_2_0 () - update rx stats
+ *
+ * @peer: monitor peer handle
+ * @ppdu: Rx PPDU status metadata object
+ * @ppdu_user: Rx PPDU user status metadata object
+ *
+ * Return: Void
+ */
+void dp_rx_mon_stats_update_2_0(struct dp_mon_peer *mon_peer,
+				struct cdp_rx_indication_ppdu *ppdu,
+				struct cdp_rx_stats_ppdu_user *ppdu_user);
+
+/**
+ * dp_rx_mon_populate_ppdu_usr_info_2_0 () - Populate ppdu user info
+ *
+ * @rx_user_status: Rx user status
+ * @ppdu_user: ppdu user metadata
+ *
+ * Return: void
+ */
+void
+dp_rx_mon_populate_ppdu_usr_info_2_0(struct mon_rx_user_status *rx_user_status,
+				     struct cdp_rx_stats_ppdu_user *ppdu_user);
+
+/**
+ * dp_rx_mon_populate_ppdu_info_2_0 () --  Populate ppdu info
+ *
+ * @hal_ppdu_info: HAL PPDU info
+ * @ppdu: Rx PPDU status metadata object
+ *
+ * Return: void
+ */
+void
+dp_rx_mon_populate_ppdu_info_2_0(struct hal_rx_ppdu_info *hal_ppdu_info,
+				 struct cdp_rx_indication_ppdu *ppdu);
+
+/*
+ * dp_rx_process_pktlog_be() - process pktlog
+ * @soc: dp soc handle
+ * @pdev: dp pdev handle
+ * @ppdu_info: HAL PPDU info
+ * @status_frag: frag pointer which needs to be added to nbuf
+ * @end_offset: Offset in frag to be added to nbuf_frags
+ *
+ * Return: SUCCESS or Failure
+ */
+QDF_STATUS dp_rx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
+				   struct hal_rx_ppdu_info *ppdu_info,
+				   void *status_frag, uint32_t end_offset);
+
+#if !defined(DISABLE_MON_CONFIG)
+/*
+ * dp_rx_mon_process_2_0 () - Process Rx monitor interrupt
+ *
+ * @soc: DP soc handle
+ * @int_ctx: Interrupt context
+ * @mac_id: LMAC id
+ * @quota: quota to reap
+ */
+uint32_t
+dp_rx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
+		      uint32_t mac_id, uint32_t quota);
+#else
+static uint32_t
+dp_rx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
+		      uint32_t mac_id, uint32_t quota)
+{
+	return 0;
+}
+
+#endif /* DISABLE_MON_CONFIG */
 #endif /* _DP_RX_MON_2_0_H_ */

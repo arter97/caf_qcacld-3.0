@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -174,6 +175,10 @@ struct reg_domain_pair {
  * @FCC1_6G_07: Super domain FCC1_6G_07 for Brazil
  * @APL3_6G_08: Super domain APL3_6G_08 for UAE
  * @FCC1_6G_09: Super domain FCC1_6G_09 for US AFC Testing
+ * @FCC2_6G_10: Super domain FCC1_6G_10 for Canada LPI &
+		SP(VLP to be added later)
+ * @APL4_6G_11: Super domain APL3_6G_11 for Costa Rica LPI and VLP
+ * @APL5_6G_12: Super domain APL3_6G_12 for CHILE LPI and VLP
  */
 enum reg_super_domain_6g {
 	FCC1_6G_01 = 0x01,
@@ -185,6 +190,9 @@ enum reg_super_domain_6g {
 	FCC1_6G_07 = 0x07,
 	APL3_6G_08 = 0x08,
 	FCC1_6G_09 = 0x09,
+	FCC2_6G_10 = 0x10,
+	APL4_6G_11 = 0x11,
+	APL5_6G_12 = 0x12,
 };
 
 #if defined(COMPILE_REGDB_6G)
@@ -214,8 +222,6 @@ QDF_STATUS reg_get_num_countries(int *num_countries);
 
 QDF_STATUS reg_get_num_reg_dmn_pairs(int *num_reg_dmn);
 
-QDF_STATUS reg_get_default_country(uint16_t *default_country);
-
 /**
  * reg_etsi13_regdmn () - Checks if the reg domain is ETSI13 or not
  * @reg_dmn: reg domain
@@ -232,6 +238,9 @@ bool reg_etsi13_regdmn(uint8_t reg_dmn);
  */
 bool reg_fcc_regdmn(uint8_t reg_dmn);
 
+#ifdef WLAN_REG_PARTIAL_OFFLOAD
+QDF_STATUS reg_get_default_country(uint16_t *default_country);
+
 /**
  * reg_en302_502_regdmn() - Check if the reg domain is en302_502 applicable.
  * @reg_dmn: Regulatory domain pair ID.
@@ -239,4 +248,5 @@ bool reg_fcc_regdmn(uint8_t reg_dmn);
  * Return: True if EN302_502 applicable, else false.
  */
 bool reg_en302_502_regdmn(uint16_t reg_dmn);
+#endif
 #endif

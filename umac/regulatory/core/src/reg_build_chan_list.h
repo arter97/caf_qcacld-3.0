@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -34,6 +35,7 @@
 #define MAX_AFC_BW 160
 #endif
 
+#include "reg_priv_objs.h"
 /**
  * reg_reset_reg_rules() - provides the reg domain rules info
  * @reg_rules: reg rules pointer
@@ -94,38 +96,6 @@ void reg_propagate_mas_chan_list_to_pdev(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 reg_process_master_chan_list_ext(struct cur_regulatory_info *reg_info);
 
-#ifdef CONFIG_AFC_SUPPORT
-/**
- * reg_process_afc_event() - Process the afc event and compute the 6G AFC
- * channel list based on the frequency range and channel frequency indices set.
- * @reg_info: Pointer to regulatory info
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-reg_process_afc_event(struct afc_regulatory_info *afc_info);
-#endif
-#endif
-/**
- * reg_process_master_chan_list() - Compute master channel list based on the
- * regulatory rules.
- * @reg_info: Pointer to regulatory info
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS reg_process_master_chan_list(struct cur_regulatory_info *reg_info);
-
-/**
- * reg_get_current_chan_list() - provide the pdev current channel list
- * @pdev: pdev pointer
- * @chan_list: channel list pointer
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS reg_get_current_chan_list(struct wlan_objmgr_pdev *pdev,
-				     struct regulatory_channel *chan_list);
-
-#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
 /**
  * reg_get_6g_ap_master_chan_list() - Get  an ap  master channel list depending
  * on * ap power type
@@ -138,6 +108,97 @@ QDF_STATUS reg_get_6g_ap_master_chan_list(struct wlan_objmgr_pdev *pdev,
 					  enum reg_6g_ap_type ap_pwr_type,
 					  struct regulatory_channel *chan_list);
 
+/**
+ * reg_get_reg_maschan_lst_frm_6g_pwr_mode() - Return the mas_chan_list entry
+ * for based on the channel index and input power mode
+ * @supp_pwr_mode: 6G supported power mode
+ * @pdev_priv_obj: Pointer to pdev_priv_obj
+ * @chan_idx: Channel index
+ *
+ * Return: Pointer to struct regulatory_channel
+ */
+struct regulatory_channel *reg_get_reg_maschan_lst_frm_6g_pwr_mode(
+			enum supported_6g_pwr_types supp_pwr_mode,
+			struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
+			uint16_t chan_idx);
+
+#ifdef CONFIG_REG_CLIENT
+/**
+ * reg_get_power_string() - get power string from power enum type
+ * @power_type: power type enum value
+ *
+ * Return: power type string
+ */
+const char *reg_get_power_string(enum reg_6g_ap_type power_type);
+#endif
+
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * reg_process_afc_event() - Process the afc event and compute the 6G AFC
+ * channel list based on the frequency range and channel frequency indices set.
+ * @reg_info: Pointer to regulatory info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+reg_process_afc_event(struct afc_regulatory_info *afc_info);
+#endif
+
+#else /* CONFIG_BAND_6GHZ */
+static inline QDF_STATUS
+reg_get_6g_ap_master_chan_list(struct wlan_objmgr_pdev *pdev,
+			       enum reg_6g_ap_type ap_pwr_type,
+			       struct regulatory_channel *chan_list)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+struct regulatory_channel *reg_get_reg_maschan_lst_frm_6g_pwr_mode(
+			enum supported_6g_pwr_types supp_pwr_mode,
+			struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
+			uint16_t chan_idx)
+{
+	return NULL;
+}
+#endif /* CONFIG_BAND_6GHZ */
+/**
+ * reg_process_master_chan_list() - Compute master channel list based on the
+ * regulatory rules.
+ * @reg_info: Pointer to regulatory info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_process_master_chan_list(struct cur_regulatory_info *reg_info);
+
+/**
+ * reg_get_pwrmode_chan_list() - Get the modified channel list. A modified
+ * current channel list consists of 2G and 5G portions of the current channel
+ * list and the 6G portion of the current channel list is derived from the input
+ * 6g power type.
+ * @pdev: Pointer to pdev
+ * @in_6g_pwr_mode: Input 6GHz power mode.
+ *
+ * Return:
+ * QDF_STATUS_SUCCESS: Success
+ * QDF_STATUS_E_INVAL: Failed to get channel list
+ */
+QDF_STATUS reg_get_pwrmode_chan_list(struct wlan_objmgr_pdev *pdev,
+				     struct regulatory_channel *chan_list,
+				     enum supported_6g_pwr_types
+				     in_6g_pwr_mode);
+
+/**
+ * reg_get_current_chan_list() - provide the pdev current channel list
+ * @pdev: pdev pointer
+ * @chan_list: channel list pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_get_current_chan_list(struct wlan_objmgr_pdev *pdev,
+				     struct regulatory_channel *chan_list);
+
+#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
 /**
  * reg_get_6g_afc_chan_list() - provide the pdev afc channel list
  * @pdev: pdev pointer
@@ -188,4 +249,16 @@ QDF_STATUS
 reg_get_secondary_current_chan_list(struct wlan_objmgr_pdev *pdev,
 				    struct regulatory_channel *chan_list);
 #endif
+
+/**
+ * reg_is_chan_disabled_and_not_nol() - In the regulatory channel list, a
+ * channel may be disabled by the regulatory/device or by radar. Radar is
+ * temporary and a radar disabled channel does not mean that the channel is
+ * permanently disabled. The API checks if the channel is disabled, but not due
+ * to radar.
+ * @chan - Regulatory channel object
+ *
+ * Return - True,  the channel is disabled, but not due to radar, else false.
+ */
+bool reg_is_chan_disabled_and_not_nol(struct regulatory_channel *chan);
 #endif

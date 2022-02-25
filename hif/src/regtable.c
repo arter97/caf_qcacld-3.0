@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -92,14 +93,6 @@ void hif_target_register_tbl_attach(struct hif_softc *scn, u32 target_type)
 		scn->target_ce_def = QCA9888_CE_TARGETdef;
 		break;
 #endif
-#ifdef ATH_AHB
-#if defined(IPQ4019_HEADERS_DEF)
-	case TARGET_TYPE_IPQ4019:
-		scn->targetdef = IPQ4019_TARGETdef;
-		scn->target_ce_def = IPQ4019_CE_TARGETdef;
-		break;
-#endif
-#endif
 #if defined(QCA8074_HEADERS_DEF)
 	case TARGET_TYPE_QCA8074:
 		scn->targetdef = QCA8074_TARGETdef;
@@ -181,13 +174,13 @@ void hif_target_register_tbl_attach(struct hif_softc *scn, u32 target_type)
 		break;
 #endif /* QCA6490_HEADERS_DEF */
 
-#if defined(WCN7850_HEADERS_DEF)
-	case TARGET_TYPE_WCN7850:
-		scn->targetdef = WCN7850_TARGETdef;
-		scn->target_ce_def = WCN7850_CE_TARGETdef;
-		hif_info("TARGET_TYPE_WCN7850");
+#if defined(KIWI_HEADERS_DEF)
+	case TARGET_TYPE_KIWI:
+		scn->targetdef = KIWI_TARGETdef;
+		scn->target_ce_def = KIWI_CE_TARGETdef;
+		hif_info("TARGET_TYPE_KIWI");
 		break;
-#endif /* WCN7850_HEADERS_DEF */
+#endif /* KIWI_HEADERS_DEF */
 
 #if defined(QCA6750_HEADERS_DEF)
 	case TARGET_TYPE_QCA6750:
@@ -256,13 +249,6 @@ void hif_register_tbl_attach(struct hif_softc *scn, u32 hif_type)
 		break;
 #endif
 
-#ifdef ATH_AHB
-#if defined(IPQ4019_HEADERS_DEF)
-	case HIF_TYPE_IPQ4019:
-		scn->hostdef = IPQ4019_HOSTdef;
-		break;
-#endif
-#endif
 #if defined(QCA8074_HEADERS_DEF)
 	case HIF_TYPE_QCA8074:
 		scn->hostdef = QCA8074_HOSTdef;
@@ -325,12 +311,12 @@ void hif_register_tbl_attach(struct hif_softc *scn, u32 hif_type)
 		break;
 #endif /* QCA6490_HEADERS_DEF */
 
-#if defined(WCN7850_HEADERS_DEF)
-	case HIF_TYPE_WCN7850:
-		scn->hostdef = WCN7850_HOSTdef;
-		hif_info("HIF_TYPE_WCN7850");
+#if defined(KIWI_HEADERS_DEF)
+	case HIF_TYPE_KIWI:
+		scn->hostdef = KIWI_HOSTdef;
+		hif_info("HIF_TYPE_KIWI");
 		break;
-#endif /* WCN7850_HEADERS_DEF */
+#endif /* KIWI_HEADERS_DEF */
 
 #if defined(QCA6750_HEADERS_DEF)
 	case HIF_TYPE_QCA6750:

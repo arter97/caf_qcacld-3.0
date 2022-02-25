@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -165,13 +165,18 @@ static void hal_rx_mon_hw_desc_get_mpdu_status_6490(void *hw_desc_addr,
 
 	rs->ant_signal_db = HAL_RX_GET(rx_msdu_start,
 				RX_MSDU_START_5, USER_RSSI);
-	rs->is_stbc = HAL_RX_GET(rx_msdu_start, RX_MSDU_START_5, STBC);
+	if (!rs->vht_flags) {
+		rs->is_stbc = HAL_RX_GET(rx_msdu_start,
+					 RX_MSDU_START_5, STBC);
 
-	reg_value = HAL_RX_GET(rx_msdu_start, RX_MSDU_START_5, SGI);
-	rs->sgi = sgi_hw_to_cdp[reg_value];
+		reg_value = HAL_RX_GET(rx_msdu_start, RX_MSDU_START_5, SGI);
+		rs->sgi = sgi_hw_to_cdp[reg_value];
 
-	reg_value = HAL_RX_GET(rx_msdu_start, RX_MSDU_START_5, RECEPTION_TYPE);
-	rs->beamformed = (reg_value == HAL_RX_RECEPTION_TYPE_MU_MIMO) ? 1 : 0;
+		reg_value = HAL_RX_GET(rx_msdu_start, RX_MSDU_START_5,
+				       RECEPTION_TYPE);
+		rs->beamformed =
+			(reg_value == HAL_RX_RECEPTION_TYPE_MU_MIMO) ? 1 : 0;
+	}
 	/* TODO: rs->beamformed should be set for SU beamforming also */
 }
 
@@ -1810,6 +1815,8 @@ static void hal_hw_txrx_ops_attach_qca6490(struct hal_soc *hal_soc)
 					hal_rx_msdu_flow_idx_timeout_6490;
 	hal_soc->ops->hal_rx_msdu_fse_metadata_get =
 					hal_rx_msdu_fse_metadata_get_6490;
+	hal_soc->ops->hal_rx_msdu_cce_match_get =
+					hal_rx_msdu_cce_match_get_li;
 	hal_soc->ops->hal_rx_msdu_cce_metadata_get =
 					hal_rx_msdu_cce_metadata_get_6490;
 	hal_soc->ops->hal_rx_msdu_get_flow_params =
@@ -1853,6 +1860,11 @@ static void hal_hw_txrx_ops_attach_qca6490(struct hal_soc *hal_soc)
 					hal_rx_pkt_tlv_offset_get_generic;
 #endif
 	hal_soc->ops->hal_rx_flow_setup_fse = hal_rx_flow_setup_fse_6490;
+	hal_soc->ops->hal_rx_flow_get_tuple_info =
+					hal_rx_flow_get_tuple_info_li;
+	 hal_soc->ops->hal_rx_flow_delete_entry =
+					hal_rx_flow_delete_entry_li;
+	hal_soc->ops->hal_rx_fst_get_fse_size = hal_rx_fst_get_fse_size_li;
 	hal_soc->ops->hal_compute_reo_remap_ix2_ix3 =
 					hal_compute_reo_remap_ix2_ix3_6490;
 	hal_soc->ops->hal_rx_msdu_get_reo_destination_indication =

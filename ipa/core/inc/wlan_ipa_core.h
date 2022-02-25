@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -542,6 +543,21 @@ void wlan_ipa_reg_sap_xmit_cb(struct wlan_ipa_priv *ipa_ctx,
 }
 
 /**
+ * wlan_ipa_reg_is_driver_unloading_cb() - Register cb to check if driver
+ * is unloading
+ * @ipa_ctx: IPA context
+ * @cb: callback
+ *
+ * Return: None
+ */
+static inline
+void wlan_ipa_reg_is_driver_unloading_cb(struct wlan_ipa_priv *ipa_ctx,
+					 wlan_ipa_driver_unloading cb)
+{
+	ipa_ctx->driver_is_unloading = cb;
+}
+
+/**
  * wlan_ipa_reg_send_to_nw_cb() - Register cb to send IPA Rx packet to network
  * @ipa_ctx: IPA context
  * @cb: callback
@@ -717,7 +733,7 @@ QDF_STATUS wlan_ipa_suspend(struct wlan_ipa_priv *ipa_ctx);
  */
 QDF_STATUS wlan_ipa_resume(struct wlan_ipa_priv *ipa_ctx);
 
-#ifndef QCA_LL_TX_FLOW_CONTROL_V2
+#if !defined(QCA_LL_TX_FLOW_CONTROL_V2) && !defined(QCA_IPA_LL_TX_FLOW_CONTROL)
 /**
  * wlan_ipa_send_mcc_scc_msg() - Send IPA WLAN_SWITCH_TO_MCC/SCC message
  * @ipa_ctx: IPA context
@@ -754,7 +770,8 @@ static inline void wlan_ipa_mcc_work_handler(void *data)
 QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			     uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
-			     uint8_t *mac_addr, bool is_2g_iface);
+			     uint8_t *mac_addr, bool is_2g_iface,
+			     struct wlan_ipa_priv *ipa_obj);
 
 /**
  * wlan_ipa_uc_smmu_map() - Map / Unmap DMA buffer to IPA UC

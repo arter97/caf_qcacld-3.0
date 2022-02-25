@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -648,15 +649,17 @@ static void utils_dfs_get_max_sup_width(struct wlan_objmgr_pdev *pdev,
 void utils_dfs_get_chan_list(struct wlan_objmgr_pdev *pdev,
 			     void *clist, uint32_t *num_chan)
 {
-	int i = 0, j = 0;
+	uint32_t i = 0, j = 0;
 	enum channel_state state;
 	struct regulatory_channel *cur_chan_list;
 	struct wlan_dfs *dfs;
 	struct dfs_channel *chan_list = (struct dfs_channel *)clist;
 
 	dfs = wlan_pdev_get_dfs_obj(pdev);
-	if (!dfs)
+	if (!dfs) {
+		*num_chan = 0;
 		return;
+	}
 
 	cur_chan_list = qdf_mem_malloc(NUM_CHANNELS *
 			sizeof(struct regulatory_channel));
@@ -723,7 +726,7 @@ static void utils_dfs_get_channel_list(struct wlan_objmgr_pdev *pdev,
 	uint8_t chan_num;
 	uint16_t center_freq;
 	uint16_t flagext;
-	int i, j = 0;
+	uint32_t i, j = 0;
 
 	dfs = wlan_pdev_get_dfs_obj(pdev);
 	if (!dfs) {
@@ -800,7 +803,7 @@ static void utils_dfs_get_channel_list(struct wlan_objmgr_pdev *pdev,
 	uint8_t weight_list[NUM_CHANNELS] = {0};
 	uint32_t len;
 	uint32_t weight_len;
-	int i;
+	uint32_t i;
 	struct wlan_objmgr_psoc *psoc;
 	uint32_t conn_count = 0;
 	enum policy_mgr_con_mode mode;
@@ -1237,15 +1240,6 @@ int utils_get_dfsdomain(struct wlan_objmgr_pdev *pdev)
 	wlan_reg_get_dfs_region(pdev, &dfsdomain);
 
 	return dfsdomain;
-}
-
-uint16_t utils_dfs_get_cur_rd(struct wlan_objmgr_pdev *pdev)
-{
-	struct cur_regdmn_info cur_regdmn;
-
-	wlan_reg_get_curr_regdomain(pdev, &cur_regdmn);
-
-	return cur_regdmn.regdmn_pair_id;
 }
 
 #if defined(WLAN_DFS_PARTIAL_OFFLOAD) && defined(HOST_DFS_SPOOF_TEST)

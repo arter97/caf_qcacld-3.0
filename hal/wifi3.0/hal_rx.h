@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -585,6 +585,9 @@ enum hal_reo_error_code {
  * @ HAL_RXDMA_AMSDU_FRAGMENT    : Rx PCU reported A-MSDU
  *                                 present as well as a fragmented MPDU
  * @ HAL_RXDMA_MULTICAST_ECHO    : RX OLE reported a multicast echo
+ * @ HAL_RXDMA_AMSDU_ADDR_MISMATCH : RX OLE reported AMSDU address mismatch
+ * @ HAL_RXDMA_UNAUTHORIZED_WDS  : RX PCU reported unauthorized wds
+ * @ HAL_RXDMA_GROUPCAST_AMSDU_OR_WDS :RX PCU reported group cast AMSDU or WDS
  * @ HAL_RXDMA_ERR_WAR           : RxDMA WAR dummy errors
  */
 enum hal_rxdma_error_code {
@@ -604,6 +607,9 @@ enum hal_rxdma_error_code {
 	HAL_RXDMA_ERR_FLUSH_REQUEST,
 	HAL_RXDMA_AMSDU_FRAGMENT,
 	HAL_RXDMA_MULTICAST_ECHO,
+	HAL_RXDMA_AMSDU_ADDR_MISMATCH,
+	HAL_RXDMA_UNAUTHORIZED_WDS,
+	HAL_RXDMA_GROUPCAST_AMSDU_OR_WDS,
 	HAL_RXDMA_ERR_WAR = 31,
 	HAL_RXDMA_ERR_MAX
 };
@@ -1153,6 +1159,21 @@ hal_rx_msdu_end_last_msdu_get(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
+ * hal_rx_msdu_cce_match_get: API to get CCE match
+ * from rx_msdu_end TLV
+ * @buf: pointer to the start of RX PKT TLV headers
+ * Return: cce_meta_data
+ */
+static inline bool
+hal_rx_msdu_cce_match_get(hal_soc_handle_t hal_soc_hdl,
+			  uint8_t *buf)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	return hal_soc->ops->hal_rx_msdu_cce_match_get(buf);
+}
+
+/**
  * hal_rx_msdu_cce_metadata_get: API to get CCE metadata
  * from rx_msdu_end TLV
  * @buf: pointer to the start of RX PKT TLV headers
@@ -1220,6 +1241,27 @@ void hal_rx_reo_buf_paddr_get(hal_soc_handle_t hal_soc_hdl,
 					rx_desc,
 					buf_info);
 
+}
+
+/**
+ * hal_rx_wbm_rel_buf_paddr_get: Gets the physical address and
+ * cookie from the WBM release ring element
+ *
+ * @ hal_rx_desc_cookie: Opaque cookie pointer used by HAL to get to
+ * the current descriptor
+ * @ buf_info: structure to return the buffer information
+ * Return: void
+ */
+static inline
+void hal_rx_wbm_rel_buf_paddr_get(hal_soc_handle_t hal_soc_hdl,
+				  hal_ring_desc_t rx_desc,
+				  struct hal_buf_info *buf_info)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (hal_soc->ops->hal_rx_wbm_rel_buf_paddr_get)
+		return hal_soc->ops->hal_rx_wbm_rel_buf_paddr_get(rx_desc,
+								  buf_info);
 }
 
 /**
@@ -2583,7 +2625,7 @@ hal_get_reo_ent_desc_qdesc_addr(hal_soc_handle_t hal_soc_hdl, uint8_t *desc)
 	return NULL;
 }
 
-static inline uint8_t *
+static inline uint64_t
 hal_rx_get_qdesc_addr(hal_soc_handle_t hal_soc_hdl, uint8_t *dst_ring_desc,
 		      uint8_t *buf)
 {
@@ -2592,7 +2634,7 @@ hal_rx_get_qdesc_addr(hal_soc_handle_t hal_soc_hdl, uint8_t *dst_ring_desc,
 	if (hal_soc->ops->hal_rx_get_qdesc_addr)
 		return hal_soc->ops->hal_rx_get_qdesc_addr(dst_ring_desc, buf);
 
-	return NULL;
+	return 0;
 }
 
 static inline void
@@ -2850,4 +2892,64 @@ hal_rx_mpdu_info_ampdu_flag_get(hal_soc_handle_t hal_soc_hdl, uint8_t *buf)
 	return hal_soc->ops->hal_rx_mpdu_info_ampdu_flag_get(buf);
 }
 
+#ifdef REO_SHARED_QREF_TABLE_EN
+/**
+ * hal_reo_shared_qaddr_write(): Write REo tid queue addr
+ * LUT shared by SW and HW at the index given by peer id
+ * and tid.
+ *
+ * @hal_soc: hal soc pointer
+ * @reo_qref_addr: pointer to index pointed to be peer_id
+ * and tid
+ * @tid: tid queue number
+ * @hw_qdesc_paddr: reo queue addr
+ */
+static inline void
+hal_reo_shared_qaddr_write(hal_soc_handle_t hal_soc_hdl,
+			   uint16_t peer_id,
+			   int tid,
+			   qdf_dma_addr_t hw_qdesc_paddr)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (hal_soc->ops->hal_reo_shared_qaddr_write)
+		return hal_soc->ops->hal_reo_shared_qaddr_write(hal_soc_hdl,
+				peer_id, tid, hw_qdesc_paddr);
+}
+
+/**
+ * hal_reo_shared_qaddr_init(): Initialize reo qref LUT
+ * @hal_soc: Hal soc pointer
+ *
+ * Write MLO and Non MLO table start addr to HW reg
+ *
+ * Return: void
+ */
+static inline void
+hal_reo_shared_qaddr_init(hal_soc_handle_t hal_soc_hdl)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (hal_soc->ops->hal_reo_shared_qaddr_init)
+		return hal_soc->ops->hal_reo_shared_qaddr_init(hal_soc_hdl);
+}
+
+#else
+static inline void
+hal_reo_shared_qaddr_write(hal_soc_handle_t hal_soc_hdl,
+			   uint16_t peer_id,
+			   int tid,
+			   qdf_dma_addr_t hw_qdesc_paddr) {}
+static inline void
+hal_reo_shared_qaddr_init(hal_soc_handle_t hal_soc_hdl) {}
+
+#endif /* REO_SHARED_QREF_TABLE_EN */
+
+static inline uint8_t
+hal_reo_shared_qaddr_is_enable(hal_soc_handle_t hal_soc_hdl)
+{
+	struct hal_soc *hal = (struct hal_soc *)hal_soc_hdl;
+
+	return hal->reo_qref.reo_qref_table_en;
+}
 #endif /* _HAL_RX_H */

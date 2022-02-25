@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -123,6 +123,26 @@ bool wlan_reg_is_range_overlap_5g(qdf_freq_t low_freq, qdf_freq_t high_freq);
 bool wlan_reg_is_freq_indoor(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
 
 /**
+ * wlan_reg_get_min_chwidth() - Return min chanwidth supported by freq.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency.
+ *
+ * Return: Min chwidth supported by freq as per regulatory DB.
+ */
+uint16_t wlan_reg_get_min_chwidth(struct wlan_objmgr_pdev *pdev,
+				  qdf_freq_t freq);
+
+/**
+ * wlan_reg_get_max_chwidth() - Return max chanwidth supported by freq.
+ * @pdev: Pointer to pdev.
+ * @freq: Channel frequency.
+ *
+ * Return: Max chwidth supported by freq as per regulatory DB.
+ */
+uint16_t wlan_reg_get_max_chwidth(struct wlan_objmgr_pdev *pdev,
+				  qdf_freq_t freq);
+
+/**
  * wlan_reg_get_next_lower_bandwidth() - Get next lower bandwdith
  * @ch_width: channel bandwdith
  *
@@ -192,6 +212,30 @@ static inline bool wlan_reg_is_range_overlap_6g(qdf_freq_t low_freq,
 #endif
 
 /**
+ * wlan_reg_get_6g_ap_master_chan_list() - provide  the appropriate ap master
+ * channel list
+ * @pdev: pdev pointer
+ * @ap_pwr_type: The ap power type (LPI/VLP/SP)
+ * @chan_list: channel list pointer
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_reg_get_6g_ap_master_chan_list(
+					struct wlan_objmgr_pdev *pdev,
+					enum reg_6g_ap_type ap_pwr_type,
+					struct regulatory_channel *chan_list);
+
+#ifdef CONFIG_REG_CLIENT
+/**
+ * wlan_reg_get_power_string () - wlan reg get power type string
+ * @power_type: power type enum
+ *
+ * Return: power type string
+ */
+const char *wlan_reg_get_power_string(enum reg_6g_ap_type power_type);
+#endif
+
+/**
  * wlan_reg_is_6ghz_psc_chan_freq() - Check if the given 6GHz channel frequency
  * is preferred scanning channel frequency.
  * @freq: Channel frequency
@@ -252,6 +296,21 @@ wlan_reg_get_max_txpower_for_6g_tpe(struct wlan_objmgr_pdev *pdev,
 				    bool is_psd,
 				    uint8_t *tx_power);
 
+/**
+ * wlan_reg_get_superchan_entry() - Get the address of the super channel list
+ * entry for a given input channel index.
+ *
+ * @pdev: pdev ptr
+ * @chan_enum: Channel enum
+ * @p_sup_chan_entry: Pointer to address of *p_sup_chan_entry
+ *
+ * Return: QDF_STATUS_SUCCESS if super channel entry is available for the input
+ * chan_enum else QDF_STATUS_E_FAILURE
+ */
+QDF_STATUS wlan_reg_get_superchan_entry(
+		struct wlan_objmgr_pdev *pdev,
+		enum channel_enum chan_enum,
+		const struct super_chan_info **p_sup_chan_entry);
 #else
 
 #define WLAN_REG_IS_6GHZ_CHAN_FREQ(freq) (false)
@@ -306,6 +365,24 @@ wlan_reg_get_max_txpower_for_6g_tpe(struct wlan_objmgr_pdev *pdev,
 				    uint8_t *tx_power)
 {
 	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
+wlan_reg_get_6g_ap_master_chan_list(struct wlan_objmgr_pdev *pdev,
+				    enum reg_6g_ap_type ap_pwr_type,
+				    struct regulatory_channel *chan_list)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+QDF_STATUS wlan_reg_get_superchan_entry(
+		struct wlan_objmgr_pdev *pdev,
+		enum channel_enum chan_enum,
+		const struct super_chan_info **p_sup_chan_entry)
+{
+	*p_sup_chan_entry = NULL;
+	return QDF_STATUS_E_NOSUPPORT;
 }
 #endif /* CONFIG_BAND_6GHZ */
 
@@ -410,25 +487,31 @@ QDF_STATUS wlan_reg_read_default_country(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_reg_get_ctry_idx_max_bw_from_country_code() - Get the max 5G
  * bandwidth from country code
- * @cc : Country Code
- * @max_bw_5g : Max 5G bandwidth supported by the country
+ * @pdev: pdev pointer
+ * @cc: Country Code
+ * @max_bw_5g: Max 5G bandwidth supported by the country
  *
- * Return : QDF_STATUS
+ * Return: QDF_STATUS
  */
 
-QDF_STATUS wlan_reg_get_max_5g_bw_from_country_code(uint16_t cc,
-						    uint16_t *max_bw_5g);
+QDF_STATUS wlan_reg_get_max_5g_bw_from_country_code(
+					struct wlan_objmgr_pdev *pdev,
+					uint16_t cc,
+					uint16_t *max_bw_5g);
 
 /**
  * wlan_reg_get_max_5g_bw_from_regdomain() - Get the max 5G bandwidth
  * supported by the regdomain
- * @orig_regdmn : Regdomain Pair value
- * @max_bw_5g : Max 5G bandwidth supported by the country
+ * @pdev: pdev pointer
+ * @orig_regdmn: Regdomain Pair value
+ * @max_bw_5g: Max 5G bandwidth supported by the country
  *
- * Return : QDF_STATUS
+ * Return: QDF_STATUS
  */
-QDF_STATUS wlan_reg_get_max_5g_bw_from_regdomain(uint16_t regdmn,
-						 uint16_t *max_bw_5g);
+QDF_STATUS wlan_reg_get_max_5g_bw_from_regdomain(
+					struct wlan_objmgr_pdev *pdev,
+					uint16_t regdmn,
+					uint16_t *max_bw_5g);
 
 /**
  * wlan_reg_get_fcc_constraint() - Check FCC constraint on given frequency
@@ -458,14 +541,15 @@ QDF_STATUS wlan_reg_read_current_country(struct wlan_objmgr_psoc *psoc,
  * @sta_ctry: ptr to sta programmed country
  * @pwr_type_6g: ptr to 6G power type
  * @ctry_code_match: Check for country IE and sta country code match
- *
+ * @ap_pwr_type: AP's power type for 6G as advertised in HE ops IE
  * Return: QDF_STATUS
  */
 QDF_STATUS
 wlan_reg_get_6g_power_type_for_ctry(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *ap_ctry, uint8_t *sta_ctry,
 				    enum reg_6g_ap_type *pwr_type_6g,
-				    bool *ctry_code_match);
+				    bool *ctry_code_match,
+				    enum reg_6g_ap_type ap_pwr_type);
 #endif
 
 #ifdef CONFIG_CHAN_FREQ_API
@@ -519,6 +603,18 @@ QDF_STATUS wlan_reg_get_dfs_region(struct wlan_objmgr_pdev *pdev,
 			     enum dfs_reg *dfs_reg);
 
 /**
+ * wlan_reg_is_chan_disabled_and_not_nol() - In the regulatory channel list, a
+ * channel may be disabled by the regulatory/device or by radar. Radar is
+ * temporary and a radar disabled channel does not mean that the channel is
+ * permanently disabled. The API checks if the channel is disabled, but not due
+ * to radar.
+ * @chan - Regulatory channel object
+ *
+ * Return - True,  the channel is disabled, but not due to radar, else false.
+ */
+bool wlan_reg_is_chan_disabled_and_not_nol(struct regulatory_channel *chan);
+
+/**
  * wlan_reg_get_current_chan_list() - provide the pdev current channel list
  * @pdev: pdev pointer
  * @chan_list: channel list pointer
@@ -527,6 +623,59 @@ QDF_STATUS wlan_reg_get_dfs_region(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS wlan_reg_get_current_chan_list(struct wlan_objmgr_pdev *pdev,
 		struct regulatory_channel *chan_list);
+
+/**
+ * wlan_reg_is_freq_enabled() - Checks if the given frequency is enabled on the
+ * given power mode or not. If the frequency is not a 6G frequency then the
+ * input power mode is ignored and only current channel list is searched.
+ *
+ * @pdev: pdev pointer.
+ * @freq: input frequency.
+ * @in_6g_pwr_mode: Power mode on which the freq is enabled or not is to be
+ * checked.
+ *
+ * Return: True if the frequency is present in the given power mode channel
+ * list.
+ */
+bool wlan_reg_is_freq_enabled(struct wlan_objmgr_pdev *pdev,
+			      qdf_freq_t freq,
+			      enum supported_6g_pwr_types in_6g_pwr_mode);
+
+/**
+ * wlan_reg_is_freq_idx_enabled() - Checks if the given frequency index is
+ * enabled on the given power mode or not. If the frequency index is not a 6G
+ * frequency then the input power mode is ignored and only current channel list
+ * is searched.
+ *
+ * @pdev: pdev pointer.
+ * @freq_idx: input frequency index.
+ * @in_6g_pwr_mode: Power mode on which the frequency index is enabled or not
+ * is to be checked.
+ *
+ * Return: True if the frequency index is present in the given power mode
+ * channel list.
+ */
+bool wlan_reg_is_freq_idx_enabled(struct wlan_objmgr_pdev *pdev,
+				  enum channel_enum freq_idx,
+				  enum supported_6g_pwr_types in_6g_pwr_mode);
+
+/**
+ * wlan_reg_get_pwrmode_chan_list() - Get the modified channel list. A modified
+ * current channel list consists of 2G and 5G portions of the current channel
+ * list and the 6G portion of the current channel list is derived from the input
+ * 6g power type.
+ * @pdev: Pointer to pdev
+ * @chan_list: Pointer to buffer which stores list of regulatory_channels.
+ * @in_6g_pwr_mode: 6GHz power type
+ *
+ * Return:
+ * QDF_STATUS_SUCCESS: Success
+ * QDF_STATUS_E_INVAL: Failed to get channel list
+ */
+QDF_STATUS wlan_reg_get_pwrmode_chan_list(struct wlan_objmgr_pdev *pdev,
+					  struct regulatory_channel *chan_list,
+					  enum supported_6g_pwr_types
+					  in_6g_pwr_mode);
 
 #ifdef CONFIG_REG_CLIENT
 /**
@@ -543,19 +692,6 @@ QDF_STATUS wlan_reg_get_secondary_current_chan_list(
 #endif
 
 #if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
-/**
- * wlan_reg_get_6g_ap_master_chan_list() - provide  the appropriate ap master
- * channel list
- * @pdev: pdev pointer
- * @ap_pwr_type: The ap power type (LPI/VLP/SP)
- * @chan_list: channel list pointer
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_reg_get_6g_ap_master_chan_list(struct wlan_objmgr_pdev *pdev,
-					       enum reg_6g_ap_type ap_pwr_type,
-					       struct regulatory_channel *chan_list);
-
 /**
  * wlan_reg_get_6g_afc_chan_list() - provide the pdev afc channel list
  * @pdev: pdev pointer
@@ -1007,6 +1143,7 @@ wlan_reg_get_tx_ops(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS wlan_reg_get_curr_regdomain(struct wlan_objmgr_pdev *pdev,
 		struct cur_regdmn_info *cur_regdmn);
 
+#ifdef WLAN_REG_PARTIAL_OFFLOAD
 /**
  * wlan_reg_is_regdmn_en302502_applicable() - Find if ETSI EN302_502 radar
  * pattern is applicable in the current regulatory domain.
@@ -1017,6 +1154,7 @@ QDF_STATUS wlan_reg_get_curr_regdomain(struct wlan_objmgr_pdev *pdev,
  * False: otherwise.
  */
 bool wlan_reg_is_regdmn_en302502_applicable(struct wlan_objmgr_pdev *pdev);
+#endif
 
 /**
  * wlan_reg_modify_pdev_chan_range() - Compute current channel list for the
@@ -1046,7 +1184,7 @@ QDF_STATUS wlan_reg_get_phybitmap(struct wlan_objmgr_pdev *pdev,
  * Return : QDF_STATUS
  */
 QDF_STATUS wlan_reg_update_pdev_wireless_modes(struct wlan_objmgr_pdev *pdev,
-					       uint32_t wireless_modes);
+					       uint64_t wireless_modes);
 /**
  * wlan_reg_disable_chan_coex() - Disable Coexisting channels based on the input
  * bitmask
@@ -1132,16 +1270,6 @@ void wlan_reg_update_nol_history_ch_for_freq(struct wlan_objmgr_pdev *pdev,
 					     uint16_t *ch_list,
 					     uint8_t num_ch,
 					     bool nol_history_ch);
-/**
- * wlan_reg_is_frequency_valid_5g_sbs() Check if the given frequency is 5G SBS.
- * @curfreq: current channel center frequency
- * @newfreq:new channel center frequency
- *
- * Return: true if the given frequency is a valid 5G SBS
- */
-#define WLAN_REG_IS_FREQUENCY_VALID_5G_SBS(curfreq, newfreq) \
-	wlan_reg_is_frequency_valid_5g_sbs(curfreq, newfreq)
-bool wlan_reg_is_frequency_valid_5g_sbs(qdf_freq_t curfreq, qdf_freq_t newfreq);
 
 /**
  * wlan_reg_chan_has_dfs_attribute_for_freq() - check channel has dfs
@@ -1238,6 +1366,31 @@ void wlan_reg_fill_channel_list(struct wlan_objmgr_pdev *pdev,
 				enum phy_ch_width ch_width,
 				qdf_freq_t band_center_320,
 				struct reg_channel_list *chan_list);
+
+/**
+ * wlan_reg_is_punc_bitmap_valid() - is puncture bitmap valid or not
+ * @bw: Input channel width.
+ * @puncture_bitmap Input puncture bitmap.
+ *
+ * Return: true if given puncture bitmap is valid
+ */
+bool wlan_reg_is_punc_bitmap_valid(enum phy_ch_width bw,
+				   uint16_t puncture_bitmap);
+
+/**
+ * wlan_reg_set_create_punc_bitmap() - set is_create_punc_bitmap of ch_params
+ * @ch_params: ch_params to set
+ * @is_create_punc_bitmap: is create punc bitmap
+ *
+ * Return: NULL
+ */
+void wlan_reg_set_create_punc_bitmap(struct ch_params *ch_params,
+				     bool is_create_punc_bitmap);
+#else
+static inline void wlan_reg_set_create_punc_bitmap(struct ch_params *ch_params,
+						   bool is_create_punc_bitmap)
+{
+}
 #endif
 
 /**

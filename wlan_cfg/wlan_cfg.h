@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,6 +90,7 @@
 /* Max number of chips that can participate in MLO */
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 #define WLAN_MAX_MLO_CHIPS 3
+#define WLAN_MAX_MLO_LINKS_PER_SOC 2
 #else
 #define WLAN_MAX_MLO_CHIPS 1
 #endif
@@ -131,6 +132,7 @@ struct wlan_srng_cfg {
  *			allocation request for this device
  * @per_pdev_tx_ring: 0: TCL ring is not mapped per radio
  *		       1: Each TCL ring is mapped to one radio/pdev
+ * @num_tx_comp_rings: Number of Tx comp rings supported by device
  * @num_tcl_data_rings: Number of TCL Data rings supported by device
  * @per_pdev_rx_ring: 0: REO ring is not mapped per radio
  *		       1: Each REO ring is mapped to one radio/pdev
@@ -161,6 +163,8 @@ struct wlan_srng_cfg {
  *				mapped to each NAPI/INTR context
  * @int_tx_ring_near_full_irq_mask: Bitmap of Tx completion ring near full
  *				interrupt mapped to each NAPI/INTR context
+ * @int_host2txmon_ring_mask: Bitmap of Tx monitor source ring interrupt
+ *				mapped to each NAPI/INTR context
  * @int_ce_ring_mask: Bitmap of CE interrupts mapped to each NAPI/Intr context
  * @lro_enabled: enable/disable lro feature
  * @rx_hash: Enable hash based steering of rx packets
@@ -246,12 +250,15 @@ struct wlan_srng_cfg {
  * @lmac_peer_id_msb: value used for hash based routing
  * @vdev_stats_hw_offload_config: HW vdev stats config
  * @vdev_stats_hw_offload_timer: HW vdev stats timer duration
+ * @txmon_hw_support: TxMON HW support
+ * @num_rxdma_status_rings_per_pdev: Num RXDMA status rings
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
 	int max_clients;
 	int max_alloc_size;
 	int per_pdev_tx_ring;
+	int num_tx_comp_rings;
 	int num_tcl_data_rings;
 	int num_nss_tcl_data_rings;
 	int per_pdev_rx_ring;
@@ -290,6 +297,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t int_rx_ring_near_full_irq_1_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t int_rx_ring_near_full_irq_2_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t int_tx_ring_near_full_irq_mask[WLAN_CFG_INT_NUM_CONTEXTS];
+	uint8_t int_host2txmon_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	int hw_macid[MAX_PDEV_CNT];
 	int hw_macid_pdev_id_map[MAX_NUM_LMAC_HW];
 	int base_hw_macid;
@@ -402,6 +410,15 @@ struct wlan_cfg_dp_soc_ctxt {
 #ifdef QCA_VDEV_STATS_HW_OFFLOAD_SUPPORT
 	bool vdev_stats_hw_offload_config;
 	int vdev_stats_hw_offload_timer;
+#endif
+	uint8_t num_rxdma_dst_rings_per_pdev;
+	bool txmon_hw_support;
+	uint8_t num_rxdma_status_rings_per_pdev;
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+	uint32_t tx_capt_max_mem_allowed;
+#endif
+#ifdef CONFIG_SAWF
+	bool sawf_enabled;
 #endif
 };
 
@@ -904,6 +921,14 @@ uint32_t wlan_cfg_max_alloc_size(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
  * Return: per_pdev_tx_ring
  */
 int wlan_cfg_per_pdev_tx_ring(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
+
+/*
+ * wlan_cfg_num_tx_comp_rings() - Number of Tx comp rings (HOST mode)
+ * @wlan_cfg_ctx
+ *
+ * Return: num_tx_comp_rings
+ */
+int wlan_cfg_num_tx_comp_rings(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
 
 /*
  * wlan_cfg_num_tcl_data_rings() - Number of TCL Data rings (HOST mode)
@@ -1873,6 +1898,30 @@ wlan_cfg_get_dp_soc_ppe2tcl_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
  */
 int
 wlan_cfg_get_dp_soc_ppe_release_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
+#else
+static inline bool
+wlan_cfg_get_dp_soc_is_ppe_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return false;
+}
+
+static inline int
+wlan_cfg_get_dp_soc_reo2ppe_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+
+static inline int
+wlan_cfg_get_dp_soc_ppe2tcl_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+
+static inline int
+wlan_cfg_get_dp_soc_ppe_release_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
 #endif
 
 /**
@@ -1955,6 +2004,18 @@ wlan_cfg_set_rx_rel_ring_id(struct wlan_cfg_dp_soc_ctxt *cfg,
 			    uint8_t wbm2sw_ring_id);
 
 /**
+ * wlan_cfg_set_vdev_stats_hw_offload_config() - Set hw vdev stats offload
+ *						 config
+ * @cfg: config context
+ * @value: value to be set
+ *
+ * Return: none
+ */
+void
+wlan_cfg_set_vdev_stats_hw_offload_config(struct wlan_cfg_dp_soc_ctxt *cfg,
+					  bool value);
+
+/**
  * wlan_cfg_get_vdev_stats_hw_offload_config() - Get hw vdev stats offload
  *						 config
  * @cfg: config context
@@ -1971,6 +2032,25 @@ wlan_cfg_get_vdev_stats_hw_offload_config(struct wlan_cfg_dp_soc_ctxt *cfg);
  * Return: value of hw vdev stats timer duration
  */
 int wlan_cfg_get_vdev_stats_hw_offload_timer(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_set_sawf_config() - Set SAWF config enable/disable
+ * @cfg: config context
+ * @value: value to be set
+ *
+ * Return: none
+ */
+void
+wlan_cfg_set_sawf_config(struct wlan_cfg_dp_soc_ctxt *cfg, bool value);
+
+/**
+ * wlan_cfg_get_sawf_config() - Get SAWF config enable/disable
+ * @cfg: config context
+ *
+ * Return: true or false
+ */
+bool
+wlan_cfg_get_sawf_config(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 /**
@@ -2005,5 +2085,58 @@ wlan_cfg_mlo_default_rx_ring_get_by_chip_id(struct wlan_cfg_dp_soc_ctxt *cfg,
 uint8_t
 wlan_cfg_mlo_lmac_peer_id_msb_get_by_chip_id(struct wlan_cfg_dp_soc_ctxt *cfg,
 					     uint8_t chip_id);
+
 #endif
+
+/*
+ * wlan_cfg_set_host2txmon_ring_mask() - Set host2txmon ring
+ *                               interrupt mask mapped to an interrupt context
+ * @wlan_cfg_ctx - Configuration Handle
+ *
+ * Return: None
+ */
+void wlan_cfg_set_host2txmon_ring_mask(struct wlan_cfg_dp_soc_ctxt *cfg,
+				       int context, int mask);
+/**
+ * wlan_cfg_get_host2txmon_ring_mask() - Return host2txmon ring
+ *                               interrupt mask mapped to an interrupt context
+ * @wlan_cfg_ctx - Configuration Handle
+ * @context - Numerical ID identifying the Interrupt/NAPI context
+ *
+ * Return: int_host2txmon_ring_mask[context]
+ */
+int wlan_cfg_get_host2txmon_ring_mask(struct wlan_cfg_dp_soc_ctxt *cfg,
+				      int context);
+/**
+ * wlan_cfg_set_txmon_hw_support () - Set txmon hw support
+ * @cfg:  Configuration Handle
+ * @txmon_hw_support: value to set
+ *
+ * Return: None
+ */
+void wlan_cfg_set_txmon_hw_support(struct wlan_cfg_dp_soc_ctxt *cfg,
+				   bool txmon_hw_support);
+
+/**
+ * wlan_cfg_get_txmon_hw_support () - Get txmon hw support
+ * @cfg:  Configuration Handle
+ *
+ * Return: txmon_hw_support
+ */
+bool wlan_cfg_get_txmon_hw_support(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+#ifdef WLAN_TX_PKT_CAPTURE_ENH
+/*
+ * wlan_cfg_get_tx_capt_max_mem - Get max memory allowed for TX capture feature
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: user given size in bytes
+ */
+static inline int
+wlan_cfg_get_tx_capt_max_mem(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->tx_capt_max_mem_allowed;
+}
+#endif /* WLAN_TX_PKT_CAPTURE_ENH */
+
 #endif /*__WLAN_CFG_H*/
