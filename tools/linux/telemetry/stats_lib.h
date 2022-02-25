@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -20,11 +21,112 @@
 #define _STATS_LIB_H_
 
 /* Network Interface name length */
-#define IFNAME_LEN                IFNAMSIZ
-#define MAX_RADIO_NUM             3
-#define MAX_VAP_NUM               (17 * MAX_RADIO_NUM)
+#define IFNAME_LEN                   IFNAMSIZ
+#define MAX_RADIO_NUM                3
+#define MAX_VAP_NUM                  (17 * MAX_RADIO_NUM)
 /* This path is for network interfaces */
-#define PATH_SYSNET_DEV           "/sys/class/net/"
+#define PATH_SYSNET_DEV              "/sys/class/net/"
+#define STATS_IF_MCS_VALID           1
+#define STATS_IF_MCS_INVALID         0
+#define STATS_IF_MAX_MCS_STRING_LEN  34
+
+#ifdef WLAN_FEATURE_11BE
+enum stats_if_ru_index {
+	STATS_IF_RU_26_INDEX = 0,
+	STATS_IF_RU_52_INDEX,
+	STATS_IF_RU_52_26_INDEX,
+	STATS_IF_RU_106_INDEX,
+	STATS_IF_RU_106_26_INDEX,
+	STATS_IF_RU_242_INDEX,
+	STATS_IF_RU_484_INDEX,
+	STATS_IF_RU_484_242_INDEX,
+	STATS_IF_RU_996_INDEX,
+	STATS_IF_RU_996_484_INDEX,
+	STATS_IF_RU_996_484_242_INDEX,
+	STATS_IF_RU_2X996_INDEX,
+	STATS_IF_RU_2X996_484_INDEX,
+	STATS_IF_RU_3X996_INDEX,
+	STATS_IF_RU_3X996_484_INDEX,
+	STATS_IF_RU_4X996_INDEX,
+	STATS_IF_RU_INDEX_MAX,
+};
+#else
+enum stats_if_ru_index {
+	STATS_IF_RU_26_INDEX = 0,
+	STATS_IF_RU_52_INDEX,
+	STATS_IF_RU_106_INDEX,
+	STATS_IF_RU_242_INDEX,
+	STATS_IF_RU_484_INDEX,
+	STATS_IF_RU_996_INDEX,
+	STATS_IF_RU_INDEX_MAX,
+};
+#endif
+
+enum stats_if_proto_subtype {
+	STATS_IF_PROTO_INVALID,
+	STATS_IF_PROTO_EAPOL_M1,
+	STATS_IF_PROTO_EAPOL_M2,
+	STATS_IF_PROTO_EAPOL_M3,
+	STATS_IF_PROTO_EAPOL_M4,
+	STATS_IF_PROTO_DHCP_DISCOVER,
+	STATS_IF_PROTO_DHCP_REQUEST,
+	STATS_IF_PROTO_DHCP_OFFER,
+	STATS_IF_PROTO_DHCP_ACK,
+	STATS_IF_PROTO_DHCP_NACK,
+	STATS_IF_PROTO_DHCP_RELEASE,
+	STATS_IF_PROTO_DHCP_INFORM,
+	STATS_IF_PROTO_DHCP_DECLINE,
+	STATS_IF_PROTO_ARP_REQ,
+	STATS_IF_PROTO_ARP_RES,
+	STATS_IF_PROTO_ICMP_REQ,
+	STATS_IF_PROTO_ICMP_RES,
+	STATS_IF_PROTO_ICMPV6_REQ,
+	STATS_IF_PROTO_ICMPV6_RES,
+	STATS_IF_PROTO_ICMPV6_RS,
+	STATS_IF_PROTO_ICMPV6_RA,
+	STATS_IF_PROTO_ICMPV6_NS,
+	STATS_IF_PROTO_ICMPV6_NA,
+	STATS_IF_PROTO_IPV4_UDP,
+	STATS_IF_PROTO_IPV4_TCP,
+	STATS_IF_PROTO_IPV6_UDP,
+	STATS_IF_PROTO_IPV6_TCP,
+	STATS_IF_PROTO_MGMT_ASSOC,
+	STATS_IF_PROTO_MGMT_DISASSOC,
+	STATS_IF_PROTO_MGMT_AUTH,
+	STATS_IF_PROTO_MGMT_DEAUTH,
+	STATS_IF_ROAM_SYNCH,
+	STATS_IF_ROAM_COMPLETE,
+	STATS_IF_ROAM_EVENTID,
+	STATS_IF_PROTO_DNS_QUERY,
+	STATS_IF_PROTO_DNS_RES,
+	STATS_IF_PROTO_SUBTYPE_MAX
+};
+
+struct stats_if_ru_debug {
+	char *ru_type;
+};
+
+enum stats_if_delay_bucket_index {
+	STATS_IF_DELAY_BUCKET_0,
+	STATS_IF_DELAY_BUCKET_1,
+	STATS_IF_DELAY_BUCKET_2,
+	STATS_IF_DELAY_BUCKET_3,
+	STATS_IF_DELAY_BUCKET_4,
+	STATS_IF_DELAY_BUCKET_5,
+	STATS_IF_DELAY_BUCKET_6,
+	STATS_IF_DELAY_BUCKET_7,
+	STATS_IF_DELAY_BUCKET_8,
+	STATS_IF_DELAY_BUCKET_9,
+	STATS_IF_DELAY_BUCKET_10,
+	STATS_IF_DELAY_BUCKET_11,
+	STATS_IF_DELAY_BUCKET_12,
+	STATS_IF_DELAY_BUCKET_MAX,
+};
+
+struct stats_if_rate_debug {
+	char mcs_type[STATS_IF_MAX_MCS_STRING_LEN];
+	uint8_t valid;
+};
 
 /**
  * struct interface_list: Structure to hold interfaces for Driver Communication
@@ -38,18 +140,6 @@ struct interface_list {
 	u_int8_t v_count;
 	char *r_names[MAX_RADIO_NUM];
 	char *v_names[MAX_VAP_NUM];
-};
-
-/**
- * struct stats_list_manager: Structure to hold object list node pointers
- * @next:  Points to next node in same list
- * @parent:  Points to parent node from parent list
- * @child_root:  Points to child head node of child list
- */
-struct stats_list_manager {
-	void *next;
-	void *parent;
-	void *child_root;
 };
 
 /* Basic peer data stats holder */
@@ -110,6 +200,8 @@ struct advance_peer_data {
 	struct advance_peer_data_link *link;
 	struct advance_peer_data_rate *rate;
 	struct advance_peer_data_nawds *nawds;
+	struct advance_peer_data_delay *delay;
+	struct advance_peer_data_jitter *jitter;
 };
 
 /* Advance peer control stats holder */
@@ -165,126 +257,103 @@ struct advance_psoc_data {
 };
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
-/**
- * struct stats_sta: Declares structure to hold Sta Stats
- * @mgr:  List manager for Sta list
- * @u_basic:  Union of Basic Data and Control stats for Sta
- * @u_advance:  Union of Advance Data and Control stats for Sta
- * @mac_addr:  Sta MAC Address reported from Driver
- */
-struct stats_sta {
-	struct stats_list_manager mgr;
-	union {
-		struct basic_peer_data data;
-		struct basic_peer_ctrl ctrl;
-	} u_basic;
-#if WLAN_ADVANCE_TELEMETRY
-	union {
-		struct advance_peer_data data;
-		struct advance_peer_ctrl ctrl;
-	} u_advance;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-	u_int8_t mac_addr[ETH_ALEN];
+#if WLAN_DEBUG_TELEMETRY
+/* Debug peer data stats holder */
+struct debug_peer_data {
+	struct debug_peer_data_tx *tx;
+	struct debug_peer_data_rx *rx;
+	struct debug_peer_data_link *link;
+	struct debug_peer_data_rate *rate;
+	struct debug_peer_data_txcap *txcap;
 };
 
-/**
- * struct stats_vap: Declares structure to hold Vap Stats
- * @mgr:  List manager for Vap list
- * @u_basic:  Union of Basic Data and Control stats for Vap
- * @u_advance:  Union of Advance Data and Control stats for Vap
- * @recursive:  Recursive flag
- * @id:  ID of Vap maintained internally to link corresponding child objects
- * @vap_name: Vap name reported from Driver
- */
-struct stats_vap {
-	struct stats_list_manager mgr;
-	union {
-		struct basic_vdev_data data;
-		struct basic_vdev_ctrl ctrl;
-	} u_basic;
-#if WLAN_ADVANCE_TELEMETRY
-	union {
-		struct advance_vdev_data data;
-		struct advance_vdev_ctrl ctrl;
-	} u_advance;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-	bool recursive;
-	u_int8_t id;
-	char vap_name[IFNAME_LEN];
+/* Debug peer control stats holder */
+struct debug_peer_ctrl {
+	struct debug_peer_ctrl_tx *tx;
+	struct debug_peer_ctrl_rx *rx;
+	struct debug_peer_ctrl_link *link;
+	struct debug_peer_ctrl_rate *rate;
 };
 
-/**
- * struct stats_radio: Declares structure to hold Radio Stats
- * @mgr:  List manager for Radio list
- * @u_basic:  Union of Basic Data and Control stats for Radio
- * @u_advance:  Union of Advance Data and Control stats for Radio
- * @recursive:  Recursive flag
- * @id:  ID of Radio maintained internally to link corresponding child objects
- * @radio_name: Radio Name based on the id reported from Driver
- */
-struct stats_radio {
-	struct stats_list_manager mgr;
-	union {
-		struct basic_pdev_data data;
-		struct basic_pdev_ctrl ctrl;
-	} u_basic;
-#if WLAN_ADVANCE_TELEMETRY
-	union {
-		struct advance_pdev_data data;
-		struct advance_pdev_ctrl ctrl;
-	} u_advance;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-	bool recursive;
-	u_int8_t id;
-	char radio_name[IFNAME_LEN];
+/* Debug vdev data stats holder */
+struct debug_vdev_data {
+	struct debug_vdev_data_tx *tx;
+	struct debug_vdev_data_rx *rx;
+	struct debug_vdev_data_me *me;
+	struct debug_vdev_data_raw *raw;
+	struct debug_vdev_data_tso *tso;
 };
 
+/* Debug vdev control stats holder */
+struct debug_vdev_ctrl {
+	struct debug_vdev_ctrl_tx *tx;
+	struct debug_vdev_ctrl_rx *rx;
+	struct debug_vdev_ctrl_wmi *wmi;
+};
+
+/* Debug pdev data stats holder */
+struct debug_pdev_data {
+	struct debug_pdev_data_tx *tx;
+	struct debug_pdev_data_rx *rx;
+	struct debug_pdev_data_me *me;
+	struct debug_pdev_data_raw *raw;
+	struct debug_pdev_data_tso *tso;
+	struct debug_pdev_data_cfr *cfr;
+	struct debug_pdev_data_htt *htt;
+	struct debug_pdev_data_wdi *wdi;
+	struct debug_pdev_data_mesh *mesh;
+	struct debug_pdev_data_txcap *txcap;
+	struct debug_pdev_data_monitor *monitor;
+};
+
+/* Debug pdev control stats holder */
+struct debug_pdev_ctrl {
+	struct debug_pdev_ctrl_tx *tx;
+	struct debug_pdev_ctrl_rx *rx;
+	struct debug_pdev_ctrl_wmi *wmi;
+	struct debug_pdev_ctrl_link *link;
+};
+
+/* Debug psoc data stats holder */
+struct debug_psoc_data {
+	struct debug_psoc_data_tx *tx;
+	struct debug_psoc_data_rx *rx;
+	struct debug_psoc_data_ast *ast;
+};
+#endif /* WLAN_DEBUG_TELEMETRY */
+
 /**
- * struct stats_ap: Declares structure to hold AP stats
- * @mgr:  List manager for AP list
- * @u:  Union of Basic and Advance stats for AP
- * @b_data:  Basic stats holder
- * @a_data:  Advance Stats holder
- * @recursive:  Recursive flag
- * @id:  ID of SoC maintained internally to link corresponding child objects
- * @ap_name:  SoC name based on the id reported from Driver
+ * struct stats_obj: Declares structure to hold Stats
+ * @lvl: Stats level Basic/Advance/Debug
+ * @obj_type: Stats object STA/VAP/RADIO/AP
+ * @type: Stats type data or control
+ * @pif_name: Parent interface name
+ * @u_id.mac_addr: MAC address for STA object
+ * @u_id.if_name: Interface name for VAP/RADIO/AP objects
+ * @stats: Stats based on above meta information
+ * @next: Next stats_obj
  */
-struct stats_ap {
-	struct stats_list_manager mgr;
+struct stats_obj {
+	enum stats_level_e lvl;
+	enum stats_object_e obj_type;
+	enum stats_type_e type;
+	char pif_name[IFNAME_LEN];
 	union {
-		struct basic_psoc_data b_data;
-#if WLAN_ADVANCE_TELEMETRY
-		struct advance_psoc_data a_data;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-	} u;
-	bool recursive;
-	u_int8_t id;
-	char ap_name[IFNAME_LEN];
+		u_int8_t mac_addr[ETH_ALEN];
+		char if_name[IFNAME_LEN];
+	} u_id;
+	void *stats;
+	struct stats_obj *next;
 };
 
 /**
  * struct reply_buffer: Defines structure to hold the driver reply
- * @root_obj:  The User requested Stats object
- * @vap_count:  Number of VAP's stats are parsed from driver response
- * @radio_count:  Number of Radio's stats are parsed from driver response
- * @ap_count:  Number of SoC's stats parsed from driver response
- * @obj_list:  Internal structure to hold below members
- * @sta_list:  Pointer to the head of STA list
- * @vap_list:  Pointer to the head of VAP list
- * @radio_list:  Pointer to the head of Radio list
- * @ap_list:  Pointer to the head of AP list
+ * @obj_head:  Head pointer of stats_obj list
+ * @obj_last:  Last pointer of stats_obj list
  */
 struct reply_buffer {
-	enum stats_object_e root_obj;
-	u_int8_t vap_count;
-	u_int8_t radio_count;
-	u_int8_t ap_count;
-	struct {
-		struct stats_sta *sta_list;
-		struct stats_vap *vap_list;
-		struct stats_radio *radio_list;
-		struct stats_ap *ap_list;
-	} obj_list;
+	struct stats_obj *obj_head;
+	struct stats_obj *obj_last;
 };
 
 /**

@@ -112,6 +112,99 @@ static QDF_STATUS send_peer_del_wds_entry_cmd_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_MULTI_AST_DEL
+/**
+ * send_peer_del_wds_entry_cmd_tlv() - send peer ast delete command to fw
+ * @wmi_handle: wmi handle
+ * @param: pointer holding wds entries details
+ *
+ * Return: QDF_STATUS_SUCCESS on sending wmi cmd to FW, else error value
+ */
+static QDF_STATUS send_peer_del_multi_wds_entries_cmd_tlv(
+		wmi_unified_t wmi_handle,
+		struct peer_del_multi_wds_entry_params *param)
+{
+	int i;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	wmi_vdev_multiple_peer_group_cmd_fixed_param *cmd;
+	uint32_t len = sizeof(*cmd);
+	wmi_mac_addr *mac_addr;
+	uint32_t max_macs_per_cmd, max_macs_cnt;
+	uint32_t pending_cnt = param->num_entries;
+	uint32_t num_macs = 0;
+	struct peer_del_multi_wds_entry_val *param_list = param->dest_list;
+
+	max_macs_per_cmd = (wmi_get_max_msg_len(wmi_handle) -
+			    sizeof(*cmd) - WMI_TLV_HDR_SIZE) /
+			    sizeof(wmi_mac_addr);
+
+	if (param->num_entries &&
+	    param->num_entries <= max_macs_per_cmd)
+		max_macs_cnt = param->num_entries;
+	else
+		max_macs_cnt = max_macs_per_cmd;
+
+	wmi_debug("Setting max macs limit as %u", max_macs_cnt);
+	while (pending_cnt > 0) {
+		len = sizeof(*cmd) + WMI_TLV_HDR_SIZE;
+		if (pending_cnt >= max_macs_cnt)
+			num_macs = max_macs_cnt;
+		else
+			num_macs = pending_cnt;
+
+		len += num_macs * sizeof(wmi_mac_addr);
+		buf = wmi_buf_alloc(wmi_handle, len);
+		if (!buf) {
+			wmi_err("Failed to allocate memory");
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		buf_ptr = (uint8_t *)wmi_buf_data(buf);
+		cmd = (wmi_vdev_multiple_peer_group_cmd_fixed_param *)
+						wmi_buf_data(buf);
+		WMITLV_SET_HDR(
+			&cmd->tlv_header,
+			WMITLV_TAG_STRUC_wmi_vdev_multiple_peer_group_cmd_fixed_param,
+			WMITLV_GET_STRUCT_TLVLEN
+			(wmi_vdev_multiple_peer_group_cmd_fixed_param));
+
+		cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+					wmi_handle, param->pdev_id);
+		cmd->vdev_id = param->vdev_id;
+		cmd->sub_cmd_id = WMI_PEER_REMOVE_WDS_ENTRY_CMDID;
+
+		buf_ptr += sizeof(*cmd);
+		WMITLV_SET_HDR(buf_ptr,
+			       WMITLV_TAG_ARRAY_FIXED_STRUC,
+			       num_macs * sizeof(wmi_mac_addr));
+
+		mac_addr = (wmi_mac_addr *)(buf_ptr + WMI_TLV_HDR_SIZE);
+		wmi_debug("send vdev_id %d num_macs:%d!",
+			  param->vdev_id, num_macs);
+		for (i = 0; i < num_macs; i++)
+			WMI_CHAR_ARRAY_TO_MAC_ADDR(param_list[i].dest_addr,
+						   &mac_addr[i]);
+
+		pending_cnt -= num_macs;
+		param_list += num_macs;
+
+		wmi_mtrace(WMI_VDEV_MULTIPLE_PEER_GROUP_CMDID, cmd->vdev_id, 0);
+
+		if (wmi_unified_cmd_send(wmi_handle, buf, len,
+					 WMI_VDEV_MULTIPLE_PEER_GROUP_CMDID)) {
+			wmi_err("vdev_id %d num_entries:%d failed!",
+				param->vdev_id, param->num_entries);
+			wmi_buf_free(buf);
+			return QDF_STATUS_E_FAILURE;
+		}
+		wmi_debug("vdev_id %d num_entries:%d done!",
+			  param->vdev_id, num_macs);
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * send_peer_update_wds_entry_cmd_tlv() - send peer update command to fw
  * @wmi_handle: wmi handle
@@ -2104,53 +2197,6 @@ send_fils_discovery_send_cmd_tlv(wmi_unified_t wmi_handle,
 #endif /* WLAN_SUPPORT_FILS */
 
 /**
- * send_set_qboost_param_cmd_tlv() - send set qboost command to fw
- * @wmi_handle: wmi handle
- * @param: pointer to qboost params
- * @macaddr: vdev mac address
- *
- *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
- */
-static QDF_STATUS
-send_set_qboost_param_cmd_tlv(wmi_unified_t wmi_handle,
-			      uint8_t macaddr[QDF_MAC_ADDR_SIZE],
-			      struct set_qboost_params *param)
-{
-	WMI_QBOOST_CFG_CMD_fixed_param *cmd;
-	wmi_buf_t buf;
-	int32_t len;
-	QDF_STATUS ret;
-
-	len = sizeof(*cmd);
-
-	buf = wmi_buf_alloc(wmi_handle, len);
-	if (!buf) {
-		wmi_err("wmi_buf_alloc failed");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	cmd = (WMI_QBOOST_CFG_CMD_fixed_param *)wmi_buf_data(buf);
-	WMITLV_SET_HDR(&cmd->tlv_header,
-		       WMITLV_TAG_STRUC_WMI_QBOOST_CFG_CMD_fixed_param,
-		       WMITLV_GET_STRUCT_TLVLEN(
-				WMI_QBOOST_CFG_CMD_fixed_param));
-	cmd->vdev_id = param->vdev_id;
-	WMI_CHAR_ARRAY_TO_MAC_ADDR(macaddr, &cmd->peer_macaddr);
-	cmd->qb_enable = param->value;
-
-	wmi_mtrace(WMI_QBOOST_CFG_CMDID, cmd->vdev_id, 0);
-	ret = wmi_unified_cmd_send(wmi_handle, buf, sizeof(*cmd),
-			WMI_QBOOST_CFG_CMDID);
-
-	if (ret != 0) {
-		wmi_err("Setting qboost cmd failed");
-		wmi_buf_free(buf);
-	}
-
-	return ret;
-}
-
-/**
  * send_mcast_group_update_cmd_tlv() - send mcast group update cmd to fw
  * @wmi_handle: wmi handle
  * @param: pointer to hold mcast update param
@@ -3258,12 +3304,241 @@ config_peer_latency_info_cmd_tlv(wmi_unified_t wmi_handle,
 }
 #endif
 
+/**
+ * send_soc_tqm_reset_enable_disable_cmd_tlv() - This API to send the
+ * WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID to FW
+ * @wmi_handle: wmi handle
+ * @enable: Enable/Disable configuration
+ *
+ * Return: Success if the cmd is sent successfully to the firmware
+ */
+static
+QDF_STATUS send_soc_tqm_reset_enable_disable_cmd_tlv(wmi_unified_t wmi_handle,
+						     uint32_t enable)
+{
+	wmi_soc_tqm_reset_enable_disable_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_soc_tqm_reset_enable_disable_cmd_fixed_param *)
+			wmi_buf_data(buf);
+	WMITLV_SET_HDR
+		(&cmd->tlv_header,
+		 WMITLV_TAG_STRUC_wmi_soc_tqm_reset_enable_disable_cmd_fixed_param,
+		 WMITLV_GET_STRUCT_TLVLEN(wmi_soc_tqm_reset_enable_disable_cmd_fixed_param));
+
+	cmd->enable = !!enable;
+	wmi_debug("TQM reset enable:%d", cmd->enable);
+
+	wmi_mtrace(WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID)) {
+		wmi_err("Failed to send WMI_SOC_TQM_RESET_ENABLE_DISABLE_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef CONFIG_SAWF_DEF_QUEUES
+static QDF_STATUS
+send_set_rate_upper_cap_cmd_tlv(struct wmi_unified *wmi_handle, uint8_t pdev_id,
+				struct wmi_rc_params *param)
+{
+	struct pdev_params pparam;
+	uint32_t value = 0;
+
+	WMI_PDEV_UPPER_CAP_NSS_SET(value, param->upper_cap_nss);
+	WMI_PDEV_UPPER_CAP_MCS_SET(value, param->upper_cap_mcs);
+	WMI_PDEV_UPPER_CAP_NSS_VALID_SET(value, param->en_nss_cap);
+	WMI_PDEV_UPPER_CAP_MCS_VALID_SET(value, param->en_mcs_cap);
+
+	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
+
+	qdf_mem_set(&pparam, sizeof(pparam), 0);
+	pparam.param_id = wmi_pdev_param_rate_upper_cap;
+	pparam.param_value = value;
+
+	if (wmi_handle->ops->send_pdev_param_cmd)
+		return wmi_handle->ops->send_pdev_param_cmd(wmi_handle, &pparam,
+							    pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+send_set_rate_retry_mcs_drop_cmd_tlv(struct wmi_unified *wmi_handle,
+				     uint8_t pdev_id,
+				     struct wmi_rc_params *param)
+{
+	struct pdev_params pparam;
+	uint32_t value = 0;
+
+	WMI_PDEV_RATE_DROP_NUM_MCS_SET(value, param->mcs_drop);
+	WMI_PDEV_RATE_DROP_RETRY_THRSH_SET(value, param->retry_thresh);
+	WMI_PDEV_RATE_DROP_NUM_MCS_VALID_SET(value, param->en_mcs_drop);
+	WMI_PDEV_RATE_DROP_RETRY_THRSH_VALID_SET(value, param->en_retry_thresh);
+
+	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
+
+	qdf_mem_set(&pparam, sizeof(pparam), 0);
+	pparam.param_id = wmi_pdev_param_rate_retry_mcs_drop;
+	pparam.param_value = value;
+
+	if (wmi_handle->ops->send_pdev_param_cmd)
+		return wmi_handle->ops->send_pdev_param_cmd(wmi_handle, &pparam,
+							    pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+send_set_mcs_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
+				 uint8_t pdev_id, struct wmi_rc_params *param)
+{
+	struct pdev_params pparam;
+	uint32_t value = 0;
+
+	WMI_PDEV_RATE_MIN_MCS_PROBE_INTERVAL_SET(value,
+			param->min_mcs_probe_intvl);
+	WMI_PDEV_RATE_MAX_MCS_PROBE_INTERVAL_SET(value,
+			param->max_mcs_probe_intvl);
+
+	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
+
+	qdf_mem_set(&pparam, sizeof(pparam), 0);
+	pparam.param_id = wmi_pdev_param_mcs_probe_intvl;
+	pparam.param_value = value;
+
+	if (wmi_handle->ops->send_pdev_param_cmd)
+		return wmi_handle->ops->send_pdev_param_cmd(wmi_handle, &pparam,
+							    pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+static QDF_STATUS
+send_set_nss_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
+				 uint8_t pdev_id, struct wmi_rc_params *param)
+{
+	struct pdev_params pparam;
+	uint32_t value = 0;
+
+	WMI_PDEV_RATE_MIN_NSS_PROBE_INTERVAL_SET(value,
+			param->min_nss_probe_intvl);
+	WMI_PDEV_RATE_MAX_NSS_PROBE_INTERVAL_SET(value,
+			param->max_nss_probe_intvl);
+
+	wmi_info("pdev_id:%u param_value:0x%.8x", pdev_id, value);
+
+	qdf_mem_set(&pparam, sizeof(pparam), 0);
+	pparam.param_id = wmi_pdev_param_nss_probe_intvl;
+	pparam.param_value = value;
+
+	if (wmi_handle->ops->send_pdev_param_cmd)
+		return wmi_handle->ops->send_pdev_param_cmd(wmi_handle, &pparam,
+							    pdev_id);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
+				    struct wmi_sawf_params *param)
+{
+	QDF_STATUS ret;
+	wmi_sawf_svc_class_cfg_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint16_t len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_sawf_svc_class_cfg_cmd_fixed_param *)wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_sawf_svc_class_cfg_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_sawf_svc_class_cfg_cmd_fixed_param));
+
+	cmd->svc_class_id = param->svc_id;
+	cmd->min_thruput_kbps = param->min_thruput_rate;
+	cmd->max_thruput_kbps = param->max_thruput_rate;
+	cmd->burst_size_bytes = param->burst_size;
+	cmd->svc_interval_ms = param->service_interval;
+	cmd->delay_bound_ms = param->delay_bound;
+	cmd->time_to_live_ms = param->msdu_ttl;
+	cmd->priority = param->priority;
+	cmd->tid = param->tid;
+	cmd->msdu_loss_rate_ppm = param->msdu_rate_loss;
+
+	qdf_info("Setting sawf svc_id %d min_thrput_rate %d max_thrput_rate %d"
+		 "burst_size %d service_interval %d delay_bound %d msdu_ttl %d"
+		 "priority %d tid %d msdu_rate_loss %d \n",
+		 cmd->svc_class_id, cmd->min_thruput_kbps,
+		 cmd->max_thruput_kbps, cmd->burst_size_bytes,
+		 cmd->svc_interval_ms, cmd->delay_bound_ms,
+		 cmd->time_to_live_ms, cmd->priority, cmd->tid,
+		 cmd->msdu_loss_rate_ppm);
+	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
+				   WMI_SAWF_SVC_CLASS_CFG_CMDID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wmi_err("Failed to send set param command ret = %d", ret);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
+
+QDF_STATUS send_sawf_disable_cmd_tlv(wmi_unified_t wmi_handle,
+				     uint32_t svc_id)
+{
+	QDF_STATUS ret;
+	wmi_sawf_svc_class_disable_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint16_t len = sizeof(*cmd);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_sawf_svc_class_disable_cmd_fixed_param *)wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_sawf_svc_class_disable_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_sawf_svc_class_disable_cmd_fixed_param));
+
+	cmd->svc_class_id = svc_id;
+
+	qdf_info("Disabling svc id:%d", cmd->svc_class_id);
+	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
+			WMI_SAWF_SVC_CLASS_DISABLE_CMDID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wmi_err("Failed to send set param command ret = %d", ret);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
+#endif
+
 void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
-
 	ops->send_peer_add_wds_entry_cmd = send_peer_add_wds_entry_cmd_tlv;
 	ops->send_peer_del_wds_entry_cmd = send_peer_del_wds_entry_cmd_tlv;
+#ifdef WLAN_FEATURE_MULTI_AST_DEL
+	ops->send_peer_del_multi_wds_entries_cmd =
+					send_peer_del_multi_wds_entries_cmd_tlv;
+#endif
 	ops->send_peer_update_wds_entry_cmd =
 					send_peer_update_wds_entry_cmd_tlv;
 	ops->send_pdev_get_tpc_config_cmd = send_pdev_get_tpc_config_cmd_tlv;
@@ -3314,7 +3589,6 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->extract_swfda_vdev_id = extract_swfda_vdev_id_tlv;
 	ops->send_fils_discovery_send_cmd = send_fils_discovery_send_cmd_tlv;
 #endif /* WLAN_SUPPORT_FILS */
-	ops->send_set_qboost_param_cmd = send_set_qboost_param_cmd_tlv;
 	ops->send_mcast_group_update_cmd = send_mcast_group_update_cmd_tlv;
 	ops->send_pdev_qvit_cmd = send_pdev_qvit_cmd_tlv;
 	ops->send_wmm_update_cmd = send_wmm_update_cmd_tlv;
@@ -3344,4 +3618,15 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_get_halphy_cal_status_cmd = send_get_halphy_cal_status_cmd_tlv;
 	ops->send_peer_set_intra_bss_cmd = send_peer_set_intra_bss_cmd_tlv;
 	ops->send_vdev_set_intra_bss_cmd = send_vdev_set_intra_bss_cmd_tlv;
+	ops->send_soc_tqm_reset_enable_disable_cmd =
+				send_soc_tqm_reset_enable_disable_cmd_tlv;
+#ifdef CONFIG_SAWF_DEF_QUEUES
+	ops->send_set_rate_upper_cap_cmd = send_set_rate_upper_cap_cmd_tlv;
+	ops->send_set_rate_retry_mcs_drop_cmd =
+		send_set_rate_retry_mcs_drop_cmd_tlv;
+	ops->send_set_mcs_probe_intvl_cmd = send_set_mcs_probe_intvl_cmd_tlv;
+	ops->send_set_nss_probe_intvl_cmd = send_set_nss_probe_intvl_cmd_tlv;
+	ops->send_sawf_create_cmd = send_sawf_create_cmd_tlv;
+	ops->send_sawf_disable_cmd = send_sawf_disable_cmd_tlv;
+#endif
 }

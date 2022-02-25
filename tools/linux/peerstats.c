@@ -90,10 +90,10 @@ static void dp_peer_rx_rate_stats_print(uint8_t *peer_mac,
 	      "rssi\n");
 
 	for (i = 0; i < WLANSTATS_CACHE_SIZE; i++) {
-		if (rx_stats->rix != INVALID_CACHE_IDX) {
+		if (rx_stats->ratecode != INVALID_CACHE_IDX) {
 			PRINT(" %10u | %10u | %10u | %10u | %10u | %10u |",
 			      rx_stats->rate,
-			      GET_DP_PEER_STATS_RIX(rx_stats->rix),
+			      GET_DP_PEER_STATS_RIX(rx_stats->ratecode),
 			      rx_stats->num_bytes,
 			      rx_stats->num_msdus,
 			      rx_stats->num_mpdus,
@@ -211,7 +211,7 @@ static void dp_peer_rx_rate_stats_print(uint8_t *peer_mac,
 	      "rssi 4 e80");
 	}
 	for (i = 0; i < WLANSTATS_CACHE_SIZE; i++) {
-		if (tmp_rx_stats->rix != INVALID_CACHE_IDX) {
+		if (tmp_rx_stats->ratecode != INVALID_CACHE_IDX) {
 			printf(" %10u |", tmp_rx_stats->rate);
 			for (chain = 0; chain < max_chain; chain++) {
 				for (bw = 0; bw < max_bw; bw++) {
@@ -237,7 +237,7 @@ dp_peer_tx_sojourn_stats_print(uint8_t *peer_mac,
 	PRINT("....................................");
 	PRINT("....................................");
 	PRINT(".........................................\n");
-	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx%02hhx:%02hhx\n",
+	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx\n",
 	      peer_mac[0],
 	      peer_mac[1],
 	      peer_mac[2],
@@ -292,7 +292,7 @@ static void dp_peer_tx_rate_stats_print(uint8_t *peer_mac,
 	PRINT("...................................");
 	PRINT("...................................");
 	PRINT("...........................................\n");
-	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx%02hhx:%02hhx\n\n",
+	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx\n\n",
 	      peer_mac[0],
 	      peer_mac[1],
 	      peer_mac[2],
@@ -317,10 +317,10 @@ static void dp_peer_tx_rate_stats_print(uint8_t *peer_mac,
 	      "retries\n");
 
 	for (i = 0; i < WLANSTATS_CACHE_SIZE; i++) {
-		if (tx_stats->rix != INVALID_CACHE_IDX) {
+		if (tx_stats->ratecode != INVALID_CACHE_IDX) {
 			PRINT("\t\t%10u | %10u | %10u | %10u | %10u\n",
 			      tx_stats->rate,
-			      GET_DP_PEER_STATS_RIX(tx_stats->rix),
+			      GET_DP_PEER_STATS_RIX(tx_stats->ratecode),
 			      tx_stats->mpdu_attempts,
 			      tx_stats->mpdu_success,
 			      tx_stats->num_ppdus);
@@ -358,7 +358,7 @@ static void dp_peer_avg_rate_stats_print(uint8_t *peer_mac,
 	uint32_t avg_mbps;
 	uint32_t avg_snr;
 
-	PRINT("peer %02hhx:%02hhx:%02hhx:%02hhx%02hhx:%02hhx",
+	PRINT("peer %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
 	       peer_mac[0],
 	       peer_mac[1],
 	       peer_mac[2],
@@ -452,7 +452,7 @@ static void dp_peer_tx_link_stats_print(uint8_t *peer_mac,
 
 	PRINT("\n\n");
 	PRINT("========= PEER TX LINK QUALITY METRICS =========\n");
-	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx%02hhx:%02hhx",
+	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
 	      peer_mac[0],
 	      peer_mac[1],
 	      peer_mac[2],
@@ -499,7 +499,7 @@ static void dp_peer_rx_link_stats_print(uint8_t *peer_mac,
 
 	PRINT("\n\n");
 	PRINT("========= PEER RX LINK QUALITY METRICS =========\n");
-	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx%02hhx:%02hhx",
+	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
 	      peer_mac[0],
 	      peer_mac[1],
 	      peer_mac[2],

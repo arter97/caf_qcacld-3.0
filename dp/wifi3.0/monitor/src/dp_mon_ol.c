@@ -43,25 +43,38 @@ void monitor_osif_deliver_tx_capture_data(osif_dev *osifp, struct sk_buff *skb);
 int wlan_cfg80211_set_peer_pkt_capture_params(struct wiphy *wiphy,
 					      struct wireless_dev *wdev,
 					      struct wlan_cfg8011_genric_params *params);
-
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+int wlan_cfg80211_set_phyrx_error_mask(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       struct wlan_cfg8011_genric_params *params);
+int wlan_cfg80211_get_phyrx_error_mask(struct wiphy *wiphy,
+				       struct wireless_dev *wdev,
+				       struct wlan_cfg8011_genric_params *params);
+void monitor_osif_deliver_rx_capture_undecoded_metadata(osif_dev *osifp,
+							struct sk_buff *skb);
+#define DEBUG_SNIFFER_TEST_RX_UNDEOCDED_FRAME_CAPTURE     "UNDECO"
+#endif
+#define DEBUG_SNIFFER_SIGNATURE_LEN 6
 /*
  * expected values for filter (val) 0, 1, 2, 4, 8
  * these values could be for FP, MO, or both by using first 16 bits.
  * i.e. 0x10004 (FP only enable with filter 4 on)
  */
-static int ol_ath_set_rx_monitor_filter(struct ieee80211com *ic, uint32_t val)
+static int ol_ath_set_rx_monitor_filter(struct ieee80211com *ic)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(ic->ic_pdev_obj);
 	struct cdp_monitor_filter filter_val;
 	ol_txrx_soc_handle soc_txrx_handle;
-	uint32_t shift_val = FILTER_MODE(val);
+	uint64_t val = ic->ic_os_monrxfilter;
+	uint32_t filter_mode;
 
 	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
 	filter_val.mode = RX_MON_FILTER_PASS | RX_MON_FILTER_OTHER;
 
-	if (shift_val == FILTER_PASS_ONLY)
+	filter_mode = FILTER_MODE(val);
+	if (filter_mode == FILTER_PASS_ONLY)
 		filter_val.mode = RX_MON_FILTER_PASS;
-	else if (shift_val == MONITOR_OTHER_ONLY)
+	else if (filter_mode == MONITOR_OTHER_ONLY)
 		filter_val.mode = RX_MON_FILTER_OTHER;
 
 	if (filter_val.mode & RX_MON_FILTER_PASS) {
@@ -396,9 +409,13 @@ static void ol_ath_process_tx_frames(void *pdev_hdl, enum WDI_EVENT event,
 	}
 
 	ptr_tx_info->mpdu_nbuf = NULL;
-	/* update radiotap header */
-	convert_tx_to_rx_stats(ptr_tx_info, &rx_status);
-	qdf_nbuf_update_radiotap(&rx_status, skb, RX_PADDING_SIZE);
+
+	/* differentiate Lithium and Beryllium */
+	if (!ptr_tx_info->radiotap_done) {
+		/* update radiotap header */
+		convert_tx_to_rx_stats(ptr_tx_info, &rx_status);
+		qdf_nbuf_update_radiotap(&rx_status, skb, RX_PADDING_SIZE);
+	}
 
 	monitor_osif_deliver_tx_capture_data(osifp, skb);
 }
@@ -487,6 +504,62 @@ ol_ath_ucfg_set_peer_pkt_capture(void *vscn,
 	return 0;
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
+
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+int ol_ath_set_phyrx_error_mask(void *vscn, uint32_t mask, uint32_t mask_cont)
+{
+	struct ol_ath_softc_net80211 *scn =
+			(struct ol_ath_softc_net80211 *)vscn;
+	ol_txrx_soc_handle soc_txrx_handle;
+	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(scn->sc_pdev);
+	QDF_STATUS status;
+
+	soc_txrx_handle =
+		(ol_txrx_soc_handle)wlan_psoc_get_dp_handle(scn->soc->psoc_obj);
+	if (!soc_txrx_handle) {
+		dp_mon_err("psoc handle is NULL");
+		return -EFAULT;
+	}
+
+	status =
+		cdp_txrx_set_pdev_phyrx_error_mask(soc_txrx_handle, pdev_id,
+						   mask, mask_cont);
+	if (status != QDF_STATUS_SUCCESS) {
+		dp_mon_err("Phyrx error mask configuration failed");
+		return -EINVAL;
+	}
+	dp_mon_info("mask(0 to 31):0x%x mask(32 to 64):0x%x", mask, mask_cont);
+
+	return 0;
+}
+
+int
+ol_ath_get_phyrx_error_mask(void *vscn, uint32_t *mask, uint32_t *mask_cont)
+{
+	struct ol_ath_softc_net80211 *scn =
+			(struct ol_ath_softc_net80211 *)vscn;
+	ol_txrx_soc_handle soc_txrx_handle;
+	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(scn->sc_pdev);
+	QDF_STATUS status;
+
+	soc_txrx_handle =
+		(ol_txrx_soc_handle)wlan_psoc_get_dp_handle(scn->soc->psoc_obj);
+	if (!soc_txrx_handle) {
+		dp_mon_err("psoc handle is NULL");
+		return -EFAULT;
+	}
+
+	status =
+		cdp_txrx_get_pdev_phyrx_error_mask(soc_txrx_handle, pdev_id,
+						   mask, mask_cont);
+	if (status != QDF_STATUS_SUCCESS) {
+		dp_mon_err("Get configured phyrx error mask failed");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+#endif /* QCA_UNDECODED_METADATA_SUPPORT */
 
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 QDF_STATUS
@@ -806,12 +879,189 @@ int ol_ath_set_bpr_wifi3(struct ol_ath_softc_net80211 *scn, int val)
 }
 #endif
 
+#if QCA_UNDECODED_METADATA_SUPPORT
+struct ieee80211vap *
+ol_ath_get_special_vap(struct ieee80211com *ic)
+{
+	struct ieee80211vap *tmp_vap = NULL;
+
+	TAILQ_FOREACH(tmp_vap, &ic->ic_vaps, iv_next) {
+		if (tmp_vap->iv_opmode == IEEE80211_M_HOSTAP &&
+		    IEEE80211_IS_SPECIAL_VAP_ONLY(tmp_vap)) {
+			return tmp_vap;
+		}
+	}
+	return NULL;
+}
+
+static void
+ol_if_process_rx_data_undecoded_frame(struct ieee80211com *ic, void *data)
+{
+	qdf_nbuf_t skb = (qdf_nbuf_t)data;
+	struct ieee80211vap *vap = NULL;
+	osif_dev  *osifp = NULL;
+	char *buf = NULL;
+
+	if (ic->ic_mon_vap)
+		vap = ic->ic_mon_vap;
+	else
+		vap = ol_ath_get_special_vap(ic);
+
+	if (!vap) {
+		qdf_nbuf_free(skb);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+			  "No monitor or special vap created");
+		return;
+	}
+
+	/**
+	 * Forwarding the buffer to user space or freeing the
+	 * buffer based on the feature flag if not enabled.
+	 * Have callback here to extract the data if required.
+	 */
+	if (!ic->ic_undecoded_metadata_enable) {
+		qdf_debug("undecoded_metadata not enabled drop the frame");
+		qdf_nbuf_free(skb);
+		return;
+	}
+
+	osifp = (osif_dev *)vap->iv_ifp;
+
+	buf = (char *)qdf_nbuf_put_tail(skb, DEBUG_SNIFFER_SIGNATURE_LEN);
+	if (buf) {
+		qdf_mem_copy(buf,
+			     DEBUG_SNIFFER_TEST_RX_UNDEOCDED_FRAME_CAPTURE,
+			     DEBUG_SNIFFER_SIGNATURE_LEN);
+	}
+
+	/* Ensure to free the skb here if not being sent to upper layer */
+	monitor_osif_deliver_rx_capture_undecoded_metadata(osifp, skb);
+}
+
+/**
+ * ol_ath_process_rx_data_undecoded_frame() - Callback registered for
+ *                          WDI_EVENT_RX_PPDU_DESC_UNDECODED_METADATA
+ * @pdev_hdl: pdev pointer
+ * @event:   WDi event
+ * @data:    skb received
+ * @peer_id: peer_id
+ * @status:  status from event
+ *
+ * @Return: None
+ */
+void
+ol_ath_process_ppdu_info_undecoded_frame(void *pdev_hdl, enum WDI_EVENT event,
+					 void *data, uint16_t peer_id,
+					 enum htt_cmn_rx_status status)
+{
+	struct wlan_objmgr_pdev *pdev_obj =
+		(struct wlan_objmgr_pdev *)pdev_hdl;
+	struct ieee80211com *ic;
+	qdf_nbuf_t nbuf = (qdf_nbuf_t)data;
+
+	if (qdf_unlikely((!pdev_obj || !data))) {
+		qdf_err("Invalid pdev %p or data %p event %d",
+			pdev_obj, data, event);
+		qdf_nbuf_free(nbuf);
+		return;
+	}
+
+	ic = wlan_pdev_get_mlme_ext_obj(pdev_obj);
+	if (!ic) {
+		qdf_err(" ic is NULL");
+		qdf_nbuf_free(nbuf);
+		return;
+	}
+
+	ol_if_process_rx_data_undecoded_frame(ic, data);
+}
+
+static int
+ol_set_undeocded_metadata_capture(struct ol_ath_softc_net80211 *scn,
+				  uint8_t pdev_id,
+				  ol_txrx_soc_handle soc_txrx_handle, int val)
+{
+	struct ieee80211com *ic = &scn->sc_ic;
+	cdp_config_param_type value = {0};
+
+	if (val) {
+		/* registere wdi event */
+		scn->rx_undecoded_ppdu_info_subscriber.callback =
+				ol_ath_process_ppdu_info_undecoded_frame;
+		scn->rx_undecoded_ppdu_info_subscriber.context =
+				scn->sc_pdev;
+
+		if (cdp_wdi_event_sub(soc_txrx_handle, pdev_id,
+				      &scn->rx_undecoded_ppdu_info_subscriber,
+				      WDI_EVENT_RX_PPDU_DESC_UNDECODED_METADATA)) {
+			qdf_err("wdi event subscription failed");
+			return A_ERROR;
+		}
+
+		value.cdp_pdev_param_undecoded_metadata_enable = val;
+		if (cdp_txrx_set_pdev_param(soc_txrx_handle, pdev_id,
+					    CDP_CONFIG_UNDECODED_METADATA_CAPTURE_ENABLE,
+					    value)) {
+			qdf_err("Enable undecoded metadata capture failed.");
+
+			/* unsubscribe registered wdi event */
+			if (cdp_wdi_event_unsub(soc_txrx_handle, pdev_id,
+						&scn->rx_undecoded_ppdu_info_subscriber,
+						WDI_EVENT_RX_PPDU_DESC_UNDECODED_METADATA)) {
+				qdf_err("wdi event unsubscription failed");
+				return A_ERROR;
+			}
+			return -EINVAL;
+		}
+		ic->ic_undecoded_metadata_enable = val;
+
+		if (cdp_txrx_set_pdev_phyrx_error_mask(soc_txrx_handle,
+						       pdev_id,
+						       ic->ic_phyrx_error_mask,
+						       ic->ic_phyrx_error_mask_cont)) {
+			dp_mon_err("Phyrx error mask configuration failed");
+		}
+		dp_mon_info("mask(0 to 31):0x%x mask(32 to 64):0x%x",
+			    ic->ic_phyrx_error_mask,
+			    ic->ic_phyrx_error_mask_cont);
+	} else {
+		if (!ic->ic_undecoded_metadata_enable) {
+			qdf_info("Undecoded metadata capture already disabled");
+			return 0;
+		}
+		ic->ic_undecoded_metadata_enable = val;
+
+		value.cdp_pdev_param_undecoded_metadata_enable = val;
+		cdp_txrx_set_pdev_param(soc_txrx_handle, pdev_id,
+					CDP_CONFIG_UNDECODED_METADATA_CAPTURE_ENABLE,
+					value);
+
+		/* unsubscribe registered wdi event */
+		if (cdp_wdi_event_unsub(soc_txrx_handle, pdev_id,
+					&scn->rx_undecoded_ppdu_info_subscriber,
+					WDI_EVENT_RX_PPDU_DESC_UNDECODED_METADATA)) {
+			qdf_err("wdi event unsubscription failed");
+			return A_ERROR;
+		}
+	}
+
+	return 0;
+}
+#endif /* QCA_UNDECODED_METADATA_SUPPORT */
+
 static struct mon_ops monitor_ops = {
 	.mon_ath_set_bpr_wifi3 = ol_ath_set_bpr_wifi3,
 	.mon_set_lite_mode = ol_set_lite_mode,
 	.mon_cfg80211_set_peer_pkt_capture_params =
 		wlan_cfg80211_set_peer_pkt_capture_params,
 	.mon_set_tx_sniffer_mode = ol_set_tx_sniffer_mode,
+#ifdef QCA_UNDECODED_METADATA_SUPPORT
+	.mon_set_undeocded_metadata_capture = ol_set_undeocded_metadata_capture,
+	.mon_cfg80211_set_phyrx_error_mask =
+		wlan_cfg80211_set_phyrx_error_mask,
+	.mon_cfg80211_get_phyrx_error_mask =
+		wlan_cfg80211_get_phyrx_error_mask,
+#endif
 };
 
 QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc)

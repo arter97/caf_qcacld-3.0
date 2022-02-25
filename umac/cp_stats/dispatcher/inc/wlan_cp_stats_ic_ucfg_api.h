@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018, 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -473,6 +474,7 @@ UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(rx_badkeyid);
 UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(rx_decryptok);
 UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(rx_wepfail);
 UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(rx_tkipicv);
+UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(rx_pnerr);
 UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(rx_tkipreplay);
 UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(rx_tkipformat);
 UCFG_VDEV_UCAST_CP_STATS_SET_FUNCS(rx_ccmpmic);
@@ -505,6 +507,7 @@ UCFG_VDEV_UCAST_CP_STATS_GET_FUNCS(rx_decryptok);
 UCFG_VDEV_UCAST_CP_STATS_GET_FUNCS(rx_ccmpmic);
 UCFG_VDEV_UCAST_CP_STATS_GET_FUNCS(rx_ccmpreplay);
 UCFG_VDEV_UCAST_CP_STATS_GET_FUNCS(rx_wepfail);
+UCFG_VDEV_UCAST_CP_STATS_GET_FUNCS(rx_pnerr);
 
 #define UCFG_VDEV_MCAST_CP_STATS_SET_FUNCS(field) \
 	static inline void \
@@ -551,6 +554,7 @@ UCFG_VDEV_UCAST_CP_STATS_GET_FUNCS(rx_wepfail);
 
 UCFG_VDEV_MCAST_CP_STATS_SET_FUNCS(rx_badkeyid);
 UCFG_VDEV_MCAST_CP_STATS_SET_FUNCS(rx_decryptok);
+UCFG_VDEV_MCAST_CP_STATS_SET_FUNCS(rx_decryptcrc);
 UCFG_VDEV_MCAST_CP_STATS_SET_FUNCS(rx_wepfail);
 UCFG_VDEV_MCAST_CP_STATS_SET_FUNCS(rx_tkipicv);
 UCFG_VDEV_MCAST_CP_STATS_SET_FUNCS(rx_tkipreplay);
@@ -637,6 +641,7 @@ UCFG_PEER_CP_STATS_SET_FUNCS(is_tx_not_ok);
 UCFG_PEER_CP_STATS_SET_FUNCS(rx_noprivacy);
 UCFG_PEER_CP_STATS_SET_FUNCS(rx_wepfail);
 UCFG_PEER_CP_STATS_SET_FUNCS(rx_tkipicv);
+UCFG_PEER_CP_STATS_SET_FUNCS(rx_pnerr);
 UCFG_PEER_CP_STATS_SET_FUNCS(rx_wpimic);
 UCFG_PEER_CP_STATS_SET_FUNCS(rx_ccmpmic);
 UCFG_PEER_CP_STATS_SET_FUNCS(ps_discard);
@@ -718,6 +723,7 @@ UCFG_PEER_CP_STATS_GET_FUNCS(rx_mgmt_rate);
 UCFG_PEER_CP_STATS_GET_FUNCS(tx_dropblock);
 #endif
 UCFG_PEER_CP_STATS_GET_FUNCS(rx_decryptcrc);
+UCFG_PEER_CP_STATS_GET_FUNCS(rx_pnerr);
 
 /**
  * wlan_ucfg_get_peer_cp_stats() - ucfg API to get peer cp stats

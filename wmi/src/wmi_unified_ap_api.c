@@ -43,6 +43,19 @@ QDF_STATUS wmi_unified_peer_del_wds_entry_cmd_send(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef WLAN_FEATURE_MULTI_AST_DEL
+QDF_STATUS wmi_unified_peer_del_multi_wds_entries_cmd_send(
+		wmi_unified_t wmi_handle,
+		struct peer_del_multi_wds_entry_params *param)
+{
+	if (wmi_handle->ops->send_peer_del_multi_wds_entries_cmd)
+		return wmi_handle->ops->send_peer_del_multi_wds_entries_cmd(
+				wmi_handle, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_FEATURE_MULTI_AST_DEL */
+
 QDF_STATUS wmi_unified_peer_update_wds_entry_cmd_send(
 		wmi_unified_t wmi_handle,
 		struct peer_update_wds_entry_params *param)
@@ -463,18 +476,6 @@ wmi_extract_swfda_vdev_id(wmi_unified_t wmi_handle, void *evt_buf,
 }
 #endif /* WLAN_SUPPORT_FILS */
 
-QDF_STATUS wmi_unified_set_qboost_param_cmd_send(
-		wmi_unified_t wmi_handle,
-		uint8_t macaddr[QDF_MAC_ADDR_SIZE],
-		struct set_qboost_params *param)
-{
-	if (wmi_handle->ops->send_set_qboost_param_cmd)
-		return wmi_handle->ops->send_set_qboost_param_cmd(wmi_handle,
-				  macaddr, param);
-
-	return QDF_STATUS_E_FAILURE;
-}
-
 QDF_STATUS wmi_unified_mcast_group_update_cmd_send(
 		wmi_unified_t wmi_handle,
 		struct mcast_group_update_params *param)
@@ -731,6 +732,92 @@ wmi_unified_peer_set_intra_bss_cmd_send(struct wmi_unified *wmi_handle,
 		return wmi_handle->ops->send_peer_set_intra_bss_cmd(wmi_handle,
 								    param);
 
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
+/**
+ * wmi_unified_soc_tqm_reset_enable_disable_cmd() - Send tqm reset command to FW
+ * @wmi_handle: wmi handle
+ * @enable: enable or disable configuration from user
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_soc_tqm_reset_enable_disable_cmd(wmi_unified_t wmi_handle,
+					     uint32_t enable)
+{
+	if (wmi_handle->ops->send_soc_tqm_reset_enable_disable_cmd)
+		return wmi_handle->ops->send_soc_tqm_reset_enable_disable_cmd
+			(wmi_handle, enable);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+#ifdef CONFIG_SAWF_DEF_QUEUES
+QDF_STATUS
+wmi_unified_set_rate_upper_cap_cmd_send(struct wmi_unified *wmi_handle,
+					uint8_t pdev_id,
+					struct wmi_rc_params *param)
+{
+	if (wmi_handle->ops->send_set_rate_upper_cap_cmd)
+		return wmi_handle->ops->send_set_rate_upper_cap_cmd(wmi_handle,
+								    pdev_id,
+								    param);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_set_rate_retry_mcs_drop_cmd_send(struct wmi_unified *wmi_handle,
+					     uint8_t pdev_id,
+					     struct wmi_rc_params *param)
+{
+	if (wmi_handle->ops->send_set_rate_retry_mcs_drop_cmd)
+		return wmi_handle->ops->send_set_rate_retry_mcs_drop_cmd
+			(wmi_handle, pdev_id, param);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_set_mcs_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
+					 uint8_t pdev_id,
+					 struct wmi_rc_params *param)
+{
+	if (wmi_handle->ops->send_set_mcs_probe_intvl_cmd)
+		return wmi_handle->ops->send_set_mcs_probe_intvl_cmd(wmi_handle,
+								     pdev_id,
+								     param);
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_unified_set_nss_probe_intvl_cmd_send(struct wmi_unified *wmi_handle,
+					 uint8_t pdev_id,
+					 struct wmi_rc_params *param)
+{
+	if (wmi_handle->ops->send_set_nss_probe_intvl_cmd)
+		return wmi_handle->ops->send_set_nss_probe_intvl_cmd(wmi_handle,
+								     pdev_id,
+								     param);
+}
+
+QDF_STATUS wmi_sawf_create_send(struct wmi_unified *wmi_handle,
+				struct wmi_sawf_params *param)
+{
+	if (wmi_handle->ops->send_sawf_create_cmd) {
+		return wmi_handle->ops->send_sawf_create_cmd(wmi_handle,
+							     param);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS wmi_sawf_disable_send(struct wmi_unified *wmi_handle,
+				 uint8_t svc_id)
+{
+	if (wmi_handle->ops->send_sawf_disable_cmd) {
+		return wmi_handle->ops->send_sawf_disable_cmd(wmi_handle,
+							      svc_id);
+	}
 	return QDF_STATUS_E_FAILURE;
 }
 #endif

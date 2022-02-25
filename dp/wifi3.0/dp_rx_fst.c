@@ -26,8 +26,6 @@
 #include "hal_rx_flow.h"
 #include "dp_htt.h"
 
-QDF_STATUS
-hal_rx_flow_delete_entry(struct hal_rx_fst *fst, void *hal_rx_fse);
 /**
  * In Hawkeye, a hardware bug disallows SW to only clear a single flow entry
  * when added/deleted by upper layer. Workaround is to clear entire cache,
@@ -124,13 +122,15 @@ uint32_t dp_rx_flow_compute_flow_hash(struct dp_rx_fst *fst,
 
 /**
  * dp_rx_flow_alloc_entry() - Create DP and HAL flow entries in FST
+ * @hal_soc_hdl: HAL SOC handle
  * @fst: Rx FST Handle
  * @rx_flow_info: DP Rx Flow 5-tuple to be added to DP FST
  * @flow: HAL (HW) flow entry that is created
  *
  * Return: Computed Toeplitz hash
  */
-struct dp_rx_fse *dp_rx_flow_alloc_entry(struct dp_rx_fst *fst,
+struct dp_rx_fse *dp_rx_flow_alloc_entry(hal_soc_handle_t hal_soc,
+					 struct dp_rx_fst *fst,
 					 struct cdp_rx_flow_info *rx_flow_info,
 					 struct hal_rx_flow *flow)
 {
@@ -141,7 +141,8 @@ struct dp_rx_fse *dp_rx_flow_alloc_entry(struct dp_rx_fst *fst,
 
 	flow_hash = dp_rx_flow_compute_flow_hash(fst, rx_flow_info, flow);
 
-	status = hal_rx_insert_flow_entry(fst->hal_rx_fst,
+	status = hal_rx_insert_flow_entry(hal_soc,
+					  fst->hal_rx_fst,
 					  flow_hash,
 					  &rx_flow_info->flow_tuple_info,
 					  &flow_idx);
@@ -170,7 +171,8 @@ struct dp_rx_fse *dp_rx_flow_alloc_entry(struct dp_rx_fst *fst,
  * Return: Pointer to the DP FSE entry
  */
 struct dp_rx_fse *
-dp_rx_flow_find_entry_by_tuple(struct dp_rx_fst *fst,
+dp_rx_flow_find_entry_by_tuple(hal_soc_handle_t hal_soc_hdl,
+			       struct dp_rx_fst *fst,
 			       struct cdp_rx_flow_info *rx_flow_info,
 			       struct hal_rx_flow *flow)
 {
@@ -180,10 +182,12 @@ dp_rx_flow_find_entry_by_tuple(struct dp_rx_fst *fst,
 
 	flow_hash = dp_rx_flow_compute_flow_hash(fst, rx_flow_info, flow);
 
-	status = hal_rx_find_flow_from_tuple(fst->hal_rx_fst,
+	status = hal_rx_find_flow_from_tuple(hal_soc_hdl,
+					     fst->hal_rx_fst,
 					     flow_hash,
 					     &rx_flow_info->flow_tuple_info,
 					     &flow_idx);
+
 	if (status != QDF_STATUS_SUCCESS) {
 		dp_err("Could not find tuple with hash %u", flow_hash);
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
@@ -277,7 +281,7 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 	}
 
 	/* Allocate entry in DP FST */
-	fse = dp_rx_flow_alloc_entry(fst, rx_flow_info, &flow);
+	fse = dp_rx_flow_alloc_entry(soc->hal_soc, fst, rx_flow_info, &flow);
 	if (NULL == fse) {
 		dp_err("RX FSE alloc failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
@@ -339,7 +343,7 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 			       status);
 			dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
 			/* Free DP FSE and HAL FSE */
-			hal_rx_flow_delete_entry(fst->hal_rx_fst,
+			hal_rx_flow_delete_entry(soc->hal_soc, fst->hal_rx_fst,
 						 fse->hal_rx_fse);
 			fse->is_valid = false;
 			return status;
@@ -368,7 +372,9 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	fst = pdev->rx_fst;
 
 	/* Find the given flow entry DP FST */
-	fse = dp_rx_flow_find_entry_by_tuple(fst, rx_flow_info, &flow);
+	fse = dp_rx_flow_find_entry_by_tuple(soc->hal_soc, fst,
+					     rx_flow_info, &flow);
+
 	if (!fse) {
 		dp_err("RX flow delete entry failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
@@ -376,7 +382,8 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	}
 
 	/* Delete the FSE in HW FST */
-	status = hal_rx_flow_delete_entry(fst->hal_rx_fst, fse->hal_rx_fse);
+	status = hal_rx_flow_delete_entry(soc->hal_soc, fst->hal_rx_fst,
+					  fse->hal_rx_fse);
 	qdf_assert_always(status == QDF_STATUS_SUCCESS);
 
 	/* Free the FSE in DP FST */
@@ -442,6 +449,7 @@ QDF_STATUS dp_rx_flow_get_fse_stats(struct dp_pdev *pdev,
 				    struct cdp_rx_flow_info *rx_flow_info,
 				    struct cdp_flow_stats *stats)
 {
+	struct dp_soc *soc = pdev->soc;
 	struct dp_rx_fst *fst;
 	struct dp_rx_fse *fse;
 	struct hal_rx_flow flow;
@@ -449,7 +457,8 @@ QDF_STATUS dp_rx_flow_get_fse_stats(struct dp_pdev *pdev,
 	fst = pdev->rx_fst;
 
 	/* Find the given flow entry DP FST */
-	fse = dp_rx_flow_find_entry_by_tuple(fst, rx_flow_info, &flow);
+	fse = dp_rx_flow_find_entry_by_tuple(soc->hal_soc, fst,
+					     rx_flow_info, &flow);
 	if (!fse) {
 		dp_err("RX flow entry search failed");
 		dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
@@ -594,6 +603,7 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 		    (sizeof(struct dp_rx_fse) * fst->max_entries));
 
 	fst->hal_rx_fst = hal_rx_fst_attach(
+				soc->hal_soc,
 				soc->osdev,
 				&fst->hal_rx_fst_base_paddr,
 				fst->max_entries,
@@ -660,7 +670,8 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 	}
 
 	if (qdf_likely(dp_fst)) {
-		hal_rx_fst_detach(dp_fst->hal_rx_fst, soc->osdev);
+		hal_rx_fst_detach(soc->hal_soc, dp_fst->hal_rx_fst,
+				  soc->osdev);
 		if (soc->is_rx_fse_full_cache_invalidate_war_enabled) {
 			qdf_timer_sync_cancel(&dp_fst->cache_invalidate_timer);
 			qdf_timer_stop(&dp_fst->cache_invalidate_timer);

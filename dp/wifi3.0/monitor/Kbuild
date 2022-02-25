@@ -71,9 +71,17 @@ INCS += -I$(obj)/$(DEPTH)/include \
         -I$(obj)/$(DEPTH)/cmn_dev/qal/linux/src/ \
         -I$(obj)/$(DEPTH)/cmn_dev/wmi/inc/ \
         -I$(obj)/$(DEPTH)/dp/ \
+        -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/core/inc \
+        -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/core/src \
+        -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/dispatcher/inc \
+        -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/dispatcher/src \
+        -I$(obj)/$(DEPTH)/cmn_dev/target_if/ipa/inc \
+        -I$(obj)/$(DEPTH)/cmn_dev/target_if/ipa/src \
         -I$(obj)/$(DEPTH)/pld/inc  \
         -I$(obj)/$(HOST_CMN_CONVG_SRC)/umac/mlo_mgr/inc \
         -I$(obj)/$(DEPTH)/cmn_dev/fw_hdr/fw/
+
+INCS += -I$(obj)/$(DEPTH)/cmn_dev/umac/twt/dispatcher/inc
 
 PERF_PWR_OFFLOAD_INC :=  \
         -I$(PERF_PWR_OFFLOAD_DIR_PATH)/wlan/include \
@@ -100,23 +108,7 @@ PERF_PWR_OFFLOAD_INC :=  \
 MONITOR_2_0_INC += -I$(obj)/$(DEPTH)/cmn_dev/dp/wifi3.0/monitor/2.0/
 MONITOR_1_0_INC += -I$(obj)/$(DEPTH)/cmn_dev/dp/wifi3.0/monitor/1.0/
 
-FW_HDRS_QCN9224_INC_PATH += -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/reg_header/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/include/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/common/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/datastruct/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/datastruct_16/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/tlv_32/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/tlv_64/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/user_ctlv_76/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/user_tlv_32/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/phy_ds/user_tlv_64/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/common/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/datastruct/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/datastruct_16/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/tlv_64/ \
-                        -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qcn9224/$(QCN9224_HDR_VER)/mac_ds/user_tlv_64
+FW_HDRS_QCN9224_INC_PATH += -I$(PERF_PWR_OFFLOAD_DIR_PATH)/../cmn_dev/fw_hdr/hw/qcn9224
 
 PERF_PWR_OFFLOAD_HW_LI_INC += -I$(PERF_PWR_OFFLOAD_DIR_PATH)/include/qca8074/v1/
 
@@ -157,8 +149,8 @@ monitor-objs := \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_mon_ol.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_rx_mon_feature.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/src/dp_tx_capture.o \
-	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/linux/dp_mon_osif.o \
-	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/linux/dp_mon_cfg80211.o \
+	$(HOST_CMN_CONVG_SRC)/../component_dev/os_if/linux/dp/src/dp_mon_osif.o \
+	$(HOST_CMN_CONVG_SRC)/../component_dev/os_if/linux/dp/src/dp_mon_cfg80211.o \
 	$(HOST_CMN_CONVG_SRC)/../component_dev/dp/wifi3.0/monitor/linux/dp_mon_module.o
 
 monitor-objs += \

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -18,7 +18,6 @@
  */
 
 #include <qcatools_lib.h>
-#include <cdp_txrx_stats_struct.h>
 #include <wlan_stats_define.h>
 #include <stats_lib.h>
 
@@ -61,6 +60,285 @@
 /* WLAN MAC Address length */
 #define USER_MAC_ADDR_LEN     (ETH_ALEN * 3)
 
+#define STATS_IF_NSS_LENGTH   (6 * STATS_IF_SS_COUNT)
+
+#define MAX_STRING_LEN        500
+
+#ifdef WLAN_FEATURE_11BE
+static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
+						   [STATS_IF_MAX_MCS] = {
+	{
+		{"OFDM 48 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 24 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 12 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 6 Mbps ", STATS_IF_MCS_VALID},
+		{"OFDM 54 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 36 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 18 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 9 Mbps ", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"CCK 11 Mbps Long  ", STATS_IF_MCS_VALID},
+		{"CCK 5.5 Mbps Long ", STATS_IF_MCS_VALID},
+		{"CCK 2 Mbps Long   ", STATS_IF_MCS_VALID},
+		{"CCK 1 Mbps Long   ", STATS_IF_MCS_VALID},
+		{"CCK 11 Mbps Short ", STATS_IF_MCS_VALID},
+		{"CCK 5.5 Mbps Short", STATS_IF_MCS_VALID},
+		{"CCK 2 Mbps Short  ", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"HT MCS 0 (BPSK 1/2)  ", STATS_IF_MCS_VALID},
+		{"HT MCS 1 (QPSK 1/2)  ", STATS_IF_MCS_VALID},
+		{"HT MCS 2 (QPSK 3/4)  ", STATS_IF_MCS_VALID},
+		{"HT MCS 3 (16-QAM 1/2)", STATS_IF_MCS_VALID},
+		{"HT MCS 4 (16-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HT MCS 5 (64-QAM 2/3)", STATS_IF_MCS_VALID},
+		{"HT MCS 6 (64-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HT MCS 7 (64-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"VHT MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"VHT MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"VHT MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"VHT MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"VHT MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"VHT MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"VHT MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"HE MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"HE MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"HE MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"HE MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"HE MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"EHT MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"EHT MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"EHT MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"EHT MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"EHT MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"EHT MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"EHT MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"EHT MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"EHT MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"EHT MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"EHT MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"EHT MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"EHT MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"EHT MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"EHT MCS 14 (BPSK-DCM 1/2)", STATS_IF_MCS_VALID},
+		{"EHT MCS 15 (BPSK-DCM 1/2)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	}
+};
+#else
+static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
+						   [STATS_IF_MAX_MCS] = {
+	{
+		{"OFDM 48 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 24 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 12 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 6 Mbps ", STATS_IF_MCS_VALID},
+		{"OFDM 54 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 36 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 18 Mbps", STATS_IF_MCS_VALID},
+		{"OFDM 9 Mbps ", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"CCK 11 Mbps Long  ", STATS_IF_MCS_VALID},
+		{"CCK 5.5 Mbps Long ", STATS_IF_MCS_VALID},
+		{"CCK 2 Mbps Long   ", STATS_IF_MCS_VALID},
+		{"CCK 1 Mbps Long   ", STATS_IF_MCS_VALID},
+		{"CCK 11 Mbps Short ", STATS_IF_MCS_VALID},
+		{"CCK 5.5 Mbps Short", STATS_IF_MCS_VALID},
+		{"CCK 2 Mbps Short  ", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"HT MCS 0 (BPSK 1/2)  ", STATS_IF_MCS_VALID},
+		{"HT MCS 1 (QPSK 1/2)  ", STATS_IF_MCS_VALID},
+		{"HT MCS 2 (QPSK 3/4)  ", STATS_IF_MCS_VALID},
+		{"HT MCS 3 (16-QAM 1/2)", STATS_IF_MCS_VALID},
+		{"HT MCS 4 (16-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HT MCS 5 (64-QAM 2/3)", STATS_IF_MCS_VALID},
+		{"HT MCS 6 (64-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HT MCS 7 (64-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"VHT MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"VHT MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"VHT MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"VHT MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"VHT MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"VHT MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"VHT MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"VHT MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"HE MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"HE MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"HE MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"HE MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"HE MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"HE MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	}
+};
+#endif
+
+#if WLAN_DEBUG_TELEMETRY
+#ifdef WLAN_FEATURE_11BE
+static const struct stats_if_ru_debug ru_string[STATS_IF_RU_INDEX_MAX] = {
+	{ "RU_26" },
+	{ "RU_52" },
+	{ "RU_52_26" },
+	{ "RU_106" },
+	{ "RU_106_26" },
+	{ "RU_242" },
+	{ "RU_484" },
+	{ "RU_484_242" },
+	{ "RU_996" },
+	{ "RU_996_484" },
+	{ "RU_996_484_242" },
+	{ "RU_2x996" },
+	{ "RU_2x996_484" },
+	{ "RU_3x996" },
+	{ "RU_3x996_484" },
+	{ "RU_4x996" },
+};
+#else
+static const struct stats_if_ru_debug ru_string[STATS_IF_RU_INDEX_MAX] = {
+	{ "RU_26" },
+	{ "RU_52" },
+	{ "RU_106" },
+	{ "RU_242" },
+	{ "RU_484" },
+	{ "RU_996" }
+};
+#endif
+
+static const char *proto_subtype_string[STATS_IF_PROTO_SUBTYPE_MAX] = {
+	"INVALID",
+	"EAPOL_M1",
+	"EAPOL_M2",
+	"EAPOL_M3",
+	"EAPOL_M4",
+	"DHCP_DISCOVER",
+	"DHCP_REQUEST",
+	"DHCP_OFFER",
+	"DHCP_ACK",
+	"DHCP_NACK",
+	"DHCP_RELEASE",
+	"DHCP_INFORM",
+	"DHCP_DECLINE",
+	"ARP_REQ",
+	"ARP_RES",
+	"ICMP_REQ",
+	"ICMP_RES",
+	"ICMPV6_REQ",
+	"ICMPV6_RES",
+	"ICMPV6_RS",
+	"ICMPV6_RA",
+	"ICMPV6_NS",
+	"ICMPV6_NA",
+	"IPV4_UDP",
+	"IPV4_TCP",
+	"IPV6_UDP",
+	"IPV6_TCP",
+	"MGMT_ASSOC",
+	"MGMT_DISASSOC",
+	"MGMT_AUTH",
+	"MGMT_DEAUTH",
+	"ROAM_SYNCH",
+	"ROAM_COMPLETE",
+	"ROAM_EVENTID",
+	"DNS_QUERY",
+	"DNS_RES",
+};
+
+const char *mu_reception_mode[STATS_IF_TXRX_TYPE_MU_MAX] = {
+	"MU MIMO", "MU OFDMA"
+};
+#endif /* WLAN_DEBUG_TELEMETRY */
+
 static const char *opt_string = "BADarvsdcf:i:m:Rh?";
 
 static const struct option long_opts[] = {
@@ -79,6 +357,33 @@ static const struct option long_opts[] = {
 	{ "recursive", no_argument, NULL, 'R' },
 	{ "help", no_argument, NULL, 'h' },
 	{ NULL, no_argument, NULL, 0 },
+};
+
+const char *stats_if_fw_to_hw_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 10 ms", "11 to 20 ms",
+	"21 to 30 ms", "31 to 40 ms",
+	"41 to 50 ms", "51 to 60 ms",
+	"61 to 70 ms", "71 to 80 ms",
+	"81 to 90 ms", "91 to 100 ms",
+	"101 to 250 ms", "251 to 500 ms", "500+ ms"
+};
+
+const char *stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 1 ms", "1 to 2 ms",
+	"2 to 3 ms", "3 to 4 ms",
+	"4 to 5 ms", "5 to 6 ms",
+	"6 to 7 ms", "7 to 8 ms",
+	"8 to 9 ms", "9 to 10 ms",
+	"10 to 11 ms", "11 to 12 ms", "12+ ms"
+};
+
+const char *stats_if_intfrm_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 5 ms", "6 to 10 ms",
+	"11 to 15 ms", "16 to 20 ms",
+	"21 to 25 ms", "26 to 30 ms",
+	"31 to 35 ms", "36 to 40 ms",
+	"41 to 45 ms", "46 to 50 ms",
+	"51 to 55 ms", "56 to 60 ms", "60+ ms"
 };
 
 static void display_help(void)
@@ -350,8 +655,8 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 	STATS_PRINT("\tTx SGI = 0.8us %u, 0.4us %u, 1.6us %u, 3.2us %u\n",
 		    tx->sgi_count[0], tx->sgi_count[1],
 		    tx->sgi_count[2], tx->sgi_count[3]);
-	STATS_PRINT("\tTx NSS (1-%d)\n\t", SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+	STATS_PRINT("\tTx NSS (1-%d)\n\t", STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), tx->nss[inx]);
 	STATS_PRINT("\n\tTx BW Counts = 20MHZ %u 40MHZ %u 80MHZ %u 160MHZ %u\n",
 		    tx->bw[0], tx->bw[1], tx->bw[2], tx->bw[3]);
@@ -381,30 +686,34 @@ void print_advance_data_rx_stats(struct advance_data_rx_stats *rx)
 	STATS_32(stdout, "Rx MPDU FCS Ok Count", rx->mpdu_cnt_fcs_ok);
 	STATS_32(stdout, "Rx MPDU FCS Error Count", rx->mpdu_cnt_fcs_err);
 	STATS_PRINT("\tRx PPDU Counts\n");
-	for (inx = 0; inx < MAX_MCS; inx++) {
-		if (!cdp_rate_string[DOT11_AX][inx].valid)
+	for (inx = 0; inx < STATS_IF_MAX_MCS; inx++) {
+		if (!rate_string[STATS_IF_DOT11_AX][inx].valid)
 			continue;
 		STATS_PRINT("\t\t%s = %u\n",
-			    cdp_rate_string[DOT11_AX][inx].mcs_type,
+			    rate_string[STATS_IF_DOT11_AX][inx].mcs_type,
 			    rx->su_ax_ppdu_cnt[inx]);
 	}
 	STATS_PRINT("\tRx SGI = 0.8us %u, 0.4us %u, 1.6us %u, 3.2us %u\n",
 		    rx->sgi_count[0], rx->sgi_count[1],
 		    rx->sgi_count[2], rx->sgi_count[3]);
-	STATS_PRINT("\tRx MSDU Counts for NSS (1-%u)\n\t", SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+	STATS_PRINT("\tRx MSDU Counts for NSS (1-%u)\n\t", STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), rx->nss[inx]);
 	STATS_PRINT("\n\tRx PPDU Counts for NSS (1-%u) in SU mode\n\t",
-		    SS_COUNT);
-	for (inx = 0; inx < SS_COUNT; inx++)
+		    STATS_IF_SS_COUNT);
+	for (inx = 0; inx < STATS_IF_SS_COUNT; inx++)
 		STATS_PRINT(" %u = %u ", (inx + 1), rx->ppdu_nss[inx]);
 	STATS_PRINT("\n\tRx BW Counts = 20MHZ %u 40MHZ %u 80MHZ %u 160MHZ %u\n",
 		    rx->bw[0], rx->bw[1], rx->bw[2], rx->bw[3]);
 	STATS_PRINT("\tRx Data Packets per AC\n");
-	STATS_32(stdout, "     Best effort", rx->wme_ac_type[WME_AC_BE]);
-	STATS_32(stdout, "      Background", rx->wme_ac_type[WME_AC_BK]);
-	STATS_32(stdout, "           Video", rx->wme_ac_type[WME_AC_VI]);
-	STATS_32(stdout, "           Voice", rx->wme_ac_type[WME_AC_VO]);
+	STATS_32(stdout, "     Best effort",
+		 rx->wme_ac_type[STATS_IF_WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 rx->wme_ac_type[STATS_IF_WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 rx->wme_ac_type[STATS_IF_WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 rx->wme_ac_type[STATS_IF_WME_AC_VO]);
 	STATS_PRINT("\tRx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", rx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
@@ -472,6 +781,89 @@ void print_advance_sta_data_nawds(struct advance_peer_data_nawds *nawds)
 	STATS_32(stdout, "NAWDS Rx Drop Count", nawds->nawds_mcast_rx_drop);
 }
 
+static void print_advance_hist_stats(struct stats_if_hist_stats *hstats,
+				     enum stats_if_hist_types hist_type)
+{
+	uint8_t index = 0;
+	uint64_t count = 0;
+
+	for (index = 0; index < STATS_IF_HIST_BUCKET_MAX; index++) {
+		count = hstats->hist.freq[index];
+		if (!count)
+			continue;
+		if (index > STATS_IF_DELAY_BUCKET_MAX) {
+			STATS_PRINT("%s: Packets = %ju ",
+				    "Invalid index", count);
+			continue;
+		}
+		switch (hist_type) {
+		case STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY:
+			STATS_PRINT("%s: Packets = %ju ",
+				    stats_if_sw_enq_delay_bucket[index],
+				    count);
+			break;
+		case STATS_IF_HIST_TYPE_HW_COMP_DELAY:
+			STATS_PRINT("%s: Packets = %ju ",
+				    stats_if_fw_to_hw_delay_bucket[index],
+				    count);
+			break;
+		case STATS_IF_HIST_TYPE_REAP_STACK:
+			STATS_PRINT("%s: Packets = %ju ",
+				    stats_if_intfrm_delay_bucket[index],
+				    count);
+			break;
+		default:
+			break;
+		}
+	}
+
+	STATS_PRINT("Min = %d ", hstats->min);
+	STATS_PRINT("Max = %d ", hstats->max);
+	STATS_PRINT("Avg = %d\n", hstats->avg);
+}
+
+static void print_advance_sta_data_delay(struct advance_peer_data_delay *delay)
+{
+	uint8_t tid;
+
+	STATS_PRINT("Tx Delay Stats:\n");
+	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
+		STATS_PRINT("----TID: %d----", tid);
+		STATS_PRINT(" Software Enqueue Delay: ");
+		print_advance_hist_stats(&delay->delay_stats[tid].tx_delay.tx_swq_delay,
+					 STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY);
+		STATS_PRINT("\t\tHardware Transmission Delay: ");
+		print_advance_hist_stats(&delay->delay_stats[tid].tx_delay.hwtx_delay,
+					 STATS_IF_HIST_TYPE_HW_COMP_DELAY);
+	}
+	STATS_PRINT("\nRx Delay Stats:\n");
+	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
+		STATS_PRINT("----TID: %d---- ", tid);
+		STATS_PRINT("Reap2stack Deliver Delay: ");
+		print_advance_hist_stats(&delay->delay_stats[tid].rx_delay
+					 .to_stack_delay,
+					 STATS_IF_HIST_TYPE_REAP_STACK);
+	}
+}
+
+static void
+print_advance_sta_data_jitter(struct advance_peer_data_jitter *jitter)
+{
+	uint8_t tid;
+
+	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
+		STATS_PRINT("----TID: %d---- ", tid);
+		STATS_PRINT("avg_jitter = %u ",
+			    jitter->jitter_stats[tid].tx_avg_jitter);
+		STATS_PRINT("avg_delay  = %u ",
+			    jitter->jitter_stats[tid].tx_avg_delay);
+		STATS_PRINT("avg_err  = %ju ",
+			    jitter->jitter_stats[tid].tx_avg_err);
+		STATS_PRINT("total_success = %ju ",
+			    jitter->jitter_stats[tid].tx_total_success);
+		STATS_PRINT("drop  = %ju\n", jitter->jitter_stats[tid].tx_drop);
+	}
+}
 void print_advance_sta_ctrl_tx(struct advance_peer_ctrl_tx *tx)
 {
 	print_basic_sta_ctrl_tx(&tx->b_tx);
@@ -750,593 +1142,168 @@ void print_advance_ap_data_rx(struct advance_psoc_data_rx *rx)
 	print_basic_ap_data_rx(&rx->b_rx);
 	STATS_32(stdout, "Rx Ring Error Packets", rx->err_ring_pkts);
 	STATS_32(stdout, "Rx Fragments", rx->rx_frags);
-	STATS_32(stdout, "Rx REO Reinject", rx->reo_reinject);
+	STATS_32(stdout, "Rx HW Reinject", rx->rx_hw_reinject);
 	STATS_32(stdout, "Rx BAR Frames", rx->bar_frame);
 	STATS_32(stdout, "Rx Rejected", rx->rejected);
 	STATS_32(stdout, "Rx RAW Frame Drop", rx->raw_frm_drop);
 }
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
-void print_basic_sta_data(struct stats_sta *sta, u_int8_t parent_id)
+void print_basic_sta_data(struct stats_obj *sta)
 {
-	struct stats_vap *parent = NULL;
-	bool reprint = true;
+	struct basic_peer_data *data = sta->stats;
 
-	while (sta) {
-		parent = sta->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic STA Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For STA %s\n",
-			    macaddr_to_str(sta->mac_addr));
-		if (sta->u_basic.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_sta_data_tx(sta->u_basic.data.tx);
-		}
-		if (sta->u_basic.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_sta_data_rx(sta->u_basic.data.rx);
-		}
-		if (sta->u_basic.data.link) {
-			STATS_PRINT("Link Stats\n");
-			print_basic_sta_data_link(sta->u_basic.data.link);
-		}
-		if (sta->u_basic.data.rate) {
-			STATS_PRINT("Rate Stats\n");
-			print_basic_sta_data_rate(sta->u_basic.data.rate);
-		}
-		sta = sta->mgr.next;
+	STATS_PRINT("Basic Data STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_sta_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_sta_data_rx(data->rx);
+	}
+	if (data->link) {
+		STATS_PRINT("Link Stats\n");
+		print_basic_sta_data_link(data->link);
+	}
+	if (data->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_basic_sta_data_rate(data->rate);
 	}
 }
 
-void print_basic_sta_ctrl(struct stats_sta *sta, u_int8_t parent_id)
+void print_basic_sta_ctrl(struct stats_obj *sta)
 {
-	struct stats_vap *parent = NULL;
-	bool reprint = true;
+	struct basic_peer_ctrl *ctrl = sta->stats;
 
-	while (sta) {
-		parent = sta->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic STA Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For STA %s\n",
-			    macaddr_to_str(sta->mac_addr));
-		if (sta->u_basic.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_sta_ctrl_tx(sta->u_basic.ctrl.tx);
-		}
-		if (sta->u_basic.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_sta_ctrl_rx(sta->u_basic.ctrl.rx);
-		}
-		if (sta->u_basic.ctrl.link) {
-			STATS_PRINT("Link Stats\n");
-			print_basic_sta_ctrl_link(sta->u_basic.ctrl.link);
-		}
-		if (sta->u_basic.ctrl.rate) {
-			STATS_PRINT("Rate Stats\n");
-			print_basic_sta_ctrl_rate(sta->u_basic.ctrl.rate);
-		}
-		sta = sta->mgr.next;
+	STATS_PRINT("Basic Control STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_sta_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_sta_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_basic_sta_ctrl_link(ctrl->link);
+	}
+	if (ctrl->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_basic_sta_ctrl_rate(ctrl->rate);
 	}
 }
 
-void print_basic_vap_data(struct stats_vap *vap, u_int8_t parent_id)
+void print_basic_vap_data(struct stats_obj *vap)
 {
-	struct stats_radio *parent = NULL;
-	bool reprint = true;
+	struct basic_vdev_data *data = vap->stats;
 
-	while (vap) {
-		parent = vap->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic VAP Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For VAP %s\n", vap->vap_name);
-		if (vap->u_basic.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_vap_data_tx(vap->u_basic.data.tx);
-		}
-		if (vap->u_basic.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_vap_data_rx(vap->u_basic.data.rx);
-		}
-		if (vap->recursive) {
-			print_basic_sta_data(vap->mgr.child_root, vap->id);
-			reprint = true;
-		}
-		vap = vap->mgr.next;
+	STATS_PRINT("Basic Data STATS For VAP %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_vap_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_vap_data_rx(data->rx);
 	}
 }
 
-void print_basic_vap_ctrl(struct stats_vap *vap, u_int8_t parent_id)
+void print_basic_vap_ctrl(struct stats_obj *vap)
 {
-	struct stats_radio *parent = NULL;
-	bool reprint = true;
+	struct basic_vdev_ctrl *ctrl = vap->stats;
 
-	while (vap) {
-		parent = vap->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic VAP Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For VAP %s\n", vap->vap_name);
-		if (vap->u_basic.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_vap_ctrl_tx(vap->u_basic.ctrl.tx);
-		}
-		if (vap->u_basic.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_vap_ctrl_rx(vap->u_basic.ctrl.rx);
-		}
-		if (vap->recursive) {
-			print_basic_sta_ctrl(vap->mgr.child_root, vap->id);
-			reprint = true;
-		}
-		vap = vap->mgr.next;
+	STATS_PRINT("Basic Control STATS For VAP %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_vap_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_vap_ctrl_rx(ctrl->rx);
 	}
 }
 
-void print_basic_radio_data(struct stats_radio *radio, u_int8_t parent_id)
+void print_basic_radio_data(struct stats_obj *radio)
 {
-	struct stats_ap *parent = NULL;
-	bool reprint = true;
+	struct basic_pdev_data *data = radio->stats;
 
-	while (radio) {
-		parent = radio->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic Radio Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Radio %s\n", radio->radio_name);
-		if (radio->u_basic.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_radio_data_tx(radio->u_basic.data.tx);
-		}
-		if (radio->u_basic.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_radio_data_rx(radio->u_basic.data.rx);
-		}
-		if (radio->recursive) {
-			print_basic_vap_data(radio->mgr.child_root, radio->id);
-			reprint = true;
-		}
-		radio = radio->mgr.next;
+	STATS_PRINT("Basic Data STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_radio_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_radio_data_rx(data->rx);
 	}
 }
 
-void print_basic_radio_ctrl(struct stats_radio *radio, u_int8_t parent_id)
+void print_basic_radio_ctrl(struct stats_obj *radio)
 {
-	struct stats_ap *parent = NULL;
-	bool reprint = true;
+	struct basic_pdev_ctrl *ctrl = radio->stats;
 
-	while (radio) {
-		parent = radio->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic Radio Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Radio %s\n", radio->radio_name);
-		if (radio->u_basic.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_radio_ctrl_tx(radio->u_basic.ctrl.tx);
-		}
-		if (radio->u_basic.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_radio_ctrl_rx(radio->u_basic.ctrl.rx);
-		}
-		if (radio->u_basic.ctrl.link) {
-			STATS_PRINT("Link Stats\n");
-			print_basic_radio_ctrl_link(radio->u_basic.ctrl.link);
-		}
-		if (radio->recursive) {
-			print_basic_vap_ctrl(radio->mgr.child_root, radio->id);
-			reprint = true;
-		}
-		radio = radio->mgr.next;
+	STATS_PRINT("Basic Control STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_radio_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_radio_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_basic_radio_ctrl_link(ctrl->link);
 	}
 }
 
-void print_basic_ap_data(struct stats_ap *ap)
+void print_basic_ap_data(struct stats_obj *ap)
 {
-	bool reprint = true;
+	struct basic_psoc_data *data = ap->stats;
 
-	while (ap) {
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic AP Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for AP %s\n", ap->ap_name);
-		if (ap->u.b_data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_basic_ap_data_tx(ap->u.b_data.tx);
-		}
-		if (ap->u.b_data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_basic_ap_data_rx(ap->u.b_data.rx);
-		}
-		if (ap->recursive) {
-			print_basic_radio_data(ap->mgr.child_root, ap->id);
-			reprint = true;
-		}
-		ap = ap->mgr.next;
+	STATS_PRINT("Basic Data STATS for AP %s\n", ap->u_id.if_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_basic_ap_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_basic_ap_data_rx(data->rx);
 	}
 }
 
-void print_basic_ap_ctrl(struct stats_ap *ap)
+void print_basic_stats(struct stats_obj *obj)
 {
-	bool reprint = true;
-
-	while (ap) {
-		if (reprint) {
-			STATS_PRINT("\n\t\tBasic AP Control Stats");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for AP %s\n", ap->ap_name);
-		if (ap->recursive) {
-			print_basic_radio_ctrl(ap->mgr.child_root, ap->id);
-			reprint = true;
-		}
-		ap = ap->mgr.next;
-	}
-}
-
-#if WLAN_ADVANCE_TELEMETRY
-void print_advance_sta_data(struct stats_sta *sta, u_int8_t parent_id)
-{
-	struct stats_vap *parent = NULL;
-	bool reprint = true;
-
-	while (sta) {
-		parent = sta->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance STA Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For STA %s\n",
-			    macaddr_to_str(sta->mac_addr));
-		if (sta->u_advance.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_sta_data_tx(sta->u_advance.data.tx);
-		}
-		if (sta->u_advance.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_sta_data_rx(sta->u_advance.data.rx);
-		}
-		if (sta->u_advance.data.fwd) {
-			STATS_PRINT("Intra Bss (FWD) Stats\n");
-			print_advance_sta_data_fwd(sta->u_advance.data.fwd);
-		}
-		if (sta->u_advance.data.raw) {
-			STATS_PRINT("RAW Stats\n");
-			print_advance_sta_data_raw(sta->u_advance.data.raw);
-		}
-		if (sta->u_advance.data.twt) {
-			STATS_PRINT("TWT Stats\n");
-			print_advance_sta_data_twt(sta->u_advance.data.twt);
-		}
-		if (sta->u_advance.data.link) {
-			STATS_PRINT("Link Stats\n");
-			print_advance_sta_data_link(sta->u_advance.data.link);
-		}
-		if (sta->u_advance.data.rate) {
-			STATS_PRINT("Rate Stats\n");
-			print_advance_sta_data_rate(sta->u_advance.data.rate);
-		}
-		if (sta->u_advance.data.nawds) {
-			STATS_PRINT("NAWDS Stats\n");
-			print_advance_sta_data_nawds(sta->u_advance.data.nawds);
-		}
-		sta = sta->mgr.next;
-	}
-}
-
-void print_advance_sta_ctrl(struct stats_sta *sta, u_int8_t parent_id)
-{
-	struct stats_vap *parent = NULL;
-	bool reprint = true;
-
-	while (sta) {
-		parent = sta->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance STA Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS For STA %s\n",
-			    macaddr_to_str(sta->mac_addr));
-		if (sta->u_advance.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_sta_ctrl_tx(sta->u_advance.ctrl.tx);
-		}
-		if (sta->u_advance.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_sta_ctrl_rx(sta->u_advance.ctrl.rx);
-		}
-		if (sta->u_advance.ctrl.twt) {
-			STATS_PRINT("TWT Stats\n");
-			print_advance_sta_ctrl_twt(sta->u_advance.ctrl.twt);
-		}
-		if (sta->u_advance.ctrl.link) {
-			STATS_PRINT("Link Stats\n");
-			print_advance_sta_ctrl_link(sta->u_advance.ctrl.link);
-		}
-		if (sta->u_advance.ctrl.rate) {
-			STATS_PRINT("Rate Stats\n");
-			print_advance_sta_ctrl_rate(sta->u_advance.ctrl.rate);
-		}
-		sta = sta->mgr.next;
-	}
-}
-
-void print_advance_vap_data(struct stats_vap *vap, u_int8_t parent_id)
-{
-	struct stats_radio *parent = NULL;
-	bool reprint = true;
-
-	while (vap) {
-		parent = vap->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance VAP Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Vap %s\n", vap->vap_name);
-		if (vap->u_advance.data.me) {
-			STATS_PRINT("ME Stats\n");
-			print_advance_vap_data_me(vap->u_advance.data.me);
-		}
-		if (vap->u_advance.data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_vap_data_tx(vap->u_advance.data.tx);
-		}
-		if (vap->u_advance.data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_vap_data_rx(vap->u_advance.data.rx);
-		}
-		if (vap->u_advance.data.raw) {
-			STATS_PRINT("RAW Stats\n");
-			print_advance_vap_data_raw(vap->u_advance.data.raw);
-		}
-		if (vap->u_advance.data.tso) {
-			STATS_PRINT("TSO Stats\n");
-			print_advance_vap_data_tso(vap->u_advance.data.tso);
-		}
-		if (vap->u_advance.data.igmp) {
-			STATS_PRINT("IGMP Stats\n");
-			print_advance_vap_data_igmp(vap->u_advance.data.igmp);
-		}
-		if (vap->u_advance.data.mesh) {
-			STATS_PRINT("MESH Stats\n");
-			print_advance_vap_data_mesh(vap->u_advance.data.mesh);
-		}
-		if (vap->u_advance.data.nawds) {
-			STATS_PRINT("NAWDS Stats\n");
-			print_advance_vap_data_nawds(vap->u_advance.data.nawds);
-		}
-		if (vap->recursive) {
-			print_advance_sta_data(vap->mgr.child_root, vap->id);
-			reprint = true;
-		}
-		vap = vap->mgr.next;
-	}
-}
-
-void print_advance_vap_ctrl(struct stats_vap *vap, u_int8_t parent_id)
-{
-	struct stats_radio *parent = NULL;
-	bool reprint = true;
-
-	while (vap) {
-		parent = vap->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance VAP Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Vap %s\n", vap->vap_name);
-		if (vap->u_advance.ctrl.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_vap_ctrl_tx(vap->u_advance.ctrl.tx);
-		}
-		if (vap->u_advance.ctrl.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_vap_ctrl_rx(vap->u_advance.ctrl.rx);
-		}
-		if (vap->recursive) {
-			print_advance_sta_ctrl(vap->mgr.child_root, vap->id);
-			reprint = true;
-		}
-		vap = vap->mgr.next;
-	}
-}
-
-void print_advance_radio_data(struct stats_radio *radio, u_int8_t parent_id)
-{
-	struct stats_ap *parent = NULL;
-	struct advance_pdev_data *data = NULL;
-	bool reprint = true;
-
-	while (radio) {
-		parent = radio->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance Radio Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Radio %s\n", radio->radio_name);
-		data = &radio->u_advance.data;
-		if (data->me) {
-			STATS_PRINT("ME Stats\n");
-			print_advance_radio_data_me(data->me);
-		}
-		if (data->tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_radio_data_tx(data->tx);
-		}
-		if (data->rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_radio_data_rx(data->rx);
-		}
-		if (data->raw) {
-			STATS_PRINT("RAW Stats\n");
-			print_advance_radio_data_raw(data->raw);
-		}
-		if (data->tso) {
-			STATS_PRINT("TSO Stats\n");
-			print_advance_radio_data_tso(data->tso);
-		}
-		if (data->igmp) {
-			STATS_PRINT("IGMP Stats\n");
-			print_advance_radio_data_igmp(data->igmp);
-		}
-		if (data->mesh) {
-			STATS_PRINT("MESH Stats\n");
-			print_advance_radio_data_mesh(data->mesh);
-		}
-		if (data->nawds) {
-			STATS_PRINT("NAWDS Stats\n");
-			print_advance_radio_data_nawds(data->nawds);
-		}
-		if (radio->recursive) {
-			print_advance_vap_data(radio->mgr.child_root,
-					       radio->id);
-			reprint = true;
-		}
-		radio = radio->mgr.next;
-	}
-}
-
-void print_advance_radio_ctrl(struct stats_radio *radio, u_int8_t parent_id)
-{
-	struct stats_ap *parent = NULL;
-	struct advance_pdev_ctrl *ctrl = NULL;
-	bool reprint = true;
-
-	while (radio) {
-		parent = radio->mgr.parent;
-		if (parent && (parent_id != parent->id))
-			break;
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance Radio Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for Radio %s\n", radio->radio_name);
-		ctrl = &radio->u_advance.ctrl;
-		if (ctrl->tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_radio_ctrl_tx(ctrl->tx);
-		}
-		if (ctrl->rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_radio_ctrl_rx(ctrl->rx);
-		}
-		if (ctrl->link) {
-			STATS_PRINT("Link Stats\n");
-			print_advance_radio_ctrl_link(ctrl->link);
-		}
-		if (radio->recursive) {
-			print_advance_vap_ctrl(radio->mgr.child_root,
-					       radio->id);
-			reprint = true;
-		}
-		radio = radio->mgr.next;
-	}
-}
-
-void print_advance_ap_data(struct stats_ap *ap)
-{
-	bool reprint = true;
-
-	while (ap) {
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance AP Data Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for AP %s\n", ap->ap_name);
-		if (ap->u.a_data.tx) {
-			STATS_PRINT("Tx Stats\n");
-			print_advance_ap_data_tx(ap->u.a_data.tx);
-		}
-		if (ap->u.a_data.rx) {
-			STATS_PRINT("Rx Stats\n");
-			print_advance_ap_data_rx(ap->u.a_data.rx);
-		}
-		if (ap->recursive) {
-			print_advance_radio_data(ap->mgr.child_root, ap->id);
-			reprint = true;
-		}
-		ap = ap->mgr.next;
-	}
-}
-
-void print_advance_ap_ctrl(struct stats_ap *ap)
-{
-	bool reprint = true;
-
-	while (ap) {
-		if (reprint) {
-			STATS_PRINT("\n\t\tAdvance AP Control Stats\n");
-			reprint = false;
-		}
-		STATS_PRINT("STATS for AP %s\n", ap->ap_name);
-		if (ap->recursive) {
-			print_advance_radio_ctrl(ap->mgr.child_root, ap->id);
-			reprint = true;
-		}
-		ap = ap->mgr.next;
-	}
-}
-#endif /* WLAN_ADVANCE_TELEMETRY */
-
-void print_basic_stats(struct stats_command *cmd)
-{
-	struct reply_buffer *reply = cmd->reply;
-
-	switch (cmd->obj) {
+	switch (obj->obj_type) {
 	case STATS_OBJ_STA:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_basic_sta_data(reply->obj_list.sta_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_basic_sta_data(obj);
 		else
-			print_basic_sta_ctrl(reply->obj_list.sta_list, 0);
+			print_basic_sta_ctrl(obj);
 		break;
 	case STATS_OBJ_VAP:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_basic_vap_data(reply->obj_list.vap_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_basic_vap_data(obj);
 		else
-			print_basic_vap_ctrl(reply->obj_list.vap_list, 0);
+			print_basic_vap_ctrl(obj);
 		break;
 	case STATS_OBJ_RADIO:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_basic_radio_data(reply->obj_list.radio_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_basic_radio_data(obj);
 		else
-			print_basic_radio_ctrl(reply->obj_list.radio_list, 0);
+			print_basic_radio_ctrl(obj);
 		break;
 	case STATS_OBJ_AP:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_basic_ap_data(reply->obj_list.ap_list);
-		else
-			print_basic_ap_ctrl(reply->obj_list.ap_list);
+		if (obj->type == STATS_TYPE_DATA)
+			print_basic_ap_data(obj);
 		break;
 	default:
 		STATS_ERR("Invalid object option\n");
@@ -1344,34 +1311,237 @@ void print_basic_stats(struct stats_command *cmd)
 }
 
 #if WLAN_ADVANCE_TELEMETRY
-void print_advance_stats(struct stats_command *cmd)
+void print_advance_sta_data(struct stats_obj *sta)
 {
-	struct reply_buffer *reply = cmd->reply;
+	struct advance_peer_data *data = sta->stats;
 
-	switch (cmd->obj) {
+	STATS_PRINT("Advance Data STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_sta_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_sta_data_rx(data->rx);
+	}
+	if (data->fwd) {
+		STATS_PRINT("Intra Bss (FWD) Stats\n");
+		print_advance_sta_data_fwd(data->fwd);
+	}
+	if (data->raw) {
+		STATS_PRINT("RAW Stats\n");
+		print_advance_sta_data_raw(data->raw);
+	}
+	if (data->twt) {
+		STATS_PRINT("TWT Stats\n");
+		print_advance_sta_data_twt(data->twt);
+	}
+	if (data->link) {
+		STATS_PRINT("Link Stats\n");
+		print_advance_sta_data_link(data->link);
+	}
+	if (data->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_advance_sta_data_rate(data->rate);
+	}
+	if (data->nawds) {
+		STATS_PRINT("NAWDS Stats\n");
+		print_advance_sta_data_nawds(data->nawds);
+	}
+	if (data->delay) {
+		STATS_PRINT("DELAY Stats\n");
+		print_advance_sta_data_delay(data->delay);
+	}
+	if (data->jitter) {
+		STATS_PRINT("JITTER Stats\n");
+		print_advance_sta_data_jitter(data->jitter);
+	}
+}
+
+void print_advance_sta_ctrl(struct stats_obj *sta)
+{
+	struct advance_peer_ctrl *ctrl = sta->stats;
+
+	STATS_PRINT("Advance Control STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_sta_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_sta_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->twt) {
+		STATS_PRINT("TWT Stats\n");
+		print_advance_sta_ctrl_twt(ctrl->twt);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_advance_sta_ctrl_link(ctrl->link);
+	}
+	if (ctrl->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_advance_sta_ctrl_rate(ctrl->rate);
+	}
+}
+
+void print_advance_vap_data(struct stats_obj *vap)
+{
+	struct advance_vdev_data *data = vap->stats;
+
+	STATS_PRINT("Advance Data STATS for Vap %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (data->me) {
+		STATS_PRINT("ME Stats\n");
+		print_advance_vap_data_me(data->me);
+	}
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_vap_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_vap_data_rx(data->rx);
+	}
+	if (data->raw) {
+		STATS_PRINT("RAW Stats\n");
+		print_advance_vap_data_raw(data->raw);
+	}
+	if (data->tso) {
+		STATS_PRINT("TSO Stats\n");
+		print_advance_vap_data_tso(data->tso);
+	}
+	if (data->igmp) {
+		STATS_PRINT("IGMP Stats\n");
+		print_advance_vap_data_igmp(data->igmp);
+	}
+	if (data->mesh) {
+		STATS_PRINT("MESH Stats\n");
+		print_advance_vap_data_mesh(data->mesh);
+	}
+	if (data->nawds) {
+		STATS_PRINT("NAWDS Stats\n");
+		print_advance_vap_data_nawds(data->nawds);
+	}
+}
+
+void print_advance_vap_ctrl(struct stats_obj *vap)
+{
+	struct advance_vdev_ctrl *ctrl = vap->stats;
+
+	STATS_PRINT("Advance Control STATS for Vap %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_vap_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_vap_ctrl_rx(ctrl->rx);
+	}
+}
+
+void print_advance_radio_data(struct stats_obj *radio)
+{
+	struct advance_pdev_data *data = radio->stats;
+
+	STATS_PRINT("Advance Data STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (data->me) {
+		STATS_PRINT("ME Stats\n");
+		print_advance_radio_data_me(data->me);
+	}
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_radio_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_radio_data_rx(data->rx);
+	}
+	if (data->raw) {
+		STATS_PRINT("RAW Stats\n");
+		print_advance_radio_data_raw(data->raw);
+	}
+	if (data->tso) {
+		STATS_PRINT("TSO Stats\n");
+		print_advance_radio_data_tso(data->tso);
+	}
+	if (data->igmp) {
+		STATS_PRINT("IGMP Stats\n");
+		print_advance_radio_data_igmp(data->igmp);
+	}
+	if (data->mesh) {
+		STATS_PRINT("MESH Stats\n");
+		print_advance_radio_data_mesh(data->mesh);
+	}
+	if (data->nawds) {
+		STATS_PRINT("NAWDS Stats\n");
+		print_advance_radio_data_nawds(data->nawds);
+	}
+}
+
+void print_advance_radio_ctrl(struct stats_obj *radio)
+{
+	struct advance_pdev_ctrl *ctrl = radio->stats;
+
+	STATS_PRINT("Advance Control STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_radio_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_radio_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_advance_radio_ctrl_link(ctrl->link);
+	}
+}
+
+void print_advance_ap_data(struct stats_obj *ap)
+{
+	struct advance_psoc_data *data = ap->stats;
+
+	STATS_PRINT("Advance Data STATS for AP %s\n", ap->u_id.if_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_advance_ap_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_advance_ap_data_rx(data->rx);
+	}
+}
+
+void print_advance_stats(struct stats_obj *obj)
+{
+	switch (obj->obj_type) {
 	case STATS_OBJ_STA:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_advance_sta_data(reply->obj_list.sta_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_advance_sta_data(obj);
 		else
-			print_advance_sta_ctrl(reply->obj_list.sta_list, 0);
+			print_advance_sta_ctrl(obj);
 		break;
 	case STATS_OBJ_VAP:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_advance_vap_data(reply->obj_list.vap_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_advance_vap_data(obj);
 		else
-			print_advance_vap_ctrl(reply->obj_list.vap_list, 0);
+			print_advance_vap_ctrl(obj);
 		break;
 	case STATS_OBJ_RADIO:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_advance_radio_data(reply->obj_list.radio_list, 0);
+		if (obj->type == STATS_TYPE_DATA)
+			print_advance_radio_data(obj);
 		else
-			print_advance_radio_ctrl(reply->obj_list.radio_list, 0);
+			print_advance_radio_ctrl(obj);
 		break;
 	case STATS_OBJ_AP:
-		if (cmd->type == STATS_TYPE_DATA)
-			print_advance_ap_data(reply->obj_list.ap_list);
-		else
-			print_advance_ap_ctrl(reply->obj_list.ap_list);
+		if (obj->type == STATS_TYPE_DATA)
+			print_advance_ap_data(obj);
 		break;
 	default:
 		STATS_ERR("Invalid object option\n");
@@ -1379,23 +1549,1169 @@ void print_advance_stats(struct stats_command *cmd)
 }
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
-void print_response(struct stats_command *cmd)
+#if WLAN_DEBUG_TELEMETRY
+#ifdef VDEV_PEER_PROTOCOL_COUNT
+static void stats_if_print_tx_proto_trace(struct debug_data_tx_stats *tx)
 {
-	switch (cmd->lvl) {
-	case STATS_LVL_BASIC:
-		print_basic_stats(cmd);
+	STATS_PRINT("\tTx Data Packets PROTOCOL Based:\n");
+	STATS_16(stdout, "ICMP tx ingress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].ingress_cnt);
+	STATS_16(stdout, "ICMP tx egress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].egress_cnt);
+	STATS_16(stdout, "ARP tx ingress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_ARP].ingress_cnt);
+	STATS_16(stdout, "ARP tx egress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_ARP].egress_cnt);
+	STATS_16(stdout, "EAP tx ingress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_EAP].ingress_cnt);
+	STATS_16(stdout, "EAP tx egress",
+		 tx->protocol_trace_cnt[STATS_IF_TRACE_EAP].egress_cnt);
+}
+
+static void stats_if_print_rx_proto_trace(struct debug_data_rx_stats *rx)
+{
+	STATS_PRINT("\tRx Data Packets PROTOCOL Based:\n");
+	STATS_16(stdout, "ICMP rx ingress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].ingress_cnt);
+	STATS_16(stdout, "ICMP rx egress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_ICMP].egress_cnt);
+	STATS_16(stdout, "ARP rx ingress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_ARP].ingress_cnt);
+	STATS_16(stdout, "ARP rx egress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_ARP].egress_cnt);
+	STATS_16(stdout, "EAP rx ingress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_EAP].ingress_cnt);
+	STATS_16(stdout, "EAP rx egress",
+		 rx->protocol_trace_cnt[STATS_IF_TRACE_EAP].egress_cnt);
+}
+#else
+static void stats_if_print_tx_proto_trace(struct debug_data_tx_stats *tx)
+{
+}
+
+static void stats_if_print_rx_proto_trace(struct debug_data_rx_stats *rx)
+{
+}
+#endif /* VDEV_PEER_PROTOCOL_COUNT */
+
+static void stats_if_print_ru_loc(struct debug_data_tx_stats *tx)
+{
+	uint8_t i;
+
+	STATS_PRINT("\tRU Locations:\n");
+	STATS_PRINT("\t\tMSDU:\n");
+	for (i = 0; i < STATS_IF_RU_INDEX_MAX; i++) {
+		STATS_PRINT("\t\t%s:  %u\n", ru_string[i].ru_type,
+			    tx->ru_loc[i].num_msdu);
+	}
+	STATS_PRINT("\t\tMPDU:\n");
+	for (i = 0; i < STATS_IF_RU_INDEX_MAX; i++) {
+		STATS_PRINT("\t\t%s:  %u\n", ru_string[i].ru_type,
+			    tx->ru_loc[i].num_mpdu);
+	}
+	STATS_PRINT("\t\tMPDU Tried:\n");
+	for (i = 0; i < STATS_IF_RU_INDEX_MAX; i++) {
+		STATS_PRINT("\t\t%s:  %u\n", ru_string[i].ru_type,
+			    tx->ru_loc[i].mpdu_tried);
+	}
+}
+
+void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
+{
+	char mu_group_id[STATS_IF_MU_GROUP_LENGTH] = {'\0'};
+	uint8_t i, mcs, ptype;
+	uint32_t j, index;
+
+	STATS_PRINT("\tTx Stats in Last One Second:\n");
+	STATS_32(stdout, "Tx success packets", tx->tx_data_success_last);
+	STATS_32(stdout, "Tx success bytes", tx->tx_bytes_success_last);
+	STATS_32(stdout, "Tx packets", tx->tx_data_rate);
+	STATS_32(stdout, "Tx bytes", tx->tx_byte_rate);
+	STATS_32(stdout, "Tx Packet Error Rate (PER)", tx->last_per);
+	STATS_32(stdout, "Tx unicast data", tx->tx_data_ucast_last);
+	STATS_32(stdout, "Tx unicast data rate", tx->tx_data_ucast_rate);
+	STATS_PRINT("\n");
+	STATS_32(stdout, "Inactive time in seconds", tx->inactive_time);
+	STATS_32(stdout, "Total packets as Ofdma", tx->ofdma);
+	STATS_32(stdout, "Total packets in STBC", tx->stbc);
+	STATS_32(stdout, "Total packets in LDPC", tx->ldpc);
+	STATS_32(stdout, "Number of PPDU's with Punctured Preamble",
+		 tx->pream_punct_cnt);
+	STATS_32(stdout, "Number of stand alone received",
+		 tx->num_ppdu_cookie_valid);
+	STATS_PRINT("\tPackets dropped on the Tx side:\n");
+	STATS_64(stdout, "Firmware discarded packets", tx->fw_rem.num);
+	STATS_64(stdout, "Firmware discarded bytes", tx->fw_rem.bytes);
+	STATS_32(stdout, "Firmware discard untransmitted", tx->fw_rem_notx);
+	STATS_32(stdout, "Firmware discard transmitted", tx->fw_rem_tx);
+	STATS_32(stdout, "Aged out in mpdu/msdu queues", tx->age_out);
+	STATS_32(stdout, "Firmware discard untransmitted fw_reason1",
+		 tx->fw_reason1);
+	STATS_32(stdout, "Firmware discard untransmitted fw_reason2",
+		 tx->fw_reason2);
+	STATS_32(stdout, "Firmware discard untransmitted fw_reason3",
+		 tx->fw_reason3);
+	STATS_PRINT("\tLast Packet RU index [%u], Size [%u]\n",
+		    tx->ru_start, tx->ru_tones);
+	STATS_PRINT("\tTx Data Packets per AC\n");
+	STATS_32(stdout, "     Best effort",
+		 tx->wme_ac_type[STATS_IF_WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 tx->wme_ac_type[STATS_IF_WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 tx->wme_ac_type[STATS_IF_WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 tx->wme_ac_type[STATS_IF_WME_AC_VO]);
+	STATS_PRINT("\tExcess Retries per AC\n");
+	STATS_32(stdout, "     Best effort",
+		 tx->excess_retries_per_ac[STATS_IF_WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 tx->excess_retries_per_ac[STATS_IF_WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 tx->excess_retries_per_ac[STATS_IF_WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 tx->excess_retries_per_ac[STATS_IF_WME_AC_VO]);
+	STATS_PRINT("\tTransmit Type:\n");
+	STATS_PRINT("\tMSDU:SU %u, MU_MIMO %u, MU_OFDMA %u, MU_MIMO_OFDMA %u\n",
+		    tx->transmit_type[STATS_IF_SU].num_msdu,
+		    tx->transmit_type[STATS_IF_MU_MIMO].num_msdu,
+		    tx->transmit_type[STATS_IF_MU_OFDMA].num_msdu,
+		    tx->transmit_type[STATS_IF_MU_MIMO_OFDMA].num_msdu);
+	STATS_PRINT("\tMPDU:SU %u, MU_MIMO %u, MU_OFDMA %u, MU_MIMO_OFDMA %u\n",
+		    tx->transmit_type[STATS_IF_SU].num_mpdu,
+		    tx->transmit_type[STATS_IF_MU_MIMO].num_mpdu,
+		    tx->transmit_type[STATS_IF_MU_OFDMA].num_mpdu,
+		    tx->transmit_type[STATS_IF_MU_MIMO_OFDMA].num_mpdu);
+	STATS_PRINT("\tMPDU Tried:");
+	STATS_PRINT("SU %u, MU_MIMO %u, MU_OFDMA %u, MU_MIMO_OFDMA %u\n",
+		    tx->transmit_type[STATS_IF_SU].mpdu_tried,
+		    tx->transmit_type[STATS_IF_MU_MIMO].mpdu_tried,
+		    tx->transmit_type[STATS_IF_MU_OFDMA].mpdu_tried,
+		    tx->transmit_type[STATS_IF_MU_MIMO_OFDMA].mpdu_tried);
+	for (i = 0; i < STATS_IF_MAX_MU_GROUP_ID;) {
+		index = 0;
+		for (j = 0; j < STATS_IF_MU_GROUP_SHOW &&
+		     i < STATS_IF_MAX_MU_GROUP_ID; j++) {
+			index += snprintf(&mu_group_id[index],
+					  STATS_IF_MU_GROUP_LENGTH - index,
+					  " %d", tx->mu_group_id[i]);
+			i++;
+		}
+		STATS_PRINT("\tUser position list for GID %02u->%u: [%s]\n",
+			    i - STATS_IF_MU_GROUP_SHOW, i - 1, mu_group_id);
+	}
+	STATS_PRINT("\tTx Rate Info:\n");
+	for (ptype = 0; ptype < STATS_IF_DOT11_MAX; ptype++) {
+		index = 0;
+		for (mcs = 0; mcs < STATS_IF_MAX_MCS; mcs++) {
+			if (rate_string[ptype][mcs].valid)
+				STATS_PRINT("\t\t %s = %u\n",
+					    rate_string[ptype][mcs].mcs_type,
+					    tx->pkt_type[ptype].mcs_count[mcs]);
+		}
+	}
+
+	stats_if_print_ru_loc(tx);
+	stats_if_print_tx_proto_trace(tx);
+
+	STATS_PRINT("\tTx Ack not recevied counter:\n");
+	for (ptype = STATS_IF_PROTO_EAPOL_M1;
+	     ptype < STATS_IF_PROTO_SUBTYPE_MAX; ptype++) {
+		if (tx->no_ack_count[ptype])
+			STATS_PRINT("\t\t%s = %u\n",
+				    proto_subtype_string[ptype],
+				    tx->no_ack_count[ptype]);
+	}
+}
+
+void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
+{
+	enum stats_if_mu_packet_type rx_mu_type;
+	struct rx_mu_info *rx_mu;
+	uint32_t *pnss;
+	char nss[STATS_IF_NSS_LENGTH];
+	uint8_t i;
+	uint32_t index;
+
+	STATS_PRINT("\tRx Stats in Last One Second:\n");
+	STATS_32(stdout, "Rx packets", rx->rx_data_success_last);
+	STATS_32(stdout, "Rx bytes", rx->rx_bytes_success_last);
+	STATS_32(stdout, "Rx packets", rx->rx_data_rate);
+	STATS_32(stdout, "Rx bytes", rx->rx_byte_rate);
+	STATS_PRINT("\n");
+	STATS_32(stdout, "Rx Dropped", rx->rx_discard);
+	STATS_32(stdout, "Rx MIC Error", rx->mic_err);
+	STATS_32(stdout, "Rx Decrypt Error", rx->decrypt_err);
+	STATS_32(stdout, "Rx FCS Error", rx->fcserr);
+	STATS_32(stdout, "Rx PN Error", rx->pn_err);
+	STATS_32(stdout, "Rx Out of Order Error", rx->oor_err);
+	STATS_64(stdout, "Rx MEC drop packets", rx->mec_drop.num);
+	STATS_64(stdout, "Rx MEC drop bytes", rx->mec_drop.bytes);
+	STATS_PRINT("\tMSDU Reception Type:\n");
+	STATS_PRINT("\t\tSU %u MU_MIMO %u MU_OFDMA %u MU_OFDMA_MIMO %u\n",
+		    rx->reception_type[STATS_IF_SU],
+		    rx->reception_type[STATS_IF_MU_MIMO],
+		    rx->reception_type[STATS_IF_MU_OFDMA],
+		    rx->reception_type[STATS_IF_MU_MIMO_OFDMA]);
+	STATS_PRINT("\tPPDU Reception Type:\n");
+	STATS_PRINT("\t\tSU %u MU_MIMO %u MU_OFDMA %u MU_OFDMA_MIMO %u\n",
+		    rx->ppdu_cnt[STATS_IF_SU],
+		    rx->ppdu_cnt[STATS_IF_MU_MIMO],
+		    rx->ppdu_cnt[STATS_IF_MU_OFDMA],
+		    rx->ppdu_cnt[STATS_IF_MU_MIMO_OFDMA]);
+	for (rx_mu_type = 0; rx_mu_type < STATS_IF_TXRX_TYPE_MU_MAX;
+	     rx_mu_type++) {
+		STATS_PRINT("\tReception mode %s\n",
+			    mu_reception_mode[rx_mu_type]);
+		rx_mu = &rx->rx_mu[rx_mu_type];
+		pnss = &rx_mu->ppdu_nss[0];
+		index = 0;
+		for (i = 0; i < STATS_IF_SS_COUNT; i++) {
+			index += snprintf(&nss[index],
+					  STATS_IF_NSS_LENGTH - index,
+					  " %u", *(pnss + i));
+		}
+		STATS_PRINT("\t\tPPDU Count\n");
+		STATS_PRINT("\t\t\tNSS(1-8) = %s\n", nss);
+		STATS_PRINT("\t\t\tMPDU OK = %u, MPDU Fail = %u\n",
+			    rx_mu->mpdu_cnt_fcs_ok, rx_mu->mpdu_cnt_fcs_err);
+	}
+
+	stats_if_print_rx_proto_trace(rx);
+
+	for (i = 0; i <  STATS_IF_MAX_RX_RINGS; i++) {
+		STATS_PRINT("\tRing Id = %u", i);
+		STATS_64(stdout, "Packets Received", rx->rcvd_reo[i].num);
+		STATS_64(stdout, "\t\tBytes Received", rx->rcvd_reo[i].bytes);
+	}
+}
+
+void print_debug_sta_data_tx(struct debug_peer_data_tx *tx)
+{
+	print_basic_sta_data_tx(&tx->b_tx);
+	print_debug_data_tx_stats(&tx->dbg_tx);
+}
+
+void print_debug_sta_data_rx(struct debug_peer_data_rx *rx)
+{
+	print_basic_sta_data_rx(&rx->b_rx);
+	print_debug_data_rx_stats(&rx->dbg_rx);
+}
+
+void print_debug_sta_data_link(struct debug_peer_data_link *link)
+{
+	print_basic_sta_data_link(&link->b_link);
+	STATS_32(stdout, "Last ack rssi", link->last_ack_rssi);
+}
+
+void print_debug_sta_data_rate(struct debug_peer_data_rate *rate)
+{
+	print_basic_sta_data_rate(&rate->b_rate);
+	STATS_32(stdout, "Last Tx rate for unicast Packets(mcs)",
+		 rate->last_tx_rate_mcs);
+	STATS_32(stdout, "Last Tx rate for multicast Packets",
+		 rate->mcast_last_tx_rate);
+	STATS_32(stdout, "Last Tx rate for multicast Packets(mcs)",
+		 rate->mcast_last_tx_rate_mcs);
+}
+
+void print_debug_sta_data_txcap(struct debug_peer_data_txcap *txcap)
+{
+	uint8_t tid;
+
+	for (tid = 0; tid < STATS_IF_MAX_TIDS; tid++) {
+		STATS_PRINT("\tTID[%u]: defer_msdu_q[%ju] ", tid,
+			    txcap->defer_msdu_len[tid]);
+		STATS_PRINT("msdu_comp_q[%ju] pending_ppdu_q[%ju]\n",
+			    txcap->tasklet_msdu_len[tid],
+			    txcap->pending_q_len[tid]);
+	}
+	STATS_PRINT("\tMSDU SUCC:%u ENQ:%u DEQ:%u FLUSH:%u DROP:%u XRETRY:%u\n",
+		    txcap->msdu[STATS_IF_MSDU_SUCC],
+		    txcap->msdu[STATS_IF_MSDU_ENQ],
+		    txcap->msdu[STATS_IF_MSDU_DEQ],
+		    txcap->msdu[STATS_IF_MSDU_FLUSH],
+		    txcap->msdu[STATS_IF_MSDU_DROP],
+		    txcap->msdu[STATS_IF_MSDU_XRETRY]);
+	STATS_PRINT("\tMPDU TRI:%u SUCC:%u RESTITCH:%u ARR:%u CLONE:%u",
+		    txcap->mpdu[STATS_IF_MPDU_TRI],
+		    txcap->mpdu[STATS_IF_MPDU_SUCC],
+		    txcap->mpdu[STATS_IF_MPDU_RESTITCH],
+		    txcap->mpdu[STATS_IF_MPDU_ARR],
+		    txcap->mpdu[STATS_IF_MPDU_CLONE]);
+	STATS_PRINT(" TO STACK:%u\n", txcap->mpdu[STATS_IF_MPDU_TO_STACK]);
+}
+
+void print_debug_sta_ctrl_tx(struct debug_peer_ctrl_tx *tx)
+{
+	print_basic_sta_ctrl_tx(&tx->b_tx);
+	STATS_32(stdout, "Tx Packets Discard as Power save aged",
+		 tx->cs_ps_discard);
+	STATS_32(stdout, "Tx Packets dropped form PS queue", tx->cs_psq_drops);
+}
+
+void print_debug_sta_ctrl_rx(struct debug_peer_ctrl_rx *rx)
+{
+	print_basic_sta_ctrl_rx(&rx->b_rx);
+}
+
+void print_debug_sta_ctrl_link(struct debug_peer_ctrl_link *link)
+{
+	print_basic_sta_ctrl_link(&link->b_link);
+}
+
+void print_debug_sta_ctrl_rate(struct debug_peer_ctrl_rate *rate)
+{
+	print_basic_sta_ctrl_rate(&rate->b_rate);
+}
+
+void print_debug_sta_data(struct stats_obj *sta)
+{
+	struct debug_peer_data *data = sta->stats;
+
+	STATS_PRINT("Debug Data STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_debug_sta_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_debug_sta_data_rx(data->rx);
+	}
+	if (data->link) {
+		STATS_PRINT("Link Stats\n");
+		print_debug_sta_data_link(data->link);
+	}
+	if (data->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_debug_sta_data_rate(data->rate);
+	}
+	if (data->txcap) {
+		STATS_PRINT("Tx Capture Stats\n");
+		print_debug_sta_data_txcap(data->txcap);
+	}
+}
+
+void print_debug_sta_ctrl(struct stats_obj *sta)
+{
+	struct debug_peer_ctrl *ctrl = sta->stats;
+
+	STATS_PRINT("Debug Control STATS For STA %s (Parent %s)\n",
+		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_debug_sta_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_debug_sta_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_debug_sta_ctrl_link(ctrl->link);
+	}
+	if (ctrl->rate) {
+		STATS_PRINT("Rate Stats\n");
+		print_debug_sta_ctrl_rate(ctrl->rate);
+	}
+}
+
+void print_debug_vap_data_me(struct debug_vdev_data_me *me)
+{
+	STATS_32(stdout, "Packets dropped due to map error",
+		 me->dropped_map_error);
+	STATS_32(stdout, "Packets dropped due to self Mac address",
+		 me->dropped_self_mac);
+	STATS_32(stdout, "Packets dropped due to send fail",
+		 me->dropped_send_fail);
+	STATS_32(stdout, "Segment allocation failure", me->fail_seg_alloc);
+	STATS_32(stdout, "NBUF clone failure", me->clone_fail);
+}
+
+void print_debug_vap_data_tx(struct debug_vdev_data_tx *tx)
+{
+	print_basic_vap_data_tx(&tx->b_tx);
+	print_debug_data_tx_stats(&tx->dbg_tx);
+	STATS_PRINT("\tPackets dropped on the Tx ingress side:\n");
+	STATS_64(stdout, "Packets dropped Desc Not Available", tx->desc_na.num);
+	STATS_64(stdout, "Bytes dropped Desc Not Available", tx->desc_na.bytes);
+	STATS_64(stdout, "Packets dropped Descriptor alloc fail",
+		 tx->desc_na_exc_alloc_fail.num);
+	STATS_64(stdout, "Bytes dropped Descriptor alloc fail",
+		 tx->desc_na_exc_alloc_fail.bytes);
+	STATS_64(stdout, "Packets dropped Tx outstanding too many",
+		 tx->desc_na_exc_outstand.num);
+	STATS_64(stdout, "Bytes dropped Tx outstanding too many",
+		 tx->desc_na_exc_outstand.bytes);
+	STATS_64(stdout, "Packets dropped as Exception pkts more than limit",
+		 tx->exc_desc_na.num);
+	STATS_64(stdout, "Bytes dropped as Exception pkts more than limit",
+		 tx->exc_desc_na.bytes);
+	STATS_64(stdout, "Packets dropped due to sniffer received",
+		 tx->sniffer_rcvd.num);
+	STATS_64(stdout, "Bytes dropped due to sniffer received",
+		 tx->sniffer_rcvd.bytes);
+	STATS_32(stdout, "Packets dropped due to Ring full", tx->ring_full);
+	STATS_32(stdout, "Packets dropped due to HW enqueue failed",
+		 tx->enqueue_fail);
+	STATS_32(stdout, "Packets dropped due to DMA error", tx->dma_error);
+	STATS_32(stdout, "Packets dropped due to Resource Full", tx->res_full);
+	STATS_32(stdout, "Packets dropped due to Insufficient Headroom",
+		 tx->headroom_insufficient);
+	STATS_32(stdout, "Packets dropped due to per Pkt vdev id check fail",
+		 tx->fail_per_pkt_vdev_id_check);
+}
+
+void print_debug_vap_data_rx(struct debug_vdev_data_rx *rx)
+{
+	print_basic_vap_data_rx(&rx->b_rx);
+	print_debug_data_rx_stats(&rx->dbg_rx);
+}
+
+void print_debug_vap_data_raw(struct debug_vdev_data_raw *raw)
+{
+	STATS_32(stdout, "DMA map error", raw->dma_map_error);
+	STATS_32(stdout, "Packet type not data error",
+		 raw->invalid_raw_pkt_datatype);
+	STATS_32(stdout, "Frags count overflow error",
+		 raw->num_frags_overflow_err);
+}
+
+void print_debug_vap_data_tso(struct debug_vdev_data_tso *tso)
+{
+	STATS_64(stdout, "Packets dropped by host", tso->dropped_host.num);
+	STATS_64(stdout, "Bytes dropped by host", tso->dropped_host.bytes);
+	STATS_32(stdout, "TSO DMA map error", tso->dma_map_error);
+	STATS_32(stdout, "Packets dropped by target", tso->dropped_target);
+}
+
+void print_debug_vap_ctrl_tx(struct debug_vdev_ctrl_tx *tx)
+{
+	print_basic_vap_ctrl_tx(&tx->b_tx);
+	STATS_64(stdout, "Tx SWBA Beacon interval Counter", tx->cs_tx_bcn_swba);
+	STATS_64(stdout, "Tx failed due to no Node", tx->cs_tx_nonode);
+	STATS_64(stdout, "Tx Not ok set in descriptor", tx->cs_tx_not_ok);
+}
+
+void print_debug_vap_ctrl_rx(struct debug_vdev_ctrl_rx *rx)
+{
+	print_basic_vap_ctrl_rx(&rx->b_rx);
+	STATS_64(stdout, "Invalid mac address: node alloc failure",
+		 rx->cs_invalid_macaddr_nodealloc_fail);
+	STATS_64(stdout, "Packets due to wrong direction",
+		 rx->cs_rx_wrongdir);
+	STATS_64(stdout, "Packets dropped due to sta not associated",
+		 rx->cs_rx_not_assoc);
+	STATS_64(stdout, "Packets dropped due to rateset truncated",
+		 rx->cs_rx_rs_too_big);
+	STATS_64(stdout, "Packets dropped due to required element missing",
+		 rx->cs_rx_elem_missing);
+	STATS_64(stdout, "Packets dropped due to element too big",
+		 rx->cs_rx_elem_too_big);
+	STATS_64(stdout, "Packets with invalid channel dropped",
+		 rx->cs_rx_chan_err);
+	STATS_64(stdout, "Packets dropped due to node allocation failure",
+		 rx->cs_rx_node_alloc);
+	STATS_64(stdout, "Packets with unsupported Auth algo dropped",
+		 rx->cs_rx_auth_unsupported);
+	STATS_64(stdout, "STA Auth failure", rx->cs_rx_auth_fail);
+	STATS_64(stdout, "Auth discard due to counter measure",
+		 rx->cs_rx_auth_countermeasures);
+	STATS_64(stdout, "Assoc from wrong BSS", rx->cs_rx_assoc_bss);
+	STATS_64(stdout, "Auth without assoc", rx->cs_rx_assoc_notauth);
+	STATS_64(stdout, "Assoc with Capabilities mismatch",
+		 rx->cs_rx_assoc_cap_mismatch);
+	STATS_64(stdout, "Assoc with no rate match", rx->cs_rx_assoc_norate);
+	STATS_64(stdout, "Assoc with bad WPA IE", rx->cs_rx_assoc_wpaie_err);
+	STATS_64(stdout, "Bad auth request", rx->cs_rx_auth_err);
+	STATS_64(stdout, "Rx discarded due to ACL policy", rx->cs_rx_acl);
+	STATS_64(stdout, "Rx 4-addressed pkts while WDS disable",
+		 rx->cs_rx_nowds);
+	STATS_64(stdout, "Rx from wrong BSSID", rx->cs_rx_wrongbss);
+	STATS_64(stdout, "Rx packet length too short", rx->cs_rx_tooshort);
+	STATS_64(stdout, "Rx SSID mismatch", rx->cs_rx_ssid_mismatch);
+	STATS_64(stdout, "Rx Ucast Dycrypt Ok", rx->cs_rx_decryptok_u);
+	STATS_64(stdout, "Rx Mcast Dycrypt Ok", rx->cs_rx_decryptok_m);
+}
+
+void print_debug_vap_ctrl_wmi(struct debug_vdev_ctrl_wmi *wmi)
+{
+	STATS_64(stdout, "Peer delete req", wmi->cs_peer_delete_req);
+	STATS_64(stdout, "Peer delete resp", wmi->cs_peer_delete_resp);
+	STATS_64(stdout, "Peer delete all req", wmi->cs_peer_delete_all_req);
+	STATS_64(stdout, "Peer delete all resp", wmi->cs_peer_delete_all_resp);
+}
+
+void print_debug_vap_data(struct stats_obj *vap)
+{
+	struct debug_vdev_data *data = vap->stats;
+
+	STATS_PRINT("Debug Data STATS for Vap %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_debug_vap_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_debug_vap_data_rx(data->rx);
+	}
+	if (data->me) {
+		STATS_PRINT("ME Stats\n");
+		print_debug_vap_data_me(data->me);
+	}
+	if (data->raw) {
+		STATS_PRINT("RAW Stats\n");
+		print_debug_vap_data_raw(data->raw);
+	}
+	if (data->tso) {
+		STATS_PRINT("TSO Stats\n");
+		print_debug_vap_data_tso(data->tso);
+	}
+}
+
+void print_debug_vap_ctrl(struct stats_obj *vap)
+{
+	struct debug_vdev_ctrl *ctrl = vap->stats;
+
+	STATS_PRINT("Debug Control STATS for Vap %s (Parent %s)\n",
+		    vap->u_id.if_name, vap->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_debug_vap_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_debug_vap_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->wmi) {
+		STATS_PRINT("WMI Stats\n");
+		print_debug_vap_ctrl_wmi(ctrl->wmi);
+	}
+}
+
+void print_debug_radio_data_me(struct debug_pdev_data_me *me)
+{
+	STATS_32(stdout, "Packets dropped due to map error",
+		 me->dropped_map_error);
+	STATS_32(stdout, "Packets dropped due to self Mac address",
+		 me->dropped_self_mac);
+	STATS_32(stdout, "Packets dropped due to send fail",
+		 me->dropped_send_fail);
+	STATS_32(stdout, "Segment allocation failure", me->fail_seg_alloc);
+	STATS_32(stdout, "NBUF clone failure", me->clone_fail);
+}
+
+void print_debug_radio_data_tx(struct debug_pdev_data_tx *tx)
+{
+	print_basic_radio_data_tx(&tx->b_tx);
+	print_debug_data_tx_stats(&tx->dbg_tx);
+}
+
+void print_debug_radio_data_rx(struct debug_pdev_data_rx *rx)
+{
+	print_basic_radio_data_rx(&rx->b_rx);
+	print_debug_data_rx_stats(&rx->dbg_rx);
+	STATS_PRINT("\tRx Packets dropped:\n");
+	STATS_64(stdout, "Total Packets replenished", rx->replenished_pkts.num);
+	STATS_64(stdout, "Total Bytes replenished", rx->replenished_pkts.bytes);
+	STATS_32(stdout, "Rx DMA Error replenished", rx->rxdma_err);
+	STATS_32(stdout, "NBUG allocation failed", rx->nbuf_alloc_fail);
+	STATS_32(stdout, "Frag allocation failed", rx->frag_alloc_fail);
+	STATS_32(stdout, "MAP error", rx->map_err);
+	STATS_32(stdout, "x86 failure", rx->x86_fail);
+	STATS_32(stdout, "Low threshold interrupts", rx->low_thresh_intrs);
+	STATS_32(stdout, "Packets dropped because msdu_done bit not set",
+		 rx->msdu_not_done);
+	STATS_32(stdout, "Multicast Echo check", rx->mec);
+	STATS_32(stdout, "Mesh Filtered packets", rx->mesh_filter);
+	STATS_32(stdout, "Wifi Parse failed", rx->wifi_parse);
+	STATS_32(stdout, "Mon Rx drop", rx->mon_rx_drop);
+	STATS_32(stdout, "Mon Radio Tap error drop",
+		 rx->mon_radiotap_update_err);
+	STATS_32(stdout, "Descriptor alloc fail", rx->desc_alloc_fail);
+	STATS_32(stdout, "IP checksum error", rx->ip_csum_err);
+	STATS_32(stdout, "TCP/UDP checksum error", rx->tcp_udp_csum_err);
+	STATS_32(stdout, "Rx HW error", rx->reo_error);
+	STATS_PRINT("\n");
+	STATS_32(stdout, "Buffer added back in freelist", rx->buf_freelist);
+	STATS_PRINT("\tSent To Stack:\n");
+	STATS_32(stdout, "Vlan tagged stp packets in wifi parse error",
+		 rx->vlan_tag_stp_cnt);
+}
+
+void print_debug_radio_data_raw(struct debug_pdev_data_raw *raw)
+{
+	STATS_32(stdout, "DMA map error", raw->dma_map_error);
+	STATS_32(stdout, "Packet type not data error",
+		 raw->invalid_raw_pkt_datatype);
+	STATS_32(stdout, "Frags count overflow error",
+		 raw->num_frags_overflow_err);
+}
+
+void print_debug_radio_data_tso(struct debug_pdev_data_tso *tso)
+{
+	STATS_64(stdout, "Packets dropped by host", tso->dropped_host.num);
+	STATS_64(stdout, "Bytes dropped by host", tso->dropped_host.bytes);
+	STATS_64(stdout, "Packets dropped due to no memory",
+		 tso->tso_no_mem_dropped.num);
+	STATS_64(stdout, "Bytes dropped due to no memory",
+		 tso->tso_no_mem_dropped.bytes);
+	STATS_32(stdout, "Packets dropped by target", tso->dropped_target);
+}
+
+static const char *capture_status_to_str(enum stats_if_chan_capture_status type)
+{
+	switch (type) {
+	case STATS_IF_CAPTURE_IDLE:
+		return "CAPTURE_IDLE";
+	case STATS_IF_CAPTURE_BUSY:
+		return "CAPTURE_BUSY";
+	case STATS_IF_CAPTURE_ACTIVE:
+		return "CAPTURE_ACTIVE";
+	case STATS_IF_CAPTURE_NO_BUFFER:
+		return "CAPTURE_NO_BUFFER";
+	default:
+		return "INVALID";
+	}
+}
+
+static const
+char *freeze_reason_to_str(enum stats_if_freeze_capture_reason type)
+{
+	switch (type) {
+	case STATS_IF_FREEZE_REASON_TM:
+		return "FREEZE_REASON_TM";
+	case STATS_IF_FREEZE_REASON_FTM:
+		return "FREEZE_REASON_FTM";
+	case STATS_IF_FREEZE_REASON_ACK_RESP_TO_TM_FTM:
+		return "FREEZE_REASON_ACK_RESP_TO_TM_FTM";
+	case STATS_IF_FREEZE_REASON_TA_RA_TYPE_FILTER:
+		return "FREEZE_REASON_TA_RA_TYPE_FILTER";
+	case STATS_IF_FREEZE_REASON_NDPA_NDP:
+		return "FREEZE_REASON_NDPA_NDP";
+	case STATS_IF_FREEZE_REASON_ALL_PACKET:
+		return "FREEZE_REASON_ALL_PACKET";
+	default:
+		return "INVALID";
+	}
+}
+
+void print_debug_radio_data_cfr(struct debug_pdev_data_cfr *cfr)
+{
+	uint8_t cnt;
+
+	STATS_64(stdout, "bb_captured_channel_cnt",
+		 cfr->bb_captured_channel_cnt);
+	STATS_64(stdout, "bb_captured_timeout_cnt",
+		 cfr->bb_captured_timeout_cnt);
+	STATS_64(stdout, "rx_loc_info_valid_cnt",
+		 cfr->rx_loc_info_valid_cnt);
+	STATS_PRINT("\tChannel capture status:\n");
+	for (cnt = 0; cnt < STATS_IF_CAPTURE_MAX; cnt++)
+		STATS_PRINT("\t\t%s = %ju\n", capture_status_to_str(cnt),
+			    cfr->chan_capture_status[cnt]);
+	STATS_PRINT("\tFreeze reason:\n");
+	for (cnt = 0; cnt < STATS_IF_FREEZE_REASON_MAX; cnt++)
+		STATS_PRINT("\t\t%s = %ju\n", freeze_reason_to_str(cnt),
+			    cfr->reason_cnt[cnt]);
+}
+
+void print_debug_radio_data_htt(struct debug_pdev_data_htt *htt)
+{
+}
+
+void print_debug_radio_data_wdi(struct debug_pdev_data_wdi *wdi)
+{
+	uint8_t i;
+
+	for (i = 0; i < STATS_IF_WDI_EVENT_LAST; i++) {
+		if (wdi->wdi_event[i])
+			STATS_PRINT("\tWdi msgs received from fw [%u]: [%u]\n",
+				    i, wdi->wdi_event[i]);
+	}
+}
+
+void print_debug_radio_data_mesh(struct debug_pdev_data_mesh *mesh)
+{
+	STATS_32(stdout, "Mesh Rx Stats Alloc fail", mesh->mesh_mem_alloc);
+}
+
+void print_debug_radio_data_txcap(struct debug_pdev_data_txcap *txcap)
+{
+	uint8_t i, j;
+
+	STATS_32(stdout, "BA not received for delayed_ba",
+		 txcap->delayed_ba_not_recev);
+	STATS_32(stdout, "Last received ppdu stats", txcap->last_rcv_ppdu);
+	STATS_32(stdout, "PPDU stats queue depth",
+		 txcap->ppdu_stats_queue_depth);
+	STATS_32(stdout, "PPDU stats defer queue depth",
+		 txcap->ppdu_stats_defer_queue_depth);
+	STATS_32(stdout, "PPDU dropped", txcap->ppdu_dropped);
+	STATS_32(stdout, "Pending PPDU dropped", txcap->pend_ppdu_dropped);
+	STATS_32(stdout, "PPDU peer flush counter", txcap->ppdu_flush_count);
+	STATS_32(stdout, "PPDU MSDU threshold drop",
+		 txcap->msdu_threshold_drop);
+	STATS_64(stdout, "Peer mismatch", txcap->peer_mismatch);
+	STATS_64(stdout, "defer_msdu_q length", txcap->defer_msdu_len);
+	STATS_64(stdout, "msdu_comp_q length", txcap->tasklet_msdu_len);
+	STATS_64(stdout, "pending_ppdu_q length", txcap->pending_q_len);
+	STATS_64(stdout, "tx_ppdu_proc", txcap->tx_ppdu_proc);
+	STATS_64(stdout, "ACK BA comes twice", txcap->ack_ba_comes_twice);
+	STATS_64(stdout, "PPDU dropped because of incomplete tlv",
+		 txcap->ppdu_drop);
+	STATS_64(stdout, "PPDU dropped because of wrap around",
+		 txcap->ppdu_wrap_drop);
+	STATS_PRINT("\tMgmt control enqueue stats:\n");
+	for (i = 0; i < STATS_IF_TXCAP_MAX_TYPE; i++) {
+		for (j = 0; j < STATS_IF_TXCAP_MAX_SUBTYPE; j++) {
+			if (!txcap->ctl_mgmt_q_len[i][j])
+				continue;
+			STATS_PRINT("\t\tctl_mgmt_q[%u][%u].len = %ju\n", i, j,
+				    txcap->ctl_mgmt_q_len[i][j]);
+		}
+	}
+	STATS_PRINT("\tMgmt control retry queue stats:\n");
+	for (i = 0; i < STATS_IF_TXCAP_MAX_TYPE; i++) {
+		for (j = 0; j < STATS_IF_TXCAP_MAX_SUBTYPE; j++) {
+			if (!txcap->retries_ctl_mgmt_q_len[i][j])
+				continue;
+			STATS_PRINT("\t\tretries_ctl_mgmt_q[%u][%u].len = %ju",
+				    i, j, txcap->retries_ctl_mgmt_q_len[i][j]);
+			STATS_PRINT("\n");
+		}
+	}
+	STATS_PRINT("\tHTT Frame Type Stats:\n");
+	for (i = 0; i < STATS_IF_TX_CAP_HTT_MAX_FTYPE; i++) {
+		if (txcap->htt_frame_type[i])
+			STATS_PRINT("\t\tsgen htt frame type[%d] = %d\n",
+				    i, txcap->htt_frame_type[i]);
+	}
+	STATS_PRINT("\tPPDU stats counter:\n");
+	for (i = 0; i < STATS_IF_PPDU_STATS_MAX_TAG; i++)
+		STATS_PRINT("\t\tTag[%u] = %ju\n",
+			    i, txcap->ppdu_stats_counter[i]);
+}
+
+void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
+{
+	uint32_t i, idx;
+	char *str_buf = malloc(MAX_STRING_LEN);
+
+	if (!monitor->status_ppdu_state)
+		STATS_UNVLBL(stdout, "PPDU State", "Start");
+	else
+		STATS_UNVLBL(stdout, "PPDU State", "End");
+	STATS_32(stdout, "ul_ofdma_data_rx_ppdu", monitor->data_rx_ppdu);
+	for (i = 0; i < STATS_IF_OFDMA_NUM_USERS; i++) {
+		STATS_PRINT("\t\tul_ofdma data %u user = %u\n",
+			    i, monitor->data_users[i]);
+	}
+	STATS_32(stdout, "status_ppdu_start_cnt", monitor->status_ppdu_start);
+	STATS_32(stdout, "status_ppdu_end_cnt", monitor->status_ppdu_end);
+	STATS_32(stdout, "status_ppdu_start_mis_cnt",
+		 monitor->status_ppdu_compl);
+	STATS_32(stdout, "status_ppdu_start_mis_cnt",
+		 monitor->status_ppdu_start_mis);
+	STATS_32(stdout, "status_ppdu_end_mis_cnt",
+		 monitor->status_ppdu_end_mis);
+	STATS_32(stdout, "status_ppdu_done_cnt", monitor->status_ppdu_done);
+	STATS_32(stdout, "dest_ppdu_done_cnt", monitor->dest_ppdu_done);
+	STATS_32(stdout, "dest_mpdu_done_cnt", monitor->dest_mpdu_done);
+	STATS_32(stdout, "dest_mpdu_drop_cnt", monitor->dest_mpdu_drop);
+	STATS_32(stdout, "dup_mon_linkdesc_cnt", monitor->dup_mon_linkdesc_cnt);
+	STATS_32(stdout, "dup_mon_buf_cnt", monitor->dup_mon_buf_cnt);
+	idx = monitor->ppdu_id_hist_idx;
+	STATS_PRINT("\tPPDU Id history:\n");
+	STATS_PRINT("\tstat_ring_ppdu_ids\t dest_ring_ppdu_ids\n");
+	for (i = 0; i < STATS_IF_MAX_PPDU_ID_HIST; i++) {
+		idx = (idx + 1) & (STATS_IF_MAX_PPDU_ID_HIST - 1);
+		STATS_PRINT("\t\t%*u\t%*u\n", 16,
+			    monitor->stat_ring_ppdu_id_hist[idx], 16,
+			    monitor->dest_ring_ppdu_id_hist[idx]);
+	}
+	STATS_32(stdout, "mon_rx_dest_stuck", monitor->mon_rx_dest_stuck);
+	STATS_32(stdout, "tlv_tag_status_err_cnt", monitor->tlv_tag_status_err);
+	STATS_32(stdout, "mon status DMA not done WAR count",
+		 monitor->status_buf_done_war);
+	STATS_32(stdout, "mon_rx_buf_replenished",
+		 monitor->mon_rx_bufs_replenished_dest);
+	STATS_32(stdout, "mon_rx_buf_reaped", monitor->mon_rx_bufs_reaped_dest);
+	STATS_32(stdout, "ppdu_id_mismatch", monitor->ppdu_id_mismatch);
+	STATS_32(stdout, "mpdu_ppdu_id_match_cnt", monitor->ppdu_id_match);
+	STATS_32(stdout, "ppdus dropped frm status ring",
+		 monitor->status_ppdu_drop);
+	STATS_32(stdout, "ppdus dropped frm dest ring",
+		 monitor->dest_ppdu_drop);
+	STATS_32(stdout, "mon_link_desc_invalid",
+		 monitor->mon_link_desc_invalid);
+	STATS_32(stdout, "mon_rx_desc_invalid", monitor->mon_rx_desc_invalid);
+	STATS_32(stdout, "mon_nbuf_sanity_err", monitor->mon_nbuf_sanity_err);
+	if (str_buf) {
+		uint32_t index = 0;
+
+		memset(str_buf, 0, MAX_STRING_LEN);
+		for (i = 0; i < STATS_IF_OFDMA_NUM_RU_SIZE; i++) {
+			index += snprintf(&str_buf[index],
+					  STATS_IF_OFDMA_NUM_RU_SIZE - index,
+					  " %u:%u,", i,
+					  monitor->data_rx_ru_size[i]);
+		}
+		STATS_UNVLBL(stdout, "ul_ofdma_data_rx_ru_size", str_buf);
+		index = 0;
+		memset(str_buf, 0, MAX_STRING_LEN);
+		for (i = 0; i < STATS_IF_OFDMA_NUM_RU_SIZE; i++) {
+			index += snprintf(&str_buf[index],
+					  STATS_IF_OFDMA_NUM_RU_SIZE - index,
+					  " %u:%u,", i,
+					  monitor->nondata_rx_ru_size[i]);
+		}
+		STATS_UNVLBL(stdout, "ul_ofdma_nodata_rx_ru_size", str_buf);
+	}
+}
+
+void print_debug_radio_ctrl_tx(struct debug_pdev_ctrl_tx *tx)
+{
+	print_basic_radio_ctrl_tx(&tx->b_tx);
+	STATS_32(stdout, "Tx no buffer", tx->cs_be_nobuf);
+	STATS_32(stdout, "Tx buffer count", tx->cs_tx_buf_count);
+	STATS_64(stdout, "Tx HW retries", tx->cs_tx_hw_retries);
+	STATS_64(stdout, "Tx HW failures", tx->cs_tx_hw_failures);
+	STATS_8(stdout, "AP stats tx cal enable status",
+		tx->cs_ap_stats_tx_cal_enable);
+}
+
+void print_debug_radio_ctrl_rx(struct debug_pdev_ctrl_rx *rx)
+{
+	print_basic_radio_ctrl_rx(&rx->b_rx);
+	STATS_32(stdout, "Rx RTS success count", rx->cs_rx_rts_success);
+	STATS_32(stdout, "Rx clear count", rx->cs_rx_clear_count);
+	STATS_32(stdout, "Rx overrun frames", rx->cs_rx_overrun);
+	STATS_32(stdout, "Rx phy error", rx->cs_rx_phy_err);
+	STATS_32(stdout, "Rx ack error", rx->cs_rx_ack_err);
+	STATS_32(stdout, "Rx RTS error", rx->cs_rx_rts_err);
+	STATS_32(stdout, "Rx No beacon count", rx->cs_no_beacons);
+	STATS_32(stdout, "Rx phy error count", rx->cs_phy_err_count);
+	STATS_32(stdout, "Rx FCS error count", rx->cs_fcsbad);
+	STATS_32(stdout, "Rx loop limit Start", rx->cs_rx_looplimit_start);
+	STATS_32(stdout, "Rx loop limit End", rx->cs_rx_looplimit_end);
+}
+
+void print_debug_radio_ctrl_wmi(struct debug_pdev_ctrl_wmi *wmi)
+{
+	STATS_64(stdout, "Tx Mgmt count", wmi->cs_wmi_tx_mgmt);
+	STATS_64(stdout, "Tx Mgmt completions count",
+		 wmi->cs_wmi_tx_mgmt_completions);
+	STATS_32(stdout, "Tx Mgmt completions error",
+		 wmi->cs_wmi_tx_mgmt_completion_err);
+}
+
+void print_debug_radio_ctrl_link(struct debug_pdev_ctrl_link *link)
+{
+	print_basic_radio_ctrl_link(&link->b_link);
+}
+
+void print_debug_radio_data(struct stats_obj *radio)
+{
+	struct debug_pdev_data *data = radio->stats;
+
+	STATS_PRINT("Debug Data STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_debug_radio_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_debug_radio_data_rx(data->rx);
+	}
+	if (data->me) {
+		STATS_PRINT("ME Stats\n");
+		print_debug_radio_data_me(data->me);
+	}
+	if (data->raw) {
+		STATS_PRINT("RAW Stats\n");
+		print_debug_radio_data_raw(data->raw);
+	}
+	if (data->tso) {
+		STATS_PRINT("TSO Stats\n");
+		print_debug_radio_data_tso(data->tso);
+	}
+	if (data->cfr) {
+		STATS_PRINT("CFR Stats\n");
+		print_debug_radio_data_cfr(data->cfr);
+	}
+	if (data->htt) {
+		STATS_PRINT("HTT Stats\n");
+		print_debug_radio_data_htt(data->htt);
+	}
+	if (data->wdi) {
+		STATS_PRINT("WDI Stats\n");
+		print_debug_radio_data_wdi(data->wdi);
+	}
+	if (data->mesh) {
+		STATS_PRINT("MESH Stats\n");
+		print_debug_radio_data_mesh(data->mesh);
+	}
+	if (data->txcap) {
+		STATS_PRINT("Tx Capture Stats\n");
+		print_debug_radio_data_txcap(data->txcap);
+	}
+	if (data->monitor) {
+		STATS_PRINT("Monitor mode Stats\n");
+		print_debug_radio_data_monitor(data->monitor);
+	}
+}
+
+void print_debug_radio_ctrl(struct stats_obj *radio)
+{
+	struct debug_pdev_ctrl *ctrl = radio->stats;
+
+	STATS_PRINT("Debug Control STATS for Radio %s (Parent %s)\n",
+		    radio->u_id.if_name, radio->pif_name);
+	if (ctrl->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_debug_radio_ctrl_tx(ctrl->tx);
+	}
+	if (ctrl->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_debug_radio_ctrl_rx(ctrl->rx);
+	}
+	if (ctrl->wmi) {
+		STATS_PRINT("WMI Stats\n");
+		print_debug_radio_ctrl_wmi(ctrl->wmi);
+	}
+	if (ctrl->link) {
+		STATS_PRINT("Link Stats\n");
+		print_debug_radio_ctrl_link(ctrl->link);
+	}
+}
+
+void print_debug_ap_data_tx(struct debug_psoc_data_tx *tx)
+{
+	uint8_t i;
+
+	print_basic_ap_data_tx(&tx->b_tx);
+	STATS_64(stdout, "Tx Invalid peer Packets", tx->tx_invalid_peer.num);
+	STATS_64(stdout, "Tx Invalid peer Bytes", tx->tx_invalid_peer.bytes);
+	STATS_PRINT("\tPackets Queued in HW Ring:\n");
+	for (i = 0; i < STATS_IF_MAX_TX_DATA_RINGS; i++)
+		STATS_PRINT("\t\tRing ID %u = %u\n", i, tx->tx_hw_enq[i]);
+	STATS_PRINT("\tPackets dropped due to HW Ring full = %u %u %u\n",
+		    tx->tx_hw_ring_full[0], tx->tx_hw_ring_full[1],
+		    tx->tx_hw_ring_full[2]);
+	STATS_32(stdout, "Tx Descriptor in use", tx->desc_in_use);
+	STATS_32(stdout, "Tx packets dropped due to FW removed",
+		 tx->dropped_fw_removed);
+	STATS_PRINT("Tx comp wifi internal error = %u : [%u %u %u %u]\n",
+		    tx->wifi_internal_error[0], tx->wifi_internal_error[1],
+		    tx->wifi_internal_error[2], tx->wifi_internal_error[3],
+		    tx->wifi_internal_error[4]);
+	STATS_32(stdout, "Tx invalid completion release",
+		 tx->invalid_release_source);
+	STATS_32(stdout, "Tx comp non wifi internal error",
+		 tx->non_wifi_internal_err);
+	STATS_32(stdout, "Tx comp loop pkt limit hit",
+		 tx->tx_comp_loop_pkt_limit_hit);
+	STATS_32(stdout, "Tx comp HP out of sync2", tx->hp_oos2);
+	STATS_32(stdout, "Tx comp exception", tx->tx_comp_exception);
+}
+
+void print_debug_ap_data_rx(struct debug_psoc_data_rx *rx)
+{
+	uint8_t ring;
+	uint16_t core;
+	uint32_t err_code;
+	uint64_t total_pkts;
+
+	print_basic_ap_data_rx(&rx->b_rx);
+	STATS_PRINT("\tPackets per Core per Ring:\n");
+	for (ring = 0; ring < STATS_IF_MAX_RX_DEST_RINGS; ring++) {
+		total_pkts = 0;
+		STATS_PRINT("\t\tPackets on ring %u:\n", ring);
+		for (core = 0; core < rx->rx_packets.num_cpus; core++) {
+			if (rx->rx_packets.pkts[core][ring]) {
+				STATS_PRINT("\t\t\tPackets on core%u: %ju\n",
+					    core,
+					    rx->rx_packets.pkts[core][ring]);
+				total_pkts += rx->rx_packets.pkts[core][ring];
+			}
+		}
+		STATS_PRINT("\t\t\tTotal Packets on Ring %u: %ju\n",
+			    ring, total_pkts);
+	}
+	STATS_64(stdout, "Rx Invalid Peer Packets", rx->rx_invalid_peer.num);
+	STATS_64(stdout, "Rx Invalid Peer Bytes", rx->rx_invalid_peer.bytes);
+	STATS_64(stdout, "Rx Invalid SW Peer Id Packets",
+		 rx->rx_invalid_peer_id.num);
+	STATS_64(stdout, "Rx Invalid SW Peer Id Bytes",
+		 rx->rx_invalid_peer_id.bytes);
+	STATS_64(stdout, "Rx Invalid length Packets",
+		 rx->rx_invalid_pkt_len.num);
+	STATS_64(stdout, "Rx Invalid length Bytes",
+		 rx->rx_invalid_pkt_len.bytes);
+	STATS_32(stdout, "Rx Frag Length error", rx->rx_frag_err_len_error);
+	STATS_32(stdout, "Rx Frag No Peer error", rx->rx_frag_err_no_peer);
+	STATS_32(stdout, "Rx Frag Wait", rx->rx_frag_wait);
+	STATS_32(stdout, "Rx Frag Error", rx->rx_frag_err);
+	STATS_32(stdout, "Rx Frag Out of order", rx->rx_frag_oor);
+	STATS_32(stdout, "Rx Reap Loop Pkt Limit Hit",
+		 rx->reap_loop_pkt_limit_hit);
+	STATS_32(stdout, "Rx HP out_of_sync", rx->hp_oos2);
+	STATS_32(stdout, "Rx HW near full", rx->near_full);
+	STATS_32(stdout, "Rx wait completed msdu break",
+		 rx->msdu_scatter_wait_break);
+	STATS_32(stdout, "Rx SW2rel route drop", rx->rx_sw_route_drop);
+	STATS_32(stdout, "Rx HW2rel route drop", rx->rx_hw_route_drop);
+	STATS_32(stdout, "Phy ring access fail: msdus",
+		 rx->phy_ring_access_fail);
+	STATS_32(stdout, "Phy ring access full fail: msdus",
+		 rx->phy_ring_access_full_fail);
+	STATS_32(stdout, "Phy Rx HW DUP DESC", rx->phy_rx_hw_dest_dup);
+	STATS_32(stdout, "Phy Rx HW REL DUP DESC", rx->phy_wifi_rel_dup);
+	STATS_32(stdout, "Phy Rx SW ERR DUP DESC", rx->phy_rx_sw_err_dup);
+	STATS_32(stdout, "rbm error: msdus", rx->invalid_rbm);
+	STATS_32(stdout, "Invalid vdev", rx->invalid_vdev);
+	STATS_32(stdout, "Invalid pdev", rx->invalid_pdev);
+	STATS_32(stdout, "pkts delivered no peer", rx->pkt_delivered_no_peer);
+	STATS_32(stdout, "defrag peer uninit", rx->defrag_peer_uninit);
+	STATS_32(stdout, "sa or da idx invalid", rx->invalid_sa_da_idx);
+	STATS_32(stdout, "MSDU Done failures", rx->msdu_done_fail);
+	STATS_32(stdout, "Rx DESC invalid magic", rx->rx_desc_invalid_magic);
+	STATS_32(stdout, "Rx HW CMD SEND FAIL", rx->rx_hw_cmd_send_fail);
+	STATS_32(stdout, "Rx HW CMD SEND Drain", rx->rx_hw_cmd_send_drain);
+	STATS_32(stdout, "Rx scatter msdu", rx->scatter_msdu);
+	STATS_32(stdout, "RX invalid cookie", rx->invalid_cookie);
+	STATS_32(stdout, "RX stale cookie", rx->stale_cookie);
+	STATS_32(stdout, "2k jump delba sent", rx->rx_2k_jump_delba_sent);
+	STATS_32(stdout, "2k jump msdu to stack", rx->rx_2k_jump_to_stack);
+	STATS_32(stdout, "2k jump msdu drop", rx->rx_2k_jump_drop);
+	STATS_32(stdout, "Rx HW Error MSDU buffer recved",
+		 rx->rx_hw_err_msdu_buf_rcved);
+	STATS_32(stdout, "Rx HW Error MSDU buffer invalid cookie",
+		 rx->rx_hw_err_msdu_buf_invalid_cookie);
+	STATS_32(stdout, "Rx HW oor msdu drop", rx->rx_hw_err_oor_drop);
+	STATS_32(stdout, "Rx HW oor msdu to stack", rx->rx_hw_err_oor_to_stack);
+	STATS_32(stdout, "Rx HW Out of Order sg count",
+		 rx->rx_hw_err_oor_sg_count);
+	STATS_32(stdout, "Rx MSDU count mismatch", rx->msdu_count_mismatch);
+	STATS_32(stdout, "Rx stale link desc cookie", rx->invalid_link_cookie);
+	STATS_32(stdout, "Rx nbuf sanity fails", rx->nbuf_sanity_fail);
+	STATS_32(stdout, "Rx refill duplicate link desc",
+		 rx->dup_refill_link_desc);
+	STATS_32(stdout, "Rx err msdu continuation err",
+		 rx->msdu_continuation_err);
+	STATS_32(stdout, "ssn update count", rx->ssn_update_count);
+	STATS_32(stdout, "bar handle update fail count",
+		 rx->bar_handle_fail_count);
+	STATS_32(stdout, "Intra-bss EAPOL drops", rx->intrabss_eapol_drop);
+	STATS_32(stdout, "PN-in-Dest error frame pn-check fail",
+		 rx->pn_in_dest_check_fail);
+	STATS_32(stdout, "MSDU Length Error", rx->msdu_len_err);
+	STATS_32(stdout, "Rx Flush count", rx->rx_flush_count);
+	for (err_code = 0; err_code < STATS_IF_WIFI_ERR_MAX; err_code++) {
+		if (rx->rx_sw_error[err_code])
+			STATS_PRINT("\tRx SW error number (%u): %u msdus\n",
+				    err_code, rx->rx_sw_error[err_code]);
+	}
+	for (err_code = 0; err_code < STATS_IF_RX_ERR_MAX; err_code++) {
+		if (rx->rx_hw_error[err_code])
+			STATS_PRINT("\tRx HW error number (%u): %u msdus\n",
+				    err_code, rx->rx_hw_error[err_code]);
+	}
+	for (err_code = 0; err_code < STATS_IF_MAX_RX_DEST_RINGS; err_code++) {
+		if (rx->phy_rx_hw_error[err_code])
+			STATS_PRINT("\tPhy Rx SW error number (%u): %u msdus\n",
+				    err_code, rx->phy_rx_hw_error[err_code]);
+	}
+}
+
+void print_debug_ap_data_ast(struct debug_psoc_data_ast *ast)
+{
+	STATS_32(stdout, "Entries Added", ast->ast_added);
+	STATS_32(stdout, "Entries Deleted", ast->ast_deleted);
+	STATS_32(stdout, "Entries Agedout", ast->ast_aged_out);
+	STATS_32(stdout, "Entries MAP ERR", ast->ast_map_err);
+	STATS_32(stdout, "Entries Mismatch ERR", ast->ast_mismatch);
+	STATS_32(stdout, "MEC Added", ast->mec_added);
+	STATS_32(stdout, "MEC Deleted", ast->mec_deleted);
+}
+
+void print_debug_ap_data(struct stats_obj *ap)
+{
+	struct debug_psoc_data *data = ap->stats;
+
+	STATS_PRINT("Debug Data STATS for AP %s\n", ap->u_id.if_name);
+	if (data->tx) {
+		STATS_PRINT("Tx Stats\n");
+		print_debug_ap_data_tx(data->tx);
+	}
+	if (data->rx) {
+		STATS_PRINT("Rx Stats\n");
+		print_debug_ap_data_rx(data->rx);
+	}
+	if (data->ast) {
+		STATS_PRINT("AST Stats\n");
+		print_debug_ap_data_ast(data->ast);
+	}
+}
+
+void print_debug_stats(struct stats_obj *obj)
+{
+	switch (obj->obj_type) {
+	case STATS_OBJ_STA:
+		if (obj->type == STATS_TYPE_DATA)
+			print_debug_sta_data(obj);
+		else
+			print_debug_sta_ctrl(obj);
 		break;
+	case STATS_OBJ_VAP:
+		if (obj->type == STATS_TYPE_DATA)
+			print_debug_vap_data(obj);
+		else
+			print_debug_vap_ctrl(obj);
+		break;
+	case STATS_OBJ_RADIO:
+		if (obj->type == STATS_TYPE_DATA)
+			print_debug_radio_data(obj);
+		else
+			print_debug_radio_ctrl(obj);
+		break;
+	case STATS_OBJ_AP:
+		if (obj->type == STATS_TYPE_DATA)
+			print_debug_ap_data(obj);
+		break;
+	default:
+		STATS_ERR("Invalid object option\n");
+	}
+}
+#endif /* WLAN_DEBUG_TELEMETRY */
+
+void print_response(struct reply_buffer *reply)
+{
+	struct stats_obj *obj = reply->obj_head;
+
+	while (obj) {
+		switch (obj->lvl) {
+		case STATS_LVL_BASIC:
+			print_basic_stats(obj);
+			break;
 #if WLAN_ADVANCE_TELEMETRY
-	case STATS_LVL_ADVANCE:
-		print_advance_stats(cmd);
-		break;
+		case STATS_LVL_ADVANCE:
+			print_advance_stats(obj);
+			break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
-	case STATS_LVL_DEBUG:
-		break;
+		case STATS_LVL_DEBUG:
+			print_debug_stats(obj);
+			break;
 #endif /* WLAN_DEBUG_TELEMETRY */
-	default:
-		STATS_ERR("Invalid Level!\n");
+		default:
+			STATS_ERR("Invalid Level!\n");
+		}
+		obj = obj->next;
 	}
 }
 
@@ -1774,7 +3090,7 @@ int main(int argc, char *argv[])
 
 	/* Print Output */
 	if (!ret)
-		print_response(&cmd);
+		print_response(cmd.reply);
 
 	/* Cleanup */
 	free_interface_list(&if_list);

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,7 +16,6 @@
  */
 
 #if ATH_SUPPORT_WRAP
-#if !WLAN_QWRAP_LEGACY
 #include <qdf_nbuf.h>
 #include <wlan_objmgr_cmn.h>
 #include <wlan_objmgr_psoc_obj.h>
@@ -366,6 +366,58 @@ qdf_export_symbol(dp_wrap_detach);
  * @vdev: handle to the objmgr vdev.
  * Return: void
  */
+#ifdef WLAN_FEATURE_11BE_MLO
+void dp_wrap_vdev_set_psta(struct wlan_objmgr_vdev *vdev)
+{
+	struct dp_wrap_vdev *wvdev;
+	struct dp_wrap_pdev *wpdev;
+	struct wlan_objmgr_pdev *pdev;
+
+	if (vdev) {
+		pdev = vdev->vdev_objmgr.wlan_pdev;
+		if (!pdev) {
+			qwrap_err(" pdev is NULL");
+			return;
+		}
+		wpdev = dp_wrap_get_pdev_handle(pdev);
+		if (!wpdev) {
+			qwrap_err(" wrap_pdev is NULL");
+			return;
+		}
+		wvdev = dp_wrap_get_vdev_handle(vdev);
+		if (!wvdev) {
+			qwrap_err(" wrap_vdev is NULL");
+			return;
+		}
+		OS_MEMZERO(wvdev, sizeof(struct dp_wrap_vdev));
+		wvdev->wrap_pdev = wpdev;
+		wvdev->is_psta = 1;
+		wvdev->vdev = vdev;
+		wpdev->npstavaps++;
+		if (wlan_rptr_vdev_is_wired_psta(vdev))
+			wvdev->is_wired_psta = 1;
+		if (wlan_rptr_vdev_is_mat(vdev)) {
+			wvdev->mat_enabled = 1;
+			WLAN_ADDR_COPY(wvdev->wrap_dev_oma,
+				       vdev->vdev_mlme.mataddr);
+		} else {
+			WLAN_ADDR_COPY(wvdev->wrap_dev_oma,
+				       vdev->vdev_mlme.macaddr);
+		}
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+			WLAN_ADDR_COPY(wvdev->wrap_dev_vma, vdev->vdev_mlme.mldaddr);
+		else
+			WLAN_ADDR_COPY(wvdev->wrap_dev_vma, vdev->vdev_mlme.macaddr);
+
+		qwrap_info("set PSTA flags for vdev_id:%d pdev_id:%d OMA addr:"
+				QDF_MAC_ADDR_FMT "Vma addr:" QDF_MAC_ADDR_FMT,
+				vdev->vdev_objmgr.vdev_id,
+				wlan_objmgr_pdev_get_pdev_id(pdev),
+				QDF_MAC_ADDR_REF(wvdev->wrap_dev_oma),
+				QDF_MAC_ADDR_REF(wvdev->wrap_dev_vma));
+	}
+}
+#else
 void dp_wrap_vdev_set_psta(struct wlan_objmgr_vdev *vdev)
 {
 	struct dp_wrap_vdev *wvdev;
@@ -404,6 +456,7 @@ void dp_wrap_vdev_set_psta(struct wlan_objmgr_vdev *vdev)
 				       vdev->vdev_mlme.macaddr);
 		}
 		WLAN_ADDR_COPY(wvdev->wrap_dev_vma, vdev->vdev_mlme.macaddr);
+
 		qwrap_info("set PSTA flags for vdev_id:%d pdev_id:%d OMA addr:"
 				QDF_MAC_ADDR_FMT "Vma addr:" QDF_MAC_ADDR_FMT,
 				vdev->vdev_objmgr.vdev_id,
@@ -412,6 +465,7 @@ void dp_wrap_vdev_set_psta(struct wlan_objmgr_vdev *vdev)
 				QDF_MAC_ADDR_REF(wvdev->wrap_dev_vma));
 	}
 }
+#endif
 
 /**
  * dp_wrap_vdev_clear_psta() - clear psta flag
@@ -915,5 +969,4 @@ void dp_wrap_register_xmit_handler(struct wlan_objmgr_vdev *vdev,
 	else
 		qwrap_err("Error in registering xmit queue");
 }
-#endif
 #endif

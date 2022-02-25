@@ -124,3 +124,18 @@ ucfg_dfs_get_postnol_cfreq2(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+#ifdef WLAN_DFS_PRECAC_AUTO_CHAN_SUPPORT
+/**
+ * utils_dfs_reset_intercac() - Reset all params which decides
+ *                              interCAC feature.
+ * @pdev: Pointer to DFS pdev object.
+ * Return: Nothing.
+ */
+void utils_dfs_reset_intercac(struct wlan_objmgr_pdev *pdev);
+#else
+static inline void
+utils_dfs_reset_intercac(struct wlan_objmgr_pdev *pdev)
+{
+}
+#endif

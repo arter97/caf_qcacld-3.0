@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,13 +32,12 @@
 #include <qca_multi_link.h>
 #endif
 #if ATH_SUPPORT_WRAP
-#if !WLAN_QWRAP_LEGACY
 #include <dp_wrap.h>
 #endif
-#endif
 #include <wlan_mlme_if.h>
-
+#include <wlan_pdev_mlme.h>
 #define IE_CONTENT_SIZE 1
+#include <ieee80211_api.h>
 
 extern bool
 wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev);
@@ -371,7 +370,6 @@ void wlan_rptr_vdev_set_params(struct wlan_objmgr_vdev *vdev)
 #if ATH_SUPPORT_WRAP
 	wlan_rptr_vdev_get_qwrap_cflags(vdev, &psta, &mpsta, &wrap);
 
-#if !WLAN_QWRAP_LEGACY
 	if (psta) {
 		val.cdp_vdev_param_proxysta = 1;
 		cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id,
@@ -392,7 +390,6 @@ void wlan_rptr_vdev_set_params(struct wlan_objmgr_vdev *vdev)
 						CDP_ENABLE_QWRAP_ISOLATION, val);
 		}
 	}
-#endif
 #endif
 	if (opmode == QDF_SAP_MODE) {
 #if ATH_SUPPORT_WRAP
@@ -449,12 +446,10 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 	struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
 	struct wlan_rptr_vdev_priv *vdev_priv = NULL;
-#if !WLAN_QWRAP_LEGACY
 #if DBDC_REPEATER_SUPPORT
 	u8 *oma_addr = NULL;
 	u8 *vma_addr = NULL;
 	struct net_device *wrap_dev;
-#endif
 #endif
 
 	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
@@ -462,12 +457,9 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 	if (!pdev_priv || !vdev_priv)
 		return;
 
-#if !WLAN_QWRAP_LEGACY
 	if (wlan_rptr_vdev_is_wrap(vdev) || wlan_rptr_vdev_is_psta(vdev))
 		dp_wrap_vdev_set_netdev(vdev, dev);
-#endif
 	if (wlan_rptr_vdev_is_psta(vdev)) {
-#if !WLAN_QWRAP_LEGACY
 		dp_wrap_dev_add(vdev);
 #if DBDC_REPEATER_SUPPORT
 		if (dp_wrap_get_vdev(pdev) && !wlan_rptr_vdev_is_mpsta(vdev) &&
@@ -485,7 +477,6 @@ wlan_rptr_vdev_create_complete(struct wlan_objmgr_vdev *vdev,
 				}
 			}
 		}
-#endif
 #endif
 
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
@@ -513,13 +504,11 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 	struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
 #endif
 	enum QDF_OPMODE opmode;
-#if !WLAN_QWRAP_LEGACY
 #if DBDC_REPEATER_SUPPORT
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	u8 *oma_addr = NULL;
 	u8 *vma_addr = NULL;
 	struct net_device *wrap_dev;
-#endif
 #endif
 
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
@@ -527,7 +516,6 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
 		ext_cb->vdev_nss_ol_psta_delete(vdev);
 #endif
-#if !WLAN_QWRAP_LEGACY
 #if DBDC_REPEATER_SUPPORT
 		if (dp_wrap_get_vdev(pdev) && !wlan_rptr_vdev_is_mpsta(vdev) &&
 		    !wlan_rptr_vdev_is_wired_psta(vdev)) {
@@ -545,7 +533,6 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 #endif
 		dp_wrap_dev_remove(vdev);
 		dp_wrap_dev_remove_vma(vdev);
-#endif
 	}
 	if ((opmode == QDF_STA_MODE) && wlan_rptr_vdev_is_extap(vdev)) {
 		dp_extap_disable(vdev);
@@ -565,18 +552,10 @@ wlan_rptr_vdev_delete_start(struct wlan_objmgr_vdev *vdev)
 bool
 wlan_rptr_vdev_is_key_set_allowed(struct wlan_objmgr_vdev *vdev, uint16_t flags)
 {
-#if WLAN_QWRAP_LEGACY
-	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
-	struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
-
-	if (ext_cb->vdev_is_psta(vdev) && !(ext_cb->vdev_is_mpsta(vdev)) &&
-	    (flags & WLAN_CRYPTO_KEY_GROUP)) {
-#else
-		if (wlan_rptr_vdev_is_psta(vdev) && !(wlan_rptr_vdev_is_mpsta
-		    (vdev)) && (flags & WLAN_CRYPTO_KEY_GROUP)) {
-#endif
-			return 0;
-		}
+	if (wlan_rptr_vdev_is_psta(vdev) && !(wlan_rptr_vdev_is_mpsta
+	    (vdev)) && (flags & WLAN_CRYPTO_KEY_GROUP)) {
+		return 0;
+	}
 	return 1;
 }
 
@@ -970,17 +949,9 @@ QDF_STATUS
 wlan_rptr_set_psta_bssid_filter(struct wlan_objmgr_vdev *vdev,
 				bool *des_bssid_set, struct scan_filter *filter)
 {
-#if WLAN_QWRAP_LEGACY
-	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
-	struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
-#endif
 	struct qdf_mac_addr mpsta_bssid;
 	int retv = QDF_STATUS_SUCCESS;
-#if WLAN_QWRAP_LEGACY
-	if (ext_cb->vdev_is_psta(vdev) && !ext_cb->vdev_is_mpsta(vdev)) {
-#else
 	if (wlan_rptr_vdev_is_psta(vdev) && !wlan_rptr_vdev_is_mpsta(vdev)) {
-#endif
 		retv = wlan_rptr_get_mpsta_bssid(vdev, &mpsta_bssid);
 		if (retv == QDF_STATUS_SUCCESS) {
 			/* For PSTA, desired BSSID should be MPSTA BSSID */
@@ -1009,24 +980,13 @@ wlan_rptr_psta_validate_chan(struct wlan_objmgr_vdev *vdev, uint16_t freq)
 	struct wlan_objmgr_vdev *mpsta_vdev = NULL;
 	struct wlan_channel *chan;
 	u16 mpsta_freq;
-#if WLAN_QWRAP_LEGACY
-	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
-	struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
 
-	if (ext_cb->vdev_is_psta(vdev)) {
-		if (ext_cb->vdev_is_mpsta(vdev)) {
-#else
 	if (wlan_rptr_vdev_is_psta(vdev)) {
 		if (wlan_rptr_vdev_is_mpsta(vdev)) {
-#endif
 			wlan_cm_set_max_connect_attempts(vdev, 1);
 		} else {
-#if WLAN_QWRAP_LEGACY
-			mpsta_vdev = ext_cb->get_mpsta_vdev(vdev);
-#else
 			mpsta_vdev = dp_wrap_get_mpsta_vdev(wlan_vdev_get_pdev(
 									vdev));
-#endif
 			if (mpsta_vdev) {
 				chan = wlan_vdev_mlme_get_bss_chan(mpsta_vdev);
 				mpsta_freq = chan->ch_freq;
@@ -1056,16 +1016,16 @@ wlan_rptr_psta_validate_chan(struct wlan_objmgr_vdev *vdev, uint16_t freq)
 uint8_t wlan_rptr_get_qwrap_vdevs_for_pdev_id(struct wlan_objmgr_psoc *psoc,
 					      uint16_t pdev_id)
 {
-	switch (pdev_id) {
-	case 0:
-		return cfg_get(psoc, CFG_OL_QWRAP_VDEVS_PDEV0);
-	case 1:
-		return cfg_get(psoc, CFG_OL_QWRAP_VDEVS_PDEV1);
-	case 2:
-		return cfg_get(psoc, CFG_OL_QWRAP_VDEVS_PDEV2);
-	default:
-		return 0;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	uint32_t num_vdevs = 0;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, WLAN_MLME_NB_ID);
+	if (pdev) {
+		num_vdevs = wlan_pdev_get_config_params(pdev, WLAN_CONFIG_NUM_QWRAP_VDEVS);
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 	}
+
+	return num_vdevs;
 }
 
 qdf_export_symbol(wlan_rptr_get_qwrap_vdevs_for_pdev_id);
@@ -1086,16 +1046,16 @@ qdf_export_symbol(wlan_rptr_get_qwrap_vdevs_for_pdev_id);
 uint8_t wlan_rptr_get_qwrap_peers_for_pdev_id(struct wlan_objmgr_psoc *psoc,
 					      uint16_t pdev_id)
 {
-	switch (pdev_id) {
-	case 0:
-		return cfg_get(psoc, CFG_OL_QWRAP_PEERS_PDEV0);
-	case 1:
-		return cfg_get(psoc, CFG_OL_QWRAP_PEERS_PDEV1);
-	case 2:
-		return cfg_get(psoc, CFG_OL_QWRAP_PEERS_PDEV2);
-	default:
-		return 0;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	uint32_t num_peers = 0;
+
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, WLAN_MLME_NB_ID);
+	if (pdev) {
+		num_peers = wlan_pdev_get_config_params(pdev, WLAN_CONFIG_NUM_QWRAP_PEERS);
+		wlan_objmgr_pdev_release_ref(pdev, WLAN_MLME_NB_ID);
 	}
+
+	return num_peers;
 }
 
 qdf_export_symbol(wlan_rptr_get_qwrap_peers_for_pdev_id);
@@ -1249,9 +1209,7 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 #endif
 
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
-	if (g_priv->num_stavaps_up == 1) {
-		ext_cb->legacy_dbdc_rootap_set(pdev, 0);
-	} else if (g_priv->num_stavaps_up == 0) {
+	if (g_priv->num_stavaps_up == 0) {
 		val.cdp_vdev_param_da_war = 1;
 		cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id, CDP_ENABLE_DA_WAR,
 				val);
@@ -1288,31 +1246,27 @@ wlan_rptr_vdev_s_ssid_check_cb(struct wlan_objmgr_psoc *psoc,
 			       void *obj, void *arg)
 {
 	struct wlan_objmgr_vdev *vdev = NULL;
-	struct s_ssid_info *s_ssid_msg;
-	u8 ssid[WLAN_SSID_MAX_LEN + 1] = {0};
-	u8 len = 0;
+	struct s_ssid_info *s_ssid_msg = NULL;
 
 	vdev = (struct wlan_objmgr_vdev *)obj;
 	if (!vdev) {
 		RPTR_LOGE("RPTR VDEV is null");
 		return;
 	}
-	if (QDF_STATUS_SUCCESS !=
-			wlan_vdev_mlme_get_ssid(vdev, ssid, &len))
-		return;
 
 	s_ssid_msg = ((struct s_ssid_info *)arg);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) != wlan_vdev_mlme_get_opmode(
 							s_ssid_msg->vdev)) {
+		struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+		struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
+
 		if (wlan_rptr_is_psta_vdev(vdev))
 			return;
 
-		if (s_ssid_msg->ssid_len != len ||
-		    qdf_mem_cmp(s_ssid_msg->ssid, ssid, len)) {
-			return;
+		if (ext_cb->dessired_ssid_found(vdev, s_ssid_msg->ssid, s_ssid_msg->ssid_len)) {
+			s_ssid_msg->ssid_match = 1;
 		}
-		s_ssid_msg->ssid_match = 1;
 	}
 }
 
