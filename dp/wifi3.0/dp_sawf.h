@@ -93,4 +93,17 @@ QDF_STATUS
 dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 			      struct dp_tx_desc_s *tx_desc,
 			      uint8_t tid);
+
+#define DP_SAWF_STATS_SVC_CLASS_ID_ALL	0
+
+QDF_STATUS
+dp_sawf_dump_peer_stats(struct dp_txrx_peer *txrx_peer);
+
+QDF_STATUS
+dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
+			     uint32_t svc_id, uint8_t *mac, void *data);
+
+QDF_STATUS
+dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
+			  uint32_t svc_id, uint8_t *mac, void *data);
 #endif /* DP_SAWF_H*/
