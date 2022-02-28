@@ -21,6 +21,8 @@
 
 #include <qdf_lock.h>
 #include <dp_types.h>
+#include "dp_internal.h"
+#include "dp_types.h"
 #include "cdp_txrx_cmn_struct.h"
 #include "cdp_txrx_hist_struct.h"
 #include "cdp_txrx_extd_struct.h"
@@ -28,6 +30,14 @@
 #define MSDU_QUEUE_LATENCY_WIN_MIN_SAMPLES 20
 #define WLAN_TX_DELAY_UNITS_US 10
 #define WLAN_TX_DELAY_MASK 0x1FFFFFFF
+#define DP_SAWF_DEFINED_Q_PTID_MAX 2
+#define DP_SAWF_DEFAULT_Q_PTID_MAX 2
+#define DP_SAWF_TID_MAX 8
+#define DP_SAWF_Q_MAX (DP_SAWF_DEFINED_Q_PTID_MAX * DP_SAWF_TID_MAX)
+#define DP_SAWF_DEFAULT_Q_MAX (DP_SAWF_DEFAULT_Q_PTID_MAX * DP_SAWF_TID_MAX)
+#define dp_sawf(peer, msduq_num, field) ((peer)->sawf->msduq[msduq_num].field)
+#define DP_SAWF_DEFAULT_Q_INVALID 0xff
+#define DP_SAWF_INVALID_AST_IDX 0xffff
 
 struct sawf_stats {
 	struct sawf_delay_stats delay[DP_SAWF_MAX_TIDS][DP_SAWF_MAX_QUEUES];
@@ -106,4 +116,32 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 QDF_STATUS
 dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 			  uint32_t svc_id, uint8_t *mac, void *data);
+
+struct dp_sawf_msduq {
+	uint8_t ref_count;
+	uint8_t htt_msduq;
+	uint8_t remapped_tid;
+	bool is_used;
+	bool del_in_progress;
+	uint32_t tx_flow_number;
+	uint32_t svc_id;
+};
+
+struct dp_sawf_msduq_tid_map {
+	uint32_t host_queue_id;
+};
+
+struct dp_peer_sawf {
+	/* qdf_bitmap queue_usage; */
+	struct dp_sawf_msduq msduq[DP_SAWF_Q_MAX];
+	struct dp_sawf_msduq_tid_map
+	       msduq_map[DP_SAWF_TID_MAX][DP_SAWF_DEFAULT_Q_PTID_MAX];
+	struct sawf_def_queue_report tid_reports[DP_SAWF_TID_MAX];
+};
+
+uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
+			   uint32_t service_id);
+uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				  uint8_t vdev_id, uint16_t queue_id);
+
 #endif /* DP_SAWF_H*/
