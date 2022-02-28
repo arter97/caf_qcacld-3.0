@@ -29,6 +29,14 @@
 #ifdef QCA_SUPPORT_CP_STATS
 
 #include <wlan_cp_stats_ic_dcs_defs.h>
+
+#if defined(WLAN_SUPPORT_TWT) && defined(WLAN_TWT_CONV_SUPPORTED)
+
+/* Max TWT sessions per peer */
+#define TWT_PEER_MAX_SESSIONS 1
+
+#endif /* WLAN_SUPPORT_TWT */
+
 /**
  * struct pdev_rx_rssi - rx rssi information
  *
