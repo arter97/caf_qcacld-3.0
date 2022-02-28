@@ -14,10 +14,18 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include<dp_sawf.h>
+#include <wlan_sawf.h>
 
 uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 			    uint32_t service_id)
 {
+	if (!wlan_service_id_valid(service_id) ||
+	    !wlan_service_id_configured(service_id)) {
+		qdf_info("Service ID(%d) is not valid or not configured",
+			  service_id);
+	   return DP_SAWF_PEER_Q_INVALID;
+	}
+
 	return dp_sawf_get_msduq(netdev, peer_mac, service_id);
 }
 

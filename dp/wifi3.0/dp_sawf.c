@@ -34,6 +34,75 @@
 #include "osif_private.h"
 #include <wlan_objmgr_vdev_obj.h>
 
+/**
+ ** SAWF_metadata related information.
+ **/
+#define SAWF_VALID_TAG 0xAA
+#define SAWF_TAG_SHIFT 0x18
+#define SAWF_SERVICE_CLASS_SHIFT 0x10
+#define SAWF_SERVICE_CLASS_MASK 0xff
+#define SAWF_PEER_ID_SHIFT 0x6
+#define SAWF_PEER_ID_MASK 0x3ff
+#define SAWF_MSDUQ_MASK 0x3f
+
+/**
+ ** SAWF_metadata extraction.
+ **/
+#define SAWF_TAG_GET(x) ((x) >> SAWF_TAG_SHIFT)
+#define SAWF_SERVICE_CLASS_GET(x) (((x) >> SAWF_SERVICE_CLASS_SHIFT) \
+	& SAWF_SERVICE_CLASS_MASK)
+#define SAWF_PEER_ID_GET(x) (((x) >> SAWF_PEER_ID_SHIFT) \
+	& SAWF_PEER_ID_MASK)
+#define SAWF_MSDUQ_GET(x) ((x) & SAWF_MSDUQ_MASK)
+#define SAWF_TAG_IS_VALID(x) \
+	((SAWF_TAG_GET(x) == SAWF_VALID_TAG) ? true : false)
+
+#define DP_TX_TCL_METADATA_TYPE_SET(_var, _val) \
+	HTT_TX_TCL_METADATA_TYPE_V2_SET(_var, _val)
+#define DP_TCL_METADATA_TYPE_SVC_ID_BASED \
+	HTT_TCL_METADATA_V2_TYPE_SVC_ID_BASED
+
+uint16_t dp_sawf_msduq_peer_id_set(uint16_t peer_id, uint8_t msduq)
+{
+	uint16_t peer_msduq = 0;
+
+	peer_msduq |= (peer_id & SAWF_PEER_ID_MASK) << SAWF_PEER_ID_SHIFT;
+	peer_msduq |= (msduq & SAWF_PEER_ID_MASK);
+	return peer_msduq;
+}
+
+bool dp_sawf_tag_valid_get(qdf_nbuf_t nbuf)
+{
+	if (SAWF_TAG_IS_VALID(qdf_nbuf_get_mark(nbuf)))
+		return true;
+
+	return false;
+}
+
+uint32_t dp_sawf_queue_id_get(qdf_nbuf_t nbuf)
+{
+	uint32_t mark = qdf_nbuf_get_mark(nbuf);
+
+	if (!SAWF_TAG_IS_VALID(mark))
+		return DP_SAWF_DEFAULT_Q_INVALID;
+
+	return SAWF_MSDUQ_GET(mark);
+}
+
+void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf)
+{
+	uint32_t mark = qdf_nbuf_get_mark(nbuf);
+	uint16_t service_id = SAWF_SERVICE_CLASS_GET(mark);
+
+	if (!SAWF_TAG_IS_VALID(mark))
+		return;
+
+	DP_TX_TCL_METADATA_TYPE_SET(*htt_tcl_metadata,
+				    DP_TCL_METADATA_TYPE_SVC_ID_BASED);
+	HTT_TX_FLOW_METADATA_TID_OVERRIDE_SET(*htt_tcl_metadata, 1);
+	HTT_TX_TCL_METADATA_SVC_CLASS_ID_SET(*htt_tcl_metadata, service_id);
+}
+
 QDF_STATUS
 dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 		       struct dp_peer *peer)
@@ -872,9 +941,7 @@ uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 {
 	struct dp_peer *peer = NULL;
 	uint32_t search_index = DP_SAWF_INVALID_AST_IDX;
-	struct ether_header *eh = (struct ether_header *)(qdf_nbuf_data(nbuf));
-	uint8_t *dest_mac = eh->ether_dhost;
-	uint16_t peer_id = dp_sawf_get_peerid(soc, dest_mac, vdev_id);
+	uint16_t peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(nbuf));
 	uint8_t index = queue_id / DP_SAWF_TID_MAX;
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
@@ -897,14 +964,15 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	wlan_if_t vap;
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t vdev_id;
-	int i = 1;
+	uint8_t i = 1;
 	struct dp_peer *peer = NULL;
 	struct dp_soc *soc = NULL;
 	uint16_t peer_id;
+	uint8_t q_id;
 
 	if (!netdev->ieee80211_ptr) {
 		qdf_warn("%s non vap netdevice\n", __func__);
-		return DP_SAWF_DEFAULT_Q_INVALID;
+		return DP_SAWF_PEER_Q_INVALID;
 	}
 
 	osdev = ath_netdev_priv(netdev);
@@ -914,50 +982,53 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	      (wlan_pdev_get_psoc(wlan_vdev_get_pdev(vdev)));
 
 	vdev_id = wlan_vdev_get_id(vdev);
-	qdf_info("dest_mac: " QDF_MAC_ADDR_FMT " vdev_id:%d\n",
-		 QDF_MAC_ADDR_REF(dest_mac), vdev_id);
 
 	peer_id = dp_sawf_get_peerid(soc, dest_mac, vdev_id);
 	if (peer_id == HTT_INVALID_PEER)
-		return DP_SAWF_DEFAULT_Q_INVALID;
+		return DP_SAWF_PEER_Q_INVALID;
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id,
 				     DP_MOD_ID_SAWF);
 
 	if (!peer) {
 		qdf_warn("%s NULL peer\n", __func__);
-		return DP_SAWF_DEFAULT_Q_INVALID;
+		return DP_SAWF_PEER_Q_INVALID;
 	}
 
-	qdf_info("osdev:%p peer:%p sawf_ctx : %p soc:%p\n",
-		 osdev, peer, peer->sawf, soc);
-
-	for (i = 1 ; i <= DP_SAWF_Q_MAX; i++) {
+	/*
+	 * First loop to go through all msdu queues of peer which
+	 * have been used. If flow has same service id as that of
+	 * used msdu queues, return used msdu queue.
+	 */
+	for (i = 1; i <= DP_SAWF_Q_MAX; i++) {
 		if ((dp_sawf(peer, i, is_used) == 1) &&
 		    dp_sawf(peer, i, svc_id) == service_id) {
 			dp_sawf(peer, i, ref_count)++;
 			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
-			qdf_info("%s queue_id:%d\n",
-				 i + DP_SAWF_DEFAULT_Q_MAX);
-			return i + DP_SAWF_DEFAULT_Q_MAX;
+			q_id = i + DP_SAWF_DEFAULT_Q_MAX;
+			return dp_sawf_msduq_peer_id_set(peer_id, q_id);
 		}
 	}
 
+	/*
+	 * Second loop to go through all unused msdu queues of peer.
+	 * Allot new msdu queue for new service class.
+	 */
 	for (i = 1; i <= DP_SAWF_Q_MAX; i++) {
 		if (dp_sawf(peer, i, is_used) == 0) {
 			dp_sawf(peer, i, is_used) = 1;
 			dp_sawf(peer, i, svc_id) = service_id;
 			dp_sawf(peer, i, ref_count)++;
 			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
-			qdf_info("%s queue_id:%d\n",
-				 i + DP_SAWF_DEFAULT_Q_MAX);
-			return i + DP_SAWF_DEFAULT_Q_MAX;
+			q_id = i + DP_SAWF_DEFAULT_Q_MAX;
+			return dp_sawf_msduq_peer_id_set(peer_id, q_id);
 		}
 	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
-	return DP_SAWF_DEFAULT_Q_INVALID;
+
 	/* request for more msdu queues. Return error*/
+	return DP_SAWF_PEER_Q_INVALID;
 }
 
 qdf_export_symbol(dp_sawf_get_msduq);
