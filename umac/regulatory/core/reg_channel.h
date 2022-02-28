@@ -37,6 +37,8 @@
  * @phy_in: phymode that the user requested.
  * @ch_width: Channel width that the user requested.
  * @primary_freq: Input primary frequency.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
  *
  * Return: true if phymode is allowed, else false.
  */
@@ -44,7 +46,8 @@ bool reg_is_phymode_chwidth_allowed(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
 		enum reg_phymode phy_in,
 		enum phy_ch_width ch_width,
-		qdf_freq_t primary_freq);
+		qdf_freq_t primary_freq,
+		enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
  * reg_set_chan_blocked() - Set is_chan_hop_blocked to true for a frequency
@@ -243,13 +246,16 @@ bool reg_is_freq_width_dfs(struct wlan_objmgr_pdev *pdev,
  * @freq: Channel center frequency.
  * @sec_ch_2g_freq: Secondary 2G channel frequency
  * @ch_params: pointer to the channel parameters.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
  *
  * Return: None
  */
 void reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 			    qdf_freq_t freq,
 			    qdf_freq_t sec_ch_2g_freq,
-			    struct ch_params *ch_params);
+			    struct ch_params *ch_params,
+			    enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
  * reg_filter_wireless_modes() - Filter out the wireless modes
