@@ -44,6 +44,8 @@
 #define STATS_FEAT_FLG_TXCAP           0x00100000
 #define STATS_FEAT_FLG_MONITOR         0x00200000
 #define STATS_FEAT_FLG_JITTER          0x00400000
+#define STATS_FEAT_FLG_SAWFDELAY       0x00800000
+#define STATS_FEAT_FLG_SAWFTX          0x01000000
 
 /* Add new feature flag above and update STATS_FEAT_FLG_ALL */
 #define STATS_FEAT_FLG_ALL             \
@@ -54,7 +56,8 @@
 	 STATS_FEAT_FLG_WMI | STATS_FEAT_FLG_IGMP | STATS_FEAT_FLG_LINK | \
 	 STATS_FEAT_FLG_MESH | STATS_FEAT_FLG_RATE | STATS_FEAT_FLG_DELAY | \
 	 STATS_FEAT_FLG_ME | STATS_FEAT_FLG_NAWDS | STATS_FEAT_FLG_TXCAP | \
-	 STATS_FEAT_FLG_MONITOR | STATS_FEAT_FLG_JITTER)
+	 STATS_FEAT_FLG_MONITOR | STATS_FEAT_FLG_JITTER | \
+	 STATS_FEAT_FLG_SAWFDELAY | STATS_FEAT_FLG_SAWFTX)
 
 #define STATS_BASIC_AP_CTRL_MASK       0
 #define STATS_BASIC_AP_DATA_MASK       (STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX)
@@ -93,7 +96,8 @@
 	 STATS_FEAT_FLG_FWD | STATS_FEAT_FLG_TWT |     \
 	 STATS_FEAT_FLG_RAW | STATS_FEAT_FLG_RDK |     \
 	 STATS_FEAT_FLG_NAWDS | STATS_FEAT_FLG_DELAY | \
-	 STATS_FEAT_FLG_JITTER)
+	 STATS_FEAT_FLG_JITTER | \
+	 STATS_FEAT_FLG_SAWFDELAY | STATS_FEAT_FLG_SAWFTX)
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
 #if WLAN_DEBUG_TELEMETRY
@@ -332,6 +336,9 @@ struct basic_psoc_data_rx {
 #define STATS_IF_MAX_BW              8
 #define STATS_IF_MAX_DATA_TIDS       9
 #define STATS_IF_MAX_RX_CTX          8
+#define STATS_IF_MAX_SAWF_DATA_TIDS  8
+#define STATS_IF_MAX_SAWF_DATA_QUEUE 2
+#define STATS_IF_NUM_AVG_WINDOWS     5
 
 enum stats_if_hist_bucket_index {
 	STATS_IF_HIST_BUCKET_0,
@@ -386,6 +393,39 @@ struct stats_if_jitter_tid_stats {
 	u_int64_t tx_avg_err;
 	u_int64_t tx_total_success;
 	u_int64_t tx_drop;
+};
+
+struct stats_if_sawf_delay_stats {
+	struct stats_if_hist_stats delay_hist;
+	struct {
+		uint32_t sum;
+		uint32_t count;
+	} avg;
+	struct {
+		uint32_t sum;
+		uint32_t count;
+	} win_avgs[STATS_IF_NUM_AVG_WINDOWS];
+	uint8_t cur_win;
+};
+
+struct stats_if_pkt_info {
+	uint32_t num;
+	uint64_t bytes;
+};
+
+struct stats_if_sawf_tx_stats {
+	struct stats_if_pkt_info tx_success;
+	struct {
+		struct stats_if_pkt_info fw_rem;
+		uint32_t fw_rem_notx;
+		uint32_t fw_rem_tx;
+		uint32_t age_out;
+		uint32_t fw_reason1;
+		uint32_t fw_reason2;
+		uint32_t fw_reason3;
+	} dropped;
+	uint32_t tx_failed;
+	uint32_t queue_depth;
 };
 
 struct advance_data_tx_stats {
@@ -475,6 +515,14 @@ struct advance_peer_data_jitter {
 
 struct advance_peer_data_delay {
 	struct stats_if_delay_tid_stats delay_stats[STATS_IF_MAX_DATA_TIDS];
+};
+
+struct advance_peer_data_sawfdelay {
+	struct stats_if_sawf_delay_stats delay[STATS_IF_MAX_SAWF_DATA_TIDS][STATS_IF_MAX_SAWF_DATA_QUEUE];
+};
+
+struct advance_peer_data_sawftx {
+	struct stats_if_sawf_tx_stats tx[STATS_IF_MAX_SAWF_DATA_TIDS][STATS_IF_MAX_SAWF_DATA_QUEUE];
 };
 
 /* Advance Peer Ctrl */

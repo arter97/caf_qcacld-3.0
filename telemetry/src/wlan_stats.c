@@ -23,6 +23,10 @@
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_peer_obj.h>
 #include <cdp_txrx_host_stats.h>
+#if CONFIG_SAWF
+#include <cdp_txrx_extd_struct.h>
+#include <cdp_txrx_sawf.h>
+#endif
 #include <wlan_cfg80211_ic_cp_stats.h>
 #include <qdf_event.h>
 #include <ieee80211_var.h>
@@ -1161,6 +1165,94 @@ fill_advance_peer_jitter_stats(struct advance_peer_data_jitter *data,
 	}
 }
 
+#if CONFIG_SAWF
+static void
+fill_advance_peer_sawftx_stats(struct advance_peer_data_sawftx *data,
+			       struct sawf_tx_stats *tx_stats)
+{
+	uint8_t tidx = 0, queues = 0, tidx_count, queues_count;
+
+	tidx_count = qdf_min((uint8_t)STATS_IF_MAX_SAWF_DATA_TIDS,
+			     (uint8_t)DP_SAWF_MAX_TIDS);
+	queues_count = qdf_min((uint8_t)STATS_IF_MAX_SAWF_DATA_QUEUE,
+			       (uint8_t)DP_SAWF_MAX_QUEUES);
+	for (tidx = 0; tidx < tidx_count; tidx++) {
+		for (queues = 0; queues < queues_count; queues++) {
+			data->tx[tidx][queues].tx_success.num =
+					tx_stats->tx_success.num;
+			data->tx[tidx][queues].tx_success.bytes =
+					tx_stats->tx_success.bytes;
+			data->tx[tidx][queues].dropped.fw_rem.num =
+					tx_stats->dropped.fw_rem.num;
+			data->tx[tidx][queues].dropped.fw_rem.bytes =
+					tx_stats->dropped.fw_rem.bytes;
+			data->tx[tidx][queues].dropped.fw_rem_notx =
+					tx_stats->dropped.fw_rem_notx;
+			data->tx[tidx][queues].dropped.fw_rem_tx =
+					tx_stats->dropped.fw_rem_tx;
+			data->tx[tidx][queues].dropped.age_out =
+					tx_stats->dropped.age_out;
+			data->tx[tidx][queues].dropped.fw_reason1 =
+					tx_stats->dropped.fw_reason1;
+			data->tx[tidx][queues].dropped.fw_reason2 =
+					tx_stats->dropped.fw_reason2;
+			data->tx[tidx][queues].dropped.fw_reason3 =
+					tx_stats->dropped.fw_reason3;
+			data->tx[tidx][queues].tx_failed =
+					tx_stats->tx_failed;
+			data->tx[tidx][queues].queue_depth =
+					tx_stats->queue_depth;
+			tx_stats++;
+		}
+	}
+}
+
+static void
+fill_advance_peer_sawfdelay_stats(struct advance_peer_data_sawfdelay *data,
+				  struct sawf_delay_stats *delay_stats)
+{
+	uint8_t tidx = 0, queues = 0, idx = 0, tidx_count, queues_count;
+	uint8_t mx_win = 0, mx_buc;
+
+	tidx_count = qdf_min((uint8_t)STATS_IF_MAX_SAWF_DATA_TIDS,
+			     (uint8_t)DP_SAWF_MAX_TIDS);
+	queues_count = qdf_min((uint8_t)STATS_IF_MAX_SAWF_DATA_QUEUE,
+			       (uint8_t)DP_SAWF_MAX_QUEUES);
+	mx_buc = qdf_min((uint8_t)STATS_IF_HIST_BUCKET_MAX,
+			 (uint8_t)CDP_HIST_BUCKET_MAX);
+	mx_win = qdf_min((uint8_t)STATS_IF_NUM_AVG_WINDOWS,
+			 (uint8_t)DP_SAWF_NUM_AVG_WINDOWS);
+	for (tidx = 0; tidx < tidx_count; tidx++) {
+		for (queues = 0; queues < queues_count; queues++) {
+			data->delay[tidx][queues].delay_hist.max =
+					delay_stats->delay_hist.max;
+			data->delay[tidx][queues].delay_hist.min =
+					delay_stats->delay_hist.min;
+			data->delay[tidx][queues].delay_hist.avg =
+					delay_stats->delay_hist.avg;
+			data->delay[tidx][queues].delay_hist.hist.hist_type =
+					delay_stats->delay_hist.hist.hist_type;
+			data->delay[tidx][queues].avg.sum =
+					delay_stats->avg.sum;
+			data->delay[tidx][queues].avg.count =
+					delay_stats->avg.count;
+			data->delay[tidx][queues].cur_win =
+					delay_stats->cur_win;
+			for (idx = 0; idx < mx_win; idx++) {
+				data->delay[tidx][queues].win_avgs[idx].sum =
+					delay_stats->win_avgs[idx].sum;
+				data->delay[tidx][queues].win_avgs[idx].count =
+					delay_stats->win_avgs[idx].count;
+			}
+			for (idx = 0; idx < mx_buc; idx++)
+				data->delay[tidx][queues].delay_hist.hist.freq[idx] =
+					delay_stats->delay_hist.hist.freq[idx];
+			delay_stats++;
+		}
+	}
+}
+#endif
+
 static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
 				       struct cdp_tx_stats *cdp_tx)
 {
@@ -1269,6 +1361,106 @@ get_advance_peer_jitter_stats(struct cdp_peer_tid_stats *jitter,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if CONFIG_SAWF
+static QDF_STATUS
+get_advance_peer_data_sawfdelay(struct sawf_delay_stats *sawf_delay_stats,
+				struct unified_stats *stats, uint8_t svc_id)
+{
+	struct advance_peer_data_sawfdelay *data = NULL;
+
+	data = qdf_mem_malloc(sizeof(struct advance_peer_data_sawfdelay));
+	if (!data) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	if (svc_id == 0) {
+		fill_advance_peer_sawfdelay_stats(data, sawf_delay_stats);
+	} else {
+		uint8_t idx = 0;
+		uint8_t mx_buc, mx_win;
+
+		mx_buc = qdf_min((uint8_t)STATS_IF_HIST_BUCKET_MAX,
+				 (uint8_t)CDP_HIST_BUCKET_MAX);
+		mx_win = qdf_min((uint8_t)STATS_IF_NUM_AVG_WINDOWS,
+				 (uint8_t)DP_SAWF_NUM_AVG_WINDOWS);
+
+		data->delay[0][0].delay_hist.max =
+					sawf_delay_stats->delay_hist.max;
+		data->delay[0][0].delay_hist.min =
+					sawf_delay_stats->delay_hist.min;
+		data->delay[0][0].delay_hist.avg =
+					sawf_delay_stats->delay_hist.avg;
+		data->delay[0][0].delay_hist.hist.hist_type =
+				sawf_delay_stats->delay_hist.hist.hist_type;
+		data->delay[0][0].avg.sum =
+				sawf_delay_stats->avg.sum;
+		data->delay[0][0].avg.count =
+					sawf_delay_stats->avg.count;
+		data->delay[0][0].cur_win =
+					sawf_delay_stats->cur_win;
+		for (idx = 0; idx < mx_win; idx++) {
+			data->delay[0][0].win_avgs[idx].sum =
+					sawf_delay_stats->win_avgs[idx].sum;
+			data->delay[0][0].win_avgs[idx].count =
+					sawf_delay_stats->win_avgs[idx].count;
+		}
+		for (idx = 0; idx < mx_buc; idx++)
+			data->delay[0][0].delay_hist.hist.freq[idx] =
+				sawf_delay_stats->delay_hist.hist.freq[idx];
+	}
+
+	stats->feat[INX_FEAT_SAWFDELAY] = data;
+	stats->size[INX_FEAT_SAWFDELAY] =
+			sizeof(struct advance_peer_data_sawfdelay);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+get_advance_peer_data_sawftx(struct sawf_tx_stats *sawf_tx_stats,
+			     struct unified_stats *stats, uint8_t svc_id)
+{
+	struct advance_peer_data_sawftx *data = NULL;
+
+	data = qdf_mem_malloc(sizeof(struct advance_peer_data_sawftx));
+	if (!data) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+	if (svc_id == 0) {
+		fill_advance_peer_sawftx_stats(data, sawf_tx_stats);
+	} else {
+		data->tx[0][0].tx_success.num =
+					sawf_tx_stats->tx_success.num;
+		data->tx[0][0].tx_success.bytes =
+					sawf_tx_stats->tx_success.bytes;
+		data->tx[0][0].dropped.fw_rem.num =
+					sawf_tx_stats->dropped.fw_rem.num;
+		data->tx[0][0].dropped.fw_rem.bytes =
+					sawf_tx_stats->dropped.fw_rem.bytes;
+		data->tx[0][0].dropped.fw_rem_notx =
+					sawf_tx_stats->dropped.fw_rem_notx;
+		data->tx[0][0].dropped.fw_rem_tx =
+					sawf_tx_stats->dropped.fw_rem_tx;
+		data->tx[0][0].dropped.age_out =
+					sawf_tx_stats->dropped.age_out;
+		data->tx[0][0].dropped.fw_reason1 =
+					sawf_tx_stats->dropped.fw_reason1;
+		data->tx[0][0].dropped.fw_reason2 =
+					sawf_tx_stats->dropped.fw_reason2;
+		data->tx[0][0].dropped.fw_reason3 =
+					sawf_tx_stats->dropped.fw_reason3;
+		data->tx[0][0].tx_failed =
+					sawf_tx_stats->tx_failed;
+		data->tx[0][0].queue_depth = sawf_tx_stats->queue_depth;
+	}
+
+	stats->feat[INX_FEAT_SAWFTX] = data;
+	stats->size[INX_FEAT_SAWFTX] = sizeof(struct advance_peer_data_sawftx);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 static QDF_STATUS get_advance_peer_data_tx(struct unified_stats *stats,
 					   struct cdp_peer_stats *peer_stats)
 {
@@ -1604,10 +1796,86 @@ static QDF_STATUS get_advance_peer_ctrl_rate(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if CONFIG_SAWF
+static bool get_advance_sawf_stats(uint32_t feat,
+				   void *dp_soc,
+				   struct unified_stats *stats,
+				   uint8_t service_id,
+				   uint8_t *peer_mac)
+{
+	struct sawf_delay_stats *sawf_delay = NULL;
+	struct sawf_tx_stats *sawf_tx = NULL;
+	bool stats_collected = false;
+	uint32_t size = 0;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	if (feat & STATS_FEAT_FLG_SAWFDELAY) {
+		if (service_id == 0)
+			size = sizeof(struct sawf_delay_stats) *
+				DP_SAWF_MAX_TIDS * DP_SAWF_MAX_QUEUES;
+		else
+			size = sizeof(struct sawf_delay_stats);
+		sawf_delay = qdf_mem_malloc(size);
+		if (!sawf_delay) {
+			qdf_err("Allocation failed");
+			ret = QDF_STATUS_E_NOMEM;
+			goto get_failed;
+		}
+		ret = cdp_get_peer_sawf_delay_stats(dp_soc, service_id,
+						    peer_mac, sawf_delay);
+		if (ret == QDF_STATUS_SUCCESS)
+			ret = get_advance_peer_data_sawfdelay(sawf_delay, stats,
+							      service_id);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch peer Sawf Delay Stats!");
+		else
+			stats_collected = true;
+	}
+	if (feat & STATS_FEAT_FLG_SAWFTX) {
+		if (service_id == 0)
+			size = sizeof(struct sawf_tx_stats) *
+				DP_SAWF_MAX_TIDS * DP_SAWF_MAX_QUEUES;
+		else
+			size = sizeof(struct sawf_tx_stats);
+		sawf_tx = qdf_mem_malloc(size);
+		if (!sawf_tx) {
+			qdf_err("Allocation failed");
+			ret = QDF_STATUS_E_NOMEM;
+			goto get_failed;
+		}
+		ret = cdp_get_peer_sawf_tx_stats(dp_soc, service_id,
+						 peer_mac, sawf_tx);
+		if (ret == QDF_STATUS_SUCCESS)
+			ret = get_advance_peer_data_sawftx(sawf_tx, stats,
+							   service_id);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch peer Sawf Tx Stats!");
+		else
+			stats_collected = true;
+	}
+
+get_failed:
+	if (sawf_tx)
+		qdf_mem_free(sawf_tx);
+	if (sawf_delay)
+		qdf_mem_free(sawf_delay);
+
+	return stats_collected;
+}
+#else
+static bool  get_advance_sawf_stats(uint32_t feat,
+				    void *dp_soc,
+				    struct unified_stats *stats,
+				    uint8_t service_id,
+				    uint8_t *peer_mac)
+{
+	return false;
+}
+#endif
 static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 					struct wlan_objmgr_peer *peer,
 					struct unified_stats *stats,
-					uint32_t feat)
+					struct stats_config *cfg)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct cdp_peer_stats *peer_stats = NULL;
@@ -1619,7 +1887,11 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 	struct cdp_peer_tid_stats *jitter = NULL;
 	uint32_t size;
 	bool stats_collected = false;
+	uint32_t feat = 0;
+	uint8_t service_id = 0;
 
+	feat = cfg->feat;
+	service_id = cfg->serviceid;
 	if (!psoc || !peer) {
 		qdf_err("Invalid Psoc or Peer!");
 		return QDF_STATUS_E_INVAL;
@@ -1740,7 +2012,8 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 		else
 			stats_collected = true;
 	}
-
+	stats_collected = get_advance_sawf_stats(feat, dp_soc, stats,
+						 service_id, peer_mac);
 get_failed:
 	if (peer_stats)
 		qdf_mem_free(peer_stats);
@@ -4775,7 +5048,7 @@ QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_psoc *psoc,
 	case STATS_LVL_ADVANCE:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_advance_peer_data(psoc, peer,
-						    stats, cfg->feat);
+						    stats, cfg);
 		else
 			ret = get_advance_peer_ctrl(peer, stats, cfg->feat);
 		break;
