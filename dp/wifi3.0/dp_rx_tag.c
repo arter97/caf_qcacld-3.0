@@ -68,7 +68,7 @@ void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 
 	pdev->reo_proto_tag_stats[ring_index][protocol_index].tag_ctr++;
 }
-#elif defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG)
+#else
 void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 					uint16_t protocol_index,
 					uint16_t ring_index)
@@ -97,7 +97,7 @@ void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
 	pdev->rx_err_proto_tag_stats[protocol_index].tag_ctr++;
 }
 
-#elif defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG)
+#else
 void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
 					    uint16_t protocol_index)
 {
