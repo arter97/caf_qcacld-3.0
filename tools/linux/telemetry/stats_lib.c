@@ -1972,66 +1972,43 @@ static void free_basic_ap(struct stats_obj *ap)
 	free(ap->stats);
 }
 
-#if WLAN_ADVANCE_TELEMETRY
-static void aggr_advance_pdev_ctrl(struct advance_pdev_ctrl *pdev_ctrl,
-				   struct advance_vdev_ctrl *vdev_ctrl)
+static void update_basic_pdev_ctrl_tx(struct basic_pdev_ctrl_tx *pdev_tx,
+				      struct basic_vdev_ctrl_tx *vdev_tx)
 {
-	if (!pdev_ctrl || !vdev_ctrl)
-		return;
+	pdev_tx->cs_tx_mgmt += vdev_tx->cs_tx_mgmt;
+}
 
+static void update_basic_pdev_ctrl_rx(struct basic_pdev_ctrl_rx *pdev_rx,
+				      struct basic_vdev_ctrl_rx *vdev_rx)
+{
+	pdev_rx->cs_rx_mgmt += vdev_rx->cs_rx_mgmt;
+}
+
+static void update_pdev_basic_ctrl_stats(struct basic_pdev_ctrl *pdev_ctrl,
+					 struct basic_vdev_ctrl *vdev_ctrl)
+{
 	if (pdev_ctrl->tx && vdev_ctrl->tx)
-		pdev_ctrl->tx->cs_tx_beacon +=
-					vdev_ctrl->tx->cs_tx_bcn_success +
-					vdev_ctrl->tx->cs_tx_bcn_outage;
+		update_basic_pdev_ctrl_tx(pdev_ctrl->tx, vdev_ctrl->tx);
+	if (pdev_ctrl->rx && vdev_ctrl->rx)
+		update_basic_pdev_ctrl_rx(pdev_ctrl->rx, vdev_ctrl->rx);
 }
 
-static void aggregate_advance_stats(struct stats_obj *obj)
+static void update_pdev_basic_stats(struct stats_obj *radio,
+				    struct stats_obj *vap)
 {
-	struct stats_obj *radio = NULL;
-
-	while (obj) {
-		if (obj->obj_type == STATS_OBJ_RADIO)
-			radio = obj;
-
-		if ((obj->obj_type == STATS_OBJ_VAP) && (radio)) {
-			switch (obj->type) {
-			case STATS_TYPE_DATA:
-				break;
-			case STATS_TYPE_CTRL:
-				aggr_advance_pdev_ctrl(radio->stats,
-						       obj->stats);
-				break;
-			}
-		}
-		obj = obj->next;
-	}
-}
-
-static void accumulate_advance_stats(struct stats_command *cmd)
-{
-	if (!cmd->recursive)
-		return;
-
-	/**
-	 * Aggregation should be handled in each lower node of hierarchy first
-	 * and then in top node. That should be handled in each object level
-	 * aggreagation functions.
-	 *
-	 * In STA, aggregation is not required. So, treated as default case.
-	 **/
-	switch (cmd->obj) {
-	case STATS_OBJ_AP:
-	case STATS_OBJ_RADIO:
-		aggregate_advance_stats(cmd->reply->obj_head);
+	switch (radio->type) {
+	case STATS_TYPE_DATA:
 		break;
-	case STATS_OBJ_VAP:
+	case STATS_TYPE_CTRL:
+		if (radio->stats && vap->stats)
+			update_pdev_basic_ctrl_stats(radio->stats, vap->stats);
 		break;
-	case STATS_OBJ_STA:
 	default:
-		break;
+		STATS_ERR("Unexpected stats type %d!\n", radio->type);
 	}
 }
 
+#if WLAN_ADVANCE_TELEMETRY
 static void free_advance_sta(struct stats_obj *sta)
 {
 	if (!sta->stats)
@@ -2197,6 +2174,43 @@ static void free_advance_ap(struct stats_obj *ap)
 
 	free(ap->stats);
 }
+
+static void update_pdev_advance_ctrl_stats(struct advance_pdev_ctrl *pdev_ctrl,
+					   struct advance_vdev_ctrl *vdev_ctrl)
+{
+	if (pdev_ctrl->tx && vdev_ctrl->tx) {
+		pdev_ctrl->tx->cs_tx_beacon +=
+					vdev_ctrl->tx->cs_tx_bcn_success +
+					vdev_ctrl->tx->cs_tx_bcn_outage;
+		update_basic_pdev_ctrl_tx(&pdev_ctrl->tx->b_tx,
+					  &vdev_ctrl->tx->b_tx);
+	}
+	if (pdev_ctrl->rx && vdev_ctrl->rx) {
+		update_basic_pdev_ctrl_rx(&pdev_ctrl->rx->b_rx,
+					  &vdev_ctrl->rx->b_rx);
+	}
+}
+
+static void update_pdev_advance_stats(struct stats_obj *radio,
+				      struct stats_obj *vap)
+{
+	switch (radio->type) {
+	case STATS_TYPE_DATA:
+		break;
+	case STATS_TYPE_CTRL:
+		if (radio->stats && vap->stats)
+			update_pdev_advance_ctrl_stats(radio->stats,
+						       vap->stats);
+		break;
+	default:
+		STATS_ERR("Unexpected stats type %d!\n", radio->type);
+	}
+}
+#else
+static void update_pdev_advance_stats(struct stats_obj *radio,
+				      struct stats_obj *vap)
+{
+}
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
 #if WLAN_DEBUG_TELEMETRY
@@ -2355,7 +2369,91 @@ static void free_debug_ap(struct stats_obj *ap)
 
 	free(ap->stats);
 }
+
+static void update_pdev_debug_ctrl_stats(struct debug_pdev_ctrl *pdev_ctrl,
+					 struct debug_vdev_ctrl *vdev_ctrl)
+{
+	if (pdev_ctrl->tx && vdev_ctrl->tx) {
+		update_basic_pdev_ctrl_tx(&pdev_ctrl->tx->b_tx,
+					  &vdev_ctrl->tx->b_tx);
+	}
+	if (pdev_ctrl->rx && vdev_ctrl->rx) {
+		update_basic_pdev_ctrl_rx(&pdev_ctrl->rx->b_rx,
+					  &vdev_ctrl->rx->b_rx);
+	}
+}
+
+static void update_pdev_debug_stats(struct stats_obj *radio,
+				    struct stats_obj *vap)
+{
+	switch (radio->type) {
+	case STATS_TYPE_DATA:
+		break;
+	case STATS_TYPE_CTRL:
+		if (radio->stats && vap->stats)
+			update_pdev_debug_ctrl_stats(radio->stats,
+						     vap->stats);
+		break;
+	default:
+		STATS_ERR("Unexpected stats type %d!\n", radio->type);
+	}
+}
+#else
+static void update_pdev_debug_stats(struct stats_obj *radio,
+				    struct stats_obj *vap)
+{
+}
 #endif /* WLAN_DEBUG_TELEMETRY */
+
+static void aggregate_pdev_stats(struct stats_obj *radio, struct stats_obj *vap)
+{
+	if (!radio)
+		return;
+
+	switch (radio->lvl) {
+	case STATS_LVL_BASIC:
+		update_pdev_basic_stats(radio, vap);
+		break;
+	case STATS_LVL_ADVANCE:
+		update_pdev_advance_stats(radio, vap);
+		break;
+	case STATS_LVL_DEBUG:
+		update_pdev_debug_stats(radio, vap);
+		break;
+	default:
+		STATS_ERR("Unexpected Level %d!\n", radio->lvl);
+	}
+}
+
+static void accumulate_stats(struct stats_command *cmd)
+{
+	struct stats_obj *radio = NULL;
+	struct stats_obj *vap = NULL;
+	struct stats_obj *obj = NULL;
+
+	if (!cmd->recursive || !cmd->reply)
+		return;
+
+	obj = cmd->reply->obj_head;
+	while (obj) {
+		switch (obj->obj_type) {
+		case STATS_OBJ_AP:
+			break;
+		case STATS_OBJ_RADIO:
+			radio = obj;
+			break;
+		case STATS_OBJ_VAP:
+			vap = obj;
+			aggregate_pdev_stats(radio, vap);
+			break;
+		case STATS_OBJ_STA:
+			break;
+		default:
+			STATS_ERR("Invalid onj %d", obj->obj_type);
+		}
+		obj = obj->next;
+	}
+}
 
 static void free_sta(struct stats_obj *sta)
 {
@@ -2522,9 +2620,7 @@ int32_t libstats_request_handle(struct stats_command *cmd)
 
 	stats_lib_deinit();
 
-#if WLAN_ADVANCE_TELEMETRY
-	accumulate_advance_stats(cmd);
-#endif /* WLAN_ADVANCE_TELEMETRY */
+	accumulate_stats(cmd);
 
 	return ret;
 }

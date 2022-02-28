@@ -129,6 +129,17 @@ struct unified_stats {
 };
 
 /**
+ * struct iterator_ctx: Structure is used internaly for iteration over all
+ *                      peer/vdev to aggregate the stats
+ * @pvt: Void pointer to carry stats config
+ * @stats: Pointer to unified stats
+ */
+struct iterator_ctx {
+	void *pvt;
+	struct unified_stats *stats;
+};
+
+/**
  * wlan_stats_get_peer_stats(): Function to get peer specific stats
  * @psoc:  Pointer to Psoc object
  * @peer:  Pointer to Peer object

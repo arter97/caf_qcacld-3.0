@@ -1845,9 +1845,8 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 		STATS_PRINT("\tUser position list for GID %02u->%u: [%s]\n",
 			    i - STATS_IF_MU_GROUP_SHOW, i - 1, mu_group_id);
 	}
-	STATS_PRINT("\tTx Rate Info:\n");
+	STATS_PRINT("\tTx MCS stats:\n");
 	for (ptype = 0; ptype < STATS_IF_DOT11_MAX; ptype++) {
-		index = 0;
 		for (mcs = 0; mcs < STATS_IF_MAX_MCS; mcs++) {
 			if (rate_string[ptype][mcs].valid)
 				STATS_PRINT("\t\t %s = %u\n",
@@ -1875,7 +1874,7 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 	struct rx_mu_info *rx_mu;
 	uint32_t *pnss;
 	char nss[STATS_IF_NSS_LENGTH];
-	uint8_t i;
+	uint8_t i, mcs, ptype;
 	uint32_t index;
 
 	STATS_PRINT("\tRx Stats in Last One Second:\n");
@@ -1920,6 +1919,15 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 		STATS_PRINT("\t\t\tNSS(1-8) = %s\n", nss);
 		STATS_PRINT("\t\t\tMPDU OK = %u, MPDU Fail = %u\n",
 			    rx_mu->mpdu_cnt_fcs_ok, rx_mu->mpdu_cnt_fcs_err);
+	}
+	STATS_PRINT("\tRx MCS stats:\n");
+	for (ptype = 0; ptype < STATS_IF_DOT11_MAX; ptype++) {
+		for (mcs = 0; mcs < STATS_IF_MAX_MCS; mcs++) {
+			if (rate_string[ptype][mcs].valid)
+				STATS_PRINT("\t\t %s = %u\n",
+					    rate_string[ptype][mcs].mcs_type,
+					    rx->pkt_type[ptype].mcs_count[mcs]);
+		}
 	}
 
 	stats_if_print_rx_proto_trace(rx);
