@@ -6404,15 +6404,15 @@ void dp_tx_ppdu_stats_process(void *context)
 }
 
 /**
- * dp_ppdu_desc_deliver(): Function to deliver Tx PPDU status descriptor
+ * dp_ppdu_desc_deliver_1_0(): Function to deliver Tx PPDU status descriptor
  * to upper layer
  * @pdev: DP pdev handle
  * @ppdu_info: per PPDU TLV descriptor
  *
  * return: void
  */
-void dp_ppdu_desc_deliver(struct dp_pdev *pdev,
-			  struct ppdu_info *ppdu_info)
+void dp_ppdu_desc_deliver_1_0(struct dp_pdev *pdev,
+			      struct ppdu_info *ppdu_info)
 {
 	struct ppdu_info *s_ppdu_info = NULL;
 	struct ppdu_info *ppdu_info_next = NULL;
