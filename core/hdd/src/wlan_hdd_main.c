@@ -15186,7 +15186,8 @@ int hdd_wlan_startup(struct hdd_context *hdd_ctx)
 	hdd_debugfs_ini_config_init(hdd_ctx);
 	wlan_hdd_debugfs_unit_test_host_create(hdd_ctx);
 	wlan_hdd_create_mib_stats_lock();
-	wlan_cfg80211_init_interop_issues_ap(hdd_ctx->pdev);
+	if (QDF_GLOBAL_FTM_MODE != hdd_get_conparam())
+		wlan_cfg80211_init_interop_issues_ap(hdd_ctx->pdev);
 
 	hdd_exit();
 
