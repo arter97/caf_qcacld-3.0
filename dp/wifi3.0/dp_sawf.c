@@ -340,7 +340,6 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 
 	status = dp_sawf_compute_tx_delay_us(soc, vdev, ts, &hw_delay);
 	if (status != QDF_STATUS_SUCCESS) {
-		qdf_err("Fail to update tx delay");
 		return status;
 	}
 

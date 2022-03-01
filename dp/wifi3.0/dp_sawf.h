@@ -47,40 +47,114 @@ struct dp_peer_sawf {
 	struct sawf_def_queue_report tid_reports[DP_SAWF_MAX_TIDS];
 };
 
+/**
+ * dp_sawf_def_queues_unmap_req - unmap peer to service class ID mapping
+ * @soc: soc handle
+ * @mac_addr: mac address
+ * @svc_id: service class ID
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_sawf_def_queues_unmap_req(struct cdp_soc_t *soc_hdl,
 			     uint8_t *mac_addr,
 			     uint8_t svc_id);
 
+/**
+ * dp_sawf_def_queues_get_map_report - get peer to sevice class ID mappings
+ * @soc: soc handle
+ * @mac_addr: mac address
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_sawf_def_queues_get_map_report(struct cdp_soc_t *soc_hdl,
 				  uint8_t *mac_addr);
 
+/**
+ * dp_sawf_def_queues_map_req - map peer to service class ID
+ * @soc: soc handle
+ * @mac_addr: mac address
+ * @svc_clss_id: service class ID
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_sawf_def_queues_map_req(struct cdp_soc_t *soc_hdl,
 			   uint8_t *mac_addr, uint8_t svc_class_id);
 
+/**
+ * dp_peer_sawf_ctx_alloc - allocate SAWF ctx
+ * @soc: soc handle
+ * @peer: dp peer
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 		       struct dp_peer *peer);
 
+/**
+ * dp_peer_sawf_ctx_free - free SAWF ctx
+ * @soc: soc handle
+ * @peer: dp peer
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_peer_sawf_ctx_free(struct dp_soc *soc,
 		      struct dp_peer *peer);
 
+/**
+ * dp_peer_sawf_ctx_get - get SAWF ctx
+ * @peer: dp peer
+ *
+ * Return: SAWF ctx on success; NULL otherwise
+ */
 struct dp_peer_sawf *dp_peer_sawf_ctx_get(struct dp_peer *peer);
 
+/**
+ * dp_peer_sawf_stats_ctx_alloc - allocate SAWF stats ctx
+ * @soc: soc handle
+ * @txrx_peer: DP txrx peer
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_peer_sawf_stats_ctx_alloc(struct dp_soc *soc,
 			     struct dp_txrx_peer *txrx_peer);
 
+/**
+ * dp_peer_sawf_stats_ctx_free - free SAWF stats ctx
+ * @soc: soc handle
+ * @txrx_peer: DP txrx peer
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_peer_sawf_stats_ctx_free(struct dp_soc *soc,
 			    struct dp_txrx_peer *txrx_peer);
 
+/**
+ * dp_peer_sawf_stats_ctx_free - free SAWF stats ctx
+ * @txrx_peer: DP txrx peer
+ *
+ * Return: SAWF stas ctx on success, NULL otherwise
+ */
 struct dp_peer_sawf_stats *
 dp_peer_sawf_stats_ctx_get(struct dp_txrx_peer *txrx_peer);
 
+/**
+ * dp_sawf_tx_compl_update_peer_stats - update SAWF stats in Tx completion
+ * @soc: soc handle
+ * @vdev: DP vdev context
+ * @txrx_peer: DP txrx peer
+ * @tx_desc: Tx descriptor
+ * @ts: Tx completion status
+ * @tid: TID
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 				   struct dp_vdev *vdev,
@@ -89,6 +163,14 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 				   struct hal_tx_completion_status *ts,
 				   uint8_t tid);
 
+/**
+ * dp_sawf_tx_enqueue_peer_stats - update SAWF stats in Tx enqueue
+ * @soc: soc handle
+ * @tx_desc: Tx descriptor
+ * @tid: TID
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 			      struct dp_tx_desc_s *tx_desc,
@@ -96,13 +178,37 @@ dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 
 #define DP_SAWF_STATS_SVC_CLASS_ID_ALL	0
 
+/**
+ * dp_sawf_dump_peer_stats - print peer stats
+ * @txrx_peer: DP txrx peer
+ *
+ * Return: Success
+ */
 QDF_STATUS
 dp_sawf_dump_peer_stats(struct dp_txrx_peer *txrx_peer);
 
+/**
+ * dp_sawf_get_peer_delay_stats - get delay stats
+ * @soc: soc handle
+ * @svc_id: service class ID
+ * @mac: mac address
+ * @data: data to be filled
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 			     uint32_t svc_id, uint8_t *mac, void *data);
 
+/**
+ * dp_sawf_get_peer_tx_stats - get Tx stats
+ * @soc: soc handle
+ * @svc_id: service class ID
+ * @mac: mac address
+ * @data: data to be filled
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS
 dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 			  uint32_t svc_id, uint8_t *mac, void *data);
