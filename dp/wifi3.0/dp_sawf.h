@@ -37,6 +37,7 @@
 #define DP_SAWF_DEFAULT_Q_MAX (DP_SAWF_DEFAULT_Q_PTID_MAX * DP_SAWF_TID_MAX)
 #define dp_sawf(peer, msduq_num, field) ((peer)->sawf->msduq[msduq_num].field)
 #define DP_SAWF_DEFAULT_Q_INVALID 0xff
+#define DP_SAWF_PEER_Q_INVALID 0xffff
 #define DP_SAWF_INVALID_AST_IDX 0xffff
 
 struct sawf_stats {
@@ -51,10 +52,6 @@ struct dp_peer_sawf_stats {
 
 struct sawf_def_queue_report {
 	uint8_t svc_class_id;
-};
-
-struct dp_peer_sawf {
-	struct sawf_def_queue_report tid_reports[DP_SAWF_MAX_TIDS];
 };
 
 QDF_STATUS
@@ -143,5 +140,8 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 			   uint32_t service_id);
 uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 				  uint8_t vdev_id, uint16_t queue_id);
+uint32_t dp_sawf_queue_id_get(qdf_nbuf_t nbuf);
+void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf);
+bool dp_sawf_tag_valid_get(qdf_nbuf_t nbuf);
 
 #endif /* DP_SAWF_H*/
