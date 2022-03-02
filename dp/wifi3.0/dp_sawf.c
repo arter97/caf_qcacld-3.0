@@ -24,6 +24,15 @@
 #include <dp_sawf.h>
 #include <dp_hist.h>
 #include <hal_tx.h>
+#include "hal_hw_headers.h"
+#include "hal_api.h"
+#include "hal_rx.h"
+#include "qdf_trace.h"
+#include "dp_tx.h"
+#include "dp_peer.h"
+#include "dp_internal.h"
+#include "osif_private.h"
+#include <wlan_objmgr_vdev_obj.h>
 
 QDF_STATUS
 dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
@@ -101,7 +110,7 @@ dp_sawf_def_queues_get_map_report(struct cdp_soc_t *soc_hdl,
 
 	qdf_info("Peer ", QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac_addr));
 	qdf_nofl_info("TID\tService Class ID");
-	for (tid = 0; tid < DP_SAWF_MAX_TIDS; ++tid) {
+	for (tid = 0; tid < DP_SAWF_TID_MAX; ++tid) {
 		if (sawf_ctx->tid_reports[tid].svc_class_id ==
 				HTT_SAWF_SVC_CLASS_INVALID_ID) {
 			continue;
@@ -837,3 +846,118 @@ fail:
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 	return QDF_STATUS_E_FAILURE;
 }
+
+uint16_t dp_sawf_get_peerid(struct dp_soc *soc, uint8_t *dest_mac,
+			    uint8_t vdev_id)
+{
+	struct dp_ast_entry *ast_entry = NULL;
+	uint16_t peer_id;
+
+	qdf_spin_lock_bh(&soc->ast_lock);
+	ast_entry = dp_peer_ast_hash_find_by_vdevid(soc, dest_mac, vdev_id);
+
+	if (!ast_entry) {
+		qdf_spin_unlock_bh(&soc->ast_lock);
+		qdf_warn("%s NULL ast entry\n", __func__);
+		return HTT_INVALID_PEER;
+	}
+
+	peer_id = ast_entry->peer_id;
+	qdf_spin_unlock_bh(&soc->ast_lock);
+	return peer_id;
+}
+
+uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				  uint8_t vdev_id, uint16_t queue_id)
+{
+	struct dp_peer *peer = NULL;
+	uint32_t search_index = DP_SAWF_INVALID_AST_IDX;
+	struct ether_header *eh = (struct ether_header *)(qdf_nbuf_data(nbuf));
+	uint8_t *dest_mac = eh->ether_dhost;
+	uint16_t peer_id = dp_sawf_get_peerid(soc, dest_mac, vdev_id);
+	uint8_t index = queue_id / DP_SAWF_TID_MAX;
+
+	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
+
+	if (!peer) {
+		qdf_warn("%s NULL peer\n", __func__);
+		return DP_SAWF_INVALID_AST_IDX;
+	}
+
+	search_index = peer->peer_ast_flowq_idx[index].ast_idx;
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return search_index;
+}
+
+uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
+			   uint32_t service_id)
+{
+	osif_dev  *osdev;
+	wlan_if_t vap;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t vdev_id;
+	int i = 1;
+	struct dp_peer *peer = NULL;
+	struct dp_soc *soc = NULL;
+	uint16_t peer_id;
+
+	if (!netdev->ieee80211_ptr) {
+		qdf_warn("%s non vap netdevice\n", __func__);
+		return DP_SAWF_DEFAULT_Q_INVALID;
+	}
+
+	osdev = ath_netdev_priv(netdev);
+	vap = osdev->os_if;
+	vdev = osdev->ctrl_vdev;
+	soc = (struct dp_soc *)wlan_psoc_get_dp_handle
+	      (wlan_pdev_get_psoc(wlan_vdev_get_pdev(vdev)));
+
+	vdev_id = wlan_vdev_get_id(vdev);
+	qdf_info("dest_mac: " QDF_MAC_ADDR_FMT " vdev_id:%d\n",
+		 QDF_MAC_ADDR_REF(dest_mac), vdev_id);
+
+	peer_id = dp_sawf_get_peerid(soc, dest_mac, vdev_id);
+	if (peer_id == HTT_INVALID_PEER)
+		return DP_SAWF_DEFAULT_Q_INVALID;
+
+	peer = dp_peer_get_ref_by_id(soc, peer_id,
+				     DP_MOD_ID_SAWF);
+
+	if (!peer) {
+		qdf_warn("%s NULL peer\n", __func__);
+		return DP_SAWF_DEFAULT_Q_INVALID;
+	}
+
+	qdf_info("osdev:%p peer:%p sawf_ctx : %p soc:%p\n",
+		 osdev, peer, peer->sawf, soc);
+
+	for (i = 1 ; i <= DP_SAWF_Q_MAX; i++) {
+		if ((dp_sawf(peer, i, is_used) == 1) &&
+		    dp_sawf(peer, i, svc_id) == service_id) {
+			dp_sawf(peer, i, ref_count)++;
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			qdf_info("%s queue_id:%d\n",
+				 i + DP_SAWF_DEFAULT_Q_MAX);
+			return i + DP_SAWF_DEFAULT_Q_MAX;
+		}
+	}
+
+	for (i = 1; i <= DP_SAWF_Q_MAX; i++) {
+		if (dp_sawf(peer, i, is_used) == 0) {
+			dp_sawf(peer, i, is_used) = 1;
+			dp_sawf(peer, i, svc_id) = service_id;
+			dp_sawf(peer, i, ref_count)++;
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			qdf_info("%s queue_id:%d\n",
+				 i + DP_SAWF_DEFAULT_Q_MAX);
+			return i + DP_SAWF_DEFAULT_Q_MAX;
+		}
+	}
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+	return DP_SAWF_DEFAULT_Q_INVALID;
+	/* request for more msdu queues. Return error*/
+}
+
+qdf_export_symbol(dp_sawf_get_msduq);
