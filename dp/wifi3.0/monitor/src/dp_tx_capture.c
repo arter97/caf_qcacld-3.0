@@ -1791,7 +1791,7 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 	dp_tx_capture_debugfs_deinit_1_0(pdev);
 }
 
-#define MAX_MSDU_THRESHOLD_TSF 100000
+#define MAX_MSDU_THRESHOLD_TSF 500000
 #define MAX_MSDU_ENQUEUE_THRESHOLD 4096
 
 /**
@@ -1855,46 +1855,50 @@ dp_drop_enq_msdu_on_thresh(struct dp_pdev *pdev,
 	/* release lock here */
 	qdf_spin_unlock_bh(&tx_tid->tasklet_tid_lock);
 
-	/* take lock here */
-	qdf_spin_lock_bh(&tx_tid->tid_lock);
-	defer_msdu_qlen = qdf_nbuf_queue_len(&tx_tid->defer_msdu_q);
-	qlen = defer_msdu_qlen + comp_qlen;
+	/* drop based on queue length is done when mem limit feature
+	 * is NOT enabled */
+	if (!wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
+		/* take lock here */
+		qdf_spin_lock_bh(&tx_tid->tid_lock);
+		defer_msdu_qlen = qdf_nbuf_queue_len(&tx_tid->defer_msdu_q);
+		qlen = defer_msdu_qlen + comp_qlen;
 
-	/* Drop queued msdu when exceed threshold */
-	while (qlen > MAX_MSDU_ENQUEUE_THRESHOLD) {
-		/* get first msdu */
-		head_msdu = qdf_nbuf_queue_first(&tx_tid->defer_msdu_q);
-		if (qdf_unlikely(!head_msdu))
-			break;
-		ptr_msdu_info =
-			(struct msdu_completion_info *)qdf_nbuf_data(head_msdu);
-		ppdu_id = ptr_msdu_info->ppdu_id;
-		cur_ppdu_id = ppdu_id;
-		while (ppdu_id == cur_ppdu_id) {
-			qdf_nbuf_t nbuf = NULL;
-
-			/* free head, nbuf will be NULL if queue empty */
-			nbuf = qdf_nbuf_queue_remove(&tx_tid->defer_msdu_q);
-			if (qdf_likely(nbuf)) {
-				qdf_nbuf_free(nbuf);
-				dp_tx_cap_stats_msdu_update(peer,
-							    PEER_MSDU_DROP, 1);
-				mon_pdev->tx_capture.msdu_threshold_drop++;
-			}
-
+		/* Drop queued msdu when exceed threshold */
+		while (qlen > MAX_MSDU_ENQUEUE_THRESHOLD) {
+			/* get first msdu */
 			head_msdu = qdf_nbuf_queue_first(&tx_tid->defer_msdu_q);
 			if (qdf_unlikely(!head_msdu))
 				break;
 			ptr_msdu_info =
-			(struct msdu_completion_info *)qdf_nbuf_data(head_msdu);
-			cur_ppdu_id = ptr_msdu_info->ppdu_id;
+				(struct msdu_completion_info *)qdf_nbuf_data(head_msdu);
+			ppdu_id = ptr_msdu_info->ppdu_id;
+			cur_ppdu_id = ppdu_id;
+			while (ppdu_id == cur_ppdu_id) {
+				qdf_nbuf_t nbuf = NULL;
+
+				/* free head, nbuf will be NULL if queue empty */
+				nbuf = qdf_nbuf_queue_remove(&tx_tid->defer_msdu_q);
+				if (qdf_likely(nbuf)) {
+					qdf_nbuf_free(nbuf);
+					dp_tx_cap_stats_msdu_update(peer,
+								    PEER_MSDU_DROP, 1);
+					mon_pdev->tx_capture.msdu_threshold_drop++;
+				}
+
+				head_msdu = qdf_nbuf_queue_first(&tx_tid->defer_msdu_q);
+				if (qdf_unlikely(!head_msdu))
+					break;
+				ptr_msdu_info =
+					(struct msdu_completion_info *)qdf_nbuf_data(head_msdu);
+				cur_ppdu_id = ptr_msdu_info->ppdu_id;
+			}
+			/* get length again */
+			defer_msdu_qlen = qdf_nbuf_queue_len(&tx_tid->defer_msdu_q);
+			qlen = defer_msdu_qlen + comp_qlen;
 		}
-		/* get length again */
-		defer_msdu_qlen = qdf_nbuf_queue_len(&tx_tid->defer_msdu_q);
-		qlen = defer_msdu_qlen + comp_qlen;
+		/* release lock here */
+		qdf_spin_unlock_bh(&tx_tid->tid_lock);
 	}
-	/* release lock here */
-	qdf_spin_unlock_bh(&tx_tid->tid_lock);
 
 	return QDF_STATUS_SUCCESS;
 }
