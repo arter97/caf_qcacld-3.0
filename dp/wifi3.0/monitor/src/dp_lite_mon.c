@@ -1617,7 +1617,13 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 							 mon_mpdu,
 							 &ppdu_info->rx_status);
 	} else {
-		/* litemon pending: send wdi event */
+		/* send lite mon rx wdi event */
+		dp_wdi_event_handler(WDI_EVENT_LITE_MON_RX,
+				     be_pdev->pdev.soc,
+				     mon_mpdu,
+				     HTT_INVALID_PEER,
+				     WDI_NO_VAL,
+				     be_pdev->pdev.pdev_id);
 	}
 
 done:
