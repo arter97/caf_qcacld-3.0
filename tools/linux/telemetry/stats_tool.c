@@ -389,9 +389,9 @@ const char *stats_if_intfrm_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 
 static void display_help(void)
 {
-	STATS_PRINT("\nstats : Displays Statistics of Access Point\n");
+	STATS_PRINT("\nwifitelemetry : Displays Statistics of Access Point\n");
 	STATS_PRINT("\nUsage:\n"
-		    "stats [Level] [Object] [StatsType] [FeatureFlag] [[-i interface_name] | [-m StationMACAddress]] [-R] [-h | ?]\n"
+		    "wifitelemetry [Level] [Object] [StatsType] [FeatureFlag] [[-i interface_name] | [-m StationMACAddress]] [-R] [-h | ?]\n"
 		    "\n"
 		    "One of the 3 Levels can be selected. The Levels are as follows (catagorised based on purpose or\n"
 		    "the level of details):\n"
