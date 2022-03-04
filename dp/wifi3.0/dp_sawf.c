@@ -67,7 +67,7 @@ uint16_t dp_sawf_msduq_peer_id_set(uint16_t peer_id, uint8_t msduq)
 	uint16_t peer_msduq = 0;
 
 	peer_msduq |= (peer_id & SAWF_PEER_ID_MASK) << SAWF_PEER_ID_SHIFT;
-	peer_msduq |= (msduq & SAWF_PEER_ID_MASK);
+	peer_msduq |= (msduq & SAWF_MSDUQ_MASK);
 	return peer_msduq;
 }
 
@@ -97,6 +97,7 @@ void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf)
 	if (!SAWF_TAG_IS_VALID(mark))
 		return;
 
+	*htt_tcl_metadata = 0;
 	DP_TX_TCL_METADATA_TYPE_SET(*htt_tcl_metadata,
 				    DP_TCL_METADATA_TYPE_SVC_ID_BASED);
 	HTT_TX_FLOW_METADATA_TID_OVERRIDE_SET(*htt_tcl_metadata, 1);
@@ -999,7 +1000,7 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	 * have been used. If flow has same service id as that of
 	 * used msdu queues, return used msdu queue.
 	 */
-	for (i = 1; i <= DP_SAWF_Q_MAX; i++) {
+	for (i = 0; i < DP_SAWF_Q_MAX; i++) {
 		if ((dp_sawf(peer, i, is_used) == 1) &&
 		    dp_sawf(peer, i, svc_id) == service_id) {
 			dp_sawf(peer, i, ref_count)++;
@@ -1013,7 +1014,7 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	 * Second loop to go through all unused msdu queues of peer.
 	 * Allot new msdu queue for new service class.
 	 */
-	for (i = 1; i <= DP_SAWF_Q_MAX; i++) {
+	for (i = 0; i < DP_SAWF_Q_MAX; i++) {
 		if (dp_sawf(peer, i, is_used) == 0) {
 			dp_sawf(peer, i, is_used) = 1;
 			dp_sawf(peer, i, svc_id) = service_id;
