@@ -267,6 +267,11 @@ more_data:
 				hal_rx_get_reo_desc_va(ring_desc);
 		dp_rx_desc_sw_cc_check(soc, rx_buf_cookie, &rx_desc);
 
+		if (!rx_desc) {
+			DP_STATS_INC(soc, rx.err.invalid_cookie, 1);
+			hal_srng_dst_get_next(hal_soc, hal_ring_hdl);
+			continue;
+		}
 		status = dp_rx_desc_sanity(soc, hal_soc, hal_ring_hdl,
 					   ring_desc, rx_desc);
 		if (QDF_IS_STATUS_ERROR(status)) {
