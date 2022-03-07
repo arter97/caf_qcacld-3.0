@@ -6801,6 +6801,8 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 		       soc->stats.tx.tx_comp_loop_pkt_limit_hit);
 	DP_PRINT_STATS("Tx comp HP out of sync2 = %d",
 		       soc->stats.tx.hp_oos2);
+	DP_PRINT_STATS("Tx comp invalid cookie: %d",
+		       soc->stats.tx.invalid_tx_comp_cookie);
 }
 
 static

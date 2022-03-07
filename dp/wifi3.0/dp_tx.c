@@ -4878,7 +4878,7 @@ more_data:
 							       &tx_desc);
 		if (!tx_desc) {
 			dp_err("unable to retrieve tx_desc!");
-			QDF_BUG(0);
+			DP_STATS_INC(soc, tx.invalid_tx_comp_cookie, 1);
 			continue;
 		}
 		tx_desc->buffer_src = buffer_src;

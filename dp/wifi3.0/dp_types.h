@@ -1043,6 +1043,8 @@ struct dp_soc_stats {
 		uint32_t tx_comp_exception;
 		/* TQM drops after/during peer delete */
 		uint64_t tqm_drop_no_peer;
+		/* Invalid Tx comp cookie */
+		uint32_t invalid_tx_comp_cookie;
 	} tx;
 
 	/* SOC level RX stats */
