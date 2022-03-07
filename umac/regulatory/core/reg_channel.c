@@ -205,7 +205,7 @@ reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 			  qdf_freq_t freq,
 			  enum phy_ch_width g_max_width)
 {
-	struct reg_channel_list chan_list;
+	struct reg_channel_list chan_list = {0};
 	uint16_t i, max_bw = 0;
 	enum phy_ch_width output_width = CH_WIDTH_INVALID;
 
@@ -1161,7 +1161,7 @@ reg_get_max_channel_width_without_radar(struct wlan_objmgr_pdev *pdev,
 					qdf_freq_t freq,
 					enum phy_ch_width g_max_width)
 {
-	struct reg_channel_list chan_list;
+	struct reg_channel_list chan_list = {0};
 	uint16_t i, max_bw = 0;
 	enum phy_ch_width output_width = CH_WIDTH_INVALID;
 
