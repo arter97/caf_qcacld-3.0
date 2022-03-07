@@ -4753,4 +4753,68 @@ void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
 {
 }
 #endif
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+/**
+ * hdd_set_suspend_mode: set the suspend_mode state to pld based on the
+ *                       configuration option from INI file
+ * @hdd_ctx: HDD context
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int hdd_set_suspend_mode(struct hdd_context *hdd_ctx);
+
+/**
+ * hdd_set_pld_full_power_down_state() - set full power down state to PLD
+ * @triggered: true if full power down is triggered, otherwise false
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS hdd_set_pld_full_power_down_state(bool triggered);
+
+/**
+ * hdd_is_pld_full_power_down_triggered() - check full power down state
+ *
+ * Return: true if full power down is triggered, otherwise false
+ */
+bool hdd_is_pld_full_power_down_triggered(void);
+
+/**
+ * wlan_hdd_ipa_wdi_reset() - disconnect wdi pipes and cleanup wdi
+ *
+ * This function is called for the feature of Full Power Down while in low
+ * power mode, the ipa wdi pipes can not be disconnected and the wdi also can
+ * not be cleanup when wlan driver shutdown when do suspend for this feature,
+ * because the ipa wdi pipes diconnect and wdi cleanup will wakeup the system
+ * and cause the system suspend fail.
+ * So changing the ipa wdi pipes diconnect and wdi cleanup from wlan driver
+ * shutdown to wlan driver reinit for the feature of Full Power Down while in
+ * low power mode.
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS wlan_hdd_ipa_wdi_reset(void);
+#else
+static inline int hdd_set_suspend_mode(struct hdd_context *hdd_ctx)
+{
+	return 0;
+}
+
+static inline QDF_STATUS
+hdd_set_pld_full_power_down_state(bool triggered)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool hdd_is_pld_full_power_down_triggered(void)
+{
+	return false;
+}
+
+static inline QDF_STATUS wlan_hdd_ipa_wdi_reset(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

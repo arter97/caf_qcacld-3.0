@@ -836,5 +836,14 @@ void wlan_ipa_fw_rejuvenate_send_msg(struct wlan_ipa_priv *ipa_ctx);
  */
 void wlan_ipa_flush_pending_vdev_events(struct wlan_ipa_priv *ipa_ctx,
 					uint8_t vdev_id);
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+/**
+ * wlan_ipa_wdi_disconn_cleanup() - disconnect wdi pipes and cleanup wdi
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_ipa_wdi_disconn_cleanup(void);
+#endif /* FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT */
 #endif /* IPA_OFFLOAD */
 #endif /* _WLAN_IPA_CORE_H_ */
