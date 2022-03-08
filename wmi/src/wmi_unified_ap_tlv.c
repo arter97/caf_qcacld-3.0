@@ -3514,14 +3514,6 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->tid = param->tid;
 	cmd->msdu_loss_rate_ppm = param->msdu_rate_loss;
 
-	qdf_info("Setting sawf svc_id %d min_thrput_rate %d max_thrput_rate %d"
-		 "burst_size %d service_interval %d delay_bound %d msdu_ttl %d"
-		 "priority %d tid %d msdu_rate_loss %d \n",
-		 cmd->svc_class_id, cmd->min_thruput_kbps,
-		 cmd->max_thruput_kbps, cmd->burst_size_bytes,
-		 cmd->svc_interval_ms, cmd->delay_bound_ms,
-		 cmd->time_to_live_ms, cmd->priority, cmd->tid,
-		 cmd->msdu_loss_rate_ppm);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 				   WMI_SAWF_SVC_CLASS_CFG_CMDID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
@@ -3553,7 +3545,6 @@ QDF_STATUS send_sawf_disable_cmd_tlv(wmi_unified_t wmi_handle,
 
 	cmd->svc_class_id = svc_id;
 
-	qdf_info("Disabling svc id:%d", cmd->svc_class_id);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 			WMI_SAWF_SVC_CLASS_DISABLE_CMDID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
