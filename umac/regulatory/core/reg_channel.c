@@ -690,6 +690,12 @@ QDF_STATUS reg_get_ap_chan_list(struct wlan_objmgr_pdev *pdev,
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t i;
+	const uint8_t reg_ap_pwr_type_2_supp_pwr_type[] = {
+		[REG_INDOOR_AP] = REG_AP_LPI,
+		[REG_STANDARD_POWER_AP] = REG_AP_SP,
+		[REG_VERY_LOW_POWER_AP] = REG_AP_VLP,
+	};
+
 
 	if (!pdev) {
 		reg_err_rl("invalid pdev");
@@ -774,6 +780,10 @@ QDF_STATUS reg_get_ap_chan_list(struct wlan_objmgr_pdev *pdev,
 				chan_list[CHAN_ENUM_7115].chan_flags |=
 						REGULATORY_CHAN_DISABLED;
 			}
+			reg_modify_chan_list_for_max_chwidth_for_pwrmode(pdev,
+					chan_list,
+					reg_ap_pwr_type_2_supp_pwr_type
+					[ap_pwr_type]);
 		}
 	}
 
