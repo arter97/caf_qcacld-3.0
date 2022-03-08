@@ -35,3 +35,7 @@ QDF_STATUS
 dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
 				       uint32_t *msg_word,
 				       qdf_nbuf_t htt_t2h_msg);
+
+QDF_STATUS
+dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
+		      qdf_nbuf_t htt_t2h_msg);
