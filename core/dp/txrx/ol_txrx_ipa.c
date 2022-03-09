@@ -408,7 +408,7 @@ static inline void ol_txrx_ipa_wdi_tx_smmu_params(
 				bool over_gsi)
 {
 	QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(tx_smmu) =
-		IPA_CLIENT_WLAN1_CONS;
+		QDF_IPA_CLIENT_WLAN_WDI2_CONS;
 	qdf_mem_copy(&QDF_IPA_WDI_SETUP_INFO_SMMU_TRANSFER_RING_BASE(
 				tx_smmu),
 		     &ipa_res->tx_comp_ring->sgtable,
@@ -443,7 +443,7 @@ static inline void ol_txrx_ipa_wdi_rx_smmu_params(
 				bool over_gsi)
 {
 	QDF_IPA_WDI_SETUP_INFO_SMMU_CLIENT(rx_smmu) =
-		IPA_CLIENT_WLAN1_PROD;
+		QDF_IPA_CLIENT_WLAN_WDI2_PROD;
 	qdf_mem_copy(&QDF_IPA_WDI_SETUP_INFO_SMMU_TRANSFER_RING_BASE(
 				rx_smmu),
 		     &ipa_res->rx_rdy_ring->sgtable,
@@ -835,13 +835,20 @@ QDF_STATUS ol_txrx_ipa_cleanup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			ol_txrx_err("%s tx_comp, smmu unmap failed", __func__);
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
-		  "%s: Disconnect IPA pipe", __func__);
-	ret = qdf_ipa_wdi_disconn_pipes();
-	if (ret) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "ipa_wdi_disconn_pipes failed: ret=%d", ret);
-		return QDF_STATUS_E_FAILURE;
+	if (!pld_is_full_power_down_triggered()) {
+		/* wdi disconnect ipa pipes will wakeup system if the feature of
+		 * full power down is triggered when do suspend, so skip to discnnect
+		 * IPA pipes at here, and adding it at wlan reinit when system resume
+		 * if the feature of full power down is triggered.
+		 */
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
+			  "%s: Disconnect IPA pipe", __func__);
+		ret = qdf_ipa_wdi_disconn_pipes();
+		if (ret) {
+			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+				  "ipa_wdi_disconn_pipes failed: ret=%d", ret);
+			return QDF_STATUS_E_FAILURE;
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;

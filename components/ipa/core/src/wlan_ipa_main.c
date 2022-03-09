@@ -831,3 +831,30 @@ void ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
 	wlan_ipa_flush_pending_vdev_events(ipa_obj, vdev_id);
 }
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+QDF_STATUS ipa_set_full_power_down_state(struct wlan_objmgr_pdev *pdev,
+					bool triggered)
+{
+	struct wlan_ipa_priv *ipa_obj;
+
+	if (!pdev) {
+		ipa_err("objmgr pdev is null!");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ipa_obj = ipa_pdev_get_priv_obj(pdev);
+	if (!ipa_obj) {
+		ipa_err("IPA object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ipa_obj->is_full_power_down_triggered = triggered;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS ipa_wdi_disconn_cleanup(void)
+{
+	return wlan_ipa_wdi_disconn_cleanup();
+}
+#endif

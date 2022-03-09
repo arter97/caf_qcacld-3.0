@@ -246,3 +246,16 @@ void ucfg_ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
 {
 	ipa_flush_pending_vdev_events(pdev, vdev_id);
 }
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+QDF_STATUS ucfg_ipa_set_full_power_down_state(struct wlan_objmgr_pdev *pdev,
+					bool triggered)
+{
+	return ipa_set_full_power_down_state(pdev, triggered);
+}
+
+QDF_STATUS ucfg_ipa_wdi_disconn_cleanup(void)
+{
+	return ipa_wdi_disconn_cleanup();
+}
+#endif

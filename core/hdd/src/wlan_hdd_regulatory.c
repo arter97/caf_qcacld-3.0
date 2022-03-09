@@ -905,11 +905,6 @@ void hdd_reg_notifier(struct wiphy *wiphy,
 
 	switch (request->initiator) {
 	case NL80211_REGDOM_SET_BY_USER:
-
-		if (request->user_reg_hint_type !=
-		    NL80211_USER_REG_HINT_CELL_BASE)
-			return;
-
 		qdf_mem_copy(country, request->alpha2, QDF_MIN(
 			     sizeof(request->alpha2), sizeof(country)));
 		status = ucfg_reg_set_country(hdd_ctx->pdev, country);
@@ -1474,9 +1469,8 @@ static void hdd_restart_sap_with_new_phymode(struct hdd_context *hdd_ctx,
 		hdd_err("SAP Stop Bss fail");
 		return;
 	}
-	status = qdf_wait_for_event_completion(
-					&hostapd_state->qdf_stop_bss_event,
-					SME_CMD_STOP_BSS_TIMEOUT);
+	status = qdf_wait_single_event(&hostapd_state->qdf_stop_bss_event,
+				       SME_CMD_STOP_BSS_TIMEOUT);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("SAP Stop timeout");
 		return;
@@ -1666,6 +1660,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	struct regulatory_channel *cur_chan_list;
 	enum country_src cc_src;
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
+	int ret;
 
 	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
 	if (!cur_chan_list) {
@@ -1678,6 +1673,12 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 					       hdd_regulatory_dyn_cbk,
 					       NULL);
 
+
+	ret = hdd_update_country_code(hdd_ctx);
+	if (ret) {
+		hdd_err("Failed to update country code; errno:%d", ret);
+		return -EINVAL;
+	}
 
 	wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
 	/* Check the kernel version for upstream commit aced43ce780dc5 that

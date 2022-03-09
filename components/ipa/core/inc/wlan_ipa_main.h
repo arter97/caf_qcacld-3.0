@@ -512,10 +512,52 @@ void ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
  */
 bool ipa_is_ready(void);
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+/**
+ * ipa_set_full_power_down_state() - set full power down state to IPA
+ * @pdev: pdev obj
+ * @triggered: true if full power down is triggered, otherwise false
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS ipa_set_full_power_down_state(struct wlan_objmgr_pdev *pdev,
+					bool triggered);
+
+/**
+ * ipa_wdi_disconn_cleanup() - disconnect wdi pipes and cleanup wdi
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS ipa_wdi_disconn_cleanup(void);
+#else
+static inline QDF_STATUS
+ipa_set_full_power_down_state(struct wlan_objmgr_pdev *pdev,
+					bool triggered)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS ipa_wdi_disconn_cleanup(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #else /* Not IPA_OFFLOAD */
 typedef QDF_STATUS (*wlan_ipa_softap_xmit)(qdf_nbuf_t nbuf, qdf_netdev_t dev);
 typedef void (*wlan_ipa_send_to_nw)(qdf_nbuf_t nbuf, qdf_netdev_t dev);
 typedef void (*wlan_ipa_rps_enable)(uint8_t vdev_id, bool enable);
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+static inline QDF_STATUS
+ipa_set_full_power_down_state(struct wlan_objmgr_pdev *pdev,
+					bool triggered)
+{
+	return QDF_STATUS_SUCCESS;
+}
 
+static inline QDF_STATUS ipa_wdi_disconn_cleanup(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT */
 #endif /* IPA_OFFLOAD */
 #endif /* end  of _WLAN_IPA_MAIN_H_ */

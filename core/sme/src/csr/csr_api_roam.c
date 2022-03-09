@@ -2879,28 +2879,6 @@ void csr_prune_channel_list_for_mode(struct mac_context *mac_ctx,
 }
 
 #define INFRA_AP_DEFAULT_CHAN_FREQ 2437
-QDF_STATUS csr_is_valid_channel(struct mac_context *mac, uint32_t freq)
-{
-	uint8_t index = 0;
-	QDF_STATUS status = QDF_STATUS_E_NOSUPPORT;
-
-	/* regulatory check */
-	for (index = 0; index < mac->scan.base_channels.numChannels;
-	     index++) {
-		if (mac->scan.base_channels.channel_freq_list[index] ==
-				freq){
-			status = QDF_STATUS_SUCCESS;
-			break;
-		}
-	}
-
-	if (QDF_STATUS_SUCCESS != status) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			 FL("freq %d is not available"), freq);
-	}
-
-	return status;
-}
 
 QDF_STATUS csr_get_channel_and_power_list(struct mac_context *mac)
 {
@@ -8080,6 +8058,7 @@ QDF_STATUS csr_roam_copy_profile(struct mac_context *mac,
 		pDstProfile->extended_rates.numRates =
 			pSrcProfile->extended_rates.numRates;
 	}
+	pDstProfile->require_h2e = pSrcProfile->require_h2e;
 	pDstProfile->cac_duration_ms = pSrcProfile->cac_duration_ms;
 	pDstProfile->dfs_regdomain   = pSrcProfile->dfs_regdomain;
 	pDstProfile->chan_switch_hostapd_rate_enabled  =
@@ -10891,10 +10870,8 @@ csr_issue_set_context_req_helper(struct mac_context *mac_ctx,
 	 * send OBSS scan and QOS event.
 	 */
 	if (profile &&
-	    profile->negotiatedUCEncryptionType == eCSR_ENCRYPT_TYPE_NONE) {
-		if (unicast)
-			return QDF_STATUS_SUCCESS;
-
+	    profile->negotiatedUCEncryptionType == eCSR_ENCRYPT_TYPE_NONE &&
+	    !unicast) {
 		install_key_rsp.length = sizeof(install_key_rsp);
 		install_key_rsp.status_code = eSIR_SME_SUCCESS;
 		install_key_rsp.sessionId = session_id;
@@ -13733,6 +13710,7 @@ csr_roam_get_bss_start_parms(struct mac_context *mac,
 	uint32_t opr_ch_freq = 0;
 	tSirNwType nw_type;
 	uint32_t tmp_opr_ch_freq = 0;
+	uint8_t h2e;
 	tSirMacRateSet *opr_rates = &pParam->operationalRateSet;
 	tSirMacRateSet *ext_rates = &pParam->extendedRateSet;
 
@@ -13822,6 +13800,21 @@ csr_roam_get_bss_start_parms(struct mac_context *mac,
 		pParam->operation_chan_freq = opr_ch_freq;
 	}
 
+	if (pProfile->require_h2e) {
+		h2e = WLAN_BASIC_RATE_MASK |
+			 WLAN_BSS_MEMBERSHIP_SELECTOR_SAE_H2E;
+		if (ext_rates->numRates < SIR_MAC_MAX_NUMBER_OF_RATES) {
+			ext_rates->rate[ext_rates->numRates] = h2e;
+			ext_rates->numRates++;
+			sme_debug("H2E bss membership add to ext support rate");
+		} else if (opr_rates->numRates < SIR_MAC_MAX_NUMBER_OF_RATES) {
+			opr_rates->rate[opr_rates->numRates] = h2e;
+			opr_rates->numRates++;
+			sme_debug("H2E bss membership add to support rate");
+		} else {
+			sme_err("rates full, can not add H2E bss membership");
+		}
+	}
 	pParam->sirNwType = nw_type;
 	pParam->ch_params.ch_width = pProfile->ch_params.ch_width;
 	pParam->ch_params.center_freq_seg0 =
@@ -13938,8 +13931,8 @@ QDF_STATUS csr_roam_issue_start_bss(struct mac_context *mac, uint32_t sessionId,
 	pParam->ApUapsdEnable = pProfile->ApUapsdEnable;
 	pParam->ssidHidden = pProfile->SSIDs.SSIDList[0].ssidHidden;
 	if (CSR_IS_INFRA_AP(pProfile) && (pParam->operation_chan_freq != 0)) {
-		if (csr_is_valid_channel(mac, pParam->operation_chan_freq) !=
-		    QDF_STATUS_SUCCESS) {
+		if (!wlan_reg_is_freq_present_in_cur_chan_list(mac->pdev,
+						pParam->operation_chan_freq)) {
 			pParam->operation_chan_freq = INFRA_AP_DEFAULT_CHAN_FREQ;
 			pParam->ch_params.ch_width = CH_WIDTH_20MHZ;
 		}

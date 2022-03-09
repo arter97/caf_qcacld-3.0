@@ -1982,4 +1982,13 @@ ucfg_pmo_get_runtime_pm_delay(struct wlan_objmgr_psoc *psoc)
  */
 bool
 ucfg_pmo_get_enable_sap_suspend(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_pmo_get_suspend_mode - Return pmo_suspend_mode value to caller
+ * @psoc: Pointer to psoc object
+ *
+ * Return: The value of suspend_mode as stored in CFG
+ */
+enum pmo_suspend_mode
+ucfg_pmo_get_suspend_mode(struct wlan_objmgr_psoc *psoc);
 #endif /* end  of _WLAN_PMO_UCFG_API_H_ */

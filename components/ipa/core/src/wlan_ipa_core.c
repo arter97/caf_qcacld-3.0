@@ -2792,6 +2792,33 @@ wlan_host_to_ipa_wlan_event(enum wlan_ipa_wlan_event wlan_ipa_event_type)
 	return ipa_event;
 }
 
+#ifdef IPA_P2P_SUPPORT
+/**
+ * wlan_ipa_device_mode_switch() - Switch P2p GO/CLI to SAP/STA mode
+ * @device_mode: device mode
+ *
+ * Return: New device mode after switching
+ */
+static uint8_t wlan_ipa_device_mode_switch(uint8_t device_mode)
+{
+	switch (device_mode) {
+	case QDF_P2P_CLIENT_MODE:
+		return QDF_STA_MODE;
+	case QDF_P2P_GO_MODE:
+		return QDF_SAP_MODE;
+	default:
+		break;
+	}
+
+	return device_mode;
+}
+#else
+static uint8_t wlan_ipa_device_mode_switch(uint8_t device_mode)
+{
+	return device_mode;
+}
+#endif
+
 /**
  * wlan_ipa_wlan_evt() - SSR wrapper for __wlan_ipa_wlan_evt
  * @net_dev: Interface net device
@@ -2809,6 +2836,8 @@ QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 {
 	qdf_ipa_wlan_event type = wlan_host_to_ipa_wlan_event(ipa_event_type);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	device_mode = wlan_ipa_device_mode_switch(device_mode);
 
 	/* Data path offload only support for STA and SAP mode */
 	if ((device_mode == QDF_STA_MODE) ||
@@ -3257,6 +3286,7 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 {
 	int ret, i;
 	struct wlan_ipa_iface_context *iface_context = NULL;
+	struct wlan_objmgr_pdev *pdev = ipa_ctx->pdev;
 	QDF_STATUS status;
 
 	ipa_debug("enter");
@@ -3347,6 +3377,11 @@ QDF_STATUS wlan_ipa_setup(struct wlan_ipa_priv *ipa_ctx,
 
 	qdf_event_create(&ipa_ctx->ipa_resource_comp);
 
+	status = ipa_set_full_power_down_state(pdev, false);
+	if (status != QDF_STATUS_SUCCESS)
+		ipa_err("IPA set Full Power Down state failed");
+
+
 	ipa_debug("exit: success");
 
 	return QDF_STATUS_SUCCESS;
@@ -3401,6 +3436,20 @@ void wlan_ipa_flush(struct wlan_ipa_priv *ipa_ctx)
 	qdf_spin_unlock_bh(&ipa_ctx->pm_lock);
 }
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+static bool
+wlan_ipa_is_full_power_down_triggered(struct wlan_ipa_priv *ipa_ctx)
+{
+	return ipa_ctx->is_full_power_down_triggered;
+}
+#else
+static bool
+wlan_ipa_is_full_power_down_triggered(struct wlan_ipa_priv *ipa_ctx)
+{
+	return false;
+}
+#endif
+
 QDF_STATUS wlan_ipa_cleanup(struct wlan_ipa_priv *ipa_ctx)
 {
 	struct wlan_ipa_iface_context *iface_context;
@@ -3433,7 +3482,8 @@ QDF_STATUS wlan_ipa_cleanup(struct wlan_ipa_priv *ipa_ctx)
 	}
 
 	if (wlan_ipa_uc_is_enabled(ipa_ctx->config)) {
-		wlan_ipa_wdi_cleanup();
+		if (!wlan_ipa_is_full_power_down_triggered(ipa_ctx))
+			wlan_ipa_wdi_cleanup();
 		qdf_mutex_destroy(&ipa_ctx->event_lock);
 		qdf_mutex_destroy(&ipa_ctx->ipa_lock);
 		qdf_list_destroy(&ipa_ctx->pending_event);
@@ -4041,3 +4091,24 @@ void wlan_ipa_flush_pending_vdev_events(struct wlan_ipa_priv *ipa_ctx,
 
 	qdf_mutex_release(&ipa_ctx->ipa_lock);
 }
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+QDF_STATUS wlan_ipa_wdi_disconn_cleanup(void)
+{
+	int ret;
+
+	ret = qdf_ipa_wdi_disconn_pipes();
+	if (ret) {
+		ipa_err("ipa wdi disconnect pipes failed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ret = wlan_ipa_wdi_cleanup();
+	if (ret) {
+		ipa_err("ipa wdi cleanup failed");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

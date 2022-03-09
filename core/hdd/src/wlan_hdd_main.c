@@ -195,6 +195,7 @@
 #include "wlan_cm_roam_ucfg_api.h"
 #include <cdp_txrx_ctrl.h>
 #include "qdf_lock.h"
+#include "wlan_hdd_thermal.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -3582,7 +3583,7 @@ static void hdd_skip_acs_scan_timer_deinit(struct hdd_context *hdd_ctx) {}
  *
  * Return: 0 on success and errno on failure
  */
-static int hdd_update_country_code(struct hdd_context *hdd_ctx)
+int hdd_update_country_code(struct hdd_context *hdd_ctx)
 {
 	if (!country_code)
 		return 0;
@@ -7157,7 +7158,7 @@ QDF_STATUS hdd_stop_adapter(struct hdd_context *hdd_ctx,
 					WLAN_HDD_GET_HOSTAP_STATE_PTR(adapter);
 				qdf_event_reset(&hostapd_state->
 						qdf_stop_bss_event);
-				status = qdf_wait_for_event_completion(
+				status = qdf_wait_single_event(
 					&hostapd_state->qdf_stop_bss_event,
 					SME_CMD_STOP_BSS_TIMEOUT);
 				if (QDF_IS_STATUS_ERROR(status)) {
@@ -12091,7 +12092,6 @@ static void hdd_cfg_params_init(struct hdd_context *hdd_ctx)
 			cfg_get(psoc, CFG_ENABLE_UNIT_TEST_FRAMEWORK);
 	config->disable_channel = cfg_get(psoc, CFG_ENABLE_DISABLE_CHANNEL);
 	config->enable_sar_conversion = cfg_get(psoc, CFG_SAR_CONVERSION);
-	config->is_wow_disabled = cfg_get(psoc, CFG_WOW_DISABLE);
 	config->nb_commands_interval =
 				cfg_get(psoc, CFG_NB_COMMANDS_RATE_LIMIT);
 
@@ -13450,12 +13450,6 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	bool b_cts2self, is_imps_enabled;
 
 	hdd_enter();
-
-	ret = hdd_update_country_code(hdd_ctx);
-	if (ret) {
-		hdd_err("Failed to update country code; errno:%d", ret);
-		return -EINVAL;
-	}
 
 	ret = hdd_init_mws_coex(hdd_ctx);
 	if (ret)
@@ -14955,6 +14949,7 @@ int hdd_register_cb(struct hdd_context *hdd_ctx)
 	wlan_hdd_register_cp_stats_cb(hdd_ctx);
 	hdd_dcs_register_cb(hdd_ctx);
 
+	hdd_thermal_register_callbacks(hdd_ctx);
 	/* print error and not block the startup process */
 	if (!QDF_IS_STATUS_SUCCESS(status))
 		hdd_err("set lost link info callback failed");
@@ -15043,7 +15038,7 @@ void hdd_deregister_cb(struct hdd_context *hdd_ctx)
 	ret = hdd_deregister_data_stall_detect_cb();
 	if (ret)
 		hdd_err("Failed to de-register data stall detect event callback");
-
+	hdd_thermal_unregister_callbacks(hdd_ctx);
 	sme_deregister_oem_data_rsp_callback(mac_handle);
 
 	hdd_exit();
@@ -15541,7 +15536,7 @@ void wlan_hdd_stop_sap(struct hdd_adapter *ap_adapter)
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(hdd_ap_ctx->
 							sap_context)) {
-			qdf_status = qdf_wait_for_event_completion(&hostapd_state->
+			qdf_status = qdf_wait_single_event(&hostapd_state->
 					qdf_stop_bss_event,
 					SME_CMD_STOP_BSS_TIMEOUT);
 			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -16177,10 +16172,12 @@ void hdd_component_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	ucfg_interop_issues_ap_psoc_enable(psoc);
 	policy_mgr_psoc_enable(psoc);
 	ucfg_tdls_psoc_enable(psoc);
+	ucfg_fwol_psoc_enable(psoc);
 }
 
 void hdd_component_psoc_disable(struct wlan_objmgr_psoc *psoc)
 {
+	ucfg_fwol_psoc_disable(psoc);
 	ucfg_tdls_psoc_disable(psoc);
 	policy_mgr_psoc_disable(psoc);
 	ucfg_interop_issues_ap_psoc_disable(psoc);
@@ -16637,6 +16634,47 @@ static int con_mode_handler(const char *kmessage, const struct kernel_param *kp)
 	return hdd_set_con_mode_cb(mode);
 }
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+int hdd_set_suspend_mode(struct hdd_context *hdd_ctx)
+{
+	int errno;
+
+	if (wlan_hdd_is_full_power_down_enable(hdd_ctx))
+		errno = pld_set_suspend_mode(PLD_FULL_POWER_DOWN);
+	else
+		errno = pld_set_suspend_mode(PLD_SUSPEND);
+
+	return errno;
+}
+
+QDF_STATUS hdd_set_pld_full_power_down_state(bool triggered)
+{
+	int errno;
+
+	errno = pld_set_full_power_down_state(triggered);
+	if (errno == 0)
+		return QDF_STATUS_SUCCESS;
+	else
+		return QDF_STATUS_E_INVAL;
+}
+
+bool hdd_is_pld_full_power_down_triggered(void)
+{
+	return pld_is_full_power_down_triggered();
+}
+
+QDF_STATUS wlan_hdd_ipa_wdi_reset(void)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (hdd_is_pld_full_power_down_triggered()) {
+		status = ucfg_ipa_wdi_disconn_cleanup();
+	}
+
+	return status;
+}
+#endif
+
 int hdd_driver_load(void)
 {
 	struct osif_driver_sync *driver_sync;
@@ -16699,6 +16737,10 @@ int hdd_driver_load(void)
 	errno = pld_set_mode(con_mode);
 	if (errno)
 		hdd_err("Failed to set mode in PLD; errno:%d", errno);
+
+	errno = pld_set_full_power_down_state(false);
+	if (errno)
+		hdd_err("Failed to init full power down state in PLD");
 
 	hdd_driver_mode_change_register();
 
@@ -17789,9 +17831,8 @@ void hdd_restart_sap(struct hdd_adapter *ap_adapter)
 		hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(ap_adapter);
 		qdf_event_reset(&hostapd_state->qdf_stop_bss_event);
 		if (QDF_STATUS_SUCCESS == wlansap_stop_bss(sap_ctx)) {
-			qdf_status =
-				qdf_wait_for_event_completion(&hostapd_state->
-					qdf_stop_bss_event,
+			qdf_status = qdf_wait_single_event(
+					&hostapd_state->qdf_stop_bss_event,
 					SME_CMD_STOP_BSS_TIMEOUT);
 
 			if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {

@@ -573,6 +573,10 @@ static int __hdd_soc_probe(struct device *dev,
 	hdd_start_complete(0);
 	hdd_thermal_mitigation_register(hdd_ctx, dev);
 
+	errno = hdd_set_suspend_mode(hdd_ctx);
+	if (errno)
+		hdd_err("Failed to set suspend mode in PLD; errno:%d", errno);
+
 	hdd_soc_load_unlock(dev);
 
 	return 0;
@@ -903,15 +907,18 @@ static void __hdd_soc_recovery_shutdown(void)
 	struct hdd_context *hdd_ctx;
 	void *hif_ctx;
 
-	/* recovery starts via firmware down indication; ensure we got one */
-	QDF_BUG(cds_is_driver_recovering());
-	hdd_init_start_completion();
-
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is null");
 		return;
 	}
+
+	if (hdd_is_pld_full_power_down_triggered())
+		cds_set_driver_state(CDS_DRIVER_STATE_RECOVERING);
+
+	/* recovery starts via firmware down indication; ensure we got one */
+	QDF_BUG(cds_is_driver_recovering());
+	hdd_init_start_completion();
 
 	/*
 	 * Perform SSR related cleanup if it has not already been done as a
@@ -1740,6 +1747,7 @@ static void wlan_hdd_pld_shutdown(struct device *dev,
 	hdd_exit();
 }
 
+
 /**
  * wlan_hdd_pld_reinit() - reinit function registered to PLD
  * @dev: device
@@ -1760,6 +1768,15 @@ static int wlan_hdd_pld_reinit(struct device *dev,
 		hdd_err("Invalid bus type %d->%d", pld_bus_type, bus_type);
 		return -EINVAL;
 	}
+
+	/* wdi disconnect ipa pipes will wakeup system if the feature of
+	 * full power down is triggered when do suspend, so skip to IPA pipes
+	 * disconnect and IPA cleanup when wlan driver shutdown when suspend,
+         * and adding it at here when system resume if the feature of full
+	 * power down is triggered.
+	 */
+	if (QDF_STATUS_SUCCESS != wlan_hdd_ipa_wdi_reset())
+		hdd_err("ipa wdi disconnect and cleanup failed");
 
 	return hdd_soc_recovery_reinit(dev, bdev, id, bus_type);
 }

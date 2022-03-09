@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,6 +34,10 @@ struct pld_context {
 	struct list_head dev_list;
 	uint32_t pld_driver_state;
 	uint8_t mode;
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+	enum pld_suspend_mode suspend_mode;
+	bool is_full_power_down_triggered;
+#endif
 };
 
 struct pld_context *pld_get_global_context(void);

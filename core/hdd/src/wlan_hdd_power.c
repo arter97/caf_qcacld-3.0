@@ -1826,6 +1826,45 @@ hdd_sched_scan_results(struct wiphy *wiphy, uint64_t reqid)
 }
 #endif
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+bool wlan_hdd_is_full_power_down_enable(struct hdd_context *hdd_ctx)
+{
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_FULL_POWER_DOWN) {
+		hdd_info_rl("Wlan full power down is enabled while suspend");
+		return true;
+	}
+
+	return false;
+}
+
+static QDF_STATUS
+wlan_hdd_set_full_power_down_state(struct hdd_context *hdd_ctx,
+					bool triggered)
+{
+	QDF_STATUS status;
+
+	status = hdd_set_pld_full_power_down_state(triggered);
+	if (status != QDF_STATUS_SUCCESS) {
+		hdd_info_rl("set full power down state to PLD fail");
+		goto out;
+	}
+
+	status = ucfg_ipa_set_full_power_down_state(hdd_ctx->pdev, triggered);
+	if (status != QDF_STATUS_SUCCESS)
+		hdd_info_rl("ucfg set full power down state to IPA fail");
+
+out:
+	return status;
+}
+#else
+static QDF_STATUS
+wlan_hdd_set_full_power_down_state(struct hdd_context *hdd_ctx,
+					bool triggered)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_resume_wlan() - cfg80211 resume callback
  * @wiphy: Pointer to wiphy
@@ -1859,9 +1898,19 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		goto exit_with_code;
 	}
 
-	if (hdd_ctx->config->is_wow_disabled) {
-		hdd_err("wow is disabled");
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
+		hdd_info_rl("Suspend is not supported");
 		return -EINVAL;
+	}
+
+	if (wlan_hdd_is_full_power_down_enable(hdd_ctx)) {
+		status = wlan_hdd_set_full_power_down_state(hdd_ctx, false);
+		if (status != QDF_STATUS_SUCCESS) {
+			hdd_err("Failed to set full power down status(false)!");
+		}
+		hdd_debug("Driver has been re-initialized; Skipping resume");
+		exit_code = 0;
+		goto exit_with_code;
 	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1998,6 +2047,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
 	int rc;
+	QDF_STATUS status;
 
 	hdd_enter();
 
@@ -2012,9 +2062,18 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	if (0 != rc)
 		return rc;
 
-	if (hdd_ctx->config->is_wow_disabled) {
-		hdd_info_rl("wow is disabled");
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
+		hdd_info_rl("Suspend is not supported");
 		return -EINVAL;
+	}
+
+	if (wlan_hdd_is_full_power_down_enable(hdd_ctx)) {
+		status = wlan_hdd_set_full_power_down_state(hdd_ctx, true);
+		if (status != QDF_STATUS_SUCCESS) {
+			hdd_err("Failed to set full power down status(true)!");
+		}
+		hdd_debug("Driver will be shutdown; Skipping suspend");
+		return 0;
 	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
