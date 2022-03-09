@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -1495,6 +1496,7 @@ typedef struct sSirSmeAssocInd {
 	uint8_t uniSig;         /* DPU signature for unicast packets */
 	uint8_t bcastSig;       /* DPU signature for broadcast packets */
 	tAniAuthType authType;
+	enum ani_akm_type akm_type;
 	tAniSSID ssId;          /* SSID used by STA to associate */
 	tSirWAPIie wapiIE;      /* WAPI IE received from peer */
 	tSirRSNie rsnIE;        /* RSN IE received from peer */
@@ -1537,7 +1539,20 @@ typedef struct sSirSmeAssocInd {
 	tDot11fIEVHTCaps VHTCaps;
 	tSirMacCapabilityInfo capability_info;
 	bool is_sae_authenticated;
+	const uint8_t *owe_ie;
+	uint32_t owe_ie_len;
+	uint16_t owe_status;
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
+
+/**
+ * struct owe_assoc_ind - owe association indication
+ * @node : List entry element
+ * @assoc_ind: pointer to assoc ind
+ */
+struct owe_assoc_ind {
+	qdf_list_node_t node;
+	tSirSmeAssocInd *assoc_ind;
+};
 
 /* / Definition for Association confirm */
 /* / ---> MAC */
@@ -1551,6 +1566,8 @@ typedef struct sSirSmeAssocCnf {
 	struct qdf_mac_addr alternate_bssid;
 	uint8_t alternateChannelId;
 	tSirMacStatusCodes mac_status_code;
+	uint8_t *owe_ie;
+	uint32_t owe_ie_len;
 } tSirSmeAssocCnf, *tpSirSmeAssocCnf;
 
 /* / Enum definition for  Wireless medium status change codes */

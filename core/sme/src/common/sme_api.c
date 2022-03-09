@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -19561,4 +19562,10 @@ bool sme_validate_channel_list(tHalHandle hal,
 QDF_STATUS sme_get_scan_id(uint32_t *scan_id)
 {
 	return wma_get_scan_id(scan_id);
+}
+
+QDF_STATUS sme_update_owe_info(tpAniSirGlobal mac,
+			       tSirSmeAssocInd *assoc_ind)
+{
+	return csr_update_owe_info(mac, assoc_ind);
 }
