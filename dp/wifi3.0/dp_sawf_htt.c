@@ -310,8 +310,10 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 	uint16_t ast_idx;
 	uint8_t hlos_tid, tid_queue;
 	uint8_t host_queue, remapped_tid;
-	struct dp_sawf_msduq msduq;
+	struct dp_sawf_msduq *msduq;
 	struct dp_sawf_msduq_tid_map msduq_map;
+	uint8_t host_tid_queue;
+	uint8_t msduq_index = 0;
 
 	peer_id = HTT_T2H_SAWF_MSDUQ_INFO_HTT_PEER_ID_GET(*msg_word);
 	tid_queue = HTT_T2H_SAWF_MSDUQ_INFO_HTT_QTYPE_GET(*msg_word);
@@ -341,19 +343,23 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 	qdf_info("|AST idx: %d|HLOS TID:%d|TID Q:%d|Remapped TID:%d|Host Q:%d|",
 		 ast_idx, hlos_tid, tid_queue, remapped_tid, host_queue);
 
-	qdf_assert_always(!((ast_idx == 2) || (ast_idx == 3)));
-	qdf_assert_always(!((hlos_tid < 0) || (hlos_tid >= DP_SAWF_TID_MAX)));
+	qdf_assert_always((ast_idx == 2) || (ast_idx == 3));
+	qdf_assert_always((hlos_tid >= 0) || (hlos_tid <= DP_SAWF_TID_MAX));
+
+	host_tid_queue = tid_queue - DP_SAWF_DEFAULT_Q_PTID_MAX;
 
 	if (remapped_tid < DP_SAWF_TID_MAX &&
-	    tid_queue < DP_SAWF_DEFINED_Q_PTID_MAX) {
-		msduq_map = sawf_ctx->msduq_map[remapped_tid][tid_queue];
+	    host_tid_queue < DP_SAWF_DEFINED_Q_PTID_MAX) {
+		msduq_map = sawf_ctx->msduq_map[remapped_tid][host_tid_queue];
 		msduq_map.host_queue_id = host_queue;
 	}
 
-	if (host_queue < DP_SAWF_Q_MAX) {
-		msduq = sawf_ctx->msduq[host_queue];
-		msduq.remapped_tid = remapped_tid;
-		msduq.htt_msduq = tid_queue;
+	msduq_index = host_queue - DP_SAWF_DEFAULT_Q_MAX;
+
+	if (msduq_index < DP_SAWF_Q_MAX) {
+		msduq = &sawf_ctx->msduq[msduq_index];
+		msduq->remapped_tid = remapped_tid;
+		msduq->htt_msduq = host_tid_queue;
 	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);

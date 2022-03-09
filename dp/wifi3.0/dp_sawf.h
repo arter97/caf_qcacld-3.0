@@ -171,17 +171,26 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 				   uint8_t tid);
 
 /**
+ * dp_sawf_tx_enqueue_fail_peer_stats - update SAWF stats in Tx enqueue failure
+ * @soc: soc handle
+ * @tx_desc: Tx descriptor
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
+				   struct dp_tx_desc_s *tx_desc);
+
+/**
  * dp_sawf_tx_enqueue_peer_stats - update SAWF stats in Tx enqueue
  * @soc: soc handle
  * @tx_desc: Tx descriptor
- * @tid: TID
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
-			      struct dp_tx_desc_s *tx_desc,
-			      uint8_t tid);
+			      struct dp_tx_desc_s *tx_desc);
 
 #define DP_SAWF_STATS_SVC_CLASS_ID_ALL	0
 
