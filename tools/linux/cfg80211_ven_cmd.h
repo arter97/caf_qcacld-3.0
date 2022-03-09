@@ -3573,7 +3573,7 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_UNDECODED_METADATA_CAPTURE,
 		GET_PARAM, 0},
 #endif
-#if CONFIG_SAWF_DEF_QUEUES
+#ifdef CONFIG_SAWF_DEF_QUEUES
 	{"get_rate_upper_cap_nss",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RC_UPPER_CAP_NSS,
 		GET_PARAM, 0},
