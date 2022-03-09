@@ -231,14 +231,14 @@ struct dp_sawf_msduq {
 };
 
 struct dp_sawf_msduq_tid_map {
-	uint32_t host_queue_id;
+	uint8_t host_queue_id;
 };
 
 struct dp_peer_sawf {
 	/* qdf_bitmap queue_usage; */
 	struct dp_sawf_msduq msduq[DP_SAWF_Q_MAX];
 	struct dp_sawf_msduq_tid_map
-	       msduq_map[DP_SAWF_TID_MAX][DP_SAWF_DEFAULT_Q_PTID_MAX];
+	       msduq_map[DP_SAWF_TID_MAX][DP_SAWF_DEFINED_Q_PTID_MAX];
 	struct sawf_def_queue_report tid_reports[DP_SAWF_TID_MAX];
 };
 

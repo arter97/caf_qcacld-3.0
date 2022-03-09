@@ -299,3 +299,64 @@ dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
+		      qdf_nbuf_t htt_t2h_msg)
+{
+	uint16_t peer_id;
+	struct dp_peer *peer;
+	struct dp_peer_sawf *sawf_ctx;
+	uint16_t ast_idx;
+	uint8_t hlos_tid, tid_queue;
+	uint8_t host_queue, remapped_tid;
+	struct dp_sawf_msduq msduq;
+	struct dp_sawf_msduq_tid_map msduq_map;
+
+	peer_id = HTT_T2H_SAWF_MSDUQ_INFO_HTT_PEER_ID_GET(*msg_word);
+	tid_queue = HTT_T2H_SAWF_MSDUQ_INFO_HTT_QTYPE_GET(*msg_word);
+
+	peer = dp_peer_get_ref_by_id(soc->dp_soc, peer_id,
+				     DP_MOD_ID_SAWF);
+	if (!peer) {
+		qdf_err("Invalid peer");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(peer);
+	if (!sawf_ctx) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		qdf_err("Invalid SAWF ctx");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	msg_word++;
+	remapped_tid = HTT_T2H_SAWF_MSDUQ_INFO_HTT_REMAP_TID_GET(*msg_word);
+	hlos_tid = HTT_T2H_SAWF_MSDUQ_INFO_HTT_HLOS_TID_GET(*msg_word);
+	ast_idx = HTT_T2H_SAWF_MSDUQ_INFO_HTT_AST_LIST_IDX_GET(*msg_word);
+
+	host_queue = DP_SAWF_DEFAULT_Q_MAX +
+		     (ast_idx - 2) * DP_SAWF_TID_MAX + hlos_tid;
+
+	qdf_info("|AST idx: %d|HLOS TID:%d|TID Q:%d|Remapped TID:%d|Host Q:%d|",
+		 ast_idx, hlos_tid, tid_queue, remapped_tid, host_queue);
+
+	qdf_assert_always(!((ast_idx == 2) || (ast_idx == 3)));
+	qdf_assert_always(!((hlos_tid < 0) || (hlos_tid >= DP_SAWF_TID_MAX)));
+
+	if (remapped_tid < DP_SAWF_TID_MAX &&
+	    tid_queue < DP_SAWF_DEFINED_Q_PTID_MAX) {
+		msduq_map = sawf_ctx->msduq_map[remapped_tid][tid_queue];
+		msduq_map.host_queue_id = host_queue;
+	}
+
+	if (host_queue < DP_SAWF_Q_MAX) {
+		msduq = sawf_ctx->msduq[host_queue];
+		msduq.remapped_tid = remapped_tid;
+		msduq.htt_msduq = tid_queue;
+	}
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return QDF_STATUS_SUCCESS;
+}
