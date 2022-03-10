@@ -1193,7 +1193,7 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 		else if(is_not_match)
 			goto drop_nbuf;
 	}
-	
+
 	/*
 	 * Drop packets in this path if cce_match is found. Packets will come
 	 * in following path depending on whether tidQ is setup.
@@ -1206,10 +1206,8 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	 *    These packets need to be dropped and should not get delivered
 	 *    to stack.
 	 */
-	if (qdf_unlikely(dp_rx_err_cce_drop(soc, vdev, nbuf, rx_tlv_hdr))) {
-		qdf_nbuf_free(nbuf);
-		return QDF_STATUS_E_FAILURE;
-	}
+	if (qdf_unlikely(dp_rx_err_cce_drop(soc, vdev, nbuf, rx_tlv_hdr)))
+		goto drop_nbuf;
 
 	if (qdf_unlikely(vdev->rx_decap_type == htt_cmn_pkt_type_raw)) {
 		qdf_nbuf_set_next(nbuf, NULL);
