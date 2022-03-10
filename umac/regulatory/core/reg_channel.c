@@ -949,8 +949,11 @@ reg_get_5g_chan_state(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 	}
 
 	ch_indx = reg_get_chan_enum_for_freq(freq);
-	if (ch_indx == INVALID_CHANNEL)
+	if (ch_indx == INVALID_CHANNEL) {
+		qdf_mem_free(reg_channels);
 		return CHANNEL_STATE_INVALID;
+	}
+
 	if (bw == CH_WIDTH_5MHZ)
 		bw_enabled = true;
 	else if (bw == CH_WIDTH_10MHZ)
@@ -1053,6 +1056,7 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 				NEAREST_20MHZ_CHAN_FREQ_OFFSET);
 		if (sec_5g_chan_enum == INVALID_CHANNEL) {
 			reg_err("secondary channel freq is not valid");
+			qdf_mem_free(reg_chan_list);
 			return;
 		}
 
