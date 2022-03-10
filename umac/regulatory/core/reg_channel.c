@@ -1161,50 +1161,6 @@ void reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 					   sec_ch_2g_freq);
 }
 
-#ifdef WLAN_FEATURE_11BE
-static enum phy_ch_width reg_find_chwidth_from_bw(uint16_t bw)
-{
-	switch (bw) {
-	case BW_5_MHZ:
-		return CH_WIDTH_5MHZ;
-	case BW_10_MHZ:
-		return CH_WIDTH_10MHZ;
-	case BW_20_MHZ:
-		return CH_WIDTH_20MHZ;
-	case BW_40_MHZ:
-		return CH_WIDTH_40MHZ;
-	case BW_80_MHZ:
-		return CH_WIDTH_80MHZ;
-	case BW_160_MHZ:
-		return CH_WIDTH_160MHZ;
-	case BW_320_MHZ:
-		return CH_WIDTH_320MHZ;
-	default:
-		return CH_WIDTH_INVALID;
-	}
-}
-#else
-static enum phy_ch_width reg_find_chwidth_from_bw(uint16_t bw)
-{
-	switch (bw) {
-	case BW_5_MHZ:
-		return CH_WIDTH_5MHZ;
-	case BW_10_MHZ:
-		return CH_WIDTH_10MHZ;
-	case BW_20_MHZ:
-		return CH_WIDTH_20MHZ;
-	case BW_40_MHZ:
-		return CH_WIDTH_40MHZ;
-	case BW_80_MHZ:
-		return CH_WIDTH_80MHZ;
-	case BW_160_MHZ:
-		return CH_WIDTH_160MHZ;
-	default:
-		return CH_WIDTH_INVALID;
-	}
-}
-#endif
-
 /**
  * reg_get_max_channel_width_without_radar() - Get the maximum channel width
  * supported given a frequency and a global maximum channel width.
