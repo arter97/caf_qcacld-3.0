@@ -157,6 +157,10 @@ struct csr_roamstart_bssparams {
 	enum QDF_OPMODE bssPersona;
 	uint16_t nRSNIELength;  /* If 0, pRSNIE is ignored. */
 	uint8_t *pRSNIE;        /* If not null, it has IE byte stream for RSN */
+#ifdef FEATURE_WLAN_WAPI
+	uint16_t nWAPIIELength;  /* If 0, pWAPIIE is ignored. */
+	uint8_t *pWAPIIE;        /* If not null, it has IE byte stream for WAPI */
+#endif
 	/* Flag used to indicate update beaconInterval */
 	bool updatebeaconInterval;
 	struct add_ie_params add_ie_params;
