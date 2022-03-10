@@ -737,8 +737,9 @@ struct start_bss_req {
 	uint8_t txLdpcIniFeatureEnabled;
 
 	tSirRSNie rsnIE;        /* RSN IE to be sent in */
-	/* Beacon and Probe */
-	/* Response frames */
+#ifdef FEATURE_WLAN_WAPI
+	tSirWAPIie wapiIE;
+#endif
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */

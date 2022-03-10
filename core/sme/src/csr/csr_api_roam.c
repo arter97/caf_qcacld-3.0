@@ -5512,7 +5512,10 @@ QDF_STATUS csr_roam_issue_start_bss(struct mac_context *mac, uint32_t sessionId,
 	/* Put RSN information in for Starting BSS */
 	pParam->nRSNIELength = (uint16_t) pProfile->nRSNReqIELength;
 	pParam->pRSNIE = pProfile->pRSNReqIE;
-
+#ifdef FEATURE_WLAN_WAPI
+	pParam->nWAPIIELength = (uint16_t)pProfile->nWAPIReqIELength;
+	pParam->pWAPIIE = pProfile->pWAPIReqIE;
+#endif
 	pParam->privacy = pProfile->privacy;
 	pParam->fwdWPSPBCProbeReq = pProfile->fwdWPSPBCProbeReq;
 	pParam->authType = pProfile->csr80211AuthType;
@@ -6934,6 +6937,12 @@ QDF_STATUS csr_send_mb_start_bss_req_msg(struct mac_context *mac, uint32_t
 	qdf_mem_copy(pMsg->rsnIE.rsnIEdata,
 		     pParam->pRSNIE,
 		     pParam->nRSNIELength);
+#ifdef FEATURE_WLAN_WAPI
+	pMsg->wapiIE.length = pParam->nWAPIIELength;
+	qdf_mem_copy(pMsg->wapiIE.wapiIEdata,
+		     pParam->pWAPIIE,
+		     pParam->nWAPIIELength);
+#endif
 	pMsg->nwType = (tSirNwType)pParam->sirNwType;
 	qdf_mem_copy(&pMsg->operationalRateSet,
 		     &pParam->operationalRateSet,

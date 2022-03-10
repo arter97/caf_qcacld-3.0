@@ -1867,20 +1867,21 @@ QDF_STATUS populate_dot11f_rsn_opaque(struct mac_context *mac,
 } /* End populate_dot11f_rsn_opaque. */
 
 #if defined(FEATURE_WLAN_WAPI)
-
 QDF_STATUS
 populate_dot11f_wapi(struct mac_context *mac,
-		     tpSirRSNie pRsnIe, tDot11fIEWAPI *pDot11f)
+		     tpSirWAPIie pWapiIe, tDot11fIEWAPI *pDot11f)
 {
 	uint32_t status;
 	int idx;
 
-	if (pRsnIe->length) {
-		idx = find_ie_location(mac, pRsnIe, DOT11F_EID_WAPI);
+	if (pWapiIe->length) {
+		idx = find_ie_location(mac, (tpSirRSNie)pWapiIe, DOT11F_EID_WAPI);
 		if (0 <= idx) {
-			status = dot11f_unpack_ie_wapi(mac, pRsnIe->rsnIEdata + idx + 2,  /* EID, length */
-						       pRsnIe->rsnIEdata[idx + 1],
-						       pDot11f, false);
+			status =
+			    dot11f_unpack_ie_wapi(mac,
+						  pWapiIe->wapiIEdata + idx + 2,
+						  pWapiIe->wapiIEdata[idx + 1],
+						  pDot11f, false);
 			if (DOT11F_FAILED(status)) {
 				pe_err("Parse failure (0x%08x)", status);
 				return QDF_STATUS_E_FAILURE;
@@ -1911,7 +1912,6 @@ QDF_STATUS populate_dot11f_wapi_opaque(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 
 } /* End populate_dot11f_wapi_opaque. */
-
 #endif /* defined(FEATURE_WLAN_WAPI) */
 
 void

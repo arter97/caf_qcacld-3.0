@@ -778,7 +778,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 #if defined(FEATURE_WLAN_WAPI)
 	if (pe_session->pLimStartBssReq)
 		populate_dot11f_wapi(mac_ctx,
-			&(pe_session->pLimStartBssReq->rsnIE),
+			&pe_session->pLimStartBssReq->wapiIE,
 			&frm->WAPI);
 #endif /* defined(FEATURE_WLAN_WAPI) */
 
