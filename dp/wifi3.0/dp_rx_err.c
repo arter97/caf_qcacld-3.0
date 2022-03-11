@@ -2624,7 +2624,10 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 			continue;
 		}
 
-		qdf_assert_always(rx_desc);
+		if (!rx_desc) {
+			DP_STATS_INC(soc, rx.err.invalid_cookie, 1);
+			continue;
+		}
 
 		if (!dp_rx_desc_check_magic(rx_desc)) {
 			dp_rx_err_err("%pk: Invalid rx_desc %pk",
