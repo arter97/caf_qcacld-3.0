@@ -300,7 +300,7 @@ more_data:
 
 		if (qdf_unlikely(!rx_desc->in_use)) {
 			DP_STATS_INC(soc, rx.err.hal_reo_dest_dup, 1);
-			dp_info_rl("Reaping rx_desc not in use!");
+			dp_rx_alert("Duplicate desc rx_desc not in use!");
 			dp_rx_dump_info_and_assert(soc, hal_ring_hdl,
 						   ring_desc, rx_desc);
 			/* ignore duplicate RX desc and continue to process */
@@ -312,7 +312,7 @@ more_data:
 		status = dp_rx_desc_nbuf_sanity_check(soc, ring_desc, rx_desc);
 		if (qdf_unlikely(QDF_IS_STATUS_ERROR(status))) {
 			DP_STATS_INC(soc, rx.err.nbuf_sanity_fail, 1);
-			dp_info_rl("Nbuf sanity check failure!");
+			dp_rx_alert("Duplicate desc Nbuf sanity check failure");
 			dp_rx_dump_info_and_assert(soc, hal_ring_hdl,
 						   ring_desc, rx_desc);
 			rx_desc->in_err_state = 1;
@@ -321,7 +321,7 @@ more_data:
 		}
 
 		if (qdf_unlikely(!dp_rx_desc_check_magic(rx_desc))) {
-			dp_err("Invalid rx_desc cookie=%d", rx_buf_cookie);
+			dp_rx_alert("Invalid rx_desc cookie=%d", rx_buf_cookie);
 			DP_STATS_INC(soc, rx.err.rx_desc_invalid_magic, 1);
 			dp_rx_dump_info_and_assert(soc, hal_ring_hdl,
 						   ring_desc, rx_desc);

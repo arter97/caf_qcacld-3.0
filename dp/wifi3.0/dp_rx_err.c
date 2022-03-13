@@ -2643,6 +2643,7 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		 * including the software descriptor rx_desc and assert.
 		 */
 		if (qdf_unlikely(!rx_desc->in_use)) {
+			dp_rx_err_alert("Duplicate desc rx_desc not in use!");
 			DP_STATS_INC(soc, rx.err.hal_wbm_rel_dup, 1);
 			dp_rx_dump_info_and_assert(soc, hal_ring_hdl,
 						   ring_desc, rx_desc);
