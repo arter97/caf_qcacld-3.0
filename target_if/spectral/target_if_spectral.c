@@ -4449,7 +4449,7 @@ target_if_start_spectral_scan(struct wlan_objmgr_pdev *pdev,
 		spectral->params_valid[smode] = true;
 	}
 
-	qdf_spin_lock(&spectral->spectral_lock);
+	qdf_spin_lock_bh(&spectral->spectral_lock);
 	if (smode == SPECTRAL_SCAN_MODE_AGILE) {
 		QDF_STATUS status;
 		bool is_overlapping;
@@ -4465,7 +4465,7 @@ target_if_start_spectral_scan(struct wlan_objmgr_pdev *pdev,
 			(spectral, ch_width, spectral->params
 			 [SPECTRAL_SCAN_MODE_AGILE].ss_frequency.cfreq2 > 0);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			qdf_spin_unlock(&spectral->spectral_lock);
+			qdf_spin_unlock_bh(&spectral->spectral_lock);
 			spectral_err("Failed to populate channel width");
 			return QDF_STATUS_E_FAILURE;
 		}
@@ -4476,7 +4476,7 @@ target_if_start_spectral_scan(struct wlan_objmgr_pdev *pdev,
 		    (agile_ch_width == CH_WIDTH_80P80MHZ &&
 		    !spectral->params[smode].ss_frequency.cfreq2)) {
 			*err = SPECTRAL_SCAN_ERR_PARAM_NOT_INITIALIZED;
-			qdf_spin_unlock(&spectral->spectral_lock);
+			qdf_spin_unlock_bh(&spectral->spectral_lock);
 			return QDF_STATUS_E_FAILURE;
 		}
 
@@ -4485,13 +4485,13 @@ target_if_start_spectral_scan(struct wlan_objmgr_pdev *pdev,
 				 &spectral->params[smode].ss_frequency,
 				 &is_overlapping);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			qdf_spin_unlock(&spectral->spectral_lock);
+			qdf_spin_unlock_bh(&spectral->spectral_lock);
 			return QDF_STATUS_E_FAILURE;
 		}
 
 		if (is_overlapping) {
 			*err = SPECTRAL_SCAN_ERR_PARAM_INVALID_VALUE;
-			qdf_spin_unlock(&spectral->spectral_lock);
+			qdf_spin_unlock_bh(&spectral->spectral_lock);
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
@@ -4499,7 +4499,7 @@ target_if_start_spectral_scan(struct wlan_objmgr_pdev *pdev,
 	target_if_spectral_scan_enable_params(spectral,
 					      &spectral->params[smode], smode,
 					      err);
-	qdf_spin_unlock(&spectral->spectral_lock);
+	qdf_spin_unlock_bh(&spectral->spectral_lock);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4536,7 +4536,7 @@ target_if_stop_spectral_scan(struct wlan_objmgr_pdev *pdev,
 	}
 	p_sops = GET_TARGET_IF_SPECTRAL_OPS(spectral);
 
-	qdf_spin_lock(&spectral->spectral_lock);
+	qdf_spin_lock_bh(&spectral->spectral_lock);
 	p_sops->stop_spectral_scan(spectral, smode);
 	if (spectral->classify_scan) {
 		/* TODO : Check if this logic is necessary */
@@ -4550,7 +4550,7 @@ target_if_stop_spectral_scan(struct wlan_objmgr_pdev *pdev,
 	spectral->send_single_packet = 0;
 	spectral->sc_spectral_scan = 0;
 
-	qdf_spin_unlock(&spectral->spectral_lock);
+	qdf_spin_unlock_bh(&spectral->spectral_lock);
 
 	return QDF_STATUS_SUCCESS;
 }
