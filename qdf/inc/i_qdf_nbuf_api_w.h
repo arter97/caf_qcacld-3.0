@@ -39,6 +39,16 @@ static inline void *qdf_nbuf_get_rx_fctx(qdf_nbuf_t buf)
 	return  __qdf_nbuf_get_rx_fctx(buf);
 }
 
+static inline void
+qdf_nbuf_set_rx_ftype(qdf_nbuf_t buf, enum cb_ftype type)
+{
+	__qdf_nbuf_set_rx_ftype(buf, type);
+}
+
+static inline enum cb_ftype qdf_nbuf_get_rx_ftype(qdf_nbuf_t buf)
+{
+	return  __qdf_nbuf_get_rx_ftype(buf);
+}
 
 static inline void
 qdf_nbuf_set_tx_fctx_type(qdf_nbuf_t buf, void *ctx, uint8_t type)
@@ -51,7 +61,6 @@ qdf_nbuf_set_rx_fctx_type(qdf_nbuf_t buf, void *ctx, uint8_t type)
 {
 	__qdf_nbuf_set_rx_fctx_type(buf, ctx, type);
 }
-
 
 static inline void *
 qdf_nbuf_get_ext_cb(qdf_nbuf_t buf)

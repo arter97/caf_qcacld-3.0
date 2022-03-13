@@ -1547,14 +1547,6 @@ qdf_nbuf_set_tx_ftype(qdf_nbuf_t buf, enum cb_ftype type)
 	__qdf_nbuf_set_tx_ftype(buf, type);
 }
 
-static inline void
-qdf_nbuf_set_rx_ftype(qdf_nbuf_t buf, enum cb_ftype type)
-{
-	__qdf_nbuf_set_rx_ftype(buf, type);
-}
-
-
-
 static inline uint8_t
 qdf_nbuf_get_vdev_ctx(qdf_nbuf_t buf)
 {
@@ -1565,12 +1557,6 @@ static inline enum cb_ftype qdf_nbuf_get_tx_ftype(qdf_nbuf_t buf)
 {
 	return  __qdf_nbuf_get_tx_ftype(buf);
 }
-
-static inline enum cb_ftype qdf_nbuf_get_rx_ftype(qdf_nbuf_t buf)
-{
-	return  __qdf_nbuf_get_rx_ftype(buf);
-}
-
 
 static inline qdf_dma_addr_t
 qdf_nbuf_mapped_paddr_get(qdf_nbuf_t buf)
