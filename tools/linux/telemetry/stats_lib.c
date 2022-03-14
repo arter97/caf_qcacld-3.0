@@ -76,7 +76,7 @@ static struct feat_parser_t g_feat[] = {
 	{ "FWD", STATS_FEAT_FLG_FWD },
 	{ "HTT", STATS_FEAT_FLG_HTT },
 	{ "RAW", STATS_FEAT_FLG_RAW },
-	{ "RDK", STATS_FEAT_FLG_RDK },
+	{ "RDK", STATS_FEAT_FLG_PEER },
 	{ "TSO", STATS_FEAT_FLG_TSO },
 	{ "TWT", STATS_FEAT_FLG_TWT },
 	{ "VOW", STATS_FEAT_FLG_VOW },

@@ -133,8 +133,8 @@ wlan_peer_update_avg_tx_rate_stats(
 	struct cdp_tx_completion_ppdu_user *user;
 	int i;
 
-	if (soc_stats_ctx->stats_ver != RDK_RATE_STATS &&
-	    soc_stats_ctx->stats_ver != RDK_ALL_STATS)
+	if (soc_stats_ctx->stats_ver != PEER_EXT_RATE_STATS &&
+	    soc_stats_ctx->stats_ver != PEER_EXT_ALL_STATS)
 		return;
 
 	for (i = 0; i < ppdu->num_users; i++) {
@@ -146,9 +146,9 @@ wlan_peer_update_avg_tx_rate_stats(
 			continue;
 		}
 
-		stats_ctx = cdp_peer_get_rdkstats_ctx(soc_stats_ctx->soc,
-						      ppdu->vdev_id,
-						      user->mac_addr);
+		stats_ctx = cdp_peer_get_peerstats_ctx(soc_stats_ctx->soc,
+						       ppdu->vdev_id,
+						       user->mac_addr);
 		if (qdf_unlikely(!stats_ctx)) {
 			dp_warn("peer rate stats ctx is NULL, return");
 			dp_warn("peer_mac:  " QDF_MAC_ADDR_FMT,
@@ -254,8 +254,8 @@ wlan_peer_update_avg_rx_rate_stats(
 	struct cdp_rx_stats_ppdu_user *user;
 	int i;
 
-	if (soc_stats_ctx->stats_ver != RDK_RATE_STATS &&
-	    soc_stats_ctx->stats_ver != RDK_ALL_STATS)
+	if (soc_stats_ctx->stats_ver != PEER_EXT_RATE_STATS &&
+	    soc_stats_ctx->stats_ver != PEER_EXT_ALL_STATS)
 		return;
 
 	for (i = 0; i < ppdu->num_users; i++) {
@@ -269,9 +269,9 @@ wlan_peer_update_avg_rx_rate_stats(
 			continue;
 		}
 
-		stats_ctx = cdp_peer_get_rdkstats_ctx(soc_stats_ctx->soc,
-						      ppdu->vdev_id,
-						      user->mac_addr);
+		stats_ctx = cdp_peer_get_peerstats_ctx(soc_stats_ctx->soc,
+						       ppdu->vdev_id,
+						       user->mac_addr);
 		if (qdf_unlikely(!stats_ctx)) {
 			dp_warn("peer rate stats ctx is NULL, return");
 			dp_warn("peer_mac:  " QDF_MAC_ADDR_FMT,
@@ -533,8 +533,8 @@ static void
 wlan_peer_flush_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			   struct wlan_peer_rate_stats_ctx *stats_ctx)
 {
-	if (soc_stats_ctx->stats_ver == RDK_RATE_STATS ||
-	    soc_stats_ctx->stats_ver == RDK_ALL_STATS) {
+	if (soc_stats_ctx->stats_ver == PEER_EXT_RATE_STATS ||
+	    soc_stats_ctx->stats_ver == PEER_EXT_ALL_STATS) {
 
 		wlan_peer_flush_tx_rate_stats(soc_stats_ctx, stats_ctx);
 
@@ -543,8 +543,8 @@ wlan_peer_flush_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 		wlan_peer_flush_avg_rate_stats(soc_stats_ctx, stats_ctx);
 	}
 
-	if (soc_stats_ctx->stats_ver == RDK_LINK_STATS ||
-	    soc_stats_ctx->stats_ver == RDK_ALL_STATS) {
+	if (soc_stats_ctx->stats_ver == PEER_EXT_LINK_STATS ||
+	    soc_stats_ctx->stats_ver == PEER_EXT_ALL_STATS) {
 
 		wlan_peer_flush_tx_link_stats(soc_stats_ctx, stats_ctx);
 
@@ -620,17 +620,17 @@ wlan_peer_update_tx_link_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 	struct wlan_tx_link_stats *tx_stats;
 	uint8_t user_idx;
 
-	if (soc_stats_ctx->stats_ver != RDK_LINK_STATS &&
-	    soc_stats_ctx->stats_ver != RDK_ALL_STATS)
+	if (soc_stats_ctx->stats_ver != PEER_EXT_LINK_STATS &&
+	    soc_stats_ctx->stats_ver != PEER_EXT_ALL_STATS)
 		return;
 
 	for (user_idx = 0; user_idx < cdp_tx_ppdu->num_users; user_idx++) {
 		ppdu_user = &cdp_tx_ppdu->user[user_idx];
 
 		STATS_CTX_LOCK_ACQUIRE(&soc_stats_ctx->tx_ctx_lock);
-		stats_ctx = cdp_peer_get_rdkstats_ctx(soc_stats_ctx->soc,
-						      cdp_tx_ppdu->vdev_id,
-						      ppdu_user->mac_addr);
+		stats_ctx = cdp_peer_get_peerstats_ctx(soc_stats_ctx->soc,
+						       cdp_tx_ppdu->vdev_id,
+						       ppdu_user->mac_addr);
 
 		if (qdf_unlikely(!stats_ctx)) {
 			dp_warn("peer rate stats ctx is NULL, return");
@@ -690,8 +690,8 @@ wlan_peer_update_rx_link_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 	struct wlan_rx_link_stats *rx_stats;
 	uint8_t user_idx;
 
-	if (soc_stats_ctx->stats_ver != RDK_LINK_STATS &&
-	    soc_stats_ctx->stats_ver != RDK_ALL_STATS)
+	if (soc_stats_ctx->stats_ver != PEER_EXT_LINK_STATS &&
+	    soc_stats_ctx->stats_ver != PEER_EXT_ALL_STATS)
 		return;
 
 	for (user_idx = 0;
@@ -703,9 +703,9 @@ wlan_peer_update_rx_link_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			continue;
 
 		STATS_CTX_LOCK_ACQUIRE(&soc_stats_ctx->rx_ctx_lock);
-		stats_ctx = cdp_peer_get_rdkstats_ctx(soc_stats_ctx->soc,
-						      ppdu_user->vdev_id,
-						      ppdu_user->mac_addr);
+		stats_ctx = cdp_peer_get_peerstats_ctx(soc_stats_ctx->soc,
+						       ppdu_user->vdev_id,
+						       ppdu_user->mac_addr);
 
 		if (qdf_unlikely(!stats_ctx)) {
 			dp_warn("peer rate stats ctx is NULL, return");
@@ -767,8 +767,8 @@ wlan_peer_update_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 	uint8_t max_users;
 	bool idx_match = false;
 
-	if (soc_stats_ctx->stats_ver != RDK_RATE_STATS &&
-	    soc_stats_ctx->stats_ver != RDK_ALL_STATS)
+	if (soc_stats_ctx->stats_ver != PEER_EXT_RATE_STATS &&
+	    soc_stats_ctx->stats_ver != PEER_EXT_ALL_STATS)
 		return;
 
 	user_idx = 0;
@@ -782,9 +782,9 @@ wlan_peer_update_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 
 		STATS_CTX_LOCK_ACQUIRE(&soc_stats_ctx->rx_ctx_lock);
 
-		stats_ctx = cdp_peer_get_rdkstats_ctx(soc_stats_ctx->soc,
-						      ppdu_user->vdev_id,
-						      ppdu_user->mac_addr);
+		stats_ctx = cdp_peer_get_peerstats_ctx(soc_stats_ctx->soc,
+						       ppdu_user->vdev_id,
+						       ppdu_user->mac_addr);
 
 		if (qdf_unlikely(!stats_ctx)) {
 			dp_warn("peer rate stats ctx is NULL, return");
@@ -888,17 +888,17 @@ wlan_peer_update_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 	uint8_t user_idx;
 	bool idx_match = false;
 
-	if (soc_stats_ctx->stats_ver != RDK_RATE_STATS &&
-	    soc_stats_ctx->stats_ver != RDK_ALL_STATS)
+	if (soc_stats_ctx->stats_ver != PEER_EXT_RATE_STATS &&
+	    soc_stats_ctx->stats_ver != PEER_EXT_ALL_STATS)
 		return;
 
 	for (user_idx = 0; user_idx < cdp_tx_ppdu->num_users; user_idx++) {
 		ppdu_user = &cdp_tx_ppdu->user[user_idx];
 
 		STATS_CTX_LOCK_ACQUIRE(&soc_stats_ctx->tx_ctx_lock);
-		stats_ctx = cdp_peer_get_rdkstats_ctx(soc_stats_ctx->soc,
-						      cdp_tx_ppdu->vdev_id,
-						      ppdu_user->mac_addr);
+		stats_ctx = cdp_peer_get_peerstats_ctx(soc_stats_ctx->soc,
+						       cdp_tx_ppdu->vdev_id,
+						       ppdu_user->mac_addr);
 
 		if (qdf_unlikely(!ppdu_user->tx_ratekbps || !ppdu_user->rix ||
 				 ppdu_user->rix > DP_RATE_TABLE_SIZE)) {
@@ -972,8 +972,8 @@ wlan_peer_update_sojourn_stats(struct wlan_soc_rate_stats_ctx  *soc_stats_ctx,
 	struct wlan_peer_tx_rate_stats *tx_stats;
 	uint8_t tid;
 
-	if (soc_stats_ctx->stats_ver != RDK_RATE_STATS &&
-	    soc_stats_ctx->stats_ver != RDK_ALL_STATS)
+	if (soc_stats_ctx->stats_ver != PEER_EXT_RATE_STATS &&
+	    soc_stats_ctx->stats_ver != PEER_EXT_ALL_STATS)
 		return;
 
 	stats_ctx = (struct wlan_peer_rate_stats_ctx *)sojourn_stats->cookie;
@@ -1068,8 +1068,8 @@ void wlan_peer_create_event_handler(void *ctx, enum WDI_EVENT event,
 		return;
 	}
 
-	if (soc_stats_ctx->stats_ver == RDK_RATE_STATS ||
-	    soc_stats_ctx->stats_ver == RDK_ALL_STATS) {
+	if (soc_stats_ctx->stats_ver == PEER_EXT_RATE_STATS ||
+	    soc_stats_ctx->stats_ver == PEER_EXT_ALL_STATS) {
 		stats->rate_stats =
 			qdf_mem_malloc(sizeof(struct wlan_peer_rate_stats));
 		if (!stats->rate_stats) {
@@ -1084,8 +1084,8 @@ void wlan_peer_create_event_handler(void *ctx, enum WDI_EVENT event,
 		}
 	}
 
-	if (soc_stats_ctx->stats_ver == RDK_LINK_STATS ||
-	    soc_stats_ctx->stats_ver == RDK_ALL_STATS) {
+	if (soc_stats_ctx->stats_ver == PEER_EXT_LINK_STATS ||
+	    soc_stats_ctx->stats_ver == PEER_EXT_ALL_STATS) {
 		stats->link_metrics =
 			qdf_mem_malloc(sizeof(struct wlan_peer_link_metrics));
 		if (!stats->link_metrics) {
@@ -1102,8 +1102,8 @@ void wlan_peer_create_event_handler(void *ctx, enum WDI_EVENT event,
 	return;
 
 peer_create_fail2:
-	if (soc_stats_ctx->stats_ver == RDK_RATE_STATS ||
-	    soc_stats_ctx->stats_ver == RDK_ALL_STATS) {
+	if (soc_stats_ctx->stats_ver == PEER_EXT_RATE_STATS ||
+	    soc_stats_ctx->stats_ver == PEER_EXT_ALL_STATS) {
 		qdf_mem_free(stats->rate_stats);
 		stats->rate_stats = NULL;
 	}
