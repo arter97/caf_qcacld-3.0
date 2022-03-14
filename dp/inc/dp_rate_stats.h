@@ -153,17 +153,17 @@ struct wlan_peer_rate_stats_ctx {
 };
 
 /**
- * enum rdk_stats_version - Peer statistics versions
- * @RDK_STATS_DISABLED: peer statistics disabled
- * @RDK_RATE_STATS: peer rate statistics enabled
- * @RDK_LINK_STATS: peer link metrics enabled
- * @RDK_ALL_STATS: peer all statistics enabled
+ * enum peer_extended_stats_version - Peer statistics versions
+ * @PEER_EXT_STATS_DISABLED: peer statistics disabled
+ * @PEER_EXT_RATE_STATS: peer rate statistics enabled
+ * @PEER_EXT_LINK_STATS: peer link metrics enabled
+ * @PEER_EXT_ALL_STATS: peer all statistics enabled
  */
-enum rdk_stats_version {
-	RDK_STATS_DISABLED = 0,
-	RDK_RATE_STATS = 1,
-	RDK_LINK_STATS = 2,
-	RDK_ALL_STATS = 3,
+enum peer_extended_stats_version {
+	PEER_EXT_STATS_DISABLED = 0,
+	PEER_EXT_RATE_STATS = 1,
+	PEER_EXT_LINK_STATS = 2,
+	PEER_EXT_ALL_STATS = 3,
 };
 
 /**
@@ -192,7 +192,7 @@ struct wlan_soc_rate_stats_ctx {
 	uint32_t rxs_cache_hit;
 	uint32_t txs_cache_miss;
 	uint32_t rxs_cache_miss;
-	enum rdk_stats_version stats_ver;
+	enum peer_extended_stats_version stats_ver;
 	bool is_lithium;
 	qdf_spinlock_t tx_ctx_lock;
 	qdf_spinlock_t rx_ctx_lock;
