@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -7665,6 +7665,7 @@ QDF_STATUS csr_roam_copy_profile(struct mac_context *mac,
 	pDstProfile->chan_switch_hostapd_rate_enabled  =
 		pSrcProfile->chan_switch_hostapd_rate_enabled;
 	pDstProfile->force_rsne_override = pSrcProfile->force_rsne_override;
+	pDstProfile->is_hs_20_ap = pSrcProfile->is_hs_20_ap;
 end:
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		csr_release_profile(mac, pDstProfile);
@@ -16854,6 +16855,11 @@ static void csr_roam_link_down(struct mac_context *mac, uint32_t sessionId)
 				       eCSR_ROAM_LOSTLINK,
 				       eCSR_ROAM_RESULT_LOSTLINK);
 	}
+
+	/* In case of STA mode disconnect, stop the roam_invoke timer */
+	if (csr_roam_is_sta_mode(mac, sessionId))
+		csr_roam_invoke_timer_stop(mac, sessionId);
+
 	/* Indicate the neighbor roal algorithm about the disconnect
 	 * indication
 	 */
@@ -17040,7 +17046,9 @@ static void csr_update_btm_offload_config(struct mac_context *mac_ctx,
 		return;
 
 	/* For RSO Stop Disable BTM offload to firmware */
-	if (command == ROAM_SCAN_OFFLOAD_STOP) {
+	if (command == ROAM_SCAN_OFFLOAD_STOP ||
+	    session->pCurRoamProfile->is_hs_20_ap) {
+		sme_debug("RSO cmd: %d", command);
 		*btm_offload_config = 0;
 		return;
 	}
@@ -18674,6 +18682,26 @@ csr_cm_roam_scan_offload_fill_lfr3_config(
 }
 #endif
 
+#ifdef CONFIG_BAND_6GHZ
+static void
+csr_cm_fill_6ghz_dwell_times(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_roam_scan_params *scan_params)
+{
+	wlan_scan_cfg_get_active_6g_dwelltime(
+					psoc,
+					&scan_params->dwell_time_active_6ghz);
+
+	wlan_scan_cfg_get_passive_6g_dwelltime(
+					psoc,
+					&scan_params->dwell_time_passive_6ghz);
+}
+#else
+static inline void
+csr_cm_fill_6ghz_dwell_times(struct wlan_objmgr_psoc *psoc,
+			     struct wlan_roam_scan_params *scan_params)
+{}
+#endif
+
 static void
 csr_cm_roam_scan_offload_fill_scan_params(
 		struct mac_context *mac,
@@ -18794,6 +18822,8 @@ csr_cm_roam_scan_offload_fill_scan_params(
 
 	scan_params->rso_adaptive_dwell_mode =
 		mac->mlme_cfg->lfr.adaptive_roamscan_dwell_mode;
+
+	csr_cm_fill_6ghz_dwell_times(mac->psoc, scan_params);
 }
 
 /**
@@ -21185,7 +21215,6 @@ csr_process_roam_sync_callback(struct mac_context *mac_ctx,
 					   REASON_ROAM_ABORT);
 		csr_roam_roaming_offload_timer_action(mac_ctx,
 				0, session_id, ROAMING_OFFLOAD_TIMER_STOP);
-		csr_roam_invoke_timer_stop(mac_ctx, session_id);
 		csr_roam_call_callback(mac_ctx, session_id, NULL, 0,
 				eCSR_ROAM_ABORT, eCSR_ROAM_RESULT_SUCCESS);
 		goto end;
