@@ -320,7 +320,7 @@ void dfs_cancel_precac_timer(struct wlan_dfs *dfs)
 	struct dfs_soc_priv_obj *dfs_soc_obj;
 
 	dfs_soc_obj = dfs->dfs_soc_obj;
-	qdf_timer_sync_cancel(&dfs_soc_obj->dfs_precac_timer);
+	qdf_hrtimer_cancel(&dfs_soc_obj->dfs_precac_timer);
 	dfs_soc_obj->dfs_precac_timer_running = 0;
 }
 
@@ -401,7 +401,9 @@ void dfs_set_precac_enable(struct wlan_dfs *dfs, uint32_t value)
 #if defined(ATH_SUPPORT_ZERO_CAC_DFS) && !defined(QCA_MCL_DFS_SUPPORT)
 void dfs_zero_cac_timer_detach(struct dfs_soc_priv_obj *dfs_soc_obj)
 {
-	qdf_timer_free(&dfs_soc_obj->dfs_precac_timer);
+	qdf_hrtimer_kill(&dfs_soc_obj->dfs_precac_timer);
+	qdf_flush_work(&dfs_soc_obj->dfs_precac_completion_work);
+	qdf_destroy_work(NULL, &dfs_soc_obj->dfs_precac_completion_work);
 }
 #endif
 
@@ -847,43 +849,69 @@ bool dfs_precac_check_home_chan_change(struct wlan_dfs *dfs)
 }
 #endif
 
+void dfs_process_precac_completion(void *context)
+{
+	struct dfs_soc_priv_obj *dfs_soc_obj =
+					(struct dfs_soc_priv_obj *)context;
+	struct wlan_dfs *dfs = NULL;
+	uint32_t current_time;
+
+	dfs_soc_obj->dfs_precac_timer_running = 0;
+	dfs = dfs_soc_obj->dfs_priv[dfs_soc_obj->cur_agile_dfs_index].dfs;
+
+	if (dfs_is_agile_precac_enabled(dfs)) {
+		current_time = qdf_system_ticks_to_msecs(qdf_system_ticks());
+		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			 "Pre-cac expired, Agile Precac chan %u curr time %d",
+			 dfs->dfs_agile_precac_freq_mhz,
+			 current_time / 1000);
+		dfs_agile_sm_deliver_evt(dfs_soc_obj,
+					 DFS_AGILE_SM_EV_AGILE_DONE,
+					 0, (void *)dfs);
+	}
+}
+
 /**
  * dfs_precac_timeout() - Precac timeout.
  *
  * Removes the channel from precac_required list and adds it to the
  * precac_done_list. Triggers a precac channel change.
  */
-static os_timer_func(dfs_precac_timeout)
+static enum qdf_hrtimer_restart_status
+dfs_precac_timeout(qdf_hrtimer_data_t *arg)
 {
-	struct wlan_dfs *dfs = NULL;
 	struct dfs_soc_priv_obj *dfs_soc_obj = NULL;
 	uint32_t current_time;
+	void *ptr = (void *)arg;
+	qdf_hrtimer_data_t *thr = container_of(ptr, qdf_hrtimer_data_t, u);
 
-	OS_GET_TIMER_ARG(dfs_soc_obj, struct dfs_soc_priv_obj *);
+	dfs_soc_obj = container_of(thr,
+				   struct dfs_soc_priv_obj,
+				   dfs_precac_timer);
+	current_time = qdf_system_ticks_to_msecs(qdf_system_ticks());
+	dfs_info(NULL, WLAN_DEBUG_DFS_ALWAYS,
+		 "inside precactimer: current time %d",
+		 current_time / 1000);
 
-	dfs = dfs_soc_obj->dfs_priv[dfs_soc_obj->cur_agile_dfs_index].dfs;
-	dfs_soc_obj->dfs_precac_timer_running = 0;
+	qdf_sched_work(NULL, &dfs_soc_obj->dfs_precac_completion_work);
 
-	if (dfs_is_agile_precac_enabled(dfs)) {
-	    current_time = qdf_system_ticks_to_msecs(qdf_system_ticks());
-	    dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
-		     "Pre-cac expired, Agile Precac chan %u curr time %d",
-		     dfs->dfs_agile_precac_freq_mhz,
-		     current_time / 1000);
-	    dfs_agile_sm_deliver_evt(dfs_soc_obj,
-				     DFS_AGILE_SM_EV_AGILE_DONE,
-				     0, (void *)dfs);
-	}
+	return QDF_HRTIMER_NORESTART;
 }
 
 #if defined(ATH_SUPPORT_ZERO_CAC_DFS) && !defined(QCA_MCL_DFS_SUPPORT)
 void dfs_zero_cac_timer_init(struct dfs_soc_priv_obj *dfs_soc_obj)
 {
 	dfs_soc_obj->precac_state_started = false;
-	qdf_timer_init(NULL, &dfs_soc_obj->dfs_precac_timer,
-		       dfs_precac_timeout,
-		       (void *)dfs_soc_obj,
-		       QDF_TIMER_TYPE_WAKE_APPS);
+	qdf_hrtimer_init(&dfs_soc_obj->dfs_precac_timer,
+			 dfs_precac_timeout,
+			 QDF_CLOCK_MONOTONIC,
+			 QDF_HRTIMER_MODE_REL,
+			 QDF_CONTEXT_HARDWARE);
+	qdf_create_work(NULL,
+			&dfs_soc_obj->dfs_precac_completion_work,
+			dfs_process_precac_completion,
+			dfs_soc_obj);
+
 }
 #endif
 
@@ -1151,7 +1179,9 @@ void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
 					sub_chans[i],
 					WLAN_EV_PCAC_STARTED);
 
-	qdf_timer_mod(&dfs_soc_obj->dfs_precac_timer, min_precac_timeout);
+	qdf_hrtimer_start(&dfs_soc_obj->dfs_precac_timer,
+			  qdf_time_ms_to_ktime(min_precac_timeout),
+			  QDF_HRTIMER_MODE_REL);
 }
 #endif
 
@@ -1248,7 +1278,9 @@ void dfs_start_precac_timer_for_freq(struct wlan_dfs *dfs,
 					sub_chans[i],
 					WLAN_EV_PCAC_STARTED);
 
-	qdf_timer_mod(&dfs_soc_obj->dfs_precac_timer, (precac_timeout) * 1000);
+	qdf_hrtimer_start(&dfs_soc_obj->dfs_precac_timer,
+			  qdf_time_ms_to_ktime(precac_timeout * 1000),
+			  QDF_HRTIMER_MODE_REL);
 }
 #endif
 
