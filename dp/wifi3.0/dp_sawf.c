@@ -469,7 +469,7 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 }
 
 QDF_STATUS
-dp_sawf_get_msduq_map_info(struct dp_soc *soc, uint8_t peer_id,
+dp_sawf_get_msduq_map_info(struct dp_soc *soc, uint16_t peer_id,
 			   uint8_t host_q_idx,
 			   uint8_t *remaped_tid, uint8_t *target_q_idx)
 {
