@@ -17794,7 +17794,7 @@ static int wlan_hdd_cfg80211_set_ie(struct hdd_adapter *adapter,
 			}
 		case WLAN_ELEMID_RSNXE:
 			hdd_debug("Set RSNXE(len %d)", eLen + 2);
-			status = wlan_hdd_add_assoc_ie(pWextState, genie - 2,
+			status = wlan_hdd_add_assoc_ie(adapter, genie - 2,
 						       eLen + 2);
 			if (status)
 				return status;
