@@ -261,5 +261,51 @@ dp_lite_mon_dealloc(struct dp_pdev *pdev);
  */
 void
 dp_lite_mon_vdev_delete(struct dp_pdev *pdev, struct dp_vdev *vdev);
+
+/**
+ * dp_lite_mon_config_nac_peer - config nac peer and filter
+ * @soc_hdl: dp soc hdl
+ * @vdev_id: vdev id
+ * @cmd: peer cmd
+ * @macaddr: peer mac
+ *
+ * Return: 1 if success, 0 if failure
+ */
+int
+dp_lite_mon_config_nac_peer(struct cdp_soc_t *soc_hdl,
+			    uint8_t vdev_id,
+			    uint32_t cmd, uint8_t *macaddr);
+
+/**
+ * dp_lite_mon_config_nac_rssi_peer - config nac rssi peer
+ * @soc_hdl: dp soc hdl
+ * @cmd: peer cmd
+ * @vdev_id: vdev id
+ * @bssid: peer bssid
+ * @macaddr: peer mac
+ * @chan_num: channel num
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_lite_mon_config_nac_rssi_peer(struct cdp_soc_t *soc_hdl,
+				 uint8_t vdev_id,
+				 enum cdp_nac_param_cmd cmd,
+				 char *bssid, char *macaddr,
+				 uint8_t chan_num);
+
+/**
+ * dp_lite_mon_get_nac_peer_rssi - get nac peer rssi
+ * @soc_hdl: dp soc hdl
+ * @vdev_id: vdev id
+ * @macaddr: peer mac
+ * @rssi: peer rssi
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_lite_mon_get_nac_peer_rssi(struct cdp_soc_t *soc_hdl,
+			      uint8_t vdev_id, char *macaddr,
+			      uint8_t *rssi);
 #endif
 #endif /* _DP_LITE_MON_H_ */

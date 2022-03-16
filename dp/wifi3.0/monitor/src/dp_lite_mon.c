@@ -864,6 +864,205 @@ dp_lite_mon_is_enabled(struct cdp_soc_t *soc_hdl,
 }
 
 /**
+ * dp_lite_mon_config_nac_peer - config nac peer and filter
+ * @soc_hdl: dp soc hdl
+ * @vdev_id: vdev id
+ * @cmd: peer cmd
+ * @macaddr: peer mac
+ *
+ * Return: 1 if success, 0 if failure
+ */
+int
+dp_lite_mon_config_nac_peer(struct cdp_soc_t *soc_hdl,
+			    uint8_t vdev_id,
+			    uint32_t cmd, uint8_t *macaddr)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_vdev *vdev =
+		dp_vdev_get_ref_by_id(soc, vdev_id,
+				      DP_MOD_ID_CDP);
+	struct dp_pdev_be *be_pdev;
+	struct dp_mon_pdev_be *be_mon_pdev;
+	struct dp_lite_mon_config *rx_config;
+	struct cdp_lite_mon_peer_config peer_config;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!vdev || !vdev->pdev || !macaddr) {
+		dp_mon_err("Invalid vdev or macaddr");
+		goto fail;
+	}
+
+	be_pdev = dp_get_be_pdev_from_dp_pdev(vdev->pdev);
+	be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+	if (!be_mon_pdev) {
+		dp_mon_err("Invalid mon pdev");
+		goto fail;
+	}
+
+	/* populate peer config fields */
+	qdf_mem_zero(&peer_config,
+		     sizeof(struct cdp_lite_mon_peer_config));
+	peer_config.direction = CDP_LITE_MON_DIRECTION_RX;
+	peer_config.type = CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED;
+	peer_config.vdev_id = vdev_id;
+	qdf_mem_copy(peer_config.mac, macaddr, QDF_MAC_ADDR_SIZE);
+	if (cmd == DP_NAC_PARAM_ADD)
+		peer_config.action = CDP_LITE_MON_PEER_ADD;
+	else if (cmd == DP_NAC_PARAM_DEL)
+		peer_config.action = CDP_LITE_MON_PEER_REMOVE;
+
+	rx_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	if (peer_config.action == CDP_LITE_MON_PEER_ADD) {
+		/* first neighbor */
+		if (!rx_config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED]) {
+			struct cdp_lite_mon_filter_config filter_config;
+
+			/* setup filter settings */
+			qdf_mem_zero(&filter_config,
+				     sizeof(struct cdp_lite_mon_filter_config));
+			filter_config.disable = 0;
+			filter_config.direction = CDP_LITE_MON_DIRECTION_RX;
+			filter_config.level = CDP_LITE_MON_LEVEL_PPDU;
+			filter_config.data_filter[CDP_LITE_MON_MODE_MD] =
+							CDP_LITE_MON_FILTER_ALL;
+			filter_config.len[CDP_LITE_MON_FRM_TYPE_DATA] =
+							CDP_LITE_MON_LEN_128B;
+			filter_config.metadata = DP_LITE_MON_RTAP_HDR_BITMASK;
+			filter_config.vdev_id = vdev_id;
+			status = dp_lite_mon_set_rx_config(be_pdev,
+							   &filter_config);
+			if (status != QDF_STATUS_SUCCESS)
+				goto fail;
+		}
+
+		/* add peer */
+		status = dp_lite_mon_set_rx_peer_config(soc, be_pdev,
+							&peer_config);
+		if (status != QDF_STATUS_SUCCESS)
+			goto fail;
+	} else if (peer_config.action == CDP_LITE_MON_PEER_REMOVE) {
+		/* remove peer */
+		status = dp_lite_mon_set_rx_peer_config(soc, be_pdev,
+							&peer_config);
+		if (status != QDF_STATUS_SUCCESS)
+			goto fail;
+
+		/* last neighbor */
+		if (!rx_config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED]) {
+			struct cdp_lite_mon_filter_config filter_config;
+
+			/* reset filter settings */
+			qdf_mem_zero(&filter_config,
+				     sizeof(struct cdp_lite_mon_filter_config));
+			filter_config.disable = 1;
+			filter_config.direction = CDP_LITE_MON_DIRECTION_RX;
+			status = dp_lite_mon_set_rx_config(be_pdev,
+							   &filter_config);
+			if (status != QDF_STATUS_SUCCESS)
+				goto fail;
+		}
+	}
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+
+	return 1;
+
+fail:
+	if (vdev)
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+
+	return 0;
+}
+
+/**
+ * dp_lite_mon_get_nac_peer_rssi - get nac peer rssi
+ * @soc_hdl: dp soc hdl
+ * @vdev_id: vdev id
+ * @macaddr: peer mac
+ * @rssi: peer rssi
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_lite_mon_get_nac_peer_rssi(struct cdp_soc_t *soc_hdl,
+			      uint8_t vdev_id, char *macaddr,
+			      uint8_t *rssi)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_vdev *vdev =
+		dp_vdev_get_ref_by_id(soc, vdev_id,
+				      DP_MOD_ID_CDP);
+	struct dp_pdev_be *be_pdev;
+	struct dp_mon_pdev_be *be_mon_pdev;
+	struct dp_lite_mon_config *rx_config;
+	struct dp_lite_mon_rx_config *lite_mon_rx_config;
+	struct dp_lite_mon_peer *peer;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (!vdev || !vdev->pdev || !macaddr) {
+		dp_mon_err("Invalid vdev or macaddr");
+		return status;
+	}
+
+	be_pdev = dp_get_be_pdev_from_dp_pdev(vdev->pdev);
+	be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+	if (!be_mon_pdev) {
+		dp_mon_err("Invalid mon pdev");
+		return status;
+	}
+
+	lite_mon_rx_config = be_mon_pdev->lite_mon_rx_config;
+	rx_config = &lite_mon_rx_config->rx_config;
+	qdf_spin_lock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+	TAILQ_FOREACH(peer, &rx_config->peer_list, peer_list_elem) {
+		if (peer->type !=
+			CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED)
+			continue;
+
+		if (qdf_mem_cmp(&peer->peer_mac.raw[0],
+				macaddr,
+				QDF_MAC_ADDR_SIZE) == 0) {
+			*rssi = peer->rssi;
+			status = QDF_STATUS_SUCCESS;
+			break;
+		}
+	}
+	qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+
+	return status;
+}
+
+/**
+ * dp_lite_mon_config_nac_rssi_peer - config nac rssi peer
+ * @soc_hdl: dp soc hdl
+ * @cmd: peer cmd
+ * @vdev_id: vdev id
+ * @bssid: peer bssid
+ * @macaddr: peer mac
+ * @chan_num: channel num
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_lite_mon_config_nac_rssi_peer(struct cdp_soc_t *soc_hdl,
+				 uint8_t vdev_id,
+				 enum cdp_nac_param_cmd cmd,
+				 char *bssid, char *macaddr,
+				 uint8_t chan_num)
+{
+	int ret;
+
+	ret = dp_lite_mon_config_nac_peer(soc_hdl, vdev_id,
+					  cmd, macaddr);
+	if (!ret) {
+		dp_mon_err("failed to add nac rssi peers");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
  * dp_lite_mon_rx_alloc - alloc lite mon rx context
  * @be_mon_pdev: be dp mon pdev
  *
