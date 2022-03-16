@@ -73,6 +73,7 @@
 #include <wlan_tdls_cfg_api.h>
 #include "cfg_ucfg_api.h"
 #include "wlan_mlme_public_struct.h"
+#include "wlan_mlme_main.h"
 
 static void __lim_init_bss_vars(struct mac_context *mac)
 {
