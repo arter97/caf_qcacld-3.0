@@ -4936,13 +4936,13 @@ static int wlan_hdd_sap_p2p_11ac_overrides(struct hdd_adapter *ap_adapter)
 			 */
 			ucfg_mlme_get_channel_bonding_24ghz(
 				hdd_ctx->psoc, &channel_bonding_mode);
-			if (sap_cfg->ch_width_orig >= eHT_CHANNEL_WIDTH_40MHZ &&
+			if (sap_cfg->ch_width_orig >= CH_WIDTH_40MHZ &&
 			    channel_bonding_mode)
 				sap_cfg->ch_width_orig =
-					eHT_CHANNEL_WIDTH_40MHZ;
+					CH_WIDTH_40MHZ;
 			else
 				sap_cfg->ch_width_orig =
-					eHT_CHANNEL_WIDTH_20MHZ;
+					CH_WIDTH_20MHZ;
 		}
 	}
 
@@ -5898,17 +5898,12 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		sme_config->csr_config.WMMSupportMode = WMM_USER_MODE_NO_QOS;
 	sme_update_config(mac_handle, sme_config);
 
-	if (!((adapter->device_mode == QDF_SAP_MODE) &&
+	if (((adapter->device_mode == QDF_SAP_MODE) &&
 	     (sap_force_11n_for_11ac)) ||
 	     ((adapter->device_mode == QDF_P2P_GO_MODE) &&
 	     (go_force_11n_for_11ac))) {
-		config->ch_width_orig =
-			hdd_map_nl_chan_width(config->ch_width_orig);
-	} else {
-		if (config->ch_width_orig >= NL80211_CHAN_WIDTH_40)
+		if (config->ch_width_orig > CH_WIDTH_40MHZ)
 			config->ch_width_orig = CH_WIDTH_40MHZ;
-		else
-			config->ch_width_orig = CH_WIDTH_20MHZ;
 	}
 
 	if (wlan_hdd_setup_driver_overrides(adapter)) {
@@ -6653,6 +6648,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	bool srd_channel_allowed, disable_nan = true;
 	enum QDF_OPMODE vdev_opmode;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS], i;
+	enum policy_mgr_con_mode intf_pm_mode;
 
 	hdd_enter();
 
@@ -6734,6 +6730,15 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	if (!status)
 		return -EINVAL;
 
+	intf_pm_mode = policy_mgr_convert_device_mode_to_qdf_type(
+							adapter->device_mode);
+	status = policy_mgr_is_multi_sap_allowed_on_same_band(
+				hdd_ctx->pdev,
+				intf_pm_mode,
+				chandef->chan->center_freq);
+	if (!status)
+		return -EINVAL;
+
 	vdev_opmode = wlan_vdev_mlme_get_opmode(adapter->vdev);
 	ucfg_mlme_get_srd_master_mode_for_vdev(hdd_ctx->psoc, vdev_opmode,
 					       &srd_channel_allowed);
@@ -6808,8 +6813,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 
 	/* check if concurrency is allowed */
 	if (!policy_mgr_allow_concurrency(hdd_ctx->psoc,
-				policy_mgr_convert_device_mode_to_qdf_type(
-				adapter->device_mode),
+				intf_pm_mode,
 				freq,
 				channel_width)) {
 		hdd_err("Connection failed due to concurrency check failure");
@@ -6921,7 +6925,7 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 				eSAP_AUTO_SWITCH;
 		}
 		adapter->session.ap.sap_config.ch_width_orig =
-						chandef->width;
+					hdd_map_nl_chan_width(chandef->width);
 
 		/*
 		 * Enable/disable TWT responder based on
