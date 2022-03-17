@@ -3164,7 +3164,7 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"fc_video_stats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_VIDEO_STATS_FC, GET_PARAM, 0},
 	{"fc_delay_stats",
-		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_VIDEO_DELAY_STATS_FC, GET_PARAM, 0},
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_VIDEO_DELAY_STATS_FC, SET_PARAM, 1},
 #endif
 	{"set_retry_stats",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_PEER_RETRY_STATS, SET_PARAM, 1},
