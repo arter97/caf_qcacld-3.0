@@ -1370,6 +1370,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_RC_NSS_PROBE_INTVL_MAX = 503,
 	OL_ATH_PARAM_DISABLE_NSS_PROBE_INTVL = 504,
 #endif
+	OL_ATH_PARAM_ACS_6G_NON_PRIO_CHAN_PENALTY = 505,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3611,6 +3612,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_NSS_PROBE_INTVL,
 		SET_PARAM, 1},
 #endif
+	{"acs_6g_non_prio_chan_penalty",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_NON_PRIO_CHAN_PENALTY,
+		SET_PARAM, 1},
+	{"g_acs_6g_non_prio_chan_penalty",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_NON_PRIO_CHAN_PENALTY,
+		GET_PARAM, 0},
 };
 #endif
 
