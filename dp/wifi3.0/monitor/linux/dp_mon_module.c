@@ -30,6 +30,11 @@
 
 MODULE_LICENSE("Dual BSD/GPL");
 
+extern ol_ath_soc_softc_t *ol_global_soc[GLOBAL_SOC_SIZE];
+extern int ol_num_global_soc;
+#ifdef ATH_AHB
+extern int wifi_exit_in_progress;
+#endif
 QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc);
 void mon_soc_ol_detach(struct wlan_objmgr_psoc *psoc);
 
@@ -202,6 +207,22 @@ void monitor_mod_exit(void)
 	uint8_t pdev_id = 0;
 	uint8_t pdev_count = 0;
 	struct dp_mon_ops *mon_ops;
+	ol_ath_soc_softc_t *temp_soc = NULL;
+
+	for (index = 0; index < ol_num_global_soc; index++) {
+		temp_soc = ol_global_soc[index];
+		if (!temp_soc)
+			continue;
+		while (qdf_atomic_test_bit(SOC_RESET_IN_PROGRESS_BIT,
+					   &temp_soc->reset_in_progress)) {
+			dp_mon_err("Reset in progress SoC ID %d! waiting",
+				   index);
+			qdf_sleep(100);
+		}
+	}
+#ifdef ATH_AHB
+	wifi_exit_in_progress = 1;
+#endif
 
 	for (index = 0; index < WLAN_OBJMGR_MAX_DEVICES; index++) {
 		psoc = g_umac_glb_obj->psoc[index];
