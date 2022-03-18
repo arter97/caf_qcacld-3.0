@@ -162,6 +162,9 @@ QDF_STATUS dp_rx_desc_sanity(struct dp_soc *soc, hal_soc_handle_t hal_soc,
 			     hal_ring_desc_t ring_desc,
 			     struct dp_rx_desc *rx_desc)
 {
+	if (qdf_unlikely(!rx_desc))
+		return QDF_STATUS_E_NULL_VALUE;
+
 	return QDF_STATUS_SUCCESS;
 }
 #endif
