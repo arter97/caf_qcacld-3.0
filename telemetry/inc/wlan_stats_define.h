@@ -519,10 +519,14 @@ struct advance_peer_data_delay {
 
 struct advance_peer_data_sawfdelay {
 	struct stats_if_sawf_delay_stats delay[STATS_IF_MAX_SAWF_DATA_TIDS][STATS_IF_MAX_SAWF_DATA_QUEUE];
+	uint8_t tid;
+	uint8_t msduq;
 };
 
 struct advance_peer_data_sawftx {
 	struct stats_if_sawf_tx_stats tx[STATS_IF_MAX_SAWF_DATA_TIDS][STATS_IF_MAX_SAWF_DATA_QUEUE];
+	uint8_t tid;
+	uint8_t msduq;
 };
 
 /* Advance Peer Ctrl */

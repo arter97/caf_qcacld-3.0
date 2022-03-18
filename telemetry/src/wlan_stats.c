@@ -1473,6 +1473,8 @@ get_advance_peer_data_sawfdelay(struct sawf_delay_stats *sawf_delay_stats,
 		for (idx = 0; idx < mx_buc; idx++)
 			data->delay[0][0].delay_hist.hist.freq[idx] =
 				sawf_delay_stats->delay_hist.hist.freq[idx];
+		data->tid = sawf_delay_stats->tid;
+		data->msduq = sawf_delay_stats->msduq;
 	}
 
 	stats->feat[INX_FEAT_SAWFDELAY] = data;
@@ -1519,6 +1521,9 @@ get_advance_peer_data_sawftx(struct sawf_tx_stats *sawf_tx_stats,
 		data->tx[0][0].tx_failed =
 					sawf_tx_stats->tx_failed;
 		data->tx[0][0].queue_depth = sawf_tx_stats->queue_depth;
+		data->tid = sawf_tx_stats->tid;
+		data->msduq = sawf_tx_stats->msduq;
+
 	}
 
 	stats->feat[INX_FEAT_SAWFTX] = data;
