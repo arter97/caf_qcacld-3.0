@@ -288,6 +288,49 @@ typedef struct rx_mpdu_start hal_rx_mon_mpdu_start_t;
 typedef struct rx_msdu_end hal_rx_mon_msdu_end_t;
 #endif
 
+struct phyrx_common_user_info {
+#ifndef BIG_ENDIAN_HOST
+	uint32_t receive_duration                  : 16,
+		 reserved_0a                       : 16;
+	uint32_t u_sig_puncture_pattern_encoding   :  6,
+		 reserved_1a                       : 26;
+	uint32_t eht_ppdu_type                     :  2,
+		 bss_color_id                      :  6,
+		 dl_ul_flag                        :  1,
+		 txop_duration                     :  7,
+		 cp_setting                        :  2,
+		 ltf_size                          :  2,
+		 spatial_reuse                     :  4,
+		 rx_ndp                            :  1,
+		 dot11be_su_extended               :  1,
+		 reserved_2a                       :  6;
+	uint32_t eht_duplicate                     :  2,
+		 eht_sig_cmn_field_type            :  2,
+		 doppler_indication                :  1,
+		 sta_id                            : 11,
+		 puncture_bitmap                   : 16;
+#else
+	uint32_t reserved_0a                       : 16,
+		 receive_duration                  : 16;
+	uint32_t reserved_1a                       : 26,
+		 u_sig_puncture_pattern_encoding   :  6;
+	uint32_t reserved_2a                       :  6,
+		 dot11be_su_extended               :  1,
+		 rx_ndp                            :  1,
+		 spatial_reuse                     :  4,
+		 ltf_size                          :  2,
+		 cp_setting                        :  2,
+		 txop_duration                     :  7,
+		 dl_ul_flag                        :  1,
+		 bss_color_id                      :  6,
+		 eht_ppdu_type                     :  2;
+	uint32_t puncture_bitmap                   : 16,
+		 sta_id                            : 11,
+		 doppler_indication                :  1,
+		 eht_sig_cmn_field_type            :  2,
+		 eht_duplicate                     :  2;
+#endif
+};
 /*
  * struct mon_destination_drop - monitor drop descriptor
  *
@@ -1366,7 +1409,6 @@ hal_rx_parse_eht_sig_hdr(struct hal_soc *hal_soc, uint8_t *tlv,
 	return HAL_TLV_STATUS_PPDU_NOT_DONE;
 }
 
-#ifdef WLAN_RX_MON_PARSE_CMN_USER_INFO
 static inline uint32_t
 hal_rx_parse_cmn_usr_info(struct hal_soc *hal_soc, uint8_t *tlv,
 			  struct hal_rx_ppdu_info *ppdu_info)
@@ -1388,14 +1430,6 @@ hal_rx_parse_cmn_usr_info(struct hal_soc *hal_soc, uint8_t *tlv,
 
 	return HAL_TLV_STATUS_PPDU_NOT_DONE;
 }
-#else
-static inline uint32_t
-hal_rx_parse_cmn_usr_info(struct hal_soc *hal_soc, uint8_t *tlv,
-			  struct hal_rx_ppdu_info *ppdu_info)
-{
-	return HAL_TLV_STATUS_PPDU_NOT_DONE;
-}
-#endif
 
 static inline enum ieee80211_eht_ru_size
 hal_rx_mon_hal_ru_size_to_ieee80211_ru_size(struct hal_soc *hal_soc,
