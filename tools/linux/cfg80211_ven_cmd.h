@@ -783,6 +783,7 @@ enum {
 	IEEE80211_PARAM_6G_SECURITY_COMP           = 714, /* 6G Security Compliance on/off */
 	IEEE80211_PARAM_6G_KEYMGMT_MASK            = 715, /* 6G Key Mgmt Mask Config */
 	IEEE80211_PARAM_PRB_RETRY                  = 716,   /* Set/Get probe-response frame retry limit */
+	IEEE80211_PARAM_STEALTHDOWN                = 717,  /* Flag to indicate vap down without sending deauth or disassoc */
 };
 
 enum {
@@ -2015,10 +2016,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_he_sounding_mode",    IEEE80211_PARAM_HE_SOUNDING_MODE, GET_PARAM, 0},
 	{"rsn_override",        IEEE80211_PARAM_RSN_OVERRIDE, SET_PARAM, 1},
 	{"g_rsn_override",      IEEE80211_PARAM_RSN_OVERRIDE, GET_PARAM, 0},
-	{"map",                 IEEE80211_PARAM_MAP, SET_PARAM, 1},
-	{"get_map",             IEEE80211_PARAM_MAP, GET_PARAM, 0},
-	{"MapBSSType",          IEEE80211_PARAM_MAP_BSS_TYPE, SET_PARAM, 1},
-	{"get_MapBSSType",      IEEE80211_PARAM_MAP_BSS_TYPE, GET_PARAM, 0},
+	{"stealthdown",         IEEE80211_PARAM_STEALTHDOWN, SET_PARAM, 1},
+	{"g_stealthdown",       IEEE80211_PARAM_STEALTHDOWN, GET_PARAM, 0},
 	{"he_ht_ctrl",          IEEE80211_PARAM_HE_HT_CTRL, SET_PARAM, 1},
 	{"get_he_ht_ctrl",      IEEE80211_PARAM_HE_HT_CTRL, GET_PARAM, 0},
 	{"acsmaxscantime",      IEEE80211_PARAM_MAX_SCAN_TIME_ACS_REPORT, SET_PARAM, 1},
