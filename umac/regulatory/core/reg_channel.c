@@ -213,7 +213,7 @@ reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 	wlan_reg_fill_channel_list_for_pwrmode(pdev, freq, 0,
 					       g_max_width, 0,
 					       &chan_list,
-					       in_6g_pwr_mode);
+					       in_6g_pwr_mode, false);
 
 	for (i = 0; i < chan_list.num_ch_params; i++) {
 		struct ch_params *ch_param = &chan_list.chan_param[i];
@@ -1188,7 +1188,7 @@ reg_get_max_channel_width_without_radar(struct wlan_objmgr_pdev *pdev,
 	wlan_reg_fill_channel_list_for_pwrmode(pdev, freq, 0,
 					       g_max_width, 0,
 					       &chan_list,
-					       REG_CURRENT_PWR_MODE);
+					       REG_CURRENT_PWR_MODE, true);
 
 	for (i = 0; i < chan_list.num_ch_params; i++) {
 		struct ch_params *ch_param = &chan_list.chan_param[i];
@@ -1213,7 +1213,7 @@ reg_get_max_channel_width_without_radar(struct wlan_objmgr_pdev *pdev,
 	reg_get_cur_6g_ap_pwr_type(pdev, &in_6g_pwr_mode);
 	chan_params.ch_width = g_max_width;
 	reg_set_channel_params_for_pwrmode(pdev, freq, 0, &chan_params,
-					   in_6g_pwr_mode);
+					   in_6g_pwr_mode, true);
 	return chan_params.ch_width;
 }
 #endif
