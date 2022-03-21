@@ -798,6 +798,7 @@ enum {
 	IEEE80211_PARAM_VAP_PROFILE_CONFIG         = 737,   /* Per vap resource profile size for EMA non tx vap */
 	IEEE80211_PARAM_DISC_FRM_CLEAR_USR_OVERRIDE = 738,  /* Discovery frame override with OOB */
 	IEEE80211_PARAM_MBSS_GROUP                 = 739,
+	IEEE80211_PARAM_STEALTHDOWN       = 779,  /* Flag to indicate vap down without sending deauth or disassoc */
 };
 
 enum {
@@ -2054,6 +2055,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_map",             IEEE80211_PARAM_MAP, GET_PARAM, 0},
 	{"MapBSSType",          IEEE80211_PARAM_MAP_BSS_TYPE, SET_PARAM, 1},
 	{"get_MapBSSType",      IEEE80211_PARAM_MAP_BSS_TYPE, GET_PARAM, 0},
+	{"stealthdown",         IEEE80211_PARAM_STEALTHDOWN, SET_PARAM, 1},
+	{"g_stealthdown",       IEEE80211_PARAM_STEALTHDOWN, GET_PARAM, 0},
 	{"he_ht_ctrl",          IEEE80211_PARAM_HE_HT_CTRL, SET_PARAM, 1},
 	{"get_he_ht_ctrl",      IEEE80211_PARAM_HE_HT_CTRL, GET_PARAM, 0},
 	{"acsmaxscantime",      IEEE80211_PARAM_MAX_SCAN_TIME_ACS_REPORT, SET_PARAM, 1},
