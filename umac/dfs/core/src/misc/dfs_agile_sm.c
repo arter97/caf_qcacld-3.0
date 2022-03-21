@@ -454,7 +454,6 @@ static bool dfs_agile_state_init_event(void *ctx,
 			 * in any of the radios
 			 */
 			dfs_soc->cur_agile_dfs_index = DFS_PSOC_NO_IDX;
-			dfs_cancel_precac_timer(dfs);
 			dfs_agile_precac_cleanup(dfs);
 			/* Cleanup and wait */
 		}
