@@ -817,6 +817,7 @@ enum {
 	IEEE80211_PARAM_MAX_CAP_AP                 = 776,   /* Advertise Maximum capability of AP */
         IEEE80211_PARAM_NEIG_RPT          = 777,   /* disable/enable inclusion of Neighbor Report bit in Beacon/Probe-Rsp */
 	IEEE80211_PARAM_VDEV_TSF          = 778,
+	IEEE80211_PARAM_STEALTHDOWN       = 779,  /* Flag to indicate vap down without sending deauth or disassoc */
 };
 
 enum {
@@ -2119,6 +2120,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_he_sounding_mode",    IEEE80211_PARAM_HE_SOUNDING_MODE, GET_PARAM, 0},
 	{"rsn_override",        IEEE80211_PARAM_RSN_OVERRIDE, SET_PARAM, 1},
 	{"g_rsn_override",      IEEE80211_PARAM_RSN_OVERRIDE, GET_PARAM, 0},
+	{"stealthdown",         IEEE80211_PARAM_STEALTHDOWN, SET_PARAM, 1},
+	{"g_stealthdown",       IEEE80211_PARAM_STEALTHDOWN, GET_PARAM, 0},
 	{"he_ht_ctrl",          IEEE80211_PARAM_HE_HT_CTRL, SET_PARAM, 1},
 	{"get_he_ht_ctrl",      IEEE80211_PARAM_HE_HT_CTRL, GET_PARAM, 0},
 	{"acsmaxscantime",      IEEE80211_PARAM_MAX_SCAN_TIME_ACS_REPORT, SET_PARAM, 1},
