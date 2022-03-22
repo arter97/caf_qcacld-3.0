@@ -484,7 +484,7 @@ struct sap_config {
 	uint32_t chan_freq;          /* Operation channel frequency */
 	uint32_t sec_ch_freq;
 	struct ch_params ch_params;
-	uint32_t ch_width_orig;
+	enum phy_ch_width ch_width_orig;
 	uint8_t max_num_sta;      /* maximum number of STAs in station table */
 	uint8_t dtim_period;      /* dtim interval */
 	uint16_t num_accept_mac;
