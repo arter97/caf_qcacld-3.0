@@ -350,18 +350,18 @@ void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 				 enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
- * wlan_reg_filter_wireless_modes() - Filter out the wireless modes
+ * wlan_reg_get_wmodes_and_max_chwidth() - Filter out the wireless modes
  * that are not supported by the available regulatory channels.
  * @pdev: Pointer to pdev.
  * @mode_select: Wireless modes to be filtered.
  * @include_nol_chan: boolean to indicate whether NOL channels are to be
  * considered as available channels.
  *
- * Return: Void.
+ * Return: Max channel width
  */
-void wlan_reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
-				    uint64_t *mode_select,
-				    bool include_nol_chan);
+uint16_t wlan_reg_get_wmodes_and_max_chwidth(struct wlan_objmgr_pdev *pdev,
+					     uint64_t *mode_select,
+					     bool include_nol_chan);
 
 /**
  * wlan_reg_get_client_power_for_rep_ap() - Get the client power for the

@@ -1236,9 +1236,9 @@ reg_remove_320mhz_modes(int max_bw, uint64_t *wireless_modes)
 }
 #endif
 
-void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
-			       uint64_t *mode_select,
-			       bool include_nol_chan)
+uint16_t reg_get_wmodes_and_max_chwidth(struct wlan_objmgr_pdev *pdev,
+					uint64_t *mode_select,
+					bool include_nol_chan)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	uint64_t in_wireless_modes = *mode_select;
@@ -1251,19 +1251,19 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 
 	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
 		reg_err("pdev reg obj is NULL");
-		return;
+		return 0;
 	}
 
 	chan_list = qdf_mem_malloc(NUM_CHANNELS * sizeof(*chan_list));
 	if (!chan_list)
-		return;
+		return 0;
 
 	for (pwr_mode = REG_AP_LPI; pwr_mode <= REG_CLI_SUB_VLP; pwr_mode++) {
 
 		qdf_mem_zero(chan_list, NUM_CHANNELS * sizeof(*chan_list));
 		if (reg_get_pwrmode_chan_list(pdev, chan_list, pwr_mode)) {
 			qdf_mem_free(chan_list);
-			return;
+			return 0;
 		}
 
 		for (i = 0; i < NUM_CHANNELS; i++) {
@@ -1320,6 +1320,8 @@ void reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
 
 	reg_remove_320mhz_modes(max_bw, &in_wireless_modes);
 	*mode_select = in_wireless_modes;
+
+	return max_bw;
 }
 
 QDF_STATUS

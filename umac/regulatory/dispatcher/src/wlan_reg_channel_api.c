@@ -250,11 +250,11 @@ void wlan_reg_get_channel_params(struct wlan_objmgr_pdev *pdev,
 			       in_6g_pwr_mode);
 }
 
-void wlan_reg_filter_wireless_modes(struct wlan_objmgr_pdev *pdev,
-				    uint64_t *mode_select,
-				    bool include_nol_chan)
+uint16_t wlan_reg_get_wmodes_and_max_chwidth(struct wlan_objmgr_pdev *pdev,
+					     uint64_t *mode_select,
+					     bool include_nol_chan)
 {
-	reg_filter_wireless_modes(pdev, mode_select, include_nol_chan);
+    return reg_get_wmodes_and_max_chwidth(pdev, mode_select, include_nol_chan);
 }
 
 QDF_STATUS
