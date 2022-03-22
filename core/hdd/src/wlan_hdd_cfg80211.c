@@ -21384,7 +21384,7 @@ int wlan_hdd_disconnect(struct hdd_adapter *adapter, u16 reason,
 
 	/* Disable STA power-save mode */
 	if ((adapter->device_mode == QDF_STA_MODE) &&
-	    wlan_hdd_set_powersave(adapter, false, 0))
+	    wlan_hdd_set_powersave(adapter, false, 0, false))
 		hdd_debug("Not disable PS for STA");
 
 	wlan_rec_conn_info(adapter->vdev_id, DEBUG_CONN_DISCONNECT,
