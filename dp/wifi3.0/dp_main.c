@@ -10981,6 +10981,7 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 	.txrx_update_peer_pkt_capture_params =
 		 dp_peer_update_pkt_capture_params,
 #endif /* WLAN_TX_PKT_CAPTURE_ENH || WLAN_RX_PKT_CAPTURE_ENH */
+	.txrx_peer_flush_frags = dp_peer_flush_frags,
 };
 
 static struct cdp_me_ops dp_ops_me = {
