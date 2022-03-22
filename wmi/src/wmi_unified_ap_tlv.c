@@ -3451,6 +3451,63 @@ send_set_nss_probe_intvl_cmd_tlv(struct wmi_unified *wmi_handle,
 
 #define SAWF_CONFIG_PARAM_MAX 0xFFFFFFFF
 
+static uint32_t sawf_tid_infer(wmi_sawf_svc_class_cfg_cmd_fixed_param *p_cmd)
+{
+	uint32_t delay_bound_present, time_to_live_present, svc_interval_present;
+	uint8_t tid;
+
+	delay_bound_present =
+		p_cmd->delay_bound_ms != WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_DELAY_BOUND;
+	time_to_live_present =
+		p_cmd->time_to_live_ms != WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_TIME_TO_LIVE;
+	svc_interval_present =
+		p_cmd->svc_interval_ms != WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_SVC_INTERVAL;
+
+	tid = 0; /* default */
+	if (delay_bound_present) {
+		if (SAWF_TID_INFER_LESS_THAN(delay_bound_ms,
+					     DELAY_BOUND_ULTRA_LOW)) {
+			tid = 7;
+		} else if (SAWF_TID_INFER_LESS_THAN(delay_bound_ms,
+						    DELAY_BOUND_LOW)) {
+			tid = 6;
+		} else if (SAWF_TID_INFER_LESS_THAN(delay_bound_ms,
+						    DELAY_BOUND_MID)) {
+			tid = 4;
+			if (time_to_live_present &&
+			    (SAWF_TID_INFER_LESS_THAN(time_to_live_ms,
+						      TIME_TO_LIVE_MID)))
+				tid = 5;
+		} else if (SAWF_TID_INFER_LESS_THAN(delay_bound_ms,
+						    DELAY_BOUND_HIGH)) {
+			tid = 4;
+			if (svc_interval_present) {
+				if (SAWF_TID_INFER_LESS_THAN(svc_interval_ms,
+							     SVC_INTERVAL_ULTRA_LOW))
+					tid = 7;
+			else if (SAWF_TID_INFER_LESS_THAN(svc_interval_ms,
+							  SVC_INTERVAL_LOW))
+					tid = 6;
+			}
+		}
+	} else if (svc_interval_present) {
+		if (SAWF_TID_INFER_LESS_THAN(svc_interval_ms,
+					     SVC_INTERVAL_ULTRA_LOW))
+			tid = 7;
+		else if (SAWF_TID_INFER_LESS_THAN(svc_interval_ms,
+						  SVC_INTERVAL_LOW))
+			tid = 6;
+	} else if (time_to_live_present) {
+		if (SAWF_TID_INFER_LESS_THAN(time_to_live_ms,
+					     TIME_TO_LIVE_ULTRA_LOW))
+			tid = 7;
+		else if (SAWF_TID_INFER_LESS_THAN(time_to_live_ms,
+						  TIME_TO_LIVE_LOW))
+			tid = 6;
+	}
+	return tid;
+}
+
 static void sawf_create_set_defaults(struct wmi_sawf_params *param)
 {
 	if (param->min_thruput_rate == SAWF_CONFIG_PARAM_MAX)
@@ -3488,6 +3545,7 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 	QDF_STATUS ret;
 	wmi_sawf_svc_class_cfg_cmd_fixed_param *cmd;
 	wmi_buf_t buf;
+	uint8_t tid;
 	uint16_t len = sizeof(*cmd);
 
 	buf = wmi_buf_alloc(wmi_handle, len);
@@ -3513,6 +3571,12 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->priority = param->priority;
 	cmd->tid = param->tid;
 	cmd->msdu_loss_rate_ppm = param->msdu_rate_loss;
+
+	if (param->tid == WMI_SAWF_SVC_CLASS_PARAM_DEFAULT_TID) {
+		tid = sawf_tid_infer(cmd);
+		cmd->tid = tid;
+		param->tid = tid;
+	}
 
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 				   WMI_SAWF_SVC_CLASS_CFG_CMDID);

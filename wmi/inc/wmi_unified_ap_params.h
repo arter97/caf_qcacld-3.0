@@ -28,6 +28,17 @@
 /* Civic information size in bytes */
 #define CIVIC_INFO_LEN 256
 
+#define DELAY_BOUND_ULTRA_LOW 10
+#define DELAY_BOUND_LOW 100
+#define DELAY_BOUND_MID 200
+#define DELAY_BOUND_HIGH 300
+#define SVC_INTERVAL_ULTRA_LOW 20
+#define SVC_INTERVAL_LOW 50
+#define TIME_TO_LIVE_ULTRA_LOW 20
+#define TIME_TO_LIVE_LOW 200
+#define TIME_TO_LIVE_MID 250
+#define SAWF_TID_INFER_LESS_THAN(param, threshold) \
+	p_cmd->param < threshold
 /**
  * wmi_wifi_pos_lcr_info - LCR info structure
  * @pdev_id: host pdev id
