@@ -87,6 +87,7 @@ static inline bool is_no_backhaul_radio(struct wiphy *no_bl_wiphy)
 
 static inline bool is_other_fast_lane_radio_primary(struct wiphy *fl_wiphy)
 {
+	QDF_STATUS status;
 	qdf_list_node_t *next_node = NULL;
 
 	if (!fl_wiphy) {
@@ -98,9 +99,9 @@ static inline bool is_other_fast_lane_radio_primary(struct wiphy *fl_wiphy)
 	}
 
 	qdf_spin_lock(&qca_multi_link_cfg.radio_lock);
-	qdf_list_peek_front(&qca_multi_link_cfg.radio_list,
-			   (qdf_list_node_t **)&next_node);
-	while (next_node) {
+	status = qdf_list_peek_front(&qca_multi_link_cfg.radio_list,
+				     (qdf_list_node_t **)&next_node);
+	while (QDF_IS_STATUS_SUCCESS(status)) {
 		qca_multi_link_radio_node_t *radio_node
 		= (qca_multi_link_radio_node_t *)next_node;
 		if ((radio_node->wiphy != fl_wiphy) &&
@@ -109,6 +110,8 @@ static inline bool is_other_fast_lane_radio_primary(struct wiphy *fl_wiphy)
 			qdf_spin_unlock(&qca_multi_link_cfg.radio_lock);
 			return true;
 		}
+		status = qdf_list_peek_next(&qca_multi_link_cfg.radio_list,
+					    next_node, &next_node);
 	}
 	qdf_spin_unlock(&qca_multi_link_cfg.radio_lock);
 	return false;
