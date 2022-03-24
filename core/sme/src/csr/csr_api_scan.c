@@ -3026,10 +3026,16 @@ void csr_init_occupied_channels_list(struct mac_context *mac_ctx,
 	tListElem *scan_entry = NULL;
 	struct tag_csrscan_result *bss_desc = NULL;
 	tDot11fBeaconIEs *ie_ptr = NULL;
-	tpCsrNeighborRoamControlInfo neighbor_roam_info =
-		&mac_ctx->roam.neighborRoamInfo[sessionId];
+	tpCsrNeighborRoamControlInfo neighbor_roam_info;
 
-	if (neighbor_roam_info->cfgParams.channelInfo.numOfChannels) {
+	if (!(mac_ctx && mac_ctx->roam.roamSession &&
+	      CSR_IS_SESSION_VALID(mac_ctx, sessionId))) {
+		sme_debug("Invalid session");
+		return;
+	}
+	neighbor_roam_info = &mac_ctx->roam.neighborRoamInfo[sessionId];
+
+	if (neighbor_roam_info->cfgParams.specific_chan_info.numOfChannels) {
 		/*
 		 * Ini file contains neighbor scan channel list, hence NO need
 		 * to build occupied channel list"
