@@ -3106,4 +3106,23 @@ bool wlan_mlme_is_local_tpe_pref(struct wlan_objmgr_psoc *psoc);
  * operating in 2G/5G bands, false if host should always consider TPE IE values
  */
 bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc);
+
+#ifdef WLAN_FEATURE_P2P_P2P_STA
+/**
+ * wlan_mlme_get_p2p_p2p_conc_support() - Get p2p+p2p conc support
+ *
+ * @psoc: pointer to psoc object
+ * @val : value
+ *
+ * Return: Success/failure
+ */
+bool
+wlan_mlme_get_p2p_p2p_conc_support(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+wlan_mlme_get_p2p_p2p_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
 #endif /* _WLAN_MLME_API_H_ */

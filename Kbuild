@@ -391,6 +391,10 @@ HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_swlm.o
 endif
 endif
 
+ifeq ($(CONFIG_DP_PKT_ADD_TIMESTAMP), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_add_timestamp.o
+endif
+
 ifeq ($(CONFIG_QCACLD_FEATURE_FW_STATE), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_fw_state.o
 endif
@@ -840,6 +844,10 @@ endif
 
 ifeq ($(CONFIG_IPA_OFFLOAD), y)
 QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_ipa.o
+endif
+
+ifeq ($(CONFIG_DP_PKT_ADD_TIMESTAMP), y)
+QDF_OBJS += $(QDF_LINUX_OBJ_DIR)/qdf_pkt_add_timestamp.o
 endif
 
 # enable CPU hotplug support if SMP is enabled
@@ -2798,6 +2806,7 @@ cppflags-$(CONFIG_WLAN_SYSFS_HE_BSS_COLOR) += -DWLAN_SYSFS_HE_BSS_COLOR
 cppflags-$(CONFIG_WLAN_SYSFS_STA_INFO) += -DWLAN_SYSFS_STA_INFO
 cppflags-$(CONFIG_WLAN_DL_MODES) += -DCONFIG_WLAN_DL_MODES
 cppflags-$(CONFIG_WLAN_THERMAL_MULTI_CLIENT_SUPPORT) += -DFEATURE_WPSS_THERMAL_MITIGATION
+cppflags-$(CONFIG_DP_PKT_ADD_TIMESTAMP) += -DCONFIG_DP_PKT_ADD_TIMESTAMP
 
 ifeq ($(CONFIG_LEAK_DETECTION), y)
 cppflags-y += \
@@ -2838,6 +2847,7 @@ cppflags-y += -DCONN_MGR_ADV_FEATURE
 cppflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_ROAM_OFFLOAD
 
 cppflags-$(CONFIG_WLAN_FEATURE_MBSSID) += -DWLAN_FEATURE_MBSSID
+cppflags-$(CONFIG_WLAN_FEATURE_P2P_P2P_STA) += -DWLAN_FEATURE_P2P_P2P_STA
 
 ifeq (y,$(findstring y, $(CONFIG_CNSS_GENL) $(CONFIG_CNSS_GENL_MODULE)))
 cppflags-y += -DCNSS_GENL

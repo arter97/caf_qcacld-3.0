@@ -4802,3 +4802,12 @@ bool wlan_mlme_skip_tpe(struct wlan_objmgr_psoc *psoc)
 
 	return mlme_obj->cfg.power.skip_tpe;
 }
+
+#ifdef WLAN_FEATURE_P2P_P2P_STA
+bool
+wlan_mlme_get_p2p_p2p_conc_support(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_psoc_nif_fw_ext_cap_get(psoc,
+					    WLAN_SOC_EXT_P2P_P2P_CONC_SUPPORT);
+}
+#endif
