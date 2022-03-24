@@ -2448,4 +2448,14 @@ enum channel_state reg_get_chan_state(struct wlan_objmgr_pdev *pdev,
 				      enum supported_6g_pwr_types
 				      in_6g_pwr_mode,
 				      bool treat_nol_chan_as_disabled);
+
+/**
+ * reg_get_regd_rules() - provides the reg domain rules info
+ * @pdev: pdev pointer
+ * @reg_rules: regulatory rules
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_get_regd_rules(struct wlan_objmgr_pdev *pdev,
+			      struct reg_rule_info *reg_rules);
 #endif
