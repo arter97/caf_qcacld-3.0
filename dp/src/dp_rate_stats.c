@@ -594,7 +594,7 @@ __wlan_peer_update_rx_rate_stats(struct wlan_rx_rate_stats *__rx_stats,
 	__rx_stats->num_retries += ppdu_user->retries;
 	__rx_stats->num_ppdus += 1;
 
-	if (cdp_rx_ppdu->u.gi)
+	if (cdp_rx_ppdu->u.gi == CDP_SGI_0_4_US)
 		__rx_stats->num_sgi++;
 
 	qdf_ewma_rx_rssi_add(&__rx_stats->avg_rssi, cdp_rx_ppdu->rssi);
