@@ -22,6 +22,7 @@
 #include <dp_htt.h>
 #include <dp_sawf.h>
 #include <dp_sawf_htt.h>
+#include "cdp_txrx_cmn_reg.h"
 
 #define HTT_MSG_BUF_SIZE(msg_bytes) \
 	((msg_bytes) + HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING)
@@ -31,6 +32,40 @@ dp_htt_h2t_send_complete_free_netbuf(void *soc, A_STATUS status,
 				     qdf_nbuf_t netbuf)
 {
 	qdf_nbuf_free(netbuf);
+}
+
+QDF_STATUS
+dp_htt_sawf_get_host_queue(struct dp_soc *soc, uint32_t *msg_word,
+			   uint8_t *host_queue)
+{
+	uint8_t cl_info, fl_override, hlos_tid;
+	uint16_t ast_idx;
+	hlos_tid = HTT_T2H_SAWF_MSDUQ_INFO_HTT_HLOS_TID_GET(*msg_word);
+	ast_idx = HTT_T2H_SAWF_MSDUQ_INFO_HTT_AST_LIST_IDX_GET(*msg_word);
+
+	qdf_assert_always((hlos_tid >= 0) || (hlos_tid <= DP_SAWF_TID_MAX));
+
+	switch (soc->arch_id) {
+	case CDP_ARCH_TYPE_LI:
+		*host_queue = DP_SAWF_DEFAULT_Q_MAX +
+			      (ast_idx - 2) * DP_SAWF_TID_MAX + hlos_tid;
+		qdf_assert_always((ast_idx == 2) || (ast_idx == 3));
+		break;
+	case CDP_ARCH_TYPE_BE:
+		cl_info =
+		HTT_T2H_SAWF_MSDUQ_INFO_HTT_WHO_CLASS_INFO_SEL_GET(*msg_word);
+		fl_override =
+		HTT_T2H_SAWF_MSDUQ_INFO_HTT_FLOW_OVERRIDE_GET(*msg_word);
+		*host_queue = (cl_info * DP_SAWF_DEFAULT_Q_MAX) + (fl_override)
+			       + (hlos_tid << 1);
+		break;
+	default:
+		dp_err("unkonwn arch_id 0x%x", soc->arch_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+	qdf_info("|AST idx: %d|HLOS TID:%d", ast_idx, hlos_tid);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
@@ -307,13 +342,13 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 	uint16_t peer_id;
 	struct dp_peer *peer;
 	struct dp_peer_sawf *sawf_ctx;
-	uint16_t ast_idx;
-	uint8_t hlos_tid, tid_queue;
+	uint8_t tid_queue;
 	uint8_t host_queue, remapped_tid;
 	struct dp_sawf_msduq *msduq;
 	struct dp_sawf_msduq_tid_map msduq_map;
 	uint8_t host_tid_queue;
 	uint8_t msduq_index = 0;
+	struct dp_peer *primary_link_peer = NULL;
 
 	peer_id = HTT_T2H_SAWF_MSDUQ_INFO_HTT_PEER_ID_GET(*msg_word);
 	tid_queue = HTT_T2H_SAWF_MSDUQ_INFO_HTT_QTYPE_GET(*msg_word);
@@ -325,6 +360,23 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (IS_MLO_DP_MLD_PEER(peer)) {
+		primary_link_peer = dp_get_primary_link_peer_by_id(soc->dp_soc,
+					peer->peer_id, DP_MOD_ID_SAWF);
+		if (!primary_link_peer) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			qdf_err("Invalid peer");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		/*
+		 * Release the MLD-peer reference.
+		 * Hold only primary link ref now.
+		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		peer = primary_link_peer;
+	}
+
 	sawf_ctx = dp_peer_sawf_ctx_get(peer);
 	if (!sawf_ctx) {
 		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
@@ -334,17 +386,16 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 
 	msg_word++;
 	remapped_tid = HTT_T2H_SAWF_MSDUQ_INFO_HTT_REMAP_TID_GET(*msg_word);
-	hlos_tid = HTT_T2H_SAWF_MSDUQ_INFO_HTT_HLOS_TID_GET(*msg_word);
-	ast_idx = HTT_T2H_SAWF_MSDUQ_INFO_HTT_AST_LIST_IDX_GET(*msg_word);
 
-	host_queue = DP_SAWF_DEFAULT_Q_MAX +
-		     (ast_idx - 2) * DP_SAWF_TID_MAX + hlos_tid;
+	if (dp_htt_sawf_get_host_queue(soc->dp_soc, msg_word, &host_queue) ==
+		QDF_STATUS_E_FAILURE) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		qdf_err("Invalid host queue");
+		return QDF_STATUS_E_FAILURE;
+	}
 
-	qdf_info("|AST idx: %d|HLOS TID:%d|TID Q:%d|Remapped TID:%d|Host Q:%d|",
-		 ast_idx, hlos_tid, tid_queue, remapped_tid, host_queue);
-
-	qdf_assert_always((ast_idx == 2) || (ast_idx == 3));
-	qdf_assert_always((hlos_tid >= 0) || (hlos_tid <= DP_SAWF_TID_MAX));
+	qdf_info("|TID Q:%d|Remapped TID:%d|Host Q:%d|",
+		 tid_queue, remapped_tid, host_queue);
 
 	host_tid_queue = tid_queue - DP_SAWF_DEFAULT_Q_PTID_MAX;
 

@@ -1107,6 +1107,7 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	uint8_t vdev_id;
 	uint8_t i = 1;
 	struct dp_peer *peer = NULL;
+	struct dp_peer *primary_link_peer = NULL;
 	struct dp_soc *soc = NULL;
 	uint16_t peer_id;
 	uint8_t q_id;
@@ -1124,17 +1125,31 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	peer_id = dp_sawf_get_peerid(soc, dest_mac, vdev_id);
-	if (peer_id == HTT_INVALID_PEER)
-		return DP_SAWF_PEER_Q_INVALID;
-
-	peer = dp_peer_get_ref_by_id(soc, peer_id,
-				     DP_MOD_ID_SAWF);
-
+	peer = soc->arch_ops.dp_find_peer_by_destmac(soc,
+					dest_mac, vdev_id);
 	if (!peer) {
 		qdf_warn("NULL peer");
 		return DP_SAWF_PEER_Q_INVALID;
 	}
+
+	if (IS_MLO_DP_MLD_PEER(peer)) {
+		primary_link_peer = dp_get_primary_link_peer_by_id(soc,
+					peer->peer_id,
+					DP_MOD_ID_SAWF);
+		if (!primary_link_peer) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			qdf_warn("NULL peer");
+			return DP_SAWF_PEER_Q_INVALID;
+		}
+
+		/*
+		 * Release the MLD-peer reference.
+		 * Hold only primary link ref now.
+		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		peer = primary_link_peer;
+	}
+	peer_id = peer->peer_id;
 
 	/*
 	 * First loop to go through all msdu queues of peer which
