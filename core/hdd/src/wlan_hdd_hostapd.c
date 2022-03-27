@@ -3235,10 +3235,10 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 }
 
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-void hdd_sap_restart_with_channel_switch(struct hdd_adapter *ap_adapter,
-					uint32_t target_chan_freq,
-					uint32_t target_bw,
-					bool forced)
+QDF_STATUS hdd_sap_restart_with_channel_switch(struct hdd_adapter *ap_adapter,
+					       uint32_t target_chan_freq,
+					       uint32_t target_bw,
+					       bool forced)
 {
 	struct net_device *dev = ap_adapter->dev;
 	int ret;
@@ -3247,32 +3247,33 @@ void hdd_sap_restart_with_channel_switch(struct hdd_adapter *ap_adapter,
 
 	if (!dev) {
 		hdd_err("Invalid dev pointer");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	ret = hdd_softap_set_channel_change(dev, target_chan_freq,
 					    target_bw, forced);
 	if (ret) {
 		hdd_err("channel switch failed");
-		return;
 	}
+
+	return qdf_status_from_os_return(ret);
 }
 
-void hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
-				    uint8_t vdev_id, uint32_t ch_freq,
-				    uint32_t channel_bw,
-				    bool forced)
+QDF_STATUS hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id, uint32_t ch_freq,
+					  uint32_t channel_bw, bool forced)
 {
 	struct hdd_adapter *ap_adapter =
 		wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
 
 	if (!ap_adapter) {
 		hdd_err("Adapter is NULL");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
-	hdd_sap_restart_with_channel_switch(ap_adapter,
-					    ch_freq,
-					    channel_bw, forced);
+
+	return hdd_sap_restart_with_channel_switch(ap_adapter,
+						   ch_freq,
+						   channel_bw, forced);
 }
 
 void wlan_hdd_set_sap_csa_reason(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -3305,6 +3306,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	struct sap_context *sap_context;
 	enum sap_csa_reason_code csa_reason =
 		CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
+	QDF_STATUS status;
 
 	if (!ap_adapter) {
 		hdd_err("ap_adapter is NULL");
@@ -3418,17 +3420,28 @@ sap_restart:
 		wlansap_get_csa_chanwidth_from_phymode(
 					sap_context, intf_ch_freq,
 					&ch_params);
+
+	hdd_debug("mhz_freq_seg0: %d, ch_width: %d",
+		  ch_params.mhz_freq_seg0, ch_params.ch_width);
+	if (sap_context->csa_reason == CSA_REASON_UNSAFE_CHANNEL &&
+	    (!policy_mgr_check_bw_with_unsafe_chan_freq(hdd_ctx->psoc,
+							ch_params.mhz_freq_seg0,
+							ch_params.ch_width))) {
+		hdd_debug("SAP bw shrink to 20M for unsafe");
+		ch_params.ch_width = CH_WIDTH_20MHZ;
+	}
+
 	hdd_debug("SAP restart orig chan freq: %d, new freq: %d bw %d",
 		  hdd_ap_ctx->sap_config.chan_freq, intf_ch_freq,
 		  ch_params.ch_width);
 	hdd_ap_ctx->bss_stop_reason = BSS_STOP_DUE_TO_MCC_SCC_SWITCH;
 	*ch_freq = intf_ch_freq;
 	hdd_debug("SAP channel change with CSA/ECSA");
-	hdd_sap_restart_chan_switch_cb(psoc, vdev_id, *ch_freq,
-				       ch_params.ch_width, false);
+	status = hdd_sap_restart_chan_switch_cb(psoc, vdev_id, *ch_freq,
+						ch_params.ch_width, false);
 	wlansap_context_put(sap_context);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 QDF_STATUS

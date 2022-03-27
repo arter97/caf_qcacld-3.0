@@ -626,6 +626,18 @@ QDF_STATUS policy_mgr_change_mcc_go_beacon_interval(
 
 #if defined(FEATURE_WLAN_MCC_TO_SCC_SWITCH)
 /**
+ * policy_mgr_check_bw_with_unsafe_chan_freq() - valid SAP channel bw against
+ *                                               unsafe channel list
+ * @psoc: PSOC object information
+ * @center_freq: SAP channel center frequency
+ *
+ * Return: true if no unsafe channel fall in SAP channel bandwidth range,
+ *         false otherwise
+ */
+bool policy_mgr_check_bw_with_unsafe_chan_freq(struct wlan_objmgr_psoc *psoc,
+					       qdf_freq_t center_freq,
+					       enum phy_ch_width ch_width);
+/**
  * policy_mgr_change_sap_channel_with_csa() - Move SAP channel using (E)CSA
  * @psoc: PSOC object information
  * @vdev_id: Vdev id
@@ -635,17 +647,18 @@ QDF_STATUS policy_mgr_change_mcc_go_beacon_interval(
  *
  * Invoke the callback function to change SAP channel using (E)CSA
  *
- * Return: None
+ * Return: QDF_STATUS_SUCCESS on success
  */
-void policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id, uint32_t ch_freq,
-					    uint32_t ch_width, bool forced);
+QDF_STATUS
+policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id, uint32_t ch_freq,
+				       uint32_t ch_width, bool forced);
 
 #else
-static inline void policy_mgr_change_sap_channel_with_csa(
-		struct wlan_objmgr_psoc *psoc,
-		uint8_t vdev_id, uint32_t ch_freq,
-		uint32_t ch_width, bool forced)
+static inline QDF_STATUS
+policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id, uint32_t ch_freq,
+				       uint32_t ch_width, bool forced)
 {
 
 }
@@ -1623,10 +1636,11 @@ struct policy_mgr_sme_cbacks {
  *  based on target channel frequency and concurrent connections.
  */
 struct policy_mgr_hdd_cbacks {
-	void (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
-				uint8_t vdev_id, uint32_t ch_freq,
-				uint32_t channel_bw,
-				bool forced);
+	QDF_STATUS (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
+						 uint8_t vdev_id,
+						 uint32_t ch_freq,
+						 uint32_t channel_bw,
+						 bool forced);
 	QDF_STATUS (*wlan_hdd_get_channel_for_sap_restart)(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id, uint32_t *ch_freq);
