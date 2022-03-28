@@ -1234,6 +1234,7 @@ struct wlan_mlme_ratemask {
  * @enabled_rf_test_mode: Enable/disable the RF test mode config
  * @monitor_mode_concurrency: Monitor mode concurrency supported
  * @ocv_support: FW supports OCV or not
+ * @relaxed_6ghz_conn_policy: 6GHz relaxed connection policy
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1278,6 +1279,9 @@ struct wlan_mlme_generic {
 	bool enabled_rf_test_mode;
 	enum monitor_mode_concurrency monitor_mode_concurrency;
 	bool ocv_support;
+#ifdef CONFIG_BAND_6GHZ
+	bool relaxed_6ghz_conn_policy;
+#endif
 };
 
 /*
