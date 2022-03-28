@@ -348,6 +348,8 @@ wlan_peer_flush_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 		     sizeof(struct wlan_rx_rate_stats));
 	for (idx = 0; idx < WLANSTATS_CACHE_SIZE; idx++)
 		rx_stats->stats[idx].ratecode = INVALID_CACHE_IDX;
+
+	rx_stats->cur_cache_idx = 0;
 }
 
 static void
@@ -408,6 +410,8 @@ wlan_peer_flush_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 	}
 	for (idx = 0; idx < WLANSTATS_CACHE_SIZE; idx++)
 		tx_stats->stats[idx].ratecode = INVALID_CACHE_IDX;
+
+	tx_stats->cur_cache_idx = 0;
 }
 
 static void
