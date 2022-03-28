@@ -14218,8 +14218,8 @@ void sme_add_qcn_ie(mac_handle_t mac_handle, uint8_t *ie_data,
 /**
  * sme_get_status_for_candidate() - Get bss transition status for candidate
  * @mac_handle: Opaque handle to the global MAC context
- * @conn_bss_desc: connected bss descriptor
- * @bss_desc: candidate bss descriptor
+ * @conn_bss: connected bss scan entry
+ * @candidate_bss: candidate bss scan entry
  * @info: candiadate bss information
  * @trans_reason: transition reason code
  * @is_bt_in_progress: bt activity indicator
@@ -14228,8 +14228,8 @@ void sme_add_qcn_ie(mac_handle_t mac_handle, uint8_t *ie_data,
  * @info->status. Otherwise returns false.
  */
 static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
-					 struct bss_description *conn_bss_desc,
-					 struct bss_description *bss_desc,
+					 struct scan_cache_entry *conn_bss,
+					 struct scan_cache_entry *candidate_bss,
 					 struct bss_candidate_info *info,
 					 uint8_t trans_reason,
 					 bool is_bt_in_progress)
@@ -14252,18 +14252,19 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 	 * bss rssi is greater than mbo_current_rssi_thres, then reject the
 	 * candidate with MBO reason code 4.
 	 */
-	if ((bss_desc->rssi < mbo_cfg->mbo_candidate_rssi_thres) &&
-	    (conn_bss_desc->rssi > mbo_cfg->mbo_current_rssi_thres)) {
-		sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" has LOW RSSI(%d), hence reject",
-			QDF_MAC_ADDR_REF(bss_desc->bssId), bss_desc->rssi);
+	if ((candidate_bss->rssi_raw < mbo_cfg->mbo_candidate_rssi_thres) &&
+	    (conn_bss->rssi_raw > mbo_cfg->mbo_current_rssi_thres)) {
+		sme_err("Candidate BSS " QDF_MAC_ADDR_FMT " has LOW RSSI(%d), hence reject",
+			QDF_MAC_ADDR_REF(candidate_bss->bssid.bytes),
+			candidate_bss->rssi_raw);
 		info->status = QCA_STATUS_REJECT_LOW_RSSI;
 		return true;
 	}
 
 	if (trans_reason == MBO_TRANSITION_REASON_LOAD_BALANCING ||
 	    trans_reason == MBO_TRANSITION_REASON_TRANSITIONING_TO_PREMIUM_AP) {
-		bss_chan_freq = bss_desc->chan_freq;
-		conn_bss_chan_freq = conn_bss_desc->chan_freq;
+		bss_chan_freq = candidate_bss->channel.chan_freq;
+		conn_bss_chan_freq = conn_bss->channel.chan_freq;
 		/*
 		 * MCC rejection
 		 * If moving to candidate's channel will result in MCC scenario
@@ -14272,10 +14273,10 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 		 * MBO reason code 3.
 		 */
 		current_rssi_mcc_thres = mbo_cfg->mbo_current_rssi_mcc_thres;
-		if ((conn_bss_desc->rssi > current_rssi_mcc_thres) &&
+		if ((conn_bss->rssi_raw > current_rssi_mcc_thres) &&
 		    csr_is_mcc_channel(mac_ctx, bss_chan_freq)) {
-			sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" causes MCC, hence reject",
-				QDF_MAC_ADDR_REF(bss_desc->bssId));
+			sme_err("Candidate BSS "  QDF_MAC_ADDR_FMT " causes MCC, hence reject",
+				QDF_MAC_ADDR_REF(candidate_bss->bssid.bytes));
 			info->status =
 				QCA_STATUS_REJECT_INSUFFICIENT_QOS_CAPACITY;
 			return true;
@@ -14291,9 +14292,9 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 		if (WLAN_REG_IS_5GHZ_CH_FREQ(conn_bss_chan_freq) &&
 		    WLAN_REG_IS_24GHZ_CH_FREQ(bss_chan_freq) &&
 		    is_bt_in_progress &&
-		    (bss_desc->rssi < mbo_cfg->mbo_candidate_rssi_btc_thres)) {
-			sme_err("Candidate BSS "QDF_MAC_ADDR_FMT" causes BT coex, hence reject",
-				QDF_MAC_ADDR_REF(bss_desc->bssId));
+		    (candidate_bss->rssi_raw < mbo_cfg->mbo_candidate_rssi_btc_thres)) {
+			sme_err("Candidate BSS " QDF_MAC_ADDR_FMT " causes BT coex, hence reject",
+				QDF_MAC_ADDR_REF(candidate_bss->bssid.bytes));
 			info->status =
 				QCA_STATUS_REJECT_EXCESSIVE_DELAY_EXPECTED;
 			return true;
@@ -14311,8 +14312,8 @@ static bool sme_get_status_for_candidate(mac_handle_t mac_handle,
 
 		if (conn_bss_chan_safe && !bss_chan_safe) {
 			sme_err("High interference expected if transitioned to BSS "
-				QDF_MAC_ADDR_FMT" hence reject",
-				QDF_MAC_ADDR_REF(bss_desc->bssId));
+				QDF_MAC_ADDR_FMT " hence reject",
+				QDF_MAC_ADDR_REF(candidate_bss->bssid.bytes));
 			info->status =
 				QCA_STATUS_REJECT_HIGH_INTERFERENCE;
 			return true;
@@ -14331,48 +14332,57 @@ QDF_STATUS sme_get_bss_transition_status(mac_handle_t mac_handle,
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct bss_description *bss_desc, *conn_bss_desc;
-	tCsrScanResultInfo *res, *conn_res;
 	uint16_t i;
+	qdf_list_t *bssid_list = NULL, *candidate_list = NULL;
+	struct scan_cache_node *conn_bss = NULL, *candidate_bss = NULL;
+	qdf_list_node_t *cur_lst = NULL;
 
 	if (!n_candidates || !info) {
 		sme_err("No candidate info available");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	conn_res = qdf_mem_malloc(sizeof(tCsrScanResultInfo));
-	if (!conn_res)
-		return QDF_STATUS_E_NOMEM;
-
-	res = qdf_mem_malloc(sizeof(tCsrScanResultInfo));
-	if (!res) {
-		status = QDF_STATUS_E_NOMEM;
-		goto free;
-	}
-
 	/* Get the connected BSS descriptor */
-	status = csr_scan_get_result_for_bssid(mac_ctx, bssid, conn_res);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		sme_err("Failed to find connected BSS in scan list");
-		goto free;
+	status = csr_scan_get_result_for_bssid(mac_ctx, bssid, &bssid_list);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_err("connected BSS: " QDF_MAC_ADDR_FMT " not present in scan db",
+			QDF_MAC_ADDR_REF(bssid->bytes));
+		goto purge;
 	}
-	conn_bss_desc = &conn_res->BssDescriptor;
+	qdf_list_peek_front(bssid_list, &cur_lst);
+	if (!cur_lst) {
+		sme_err("Failed to peek connected BSS : " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(bssid->bytes));
+		goto purge;
+	}
+
+	conn_bss =
+		qdf_container_of(cur_lst, struct scan_cache_node, node);
 
 	for (i = 0; i < n_candidates; i++) {
 		/* Get candidate BSS descriptors */
 		status = csr_scan_get_result_for_bssid(mac_ctx, &info[i].bssid,
-						       res);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			sme_err("BSS "QDF_MAC_ADDR_FMT" not present in scan list",
+						       &candidate_list);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			sme_err("BSS " QDF_MAC_ADDR_FMT " not present in scan db",
 				QDF_MAC_ADDR_REF(info[i].bssid.bytes));
 			info[i].status = QCA_STATUS_REJECT_UNKNOWN;
 			continue;
 		}
+		cur_lst = NULL;
+		qdf_list_peek_front(candidate_list, &cur_lst);
+		if (!cur_lst) {
+			sme_err("Failed to peek candidate: " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(info[i].bssid.bytes));
+			goto next;
+		}
 
-		bss_desc = &res->BssDescriptor;
-		if (!sme_get_status_for_candidate(mac_handle, conn_bss_desc,
-						  bss_desc, &info[i],
-						  transition_reason,
+		candidate_bss =
+			qdf_container_of(cur_lst, struct scan_cache_node, node);
+		if (!sme_get_status_for_candidate(mac_handle,
+						  conn_bss->entry,
+						  candidate_bss->entry,
+						  &info[i], transition_reason,
 						  is_bt_in_progress)) {
 			/*
 			 * If status is not over written, it means it is a
@@ -14380,17 +14390,19 @@ QDF_STATUS sme_get_bss_transition_status(mac_handle_t mac_handle,
 			 */
 			info[i].status = QCA_STATUS_ACCEPT;
 		}
+next:
+		wlan_scan_purge_results(candidate_list);
+		candidate_list = NULL;
 	}
 
 	/* success */
 	status = QDF_STATUS_SUCCESS;
 
-free:
-	/* free allocated memory */
-	if (conn_res)
-		qdf_mem_free(conn_res);
-	if (res)
-		qdf_mem_free(res);
+purge:
+	if (bssid_list)
+		wlan_scan_purge_results(bssid_list);
+	if (candidate_list)
+		wlan_scan_purge_results(candidate_list);
 
 	return status;
 }

@@ -190,13 +190,13 @@ QDF_STATUS csr_scan_get_result(struct mac_context *mac,
  *      bssid specified
  * @mac_ctx: mac context
  * @bssid: bssid to get the scan result for
- * @res: pointer to tCsrScanResultInfo
+ * @ret_list: pointer to scan results
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS csr_scan_get_result_for_bssid(struct mac_context *mac_ctx,
 					 struct qdf_mac_addr *bssid,
-					 tCsrScanResultInfo *res);
+					 qdf_list_t **ret_list);
 
 /**
  * csr_scan_filter_results: filter scan result based
