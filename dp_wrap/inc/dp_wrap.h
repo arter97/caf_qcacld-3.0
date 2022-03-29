@@ -316,5 +316,6 @@ void dp_wrap_register_xmit_handler(struct wlan_objmgr_vdev *vdev,
 				    void (*wlan_vdev_xmit_queue)
 				    (struct net_device *dev, wbuf_t wbuf));
 struct net_device *dp_wrap_vdev_get_netdev(struct wlan_objmgr_vdev *vdev);
+void dp_wrap_mat_params_update(struct wlan_objmgr_vdev *vdev);
 #endif
 #endif
