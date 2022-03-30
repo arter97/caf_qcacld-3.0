@@ -61,6 +61,7 @@ enum dp_ppdu_type {
  * struct wlan_peer_tx_rate_stats - peer tx rate statistics
  * @stats: array containing tx rate stats
  * @cur_rix: rate index updated last in list
+ * @cur_rate: rate updated last in list
  * @lock: lock protecting list
  * @sojourn: sojourn statistics
  */
@@ -68,6 +69,7 @@ struct wlan_peer_tx_rate_stats {
 	struct wlan_tx_rate_stats stats[WLANSTATS_CACHE_SIZE];
 	struct wlan_tx_sojourn_stats sojourn;
 	uint32_t cur_rix;
+	uint32_t cur_rate;
 	uint8_t cur_cache_idx;
 };
 
@@ -75,11 +77,13 @@ struct wlan_peer_tx_rate_stats {
  * struct wlan_peer_rx_rate_stats - Peer Rx rate statistics
  * @stats: array containing rx rate stats
  * @cur_rix: rate index updated last in list
+ * @cur_rate: rate updated last in list
  * @lock: lock protecting list
  */
 struct wlan_peer_rx_rate_stats {
 	struct wlan_rx_rate_stats stats[WLANSTATS_CACHE_SIZE];
 	uint32_t cur_rix;
+	uint32_t cur_rate;
 	uint32_t cur_cache_idx;
 };
 
