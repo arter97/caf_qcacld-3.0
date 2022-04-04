@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -250,6 +251,8 @@ extern enum policy_mgr_conc_next_action
  * @enable_sta_cxn_5g_band: Enable/Disable STA connection in 5G band
  * @go_force_scc: Enable/Disable P2P GO force SCC
  * @pcl_band_priority: PCL channel order between 5G and 6G.
+ * @multi_sap_allowed_on_same_band: Enable/Disable multi sap started
+ *                                  on same band
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -272,6 +275,7 @@ struct policy_mgr_cfg {
 	uint32_t chnl_select_plcy;
 	uint8_t go_force_scc;
 	enum policy_mgr_pcl_band_priority pcl_band_priority;
+	bool multi_sap_allowed_on_same_band;
 };
 
 /**
