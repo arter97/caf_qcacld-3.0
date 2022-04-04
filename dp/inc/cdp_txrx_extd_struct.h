@@ -200,9 +200,10 @@ struct sawf_delay_stats {
 		u_int32_t sum;
 		u_int32_t count;
 	} win_avgs[DP_SAWF_NUM_AVG_WINDOWS];
-
 	/*Index for the current window*/
 	uint8_t cur_win;
+	uint8_t tid;
+	uint8_t msduq;
 };
 
 struct sawf_tx_stats {
@@ -218,6 +219,8 @@ struct sawf_tx_stats {
 	} dropped;
 	uint32_t tx_failed;
 	uint32_t queue_depth;
+	uint8_t tid;
+	uint8_t msduq;
 };
 #endif
 #endif /* _CDP_TXRX_EXTD_STRUCT_H_ */

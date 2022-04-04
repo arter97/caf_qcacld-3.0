@@ -876,18 +876,20 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 	uint8_t idx = 0;
 
 	if (svc_id > 0) {
-		STATS_PRINT("sliding_window_sum = %u   ",
+		STATS_PRINT("----TIDX: %d----   ", data->tid);
+		STATS_PRINT("----QUEUE: %d---- \n", data->msduq);
+		STATS_PRINT("sliding_window_sum         = %u\n",
 			    data->delay[0][0].avg.sum);
-		STATS_PRINT("sliding_window_count = %u   ",
+		STATS_PRINT("sliding_window_count       = %u\n",
 			    data->delay[0][0].avg.count);
-		STATS_PRINT("current_window_index = %u   ",
+		STATS_PRINT("current_window_index       = %u\n",
 			    data->delay[0][0].cur_win);
-		STATS_PRINT("data_for_each_window");
+		STATS_PRINT("\ndata_for_each_window\n");
 		for (idx = 0; idx < STATS_IF_NUM_AVG_WINDOWS; idx++) {
-			STATS_PRINT("----WINDOW: %d----   ", idx);
-			STATS_PRINT("sum = %u   ",
+			STATS_PRINT("  WINDOW: %d\n", idx);
+			STATS_PRINT("	sum                = %u\n",
 				    data->delay[0][0].win_avgs[idx].sum);
-			STATS_PRINT("count = %u   ",
+			STATS_PRINT("	count              = %u\n",
 				    data->delay[0][0].win_avgs[idx].count);
 		}
 		print_advance_hist_stats(&data->delay[0][0].delay_hist,
@@ -904,19 +906,19 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 				STATS_PRINT("----TID: %d----   ", tidx);
 				STATS_PRINT("----QUEUES: %d----\n", queues);
 
-				STATS_PRINT("sliding_window_sum = %u\n",
+				STATS_PRINT("sliding_window_sum         = %u\n",
 					    dly->avg.sum);
-				STATS_PRINT("sliding_window_count = %u\n",
+				STATS_PRINT("sliding_window_count       = %u\n",
 					    dly->avg.count);
-				STATS_PRINT("current_window_index = %u\n",
+				STATS_PRINT("current_window_index       = %u\n",
 					    dly->cur_win);
-				STATS_PRINT("data_for_each_window\n");
+				STATS_PRINT("\ndata_for_each_window\n");
 				for (idx = 0; idx < STATS_IF_NUM_AVG_WINDOWS;
 				     idx++) {
-					STATS_PRINT("----WINDOW: %d---- ", idx);
-					STATS_PRINT("sum = %u    ",
+					STATS_PRINT("  WINDOW: %d\n", idx);
+					STATS_PRINT("	sum                = %u\n",
 						    dly->win_avgs[idx].sum);
-					STATS_PRINT("count = %u\n",
+					STATS_PRINT("	count              = %u\n",
 						    dly->win_avgs[idx].count);
 				}
 				print_advance_hist_stats(&dly->delay_hist,
@@ -931,33 +933,34 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 			       uint8_t svc_id)
 {
 	if (svc_id > 0) {
-		STATS_PRINT("Tx_info_success_num = %u   ",
+		STATS_PRINT("----TIDX: %d----   ", data->tid);
+		STATS_PRINT("----QUEUE: %d----\n", data->msduq);
+
+		STATS_PRINT("Tx_info_success_num        = %u\n",
 			    data->tx[0][0].tx_success.num);
-		STATS_PRINT("Tx_info_success_bytes = %ju   ",
+		STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 			    data->tx[0][0].tx_success.bytes);
-		STATS_PRINT("Tx_info_dropped_num = %u   ",
+
+		STATS_PRINT("Tx_info_drop_num           = %u\n",
 			    data->tx[0][0].dropped.fw_rem.num);
-
-
-		STATS_PRINT("Tx_info_dropped_bytes = %ju   ",
-			    data->tx[0][0].dropped.fw_rem.bytes);
-		STATS_PRINT("Tx_info_dropped_Tx_fw_rem_notx = %u   ",
+		STATS_PRINT("Tx_info_drop_bytes         = %ju\n",
+			     data->tx[0][0].dropped.fw_rem.bytes);
+		STATS_PRINT("Tx_info_drop_fw_rem_notx   = %u\n",
 			    data->tx[0][0].dropped.fw_rem_notx);
-		STATS_PRINT("Tx_info_dropped_Tx_fw_rem_tx = %u   ",
+		STATS_PRINT("Tx_info_drop_Tx_fw_rem_tx  = %u\n",
 			    data->tx[0][0].dropped.fw_rem_tx);
-		STATS_PRINT("Tx_info_dropped_Tx_age_out = %u   ",
+		STATS_PRINT("Tx_info_drop_Tx_age_out    = %u\n",
 			    data->tx[0][0].dropped.age_out);
 
-
-		STATS_PRINT("Tx_info_dropped_Tx_fw_reason1 = %u   ",
+		STATS_PRINT("Tx_info_drop_fw_reason1    = %u\n",
 			    data->tx[0][0].dropped.fw_reason1);
-		STATS_PRINT("Tx_info_dropped_Tx_fw_reason2 = %u   ",
+		STATS_PRINT("Tx_info_drop_fw_reason2    = %u\n",
 			    data->tx[0][0].dropped.fw_reason2);
-		STATS_PRINT("Tx_info_dropped_Tx_fw_reason3 = %u   ",
+		STATS_PRINT("Tx_info_drop_fw_reason3    = %u\n",
 			    data->tx[0][0].dropped.fw_reason3);
-		STATS_PRINT("Tx_info_tx_failed = %u   ",
+		STATS_PRINT("Tx_info_tx_failed          = %u\n",
 			    data->tx[0][0].tx_failed);
-		STATS_PRINT("Tx_info_queue_depth = %u",
+		STATS_PRINT("Tx_info_queue_depth        = %u\n",
 			    data->tx[0][0].queue_depth);
 	} else {
 		uint8_t tidx = 0, queues = 0;
@@ -968,34 +971,34 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 			for (queues = 0; queues < max_queue; queues++) {
 				sawftx = &data->tx[tidx][queues];
 				STATS_PRINT("----TIDX: %d----   ", tidx);
-				STATS_PRINT("----QUEUE: %d---- \n", queues);
-				STATS_PRINT("Tx_info_success_num = %u\n",
+				STATS_PRINT("----QUEUE: %d----\n", queues);
+				STATS_PRINT("Tx_info_success_num        = %u\n",
 					    sawftx->tx_success.num);
-				STATS_PRINT("Tx_info_success_bytes = %ju\n",
+				STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 					    sawftx->tx_success.bytes);
 
 
-				STATS_PRINT("Tx_info_drop_num = %u\n",
+				STATS_PRINT("Tx_info_drop_num           = %u\n",
 					    sawftx->dropped.fw_rem.num);
-				STATS_PRINT("Tx_info_drop_bytes = %ju\n",
+				STATS_PRINT("Tx_info_drop_bytes         = %ju\n",
 					    sawftx->dropped.fw_rem.bytes);
-				STATS_PRINT("Tx_info_drop_fw_rem_notx = %u\n",
+				STATS_PRINT("Tx_info_drop_fw_rem_notx   = %u\n",
 					    sawftx->dropped.fw_rem_notx);
-				STATS_PRINT("Tx_info_drop_Tx_fw_rem_tx= %u\n",
+				STATS_PRINT("Tx_info_drop_Tx_fw_rem_tx  = %u\n",
 					    sawftx->dropped.fw_rem_tx);
-				STATS_PRINT("Tx_info_drop_Tx_age_out = %u\n",
+				STATS_PRINT("Tx_info_drop_Tx_age_out    = %u\n",
 					    sawftx->dropped.age_out);
 
 
-				STATS_PRINT("Tx_info_drop_fw_reason1 = %u \n",
+				STATS_PRINT("Tx_info_drop_fw_reason1    = %u\n",
 					    sawftx->dropped.fw_reason1);
-				STATS_PRINT("Tx_inf_drop_Tx_fw_reason2 = %u \n",
+				STATS_PRINT("Tx_inf_drop_Tx_fw_reason2  = %u\n",
 					    sawftx->dropped.fw_reason2);
 				STATS_PRINT("Tx_info_drop_Tx_fw_reason3 = %u\n",
 					    sawftx->dropped.fw_reason3);
-				STATS_PRINT("Tx_info_tx_failed = %u\n",
+				STATS_PRINT("Tx_info_tx_failed          = %u\n",
 					    sawftx->tx_failed);
-				STATS_PRINT("Tx_info_queue_depth = %u \n",
+				STATS_PRINT("Tx_info_queue_depth        = %u\n",
 					    sawftx->queue_depth);
 			}
 		}

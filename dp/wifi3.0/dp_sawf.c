@@ -957,6 +957,8 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 
 		src = &stats_ctx->stats.delay[tid][q_idx];
 		dp_sawf_copy_delay_stats(dst, src);
+		dst->tid = tid;
+		dst->msduq = q_idx;
 	}
 
 	dp_sawf_dump_peer_stats(txrx_peer);
@@ -1041,6 +1043,8 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 
 		src = &stats_ctx->stats.tx_stats[tid][q_idx];
 		dp_sawf_copy_tx_stats(dst, src);
+		dst->tid = tid;
+		dst->msduq = q_idx;
 	}
 
 	dp_sawf_dump_peer_stats(txrx_peer);
