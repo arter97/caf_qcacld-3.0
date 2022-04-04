@@ -456,7 +456,8 @@ void mlo_ap_ml_peerid_free(uint16_t mlo_peer_id)
 		return;
 	}
 
-	if (mlo_peer_id > mlo_ctx->max_mlo_peer_id) {
+	if ((mlo_peer_id > mlo_ctx->max_mlo_peer_id) ||
+	    (mlo_peer_id > MAX_MLO_PEER_ID)) {
 		mlo_err(" ML peer id %d is invalid", mlo_peer_id);
 		QDF_BUG(0);
 		return;
