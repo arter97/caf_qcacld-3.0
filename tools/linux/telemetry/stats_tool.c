@@ -627,7 +627,6 @@ void print_basic_radio_ctrl_rx(struct basic_pdev_ctrl_rx *rx)
 void print_basic_radio_ctrl_link(struct basic_pdev_ctrl_link *link)
 {
 	STATS_32(stdout, "Channel Tx Power", link->cs_chan_tx_pwr);
-	STATS_32(stdout, "Rx Rssi Combind", link->cs_rx_rssi_comb);
 	STATS_16_SIGNED(stdout, "Channel NF", link->cs_chan_nf);
 	STATS_16_SIGNED(stdout, "Channel NF Sec80", link->cs_chan_nf_sec80);
 	STATS_8(stdout, "DCS Total Util", link->dcs_total_util);
@@ -1226,7 +1225,6 @@ void print_advance_radio_ctrl_tx(struct advance_pdev_ctrl_tx *tx)
 {
 	print_basic_radio_ctrl_tx(&tx->b_tx);
 	STATS_64(stdout, "Tx Beacon Count", tx->cs_tx_beacon);
-	STATS_64(stdout, "Tx Retries Count", tx->cs_tx_retries);
 }
 
 void print_advance_radio_ctrl_rx(struct advance_pdev_ctrl_rx *rx)

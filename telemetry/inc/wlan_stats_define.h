@@ -316,7 +316,6 @@ struct basic_pdev_ctrl_rx {
 
 struct basic_pdev_ctrl_link {
 	u_int32_t cs_chan_tx_pwr;
-	u_int32_t cs_rx_rssi_comb;
 	int16_t cs_chan_nf;
 	int16_t cs_chan_nf_sec80;
 	u_int8_t dcs_total_util;
@@ -703,7 +702,6 @@ struct advance_pdev_data_nawds {
 struct advance_pdev_ctrl_tx {
 	struct basic_pdev_ctrl_tx b_tx;
 	u_int64_t cs_tx_beacon;
-	u_int64_t cs_tx_retries;
 };
 
 struct advance_pdev_ctrl_rx {
