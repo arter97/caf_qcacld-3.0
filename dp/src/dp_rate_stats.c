@@ -348,6 +348,8 @@ wlan_peer_flush_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 		     sizeof(struct wlan_rx_rate_stats));
 	for (idx = 0; idx < WLANSTATS_CACHE_SIZE; idx++)
 		rx_stats->stats[idx].ratecode = INVALID_CACHE_IDX;
+
+	rx_stats->cur_cache_idx = 0;
 }
 
 static void
@@ -408,6 +410,8 @@ wlan_peer_flush_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 	}
 	for (idx = 0; idx < WLANSTATS_CACHE_SIZE; idx++)
 		tx_stats->stats[idx].ratecode = INVALID_CACHE_IDX;
+
+	tx_stats->cur_cache_idx = 0;
 }
 
 static void
@@ -798,7 +802,8 @@ wlan_peer_update_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			continue;
 		}
 
-		if (qdf_likely(rx_stats->cur_rix == ppdu_user->rix)) {
+		if (qdf_likely(rx_stats->cur_rix == ppdu_user->rix &&
+			       rx_stats->cur_rate == ppdu_user->rx_ratekbps)) {
 			__rx_stats = &rx_stats->stats[rx_stats->cur_cache_idx];
 			__wlan_peer_update_rx_rate_stats(__rx_stats,
 							 cdp_rx_ppdu, user_idx);
@@ -811,7 +816,8 @@ wlan_peer_update_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 		for (cache_idx = 0; cache_idx < WLANSTATS_CACHE_SIZE; cache_idx++) {
 			__rx_stats = &rx_stats->stats[cache_idx];
 			if ((__rx_stats->ratecode == INVALID_CACHE_IDX) ||
-			    (GET_DP_PEER_STATS_RIX(__rx_stats->ratecode) == ppdu_user->rix)) {
+			    ((GET_DP_PEER_STATS_RIX(__rx_stats->ratecode) == ppdu_user->rix) &&
+			     (__rx_stats->rate == ppdu_user->rx_ratekbps))) {
 				idx_match = true;
 				break;
 			}
@@ -824,6 +830,7 @@ wlan_peer_update_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			__wlan_peer_update_rx_rate_stats(__rx_stats,
 							 cdp_rx_ppdu, user_idx);
 			rx_stats->cur_rix = ppdu_user->rix;
+			rx_stats->cur_rate = ppdu_user->rx_ratekbps;
 			rx_stats->cur_cache_idx = cache_idx;
 			soc_stats_ctx->rxs_cache_hit++;
 		} else {
@@ -832,6 +839,7 @@ wlan_peer_update_rx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			__wlan_peer_update_rx_rate_stats(__rx_stats,
 							 cdp_rx_ppdu, user_idx);
 			rx_stats->cur_rix = ppdu_user->rix;
+			rx_stats->cur_rate = ppdu_user->rx_ratekbps;
 			rx_stats->cur_cache_idx = 0;
 			soc_stats_ctx->rxs_cache_miss++;
 		}
@@ -908,7 +916,8 @@ wlan_peer_update_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 
 		tx_stats = &stats_ctx->rate_stats->tx;
 
-		if (qdf_likely(tx_stats->cur_rix == ppdu_user->rix)) {
+		if (qdf_likely(tx_stats->cur_rix == ppdu_user->rix &&
+			       tx_stats->cur_rate == ppdu_user->tx_ratekbps)) {
 			__tx_stats = &tx_stats->stats[tx_stats->cur_cache_idx];
 			__wlan_peer_update_tx_rate_stats(__tx_stats, ppdu_user);
 			soc_stats_ctx->txs_last_idx_cache_hit++;
@@ -922,7 +931,8 @@ wlan_peer_update_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			__tx_stats = &tx_stats->stats[cache_idx];
 
 			if ((__tx_stats->ratecode == INVALID_CACHE_IDX) ||
-			    (GET_DP_PEER_STATS_RIX(__tx_stats->ratecode) == ppdu_user->rix)) {
+			    ((GET_DP_PEER_STATS_RIX(__tx_stats->ratecode) == ppdu_user->rix) &&
+			     (__tx_stats->rate == ppdu_user->tx_ratekbps))) {
 				idx_match = true;
 				break;
 			}
@@ -937,6 +947,7 @@ wlan_peer_update_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			__wlan_peer_update_tx_rate_stats(__tx_stats,
 							 ppdu_user);
 			tx_stats->cur_rix = ppdu_user->rix;
+			tx_stats->cur_rate = ppdu_user->tx_ratekbps;
 			tx_stats->cur_cache_idx = cache_idx;
 		} else {
 			soc_stats_ctx->txs_cache_miss++;
@@ -946,6 +957,7 @@ wlan_peer_update_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			__wlan_peer_update_tx_rate_stats(__tx_stats,
 							 ppdu_user);
 			tx_stats->cur_rix = ppdu_user->rix;
+			tx_stats->cur_rate = ppdu_user->tx_ratekbps;
 			tx_stats->cur_cache_idx = 0;
 		}
 		STATS_CTX_LOCK_RELEASE(&soc_stats_ctx->tx_ctx_lock);
