@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -55,6 +56,11 @@ struct mon_ops {
 						 struct wireless_dev *wdev,
 						 struct wlan_cfg8011_genric_params *params);
 #endif
+#ifdef QCA_SUPPORT_LITE_MONITOR
+	int (*mon_cfg80211_lite_monitor_config)(struct wiphy *wiphy,
+						struct wireless_dev *wdev,
+						struct wlan_cfg8011_genric_params *params);
+#endif /* QCA_SUPPORT_LITE_MONITOR */
 };
 
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
@@ -200,4 +206,27 @@ monitor_ol_ath_set_bpr_wifi3(struct ol_ath_softc_net80211 *scn,
 	soc->soc_mon_ops->mon_ath_set_bpr_wifi3(scn, val);
 }
 
+#ifdef QCA_SUPPORT_LITE_MONITOR
+static inline int
+monitor_cfg80211_lite_monitor_config(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     struct wlan_cfg8011_genric_params *params)
+{
+	struct ol_ath_softc_net80211 *scn =  ath_netdev_priv(wdev->netdev);
+	ol_ath_soc_softc_t *soc;
+
+	if (!scn || !scn->soc)
+		return -EOPNOTSUPP;
+
+	soc = scn->soc;
+
+	if (!soc->soc_mon_ops ||
+	    !soc->soc_mon_ops->mon_cfg80211_lite_monitor_config)
+		return -EOPNOTSUPP;
+
+	return soc->soc_mon_ops->mon_cfg80211_lite_monitor_config(wiphy,
+								  wdev,
+								  params);
+}
+#endif /* QCA_SUPPORT_LITE_MONITOR */
 #endif /* _DP_MON_OL_H_ */

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,6 +16,9 @@
  */
 #include "osif_private.h"
 #include <qdf_nbuf.h>
+#include <qdf_net_if.h>
+
+#define IFNAME_SIZE 16
 
 void monitor_osif_process_rx_mpdu(osif_dev *osifp, qdf_nbuf_t mpdu_ind)
 {
@@ -49,3 +53,31 @@ void monitor_osif_deliver_rx_capture_undecoded_metadata(osif_dev *osifp,
 	netif_rx(skb);
 }
 #endif
+
+void *monitor_osif_get_vdev_by_name(char *name)
+{
+	struct net_device *dev;
+	osif_dev *osifp = NULL;
+	char dev_name[IFNAME_SIZE];
+	void *data = NULL;
+
+	if (strncmp(name, "ath", 3) != 0)
+		return NULL;
+
+	if (strlcpy(dev_name, name, IFNAME_SIZE) >= IFNAME_SIZE)
+		return NULL;
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 23))
+	dev = (struct net_device *)qdf_net_if_get_dev_by_name(dev_name);
+	if (dev != NULL) {
+#else
+	dev = dev_get_by_name(dev_name);
+	if (dev != NULL) {
+#endif
+		osifp = ath_netdev_priv(dev);
+		data = (void *)osifp->ctrl_vdev;
+		qdf_net_if_release_dev((struct qdf_net_if *)dev);
+	}
+
+	return data;
+}

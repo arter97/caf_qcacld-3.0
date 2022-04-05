@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
 
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -55,6 +56,10 @@ void monitor_osif_deliver_rx_capture_undecoded_metadata(osif_dev *osifp,
 #define DEBUG_SNIFFER_TEST_RX_UNDEOCDED_FRAME_CAPTURE     "UNDECO"
 #endif
 #define DEBUG_SNIFFER_SIGNATURE_LEN 6
+int wlan_cfg80211_lite_monitor_config(struct wiphy *wiphy,
+				      struct wireless_dev *wdev,
+				      struct wlan_cfg8011_genric_params *params);
+
 /*
  * expected values for filter (val) 0, 1, 2, 4, 8
  * these values could be for FP, MO, or both by using first 16 bits.
@@ -1062,6 +1067,10 @@ static struct mon_ops monitor_ops = {
 	.mon_cfg80211_get_phyrx_error_mask =
 		wlan_cfg80211_get_phyrx_error_mask,
 #endif
+#ifdef QCA_SUPPORT_LITE_MONITOR
+	.mon_cfg80211_lite_monitor_config =
+		wlan_cfg80211_lite_monitor_config,
+#endif /* QCA_SUPPORT_LITE_MONITOR */
 };
 
 QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc)
