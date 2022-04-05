@@ -93,6 +93,7 @@ enum MLO_LINK_STATE {
  * @pdev_list[MAX_MLO_LINKS]: pdev pointers belonging to this group
  * @soc_list[MAX_MLO_CHIPS]: psoc pointers belonging to this group
  * @state[MAX_MLO_LINKS]: MLO link state
+ * @valid_link_bitmap: valid MLO link bitmap
  * @state_lock: lock to protect access to link state
  * @qdf_event_t: event for tearodwn completion
  */
@@ -107,6 +108,7 @@ struct mlo_setup_info {
 	struct wlan_objmgr_pdev *pdev_list[MAX_MLO_LINKS];
 	struct wlan_objmgr_psoc *soc_list[MAX_MLO_CHIPS];
 	enum MLO_LINK_STATE state[MAX_MLO_LINKS];
+	uint16_t valid_link_bitmap;
 	qdf_spinlock_t state_lock;
 	qdf_event_t event;
 };
@@ -633,5 +635,19 @@ struct mlo_link_set_active_ctx {
 struct mlo_link_set_active_req {
 	struct mlo_link_set_active_ctx ctx;
 	struct mlo_link_set_active_param param;
+};
+
+/*
+ * enum mlo_chip_recovery_type - MLO chip recovery types
+ * @MLO_RECOVERY_MODE_0: CRASH_PARTNER_CHIPS & recover all chips
+ * @MLO_RECOVERY_MODE_1: Crash & recover asserted chip alone
+ * @MLO_RECOVERY_MODE_MAX: Max limit for recovery types
+ */
+enum mlo_chip_recovery_type {
+	MLO_RECOVERY_MODE_0 = 1,
+	MLO_RECOVERY_MODE_1 = 2,
+
+	/* Add new types above */
+	MLO_RECOVERY_MODE_MAX = 0xf
 };
 #endif
