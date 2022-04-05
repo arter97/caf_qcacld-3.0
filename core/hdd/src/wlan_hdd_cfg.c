@@ -6462,6 +6462,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_DFS_CHAN_AGEOUT_TIME_DEFAULT,
 		     CFG_DFS_CHAN_AGEOUT_TIME_MIN,
 		     CFG_DFS_CHAN_AGEOUT_TIME_MAX),
+
+	REG_VARIABLE(CFG_DISABLE_HW_ASSIST, WLAN_PARAM_Integer,
+		     struct hdd_config, disable_hw_assist,
+		     VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+		     CFG_DISABLE_HW_ASSIST_DEFAULT,
+		     CFG_DISABLE_HW_ASSIST_MIN,
+		     CFG_DISABLE_HW_ASSIST_MAX),
 };
 
 /**
@@ -8566,6 +8573,9 @@ void hdd_cfg_print(struct hdd_context *hdd_ctx)
 	hdd_debug("Name = [%s] Value = [%u]",
 		  CFG_DFS_CHAN_AGEOUT_TIME,
 		  hdd_ctx->config->dfs_chan_ageout_time);
+	hdd_debug("Name = [%s] Value = [%u]",
+		  CFG_DISABLE_HW_ASSIST,
+		  hdd_ctx->config->disable_hw_assist);
 }
 
 /**
