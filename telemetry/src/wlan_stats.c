@@ -238,7 +238,6 @@ static void fill_basic_pdev_ctrl_link(struct basic_pdev_ctrl_link *ctrl,
 				      struct pdev_ic_cp_stats *cp_stats)
 {
 	ctrl->cs_chan_tx_pwr = cp_stats->stats.cs_chan_tx_pwr;
-	ctrl->cs_rx_rssi_comb = cp_stats->stats.cs_rx_rssi_comb;
 	ctrl->cs_chan_nf = cp_stats->stats.cs_chan_nf;
 	ctrl->cs_chan_nf_sec80 = cp_stats->stats.cs_chan_nf_sec80;
 	ctrl->dcs_total_util = cp_stats->stats.chan_stats.dcs_total_util;
@@ -2855,7 +2854,6 @@ static QDF_STATUS get_advance_pdev_ctrl_tx(struct unified_stats *stats,
 	fill_basic_pdev_ctrl_tx(&ctrl->b_tx, cp_stats);
 
 	ctrl->cs_tx_beacon = cp_stats->stats.cs_tx_beacon;
-	ctrl->cs_tx_retries = cp_stats->stats.cs_tx_retries;
 
 	stats->feat[INX_FEAT_TX] = ctrl;
 	stats->size[INX_FEAT_TX] = sizeof(struct advance_pdev_ctrl_tx);
