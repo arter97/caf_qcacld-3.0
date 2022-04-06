@@ -35,6 +35,7 @@
 #include <dfs_process_radar_found_ind.h>
 #include <dfs_internal.h>
 #include <wlan_reg_channel_api.h>
+#include <reg_services_common.h>
 
 /* dfs_init_precac_tree_node() - Initialise the preCAC BSTree node with the
  *                               provided values.
@@ -1053,6 +1054,114 @@ dfs_find_precac_state_of_node(qdf_freq_t channel,
 	return PRECAC_ERR;
 }
 
+/**
+ * dfs_is_precac_bw_5mhz() - Return true if the given bw is 5mhz,
+ * false otherwise.
+ * @bw: channel bandwidth
+ *
+ * Return - True if BW is 5mhz, false otherwise
+ */
+static bool dfs_is_precac_bw_5mhz(uint8_t bw)
+{
+	if (bw == DFS_CHWIDTH_5_VAL)
+		return true;
+
+	return false;
+}
+
+/**
+ * dfs_is_precac_bw_10mhz() - Return true if the given bw is 10mhz,
+ * false otherwise.
+ * @bw: channel bandwidth
+ *
+ * Return - True if BW is 10mhz, false otherwise
+ */
+static bool dfs_is_precac_bw_10mhz(uint8_t bw)
+{
+	if (bw == DFS_CHWIDTH_10_VAL)
+		return true;
+
+	return false;
+}
+
+/**
+ * dfs_is_precac_bw_5m_or_10m() - Return true if the given bw is 5mhz or 10mhz,
+ * false otherwise.
+ * @bw: channel bandwidth
+ *
+ * Return - True if BW is 5mhz or 10mhz, false otherwise
+ */
+static bool dfs_is_precac_bw_5m_or_10m(uint8_t bw)
+{
+	if (dfs_is_precac_bw_10mhz(bw) ||
+	    dfs_is_precac_bw_5mhz(bw))
+		return true;
+
+	return false;
+}
+
+/**
+ * dfs_get_precac_freq() - Fetch a frequency to program the agile synth.
+ * Following conditions must be satisfied to pick a preCAC freq:
+ * 1. Must not be CAC done
+ * 2. Must not be in NOL
+ * 3. Should not be an excluded freq
+ *
+ * Return - preCAC freq if found, else 0.
+ */
+static qdf_freq_t
+dfs_get_precac_freq(struct dfs_precac_5_10_entry *precac_entry,
+		    qdf_freq_t exclude_pri_ch_freq)
+{
+	if (!precac_entry->is_cac_done &&
+	    !precac_entry->is_freq_nol &&
+	    precac_entry->center_freq != exclude_pri_ch_freq) {
+	    return precac_entry->center_freq;
+	}
+	return 0;
+}
+
+/**
+ * dfs_find_5m_or_10m_precac_freq() - Find a preCAC freq searching through
+ * the 5m or 10m linked list based on the input bandwidth
+ * @dfs: Pointer to struct wlan_dfs
+ * @exclude_pri_ch_freq: Frequency to be excluded
+ * @precac_req_bw: preCAC bandwidth
+ *
+ */
+static qdf_freq_t
+dfs_find_5m_or_10m_precac_freq(struct wlan_dfs *dfs,
+			       uint16_t exclude_pri_ch_freq,
+			       uint8_t precac_req_bw)
+{
+	struct dfs_precac_5_10_entry *precac_entry;
+	uint16_t ieee_chan_freq = 0;
+
+	PRECAC_LIST_LOCK(dfs);
+	if (dfs_is_precac_bw_5mhz(precac_req_bw)) {
+	    STAILQ_FOREACH(precac_entry, &dfs->dfs_precac_5m_list,
+			   pe_5_10_list) {
+		ieee_chan_freq =
+		    dfs_get_precac_freq(precac_entry,
+					exclude_pri_ch_freq);
+		if (ieee_chan_freq)
+		    break;
+	    }
+	} else if (dfs_is_precac_bw_10mhz(precac_req_bw)) {
+	    STAILQ_FOREACH(precac_entry, &dfs->dfs_precac_10m_list,
+			   pe_5_10_list) {
+		ieee_chan_freq =
+		    dfs_get_precac_freq(precac_entry,
+					exclude_pri_ch_freq);
+		if (ieee_chan_freq)
+		    break;
+	    }
+	}
+	PRECAC_LIST_UNLOCK(dfs);
+
+	return ieee_chan_freq;
+}
+
 /*
  * dfs_get_ieeechan_for_precac_for_freq() - Get chan frequency for preCAC.
  * @dfs: Pointer to wlan_dfs.
@@ -1073,6 +1182,14 @@ uint16_t dfs_get_ieeechan_for_precac_for_freq(struct wlan_dfs *dfs,
 		 "current operating channel(s) to be excluded = [%u] [%u]",
 		 exclude_pri_ch_freq,
 		 exclude_sec_ch_freq);
+
+	if (dfs_is_precac_bw_5m_or_10m(bw)) {
+		ieee_chan_freq =
+		    dfs_find_5m_or_10m_precac_freq(dfs,
+						   exclude_pri_ch_freq,
+						   bw);
+		goto exit;
+	}
 
 	/* If interCAC is enabled, prioritize the desired channel first before
 	 * using the normal logic to find a channel for preCAC.
@@ -1281,6 +1398,170 @@ void dfs_init_precac_list(struct wlan_dfs *dfs)
 	PRECAC_LIST_UNLOCK(dfs);
 }
 
+#define BW_WITHIN(min, bw, max) ((min) <= (bw) && (bw) <= (max))
+/**
+ * dfs_is_chan_10mhz_supported() - Finds out if the given reg_chan supports
+ * 10MHZ BW.
+ * @reg_chan: Pointer to struct regulatory_channel
+ *
+ * Return - True if 10MHZ is supported, false otherwise.
+ */
+static bool
+dfs_is_chan_10mhz_supported(struct regulatory_channel *reg_chan)
+{
+	if (BW_WITHIN(reg_chan->min_bw, BW_10_MHZ, reg_chan->max_bw))
+		return true;
+
+	return false;
+}
+
+/**
+ * dfs_is_chan_5mhz_supported() - Finds out if the given reg_chan supports
+ * 5MHZ BW.
+ * @reg_chan: Pointer to struct regulatory_channel
+ *
+ * Return - True if 5MHZ is supported, false otherwise.
+ */
+static bool
+dfs_is_chan_5mhz_supported(struct regulatory_channel *reg_chan)
+{
+	if (BW_WITHIN(reg_chan->min_bw, BW_5_MHZ, reg_chan->max_bw))
+		return true;
+
+	return false;
+}
+
+/**
+ * dfs_insert_elem_into_5or10_precac_list() - Insert the precac node entry
+ * into the linked list.
+ * @dfs: Pointer to struct wlan_dfs
+ * @precac_entry: Pointer to struct dfs_precac_5_10_entry
+ * @bandwidth: Channel bandwidth
+ *
+ * Return - None
+ */
+static void
+dfs_insert_elem_into_5or10_precac_list(struct wlan_dfs *dfs,
+				       struct dfs_precac_5_10_entry
+				       *precac_entry,
+				       uint8_t bandwidth)
+{
+	PRECAC_LIST_LOCK(dfs);
+	if (bandwidth == BW_5_MHZ)
+		STAILQ_INSERT_TAIL(&dfs->dfs_precac_5m_list, precac_entry,
+				   pe_5_10_list);
+	else if (bandwidth == BW_10_MHZ)
+		STAILQ_INSERT_TAIL(&dfs->dfs_precac_10m_list, precac_entry,
+				   pe_5_10_list);
+	PRECAC_LIST_UNLOCK(dfs);
+}
+/**
+ * dfs_create_precac_5_or_10mhz_entry() - Create a linked list of 5/10M
+ * preCAC entries.
+ * @dfs: Pointer to struct wlan_dfs
+ * @center_freq: Center frequency in MHZ
+ * @bandwidth: Channel bandwidth in MHZ
+ *
+ * Return - Success if entry is added to the linked list, failure otherwise.
+ */
+static QDF_STATUS
+dfs_create_precac_5_or_10mhz_entry(struct wlan_dfs *dfs, qdf_freq_t center_freq,
+				   uint8_t bandwidth)
+{
+	struct dfs_precac_5_10_entry *precac_entry;
+
+	precac_entry = qdf_mem_malloc(sizeof(*precac_entry));
+
+	if (!precac_entry) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			"precac entry alloc failed");
+		return -ENOMEM;
+	}
+
+	precac_entry->center_freq = center_freq;
+	precac_entry->bandwidth = bandwidth;
+
+	dfs_insert_elem_into_5or10_precac_list(dfs, precac_entry, bandwidth);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dfs_print_precac_elements() - Print precac elements
+ * @dfs: Pointer to struct wlan_dfs
+ * @precac_entry: Pointer to struct dfs_precac_5_10_entry
+ *
+ * Return - None
+ */
+static void
+dfs_print_precac_elements(struct wlan_dfs *dfs,
+			  struct dfs_precac_5_10_entry *precac_entry)
+{
+	uint8_t ch_ieee, bw;
+
+	ch_ieee = utils_dfs_freq_to_chan(precac_entry->center_freq);
+	bw = precac_entry->bandwidth;
+
+	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "ieee=%u bw=%u, cac_done: %u "
+		 "is_nol: %u", ch_ieee, bw, precac_entry->is_cac_done,
+		 precac_entry->is_freq_nol);
+}
+
+/**
+ * dfs_init_precac_5_and_10_lists() - Initialize the precac linked list of 5M
+ * and 10M channel list.
+ * @dfs: Pointer to struct wlan_dfs
+ *
+ * Return - None
+ */
+void
+dfs_init_precac_5_and_10_lists(struct wlan_dfs *dfs)
+{
+	struct regulatory_channel *cur_chan_list;
+	uint16_t i;
+
+	cur_chan_list = qdf_mem_malloc(NUM_CHANNELS * sizeof(*cur_chan_list));
+
+	if (!cur_chan_list) {
+		dfs_alert(dfs, WLAN_DEBUG_DFS_ALWAYS, "failed to alloc current"
+			  "channel list");
+		return;
+	}
+
+	if (wlan_reg_get_current_chan_list(dfs->dfs_pdev_obj,
+					   cur_chan_list) !=
+	    QDF_STATUS_SUCCESS) {
+		dfs_alert(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			  "failed to get curr channel list");
+		qdf_mem_free(cur_chan_list);
+		return;
+	}
+
+	STAILQ_INIT(&dfs->dfs_precac_5m_list);
+	STAILQ_INIT(&dfs->dfs_precac_10m_list);
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		qdf_freq_t center_freq = cur_chan_list[i].center_freq;
+
+		if (!WLAN_REG_IS_5GHZ_CH_FREQ(center_freq))
+			continue;
+
+		if (wlan_reg_is_chan_disabled(&cur_chan_list[i]))
+			continue;
+
+		if (!reg_is_dfs_for_freq(dfs->dfs_pdev_obj, center_freq))
+			continue;
+
+		if (dfs_is_chan_10mhz_supported(&cur_chan_list[i]))
+			dfs_create_precac_5_or_10mhz_entry(dfs, center_freq,
+							   BW_10_MHZ);
+
+		if (dfs_is_chan_5mhz_supported(&cur_chan_list[i]))
+			dfs_create_precac_5_or_10mhz_entry(dfs, center_freq,
+							   BW_5_MHZ);
+	}
+	qdf_mem_free(cur_chan_list);
+}
+
 /*
  * dfs_is_precac_done() - Verify if preCAC is done.
  * @dfs: Pointer to wlan_dfs.
@@ -1435,6 +1716,55 @@ void dfs_mark_adfs_chan_as_cac_done(struct wlan_dfs *dfs)
 	dfs_mark_precac_done_for_freq(dfs, pri_chan_freq, sec_chan_freq,
 				      chan_width,
 				      is_adfs_completed_by_all_stas);
+}
+
+/**
+ * dfs_is_chwidth_5m() - Return true if channel width is 5mhz,
+ * false otherwise.
+ * @ch_width: Channel width
+ *
+ * Return - True if channel width is 5mhz , false otherwise
+ */
+static bool
+dfs_is_chwidth_5m(enum phy_ch_width ch_width)
+{
+	if (ch_width == CH_WIDTH_5MHZ)
+		return true;
+
+	return false;
+}
+
+/**
+ * dfs_is_chwidth_10m() - Return true if channel width is 10mhz,
+ * false otherwise.
+ * @ch_width: Channel width
+ *
+ * Return - True if channel width is 10mhz , false otherwise
+ */
+static bool
+dfs_is_chwidth_10m(enum phy_ch_width ch_width)
+{
+	if (ch_width == CH_WIDTH_10MHZ)
+		return true;
+
+	return false;
+}
+
+/**
+ * dfs_is_chwidth_5m_or_10m() - Return true if channel width is 5mhz or 10mhz,
+ * false otherwise.
+ * @ch_width: Channel width
+ *
+ * Return - True if channel width is 5mhz or 10mhz , false otherwise
+ */
+static bool
+dfs_is_chwidth_5m_or_10m(enum phy_ch_width ch_width)
+{
+	if (dfs_is_chwidth_10m(ch_width) ||
+		dfs_is_chwidth_5m(ch_width))
+		return true;
+
+	return false;
 }
 
 /*
@@ -1758,6 +2088,36 @@ static void dfs_print_precac_tree_nodes(struct wlan_dfs *dfs,
 	}
 }
 
+/**
+ * dfs_print_5_and_10_precac_lists() - Print precac list of 5m and 10m elements
+ * @dfs: Pointer to struct wlan_dfs
+ *
+ * Return - None
+ */
+static void
+dfs_print_5_and_10_precac_lists(struct wlan_dfs *dfs)
+{
+	struct dfs_precac_5_10_entry *precac_entry;
+
+	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		 "Precac status of all 5 MHZ nodes in the list:");
+
+	PRECAC_LIST_LOCK(dfs);
+	STAILQ_FOREACH(precac_entry, &dfs->dfs_precac_5m_list,
+		       pe_5_10_list) {
+	    dfs_print_precac_elements(dfs, precac_entry);
+	}
+
+	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
+		 "Precac status of all 10 MHZ nodes in the list:");
+
+	STAILQ_FOREACH(precac_entry, &dfs->dfs_precac_10m_list,
+		       pe_5_10_list) {
+	    dfs_print_precac_elements(dfs, precac_entry);
+	}
+	PRECAC_LIST_UNLOCK(dfs);
+}
+
 void dfs_print_precaclists(struct wlan_dfs *dfs)
 {
 	struct dfs_precac_entry *tmp_precac_entry;
@@ -1767,8 +2127,9 @@ void dfs_print_precaclists(struct wlan_dfs *dfs)
 		return;
 	}
 
-	PRECAC_LIST_LOCK(dfs);
+	dfs_print_5_and_10_precac_lists(dfs);
 
+	PRECAC_LIST_LOCK(dfs);
 	/* Print the Pre-CAC required List */
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 		 "Precac status of all nodes in the list:");
@@ -1850,6 +2211,7 @@ void dfs_reset_precaclists(struct wlan_dfs *dfs)
 		  "Reset precaclist of VHT80 frequencies");
 	dfs_deinit_precac_list(dfs);
 	dfs_init_precac_list(dfs);
+	dfs_init_precac_5_and_10_lists(dfs);
 }
 
 /*
