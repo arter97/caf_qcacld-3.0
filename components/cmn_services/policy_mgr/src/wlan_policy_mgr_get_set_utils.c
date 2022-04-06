@@ -170,6 +170,40 @@ policy_mgr_get_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+policy_mgr_set_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
+					bool multi_sap_allowed_on_same_band)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	pm_ctx->cfg.multi_sap_allowed_on_same_band =
+				multi_sap_allowed_on_same_band;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+policy_mgr_get_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
+					bool *multi_sap_allowed_on_same_band)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	*multi_sap_allowed_on_same_band =
+				pm_ctx->cfg.multi_sap_allowed_on_same_band;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static bool
 policy_mgr_update_dfs_master_dynamic_enabled(
 	struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
@@ -4097,6 +4131,80 @@ bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc)
 	return true;
 }
 
+static void
+policy_mgr_fill_trim_chan(struct wlan_objmgr_pdev *pdev,
+			  void *object, void *arg)
+{
+	struct wlan_objmgr_vdev *vdev = object;
+	struct trim_chan_info *trim_info = arg;
+	uint16_t sap_peer_count = 0;
+	qdf_freq_t chan_freq;
+
+	if (wlan_vdev_mlme_get_opmode(vdev) != QDF_SAP_MODE)
+		return;
+
+	if (wlan_vdev_is_up(vdev) != QDF_STATUS_SUCCESS)
+		return;
+
+	sap_peer_count = wlan_vdev_get_peer_count(vdev);
+	policy_mgr_debug("vdev %d - peer count %d",
+			 wlan_vdev_get_id(vdev), sap_peer_count);
+	if (sap_peer_count <= 1)
+		return;
+
+	chan_freq = wlan_get_operation_chan_freq(vdev);
+	if (!chan_freq)
+		return;
+
+	if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq)) {
+		trim_info->trim |= TRIM_CHANNEL_LIST_5G;
+	} else if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq)) {
+		if (trim_info->sap_count != 1)
+			return;
+
+		if ((trim_info->band_capability & BIT(REG_BAND_5G)) ==
+		     BIT(REG_BAND_5G))
+			return;
+
+		trim_info->trim |= TRIM_CHANNEL_LIST_24G;
+	}
+}
+
+uint16_t
+policy_mgr_scan_trim_chnls_for_connected_ap(struct wlan_objmgr_pdev *pdev)
+{
+	struct trim_chan_info trim_info;
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return TRIM_CHANNEL_LIST_NONE;
+
+	status = wlan_mlme_get_band_capability(psoc,
+					       &trim_info.band_capability);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		policy_mgr_err("Could not get band capability");
+		return TRIM_CHANNEL_LIST_NONE;
+	}
+
+	trim_info.sap_count = policy_mgr_mode_specific_connection_count(psoc,
+							PM_SAP_MODE, NULL);
+	if (!trim_info.sap_count)
+		return TRIM_CHANNEL_LIST_NONE;
+
+	trim_info.trim = TRIM_CHANNEL_LIST_NONE;
+
+	wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
+					  policy_mgr_fill_trim_chan, &trim_info,
+					  0, WLAN_POLICY_MGR_ID);
+	policy_mgr_debug("band_capability %d, sap_count %d, trim %d",
+			 trim_info.band_capability, trim_info.sap_count,
+			 trim_info.trim);
+
+	return trim_info.trim;
+}
+
 QDF_STATUS policy_mgr_get_nss_for_vdev(struct wlan_objmgr_psoc *psoc,
 				enum policy_mgr_con_mode mode,
 				uint8_t *nss_2g, uint8_t *nss_5g)
@@ -4745,6 +4853,63 @@ bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 		status = true;
 
 	return status;
+}
+
+bool policy_mgr_is_multi_sap_allowed_on_same_band(
+					struct wlan_objmgr_pdev *pdev,
+					enum policy_mgr_con_mode mode,
+					qdf_freq_t ch_freq)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	bool multi_sap_allowed_on_same_band;
+	QDF_STATUS status;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return false;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return false;
+	}
+
+	if (!ch_freq || mode != PM_SAP_MODE)
+		return true;
+
+	status = policy_mgr_get_multi_sap_allowed_on_same_band(psoc,
+					&multi_sap_allowed_on_same_band);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		policy_mgr_err("Failed to get multi_sap_allowed_on_same_band");
+		/* Allow multi SAPs started on same band by default. */
+		multi_sap_allowed_on_same_band = true;
+	}
+	if (!multi_sap_allowed_on_same_band) {
+		uint32_t ap_cnt, index = 0;
+		uint32_t list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+		struct policy_mgr_conc_connection_info *ap_info;
+
+		ap_cnt = policy_mgr_mode_specific_connection_count(psoc,
+							PM_SAP_MODE, list);
+		if (!ap_cnt)
+			return true;
+
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		while (index < ap_cnt) {
+			ap_info = &pm_conc_connection_list[list[index]];
+			if (WLAN_REG_IS_SAME_BAND_FREQS(ch_freq,
+							ap_info->freq)) {
+				policy_mgr_rl_debug("Don't allow SAP on same band");
+				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+				return false;
+			}
+			index++;
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	}
+
+	return true;
 }
 
 bool policy_mgr_is_special_mode_active_5g(struct wlan_objmgr_psoc *psoc,

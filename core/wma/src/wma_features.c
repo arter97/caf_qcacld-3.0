@@ -4183,13 +4183,10 @@ QDF_STATUS wma_set_tx_rx_aggr_size(uint8_t vdev_id,
 	if (wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_ampdu_tx_buf_size_256_support)) {
 		cmd->enable_bitmap |= (0x1 << 6);
-		if (!(tx_size <= ADDBA_TXAGGR_SIZE_LITHIUM)) {
-			wma_err("Invalid AMPDU Size");
-			return QDF_STATUS_E_INVAL;
-		}
-	} else if (tx_size == ADDBA_TXAGGR_SIZE_LITHIUM) {
-		tx_size = ADDBA_TXAGGR_SIZE_HELIUM;
-	} else if (!(tx_size <= ADDBA_TXAGGR_SIZE_HELIUM)) {
+	}
+
+	if ((tx_size != ADDBA_TXAGGR_SIZE_LITHIUM) &&
+	    (tx_size > ADDBA_TXAGGR_SIZE_HELIUM)) {
 		wma_err("Invalid AMPDU Size");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -4262,13 +4259,10 @@ QDF_STATUS wma_set_tx_rx_aggr_size_per_ac(WMA_HANDLE handle,
 		if (wmi_service_enabled(wma_handle->wmi_handle,
 					wmi_service_ampdu_tx_buf_size_256_support)) {
 			cmd->enable_bitmap |= (0x1 << 6);
-			if (!(tx_aggr_size[queue_num] <= ADDBA_TXAGGR_SIZE_LITHIUM)) {
-				wma_err("Invalid AMPDU Size");
-				return QDF_STATUS_E_INVAL;
-			}
-		} else if (tx_aggr_size[queue_num] == ADDBA_TXAGGR_SIZE_LITHIUM) {
-			tx_aggr_size[queue_num] = ADDBA_TXAGGR_SIZE_HELIUM;
-		} else if (!(tx_aggr_size[queue_num] <= ADDBA_TXAGGR_SIZE_HELIUM)) {
+		}
+
+		if ((tx_aggr_size[queue_num] != ADDBA_TXAGGR_SIZE_LITHIUM) &&
+		    (tx_aggr_size[queue_num] > ADDBA_TXAGGR_SIZE_HELIUM)) {
 			wma_err("Invalid AMPDU Size");
 			return QDF_STATUS_E_INVAL;
 		}
