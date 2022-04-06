@@ -630,6 +630,25 @@ dfs_is_allsubchans_cac_done(struct precac_tree_node *curr_node)
 		N_SUBCHS_FOR_BANDWIDTH(curr_node->bandwidth));
 }
 
+/**
+ * dfs_create_range_from_freq_bw() - Create range from center freq and bw
+ * @center_freq: Center frequency in MHZ
+ * @bw: Bandwidth
+ *
+ * Return - Frequency range
+ */
+struct dfs_freq_range
+dfs_create_range_from_freq_bw(qdf_freq_t center_freq,
+			      uint8_t bw)
+{
+	struct dfs_freq_range range;
+
+	range.start_freq = center_freq - bw / 2;
+	range.end_freq  =  center_freq + bw / 2;
+
+	return range;
+}
+
 /* dfs_mark_tree_node_as_cac_done_for_freq() - Mark the preCAC BSTree node as
  * CAC done.
  * @dfs:          Pointer to WLAN DFS structure.
@@ -723,6 +742,7 @@ void dfs_deinit_precac_list(struct wlan_dfs *dfs)
 		}
 	PRECAC_LIST_UNLOCK(dfs);
 
+	dfs_delete_5_and_10m_precac_lists(dfs);
 }
 
 /* dfs_mark_tree_node_as_nol_for_freq() - Mark the preCAC BSTree node as NOL.
@@ -1562,6 +1582,43 @@ dfs_init_precac_5_and_10_lists(struct wlan_dfs *dfs)
 	qdf_mem_free(cur_chan_list);
 }
 
+/**
+ * dfs_get_chan_bw_and_center_from_mode() - Given a dfs channel pointer,
+ * find the chan center freq and bandwidth
+ * @dfs: Pointer to struct wlan_dfs
+ * @chan: Pointer to struct dfs_channel
+ * @cfreq: Center frequency in MHZ
+ *
+ * Return - channel bandwidth in mhz
+ */
+static uint8_t
+dfs_get_chan_bw_and_center_from_chan(struct wlan_dfs *dfs,
+				     struct dfs_channel *chan,
+				     qdf_freq_t *cfreq)
+{
+	uint8_t bw;
+
+	if (WLAN_IS_CHAN_MODE_10(chan)) {
+		bw = DFS_CHWIDTH_10_VAL;
+	} else if (WLAN_IS_CHAN_MODE_5(chan)) {
+		bw = DFS_CHWIDTH_5_VAL;
+	} else if (WLAN_IS_CHAN_MODE_160(chan)) {
+		*cfreq = chan->dfs_ch_mhz_freq_seg2;
+		bw = DFS_CHWIDTH_160_VAL;
+	} else if (WLAN_IS_CHAN_MODE_165(dfs, chan)) {
+		*cfreq = RESTRICTED_80P80_CHAN_CENTER_FREQ;
+		bw = DFS_CHWIDTH_165_VAL;
+	} else if (WLAN_IS_CHAN_MODE_80(chan)) {
+		bw = DFS_CHWIDTH_80_VAL;
+	} else if (WLAN_IS_CHAN_MODE_40(chan)) {
+		bw = DFS_CHWIDTH_40_VAL;
+	} else if (WLAN_IS_CHAN_MODE_20(chan)) {
+		bw = DFS_CHWIDTH_20_VAL;
+	}
+
+	return bw;
+}
+
 /*
  * dfs_is_precac_done() - Verify if preCAC is done.
  * @dfs: Pointer to wlan_dfs.
@@ -1570,7 +1627,9 @@ dfs_init_precac_5_and_10_lists(struct wlan_dfs *dfs)
 bool dfs_is_precac_done(struct wlan_dfs *dfs, struct dfs_channel *chan)
 {
 	bool ret_val = 0;
-	uint16_t cfreq;
+	uint16_t cfreq = chan->dfs_ch_mhz_freq_seg1;
+	struct dfs_freq_range chan_range;
+	uint8_t bw = 0;
 
 	if (!WLAN_IS_CHAN_5GHZ(chan)) {
 		dfs_debug(dfs, WLAN_DEBUG_DFS,
@@ -1579,15 +1638,9 @@ bool dfs_is_precac_done(struct wlan_dfs *dfs, struct dfs_channel *chan)
 		return 0;
 	}
 
-	if (WLAN_IS_CHAN_MODE_160(chan))
-		cfreq = chan->dfs_ch_mhz_freq_seg2;
-	else if (WLAN_IS_CHAN_MODE_165(dfs, chan))
-		cfreq = RESTRICTED_80P80_CHAN_CENTER_FREQ;
-	else
-	    /* Center frequency of 20/40/80MHz is given
-	     * by dfs_ch_mhz_freq_seg1.
-	     */
-		cfreq = chan->dfs_ch_mhz_freq_seg1;
+	dfs_get_chan_bw_and_center_from_chan(dfs, chan, &cfreq);
+
+	chan_range = dfs_create_range_from_freq_bw(cfreq, bw);
 
 	if (WLAN_IS_CHAN_MODE_20(chan) ||
 	    WLAN_IS_CHAN_MODE_40(chan) ||
@@ -1601,6 +1654,12 @@ bool dfs_is_precac_done(struct wlan_dfs *dfs, struct dfs_channel *chan)
 	} else if (WLAN_IS_CHAN_MODE_80_80(chan)) {
 		ret_val = dfs_is_precac_done_on_ht8080_chan(dfs, chan);
 	}
+
+	/* If CAC done is not marked on BST tree, check the 5/10M list for
+	 * CAC done status.
+	 */
+	if (!ret_val)
+		ret_val = dfs_is_cac_done_in_5_10_mhz_list(dfs, chan_range);
 
 	dfs_debug(dfs, WLAN_DEBUG_DFS, "precac_done_status = %d", ret_val);
 	return ret_val;
@@ -1768,19 +1827,21 @@ dfs_is_chwidth_5m_or_10m(enum phy_ch_width ch_width)
 }
 
 /*
- * dfs_mark_precac_done_for_freq() - Mark a frequency as preCAC done.
+ * dfs_mark_cac_done_in_tree() - Mark a frequency as preCAC done.
+ * in the bst tree (consisting of channels of 20m bw and
+ * above).
  * @dfs: Pointer to wlan_dfs.
  * @pri_ch_freq: Primary 80MHZ center frequency.
  * @sec_ch_freq: Secondary 80MHZ center frequency.
  * @ch_width: Channel width.
- * @is_adfs_completed_by_all_stas: boolean to represent ADFS completion by
- * all connected clients.
  */
-void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
-				   uint16_t pri_ch_freq,
-				   uint16_t sec_ch_freq,
-				   enum phy_ch_width ch_width,
-				   bool is_adfs_completed_by_all_stas)
+
+static void
+dfs_mark_cac_done_in_tree(struct wlan_dfs *dfs,
+			  uint16_t pri_ch_freq,
+			  uint16_t sec_ch_freq,
+			  enum phy_ch_width ch_width,
+			  bool is_adfs_completed_by_all_stas)
 {
 	struct dfs_precac_entry *precac_entry = NULL, *tmp_precac_entry = NULL;
 	uint16_t channels[NUM_CHANNELS_160MHZ];
@@ -1824,18 +1885,101 @@ void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
 }
 
 /*
+ * dfs_mark_cac_done_on_80p_80() - Mark a 80p80 channel as preCAC done.
+ * @dfs: Pointer to wlan_dfs.
+ * @pri_ch_freq: Primary 80MHZ center frequency.
+ * @sec_ch_freq: Secondary 80MHZ center frequency.
+ * @ch_width: Channel width.
+ */
+static void
+dfs_mark_cac_done_on_80p_80(struct wlan_dfs *dfs,
+			    uint16_t pri_ch_freq,
+			    uint16_t sec_ch_freq,
+			    enum phy_ch_width ch_width)
+{
+	uint8_t bw;
+
+	if (ch_width == CH_WIDTH_80P80MHZ)
+		bw = DFS_CHWIDTH_80_VAL;
+
+	dfs_mark_5_and_10mhz_list_as_cac_done(dfs, pri_ch_freq, bw);
+
+	if (sec_ch_freq)
+		dfs_mark_5_and_10mhz_list_as_cac_done(dfs, sec_ch_freq, bw);
+}
+
+/*
+ * dfs_mark_precac_done_in_list() - Mark a frequency as preCAC done in
+ * the precac linked list of 5m and 10m channels.
+ * @dfs: Pointer to wlan_dfs.
+ * @pri_ch_freq: Primary 80MHZ center frequency.
+ * @sec_ch_freq: Secondary 80MHZ center frequency.
+ * @ch_width: Channel width.
+ */
+static void dfs_mark_precac_done_in_list(struct wlan_dfs *dfs,
+					 uint16_t pri_ch_freq,
+					 uint16_t sec_ch_freq,
+					 enum phy_ch_width ch_width)
+{
+	uint8_t bw = wlan_reg_get_bw_value(ch_width);
+
+	if (!reg_is_dfs_for_freq(dfs->dfs_pdev_obj, pri_ch_freq))
+		return;
+
+	if (ch_width == CH_WIDTH_80P80MHZ) {
+	    dfs_mark_cac_done_on_80p_80(dfs, pri_ch_freq, sec_ch_freq, bw);
+	} else {
+	    dfs_mark_5_and_10mhz_list_as_cac_done(dfs, pri_ch_freq, bw);
+	}
+}
+
+/*
+ * dfs_mark_precac_done_for_freq() - Mark a frequency as preCAC done.
+ * Marks the frequency as precac done in the linked list (consisting of 5m
+ * and 10m channels) and in the bst tree (consisting of channels of 20m bw and
+ * above).
+ * @dfs: Pointer to wlan_dfs.
+ * @pri_ch_freq: Primary 80MHZ center frequency.
+ * @sec_ch_freq: Secondary 80MHZ center frequency.
+ * @ch_width: Channel width.
+ * @is_adfs_completed_by_all_stas: boolean to represent ADFS completion by
+ * all connected clients.
+ */
+void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
+				   uint16_t pri_ch_freq,
+				   uint16_t sec_ch_freq,
+				   enum phy_ch_width ch_width,
+				   bool is_adfs_completed_by_all_stas)
+{
+	/* eg: When a 20MHZ channel is CAC done, mark the 5/10M channels that
+	 * are subset of this 20MHZ channel as CAC done.
+	 */
+	dfs_mark_precac_done_in_list(dfs, pri_ch_freq, sec_ch_freq, ch_width);
+
+	if (!dfs_is_chwidth_5m_or_10m(ch_width))
+		dfs_mark_cac_done_in_tree(dfs, pri_ch_freq, sec_ch_freq,
+					  ch_width,
+					  is_adfs_completed_by_all_stas);
+
+}
+
+/*
  * dfs_mark_precac_nol_for_freq() - Mark a channel as preCAC NOL.
  * @dfs: Pointer to wlan_dfs.
  * @is_radar_found_on_secondary_seg: Flag to indicate second segment radar.
  * @detector_id: Detector ID.
  * @freq_list: frequency list.
  * @num_channels: Number of channels.
+ * @radar_freq_range: Frequency range of radar
+ * @range_count: Range count
  */
 void dfs_mark_precac_nol_for_freq(struct wlan_dfs *dfs,
 				  uint8_t is_radar_found_on_secondary_seg,
 				  uint8_t detector_id,
 				  uint16_t *freq_lst,
-				  uint8_t num_channels)
+				  uint8_t num_channels,
+				  struct dfs_freq_range *radar_freq_range,
+				  uint8_t range_count)
 {
 	struct dfs_precac_entry *precac_entry = NULL, *tmp_precac_entry = NULL;
 	struct wlan_objmgr_psoc *psoc;
@@ -1856,6 +2000,8 @@ void dfs_mark_precac_nol_for_freq(struct wlan_dfs *dfs,
 		  dfs->dfs_precac_secondary_freq_mhz,
 		  dfs->dfs_precac_primary_freq_mhz);
 
+	dfs_modify_precac_5_10_mhz_list_for_nol(dfs, radar_freq_range,
+						range_count, true);
 	/*
 	 * Even if radar found on primary, we need to move
 	 * the channel from precac-required-list and precac-done-list
@@ -2325,3 +2471,232 @@ void dfs_unmark_rcac_done(struct wlan_dfs *dfs)
 	PRECAC_LIST_UNLOCK(dfs);
 }
 #endif
+
+/**
+ * dfs_update_precac_entry_for_nol() - Mark/unmark a given precac entry
+ * as nol
+ * @precac_entry: Pointer to struct dfs_precac_5_10_entry
+ * @nol_ranges: Pointer to struct dfs_freq_range
+ * @nol_range_count: nol count
+ * @is_nol_found: bool to indicate if nol is found
+ *
+ * Return - None
+ */
+static void
+dfs_update_precac_entry_for_nol(struct dfs_precac_5_10_entry *precac_entry,
+				struct dfs_freq_range *nol_ranges,
+				uint8_t nol_range_count,
+				bool is_nol_found)
+{
+	struct dfs_freq_range pcac_list_freq_range;
+	uint8_t i;
+
+	pcac_list_freq_range =
+		dfs_create_range_from_freq_bw(precac_entry->center_freq,
+					      precac_entry->bandwidth);
+
+	for (i = 0; i < nol_range_count; i++) {
+		if (dfs_is_range_overlap(nol_ranges[i],
+					 pcac_list_freq_range)) {
+			if (is_nol_found) {
+				precac_entry->is_freq_nol = true;
+				precac_entry->is_cac_done = false;
+			} else {
+				precac_entry->is_freq_nol = false;
+			}
+		}
+	}
+}
+
+/**
+ * dfs_mark_unmark_5m_or_10m_chan_as_nol() - Given a precac list head,
+ * mark/unmark the channels of the list that overlap with nol_ranges
+ * as nol based on the input flag "is_nol_found".
+ * @dfs: Pointer to struct wlan_dfs
+ * @nol_ranges: Pointer to struct dfs_freq_range
+ * @nol_range_count: nol range count
+ * @is_nol_found: Bool to indicate if nol chan should be marked/unmarked
+ *
+ * Return - None
+ */
+static void
+dfs_mark_unmark_5m_or_10m_chan_as_nol(struct wlan_dfs *dfs,
+				      struct dfs_freq_range *nol_ranges,
+				      uint8_t nol_range_count,
+				      bool is_nol_found)
+{
+	struct dfs_precac_5_10_entry *pcac_entry;
+
+	PRECAC_LIST_LOCK(dfs);
+	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_5m_list, pe_5_10_list) {
+		dfs_update_precac_entry_for_nol(pcac_entry, nol_ranges,
+						nol_range_count,
+						is_nol_found);
+	}
+	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_10m_list, pe_5_10_list) {
+		dfs_update_precac_entry_for_nol(pcac_entry, nol_ranges,
+						nol_range_count,
+						is_nol_found);
+	}
+	PRECAC_LIST_UNLOCK(dfs);
+}
+
+void
+dfs_modify_precac_5_10_mhz_list_for_nol(struct wlan_dfs *dfs,
+					struct dfs_freq_range *nol_ranges,
+					uint8_t nol_range_count,
+					bool is_nol_found)
+{
+	if (!nol_range_count || !nol_ranges)
+		return;
+
+	dfs_mark_unmark_5m_or_10m_chan_as_nol(dfs, nol_ranges, nol_range_count,
+					      is_nol_found);
+}
+
+bool
+dfs_is_cac_done_in_5_10_mhz_list(struct wlan_dfs *dfs,
+				 struct dfs_freq_range chan_range)
+{
+	struct dfs_precac_5_10_entry *pcac_entry;
+	struct dfs_freq_range pcac_entry_freq_range;
+	bool is_cac_done = false;
+
+	PRECAC_LIST_LOCK(dfs);
+	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_5m_list, pe_5_10_list) {
+
+	    pcac_entry_freq_range =
+		dfs_create_range_from_freq_bw(pcac_entry->center_freq,
+					      pcac_entry->bandwidth);
+	    /**
+	     * There can be more than 1 overlapping precac channel
+	     * range with the given i/p channel range. Hence
+	     * the input range is considered as cac done only
+	     * if all the overlapping ranges are caced. If atleast
+	     * one overlapping range is not CACed, then the input
+	     * range is marked as non-CACed.
+	     */
+	    if (dfs_is_range_overlap(chan_range, pcac_entry_freq_range)) {
+		if (!(pcac_entry->is_cac_done)) {
+		    is_cac_done = false;
+		    break;
+		}
+		is_cac_done = true;
+	    }
+	}
+	PRECAC_LIST_UNLOCK(dfs);
+
+	if (is_cac_done)
+	    return true;
+
+	is_cac_done = false;
+	PRECAC_LIST_LOCK(dfs);
+	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_10m_list, pe_5_10_list) {
+
+	    pcac_entry_freq_range =
+		dfs_create_range_from_freq_bw(pcac_entry->center_freq,
+					      pcac_entry->bandwidth);
+	    /**
+	     * There can be more than 1 overlapping precac channel
+	     * range with the given i/p channel range. Hence
+	     * the input range is considered as cac done only
+	     * if all the overlapping ranges are caced. If atleast
+	     * one overlapping range is not CACed, then the input
+	     * range is marked as non-CACed.
+	     */
+	    if (dfs_is_range_overlap(chan_range, pcac_entry_freq_range)) {
+		if (!(pcac_entry->is_cac_done)) {
+		    is_cac_done = false;
+		    break;
+		}
+		is_cac_done = true;
+	    }
+	}
+	PRECAC_LIST_UNLOCK(dfs);
+
+	return is_cac_done;
+}
+
+static bool dfs_is_range_subset(struct dfs_freq_range range_large,
+				struct dfs_freq_range range_small)
+{
+	return ((range_large.start_freq <= range_small.start_freq) &&
+		(range_large.end_freq >= range_small.end_freq));
+}
+
+/**
+ * dfs_mark_precac_done_and_notify() - Mark the subset range of
+ * the given input range as precac done.
+ * @input_range: Input range
+ * @center_freq: center frequency
+ * @pcac_entry: Pointer to struct dfs_precac_5_10_entry
+ * @dfs: pointer to struct wlan_dfs
+ *
+ * Return - none
+ */
+static void
+dfs_mark_precac_done_and_notify(struct dfs_freq_range input_range,
+				qdf_freq_t center_freq,
+				struct dfs_precac_5_10_entry *pcac_entry,
+				struct wlan_dfs *dfs)
+{
+	struct dfs_freq_range pcac_freq_range;
+
+	pcac_freq_range =
+	    dfs_create_range_from_freq_bw(pcac_entry->center_freq,
+					  pcac_entry->bandwidth);
+	if (dfs_is_range_subset(input_range, pcac_freq_range) &&
+	    !pcac_entry->is_freq_nol) {
+	    pcac_entry->is_cac_done = true;
+	    utils_dfs_deliver_event(dfs->dfs_pdev_obj,
+				    center_freq,
+				    WLAN_EV_PCAC_COMPLETED);
+	}
+}
+
+
+void dfs_mark_5_and_10mhz_list_as_cac_done(struct wlan_dfs *dfs,
+					   qdf_freq_t center_freq,
+					   uint8_t bw)
+{
+	struct dfs_freq_range input_range;
+	struct dfs_precac_5_10_entry *pcac_entry;
+
+	input_range = dfs_create_range_from_freq_bw(center_freq, bw);
+
+	PRECAC_LIST_LOCK(dfs);
+	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_5m_list, pe_5_10_list) {
+	    dfs_mark_precac_done_and_notify(input_range, center_freq,
+					    pcac_entry, dfs);
+	}
+
+	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_10m_list, pe_5_10_list) {
+	    dfs_mark_precac_done_and_notify(input_range, center_freq,
+					    pcac_entry, dfs);
+	}
+	PRECAC_LIST_UNLOCK(dfs);
+
+}
+
+void dfs_delete_5_and_10m_precac_lists(struct wlan_dfs *dfs)
+{
+	struct dfs_precac_5_10_entry *pcac_entry = NULL, *tmp_pcac_entry = NULL;
+
+	dfs_debug(dfs, WLAN_DEBUG_DFS,
+		  "Free the 5MHz and 10MHz preCAC list");
+
+	PRECAC_LIST_LOCK(dfs);
+	STAILQ_FOREACH_SAFE(pcac_entry, &dfs->dfs_precac_5m_list, pe_5_10_list,
+			    tmp_pcac_entry) {
+		STAILQ_REMOVE(&dfs->dfs_precac_5m_list, pcac_entry,
+			      dfs_precac_5_10_entry, pe_5_10_list);
+		qdf_mem_free(pcac_entry);
+	}
+	STAILQ_FOREACH_SAFE(pcac_entry, &dfs->dfs_precac_10m_list, pe_5_10_list,
+			    tmp_pcac_entry) {
+		STAILQ_REMOVE(&dfs->dfs_precac_10m_list, pcac_entry,
+			      dfs_precac_5_10_entry, pe_5_10_list);
+		qdf_mem_free(pcac_entry);
+	}
+	PRECAC_LIST_UNLOCK(dfs);
+}
