@@ -502,6 +502,58 @@ void dp_wrap_vdev_clear_psta(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
+ * dp_wrap_mat_params_update() - Update MAT params
+ *
+ * @vdev: handle to the objmgr vdev.
+ * Return: void
+ */
+void dp_wrap_mat_params_update(struct wlan_objmgr_vdev *vdev)
+{
+	struct dp_wrap_vdev *wvdev;
+	struct wlan_objmgr_pdev *pdev;
+
+	if (vdev) {
+		pdev = vdev->vdev_objmgr.wlan_pdev;
+		if (!pdev) {
+			qwrap_err(" pdev is NULL");
+			return;
+		}
+		wvdev = dp_wrap_get_vdev_handle(vdev);
+		if (!wvdev) {
+			qwrap_err(" wrap_vdev is NULL");
+			return;
+		}
+
+		if (qdf_is_macaddr_zero((struct qdf_mac_addr *)vdev->vdev_mlme.mldaddr)) {
+			return;
+		}
+
+		if (wvdev->is_psta) {
+			if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+				WLAN_ADDR_COPY(wvdev->wrap_dev_vma,
+						vdev->vdev_mlme.mldaddr);
+			} else {
+				WLAN_ADDR_COPY(wvdev->wrap_dev_vma,
+						vdev->vdev_mlme.macaddr);
+			}
+		}
+
+		if (wvdev->is_mpsta) {
+			dp_wrap_dev_remove(vdev);
+			dp_wrap_dev_remove_vma(vdev);
+			if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+				WLAN_ADDR_COPY(wvdev->wrap_dev_oma,
+						vdev->vdev_mlme.mldaddr);
+			} else {
+				WLAN_ADDR_COPY(wvdev->wrap_dev_oma,
+						vdev->vdev_mlme.macaddr);
+			}
+			dp_wrap_dev_add(vdev);
+		}
+	}
+}
+
+/**
  * dp_wrap_vdev_set_mpsta() - Set mpsta flag
  *
  * @vdev: handle to the objmgr vdev.
