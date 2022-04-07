@@ -1198,6 +1198,62 @@ static QDF_STATUS extract_pdev_tpc_config_ev_param_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef QCA_RSSI_DB2DBM
+/**
+ * extract_pdev_rssi_dbm_conv_ev_param_tlv() - extract rssi_db2dbm event
+ * @wmi_handle: wmi handle
+ * @param evt_buf: pointer to event buffer
+ * @param buf: Pointer to hold rssi_db2dbm param
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS extract_pdev_rssi_dbm_conv_ev_param_tlv(
+				wmi_unified_t wmi_handle,
+				void *evt_buf,
+				struct rssi_db2dbm_param *buf)
+{
+	WMI_PDEV_RSSI_DBM_CONVERSION_PARAMS_INFO_EVENTID_param_tlvs *param_buf;
+	wmi_rssi_dbm_conversion_params_info_event_fixed_param *ev;
+	wmi_rssi_dbm_conversion_params_info *rssi_info_buf;
+	wmi_rssi_dbm_conversion_temp_offset_info *tmp_offset_buf;
+
+
+	if (!evt_buf) {
+		wmi_err("RSSI_DB2DBM event buffer is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	param_buf = (WMI_PDEV_RSSI_DBM_CONVERSION_PARAMS_INFO_EVENTID_param_tlvs *)evt_buf;
+	ev = (wmi_rssi_dbm_conversion_params_info_event_fixed_param *)param_buf->fixed_param;
+	buf->pdev_id = wmi_handle->ops->convert_pdev_id_target_to_host(wmi_handle,
+								   ev->pdev_id);
+	tmp_offset_buf = param_buf->rssi_temp_offset;
+
+	if (tmp_offset_buf &&
+	    (WMITLV_TAG_STRUC_wmi_rssi_dbm_conversion_temp_offset_info == WMITLV_GET_TLVTAG(tmp_offset_buf->tlv_header)) &&
+	    (WMITLV_GET_STRUCT_TLVLEN(wmi_rssi_dbm_conversion_temp_offset_info) == WMITLV_GET_TLVLEN(tmp_offset_buf->tlv_header))) {
+		qdf_mem_copy(&(buf->temp_off_param),
+			     (((u_int8_t *)tmp_offset_buf) + WMI_TLV_HDR_SIZE),
+			     sizeof(struct rssi_temp_off_param));
+		buf->rssi_temp_off_present = true;
+	}
+
+	rssi_info_buf = param_buf->rssi_dbm_conversion_params;
+
+	if (rssi_info_buf &&
+	    (WMITLV_TAG_STRUC_wmi_rssi_dbm_conversion_params_info == WMITLV_GET_TLVTAG(rssi_info_buf->tlv_header)) &&
+	    (WMITLV_GET_STRUCT_TLVLEN(wmi_rssi_dbm_conversion_params_info) == WMITLV_GET_TLVLEN(rssi_info_buf->tlv_header))) {
+		qdf_mem_copy(&(buf->rssi_dbm_param),
+			     (((u_int8_t *)rssi_info_buf) + WMI_TLV_HDR_SIZE),
+			     sizeof(struct rssi_dbm_conv_param));
+		buf->rssi_dbm_info_present = true;
+		buf->rssi_dbm_param.curr_bw = wmi_map_ch_width(buf->rssi_dbm_param.curr_bw);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * extract_peer_sta_kickout_ev_tlv() - extract peer sta kickout event
  * @wmi_handle: wmi handle
@@ -3718,5 +3774,8 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_set_nss_probe_intvl_cmd = send_set_nss_probe_intvl_cmd_tlv;
 	ops->send_sawf_create_cmd = send_sawf_create_cmd_tlv;
 	ops->send_sawf_disable_cmd = send_sawf_disable_cmd_tlv;
+#endif
+#ifdef QCA_RSSI_DB2DBM
+	ops->extract_pdev_rssi_dbm_conv_ev_param = extract_pdev_rssi_dbm_conv_ev_param_tlv;
 #endif
 }

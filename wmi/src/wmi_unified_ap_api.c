@@ -385,6 +385,19 @@ QDF_STATUS wmi_extract_pdev_tpc_config_ev_param(
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef QCA_RSSI_DB2DBM
+QDF_STATUS wmi_extract_pdev_rssi_dbm_conv_ev_param(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct rssi_db2dbm_param *param)
+{
+	if (wmi_handle->ops->extract_pdev_rssi_dbm_conv_ev_param)
+		return wmi_handle->ops->extract_pdev_rssi_dbm_conv_ev_param(
+					wmi_handle, evt_buf, param);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 QDF_STATUS wmi_extract_nfcal_power_ev_param(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_host_pdev_nfcal_power_all_channels_event *param)
