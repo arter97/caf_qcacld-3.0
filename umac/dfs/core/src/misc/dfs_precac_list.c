@@ -1523,8 +1523,10 @@ dfs_print_precac_elements(struct wlan_dfs *dfs,
 	bw = precac_entry->bandwidth;
 
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "ieee=%u bw=%u, cac_done: %u "
-		 "is_nol: %u", ch_ieee, bw, precac_entry->is_cac_done,
-		 precac_entry->is_freq_nol);
+		 "is_nol: %u, is_sta_adfs_done: %s", ch_ieee, bw,
+		 precac_entry->is_cac_done, precac_entry->is_freq_nol,
+		 (precac_entry->is_adfs_completed_by_all_stas) ? "true" :
+		 "false");
 }
 
 /**
@@ -1883,22 +1885,27 @@ dfs_mark_cac_done_in_tree(struct wlan_dfs *dfs,
  * @pri_ch_freq: Primary 80MHZ center frequency.
  * @sec_ch_freq: Secondary 80MHZ center frequency.
  * @ch_width: Channel width.
+ * @is_adfs_completed_by_all_stas: boolean to represent ADFS completion by
+ * all connected clients.
  */
 static void
 dfs_mark_cac_done_on_80p_80(struct wlan_dfs *dfs,
 			    uint16_t pri_ch_freq,
 			    uint16_t sec_ch_freq,
-			    enum phy_ch_width ch_width)
+			    enum phy_ch_width ch_width,
+			    bool is_adfs_completed_by_all_stas)
 {
 	uint8_t bw;
 
 	if (ch_width == CH_WIDTH_80P80MHZ)
 		bw = DFS_CHWIDTH_80_VAL;
 
-	dfs_mark_5_and_10mhz_list_as_cac_done(dfs, pri_ch_freq, bw);
+	dfs_mark_5_and_10mhz_list_as_cac_done(dfs, pri_ch_freq, bw,
+					      is_adfs_completed_by_all_stas);
 
 	if (sec_ch_freq)
-		dfs_mark_5_and_10mhz_list_as_cac_done(dfs, sec_ch_freq, bw);
+		dfs_mark_5_and_10mhz_list_as_cac_done(
+			dfs, sec_ch_freq, bw, is_adfs_completed_by_all_stas);
 }
 
 /*
@@ -1908,11 +1915,14 @@ dfs_mark_cac_done_on_80p_80(struct wlan_dfs *dfs,
  * @pri_ch_freq: Primary 80MHZ center frequency.
  * @sec_ch_freq: Secondary 80MHZ center frequency.
  * @ch_width: Channel width.
+ * @is_adfs_completed_by_all_stas: boolean to represent ADFS completion by
+ * all connected clients.
  */
 static void dfs_mark_precac_done_in_list(struct wlan_dfs *dfs,
 					 uint16_t pri_ch_freq,
 					 uint16_t sec_ch_freq,
-					 enum phy_ch_width ch_width)
+					 enum phy_ch_width ch_width,
+					 bool is_adfs_completed_by_all_stas)
 {
 	uint8_t bw = wlan_reg_get_bw_value(ch_width);
 
@@ -1920,9 +1930,11 @@ static void dfs_mark_precac_done_in_list(struct wlan_dfs *dfs,
 		return;
 
 	if (ch_width == CH_WIDTH_80P80MHZ) {
-	    dfs_mark_cac_done_on_80p_80(dfs, pri_ch_freq, sec_ch_freq, bw);
+		dfs_mark_cac_done_on_80p_80(dfs, pri_ch_freq, sec_ch_freq, bw,
+					    is_adfs_completed_by_all_stas);
 	} else {
-	    dfs_mark_5_and_10mhz_list_as_cac_done(dfs, pri_ch_freq, bw);
+		dfs_mark_5_and_10mhz_list_as_cac_done(
+			dfs, pri_ch_freq, bw, is_adfs_completed_by_all_stas);
 	}
 }
 
@@ -1947,7 +1959,8 @@ void dfs_mark_precac_done_for_freq(struct wlan_dfs *dfs,
 	/* eg: When a 20MHZ channel is CAC done, mark the 5/10M channels that
 	 * are subset of this 20MHZ channel as CAC done.
 	 */
-	dfs_mark_precac_done_in_list(dfs, pri_ch_freq, sec_ch_freq, ch_width);
+	dfs_mark_precac_done_in_list(dfs, pri_ch_freq, sec_ch_freq, ch_width,
+				     is_adfs_completed_by_all_stas);
 
 	if (!dfs_is_chwidth_5m_or_10m(ch_width))
 		dfs_mark_cac_done_in_tree(dfs, pri_ch_freq, sec_ch_freq,
@@ -2131,11 +2144,13 @@ static void dfs_print_node_data(struct wlan_dfs *dfs,
 	if (node->n_valid_subchs != N_SUBCHS_FOR_BANDWIDTH(node->bandwidth))
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "%s%s", prefix, inv);
 	else
-		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "%s%u(%u,%u)",
+		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "%s%u(%u,%u, %s)",
 			 prefix,
 			 node->ch_ieee,
 			 node->n_caced_subchs,
-			 node->n_nol_subchs);
+			 node->n_nol_subchs,
+			 (node->is_adfs_completed_by_all_stas) ? "true" :
+			 "false");
 }
 
 /* dfs_print_precac_tree_nodes() - print the precac tree nodes using
@@ -2273,7 +2288,8 @@ void dfs_print_precaclists(struct wlan_dfs *dfs)
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 		 "Precac status of all nodes in the list:");
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
-		 "NOTE: Syntax for each node: <ch_ieee>(<CAC>,<NOL>)");
+		 "NOTE: Syntax for each node: <ch_ieee>(<CAC>,<NOL>,"
+		 "<STA_ADFS>)");
 	TAILQ_FOREACH(tmp_precac_entry,
 			&dfs->dfs_precac_list,
 			pe_list) {
@@ -2625,6 +2641,8 @@ bool dfs_is_range_subset(struct dfs_freq_range range_large,
  * @center_freq: center frequency
  * @pcac_entry: Pointer to struct dfs_precac_5_10_entry
  * @dfs: pointer to struct wlan_dfs
+ * @is_adfs_completed_by_all_stas: boolean to represent ADFS completion by
+ * all connected clients.
  *
  * Return - none
  */
@@ -2632,7 +2650,8 @@ static void
 dfs_mark_precac_done_and_notify(struct dfs_freq_range input_range,
 				qdf_freq_t center_freq,
 				struct dfs_precac_5_10_entry *pcac_entry,
-				struct wlan_dfs *dfs)
+				struct wlan_dfs *dfs,
+				bool is_adfs_completed_by_all_stas)
 {
 	struct dfs_freq_range pcac_freq_range;
 
@@ -2642,6 +2661,8 @@ dfs_mark_precac_done_and_notify(struct dfs_freq_range input_range,
 	if (dfs_is_range_subset(input_range, pcac_freq_range) &&
 	    !pcac_entry->is_freq_nol) {
 	    pcac_entry->is_cac_done = true;
+	    pcac_entry->is_adfs_completed_by_all_stas =
+		    is_adfs_completed_by_all_stas;
 	    utils_dfs_deliver_event(dfs->dfs_pdev_obj,
 				    center_freq,
 				    WLAN_EV_PCAC_COMPLETED);
@@ -2651,7 +2672,8 @@ dfs_mark_precac_done_and_notify(struct dfs_freq_range input_range,
 
 void dfs_mark_5_and_10mhz_list_as_cac_done(struct wlan_dfs *dfs,
 					   qdf_freq_t center_freq,
-					   uint8_t bw)
+					   uint8_t bw,
+					   bool is_adfs_completed_by_all_stas)
 {
 	struct dfs_freq_range input_range;
 	struct dfs_precac_5_10_entry *pcac_entry;
@@ -2661,15 +2683,16 @@ void dfs_mark_5_and_10mhz_list_as_cac_done(struct wlan_dfs *dfs,
 	PRECAC_LIST_LOCK(dfs);
 	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_5m_list, pe_5_10_list) {
 	    dfs_mark_precac_done_and_notify(input_range, center_freq,
-					    pcac_entry, dfs);
+					    pcac_entry, dfs,
+					    is_adfs_completed_by_all_stas);
 	}
 
 	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_10m_list, pe_5_10_list) {
 	    dfs_mark_precac_done_and_notify(input_range, center_freq,
-					    pcac_entry, dfs);
+					    pcac_entry, dfs,
+					    is_adfs_completed_by_all_stas);
 	}
 	PRECAC_LIST_UNLOCK(dfs);
-
 }
 
 void dfs_delete_5_and_10m_precac_lists(struct wlan_dfs *dfs)

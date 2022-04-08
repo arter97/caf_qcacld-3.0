@@ -2363,6 +2363,7 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 				 radar_found,
 				 nol_freq_list,
 				 num_channels,
+				 radar_freq_range,
 				 &wait_for_csa);
 
 	if (is_radar_source_agile)
