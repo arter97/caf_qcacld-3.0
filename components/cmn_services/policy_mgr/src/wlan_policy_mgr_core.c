@@ -3201,23 +3201,9 @@ static bool policy_mgr_is_3rd_conn_on_same_band(uint32_t ch_freq)
 	return ret;
 }
 
-/**
- * policy_mgr_allow_new_home_channel() - Check for allowed number of
- * home channels
- * @mode: policy_mgr_con_mode of new connection,
- * @channel: channel on which new connection is coming up
- * @num_connections: number of current connections
- * @is_dfs_ch: DFS channel or not
- *
- * When a new connection is about to come up check if current
- * concurrency combination including the new connection is
- * allowed or not based on the HW capability
- *
- * Return: True/False
- */
 bool policy_mgr_allow_new_home_channel(
 	struct wlan_objmgr_psoc *psoc, enum policy_mgr_con_mode mode,
-	uint32_t ch_freq, uint32_t num_connections, bool is_dfs_ch)
+	qdf_freq_t ch_freq, uint32_t num_connections, bool is_dfs_ch)
 {
 	bool status = true;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
@@ -3232,7 +3218,13 @@ bool policy_mgr_allow_new_home_channel(
 		policy_mgr_get_mcc_to_scc_switch_mode(psoc);
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
-	if (num_connections == 2) {
+	if (num_connections == 3) {
+		status = policy_mgr_allow_4th_new_freq(psoc,
+						pm_conc_connection_list[0].freq,
+						pm_conc_connection_list[1].freq,
+						pm_conc_connection_list[2].freq,
+						ch_freq);
+	} else if (num_connections == 2) {
 	/* No SCC or MCC combination is allowed with / on DFS channel */
 		if ((mcc_to_scc_switch ==
 		QDF_MCC_TO_SCC_SWITCH_FORCE_PREFERRED_WITHOUT_DISCONNECTION) &&
