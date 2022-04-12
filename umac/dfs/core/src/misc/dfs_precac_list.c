@@ -1809,14 +1809,7 @@ dfs_is_chwidth_10m(enum phy_ch_width ch_width)
 	return false;
 }
 
-/**
- * dfs_is_chwidth_5m_or_10m() - Return true if channel width is 5mhz or 10mhz,
- * false otherwise.
- * @ch_width: Channel width
- *
- * Return - True if channel width is 5mhz or 10mhz , false otherwise
- */
-static bool
+bool
 dfs_is_chwidth_5m_or_10m(enum phy_ch_width ch_width)
 {
 	if (dfs_is_chwidth_10m(ch_width) ||
@@ -2590,6 +2583,7 @@ dfs_is_cac_done_in_5_10_mhz_list(struct wlan_dfs *dfs,
 	    return true;
 
 	is_cac_done = false;
+
 	PRECAC_LIST_LOCK(dfs);
 	STAILQ_FOREACH(pcac_entry, &dfs->dfs_precac_10m_list, pe_5_10_list) {
 
@@ -2597,14 +2591,14 @@ dfs_is_cac_done_in_5_10_mhz_list(struct wlan_dfs *dfs,
 		dfs_create_range_from_freq_bw(pcac_entry->center_freq,
 					      pcac_entry->bandwidth);
 	    /**
-	     * There can be more than 1 overlapping precac channel
+	     * There can be more than 1 subset precac channel
 	     * range with the given i/p channel range. Hence
 	     * the input range is considered as cac done only
-	     * if all the overlapping ranges are caced. If atleast
-	     * one overlapping range is not CACed, then the input
+	     * if all the subset ranges are caced. If atleast
+	     * one subset range is not CACed, then the input
 	     * range is marked as non-CACed.
 	     */
-	    if (dfs_is_range_overlap(chan_range, pcac_entry_freq_range)) {
+	    if (dfs_is_range_subset(chan_range, pcac_entry_freq_range)) {
 		if (!(pcac_entry->is_cac_done)) {
 		    is_cac_done = false;
 		    break;
@@ -2617,8 +2611,8 @@ dfs_is_cac_done_in_5_10_mhz_list(struct wlan_dfs *dfs,
 	return is_cac_done;
 }
 
-static bool dfs_is_range_subset(struct dfs_freq_range range_large,
-				struct dfs_freq_range range_small)
+bool dfs_is_range_subset(struct dfs_freq_range range_large,
+			 struct dfs_freq_range range_small)
 {
 	return ((range_large.start_freq <= range_small.start_freq) &&
 		(range_large.end_freq >= range_small.end_freq));

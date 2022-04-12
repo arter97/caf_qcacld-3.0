@@ -2283,13 +2283,15 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 	bool is_radar_source_agile =
 		(radar_found->detector_id == dfs_get_agile_detector_id(dfs));
 	bool wait_for_csa = false;
+	struct dfs_freq_range radar_freq_range;
+	uint8_t nol_count;
 
 	dfs_compute_radar_found_cfreq(dfs, radar_found, &freq_center);
 	radarfound_freq = freq_center + radar_found->freq_offset;
 	if (is_radar_source_agile)
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
-			 "Radar found on Agile detector freq=%d radar freq=%d",
-			 freq_center, radarfound_freq);
+			 "Radar found on Agile detector freq=%d radar freq=%d, bw=%d",
+			 freq_center, radarfound_freq, radar_found->chan_width);
 	else if (radar_found->segment_id == SEG_ID_SECONDARY)
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			 "Radar found on second segment.Radarfound Freq=%d MHz.Secondary Chan cfreq=%d MHz.",
@@ -2310,15 +2312,10 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 
 	 dfs_reset_bangradar(dfs);
 
-	 status = dfs_radar_add_channel_list_to_nol_for_freq(dfs,
-			 freq_list,
-			 nol_freq_list,
-			 &num_channels);
-	 if (QDF_IS_STATUS_ERROR(status)) {
-		dfs_err(dfs, WLAN_DEBUG_DFS,
-			"radar event received on invalid channel");
-		goto exit;
-	 }
+	 radar_freq_range =
+	     dfs_find_radar_freq_range_and_add_to_nol(dfs,
+						      radar_found,
+						      freq_center);
 	 /*
 	  * If precac is running and the radar found in secondary
 	  * VHT80 mark the channel as radar and add to NOL list.
@@ -2339,11 +2336,16 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 	 dfs_debug(dfs, WLAN_DEBUG_DFS,
 			 "%s: %d Radar found on dfs detector:%d",
 			 __func__, __LINE__, radar_found->detector_id);
+
+	 nol_count =
+	     dfs_convert_rangelist_2_reg_freqlist(dfs, &radar_freq_range,
+						  1, nol_freq_list);
+
 	 dfs_mark_precac_nol_for_freq(dfs,
-			 dfs->is_radar_found_on_secondary_seg,
-			 radar_found->detector_id,
-			 nol_freq_list,
-			 num_channels);
+				      dfs->is_radar_found_on_secondary_seg,
+				      radar_found->detector_id,
+				      nol_freq_list,
+				      nol_count, &radar_freq_range, 1);
 	 /*
 	  * EV 129487 : We have detected radar in the channel,
 	  * stop processing PHY error data as this can cause
