@@ -2827,6 +2827,7 @@ static QDF_STATUS send_lcr_cmd_tlv(wmi_unified_t wmi_handle,
 	uint32_t buf_len;
 	uint8_t *civic_info;
 	uint8_t lcr_info_len;
+	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 
 	buf_len = req_head_len + lcr_cfg_head_len;
 
@@ -2869,10 +2870,11 @@ static QDF_STATUS send_lcr_cmd_tlv(wmi_unified_t wmi_handle,
 	qdf_mem_copy(&civic_info[2], lcr_info->civic_info, lcr_info->civic_len);
 
 	if (wmi_handle->ops->send_start_oem_data_cmd)
-		return wmi_handle->ops->send_start_oem_data_cmd(wmi_handle,
+		ret = wmi_handle->ops->send_start_oem_data_cmd(wmi_handle,
 								buf_len, buf);
 
-	return QDF_STATUS_E_FAILURE;
+	qdf_mem_free(buf);
+	return ret;
 }
 
 static QDF_STATUS send_lci_cmd_tlv(wmi_unified_t wmi_handle,
@@ -2884,6 +2886,7 @@ static QDF_STATUS send_lci_cmd_tlv(wmi_unified_t wmi_handle,
 	uint32_t lci_cfg_head_len = sizeof(struct wmi_rtt_oem_lci_cfg_head);
 	uint8_t *buf;
 	uint32_t buf_len;
+	QDF_STATUS ret = QDF_STATUS_E_FAILURE;
 
 	buf_len = req_head_len + lci_cfg_head_len;
 
@@ -2928,10 +2931,11 @@ static QDF_STATUS send_lci_cmd_tlv(wmi_unified_t wmi_handle,
 	lci_config->usage_rules = lci_info->usage_rules;
 
 	if (wmi_handle->ops->send_start_oem_data_cmd)
-		return wmi_handle->ops->send_start_oem_data_cmd(wmi_handle,
+		ret = wmi_handle->ops->send_start_oem_data_cmd(wmi_handle,
 								buf_len, buf);
 
-	return QDF_STATUS_E_FAILURE;
+	qdf_mem_free(buf);
+	return ret;
 }
 
 /**
