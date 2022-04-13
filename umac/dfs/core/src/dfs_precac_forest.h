@@ -264,4 +264,40 @@ static inline bool dfs_precac_check_home_chan_change(struct wlan_dfs *dfs)
 	return false;
 }
 #endif
+
+/**
+ * dfs_modify_precac_5_10_mhz_list_for_nol() - Given a nol freq range,
+ * find out all the ranges of 5/10M channels that overlap with the nol
+ * freq range and mark/unmark them as NOL.
+ * @dfs: Pointer to struct wlan_dfs
+ * @nol_ranges: Pointer to struct dfs_freq_range
+ * @nol_range_count: number of nol ranges
+ * @is_nol_found: Bool to indicate if nol is found
+ *
+ * Return - None
+ */
+void
+dfs_modify_precac_5_10_mhz_list_for_nol(struct wlan_dfs *dfs,
+					struct dfs_freq_range *nol_ranges,
+					uint8_t nol_range_count,
+					bool is_nol_found);
+/**
+ * dfs_is_chwidth_5m_or_10m() - Given a channel width, return true if
+ * channel width is 5/10M.
+ * @chwidth: Channel width
+ * Return true if width is 5/10M, false otherwise.
+ */
+bool
+dfs_is_chwidth_5m_or_10m(enum phy_ch_width ch_width);
+
+/**
+ * dfs_is_range_subset() - Given 2 ranges, find if they are subsets
+ * of each other.
+ * @range_large: Range1
+ * @range_small: Range2
+ *
+ * Return - true if they subsets, false otherwise.
+ */
+bool dfs_is_range_subset(struct dfs_freq_range range_large,
+			 struct dfs_freq_range range_small);
 #endif /* _DFS_PRECAC_FOREST_H_ */
