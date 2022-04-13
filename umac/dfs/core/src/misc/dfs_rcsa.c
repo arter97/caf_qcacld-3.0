@@ -163,7 +163,7 @@ bool dfs_process_nol_ie_bitmap(struct wlan_dfs *dfs, uint8_t nol_ie_bandwidth,
 					     0,
 					     0,
 					     nol_freq_list,
-					     num_subchans);
+					     num_subchans, NULL, 0);
 		utils_dfs_agile_sm_deliver_evt(dfs->dfs_pdev_obj,
 					       DFS_AGILE_SM_EV_ADFS_RADAR);
 	}

@@ -457,7 +457,12 @@ dfs_find_curchwidth_and_center_chan_for_freq(struct wlan_dfs *dfs,
 
 	if (primary_chan_freq)
 		*primary_chan_freq = curchan->dfs_ch_mhz_freq_seg1;
-	if (WLAN_IS_CHAN_MODE_20(curchan)) {
+
+	if (WLAN_IS_CHAN_MODE_5(curchan)) {
+		*chwidth = CH_WIDTH_5MHZ;
+	} else if (WLAN_IS_CHAN_MODE_10(curchan)) {
+		*chwidth = CH_WIDTH_10MHZ;
+	} else if (WLAN_IS_CHAN_MODE_20(curchan)) {
 		*chwidth = CH_WIDTH_20MHZ;
 	} else if (WLAN_IS_CHAN_MODE_40(curchan)) {
 		*chwidth = CH_WIDTH_40MHZ;
@@ -620,6 +625,8 @@ uint8_t dfs_find_subchannels_for_center_freq(qdf_freq_t pri_center_freq,
 	uint8_t nchannels = 0;
 
 	switch (ch_width) {
+	case CH_WIDTH_5MHZ:
+	case CH_WIDTH_10MHZ:
 	case CH_WIDTH_20MHZ:
 		nchannels = 1;
 		channels[0] = pri_center_freq;
@@ -1079,6 +1086,8 @@ static bool dfs_is_pcac_on_weather_channel_for_freq(struct wlan_dfs *dfs,
 	uint16_t first_subch, last_subch;
 
 	switch (chwidth) {
+	case CH_WIDTH_5MHZ:
+	case CH_WIDTH_10MHZ:
 	case CH_WIDTH_20MHZ:
 		first_subch = precac_freq;
 		last_subch = precac_freq;
@@ -1476,6 +1485,10 @@ dfs_translate_chwidth_enum2val(struct wlan_dfs *dfs,
 			       enum phy_ch_width chwidth)
 {
 	switch (chwidth) {
+	case CH_WIDTH_5MHZ:
+		return DFS_CHWIDTH_5_VAL;
+	case CH_WIDTH_10MHZ:
+		return DFS_CHWIDTH_10_VAL;
 	case CH_WIDTH_20MHZ:
 		return DFS_CHWIDTH_20_VAL;
 	case CH_WIDTH_40MHZ:
@@ -1504,6 +1517,10 @@ static enum phy_ch_width
 dfs_map_to_agile_width(struct wlan_dfs *dfs, enum phy_ch_width chwidth)
 {
 	switch (chwidth) {
+	case CH_WIDTH_5MHZ:
+		return CH_WIDTH_5MHZ;
+	case CH_WIDTH_10MHZ:
+		return CH_WIDTH_10MHZ;
 	case CH_WIDTH_20MHZ:
 		return CH_WIDTH_20MHZ;
 	case CH_WIDTH_40MHZ:
@@ -1660,20 +1677,14 @@ dfs_compute_agile_and_curchan_width(struct wlan_dfs *dfs,
 				    enum phy_ch_width *agile_ch_width,
 				    enum phy_ch_width *cur_ch_width)
 {
-	if (dfs->dfs_curchan->dfs_ch_flags & WLAN_CHAN_HALF ||
-	    dfs->dfs_curchan->dfs_ch_flags & WLAN_CHAN_QUARTER) {
-	    dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
-		    "aDFS during 5/10MHz operation not supported");
-		return;
-	}
-
 	/*
 	 * Agile detector's band of operation depends on current pdev.
 	 * Find the current channel's width and apply the translate rules
 	 * to find the Agile detector bandwidth.
 	 * Translate rules (all numbers are in MHz) from current pdev's width
 	 * to Agile detector's width:
-	 * 20 - 20, 40 - 40, 80 - 80, 160 - 80, 160 (non contiguous) - 80.
+	 * 5 -5, 10 -10, 20 - 20, 40 - 40, 80 - 80, 160 - 80, 160
+	 * (non contiguous) - 80.
 	 */
 	dfs_find_curchwidth_and_center_chan_for_freq(dfs, cur_ch_width,
 						     NULL, NULL);
