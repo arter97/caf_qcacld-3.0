@@ -60,9 +60,7 @@ static void dp_peer_rx_rate_stats_print(uint8_t *peer_mac,
 	      peer_mac[3],
 	      peer_mac[4],
 	      peer_mac[5]);
-	PRINT("\tpeer cookie: %016"PRIx64"\n",
-					(peer_cookie & 0xFFFFFFFF00000000) >>
-					WLANSTATS_PEER_COOKIE_LSB);
+	PRINT("\tPEER Cookie: %016"PRIx64"\n", peer_cookie);
 	is_lithium =  (peer_cookie & WLANSTATS_COOKIE_PLATFORM_OFFSET)
 					>> WLANSTATS_PEER_COOKIE_LSB;
 	if (is_lithium) {
