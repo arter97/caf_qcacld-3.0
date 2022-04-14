@@ -2402,6 +2402,10 @@ void dfs_start_adfs_for_sta(struct wlan_dfs *dfs,
 		return;
 	}
 
+	dfs_agile_sm_deliver_evt(dfs->dfs_soc_obj,
+				 DFS_AGILE_SM_EV_AGILE_STOP,
+				 0, (void *)dfs);
+
 	dfs->dfs_soc_obj->ocac_status = OCAC_RESET;
 	dfs->dfs_agile_precac_freq_mhz = agile_cfreq;
 	dfs->dfs_precac_chwidth = agile_chwidth;
