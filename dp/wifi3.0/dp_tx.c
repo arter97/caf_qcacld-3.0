@@ -121,18 +121,14 @@ dp_tx_limit_check(struct dp_vdev *vdev)
 
 	if (qdf_atomic_read(&soc->num_tx_outstanding) >=
 			soc->num_tx_allowed) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			  "%s: queued packets are more than max tx, drop the frame",
-			  __func__);
+		dp_tx_info("queued packets are more than max tx, drop the frame");
 		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
 		return true;
 	}
 
 	if (qdf_atomic_read(&pdev->num_tx_outstanding) >=
 			pdev->num_tx_allowed) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-			  "%s: queued packets are more than max tx, drop the frame",
-			  __func__);
+		dp_tx_info("queued packets are more than max tx, drop the frame");
 		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
 		return true;
 	}
@@ -267,14 +263,10 @@ static void dp_tx_tso_desc_release(struct dp_soc *soc,
 {
 	TSO_DEBUG("%s: Free the tso descriptor", __func__);
 	if (qdf_unlikely(!tx_desc->tso_desc)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s %d TSO desc is NULL!",
-			  __func__, __LINE__);
+		dp_tx_err("SO desc is NULL!");
 		qdf_assert(0);
 	} else if (qdf_unlikely(!tx_desc->tso_num_desc)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s %d TSO num desc is NULL!",
-			  __func__, __LINE__);
+		dp_tx_err("TSO num desc is NULL!");
 		qdf_assert(0);
 	} else {
 		struct qdf_tso_num_seg_elem_t *tso_num_desc =
@@ -350,10 +342,9 @@ dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id)
 	else
 		comp_status = HAL_TX_COMP_RELEASE_REASON_FW;
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		"Tx Completion Release desc %d status %d outstanding %d",
-		tx_desc->id, comp_status,
-		qdf_atomic_read(&pdev->num_tx_outstanding));
+	dp_tx_debug("Tx Completion Release desc %d status %d outstanding %d",
+		    tx_desc->id, comp_status,
+		    qdf_atomic_read(&pdev->num_tx_outstanding));
 
 	dp_tx_desc_free(soc, tx_desc, desc_pool_id);
 	return;
@@ -418,8 +409,7 @@ static uint8_t dp_tx_prepare_htt_metadata(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		/* Fill and add HTT metaheader */
 		hdr = qdf_nbuf_push_head(nbuf, htt_desc_size_aligned);
 		if (!hdr) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"Error in filling HTT metadata");
+			dp_tx_err("Error in filling HTT metadata");
 
 			return 0;
 		}
@@ -924,8 +914,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 		}
 
 		if (qdf_nbuf_push_head(nbuf, align_pad) == NULL) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"qdf_nbuf_push_head failed");
+			dp_tx_err("qdf_nbuf_push_head failed");
 			goto failure;
 		}
 
@@ -1008,9 +997,7 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 	/* Allocate and prepare an extension descriptor for scattered frames */
 	msdu_ext_desc = dp_tx_prepare_ext_desc(vdev, msdu_info, desc_pool_id);
 	if (!msdu_ext_desc) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
-				"%s Tx Extension Descriptor Alloc Fail",
-				__func__);
+		dp_tx_info("Tx Extension Descriptor Alloc Fail");
 		goto failure;
 	}
 
@@ -1065,8 +1052,7 @@ static qdf_nbuf_t dp_tx_prepare_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	/* Continue only if frames are of DATA type */
 	if (!DP_FRAME_IS_DATA(qos_wh)) {
 		DP_STATS_INC(vdev, tx_i.raw.invalid_raw_pkt_datatype, 1);
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-			  "Pkt. recd is of not data type");
+		dp_tx_debug("Pkt. recd is of not data type");
 		goto error;
 	}
 	/* SWAR for HW: Enable WEP bit in the AMSDU frames for RAW mode */
@@ -1091,8 +1077,7 @@ static qdf_nbuf_t dp_tx_prepare_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 						   curr_nbuf,
 						   QDF_DMA_TO_DEVICE,
 						   curr_nbuf->len)) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"%s dma map error ", __func__);
+			dp_tx_err("%s dma map error ", __func__);
 			DP_STATS_INC(vdev, tx_i.raw.dma_map_error, 1);
 			goto error;
 		}
@@ -1987,9 +1972,8 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 				  tx_exc_metadata, msdu_info);
 
 	if (status != QDF_STATUS_SUCCESS) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s Tx_hw_enqueue Fail tx_desc %pK queue %d",
-			  __func__, tx_desc, tx_q->ring_id);
+		dp_tx_err("Tx_hw_enqueue Fail tx_desc %pK queue %d",
+			  tx_desc, tx_q->ring_id);
 		qdf_nbuf_unmap_nbytes_single(vdev->osdev, nbuf,
 					     QDF_DMA_TO_DEVICE,
 					     nbuf->len);
@@ -2320,8 +2304,7 @@ static qdf_nbuf_t dp_tx_prepare_sg(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		qdf_nbuf_map_nbytes_single(vdev->osdev, nbuf,
 					   QDF_DMA_TO_DEVICE,
 					   qdf_nbuf_headlen(nbuf))) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"dma map error");
+		dp_tx_err("dma map error");
 		DP_STATS_INC(vdev, tx_i.sg.dma_map_error, 1);
 
 		qdf_nbuf_free(nbuf);
@@ -2337,8 +2320,7 @@ static qdf_nbuf_t dp_tx_prepare_sg(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	for (cur_frag = 0; cur_frag < nr_frags; cur_frag++) {
 		if (QDF_STATUS_E_FAILURE == qdf_nbuf_frag_map(vdev->osdev,
 					nbuf, 0, QDF_DMA_TO_DEVICE, cur_frag)) {
-			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-					"frag dma map error");
+			dp_tx_err("frag dma map error");
 			DP_STATS_INC(vdev, tx_i.sg.dma_map_error, 1);
 			goto map_err;
 		}
@@ -2475,24 +2457,22 @@ qdf_nbuf_t dp_tx_extract_mesh_meta_data(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 remove_meta_hdr:
 	if (qdf_nbuf_pull_head(nbuf, sizeof(struct meta_hdr_s)) == NULL) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-				"qdf_nbuf_pull_head failed");
+		dp_tx_err("qdf_nbuf_pull_head failed");
 		qdf_nbuf_free(nbuf);
 		return NULL;
 	}
 
 	msdu_info->tid = qdf_nbuf_get_priority(nbuf);
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO_HIGH,
-			"%s , Meta hdr %0x %0x %0x %0x %0x %0x"
-			" tid %d to_fw %d",
-			__func__, msdu_info->meta_data[0],
-			msdu_info->meta_data[1],
-			msdu_info->meta_data[2],
-			msdu_info->meta_data[3],
-			msdu_info->meta_data[4],
-			msdu_info->meta_data[5],
-			msdu_info->tid, msdu_info->exception_fw);
+	dp_tx_info("Meta hdr %0x %0x %0x %0x %0x %0x"
+		   " tid %d to_fw %d",
+		   msdu_info->meta_data[0],
+		   msdu_info->meta_data[1],
+		   msdu_info->meta_data[2],
+		   msdu_info->meta_data[3],
+		   msdu_info->meta_data[4],
+		   msdu_info->meta_data[5],
+		   msdu_info->tid, msdu_info->exception_fw);
 
 	return nbuf;
 }
@@ -2655,8 +2635,7 @@ dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	DP_STATS_INC_PKT(vdev, tx_i.rcvd, 1, qdf_nbuf_len(nbuf));
 
 	if (qdf_unlikely(!dp_check_exc_metadata(tx_exc_metadata))) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"Invalid parameters in exception path");
+		dp_tx_err("Invalid parameters in exception path");
 		goto fail;
 	}
 
@@ -2664,8 +2643,7 @@ dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 	/* MESH mode */
 	if (qdf_unlikely(vdev->mesh_vdev)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"Mesh mode is not supported in exception path");
+		dp_tx_err("Mesh mode is not supported in exception path");
 		goto fail;
 	}
 
@@ -4297,12 +4275,14 @@ void dp_tx_process_htt_completion(struct dp_soc *soc,
 	 * continue to next descriptor
 	 */
 	if (qdf_unlikely(!tx_desc->flags)) {
-		dp_tx_comp_info_rl("Descriptor freed in vdev_detach %d", tx_desc->id);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "Descriptor freed in vdev_detach %d", tx_desc->id);
 		return;
 	}
 
 	if (qdf_unlikely(tx_desc->vdev_id == DP_INVALID_VDEV_ID)) {
-		dp_tx_comp_info_rl("Invalid vdev_id %d", tx_desc->id);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "Invalid vdev_id %d", tx_desc->id);
 		dp_tx_comp_free_buf(soc, tx_desc);
 		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
 		return;
@@ -4311,7 +4291,8 @@ void dp_tx_process_htt_completion(struct dp_soc *soc,
 	pdev = tx_desc->pdev;
 
 	if (qdf_unlikely(tx_desc->pdev->is_pdev_down)) {
-		dp_tx_comp_info_rl("pdev in down state %d", tx_desc->id);
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+			  "pdev in down state %d", tx_desc->id);
 		dp_tx_comp_free_buf(soc, tx_desc);
 		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
 		return;
@@ -4324,7 +4305,7 @@ void dp_tx_process_htt_completion(struct dp_soc *soc,
 			DP_MOD_ID_HTT_COMP);
 
 	if (qdf_unlikely(!vdev)) {
-		dp_tx_comp_info_rl("Unable to get vdev ref  %d", tx_desc->id);
+		dp_tx_comp_info("Unable to get vdev ref  %d", tx_desc->id);
 		dp_tx_comp_free_buf(soc, tx_desc);
 		dp_tx_desc_release(tx_desc, tx_desc->pool_id);
 		return;
@@ -4566,14 +4547,14 @@ more_data:
 			if (qdf_unlikely
 				((tx_desc->vdev_id == DP_INVALID_VDEV_ID) &&
 				 !tx_desc->flags)) {
-				dp_tx_comp_info_rl("Descriptor freed in vdev_detach %d",
-						   tx_desc_id);
+				dp_tx_comp_info("Descriptor freed in vdev_detach %d",
+						tx_desc_id);
 				continue;
 			}
 
 			if (qdf_unlikely(tx_desc->pdev->is_pdev_down)) {
-				dp_tx_comp_info_rl("pdev in down state %d",
-						   tx_desc_id);
+				dp_tx_comp_info("pdev in down state %d",
+						tx_desc_id);
 				dp_tx_comp_free_buf(soc, tx_desc);
 				dp_tx_desc_release(tx_desc, tx_desc->pool_id);
 				goto next_desc;
@@ -4581,20 +4562,16 @@ more_data:
 
 			/* Pool id is not matching. Error */
 			if (tx_desc->pool_id != pool_id) {
-				QDF_TRACE(QDF_MODULE_ID_DP,
-					QDF_TRACE_LEVEL_FATAL,
-					"Tx Comp pool id %d not matched %d",
-					pool_id, tx_desc->pool_id);
+				dp_tx_comp_alert("Tx Comp pool id %d not matched %d",
+						 pool_id, tx_desc->pool_id);
 
 				qdf_assert_always(0);
 			}
 
 			if (!(tx_desc->flags & DP_TX_DESC_FLAG_ALLOCATED) ||
 				!(tx_desc->flags & DP_TX_DESC_FLAG_QUEUED_TX)) {
-				QDF_TRACE(QDF_MODULE_ID_DP,
-					  QDF_TRACE_LEVEL_FATAL,
-					  "Txdesc invalid, flgs = %x,id = %d",
-					  tx_desc->flags, tx_desc_id);
+				dp_tx_comp_alert("Txdesc invalid, flgs = %x,id = %d",
+						 tx_desc->flags, tx_desc_id);
 				qdf_assert_always(0);
 			}
 
