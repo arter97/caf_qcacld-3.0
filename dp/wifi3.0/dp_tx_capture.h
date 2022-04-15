@@ -58,6 +58,13 @@ struct dp_tx_desc_s;
 
 #define DP_TX_CAP_MAX_MS 0xFFFFFFFF
 
+#define dp_tx_capture_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_DP_TX_CAPTURE, params)
+#define dp_tx_capture_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_DP_TX_CAPTURE, params)
+#define dp_tx_capture_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_DP_TX_CAPTURE, params)
+#define dp_tx_capture_info(params...) \
+	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP_TX_CAPTURE, ## params)
+#define dp_tx_capture_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_TX_CAPTURE, params)
+
 /* stats */
 enum CDP_PEER_MSDU_DESC {
 	PEER_MSDU_SUCC,
