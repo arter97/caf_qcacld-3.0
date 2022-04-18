@@ -1015,6 +1015,43 @@ static inline int pld_nbuf_pre_alloc_free(struct sk_buff *skb)
 	return 0;
 }
 #endif
+
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * pld_send_buffer_to_afcmem() - Send afc data to afc memory
+ * @dev: The device structure
+ * @afcdb: Pointer to afc data buffer
+ * @len: Length of afc data
+ * @slotid: Slot id of afc memory
+ *
+ * Return: Non-zero code for error; zero for success
+ */
+int pld_send_buffer_to_afcmem(struct device *dev, char *afcdb, uint32_t len,
+			      uint8_t slotid);
+
+/**
+ * pld_reset_afcmem() - Reset afc data in afc memory
+ * @dev: The device structure
+ * @slotid: Slot id of afc memory
+ *
+ * Return: Non-zero code for error; zero for success
+ */
+int pld_reset_afcmem(struct device *dev, uint8_t slotid);
+#else
+static inline
+int pld_send_buffer_to_afcmem(struct device *dev, char *afcdb, uint32_t len,
+			      uint8_t slotid)
+{
+	return -EINVAL;
+}
+
+static inline
+int pld_reset_afcmem(struct device *dev, uint8_t slotid)
+{
+	return -EINVAL;
+}
+#endif
+
 /**
  * pld_get_bus_type() - Bus type of the device
  * @dev: device

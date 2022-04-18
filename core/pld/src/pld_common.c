@@ -3194,3 +3194,16 @@ int pld_get_audio_wlan_timestamp(struct device *dev,
 	return ret;
 }
 #endif /* FEATURE_WLAN_TIME_SYNC_FTM */
+
+#ifdef CONFIG_AFC_SUPPORT
+int pld_send_buffer_to_afcmem(struct device *dev, char *afcdb, uint32_t len,
+			      uint8_t slotid)
+{
+	return cnss_send_buffer_to_afcmem(dev, afcdb, len, slotid);
+}
+
+int pld_reset_afcmem(struct device *dev, uint8_t slotid)
+{
+	return cnss_reset_afcmem(dev, slotid);
+}
+#endif
