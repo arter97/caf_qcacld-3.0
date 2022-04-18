@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2012,2014-2015,2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -45,9 +46,15 @@
  * Return: true when received SME_START_BSS_REQ is formatted correctly false
  *         otherwise
  */
+#ifndef SAP_CP_CLEANUP
 bool lim_is_sme_start_bss_req_valid(struct mac_context *mac_ctx,
-				    struct start_bss_req *start_bss_req);
-
+				    struct start_bss_req *start_bss_req,
+				    enum bss_type bss_type);
+#else
+bool lim_is_sme_start_bss_req_valid(struct mac_context *mac_ctx,
+				    struct start_bss_config *start_bss_req,
+				    enum bss_type bss_type);
+#endif
 uint8_t lim_set_rs_nie_wp_aiefrom_sme_start_bss_req_message(struct mac_context *,
 							    tpSirRSNie, struct pe_session *);
 

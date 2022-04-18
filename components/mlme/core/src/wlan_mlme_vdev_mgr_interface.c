@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -347,6 +348,27 @@ static QDF_STATUS sta_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
+ * sta_mlme_vdev_sta_disconnect_start() - MLME vdev disconnect send callback
+ * @vdev_mlme: vdev mlme object
+ * @event_data_len: event data length
+ * @event_data: event data
+ *
+ * This function is called to trigger the vdev stop to firmware when
+ * reassoc failure
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+sta_mlme_vdev_sta_disconnect_start(struct vdev_mlme_obj *vdev_mlme,
+				   uint16_t data_len, void *data)
+{
+	mlme_legacy_debug("vdev id = %d ",
+			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	return lim_sta_mlme_vdev_sta_disconnect_start(vdev_mlme, data_len,
+						      data);
+}
+
+/**
  * vdevmgr_mlme_stop_continue() - MLME vdev stop send callback
  * @vdev_mlme: vdev mlme object
  * @event_data_len: event data length
@@ -399,6 +421,8 @@ static QDF_STATUS ap_mlme_start_continue(struct vdev_mlme_obj *vdev_mlme,
 {
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	mlme_set_notify_co_located_ap_update_rnr(vdev_mlme->vdev, true);
+
 	return wma_ap_mlme_vdev_start_continue(vdev_mlme, data_len, data);
 }
 
@@ -440,6 +464,21 @@ static QDF_STATUS ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 	return lim_ap_mlme_vdev_up_send(vdev_mlme, data_len, data);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline void
+wlan_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_vdev *vdev,
+				    bool is_ap_up)
+{
+	csr_handle_sap_mlo_sta_concurrency(vdev, is_ap_up);
+}
+#else
+static inline void
+wlan_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_vdev *vdev,
+				    bool is_ap_up)
+{
+}
+#endif
+
 /**
  * ap_mlme_vdev_notify_up_complete() - callback to notify up completion
  * @vdev_mlme: vdev mlme object
@@ -460,6 +499,8 @@ ap_mlme_vdev_notify_up_complete(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	pe_debug("Vdev %d is up", wlan_vdev_get_id(vdev_mlme->vdev));
+	if (wlan_vdev_mlme_get_opmode(vdev_mlme->vdev) == QDF_SAP_MODE)
+		wlan_handle_sap_mlo_sta_concurrency(vdev_mlme->vdev, true);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -560,6 +601,8 @@ static QDF_STATUS vdevmgr_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
 {
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	if (wlan_vdev_mlme_get_opmode(vdev_mlme->vdev) == QDF_SAP_MODE)
+		wlan_handle_sap_mlo_sta_concurrency(vdev_mlme->vdev, false);
 	return wma_mlme_vdev_notify_down_complete(vdev_mlme, data_len, data);
 }
 
@@ -976,6 +1019,33 @@ QDF_STATUS mlme_set_vdev_stop_type(struct wlan_objmgr_vdev *vdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+void mlme_set_notify_co_located_ap_update_rnr(struct wlan_objmgr_vdev *vdev,
+					      bool upt_rnr)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return;
+	}
+
+	mlme_priv->notify_co_located_ap_upt_rnr = upt_rnr;
+}
+
+bool mlme_is_notify_co_located_ap_update_rnr(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	return mlme_priv->notify_co_located_ap_upt_rnr;
+}
+
 enum vdev_assoc_type  mlme_get_assoc_type(struct wlan_objmgr_vdev *vdev)
 {
 	struct mlme_legacy_priv *mlme_priv;
@@ -1339,6 +1409,16 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_destroy(struct vdev_mlme_obj *vdev_mlme)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+static
+QDF_STATUS vdevmgr_mlme_vdev_send_set_mac_addr(struct qdf_mac_addr mac_addr,
+					       struct qdf_mac_addr mld_addr,
+					       struct wlan_objmgr_vdev *vdev)
+{
+	return vdev_mgr_send_set_mac_addr(mac_addr, mld_addr, vdev);
+}
+#endif
 
 /**
  * ap_vdev_dfs_cac_timer_stop() – callback to stop cac timer
@@ -1753,6 +1833,8 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
  *                                      MLME down operation
  * @mlme_vdev_notify_down_complete:     callback to notify VDEV MLME on moving
  *                                      to INIT state
+ * @mlme_vdev_sta_disconn_start         callback to trigger vdev stop to
+ *                                      firmware when resaaoc failure
  */
 static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_start_send = sta_mlme_vdev_start_send,
@@ -1770,6 +1852,7 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_notify_down_complete = vdevmgr_notify_down_complete,
 	.mlme_vdev_ext_stop_rsp = vdevmgr_vdev_stop_rsp_handle,
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
+	.mlme_vdev_sta_disconn_start = sta_mlme_vdev_sta_disconnect_start,
 };
 
 /**
@@ -1858,6 +1941,10 @@ static struct mlme_ext_ops ext_ops = {
 	.mlme_cm_ext_vdev_down_req_cb = cm_send_vdev_down_req,
 	.mlme_cm_ext_reassoc_req_cb = cm_handle_reassoc_req,
 	.mlme_cm_ext_roam_start_ind_cb = cm_handle_roam_start,
+#ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+	.mlme_vdev_send_set_mac_addr = vdevmgr_mlme_vdev_send_set_mac_addr,
+#endif
+	.mlme_cm_ext_rso_stop_cb = cm_send_rso_stop,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -1866,5 +1953,6 @@ static struct mlo_mlme_ext_ops mlo_ext_ops = {
 	.mlo_mlme_ext_peer_delete = lim_mlo_cleanup_partner_peer,
 	.mlo_mlme_ext_peer_assoc_fail = lim_mlo_ap_sta_assoc_fail,
 	.mlo_mlme_ext_assoc_resp = lim_mlo_ap_sta_assoc_suc,
+	.mlo_mlme_ext_handle_sta_csa_param = lim_handle_mlo_sta_csa_param,
 };
 #endif

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +23,6 @@
 #include <son_ucfg_api.h>
 #include <wlan_mlme_main.h>
 #include <init_deinit_lmac.h>
-#include <son_api.h>
 
 qdf_freq_t
 ucfg_son_get_operation_chan_freq_vdev_id(struct wlan_objmgr_pdev *pdev,
@@ -69,4 +69,78 @@ uint32_t ucfg_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 {
 	return wlan_son_get_chan_flag(pdev, freq, flag_160,
 				      chan_params);
+}
+
+QDF_STATUS ucfg_son_set_peer_kickout_allow(struct wlan_objmgr_vdev *vdev,
+					   struct wlan_objmgr_peer *peer,
+					   bool kickout_allow)
+{
+	return wlan_son_peer_set_kickout_allow(vdev, peer, kickout_allow);
+}
+
+QDF_STATUS ucfg_son_register_deliver_opmode_cb(struct wlan_objmgr_psoc *psoc,
+					       mlme_deliver_cb cb)
+{
+	return wlan_son_register_mlme_deliver_cb(psoc, cb,
+					SON_MLME_DELIVER_CB_TYPE_OPMODE);
+}
+
+QDF_STATUS ucfg_son_register_deliver_smps_cb(struct wlan_objmgr_psoc *psoc,
+					     mlme_deliver_cb cb)
+{
+	return wlan_son_register_mlme_deliver_cb(psoc, cb,
+					SON_MLME_DELIVER_CB_TYPE_SMPS);
+}
+
+int ucfg_son_cbs_init(void)
+{
+	return wlan_son_cbs_init();
+}
+
+int ucfg_son_cbs_deinit(void)
+{
+	return wlan_son_cbs_deinit();
+}
+
+int ucfg_son_set_cbs(struct wlan_objmgr_vdev *vdev,
+		     bool enable)
+{
+	return wlan_son_set_cbs(vdev, enable);
+}
+
+int ucfg_son_set_cbs_wait_time(struct wlan_objmgr_vdev *vdev,
+			       uint32_t val)
+{
+	return wlan_son_set_cbs_wait_time(vdev, val);
+}
+
+int ucfg_son_set_cbs_dwell_split_time(struct wlan_objmgr_vdev *vdev,
+				      uint32_t val)
+{
+	return wlan_son_set_cbs_dwell_split_time(vdev, val);
+}
+
+int ucfg_son_disable_cbs(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_son_cbs_disable(vdev);
+}
+
+uint8_t ucfg_son_get_tx_power(struct element_info assoc_req_ies)
+{
+	return wlan_son_get_node_tx_power(assoc_req_ies);
+}
+
+uint8_t ucfg_son_get_max_mcs(uint8_t mode, uint8_t supp_idx, uint8_t ext_idx,
+			     uint8_t ht_mcs_idx, uint8_t vht_mcs_map)
+{
+	return wlan_son_get_max_mcs(mode, supp_idx, ext_idx, ht_mcs_idx,
+				    vht_mcs_map);
+}
+
+QDF_STATUS ucfg_son_get_peer_rrm_info(struct element_info assoc_req_ies,
+				      uint8_t *rrmcaps,
+				      bool *is_beacon_meas_supported)
+{
+	return wlan_son_get_peer_rrm_info(assoc_req_ies, rrmcaps,
+					  is_beacon_meas_supported);
 }

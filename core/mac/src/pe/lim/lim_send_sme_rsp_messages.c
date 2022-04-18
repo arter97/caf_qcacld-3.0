@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -55,6 +56,7 @@
 #include "lim_process_fils.h"
 #include "wma.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
+#include <wlan_mlo_mgr_sta.h>
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -390,6 +392,7 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 	int i;
 	struct mlo_partner_info *partner_info;
 	struct mlo_partner_info *rsp_partner_info;
+	uint8_t chan, op_class, link_id;
 
 	partner_info = &pe_session->ml_partner_info;
 	rsp_partner_info = &rsp->connect_rsp.ml_parnter_info;
@@ -397,11 +400,23 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 	rsp_partner_info->num_partner_links = partner_info->num_partner_links;
 
 	for (i = 0; i < rsp_partner_info->num_partner_links; i++) {
-		rsp_partner_info->partner_link_info[i].link_id =
-			partner_info->partner_link_info[i].link_id;
+		link_id = partner_info->partner_link_info[i].link_id;
+		rsp_partner_info->partner_link_info[i].link_id = link_id;
 		qdf_copy_macaddr(
 			&rsp_partner_info->partner_link_info[i].link_addr,
 			&partner_info->partner_link_info[i].link_addr);
+
+		wlan_get_chan_by_link_id_from_rnr(pe_session->vdev,
+						  pe_session->cm_id,
+						  link_id, &chan, &op_class);
+		if (chan) {
+			rsp_partner_info->partner_link_info[i].chan_freq =
+				wlan_reg_chan_opclass_to_freq(chan, op_class,
+							      true);
+		} else {
+			pe_debug("Failed to get channel info for link ID:%d",
+				 link_id);
+		}
 	}
 }
 #endif
@@ -564,91 +579,23 @@ void lim_send_sme_start_bss_rsp(struct mac_context *mac,
 				uint8_t smesessionId)
 {
 
-	uint16_t size = 0;
 	struct scheduler_msg mmhMsg = {0};
-	struct start_bss_rsp *pSirSmeRsp;
-	uint16_t beacon_length, ieLen;
-	uint16_t ieOffset, curLen;
+	struct start_bss_rsp *start_bss_rsp;
 
 	pe_debug("Sending message: %s with reasonCode: %s",
 		       lim_msg_str(msgType), lim_result_code_str(resultCode));
 
-	size = sizeof(struct start_bss_rsp);
+	start_bss_rsp = qdf_mem_malloc(sizeof(*start_bss_rsp));
+	if (!start_bss_rsp)
+		return;
 
-	if (!pe_session) {
-		pSirSmeRsp = qdf_mem_malloc(size);
-		if (!pSirSmeRsp)
-			return;
-	} else {
-		/* subtract size of beaconLength + Mac Hdr + Fixed Fields before SSID */
-		ieOffset = sizeof(tAniBeaconStruct) + SIR_MAC_B_PR_SSID_OFFSET;
-		beacon_length = pe_session->schBeaconOffsetBegin +
-						pe_session->schBeaconOffsetEnd;
-		ieLen = beacon_length - ieOffset;
-
-		/* Invalidate for non-beaconing entities */
-		if (beacon_length <= ieOffset)
-			ieLen = ieOffset = 0;
-		/* calculate the memory size to allocate */
-		size += ieLen;
-
-		pSirSmeRsp = qdf_mem_malloc(size);
-		if (!pSirSmeRsp)
-			return;
-		size = sizeof(struct start_bss_rsp);
-		if (resultCode == eSIR_SME_SUCCESS) {
-
-			sir_copy_mac_addr(pSirSmeRsp->bssDescription.bssId,
-					  pe_session->bssId);
-
-			/* Read beacon interval from session */
-			pSirSmeRsp->bssDescription.beaconInterval =
-				(uint16_t) pe_session->beaconParams.
-				beaconInterval;
-			pSirSmeRsp->bssType = pe_session->bssType;
-
-			if (lim_get_capability_info
-				    (mac, &pSirSmeRsp->bssDescription.capabilityInfo,
-				    pe_session)
-			    != QDF_STATUS_SUCCESS)
-				pe_err("could not retrieve Capabilities value");
-
-			lim_get_phy_mode(mac,
-					 (uint32_t *) &pSirSmeRsp->bssDescription.
-					 nwType, pe_session);
-
-			pSirSmeRsp->bssDescription.chan_freq =
-				pe_session->curr_op_freq;
-
-		if (!LIM_IS_NDI_ROLE(pe_session)) {
-			curLen = pe_session->schBeaconOffsetBegin - ieOffset;
-			qdf_mem_copy((uint8_t *) &pSirSmeRsp->bssDescription.
-				     ieFields,
-				     pe_session->pSchBeaconFrameBegin +
-				     ieOffset, (uint32_t) curLen);
-
-			qdf_mem_copy(((uint8_t *) &pSirSmeRsp->bssDescription.
-				      ieFields) + curLen,
-				     pe_session->pSchBeaconFrameEnd,
-				     (uint32_t) pe_session->
-				     schBeaconOffsetEnd);
-
-			pSirSmeRsp->bssDescription.length = (uint16_t)
-				(offsetof(struct bss_description, ieFields[0])
-				- sizeof(pSirSmeRsp->bssDescription.length)
-				+ ieLen);
-			/* This is the size of the message, subtracting the size of the pointer to ieFields */
-			size += ieLen - sizeof(uint32_t);
-		}
-		}
-	}
-	pSirSmeRsp->messageType = msgType;
-	pSirSmeRsp->length = size;
-	pSirSmeRsp->sessionId = smesessionId;
-	pSirSmeRsp->status_code = resultCode;
+	start_bss_rsp->messageType = msgType;
+	start_bss_rsp->length = sizeof(*start_bss_rsp);
+	start_bss_rsp->sessionId = smesessionId;
+	start_bss_rsp->status_code = resultCode;
 
 	mmhMsg.type = msgType;
-	mmhMsg.bodyptr = pSirSmeRsp;
+	mmhMsg.bodyptr = start_bss_rsp;
 	mmhMsg.bodyval = 0;
 	if (!pe_session) {
 		MTRACE(mac_trace(mac, TRACE_CODE_TX_SME_MSG,
@@ -1715,18 +1662,16 @@ static bool lim_is_csa_channel_allowed(struct mac_context *mac_ctx,
 }
 
 /**
- * lim_handle_csa_offload_msg() - Handle CSA offload message
- * @mac_ctx:         pointer to global adapter context
- * @msg:             Message pointer.
+ * lim_handle_sta_csa_param() - Handle CSA offload param
+ * @mac_ctx: pointer to global adapter context
+ * @csa_params: csa parameters.
  *
  * Return: None
  */
-void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
-				struct scheduler_msg *msg)
+static void lim_handle_sta_csa_param(struct mac_context *mac_ctx,
+				     struct csa_offload_params *csa_params)
 {
 	struct pe_session *session_entry;
-	struct csa_offload_params *csa_params =
-				(struct csa_offload_params *) (msg->bodyptr);
 	tpDphHashNode sta_ds = NULL;
 	uint8_t session_id;
 	uint16_t aid = 0;
@@ -1744,13 +1689,12 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 
 	session_entry =
 		pe_find_session_by_bssid(mac_ctx,
-			csa_params->bssId, &session_id);
+			csa_params->bssid.bytes, &session_id);
 	if (!session_entry) {
 		pe_err("Session does not exists for "QDF_MAC_ADDR_FMT,
-				QDF_MAC_ADDR_REF(csa_params->bssId));
+		       QDF_MAC_ADDR_REF(csa_params->bssid.bytes));
 		goto err;
 	}
-
 	sta_ds = dph_lookup_hash_entry(mac_ctx, session_entry->bssId, &aid,
 		&session_entry->dph.dphHashTable);
 
@@ -1847,9 +1791,9 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 	} else if (channel_bonding_mode &&
 	    ((session_entry->vhtCapability && session_entry->htCapability) ||
 	      lim_is_session_he_capable(session_entry))) {
-		if ((csa_params->ies_present_flag & lim_wbw_ie_present) &&
-			(QDF_STATUS_SUCCESS == lim_process_csa_wbw_ie(mac_ctx,
-					csa_params, chnl_switch_info,
+		if ((csa_params->ies_present_flag & MLME_WBW_IE_PRESENT) &&
+		    (QDF_STATUS_SUCCESS == lim_process_csa_wbw_ie(
+					mac_ctx, csa_params, chnl_switch_info,
 					session_entry))) {
 			lim_ch_switch->sec_ch_offset =
 				PHY_SINGLE_CHANNEL_CENTERED;
@@ -1865,7 +1809,7 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 									true;
 			}
 		} else if (csa_params->ies_present_flag
-				& lim_xcsa_ie_present) {
+				& MLME_XCSA_IE_PRESENT) {
 			uint32_t fw_vht_ch_wd = wma_get_vht_ch_width();
 
 			if (wlan_reg_is_6ghz_op_class
@@ -1947,7 +1891,7 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 
 	} else if (channel_bonding_mode && session_entry->htCapability) {
 		if (csa_params->ies_present_flag
-				& lim_xcsa_ie_present) {
+				& MLME_XCSA_IE_PRESENT) {
 			chan_space =
 				wlan_reg_dmn_get_chanwidth_from_opclass_auto(
 						country_code,
@@ -2039,6 +1983,62 @@ void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
 err:
 	qdf_mem_free(csa_params);
 }
+
+void lim_handle_csa_offload_msg(struct mac_context *mac_ctx,
+				struct scheduler_msg *msg)
+{
+	struct pe_session *session;
+	struct csa_offload_params *csa_params =
+				(struct csa_offload_params *)(msg->bodyptr);
+	uint8_t session_id;
+
+	if (!csa_params) {
+		pe_err("limMsgQ body ptr is NULL");
+		return;
+	}
+
+	session = pe_find_session_by_bssid(
+				mac_ctx, csa_params->bssid.bytes, &session_id);
+	if (!session) {
+		pe_err("Session does not exists for " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(csa_params->bssid.bytes));
+		qdf_mem_free(csa_params);
+		return;
+	}
+	if (wlan_vdev_mlme_is_mlo_vdev(session->vdev) &&
+	    mlo_is_sta_csa_param_handled(session->vdev, csa_params)) {
+		pe_debug("vdev_id: %d, csa param is already handled. return",
+			 session_id);
+		qdf_mem_free(csa_params);
+		return;
+	}
+	lim_handle_sta_csa_param(mac_ctx, csa_params);
+}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void lim_handle_mlo_sta_csa_param(struct wlan_objmgr_vdev *vdev,
+				  struct csa_offload_params *csa_params)
+{
+	struct mac_context *mac;
+	struct csa_offload_params *tmp_csa_params;
+
+	mac = cds_get_context(QDF_MODULE_ID_PE);
+	if (!mac) {
+		pe_err("mac ctx is null");
+		return;
+	}
+
+	tmp_csa_params = qdf_mem_malloc(sizeof(*tmp_csa_params));
+	if (!tmp_csa_params) {
+		pe_err("tmp_csa_params allocation fails");
+		return;
+	}
+
+	qdf_mem_copy(tmp_csa_params, csa_params, sizeof(*tmp_csa_params));
+
+	lim_handle_sta_csa_param(mac, tmp_csa_params);
+}
+#endif
 
 /*--------------------------------------------------------------------------
    \brief pe_delete_session() - Handle the Delete BSS Response from HAL.

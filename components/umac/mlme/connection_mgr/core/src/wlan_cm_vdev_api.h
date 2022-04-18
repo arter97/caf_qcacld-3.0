@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,6 +33,9 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include "wlan_mlo_mgr_public_structs.h"
 #endif
+
+#define HS20_OUI_TYPE   "\x50\x6f\x9a\x10"
+#define HS20_OUI_TYPE_SIZE  4
 
 /**
  * struct cm_vdev_join_req - connect req from legacy CM to vdev manager
@@ -686,4 +690,32 @@ QDF_STATUS wlan_cm_send_connect_rsp(struct scheduler_msg *msg);
  * Return: void
  */
 void wlan_cm_free_connect_rsp(struct cm_vdev_join_rsp *rsp);
+
+/**
+ * wlan_cm_rso_stop_continue_disconnect() - Continue disconnect after RSO stop
+ * @psoc: psoc object
+ * @vdev_id: vdev id
+ * @is_ho_fail: Carries true if HO_FAIL happened
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_rso_stop_continue_disconnect(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, bool is_ho_fail);
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * cm_send_rso_stop() - Send RSP stop req to firmware
+ * @vdev: VDEV object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_send_rso_stop(struct wlan_objmgr_vdev *vdev);
+#else
+static inline QDF_STATUS
+cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif /* __WLAN_CM_VDEV_API_H__ */

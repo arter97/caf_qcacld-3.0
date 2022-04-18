@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,10 +39,13 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev)
 	enum QDF_OPMODE  vdev_opmode;
 	struct pmo_psoc_priv_obj *psoc_ctx;
 	pmo_is_device_in_low_pwr_mode is_low_pwr_mode;
+	struct pmo_vdev_priv_obj *vdev_ctx;
 
 	vdev_opmode = pmo_get_vdev_opmode(vdev);
 	vdev_id = pmo_vdev_get_id(vdev);
 	pmo_debug("vdev_opmode %d vdev_id %d", vdev_opmode, vdev_id);
+
+	vdev_ctx = pmo_vdev_get_priv(vdev);
 
 	switch (vdev_opmode) {
 	case QDF_STA_MODE:
@@ -65,10 +69,18 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev)
 	case QDF_OCB_MODE:
 	case QDF_MONITOR_MODE:
 		pmo_set_sta_wow_bitmask(event_bitmap, PMO_WOW_MAX_EVENT_BM_LEN);
+		if (vdev_ctx->magic_ptrn_enable)
+			pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
+						 PMO_WOW_MAX_EVENT_BM_LEN,
+						 event_bitmap);
 		break;
 
 	case QDF_IBSS_MODE:
 		pmo_set_sta_wow_bitmask(event_bitmap, PMO_WOW_MAX_EVENT_BM_LEN);
+		if (vdev_ctx->magic_ptrn_enable)
+			pmo_set_wow_event_bitmap(WOW_MAGIC_PKT_RECVD_EVENT,
+						 PMO_WOW_MAX_EVENT_BM_LEN,
+						 event_bitmap);
 		pmo_set_wow_event_bitmap(WOW_BEACON_EVENT,
 					 PMO_WOW_MAX_EVENT_BM_LEN,
 					 event_bitmap);
@@ -359,18 +371,14 @@ void pmo_register_wow_default_patterns(struct wlan_objmgr_vdev *vdev)
 }
 
 #ifdef CONFIG_LITHIUM
-#define ADDBA_REQ 0
-static void set_action_id_drop_pattern_for_block_ack(
-					uint32_t *action_category_map,
-					uint32_t *action_id_per_category)
+static void
+set_action_id_drop_pattern_for_block_ack(uint32_t *action_category_map)
 {
 	action_category_map[0] |= 1 << PMO_MAC_ACTION_BLKACK;
-	action_id_per_category[0] = 1 << ADDBA_REQ;
 }
 #else
-static inline void set_action_id_drop_pattern_for_block_ack(
-					uint32_t *action_category_map,
-					uint32_t *action_id_per_category)
+static inline void
+set_action_id_drop_pattern_for_block_ack(uint32_t *action_category_map)
 {
 }
 #endif
@@ -435,8 +443,7 @@ pmo_register_action_frame_patterns(struct wlan_objmgr_vdev *vdev,
 
 	set_action_id_drop_pattern_for_spec_mgmt(cmd->action_per_category);
 	set_action_id_drop_pattern_for_public_action(cmd->action_per_category);
-	set_action_id_drop_pattern_for_block_ack(&cmd->action_category_map[0],
-						 cmd->action_per_category);
+	set_action_id_drop_pattern_for_block_ack(&cmd->action_category_map[0]);
 
 	for (i = 0; i < PMO_SUPPORTED_ACTION_CATE_ELE_LIST; i++) {
 		if (i < ALLOWED_ACTION_FRAME_MAP_WORDS)

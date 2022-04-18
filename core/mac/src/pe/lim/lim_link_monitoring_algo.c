@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -201,17 +202,7 @@ void lim_delete_sta_context(struct mac_context *mac_ctx,
 	case HAL_DEL_STA_REASON_CODE_SA_QUERY_TIMEOUT:
 	case HAL_DEL_STA_REASON_CODE_XRETRY:
 		if (LIM_IS_STA_ROLE(session_entry) && !msg->is_tdls) {
-			if (!((session_entry->limMlmState ==
-			    eLIM_MLM_LINK_ESTABLISHED_STATE) &&
-			    (session_entry->limSmeState !=
-			    eLIM_SME_WT_DISASSOC_STATE) &&
-			    (session_entry->limSmeState !=
-			    eLIM_SME_WT_DEAUTH_STATE))) {
-				pe_err("Do not process in limMlmState %s(%x) limSmeState %s(%x)",
-				  lim_mlm_state_str(session_entry->limMlmState),
-				  session_entry->limMlmState,
-				  lim_sme_state_str(session_entry->limSmeState),
-				  session_entry->limSmeState);
+			if (!lim_is_sb_disconnect_allowed(session_entry)) {
 				qdf_mem_free(msg);
 				return;
 			}
@@ -244,7 +235,7 @@ void lim_delete_sta_context(struct mac_context *mac_ctx,
 			ap_info.reject_ap_type = DRIVER_AVOID_TYPE;
 			ap_info.reject_reason = REASON_STA_KICKOUT;
 			ap_info.source = ADDED_BY_DRIVER;
-			wlan_blm_add_bssid_to_reject_list(mac_ctx->pdev,
+			wlan_dlm_add_bssid_to_reject_list(mac_ctx->pdev,
 							  &ap_info);
 
 			/* only break for STA role (non TDLS) */
@@ -262,10 +253,7 @@ void lim_delete_sta_context(struct mac_context *mac_ctx,
 		break;
 
 	case HAL_DEL_STA_REASON_CODE_BTM_DISASSOC_IMMINENT:
-		if (session_entry->limMlmState !=
-		    eLIM_MLM_LINK_ESTABLISHED_STATE) {
-			pe_err("BTM request received in state %s",
-				lim_mlm_state_str(session_entry->limMlmState));
+		if (!lim_is_sb_disconnect_allowed(session_entry)) {
 			qdf_mem_free(msg);
 			lim_msg->bodyptr = NULL;
 			return;
@@ -357,16 +345,21 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 		pe_err("Session Does not exist for given sessionID");
 		return;
 	}
+
+	pe_info("Session %d Vdev %d reason code %d trigger %d",
+		pe_session->peSessionId, pe_session->vdev_id, reasonCode,
+		trigger);
+
+	/* Add the check here in case caller missed the check */
+	if (!lim_is_sb_disconnect_allowed(pe_session))
+		return;
+
 	/**
 	 * Heart beat failed for upto threshold value
 	 * and AP did not respond for Probe request.
 	 * Trigger link tear down.
 	 */
 	pe_session->pmmOffloadInfo.bcnmiss = false;
-
-	pe_info("Session %d Vdev %d reason code %d trigger %d",
-		pe_session->peSessionId, pe_session->vdev_id, reasonCode,
-		trigger);
 
 	/* Announce loss of link to Roaming algorithm */
 	/* and cleanup by sending SME_DISASSOC_REQ to SME */
@@ -377,6 +370,7 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 
 	if (sta) {
 		tLimMlmDeauthInd mlmDeauthInd;
+		struct qdf_mac_addr connected_bssid;
 
 		if ((sta->mlmStaContext.disassocReason ==
 		    REASON_DEAUTH_NETWORK_LEAVING) ||
@@ -425,9 +419,21 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 		mlmDeauthInd.deauthTrigger =
 			sta->mlmStaContext.cleanupTrigger;
 
-		if (LIM_IS_STA_ROLE(pe_session))
+		if (LIM_IS_STA_ROLE(pe_session)) {
+			if (reasonCode == REASON_BEACON_MISSED) {
+				qdf_copy_macaddr(
+					&connected_bssid,
+					(struct qdf_mac_addr *)sta->staAddr);
+				cm_roam_beacon_loss_disconnect_event(
+					connected_bssid,
+					pe_session->hb_failure_ap_rssi,
+					pe_session->vdev_id);
+			}
+;
 			lim_post_sme_message(mac, LIM_MLM_DEAUTH_IND,
 				     (uint32_t *) &mlmDeauthInd);
+		}
+
 		if (mac->mlme_cfg->gen.fatal_event_trigger)
 			cds_flush_logs(WLAN_LOG_TYPE_FATAL,
 					WLAN_LOG_INDICATOR_HOST_DRIVER,
@@ -453,8 +459,6 @@ lim_tear_down_link_with_ap(struct mac_context *mac, uint8_t sessionId,
 void lim_handle_heart_beat_failure(struct mac_context *mac_ctx,
 				   struct pe_session *session)
 {
-	tpSirAddie scan_ie = NULL;
-
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM    /* FEATURE_WLAN_DIAG_SUPPORT */
 	host_log_beacon_update_pkt_type *log_ptr = NULL;
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
@@ -471,9 +475,7 @@ void lim_handle_heart_beat_failure(struct mac_context *mac_ctx,
 	session->LimHBFailureStatus = false;
 
 	if (LIM_IS_STA_ROLE(session) &&
-	    (session->limMlmState == eLIM_MLM_LINK_ESTABLISHED_STATE) &&
-	    (session->limSmeState != eLIM_SME_WT_DISASSOC_STATE) &&
-	    (session->limSmeState != eLIM_SME_WT_DEAUTH_STATE)) {
+	    lim_is_sb_disconnect_allowed(session)) {
 		if (!mac_ctx->sys.gSysEnableLinkMonitorMode) {
 			goto hb_handler_fail;
 		}
@@ -490,49 +492,19 @@ void lim_handle_heart_beat_failure(struct mac_context *mac_ctx,
 		mac_ctx->lim.gLimHBfailureCntInLinkEstState++;
 
 		/*
-		 * Check if connected on the DFS channel, if not connected on
-		 * DFS channel then only send the probe request otherwise tear
-		 * down the link
+		 * Before host received beacon miss, firmware has checked link
+		 * by sending QoS NULL data, don't need host send probe req.
+		 * Some IoT AP can send probe response, but can't send beacon
+		 * sometimes, need disconnect too, or firmware will assert.
 		 */
-		if (!lim_isconnected_on_dfs_freq(mac_ctx,
-						 session->curr_op_freq)) {
-			/* Detected continuous Beacon Misses */
-			session->LimHBFailureStatus = true;
-
-			/*Reset the HB packet count before sending probe*/
-			limResetHBPktCount(session);
-			/**
-			 * Send Probe Request frame to AP to see if
-			 * it is still around. Wait until certain
-			 * timeout for Probe Response from AP.
-			 */
-			pe_debug("HB missed from AP. Sending Probe Req");
-			/* for searching AP, we don't include any more IE */
-			if (session->lim_join_req) {
-				scan_ie = &session->lim_join_req->addIEScan;
-				lim_send_probe_req_mgmt_frame(mac_ctx,
-					&session->ssId,
-					session->bssId, session->curr_op_freq,
-					session->self_mac_addr,
-					session->dot11mode,
-					&scan_ie->length, scan_ie->addIEdata);
-			} else {
-				lim_send_probe_req_mgmt_frame(mac_ctx,
-					&session->ssId,
-					session->bssId, session->curr_op_freq,
-					session->self_mac_addr,
-					session->dot11mode, NULL, NULL);
-			}
-		} else {
-			/*
-			 * Connected on DFS channel so should not send the
-			 * probe request tear down the link directly
-			 */
-			lim_tear_down_link_with_ap(mac_ctx,
-				session->peSessionId,
-				REASON_BEACON_MISSED,
-				eLIM_LINK_MONITORING_DEAUTH);
-		}
+		lim_send_deauth_mgmt_frame(mac_ctx,
+					   REASON_DISASSOC_DUE_TO_INACTIVITY,
+					   session->bssId,
+					   session, false);
+		lim_tear_down_link_with_ap(mac_ctx,
+					   session->peSessionId,
+					   REASON_BEACON_MISSED,
+					   eLIM_LINK_MONITORING_DEAUTH);
 	} else {
 		/**
 		 * Heartbeat timer may have timed out

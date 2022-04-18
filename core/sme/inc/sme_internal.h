@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -39,7 +40,7 @@
 #include "wmi_unified.h"
 #include "wmi_unified_param.h"
 
-struct twt_add_dialog_complete_event;
+struct wma_twt_add_dialog_complete_event;
 struct wmi_twt_add_dialog_complete_event_param;
 struct wmi_twt_enable_complete_event_param;
 /*--------------------------------------------------------------------------
@@ -53,7 +54,6 @@ typedef enum eSmeCommandType {
 	eSmeCsrCommandMask = 0x10000,
 	eSmeCommandRoam,
 	eSmeCommandWmStatusChange,
-	eSmeCommandGetdisconnectStats,
 	/* QOS */
 	eSmeQosCommandMask = 0x40000,   /* To identify Qos commands */
 	eSmeCommandAddTs,
@@ -168,7 +168,7 @@ typedef void (*twt_disable_cb)(hdd_handle_t hdd_handle);
  */
 typedef
 void (*twt_add_dialog_cb)(struct wlan_objmgr_psoc *psoc,
-			  struct twt_add_dialog_complete_event *add_dialog_evt,
+			  struct wma_twt_add_dialog_complete_event *add_dialog_evt,
 			  bool renego_fail);
 
 /**
@@ -242,7 +242,7 @@ struct twt_callbacks {
 			      struct wmi_twt_enable_complete_event_param *params);
 	void (*twt_disable_cb)(hdd_handle_t hdd_handle);
 	void (*twt_add_dialog_cb)(struct wlan_objmgr_psoc *psoc,
-				  struct twt_add_dialog_complete_event *add_dialog_event,
+				  struct wma_twt_add_dialog_complete_event *add_dialog_event,
 				  bool renego);
 	void (*twt_del_dialog_cb)(struct wlan_objmgr_psoc *psoc,
 				  struct wmi_twt_del_dialog_complete_event_param *params);
@@ -510,6 +510,10 @@ struct sme_context {
 #endif
 #if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
 	void (*beacon_latency_event_cb)(uint32_t latency_level);
+#endif
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+	void (*roam_rt_stats_cb)(hdd_handle_t hdd_handle, uint8_t idx,
+				 struct roam_stats_event *roam_stats);
 #endif
 };
 

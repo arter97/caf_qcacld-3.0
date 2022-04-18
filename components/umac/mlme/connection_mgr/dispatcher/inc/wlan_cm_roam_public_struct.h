@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1652,6 +1653,27 @@ struct wlan_roam_rssi_change_params {
 };
 
 /**
+ * struct wlan_cm_roam_rt_stats - Roam events stats update
+ * @roam_stats_enabled: set 1 if roam stats feature is enabled from userspace
+ * @roam_stats_wow_sent: set 1 if roam stats wow event is sent to FW
+ */
+struct wlan_cm_roam_rt_stats {
+	uint8_t roam_stats_enabled;
+	uint8_t roam_stats_wow_sent;
+};
+
+/**
+ * enum roam_rt_stats_params: different types of params to set or get roam
+ * events stats for the vdev
+ * @ROAM_RT_STATS_ENABLE:              Roam stats feature if enable/not
+ * @ROAM_RT_STATS_SUSPEND_MODE_ENABLE: Roam stats wow event if sent to FW/not
+ */
+enum roam_rt_stats_params {
+	ROAM_RT_STATS_ENABLE,
+	ROAM_RT_STATS_SUSPEND_MODE_ENABLE,
+};
+
+/**
  * struct wlan_roam_start_config - structure containing parameters for
  * roam start config
  * @rssi_params: roam scan rssi threshold parameters
@@ -1669,6 +1691,7 @@ struct wlan_roam_rssi_change_params {
  * @bss_load_config: bss load config
  * @disconnect_params: disconnect params
  * @idle_params: idle params
+ * @wlan_roam_rt_stats_config: roam events stats config
  */
 struct wlan_roam_start_config {
 	struct wlan_roam_offload_scan_rssi_params rssi_params;
@@ -1687,6 +1710,7 @@ struct wlan_roam_start_config {
 	struct wlan_roam_bss_load_config bss_load_config;
 	struct wlan_roam_disconnect_params disconnect_params;
 	struct wlan_roam_idle_params idle_params;
+	uint8_t wlan_roam_rt_stats_config;
 	/* other wmi cmd structures */
 };
 
@@ -1703,6 +1727,8 @@ struct wlan_roam_start_config {
  * @idle_params: idle params
  * @roam_triggers: roam triggers parameters
  * @rssi_params: roam scan rssi threshold parameters
+ * @send_rso_stop_resp: send rso stop response
+ * @start_rso_stop_timer: start rso stop timer
  */
 struct wlan_roam_stop_config {
 	uint8_t reason;
@@ -1715,6 +1741,8 @@ struct wlan_roam_stop_config {
 	struct wlan_roam_idle_params idle_params;
 	struct wlan_roam_triggers roam_triggers;
 	struct wlan_roam_offload_scan_rssi_params rssi_params;
+	bool send_rso_stop_resp;
+	bool start_rso_stop_timer;
 };
 
 /**
@@ -1731,6 +1759,7 @@ struct wlan_roam_stop_config {
  * @disconnect_params: disconnect params
  * @idle_params: idle params
  * @roam_triggers: roam triggers parameters
+ * @wlan_roam_rt_stats_config: roam events stats config
  */
 struct wlan_roam_update_config {
 	struct wlan_roam_beacon_miss_cnt beacon_miss_cnt;
@@ -1744,6 +1773,7 @@ struct wlan_roam_update_config {
 	struct wlan_roam_disconnect_params disconnect_params;
 	struct wlan_roam_idle_params idle_params;
 	struct wlan_roam_triggers roam_triggers;
+	uint8_t wlan_roam_rt_stats_config;
 };
 
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
@@ -1760,6 +1790,8 @@ struct wlan_roam_update_config {
  * transitioned after candidate selection is done at fw and preauth to
  * the AP is started.
  * @WLAN_ROAM_SYNCH_IN_PROG: Roaming handoff complete
+ * @WLAN_MLO_ROAM_SYNCH_IN_PROG: MLO Roam sync is ongoing,
+ * only used for ml links.
  */
 enum roam_offload_state {
 	WLAN_ROAM_DEINIT,
@@ -1768,7 +1800,12 @@ enum roam_offload_state {
 	WLAN_ROAM_RSO_STOPPED,
 	WLAN_ROAMING_IN_PROG,
 	WLAN_ROAM_SYNCH_IN_PROG,
+	WLAN_MLO_ROAM_SYNCH_IN_PROG,
 };
+
+#define WLAN_ROAM_SCAN_CANDIDATE_AP 0
+#define WLAN_ROAM_SCAN_CURRENT_AP   1
+#define WLAN_ROAM_SCAN_ROAMED_AP    2
 
 /**
  *  struct roam_btm_response_data - BTM response related data
@@ -1823,6 +1860,30 @@ struct roam_msg_info {
 	uint32_t msg_id;
 	uint32_t msg_param1;
 	uint32_t msg_param2;
+};
+
+/**
+ * struct roam_event_rt_info - Roam event related information
+ * @roam_scan_state: roam scan state notif value
+ * @roam_invoke_fail_reason: roam invoke fail reason
+ */
+struct roam_event_rt_info {
+	uint32_t roam_scan_state;
+	uint32_t roam_invoke_fail_reason;
+};
+
+/**
+ * enum roam_rt_stats_type: different types of params to get roam event stats
+ * for the vdev
+ * @ROAM_RT_STATS_TYPE_SCAN_STATE: Roam Scan Start/End
+ * @ROAM_RT_STATS_TYPE_INVOKE_FAIL_REASON: One of WMI_ROAM_FAIL_REASON_ID for
+ * roam failure in case of forced roam
+ * @ROAM_RT_STATS_TYPE_ROAM_SCAN_INFO: Roam Trigger/Fail/Scan/AP Stats
+ */
+enum roam_rt_stats_type {
+	ROAM_RT_STATS_TYPE_SCAN_STATE,
+	ROAM_RT_STATS_TYPE_INVOKE_FAIL_REASON,
+	ROAM_RT_STATS_TYPE_ROAM_SCAN_INFO,
 };
 
 /**
@@ -1932,6 +1993,11 @@ struct roam_invoke_req {
  * @CM_ROAM_NOTIF_DISASSOC_RECV: indicate disassoc received, notif_params to be
 				 sent as reason code, notif_params1 to be sent
 				 as frame length
+ * @CM_ROAM_NOTIF_HO_FAIL: indicates that roaming scan mode is successful but
+			   caused disconnection and subsequent
+			   WMI_ROAM_REASON_HO_FAILED is event expected
+ * @CM_ROAM_NOTIF_SCAN_END: indicate roam scan end, notif_params to be sent
+			    as WMI_ROAM_TRIGGER_REASON_ID
  */
 enum cm_roam_notif {
 	CM_ROAM_NOTIF_INVALID = 0,
@@ -1945,6 +2011,8 @@ enum cm_roam_notif {
 	CM_ROAM_NOTIF_SCAN_START,
 	CM_ROAM_NOTIF_DEAUTH_RECV,
 	CM_ROAM_NOTIF_DISASSOC_RECV,
+	CM_ROAM_NOTIF_HO_FAIL,
+	CM_ROAM_NOTIF_SCAN_END,
 };
 
 /**
@@ -1985,18 +2053,18 @@ enum roam_reason {
  * @timeout: time duration for which the bssid is blacklisted
  * @received_time: boot timestamp at which the firmware event was received
  * @rssi: rssi value for which the bssid is blacklisted
- * @reject_reason: reason to add the BSSID to BLM
+ * @reject_reason: reason to add the BSSID to DLM
  * @original_timeout: original timeout sent by the AP
- * @source: Source of adding the BSSID to BLM
+ * @source: Source of adding the BSSID to DLM
  */
 struct roam_blacklist_timeout {
 	struct qdf_mac_addr bssid;
 	uint32_t timeout;
 	qdf_time_t received_time;
 	int32_t rssi;
-	enum blm_reject_ap_reason reject_reason;
+	enum dlm_reject_ap_reason reject_reason;
 	uint32_t original_timeout;
-	enum blm_reject_ap_source source;
+	enum dlm_reject_ap_source source;
 };
 
 /*
@@ -2086,6 +2154,7 @@ struct roam_offload_roam_event {
 	uint32_t notif_params1;
 	struct cm_hw_mode_trans_ind *hw_mode_trans_ind;
 	uint8_t *deauth_disassoc_frame;
+	bool rso_timer_stopped;
 };
 
 /**
@@ -2100,6 +2169,7 @@ struct roam_offload_roam_event {
  * @btm_rsp: BTM response related data
  * @roam_init_info: Roam initial related data
  * @roam_msg_info: Roam message related information
+ * @roam_event_param: Roam event notif params
  */
 struct roam_stats_event {
 	uint8_t vdev_id;
@@ -2112,6 +2182,7 @@ struct roam_stats_event {
 	struct roam_btm_response_data btm_rsp[MAX_ROAM_SCAN_STATS_TLV];
 	struct roam_initial_data roam_init_info[MAX_ROAM_SCAN_STATS_TLV];
 	struct roam_msg_info *roam_msg_info;
+	struct roam_event_rt_info roam_event_param;
 };
 
 /*
@@ -2149,6 +2220,7 @@ struct roam_pmkid_req_event {
  * commands
  * @send_roam_abort: send roam abort
  * @send_roam_disable_config: send roam disable config
+ * @send_roam_rt_stats_config: Send roam events vendor command param value to FW
  */
 struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_vdev_set_pcl_cmd)(struct wlan_objmgr_vdev *vdev,
@@ -2176,6 +2248,10 @@ struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_roam_invoke_cmd)(struct wlan_objmgr_vdev *vdev,
 					   struct roam_invoke_req *req);
 	QDF_STATUS (*send_roam_sync_complete_cmd)(struct wlan_objmgr_vdev *vdev);
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+	QDF_STATUS (*send_roam_rt_stats_config)(struct wlan_objmgr_vdev *vdev,
+						uint8_t vdev_id, uint8_t value);
+#endif
 };
 
 /**
@@ -2259,12 +2335,12 @@ struct policy_mgr_vdev_mac_map {
 
 /**
  * struct policy_mgr_pdev_mac_freq_map - vdev id-mac id map
- * @pdev_id: Pdev id, macros starting with WMI_PDEV_ID_
+ * @mac_id: mac_id mapped to pdev id (macros starting with WMI_PDEV_ID_)
  * @start_freq: Start Frequency in Mhz
  * @end_freq: End Frequency in Mhz
  */
 struct policy_mgr_pdev_mac_freq_map {
-	uint32_t pdev_id;
+	uint32_t mac_id;
 	qdf_freq_t start_freq;
 	qdf_freq_t end_freq;
 };
@@ -2291,12 +2367,14 @@ struct cm_hw_mode_trans_ind {
  * @link_id: link id of the link
  * @channel: wmi channel
  * @flags: link flags
+ * @link_addr: link mac addr
  */
 struct ml_setup_link_param {
 	uint32_t vdev_id;
 	uint32_t link_id;
 	wmi_channel channel;
 	uint32_t flags;
+	struct qdf_mac_addr link_addr;
 };
 
 /*
@@ -2352,6 +2430,7 @@ struct roam_offload_synch_ind {
 #endif
 	uint8_t *ric_tspec_data;
 	uint16_t aid;
+	bool hw_mode_trans_present;
 	struct cm_hw_mode_trans_ind hw_mode_trans_ind;
 	uint8_t nss;
 	struct qdf_mac_addr dst_mac;
@@ -2369,6 +2448,18 @@ struct roam_offload_synch_ind {
 #endif
 };
 
+/*
+ * struct roam_scan_candidate_frame Roam candidate scan entry
+ * vdev_id : vdev id
+ * frame_len : Length of the beacon/probe rsp frame
+ * frame : Pointer to the frame
+ */
+struct roam_scan_candidate_frame {
+	uint8_t vdev_id;
+	uint32_t frame_length;
+	uint8_t *frame;
+};
+
 /**
  * wlan_cm_roam_rx_ops  - structure of rx function pointers for
  * roaming related commands
@@ -2381,6 +2472,7 @@ struct roam_offload_synch_ind {
  * @roam_stats_event_rx: Rx ops function pointer for roam stats event
  * @roam_auth_offload_event: Rx ops function pointer for auth offload event
  * @roam_pmkid_request_event_rx: Rx ops function pointer for roam pmkid event
+ * @roam_candidate_frame_event : Rx ops function pointer for roam frame event
  */
 struct wlan_cm_roam_rx_ops {
 	QDF_STATUS (*roam_sync_event)(struct wlan_objmgr_psoc *psoc,
@@ -2403,5 +2495,8 @@ struct wlan_cm_roam_rx_ops {
 	(*roam_auth_offload_event)(struct auth_offload_event *auth_event);
 	QDF_STATUS
 	(*roam_pmkid_request_event_rx)(struct roam_pmkid_req_event *list);
+	QDF_STATUS
+	(*roam_candidate_frame_event)(struct wlan_objmgr_psoc *psoc,
+				      struct roam_scan_candidate_frame *frame);
 };
 #endif

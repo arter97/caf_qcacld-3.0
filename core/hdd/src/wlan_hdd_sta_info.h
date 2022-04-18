@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -85,8 +86,8 @@ enum dhcp_nego_status {
  * @STA_INFO_SOFTAP_REGISTER_STA:       Register a SoftAP STA
  * @STA_INFO_GET_CACHED_STATION_REMOTE: Get cached peer's info
  * @STA_INFO_HDD_GET_STATION_REMOTE:    Get remote peer's info
- * @STA_INFO_WLAN_HDD_GET_STATION_REMOTE: NL80211_CMD_GET_STATION handler for
- *                                        SoftAP
+ * @STA_INFO_WLAN_HDD_CFG80211_GET_STATION: NL80211_CMD_GET_STATION handler for
+ *                                          SoftAP
  * @STA_INFO_SOFTAP_DEAUTH_CURRENT_STA: Deauth current sta
  * @STA_INFO_SOFTAP_DEAUTH_ALL_STA:     Deauth all sta in the sta list
  * @STA_INFO_CFG80211_DEL_STATION:      CFG80211 del station handler
@@ -108,6 +109,9 @@ enum dhcp_nego_status {
  * @STA_INFO_ATTACH_DETACH:             Station info attach/detach
  * @STA_INFO_SHOW:     Station info show
  * @STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK: Update rx mcbc stats for IPA case
+ * @STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION: NL80211_CMD_GET_STATION dumpit
+ *                                           handler for SoftAP
+ * @STA_INFO_SON_GET_DATRATE_INFO: gets datarate info for a SON node
  *
  */
 /*
@@ -126,7 +130,7 @@ typedef enum {
 	STA_INFO_SOFTAP_REGISTER_STA = 8,
 	STA_INFO_GET_CACHED_STATION_REMOTE = 9,
 	STA_INFO_HDD_GET_STATION_REMOTE = 10,
-	STA_INFO_WLAN_HDD_GET_STATION_REMOTE = 11,
+	STA_INFO_WLAN_HDD_CFG80211_GET_STATION = 11,
 	STA_INFO_SOFTAP_DEAUTH_CURRENT_STA = 12,
 	STA_INFO_SOFTAP_DEAUTH_ALL_STA = 13,
 	STA_INFO_CFG80211_DEL_STATION = 14,
@@ -146,7 +150,8 @@ typedef enum {
 	STA_INFO_ATTACH_DETACH = 28,
 	STA_INFO_SHOW = 29,
 	STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK = 30,
-
+	STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION = 31,
+	STA_INFO_SON_GET_DATRATE_INFO = 32,
 	STA_INFO_ID_MAX,
 } wlan_sta_info_dbgid;
 
@@ -169,6 +174,7 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  *           Broadcast uses station ID zero by default.
  * @sta_type: Type of station i.e. p2p client or infrastructure station
  * @sta_mac: MAC address of the station
+ * @mld_addr: MLD address of the station
  * @peer_state: Current Station state so HDD knows how to deal with packet
  *              queue. Most recent states used to change TLSHIM STA state.
  * @is_qos_enabled: Track QoS status of station
@@ -176,6 +182,8 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * @nss: Number of spatial streams supported
  * @rate_flags: Rate Flags for this connection
  * @ecsa_capable: Extended CSA capabilities
+ * @ext_cap: The first 4 bytes of Extended capabilities IE
+ * @supported_band: sta band capabilities bitmap from supporting opclass
  * @max_phy_rate: Calcuated maximum phy rate based on mode, nss, mcs etc.
  * @tx_packets: The number of frames from host to firmware
  * @tx_bytes: Bytes send to current station
@@ -236,12 +244,15 @@ struct hdd_station_info {
 	uint8_t sta_id;
 	eStationType sta_type;
 	struct qdf_mac_addr sta_mac;
+	struct qdf_mac_addr mld_addr;
 	enum ol_txrx_peer_state peer_state;
 	bool is_qos_enabled;
 	bool is_deauth_in_progress;
 	uint8_t   nss;
 	uint32_t  rate_flags;
 	uint8_t   ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 	uint32_t max_phy_rate;
 	uint32_t tx_packets;
 	uint64_t tx_bytes;
@@ -557,6 +568,21 @@ void hdd_sta_info_detach(struct hdd_sta_info_obj *sta_info_container,
  */
 QDF_STATUS hdd_sta_info_attach(struct hdd_sta_info_obj *sta_info_container,
 			       struct hdd_station_info *sta_info);
+
+/**
+ * hdd_get_sta_info_by_id() - Find the sta_info structure by index
+ * @sta_info_container: The station info container obj that stores and maintains
+ *                      the sta_info obj.
+ * @idx: The index which the sta_info has to be fetched.
+ * @sta_info_dbgid: Debug ID of the caller API
+ *
+ * Return: Reference-counted Pointer to the hdd_station_info structure which
+ *         contains the mac address passed
+ */
+struct hdd_station_info *hdd_get_sta_info_by_id(
+				struct hdd_sta_info_obj *sta_info_container,
+				const int idx,
+				wlan_sta_info_dbgid sta_info_dbgid);
 
 /**
  * hdd_get_sta_info_by_mac() - Find the sta_info structure by mac addr

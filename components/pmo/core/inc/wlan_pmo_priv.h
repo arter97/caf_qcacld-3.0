@@ -98,6 +98,7 @@ struct wlan_pmo_ctx {
  * @gtk_err_enable: gtk error is enabled or not
  * @vdev_bpf_req: place holder for apf/bpf for vdev
  * @vdev_pkt_filter: place holder for vdev packet filter
+ * @magic_ptrn_enable: true when magic pattern is enabled else false
  * @ptrn_match_enable: true when pattern match is enabled else false
  * @num_wow_default_patterns: number of wow default patterns for vdev
  * @num_wow_user_patterns: number of user wow patterns for vdev
@@ -111,6 +112,9 @@ struct wlan_pmo_ctx {
  * @dyn_listen_interval: dynamically user configured listen interval
  * @restore_dtim_setting: DTIM settings restore flag
  * @pmo_vdev_lock: spin lock for pmo vdev priv ctx
+ * @dyn_arp_ns_offload_disable: true when arp/ns offload is disable
+ * @dyn_arp_ns_offload_rt_lock: wake lock which prevent runtime pm happen if
+ *                              arp/ns offload is disable
  */
 struct pmo_vdev_priv_obj {
 	struct pmo_psoc_priv_obj *pmo_psoc_ctx;
@@ -121,6 +125,7 @@ struct pmo_vdev_priv_obj {
 	struct pmo_gtk_req vdev_gtk_req;
 	struct pmo_gtk_rsp_req vdev_gtk_rsp_req;
 	qdf_atomic_t gtk_err_enable;
+	bool magic_ptrn_enable;
 	bool ptrn_match_enable;
 	uint8_t num_wow_default_patterns;
 	uint8_t num_wow_user_patterns;
@@ -134,6 +139,10 @@ struct pmo_vdev_priv_obj {
 	uint32_t dyn_listen_interval;
 	bool restore_dtim_setting;
 	qdf_spinlock_t pmo_vdev_lock;
+#ifdef FEATURE_WLAN_DYNAMIC_ARP_NS_OFFLOAD
+	bool dyn_arp_ns_offload_disable;
+	qdf_runtime_lock_t dyn_arp_ns_offload_rt_lock;
+#endif
 };
 
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */

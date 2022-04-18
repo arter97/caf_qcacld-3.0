@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,6 +91,7 @@
 
 #include "wlan_hdd_twt.h"
 #include "wlan_cm_roam_ucfg_api.h"
+#include "wlan_hdd_son.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -1158,6 +1160,8 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 		    (wlan_mlme_get_wds_mode(hdd_ctx->psoc) ==
 		    WLAN_WDS_MODE_REPEATER))
 			hdd_config_wds_repeater_mode(adapter, peer_mac);
+
+		hdd_son_deliver_peer_authorize_event(adapter, peer_mac);
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -1275,6 +1279,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 
 	txrx_ops.tx.tx_comp = hdd_sta_notify_tx_comp_cb;
 	txrx_ops.tx.tx = NULL;
+	txrx_ops.get_tsf_time = hdd_get_tsf_time;
 	cdp_vdev_register(soc, adapter->vdev_id, (ol_osif_vdev_handle)adapter,
 			  &txrx_ops);
 	if (!txrx_ops.tx.tx) {
@@ -1564,10 +1569,27 @@ QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
 	}
+	if (adapter->hdd_ctx->config->fisa_enable &&
+	    adapter->device_mode != QDF_MONITOR_MODE) {
+		hdd_debug("FISA feature enabled");
+		hdd_rx_register_fisa_ops(&txrx_ops);
+	}
+
+	txrx_ops.rx.stats_rx = hdd_tx_rx_collect_connectivity_stats_info;
+
+	txrx_ops.tx.tx_comp = hdd_sta_notify_tx_comp_cb;
+	txrx_ops.tx.tx = NULL;
+
 	cdp_vdev_register(soc, adapter->vdev_id, (ol_osif_vdev_handle)adapter,
 			  &txrx_ops);
+
+	if (!txrx_ops.tx.tx) {
+		hdd_err("vdev register fail");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	adapter->tx_fn = txrx_ops.tx.tx;
-	txrx_ops.rx.stats_rx = hdd_tx_rx_collect_connectivity_stats_info;
+
 
 	/* Register the Station with TL...  */
 	qdf_status = cdp_peer_register(soc, OL_TXRX_PDEV_ID, &txrx_desc);

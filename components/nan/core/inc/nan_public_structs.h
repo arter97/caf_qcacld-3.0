@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -610,12 +611,14 @@ struct nan_disable_req {
  * @psoc: Pointer to the psoc object
  * @social_chan_2g_freq: Social channel in 2G band for the NAN Discovery
  * @social_chan_5g_freq: Social channel in 5G band for the NAN Discovery
+ * @pdev: Pointer to the pdev object
  * @params: NAN request structure containing message for the target
  */
 struct nan_enable_req {
 	struct wlan_objmgr_psoc *psoc;
 	uint32_t social_chan_2g_freq;
 	uint32_t social_chan_5g_freq;
+	struct wlan_objmgr_pdev *pdev;
 	/* Variable length, do not add anything after this */
 	struct nan_msg_params params;
 };
@@ -848,6 +851,7 @@ struct wlan_nan_rx_ops {
  * @sta_nan_ndi_ndi_allowed: 4 port concurrency of STA+NAN+NDI+NDI is supported
  * @ndi_txbf_supported: Target supports NAN Datapath with TX beamforming
  * by Fw or not.
+ * @mlo_sta_nan_ndi_allowed: MLO STA + NAN + NDI concurrency is supported
  */
 struct nan_tgt_caps {
 	uint32_t nan_conc_control:1;
@@ -858,6 +862,9 @@ struct nan_tgt_caps {
 	uint32_t nan_vdev_allowed:1;
 	uint32_t sta_nan_ndi_ndi_allowed:1;
 	uint32_t ndi_txbf_supported:1;
+#ifdef WLAN_FEATURE_11BE_MLO
+	uint32_t mlo_sta_nan_ndi_allowed:1;
+#endif
 };
 
 #endif

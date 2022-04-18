@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -832,7 +832,6 @@ int wma_profile_data_report_event_handler(void *handle, uint8_t *event_buf,
 	wmi_wlan_profile_t *profile_data;
 	uint32_t i = 0;
 	uint32_t entries;
-	uint8_t *buf_ptr;
 	char temp_str[150];
 
 	param_buf = (WMI_WLAN_PROFILE_DATA_EVENTID_param_tlvs *) event_buf;
@@ -840,12 +839,9 @@ int wma_profile_data_report_event_handler(void *handle, uint8_t *event_buf,
 		wma_err("Invalid profile data event buf");
 		return -EINVAL;
 	}
-	profile_ctx = param_buf->profile_ctx;
-	buf_ptr = (uint8_t *)profile_ctx;
-	buf_ptr = buf_ptr + sizeof(wmi_wlan_profile_ctx_t) + WMI_TLV_HDR_SIZE;
-	profile_data = (wmi_wlan_profile_t *) buf_ptr;
-	entries = profile_ctx->bin_count;
 
+	profile_ctx = param_buf->profile_ctx;
+	entries = profile_ctx->bin_count;
 	if (entries > param_buf->num_profile_data) {
 		wma_err("FW bin count %d more than data %d in TLV hdr",
 			 entries,
@@ -874,6 +870,7 @@ int wma_profile_data_report_event_handler(void *handle, uint8_t *event_buf,
 	QDF_TRACE(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_ERROR,
 		  "Profile ID: Count: TOT: Min: Max: hist_intvl: hist[0]: hist[1]:hist[2]");
 
+	profile_data = param_buf->profile_data;
 	for (i = 0; i < entries; i++) {
 		if (i == WMI_WLAN_PROFILE_MAX_BIN_CNT)
 			break;
@@ -1150,9 +1147,9 @@ wma_fill_tx_stats(struct sir_wifi_ll_ext_stats *ll_stats,
 	struct sir_wifi_tx *tx_stats;
 	struct sir_wifi_ll_ext_peer_stats *peer_stats;
 	uint32_t *tx_mpdu_aggr, *tx_succ_mcs, *tx_fail_mcs, *tx_delay;
-	uint32_t len, dst_len, param_len, tx_mpdu_aggr_array_len,
-		 tx_succ_mcs_array_len, tx_fail_mcs_array_len,
-		 tx_delay_array_len;
+	uint32_t len, dst_len, param_len, num_entries,
+		 tx_mpdu_aggr_array_len, tx_succ_mcs_array_len,
+		 tx_fail_mcs_array_len, tx_delay_array_len;
 
 	result = *buf;
 	dst_len = *buf_length;
@@ -1228,6 +1225,12 @@ wma_fill_tx_stats(struct sir_wifi_ll_ext_stats *ll_stats,
 	if (!wmi_peer_tx || !wmi_tx || !peer_stats) {
 		wma_err("Invalid arg, peer_tx %pK, wmi_tx %pK stats %pK",
 			 wmi_peer_tx, wmi_tx, peer_stats);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	num_entries = fix_param->num_peer_ac_tx_stats * WLAN_MAX_AC;
+	if (num_entries > param_buf->num_tx_stats) {
+		wma_err("tx stats invalid arg, %d", num_entries);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1855,6 +1858,8 @@ int wma_unified_radio_tx_mem_free(void *handle)
 
 	if (!wma_handle->link_stats_results)
 		return 0;
+
+	wma_debug("free link_stats_results");
 	qdf_mutex_acquire(&wma_handle->radio_stats_lock);
 	ret = __wma_unified_radio_tx_mem_free(wma_handle);
 	qdf_mutex_release(&wma_handle->radio_stats_lock);
@@ -1963,12 +1968,13 @@ static int __wma_unified_radio_tx_power_level_stats_event_handler(
 	}
 
 	if (!rs_results->tx_time_per_power_level) {
-		rs_results->tx_time_per_power_level = qdf_mem_malloc(
-				sizeof(uint32_t) *
-				rs_results->total_num_tx_power_levels);
+		rs_results->tx_time_per_power_level =
+			qdf_mem_malloc(sizeof(uint32_t) *
+				       rs_results->total_num_tx_power_levels);
 		if (!rs_results->tx_time_per_power_level) {
 			/* In error case, atleast send the radio stats without
-			 * tx_power_level stats */
+			 * tx_power_level stats
+			 */
 			rs_results->total_num_tx_power_levels = 0;
 			link_stats_results->nr_received++;
 			goto post_stats;
@@ -2188,7 +2194,7 @@ __wma_unified_link_radio_stats_event_handler(tp_wma_handle wma_handle,
 	}
 	if (wma_handle->link_stats_results &&
 	    !wma_handle->link_stats_results->num_radio)
-		wma_unified_radio_tx_mem_free(wma_handle);
+		__wma_unified_radio_tx_mem_free(wma_handle);
 
 	if (!wma_handle->link_stats_results) {
 		wma_handle->link_stats_results = qdf_mem_malloc(
@@ -3288,7 +3294,7 @@ wma_peer_phymode(tSirNwType nw_type, uint8_t sta_type,
 			phymode = WLAN_PHYMODE_11A;
 			break;
 		}
-#ifdef WLAN_FEATURE_11BE
+#if defined(WLAN_FEATURE_11BE)
 		if (is_eht) {
 			if (ch_width == CH_WIDTH_160MHZ)
 				phymode = WLAN_PHYMODE_11BEA_EHT160;
@@ -4248,6 +4254,73 @@ void wma_remove_bss_peer_on_failure(tp_wma_handle wma, uint8_t vdev_id)
 	wma_remove_peer(wma, bss_peer.bytes, vdev_id, false);
 }
 
+QDF_STATUS wma_remove_bss_peer_before_join(
+	tp_wma_handle wma, uint8_t vdev_id,
+	void *cm_join_req)
+{
+	uint8_t *mac_addr;
+	struct wma_target_req *del_req;
+	QDF_STATUS qdf_status;
+	struct qdf_mac_addr bssid;
+	enum QDF_OPMODE mode;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!wma || !wma->interfaces)
+		return QDF_STATUS_E_FAILURE;
+
+	if (vdev_id >= WLAN_MAX_VDEVS) {
+		wma_err("Invalid vdev id %d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+	vdev = wma->interfaces[vdev_id].vdev;
+	if (!vdev) {
+		wma_err("Invalid vdev, %d", vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (mode != QDF_STA_MODE && mode != QDF_P2P_CLIENT_MODE) {
+		wma_err("unexpected mode %d vdev %d", mode, vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_status = wlan_vdev_get_bss_peer_mac(vdev, &bssid);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wma_err("Failed to get bssid for vdev_id: %d", vdev_id);
+		return qdf_status;
+	}
+	mac_addr = bssid.bytes;
+
+	qdf_status = wma_remove_peer(wma, mac_addr, vdev_id, false);
+
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wma_err("wma_remove_peer failed vdev_id:%d", vdev_id);
+		return qdf_status;
+	}
+
+	if (cds_is_driver_recovering())
+		return QDF_STATUS_E_FAILURE;
+
+	if (wmi_service_enabled(wma->wmi_handle,
+				wmi_service_sync_delete_cmds)) {
+		wma_debug("Wait for the peer delete. vdev_id %d", vdev_id);
+		del_req = wma_fill_hold_req(wma, vdev_id,
+					    WMA_DELETE_STA_REQ,
+					    WMA_DELETE_STA_CONNECT_RSP,
+					    cm_join_req,
+					    WMA_DELETE_STA_TIMEOUT);
+		if (!del_req) {
+			wma_err("Failed to allocate request. vdev_id %d",
+				vdev_id);
+			qdf_status = QDF_STATUS_E_NOMEM;
+		} else {
+			qdf_status = QDF_STATUS_E_PENDING;
+		}
+	}
+
+	return qdf_status;
+}
+
 QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 				uint16_t data_len, void *data)
 {
@@ -4409,10 +4482,18 @@ wma_mlme_vdev_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
 	status = mlme_get_vdev_stop_type(wma->interfaces[resp->vdev_id].vdev,
 					 &vdev_stop_type);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("Failed to get msg_type");
+		wma_err("Failed to get vdev stop type for vdev_id: %d",
+			resp->vdev_id);
 		status = QDF_STATUS_E_INVAL;
 		goto end;
 	}
+
+	/*
+	 * Need reset vdev_stop_type to 0 here, otherwise the vdev_stop_type
+	 * would be taken to next BSS stop in some stress test, then cause
+	 * unexpected behavior.
+	 */
+	mlme_set_vdev_stop_type(wma->interfaces[resp->vdev_id].vdev, 0);
 
 	if (vdev_stop_type == WMA_DELETE_BSS_HO_FAIL_REQ) {
 		resp->status = QDF_STATUS_SUCCESS;
