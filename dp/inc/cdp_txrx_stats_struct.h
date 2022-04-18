@@ -1651,6 +1651,7 @@ struct cdp_rx_stats {
 	struct cdp_pkt_type su_be_ppdu_cnt;
 	struct cdp_pkt_type mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX];
 #endif
+	uint32_t mcast_3addr_drop;
 };
 
 /* struct cdp_tx_ingress_stats - Tx ingress Stats
