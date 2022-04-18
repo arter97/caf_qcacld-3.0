@@ -849,7 +849,7 @@ static QDF_STATUS send_peer_flush_tids_cmd_non_tlv(wmi_unified_t wmi_handle,
 static QDF_STATUS send_peer_delete_cmd_non_tlv(wmi_unified_t wmi_handle,
 					uint8_t
 					peer_addr[QDF_MAC_ADDR_SIZE],
-					uint8_t vdev_id)
+					struct peer_delete_cmd_params *param)
 {
 	wmi_peer_delete_cmd *cmd;
 	wmi_buf_t buf;
@@ -863,7 +863,7 @@ static QDF_STATUS send_peer_delete_cmd_non_tlv(wmi_unified_t wmi_handle,
 	}
 	cmd = (wmi_peer_delete_cmd *)wmi_buf_data(buf);
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_addr, &cmd->peer_macaddr);
-	cmd->vdev_id = vdev_id;
+	cmd->vdev_id = param->vdev_id;
 	ret =  wmi_unified_cmd_send(wmi_handle, buf, len,
 			WMI_PEER_DELETE_CMDID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
