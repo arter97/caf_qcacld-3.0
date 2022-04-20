@@ -379,6 +379,21 @@ QDF_STATUS wmi_extract_pdev_tpc_config_ev_param(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		wmi_host_pdev_tpc_config_event *param);
 
+#ifdef QCA_RSSI_DB2DBM
+/**
+ * wmi_extract_pdev_rssi_dbm_conv_ev_param() - extract rssi_dbm evt params
+ *
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @param: Pointer to hold tpc configuration
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS wmi_extract_pdev_rssi_dbm_conv_ev_param(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct rssi_db2dbm_param *param);
+#endif
+
 /**
  * wmi_extract_nfcal_power_ev_param() - extract noise floor calibration
  * power param from event

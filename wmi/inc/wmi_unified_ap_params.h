@@ -28,6 +28,12 @@
 /* Civic information size in bytes */
 #define CIVIC_INFO_LEN 256
 
+/* Same as MAX_20MHZ_SEGMENTS */
+#define MAX_20MHZ_SEGS 16
+
+/* Same as MAX_ANTENNA_EIGHT */
+#define MAX_NUM_ANTENNA 8
+
 #define DELAY_BOUND_ULTRA_LOW 10
 #define DELAY_BOUND_LOW 100
 #define DELAY_BOUND_MID 200
@@ -428,6 +434,51 @@ typedef struct {
 	int8_t  maxRegAllowedPowerAGTXBF[WMI_HOST_TPC_TX_NUM_CHAIN][WMI_HOST_TPC_TX_NUM_CHAIN];
 	uint8_t ratesArray[WMI_HOST_TPC_RATE_MAX];
 } wmi_host_pdev_tpc_config_event;
+
+
+#ifdef QCA_RSSI_DB2DBM
+/**
+ * struct rssi_temp_off_param
+ * @rssi_temp_offset: RSSI Temperature offset.
+ */
+struct rssi_temp_off_param {
+	int32_t rssi_temp_offset;
+};
+
+/**
+ * struct rssi_dbm_conv_param
+ * @curr_bw: Current bandwidth
+ * @curr_rx_chainmask: Current Rx chain mask
+ * @xbar_config: Xbar configuration
+ * @xlna_bypass_offset: Xlna bypass offset
+ * @xlna_bypass_threshold: Xlna bypass threshold
+ * @nf_bw_dbm: Noise floor table.
+ */
+struct rssi_dbm_conv_param {
+	uint32_t curr_bw;
+	uint32_t curr_rx_chainmask;
+	uint32_t xbar_config;
+	int32_t xlna_bypass_offset;
+	int32_t xlna_bypass_threshold;
+	int8_t nf_hw_dbm[MAX_NUM_ANTENNA][MAX_20MHZ_SEGS];
+};
+
+/**
+ * struct rssi_db2dbm_param
+ * @pdev_id: PDEV ID sent by Target
+ * @rssi_temp_off_present: Set to true if temperature offset info preset
+ * @rssi_dbm_info_present: Set to true if XBAR and XLNA info present
+ * @temp_off_param: Object of struct rssi_temp_off_param
+ * @rssi_dbm_param: Object of struct rssi_dbm_conv_param
+ */
+struct rssi_db2dbm_param {
+	uint32_t pdev_id;
+	bool rssi_temp_off_present;
+	bool rssi_dbm_info_present;
+	struct rssi_temp_off_param temp_off_param;
+	struct rssi_dbm_conv_param rssi_dbm_param;
+};
+#endif
 
 /**
  * struct wmi_host_peer_sta_kickout_event
