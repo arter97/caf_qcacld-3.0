@@ -2629,6 +2629,13 @@ void policy_mgr_do_go_plus_go_force_scc(struct wlan_objmgr_psoc *psoc,
 					uint32_t ch_width)
 {
 	uint8_t total_connection;
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return;
+	}
 
 	total_connection = policy_mgr_mode_specific_connection_count(
 						psoc, PM_P2P_GO_MODE, NULL);
@@ -2637,6 +2644,11 @@ void policy_mgr_do_go_plus_go_force_scc(struct wlan_objmgr_psoc *psoc,
 
 	/* If any p2p disconnected, don't do csa */
 	if (total_connection > 1) {
+		if (pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason)
+			pm_ctx->hdd_cbacks.wlan_hdd_set_sap_csa_reason(
+				psoc, vdev_id,
+				CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL);
+
 		policy_mgr_change_sap_channel_with_csa(psoc, vdev_id,
 						       ch_freq, ch_width, true);
 	}
