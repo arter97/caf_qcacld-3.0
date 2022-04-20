@@ -22,7 +22,6 @@
  */
 static void usage(void)
 {
-	printf("nandhaki %s[%d]\n",  __func__, __LINE__);
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"lite_mon wifiX <option> <arguments>");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
