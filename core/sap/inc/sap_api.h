@@ -112,8 +112,8 @@ typedef enum {
 } eSapMacAddrACL;
 
 typedef enum {
-	eSAP_BLACK_LIST = 0,   /* List of mac addresses NOT allowed to assoc */
-	eSAP_WHITE_LIST = 1,   /* List of mac addresses allowed to assoc */
+	SAP_DENY_LIST = 0,   /* List of mac addresses NOT allowed to assoc */
+	SAP_ALLOW_LIST = 1,   /* List of mac addresses allowed to assoc */
 } eSapACLType;
 
 typedef enum {
@@ -149,7 +149,7 @@ typedef enum {
 	eSAP_DISCONNECT_ALL_P2P_CLIENT,
 	eSAP_MAC_TRIG_STOP_BSS_EVENT,
 	/*
-	 * Event send when a STA in neither white list or black list tries to
+	 * Event send when a STA in neither allow list or deny list tries to
 	 * associate in softap mode
 	 */
 	eSAP_UNKNOWN_STA_JOIN,
@@ -456,6 +456,10 @@ struct sap_acs_cfg {
 	uint32_t    vht_seg0_center_ch_freq;
 	uint32_t    vht_seg1_center_ch_freq;
 	uint32_t   band;
+#ifdef WLAN_FEATURE_11BE
+	bool       is_eht_enabled;
+	uint16_t   acs_puncture_bitmap;
+#endif
 };
 
 /*
@@ -483,7 +487,7 @@ struct sap_config {
 	uint32_t chan_freq;          /* Operation channel frequency */
 	uint32_t sec_ch_freq;
 	struct ch_params ch_params;
-	uint32_t ch_width_orig;
+	enum phy_ch_width ch_width_orig;
 	uint8_t dtim_period;      /* dtim interval */
 	uint16_t num_accept_mac;
 	uint16_t num_deny_mac;
@@ -1074,11 +1078,11 @@ QDF_STATUS wlansap_get_acl_mode(struct sap_context *sap_ctx,
  * wlansap_modify_acl() - Update ACL entries
  * @sap_ctx: Pointer to the SAP context
  * @peer_sta_mac: peer sta mac to be updated.
- * @list_type: white/Black list type.
+ * @list_type: allow/Deny list type.
  * @cmd: command to be executed on ACL.
  *
  * This function is called when a peer needs to be added or deleted from the
- * white/black ACL
+ * allow/deny ACL
  *
  * Return: Status
  */
@@ -1774,6 +1778,38 @@ void sap_dump_acs_channel(struct sap_acs_cfg *acs_cfg);
  * Return: None
  */
 void sap_release_vdev_ref(struct sap_context *sap_ctx);
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * sap_acs_is_puncture_applicable() - Is static puncturing applicable according
+ *                                    to ACS configure of given sap acs config.
+ * @acs_cfg: pointer to sap_acs_cfg
+ *
+ * Return: true if static puncturing is applicable to given sap acs config.
+ */
+bool sap_acs_is_puncture_applicable(struct sap_acs_cfg *acs_cfg);
+
+/**
+ * sap_acs_set_puncture_support() - Set puncturing support according
+ *                                  to ACS configure of given sap.
+ * @sap_ctx: Pointer to SAP Context
+ * @ch_params: pointer to ch_params
+ *
+ * Return: void.
+ */
+void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
+				  struct ch_params *ch_params);
+#else
+static inline bool sap_acs_is_puncture_applicable(struct sap_acs_cfg *acs_cfg)
+{
+	return false;
+}
+
+static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
+						struct ch_params *ch_params)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
 #ifdef __cplusplus
 }
 #endif

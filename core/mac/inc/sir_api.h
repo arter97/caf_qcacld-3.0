@@ -434,7 +434,6 @@ typedef enum eSirResultCodes {
 	eSIR_SME_DEAUTH_STATUS,
 	eSIR_PNO_SCAN_SUCCESS,
 	eSIR_SME_INVALID_SESSION,
-	eSIR_SME_PEER_CREATE_FAILED,
 	eSIR_DONOT_USE_RESULT_CODE = SIR_MAX_ENUM_SIZE
 } tSirResultCodes;
 
@@ -535,6 +534,7 @@ struct roam_pmkid_req_event;
 /**
  * typedef pe_roam_synch_fn_t - PE roam synch callback routine pointer
  * @mac_ctx: Global MAC context
+ * @vdev_id: vdev id
  * @roam_sync_ind_ptr: Structure with roam synch parameters
  * @ie_len: ie length
  * @reason: Reason for calling the callback
@@ -547,6 +547,7 @@ struct roam_pmkid_req_event;
  */
 typedef QDF_STATUS
 (*pe_roam_synch_fn_t)(struct mac_context *mac_ctx,
+		      uint8_t vdev_id,
 		      struct roam_offload_synch_ind *roam_sync_ind_ptr,
 		      uint16_t ie_len,
 		      enum sir_roam_op_code reason);
@@ -686,6 +687,7 @@ struct add_ie_params {
 	uint8_t *probeRespBCNData_buff;
 };
 
+#ifndef SAP_CP_CLEANUP
 /* / Definition for kick starting BSS */
 /* / ---> MAC */
 /**
@@ -730,7 +732,7 @@ struct start_bss_req {
 	uint32_t dfs_regdomain;
 
 };
-
+#endif
 #define GET_IE_LEN_IN_BSS(lenInBss) (lenInBss + sizeof(lenInBss) - \
 			    ((uintptr_t)OFFSET_OF(struct bss_description,\
 						  ieFields)))
@@ -805,11 +807,12 @@ struct start_bss_rsp {
 	uint16_t messageType;   /* eWNI_SME_START_BSS_RSP */
 	uint16_t length;
 	uint8_t sessionId;
+/* To be removed after SAP CSR cleanup changes */
+#ifdef SAP_CP_CLEANUP
+	uint32_t cmd_id;
+#endif
 	tSirResultCodes status_code;
-	enum bss_type bssType;    /* Add new type for WDS mode */
-	uint16_t beaconInterval;        /* Beacon Interval for both type */
 	uint32_t staId;         /* Station ID for Self */
-	struct bss_description bssDescription;      /* Peer BSS description */
 };
 
 struct report_channel_list {
@@ -2248,6 +2251,7 @@ typedef struct sSirSmeDfsChannelList {
 	uint8_t channels[SIR_DFS_MAX_20M_SUB_CH];
 } tSirSmeDfsChannelList, *tpSirSmeDfsChannelList;
 
+#ifndef SAP_CP_CLEANUP
 typedef struct sSirChanChangeRequest {
 	uint16_t messageType;
 	uint16_t messageLen;
@@ -2264,6 +2268,7 @@ typedef struct sSirChanChangeRequest {
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
 } tSirChanChangeRequest, *tpSirChanChangeRequest;
+#endif
 
 typedef struct sSirChanChangeResponse {
 	uint8_t sessionId;
@@ -2562,8 +2567,8 @@ enum extscan_configuration_flags {
  *			if ssid is specified, that is, epno entries for
  *			which an exact match is required,
  *			or entries corresponding to hidden ssids
- * @max_number_of_white_listed_ssid: max number of white listed SSIDs
- * @max_number_of_black_listed_bssid: max number of black listed BSSIDs
+ * @max_number_of_allow_listed_ssid: max number of allow listed SSIDs
+ * @max_number_of_deny_listed_bssid: max number of deny listed BSSIDs
  */
 struct ext_scan_capabilities_response {
 	uint32_t requestId;
@@ -2582,8 +2587,8 @@ struct ext_scan_capabilities_response {
 	uint32_t max_hotlist_ssids;
 	uint32_t max_number_epno_networks;
 	uint32_t max_number_epno_networks_by_ssid;
-	uint32_t max_number_of_white_listed_ssid;
-	uint32_t max_number_of_black_listed_bssid;
+	uint32_t max_number_of_allow_listed_ssid;
+	uint32_t max_number_of_deny_listed_bssid;
 };
 
 typedef struct {
@@ -3966,29 +3971,6 @@ struct adaptive_dwelltime_params {
 };
 
 /**
- * struct csa_offload_params - CSA offload request parameters
- * @channel: channel
- * @switch_mode: switch mode
- * @sec_chan_offset: second channel offset
- * @new_ch_width: new channel width
- * @new_ch_freq_seg1: channel center freq 1
- * @new_ch_freq_seg2: channel center freq 2
- * @ies_present_flag: IE present flag
- */
-struct csa_offload_params {
-	uint8_t channel;
-	uint32_t csa_chan_freq;
-	uint8_t switch_mode;
-	uint8_t sec_chan_offset;
-	uint8_t new_ch_width;
-	uint8_t new_op_class;
-	uint8_t new_ch_freq_seg1;
-	uint8_t new_ch_freq_seg2;
-	uint32_t ies_present_flag;
-	tSirMacAddr bssId;
-};
-
-/**
  * enum obss_ht40_scancmd_type - obss scan command type
  * @HT40_OBSS_SCAN_PARAM_START: OBSS scan start
  * @HT40_OBSS_SCAN_PARAM_UPDATE: OBSS scan param update
@@ -5105,7 +5087,7 @@ struct sir_peer_set_rx_blocksize {
  * @reject_reason: reason to add the BSSID to DLM
  * @source: Source of adding the BSSID to DLM
  * @original_timeout: original timeout sent by the AP
- * @received_time: Timestamp when the AP was added to the Blacklist
+ * @received_time: Timestamp when the AP was added to the Denylist
  */
 struct sir_rssi_disallow_lst {
 	qdf_list_node_t node;
@@ -5258,4 +5240,91 @@ struct sir_update_session_txq_edca_param {
 	uint8_t vdev_id;
 	tSirMacEdcaParamRecord txq_edca_params;
 };
+
+#ifdef SAP_CP_CLEANUP
+/* struct channel_change_req - Change channel
+ * request for SAP
+ * @vdev_id: vdev id
+ * @target_chan_freq: New channel frequency
+ * @sec_ch_offset: second channel offset
+ * @center_freq_seg0: channel center freq 0
+ * @center_freq_seg1: channel center freq 1
+ * @dot11mode: dot11 mode
+ * @nw_type: nw type
+ * @cac_duration_ms:  cac duration in ms
+ * @dfs_regdomain: dfs regdomain
+ * @opr_rates: operational rates
+ * @ext_rates: extended rates
+ */
+struct channel_change_req {
+	uint8_t vdev_id;
+	uint32_t target_chan_freq;
+	uint8_t sec_ch_offset;
+	enum phy_ch_width ch_width;
+	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg1;
+	uint32_t dot11mode;
+	tSirNwType nw_type;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
+	tSirMacRateSet opr_rates;
+	tSirMacRateSet ext_rates;
+};
+
+/* struct start_bss_config - Start BSS
+ * request configurations
+ * @vdev_id: vdev id
+ * @cmd_id: serialization command id
+ * @ssid: ssid
+ * @dtim_period: dtim period
+ * @hidden_ssid: hidden ssid parameter
+ * @privacy: ssid privacy
+ * @auth_type: authentication type
+ * @rsnie: RSN IE of the AP
+ * @add_ie_params: additional IEs
+ * @oper_ch_freq: operating frequency
+ * @channel_width: channel width
+ * @center_freq_seg0: channel center freq 0
+ * @center_freq_seg1: channel center freq 1
+ * @sec_ch_offset: secondary channel offset
+ * @wps_state: wps config
+ * @dot11mode: dot11 mode
+ * @nw_type: nw type
+ * @opr_rates: operational rates
+ * @ext_rates: extended rates
+ * @beacon_tx_rate: Tx rate for beacon
+ * @cac_duration_ms: cac duration in ms
+ * @dfs_regdomain: dfs regdomain
+ */
+struct start_bss_config {
+	uint8_t vdev_id;
+	uint32_t cmd_id;
+	tSirMacSSid ssid;
+	uint16_t bcn_int;
+	uint32_t dtim_period;
+	uint8_t hidden_ssid;
+
+	uint8_t privacy;
+	tAniAuthType auth_type;
+	tSirRSNie rsn_ie;
+	struct add_ie_params add_ie_params;
+
+	uint32_t oper_ch_freq;
+	uint8_t channel_width;
+	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg1;
+	uint8_t sec_ch_offset;
+
+	uint8_t wps_state;
+	uint8_t dot11mode;
+	tSirNwType nw_type;
+
+	tSirMacRateSet opr_rates;
+	tSirMacRateSet ext_rates;
+	uint16_t beacon_tx_rate;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
+};
+#endif
+
 #endif /* __SIR_API_H */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -28,6 +28,11 @@
 
 #define IS_FEATURE_SUPPORTED_BY_FW(feat_enum_value) \
 				wma_get_fw_wlan_feat_caps(feat_enum_value)
+#ifdef WLAN_FEATURE_11BE
+#define IS_FEATURE_11BE_SUPPORTED_BY_FW IS_FEATURE_SUPPORTED_BY_FW(DOT11BE)
+#else
+#define IS_FEATURE_11BE_SUPPORTED_BY_FW 0
+#endif
 
 #define DPU_FEEDBACK_UNPROTECTED_ERROR 0x0F
 
@@ -259,8 +264,6 @@ enum wmamsgtype {
 	WMA_NAN_REQUEST = SIR_HAL_NAN_REQUEST,
 #endif
 
-	WMA_START_SCAN_OFFLOAD_REQ = SIR_HAL_START_SCAN_OFFLOAD_REQ,
-	WMA_STOP_SCAN_OFFLOAD_REQ = SIR_HAL_STOP_SCAN_OFFLOAD_REQ,
 	WMA_UPDATE_CHAN_LIST_REQ = SIR_HAL_UPDATE_CHAN_LIST_REQ,
 	WMA_RX_SCAN_EVENT = SIR_HAL_RX_SCAN_EVENT,
 	WMA_RX_CHN_STATUS_EVENT = SIR_HAL_RX_CHN_STATUS_EVENT,

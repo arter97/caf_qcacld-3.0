@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -87,6 +87,40 @@ int hdd_son_deliver_assoc_disassoc_event(struct hdd_adapter *adapter,
 void
 hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 				     uint8_t *peer_mac);
+
+/**
+ * hdd_son_send_set_wifi_generic_command() - Send Generic SET command to SON
+ * @wiphy: standard kernel wiphy
+ * @wdev: wireless device
+ * @tb: NL attributes
+ *
+ * Return: 0 on success
+ */
+int hdd_son_send_set_wifi_generic_command(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  struct nlattr **tb);
+
+/**
+ * hdd_son_send_get_wifi_generic_command() - Send Generic GET command to SON
+ * @wiphy: standard kernel wiphy
+ * @wdev: wireless device
+ * @tb: NL attributes
+ *
+ * Return: 0 on success
+ */
+int hdd_son_send_get_wifi_generic_command(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  struct nlattr **tb);
+
+/**
+ * hdd_son_get_peer_max_mcs_idx() - Get peer max mcs index
+ * @vdev: vdev object
+ * @peer: peer obj
+ *
+ * Return: number of max mcs on succes or 0 on failure
+ */
+uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_objmgr_peer *peer);
 #else
 
 static inline void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
@@ -119,6 +153,29 @@ static inline void
 hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 				     uint8_t *peer_mac)
 {
+}
+
+static inline
+int hdd_son_send_set_wifi_generic_command(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  struct nlattr **tb)
+{
+	return -EINVAL;
+}
+
+static inline
+int hdd_son_send_get_wifi_generic_command(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  struct nlattr **tb)
+{
+	return -EINVAL;
+}
+
+static inline
+uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_objmgr_peer *peer)
+{
+	return 0;
 }
 
 #endif /* WLAN_FEATURE_SON */

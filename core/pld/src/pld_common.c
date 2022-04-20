@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -36,6 +36,19 @@
 #include <net/cnss2.h>
 #endif
 #endif
+
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#ifdef CONFIG_PLD_SNOC_ICNSS
+#ifdef CONFIG_PLD_SNOC_ICNSS2
+#include "icnss2.h"
+#else
+#include "icnss.h"
+#endif
+#endif
+#ifdef CONFIG_PLD_IPCI_ICNSS
+#include "icnss2.h"
+#endif
+#else
 #ifdef CONFIG_PLD_SNOC_ICNSS
 #ifdef CONFIG_PLD_SNOC_ICNSS2
 #include <soc/qcom/icnss2.h>
@@ -45,6 +58,7 @@
 #endif
 #ifdef CONFIG_PLD_IPCI_ICNSS
 #include <soc/qcom/icnss2.h>
+#endif
 #endif
 
 #include "pld_pcie.h"
@@ -330,14 +344,14 @@ int pld_register_driver(struct pld_driver_ops *ops)
 
 	ret = pld_pcie_register_driver();
 	if (ret) {
-		pr_err("Fail to register pcie driver\n");
+		pld_err_rl("Fail to register pcie driver\n");
 		goto fail_pcie;
 	}
 	pld_context->pld_driver_state |= PLD_PCIE_REGISTERED;
 
 	ret = pld_snoc_register_driver();
 	if (ret) {
-		pr_err("Fail to register snoc driver\n");
+		pld_err_rl("Fail to register snoc driver\n");
 		goto fail_snoc;
 	}
 	pld_context->pld_driver_state |= PLD_SNOC_REGISTERED;
@@ -372,7 +386,7 @@ int pld_register_driver(struct pld_driver_ops *ops)
 
 	ret = pld_ipci_register_driver();
 	if (ret) {
-		pr_err("Fail to register ipci driver\n");
+		pld_err_rl("Fail to register ipci driver\n");
 		goto fail_ipci;
 	}
 	pld_context->pld_driver_state |= PLD_IPCI_REGISTERED;
@@ -1837,6 +1851,35 @@ void pld_unlock_reg_window(struct device *dev, unsigned long *flags)
 		pr_err("Invalid device type\n");
 		break;
 	}
+}
+
+/**
+ * pld_get_pci_slot() - Get PCI slot of attached device
+ * @dev: device
+ *
+ * Return: pci slot
+ */
+int pld_get_pci_slot(struct device *dev)
+{
+	int ret = 0;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_get_pci_slot(dev);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
 }
 
 /**

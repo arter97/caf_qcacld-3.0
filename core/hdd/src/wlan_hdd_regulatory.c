@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -210,6 +210,50 @@ void hdd_reset_global_reg_params(void)
 	init_by_reg_core = false;
 }
 
+/**
+ * hdd_update_coex_unsafe_chan_nb_user_prefer() - update coex unsafe
+ * nb prefer framework
+ * @hdd_ctx: hdd context
+ * @config_vars: reg config
+ *
+ * Return: void
+ */
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+static inline
+void hdd_update_coex_unsafe_chan_nb_user_prefer(
+		struct hdd_context *hdd_ctx,
+		struct reg_config_vars *config_vars)
+{
+	config_vars->coex_unsafe_chan_nb_user_prefer =
+		ucfg_mlme_get_coex_unsafe_chan_nb_user_prefer(
+		hdd_ctx->psoc);
+}
+
+static inline
+void hdd_update_coex_unsafe_chan_reg_disable(
+		struct hdd_context *hdd_ctx,
+		struct reg_config_vars *config_vars)
+{
+	config_vars->coex_unsafe_chan_reg_disable =
+		ucfg_mlme_get_coex_unsafe_chan_reg_disable(
+		hdd_ctx->psoc);
+}
+#else
+static inline
+void hdd_update_coex_unsafe_chan_nb_user_prefer(
+		struct hdd_context *hdd_ctx,
+		struct reg_config_vars *config_vars)
+{
+}
+
+static inline
+void hdd_update_coex_unsafe_chan_reg_disable(
+		struct hdd_context *hdd_ctx,
+		struct reg_config_vars *config_vars)
+{
+}
+#endif
+
 static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 				    struct reg_config_vars *config_vars)
 {
@@ -275,6 +319,8 @@ static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 						    &enable_5dot9_ghz_chan);
 	config_vars->enable_5dot9_ghz_chan_in_master_mode =
 						enable_5dot9_ghz_chan;
+	hdd_update_coex_unsafe_chan_nb_user_prefer(hdd_ctx, config_vars);
+	hdd_update_coex_unsafe_chan_reg_disable(hdd_ctx, config_vars);
 }
 
 /**
@@ -1198,6 +1244,7 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 {
 	uint16_t *local_unsafe_list;
 	uint16_t local_unsafe_list_count;
+	uint32_t restriction_mask;
 	uint8_t i;
 
 	/* Basic sanity */
@@ -1211,6 +1258,7 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 			sizeof(struct ch_avoid_ind_type));
 	mutex_unlock(&hdd_ctxt->avoid_freq_lock);
 
+	restriction_mask = wlan_hdd_get_restriction_mask(hdd_ctxt);
 	if (hdd_clone_local_unsafe_chan(hdd_ctxt,
 					&local_unsafe_list,
 					&local_unsafe_list_count) != 0) {
@@ -1224,6 +1272,8 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 					sizeof(hdd_ctxt->unsafe_channel_list));
 
 	hdd_ctxt->unsafe_channel_count = unsafe_chan_list->chan_cnt;
+
+	wlan_hdd_set_restriction_mask(hdd_ctxt);
 
 	for (i = 0; i < unsafe_chan_list->chan_cnt; i++) {
 		hdd_ctxt->unsafe_channel_list[i] =
@@ -1268,7 +1318,8 @@ void hdd_ch_avoid_ind(struct hdd_context *hdd_ctxt,
 	}
 	if (hdd_local_unsafe_channel_updated(hdd_ctxt,
 					    local_unsafe_list,
-					    local_unsafe_list_count))
+					    local_unsafe_list_count,
+					    restriction_mask))
 		hdd_unsafe_channel_restart_sap(hdd_ctxt);
 	qdf_mem_free(local_unsafe_list);
 
@@ -1563,10 +1614,14 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 								    adapter,
 								    oper_freq);
 
-			if (phy_changed || freq_changed || width_changed) {
+			if (hdd_is_vdev_in_conn_state(adapter) &&
+			    (phy_changed || freq_changed || width_changed)) {
+				hdd_debug("changed: phy %d, freq %d, width %d",
+					  phy_changed, freq_changed,
+					  width_changed);
 				wlan_hdd_cm_issue_disconnect(adapter,
-							 REASON_UNSPEC_FAILURE,
-							 false);
+							REASON_UNSPEC_FAILURE,
+							false);
 				sta_ctx->reg_phymode = csr_phy_mode;
 			}
 			break;
@@ -1846,6 +1901,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	struct regulatory_channel *cur_chan_list;
 	enum country_src cc_src;
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
+	int ret;
 
 	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
 	if (!cur_chan_list) {
@@ -1857,6 +1913,12 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	ucfg_reg_register_chan_change_callback(hdd_ctx->psoc,
 					       hdd_regulatory_dyn_cbk,
 					       NULL);
+
+	ret = hdd_update_country_code(hdd_ctx);
+	if (ret) {
+		hdd_err("Failed to update country code; errno:%d", ret);
+		return -EINVAL;
+	}
 
 	wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
 	/* Check the kernel version for upstream commit aced43ce780dc5 that

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -289,6 +289,12 @@
 
 #define WMA_DEFAULT_HW_MODE_INDEX 0xFFFF
 #define TWO_THIRD (2/3)
+
+#ifdef WLAN_FEATURE_SON
+#define WMA_SON_MAX_PEER_EXT_STATS 16
+#else
+#define WMA_SON_MAX_PEER_EXT_STATS 0
+#endif
 
 /**
  * WMA hardware mode list bit-mask definitions.
@@ -995,6 +1001,7 @@ typedef struct {
 						    uint8_t vdev_id,
 						    struct qdf_mac_addr bssid);
 	QDF_STATUS (*pe_roam_synch_cb)(struct mac_context *mac,
+		uint8_t vdev_id,
 		struct roam_offload_synch_ind *roam_synch_data,
 		uint16_t ie_len,
 		enum sir_roam_op_code reason);

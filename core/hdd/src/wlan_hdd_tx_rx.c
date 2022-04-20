@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -485,10 +485,9 @@ uint32_t hdd_txrx_get_tx_ack_count(struct hdd_adapter *adapter)
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
- * qdf_event_eapol_log() - send event to wlan diag
+ * hdd_event_eapol_log() - send event to wlan diag
  * @skb: skb ptr
  * @dir: direction
- * @eapol_key_info: eapol key info
  *
  * Return: None
  */
@@ -549,15 +548,57 @@ int hdd_set_udp_qos_upgrade_config(struct hdd_adapter *adapter,
 }
 
 /**
- * wlan_hdd_classify_pkt() - classify packet
- * @skb - sk buff
+ * wlan_hdd_mark_critical_pkt() - Identify and mark critical packets
+ * @skb: skb ptr
  *
- * Return: none
+ * Return: None
  */
-void wlan_hdd_classify_pkt(struct sk_buff *skb)
+static void wlan_hdd_mark_critical_pkt(struct sk_buff *skb)
+{
+	if (qdf_nbuf_is_ipv4_eapol_pkt(skb)) {
+		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
+				QDF_NBUF_CB_PACKET_TYPE_EAPOL;
+	} else if (qdf_nbuf_is_ipv4_arp_pkt(skb)) {
+		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
+				QDF_NBUF_CB_PACKET_TYPE_ARP;
+	} else if (qdf_nbuf_is_ipv4_dhcp_pkt(skb)) {
+		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
+				QDF_NBUF_CB_PACKET_TYPE_DHCP;
+	} else if (qdf_nbuf_is_ipv6_dhcp_pkt(skb)) {
+		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
+				QDF_NBUF_CB_PACKET_TYPE_DHCPV6;
+	} else if (qdf_nbuf_is_icmpv6_pkt(skb)) {
+		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
+			QDF_NBUF_CB_PACKET_TYPE_ICMPv6;
+	}
+
+	QDF_NBUF_CB_TX_EXTRA_IS_CRITICAL(skb) = true;
+}
+
+/**
+ * wlan_hdd_mark_non_critical_pkt() - Identify and mark non-critical packets
+ * @skb: skb ptr
+ *
+ * Return: None
+ */
+static void wlan_hdd_mark_non_critical_pkt(struct sk_buff *skb)
+{
+	if (qdf_nbuf_is_icmp_pkt(skb))
+		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
+				QDF_NBUF_CB_PACKET_TYPE_ICMP;
+	else if (qdf_nbuf_is_ipv4_wapi_pkt(skb))
+		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
+			QDF_NBUF_CB_PACKET_TYPE_WAPI;
+}
+
+void wlan_hdd_mark_pkt_type(struct sk_buff *skb)
 {
 	struct ethhdr *eh = (struct ethhdr *)skb->data;
 
+	/*
+	 * Zero out CB before accessing it. Expection is that cb is accessed
+	 * for the first time here on TX path in hard_start_xmit.
+	 */
 	qdf_mem_zero(skb->cb, sizeof(skb->cb));
 
 	/* check destination mac address is broadcast/multicast */
@@ -566,24 +607,14 @@ void wlan_hdd_classify_pkt(struct sk_buff *skb)
 	else if (is_multicast_ether_addr((uint8_t *)eh))
 		QDF_NBUF_CB_GET_IS_MCAST(skb) = true;
 
-	if (qdf_nbuf_is_ipv4_arp_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_ARP;
-	else if (qdf_nbuf_is_ipv4_dhcp_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_DHCP;
-	else if (qdf_nbuf_is_ipv4_eapol_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_EAPOL;
-	else if (qdf_nbuf_is_ipv4_wapi_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_WAPI;
-	else if (qdf_nbuf_is_icmp_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_ICMP;
-	else if (qdf_nbuf_is_icmpv6_pkt(skb))
-		QDF_NBUF_CB_GET_PACKET_TYPE(skb) =
-			QDF_NBUF_CB_PACKET_TYPE_ICMPv6;
+	/*
+	 * TX Packets in the HI_PRIO queue are assumed to be critical and
+	 * marked accordingly.
+	 */
+	if (skb->queue_mapping == TX_GET_QUEUE_IDX(HDD_LINUX_AC_HI_PRIO, 0))
+		wlan_hdd_mark_critical_pkt(skb);
+	else
+		wlan_hdd_mark_non_critical_pkt(skb);
 }
 
 /**
@@ -1064,6 +1095,20 @@ static void hdd_mark_icmp_req_to_fw(struct hdd_context *hdd_ctx,
 }
 #endif
 
+#ifdef CONFIG_DP_PKT_ADD_TIMESTAMP
+void hdd_pkt_add_timestamp(struct hdd_adapter *adapter,
+			   enum qdf_pkt_timestamp_index index, uint64_t time,
+			   struct sk_buff *skb)
+{
+	if (unlikely(qdf_is_dp_pkt_timestamp_enabled())) {
+		uint64_t tsf_time;
+
+		hdd_get_tsf_time(adapter, time, &tsf_time);
+		qdf_add_dp_pkt_timestamp(skb, index, tsf_time);
+	}
+}
+#endif
+
 /**
  * __hdd_hard_start_xmit() - Transmit a frame
  * @skb: pointer to OS packet (sk_buff)
@@ -1120,12 +1165,17 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		goto drop_pkt;
 	}
 
-	wlan_hdd_classify_pkt(skb);
+	/*
+	 * wlan_hdd_mark_pkt_type zeros out skb->cb.  All skb->cb access
+	 * should be after it.
+	 */
+	wlan_hdd_mark_pkt_type(skb);
+	QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(skb) = 1;
+
 	if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) == QDF_NBUF_CB_PACKET_TYPE_ARP) {
 		if (qdf_nbuf_data_is_arp_req(skb) &&
 		    (adapter->track_arp_ip == qdf_nbuf_get_arp_tgt_ip(skb))) {
 			is_arp = true;
-			QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(skb) = 1;
 			++adapter->hdd_stats.hdd_arp_stats.tx_arp_req_count;
 			QDF_TRACE(QDF_MODULE_ID_HDD_DATA,
 				  QDF_TRACE_LEVEL_INFO_HIGH,
@@ -1136,11 +1186,9 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		subtype = qdf_nbuf_get_eapol_subtype(skb);
 		if (subtype == QDF_PROTO_EAPOL_M2) {
 			++adapter->hdd_stats.hdd_eapol_stats.eapol_m2_count;
-			QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(skb) = 1;
 			is_eapol = true;
 		} else if (subtype == QDF_PROTO_EAPOL_M4) {
 			++adapter->hdd_stats.hdd_eapol_stats.eapol_m4_count;
-			QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(skb) = 1;
 			is_eapol = true;
 		}
 	} else if (QDF_NBUF_CB_GET_PACKET_TYPE(skb) ==
@@ -1148,11 +1196,9 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		subtype = qdf_nbuf_get_dhcp_subtype(skb);
 		if (subtype == QDF_PROTO_DHCP_DISCOVER) {
 			++adapter->hdd_stats.hdd_dhcp_stats.dhcp_dis_count;
-			QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(skb) = 1;
 			is_dhcp = true;
 		} else if (subtype == QDF_PROTO_DHCP_REQUEST) {
 			++adapter->hdd_stats.hdd_dhcp_stats.dhcp_req_count;
-			QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(skb) = 1;
 			is_dhcp = true;
 		}
 	} else if ((QDF_NBUF_CB_GET_PACKET_TYPE(skb) ==
@@ -1161,6 +1207,9 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 		   QDF_NBUF_CB_PACKET_TYPE_ICMPv6)) {
 		hdd_mark_icmp_req_to_fw(hdd_ctx, skb);
 	}
+
+	hdd_pkt_add_timestamp(adapter, QDF_PKT_TX_DRIVER_ENTRY,
+			      qdf_get_log_timestamp(), skb);
 
 	/* track connectivity stats */
 	if (adapter->pkt_type_bitmap)
@@ -2654,6 +2703,10 @@ QDF_STATUS hdd_rx_packet_cbk(void *adapter_context,
 				is_dhcp = true;
 			}
 		}
+
+		hdd_pkt_add_timestamp(adapter, QDF_PKT_RX_DRIVER_EXIT,
+				      qdf_get_log_timestamp(), skb);
+
 		/* track connectivity stats */
 		if (adapter->pkt_type_bitmap)
 			hdd_tx_rx_collect_connectivity_stats_info(skb, adapter,

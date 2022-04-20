@@ -828,7 +828,7 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 	switch (csrDot11Mode) {
 	case eCSR_CFG_DOT11_MODE_AUTO:
 #ifdef WLAN_FEATURE_11BE
-		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11BE))
+		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			ret = MLME_DOT11_MODE_11BE;
 		else
 #endif
@@ -887,7 +887,7 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 		break;
 #ifdef WLAN_FEATURE_11BE
 	case eCSR_CFG_DOT11_MODE_11BE_ONLY:
-		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11BE))
+		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			ret = MLME_DOT11_MODE_11BE_ONLY;
 		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 			ret = MLME_DOT11_MODE_11AX_ONLY;
@@ -897,7 +897,7 @@ uint32_t csr_translate_to_wni_cfg_dot11_mode(struct mac_context *mac,
 			ret = MLME_DOT11_MODE_11N;
 		break;
 	case eCSR_CFG_DOT11_MODE_11BE:
-		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11BE))
+		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			ret = MLME_DOT11_MODE_11BE;
 		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 			ret = MLME_DOT11_MODE_11AX;
@@ -1095,9 +1095,7 @@ void csr_release_profile(struct mac_context *mac,
 /* CSR never sets MLME_DOT11_MODE_ALL to the CFG */
 /* So PE should not see MLME_DOT11_MODE_ALL when it gets the CFG value */
 enum csr_cfgdot11mode
-csr_get_cfg_dot11_mode_from_csr_phy_mode(struct csr_roam_profile *pProfile,
-					 eCsrPhyMode phyMode,
-					 bool fProprietary)
+csr_get_cfg_dot11_mode_from_csr_phy_mode(bool is_ap, eCsrPhyMode phyMode)
 {
 	uint32_t cfgDot11Mode = eCSR_CFG_DOT11_MODE_ABG;
 
@@ -1111,8 +1109,7 @@ csr_get_cfg_dot11_mode_from_csr_phy_mode(struct csr_roam_profile *pProfile,
 		break;
 	case eCSR_DOT11_MODE_11g:
 	case eCSR_DOT11_MODE_11g_ONLY:
-		if (pProfile && (CSR_IS_INFRA_AP(pProfile))
-		    && (phyMode == eCSR_DOT11_MODE_11g_ONLY))
+		if (is_ap && (phyMode == eCSR_DOT11_MODE_11g_ONLY))
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11G_ONLY;
 		else
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11G;
@@ -1121,7 +1118,7 @@ csr_get_cfg_dot11_mode_from_csr_phy_mode(struct csr_roam_profile *pProfile,
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
 		break;
 	case eCSR_DOT11_MODE_11n_ONLY:
-		if (pProfile && CSR_IS_INFRA_AP(pProfile))
+		if (is_ap)
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N_ONLY;
 		else
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
@@ -1163,7 +1160,7 @@ csr_get_cfg_dot11_mode_from_csr_phy_mode(struct csr_roam_profile *pProfile,
 		break;
 #ifdef WLAN_FEATURE_11BE
 	case eCSR_DOT11_MODE_11be:
-		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11BE))
+		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BE;
 		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AX;
@@ -1173,7 +1170,7 @@ csr_get_cfg_dot11_mode_from_csr_phy_mode(struct csr_roam_profile *pProfile,
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11N;
 		break;
 	case eCSR_DOT11_MODE_11be_ONLY:
-		if (IS_FEATURE_SUPPORTED_BY_FW(DOT11BE))
+		if (IS_FEATURE_11BE_SUPPORTED_BY_FW)
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11BE_ONLY;
 		else if (IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 			cfgDot11Mode = eCSR_CFG_DOT11_MODE_11AX_ONLY;
@@ -1426,80 +1423,6 @@ QDF_STATUS csr_mlme_vdev_stop_bss(uint8_t vdev_id)
 				      eCSR_ROAM_SEND_P2P_STOP_BSS,
 				      eCSR_ROAM_RESULT_NONE);
 }
-
-#ifdef WLAN_FEATURE_11BE_MLO
-void csr_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_vdev *vdev,
-					bool is_ap_up)
-{
-	uint8_t num_mlo = 0;
-	qdf_freq_t sap_chan = 0;
-	struct wlan_channel *bss_chan = NULL;
-	uint8_t mlo_vdev_lst[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
-	bool is_mlo_sbs;
-	struct mac_context *mac_ctx = cds_get_context(QDF_MODULE_ID_SME);
-
-	if (!mac_ctx)
-		return;
-
-	is_mlo_sbs = policy_mgr_is_mlo_in_mode_sbs(mac_ctx->psoc, PM_STA_MODE,
-						   mlo_vdev_lst, &num_mlo);
-
-	if (num_mlo < 2) {
-		sme_debug("vdev %d AP_state %d MLO Sta links %d",
-			  wlan_vdev_get_id(vdev), is_ap_up, num_mlo);
-		return;
-	}
-
-	bss_chan = wlan_vdev_mlme_get_bss_chan(vdev);
-	if (bss_chan)
-		sap_chan = bss_chan->ch_freq;
-	if (!sap_chan) {
-		sme_debug("Invalid SAP Chan");
-		return;
-	}
-
-	sme_debug("vdev %d: is_ap_up %d num_mlo %d is_mlo_sbs %d sap_chan %d",
-		  wlan_vdev_get_id(vdev), is_ap_up, num_mlo, is_mlo_sbs,
-		  sap_chan);
-
-	if (!is_mlo_sbs)
-		return;
-
-	if (is_ap_up) {
-		/*
-		 * During 2.4Ghz SAP up, If SBS MLO STA is present,
-		 * then Disable one of the links.
-		 */
-		if (wlan_reg_is_24ghz_ch_freq(sap_chan))
-			wlan_mlo_sta_mlo_concurency_set_link(vdev,
-						MLO_LINK_FORCE_REASON_CONNECT,
-						MLO_LINK_FORCE_MODE_ACTIVE_NUM,
-						num_mlo, mlo_vdev_lst);
-		/*
-		 * During 2.4Ghz SAP up, If there is channel switch for sap from
-		 * 2.4 ghz to 5 ghz, enable both the links, as one of them was
-		 * disabled by previous up operations when sap was on 2.4 ghz
-		 */
-		else
-			wlan_mlo_sta_mlo_concurency_set_link(vdev,
-						MLO_LINK_FORCE_REASON_CONNECT,
-						MLO_LINK_FORCE_MODE_NO_FORCE,
-						num_mlo, mlo_vdev_lst);
-
-		return;
-	}
-
-	/*
-	 * During 2.4Ghz SAP down, if SBS MLO STA is present, renable both the
-	 * links, as one of them was disabled during up.
-	 */
-	if (wlan_reg_is_24ghz_ch_freq(sap_chan))
-		wlan_mlo_sta_mlo_concurency_set_link(vdev,
-					MLO_LINK_FORCE_REASON_DISCONNECT,
-					MLO_LINK_FORCE_MODE_NO_FORCE,
-					num_mlo, mlo_vdev_lst);
-}
-#endif
 
 qdf_freq_t csr_mlme_get_concurrent_operation_freq(void)
 {

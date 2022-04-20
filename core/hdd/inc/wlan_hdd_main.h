@@ -1226,10 +1226,12 @@ struct hdd_context;
  * @vdev_id: Unique identifier assigned to the vdev
  * @event_flags: a bitmap of hdd_adapter_flags
  * @mic_work: mic work information
+ * @enable_dynamic_tsf_sync: Enable/Disable TSF sync through NL interface
+ * @dynamic_tsf_sync_interval: TSF sync interval configure through NL interface
  * @gpio_tsf_sync_work: work to sync send TSF CAP WMI command
  * @cache_sta_count: number of currently cached stations
  * @acs_complete_event: acs complete event
- * @latency_level: 0 - normal, 1 - moderate, 2 - low, 3 - ultralow
+ * @latency_level: 0 - normal, 1 - xr, 2 - low, 3 - ultralow
  * @last_disconnect_reason: Last disconnected internal reason code
  *                          as per enum qca_disconnect_reason_codes
  * @connect_req_status: Last disconnected internal status code
@@ -1246,6 +1248,7 @@ struct hdd_context;
  * @delete_in_progress: Flag to indicate that the adapter delete is in
  *			progress, and any operation using rtnl lock inside
  *			the driver can be avoided/skipped.
+ * @is_virtual_iface: Indicates that netdev is called from virtual interface
  * @mon_adapter: hdd_adapter of monitor mode.
  * @set_mac_addr_req_ctx: Set MAC address command request context
  */
@@ -1393,6 +1396,8 @@ struct hdd_adapter {
 	/* spin lock for read/write timestamps */
 	qdf_spinlock_t host_target_sync_lock;
 	qdf_mc_timer_t host_target_sync_timer;
+	bool enable_dynamic_tsf_sync;
+	uint32_t dynamic_tsf_sync_interval;
 	uint64_t cur_host_time;
 	uint64_t last_host_time;
 	uint64_t last_target_time;
@@ -1565,6 +1570,7 @@ struct hdd_adapter {
 	/* Flag to indicate whether it is a pre cac adapter or not */
 	bool is_pre_cac_adapter;
 	bool delete_in_progress;
+	bool is_virtual_iface;
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
 	struct big_data_stats_event big_data_stats;
 #endif
@@ -2021,6 +2027,9 @@ struct hdd_context {
 	/* Flag keeps track of wiphy suspend/resume */
 	bool is_wiphy_suspended;
 
+	/* Flag keeps track of idle shutdown triggered by suspend */
+	bool shutdown_in_suspend;
+
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 	struct qdf_periodic_work bus_bw_work;
 	int cur_vote_level;
@@ -2061,6 +2070,9 @@ struct hdd_context {
 	uint16_t unsafe_channel_count;
 	uint16_t unsafe_channel_list[NUM_CHANNELS];
 #endif /* FEATURE_WLAN_CH_AVOID */
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+	uint32_t restriction_mask;
+#endif
 
 	uint8_t max_intf_count;
 #ifdef WLAN_FEATURE_LPSS
@@ -2317,6 +2329,9 @@ struct hdd_context {
 
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	bool is_vdev_macaddr_dynamic_update_supported;
+#endif
+#ifdef CONFIG_WLAN_FREQ_LIST
+	uint8_t power_type;
 #endif
 };
 
@@ -3468,6 +3483,44 @@ void hdd_acs_response_timeout_handler(void *context);
 int wlan_hdd_cfg80211_start_acs(struct hdd_adapter *adapter);
 
 /**
+ * wlan_hdd_trim_acs_channel_list() - Trims ACS channel list with
+ * intersection of PCL
+ * @pcl: preferred channel list
+ * @pcl_count: Preferred channel list count
+ * @org_ch_list: ACS channel list from user space
+ * @org_ch_list_count: ACS channel count from user space
+ *
+ * Return: None
+ */
+void wlan_hdd_trim_acs_channel_list(uint32_t *pcl, uint8_t pcl_count,
+				    uint32_t *org_freq_list,
+				    uint8_t *org_ch_list_count);
+
+/**
+ * wlan_hdd_handle_zero_acs_list() - Handle worst case of acs channel
+ * trimmed to zero
+ * @hdd_ctx: struct hdd_context
+ * @org_ch_list: ACS channel list from user space
+ * @org_ch_list_count: ACS channel count from user space
+ *
+ * When all chan in ACS freq list is filtered out
+ * by wlan_hdd_trim_acs_channel_list, the hostapd start will fail.
+ * This happens when PCL is PM_24G_SCC_CH_SBS_CH, and SAP acs range includes
+ * 5G channel list. One example is STA active on 6Ghz chan. Hostapd
+ * start SAP on 5G ACS range. The intersection of PCL and ACS range is zero.
+ * Instead of ACS failure, this API selects one channel from ACS range
+ * and report to Hostapd. When hostapd do start_ap, the driver will
+ * force SCC to 6G or move SAP to 2G based on SAP's configuration.
+ *
+ * Return: None
+ */
+void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
+				   uint32_t *acs_freq_list,
+				   uint8_t *acs_ch_list_count,
+				   uint32_t *org_freq_list,
+				   uint8_t org_ch_list_count);
+
+/**
  * hdd_cfg80211_update_acs_config() - update acs config to application
  * @adapter: hdd adapter
  * @reason: channel change reason
@@ -3509,10 +3562,10 @@ void hdd_switch_sap_channel(struct hdd_adapter *adapter, uint8_t channel,
  * Moves the SAP interface by invoking the function which
  * executes the callback to perform channel switch using (E)CSA.
  *
- * Return: None
+ * Return: QDF_STATUS_SUCCESS if successfully
  */
-void hdd_switch_sap_chan_freq(struct hdd_adapter *adapter, qdf_freq_t chan_freq,
-			      bool forced);
+QDF_STATUS hdd_switch_sap_chan_freq(struct hdd_adapter *adapter,
+				    qdf_freq_t chan_freq, bool forced);
 
 #if defined(FEATURE_WLAN_CH_AVOID)
 void hdd_unsafe_channel_restart_sap(struct hdd_context *hdd_ctx);
@@ -3694,7 +3747,22 @@ void hdd_indicate_mgmt_frame(tSirSmeMgmtFrameInd *frame_ind);
  *
  */
 struct hdd_adapter *hdd_get_adapter_by_iface_name(struct hdd_context *hdd_ctx,
-					     const char *iface_name);
+						  const char *iface_name);
+
+/**
+ * hdd_get_adapter_by_ifindex() - Return adapter associated with an ifndex
+ * @hdd_ctx: hdd context.
+ * @if_index: netdev interface index
+ *
+ * This function is used to get the adapter associated with a netdev with the
+ * given interface index.
+ *
+ * Return: adapter pointer if found, NULL otherwise
+ *
+ */
+struct hdd_adapter *hdd_get_adapter_by_ifindex(struct hdd_context *hdd_ctx,
+					       uint32_t if_index);
+
 enum phy_ch_width hdd_map_nl_chan_width(enum nl80211_chan_width ch_width);
 
 /**
@@ -4047,6 +4115,8 @@ int hdd_clone_local_unsafe_chan(struct hdd_context *hdd_ctx,
  * @hdd_ctx: hdd context pointer
  * @local_unsafe_list: unsafe chan list to be compared with hdd_ctx's list
  * @local_unsafe_list_count: channel number in local_unsafe_list
+ * @restriction_mask: restriction mask is to differentiate current channel
+ * list different from previous channel list
  *
  * The function checked the input channel is same as current unsafe chan
  * list in hdd_ctx.
@@ -4054,11 +4124,28 @@ int hdd_clone_local_unsafe_chan(struct hdd_context *hdd_ctx,
  * Return: true if input channel list is same as the list in hdd_ctx
  */
 bool hdd_local_unsafe_channel_updated(struct hdd_context *hdd_ctx,
-	uint16_t *local_unsafe_list, uint16_t local_unsafe_list_count);
+	uint16_t *local_unsafe_list, uint16_t local_unsafe_list_count,
+	uint32_t restriction_mask);
 
 int hdd_enable_disable_ca_event(struct hdd_context *hddctx,
 				uint8_t set_value);
 void wlan_hdd_undo_acs(struct hdd_adapter *adapter);
+
+/**
+ * wlan_hdd_set_restriction_mask() - set restriction mask for hdd context
+ * @hdd_ctx: hdd context pointer
+ *
+ * Return: None
+ */
+void wlan_hdd_set_restriction_mask(struct hdd_context *hdd_ctx);
+
+/**
+ * wlan_hdd_get_restriction_mask() - get restriction mask from hdd context
+ * @hdd_ctx: hdd context pointer
+ *
+ * Return: restriction_mask
+ */
+uint32_t wlan_hdd_get_restriction_mask(struct hdd_context *hdd_ctx);
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 7, 0))
 static inline int
@@ -4305,13 +4392,13 @@ void hdd_chip_pwr_save_fail_detected_cb(hdd_handle_t hdd_handle,
 				*data);
 
 /**
- * hdd_update_ie_whitelist_attr() - Copy probe req ie whitelist attrs from cfg
- * @ie_whitelist: output parameter
+ * hdd_update_ie_allowlist_attr() - Copy probe req ie allowlist attrs from cfg
+ * @ie_allowlist: output parameter
  * @hdd_ctx: pointer to hdd context
  *
  * Return: None
  */
-void hdd_update_ie_whitelist_attr(struct probe_req_whitelist_attr *ie_whitelist,
+void hdd_update_ie_allowlist_attr(struct probe_req_allowlist_attr *ie_allowlist,
 				  struct hdd_context *hdd_ctx);
 
 /**
@@ -4514,6 +4601,16 @@ uint32_t hdd_wlan_get_version(struct hdd_context *hdd_ctx,
  * Return: assembled rate code
  */
 int hdd_assemble_rate_code(uint8_t preamble, uint8_t nss, uint8_t rate);
+
+/**
+ * hdd_update_country_code - Update country code
+ * @hdd_ctx: HDD context
+ *
+ * Update country code based on module parameter country_code
+ *
+ * Return: 0 on success and errno on failure
+ */
+int hdd_update_country_code(struct hdd_context *hdd_ctx);
 
 /**
  * hdd_set_11ax_rate() - set 11ax rate
@@ -5173,6 +5270,15 @@ int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter,
 				struct qdf_mac_addr mac_addr);
 
+/**
+ * hdd_is_dynamic_set_mac_addr_allowed() - API to check dynamic MAC address
+ *				           update is allowed or not
+ * @adapter: Pointer to the adapter structure
+ *
+ * Return: true or false
+ */
+bool hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter);
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 /**
  * hdd_update_vdev_mac_address() - Update VDEV MAC address dynamically
@@ -5209,6 +5315,13 @@ static inline int hdd_dynamic_mac_address_set(struct hdd_context *hdd_ctx,
 {
 	return 0;
 }
+
+static inline bool
+hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
+{
+	return false;
+}
+
 #endif /* WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE */
 
 #ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
@@ -5227,4 +5340,12 @@ static inline int hdd_set_suspend_mode(struct hdd_context *hdd_ctx)
 	return 0;
 }
 #endif
+/*
+ * hdd_shutdown_wlan_in_suspend: shutdown wlan chip when suspend called
+ * @hdd_ctx: HDD context
+ *
+ * this function called by __wlan_hdd_cfg80211_suspend_wlan(), and it
+ * schedule idle shutdown work queue when no interface open.
+ */
+void hdd_shutdown_wlan_in_suspend(struct hdd_context *hdd_ctx);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

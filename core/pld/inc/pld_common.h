@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -51,6 +51,30 @@
 #include <net/cnss_prealloc.h>
 #endif
 #endif
+
+#define PLD_LIMIT_LOG_FOR_SEC 6
+/**
+ * __PLD_TRACE_RATE_LIMITED() - rate limited version of PLD_TRACE
+ * @params: parameters to pass through to PLD_TRACE
+ *
+ * This API prevents logging a message more than once in PLD_LIMIT_LOG_FOR_SEC
+ * seconds. This means any subsequent calls to this API from the same location
+ * within PLD_LIMIT_LOG_FOR_SEC seconds will be dropped.
+ *
+ * Return: None
+ */
+#define __PLD_TRACE_RATE_LIMITED(params...)\
+	do {\
+		static ulong __last_ticks;\
+		ulong __ticks = jiffies;\
+		if (time_after(__ticks,\
+			       __last_ticks + (HZ * PLD_LIMIT_LOG_FOR_SEC))) {\
+			pr_err(params);\
+			__last_ticks = __ticks;\
+		} \
+	} while (0)
+
+#define pld_err_rl(params...) __PLD_TRACE_RATE_LIMITED(params)
 
 /**
  * enum pld_bus_type - bus type
@@ -851,6 +875,7 @@ void pld_lock_pm_sem(struct device *dev);
 void pld_release_pm_sem(struct device *dev);
 void pld_lock_reg_window(struct device *dev, unsigned long *flags);
 void pld_unlock_reg_window(struct device *dev, unsigned long *flags);
+int pld_get_pci_slot(struct device *dev);
 int pld_power_on(struct device *dev);
 int pld_power_off(struct device *dev);
 int pld_athdiag_read(struct device *dev, uint32_t offset, uint32_t memtype,
@@ -1212,6 +1237,11 @@ static inline int pfrm_write_config_dword(struct pci_dev *pdev, int offset,
 					  uint32_t val)
 {
 	return pld_pci_write_config_dword(pdev, offset, val);
+}
+
+static inline bool pld_get_enable_intx(struct device *dev)
+{
+	return false;
 }
 
 #endif

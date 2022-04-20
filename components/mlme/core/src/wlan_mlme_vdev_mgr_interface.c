@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -348,6 +348,27 @@ static QDF_STATUS sta_mlme_vdev_stop_send(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
+ * sta_mlme_vdev_sta_disconnect_start() - MLME vdev disconnect send callback
+ * @vdev_mlme: vdev mlme object
+ * @event_data_len: event data length
+ * @event_data: event data
+ *
+ * This function is called to trigger the vdev stop to firmware when
+ * reassoc failure
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+sta_mlme_vdev_sta_disconnect_start(struct vdev_mlme_obj *vdev_mlme,
+				   uint16_t data_len, void *data)
+{
+	mlme_legacy_debug("vdev id = %d ",
+			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
+	return lim_sta_mlme_vdev_sta_disconnect_start(vdev_mlme, data_len,
+						      data);
+}
+
+/**
  * vdevmgr_mlme_stop_continue() - MLME vdev stop send callback
  * @vdev_mlme: vdev mlme object
  * @event_data_len: event data length
@@ -448,7 +469,14 @@ static inline void
 wlan_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_vdev *vdev,
 				    bool is_ap_up)
 {
-	csr_handle_sap_mlo_sta_concurrency(vdev, is_ap_up);
+	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
+
+	if (!psoc) {
+		mlme_legacy_debug("psoc Null");
+		return;
+	}
+
+	policy_mgr_handle_sap_mlo_sta_concurrency(psoc, vdev, is_ap_up);
 }
 #else
 static inline void
@@ -1812,6 +1840,8 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
  *                                      MLME down operation
  * @mlme_vdev_notify_down_complete:     callback to notify VDEV MLME on moving
  *                                      to INIT state
+ * @mlme_vdev_sta_disconn_start         callback to trigger vdev stop to
+ *                                      firmware when resaaoc failure
  */
 static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_start_send = sta_mlme_vdev_start_send,
@@ -1829,6 +1859,7 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_notify_down_complete = vdevmgr_notify_down_complete,
 	.mlme_vdev_ext_stop_rsp = vdevmgr_vdev_stop_rsp_handle,
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
+	.mlme_vdev_sta_disconn_start = sta_mlme_vdev_sta_disconnect_start,
 };
 
 /**
@@ -1920,6 +1951,7 @@ static struct mlme_ext_ops ext_ops = {
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	.mlme_vdev_send_set_mac_addr = vdevmgr_mlme_vdev_send_set_mac_addr,
 #endif
+	.mlme_cm_ext_rso_stop_cb = cm_send_rso_stop,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -1928,5 +1960,6 @@ static struct mlo_mlme_ext_ops mlo_ext_ops = {
 	.mlo_mlme_ext_peer_delete = lim_mlo_cleanup_partner_peer,
 	.mlo_mlme_ext_peer_assoc_fail = lim_mlo_ap_sta_assoc_fail,
 	.mlo_mlme_ext_assoc_resp = lim_mlo_ap_sta_assoc_suc,
+	.mlo_mlme_ext_handle_sta_csa_param = lim_handle_mlo_sta_csa_param,
 };
 #endif

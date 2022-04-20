@@ -848,6 +848,7 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 			    struct wifi_interface_info *info)
 {
 	struct hdd_station_ctx *sta_ctx;
+	struct sap_config *config;
 
 	info->mode = hdd_map_device_to_ll_iface_mode(adapter->device_mode);
 
@@ -886,6 +887,15 @@ bool hdd_get_interface_info(struct hdd_adapter *adapter,
 		}
 	}
 
+	if ((adapter->device_mode == QDF_SAP_MODE) ||
+	    (adapter->device_mode == QDF_P2P_GO_MODE)) {
+		if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
+			config = &adapter->session.ap.sap_config;
+
+			qdf_copy_macaddr(&info->bssid,
+					 &config->self_macaddr);
+		}
+	}
 	wlan_reg_get_cc_and_src(adapter->hdd_ctx->psoc, info->countryStr);
 	wlan_reg_get_cc_and_src(adapter->hdd_ctx->psoc, info->apCountryStr);
 
@@ -1710,6 +1720,7 @@ __wlan_hdd_cfg80211_ll_stats_set(struct wiphy *wiphy,
 		return -EINVAL;
 
 	if (adapter->device_mode != QDF_STA_MODE &&
+	    adapter->device_mode != QDF_SAP_MODE &&
 	    adapter->device_mode != QDF_P2P_CLIENT_MODE &&
 	    adapter->device_mode != QDF_P2P_GO_MODE) {
 		hdd_debug("Cannot set LL_STATS for device mode %d",
@@ -6174,6 +6185,9 @@ static int __wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
 			hdd_err("sap get peer info disabled!");
 		}
 	} else {
+		if (idx != 0)
+			return -ENOENT;
+
 		qdf_mem_copy(mac, dev->dev_addr, QDF_MAC_ADDR_SIZE);
 		errno = wlan_hdd_get_sta_stats(wiphy, adapter, mac, sinfo);
 	}
@@ -7096,8 +7110,9 @@ int wlan_hdd_get_temperature(struct hdd_adapter *adapter, int *temperature)
 		return -EPERM;
 	}
 
-	if (!adapter->hdd_ctx->is_therm_cmd_supp) {
-		hdd_err("WMI_SERVICE_THERM_THROT or gThermalMitigationEnable is disable");
+	if (!wlan_psoc_nif_fw_ext_cap_get(adapter->hdd_ctx->psoc,
+					  WLAN_SOC_CEXT_TT_SUPPORT)) {
+		hdd_err("WMI_SERVICE_THERM_THROT service from FW is disable");
 		return -EINVAL;
 	}
 

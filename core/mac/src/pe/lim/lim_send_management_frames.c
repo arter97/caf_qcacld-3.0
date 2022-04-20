@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,6 +48,7 @@
 #include "sme_trace.h"
 #include "rrm_api.h"
 #include "qdf_crypto.h"
+#include "parser_api.h"
 
 #include "wma_types.h"
 #include <cdp_txrx_cmn.h>
@@ -662,6 +663,7 @@ lim_send_probe_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	populate_dot11f_ssid(mac_ctx, (tSirMacSSid *) ssid, &frm->SSID);
 	populate_dot11f_supp_rates(mac_ctx, POPULATE_DOT11F_RATES_OPERATIONAL,
 		&frm->SuppRates, pe_session);
+	populate_dot11f_tpc_report(mac_ctx, &frm->TPCReport, pe_session);
 
 	populate_dot11f_ds_params(
 		mac_ctx, &frm->DSParams,
@@ -1502,7 +1504,6 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 		if (sta->mlmStaContext.htCapability &&
 		    pe_session->htCapability) {
-			pe_debug("Populate HT IEs in Assoc Response");
 			populate_dot11f_ht_caps(mac_ctx, pe_session,
 				&frm.HTCaps);
 			/*
@@ -1520,17 +1521,9 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			populate_dot11f_ht_info(mac_ctx, &frm.HTInfo,
 						pe_session);
 		}
-		pe_debug("SupportedChnlWidth: %d, mimoPS: %d, GF: %d, short GI20:%d, shortGI40: %d, dsssCck: %d, AMPDU Param: %x",
-			frm.HTCaps.supportedChannelWidthSet,
-			frm.HTCaps.mimoPowerSave,
-			frm.HTCaps.greenField, frm.HTCaps.shortGI20MHz,
-			frm.HTCaps.shortGI40MHz,
-			frm.HTCaps.dsssCckMode40MHz,
-			frm.HTCaps.maxRxAMPDUFactor);
 
 		if (sta->mlmStaContext.vhtCapability &&
 		    pe_session->vhtCapability) {
-			pe_debug("Populate VHT IEs in Assoc Response");
 			populate_dot11f_vht_caps(mac_ctx, pe_session,
 				&frm.VHTCaps);
 			populate_dot11f_vht_operation(mac_ctx, pe_session,
@@ -1558,7 +1551,6 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		    pe_session->vendor_vht_sap &&
 		    (assoc_req) &&
 		    assoc_req->vendor_vht_ie.VHTCaps.present) {
-			pe_debug("Populate Vendor VHT IEs in Assoc Rsponse");
 			frm.vendor_vht_ie.present = 1;
 			frm.vendor_vht_ie.sub_type =
 				pe_session->vendor_specific_vht_ie_sub_type;
@@ -1577,7 +1569,6 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 		if (lim_is_sta_he_capable(sta) &&
 		    lim_is_session_he_capable(pe_session)) {
-			pe_debug("Populate HE IEs");
 			populate_dot11f_he_caps(mac_ctx, pe_session,
 						&frm.he_cap);
 			populate_dot11f_he_operation(mac_ctx, pe_session,
@@ -1588,7 +1579,6 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 		if (lim_is_sta_eht_capable(sta) &&
 		    lim_is_session_eht_capable(pe_session)) {
-			pe_debug("Populate EHT IEs");
 			populate_dot11f_eht_caps(mac_ctx, pe_session,
 						 &frm.eht_cap);
 			populate_dot11f_eht_operation(mac_ctx, pe_session,
@@ -1675,8 +1665,6 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			}
 			bytes = bytes + addn_ie_len;
 		}
-		pe_debug("addn_ie_len: %d for Assoc Resp: %d",
-			addn_ie_len, assoc_req->addIEPresent);
 	}
 
 	/*
@@ -1744,11 +1732,6 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			status);
 	}
 
-	pe_nofl_debug("Assoc rsp TX: vdev %d subtype %d to "QDF_MAC_ADDR_FMT" seq num %d status %d aid %d",
-		      pe_session->vdev_id, subtype,
-		      QDF_MAC_ADDR_REF(mac_hdr->da),
-		      mac_ctx->mgmtSeqNum, status_code, aid);
-
 	if (addn_ie_len && addn_ie_len <= WNI_CFG_ASSOC_RSP_ADDNIE_DATA_LEN)
 		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     &add_ie[0], addn_ie_len);
@@ -1758,6 +1741,15 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			     + addn_ie_len,
 			     sta->mlmStaContext.owe_ie,
 			     sta->mlmStaContext.owe_ie_len);
+	pe_nofl_debug("Assoc rsp TX: vdev %d subtype %d to "QDF_MAC_ADDR_FMT" seq num %d status %d aid %d addn_ie_len %d ht %d vht %d vendor vht %d he %d eht %d",
+		      pe_session->vdev_id, subtype,
+		      QDF_MAC_ADDR_REF(mac_hdr->da),
+		      mac_ctx->mgmtSeqNum, status_code, aid, addn_ie_len,
+		      frm.HTCaps.present, frm.VHTCaps.present,
+		      frm.vendor_vht_ie.present, frm.he_cap.present,
+		      frm.eht_cap.present);
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
+			   frame, (uint16_t)bytes);
 
 	if (!wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) ||
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
@@ -2190,7 +2182,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			extr_ext_flag = (extr_ext_cap.num_bytes > 0);
 		}
 	} else {
-		pe_debug("No addn IE or peer doesn't support addnIE for Assoc Req");
 		extr_ext_flag = false;
 	}
 
@@ -2307,34 +2298,26 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * when AP is also operating in 11n mode
 	 */
 	if (pe_session->htCapability &&
-	    mac_ctx->lim.htCapabilityPresentInBeacon) {
-		pe_debug("Populate HT Caps in Assoc Request");
+	    mac_ctx->lim.htCapabilityPresentInBeacon)
 		populate_dot11f_ht_caps(mac_ctx, pe_session, &frm->HTCaps);
-	} else if (pe_session->he_with_wep_tkip) {
-		pe_debug("Populate HT Caps in Assoc Request with WEP/TKIP");
+	else if (pe_session->he_with_wep_tkip)
 		populate_dot11f_ht_caps(mac_ctx, NULL, &frm->HTCaps);
-	}
 
 	if (pe_session->vhtCapability &&
 	    pe_session->vhtCapabilityPresentInBeacon) {
-		pe_debug("Populate VHT IEs in Assoc Request");
 		populate_dot11f_vht_caps(mac_ctx, pe_session, &frm->VHTCaps);
 		vht_enabled = true;
 		if (pe_session->gLimOperatingMode.present &&
 		    pe_session->ch_width == CH_WIDTH_20MHZ &&
 		    frm->VHTCaps.present) {
-			pe_debug("VHT OP mode IE in Assoc Req");
 			populate_dot11f_operating_mode(mac_ctx,
 					&frm->OperatingMode, pe_session);
 		}
 	} else if (pe_session->he_with_wep_tkip) {
-		pe_debug("Populate VHT IEs in Assoc Request with WEP/TKIP");
 		populate_dot11f_vht_caps(mac_ctx, NULL, &frm->VHTCaps);
 	}
 
-	if (!vht_enabled &&
-			pe_session->is_vendor_specific_vhtcaps) {
-		pe_debug("Populate Vendor VHT IEs in Assoc Request");
+	if (!vht_enabled && pe_session->is_vendor_specific_vhtcaps) {
 		frm->vendor_vht_ie.present = 1;
 		frm->vendor_vht_ie.sub_type =
 			pe_session->vendor_specific_vht_ie_sub_type;
@@ -2359,22 +2342,18 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 				     &frm->bss_max_idle_period);
 
 	if (lim_is_session_he_capable(pe_session)) {
-		pe_debug("Populate HE IEs");
 		populate_dot11f_he_caps(mac_ctx, pe_session,
 					&frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
 					    &frm->he_6ghz_band_cap);
 	} else if (pe_session->he_with_wep_tkip) {
-		pe_debug("Populate HE IEs in Assoc Request with WEP/TKIP");
 		populate_dot11f_he_caps(mac_ctx, NULL, &frm->he_cap);
 		populate_dot11f_he_6ghz_cap(mac_ctx, pe_session,
 					    &frm->he_6ghz_band_cap);
 	}
 
-	if (lim_is_session_eht_capable(pe_session)) {
-		pe_debug("Populate EHT IEs");
+	if (lim_is_session_eht_capable(pe_session))
 		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
-	}
 
 #ifdef WLAN_FEATURE_11BE_MLO
 	if ((wlan_vdev_mlme_get_opmode(pe_session->vdev) == QDF_STA_MODE) &&
@@ -2537,9 +2516,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		if (pe_session->connected_akm == ANI_AKM_TYPE_NONE)
 			is_open_auth = true;
 
-		pe_debug("Stripped MBO IE of length %d is_open_auth:%d",
-			 mbo_ie_len, is_open_auth);
-
 		if (!is_open_auth) {
 			bss_mfp_capable =
 				lim_get_vdev_rmf_capable(mac_ctx, pe_session);
@@ -2573,8 +2549,6 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 			}
 
 			vendor_ie_len = current_len - add_ie_len;
-			pe_debug("Stripped vendor IEs of size: %u",
-				 current_len);
 		}
 	}
 
@@ -2721,8 +2695,14 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
 
-	pe_nofl_info("Assoc req TX: vdev %d to "QDF_MAC_ADDR_FMT" seq num %d", pe_session->vdev_id,
-		     QDF_MAC_ADDR_REF(pe_session->bssId),
+	pe_debug("extr_ext_flag %d mbo ie len %d is open auth %d stripped vendor len %d he with tkip %d ht %d vht %d opmode %d vendor vht %d he %d eht %d",
+		 extr_ext_flag, mbo_ie_len, is_open_auth, current_len,
+		 pe_session->he_with_wep_tkip,
+		 frm->HTCaps.present, frm->VHTCaps.present,
+		 frm->OperatingMode.present, frm->vendor_vht_ie.present,
+		 frm->he_cap.present, frm->eht_cap.present);
+	pe_nofl_info("Assoc req TX: vdev %d to "QDF_MAC_ADDR_FMT" seq num %d",
+		     pe_session->vdev_id, QDF_MAC_ADDR_REF(pe_session->bssId),
 		     mac_ctx->mgmtSeqNum);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 			  frame, (uint16_t)(sizeof(tSirMacMgmtHdr) + payload));
@@ -2944,6 +2924,59 @@ static QDF_STATUS lim_auth_tx_complete_cnf(void *context,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static uint32_t lim_populate_auth_mlo_ie(struct mac_context *mac_ctx,
+					 struct pe_session *session,
+					 tSirMacAddr peer_addr,
+					 uint8_t *mlo_ie_buf)
+{
+	tDot11fIEmlo_ie mlo_ie;
+	uint32_t mlo_ie_len = 0;
+	struct tLimPreAuthNode *auth_node;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(session->vdev)) {
+		qdf_mem_zero(&mlo_ie, sizeof(tDot11fIEmlo_ie));
+
+		pe_debug("Auth TX sys role: %d", GET_LIM_SYSTEM_ROLE(session));
+		if (LIM_IS_STA_ROLE(session)) {
+			populate_dot11f_auth_mlo_ie(mac_ctx, session, &mlo_ie);
+			dot11f_pack_ie_mlo_ie(mac_ctx, &mlo_ie, mlo_ie_buf,
+					      DOT11F_EID_MLO_IE, &mlo_ie_len);
+		} else if (LIM_IS_AP_ROLE(session)) {
+			auth_node = lim_search_pre_auth_list(mac_ctx, peer_addr);
+			if (!auth_node) {
+				pe_err("no pre-auth ctx with peer addr");
+				return 0;
+			}
+
+			/*
+			 * Populate MLO IE in Auth response frame if
+			 * is_mlo_ie_present flag is set. It is set when peer
+			 * is MLO AP
+			 */
+			if (auth_node && auth_node->is_mlo_ie_present) {
+				populate_dot11f_auth_mlo_ie(mac_ctx, session,
+							    &mlo_ie);
+				dot11f_pack_ie_mlo_ie(
+					mac_ctx, &mlo_ie, mlo_ie_buf,
+					DOT11F_EID_MLO_IE, &mlo_ie_len);
+			}
+		}
+	}
+
+	return mlo_ie_len;
+}
+#else
+static inline
+uint32_t lim_populate_auth_mlo_ie(struct mac_context *mac_ctx,
+				  struct pe_session *session,
+				  tSirMacAddr peer_addr,
+				  uint8_t *mlo_ie_buf)
+{
+	return 0;
+}
+#endif
+
 /**
  * lim_send_auth_mgmt_frame() - Send an Authentication frame
  *
@@ -2978,6 +3011,8 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 	enum rateid min_rid = RATEID_DEFAULT;
 	uint16_t ch_freq_tx_frame = 0;
 	int8_t peer_rssi = 0;
+	uint8_t mlo_ie_buf[DOT11F_EID_MLO_IE];
+	uint32_t mlo_ie_len = 0;
 
 	if (!session) {
 		pe_err("Error: psession Entry is NULL");
@@ -3106,6 +3141,12 @@ lim_send_auth_mgmt_frame(struct mac_context *mac_ctx,
 		return;
 	} /* switch (auth_frame->authTransactionSeqNumber) */
 
+	qdf_mem_zero(&mlo_ie_buf, sizeof(mlo_ie_buf));
+
+	mlo_ie_len =  lim_populate_auth_mlo_ie(mac_ctx, session, peer_addr,
+					       mlo_ie_buf);
+	frame_len += mlo_ie_len;
+
 alloc_packet:
 	qdf_status = cds_packet_alloc((uint16_t) frame_len, (void **)&frame,
 				 (void **)&packet);
@@ -3219,6 +3260,9 @@ alloc_packet:
 			lim_add_fils_data_to_auth_frame(session, body);
 		}
 	}
+
+	if (mlo_ie_len)
+		qdf_mem_copy(body, &mlo_ie_buf, mlo_ie_len);
 
 	pe_nofl_info("Auth TX: vdev %d seq %d seq num %d status %d WEP %d to " QDF_MAC_ADDR_FMT,
 		     vdev_id, auth_frame->authTransactionSeqNumber,
@@ -5224,7 +5268,7 @@ returnAfterError:
 	return status_code;
 }
 
-static bool
+bool
 lim_is_self_and_peer_ocv_capable(struct mac_context *mac,
 				 uint8_t *peer,
 				 struct pe_session *pe_session)
@@ -5246,7 +5290,7 @@ lim_is_self_and_peer_ocv_capable(struct mac_context *mac,
 	return false;
 }
 
-static void
+void
 lim_fill_oci_params(struct mac_context *mac, struct pe_session *session,
 		    tDot11fIEoci *oci)
 {
@@ -5570,7 +5614,7 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	uint8_t he_frag = 0;
 	tpDphHashNode sta_ds = NULL;
 	uint16_t aid;
-	bool he_cap = false;
+	bool he_cap = false, peer_he_cap = false;
 	struct wlan_mlme_qos *qos_aggr;
 
 	vdev_id = session->vdev_id;
@@ -5587,6 +5631,8 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	frm.DialogToken.token = dialog_token;
 	frm.Status.status = status_code;
 
+	sta_ds = dph_lookup_hash_entry(mac_ctx, peer_mac, &aid,
+				       &session->dph.dphHashTable);
 	if ((LIM_IS_STA_ROLE(session) && qos_aggr->rx_aggregation_size == 1 &&
 	    !mac_ctx->usr_cfg_ba_buff_size) || mac_ctx->reject_addba_req) {
 		frm.Status.status = STATUS_REQUEST_DECLINED;
@@ -5596,8 +5642,6 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 		frm.addba_param_set.buff_size =
 			QDF_MIN(qos_aggr->rx_aggregation_size, calc_buff_size);
 	} else {
-		sta_ds = dph_lookup_hash_entry(mac_ctx, peer_mac, &aid,
-					       &session->dph.dphHashTable);
 		if (sta_ds && lim_is_session_he_capable(session))
 			he_cap = lim_is_sta_he_capable(sta_ds);
 
@@ -5632,11 +5676,15 @@ QDF_STATUS lim_send_addba_response_frame(struct mac_context *mac_ctx,
 	}
 
 	frm.addba_param_set.tid = tid;
+	if (sta_ds)
+		peer_he_cap = lim_is_sta_he_capable(sta_ds);
+
 	/* Enable RX AMSDU only in HE mode if supported */
 	if (mac_ctx->is_usr_cfg_amsdu_enabled &&
 	    ((IS_PE_SESSION_HE_MODE(session) &&
 	      WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq)) ||
-	     !WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq)))
+	     !WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq) ||
+	     (sta_ds && sta_ds->staType == STA_ENTRY_TDLS_PEER && peer_he_cap)))
 		frm.addba_param_set.amsdu_supp = amsdu_support;
 	else
 		frm.addba_param_set.amsdu_supp = 0;
@@ -5945,7 +5993,6 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 	qdf_mtrace(QDF_MODULE_ID_PE, QDF_MODULE_ID_WMA, TRACE_CODE_TX_MGMT,
 		   session->peSessionId, 0);
 
-	mac_ctx->auth_ack_status = LIM_ACK_NOT_RCD;
 	min_rid = lim_get_min_session_txrate(session);
 
 	if (fc->subType == SIR_MAC_MGMT_AUTH &&
@@ -6100,6 +6147,6 @@ void lim_send_mgmt_frame_tx(struct mac_context *mac_ctx,
 			lim_handle_sae_auth_retry(mac_ctx, vdev_id,
 						  mb_msg->data, msg_len);
 	}
-
+	mac_ctx->auth_ack_status = LIM_ACK_NOT_RCD;
 	lim_send_frame(mac_ctx, vdev_id, mb_msg->data, msg_len);
 }

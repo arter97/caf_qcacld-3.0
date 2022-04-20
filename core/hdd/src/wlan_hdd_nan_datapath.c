@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -332,16 +332,22 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
 	uint32_t roam_id;
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	struct csr_roam_profile *roam_profile;
+#endif
 	mac_handle_t mac_handle;
-	uint8_t wmm_mode = 0;
 	struct hdd_context *hdd_ctx;
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
+	uint8_t wmm_mode = 0;
 	uint8_t value = 0;
-
+#endif
 	hdd_enter();
-
-	roam_profile = hdd_roam_profile(adapter);
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
+	roam_profile = hdd_roam_profile(adapter);
 
 	status = ucfg_mlme_get_wmm_mode(hdd_ctx->psoc, &wmm_mode);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -382,6 +388,7 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 	mac_handle = hdd_adapter_get_mac_handle(adapter);
 	status = sme_bss_start(mac_handle, adapter->vdev_id,
 			       roam_profile, &roam_id);
+#endif
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("NDI sme_RoamConnect session %d failed with status %d -> NotConnected",
 			adapter->vdev_id, status);
@@ -391,11 +398,12 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 	} else {
 		hdd_info("sme_RoamConnect issued successfully for NDI");
 	}
-
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	qdf_mem_free(roam_profile->ChannelInfo.freq_list);
 	roam_profile->ChannelInfo.freq_list = NULL;
 	roam_profile->ChannelInfo.numOfChannels = 0;
-
+#endif
 	hdd_exit();
 
 	return 0;
@@ -557,7 +565,7 @@ static int __wlan_hdd_cfg80211_process_ndp_cmd(struct wiphy *wiphy,
 	}
 
 	return os_if_nan_process_ndp_cmd(hdd_ctx->psoc, data, data_len,
-					 hdd_is_ndp_allowed(hdd_ctx));
+					 hdd_is_ndp_allowed(hdd_ctx), wdev);
 }
 
 /**

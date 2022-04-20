@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -319,7 +320,7 @@ static QDF_STATUS hdd_print_acl(struct hdd_adapter *adapter)
 	if (QDF_STATUS_SUCCESS == wlansap_get_acl_accept_list(sap_ctx,
 							      &maclist[0],
 							      &listnum)) {
-		pr_info("******* WHITE LIST ***********\n");
+		pr_info("******* ALLOW LIST ***********\n");
 		if (listnum <= MAX_ACL_MAC_ADDRESS)
 			print_mac_list(&maclist[0], listnum);
 	} else {
@@ -329,7 +330,7 @@ static QDF_STATUS hdd_print_acl(struct hdd_adapter *adapter)
 	if (QDF_STATUS_SUCCESS == wlansap_get_acl_deny_list(sap_ctx,
 							    &maclist[0],
 							    &listnum)) {
-		pr_info("******* BLACK LIST ***********\n");
+		pr_info("******* DENY LIST ***********\n");
 		if (listnum <= MAX_ACL_MAC_ADDRESS)
 			print_mac_list(&maclist[0], listnum);
 	} else {
@@ -1053,6 +1054,7 @@ static int __iw_softap_get_three(struct net_device *dev,
 	int ret = 0; /* success */
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_tsf_op_response tsf_op_resp;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	ret = wlan_hdd_validate_context(hdd_ctx);
@@ -1065,7 +1067,12 @@ static int __iw_softap_get_three(struct net_device *dev,
 
 	switch (sub_cmd) {
 	case QCSAP_GET_TSF:
-		ret = hdd_indicate_tsf(adapter, value, 3);
+		ret = hdd_indicate_tsf(adapter, &tsf_op_resp);
+		if (!ret) {
+			value[0] = tsf_op_resp.status;
+			value[1] = tsf_op_resp.time & 0xffffffff;
+			value[2] = (tsf_op_resp.time >> 32) & 0xffffffff;
+		}
 		break;
 	default:
 		hdd_err("Invalid getparam command: %d", sub_cmd);
@@ -1381,8 +1388,8 @@ static iw_softap_getparam(struct net_device *dev,
 }
 
 /* Usage:
- *  BLACK_LIST  = 0
- *  WHITE_LIST  = 1
+ *  DENY_LIST  = 0
+ *  ALLOW_LIST  = 1
  *  ADD MAC = 0
  *  REMOVE MAC  = 1
  *
@@ -1395,9 +1402,9 @@ static iw_softap_getparam(struct net_device *dev,
  *  <6 octet mac addr> <list type> <cmd type>
  *
  *  Examples:
- *  eg 1. to add a mac addr 00:0a:f5:89:89:90 to the black list
+ *  eg 1. to add a mac addr 00:0a:f5:89:89:90 to the deny list
  *  iwpriv softap.0 modify_acl 0x00 0x0a 0xf5 0x89 0x89 0x90 0 0
- *  eg 2. to delete a mac addr 00:0a:f5:89:89:90 from white list
+ *  eg 2. to delete a mac addr 00:0a:f5:89:89:90 from allow list
  *  iwpriv softap.0 modify_acl 0x00 0x0a 0xf5 0x89 0x89 0x90 1 1
  */
 static

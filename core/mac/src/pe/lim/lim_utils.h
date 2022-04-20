@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -334,8 +334,7 @@ void lim_update_short_slot_time(struct mac_context *mac, tSirMacAddr peerMacAddr
  * @frame_type: Type of mgmt frame
  * @frame: Frame pointer
  * @frame_len: Length og mgmt frame
- * @session_id: session id
- * @psession_entry: PE Session Entry
+ * @vdev_id: session id
  * @rx_freq: Frequency on which packet is received
  * @rx_rssi: rssi value
  * @rx_flags: RXMGMT flags to be set for the frame. Defined in enum rxmgmt_flags
@@ -347,8 +346,7 @@ void lim_update_short_slot_time(struct mac_context *mac, tSirMacAddr peerMacAddr
 */
 void lim_send_sme_mgmt_frame_ind(struct mac_context *mac_ctx, uint8_t frame_type,
 				 uint8_t *frame, uint32_t frame_len,
-				 uint16_t session_id, uint32_t rx_freq,
-				 struct pe_session *psession_entry,
+				 uint16_t vdev_id, uint32_t rx_freq,
 				 int8_t rx_rssi, enum rxmgmt_flags rx_flags);
 
 /*
@@ -561,14 +559,14 @@ int
 lim_assoc_rej_get_remaining_delta(struct sir_rssi_disallow_lst *node);
 
 /**
- * lim_rem_blacklist_entry_with_lowest_delta() - Remove the entry with lowest
+ * lim_rem_denylist_entry_with_lowest_delta() - Remove the entry with lowest
  * time delta
  * @list: rssi based rejected BSSID list
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-lim_rem_blacklist_entry_with_lowest_delta(qdf_list_t *list);
+lim_rem_denylist_entry_with_lowest_delta(qdf_list_t *list);
 
 static inline enum reg_wifi_band lim_get_rf_band(uint32_t chan_freq)
 {
@@ -1098,7 +1096,7 @@ bool lim_get_vdev_rmf_capable(struct mac_context *mac,
 			      struct pe_session *session);
 
 /**
- * lim_add_bssid_to_reject_list:- Add rssi reject Ap info to blacklist mgr.
+ * lim_add_bssid_to_reject_list:- Add rssi reject Ap info to denylist mgr.
  * @pdev: pdev
  * @entry: info of the BSSID to be put in rssi reject list.
  *
@@ -2599,6 +2597,21 @@ QDF_STATUS lim_ap_mlme_vdev_restart_send(struct vdev_mlme_obj *vdev_mlme,
 					 uint16_t data_len, void *data);
 
 /**
+ * lim_ap_mlme_vdev_restart_send - Invokes VDEV sta disconnect operation
+ * @vdev_mlme_obj:  VDEV MLME comp object
+ * @data_len: data size
+ * @data: event data
+ *
+ * API invokes VDEV sta disconnect operation
+ *
+ * Return: SUCCESS on successful completion of sta disconnect operation
+ *         FAILURE, if it fails due to any
+ */
+QDF_STATUS
+lim_sta_mlme_vdev_sta_disconnect_start(struct vdev_mlme_obj *vdev_mlme,
+				       uint16_t data_len, void *data);
+
+/**
  * lim_ap_mlme_vdev_start_req_failed - handle vdev start req failure
  * @vdev_mlme_obj:  VDEV MLME comp object
  * @data_len: data size
@@ -2765,4 +2778,30 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
  * Return: void
  */
 void lim_send_conc_params_update(void);
+
+/**
+ * lim_is_self_and_peer_ocv_capable() - check whether OCV capable
+ * @mac:        pointer to mac data
+ * @pe_session: pointer to pe session
+.* @peer:       peer mac address
+ *
+ * Return: true if both self and peer ocv capable
+ */
+bool
+lim_is_self_and_peer_ocv_capable(struct mac_context *mac,
+				 uint8_t *peer,
+				 struct pe_session *pe_session);
+
+/**
+ * lim_fill_oci_params() - fill oci parameters
+ * @mac:        pointer to mac data
+ * @session: pointer to pe session
+.* @oci:       pointer of tDot11fIEoci
+ *
+ * Return: void
+ */
+void
+lim_fill_oci_params(struct mac_context *mac, struct pe_session *session,
+		    tDot11fIEoci *oci);
+
 #endif /* __LIM_UTILS_H */

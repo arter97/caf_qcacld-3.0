@@ -716,47 +716,6 @@ QDF_STATUS
 wlan_cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 
 /**
- * wlan_cm_roam_extract_btm_response() - Extract BTM rsp stats
- * @wmi:       wmi handle
- * @evt_buf:   Pointer to the event buffer
- * @dst:       Pointer to destination structure to fill data
- * @idx:       TLV id
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_roam_extract_btm_response(wmi_unified_t wmi, void *evt_buf,
-				  struct roam_btm_response_data *dst,
-				  uint8_t idx);
-
-/**
- * wlan_cm_roam_extract_roam_initial_info() - Extract Roam Initial stats
- * @wmi:       wmi handle
- * @evt_buf:   Pointer to the event buffer
- * @dst:       Pointer to destination structure to fill data
- * @idx:       TLV id
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_roam_extract_roam_initial_info(wmi_unified_t wmi, void *evt_buf,
-				       struct roam_initial_data *dst,
-				       uint8_t idx);
-
-/**
- * wlan_cm_roam_extract_roam_msg_info() - Extract Roam msg stats
- * @wmi:       wmi handle
- * @evt_buf:   Pointer to the event buffer
- * @dst:       Pointer to destination structure to fill data
- * @idx:       TLV id
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_roam_extract_roam_msg_info(wmi_unified_t wmi, void *evt_buf,
-				   struct roam_msg_info *dst, uint8_t idx);
-
-/**
  * wlan_cm_get_roam_band_value  - Get roam band value from RSO config
  * @psoc: psoc pointer
  * @vdev: Pointer to vdev
@@ -765,21 +724,6 @@ wlan_cm_roam_extract_roam_msg_info(wmi_unified_t wmi, void *evt_buf,
  */
 uint32_t wlan_cm_get_roam_band_value(struct wlan_objmgr_psoc *psoc,
 				     struct wlan_objmgr_vdev *vdev);
-
-/**
- * wlan_cm_roam_extract_frame_info  - Extract the roam frame info TLV
- * @wmi: wmi handle
- * @evt_buf: Pointer to the event buffer
- * @dst: Destination buffer
- * @idx: TLV index
- * @num_frames: Number of frame info TLVs
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_cm_roam_extract_frame_info(wmi_unified_t wmi, void *evt_buf,
-				struct roam_frame_info *dst, uint8_t idx,
-				uint8_t num_frames);
 
 /**
  * wlan_cm_roam_activate_pcl_per_vdev() - Set the PCL command to be sent per
@@ -1350,6 +1294,15 @@ cm_handle_roam_reason_invoke_roam_fail(uint8_t vdev_id,	uint32_t notif_params,
 				       struct cm_hw_mode_trans_ind *trans_ind);
 
 /**
+ * cm_handle_roam_sync_update_hw_mode() - Handler for roam sync hw mode update
+ * @trans_ind: hw_mode transition indication
+ *
+ * Return: None
+ */
+void
+cm_handle_roam_sync_update_hw_mode(struct cm_hw_mode_trans_ind *trans_ind);
+
+/**
  * cm_handle_roam_reason_deauth() - Handler for roam due to deauth from AP
  * @vdev_id: vdev id
  * @notif_params: contains roam invoke fail reason from wmi_roam_invoke_error_t
@@ -1407,15 +1360,15 @@ QDF_STATUS
 cm_roam_event_handler(struct roam_offload_roam_event *roam_event);
 
 /**
- * cm_btm_blacklist_event_handler() - Black list the given BSSID due to btm
+ * cm_btm_denylist_event_handler() - Deny list the given BSSID due to btm
  * @psoc: PSOC pointer
- * @list: Roam blacklist info
+ * @list: Roam denylist info
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
-cm_btm_blacklist_event_handler(struct wlan_objmgr_psoc *psoc,
-			       struct roam_blacklist_event *list);
+cm_btm_denylist_event_handler(struct wlan_objmgr_psoc *psoc,
+			      struct roam_denylist_event *list);
 
 /**
  * cm_vdev_disconnect_event_handler() - disconnect evt handler for target_if
@@ -1485,6 +1438,7 @@ cm_roam_pmkid_request_handler(struct roam_pmkid_req_event *data);
 /**
  * cm_roam_update_vdev() - Update the STA and BSS
  * @sync_ind: Information needed for roam sync propagation
+ * @vdev_id: vdev id
  *
  * This function will perform all the vdev related operations with
  * respect to the self sta and the peer after roaming and completes
@@ -1492,12 +1446,14 @@ cm_roam_pmkid_request_handler(struct roam_pmkid_req_event *data);
  *
  * Return: None
  */
-void cm_roam_update_vdev(struct roam_offload_synch_ind *sync_ind);
+void cm_roam_update_vdev(struct roam_offload_synch_ind *sync_ind,
+			 uint8_t vdev_id);
 
 /**
  * cm_roam_pe_sync_callback() - Callback registered at pe, gets invoked when
  * ROAM SYNCH event is received from firmware
  * @sync_ind: Structure with roam synch parameters
+ * @vdev_id: vdev id
  * @len: length for bss_description
  *
  * This is a PE level callback called from CM to complete the roam synch
@@ -1508,7 +1464,7 @@ void cm_roam_update_vdev(struct roam_offload_synch_ind *sync_ind);
  */
 QDF_STATUS
 cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
-			 uint16_t len);
+			 uint8_t vdev_id, uint16_t len);
 
 /**
  * cm_update_phymode_on_roam() - Update new phymode after

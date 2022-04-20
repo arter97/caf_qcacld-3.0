@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012 - 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -137,8 +138,8 @@ struct wlan_fwol_thermal_temp {
 };
 
 /**
- * struct wlan_fwol_ie_whitelist - Probe request IE whitelist config items
- * @ie_whitelist: IE whitelist flag
+ * struct wlan_fwol_ie_allowlist - Probe request IE allowlist config items
+ * @ie_allowlist: IE allowlist flag
  * @ie_bitmap_0: IE bitmap 0
  * @ie_bitmap_1: IE bitmap 1
  * @ie_bitmap_2: IE bitmap 2
@@ -150,8 +151,8 @@ struct wlan_fwol_thermal_temp {
  * @no_of_probe_req_ouis: Total number of ouis present in probe req
  * @probe_req_voui: Stores oui values after parsing probe req ouis
  */
-struct wlan_fwol_ie_whitelist {
-	bool ie_whitelist;
+struct wlan_fwol_ie_allowlist {
+	bool ie_allowlist;
 	uint32_t ie_bitmap_0;
 	uint32_t ie_bitmap_1;
 	uint32_t ie_bitmap_2;
@@ -190,7 +191,7 @@ struct wlan_fwol_neighbor_report_cfg {
  * struct wlan_fwol_cfg - fwol config items
  * @coex_config: coex config items
  * @thermal_temp_cfg: Thermal temperature related config items
- * @ie_whitelist_cfg: IE Whitelist related config items
+ * @ie_allowlist_cfg: IE Allowlist related config items
  * @neighbor_report_cfg: 11K neighbor report config
  * @ani_enabled: ANI enable/disable
  * @enable_rts_sifsbursting: Enable RTS SIFS Bursting
@@ -226,12 +227,13 @@ struct wlan_fwol_neighbor_report_cfg {
  * @enable_ilp: ILP HW block configuration
  * @sap_sho: SAP SHO HW offload configuration
  * @disable_hw_assist: Flag to configure HW assist feature in FW
+ * @enable_ofdm_scrambler_seed: Decide to enable/disable OFDM scrambler seed
  */
 struct wlan_fwol_cfg {
 	/* Add CFG and INI items here */
 	struct wlan_fwol_coex_config coex_config;
 	struct wlan_fwol_thermal_temp thermal_temp_cfg;
-	struct wlan_fwol_ie_whitelist ie_whitelist_cfg;
+	struct wlan_fwol_ie_allowlist ie_allowlist_cfg;
 	struct wlan_fwol_neighbor_report_cfg neighbor_report_cfg;
 	bool ani_enabled;
 	bool enable_rts_sifsbursting;
@@ -281,6 +283,9 @@ struct wlan_fwol_cfg {
 	uint32_t enable_ilp;
 	uint32_t sap_sho;
 	bool disable_hw_assist;
+#ifdef WLAN_FEATURE_OFDM_SCRAMBLER_SEED
+	bool enable_ofdm_scrambler_seed;
+#endif
 };
 
 /**

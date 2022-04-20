@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,9 @@
 #include <wlan_reg_services_api.h>
 #include <son_ucfg_api.h>
 #include <wlan_hdd_son.h>
+#include <wlan_hdd_object_manager.h>
+#include <wlan_hdd_stats.h>
+
 
 /**
  * hdd_son_is_acs_in_progress() - whether acs is in progress or not
@@ -1253,9 +1256,9 @@ static int hdd_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
 	wlansap_get_acl_mode(WLAN_HDD_GET_SAP_CTX_PTR(adapter), &acl_policy);
 
 	if (acl_policy == eSAP_ACCEPT_UNLESS_DENIED) {
-		list_type = eSAP_BLACK_LIST;
+		list_type = SAP_DENY_LIST;
 	} else if (acl_policy == eSAP_DENY_UNLESS_ACCEPTED) {
-		list_type = eSAP_WHITE_LIST;
+		list_type = SAP_ALLOW_LIST;
 	} else {
 		hdd_err("Invalid ACL policy %d.", acl_policy);
 		return -EINVAL;
@@ -1310,9 +1313,9 @@ static int hdd_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
 	wlansap_get_acl_mode(sap_ctx, &acl_policy);
 
 	if (acl_policy == eSAP_ACCEPT_UNLESS_DENIED) {
-		list_type = eSAP_BLACK_LIST;
+		list_type = SAP_DENY_LIST;
 	} else if (acl_policy == eSAP_DENY_UNLESS_ACCEPTED) {
-		list_type = eSAP_WHITE_LIST;
+		list_type = SAP_ALLOW_LIST;
 	} else {
 		hdd_err("Invalid ACL policy %d.", acl_policy);
 		return -EINVAL;
@@ -1408,20 +1411,20 @@ static void hdd_son_modify_acl(struct wlan_objmgr_vdev *vdev,
 	if (allow_auth) {
 		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 					    peer_mac,
-					    eSAP_BLACK_LIST,
+					    SAP_DENY_LIST,
 					    DELETE_STA_FROM_ACL);
 		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 					    peer_mac,
-					    eSAP_WHITE_LIST,
+					    SAP_ALLOW_LIST,
 					    ADD_STA_TO_ACL);
 	} else {
 		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 					    peer_mac,
-					    eSAP_WHITE_LIST,
+					    SAP_ALLOW_LIST,
 					    DELETE_STA_FROM_ACL);
 		status = wlansap_modify_acl(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
 					    peer_mac,
-					    eSAP_BLACK_LIST,
+					    SAP_DENY_LIST,
 					    ADD_STA_TO_ACL);
 	}
 }
@@ -1503,6 +1506,902 @@ static int hdd_son_deliver_smps(struct wlan_objmgr_vdev *vdev,
 				      event_buf);
 }
 
+/**
+ * hdd_son_get_vdev_by_netdev() - get vdev from net device
+ * @dev: struct net_device dev
+ *
+ * Return: vdev on success, NULL on failure
+ */
+static struct wlan_objmgr_vdev *
+hdd_son_get_vdev_by_netdev(struct net_device *dev)
+{
+	struct hdd_adapter *adapter;
+	struct wlan_objmgr_vdev *vdev;
+
+	if (!dev)
+		return NULL;
+
+	adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	if (!adapter || (adapter && adapter->delete_in_progress))
+		return NULL;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	if (!vdev)
+		return NULL;
+
+	return vdev;
+}
+
+/**
+ * son_trigger_vdev_obj_creation() - Trigger vdev object creation
+ * @psoc: psoc object
+ * @object: vdev object
+ * @arg: component id
+ *
+ * Return: void
+ */
+static void
+son_trigger_vdev_obj_creation(struct wlan_objmgr_psoc *psoc,
+			      void *object, void *arg)
+{
+	QDF_STATUS ret;
+	struct wlan_objmgr_vdev *vdev;
+	enum wlan_umac_comp_id *id;
+
+	vdev = object;
+	id = arg;
+
+	ret = wlan_objmgr_trigger_vdev_comp_priv_object_creation(vdev, *id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("vdev obj creation trigger failed");
+}
+
+/**
+ * son_trigger_pdev_obj_creation() - Trigger pdev object creation
+ * @psoc: psoc object
+ * @object: pdev object
+ * @arg: component id
+ *
+ * Return: void
+ */
+static void
+son_trigger_pdev_obj_creation(struct wlan_objmgr_psoc *psoc,
+			      void *object, void *arg)
+{
+	QDF_STATUS ret;
+	struct wlan_objmgr_pdev *pdev;
+	enum wlan_umac_comp_id *id;
+
+	pdev = object;
+	id = arg;
+
+	ret = wlan_objmgr_trigger_pdev_comp_priv_object_creation(pdev, *id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("pdev obj creation trigger failed");
+}
+
+/**
+ * son_trigger_pdev_obj_deletion() - Trigger pdev object deletion
+ * @psoc: psoc object
+ * @object: pdev object
+ * @arg: component id
+ *
+ * Return: void
+ */
+static void
+son_trigger_pdev_obj_deletion(struct wlan_objmgr_psoc *psoc,
+			      void *object, void *arg)
+{
+	QDF_STATUS ret;
+	struct wlan_objmgr_pdev *pdev;
+	enum wlan_umac_comp_id *id;
+
+	pdev = object;
+	id = arg;
+
+	ret = wlan_objmgr_trigger_pdev_comp_priv_object_deletion(pdev, *id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("pdev obj delete trigger failed");
+}
+
+/**
+ * hdd_son_trigger_objmgr_object_creation() - Trigger objmgr object creation
+ * @id: umac component id
+ *
+ * Return: QDF_STATUS_SUCCESS on success otherwise failure
+ */
+static QDF_STATUS
+hdd_son_trigger_objmgr_object_creation(enum wlan_umac_comp_id id)
+{
+	QDF_STATUS ret;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_objmgr_get_psoc_by_id(0, WLAN_SON_ID);
+	if (!psoc) {
+		hdd_err("psoc null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ret = wlan_objmgr_trigger_psoc_comp_priv_object_creation(psoc, id);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("psoc object create trigger failed");
+		goto out;
+	}
+
+	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
+					   son_trigger_pdev_obj_creation,
+					   &id, 0, id);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("pdev object create trigger failed");
+		goto fail;
+	}
+
+	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_VDEV_OP,
+					   son_trigger_vdev_obj_creation,
+					   &id, 0, id);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("vdev object create trigger failed");
+		goto fail1;
+	}
+	wlan_objmgr_psoc_release_ref(psoc, WLAN_SON_ID);
+	return ret;
+
+fail1:
+	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
+					   son_trigger_pdev_obj_deletion,
+					   &id, 0, id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("pdev object delete trigger failed");
+fail:
+	ret = wlan_objmgr_trigger_psoc_comp_priv_object_deletion(psoc, id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("psoc object delete trigger failed");
+out:
+	wlan_objmgr_psoc_release_ref(psoc, WLAN_SON_ID);
+	return ret;
+}
+
+/**
+ * son_trigger_peer_obj_deletion() - Trigger peer object deletion
+ * @psoc: psoc object
+ * @object: peer object
+ * @arg: component id
+ *
+ * Return: void
+ */
+static void
+son_trigger_peer_obj_deletion(struct wlan_objmgr_psoc *psoc,
+			      void *object, void *arg)
+{
+	QDF_STATUS ret;
+	struct wlan_objmgr_peer *peer;
+	enum wlan_umac_comp_id *id;
+
+	peer = object;
+	id = arg;
+
+	ret = wlan_objmgr_trigger_peer_comp_priv_object_deletion(peer, *id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("peer obj delete trigger failed");
+}
+
+/**
+ * son_trigger_vdev_obj_deletion() - Trigger vdev object deletion
+ * @psoc: psoc object
+ * @object: vdev object
+ * @arg: component id
+ *
+ * Return: void
+ */
+static void
+son_trigger_vdev_obj_deletion(struct wlan_objmgr_psoc *psoc,
+			      void *object, void *arg)
+{
+	QDF_STATUS ret;
+	struct wlan_objmgr_vdev *vdev;
+	enum wlan_umac_comp_id *id;
+
+	vdev = object;
+	id = arg;
+
+	ret = wlan_objmgr_trigger_vdev_comp_priv_object_deletion(vdev, *id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("vdev obj deletion trigger failed");
+}
+
+/**
+ * hdd_son_trigger_objmgr_object_deletion() - Trigger objmgr object deletion
+ * @id: umac component id
+ *
+ * Return: QDF_STATUS_SUCCESS on success otherwise failure
+ */
+static QDF_STATUS
+hdd_son_trigger_objmgr_object_deletion(enum wlan_umac_comp_id id)
+{
+	QDF_STATUS ret;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_objmgr_get_psoc_by_id(0, WLAN_SON_ID);
+	if (!psoc) {
+		hdd_err("psoc null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_PEER_OP,
+					   son_trigger_peer_obj_deletion,
+					   &id, 0, id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("peer object deletion trigger failed");
+
+	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_VDEV_OP,
+					   son_trigger_vdev_obj_deletion,
+					   &id, 0, id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("vdev object deletion trigger failed");
+
+	ret = wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
+					   son_trigger_pdev_obj_deletion,
+					   &id, 0, id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("pdev object delete trigger failed");
+
+	ret = wlan_objmgr_trigger_psoc_comp_priv_object_deletion(psoc, id);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("psoc object delete trigger failed");
+
+	wlan_objmgr_psoc_release_ref(psoc, WLAN_SON_ID);
+	return ret;
+}
+
+/*
+ * hdd_son_init_acs_channels() -initializes acs configs
+ *
+ * @adapter: pointer to hdd adapter
+ * @hdd_ctx: pointer to hdd context
+ * @acs_cfg: pointer to acs configs
+ *
+ * Return: QDF_STATUS_SUCCESS if ACS configuration is initialized,
+ */
+static QDF_STATUS hdd_son_init_acs_channels(struct hdd_adapter *adapter,
+					    struct hdd_context *hdd_ctx,
+					    struct sap_acs_cfg *acs_cfg)
+{
+	enum policy_mgr_con_mode pm_mode;
+	uint32_t freq_list[NUM_CHANNELS], num_channels, i;
+
+	if (!hdd_ctx || !acs_cfg) {
+		hdd_err("Null pointer!!! hdd_ctx or acs_cfg");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (acs_cfg->freq_list) {
+		hdd_debug("ACS config is already there, no need to init again");
+		return QDF_STATUS_SUCCESS;
+	}
+	/* Setting ACS config */
+	qdf_mem_zero(acs_cfg, sizeof(*acs_cfg));
+	acs_cfg->ch_width = CH_WIDTH_20MHZ;
+	policy_mgr_get_valid_chans(hdd_ctx->psoc, freq_list, &num_channels);
+	/* convert and store channel to freq */
+	if (!num_channels) {
+		hdd_err("No Valid channel for ACS");
+		return QDF_STATUS_E_INVAL;
+	}
+	acs_cfg->freq_list = qdf_mem_malloc(sizeof(*acs_cfg->freq_list) *
+					    num_channels);
+	if (!acs_cfg->freq_list) {
+		hdd_err("Mem-alloc failed for acs_cfg->freq_list");
+		return QDF_STATUS_E_NOMEM;
+	}
+	acs_cfg->master_freq_list =
+			qdf_mem_malloc(sizeof(*acs_cfg->master_freq_list) *
+				       num_channels);
+	if (!acs_cfg->master_freq_list) {
+		hdd_err("Mem-alloc failed for acs_cfg->master_freq_list");
+		qdf_mem_free(acs_cfg->freq_list);
+		acs_cfg->freq_list = NULL;
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	pm_mode =
+	      policy_mgr_convert_device_mode_to_qdf_type(adapter->device_mode);
+	/* convert channel to freq */
+	for (i = 0; i < num_channels; i++) {
+		acs_cfg->freq_list[i] = freq_list[i];
+		acs_cfg->master_freq_list[i] = freq_list[i];
+	}
+	acs_cfg->ch_list_count = num_channels;
+	acs_cfg->master_ch_list_count = num_channels;
+	if (policy_mgr_is_force_scc(hdd_ctx->psoc) &&
+	    policy_mgr_get_connection_count(hdd_ctx->psoc)) {
+		policy_mgr_get_pcl(hdd_ctx->psoc, pm_mode,
+				   acs_cfg->pcl_chan_freq,
+				   &acs_cfg->pcl_ch_count,
+				   acs_cfg->pcl_channels_weight_list,
+				   NUM_CHANNELS);
+		wlan_hdd_trim_acs_channel_list(acs_cfg->pcl_chan_freq,
+					       acs_cfg->pcl_ch_count,
+					       acs_cfg->freq_list,
+					       &acs_cfg->ch_list_count);
+		if (!acs_cfg->ch_list_count && acs_cfg->master_ch_list_count)
+			wlan_hdd_handle_zero_acs_list
+					       (hdd_ctx,
+						acs_cfg->freq_list,
+						&acs_cfg->ch_list_count,
+						acs_cfg->master_freq_list,
+						acs_cfg->master_ch_list_count);
+	}
+	acs_cfg->start_ch_freq = acs_cfg->freq_list[0];
+	acs_cfg->end_ch_freq = acs_cfg->freq_list[acs_cfg->ch_list_count - 1];
+	acs_cfg->hw_mode = eCSR_DOT11_MODE_abg;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * hdd_son_start_acs() -Trigers ACS
+ *
+ * @vdev: pointer to object mgr vdev
+ * @enable: True to trigger ACS
+ *
+ * Return: 0 on success
+ */
+static int hdd_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
+{
+	struct hdd_adapter *adapter;
+	struct sap_config *sap_config;
+	struct hdd_context *hdd_ctx;
+
+	if (!enable) {
+		hdd_err("ACS Start report with disabled flag");
+		return -EINVAL;
+	}
+	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	if (!adapter) {
+		hdd_err("null adapter");
+		return -EINVAL;
+	}
+	if (adapter->device_mode != QDF_SAP_MODE) {
+		hdd_err("Invalid device mode %d", adapter->device_mode);
+		return -EINVAL;
+	}
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("null hdd_ctx");
+		return -EINVAL;
+	}
+	if (qdf_atomic_read(&adapter->session.ap.acs_in_progress)) {
+		hdd_err("ACS is in-progress");
+		return -EAGAIN;
+	}
+	wlan_hdd_undo_acs(adapter);
+	sap_config = &adapter->session.ap.sap_config;
+	hdd_debug("ACS Config country %s hw_mode %d ACS_BW: %d START_CH: %d END_CH: %d band %d",
+		  hdd_ctx->reg.alpha2, sap_config->acs_cfg.hw_mode,
+		  sap_config->acs_cfg.ch_width,
+		  sap_config->acs_cfg.start_ch_freq,
+		  sap_config->acs_cfg.end_ch_freq, sap_config->acs_cfg.band);
+	sap_dump_acs_channel(&sap_config->acs_cfg);
+
+	wlan_hdd_cfg80211_start_acs(adapter);
+
+	return 0;
+}
+
+#define ACS_SET_CHAN_LIST_APPEND 0xFF
+#define ACS_SNR_NEAR_RANGE_MIN 60
+#define ACS_SNR_MID_RANGE_MIN 30
+#define ACS_SNR_FAR_RANGE_MIN 0
+
+/**
+ * hdd_son_set_acs_channels() - Sets Channels for ACS
+ *
+ * @vdev: pointer to object mgr vdev
+ * @req: target channels
+ *
+ * Return: 0 on success
+ */
+static int hdd_son_set_acs_channels(struct wlan_objmgr_vdev *vdev,
+				    struct ieee80211req_athdbg *req)
+{
+	struct sap_config *sap_config;
+	/* Append the new channels with existing channel list */
+	bool append;
+	/* Duplicate */
+	bool dup;
+	uint32_t freq_list[ACS_MAX_CHANNEL_COUNT];
+	uint32_t num_channels;
+	uint32_t chan_idx = 0;
+	uint32_t tmp;
+	uint16_t chan_start = 0;
+	uint16_t i, j;
+	uint16_t acs_chan_count = 0;
+	uint32_t *prev_acs_list;
+	struct ieee80211_chan_def *chans = req->data.user_chanlist.chans;
+	uint16_t nchans = req->data.user_chanlist.n_chan;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct hdd_context *hdd_ctx;
+
+	if (!adapter || !req) {
+		hdd_err("null adapter or req");
+		return -EINVAL;
+	}
+	if (adapter->device_mode != QDF_SAP_MODE) {
+		hdd_err("Invalid device mode %d", adapter->device_mode);
+		return -EINVAL;
+	}
+	if (!nchans) {
+		hdd_err("No channels are sent to be set");
+		return -EINVAL;
+	}
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("null hdd_ctx");
+		return -EINVAL;
+	}
+	sap_config = &adapter->session.ap.sap_config;
+	/* initialize with default channels */
+	if (hdd_son_init_acs_channels(adapter, hdd_ctx, &sap_config->acs_cfg)
+						       != QDF_STATUS_SUCCESS) {
+		hdd_err("Failed to start the ACS");
+		return -EAGAIN;
+	}
+	append = (chans[0].chan == ACS_SET_CHAN_LIST_APPEND);
+	if (append) {
+		chan_start = 1;
+		acs_chan_count = sap_config->acs_cfg.ch_list_count;
+	}
+	prev_acs_list = sap_config->acs_cfg.freq_list;
+	for (i = chan_start; i < nchans; i++) {
+		tmp = wlan_reg_legacy_chan_to_freq(pdev, chans[i].chan);
+		if (append) {
+			for (j = 0; j < acs_chan_count; j++) {
+				if (prev_acs_list[j] == tmp) {
+					dup = true;
+					break;
+				}
+			}
+		}
+		/* Remove duplicate */
+		if (!dup) {
+			freq_list[chan_idx] = tmp;
+			chan_idx++;
+		} else {
+			dup = false;
+		}
+	}
+	num_channels = chan_idx + acs_chan_count;
+	sap_config->acs_cfg.ch_list_count = num_channels;
+	sap_config->acs_cfg.freq_list =
+			qdf_mem_malloc(num_channels *
+				       sizeof(*sap_config->acs_cfg.freq_list));
+	if (!sap_config->acs_cfg.freq_list) {
+		hdd_err("Error in allocating memory, failed to set channels");
+		sap_config->acs_cfg.freq_list = prev_acs_list;
+		sap_config->acs_cfg.ch_list_count = acs_chan_count;
+		return -ENOMEM;
+	}
+	if (append)
+		qdf_mem_copy(sap_config->acs_cfg.freq_list, prev_acs_list,
+			     sizeof(uint32_t) * acs_chan_count);
+	qdf_mem_copy(&sap_config->acs_cfg.freq_list[acs_chan_count], freq_list,
+		     sizeof(uint32_t) * chan_idx);
+	qdf_mem_free(prev_acs_list);
+
+	return 0;
+}
+
+static enum wlan_band_id
+reg_wifi_band_to_wlan_band_id(enum reg_wifi_band reg_wifi_band)
+{
+	enum wlan_band_id wlan_band;
+	const uint32_t reg_wifi_band_to_wlan_band_id_map[] = {
+		[REG_BAND_2G] = WLAN_BAND_2GHZ,
+		[REG_BAND_5G] = WLAN_BAND_5GHZ,
+		[REG_BAND_6G] = WLAN_BAND_6GHZ,
+		[REG_BAND_UNKNOWN] = WLAN_BAND_MAX,};
+
+	wlan_band = reg_wifi_band_to_wlan_band_id_map[reg_wifi_band];
+	if (wlan_band == WLAN_BAND_MAX) {
+		hdd_err("Invalid wlan_band_id %d, reg_wifi_band: %d",
+			wlan_band, reg_wifi_band);
+		return -EINVAL;
+	}
+
+	return wlan_band;
+}
+
+/**
+ * get_son_acs_report_values() - Gets ACS report for target channel
+ *
+ * @vdev: pointer to object mgr vdev
+ * @acs_r: pointer to acs_dbg
+ * @mac_handle: Handle to MAC
+ * @chan_freq: Channel frequency
+ *
+ * Return: void
+ */
+static void get_son_acs_report_values(struct wlan_objmgr_vdev *vdev,
+				      struct ieee80211_acs_dbg *acs_r,
+				      mac_handle_t mac_handle,
+				      uint16_t chan_freq)
+{
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	struct scan_filter *filter = qdf_mem_malloc(sizeof(*filter));
+	struct scan_cache_node *cur_node;
+	struct scan_cache_entry *se;
+	enum ieee80211_phymode phymode_se;
+	struct ieee80211_ie_hecap *hecap_ie;
+	struct ieee80211_ie_srp_extie *srp_ie;
+	qdf_list_node_t *cur_lst = NULL, *next_lst = NULL;
+	uint32_t srps = 0;
+	qdf_list_t *scan_list = NULL;
+	uint8_t snr_se, *hecap_phy_ie;
+
+	if (!filter)
+		return;
+	filter->num_of_channels = 1;
+	filter->chan_freq_list[0] = chan_freq;
+	scan_list = ucfg_scan_get_result(pdev, filter);
+	acs_r->chan_nbss = qdf_list_size(scan_list);
+
+	acs_r->chan_maxrssi = 0;
+	acs_r->chan_minrssi = 0;
+	acs_r->chan_nbss_near = 0;
+	acs_r->chan_nbss_mid = 0;
+	acs_r->chan_nbss_far = 0;
+	acs_r->chan_nbss_srp = 0;
+	qdf_list_peek_front(scan_list, &cur_lst);
+	while (cur_lst) {
+		qdf_list_peek_next(scan_list, cur_lst, &next_lst);
+		cur_node = qdf_container_of(cur_lst,
+					    struct scan_cache_node, node);
+		se = cur_node->entry;
+		snr_se = util_scan_entry_snr(se);
+		hecap_ie = (struct ieee80211_ie_hecap *)
+			   util_scan_entry_hecap(se);
+		srp_ie = (struct ieee80211_ie_srp_extie *)
+			 util_scan_entry_spatial_reuse_parameter(se);
+		phymode_se = util_scan_entry_phymode(se);
+
+		if (hecap_ie) {
+			hecap_phy_ie = &hecap_ie->hecap_phyinfo[0];
+			srps = hecap_phy_ie[HECAP_PHYBYTE_IDX7] &
+			       HECAP_PHY_SRP_SR_BITS;
+		}
+
+		if (acs_r->chan_maxrssi < snr_se)
+			acs_r->chan_maxrssi = snr_se;
+		else if (acs_r->chan_minrssi > snr_se)
+			acs_r->chan_minrssi = snr_se;
+		if (snr_se > ACS_SNR_NEAR_RANGE_MIN)
+			acs_r->chan_nbss_near += 1;
+		else if (snr_se > ACS_SNR_MID_RANGE_MIN)
+			acs_r->chan_nbss_mid += 1;
+		else
+			acs_r->chan_nbss_far += 1;
+		if (srp_ie &&
+		    (!(srp_ie->sr_control &
+		       IEEE80211_SRP_SRCTRL_OBSS_PD_DISALLOWED_MASK) || srps))
+			acs_r->chan_nbss_srp++;
+
+		cur_lst = next_lst;
+		next_lst = NULL;
+	}
+	acs_r->chan_80211_b_duration = sme_get_11b_data_duration(mac_handle,
+								 chan_freq);
+	acs_r->chan_nbss_eff = 100 + (acs_r->chan_nbss_near * 50)
+				   + (acs_r->chan_nbss_mid * 50)
+				   + (acs_r->chan_nbss_far * 25);
+	acs_r->chan_srp_load = acs_r->chan_nbss_srp * 4;
+	acs_r->chan_efficiency = (1000 + acs_r->chan_grade) /
+				  acs_r->chan_nbss_eff;
+	ucfg_scan_purge_results(scan_list);
+
+	qdf_mem_free(filter);
+}
+
+/**
+ * hdd_son_get_acs_report() - Gets ACS report
+ *
+ * @vdev: pointer to object mgr vdev
+ * @acs_report: pointer to acs_dbg
+ *
+ * Return: 0 on success
+ */
+static int hdd_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
+				  struct ieee80211_acs_dbg *acs_report)
+{
+	struct hdd_adapter *adapter;
+	uint8_t  acs_entry_id = 0;
+	ACS_LIST_TYPE acs_type = 0;
+	int ret = 0, i = 0;
+	struct sap_acs_cfg *acs_cfg;
+	struct hdd_context *hdd_ctx;
+	struct ieee80211_acs_dbg *acs_r = NULL;
+	struct sap_context *sap_ctx;
+
+	if (!acs_report) {
+		hdd_err("null acs_report");
+		ret = -EINVAL;
+		goto end;
+	}
+	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	if (!adapter) {
+		hdd_err("null adapter");
+		ret = -EINVAL;
+		goto end;
+	}
+	if (adapter->device_mode != QDF_SAP_MODE) {
+		hdd_err("Invalid device mode %d", adapter->device_mode);
+		ret = -EINVAL;
+		goto end;
+	}
+	if (hdd_son_is_acs_in_progress(vdev)) {
+		acs_report->nchans = 0;
+		hdd_err("ACS is in-progress");
+		ret = -EAGAIN;
+		goto end;
+	}
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("null hdd_ctx");
+		ret = -EINVAL;
+		goto end;
+	}
+	acs_r = qdf_mem_malloc(sizeof(*acs_r));
+	if (!acs_r) {
+		hdd_err("Failed to allocate memory");
+		ret = -ENOMEM;
+		goto end;
+	}
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	acs_cfg = &adapter->session.ap.sap_config.acs_cfg;
+	if (!acs_cfg->freq_list &&
+	    (hdd_son_init_acs_channels(adapter, hdd_ctx,
+				       acs_cfg) != QDF_STATUS_SUCCESS)) {
+		hdd_err("Failed to start the ACS");
+		ret = -EAGAIN;
+		goto end_acs_r_free;
+	}
+	acs_r->nchans = acs_cfg->ch_list_count;
+	ret = copy_from_user(&acs_entry_id, &acs_report->entry_id,
+			     sizeof(acs_report->entry_id));
+	hdd_debug("acs entry id: %u num of channels: %u",
+		  acs_entry_id, acs_r->nchans);
+	if (acs_entry_id > acs_r->nchans) {
+		ret = -EINVAL;
+		goto end_acs_r_free;
+	}
+	ret = copy_from_user(&acs_type, &acs_report->acs_type,
+			     sizeof(acs_report->acs_type));
+
+	acs_r->acs_status = ACS_DEFAULT;
+	acs_r->chan_freq = acs_cfg->freq_list[acs_entry_id];
+	acs_r->chan_band = reg_wifi_band_to_wlan_band_id
+				(wlan_reg_freq_to_band(acs_r->chan_freq));
+	hdd_debug("acs type: %d", acs_type);
+	if (acs_type == ACS_CHAN_STATS) {
+		acs_r->ieee_chan = wlan_reg_freq_to_chan(hdd_ctx->pdev,
+							 acs_r->chan_freq);
+		acs_r->chan_width = IEEE80211_CWM_WIDTH20;
+		acs_r->channel_loading = 0;
+		acs_r->chan_availability = 100;
+		acs_r->chan_grade = 100; /* as hw_chan_grade is 100 in WIN 8 */
+		acs_r->sec_chan = false;
+		acs_r->chan_radar_noise =
+		    wlansap_is_channel_in_nol_list(sap_ctx, acs_r->chan_freq,
+						   PHY_SINGLE_CHANNEL_CENTERED);
+		get_son_acs_report_values(vdev, acs_r, hdd_ctx->mac_handle,
+					  acs_r->chan_freq);
+		acs_r->chan_load = 0;
+		acs_r->noisefloor = -254; /* NF_INVALID */
+		for (i = 0; i < SIR_MAX_NUM_CHANNELS; i++) {
+			if (hdd_ctx->chan_info[i].freq == acs_r->chan_freq) {
+				acs_r->noisefloor =
+					hdd_ctx->chan_info[i].noise_floor;
+				acs_r->chan_load =
+					hdd_ctx->chan_info[i].rx_clear_count;
+				break;
+			}
+		}
+		copy_to_user(acs_report, acs_r, sizeof(*acs_r));
+	} else if (acs_type == ACS_CHAN_NF_STATS) {
+	} else if (acs_type == ACS_NEIGHBOUR_GET_LIST_COUNT ||
+		   acs_type == ACS_NEIGHBOUR_GET_LIST) {
+	}
+end_acs_r_free:
+	qdf_mem_free(acs_r);
+end:
+	return ret;
+}
+
+static const uint8_t wlanphymode2ieeephymode[WLAN_PHYMODE_MAX] = {
+	[WLAN_PHYMODE_AUTO] = IEEE80211_MODE_AUTO,
+	[WLAN_PHYMODE_11A] = IEEE80211_MODE_11A,
+	[WLAN_PHYMODE_11B] = IEEE80211_MODE_11B,
+	[WLAN_PHYMODE_11G] = IEEE80211_MODE_11G,
+	[WLAN_PHYMODE_11G_ONLY] = 0,
+	[WLAN_PHYMODE_11NA_HT20] = IEEE80211_MODE_11NA_HT20,
+	[WLAN_PHYMODE_11NG_HT20] = IEEE80211_MODE_11NG_HT20,
+	[WLAN_PHYMODE_11NA_HT40] = IEEE80211_MODE_11NA_HT40,
+	[WLAN_PHYMODE_11NG_HT40PLUS] = IEEE80211_MODE_11NG_HT40PLUS,
+	[WLAN_PHYMODE_11NG_HT40MINUS] = IEEE80211_MODE_11NG_HT40MINUS,
+	[WLAN_PHYMODE_11NG_HT40] = IEEE80211_MODE_11NG_HT40,
+	[WLAN_PHYMODE_11AC_VHT20] = IEEE80211_MODE_11AC_VHT20,
+	[WLAN_PHYMODE_11AC_VHT20_2G] = 0,
+	[WLAN_PHYMODE_11AC_VHT40] = IEEE80211_MODE_11AC_VHT40,
+	[WLAN_PHYMODE_11AC_VHT40PLUS_2G] = IEEE80211_MODE_11AC_VHT40PLUS,
+	[WLAN_PHYMODE_11AC_VHT40MINUS_2G] = IEEE80211_MODE_11AC_VHT40MINUS,
+	[WLAN_PHYMODE_11AC_VHT40_2G] = 0,
+	[WLAN_PHYMODE_11AC_VHT80] = IEEE80211_MODE_11AC_VHT80,
+	[WLAN_PHYMODE_11AC_VHT80_2G] = 0,
+	[WLAN_PHYMODE_11AC_VHT160] = IEEE80211_MODE_11AC_VHT160,
+	[WLAN_PHYMODE_11AC_VHT80_80] = IEEE80211_MODE_11AC_VHT80_80,
+	[WLAN_PHYMODE_11AXA_HE20] = IEEE80211_MODE_11AXA_HE20,
+	[WLAN_PHYMODE_11AXG_HE20] = IEEE80211_MODE_11AXG_HE20,
+	[WLAN_PHYMODE_11AXA_HE40] = IEEE80211_MODE_11AXA_HE40,
+	[WLAN_PHYMODE_11AXG_HE40PLUS] = IEEE80211_MODE_11AXG_HE40PLUS,
+	[WLAN_PHYMODE_11AXG_HE40MINUS] = IEEE80211_MODE_11AXG_HE40MINUS,
+	[WLAN_PHYMODE_11AXG_HE40] = IEEE80211_MODE_11AXG_HE40,
+	[WLAN_PHYMODE_11AXA_HE80] = IEEE80211_MODE_11AXA_HE80,
+	[WLAN_PHYMODE_11AXA_HE80] = 0,
+	[WLAN_PHYMODE_11AXA_HE160] = IEEE80211_MODE_11AXA_HE160,
+	[WLAN_PHYMODE_11AXA_HE80_80] = IEEE80211_MODE_11AXA_HE80_80,
+#ifdef WLAN_FEATURE_11BE
+	[WLAN_PHYMODE_11BEA_EHT20] = IEEE80211_MODE_11BEA_EHT20,
+	[WLAN_PHYMODE_11BEG_EHT20] = IEEE80211_MODE_11BEG_EHT20,
+	[WLAN_PHYMODE_11BEA_EHT40MINUS] = IEEE80211_MODE_11BEA_EHT40,
+	[WLAN_PHYMODE_11BEG_EHT40PLUS] = IEEE80211_MODE_11BEG_EHT40PLUS,
+	[WLAN_PHYMODE_11BEG_EHT40MINUS] = IEEE80211_MODE_11BEG_EHT40MINUS,
+	[WLAN_PHYMODE_11BEG_EHT40] = IEEE80211_MODE_11BEG_EHT40,
+	[WLAN_PHYMODE_11BEA_EHT80] = IEEE80211_MODE_11BEA_EHT80,
+	[WLAN_PHYMODE_11BEG_EHT80] = 0,
+	[WLAN_PHYMODE_11BEA_EHT160] = IEEE80211_MODE_11BEA_EHT160,
+	[WLAN_PHYMODE_11BEA_EHT320] = IEEE80211_MODE_11BEA_EHT320,
+#endif /* WLAN_FEATURE_11BE */
+};
+
+static enum ieee80211_phymode
+wlan_hdd_son_get_ieee_phymode(enum wlan_phymode wlan_phymode)
+{
+	if (wlan_phymode >= WLAN_PHYMODE_MAX)
+		return IEEE80211_MODE_AUTO;
+
+	return wlanphymode2ieeephymode[wlan_phymode];
+}
+
+static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
+					uint8_t *mac_addr,
+					wlan_node_info *node_info)
+{
+	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct hdd_station_info *sta_info;
+	enum wlan_phymode peer_phymode;
+	struct wlan_objmgr_psoc *psoc;
+
+	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list, mac_addr,
+					   STA_INFO_SON_GET_DATRATE_INFO);
+	if (!sta_info) {
+		hdd_err("Sta info is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("null psoc");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	node_info->max_chwidth =
+			hdd_chan_width_to_son_chwidth(sta_info->ch_width);
+	node_info->num_streams = (sta_info->max_mcs_idx >= 8) ? 2 : 1;
+	ucfg_mlme_get_peer_phymode(psoc, mac_addr, &peer_phymode);
+	node_info->phymode = wlan_hdd_son_get_ieee_phymode(peer_phymode);
+	node_info->max_txpower = ucfg_son_get_tx_power(sta_info->assoc_req_ies);
+	node_info->max_MCS = ucfg_son_get_max_mcs(sta_info->mode,
+						  sta_info->max_supp_idx,
+						  sta_info->max_ext_idx,
+						  sta_info->max_mcs_idx,
+						  sta_info->rx_mcs_map);
+	if (sta_info->vht_present)
+		node_info->is_mu_mimo_supported =
+				sta_info->vht_caps.vht_cap_info
+				& IEEE80211_VHT_CAP_MU_BEAMFORMEE_CAPABLE;
+	if (sta_info->ht_present)
+		node_info->is_static_smps = ((sta_info->ht_caps.cap_info
+				& IEEE80211_HTCAP_C_SM_MASK) ==
+				IEEE80211_HTCAP_C_SMPOWERSAVE_STATIC);
+	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
+			     STA_INFO_SON_GET_DATRATE_INFO);
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS hdd_son_get_peer_capability(struct wlan_objmgr_vdev *vdev,
+					      struct wlan_objmgr_peer *peer,
+					      wlan_peer_cap *peer_cap)
+{
+	struct hdd_station_info *sta_info;
+	struct hdd_adapter *adapter;
+	bool b_meas_supported;
+	QDF_STATUS status;
+
+	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	if (!adapter) {
+		hdd_err("null adapter");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
+					   peer->macaddr,
+					   STA_INFO_SOFTAP_GET_STA_INFO);
+	if (!sta_info) {
+		hdd_err("sta_info NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hdd_info("Getting peer capability from sta_info");
+	qdf_mem_copy(peer_cap->bssid, vdev->vdev_mlme.macaddr,
+		     QDF_MAC_ADDR_SIZE);
+	peer_cap->is_BTM_Supported = !!(sta_info->ext_cap &
+				   BIT(19/*BSS_TRANSITION*/));
+	peer_cap->is_RRM_Supported = !!(sta_info->capability &
+				   WLAN_CAPABILITY_RADIO_MEASURE);
+
+	peer_cap->band_cap = sta_info->supported_band;
+	if (sta_info->assoc_req_ies.len) {
+		status = ucfg_son_get_peer_rrm_info(sta_info->assoc_req_ies,
+						    peer_cap->rrmcaps,
+						    &(b_meas_supported));
+		if (status == QDF_STATUS_SUCCESS)
+			peer_cap->is_beacon_meas_supported = b_meas_supported;
+	}
+	if (sta_info->ht_present)
+		peer_cap->htcap = sta_info->ht_caps.cap_info;
+	if (sta_info->vht_present)
+		peer_cap->vhtcap = sta_info->vht_caps.vht_cap_info;
+
+	qdf_mem_zero(&peer_cap->hecap, sizeof(wlan_client_he_capabilities));
+
+	os_if_son_get_node_datarate_info(vdev, peer->macaddr,
+					 &peer_cap->info);
+
+	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
+			     STA_INFO_SOFTAP_GET_STA_INFO);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_objmgr_peer *peer)
+{
+	uint32_t ret = 0;
+	struct hdd_station_info *sta_info = NULL;
+	struct hdd_adapter *adapter = NULL;
+
+	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	if (!adapter) {
+		hdd_err("null adapter");
+		return ret;
+	}
+
+	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
+					   peer->macaddr,
+					   STA_INFO_SOFTAP_GET_STA_INFO);
+	if (!sta_info) {
+		hdd_err("sta_info NULL");
+		return ret;
+	}
+
+	ret = sta_info->max_mcs_idx;
+
+	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
+			     STA_INFO_SOFTAP_GET_STA_INFO);
+	hdd_debug("Peer " QDF_MAC_ADDR_FMT " max MCS index: %u",
+		  QDF_MAC_ADDR_REF(peer->macaddr), ret);
+
+	return ret;
+}
+
 void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct son_callbacks cb_obj = {0};
@@ -1530,6 +2429,17 @@ void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.os_if_modify_acl = hdd_son_modify_acl;
 	cb_obj.os_if_get_sta_list = hdd_son_get_sta_list;
 	cb_obj.os_if_get_sta_space = hdd_son_get_sta_space;
+	cb_obj.os_if_get_vdev_by_netdev = hdd_son_get_vdev_by_netdev;
+	cb_obj.os_if_trigger_objmgr_object_creation =
+				hdd_son_trigger_objmgr_object_creation;
+	cb_obj.os_if_trigger_objmgr_object_deletion =
+				hdd_son_trigger_objmgr_object_deletion;
+	cb_obj.os_if_start_acs = hdd_son_start_acs;
+	cb_obj.os_if_set_acs_channels = hdd_son_set_acs_channels;
+	cb_obj.os_if_get_acs_report = hdd_son_get_acs_report;
+	cb_obj.os_if_get_node_info = hdd_son_get_node_info;
+	cb_obj.os_if_get_peer_capability = hdd_son_get_peer_capability;
+	cb_obj.os_if_get_peer_max_mcs_idx = hdd_son_get_peer_max_mcs_idx;
 
 	os_if_son_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 
@@ -1541,21 +2451,42 @@ void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 
 int hdd_son_deliver_acs_complete_event(struct hdd_adapter *adapter)
 {
-	int ret;
+	int ret = -EINVAL;
+	struct wlan_objmgr_vdev *vdev;
 
-	ret = os_if_son_deliver_ald_event(adapter, NULL,
-					  MLME_EVENT_ACS_COMPLETE, NULL);
+	if (adapter) {
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+		if (!vdev) {
+			hdd_err("null vdev");
+			return ret;
+		}
+		ret = os_if_son_deliver_ald_event(vdev, NULL,
+						  MLME_EVENT_ACS_COMPLETE,
+						  NULL);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+	}
+
 	return ret;
 }
 
 int hdd_son_deliver_cac_status_event(struct hdd_adapter *adapter,
 				     bool radar_detected)
 {
-	int ret;
+	int ret = -EINVAL;
+	struct wlan_objmgr_vdev *vdev;
 
-	ret = os_if_son_deliver_ald_event(adapter, NULL,
-					  MLME_EVENT_CAC_STATUS,
-					  &radar_detected);
+	if (adapter) {
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+		if (!vdev) {
+			hdd_err("null vdev");
+			return ret;
+		}
+		ret = os_if_son_deliver_ald_event(vdev, NULL,
+						  MLME_EVENT_CAC_STATUS,
+						  &radar_detected);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+	}
+
 	return ret;
 }
 
@@ -1564,15 +2495,26 @@ int hdd_son_deliver_assoc_disassoc_event(struct hdd_adapter *adapter,
 					 uint32_t reason_code,
 					 enum assoc_disassoc_event flag)
 {
-	int ret;
+	int ret = -EINVAL;
 	struct son_ald_assoc_event_info info;
+	struct wlan_objmgr_vdev *vdev;
 
 	qdf_mem_zero(&info, sizeof(info));
 	memcpy(info.macaddr, &sta_mac.bytes, QDF_MAC_ADDR_SIZE);
 	info.flag = flag;
 	info.reason = reason_code;
-	ret = os_if_son_deliver_ald_event(adapter, NULL,
-					  MLME_EVENT_ASSOC_DISASSOC, &info);
+	if (adapter) {
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+		if (!vdev) {
+			hdd_err("null vdev");
+			return ret;
+		}
+		ret = os_if_son_deliver_ald_event(vdev, NULL,
+						  MLME_EVENT_ASSOC_DISASSOC,
+						  &info);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+	}
+
 	return ret;
 }
 
@@ -1581,23 +2523,54 @@ void hdd_son_deliver_peer_authorize_event(struct hdd_adapter *adapter,
 {
 	struct wlan_objmgr_peer *peer;
 	int ret;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
 
-	if (adapter->device_mode != QDF_SAP_MODE) {
-		osif_err("Non SAP vdev");
+	if (!adapter || adapter->device_mode != QDF_SAP_MODE) {
+		hdd_err("Non SAP vdev");
+		return;
+	}
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_SON_ID);
+	if (!vdev) {
+		hdd_err("null vdev");
+		return;
+	}
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		hdd_err("null psoc");
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 		return;
 	}
 	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_UMAC_COMP_SON);
 	if (!peer) {
-		osif_err("No peer object for sta" QDF_FULL_MAC_FMT,
-			 QDF_FULL_MAC_REF(peer_mac));
+		hdd_err("No peer object for sta" QDF_FULL_MAC_FMT,
+			QDF_FULL_MAC_REF(peer_mac));
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
 		return;
 	}
 
-	ret = os_if_son_deliver_ald_event(adapter, peer,
+	ret = os_if_son_deliver_ald_event(vdev, peer,
 					  MLME_EVENT_CLIENT_ASSOCIATED, NULL);
 	if (ret)
-		osif_err("ALD ASSOCIATED Event failed for" QDF_FULL_MAC_FMT,
-			 QDF_FULL_MAC_REF(peer_mac));
+		hdd_err("ALD ASSOCIATED Event failed for" QDF_FULL_MAC_FMT,
+			QDF_FULL_MAC_REF(peer_mac));
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_UMAC_COMP_SON);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_SON_ID);
+}
+
+int hdd_son_send_set_wifi_generic_command(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  struct nlattr **tb)
+{
+	return os_if_son_parse_generic_nl_cmd(wiphy, wdev, tb,
+					      OS_IF_SON_VENDOR_SET_CMD);
+}
+
+int hdd_son_send_get_wifi_generic_command(struct wiphy *wiphy,
+					  struct wireless_dev *wdev,
+					  struct nlattr **tb)
+{
+	return os_if_son_parse_generic_nl_cmd(wiphy, wdev, tb,
+					      OS_IF_SON_VENDOR_GET_CMD);
 }

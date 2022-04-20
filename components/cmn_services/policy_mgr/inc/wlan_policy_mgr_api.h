@@ -214,6 +214,18 @@ QDF_STATUS policy_mgr_get_dual_mac_feature(struct wlan_objmgr_psoc *psoc,
 					   uint8_t *dual_mac_feature);
 
 /**
+ * policy_mgr_allow_multiple_sta_connections() - to find out if STA+STA feature
+ * is enabled.
+ * @psoc: pointer to psoc
+ *
+ * This API is used to find out whether STA+STA specific feature is enabled
+ * or not
+ *
+ * Return: true if supports else false.
+ */
+bool policy_mgr_allow_multiple_sta_connections(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_set_dual_mac_feature() - to set the dual mac feature value
  * @psoc: pointer to psoc
  * @dual_mac_feature: value to be updated
@@ -265,6 +277,45 @@ policy_mgr_set_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_get_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 				       uint8_t *sta_sap_scc_on_dfs_chnl);
+
+/**
+ * policy_mgr_set_multi_sap_allowed_on_same_band() - to set
+ * multi_sap_allowed_on_same_band
+ * @psoc: pointer to psoc
+ * @multi_sap_allowed_on_same_band: value to be set
+ *
+ * This API is used to set multi_sap_allowed_on_same_band
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_set_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
+				bool multi_sap_allowed_on_same_band);
+
+/**
+ * policy_mgr_get_multi_sap_allowed_on_same_band() - to find out if multi sap
+ * is allowed on same band
+ * @psoc: pointer to psoc
+ * @multi_sap_allowed_on_same_band: value to be filled
+ *
+ * This API is used to find out whether multi sap is allowed on same band
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_get_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
+				bool *multi_sap_allowed_on_same_band);
+
+/*
+ * policy_mgr_get_connected_vdev_band_mask() - to get the connected vdev band
+ * mask
+ * @vdev: pointer to vdev
+ *
+ * This API is used to get band of the frequency.
+ *
+ * Return: band mask of the frequency associated with the vdev
+ */
+uint32_t policy_mgr_get_connected_vdev_band_mask(struct wlan_objmgr_vdev *vdev);
 
 /**
  * policy_mgr_get_dfs_master_dynamic_enabled() - support dfs master or not
@@ -639,6 +690,19 @@ QDF_STATUS policy_mgr_change_mcc_go_beacon_interval(
 
 #if defined(FEATURE_WLAN_MCC_TO_SCC_SWITCH)
 /**
+ * policy_mgr_check_bw_with_unsafe_chan_freq() - valid SAP channel bw against
+ *                                               unsafe channel list
+ * @psoc: PSOC object information
+ * @center_freq: SAP channel center frequency
+ * @ch_width: SAP channel width
+ *
+ * Return: true if no unsafe channel fall in SAP channel bandwidth range,
+ *         false otherwise
+ */
+bool policy_mgr_check_bw_with_unsafe_chan_freq(struct wlan_objmgr_psoc *psoc,
+					       qdf_freq_t center_freq,
+					       enum phy_ch_width ch_width);
+/**
  * policy_mgr_change_sap_channel_with_csa() - Move SAP channel using (E)CSA
  * @psoc: PSOC object information
  * @vdev_id: Vdev id
@@ -648,17 +712,18 @@ QDF_STATUS policy_mgr_change_mcc_go_beacon_interval(
  *
  * Invoke the callback function to change SAP channel using (E)CSA
  *
- * Return: None
+ * Return: QDF_STATUS_SUCCESS on success
  */
-void policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
-					    uint8_t vdev_id, uint32_t ch_freq,
-					    uint32_t ch_width, bool forced);
+QDF_STATUS
+policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id, uint32_t ch_freq,
+				       uint32_t ch_width, bool forced);
 
 #else
-static inline void policy_mgr_change_sap_channel_with_csa(
-		struct wlan_objmgr_psoc *psoc,
-		uint8_t vdev_id, uint32_t ch_freq,
-		uint32_t ch_width, bool forced)
+static inline QDF_STATUS
+policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
+				       uint8_t vdev_id, uint32_t ch_freq,
+				       uint32_t ch_width, bool forced)
 {
 
 }
@@ -1676,10 +1741,11 @@ struct policy_mgr_sme_cbacks {
  * @wlan_get_sap_acs_band: get acs band from sap config
  */
 struct policy_mgr_hdd_cbacks {
-	void (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
-				uint8_t vdev_id, uint32_t ch_freq,
-				uint32_t channel_bw,
-				bool forced);
+	QDF_STATUS (*sap_restart_chan_switch_cb)(struct wlan_objmgr_psoc *psoc,
+						 uint8_t vdev_id,
+						 uint32_t ch_freq,
+						 uint32_t channel_bw,
+						 bool forced);
 	QDF_STATUS (*wlan_hdd_get_channel_for_sap_restart)(
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id, uint32_t *ch_freq);
@@ -2557,6 +2623,16 @@ bool policy_mgr_current_concurrency_is_scc(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_current_concurrency_is_mcc(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_concurrent_sta_doing_dbs() - To check the current
+ * concurrency STA combination if it is doing DBS
+ * @psoc: PSOC object information
+ * This routine is called to check if it is doing DBS
+ *
+ * Return: True - DBS, False - Otherwise
+ */
+bool policy_mgr_concurrent_sta_doing_dbs(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_is_sap_p2pgo_on_dfs() - check if there is a P2PGO or SAP
  * operating in a DFS channel
  * @psoc: PSOC object information
@@ -2821,14 +2897,14 @@ bool policy_mgr_is_current_hwmode_dbs(struct wlan_objmgr_psoc *psoc);
 bool policy_mgr_is_current_hwmode_sbs(struct wlan_objmgr_psoc *psoc);
 
 /**
- * policy_mgr_is_dp_hw_dbs_2x2_capable() - if hardware is capable of dbs 2x2
- * for Data Path.
+ * policy_mgr_is_dp_hw_dbs_capable() - if hardware is capable of dbs 2x2
+ * or 1X1 for Data Path (HW mode)
  * @psoc: PSOC object information
- * This API is for Data Path to get HW dbs 2x2 capable.
+ * This API is for Data Path to get HW mode support dbs.
  *
- * Return: true - DBS2x2, false - DBS1x1
+ * Return: true - DBS capable, false - not
  */
-bool policy_mgr_is_dp_hw_dbs_2x2_capable(struct wlan_objmgr_psoc *psoc);
+bool policy_mgr_is_dp_hw_dbs_capable(struct wlan_objmgr_psoc *psoc);
 
 /**
  * policy_mgr_is_hw_dbs_2x2_capable() - if hardware is capable of dbs 2x2
@@ -3565,6 +3641,21 @@ bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 		struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_is_multi_sap_allowed_on_same_band() - check if multi sap allowed
+ * on same band
+ * @pdev: id of objmgr pdev
+ * @mode: operating mode of interface to be checked
+ * @ch_freq: channel freq
+ * This function is used to check if multi sap can be started on the same band
+ *
+ * Return: true if multi sap is allowed on same band, otherwise false
+ */
+bool policy_mgr_is_multi_sap_allowed_on_same_band(
+					struct wlan_objmgr_pdev *pdev,
+					enum policy_mgr_con_mode mode,
+					qdf_freq_t ch_freq);
+
+/**
  * policy_mgr_is_special_mode_active_5g() - check if given mode active in 5g
  * @psoc: pointer to soc
  * @mode: operating mode of interface to be checked
@@ -4105,6 +4196,28 @@ bool policy_mgr_is_mlo_in_mode_sbs(struct wlan_objmgr_psoc *psoc,
 				   enum policy_mgr_con_mode mode,
 				   uint8_t *mlo_vdev_lst, uint8_t *num_mlo);
 
+/*
+ * policy_mgr_handle_sap_mlo_sta_concurrency() - Handle SAP MLO STA concurrency
+ *                                             such as:
+ *       1) If MLO STA is present with both links in 5/6 Ghz then SAP comes up
+ *          on 2.4 Ghz, then Disable one of the links
+ *       2) If MLO STA is present with both links in 5/6 Ghz and SAP, which was
+ *          present on 2.4 ghz, stops then renable both the as one of the links
+ *          were disabled because of sap on 2.4 ghz.
+ *
+ * @vdev: vdev mlme object
+ * @is_ap_up: bool to represent sap state
+ *
+ * Return: Void
+ */
+void policy_mgr_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_psoc *psoc,
+					       struct wlan_objmgr_vdev *vdev,
+					       bool is_ap_up);
+
+void policy_mgr_handle_ml_sta_link_concurrency(struct wlan_objmgr_psoc *psoc,
+					       struct wlan_objmgr_vdev *vdev,
+					       bool is_connect);
+
 #else
 
 static inline bool policy_mgr_is_mlo_sap_concurrency_allowed(
@@ -4131,6 +4244,20 @@ bool policy_mgr_is_mlo_in_mode_sbs(struct wlan_objmgr_psoc *psoc,
 				   uint8_t *mlo_vdev_lst, uint8_t *num_mlo)
 {
 	return false;
+}
+
+static inline
+void policy_mgr_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_psoc *psoc,
+					       struct wlan_objmgr_vdev *vdev,
+					       bool is_ap_up)
+{
+}
+
+static inline
+void policy_mgr_handle_ml_sta_link_concurrency(struct wlan_objmgr_psoc *psoc,
+					       struct wlan_objmgr_vdev *vdev,
+					       bool is_connect)
+{
 }
 #endif
 

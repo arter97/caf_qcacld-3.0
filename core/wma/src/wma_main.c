@@ -310,6 +310,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 				       target_resource_config *tgt_cfg,
 				       struct cds_config_info *cds_cfg)
 {
+	enum QDF_GLOBAL_MODE con_mode;
+
 	qdf_mem_zero(tgt_cfg, sizeof(target_resource_config));
 
 	tgt_cfg->num_vdevs = cds_cfg->num_vdevs;
@@ -382,9 +384,20 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	cfg_nan_get_max_ndi(wma_handle->psoc,
 			    &tgt_cfg->max_ndi);
 
-	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
+	con_mode = cds_get_conparam();
+	if (con_mode == QDF_GLOBAL_MONITOR_MODE)
 		tgt_cfg->rx_decap_mode = CFG_TGT_RX_DECAP_MODE_RAW;
 
+	if (con_mode == QDF_GLOBAL_FTM_MODE) {
+		tgt_cfg->num_offload_peers = 0;
+		tgt_cfg->num_offload_reorder_buffs = 0;
+		tgt_cfg->bmiss_offload_max_vdev = 0;
+		tgt_cfg->roam_offload_max_vdev = 0;
+		tgt_cfg->roam_offload_max_ap_profiles = 0;
+		tgt_cfg->beacon_tx_offload_max_vdev = 1;
+		tgt_cfg->num_multicast_filter_entries = 0;
+		tgt_cfg->gtk_offload_max_vdev = 0;
+	}
 	cfg_nan_get_ndp_max_sessions(wma_handle->psoc,
 				     &tgt_cfg->max_ndp_sessions);
 
@@ -4609,7 +4622,11 @@ static void wma_update_fw_config(struct wlan_objmgr_psoc *psoc,
 					target_if_get_max_frag_entry(tgt_hdl));
 	target_if_set_max_frag_entry(tgt_hdl, cfg->max_frag_entries);
 
-	cfg->num_wow_filters = ucfg_pmo_get_num_wow_filters(psoc);
+	if (cds_get_conparam() == QDF_GLOBAL_FTM_MODE)
+		cfg->num_wow_filters =  0;
+	else
+		cfg->num_wow_filters = ucfg_pmo_get_num_wow_filters(psoc);
+
 	cfg->apf_instruction_size = ucfg_pmo_get_apf_instruction_size(psoc);
 	cfg->num_packet_filters = ucfg_pmo_get_num_packet_filters(psoc);
 }
@@ -5419,6 +5436,21 @@ static void wma_green_ap_register_handlers(tp_wma_handle wma_handle)
 #endif
 
 #ifdef WLAN_FEATURE_NAN
+#ifdef WLAN_FEATURE_11BE_MLO
+static void wma_update_mlo_sta_nan_ndi_target_caps(tp_wma_handle wma_handle,
+						   struct wma_tgt_cfg *tgt_cfg)
+{
+	if (wmi_service_enabled(wma_handle->wmi_handle,
+				wmi_service_mlo_sta_nan_ndi_support))
+		tgt_cfg->nan_caps.mlo_sta_nan_ndi_allowed = 1;
+}
+#else
+static void wma_update_mlo_sta_nan_ndi_target_caps(tp_wma_handle wma_handle,
+						   struct wma_tgt_cfg *tgt_cfg)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
 				       struct wma_tgt_cfg *tgt_cfg)
 {
@@ -5452,6 +5484,8 @@ static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
 	if (wmi_service_enabled(wma_handle->wmi_handle,
 				wmi_service_ndi_txbf_support))
 		tgt_cfg->nan_caps.ndi_txbf_supported = 1;
+
+	wma_update_mlo_sta_nan_ndi_target_caps(wma_handle, tgt_cfg);
 }
 #else
 static void wma_update_nan_target_caps(tp_wma_handle wma_handle,
@@ -6872,7 +6906,8 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	 * the num_vdevs by 1.
 	 */
 
-	if (wmi_service_enabled(wma_handle->wmi_handle, wmi_service_nan)) {
+	if (wmi_service_enabled(wma_handle->wmi_handle, wmi_service_nan) &&
+	    cfg_nan_get_enable(wma_handle->psoc)) {
 		if (ucfg_nan_is_vdev_creation_allowed(wma_handle->psoc) ||
 		    QDF_GLOBAL_FTM_MODE == cds_get_conparam()) {
 			wlan_res_cfg->nan_separate_iface_support = true;
@@ -6889,6 +6924,7 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 		wlan_res_cfg->pktcapture_support = true;
 	else
 		wlan_res_cfg->pktcapture_support = false;
+	wlan_res_cfg->max_peer_ext_stats = WMA_SON_MAX_PEER_EXT_STATS;
 
 	if (wmi_service_enabled(wmi_handle,
 				wmi_service_sae_eapol_offload_support))

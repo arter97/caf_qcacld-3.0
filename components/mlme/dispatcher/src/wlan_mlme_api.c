@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +30,7 @@
 #include "wlan_crypto_global_api.h"
 #include "wlan_utility.h"
 #include "wlan_policy_mgr_ucfg.h"
+#include "wlan_vdev_mgr_utils_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -974,6 +975,7 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	tDot11fIEeht_cap *eht_cap = &wma_cfg->eht_cap;
+	tDot11fIEeht_cap *mlme_eht_cap;
 
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
@@ -981,6 +983,55 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	mlme_obj->cfg.eht_caps.dot11_eht_cap.present = 1;
 	qdf_mem_copy(&mlme_obj->cfg.eht_caps.dot11_eht_cap, eht_cap,
 		     sizeof(tDot11fIEeht_cap));
+	mlme_eht_cap = &mlme_obj->cfg.eht_caps.dot11_eht_cap;
+	if (mlme_obj->cfg.vht_caps.vht_cap_info.su_bformer) {
+		mlme_eht_cap->su_beamformer = eht_cap->su_beamformer;
+		if (cfg_in_range(CFG_EHT_NUM_SOUNDING_DIM_LE_80MHZ,
+				 eht_cap->num_sounding_dim_le_80mhz))
+			mlme_eht_cap->num_sounding_dim_le_80mhz =
+				eht_cap->num_sounding_dim_le_80mhz;
+		if (cfg_in_range(CFG_EHT_NUM_SOUNDING_DIM_160MHZ,
+				 eht_cap->num_sounding_dim_160mhz))
+			mlme_eht_cap->num_sounding_dim_160mhz =
+				eht_cap->num_sounding_dim_160mhz;
+		if (cfg_in_range(CFG_EHT_NUM_SOUNDING_DIM_320MHZ,
+				 eht_cap->num_sounding_dim_320mhz))
+			mlme_eht_cap->num_sounding_dim_320mhz =
+				eht_cap->num_sounding_dim_320mhz;
+		mlme_eht_cap->mu_bformer_le_80mhz =
+			eht_cap->mu_bformer_le_80mhz;
+		mlme_eht_cap->mu_bformer_160mhz = eht_cap->mu_bformer_160mhz;
+		mlme_eht_cap->mu_bformer_320mhz = eht_cap->mu_bformer_320mhz;
+
+	} else {
+		mlme_eht_cap->su_beamformer = 0;
+		mlme_eht_cap->num_sounding_dim_le_80mhz = 0;
+		mlme_eht_cap->num_sounding_dim_160mhz = 0;
+		mlme_eht_cap->num_sounding_dim_320mhz = 0;
+		mlme_eht_cap->mu_bformer_le_80mhz = 0;
+		mlme_eht_cap->mu_bformer_160mhz = 0;
+		mlme_eht_cap->mu_bformer_320mhz = 0;
+	}
+
+	if (mlme_obj->cfg.vht_caps.vht_cap_info.su_bformee) {
+		mlme_eht_cap->su_beamformee = eht_cap->su_beamformee;
+		if (cfg_in_range(CFG_EHT_BFEE_SS_LE_80MHZ,
+				 eht_cap->bfee_ss_le_80mhz))
+			mlme_eht_cap->bfee_ss_le_80mhz =
+						eht_cap->bfee_ss_le_80mhz;
+		if (cfg_in_range(CFG_EHT_BFEE_SS_160MHZ,
+				 eht_cap->bfee_ss_160mhz))
+			mlme_eht_cap->bfee_ss_160mhz = eht_cap->bfee_ss_160mhz;
+		if (cfg_in_range(CFG_EHT_BFEE_SS_320MHZ,
+				 eht_cap->bfee_ss_320mhz))
+			mlme_eht_cap->bfee_ss_320mhz = eht_cap->bfee_ss_320mhz;
+
+	} else {
+		mlme_eht_cap->su_beamformee = 0;
+		mlme_eht_cap->bfee_ss_le_80mhz = 0;
+		mlme_eht_cap->bfee_ss_160mhz = 0;
+		mlme_eht_cap->bfee_ss_320mhz = 0;
+	}
 	return QDF_STATUS_SUCCESS;
 }
 #endif
@@ -2980,6 +3031,23 @@ wlan_mlme_set_rf_test_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef CONFIG_BAND_6GHZ
+QDF_STATUS
+wlan_mlme_is_relaxed_6ghz_conn_policy_enabled(struct wlan_objmgr_psoc *psoc,
+					      bool *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	*value = mlme_obj->cfg.gen.relaxed_6ghz_conn_policy;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS
 wlan_mlme_cfg_set_vht_chan_width(struct wlan_objmgr_psoc *psoc, uint8_t value)
@@ -5325,3 +5393,202 @@ wlan_mlme_get_tx_retry_multiplier(struct wlan_objmgr_psoc *psoc,
 	*tx_retry_multiplier = mlme_obj->cfg.gen.tx_retry_multiplier;
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+wlan_mlme_get_channel_bonding_5ghz(struct wlan_objmgr_psoc *psoc,
+				   uint32_t *value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj) {
+		*value = cfg_default(CFG_CHANNEL_BONDING_MODE_5GHZ);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	*value = mlme_obj->cfg.feature_flags.channel_bonding_mode_5ghz;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_update_ratemask_params(struct wlan_objmgr_vdev *vdev,
+				 uint8_t num_ratemask,
+				 struct config_ratemask_params *rate_params)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+	struct vdev_mlme_rate_info *rate_info;
+	QDF_STATUS ret;
+	uint8_t i = 0;
+	uint8_t index;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return QDF_STATUS_E_FAILURE;
+
+	rate_info = &vdev_mlme->mgmt.rate_info;
+	while (i < num_ratemask) {
+		index = rate_params[i].type;
+		if (index >= WLAN_VDEV_RATEMASK_TYPE_MAX) {
+			mlme_legacy_err("Invalid ratemask type");
+			++i;
+			continue;
+		}
+
+		if (rate_info->ratemask_params[index].lower32 !=
+		    rate_params[i].lower32 ||
+		    rate_info->ratemask_params[index].lower32_2 !=
+		    rate_params[i].lower32_2 ||
+		    rate_info->ratemask_params[index].higher32 !=
+		    rate_params[i].higher32 ||
+		    rate_info->ratemask_params[index].higher32_2 !=
+		    rate_params[i].higher32_2) {
+			rate_info->ratemask_params[index].lower32 =
+						rate_params[i].lower32;
+			rate_info->ratemask_params[index].higher32 =
+						rate_params[i].higher32;
+			rate_info->ratemask_params[index].lower32_2 =
+						rate_params[i].lower32_2;
+			rate_info->ratemask_params[index].higher32_2 =
+						rate_params[i].higher32_2;
+			ret = wlan_util_vdev_mlme_set_ratemask_config(vdev_mlme,
+								      index);
+			if (ret != QDF_STATUS_SUCCESS)
+				mlme_legacy_err("ratemask config failed");
+		} else {
+			mlme_legacy_debug("Ratemask same as configured mask");
+		}
+		++i;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef WLAN_FEATURE_MCC_QUOTA
+#define WLAN_MCC_MIN_QUOTA 10 /* in %age */
+#define WLAN_MCC_MAX_QUOTA 90 /* in %age */
+QDF_STATUS wlan_mlme_set_user_mcc_quota(struct wlan_objmgr_psoc *psoc,
+					struct wlan_user_mcc_quota *quota)
+
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	if (!quota)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	if (quota->quota < WLAN_MCC_MIN_QUOTA)
+		quota->quota = WLAN_MCC_MIN_QUOTA;
+	else if (quota->quota > WLAN_MCC_MAX_QUOTA)
+		quota->quota = WLAN_MCC_MAX_QUOTA;
+
+	mlme_obj->cfg.gen.user_mcc_quota.quota = quota->quota;
+	mlme_obj->cfg.gen.user_mcc_quota.op_mode = quota->op_mode;
+	mlme_obj->cfg.gen.user_mcc_quota.vdev_id = quota->vdev_id;
+
+	mlme_debug("quota : %u, op_mode : %d, vdev_id : %u",
+		   quota->quota, quota->op_mode, quota->vdev_id);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS wlan_mlme_get_user_mcc_quota(struct wlan_objmgr_psoc *psoc,
+					struct wlan_user_mcc_quota *quota)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	if (!quota)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	quota->quota = mlme_obj->cfg.gen.user_mcc_quota.quota;
+	quota->op_mode = mlme_obj->cfg.gen.user_mcc_quota.op_mode;
+	quota->vdev_id = mlme_obj->cfg.gen.user_mcc_quota.vdev_id;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+uint32_t
+wlan_mlme_get_user_mcc_duty_cycle_percentage(struct wlan_objmgr_psoc *psoc)
+{
+	uint32_t mcc_freq, ch_freq, quota_value;
+	struct wlan_user_mcc_quota quota;
+	uint8_t operating_channel;
+	int status;
+
+	quota.vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	quota.quota = 0;
+	if (QDF_IS_STATUS_ERROR(wlan_mlme_get_user_mcc_quota(psoc, &quota))) {
+		mlme_debug("Error getting user quota set");
+		return 0;
+	}
+
+	if (quota.vdev_id == WLAN_UMAC_VDEV_ID_MAX || quota.quota == 0) {
+		mlme_debug("Invalid quota : vdev %u, quota %u",
+			   quota.vdev_id, quota.quota);
+		return 0;
+	}
+	status = policy_mgr_get_chan_by_session_id(psoc, quota.vdev_id,
+						   &ch_freq);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlme_debug("Could not get vdev %u chan", quota.vdev_id);
+		return 0;
+	}
+	mcc_freq = policy_mgr_get_mcc_operating_channel(psoc, quota.vdev_id);
+	if (mcc_freq == INVALID_CHANNEL_ID)
+		return 0;
+
+	operating_channel = wlan_freq_to_chan(ch_freq);
+	if (!operating_channel) {
+		mlme_debug("Primary op channel is invalid");
+		return 0;
+	}
+	/*
+	 * The channel numbers for both adapters and the time
+	 * quota for the 1st adapter, i.e., one specified in cmd
+	 * are formatted as a bit vector
+	 * ******************************************************
+	 * |bit 31-24  | bit 23-16 |  bits 15-8  |bits 7-0   |
+	 * |  Unused   | Quota for | chan. # for |chan. # for|
+	 * |           |  1st chan | 1st chan.   |2nd chan.  |
+	 * ******************************************************
+	 */
+	mlme_debug("Opmode (%d) vdev (%u) channel %u and quota %u",
+		   quota.op_mode, quota.vdev_id,
+		   operating_channel, quota.quota);
+	quota_value = quota.quota;
+	/* Move the time quota for first channel to bits 15-8 */
+	quota_value = quota_value << 8;
+	/*
+	 * Store the channel number of 1st channel at bits 7-0
+	 * of the bit vector
+	 */
+	quota_value |= operating_channel;
+
+	operating_channel = wlan_freq_to_chan(mcc_freq);
+	if (!operating_channel) {
+		mlme_debug("Secondary op channel is invalid");
+		return 0;
+	}
+
+	/*
+	 * Now move the time quota and channel number of the
+	 * 1st adapter to bits 23-16 and bits 15-8 of the bit
+	 * vector, respectively.
+	 */
+	quota_value = quota_value << 8;
+	/*
+	 * Set the channel number for 2nd MCC vdev at bits
+	 * 7-0 of set_value
+	 */
+	quota_value |= operating_channel;
+	mlme_debug("quota value:%x", quota_value);
+
+	return quota_value;
+}
+#endif /* WLAN_FEATURE_MCC_QUOTA */

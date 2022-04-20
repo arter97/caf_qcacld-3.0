@@ -404,6 +404,17 @@ struct wlan_objmgr_vdev *sme_vdev_create(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_vdev_post_vdev_create_setup(mac_handle_t mac_handle,
 					   struct wlan_objmgr_vdev *vdev);
+
+/**
+ * sme_vdev_set_data_tx_callback() - Set dp vdev tx callback
+ * @vdev: Object manger vdev
+ *
+ * This api will setup the dp vdev tx data callbaack.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_vdev_set_data_tx_callback(struct wlan_objmgr_vdev *vdev);
+
 /**
  * sme_vdev_delete() - Delete vdev for given id
  * @mac_handle: The handle returned by mac_open.
@@ -535,6 +546,7 @@ tCsrScanResultInfo *sme_scan_result_get_next(mac_handle_t,
 		tScanResultHandle hScanResult);
 QDF_STATUS sme_scan_result_purge(tScanResultHandle hScanResult);
 
+#ifndef SAP_CP_CLEANUP
 /**
  * sme_bss_start() - A wrapper function to request CSR to inititiate start bss
  * @mac_handle: mac handle
@@ -546,7 +558,7 @@ QDF_STATUS sme_scan_result_purge(tScanResultHandle hScanResult);
  */
 QDF_STATUS sme_bss_start(mac_handle_t mac_handle, uint8_t vdev_id,
 			 struct csr_roam_profile *profile, uint32_t *roam_id);
-
+#endif
 /**
  * sme_roam_ndi_stop() - API to request stop ndi
  * @mac_handle: Opaque handle to the global MAC context
@@ -1188,6 +1200,8 @@ bool sme_is_feature_supported_by_fw(enum cap_bitmap feature);
 
 QDF_STATUS sme_set_phy_mode(mac_handle_t mac_handle, eCsrPhyMode phyMode);
 eCsrPhyMode sme_get_phy_mode(mac_handle_t mac_handle);
+uint32_t sme_get_11b_data_duration(mac_handle_t mac_handle,
+				   uint32_t chan_freq);
 
 QDF_STATUS sme_add_periodic_tx_ptrn(mac_handle_t mac_handle,
 		tSirAddPeriodicTxPtrn *addPeriodicTxPtrnParams);
@@ -1283,6 +1297,7 @@ QDF_STATUS sme_set_auto_shutdown_timer(mac_handle_t mac_handle,
 				       uint32_t timer_value);
 #endif
 
+#ifndef SAP_CP_CLEANUP
 /**
  * sme_roam_channel_change_req() - Channel change to new target channel
  * @mac_handle: handle returned by mac_open
@@ -1300,7 +1315,7 @@ QDF_STATUS sme_roam_channel_change_req(mac_handle_t mac_handle,
 				       uint8_t vdev_id,
 				       struct ch_params *ch_params,
 				       struct csr_roam_profile *profile);
-
+#endif
 QDF_STATUS sme_roam_start_beacon_req(mac_handle_t mac_handle,
 				     struct qdf_mac_addr bssid,
 				     uint8_t dfsCacWaitStatus);
@@ -4517,4 +4532,69 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 				    bool update_sta_self_peer, int req_status);
 #endif
 
+#ifdef SAP_CP_CLEANUP
+/**
+ * sme_get_network_params() - SME API to get dot11 config for SAP
+ * functionality
+ *@mac_ctx: mac context
+ *@dot11_cfg : pointer to dot11 config
+ *
+ * Return : QDF_STATUS
+ */
+QDF_STATUS
+sme_get_network_params(struct mac_context *mac_ctx,
+		       struct bss_dot11_config *dot11_cfg);
+
+/**
+ * sme_start_bss() -A wrapper function to request CSR to
+ * inititiate start bss
+ * @mac_handle: mac hancle
+ * @vdev_id: vdev id
+ * @bss_config: pointer to start bss config
+ * @roam_id: pointer to roam id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_start_bss(mac_handle_t mac_handle, uint8_t vdev_id,
+			 struct start_bss_config *bss_config,
+			 uint32_t *roam_id);
+
+/**
+ * sme_sap_ser_callback() - callback from serialization module
+ * @cmd: serialization command
+ * @reason: reason why serialization module has given this callback
+ *
+ * Serialization module will give callback to SME for why it triggered
+ * the callback
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_sap_ser_callback(struct wlan_serialization_command *cmd,
+				enum wlan_serialization_cb_reason reason);
+
+/**
+ *sme_fill_channel_change_request() - SME API to fill the channel
+ * change request for monitor mode
+ * @mac_handle: mac handle
+ * @req: pointer to change channel request message
+ * @phy_mode: phy mode of the vdev
+ *
+ * Return: QDF_STATUS
+ */
+void
+sme_fill_channel_change_request(mac_handle_t mac_handle,
+				struct channel_change_req *req,
+				eCsrPhyMode phy_mode);
+
+/**
+ * sme_sap_channel_change_req() - SME API to post channel change
+ * request to LIM
+ * @mac_handle: mac handle
+ * @req: pointer to change channel request message
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_sap_channel_change_req(mac_handle_t mac_handle,
+				      struct channel_change_req *req);
+#endif
 #endif /* #if !defined( __SME_API_H ) */

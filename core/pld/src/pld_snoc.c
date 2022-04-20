@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,11 +22,21 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#ifdef CONFIG_PLD_SNOC_ICNSS
+#ifdef CONFIG_PLD_SNOC_ICNSS2
+#include "icnss2.h"
+#else
+#include "icnss.h"
+#endif
+#endif
+#else
 #ifdef CONFIG_PLD_SNOC_ICNSS
 #ifdef CONFIG_PLD_SNOC_ICNSS2
 #include <soc/qcom/icnss2.h>
 #else
 #include <soc/qcom/icnss.h>
+#endif
 #endif
 #endif
 
@@ -34,6 +45,9 @@
 #include "osif_psoc_sync.h"
 
 #ifdef CONFIG_PLD_SNOC_ICNSS
+
+#define ADRASTEA_DEVICE_ID 0xabcd
+
 /**
  * pld_snoc_idle_restart_cb() - Perform idle restart
  * @pdev: platform device
@@ -384,8 +398,18 @@ out:
 #define PLD_SNOC_OPS_NAME "pld_snoc"
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+static struct device_info pld_snoc_dev_info[] = {
+	{ "ADRASTEA", ADRASTEA_DEVICE_ID },
+	{ 0 }
+};
+#endif
+
 struct icnss_driver_ops pld_snoc_ops = {
 	.name       = PLD_SNOC_OPS_NAME,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+	.dev_info   = pld_snoc_dev_info,
+#endif
 	.probe      = pld_snoc_probe,
 	.remove     = pld_snoc_remove,
 	.shutdown   = pld_snoc_shutdown,

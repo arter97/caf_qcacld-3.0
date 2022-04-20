@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -177,35 +178,35 @@ ucfg_fwol_is_neighbor_report_req_supported(struct wlan_objmgr_psoc *psoc,
 					   bool *neighbor_report_req);
 
 /**
- * ucfg_fwol_get_ie_whitelist() - Get IE whitelist param value
+ * ucfg_fwol_get_ie_allowlist() - Get IE allowlist param value
  * @psoc: Pointer to psoc object
- * @ie_whitelist: Pointer to return the IE whitelist param value
+ * @ie_allowlist: Pointer to return the IE allowlist param value
  *
  * Return: QDF Status
  */
 QDF_STATUS
-ucfg_fwol_get_ie_whitelist(struct wlan_objmgr_psoc *psoc, bool *ie_whitelist);
+ucfg_fwol_get_ie_allowlist(struct wlan_objmgr_psoc *psoc, bool *ie_allowlist);
 
 /**
- * ucfg_fwol_set_ie_whitelist() - Set IE whitelist param value
+ * ucfg_fwol_set_ie_allowlist() - Set IE allowlist param value
  * @psoc: Pointer to psoc object
- * @ie_whitelist: Value to set IE whitelist param
+ * @ie_allowlist: Value to set IE allowlist param
  *
  * Return: QDF Status
  */
 QDF_STATUS
-ucfg_fwol_set_ie_whitelist(struct wlan_objmgr_psoc *psoc, bool ie_whitelist);
+ucfg_fwol_set_ie_allowlist(struct wlan_objmgr_psoc *psoc, bool ie_allowlist);
 
 /**
- * ucfg_fwol_get_all_whitelist_params() - Get all IE whitelist param values
+ * ucfg_fwol_get_all_allowlist_params() - Get all IE allowlist param values
  * @psoc: Pointer to psoc object
- * @whitelist: Pointer to struct wlan_fwol_ie_whitelist
+ * @allowlist: Pointer to struct wlan_fwol_ie_allowlist
  *
  * Return: QDF Status
  */
 QDF_STATUS
-ucfg_fwol_get_all_whitelist_params(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_fwol_ie_whitelist *whitelist);
+ucfg_fwol_get_all_allowlist_params(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_fwol_ie_allowlist *allowlist);
 
 /** ucfg_fwol_get_ani_enabled() - Assigns the ani_enabled value
  * @psoc: pointer to the psoc object
@@ -490,6 +491,26 @@ bool ucfg_fwol_get_gcmp_enable(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS ucfg_fwol_get_enable_tx_sch_delay(struct wlan_objmgr_psoc *psoc,
 					     uint8_t *enable_tx_sch_delay);
+
+#ifdef WLAN_FEATURE_OFDM_SCRAMBLER_SEED
+/**
+ * ucfg_fwol_get_ofdm_scrambler_seed() - Assigns enable_ofdm_scrambler_seed
+ * @psoc: pointer to psoc object
+ * @enable_ofdm_scrambler_seed: Pointer to return enable_ofdm_scrambler_seed
+ * value
+ *
+ * Return: QDF_STATUS_SUCCESS - in case of success
+ */
+QDF_STATUS ucfg_fwol_get_ofdm_scrambler_seed(struct wlan_objmgr_psoc *psoc,
+					     bool *enable_ofdm_scrambler_seed);
+#else
+static inline QDF_STATUS ucfg_fwol_get_ofdm_scrambler_seed(
+				struct wlan_objmgr_psoc *psoc,
+				bool *enable_ofdm_scrambler_seed)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /**
  * ucfg_fwol_get_enable_secondary_rate() - Get enable secondary rate
@@ -788,20 +809,20 @@ ucfg_fwol_is_neighbor_report_req_supported(struct wlan_objmgr_psoc *psoc,
 }
 
 static inline QDF_STATUS
-ucfg_fwol_get_ie_whitelist(struct wlan_objmgr_psoc *psoc, bool *ie_whitelist)
+ucfg_fwol_get_ie_allowlist(struct wlan_objmgr_psoc *psoc, bool *ie_allowlist)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
 static inline QDF_STATUS
-ucfg_fwol_set_ie_whitelist(struct wlan_objmgr_psoc *psoc, bool ie_whitelist)
+ucfg_fwol_set_ie_allowlist(struct wlan_objmgr_psoc *psoc, bool ie_allowlist)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
 static inline QDF_STATUS
-ucfg_fwol_get_all_whitelist_params(struct wlan_objmgr_psoc *psoc,
-				   struct wlan_fwol_ie_whitelist *whitelist)
+ucfg_fwol_get_all_allowlist_params(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_fwol_ie_allowlist *allowlist)
 {
 	return QDF_STATUS_E_FAILURE;
 }

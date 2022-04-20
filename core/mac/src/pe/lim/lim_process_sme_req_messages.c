@@ -445,10 +445,17 @@ static bool __lim_process_sme_sys_ready_ind(struct mac_context *mac,
  *
  * Return: None.
  */
+#ifndef SAP_CP_CLEANUP
 static void
 lim_configure_ap_start_bss_session(struct mac_context *mac_ctx,
 				   struct pe_session *session,
 				   struct start_bss_req *sme_start_bss_req)
+#else
+static void
+lim_configure_ap_start_bss_session(struct mac_context *mac_ctx,
+				   struct pe_session *session,
+				   struct start_bss_config *sme_start_bss_req)
+#endif
 {
 	bool sap_uapsd;
 	uint16_t ht_cap = cfg_default(CFG_AP_PROTECTION_MODE);
@@ -759,7 +766,12 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 	uint32_t val = 0;
 	tSirMacChanNum channel_number;
 	tLimMlmStartReq *mlm_start_req = NULL;
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	struct start_bss_req *sme_start_bss_req = NULL;
+#else
+	struct start_bss_config *sme_start_bss_req = NULL;
+#endif
 	tSirResultCodes ret_code = eSIR_SME_SUCCESS;
 	uint8_t session_id;
 	struct pe_session *session = NULL;
@@ -2895,7 +2907,7 @@ static void lim_update_qos(struct mac_context *mac_ctx,
 		 session->limWmeEnabled);
 }
 
-static QDF_STATUS
+QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 		    struct bss_description *bss_desc)
 {
@@ -2921,6 +2933,9 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	uint8_t programmed_country[REG_ALPHA2_LEN + 1];
 	enum reg_6g_ap_type power_type_6g;
 	bool ctry_code_match;
+	struct cm_roam_values_copy temp;
+	uint32_t neighbor_lookup_threshold;
+	uint32_t hi_rssi_scan_rssi_delta;
 
 	/*
 	 * Update the capability here itself as this is used in
@@ -3032,7 +3047,20 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	lim_fill_11r_params(mac_ctx, session , ese_ver_present);
 	lim_fill_ese_params(mac_ctx, session, ese_ver_present);
 
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq)) {
+	wlan_cm_roam_cfg_get_value(mac_ctx->psoc, session->vdev_id,
+				   NEIGHBOUR_LOOKUP_THRESHOLD, &temp);
+	neighbor_lookup_threshold = temp.uint_value;
+
+	wlan_cm_roam_cfg_get_value(mac_ctx->psoc, session->vdev_id,
+				   HI_RSSI_SCAN_RSSI_DELTA, &temp);
+	hi_rssi_scan_rssi_delta = temp.uint_value;
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(bss_desc->chan_freq) &&
+	    (abs(bss_desc->rssi) >
+	     (neighbor_lookup_threshold - hi_rssi_scan_rssi_delta))) {
+		pe_debug("Enabling HI_RSSI, rssi: %d lookup_th: %d, delta:%d",
+			 bss_desc->rssi, neighbor_lookup_threshold,
+			 hi_rssi_scan_rssi_delta);
 		wlan_cm_set_disable_hi_rssi(mac_ctx->pdev, session->vdev_id,
 					    false);
 	} else {
@@ -3841,6 +3869,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	struct join_req *pe_join_req;
 	int32_t akm;
 	struct mlme_legacy_priv *mlme_priv;
+	uint32_t assoc_ie_len;
 
 	ie_len = util_scan_entry_ie_len(req->entry);
 	bss_len = (uint16_t)(offsetof(struct bss_description,
@@ -3896,12 +3925,19 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	if (req->assoc_ie.len)
 		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 				   req->assoc_ie.ptr, req->assoc_ie.len);
+
+	assoc_ie_len = req->assoc_ie.len;
 	lim_fill_crypto_params(mac_ctx, session, req);
 
-	pe_debug("After stripping Assoc IE len: %d", req->assoc_ie.len);
-	if (req->assoc_ie.len)
-		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-				   req->assoc_ie.ptr, req->assoc_ie.len);
+	if (assoc_ie_len != req->assoc_ie.len) {
+		pe_debug("After stripping Assoc IE len: %d", req->assoc_ie.len);
+		if (req->assoc_ie.len)
+			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
+					   QDF_TRACE_LEVEL_DEBUG,
+					   req->assoc_ie.ptr,
+					   req->assoc_ie.len);
+	}
+
 	qdf_mem_copy(pe_join_req->addIEAssoc.addIEdata,
 		     req->assoc_ie.ptr, req->assoc_ie.len);
 	/* update assoc ie to cm */
@@ -4023,8 +4059,8 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 		       pe_session->vdev_id);
 		goto fail;
 	}
-	if (wlan_vdev_mlme_is_mlo_vdev(pe_session->vdev) &&
-	    !wlan_vdev_mlme_is_mlo_link_vdev(pe_session->vdev))
+
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(pe_session->vdev))
 		lim_send_mlo_caps_ie(mac_ctx, pe_session,
 				     QDF_STA_MODE,
 				     pe_session->vdev_id);
@@ -4162,7 +4198,8 @@ static void lim_process_nb_disconnect_req(struct mac_context *mac_ctx,
 		break;
 	default:
 		/* Set reason REASON_UNSPEC_FAILURE for prop disassoc */
-		if (reason_code >= REASON_PROP_START)
+		if (reason_code >= REASON_PROP_START &&
+		    reason_code != REASON_FW_TRIGGERED_ROAM_FAILURE)
 			req->req.reason_code = REASON_UNSPEC_FAILURE;
 		lim_prepare_and_send_disassoc(mac_ctx, pe_session, req);
 	}
@@ -4385,6 +4422,12 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 					session_entry);
 		goto end;
 	}
+
+	if  (session_entry->lim_join_req) {
+		qdf_mem_free(session_entry->lim_join_req);
+		session_entry->lim_join_req = NULL;
+	}
+
 	session_entry->cm_id = req->cm_id;
 	ie_len = util_scan_entry_ie_len(req->entry);
 	bss_len = (uint16_t)(offsetof(struct bss_description,
@@ -4435,6 +4478,17 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 		lim_fill_wpa_ie(mac_ctx, session_entry, req);
 	else if (lim_is_wapi_profile(session_entry))
 		lim_fill_wapi_ie(mac_ctx, session_entry, req);
+
+	if (lim_is_rsn_profile(session_entry) &&
+	    !util_scan_entry_rsnxe(req->entry)) {
+		pe_debug("Bss bcn has no RSNXE, strip if has");
+		status = lim_strip_ie(mac_ctx, req->assoc_ie.ptr,
+				      (uint16_t *)&req->assoc_ie.len,
+				      WLAN_ELEMID_RSNXE, ONE_BYTE,
+				      NULL, 0, NULL, 0);
+		if (QDF_IS_STATUS_ERROR(status))
+			pe_err("Strip RNSXE failed");
+	}
 
 	pe_debug("After stripping Assoc IE len: %d", req->assoc_ie.len);
 	if (req->assoc_ie.len)
@@ -6402,7 +6456,7 @@ __lim_process_sme_addts_req(struct mac_context *mac, uint32_t *msg_buf)
 	/* ship out the message now */
 	lim_send_addts_req_action_frame(mac, peerMac, &pSirAddts->req,
 					pe_session);
-	pe_err("Sent ADDTS request");
+	pe_debug("Sent ADDTS request");
 	/* start a timer to wait for the response */
 	if (pSirAddts->timeout)
 		timeout = pSirAddts->timeout;
@@ -6765,6 +6819,8 @@ lim_process_sme_update_session_edca_txq_params(struct mac_context *mac_ctx,
 			msg->txq_edca_params.aci.aifsn;
 	pe_session->gLimEdcaParams[ac].txoplimit =
 			msg->txq_edca_params.txoplimit;
+	pe_session->gLimEdcaParams[ac].user_edca_set =
+			msg->txq_edca_params.user_edca_set;
 
 	lim_send_edca_params(mac_ctx,
 			     pe_session->gLimEdcaParams,
@@ -8046,7 +8102,12 @@ static void lim_change_channel(
 static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		uint32_t *msg_buf)
 {
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	tpSirChanChangeRequest ch_change_req;
+#else
+	struct channel_change_req *ch_change_req;
+#endif
 	struct pe_session *session_entry;
 	uint8_t session_id;      /* PE session_id */
 	int8_t max_tx_pwr;
@@ -8057,19 +8118,22 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		pe_err("msg_buf is NULL");
 		return;
 	}
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	ch_change_req = (tpSirChanChangeRequest)msg_buf;
-
+#endif
 	target_freq = ch_change_req->target_chan_freq;
 
 	max_tx_pwr = wlan_reg_get_channel_reg_power_for_freq(
 				mac_ctx->pdev, target_freq);
-
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	if ((ch_change_req->messageType != eWNI_SME_CHANNEL_CHANGE_REQ) ||
 			(max_tx_pwr == WMA_MAX_TXPOWER_INVALID)) {
 		pe_err("Invalid Request/max_tx_pwr");
 		return;
 	}
-
+#endif
 	session_entry = pe_find_session_by_bssid(mac_ctx,
 			ch_change_req->bssid, &session_id);
 	if (!session_entry) {

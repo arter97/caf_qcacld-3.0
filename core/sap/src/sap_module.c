@@ -306,7 +306,8 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 		sap_err("Invalid SAP pointer");
 		return QDF_STATUS_E_FAULT;
 	}
-
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	/* Now configure the roaming profile links. To SSID and bssid.*/
 	/* We have room for two SSIDs. */
 	sap_ctx->csr_roamProfile.SSIDs.numOfSSIDs = 1;   /* This is true for now. */
@@ -316,9 +317,10 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 		sap_ctx->SSIDList[0].ssidHidden;
 
 	sap_ctx->csr_roamProfile.BSSIDs.numOfBSSIDs = 1; /* This is true for now. */
-	sap_ctx->csa_reason = CSA_REASON_UNKNOWN;
 	sap_ctx->csr_roamProfile.BSSIDs.bssid = &sap_ctx->bssid;
 	sap_ctx->csr_roamProfile.csrPersona = mode;
+#endif
+	sap_ctx->csa_reason = CSA_REASON_UNKNOWN;
 	qdf_mem_copy(sap_ctx->self_mac_addr, addr, QDF_MAC_ADDR_SIZE);
 
 	mac = sap_get_mac_context();
@@ -376,7 +378,10 @@ QDF_STATUS sap_deinit_ctx(struct sap_context *sap_ctx)
 		sap_ctx->freq_list = NULL;
 		sap_ctx->num_of_channel = 0;
 	}
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	sap_free_roam_profile(&sap_ctx->csr_roamProfile);
+#endif
 	if (sap_ctx->sessionId != WLAN_UMAC_VDEV_ID_MAX) {
 		/* empty queues/lists/pkts if any */
 		sap_clear_session_param(MAC_HANDLE(mac), sap_ctx,
@@ -534,7 +539,8 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 	psap_ctx->acs_cfg = &config->acs_cfg;
 	psap_ctx->ch_width_orig = config->acs_cfg.ch_width;
 	psap_ctx->sec_ch_freq = config->sec_ch_freq;
-
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	/*
 	 * Set the BSSID to your "self MAC Addr" read
 	 * the mac address from Configuation ITEM received
@@ -545,6 +551,7 @@ wlansap_set_scan_acs_channel_params(struct sap_config *config,
 	/* Save a copy to SAP context */
 	qdf_mem_copy(psap_ctx->csr_roamProfile.BSSIDs.bssid,
 		config->self_macaddr.bytes, QDF_MAC_ADDR_SIZE);
+#endif
 	qdf_mem_copy(psap_ctx->self_mac_addr,
 		config->self_macaddr.bytes, QDF_MAC_ADDR_SIZE);
 
@@ -757,6 +764,8 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	sap_ctx->phyMode = config->SapHw_mode;
 	sap_ctx->csa_reason = CSA_REASON_UNKNOWN;
 
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	/* Set the BSSID to your "self MAC Addr" read the mac address
 		from Configuation ITEM received from HDD */
 	sap_ctx->csr_roamProfile.BSSIDs.numOfBSSIDs = 1;
@@ -766,13 +775,13 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	/* Save a copy to SAP context */
 	qdf_mem_copy(sap_ctx->csr_roamProfile.BSSIDs.bssid,
 		     config->self_macaddr.bytes, QDF_MAC_ADDR_SIZE);
-	qdf_mem_copy(sap_ctx->self_mac_addr,
-		     config->self_macaddr.bytes, QDF_MAC_ADDR_SIZE);
 
 	/* copy the configuration items to csrProfile */
 	sapconvert_to_csr_profile(config, eCSR_BSS_TYPE_INFRA_AP,
 			       &sap_ctx->csr_roamProfile);
-
+#endif
+	qdf_mem_copy(sap_ctx->self_mac_addr,
+		     config->self_macaddr.bytes, QDF_MAC_ADDR_SIZE);
 	/*
 	 * Set the DFS Test Mode setting
 	 * Set beacon channel count before chanel switch
@@ -835,9 +844,11 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	/* Handle event */
 	qdf_status = sap_fsm(sap_ctx, &sap_event);
 fail:
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		sap_free_roam_profile(&sap_ctx->csr_roamProfile);
-
+#endif
 	return qdf_status;
 } /* wlansap_start_bss */
 
@@ -978,7 +989,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 			      uint8_t *peer_sta_mac,
 			      eSapACLType list_type, eSapACLCmdType cmd)
 {
-	bool sta_white_list = false, sta_black_list = false;
+	bool sta_allow_list = false, sta_deny_list = false;
 	uint16_t staWLIndex, staBLIndex;
 
 	if (!sap_ctx) {
@@ -988,32 +999,32 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 	if (qdf_mem_cmp(sap_ctx->bssid.bytes, peer_sta_mac,
 			QDF_MAC_ADDR_SIZE) == 0) {
 		sap_err("requested peer mac is "QDF_MAC_ADDR_FMT
-			"our own SAP BSSID. Do not blacklist or whitelist this BSSID",
+			"our own SAP BSSID. Do not denylist or allowlist this BSSID",
 			QDF_MAC_ADDR_REF(peer_sta_mac));
 		return QDF_STATUS_E_FAULT;
 	}
 	sap_debug("Modify ACL entered\n" "Before modification of ACL\n"
 		  "size of accept and deny lists %d %d", sap_ctx->nAcceptMac,
 		  sap_ctx->nDenyMac);
-	sap_debug("*** WHITE LIST ***");
+	sap_debug("*** ALLOW LIST ***");
 	sap_print_acl(sap_ctx->acceptMacList, sap_ctx->nAcceptMac);
-	sap_debug("*** BLACK LIST ***");
+	sap_debug("*** DENY LIST ***");
 	sap_print_acl(sap_ctx->denyMacList, sap_ctx->nDenyMac);
 
 	/* the expectation is a mac addr will not be in both the lists
 	 * at the same time. It is the responsiblity of userspace to
 	 * ensure this
 	 */
-	sta_white_list =
+	sta_allow_list =
 		sap_search_mac_list(sap_ctx->acceptMacList, sap_ctx->nAcceptMac,
 				 peer_sta_mac, &staWLIndex);
-	sta_black_list =
+	sta_deny_list =
 		sap_search_mac_list(sap_ctx->denyMacList, sap_ctx->nDenyMac,
 				 peer_sta_mac, &staBLIndex);
 
-	if (sta_white_list && sta_black_list) {
+	if (sta_allow_list && sta_deny_list) {
 		sap_err("Peer mac " QDF_MAC_ADDR_FMT
-			" found in white and black lists."
+			" found in allow and deny lists."
 			"Initial lists passed incorrect. Cannot execute this command.",
 			QDF_MAC_ADDR_REF(peer_sta_mac));
 		return QDF_STATUS_E_FAILURE;
@@ -1022,31 +1033,37 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 	sap_debug("cmd %d", cmd);
 
 	switch (list_type) {
-	case eSAP_WHITE_LIST:
+	case SAP_ALLOW_LIST:
 		if (cmd == ADD_STA_TO_ACL) {
 			/* error check */
 			/* if list is already at max, return failure */
 			if (sap_ctx->nAcceptMac == MAX_ACL_MAC_ADDRESS) {
-				sap_err("White list is already maxed out. Cannot accept "
+				sap_err("Allow list is already maxed out. Cannot accept "
 					  QDF_MAC_ADDR_FMT,
 					  QDF_MAC_ADDR_REF(peer_sta_mac));
 				return QDF_STATUS_E_FAILURE;
 			}
-			if (sta_white_list) {
-				/* Do nothing if already present in white list. Just print a warning */
-				sap_warn("MAC address already present in white list "
+			if (sta_allow_list) {
+				/*
+				 * Do nothing if already present in allow
+				 * list. Just print a warning
+				 */
+				sap_warn("MAC address already present in allow list "
 					 QDF_MAC_ADDR_FMT,
 					 QDF_MAC_ADDR_REF(peer_sta_mac));
 				return QDF_STATUS_SUCCESS;
 			}
-			if (sta_black_list) {
-				/* remove it from black list before adding to the white list */
-				sap_warn("STA present in black list so first remove from it");
+			if (sta_deny_list) {
+				/*
+				 * remove it from deny list before adding
+				 * to the allow list
+				 */
+				sap_warn("STA present in deny list so first remove from it");
 				sap_remove_mac_from_acl(sap_ctx->denyMacList,
 						    &sap_ctx->nDenyMac,
 						    staBLIndex);
 			}
-			sap_debug("... Now add to the white list");
+			sap_debug("... Now add to the allow list");
 			sap_add_mac_to_acl(sap_ctx->acceptMacList,
 					       &sap_ctx->nAcceptMac,
 			       peer_sta_mac);
@@ -1054,15 +1071,17 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 					  sap_ctx->nAcceptMac,
 					  sap_ctx->nDenyMac);
 		} else if (cmd == DELETE_STA_FROM_ACL) {
-			if (sta_white_list) {
+			if (sta_allow_list) {
 
 				struct csr_del_sta_params delStaParams;
 
-				sap_info("Delete from white list");
+				sap_info("Delete from allow list");
 				sap_remove_mac_from_acl(sap_ctx->acceptMacList,
 						    &sap_ctx->nAcceptMac,
 						    staWLIndex);
-				/* If a client is deleted from white list and it is connected, send deauth */
+				/* If a client is deleted from allow list and */
+				/* it is connected, send deauth
+				 */
 				wlansap_populate_del_sta_params(peer_sta_mac,
 					eCsrForcedDeauthSta,
 					SIR_MAC_MGMT_DEAUTH,
@@ -1072,7 +1091,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 					  sap_ctx->nAcceptMac,
 					  sap_ctx->nDenyMac);
 			} else {
-				sap_warn("MAC address to be deleted is not present in the white list "
+				sap_warn("MAC address to be deleted is not present in the allow list "
 					 QDF_MAC_ADDR_FMT,
 					 QDF_MAC_ADDR_REF(peer_sta_mac));
 				return QDF_STATUS_E_FAILURE;
@@ -1083,47 +1102,55 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 		}
 		break;
 
-	case eSAP_BLACK_LIST:
+	case SAP_DENY_LIST:
 
 		if (cmd == ADD_STA_TO_ACL) {
 			struct csr_del_sta_params delStaParams;
 			/* error check */
 			/* if list is already at max, return failure */
 			if (sap_ctx->nDenyMac == MAX_ACL_MAC_ADDRESS) {
-				sap_err("Black list is already maxed out. Cannot accept "
+				sap_err("Deny list is already maxed out. Cannot accept "
 					QDF_MAC_ADDR_FMT,
 					QDF_MAC_ADDR_REF(peer_sta_mac));
 				return QDF_STATUS_E_FAILURE;
 			}
-			if (sta_black_list) {
-				/* Do nothing if already present in white list */
-				sap_warn("MAC address already present in black list "
+			if (sta_deny_list) {
+				/*
+				 * Do nothing if already present in
+				 * allow list
+				 */
+				sap_warn("MAC address already present in deny list "
 					 QDF_MAC_ADDR_FMT,
 					 QDF_MAC_ADDR_REF(peer_sta_mac));
 				return QDF_STATUS_SUCCESS;
 			}
-			if (sta_white_list) {
-				/* remove it from white list before adding to the black list */
-				sap_warn("Present in white list so first remove from it");
+			if (sta_allow_list) {
+				/*
+				 * remove it from allow list before adding to
+				 * the deny list
+				 */
+				sap_warn("Present in allow list so first remove from it");
 				sap_remove_mac_from_acl(sap_ctx->acceptMacList,
 						    &sap_ctx->nAcceptMac,
 						    staWLIndex);
 			}
-			/* If we are adding a client to the black list; if its connected, send deauth */
+			/* If we are adding a client to the deny list; */
+			/* if its connected, send deauth
+			 */
 			wlansap_populate_del_sta_params(peer_sta_mac,
 				eCsrForcedDeauthSta,
 				SIR_MAC_MGMT_DEAUTH,
 				&delStaParams);
 			wlansap_deauth_sta(sap_ctx, &delStaParams);
-			sap_info("... Now add to black list");
+			sap_info("... Now add to deny list");
 			sap_add_mac_to_acl(sap_ctx->denyMacList,
 				       &sap_ctx->nDenyMac, peer_sta_mac);
 			sap_debug("size of accept and deny lists %d %d",
 				  sap_ctx->nAcceptMac,
 				  sap_ctx->nDenyMac);
 		} else if (cmd == DELETE_STA_FROM_ACL) {
-			if (sta_black_list) {
-				sap_info("Delete from black list");
+			if (sta_deny_list) {
+				sap_info("Delete from deny list");
 				sap_remove_mac_from_acl(sap_ctx->denyMacList,
 						    &sap_ctx->nDenyMac,
 						    staBLIndex);
@@ -1131,7 +1158,7 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 					  sap_ctx->nAcceptMac,
 					  sap_ctx->nDenyMac);
 			} else {
-				sap_warn("MAC address to be deleted is not present in the black list "
+				sap_warn("MAC address to be deleted is not present in the deny list "
 					  QDF_MAC_ADDR_FMT,
 					  QDF_MAC_ADDR_REF(peer_sta_mac));
 				return QDF_STATUS_E_FAILURE;
@@ -1149,9 +1176,9 @@ QDF_STATUS wlansap_modify_acl(struct sap_context *sap_ctx,
 	}
 	}
 	sap_debug("After modification of ACL");
-	sap_debug("*** WHITE LIST ***");
+	sap_debug("*** ALLOW LIST ***");
 	sap_print_acl(sap_ctx->acceptMacList, sap_ctx->nAcceptMac);
-	sap_debug("*** BLACK LIST ***");
+	sap_debug("*** DENY LIST ***");
 	sap_print_acl(sap_ctx->denyMacList, sap_ctx->nDenyMac);
 	return QDF_STATUS_SUCCESS;
 }
@@ -1240,6 +1267,7 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	enum phy_ch_width ch_width, concurrent_bw = 0;
 	struct mac_context *mac;
 	struct ch_params ch_params = {0};
+	uint32_t channel_bonding_mode = 0;
 
 	mac = sap_get_mac_context();
 	if (!mac) {
@@ -1255,7 +1283,14 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 		 */
 		ch_width = CH_WIDTH_20MHZ;
 	} else {
-		ch_width = wlansap_get_max_bw_by_phymode(sap_context);
+		wlan_mlme_get_channel_bonding_5ghz(mac->psoc,
+						   &channel_bonding_mode);
+		if (WLAN_REG_IS_5GHZ_CH_FREQ(chan_freq) &&
+		    (!channel_bonding_mode))
+			ch_width = CH_WIDTH_20MHZ;
+		else
+			ch_width = wlansap_get_max_bw_by_phymode(sap_context);
+
 		ch_width = wlansap_5g_original_bw_validate(
 				sap_context, chan_freq, ch_width);
 		concurrent_bw = wlan_sap_get_concurrent_bw(
@@ -1271,13 +1306,14 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	ch_width = ch_params.ch_width;
 	if (tgt_ch_params)
 		*tgt_ch_params = ch_params;
-	sap_nofl_debug("csa freq %d bw %d (phymode %d con bw %d tgt bw %d orig %d reason %d)",
+	sap_nofl_debug("csa freq %d bw %d (phymode %d con bw %d tgt bw %d orig %d reason %d) channel bonding 5g %d",
 		       chan_freq, ch_width,
 		       sap_context->phyMode,
 		       concurrent_bw,
 		       tgt_ch_params ? tgt_ch_params->ch_width : CH_WIDTH_MAX,
 		       sap_context->ch_width_orig,
-		       sap_context->csa_reason);
+		       sap_context->csa_reason,
+		       channel_bonding_mode);
 
 	return ch_width;
 }
@@ -1746,6 +1782,24 @@ void wlansap_get_sec_channel(uint8_t sec_ch_offset,
 	}
 }
 
+#ifdef SAP_CP_CLEANUP
+/**
+ * wlansap_fill_channel_change_request() - Fills the channel change request
+ * @sap_ctx: sap context
+ * @req: pointer to change channel request
+ *
+ * This function fills the channel change request for SAP
+ *
+ * Return: None
+ */
+static void
+wlansap_fill_channel_change_request(struct sap_context *sap_ctx,
+				    struct channel_change_req *req)
+{
+	return;
+}
+#endif
+
 QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 					  uint32_t target_chan_freq)
 {
@@ -1780,16 +1834,20 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 	else if (WLAN_REG_IS_24GHZ_CH_FREQ(target_chan_freq) &&
 		 (phy_mode == eCSR_DOT11_MODE_11a))
 		phy_mode = eCSR_DOT11_MODE_11g;
-
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	sap_ctx->csr_roamProfile.phyMode = phy_mode;
+#endif
 	sap_ctx->phyMode = phy_mode;
 
 	if (!sap_ctx->chan_freq) {
 		sap_err("Invalid channel list");
 		return QDF_STATUS_E_FAULT;
 	}
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	sap_ctx->csr_roamProfile.ChannelInfo.freq_list[0] = target_chan_freq;
-
+#endif
 	/*
 	 * We are getting channel bonding mode from sapDfsInfor structure
 	 * because we've implemented channel width fallback mechanism for DFS
@@ -1806,9 +1864,13 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 	sap_ctx->chan_freq = target_chan_freq;
 	wlansap_get_sec_channel(ch_params->sec_ch_offset, sap_ctx->chan_freq,
 				&sap_ctx->sec_ch_freq);
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	sap_ctx->csr_roamProfile.ch_params = *ch_params;
+#endif
 	sap_dfs_set_current_channel(sap_ctx);
-
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	sap_get_cac_dur_dfs_region(sap_ctx,
 				   &sap_ctx->csr_roamProfile.cac_duration_ms,
 				   &sap_ctx->csr_roamProfile.dfs_regdomain,
@@ -1821,7 +1883,7 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 					     sap_ctx->sessionId,
 					     ch_params,
 					     &sap_ctx->csr_roamProfile);
-
+#endif
 	sap_debug("chan_freq:%d phy_mode %d width:%d offset:%d seg0:%d seg1:%d",
 		  sap_ctx->chan_freq, phy_mode, ch_params->ch_width,
 		  ch_params->sec_ch_offset, ch_params->center_freq_seg0,
@@ -2467,7 +2529,10 @@ QDF_STATUS wlansap_acs_chselect(struct sap_context *sap_context,
 
 	sap_context->acs_cfg = &config->acs_cfg;
 	sap_context->ch_width_orig = config->acs_cfg.ch_width;
+/* To be removed after SAP CSR cleanup changes */
+#ifndef SAP_CP_CLEANUP
 	sap_context->csr_roamProfile.phyMode = config->acs_cfg.hw_mode;
+#endif
 	sap_context->phyMode = config->acs_cfg.hw_mode;
 
 	/*
@@ -3183,7 +3248,9 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 			restart_ch_width = CH_WIDTH_40MHZ;
 		}
 	} else if (sap_band == REG_BAND_2G && (band & BIT(REG_BAND_5G)) &&
-		   sap_ctx->chan_freq_before_switch_band) {
+		   sap_ctx->chan_freq_before_switch_band &&
+		   wlan_reg_is_enable_in_secondary_list_for_freq(mac->pdev,
+				sap_ctx->chan_freq_before_switch_band)) {
 		restart_freq = sap_ctx->chan_freq_before_switch_band;
 		restart_ch_width = sap_ctx->chan_width_before_switch_band;
 		sap_debug("Restore chan freq: %d, width: %d",
@@ -3437,5 +3504,42 @@ void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 
 	sap_context->chan_freq = ch_freq;
 	sap_debug("ACS configuring ch_freq=%d", sap_context->chan_freq);
+}
+#endif
+
+#ifdef WLAN_FEATURE_11BE
+bool sap_acs_is_puncture_applicable(struct sap_acs_cfg *acs_cfg)
+{
+	bool is_eht_bw_80 = false;
+
+	if (!acs_cfg) {
+		sap_err("Invalid parameters");
+		return is_eht_bw_80;
+	}
+
+	switch (acs_cfg->ch_width) {
+	case CH_WIDTH_80MHZ:
+	case CH_WIDTH_80P80MHZ:
+	case CH_WIDTH_160MHZ:
+	case CH_WIDTH_320MHZ:
+		is_eht_bw_80 = acs_cfg->is_eht_enabled;
+		break;
+	default:
+		break;
+	}
+
+	return is_eht_bw_80;
+}
+
+void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
+				  struct ch_params *ch_params)
+{
+	if (!sap_ctx || !ch_params) {
+		sap_err("Invalid parameters");
+		return;
+	}
+
+	if (sap_acs_is_puncture_applicable(sap_ctx->acs_cfg))
+		ch_params->is_create_punc_bitmap = true;
 }
 #endif

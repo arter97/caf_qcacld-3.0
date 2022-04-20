@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -289,7 +290,7 @@ fwol_set_adaptive_dwelltime_config(
 /**
  * fwol_parse_probe_req_ouis - form ouis from ini gProbeReqOUIs
  * @psoc: Pointer to struct wlan_objmgr_psoc context
- * @whitelist: Pointer to struct wlan_fwol_ie_whitelist
+ * @allowlist: Pointer to struct wlan_fwol_ie_allowlist
  *
  * This function parses the ini string gProbeReqOUIs which needs be to in the
  * following format:
@@ -301,10 +302,10 @@ fwol_set_adaptive_dwelltime_config(
  * Return: None
  */
 static void fwol_parse_probe_req_ouis(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_fwol_ie_whitelist *whitelist)
+				      struct wlan_fwol_ie_allowlist *allowlist)
 {
 	uint8_t probe_req_ouis[MAX_PRB_REQ_VENDOR_OUI_INI_LEN] = {0};
-	uint32_t *voui = whitelist->probe_req_voui;
+	uint32_t *voui = allowlist->probe_req_voui;
 	char *str;
 	uint8_t *token;
 	uint32_t oui_indx = 0;
@@ -314,7 +315,7 @@ static void fwol_parse_probe_req_ouis(struct wlan_objmgr_psoc *psoc,
 	qdf_str_lcopy(probe_req_ouis, cfg_get(psoc, CFG_PROBE_REQ_OUI),
 		      MAX_PRB_REQ_VENDOR_OUI_INI_LEN);
 	str = probe_req_ouis;
-	whitelist->no_of_probe_req_ouis = 0;
+	allowlist->no_of_probe_req_ouis = 0;
 
 	if (!qdf_str_len(str)) {
 		fwol_debug("NO OUIs to parse");
@@ -338,27 +339,27 @@ next_token:
 	}
 
 	if (!oui_indx) {
-		whitelist->ie_whitelist = false;
+		allowlist->ie_allowlist = false;
 		return;
 	}
 
-	whitelist->no_of_probe_req_ouis = oui_indx;
+	allowlist->no_of_probe_req_ouis = oui_indx;
 }
 
 /**
- * fwol_validate_ie_bitmaps() - Validate all IE whitelist bitmap param values
+ * fwol_validate_ie_bitmaps() - Validate all IE allowlist bitmap param values
  * @psoc: Pointer to struct wlan_objmgr_psoc
- * @whitelist: Pointer to struct wlan_fwol_ie_whitelist
+ * @allowlist: Pointer to struct wlan_fwol_ie_allowlist
  *
  * Return: True if all bitmap values are valid, else false
  */
 static bool fwol_validate_ie_bitmaps(struct wlan_objmgr_psoc *psoc,
-				     struct wlan_fwol_ie_whitelist *whitelist)
+				     struct wlan_fwol_ie_allowlist *allowlist)
 {
-	if (!(whitelist->ie_bitmap_0 || whitelist->ie_bitmap_1 ||
-	      whitelist->ie_bitmap_2 || whitelist->ie_bitmap_3 ||
-	      whitelist->ie_bitmap_4 || whitelist->ie_bitmap_5 ||
-	      whitelist->ie_bitmap_6 || whitelist->ie_bitmap_7))
+	if (!(allowlist->ie_bitmap_0 || allowlist->ie_bitmap_1 ||
+	      allowlist->ie_bitmap_2 || allowlist->ie_bitmap_3 ||
+	      allowlist->ie_bitmap_4 || allowlist->ie_bitmap_5 ||
+	      allowlist->ie_bitmap_6 || allowlist->ie_bitmap_7))
 		return false;
 
 	/*
@@ -367,12 +368,12 @@ static bool fwol_validate_ie_bitmaps(struct wlan_objmgr_psoc *psoc,
 	 * for atleast one OUI, minimum length is 8 and hence this string length
 	 * is checked for minimum of 8
 	 */
-	if ((whitelist->ie_bitmap_6 & VENDOR_SPECIFIC_IE_BITMAP) &&
+	if ((allowlist->ie_bitmap_6 & VENDOR_SPECIFIC_IE_BITMAP) &&
 	    (qdf_str_len(cfg_get(psoc, CFG_PROBE_REQ_OUI)) < 8))
 		return false;
 
 	/* check whether vendor oui IE is not set but OUIs are present */
-	if (!(whitelist->ie_bitmap_6 & VENDOR_SPECIFIC_IE_BITMAP) &&
+	if (!(allowlist->ie_bitmap_6 & VENDOR_SPECIFIC_IE_BITMAP) &&
 	    (qdf_str_len(cfg_get(psoc, CFG_PROBE_REQ_OUI)) > 0))
 		return false;
 
@@ -381,20 +382,20 @@ static bool fwol_validate_ie_bitmaps(struct wlan_objmgr_psoc *psoc,
 
 static void
 fwol_init_ie_whiltelist_in_cfg(struct wlan_objmgr_psoc *psoc,
-			       struct wlan_fwol_ie_whitelist *whitelist)
+			       struct wlan_fwol_ie_allowlist *allowlist)
 {
-	whitelist->ie_whitelist = cfg_get(psoc, CFG_PROBE_REQ_IE_WHITELIST);
-	whitelist->ie_bitmap_0 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP0);
-	whitelist->ie_bitmap_1 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP1);
-	whitelist->ie_bitmap_2 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP2);
-	whitelist->ie_bitmap_3 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP3);
-	whitelist->ie_bitmap_4 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP4);
-	whitelist->ie_bitmap_5 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP5);
-	whitelist->ie_bitmap_6 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP6);
-	whitelist->ie_bitmap_7 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP7);
-	if (!fwol_validate_ie_bitmaps(psoc, whitelist))
-		whitelist->ie_whitelist = false;
-	fwol_parse_probe_req_ouis(psoc, whitelist);
+	allowlist->ie_allowlist = cfg_get(psoc, CFG_PROBE_REQ_IE_ALLOWLIST);
+	allowlist->ie_bitmap_0 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP0);
+	allowlist->ie_bitmap_1 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP1);
+	allowlist->ie_bitmap_2 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP2);
+	allowlist->ie_bitmap_3 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP3);
+	allowlist->ie_bitmap_4 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP4);
+	allowlist->ie_bitmap_5 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP5);
+	allowlist->ie_bitmap_6 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP6);
+	allowlist->ie_bitmap_7 = cfg_get(psoc, CFG_PROBE_REQ_IE_BIT_MAP7);
+	if (!fwol_validate_ie_bitmaps(psoc, allowlist))
+		allowlist->ie_allowlist = false;
+	fwol_parse_probe_req_ouis(psoc, allowlist);
 }
 
 /**
@@ -567,6 +568,20 @@ static void fwol_thermal_init(struct wlan_fwol_psoc_obj *fwol_obj)
 }
 #endif
 
+#ifdef WLAN_FEATURE_OFDM_SCRAMBLER_SEED
+static inline void fwol_ofdm_scrambler_init(struct wlan_fwol_cfg *fwol_cfg,
+					    struct wlan_objmgr_psoc *psoc)
+{
+	fwol_cfg->enable_ofdm_scrambler_seed =
+				cfg_get(psoc, CFG_ENABLE_OFDM_SCRAMBLER_SEED);
+}
+#else
+static inline void fwol_ofdm_scrambler_init(struct wlan_fwol_cfg *fwol_cfg,
+					    struct wlan_objmgr_psoc *psoc)
+{
+}
+#endif
+
 QDF_STATUS fwol_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -585,7 +600,7 @@ QDF_STATUS fwol_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 
 	fwol_init_coex_config_in_cfg(psoc, &fwol_cfg->coex_config);
 	fwol_init_thermal_temp_in_cfg(psoc, &fwol_cfg->thermal_temp_cfg);
-	fwol_init_ie_whiltelist_in_cfg(psoc, &fwol_cfg->ie_whitelist_cfg);
+	fwol_init_ie_whiltelist_in_cfg(psoc, &fwol_cfg->ie_allowlist_cfg);
 	fwol_init_neighbor_report_cfg(psoc, &fwol_cfg->neighbor_report_cfg);
 	fwol_cfg->ani_enabled = cfg_get(psoc, CFG_ENABLE_ANI);
 	fwol_cfg->enable_rts_sifsbursting =
@@ -633,6 +648,7 @@ QDF_STATUS fwol_cfg_on_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	fwol_cfg->sap_sho = cfg_get(psoc, CFG_SAP_SHO_CONFIG);
 	fwol_cfg->disable_hw_assist = cfg_get(psoc, CFG_DISABLE_HW_ASSIST);
 	fwol_thermal_init(fwol_obj);
+	fwol_ofdm_scrambler_init(fwol_cfg, psoc);
 
 	return status;
 }

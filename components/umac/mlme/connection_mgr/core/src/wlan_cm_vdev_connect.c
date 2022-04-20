@@ -1018,8 +1018,15 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NOSUPPORT;
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
-	if (rso_cfg)
-		rso_cfg->rsn_cap = req->crypto.rsn_caps;
+	if (rso_cfg) {
+		rso_cfg->orig_sec_info.rsn_caps = req->crypto.rsn_caps;
+		rso_cfg->orig_sec_info.authmodeset = req->crypto.auth_type;
+		rso_cfg->orig_sec_info.ucastcipherset =
+					req->crypto.ciphers_pairwise;
+		rso_cfg->orig_sec_info.mcastcipherset =
+					req->crypto.group_cipher;
+		rso_cfg->orig_sec_info.key_mgmt = req->crypto.akm_suites;
+	}
 
 	if (wlan_get_vendor_ie_ptr_from_oui(HS20_OUI_TYPE,
 					    HS20_OUI_TYPE_SIZE,
@@ -1141,7 +1148,8 @@ QDF_STATUS wlan_cm_send_connect_rsp(struct scheduler_msg *msg)
 	}
 
 	/*  check and delete bss peer in case of failure */
-	if (QDF_IS_STATUS_ERROR(rsp->connect_rsp.connect_status)) {
+	if (QDF_IS_STATUS_ERROR(rsp->connect_rsp.connect_status) &&
+	    (wlan_vdev_mlme_is_init_state(vdev) == QDF_STATUS_SUCCESS)) {
 		peer = wlan_objmgr_vdev_try_get_bsspeer(vdev,
 							WLAN_MLME_CM_ID);
 		if (peer) {
@@ -1436,6 +1444,7 @@ cm_connect_complete_ind(struct wlan_objmgr_vdev *vdev,
 					     mlme_get_tdls_prohibited(vdev),
 					     vdev);
 		wlan_p2p_status_connect(vdev);
+
 	}
 
 	if (op_mode == QDF_STA_MODE &&

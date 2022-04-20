@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -59,6 +59,7 @@
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
 #define SA_QUERY_RESP_MIN_LEN \
 (DOT11F_FF_CATEGORY_LEN + DOT11F_FF_ACTION_LEN + DOT11F_FF_TRANSACTIONID_LEN)
+#define SA_QUERY_IE_OFFSET (4)
 
 static last_processed_msg rrm_link_action_frm;
 
@@ -949,7 +950,7 @@ static void __lim_process_qos_map_configure_frame(struct mac_context *mac_ctx,
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
 				    (uint8_t *)mac_hdr,
 				    frame_len + sizeof(tSirMacMgmtHdr), 0,
-				    WMA_GET_RX_FREQ(rx_pkt_info), session,
+				    WMA_GET_RX_FREQ(rx_pkt_info),
 				    WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
 				    RXMGMT_FLAG_NONE);
 }
@@ -1172,7 +1173,7 @@ __lim_process_radio_measure_request(struct mac_context *mac, uint8_t *pRxPacketI
 	mac->rrm.rrmPEContext.prev_rrm_report_seq_num = curr_seq_num;
 	lim_send_sme_mgmt_frame_ind(mac, pHdr->fc.subType, (uint8_t *)pHdr,
 				    frameLen + sizeof(tSirMacMgmtHdr), 0,
-				    WMA_GET_RX_FREQ(pRxPacketInfo), pe_session,
+				    WMA_GET_RX_FREQ(pRxPacketInfo),
 				    WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo),
 				    RXMGMT_FLAG_NONE);
 
@@ -1286,6 +1287,48 @@ __lim_process_neighbor_report(struct mac_context *mac, uint8_t *pRxPacketInfo,
 	qdf_mem_free(pFrm);
 }
 
+static bool
+lim_check_oci_match(struct mac_context *mac, struct pe_session *pe_session,
+		    uint8_t *ie, uint8_t *peer, uint32_t ie_len)
+{
+	const uint8_t *oci_ie;
+	tDot11fIEoci self_oci, *peer_oci;
+
+	if (!lim_is_self_and_peer_ocv_capable(mac, peer, pe_session))
+		return true;
+
+	oci_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_OCI, ie, ie_len);
+	if (!oci_ie) {
+		pe_err("OCV not found OCI in SA Query frame!");
+		return false;
+	}
+
+	/* OCV enabled, check the OCI information:
+	 * Element ID           : 1 byte
+	 * Packet length        : 1 byte
+	 * Element ID extension : 1 byte
+	 * Operating class      : 1 byte
+	 * Primary channel      : 1 byte
+	 * Freq_seg_1_ch_num    : 1 byte
+	 */
+	peer_oci = (tDot11fIEoci *)&oci_ie[2];
+	lim_fill_oci_params(mac, pe_session, &self_oci);
+
+	if ((self_oci.op_class != peer_oci->op_class) ||
+	    (self_oci.prim_ch_num != peer_oci->prim_ch_num) ||
+	    (self_oci.freq_seg_1_ch_num != peer_oci->freq_seg_1_ch_num)) {
+		pe_err("OCI mismatch,self %d %d %d, peer %d %d %d",
+		       self_oci.op_class,
+		       self_oci.prim_ch_num,
+		       self_oci.freq_seg_1_ch_num,
+		       peer_oci->op_class,
+		       peer_oci->prim_ch_num,
+		       peer_oci->freq_seg_1_ch_num);
+		return false;
+	}
+
+	return true;
+}
 
 /**
  * limProcessSAQueryRequestActionFrame
@@ -1310,8 +1353,8 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 							uint8_t *pRxPacketInfo,
 							struct pe_session *pe_session)
 {
-	tpSirMacMgmtHdr pHdr;
-	uint8_t *pBody;
+	tpSirMacMgmtHdr mac_header;
+	uint8_t *p_body;
 	uint32_t frame_len;
 	uint8_t transId[2];
 
@@ -1319,8 +1362,8 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 	   pHdr = SIR_MAC_BD_TO_MPDUHEADER(pBd);
 	   pBody = SIR_MAC_BD_TO_MPDUDATA(pBd); */
 
-	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
-	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
+	mac_header = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
+	p_body = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
 
 	if (frame_len < SA_QUERY_REQ_MIN_LEN) {
@@ -1328,7 +1371,7 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 		return;
 	}
 	/* If this is an unprotected SA Query Request, then ignore it. */
-	if (pHdr->fc.wep == 0)
+	if (mac_header->fc.wep == 0)
 		return;
 
 	/* 11w offload is enabled then firmware should not fwd this frame */
@@ -1343,12 +1386,18 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 	   Category       : 1 byte
 	   Action         : 1 byte
 	   Transaction ID : 2 bytes */
-	qdf_mem_copy(&transId[0], &pBody[2], 2);
+	qdf_mem_copy(&transId[0], &p_body[2], 2);
+
+	if (!lim_check_oci_match(mac, pe_session,
+				 p_body + SA_QUERY_IE_OFFSET,
+				 mac_header->sa,
+				 frame_len - SA_QUERY_IE_OFFSET))
+		return;
 
 	/* Send 11w SA query response action frame */
 	if (lim_send_sa_query_response_frame(mac,
 					     transId,
-					     pHdr->sa,
+					     mac_header->sa,
 					     pe_session) != QDF_STATUS_SUCCESS) {
 		pe_err("fail to send SA query response action frame");
 		return;
@@ -1377,17 +1426,17 @@ static void __lim_process_sa_query_response_action_frame(struct mac_context *mac
 							 uint8_t *pRxPacketInfo,
 							 struct pe_session *pe_session)
 {
-	tpSirMacMgmtHdr pHdr;
+	tpSirMacMgmtHdr m_hdr;
 	uint32_t frame_len;
-	uint8_t *pBody;
+	uint8_t *p_body;
 	tpDphHashNode pSta;
 	uint16_t aid;
 	uint16_t transId;
 	uint8_t retryNum;
 
-	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
+	m_hdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
-	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
+	p_body = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
 	pe_debug("SA Query Response received");
 
 	if (frame_len < SA_QUERY_RESP_MIN_LEN) {
@@ -1398,30 +1447,29 @@ static void __lim_process_sa_query_response_action_frame(struct mac_context *mac
 	 * Forward to SME to HDD to wpa_supplicant.
 	 */
 	if (LIM_IS_STA_ROLE(pe_session)) {
-		lim_send_sme_mgmt_frame_ind(mac, pHdr->fc.subType,
-					    (uint8_t *)pHdr,
+		lim_send_sme_mgmt_frame_ind(mac, m_hdr->fc.subType,
+					    (uint8_t *)m_hdr,
 					    frame_len + sizeof(tSirMacMgmtHdr),
 					    0,
 					    WMA_GET_RX_FREQ(pRxPacketInfo),
-					    pe_session,
 					    WMA_GET_RX_RSSI_NORMALIZED(
 					    pRxPacketInfo), RXMGMT_FLAG_NONE);
 		return;
 	}
 
 	/* If this is an unprotected SA Query Response, then ignore it. */
-	if (pHdr->fc.wep == 0)
+	if (m_hdr->fc.wep == 0)
 		return;
 
 	pSta =
-		dph_lookup_hash_entry(mac, pHdr->sa, &aid,
+		dph_lookup_hash_entry(mac, m_hdr->sa, &aid,
 				      &pe_session->dph.dphHashTable);
 	if (!pSta)
 		return;
 
 	pe_debug("SA Query Response source addr:  %0x:%0x:%0x:%0x:%0x:%0x",
-		pHdr->sa[0], pHdr->sa[1], pHdr->sa[2], pHdr->sa[3],
-		pHdr->sa[4], pHdr->sa[5]);
+		 m_hdr->sa[0], m_hdr->sa[1], m_hdr->sa[2], m_hdr->sa[3],
+		 m_hdr->sa[4], m_hdr->sa[5]);
 	pe_debug("SA Query state for station: %d", pSta->pmfSaQueryState);
 
 	if (DPH_SA_QUERY_IN_PROGRESS != pSta->pmfSaQueryState)
@@ -1432,13 +1480,19 @@ static void __lim_process_sa_query_response_action_frame(struct mac_context *mac
 	   Category       : 1 byte
 	   Action         : 1 byte
 	   Transaction ID : 2 bytes */
-	qdf_mem_copy(&transId, &pBody[2], 2);
+	qdf_mem_copy(&transId, &p_body[2], 2);
 
 	/* If SA Query is in progress with the station and the station
 	   responds then the association request that triggered the SA
 	   query is from a rogue station, just go back to initial state. */
 	for (retryNum = 0; retryNum <= pSta->pmfSaQueryRetryCount; retryNum++)
 		if (transId == pSta->pmfSaQueryStartTransId + retryNum) {
+			if (!lim_check_oci_match(mac, pe_session,
+						 p_body + SA_QUERY_IE_OFFSET,
+						 m_hdr->sa,
+						 frame_len -
+						 SA_QUERY_IE_OFFSET))
+				return;
 			pe_debug("Found matching SA Query Request - transaction ID: %d",
 				transId);
 			tx_timer_deactivate(&pSta->pmfSaQueryTimer);
@@ -1821,9 +1875,9 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					mac_hdr->fc.subType,
 					(uint8_t *) mac_hdr,
 					frame_len + sizeof(tSirMacMgmtHdr),
-					session->smeSessionId,
+					session->vdev_id,
 					WMA_GET_RX_FREQ(rx_pkt_info),
-					session, rssi, RXMGMT_FLAG_NONE);
+					rssi, RXMGMT_FLAG_NONE);
 			break;
 		default:
 			pe_debug("Action ID: %d not handled in WNM category",
@@ -1912,15 +1966,12 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			 * type is ACTION
 			 */
 			lim_send_sme_mgmt_frame_ind(mac_ctx,
-					mac_hdr->fc.subType,
-					(uint8_t *) mac_hdr,
-					frame_len +
-					sizeof(tSirMacMgmtHdr),
-					session->smeSessionId,
-					WMA_GET_RX_FREQ(rx_pkt_info),
-					session,
-					WMA_GET_RX_RSSI_NORMALIZED(
-					rx_pkt_info), RXMGMT_FLAG_NONE);
+				mac_hdr->fc.subType, (uint8_t *)mac_hdr,
+				frame_len + sizeof(tSirMacMgmtHdr),
+				session->vdev_id,
+				WMA_GET_RX_FREQ(rx_pkt_info),
+				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+				RXMGMT_FLAG_NONE);
 		} else {
 			pe_debug("Dropping the vendor specific action frame SelfSta address system role: %d",
 				 GET_LIM_SYSTEM_ROLE(session));
@@ -1981,13 +2032,12 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			 * type is ACTION
 			 */
 			lim_send_sme_mgmt_frame_ind(mac_ctx,
-					mac_hdr->fc.subType,
-					(uint8_t *) mac_hdr,
-					frame_len + sizeof(tSirMacMgmtHdr),
-					session->smeSessionId,
-					WMA_GET_RX_FREQ(rx_pkt_info), session,
-					WMA_GET_RX_RSSI_NORMALIZED(
-					rx_pkt_info), RXMGMT_FLAG_NONE);
+				mac_hdr->fc.subType, (uint8_t *)mac_hdr,
+				frame_len + sizeof(tSirMacMgmtHdr),
+				session->vdev_id,
+				WMA_GET_RX_FREQ(rx_pkt_info),
+				WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+				RXMGMT_FLAG_NONE);
 			break;
 		}
 		break;
@@ -2047,9 +2097,8 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 		lim_send_sme_mgmt_frame_ind(mac_ctx, hdr->fc.subType,
 					    (uint8_t *)hdr,
 					    frame_len + sizeof(tSirMacMgmtHdr),
-					    session->smeSessionId,
+					    session->vdev_id,
 					    WMA_GET_RX_FREQ(rx_pkt_info),
-					    session,
 					    WMA_GET_RX_RSSI_NORMALIZED(
 					    rx_pkt_info), RXMGMT_FLAG_NONE);
 		break;
@@ -2067,8 +2116,8 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 			lim_send_sme_mgmt_frame_ind(mac_ctx,
 				mac_hdr->fc.subType, (uint8_t *) mac_hdr,
 				frame_len + sizeof(tSirMacMgmtHdr),
-				session->smeSessionId,
-				WMA_GET_RX_FREQ(rx_pkt_info), session, rssi,
+				session->vdev_id,
+				WMA_GET_RX_FREQ(rx_pkt_info), rssi,
 				RXMGMT_FLAG_NONE);
 			break;
 		default:
@@ -2173,7 +2222,7 @@ void lim_process_action_frame_no_session(struct mac_context *mac, uint8_t *pBd)
 					mac_hdr->fc.subType,
 					(uint8_t *) mac_hdr,
 					frame_len + sizeof(tSirMacMgmtHdr), 0,
-					WMA_GET_RX_FREQ(pBd), NULL,
+					WMA_GET_RX_FREQ(pBd),
 					WMA_GET_RX_RSSI_NORMALIZED(pBd),
 					RXMGMT_FLAG_NONE);
 			break;

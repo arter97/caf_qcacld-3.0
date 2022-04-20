@@ -30,8 +30,9 @@
 #include "wlan_mlme_main.h"
 #include <../../core/src/wlan_cm_roam_i.h>
 #include "wlan_cm_roam_api.h"
+#include "target_if_cm_roam_offload.h"
 
-static inline struct wlan_cm_roam_rx_ops *
+struct wlan_cm_roam_rx_ops *
 target_if_cm_get_roam_rx_ops(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *psoc_ext_priv;
@@ -57,7 +58,7 @@ target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops)
 	rx_ops->roam_sync_event = cm_roam_sync_event_handler;
 	rx_ops->roam_sync_frame_event = cm_roam_sync_frame_event_handler;
 	rx_ops->roam_event_rx = cm_roam_event_handler;
-	rx_ops->btm_blacklist_event = cm_btm_blacklist_event_handler;
+	rx_ops->btm_denylist_event = cm_btm_denylist_event_handler;
 	rx_ops->vdev_disconnect_event = cm_vdev_disconnect_event_handler;
 	rx_ops->roam_scan_chan_list_event = cm_roam_scan_ch_list_event_handler;
 	rx_ops->roam_stats_event_rx = cm_roam_stats_event_handler;
@@ -238,6 +239,14 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 
 	roam_event->psoc = psoc;
 
+	/**
+	 * Stop the timer upon RSO stop status success. The timer shall continue
+	 * to run upon HO_FAIL status and would be stopped upon HO_FAILED event
+	 */
+	if (roam_event->reason == ROAM_REASON_RSO_STATUS ||
+	    roam_event->reason == ROAM_REASON_HO_FAILED)
+		target_if_stop_rso_stop_timer(roam_event);
+
 	roam_rx_ops = target_if_cm_get_roam_rx_ops(psoc);
 	if (!roam_rx_ops || !roam_rx_ops->roam_event_rx) {
 		target_if_err("No valid roam rx ops");
@@ -261,11 +270,11 @@ done:
 }
 
 static int
-target_if_cm_btm_blacklist_event(ol_scn_t scn, uint8_t *event, uint32_t len)
+target_if_cm_btm_denylist_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 {
 	QDF_STATUS qdf_status;
 	int status = 0;
-	struct roam_blacklist_event *dst_list = NULL;
+	struct roam_denylist_event *dst_list = NULL;
 	struct wmi_unified *wmi_handle;
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_cm_roam_rx_ops *roam_rx_ops;
@@ -282,26 +291,26 @@ target_if_cm_btm_blacklist_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 		return -EINVAL;
 	}
 
-	qdf_status = wmi_extract_btm_blacklist_event(wmi_handle, event, len,
-						     &dst_list);
+	qdf_status = wmi_extract_btm_denylist_event(wmi_handle, event, len,
+						    &dst_list);
 	if (QDF_IS_STATUS_ERROR(qdf_status)) {
 		target_if_err("parsing of event failed, %d", qdf_status);
 		return -EINVAL;
 	}
 
 	if (!dst_list) {
-		/* No APs to blacklist, just return */
-		target_if_err_rl("No APs in blacklist received");
+		/* No APs to denylist, just return */
+		target_if_err_rl("No APs in denylist received");
 		return 0;
 	}
 
 	roam_rx_ops = target_if_cm_get_roam_rx_ops(psoc);
-	if (!roam_rx_ops || !roam_rx_ops->btm_blacklist_event) {
+	if (!roam_rx_ops || !roam_rx_ops->btm_denylist_event) {
 		target_if_err("No valid roam rx ops");
 		status = -EINVAL;
 		goto done;
 	}
-	qdf_status = roam_rx_ops->btm_blacklist_event(psoc, dst_list);
+	qdf_status = roam_rx_ops->btm_denylist_event(psoc, dst_list);
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		status = -EINVAL;
 
@@ -630,12 +639,12 @@ target_if_roam_offload_register_events(struct wlan_objmgr_psoc *psoc)
 	}
 
 	ret = wmi_unified_register_event_handler(handle,
-					wmi_roam_blacklist_event_id,
-					target_if_cm_btm_blacklist_event,
+					wmi_roam_denylist_event_id,
+					target_if_cm_btm_denylist_event,
 					WMI_RX_SERIALIZER_CTX);
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		target_if_err("wmi event(%u) registration failed, ret: %d",
-			      wmi_roam_blacklist_event_id, ret);
+			      wmi_roam_denylist_event_id, ret);
 		return QDF_STATUS_E_FAILURE;
 	}
 

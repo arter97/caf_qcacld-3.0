@@ -1,6 +1,6 @@
  /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -41,7 +41,7 @@
 #include "qdf_nbuf.h"
 #include "qdf_types.h"
 #include "qdf_mem.h"
-#include "wlan_blm_api.h"
+#include "wlan_dlm_api.h"
 
 #include "wma_types.h"
 #include "lim_api.h"
@@ -82,13 +82,14 @@
 #include <wlan_crypto_global_api.h>
 #include <cdp_txrx_mon.h>
 #include <cdp_txrx_ctrl.h>
-#include "wlan_blm_api.h"
+#include "wlan_dlm_api.h"
 #include "wlan_cm_roam_api.h"
 #ifdef FEATURE_WLAN_DIAG_SUPPORT    /* FEATURE_WLAN_DIAG_SUPPORT */
 #include "host_diag_core_log.h"
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
 #include <../../core/src/wlan_cm_roam_i.h>
 #include "wlan_cm_roam_api.h"
+#include "wlan_mlo_mgr_roam.h"
 #ifdef FEATURE_WLAN_EXTSCAN
 #define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION WAKELOCK_DURATION_RECOMMENDED
 
@@ -543,14 +544,17 @@ wma_send_roam_preauth_status(tp_wma_handle wma_handle,
  */
 static void
 wma_roam_update_vdev(tp_wma_handle wma,
-		     struct roam_offload_synch_ind *roam_synch_ind_ptr)
+		     struct roam_offload_synch_ind *roam_synch_ind_ptr,
+		     uint8_t roamed_vdev_id)
 {
 	tDeleteStaParams *del_sta_params;
 	tAddStaParams *add_sta_params;
 	uint8_t vdev_id, *bssid;
 	int32_t uc_cipher, cipher_cap;
+	bool is_assoc_peer = false;
+	struct qdf_mac_addr mac_addr;
 
-	vdev_id = roam_synch_ind_ptr->roamed_vdev_id;
+	vdev_id = roamed_vdev_id;
 	wma->interfaces[vdev_id].nss = roam_synch_ind_ptr->nss;
 	/* update freq and channel width */
 	wma->interfaces[vdev_id].ch_freq =
@@ -569,13 +573,19 @@ wma_roam_update_vdev(tp_wma_handle wma,
 		return;
 	}
 
+	if (is_multi_link_roam(roam_synch_ind_ptr))
+		mlo_get_sta_link_mac_addr(vdev_id, roam_synch_ind_ptr,
+					  &mac_addr);
+	else
+		mac_addr = roam_synch_ind_ptr->bssid;
+
 	qdf_mem_zero(del_sta_params, sizeof(*del_sta_params));
 	qdf_mem_zero(add_sta_params, sizeof(*add_sta_params));
 
 	del_sta_params->smesessionId = vdev_id;
 	add_sta_params->staType = STA_ENTRY_SELF;
 	add_sta_params->smesessionId = vdev_id;
-	qdf_mem_copy(&add_sta_params->bssId, &roam_synch_ind_ptr->bssid.bytes,
+	qdf_mem_copy(&add_sta_params->bssId, &mac_addr,
 		     QDF_MAC_ADDR_SIZE);
 	add_sta_params->assocId = roam_synch_ind_ptr->aid;
 
@@ -587,19 +597,36 @@ wma_roam_update_vdev(tp_wma_handle wma,
 
 	wma_delete_sta(wma, del_sta_params);
 	wma_delete_bss(wma, vdev_id);
-	wma_create_peer(wma, roam_synch_ind_ptr->bssid.bytes,
-			WMI_PEER_TYPE_DEFAULT, vdev_id, NULL, false);
+	is_assoc_peer = wlan_vdev_mlme_get_is_mlo_vdev(wma->psoc, vdev_id);
+	if (is_multi_link_roam(roam_synch_ind_ptr)) {
+		wma_create_peer(wma, mac_addr.bytes,
+				WMI_PEER_TYPE_DEFAULT, vdev_id,
+				roam_synch_ind_ptr->bssid.bytes,
+				is_assoc_peer);
+	} else {
+		wma_create_peer(wma, mac_addr.bytes,
+				WMI_PEER_TYPE_DEFAULT,
+				vdev_id,
+				NULL,
+				is_assoc_peer);
+	}
+
+	if (is_multi_link_roam(roam_synch_ind_ptr))
+		lim_roam_mlo_create_peer(wma->mac_context,
+					 roam_synch_ind_ptr,
+					 vdev_id,
+					 mac_addr.bytes);
 
 	/* Update new peer's uc cipher */
 	uc_cipher = wlan_crypto_get_param(wma->interfaces[vdev_id].vdev,
 					   WLAN_CRYPTO_PARAM_UCAST_CIPHER);
 	cipher_cap = wlan_crypto_get_param(wma->interfaces[vdev_id].vdev,
 					   WLAN_CRYPTO_PARAM_CIPHER_CAP);
-	wma_set_peer_ucast_cipher(roam_synch_ind_ptr->bssid.bytes, uc_cipher,
+	wma_set_peer_ucast_cipher(mac_addr.bytes, uc_cipher,
 				  cipher_cap);
 	wma_add_bss_lfr3(wma, roam_synch_ind_ptr->add_bss_params);
 	wma_add_sta(wma, add_sta_params);
-	qdf_mem_copy(bssid, roam_synch_ind_ptr->bssid.bytes,
+	qdf_mem_copy(bssid, mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
 	lim_fill_roamed_peer_twt_caps(wma->mac_context, vdev_id,
 				      roam_synch_ind_ptr);
@@ -1453,10 +1480,10 @@ int wma_extscan_capabilities_event_handler(void *handle,
 				event->num_epno_networks;
 	dest_capab->max_number_epno_networks_by_ssid =
 				event->num_epno_networks;
-	dest_capab->max_number_of_white_listed_ssid =
-				event->num_roam_ssid_whitelist;
-	dest_capab->max_number_of_black_listed_bssid =
-				event->num_roam_bssid_blacklist;
+	dest_capab->max_number_of_allow_listed_ssid =
+				event->num_roam_ssid_allowlist;
+	dest_capab->max_number_of_deny_listed_bssid =
+				event->num_roam_bssid_denylist;
 	dest_capab->status = 0;
 
 	wma_debug("request_id: %u status: %d",
@@ -1476,9 +1503,9 @@ int wma_extscan_capabilities_event_handler(void *handle,
 		 dest_capab->max_hotlist_ssids,
 		 dest_capab->max_number_epno_networks,
 		 dest_capab->max_number_epno_networks_by_ssid);
-	wma_debug("max_number_of_white_listed_ssid: %d, max_number_of_black_listed_bssid: %d",
-		 dest_capab->max_number_of_white_listed_ssid,
-		 dest_capab->max_number_of_black_listed_bssid);
+	wma_debug("max_number_of_allow_listed_ssid: %d, max_number_of_deny_listed_bssid: %d",
+		  dest_capab->max_number_of_allow_listed_ssid,
+		  dest_capab->max_number_of_deny_listed_bssid);
 
 	mac->sme.ext_scan_ind_cb(mac->hdd_handle,
 				eSIR_EXTSCAN_GET_CAPABILITIES_IND, dest_capab);
@@ -2559,6 +2586,7 @@ static void wma_invalid_roam_reason_handler(tp_wma_handle wma_handle,
 	roam_synch_data->roamed_vdev_id = vdev_id;
 	if (notif != CM_ROAM_NOTIF_ROAM_START)
 		wma_handle->pe_roam_synch_cb(wma_handle->mac_context,
+					     roam_synch_data->roamed_vdev_id,
 					     roam_synch_data, 0, op_code);
 
 	if (notif == CM_ROAM_NOTIF_ROAM_START)
@@ -2645,6 +2673,7 @@ static void wma_handle_roam_reason_bmiss(uint8_t vdev_id, uint32_t rssi)
 	 * avoid using CSR/PE structure directly
 	 */
 	wma_debug("Beacon Miss for vdevid %x", vdev_id);
+	mlme_set_hb_ap_rssi(wma_handle->interfaces[vdev_id].vdev, rssi);
 	wma_beacon_miss_handler(wma_handle, vdev_id, rssi);
 	wma_sta_kickout_event(HOST_STA_KICKOUT_REASON_BMISS, vdev_id, NULL);
 }
@@ -2755,6 +2784,23 @@ cm_handle_roam_reason_invoke_roam_fail(uint8_t vdev_id,	uint32_t notif_params,
 	cm_report_roam_rt_stats(wma_handle->psoc, vdev_id,
 				ROAM_RT_STATS_TYPE_INVOKE_FAIL_REASON,
 				NULL, notif_params, 0);
+}
+
+void
+cm_handle_roam_sync_update_hw_mode(struct cm_hw_mode_trans_ind *trans_ind)
+{
+	tp_wma_handle wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
+	struct cm_hw_mode_trans_ind *trans_ind_data;
+
+	if (!wma_handle) {
+		wma_err("invalid wma handle");
+		return;
+	}
+	trans_ind_data = qdf_mem_malloc(sizeof(*trans_ind_data));
+	if (!trans_ind_data)
+		return;
+	qdf_mem_copy(trans_ind_data, trans_ind, sizeof(*trans_ind_data));
+	wma_handle_hw_mode_trans_ind(wma_handle, trans_ind_data);
 }
 
 static void
@@ -3001,28 +3047,43 @@ QDF_STATUS wma_send_ht40_obss_scanind(tp_wma_handle wma,
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-void cm_roam_update_vdev(struct roam_offload_synch_ind *sync_ind)
+void cm_roam_update_vdev(struct roam_offload_synch_ind *sync_ind,
+			 uint8_t vdev_id)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
 	if (!wma)
 		return;
 
-	wma_roam_update_vdev(wma, sync_ind);
+	wma_roam_update_vdev(wma, sync_ind, vdev_id);
 }
 
 QDF_STATUS
 cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
-			 uint16_t ie_len)
+			 uint8_t vdev_id, uint16_t ie_len)
 {
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
+	struct pe_session *pe_session;
 	QDF_STATUS status;
 
 	if (!wma)
 		return QDF_STATUS_E_INVAL;
 
+	pe_session = pe_find_session_by_vdev_id(wma->mac_context, vdev_id);
+	if (!pe_session) {
+		/* Legacy to MLO roaming: create new pe session */
+		status = lim_create_and_fill_link_session(wma->mac_context,
+							  vdev_id,
+							  sync_ind, ie_len);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			wma_err("MLO ROAM: pe session creation failed vdev id %d",
+				vdev_id);
+			return status;
+		}
+	}
 	status = wma->pe_roam_synch_cb(wma->mac_context,
-				sync_ind, ie_len,
+				vdev_id, sync_ind, ie_len,
 				SIR_ROAM_SYNCH_PROPAGATION);
 
 	return status;
