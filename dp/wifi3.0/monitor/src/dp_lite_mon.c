@@ -22,6 +22,9 @@
 #include "dp_peer.h"
 #include "dp_types.h"
 #include "dp_internal.h"
+#include <dp_htt.h>
+#include "dp_mon_filter.h"
+#include "dp_mon_filter_2.0.h"
 #include "qdf_mem.h"
 #include "cdp_txrx_cmn_struct.h"
 #include "qdf_lock.h"
@@ -69,6 +72,9 @@ dp_lite_mon_reset_config(struct dp_lite_mon_config *config)
 	qdf_mem_zero(config->mgmt_filter, sizeof (config->mgmt_filter));
 	qdf_mem_zero(config->ctrl_filter, sizeof (config->ctrl_filter));
 	qdf_mem_zero(config->data_filter, sizeof (config->data_filter));
+	config->fp_enabled = false;
+	config->md_enabled = false;
+	config->mo_enabled = false;
 	qdf_mem_zero(config->len, sizeof (config->len));
 	config->metadata = 0;
 	config->debug = 0;
@@ -93,6 +99,7 @@ dp_lite_mon_update_config(struct dp_pdev *pdev,
 	if (!new_config->disable) {
 		/* Update new config */
 		curr_config->level = new_config->level;
+
 		qdf_mem_copy(curr_config->mgmt_filter,
 			     new_config->mgmt_filter,
 			     sizeof(curr_config->mgmt_filter));
@@ -102,11 +109,29 @@ dp_lite_mon_update_config(struct dp_pdev *pdev,
 		qdf_mem_copy(curr_config->data_filter,
 			     new_config->data_filter,
 			     sizeof(curr_config->data_filter));
+
+		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_FP] ||
+		    new_config->ctrl_filter[CDP_LITE_MON_MODE_FP] ||
+		    new_config->data_filter[CDP_LITE_MON_MODE_FP])
+			curr_config->fp_enabled = true;
+
+		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_MD] ||
+		    new_config->ctrl_filter[CDP_LITE_MON_MODE_MD] ||
+		    new_config->data_filter[CDP_LITE_MON_MODE_MD])
+			curr_config->md_enabled = true;
+
+		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_MO] ||
+		    new_config->ctrl_filter[CDP_LITE_MON_MODE_MO] ||
+		    new_config->data_filter[CDP_LITE_MON_MODE_MO])
+			curr_config->mo_enabled = true;
+
 		qdf_mem_copy(curr_config->len,
 			     new_config->len,
 			     sizeof(curr_config->len));
+
 		curr_config->metadata = new_config->metadata;
 		curr_config->debug = new_config->debug;
+
 		if (new_config->vdev_id != CDP_INVALID_VDEV_ID) {
 			vdev = dp_vdev_get_ref_by_id(pdev->soc,
 						     new_config->vdev_id,
@@ -117,6 +142,7 @@ dp_lite_mon_update_config(struct dp_pdev *pdev,
 						     DP_MOD_ID_CDP);
 			}
 		}
+
 		curr_config->enable = true;
 	} else {
 		/* if new config disable is set then it means
@@ -159,6 +185,42 @@ dp_lite_mon_copy_config(struct dp_lite_mon_config *curr_config,
 }
 
 /**
+ * dp_lite_mon_disable_rx - disables rx lite mon
+ * @pdev: dp pdev
+ *
+ * Return: void
+ */
+void
+dp_lite_mon_disable_rx(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev_be *be_mon_pdev;
+	struct dp_lite_mon_rx_config *lite_mon_rx_config;
+	struct dp_mon_pdev *mon_pdev;
+	QDF_STATUS status;
+
+	if (!pdev)
+		return;
+
+	mon_pdev = (struct dp_mon_pdev *)pdev->monitor_pdev;
+	if (!mon_pdev)
+		return;
+
+	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	lite_mon_rx_config = be_mon_pdev->lite_mon_rx_config;
+
+	qdf_spin_lock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+	/* reset filters */
+	dp_mon_filter_reset_rx_lite_mon(be_mon_pdev);
+	status = dp_mon_filter_update(pdev);
+	if (status != QDF_STATUS_SUCCESS)
+		dp_mon_err("Failed to reset rx lite mon filters");
+
+	/* reset rx lite mon config */
+	dp_lite_mon_reset_config(&lite_mon_rx_config->rx_config);
+	qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+}
+
+/**
  * dp_lite_mon_set_rx_config - Update rx lite mon config
  * @be_pdev: be dp pdev
  * @config: new lite mon config
@@ -184,29 +246,57 @@ dp_lite_mon_set_rx_config(struct dp_pdev_be *be_pdev,
 	}
 
 	if (config->disable) {
-		/* lite mon pending:
-		 * -reset rx filters
-		 * -restore full mon if required
-		 */
-
-		/* lite mon pending: reset rx lite mon config */
 		qdf_spin_lock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+		/* reset lite mon filters */
+		dp_mon_filter_reset_rx_lite_mon(be_mon_pdev);
+		status = dp_mon_filter_update(&be_pdev->pdev);
+		if (status != QDF_STATUS_SUCCESS)
+			dp_mon_err("Failed to reset rx lite mon filters");
+
+		/* reset rx lite mon config */
 		dp_lite_mon_update_config(&be_pdev->pdev,
 					  &lite_mon_rx_config->rx_config,
 					  config);
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+
+		/* restore full mon filter if enabled */
+		qdf_spin_lock_bh(&be_mon_pdev->mon_pdev.mon_lock);
+		if (be_mon_pdev->mon_pdev.monitor_configured) {
+			dp_mon_filter_setup_mon_mode(&be_pdev->pdev);
+			if (dp_mon_filter_update(&be_pdev->pdev) !=
+							QDF_STATUS_SUCCESS)
+				dp_mon_info("failed to setup full mon filters");
+		}
+		qdf_spin_unlock_bh(&be_mon_pdev->mon_pdev.mon_lock);
 	} else {
-		/* lite mon pending:
-		 * -Handle full mon interdependency
-		 */
+		/* reset full mon filters if enabled */
+		qdf_spin_lock_bh(&be_mon_pdev->mon_pdev.mon_lock);
+		if (be_mon_pdev->mon_pdev.monitor_configured) {
+			dp_mon_filter_reset_mon_mode(&be_pdev->pdev);
+			if (dp_mon_filter_update(&be_pdev->pdev) !=
+							QDF_STATUS_SUCCESS)
+				dp_mon_info("failed to reset full mon filters");
+		}
+		qdf_spin_unlock_bh(&be_mon_pdev->mon_pdev.mon_lock);
 
-		 /* -store rx lite mon config*/
 		qdf_spin_lock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+		/* store rx lite mon config */
 		dp_lite_mon_update_config(&be_pdev->pdev,
 					  &lite_mon_rx_config->rx_config,
 					  config);
+
+		/* setup rx lite mon filters */
+		dp_mon_filter_setup_rx_lite_mon(be_mon_pdev);
+		status = dp_mon_filter_update(&be_pdev->pdev);
+		if (status != QDF_STATUS_SUCCESS) {
+			dp_mon_err("Failed to setup rx lite mon filters");
+			dp_mon_filter_reset_rx_lite_mon(be_mon_pdev);
+			config->disable = 1;
+			dp_lite_mon_update_config(&be_pdev->pdev,
+						  &lite_mon_rx_config->rx_config,
+						  config);
+		}
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
-		/* lite mon pending: setup and update rx filter */
 	}
 
 	return status;
@@ -688,6 +778,29 @@ dp_lite_mon_get_peer_config(struct cdp_soc_t *soc_hdl,
 }
 
 /**
+ * dp_lite_mon_is_level_msdu - check if level is msdu
+ * @mon_pdev: monitor pdev handle
+ *
+ * Return: 0 if level is not msdu else return 1
+ */
+int dp_lite_mon_is_level_msdu(struct dp_mon_pdev *mon_pdev)
+{
+	struct dp_mon_pdev_be *be_mon_pdev;
+	struct dp_lite_mon_config *rx_config;
+
+	if (!mon_pdev)
+		return 0;
+
+	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	rx_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+	if (be_mon_pdev->lite_mon_rx_config->rx_config.level ==
+						CDP_LITE_MON_LEVEL_MSDU)
+		return 1;
+
+	return 0;
+}
+
+/**
  * dp_lite_mon_is_rx_enabled - get lite mon rx enable status
  * @mon_pdev: monitor pdev handle
  *
@@ -695,11 +808,12 @@ dp_lite_mon_get_peer_config(struct cdp_soc_t *soc_hdl,
  */
 int dp_lite_mon_is_rx_enabled(struct dp_mon_pdev *mon_pdev)
 {
-	struct dp_mon_pdev_be *be_mon_pdev =
-			dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	struct dp_mon_pdev_be *be_mon_pdev;
 
-	if (!be_mon_pdev)
+	if (!mon_pdev)
 		return 0;
+
+	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 
 	return be_mon_pdev->lite_mon_rx_config->rx_config.enable;
 }
@@ -712,11 +826,12 @@ int dp_lite_mon_is_rx_enabled(struct dp_mon_pdev *mon_pdev)
  */
 int dp_lite_mon_is_tx_enabled(struct dp_mon_pdev *mon_pdev)
 {
-	struct dp_mon_pdev_be *be_mon_pdev =
-			dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	struct dp_mon_pdev_be *be_mon_pdev;
 
-	if (!be_mon_pdev)
+	if (!mon_pdev)
 		return 0;
+
+	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
 
 	return be_mon_pdev->lite_mon_tx_config->tx_config.enable;
 }
@@ -818,16 +933,19 @@ dp_lite_mon_alloc(struct dp_pdev *pdev)
 
 /**
  * dp_lite_mon_rx_dealloc - free lite mon rx context
- * @be_mon_pdev: be dp mon pdev
+ * @be_pdev: be dp pdev
  *
  * Return: void
  */
 static inline
-void dp_lite_mon_rx_dealloc(struct dp_mon_pdev_be *be_mon_pdev)
+void dp_lite_mon_rx_dealloc(struct dp_pdev_be *be_pdev)
 {
+	struct dp_mon_pdev_be *be_mon_pdev =
+		(struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+
 	if (be_mon_pdev->lite_mon_rx_config) {
-		/* delete rx peers from the list */
-		dp_lite_mon_free_peers(&be_mon_pdev->lite_mon_rx_config->rx_config);
+		/* disable rx lite mon */
+		dp_lite_mon_disable_rx(&be_pdev->pdev);
 		qdf_spinlock_destroy(&be_mon_pdev->lite_mon_rx_config->lite_mon_rx_lock);
 		qdf_mem_free(be_mon_pdev->lite_mon_rx_config);
 	}
@@ -835,13 +953,16 @@ void dp_lite_mon_rx_dealloc(struct dp_mon_pdev_be *be_mon_pdev)
 
 /**
  * dp_lite_mon_tx_dealloc - free lite mon tx context
- * @be_mon_pdev: be dp mon pdev
+ * @be_pdev: be dp pdev
  *
  * Return: void
  */
 static inline
-void dp_lite_mon_tx_dealloc(struct dp_mon_pdev_be *be_mon_pdev)
+void dp_lite_mon_tx_dealloc(struct dp_pdev_be *be_pdev)
 {
+	struct dp_mon_pdev_be *be_mon_pdev =
+		(struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+
 	if (be_mon_pdev->lite_mon_tx_config) {
 		/* delete tx peers from the list */
 		dp_lite_mon_free_peers(&be_mon_pdev->lite_mon_tx_config->tx_config);
@@ -890,10 +1011,8 @@ void
 dp_lite_mon_dealloc(struct dp_pdev *pdev)
 {
 	struct dp_pdev_be *be_pdev = dp_get_be_pdev_from_dp_pdev(pdev);
-	struct dp_mon_pdev_be *be_mon_pdev =
-			(struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
 
-	dp_lite_mon_rx_dealloc(be_mon_pdev);
-	dp_lite_mon_tx_dealloc(be_mon_pdev);
+	dp_lite_mon_rx_dealloc(be_pdev);
+	dp_lite_mon_tx_dealloc(be_pdev);
 }
 #endif
