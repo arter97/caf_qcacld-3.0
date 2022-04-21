@@ -88,8 +88,10 @@ static void sch_get_csa_ecsa_count_offset(const uint8_t *ie, uint32_t ie_len,
 		    elem_len == 4)
 			*ecsa_count_offset = offset +
 					SCH_ECSA_SWITCH_COUNT_OFFSET;
+
 		if (ie_len < elem_len)
-		    return;
+			return;
+
 		ie_len -= elem_len;
 		offset += elem_len;
 		ptr += (elem_len + 2);

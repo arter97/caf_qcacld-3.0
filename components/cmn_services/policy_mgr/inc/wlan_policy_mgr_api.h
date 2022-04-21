@@ -173,6 +173,18 @@ static inline const char *device_mode_to_string(uint32_t idx)
 };
 
 /**
+ * trim_chan_info - trim channel info
+ * @band_capability: band capability
+ * @sap_count: sap count
+ * @trim: enum trim channel list
+ */
+struct trim_chan_info {
+	uint32_t band_capability;
+	uint32_t sap_count;
+	uint16_t trim;
+};
+
+/**
  * policy_mgr_get_allow_mcc_go_diff_bi() - to get information on whether GO
  *						can have diff BI than STA in MCC
  * @psoc: pointer to psoc
@@ -252,6 +264,34 @@ policy_mgr_set_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 policy_mgr_get_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 				       uint8_t *sta_sap_scc_on_dfs_chnl);
+
+/**
+ * policy_mgr_set_multi_sap_allowed_on_same_band() - to set
+ * multi_sap_allowed_on_same_band
+ * @psoc: pointer to psoc
+ * @multi_sap_allowed_on_same_band: value to be set
+ *
+ * This API is used to set multi_sap_allowed_on_same_band
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_set_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
+				bool multi_sap_allowed_on_same_band);
+
+/**
+ * policy_mgr_get_multi_sap_allowed_on_same_band() - to find out if multi sap
+ * is allowed on same band
+ * @psoc: pointer to psoc
+ * @multi_sap_allowed_on_same_band: value to be filled
+ *
+ * This API is used to find out whether multi sap is allowed on same band
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_get_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
+				bool *multi_sap_allowed_on_same_band);
 
 /**
  * policy_mgr_get_dfs_master_dynamic_enabled() - support dfs master or not
@@ -3507,6 +3547,21 @@ bool policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(
 		struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_is_multi_sap_allowed_on_same_band() - check if multi sap allowed
+ * on same band
+ * @pdev: id of objmgr pdev
+ * @mode: operating mode of interface to be checked
+ * @ch_freq: channel freq
+ * This function is used to check if multi sap can be started on the same band
+ *
+ * Return: true if multi sap is allowed on same band, otherwise false
+ */
+bool policy_mgr_is_multi_sap_allowed_on_same_band(
+					struct wlan_objmgr_pdev *pdev,
+					enum policy_mgr_con_mode mode,
+					qdf_freq_t ch_freq);
+
+/**
  * policy_mgr_is_special_mode_active_5g() - check if given mode active in 5g
  * @psoc: pointer to soc
  * @mode: operating mode of interface to be checked
@@ -3533,6 +3588,20 @@ bool policy_mgr_is_sta_connected_2g(struct wlan_objmgr_psoc *psoc);
  * Return: true if sta scan 5g chan should be skipped
  */
 bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_scan_trim_chnls_for_connected_ap() - check if sta scan
+ * should skip 5g or 2.4g channel when AP/GO connected by clients.
+ * STA + AP 5G (connected) + AP 2.4G		skip 5G scan
+ * STA + AP 5G (connected)			skip 5G scan
+ * STA + AP 2.4G (connected && 2.4G only)	skip 2.4G scan
+ *
+ * @pdev: pointer to pdev
+ *
+ * Return: trim_channel_list
+ */
+uint16_t
+policy_mgr_scan_trim_chnls_for_connected_ap(struct wlan_objmgr_pdev *pdev);
 
 /**
  * policy_mgr_is_hwmode_set_for_given_chnl() - to check for given channel

@@ -2378,11 +2378,8 @@ cm_roam_pmkid_request_handler(struct roam_pmkid_req_event *data)
 	QDF_STATUS status;
 
 	status = cm_roam_pmkid_req_ind(data->psoc, data->vdev_id, data);
-	if (QDF_IS_STATUS_ERROR(status)) {
+	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("Pmkid request failed");
-		qdf_mem_free(data);
-		return status;
-	}
 
 	return status;
 }
@@ -2396,6 +2393,12 @@ cm_handle_roam_offload_events(struct roam_offload_roam_event *roam_event)
 
 QDF_STATUS
 cm_vdev_disconnect_event_handler(struct vdev_disconnect_event_data *data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+cm_roam_auth_offload_event_handler(struct auth_offload_event *auth_event)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -3086,6 +3089,13 @@ err:
 		qdf_mem_free(stats_info->roam_msg_info);
 	qdf_mem_free(stats_info);
 	return status;
+}
+#else
+QDF_STATUS
+cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
+			    struct roam_stats_event *stats_info)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 

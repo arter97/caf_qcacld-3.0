@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -13923,10 +13924,6 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 		wlan_cm_set_check_6ghz_security(hdd_ctx->psoc, true);
 		wlan_cm_set_6ghz_key_mgmt_mask(hdd_ctx->psoc,
 					       ALLOWED_KEYMGMT_6G_MASK);
-	} else {
-		wlan_cm_set_check_6ghz_security(hdd_ctx->psoc, false);
-		wlan_cm_set_6ghz_key_mgmt_mask(hdd_ctx->psoc,
-					       DEFAULT_KEYMGMT_6G_MASK);
 	}
 	hdd_thermal_stats_cmd_init(hdd_ctx);
 
@@ -17335,6 +17332,24 @@ static int hdd_register_driver_retry(void)
 	}
 
 	return errno;
+}
+
+void hdd_shutdown_wlan_in_suspend(struct hdd_context *hdd_ctx)
+{
+/* schedule timeout cb as soon as possible */
+#define SHUTDOWN_IN_SUSPEND_WAIT_TIMEOUT 0
+/* prevent system suspend to let shutdown_restart work can be invoked */
+#define SHUTDOWN_IN_SUSPEND_PREVENT_TIMEOUT 5
+
+	if (!hdd_is_any_interface_open(hdd_ctx)) {
+		hdd_ctx->shutdown_in_suspend = true;
+		qdf_delayed_work_start(&hdd_ctx->psoc_idle_timeout_work,
+				       SHUTDOWN_IN_SUSPEND_WAIT_TIMEOUT);
+		hdd_prevent_suspend_timeout(SHUTDOWN_IN_SUSPEND_PREVENT_TIMEOUT,
+				WIFI_POWER_EVENT_WAKELOCK_DRIVER_IDLE_SHUTDOWN);
+	} else {
+		hdd_err("some adapter not stopped");
+	}
 }
 
 int hdd_driver_load(void)

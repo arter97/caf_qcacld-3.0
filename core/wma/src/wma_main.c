@@ -311,6 +311,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 				       target_resource_config *tgt_cfg,
 				       struct cds_config_info *cds_cfg)
 {
+	enum QDF_GLOBAL_MODE con_mode;
+
 	qdf_mem_zero(tgt_cfg, sizeof(target_resource_config));
 
 	tgt_cfg->num_vdevs = cds_cfg->num_vdevs;
@@ -385,9 +387,20 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 	cfg_nan_get_max_ndi(wma_handle->psoc,
 			    &tgt_cfg->max_ndi);
 
-	if (cds_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
+	con_mode = cds_get_conparam();
+	if (con_mode == QDF_GLOBAL_MONITOR_MODE)
 		tgt_cfg->rx_decap_mode = CFG_TGT_RX_DECAP_MODE_RAW;
 
+	if (con_mode == QDF_GLOBAL_FTM_MODE) {
+		tgt_cfg->num_offload_peers = 0;
+		tgt_cfg->num_offload_reorder_buffs = 0;
+		tgt_cfg->bmiss_offload_max_vdev = 0;
+		tgt_cfg->roam_offload_max_vdev = 0;
+		tgt_cfg->roam_offload_max_ap_profiles = 0;
+		tgt_cfg->beacon_tx_offload_max_vdev = 1;
+		tgt_cfg->num_multicast_filter_entries = 0;
+		tgt_cfg->gtk_offload_max_vdev = 0;
+	}
 	cfg_nan_get_ndp_max_sessions(wma_handle->psoc,
 				     &tgt_cfg->max_ndp_sessions);
 
@@ -3083,6 +3096,10 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	/* Register Converged Event handlers */
 	init_deinit_register_tgt_psoc_ev_handlers(psoc);
 
+	/* Register LFR2/3 common Roam Event handler */
+	target_if_roam_register_common_events(psoc);
+
+	/* Register Roam offload Event handlers */
 	target_if_roam_offload_register_events(psoc);
 
 	/* Initialize max_no_of_peers for wma_get_number_of_peers_supported() */
@@ -4580,7 +4597,11 @@ static void wma_update_fw_config(struct wlan_objmgr_psoc *psoc,
 					target_if_get_max_frag_entry(tgt_hdl));
 	target_if_set_max_frag_entry(tgt_hdl, cfg->max_frag_entries);
 
-	cfg->num_wow_filters = ucfg_pmo_get_num_wow_filters(psoc);
+	if (cds_get_conparam() == QDF_GLOBAL_FTM_MODE)
+		cfg->num_wow_filters =  0;
+	else
+		cfg->num_wow_filters = ucfg_pmo_get_num_wow_filters(psoc);
+
 	cfg->apf_instruction_size = ucfg_pmo_get_apf_instruction_size(psoc);
 	cfg->num_packet_filters = ucfg_pmo_get_num_packet_filters(psoc);
 }
