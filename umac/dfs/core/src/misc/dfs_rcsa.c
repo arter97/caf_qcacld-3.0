@@ -163,6 +163,7 @@ dfs_create_range_from_nol_bit(struct wlan_dfs *dfs,
 	struct dfs_freq_range nol_range;
 	uint8_t i;
 	uint8_t bits = 0x01;
+	uint8_t agile_bw = wlan_reg_get_bw_value(dfs->dfs_precac_chwidth);
 
 	for (i = 0; i < NUM_CHANNELS_160MHZ; i++) {
 		/*
@@ -175,7 +176,7 @@ dfs_create_range_from_nol_bit(struct wlan_dfs *dfs,
 				start_freq = cur_freq - bw / 2;
 			if (IS_WITHIN_RANGE(cur_freq,
 					    dfs->dfs_agile_precac_freq_mhz,
-					    dfs->dfs_precac_chwidth))
+					    (agile_bw / 2)))
 				*is_radar_on_precac_chan = true;
 		} else {
 			if (start_freq && !end_freq)
