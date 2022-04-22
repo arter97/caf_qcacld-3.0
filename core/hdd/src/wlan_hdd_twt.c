@@ -4461,6 +4461,8 @@ void __hdd_twt_update_work_handler(struct hdd_context *hdd_ctx)
 	hdd_debug("Total connection %d, sta_count %d, sap_count %d",
 		  num_connections, sta_count, sap_count);
 	switch (num_connections) {
+	case 0:
+		break;
 	case 1:
 		if (sta_count == 1) {
 			hdd_send_twt_requestor_enable_cmd(hdd_ctx);
@@ -4504,7 +4506,7 @@ void __hdd_twt_update_work_handler(struct hdd_context *hdd_ctx)
 					WLAN_HDD_ID_OBJ_MGR);
 		break;
 	default:
-		hdd_err("Unexpected number of connection");
+		hdd_debug("Unexpected number of connection");
 		break;
 	}
 }
