@@ -46,6 +46,26 @@
 	 ((DP_LITE_MON_MAX_META_HDR_TLVS) * (DP_LITE_MON_META_TLV_MIN_SIZE)) + \
 	 ((DP_LITE_MON_PPDU_ID_LEN)))
 
+#define DP_LITE_MON_META_HDR_MARKER 0xFEED
+
+/* mpdu filter categories */
+enum dp_mpdu_filter_category {
+	/* category filter pass */
+	DP_MPDU_FILTER_CATEGORY_FP = 0,
+	/* category monitor direct */
+	DP_MPDU_FILTER_CATEGORY_MD = 1,
+	/* category monitor other */
+	DP_MPDU_FILTER_CATEGORY_MO = 2,
+	/* category filter pass monitor override */
+	DP_MPDU_FILTER_CATEGORY_FP_MO = 3,
+	DP_MPDU_FILTER_CATEGORY_INVALID = 4,
+};
+
+#define DP_RX_MON_CCE_METADATA_SIZE (2)
+#define DP_RX_MON_FSE_METADATA_SIZE (4)
+#define DP_RX_MON_CCE_FSE_METADATA_SIZE \
+	((DP_RX_MON_CCE_METADATA_SIZE) + (DP_RX_MON_FSE_METADATA_SIZE))
+
 /**
  * dp_lite_mon_peer - lite mon peer structure
  * @peer_mac: mac addr of peer
@@ -307,5 +327,21 @@ QDF_STATUS
 dp_lite_mon_get_nac_peer_rssi(struct cdp_soc_t *soc_hdl,
 			      uint8_t vdev_id, char *macaddr,
 			      uint8_t *rssi);
+
+/**
+ * dp_lite_mon_rx_mpdu_process - core lite mon mpdu processing
+ * @pdev: pdev context
+ * @ppdu_info: ppdu info context
+ * @mon_mpdu: mpdu nbuf
+ * @mpdu_id: mpdu id
+ * @user: user id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
+			    struct hal_rx_ppdu_info *ppdu_info,
+			    qdf_nbuf_t mon_mpdu, uint16_t mpdu_id,
+			    uint8_t user);
 #endif
 #endif /* _DP_LITE_MON_H_ */

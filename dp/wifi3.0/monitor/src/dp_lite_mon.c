@@ -27,11 +27,13 @@
 #include "dp_mon_filter_2.0.h"
 #include "qdf_mem.h"
 #include "cdp_txrx_cmn_struct.h"
+#include "cdp_txrx_cmn_reg.h"
 #include "qdf_lock.h"
 #include "dp_rx.h"
 #include "dp_mon.h"
 #include <dp_mon_2.0.h>
 #include <dp_be.h>
+#include <dp_rx_mon_2.0.h>
 
 /**
  * dp_lite_mon_free_peers - free peers
@@ -110,6 +112,7 @@ dp_lite_mon_update_config(struct dp_pdev *pdev,
 			     new_config->data_filter,
 			     sizeof(curr_config->data_filter));
 
+		/* enable appropriate modes */
 		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_FP] ||
 		    new_config->ctrl_filter[CDP_LITE_MON_MODE_FP] ||
 		    new_config->data_filter[CDP_LITE_MON_MODE_FP])
@@ -125,9 +128,24 @@ dp_lite_mon_update_config(struct dp_pdev *pdev,
 		    new_config->data_filter[CDP_LITE_MON_MODE_MO])
 			curr_config->mo_enabled = true;
 
-		qdf_mem_copy(curr_config->len,
-			     new_config->len,
-			     sizeof(curr_config->len));
+		/* set appropriate lengths */
+		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_FP] ||
+		    new_config->mgmt_filter[CDP_LITE_MON_MODE_MD] ||
+		    new_config->mgmt_filter[CDP_LITE_MON_MODE_MO])
+			curr_config->len[CDP_LITE_MON_FRM_TYPE_MGMT] =
+				new_config->len[CDP_LITE_MON_FRM_TYPE_MGMT];
+
+		if (new_config->ctrl_filter[CDP_LITE_MON_MODE_FP] ||
+		    new_config->ctrl_filter[CDP_LITE_MON_MODE_MD] ||
+		    new_config->ctrl_filter[CDP_LITE_MON_MODE_MO])
+			curr_config->len[CDP_LITE_MON_FRM_TYPE_CTRL] =
+				new_config->len[CDP_LITE_MON_FRM_TYPE_CTRL];
+
+		if (new_config->data_filter[CDP_LITE_MON_MODE_FP] ||
+		    new_config->data_filter[CDP_LITE_MON_MODE_MD] ||
+		    new_config->data_filter[CDP_LITE_MON_MODE_MO])
+			curr_config->len[CDP_LITE_MON_FRM_TYPE_DATA] =
+				new_config->len[CDP_LITE_MON_FRM_TYPE_DATA];
 
 		curr_config->metadata = new_config->metadata;
 		curr_config->debug = new_config->debug;
@@ -269,6 +287,20 @@ dp_lite_mon_set_rx_config(struct dp_pdev_be *be_pdev,
 		}
 		qdf_spin_unlock_bh(&be_mon_pdev->mon_pdev.mon_lock);
 	} else {
+		/* validate configuration */
+		/* if level is MPDU/PPDU and data pkt is full len, then
+		 * this is a contradicting request as full data pkt can span
+		 * multiple mpdus. Whereas Mgmt/Ctrl pkt full len with level
+		 * MPDU/PPDU is supported as they span max one mpdu.
+		 */
+		if ((config->level != CDP_LITE_MON_LEVEL_MSDU) &&
+		    (config->len[CDP_LITE_MON_FRM_TYPE_DATA] ==
+						CDP_LITE_MON_LEN_FULL)) {
+			dp_mon_err("Filter combination not supported "
+				   "level mpdu/ppdu and data full pkt");
+			return QDF_STATUS_E_INVAL;
+		}
+
 		/* reset full mon filters if enabled */
 		qdf_spin_lock_bh(&be_mon_pdev->mon_pdev.mon_lock);
 		if (be_mon_pdev->mon_pdev.monitor_configured) {
@@ -1060,6 +1092,542 @@ dp_lite_mon_config_nac_rssi_peer(struct cdp_soc_t *soc_hdl,
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_lite_mon_rx_filter_check - check if mpdu rcvd match filter setting
+ * @ppdu_info: ppdu info context
+ * @config: current lite mon config
+ * @user: user id
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
+			    struct dp_lite_mon_config *config,
+			    uint8_t user)
+{
+	uint8_t filter_category;
+
+	filter_category = ppdu_info->rx_user_status[user].filter_category;
+	switch (filter_category) {
+	case DP_MPDU_FILTER_CATEGORY_FP:
+		if (config->fp_enabled &&
+		    (!config->peer_count[CDP_LITE_MON_PEER_TYPE_ASSOCIATED] ||
+		     !config->fpmo_enabled))
+			return QDF_STATUS_SUCCESS;
+		break;
+	case DP_MPDU_FILTER_CATEGORY_MD:
+		if (config->md_enabled)
+			return QDF_STATUS_SUCCESS;
+		break;
+	case DP_MPDU_FILTER_CATEGORY_MO:
+		if (config->mo_enabled &&
+		    (!config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED] ||
+		     !config->md_enabled))
+			return QDF_STATUS_SUCCESS;
+		break;
+	case DP_MPDU_FILTER_CATEGORY_FP_MO:
+		if (config->fpmo_enabled)
+			return QDF_STATUS_SUCCESS;
+		break;
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+#ifdef META_HDR_NOT_YET_SUPPORTED
+#ifdef WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG
+/**
+ * dp_lite_mon_update_protocol_tag - update ptag to headroom
+ * @be_pdev: be pdev context
+ * @frag_idx: frag index
+ * @mpdu_nbuf: mpdu nbuf
+ *
+ * Return: void
+ */
+static inline void
+dp_lite_mon_update_protocol_tag(struct dp_pdev_be *be_pdev,
+				uint8_t frag_idx,
+				qdf_nbuf_t mpdu_nbuf)
+{
+	uint16_t cce_metadata = 0;
+	uint16_t protocol_tag = 0;
+	uint8_t *nbuf_head = NULL;
+
+	if (qdf_unlikely(be_pdev->pdev.is_rx_protocol_tagging_enabled)) {
+		nbuf_head = qdf_nbuf_head(mpdu_nbuf);
+		nbuf_head += (frag_idx * DP_RX_MON_CCE_FSE_METADATA_SIZE);
+
+		cce_metadata = *((uint16_t *)nbuf_head);
+		/* check if cce_metadata is in valid range */
+		if (qdf_likely(cce_metadata >= RX_PROTOCOL_TAG_START_OFFSET) &&
+			  (cce_metadata < (RX_PROTOCOL_TAG_START_OFFSET +
+			   RX_PROTOCOL_TAG_MAX))) {
+			/*
+			 * The CCE metadata received is just the
+			 * packet_type + RX_PROTOCOL_TAG_START_OFFSET
+			 */
+			cce_metadata -= RX_PROTOCOL_TAG_START_OFFSET;
+
+			/*
+			 * Update the nbuf headroom with the user-specified
+			 * tag/metadata by looking up tag value for
+			 * received protocol type */
+			protocol_tag = be_pdev->pdev.rx_proto_tag_map[cce_metadata].tag;
+		}
+	}
+	nbuf_head = qdf_nbuf_head(mpdu_nbuf);
+	nbuf_head += (frag_idx * DP_RX_MON_PF_TAG_SIZE);
+	*((uint16_t *)nbuf_head) = protocol_tag;
+}
+#else
+static inline void
+dp_lite_mon_update_protocol_tag(struct dp_pdev_be *be_pdev,
+				uint8_t frag_idx,
+				qdf_nbuf_t mpdu_nbuf)
+{
+}
+#endif
+
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+/**
+ * dp_lite_mon_update_flow_tag - update ftag to headroom
+ * @dp_soc: dp_soc context
+ * @frag_idx: frag index
+ * @mpdu_nbuf: mpdu nbuf
+ *
+ * Return: void
+ */
+static inline void
+dp_lite_mon_update_flow_tag(struct dp_soc *soc,
+			    uint8_t frag_idx,
+			    qdf_nbuf_t mpdu_nbuf)
+{
+	uint16_t flow_tag = 0;
+	uint8_t *nbuf_head = NULL;
+
+	if (qdf_unlikely(wlan_cfg_is_rx_flow_tag_enabled(soc->wlan_cfg_ctx))) {
+		nbuf_head = qdf_nbuf_head(mpdu_nbuf);
+		nbuf_head += ((frag_idx * DP_RX_MON_CCE_FSE_METADATA_SIZE) +
+				DP_RX_MON_CCE_METADATA_SIZE);
+
+		/* limit FSE metadata to 16bit */
+		flow_tag = (uint16_t)(*((uint32_t *)nbuf_head) & 0xFFFF);
+	}
+	nbuf_head = qdf_nbuf_head(mpdu_nbuf);
+	nbuf_head += (frag_idx * DP_RX_MON_PF_TAG_SIZE) + sizeof(uint16_t);
+	*((uint16_t *)nbuf_head) = flow_tag;
+}
+#else
+static inline void
+dp_lite_mon_update_flow_tag(struct dp_soc *soc,
+			    uint8_t frag_idx,
+			    qdf_nbuf_t mpdu_nbuf)
+{
+}
+#endif
+#endif
+
+/**
+ * dp_lite_mon_rx_adjust_mpdu_len - adjust mpdu len as per set type len
+ * @be_pdev: be pdev context
+ * @ppdu_info: ppdu info context
+ * @config: curr lite mon config
+ * @mpdu_nbuf: mpdu nbuf
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+dp_lite_mon_rx_adjust_mpdu_len(struct dp_pdev_be *be_pdev,
+			       struct hal_rx_ppdu_info *ppdu_info,
+			       struct dp_lite_mon_config *config,
+			       qdf_nbuf_t mpdu_nbuf)
+{
+	struct dp_soc *soc = be_pdev->pdev.soc;
+	struct ieee80211_frame *wh;
+	qdf_nbuf_t curr_nbuf = NULL;
+	uint32_t frag_size;
+	int trim_size;
+	uint16_t type_len;
+	uint8_t type;
+	uint8_t num_frags = 0;
+	uint8_t frag_iter = 0;
+	bool is_head_nbuf = true;
+	bool is_data_pkt = false;
+	bool is_rx_mon_protocol_flow_tag_en;
+
+	if (qdf_unlikely(!soc))
+		return QDF_STATUS_E_INVAL;
+
+	wh = (struct ieee80211_frame *)qdf_nbuf_get_frag_addr(mpdu_nbuf, 0);
+	type = ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) >> IEEE80211_FC0_TYPE_SHIFT);
+	type_len = (type < CDP_LITE_MON_FRM_TYPE_MAX) ? config->len[type] : 0;
+	if (qdf_unlikely(!type_len || type_len == CDP_LITE_MON_LEN_FULL)) {
+		dp_mon_debug("Invalid type(%d) len, mpdu len adjust failed", type);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	/* if user has configured different custom pkt len
+	 * (for ex: data 256bytes, mgmt/ctrl 128bytes) for
+	 * different types we subscribe header tlv with max
+	 * custom len(265bytes for above ex). We need to trim
+	 * mgmt/ctrl hdrs to their respective lengths(128bytes for above ex).
+	 * Below logic handles that */
+
+	if (ppdu_info->rx_status.frame_control_info_valid &&
+	    ((ppdu_info->rx_status.frame_control & IEEE80211_FC0_TYPE_MASK) ==
+	      IEEE80211_FC0_TYPE_DATA))
+		is_data_pkt = true;
+
+	is_rx_mon_protocol_flow_tag_en =
+		wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(soc->wlan_cfg_ctx);
+
+	for (curr_nbuf = mpdu_nbuf; curr_nbuf;) {
+		num_frags = qdf_nbuf_get_nr_frags(curr_nbuf);
+		if (num_frags > 1 &&
+		    config->level != CDP_LITE_MON_LEVEL_MSDU) {
+			dp_mon_err("level mpdu/ppdu expects only single frag");
+			return QDF_STATUS_E_INVAL;
+		}
+
+		for (frag_iter = 0; frag_iter < num_frags; ++frag_iter) {
+			frag_size = qdf_nbuf_get_frag_size_by_idx(curr_nbuf,
+								  frag_iter);
+			if (frag_size > type_len) {
+				trim_size = frag_size - type_len;
+				qdf_nbuf_trim_add_frag_size(curr_nbuf,
+							    frag_iter,
+							    -(trim_size), 0);
+			}
+
+#ifdef META_HDR_NOT_YET_SUPPORTED
+			if (config->level == CDP_LITE_MON_LEVEL_MSDU) {
+				if (is_data_pkt &&
+				    is_rx_mon_protocol_flow_tag_en) {
+					/* update protocol tag from cce metadata */
+					dp_lite_mon_update_protocol_tag(be_pdev,
+									frag_iter,
+									mpdu_nbuf);
+
+					/* update flow tag from fse metadata */
+					dp_lite_mon_update_flow_tag(soc,
+								    frag_iter,
+								    mpdu_nbuf);
+
+					/* litemon pending :check to add pf tag
+					 * trailer info for debug
+					 */
+				}
+			}
+#endif /* META_HDR_NOT_YET_SUPPORTED */
+		}
+		if (is_head_nbuf) {
+			curr_nbuf = qdf_nbuf_get_ext_list(curr_nbuf);
+			is_head_nbuf = false;
+		} else
+			curr_nbuf = qdf_nbuf_queue_next(curr_nbuf);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef META_HDR_NOT_YET_SUPPORTED
+/**
+ * dp_lite_mon_add_tlv - add tlv to headroom
+ * @id: tlv id
+ * @len: tlv len
+ * @value: tlv value
+ * @mpdu_nbuf: mpdu nbuf
+ *
+ * Return: number of bytes pushed
+ */
+static inline
+uint32_t dp_lite_mon_add_tlv(uint8_t id, uint16_t len, void *value,
+			     qdf_nbuf_t mpdu_nbuf)
+{
+	uint8_t *dest = NULL;
+	uint32_t num_bytes_pushed = 0;
+
+	/* Add tlv id field */
+	dest = qdf_nbuf_push_head(mpdu_nbuf, sizeof(uint8_t));
+	if (qdf_likely(dest)) {
+		*((uint8_t *)dest) = id;
+		num_bytes_pushed += sizeof(uint8_t);
+	}
+
+	/* Add tlv len field */
+	dest = qdf_nbuf_push_head(mpdu_nbuf, sizeof(uint16_t));
+	if (qdf_likely(dest)) {
+		*((uint16_t *)dest) = len;
+		num_bytes_pushed += sizeof(uint16_t);
+	}
+
+	/* Add tlv value field */
+	dest = qdf_nbuf_push_head(mpdu_nbuf, len);
+	if (qdf_likely(dest)) {
+		qdf_mem_copy(dest, value, len);
+		num_bytes_pushed += len;
+	}
+
+	return num_bytes_pushed;
+}
+
+/**
+ * dp_lite_mon_add_pf_tag_tlv_to_headroom - add pftag tlv to headroom
+ * @mpdu_nbuf: mpdu nbuf
+ *
+ * Return: void
+ */
+static inline void
+dp_lite_mon_add_pf_tag_tlv_to_headroom(qdf_nbuf_t mpdu_nbuf)
+{
+	qdf_nbuf_t curr_nbuf;
+	uint8_t tlv_id;
+	uint16_t tlv_len;
+	uint32_t pull_bytes = 0;
+	bool is_head_nbuf = true;
+
+	if (!qdf_nbuf_get_nr_frags(mpdu_nbuf))
+		return;
+
+	tlv_id = DP_LITE_MON_META_HDR_TLV_PFTAG;
+	for (curr_nbuf = mpdu_nbuf; curr_nbuf;) {
+		/* litemon pending: check for available headroom
+		 * also check if we should consider max nr frags for copying */
+		tlv_len = qdf_nbuf_get_nr_frags(curr_nbuf) * DP_RX_MON_PF_TAG_SIZE;
+		pull_bytes += dp_lite_mon_add_tlv(tlv_id, tlv_len,
+						  qdf_nbuf_head(curr_nbuf),
+						  curr_nbuf);
+		qdf_nbuf_pull_head(curr_nbuf, pull_bytes);
+
+		if (is_head_nbuf) {
+			curr_nbuf = qdf_nbuf_get_ext_list(curr_nbuf);
+			is_head_nbuf = false;
+		} else
+			curr_nbuf = qdf_nbuf_queue_next(curr_nbuf);
+	}
+}
+
+/**
+ * dp_lite_mon_add_meta_header_to_headroom - add lite mon meta hdr
+ * @be_pdev: be pdev context
+ * @ppdu_info: ppdu info context
+ * @mpdu_nbuf: mpdu nbuf
+ *
+ * Return: void
+ */
+void
+dp_lite_mon_add_meta_header_to_headroom(struct dp_pdev_be *be_pdev,
+					struct hal_rx_ppdu_info *ppdu_info,
+					qdf_nbuf_t mpdu_nbuf)
+{
+	struct dp_mon_pdev_be *be_mon_pdev;
+	struct dp_lite_mon_config *config;
+	struct dp_soc *soc = be_pdev->pdev.soc;
+	uint32_t pull_bytes = 0;
+	uint16_t meta_hdr_marker = DP_LITE_MON_META_HDR_MARKER;
+	uint8_t tlv_id;
+	uint16_t tlv_len;
+
+	if (qdf_unlikely(!soc))
+		return;
+
+	be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+	config = &be_mon_pdev->lite_mon_rx_config->rx_config;
+
+	/* litemon pending: put check for available headroom it must be
+	   large enough to hold meta header */
+
+	/* Add marker: we first add marker, this will indicate
+	 * beginning of meta header information in headroom.
+	 */
+	qdf_nbuf_push_head(mpdu_nbuf, sizeof(meta_hdr_marker));
+	qdf_mem_copy(qdf_nbuf_data(mpdu_nbuf), &meta_hdr_marker,
+		     sizeof(meta_hdr_marker));
+	pull_bytes += sizeof(meta_hdr_marker);
+
+	/* Add Meta hdr: Meta hdr consists of various information in
+	 * TLV format [TLV ID][TLV Len][TLV Value] */
+
+	/* add PPDU ID TLV */
+	tlv_id = DP_LITE_MON_META_HDR_TLV_PPDUID;
+	tlv_len = sizeof(ppdu_info->com_info.ppdu_id);
+	pull_bytes += dp_lite_mon_add_tlv(tlv_id, tlv_len,
+					  &ppdu_info->com_info.ppdu_id,
+					  mpdu_nbuf);
+
+	/* add PFTAG TLV */
+	if (config->level == CDP_LITE_MON_LEVEL_MSDU) {
+		/* proceed only if data pkt */
+		if (ppdu_info->rx_status.frame_control_info_valid &&
+		    ((ppdu_info->rx_status.frame_control & IEEE80211_FC0_TYPE_MASK) ==
+		      IEEE80211_FC0_TYPE_DATA)) {
+			bool is_rx_mon_protocol_flow_tag_en;
+
+			/* check if rx mon protocol flow tag enabled */
+			is_rx_mon_protocol_flow_tag_en =
+				wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(
+							soc->wlan_cfg_ctx);
+			if (is_rx_mon_protocol_flow_tag_en)
+				dp_lite_mon_add_pf_tag_tlv_to_headroom(mpdu_nbuf);
+		}
+	}
+
+	qdf_nbuf_pull_head(mpdu_nbuf, pull_bytes);
+}
+#endif /* META_HDR_NOT_YET_SUPPORTED */
+
+/**
+ * dp_lite_mon_rx_mpdu_process - core lite mon mpdu processing
+ * @pdev: pdev context
+ * @ppdu_info: ppdu info context
+ * @mon_mpdu: mpdu nbuf
+ * @mpdu_id: mpdu id
+ * @user: user id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
+			    struct hal_rx_ppdu_info *ppdu_info,
+			    qdf_nbuf_t mon_mpdu, uint16_t mpdu_id,
+			    uint8_t user)
+{
+	struct dp_pdev_be *be_pdev;
+	struct dp_mon_pdev_be *be_mon_pdev;
+	struct hal_rx_mon_mpdu_info *mpdu_meta;
+	struct dp_lite_mon_rx_config *lite_mon_rx_config;
+	struct dp_lite_mon_config *config;
+	struct dp_vdev *lite_mon_vdev;
+	struct dp_mon_vdev *mon_vdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (qdf_unlikely(!mon_mpdu || !ppdu_info)) {
+		dp_mon_debug("mon mpdu or ppdu info is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (qdf_unlikely(!pdev)) {
+		dp_mon_debug("pdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+	be_pdev = dp_get_be_pdev_from_dp_pdev(pdev);
+
+	be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
+	if (qdf_unlikely(!be_mon_pdev)) {
+		dp_mon_debug("be mon pdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	lite_mon_rx_config = be_mon_pdev->lite_mon_rx_config;
+	if (qdf_unlikely(!lite_mon_rx_config)) {
+		dp_mon_debug("lite mon rx config is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	config = &lite_mon_rx_config->rx_config;
+	qdf_spin_lock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+	if (!config->enable) {
+		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+		dp_mon_debug("lite mon rx is not enabled");
+		status = QDF_STATUS_E_INVAL;
+		goto done;
+	}
+
+	/* update rssi for nac client, we can do this only for
+	 * first mpdu as rssi is at ppdu level */
+	if (mpdu_id == 0 &&
+	    config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED]) {
+		struct dp_lite_mon_peer *peer = NULL;
+
+		TAILQ_FOREACH(peer, &config->peer_list,
+			      peer_list_elem) {
+			if (!qdf_mem_cmp(&peer->peer_mac,
+					 &ppdu_info->nac_info.mac_addr2,
+					 QDF_MAC_ADDR_SIZE)) {
+				peer->rssi = ppdu_info->rx_status.rssi_comb;
+				break;
+			}
+		}
+	}
+
+	/* if level is PPDU we need only first MPDU, drop others
+	 * and return success*/
+	if (config->level == CDP_LITE_MON_LEVEL_PPDU && mpdu_id != 0) {
+		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+		dp_mon_debug("level is PPDU drop subsequent mpdu");
+		qdf_nbuf_free(mon_mpdu);
+		goto done;
+	}
+
+	if (QDF_STATUS_SUCCESS !=
+		dp_lite_mon_rx_filter_check(ppdu_info, config, user)) {
+		/* mpdu did not pass filter check drop and return success */
+		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+		dp_mon_debug("filter check did not pass, drop mpdu");
+		qdf_nbuf_free(mon_mpdu);
+		goto done;
+	}
+
+	mpdu_meta = (struct hal_rx_mon_mpdu_info *)qdf_nbuf_data(mon_mpdu);
+	if (mpdu_meta->full_pkt) {
+		/* full pkt, restitch required */
+		dp_rx_mon_handle_full_mon(pdev, ppdu_info, mon_mpdu);
+	} else {
+		/* not a full pkt contains only headers, adjust header
+		 * lengths as per user configured value */
+		status = dp_lite_mon_rx_adjust_mpdu_len(be_pdev, ppdu_info,
+							config, mon_mpdu);
+		if (status != QDF_STATUS_SUCCESS) {
+			qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+			dp_mon_debug("mpdu len adjustment failed");
+			goto done;
+		}
+	}
+
+	/* Add rtap header if requested */
+	if (config->metadata & DP_LITE_MON_RTAP_HDR_BITMASK) {
+		if (!qdf_nbuf_update_radiotap(&ppdu_info->rx_status,
+					      mon_mpdu,
+					      qdf_nbuf_headroom(mon_mpdu)))
+			dp_mon_debug("rtap hdr update failed");
+	}
+
+	/* Add meta header if requested */
+	if (config->metadata & DP_LITE_MON_META_HDR_BITMASK) {
+#ifdef META_HDR_NOT_YET_SUPPORTED
+		/* update meta hdr */
+		dp_lite_mon_add_meta_header_to_headroom(be_pdev, ppdu_info,
+							mon_mpdu);
+#endif /* META_HDR_NOT_YET_SUPPORTED */
+	}
+
+	/* get output vap */
+	lite_mon_vdev = config->lite_mon_vdev;
+	qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+
+	/* If output vap is set send frame to stack else send WDI event */
+	if (lite_mon_vdev && lite_mon_vdev->osif_vdev &&
+	    lite_mon_vdev->monitor_vdev &&
+	    lite_mon_vdev->monitor_vdev->osif_rx_mon) {
+		mon_vdev = lite_mon_vdev->monitor_vdev;
+
+		lite_mon_vdev->monitor_vdev->osif_rx_mon(lite_mon_vdev->osif_vdev,
+							 mon_mpdu,
+							 &ppdu_info->rx_status);
+	} else {
+		/* send lite mon rx wdi event */
+		dp_wdi_event_handler(WDI_EVENT_LITE_MON_RX,
+				     be_pdev->pdev.soc,
+				     mon_mpdu,
+				     HTT_INVALID_PEER,
+				     WDI_NO_VAL,
+				     be_pdev->pdev.pdev_id);
+	}
+
+done:
+	return status;
 }
 
 /**

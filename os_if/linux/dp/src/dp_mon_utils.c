@@ -18,6 +18,9 @@
 #include <cdp_txrx_ctrl.h>
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
+
+void monitor_osif_process_rx_mpdu(osif_dev *osifp, qdf_nbuf_t mpdu_ind);
+
 /**
  * wlan_lite_mon_rx_process - rx lite mon wdi event handler
  * @pdev_hdl: dp pdev hdl
@@ -32,7 +35,30 @@ static void wlan_lite_mon_rx_process(void *pdev_hdl, enum WDI_EVENT event,
 				     void *data, uint16_t peer_id,
 				     uint32_t status)
 {
-	/* lite mon pending: handle rx mpdus */
+	/* handle rx mpdus */
+	qdf_nbuf_t skb = (qdf_nbuf_t)data;
+	struct wlan_objmgr_pdev *pdev_obj =
+			(struct wlan_objmgr_pdev *)pdev_hdl;
+	struct ieee80211com *ic = wlan_pdev_get_mlme_ext_obj(pdev_obj);
+	struct ieee80211vap *vap = NULL;
+
+	if (!skb)
+		return;
+
+	if (!ic) {
+		qdf_nbuf_free(skb);
+		qdf_debug("ic is NULL");
+		return;
+	}
+
+	vap = ic->ic_mon_vap;
+	if (!vap) {
+		qdf_nbuf_free(skb);
+		qdf_debug("No mon vap to dump skb");
+		return;
+	}
+
+	monitor_osif_process_rx_mpdu((osif_dev *)vap->iv_ifp, skb);
 }
 
 /**
