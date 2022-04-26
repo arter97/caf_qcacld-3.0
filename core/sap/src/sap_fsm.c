@@ -3490,6 +3490,11 @@ void sap_free_roam_profile(struct csr_roam_profile *profile)
 		qdf_mem_free(profile->pRSNReqIE);
 		profile->pRSNReqIE = NULL;
 	}
+
+	if (profile->pWAPIReqIE) {
+		qdf_mem_free(profile->pWAPIReqIE);
+		profile->pWAPIReqIE = NULL;
+	}
 }
 
 void sap_sort_mac_list(struct qdf_mac_addr *macList, uint16_t size)
