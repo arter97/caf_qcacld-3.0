@@ -3032,7 +3032,20 @@ QDF_STATUS csr_roam_copy_profile(struct mac_context *mac,
 		qdf_mem_copy(pDstProfile->pRSNReqIE, pSrcProfile->pRSNReqIE,
 			pSrcProfile->nRSNReqIELength);
 	}
-
+#ifdef FEATURE_WLAN_WAPI
+	if (pSrcProfile->nWAPIReqIELength) {
+		pDstProfile->pWAPIReqIE =
+			qdf_mem_malloc(pSrcProfile->nWAPIReqIELength);
+		if (!pDstProfile->pWAPIReqIE) {
+			status = QDF_STATUS_E_NOMEM;
+			goto end;
+		}
+		pDstProfile->nWAPIReqIELength =
+			pSrcProfile->nWAPIReqIELength;
+		qdf_mem_copy(pDstProfile->pWAPIReqIE, pSrcProfile->pWAPIReqIE,
+			pSrcProfile->nWAPIReqIELength);
+	}
+#endif /* FEATURE_WLAN_WAPI */
 	if (pSrcProfile->ChannelInfo.freq_list) {
 		pDstProfile->ChannelInfo.freq_list =
 			qdf_mem_malloc(sizeof(uint32_t) *
