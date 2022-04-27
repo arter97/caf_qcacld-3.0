@@ -334,7 +334,7 @@ QDF_STATUS mbss_ap_cancel_acs_ht40(struct wlan_objmgr_vdev *vdev,
 
 	struct mbss_ht40_ctx *mbss_ht40;
 	struct mbss_ht40_data *ht40_data;
-	uint8_t ht40_vdev_id;
+	uint8_t ht40_vdev_id = WLAN_UMAC_PDEV_MAX_VDEVS;
 	mbss_bitmap_type *ht40_bitmap;
 	bool ht40_vdev_identified = false;
 
@@ -439,6 +439,8 @@ QDF_STATUS mbss_ap_cancel_acs_ht40(struct wlan_objmgr_vdev *vdev,
 			src_vdev_id = acs_vdev_id;
 		new_src_vdev = wlan_objmgr_get_vdev_by_id_from_pdev(
 				pdev, ht40_vdev_id, WLAN_MBSS_ID);
+		if (!new_src_vdev)
+			goto done;
 		mbss_debug("Trigger HT40 handoff for %d", src_vdev_id);
 		if (mbss_ops->ext_ops.mbss_start_ht40) {
 			mbss_unlock(mbss_pdev);
