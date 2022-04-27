@@ -213,8 +213,8 @@ static void dp_peer_rx_rate_stats_print(uint8_t *peer_mac,
 			printf(" %10u |", tmp_rx_stats->rate);
 			for (chain = 0; chain < max_chain; chain++) {
 				for (bw = 0; bw < max_bw; bw++) {
-					printf(" %10lu |",
-					tmp_rx_stats->avg_rssi_ant[chain][bw]);
+					printf(" %10d |",
+					(int8_t)tmp_rx_stats->avg_rssi_ant[chain][bw]);
 				}
 				printf("            \n\t     ");
 			}

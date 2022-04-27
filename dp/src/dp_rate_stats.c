@@ -572,7 +572,7 @@ __wlan_peer_update_rx_rate_stats(struct wlan_rx_rate_stats *__rx_stats,
 				 struct cdp_rx_indication_ppdu *cdp_rx_ppdu,
 				 uint8_t user_idx)
 {
-	uint8_t ant, ht, mcs, nss;
+	uint8_t ant, ht, mcs, nss, rssi;
 	struct cdp_rx_stats_ppdu_user *ppdu_user = &cdp_rx_ppdu->user[user_idx];
 
 	if (cdp_rx_ppdu->u.ppdu_type != DP_PPDU_TYPE_SU) {
@@ -605,8 +605,9 @@ __wlan_peer_update_rx_rate_stats(struct wlan_rx_rate_stats *__rx_stats,
 
 	for (ant = 0; ant < SS_COUNT; ant++) {
 		for (ht = 0; ht < MAX_BW; ht++) {
+			rssi = cdp_rx_ppdu->rssi_chain[ant][ht];
 			qdf_ewma_rx_rssi_add(&__rx_stats->avg_rssi_ant[ant][ht],
-					     cdp_rx_ppdu->rssi_chain[ant][ht]);
+					     rssi);
 		}
 	}
 }
