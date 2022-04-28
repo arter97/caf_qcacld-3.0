@@ -9008,6 +9008,71 @@ static int iw_set_two_ints_getnone(struct net_device *dev,
 	return ret;
 }
 
+/* cat /proc/net/wireless invokes this function to get wireless stats */
+static struct iw_statistics *__get_wireless_stats(struct net_device *dev)
+{
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx;
+	struct hdd_station_ctx *sta_ctx;
+	int8_t snr = 0, rssi = 0;
+
+	hdd_enter();
+
+	if (!adapter) {
+		hdd_err("%s: Adapter is NULL", __func__);
+		return NULL;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	if (wlan_hdd_validate_context(hdd_ctx) != 0) {
+		hdd_err("%s: hdd context is invalid", __func__);
+		return NULL;
+	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	if (!sta_ctx) {
+		hdd_err("%s: STA Context is NULL", __func__);
+		return NULL;
+	}
+
+	if (eConnectionState_Associated == sta_ctx->conn_info.connState) {
+		wlan_hdd_get_station_stats(adapter);
+		wlan_hdd_get_snr(adapter, &snr);
+		wlan_hdd_get_rssi(adapter, &rssi);
+
+		qdf_mem_zero(&adapter->iwStats, sizeof(adapter->iwStats));
+		adapter->iwStats.status = 0;
+		adapter->iwStats.qual.qual = snr;
+		adapter->iwStats.qual.level = rssi;
+		adapter->iwStats.qual.noise = rssi - snr;
+		adapter->iwStats.discard.code = 0;
+		adapter->iwStats.discard.retries = 0;
+		adapter->iwStats.miss.beacon = 0;
+		adapter->iwStats.qual.updated =
+			IW_QUAL_ALL_UPDATED | IW_QUAL_DBM;
+	} else {
+		hdd_debug("device not in associated state: %d",
+				sta_ctx->conn_info.connState);
+		return NULL;
+	}
+
+	hdd_exit();
+
+	return &(adapter->iwStats);
+}
+
+static struct iw_statistics *get_wireless_stats(struct net_device *dev)
+{
+	struct iw_statistics *stats;
+
+	cds_ssr_protect(__func__);
+	stats = __get_wireless_stats(dev);
+	cds_ssr_unprotect(__func__);
+
+	return stats;
+}
+
 /* Define the Wireless Extensions to the Linux Network Device structure */
 
 static const iw_handler we_private[] = {
@@ -10215,7 +10280,7 @@ const struct iw_handler_def we_handler_def = {
 	.standard = NULL,
 	.private = (iw_handler *) we_private,
 	.private_args = we_private_args,
-	.get_wireless_stats = NULL,
+	.get_wireless_stats = get_wireless_stats,
 };
 
 void hdd_register_wext(struct net_device *dev)
