@@ -374,7 +374,7 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_SM_ENGINE: SM engine module ID
  * @QDF_MODULE_ID_CMN_MLME: CMN MLME module ID
  * @QDF_MODULE_ID_CFR: CFR module ID
- * @QDF_MODULE_ID_TX_CAPTURE: Tx capture enhancement feature ID
+ * @QDF_MODULE_ID_DP_TX_CAPTURE: Tx capture enhancement feature ID
  * @QDF_MODULE_ID_INTEROP_ISSUES_AP: interop issues ap module ID
  * @QDF_MODULE_ID_BLACKLIST_MGR: Blacklist Manager module
  * @QDF_MODULE_ID_QLD: QCA Live Debug module ID
@@ -523,7 +523,7 @@ typedef enum {
 	QDF_MODULE_ID_CMN_MLME,
 	QDF_MODULE_ID_BSSCOLOR,
 	QDF_MODULE_ID_CFR,
-	QDF_MODULE_ID_TX_CAPTURE,
+	QDF_MODULE_ID_DP_TX_CAPTURE,
 	QDF_MODULE_ID_INTEROP_ISSUES_AP,
 	QDF_MODULE_ID_BLACKLIST_MGR,
 	QDF_MODULE_ID_QLD,
