@@ -81,7 +81,8 @@ INCS += -I$(obj)/$(DEPTH)/include \
         -I$(obj)/$(DEPTH)/cmn_dev/target_if/ipa/src \
         -I$(obj)/$(DEPTH)/pld/inc  \
         -I$(obj)/$(HOST_CMN_CONVG_SRC)/umac/mlo_mgr/inc \
-        -I$(obj)/$(DEPTH)/cmn_dev/fw_hdr/fw/
+        -I$(obj)/$(DEPTH)/cmn_dev/fw_hdr/fw/ \
+        -I$(obj)/$(DEPTH)/cmn_dev/umac/wifi_pos/inc
 
 INCS += -I$(obj)/$(DEPTH)/cmn_dev/umac/twt/dispatcher/inc
 
