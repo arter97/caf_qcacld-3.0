@@ -422,6 +422,14 @@ void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 		return;
 
 	chan = dfs->dfs_prevchan;
+
+	/**
+	 * Do not change the state of NOL infected channels to
+	 * "CAC Required" within the NOL duration.
+	 */
+	if (WLAN_IS_CHAN_RADAR(dfs, chan))
+		return;
+
 	nchannels =
 		dfs_get_bonding_channel_without_seg_info_for_freq(chan,
 								  freq_list);
