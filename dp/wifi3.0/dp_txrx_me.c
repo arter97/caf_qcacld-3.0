@@ -275,13 +275,14 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 	qdf_nbuf_t  nbuf_ref;
 	dp_vdev_dms_me_t *dms_me = (dp_vdev_dms_me_t *)arg;
 
-	if (peer->bss_peer)
+	if (peer->bss_peer || !dp_peer_is_primary_link_peer(peer))
 		return;
 
 	dms_me->tx_exc_metadata->peer_id = peer->peer_id;
 	/* Update the ref count for each peer */
 	qdf_nbuf_ref(dms_me->nbuf);
 	nbuf_ref = dms_me->nbuf;
+	dms_me->num_pkt_sent++;
 	nbuf_ref = dp_tx_send_exception(dms_me->soc_hdl,
 					dms_me->vdev->vdev_id,
 					nbuf_ref,
@@ -307,7 +308,6 @@ dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct cdp_tx_exception_metadata tx_exc_param = {0};
-	uint8_t count = vdev->num_peers;
 	dp_vdev_dms_me_t dms_me;
 
 	tx_exc_param.sec_type = vdev->sec_type;
@@ -322,20 +322,21 @@ dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 	dms_me.vdev = vdev;
 	dms_me.nbuf = nbuf;
 	dms_me.tx_exc_metadata = &tx_exc_param;
+	dms_me.num_pkt_sent = 0;
 
 	dp_vdev_iterate_peer(vdev, dp_tx_me_send_dms_pkt,
 			     &dms_me, DP_MOD_ID_MCAST2UCAST);
 
 	qdf_nbuf_free(nbuf);
-	DP_STATS_INC(vdev, tx_i.mcast_en.ucast, count - 1);
+	DP_STATS_INC(vdev, tx_i.mcast_en.ucast, dms_me.num_pkt_sent);
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_MCAST2UCAST);
 
 	/* only bss peer is present, free the buffer*/
-	if (count == 1) {
+	if (!dms_me.num_pkt_sent) {
 		qdf_nbuf_free(nbuf);
-		return count;
+		return 1;
 	}
-	return count - 1;
+	return dms_me.num_pkt_sent;
 }
 
 /**

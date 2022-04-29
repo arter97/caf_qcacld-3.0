@@ -24,6 +24,7 @@ typedef struct dp_vdev_dms_me {
 	struct dp_vdev                   *vdev;
 	qdf_nbuf_t                       nbuf;
 	struct cdp_tx_exception_metadata *tx_exc_metadata;
+	uint16_t			 num_pkt_sent;
 } dp_vdev_dms_me_t;
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
