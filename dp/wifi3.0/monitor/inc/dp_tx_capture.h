@@ -183,6 +183,7 @@ struct dp_tx_tid {
 	uint32_t last_enq_ms;
 	uint32_t last_deq_ms;
 	uint32_t last_processed_ms;
+	qdf_atomic_t msdu_comp_bytes;
 };
 
 struct dp_peer_tx_capture {
