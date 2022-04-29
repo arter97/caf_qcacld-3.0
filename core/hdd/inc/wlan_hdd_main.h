@@ -1432,6 +1432,9 @@ struct hdd_adapter {
 	int ocb_mac_addr_count;
 #endif
 
+	/* Wireless statistics */
+	struct iw_statistics iwStats;
+
 	/* BITMAP indicating pause reason */
 	uint32_t pause_map;
 	spinlock_t pause_map_lock;
