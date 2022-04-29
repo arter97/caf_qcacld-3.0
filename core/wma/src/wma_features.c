@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -951,6 +952,12 @@ WLAN_PHY_MODE wma_chan_phy_mode(u8 chan, enum phy_ch_width chan_width,
 {
 	WLAN_PHY_MODE phymode = MODE_UNKNOWN;
 	uint16_t bw_val = cds_bw_value(chan_width);
+
+	if (chan_width >= CH_WIDTH_INVALID || !bw_val ||
+	    (CDS_IS_CHANNEL_24GHZ(chan) && bw_val > 40)) {
+		WMA_LOGE("Invalid channel width %d chan %d", chan_width, chan);
+		return phymode;
+	}
 
 	if (CDS_IS_CHANNEL_24GHZ(chan)) {
 		if (((CH_WIDTH_5MHZ == chan_width) ||
