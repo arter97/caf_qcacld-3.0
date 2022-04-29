@@ -1302,6 +1302,7 @@ enum _ol_ath_param_t {
 
 	OL_ATH_PARAM_LSIG_RLSIG_POWER_SCALING = 494,
 	OL_ATH_PARAM_HESIGA_POWER_SCALING = 495,
+	OL_ATH_PARAM_EN_RU_106_TONE_ER_SU_DCM = 496,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3354,6 +3355,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_LSIG_RLSIG_POWER_SCALING, SET_PARAM, 1},
 	{"hesiga_power_scaling",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_HESIGA_POWER_SCALING, SET_PARAM, 1},
+	{"en_ru_106_tone_er_su_dcm",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_RU_106_TONE_ER_SU_DCM, SET_PARAM, 1},
 };
 #endif
 #endif
