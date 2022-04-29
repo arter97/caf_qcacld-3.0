@@ -91,10 +91,7 @@
 #include "wlan_cp_stats_mc_ucfg_api.h"
 #include "init_cmd_api.h"
 #include "wma_coex.h"
-
-#ifdef WLAN_FEATURE_PKT_CAPTURE
 #include "wlan_pkt_capture_ucfg_api.h"
-#endif
 
 #define WMA_LOG_COMPLETION_TIMER 3000 /* 3 seconds */
 #define WMI_TLV_HEADROOM 128
@@ -6848,6 +6845,13 @@ int wma_rx_service_ready_ext_event(void *handle, uint8_t *event,
 	} else {
 		wlan_res_cfg->three_way_coex_config_legacy_en = false;
 	}
+
+	if (ucfg_pkt_capture_get_mode(wma_handle->psoc) &&
+	    wmi_service_enabled(wmi_handle,
+				wmi_service_packet_capture_support))
+		wlan_res_cfg->pktcapture_support = true;
+	else
+		wlan_res_cfg->pktcapture_support = false;
 
 	return 0;
 }
