@@ -68,6 +68,35 @@ void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 
 	pdev->reo_proto_tag_stats[ring_index][protocol_index].tag_ctr++;
 }
+
+/* dp_mon_rx_update_rx_protocol_tag_stats() - Update mon protocols's
+ *					      statistics
+ * @pdev: pdev handle
+ * @protocol_index: Protocol index for which the stats should be incremented
+ * @ring_index: REO ring number from which this tag was received.
+ *
+ * Return: void
+ */
+#if QCA_TEST_MON_PF_TAGS_STATS
+void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
+					    uint16_t protocol_index,
+					    uint16_t ring_index)
+{
+	if (ring_index >= MAX_REO_DEST_RINGS) {
+		dp_err("Ring Index: %d exceeds Max Number of dest rings",
+		       ring_index);
+		return;
+	}
+
+	pdev->reo_proto_tag_stats[ring_index][protocol_index].mon_tag_ctr++;
+}
+#else
+void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
+					    uint16_t protocol_index,
+					    uint16_t ring_index)
+{
+}
+#endif
 #else
 void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 					uint16_t protocol_index,
@@ -97,6 +126,27 @@ void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
 	pdev->rx_err_proto_tag_stats[protocol_index].tag_ctr++;
 }
 
+/* dp_mon_rx_update_rx_protocol_tag_stats() - Update mon protocols's
+ *					      statistics from given protocol
+ *					      type
+ * @pdev: pdev handle
+ * @pdev: TXRX pdev context for which stats should be incremented
+ * @protocol_index: Protocol index for which the stats should be incremented
+ *
+ * Return: void
+ */
+#if QCA_TEST_MON_PF_TAGS_STATS
+void dp_mon_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
+						uint16_t protocol_index)
+{
+	pdev->rx_err_proto_tag_stats[protocol_index].mon_tag_ctr++;
+}
+#else
+void dp_mon_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
+						uint16_t protocol_index)
+{
+}
+#endif
 #else
 void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
 					    uint16_t protocol_index)
