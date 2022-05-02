@@ -2284,7 +2284,7 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 {
 	uint32_t freq_center;
 	uint32_t radarfound_freq;
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	uint8_t num_channels;
 	uint16_t freq_list[NUM_CHANNELS_160MHZ];
 	uint16_t nol_freq_list[NUM_CHANNELS_160MHZ];
@@ -2293,6 +2293,11 @@ dfs_process_radar_ind_on_agile_chan(struct wlan_dfs *dfs,
 	bool wait_for_csa = false;
 	struct dfs_freq_range radar_freq_range;
 	uint8_t nol_count;
+
+	if (!dfs_is_freq_offset_valid(dfs, radar_found)) {
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
 
 	dfs_compute_radar_found_cfreq(dfs, radar_found, &freq_center);
 	radarfound_freq = freq_center + radar_found->freq_offset;
