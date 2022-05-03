@@ -1068,7 +1068,7 @@ uint16_t dp_sawf_get_peerid(struct dp_soc *soc, uint8_t *dest_mac,
 
 	if (!ast_entry) {
 		qdf_spin_unlock_bh(&soc->ast_lock);
-		qdf_warn("%s NULL ast entry\n", __func__);
+		qdf_warn("%s NULL ast entry");
 		return HTT_INVALID_PEER;
 	}
 
@@ -1088,7 +1088,7 @@ uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
 
 	if (!peer) {
-		qdf_warn("%s NULL peer\n", __func__);
+		qdf_warn("%s NULL peer");
 		return DP_SAWF_INVALID_AST_IDX;
 	}
 
@@ -1112,7 +1112,7 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	uint8_t q_id;
 
 	if (!netdev->ieee80211_ptr) {
-		qdf_warn("%s non vap netdevice\n", __func__);
+		qdf_debug("non vap netdevice");
 		return DP_SAWF_PEER_Q_INVALID;
 	}
 
@@ -1132,7 +1132,7 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 				     DP_MOD_ID_SAWF);
 
 	if (!peer) {
-		qdf_warn("%s NULL peer\n", __func__);
+		qdf_warn("NULL peer");
 		return DP_SAWF_PEER_Q_INVALID;
 	}
 
