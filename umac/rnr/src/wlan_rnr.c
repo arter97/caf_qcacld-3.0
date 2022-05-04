@@ -79,6 +79,13 @@ int32_t wlan_lower_band_ap_cnt_get(void)
 
 qdf_export_symbol(wlan_lower_band_ap_cnt_get);
 
+int32_t wlan_6ghz_band_ap_cnt_get(void)
+{
+	return qdf_atomic_read(&(g_rnr_info.vdev_6ghz_band_cnt));
+}
+
+qdf_export_symbol(wlan_6ghz_band_ap_cnt_get);
+
 struct wlan_objmgr_pdev *wlan_gbl_6ghz_pdev_get(void)
 {
 	return g_rnr_info.pdev_6ghz_ctx;
