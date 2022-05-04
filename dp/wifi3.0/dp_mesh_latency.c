@@ -80,6 +80,8 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct cdp_soc_t *cdp_soc = NULL;
 	struct dp_ast_entry *ase = NULL;
+	uint16_t peer_id;
+
 	if (!dpsoc) {
 		QDF_TRACE(QDF_MODULE_ID_DP_CDP, QDF_TRACE_LEVEL_ERROR,
 				"%s: Invalid soc\n", __func__);
@@ -94,10 +96,9 @@ QDF_STATUS dp_mesh_latency_update_peer_parameter(struct cdp_soc_t *soc_hdl,
 			qdf_spin_unlock_bh(&dpsoc->ast_lock);
 			return QDF_STATUS_E_INVAL;
 		}
-
+		peer_id = ase->peer_id;
 		qdf_spin_unlock_bh(&dpsoc->ast_lock);
-		peer = dp_peer_get_ref_by_id(dpsoc, ase->peer_id,
-					DP_MOD_ID_AST);
+		peer = dp_peer_get_ref_by_id(dpsoc, peer_id, DP_MOD_ID_AST);
 	} else {
 		QDF_TRACE(QDF_MODULE_ID_DP_CDP, QDF_TRACE_LEVEL_ERROR,
 				"%s: Mesh Latency support for WIFI7 peers need to be added\n", __func__);
