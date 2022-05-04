@@ -1840,6 +1840,34 @@ wlan_rptr_s_ssid_vdev_connection_down(struct wlan_objmgr_vdev *vdev)
 
 qdf_export_symbol(wlan_rptr_s_ssid_vdev_connection_down);
 
+/**
+ * wlan_rptr_s_ssid_vdev_down_process - reset same ssid related pdev params
+ * during stavap disconnect
+ * @vdev- vdev object manager
+ * return void
+ */
+void wlan_rptr_s_ssid_vdev_down_process(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_objmgr_pdev *pdev;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+
+	if (!pdev)
+		return;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv)
+		return;
+
+	RPTR_PDEV_LOCK(&pdev_priv->rptr_pdev_lock);
+	pdev_priv->extender_connection = ext_connection_type_init;
+	qdf_mem_zero(pdev_priv->preferred_bssid, QDF_MAC_ADDR_SIZE);
+	RPTR_PDEV_UNLOCK(&pdev_priv->rptr_pdev_lock);
+}
+
+qdf_export_symbol(wlan_rptr_s_ssid_vdev_down_process);
+
 void
 wlan_rptr_disconnect_sec_stavap_cb(struct wlan_objmgr_psoc *psoc,
 				   void *obj, void *arg)

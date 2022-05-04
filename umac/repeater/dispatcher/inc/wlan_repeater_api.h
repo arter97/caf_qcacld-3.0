@@ -682,6 +682,14 @@ void
 wlan_rptr_s_ssid_vdev_connection_down(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * wlan_rptr_s_ssid_vdev_down_process - reset same ssid related pdev params
+ * during stavap disconnect
+ * @vdev- vdev object manager
+ * return void
+ */
+void wlan_rptr_s_ssid_vdev_down_process(struct wlan_objmgr_vdev *vdev);
+
+/**
  * wlan_rptr_update_extender_info - update extender info
  * @vdev- vdev object manager
  * @scan_entry- scan entry
