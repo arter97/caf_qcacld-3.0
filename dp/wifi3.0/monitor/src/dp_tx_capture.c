@@ -713,6 +713,14 @@ dp_tx_find_usr_idx_from_peer_id(struct cdp_tx_completion_ppdu *ppdu_desc,
 	if (!found) {
 		dp_tx_capture_alert("peer_id: %d, ppdu_desc[%p][num_users: %d]\n",
 				    peer_id, ppdu_desc, ppdu_desc->num_users);
+
+		for (usr_idx = 0; usr_idx < ppdu_desc->num_users; usr_idx++) {
+			dp_tx_capture_alert("peer_id:%d pid:%d sched_cmdid: %d",
+					    ppdu_desc->user[usr_idx].peer_id,
+					    ppdu_desc->ppdu_id,
+					    ppdu_desc->sched_cmdid);
+		}
+
 		qdf_assert_always(0);
 	}
 
@@ -4357,20 +4365,33 @@ dp_tx_mon_proc_pending_ppdus(struct dp_pdev *pdev, struct dp_tx_tid *tx_tid,
 		/* Find missing mpdus from current schedule list */
 		ppdu_cnt = 0;
 		while (ppdu_cnt < ppdu_desc_cnt) {
+			uint8_t idx = 0;
+
+			cur_user = NULL;
+
 			ptr_nbuf_list = &nbuf_ppdu_list[ppdu_cnt];
 			ppdu_cnt++;
+
 			if (!dp_tx_cap_nbuf_list_get_ref(ptr_nbuf_list))
 				continue;
 
 			cur_ppdu_desc = (struct cdp_tx_completion_ppdu *)
-					qdf_nbuf_data(ptr_nbuf_list->nbuf_ppdu);
+				qdf_nbuf_data(ptr_nbuf_list->nbuf_ppdu);
+
 			if (!cur_ppdu_desc)
 				continue;
 
-			cur_usr_idx = dp_tx_find_usr_idx_from_peer_id(
-						cur_ppdu_desc, peer_id);
+			for (idx = 0; idx < cur_ppdu_desc->num_users; idx++) {
+				if (peer_id ==
+				    cur_ppdu_desc->user[idx].peer_id) {
+					cur_user = &cur_ppdu_desc->user[idx];
+					cur_usr_idx = idx;
+					break;
+				}
+			}
 
-			cur_user = &cur_ppdu_desc->user[cur_usr_idx];
+			if (qdf_unlikely(!cur_user))
+				continue;
 
 			if ((cur_user->skip == 1) ||
 			    (cur_user->mon_procd == 1))
