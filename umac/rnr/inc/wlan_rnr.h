@@ -106,6 +106,15 @@ void wlan_global_6ghz_pdev_destroy(void);
 int32_t wlan_lower_band_ap_cnt_get(void);
 
 /**
+ * wlan_6ghz_band_ap_cnt_get - Get 6GHz band AP count
+ *
+ * API to get 6GHz band vdev from global context for
+ * faster access
+ *
+ * Return: int32_t
+ */
+int32_t wlan_6ghz_band_ap_cnt_get(void);
+/**
  * wlan_rnr_init_cnt - Initialize counters for
  *			6Ghz vdev and lower band vdev
  *
