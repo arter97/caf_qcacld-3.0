@@ -160,21 +160,17 @@ static inline bool dp_tx_capt_mem_check(struct dp_pdev *pdev, int buf_size)
 	}
 }
 
-static void dp_tx_capt_decr_ppdu_mgmt_bytes(struct dp_pdev *pdev,
-					      qdf_nbuf_queue_t *q)
+static uint32_t get_queue_bytes(qdf_nbuf_queue_t *q)
 {
-	qdf_nbuf_t next = NULL;
-	uint32_t nbufs_len = 0;
-	struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
+	qdf_nbuf_t nbuf;
+	uint32_t num_bytes = 0;
 
-	next = qdf_nbuf_queue_first(q);
-	while (next) {
-		nbufs_len += qdf_nbuf_get_truesize(next);
-		next = qdf_nbuf_queue_next(next);
+	nbuf = qdf_nbuf_queue_first(q);
+	while (nbuf) {
+		num_bytes += qdf_nbuf_get_truesize(nbuf);
+		nbuf = qdf_nbuf_queue_next(nbuf);
 	}
-
-	qdf_atomic_sub(nbufs_len,
-		       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
+	return num_bytes;
 }
 
 #ifdef WLAN_TX_PKT_CAPTURE_ENH_DEBUG
@@ -481,10 +477,11 @@ dp_peer_print_tid_qlen(struct dp_soc *soc,
 		if (!msdu_len && !ppdu_len && !tasklet_msdu_len)
 			continue;
 
-		DP_PRINT_STATS(" peer_id[%d] tid[%d] msdu_comp_q[%d] defer_msdu_q[%d] pending_ppdu_q[%d]",
+		DP_PRINT_STATS(" peer_id[%d] tid[%d] msdu_comp_q[%d] defer_msdu_q[%d] pending_ppdu_q[%d] last_deq:%d",
 			       peer->peer_id, tid,
 			       tasklet_msdu_len,
-			       msdu_len, ppdu_len);
+			       msdu_len, ppdu_len,
+			       tx_tid->last_deq_ms);
 	}
 	dp_tx_capture_print_stats(peer);
 }
@@ -825,6 +822,7 @@ void dp_peer_tid_queue_init(struct dp_peer *peer)
 		/* spinlock create */
 		qdf_spinlock_create(&tx_tid->tid_lock);
 		qdf_spinlock_create(&tx_tid->tasklet_tid_lock);
+		qdf_atomic_init(&tx_tid->msdu_comp_bytes);
 	}
 
 	mon_peer->tx_capture.is_tid_initialized = 1;
@@ -875,6 +873,8 @@ void dp_peer_tx_cap_tid_queue_flush(struct dp_soc *soc, struct dp_peer *peer,
 		uint32_t len = 0;
 		uint32_t actual_len = 0;
 		uint32_t delta_ms = 0;
+		uint32_t nbytes = 0;
+		struct dp_mon_soc *mon_soc = soc->monitor_soc;
 
 		tx_tid = &mon_peer->tx_capture.tx_tid[tid];
 
@@ -901,6 +901,11 @@ void dp_peer_tx_cap_tid_queue_flush(struct dp_soc *soc, struct dp_peer *peer,
 		xretry_user = &xretry_ppdu->user[0];
 
 		qdf_spin_lock_bh(&tx_tid->tid_lock);
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx) &&
+		    !qdf_nbuf_is_queue_empty(&tx_tid->defer_msdu_q)) {
+			nbytes = get_queue_bytes(&tx_tid->defer_msdu_q);
+			qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_bytes);
+		}
 		TX_CAP_NBUF_QUEUE_FREE(&tx_tid->defer_msdu_q);
 		/* update last dequeue time with current msec */
 		tx_tid->last_deq_ms = flush->now_ms;
@@ -909,6 +914,9 @@ void dp_peer_tx_cap_tid_queue_flush(struct dp_soc *soc, struct dp_peer *peer,
 		qdf_spin_unlock_bh(&tx_tid->tid_lock);
 
 		qdf_spin_lock_bh(&tx_tid->tasklet_tid_lock);
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
+			qdf_atomic_set(&tx_tid->msdu_comp_bytes, 0);
+		}
 		TX_CAP_NBUF_QUEUE_FREE(&tx_tid->msdu_comp_q);
 		qdf_spin_unlock_bh(&tx_tid->tasklet_tid_lock);
 
@@ -1005,10 +1013,20 @@ void dp_peer_tid_queue_cleanup(struct dp_peer *peer)
 		xretry_user = &xretry_ppdu->user[0];
 
 		qdf_spin_lock_bh(&tx_tid->tid_lock);
+		len = qdf_nbuf_queue_len(&tx_tid->defer_msdu_q);
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx) &&
+		    !qdf_nbuf_is_queue_empty(&tx_tid->defer_msdu_q)) {
+			uint32_t nbytes = get_queue_bytes(&tx_tid->defer_msdu_q);
+			qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_bytes);
+		}
 		TX_CAP_NBUF_QUEUE_FREE(&tx_tid->defer_msdu_q);
 		qdf_spin_unlock_bh(&tx_tid->tid_lock);
 
 		qdf_spin_lock_bh(&tx_tid->tasklet_tid_lock);
+		len = qdf_nbuf_queue_len(&tx_tid->msdu_comp_q);
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
+			qdf_atomic_set(&tx_tid->msdu_comp_bytes, 0);
+		}
 		TX_CAP_NBUF_QUEUE_FREE(&tx_tid->msdu_comp_q);
 		qdf_spin_unlock_bh(&tx_tid->tasklet_tid_lock);
 
@@ -1745,10 +1763,12 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
 			qdf_nbuf_queue_t *retries_q;
+			uint32_t nbytes;
+			struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
 
 			if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
-				dp_tx_capt_decr_ppdu_mgmt_bytes(pdev,
-						&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				nbytes = get_queue_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
 
 			qdf_spin_lock_bh(
@@ -1765,7 +1785,8 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 
 			if (!qdf_nbuf_is_queue_empty(retries_q)) {
 				if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
-					dp_tx_capt_decr_ppdu_mgmt_bytes(pdev, retries_q);
+					uint32_t nbytes = get_queue_bytes(retries_q);
+					qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 				}
 				TX_CAP_NBUF_QUEUE_FREE(retries_q);
 			}
@@ -1845,6 +1866,10 @@ dp_drop_enq_msdu_on_thresh(struct dp_pdev *pdev,
 			break;
 		}
 
+		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
+			qdf_atomic_sub(qdf_nbuf_get_truesize(nbuf),
+				       &tx_tid->msdu_comp_bytes);
+		}
 		qdf_nbuf_free(nbuf);
 		dp_tx_cap_stats_msdu_update(peer, PEER_MSDU_DROP, 1);
 		mon_pdev->tx_capture.msdu_threshold_drop++;
@@ -1983,6 +2008,10 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 	qdf_spin_lock_bh(&tx_tid->tasklet_tid_lock);
 	/* add nbuf to tail queue per peer tid */
 	qdf_nbuf_queue_add(&tx_tid->msdu_comp_q, netbuf);
+	if (wlan_cfg_get_tx_capt_max_mem(soc->wlan_cfg_ctx)) {
+		qdf_atomic_add(qdf_nbuf_get_truesize(netbuf),
+			       &tx_tid->msdu_comp_bytes);
+	}
 	dp_tx_cap_stats_msdu_update(peer, PEER_MSDU_ENQ, 1);
 	/* store last enqueue msec */
 	tx_tid->last_enq_ms = qdf_system_ticks_to_msecs(qdf_system_ticks());
@@ -2370,10 +2399,14 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 	for (i = 0; i < TXCAP_MAX_TYPE; i++) {
 		for (j = 0; j < TXCAP_MAX_SUBTYPE; j++) {
 			qdf_nbuf_queue_t *retries_q;
+			uint32_t nbytes;
+			struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
 
 			if (mem_limit_flag) {
-				dp_tx_capt_decr_ppdu_mgmt_bytes(pdev,
-						&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				 nbytes =
+				 get_queue_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				 qdf_atomic_sub(nbytes,
+					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
 
 			qdf_spin_lock_bh(
@@ -2386,7 +2419,8 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 				&mon_pdev->tx_capture.retries_ctl_mgmt_q[i][j];
 			if (!qdf_nbuf_is_queue_empty(retries_q)) {
 				if (mem_limit_flag) {
-					dp_tx_capt_decr_ppdu_mgmt_bytes(pdev, retries_q);
+					nbytes = get_queue_bytes(retries_q);
+					qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 				}
 				TX_CAP_NBUF_QUEUE_FREE(retries_q);
 			}
@@ -2888,9 +2922,7 @@ dp_tx_mon_restitch_mpdu(struct dp_pdev *pdev, struct dp_peer *peer,
 	qdf_nbuf_t first_nbuf = NULL;
 	qdf_nbuf_t prev_nbuf = NULL;
 	qdf_nbuf_t mpdu_nbuf = NULL;
-
 	struct msdu_completion_info *ptr_msdu_info = NULL;
-
 	uint8_t first_msdu = 0;
 	uint8_t last_msdu = 0;
 	uint32_t frag_list_sum_len = 0;
@@ -3114,9 +3146,11 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 	uint32_t msdu_ppdu_id;
 	qdf_nbuf_t curr_msdu = NULL;
 	struct msdu_completion_info *ptr_msdu_info = NULL;
-	uint32_t wbm_tsf;
+	uint32_t wbm_tsf = 0xffff;
 	uint32_t matched = 0;
 	qdf_nbuf_queue_t temp_defer_q;
+	struct dp_soc *soc = NULL;
+	struct dp_mon_soc *mon_soc = NULL;
 
 	if (qdf_unlikely(!peer))
 		return 0;
@@ -3133,12 +3167,22 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 	if (qdf_unlikely(!tx_tid))
 		return 0;
 
+	soc = peer->vdev->pdev->soc;
+	mon_soc = soc->monitor_soc;
+
 	/* Initialize temp list */
 	qdf_nbuf_queue_init(&temp_defer_q);
 
 	/* lock here */
 	qdf_spin_lock_bh(&tx_tid->tasklet_tid_lock);
 	qdf_nbuf_queue_append(&temp_defer_q, &tx_tid->msdu_comp_q);
+
+	if (wlan_cfg_get_tx_capt_max_mem(soc->wlan_cfg_ctx)) {
+		qdf_atomic_add(qdf_atomic_read(&tx_tid->msdu_comp_bytes),
+			       &mon_soc->dp_soc_tx_capt.ppdu_bytes);
+		qdf_atomic_set(&tx_tid->msdu_comp_bytes, 0);
+	}
+
 	qdf_nbuf_queue_init(&tx_tid->msdu_comp_q);
 	/* unlock here */
 	qdf_spin_unlock_bh(&tx_tid->tasklet_tid_lock);
@@ -3173,6 +3217,10 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 		    (ptr_msdu_info->status == HAL_TX_TQM_RR_REM_CMD_AGED)) {
 			/* Frames removed due to excessive retries */
 			qdf_nbuf_queue_remove(&tx_tid->defer_msdu_q);
+			if (wlan_cfg_get_tx_capt_max_mem(soc->wlan_cfg_ctx)) {
+				qdf_atomic_sub(qdf_nbuf_get_truesize(curr_msdu),
+					       &mon_soc->dp_soc_tx_capt.ppdu_bytes);
+			}
 			qdf_nbuf_queue_add(head_xretries, curr_msdu);
 			dp_tx_cap_stats_msdu_update(peer, PEER_MSDU_XRETRY, 1);
 			curr_msdu = qdf_nbuf_queue_first(
@@ -3191,9 +3239,13 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 		if (wbm_tsf && (wbm_tsf < start_tsf)) {
 			/* remove the aged packet */
 			qdf_nbuf_queue_remove(&tx_tid->defer_msdu_q);
+			if (wlan_cfg_get_tx_capt_max_mem(soc->wlan_cfg_ctx)) {
+				qdf_atomic_sub(qdf_nbuf_get_truesize(curr_msdu),
+					       &mon_soc->dp_soc_tx_capt.ppdu_bytes);
+			}
+
 			qdf_nbuf_free(curr_msdu);
 			dp_tx_cap_stats_msdu_update(peer, PEER_MSDU_DROP, 1);
-
 			curr_msdu = qdf_nbuf_queue_first(
 					&tx_tid->defer_msdu_q);
 			continue;
@@ -3202,11 +3254,13 @@ uint32_t dp_tx_msdu_dequeue(struct dp_peer *peer, uint32_t ppdu_id,
 		if (msdu_ppdu_id == ppdu_id) {
 			/* remove head */
 			qdf_nbuf_queue_remove(&tx_tid->defer_msdu_q);
-
+			if (wlan_cfg_get_tx_capt_max_mem(soc->wlan_cfg_ctx)) {
+				qdf_atomic_sub(qdf_nbuf_get_truesize(curr_msdu),
+					       &mon_soc->dp_soc_tx_capt.ppdu_bytes);
+			}
 			/* add msdu to head queue */
 			qdf_nbuf_queue_add(head, curr_msdu);
-			dp_tx_cap_stats_msdu_update(peer, PEER_MSDU_DEQ,
-						    1);
+			dp_tx_cap_stats_msdu_update(peer, PEER_MSDU_DEQ, 1);
 			/* get next msdu from defer_msdu_q */
 			curr_msdu = qdf_nbuf_queue_first(&tx_tid->defer_msdu_q);
 			continue;
@@ -4010,7 +4064,6 @@ dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 	int i;
 	uint32_t seq_no;
 	uint8_t usr_idx = 0;
-	struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
 
 	xretry_ppdu = tx_tid->xretry_ppdu;
 	if (!xretry_ppdu) {
@@ -4110,15 +4163,6 @@ dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 			}
 		}
 
-		/* if last element is NULL, then increment global count by
-		   xretry user mpdu bytes */
-		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
-			if (!qdf_nbuf_queue_next(ppdu_nbuf)) {
-				qdf_atomic_add(xretry_user->mpdu_bytes,
-					       &mon_soc->dp_soc_tx_capt.ppdu_bytes);
-			}
-		}
-
 		if ((user->pending_retries == 0) &&
 		    (ppdu_nbuf ==
 		     qdf_nbuf_queue_first(&tx_tid->pending_ppdu_q))) {
@@ -4135,13 +4179,6 @@ dp_tx_mon_proc_xretries(struct dp_pdev *pdev, struct dp_peer *peer,
 	}
 
 	TX_CAP_NBUF_QUEUE_FREE(&xretry_user->mpdu_q);
-
-	if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
-		qdf_atomic_sub(xretry_user->mpdu_bytes,
-			       &mon_soc->dp_soc_tx_capt.ppdu_bytes);
-		xretry_user->mpdu_bytes = 0;
-	}
-
 }
 
 static
@@ -4812,7 +4849,9 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 
 		if (ppdu_desc->sched_cmdid != retry_ppdu->sched_cmdid) {
 			if (mem_limit_flag) {
-				dp_tx_capt_decr_ppdu_mgmt_bytes(pdev, retries_q);
+				uint32_t nbytes = get_queue_bytes(retries_q);
+				qdf_atomic_sub(nbytes,
+					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
 			TX_CAP_NBUF_QUEUE_FREE(retries_q);
 		}
@@ -4920,20 +4959,20 @@ get_mgmt_pkt_from_queue:
 			 */
 			if (mem_limit_flag) {
 				if (!dp_tx_capt_mem_check(pdev,
-							  qdf_nbuf_get_truesize(mgmt_ctl_nbuf))) {
+							  qdf_nbuf_get_truesize(nbuf_ppdu_desc))) {
 					mon_soc->dp_soc_tx_capt.mem_limit_drops++;
-					status = QDF_STATUS_E_FAILURE;
-					goto exit;
+					qdf_nbuf_free(nbuf_ppdu_desc);
 				} else {
 					qdf_atomic_add(qdf_nbuf_get_truesize(nbuf_ppdu_desc),
 						       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
+					qdf_nbuf_queue_add(retries_q, nbuf_ppdu_desc);
 				}
+			} else {
+				/*
+				 * add the ppdu_desc into retry queue
+				 */
+				qdf_nbuf_queue_add(retries_q, nbuf_ppdu_desc);
 			}
-
-			/*
-			 * add the ppdu_desc into retry queue
-			 */
-			qdf_nbuf_queue_add(retries_q, nbuf_ppdu_desc);
 
 			/* flushing retry queue since completion status is
 			 * in final state. meaning that even though ppdu_id are
@@ -4942,7 +4981,9 @@ get_mgmt_pkt_from_queue:
 			if (qdf_unlikely(ppdu_desc->user[0].completion_status ==
 					 HTT_PPDU_STATS_USER_STATUS_OK)) {
 				if (mem_limit_flag) {
-					dp_tx_capt_decr_ppdu_mgmt_bytes(pdev, retries_q);
+					uint32_t nbytes = get_queue_bytes(retries_q);
+					qdf_atomic_sub(nbytes,
+						       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 				}
 				TX_CAP_NBUF_QUEUE_FREE(retries_q);
 			}
@@ -5010,7 +5051,9 @@ insert_mgmt_buf_to_queue:
 					qdf_nbuf_free(mgmt_ctl_nbuf);
 
 					if (mem_limit_flag) {
-						dp_tx_capt_decr_ppdu_mgmt_bytes(pdev, retries_q);
+						uint32_t nbytes = get_queue_bytes(retries_q);
+						qdf_atomic_sub(nbytes,
+							       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 					}
 					TX_CAP_NBUF_QUEUE_FREE(retries_q);
 					status = QDF_STATUS_SUCCESS;
@@ -5172,7 +5215,9 @@ insert_mgmt_buf_to_queue:
 		if (qdf_unlikely(ppdu_desc->user[0].completion_status ==
 				 HTT_PPDU_STATS_USER_STATUS_OK)) {
 			if (mem_limit_flag) {
-				dp_tx_capt_decr_ppdu_mgmt_bytes(pdev, retries_q);
+				uint32_t nbytes = get_queue_bytes(retries_q);
+				qdf_atomic_sub(nbytes,
+					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
 			TX_CAP_NBUF_QUEUE_FREE(retries_q);
 		}
@@ -6036,14 +6081,11 @@ free_nbuf_dec_ref:
 		ppdu_desc_cnt++;
 
 		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
-
 			qdf_size_t desc_size = sizeof(*ppdu_desc) +
 				(ppdu_desc->max_users *	sizeof(struct cdp_tx_completion_ppdu_user));
-
 			ppdu_desc->ppdu_bytes +=  desc_size;
 			qdf_atomic_add(ppdu_desc->ppdu_bytes,
 					&mon_soc->dp_soc_tx_capt.ppdu_bytes);
-
 			/* store the descriptor size so that global count can be
 			 * decremented by (desc_size + last user->mpdu_bytes
 			 * in dp_tx_ppdu_queue_free
@@ -6095,6 +6137,7 @@ dp_pdev_tx_cap_flush(struct dp_pdev *pdev, bool is_stats_queue_empty)
 	uint32_t delta_ms = 0;
 	uint32_t i = 0, j = 0;
 	bool mem_limit_flag = false;
+	struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
 
 	mem_limit_flag = wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx);
 
@@ -6130,8 +6173,9 @@ dp_pdev_tx_cap_flush(struct dp_pdev *pdev, bool is_stats_queue_empty)
 			qdf_nbuf_queue_t *retries_q;
 
 			if (mem_limit_flag) {
-				dp_tx_capt_decr_ppdu_mgmt_bytes(pdev,
-							&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				uint32_t nbytes = get_queue_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				qdf_atomic_sub(nbytes,
+					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
 
 			qdf_spin_lock_bh(
@@ -6148,7 +6192,9 @@ dp_pdev_tx_cap_flush(struct dp_pdev *pdev, bool is_stats_queue_empty)
 				&mon_pdev->tx_capture.retries_ctl_mgmt_q[i][j];
 			if (!qdf_nbuf_is_queue_empty(retries_q)) {
 				if (mem_limit_flag) {
-					dp_tx_capt_decr_ppdu_mgmt_bytes(pdev, retries_q);
+					uint32_t nbytes = get_queue_bytes(retries_q);
+					qdf_atomic_sub(nbytes,
+						       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 				}
 				TX_CAP_NBUF_QUEUE_FREE(retries_q);
 			}
