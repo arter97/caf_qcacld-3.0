@@ -1371,6 +1371,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_DISABLE_NSS_PROBE_INTVL = 504,
 #endif
 	OL_ATH_PARAM_ACS_6G_NON_PRIO_CHAN_PENALTY = 505,
+	OL_ATH_PARAM_DCS_BANDWIDTH_REDUCTION_CONTROL = 506,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3618,6 +3619,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_acs_6g_non_prio_chan_penalty",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_NON_PRIO_CHAN_PENALTY,
 		GET_PARAM, 0},
+	{"set_dcs_bw_reduction_ctrl",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_BANDWIDTH_REDUCTION_CONTROL, SET_PARAM, 1},
+	{"get_dcs_bw_reduction_ctrl",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_BANDWIDTH_REDUCTION_CONTROL, GET_PARAM, 0},
 };
 #endif
 
