@@ -612,6 +612,32 @@ hif_is_force_napi_complete_required(struct hif_exec_context *hif_ext_group)
 #endif
 
 /**
+ * hif_irq_disabled_time_limit_reached() - determine if irq disabled limit
+ * reached for single MSI
+ * @hif_ext_group: hif exec context
+ *
+ * Return: true if reached, else false.
+ */
+static bool
+hif_irq_disabled_time_limit_reached(struct hif_exec_context *hif_ext_group)
+{
+	unsigned long long irq_disabled_duration_ns;
+
+	if (hif_ext_group->type != HIF_EXEC_NAPI_TYPE)
+		return false;
+
+	irq_disabled_duration_ns = qdf_time_sched_clock() -
+					hif_ext_group->irq_disabled_start_time;
+	if (irq_disabled_duration_ns >= IRQ_DISABLED_MAX_DURATION_NS) {
+		hif_record_event(hif_ext_group->hif, hif_ext_group->grp_id,
+				 0, 0, 0, HIF_EVENT_IRQ_DISABLE_EXPIRED);
+		return true;
+	}
+
+	return false;
+}
+
+/**
  * hif_exec_poll() - napi poll
  * napi: napi struct
  * budget: budget for napi
@@ -647,7 +673,9 @@ static int hif_exec_poll(struct napi_struct *napi, int budget)
 	actual_dones = work_done;
 
 	if (hif_is_force_napi_complete_required(hif_ext_group) ||
-	    (!hif_ext_group->force_break && work_done < normalized_budget)) {
+	    (!hif_ext_group->force_break && work_done < normalized_budget) ||
+	    ((pld_is_one_msi(scn->qdf_dev->dev) &&
+	    hif_irq_disabled_time_limit_reached(hif_ext_group)))) {
 		hif_record_event(hif_ext_group->hif, hif_ext_group->grp_id,
 				 0, 0, 0, HIF_EVENT_BH_COMPLETE);
 		napi_complete(napi);
@@ -943,6 +971,10 @@ irqreturn_t hif_ext_group_interrupt_handler(int irq, void *context)
 				 0, 0, 0, HIF_EVENT_IRQ_TRIGGER);
 
 		hif_ext_group->irq_disable(hif_ext_group);
+
+		if (pld_is_one_msi(scn->qdf_dev->dev))
+			hif_ext_group->irq_disabled_start_time =
+							qdf_time_sched_clock();
 		/*
 		 * if private ioctl has issued fake suspend command to put
 		 * FW in D0-WOW state then here is our chance to bring FW out

@@ -41,6 +41,10 @@
 /*Buckets for latency between 250 to 500 ms*/
 #define HIF_SCHED_LATENCY_BUCKET_251_500 500
 
+#ifndef IRQ_DISABLED_MAX_DURATION_NS
+#define IRQ_DISABLED_MAX_DURATION_NS 100000000
+#endif
+
 struct hif_exec_context;
 
 struct hif_execution_ops {
@@ -77,6 +81,7 @@ struct hif_execution_ops {
  *		 to HIF. This means there is more work to be done. Hence do not
  *		 call napi_complete.
  * @force_napi_complete: do a force napi_complete when this flag is set to -1
+ * @irq_disabled_start_time: irq disabled start time for single MSI
  */
 struct hif_exec_context {
 	struct hif_execution_ops *sched_ops;
@@ -116,6 +121,7 @@ struct hif_exec_context {
 #ifdef FEATURE_IRQ_AFFINITY
 	qdf_atomic_t force_napi_complete;
 #endif
+	unsigned long long irq_disabled_start_time;
 };
 
 /**
