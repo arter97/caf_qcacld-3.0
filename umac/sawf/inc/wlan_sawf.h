@@ -51,7 +51,7 @@
  * Granularity: 100µs
  */
 #define SAWF_MIN_SVC_INTERVAL 0
-#define SAWF_MAX_SVC_INTERVAL (10 * 1000 * 1000)
+#define SAWF_MAX_SVC_INTERVAL (10 * 100 * 100)
 
 /*
  * Burst size 0 - 16Mbytes.
@@ -65,14 +65,14 @@
  * Granularity: 100µs
  */
 #define SAWF_MIN_DELAY_BOUND 0
-#define SAWF_MAX_DELAY_BOUND (10 * 1000 * 1000)
+#define SAWF_MAX_DELAY_BOUND (10 * 100 * 100)
 
 /*
  * Msdu TTL limit 0 - 10secs.
  * Granularity: 100µs
  */
 #define SAWF_MIN_MSDU_TTL 0
-#define SAWF_MAX_MSDU_TTL (10 * 1024 * 1024)
+#define SAWF_MAX_MSDU_TTL (10 * 100 * 100)
 
 /*
  * Priority limit 0 - 127.
@@ -91,7 +91,7 @@
  * Granularity: 0.01%
  */
 #define SAWF_MIN_MSDU_LOSS_RATE 0
-#define SAWF_MAX_MSDU_LOSS_RATE 1000
+#define SAWF_MAX_MSDU_LOSS_RATE 10000
 
 /**
  * struct wlan_sawf_scv_class_params- Service Class Parameters
