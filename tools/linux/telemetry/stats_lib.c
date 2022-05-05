@@ -18,6 +18,7 @@
  */
 
 #include <qcatools_lib.h>
+#include <ieee80211_external.h>
 #include <wlan_stats_define.h>
 #include <stats_lib.h>
 #if UMAC_SUPPORT_CFG80211
@@ -29,17 +30,30 @@
 #define FL "%s(): %d:"
 
 #define STATS_ERR(fmt, args...) \
-	fprintf(stderr, FL "stats: Error: "fmt, __func__, __LINE__, ## args)
+	fprintf(stderr, "stats_lib:E:" FL ": "fmt, __func__, __LINE__, ## args)
 #define STATS_WARN(fmt, args...) \
-	fprintf(stdout, FL "stats: Warn: "fmt, __func__, __LINE__, ## args)
+	fprintf(stdout, "stats_lib:W:" FL ": "fmt, __func__, __LINE__, ## args)
 #define STATS_MSG(fmt, args...) \
-	fprintf(stdout, FL "stats: "fmt, __func__, __LINE__, ## args)
+	fprintf(stdout, "stats_lib:M:" FL ": "fmt, __func__, __LINE__, ## args)
+#define STATS_INFO(fmt, args...) \
+	fprintf(stdout, "stats_lib:I:" FL ": "fmt, __func__, __LINE__, ## args)
 
-#define STATS_PRINT(fmt, args...) \
-	fprintf(stdout, "stats: "fmt, ## args)
-
+/* Expected MAX STAs per VAP */
+#define EXPECTED_MAX_STAS_PERVAP       (50)
+/* MAX NL buffer size of station list */
+#define LIST_STATION_CFG_ALLOC_SIZE    (3500)
+/* MAX Radio count */
+#define MAX_RADIO_NUM                3
+/* MAX SoC count expected same as Radio count */
+#define MAX_SOC_NUM                  3
+/* MAX Possible VAP count based on radio count */
+#define MAX_VAP_NUM                  (17 * MAX_RADIO_NUM)
+/* This path is for network interfaces */
+#define PATH_SYSNET_DEV              "/sys/class/net/"
 /* This path is created if phy is brought up in cfg80211 mode */
 #define CFG80211_MODE_FILE_PATH      "/sys/class/net/wifi%d/phy80211/"
+/* Radio interface name size */
+#define RADIO_IFNAME_SIZE            5
 
 /* NL80211 command and event socket IDs */
 #define STATS_NL80211_CMD_SOCK_ID    DEFAULT_NL80211_CMD_SOCK_ID
@@ -55,6 +69,73 @@
 
 /* Global socket context to create nl80211 command and event interface */
 static struct socket_context g_sock_ctx = {0};
+/* Global parent vap to build child sta object list */
+static struct object_list *g_parent_vap_obj;
+/**
+ * Global sta object pointor to avoid sta list traversal to find current
+ * sta pointer while building sta object list.
+ */
+static struct object_list *g_curr_sta_obj;
+
+/**
+ * struct soc_ifnames: Radio interface of a soc
+ * @ifname: Radio Interface name
+ */
+struct soc_ifnames {
+	char ifname[IFNAME_LEN];
+};
+
+/**
+ * struct interface: Each interface details
+ * @added: flag to indicate that the interface is added to object list
+ * @active: flag to indicate that the interface is up and running
+ * @name: Name of the interface
+ * @hw_addr: Hardware address of the interface
+ */
+struct interface {
+	bool added;
+	bool active;
+	char *name;
+	uint8_t hw_addr[ETH_ALEN];
+};
+
+/**
+ * struct interface_list: List of interfaces in sys entry
+ * @s_count: Number of socs
+ * @r_count: Number of radios
+ * @v_count: Number of vaps
+ * @soc: Array of Soc Interface details
+ * @radio: Array of Radio interface details
+ * @vap: Array of vap interface details
+ */
+struct interface_list {
+	uint8_t s_count;
+	uint8_t r_count;
+	uint8_t v_count;
+	struct interface soc[MAX_SOC_NUM];
+	struct interface radio[MAX_RADIO_NUM];
+	struct interface vap[MAX_VAP_NUM];
+};
+
+/**
+ * struct object_list: Holds request object hierarchy
+ * @nlsent: Flag to indicate nl request is sent
+ * @obj_type: Specifies stats_object_e type
+ * @ifname: Interface to be used for sending nl command
+ * @hw_addr: Hardware address if it is a STA type object
+ * @parent: Pionter to parent object list
+ * @child: Pointer to child object list
+ * @next: Pointer to next object in the list
+ */
+struct object_list {
+	bool nlsent;
+	enum stats_object_e obj_type;
+	char ifname[IFNAME_LEN];
+	uint8_t hw_addr[ETH_ALEN];
+	struct object_list *parent;
+	struct object_list *child;
+	struct object_list *next;
+};
 
 /**
  * struct feat_parser_t: Defines feature name and corresponding ID
@@ -66,6 +147,9 @@ struct feat_parser_t {
 	u_int64_t id;
 };
 
+/**
+ * Mapping for Supported Features
+ */
 static struct feat_parser_t g_feat[] = {
 	{ "ALL", STATS_FEAT_FLG_ALL },
 	{ "ME", STATS_FEAT_FLG_ME },
@@ -96,6 +180,7 @@ static struct feat_parser_t g_feat[] = {
 	{ NULL, 0 },
 };
 
+/* Global nl policy for response attributes */
 struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_FEAT_ME] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_RX] = { .type = NLA_UNSPEC },
@@ -120,14 +205,18 @@ struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_FEAT_MONITOR] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFDELAY] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFTX] = { .type = NLA_UNSPEC },
-	[QCA_WLAN_VENDOR_ATTR_RECURSIVE] = { .type = NLA_FLAG },
 };
 
-static int is_radio_ifname_valid(const char *ifname)
+static int is_ifname_valid(const char *ifname, enum stats_object_e obj)
 {
-	int i;
+	int i, ret;
+	ssize_t size = 0;
+	char *str = 0;
+	char path[100];
+	FILE *fp;
 
 	assert(ifname);
+
 	/*
 	 * At this step, we only validate if the string makes sense.
 	 * If the interface doesn't actually exist, we'll throw an
@@ -135,45 +224,51 @@ static int is_radio_ifname_valid(const char *ifname)
 	 * use the interface.
 	 * Reduces the no. of ioctl calls.
 	 */
-	if (strncmp(ifname, "wifi", 4) != 0)
-		return 0;
-	if (!ifname[4] || !isdigit(ifname[4]))
-		return 0;
-	/*
-	 * We don't make any assumptions on max no. of radio interfaces,
-	 * at this step.
-	 */
-	for (i = 5; i < IFNAMSIZ; i++) {
-		if (!ifname[i])
-			break;
-		if (!isdigit(ifname[i]))
+	if (STATS_OBJ_VAP == obj) {
+		ret = 0;
+		size = sizeof(path);
+		if ((strlcpy(path, PATH_SYSNET_DEV, size) >= size) ||
+		    (strlcat(path, ifname, size) >= size) ||
+		    (strlcat(path, "/parent", size) >= size)) {
+			STATS_ERR("Error creating pathname\n");
 			return 0;
+		}
+		fp = fopen(path, "r");
+		if (fp) {
+			fclose(fp);
+			ret = 1;
+		}
+	} else {
+		ret = 1;
+		switch (obj) {
+		case STATS_OBJ_AP:
+			str = "soc";
+			size = 4;
+			break;
+		case STATS_OBJ_RADIO:
+			str = "wifi";
+			size = 5;
+			break;
+		default:
+			return 0;
+		}
+
+		if ((strncmp(ifname, str, size - 1) == 0) &&
+		    ifname[size - 1] && isdigit(ifname[size - 1])) {
+			/*
+			 * We don't make any assumptions on max no. of radio
+			 * interfaces, at this step.
+			 */
+			for (i = size; ifname[i]; i++) {
+				if (!isdigit(ifname[i]))
+					return 0;
+			}
+		} else {
+			ret = 0;
+		}
 	}
 
-	return 1;
-}
-
-static int is_vap_ifname_valid(const char *ifname)
-{
-	char path[100];
-	FILE *fp;
-	ssize_t bufsize = sizeof(path);
-
-	assert(ifname);
-
-	if ((strlcpy(path, PATH_SYSNET_DEV, bufsize) >= bufsize) ||
-	    (strlcat(path, ifname, bufsize) >= bufsize) ||
-	    (strlcat(path, "/parent", bufsize) >= bufsize)) {
-		STATS_ERR("Error creating pathname\n");
-		return -EINVAL;
-	}
-	fp = fopen(path, "r");
-	if (fp) {
-		fclose(fp);
-		return 1;
-	}
-
-	return 0;
+	return ret;
 }
 
 static int is_cfg80211_mode_enabled(void)
@@ -194,6 +289,181 @@ static int is_cfg80211_mode_enabled(void)
 	}
 
 	return ret;
+}
+
+static void free_interface_list(struct interface_list *if_list)
+{
+	u_int8_t inx = 0;
+
+	for (inx = 0; inx < MAX_SOC_NUM; inx++) {
+		if (if_list->soc[inx].name)
+			free(if_list->soc[inx].name);
+	}
+	if_list->s_count = 0;
+	for (inx = 0; inx < MAX_RADIO_NUM; inx++) {
+		if (if_list->radio[inx].name)
+			free(if_list->radio[inx].name);
+	}
+	if_list->r_count = 0;
+	for (inx = 0; inx < MAX_VAP_NUM; inx++) {
+		if (if_list->vap[inx].name)
+			free(if_list->vap[inx].name);
+	}
+	if_list->v_count = 0;
+}
+
+static int get_active_radio_intf_for_soc(struct interface_list *if_list,
+					 struct soc_ifnames *soc_if,
+					 char *soc_name, uint8_t *count)
+{
+	DIR *dir = NULL;
+	char path[100] = {'\0'};
+	ssize_t bufsize = sizeof(path);
+	uint8_t inx = 0;
+
+	assert(soc_name && soc_if);
+
+	if ((strlcpy(path, PATH_SYSNET_DEV, bufsize) >= bufsize) ||
+	    (strlcat(path, soc_name, bufsize) >= bufsize) ||
+	    (strlcat(path, "/device/net", bufsize) >= bufsize)) {
+		STATS_ERR("Error creating pathname\n");
+		return -EINVAL;
+	}
+
+	dir = opendir(path);
+	if (!dir) {
+		perror(path);
+		return -ENOENT;
+	}
+
+	while (1) {
+		struct dirent *entry;
+		char *d_name;
+		uint8_t rinx;
+		bool found = false;
+
+		entry = readdir(dir);
+		if (!entry)
+			break;
+		if ((inx >= MAX_RADIO_NUM) || !soc_if)
+			break;
+		d_name = entry->d_name;
+		if (entry->d_type & (DT_DIR | DT_LNK)) {
+			if (strlcpy(soc_if->ifname, d_name, IFNAME_LEN) >=
+				    IFNAME_LEN) {
+				STATS_ERR("Unable to fetch interface name\n");
+				closedir(dir);
+				return -EIO;
+			}
+			for (rinx = 0; rinx < if_list->r_count; rinx++) {
+				if (!strncmp(soc_if->ifname,
+					     if_list->radio[rinx].name,
+					     RADIO_IFNAME_SIZE)) {
+					found = true;
+					break;
+				}
+			}
+			if (found && if_list->radio[rinx].active) {
+				inx++;
+				soc_if++;
+			} else {
+				memset(soc_if->ifname, '\0', IFNAME_LEN);
+			}
+		}
+	}
+
+	closedir(dir);
+	*count = inx;
+
+	return 0;
+}
+
+static int fetch_all_interfaces(struct interface_list *if_list)
+{
+	char temp_name[IFNAME_LEN] = {'\0'};
+	DIR *dir = NULL;
+	u_int8_t rinx = 0;
+	u_int8_t vinx = 0;
+	u_int8_t sinx = 0;
+	ssize_t size = 0;
+
+	dir = opendir(PATH_SYSNET_DEV);
+	if (!dir) {
+		perror(PATH_SYSNET_DEV);
+		return -ENOENT;
+	}
+	while (1) {
+		struct dirent *entry;
+		char *d_name;
+
+		entry = readdir(dir);
+		if (!entry)
+			break;
+		d_name = entry->d_name;
+		if (entry->d_type & (DT_DIR | DT_LNK)) {
+			if (strlcpy(temp_name, d_name, IFNAME_LEN) >=
+				    IFNAME_LEN) {
+				STATS_ERR("Unable to fetch interface name\n");
+				closedir(dir);
+				return -EIO;
+			}
+		} else {
+			continue;
+		}
+		if (is_ifname_valid(temp_name, STATS_OBJ_AP)) {
+			if (sinx >= MAX_SOC_NUM) {
+				STATS_WARN("SOC Interfaces exceeded limit\n");
+				continue;
+			}
+			size = strlen(temp_name) + 1;
+			if_list->soc[sinx].name = (char *)malloc(size);
+			if (!if_list->soc[sinx].name) {
+				STATS_ERR("Unable to Allocate Memory!\n");
+				closedir(dir);
+				return -ENOMEM;
+			}
+			strlcpy(if_list->soc[sinx].name, temp_name, size);
+			if_list->soc[sinx].added = false;
+			sinx++;
+		} else if (is_ifname_valid(temp_name, STATS_OBJ_RADIO)) {
+			if (rinx >= MAX_RADIO_NUM) {
+				STATS_WARN("Radio Interfaces exceeded limit\n");
+				continue;
+			}
+			size = strlen(temp_name) + 1;
+			if_list->radio[rinx].name = (char *)malloc(size);
+			if (!if_list->radio[rinx].name) {
+				STATS_ERR("Unable to Allocate Memory!\n");
+				closedir(dir);
+				return -ENOMEM;
+			}
+			strlcpy(if_list->radio[rinx].name, temp_name, size);
+			if_list->radio[rinx].added = false;
+			rinx++;
+		} else if (is_ifname_valid(temp_name, STATS_OBJ_VAP)) {
+			if (vinx >= MAX_VAP_NUM) {
+				STATS_WARN("Vap Interfaces exceeded limit\n");
+				continue;
+			}
+			size = strlen(temp_name) + 1;
+			if_list->vap[vinx].name = (char *)malloc(size);
+			if (!if_list->vap[vinx].name) {
+				STATS_ERR("Unable to Allocate Memory!\n");
+				closedir(dir);
+				return -ENOMEM;
+			}
+			strlcpy(if_list->vap[vinx].name, temp_name, size);
+			if_list->vap[vinx].added = false;
+			vinx++;
+		}
+	}
+
+	closedir(dir);
+	if_list->s_count = sinx;
+	if_list->r_count = rinx;
+	if_list->v_count = vinx;
+
+	return 0;
 }
 
 static int stats_lib_socket_init(void)
@@ -218,7 +488,7 @@ static int stats_lib_init(void)
 	/* There are few generic IOCTLS, so we need to have sockfd */
 	g_sock_ctx.sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (g_sock_ctx.sock_fd < 0) {
-		errx(1, "socket creation failed");
+		STATS_ERR("socket creation failed\n");
 		return -EIO;
 	}
 
@@ -231,6 +501,23 @@ static void stats_lib_deinit(void)
 		return;
 	destroy_socket_context(&g_sock_ctx);
 	close(g_sock_ctx.sock_fd);
+}
+
+static int32_t get_hw_address(const char *if_name, uint8_t *hw_addr)
+{
+	struct ifreq dev = {0};
+
+	dev.ifr_addr.sa_family = AF_INET;
+	memset(dev.ifr_name, '\0', IFNAMSIZ);
+	if (strlcpy(dev.ifr_name, if_name, IFNAMSIZ) > IFNAMSIZ)
+		return -EIO;
+
+	if (ioctl(g_sock_ctx.sock_fd, SIOCGIFHWADDR, &dev) < 0)
+		return -EIO;
+
+	memcpy(hw_addr, dev.ifr_hwaddr.sa_data, ETH_ALEN);
+
+	return 0;
 }
 
 static bool is_interface_active(const char *if_name, enum stats_object_e obj)
@@ -246,152 +533,40 @@ static bool is_interface_active(const char *if_name, enum stats_object_e obj)
 		return false;
 
 	if ((dev.ifr_flags & IFF_RUNNING) &&
-	    ((obj == STATS_OBJ_AP) || (obj == STATS_OBJ_RADIO) ||
-	    (dev.ifr_flags & IFF_UP)))
+	    ((obj == STATS_OBJ_RADIO) || (dev.ifr_flags & IFF_UP)))
 		return true;
 
 	return false;
 }
 
-static void set_valid_feature_request(struct stats_command *cmd)
+static bool is_vap_radiochild(const char *rif_name, const uint8_t *rhw_addr,
+			      const char *vif_name, const uint8_t *vhw_addr)
 {
-	if (cmd->feat_flag == STATS_FEAT_FLG_ALL)
-		return;
+	char path[100];
+	char parent[IFNAMSIZ];
+	FILE *fp;
+	ssize_t bufsize = sizeof(path);
 
-	switch (cmd->lvl) {
-	case STATS_LVL_BASIC:
-		{
-			switch (cmd->obj) {
-			case STATS_OBJ_AP:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_BASIC_AP_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_BASIC_AP_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_RADIO:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_BASIC_RADIO_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_BASIC_RADIO_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_VAP:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_BASIC_VAP_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_BASIC_VAP_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_STA:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_BASIC_STA_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_BASIC_STA_DATA_MASK);
-				}
-				break;
-			}
-		}
-		break;
-#if WLAN_ADVANCE_TELEMETRY
-	case STATS_LVL_ADVANCE:
-		{
-			switch (cmd->obj) {
-			case STATS_OBJ_AP:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_ADVANCE_AP_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_ADVANCE_AP_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_RADIO:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_ADVANCE_RADIO_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_ADVANCE_RADIO_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_VAP:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_ADVANCE_VAP_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_ADVANCE_VAP_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_STA:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_ADVANCE_STA_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_ADVANCE_STA_DATA_MASK);
-				}
-				break;
-			}
-		}
-		break;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-#if WLAN_DEBUG_TELEMETRY
-	case STATS_LVL_DEBUG:
-		{
-			switch (cmd->obj) {
-			case STATS_OBJ_AP:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_DEBUG_AP_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_DEBUG_AP_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_RADIO:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_DEBUG_RADIO_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_DEBUG_RADIO_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_VAP:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_DEBUG_VAP_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_DEBUG_VAP_DATA_MASK);
-				}
-				break;
-			case STATS_OBJ_STA:
-				if (cmd->type & STATS_TYPE_CTRL) {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_DEBUG_STA_CTRL_MASK);
-				} else {
-					SET_FLAG(cmd->feat_flag,
-						 STATS_DEBUG_STA_DATA_MASK);
-				}
-				break;
-			}
-		}
-		break;
-#endif /* WLAN_DEBUG_TELEMETRY */
-	default:
-		cmd->feat_flag = 0;
+	/* Exclude MSB to compare as LA bit would have been set */
+	if (!memcmp(&vhw_addr[1], &rhw_addr[1], 5))
+		return true;
+
+	if ((strlcpy(path, PATH_SYSNET_DEV, bufsize) >= bufsize) ||
+	    (strlcat(path, vif_name, bufsize) >= bufsize) ||
+	    (strlcat(path, "/parent", bufsize) >= bufsize)) {
+		STATS_ERR("Error creating pathname\n");
+		return false;
 	}
+	fp = fopen(path, "r");
+	if (!fp)
+		return false;
+	fgets(parent, IFNAMSIZ, fp);
+	fclose(fp);
+
+	if (!strncmp(parent, rif_name, RADIO_IFNAME_SIZE))
+		return true;
+
+	return false;
 }
 
 static int is_valid_cmd(struct stats_command *cmd)
@@ -408,7 +583,7 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("Radio Interface name not configured.\n");
 			return -EINVAL;
 		}
-		if (!is_radio_ifname_valid(cmd->if_name)) {
+		if (!is_ifname_valid(cmd->if_name, STATS_OBJ_RADIO)) {
 			STATS_ERR("Radio Interface name invalid.\n");
 			return -EINVAL;
 		}
@@ -420,7 +595,7 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("VAP Interface name not configured.\n");
 			return -EINVAL;
 		}
-		if (!is_vap_ifname_valid(cmd->if_name)) {
+		if (!is_ifname_valid(cmd->if_name, STATS_OBJ_VAP)) {
 			STATS_ERR("VAP Interface name invalid.\n");
 			return -EINVAL;
 		}
@@ -434,12 +609,6 @@ static int is_valid_cmd(struct stats_command *cmd)
 		break;
 	default:
 		STATS_ERR("Unknown Stats object.\n");
-		return -EINVAL;
-	}
-	if (!cmd->recursive)
-		set_valid_feature_request(cmd);
-	if (!cmd->feat_flag) {
-		STATS_ERR("Invalid Feature Request!\n");
 		return -EINVAL;
 	}
 
@@ -465,9 +634,9 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 		STATS_ERR("failed to put stats category type\n");
 		return -EIO;
 	}
-	if (cmd->recursive &&
-	    nla_put_flag(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_RECURSIVE)) {
-		STATS_ERR("failed to put recursive flag\n");
+	if (!cmd->recursive &&
+	    nla_put_flag(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_AGGREGATE)) {
+		STATS_ERR("failed to put aggregate flag\n");
 		return -EIO;
 	}
 	if (nla_put_u64(nlmsg, QCA_WLAN_VENDOR_ATTR_TELEMETRIC_FEATURE_FLAG,
@@ -1830,9 +1999,590 @@ static int32_t send_nl_command(struct stats_command *cmd,
 	return ret;
 }
 
-static int32_t process_and_send_stats_request(struct stats_command *cmd)
+static void *alloc_object(enum stats_object_e obj_type, char *ifname)
+{
+	struct object_list *temp_obj = NULL;
+
+	temp_obj = (struct object_list *)malloc(sizeof(struct object_list));
+	if (!temp_obj) {
+		STATS_ERR("Unable to allocate Memory!\n");
+		return NULL;
+	}
+
+	temp_obj->nlsent = false;
+	temp_obj->next = NULL;
+	temp_obj->parent = NULL;
+	temp_obj->child = NULL;
+	temp_obj->obj_type = obj_type;
+	strlcpy(temp_obj->ifname, ifname, IFNAME_LEN);
+
+	return temp_obj;
+}
+
+static void free_object_list(struct object_list *temp_obj)
+{
+	struct object_list *obj_to_free = NULL;
+
+	while (temp_obj) {
+		if (temp_obj->child) {
+			temp_obj = temp_obj->child;
+			continue;
+		}
+		obj_to_free = temp_obj;
+		if (obj_to_free->parent)
+			obj_to_free->parent->child = obj_to_free->next;
+		if (obj_to_free->next)
+			temp_obj = obj_to_free->next;
+		else
+			temp_obj = obj_to_free->parent;
+		obj_to_free->next = NULL;
+		obj_to_free->parent = NULL;
+		obj_to_free->child = NULL;
+		free(obj_to_free);
+	}
+}
+
+static void get_sta_info(struct cfg80211_data *buffer)
+{
+	struct ieee80211req_sta_info *si = NULL;
+	uint8_t *buf = NULL, *cp = NULL;
+	uint32_t remaining_len = 0;
+	struct object_list *parent_obj = g_parent_vap_obj;
+	struct object_list *temp_obj = NULL;
+
+	buf = buffer->data;
+	remaining_len = buffer->length;
+	cp = buf;
+
+	if (remaining_len < sizeof(struct ieee80211req_sta_info))
+		return;
+
+	do {
+		si = (struct ieee80211req_sta_info *)cp;
+		if (!si || !si->isi_len)
+			break;
+		temp_obj = alloc_object(STATS_OBJ_STA, parent_obj->ifname);
+		if (!temp_obj)
+			break;
+		temp_obj->parent = parent_obj;
+		if (!parent_obj->child)
+			parent_obj->child = temp_obj;
+		else
+			g_curr_sta_obj->next = temp_obj;
+		g_curr_sta_obj = temp_obj;
+
+		memcpy(g_curr_sta_obj->hw_addr, si->isi_macaddr, ETH_ALEN);
+
+		cp += si->isi_len;
+		remaining_len -= si->isi_len;
+	} while (remaining_len >= sizeof(struct ieee80211req_sta_info));
+
+	buffer->length = LIST_STATION_CFG_ALLOC_SIZE;
+}
+
+static int32_t build_child_sta_list(char *ifname,
+				    struct object_list *parent_obj)
 {
 	struct cfg80211_data buffer;
+	uint32_t len = 0;
+	uint32_t opmode = 0;
+	uint8_t *buf = NULL;
+	int32_t msg = 0;
+	uint16_t cmd = 0;
+
+	buffer.data = &opmode;
+	buffer.length = sizeof(uint32_t);
+	buffer.parse_data = 0;
+	buffer.callback = NULL;
+	buffer.parse_data = 0;
+	cmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_PARAMS;
+	msg = wifi_cfg80211_send_getparam_command(&g_sock_ctx.cfg80211_ctxt,
+						  cmd,
+						  IEEE80211_PARAM_GET_OPMODE,
+						  ifname, (char *)&buffer,
+						  sizeof(uint32_t));
+	if (msg < 0) {
+		STATS_ERR("Couldn't send NL command; %d\n", msg);
+		return -EIO;
+	}
+
+	if (opmode != IEEE80211_M_HOSTAP)
+		return 0;
+
+	memset(&buffer, 0, sizeof(buffer));
+	len = sizeof(struct ieee80211req_sta_info) * EXPECTED_MAX_STAS_PERVAP;
+
+	buf = (uint8_t *)malloc(len);
+	if (!buf) {
+		STATS_ERR("Unable to allocate Memory!\n");
+		return -ENOMEM;
+	}
+	buffer.data = buf;
+	buffer.length = LIST_STATION_CFG_ALLOC_SIZE;
+	buffer.flags = 0;
+	buffer.parse_data = 0;
+	buffer.callback = &get_sta_info;
+	g_parent_vap_obj = parent_obj;
+	cmd = QCA_NL80211_VENDOR_SUBCMD_SET_WIFI_CONFIGURATION;
+	wifi_cfg80211_send_generic_command(&g_sock_ctx.cfg80211_ctxt, cmd,
+					   QCA_NL80211_VENDOR_SUBCMD_LIST_STA,
+					   ifname, (char *)&buffer,
+					   buffer.length);
+
+	free(buf);
+
+	return 0;
+}
+
+static int32_t build_child_vap_list(struct interface_list *if_list,
+				    char *rifname, uint8_t *rhw_addr,
+				    struct object_list *parent_obj)
+{
+	uint8_t inx = 0;
+	struct object_list *temp_obj = NULL;
+	struct object_list *curr_obj = NULL;
+	char *ifname = NULL;
+
+	if (!rifname || !rhw_addr || !parent_obj)
+		return -EINVAL;
+
+	for (inx = 0; inx < if_list->v_count; inx++) {
+		ifname = if_list->vap[inx].name;
+		if (if_list->vap[inx].added)
+			continue;
+		if (!if_list->vap[inx].active)
+			continue;
+		if (!is_vap_radiochild(rifname, rhw_addr, ifname,
+				       if_list->vap[inx].hw_addr))
+			continue;
+		temp_obj = alloc_object(STATS_OBJ_VAP, ifname);
+		if (!temp_obj) {
+			STATS_ERR("Allocation failed for %s object\n", ifname);
+			return -EIO;
+		}
+
+		if_list->vap[inx].added = true;
+		temp_obj->parent = parent_obj;
+
+		if (!parent_obj->child)
+			parent_obj->child = temp_obj;
+		else if (curr_obj)
+			curr_obj->next = temp_obj;
+		curr_obj = temp_obj;
+
+		if (build_child_sta_list(ifname, curr_obj))
+			return -EIO;
+	}
+
+	return 0;
+}
+
+static int32_t build_child_radio_list(struct interface_list *if_list,
+				      struct soc_ifnames *soc_if,
+				      uint8_t if_count,
+				      struct object_list *parent_obj)
+{
+	uint8_t inx = 0;
+	uint8_t rinx = 0;
+	struct object_list *temp_obj = NULL;
+	struct object_list *curr_obj = NULL;
+	char *ifname = NULL;
+
+	if (!parent_obj)
+		return -EINVAL;
+
+	for (inx = 0; inx < if_count; inx++, soc_if++) {
+		ifname = NULL;
+		if (!soc_if) {
+			STATS_ERR("No valid interface available!\n");
+			return -EINVAL;
+		}
+		for (rinx = 0; rinx < if_list->r_count; rinx++) {
+			if (!strncmp(if_list->radio[rinx].name, soc_if->ifname,
+				     IFNAME_LEN)) {
+				ifname = if_list->radio[rinx].name;
+				break;
+			}
+		}
+		if (!ifname)
+			continue;
+		if (if_list->radio[rinx].added)
+			continue;
+		temp_obj = alloc_object(STATS_OBJ_RADIO, ifname);
+		if (!temp_obj) {
+			STATS_ERR("Allocation failed for %s object\n", ifname);
+			return -EIO;
+		}
+
+		temp_obj->parent = parent_obj;
+		if_list->radio[rinx].added = true;
+		if (!parent_obj->child)
+			parent_obj->child = temp_obj;
+		else if (curr_obj)
+			curr_obj->next = temp_obj;
+		curr_obj = temp_obj;
+
+		if (build_child_vap_list(if_list, ifname,
+					 if_list->radio[rinx].hw_addr,
+					 curr_obj))
+			return -EIO;
+	}
+
+	return 0;
+}
+
+static void *build_object_list()
+{
+	struct interface_list if_list = {0};
+	struct soc_ifnames soc_if[MAX_RADIO_NUM] = {0};
+	struct object_list *req_obj_list = NULL;
+	struct object_list *temp_obj = NULL;
+	struct object_list *curr_obj = NULL;
+	char *ifname = NULL;
+	int32_t ret = 0;
+	uint8_t inx = 0;
+	uint8_t if_count = 0;
+
+	ret = fetch_all_interfaces(&if_list);
+	if (ret < 0) {
+		STATS_ERR("Unable to fetch Interfaces!\n");
+		free_interface_list(&if_list);
+		return NULL;
+	}
+
+	/* Check Radio is active or not and get HW address */
+	for (inx = 0; inx < if_list.r_count; inx++) {
+		ifname = if_list.radio[inx].name;
+		if (!is_interface_active(ifname, STATS_OBJ_RADIO)) {
+			if_list.radio[inx].active = false;
+			continue;
+		}
+		if_list.radio[inx].active = true;
+		get_hw_address(ifname, if_list.radio[inx].hw_addr);
+	}
+
+	/* Check Vap is active or not and get HW address */
+	for (inx = 0; inx < if_list.v_count; inx++) {
+		ifname = if_list.vap[inx].name;
+		if (!is_interface_active(ifname, STATS_OBJ_VAP)) {
+			if_list.vap[inx].active = false;
+			continue;
+		}
+		if_list.vap[inx].active = true;
+		get_hw_address(ifname, if_list.vap[inx].hw_addr);
+	}
+
+	for (inx = 0; inx < if_list.s_count; inx++) {
+		if (get_active_radio_intf_for_soc(&if_list, soc_if,
+						  if_list.soc[inx].name,
+						  &if_count) || !if_count)
+			continue;
+		temp_obj = alloc_object(STATS_OBJ_AP, soc_if[0].ifname);
+		if (!temp_obj) {
+			STATS_ERR("Allocation failed for %s object\n",
+				  if_list.soc[inx].name);
+			ret = -1;
+			break;
+		}
+		if (!req_obj_list)
+			req_obj_list = temp_obj;
+		else if (curr_obj)
+			curr_obj->next = temp_obj;
+		curr_obj = temp_obj;
+
+		if (build_child_radio_list(&if_list, soc_if, if_count,
+					   curr_obj)) {
+			ret = -1;
+			break;
+		}
+		if_count = 0;
+		memset(soc_if, 0, (MAX_RADIO_NUM * sizeof(struct soc_ifnames)));
+	}
+
+	free_interface_list(&if_list);
+	if ((ret < 0) && req_obj_list) {
+		STATS_ERR("Failed to build Object List! Clean existing\n");
+		free_object_list(req_obj_list);
+		req_obj_list = NULL;
+	}
+
+	return req_obj_list;
+}
+
+static struct object_list *find_head_object(struct stats_command *cmd,
+					    struct object_list *obj_list)
+{
+	struct object_list *temp_obj = NULL;
+
+	temp_obj = obj_list;
+
+	switch (cmd->obj) {
+	case STATS_OBJ_AP:
+		break;
+	case STATS_OBJ_RADIO:
+		while (temp_obj) {
+			if (temp_obj->obj_type != STATS_OBJ_RADIO) {
+				temp_obj = temp_obj->child;
+				continue;
+			}
+			if (!strncmp(temp_obj->ifname, cmd->if_name, 5))
+				break;
+			if (temp_obj->next)
+				temp_obj = temp_obj->next;
+			else
+				temp_obj = temp_obj->parent->next;
+		}
+		break;
+	case STATS_OBJ_VAP:
+		while (temp_obj) {
+			struct object_list *ap_obj = NULL;
+			struct object_list *radio_obj = NULL;
+
+			if (temp_obj->obj_type != STATS_OBJ_VAP) {
+				temp_obj = temp_obj->child;
+				continue;
+			}
+			if (!strncmp(temp_obj->ifname, cmd->if_name,
+				     IFNAME_LEN))
+				break;
+
+			radio_obj = temp_obj->parent;
+			ap_obj = radio_obj->parent;
+			if (temp_obj->next)
+				temp_obj = temp_obj->next;
+			else if (radio_obj->next)
+				temp_obj = radio_obj->next;
+			else
+				temp_obj = ap_obj->next;
+		}
+		break;
+	case STATS_OBJ_STA:
+		while (temp_obj) {
+			struct object_list *ap_obj = NULL;
+			struct object_list *radio_obj = NULL;
+			struct object_list *vap_obj = NULL;
+
+			if (temp_obj->obj_type != STATS_OBJ_STA) {
+				temp_obj = temp_obj->child;
+				continue;
+			}
+			if (!memcmp(temp_obj->hw_addr,
+				    cmd->sta_mac.ether_addr_octet, ETH_ALEN))
+				break;
+			vap_obj = temp_obj->parent;
+			radio_obj = vap_obj->parent;
+			ap_obj = radio_obj->parent;
+			if (temp_obj->next)
+				temp_obj = temp_obj->next;
+			else if (vap_obj->next)
+				temp_obj = vap_obj->next;
+			else if (radio_obj->next)
+				temp_obj = radio_obj->next;
+			else
+				temp_obj = ap_obj->next;
+		}
+		break;
+	default:
+		STATS_ERR("Invalid Object Type %d!\n", cmd->obj);
+	}
+
+	return temp_obj;
+}
+
+static bool is_feat_valid_for_obj(struct stats_command *cmd)
+{
+	switch (cmd->lvl) {
+	case STATS_LVL_BASIC:
+		switch (cmd->obj) {
+		case STATS_OBJ_STA:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_BASIC_STA_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_BASIC_STA_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_VAP:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_BASIC_VAP_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_BASIC_VAP_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_RADIO:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_BASIC_RADIO_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_BASIC_RADIO_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_AP:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_BASIC_AP_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_BASIC_AP_CTRL_MASK))
+				return true;
+			break;
+		default:
+			STATS_ERR("Invalid obj %d!\n", cmd->obj);
+		}
+		break;
+	case STATS_LVL_ADVANCE:
+		switch (cmd->obj) {
+		case STATS_OBJ_STA:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_ADVANCE_STA_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_ADVANCE_STA_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_VAP:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_ADVANCE_VAP_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_ADVANCE_VAP_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_RADIO:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_ADVANCE_RADIO_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_ADVANCE_RADIO_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_AP:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_ADVANCE_AP_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_ADVANCE_AP_CTRL_MASK))
+				return true;
+			break;
+		default:
+			STATS_ERR("Invalid obj %d!\n", cmd->obj);
+		}
+		break;
+	case STATS_LVL_DEBUG:
+		switch (cmd->obj) {
+		case STATS_OBJ_STA:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_DEBUG_STA_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_DEBUG_STA_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_VAP:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_DEBUG_VAP_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_DEBUG_VAP_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_RADIO:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_DEBUG_RADIO_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_DEBUG_RADIO_CTRL_MASK))
+				return true;
+			break;
+		case STATS_OBJ_AP:
+			if ((cmd->type == STATS_TYPE_DATA) &&
+			    (cmd->feat_flag & STATS_DEBUG_AP_DATA_MASK))
+				return true;
+			if ((cmd->type == STATS_TYPE_CTRL) &&
+			    (cmd->feat_flag & STATS_DEBUG_AP_CTRL_MASK))
+				return true;
+			break;
+		default:
+			STATS_ERR("Invalid obj %d!\n", cmd->obj);
+		}
+		break;
+	default:
+		STATS_ERR("Invalid Level %d!\n", cmd->lvl);
+	}
+
+	return false;
+}
+
+static int32_t send_request_per_object(struct stats_command *user_cmd,
+				       struct object_list *obj_list)
+{
+	struct cfg80211_data buffer;
+	struct stats_command cmd;
+	struct object_list *temp_obj = NULL;
+	struct object_list *root_obj = NULL;
+	int32_t ret = 0;
+
+	if (!obj_list) {
+		STATS_ERR("Invalid Object List\n");
+		return -EINVAL;
+	}
+
+	/**
+	 * Based on user request find the requested subtree in root_obj.
+	 **/
+	root_obj = find_head_object(user_cmd, obj_list);
+	if (!root_obj) {
+		STATS_ERR("No object found for %d obj type\n", user_cmd->obj);
+		return -EPERM;
+	}
+	temp_obj = root_obj;
+
+	memcpy(&cmd, user_cmd, sizeof(struct stats_command));
+	cmd.recursive = user_cmd->recursive;
+	memset(&buffer, 0, sizeof(struct cfg80211_data));
+	buffer.data = &cmd;
+	buffer.length = sizeof(struct stats_command);
+	buffer.callback = stats_response_handler;
+	buffer.parse_data = 1;
+
+	while (temp_obj) {
+		if (!temp_obj->nlsent) {
+			temp_obj->nlsent = true;
+			cmd.obj = temp_obj->obj_type;
+			if (temp_obj->obj_type == STATS_OBJ_STA)
+				memcpy(cmd.sta_mac.ether_addr_octet,
+				       temp_obj->hw_addr, ETH_ALEN);
+			if (is_feat_valid_for_obj(&cmd)) {
+				ret = send_nl_command(&cmd, &buffer,
+						      temp_obj->ifname);
+				if (ret < 0)
+					break;
+			}
+		}
+		if (!cmd.recursive)
+			break;
+		if (temp_obj->child && !temp_obj->child->nlsent)
+			temp_obj = temp_obj->child;
+		else if (temp_obj->next)
+			temp_obj = temp_obj->next;
+		else
+			temp_obj = temp_obj->parent;
+
+		/**
+		 * Request is not for All stats.
+		 * So, break from here as we only need stats of this subtree.
+		 **/
+		if ((root_obj->obj_type != STATS_OBJ_AP) &&
+		    (root_obj->obj_type <= temp_obj->obj_type))
+			break;
+	}
+
+	return ret;
+}
+
+static int32_t process_and_send_stats_request(struct stats_command *cmd)
+{
+	struct object_list *req_obj_list = NULL;
 	int32_t ret = 0;
 
 	if (!g_sock_ctx.cfg80211) {
@@ -1845,14 +2595,14 @@ static int32_t process_and_send_stats_request(struct stats_command *cmd)
 		return -EINVAL;
 	}
 
-	memset(&buffer, 0, sizeof(struct cfg80211_data));
-	buffer.data = cmd;
-	buffer.length = sizeof(*cmd);
-	buffer.callback = stats_response_handler;
-	buffer.parse_data = 1;
+	req_obj_list = build_object_list();
+	if (!req_obj_list) {
+		STATS_ERR("Failed to build Object Hierarchy!\n");
+		return -EPERM;
+	}
 
-	if (is_interface_active(cmd->if_name, cmd->obj))
-		ret = send_nl_command(cmd, &buffer, cmd->if_name);
+	ret = send_request_per_object(cmd, req_obj_list);
+	free_object_list(req_obj_list);
 
 	return ret;
 }
@@ -2620,7 +3370,8 @@ int32_t libstats_request_handle(struct stats_command *cmd)
 
 	stats_lib_deinit();
 
-	accumulate_stats(cmd);
+	if (!ret)
+		accumulate_stats(cmd);
 
 	return ret;
 }
