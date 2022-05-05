@@ -187,7 +187,7 @@ wlan_cfg80211_get_phyrx_error_mask(struct wiphy *wiphy,
 	void *cmd;
 	int val[PHYRX_ERROR_MASK_ARGS] = {0};
 	char string[PHYRX_ERROR_MASK_STRING];
-	uint32_t mask, mask_cont;
+	uint32_t mask = 0, mask_cont = 0;
 
 	cfg_ctx = (struct cfg80211_context *)wiphy_priv(wiphy);
 	ic = cfg_ctx->ic;
