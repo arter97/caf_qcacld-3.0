@@ -832,7 +832,7 @@ int main(int argc, char *argv[])
 			    DEFAULT_NL80211_EVENT_SOCK_ID);
 
 	while (1) {
-		c = getopt_long(argc, argv, "d:e:Dp:m:o:j:k:l:O:sa:r:Lx:M:t:",
+		c = getopt_long(argc, argv, "d:e:Dp:m:o:j:k:l:O:sa:r:Lhx:M:t:v:",
 				long_options, &option_index);
 		if (c == -1)
 			break;
