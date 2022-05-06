@@ -4347,6 +4347,167 @@ static uint32_t reg_get_channel_flags_from_secondary_list_for_freq(
 
 	return pdev_priv_obj->secondary_cur_chan_list[chan_enum].chan_flags;
 }
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * reg_get_psd_power() - Function to get PSD power for 6 GHz channel
+ * @chan: Pointer to channel object
+ * @is_psd: Pointer to whether it is PSD power
+ *
+ * Return: Channel PSD power value if it is PSD type.
+ */
+static uint16_t reg_get_psd_power(struct regulatory_channel *chan, bool *is_psd)
+{
+	if (is_psd)
+		*is_psd = chan->psd_flag;
+	return chan->psd_eirp;
+}
+#else
+static uint16_t reg_get_psd_power(struct regulatory_channel *chan, bool *is_psd)
+{
+	if (is_psd)
+		*is_psd = false;
+	return 0;
+}
+#endif
+
+QDF_STATUS
+reg_get_channel_power_attr_from_secondary_list_for_freq(
+		struct wlan_objmgr_pdev *pdev,
+		qdf_freq_t freq, bool *is_psd,
+		uint16_t *tx_power, uint16_t *psd_eirp, uint32_t *flags)
+{
+	enum channel_enum chan_enum;
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *chan;
+
+	if (!is_psd && !tx_power && !psd_eirp && !flags) {
+		reg_err("all pointers null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!pdev_priv_obj) {
+		reg_err("pdev priv obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	chan_enum = reg_get_chan_enum_for_freq(freq);
+	if (chan_enum == INVALID_CHANNEL) {
+		reg_err_rl("chan freq %u is not valid", freq);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	chan = &pdev_priv_obj->secondary_cur_chan_list[chan_enum];
+
+	if (chan->state == CHANNEL_STATE_DISABLE ||
+	    chan->state == CHANNEL_STATE_INVALID) {
+		reg_err_rl("invalid channel state %d", chan->state);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (tx_power)
+		*tx_power = chan->tx_power;
+	if (psd_eirp)
+		*psd_eirp = reg_get_psd_power(chan, is_psd);
+	if (flags)
+		*flags = chan->chan_flags;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#ifdef CONFIG_BAND_6GHZ
+QDF_STATUS
+reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
+					 qdf_freq_t freq, enum phy_ch_width bw,
+					 bool *is_psd, uint16_t *min_tx_power,
+					 int16_t *min_psd_eirp,
+					 enum reg_6g_ap_type *power_type)
+{
+	const struct bonded_channel_freq *bonded_chan_ptr = NULL;
+	enum channel_state state;
+	qdf_freq_t start_freq;
+	uint16_t tx_power, psd_eirp;
+	uint32_t chan_flags, min_chan_flags = 0;
+	bool first_time = true;
+
+	if (!reg_is_6ghz_chan_freq(freq))
+		return QDF_STATUS_E_INVAL;
+
+	if (!is_psd) {
+		reg_err("is_psd pointer null");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (!min_tx_power) {
+		reg_err("min_tx_power pointer null");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (!min_psd_eirp) {
+		reg_err("min_psd_eirp pointer null");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (!power_type) {
+		reg_err("power_type pointer null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	state = reg_get_5g_bonded_channel_for_freq(pdev,
+						   freq,
+						   bw,
+						   &bonded_chan_ptr);
+	if (state != CHANNEL_STATE_ENABLE &&
+	    state != CHANNEL_STATE_DFS) {
+		reg_err("invalid channel state %d", state);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (bw <= CH_WIDTH_20MHZ) {
+		if (reg_get_channel_power_attr_from_secondary_list_for_freq(
+			pdev, freq, is_psd, &tx_power,
+			&psd_eirp, &chan_flags) != QDF_STATUS_SUCCESS)
+			return QDF_STATUS_E_INVAL;
+		*min_psd_eirp = (int16_t)psd_eirp;
+		*min_tx_power = tx_power;
+		min_chan_flags = chan_flags;
+		goto decide_power_type;
+	}
+
+	start_freq = bonded_chan_ptr->start_freq;
+	while (start_freq <= bonded_chan_ptr->end_freq) {
+		if (reg_get_channel_power_attr_from_secondary_list_for_freq(
+			pdev, start_freq, is_psd, &tx_power,
+			&psd_eirp, &chan_flags) != QDF_STATUS_SUCCESS)
+			return QDF_STATUS_E_INVAL;
+
+		if (first_time) {
+			*min_psd_eirp = (int16_t)psd_eirp;
+			*min_tx_power = tx_power;
+			min_chan_flags = chan_flags;
+			first_time = false;
+		}
+		if ((int16_t)psd_eirp < *min_psd_eirp)
+			*min_psd_eirp = (int16_t)psd_eirp;
+		if (tx_power < *min_tx_power)
+			*min_tx_power = tx_power;
+		min_chan_flags |= (chan_flags & REGULATORY_CHAN_AFC);
+		min_chan_flags |= (chan_flags & REGULATORY_CHAN_INDOOR_ONLY);
+		start_freq += 20;
+	}
+
+decide_power_type:
+	if ((min_chan_flags & REGULATORY_CHAN_AFC) &&
+	    (min_chan_flags & REGULATORY_CHAN_INDOOR_ONLY))
+		*power_type = REG_INDOOR_AP;
+	else if (min_chan_flags & REGULATORY_CHAN_AFC)
+		*power_type = REG_STANDARD_POWER_AP;
+	else if (min_chan_flags & REGULATORY_CHAN_INDOOR_ONLY)
+		*power_type = REG_INDOOR_AP;
+	else
+		*power_type = REG_VERY_LOW_POWER_AP;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif
 
 /**

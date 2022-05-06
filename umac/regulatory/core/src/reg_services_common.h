@@ -1293,6 +1293,57 @@ bool reg_is_dfs_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
  */
 bool reg_is_dfs_in_secondary_list_for_freq(struct wlan_objmgr_pdev *pdev,
 					   qdf_freq_t freq);
+
+/**
+ * reg_get_channel_power_attr_from_secondary_list_for_freq() - get channel
+ * power attributions from secondary channel list.
+ * @pdev: pdev pointer
+ * @freq: channel frequency
+ * @is_psd: pointer to retrieve value whether channel power is psd
+ * @tx_power: pointer to retrieve value of channel eirp tx power
+ * @psd_eirp: pointer to retrieve value of channel psd eirp power
+ * @flags: pointer to retrieve value of channel flags
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+reg_get_channel_power_attr_from_secondary_list_for_freq(
+			struct wlan_objmgr_pdev *pdev,
+			qdf_freq_t freq, bool *is_psd,
+			uint16_t *tx_power, uint16_t *psd_eirp,
+			uint32_t *flags);
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * reg_decide_6ghz_power_within_bw_for_freq() - decide tx power and 6 GHz power
+ * type given channel frequency and bandwidth.
+ * @pdev: pdev pointer
+ * @freq: channel frequency
+ * @bw: channel bandwidth
+ * @is_psd: pointer to retrieve value whether channel power is psd
+ * @min_tx_power: pointer to retrieve value of minimum eirp tx power in bw
+ * @min_psd_eirp: pointer to retrieve value of minimum psd eirp power in bw
+ * @power_type: pointer to retrieve value of 6 GHz power type
+ *
+ * Return: QDF STATUS
+ */
+QDF_STATUS
+reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
+					 qdf_freq_t freq, enum phy_ch_width bw,
+					 bool *is_psd, uint16_t *min_tx_power,
+					 int16_t *min_psd_eirp,
+					 enum reg_6g_ap_type *power_type);
+#else
+static inline QDF_STATUS
+reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
+					 qdf_freq_t freq, enum phy_ch_width bw,
+					 bool *is_psd, uint16_t *min_tx_power,
+					 int16_t *min_psd_eirp,
+					 enum reg_6g_ap_type *power_type)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif
 
 /**
