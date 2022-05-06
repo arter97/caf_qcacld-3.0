@@ -729,6 +729,8 @@ dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 
 	tx_stats = &sawf_ctx->stats.tx_stats[tid][msduq_idx];
 	tx_stats->queue_depth++;
+	DP_STATS_INC_PKT(sawf_ctx, tx_stats[tid][msduq_idx].tx_ingress, 1,
+			 tx_desc->length);
 	tx_desc->timestamp = qdf_ktime_to_ms(qdf_ktime_real_get());
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_TX);

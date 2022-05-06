@@ -21,6 +21,7 @@
 
 #include <qdf_lock.h>
 #include <dp_types.h>
+#include <dp_peer.h>
 #include "dp_internal.h"
 #include "dp_types.h"
 #include "cdp_txrx_cmn_struct.h"
@@ -77,6 +78,12 @@
 #define DP_SAWF_PEER_Q_INVALID 0xffff
 #define DP_SAWF_INVALID_AST_IDX 0xffff
 
+/**
+ * sawf_stats - sawf stats
+ * @delay: delay stats per-TID per-queue
+ * @tx_stats: Tx stats per-TID per-queue
+ * @lock: Protection for sawf-stats
+ */
 struct sawf_stats {
 	struct sawf_delay_stats delay[DP_SAWF_MAX_TIDS][DP_SAWF_MAX_QUEUES];
 	struct sawf_tx_stats tx_stats[DP_SAWF_MAX_TIDS][DP_SAWF_MAX_QUEUES];
@@ -356,4 +363,97 @@ QDF_STATUS dp_sawf_set_sla_params(uint32_t num_pkt,
  */
 
 QDF_STATUS dp_sawf_init_telemetry_params(void);
+
+/** dp_sawf_update_svc_intval_mpdu_stats - Update Tx-mpdu_stats for svc_interval
+ * @soc: soc handle
+ * @peer_id: peer ID
+ * @tid: tid used for Tx
+ * @q_idx: msdu queue-index used for Tx
+ * @success_cnt: no of msdu's successfully transmitted
+ * @failure_cnt: no of msdu's failed to be transmitted
+ *
+ * Return: void
+ */
+static void dp_sawf_update_svc_intval_mpdu_stats(struct dp_soc *soc,
+						 uint16_t peer_id,
+						 uint8_t tid, uint8_t q_idx,
+						 uint64_t success_cnt,
+						 uint64_t failure_cnt)
+{
+	struct dp_txrx_peer *txrx_peer;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	struct dp_peer_sawf_stats *sawf_stats_ctx;
+	struct sawf_fw_mpdu_stats *stats;
+
+	if (!soc) {
+		qdf_err("Invalid soc context");
+		return;
+	}
+
+	txrx_peer = dp_txrx_peer_get_ref_by_id(soc, peer_id, &txrx_ref_handle,
+					       DP_MOD_ID_SAWF);
+	if (!txrx_peer) {
+		qdf_err("No txrx-peer for id %d", peer_id);
+		return;
+	}
+
+	sawf_stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
+	if (!sawf_stats_ctx) {
+		qdf_err("No sawf stats ctx for peer_id %d", peer_id);
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
+		return;
+	}
+
+	stats = &sawf_stats_ctx->stats.tx_stats[tid][q_idx].svc_intval_stats;
+	stats->success_cnt = success_cnt;
+	stats->failure_cnt = failure_cnt;
+	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
+}
+
+/**
+ * dp_sawf_update_burst_size_mpdu_stats - Update Tx-mpdu_stats for burst_size
+ * @soc: soc handle
+ * @peer_id: peer ID
+ * @tid: tid used for Tx
+ * @q_idx: msdu queue-index used for Tx
+ * @success_cnt: no of msdu's successfully transmitted
+ * @failure_cnt: no of msdu's failed to be transmitted
+ *
+ * Return: void
+ */
+static void dp_sawf_update_burst_size_mpdu_stats(struct dp_soc *soc,
+						 uint16_t peer_id,
+						 uint8_t tid, uint8_t q_idx,
+						 uint64_t success_cnt,
+						 uint64_t failure_cnt)
+{
+	struct dp_txrx_peer *txrx_peer;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	struct dp_peer_sawf_stats *sawf_stats_ctx;
+	struct sawf_fw_mpdu_stats *stats;
+
+	if (!soc) {
+		qdf_err("Invalid soc context");
+		return;
+	}
+
+	txrx_peer = dp_txrx_peer_get_ref_by_id(soc, peer_id, &txrx_ref_handle,
+					       DP_MOD_ID_SAWF);
+	if (!txrx_peer) {
+		qdf_err("No txrx_peer for id %d", peer_id);
+		return;
+	}
+
+	sawf_stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
+	if (!sawf_stats_ctx) {
+		qdf_err("No sawf stats ctx for peer_id %d", peer_id);
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
+		return;
+	}
+
+	stats = &sawf_stats_ctx->stats.tx_stats[tid][q_idx].burst_size_stats;
+	stats->success_cnt = success_cnt;
+	stats->failure_cnt = failure_cnt;
+	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
+}
 #endif /* DP_SAWF_H*/
