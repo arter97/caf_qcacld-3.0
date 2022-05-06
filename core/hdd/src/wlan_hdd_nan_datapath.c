@@ -652,7 +652,7 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter;
 	struct hdd_station_ctx *sta_ctx;
-	struct csr_roam_info roam_info = {0};
+	struct csr_roam_info *roam_info;
 	struct bss_description tmp_bss_descp = {0};
 	struct qdf_mac_addr bc_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 	uint8_t sta_id;
@@ -681,6 +681,10 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 		return;
 	}
 
+	roam_info = qdf_mem_malloc(sizeof(*roam_info));
+	if (!roam_info)
+		return;
+
 	if (ndi_rsp->status == QDF_STATUS_SUCCESS) {
 		hdd_alert("NDI interface successfully created");
 		os_if_nan_set_ndp_create_transaction_id(adapter->vdev, 0);
@@ -696,9 +700,10 @@ void hdd_ndi_drv_ndi_create_rsp_handler(uint8_t vdev_id,
 
 	sta_ctx->broadcast_staid = sta_id;
 	hdd_save_peer(sta_ctx, sta_id, &bc_mac_addr);
-	hdd_roam_register_sta(adapter, &roam_info, sta_id,
+	hdd_roam_register_sta(adapter, roam_info, sta_id,
 			      &bc_mac_addr, &tmp_bss_descp);
 	hdd_ctx->sta_to_adapter[sta_id] = adapter;
+	qdf_mem_free(roam_info);
 }
 
 void hdd_ndi_close(uint8_t vdev_id)
@@ -789,7 +794,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 	struct hdd_adapter *adapter;
 	struct hdd_station_ctx *sta_ctx;
 	struct bss_description tmp_bss_descp = {0};
-	struct csr_roam_info roam_info = {0};
+	struct csr_roam_info *roam_info;
 
 	hdd_enter();
 
@@ -822,18 +827,23 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		return -EPERM;
 	}
 
+	roam_info = qdf_mem_malloc(sizeof(*roam_info));
+	if (!roam_info)
+		return -ENOMEM;
+
 	/* this function is called for each new peer */
-	hdd_roam_register_sta(adapter, &roam_info, sta_id,
-				peer_mac_addr, &tmp_bss_descp);
+	hdd_roam_register_sta(adapter, roam_info, sta_id,
+			      peer_mac_addr, &tmp_bss_descp);
 	hdd_ctx->sta_to_adapter[sta_id] = adapter;
 	/* perform following steps for first new peer ind */
 	if (fist_peer) {
 		hdd_info("Set ctx connection state to connected");
 		sta_ctx->conn_info.connState = eConnectionState_NdiConnected;
-		hdd_wmm_connect(adapter, &roam_info, eCSR_BSS_TYPE_NDI);
+		hdd_wmm_connect(adapter, roam_info, eCSR_BSS_TYPE_NDI);
 		wlan_hdd_netif_queue_control(adapter,
 				WLAN_WAKE_ALL_NETIF_QUEUE, WLAN_CONTROL_PATH);
 	}
+	qdf_mem_free(roam_info);
 	hdd_exit();
 	return 0;
 }
