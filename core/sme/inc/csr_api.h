@@ -1467,6 +1467,7 @@ struct csr_roam_info {
 	struct sir_sae_info *sae_info;
 #endif
 	uint16_t roam_reason;
+	tSirSmeAssocInd *owe_pending_assoc_ind;
 };
 
 typedef struct tagCsrFreqScanInfo {
@@ -1508,6 +1509,8 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	/* Extended capabilities of STA */
 	uint8_t              ecsa_capable;
 
+	uint32_t ies_len;
+	uint8_t *ies;
 	tDot11fIEHTCaps ht_caps;
 	tDot11fIEVHTCaps vht_caps;
 	tSirMacCapabilityInfo capability_info;
@@ -1788,4 +1791,14 @@ csr_get_channel_status(tpAniSirGlobal mac, uint32_t channel_id);
  * Return: none
  */
 void csr_clear_channel_status(tpAniSirGlobal mac);
+
+/**
+ * csr_update_owe_info() - Update OWE info
+ * @mac: mac context
+ * @assoc_ind: assoc ind
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS csr_update_owe_info(tpAniSirGlobal mac,
+			       tSirSmeAssocInd *assoc_ind);
 #endif

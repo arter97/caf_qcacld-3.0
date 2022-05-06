@@ -1246,7 +1246,20 @@ typedef struct sSirSmeAssocInd {
 	bool he_caps_present;
 	tSirMacCapabilityInfo capability_info;
 	bool is_sae_authenticated;
+	const uint8_t *owe_ie;
+	uint32_t owe_ie_len;
+	uint16_t owe_status;
 } tSirSmeAssocInd, *tpSirSmeAssocInd;
+
+/**
+ * struct owe_assoc_ind - owe association indication
+ * @node : List entry element
+ * @assoc_ind: pointer to assoc ind
+ */
+struct owe_assoc_ind {
+	qdf_list_node_t node;
+	tSirSmeAssocInd *assoc_ind;
+};
 
 /* / Definition for Association confirm */
 /* / ---> MAC */
@@ -1260,6 +1273,8 @@ typedef struct sSirSmeAssocCnf {
 	struct qdf_mac_addr alternate_bssid;
 	uint8_t alternateChannelId;
 	tSirMacStatusCodes mac_status_code;
+	uint8_t *owe_ie;
+	uint32_t owe_ie_len;
 } tSirSmeAssocCnf, *tpSirSmeAssocCnf;
 
 /* / Enum definition for  Wireless medium status change codes */

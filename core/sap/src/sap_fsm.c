@@ -1400,6 +1400,106 @@ static void sap_handle_acs_scan_event(struct sap_context *sap_context,
 }
 #endif
 
+#define DH_OUI_TYPE      "\x20"
+#define DH_OUI_TYPE_SIZE (1)
+/**
+ * sap_fill_owe_ie_in_assoc_ind() - Fill OWE IE in assoc indication
+ * Function to fill OWE IE in assoc indication
+ * @assoc_ind: SAP STA association indication
+ * @sme_assoc_ind: SME association indication
+ *
+ * This function is to get OWE IEs (RSN IE, DH IE etc) from assoc request
+ * and fill them in association indication.
+ *
+ * Return: true for success and false for failure
+ */
+static bool sap_fill_owe_ie_in_assoc_ind(tSap_StationAssocIndication *assoc_ind,
+					 tSirSmeAssocInd *sme_assoc_ind)
+{
+	uint32_t owe_ie_len, rsn_ie_len, dh_ie_len;
+	const uint8_t *rsn_ie, *dh_ie;
+
+	if (assoc_ind->assocReqLength < ASSOC_REQ_IE_OFFSET) {
+		QDF_TRACE_ERROR(QDF_MODULE_ID_SAP, "Invalid assoc req");
+		return false;
+	}
+
+	rsn_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_RSN,
+			       assoc_ind->assocReqPtr + ASSOC_REQ_IE_OFFSET,
+			       assoc_ind->assocReqLength - ASSOC_REQ_IE_OFFSET);
+	if (!rsn_ie) {
+		QDF_TRACE_ERROR(QDF_MODULE_ID_SAP, "RSN IE is not present");
+		return false;
+	}
+	rsn_ie_len = rsn_ie[1] + 2;
+	if (rsn_ie_len < DOT11F_IE_RSN_MIN_LEN ||
+	    rsn_ie_len > DOT11F_IE_RSN_MAX_LEN) {
+		QDF_TRACE_ERROR(QDF_MODULE_ID_SAP, "Invalid RSN IE len %d",
+				rsn_ie_len);
+		return false;
+	}
+
+	dh_ie = wlan_get_ext_ie_ptr_from_ext_id(DH_OUI_TYPE, DH_OUI_TYPE_SIZE,
+		   assoc_ind->assocReqPtr + ASSOC_REQ_IE_OFFSET,
+		   (uint16_t)(assoc_ind->assocReqLength - ASSOC_REQ_IE_OFFSET));
+	if (!dh_ie) {
+		QDF_TRACE_ERROR(QDF_MODULE_ID_SAP, "DH IE is not present");
+		return false;
+	}
+	dh_ie_len = dh_ie[1] + 2;
+	if (dh_ie_len < DOT11F_IE_DH_PARAMETER_ELEMENT_MIN_LEN ||
+	    dh_ie_len > DOT11F_IE_DH_PARAMETER_ELEMENT_MAX_LEN) {
+		QDF_TRACE_ERROR(QDF_MODULE_ID_SAP, "Invalid DH IE len %d",
+				dh_ie_len);
+		return false;
+	}
+
+	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+		  FL("rsn_ie_len = %d, dh_ie_len = %d"), rsn_ie_len, dh_ie_len);
+
+	owe_ie_len = rsn_ie_len + dh_ie_len;
+	assoc_ind->owe_ie = qdf_mem_malloc(owe_ie_len);
+	if (!assoc_ind->owe_ie)
+		return false;
+
+	qdf_mem_copy(assoc_ind->owe_ie, rsn_ie, rsn_ie_len);
+	qdf_mem_copy(assoc_ind->owe_ie + rsn_ie_len, dh_ie, dh_ie_len);
+	assoc_ind->owe_ie_len = owe_ie_len;
+
+	return true;
+}
+
+/**
+ * sap_save_owe_pending_assoc_ind() - Save pending assoc indication
+ * Function to save pending assoc indication in SAP context
+ * @sap_ctx: SAP context
+ * @sme_assoc_ind: SME association indication
+ *
+ * This function is to save pending assoc indication in linked list
+ * in SAP context.
+ *
+ * Return: true for success and false for failure
+ */
+static bool sap_save_owe_pending_assoc_ind(struct sap_context *sap_ctx,
+					   tSirSmeAssocInd *sme_assoc_ind)
+{
+	struct owe_assoc_ind *assoc_ind;
+	QDF_STATUS status;
+
+	assoc_ind = qdf_mem_malloc(sizeof(*assoc_ind));
+	if (!assoc_ind)
+		return false;
+	assoc_ind->assoc_ind = sme_assoc_ind;
+	status = qdf_list_insert_back(&sap_ctx->owe_pending_assoc_ind_list,
+				      &assoc_ind->node);
+	if (QDF_STATUS_SUCCESS != status) {
+		qdf_mem_free(assoc_ind);
+		return false;
+	}
+
+	return true;
+}
+
 /**
  * sap_signal_hdd_event() - send event notification
  * @sap_ctx: Sap Context
@@ -1471,6 +1571,29 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 			assoc_ind->negotiatedMCEncryptionType =
 			    csr_roaminfo->u.pConnectedProfile->mcEncryptionType;
 			assoc_ind->fAuthRequired = csr_roaminfo->fAuthRequired;
+		}
+		if (csr_roaminfo->owe_pending_assoc_ind) {
+			if (!sap_fill_owe_ie_in_assoc_ind(assoc_ind,
+					 csr_roaminfo->owe_pending_assoc_ind)) {
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					  QDF_TRACE_LEVEL_ERROR,
+					  FL("Failed to fill OWE IE"));
+				qdf_mem_free(csr_roaminfo->
+					     owe_pending_assoc_ind);
+				csr_roaminfo->owe_pending_assoc_ind = NULL;
+				return QDF_STATUS_E_INVAL;
+			}
+			if (!sap_save_owe_pending_assoc_ind(sap_ctx,
+					 csr_roaminfo->owe_pending_assoc_ind)) {
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					  QDF_TRACE_LEVEL_ERROR,
+					  FL("Failed to save assoc ind"));
+				qdf_mem_free(csr_roaminfo->
+					     owe_pending_assoc_ind);
+				csr_roaminfo->owe_pending_assoc_ind = NULL;
+				return QDF_STATUS_E_INVAL;
+			}
+			csr_roaminfo->owe_pending_assoc_ind = NULL;
 		}
 		break;
 	case eSAP_START_BSS_EVENT:
@@ -1557,27 +1680,19 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 				 &csr_roaminfo->peerMac);
 		reassoc_complete->staId = csr_roaminfo->staId;
 		reassoc_complete->statusCode = csr_roaminfo->statusCode;
-		reassoc_complete->iesLen = csr_roaminfo->rsnIELen;
-		qdf_mem_copy(reassoc_complete->ies, csr_roaminfo->prsnIE,
-			     csr_roaminfo->rsnIELen);
 
-#ifdef FEATURE_WLAN_WAPI
-		if (csr_roaminfo->wapiIELen) {
-			uint8_t len = reassoc_complete->iesLen;
-
-			reassoc_complete->iesLen += csr_roaminfo->wapiIELen;
-			qdf_mem_copy(&reassoc_complete->ies[len],
-				     csr_roaminfo->pwapiIE,
-				     csr_roaminfo->wapiIELen);
+		if (csr_roaminfo->assocReqLength < ASSOC_REQ_IE_OFFSET) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+				  FL("Invalid assoc request length:%d"),
+				  csr_roaminfo->assocReqLength);
+			return QDF_STATUS_E_INVAL;
 		}
-#endif
-		if (csr_roaminfo->addIELen) {
-			uint8_t len = reassoc_complete->iesLen;
+		reassoc_complete->ies_len = (csr_roaminfo->assocReqLength -
+					    ASSOC_REQ_IE_OFFSET);
+		reassoc_complete->ies = (csr_roaminfo->assocReqPtr +
+					 ASSOC_REQ_IE_OFFSET);
 
-			reassoc_complete->iesLen += csr_roaminfo->addIELen;
-			qdf_mem_copy(&reassoc_complete->ies[len],
-				     csr_roaminfo->paddIE,
-				     csr_roaminfo->addIELen);
+		if (csr_roaminfo->addIELen) {
 			if (wlan_get_vendor_ie_ptr_from_oui(
 			    SIR_MAC_P2P_OUI, SIR_MAC_P2P_OUI_SIZE,
 			    csr_roaminfo->paddIE, csr_roaminfo->addIELen)) {
