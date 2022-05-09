@@ -1383,6 +1383,9 @@ enum _ol_ath_param_t {
 #if defined(CONFIG_AFC_SUPPORT)
 	OL_ATH_PARAM_GET_DEV_DEPLOYMENT_TYPE = 511,
 #endif
+#ifdef CONFIG_SAWF
+	OL_ATH_PARAM_SAWF_STATS_EN = 512,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3624,6 +3627,11 @@ struct vendor_commands radio_vendor_cmds[] = {
 		GET_PARAM, 0},
 	{"disable_nss_probe_intvl",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISABLE_NSS_PROBE_INTVL,
+		SET_PARAM, 1},
+#endif
+#ifdef CONFIG_SAWF
+	{"sawf_stats_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SAWF_STATS_EN,
 		SET_PARAM, 1},
 #endif
 	{"acs_6g_non_prio_chan_penalty",
