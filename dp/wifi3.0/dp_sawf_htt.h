@@ -39,3 +39,34 @@ dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
 QDF_STATUS
 dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		      qdf_nbuf_t htt_t2h_msg);
+
+/*
+ * dp_sawf_htt_h2t_mpdu_stats_req() - Send MPDU stats request to target
+ * @soc: HTT SOC handle
+ * @stats_type: MPDU stats type
+ * @enable: 1: Enable 0: Disable
+ * @config_param0: Opaque configuration
+ * @config_param1: Opaque configuration
+ * @config_param2: Opaque configuration
+ * @config_param3: Opaque configuration
+ *
+ * @Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+dp_sawf_htt_h2t_mpdu_stats_req(struct htt_soc *soc,
+			       uint8_t stats_type, uint8_t enable,
+			       uint32_t config_param0,
+			       uint32_t config_param1,
+			       uint32_t config_param2,
+			       uint32_t config_param3);
+
+/*
+ * dp_sawf_htt_mpdu_stats_handler() - Handle MPDU stats sent by target
+ * @soc: HTT SOC handle
+ * @htt_t2h_msg: HTT buffer
+ *
+ * @Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+dp_sawf_htt_mpdu_stats_handler(struct htt_soc *soc,
+			       qdf_nbuf_t htt_t2h_msg);
