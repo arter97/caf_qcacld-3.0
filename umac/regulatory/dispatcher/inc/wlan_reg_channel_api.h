@@ -163,13 +163,15 @@ QDF_STATUS wlan_reg_get_max_phymode_and_chwidth(struct wlan_objmgr_pdev *pdev,
  * @ant_gain: Antenna gain to be filled.
  * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
  * is determined.
+ * @reg_chan_list: regulatory channel list.
  *
  */
 void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
 				 qdf_freq_t freq,
 				 uint32_t *txpower,
 				 uint8_t *ant_gain,
-				 enum supported_6g_pwr_types in_6g_pwr_mode);
+				 enum supported_6g_pwr_types in_6g_pwr_mode,
+				 struct regulatory_channel *reg_chan_list);
 
 /**
  * wlan_reg_get_chan_flags() - Find the channel flags for freq1 and freq2.
@@ -180,14 +182,15 @@ void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
  * @pri_flags: Primary flags to be filled.
  * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
  * is determined.
- *
+ * @reg_chan_list: regulatory channel list.
  */
 void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 			     qdf_freq_t freq1,
 			     qdf_freq_t freq2,
 			     uint16_t *sec_flags,
 			     uint64_t *pri_flags,
-			     enum supported_6g_pwr_types in_6g_pwr_mode);
+			     enum supported_6g_pwr_types in_6g_pwr_mode,
+			     struct regulatory_channel *reg_chan_list);
 
 /**
  * wlan_reg_is_band_present() - Check if input band channels are present
@@ -261,7 +264,9 @@ static inline void
 wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
 			    qdf_freq_t freq,
 			    uint32_t *txpower,
-			    uint8_t *ant_gain)
+			    uint8_t *ant_gain,
+			    enum supported_6g_pwr_types in_6g_pwr_mode,
+			    struct regulatory_channel *reg_chan_list)
 {
 }
 
@@ -270,7 +275,9 @@ wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 			qdf_freq_t freq1,
 			qdf_freq_t freq2,
 			uint16_t *sec_flags,
-			uint64_t *pri_flags)
+			uint64_t *pri_flags,
+			enum supported_6g_pwr_types in_6g_pwr_mode,
+                        struct regulatory_channel *reg_chan_list)
 {
 }
 
@@ -383,4 +390,18 @@ wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				     qdf_freq_t chan_freq,
 				     bool *is_psd, uint16_t *reg_eirp,
 				     uint16_t *reg_psd);
+
+/**
+ * wlan_reg_is_freq_present_in_reg_chan_list() - Check if channel is present
+ * in the current/super channel list
+ * @pdev: pdev pointer
+ * @freq: Channel center frequency
+ * @in_6g_pwr_mode: Input 6G power type which will determine the 6G channel
+ *
+ * Return: true if channel is present in current/super channel list
+ */
+bool wlan_reg_is_freq_present_in_reg_chan_list(struct wlan_objmgr_pdev *pdev,
+					       qdf_freq_t freq,
+					       enum supported_6g_pwr_types in_6g_pwr_mode);
+
 #endif /* __WLAN_REG_CHANNEL_API_H */

@@ -79,24 +79,16 @@ void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
 				 qdf_freq_t freq,
 				 uint32_t *txpower,
 				 uint8_t *ant_gain,
-				 enum supported_6g_pwr_types in_6g_pwr_mode)
+				 enum supported_6g_pwr_types in_6g_pwr_mode,
+				 struct regulatory_channel *reg_chan_list)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
-	struct regulatory_channel *reg_chan_list;
 	int i;
 
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
 
 	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
 		reg_err("reg pdev priv obj is NULL");
-		return;
-	}
-
-	reg_chan_list = qdf_mem_malloc(NUM_CHANNELS * sizeof(*reg_chan_list));
-	if (!reg_chan_list)
-		return;
-	if (reg_get_pwrmode_chan_list(pdev, reg_chan_list, in_6g_pwr_mode)) {
-		qdf_mem_free(reg_chan_list);
 		return;
 	}
 
@@ -106,7 +98,6 @@ void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
 			*ant_gain = reg_chan_list[i].ant_gain;
 		}
 	}
-	qdf_mem_free(reg_chan_list);
 }
 
 void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
@@ -114,10 +105,10 @@ void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 			     qdf_freq_t freq2,
 			     uint16_t *sec_flags,
 			     uint64_t *pri_flags,
-			     enum supported_6g_pwr_types in_6g_pwr_mode)
+			     enum supported_6g_pwr_types in_6g_pwr_mode,
+                             struct regulatory_channel *reg_chan_list)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
-	struct regulatory_channel *cur_chan_list;
 	int i;
 
 	pdev_priv_obj = reg_get_pdev_obj(pdev);
@@ -127,30 +118,23 @@ void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 		return;
 	}
 
-	cur_chan_list = qdf_mem_malloc(NUM_CHANNELS * sizeof(*cur_chan_list));
-	if (!cur_chan_list)
-		return;
-	if (reg_get_pwrmode_chan_list(pdev, cur_chan_list, in_6g_pwr_mode)) {
-		qdf_mem_free(cur_chan_list);
-		return;
-	}
 
 	for (i = 0; i < NUM_CHANNELS; i++) {
-		if (cur_chan_list[i].center_freq == freq1) {
-			if (cur_chan_list[i].chan_flags &
+		if (reg_chan_list[i].center_freq == freq1) {
+			if (reg_chan_list[i].chan_flags &
 			    REGULATORY_CHAN_RADAR) {
 				*sec_flags |= WLAN_CHAN_DFS;
 				*pri_flags |= WLAN_CHAN_PASSIVE;
 				*sec_flags |= WLAN_CHAN_DISALLOW_ADHOC;
-			} else if (cur_chan_list[i].chan_flags &
+			} else if (reg_chan_list[i].chan_flags &
 				   REGULATORY_CHAN_NO_IR) {
 				/* For 2Ghz passive channels. */
 				*pri_flags |= WLAN_CHAN_PASSIVE;
 			}
 		}
 
-		if (cur_chan_list[i].center_freq == freq2 &&
-		    cur_chan_list[i].chan_flags & REGULATORY_CHAN_RADAR) {
+		if (reg_chan_list[i].center_freq == freq2 &&
+		    reg_chan_list[i].chan_flags & REGULATORY_CHAN_RADAR) {
 			*sec_flags |= WLAN_CHAN_DFS_CFREQ2;
 			*sec_flags |= WLAN_CHAN_DISALLOW_ADHOC;
 		}
@@ -158,7 +142,6 @@ void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 
 	if (WLAN_REG_IS_6GHZ_PSC_CHAN_FREQ(freq1))
 		*sec_flags |= WLAN_CHAN_PSC;
-	qdf_mem_free(cur_chan_list);
 }
 
 void wlan_reg_set_chan_blocked(struct wlan_objmgr_pdev *pdev,
@@ -268,4 +251,12 @@ wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 	return reg_get_client_power_for_rep_ap(pdev, ap_pwr_type, client_type,
 					       chan_freq, is_psd, reg_eirp,
 					       reg_psd);
+}
+
+bool
+wlan_reg_is_freq_present_in_reg_chan_list(struct wlan_objmgr_pdev *pdev,
+					  qdf_freq_t freq,
+					  enum supported_6g_pwr_types in_6g_pwr_mode)
+{
+        return reg_is_freq_present_in_reg_chan_list(pdev, freq, in_6g_pwr_mode);
 }
