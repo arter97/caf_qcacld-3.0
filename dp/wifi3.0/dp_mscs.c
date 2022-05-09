@@ -42,7 +42,6 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 	uint8_t user_prio_limit;
 	uint8_t user_prio;
 	int status = 0;
-	struct dp_ast_entry *ase = NULL;
 	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
 
 	if (!dpsoc) {
@@ -52,42 +51,14 @@ int dp_mscs_peer_lookup_n_get_priority(struct cdp_soc_t *soc_hdl,
 	}
 
 	/*
-	 * Find the MSCS source peer from global soc
+	 * Find the MSCS peer from global soc
 	 */
-	if (!dpsoc->ast_offload_support) {
-		qdf_spin_lock_bh(&dpsoc->ast_lock);
-		ase = dp_peer_ast_hash_find_soc(dpsoc, src_mac_addr);
-		if (!ase) {
-			qdf_spin_unlock_bh(&dpsoc->ast_lock);
-			return QDF_STATUS_E_INVAL;
-		}
-		qdf_spin_unlock_bh(&dpsoc->ast_lock);
-		src_peer = dp_peer_get_ref_by_id(dpsoc, ase->peer_id,
-				DP_MOD_ID_MSCS);
-	} else {
-		QDF_TRACE(QDF_MODULE_ID_DP_CDP, QDF_TRACE_LEVEL_ERROR,
-				"%s: MSCS support for WIFI7 peers need to be added\n", __func__);
-		return DP_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND;
-	}
-
+	src_peer = dp_peer_find_hash_find(dpsoc, src_mac_addr, 0,
+			DP_VDEV_ALL, DP_MOD_ID_MSCS);
 
 	if (!src_peer) {
-		if (!dpsoc->ast_offload_support) {
-			qdf_spin_lock_bh(&dpsoc->ast_lock);
-			ase = dp_peer_ast_hash_find_soc(dpsoc, dst_mac_addr);
-			if (!ase) {
-				qdf_spin_unlock_bh(&dpsoc->ast_lock);
-				return QDF_STATUS_E_INVAL;
-			}
-			qdf_spin_unlock_bh(&dpsoc->ast_lock);
-			dst_peer = dp_peer_get_ref_by_id(dpsoc, ase->peer_id,
-					DP_MOD_ID_MSCS);
-		} else {
-			QDF_TRACE(QDF_MODULE_ID_DP_CDP, QDF_TRACE_LEVEL_ERROR,
-					"%s: MSCS support for WIFI7 peers need to be added\n", __func__);
-			return DP_MSCS_PEER_LOOKUP_STATUS_PEER_NOT_FOUND;
-		}
-
+		dst_peer = dp_peer_find_hash_find(dpsoc, dst_mac_addr, 0,
+				DP_VDEV_ALL, DP_MOD_ID_MSCS);
 		if (dst_peer && dst_peer->mscs_active &&
 				!qdf_nbuf_get_priority(nbuf)) {
 			/*
