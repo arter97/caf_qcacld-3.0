@@ -37,6 +37,7 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc, uint8_t vdev_id,
 void dp_tx_me_alloc_descriptor(struct cdp_soc_t *soc, uint8_t pdev_id);
 void dp_tx_me_free_descriptor(struct cdp_soc_t *soc, uint8_t pdev_id);
 void dp_tx_me_exit(struct dp_pdev *pdev);
+void dp_tx_me_flush(struct cdp_soc_t *soc, uint8_t vdev_id);
 
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
@@ -54,4 +55,7 @@ dp_igmp_me_mcast_convert(struct cdp_soc_t *soc,
 			 uint8_t vdev_id,
 			 uint8_t pdev_id,
 			 qdf_nbuf_t wbuf);
+extern void
+dp_me_flush(struct cdp_soc_t *soc,
+			 uint8_t vdev_id);
 #endif

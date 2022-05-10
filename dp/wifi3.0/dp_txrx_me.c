@@ -167,6 +167,20 @@ dp_tx_me_exit(struct dp_pdev *pdev)
 	}
 }
 
+
+/**
+ * dp_tx_me_flush():Call ME flush
+ * @soc: DP SOC handle
+ * @vdev_id: id of DP VDEV handle
+ *
+ * Return:void
+ */
+void
+dp_tx_me_flush(struct cdp_soc_t *soc, uint8_t vdev_id)
+{
+	return dp_me_flush(soc, vdev_id);
+}
+
 /**
  * dp_tx_me_free_descriptor():free ME descriptor
  * @soc: DP SOC handle
