@@ -331,64 +331,53 @@ end:
 static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
-	uint32_t roam_id;
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	struct csr_roam_profile *roam_profile;
-#endif
-	mac_handle_t mac_handle;
+	struct bss_dot11_config dot11_cfg = {0};
+	struct start_bss_config ndi_bss_cfg = {0};
+	tCsrChannelInfo ch_info;
+	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 	struct hdd_context *hdd_ctx;
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	uint8_t wmm_mode = 0;
-	uint8_t value = 0;
-#endif
+
 	hdd_enter();
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	roam_profile = hdd_roam_profile(adapter);
 
-	status = ucfg_mlme_get_wmm_mode(hdd_ctx->psoc, &wmm_mode);
+	status = hdd_ndi_config_ch_list(hdd_ctx, &ch_info);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Get wmm_mode failed");
+		hdd_err("Unable to retrieve channel list for NAN");
 		return -EINVAL;
 	}
 
-	if (HDD_WMM_USER_MODE_NO_QOS == wmm_mode) {
-		/* QoS not enabled in cfg file*/
-		roam_profile->uapsd_mask = 0;
-	} else {
-		/* QoS enabled, update uapsd mask from cfg file*/
-		status = ucfg_mlme_get_wmm_uapsd_mask(hdd_ctx->psoc, &value);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_err("Get uapsd_mask failed");
-			return -EINVAL;
-		}
-		roam_profile->uapsd_mask = value;
+	dot11_cfg.vdev_id = adapter->vdev_id;
+	dot11_cfg.bss_op_ch_freq = ch_info.freq_list[0];
+	dot11_cfg.phy_mode = eCSR_DOT11_MODE_AUTO;
+	if (!wlan_vdev_id_is_open_cipher(mac->pdev, adapter->vdev_id))
+		dot11_cfg.privacy = 1;
+
+	sme_get_network_params(mac, &dot11_cfg);
+	ndi_bss_cfg.vdev_id = adapter->vdev_id;
+	ndi_bss_cfg.oper_ch_freq = dot11_cfg.bss_op_ch_freq;
+	ndi_bss_cfg.nwType = dot11_cfg.nw_type;
+	ndi_bss_cfg.dot11mode = dot11_cfg.dot11_mode;
+
+	if (dot11_cfg.opr_rates.numRates) {
+		qdf_mem_copy(ndi_bss_cfg.operationalRateSet.rate,
+			     dot11_cfg.opr_rates.rate,
+			     dot11_cfg.opr_rates.numRates);
+		ndi_bss_cfg.operationalRateSet.numRates =
+					dot11_cfg.opr_rates.numRates;
 	}
 
-	roam_profile->csrPersona = adapter->device_mode;
-
-	status = hdd_ndi_config_ch_list(hdd_ctx, &roam_profile->ChannelInfo);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_err("Get uapsd_mask failed");
-		return -EINVAL;
+	if (dot11_cfg.ext_rates.numRates) {
+		qdf_mem_copy(ndi_bss_cfg.extendedRateSet.rate,
+			     dot11_cfg.ext_rates.rate,
+			     dot11_cfg.ext_rates.numRates);
+		ndi_bss_cfg.extendedRateSet.numRates =
+				dot11_cfg.ext_rates.numRates;
 	}
-	roam_profile->SSIDs.numOfSSIDs = 1;
-	roam_profile->SSIDs.SSIDList->SSID.length = 0;
 
-	roam_profile->phyMode = eCSR_DOT11_MODE_AUTO;
-	roam_profile->BSSType = eCSR_BSS_TYPE_NDI;
-	roam_profile->BSSIDs.numOfBSSIDs = 1;
-	qdf_mem_copy((void *)(roam_profile->BSSIDs.bssid),
-		&adapter->mac_addr.bytes[0],
-		QDF_MAC_ADDR_SIZE);
+	status = sme_start_bss(mac_handle, adapter->vdev_id,
+			       &ndi_bss_cfg);
 
-	mac_handle = hdd_adapter_get_mac_handle(adapter);
-	status = sme_bss_start(mac_handle, adapter->vdev_id,
-			       roam_profile, &roam_id);
-#endif
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("NDI sme_RoamConnect session %d failed with status %d -> NotConnected",
 			adapter->vdev_id, status);
@@ -398,12 +387,8 @@ static int hdd_ndi_start_bss(struct hdd_adapter *adapter)
 	} else {
 		hdd_info("sme_RoamConnect issued successfully for NDI");
 	}
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	qdf_mem_free(roam_profile->ChannelInfo.freq_list);
-	roam_profile->ChannelInfo.freq_list = NULL;
-	roam_profile->ChannelInfo.numOfChannels = 0;
-#endif
+
+	qdf_mem_free(ch_info.freq_list);
 	hdd_exit();
 
 	return 0;
@@ -490,7 +475,7 @@ static int hdd_get_random_nan_mac_addr(struct hdd_context *hdd_ctx,
 
 void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 			   struct csr_roam_info *roam_info,
-			   uint32_t roam_id, eRoamCmdStatus roam_status,
+			   eRoamCmdStatus roam_status,
 			   eCsrRoamResult roam_result)
 {
 	bool success;
@@ -691,7 +676,7 @@ error_init_txrx:
 	return ret_val;
 }
 
-int hdd_ndi_open(char *iface_name)
+int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct qdf_mac_addr random_ndi_mac;
@@ -716,6 +701,10 @@ int hdd_ndi_open(char *iface_name)
 		return -EINVAL;
 	}
 
+	params.is_add_virtual_iface = is_add_virtual_iface;
+
+	hdd_debug("is_add_virtual_iface %d", is_add_virtual_iface);
+
 	if (cfg_nan_get_ndi_mac_randomize(hdd_ctx->psoc)) {
 		if (hdd_get_random_nan_mac_addr(hdd_ctx, &random_ndi_mac)) {
 			hdd_err("get random mac address failed");
@@ -730,6 +719,7 @@ int hdd_ndi_open(char *iface_name)
 		}
 	}
 
+	params.is_add_virtual_iface = 1;
 	adapter = hdd_open_adapter(hdd_ctx, QDF_NDI_MODE, iface_name,
 				   ndi_mac_addr, NET_NAME_UNKNOWN, true,
 				   &params);
@@ -744,7 +734,7 @@ int hdd_ndi_open(char *iface_name)
 	return 0;
 }
 
-int hdd_ndi_start(char *iface_name, uint16_t transaction_id)
+int hdd_ndi_start(const char *iface_name, uint16_t transaction_id)
 {
 	int ret;
 	QDF_STATUS status;
@@ -800,7 +790,50 @@ err_handler:
 	return ret;
 }
 
-int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id)
+struct wireless_dev *hdd_add_ndi_intf(struct hdd_context *hdd_ctx,
+				      const char *name)
+{
+	int ret;
+	struct hdd_adapter *adapter;
+
+	hdd_debug("change mode to NDI");
+
+	ret = hdd_ndi_open(name, true);
+	if (ret) {
+		hdd_err("ndi_open failed");
+		return ERR_PTR(-EINVAL);
+	}
+	adapter = hdd_get_adapter_by_iface_name(hdd_ctx, name);
+	if (!adapter) {
+		hdd_err("adapter is null");
+		return ERR_PTR(-EINVAL);
+	}
+	return adapter->dev->ieee80211_ptr;
+}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+static int hdd_delete_ndi_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	return 0;
+}
+#else
+static int hdd_delete_ndi_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	int ret;
+
+	ret = __wlan_hdd_del_virtual_intf(wiphy, wdev);
+
+	if (ret)
+		hdd_err("NDI delete request failed");
+	else
+		hdd_err("NDI delete request successfully issued");
+
+	return ret;
+}
+#endif
+
+int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
+		   uint16_t transaction_id)
 {
 	int ret;
 	struct hdd_adapter *adapter;
@@ -834,11 +867,8 @@ int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id)
 	os_if_nan_set_ndi_state(vdev, NAN_DATA_NDI_DELETING_STATE);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 	/* Delete the interface */
-	ret = __wlan_hdd_del_virtual_intf(hdd_ctx->wiphy, &adapter->wdev);
-	if (ret)
-		hdd_err("NDI delete request failed");
-	else
-		hdd_err("NDI delete request successfully issued");
+	adapter->is_virtual_iface = true;
+	ret = hdd_delete_ndi_intf(hdd_ctx->wiphy, &adapter->wdev);
 
 	return ret;
 }
@@ -935,6 +965,7 @@ void hdd_ndi_close(uint8_t vdev_id)
 		return;
 	}
 
+	adapter->is_virtual_iface = true;
 	hdd_close_ndi(adapter);
 }
 
@@ -991,15 +1022,6 @@ void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 }
 
-/**
- * hdd_ndp_new_peer_handler() - NDP new peer indication handler
- * @vdev_id: vdev id
- * @sta_id: station id
- * @peer_mac_addr: peer mac address
- * @first_peer: first peer
- *
- * Return: none
- */
 int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 			struct qdf_mac_addr *peer_mac_addr, bool first_peer)
 {
@@ -1101,13 +1123,6 @@ void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
 	}
 }
 
-/**
- * hdd_ndp_peer_departed_handler() - Handle NDP peer departed indication
- * @adapter: pointer to adapter context
- * @ind_params: indication parameters
- *
- * Return: none
- */
 void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 			struct qdf_mac_addr *peer_mac_addr, bool last_peer)
 {

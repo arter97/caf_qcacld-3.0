@@ -1592,6 +1592,22 @@ struct hdd_adapter {
 				(&(adapter)->session.ap.hostapd_state)
 #define WLAN_HDD_GET_SAP_CTX_PTR(adapter) ((adapter)->session.ap.sap_context)
 
+/**
+ * hdd_is_sta_authenticated() - check if given adapter's STA
+ *				session authenticated
+ * @adapter: adapter pointer
+ *
+ * Return: STA session is_authenticated flag value
+ */
+static inline
+uint8_t hdd_is_sta_authenticated(struct hdd_adapter *adapter)
+{
+	struct hdd_station_ctx *sta_ctx =
+			WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
+	return sta_ctx->conn_info.is_authenticated;
+}
+
 #ifdef WLAN_FEATURE_NAN
 #define WLAN_HDD_IS_NDP_ENABLED(hdd_ctx) ((hdd_ctx)->nan_datapath_enabled)
 #else
@@ -3675,8 +3691,35 @@ static inline int wlan_hdd_get_cpu(void)
 }
 #endif
 
+#ifdef PRE_CAC_SUPPORT
+/**
+ * wlan_hdd_sap_pre_cac_failure() - Process the pre cac failure
+ * @data: AP adapter
+ *
+ * Deletes the pre cac adapter
+ *
+ * Return: None
+ */
 void wlan_hdd_sap_pre_cac_failure(void *data);
+/**
+ * hdd_clean_up_pre_cac_interface() - Clean up the pre cac interface
+ * @hdd_ctx: HDD context
+ *
+ * Cleans up the pre cac interface, if it exists
+ *
+ * Return: None
+ */
 void hdd_clean_up_pre_cac_interface(struct hdd_context *hdd_ctx);
+#else
+static inline void wlan_hdd_sap_pre_cac_failure(void *data)
+{
+}
+
+static inline void
+hdd_clean_up_pre_cac_interface(struct hdd_context *hdd_ctx)
+{
+}
+#endif /* PRE_CAC_SUPPORT */
 
 void wlan_hdd_txrx_pause_cb(uint8_t vdev_id,
 	enum netif_action_type action, enum netif_reason_type reason);
@@ -4840,7 +4883,6 @@ bool hdd_adapter_is_ap(struct hdd_adapter *adapter);
 QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
 				    uint8_t session_id,
 				    struct csr_roam_info *roam_info,
-				    uint32_t roam_id,
 				    eRoamCmdStatus roam_status,
 				    eCsrRoamResult roam_result);
 

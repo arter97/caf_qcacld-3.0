@@ -207,10 +207,9 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 		pe_session = NULL;
 		pe_err("Start BSS Failed");
 	}
-	/* Send response to Host */
-	lim_send_sme_start_bss_rsp(mac, eWNI_SME_START_BSS_RSP,
-				((tLimMlmStartCnf *)msg_buf)->resultCode,
-				pe_session, smesessionId);
+	lim_send_sme_start_bss_rsp(mac,
+				   ((tLimMlmStartCnf *)msg_buf)->resultCode,
+				   pe_session, smesessionId);
 	if (pe_session &&
 	    (((tLimMlmStartCnf *)msg_buf)->resultCode == eSIR_SME_SUCCESS)) {
 		lim_ndi_mlme_vdev_up_transition(pe_session);
@@ -586,8 +585,12 @@ void lim_process_mlm_auth_cnf(struct mac_context *mac_ctx, uint32_t *msg)
 			 * password is used. Then AP will still reject the
 			 * authentication even correct password is used unless
 			 * STA send deauth to AP upon authentication failure.
+			 *
+			 * Do not send deauth mgmt frame when already in Deauth
+			 * state while joining.
 			 */
-			if (auth_type == eSIR_AUTH_TYPE_SAE) {
+			if (auth_type == eSIR_AUTH_TYPE_SAE &&
+			    auth_cnf->resultCode != eSIR_SME_DEAUTH_WHILE_JOIN) {
 				pe_debug("Send deauth for SAE auth failure");
 				lim_send_deauth_mgmt_frame(mac_ctx,
 						       auth_cnf->protStatusCode,
@@ -784,6 +787,7 @@ lim_fill_sme_assoc_ind_params(
 	sme_assoc_ind->max_supp_idx = assoc_ind->max_supp_idx;
 	sme_assoc_ind->max_ext_idx = assoc_ind->max_ext_idx;
 	sme_assoc_ind->max_mcs_idx = assoc_ind->max_mcs_idx;
+	sme_assoc_ind->max_real_mcs_idx = assoc_ind->max_real_mcs_idx;
 	sme_assoc_ind->rx_mcs_map = assoc_ind->rx_mcs_map;
 	sme_assoc_ind->tx_mcs_map = assoc_ind->tx_mcs_map;
 	sme_assoc_ind->ecsa_capable = assoc_ind->ecsa_capable;
@@ -1675,8 +1679,7 @@ void lim_process_ap_mlm_del_bss_rsp(struct mac_context *mac,
 	/* Initialize number of associated stations during cleanup */
 	pe_session->gLimNumOfCurrentSTAs = 0;
 end:
-	lim_send_sme_rsp(mac, eWNI_SME_STOP_BSS_RSP, rc,
-			 pe_session->smeSessionId);
+	lim_send_stop_bss_response(mac, pe_session->vdev_id, rc);
 	pe_delete_session(mac, pe_session);
 }
 

@@ -687,52 +687,6 @@ struct add_ie_params {
 	uint8_t *probeRespBCNData_buff;
 };
 
-#ifndef SAP_CP_CLEANUP
-/* / Definition for kick starting BSS */
-/* / ---> MAC */
-/**
- * Usage of ssId, numSSID & ssIdList:
- * ---------------------------------
- * 1. ssId.length of zero indicates that Broadcast/Suppress SSID
- *    feature is enabled.
- * 2. If ssId.length is zero, MAC SW will advertise NULL SSID
- *    and interpret the SSID list from numSSID & ssIdList.
- * 3. If ssId.length is non-zero, MAC SW will advertise the SSID
- *    specified in the ssId field and it is expected that
- *    application will set numSSID to one (only one SSID present
- *    in the list) and SSID in the list is same as ssId field.
- * 4. Application will always set numSSID >= 1.
- */
-/* ***** NOTE: Please make sure all codes are updated if inserting field into
- * this structure..********** */
-struct start_bss_req {
-	uint16_t messageType;   /* eWNI_SME_START_BSS_REQ */
-	uint16_t length;
-	uint8_t vdev_id;
-	uint16_t beaconInterval;
-	uint8_t dot11mode;
-	tSirMacSSid ssId;
-	uint32_t oper_ch_freq;
-	uint8_t vht_channel_width;
-	uint8_t center_freq_seg0;
-	uint8_t center_freq_seg1;
-	uint8_t sec_ch_offset;
-	uint8_t privacy;
-	uint8_t ssidHidden;
-	tAniAuthType authType;
-	uint32_t dtimPeriod;
-	uint8_t wps_state;
-	tSirRSNie rsnIE;        /* RSN IE to be sent in */
-	tSirNwType nwType;      /* Indicates 11a/b/g */
-	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
-	tSirMacRateSet extendedRateSet; /* Has 11g rates */
-	struct add_ie_params add_ie_params;
-	uint16_t beacon_tx_rate;
-	uint32_t cac_duration_ms;
-	uint32_t dfs_regdomain;
-
-};
-#endif
 #define GET_IE_LEN_IN_BSS(lenInBss) (lenInBss + sizeof(lenInBss) - \
 			    ((uintptr_t)OFFSET_OF(struct bss_description,\
 						  ieFields)))
@@ -804,13 +758,7 @@ struct bss_description {
 /* / issued start BSS request */
 /* / MAC ---> */
 struct start_bss_rsp {
-	uint16_t messageType;   /* eWNI_SME_START_BSS_RSP */
-	uint16_t length;
-	uint8_t sessionId;
-/* To be removed after SAP CSR cleanup changes */
-#ifdef SAP_CP_CLEANUP
-	uint32_t cmd_id;
-#endif
+	uint8_t vdev_id;
 	tSirResultCodes status_code;
 	uint32_t staId;         /* Station ID for Self */
 };
@@ -1045,6 +993,7 @@ struct assoc_ind {
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
 	uint8_t max_mcs_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	/* Extended CSA capability of station */
@@ -1224,13 +1173,14 @@ struct deauth_cnf {
 	struct qdf_mac_addr peer_macaddr;
 };
 
-/* / Definition for stop BSS request message */
 struct stop_bss_req {
-	uint16_t messageType;   /* eWNI_SME_STOP_BSS_REQ */
-	uint16_t length;
-	uint8_t sessionId;      /* Session ID */
-	tSirResultCodes reasonCode;
-	struct qdf_mac_addr bssid;      /* Self BSSID */
+	uint8_t vdev_id;
+	uint32_t cmd_id;
+};
+
+struct stop_bss_rsp {
+	uint8_t vdev_id;
+	tSirResultCodes status_code;
 };
 
 /* / Definition for Channel Switch indication for station */
@@ -2250,25 +2200,6 @@ typedef struct sSirSmeDfsChannelList {
 	/* Ch num including bonded channels on which the RADAR is present */
 	uint8_t channels[SIR_DFS_MAX_20M_SUB_CH];
 } tSirSmeDfsChannelList, *tpSirSmeDfsChannelList;
-
-#ifndef SAP_CP_CLEANUP
-typedef struct sSirChanChangeRequest {
-	uint16_t messageType;
-	uint16_t messageLen;
-	uint32_t target_chan_freq;
-	uint8_t sec_ch_offset;
-	enum phy_ch_width ch_width;
-	uint8_t center_freq_seg_0;
-	uint8_t center_freq_seg_1;
-	uint8_t bssid[QDF_MAC_ADDR_SIZE];
-	uint32_t dot11mode;
-	tSirNwType nw_type;
-	tSirMacRateSet operational_rateset;
-	tSirMacRateSet extended_rateset;
-	uint32_t cac_duration_ms;
-	uint32_t dfs_regdomain;
-} tSirChanChangeRequest, *tpSirChanChangeRequest;
-#endif
 
 typedef struct sSirChanChangeResponse {
 	uint8_t sessionId;
@@ -5180,6 +5111,12 @@ struct sir_sae_info {
  * @vdev_id: vdev id
  * @sae_status: SAE status, 0: Success, Non-zero: Failure.
  * @peer_mac_addr: peer MAC address
+ * @result_code: This carries the reason of the SAE auth failure.
+ *               Currently, SAE authentication failure may happen due to
+ *               1. Authentication failure detected as part of SAE auth frame
+ *                  exchanges and validation.
+ *               2. Deauth received from AP while SAE authentication is in
+ *                  progress.
  */
 struct sir_sae_msg {
 	uint16_t message_type;
@@ -5187,6 +5124,7 @@ struct sir_sae_msg {
 	uint16_t vdev_id;
 	uint8_t sae_status;
 	tSirMacAddr peer_mac_addr;
+	tSirResultCodes result_code;
 };
 
 #ifdef WLAN_FEATURE_MOTION_DETECTION
@@ -5241,7 +5179,6 @@ struct sir_update_session_txq_edca_param {
 	tSirMacEdcaParamRecord txq_edca_params;
 };
 
-#ifdef SAP_CP_CLEANUP
 /* struct channel_change_req - Change channel
  * request for SAP
  * @vdev_id: vdev id
@@ -5275,23 +5212,23 @@ struct channel_change_req {
  * request configurations
  * @vdev_id: vdev id
  * @cmd_id: serialization command id
- * @ssid: ssid
- * @dtim_period: dtim period
- * @hidden_ssid: hidden ssid parameter
+ * @ssId: ssid
+ * @dtimPeriod: dtim period
+ * @ssidHidden: hidden ssid parameter
  * @privacy: ssid privacy
- * @auth_type: authentication type
- * @rsnie: RSN IE of the AP
+ * @authType: authentication type
+ * @rsnIE: RSN IE of the AP
  * @add_ie_params: additional IEs
  * @oper_ch_freq: operating frequency
- * @channel_width: channel width
+ * @vht_channel_width: channel width
  * @center_freq_seg0: channel center freq 0
  * @center_freq_seg1: channel center freq 1
  * @sec_ch_offset: secondary channel offset
  * @wps_state: wps config
  * @dot11mode: dot11 mode
- * @nw_type: nw type
- * @opr_rates: operational rates
- * @ext_rates: extended rates
+ * @nwType: nw type
+ * @operationalRateSet: operational rates
+ * @extendedRateSet: extended rates
  * @beacon_tx_rate: Tx rate for beacon
  * @cac_duration_ms: cac duration in ms
  * @dfs_regdomain: dfs regdomain
@@ -5299,32 +5236,31 @@ struct channel_change_req {
 struct start_bss_config {
 	uint8_t vdev_id;
 	uint32_t cmd_id;
-	tSirMacSSid ssid;
-	uint16_t bcn_int;
-	uint32_t dtim_period;
-	uint8_t hidden_ssid;
+	tSirMacSSid ssId;
+	uint16_t beaconInterval;
+	uint32_t dtimPeriod;
+	uint8_t ssidHidden;
 
 	uint8_t privacy;
-	tAniAuthType auth_type;
-	tSirRSNie rsn_ie;
+	tAniAuthType authType;
+	tSirRSNie rsnIE;
 	struct add_ie_params add_ie_params;
 
 	uint32_t oper_ch_freq;
-	uint8_t channel_width;
+	uint8_t vht_channel_width;
 	uint8_t center_freq_seg0;
 	uint8_t center_freq_seg1;
 	uint8_t sec_ch_offset;
 
 	uint8_t wps_state;
 	uint8_t dot11mode;
-	tSirNwType nw_type;
+	tSirNwType nwType;
 
-	tSirMacRateSet opr_rates;
-	tSirMacRateSet ext_rates;
+	tSirMacRateSet operationalRateSet;
+	tSirMacRateSet extendedRateSet;
 	uint16_t beacon_tx_rate;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
 };
-#endif
 
 #endif /* __SIR_API_H */

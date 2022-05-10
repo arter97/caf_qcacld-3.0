@@ -574,6 +574,7 @@ struct csr_roam_info {
 	enum sir_sme_phy_mode mode;
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t max_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
@@ -620,6 +621,7 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
 	uint8_t max_mcs_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	/* Extended capabilities of STA */
@@ -741,7 +743,6 @@ struct csr_del_sta_params {
 	uint8_t subtype;
 };
 
-#ifdef SAP_CP_CLEANUP
 /* Struct bss_dot11_config - Dot11 parameters for
  * SAP operation
  * @vdev_id: vdev id
@@ -765,12 +766,10 @@ struct bss_dot11_config {
 	tSirMacRateSet opr_rates;
 	tSirMacRateSet ext_rates;
 };
-#endif
 
 typedef QDF_STATUS (*csr_roam_complete_cb)(struct wlan_objmgr_psoc *psoc,
 					   uint8_t session_id,
 					   struct csr_roam_info *param,
-					   uint32_t roam_id,
 					   eRoamCmdStatus roam_status,
 					   eCsrRoamResult roam_result);
 typedef QDF_STATUS (*csr_session_open_cb)(uint8_t session_id,
@@ -964,7 +963,18 @@ QDF_STATUS csr_mlme_vdev_stop_bss(uint8_t vdev_id);
  */
 qdf_freq_t csr_mlme_get_concurrent_operation_freq(void);
 
-#ifdef SAP_CP_CLEANUP
+/* csr_convert_mode_to_nw_type() - CSR API to convert dot11 mode
+ * to network type.
+ *
+ * @dot11_mode: dot11 mode
+ * @band: reg band
+ *
+ * Return: network type
+ */
+tSirNwType
+csr_convert_mode_to_nw_type(enum csr_cfgdot11mode dot11_mode,
+			    enum reg_wifi_band band);
+
 /*
  * csr_roam_get_phy_mode_band_for_bss() - CSR API to get phy mode and
  * band for particular dot11 config
@@ -976,5 +986,4 @@ qdf_freq_t csr_mlme_get_concurrent_operation_freq(void);
 enum csr_cfgdot11mode
 csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac,
 				   struct bss_dot11_config *dot11_cfg);
-#endif
 #endif

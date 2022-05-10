@@ -104,6 +104,11 @@
 /* Default beacon interval of 100 ms */
 #define CUSTOM_CONC_GO_BI 100
 
+#define HECAP_TXRX_MCS_NSS_IDX_80    (0)
+#define HECAP_TXRX_MCS_NSS_IDX_160   (1)
+#define HECAP_TXRX_MCS_NSS_IDX_80_80 (2)
+#define INVALID_MCS_NSS_INDEX         0xff
+
 enum diagwlan_status_eventsubtype {
 	DIAG_WLAN_STATUS_CONNECT = 0,
 	DIAG_WLAN_STATUS_DISCONNECT
@@ -1634,6 +1639,7 @@ enum station_prefer_bw {
  * @allow_tpc_from_ap:              Support for AP power constraint
  * @usr_disabled_roaming:           User config for roaming disable
  * @usr_scan_probe_unicast_ra:      User config unicast probe req in scan
+ * @single_link_mlo_conn:           Single link mlo connection is configured
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1659,6 +1665,9 @@ struct wlan_mlme_sta_cfg {
 	bool usr_scan_probe_unicast_ra;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 	host_event_wlan_status_payload_type event_payload;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool single_link_mlo_conn;
 #endif
 };
 
@@ -2279,7 +2288,6 @@ struct wlan_mlme_power {
  * @auth_rsp_timeout: authenticate response timeout
  * @assoc_failure_timeout: assoc failure timeout
  * @reassoc_failure_timeout: re-assoc failure timeout
- * @probe_after_hb_fail_timeout: Probe after HB fail timeout
  * @olbc_detect_timeout: OLBC detect timeout
  * @addts_rsp_timeout: ADDTS rsp timeout value
  * @heart_beat_threshold: Heart beat threshold
@@ -2295,7 +2303,6 @@ struct wlan_mlme_timeout {
 	uint32_t auth_rsp_timeout;
 	uint32_t assoc_failure_timeout;
 	uint32_t reassoc_failure_timeout;
-	uint32_t probe_after_hb_fail_timeout;
 	uint32_t olbc_detect_timeout;
 	uint32_t addts_rsp_timeout;
 	uint32_t heart_beat_threshold;

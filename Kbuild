@@ -996,6 +996,9 @@ cppflags-$(CONFIG_QDF_TEST) += -DWLAN_TRACKER_TEST
 cppflags-$(CONFIG_QDF_TEST) += -DWLAN_TYPES_TEST
 cppflags-$(CONFIG_WLAN_HANG_EVENT) += -DWLAN_HANG_EVENT
 
+#Flag to enable pre_cac
+cppflags-$(CONFIG_FEATURE_WLAN_PRE_CAC)  += -DPRE_CAC_SUPPORT
+
 ############ WBUFF ############
 WBUFF_OS_DIR :=	wbuff
 WBUFF_OS_INC_DIR := $(WBUFF_OS_DIR)/inc
@@ -1546,6 +1549,7 @@ MLME_OBJS +=    $(CM_DIR)/dispatcher/src/wlan_cm_tgt_if_tx_api.o \
 		$(CM_DIR)/dispatcher/src/wlan_cm_roam_api.o \
 		$(CM_DIR)/dispatcher/src/wlan_cm_roam_ucfg_api.o \
 		$(CM_TGT_IF_DIR)/src/target_if_cm_roam_offload.o \
+		$(CM_TGT_IF_DIR)/src/target_if_cm_roam_event.o \
 		$(CM_DIR)/core/src/wlan_cm_roam_offload.o \
 		$(CM_DIR)/core/src/wlan_cm_vdev_connect.o \
 		$(CM_DIR)/core/src/wlan_cm_vdev_disconnect.o
@@ -1555,8 +1559,7 @@ MLME_OBJS +=    $(CM_DIR)/utf/src/cm_utf.o
 endif
 
 ifeq ($(CONFIG_QCACLD_WLAN_LFR3), y)
-MLME_OBJS +=    $(CM_TGT_IF_DIR)/src/target_if_cm_roam_event.o \
-		$(CM_DIR)/core/src/wlan_cm_roam_fw_sync.o \
+MLME_OBJS +=    $(CM_DIR)/core/src/wlan_cm_roam_fw_sync.o \
 		$(CM_DIR)/core/src/wlan_cm_roam_offload_event.o
 endif
 
@@ -1734,7 +1737,11 @@ P2P_OBJS := $(P2P_DISPATCHER_OBJ_DIR)/wlan_p2p_ucfg_api.o \
 	    $(P2P_CORE_OBJ_DIR)/wlan_p2p_off_chan_tx.o \
 	    $(P2P_OS_IF_SRC)/wlan_cfg80211_p2p.o \
 	    $(P2P_TARGET_IF_SRC)/target_if_p2p.o
-
+ifeq ($(CONFIG_WLAN_FEATURE_MCC_QUOTA), y)
+P2P_OBJS += $(P2P_DISPATCHER_OBJ_DIR)/wlan_p2p_mcc_quota_tgt_api.o \
+	    $(P2P_CORE_OBJ_DIR)/wlan_p2p_mcc_quota.o \
+	    $(P2P_TARGET_IF_SRC)/target_if_p2p_mcc_quota.o
+endif
 $(call add-wlan-objs,p2p,$(P2P_OBJS))
 
 ###### UMAC POLICY MGR ########
@@ -2131,6 +2138,11 @@ endif
 
 ifeq ($(CONFIG_FEATURE_MEC), y)
 DP_OBJS += $(DP_SRC)/dp_txrx_wds.o
+endif
+
+ifeq ($(CONFIG_QCACLD_FEATURE_SON), y)
+DP_OBJS += $(WLAN_COMMON_ROOT)/dp/cmn_dp_api/dp_ratetable.o
+DP_INC += -I$(WLAN_COMMON_INC)/dp/cmn_dp_api
 endif
 
 endif #LITHIUM
@@ -4018,6 +4030,9 @@ cppflags-$(CONFIG_EMULATION_2_0) += -DCONFIG_KIWI_EMULATION_2_0
 cppflags-$(CONFIG_WORD_BASED_TLV) += -DCONFIG_WORD_BASED_TLV
 cppflags-$(CONFIG_WLAN_SKIP_BAR_UPDATE) += -DWLAN_SKIP_BAR_UPDATE
 cppflags-$(CONFIG_WLAN_TRACEPOINTS) += -DWLAN_TRACEPOINTS
+
+cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DFEATURE_PERPKT_INFO
+cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DQCA_ENHANCED_STATS_SUPPORT
 
 ifdef CONFIG_MAX_LOGS_PER_SEC
 ccflags-y += -DWLAN_MAX_LOGS_PER_SEC=$(CONFIG_MAX_LOGS_PER_SEC)

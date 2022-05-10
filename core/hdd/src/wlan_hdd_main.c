@@ -221,6 +221,7 @@
 #include <son_ucfg_api.h>
 #include "osif_twt_util.h"
 #include "wlan_twt_ucfg_ext_api.h"
+#include "wlan_hdd_mcc_quota.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -432,9 +433,8 @@ bool hdd_adapter_is_ap(struct hdd_adapter *adapter)
 }
 
 QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
-				     uint8_t session_id,
+				    uint8_t session_id,
 				    struct csr_roam_info *roam_info,
-				    uint32_t roam_id,
 				    eRoamCmdStatus roam_status,
 				    eCsrRoamResult roam_result)
 {
@@ -455,13 +455,13 @@ QDF_STATUS hdd_common_roam_callback(struct wlan_objmgr_psoc *psoc,
 	case QDF_NDI_MODE:
 	case QDF_P2P_CLIENT_MODE:
 	case QDF_P2P_DEVICE_MODE:
-		status = hdd_sme_roam_callback(adapter, roam_info, roam_id,
+		status = hdd_sme_roam_callback(adapter, roam_info,
 					       roam_status, roam_result);
 		break;
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
 		status = wlansap_roam_callback(adapter->session.ap.sap_context,
-					       roam_info, roam_id, roam_status,
+					       roam_info, roam_status,
 					       roam_result);
 		break;
 	default:
@@ -4631,6 +4631,9 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 			break;
 		}
 
+		if (pld_is_ipa_offload_disabled(qdf_dev->dev))
+			ucfg_ipa_set_pld_enable(false);
+
 		ucfg_ipa_component_config_update(hdd_ctx->psoc);
 
 		hdd_update_cds_ac_specs_params(hdd_ctx);
@@ -6045,10 +6048,15 @@ static const struct net_device_ops wlan_drv_ops = {
 	.ndo_set_features = hdd_set_features,
 	.ndo_tx_timeout = hdd_tx_timeout,
 	.ndo_get_stats = hdd_get_stats,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 15, 0)
 	.ndo_do_ioctl = hdd_ioctl,
+#endif
 	.ndo_set_mac_address = hdd_set_mac_address,
 	.ndo_select_queue = hdd_select_queue,
 	.ndo_set_rx_mode = hdd_set_multicast_list,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+	.ndo_siocdevprivate = hdd_dev_private_ioctl,
+#endif
 };
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
@@ -7299,7 +7307,7 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 	uint8_t enable_tx_sch_delay, dfs_chan_ageout_time;
 	uint32_t dtim_sel_diversity, enable_secondary_rate;
 	bool sap_xlna_bypass;
-	bool enable_ofdm_scrambler_seed;
+	bool enable_ofdm_scrambler_seed = false;
 
 	hdd_enter_dev(adapter->dev);
 
@@ -8042,6 +8050,7 @@ static inline void hdd_dump_func_call_map(void)
 }
 #endif
 
+#ifdef PRE_CAC_SUPPORT
 static void hdd_close_pre_cac_adapter(struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *pre_cac_adapter;
@@ -8067,6 +8076,12 @@ static void hdd_close_pre_cac_adapter(struct hdd_context *hdd_ctx)
 	osif_vdev_sync_trans_stop(vdev_sync);
 	osif_vdev_sync_destroy(vdev_sync);
 }
+#else
+static inline void
+hdd_close_pre_cac_adapter(struct hdd_context *hdd_ctx)
+{
+}
+#endif
 
 QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
@@ -8738,10 +8753,7 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 	struct hdd_mon_set_ch_info *ch_info = &sta_ctx->ch_info;
 	QDF_STATUS status;
 	struct qdf_mac_addr bssid;
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	struct csr_roam_profile roam_profile;
-#endif
+	struct channel_change_req *req;
 	struct ch_params ch_params;
 	enum phy_ch_width max_fw_bw;
 	enum phy_ch_width ch_width;
@@ -8750,6 +8762,11 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 	if ((hdd_get_conparam() != QDF_GLOBAL_MONITOR_MODE) &&
 	    (!policy_mgr_is_sta_mon_concurrency(hdd_ctx->psoc))) {
 		hdd_err("Not supported, device is not in monitor mode");
+		return -EINVAL;
+	}
+
+	if (adapter->device_mode != QDF_MONITOR_MODE) {
+		hdd_err_rl("Not supported, adapter is not in monitor mode");
 		return -EINVAL;
 	}
 
@@ -8784,15 +8801,6 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 	}
 
 	hdd_debug("Set monitor mode frequency %d", freq);
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	qdf_mem_zero(&roam_profile, sizeof(roam_profile));
-	roam_profile.ChannelInfo.freq_list = &ch_info->freq;
-	roam_profile.ChannelInfo.numOfChannels = 1;
-	roam_profile.phyMode = ch_info->phy_mode;
-	roam_profile.ch_params.ch_width = bandwidth;
-	hdd_select_cbmode(adapter, freq, 0, &roam_profile.ch_params);
-#endif
 	qdf_mem_copy(bssid.bytes, adapter->mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
 
@@ -8821,13 +8829,27 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 		return qdf_status_to_os_return(status);
 	}
 	adapter->monitor_mode_vdev_up_in_progress = true;
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	status = sme_roam_channel_change_req(hdd_ctx->mac_handle,
-					     bssid, adapter->vdev_id,
-					     &roam_profile.ch_params,
-					     &roam_profile);
-#endif
+
+	qdf_mem_zero(&ch_params, sizeof(struct ch_params));
+
+	req = qdf_mem_malloc(sizeof(struct channel_change_req));
+	if (!req)
+		return -ENOMEM;
+	req->vdev_id = adapter->vdev_id;
+	req->target_chan_freq = ch_info->freq;
+	req->ch_width = ch_width;
+
+	ch_params.ch_width = ch_width;
+	hdd_select_cbmode(adapter, freq, 0, &ch_params);
+
+	req->sec_ch_offset = ch_params.sec_ch_offset;
+	req->center_freq_seg0 = ch_params.center_freq_seg0;
+	req->center_freq_seg1 = ch_params.center_freq_seg1;
+
+	sme_fill_channel_change_request(hdd_ctx->mac_handle, req,
+					ch_info->phy_mode);
+	status = sme_send_channel_change_req(hdd_ctx->mac_handle, req);
+	qdf_mem_free(req);
 	if (status) {
 		hdd_err("Status: %d Failed to set sme_roam Channel for monitor mode",
 			status);
@@ -14808,7 +14830,7 @@ static int hdd_features_init(struct hdd_context *hdd_ctx)
 	if (wma_is_p2p_lo_capable())
 		sme_register_p2p_lo_event(mac_handle, hdd_ctx,
 					  wlan_hdd_p2p_lo_event_callback);
-
+	wlan_hdd_register_mcc_quota_event_callback(hdd_ctx);
 	ret = hdd_set_auto_shutdown_cb(hdd_ctx);
 
 	if (ret)
@@ -17364,6 +17386,9 @@ static ssize_t wlan_hdd_state_ctrl_param_write(struct file *filp,
 		goto exit;
 	}
 
+	hdd_info("is_driver_loaded %d is_driver_recovering %d",
+		 cds_is_driver_loaded(), cds_is_driver_recovering());
+
 	if (!cds_is_driver_loaded() || cds_is_driver_recovering()) {
 		rc = wait_for_completion_timeout(&wlan_start_comp,
 				msecs_to_jiffies(HDD_WLAN_START_WAIT_TIME));
@@ -18815,14 +18840,7 @@ void hdd_set_conparam(int32_t con_param)
 	curr_con_mode = con_param;
 }
 
-/**
- * hdd_clean_up_pre_cac_interface() - Clean up the pre cac interface
- * @hdd_ctx: HDD context
- *
- * Cleans up the pre cac interface, if it exists
- *
- * Return: None
- */
+#ifdef PRE_CAC_SUPPORT
 void hdd_clean_up_pre_cac_interface(struct hdd_context *hdd_ctx)
 {
 	uint8_t vdev_id;
@@ -18847,6 +18865,7 @@ void hdd_clean_up_pre_cac_interface(struct hdd_context *hdd_ctx)
 	qdf_sched_work(0, &hdd_ctx->sap_pre_cac_work);
 
 }
+#endif
 
 /**
  * hdd_svc_fw_crashed_ind() - API to send FW CRASHED IND to Userspace

@@ -464,9 +464,6 @@ void lim_deactivate_timers(struct mac_context *mac_ctx)
 	/* Deactivate Authentication failure timer. */
 	tx_timer_deactivate(&lim_timer->gLimAuthFailureTimer);
 
-	/* Deactivate wait-for-probe-after-Heartbeat timer. */
-	tx_timer_deactivate(&lim_timer->gLimProbeAfterHBTimer);
-
 	/* Deactivate cnf wait timer */
 	for (n = 0; n < (mac_ctx->lim.maxStation + 1); n++) {
 		tx_timer_deactivate(&lim_timer->gpLimCnfWaitTimer[n]);
@@ -613,9 +610,6 @@ void lim_cleanup_mlm(struct mac_context *mac_ctx)
 
 		/* Delete Authentication failure timer. */
 		tx_timer_delete(&lim_timer->gLimAuthFailureTimer);
-
-		/* Delete wait-for-probe-after-Heartbeat timer. */
-		tx_timer_delete(&lim_timer->gLimProbeAfterHBTimer);
 
 		/* Delete cnf wait timer */
 		for (n = 0; n < (mac_ctx->lim.maxStation + 1); n++) {
@@ -4477,30 +4471,6 @@ void lim_handle_heart_beat_timeout_for_session(struct mac_context *mac_ctx,
 					(LIM_IS_STA_ROLE(psession_entry)))
 			lim_handle_heart_beat_failure(mac_ctx, psession_entry);
 	}
-	/*
-	 * In the function lim_handle_heart_beat_failure things can change
-	 * so check for the session entry  valid and the other things
-	 * again
-	 */
-	if ((psession_entry->valid == true) &&
-		(psession_entry->bssType == eSIR_INFRASTRUCTURE_MODE) &&
-			(LIM_IS_STA_ROLE(psession_entry)) &&
-				(psession_entry->LimHBFailureStatus == true)) {
-		tLimTimers *lim_timer  = &mac_ctx->lim.lim_timers;
-		/*
-		 * Activate Probe After HeartBeat Timer incase HB
-		 * Failure detected
-		 */
-		pe_debug("Sending Probe for Session: %d",
-			psession_entry->vdev_id);
-		lim_deactivate_and_change_timer(mac_ctx,
-			eLIM_PROBE_AFTER_HB_TIMER);
-		MTRACE(mac_trace(mac_ctx, TRACE_CODE_TIMER_ACTIVATE, 0,
-			eLIM_PROBE_AFTER_HB_TIMER));
-		if (tx_timer_activate(&lim_timer->gLimProbeAfterHBTimer)
-					!= TX_SUCCESS)
-			pe_err("Fail to re-activate Probe-after-hb timer");
-	}
 }
 
 void lim_process_add_sta_rsp(struct mac_context *mac_ctx,
@@ -4559,76 +4529,6 @@ void lim_update_beacon(struct mac_context *mac_ctx)
 						REASON_DEFAULT);
 		}
 	}
-}
-
-/**
- * lim_handle_heart_beat_failure_timeout - handle heart beat failure
- * @mac_ctx: pointer to Global Mac Structure
- *
- * Function handle heart beat failure timeout
- *
- * Return: none
- */
-void lim_handle_heart_beat_failure_timeout(struct mac_context *mac_ctx)
-{
-	uint8_t i;
-	struct pe_session *psession_entry;
-	/*
-	 * Probe response is not received  after HB failure.
-	 * This is handled by LMM sub module.
-	 */
-	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
-		if (mac_ctx->lim.gpSession[i].valid != true)
-			continue;
-		psession_entry = &mac_ctx->lim.gpSession[i];
-		if (psession_entry->LimHBFailureStatus != true)
-			continue;
-		pe_debug("SME: %d MLME: %d HB-Count: %d",
-				psession_entry->limSmeState,
-				psession_entry->limMlmState,
-				psession_entry->LimRxedBeaconCntDuringHB);
-
-#ifdef FEATURE_WLAN_DIAG_SUPPORT_LIM
-		lim_diag_event_report(mac_ctx, WLAN_PE_DIAG_HB_FAILURE_TIMEOUT,
-					psession_entry, 0, 0);
-#endif
-		if (lim_is_sb_disconnect_allowed(psession_entry) &&
-		    (!LIM_IS_CONNECTION_ACTIVE(psession_entry) ||
-		     /*
-		      * Disconnect even if we have not received a single
-		      * beacon after connection.
-		      */
-		     !psession_entry->currentBssBeaconCnt)) {
-			pe_nofl_info("HB fail vdev %d",psession_entry->vdev_id);
-			lim_send_deauth_mgmt_frame(mac_ctx,
-				REASON_DISASSOC_DUE_TO_INACTIVITY,
-				psession_entry->bssId, psession_entry, false);
-
-			/*
-			 * AP did not respond to Probe Request.
-			 * Tear down link with it.
-			 */
-			lim_tear_down_link_with_ap(mac_ctx,
-						psession_entry->peSessionId,
-						REASON_BEACON_MISSED,
-						eLIM_LINK_MONITORING_DISASSOC);
-			mac_ctx->lim.gLimProbeFailureAfterHBfailedCnt++;
-		} else {
-			pe_err("Unexpected wt-probe-timeout in state");
-			lim_print_mlm_state(mac_ctx, LOGE,
-				psession_entry->limMlmState);
-			if (mac_ctx->sme.tx_queue_cb)
-				mac_ctx->sme.tx_queue_cb(mac_ctx->hdd_handle,
-						psession_entry->smeSessionId,
-						WLAN_WAKE_ALL_NETIF_QUEUE,
-						WLAN_CONTROL_PATH);
-		}
-	}
-	/*
-	 * Deactivate Timer ProbeAfterHB Timer -> As its a oneshot timer,
-	 * need not deactivate the timer
-	 * tx_timer_deactivate(&mac->lim.lim_timers.gLimProbeAfterHBTimer);
-	 */
 }
 
 struct pe_session *lim_is_ap_session_active(struct mac_context *mac)
@@ -8077,15 +7977,16 @@ QDF_STATUS lim_populate_he_mcs_set(struct mac_context *mac_ctx,
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
-void lim_update_sta_mlo_info(tpAddStaParams add_sta_params,
+void lim_update_sta_mlo_info(struct pe_session *session,
+			     tpAddStaParams add_sta_params,
 			     tpDphHashNode sta_ds)
 {
-	if (add_sta_params->eht_capable) {
+	if (lim_is_mlo_conn(session, sta_ds)) {
 		WLAN_ADDR_COPY(add_sta_params->mld_mac_addr, sta_ds->mld_addr);
 		add_sta_params->is_assoc_peer = lim_is_mlo_recv_assoc(sta_ds);
 	}
-	pe_debug("eht_capable: %d mld mac " QDF_MAC_ADDR_FMT " assoc peer %d",
-		 add_sta_params->eht_capable,
+	pe_debug("is mlo connection: %d mld mac " QDF_MAC_ADDR_FMT " assoc peer %d",
+		 lim_is_mlo_conn(session, sta_ds),
 		 QDF_MAC_ADDR_REF(add_sta_params->mld_mac_addr),
 		 add_sta_params->is_assoc_peer);
 }
@@ -10088,4 +9989,72 @@ QDF_STATUS lim_pre_vdev_start(struct mac_context *mac,
 				session->ssId.length);
 
 	return lim_set_ch_phy_mode(mlme_obj->vdev, session->dot11mode);
+}
+
+uint8_t lim_get_he_max_mcs_idx(enum phy_ch_width ch_width,
+			       tDot11fIEhe_cap *he_cap)
+{
+	uint16_t hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80_80 + 1];
+	uint16_t hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80_80 + 1];
+
+	qdf_mem_zero(hecap_rxmcsnssmap, sizeof(hecap_rxmcsnssmap));
+	qdf_mem_zero(hecap_txmcsnssmap, sizeof(hecap_txmcsnssmap));
+
+	qdf_mem_copy(&hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80],
+		     &he_cap->rx_he_mcs_map_lt_80,
+		     sizeof(u_int16_t));
+	qdf_mem_copy(&hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80],
+		     &he_cap->tx_he_mcs_map_lt_80,
+		     sizeof(u_int16_t));
+	if (he_cap->chan_width_2) {
+		qdf_mem_copy(&hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_160],
+			     &he_cap->rx_he_mcs_map_160,
+			     sizeof(u_int16_t));
+		qdf_mem_copy(&hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_160],
+			     &he_cap->tx_he_mcs_map_160,
+			     sizeof(u_int16_t));
+	}
+	if (he_cap->chan_width_3) {
+		qdf_mem_copy(&hecap_rxmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80_80],
+			     &he_cap->rx_he_mcs_map_80_80,
+			     sizeof(u_int16_t));
+		qdf_mem_copy(&hecap_txmcsnssmap[HECAP_TXRX_MCS_NSS_IDX_80_80],
+			     &he_cap->tx_he_mcs_map_80_80,
+			     sizeof(u_int16_t));
+	}
+
+	return mlme_get_max_he_mcs_idx(ch_width, hecap_rxmcsnssmap,
+				       hecap_txmcsnssmap);
+}
+
+uint8_t lim_get_vht_max_mcs_idx(tDot11fIEVHTCaps *vht_cap)
+{
+	return mlme_get_max_vht_mcs_idx(vht_cap->rxMCSMap & 0xff,
+					vht_cap->txMCSMap & 0xff);
+}
+
+uint8_t lim_get_ht_max_mcs_idx(tDot11fIEHTCaps *ht_cap)
+{
+	uint8_t i, maxidx = INVALID_MCS_NSS_INDEX;
+
+	for (i = 0; i < 8; i++) {
+		if (ht_cap->supportedMCSSet[0] & (1 << i))
+			maxidx = i;
+	}
+
+	return maxidx;
+}
+
+uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset)
+{
+	uint8_t maxidx;
+	int i;
+
+	maxidx = rateset->rate[0] & 0x7f;
+	for (i = 1; i < rateset->numRates; i++) {
+		if ((rateset->rate[i] & 0x7f) > maxidx)
+			maxidx = rateset->rate[i] & 0x7f;
+	}
+
+	return maxidx;
 }

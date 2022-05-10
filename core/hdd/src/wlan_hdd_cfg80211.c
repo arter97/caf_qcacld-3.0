@@ -1751,6 +1751,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_ROAM_EVENTS,
 	},
 #endif
+	FEATURE_MCC_QUOTA_VENDOR_EVENTS
 };
 
 /**
@@ -4160,6 +4161,24 @@ static void wlan_hdd_cfg80211_set_feature(uint8_t *feature_flags,
 }
 
 /**
+ * wlan_hdd_set_ndi_feature() - Set NDI related features
+ * @feature_flags: pointer to the byte array of features.
+ *
+ * Return: None
+ **/
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+static void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
+{
+	wlan_hdd_cfg80211_set_feature(feature_flags,
+				      QCA_WLAN_VENDOR_FEATURE_USE_ADD_DEL_VIRTUAL_INTF_FOR_NDI);
+}
+#else
+static inline void wlan_hdd_set_ndi_feature(uint8_t *feature_flags)
+{
+}
+#endif
+
+/**
  * __wlan_hdd_cfg80211_get_features() - Get the Driver Supported features
  * @wiphy: pointer to wireless wiphy structure.
  * @wdev: pointer to wireless_dev structure.
@@ -4272,6 +4291,8 @@ __wlan_hdd_cfg80211_get_features(struct wiphy *wiphy,
 	if (wlan_hdd_thermal_config_support())
 		wlan_hdd_cfg80211_set_feature(feature_flags,
 					QCA_WLAN_VENDOR_FEATURE_THERMAL_CONFIG);
+
+	wlan_hdd_set_ndi_feature(feature_flags);
 
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(feature_flags) +
 			NLMSG_HDRLEN);
@@ -8163,7 +8184,7 @@ static int hdd_process_generic_set_cmd(struct hdd_adapter *adapter,
 static int hdd_process_generic_set_cmd(struct hdd_adapter *adapter,
 				       struct nlattr *tb[])
 {
-	return -EINVAL;
+	return 0;
 }
 #endif
 
@@ -18101,6 +18122,19 @@ static void wlan_hdd_update_eapol_over_nl80211_flags(struct wiphy *wiphy)
 }
 #endif
 
+#ifdef CFG80211_MULTI_AKM_CONNECT_SUPPORT
+static void
+wlan_hdd_update_max_connect_akm(struct wiphy *wiphy)
+{
+	wiphy->max_num_akms_connect = WLAN_CM_MAX_CONNECT_AKMS;
+}
+#else
+static void
+wlan_hdd_update_max_connect_akm(struct wiphy *wiphy)
+{
+}
+#endif
+
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -18237,6 +18271,9 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 
 	hdd_add_channel_switch_support(&wiphy->flags);
 	wiphy->max_num_csa_counters = WLAN_HDD_MAX_NUM_CSA_COUNTERS;
+
+	wlan_hdd_update_max_connect_akm(wiphy);
+
 	wlan_hdd_cfg80211_action_frame_randomization_init(wiphy);
 
 	wlan_hdd_set_nan_supported_bands(wiphy);
@@ -19721,11 +19758,20 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 }
 
 #ifdef CFG80211_KEY_INSTALL_SUPPORT_ON_WDEV
+#ifdef CFG80211_SET_KEY_WITH_SRC_MAC
+static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     u8 key_index, bool pairwise,
+				     const u8 *src_addr,
+				     const u8 *mac_addr,
+				     struct key_params *params)
+#else
 static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 				     struct wireless_dev *wdev,
 				     u8 key_index, bool pairwise,
 				     const u8 *mac_addr,
 				     struct key_params *params)
+#endif
 {
 	int errno = -EINVAL;
 	struct osif_vdev_sync *vdev_sync;
@@ -19748,11 +19794,20 @@ static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	return errno;
 }
 #else
+#ifdef CFG80211_SET_KEY_WITH_SRC_MAC
+static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
+				     struct net_device *ndev,
+				     u8 key_index, bool pairwise,
+				     const u8 *src_addr,
+				     const u8 *mac_addr,
+				     struct key_params *params)
+#else
 static int wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 				     struct net_device *ndev,
 				     u8 key_index, bool pairwise,
 				     const u8 *mac_addr,
 				     struct key_params *params)
+#endif
 {
 	int errno;
 	struct osif_vdev_sync *vdev_sync;
@@ -22459,12 +22514,7 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	QDF_STATUS status;
 	mac_handle_t mac_handle;
 	struct qdf_mac_addr bssid;
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	struct csr_roam_profile roam_profile;
-#else
 	struct channel_change_req *req;
-#endif
 	struct ch_params ch_params = {0};
 	int ret;
 	enum channel_state chan_freq_state;
@@ -22518,13 +22568,7 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	}
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	ch_info = &sta_ctx->ch_info;
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	roam_profile.ChannelInfo.freq_list = &ch_info->freq;
-	roam_profile.ChannelInfo.numOfChannels = 1;
-	roam_profile.phyMode = ch_info->phy_mode;
-	roam_profile.ch_params.ch_width = ch_width;
-#endif
+
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(chandef->chan->center_freq) &&
 	    chandef->width == NL80211_CHAN_WIDTH_40 &&
 	    chandef->center_freq1) {
@@ -22535,11 +22579,6 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 	}
 	hdd_debug("set mon ch:width=%d, freq %d sec_ch_2g_freq=%d",
 		  chandef->width, chandef->chan->center_freq, sec_ch_2g_freq);
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	hdd_select_cbmode(adapter, chandef->chan->center_freq, sec_ch_2g_freq,
-			  &roam_profile.ch_params);
-#endif
 	qdf_mem_copy(bssid.bytes, adapter->mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
 
@@ -22565,13 +22604,29 @@ static int __wlan_hdd_cfg80211_set_mon_ch(struct wiphy *wiphy,
 		return qdf_status_to_os_return(status);
 	}
 	adapter->monitor_mode_vdev_up_in_progress = true;
-/* To be removed after SAP CSR cleanup changes */
-#ifndef SAP_CP_CLEANUP
-	status = sme_roam_channel_change_req(mac_handle, bssid,
-					     adapter->vdev_id,
-					     &roam_profile.ch_params,
-					     &roam_profile);
-#endif
+
+	qdf_mem_zero(&ch_params, sizeof(struct ch_params));
+
+	req = qdf_mem_malloc(sizeof(struct channel_change_req));
+	if (!req)
+		return -ENOMEM;
+
+	req->vdev_id = adapter->vdev_id;
+	req->target_chan_freq = ch_info->freq;
+	req->ch_width = ch_width;
+
+	ch_params.ch_width = ch_width;
+	hdd_select_cbmode(adapter, chandef->chan->center_freq, sec_ch_2g_freq,
+			  &ch_params);
+
+	req->sec_ch_offset = ch_params.sec_ch_offset;
+	req->center_freq_seg0 = ch_params.center_freq_seg0;
+	req->center_freq_seg1 = ch_params.center_freq_seg1;
+
+	sme_fill_channel_change_request(mac_handle, req, ch_info->phy_mode);
+	status = sme_send_channel_change_req(mac_handle, req);
+	qdf_mem_free(req);
+
 	if (status) {
 		hdd_err_rl("Failed to set sme_RoamChannel for monitor mode status: %d",
 			   status);
@@ -23592,7 +23647,7 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 	uint8_t rate_index;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	uint8_t vdev_id;
-	uint8_t gi_val;
+	u8 gi_val = 0;
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0))
 	uint8_t auto_rate_he_gi = 0;
 #endif

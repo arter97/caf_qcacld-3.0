@@ -1655,6 +1655,7 @@ void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
 	int status;
 	struct hdd_adapter *adapter;
+	struct hdd_station_ctx *sta_ctx;
 
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (status)
@@ -1673,6 +1674,14 @@ void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 
 	adapter->rssi_on_disconnect = lost_link_info->rssi;
 	hdd_debug("rssi on disconnect %d", adapter->rssi_on_disconnect);
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	if (!sta_ctx) {
+		hdd_err("invalid sta context");
+		return;
+	}
+
+	sta_ctx->cache_conn_info.signal = lost_link_info->rssi;
 }
 
 const struct nla_policy qca_wlan_vendor_ll_set_policy[
@@ -2223,11 +2232,6 @@ __wlan_hdd_cfg80211_ll_stats_get(struct wiphy *wiphy,
 	if (!adapter->is_link_layer_stats_set) {
 		hdd_nofl_debug("is_link_layer_stats_set: %d",
 			       adapter->is_link_layer_stats_set);
-		return -EINVAL;
-	}
-
-	if (adapter->device_mode == QDF_SAP_MODE) {
-		hdd_nofl_debug("LL_STATS get is not supported for SAP mode");
 		return -EINVAL;
 	}
 
@@ -6237,7 +6241,6 @@ struct net_device_stats *hdd_get_stats(struct net_device *dev)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
-	hdd_enter_dev(dev);
 	return &adapter->stats;
 }
 
@@ -7280,6 +7283,7 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 	struct hdd_adapter *adapter;
 	struct stats_event *ev = stats_ev;
 	uint8_t i;
+	struct hdd_station_ctx *sta_ctx;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
 		return;
@@ -7297,6 +7301,11 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 		hdd_debug("rssi %d for " QDF_MAC_ADDR_FMT,
 			  adapter->rssi_on_disconnect,
 			  QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
+
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+		if (sta_ctx)
+			sta_ctx->cache_conn_info.signal =
+					ev->vdev_summary_stats[i].stats.rssi;
 	}
 }
 

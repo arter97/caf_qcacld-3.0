@@ -479,9 +479,7 @@ static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 	QDF_STATUS status;
 	uint8_t i;
 
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		  "%s: dump valid channel list(NumChannels(%d))",
-		  __func__, NumChannels);
+	sme_debug("dump valid channel list(NumChannels(%d))", NumChannels);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			   pchan_freq_list, NumChannels);
 	for (i = 0; i < NumChannels; i++) {
@@ -490,8 +488,7 @@ static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 
 	mac->mlme_cfg->reg.valid_channel_list_num = NumChannels;
 
-	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
-		  "Scan offload is enabled, update default chan list");
+	sme_debug("Scan offload is enabled, update default chan list");
 	/*
 	 * disable fcc constraint since new country code
 	 * is being set
@@ -499,8 +496,7 @@ static void csr_set_cfg_valid_channel_list(struct mac_context *mac,
 	mac->scan.fcc_constraint = false;
 	status = csr_update_channel_list(mac);
 	if (QDF_STATUS_SUCCESS != status) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-			  "failed to update the supported channel list");
+		sme_err("failed to update the supported channel list");
 	}
 }
 
@@ -821,7 +817,6 @@ static QDF_STATUS csr_fill_bss_from_scan_entry(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_NOMEM;
 
 	csr_fill_neg_crypto_info(bss, &scan_entry->neg_sec_info);
-	bss->bss_score = scan_entry->bss_score;
 
 	result_info = &bss->Result;
 	result_info->ssId.length = scan_entry->ssid.length;
@@ -957,8 +952,7 @@ QDF_STATUS csr_scan_get_result_for_bssid(struct mac_context *mac_ctx,
 	tCsrScanResultInfo *scan_result;
 
 	if (!mac_ctx) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				FL("mac_ctx is NULL"));
+		sme_err("mac_ctx is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1002,62 +996,6 @@ free_filter:
 	return status;
 }
 
-static inline QDF_STATUS
-csr_flush_scan_results(struct mac_context *mac_ctx,
-		       struct scan_filter *filter)
-{
-	struct wlan_objmgr_pdev *pdev = NULL;
-	QDF_STATUS status;
-
-	pdev = wlan_objmgr_get_pdev_by_id(mac_ctx->psoc,
-		0, WLAN_LEGACY_MAC_ID);
-	if (!pdev) {
-		sme_err("pdev is NULL");
-		return QDF_STATUS_E_INVAL;
-	}
-	status = ucfg_scan_flush_results(pdev, filter);
-
-	wlan_objmgr_pdev_release_ref(pdev, WLAN_LEGACY_MAC_ID);
-	return status;
-}
-
-static inline void csr_flush_bssid(struct mac_context *mac_ctx,
-				   uint8_t *bssid)
-{
-	struct scan_filter *filter;
-
-	filter = qdf_mem_malloc(sizeof(*filter));
-	if (!filter)
-		return;
-
-	filter->num_of_bssid = 1;
-	qdf_mem_copy(filter->bssid_list[0].bytes,
-		     bssid, QDF_MAC_ADDR_SIZE);
-
-	csr_flush_scan_results(mac_ctx, filter);
-	sme_debug("Removed BSS entry:"QDF_MAC_ADDR_FMT,
-		   QDF_MAC_ADDR_REF(bssid));
-	if (filter)
-		qdf_mem_free(filter);
-}
-
-void csr_remove_bssid_from_scan_list(struct mac_context *mac_ctx,
-				     tSirMacAddr bssid)
-{
-	csr_flush_bssid(mac_ctx, bssid);
-}
-
-/**
- * csr_scan_filter_results: filter scan result based
- * on valid channel list number.
- * @mac_ctx: mac context
- *
- * Get scan result from scan list and Check Scan result channel number
- * with 11d channel list if channel number is found in 11d channel list
- * then do not remove scan result entry from scan list
- *
- * return: QDF Status
- */
 QDF_STATUS csr_scan_filter_results(struct mac_context *mac_ctx)
 {
 	uint32_t len = mac_ctx->mlme_cfg->reg.valid_channel_list_num;

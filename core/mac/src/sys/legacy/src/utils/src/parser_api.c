@@ -3763,6 +3763,10 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 		qdf_mem_copy(&pAssocRsp->eht_cap, &ar->eht_cap,
 			     sizeof(tDot11fIEeht_cap));
 
+	if (ar->eht_op.present)
+		qdf_mem_copy(&pAssocRsp->eht_op, &ar->eht_op,
+			     sizeof(tDot11fIEeht_op));
+
 	if (ar->he_6ghz_band_cap.present)
 		qdf_mem_copy(&pAssocRsp->he_6ghz_band_cap,
 			     &ar->he_6ghz_band_cap,
@@ -7676,10 +7680,8 @@ sir_convert_mlo_probe_rsp_frame2_struct(tDot11fProbeResponse *pr,
 	if (!pr)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	if (!pr->mlo_ie.present) {
-		pe_err("MLO IE not present");
+	if (!pr->mlo_ie.present)
 		return QDF_STATUS_E_NULL_VALUE;
-	}
 
 	qdf_mem_zero((uint8_t *)mlo_ie_ptr, sizeof(tSirMultiLink_IE));
 
@@ -8658,6 +8660,11 @@ QDF_STATUS populate_dot11f_assoc_req_mlo_ie(struct mac_context *mac_ctx,
 
 	/* find out number of links from bcn or prb rsp */
 	total_sta_prof = 1;
+	if (wlan_mlme_is_sta_single_mlo_conn(
+				wlan_vdev_get_psoc(pe_session->vdev))) {
+		pe_debug("Single link mlo connection is enabled for mlo sta");
+		total_sta_prof = 0;
+	}
 	partner_info = &pe_session->lim_join_req->partner_info;
 
 	mlo_dev_ctx = pe_session->vdev->mlo_dev_ctx;
