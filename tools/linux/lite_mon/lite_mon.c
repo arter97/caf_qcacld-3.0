@@ -37,6 +37,8 @@ static void usage(void)
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--filter_md: set filter for monitor direct");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
+			"--filter_fpmo: set filter for filter pass monitor override");
+	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"\tfilter format: 0xTSSSS, T:type, SSSS:Subtype mask");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--mgmt_len: Length of management frame to be filtered");
@@ -74,7 +76,7 @@ static void usage(void)
  * lite_mon_fill_fil_value: Fill user given value into filter structure
  * @filter_config: filter config structre to be filled
  * @input_filter: filter that was given as input by user
- * @filter_mode: filter mode, FP, MO or MD
+ * @filter_mode: filter mode, FP, MO, MD or FPMO
  * return void
  */
 static void lite_mon_fill_fil_value(struct lite_mon_filter_config *filter_config,
@@ -298,8 +300,8 @@ static void lite_mon_sanitize_filter(uint16_t *filter, uint8_t direction,
 {
 	int i;
 
-	lite_mon_printf(LITE_MON_TRACE_DEBUG, "filter FP %02X MD %02X MO %02X",
-			filter[0], filter[1], filter[2]);
+	lite_mon_printf(LITE_MON_TRACE_DEBUG, "filter FP %02X MD %02X MO %02X FPMO %02X",
+			filter[0], filter[1], filter[2], filter[3]);
 	for (i = 0; i < LITE_MON_MODE_MAX; i++) {
 		if (filter[i] == LITE_MON_FILTER_ALL)
 			continue;
@@ -618,20 +620,23 @@ static void lite_mon_display_filter(struct lite_mon_config *mon_config)
 	lite_mon_printf(LITE_MON_TRACE_INFO, "DATA Length: %02X ",
 			filter_config->len[LITE_MON_TYPE_DATA]);
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"MGMT filter: FP %02X MD %02X MO %02X",
+			"MGMT filter: FP %02X MD %02X MO %02X FPMO %02X",
 			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_FP],
 			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_MD],
-			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_MO]);
+			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_MO],
+			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_FPMO]);
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"CTRL filter: FP %02X MD %02X MO %02X",
+			"CTRL filter: FP %02X MD %02X MO %02X FPMO %02X",
 			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_FP],
 			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_MD],
-			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_MO]);
+			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_MO],
+			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_FPMO]);
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"DATA filter: FP %02X MD %02X MO %02X",
+			"DATA filter: FP %02X MD %02X MO %02X FPMO %02X",
 			filter_config->data_filter[LITE_MON_MODE_FILTER_FP],
 			filter_config->data_filter[LITE_MON_MODE_FILTER_MD],
-			filter_config->data_filter[LITE_MON_MODE_FILTER_MO]);
+			filter_config->data_filter[LITE_MON_MODE_FILTER_MO],
+			filter_config->data_filter[LITE_MON_MODE_FILTER_FPMO]);
 }
 
 /*
@@ -730,20 +735,23 @@ static void lite_mon_dump_structure_content(struct lite_mon_config *mon_config)
 				filter_config->metadata,
 				filter_config->interface_name);
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
-				"mgmt filter fp %02X md %02X mo %02X",
+				"mgmt filter fp %02X md %02X mo %02X fpmo %02X",
 				filter_config->mgmt_filter[0],
 				filter_config->mgmt_filter[1],
-				filter_config->mgmt_filter[2]);
+				filter_config->mgmt_filter[2],
+				filter_config->mgmt_filter[3]);
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
-				"ctrl filter fp %02X md %02X mo %02X",
+				"ctrl filter fp %02X md %02X mo %02X fpmo %02X",
 				filter_config->ctrl_filter[0],
 				filter_config->ctrl_filter[1],
-				filter_config->ctrl_filter[2]);
+				filter_config->ctrl_filter[2],
+				filter_config->ctrl_filter[3]);
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
-				"data filter fp %02X md %02X mo %02X",
+				"data filter fp %02X md %02X mo %02X fpmo %02X",
 				filter_config->data_filter[0],
 				filter_config->data_filter[1],
-				filter_config->data_filter[2]);
+				filter_config->data_filter[2],
+				filter_config->data_filter[3]);
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
 				"len mgmt %02X ctrl %02X data %02X",
 				filter_config->len[0],
@@ -832,7 +840,7 @@ int main(int argc, char *argv[])
 			    DEFAULT_NL80211_EVENT_SOCK_ID);
 
 	while (1) {
-		c = getopt_long(argc, argv, "d:e:Dp:m:o:j:k:l:O:sa:r:Lhx:M:t:v:",
+		c = getopt_long(argc, argv, "d:e:Dp:m:o:f:j:k:l:O:sa:r:Lhx:M:t:v:",
 				long_options, &option_index);
 		if (c == -1)
 			break;
@@ -879,6 +887,13 @@ int main(int argc, char *argv[])
 			lite_mon_fill_fil_value(&mon_config.data.filter_config,
 						filter,
 						LITE_MON_MODE_FILTER_MO);
+			break;
+		case 'f': /* filter_fpmo */
+			cmd_bitmask |= LITE_MON_SET_FILTER_MASK;
+			filter = strtoul(optarg, NULL, 0);
+			lite_mon_fill_fil_value(&mon_config.data.filter_config,
+						filter,
+						LITE_MON_MODE_FILTER_FPMO);
 			break;
 		case 'j': /* mgmt_len */
 			cmd_bitmask |= LITE_MON_SET_FILTER_MASK;
