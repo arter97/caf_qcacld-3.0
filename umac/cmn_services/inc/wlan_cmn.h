@@ -297,6 +297,7 @@
  * @WLAN_COMP_DP:                 DP component
  * @WLAN_UMAC_COMP_COAP:          Constrained Application Protocol component
  * @WLAN_UMAC_COMP_QMI:           QMI component
+ * @WLAN_UMAC_COMP_AFC:           AFC component
  * @WLAN_UMAC_COMP_ID_MAX:        Maximum components in UMAC
  *
  * This id is static.
@@ -353,6 +354,7 @@ enum wlan_umac_comp_id {
 	WLAN_COMP_TELEMETRY_AGENT         = 47,
 	WLAN_UMAC_COMP_COAP               = 48,
 	WLAN_UMAC_COMP_QMI                = 49,
+	WLAN_UMAC_COMP_AFC                = 50,
 	WLAN_UMAC_COMP_ID_MAX,
 };
 

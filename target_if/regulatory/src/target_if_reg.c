@@ -34,6 +34,9 @@
 #include <target_if_reg_lte.h>
 #include <wlan_reg_ucfg_api.h>
 #include <wlan_utility.h>
+#ifdef CONFIG_REG_CLIENT
+#include <wlan_dcs_tgt_api.h>
+#endif
 
 /**
  * get_chan_list_cc_event_id() - Get chan_list_cc event i
@@ -849,11 +852,19 @@ static void target_if_register_afc_event_handler(
 		tgt_if_regulatory_unregister_afc_event_handler;
 }
 
+#ifdef CONFIG_REG_CLIENT
+static void target_if_register_acs_trigger_for_afc
+				(struct wlan_lmac_if_reg_tx_ops *reg_ops)
+{
+	reg_ops->trigger_acs_for_afc = tgt_afc_trigger_dcs;
+}
+#else
 static void target_if_register_acs_trigger_for_afc
 				(struct wlan_lmac_if_reg_tx_ops *reg_ops)
 {
 	reg_ops->trigger_acs_for_afc = NULL;
 }
+#endif
 #else
 static void target_if_register_afc_event_handler(
 				struct wlan_lmac_if_reg_tx_ops *reg_ops)
