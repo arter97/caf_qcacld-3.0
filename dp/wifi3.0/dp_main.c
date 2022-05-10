@@ -6876,6 +6876,7 @@ static QDF_STATUS dp_vdev_detach_wifi3(struct cdp_soc_t *cdp_soc,
 	dp_tx_vdev_multipass_deinit(vdev);
 
 	if (vdev->vdev_dp_ext_handle) {
+		dp_tx_me_flush(cdp_soc, vdev_id);
 		qdf_mem_free(vdev->vdev_dp_ext_handle);
 		vdev->vdev_dp_ext_handle = NULL;
 	}
