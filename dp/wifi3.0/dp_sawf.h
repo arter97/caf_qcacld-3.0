@@ -55,6 +55,39 @@ struct sawf_def_queue_report {
 };
 
 /**
+ * sawf_mov_avg_params - SAWF telemetry moving average params
+ * @packet: num of packets per window
+ * @window: num of windows
+ *
+ */
+struct sawf_mov_avg_params {
+	uint32_t packet;
+	uint32_t window;
+};
+
+/**
+ * sawf_mov_avg_params - SAWF telemetry SLA params
+ * @num_packets: num of packets for SLA detection
+ * @time_secs: num of sec for SLA detection
+ *
+ */
+struct sawf_sla_params {
+	uint32_t num_packets;
+	uint32_t time_secs;
+};
+
+/**
+ * sawf_telemetry_params - SAWF telemetry  params
+ * @mov_avg: moving average params
+ * @sla: SLA params
+ *
+ */
+struct sawf_telemetry_params {
+	struct sawf_mov_avg_params mov_avg;
+	struct sawf_sla_params sla;
+};
+
+/**
  * dp_sawf_def_queues_unmap_req - unmap peer to service class ID mapping
  * @soc: soc handle
  * @mac_addr: mac address
@@ -259,4 +292,31 @@ uint32_t dp_sawf_queue_id_get(qdf_nbuf_t nbuf);
 void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf);
 bool dp_sawf_tag_valid_get(qdf_nbuf_t nbuf);
 
+/**
+ * dp_sawf_set_mov_avg_params- Set moving average pararms
+ * @num_pkt: No of packets per window to calucalte moving average
+ * @num_win: No of windows to calucalte moving average
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_sawf_set_mov_avg_params(uint32_t num_pkt,
+				      uint32_t num_win);
+
+/**
+ * dp_sawf_set_sla_params- Set SLA pararms
+ * @num_pkt: No of packets to detect SLA breach
+ * @time_secs: Time ins secs to detect breach
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS dp_sawf_set_sla_params(uint32_t num_pkt,
+				  uint32_t time_secs);
+
+/**
+ * dp_sawf_init_telemtry_param - Initialize telemetry params
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS dp_sawf_init_telemetry_params(void);
 #endif /* DP_SAWF_H*/

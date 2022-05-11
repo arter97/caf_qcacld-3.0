@@ -62,6 +62,14 @@
 #define DP_TCL_METADATA_TYPE_SVC_ID_BASED \
 	HTT_TCL_METADATA_V2_TYPE_SVC_ID_BASED
 
+#define SAWF_TELEMETRY_MOV_AVG_PACKETS 1000
+#define SAWF_TELEMETRY_MOV_AVG_WINDOWS 10
+
+#define SAWF_TELEMETRY_SLA_PACKETS 100000
+#define SAWF_TELEMETRY_SLA_TIME    10
+
+struct sawf_telemetry_params sawf_telemetry_cfg;
+
 uint16_t dp_sawf_msduq_peer_id_set(uint16_t peer_id, uint8_t msduq)
 {
 	uint16_t peer_msduq = 0;
@@ -1173,3 +1181,36 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 }
 
 qdf_export_symbol(dp_sawf_get_msduq);
+
+QDF_STATUS dp_sawf_set_mov_avg_params(uint32_t num_pkt,
+				      uint32_t num_win)
+{
+	sawf_telemetry_cfg.mov_avg.packet = num_pkt;
+	sawf_telemetry_cfg.mov_avg.window = num_win;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(dp_sawf_set_mov_avg_params);
+
+QDF_STATUS dp_sawf_set_sla_params(uint32_t num_pkt,
+				  uint32_t time_secs)
+{
+	sawf_telemetry_cfg.sla.num_packets = num_pkt;
+	sawf_telemetry_cfg.sla.time_secs = time_secs;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(dp_sawf_set_sla_params);
+
+QDF_STATUS dp_sawf_init_telemetry_params(void)
+{
+	sawf_telemetry_cfg.mov_avg.packet = SAWF_TELEMETRY_MOV_AVG_PACKETS;
+	sawf_telemetry_cfg.mov_avg.window = SAWF_TELEMETRY_MOV_AVG_WINDOWS;
+
+	sawf_telemetry_cfg.sla.num_packets = SAWF_TELEMETRY_SLA_PACKETS;
+	sawf_telemetry_cfg.sla.time_secs = SAWF_TELEMETRY_SLA_TIME;
+
+	return QDF_STATUS_SUCCESS;
+}
