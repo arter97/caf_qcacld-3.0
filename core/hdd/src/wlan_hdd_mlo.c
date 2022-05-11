@@ -177,7 +177,8 @@ void hdd_wlan_register_mlo_interfaces(struct hdd_context *hdd_ctx)
 	if (!ml_adapter)
 		return;
 
-	status = hdd_derive_link_address_from_mld(&ml_adapter->mld_addr,
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &ml_adapter->mld_addr,
 						  &link_addr[0],
 						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -337,15 +338,16 @@ void hdd_mlo_t2lm_unregister_callback(struct wlan_objmgr_vdev *vdev)
 	wlan_unregister_t2lm_link_update_notify_handler(vdev->mlo_dev_ctx, 0);
 }
 
-QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+QDF_STATUS hdd_derive_link_address_from_mld(struct wlan_objmgr_psoc *psoc,
+					    struct qdf_mac_addr *mld_addr,
 					    struct qdf_mac_addr *link_addr_list,
 					    uint8_t max_idx)
 {
-	uint8_t last_byte, temp_byte, idx;
+	uint8_t last_byte, temp_byte, idx, start_idx = 0;
 	struct qdf_mac_addr new_addr;
 	struct qdf_mac_addr *link_addr;
 
-	if (!mld_addr || !link_addr_list || !max_idx ||
+	if (!psoc || !mld_addr || !link_addr_list || !max_idx ||
 	    max_idx > WLAN_MAX_ML_BSS_LINKS || qdf_is_macaddr_zero(mld_addr)) {
 		hdd_err("Invalid values");
 		return QDF_STATUS_E_INVAL;
@@ -360,7 +362,13 @@ QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
 	hdd_debug("MLD addr: " QDF_MAC_ADDR_FMT,
 		  QDF_MAC_ADDR_REF(mld_addr->bytes));
 
-	for (idx = 0; idx < max_idx; idx++) {
+	if (wlan_mlme_get_sta_same_link_mld_addr(psoc)) {
+		qdf_copy_macaddr(link_addr, mld_addr);
+		link_addr++;
+		start_idx++;
+	}
+
+	for (idx = start_idx; idx < max_idx; idx++) {
 		temp_byte = ((last_byte >> 4 & INTF_MACADDR_MASK) + idx) &
 			     INTF_MACADDR_MASK;
 		new_addr.bytes[5] = last_byte + temp_byte;
@@ -471,7 +479,8 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		return ret;
 	}
 
-	status = hdd_derive_link_address_from_mld(&mac_addr, &link_addrs[0],
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &mac_addr, &link_addrs[0],
 						  WLAN_MAX_ML_BSS_LINKS);
 
 	if (QDF_IS_STATUS_ERROR(status))
@@ -535,7 +544,8 @@ int hdd_update_vdev_mac_address(struct hdd_adapter *adapter,
 		return ret;
 	}
 
-	status = hdd_derive_link_address_from_mld(&mac_addr, &link_addrs[0],
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &mac_addr, &link_addrs[0],
 						  WLAN_MAX_ML_BSS_LINKS);
 
 	if (QDF_IS_STATUS_ERROR(status))

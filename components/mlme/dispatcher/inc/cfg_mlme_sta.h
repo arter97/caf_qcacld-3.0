@@ -690,6 +690,34 @@
 #define CFG_MLO_MAX_SIMULTANEOUS_LINKS_CFG
 #define CFG_MLO_PREFER_PERCENTAGE_CFG
 #endif
+
+/*
+ * <cfg>
+ * mlo_same_link_mld_addr - Use one of the links address as same mld address
+ * @Default: false
+ *
+ * This cfg is used to configure the one of link address as same mld address
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ *
+ * </cfg>
+ */
+#define CFG_MLO_SAME_LINK_MLD_ADDR CFG_BOOL( \
+			"mlo_same_link_mld_addr",\
+			0, \
+			"same address for mlo link/mld")
+
+#ifdef WLAN_HDD_MULTI_VDEV_SINGLE_NDEV
+#define CFG_MLO_SAME_LINK_MLD_ADDR_CFG CFG(CFG_MLO_SAME_LINK_MLD_ADDR)
+#else
+#define CFG_MLO_SAME_LINK_MLD_ADDR_CFG
+#endif
+
 #define CFG_STA_ALL \
 	CFG(CFG_INFRA_STA_KEEP_ALIVE_PERIOD) \
 	CFG(CFG_STA_BSS_MAX_IDLE_PERIOD) \
@@ -714,6 +742,6 @@
 	CFG_MLO_SUPPORT_LINK_NUM_CFG \
 	CFG_MLO_MAX_SIMULTANEOUS_LINKS_CFG \
 	CFG_MLO_SUPPORT_LINK_BAND_CFG \
-	CFG_MLO_PREFER_PERCENTAGE_CFG
-
+	CFG_MLO_PREFER_PERCENTAGE_CFG \
+	CFG_MLO_SAME_LINK_MLD_ADDR_CFG
 #endif /* CFG_MLME_STA_H__ */

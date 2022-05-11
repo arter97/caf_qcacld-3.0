@@ -325,17 +325,21 @@ int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 /**
  * hdd_derive_link_address_from_mld() - Function to derive link address from
  * MLD address which is passed as input argument.
+ * @psoc: PSOC object manager
  * @mld_addr: Input MLD address
  * @link_addr_list: Start index of array to hold derived MAC addresses
  * @max_idx: Number of addresses to derive
  *
  * The API will generate link addresses from the input MLD address and saves
- * each link address as an array in @link_addr_list. Caller can request upto
- * WLAN_MAX_MLD addresses.
+ * each link address as an array in @link_addr_list.
+ *
+ * If CFG_MLO_SAME_LINK_MLD_ADDR is enabled, then API will not derive first
+ * link address and will use MLD address in that place.
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+QDF_STATUS hdd_derive_link_address_from_mld(struct wlan_objmgr_psoc *psoc,
+					    struct qdf_mac_addr *mld_addr,
 					    struct qdf_mac_addr *link_addr_list,
 					    uint8_t max_idx);
 
@@ -415,7 +419,8 @@ int wlan_hdd_cfg80211_process_ml_link_state(struct wiphy *wiphy,
 }
 
 static inline
-QDF_STATUS hdd_derive_link_address_from_mld(struct qdf_mac_addr *mld_addr,
+QDF_STATUS hdd_derive_link_address_from_mld(struct wlan_objmgr_psoc *psoc,
+					    struct qdf_mac_addr *mld_addr,
 					    struct qdf_mac_addr *link_addr_list,
 					    uint8_t max_idx)
 {

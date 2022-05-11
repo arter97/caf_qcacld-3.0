@@ -2405,6 +2405,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_MAX_SIMULTANEOUS_LINKS);
 	sta->mlo_prefer_percentage =
 		cfg_get(psoc, CFG_MLO_PREFER_PERCENTAGE);
+	sta->mlo_same_link_mld_address =
+		cfg_default(CFG_MLO_SAME_LINK_MLD_ADDR);
 }
 
 static bool

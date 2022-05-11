@@ -14373,6 +14373,7 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 {
 	int i = 0;
 	QDF_STATUS status;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	enum QDF_OPMODE opmode = adapter->device_mode;
 	struct qdf_mac_addr link_addrs[WLAN_MAX_ML_BSS_LINKS] = {0};
 	struct wlan_hdd_link_info *link_info;
@@ -14389,7 +14390,8 @@ QDF_STATUS hdd_adapter_fill_link_address(struct hdd_adapter *adapter)
 	if (!hdd_adapter_is_ml_adapter(adapter))
 		return QDF_STATUS_SUCCESS;
 
-	status = hdd_derive_link_address_from_mld(&adapter->mac_addr,
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &adapter->mac_addr,
 						  &link_addrs[0],
 						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))

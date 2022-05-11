@@ -21616,7 +21616,8 @@ hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
 	struct qdf_mac_addr link_addr[WLAN_MAX_ML_BSS_LINKS] = {0};
 
-	status = hdd_derive_link_address_from_mld(&adapter->mld_addr,
+	status = hdd_derive_link_address_from_mld(hdd_ctx->psoc,
+						  &adapter->mld_addr,
 						  &link_addr[0],
 						  WLAN_MAX_ML_BSS_LINKS);
 	if (QDF_IS_STATUS_ERROR(status))

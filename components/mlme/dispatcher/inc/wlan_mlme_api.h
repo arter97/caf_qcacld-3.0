@@ -4138,6 +4138,14 @@ uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 					       uint8_t value);
+
+/**
+ * wlan_mlme_get_sta_same_link_mld_addr() - check if mld/link use same address
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool to check if the mld/link use same mac address
+ */
+bool wlan_mlme_get_sta_same_link_mld_addr(struct wlan_objmgr_psoc *psoc);
 #else
 static inline QDF_STATUS
 wlan_mlme_set_user_set_link_num(struct wlan_objmgr_psoc *psoc,
