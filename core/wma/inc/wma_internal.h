@@ -112,6 +112,8 @@
 #define MAX_NUM_HW_MODE    0xff
 #define MAX_NUM_PHY        0xff
 
+#define DISABLE_4WAY_HS_OFFLOAD_DEFAULT BIT(0)
+
 /**
  * struct index_data_rate_type - non vht data rate type
  * @mcs_index: mcs rate index

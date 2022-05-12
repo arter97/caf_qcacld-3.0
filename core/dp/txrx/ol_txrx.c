@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018, 2020-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1559,6 +1559,8 @@ ol_txrx_pdev_attach(ol_txrx_soc_handle soc, struct cdp_cfg *ctrl_pdev,
 
 	TAILQ_INIT(&pdev->vdev_list);
 
+	TAILQ_INIT(&pdev->inactive_peer_list);
+
 	TAILQ_INIT(&pdev->req_list);
 	pdev->req_list_depth = 0;
 	qdf_spinlock_create(&pdev->req_list_spinlock);
@@ -2097,9 +2099,18 @@ ol_txrx_pdev_post_attach(struct cdp_pdev *ppdev)
 	pdev->rx_pn[htt_sec_type_tkip].len =
 		pdev->rx_pn[htt_sec_type_tkip_nomic].len =
 			pdev->rx_pn[htt_sec_type_aes_ccmp].len = 48;
+
+	pdev->rx_pn[htt_sec_type_aes_ccmp_256].len =
+		pdev->rx_pn[htt_sec_type_aes_gcmp].len =
+			pdev->rx_pn[htt_sec_type_aes_gcmp_256].len = 48;
+
 	pdev->rx_pn[htt_sec_type_tkip].cmp =
 		pdev->rx_pn[htt_sec_type_tkip_nomic].cmp =
 			pdev->rx_pn[htt_sec_type_aes_ccmp].cmp = ol_rx_pn_cmp48;
+
+	pdev->rx_pn[htt_sec_type_aes_ccmp_256].cmp =
+		pdev->rx_pn[htt_sec_type_aes_gcmp].cmp =
+		    pdev->rx_pn[htt_sec_type_aes_gcmp_256].cmp = ol_rx_pn_cmp48;
 
 	/* WAPI: 128-bit PN */
 	pdev->rx_pn[htt_sec_type_wapi].len = 128;
@@ -2335,6 +2346,7 @@ static void ol_txrx_pdev_pre_detach(struct cdp_pdev *ppdev, int force)
 		ol_txrx_dbg("Force delete for pdev %pK\n",
 			   pdev);
 		ol_txrx_peer_find_hash_erase(pdev);
+		ol_txrx_peer_free_inactive_list(pdev);
 	}
 
 	/* to get flow pool status before freeing descs */
@@ -3111,6 +3123,7 @@ ol_txrx_peer_attach(struct cdp_vdev *pvdev, uint8_t *peer_mac_addr)
 	qdf_atomic_init(&peer->delete_in_progress);
 	qdf_atomic_init(&peer->flush_in_progress);
 	qdf_atomic_init(&peer->ref_cnt);
+	qdf_atomic_init(&peer->del_ref_cnt);
 
 	for (i = 0; i < PEER_DEBUG_ID_MAX; i++)
 		qdf_atomic_init(&peer->access_list[i]);
@@ -3793,6 +3806,7 @@ int ol_txrx_peer_release_ref(ol_txrx_peer_handle peer,
 	bool ref_silent = false;
 	int access_list = 0;
 	uint32_t err_code = 0;
+	int del_rc;
 
 	/* preconditions */
 	TXRX_ASSERT2(peer);
@@ -3958,10 +3972,12 @@ int ol_txrx_peer_release_ref(ol_txrx_peer_handle peer,
 			qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
 		}
 
-		ol_txrx_info_high("[%d][%d]: Deleting peer %pK ref_cnt -> %d %s",
+		del_rc = qdf_atomic_read(&peer->del_ref_cnt);
+
+		ol_txrx_info_high("[%d][%d]: Deleting peer %pK ref_cnt -> %d del_ref_cnt -> %d %s",
 				  debug_id,
 				  qdf_atomic_read(&peer->access_list[debug_id]),
-				  peer, rc,
+				  peer, rc, del_rc,
 				  qdf_atomic_read(&peer->fw_create_pending) ==
 				  1 ? "(No Maps received)" : "");
 
@@ -3981,7 +3997,8 @@ int ol_txrx_peer_release_ref(ol_txrx_peer_handle peer,
 		    pdev->self_peer == peer)
 			pdev->self_peer = NULL;
 
-		qdf_mem_free(peer);
+		if (!del_rc)
+			qdf_mem_free(peer);
 	} else {
 		access_list = qdf_atomic_read(&peer->access_list[debug_id]);
 		qdf_spin_unlock_bh(&pdev->peer_ref_mutex);
@@ -4223,6 +4240,34 @@ static void ol_txrx_peer_unmap_sync_cb_set(
 
 	if (!pdev->peer_unmap_sync_cb)
 		pdev->peer_unmap_sync_cb = peer_unmap_sync;
+}
+
+/**
+ * ol_txrx_peer_flush_frags() - Flush fragments for a particular peer
+ * @soc_hdl - datapath soc handle
+ * @vdev_id - virtual device id
+ * @peer_mac - peer mac address
+ *
+ * Return: None
+ */
+static void
+ol_txrx_peer_flush_frags(struct cdp_pdev *ppdev, uint8_t vdev_id,
+			 uint8_t *peer_mac)
+{
+	struct ol_txrx_peer_t *peer;
+	struct ol_txrx_pdev_t *pdev = (struct ol_txrx_pdev_t *)ppdev;
+
+	if (!pdev)
+		return;
+
+	peer =  ol_txrx_peer_find_hash_find_get_ref(pdev, peer_mac, 0, 1,
+						    PEER_DEBUG_ID_OL_INTERNAL);
+	if (!peer)
+		return;
+
+	ol_rx_reorder_peer_cleanup(peer->vdev, peer);
+
+	ol_txrx_peer_release_ref(peer, PEER_DEBUG_ID_OL_INTERNAL);
 }
 
 /**
@@ -6722,6 +6767,7 @@ static struct cdp_peer_ops ol_ops_peer = {
 	.update_last_real_peer = ol_txrx_update_last_real_peer,
 #endif /* CONFIG_HL_SUPPORT */
 	.peer_detach_force_delete = ol_txrx_peer_detach_force_delete,
+	.peer_flush_frags = ol_txrx_peer_flush_frags,
 };
 
 static struct cdp_tx_delay_ops ol_ops_delay = {

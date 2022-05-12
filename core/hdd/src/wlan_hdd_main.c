@@ -5629,6 +5629,15 @@ int hdd_set_fw_params(struct hdd_adapter *adapter)
 		goto error;
 	}
 
+	ret = wma_cli_set_command(adapter->session_id,
+				  WMI_PDEV_PARAM_DISABLE_HW_ASSIST,
+				  hdd_ctx->config->disable_hw_assist,
+				  PDEV_CMD);
+	if (ret != 0) {
+		hdd_err("WMI_PDEV_PARAM_DISABLE_HW_ASSIST set failed %d", ret);
+		goto error;
+	}
+
 	hdd_set_fw_log_params(hdd_ctx, adapter);
 
 	ret = hdd_send_coex_config_params(hdd_ctx, adapter);
@@ -7704,7 +7713,7 @@ QDF_STATUS hdd_adapter_iterate(hdd_adapter_iterate_cb cb, void *context)
 	}
 	qdf_spin_unlock_bh(&hdd_ctx->hdd_adapter_lock);
 
-	for (i = 0; i < n_cache - 1; i++) {
+	for (i = 0; i < n_cache; i++) {
 		adapter = hdd_adapter_get_by_reference(hdd_ctx, cache[i]);
 		if (!adapter) {
 			/*
