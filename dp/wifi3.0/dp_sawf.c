@@ -1083,8 +1083,8 @@ uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
 
-	if (!peer) {
-		qdf_warn("%s NULL peer");
+	if (!peer || index >= DP_PEER_AST_FLOWQ_MAX) {
+		qdf_warn("peer:%p index:%d", peer, index);
 		return DP_SAWF_INVALID_AST_IDX;
 	}
 
