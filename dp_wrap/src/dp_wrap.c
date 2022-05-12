@@ -678,6 +678,15 @@ dp_wrap_tx_bridge(struct wlan_objmgr_vdev *vdev, struct dp_wrap_vdev **wvdev,
 	/* Mpsta vap here, find the correct tx vap from the wrap
 	 * common based on src address
 	 */
+	if (eh->ether_type == htons(ETHERTYPE_PAE)) {
+		if (!qdf_is_macaddr_equal(
+				(struct qdf_mac_addr *)vdev->vdev_mlme.macaddr,
+				(struct qdf_mac_addr *)eh->ether_shost)) {
+			return 1;
+		}
+		*wvdev =  dp_wrap_get_vdev_handle(vdev);
+		return 0;
+	}
 	wpdev = dp_wrap_get_pdev_handle(wlan_vdev_get_pdev(vdev));
 	if (qdf_unlikely(!wpdev))
 		return 1;
@@ -722,7 +731,7 @@ int dp_wrap_tx_process(struct net_device **dev, struct wlan_objmgr_vdev *vdev,
 	if (qdf_unlikely(wlan_rptr_vdev_is_mpsta(vdev))) {
 		if (dp_wrap_tx_bridge(vdev, &wvdev, skb))
 			return QWRAP_TX_FAILURE;
-		if (*(skb) == NULL) {
+		if ((*(skb) == NULL) || (wvdev == NULL)) {
 			qwrap_err("Drop pkt, SKB is null dev_id:%d",
 				  vdev->vdev_objmgr.vdev_id);
 			return QWRAP_TX_FAILURE;
