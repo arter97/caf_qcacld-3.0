@@ -24,6 +24,7 @@
  * @head: Head msdu
  * @tail: Tail msdu
  * @mpdu_list_elem: mpdu list element
+ * @ppdu_id: mpdu ppdu id
  * @rs_flags: Rx status flags
  * @ant_signal_db: RSSI in dBm
  * @is_stbc: is stbc is enabled
@@ -35,6 +36,7 @@ struct dp_mon_mpdu {
 	qdf_nbuf_t tail;
 	TAILQ_ENTRY(dp_mon_mpdu) mpdu_list_elem;
 
+	uint32_t ppdu_id;
 	uint8_t  rs_flags;
 	uint8_t  ant_signal_db;
 	uint8_t  is_stbc;

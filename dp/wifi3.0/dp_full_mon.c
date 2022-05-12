@@ -244,6 +244,7 @@ dp_rx_mon_prepare_mon_mpdu(struct dp_pdev *pdev,
 
 	mon_mpdu->head = head_msdu;
 	mon_mpdu->tail = tail_msdu;
+	mon_mpdu->ppdu_id = pdev->mon_desc->ppdu_id;
 	mon_mpdu->rs_flags = pdev->ppdu_info.rx_status.rs_flags;
 	mon_mpdu->ant_signal_db = pdev->ppdu_info.rx_status.ant_signal_db;
 	mon_mpdu->is_stbc = pdev->ppdu_info.rx_status.is_stbc;
@@ -300,6 +301,7 @@ dp_rx_monitor_deliver_ppdu(struct dp_soc *soc,
 {
 	struct dp_mon_mpdu *mpdu = NULL;
 	struct dp_mon_mpdu *temp_mpdu = NULL;
+	qdf_nbuf_t mon_skb, skb_next;
 
 	if (!TAILQ_EMPTY(&pdev->mon_mpdu_q)) {
 		TAILQ_FOREACH_SAFE(mpdu,
@@ -320,8 +322,25 @@ dp_rx_monitor_deliver_ppdu(struct dp_soc *soc,
 			pdev->ppdu_info.rx_status.sgi = mpdu->sgi;
 			pdev->ppdu_info.rx_status.beamformed = mpdu->beamformed;
 
-			dp_rx_mon_deliver(soc, mac_id,
-					  mpdu->head, mpdu->tail);
+			if (qdf_likely(mpdu->ppdu_id ==
+					pdev->mon_desc->ppdu_id)) {
+				dp_rx_mon_deliver(soc, mac_id,
+						  mpdu->head, mpdu->tail);
+			} else {
+				mon_skb = mpdu->head;
+				while (mon_skb) {
+					skb_next = qdf_nbuf_next(mon_skb);
+
+					QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
+						  "[%s][%d] mon_skb=%pK len %u", __func__,
+						  __LINE__, mon_skb, mon_skb->len);
+
+					qdf_nbuf_free(mon_skb);
+					mon_skb = skb_next;
+				}
+
+				pdev->rx_mon_stats.mpdu_ppdu_id_mismatch_drop++;
+			}
 
 			qdf_mem_free(mpdu);
 		}
@@ -391,6 +410,7 @@ dp_rx_mon_reap_status_ring(struct dp_soc *soc,
 			break;
 		case DP_MON_STATUS_REPLENISH:
 			/* If status ring hp entry is NULL, replenish it */
+			pdev->hold_mon_dest_ring = true;
 			work_done = dp_rx_mon_status_process(soc,  int_ctx, mac_id, 1);
 			break;
 		case DP_MON_STATUS_MATCH:
@@ -698,6 +718,7 @@ dp_rx_mon_deliver_prev_ppdu(struct dp_pdev *pdev,
 			break;
 			case DP_MON_STATUS_REPLENISH:
 			/* If status ring hp entry is NULL, replenish it */
+			pdev->hold_mon_dest_ring = true;
 			work = dp_rx_mon_status_process(soc, int_ctx, mac_id, 1);
 			break;
 			case DP_MON_STATUS_MATCH:
