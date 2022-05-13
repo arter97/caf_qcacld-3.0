@@ -369,6 +369,10 @@ static inline void dp_tx_me_exit(struct dp_pdev *pdev)
 {
 	return;
 }
+static inline void dp_tx_me_flush(struct cdp_soc_t *soc, uint8_t vdev_id)
+{
+	return;
+}
 #endif
 
 /**
