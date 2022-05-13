@@ -231,6 +231,8 @@ enum {
  * @dest_ppdu_drop: Number of ppdu dropped from monitor destination ring
  * @mon_link_desc_invalid: msdu link desc invalid count
  * @mon_rx_desc_invalid: rx_desc invalid count
+ * @mpdu_ppdu_id_mismatch_drop: mpdu's ppud id did not match destination
+    ring ppdu id
  */
 struct cdp_pdev_mon_stats {
 #ifndef REMOVE_MON_DBG_STATS
@@ -262,5 +264,6 @@ struct cdp_pdev_mon_stats {
 	uint32_t mon_link_desc_invalid;
 	uint32_t mon_rx_desc_invalid;
 	uint32_t mon_nbuf_sanity_err;
+	uint32_t mpdu_ppdu_id_mismatch_drop;
 };
 #endif
