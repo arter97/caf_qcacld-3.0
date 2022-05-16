@@ -882,6 +882,9 @@ dp_sawf_copy_tx_stats(struct sawf_tx_stats *dst, struct sawf_tx_stats *src)
 	dst->tx_success.num = src->tx_success.num;
 	dst->tx_success.bytes = src->tx_success.bytes;
 
+	dst->tx_ingress.num = src->tx_ingress.num;
+	dst->tx_ingress.bytes = src->tx_ingress.bytes;
+
 	dst->dropped.fw_rem.num = src->dropped.fw_rem.num;
 	dst->dropped.fw_rem.bytes = src->dropped.fw_rem.bytes;
 	dst->dropped.fw_rem_notx = src->dropped.fw_rem_notx;
@@ -890,6 +893,11 @@ dp_sawf_copy_tx_stats(struct sawf_tx_stats *dst, struct sawf_tx_stats *src)
 	dst->dropped.fw_reason1 = src->dropped.fw_reason1;
 	dst->dropped.fw_reason2 = src->dropped.fw_reason2;
 	dst->dropped.fw_reason3 = src->dropped.fw_reason3;
+
+	dst->svc_intval_stats.success_cnt = src->svc_intval_stats.success_cnt;
+	dst->svc_intval_stats.failure_cnt = src->svc_intval_stats.failure_cnt;
+	dst->burst_size_stats.success_cnt = src->burst_size_stats.success_cnt;
+	dst->burst_size_stats.failure_cnt = src->burst_size_stats.failure_cnt;
 
 	dst->tx_failed = src->tx_failed;
 	dst->queue_depth = src->queue_depth;

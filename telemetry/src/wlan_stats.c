@@ -1246,6 +1246,10 @@ fill_advance_peer_sawftx_stats(struct advance_peer_data_sawftx *data,
 			data->tx[tidx][queues].tx_success.num =
 					tx_stats->tx_success.num;
 			data->tx[tidx][queues].tx_success.bytes =
+					tx_stats->tx_ingress.bytes;
+			data->tx[tidx][queues].tx_ingress.num =
+					tx_stats->tx_success.num;
+			data->tx[tidx][queues].tx_success.bytes =
 					tx_stats->tx_success.bytes;
 			data->tx[tidx][queues].dropped.fw_rem.num =
 					tx_stats->dropped.fw_rem.num;
@@ -1267,6 +1271,14 @@ fill_advance_peer_sawftx_stats(struct advance_peer_data_sawftx *data,
 					tx_stats->tx_failed;
 			data->tx[tidx][queues].queue_depth =
 					tx_stats->queue_depth;
+			data->tx[tidx][queues].svc_intval_stats.success_cnt =
+					tx_stats->svc_intval_stats.success_cnt;
+			data->tx[tidx][queues].svc_intval_stats.failure_cnt =
+					tx_stats->svc_intval_stats.failure_cnt;
+			data->tx[tidx][queues].svc_intval_stats.success_cnt =
+					tx_stats->burst_size_stats.success_cnt;
+			data->tx[tidx][queues].svc_intval_stats.failure_cnt =
+					tx_stats->burst_size_stats.failure_cnt;
 			tx_stats++;
 		}
 	}
@@ -1501,6 +1513,10 @@ get_advance_peer_data_sawftx(struct sawf_tx_stats *sawf_tx_stats,
 					sawf_tx_stats->tx_success.num;
 		data->tx[0][0].tx_success.bytes =
 					sawf_tx_stats->tx_success.bytes;
+		data->tx[0][0].tx_ingress.num =
+					sawf_tx_stats->tx_ingress.num;
+		data->tx[0][0].tx_ingress.bytes =
+					sawf_tx_stats->tx_ingress.bytes;
 		data->tx[0][0].dropped.fw_rem.num =
 					sawf_tx_stats->dropped.fw_rem.num;
 		data->tx[0][0].dropped.fw_rem.bytes =
@@ -1520,6 +1536,14 @@ get_advance_peer_data_sawftx(struct sawf_tx_stats *sawf_tx_stats,
 		data->tx[0][0].tx_failed =
 					sawf_tx_stats->tx_failed;
 		data->tx[0][0].queue_depth = sawf_tx_stats->queue_depth;
+		data->tx[0][0].svc_intval_stats.success_cnt =
+			sawf_tx_stats->svc_intval_stats.success_cnt;
+		data->tx[0][0].svc_intval_stats.failure_cnt =
+			sawf_tx_stats->svc_intval_stats.failure_cnt;
+		data->tx[0][0].svc_intval_stats.success_cnt =
+			sawf_tx_stats->burst_size_stats.success_cnt;
+		data->tx[0][0].svc_intval_stats.failure_cnt =
+			sawf_tx_stats->burst_size_stats.failure_cnt;
 		data->tid = sawf_tx_stats->tid;
 		data->msduq = sawf_tx_stats->msduq;
 

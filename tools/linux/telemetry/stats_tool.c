@@ -939,6 +939,10 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 			    data->tx[0][0].tx_success.num);
 		STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 			    data->tx[0][0].tx_success.bytes);
+		STATS_PRINT("Tx_info_ingress_num        = %u\n",
+			    data->tx[0][0].tx_ingress.num);
+		STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
+			    data->tx[0][0].tx_ingress.bytes);
 
 		STATS_PRINT("Tx_info_drop_num           = %u\n",
 			    data->tx[0][0].dropped.fw_rem.num);
@@ -961,6 +965,14 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 			    data->tx[0][0].tx_failed);
 		STATS_PRINT("Tx_info_queue_depth        = %u\n",
 			    data->tx[0][0].queue_depth);
+		STATS_PRINT("Service_intvl_success_cnt  = %ju\n",
+			    data->tx[0][0].svc_intval_stats.success_cnt);
+		STATS_PRINT("Service_intvl_failure_cnt  = %ju\n",
+			    data->tx[0][0].svc_intval_stats.failure_cnt);
+		STATS_PRINT("Burst_size_success_cnt     = %ju\n",
+			    data->tx[0][0].burst_size_stats.success_cnt);
+		STATS_PRINT("Burst_size_failure_cnt     = %ju\n",
+			    data->tx[0][0].burst_size_stats.failure_cnt);
 	} else {
 		uint8_t tidx = 0, queues = 0;
 		uint8_t max_queue = STATS_IF_MAX_SAWF_DATA_QUEUE;
@@ -999,6 +1011,14 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 					    sawftx->tx_failed);
 				STATS_PRINT("Tx_info_queue_depth        = %u\n",
 					    sawftx->queue_depth);
+				STATS_PRINT("Service_intvl_success_cnt  = %ju\n",
+					sawftx->svc_intval_stats.success_cnt);
+				STATS_PRINT("Service_intvl_failure_cnt  = %ju\n",
+					sawftx->svc_intval_stats.failure_cnt);
+				STATS_PRINT("Burst_size_success_cnt     = %ju\n",
+					sawftx->burst_size_stats.success_cnt);
+				STATS_PRINT("Burst_size_failure_cnt     = %ju\n",
+					sawftx->burst_size_stats.failure_cnt);
 			}
 		}
 	}

@@ -407,6 +407,11 @@ struct stats_if_sawf_delay_stats {
 	uint8_t cur_win;
 };
 
+struct stats_if_sawf_fw_mpdu_stats {
+	uint64_t success_cnt;
+	uint64_t failure_cnt;
+};
+
 struct stats_if_pkt_info {
 	uint32_t num;
 	uint64_t bytes;
@@ -414,6 +419,7 @@ struct stats_if_pkt_info {
 
 struct stats_if_sawf_tx_stats {
 	struct stats_if_pkt_info tx_success;
+	struct stats_if_pkt_info tx_ingress;
 	struct {
 		struct stats_if_pkt_info fw_rem;
 		uint32_t fw_rem_notx;
@@ -423,6 +429,8 @@ struct stats_if_sawf_tx_stats {
 		uint32_t fw_reason2;
 		uint32_t fw_reason3;
 	} dropped;
+	struct stats_if_sawf_fw_mpdu_stats svc_intval_stats;
+	struct stats_if_sawf_fw_mpdu_stats burst_size_stats;
 	uint32_t tx_failed;
 	uint32_t queue_depth;
 };
