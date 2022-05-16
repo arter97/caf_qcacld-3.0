@@ -3367,6 +3367,12 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 	}
 
 #ifdef FEATURE_WLAN_WAPI
+	if (profile->pWAPIReqIE) {
+		sap_debug("pWAPIReqIE already allocated.");
+		qdf_mem_free(profile->pWAPIReqIE);
+		profile->pWAPIReqIE = NULL;
+	}
+
 	/* set the WAPI IE */
 	profile->nWAPIReqIELength = config->WAPIReqIELength;
 	if (config->WAPIReqIELength) {
