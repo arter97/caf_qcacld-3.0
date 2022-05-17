@@ -67,6 +67,8 @@ static struct option long_options[] = {
 	{"filter_md", 1, 0, 'm'},
 	/* filter value for monitor other*/
 	{"filter_mo", 1, 0, 'o'},
+	/* filter value for filter pass monitor override*/
+	{"filter_fpmo", 1, 0, 'f'},
 	/* Length of mgmt packet */
 	{"mgmt_len", 1, 0, 'j'},
 	/* Length of ctrl packet */
