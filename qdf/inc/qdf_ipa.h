@@ -712,5 +712,12 @@ static inline bool qdf_ipa_get_lan_rx_napi(void)
 	return false;
 }
 #endif /* IPA_LAN_RX_NAPI_SUPPORT */
+#else
+#ifdef ENABLE_SMMU_S1_TRANSLATION
+static inline bool qdf_get_ipa_smmu_enabled(void)
+{
+	return false;
+}
+#endif
 #endif /* IPA_OFFLOAD */
 #endif /* _QDF_IPA_H */
