@@ -3809,4 +3809,17 @@ bool policy_mgr_is_hwmode_offload_enabled(struct wlan_objmgr_psoc *psoc);
  */
 bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 						 enum policy_mgr_con_mode mode);
+
+/**
+ * policy_mgr_is_ap_ap_mcc_allow() - Check AP AP MCC allow or not
+ * @psoc: psoc object
+ * @vdev: vdev object of new SAP or P2P GO
+ *
+ * Check if AP AP MCC allow or not when new SAP or P2P GO creating
+ *
+ * Return: True if the target allow AP AP MCC,
+ *         False otherwise.
+ */
+bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev);
 #endif /* __WLAN_POLICY_MGR_API_H */
