@@ -30,5 +30,9 @@
 int target_if_config_lite_mon_peer(struct cdp_ctrl_objmgr_psoc *psoc, uint8_t pdev_id,
 				   uint8_t vdev_id, enum cdp_nac_param_cmd cmd,
 				   uint8_t *peer_mac);
+int target_if_config_lite_mon_tx_peer(struct cdp_ctrl_objmgr_psoc *psoc,
+				      uint8_t pdev_id, uint8_t vdev_id,
+				      enum cdp_tx_filter_action cmd,
+				      uint8_t *peer_mac);
 #endif
 #endif /* _WLAN_TARGET_IF_DP_MON_H_ */

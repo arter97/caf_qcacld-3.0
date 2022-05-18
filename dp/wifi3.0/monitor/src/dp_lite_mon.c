@@ -525,8 +525,11 @@ dp_lite_mon_update_peers(struct dp_lite_mon_config *config,
 				break;
 			}
 		}
-		if (!peer_deleted)
+		if (!peer_deleted) {
 			status = QDF_STATUS_E_FAILURE;
+			dp_mon_err("%pM Cannot find peer to delete",
+					   peer_config->mac);
+		}
 	} else {
 		dp_mon_err("invalid peer action");
 		status = QDF_STATUS_E_FAILURE;
@@ -553,6 +556,7 @@ dp_lite_mon_set_tx_peer_config(struct dp_soc *soc,
 			(struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
 	struct dp_lite_mon_peer *peer = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	enum cdp_tx_filter_action cmd;
 
 	if (!be_mon_pdev)
 		return QDF_STATUS_E_FAILURE;
@@ -579,11 +583,22 @@ dp_lite_mon_set_tx_peer_config(struct dp_soc *soc,
 					  peer_config, peer);
 	qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
 
-	if (status != QDF_STATUS_SUCCESS) {
+	if (status == QDF_STATUS_SUCCESS) {
+		/* configure peer to fw */
+		if (peer_config->action == CDP_LITE_MON_PEER_ADD)
+			cmd = CDP_TX_FILTER_ACTION_ADD;
+		else if (peer_config->action == CDP_LITE_MON_PEER_REMOVE)
+			cmd = CDP_TX_FILTER_ACTION_DEL;
+		if (soc->cdp_soc.ol_ops->config_lite_mon_tx_peer)
+			soc->cdp_soc.ol_ops->config_lite_mon_tx_peer(soc->ctrl_psoc,
+								     be_pdev->pdev.pdev_id,
+								     peer_config->vdev_id,
+								     cmd, peer_config->mac);
+	} else {
+		/* peer update failed */
 		if (peer)
 			qdf_mem_free(peer);
 	}
-
 	return status;
 }
 
