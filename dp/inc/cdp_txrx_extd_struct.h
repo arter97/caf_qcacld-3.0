@@ -206,8 +206,31 @@ struct sawf_delay_stats {
 	uint8_t msduq;
 };
 
+/**
+ * struct sawf_fw_mpdu_stats- per-mpdu Tx success/failure snapshot
+ * @success_cnt: count of pkts successfully transmitted
+ * @failure_cnt: count of pkts failed to transmit
+ */
+struct sawf_fw_mpdu_stats {
+	uint64_t success_cnt;
+	uint64_t failure_cnt;
+};
+
+/**
+ * struct sawf_tx_stats- Tx stats
+ * @tx_ucast: unicast transmit success stats
+ * @tx_ingress: enqueue success stats
+ * @dropped: detailed information for for tx-drops
+ * @svc_intval_stats: success/failure stats per service-interval
+ * @burst_size_stats: success/failure stats per burst-size
+ * @tx_failed: tx failure count
+ * @queue_depth: transmit queue-depth
+ * @tid: tid used for transmit
+ * @msduq: msdu-queue used for transmit
+ */
 struct sawf_tx_stats {
 	struct cdp_pkt_info tx_success;
+	struct cdp_pkt_info tx_ingress;
 	struct {
 		struct cdp_pkt_info fw_rem;
 		uint32_t fw_rem_notx;
@@ -217,10 +240,12 @@ struct sawf_tx_stats {
 		uint32_t fw_reason2;
 		uint32_t fw_reason3;
 	} dropped;
+	struct sawf_fw_mpdu_stats svc_intval_stats;
+	struct sawf_fw_mpdu_stats burst_size_stats;
 	uint32_t tx_failed;
 	uint32_t queue_depth;
 	uint8_t tid;
 	uint8_t msduq;
 };
-#endif
+#endif /* CONFIG_SAWF */
 #endif /* _CDP_TXRX_EXTD_STRUCT_H_ */
