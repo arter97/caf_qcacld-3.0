@@ -161,15 +161,14 @@ QDF_STATUS wlan_reg_get_max_phymode_and_chwidth(struct wlan_objmgr_pdev *pdev,
  * @freq: Given frequency.
  * @txpower: tx power to be filled.
  * @ant_gain: Antenna gain to be filled.
- * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
- * is determined.
+ * @reg_chan_list: regulatory channel list.
  *
  */
 void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
 				 qdf_freq_t freq,
 				 uint32_t *txpower,
 				 uint8_t *ant_gain,
-				 enum supported_6g_pwr_types in_6g_pwr_mode);
+				 struct regulatory_channel *reg_chan_list);
 
 /**
  * wlan_reg_get_chan_flags() - Find the channel flags for freq1 and freq2.
@@ -178,16 +177,14 @@ void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
  * @freq2: Frequency in secondary segment.
  * @sec_flags: Secondary flags to be filled.
  * @pri_flags: Primary flags to be filled.
- * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
- * is determined.
- *
+ * @reg_chan_list: regulatory channel list.
  */
 void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 			     qdf_freq_t freq1,
 			     qdf_freq_t freq2,
 			     uint16_t *sec_flags,
 			     uint64_t *pri_flags,
-			     enum supported_6g_pwr_types in_6g_pwr_mode);
+			     struct regulatory_channel *reg_chan_list);
 
 /**
  * wlan_reg_is_band_present() - Check if input band channels are present
@@ -261,7 +258,8 @@ static inline void
 wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
 			    qdf_freq_t freq,
 			    uint32_t *txpower,
-			    uint8_t *ant_gain)
+			    uint8_t *ant_gain,
+			    struct regulatory_channel *reg_chan_list)
 {
 }
 
@@ -270,7 +268,8 @@ wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 			qdf_freq_t freq1,
 			qdf_freq_t freq2,
 			uint16_t *sec_flags,
-			uint64_t *pri_flags)
+			uint64_t *pri_flags,
+			struct regulatory_channel *reg_chan_list)
 {
 }
 
