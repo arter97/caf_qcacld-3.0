@@ -638,7 +638,7 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 				&fst->hal_rx_fst_base_paddr,
 				fst->max_entries,
 				fst->max_skid_length,
-				hash_key);
+				hash_key, 0);
 
 	if (qdf_unlikely(!fst->hal_rx_fst)) {
 		QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,
@@ -701,7 +701,7 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	if (qdf_likely(dp_fst)) {
 		hal_rx_fst_detach(soc->hal_soc, dp_fst->hal_rx_fst,
-				  soc->osdev);
+				  soc->osdev, 0);
 		if (soc->is_rx_fse_full_cache_invalidate_war_enabled) {
 			qdf_timer_sync_cancel(&dp_fst->cache_invalidate_timer);
 			qdf_timer_stop(&dp_fst->cache_invalidate_timer);
