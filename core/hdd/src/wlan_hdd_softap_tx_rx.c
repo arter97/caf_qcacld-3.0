@@ -586,7 +586,8 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 	struct hdd_adapter *adapter = (struct hdd_adapter *) netdev_priv(dev);
 	struct hdd_ap_ctx *ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-	struct qdf_mac_addr *dest_mac_addr, *mac_addr;
+	struct qdf_mac_addr *dest_mac_addr;
+	struct qdf_mac_addr mac_addr;
 	static struct qdf_mac_addr bcast_mac_addr = QDF_MAC_ADDR_BCAST_INIT;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	uint32_t num_seg;
@@ -649,20 +650,20 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 
 	/* In case of mcast, fetch the bcast sta_info. Else use the pkt addr */
 	if (QDF_NBUF_CB_GET_IS_MCAST(skb))
-		mac_addr = &bcast_mac_addr;
+		qdf_copy_macaddr(&mac_addr, &bcast_mac_addr);
 	else
-		mac_addr = dest_mac_addr;
+		qdf_copy_macaddr(&mac_addr, dest_mac_addr);
 
 	sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
-					   mac_addr->bytes,
+					   mac_addr.bytes,
 					   STA_INFO_SOFTAP_HARD_START_XMIT);
 
 	/* Find wds node behind a directly associated station */
 	if (!sta_info) {
-		hdd_wds_replace_peer_mac(soc, adapter, mac_addr->bytes);
+		hdd_wds_replace_peer_mac(soc, adapter, mac_addr.bytes);
 		sta_info = hdd_get_sta_info_by_mac(&adapter->sta_info_list,
-				mac_addr->bytes,
-				STA_INFO_SOFTAP_HARD_START_XMIT);
+						   mac_addr.bytes,
+						   STA_INFO_SOFTAP_HARD_START_XMIT);
 	}
 	if (!QDF_NBUF_CB_GET_IS_BCAST(skb) && !QDF_NBUF_CB_GET_IS_MCAST(skb)) {
 		if (!sta_info) {
