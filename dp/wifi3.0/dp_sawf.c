@@ -113,6 +113,15 @@ dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 {
 	struct dp_peer_sawf *sawf_ctx;
 
+	/*
+	 * In MLO case, primary link peer holds SAWF ctx.
+	 * Secondary link peers does not hold SAWF ctx.
+	 */
+	if (!dp_peer_is_primary_link_peer(peer)) {
+		peer->sawf = NULL;
+		return QDF_STATUS_SUCCESS;
+	}
+
 	sawf_ctx = qdf_mem_malloc(sizeof(struct dp_peer_sawf));
 	if (!sawf_ctx) {
 		qdf_err("Failed to allocate peer SAWF ctx");
@@ -128,6 +137,13 @@ dp_peer_sawf_ctx_free(struct dp_soc *soc,
 		      struct dp_peer *peer)
 {
 	if (!peer->sawf) {
+
+		/*
+		 * In MLO case, primary link peer holds SAWF ctx.
+		 */
+		if (!dp_peer_is_primary_link_peer(peer)) {
+			return QDF_STATUS_SUCCESS;
+		}
 		qdf_err("Failed to free peer SAWF ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1150,6 +1166,14 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 		peer = primary_link_peer;
 	}
 	peer_id = peer->peer_id;
+
+	/*
+	 * In MLO case, secondary links may not have SAWF ctx.
+	 */
+	if (!peer->sawf) {
+		qdf_warn("Peer SAWF ctx invalid");
+		return DP_SAWF_PEER_Q_INVALID;
+	}
 
 	/*
 	 * First loop to go through all msdu queues of peer which
