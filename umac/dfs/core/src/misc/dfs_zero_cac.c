@@ -1626,6 +1626,8 @@ static enum wlan_phymode
 dfs_convert_chwidth_to_wlan_phymode(enum phy_ch_width chwidth)
 {
 	switch (chwidth) {
+	case CH_WIDTH_5MHZ:
+	case CH_WIDTH_10MHZ:
 	case CH_WIDTH_20MHZ:
 		return WLAN_PHYMODE_11AXA_HE20;
 	case CH_WIDTH_40MHZ:
@@ -1889,12 +1891,22 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 			goto exit;
 
 		nxt_chan_params.ch_width = agile_chwidth;
-		/* Get the ch_params from regulatory. ch_width and rcac_freq
-		 * are the input given to fetch other params of struct
-		 * ch_params.
-		 */
-		wlan_reg_set_channel_params_for_freq(dfs->dfs_pdev_obj,
-				rcac_freq, 0, &nxt_chan_params);
+		if (agile_chwidth == CH_WIDTH_10MHZ ||
+		    agile_chwidth == CH_WIDTH_5MHZ) {
+			nxt_chan_params.ch_width = CH_WIDTH_20MHZ;
+			nxt_chan_params.mhz_freq_seg0 = rcac_freq;
+			nxt_chan_params.center_freq_seg0 =
+				wlan_reg_freq_to_chan(dfs->dfs_pdev_obj,
+						      rcac_freq);
+		} else {
+			/* Get the ch_params from regulatory. ch_width and
+			 * rcac_freq are the input given to fetch other params
+			 * of struct ch_params.
+			 */
+			wlan_reg_set_channel_params_for_freq(dfs->dfs_pdev_obj,
+							     rcac_freq, 0,
+							     &nxt_chan_params);
+		}
 	} else {
 		/* Invoke Random channel selection and select only
 		 * DFS channels.
@@ -1918,6 +1930,10 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 					      &nxt_chan_params,
 					      agile_chwidth);
 
+		if (agile_chwidth == CH_WIDTH_5MHZ ||
+		    agile_chwidth == CH_WIDTH_10MHZ) {
+			nxt_chan_params.ch_width = CH_WIDTH_20MHZ;
+		}
 		/* The current dfs channel width may not be supported by the
 		 * agile engine. For example, some chips may support
 		 * 160/80+80Mhz mode for its operating channel (Tx/Rx),
@@ -1954,7 +1970,9 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 		return 0;
 	}
 
-	if (nxt_chan_params.ch_width != dfs->dfs_precac_chwidth) {
+	if (nxt_chan_params.ch_width != dfs->dfs_precac_chwidth &&
+	    !(dfs->dfs_precac_chwidth == CH_WIDTH_5MHZ ||
+	      dfs->dfs_precac_chwidth == CH_WIDTH_10MHZ)) {
 		dfs_debug(dfs, WLAN_DEBUG_DFS_AGILE,
 			  "Not picking an RCAC channel as next channel"
 			  "width: %d is not an agile supported width: %d",
