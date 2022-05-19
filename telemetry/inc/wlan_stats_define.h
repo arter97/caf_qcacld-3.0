@@ -353,10 +353,19 @@ enum stats_if_hist_bucket_index {
 	STATS_IF_HIST_BUCKET_MAX,
 };
 
+/*
+ * stats_if_hist_types: Histogram Types
+ * @STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY: From stack to HW enqueue delay
+ * @STATS_IF_HIST_TYPE_HW_COMP_DELAY: From HW enqueue to completion delay
+ * @STATS_IF_HIST_TYPE_REAP_STACK: Rx HW reap to stack deliver delay
+ * @STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY: Tx completion delay based on the
+ *                                       timestamp provided by HW
+ */
 enum stats_if_hist_types {
 	STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY,
 	STATS_IF_HIST_TYPE_HW_COMP_DELAY,
 	STATS_IF_HIST_TYPE_REAP_STACK,
+	STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY,
 	STATS_IF_HIST_TYPE_MAX,
 };
 

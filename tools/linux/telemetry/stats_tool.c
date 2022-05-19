@@ -387,6 +387,15 @@ const char *stats_if_intfrm_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 	"51 to 55 ms", "56 to 60 ms", "60+ ms"
 };
 
+const char *stats_if_hw_tx_comp_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 250 us", "250 to 500 us",
+	"500 to 750 us", "750 to 1000 us",
+	"1000 to 1500 us", "1500 to 2000 us",
+	"2000 to 2500 us", "2500 to 5000 us",
+	"5000 to 6000 us", "6000 to 7000 ms",
+	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
+};
+
 static void display_help(void)
 {
 	STATS_PRINT("\nwifitelemetry : Displays Statistics of Access Point\n");
@@ -815,6 +824,11 @@ static void print_advance_hist_stats(struct stats_if_hist_stats *hstats,
 				    stats_if_intfrm_delay_bucket[index],
 				    count);
 			break;
+		case STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY:
+			STATS_PRINT("%s: Packets = %ju ",
+				    stats_if_hw_tx_comp_delay_bucket[index],
+				    count);
+			break;
 		default:
 			break;
 		}
@@ -892,12 +906,12 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 				    data->delay[0][0].win_avgs[idx].count);
 		}
 		print_advance_hist_stats(&data->delay[0][0].delay_hist,
-					 STATS_IF_HIST_TYPE_HW_COMP_DELAY);
+					 STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY);
 	} else {
 		uint8_t tidx = 0, queues = 0;
 		uint8_t max_queue = STATS_IF_MAX_SAWF_DATA_QUEUE;
 		struct stats_if_sawf_delay_stats *dly = NULL;
-		uint32_t hw_comp = STATS_IF_HIST_TYPE_HW_COMP_DELAY;
+		uint32_t hw_comp = STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY;
 
 		for (tidx = 0; tidx < STATS_IF_MAX_SAWF_DATA_TIDS; tidx++) {
 			for (queues = 0; queues < max_queue; queues++) {
