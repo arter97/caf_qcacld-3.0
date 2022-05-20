@@ -39,7 +39,7 @@ QDF_STATUS ucfg_dfs_set_postnol_freq(struct wlan_objmgr_pdev *pdev,
  *
  */
 QDF_STATUS ucfg_dfs_set_postnol_mode(struct wlan_objmgr_pdev *pdev,
-				     uint8_t postnol_mode);
+				     uint16_t postnol_mode);
 
 /**
  * ucfg_dfs_set_postnol_cfreq2() - Set PostNOL secondary center frequency.
@@ -88,7 +88,7 @@ ucfg_dfs_set_postnol_freq(struct wlan_objmgr_pdev *pdev,
 
 static inline QDF_STATUS
 ucfg_dfs_set_postnol_mode(struct wlan_objmgr_pdev *pdev,
-			  uint8_t postnol_mode)
+			  uint16_t postnol_mode)
 {
 	return QDF_STATUS_SUCCESS;
 }

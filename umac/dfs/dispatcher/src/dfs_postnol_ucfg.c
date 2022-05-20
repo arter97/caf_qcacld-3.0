@@ -54,7 +54,7 @@ QDF_STATUS ucfg_dfs_set_postnol_freq(struct wlan_objmgr_pdev *pdev,
 qdf_export_symbol(ucfg_dfs_set_postnol_freq);
 
 QDF_STATUS ucfg_dfs_set_postnol_mode(struct wlan_objmgr_pdev *pdev,
-				     uint8_t postnol_mode)
+				     uint16_t postnol_mode)
 {
 	struct wlan_dfs *dfs;
 

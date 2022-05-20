@@ -40,7 +40,7 @@ void dfs_set_postnol_freq(struct wlan_dfs *dfs, qdf_freq_t postnol_freq);
  * @dfs: Pointer to wlan_dfs object.
  * @postnol_mode: PostNOL frequency value configured by the user.
  */
-void dfs_set_postnol_mode(struct wlan_dfs *dfs, uint8_t postnol_mode);
+void dfs_set_postnol_mode(struct wlan_dfs *dfs, uint16_t postnol_mode);
 
 /**
  * dfs_set_postnol_cfreq2() - DFS API to set postNOL secondary center frequency.
@@ -78,7 +78,7 @@ dfs_set_postnol_freq(struct wlan_dfs *dfs, qdf_freq_t postnol_freq)
 }
 
 static inline void
-dfs_set_postnol_mode(struct wlan_dfs *dfs, uint8_t postnol_mode)
+dfs_set_postnol_mode(struct wlan_dfs *dfs, uint16_t postnol_mode)
 {
 }
 
