@@ -443,6 +443,10 @@ struct csr_roam_profile {
 	uint8_t uapsd_mask;
 	uint32_t nRSNReqIELength; /* The byte count in the pRSNReqIE */
 	uint8_t *pRSNReqIE;       /* If not null,it's IE byte stream for RSN */
+#ifdef FEATURE_WLAN_WAPI
+	uint32_t nWAPIReqIELength;/* The byte count in the pWAPIReqIE */
+	uint8_t *pWAPIReqIE;	  /* If not null,it's IE byte stream for WAPI */
+#endif /* FEATURE_WLAN_WAPI */
 	uint8_t privacy;
 	bool fwdWPSPBCProbeReq;
 	tAniAuthType csr80211AuthType;
