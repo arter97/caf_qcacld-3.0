@@ -1095,10 +1095,15 @@ uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	uint16_t peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(nbuf));
 	uint8_t index = queue_id / DP_SAWF_TID_MAX;
 
+	if (index >= DP_PEER_AST_FLOWQ_MAX) {
+		qdf_warn("invalid index:%d", index);
+		return DP_SAWF_INVALID_AST_IDX;
+	}
+
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
 
 	if (!peer) {
-		qdf_warn("%s NULL peer");
+		qdf_warn("NULL peer");
 		return DP_SAWF_INVALID_AST_IDX;
 	}
 
