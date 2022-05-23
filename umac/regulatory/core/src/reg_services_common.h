@@ -1573,7 +1573,40 @@ reg_unregister_afc_power_event_callback(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS reg_send_afc_power_event(struct wlan_objmgr_pdev *pdev,
 				    struct reg_fw_afc_power_event *power_info);
-#endif
+
+/**
+ * reg_get_afc_dev_deploy_type() - Get AFC device deployment type
+ * @pdev: Pointer to pdev
+ * @reg_afc_dev_type: Pointer to afc device deployment type
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+reg_get_afc_dev_deploy_type(struct wlan_objmgr_pdev *pdev,
+			    enum reg_afc_dev_deploy_type *reg_afc_dev_type);
+
+/**
+ * reg_set_afc_soc_dev_deploy_type() - Set AFC soc device deployment type
+ * @pdev: Pointer to psoc
+ * @reg_afc_dev_type: afc device deployment type
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+reg_set_afc_soc_dev_type(struct wlan_objmgr_psoc *psoc,
+			 enum reg_afc_dev_deploy_type reg_afc_dev_type);
+
+/**
+ * reg_get_afc_soc_dev_deploy_type() - Get AFC soc device deployment type
+ * @pdev: Pointer to psoc
+ * @reg_afc_dev_type: Pointer to afc device deployment type
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+reg_get_afc_soc_dev_type(struct wlan_objmgr_psoc *psoc,
+			 enum reg_afc_dev_deploy_type *reg_afc_dev_type);
+#endif /* CONFIG_AFC_SUPPORT */
 
 /**
  * reg_get_cur_6g_client_type() - Get the current 6G regulatory client Type.
