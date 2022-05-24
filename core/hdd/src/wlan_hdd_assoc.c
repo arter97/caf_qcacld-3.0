@@ -161,6 +161,13 @@ uint8_t ccp_rsn_oui_90[HDD_RSN_OUI_SIZE] = {0x00, 0x0F, 0xAC, 0x09};
 static const
 u8 ccp_rsn_oui_13[HDD_RSN_OUI_SIZE] = {0x50, 0x6F, 0x9A, 0x01};
 
+#ifdef FEATURE_WLAN_WAPI
+/* WAI AKM */
+uint8_t ccp_wapi_oui_00[HDD_RSN_OUI_SIZE] = {0x00, 0x14, 0x72, 0x02};
+/* WPI-SMS4*/
+uint8_t ccp_wapi_oui_01[HDD_RSN_OUI_SIZE] = {0x00, 0x14, 0x72, 0x01};
+#endif
+
 /* Offset where the EID-Len-IE, start. */
 #define ASSOC_RSP_IES_OFFSET 6  /* Capability(2) + AID(2) + Status Code(2) */
 #define ASSOC_REQ_IES_OFFSET 4  /* Capability(2) + LI(2) */
@@ -2277,7 +2284,13 @@ enum csr_akm_type hdd_translate_rsn_to_csr_auth_type(uint8_t auth_suite[4])
 		auth_type = eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384;
 	} else if (memcmp(auth_suite, ccp_rsn_oui_13, 4) == 0) {
 		auth_type = eCSR_AUTH_TYPE_OSEN;
-	} else {
+	} else
+#ifdef FEATURE_WLAN_WAPI
+	if (memcmp(auth_suite, ccp_wapi_oui_00, 4) == 0) {
+		auth_type = eCSR_AUTH_TYPE_WAPI_WAI_PSK;
+	} else
+#endif
+	{
 		hdd_translate_fils_rsn_to_csr_auth(auth_suite, &auth_type);
 		hdd_translate_sae_rsn_to_csr_auth(auth_suite, &auth_type);
 	}
@@ -2371,6 +2384,29 @@ hdd_translate_wpa_to_csr_encryption_type(uint8_t cipher_suite[4])
 
 	return cipher_type;
 }
+
+#ifdef FEATURE_WLAN_WAPI
+
+/**
+ * hdd_translate_wapi_to_csr_encryption_type() -
+ *	Translate WAPI to CSR encryption type
+ * @cipher_suite: cipher suite
+ *
+ * Return: eCsrEncryptionType enumeration
+ */
+eCsrEncryptionType
+hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4])
+{
+	eCsrEncryptionType cipher_type;
+
+	if (memcmp(cipher_suite, ccp_wapi_oui_01, 4) == 0)
+		cipher_type = eCSR_ENCRYPT_TYPE_WPI;
+	else
+		cipher_type = eCSR_ENCRYPT_TYPE_FAILED;
+
+	return cipher_type;
+}
+#endif
 
 #ifdef WLAN_FEATURE_FILS_SK
 bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,

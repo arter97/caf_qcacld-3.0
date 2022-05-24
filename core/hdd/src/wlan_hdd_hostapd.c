@@ -2953,15 +2953,17 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 	uint16_t rsn_ie_len, i;
 	tDot11fIERSN dot11_rsn_ie = {0};
 	tDot11fIEWPA dot11_wpa_ie = {0};
+	tDot11fIEWAPI dot11_wapi_ie = {0};
 
 	if (!mac_handle) {
 		hdd_err("NULL mac Handle");
 		return -EINVAL;
 	}
+
 	/* Validity checks */
 	if ((gen_ie_len < QDF_MIN(DOT11F_IE_RSN_MIN_LEN, DOT11F_IE_WPA_MIN_LEN))
 	    || (gen_ie_len >
-		QDF_MAX(DOT11F_IE_RSN_MAX_LEN, DOT11F_IE_WPA_MAX_LEN)))
+		QDF_MAX(DOT11F_IE_RSN_MAX_LEN, DOT11F_IE_WAPI_MAX_LEN)))
 		return -EINVAL;
 	/* Type check */
 	if (gen_ie[0] == DOT11F_EID_RSN) {
@@ -3042,6 +3044,48 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		*mc_encrypt_type =
 			hdd_translate_wpa_to_csr_encryption_type(dot11_wpa_ie.
 								 multicast_cipher);
+		*mfp_capable = false;
+		*mfp_required = false;
+	} else if (gen_ie[0] == DOT11F_EID_WAPI) {
+		/* Validity checks */
+		if ((gen_ie_len < DOT11F_IE_WAPI_MIN_LEN) ||
+		    (gen_ie_len > DOT11F_IE_WAPI_MAX_LEN)) {
+			return QDF_STATUS_E_FAILURE;
+		}
+		/* Skip past the EID byte and length byte */
+		rsn_ie = gen_ie + 2;
+		rsn_ie_len = gen_ie_len - 2;
+		/* Unpack the WAPI IE */
+		memset(&dot11_wapi_ie, 0, sizeof(tDot11fIEWAPI));
+		ret = dot11f_unpack_ie_wapi(MAC_CONTEXT(mac_handle),
+					    rsn_ie, rsn_ie_len,
+					    &dot11_wapi_ie, false);
+
+		if (DOT11F_FAILED(ret)) {
+			hdd_err("unpack failed, 0x%x", ret);
+			return -EINVAL;
+		}
+
+		/* Copy out the encryption and authentication types */
+		hdd_debug("pairwise cipher count: %d akm count:%d",
+			  dot11_wapi_ie.unicast_cipher_suite_count,
+			  dot11_wapi_ie.akm_suite_count);
+		/*
+		 * Translate akms in akm suite
+		 */
+		for (i = 0; i < dot11_wapi_ie.akm_suite_count; i++)
+			akm_list->authType[i] =
+			hdd_translate_rsn_to_csr_auth_type(dot11_wapi_ie.
+							   akm_suites[i]);
+		akm_list->numEntries = dot11_wapi_ie.akm_suite_count;
+		/* dot11_rsn_ie.pwise_cipher_suite_count */
+		*encrypt_type =
+			hdd_translate_wapi_to_csr_encryption_type(dot11_wapi_ie.
+								  unicast_cipher_suites[0]);
+		/* dot11_rsn_ie.gp_cipher_suite_count */
+		*mc_encrypt_type =
+			hdd_translate_wapi_to_csr_encryption_type(dot11_wapi_ie.
+								  multicast_cipher_suite);
 		*mfp_capable = false;
 		*mfp_required = false;
 	} else {
@@ -5744,6 +5788,28 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		else
 			hdd_err("WAPI IE MAX Length exceeded; length = %d",
 				config->WAPIReqIELength);
+
+		status = hdd_softap_unpack_ie
+				(cds_get_context(QDF_MODULE_ID_SME),
+				 &rsn_encrypt_type,
+				 &mc_rsn_encrypt_type,
+				 &config->akm_list,
+				 &mfp_capable, &mfp_required,
+				 config->WAPIReqIE[1] + 2,
+				 config->WAPIReqIE);
+
+		if (QDF_STATUS_SUCCESS == status) {
+			(WLAN_HDD_GET_AP_CTX_PTR(adapter))->
+			encryption_type = rsn_encrypt_type;
+			hdd_debug("CSR Encryption: %d mcEncryption: %d num_akm_suites:%d",
+				  rsn_encrypt_type, mc_rsn_encrypt_type,
+				  config->akm_list.numEntries);
+			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD,
+					   QDF_TRACE_LEVEL_DEBUG,
+					   config->akm_list.authType,
+					   config->akm_list.numEntries);
+		}
+
 	}
 #endif /* FEATURE_WLAN_WAPI */
 

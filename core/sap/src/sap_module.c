@@ -724,6 +724,14 @@ QDF_STATUS wlansap_start_bss(struct sap_context *sap_ctx,
 	if (QDF_IS_STATUS_ERROR(qdf_status))
 		sap_debug("Failed to set crypto params from IE");
 
+#ifdef FEATURE_WLAN_WAPI
+	qdf_status = wlan_set_vdev_crypto_prarams_from_ie(
+			sap_ctx->vdev,
+			config->WAPIReqIE,
+			config->WAPIReqIELength);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		sap_debug("Failed to set crypto params from WAPI IE");
+#endif
 	/* Channel selection is auto or configured */
 	sap_ctx->chan_freq = config->chan_freq;
 	sap_ctx->dfs_mode = config->acs_dfs_mode;
