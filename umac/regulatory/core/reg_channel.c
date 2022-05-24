@@ -835,8 +835,8 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 	const struct bonded_channel_freq *bonded_chan_ptr2 = NULL;
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	enum channel_enum chan_enum, sec_5g_chan_enum;
-	uint16_t max_bw, bw_80, sec_5g_freq_max_bw = 0;
-	struct regulatory_channel *reg_chan_list;
+	uint16_t bw_80, sec_5g_freq_max_bw = 0;
+	uint16_t max_bw;
 
 	if (!ch_params) {
 		reg_err("ch_params is NULL");
@@ -862,16 +862,12 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 			ch_params->ch_width = CH_WIDTH_160MHZ;
 	}
 
-	reg_chan_list = qdf_mem_malloc(NUM_CHANNELS * sizeof(*reg_chan_list));
-	if (!reg_chan_list)
-		return;
-
-	if (reg_get_pwrmode_chan_list(pdev, reg_chan_list, in_6g_pwr_mode)) {
-		qdf_mem_free(reg_chan_list);
+	if (reg_get_min_max_bw_cur_chan_list(pdev, chan_enum, in_6g_pwr_mode,
+					     NULL, &max_bw)) {
+		ch_params->ch_width = CH_WIDTH_INVALID;
 		return;
 	}
 
-	max_bw = reg_chan_list[chan_enum].max_bw;
 	bw_80 = reg_get_bw_value(CH_WIDTH_80MHZ);
 
 	if (ch_params->ch_width == CH_WIDTH_80P80MHZ) {
@@ -881,13 +877,16 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 				NEAREST_20MHZ_CHAN_FREQ_OFFSET);
 		if (sec_5g_chan_enum == INVALID_CHANNEL) {
 			reg_err("secondary channel freq is not valid");
-			qdf_mem_free(reg_chan_list);
 			return;
 		}
 
-		sec_5g_freq_max_bw = reg_chan_list[sec_5g_chan_enum].max_bw;
+		if (reg_get_min_max_bw_cur_chan_list(pdev, chan_enum,
+						     in_6g_pwr_mode, NULL,
+						     &sec_5g_freq_max_bw)) {
+			ch_params->ch_width = CH_WIDTH_INVALID;
+			return;
+		}
 	}
-	qdf_mem_free(reg_chan_list);
 
 	while (ch_params->ch_width != CH_WIDTH_INVALID) {
 		if (ch_params->ch_width == CH_WIDTH_80P80MHZ) {
