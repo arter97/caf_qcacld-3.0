@@ -318,7 +318,6 @@ struct basic_pdev_ctrl_link {
 	u_int32_t cs_chan_tx_pwr;
 	int16_t cs_chan_nf;
 	int16_t cs_chan_nf_sec80;
-	u_int8_t dcs_total_util;
 };
 
 /* Basic psoc Data */
@@ -509,9 +508,7 @@ struct advance_peer_data_twt {
 struct advance_peer_data_rate {
 	struct basic_peer_data_rate b_rate;
 	u_int32_t rnd_avg_rx_rate;
-	u_int32_t avg_rx_rate;
 	u_int32_t rnd_avg_tx_rate;
-	u_int32_t avg_tx_rate;
 };
 
 struct advance_peer_data_link {
@@ -733,10 +730,6 @@ struct advance_pdev_ctrl_rx {
 struct advance_pdev_ctrl_link {
 	struct basic_pdev_ctrl_link b_link;
 	u_int32_t dcs_ss_under_util;
-	u_int32_t dcs_sec_20_util;
-	u_int32_t dcs_sec_40_util;
-	u_int32_t dcs_sec_80_util;
-	u_int32_t cs_tx_rssi;
 	u_int8_t dcs_ap_tx_util;
 	u_int8_t dcs_ap_rx_util;
 	u_int8_t dcs_self_bss_util;
@@ -744,22 +737,6 @@ struct advance_pdev_ctrl_link {
 	u_int8_t dcs_obss_rx_util;
 	u_int8_t dcs_free_medium;
 	u_int8_t dcs_non_wifi_util;
-	u_int8_t rx_rssi_chain0_pri20;
-	u_int8_t rx_rssi_chain0_sec20;
-	u_int8_t rx_rssi_chain0_sec40;
-	u_int8_t rx_rssi_chain0_sec80;
-	u_int8_t rx_rssi_chain1_pri20;
-	u_int8_t rx_rssi_chain1_sec20;
-	u_int8_t rx_rssi_chain1_sec40;
-	u_int8_t rx_rssi_chain1_sec80;
-	u_int8_t rx_rssi_chain2_pri20;
-	u_int8_t rx_rssi_chain2_sec20;
-	u_int8_t rx_rssi_chain2_sec40;
-	u_int8_t rx_rssi_chain2_sec80;
-	u_int8_t rx_rssi_chain3_pri20;
-	u_int8_t rx_rssi_chain3_sec20;
-	u_int8_t rx_rssi_chain3_sec40;
-	u_int8_t rx_rssi_chain3_sec80;
 };
 
 /* Advance Psoc Data */
