@@ -92,6 +92,17 @@ QDF_STATUS mlo_msgq_post(enum mlo_msg_type type,
 		mlo_mlme_peer_process_auth(peer_auth->auth_params);
 		break;
 
+	case MLO_PEER_REASSOC:
+		peer_create = (struct peer_create_notif_s *)payload;
+		mlo_mlme_peer_reassoc(peer_create->vdev_link,
+				      peer_create->ml_peer, &peer_create->addr,
+				      peer_create->frm_buf);
+		qdf_nbuf_free(peer_create->frm_buf);
+		wlan_mlo_peer_release_ref(peer_create->ml_peer);
+		wlan_objmgr_vdev_release_ref(peer_create->vdev_link,
+					     WLAN_MLO_MGR_ID);
+		break;
+
 	default:
 		break;
 	}
@@ -225,6 +236,15 @@ QDF_STATUS mlo_msgq_post(enum mlo_msg_type type,
 		peer_auth->auth_params = peer_auth_l->auth_params;
 		break;
 
+	case MLO_PEER_REASSOC:
+		peer_create = &msg->m.peer_create;
+		peer_create_l = (struct peer_create_notif_s *)payload;
+		peer_create->frm_buf = peer_create_l->frm_buf;
+		peer_create->ml_peer = peer_create_l->ml_peer;
+		peer_create->vdev_link = peer_create_l->vdev_link;
+		qdf_copy_macaddr(&peer_create->addr, &peer_create_l->addr);
+		break;
+
 	default:
 		break;
 	}
@@ -302,6 +322,17 @@ static void mlo_msgq_msg_process_hdlr(struct mlo_ctxt_switch_msg_s *msg)
 	case MLO_PEER_PENDING_AUTH:
 		peer_auth = &msg->m.peer_auth;
 		mlo_mlme_peer_process_auth(peer_auth->auth_params);
+		break;
+
+	case MLO_PEER_REASSOC:
+		peer_create = &msg->m.peer_create;
+		mlo_mlme_peer_reassoc(peer_create->vdev_link,
+				      peer_create->ml_peer, &peer_create->addr,
+				      peer_create->frm_buf);
+		qdf_nbuf_free(peer_create->frm_buf);
+		wlan_mlo_peer_release_ref(peer_create->ml_peer);
+		wlan_objmgr_vdev_release_ref(peer_create->vdev_link,
+					     WLAN_MLO_MGR_ID);
 		break;
 
 	default:

@@ -563,6 +563,7 @@ struct mlo_nstr_info {
  * @peer_list: list of peers on the MLO link
  * @link_peer_cnt: Number of link peers attached
  * @max_links: Max links for this ML peer
+ * @link_asresp_cnt: Number of reassoc resp generated
  * @mlo_peer_id: unique ID for the peer
  * @peer_mld_addr: MAC address of MLD link
  * @mlo_ie: MLO IE struct
@@ -591,6 +592,7 @@ struct wlan_mlo_peer_context {
 	struct wlan_mlo_link_peer_entry peer_list[MAX_MLO_LINK_PEERS];
 	uint8_t link_peer_cnt;
 	uint8_t max_links;
+	uint8_t link_asresp_cnt;
 	uint32_t mlo_peer_id;
 	struct qdf_mac_addr peer_mld_addr;
 	uint8_t *mlo_ie;
@@ -771,6 +773,7 @@ struct mlo_tgt_partner_info {
  * @mlo_mlme_ext_peer_process_auth: Callback to process pending auth
  * @mlo_mlme_ext_handle_sta_csa_param: Callback to handle sta csa param
  * @mlo_mlme_ext_sta_op_class:
+ * @mlo_mlme_ext_peer_reassoc: Callback to process reassoc
  */
 struct mlo_mlme_ext_ops {
 	QDF_STATUS (*mlo_mlme_ext_validate_conn_req)(
@@ -806,7 +809,10 @@ struct mlo_mlme_ext_ops {
 	QDF_STATUS (*mlo_mlme_ext_sta_op_class)(
 			struct vdev_mlme_obj *vdev_mlme,
 			uint8_t *ml_ie);
-
+	QDF_STATUS (*mlo_mlme_ext_peer_reassoc)(struct wlan_objmgr_vdev *vdev,
+					struct wlan_mlo_peer_context *ml_peer,
+					struct qdf_mac_addr *addr,
+					qdf_nbuf_t frm_buf);
 };
 
 /* maximum size of vdev bitmap array for MLO link set active command */
