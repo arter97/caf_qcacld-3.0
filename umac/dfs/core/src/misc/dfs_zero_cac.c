@@ -1881,10 +1881,9 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 	bool is_user_rcac_chan_valid = false;
 	qdf_freq_t rcac_freq, rcac_center_freq = 0;
 	struct dfs_channel dfs_chan;
-	struct ch_params nxt_chan_params;
+	struct ch_params nxt_chan_params = {0};
 
 	qdf_mem_zero(&dfs_chan, sizeof(struct dfs_channel));
-	qdf_mem_zero(&nxt_chan_params, sizeof(struct ch_params));
 
 	/* If Rolling CAC is configured, RCAC frequency is the user configured
 	 * RCAC frequency or it is found using DFS Random Channel Algorithm.
