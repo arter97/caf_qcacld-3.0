@@ -19,6 +19,7 @@
 
 #include <dp_types.h>
 #include "cdp_txrx_mon_struct.h"
+#include <wlan_cmn_ieee80211.h>
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
 
@@ -47,19 +48,6 @@
 	 ((DP_LITE_MON_PPDU_ID_LEN)))
 
 #define DP_LITE_MON_META_HDR_MARKER 0xFEED
-
-/* mpdu filter categories */
-enum dp_mpdu_filter_category {
-	/* category filter pass */
-	DP_MPDU_FILTER_CATEGORY_FP = 0,
-	/* category monitor direct */
-	DP_MPDU_FILTER_CATEGORY_MD = 1,
-	/* category monitor other */
-	DP_MPDU_FILTER_CATEGORY_MO = 2,
-	/* category filter pass monitor override */
-	DP_MPDU_FILTER_CATEGORY_FP_MO = 3,
-	DP_MPDU_FILTER_CATEGORY_INVALID = 4,
-};
 
 #define DP_RX_MON_CCE_METADATA_SIZE (2)
 #define DP_RX_MON_FSE_METADATA_SIZE (4)
@@ -101,10 +89,10 @@ struct dp_lite_mon_peer {
 struct dp_lite_mon_config {
 	bool enable;
 	uint8_t level;
-	uint16_t mgmt_filter[CDP_LITE_MON_MODE_MAX];
-	uint16_t ctrl_filter[CDP_LITE_MON_MODE_MAX];
-	uint16_t data_filter[CDP_LITE_MON_MODE_MAX];
-	uint16_t len[CDP_LITE_MON_FRM_TYPE_MAX];
+	uint16_t mgmt_filter[CDP_MON_FRM_FILTER_MODE_MAX];
+	uint16_t ctrl_filter[CDP_MON_FRM_FILTER_MODE_MAX];
+	uint16_t data_filter[CDP_MON_FRM_FILTER_MODE_MAX];
+	uint16_t len[CDP_MON_FRM_TYPE_MAX];
 	bool fp_enabled;
 	bool md_enabled;
 	bool mo_enabled;
