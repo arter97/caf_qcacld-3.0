@@ -8234,6 +8234,15 @@ dp_peer_setup_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		}
 	}
 
+	/* TODO: Need to check with STA mode */
+	if (vdev_opmode == wlan_op_mode_ap && soc->arch_ops.txrx_peer_setup) {
+		if (soc->arch_ops.txrx_peer_setup(soc, peer)
+				!= QDF_STATUS_SUCCESS) {
+			dp_err("unable to setup target peer features");
+			qdf_assert_always(0);
+		}
+	}
+
 	if (!IS_MLO_DP_MLD_PEER(peer))
 		dp_peer_ppdu_delayed_ba_init(peer);
 

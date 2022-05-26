@@ -1468,6 +1468,16 @@ struct ol_if_ops {
 				       uint8_t vdev_id,
 				       struct ol_txrx_hardtart_ctxt *ctxt);
 #endif
+#ifdef WLAN_SUPPORT_PPEDS
+	QDF_STATUS
+	(*peer_set_ppe_default_routing)(struct cdp_ctrl_objmgr_psoc *psoc,
+					uint8_t *peer_macaddr,
+					uint16_t service_code,
+					uint8_t priority_valid,
+					uint16_t src_info,
+					uint8_t vdev_id, uint8_t use_ppe,
+					uint8_t routing_enabled);
+#endif /* WLAN_SUPPORT_PPEDS */
 };
 
 #ifdef DP_PEER_EXTENDED_API
