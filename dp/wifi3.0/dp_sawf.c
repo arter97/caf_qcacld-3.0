@@ -121,6 +121,15 @@ dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 {
 	struct dp_peer_sawf *sawf_ctx;
 
+	/*
+	 * In MLO case, primary link peer holds SAWF ctx.
+	 * Secondary link peers does not hold SAWF ctx.
+	 */
+	if (!dp_peer_is_primary_link_peer(peer)) {
+		peer->sawf = NULL;
+		return QDF_STATUS_SUCCESS;
+	}
+
 	sawf_ctx = qdf_mem_malloc(sizeof(struct dp_peer_sawf));
 	if (!sawf_ctx) {
 		qdf_err("Failed to allocate peer SAWF ctx");
@@ -136,6 +145,13 @@ dp_peer_sawf_ctx_free(struct dp_soc *soc,
 		      struct dp_peer *peer)
 {
 	if (!peer->sawf) {
+
+		/*
+		 * In MLO case, primary link peer holds SAWF ctx.
+		 */
+		if (!dp_peer_is_primary_link_peer(peer)) {
+			return QDF_STATUS_SUCCESS;
+		}
 		qdf_err("Failed to free peer SAWF ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -1122,6 +1138,7 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	uint8_t vdev_id;
 	uint8_t i = 1;
 	struct dp_peer *peer = NULL;
+	struct dp_peer *primary_link_peer = NULL;
 	struct dp_soc *soc = NULL;
 	uint16_t peer_id;
 	uint8_t q_id;
@@ -1139,15 +1156,37 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 
 	vdev_id = wlan_vdev_get_id(vdev);
 
-	peer_id = dp_sawf_get_peerid(soc, dest_mac, vdev_id);
-	if (peer_id == HTT_INVALID_PEER)
-		return DP_SAWF_PEER_Q_INVALID;
-
-	peer = dp_peer_get_ref_by_id(soc, peer_id,
-				     DP_MOD_ID_SAWF);
-
+	peer = soc->arch_ops.dp_find_peer_by_destmac(soc,
+					dest_mac, vdev_id);
 	if (!peer) {
 		qdf_warn("NULL peer");
+		return DP_SAWF_PEER_Q_INVALID;
+	}
+
+	if (IS_MLO_DP_MLD_PEER(peer)) {
+		primary_link_peer = dp_get_primary_link_peer_by_id(soc,
+					peer->peer_id,
+					DP_MOD_ID_SAWF);
+		if (!primary_link_peer) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			qdf_warn("NULL peer");
+			return DP_SAWF_PEER_Q_INVALID;
+		}
+
+		/*
+		 * Release the MLD-peer reference.
+		 * Hold only primary link ref now.
+		 */
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		peer = primary_link_peer;
+	}
+	peer_id = peer->peer_id;
+
+	/*
+	 * In MLO case, secondary links may not have SAWF ctx.
+	 */
+	if (!peer->sawf) {
+		qdf_warn("Peer SAWF ctx invalid");
 		return DP_SAWF_PEER_Q_INVALID;
 	}
 
