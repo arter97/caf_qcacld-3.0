@@ -6672,11 +6672,31 @@ QDF_STATUS dp_soc_target_ppe_rxole_rxdma_cfg(struct dp_soc *soc)
 
 	return status;
 }
+
+static inline
+void dp_soc_txrx_peer_setup(enum wlan_op_mode vdev_opmode, struct dp_soc *soc,
+			    struct dp_peer *peer)
+{
+	/* TODO: Need to check with STA mode */
+	if (vdev_opmode == wlan_op_mode_ap && soc->arch_ops.txrx_peer_setup) {
+		if (soc->arch_ops.txrx_peer_setup(soc, peer)
+				!= QDF_STATUS_SUCCESS) {
+			dp_err("unable to setup target peer features");
+			qdf_assert_always(0);
+		}
+	}
+}
 #else
 static inline
 QDF_STATUS dp_soc_target_ppe_rxole_rxdma_cfg(struct dp_soc *soc)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_soc_txrx_peer_setup(enum wlan_op_mode vdev_opmode, struct dp_soc *soc,
+			    struct dp_peer *peer)
+{
 }
 #endif /* WLAN_SUPPORT_PPEDS */
 
@@ -8362,6 +8382,8 @@ dp_peer_setup_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			dp_peer_rx_init(pdev, peer);
 		}
 	}
+
+	dp_soc_txrx_peer_setup(vdev_opmode, soc, peer);
 
 	if (!IS_MLO_DP_MLD_PEER(peer))
 		dp_peer_ppdu_delayed_ba_init(peer);

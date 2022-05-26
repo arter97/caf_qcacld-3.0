@@ -32,6 +32,7 @@
 #include <hal_be_api.h>
 #ifdef WLAN_SUPPORT_PPEDS
 #include "be/dp_ppeds.h"
+#include <ppe_vp_public.h>
 #endif
 
 /* Generic AST entry aging timer value */
@@ -502,6 +503,44 @@ static QDF_STATUS dp_soc_ppe_detach_be(struct dp_soc *soc)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+static QDF_STATUS dp_peer_setup_ppe_be(struct dp_soc *soc,
+				       struct dp_peer_be *be_peer,
+				       struct dp_vdev_be *be_vdev)
+{
+	uint16_t service_code;
+	uint8_t priority_valid;
+	struct dp_ppe_vp_profile *ppe_vp_profile = &be_vdev->ppe_vp_profile;
+	uint16_t src_info = ppe_vp_profile->vp_num;
+	uint8_t vdev_id = be_vdev->vdev.vdev_id;
+	uint8_t use_ppe = PEER_ROUTING_USE_PPE;
+	uint8_t peer_routing_enabled = PEER_ROUTING_ENABLED;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	/*
+	 * Get these Values from INIT
+	 */
+	service_code = 0;
+	priority_valid = be_peer->priority_valid;
+
+	if (soc->cdp_soc.ol_ops->peer_set_ppe_default_routing) {
+		status =
+		soc->cdp_soc.ol_ops->peer_set_ppe_default_routing
+				(soc->ctrl_psoc,
+				be_peer->peer.mac_addr.raw,
+				service_code, priority_valid,
+				src_info, vdev_id, use_ppe,
+				peer_routing_enabled);
+		if (status != QDF_STATUS_SUCCESS) {
+			qdf_err("vdev_id: %d, PPE peer routing mac:"
+				 QDF_MAC_ADDR_FMT, vdev_id,
+				QDF_MAC_ADDR_REF(be_peer->peer.mac_addr.raw));
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 #else
 static QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
 {
@@ -519,6 +558,14 @@ static inline QDF_STATUS dp_soc_ppe_attach_be(struct dp_soc *soc)
 }
 
 static inline QDF_STATUS dp_soc_ppe_detach_be(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_peer_setup_ppe_be(struct dp_soc *soc,
+				struct dp_peer_be *be_peer,
+				struct dp_vdev_be *be_vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -825,6 +872,39 @@ static QDF_STATUS dp_vdev_detach_be(struct dp_soc *soc, struct dp_vdev *vdev)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_SUPPORT_PPEDS
+static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
+{
+	struct dp_peer_be *be_peer = dp_get_be_peer_from_dp_peer(peer);
+	struct dp_vdev_be *be_vdev;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+
+	if (!be_peer) {
+		qdf_err("BE peer is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	be_vdev = dp_get_be_vdev_from_dp_vdev(peer->vdev);
+	if (!be_vdev) {
+		qdf_err("BE vap is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	/*
+	 * Check if PPE routing is enabled on the associated vap.
+	 */
+	if (be_vdev->ppe_vp_enabled == PPE_VP_USER_TYPE_DS)
+		qdf_status = dp_peer_setup_ppe_be(soc, be_peer, be_vdev);
+
+	return qdf_status;
+}
+#else
+static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 qdf_size_t dp_get_soc_context_size_be(void)
 {
@@ -2127,6 +2207,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_pdev_detach = dp_pdev_detach_be;
 	arch_ops->txrx_vdev_attach = dp_vdev_attach_be;
 	arch_ops->txrx_vdev_detach = dp_vdev_detach_be;
+	arch_ops->txrx_peer_setup = dp_peer_setup_be;
 	arch_ops->txrx_peer_map_attach = dp_peer_map_attach_be;
 	arch_ops->txrx_peer_map_detach = dp_peer_map_detach_be;
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_be;

@@ -110,6 +110,9 @@ enum CMEM_MEM_CLIENTS {
 
 /* Offset of ppeds tx descripotor pool */
 #define DP_TX_PPEDS_DESC_CMEM_OFFSET 0
+
+#define PEER_ROUTING_USE_PPE 1
+#define PEER_ROUTING_ENABLED 1
 #else
 #define DP_TX_PPEDS_DESC_CMEM_OFFSET 0
 #define DP_TX_PPEDS_DESC_POOL_CMEM_SIZE 0
@@ -376,6 +379,9 @@ struct dp_vdev_be {
  */
 struct dp_peer_be {
 	struct dp_peer peer;
+#ifdef WLAN_SUPPORT_PPEDS
+	uint8_t priority_valid;
+#endif
 };
 
 /**

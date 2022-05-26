@@ -194,6 +194,11 @@ static QDF_STATUS dp_peer_map_attach_li(struct dp_soc *soc)
 }
 #endif
 
+static QDF_STATUS dp_peer_setup_li(struct dp_soc *soc, struct dp_peer *peer)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 qdf_size_t dp_get_soc_context_size_li(void)
 {
 	return sizeof(struct dp_soc);
@@ -619,6 +624,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_peer_map_attach = dp_peer_map_attach_li;
 	arch_ops->txrx_peer_map_detach = dp_peer_map_detach_li;
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_li;
+	arch_ops->txrx_peer_setup = dp_peer_setup_li;
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_li;
 	arch_ops->dp_rx_intrabss_handle_nawds = dp_rx_intrabss_handle_nawds_li;

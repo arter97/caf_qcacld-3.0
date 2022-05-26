@@ -1493,6 +1493,16 @@ struct ol_if_ops {
 void (*peer_send_wds_disconnect)(struct cdp_ctrl_objmgr_psoc *psoc,
 				 uint8_t *mac_addr, uint8_t vdev_id);
 #endif
+#ifdef WLAN_SUPPORT_PPEDS
+	QDF_STATUS
+	(*peer_set_ppe_default_routing)(struct cdp_ctrl_objmgr_psoc *psoc,
+					uint8_t *peer_macaddr,
+					uint16_t service_code,
+					uint8_t priority_valid,
+					uint16_t src_info,
+					uint8_t vdev_id, uint8_t use_ppe,
+					uint8_t routing_enabled);
+#endif /* WLAN_SUPPORT_PPEDS */
 };
 
 #ifdef DP_PEER_EXTENDED_API
