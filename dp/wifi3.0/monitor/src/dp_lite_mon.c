@@ -352,6 +352,15 @@ dp_lite_mon_set_rx_config(struct dp_pdev_be *be_pdev,
 					  &lite_mon_rx_config->rx_config,
 					  config);
 
+		/* If length is full packet, then add extra buffers into
+		 * monitor buffer ring
+		 */
+		if (dp_lite_mon_is_full_len_configured(config->len[WLAN_FC0_TYPE_DATA],
+						       config->len[WLAN_FC0_TYPE_MGMT],
+						       config->len[WLAN_FC0_TYPE_CTRL])) {
+			dp_vdev_set_monitor_mode_buf_rings_rx_2_0(&be_pdev->pdev);
+		}
+
 		/* setup rx lite mon filters */
 		dp_mon_filter_setup_rx_lite_mon(be_mon_pdev);
 		status = dp_mon_filter_update(&be_pdev->pdev);
@@ -427,6 +436,15 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 		dp_lite_mon_update_config(&be_pdev->pdev,
 					  &lite_mon_tx_config->tx_config,
 					  config);
+
+		/* If length is full packet, then add extra buffers into
+		 * monitor buffer ring
+		 */
+		if (dp_lite_mon_is_full_len_configured(config->len[WLAN_FC0_TYPE_DATA],
+						       config->len[WLAN_FC0_TYPE_MGMT],
+						       config->len[WLAN_FC0_TYPE_CTRL])) {
+			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev);
+		}
 
 		/* setupt tx lite mon filters */
 		dp_mon_filter_setup_tx_lite_mon(be_mon_pdev);
