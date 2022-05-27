@@ -40,6 +40,7 @@
 #include "wlan_mlo_mgr_public_structs.h"
 #endif
 #include "wlan_cm_ucfg_api.h"
+#include "target_if.h"
 
 #define POLICY_MGR_MAX_CON_STRING_LEN   100
 #define LOWER_END_FREQ_5GHZ 4900
@@ -82,6 +83,8 @@ QDF_STATUS policy_mgr_get_updated_scan_config(
 		bool single_mac_scan_with_dfs)
 {
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t conc_scan_config_bits = 0;
+	struct target_psoc_info *tgt_hdl;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -90,11 +93,21 @@ QDF_STATUS policy_mgr_get_updated_scan_config(
 	}
 	*scan_config = pm_ctx->dual_mac_cfg.cur_scan_config;
 
-	WMI_DBS_CONC_SCAN_CFG_DBS_SCAN_SET(*scan_config, dbs_scan);
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+	if (!tgt_hdl) {
+		policy_mgr_err("tgt_hdl NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	conc_scan_config_bits = target_if_get_conc_scan_config_bits(tgt_hdl);
+
+	WMI_DBS_CONC_SCAN_CFG_DBS_SCAN_SET(*scan_config, dbs_scan &
+					   WMI_DBS_CONC_SCAN_CFG_DBS_SCAN_GET(conc_scan_config_bits));
 	WMI_DBS_CONC_SCAN_CFG_AGILE_SCAN_SET(*scan_config,
-			dbs_plus_agile_scan);
+					     dbs_plus_agile_scan &
+					     WMI_DBS_CONC_SCAN_CFG_AGILE_SCAN_GET(conc_scan_config_bits));
 	WMI_DBS_CONC_SCAN_CFG_AGILE_DFS_SCAN_SET(*scan_config,
-			single_mac_scan_with_dfs);
+						 single_mac_scan_with_dfs &
+						 WMI_DBS_CONC_SCAN_CFG_AGILE_DFS_SCAN_GET(conc_scan_config_bits));
 
 	policy_mgr_debug("scan_config:%x ", *scan_config);
 	return QDF_STATUS_SUCCESS;
@@ -2238,26 +2251,29 @@ get_sub_channels(struct wlan_objmgr_psoc *psoc,
 	}
 	qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
 
+	*sbs_num = 0;
 	if (policy_mgr_is_hw_sbs_capable(psoc)) {
-		if (*scc_num > 1) {
-			if (policy_mgr_are_sbs_chan(psoc, scc_freqs[0],
-						    scc_freqs[1])) {
-				/* 2/3 home channels with SBS separation */
-				*sbs_num = 0;
-			} else {
-				/* SCC or MCC (not SBS separation) */
-				get_sbs_chlist(psoc, sbs_freqs, sbs_num,
-					       scc_freqs[0],
-					       chlist1, chlist1_len,
-					       chlist2, chlist2_len);
-			}
-		} else if (*scc_num > 0) {
+		/*
+		 * scc_num is number of existing 5Ghz or 6Ghz connection freqs.
+		 * So check if they are all on same mac in SBS, to get SBS
+		 * freq list.
+		 *
+		 * For scc_num > 2, it will always be with freq across
+		 * both mac, as all 3 cannot be on same mac.
+		 *
+		 * For scc_num == 0, i.e no freq on 5/6Ghz there is no need to
+		 * check for SBS freq.
+		 *
+		 * So check only if scc_num == 1 or 2, with both freq
+		 * on same mac in SBS mode (non-SBS) in case of 2.
+		 */
+		if (*scc_num == 1 ||
+		    (*scc_num == 2 &&
+		     !policy_mgr_are_sbs_chan(psoc, scc_freqs[0],
+					      scc_freqs[1])))
 			get_sbs_chlist(psoc, sbs_freqs, sbs_num, scc_freqs[0],
 				       chlist1, chlist1_len,
 				       chlist2, chlist2_len);
-		}
-	} else {
-		*sbs_num = 0;
 	}
 
 	get_rest_chlist(rest_freqs, rest_num, scc_freqs, *scc_num,

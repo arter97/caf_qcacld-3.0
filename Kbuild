@@ -91,6 +91,10 @@ UAPI_INC :=	-I$(WLAN_ROOT)/$(UAPI_DIR)/linux
 COMMON_DIR :=	core/common
 COMMON_INC :=	-I$(WLAN_ROOT)/$(COMMON_DIR)
 
+ifeq (qca_cld3, $(WLAN_WEAR_CHIPSET))
+	cppflags-y += -DWLAN_WEAR_CHIPSET
+endif
+
 ############ HDD ############
 HDD_DIR :=	core/hdd
 HDD_INC_DIR :=	$(HDD_DIR)/inc
@@ -220,10 +224,6 @@ endif
 
 ifeq ($(CONFIG_WLAN_SYNC_TSF), y)
 HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_tsf.o
-endif
-
-ifeq ($(CONFIG_MPC_UT_FRAMEWORK), y)
-HDD_OBJS +=	$(HDD_SRC_DIR)/wlan_hdd_conc_ut.o
 endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_DISA), y)
@@ -3733,8 +3733,6 @@ cppflags-$(CONFIG_WLAN_LRO) += -DFEATURE_LRO
 
 cppflags-$(CONFIG_FEATURE_AP_MCC_CH_AVOIDANCE) += -DFEATURE_AP_MCC_CH_AVOIDANCE
 
-cppflags-$(CONFIG_MPC_UT_FRAMEWORK) += -DMPC_UT_FRAMEWORK
-
 cppflags-$(CONFIG_FEATURE_EPPING) += -DWLAN_FEATURE_EPPING
 
 cppflags-$(CONFIG_WLAN_OFFLOAD_PACKETS) += -DWLAN_FEATURE_OFFLOAD_PACKETS
@@ -3798,6 +3796,7 @@ cppflags-$(CONFIG_DP_FEATURE_HW_COOKIE_CONVERSION) += -DDP_FEATURE_HW_COOKIE_CON
 cppflags-$(CONFIG_DP_HW_COOKIE_CONVERT_EXCEPTION) += -DDP_HW_COOKIE_CONVERT_EXCEPTION
 cppflags-$(CONFIG_TX_ADDR_INDEX_SEARCH) += -DTX_ADDR_INDEX_SEARCH
 cppflags-$(CONFIG_DP_RX_DELIVER_ALL_OOR_FRAMES) += -DDP_RX_DELIVER_ALL_OOR_FRAMES
+cppflags-$(CONFIG_QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES) += -DQCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES
 cppflags-$(CONFIG_RX_HASH_DEBUG) += -DRX_HASH_DEBUG
 
 ifeq ($(CONFIG_QCA6290_11AX), y)
@@ -3951,6 +3950,9 @@ cppflags-$(CONFIG_ADAPTIVE_11R) += -DWLAN_ADAPTIVE_11R
 
 #Flag to enable/disable sae single pmk feature feature
 cppflags-$(CONFIG_SAE_SINGLE_PMK) += -DWLAN_SAE_SINGLE_PMK
+
+#Flag to enable/disable multi client low latency feature support
+cppflags-$(CONFIG_MULTI_CLIENT_LL_SUPPORT) += -DMULTI_CLIENT_LL_SUPPORT
 
 #Flag to enable/disable mscs feature
 cppflags-$(CONFIG_FEATURE_MSCS) += -DWLAN_FEATURE_MSCS
@@ -4377,6 +4379,9 @@ endif
 ifeq ($(CONFIG_DP_HW_TX_DELAY_STATS_ENABLE), y)
 cppflags-y += -DHW_TX_DELAY_STATS_ENABLE
 endif
+
+#Flags to enable/disable Dynamic WLAN interface control feature
+cppflags-$(CONFIG_WLAN_DYNAMIC_IFACE_CTRL) += -DFEATURE_WLAN_DYNAMIC_IFACE_CTRL
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

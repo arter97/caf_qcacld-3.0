@@ -260,6 +260,9 @@ static int hdd_twt_configure(struct hdd_adapter *adapter,
 		ret = osif_twt_clear_session_traffic_stats(vdev,
 							   twt_param_attr);
 		break;
+	case QCA_WLAN_TWT_SET_PARAM:
+		ret = osif_twt_set_param(vdev, twt_param_attr);
+		break;
 	default:
 		hdd_err("Invalid TWT Operation");
 		ret = -EINVAL;
@@ -334,10 +337,8 @@ qca_wlan_vendor_twt_nudge_dialog_policy[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX + 1] 
 };
 
 static const struct nla_policy
-qca_wlan_vendor_twt_set_param_policy[
-	QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_MAX + 1] = {
-		[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_AP_AC_VALUE] = {
-			.type = NLA_U8 },
+qca_wlan_vendor_twt_set_param_policy[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_MAX + 1] = {
+	[QCA_WLAN_VENDOR_ATTR_TWT_SET_PARAM_AP_AC_VALUE] = {.type = NLA_U8 },
 };
 
 static
@@ -1418,6 +1419,8 @@ wmi_twt_nudge_status_to_vendor_twt_status(enum WMI_HOST_NUDGE_TWT_STATUS status)
 		return QCA_WLAN_VENDOR_TWT_STATUS_NO_ACK;
 	case WMI_HOST_NUDGE_TWT_STATUS_UNKNOWN_ERROR:
 		return QCA_WLAN_VENDOR_TWT_STATUS_UNKNOWN_ERROR;
+	case WMI_HOST_NUDGE_TWT_STATUS_ALREADY_PAUSED:
+		return QCA_WLAN_VENDOR_TWT_STATUS_ALREADY_SUSPENDED;
 	case WMI_HOST_NUDGE_TWT_STATUS_CHAN_SW_IN_PROGRESS:
 		return QCA_WLAN_VENDOR_TWT_STATUS_CHANNEL_SWITCH_IN_PROGRESS;
 	default:
@@ -3173,6 +3176,7 @@ int hdd_send_twt_nudge_dialog_cmd(struct hdd_context *hdd_ctx,
 
 		switch (ack_priv->status) {
 		case WMI_HOST_NUDGE_TWT_STATUS_INVALID_PARAM:
+		case WMI_HOST_NUDGE_TWT_STATUS_ALREADY_PAUSED:
 		case WMI_HOST_NUDGE_TWT_STATUS_UNKNOWN_ERROR:
 			ret = -EINVAL;
 			break;
@@ -4767,6 +4771,8 @@ void __hdd_twt_update_work_handler(struct hdd_context *hdd_ctx)
 	hdd_debug("Total connection %d, sta_count %d, sap_count %d",
 		  num_connections, sta_count, sap_count);
 	switch (num_connections) {
+	case 0:
+		break;
 	case 1:
 		if (sta_count == 1) {
 			hdd_send_twt_requestor_enable_cmd(hdd_ctx);
@@ -4839,7 +4845,7 @@ void __hdd_twt_update_work_handler(struct hdd_context *hdd_ctx)
 		}
 		break;
 	default:
-		hdd_err("Unexpected number of connection");
+		hdd_debug("Unexpected number of connection");
 		break;
 	}
 }

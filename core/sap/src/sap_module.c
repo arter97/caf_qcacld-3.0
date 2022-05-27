@@ -3258,8 +3258,15 @@ qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 		return 0;
 	}
 	sap_band = wlan_reg_freq_to_band(sap_ctx->chan_freq);
-	sap_debug("SAP/Go current band: %d, pdev band capability: %d",
-		  sap_band, band);
+
+	sap_debug("SAP/Go current band: %d, pdev band capability: %d, cur freq %d (is valid %d), prev freq %d (is valid %d)",
+		  sap_band, band, sap_ctx->chan_freq,
+		  wlan_reg_is_enable_in_secondary_list_for_freq(mac->pdev,
+							sap_ctx->chan_freq),
+		  sap_ctx->chan_freq_before_switch_band,
+		  wlan_reg_is_enable_in_secondary_list_for_freq(mac->pdev,
+					sap_ctx->chan_freq_before_switch_band));
+
 	if (sap_band == REG_BAND_5G && band == BIT(REG_BAND_2G)) {
 		sap_ctx->chan_freq_before_switch_band = sap_ctx->chan_freq;
 		sap_ctx->chan_width_before_switch_band =
@@ -3538,6 +3545,12 @@ void wlansap_set_acs_ch_freq(struct sap_context *sap_context,
 #endif
 
 #ifdef WLAN_FEATURE_11BE
+bool sap_phymode_is_eht(eCsrPhyMode phymode)
+{
+	return CSR_IS_DOT11_PHY_MODE_11BE(phymode) ||
+	       CSR_IS_DOT11_PHY_MODE_11BE_ONLY(phymode);
+}
+
 bool sap_acs_is_puncture_applicable(struct sap_acs_cfg *acs_cfg)
 {
 	bool is_eht_bw_80 = false;

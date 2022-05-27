@@ -2972,7 +2972,7 @@ QDF_STATUS csr_roam_ndi_stop(struct mac_context *mac_ctx, uint8_t vdev_id)
 static void csr_fill_single_pmk(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				struct bss_description *bss_desc)
 {
-	struct cm_roam_values_copy src_cfg;
+	struct cm_roam_values_copy src_cfg = {};
 
 	src_cfg.bool_value = bss_desc->is_single_pmk;
 	wlan_cm_roam_cfg_set_value(psoc, vdev_id,
@@ -3171,6 +3171,25 @@ void csr_roaming_state_msg_processor(struct mac_context *mac, void *msg_buf)
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+csr_roam_assoc_cnf_mld_copy(struct csr_roam_info *roam_info,
+			    tSirSmeAssocIndToUpperLayerCnf *pUpperLayerAssocCnf,
+			    uint32_t num_bytes)
+{
+	qdf_mem_copy(roam_info->peer_mld.bytes,
+		     pUpperLayerAssocCnf->peer_mld_addr,
+		     num_bytes);
+}
+#else /* WLAN_FEATURE_11BE_MLO */
+static inline void
+csr_roam_assoc_cnf_mld_copy(struct csr_roam_info *roam_info,
+			    tSirSmeAssocIndToUpperLayerCnf *pUpperLayerAssocCnf,
+			    uint32_t num_bytes)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 void csr_roam_joined_state_msg_processor(struct mac_context *mac, void *msg_buf)
 {
 	tSirSmeRsp *pSirMsg = (tSirSmeRsp *)msg_buf;
@@ -3228,11 +3247,9 @@ void csr_roam_joined_state_msg_processor(struct mac_context *mac, void *msg_buf)
 		qdf_mem_copy(roam_info->peerMac.bytes,
 			     pUpperLayerAssocCnf->peerMacAddr,
 			     sizeof(tSirMacAddr));
-#ifdef WLAN_FEATURE_11BE_MLO
-		qdf_mem_copy(roam_info->peer_mld.bytes,
-			     pUpperLayerAssocCnf->peer_mld_addr,
-			     sizeof(tSirMacAddr));
-#endif
+		csr_roam_assoc_cnf_mld_copy(roam_info,
+					    pUpperLayerAssocCnf,
+					    sizeof(tSirMacAddr));
 		qdf_mem_copy(&roam_info->bssid,
 			     pUpperLayerAssocCnf->bssId,
 			     sizeof(struct qdf_mac_addr));
@@ -3731,6 +3748,22 @@ static bool csr_is_sae_peer_allowed(struct mac_context *mac_ctx,
 	return is_allowed;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+csr_send_assoc_ind_to_upper_layer_mac_copy(tSirSmeAssocIndToUpperLayerCnf *cnf,
+					   struct assoc_ind *ind)
+{
+	qdf_mem_copy(&cnf->peer_mld_addr, &ind->peer_mld_addr,
+		     sizeof(cnf->peer_mld_addr));
+}
+#else /* WLAN_FEATURE_11BE_MLO */
+static inline void
+csr_send_assoc_ind_to_upper_layer_mac_copy(tSirSmeAssocIndToUpperLayerCnf *cnf,
+					   struct assoc_ind *ind)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 static QDF_STATUS
 csr_send_assoc_ind_to_upper_layer_cnf_msg(struct mac_context *mac,
 					  struct assoc_ind *ind,
@@ -3755,10 +3788,7 @@ csr_send_assoc_ind_to_upper_layer_cnf_msg(struct mac_context *mac,
 	qdf_mem_copy(&cnf->bssId, &ind->bssId, sizeof(cnf->bssId));
 	qdf_mem_copy(&cnf->peerMacAddr, &ind->peerMacAddr,
 		     sizeof(cnf->peerMacAddr));
-#ifdef WLAN_FEATURE_11BE_MLO
-	qdf_mem_copy(&cnf->peer_mld_addr, &ind->peer_mld_addr,
-		     sizeof(cnf->peer_mld_addr));
-#endif
+	csr_send_assoc_ind_to_upper_layer_mac_copy(cnf, ind);
 	cnf->aid = ind->staId;
 	cnf->wmmEnabledSta = ind->wmmEnabledSta;
 	cnf->rsnIE = ind->rsnIE;
@@ -4847,7 +4877,7 @@ QDF_STATUS csr_set_pmk_cache_ft(struct mac_context *mac, uint8_t vdev_id,
 		sme_debug("Auth type: %x update the MDID in cache", akm);
 		cm_update_pmk_cache_ft(mac->psoc, vdev_id);
 	} else {
-		struct cm_roam_values_copy src_cfg;
+		struct cm_roam_values_copy src_cfg = {};
 		struct scan_filter *scan_filter;
 		qdf_list_t *list = NULL;
 		struct scan_cache_node *first_node = NULL;
@@ -5304,7 +5334,7 @@ static void csr_fill_connected_profile(struct mac_context *mac_ctx,
 	struct bss_description *bss_desc = NULL;
 	tDot11fBeaconIEs *bcn_ies;
 	sme_QosAssocInfo assoc_info;
-	struct cm_roam_values_copy src_cfg;
+	struct cm_roam_values_copy src_cfg = {};
 	bool is_ese = false;
 	uint8_t country_code[REG_ALPHA2_LEN + 1];
 
@@ -5403,7 +5433,7 @@ QDF_STATUS cm_csr_connect_rsp(struct wlan_objmgr_vdev *vdev,
 	struct mac_context *mac_ctx;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
 	struct csr_roam_session *session;
-	struct cm_roam_values_copy src_config;
+	struct cm_roam_values_copy src_config = {};
 
 	/*
 	 * This API is to update legacy struct and should be removed once

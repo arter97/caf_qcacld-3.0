@@ -58,7 +58,7 @@
 #include "../../core/src/vdev_mgr_ops.h"
 #include "wma.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
-#include <wlan_action_oui_ucfg_api.h>
+#include "wlan_action_oui_main.h"
 #include <wlan_cm_api.h>
 #include <wlan_mlme_api.h>
 #include <wlan_mlme_ucfg_api.h>
@@ -1180,8 +1180,8 @@ __lim_handle_sme_start_bss_request(struct mac_context *mac_ctx, uint32_t *msg_bu
 
 		/* Initialize 11h Enable Flag */
 		session->lim11hEnable = 0;
-		if ((CHAN_HOP_ALL_BANDS_ENABLE ||
-		     REG_BAND_5G == session->limRFBand)) {
+		if (CHAN_HOP_ALL_BANDS_ENABLE ||
+		    (session->limRFBand != REG_BAND_2G)) {
 			session->lim11hEnable =
 				mac_ctx->mlme_cfg->gen.enabled_11h;
 
@@ -1791,9 +1791,9 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	vendor_ap_search_attr.enable_5g =
 				wlan_reg_is_5ghz_ch_freq(bss_desc->chan_freq);
 
-	force_max_nss = ucfg_action_oui_search(mac_ctx->psoc,
-					&vendor_ap_search_attr,
-					ACTION_OUI_FORCE_MAX_NSS);
+	force_max_nss = wlan_action_oui_search(mac_ctx->psoc,
+					       &vendor_ap_search_attr,
+					       ACTION_OUI_FORCE_MAX_NSS);
 
 	if (!mac_ctx->mlme_cfg->vht_caps.vht_cap_info.enable2x2) {
 		force_max_nss = false;
@@ -1811,7 +1811,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	 * WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM
 	 */
 	is_vendor_ap_present =
-			ucfg_action_oui_search(mac_ctx->psoc,
+			wlan_action_oui_search(mac_ctx->psoc,
 					       &vendor_ap_search_attr,
 					       ACTION_OUI_CCKM_1X1);
 	if (is_vendor_ap_present) {
@@ -1827,7 +1827,7 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	 * mode to 11N.
 	 */
 	is_vendor_ap_present =
-		ucfg_action_oui_search(mac_ctx->psoc,
+		wlan_action_oui_search(mac_ctx->psoc,
 				       &vendor_ap_search_attr,
 				       ACTION_OUI_SWITCH_TO_11N_MODE);
 	if (mac_ctx->roam.configParam.is_force_1x1 &&
@@ -1838,19 +1838,19 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 	     session->dot11mode == MLME_DOT11_MODE_11AC_ONLY))
 		session->dot11mode = MLME_DOT11_MODE_11N;
 
-	follow_ap_edca = ucfg_action_oui_search(mac_ctx->psoc,
-				    &vendor_ap_search_attr,
-				    ACTION_OUI_DISABLE_AGGRESSIVE_EDCA);
+	follow_ap_edca = wlan_action_oui_search(mac_ctx->psoc,
+						&vendor_ap_search_attr,
+						ACTION_OUI_DISABLE_AGGRESSIVE_EDCA);
 	mlme_set_follow_ap_edca_flag(session->vdev, follow_ap_edca);
 
-	if (ucfg_action_oui_search(mac_ctx->psoc, &vendor_ap_search_attr,
+	if (wlan_action_oui_search(mac_ctx->psoc, &vendor_ap_search_attr,
 				   ACTION_OUI_HOST_RECONN)) {
 		mlme_set_reconn_after_assoc_timeout_flag(
 			mac_ctx->psoc, session->vdev_id,
 			true);
 	}
 	is_vendor_ap_present =
-			ucfg_action_oui_search(mac_ctx->psoc,
+			wlan_action_oui_search(mac_ctx->psoc,
 					       &vendor_ap_search_attr,
 					       ACTION_OUI_CONNECT_1X1);
 
@@ -1870,9 +1870,9 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 
 	if (!is_vendor_ap_present) {
 		is_vendor_ap_present =
-			ucfg_action_oui_search(mac_ctx->psoc,
-				&vendor_ap_search_attr,
-				ACTION_OUI_CONNECT_1X1_WITH_1_CHAIN);
+			wlan_action_oui_search(mac_ctx->psoc,
+					       &vendor_ap_search_attr,
+					       ACTION_OUI_CONNECT_1X1_WITH_1_CHAIN);
 		if (is_vendor_ap_present)
 			pe_debug("1x1 with 1 Chain AP");
 	}
@@ -2962,7 +2962,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	tSirMacCapabilityInfo *ap_cap_info;
 	uint8_t wmm_mode, value;
 	struct wlan_mlme_lfr_cfg *lfr = &mac_ctx->mlme_cfg->lfr;
-	struct cm_roam_values_copy config;
+	struct cm_roam_values_copy config = {};
 	bool ese_ver_present;
 	int8_t reg_max;
 	struct ps_global_info *ps_global_info = &mac_ctx->sme.ps_global_info;
@@ -3254,7 +3254,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	session->limRFBand = lim_get_rf_band(session->curr_op_freq);
 
 	/* Initialize 11h Enable Flag */
-	if (session->limRFBand == REG_BAND_5G)
+	if (session->limRFBand != REG_BAND_2G)
 		session->lim11hEnable =
 			mac_ctx->mlme_cfg->gen.enabled_11h;
 	else
@@ -5175,6 +5175,14 @@ void lim_process_tpe_ie_from_beacon(struct mac_context *mac,
 		pe_debug("warnings (0x%08x, %d bytes):", status, buf_len);
 	}
 
+	status = lim_strip_and_decode_eht_cap(buf, buf_len, &bcn_ie->eht_cap,
+					      bcn_ie->he_cap,
+					      session->curr_op_freq);
+	if (status != QDF_STATUS_SUCCESS) {
+		pe_err("Failed to extract eht cap");
+		return;
+	}
+
 	lim_parse_tpe_ie(mac, session, bcn_ie->transmit_power_env,
 			 bcn_ie->num_transmit_power_env, &bcn_ie->he_op,
 			 has_tpe_updated);
@@ -5317,7 +5325,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 
 	ch_params.ch_width = CH_WIDTH_20MHZ;
 
-	for (i = 0; i < num_pwr_levels; i++) {
+	for (i = 0;
+		i < num_pwr_levels && (ch_params.ch_width != CH_WIDTH_INVALID);
+		i++) {
 		if (is_tpe_present) {
 			if (is_6ghz_freq) {
 				wlan_reg_get_client_power_for_connecting_ap(
@@ -5335,8 +5345,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 					mac->pdev, oper_freq, 0, &ch_params);
 				mlme_obj->reg_tpc_obj.frequency[i] =
 					ch_params.mhz_freq_seg0;
-				ch_params.ch_width =
-					get_next_higher_bw[ch_params.ch_width];
+				if (ch_params.ch_width != CH_WIDTH_INVALID)
+					ch_params.ch_width =
+						get_next_higher_bw[ch_params.ch_width];
 			}
 			if (is_6ghz_freq) {
 				if (LIM_IS_STA_ROLE(session)) {
@@ -6909,8 +6920,6 @@ lim_process_sme_update_session_edca_txq_params(struct mac_context *mac_ctx,
 			msg->txq_edca_params.aci.aifsn;
 	pe_session->gLimEdcaParams[ac].txoplimit =
 			msg->txq_edca_params.txoplimit;
-	pe_session->gLimEdcaParams[ac].user_edca_set =
-			msg->txq_edca_params.user_edca_set;
 
 	lim_send_edca_params(mac_ctx,
 			     pe_session->gLimEdcaParams,
@@ -8122,10 +8131,8 @@ static void lim_process_sme_start_beacon_req(struct mac_context *mac, uint32_t *
 		 * Tx right after the WMA_ADD_BSS_RSP.
 		 */
 		lim_apply_configuration(mac, pe_session);
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			  FL("Start Beacon with ssid %s Ch freq %d"),
-			  pe_session->ssId.ssId,
-			  pe_session->curr_op_freq);
+		pe_debug("Start Beacon with ssid %s Ch freq %d",
+			 pe_session->ssId.ssId, pe_session->curr_op_freq);
 		lim_send_beacon(mac, pe_session);
 		lim_enable_obss_detection_config(mac, pe_session);
 		lim_send_obss_color_collision_cfg(mac, pe_session,
@@ -8329,7 +8336,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 
 	/* Initialize 11h Enable Flag */
 	if (CHAN_HOP_ALL_BANDS_ENABLE ||
-	    session_entry->limRFBand == REG_BAND_5G)
+	    session_entry->limRFBand != REG_BAND_2G)
 		session_entry->lim11hEnable =
 			mac_ctx->mlme_cfg->gen.enabled_11h;
 	else
@@ -8492,12 +8499,8 @@ static void lim_process_modify_add_ies(struct mac_context *mac_ctx,
 		break;
 	case eUPDATE_IE_ASSOC_RESP:
 		/* assoc resp IE */
-		if (add_ie_params->assocRespDataLen == 0) {
-			QDF_TRACE(QDF_MODULE_ID_PE,
-					QDF_TRACE_LEVEL_ERROR, FL(
-				"assoc resp add ie not present %d"),
-				add_ie_params->assocRespDataLen);
-		}
+		if (!add_ie_params->assocRespDataLen)
+			pe_err("assoc resp add ie not present");
 		/* search through the buffer and modify the IE */
 		break;
 	case eUPDATE_IE_PROBE_BCN:

@@ -32,7 +32,7 @@
 #include <wlan_hdd_son.h>
 #include <wlan_hdd_object_manager.h>
 #include <wlan_hdd_stats.h>
-
+#include "wlan_cfg80211_mc_cp_stats.h"
 
 /**
  * hdd_son_is_acs_in_progress() - whether acs is in progress or not
@@ -2276,9 +2276,36 @@ wlan_hdd_son_get_ieee_phymode(enum wlan_phymode wlan_phymode)
 	return wlanphymode2ieeephymode[wlan_phymode];
 }
 
-static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
-					uint8_t *mac_addr,
-					wlan_node_info *node_info)
+static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *mac_addr,
+					    wlan_node_info *node_info)
+{
+	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct hdd_station_ctx *sta_ctx;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = adapter->hdd_ctx;
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return QDF_STATUS_E_FAILURE;
+
+	if (!hdd_cm_is_vdev_associated(adapter)) {
+		hdd_debug_rl("STA adapter not connected");
+		/* Still return success and framework will see default stats */
+		return QDF_STATUS_SUCCESS;
+	}
+
+	hdd_get_max_tx_bitrate(hdd_ctx, adapter);
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	node_info->tx_bitrate = cfg80211_calculate_bitrate(
+			&sta_ctx->cache_conn_info.max_tx_bitrate);
+	hdd_debug("tx_bitrate %u", node_info->tx_bitrate);
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *mac_addr,
+					    wlan_node_info *node_info)
 {
 	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
 	struct hdd_station_info *sta_info;
@@ -2319,6 +2346,20 @@ static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
 	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 			     STA_INFO_SON_GET_DATRATE_INFO);
 	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
+					uint8_t *mac_addr,
+					wlan_node_info *node_info)
+{
+	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+
+	if (adapter->device_mode == QDF_STA_MODE)
+		return hdd_son_get_node_info_sta(vdev, mac_addr, node_info);
+	else if (adapter->device_mode == QDF_SAP_MODE)
+		return hdd_son_get_node_info_sap(vdev, mac_addr, node_info);
+	else
+		return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS hdd_son_get_peer_capability(struct wlan_objmgr_vdev *vdev,
@@ -2407,6 +2448,40 @@ uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
 	return ret;
 }
 
+/**
+ * hdd_son_sta_stats() - get connected sta rssi and estimated data rate
+ * @vdev: pointer to vdev
+ * @mac_addr: connected sta mac addr
+ * @stats: pointer to ieee80211_nodestats
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int hdd_son_get_sta_stats(struct wlan_objmgr_vdev *vdev,
+				 uint8_t *mac_addr,
+				 struct ieee80211_nodestats *stats)
+{
+	struct stats_event *stats_info;
+	int ret = 0;
+
+	stats_info = wlan_cfg80211_mc_cp_stats_get_peer_rssi(
+			vdev, mac_addr, &ret);
+	if (ret || !stats_info) {
+		hdd_err("get peer rssi fail");
+		wlan_cfg80211_mc_cp_stats_free_stats_event(stats_info);
+		return ret;
+	}
+	stats->ns_rssi = stats_info->peer_stats[0].peer_rssi;
+	stats->ns_last_tx_rate = stats_info->peer_stats[0].tx_rate;
+	stats->ns_last_rx_rate = stats_info->peer_stats[0].rx_rate;
+	hdd_debug("sta " QDF_MAC_ADDR_FMT " rssi %d tx %u kbps, rx %u kbps",
+		  QDF_MAC_ADDR_REF(mac_addr), stats->ns_rssi,
+		  stats->ns_last_tx_rate,
+		  stats->ns_last_rx_rate);
+	wlan_cfg80211_mc_cp_stats_free_stats_event(stats_info);
+
+	return ret;
+}
+
 void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 {
 	struct son_callbacks cb_obj = {0};
@@ -2445,6 +2520,7 @@ void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.os_if_get_node_info = hdd_son_get_node_info;
 	cb_obj.os_if_get_peer_capability = hdd_son_get_peer_capability;
 	cb_obj.os_if_get_peer_max_mcs_idx = hdd_son_get_peer_max_mcs_idx;
+	cb_obj.os_if_get_sta_stats = hdd_son_get_sta_stats;
 
 	os_if_son_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 

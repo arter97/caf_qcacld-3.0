@@ -175,6 +175,20 @@ policy_mgr_get_sta_sap_scc_on_dfs_chnl(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+bool
+policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(struct wlan_objmgr_psoc *psoc)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return false;
+	}
+
+	return pm_ctx->cfg.sta_sap_scc_on_indoor_channel;
+}
+
 QDF_STATUS
 policy_mgr_set_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
 					bool multi_sap_allowed_on_same_band)
@@ -3522,7 +3536,6 @@ uint32_t policy_mgr_get_mode_specific_conn_info(
 	return count;
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
 void policy_mgr_get_ml_and_non_ml_sta_count(struct wlan_objmgr_psoc *psoc,
 					    uint8_t *num_ml, uint8_t *ml_idx,
 					    uint8_t *num_non_ml,
@@ -3564,32 +3577,6 @@ void policy_mgr_get_ml_and_non_ml_sta_count(struct wlan_objmgr_psoc *psoc,
 		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_POLICY_MGR_ID);
 	}
 }
-
-#else
-
-void policy_mgr_get_ml_and_non_ml_sta_count(struct wlan_objmgr_psoc *psoc,
-					    uint8_t *num_ml, uint8_t *ml_idx,
-					    uint8_t *num_non_ml,
-					    uint8_t *non_ml_idx,
-					    qdf_freq_t *freq_list,
-					    uint8_t *vdev_id_list)
-{
-	uint32_t sta_num = 0;
-
-	*num_ml = 0;
-	*num_non_ml = 0;
-
-	sta_num = policy_mgr_get_mode_specific_conn_info(psoc, freq_list,
-							 vdev_id_list,
-							 PM_STA_MODE);
-	if (!sta_num)
-		return;
-
-	*num_non_ml = sta_num;
-	/* copy vdev_id_list to non_ml_idx */
-	*non_ml_idx = *vdev_id_list;
-}
-#endif
 
 bool policy_mgr_concurrent_sta_doing_dbs(struct wlan_objmgr_psoc *psoc)
 {
@@ -6484,7 +6471,8 @@ bool policy_mgr_allow_sap_go_concurrency(struct wlan_objmgr_psoc *psoc,
 		}
 
 		if (policy_mgr_dual_beacon_on_single_mac_mcc_capable(psoc) &&
-		    (mode == PM_SAP_MODE) && (con_mode == PM_SAP_MODE))
+		    (mode == PM_SAP_MODE || mode == PM_P2P_GO_MODE) &&
+		    (con_mode == PM_SAP_MODE || con_mode == PM_P2P_GO_MODE))
 			return true;
 
 		if (policy_mgr_dual_beacon_on_single_mac_scc_capable(psoc) &&
@@ -7111,31 +7099,3 @@ bool policy_mgr_is_hwmode_offload_enabled(struct wlan_objmgr_psoc *psoc)
 				   wmi_service_hw_mode_policy_offload_support);
 }
 
-#ifdef MPC_UT_FRAMEWORK
-void policy_mgr_set_dbs_cap_ut(struct wlan_objmgr_psoc *psoc, uint32_t dbs)
-{
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t i;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return;
-	}
-
-	if (!pm_ctx->hw_mode.hw_mode_list) {
-		pm_ctx->num_dbs_hw_modes = 1;
-		pm_ctx->hw_mode.hw_mode_list =
-			qdf_mem_malloc(sizeof(*pm_ctx->hw_mode.hw_mode_list) *
-				       pm_ctx->num_dbs_hw_modes);
-		if (!pm_ctx->hw_mode.hw_mode_list)
-			return;
-
-		pm_ctx->hw_mode.hw_mode_list[0] = 0x0000;
-	}
-
-	for (i = 0; i < pm_ctx->num_dbs_hw_modes; i++)
-		POLICY_MGR_HW_MODE_DBS_MODE_SET(pm_ctx->hw_mode.hw_mode_list[i],
-						dbs);
-}
-#endif

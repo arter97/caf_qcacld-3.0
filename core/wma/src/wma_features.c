@@ -684,8 +684,10 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 	if (!wma)
 		return WLAN_PHYMODE_AUTO;
 
-	if (chan_width >= CH_WIDTH_INVALID) {
-		wma_err_rl("Invalid channel width %d", chan_width);
+	if (chan_width >= CH_WIDTH_INVALID || !bw_val ||
+	    (wlan_reg_is_24ghz_ch_freq(freq) && bw_val > 40)) {
+		wma_err_rl("Invalid channel width %d freq %d",
+			   chan_width, freq);
 		return WLAN_PHYMODE_AUTO;
 	}
 
@@ -3682,8 +3684,8 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 		goto end_tdls_peer_state;
 	}
 
-	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma_handle->psoc,
-					   peer_state->vdev_id)) {
+	if (wlan_cm_is_roam_sync_in_progress(wma_handle->psoc,
+					     peer_state->vdev_id)) {
 		wma_err("roaming in progress, reject peer update cmd!");
 		ret = -EPERM;
 		goto end_tdls_peer_state;

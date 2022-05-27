@@ -264,8 +264,20 @@ static bool lim_chk_assoc_req_parse_error(struct mac_context *mac_ctx,
 		status = sir_convert_reassoc_req_frame2_struct(mac_ctx,
 						frm_body, frame_len, assoc_req);
 
-	if (status == QDF_STATUS_SUCCESS)
+	if (status == QDF_STATUS_SUCCESS) {
+		status = lim_strip_and_decode_eht_cap(
+					frm_body + WLAN_ASSOC_REQ_IES_OFFSET,
+					frame_len - WLAN_ASSOC_REQ_IES_OFFSET,
+					&assoc_req->eht_cap,
+					assoc_req->he_cap,
+					session->curr_op_freq);
+		if (status != QDF_STATUS_SUCCESS) {
+			pe_err("Failed to extract eht cap");
+			return false;
+		}
+
 		return true;
+	}
 
 	pe_warn("Assoc Req rejected: frame parsing error. source addr:"
 			QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(sa));
@@ -2350,6 +2362,52 @@ QDF_STATUS lim_check_assoc_req(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_SUPPORT_TWT
+/* lim_set_sap_peer_twt_cap() - Set SAP peer twt requestor and responder bit
+ * @session: PE session handle
+ * @ext_cap: pointer to ext cap
+ *
+ * This function is used to update SAP peer twt requestor and responder bit
+ * from ext cap of assoc request received by SAP
+ *
+ * Return: None
+ */
+static void lim_set_sap_peer_twt_cap(struct pe_session *session,
+				     struct s_ext_cap *ext_cap)
+{
+	session->peer_twt_requestor = ext_cap->twt_requestor_support;
+	session->peer_twt_responder = ext_cap->twt_responder_support;
+
+	pe_debug("Ext Cap peer TWT requestor: %d, responder: %d",
+		 ext_cap->twt_requestor_support,
+		 ext_cap->twt_responder_support);
+}
+#else
+static inline void
+lim_set_sap_peer_twt_cap(struct pe_session *session,
+			 struct s_ext_cap *ext_cap)
+{
+}
+#endif
+
+/* lim_update_ap_ext_cap() - Update SAP with ext capabilities
+ * @session: PE session handle
+ * @ assoc_req: pointer to assoc req
+ *
+ * This function is called by lim_proc_assoc_req_frm_cmn to
+ * update SAP ext capabilities
+ *
+ * Return: None
+ */
+static void lim_update_ap_ext_cap(struct pe_session *session,
+				  tpSirAssocReq assoc_req)
+{
+	struct s_ext_cap *ext_cap;
+
+	ext_cap = (struct s_ext_cap *)assoc_req->ExtCap.bytes;
+	lim_set_sap_peer_twt_cap(session, ext_cap);
+}
+
 QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 				      uint8_t sub_type,
 				      struct pe_session *session,
@@ -2477,6 +2535,9 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 					  &pmf_connection,
 					  &akm_type))
 		goto error;
+
+	/* Update ap ext cap */
+	lim_update_ap_ext_cap(session, assoc_req);
 
 	/* Extract pre-auth context for the STA, if any. */
 	sta_pre_auth_ctx = lim_search_pre_auth_list(mac_ctx, sa);
@@ -2661,10 +2722,6 @@ void lim_process_assoc_req_frame(struct mac_context *mac_ctx,
 			session->peSessionId, QDF_MAC_ADDR_REF(hdr->sa));
 		return;
 	}
-
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   (uint8_t *)hdr,
-			   frame_len + WMA_GET_RX_MAC_HEADER_LEN(rx_pkt_info));
 
 	if (false == lim_chk_sa_da(mac_ctx, hdr, session, sub_type))
 		return;
@@ -2987,6 +3044,25 @@ static void lim_fill_assoc_ind_real_max_mcs_idx(tpLimMlmAssocInd assoc_ind,
 		assoc_ind->max_real_mcs_idx = assoc_ind->max_supp_idx;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+lim_fill_lim_assoc_ind_mac_addr_copy(tpLimMlmAssocInd assoc_ind,
+				     tpDphHashNode sta_ds,
+				     uint32_t num_bytes)
+{
+	qdf_mem_copy((uint8_t *)assoc_ind->peer_mld_addr,
+		     (uint8_t *)sta_ds->mld_addr,
+		     num_bytes);
+}
+#else /* WLAN_FEATURE_11BE_MLO */
+static inline void
+lim_fill_lim_assoc_ind_mac_addr_copy(tpLimMlmAssocInd assoc_ind,
+				     tpDphHashNode sta_ds,
+				     uint32_t num_bytes)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 bool lim_fill_lim_assoc_ind_params(
 		tpLimMlmAssocInd assoc_ind,
 		struct mac_context *mac_ctx,
@@ -3022,10 +3098,8 @@ bool lim_fill_lim_assoc_ind_params(
 
 	qdf_mem_copy((uint8_t *)assoc_ind->peerMacAddr,
 		     (uint8_t *)sta_ds->staAddr, sizeof(tSirMacAddr));
-#ifdef WLAN_FEATURE_11BE_MLO
-	qdf_mem_copy((uint8_t *)assoc_ind->peer_mld_addr,
-		     (uint8_t *)sta_ds->mld_addr, sizeof(tSirMacAddr));
-#endif
+	lim_fill_lim_assoc_ind_mac_addr_copy(assoc_ind, sta_ds,
+					     sizeof(tSirMacAddr));
 	assoc_ind->aid = sta_ds->assocId;
 	qdf_mem_copy((uint8_t *)&assoc_ind->ssId,
 		     (uint8_t *)&assoc_req->ssId,

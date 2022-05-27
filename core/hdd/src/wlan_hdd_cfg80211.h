@@ -319,6 +319,8 @@ wlan_hdd_wifi_test_config_policy[
 #define SA_QUERY_TIMEOUT_IGNORE 1
 #define FILS_DISCV_FRAMES_DISABLE 0
 #define FILS_DISCV_FRAMES_ENABLE 1
+#define H2E_RSNXE_DEFAULT 0
+#define H2E_RSNXE_IGNORE 1
 
 #define FEATURE_VENDOR_SUBCMD_WIFI_TEST_CONFIGURATION                    \
 {                                                                        \
@@ -635,6 +637,26 @@ enum hdd_chain_mode {
 };
 
 /**
+ * hdd_ba_mode: Representation of Number to configure BA mode
+ * @HDD_BA_MODE_AUTO: Auto mode
+ * @HDD_BA_MODE_MANUAL: Manual mode
+ * @HDD_BA_MODE_64: For buffer size 64
+ * @HDD_BA_MODE_256: For buffer size 256
+ * @HDD_BA_MODE_128: placeholder, not valid
+ * @HDD_BA_MODE_512: For buffer size 512
+ * @HDD_BA_MODE_1024: For buffer size 1024
+ */
+enum hdd_ba_mode {
+	HDD_BA_MODE_AUTO,
+	HDD_BA_MODE_MANUAL,
+	HDD_BA_MODE_64,
+	HDD_BA_MODE_256,
+	HDD_BA_MODE_128,
+	HDD_BA_MODE_512,
+	HDD_BA_MODE_1024,
+};
+
+/**
  * hdd_set_rate_bw(): Set the bandwidth for the given rate_info
  * @info: The rate info for which the bandwidth should be set
  * @hdd_bw: HDD representation of a rate info bandwidth
@@ -760,6 +782,115 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
 int hdd_set_dynamic_antenna_mode(struct hdd_adapter *adapter,
 				 uint8_t num_rx_chains,
 				 uint8_t num_tx_chains);
+
+#ifdef MULTI_CLIENT_LL_SUPPORT
+/**
+ * hdd_get_multi_client_ll_support() - get multi client ll support flag
+ * @adapter: hdd adapter
+ *
+ * Return: none
+ */
+bool hdd_get_multi_client_ll_support(struct hdd_adapter *adapter);
+
+/**
+ * wlan_hdd_set_wlm_client_latency_level() - Set latency level to FW
+ * @adapter: pointer to network adapter
+ * @port_id: port id for which host sends latency level to FW
+ * @latency_level: lavel to be set in fw
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_hdd_set_wlm_client_latency_level(struct hdd_adapter *adapter,
+						 uint32_t port_id,
+						 uint16_t latency_level);
+
+/**
+ * wlan_hdd_set_wlm_latency_level() - Set latency level to FW
+ * @adapter: pointer to network adapter
+ * @latency_level: lavel to be set in fw
+ * @client_id_bitmap: client id bitmap
+ * @force_reset: flag to reset latency lavel in fw
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_hdd_set_wlm_latency_level(struct hdd_adapter *adapter,
+					  uint16_t latency_level,
+					  uint32_t client_id_bitmap,
+					  bool force_reset);
+
+/**
+ * wlan_hdd_get_set_client_info_id() - to update client info table
+ * @adapter: pointer to network adapter
+ * @port_id: port id for which host receives set latency level vendor command
+ * @client_id: client id for a given port id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
+					   uint32_t port_id,
+					   uint32_t *client_id);
+
+/**
+ * wlan_hdd_get_client_id_bitmap() - to calculate client id bitmap
+ * @adapter: pointer to network adapter
+ *
+ * Return: client id bitmap
+ */
+uint8_t wlan_hdd_get_client_id_bitmap(struct hdd_adapter *adapter);
+
+/**
+ * hdd_latency_level_event_handler_cb() - Function to be invoked for low latency
+ * event
+ * @event_data: event data
+ * @vdev_id: vdev id
+ *
+ * Return: none
+ */
+void
+hdd_latency_level_event_handler_cb(const struct latency_level_data *event_data,
+				   uint8_t vdev_id);
+#else
+static inline
+QDF_STATUS wlan_hdd_set_wlm_client_latency_level(struct hdd_adapter *adapter,
+						 uint32_t port_id,
+						 uint16_t latency_level)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+QDF_STATUS wlan_hdd_set_wlm_latency_level(struct hdd_adapter *adapter,
+					  uint16_t latency_level,
+					  uint32_t client_id_bitmap,
+					  bool force_reset)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline uint8_t wlan_hdd_get_client_id_bitmap(struct hdd_adapter *adapter)
+{
+	return 0;
+}
+
+static inline
+QDF_STATUS wlan_hdd_get_set_client_info_id(struct hdd_adapter *adapter,
+					   uint32_t port_id,
+					   uint32_t *client_id)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline bool hdd_get_multi_client_ll_support(struct hdd_adapter *adapter)
+{
+	return false;
+}
+
+static inline void
+hdd_latency_level_event_handler_cb(const void *event_data,
+				   uint8_t vdev_id)
+{
+}
+#endif
 
 /**
  * hdd_convert_cfgdot11mode_to_80211mode() - Function to convert cfg dot11 mode
