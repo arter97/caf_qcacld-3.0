@@ -47,7 +47,7 @@ static void usage(void)
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--data_len: Length of data frame to be filtered");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"\tlength options: 0x40, 0x80, 0x100");
+			"\tlength options: 0x40, 0x80, Default: Full packet");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--metadata: Enable metadata <0x1/0x2>");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
@@ -269,25 +269,6 @@ static void lite_mon_set_defaults(struct lite_mon_config *mon_config)
 	lite_mon_set_default_len(mon_config);
 }
 
-/*
- * lite_mon_sanitize_level: sanitize the level given by user.
- * @level: filter level given by user.
- * return void
- */
-static void lite_mon_sanitize_level(uint8_t level)
-{
-	lite_mon_printf(LITE_MON_TRACE_DEBUG, "Level %d", level);
-	switch (level) {
-	case LITE_MON_LEVEL_MSDU:
-	case LITE_MON_LEVEL_MPDU:
-	case LITE_MON_LEVEL_PPDU:
-		break;
-	default:
-		lite_mon_printf(LITE_MON_TRACE_ERROR, "Invalid level option %d",
-				level);
-		exit(0);
-	}
-}
 
 /*
  * lite_mon_sanitize_filter: sanitize the filter given by user
@@ -338,7 +319,6 @@ static void lite_mon_sanitize_len(uint16_t *len)
 		case LITE_MON_LEN_0:
 		case LITE_MON_LEN_1:
 		case LITE_MON_LEN_2:
-		case LITE_MON_LEN_3:
 		case LITE_MON_LEN_ALL:
 			break;
 		default:
@@ -351,8 +331,8 @@ static void lite_mon_sanitize_len(uint16_t *len)
 }
 
 /*
- * lite_mon_sanitize_len: sanitize the metadata given by user
- * @len: metadata given by user
+ * lite_mon_sanitize_metadata: sanitize the metadata given by user
+ * @metadata: metadata given by user
  * return void
  */
 static void lite_mon_sanitize_metadata(uint16_t metadata)
@@ -362,26 +342,6 @@ static void lite_mon_sanitize_metadata(uint16_t metadata)
 		lite_mon_printf(LITE_MON_TRACE_ERROR,
 				"Invalid metadata option %02X",
 				metadata);
-		exit(0);
-	}
-}
-
-/*
- * lite_mon_sanitize_direction: sanitize the direction given by user.
- * @direction: filter direction given by user.
- * return void
- */
-static void lite_mon_sanitize_direction(uint8_t direction)
-{
-	lite_mon_printf(LITE_MON_TRACE_DEBUG, "Direction %d", direction);
-	switch (direction) {
-	case LITE_MON_DIRECTION_RX:
-	case LITE_MON_DIRECTION_TX:
-		break;
-	default:
-		lite_mon_printf(LITE_MON_TRACE_ERROR,
-				"Invalid direction option %d",
-				direction);
 		exit(0);
 	}
 }
@@ -464,9 +424,7 @@ static void lite_mon_sanitize_interface_name(char *ifname)
  */
 static void lite_mon_set_filter_sanity(struct lite_mon_config *mon_config)
 {
-	lite_mon_sanitize_direction(mon_config->direction);
 	lite_mon_sanitize_debug(mon_config->debug);
-	lite_mon_sanitize_level(mon_config->data.filter_config.level);
 	lite_mon_sanitize_filter(mon_config->data.filter_config.mgmt_filter,
 				 mon_config->direction,
 				 LITE_MON_MGMT_FILTER_INVALID);
@@ -487,7 +445,6 @@ static void lite_mon_set_filter_sanity(struct lite_mon_config *mon_config)
  */
 static void lite_mon_get_filter_sanity(struct lite_mon_config *mon_config)
 {
-	lite_mon_sanitize_direction(mon_config->direction);
 	lite_mon_sanitize_debug(mon_config->debug);
 }
 
@@ -498,7 +455,6 @@ static void lite_mon_get_filter_sanity(struct lite_mon_config *mon_config)
  */
 static void lite_mon_set_peer_sanity(struct lite_mon_config *mon_config)
 {
-	lite_mon_sanitize_direction(mon_config->direction);
 	lite_mon_sanitize_debug(mon_config->debug);
 	lite_mon_sanitize_type(mon_config->data.peer_config.type);
 	lite_mon_sanitize_count(mon_config->data.peer_config.count);
@@ -512,7 +468,6 @@ static void lite_mon_set_peer_sanity(struct lite_mon_config *mon_config)
  */
 static void lite_mon_get_peer_sanity(struct lite_mon_config *mon_config)
 {
-	lite_mon_sanitize_direction(mon_config->direction);
 	lite_mon_sanitize_debug(mon_config->debug);
 	lite_mon_sanitize_type(mon_config->data.peer_config.type);
 }
@@ -859,8 +814,22 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'e': /* level */
-			mon_config.data.filter_config.level = atoi(optarg);
 			cmd_bitmask |= LITE_MON_SET_FILTER_MASK;
+			if (strncmp(optarg, "MSDU", strlen("MSDU")) == 0) {
+				mon_config.data.filter_config.level =
+							LITE_MON_LEVEL_MSDU;
+			} else if (strncmp(optarg, "MPDU", strlen("MPDU")) == 0) {
+				mon_config.data.filter_config.level =
+							LITE_MON_LEVEL_MPDU;
+			} else if (strncmp(optarg, "PPDU", strlen("PPDU")) == 0) {
+				mon_config.data.filter_config.level =
+							LITE_MON_LEVEL_PPDU;
+			} else {
+				lite_mon_printf(LITE_MON_TRACE_ERROR,
+						"Wrong level option provided %s",
+						optarg);
+				exit(0);
+			}
 			break;
 		case 'D': /* disable */
 			mon_config.data.filter_config.disable = 1;

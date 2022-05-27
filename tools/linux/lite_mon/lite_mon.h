@@ -40,7 +40,6 @@ static char *lite_mon_get_debug(uint8_t debug);
 #define LITE_MON_LEN_0  0
 #define LITE_MON_LEN_1  0x40
 #define LITE_MON_LEN_2  0x80
-#define LITE_MON_LEN_3  0x100
 #define LITE_MON_LEN_ALL  0xFFFF
 
 #define LITE_MON_MGMT_FILTER_INVALID 0x8080
