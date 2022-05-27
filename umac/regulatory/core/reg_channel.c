@@ -233,7 +233,7 @@ reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 			  enum phy_ch_width g_max_width,
 			  enum supported_6g_pwr_types in_6g_pwr_mode)
 {
-	struct ch_params chan_params;
+	struct ch_params chan_params = {0};
 
 	chan_params.ch_width = g_max_width;
 	reg_get_channel_params(pdev, freq, 0, &chan_params, in_6g_pwr_mode);
@@ -1031,7 +1031,7 @@ reg_get_max_channel_width_without_radar(struct wlan_objmgr_pdev *pdev,
 					qdf_freq_t freq,
 					enum phy_ch_width g_max_width)
 {
-	struct ch_params chan_params;
+	struct ch_params chan_params = {0};
 	enum reg_6g_ap_type in_6g_pwr_mode;
 
 	reg_get_cur_6g_ap_pwr_type(pdev, &in_6g_pwr_mode);
