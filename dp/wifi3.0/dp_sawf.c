@@ -1129,6 +1129,51 @@ uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	return search_index;
 }
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+static struct dp_peer *dp_sawf_get_peer_from_wds_ext_dev(
+				struct net_device *netdev,
+				uint8_t *dest_mac,
+				struct dp_soc **soc)
+{
+	osif_peer_dev *osifp = NULL;
+	osif_dev *osdev;
+	osif_dev *parent_osdev;
+	struct wlan_objmgr_vdev *vdev = NULL;
+
+	/*
+	 * Here netdev received need to be AP vlan netdev of type WDS EXT.
+	 */
+	osdev = ath_netdev_priv(netdev);
+	if (osdev->dev_type != OSIF_NETDEV_TYPE_WDS_EXT) {
+		qdf_debug("Dev type is not WDS EXT");
+		return NULL;
+	}
+
+	/*
+	 * Get the private structure of AP vlan dev.
+	 */
+	osifp = ath_netdev_priv(netdev);
+	if (!osifp->parent_netdev) {
+		qdf_debug("Parent dev cannot be NULL");
+		return NULL;
+	}
+
+	/*
+	 * Vdev ctx are valid only in parent netdev.
+	 */
+	parent_osdev = ath_netdev_priv(osifp->parent_netdev);
+	vdev = parent_osdev->ctrl_vdev;
+	*soc = (struct dp_soc *)wlan_psoc_get_dp_handle
+	      (wlan_pdev_get_psoc(wlan_vdev_get_pdev(vdev)));
+	if (!(*soc)) {
+		qdf_debug("Soc cannot be NULL");
+		return NULL;
+	}
+
+	return dp_peer_get_ref_by_id((*soc), osifp->peer_id, DP_MOD_ID_SAWF);
+}
+#endif
+
 uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 			   uint32_t service_id)
 {
@@ -1149,10 +1194,24 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	}
 
 	osdev = ath_netdev_priv(netdev);
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	if (osdev->dev_type == OSIF_NETDEV_TYPE_WDS_EXT) {
+		peer = dp_sawf_get_peer_from_wds_ext_dev(netdev, dest_mac, &soc);
+		if (peer)
+			goto process_peer;
+
+		qdf_info("Peer not found from WDS EXT dev");
+		return DP_SAWF_PEER_Q_INVALID;
+	}
+#endif
 	vap = osdev->os_if;
 	vdev = osdev->ctrl_vdev;
 	soc = (struct dp_soc *)wlan_psoc_get_dp_handle
 	      (wlan_pdev_get_psoc(wlan_vdev_get_pdev(vdev)));
+	if (!soc) {
+		qdf_info("Soc cannot be NULL");
+		return DP_SAWF_PEER_Q_INVALID;
+	}
 
 	vdev_id = wlan_vdev_get_id(vdev);
 
@@ -1163,6 +1222,9 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 		return DP_SAWF_PEER_Q_INVALID;
 	}
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+process_peer:
+#endif
 	if (IS_MLO_DP_MLD_PEER(peer)) {
 		primary_link_peer = dp_get_primary_link_peer_by_id(soc,
 					peer->peer_id,
@@ -1186,6 +1248,7 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 	 * In MLO case, secondary links may not have SAWF ctx.
 	 */
 	if (!peer->sawf) {
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 		qdf_warn("Peer SAWF ctx invalid");
 		return DP_SAWF_PEER_Q_INVALID;
 	}
