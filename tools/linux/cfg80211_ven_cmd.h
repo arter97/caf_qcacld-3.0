@@ -3640,6 +3640,14 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_acs_6g_non_prio_chan_penalty",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ACS_6G_NON_PRIO_CHAN_PENALTY,
 		GET_PARAM, 0},
+	{"set_dcs_bw_reduction_ctrl",
+		 OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_BANDWIDTH_REDUCTION_CONTROL, SET_PARAM, 1},
+	{"get_dcs_bw_reduction_ctrl",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_BANDWIDTH_REDUCTION_CONTROL, GET_PARAM, 0},
+#ifdef WLAN_FEATURE_11BE_MLO
+	{"get_mlo_vdev_count",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MLO_VDEV_COUNT, GET_PARAM, 0},
+#endif /* WLAN_FEATURE_11BE_MLO */
 	{"bcn_rlimit",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_ENABLE_BCN_RATELIMIT, SET_PARAM, 1},
 	{"g_bcn_rlimit",
