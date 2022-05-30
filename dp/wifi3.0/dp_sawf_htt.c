@@ -366,3 +366,208 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+QDF_STATUS
+dp_sawf_htt_h2t_mpdu_stats_req(struct htt_soc *soc,
+			       uint8_t stats_type, uint8_t enable,
+			       uint32_t config_param0,
+			       uint32_t config_param1,
+			       uint32_t config_param2,
+			       uint32_t config_param3)
+{
+	qdf_nbuf_t htt_msg;
+	uint32_t *msg_word;
+	uint8_t *htt_logger_bufp;
+	struct dp_htt_htc_pkt *pkt;
+	QDF_STATUS status;
+
+	dp_sawf_info("stats_type %u enable %u", stats_type, enable);
+
+	htt_msg = qdf_nbuf_alloc(
+			soc->osdev,
+			HTT_MSG_BUF_SIZE(HTT_H2T_STREAMING_STATS_REQ_MSG_SZ),
+			HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4, TRUE);
+
+	if (!htt_msg) {
+		dp_sawf_err("Fail to allocate htt msg buffer");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	if (!qdf_nbuf_put_tail(htt_msg,
+			       HTT_H2T_STREAMING_STATS_REQ_MSG_SZ)) {
+		dp_sawf_err("Fail to expand head");
+		qdf_nbuf_free(htt_msg);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	msg_word = (uint32_t *)qdf_nbuf_data(htt_msg);
+
+	qdf_nbuf_push_head(htt_msg, HTC_HDR_ALIGNMENT_PADDING);
+
+	/* word 0 */
+	htt_logger_bufp = (uint8_t *)msg_word;
+	*msg_word = 0;
+
+	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_STREAMING_STATS_REQ);
+	HTT_H2T_STREAMING_STATS_REQ_STATS_TYPE_SET(*msg_word, stats_type);
+	HTT_H2T_STREAMING_STATS_REQ_ENABLE_SET(*msg_word, enable);
+
+	*++msg_word = config_param0;
+	*++msg_word = config_param1;
+	*++msg_word = config_param2;
+	*++msg_word = config_param3;
+
+	pkt = htt_htc_pkt_alloc(soc);
+	if (!pkt) {
+		dp_sawf_err("Fail to allocate dp_htt_htc_pkt buffer");
+		qdf_nbuf_free(htt_msg);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	pkt->soc_ctxt = NULL; /* not used during send-done callback */
+
+	/* macro to set packet parameters for TX */
+	SET_HTC_PACKET_INFO_TX(
+			&pkt->htc_pkt,
+			dp_htt_h2t_send_complete_free_netbuf,
+			qdf_nbuf_data(htt_msg),
+			qdf_nbuf_len(htt_msg),
+			soc->htc_endpoint,
+			HTC_TX_PACKET_TAG_RUNTIME_PUT);
+
+	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, htt_msg);
+
+	status = DP_HTT_SEND_HTC_PKT(
+			soc, pkt,
+			HTT_H2T_MSG_TYPE_STREAMING_STATS_REQ,
+			htt_logger_bufp);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		qdf_nbuf_free(htt_msg);
+		htt_htc_pkt_free(soc, pkt);
+	}
+
+	return status;
+}
+
+/*
+ * dp_sawf_htt_gen_mpdus_details_tlv() - Parse MPDU TLV and update stats
+ * @soc: SOC handle
+ * @tlv_buf: Pointer to TLV buffer
+ *
+ * @Return: void
+ */
+static void dp_sawf_htt_gen_mpdus_tlv(struct dp_soc *soc, uint8_t *tlv_buf)
+{
+	htt_stats_strm_gen_mpdus_tlv_t *tlv;
+	uint8_t remapped_tid, host_tid_queue;
+
+	tlv = (htt_stats_strm_gen_mpdus_tlv_t *)tlv_buf;
+
+	dp_sawf_debug("queue_id: peer_id %u tid %u htt_qtype %u|"
+			"svc_intvl: success %u fail %u|"
+			"burst_size: success %u fail %u",
+			tlv->queue_id.peer_id,
+			tlv->queue_id.tid,
+			tlv->queue_id.htt_qtype,
+			tlv->svc_interval.success,
+			tlv->svc_interval.fail,
+			tlv->burst_size.success,
+			tlv->burst_size.fail);
+
+	remapped_tid = tlv->queue_id.tid;
+	host_tid_queue = tlv->queue_id.htt_qtype - DP_SAWF_DEFAULT_Q_PTID_MAX;
+
+	if (remapped_tid > DP_SAWF_TID_MAX - 1 ||
+	    host_tid_queue > DP_SAWF_DEFINED_Q_PTID_MAX - 1) {
+		dp_sawf_err("Invalid tid (%u) or msduq idx (%u)",
+			    remapped_tid, host_tid_queue);
+		return;
+	}
+
+	dp_sawf_update_svc_intval_mpdu_stats(soc,
+					     tlv->queue_id.peer_id,
+					     remapped_tid,
+					     host_tid_queue,
+					     tlv->svc_interval.success,
+					     tlv->svc_interval.fail);
+	dp_sawf_update_burst_size_mpdu_stats(soc,
+					     tlv->queue_id.peer_id,
+					     remapped_tid,
+					     host_tid_queue,
+					     tlv->burst_size.success,
+					     tlv->burst_size.fail);
+}
+
+/*
+ * dp_sawf_htt_gen_mpdus_details_tlv() - Parse MPDU Details TLV
+ * @soc: SOC handle
+ * @tlv_buf: Pointer to TLV buffer
+ *
+ * @Return: void
+ */
+static void dp_sawf_htt_gen_mpdus_details_tlv(struct dp_soc *soc,
+					      uint8_t *tlv_buf)
+{
+	htt_stats_strm_gen_mpdus_details_tlv_t *tlv =
+		(htt_stats_strm_gen_mpdus_details_tlv_t *)tlv_buf;
+
+	dp_sawf_debug("queue_id: peer_id %u tid %u htt_qtype %u|"
+			"svc_intvl: ts_prior %ums ts_now %ums "
+			"intvl_spec %ums margin %ums|"
+			"burst_size: consumed_bytes_orig %u "
+			"consumed_bytes_final %u remaining_bytes %u "
+			"burst_size_spec %u margin_bytes %u",
+			tlv->queue_id.peer_id,
+			tlv->queue_id.tid,
+			tlv->queue_id.htt_qtype,
+			tlv->svc_interval.timestamp_prior_ms,
+			tlv->svc_interval.timestamp_now_ms,
+			tlv->svc_interval.interval_spec_ms,
+			tlv->svc_interval.margin_ms,
+			tlv->burst_size.consumed_bytes_orig,
+			tlv->burst_size.consumed_bytes_final,
+			tlv->burst_size.remaining_bytes,
+			tlv->burst_size.burst_size_spec,
+			tlv->burst_size.margin_bytes);
+}
+
+QDF_STATUS
+dp_sawf_htt_mpdu_stats_handler(struct htt_soc *soc,
+			       qdf_nbuf_t htt_t2h_msg)
+{
+	uint32_t length;
+	uint32_t *msg_word;
+	uint8_t *tlv_buf;
+	uint8_t tlv_type;
+	uint8_t tlv_length;
+
+	msg_word = (uint32_t *)qdf_nbuf_data(htt_t2h_msg);
+	length = qdf_nbuf_len(htt_t2h_msg);
+
+	msg_word++;
+
+	if (length > HTT_T2H_STREAMING_STATS_IND_HDR_SIZE)
+		length -= HTT_T2H_STREAMING_STATS_IND_HDR_SIZE;
+	else
+		return QDF_STATUS_E_FAILURE;
+
+	while (length > 0) {
+		tlv_buf = (uint8_t *)msg_word;
+		tlv_type = HTT_STATS_TLV_TAG_GET(*msg_word);
+		tlv_length = HTT_STATS_TLV_LENGTH_GET(*msg_word);
+
+		if (!tlv_length)
+			break;
+
+		if (tlv_type == HTT_STATS_STRM_GEN_MPDUS_TAG)
+			dp_sawf_htt_gen_mpdus_tlv(soc->dp_soc, tlv_buf);
+		else if (tlv_type == HTT_STATS_STRM_GEN_MPDUS_DETAILS_TAG)
+			dp_sawf_htt_gen_mpdus_details_tlv(soc->dp_soc, tlv_buf);
+
+		msg_word = (uint32_t *)(tlv_buf + tlv_length);
+		length -= tlv_length;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}

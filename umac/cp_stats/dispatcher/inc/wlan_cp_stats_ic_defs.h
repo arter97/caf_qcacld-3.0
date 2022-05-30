@@ -107,6 +107,12 @@ struct pdev_hw_stats {
  * @cs_phy_err_count: phy error count
  * @cs_chan_tx_pwr: channel tx power
  * @cs_fcsbad: fcs error count
+ * @avg_chan_lat_per_ac: average channel latency per ac
+ * @estimated_air_time_per_ac: Percentage of air time available for each AC
+ *                             BIT[0-7]   : AC_BE
+ *                             BIT[8-15]  : AC_BK
+ *                             BIT[16-23] : AC_VI
+ *                             BIT[24-31] : AC_VO
  */
 struct pdev_80211_stats {
 	uint64_t cs_tx_beacon;
@@ -151,6 +157,8 @@ struct pdev_80211_stats {
 	/* at places of copying required for scn-stats, copy till here only */
 	struct pdev_hw_stats hw_stats;
 	struct pdev_dcs_chan_stats chan_stats;
+	uint32_t avg_chan_lat_per_ac[WIFI_AC_MAX];
+	uint32_t estimated_air_time_per_ac;
 };
 
 /**

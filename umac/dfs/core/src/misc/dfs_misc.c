@@ -53,7 +53,19 @@ void dfs_set_postnol_freq(struct wlan_dfs *dfs, qdf_freq_t postnol_freq)
 	dfs->dfs_chan_postnol_freq = postnol_freq;
 }
 
-void dfs_set_postnol_mode(struct wlan_dfs *dfs, uint8_t postnol_mode)
+#ifdef WLAN_FEATURE_11BE
+static inline void dfs_set_postnol_mode_as_320(struct wlan_dfs *dfs)
+{
+	dfs->dfs_chan_postnol_mode = CH_WIDTH_320MHZ;
+}
+#else
+static inline void dfs_set_postnol_mode_as_320(struct wlan_dfs *dfs)
+{
+	dfs->dfs_chan_postnol_mode = CH_WIDTH_INVALID;
+}
+#endif
+
+void dfs_set_postnol_mode(struct wlan_dfs *dfs, uint16_t postnol_mode)
 {
 	if (dfs->dfs_chan_postnol_cfreq2) {
 		dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
@@ -74,9 +86,14 @@ void dfs_set_postnol_mode(struct wlan_dfs *dfs, uint8_t postnol_mode)
 	case DFS_CHWIDTH_160_VAL:
 		dfs->dfs_chan_postnol_mode = CH_WIDTH_160MHZ;
 		break;
+	case DFS_CHWIDTH_240_VAL:
+	case DFS_CHWIDTH_320_VAL:
+		dfs_set_postnol_mode_as_320(dfs);
+		break;
 	default:
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
-			"Invalid postNOL mode configured");
+			"Invalid postNOL mode configured %d",
+			postnol_mode);
 		return;
 	}
 
@@ -116,75 +133,104 @@ void dfs_get_postnol_cfreq2(struct wlan_dfs *dfs, qdf_freq_t *postnol_cfreq2)
 #endif
 
 #ifdef QCA_SUPPORT_DFS_CHAN_POSTNOL
+#ifdef WLAN_FEATURE_11BE
+static enum wlan_phymode dfs_get_11be_phymode(struct wlan_dfs *dfs)
+{
+	switch (dfs->dfs_chan_postnol_mode) {
+	case CH_WIDTH_20MHZ:
+		return WLAN_PHYMODE_11BEA_EHT20;
+	case CH_WIDTH_40MHZ:
+		return WLAN_PHYMODE_11BEA_EHT40;
+	case CH_WIDTH_80MHZ:
+		return WLAN_PHYMODE_11BEA_EHT80;
+	case CH_WIDTH_160MHZ:
+		return WLAN_PHYMODE_11BEA_EHT160;
+	case CH_WIDTH_320MHZ:
+		return WLAN_PHYMODE_11BEA_EHT320;
+	default:
+		return WLAN_PHYMODE_MAX;
+	}
+}
+#else
+static inline enum wlan_phymode dfs_get_11be_phymode(struct wlan_dfs *dfs)
+{
+	return WLAN_PHYMODE_MAX;
+}
+#endif
+
 bool dfs_switch_to_postnol_chan_if_nol_expired(struct wlan_dfs *dfs)
 {
 	struct dfs_channel chan;
 	struct dfs_channel *curchan = dfs->dfs_curchan;
 	bool is_curchan_11ac = false, is_curchan_11axa = false;
+	bool is_curchan_11be = false;
 	enum wlan_phymode postnol_phymode;
 
 	if (!dfs->dfs_chan_postnol_freq)
 		return false;
 
-	if (WLAN_IS_CHAN_11AC_VHT20(curchan) ||
-	    WLAN_IS_CHAN_11AC_VHT40(curchan) ||
-	    WLAN_IS_CHAN_11AC_VHT80(curchan) ||
-	    WLAN_IS_CHAN_11AC_VHT160(curchan) ||
-	    WLAN_IS_CHAN_11AC_VHT80_80(curchan))
+	if (WLAN_IS_CHAN_11AC(curchan))
 		is_curchan_11ac = true;
-	else if (WLAN_IS_CHAN_11AXA_HE20(curchan) ||
-		 WLAN_IS_CHAN_11AXA_HE40PLUS(curchan) ||
-		 WLAN_IS_CHAN_11AXA_HE40MINUS(curchan) ||
-		 WLAN_IS_CHAN_11AXA_HE80(curchan) ||
-		 WLAN_IS_CHAN_11AXA_HE160(curchan) ||
-		 WLAN_IS_CHAN_11AXA_HE80_80(curchan))
+	else if (WLAN_IS_CHAN_11AXA(curchan))
 		is_curchan_11axa = true;
+	else if (WLAN_IS_CHAN_11BE(curchan))
+		is_curchan_11be = true;
 
-	switch (dfs->dfs_chan_postnol_mode) {
-	case CH_WIDTH_20MHZ:
-		if (is_curchan_11ac)
-			postnol_phymode = WLAN_PHYMODE_11AC_VHT20;
-		else if (is_curchan_11axa)
-			postnol_phymode = WLAN_PHYMODE_11AXA_HE20;
-		else
+	if (is_curchan_11be) {
+		postnol_phymode = dfs_get_11be_phymode(dfs);
+
+		if (postnol_phymode == WLAN_PHYMODE_MAX) {
+			dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+				"Invalid postNOL mode set.");
 			return false;
-		break;
-	case CH_WIDTH_40MHZ:
-		if (is_curchan_11ac)
-			postnol_phymode = WLAN_PHYMODE_11AC_VHT40;
-		else if (is_curchan_11axa)
-			postnol_phymode = WLAN_PHYMODE_11AXA_HE40;
-		else
+		}
+	} else {
+		switch (dfs->dfs_chan_postnol_mode) {
+		case CH_WIDTH_20MHZ:
+			if (is_curchan_11ac)
+				postnol_phymode = WLAN_PHYMODE_11AC_VHT20;
+			else if (is_curchan_11axa)
+				postnol_phymode = WLAN_PHYMODE_11AXA_HE20;
+			else
+				return false;
+			break;
+		case CH_WIDTH_40MHZ:
+			if (is_curchan_11ac)
+				postnol_phymode = WLAN_PHYMODE_11AC_VHT40;
+			else if (is_curchan_11axa)
+				postnol_phymode = WLAN_PHYMODE_11AXA_HE40;
+			else
+				return false;
+			break;
+		case CH_WIDTH_80MHZ:
+			if (is_curchan_11ac)
+				postnol_phymode = WLAN_PHYMODE_11AC_VHT80;
+			else if (is_curchan_11axa)
+				postnol_phymode = WLAN_PHYMODE_11AXA_HE80;
+			else
+				return false;
+			break;
+		case CH_WIDTH_160MHZ:
+			if (is_curchan_11ac)
+				postnol_phymode = WLAN_PHYMODE_11AC_VHT160;
+			else if (is_curchan_11axa)
+				postnol_phymode = WLAN_PHYMODE_11AXA_HE160;
+			else
+				return false;
+			break;
+		case CH_WIDTH_80P80MHZ:
+			if (is_curchan_11ac)
+				postnol_phymode = WLAN_PHYMODE_11AC_VHT80_80;
+			else if (is_curchan_11axa)
+				postnol_phymode = WLAN_PHYMODE_11AXA_HE80_80;
+			else
+				return false;
+			break;
+		default:
+			dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+				"Invalid postNOL mode set.");
 			return false;
-		break;
-	case CH_WIDTH_80MHZ:
-		if (is_curchan_11ac)
-			postnol_phymode = WLAN_PHYMODE_11AC_VHT80;
-		else if (is_curchan_11axa)
-			postnol_phymode = WLAN_PHYMODE_11AXA_HE80;
-		else
-			return false;
-		break;
-	case CH_WIDTH_160MHZ:
-		if (is_curchan_11ac)
-			postnol_phymode = WLAN_PHYMODE_11AC_VHT160;
-		else if (is_curchan_11axa)
-			postnol_phymode = WLAN_PHYMODE_11AXA_HE160;
-		else
-			return false;
-		break;
-	case CH_WIDTH_80P80MHZ:
-		if (is_curchan_11ac)
-			postnol_phymode = WLAN_PHYMODE_11AC_VHT80_80;
-		else if (is_curchan_11axa)
-			postnol_phymode = WLAN_PHYMODE_11AXA_HE80_80;
-		else
-			return false;
-		break;
-	default:
-		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
-			"Invalid postNOL mode set. Cannot switch to the chan");
-		return false;
+		}
 	}
 
 	qdf_mem_zero(&chan, sizeof(struct dfs_channel));

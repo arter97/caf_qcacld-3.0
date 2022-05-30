@@ -1095,10 +1095,15 @@ uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	uint16_t peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(nbuf));
 	uint8_t index = queue_id / DP_SAWF_TID_MAX;
 
+	if (index >= DP_PEER_AST_FLOWQ_MAX) {
+		qdf_warn("invalid index:%d", index);
+		return DP_SAWF_INVALID_AST_IDX;
+	}
+
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
 
 	if (!peer) {
-		qdf_warn("%s NULL peer");
+		qdf_warn("NULL peer");
 		return DP_SAWF_INVALID_AST_IDX;
 	}
 
@@ -1183,6 +1188,60 @@ uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 }
 
 qdf_export_symbol(dp_sawf_get_msduq);
+
+/*
+ * dp_sawf_mpdu_stats_req_send() - Send MPDU stats request to target
+ * @soc_hdl: SOC handle
+ * @stats_type: MPDU stats type
+ * @enable: 1: Enable 0: Disable
+ * @config_param0: Opaque configuration
+ * @config_param1: Opaque configuration
+ * @config_param2: Opaque configuration
+ * @config_param3: Opaque configuration
+ *
+ * @Return: QDF_STATUS_SUCCESS on success
+ */
+static QDF_STATUS
+dp_sawf_mpdu_stats_req_send(struct cdp_soc_t *soc_hdl,
+			    uint8_t stats_type, uint8_t enable,
+			    uint32_t config_param0, uint32_t config_param1,
+			    uint32_t config_param2, uint32_t config_param3)
+{
+	struct dp_soc *dp_soc;
+
+	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
+
+	if (!dp_soc) {
+		dp_sawf_err("Invalid soc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return dp_sawf_htt_h2t_mpdu_stats_req(dp_soc->htt_handle,
+						   stats_type,
+						   enable,
+						   config_param0,
+						   config_param1,
+						   config_param2,
+						   config_param3);
+}
+
+QDF_STATUS
+dp_sawf_mpdu_stats_req(struct cdp_soc_t *soc_hdl, uint8_t enable)
+{
+	return dp_sawf_mpdu_stats_req_send(soc_hdl,
+					   HTT_STRM_GEN_MPDUS_STATS,
+					   enable,
+					   0, 0, 0, 0);
+}
+
+QDF_STATUS
+dp_sawf_mpdu_details_stats_req(struct cdp_soc_t *soc_hdl, uint8_t enable)
+{
+	return dp_sawf_mpdu_stats_req_send(soc_hdl,
+					   HTT_STRM_GEN_MPDUS_DETAILS_STATS,
+					   enable,
+					   0, 0, 0, 0);
+}
 
 QDF_STATUS dp_sawf_set_mov_avg_params(uint32_t num_pkt,
 				      uint32_t num_win)

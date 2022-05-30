@@ -336,6 +336,26 @@ uint32_t dp_sawf_queue_id_get(qdf_nbuf_t nbuf);
 void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf);
 bool dp_sawf_tag_valid_get(qdf_nbuf_t nbuf);
 
+/*
+ * dp_sawf_mpdu_stats_req() - Send MPDU basic stats request to target
+ * @soc_hdl: SOC handle
+ * @enable: 1: Enable 0: Disable
+ *
+ * @Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+dp_sawf_mpdu_stats_req(struct cdp_soc_t *soc_hdl, uint8_t enable);
+
+/*
+ * dp_sawf_mpdu_details_stats_req() - Send MPDU details stats request to target
+ * @soc_hdl: SOC handle
+ * @enable: 1: Enable 0: Disable
+ *
+ * @Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS
+dp_sawf_mpdu_details_stats_req(struct cdp_soc_t *soc_hdl, uint8_t enable);
+
 /**
  * dp_sawf_set_mov_avg_params- Set moving average pararms
  * @num_pkt: No of packets per window to calucalte moving average

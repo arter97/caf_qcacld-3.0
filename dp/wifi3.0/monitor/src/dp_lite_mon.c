@@ -113,39 +113,39 @@ dp_lite_mon_update_config(struct dp_pdev *pdev,
 			     sizeof(curr_config->data_filter));
 
 		/* enable appropriate modes */
-		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_FP] ||
-		    new_config->ctrl_filter[CDP_LITE_MON_MODE_FP] ||
-		    new_config->data_filter[CDP_LITE_MON_MODE_FP])
+		if (new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_FP] ||
+		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_FP] ||
+		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_FP])
 			curr_config->fp_enabled = true;
 
-		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_MD] ||
-		    new_config->ctrl_filter[CDP_LITE_MON_MODE_MD] ||
-		    new_config->data_filter[CDP_LITE_MON_MODE_MD])
+		if (new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_MD] ||
+		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_MD] ||
+		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_MD])
 			curr_config->md_enabled = true;
 
-		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_MO] ||
-		    new_config->ctrl_filter[CDP_LITE_MON_MODE_MO] ||
-		    new_config->data_filter[CDP_LITE_MON_MODE_MO])
+		if (new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_MO] ||
+		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_MO] ||
+		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_MO])
 			curr_config->mo_enabled = true;
 
 		/* set appropriate lengths */
-		if (new_config->mgmt_filter[CDP_LITE_MON_MODE_FP] ||
-		    new_config->mgmt_filter[CDP_LITE_MON_MODE_MD] ||
-		    new_config->mgmt_filter[CDP_LITE_MON_MODE_MO])
-			curr_config->len[CDP_LITE_MON_FRM_TYPE_MGMT] =
-				new_config->len[CDP_LITE_MON_FRM_TYPE_MGMT];
+		if (new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_FP] ||
+		    new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_MD] ||
+		    new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_MO])
+			curr_config->len[WLAN_FC0_TYPE_MGMT] =
+				new_config->len[WLAN_FC0_TYPE_MGMT];
 
-		if (new_config->ctrl_filter[CDP_LITE_MON_MODE_FP] ||
-		    new_config->ctrl_filter[CDP_LITE_MON_MODE_MD] ||
-		    new_config->ctrl_filter[CDP_LITE_MON_MODE_MO])
-			curr_config->len[CDP_LITE_MON_FRM_TYPE_CTRL] =
-				new_config->len[CDP_LITE_MON_FRM_TYPE_CTRL];
+		if (new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_FP] ||
+		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_MD] ||
+		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_MO])
+			curr_config->len[WLAN_FC0_TYPE_CTRL] =
+				new_config->len[WLAN_FC0_TYPE_CTRL];
 
-		if (new_config->data_filter[CDP_LITE_MON_MODE_FP] ||
-		    new_config->data_filter[CDP_LITE_MON_MODE_MD] ||
-		    new_config->data_filter[CDP_LITE_MON_MODE_MO])
-			curr_config->len[CDP_LITE_MON_FRM_TYPE_DATA] =
-				new_config->len[CDP_LITE_MON_FRM_TYPE_DATA];
+		if (new_config->data_filter[DP_MON_FRM_FILTER_MODE_FP] ||
+		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_MD] ||
+		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_MO])
+			curr_config->len[WLAN_FC0_TYPE_DATA] =
+				new_config->len[WLAN_FC0_TYPE_DATA];
 
 		curr_config->metadata = new_config->metadata;
 		curr_config->debug = new_config->debug;
@@ -294,8 +294,7 @@ dp_lite_mon_set_rx_config(struct dp_pdev_be *be_pdev,
 		 * MPDU/PPDU is supported as they span max one mpdu.
 		 */
 		if ((config->level != CDP_LITE_MON_LEVEL_MSDU) &&
-		    (config->len[CDP_LITE_MON_FRM_TYPE_DATA] ==
-						CDP_LITE_MON_LEN_FULL)) {
+		    (config->len[WLAN_FC0_TYPE_DATA] == CDP_LITE_MON_LEN_FULL)) {
 			dp_mon_err("Filter combination not supported "
 				   "level mpdu/ppdu and data full pkt");
 			return QDF_STATUS_E_INVAL;
@@ -955,9 +954,9 @@ dp_lite_mon_config_nac_peer(struct cdp_soc_t *soc_hdl,
 			filter_config.disable = 0;
 			filter_config.direction = CDP_LITE_MON_DIRECTION_RX;
 			filter_config.level = CDP_LITE_MON_LEVEL_PPDU;
-			filter_config.data_filter[CDP_LITE_MON_MODE_MD] =
+			filter_config.data_filter[DP_MON_FRM_FILTER_MODE_MD] =
 							CDP_LITE_MON_FILTER_ALL;
-			filter_config.len[CDP_LITE_MON_FRM_TYPE_DATA] =
+			filter_config.len[WLAN_FC0_TYPE_DATA] =
 							CDP_LITE_MON_LEN_128B;
 			filter_config.metadata = DP_LITE_MON_RTAP_HDR_BITMASK;
 			filter_config.vdev_id = vdev_id;
@@ -1262,7 +1261,7 @@ dp_lite_mon_rx_adjust_mpdu_len(struct dp_pdev_be *be_pdev,
 
 	wh = (struct ieee80211_frame *)qdf_nbuf_get_frag_addr(mpdu_nbuf, 0);
 	type = ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) >> IEEE80211_FC0_TYPE_SHIFT);
-	type_len = (type < CDP_LITE_MON_FRM_TYPE_MAX) ? config->len[type] : 0;
+	type_len = (type < CDP_MON_FRM_TYPE_MAX) ? config->len[type] : 0;
 	if (qdf_unlikely(!type_len || type_len == CDP_LITE_MON_LEN_FULL)) {
 		dp_mon_debug("Invalid type(%d) len, mpdu len adjust failed", type);
 		return QDF_STATUS_E_INVAL;
