@@ -1843,23 +1843,6 @@ reg_modify_chan_list_for_avoid_chan_ext(struct wlan_regulatory_pdev_priv_obj
 
 #ifdef CONFIG_BAND_6GHZ
 /**
- * reg_is_supp_pwr_mode_invalid - Indicates if the given 6G power mode is
- * one of the valid power modes enumerated by enum supported_6g_pwr_types
- * from REG_AP_LPI to REG_CLI_SUB_VLP.
- *
- * Note: REG_BEST_PWR_MODE and REG_CURRENT_PWR_MODE are not valid 6G power
- * modes.
- *
- * Return: True for any valid power mode from REG_AP_LPI tp REG_CLI_SUB_VLP.
- * False otherwise.
- */
-static inline bool
-reg_is_supp_pwr_mode_invalid(enum supported_6g_pwr_types supp_pwr_mode)
-{
-	return (supp_pwr_mode < REG_AP_LPI || supp_pwr_mode > REG_CLI_SUB_VLP);
-}
-
-/**
  * reg_dis_chan_state_and_flags() - Disable the input channel state
  * and chan_flags
  * @state: Channel state
@@ -1890,7 +1873,7 @@ static void reg_init_super_chan_entry(
 
 	chan_info = &pdev_priv_obj->super_chan_list[chan_idx];
 
-	for (pwr_type = REG_AP_LPI; pwr_type <= REG_CLI_SUB_VLP;
+	for (pwr_type = REG_CURRENT_PWR_MODE; pwr_type <= REG_CLI_SUB_VLP;
 	     pwr_type++)
 		reg_dis_chan_state_and_flags(&chan_info->state_arr[pwr_type],
 					     &chan_info->chan_flags_arr
@@ -2365,16 +2348,6 @@ static void reg_init_pdev_super_chan_list(
 static inline void
 reg_compute_super_chan_list(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {
-}
-
-static inline bool
-reg_is_supp_pwr_mode_invalid(enum supported_6g_pwr_types supp_pwr_mode)
-{
-	/* Super channel entry and 6G power modes are invalid
-	 * for non-6G chipsets.
-	 */
-
-	return true;
 }
 #endif /* CONFIG_BAND_6GHZ */
 

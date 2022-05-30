@@ -991,7 +991,7 @@ struct reo_desc_deferred_freelist_node {
 struct reo_cmd_event_record {
 	enum hal_reo_cmd_type cmd_type;
 	uint8_t cmd_return_status;
-	uint32_t timestamp;
+	uint64_t timestamp;
 };
 
 /**
@@ -1816,6 +1816,9 @@ struct dp_arch_ops {
 						     struct dp_peer *peer,
 						     int tid,
 						     uint32_t ba_window_size);
+	struct dp_peer *(*dp_find_peer_by_destmac)(struct dp_soc *soc,
+						   uint8_t *dest_mac_addr,
+						   uint8_t vdev_id);
 };
 
 /**
@@ -2252,7 +2255,7 @@ struct dp_soc {
 	struct dp_rx_fst *rx_fst;
 #ifdef WLAN_SUPPORT_RX_FISA
 	uint8_t fisa_enable;
-
+	uint8_t fisa_lru_del_enable;
 	/**
 	 * Params used for controlling the fisa aggregation dynamically
 	 */

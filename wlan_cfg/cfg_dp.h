@@ -312,15 +312,11 @@
 
 #define WLAN_CFG_RXDMA_BUF_RING_SIZE 1024
 #define WLAN_CFG_RXDMA_BUF_RING_SIZE_MIN 1024
-#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
-#define WLAN_CFG_RXDMA_BUF_RING_SIZE_MAX 1024
-#else
 #define WLAN_CFG_RXDMA_BUF_RING_SIZE_MAX 4096
-#endif
 
 #define WLAN_CFG_RXDMA_REFILL_RING_SIZE 4096
 #define WLAN_CFG_RXDMA_REFILL_RING_SIZE_MIN 16
-#define WLAN_CFG_RXDMA_REFILL_RING_SIZE_MAX 4096
+#define WLAN_CFG_RXDMA_REFILL_RING_SIZE_MAX 8192
 
 #define WLAN_CFG_TX_DESC_LIMIT_0 0
 #define WLAN_CFG_TX_DESC_LIMIT_0_MIN 4096
@@ -1234,6 +1230,27 @@
 	CFG_INI_BOOL("dp_rx_fisa_enable", true, \
 		     "Enable/Disable DP Rx FISA")
 
+/*
+ * <ini>
+ * dp_rx_fisa_lru_del_enable - Control Rx datapath FISA
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable DP Rx FISA lru deletion feature
+ *
+ * Related: dp_rx_fisa_enable
+ *
+ * Supported Feature: STA,P2P and SAP IPA disabled terminating
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_DP_RX_FISA_LRU_DEL_ENABLE \
+	CFG_INI_BOOL("dp_rx_fisa_lru_del_enable", true, \
+		     "Enable/Disable DP Rx FISA LRU deletion")
+
 #define CFG_DP_RXDMA_MONITOR_RX_DROP_THRESHOLD \
 		CFG_INI_UINT("mon_drop_thresh", \
 		WLAN_CFG_RXDMA_MONITOR_RX_DROP_THRESH_SIZE_MIN, \
@@ -1703,6 +1720,7 @@
 		CFG(CFG_DP_RXDMA_MONITOR_RX_DROP_THRESHOLD) \
 		CFG(CFG_DP_PKTLOG_BUFFER_SIZE) \
 		CFG(CFG_DP_RX_FISA_ENABLE) \
+		CFG(CFG_DP_RX_FISA_LRU_DEL_ENABLE) \
 		CFG(CFG_DP_FULL_MON_MODE) \
 		CFG(CFG_DP_REO_RINGS_MAP) \
 		CFG(CFG_DP_PEER_EXT_STATS) \

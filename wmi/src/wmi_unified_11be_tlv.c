@@ -151,6 +151,35 @@ uint8_t *bcn_tmpl_add_ml_partner_links(uint8_t *buf_ptr,
 	return buf_ptr + WMI_TLV_HDR_SIZE;
 }
 
+size_t bcn_tmpl_ml_info_size(struct beacon_tmpl_params *param)
+{
+	return (WMI_TLV_HDR_SIZE + sizeof(wmi_bcn_tmpl_ml_info));
+}
+
+uint8_t *bcn_tmpl_add_ml_info(uint8_t *buf_ptr,
+			      struct beacon_tmpl_params *param)
+{
+	wmi_bcn_tmpl_ml_info *ml_info;
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       sizeof(wmi_bcn_tmpl_ml_info));
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	ml_info = (wmi_bcn_tmpl_ml_info *)buf_ptr;
+
+	WMITLV_SET_HDR(&ml_info->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_bcn_tmpl_ml_info,
+		       WMITLV_GET_STRUCT_TLVLEN(wmi_bcn_tmpl_ml_info));
+
+	ml_info->hw_link_id = param->cu_ml_info.hw_link_id;
+	ml_info->cu_vdev_map_cat1_lo = param->cu_ml_info.cu_vdev_map_cat1_lo;
+	ml_info->cu_vdev_map_cat1_hi = param->cu_ml_info.cu_vdev_map_cat1_hi;
+	ml_info->cu_vdev_map_cat2_lo = param->cu_ml_info.cu_vdev_map_cat2_lo;
+	ml_info->cu_vdev_map_cat2_hi = param->cu_ml_info.cu_vdev_map_cat2_hi;
+
+	return buf_ptr + sizeof(wmi_bcn_tmpl_ml_info);
+}
+
 size_t peer_create_mlo_params_size(struct peer_create_params *req)
 {
 	return sizeof(wmi_peer_create_mlo_params) + WMI_TLV_HDR_SIZE;
@@ -214,6 +243,8 @@ uint8_t *peer_assoc_add_mlo_params(uint8_t *buf_ptr,
 					   req->mlo_params.mlo_logical_link_index_valid);
 	WMI_MLO_FLAGS_SET_PEER_ID_VALID(mlo_params->mlo_flags.mlo_flags,
 					req->mlo_params.mlo_peer_id_valid);
+	mlo_params->mlo_flags.mlo_force_link_inactive =
+			req->mlo_params.mlo_force_link_inactive;
 
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(req->mlo_params.mld_mac,
 				   &mlo_params->mld_macaddr);

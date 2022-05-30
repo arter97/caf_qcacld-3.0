@@ -2650,7 +2650,10 @@ static QDF_STATUS send_beacon_tmpl_send_cmd_tlv(wmi_unified_t wmi_handle,
 
 	wmi_buf_len = sizeof(wmi_bcn_tmpl_cmd_fixed_param) +
 		      sizeof(wmi_bcn_prb_info) + WMI_TLV_HDR_SIZE +
-		      param->tmpl_len_aligned + bcn_tmpl_mlo_param_size(param);
+		      param->tmpl_len_aligned +
+		      bcn_tmpl_mlo_param_size(param) +
+		      bcn_tmpl_ml_info_size(param);
+
 	wmi_buf = wmi_buf_alloc(wmi_handle, wmi_buf_len);
 	if (!wmi_buf)
 		return QDF_STATUS_E_NOMEM;
@@ -2696,6 +2699,8 @@ static QDF_STATUS send_beacon_tmpl_send_cmd_tlv(wmi_unified_t wmi_handle,
 
 	buf_ptr += roundup(param->tmpl_len, sizeof(uint32_t));
 	buf_ptr = bcn_tmpl_add_ml_partner_links(buf_ptr, param);
+
+	buf_ptr = bcn_tmpl_add_ml_info(buf_ptr, param);
 
 	wmi_mtrace(WMI_BCN_TMPL_CMDID, cmd->vdev_id, 0);
 	ret = wmi_unified_cmd_send(wmi_handle,
@@ -6656,6 +6661,7 @@ static QDF_STATUS send_stats_ext_req_cmd_tlv(wmi_unified_t wmi_handle,
 	size_t len;
 	uint8_t *buf_ptr;
 	uint16_t max_wmi_msg_size = wmi_get_max_msg_len(wmi_handle);
+	uint32_t *vdev_bitmap;
 
 	if (preq->request_data_len > (max_wmi_msg_size - WMI_TLV_HDR_SIZE -
 				      sizeof(*cmd))) {
@@ -6664,7 +6670,8 @@ static QDF_STATUS send_stats_ext_req_cmd_tlv(wmi_unified_t wmi_handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE + preq->request_data_len;
+	len = sizeof(*cmd) + WMI_TLV_HDR_SIZE + preq->request_data_len +
+	      WMI_TLV_HDR_SIZE + sizeof(uint32_t);
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf)
@@ -6688,6 +6695,19 @@ static QDF_STATUS send_stats_ext_req_cmd_tlv(wmi_unified_t wmi_handle,
 
 	buf_ptr += WMI_TLV_HDR_SIZE;
 	qdf_mem_copy(buf_ptr, preq->request_data, cmd->data_len);
+
+	buf_ptr += cmd->data_len;
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32, sizeof(uint32_t));
+
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	vdev_bitmap = (A_UINT32 *)buf_ptr;
+
+	vdev_bitmap[0] = preq->vdev_id_bitmap;
+
+	wmi_debug("Sending MLO vdev_id_bitmap:%x", vdev_bitmap[0]);
+
+	buf_ptr += sizeof(uint32_t);
 
 	wmi_mtrace(WMI_REQUEST_STATS_EXT_CMDID, cmd->vdev_id, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -16742,6 +16762,85 @@ extract_roam_scan_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 }
 
 /**
+ * wlan_roam_fail_reason_code() - Convert FW enum to Host enum
+ * @wmi_roam_fail_reason: roam fail enum
+ *
+ * Return: Roaming failure reason codes
+ */
+static enum wlan_roam_failure_reason_code
+wlan_roam_fail_reason_code(uint16_t wmi_roam_fail_reason)
+{
+	switch (wmi_roam_fail_reason) {
+	case WMI_ROAM_FAIL_REASON_NO_SCAN_START:
+		return ROAM_FAIL_REASON_NO_SCAN_START;
+	case WMI_ROAM_FAIL_REASON_NO_AP_FOUND:
+		return ROAM_FAIL_REASON_NO_AP_FOUND;
+	case WMI_ROAM_FAIL_REASON_NO_CAND_AP_FOUND:
+		return ROAM_FAIL_REASON_NO_CAND_AP_FOUND;
+	case WMI_ROAM_FAIL_REASON_HOST:
+		return ROAM_FAIL_REASON_HOST;
+	case WMI_ROAM_FAIL_REASON_AUTH_SEND:
+		return ROAM_FAIL_REASON_AUTH_SEND;
+	case WMI_ROAM_FAIL_REASON_AUTH_RECV:
+		return ROAM_FAIL_REASON_AUTH_RECV;
+	case WMI_ROAM_FAIL_REASON_NO_AUTH_RESP:
+		return ROAM_FAIL_REASON_NO_AUTH_RESP;
+	case WMI_ROAM_FAIL_REASON_REASSOC_SEND:
+		return ROAM_FAIL_REASON_REASSOC_SEND;
+	case WMI_ROAM_FAIL_REASON_REASSOC_RECV:
+		return ROAM_FAIL_REASON_REASSOC_RECV;
+	case WMI_ROAM_FAIL_REASON_NO_REASSOC_RESP:
+		return ROAM_FAIL_REASON_NO_REASSOC_RESP;
+	case WMI_ROAM_FAIL_REASON_EAPOL_TIMEOUT:
+		return ROAM_FAIL_REASON_EAPOL_TIMEOUT;
+	case WMI_ROAM_FAIL_REASON_MLME:
+		return ROAM_FAIL_REASON_MLME;
+	case WMI_ROAM_FAIL_REASON_INTERNAL_ABORT:
+		return ROAM_FAIL_REASON_INTERNAL_ABORT;
+	case WMI_ROAM_FAIL_REASON_SCAN_START:
+		return ROAM_FAIL_REASON_SCAN_START;
+	case WMI_ROAM_FAIL_REASON_AUTH_NO_ACK:
+		return ROAM_FAIL_REASON_AUTH_NO_ACK;
+	case WMI_ROAM_FAIL_REASON_AUTH_INTERNAL_DROP:
+		return ROAM_FAIL_REASON_AUTH_INTERNAL_DROP;
+	case WMI_ROAM_FAIL_REASON_REASSOC_NO_ACK:
+		return ROAM_FAIL_REASON_REASSOC_NO_ACK;
+	case WMI_ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP:
+		return ROAM_FAIL_REASON_REASSOC_INTERNAL_DROP;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_SEND:
+		return ROAM_FAIL_REASON_EAPOL_M2_SEND;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP:
+		return ROAM_FAIL_REASON_EAPOL_M2_INTERNAL_DROP;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M2_NO_ACK:
+		return ROAM_FAIL_REASON_EAPOL_M2_NO_ACK;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT:
+		return ROAM_FAIL_REASON_EAPOL_M3_TIMEOUT;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_SEND:
+		return ROAM_FAIL_REASON_EAPOL_M4_SEND;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP:
+		return ROAM_FAIL_REASON_EAPOL_M4_INTERNAL_DROP;
+	case WMI_ROAM_FAIL_REASON_EAPOL_M4_NO_ACK:
+		return ROAM_FAIL_REASON_EAPOL_M4_NO_ACK;
+	case WMI_ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS:
+		return ROAM_FAIL_REASON_NO_SCAN_FOR_FINAL_BMISS;
+	case WMI_ROAM_FAIL_REASON_DISCONNECT:
+		return ROAM_FAIL_REASON_DISCONNECT;
+	case WMI_ROAM_FAIL_REASON_SYNC:
+		return ROAM_FAIL_REASON_SYNC;
+	case WMI_ROAM_FAIL_REASON_SAE_INVALID_PMKID:
+		return ROAM_FAIL_REASON_SAE_INVALID_PMKID;
+	case WMI_ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT:
+		return ROAM_FAIL_REASON_SAE_PREAUTH_TIMEOUT;
+	case WMI_ROAM_FAIL_REASON_SAE_PREAUTH_FAIL:
+		return ROAM_FAIL_REASON_SAE_PREAUTH_FAIL;
+	case WMI_ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO:
+		return ROAM_FAIL_REASON_UNABLE_TO_START_ROAM_HO;
+	default:
+		return ROAM_FAIL_REASON_UNKNOWN;
+	}
+}
+
+/**
  * extract_roam_scan_stats_tlv() - Extract the Roam trigger stats
  * from the WMI_ROAM_STATS_EVENTID
  * @wmi_handle: wmi handle
@@ -16766,7 +16865,8 @@ extract_roam_result_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	dst->present = true;
 	dst->status = src_data->roam_status;
 	dst->timestamp = src_data->timestamp;
-	dst->fail_reason = src_data->roam_fail_reason;
+	dst->fail_reason =
+	wlan_roam_fail_reason_code(src_data->roam_fail_reason);
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_data->bssid, dst->fail_bssid.bytes);
 
 	return QDF_STATUS_SUCCESS;
@@ -17190,6 +17290,9 @@ extract_vdev_tsf_report_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	param->mac_id_valid = evt->mac_id_valid;
 	param->wlan_global_tsf_low = evt->wlan_global_tsf_low;
 	param->wlan_global_tsf_high = evt->wlan_global_tsf_high;
+	param->tqm_timer_low = evt->tqm_timer_low;
+	param->tqm_timer_high = evt->tqm_timer_high;
+	param->use_tqm_timer = evt->use_tqm_timer;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -17762,6 +17865,35 @@ extract_pktlog_decode_info_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	qdf_mem_copy(chip_info, event->chip_info, 40);
 	*pktlog_json_version = event->pktlog_defs_json_version;
 	*pdev_id = event->pdev_id;
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * extract_pdev_telemetry_stats_tlv - extract pdev telemetry stats
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @pdev stats: Pointer to hold pdev telemetry stats
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static QDF_STATUS
+extract_pdev_telemetry_stats_tlv(
+		wmi_unified_t wmi_handle, void *evt_buf,
+		struct wmi_host_pdev_telemetry_stats *pdev_stats)
+{
+	WMI_UPDATE_STATS_EVENTID_param_tlvs *param_buf;
+	wmi_pdev_telemetry_stats *ev;
+
+	param_buf = (WMI_UPDATE_STATS_EVENTID_param_tlvs *)evt_buf;
+
+	if (param_buf->pdev_telemetry_stats) {
+		ev = (wmi_pdev_telemetry_stats *)(param_buf->pdev_telemetry_stats);
+		qdf_mem_copy(pdev_stats->avg_chan_lat_per_ac,
+			     ev->avg_chan_lat_per_ac,
+			     sizeof(ev->avg_chan_lat_per_ac));
+		pdev_stats->estimated_air_time_per_ac =
+			     ev->estimated_air_time_per_ac;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -18211,6 +18343,7 @@ struct wmi_ops tlv_ops =  {
 	.send_vdev_pn_mgmt_rxfilter_cmd = send_vdev_pn_mgmt_rxfilter_cmd_tlv,
 	.extract_pktlog_decode_info_event =
 		extract_pktlog_decode_info_event_tlv,
+	.extract_pdev_telemetry_stats = extract_pdev_telemetry_stats_tlv,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO
