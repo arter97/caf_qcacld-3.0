@@ -170,17 +170,6 @@ hdd_translate_wpa_to_csr_auth_type(uint8_t auth_suite[4]);
 eCsrEncryptionType
 hdd_translate_wpa_to_csr_encryption_type(uint8_t cipher_suite[4]);
 
-#ifdef FEATURE_WLAN_WAPI
-eCsrEncryptionType
-hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4]);
-#else
-inline eCsrEncryptionType
-hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4])
-{
-	return eCSR_ENCRYPT_TYPE_UNKNOWN;
-}
-#endif
-
 QDF_STATUS hdd_softap_sta_deauth(struct hdd_adapter *adapter,
 				 struct csr_del_sta_params *param);
 void hdd_softap_sta_disassoc(struct hdd_adapter *adapter,
