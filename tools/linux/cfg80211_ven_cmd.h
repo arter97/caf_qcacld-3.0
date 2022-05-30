@@ -1305,6 +1305,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_EN_RU_106_TONE_ER_SU_DCM = 496,
 
 	OL_ATH_PARAM_WLAN_COUNTER_PERIOD = 500,
+	OL_ATH_PARAM_UL_OFDMA_RTD = 501,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -3361,6 +3362,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EN_RU_106_TONE_ER_SU_DCM, SET_PARAM, 1},
 	{"counter_period",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_WLAN_COUNTER_PERIOD, SET_PARAM, 1},
+	{"cmn_ulofdma_rtd",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UL_OFDMA_RTD, SET_PARAM, 1},
 };
 #endif
 #endif
