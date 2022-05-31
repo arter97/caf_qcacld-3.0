@@ -34,6 +34,7 @@
 #include <dp_mon_2.0.h>
 #include <dp_be.h>
 #include <dp_rx_mon_2.0.h>
+#include <dp_rx_mon.h>
 
 /**
  * dp_lite_mon_free_peers - free peers
@@ -1287,99 +1288,6 @@ dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 	return QDF_STATUS_E_FAILURE;
 }
 
-#ifdef META_HDR_NOT_YET_SUPPORTED
-#ifdef WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG
-/**
- * dp_lite_mon_update_protocol_tag - update ptag to headroom
- * @be_pdev: be pdev context
- * @frag_idx: frag index
- * @mpdu_nbuf: mpdu nbuf
- *
- * Return: void
- */
-static inline void
-dp_lite_mon_update_protocol_tag(struct dp_pdev_be *be_pdev,
-				uint8_t frag_idx,
-				qdf_nbuf_t mpdu_nbuf)
-{
-	uint16_t cce_metadata = 0;
-	uint16_t protocol_tag = 0;
-	uint8_t *nbuf_head = NULL;
-
-	if (qdf_unlikely(be_pdev->pdev.is_rx_protocol_tagging_enabled)) {
-		nbuf_head = qdf_nbuf_head(mpdu_nbuf);
-		nbuf_head += (frag_idx * DP_RX_MON_CCE_FSE_METADATA_SIZE);
-
-		cce_metadata = *((uint16_t *)nbuf_head);
-		/* check if cce_metadata is in valid range */
-		if (qdf_likely(cce_metadata >= RX_PROTOCOL_TAG_START_OFFSET) &&
-			  (cce_metadata < (RX_PROTOCOL_TAG_START_OFFSET +
-			   RX_PROTOCOL_TAG_MAX))) {
-			/*
-			 * The CCE metadata received is just the
-			 * packet_type + RX_PROTOCOL_TAG_START_OFFSET
-			 */
-			cce_metadata -= RX_PROTOCOL_TAG_START_OFFSET;
-
-			/*
-			 * Update the nbuf headroom with the user-specified
-			 * tag/metadata by looking up tag value for
-			 * received protocol type */
-			protocol_tag = be_pdev->pdev.rx_proto_tag_map[cce_metadata].tag;
-		}
-	}
-	nbuf_head = qdf_nbuf_head(mpdu_nbuf);
-	nbuf_head += (frag_idx * DP_RX_MON_PF_TAG_SIZE);
-	*((uint16_t *)nbuf_head) = protocol_tag;
-}
-#else
-static inline void
-dp_lite_mon_update_protocol_tag(struct dp_pdev_be *be_pdev,
-				uint8_t frag_idx,
-				qdf_nbuf_t mpdu_nbuf)
-{
-}
-#endif
-
-#ifdef WLAN_SUPPORT_RX_FLOW_TAG
-/**
- * dp_lite_mon_update_flow_tag - update ftag to headroom
- * @dp_soc: dp_soc context
- * @frag_idx: frag index
- * @mpdu_nbuf: mpdu nbuf
- *
- * Return: void
- */
-static inline void
-dp_lite_mon_update_flow_tag(struct dp_soc *soc,
-			    uint8_t frag_idx,
-			    qdf_nbuf_t mpdu_nbuf)
-{
-	uint16_t flow_tag = 0;
-	uint8_t *nbuf_head = NULL;
-
-	if (qdf_unlikely(wlan_cfg_is_rx_flow_tag_enabled(soc->wlan_cfg_ctx))) {
-		nbuf_head = qdf_nbuf_head(mpdu_nbuf);
-		nbuf_head += ((frag_idx * DP_RX_MON_CCE_FSE_METADATA_SIZE) +
-				DP_RX_MON_CCE_METADATA_SIZE);
-
-		/* limit FSE metadata to 16bit */
-		flow_tag = (uint16_t)(*((uint32_t *)nbuf_head) & 0xFFFF);
-	}
-	nbuf_head = qdf_nbuf_head(mpdu_nbuf);
-	nbuf_head += (frag_idx * DP_RX_MON_PF_TAG_SIZE) + sizeof(uint16_t);
-	*((uint16_t *)nbuf_head) = flow_tag;
-}
-#else
-static inline void
-dp_lite_mon_update_flow_tag(struct dp_soc *soc,
-			    uint8_t frag_idx,
-			    qdf_nbuf_t mpdu_nbuf)
-{
-}
-#endif
-#endif
-
 /**
  * dp_lite_mon_rx_adjust_mpdu_len - adjust mpdu len as per set type len
  * @be_pdev: be pdev context
@@ -1405,8 +1313,6 @@ dp_lite_mon_rx_adjust_mpdu_len(struct dp_pdev_be *be_pdev,
 	uint8_t num_frags = 0;
 	uint8_t frag_iter = 0;
 	bool is_head_nbuf = true;
-	bool is_data_pkt = false;
-	bool is_rx_mon_protocol_flow_tag_en;
 
 	if (qdf_unlikely(!soc))
 		return QDF_STATUS_E_INVAL;
@@ -1425,15 +1331,6 @@ dp_lite_mon_rx_adjust_mpdu_len(struct dp_pdev_be *be_pdev,
 	 * custom len(265bytes for above ex). We need to trim
 	 * mgmt/ctrl hdrs to their respective lengths(128bytes for above ex).
 	 * Below logic handles that */
-
-	if (ppdu_info->rx_status.frame_control_info_valid &&
-	    ((ppdu_info->rx_status.frame_control & IEEE80211_FC0_TYPE_MASK) ==
-	      IEEE80211_FC0_TYPE_DATA))
-		is_data_pkt = true;
-
-	is_rx_mon_protocol_flow_tag_en =
-		wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(soc->wlan_cfg_ctx);
-
 	for (curr_nbuf = mpdu_nbuf; curr_nbuf;) {
 		num_frags = qdf_nbuf_get_nr_frags(curr_nbuf);
 		if (num_frags > 1 &&
@@ -1451,27 +1348,6 @@ dp_lite_mon_rx_adjust_mpdu_len(struct dp_pdev_be *be_pdev,
 							    frag_iter,
 							    -(trim_size), 0);
 			}
-
-#ifdef META_HDR_NOT_YET_SUPPORTED
-			if (config->level == CDP_LITE_MON_LEVEL_MSDU) {
-				if (is_data_pkt &&
-				    is_rx_mon_protocol_flow_tag_en) {
-					/* update protocol tag from cce metadata */
-					dp_lite_mon_update_protocol_tag(be_pdev,
-									frag_iter,
-									mpdu_nbuf);
-
-					/* update flow tag from fse metadata */
-					dp_lite_mon_update_flow_tag(soc,
-								    frag_iter,
-								    mpdu_nbuf);
-
-					/* litemon pending :check to add pf tag
-					 * trailer info for debug
-					 */
-				}
-			}
-#endif /* META_HDR_NOT_YET_SUPPORTED */
 		}
 		if (is_head_nbuf) {
 			curr_nbuf = qdf_nbuf_get_ext_list(curr_nbuf);
@@ -1481,83 +1357,6 @@ dp_lite_mon_rx_adjust_mpdu_len(struct dp_pdev_be *be_pdev,
 	}
 
 	return QDF_STATUS_SUCCESS;
-}
-
-#ifdef META_HDR_NOT_YET_SUPPORTED
-/**
- * dp_lite_mon_add_tlv - add tlv to headroom
- * @id: tlv id
- * @len: tlv len
- * @value: tlv value
- * @mpdu_nbuf: mpdu nbuf
- *
- * Return: number of bytes pushed
- */
-static inline
-uint32_t dp_lite_mon_add_tlv(uint8_t id, uint16_t len, void *value,
-			     qdf_nbuf_t mpdu_nbuf)
-{
-	uint8_t *dest = NULL;
-	uint32_t num_bytes_pushed = 0;
-
-	/* Add tlv id field */
-	dest = qdf_nbuf_push_head(mpdu_nbuf, sizeof(uint8_t));
-	if (qdf_likely(dest)) {
-		*((uint8_t *)dest) = id;
-		num_bytes_pushed += sizeof(uint8_t);
-	}
-
-	/* Add tlv len field */
-	dest = qdf_nbuf_push_head(mpdu_nbuf, sizeof(uint16_t));
-	if (qdf_likely(dest)) {
-		*((uint16_t *)dest) = len;
-		num_bytes_pushed += sizeof(uint16_t);
-	}
-
-	/* Add tlv value field */
-	dest = qdf_nbuf_push_head(mpdu_nbuf, len);
-	if (qdf_likely(dest)) {
-		qdf_mem_copy(dest, value, len);
-		num_bytes_pushed += len;
-	}
-
-	return num_bytes_pushed;
-}
-
-/**
- * dp_lite_mon_add_pf_tag_tlv_to_headroom - add pftag tlv to headroom
- * @mpdu_nbuf: mpdu nbuf
- *
- * Return: void
- */
-static inline void
-dp_lite_mon_add_pf_tag_tlv_to_headroom(qdf_nbuf_t mpdu_nbuf)
-{
-	qdf_nbuf_t curr_nbuf;
-	uint8_t tlv_id;
-	uint16_t tlv_len;
-	uint32_t pull_bytes = 0;
-	bool is_head_nbuf = true;
-
-	if (!qdf_nbuf_get_nr_frags(mpdu_nbuf))
-		return;
-
-	tlv_id = DP_LITE_MON_META_HDR_TLV_PFTAG;
-	for (curr_nbuf = mpdu_nbuf; curr_nbuf;) {
-		/* litemon pending: check for available headroom
-		 * also check if we should consider max nr frags for copying */
-		tlv_len = qdf_nbuf_get_nr_frags(curr_nbuf) * DP_RX_MON_PF_TAG_SIZE;
-		pull_bytes += dp_lite_mon_add_tlv(tlv_id, tlv_len,
-						  qdf_nbuf_head(curr_nbuf),
-						  curr_nbuf);
-		qdf_nbuf_pull_head(curr_nbuf, pull_bytes);
-
-		if (is_head_nbuf) {
-			curr_nbuf = qdf_nbuf_get_ext_list(curr_nbuf);
-			is_head_nbuf = false;
-		} else
-			curr_nbuf = qdf_nbuf_queue_next(curr_nbuf);
-	}
 }
 
 /**
@@ -1575,11 +1374,16 @@ dp_lite_mon_add_meta_header_to_headroom(struct dp_pdev_be *be_pdev,
 {
 	struct dp_mon_pdev_be *be_mon_pdev;
 	struct dp_lite_mon_config *config;
+	struct ieee80211_frame *wh;
 	struct dp_soc *soc = be_pdev->pdev.soc;
-	uint32_t pull_bytes = 0;
-	uint16_t meta_hdr_marker = DP_LITE_MON_META_HDR_MARKER;
+	uint8_t *meta_hdr_len = NULL;
+	uint8_t *dp = NULL;
+	uint8_t *hp = NULL;
+	uint16_t pull_bytes;
 	uint8_t tlv_id;
 	uint16_t tlv_len;
+	uint16_t msdu_count = 0;
+	bool is_data_pkt = false;
 
 	if (qdf_unlikely(!soc))
 		return;
@@ -1587,47 +1391,111 @@ dp_lite_mon_add_meta_header_to_headroom(struct dp_pdev_be *be_pdev,
 	be_mon_pdev = (struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
 	config = &be_mon_pdev->lite_mon_rx_config->rx_config;
 
-	/* litemon pending: put check for available headroom it must be
-	   large enough to hold meta header */
+	wh = (struct ieee80211_frame *)qdf_nbuf_get_frag_addr(mpdu_nbuf, 0);
+	if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
+					IEEE80211_FC0_TYPE_DATA)
+		is_data_pkt = true;
 
-	/* Add marker: we first add marker, this will indicate
+	/* check for available headroom */
+	if (qdf_unlikely(qdf_nbuf_headroom(mpdu_nbuf) <
+			 (DP_RX_MON_TLV_ROOM))) {
+		dp_mon_err("Not enough headroom to add meta hdr");
+		return;
+	}
+
+	pull_bytes = 0;
+	/* we first add marker, this will indicate
 	 * beginning of meta header information in headroom.
 	 */
-	qdf_nbuf_push_head(mpdu_nbuf, sizeof(meta_hdr_marker));
-	qdf_mem_copy(qdf_nbuf_data(mpdu_nbuf), &meta_hdr_marker,
-		     sizeof(meta_hdr_marker));
-	pull_bytes += sizeof(meta_hdr_marker);
+	dp = qdf_nbuf_push_head(mpdu_nbuf, sizeof(uint16_t));
+	if (qdf_likely(dp)) {
+		*((uint16_t *)dp) = DP_RX_MON_TLV_HDR_MARKER;
+		pull_bytes += sizeof(uint16_t);
+	}
 
-	/* Add Meta hdr: Meta hdr consists of various information in
-	 * TLV format [TLV ID][TLV Len][TLV Value] */
+	/* reserve space for meta hdr length field
+	 * we will update the length value once all tlvs are pushed.
+	 */
+	dp = qdf_nbuf_push_head(mpdu_nbuf, sizeof(uint16_t));
+	if (qdf_likely(dp)) {
+		meta_hdr_len = dp;
+		pull_bytes += sizeof(uint16_t);
+	}
+
+	/* Add Meta hdr TLVs, meta hdr consists of various information in
+	 * TLV format [TLV ID][TLV Len][TLV Value]
+	 */
 
 	/* add PPDU ID TLV */
-	tlv_id = DP_LITE_MON_META_HDR_TLV_PPDUID;
-	tlv_len = sizeof(ppdu_info->com_info.ppdu_id);
-	pull_bytes += dp_lite_mon_add_tlv(tlv_id, tlv_len,
-					  &ppdu_info->com_info.ppdu_id,
-					  mpdu_nbuf);
+	tlv_id = DP_RX_MON_TLV_PPDU_ID;
+	tlv_len = DP_RX_MON_PPDU_ID_LEN;
+	pull_bytes += dp_mon_rx_add_tlv(tlv_id, tlv_len,
+					&ppdu_info->com_info.ppdu_id,
+					mpdu_nbuf);
 
 	/* add PFTAG TLV */
 	if (config->level == CDP_LITE_MON_LEVEL_MSDU) {
 		/* proceed only if data pkt */
-		if (ppdu_info->rx_status.frame_control_info_valid &&
-		    ((ppdu_info->rx_status.frame_control & IEEE80211_FC0_TYPE_MASK) ==
-		      IEEE80211_FC0_TYPE_DATA)) {
-			bool is_rx_mon_protocol_flow_tag_en;
-
-			/* check if rx mon protocol flow tag enabled */
-			is_rx_mon_protocol_flow_tag_en =
-				wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(
-							soc->wlan_cfg_ctx);
-			if (is_rx_mon_protocol_flow_tag_en)
-				dp_lite_mon_add_pf_tag_tlv_to_headroom(mpdu_nbuf);
+		if (is_data_pkt &&
+		    wlan_cfg_is_rx_mon_protocol_flow_tag_enabled(soc->wlan_cfg_ctx)) {
+			hp = qdf_nbuf_head(mpdu_nbuf);
+			hp += sizeof(uint16_t); /* skip test mask */
+			msdu_count = *((uint16_t *)hp);
+			if (msdu_count && (msdu_count <= DP_RX_MON_MAX_MSDU)) {
+				tlv_id = DP_RX_MON_TLV_PF_ID;
+				/* add extra 2 bytes to accommodate msdu count */
+				tlv_len = ((msdu_count * DP_RX_MON_PF_TAG_LEN_PER_FRAG) +
+					   sizeof(uint16_t));
+				pull_bytes += dp_mon_rx_add_tlv(tlv_id, tlv_len,
+								hp,
+								mpdu_nbuf);
+			}
 		}
 	}
 
+	/* update the meta hdr len now
+	 * hdr len = (pull_bytes - (hdr marker size + hdr len field size))
+	 */
+	if (meta_hdr_len)
+		*((uint16_t *)meta_hdr_len) = pull_bytes -
+						(DP_RX_MON_TLV_HDR_MARKER_LEN +
+						 DP_RX_MON_TLV_TOTAL_LEN);
+
+	/* if debug mode enabled then add meta hdr to end of mpdu
+	 * for debug purpose
+	 */
+	if (qdf_unlikely(config->debug == DP_LITE_MON_TRACE_DEBUG)) {
+		qdf_nbuf_t tmp_nbuf = NULL;
+		uint64_t dbg_sign = DP_LITE_MON_DBG_SIGNATURE;
+		uint8_t *tmp_dp = NULL;
+
+		tmp_nbuf = qdf_nbuf_alloc(be_pdev->pdev.soc->osdev,
+					  DP_RX_MON_TLV_ROOM,
+					  DP_RX_MON_TLV_ROOM,
+					  4, FALSE);
+		if (qdf_likely(tmp_nbuf)) {
+			be_mon_pdev->mon_pdev.rx_mon_stats.parent_buf_alloc++;
+			tmp_dp = qdf_nbuf_push_head(tmp_nbuf, (pull_bytes + sizeof(dbg_sign)));
+			if (qdf_likely(tmp_dp)) {
+				/* copy the dbg signature first */
+				qdf_mem_copy(tmp_dp, &dbg_sign, sizeof(dbg_sign));
+
+				tmp_dp += sizeof(dbg_sign);
+
+				/* now copy meta hdr from mpdu nbuf */
+				qdf_mem_copy(tmp_dp,
+					     qdf_nbuf_data(mpdu_nbuf),
+					     pull_bytes);
+			}
+			/* add debug nbuf to extend list */
+			qdf_nbuf_append_ext_list(mpdu_nbuf, tmp_nbuf,
+						 qdf_nbuf_len(tmp_nbuf));
+		}
+	}
+
+	/* pull back the head */
 	qdf_nbuf_pull_head(mpdu_nbuf, pull_bytes);
 }
-#endif /* META_HDR_NOT_YET_SUPPORTED */
 
 /**
  * dp_lite_mon_rx_mpdu_process - core lite mon mpdu processing
@@ -1758,11 +1626,9 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 
 	/* Add meta header if requested */
 	if (config->metadata & DP_LITE_MON_META_HDR_BITMASK) {
-#ifdef META_HDR_NOT_YET_SUPPORTED
 		/* update meta hdr */
 		dp_lite_mon_add_meta_header_to_headroom(be_pdev, ppdu_info,
 							mon_mpdu);
-#endif /* META_HDR_NOT_YET_SUPPORTED */
 	}
 
 	/* get output vap */
