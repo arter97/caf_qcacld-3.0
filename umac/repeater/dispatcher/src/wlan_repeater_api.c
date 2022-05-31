@@ -1913,6 +1913,7 @@ wlan_rptr_pdev_extd_ioctl(struct wlan_objmgr_pdev *pdev, int param, char *data)
 	struct rptr_ext_cbacks *ext_cb = NULL;
 	struct wlan_objmgr_vdev *sta_vdev = NULL;
 	struct iface_config_t *iface_config = NULL;
+	struct qwrap_config_t *qwrap_config = NULL;
 	int retv = 0;
 
 	g_priv = wlan_rptr_get_global_ctx();
@@ -1990,6 +1991,22 @@ wlan_rptr_pdev_extd_ioctl(struct wlan_objmgr_pdev *pdev, int param, char *data)
 #endif
 		}
 		break;
+	case EXTENDED_SUBIOCTL_GET_ASSOC_LINK:
+		{
+			int assoc_link;
+
+			qwrap_config = (struct qwrap_config_t *)data;
+			sta_vdev = ext_cb->get_stavap(pdev);
+
+			if (wlan_vdev_mlme_is_assoc_sta_vdev(sta_vdev))
+				assoc_link = 1;
+			else
+				assoc_link = 0;
+
+			qwrap_config->is_assoc_link = assoc_link;
+		}
+		break;
+
 	}
 	return retv;
 }
