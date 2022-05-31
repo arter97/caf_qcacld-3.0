@@ -315,6 +315,7 @@ struct debug_psoc_data {
  * @u_id.if_name: Interface name for VAP/RADIO/AP objects
  * @stats: Stats based on above meta information
  * @next: Next stats_obj
+ * @parent: Parent stats_obj
  */
 struct stats_obj {
 	enum stats_level_e lvl;
@@ -328,6 +329,7 @@ struct stats_obj {
 	} u_id;
 	void *stats;
 	struct stats_obj *next;
+	struct stats_obj *parent;
 };
 
 /**

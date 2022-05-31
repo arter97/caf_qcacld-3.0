@@ -976,21 +976,20 @@ static void aggregate_basic_pdev_stats(struct wlan_objmgr_pdev *pdev,
 				       struct unified_stats *stats,
 				       enum stats_type_e type)
 {
-	struct iterator_ctx ctx;
-	struct vdev_ic_cp_stats *cp_stats;
-
-	cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
-	if (!cp_stats) {
-		qdf_debug("Allocation Failed!");
-		return;
-	}
-	ctx.pvt = cp_stats;
-	ctx.stats = stats;
+	struct iterator_ctx ctx = {0};
+	struct vdev_ic_cp_stats *cp_stats = NULL;
 
 	switch (type) {
 	case STATS_TYPE_DATA:
 		break;
 	case STATS_TYPE_CTRL:
+		cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+		if (!cp_stats) {
+			qdf_debug("Allocation Failed!");
+			return;
+		}
+		ctx.pvt = cp_stats;
+		ctx.stats = stats;
 		wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
 						  aggr_basic_pdev_ctrl_stats,
 						  &ctx, 1, WLAN_MLME_SB_ID);
@@ -999,7 +998,8 @@ static void aggregate_basic_pdev_stats(struct wlan_objmgr_pdev *pdev,
 		qdf_err("Invalid type %d!", type);
 	}
 
-	qdf_mem_free(cp_stats);
+	if (cp_stats)
+		qdf_mem_free(cp_stats);
 }
 
 static QDF_STATUS get_basic_pdev_data(struct wlan_objmgr_psoc *psoc,
@@ -1057,6 +1057,7 @@ static QDF_STATUS get_basic_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 	struct pdev_ic_cp_stats *pdev_cp_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	bool stats_collected = false;
+	bool aggr_required = false;
 
 	if (!pdev) {
 		qdf_err("Invalid pdev!");
@@ -1074,17 +1075,21 @@ static QDF_STATUS get_basic_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 	}
 	if (feat & STATS_FEAT_FLG_TX) {
 		ret = get_basic_pdev_ctrl_tx(stats, pdev_cp_stats);
-		if (ret != QDF_STATUS_SUCCESS)
+		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch pdev Basic TX stats!");
-		else
+		} else {
 			stats_collected = true;
+			aggr_required = aggregate;
+		}
 	}
 	if (feat & STATS_FEAT_FLG_RX) {
 		ret = get_basic_pdev_ctrl_rx(stats, pdev_cp_stats);
-		if (ret != QDF_STATUS_SUCCESS)
+		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch pdev Basic RX stats!");
-		else
+		} else {
 			stats_collected = true;
+			aggr_required = aggregate;
+		}
 	}
 	if (feat & STATS_FEAT_FLG_LINK) {
 		ret = get_basic_pdev_ctrl_link(stats, pdev_cp_stats);
@@ -1094,7 +1099,7 @@ static QDF_STATUS get_basic_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 			stats_collected = true;
 	}
 
-	if (stats_collected && aggregate)
+	if (aggr_required)
 		aggregate_basic_pdev_stats(pdev, stats, STATS_TYPE_CTRL);
 
 get_failed:
@@ -1330,6 +1335,30 @@ fill_advance_peer_sawfdelay_stats(struct advance_peer_data_sawfdelay *data,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+#define update_ppdu_be_stats(dst, src)                                         \
+	do {                                                                   \
+		uint8_t inx, count, mcs_cnt;                                   \
+		count = qdf_min((uint8_t)MAX_PUNCTURED_MODE,                   \
+				(uint8_t)STATS_IF_MAX_PUNCTURED_MODE);         \
+		qdf_mem_copy(&dst->punc_bw[0], &src->punc_bw[0],               \
+			     count * sizeof(uint32_t));                        \
+		mcs_cnt = qdf_min((uint8_t)MAX_MCS,                            \
+				  (uint8_t)STATS_IF_MAX_MCS);                  \
+		qdf_mem_copy(&dst->su_be_ppdu_cnt.mcs_count[0],                \
+			     &src->su_be_ppdu_cnt.mcs_count[0],                \
+			     mcs_cnt * sizeof(uint32_t));                      \
+		loop_cnt = qdf_min((uint8_t)TXRX_TYPE_MU_MAX,                  \
+				   (uint8_t)STATS_IF_TXRX_TYPE_MU_MAX);        \
+		for (inx = 0; inx < loop_cnt; inx++)                           \
+			qdf_mem_copy(&dst->mu_be_ppdu_cnt[inx].mcs_count[0],   \
+				     &src->mu_be_ppdu_cnt[inx].mcs_count[0],   \
+				     mcs_cnt * sizeof(uint32_t));              \
+	} while (0)
+#else
+#define update_ppdu_be_stats(dst, src) {}
+#endif /* WLAN_FEATURE_11BE */
+
 static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
 				       struct cdp_tx_stats *cdp_tx)
 {
@@ -1357,6 +1386,7 @@ static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
 	tx->amsdu_cnt = cdp_tx->amsdu_cnt;
 	tx->ampdu_cnt = cdp_tx->ampdu_cnt;
 	tx->non_ampdu_cnt = cdp_tx->non_ampdu_cnt;
+	update_ppdu_be_stats(tx, cdp_tx);
 }
 
 static void fill_advance_data_rx_stats(struct advance_data_rx_stats *rx,
@@ -1400,6 +1430,7 @@ static void fill_advance_data_rx_stats(struct advance_data_rx_stats *rx,
 	rx->bar_recv_cnt = cdp_rx->bar_recv_cnt;
 	rx->rx_retries = cdp_rx->rx_retries;
 	rx->multipass_rx_pkt_drop = cdp_rx->multipass_rx_pkt_drop;
+	update_ppdu_be_stats(rx, cdp_rx);
 }
 
 static QDF_STATUS
@@ -3019,21 +3050,20 @@ static void aggregate_advance_pdev_stats(struct wlan_objmgr_pdev *pdev,
 					 struct unified_stats *stats,
 					 enum stats_type_e type)
 {
-	struct iterator_ctx ctx;
-	struct vdev_ic_cp_stats *cp_stats;
-
-	cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
-	if (!cp_stats) {
-		qdf_debug("Allocation Failed!");
-		return;
-	}
-	ctx.pvt = cp_stats;
-	ctx.stats = stats;
+	struct iterator_ctx ctx = {0};
+	struct vdev_ic_cp_stats *cp_stats = NULL;
 
 	switch (type) {
 	case STATS_TYPE_DATA:
 		break;
 	case STATS_TYPE_CTRL:
+		cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+		if (!cp_stats) {
+			qdf_debug("Allocation Failed!");
+			return;
+		}
+		ctx.pvt = cp_stats;
+		ctx.stats = stats;
 		wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
 						  aggr_advance_pdev_ctrl_stats,
 						  &ctx, 1, WLAN_MLME_SB_ID);
@@ -3042,7 +3072,8 @@ static void aggregate_advance_pdev_stats(struct wlan_objmgr_pdev *pdev,
 		qdf_err("Invalid type %d!", type);
 	}
 
-	qdf_mem_free(cp_stats);
+	if (cp_stats)
+		qdf_mem_free(cp_stats);
 }
 
 static QDF_STATUS get_advance_pdev_data(struct wlan_objmgr_psoc *psoc,
@@ -3142,6 +3173,7 @@ static QDF_STATUS get_advance_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 	struct pdev_ic_cp_stats *pdev_cp_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	bool stats_collected = false;
+	bool aggr_required = false;
 
 	if (!pdev) {
 		qdf_err("Invalid pdev!");
@@ -3159,17 +3191,21 @@ static QDF_STATUS get_advance_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 	}
 	if (feat & STATS_FEAT_FLG_TX) {
 		ret = get_advance_pdev_ctrl_tx(stats, pdev_cp_stats);
-		if (ret != QDF_STATUS_SUCCESS)
+		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch pdev Advance TX Stats!");
-		else
+		} else {
 			stats_collected = true;
+			aggr_required = aggregate;
+		}
 	}
 	if (feat & STATS_FEAT_FLG_RX) {
 		ret = get_advance_pdev_ctrl_rx(stats, pdev_cp_stats);
-		if (ret != QDF_STATUS_SUCCESS)
+		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch pdev Advance RX Stats!");
-		else
+		} else {
 			stats_collected = true;
+			aggr_required = aggregate;
+		}
 	}
 	if (feat & STATS_FEAT_FLG_LINK) {
 		ret = get_advance_pdev_ctrl_link(stats, pdev_cp_stats);
@@ -3179,7 +3215,7 @@ static QDF_STATUS get_advance_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 			stats_collected = true;
 	}
 
-	if (stats_collected && aggregate)
+	if (aggr_required)
 		aggregate_advance_pdev_stats(pdev, stats, STATS_TYPE_CTRL);
 
 get_failed:
@@ -4782,21 +4818,20 @@ static void aggregate_debug_pdev_stats(struct wlan_objmgr_pdev *pdev,
 				       struct unified_stats *stats,
 				       enum stats_type_e type)
 {
-	struct iterator_ctx ctx;
-	struct vdev_ic_cp_stats *cp_stats;
-
-	cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
-	if (!cp_stats) {
-		qdf_debug("Allocation Failed!");
-		return;
-	}
-	ctx.pvt = cp_stats;
-	ctx.stats = stats;
+	struct iterator_ctx ctx = {0};
+	struct vdev_ic_cp_stats *cp_stats = NULL;
 
 	switch (type) {
 	case STATS_TYPE_DATA:
 		break;
 	case STATS_TYPE_CTRL:
+		cp_stats = qdf_mem_malloc(sizeof(struct vdev_ic_cp_stats));
+		if (!cp_stats) {
+			qdf_debug("Allocation Failed!");
+			return;
+		}
+		ctx.pvt = cp_stats;
+		ctx.stats = stats;
 		wlan_objmgr_pdev_iterate_obj_list(pdev, WLAN_VDEV_OP,
 						  aggr_debug_pdev_ctrl_stats,
 						  &ctx, 1, WLAN_MLME_SB_ID);
@@ -4805,7 +4840,8 @@ static void aggregate_debug_pdev_stats(struct wlan_objmgr_pdev *pdev,
 		qdf_err("Invalid type %d!", type);
 	}
 
-	qdf_mem_free(cp_stats);
+	if (cp_stats)
+		qdf_mem_free(cp_stats);
 }
 
 static QDF_STATUS get_debug_pdev_data(struct wlan_objmgr_psoc *psoc,
@@ -4945,6 +4981,7 @@ static QDF_STATUS get_debug_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 	struct pdev_ic_cp_stats *pdev_cp_stats = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	bool stats_collected = false;
+	bool aggr_required = false;
 
 	if (!pdev) {
 		qdf_err("Invalid pdev!");
@@ -4963,17 +5000,21 @@ static QDF_STATUS get_debug_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 	}
 	if (feat & STATS_FEAT_FLG_TX) {
 		ret = get_debug_pdev_ctrl_tx(stats, pdev_cp_stats);
-		if (ret != QDF_STATUS_SUCCESS)
+		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch pdev Debug TX Stats!");
-		else
+		} else {
 			stats_collected = true;
+			aggr_required =  aggregate;
+		}
 	}
 	if (feat & STATS_FEAT_FLG_RX) {
 		ret = get_debug_pdev_ctrl_rx(stats, pdev_cp_stats);
-		if (ret != QDF_STATUS_SUCCESS)
+		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch pdev Debug RX Stats!");
-		else
+		} else {
 			stats_collected = true;
+			aggr_required =  aggregate;
+		}
 	}
 	if (feat & STATS_FEAT_FLG_WMI) {
 		ret = get_debug_pdev_ctrl_wmi(stats, pdev_cp_stats);
@@ -4990,7 +5031,7 @@ static QDF_STATUS get_debug_pdev_ctrl(struct wlan_objmgr_pdev *pdev,
 			stats_collected = true;
 	}
 
-	if (stats_collected && aggregate)
+	if (aggr_required)
 		aggregate_debug_pdev_stats(pdev, stats, STATS_TYPE_CTRL);
 
 get_failed:

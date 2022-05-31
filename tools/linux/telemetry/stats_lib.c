@@ -660,25 +660,51 @@ static int32_t prepare_request(struct nl_msg *nlmsg, struct stats_command *cmd)
 	return ret;
 }
 
-static struct stats_obj *add_stats_obj(struct reply_buffer *reply)
+static struct stats_obj *allocate_stats_obj()
 {
 	struct stats_obj *obj;
 
-	obj = (struct stats_obj *)malloc(sizeof(struct stats_obj));
+	obj = malloc(sizeof(struct stats_obj));
 	if (!obj) {
 		STATS_ERR("Unable to allocate stats_obj!\n");
 		return NULL;
 	}
 	memset(obj, 0, sizeof(struct stats_obj));
+
+	return obj;
+}
+
+static void set_parent_stats_obj(struct stats_obj *obj_last,
+				 struct stats_obj *obj)
+{
+	struct stats_obj *temp = obj_last;
+
+	if (!obj->pif_name[0])
+		return;
+
+	while (temp) {
+		if (!strncmp(temp->u_id.if_name, obj->pif_name,
+			     IFNAME_LEN)) {
+			obj->parent = temp;
+			break;
+		}
+		temp = temp->parent;
+	}
+}
+
+static void add_stats_obj(struct reply_buffer *reply, struct stats_obj *obj)
+{
+	if (!reply || !obj)
+		return;
+
 	if (!reply->obj_head) {
 		reply->obj_head = obj;
 		reply->obj_last = obj;
 	} else {
 		reply->obj_last->next = obj;
+		set_parent_stats_obj(reply->obj_last, obj);
 		reply->obj_last = obj;
 	}
-
-	return obj;
 }
 
 static void parse_basic_sta(struct nlattr *rattr, struct stats_obj *obj)
@@ -1816,6 +1842,7 @@ static void parse_debug_ap(struct nlattr *rattr, struct stats_obj *obj)
 
 static void stats_response_handler(struct cfg80211_data *buffer)
 {
+	bool add_pending;
 	struct stats_command *cmd;
 	struct reply_buffer *reply;
 	struct nlattr *attr;
@@ -1876,10 +1903,13 @@ static void stats_response_handler(struct cfg80211_data *buffer)
 		STATS_ERR("NLA Parsing failed for Stats Recursive\n");
 		return;
 	}
-	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_MULTI_REPLY])
-		obj = add_stats_obj(reply);
-	else
+	if (!tb[QCA_WLAN_VENDOR_ATTR_STATS_MULTI_REPLY]) {
+		obj = allocate_stats_obj();
+		add_pending = true;
+	} else {
+		add_pending = false;
 		obj = reply->obj_last;
+	}
 	if (!obj)
 		return;
 	obj->lvl = nla_get_u8(tb[QCA_WLAN_VENDOR_ATTR_STATS_LEVEL]);
@@ -1961,6 +1991,10 @@ static void stats_response_handler(struct cfg80211_data *buffer)
 	} else {
 		STATS_ERR("Level Not Supported!\n");
 	}
+
+	/* Add into the list */
+	if (add_pending)
+		add_stats_obj(reply, obj);
 }
 
 static int32_t send_nl_command(struct stats_command *cmd,
@@ -2734,7 +2768,7 @@ static void update_basic_pdev_ctrl_rx(struct basic_pdev_ctrl_rx *pdev_rx,
 	pdev_rx->cs_rx_mgmt += vdev_rx->cs_rx_mgmt;
 }
 
-static void update_pdev_basic_ctrl_stats(struct basic_pdev_ctrl *pdev_ctrl,
+static void update_basic_pdev_ctrl_stats(struct basic_pdev_ctrl *pdev_ctrl,
 					 struct basic_vdev_ctrl *vdev_ctrl)
 {
 	if (pdev_ctrl->tx && vdev_ctrl->tx)
@@ -2743,15 +2777,17 @@ static void update_pdev_basic_ctrl_stats(struct basic_pdev_ctrl *pdev_ctrl,
 		update_basic_pdev_ctrl_rx(pdev_ctrl->rx, vdev_ctrl->rx);
 }
 
-static void update_pdev_basic_stats(struct stats_obj *radio,
+static void update_basic_pdev_stats(struct stats_obj *radio,
 				    struct stats_obj *vap)
 {
+	if (!radio->stats || !vap->stats)
+		return;
+
 	switch (radio->type) {
 	case STATS_TYPE_DATA:
 		break;
 	case STATS_TYPE_CTRL:
-		if (radio->stats && vap->stats)
-			update_pdev_basic_ctrl_stats(radio->stats, vap->stats);
+		update_basic_pdev_ctrl_stats(radio->stats, vap->stats);
 		break;
 	default:
 		STATS_ERR("Unexpected stats type %d!\n", radio->type);
@@ -2925,7 +2961,7 @@ static void free_advance_ap(struct stats_obj *ap)
 	free(ap->stats);
 }
 
-static void update_pdev_advance_ctrl_stats(struct advance_pdev_ctrl *pdev_ctrl,
+static void update_advance_pdev_ctrl_stats(struct advance_pdev_ctrl *pdev_ctrl,
 					   struct advance_vdev_ctrl *vdev_ctrl)
 {
 	if (pdev_ctrl->tx && vdev_ctrl->tx) {
@@ -2941,25 +2977,21 @@ static void update_pdev_advance_ctrl_stats(struct advance_pdev_ctrl *pdev_ctrl,
 	}
 }
 
-static void update_pdev_advance_stats(struct stats_obj *radio,
+static void update_advance_pdev_stats(struct stats_obj *radio,
 				      struct stats_obj *vap)
 {
+	if (!radio->stats || !vap->stats)
+		return;
+
 	switch (radio->type) {
 	case STATS_TYPE_DATA:
 		break;
 	case STATS_TYPE_CTRL:
-		if (radio->stats && vap->stats)
-			update_pdev_advance_ctrl_stats(radio->stats,
-						       vap->stats);
+		update_advance_pdev_ctrl_stats(radio->stats, vap->stats);
 		break;
 	default:
 		STATS_ERR("Unexpected stats type %d!\n", radio->type);
 	}
-}
-#else
-static void update_pdev_advance_stats(struct stats_obj *radio,
-				      struct stats_obj *vap)
-{
 }
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
@@ -3120,7 +3152,7 @@ static void free_debug_ap(struct stats_obj *ap)
 	free(ap->stats);
 }
 
-static void update_pdev_debug_ctrl_stats(struct debug_pdev_ctrl *pdev_ctrl,
+static void update_debug_pdev_ctrl_stats(struct debug_pdev_ctrl *pdev_ctrl,
 					 struct debug_vdev_ctrl *vdev_ctrl)
 {
 	if (pdev_ctrl->tx && vdev_ctrl->tx) {
@@ -3133,52 +3165,96 @@ static void update_pdev_debug_ctrl_stats(struct debug_pdev_ctrl *pdev_ctrl,
 	}
 }
 
-static void update_pdev_debug_stats(struct stats_obj *radio,
+static void update_debug_pdev_stats(struct stats_obj *radio,
 				    struct stats_obj *vap)
 {
+	if (!radio->stats || !vap->stats)
+		return;
+
 	switch (radio->type) {
 	case STATS_TYPE_DATA:
 		break;
 	case STATS_TYPE_CTRL:
-		if (radio->stats && vap->stats)
-			update_pdev_debug_ctrl_stats(radio->stats,
-						     vap->stats);
+		update_debug_pdev_ctrl_stats(radio->stats, vap->stats);
 		break;
 	default:
 		STATS_ERR("Unexpected stats type %d!\n", radio->type);
 	}
 }
-#else
-static void update_pdev_debug_stats(struct stats_obj *radio,
-				    struct stats_obj *vap)
-{
-}
 #endif /* WLAN_DEBUG_TELEMETRY */
 
-static void aggregate_pdev_stats(struct stats_obj *radio, struct stats_obj *vap)
+static void aggregate_radio_stats(struct stats_obj *radio)
 {
 	if (!radio)
 		return;
 
 	switch (radio->lvl) {
 	case STATS_LVL_BASIC:
-		update_pdev_basic_stats(radio, vap);
 		break;
+#if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
-		update_pdev_advance_stats(radio, vap);
 		break;
+#endif /* WLAN_ADVANCE_TELEMETRY */
+#if WLAN_DEBUG_TELEMETRY
 	case STATS_LVL_DEBUG:
-		update_pdev_debug_stats(radio, vap);
 		break;
+#endif /* WLAN_DEBUG_TELEMETRY */
 	default:
 		STATS_ERR("Unexpected Level %d!\n", radio->lvl);
 	}
 }
 
+static void aggregate_vap_stats(struct stats_obj *vap)
+{
+	if (!vap || !vap->parent)
+		return;
+
+	switch (vap->lvl) {
+	case STATS_LVL_BASIC:
+		update_basic_pdev_stats(vap->parent, vap);
+		break;
+#if WLAN_ADVANCE_TELEMETRY
+	case STATS_LVL_ADVANCE:
+		update_advance_pdev_stats(vap->parent, vap);
+		break;
+#endif /* WLAN_ADVANCE_TELEMETRY */
+#if WLAN_DEBUG_TELEMETRY
+	case STATS_LVL_DEBUG:
+		update_debug_pdev_stats(vap->parent, vap);
+		break;
+#endif /* WLAN_DEBUG_TELEMETRY */
+	default:
+		STATS_ERR("Unexpected Level %d!\n", vap->lvl);
+	}
+
+	aggregate_radio_stats(vap->parent);
+}
+
+static void aggregate_sta_stats(struct stats_obj *sta)
+{
+	if (!sta || sta->parent)
+		return;
+
+	switch (sta->lvl) {
+	case STATS_LVL_BASIC:
+		break;
+#if WLAN_ADVANCE_TELEMETRY
+	case STATS_LVL_ADVANCE:
+		break;
+#endif /* WLAN_ADVANCE_TELEMETRY */
+#if WLAN_DEBUG_TELEMETRY
+	case STATS_LVL_DEBUG:
+		break;
+#endif /* WLAN_DEBUG_TELEMETRY */
+	default:
+		STATS_ERR("Unexpected Level %d!\n", sta->lvl);
+	}
+
+	aggregate_vap_stats(sta->parent);
+}
+
 static void accumulate_stats(struct stats_command *cmd)
 {
-	struct stats_obj *radio = NULL;
-	struct stats_obj *vap = NULL;
 	struct stats_obj *obj = NULL;
 
 	if (!cmd->recursive || !cmd->reply)
@@ -3186,21 +3262,9 @@ static void accumulate_stats(struct stats_command *cmd)
 
 	obj = cmd->reply->obj_head;
 	while (obj) {
-		switch (obj->obj_type) {
-		case STATS_OBJ_AP:
-			break;
-		case STATS_OBJ_RADIO:
-			radio = obj;
-			break;
-		case STATS_OBJ_VAP:
-			vap = obj;
-			aggregate_pdev_stats(radio, vap);
-			break;
-		case STATS_OBJ_STA:
-			break;
-		default:
-			STATS_ERR("Invalid onj %d", obj->obj_type);
-		}
+		if (obj->obj_type == STATS_OBJ_STA)
+			aggregate_sta_stats(obj);
+
 		obj = obj->next;
 	}
 }

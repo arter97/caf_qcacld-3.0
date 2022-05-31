@@ -193,6 +193,23 @@ enum stats_if_packet_type {
 	STATS_IF_DOT11_MAX,
 };
 
+enum stats_if_punctured_modes {
+	STATS_IF_NO_PUNCTURE,
+#ifdef WLAN_FEATURE_11BE
+	STATS_IF_PUNCTURED_20MHZ,
+	STATS_IF_PUNCTURED_40MHZ,
+	STATS_IF_PUNCTURED_80MHZ,
+	STATS_IF_PUNCTURED_120MHZ,
+#endif
+	STATS_IF_PUNCTURED_MODE_CNT,
+};
+
+enum stats_if_mu_packet_type {
+	STATS_IF_TXRX_TYPE_MU_MIMO = 0,
+	STATS_IF_TXRX_TYPE_MU_OFDMA = 1,
+	STATS_IF_TXRX_TYPE_MU_MAX = 2,
+};
+
 /**
  * struct pkt_info: Structure to hold packet info
  * @num:  Number packets
@@ -201,6 +218,10 @@ enum stats_if_packet_type {
 struct pkt_info {
 	u_int64_t num;
 	u_int64_t bytes;
+};
+
+struct pkt_type {
+	uint32_t mcs_count[STATS_IF_MAX_MCS];
 };
 
 struct basic_data_tx_stats {
@@ -338,6 +359,7 @@ struct basic_psoc_data_rx {
 #define STATS_IF_MAX_SAWF_DATA_TIDS  8
 #define STATS_IF_MAX_SAWF_DATA_QUEUE 2
 #define STATS_IF_NUM_AVG_WINDOWS     5
+#define STATS_IF_MAX_PUNCTURED_MODE  STATS_IF_PUNCTURED_MODE_CNT
 
 enum stats_if_hist_bucket_index {
 	STATS_IF_HIST_BUCKET_0,
@@ -448,9 +470,12 @@ struct advance_data_tx_stats {
 	struct pkt_info ucast;
 	struct pkt_info mcast;
 	struct pkt_info bcast;
+	struct pkt_type su_be_ppdu_cnt;
+	struct pkt_type mu_be_ppdu_cnt[STATS_IF_TXRX_TYPE_MU_MAX];
 	u_int32_t nss[STATS_IF_SS_COUNT];
 	u_int32_t sgi_count[STATS_IF_MAX_GI];
 	u_int32_t bw[STATS_IF_MAX_BW];
+	u_int32_t punc_bw[STATS_IF_MAX_PUNCTURED_MODE];
 	u_int32_t retries;
 	u_int32_t non_amsdu_cnt;
 	u_int32_t amsdu_cnt;
@@ -462,6 +487,8 @@ struct advance_data_rx_stats {
 	struct pkt_info unicast;
 	struct pkt_info multicast;
 	struct pkt_info bcast;
+	struct pkt_type su_be_ppdu_cnt;
+	struct pkt_type mu_be_ppdu_cnt[STATS_IF_TXRX_TYPE_MU_MAX];
 	u_int32_t su_ax_ppdu_cnt[STATS_IF_MAX_MCS];
 	u_int32_t rx_mpdu_cnt[STATS_IF_MAX_MCS];
 	u_int32_t wme_ac_type[STATS_IF_WME_AC_MAX];
@@ -469,6 +496,7 @@ struct advance_data_rx_stats {
 	u_int32_t nss[STATS_IF_SS_COUNT];
 	u_int32_t ppdu_nss[STATS_IF_SS_COUNT];
 	u_int32_t bw[STATS_IF_MAX_BW];
+	u_int32_t punc_bw[STATS_IF_MAX_PUNCTURED_MODE];
 	u_int32_t mpdu_cnt_fcs_ok;
 	u_int32_t mpdu_cnt_fcs_err;
 	u_int32_t non_amsdu_cnt;
@@ -953,12 +981,6 @@ enum stats_if_tx_transmit_type {
 	STATS_IF_MU_MIMO_OFDMA,
 };
 
-enum stats_if_mu_packet_type {
-	STATS_IF_TXRX_TYPE_MU_MIMO = 0,
-	STATS_IF_TXRX_TYPE_MU_OFDMA = 1,
-	STATS_IF_TXRX_TYPE_MU_MAX = 2,
-};
-
 struct tx_pkt_info {
 	uint32_t num_msdu;
 	uint32_t num_mpdu;
@@ -968,10 +990,6 @@ struct tx_pkt_info {
 struct proto_trace_count {
 	uint16_t egress_cnt;
 	uint16_t ingress_cnt;
-};
-
-struct pkt_type {
-	uint32_t mcs_count[STATS_IF_MAX_MCS];
 };
 
 struct rx_mu_info {
