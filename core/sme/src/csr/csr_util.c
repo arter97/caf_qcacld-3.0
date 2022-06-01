@@ -1099,10 +1099,6 @@ void csr_release_profile(struct mac_context *mac,
 			qdf_mem_free(pProfile->pRSNReqIE);
 			pProfile->pRSNReqIE = NULL;
 		}
-		if (pProfile->pWAPIReqIE) {
-			qdf_mem_free(pProfile->pWAPIReqIE);
-			pProfile->pWAPIReqIE = NULL;
-		}
 		qdf_mem_zero(pProfile, sizeof(struct csr_roam_profile));
 	}
 }

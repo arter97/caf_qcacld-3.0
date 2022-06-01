@@ -898,7 +898,7 @@ populate_dot11f_rsn_opaque(struct mac_context *mac,
 
 QDF_STATUS
 populate_dot11f_wapi(struct mac_context *mac,
-		tpSirWAPIie pWapiIe, tDot11fIEWAPI *pDot11f);
+		tpSirRSNie pRsnIe, tDot11fIEWAPI *pDot11f);
 
 QDF_STATUS populate_dot11f_wapi_opaque(struct mac_context *mac,
 					tpSirRSNie pRsnIe,

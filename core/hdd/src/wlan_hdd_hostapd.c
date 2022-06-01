@@ -5733,20 +5733,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		goto error;
 	}
 
-#ifdef FEATURE_WLAN_WAPI
-	ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_WAPI, beacon->tail,
-				      beacon->tail_len);
-	if (ie && ie[1]) {
-		config->WAPIReqIELength = ie[1] + 2;
-		if (config->WAPIReqIELength < sizeof(config->WAPIReqIE))
-			memcpy(&config->WAPIReqIE[0], ie,
-			       config->WAPIReqIELength);
-		else
-			hdd_err("WAPI IE MAX Length exceeded; length = %d",
-				config->WAPIReqIELength);
-	}
-#endif /* FEATURE_WLAN_WAPI */
-
 	config->SSIDinfo.ssidHidden = false;
 
 	if (ssid) {
