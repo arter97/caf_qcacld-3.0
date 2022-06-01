@@ -587,6 +587,7 @@ populate_dot11f_country(struct mac_context *mac,
 	uint8_t chan_spacing_for_2ghz = 1;
 	uint8_t chan_spacing_for_5ghz_6ghz = 4;
 	struct mlme_legacy_priv *mlme_priv = NULL;
+	bool always_take_all_band = true;
 
 	sec_cur_chan_list = qdf_mem_malloc(NUM_CHANNELS *
 					   sizeof(*sec_cur_chan_list));
@@ -602,7 +603,7 @@ populate_dot11f_country(struct mac_context *mac,
 		}
 	}
 
-	if (!pe_session ||
+	if (!pe_session || always_take_all_band ||
 	    (mlme_priv && mlme_priv->country_ie_for_all_band)) {
 		status = wlan_mlme_get_band_capability(mac->psoc,
 						       &band_capability);
