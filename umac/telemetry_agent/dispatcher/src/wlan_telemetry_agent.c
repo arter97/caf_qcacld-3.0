@@ -176,6 +176,273 @@ telemetry_agent_peer_delete_handler(struct wlan_objmgr_peer *peer,
 	return status;
 }
 
+#ifdef CONFIG_SAWF_TELEMETRY
+void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
+				    uint8_t svc_id, uint8_t hostq_id)
+{
+	if (g_agent_ops)
+		return g_agent_ops->sawf_alloc_peer(soc, sawf_ctx,
+						    svc_id,
+						    hostq_id);
+
+	return NULL;
+}
+qdf_export_symbol(telemetry_sawf_peer_ctx_alloc);
+
+void telemetry_sawf_peer_ctx_free(void *telemetry_ctx)
+{
+	if (g_agent_ops)
+		g_agent_ops->sawf_free_peer(telemetry_ctx);
+}
+qdf_export_symbol(telemetry_sawf_peer_ctx_free);
+
+QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
+					 uint8_t hostq_id,
+					 uint8_t tid, uint8_t msduq_idx)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_updt_queue_info(telemetry_ctx,
+						      hostq_id, tid,
+						      msduq_idx))
+			return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+qdf_export_symbol(telemetry_sawf_updt_tid_msduq);
+
+QDF_STATUS telemetry_sawf_set_mov_avg_params(uint32_t num_pkt,
+					     uint32_t num_win)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_updt_delay_mvng(num_pkt, num_win))
+			return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_set_mov_avg_params);
+
+QDF_STATUS telemetry_sawf_set_sla_params(uint32_t num_pkt,
+					 uint32_t time_sec)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_updt_sla_params(num_pkt, time_sec))
+			return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_set_sla_params);
+
+QDF_STATUS telemetry_sawf_set_sla_cfg(uint8_t svc_id,
+				      uint8_t min_tput_rate,
+				      uint8_t max_tput_rate,
+				      uint8_t burst_size,
+				      uint8_t svc_interval,
+				      uint8_t delay_bound,
+				      uint8_t msdu_ttl,
+				      uint8_t msdu_rate_loss)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_set_sla_cfg(svc_id,
+						  min_tput_rate,
+						  max_tput_rate,
+						  burst_size,
+						  svc_interval,
+						  delay_bound,
+						  msdu_ttl,
+						  msdu_rate_loss))
+			return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_set_sla_cfg);
+
+QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
+					     uint8_t min_tput_rate,
+					     uint8_t max_tput_rate,
+					     uint8_t burst_size,
+					     uint8_t svc_interval,
+					     uint8_t delay_bound,
+					     uint8_t msdu_ttl,
+					     uint8_t msdu_rate_loss)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_set_sla_dtct_cfg(detect_type,
+						       min_tput_rate,
+						       max_tput_rate,
+						       burst_size,
+						       svc_interval,
+						       delay_bound,
+						       msdu_ttl,
+						       msdu_rate_loss))
+			return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_set_sla_detect_cfg);
+
+QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
+				     uint8_t queue, uint64_t pass,
+				     uint64_t fail)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_push_delay(telemetry_ctx, tid,
+						 queue, pass, fail))
+			return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_push_delay);
+
+QDF_STATUS telemetry_sawf_push_delay_mvng(void *telemetry_ctx,
+					  uint8_t tid, uint8_t queue,
+					  uint64_t sum_windows)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_push_delay_mvng(telemetry_ctx,
+						      tid, queue,
+						      sum_windows))
+			return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_push_delay_mvng);
+
+QDF_STATUS telemetry_sawf_pull_msdu_drop(void *telemetry_ctx,
+					 uint8_t tid, uint8_t queue,
+					 uint64_t success,
+					 uint64_t failure_drop,
+					 uint64_t failure_ttl)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_push_msdu_drop(telemetry_ctx, tid,
+						     queue, success,
+						     failure_drop,
+						     failure_ttl))
+			return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_pull_msdu_drop);
+
+QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
+				    uint8_t queue, uint32_t *rate)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_pull_rate(telemetry_ctx, tid,
+						queue, rate))
+			return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_pull_rate);
+
+QDF_STATUS telemetry_sawf_pull_mov_avg(void *telemetry_ctx, uint8_t tid,
+				       uint8_t queue, uint32_t *mov_avg)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_pull_mov_avg(telemetry_ctx, tid,
+						   queue, mov_avg))
+			return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+qdf_export_symbol(telemetry_sawf_pull_mov_avg);
+#else
+void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
+				    uint8_t svc_id, uint8_t hostq_id)
+{
+	return NULL;
+}
+
+QDF_STATUS telemetry_sawf_peer_ctx_free(void *telemetry_ctx)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
+					 uint8_t hostq_id,
+					 uint8_t tid, uint8_t msduq_idx)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_set_mov_avg_params(uint32_t num_pkt,
+					     uint32_t num_win)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_set_sla_params(uint32_t num_pkt,
+					 uint32_t time_sec)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_set_sla_cfg(uint8_t svc_id,
+				      uint8_t min_tput_rate,
+				      uint8_t max_tput_rate,
+				      uint8_t burst_size,
+				      uint8_t svc_interval,
+				      uint8_t delay_bound,
+				      uint8_t msdu_ttl,
+				      uint8_t msdu_rate_loss)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
+					     uint8_t min_tput_rate,
+					     uint8_t max_tput_rate,
+					     uint8_t burst_size,
+					     uint8_t svc_interval,
+					     uint8_t delay_bound,
+					     uint8_t msdu_ttl,
+					     uint8_t msdu_rate_loss)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
+				     uint8_t queue, uint64_t pass,
+				     uint64_t fail)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_push_delay_mvng(void *telemetry_ctx,
+					  uint8_t tid, uint8_t queue,
+					  uint64_t sum_windows)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_push_msdu_drop(void *telemetry_ctx,
+					 uint8_t tid, uint8_t queue,
+					 uint64_t success,
+					 uint64_t failure_drop,
+					 uint64_t failure_ttl)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
+				    uint8_t queue, uint32_t *rate)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS telemetry_sawf_pull_mov_avg(void *telemetry_ctx, uint8_t tid,
+				       uint8_t queue, uint32_t *mov_avg)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 int register_telemetry_agent_ops(struct telemetry_agent_ops *agent_ops)
 {
 	g_agent_ops = agent_ops;
