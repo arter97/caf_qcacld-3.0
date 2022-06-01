@@ -29,6 +29,45 @@
 #include "wlan_cm_roam_public_struct.h"
 #include <target_if.h>
 
+/**
+ * target_if_cm_get_roam_rx_ops() - Get CM roam rx ops registered
+ * @psoc: pointer to psoc object
+ *
+ * Return: roam rx ops of connection mgr
+ */
+struct wlan_cm_roam_rx_ops *
+target_if_cm_get_roam_rx_ops(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * target_if_cm_roam_register_rx_ops  - Target IF API to register roam
+ * related rx op.
+ * @rx_ops: Pointer to rx ops fp struct
+ *
+ * Return: none
+ */
+void
+target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops);
+
+/**
+ * target_if_cm_roam_event() - Target IF handler for roam events
+ * @scn: target handle
+ * @event: event buffer
+ * @len: event buffer length
+ *
+ * Return: int for success or error code
+ */
+int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len);
+
+/**
+ * target_if_roam_register_common_events() - register common roam events
+ * of LFR2/3
+ * @psoc: pointer to psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+target_if_roam_register_common_events(struct wlan_objmgr_psoc *psoc);
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * target_if_cm_roam_sync_event() - Target IF handler for roam sync events
@@ -56,16 +95,6 @@ target_if_cm_roam_sync_frame_event(ol_scn_t scn,
 				   uint32_t len);
 
 /**
- * target_if_cm_roam_event() - Target IF handler for roam events
- * @scn: target handle
- * @event: event buffer
- * @len: event buffer length
- *
- * Return: int for success or error code
- */
-int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len);
-
-/**
  * target_if_cm_roam_stats_event() - Target IF handler for roam stats event
  * @scn: target handle
  * @event: event buffer
@@ -89,7 +118,7 @@ target_if_cm_roam_auth_offload_event(ol_scn_t scn, uint8_t *event,
 				     uint32_t len);
 
 /**
- * target_if_roam_offload_register_events() - register roam events
+ * target_if_roam_offload_register_events() - register roam offload events
  * @psoc: pointer to psoc object
  *
  * Return: QDF_STATUS
@@ -132,34 +161,12 @@ target_if_cm_roam_scan_chan_list_event_handler(ol_scn_t scn, uint8_t *event,
 int
 target_if_pmkid_request_event_handler(ol_scn_t scn, uint8_t *event,
 				      uint32_t len);
-
-/**
- * target_if_cm_roam_register_rx_ops  - Target IF API to register roam
- * related rx op.
- * @rx_ops: Pointer to rx ops fp struct
- *
- * Return: none
- */
-void
-target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops);
 #else /* WLAN_FEATURE_ROAM_OFFLOAD */
-static inline
-void
-target_if_cm_roam_register_rx_ops(struct wlan_cm_roam_rx_ops *rx_ops)
-{
-}
-
 static inline
 QDF_STATUS
 target_if_roam_offload_register_events(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_E_NOSUPPORT;
-}
-
-static inline int
-target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
-{
-	return 0;
 }
 
 static inline int

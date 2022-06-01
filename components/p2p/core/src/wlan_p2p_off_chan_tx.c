@@ -750,6 +750,8 @@ static char *p2p_get_frame_type_str(struct p2p_frame_info *frame_info)
 		return "GAS come back request";
 	case P2P_PUBLIC_ACTION_GAS_COMB_RSP:
 		return "GAS come back response";
+	case P2P_PUBLIC_ACTION_WNM_BTM_REQ:
+		return "BTM request";
 	default:
 		return "Other frame";
 	}
@@ -811,18 +813,24 @@ static QDF_STATUS p2p_get_frame_info(uint8_t *data_buf, uint32_t length,
 		return QDF_STATUS_SUCCESS;
 
 	buf += P2P_ACTION_OFFSET;
-	if (length > P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET &&
-	    buf[0] == P2P_PUBLIC_ACTION_FRAME &&
-	    buf[1] == P2P_PUBLIC_ACTION_VENDOR_SPECIFIC &&
-	    !qdf_mem_cmp(&buf[2], P2P_OUI, P2P_OUI_SIZE)) {
-		buf = data_buf +
-			P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET;
-		action_type = buf[0];
-		if (action_type > P2P_PUBLIC_ACTION_PROV_DIS_RSP)
-			frame_info->public_action_type =
-				P2P_PUBLIC_ACTION_NOT_SUPPORT;
-		else
-			frame_info->public_action_type = action_type;
+	if (length > P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET) {
+		if (buf[0] == P2P_PUBLIC_ACTION_FRAME &&
+		    buf[1] == P2P_PUBLIC_ACTION_VENDOR_SPECIFIC &&
+		    !qdf_mem_cmp(&buf[2], P2P_OUI, P2P_OUI_SIZE)) {
+			buf = data_buf +
+				P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET;
+			action_type = buf[0];
+			if (action_type > P2P_PUBLIC_ACTION_PROV_DIS_RSP)
+				frame_info->public_action_type =
+					P2P_PUBLIC_ACTION_NOT_SUPPORT;
+			else
+				frame_info->public_action_type = action_type;
+		} else if (buf[0] == WNM_ACTION_FRAME &&
+			   buf[1] == WNM_BSS_TM_REQUEST) {
+				action_type = buf[0];
+				frame_info->public_action_type =
+					P2P_PUBLIC_ACTION_WNM_BTM_REQ;
+		}
 	} else if (length > P2P_ACTION_FRAME_TYPE_OFFSET &&
 		   buf[0] == P2P_ACTION_VENDOR_SPECIFIC_CATEGORY &&
 		   !qdf_mem_cmp(&buf[1], P2P_OUI, P2P_OUI_SIZE)) {

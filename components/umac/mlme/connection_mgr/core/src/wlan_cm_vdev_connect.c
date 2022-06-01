@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1000,6 +1001,7 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct rso_config *rso_cfg;
+	struct cm_roam_values_copy src_cfg;
 
 	if (!vdev || !req) {
 		mlme_err("vdev or req is NULL");
@@ -1017,6 +1019,16 @@ QDF_STATUS cm_connect_start_ind(struct wlan_objmgr_vdev *vdev,
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (rso_cfg)
 		rso_cfg->rsn_cap = req->crypto.rsn_caps;
+
+	if (wlan_get_vendor_ie_ptr_from_oui(HS20_OUI_TYPE,
+					    HS20_OUI_TYPE_SIZE,
+					    req->assoc_ie.ptr,
+					    req->assoc_ie.len)) {
+		src_cfg.bool_value = true;
+		wlan_cm_roam_cfg_set_value(wlan_vdev_get_psoc(vdev),
+					   wlan_vdev_get_id(vdev),
+					   HS_20_AP, &src_cfg);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
