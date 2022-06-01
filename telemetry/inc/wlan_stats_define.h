@@ -1295,6 +1295,7 @@ struct debug_pdev_data_monitor {
 	uint32_t mon_link_desc_invalid;
 	uint32_t mon_rx_desc_invalid;
 	uint32_t mon_nbuf_sanity_err;
+	uint32_t mpdu_ppdu_id_mismatch_drop;
 };
 
 /* Debug pdev control */

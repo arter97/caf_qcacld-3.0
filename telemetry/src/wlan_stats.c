@@ -4593,6 +4593,7 @@ static QDF_STATUS get_debug_pdev_data_monitor(struct unified_stats *stats,
 	data->mon_link_desc_invalid = mon->mon_link_desc_invalid;
 	data->mon_rx_desc_invalid = mon->mon_rx_desc_invalid;
 	data->mon_nbuf_sanity_err = mon->mon_nbuf_sanity_err;
+	data->mpdu_ppdu_id_mismatch_drop = mon->mpdu_ppdu_id_mismatch_drop;
 	loop_cnt = qdf_min((uint8_t)MAX_PPDU_ID_HIST,
 			   (uint8_t)STATS_IF_MAX_PPDU_ID_HIST);
 	for (inx = 0; inx < loop_cnt; inx++) {
