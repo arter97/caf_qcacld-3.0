@@ -665,10 +665,11 @@ static void __hdd_softap_hard_start_xmit(struct sk_buff *skb,
 		}
 
 		if (sta_info->peer_state == OL_TXRX_PEER_STATE_CONN) {
-			if (ntohs(skb->protocol) != HDD_ETHERTYPE_802_1_X) {
+			if (ntohs(skb->protocol) != HDD_ETHERTYPE_802_1_X &&
+			   !IS_HDD_ETHERTYPE_WAI(skb)) {
 				QDF_TRACE_DEBUG_RL(
 					  QDF_MODULE_ID_HDD_SAP_DATA,
-					  "%s: NON-EAPOL packet in non-Authenticated state",
+					  "%s: NON EAPOL/WAPI pkt in non-Authenticated state",
 					  __func__);
 				goto drop_pkt;
 			}

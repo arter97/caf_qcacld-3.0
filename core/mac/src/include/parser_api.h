@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -895,15 +896,28 @@ populate_dot11f_rsn_opaque(struct mac_context *mac,
 		tpSirRSNie pRsnIe, tDot11fIERSNOpaque *pDot11f);
 
 #if defined(FEATURE_WLAN_WAPI)
-
 QDF_STATUS
 populate_dot11f_wapi(struct mac_context *mac,
-		tpSirRSNie pRsnIe, tDot11fIEWAPI *pDot11f);
+		     tpSirRSNie pRsnIe, tDot11fIEWAPI *pDot11f);
 
 QDF_STATUS populate_dot11f_wapi_opaque(struct mac_context *mac,
-					tpSirRSNie pRsnIe,
-					tDot11fIEWAPIOpaque *pDot11f);
+				       tpSirRSNie pRsnIe,
+				       tDot11fIEWAPIOpaque *pDot11f);
+#else
+static inline QDF_STATUS
+populate_dot11f_wapi(struct mac_context *mac,
+		     tpSirRSNie pRsnIe, tDot11fIEWAPI *pDot11f)
+{
+	return QDF_STATUS_SUCCESS;
+}
 
+static inline QDF_STATUS
+populate_dot11f_wapi_opaque(struct mac_context *mac,
+			    tpSirRSNie pRsnIe,
+			    tDot11fIEWAPIOpaque *pDot11f)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* defined(FEATURE_WLAN_WAPI) */
 
 /* / Populate a tDot11fIESSID given a tSirMacSSid */

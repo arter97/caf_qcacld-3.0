@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -538,5 +539,38 @@ wlan_hdd_ft_set_key_delay(struct wlan_objmgr_vdev *vdev)
 {
 }
 #endif
+
+#ifdef FEATURE_WLAN_WAPI
+/**
+ * hdd_translate_wapi_to_csr_auth_type() - Translate WAPI to CSR auth type
+ * @auth_suite: auth suite
+ *
+ * Return: enum csr_akm_type enumeration
+ */
+enum csr_akm_type hdd_translate_wapi_to_csr_auth_type(uint8_t auth_suite[4]);
+
+/**
+ * hdd_translate_wapi_to_csr_encryption_type() -
+ *	Translate WAPI to CSR encryption type
+ * @cipher_suite: cipher suite
+ *
+ * Return: eCsrEncryptionType enumeration
+ */
+eCsrEncryptionType
+hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4]);
+#else
+enum csr_akm_type hdd_translate_wapi_to_csr_auth_type(uint8_t auth_suite[4])
+{
+	return eCSR_AUTH_TYPE_UNKNOWN;
+}
+
+eCsrEncryptionType
+hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4])
+{
+	return eCSR_AUTH_TYPE_UNKNOWN;
+}
+#endif
+
+
 
 #endif
