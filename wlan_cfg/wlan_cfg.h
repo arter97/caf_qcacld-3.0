@@ -421,6 +421,9 @@ struct wlan_cfg_dp_soc_ctxt {
 #ifdef CONFIG_SAWF
 	bool sawf_enabled;
 #endif
+	uint8_t mpdu_retry_threshold_1;
+	uint8_t mpdu_retry_threshold_2;
+	uint8_t napi_scale_factor;
 };
 
 /**
@@ -2149,5 +2152,15 @@ wlan_cfg_get_tx_capt_max_mem(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return cfg->tx_capt_max_mem_allowed;
 }
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
+
+/**
+ * wlan_cfg_get_napi_scale_factor() - Get napi scale factor
+ *
+ *
+ * @cfg: soc configuration context
+ *
+ * Return: napi scale factor
+ */
+uint8_t wlan_cfg_get_napi_scale_factor(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 #endif /*__WLAN_CFG_H*/

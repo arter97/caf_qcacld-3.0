@@ -2149,6 +2149,8 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 					NUM_RXDMA_RINGS_PER_PDEV;
 	wlan_soc_tx_capt_cfg_attach(psoc, wlan_cfg_ctx);
 
+	wlan_cfg_ctx->napi_scale_factor = cfg_get(psoc,
+						  CFG_DP_NAPI_SCALE_FACTOR);
 	return wlan_cfg_ctx;
 }
 
@@ -3396,3 +3398,8 @@ bool wlan_cfg_get_txmon_hw_support(struct wlan_cfg_dp_soc_ctxt *cfg)
 }
 
 qdf_export_symbol(wlan_cfg_get_txmon_hw_support);
+
+uint8_t wlan_cfg_get_napi_scale_factor(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->napi_scale_factor;
+}
