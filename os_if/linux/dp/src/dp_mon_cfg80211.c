@@ -691,6 +691,11 @@ int wlan_cfg80211_lite_monitor_config(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
+	if (!(ic->ic_monitor_version == MONITOR_VERSION_2)) {
+		dp_mon_err("cmd not supported");
+		return -EOPNOTSUPP;
+	}
+
 	cmd = extract_command(ic, wdev, &cmd_type);
 	if (!cmd_type) {
 		dp_mon_err("Command on invalid interface");
