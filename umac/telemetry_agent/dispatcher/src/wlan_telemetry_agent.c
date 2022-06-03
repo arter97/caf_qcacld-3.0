@@ -187,6 +187,7 @@ void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
 
 	return NULL;
 }
+
 qdf_export_symbol(telemetry_sawf_peer_ctx_alloc);
 
 void telemetry_sawf_peer_ctx_free(void *telemetry_ctx)
@@ -194,6 +195,7 @@ void telemetry_sawf_peer_ctx_free(void *telemetry_ctx)
 	if (g_agent_ops)
 		g_agent_ops->sawf_free_peer(telemetry_ctx);
 }
+
 qdf_export_symbol(telemetry_sawf_peer_ctx_free);
 
 QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
@@ -209,6 +211,7 @@ QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
 qdf_export_symbol(telemetry_sawf_updt_tid_msduq);
 
 QDF_STATUS telemetry_sawf_set_mov_avg_params(uint32_t num_pkt,
@@ -221,6 +224,7 @@ QDF_STATUS telemetry_sawf_set_mov_avg_params(uint32_t num_pkt,
 
 	return QDF_STATUS_SUCCESS;
 }
+
 qdf_export_symbol(telemetry_sawf_set_mov_avg_params);
 
 QDF_STATUS telemetry_sawf_set_sla_params(uint32_t num_pkt,
@@ -233,6 +237,7 @@ QDF_STATUS telemetry_sawf_set_sla_params(uint32_t num_pkt,
 
 	return QDF_STATUS_SUCCESS;
 }
+
 qdf_export_symbol(telemetry_sawf_set_sla_params);
 
 QDF_STATUS telemetry_sawf_set_sla_cfg(uint8_t svc_id,
@@ -258,7 +263,34 @@ QDF_STATUS telemetry_sawf_set_sla_cfg(uint8_t svc_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
 qdf_export_symbol(telemetry_sawf_set_sla_cfg);
+
+QDF_STATUS telemetry_sawf_set_svclass_cfg(bool enable, uint8_t svc_id,
+					  uint32_t min_tput_rate,
+					  uint32_t max_tput_rate,
+					  uint32_t burst_size,
+					  uint32_t svc_interval,
+					  uint32_t delay_bound,
+					  uint32_t msdu_ttl,
+					  uint32_t msdu_rate_loss)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_set_svclass_cfg(enable, svc_id,
+						      min_tput_rate,
+						      max_tput_rate,
+						      burst_size,
+						      svc_interval,
+						      delay_bound,
+						      msdu_ttl,
+						      msdu_rate_loss))
+			return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(telemetry_sawf_set_svclass_cfg);
 
 QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
 					     uint8_t min_tput_rate,
@@ -283,6 +315,7 @@ QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
 
 	return QDF_STATUS_SUCCESS;
 }
+
 qdf_export_symbol(telemetry_sawf_set_sla_detect_cfg);
 
 QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
@@ -296,6 +329,7 @@ QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
 qdf_export_symbol(telemetry_sawf_push_delay);
 
 QDF_STATUS telemetry_sawf_push_delay_mvng(void *telemetry_ctx,
@@ -310,6 +344,7 @@ QDF_STATUS telemetry_sawf_push_delay_mvng(void *telemetry_ctx,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
 qdf_export_symbol(telemetry_sawf_push_delay_mvng);
 
 QDF_STATUS telemetry_sawf_pull_msdu_drop(void *telemetry_ctx,
@@ -327,6 +362,7 @@ QDF_STATUS telemetry_sawf_pull_msdu_drop(void *telemetry_ctx,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
 qdf_export_symbol(telemetry_sawf_pull_msdu_drop);
 
 QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
@@ -339,6 +375,7 @@ QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+
 qdf_export_symbol(telemetry_sawf_pull_rate);
 
 QDF_STATUS telemetry_sawf_pull_mov_avg(void *telemetry_ctx, uint8_t tid,
@@ -350,7 +387,9 @@ QDF_STATUS telemetry_sawf_pull_mov_avg(void *telemetry_ctx, uint8_t tid,
 			return QDF_STATUS_E_FAILURE;
 	}
 	return QDF_STATUS_SUCCESS;
+
 }
+
 qdf_export_symbol(telemetry_sawf_pull_mov_avg);
 #else
 void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
@@ -359,10 +398,14 @@ void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
 	return NULL;
 }
 
-QDF_STATUS telemetry_sawf_peer_ctx_free(void *telemetry_ctx)
+qdf_export_symbol(telemetry_sawf_peer_ctx_alloc);
+
+void telemetry_sawf_peer_ctx_free(void *telemetry_ctx)
 {
-	return QDF_STATUS_E_FAILURE;
+	return;
 }
+
+qdf_export_symbol(telemetry_sawf_peer_ctx_free);
 
 QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
 					 uint8_t hostq_id,
@@ -371,17 +414,23 @@ QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
 	return QDF_STATUS_E_FAILURE;
 }
 
+qdf_export_symbol(telemetry_sawf_updt_tid_msduq);
+
 QDF_STATUS telemetry_sawf_set_mov_avg_params(uint32_t num_pkt,
 					     uint32_t num_win)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
+qdf_export_symbol(telemetry_sawf_set_mov_avg_params);
+
 QDF_STATUS telemetry_sawf_set_sla_params(uint32_t num_pkt,
 					 uint32_t time_sec)
 {
 	return QDF_STATUS_E_FAILURE;
 }
+
+qdf_export_symbol(telemetry_sawf_set_sla_params);
 
 QDF_STATUS telemetry_sawf_set_sla_cfg(uint8_t svc_id,
 				      uint8_t min_tput_rate,
@@ -395,6 +444,22 @@ QDF_STATUS telemetry_sawf_set_sla_cfg(uint8_t svc_id,
 	return QDF_STATUS_E_FAILURE;
 }
 
+qdf_export_symbol(telemetry_sawf_set_sla_cfg);
+
+QDF_STATUS telemetry_sawf_set_svclass_cfg(bool enable, uint8_t svc_id,
+					  uint32_t min_tput_rate,
+					  uint32_t max_tput_rate,
+					  uint32_t burst_size,
+					  uint32_t svc_interval,
+					  uint32_t delay_bound,
+					  uint32_t msdu_ttl,
+					  uint32_t msdu_rate_loss)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+qdf_export_symbol(telemetry_sawf_set_svclass_cfg);
+
 QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
 					     uint8_t min_tput_rate,
 					     uint8_t max_tput_rate,
@@ -407,6 +472,8 @@ QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
 	return QDF_STATUS_E_FAILURE;
 }
 
+qdf_export_symbol(telemetry_sawf_set_sla_detect_cfg);
+
 QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
 				     uint8_t queue, uint64_t pass,
 				     uint64_t fail)
@@ -414,12 +481,16 @@ QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
 	return QDF_STATUS_E_FAILURE;
 }
 
+qdf_export_symbol(telemetry_sawf_push_delay);
+
 QDF_STATUS telemetry_sawf_push_delay_mvng(void *telemetry_ctx,
 					  uint8_t tid, uint8_t queue,
 					  uint64_t sum_windows)
 {
 	return QDF_STATUS_E_FAILURE;
 }
+
+qdf_export_symbol(telemetry_sawf_push_delay_mvng);
 
 QDF_STATUS telemetry_sawf_push_msdu_drop(void *telemetry_ctx,
 					 uint8_t tid, uint8_t queue,
@@ -430,18 +501,24 @@ QDF_STATUS telemetry_sawf_push_msdu_drop(void *telemetry_ctx,
 	return QDF_STATUS_E_FAILURE;
 }
 
+qdf_export_symbol(telemetry_sawf_push_msdu_drop);
+
 QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
 				    uint8_t queue, uint32_t *rate)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
+qdf_export_symbol(telemetry_sawf_pull_rate);
+
 QDF_STATUS telemetry_sawf_pull_mov_avg(void *telemetry_ctx, uint8_t tid,
 				       uint8_t queue, uint32_t *mov_avg)
 {
 	return QDF_STATUS_E_FAILURE;
 }
-#endif
+
+qdf_export_symbol(telemetry_sawf_pull_mov_avg);
+#endif /* CONFIG_SAWF_TELEMETRY */
 
 int register_telemetry_agent_ops(struct telemetry_agent_ops *agent_ops)
 {

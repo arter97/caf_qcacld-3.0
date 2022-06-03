@@ -104,6 +104,29 @@ QDF_STATUS telemetry_sawf_set_sla_cfg(uint8_t svc_id,
 				      uint8_t msdu_rate_loss);
 
 /**
+ * telemetry_sawf_set_svclass_cfg - Set service-class config
+ * @enable: flag to denote enable/disable
+ * @svc_id: service-id
+ * @min_tput_rate: minimum throuput rate
+ * @max_tput_rate: maximum throuput rate
+ * @burst_size: burst-size
+ * @svc_intval: service interval
+ * @delay_bound: delay boundary
+ * @msdu_ttl: msdu TTL
+ * @msdu_rate_loss: msdu loss rate
+ *
+ * Return: QDF_STATUS_SUCCESS on success
+ */
+QDF_STATUS telemetry_sawf_set_svclass_cfg(bool enable, uint8_t svc_id,
+					  uint32_t min_tput_rate,
+					  uint32_t max_tput_rate,
+					  uint32_t burst_size,
+					  uint32_t svc_interval,
+					  uint32_t delay_bound,
+					  uint32_t msdu_ttl,
+					  uint32_t msdu_rate_loss);
+
+/**
  * telemetry_sawf_set_sla_detect_cfg - Set sla-detect config
  * @detect-type: detection-type
  * @min_tput_rate: minimum throuput rate
