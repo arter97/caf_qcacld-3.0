@@ -333,7 +333,7 @@ dp_peer_sawf_stats_ctx_alloc(struct dp_soc *soc,
 	for (tid = 0; tid < DP_SAWF_MAX_TIDS; tid++) {
 		for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
 			dp_hist_init(&stats->delay[tid][q_idx].delay_hist,
-				     CDP_HIST_TYPE_HW_COMP_DELAY);
+				     CDP_HIST_TYPE_HW_TX_COMP_DELAY);
 		}
 	}
 
@@ -416,36 +416,17 @@ dp_sawf_compute_tx_hw_delay_us(struct dp_soc *soc,
 			       struct hal_tx_completion_status *ts,
 			       uint32_t *delay_us)
 {
-	int32_t buffer_ts;
-	int32_t delta_tsf;
-	int32_t delay;
-
-	/* Tx_rate_stats_info_valid is 0 and tsf is invalid then */
-	if (!ts->valid) {
-		qdf_info("Invalid Tx rate stats info");
-		return QDF_STATUS_E_FAILURE;
-	}
+	uint32_t delay;
 
 	if (!vdev) {
 		qdf_err("vdev is null");
 		return QDF_STATUS_E_INVAL;
 	}
 
-	delta_tsf = vdev->delta_tsf;
-
-	/* buffer_timestamp is in units of 1024 us and is [31:13] of
-	 * WBM_RELEASE_RING_4. After left shift 10 bits, it's
-	 * valid up to 29 bits.
-	 */
-	buffer_ts = ts->buffer_timestamp << WLAN_TX_DELAY_UNITS_US;
-
-	delay = ts->tsf - buffer_ts - delta_tsf;
-	/* mask 29 BITS */
-	delay &= WLAN_TX_DELAY_MASK;
-
-	if (delay > 0x1000000) {
+	if (QDF_IS_STATUS_ERROR(dp_tx_compute_hw_delay_us(ts,
+							  vdev->delta_tsf,
+							  &delay)))
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	if (delay_us)
 		*delay_us = delay;
@@ -466,7 +447,8 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 	uint32_t hw_delay;
 	uint8_t cur_win;
 
-	if (QDF_IS_STATUS_ERROR(dp_sawf_compute_tx_delay(tx_desc, &hw_delay)))
+	if (QDF_IS_STATUS_ERROR(dp_sawf_compute_tx_hw_delay_us(soc, vdev, ts,
+							       &hw_delay)))
 		return QDF_STATUS_E_FAILURE;
 
 	tx_delay = &stats->delay[tid][msduq_idx];
@@ -589,12 +571,6 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 	qdf_assert(tid < DP_SAWF_MAX_TIDS);
 	qdf_assert(msduq_idx < DP_SAWF_MAX_QUEUES);
 
-	status = dp_sawf_update_tx_delay(soc, vdev, ts, tx_desc,
-					 &sawf_ctx->stats, tid, msduq_idx);
-
-	if (QDF_IS_STATUS_ERROR(status))
-		return QDF_STATUS_E_FAILURE;
-
 	length = qdf_nbuf_len(tx_desc->nbuf);
 
 	DP_STATS_INCC_PKT(sawf_ctx, tx_stats[tid][msduq_idx].tx_success, 1,
@@ -633,6 +609,11 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 
 	if (tx_stats->queue_depth > 0)
 		tx_stats->queue_depth--;
+
+	status = dp_sawf_update_tx_delay(soc, vdev, ts, tx_desc,
+					 &sawf_ctx->stats, tid, msduq_idx);
+	if (QDF_IS_STATUS_ERROR(status))
+		return QDF_STATUS_E_FAILURE;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -757,23 +738,6 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
-const char *hw_delay_bucket[CDP_DELAY_BUCKET_MAX + 1] = {
-	"0 to 10 ms", "11 to 20 ms",
-	"21 to 30 ms", "31 to 40 ms",
-	"41 to 50 ms", "51 to 60 ms",
-	"61 to 70 ms", "71 to 80 ms",
-	"81 to 90 ms", "91 to 100 ms",
-	"101 to 250 ms", "251 to 500 ms", "500+ ms"
-};
-
-static inline const char *dp_sawf_str_hw_delay(uint8_t index)
-{
-	if (index > CDP_DELAY_BUCKET_MAX)
-		return "Invalid index";
-
-	return hw_delay_bucket[index];
-}
-
 static void dp_sawf_dump_delay_stats(struct sawf_delay_stats *stats)
 {
 	uint8_t idx;
@@ -799,7 +763,7 @@ static void dp_sawf_dump_delay_stats(struct sawf_delay_stats *stats)
 	/* CDP hist bucket frequency */
 	for (idx = 0; idx < CDP_HIST_BUCKET_MAX; idx++) {
 		DP_PRINT_STATS("%s:  Packets = %llu",
-			       dp_sawf_str_hw_delay(idx),
+			       dp_hist_tx_hw_delay_str(idx),
 			       stats->delay_hist.hist.freq[idx]);
 	}
 }
