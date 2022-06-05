@@ -667,6 +667,7 @@ enum wmi_pdev_pkt_routing_pkt_type {
 	PDEV_PKT_TYPE_IPV4,
 	PDEV_PKT_TYPE_IPV6,
 	PDEV_PKT_TYPE_EAP,
+	PDEV_PKT_TYPE_VLAN,
 	PDEV_PKT_TYPE_MAX
 };
 
