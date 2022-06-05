@@ -5299,25 +5299,16 @@ hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 
 #endif /* WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE */
 
-#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+#define HDD_DATA_STALL_ENABLE      BIT(0)
+#define HDD_HOST_STA_TX_TIMEOUT    BIT(16)
+#define HDD_HOST_SAP_TX_TIMEOUT    BIT(17)
+#define HDD_HOST_NUD_FAILURE       BIT(18)
+#define HDD_TIMEOUT_WLM_MODE       BIT(31)
+#define FW_DATA_STALL_EVT_MASK     0x8000FFFF
+
 /**
- * hdd_set_suspend_mode: set the suspend_mode state to pld based on the
- *                       configuration option from INI file
- * @hdd_ctx: HDD context
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
-int hdd_set_suspend_mode(struct hdd_context *hdd_ctx);
-#else
-static inline int hdd_set_suspend_mode(struct hdd_context *hdd_ctx)
-{
-	return 0;
-}
-#endif
-/*
- * hdd_shutdown_wlan_in_suspend: shutdown wlan chip when suspend called
- * @hdd_ctx: HDD context
+ * hdd_is_data_stall_event_enabled() - Check if data stall detection is enabled
+ * @evt: Data stall event to be checked
  *
  * this function called by __wlan_hdd_cfg80211_suspend_wlan(), and it
  * schedule idle shutdown work queue when no interface open.
