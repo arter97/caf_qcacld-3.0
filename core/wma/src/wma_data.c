@@ -3068,6 +3068,73 @@ void wma_tx_abort(uint8_t vdev_id)
 					 &param);
 }
 
+QDF_STATUS wma_peer_tid_flush(tp_wma_handle wma,
+			      struct sme_peer_tid_flush *tid_flush)
+{
+	static const uint8_t ac_to_tid[4][2] = { {0, 3}, {1, 2}, {4, 5},
+					       {6, 7} };
+	uint8_t i, vdev_id, peer_id;
+	uint32_t peer_tid_bitmap = 0;
+	struct wma_txrx_node *iface;
+	struct peer_flush_params param = {0};
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	QDF_STATUS status;
+	struct ol_txrx_peer_t *peer;
+	struct cdp_pdev *pdev;
+
+	pdev = cds_get_context(QDF_MODULE_ID_TXRX);
+	peer = cdp_peer_find_by_addr(soc, pdev, tid_flush->peer_addr.bytes,
+				     &peer_id);
+	if (!peer) {
+		sme_err("PEER %pM not found", tid_flush->peer_addr.bytes);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (tid_flush->flush_ac) {
+		for (i = 0; i < 4; ++i) {
+			if (((tid_flush->flush_ac & 0x0f) >> i) & 0x01) {
+				peer_tid_bitmap |= (1 << ac_to_tid[i][0]) |
+						(1 << ac_to_tid[i][1]);
+			}
+		}
+	} else {
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (peer_tid_bitmap != PEER_TID_FLUSH) {
+		WMA_LOGE("Invalid AC value %d", tid_flush->flush_ac);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev_id = tid_flush->vdev_id;
+	iface = &wma->interfaces[vdev_id];
+	if (!iface->handle) {
+		WMA_LOGE("%s: Failed to get iface handle: %pK",
+			 __func__, iface->handle);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	WMA_LOGD("%s: vdevid %d peer addr %pM peer_tid_bitmap %d ", __func__,
+		 vdev_id, tid_flush->peer_addr.bytes, peer_tid_bitmap);
+
+	wma_vdev_set_pause_bit(vdev_id, PAUSE_TYPE_HOST);
+	cdp_fc_vdev_pause(soc, iface->handle, OL_TXQ_PAUSE_REASON_TX_ABORT);
+
+	/* Flush all TIDs except MGMT TID for this peer in Target */
+	peer_tid_bitmap &= ~(0x1 << WMI_MGMT_TID);
+	param.peer_tid_bitmap = peer_tid_bitmap;
+	param.vdev_id = vdev_id;
+	status = wmi_unified_peer_flush_tids_send(wma->wmi_handle,
+						  tid_flush->peer_addr.bytes,
+						  &param);
+
+	cdp_fc_vdev_unpause(soc, iface->handle,
+			    OL_TXQ_PAUSE_REASON_TX_ABORT);
+	wma_vdev_clear_pause_bit(vdev_id, PAUSE_TYPE_HOST);
+
+	return status;
+}
+
 /**
  * wma_lro_config_cmd() - process the LRO config command
  * @wma: Pointer to WMA handle

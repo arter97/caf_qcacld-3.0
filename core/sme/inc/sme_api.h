@@ -301,6 +301,18 @@ enum {
 	MBO_TRANSITION_REASON_TRANSITIONING_TO_PREMIUM_AP,
 };
 
+/**
+ * struct sme_peer_tid_flush - flush pending packets for specified tids
+ * @vdev_id: vdev Id.
+ * @peer_addr: peer mac address.
+ * @flush_ac: Access category of the pkts to be flushed.
+ */
+struct sme_peer_tid_flush {
+	uint8_t vdev_id;
+	struct qdf_mac_addr peer_addr;
+	uint8_t flush_ac;
+};
+
 /*-------------------------------------------------------------------------
   Function declarations and documenation
   ------------------------------------------------------------------------*/
@@ -3250,4 +3262,13 @@ sme_set_beacon_latency_event_cb(mac_handle_t mac_handle,
 }
 #endif
 
+/**
+ * sme_peer_tid_flush_pkts - flush pending packets with specified tids
+ * @mac_handle: Opaque handle to the MAC context
+ * @struct sme_peer_tid_flush - Carries pointer of the object containing
+ *			       vdev id, peer mac and access category
+ */
+
+QDF_STATUS sme_peer_tid_flush_pkts(mac_handle_t mac_handle,
+				   struct sme_peer_tid_flush *tid_flush);
 #endif /* #if !defined( __SME_API_H ) */
