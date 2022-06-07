@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +36,7 @@
 #include <wlan_reg_services_api.h>
 #include "wlan_cfg80211_mc_cp_stats.h"
 #include "sir_api.h"
-
+#include "wlan_tdls_ucfg_api.h"
 
 #define TDLS_MAX_NO_OF_2_4_CHANNELS 14
 
@@ -98,109 +99,9 @@ void wlan_cfg80211_tdls_osif_priv_deinit(struct wlan_objmgr_vdev *vdev)
 	osif_priv->osif_tdls = NULL;
 }
 
-void hdd_notify_teardown_tdls_links(struct wlan_objmgr_psoc *psoc)
-{
-	struct vdev_osif_priv *osif_priv;
-	struct osif_tdls_vdev *tdls_priv;
-	QDF_STATUS status;
-	unsigned long rc;
-	struct wlan_objmgr_vdev *vdev;
-
-	vdev = ucfg_get_tdls_vdev(psoc, WLAN_OSIF_ID);
-	if (!vdev)
-		return;
-
-	osif_priv = wlan_vdev_get_ospriv(vdev);
-
-	if (!osif_priv || !osif_priv->osif_tdls) {
-		osif_err("osif priv or tdls priv is NULL");
-		goto release_ref;
-	}
-	tdls_priv = osif_priv->osif_tdls;
-
-	reinit_completion(&tdls_priv->tdls_teardown_comp);
-	status = ucfg_tdls_teardown_links(psoc);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("ucfg_tdls_teardown_links failed err %d", status);
-		goto release_ref;
-	}
-
-	osif_debug("Wait for tdls teardown completion. Timeout %u ms",
-		   WAIT_TIME_FOR_TDLS_TEARDOWN_LINKS);
-
-	rc = wait_for_completion_timeout(
-		&tdls_priv->tdls_teardown_comp,
-		msecs_to_jiffies(WAIT_TIME_FOR_TDLS_TEARDOWN_LINKS));
-
-	if (0 == rc) {
-		osif_err(" Teardown Completion timed out rc: %ld", rc);
-		goto release_ref;
-	}
-
-	osif_debug("TDLS teardown completion status %ld ", rc);
-
-release_ref:
-	wlan_objmgr_vdev_release_ref(vdev,
-				     WLAN_OSIF_ID);
-}
-
 void hdd_notify_tdls_reset_adapter(struct wlan_objmgr_vdev *vdev)
 {
 	ucfg_tdls_notify_reset_adapter(vdev);
-}
-
-void
-hdd_notify_sta_connect(uint8_t session_id,
-		       bool tdls_chan_swit_prohibited,
-		       bool tdls_prohibited,
-		       struct wlan_objmgr_vdev *vdev)
-{
-	struct tdls_sta_notify_params notify_info = {0};
-	QDF_STATUS status;
-
-	if (!vdev) {
-		osif_err("vdev is NULL");
-		return;
-	}
-	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("can't get vdev");
-		return;
-	}
-
-	notify_info.session_id = session_id;
-	notify_info.vdev = vdev;
-	notify_info.tdls_chan_swit_prohibited = tdls_chan_swit_prohibited;
-	notify_info.tdls_prohibited = tdls_prohibited;
-	ucfg_tdls_notify_sta_connect(&notify_info);
-}
-
-void hdd_notify_sta_disconnect(uint8_t session_id,
-			       bool lfr_roam,
-			       bool user_disconnect,
-			       struct wlan_objmgr_vdev *vdev)
-{
-	struct tdls_sta_notify_params notify_info = {0};
-	QDF_STATUS status;
-
-	if (!vdev) {
-		osif_err("vdev is NULL");
-		return;
-	}
-
-	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_TDLS_NB_ID);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		osif_err("can't get vdev");
-		return;
-	}
-
-	notify_info.session_id = session_id;
-	notify_info.lfr_roam = lfr_roam;
-	notify_info.tdls_chan_swit_prohibited = false;
-	notify_info.tdls_prohibited = false;
-	notify_info.vdev = vdev;
-	notify_info.user_disconnect = user_disconnect;
-	ucfg_tdls_notify_sta_disconnect(&notify_info);
 }
 
 int wlan_cfg80211_tdls_add_peer(struct wlan_objmgr_vdev *vdev,
@@ -337,9 +238,68 @@ tdls_calc_channels_from_staparams(struct tdls_update_peer_params *req_info,
 		   req_info->supported_channels_len);
 }
 
+#ifdef WLAN_FEATURE_11AX
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)) && defined(CONFIG_BAND_6GHZ)
+static void
+wlan_cfg80211_tdls_extract_6ghz_params(struct tdls_update_peer_params *req_info,
+				       struct station_parameters *params)
+{
+	if (!params->he_6ghz_capa) {
+		osif_debug("6 Ghz he_capa not present");
+		return;
+	}
+
+	qdf_mem_copy(&req_info->he_6ghz_cap, params->he_6ghz_capa,
+		     sizeof(req_info->he_6ghz_cap));
+}
+#else
+static void
+wlan_cfg80211_tdls_extract_6ghz_params(struct tdls_update_peer_params *req_info,
+				       struct station_parameters *params)
+{
+	osif_debug("kernel don't support tdls 6 ghz band");
+}
+#endif
+
+static void
+wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
+				     struct station_parameters *params)
+{
+	if (params->he_capa_len < MIN_TDLS_HE_CAP_LEN) {
+		osif_debug("he_capa_len %d less than MIN_TDLS_HE_CAP_LEN",
+			   params->he_capa_len);
+		return;
+	}
+
+	if (!params->he_capa) {
+		osif_debug("he_capa not present");
+		return;
+	}
+
+	req_info->he_cap_len = params->he_capa_len;
+	if (req_info->he_cap_len > MAX_TDLS_HE_CAP_LEN)
+		req_info->he_cap_len = MAX_TDLS_HE_CAP_LEN;
+
+	qdf_mem_copy(&req_info->he_cap, params->he_capa,
+		     req_info->he_cap_len);
+
+	wlan_cfg80211_tdls_extract_6ghz_params(req_info, params);
+
+	return;
+}
+
+#else
+static void
+wlan_cfg80211_tdls_extract_he_params(struct tdls_update_peer_params *req_info,
+				     struct station_parameters *params)
+{
+}
+#endif
+
 static void
 wlan_cfg80211_tdls_extract_params(struct tdls_update_peer_params *req_info,
-				  struct station_parameters *params)
+				  struct station_parameters *params,
+				  bool tdls_11ax_support)
 {
 	int i;
 
@@ -419,6 +379,10 @@ wlan_cfg80211_tdls_extract_params(struct tdls_update_peer_params *req_info,
 		osif_debug("TDLS peer pmf capable");
 		req_info->is_pmf = 1;
 	}
+	if (tdls_11ax_support)
+		wlan_cfg80211_tdls_extract_he_params(req_info, params);
+	else
+		osif_debug("tdls ax disabled");
 }
 
 int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
@@ -430,6 +394,8 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 	struct vdev_osif_priv *osif_priv;
 	struct osif_tdls_vdev *tdls_priv;
 	unsigned long rc;
+	struct wlan_objmgr_psoc *psoc;
+	bool tdls_11ax_support = false;
 
 	status = wlan_cfg80211_tdls_validate_mac_addr(mac);
 
@@ -443,7 +409,14 @@ int wlan_cfg80211_tdls_update_peer(struct wlan_objmgr_vdev *vdev,
 	if (!req_info)
 		return -EINVAL;
 
-	wlan_cfg80211_tdls_extract_params(req_info, params);
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err_rl("Invalid psoc");
+		return -EINVAL;
+	}
+
+	tdls_11ax_support = ucfg_tdls_is_fw_11ax_capable(psoc);
+	wlan_cfg80211_tdls_extract_params(req_info, params, tdls_11ax_support);
 
 	osif_priv = wlan_vdev_get_ospriv(vdev);
 	if (!osif_priv || !osif_priv->osif_tdls) {
@@ -971,9 +944,6 @@ void wlan_cfg80211_tdls_event_callback(void *user_data,
 		break;
 	case TDLS_EVENT_SETUP_REQ:
 		wlan_cfg80211_tdls_indicate_setup(ind);
-		break;
-	case TDLS_EVENT_TEARDOWN_LINKS_DONE:
-		complete(&tdls_priv->tdls_teardown_comp);
 		break;
 	case TDLS_EVENT_USER_CMD:
 		tdls_priv->tdls_user_cmd_len = ind->status;

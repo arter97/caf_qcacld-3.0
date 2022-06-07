@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,6 +35,25 @@
  * Return: QDF_STATUS
  */
 QDF_STATUS mlme_register_mlme_ext_ops(void);
+
+/**
+ * mlme_register_mlo_ext_ops() - Register mlme mlo ext ops
+ *
+ * This function is called to register mlme mlo ext operations
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_register_mlo_ext_ops(void);
+
+/**
+ * mlme_unregister_mlo_ext_ops() - Unregister mlme mlo ext ops
+ *
+ * This function is called to unregister mlme mlo ext operations
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_unregister_mlo_ext_ops(void);
+
 /**
  * mlme_register_vdev_mgr_ops() - Register vdev mgr ops
  * @vdev_mlme: vdev mlme object
@@ -161,6 +180,66 @@ QDF_STATUS mlme_set_bigtk_support(struct wlan_objmgr_vdev *vdev, bool val);
 
 bool mlme_get_bigtk_support(struct wlan_objmgr_vdev *vdev);
 
+#ifdef FEATURE_WLAN_TDLS
+/**
+ * mlme_set_tdls_chan_switch_prohibited() - set tdls chan switch prohibited
+ * @vdev: vdev pointer
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_set_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev, bool val);
+
+/**
+ * mlme_get_tdls_chan_switch_prohibited() - get tdls chan switch prohibited
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+bool mlme_get_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_set_tdls_prohibited() - set tdls prohibited
+ * @vdev: vdev pointer
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_set_tdls_prohibited(struct wlan_objmgr_vdev *vdev, bool val);
+
+/**
+ * mlme_get_tdls_prohibited() - get tdls prohibited
+ * @vdev: vdev pointer
+ *
+ * Return: bool
+ */
+bool mlme_get_tdls_prohibited(struct wlan_objmgr_vdev *vdev);
+#else
+static inline QDF_STATUS
+mlme_set_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool mlme_get_tdls_chan_switch_prohibited(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+mlme_set_tdls_prohibited(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool mlme_get_tdls_prohibited(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
 /**
  * mlme_set_roam_reason_better_ap() - set roam reason better AP
  * @vdev: vdev pointer
@@ -311,19 +390,6 @@ QDF_STATUS mlme_set_assoc_type(struct wlan_objmgr_vdev *vdev,
 			       enum vdev_assoc_type assoc_type);
 
 /**
- * mlme_get_vdev_bss_peer_mac_addr() - to get peer mac address
- * @vdev: pointer to vdev
- * @bss_peer_mac_address: pointer to bss_peer_mac_address
- *
- * This API is used to get mac address of peer.
- *
- * Return: QDF_STATUS based on overall success
- */
-QDF_STATUS mlme_get_vdev_bss_peer_mac_addr(
-		struct wlan_objmgr_vdev *vdev,
-		struct qdf_mac_addr *bss_peer_mac_address);
-
-/**
  * mlme_get_vdev_stop_type() - to get vdev stop type
  * @vdev: vdev pointer
  * @vdev_stop_type: vdev stop type
@@ -407,4 +473,30 @@ void mlme_vdev_self_peer_delete_resp(struct del_vdev_params *param);
  * Return: none
  */
 void mlme_vdev_del_resp(uint8_t vdev_id);
+
+/**
+ * wlan_sap_disconnect_all_p2p_client() - send SAP disconnect all P2P
+ *	client event to the SAP event handler
+ * @vdev_id: vdev id of SAP
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sap_disconnect_all_p2p_client(uint8_t vdev_id);
+
+/**
+ * wlan_sap_stop_bss() - send SAP stop bss event to the SAP event
+ *	handler
+ * @vdev_id: vdev id of SAP
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_sap_stop_bss(uint8_t vdev_id);
+
+/**
+ * wlan_get_conc_freq() - get concurrent operation frequency
+ *
+ * Return: concurrent frequency
+ */
+qdf_freq_t wlan_get_conc_freq(void);
+
 #endif

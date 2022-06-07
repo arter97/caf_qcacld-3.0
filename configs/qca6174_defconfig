@@ -1,3 +1,6 @@
+CONFIG_TX_AGGREGATION_SIZE_ENABLE := y
+
+CONFIG_AR6320_SUPPORT := y
 ifeq ($(CONFIG_CLD_HL_SDIO_CORE), y)
 	CONFIG_QCA_WIFI_SDIO := y
 ifndef CONFIG_SDIO_TRANSFER
@@ -63,7 +66,7 @@ ifeq ($(CONFIG_ARCH_SDX20), y)
 CONFIG_MOBILE_ROUTER := y
 endif
 
-ifeq (y, $(filter y, $(CONFIG_ARCH_SDXPRAIRIE), $(CONFIG_ARCH_SA515)))
+ifeq (y, $(filter y, $(CONFIG_ARCH_SDXPRAIRIE) $(CONFIG_ARCH_SA515) $(CONFIG_ARCH_SDXPOORWILLS)))
 CONFIG_MOBILE_ROUTER := y
 endif
 
@@ -137,8 +140,6 @@ CONFIG_WLAN_FEATURE_ACTION_OUI := y
 CONFIG_WLAN_FEATURE_FILS := y
 ifneq ($(CONFIG_QCA_CLD_WLAN),)
 	ifeq (y,$(findstring y,$(CONFIG_CNSS) $(CONFIG_CNSS2) $(CONFIG_ICNSS)))
-	#Flag to enable Protected Management Frames (11w) feature
-	CONFIG_WLAN_FEATURE_11W := y
 	#Flag to enable LTE CoEx feature
 	CONFIG_QCOM_LTE_COEX := y
 		ifneq ($(CONFIG_MOBILE_ROUTER), y)
@@ -148,8 +149,6 @@ ifneq ($(CONFIG_QCA_CLD_WLAN),)
 	endif
 
 	ifeq (m,$(findstring m,$(CONFIG_CNSS2)))
-	#Flag to enable Protected Management Frames (11w) feature
-	CONFIG_WLAN_FEATURE_11W := y
 	#Flag to enable LTE CoEx feature
 	CONFIG_QCOM_LTE_COEX := y
 		ifneq ($(CONFIG_MOBILE_ROUTER), y)
@@ -157,14 +156,6 @@ ifneq ($(CONFIG_QCA_CLD_WLAN),)
 		CONFIG_WLAN_FEATURE_LPSS := y
 		endif
 	endif
-endif
-
-#Flag to enable Protected Management Frames (11w) feature
-ifeq ($(CONFIG_ROME_IF),usb)
-	CONFIG_WLAN_FEATURE_11W := y
-endif
-ifeq ($(CONFIG_ROME_IF),sdio)
-	CONFIG_WLAN_FEATURE_11W := y
 endif
 
 #Flag to enable the tx desc sanity check
@@ -657,7 +648,9 @@ ifeq ($(CONFIG_SLUB_DEBUG_ON), y)
 	CONFIG_DESC_TIMESTAMP_DEBUG_INFO := y
 	CONFIG_FEATURE_UNIT_TEST_SUSPEND := y
 	CONFIG_LEAK_DETECTION := y
+ifndef CONFIG_MAX_LOGS_PER_SEC
 	CONFIG_MAX_LOGS_PER_SEC := 500
+endif
 	CONFIG_SCHED_HISTORY_SIZE := 256
 	CONFIG_TALLOC_DEBUG := y
 	CONFIG_UNIT_TEST := y
@@ -749,3 +742,4 @@ CONFIG_WLAN_FW_OFFLOAD := y
 
 CONFIG_FEATURE_SG := y
 
+CONFIG_WLAN_SYSFS_MEM_STATS := y

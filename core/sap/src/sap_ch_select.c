@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -443,10 +443,6 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	for (channelnum = 0;
 	     channelnum < pSpectInfoParams->numSpectChans;
 	     channelnum++, pChans++, pSpectCh++) {
-		uint8_t channel;
-
-		channel = wlan_reg_freq_to_chan(mac->pdev, *pChans);
-
 		pSpectCh->chan_freq = *pChans;
 		/* Initialise for all channels */
 		pSpectCh->rssiAgr = SOFTAP_MIN_RSSI;
@@ -455,9 +451,9 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 
 		/* check if the channel is in NOL blacklist */
 		if (sap_dfs_is_channel_in_nol_list(
-					sap_ctx, channel,
+					sap_ctx, *pChans,
 					PHY_SINGLE_CHANNEL_CENTERED)) {
-			sap_debug("Ch %d is in NOL list", channel);
+			sap_debug_rl("Ch freq %d is in NOL list", *pChans);
 			continue;
 		}
 
@@ -466,22 +462,25 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 			if (wlan_reg_is_dfs_for_freq(mac->pdev,
 						     pSpectCh->chan_freq)) {
 				sap_debug("DFS Ch %d not considered for ACS. include_dfs_ch %u, sta_sap_scc_on_dfs_chnl_config_value %d",
-					channel, include_dfs_ch,
-					sta_sap_scc_on_dfs_chnl_config_value);
+					  *pChans, include_dfs_ch,
+					  sta_sap_scc_on_dfs_chnl_config_value);
 				continue;
 			}
 		}
 
-		if (!policy_mgr_is_safe_channel(mac->psoc, *pChans))
+		if (!policy_mgr_is_sap_freq_allowed(mac->psoc, *pChans)) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
+				  "%s: Skip freq %d", __func__, *pChans);
 			continue;
+		}
 
-		/* OFDM rates are not supported on channel 14 */
-		if (channel == 14 &&
-		    eCSR_DOT11_MODE_11b != sap_ctx->csr_roamProfile.phyMode)
+		/* OFDM rates are not supported on frequency 2484 */
+		if (*pChans == 2484 &&
+		    eCSR_DOT11_MODE_11b != sap_ctx->phyMode)
 			continue;
 
 		/* Skip DSRC channels */
-		if (wlan_reg_is_dsrc_chan(mac->pdev, channel))
+		if (wlan_reg_is_dsrc_freq(pSpectCh->chan_freq))
 			continue;
 
 		/*
@@ -1021,15 +1020,16 @@ static void sap_interference_rssi_count_5G(tSapSpectChInfo *spect_ch,
  */
 
 static void sap_interference_rssi_count(tSapSpectChInfo *spect_ch,
-	tSapSpectChInfo *spectch_start,
-	tSapSpectChInfo *spectch_end)
+					tSapSpectChInfo *spectch_start,
+					tSapSpectChInfo *spectch_end,
+					struct mac_context *mac)
 {
 	if (!spect_ch) {
 		sap_err("spect_ch is NULL");
 		return;
 	}
 
-	switch (wlan_freq_to_chan(spect_ch->chan_freq)) {
+	switch (wlan_reg_freq_to_chan(mac->pdev, spect_ch->chan_freq)) {
 	case CHANNEL_1:
 		sap_update_rssi_bsscount(spect_ch, 1, true,
 			spectch_start, spectch_end);
@@ -1324,7 +1324,7 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 
 			if (WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq))
 				sap_interference_rssi_count(pSpectCh,
-					spectch_start, spectch_end);
+					spectch_start, spectch_end, mac);
 			else
 				sap_interference_rssi_count_5G(
 				    pSpectCh, ch_width, secondaryChannelOffset,
@@ -1436,9 +1436,9 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 			normalized_weight =
 				((SAP_ACS_WEIGHT_MAX - pSpectCh->weight) *
 				(100 - normalize_factor)) / 100;
-			sap_debug("freq %d old weight %d new weight %d",
-				  chan_freq, pSpectCh->weight,
-				  pSpectCh->weight + normalized_weight);
+			sap_debug_rl("freq %d old weight %d new weight %d",
+				     chan_freq, pSpectCh->weight,
+				     pSpectCh->weight + normalized_weight);
 			pSpectCh->weight += normalized_weight;
 			freq_present_in_list = false;
 		}
@@ -1448,9 +1448,9 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		pSpectCh->weight_copy = pSpectCh->weight;
 
 debug_info:
-		sap_debug("freq = %d, weight = %d rssi = %d bss count = %d",
-			   pSpectCh->chan_freq, pSpectCh->weight,
-			  pSpectCh->rssiAgr, pSpectCh->bssCount);
+		sap_debug_rl("freq = %d, weight = %d rssi = %d bss count = %d",
+			     pSpectCh->chan_freq, pSpectCh->weight,
+			     pSpectCh->rssiAgr, pSpectCh->bssCount);
 
 		pSpectCh++;
 	}
@@ -1653,9 +1653,9 @@ static void sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 
 	for (j = 0; j < (pSpectInfoParams->numSpectChans); j++) {
-		sap_debug("freq = %d weight = %d rssi = %d bss count = %d",
-			  pSpectInfo->chan_freq, pSpectInfo->weight,
-			  pSpectInfo->rssiAgr, pSpectInfo->bssCount);
+		sap_debug_rl("freq = %d weight = %d rssi = %d bss count = %d",
+			     pSpectInfo->chan_freq, pSpectInfo->weight,
+			     pSpectInfo->rssiAgr, pSpectInfo->bssCount);
 
 		pSpectInfo++;
 	}
@@ -1818,13 +1818,249 @@ static void sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 	for (j = 0; j < (pSpectInfoParams->numSpectChans); j++) {
-		sap_debug("freq = %d weight = %d rssi = %d bss count = %d",
-			  pSpectInfo->chan_freq, pSpectInfo->weight,
-			  pSpectInfo->rssiAgr, pSpectInfo->bssCount);
+		sap_debug_rl("freq = %d weight = %d rssi = %d bss count = %d",
+			     pSpectInfo->chan_freq, pSpectInfo->weight,
+			     pSpectInfo->rssiAgr, pSpectInfo->bssCount);
 
 		pSpectInfo++;
 	}
 }
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * sap_sort_chl_weight_320_mhz() - to sort the channels with the least weight
+ * @pSpectInfoParams: Pointer to the tSapChSelSpectInfo structure
+ *
+ * Function to sort the channels with the least weight first for 320MHz channels
+ *
+ * Return: none
+ */
+static void sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
+					tSapChSelSpectInfo *pSpectInfoParams)
+{
+	uint8_t i, j;
+	tSapSpectChInfo *pSpectInfo;
+	uint8_t minIdx;
+	struct ch_params acs_ch_params;
+	int8_t center_freq_diff;
+	uint32_t combined_weight;
+	uint32_t min_ch_weight;
+
+	pSpectInfo = pSpectInfoParams->pSpectCh;
+
+	for (j = 0; j < pSpectInfoParams->numSpectChans; j++) {
+		if (pSpectInfo[j].weight_calc_done)
+			continue;
+
+		acs_ch_params.ch_width = CH_WIDTH_320MHZ;
+
+		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+						     pSpectInfo[j].chan_freq,
+						     0, &acs_ch_params);
+
+		/* Check if the freq supports 320 Mhz */
+		if (acs_ch_params.ch_width != CH_WIDTH_320MHZ) {
+			pSpectInfo[j].weight = SAP_ACS_WEIGHT_MAX * 16;
+			pSpectInfo[j].weight_calc_done = true;
+			continue;
+		}
+
+		center_freq_diff = acs_ch_params.mhz_freq_seg1 -
+				   pSpectInfo[j].chan_freq;
+
+		/* This channel frequency does not have all channels */
+		if (center_freq_diff != 150) {
+			pSpectInfo[j].weight = SAP_ACS_WEIGHT_MAX * 16;
+			pSpectInfo[j].weight_calc_done = true;
+			continue;
+		}
+
+		/* no other freq left for 320 Mhz operation in spectrum */
+		if (j + 15 > pSpectInfoParams->numSpectChans)
+			continue;
+
+		/* Check whether all frequencies are present for 160 Mhz */
+
+		if (!(((pSpectInfo[j].chan_freq + 20) ==
+			pSpectInfo[j + 1].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 40) ==
+				 pSpectInfo[j + 2].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 60) ==
+				 pSpectInfo[j + 3].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 80) ==
+				 pSpectInfo[j + 4].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 100) ==
+				 pSpectInfo[j + 5].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 120) ==
+				 pSpectInfo[j + 6].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 140) ==
+				 pSpectInfo[j + 7].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 160) ==
+				 pSpectInfo[j + 8].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 180) ==
+				 pSpectInfo[j + 9].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 200) ==
+				 pSpectInfo[j + 10].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 220) ==
+				 pSpectInfo[j + 11].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 240) ==
+				 pSpectInfo[j + 12].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 260) ==
+				 pSpectInfo[j + 13].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 280) ==
+				 pSpectInfo[j + 14].chan_freq) &&
+			((pSpectInfo[j].chan_freq + 300) ==
+				 pSpectInfo[j + 15].chan_freq))) {
+			/*
+			 * some channels does not exist in pSectInfo array,
+			 * skip this channel and those in the same ETH320 width
+			 */
+			pSpectInfo[j].weight = SAP_ACS_WEIGHT_MAX * 16;
+			pSpectInfo[j].weight_calc_done = true;
+			if ((pSpectInfo[j].chan_freq + 20) ==
+					pSpectInfo[j + 1].chan_freq) {
+				pSpectInfo[j + 1].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 1].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 40) ==
+					pSpectInfo[j + 2].chan_freq) {
+				pSpectInfo[j + 2].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 2].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 60) ==
+					pSpectInfo[j + 3].chan_freq) {
+				pSpectInfo[j + 3].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 3].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 80) ==
+					pSpectInfo[j + 4].chan_freq) {
+				pSpectInfo[j + 4].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 4].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 100) ==
+					pSpectInfo[j + 5].chan_freq) {
+				pSpectInfo[j + 5].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 5].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 120) ==
+					pSpectInfo[j + 6].chan_freq) {
+				pSpectInfo[j + 6].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 6].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 140) ==
+					pSpectInfo[j + 7].chan_freq) {
+				pSpectInfo[j + 7].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 7].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 160) ==
+					pSpectInfo[j + 8].chan_freq) {
+				pSpectInfo[j + 8].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 8].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 180) ==
+					pSpectInfo[j + 9].chan_freq) {
+				pSpectInfo[j + 9].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 9].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 200) ==
+					pSpectInfo[j + 10].chan_freq) {
+				pSpectInfo[j + 10].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 10].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 220) ==
+					pSpectInfo[j + 11].chan_freq) {
+				pSpectInfo[j + 11].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 11].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 240) ==
+					pSpectInfo[j + 12].chan_freq) {
+				pSpectInfo[j + 12].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 12].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 260) ==
+					pSpectInfo[j + 13].chan_freq) {
+				pSpectInfo[j + 13].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 13].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 280) ==
+					pSpectInfo[j + 14].chan_freq) {
+				pSpectInfo[j + 14].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 14].weight_calc_done = true;
+			}
+			if ((pSpectInfo[j].chan_freq + 300) ==
+					pSpectInfo[j + 15].chan_freq) {
+				pSpectInfo[j + 15].weight =
+					SAP_ACS_WEIGHT_MAX * 16;
+				pSpectInfo[j + 15].weight_calc_done = true;
+			}
+
+			continue;
+		}
+
+		/* We have 16 channels to calculate cumulative weight */
+		combined_weight = pSpectInfo[j].weight +
+				  pSpectInfo[j + 1].weight +
+				  pSpectInfo[j + 2].weight +
+				  pSpectInfo[j + 3].weight +
+				  pSpectInfo[j + 4].weight +
+				  pSpectInfo[j + 5].weight +
+				  pSpectInfo[j + 6].weight +
+				  pSpectInfo[j + 7].weight +
+				  pSpectInfo[j + 8].weight +
+				  pSpectInfo[j + 9].weight +
+				  pSpectInfo[j + 10].weight +
+				  pSpectInfo[j + 11].weight +
+				  pSpectInfo[j + 12].weight +
+				  pSpectInfo[j + 13].weight +
+				  pSpectInfo[j + 14].weight +
+				  pSpectInfo[j + 15].weight;
+
+		min_ch_weight = pSpectInfo[j].weight;
+		minIdx = 0;
+
+		for (i = 0; i < 16; i++) {
+			if (min_ch_weight > pSpectInfo[j + i].weight) {
+				min_ch_weight = pSpectInfo[j + i].weight;
+				minIdx = i;
+			}
+			pSpectInfo[j + i].weight = SAP_ACS_WEIGHT_MAX * 16;
+			pSpectInfo[j + i].weight_calc_done = true;
+		}
+
+		pSpectInfo[j + minIdx].weight = combined_weight;
+
+		sap_debug("best freq = %d for 320mhz center freq %d combined weight = %d",
+			  pSpectInfo[j + minIdx].chan_freq,
+			  acs_ch_params.mhz_freq_seg1,
+			  combined_weight);
+	}
+
+	sap_sort_chl_weight(pSpectInfoParams);
+
+	pSpectInfo = pSpectInfoParams->pSpectCh;
+	for (j = 0; j < (pSpectInfoParams->numSpectChans); j++) {
+		sap_debug_rl("freq = %d weight = %d rssi = %d bss count = %d",
+			     pSpectInfo->chan_freq, pSpectInfo->weight,
+			     pSpectInfo->rssiAgr, pSpectInfo->bssCount);
+
+		pSpectInfo++;
+	}
+}
+#endif /* WLAN_FEATURE_11BE */
 
 /**
  * sap_allocate_max_weight_ht40_24_g() - allocate max weight for 40Mhz
@@ -1901,7 +2137,8 @@ static void sap_sort_chl_weight_ht40_24_g(struct mac_context *mac_ctx,
 	 */
 	for (i = 0; i < ARRAY_SIZE(acs_ht40_channels24_g); i++) {
 		for (j = 0; j < pSpectInfoParams->numSpectChans; j++) {
-			channel = wlan_freq_to_chan(pSpectInfo[j].chan_freq);
+			channel = wlan_reg_freq_to_chan(mac_ctx->pdev,
+							pSpectInfo[j].chan_freq);
 			if (channel == acs_ht40_channels24_g[i].chStartNum)
 				break;
 		}
@@ -2010,9 +2247,9 @@ static void sap_sort_chl_weight_ht40_24_g(struct mac_context *mac_ctx,
 
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 	for (j = 0; j < (pSpectInfoParams->numSpectChans); j++) {
-		sap_debug("freq = %d weight = %d rssi = %d bss count = %d",
-			  pSpectInfo->chan_freq, pSpectInfo->weight,
-			  pSpectInfo->rssiAgr, pSpectInfo->bssCount);
+		sap_debug_rl("freq = %d weight = %d rssi = %d bss count = %d",
+			     pSpectInfo->chan_freq, pSpectInfo->weight,
+			     pSpectInfo->rssiAgr, pSpectInfo->bssCount);
 
 		pSpectInfo++;
 	}
@@ -2118,9 +2355,9 @@ static void sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 
 	pSpectInfo = pSpectInfoParams->pSpectCh;
 	for (j = 0; j < (pSpectInfoParams->numSpectChans); j++) {
-		sap_debug("freq = %d weight = %d rssi = %d bss count = %d",
-			  pSpectInfo->chan_freq, pSpectInfo->weight,
-			  pSpectInfo->rssiAgr, pSpectInfo->bssCount);
+		sap_debug_rl("freq = %d weight = %d rssi = %d bss count = %d",
+			     pSpectInfo->chan_freq, pSpectInfo->weight,
+			     pSpectInfo->rssiAgr, pSpectInfo->bssCount);
 
 		pSpectInfo++;
 	}
@@ -2181,6 +2418,11 @@ static void sap_sort_chl_weight_all(struct mac_context *mac_ctx,
 	case CH_WIDTH_160MHZ:
 		sap_sort_chl_weight_160_mhz(mac_ctx, pSpectInfoParams);
 		break;
+#ifdef WLAN_FEATURE_11BE
+	case CH_WIDTH_320MHZ:
+		sap_sort_chl_weight_320_mhz(mac_ctx, pSpectInfoParams);
+		break;
+#endif
 	case CH_WIDTH_20MHZ:
 	default:
 		/* Sorting the channels as per weights as 20MHz channels */
@@ -2189,9 +2431,9 @@ static void sap_sort_chl_weight_all(struct mac_context *mac_ctx,
 
 	pSpectCh = pSpectInfoParams->pSpectCh;
 	for (j = 0; j < (pSpectInfoParams->numSpectChans); j++) {
-		sap_debug("Freq = %d weight = %d rssi aggr = %d bss count = %d",
-			  pSpectCh->chan_freq, pSpectCh->weight,
-			  pSpectCh->rssiAgr, pSpectCh->bssCount);
+		sap_debug_rl("Freq = %d weight = %d rssi aggr = %d bss count = %d",
+			     pSpectCh->chan_freq, pSpectCh->weight,
+			     pSpectCh->rssiAgr, pSpectCh->bssCount);
 		pSpectCh++;
 	}
 
@@ -2213,6 +2455,18 @@ static bool sap_is_ch_non_overlap(struct sap_context *sap_ctx, uint16_t ch)
 		return true;
 
 	return false;
+}
+
+static enum phy_ch_width
+sap_acs_next_lower_bandwidth(enum phy_ch_width ch_width)
+{
+	if (ch_width <= CH_WIDTH_20MHZ ||
+	    ch_width == CH_WIDTH_5MHZ ||
+	    ch_width == CH_WIDTH_10MHZ ||
+	    ch_width >= CH_WIDTH_INVALID)
+		return CH_WIDTH_INVALID;
+
+	return wlan_reg_get_next_lower_bandwidth(ch_width);
 }
 
 uint32_t sap_select_channel(mac_handle_t mac_handle,
@@ -2259,6 +2513,9 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 
 	/*Loop till get the best channel in the given range */
 	for (count = 0; count < spect_info->numSpectChans; count++) {
+		if (!spect_info->pSpectCh[count].valid)
+			continue;
+
 		best_chan_freq = spect_info->pSpectCh[count].chan_freq;
 		/* check if best_ch_num is in preferred channel list */
 		best_chan_freq =
@@ -2305,7 +2562,16 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	 */
 	if (!ch_in_pcl(sap_ctx, best_chan_freq)) {
 		uint32_t cal_chan_freq, cal_chan_weight;
+
+		enum phy_ch_width pref_bw = sap_ctx->acs_cfg->ch_width;
+next_bw:
+		sap_debug("check bw %d", pref_bw);
 		for (count = 0; count < spect_info->numSpectChans; count++) {
+			struct ch_params ch_params = {0};
+
+			if (!spect_info->pSpectCh[count].valid)
+				continue;
+
 			cal_chan_freq = spect_info->pSpectCh[count].chan_freq;
 			cal_chan_weight = spect_info->pSpectCh[count].weight;
 			/* skip pcl channel whose weight is bigger than best */
@@ -2321,12 +2587,20 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 				spect_info)
 				== SAP_CHANNEL_NOT_SELECTED)
 				continue;
-
+			ch_params.ch_width = pref_bw;
+			wlan_reg_set_channel_params_for_freq(
+				mac_ctx->pdev, cal_chan_freq, 0, &ch_params);
+			if (ch_params.ch_width != pref_bw)
+				continue;
 			best_chan_freq = cal_chan_freq;
-			sap_debug("Changed best freq to %d Preferred freq",
-				  best_chan_freq);
-
+			sap_debug("Changed best freq to %d Preferred freq bw %d",
+				  best_chan_freq, pref_bw);
 			break;
+		}
+		if (count == spect_info->numSpectChans) {
+			pref_bw = sap_acs_next_lower_bandwidth(pref_bw);
+			if (pref_bw != CH_WIDTH_INVALID)
+				goto next_bw;
 		}
 	}
 

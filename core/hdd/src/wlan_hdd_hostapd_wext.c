@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -288,7 +288,7 @@ static QDF_STATUS hdd_print_acl(struct hdd_adapter *adapter)
 {
 	eSapMacAddrACL acl_mode;
 	struct qdf_mac_addr maclist[MAX_ACL_MAC_ADDRESS];
-	uint8_t listnum;
+	uint16_t listnum;
 	struct sap_context *sap_ctx;
 
 	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
@@ -404,9 +404,14 @@ static __iw_softap_setparam(struct net_device *dev,
 						    CSA_REASON_USER_INITIATED);
 			hdd_debug("SET Channel Change to new channel= %d",
 			       set_value);
-			ret = hdd_softap_set_channel_change(dev,
-							    wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, set_value),
-							    CH_WIDTH_MAX, false);
+			if (set_value <= wlan_reg_max_5ghz_ch_num())
+				set_value = wlan_reg_legacy_chan_to_freq(
+								hdd_ctx->pdev,
+								set_value);
+
+			ret = hdd_softap_set_channel_change(dev, set_value,
+							    CH_WIDTH_MAX,
+							    false);
 		} else {
 			hdd_err("Channel Change Failed, Device in test mode");
 			ret = -EINVAL;
@@ -868,7 +873,8 @@ static __iw_softap_setparam(struct net_device *dev,
 		}
 
 		qdf_mem_zero(&radar, sizeof(radar));
-		if (wlan_reg_is_dfs_for_freq(pdev, ap_ctx->operating_chan_freq))
+		if (policy_mgr_get_dfs_beaconing_session_id(hdd_ctx->psoc) !=
+		    WLAN_UMAC_VDEV_ID_MAX)
 			tgt_dfs_process_radar_ind(pdev, &radar);
 		else
 			hdd_debug("Ignore set radar, op ch_freq(%d) is not dfs",
@@ -899,7 +905,7 @@ static __iw_softap_setparam(struct net_device *dev,
 	case QCASAP_NSS_CMD:
 	{
 		hdd_debug("QCASAP_NSS_CMD val %d", set_value);
-		hdd_update_nss(adapter, set_value);
+		hdd_update_nss(adapter, set_value, set_value);
 		ret = wma_cli_set_command(adapter->vdev_id,
 					  WMI_VDEV_PARAM_NSS,
 					  set_value, VDEV_CMD);
@@ -1141,7 +1147,7 @@ static __iw_softap_getparam(struct net_device *dev,
 
 	switch (sub_cmd) {
 	case QCSAP_PARAM_MAX_ASSOC:
-		if (ucfg_mlme_set_assoc_sta_limit(hdd_ctx->psoc, *value) !=
+		if (ucfg_mlme_get_assoc_sta_limit(hdd_ctx->psoc, value) !=
 		    QDF_STATUS_SUCCESS) {
 			hdd_err("CFG_ASSOC_STA_LIMIT failed");
 			ret = -EIO;
@@ -2132,8 +2138,7 @@ __iw_softap_stopbss(struct net_device *dev,
 		status = wlansap_stop_bss(
 			WLAN_HDD_GET_SAP_CTX_PTR(adapter));
 		if (QDF_IS_STATUS_SUCCESS(status)) {
-			status =
-				qdf_wait_for_event_completion(&hostapd_state->
+			status = qdf_wait_single_event(&hostapd_state->
 					qdf_stop_bss_event,
 					SME_CMD_STOP_BSS_TIMEOUT);
 
@@ -2606,14 +2611,14 @@ __iw_get_peer_rssi(struct net_device *dev, struct iw_request_info *info,
 			hdd_err("String to Hex conversion Failed");
 	}
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
 	if (!vdev)
 		return -EINVAL;
 
 	rssi_info = wlan_cfg80211_mc_cp_stats_get_peer_rssi(vdev,
 							    macaddress.bytes,
 							    &ret);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 	if (ret || !rssi_info) {
 		wlan_cfg80211_mc_cp_stats_free_stats_event(rssi_info);
 		return ret;

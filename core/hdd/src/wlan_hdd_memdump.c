@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,11 +32,7 @@
 #include <sme_api.h>
 #include <wlan_hdd_includes.h>
 
-#ifdef MULTI_IF_NAME
-#define PROCFS_DRIVER_DUMP_DIR "debugdriver" MULTI_IF_NAME
-#else
 #define PROCFS_DRIVER_DUMP_DIR "debugdriver"
-#endif
 #define PROCFS_DRIVER_DUMP_NAME "driverdump"
 #define PROCFS_DRIVER_DUMP_PERM 0444
 
@@ -64,10 +60,8 @@ void hdd_driver_mem_cleanup(void)
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("Invalid HDD context");
+	if (!hdd_ctx)
 		return;
-	}
 
 	if (hdd_ctx->driver_dump_mem) {
 		qdf_mem_free(hdd_ctx->driver_dump_mem);
@@ -261,6 +255,8 @@ static int hdd_driver_memdump_procfs_init(struct hdd_context *hdd_ctx)
  */
 static void hdd_driver_memdump_procfs_remove(void)
 {
+	if (!proc_file_driver)
+		return;
 	remove_proc_entry(PROCFS_DRIVER_DUMP_NAME, proc_dir_driver);
 	pr_debug("/proc/%s/%s removed\n", PROCFS_DRIVER_DUMP_DIR,
 					  PROCFS_DRIVER_DUMP_NAME);
@@ -282,10 +278,8 @@ int hdd_driver_memdump_init(void)
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("Invalid HDD context");
+	if (!hdd_ctx)
 		return -EINVAL;
-	}
 
 	mutex_init(&hdd_ctx->memdump_lock);
 

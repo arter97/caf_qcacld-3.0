@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -553,7 +553,6 @@ static inline void ol_check_clean_recovery_flag(struct ol_context *ol_ctx)
 	qdf_device_t qdf_dev = ol_ctx->qdf_dev;
 
 	if (!pld_have_platform_driver_support(qdf_dev->dev)) {
-		cds_set_recovery_in_progress(false);
 		if (ol_ctx->fw_crashed_cb)
 			ol_ctx->fw_crashed_cb();
 	}
@@ -584,10 +583,9 @@ int ol_copy_ramdump(struct hif_opaque_softc *scn)
 	struct ramdump_info *info;
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
-	if (!qdf_dev) {
-		BMI_ERR("%s qdf_dev is NULL", __func__);
+	if (!qdf_dev)
 		return -EINVAL;
-	}
+
 	if (pld_is_fw_dump_skipped(qdf_dev->dev)) {
 		BMI_INFO("%s ssr enabled, skip ramdump", __func__);
 		return 0;

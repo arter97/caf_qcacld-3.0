@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,9 @@
 #endif
 
 #include "ol_txrx_api.h"
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+#include <cdp_txrx_ctrl.h>
+#endif
 
 #ifdef WLAN_FEATURE_TSF_PLUS
 #if !defined(WLAN_FEATURE_TSF_PLUS_NOIRQ) && \
@@ -104,13 +107,10 @@ static
 enum hdd_tsf_get_state hdd_tsf_check_conn_state(struct hdd_adapter *adapter)
 {
 	enum hdd_tsf_get_state ret = TSF_RETURN;
-	struct hdd_station_ctx *hdd_sta_ctx;
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 			adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-		if (hdd_sta_ctx->conn_info.conn_state !=
-				eConnectionState_Associated) {
+		if (!hdd_cm_is_vdev_associated(adapter)) {
 			hdd_err("failed to cap tsf, not connect with ap");
 			ret = TSF_STA_NOT_CONNECTED_NO_TSF;
 		}
@@ -290,6 +290,17 @@ bool hdd_tsf_is_tsf64_tx_set(struct hdd_context *hdd)
 	if (hdd && QDF_IS_STATUS_SUCCESS(
 	    ucfg_fwol_get_tsf_ptp_options(hdd->psoc, &tsf_ptp_options)))
 		return tsf_ptp_options & CFG_SET_TSF_PTP_OPT_TSF64_TX;
+	else
+		return false;
+}
+
+static bool hdd_is_tsf_sync_enabled(struct hdd_context *hdd)
+{
+	bool is_tsf_sync_enable;
+
+	if (hdd && QDF_IS_STATUS_SUCCESS(
+	    ucfg_fwol_get_tsf_sync_enable(hdd->psoc, &is_tsf_sync_enable)))
+		return is_tsf_sync_enable;
 	else
 		return false;
 }
@@ -661,6 +672,16 @@ static
 enum hdd_tsf_op_result __hdd_stop_tsf_sync(struct hdd_adapter *adapter)
 {
 	QDF_STATUS ret;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("invalid hdd context");
+		return HDD_TSF_OP_FAIL;
+	}
+
+	if (!hdd_is_tsf_sync_enabled(hdd_ctx))
+		return HDD_TSF_OP_FAIL;
 
 	if (!hdd_get_th_sync_status(adapter)) {
 		hdd_err("Host Target sync has not initialized");
@@ -1122,11 +1143,9 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 			break;
 		}
 		hdd_warn("Reach the max continuous error count");
-		/*
-		 * fall through:
-		 * If reach MAX_CONTINUOUS_ERROR_CNT, treat it as a
-		 * valid pair
-		 */
+
+		/* If reach MAX_CONTINUOUS_ERROR_CNT, treat it as valid pair */
+		/* fallthrough */
 	case HDD_TS_STATUS_READY:
 		adapter->last_target_time = adapter->cur_target_time;
 		adapter->last_target_global_tsf_time =
@@ -1192,7 +1211,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 				 "TSF sync is not initialized\n");
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (eConnectionState_Associated != hdd_sta_ctx->conn_info.conn_state &&
+	if (!hdd_cm_is_vdev_associated(adapter) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");
@@ -1354,7 +1373,7 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 				 "TSF sync is not initialized\n");
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (eConnectionState_Associated != hdd_sta_ctx->conn_info.conn_state &&
+	if (!hdd_cm_is_vdev_associated(adapter) &&
 	    (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE))
 		return scnprintf(buf, PAGE_SIZE, "NOT connected\n");
@@ -1433,6 +1452,11 @@ static enum hdd_tsf_op_result hdd_tsf_sync_init(struct hdd_adapter *adapter)
 		return HDD_TSF_OP_FAIL;
 	}
 
+	if (!hdd_is_tsf_sync_enabled(hddctx)) {
+		hdd_err("TSF sync feature not enabled");
+		return HDD_TSF_OP_FAIL;
+	}
+
 	if (hdd_get_th_sync_status(adapter)) {
 		hdd_err("Host Target sync has been initialized!!");
 		return HDD_TSF_OP_SUCC;
@@ -1471,10 +1495,8 @@ static enum hdd_tsf_op_result hdd_tsf_sync_deinit(struct hdd_adapter *adapter)
 	if (!adapter)
 		return HDD_TSF_OP_FAIL;
 
-	if (!hdd_get_th_sync_status(adapter)) {
-		hdd_err("Host Target sync has not been initialized!!");
+	if (!hdd_get_th_sync_status(adapter))
 		return HDD_TSF_OP_SUCC;
-	}
 
 	hdd_set_th_sync_status(adapter, false);
 	ret = qdf_mc_timer_destroy(&adapter->host_target_sync_timer);
@@ -1506,6 +1528,75 @@ static enum hdd_tsf_op_result hdd_tsf_sync_deinit(struct hdd_adapter *adapter)
 	return HDD_TSF_OP_SUCC;
 }
 
+int hdd_start_tsf_sync(struct hdd_adapter *adapter)
+{
+	enum hdd_tsf_op_result ret;
+
+	if (!adapter)
+		return -EINVAL;
+
+	ret = hdd_tsf_sync_init(adapter);
+	if (ret != HDD_TSF_OP_SUCC)
+		return -EINVAL;
+
+	return (__hdd_start_tsf_sync(adapter) ==
+		HDD_TSF_OP_SUCC) ? 0 : -EINVAL;
+}
+
+int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
+{
+	enum hdd_tsf_op_result ret;
+
+	if (!adapter)
+		return -EINVAL;
+
+	ret = __hdd_stop_tsf_sync(adapter);
+	if (ret != HDD_TSF_OP_SUCC)
+		return -EINVAL;
+
+	ret = hdd_tsf_sync_deinit(adapter);
+	if (ret != HDD_TSF_OP_SUCC) {
+		hdd_err("Failed to deinit tsf sync, ret: %d", ret);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static inline int __hdd_capture_tsf(struct hdd_adapter *adapter,
+				    uint32_t *buf, int len)
+{
+	if (!adapter || !buf) {
+		hdd_err("invalid pointer");
+		return -EINVAL;
+	}
+
+	if (len != 1)
+		return -EINVAL;
+
+	buf[0] = TSF_DISABLED_BY_TSFPLUS;
+
+	return 0;
+}
+
+static inline int __hdd_indicate_tsf(struct hdd_adapter *adapter,
+				     uint32_t *buf, int len)
+{
+	if (!adapter || !buf) {
+		hdd_err("invalid pointer");
+		return -EINVAL;
+	}
+
+	if (len != 3)
+		return -EINVAL;
+
+	buf[0] = TSF_DISABLED_BY_TSFPLUS;
+	buf[1] = 0;
+	buf[2] = 0;
+
+	return 0;
+}
+
+#ifdef WLAN_FEATURE_TSF_PLUS_SOCK_TS
 #ifdef CONFIG_HL_SUPPORT
 static inline
 enum hdd_tsf_op_result hdd_netbuf_timestamp(qdf_nbuf_t netbuf,
@@ -1563,43 +1654,18 @@ enum hdd_tsf_op_result hdd_netbuf_timestamp(qdf_nbuf_t netbuf,
 }
 #endif
 
-int hdd_start_tsf_sync(struct hdd_adapter *adapter)
-{
-	enum hdd_tsf_op_result ret;
-
-	if (!adapter)
-		return -EINVAL;
-
-	ret = hdd_tsf_sync_init(adapter);
-	if (ret != HDD_TSF_OP_SUCC) {
-		hdd_err("Failed to init tsf sync, ret: %d", ret);
-		return -EINVAL;
-	}
-
-	return (__hdd_start_tsf_sync(adapter) ==
-		HDD_TSF_OP_SUCC) ? 0 : -EINVAL;
-}
-
-int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
-{
-	enum hdd_tsf_op_result ret;
-
-	if (!adapter)
-		return -EINVAL;
-
-	ret = __hdd_stop_tsf_sync(adapter);
-	if (ret != HDD_TSF_OP_SUCC)
-		return -EINVAL;
-
-	ret = hdd_tsf_sync_deinit(adapter);
-	if (ret != HDD_TSF_OP_SUCC) {
-		hdd_err("Failed to deinit tsf sync, ret: %d", ret);
-		return -EINVAL;
-	}
-	return 0;
-}
-
-int hdd_tx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time)
+/**
+ * hdd_tx_timestamp() - time stamp TX netbuf
+ *
+ * @netbuf: pointer to a TX netbuf
+ * @target_time: TX time for the netbuf
+ *
+ * This function  get corresponding host time from target time,
+ * and time stamp the TX netbuf with this time
+ *
+ * Return: Describe the execute result of this routine
+ */
+static int hdd_tx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time)
 {
 	struct sock *sk = netbuf->sk;
 
@@ -1647,47 +1713,33 @@ int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time)
 	return -EINVAL;
 }
 
-static inline int __hdd_capture_tsf(struct hdd_adapter *adapter,
-				    uint32_t *buf, int len)
+static inline void wlan_hdd_tsf_plus_sock_ts_init(struct hdd_context *hdd_ctx)
 {
-	if (!adapter || !buf) {
-		hdd_err("invalid pointer");
-		return -EINVAL;
-	}
-
-	if (len != 1)
-		return -EINVAL;
-
-	buf[0] = TSF_DISABLED_BY_TSFPLUS;
-
-	return 0;
+	if (hdd_tsf_is_tx_set(hdd_ctx))
+		ol_register_timestamp_callback(hdd_tx_timestamp);
 }
 
-static inline int __hdd_indicate_tsf(struct hdd_adapter *adapter,
-				     uint32_t *buf, int len)
+static inline void wlan_hdd_tsf_plus_sock_ts_deinit(struct hdd_context *hdd_ctx)
 {
-	if (!adapter || !buf) {
-		hdd_err("invalid pointer");
-		return -EINVAL;
-	}
-
-	if (len != 3)
-		return -EINVAL;
-
-	buf[0] = TSF_DISABLED_BY_TSFPLUS;
-	buf[1] = 0;
-	buf[2] = 0;
-
-	return 0;
+	if (hdd_tsf_is_tx_set(hdd_ctx))
+		ol_deregister_timestamp_callback();
 }
+#else
+static inline void wlan_hdd_tsf_plus_sock_ts_init(struct hdd_context *hdd_ctx)
+{
+}
+
+static inline void wlan_hdd_tsf_plus_sock_ts_deinit(struct hdd_context *hdd_ctx)
+{
+}
+#endif /* WLAN_FEATURE_TSF_PLUS_SOCK_TS */
 
 #if defined(WLAN_FEATURE_TSF_PLUS_NOIRQ)
 static inline
 enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(struct hdd_context *hdd_ctx)
 {
 
-	if (hdd_tsf_is_tx_set(hdd_ctx))
-		ol_register_timestamp_callback(hdd_tx_timestamp);
+	wlan_hdd_tsf_plus_sock_ts_init(hdd_ctx);
 	return HDD_TSF_OP_SUCC;
 }
 
@@ -1699,8 +1751,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_deinit(struct hdd_context *hdd_ctx)
 	qdf_mc_timer_t *cap_timer;
 	struct hdd_adapter *adapter, *adapternode_ptr, *next_ptr;
 
-	if (hdd_tsf_is_tx_set(hdd_ctx))
-		ol_deregister_timestamp_callback();
+	wlan_hdd_tsf_plus_sock_ts_deinit(hdd_ctx);
 
 	status = hdd_get_front_adapter(hdd_ctx, &adapternode_ptr);
 
@@ -1759,8 +1810,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(struct hdd_context *hdd_ctx)
 		goto fail_free_gpio;
 	}
 
-	if (hdd_tsf_is_tx_set(hdd_ctx))
-		ol_register_timestamp_callback(hdd_tx_timestamp);
+	wlan_hdd_tsf_plus_sock_ts_init(hdd_ctx);
 
 	return HDD_TSF_OP_SUCC;
 
@@ -1784,8 +1834,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_deinit(struct hdd_context *hdd_ctx)
 	if (tsf_sync_gpio_pin == TSF_GPIO_PIN_INVALID)
 		return QDF_STATUS_E_INVAL;
 
-	if (hdd_tsf_is_tx_set(hdd_ctx))
-		ol_deregister_timestamp_callback();
+	wlan_hdd_tsf_plus_sock_ts_deinit(hdd_ctx);
 
 	gpio_free(tsf_sync_gpio_pin);
 	return HDD_TSF_OP_SUCC;
@@ -1838,8 +1887,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(struct hdd_context *hdd_ctx)
 		goto fail_free_gpio;
 	}
 
-	if (hdd_tsf_is_tx_set(hdd_ctx))
-		ol_register_timestamp_callback(hdd_tx_timestamp);
+	wlan_hdd_tsf_plus_sock_ts_init(hdd_ctx);
 
 	return HDD_TSF_OP_SUCC;
 
@@ -1864,8 +1912,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_deinit(struct hdd_context *hdd_ctx)
 	if (tsf_irq_gpio_pin == TSF_GPIO_PIN_INVALID)
 		return QDF_STATUS_E_INVAL;
 
-	if (hdd_tsf_is_tx_set(hdd_ctx))
-		ol_deregister_timestamp_callback();
+	wlan_hdd_tsf_plus_sock_ts_deinit(hdd_ctx);
 
 	if (tsf_gpio_irq_num >= 0) {
 		free_irq(tsf_gpio_irq_num, hdd_ctx);
@@ -1930,8 +1977,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_init(struct hdd_context *hdd_ctx)
 		return HDD_TSF_OP_FAIL;
 	}
 
-	if (hdd_tsf_is_tx_set(hdd_ctx))
-		ol_register_timestamp_callback(hdd_tx_timestamp);
+	wlan_hdd_tsf_plus_sock_ts_init(hdd_ctx);
 	return HDD_TSF_OP_SUCC;
 }
 
@@ -1940,8 +1986,7 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_deinit(struct hdd_context *hdd_ctx)
 {
 	int ret;
 
-	if (hdd_tsf_is_tx_set(hdd_ctx))
-		ol_deregister_timestamp_callback();
+	wlan_hdd_tsf_plus_sock_ts_deinit(hdd_ctx);
 
 	ret = cnss_common_unregister_tsf_captured_handler(
 				hdd_ctx->parent_dev,
@@ -1955,21 +2000,6 @@ enum hdd_tsf_op_result wlan_hdd_tsf_plus_deinit(struct hdd_context *hdd_ctx)
 	return HDD_TSF_OP_SUCC;
 }
 #endif
-
-void hdd_tsf_notify_wlan_state_change(struct hdd_adapter *adapter,
-				      eConnectionState old_state,
-				      eConnectionState new_state)
-{
-	if (!adapter)
-		return;
-
-	if (old_state != eConnectionState_Associated &&
-	    new_state == eConnectionState_Associated)
-		hdd_start_tsf_sync(adapter);
-	else if (old_state == eConnectionState_Associated &&
-		 new_state != eConnectionState_Associated)
-		hdd_stop_tsf_sync(adapter);
-}
 #else
 static inline void hdd_update_tsf(struct hdd_adapter *adapter, uint64_t tsf)
 {
@@ -2226,6 +2256,115 @@ hdd_convert_qtime_to_us(uint64_t time)
 }
 #endif
 
+#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
+static int hdd_set_tsf_auto_report(struct hdd_adapter *adapter, bool ena)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	int ret;
+
+	if (QDF_IS_STATUS_ERROR(cdp_set_tsf_ul_delay_report(soc,
+							    adapter->vdev_id,
+							    ena))) {
+		hdd_err_rl("Set tsf report uplink delay failed");
+		return -EPERM;
+	}
+
+	ret = wma_cli_set_command((int)adapter->vdev_id,
+				  ena ? (int)GEN_PARAM_TSF_AUTO_REPORT_ENABLE :
+				  (int)GEN_PARAM_TSF_AUTO_REPORT_DISABLE,
+				  ena, GEN_CMD);
+	if (ret) {
+		hdd_err_rl("tsf auto report %d failed", ena);
+		return -EINPROGRESS;
+	}
+
+	qdf_atomic_set(&adapter->tsf_auto_report, ena);
+
+	return 0;
+}
+
+/**
+ * hdd_handle_tsf_auto_report(): Handle TSF auto report enable or disable
+ * @adapter: pointer of struct hdd_adapter
+ * @tsf_cmd: TSF command from user space
+ *
+ * Return: 0 for success, -EINVAL to continue to handle other TSF commands and
+ *	   else errors
+ */
+static int hdd_handle_tsf_auto_report(struct hdd_adapter *adapter,
+				      uint32_t tsf_cmd)
+{
+	bool ena;
+
+	if (tsf_cmd != QCA_TSF_AUTO_REPORT_ENABLE &&
+	    tsf_cmd != QCA_TSF_AUTO_REPORT_DISABLE) {
+		hdd_debug_rl("tsf_cmd %d not for uplink delay", tsf_cmd);
+		return -EINVAL;
+	}
+
+	/* uplink delay feature is only required for STA mode */
+	if (adapter->device_mode != QDF_STA_MODE) {
+		hdd_debug_rl("tsf_cmd %d not allowed for device mode %d",
+			     tsf_cmd, adapter->device_mode);
+		return -EPERM;
+	}
+
+	ena = (tsf_cmd == QCA_TSF_AUTO_REPORT_ENABLE) ? true : false;
+
+	return hdd_set_tsf_auto_report(adapter, ena);
+}
+
+static QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
+				    struct stsf *ptsf)
+{
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint32_t delta_tsf;
+
+	/* If TSF report is for uplink delay, mac_id_valid will be set to
+	 * 1 by target. If not, the report is not for uplink delay feature
+	 * and return failure here so that legacy BSS TSF logic can be
+	 * continued.
+	 */
+	if (!ptsf->mac_id_valid) {
+		hdd_debug_rl("TSF report not for uplink delay");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* For uplink delay feature, TSF auto report needs to be enabled
+	 * first. Otherwise TSF event will not be posted by target.
+	 */
+	if (!qdf_atomic_read(&adapter->tsf_auto_report)) {
+		hdd_debug_rl("adapter %u tsf_auto_report disabled",
+			     adapter->vdev_id);
+		goto exit_with_success;
+	}
+
+	delta_tsf = ptsf->tsf_low - ptsf->soc_timer_low;
+	hdd_debug("vdev %u tsf_low %u qtimer_low %u delta_tsf %u",
+		  ptsf->vdev_id, ptsf->tsf_low, ptsf->soc_timer_low, delta_tsf);
+
+	/* Pass delta_tsf to DP layer to report uplink delay
+	 * on a per vdev basis
+	 */
+	cdp_set_delta_tsf(soc, adapter->vdev_id, delta_tsf);
+
+exit_with_success:
+	return QDF_STATUS_SUCCESS;
+}
+#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY */
+static inline int hdd_handle_tsf_auto_report(struct hdd_adapter *adapter,
+					     uint32_t tsf_cmd)
+{
+	return -EINVAL;
+}
+
+static inline QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
+					   struct stsf *ptsf)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+
 /**
  * hdd_get_tsf_cb() - handle tsf callback
  * @pcb_cxt: pointer to the hdd_contex
@@ -2264,6 +2403,14 @@ int hdd_get_tsf_cb(void *pcb_cxt, struct stsf *ptsf)
 		hdd_err("failed to find adapter");
 		return -EINVAL;
 	}
+
+	/* Intercept tsf report and check if it is for uplink delay.
+	 * If yes, return in advance and skip the legacy BSS TSF
+	 * report. Otherwise continue on to the legacy BSS TSF
+	 * report logic.
+	 */
+	if (QDF_IS_STATUS_SUCCESS(hdd_set_delta_tsf(adapter, ptsf)))
+		return 0;
 
 	if (!hdd_tsf_is_initialized(adapter)) {
 		hdd_err("tsf is not init, ignore tsf event");
@@ -2349,6 +2496,14 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 	tsf_cmd = nla_get_u32(tb_vendor[QCA_WLAN_VENDOR_ATTR_TSF_CMD]);
+
+	/* Intercept tsf_cmd for TSF auto report enable or disable subcmds.
+	 * If status is -EINVAL, it means tsf_cmd is not for auto report and
+	 * need to continue to handle other tsf cmds.
+	 */
+	status = hdd_handle_tsf_auto_report(adapter, tsf_cmd);
+	if (status != -EINVAL)
+		goto end;
 
 	if (tsf_cmd == QCA_TSF_CAPTURE || tsf_cmd == QCA_TSF_SYNC_GET) {
 		hdd_capture_tsf(adapter, tsf_op_resp, 1);

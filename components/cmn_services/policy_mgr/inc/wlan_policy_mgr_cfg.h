@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -327,29 +328,6 @@ CFG_INI_UINT("gAllowMCCGODiffBI", 0, 4, 4, CFG_VALUE_OR_DEFAULT, \
 	     "Allow GO in MCC mode to accept different BI than STA's")
 
 /*
- * <ini>
- * gEnableOverLapCh - Enables Overlap Channel. If set, allow overlapping
- *                    channels to be selected for the SoftAP
- * @Min: 0
- * @Max: 1
- * @Default: 0
- *
- * This ini is used to set Overlap Channel
- *
- * Related: None
- *
- * Supported Feature: STA
- *
- * Usage: External
- *
- * </ini>
- */
-
-#define CFG_ENABLE_OVERLAP_CH \
-CFG_INI_UINT("gEnableOverLapCh", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
-	     "Overlap channels are allowed for SAP when flag is set")
-
-/*
  *
  * <ini>
  * gDualMacFeatureDisable - Disable Dual MAC feature.
@@ -395,6 +373,9 @@ CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 6, CFG_VALUE_OR_DEFAULT, \
  * support disabled, the value is defined by enum PM_AP_DFS_MASTER_MODE.
  * 0 - Disallow STA+SAP SCC on DFS channel
  * 1 - Allow STA+SAP SCC on DFS channel with master mode disabled
+ *       This needs gEnableDFSMasterCap enabled to allow SAP SCC with
+ *       STA on DFS but dfs master mode disabled. Single SAP is not allowed
+ *       on DFS.
  * 2 - enhance "1" with below requirement
  *	 a. Allow single SAP (GO) start on DFS channel.
  *	 b. Allow CAC process on DFS channel in single SAP (GO) mode
@@ -545,11 +526,18 @@ CFG_INI_UINT("g_mark_sap_indoor_as_disable", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  * <ini>
  * g_enable_go_force_scc - Enable/Disable force SCC on P2P GO
  * @Min: 0
- * @Max: 1
+ * @Max: 2
  * @Default: 0
  *
  * This ini and along with "gWlanMccToSccSwitchMode" is used to enable
  * force SCC on P2P GO interface.
+ *
+ * GO_FORCE_SCC_DISABLED (value 0): GO force scc disabled and GO can come up
+ * in MCC mode
+ * GO_FORCE_SCC_STRICT (value 1): New GO will be forced to form on existing
+ * GO/STA/GC channel in start bss itself.
+ * GO_FORCE_SCC_LIBERAL (value 2): After SET KEY is done, do force SCC for the
+ * first GO to move to new GO channel.
  *
  * Supported Feature: P2P GO
  *
@@ -559,7 +547,7 @@ CFG_INI_UINT("g_mark_sap_indoor_as_disable", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  */
 
 #define CFG_P2P_GO_ENABLE_FORCE_SCC \
-CFG_INI_UINT("g_enable_go_force_scc", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
+CFG_INI_UINT("g_enable_go_force_scc", 0, 2, 0, CFG_VALUE_OR_DEFAULT, \
 	     "Enable/Disable P2P GO force SCC")
 
 /**
@@ -591,25 +579,24 @@ CFG_INI_UINT("g_pcl_band_priority", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
 
 /*
  * <ini>
- * g_prefer_5g_scc_to_dbs - prefer 5g scc to dbs
+ * g_multi_sap_allowed_on_same_band - Allow multi sap started on same band
  * @Min: 0
- * @Max: 0xFFFFFFFF
- * @Default: 0
+ * @Max: 1
+ * @Default: 1
  *
- * This ini is used to give higher priority for 5g scc than dbs.
- * It is bitmap per enum policy_mgr_con_mode.
- * For example in GO+STA(5G) mode, when TPUT is onfigured as wlan system
- * preference option, If 5G SCC needs higher priority than dbs, set it as 0x8.
+ * This ini is used to allow multi sap started on same band or not.
+ * 0 - Disallow multi sap started on same band
+ * 1 - Allow multi sap started on same band
  *
- * Supported Feature: P2P GO
+ * Supported Feature: SAP
  *
  * Usage: External
  *
  * </ini>
  */
-#define CFG_PREFER_5G_SCC_TO_DBS \
-CFG_INI_UINT("g_prefer_5g_scc_to_dbs", 0, 0xFFFFFFFF, 0, CFG_VALUE_OR_DEFAULT, \
-	     "5G SCC has higher priority than DBS")
+#define CFG_MULTI_SAP_ALLOWED_ON_SAME_BAND \
+CFG_INI_BOOL("g_multi_sap_allowed_on_same_band", 1, \
+	     "Allow multi SAP started on same band")
 
 #define CFG_POLICY_MGR_ALL \
 		CFG(CFG_MCC_TO_SCC_SWITCH) \
@@ -622,7 +609,6 @@ CFG_INI_UINT("g_prefer_5g_scc_to_dbs", 0, 0xFFFFFFFF, 0, CFG_VALUE_OR_DEFAULT, \
 		CFG(CFG_ENABLE_CONC_RULE2) \
 		CFG(CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME)\
 		CFG(CFG_ENABLE_STA_CONNECTION_IN_5GHZ)\
-		CFG(CFG_ENABLE_OVERLAP_CH)\
 		CFG(CFG_DUAL_MAC_FEATURE_DISABLE)\
 		CFG(CFG_STA_SAP_SCC_ON_DFS_CHAN)\
 		CFG(CFG_FORCE_1X1_FEATURE)\
@@ -633,5 +619,5 @@ CFG_INI_UINT("g_prefer_5g_scc_to_dbs", 0, 0xFFFFFFFF, 0, CFG_VALUE_OR_DEFAULT, \
 		CFG(CFG_ALLOW_MCC_GO_DIFF_BI) \
 		CFG(CFG_P2P_GO_ENABLE_FORCE_SCC) \
 		CFG(CFG_PCL_BAND_PRIORITY) \
-		CFG(CFG_PREFER_5G_SCC_TO_DBS)
+		CFG(CFG_MULTI_SAP_ALLOWED_ON_SAME_BAND)
 #endif

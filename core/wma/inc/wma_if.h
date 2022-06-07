@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -167,6 +167,11 @@ struct sAniProbeRspStruct {
  * @nss: Return the number of spatial streams supported
  * @stbc_capable: stbc capable
  * @no_ptk_4_way: Do not need 4-way handshake
+ * @eht_capable: is EHT capabale or not
+ * @eht_config: EHT capability
+ * @eht_op: EHT operation
+ * @mld_mac_addr: mld mac address
+ * @is_assoc_peer: is assoc peer or not
  *
  * This structure contains parameter required for
  * add sta request of upper layer.
@@ -248,6 +253,15 @@ typedef struct {
 	uint8_t twt_responder;
 #endif
 	bool no_ptk_4_way;
+#ifdef WLAN_FEATURE_11BE
+	bool eht_capable;
+	tDot11fIEeht_cap eht_config;
+	tDot11fIEeht_op eht_op;
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	uint8_t mld_mac_addr[QDF_MAC_ADDR_SIZE];
+	bool is_assoc_peer;
+#endif
 } tAddStaParams, *tpAddStaParams;
 
 /**
@@ -338,6 +352,7 @@ typedef struct sLimMlmSetKeysReq {
  * @ch_width: VHT tx channel width
  * @he_capable: HE Capability
  * @no_ptk_4_way: Do not need 4-way handshake
+ * @eht_capable: EHT capability
  */
 struct bss_params {
 	tSirMacAddr bssId;
@@ -363,6 +378,10 @@ struct bss_params {
 	uint32_t he_sta_obsspd;
 #endif
 	bool no_ptk_4_way;
+	uint16_t bss_max_idle_period;
+#ifdef WLAN_FEATURE_11BE
+	bool eht_capable;
+#endif
 };
 
 /**
@@ -377,16 +396,6 @@ struct add_bss_rsp {
 	QDF_STATUS status;
 	uint32_t chain_mask;
 	uint8_t smps_mode;
-};
-
-/**
- * struct del_bss_resp - params required for del bss response
- * @status: QDF status
- * @vdev_id: vdev_id
- */
-struct del_bss_resp {
-	QDF_STATUS status;
-	uint8_t vdev_id;
 };
 
 typedef enum eDelStaReasonCode {
@@ -475,6 +484,9 @@ typedef struct {
 	uint32_t ecsa_count_offset;
 	enum sir_bcn_update_reason reason;
 	QDF_STATUS status;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct mlo_bcn_templ_partner_links mlo_partner;
+#endif
 } tSendbeaconParams, *tpSendbeaconParams;
 
 /**
@@ -738,6 +750,14 @@ struct send_peer_unmap_conf_params {
 };
 
 /**
+ * struct peer_create_rsp_params  - Peer create response parameters
+ * @peer_mac: Peer mac address
+ */
+struct peer_create_rsp_params {
+	struct qdf_mac_addr peer_mac;
+};
+
+/**
  * struct tDisableIntraBssFwd - intra bss forward parameters
  * @sessionId: session id
  * @disableintrabssfwd: disable intra bss forward flag
@@ -760,45 +780,5 @@ typedef struct sStatsExtRequest {
 	uint8_t request_data[];
 } tStatsExtRequest, *tpStatsExtRequest;
 #endif /* WLAN_FEATURE_STATS_EXT */
-
-/*
- * struct roam_blacklist_timeout - BTM blacklist entry
- * @bssid - bssid that is to be blacklisted
- * @timeout - time duration for which the bssid is blacklisted
- * @received_time - boot timestamp at which the firmware event was received
- * @rssi - rssi value for which the bssid is blacklisted
- * @reject_reason: reason to add the BSSID to BLM
- * @original_timeout: original timeout sent by the AP
- * @source: Source of adding the BSSID to BLM
- */
-struct roam_blacklist_timeout {
-	struct qdf_mac_addr bssid;
-	uint32_t timeout;
-	qdf_time_t received_time;
-	int32_t rssi;
-	enum blm_reject_ap_reason reject_reason;
-	uint32_t original_timeout;
-	enum blm_reject_ap_source source;
-};
-
-/*
- * struct roam_blacklist_event - Blacklist event entries destination structure
- * @num_entries: total entries sent over the event
- * @roam_blacklist: blacklist details
- */
-struct roam_blacklist_event {
-	uint32_t num_entries;
-	struct roam_blacklist_timeout roam_blacklist[];
-};
-
-/*
- * struct roam_pmkid_req_event - Pmkid event with entries destination structure
- * @num_entries: total entries sent over the event
- * @ap_bssid: bssid list
- */
-struct roam_pmkid_req_event {
-	uint32_t num_entries;
-	struct qdf_mac_addr ap_bssid[];
-};
 
 #endif /* _HALMSGAPI_H_ */

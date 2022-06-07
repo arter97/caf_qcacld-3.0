@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -22,16 +22,6 @@
 
 #ifndef __CFG_MLME_SAP_H
 #define __CFG_MLME_SAP_H
-
-#define STR_SSID_DEFAULT "1234567890"
-#define STR_SSID_DEFAULT_LEN sizeof(STR_SSID_DEFAULT)
-
-#define CFG_SSID CFG_STRING( \
-			"cfg_ssid", \
-			0, \
-			STR_SSID_DEFAULT_LEN, \
-			STR_SSID_DEFAULT, \
-			"CFG_SSID")
 
 #define CFG_BEACON_INTERVAL CFG_INI_UINT( \
 			"gBeaconInterval", \
@@ -461,7 +451,7 @@
  * gCountryCodePriority - Priority to set country code
  * @Min: 0
  * @Max: 1
- * @Default: 0
+ * @Default: 1
  *
  * This ini is used to set default gCountryCodePriority
  *
@@ -469,13 +459,13 @@
  *
  * Supported Feature: SAP
  *
- * Usage: Internal/External
+ * Usage: Internal
  *
  * </ini>
  */
 #define CFG_COUNTRY_CODE_PRIORITY CFG_INI_BOOL( \
 			"gCountryCodePriority", \
-			0, \
+			1, \
 			"Country code priority")
 
 /*
@@ -735,7 +725,6 @@
 #define CFG_SAP_ALL \
 	CFG_SAP_SAE \
 	CFG(CFG_AP_ENABLE_RANDOM_BSSID) \
-	CFG(CFG_SSID) \
 	CFG(CFG_BEACON_INTERVAL) \
 	CFG(CFG_DTIM_PERIOD) \
 	CFG(CFG_LISTEN_INTERVAL) \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,6 +47,7 @@
 #include <qdf_notifier.h>
 #include <qdf_hang_event_notifier.h>
 #include "wlan_hdd_thermal.h"
+#include "wlan_hdd_bus_bandwidth.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -59,6 +60,9 @@ static uint8_t re_init_fail_cnt, probe_fail_cnt;
 
 /* An atomic flag to check if SSR cleanup has been done or not */
 static qdf_atomic_t is_recovery_cleanup_done;
+
+/* firmware/host hang event data */
+static uint8_t g_fw_host_hang_event[QDF_HANG_EVENT_DATA_SIZE];
 
 /*
  * In BMI Phase we are only sending small chunk (256 bytes) of the FW image at
@@ -227,6 +231,13 @@ static void hdd_hif_init_driver_state_callbacks(void *data,
 		hdd_put_consistent_mem_unaligned;
 }
 
+#ifdef HIF_DETECTION_LATENCY_ENABLE
+void hdd_hif_set_enable_detection(struct hif_opaque_softc *hif_ctx, bool value)
+{
+	hif_set_enable_detection(hif_ctx, value);
+}
+#endif
+
 #ifdef FORCE_WAKE
 void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
 			    bool hal_init_phase)
@@ -265,6 +276,38 @@ hdd_hif_register_shutdown_notifier(struct hif_opaque_softc *hif_ctx)
 					hif_shutdown_notifier_cb,
 					hif_ctx);
 }
+
+/**
+
+ * hdd_hif_set_ce_max_yield_time() - Wrapper API to set CE max yield time
+ * @hif_ctx: hif context
+ * @bus_type: underlying bus type
+ * @ce_service_max_yield_time: max yield time to be set
+ *
+ * Return: None
+ */
+#if defined(CONFIG_SLUB_DEBUG_ON)
+#define CE_SNOC_MAX_YIELD_TIME_US 2000
+
+static void hdd_hif_set_ce_max_yield_time(struct hif_opaque_softc *hif_ctx,
+					  enum qdf_bus_type bus_type,
+					  uint32_t ce_service_max_yield_time)
+{
+	if (bus_type == QDF_BUS_TYPE_SNOC &&
+	    ce_service_max_yield_time < CE_SNOC_MAX_YIELD_TIME_US)
+		ce_service_max_yield_time = CE_SNOC_MAX_YIELD_TIME_US;
+
+	hif_set_ce_service_max_yield_time(hif_ctx, ce_service_max_yield_time);
+}
+
+#else
+static void hdd_hif_set_ce_max_yield_time(struct hif_opaque_softc *hif_ctx,
+					  enum qdf_bus_type bus_type,
+					  uint32_t ce_service_max_yield_time)
+{
+	hif_set_ce_service_max_yield_time(hif_ctx, ce_service_max_yield_time);
+}
+#endif
 
 /**
  * hdd_init_cds_hif_context() - API to set CDS HIF Context
@@ -339,10 +382,8 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 	uint32_t mode = cds_get_conparam();
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx error");
+	if (!hdd_ctx)
 		return -EFAULT;
-	}
 
 	hdd_hif_init_driver_state_callbacks(dev, &cbk);
 
@@ -392,7 +433,8 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 		}
 	}
 
-	hif_set_ce_service_max_yield_time(hif_ctx,
+	hdd_hif_set_ce_max_yield_time(
+				hif_ctx, bus_type,
 				cfg_get(hdd_ctx->psoc,
 					CFG_DP_CE_SERVICE_MAX_YIELD_TIME));
 	ucfg_pmo_psoc_set_hif_handle(hdd_ctx->psoc, hif_ctx);
@@ -448,10 +490,8 @@ static int hdd_init_qdf_ctx(struct device *dev, void *bdev,
 {
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
-	if (!qdf_dev) {
-		hdd_err("Invalid QDF device");
+	if (!qdf_dev)
 		return -EINVAL;
-	}
 
 	qdf_dev->dev = dev;
 	qdf_dev->drv_hdl = bdev;
@@ -524,6 +564,26 @@ static void hdd_soc_load_unlock(struct device *dev)
 	hdd_allow_suspend(WIFI_POWER_EVENT_WAKELOCK_DRIVER_INIT);
 }
 
+#ifdef DP_MEM_PRE_ALLOC
+/**
+ * hdd_init_dma_mask() - Set the DMA mask for dma memory pre-allocation
+ * @dev: device handle
+ * @bus_type: Bus type for which init is being done
+ *
+ * Return: 0 - success, non-zero on failure
+ */
+static int hdd_init_dma_mask(struct device *dev, enum qdf_bus_type bus_type)
+{
+	return hif_init_dma_mask(dev, bus_type);
+}
+#else
+static inline int
+hdd_init_dma_mask(struct device *dev, enum qdf_bus_type bus_type)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static int __hdd_soc_probe(struct device *dev,
 			   void *bdev,
 			   const struct hif_bus_id *bid,
@@ -544,17 +604,21 @@ static int __hdd_soc_probe(struct device *dev,
 	if (errno)
 		goto unlock;
 
-	status = dp_prealloc_init();
-
-	if (status != QDF_STATUS_SUCCESS) {
-		errno = qdf_status_to_os_return(status);
+	errno = hdd_init_dma_mask(dev, bus_type);
+	if (errno)
 		goto unlock;
-	}
 
 	hdd_ctx = hdd_context_create(dev);
 	if (IS_ERR(hdd_ctx)) {
 		errno = PTR_ERR(hdd_ctx);
 		goto assert_fail_count;
+	}
+
+	status = dp_prealloc_init((struct cdp_ctrl_objmgr_psoc *)hdd_ctx->psoc);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		errno = qdf_status_to_os_return(status);
+		goto dp_prealloc_fail;
 	}
 
 	errno = hdd_wlan_startup(hdd_ctx);
@@ -581,10 +645,12 @@ wlan_exit:
 	hdd_wlan_exit(hdd_ctx);
 
 hdd_context_destroy:
+	dp_prealloc_deinit();
+
+dp_prealloc_fail:
 	hdd_context_destroy(hdd_ctx);
 
 assert_fail_count:
-	dp_prealloc_deinit();
 	probe_fail_cnt++;
 	hdd_err("consecutive probe failures:%u", probe_fail_cnt);
 	QDF_BUG(probe_fail_cnt < SSR_MAX_FAIL_CNT);
@@ -673,8 +739,10 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	 * So check if FW is down then don't reset the recovery
 	 * in progress
 	 */
-	if (!qdf_is_fw_down())
+	if (!qdf_is_fw_down()) {
 		cds_set_recovery_in_progress(false);
+		hdd_handle_cached_commands();
+	}
 
 	hdd_soc_load_unlock(dev);
 	hdd_start_complete(0);
@@ -756,7 +824,7 @@ static void __hdd_soc_remove(struct device *dev)
 		 * Trigger runtime sync resume before setting unload in progress
 		 * such that resume can happen successfully
 		 */
-		hif_pm_runtime_sync_resume(hif_ctx);
+		hif_pm_runtime_sync_resume(hif_ctx, RTPM_ID_SOC_REMOVE);
 	}
 
 	cds_set_driver_loaded(false);
@@ -875,10 +943,8 @@ static void hdd_soc_recovery_cleanup(void)
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	if (!hdd_ctx)
 		return;
-	}
 
 	/* cancel/flush any pending/active idle shutdown work */
 	hdd_psoc_idle_timer_stop(hdd_ctx);
@@ -908,10 +974,8 @@ static void __hdd_soc_recovery_shutdown(void)
 	hdd_init_start_completion();
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is null");
+	if (!hdd_ctx)
 		return;
-	}
 
 	/*
 	 * Perform SSR related cleanup if it has not already been done as a
@@ -926,10 +990,8 @@ static void __hdd_soc_recovery_shutdown(void)
 		hdd_err("Debufs threads are still pending, attempting SSR anyway");
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx) {
-		hdd_err("Failed to get HIF context, ignore SSR shutdown");
+	if (!hif_ctx)
 		return;
-	}
 
 	/* mask the host controller interrupts */
 	hif_mask_interrupt_call(hif_ctx);
@@ -989,10 +1051,8 @@ static void wlan_hdd_crash_shutdown(void)
 	QDF_STATUS ret;
 	WMA_HANDLE wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma_handle) {
-		hdd_err("wma_handle is null");
+	if (!wma_handle)
 		return;
-	}
 
 	/*
 	 * When kernel panic happen, if WiFi FW is still active
@@ -1103,6 +1163,7 @@ hdd_to_pmo_wow_enable_params(struct wow_enable_params *in_params,
 /**
  * __wlan_hdd_bus_suspend() - handles platform supsend
  * @wow_params: collection of wow enable override parameters
+ * @type: WoW suspend type
  *
  * Does precondtion validation. Ensures that a subsystem restart isn't in
  * progress. Ensures that no load or unload is in progress. Does:
@@ -1114,7 +1175,8 @@ hdd_to_pmo_wow_enable_params(struct wow_enable_params *in_params,
  *     -EBUSY or -EAGAIN if another opperation is in progress and
  *     wlan will not be ready to suspend in time.
  */
-static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
+static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
+				  enum qdf_suspend_type type)
 {
 	int err;
 	QDF_STATUS status;
@@ -1123,14 +1185,16 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	void *dp_soc;
 	struct pmo_wow_enable_params pmo_params;
 	int pending;
+	struct bbm_params param = {0};
 
 	hdd_info("starting bus suspend");
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err_rl("hdd context is NULL");
-		return -ENODEV;
-	}
+
+	err = wlan_hdd_validate_context(hdd_ctx);
+	if (err)
+		return err;
+
 
 	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1138,15 +1202,10 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 		return 0;
 	}
 
-	err = wlan_hdd_validate_context(hdd_ctx);
-	if (err)
-		return err;
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx) {
-		hdd_err("Failed to get hif context");
+	if (!hif_ctx)
 		return -EINVAL;
-	}
 
 	err = hdd_to_pmo_wow_enable_params(&wow_params, &pmo_params);
 	if (err) {
@@ -1174,7 +1233,7 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	}
 
 	status = ucfg_pmo_psoc_bus_suspend_req(hdd_ctx->psoc,
-					       QDF_SYSTEM_SUSPEND,
+					       type,
 					       &pmo_params);
 	err = qdf_status_to_os_return(status);
 	if (err) {
@@ -1182,27 +1241,48 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 		goto late_hif_resume;
 	}
 
+	hif_system_pm_set_state_suspended(hif_ctx);
+
 	err = hif_bus_suspend(hif_ctx);
 	if (err) {
 		hdd_err("Failed hif bus suspend: %d", err);
 		goto resume_pmo;
 	}
 
+	status = ucfg_pmo_core_txrx_suspend(hdd_ctx->psoc);
+	err = qdf_status_to_os_return(status);
+	if (err) {
+		hdd_err("Failed to suspend TXRX: %d", err);
+		goto resume_hif;
+	}
+
 	pending = cdp_rx_get_pending(cds_get_context(QDF_MODULE_ID_SOC));
 	if (pending) {
 		hdd_debug("Prevent suspend, RX frame pending %d", pending);
 		err = -EBUSY;
-		goto resume_hif;
+		goto resume_txrx;
+	}
+
+	if (hif_try_prevent_ep_vote_access(hif_ctx)) {
+		hdd_debug("Prevent suspend, ep work pending");
+		err = QDF_STATUS_E_BUSY;
+		goto resume_txrx;
 	}
 
 	/*
 	 * Remove bus votes at the very end, after making sure there are no
 	 * pending bus transactions from WLAN SOC for TX/RX.
 	 */
-	pld_request_bus_bandwidth(hdd_ctx->parent_dev, PLD_BUS_WIDTH_NONE);
+	param.policy = BBM_NON_PERSISTENT_POLICY;
+	param.policy_info.flag = BBM_APPS_SUSPEND;
+	hdd_bbm_apply_independent_policy(hdd_ctx, &param);
 
 	hdd_info("bus suspend succeeded");
 	return 0;
+
+resume_txrx:
+	status = ucfg_pmo_core_txrx_resume(hdd_ctx->psoc);
+	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
 resume_hif:
 	status = hif_bus_resume(hif_ctx);
@@ -1210,7 +1290,7 @@ resume_hif:
 
 resume_pmo:
 	status = ucfg_pmo_psoc_bus_resume_req(hdd_ctx->psoc,
-					      QDF_SYSTEM_SUSPEND);
+					      type);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
 
 late_hif_resume:
@@ -1220,6 +1300,7 @@ late_hif_resume:
 resume_cdp:
 	status = cdp_bus_resume(dp_soc, OL_TXRX_PDEV_ID);
 	QDF_BUG(QDF_IS_STATUS_SUCCESS(status));
+	hif_system_pm_set_state_on(hif_ctx);
 
 	return err;
 }
@@ -1228,13 +1309,13 @@ int wlan_hdd_bus_suspend(void)
 {
 	struct wow_enable_params default_params = {0};
 
-	return __wlan_hdd_bus_suspend(default_params);
+	return __wlan_hdd_bus_suspend(default_params, QDF_SYSTEM_SUSPEND);
 }
 
 #ifdef WLAN_SUSPEND_RESUME_TEST
 int wlan_hdd_unit_test_bus_suspend(struct wow_enable_params wow_params)
 {
-	return __wlan_hdd_bus_suspend(wow_params);
+	return __wlan_hdd_bus_suspend(wow_params, QDF_UNIT_TEST_WOW_SUSPEND);
 }
 #endif
 
@@ -1257,10 +1338,8 @@ int wlan_hdd_bus_suspend_noirq(void)
 
 	hdd_debug("start bus_suspend_noirq");
 
-	if (!hdd_ctx) {
-		hdd_err_rl("hdd context is NULL");
+	if (!hdd_ctx)
 		return -ENODEV;
-	}
 
 	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1273,10 +1352,8 @@ int wlan_hdd_bus_suspend_noirq(void)
 		return errno;
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx) {
-		hdd_err("hif_ctx is null");
+	if (!hif_ctx)
 		return -EINVAL;
-	}
 
 	errno = hif_bus_suspend_noirq(hif_ctx);
 	if (errno)
@@ -1316,6 +1393,8 @@ done:
 /**
  * wlan_hdd_bus_resume() - handles platform resume
  *
+ * @type: WoW suspend type
+ *
  * Does precondtion validation. Ensures that a subsystem restart isn't in
  * progress.  Ensures that no load or unload is in progress.  Ensures that
  * it has valid pointers for the required contexts.
@@ -1326,23 +1405,22 @@ done:
  *
  * return: error code or 0 for success
  */
-int wlan_hdd_bus_resume(void)
+int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	void *hif_ctx;
 	int status;
 	QDF_STATUS qdf_status;
 	void *dp_soc;
+	struct bbm_params param = {0};
 
 	if (cds_is_driver_recovering())
 		return 0;
 
 	hdd_info("starting bus resume");
 
-	if (!hdd_ctx) {
-		hdd_err_rl("hdd context is NULL");
+	if (!hdd_ctx)
 		return -ENODEV;
-	}
 
 	/* If Wifi is off, return success for system resume */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1355,22 +1433,16 @@ int wlan_hdd_bus_resume(void)
 		return status;
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (!hif_ctx) {
-		hdd_err("Failed to get hif context");
+	if (!hif_ctx)
 		return -EINVAL;
-	}
 
 	/*
 	 * Add bus votes at the beginning, before making sure there are any
 	 * bus transactions from WLAN SOC for TX/RX.
 	 */
-	if (hdd_is_any_adapter_connected(hdd_ctx)) {
-		pld_request_bus_bandwidth(hdd_ctx->parent_dev,
-					  PLD_BUS_WIDTH_MEDIUM);
-	} else {
-		pld_request_bus_bandwidth(hdd_ctx->parent_dev,
-					  PLD_BUS_WIDTH_NONE);
-	}
+	param.policy = BBM_NON_PERSISTENT_POLICY;
+	param.policy_info.flag = BBM_APPS_RESUME;
+	hdd_bbm_apply_independent_policy(hdd_ctx, &param);
 
 	status = hif_bus_resume(hif_ctx);
 	if (status) {
@@ -1378,13 +1450,24 @@ int wlan_hdd_bus_resume(void)
 		goto out;
 	}
 
+	hif_system_pm_set_state_resuming(hif_ctx);
+
 	qdf_status = ucfg_pmo_psoc_bus_resume_req(hdd_ctx->psoc,
-						  QDF_SYSTEM_SUSPEND);
+						  type);
 	status = qdf_status_to_os_return(qdf_status);
 	if (status) {
 		hdd_err("Failed pmo bus resume");
 		goto out;
 	}
+
+	qdf_status = ucfg_pmo_core_txrx_resume(hdd_ctx->psoc);
+	status = qdf_status_to_os_return(qdf_status);
+	if (status) {
+		hdd_err("Failed to resume TXRX");
+		goto out;
+	}
+
+	hif_system_pm_set_state_on(hif_ctx);
 
 	status = hif_bus_late_resume(hif_ctx);
 	if (status) {
@@ -1404,6 +1487,7 @@ int wlan_hdd_bus_resume(void)
 	return 0;
 
 out:
+	hif_system_pm_set_state_suspended(hif_ctx);
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state() ||
 		cds_is_fw_down())
 		return 0;
@@ -1433,10 +1517,8 @@ int wlan_hdd_bus_resume_noirq(void)
 	if (cds_is_driver_recovering())
 		return 0;
 
-	if (!hdd_ctx) {
-		hdd_err_rl("hdd context is NULL");
+	if (!hdd_ctx)
 		return -ENODEV;
-	}
 
 	/* If Wifi is off, return success for system resume */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1476,10 +1558,8 @@ static int wlan_hdd_bus_reset_resume(void)
 {
 	struct hif_opaque_softc *scn = cds_get_context(QDF_MODULE_ID_HIF);
 
-	if (!scn) {
-		hdd_err("Failed to get HIF context");
+	if (!scn)
 		return -EFAULT;
-	}
 
 	return hif_bus_reset_resume(scn);
 }
@@ -1494,10 +1574,8 @@ static int hdd_pld_runtime_suspend_cb(void)
 {
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
-	if (!qdf_dev) {
-		hdd_err("Invalid context");
+	if (!qdf_dev)
 		return -EINVAL;
-	}
 
 	return pld_auto_suspend(qdf_dev->dev);
 }
@@ -1530,9 +1608,22 @@ static int wlan_hdd_runtime_suspend(struct device *dev)
 		return 0;
 	}
 
+	if (!hdd_is_runtime_pm_enabled(hdd_ctx))
+		return 0;
+
 	if (ucfg_scan_get_pdev_status(hdd_ctx->pdev) !=
 	    SCAN_NOT_IN_PROGRESS) {
 		hdd_debug("Scan in progress, ignore runtime suspend");
+		return -EBUSY;
+	}
+
+	if (ucfg_ipa_is_tx_pending(hdd_ctx->pdev)) {
+		hdd_debug("IPA TX comps pending, ignore rtpm suspend");
+		return -EBUSY;
+	}
+
+	if (wlan_hdd_is_cpu_pm_qos_in_progress(hdd_ctx)) {
+		hdd_debug("PM QoS Latency constraint, ignore runtime suspend");
 		return -EBUSY;
 	}
 
@@ -1567,10 +1658,8 @@ static int hdd_pld_runtime_resume_cb(void)
 {
 	qdf_device_t qdf_dev = cds_get_context(QDF_MODULE_ID_QDF_DEVICE);
 
-	if (!qdf_dev) {
-		hdd_err("Invalid context");
+	if (!qdf_dev)
 		return -EINVAL;
-	}
 
 	return pld_auto_resume(qdf_dev->dev);
 }
@@ -1599,10 +1688,9 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 	 * resume fail, if driver load/unload in-progress, so not doing
 	 * wlan_hdd_validate_context, have only SSR in progress check.
 	 */
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is NULL");
+	if (!hdd_ctx)
 		return 0;
-	}
+
 	if (cds_is_driver_recovering()) {
 		hdd_debug("Recovery in progress, state:0x%x",
 			  cds_get_driver_state());
@@ -1613,6 +1701,9 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 		hdd_debug("Driver module closed skipping runtime resume");
 		return 0;
 	}
+
+	if (!hdd_is_runtime_pm_enabled(hdd_ctx))
+		return 0;
 
 	hdd_ctx->runtime_resume_start_time_stamp =
 						qdf_get_log_timestamp_usecs();
@@ -1792,6 +1883,20 @@ static int wlan_hdd_pld_suspend(struct device *dev,
 {
 	struct osif_psoc_sync *psoc_sync;
 	int errno;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+	/*
+	 * Flush the idle shutdown before ops start.This is done here to avoid
+	 * the deadlock as idle shutdown waits for the dsc ops
+	 * to complete.
+	 */
+	hdd_psoc_idle_timer_stop(hdd_ctx);
+
 
 	errno = osif_psoc_sync_op_start(dev, &psoc_sync);
 	if (errno)
@@ -1821,7 +1926,7 @@ static int wlan_hdd_pld_resume(struct device *dev,
 	if (errno)
 		return errno;
 
-	errno = wlan_hdd_bus_resume();
+	errno = wlan_hdd_bus_resume(QDF_SYSTEM_SUSPEND);
 
 	osif_psoc_sync_op_stop(psoc_sync);
 
@@ -1944,9 +2049,13 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 	bus_type = pld_get_bus_type(dev);
 
 	switch (event_data->uevent) {
+	case PLD_SMMU_FAULT:
+		qdf_set_smmu_fault_state(true);
+		hdd_debug("Received smmu fault indication");
+		break;
 	case PLD_FW_DOWN:
 		hdd_debug("Received firmware down indication");
-
+		hdd_dump_log_buffer();
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
 
@@ -1976,10 +2085,8 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 	case PLD_FW_HANG_EVENT:
 		hdd_info("Received firmware hang event");
 		cds_get_recovery_reason(&reason);
-		hang_evt_data.hang_data =
-				qdf_mem_malloc(QDF_HANG_EVENT_DATA_SIZE);
-		if (!hang_evt_data.hang_data)
-			return;
+		qdf_mem_zero(&g_fw_host_hang_event, QDF_HANG_EVENT_DATA_SIZE);
+		hang_evt_data.hang_data = g_fw_host_hang_event;
 		hang_evt_data.offset = 0;
 		qdf_hang_event_notifier_call(reason, &hang_evt_data);
 		hang_evt_data.offset = QDF_WLAN_HANG_FW_OFFSET;
@@ -1996,8 +2103,16 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 
 		hdd_send_hang_data(hang_evt_data.hang_data,
 				   QDF_HANG_EVENT_DATA_SIZE);
-		qdf_mem_free(hang_evt_data.hang_data);
+		break;
+	case PLD_BUS_EVENT:
+		hdd_debug("Bus event received");
 
+		/* Currently only link_down taken care.
+		 * Need to extend event buffer to define more bus info,
+		 * if need later.
+		 */
+		if (event_data->bus_data.etype == PLD_BUS_EVENT_PCIE_LINK_DOWN)
+			host_log_device_status(WLAN_STATUS_BUS_EXCEPTION);
 		break;
 	default:
 		/* other events intentionally not handled */

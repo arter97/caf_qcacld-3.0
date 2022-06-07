@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -58,6 +58,7 @@
 #include "wlan_mlme_ucfg_api.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_hdd_object_manager.h"
+#include "wlan_hdd_cm_api.h"
 
 #define HDD_WMM_UP_TO_AC_MAP_SIZE 8
 #define DSCP(x)	x
@@ -1525,12 +1526,12 @@ QDF_STATUS hdd_send_dscp_up_map_to_fw(struct hdd_adapter *adapter)
 	struct wlan_objmgr_vdev *vdev;
 	int ret;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_FWOL_NB_ID);
 
 	if (vdev) {
 		/* Send DSCP to TID map table to FW */
 		ret = os_if_fwol_send_dscp_up_map_to_fw(vdev, dscp_to_up_map);
-		hdd_objmgr_put_vdev(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_FWOL_NB_ID);
 		if (ret && ret != -EOPNOTSUPP)
 			return QDF_STATUS_E_FAILURE;
 	}
@@ -1745,6 +1746,51 @@ QDF_STATUS hdd_wmm_adapter_close(struct hdd_adapter *adapter)
 }
 
 /**
+ * hdd_check_and_upgrade_udp_qos() - Check and upgrade the qos for UDP packets
+ *				     if the current set priority is below the
+ *				     pre-configured threshold for upgrade.
+ * @adapter: [in] pointer to the adapter context (Should not be invalid)
+ * @skb: [in] pointer to the packet to be transmitted
+ * @user_pri: [out] priority set for this packet
+ *
+ * This function checks if the packet is a UDP packet and upgrades its
+ * priority if its below the pre-configured upgrade threshold.
+ * The upgrade order is as below:
+ * BK -> BE -> VI -> VO
+ *
+ * Return: none
+ */
+static inline void
+hdd_check_and_upgrade_udp_qos(struct hdd_adapter *adapter,
+			      qdf_nbuf_t skb,
+			      enum sme_qos_wmmuptype *user_pri)
+{
+	/* Upgrade UDP pkt priority alone */
+	if (!(qdf_nbuf_is_ipv4_udp_pkt(skb) || qdf_nbuf_is_ipv6_udp_pkt(skb)))
+		return;
+
+	switch (adapter->upgrade_udp_qos_threshold) {
+	case QCA_WLAN_AC_BK:
+		break;
+	case QCA_WLAN_AC_BE:
+		if (*user_pri == qca_wlan_ac_to_sme_qos(QCA_WLAN_AC_BK))
+			*user_pri = qca_wlan_ac_to_sme_qos(QCA_WLAN_AC_BE);
+
+		break;
+	case QCA_WLAN_AC_VI:
+	case QCA_WLAN_AC_VO:
+		if (*user_pri <
+		    qca_wlan_ac_to_sme_qos(adapter->upgrade_udp_qos_threshold))
+			*user_pri = qca_wlan_ac_to_sme_qos(
+					adapter->upgrade_udp_qos_threshold);
+
+		break;
+	default:
+		break;
+	}
+}
+
+/**
  * hdd_wmm_classify_pkt() - Function which will classify an OS packet
  * into a WMM AC based on DSCP
  *
@@ -1869,12 +1915,7 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 	 * Upgrade the priority, if the user priority of this packet is
 	 * less than the configured threshold.
 	 */
-	if (*user_pri < adapter->upgrade_udp_qos_threshold &&
-	    (qdf_nbuf_is_ipv4_udp_pkt(skb) || qdf_nbuf_is_ipv6_udp_pkt(skb))) {
-		/* Upgrade UDP pkt priority alone */
-		*user_pri = qca_wlan_ac_to_sme_qos(
-				adapter->upgrade_udp_qos_threshold);
-	}
+	hdd_check_and_upgrade_udp_qos(adapter, skb, user_pri);
 
 #ifdef HDD_WMM_DEBUG
 	hdd_debug("tos is %d, dscp is %d, up is %d", tos, dscp, *user_pri);
@@ -2060,19 +2101,18 @@ QDF_STATUS hdd_wmm_acquire_access(struct hdd_adapter *adapter,
 {
 	struct hdd_wmm_qos_context *qos_context;
 	struct hdd_context *hdd_ctx;
-	bool enable;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	/* The ini ImplicitQosIsEnabled is deprecated. By default, the ini
+	 * value is disabled. So, setting the variable is_implicit_qos_enabled
+	 * value to false.
+	 */
+	bool is_implicit_qos_enabled = false;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_DEBUG,
 		  "%s: Entered for AC %d", __func__, ac_type);
 
-	status = ucfg_mlme_get_implicit_qos_is_enabled(hdd_ctx->psoc, &enable);
-		if (!QDF_IS_STATUS_SUCCESS(status)) {
-			hdd_err("Get implicit_qos_is_enabled failed");
-		}
-	if (!hdd_wmm_is_active(adapter) || !(enable) ||
+	if (!hdd_wmm_is_active(adapter) || !(is_implicit_qos_enabled) ||
 	    !adapter->hdd_wmm_status.ac_status[ac_type].is_access_required) {
 		/* either we don't want QoS or the AP doesn't support
 		 * QoS or we don't want to do implicit QoS
@@ -2164,21 +2204,9 @@ QDF_STATUS hdd_wmm_acquire_access(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * hdd_wmm_assoc() - Function which will handle the housekeeping
- * required by WMM when association takes place
- *
- * @adapter: [in]  pointer to adapter context
- * @roam_info: [in]  pointer to roam information
- * @bss_type: [in]  type of BSS
- *
- * Return: QDF_STATUS enumeration
- */
 QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
-			 struct csr_roam_info *roam_info,
-			 eCsrRoamBssType bss_type)
+			 bool is_reassoc, uint8_t uapsd_mask)
 {
-	uint8_t uapsd_mask;
 	QDF_STATUS status;
 	uint32_t srv_value = 0;
 	uint32_t sus_value = 0;
@@ -2191,7 +2219,7 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 
 	hdd_enter();
 
-	if (roam_info->fReassocReq) {
+	if (is_reassoc) {
 		/* when we reassociate we should continue to use
 		 * whatever parameters were previously established.
 		 * if we are reassociating due to a U-APSD change for
@@ -2205,9 +2233,6 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 
 		return QDF_STATUS_SUCCESS;
 	}
-	/* get the negotiated UAPSD Mask */
-	uapsd_mask =
-		roam_info->u.pConnectedProfile->modifyProfileFields.uapsd_mask;
 
 	hdd_debug("U-APSD mask is 0x%02x", (int)uapsd_mask);
 
@@ -2318,13 +2343,6 @@ QDF_STATUS hdd_wmm_assoc(struct hdd_adapter *adapter,
 	return QDF_STATUS_SUCCESS;
 }
 
-static const uint8_t acm_mask_bit[WLAN_MAX_AC] = {
-	0x4,                    /* SME_AC_BK */
-	0x8,                    /* SME_AC_BE */
-	0x2,                    /* SME_AC_VI */
-	0x1                     /* SME_AC_VO */
-};
-
 /**
  * hdd_wmm_connect() - Function which will handle the housekeeping
  * required by WMM when a connection is established
@@ -2340,68 +2358,21 @@ QDF_STATUS hdd_wmm_connect(struct hdd_adapter *adapter,
 			   eCsrRoamBssType bss_type)
 {
 	int ac;
-	bool qap;
-	bool qos_connection;
-	uint8_t acm_mask;
-	mac_handle_t mac_handle;
-
-	if ((eCSR_BSS_TYPE_INFRASTRUCTURE == bss_type) &&
-	    roam_info && roam_info->u.pConnectedProfile) {
-		qap = roam_info->u.pConnectedProfile->qap;
-		qos_connection = roam_info->u.pConnectedProfile->qosConnection;
-		acm_mask = roam_info->u.pConnectedProfile->acm_mask;
-	} else {
-		qap = true;
-		qos_connection = true;
-		acm_mask = 0x0;
-	}
+	bool qap = true;
+	bool qos_connection = true;
+	uint8_t acm_mask = 0x0;
 
 	hdd_debug("qap is %d, qos_connection is %d, acm_mask is 0x%x",
 		 qap, qos_connection, acm_mask);
 
 	adapter->hdd_wmm_status.qap = qap;
 	adapter->hdd_wmm_status.qos_connection = qos_connection;
-	mac_handle = hdd_adapter_get_mac_handle(adapter);
 
 	for (ac = 0; ac < WLAN_MAX_AC; ac++) {
-		if (qap && qos_connection && (acm_mask & acm_mask_bit[ac])) {
-			hdd_debug("ac %d on", ac);
-
-			/* admission is required */
-			adapter->hdd_wmm_status.ac_status[ac].
-			is_access_required = true;
-			adapter->hdd_wmm_status.ac_status[ac].
-			is_access_allowed = false;
-			adapter->hdd_wmm_status.ac_status[ac].
-			was_access_granted = false;
-			/* after reassoc if we have valid tspec, allow access */
-			if (adapter->hdd_wmm_status.ac_status[ac].
-			    is_tspec_valid
-			    && (adapter->hdd_wmm_status.ac_status[ac].
-				tspec.ts_info.direction !=
-				SME_QOS_WMM_TS_DIR_DOWNLINK)) {
-				adapter->hdd_wmm_status.ac_status[ac].
-				is_access_allowed = true;
-			}
-			if (!roam_info->fReassocReq &&
-			    !sme_neighbor_roam_is11r_assoc(
-						mac_handle,
-						adapter->vdev_id) &&
-			    !sme_roam_is_ese_assoc(roam_info)) {
-				adapter->hdd_wmm_status.ac_status[ac].
-					is_tspec_valid = false;
-				adapter->hdd_wmm_status.ac_status[ac].
-					is_access_allowed = false;
-			}
-		} else {
-			hdd_debug("ac %d off", ac);
-			/* admission is not required so access is allowed */
-			adapter->hdd_wmm_status.ac_status[ac].
-			is_access_required = false;
-			adapter->hdd_wmm_status.ac_status[ac].
-			is_access_allowed = true;
-		}
-
+		hdd_debug("ac %d off", ac);
+		/* admission is not required so access is allowed */
+		adapter->hdd_wmm_status.ac_status[ac].is_access_required = false;
+		adapter->hdd_wmm_status.ac_status[ac].is_access_allowed = true;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -2432,10 +2403,8 @@ bool hdd_wmm_is_acm_allowed(uint8_t vdev_id)
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	if (!hdd_ctx) {
-		hdd_err("Unable to fetch the hdd context");
+	if (!hdd_ctx)
 		return false;
-	}
 
 	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
 	if (hdd_validate_adapter(adapter))

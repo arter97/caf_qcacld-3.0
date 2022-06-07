@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -96,10 +96,9 @@ QDF_STATUS lim_send_switch_chnl_params(struct mac_context *mac,
 	struct vdev_start_response rsp = {0};
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma) {
-		pe_err("Invalid wma handle");
+	if (!wma)
 		return QDF_STATUS_E_FAILURE;
-	}
+
 	if (!session) {
 		pe_err("session is NULL");
 		return QDF_STATUS_E_FAILURE;
@@ -414,7 +413,6 @@ QDF_STATUS lim_set_user_pos(struct mac_context *mac,
 	return retCode;
 }
 
-#ifdef WLAN_FEATURE_11W
 /**
  * lim_send_exclude_unencrypt_ind() - sends WMA_EXCLUDE_UNENCRYPTED_IND to HAL
  * @mac:          mac global context
@@ -458,7 +456,6 @@ QDF_STATUS lim_send_exclude_unencrypt_ind(struct mac_context *mac,
 
 	return retCode;
 }
-#endif
 
 /**
  * lim_send_ht40_obss_scanind() - send ht40 obss start scan request
@@ -481,9 +478,6 @@ QDF_STATUS lim_send_ht40_obss_scanind(struct mac_context *mac_ctx,
 	ht40_obss_scanind = qdf_mem_malloc(sizeof(struct obss_ht40_scanind));
 	if (!ht40_obss_scanind)
 		return QDF_STATUS_E_FAILURE;
-	QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR,
-		  "OBSS Scan Indication bssid " QDF_MAC_ADDR_FMT,
-		  QDF_MAC_ADDR_REF(session->bssId));
 
 	ht40_obss_scanind->cmd = HT40_OBSS_SCAN_PARAM_START;
 	ht40_obss_scanind->scan_type = eSIR_ACTIVE_SCAN;
@@ -512,7 +506,7 @@ QDF_STATUS lim_send_ht40_obss_scanind(struct mac_context *mac_ctx,
 	/* Extract 24G channel list */
 	channel24gnum = 0;
 	for (count = 0; count < channelnum &&
-		(channel24gnum < SIR_ROAM_MAX_CHANNELS); count++) {
+		(channel24gnum < CFG_VALID_CHANNEL_LIST_LEN); count++) {
 		chan_freq =
 			mac_ctx->mlme_cfg->reg.valid_channel_freq_list[count];
 		if (wlan_reg_is_24ghz_ch_freq(chan_freq)) {
@@ -530,10 +524,10 @@ QDF_STATUS lim_send_ht40_obss_scanind(struct mac_context *mac_ctx,
 	msg.reserved = 0;
 	msg.bodyptr = (void *)ht40_obss_scanind;
 	msg.bodyval = 0;
-	pe_debug("Sending WDA_HT40_OBSS_SCAN_IND to WDA"
-		"Obss Scan trigger width: %d, delay factor: %d",
-		ht40_obss_scanind->obss_width_trigger_interval,
-		ht40_obss_scanind->bsswidth_ch_trans_delay);
+	pe_debug("Obss Scan trigger width: %d, delay factor: %d bssid " QDF_MAC_ADDR_FMT,
+		 ht40_obss_scanind->obss_width_trigger_interval,
+		 ht40_obss_scanind->bsswidth_ch_trans_delay,
+		 QDF_MAC_ADDR_REF(session->bssId));
 	ret = wma_post_ctrl_msg(mac_ctx, &msg);
 	if (QDF_STATUS_SUCCESS != ret) {
 		pe_err("WDA_HT40_OBSS_SCAN_IND msg failed, reason=%X",

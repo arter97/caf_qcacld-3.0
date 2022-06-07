@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,23 +37,30 @@ static bool dp_swlm_is_tput_thresh_reached(struct dp_soc *soc)
 {
 	struct dp_swlm *swlm = &soc->swlm;
 	static int prev_rx_bytes, prev_tx_bytes;
-	int rx_delta, tx_delta;
+	int rx_delta, tx_delta, tx_packet_delta;
+	static int prev_tx_packets;
+	bool result = false;
 
 	tx_delta = soc->stats.tx.egress.bytes - prev_tx_bytes;
 	prev_tx_bytes = soc->stats.tx.egress.bytes;
 	if (tx_delta > swlm->params.tcl.tx_traffic_thresh) {
 		swlm->params.tcl.sampling_session_tx_bytes = tx_delta;
-		return true;
+		result = true;
 	}
 
 	rx_delta = soc->stats.rx.ingress.bytes - prev_rx_bytes;
 	prev_rx_bytes = soc->stats.rx.ingress.bytes;
-	if (rx_delta > swlm->params.tcl.rx_traffic_thresh) {
+	if (!result && rx_delta > swlm->params.tcl.rx_traffic_thresh) {
 		swlm->params.tcl.sampling_session_tx_bytes = tx_delta;
-		return true;
+		result = true;
 	}
 
-	return false;
+	tx_packet_delta = soc->stats.tx.egress.num - prev_tx_packets;
+	prev_tx_packets = soc->stats.tx.egress.num;
+	if (tx_packet_delta < swlm->params.tcl.tx_pkt_thresh)
+		result = false;
+
+	return result;
 }
 
 /**
@@ -162,7 +169,8 @@ static void dp_swlm_tcl_flush_timer(void *arg)
 	if (hal_srng_try_access_start(soc->hal_soc, hal_ring_hdl) < 0)
 		goto fail;
 
-	if (hif_pm_runtime_get(soc->hif_handle, RTPM_ID_DW_TX_HW_ENQUEUE)) {
+	if (hif_pm_runtime_get(soc->hif_handle, RTPM_ID_DW_TX_HW_ENQUEUE,
+			       true)) {
 		hal_srng_access_end_reap(soc->hal_soc, hal_ring_hdl);
 		hal_srng_set_event(hal_ring_hdl, HAL_SRNG_FLUSH_EVENT);
 		hal_srng_inc_flush_cnt(hal_ring_hdl);
@@ -199,6 +207,7 @@ static inline QDF_STATUS dp_soc_swlm_tcl_attach(struct dp_soc *soc)
 	swlm->params.tcl.time_flush_thresh = DP_SWLM_TCL_TIME_FLUSH_THRESH;
 	swlm->params.tcl.tx_thresh_multiplier =
 					DP_SWLM_TCL_TX_THRESH_MULTIPLIER;
+	swlm->params.tcl.tx_pkt_thresh = DP_SWLM_TCL_TX_PKT_THRESH;
 
 	qdf_timer_init(soc->osdev, &swlm->params.tcl.flush_timer,
 		       dp_swlm_tcl_flush_timer, (void *)soc,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -68,6 +68,7 @@ typedef struct sGenericQosCmd {
  * @next_action: Action to be taken after nss update
  * @reason: reason for nss update
  * @original_vdev_id: original request hwmode change vdev id
+ * @request_id: request id for connection manager
  */
 struct s_nss_update_cmd {
 	uint32_t new_nss;
@@ -78,6 +79,7 @@ struct s_nss_update_cmd {
 	uint8_t next_action;
 	enum policy_mgr_conn_update_reason reason;
 	uint32_t original_vdev_id;
+	uint32_t request_id;
 };
 
 /**
@@ -98,7 +100,6 @@ typedef struct tagSmeCmd {
 		struct roam_cmd roamCmd;
 		struct wmstatus_changecmd wmStatusChangeCmd;
 		tGenericQosCmd qosCmd;
-		struct delstafor_sessionCmd delStaSessionCmd;
 		struct policy_mgr_hw_mode set_hw_mode_cmd;
 		struct s_nss_update_cmd nss_update_cmd;
 		struct policy_mgr_dual_mac_config set_dual_mac_cmd;
@@ -179,40 +180,9 @@ void csr_roam_process_get_disconnect_stats_command(struct mac_context *mac,
 void csr_reinit_roam_cmd(struct mac_context *mac, tSmeCmd *pCommand);
 void csr_reinit_wm_status_change_cmd(struct mac_context *mac,
 				     tSmeCmd *pCommand);
-QDF_STATUS csr_is_valid_channel(struct mac_context *mac, uint32_t freq);
 
 QDF_STATUS sme_acquire_global_lock(struct sme_context *sme);
 QDF_STATUS sme_release_global_lock(struct sme_context *sme);
-
-/**
- * csr_flush_cfg_bg_scan_roam_channel_list() - Flush the channel list
- * @channel_info: Channel list to be flushed
- *
- * Return: None
- */
-void csr_flush_cfg_bg_scan_roam_channel_list(tCsrChannelInfo *channel_info);
-
-/**
- * csr_create_bg_scan_roam_channel_list() - Create roam scan chan list
- * @mac: global mac context
- * @channel_info: Channel list to be populated for roam scan
- * @chan_freq_list: Channel list to be populated from
- * @num_chan: Number of channels
- *
- * Return: QDF_STATUS_SUCCESS or QDF_STATUS_E_FAILURE
- */
-QDF_STATUS csr_create_bg_scan_roam_channel_list(struct mac_context *mac,
-						tCsrChannelInfo *channel_info,
-						const uint32_t *chan_freq_list,
-						const uint8_t num_chan);
-
-#ifdef FEATURE_WLAN_ESE
-QDF_STATUS csr_create_roam_scan_channel_list(struct mac_context *mac,
-		uint8_t sessionId,
-		uint32_t *chan_freq_list,
-		uint8_t numChannels,
-		const enum band_info band);
-#endif
 
 ePhyChanBondState csr_convert_cb_ini_value_to_phy_cb_state(uint32_t cbIniValue);
 void csr_process_set_dual_mac_config(struct mac_context *mac, tSmeCmd *command);

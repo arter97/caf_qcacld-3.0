@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,9 +34,7 @@
 #include "lim_send_messages.h"
 #include "lim_assoc_utils.h"
 #include "lim_ft.h"
-#ifdef WLAN_FEATURE_11W
 #include "wni_cfg.h"
-#endif
 
 #include "lim_ft_defs.h"
 #include "lim_session.h"
@@ -83,9 +81,13 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t vdev_id = 0;
 	bool vht_enabled = false;
 	tpSirMacMgmtHdr mac_hdr;
-	tftSMEContext *ft_sme_context;
+	struct mlme_legacy_priv *mlme_priv;
 
 	if (!pe_session)
+		return;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(pe_session->vdev);
+	if (!mlme_priv)
 		return;
 
 	vdev_id = pe_session->vdev_id;
@@ -129,7 +131,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	qdf_mem_copy((uint8_t *)frm->CurrentAPAddress.mac,
 			pe_session->prev_ap_bssid, sizeof(tSirMacAddr));
 
-	populate_dot11f_ssid2(mac_ctx, &frm->SSID);
+	populate_dot11f_ssid2(pe_session, &frm->SSID);
 	populate_dot11f_supp_rates(mac_ctx, POPULATE_DOT11F_RATES_OPERATIONAL,
 		&frm->SuppRates, pe_session);
 
@@ -143,7 +145,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		      LIM_BSS_CAPS_GET(WSM, pe_session->limReassocBssQosCaps);
 
 	if (pe_session->lim11hEnable &&
-	    pe_session->pLimReAssocReq->spectrumMgtIndicator == true) {
+	    pe_session->spectrumMgtEnabled) {
 		power_caps_populated = true;
 
 		populate_dot11f_power_caps(mac_ctx, &frm->PowerCaps,
@@ -213,9 +215,9 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 				&frm->WPAOpaque);
 		}
 #ifdef FEATURE_WLAN_ESE
-		if (pe_session->pLimReAssocReq->cckmIE.length) {
+		if (mlme_priv->connect_info.cckm_ie_len) {
 			populate_dot11f_ese_cckm_opaque(mac_ctx,
-				&(pe_session->pLimReAssocReq->cckmIE),
+				&mlme_priv->connect_info,
 				&frm->ESECckmOpaque);
 		}
 #endif
@@ -232,7 +234,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		populate_dot11f_ese_version(&frm->ESEVersion);
 	/* For ESE Associations fill the ESE IEs */
 	if (pe_session->isESEconnection &&
-	    pe_session->pLimReAssocReq->isESEFeatureIniEnabled) {
+	    mac_ctx->mlme_cfg->lfr.ese_enabled) {
 #ifndef FEATURE_DISABLE_RM
 		populate_dot11f_ese_rad_mgmt_cap(&frm->ESERadMgmtCap);
 #endif
@@ -264,8 +266,8 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 			else
 				rate = TSRS_11B_RATE_5_5MBPS;
 
-			if (pe_session->pLimReAssocReq->eseTspecInfo.
-			    numTspecs) {
+			if (mlme_priv->connect_info.ese_tspec_info.numTspecs)
+			{
 				struct ese_tsrs_ie tsrs_ie;
 
 				tsrs_ie.tsid = 0;
@@ -278,13 +280,12 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 #endif
 	}
 
-	ft_sme_context = &mac_ctx->roam.roamSession[vdev_id].ftSmeContext;
 	if (pe_session->htCapability &&
 	    mac_ctx->lim.htCapabilityPresentInBeacon) {
 		populate_dot11f_ht_caps(mac_ctx, pe_session, &frm->HTCaps);
 	}
 	if (pe_session->pLimReAssocReq->bssDescription.mdiePresent &&
-	    (ft_sme_context->addMDIE == true)
+	    (mlme_priv->connect_info.ft_info.add_mdie)
 #if defined FEATURE_WLAN_ESE
 	    && !pe_session->isESEconnection
 #endif
@@ -320,6 +321,11 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 					    &frm->he_6ghz_band_cap);
 	}
 
+	if (lim_is_session_eht_capable(pe_session)) {
+		pe_debug("Populate EHT IEs");
+		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
+	}
+
 	status = dot11f_get_packed_re_assoc_request_size(mac_ctx, frm,
 			&payload);
 	if (DOT11F_FAILED(status)) {
@@ -333,10 +339,10 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	bytes = payload + sizeof(tSirMacMgmtHdr) + add_ie_len;
 
 	pe_debug("FT IE Reassoc Req %d",
-		ft_sme_context->reassoc_ft_ies_length);
+		 mlme_priv->connect_info.ft_info.reassoc_ie_len);
 
 	if (pe_session->is11Rconnection)
-		ft_ies_length = ft_sme_context->reassoc_ft_ies_length;
+		ft_ies_length = mlme_priv->connect_info.ft_info.reassoc_ie_len;
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes + ft_ies_length,
 				 (void **)&frame, (void **)&packet);
@@ -372,37 +378,23 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 	pe_debug("*** Sending Re-Assoc Request length: %d %d to",
 		       bytes, payload);
 
-	if (pe_session->assoc_req) {
-		qdf_mem_free(pe_session->assoc_req);
-		pe_session->assoc_req = NULL;
-		pe_session->assocReqLen = 0;
-	}
-
 	if (add_ie_len) {
 		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
 			     add_ie, add_ie_len);
 		payload += add_ie_len;
 	}
 
-	pe_session->assoc_req = qdf_mem_malloc(payload);
-	if (pe_session->assoc_req) {
-		/*
-		 * Store the Assoc request. This is sent to csr/hdd in
-		 * join cnf response.
-		 */
-		qdf_mem_copy(pe_session->assoc_req,
-			     frame + sizeof(tSirMacMgmtHdr), payload);
-		pe_session->assocReqLen = payload;
-	}
-
-	if (pe_session->is11Rconnection && ft_sme_context->reassoc_ft_ies) {
+	if (pe_session->is11Rconnection &&
+	    mlme_priv->connect_info.ft_info.reassoc_ie_len) {
 		int i = 0;
 
 		body = frame + bytes;
 		for (i = 0; i < ft_ies_length; i++) {
-			*body = ft_sme_context->reassoc_ft_ies[i];
+			*body =
+			   mlme_priv->connect_info.ft_info.reassoc_ft_ie[i];
 			body++;
 		}
+		payload += ft_ies_length;
 	}
 	pe_debug("Re-assoc Req Frame is:");
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
@@ -422,23 +414,16 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 		pe_session->assoc_req = NULL;
 		pe_session->assocReqLen = 0;
 	}
-	if (ft_ies_length) {
-		pe_session->assoc_req = qdf_mem_malloc(ft_ies_length);
-		if (!pe_session->assoc_req) {
-			pe_session->assocReqLen = 0;
-		} else {
-			/*
-			 * Store the FT IEs. This is sent to csr/hdd in
-			 * join cnf response.
-			 */
-			qdf_mem_copy(pe_session->assoc_req,
-				     ft_sme_context->reassoc_ft_ies,
-				     ft_ies_length);
-			pe_session->assocReqLen = ft_ies_length;
-		}
-	} else {
-		pe_debug("FT IEs not present");
-		pe_session->assocReqLen = 0;
+
+	pe_session->assoc_req = qdf_mem_malloc(payload);
+	if (pe_session->assoc_req) {
+		/*
+		 * Store the Assoc request. This is sent to csr/hdd in
+		 * join cnf response.
+		 */
+		qdf_mem_copy(pe_session->assoc_req,
+			     frame + sizeof(tSirMacMgmtHdr), payload);
+		pe_session->assocReqLen = payload;
 	}
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
@@ -451,7 +436,7 @@ void lim_send_reassoc_req_with_ft_ies_mgmt_frame(struct mac_context *mac_ctx,
 				(uint16_t) (bytes + ft_ies_length),
 				TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 				lim_tx_complete, frame, tx_flag, vdev_id,
-				0, RATEID_DEFAULT);
+				0, RATEID_DEFAULT, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -595,7 +580,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 	qdf_mem_copy((uint8_t *) frm->CurrentAPAddress.mac,
 		     (uint8_t *) pe_session->bssId, 6);
 
-	populate_dot11f_ssid2(mac, &frm->SSID);
+	populate_dot11f_ssid2(pe_session, &frm->SSID);
 	populate_dot11f_supp_rates(mac, POPULATE_DOT11F_RATES_OPERATIONAL,
 				   &frm->SuppRates, pe_session);
 
@@ -609,7 +594,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 		     LIM_BSS_CAPS_GET(WSM, pe_session->limReassocBssQosCaps);
 
 	if (pe_session->lim11hEnable &&
-	    pe_session->pLimReAssocReq->spectrumMgtIndicator == true) {
+	    pe_session->spectrumMgtEnabled) {
 		PowerCapsPopulated = true;
 		populate_dot11f_power_caps(mac, &frm->PowerCaps, LIM_REASSOC,
 					   pe_session);
@@ -699,6 +684,11 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 					    &frm->he_6ghz_band_cap);
 	}
 
+	if (lim_is_session_eht_capable(pe_session)) {
+		pe_debug("Populate EHT IEs");
+		populate_dot11f_eht_caps(mac, pe_session, &frm->eht_cap);
+	}
+
 	nStatus =
 		dot11f_get_packed_re_assoc_request_size(mac, frm, &nPayload);
 	if (DOT11F_FAILED(nStatus)) {
@@ -786,7 +776,7 @@ void lim_send_reassoc_req_mgmt_frame(struct mac_context *mac,
 			   (uint16_t) (sizeof(tSirMacMgmtHdr) + nPayload),
 			   TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS, 7,
 			   lim_tx_complete, pFrame, txFlag, smeSessionId, 0,
-			   RATEID_DEFAULT);
+			   RATEID_DEFAULT, 0);
 	MTRACE(qdf_trace
 		       (QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
 		       pe_session->peSessionId, qdf_status));

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -209,7 +209,7 @@ static QDF_STATUS p2p_check_and_update_channel(struct tx_action_context *tx_ctx)
 	struct p2p_soc_priv_obj *p2p_soc_obj;
 	struct p2p_roc_context *curr_roc_ctx;
 
-	if (!tx_ctx || tx_ctx->chan) {
+	if (!tx_ctx || tx_ctx->chan_freq) {
 		p2p_err("NULL tx ctx or channel valid");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -230,7 +230,7 @@ static QDF_STATUS p2p_check_and_update_channel(struct tx_action_context *tx_ctx)
 	    (mode == QDF_P2P_DEVICE_MODE ||
 	     mode == QDF_P2P_CLIENT_MODE ||
 	     mode == QDF_P2P_GO_MODE))
-		tx_ctx->chan = curr_roc_ctx->chan;
+		tx_ctx->chan_freq = curr_roc_ctx->chan_freq;
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 
@@ -575,6 +575,69 @@ static void p2p_set_ht_caps(struct tx_action_context *tx_ctx,
 }
 
 /**
+ * p2p_get_next_seq_num() - get next sequence number to fill mac header
+ * @peer:   PEER object
+ * @tx_ctx: tx context
+ * @ta : transmitter address
+ *
+ * API to get next sequence number of action frame for the peer.
+ *
+ * Return: Next sequence number of the peer
+ */
+static uint16_t p2p_get_next_seq_num(struct wlan_objmgr_peer *peer,
+				     struct tx_action_context *tx_ctx,
+				     uint8_t *ta)
+{
+	uint16_t random_num, random_num_bitmask = 0x03FF;
+	uint16_t seq_num, seq_num_bitmask = 0x0FFF;
+	struct p2p_vdev_priv_obj *p2p_vdev_obj;
+	struct wlan_objmgr_vdev *vdev;
+	bool is_new_random_ta;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(tx_ctx->p2p_soc_obj->soc,
+						    tx_ctx->vdev_id,
+						    WLAN_P2P_ID);
+	if (!vdev) {
+		p2p_debug("vdev is null");
+		return false;
+	}
+
+	p2p_vdev_obj = wlan_objmgr_vdev_get_comp_private_obj(
+						vdev, WLAN_UMAC_COMP_P2P);
+	if (!p2p_vdev_obj) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+		p2p_debug("p2p vdev object is NULL");
+		return false;
+	}
+
+	is_new_random_ta = qdf_mem_cmp(p2p_vdev_obj->prev_action_frame_addr2,
+				       ta, QDF_MAC_ADDR_SIZE);
+	if (is_new_random_ta &&
+	    tx_ctx->p2p_soc_obj->param.is_random_seq_num_enabled) {
+		/**
+		 * Increment the previous sequence number with 10-bits
+		 * random number to get the next sequence number.
+		 */
+
+		qdf_get_random_bytes(&random_num, sizeof(random_num));
+		random_num &= random_num_bitmask;
+		seq_num = (peer->peer_mlme.seq_num + random_num) &
+			  seq_num_bitmask;
+		peer->peer_mlme.seq_num = seq_num;
+
+		qdf_mem_copy(p2p_vdev_obj->prev_action_frame_addr2, ta,
+			     QDF_MAC_ADDR_SIZE);
+
+	} else {
+		seq_num = wlan_peer_mlme_get_next_seq_num(peer);
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+
+	return seq_num;
+}
+
+/**
  * p2p_populate_mac_header() - update sequence number
  * @tx_ctx:      tx context
  *
@@ -626,7 +689,7 @@ static QDF_STATUS p2p_populate_mac_header(
 		p2p_err("no valid peer");
 		return QDF_STATUS_E_INVAL;
 	}
-	seq_num = (uint16_t)wlan_peer_mlme_get_next_seq_num(peer);
+	seq_num = (uint16_t)p2p_get_next_seq_num(peer, tx_ctx, wh->i_addr2);
 	seq_ctl = (struct wlan_seq_ctl *)(tx_ctx->buf +
 			WLAN_SEQ_CTL_OFFSET);
 	seq_ctl->seq_num_lo = (seq_num & WLAN_LOW_SEQ_NUM_MASK);
@@ -687,6 +750,8 @@ static char *p2p_get_frame_type_str(struct p2p_frame_info *frame_info)
 		return "GAS come back request";
 	case P2P_PUBLIC_ACTION_GAS_COMB_RSP:
 		return "GAS come back response";
+	case P2P_PUBLIC_ACTION_WNM_BTM_REQ:
+		return "BTM request";
 	default:
 		return "Other frame";
 	}
@@ -748,18 +813,24 @@ static QDF_STATUS p2p_get_frame_info(uint8_t *data_buf, uint32_t length,
 		return QDF_STATUS_SUCCESS;
 
 	buf += P2P_ACTION_OFFSET;
-	if (length > P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET &&
-	    buf[0] == P2P_PUBLIC_ACTION_FRAME &&
-	    buf[1] == P2P_PUBLIC_ACTION_VENDOR_SPECIFIC &&
-	    !qdf_mem_cmp(&buf[2], P2P_OUI, P2P_OUI_SIZE)) {
-		buf = data_buf +
-			P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET;
-		action_type = buf[0];
-		if (action_type > P2P_PUBLIC_ACTION_PROV_DIS_RSP)
-			frame_info->public_action_type =
-				P2P_PUBLIC_ACTION_NOT_SUPPORT;
-		else
-			frame_info->public_action_type = action_type;
+	if (length > P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET) {
+		if (buf[0] == P2P_PUBLIC_ACTION_FRAME &&
+		    buf[1] == P2P_PUBLIC_ACTION_VENDOR_SPECIFIC &&
+		    !qdf_mem_cmp(&buf[2], P2P_OUI, P2P_OUI_SIZE)) {
+			buf = data_buf +
+				P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET;
+			action_type = buf[0];
+			if (action_type > P2P_PUBLIC_ACTION_PROV_DIS_RSP)
+				frame_info->public_action_type =
+					P2P_PUBLIC_ACTION_NOT_SUPPORT;
+			else
+				frame_info->public_action_type = action_type;
+		} else if (buf[0] == WNM_ACTION_FRAME &&
+			   buf[1] == WNM_BSS_TM_REQUEST) {
+				action_type = buf[0];
+				frame_info->public_action_type =
+					P2P_PUBLIC_ACTION_WNM_BTM_REQ;
+		}
 	} else if (length > P2P_ACTION_FRAME_TYPE_OFFSET &&
 		   buf[0] == P2P_ACTION_VENDOR_SPECIFIC_CATEGORY &&
 		   !qdf_mem_cmp(&buf[1], P2P_OUI, P2P_OUI_SIZE)) {
@@ -1001,20 +1072,31 @@ static QDF_STATUS p2p_mgmt_tx(struct tx_action_context *tx_ctx,
 	void *mac_addr;
 	uint8_t pdev_id;
 	struct wlan_objmgr_vdev *vdev;
-	uint16_t chanfreq = 0;
+	struct wlan_objmgr_pdev *pdev;
 
 	psoc = tx_ctx->p2p_soc_obj->soc;
 	mgmt_param.tx_frame = packet;
 	mgmt_param.frm_len = buf_len;
 	mgmt_param.vdev_id = tx_ctx->vdev_id;
 	mgmt_param.pdata = frame;
-	if (tx_ctx->chan)
-		chanfreq = (uint16_t)wlan_chan_to_freq(tx_ctx->chan);
-	mgmt_param.chanfreq = chanfreq;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, tx_ctx->vdev_id,
+						    WLAN_P2P_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mgmt_param.chanfreq = tx_ctx->chan_freq;
 
 	mgmt_param.qdf_ctx = wlan_psoc_get_qdf_dev(psoc);
 	if (!(mgmt_param.qdf_ctx)) {
 		p2p_err("qdf ctx is null");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1029,15 +1111,13 @@ static QDF_STATUS p2p_mgmt_tx(struct tx_action_context *tx_ctx,
 					    WLAN_P2P_ID);
 	}
 	if (!peer && tx_ctx->rand_mac_tx) {
-		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
-				psoc, tx_ctx->vdev_id, WLAN_P2P_ID);
 		if (vdev) {
 			mac_addr = wlan_vdev_mlme_get_macaddr(vdev);
 			peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
 						    WLAN_P2P_ID);
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		}
 	}
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 
 	if (!peer) {
 		p2p_err("no valid peer");
@@ -1089,7 +1169,7 @@ static QDF_STATUS p2p_roc_req_for_tx_action(
 	p2p_soc_obj = tx_ctx->p2p_soc_obj;
 	roc_ctx->p2p_soc_obj = p2p_soc_obj;
 	roc_ctx->vdev_id = tx_ctx->vdev_id;
-	roc_ctx->chan = tx_ctx->chan;
+	roc_ctx->chan_freq = tx_ctx->chan_freq;
 	roc_ctx->duration = tx_ctx->duration;
 	roc_ctx->roc_state = ROC_STATE_IDLE;
 	roc_ctx->roc_type = OFF_CHANNEL_TX;
@@ -1475,38 +1555,6 @@ static QDF_STATUS p2p_disable_tx_timer(struct tx_action_context *tx_ctx)
 }
 
 /**
- * is_rmf_mgmt_action_frame() - check RMF action frame by category
- * @action_category: action frame actegory
- *
- * This function check the frame is robust mgmt action frame or not
- *
- * Return: true - if category is robust mgmt type
- */
-static bool is_rmf_mgmt_action_frame(uint8_t action_category)
-{
-	switch (action_category) {
-	case ACTION_CATEGORY_SPECTRUM_MGMT:
-	case ACTION_CATEGORY_QOS:
-	case ACTION_CATEGORY_DLS:
-	case ACTION_CATEGORY_BACK:
-	case ACTION_CATEGORY_RRM:
-	case ACTION_FAST_BSS_TRNST:
-	case ACTION_CATEGORY_SA_QUERY:
-	case ACTION_CATEGORY_PROTECTED_DUAL_OF_PUBLIC_ACTION:
-	case ACTION_CATEGORY_WNM:
-	case ACTION_CATEGORY_MESH_ACTION:
-	case ACTION_CATEGORY_MULTIHOP_ACTION:
-	case ACTION_CATEGORY_DMG:
-	case ACTION_CATEGORY_FST:
-	case ACTION_CATEGORY_VENDOR_SPECIFIC_PROTECTED:
-		return true;
-	default:
-		break;
-	}
-	return false;
-}
-
-/**
  * p2p_populate_rmf_field() - populate unicast rmf frame
  * @tx_ctx: tx_action_context
  * @size: input size of frame, and output new size
@@ -1549,7 +1597,7 @@ static QDF_STATUS p2p_populate_rmf_field(struct tx_action_context *tx_ctx,
 	 * to get the actual action category we need to ignore the MSB.
 	 */
 	action_category = action_hdr->action_category & 0x7f;
-	if (!is_rmf_mgmt_action_frame(action_category)) {
+	if (!wlan_mgmt_is_rmf_mgmt_action_frame(action_category)) {
 		p2p_debug("non rmf act frame 0x%x category %x",
 			  tx_ctx->frame_info.sub_type,
 			  action_hdr->action_category);
@@ -1764,13 +1812,15 @@ void p2p_dump_tx_queue(struct p2p_soc_priv_obj *p2p_soc_obj)
 	while (QDF_IS_STATUS_SUCCESS(status)) {
 		tx_ctx = qdf_container_of(p_node,
 				struct tx_action_context, node);
-		p2p_debug("p2p soc object:%pK, tx ctx:%pK, vdev_id:%d, scan_id:%d, roc_cookie:%llx, chan:%d, buf:%pK, len:%d, off_chan:%d, cck:%d, ack:%d, duration:%d",
-			p2p_soc_obj, tx_ctx,
-			tx_ctx->vdev_id, tx_ctx->scan_id,
-			tx_ctx->roc_cookie, tx_ctx->chan,
-			tx_ctx->buf, tx_ctx->buf_len,
-			tx_ctx->off_chan, tx_ctx->no_cck,
-			tx_ctx->no_ack, tx_ctx->duration);
+		p2p_debug("p2p soc object:%pK, tx ctx:%pK, vdev_id:%d, "
+			  "scan_id:%d, roc_cookie:%llx, freq:%d, buf:%pK, "
+			  "len:%d, off_chan:%d, cck:%d, ack:%d, duration:%d",
+			  p2p_soc_obj, tx_ctx,
+			  tx_ctx->vdev_id, tx_ctx->scan_id,
+			  tx_ctx->roc_cookie, tx_ctx->chan_freq,
+			  tx_ctx->buf, tx_ctx->buf_len,
+			  tx_ctx->off_chan, tx_ctx->no_cck,
+			  tx_ctx->no_ack, tx_ctx->duration);
 
 		status = qdf_list_peek_next(&p2p_soc_obj->tx_q_roc,
 						p_node, &p_node);
@@ -1782,13 +1832,15 @@ void p2p_dump_tx_queue(struct p2p_soc_priv_obj *p2p_soc_obj)
 	while (QDF_IS_STATUS_SUCCESS(status)) {
 		tx_ctx = qdf_container_of(p_node,
 				struct tx_action_context, node);
-		p2p_debug("p2p soc object:%pK, tx_ctx:%pK, vdev_id:%d, scan_id:%d, roc_cookie:%llx, chan:%d, buf:%pK, len:%d, off_chan:%d, cck:%d, ack:%d, duration:%d",
-			p2p_soc_obj, tx_ctx,
-			tx_ctx->vdev_id, tx_ctx->scan_id,
-			tx_ctx->roc_cookie, tx_ctx->chan,
-			tx_ctx->buf, tx_ctx->buf_len,
-			tx_ctx->off_chan, tx_ctx->no_cck,
-			tx_ctx->no_ack, tx_ctx->duration);
+		p2p_debug("p2p soc object:%pK, tx_ctx:%pK, vdev_id:%d, "
+			  "scan_id:%d, roc_cookie:%llx, freq:%d, buf:%pK, "
+			  "len:%d, off_chan:%d, cck:%d, ack:%d, duration:%d",
+			  p2p_soc_obj, tx_ctx,
+			  tx_ctx->vdev_id, tx_ctx->scan_id,
+			  tx_ctx->roc_cookie, tx_ctx->chan_freq,
+			  tx_ctx->buf, tx_ctx->buf_len,
+			  tx_ctx->off_chan, tx_ctx->no_cck,
+			  tx_ctx->no_ack, tx_ctx->duration);
 
 		status = qdf_list_peek_next(&p2p_soc_obj->tx_q_ack,
 						p_node, &p_node);
@@ -2032,6 +2084,28 @@ delete_action_frame_cookie(qdf_list_t *cookie_list,
 }
 
 /**
+ * delete_all_action_frame_cookie() - Delete all the cookies to given list
+ * @cookie_list: List of cookies
+ *
+ * This function deletes all the cookies from from given list.
+ *
+ * Return: None
+ */
+static void
+delete_all_action_frame_cookie(qdf_list_t *cookie_list)
+{
+	qdf_list_node_t *node = NULL;
+
+	p2p_debug("Delete cookie list %pK, size %d", cookie_list,
+		  qdf_list_size(cookie_list));
+
+	while (!qdf_list_empty(cookie_list)) {
+		qdf_list_remove_front(cookie_list, &node);
+		qdf_mem_free(node);
+	}
+}
+
+/**
  * append_action_frame_cookie() - Append action cookie to given list
  * @cookie_list: List of cookies
  * @rnd_cookie: Cookie to be append
@@ -2178,15 +2252,14 @@ p2p_add_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 
 QDF_STATUS
 p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
-		   uint64_t rnd_cookie, uint32_t duration)
+		   uint64_t rnd_cookie)
 {
 	uint32_t i;
 	struct action_frame_cookie *action_cookie;
 	struct p2p_vdev_priv_obj *p2p_vdev_obj;
 	struct wlan_objmgr_vdev *vdev;
 
-	p2p_debug("random_mac:vdev %d cookie %llu duration %d", vdev_id,
-		  rnd_cookie, duration);
+	p2p_debug("random_mac:vdev %d cookie %llu", vdev_id, rnd_cookie);
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(soc, vdev_id,
 						    WLAN_P2P_ID);
 	if (!vdev) {
@@ -2204,6 +2277,8 @@ p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 	qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
 	for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
 		struct action_frame_random_mac *random_mac;
+		qdf_freq_t freq;
+		uint8_t addr[QDF_MAC_ADDR_SIZE];
 
 		random_mac = &p2p_vdev_obj->random_mac[i];
 		if (!random_mac->in_use)
@@ -2219,18 +2294,114 @@ p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 			action_cookie);
 
 		if (qdf_list_empty(&random_mac->cookie_list)) {
+			random_mac->in_use = false;
+			freq = random_mac->freq;
+			qdf_mem_copy(addr, random_mac->addr, QDF_MAC_ADDR_SIZE);
 			qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
 			if (qdf_mc_timer_get_current_state(
 					&random_mac->clear_timer) ==
-			    QDF_TIMER_STATE_RUNNING)
+			    QDF_TIMER_STATE_RUNNING) {
+				p2p_debug("random_mac:stop timer on vdev %d addr " QDF_MAC_ADDR_FMT,
+					  vdev_id, QDF_MAC_ADDR_REF(addr));
 				qdf_mc_timer_stop(&random_mac->clear_timer);
-			qdf_mc_timer_start(&random_mac->clear_timer, duration);
+			}
+
+			p2p_clear_mac_filter(
+					wlan_vdev_get_psoc(p2p_vdev_obj->vdev),
+					vdev_id, addr, freq);
 
 			qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
 			p2p_debug("random_mac:noref on vdev %d addr "QDF_MAC_ADDR_FMT,
-				  vdev_id, QDF_MAC_ADDR_REF(random_mac->addr));
+				  vdev_id, QDF_MAC_ADDR_REF(addr));
 		}
 		break;
+	}
+	qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+p2p_random_mac_handle_tx_done(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+			      uint64_t rnd_cookie, uint32_t duration)
+{
+	uint32_t i;
+	struct action_frame_cookie *action_cookie;
+	struct p2p_vdev_priv_obj *p2p_vdev_obj;
+	struct wlan_objmgr_vdev *vdev;
+
+	p2p_debug("random_mac:vdev %d cookie %llu duration %d", vdev_id,
+		  rnd_cookie, duration);
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(soc, vdev_id, WLAN_P2P_ID);
+	if (!vdev) {
+		p2p_debug("vdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	p2p_vdev_obj = wlan_objmgr_vdev_get_comp_private_obj(
+						vdev, WLAN_UMAC_COMP_P2P);
+	if (!p2p_vdev_obj) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+		p2p_debug("p2p vdev object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
+	for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
+		struct action_frame_random_mac *random_mac;
+		qdf_freq_t freq;
+		uint8_t addr[QDF_MAC_ADDR_SIZE];
+
+		random_mac = &p2p_vdev_obj->random_mac[i];
+		if (!random_mac->in_use)
+			continue;
+		action_cookie = find_action_frame_cookie(
+					&random_mac->cookie_list, rnd_cookie);
+		if (!action_cookie)
+			continue;
+
+		/* If duration is zero then remove the cookie and also remove
+		 * the filter from firmware.
+		 */
+		if (!duration) {
+			delete_action_frame_cookie(&random_mac->cookie_list,
+						   action_cookie);
+			p2p_debug("random mac:clear mac addr on vdev %d addr " QDF_MAC_ADDR_FMT,
+				  vdev_id, QDF_MAC_ADDR_REF(random_mac->addr));
+
+			if (qdf_list_empty(&random_mac->cookie_list)) {
+				random_mac->in_use = false;
+				freq = random_mac->freq;
+				qdf_mem_copy(addr, random_mac->addr,
+					     QDF_MAC_ADDR_SIZE);
+				qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+				p2p_clear_mac_filter(
+					wlan_vdev_get_psoc(p2p_vdev_obj->vdev),
+					vdev_id, addr, freq);
+				qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
+			}
+		} else {
+			/* As duration is non zero start the timer for this
+			 * duration. while the timer is running if tx cancel
+			 * comes from supplicant then cookie will be removed
+			 * and random mac filter will be removed from firmware.
+			 * same thing will happen if timer expires without tx
+			 * cancel from supplicant
+			 */
+			qdf_mem_copy(addr, random_mac->addr, QDF_MAC_ADDR_SIZE);
+
+			qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+			if (qdf_mc_timer_get_current_state(
+				&random_mac->clear_timer) ==
+				QDF_TIMER_STATE_RUNNING)
+				qdf_mc_timer_stop(&random_mac->clear_timer);
+			qdf_mc_timer_start(&random_mac->clear_timer, duration);
+			p2p_debug("random_mac:start timer on vdev %d addr " QDF_MAC_ADDR_FMT,
+				  vdev_id, QDF_MAC_ADDR_REF(addr));
+
+			qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
+		}
 	}
 	qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
@@ -2641,6 +2812,47 @@ p2p_set_rand_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 }
 
 /**
+ * p2p_mac_clear_timeout() - clear random mac filter timeout
+ * @context: timer context
+ *
+ * This function will clear the mac addr rx filter in target if no
+ * reference to it.
+ *
+ * Return: void
+ */
+static void p2p_mac_clear_timeout(void *context)
+{
+	struct action_frame_random_mac *random_mac = context;
+	struct p2p_vdev_priv_obj *p2p_vdev_obj;
+	uint32_t freq;
+	uint8_t addr[QDF_MAC_ADDR_SIZE];
+	uint32_t vdev_id;
+
+	if (!random_mac || !random_mac->p2p_vdev_obj) {
+		p2p_err("invalid context for mac_clear timeout");
+		return;
+	}
+	p2p_vdev_obj = random_mac->p2p_vdev_obj;
+	if (!p2p_vdev_obj || !p2p_vdev_obj->vdev)
+		return;
+
+	qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
+
+	delete_all_action_frame_cookie(&random_mac->cookie_list);
+	random_mac->in_use = false;
+	freq = random_mac->freq;
+	qdf_mem_copy(addr, random_mac->addr, QDF_MAC_ADDR_SIZE);
+	qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+
+	vdev_id = wlan_vdev_get_id(p2p_vdev_obj->vdev);
+	p2p_debug("random_mac:clear timeout vdev %d " QDF_MAC_ADDR_FMT " freq %d",
+		  vdev_id, QDF_MAC_ADDR_REF(addr), freq);
+
+	p2p_clear_mac_filter(wlan_vdev_get_psoc(p2p_vdev_obj->vdev),
+			     vdev_id, addr, freq);
+}
+
+/**
  * p2p_request_random_mac() - request random mac mgmt tx
  * @soc: soc
  * @vdev_id: vdev id
@@ -2661,21 +2873,55 @@ p2p_request_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
 		       uint32_t duration)
 {
 	QDF_STATUS status;
+	uint32_t i;
+	struct wlan_objmgr_vdev *vdev;
+	struct p2p_vdev_priv_obj *p2p_vdev_obj;
 
 	status = p2p_add_random_mac(soc, vdev_id, mac, freq, rnd_cookie);
 	if (status == QDF_STATUS_E_EXISTS)
 		return QDF_STATUS_SUCCESS;
+
 	else if (status != QDF_STATUS_SUCCESS)
 		return status;
 
-	if (!p2p_set_rand_mac(soc, vdev_id, mac, freq, rnd_cookie))
-		status = p2p_del_random_mac(soc, vdev_id, rnd_cookie,
-					    duration);
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(soc, vdev_id, WLAN_P2P_ID);
+	if (!vdev) {
+		p2p_debug("vdev is null");
+		return QDF_STATUS_E_INVAL;
+	}
 
+	p2p_vdev_obj = wlan_objmgr_vdev_get_comp_private_obj(
+						vdev, WLAN_UMAC_COMP_P2P);
+	if (!p2p_vdev_obj) {
+		p2p_debug("random_mac:p2p vdev object is NULL");
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!p2p_set_rand_mac(soc, vdev_id, mac, freq, rnd_cookie)) {
+		p2p_debug("random mac: failed to set rand mac address");
+
+		qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
+		for (i = 0; i < MAX_RANDOM_MAC_ADDRS; i++) {
+			if (!qdf_mem_cmp(p2p_vdev_obj->random_mac[i].addr, mac,
+					 QDF_MAC_ADDR_SIZE)) {
+				qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+				p2p_mac_clear_timeout(
+						&p2p_vdev_obj->random_mac[i]);
+				status = QDF_STATUS_SUCCESS;
+				qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
+				break;
+			}
+		}
+		qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
+	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 	return status;
 }
 
-void p2p_rand_mac_tx(struct  tx_action_context *tx_action)
+void p2p_rand_mac_tx(struct wlan_objmgr_pdev *pdev,
+		     struct tx_action_context *tx_action)
 {
 	struct wlan_objmgr_psoc *soc;
 	QDF_STATUS status;
@@ -2685,17 +2931,17 @@ void p2p_rand_mac_tx(struct  tx_action_context *tx_action)
 		return;
 	soc = tx_action->p2p_soc_obj->soc;
 
-	if (!tx_action->no_ack && tx_action->chan &&
+	if (!tx_action->no_ack && tx_action->chan_freq &&
 	    tx_action->buf_len > MIN_MAC_HEADER_LEN &&
 	    p2p_is_vdev_support_rand_mac_by_id(soc, tx_action->vdev_id) &&
 	    p2p_is_random_mac(soc, tx_action->vdev_id,
 			      &tx_action->buf[SRC_MAC_ADDR_OFFSET])) {
 		status = p2p_request_random_mac(
-					soc, tx_action->vdev_id,
-					&tx_action->buf[SRC_MAC_ADDR_OFFSET],
-					wlan_chan_to_freq(tx_action->chan),
-					tx_action->id,
-					tx_action->duration);
+			soc, tx_action->vdev_id,
+			&tx_action->buf[SRC_MAC_ADDR_OFFSET],
+			tx_action->chan_freq,
+			tx_action->id,
+			tx_action->duration);
 		if (status == QDF_STATUS_SUCCESS)
 			tx_action->rand_mac_tx = true;
 		else
@@ -2710,50 +2956,8 @@ p2p_rand_mac_tx_done(struct wlan_objmgr_psoc *soc,
 	if (!tx_ctx || !tx_ctx->rand_mac_tx || !soc)
 		return;
 
-	p2p_del_random_mac(soc, tx_ctx->vdev_id, tx_ctx->id, tx_ctx->duration);
-}
-
-/**
- * p2p_mac_clear_timeout() - clear random mac filter timeout
- * @context: timer context
- *
- * This function will clear the mac addr rx filter in target if no
- * reference to it.
- *
- * Return: void
- */
-static void p2p_mac_clear_timeout(void *context)
-{
-	struct action_frame_random_mac *random_mac = context;
-	struct p2p_vdev_priv_obj *p2p_vdev_obj;
-	uint32_t freq;
-	uint8_t addr[QDF_MAC_ADDR_SIZE];
-	uint32_t vdev_id;
-	bool clear = false;
-
-	if (!random_mac || !random_mac->p2p_vdev_obj) {
-		p2p_err("invalid context for mac_clear timeout");
-		return;
-	}
-	p2p_vdev_obj = random_mac->p2p_vdev_obj;
-	if (!p2p_vdev_obj || !p2p_vdev_obj->vdev)
-		return;
-
-	qdf_spin_lock(&p2p_vdev_obj->random_mac_lock);
-	if (qdf_list_empty(&random_mac->cookie_list)) {
-		random_mac->in_use = false;
-		clear = true;
-	}
-	freq = random_mac->freq;
-	qdf_mem_copy(addr, random_mac->addr, QDF_MAC_ADDR_SIZE);
-	qdf_spin_unlock(&p2p_vdev_obj->random_mac_lock);
-
-	vdev_id = wlan_vdev_get_id(p2p_vdev_obj->vdev);
-	p2p_debug("random_mac:clear timeout vdev %d "QDF_MAC_ADDR_FMT" freq %d clr %d",
-		  vdev_id, QDF_MAC_ADDR_REF(addr), freq, clear);
-	if (clear)
-		p2p_clear_mac_filter(wlan_vdev_get_psoc(p2p_vdev_obj->vdev),
-				     vdev_id, addr, freq);
+	p2p_random_mac_handle_tx_done(soc, tx_ctx->vdev_id, tx_ctx->id,
+				      tx_ctx->duration);
 }
 
 void p2p_init_random_mac_vdev(struct p2p_vdev_priv_obj *p2p_vdev_obj)
@@ -2807,11 +3011,13 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 
 	p2p_soc_obj = tx_ctx->p2p_soc_obj;
 
-	p2p_debug("soc:%pK, tx_ctx:%pK, vdev_id:%d, scan_id:%d, roc_cookie:%llx, chan:%d, buf:%pK, len:%d, off_chan:%d, cck:%d, ack:%d, duration:%d",
-		p2p_soc_obj->soc, tx_ctx, tx_ctx->vdev_id,
-		tx_ctx->scan_id, tx_ctx->roc_cookie, tx_ctx->chan,
-		tx_ctx->buf, tx_ctx->buf_len, tx_ctx->off_chan,
-		tx_ctx->no_cck, tx_ctx->no_ack, tx_ctx->duration);
+	p2p_debug("soc:%pK, tx_ctx:%pK, vdev_id:%d, scan_id:%d, "
+		  "roc_cookie:%llx, freq:%d, buf:%pK, len:%d, "
+		  "off_chan:%d, cck:%d, ack:%d, duration:%d",
+		  p2p_soc_obj->soc, tx_ctx, tx_ctx->vdev_id,
+		  tx_ctx->scan_id, tx_ctx->roc_cookie, tx_ctx->chan_freq,
+		  tx_ctx->buf, tx_ctx->buf_len, tx_ctx->off_chan,
+		  tx_ctx->no_cck, tx_ctx->no_ack, tx_ctx->duration);
 
 	status = p2p_get_frame_info(tx_ctx->buf, tx_ctx->buf_len,
 			&(tx_ctx->frame_info));
@@ -2840,8 +3046,8 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 		tx_ctx->no_ack = 1;
 	}
 
-	if (!tx_ctx->off_chan || !tx_ctx->chan) {
-		if (!tx_ctx->chan)
+	if (!tx_ctx->off_chan || !tx_ctx->chan_freq) {
+		if (!tx_ctx->chan_freq)
 			p2p_check_and_update_channel(tx_ctx);
 		status = p2p_execute_tx_action_frame(tx_ctx);
 		if (status != QDF_STATUS_SUCCESS) {
@@ -2853,7 +3059,7 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 
 	/* For off channel tx case */
 	curr_roc_ctx = p2p_find_current_roc_ctx(p2p_soc_obj);
-	if (curr_roc_ctx && (curr_roc_ctx->chan == tx_ctx->chan)) {
+	if (curr_roc_ctx && (curr_roc_ctx->chan_freq == tx_ctx->chan_freq)) {
 		if ((curr_roc_ctx->roc_state == ROC_STATE_REQUESTED) ||
 		    (curr_roc_ctx->roc_state == ROC_STATE_STARTED)) {
 			tx_ctx->roc_cookie = (uintptr_t)curr_roc_ctx;
@@ -2867,6 +3073,8 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 				return QDF_STATUS_SUCCESS;
 		} else if (curr_roc_ctx->roc_state == ROC_STATE_ON_CHAN) {
 			p2p_adjust_tx_wait(tx_ctx);
+			if (curr_roc_ctx->duration < tx_ctx->duration)
+				curr_roc_ctx->duration = tx_ctx->duration;
 			status = p2p_restart_roc_timer(curr_roc_ctx);
 			curr_roc_ctx->tx_ctx = tx_ctx;
 			if (status != QDF_STATUS_SUCCESS) {
@@ -2882,7 +3090,8 @@ QDF_STATUS p2p_process_mgmt_tx(struct tx_action_context *tx_ctx)
 		}
 	}
 
-	curr_roc_ctx = p2p_find_roc_by_chan(p2p_soc_obj, tx_ctx->chan);
+	curr_roc_ctx = p2p_find_roc_by_chan_freq(p2p_soc_obj,
+						 tx_ctx->chan_freq);
 	if (curr_roc_ctx && (curr_roc_ctx->roc_state == ROC_STATE_IDLE)) {
 		tx_ctx->roc_cookie = (uintptr_t)curr_roc_ctx;
 		status = qdf_list_insert_back(

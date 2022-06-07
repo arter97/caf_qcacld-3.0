@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -55,9 +55,9 @@
  * @params: array pointer to store peer twt session parameters, should contain
  * mac_addr and dialog id of a peer for which twt session stats to be retrieved
  *
- * Return: QDF_STATUS_SUCCESS upon success, else qdf error values
+ * Return: total number of valid twt session
  */
-QDF_STATUS
+int
 ucfg_twt_get_peer_session_params(struct wlan_objmgr_psoc *psoc_obj,
 				 struct wmi_host_twt_session_stats_info *param);
 #endif /* WLAN_SUPPORT_TWT */
@@ -152,7 +152,35 @@ QDF_STATUS ucfg_mc_cp_stats_write_wow_stats(
 QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
 					       enum stats_req_type type,
 					       struct request_info *info);
+/**
+ * wlan_cfg80211_mc_twt_clear_infra_cp_stats() - send request to reset
+ * control path statistics
+ * @vdev: pointer to vdev object
+ * @dialog_id: dialod id of the twt session
+ * @twt_peer_mac: mac address of the peer
+ *
+ * Return: 0 for success or error code for failure
+ */
+int
+wlan_cfg80211_mc_twt_clear_infra_cp_stats(
+				struct wlan_objmgr_vdev *vdev,
+				uint32_t dialog_id,
+				uint8_t twt_peer_mac[QDF_MAC_ADDR_SIZE]);
 
+/**
+ * wlan_cfg80211_mc_twt_get_infra_cp_stats() - send twt get statistic request
+ * @vdev: pointer to vdev object
+ * @dialog_id: TWT session dialog id
+ * @twt_peer_mac: mac address of the peer
+ * @errno: error code
+ *
+ * Return: pointer to infra cp stats event for success or NULL for failure
+ */
+struct infra_cp_stats_event *
+wlan_cfg80211_mc_twt_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
+					uint32_t dialog_id,
+					uint8_t twt_peer_mac[QDF_MAC_ADDR_SIZE],
+					int *errno);
 /**
  * ucfg_mc_cp_stats_get_tx_power() - API to fetch tx_power
  * @vdev: pointer to vdev object
@@ -162,43 +190,6 @@ QDF_STATUS ucfg_mc_cp_stats_send_stats_request(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
 					 int *dbm);
-
-#ifdef WLAN_FEATURE_MEDIUM_ASSESS
-/**
- * ucfg_mc_cp_stats_reset_congestion_counter() - API to reset congestion
- * counter
- * @vdev: pointer to vdev object
- *
- * Return: status of operation
- */
-QDF_STATUS
-ucfg_mc_cp_stats_reset_congestion_counter(struct wlan_objmgr_vdev *vdev);
-
-/**
- * ucfg_mc_cp_stats_set_congestion_threshold() - API to configure congestion
- * threshold
- * @vdev: pointer to vdev object
- * @threshold: congestion threshold
- *
- * Return: status of operation
- */
-QDF_STATUS
-ucfg_mc_cp_stats_set_congestion_threshold(struct wlan_objmgr_vdev *vdev,
-					  uint8_t threshold);
-#else
-static inline QDF_STATUS
-ucfg_mc_cp_stats_reset_congestion_counter(struct wlan_objmgr_vdev *vdev)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-ucfg_mc_cp_stats_set_congestion_threshold(struct wlan_objmgr_vdev *vdev,
-					  uint8_t threshold)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 /**
  * ucfg_mc_cp_stats_is_req_pending() - API to tell if given request is pending
@@ -221,7 +212,6 @@ bool ucfg_mc_cp_stats_is_req_pending(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS ucfg_mc_cp_stats_set_pending_req(struct wlan_objmgr_psoc *psoc,
 					    enum stats_req_type type,
 					    struct request_info *req);
-
 /**
  * ucfg_mc_cp_stats_reset_pending_req() - API to reset pending request
  * @psoc: pointer to psoc object
@@ -251,9 +241,19 @@ QDF_STATUS ucfg_mc_cp_stats_get_pending_req(struct wlan_objmgr_psoc *psoc,
 					    struct request_info *info);
 
 /**
+ * ucfg_mc_infra_cp_stats_free_stats_resources() - API to free buffers within
+ * infra cp stats_event structure
+ * @ev: structure whose buffer are to freed
+ *
+ * Return: none
+ */
+void
+ucfg_mc_infra_cp_stats_free_stats_resources(struct infra_cp_stats_event *ev);
+
+/**
  * ucfg_mc_cp_stats_free_stats_resources() - API to free buffers within stats_event
  * structure
- * @ev: strcture whose buffer are to freed
+ * @ev: structure whose buffer are to freed
  *
  * Return: none
  */
@@ -300,6 +300,64 @@ void ucfg_mc_cp_stats_register_pmo_handler(void);
 #else
 void static inline ucfg_mc_cp_stats_register_pmo_handler(void) { };
 #endif /* WLAN_POWER_MANAGEMENT_OFFLOAD */
+
+#ifdef WLAN_FEATURE_BIG_DATA_STATS
+/**
+ * ucfg_send_big_data_stats_request() - API to send big data stats
+ * request
+ * @vdev: pointer to vdev object
+ * @type: request type
+ * @info: request info
+ *
+ * Return: status of operation
+ */
+QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
+					    enum stats_req_type type,
+					    struct request_info *info);
+
+/**
+ * ucfg_mc_cp_set_big_data_fw_support() - set big data fw support
+ * @psoc: PSOC object
+ *
+ * API to set fw supports big data feature or not
+ *
+ * Return: void
+ */
+void
+ucfg_mc_cp_set_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
+				   bool enable);
+
+/**
+ * ucfg_mc_cp_get_big_data_fw_support() - get big data fw support
+ * @psoc: PSOC object
+ *
+ * API to get fw supports big data feature or not
+ *
+ * Return: void
+ */
+void
+ucfg_mc_cp_get_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
+				   bool *enable);
+#else
+static inline
+QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
+					    enum stats_req_type type,
+					    struct request_info *info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+ucfg_mc_cp_set_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
+				   bool enable)
+{}
+
+static inline void
+ucfg_mc_cp_get_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
+				   bool *enable)
+{}
+#endif
+
 #else
 void static inline ucfg_mc_cp_stats_register_pmo_handler(void) { };
 static inline QDF_STATUS ucfg_mc_cp_stats_send_stats_request(
@@ -353,5 +411,24 @@ static inline QDF_STATUS ucfg_mc_cp_stats_get_vdev_wake_lock_stats(
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline
+QDF_STATUS ucfg_send_big_data_stats_request(struct wlan_objmgr_vdev *vdev,
+					    enum stats_req_type type,
+					    struct request_info *info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+ucfg_mc_cp_set_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
+				   bool enable)
+{}
+
+static inline void
+ucfg_mc_cp_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
+			       bool *enable)
+{}
 #endif /* QCA_SUPPORT_CP_STATS */
+
 #endif /* __WLAN_CP_STATS_MC_UCFG_API_H__ */

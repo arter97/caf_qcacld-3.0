@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -21,16 +21,50 @@
 
 struct ol_txrx_ops;
 
-#if defined(QCA_WIFI_QCA6290) || defined(QCA_WIFI_QCA6390) || \
-    defined(QCA_WIFI_QCA6490) || defined(QCA_WIFI_QCA6750)
+#ifdef FEATURE_MONITOR_MODE_SUPPORT
+/**
+ * hdd_rx_monitor_callback(): Callback function for receive monitor mode
+ * @vdev: Handle to vdev object
+ * @mpdu: pointer to mpdu to be delivered to os
+ * @rx_status: receive status
+ *
+ * Returns: None
+ */
 void hdd_monitor_set_rx_monitor_cb(struct ol_txrx_ops *txrx,
 				ol_txrx_rx_mon_fp rx_monitor_cb);
 
+/**
+ * hdd_monitor_set_rx_monitor_cb(): Set rx monitor mode callback function
+ * @txrx: pointer to txrx ops
+ * @rx_monitor_cb: pointer to callback function
+ *
+ * Returns: None
+ */
 void hdd_rx_monitor_callback(ol_osif_vdev_handle vdev,
 				qdf_nbuf_t mpdu,
 				void *rx_status);
-
+/**
+ * hdd_enable_monitor_mode() - Enable monitor mode
+ * @dev: Pointer to the net_device structure
+ *
+ * This function invokes cdp interface API to enable
+ * monitor mode configuration on the hardware. In this
+ * case sends HTT messages to FW to setup hardware rings
+ *
+ * Return: 0 for success; non-zero for failure
+ */
 int hdd_enable_monitor_mode(struct net_device *dev);
+
+/**
+ * hdd_disable_monitor_mode() - Disable monitor mode
+ *
+ * This function invokes cdp interface API to disable
+ * monitor mode configuration on the hardware. In this
+ * case sends HTT messages to FW to reset hardware rings
+ *
+ * Return: 0 for success; non-zero for failure
+ */
+int hdd_disable_monitor_mode(void);
 #else
 static inline void hdd_monitor_set_rx_monitor_cb(struct ol_txrx_ops *txrx,
 					ol_txrx_rx_mon_fp rx_monitor_cb){ }
@@ -41,7 +75,13 @@ static inline int hdd_enable_monitor_mode(struct net_device *dev)
 {
 	return 0;
 }
-#endif /* CONFIG_LITHIUM */
+
+static inline int hdd_disable_monitor_mode(void)
+{
+	return 0;
+}
+
+#endif /* FEATURE_MONITOR_MODE_SUPPORT */
 
 #endif /* __WLAN_HDD_RX_MONITOR_H */
 

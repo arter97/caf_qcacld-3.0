@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -81,6 +81,18 @@
  * Function Declarations and Documentation
  * -------------------------------------------------------------------------*/
 
+#ifdef WLAN_FEATURE_11BE
+static inline bool sap_acs_cfg_is_chwidth_320mhz(uint16_t width)
+{
+	return width == CH_WIDTH_320MHZ;
+}
+#else
+static inline bool sap_acs_cfg_is_chwidth_320mhz(uint16_t width)
+{
+	return false;
+}
+#endif
+
 /**
  * sap_config_acs_result : Generate ACS result params based on ch constraints
  * @sap_ctx: pointer to SAP context data struct
@@ -113,7 +125,8 @@ void sap_config_acs_result(mac_handle_t mac_handle,
 		sap_ctx->acs_cfg->vht_seg0_center_ch_freq = 0;
 
 	if (sap_ctx->acs_cfg->ch_width == CH_WIDTH_80P80MHZ ||
-	   (sap_ctx->acs_cfg->ch_width == CH_WIDTH_160MHZ))
+	   (sap_ctx->acs_cfg->ch_width == CH_WIDTH_160MHZ) ||
+	   sap_acs_cfg_is_chwidth_320mhz(sap_ctx->acs_cfg->ch_width))
 		sap_ctx->acs_cfg->vht_seg1_center_ch_freq =
 						ch_params.mhz_freq_seg1;
 	else
@@ -237,6 +250,7 @@ wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
 {
 	uint16_t i;
 	uint16_t num_safe_ch = 0;
+	uint32_t freq;
 
 	/*
 	 * There are two channel list, one acs cfg channel list, and one
@@ -252,13 +266,12 @@ wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
 	 * the acs channel list before chosing one of them as a default channel
 	 */
 	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
-		if (!policy_mgr_is_safe_channel(
-				psoc, sap_ctx->acs_cfg->freq_list[i])) {
-			sap_debug("unsafe freq %d removed from acs list",
-				  sap_ctx->acs_cfg->freq_list[i]);
+		freq = sap_ctx->acs_cfg->freq_list[i];
+		if (!policy_mgr_is_sap_freq_allowed(psoc, freq)) {
+			sap_debug("remove freq %d from acs list", freq);
 			continue;
 		}
-		/* Add only safe channels to the acs cfg ch list */
+		/* Add only allowed channels to the acs cfg ch list */
 		sap_ctx->acs_cfg->freq_list[num_safe_ch++] =
 						sap_ctx->acs_cfg->freq_list[i];
 	}
@@ -579,9 +592,6 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	    policy_mgr_is_current_hwmode_dbs(mac_ctx->psoc) ||
 	    sap_ctx->csa_reason == CSA_REASON_DCS ||
 	    !sap_scc_dfs) {
-		sap_get_cac_dur_dfs_region(sap_ctx,
-			&sap_ctx->csr_roamProfile.cac_duration_ms,
-			&sap_ctx->csr_roamProfile.dfs_regdomain);
 		/*
 		 * Most likely, radar has been detected and SAP wants to
 		 * change the channel
@@ -627,9 +637,6 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 		sap_context = mac_ctx->sap.sapCtxList[intf].sap_context;
 		sap_debug("sapdfs:issue chnl change for sapctx[%pK]",
 			  sap_context);
-		sap_get_cac_dur_dfs_region(sap_context,
-			&sap_context->csr_roamProfile.cac_duration_ms,
-			&sap_context->csr_roamProfile.dfs_regdomain);
 		/*
 		 * Most likely, radar has been detected and SAP wants to
 		 * change the channel
@@ -794,7 +801,9 @@ static void wlansap_update_vendor_acs_chan(struct mac_context *mac_ctx,
 	}
 
 	mac_ctx->sap.SapDfsInfo.target_chan_freq =
-				wlan_reg_chan_to_freq(mac_ctx->pdev, sap_ctx->dfs_vendor_channel);
+				wlan_reg_legacy_chan_to_freq(
+						mac_ctx->pdev,
+						sap_ctx->dfs_vendor_channel);
 
 	mac_ctx->sap.SapDfsInfo.new_chanWidth =
 				sap_ctx->dfs_vendor_chan_bw;
@@ -828,6 +837,104 @@ static void wlansap_update_vendor_acs_chan(struct mac_context *mac_ctx,
 		}
 	}
 }
+
+#ifdef WLAN_FEATURE_P2P_P2P_STA
+/**
+ * sap_check_and_process_forcescc_for_go_plus_go() - find if other p2p
+ * go is there and needs to be moved to current p2p go's channel.
+ *
+ * @cur_sap_ctx: current sap context
+ *
+ * Return: None
+ */
+static void
+sap_check_and_process_forcescc_for_go_plus_go(
+					struct sap_context *cur_sap_ctx)
+{
+	struct sap_context *sap_ctx;
+	struct mac_context *mac_ctx;
+	uint8_t i;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return;
+	}
+
+	for (i = 0; i < SAP_MAX_NUM_SESSION; i++) {
+		sap_ctx = mac_ctx->sap.sapCtxList[i].sap_context;
+		if (sap_ctx &&
+		    QDF_P2P_GO_MODE == mac_ctx->sap.sapCtxList[i].sapPersona &&
+		    sap_ctx->is_forcescc_restart_required) {
+			sap_debug("sessionId %d chan_freq %d chan_width %d",
+				  sap_ctx->sessionId, cur_sap_ctx->chan_freq,
+				  cur_sap_ctx->ch_params.ch_width);
+			policy_mgr_process_forcescc_for_go(
+				mac_ctx->psoc, sap_ctx->sessionId,
+				cur_sap_ctx->chan_freq,
+				cur_sap_ctx->ch_params.ch_width,
+				PM_P2P_GO_MODE);
+			sap_ctx->is_forcescc_restart_required = false;
+			break;
+		}
+	}
+}
+
+/**
+ * sap_check_and_process_go_force_scc() - find if other p2p
+ * go/cli/sta is there and needs force scc.
+ *
+ * @cur_sap_ctx: current sap context
+ *
+ * Return: None
+ */
+static void
+sap_check_and_process_go_force_ssc(struct sap_context *sap_ctx)
+{
+	struct mac_context *mac_ctx;
+	uint32_t con_freq;
+	enum phy_ch_width ch_width;
+	enum policy_mgr_con_mode existing_vdev_mode = PM_MAX_NUM_OF_MODE;
+
+	mac_ctx = sap_get_mac_context();
+	if (!mac_ctx) {
+		sap_err("Invalid MAC context");
+		return;
+	}
+	if (sap_ctx->vdev->vdev_mlme.vdev_opmode ==
+	    QDF_P2P_GO_MODE &&
+	    wlan_vdev_get_peer_count(sap_ctx->vdev) == 2 &&
+	    policy_mgr_mode_specific_connection_count(
+		    mac_ctx->psoc, PM_P2P_GO_MODE, NULL) > 1) {
+		sap_check_and_process_forcescc_for_go_plus_go(sap_ctx);
+		return;
+	}
+	policy_mgr_fetch_existing_con_info(mac_ctx->psoc, sap_ctx->sessionId,
+					   sap_ctx->chan_freq,
+					   &existing_vdev_mode,
+					   &con_freq, &ch_width);
+
+	if (sap_ctx->vdev->vdev_mlme.vdev_opmode == QDF_P2P_GO_MODE &&
+	    policy_mgr_go_scc_enforced(mac_ctx->psoc) &&
+	    !policy_mgr_is_go_scc_strict(mac_ctx->psoc) &&
+	    wlan_vdev_get_peer_count(sap_ctx->vdev) == 2 &&
+	    (existing_vdev_mode == PM_P2P_CLIENT_MODE ||
+	    existing_vdev_mode == PM_STA_MODE)){
+		policy_mgr_process_forcescc_for_go(mac_ctx->psoc,
+						   sap_ctx->sessionId,
+						   con_freq, ch_width,
+						   existing_vdev_mode);
+	}
+}
+#else
+static inline void
+sap_check_and_process_forcescc_for_go_plus_go(
+					struct sap_context *cur_sap_ctx)
+{}
+static inline void
+sap_check_and_process_go_force_ssc(struct sap_context *cur_sap_ctx)
+{}
+#endif
 
 QDF_STATUS wlansap_roam_callback(void *ctx,
 				 struct csr_roam_info *csr_roam_info,
@@ -884,18 +991,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 					     eSAP_STA_SET_KEY_EVENT,
 					     (void *) eSAP_STATUS_FAILURE);
 		break;
-	case eCSR_ROAM_ASSOCIATION_COMPLETION:
-		if (roam_result == eCSR_ROAM_RESULT_FAILURE)
-			sap_signal_hdd_event(sap_ctx, csr_roam_info,
-					     eSAP_STA_REASSOC_EVENT,
-					     (void *) eSAP_STATUS_FAILURE);
-		break;
-	case eCSR_ROAM_DISASSOCIATED:
-		if (roam_result == eCSR_ROAM_RESULT_MIC_FAILURE)
-			sap_signal_hdd_event(sap_ctx, csr_roam_info,
-					     eSAP_STA_MIC_FAILURE_EVENT,
-					     (void *) eSAP_STATUS_FAILURE);
-		break;
 	case eCSR_ROAM_WPS_PBC_PROBE_REQ_IND:
 		break;
 	case eCSR_ROAM_DISCONNECT_ALL_P2P_CLIENTS:
@@ -933,9 +1028,8 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		}
 
 		if (!sap_chan_bond_dfs_sub_chan(
-			sap_ctx, wlan_reg_freq_to_chan(mac_ctx->pdev,
-						       sap_ctx->chan_freq),
-			PHY_CHANNEL_BONDING_STATE_MAX))  {
+				sap_ctx, sap_ctx->chan_freq,
+				PHY_CHANNEL_BONDING_STATE_MAX)) {
 			sap_debug("Ignore Radar event for sap ch freq: %d",
 				  sap_ctx->chan_freq);
 			goto EXIT;
@@ -986,7 +1080,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		/* Issue stopbss for each sapctx */
 		for (intf = 0; intf < SAP_MAX_NUM_SESSION; intf++) {
 			struct sap_context *sap_context;
-			struct csr_roam_profile *profile;
 
 			if (((QDF_SAP_MODE ==
 			    mac_ctx->sap.sapCtxList[intf].sapPersona) ||
@@ -996,10 +1089,9 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			    NULL) {
 				sap_context =
 				    mac_ctx->sap.sapCtxList[intf].sap_context;
-				profile = &sap_context->csr_roamProfile;
 				if (!wlan_reg_is_passive_or_disable_for_freq(
 						mac_ctx->pdev,
-						profile->op_freq))
+						sap_context->chan_freq))
 					continue;
 				sap_debug("Vdev %d no channel available , stop bss",
 					  sap_context->sessionId);
@@ -1092,12 +1184,6 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			qdf_ret_status = QDF_STATUS_E_FAILURE;
 		break;
-	case eCSR_ROAM_RESULT_ASSOCIATED:
-		/* Fill in the event structure */
-		sap_signal_hdd_event(sap_ctx, csr_roam_info,
-				     eSAP_STA_REASSOC_EVENT,
-				     (void *) eSAP_STATUS_SUCCESS);
-		break;
 	case eCSR_ROAM_RESULT_INFRA_STARTED:
 		if (!csr_roam_info) {
 			sap_err("csr_roam_info is NULL");
@@ -1157,10 +1243,17 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		 * disassoc event
 		 * Fill in the event structure
 		 */
-		if (roam_status == eCSR_ROAM_SET_KEY_COMPLETE)
+		if (roam_status == eCSR_ROAM_SET_KEY_COMPLETE) {
 			sap_signal_hdd_event(sap_ctx, csr_roam_info,
 					     eSAP_STA_SET_KEY_EVENT,
 					     (void *) eSAP_STATUS_SUCCESS);
+		/*
+		 * After set key if this is the first peer connecting to new GO
+		 * then check for peer count (which is self peer + peer count)
+		 * and take decision for GO+GO, STA+GO and CLI+GO force SCC
+		 */
+			sap_check_and_process_go_force_ssc(sap_ctx);
+		}
 		break;
 	case eCSR_ROAM_RESULT_MAX_ASSOC_EXCEEDED:
 		/* Fill in the event structure */
@@ -1264,10 +1357,8 @@ void sap_scan_event_callback(struct wlan_objmgr_vdev *vdev,
 	session_id = wlan_vdev_get_id(vdev);
 	scan_id = event->scan_id;
 	mac_handle = cds_get_context(QDF_MODULE_ID_SME);
-	if (!mac_handle) {
-		sap_alert("invalid MAC handle");
+	if (!mac_handle)
 		return;
-	}
 
 	qdf_mtrace(QDF_MODULE_ID_SCAN, QDF_MODULE_ID_SAP, event->type,
 		   event->vdev_id, event->scan_id);

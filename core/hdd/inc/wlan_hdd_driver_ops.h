@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2015-2017, 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017, 2019, 2021 The Linux Foundation.
+ * All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -76,12 +77,14 @@ int wlan_hdd_bus_suspend_noirq(void);
 /**
  * wlan_hdd_bus_resume() - wake up the bus
  *
+ * @type: WoW suspend type
+ *
  * This function is called by the platform driver to resume wlan
  * bus
  *
  * Return: 0 for success and negative errno if failure
  */
-int wlan_hdd_bus_resume(void);
+int wlan_hdd_bus_resume(enum qdf_suspend_type type);
 
 /**
  * wlan_hdd_bus_resume_noirq() - handle bus resume no irq
@@ -155,4 +158,20 @@ void hdd_set_hif_init_phase(struct hif_opaque_softc *hif_ctx,
 {
 }
 #endif /* FORCE_WAKE */
+
+#ifdef HIF_DETECTION_LATENCY_ENABLE
+/**
+ * hdd_hif_set_enable_detection() - enable detection
+ * @hif_ctx: hif opaque handle
+ * @value: enable/disable
+ *
+ * Return: None
+ */
+void hdd_hif_set_enable_detection(struct hif_opaque_softc *hif_ctx, bool value);
+#else
+static inline
+void hdd_hif_set_enable_detection(struct hif_opaque_softc *hif_ctx, bool value)
+{
+}
+#endif /* HIF_DETECTION_LATENCY_ENABLE */
 #endif /* __WLAN_HDD_DRIVER_OPS_H__ */

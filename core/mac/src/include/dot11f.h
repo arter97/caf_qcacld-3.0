@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -150,22 +150,22 @@ void dot11f_pack_ff_beacon_interval(tpAniSirGlobal, tDot11fFfBeaconInterval *,
 				   uint8_t *);
 
 typedef struct sDot11fFfCapabilities {
-	uint16_t             ess:1;
-	uint16_t            ibss:1;
-	uint16_t      cfPollable:1;
-	uint16_t       cfPollReq:1;
-	uint16_t         privacy:1;
-	uint16_t   shortPreamble:1;
-	uint16_t            pbcc:1;
-	uint16_t  channelAgility:1;
-	uint16_t     spectrumMgt:1;
-	uint16_t             qos:1;
-	uint16_t   shortSlotTime:1;
-	uint16_t            apsd:1;
-	uint16_t             rrm:1;
-	uint16_t        dsssOfdm:1;
-	uint16_t       delayedBA:1;
-	uint16_t     immediateBA:1;
+	uint16_t                 ess:1;
+	uint16_t                ibss:1;
+	uint16_t          cfPollable:1;
+	uint16_t           cfPollReq:1;
+	uint16_t             privacy:1;
+	uint16_t       shortPreamble:1;
+	uint16_t  criticalUpdateFlag:1;
+	uint16_t      channelAgility:1;
+	uint16_t         spectrumMgt:1;
+	uint16_t                 qos:1;
+	uint16_t       shortSlotTime:1;
+	uint16_t                apsd:1;
+	uint16_t                 rrm:1;
+	uint16_t            dsssOfdm:1;
+	uint16_t           delayedBA:1;
+	uint16_t         immediateBA:1;
 } tDot11fFfCapabilities;
 
 #define DOT11F_FF_CAPABILITIES_LEN (2)
@@ -176,38 +176,38 @@ void dot11f_unpack_ff_capabilities(tpAniSirGlobal, uint8_t *,
 void dot11f_pack_ff_capabilities(tpAniSirGlobal, tDot11fFfCapabilities *,
 				 uint8_t *);
 
-#define CAPABILITIES_ESS_OFFSET            0
-#define CAPABILITIES_ESS_WIDTH             1
-#define CAPABILITIES_IBSS_OFFSET           1
-#define CAPABILITIES_IBSS_WIDTH            1
-#define CAPABILITIES_CFPOLLABLE_OFFSET     2
-#define CAPABILITIES_CFPOLLABLE_WIDTH      1
-#define CAPABILITIES_CFPOLLREQ_OFFSET      3
-#define CAPABILITIES_CFPOLLREQ_WIDTH       1
-#define CAPABILITIES_PRIVACY_OFFSET        4
-#define CAPABILITIES_PRIVACY_WIDTH         1
-#define CAPABILITIES_SHORTPREAMBLE_OFFSET  5
-#define CAPABILITIES_SHORTPREAMBLE_WIDTH   1
-#define CAPABILITIES_PBCC_OFFSET           6
-#define CAPABILITIES_PBCC_WIDTH            1
-#define CAPABILITIES_CHANNELAGILITY_OFFSET 7
-#define CAPABILITIES_CHANNELAGILITY_WIDTH  1
-#define CAPABILITIES_SPECTRUMMGT_OFFSET    8
-#define CAPABILITIES_SPECTRUMMGT_WIDTH     1
-#define CAPABILITIES_QOS_OFFSET            9
-#define CAPABILITIES_QOS_WIDTH             1
-#define CAPABILITIES_SHORTSLOTTIME_OFFSET  10
-#define CAPABILITIES_SHORTSLOTTIME_WIDTH   1
-#define CAPABILITIES_APSD_OFFSET           11
-#define CAPABILITIES_APSD_WIDTH            1
-#define CAPABILITIES_RRM_OFFSET            12
-#define CAPABILITIES_RRM_WIDTH             1
-#define CAPABILITIES_DSSSOFDM_OFFSET       13
-#define CAPABILITIES_DSSSOFDM_WIDTH        1
-#define CAPABILITIES_DELAYEDBA_OFFSET      14
-#define CAPABILITIES_DELAYEDBA_WIDTH       1
-#define CAPABILITIES_IMMEDIATEBA_OFFSET    15
-#define CAPABILITIES_IMMEDIATEBA_WIDTH     1
+#define CAPABILITIES_ESS_OFFSET                0
+#define CAPABILITIES_ESS_WIDTH                 1
+#define CAPABILITIES_IBSS_OFFSET               1
+#define CAPABILITIES_IBSS_WIDTH                1
+#define CAPABILITIES_CFPOLLABLE_OFFSET         2
+#define CAPABILITIES_CFPOLLABLE_WIDTH          1
+#define CAPABILITIES_CFPOLLREQ_OFFSET          3
+#define CAPABILITIES_CFPOLLREQ_WIDTH           1
+#define CAPABILITIES_PRIVACY_OFFSET            4
+#define CAPABILITIES_PRIVACY_WIDTH             1
+#define CAPABILITIES_SHORTPREAMBLE_OFFSET      5
+#define CAPABILITIES_SHORTPREAMBLE_WIDTH       1
+#define CAPABILITIES_CRITICALUPDATEFLAG_OFFSET 6
+#define CAPABILITIES_CRITICALUPDATEFLAG_WIDTH  1
+#define CAPABILITIES_CHANNELAGILITY_OFFSET     7
+#define CAPABILITIES_CHANNELAGILITY_WIDTH      1
+#define CAPABILITIES_SPECTRUMMGT_OFFSET        8
+#define CAPABILITIES_SPECTRUMMGT_WIDTH         1
+#define CAPABILITIES_QOS_OFFSET                9
+#define CAPABILITIES_QOS_WIDTH                 1
+#define CAPABILITIES_SHORTSLOTTIME_OFFSET      10
+#define CAPABILITIES_SHORTSLOTTIME_WIDTH       1
+#define CAPABILITIES_APSD_OFFSET               11
+#define CAPABILITIES_APSD_WIDTH                1
+#define CAPABILITIES_RRM_OFFSET                12
+#define CAPABILITIES_RRM_WIDTH                 1
+#define CAPABILITIES_DSSSOFDM_OFFSET           13
+#define CAPABILITIES_DSSSOFDM_WIDTH            1
+#define CAPABILITIES_DELAYEDBA_OFFSET          14
+#define CAPABILITIES_DELAYEDBA_WIDTH           1
+#define CAPABILITIES_IMMEDIATEBA_OFFSET        15
+#define CAPABILITIES_IMMEDIATEBA_WIDTH         1
 
 typedef struct sDot11fFfCategory {
 	uint8_t category;
@@ -3236,6 +3236,47 @@ uint32_t dot11f_get_packed_ie_BeaconReporting(
 }; /* End extern "C". */
 #endif /* C++ */
 
+/* EID 37 (0x25) */
+typedef struct sDot11fIEChanSwitchAnn {
+	uint8_t             present;
+	uint8_t             switchMode;
+	uint8_t             newChannel;
+	uint8_t             switchCount;
+} tDot11fIEChanSwitchAnn;
+
+#define DOT11F_EID_CHANSWITCHANN (37)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_CHANSWITCHANN_MIN_LEN (3)
+
+#define DOT11F_IE_CHANSWITCHANN_MAX_LEN (3)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_chan_switch_ann(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEChanSwitchAnn*,
+	bool);
+
+uint32_t dot11f_pack_ie_chan_switch_ann(
+	tpAniSirGlobal,
+	tDot11fIEChanSwitchAnn *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_ChanSwitchAnn(
+	tpAniSirGlobal,
+	tDot11fIEChanSwitchAnn *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
 /* EID 2 (0x02) */
 typedef struct sDot11fIECondensedCountryStr {
 	uint8_t             present;
@@ -3269,6 +3310,301 @@ uint32_t dot11f_pack_ie_condensed_country_str(
 uint32_t dot11f_get_packed_ie_CondensedCountryStr(
 	tpAniSirGlobal,
 	tDot11fIECondensedCountryStr *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 12 (0x0c) */
+typedef struct sDot11fIEEDCAParamSet {
+	uint8_t             present;
+	uint8_t             qos;
+	uint8_t             reserved;
+	uint8_t           acbe_aifsn:4;
+	uint8_t             acbe_acm:1;
+	uint8_t             acbe_aci:2;
+	uint8_t              unused1:1;
+	uint8_t          acbe_acwmin:4;
+	uint8_t          acbe_acwmax:4;
+	uint16_t            acbe_txoplimit;
+	uint8_t           acbk_aifsn:4;
+	uint8_t             acbk_acm:1;
+	uint8_t             acbk_aci:2;
+	uint8_t              unused2:1;
+	uint8_t          acbk_acwmin:4;
+	uint8_t          acbk_acwmax:4;
+	uint16_t            acbk_txoplimit;
+	uint8_t           acvi_aifsn:4;
+	uint8_t             acvi_acm:1;
+	uint8_t             acvi_aci:2;
+	uint8_t              unused3:1;
+	uint8_t          acvi_acwmin:4;
+	uint8_t          acvi_acwmax:4;
+	uint16_t            acvi_txoplimit;
+	uint8_t           acvo_aifsn:4;
+	uint8_t             acvo_acm:1;
+	uint8_t             acvo_aci:2;
+	uint8_t              unused4:1;
+	uint8_t          acvo_acwmin:4;
+	uint8_t          acvo_acwmax:4;
+	uint16_t            acvo_txoplimit;
+} tDot11fIEEDCAParamSet;
+
+#define DOT11F_EID_EDCAPARAMSET (12)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_EDCAPARAMSET_MIN_LEN (18)
+
+#define DOT11F_IE_EDCAPARAMSET_MAX_LEN (18)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_edca_param_set(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEEDCAParamSet*,
+	bool);
+
+uint32_t dot11f_pack_ie_edca_param_set(
+	tpAniSirGlobal,
+	tDot11fIEEDCAParamSet *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_EDCAParamSet(
+	tpAniSirGlobal,
+	tDot11fIEEDCAParamSet *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 127 (0x7f) */
+typedef struct sDot11fIEExtCap {
+	uint8_t             present;
+	uint8_t             num_bytes;
+	uint8_t             bytes[15];
+} tDot11fIEExtCap;
+
+#define DOT11F_EID_EXTCAP (127)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_EXTCAP_MIN_LEN (1)
+
+#define DOT11F_IE_EXTCAP_MAX_LEN (15)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_ext_cap(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEExtCap*,
+	bool);
+
+uint32_t dot11f_pack_ie_ext_cap(
+	tpAniSirGlobal,
+	tDot11fIEExtCap *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_ExtCap(
+	tpAniSirGlobal,
+	tDot11fIEExtCap *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 50 (0x32) */
+typedef struct sDot11fIEExtSuppRates {
+	uint8_t             present;
+	uint8_t             num_rates;
+	uint8_t             rates[12];
+} tDot11fIEExtSuppRates;
+
+#define DOT11F_EID_EXTSUPPRATES (50)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_EXTSUPPRATES_MIN_LEN (1)
+
+#define DOT11F_IE_EXTSUPPRATES_MAX_LEN (12)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_ext_supp_rates(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEExtSuppRates*,
+	bool);
+
+uint32_t dot11f_pack_ie_ext_supp_rates(
+	tpAniSirGlobal,
+	tDot11fIEExtSuppRates *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_ExtSuppRates(
+	tpAniSirGlobal,
+	tDot11fIEExtSuppRates *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 45 (0x2d) */
+typedef struct sDot11fIEHTCaps {
+	uint8_t             present;
+	uint16_t         advCodingCap:1;
+	uint16_t supportedChannelWidthSet:1;
+	uint16_t        mimoPowerSave:2;
+	uint16_t           greenField:1;
+	uint16_t         shortGI20MHz:1;
+	uint16_t         shortGI40MHz:1;
+	uint16_t               txSTBC:1;
+	uint16_t               rxSTBC:2;
+	uint16_t            delayedBA:1;
+	uint16_t     maximalAMSDUsize:1;
+	uint16_t     dsssCckMode40MHz:1;
+	uint16_t                 psmp:1;
+	uint16_t     stbcControlFrame:1;
+	uint16_t   lsigTXOPProtection:1;
+	uint8_t     maxRxAMPDUFactor:2;
+	uint8_t          mpduDensity:3;
+	uint8_t            reserved1:3;
+	uint8_t             supportedMCSSet[16];
+	uint16_t                  pco:1;
+	uint16_t       transitionTime:2;
+	uint16_t            reserved2:5;
+	uint16_t          mcsFeedback:2;
+	uint16_t            reserved3:6;
+	uint32_t                 txBF:1;
+	uint32_t  rxStaggeredSounding:1;
+	uint32_t  txStaggeredSounding:1;
+	uint32_t                rxZLF:1;
+	uint32_t                txZLF:1;
+	uint32_t         implicitTxBF:1;
+	uint32_t          calibration:2;
+	uint32_t      explicitCSITxBF:1;
+	uint32_t explicitUncompressedSteeringMatrix:1;
+	uint32_t explicitBFCSIFeedback:3;
+	uint32_t explicitUncompressedSteeringMatrixFeedback:3;
+	uint32_t explicitCompressedSteeringMatrixFeedback:3;
+	uint32_t     csiNumBFAntennae:2;
+	uint32_t uncompressedSteeringMatrixBFAntennae:2;
+	uint32_t compressedSteeringMatrixBFAntennae:2;
+	uint32_t            reserved4:7;
+	uint8_t     antennaSelection:1;
+	uint8_t explicitCSIFeedbackTx:1;
+	uint8_t antennaIndicesFeedbackTx:1;
+	uint8_t  explicitCSIFeedback:1;
+	uint8_t antennaIndicesFeedback:1;
+	uint8_t                 rxAS:1;
+	uint8_t      txSoundingPPDUs:1;
+	uint8_t            reserved5:1;
+	uint8_t             num_rsvd;
+	uint8_t             rsvd[32];
+} tDot11fIEHTCaps;
+
+#define DOT11F_EID_HTCAPS (45)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_HTCAPS_MIN_LEN (26)
+
+#define DOT11F_IE_HTCAPS_MAX_LEN (58)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_ht_caps(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEHTCaps*,
+	bool);
+
+uint32_t dot11f_pack_ie_ht_caps(
+	tpAniSirGlobal,
+	tDot11fIEHTCaps *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_HTCaps(
+	tpAniSirGlobal,
+	tDot11fIEHTCaps *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 61 (0x3d) */
+typedef struct sDot11fIEHTInfo {
+	uint8_t             present;
+	uint8_t             primaryChannel;
+	uint8_t secondaryChannelOffset:2;
+	uint8_t recommendedTxWidthSet:1;
+	uint8_t             rifsMode:1;
+	uint8_t controlledAccessOnly:1;
+	uint8_t serviceIntervalGranularity:3;
+	uint16_t               opMode:2;
+	uint16_t  nonGFDevicesPresent:1;
+	uint16_t   transmitBurstLimit:1;
+	uint16_t  obssNonHTStaPresent:1;
+	uint16_t chan_center_freq_seg2:8;
+	uint16_t             reserved:3;
+	uint16_t         basicSTBCMCS:7;
+	uint16_t    dualCTSProtection:1;
+	uint16_t      secondaryBeacon:1;
+	uint16_t lsigTXOPProtectionFullSupport:1;
+	uint16_t            pcoActive:1;
+	uint16_t             pcoPhase:1;
+	uint16_t            reserved2:4;
+	uint8_t             basicMCSSet[16];
+	uint8_t             num_rsvd;
+	uint8_t             rsvd[32];
+} tDot11fIEHTInfo;
+
+#define DOT11F_EID_HTINFO (61)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_HTINFO_MIN_LEN (22)
+
+#define DOT11F_IE_HTINFO_MAX_LEN (54)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_ht_info(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEHTInfo*,
+	bool);
+
+uint32_t dot11f_pack_ie_ht_info(
+	tpAniSirGlobal,
+	tDot11fIEHTInfo *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_HTInfo(
+	tpAniSirGlobal,
+	tDot11fIEHTInfo *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -3351,6 +3687,131 @@ uint32_t dot11f_pack_ie_multi_bssid(
 uint32_t dot11f_get_packed_ie_MultiBssid(
 	tpAniSirGlobal,
 	tDot11fIEMultiBssid *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 199 (0xc7) */
+typedef struct sDot11fIEOperatingMode {
+	uint8_t             present;
+	uint8_t            chanWidth:2;
+	uint8_t   vht_160_80p80_supp:1;
+	uint8_t              no_ldpc:1;
+	uint8_t                rxNSS:3;
+	uint8_t            rxNSSType:1;
+} tDot11fIEOperatingMode;
+
+#define DOT11F_EID_OPERATINGMODE (199)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_OPERATINGMODE_MIN_LEN (1)
+
+#define DOT11F_IE_OPERATINGMODE_MAX_LEN (1)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_operating_mode(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEOperatingMode*,
+	bool);
+
+uint32_t dot11f_pack_ie_operating_mode(
+	tpAniSirGlobal,
+	tDot11fIEOperatingMode *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_OperatingMode(
+	tpAniSirGlobal,
+	tDot11fIEOperatingMode *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 221 (0xdd) {OUI 0x50, 0x6f, 0x9a, 0x09} (Multi-IE) */
+typedef struct sDot11fIEP2PAssocRes {
+	uint8_t             present;
+	tDot11fTLVP2PStatus P2PStatus;
+	tDot11fTLVExtendedListenTiming ExtendedListenTiming;
+} tDot11fIEP2PAssocRes;
+
+#define DOT11F_EID_P2PASSOCRES (221)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_P2PASSOCRES_MIN_LEN (4)
+
+#define DOT11F_IE_P2PASSOCRES_MAX_LEN (15)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_p2_p_assoc_res(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEP2PAssocRes*,
+	bool);
+
+uint32_t dot11f_pack_ie_p2_p_assoc_res(
+	tpAniSirGlobal,
+	tDot11fIEP2PAssocRes *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_iep2_p_assoc_res(
+	tpAniSirGlobal,
+	tDot11fIEP2PAssocRes *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 40 (0x28) */
+typedef struct sDot11fIEQuiet {
+	uint8_t             present;
+	uint8_t             count;
+	uint8_t             period;
+	uint16_t            duration;
+	uint16_t            offset;
+} tDot11fIEQuiet;
+
+#define DOT11F_EID_QUIET (40)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_QUIET_MIN_LEN (6)
+
+#define DOT11F_IE_QUIET_MAX_LEN (6)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_quiet(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEQuiet*,
+	bool);
+
+uint32_t dot11f_pack_ie_quiet(
+	tpAniSirGlobal,
+	tDot11fIEQuiet *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_Quiet(
+	tpAniSirGlobal,
+	tDot11fIEQuiet *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -3508,6 +3969,57 @@ uint32_t dot11f_get_packed_ie_RRMEnabledCap(
 }; /* End extern "C". */
 #endif /* C++ */
 
+/* EID 48 (0x30) */
+typedef struct sDot11fIERSN {
+	uint8_t             present;
+	uint16_t            version /* Must be 1! */;
+	uint8_t             gp_cipher_suite_present;
+	uint8_t             gp_cipher_suite[4];
+	uint16_t            pwise_cipher_suite_count;
+	uint8_t             pwise_cipher_suites[6][4];
+	uint16_t            akm_suite_cnt;
+	uint8_t             akm_suite[6][4];
+	uint8_t             RSN_Cap_present;
+	uint8_t             RSN_Cap[2];
+	uint16_t            pmkid_count;
+	uint8_t             pmkid[4][16];
+	uint8_t             gp_mgmt_cipher_suite_present;
+	uint8_t             gp_mgmt_cipher_suite[4];
+} tDot11fIERSN;
+
+#define DOT11F_EID_RSN (48)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_RSN_MIN_LEN (2)
+
+#define DOT11F_IE_RSN_MAX_LEN (130)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_rsn(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIERSN*,
+	bool);
+
+uint32_t dot11f_pack_ie_rsn(
+	tpAniSirGlobal,
+	tDot11fIERSN *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_iersn(
+	tpAniSirGlobal,
+	tDot11fIERSN *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
 /* EID 10 (0x0a) */
 typedef struct sDot11fIERequestedInfo {
 	uint8_t             present;
@@ -3628,6 +4140,99 @@ uint32_t dot11f_pack_ie_schedule(
 uint32_t dot11f_get_packed_ie_Schedule(
 	tpAniSirGlobal,
 	tDot11fIESchedule *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 59 (0x3b) */
+typedef struct sDot11fIESuppOperatingClasses {
+	uint8_t             present;
+	uint8_t             num_classes;
+	uint8_t             classes[32];
+} tDot11fIESuppOperatingClasses;
+
+#define DOT11F_EID_SUPPOPERATINGCLASSES (59)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_SUPPOPERATINGCLASSES_MIN_LEN (1)
+
+#define DOT11F_IE_SUPPOPERATINGCLASSES_MAX_LEN (32)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_supp_operating_classes(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIESuppOperatingClasses*,
+	bool);
+
+uint32_t dot11f_pack_ie_supp_operating_classes(
+	tpAniSirGlobal,
+	tDot11fIESuppOperatingClasses *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_SuppOperatingClasses(
+	tpAniSirGlobal,
+	tDot11fIESuppOperatingClasses *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 1 (0x01) */
+typedef struct sDot11fIESuppRates {
+	uint8_t             present;
+	uint8_t             num_rates;
+	uint8_t             rates[12];
+} tDot11fIESuppRates;
+
+#define DOT11F_EID_SUPPRATES (1)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_SUPPRATES_MIN_LEN (0)
+
+#define DOT11F_IE_SUPPRATES_MAX_LEN (12)
+
+#define DOT11F_IS_BG_RATE(_x)  (((_x) == 02) || \
+				((_x) == 04) || \
+				((_x) == 11) || \
+				((_x) == 22) || \
+				((_x) == 12) || \
+				((_x) == 18) || \
+				((_x) == 24) || \
+				((_x) == 36) || \
+				((_x) == 48) || \
+				((_x) == 72) || \
+				((_x) == 96) || \
+				((_x) == 108))
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_supp_rates(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIESuppRates*,
+	bool);
+
+uint32_t dot11f_pack_ie_supp_rates(
+	tpAniSirGlobal,
+	tDot11fIESuppRates *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_SuppRates(
+	tpAniSirGlobal,
+	tDot11fIESuppRates *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -3995,6 +4600,165 @@ uint32_t dot11f_get_packed_ie_VHTOperation(
 }; /* End extern "C". */
 #endif /* C++ */
 
+/* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x02, 0x05} */
+typedef struct sDot11fIEWMMCaps {
+	uint8_t             present;
+	uint8_t             version /* Must be 1! */;
+	uint8_t             reserved:4;
+	uint8_t                 qack:1;
+	uint8_t        queue_request:1;
+	uint8_t         txop_request:1;
+	uint8_t             more_ack:1;
+} tDot11fIEWMMCaps;
+
+#define DOT11F_EID_WMMCAPS (221)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_WMMCAPS_MIN_LEN (7)
+
+#define DOT11F_IE_WMMCAPS_MAX_LEN (7)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_wmm_caps(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEWMMCaps*,
+	bool);
+
+uint32_t dot11f_pack_ie_wmm_caps(
+	tpAniSirGlobal,
+	tDot11fIEWMMCaps *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_WMMCaps(
+	tpAniSirGlobal,
+	tDot11fIEWMMCaps *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x02, 0x00} */
+typedef struct sDot11fIEWMMInfoStation {
+	uint8_t             present;
+	uint8_t             version;
+	uint8_t           acvo_uapsd:1;
+	uint8_t           acvi_uapsd:1;
+	uint8_t           acbk_uapsd:1;
+	uint8_t           acbe_uapsd:1;
+	uint8_t            reserved1:1;
+	uint8_t        max_sp_length:2;
+	uint8_t            reserved2:1;
+} tDot11fIEWMMInfoStation;
+
+#define DOT11F_EID_WMMINFOSTATION (221)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_WMMINFOSTATION_MIN_LEN (7)
+
+#define DOT11F_IE_WMMINFOSTATION_MAX_LEN (7)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_wmm_info_station(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEWMMInfoStation*,
+	bool);
+
+uint32_t dot11f_pack_ie_wmm_info_station(
+	tpAniSirGlobal,
+	tDot11fIEWMMInfoStation *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_WMMInfoStation(
+	tpAniSirGlobal,
+	tDot11fIEWMMInfoStation *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x02, 0x01} */
+typedef struct sDot11fIEWMMParams {
+	uint8_t             present;
+	uint8_t             version /* Must be 1! */;
+	uint8_t             qosInfo;
+	uint8_t             reserved2;
+	uint8_t           acbe_aifsn:4;
+	uint8_t             acbe_acm:1;
+	uint8_t             acbe_aci:2;
+	uint8_t              unused1:1;
+	uint8_t          acbe_acwmin:4;
+	uint8_t          acbe_acwmax:4;
+	uint16_t            acbe_txoplimit;
+	uint8_t           acbk_aifsn:4;
+	uint8_t             acbk_acm:1;
+	uint8_t             acbk_aci:2;
+	uint8_t              unused2:1;
+	uint8_t          acbk_acwmin:4;
+	uint8_t          acbk_acwmax:4;
+	uint16_t            acbk_txoplimit;
+	uint8_t           acvi_aifsn:4;
+	uint8_t             acvi_acm:1;
+	uint8_t             acvi_aci:2;
+	uint8_t              unused3:1;
+	uint8_t          acvi_acwmin:4;
+	uint8_t          acvi_acwmax:4;
+	uint16_t            acvi_txoplimit;
+	uint8_t           acvo_aifsn:4;
+	uint8_t             acvo_acm:1;
+	uint8_t             acvo_aci:2;
+	uint8_t              unused4:1;
+	uint8_t          acvo_acwmin:4;
+	uint8_t          acvo_acwmax:4;
+	uint16_t            acvo_txoplimit;
+} tDot11fIEWMMParams;
+
+#define DOT11F_EID_WMMPARAMS (221)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_WMMPARAMS_MIN_LEN (24)
+
+#define DOT11F_IE_WMMPARAMS_MAX_LEN (24)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_wmm_params(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEWMMParams*,
+	bool);
+
+uint32_t dot11f_pack_ie_wmm_params(
+	tpAniSirGlobal,
+	tDot11fIEWMMParams *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_WMMParams(
+	tpAniSirGlobal,
+	tDot11fIEWMMParams *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
 /* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x02, 0x09} */
 typedef struct sDot11fIEWMMSchedule {
 	uint8_t             present;
@@ -4260,6 +5024,53 @@ uint32_t dot11f_get_packed_ie_WMMTSPEC(
 }; /* End extern "C". */
 #endif /* C++ */
 
+/* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x01} */
+typedef struct sDot11fIEWPA {
+	uint8_t             present;
+	uint16_t            version /* Must be 1! */;
+	/* field added to fix the bug in dot11fPackIEWPA */
+	uint8_t             multicast_cipher_present;
+	uint8_t             multicast_cipher[4];
+	uint16_t            unicast_cipher_count;
+	uint8_t             unicast_ciphers[4][4];
+	uint16_t            auth_suite_count;
+	uint8_t             auth_suites[4][4];
+	uint16_t            caps;
+} tDot11fIEWPA;
+
+#define DOT11F_EID_WPA (221)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_WPA_MIN_LEN (6)
+
+#define DOT11F_IE_WPA_MAX_LEN (48)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_wpa(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEWPA*,
+	bool);
+
+uint32_t dot11f_pack_ie_wpa(
+	tpAniSirGlobal,
+	tDot11fIEWPA *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_iewpa(
+	tpAniSirGlobal,
+	tDot11fIEWPA *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
 /* EID 194 (0xc2) */
 typedef struct sDot11fIEWiderBWChanSwitchAnn {
 	uint8_t             present;
@@ -4381,6 +5192,502 @@ uint32_t dot11f_get_packed_ie_beacon_report_frm_body_fragment_id(
 }; /* End extern "C". */
 #endif /* C++ */
 
+/* EID 255 (0xff) Extended EID 253 (0xfd) */
+typedef struct sDot11fIEeht_cap {
+	uint8_t             present;
+	uint16_t      nsep_pri_access:1;
+	uint16_t           eht_om_ctl:1;
+	uint16_t triggered_txop_sharing:1;
+	uint16_t             reserved:13;
+	uint32_t            reserved2:1;
+	uint32_t  support_320mhz_6ghz:1;
+	uint32_t  ru_242tone_wt_20mhz:1;
+	uint32_t ndp_4x_eht_ltf_3dot2_us_gi:1;
+	uint32_t   partial_bw_mu_mimo:1;
+	uint32_t        su_beamformer:1;
+	uint32_t        su_beamformee:1;
+	uint32_t     bfee_ss_le_80mhz:3;
+	uint32_t       bfee_ss_160mhz:3;
+	uint32_t       bfee_ss_320mhz:3;
+	uint32_t num_sounding_dim_le_80mhz:3;
+	uint32_t num_sounding_dim_160mhz:3;
+	uint32_t num_sounding_dim_320mhz:3;
+	uint32_t    ng_16_su_feedback:1;
+	uint32_t    ng_16_mu_feedback:1;
+	uint32_t cb_sz_4_2_su_feedback:1;
+	uint32_t cb_sz_7_5_su_feedback:1;
+	uint32_t trig_su_bforming_feedback:1;
+	uint32_t trig_mu_bforming_partial_bw_feedback:1;
+	uint32_t triggered_cqi_feedback:1;
+	uint32_t partial_bw_dl_mu_mimo:1;
+	uint32_t         psr_based_sr:1;
+	uint32_t   power_boost_factor:1;
+	uint32_t eht_mu_ppdu_4x_ltf_0_8_us_gi:1;
+	uint32_t               max_nc:4;
+	uint32_t non_trig_cqi_feedback:1;
+	uint32_t tx_1024_4096_qam_lt_242_tone_ru:1;
+	uint32_t rx_1024_4096_qam_lt_242_tone_ru:1;
+	uint32_t         ppet_present:1;
+	uint32_t common_nominal_pkt_padding:2;
+	uint32_t      max_num_eht_ltf:5;
+	uint32_t               mcs_15:4;
+	uint32_t         eht_dup_6ghz:1;
+	uint32_t op_sta_rx_ndp_wider_bw_20mhz:1;
+	uint32_t non_ofdma_ul_mu_mimo_le_80mhz:1;
+	uint32_t non_ofdma_ul_mu_mimo_160mhz:1;
+	uint32_t non_ofdma_ul_mu_mimo_320mhz:1;
+	uint32_t  mu_bformer_le_80mhz:1;
+	uint32_t    mu_bformer_160mhz:1;
+	uint32_t    mu_bformer_320mhz:1;
+	uint32_t            reserved3:1;
+	uint8_t             num_eht_mcs_map_20;
+	uint8_t             eht_mcs_map_20[4];
+	uint8_t             num_eht_mcs_map_le_80;
+	uint8_t             eht_mcs_map_le_80[3];
+	uint8_t             num_eht_mcs_map_160;
+	uint8_t             eht_mcs_map_160[3];
+	uint8_t             eht_mcs_map_320[1][3];
+	union {
+		struct {
+			uint8_t num_ppe_th;
+			uint8_t ppe_th[62];
+		} ppe_threshold; /* ppet_present = 1 */
+	} ppet;
+} tDot11fIEeht_cap;
+
+#define DOT11F_EID_EHT_CAP (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_EHT_CAP_MIN_LEN (10)
+
+#define DOT11F_IE_EHT_CAP_MAX_LEN (85)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_eht_cap(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEeht_cap*,
+	bool);
+
+uint32_t dot11f_pack_ie_eht_cap(
+	tpAniSirGlobal,
+	tDot11fIEeht_cap *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_eht_cap(
+	tpAniSirGlobal,
+	tDot11fIEeht_cap *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 255 (0xff) Extended EID 254 (0xfe) */
+typedef struct sDot11fIEeht_op {
+	uint8_t             present;
+	uint8_t             basic_mcs_nss_set[2];
+	uint8_t             primary_channel;
+	uint8_t                width:3;
+	uint8_t             reserved:5;
+	uint8_t             chan_freq_seg0;
+	uint8_t             chan_freq_seg1;
+	uint8_t             minimum_rate;
+} tDot11fIEeht_op;
+
+#define DOT11F_EID_EHT_OP (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_EHT_OP_MIN_LEN (7)
+
+#define DOT11F_IE_EHT_OP_MAX_LEN (7)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_eht_op(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEeht_op*,
+	bool);
+
+uint32_t dot11f_pack_ie_eht_op(
+	tpAniSirGlobal,
+	tDot11fIEeht_op *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_eht_op(
+	tpAniSirGlobal,
+	tDot11fIEeht_op *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 60 (0x3c) */
+typedef struct sDot11fIEext_chan_switch_ann {
+	uint8_t             present;
+	uint8_t             switch_mode;
+	uint8_t             new_reg_class;
+	uint8_t             new_channel;
+	uint8_t             switch_count;
+} tDot11fIEext_chan_switch_ann;
+
+#define DOT11F_EID_EXT_CHAN_SWITCH_ANN (60)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_EXT_CHAN_SWITCH_ANN_MIN_LEN (4)
+
+#define DOT11F_IE_EXT_CHAN_SWITCH_ANN_MAX_LEN (4)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_ext_chan_switch_ann(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEext_chan_switch_ann*,
+	bool);
+
+uint32_t dot11f_pack_ie_ext_chan_switch_ann(
+	tpAniSirGlobal,
+	tDot11fIEext_chan_switch_ann *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_ext_chan_switch_ann(
+	tpAniSirGlobal,
+	tDot11fIEext_chan_switch_ann *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 240 (0xf0) */
+typedef struct sDot11fIEfils_indication {
+	uint8_t             present;
+	uint16_t public_key_identifiers_cnt:3;
+	uint16_t realm_identifiers_cnt:3;
+	uint16_t is_ip_config_supported:1;
+	uint16_t  is_cache_id_present:1;
+	uint16_t    is_hessid_present:1;
+	uint16_t is_fils_sk_auth_supported:1;
+	uint16_t is_fils_sk_auth_pfs_supported:1;
+	uint16_t is_pk_auth_supported:1;
+	uint16_t             reserved:4;
+	uint8_t             num_variable_data;
+	uint8_t             variable_data[255];
+} tDot11fIEfils_indication;
+
+#define DOT11F_EID_FILS_INDICATION (240)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_FILS_INDICATION_MIN_LEN (4)
+
+#define DOT11F_IE_FILS_INDICATION_MAX_LEN (257)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_fils_indication(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEfils_indication*,
+	bool);
+
+uint32_t dot11f_pack_ie_fils_indication(
+	tpAniSirGlobal,
+	tDot11fIEfils_indication *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_fils_indication(
+	tpAniSirGlobal,
+	tDot11fIEfils_indication *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 255 (0xff) Extended EID 59 (0x3b) */
+typedef struct sDot11fIEhe_6ghz_band_cap {
+	uint8_t             present;
+	uint16_t min_mpdu_start_spacing:3;
+	uint16_t    max_ampdu_len_exp:3;
+	uint16_t         max_mpdu_len:3;
+	uint16_t          sm_pow_save:2;
+	uint16_t         rd_responder:1;
+	uint16_t rx_ant_pattern_consistency:1;
+	uint16_t tx_ant_pattern_consistency:1;
+	uint16_t             reserved:2;
+} tDot11fIEhe_6ghz_band_cap;
+
+#define DOT11F_EID_HE_6GHZ_BAND_CAP (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_HE_6GHZ_BAND_CAP_MIN_LEN (2)
+
+#define DOT11F_IE_HE_6GHZ_BAND_CAP_MAX_LEN (2)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_he_6ghz_band_cap(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEhe_6ghz_band_cap*,
+	bool);
+
+uint32_t dot11f_pack_ie_he_6ghz_band_cap(
+	tpAniSirGlobal,
+	tDot11fIEhe_6ghz_band_cap *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_he_6ghz_band_cap(
+	tpAniSirGlobal,
+	tDot11fIEhe_6ghz_band_cap *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 255 (0xff) Extended EID 35 (0x23) */
+typedef struct sDot11fIEhe_cap {
+	uint8_t             present;
+	uint32_t               htc_he:1;
+	uint32_t          twt_request:1;
+	uint32_t        twt_responder:1;
+	uint32_t        fragmentation:2;
+	uint32_t max_num_frag_msdu_amsdu_exp:3;
+	uint32_t        min_frag_size:2;
+	uint32_t  trigger_frm_mac_pad:2;
+	uint32_t multi_tid_aggr_rx_supp:3;
+	uint32_t   he_link_adaptation:2;
+	uint32_t              all_ack:1;
+	uint32_t      trigd_rsp_sched:1;
+	uint32_t                a_bsr:1;
+	uint32_t        broadcast_twt:1;
+	uint32_t      ba_32bit_bitmap:1;
+	uint32_t           mu_cascade:1;
+	uint32_t ack_enabled_multitid:1;
+	uint32_t             reserved:1;
+	uint32_t           omi_a_ctrl:1;
+	uint32_t             ofdma_ra:1;
+	uint32_t max_ampdu_len_exp_ext:2;
+	uint32_t           amsdu_frag:1;
+	uint32_t       flex_twt_sched:1;
+	uint32_t        rx_ctrl_frame:1;
+	uint16_t      bsrp_ampdu_aggr:1;
+	uint16_t                  qtp:1;
+	uint16_t                a_bqr:1;
+	uint16_t spatial_reuse_param_rspder:1;
+	uint16_t    ndp_feedback_supp:1;
+	uint16_t             ops_supp:1;
+	uint16_t       amsdu_in_ampdu:1;
+	uint16_t multi_tid_aggr_tx_supp:3;
+	uint16_t he_sub_ch_sel_tx_supp:1;
+	uint16_t ul_2x996_tone_ru_supp:1;
+	uint16_t om_ctrl_ul_mu_data_dis_rx:1;
+	uint16_t      he_dynamic_smps:1;
+	uint16_t punctured_sounding_supp:1;
+	uint16_t ht_vht_trg_frm_rx_supp:1;
+	uint32_t            reserved2:1;
+	uint32_t         chan_width_0:1;
+	uint32_t         chan_width_1:1;
+	uint32_t         chan_width_2:1;
+	uint32_t         chan_width_3:1;
+	uint32_t         chan_width_4:1;
+	uint32_t         chan_width_5:1;
+	uint32_t         chan_width_6:1;
+	uint32_t  rx_pream_puncturing:4;
+	uint32_t         device_class:1;
+	uint32_t          ldpc_coding:1;
+	uint32_t he_1x_ltf_800_gi_ppdu:1;
+	uint32_t midamble_tx_rx_max_nsts:2;
+	uint32_t he_4x_ltf_3200_gi_ndp:1;
+	uint32_t tb_ppdu_tx_stbc_lt_80mhz:1;
+	uint32_t     rx_stbc_lt_80mhz:1;
+	uint32_t              doppler:2;
+	uint32_t                ul_mu:2;
+	uint32_t           dcm_enc_tx:3;
+	uint32_t           dcm_enc_rx:3;
+	uint32_t             ul_he_mu:1;
+	uint32_t        su_beamformer:1;
+	uint32_t        su_beamformee:1;
+	uint32_t        mu_beamformer:1;
+	uint32_t       bfee_sts_lt_80:3;
+	uint32_t       bfee_sts_gt_80:3;
+	uint32_t   num_sounding_lt_80:3;
+	uint32_t   num_sounding_gt_80:3;
+	uint32_t   su_feedback_tone16:1;
+	uint32_t   mu_feedback_tone16:1;
+	uint32_t          codebook_su:1;
+	uint32_t          codebook_mu:1;
+	uint32_t beamforming_feedback:3;
+	uint32_t        he_er_su_ppdu:1;
+	uint32_t   dl_mu_mimo_part_bw:1;
+	uint32_t         ppet_present:1;
+	uint32_t                  srp:1;
+	uint32_t          power_boost:1;
+	uint32_t     he_ltf_800_gi_4x:1;
+	uint32_t               max_nc:3;
+	uint32_t tb_ppdu_tx_stbc_gt_80mhz:1;
+	uint32_t     rx_stbc_gt_80mhz:1;
+	uint16_t  er_he_ltf_800_gi_4x:1;
+	uint16_t he_ppdu_20_in_40Mhz_2G:1;
+	uint16_t he_ppdu_20_in_160_80p80Mhz:1;
+	uint16_t he_ppdu_80_in_160_80p80Mhz:1;
+	uint16_t      er_1x_he_ltf_gi:1;
+	uint16_t midamble_tx_rx_1x_he_ltf:1;
+	uint16_t           dcm_max_bw:2;
+	uint16_t longer_than_16_he_sigb_ofdm_sym:1;
+	uint16_t non_trig_cqi_feedback:1;
+	uint16_t tx_1024_qam_lt_242_tone_ru:1;
+	uint16_t rx_1024_qam_lt_242_tone_ru:1;
+	uint16_t rx_full_bw_su_he_mu_compress_sigb:1;
+	uint16_t rx_full_bw_su_he_mu_non_cmpr_sigb:1;
+	uint16_t            reserved3:2;
+	uint8_t             reserved4;
+	uint16_t            rx_he_mcs_map_lt_80;
+	uint16_t            tx_he_mcs_map_lt_80;
+	uint8_t             rx_he_mcs_map_160[1][2];
+	uint8_t             tx_he_mcs_map_160[1][2];
+	uint8_t             rx_he_mcs_map_80_80[1][2];
+	uint8_t             tx_he_mcs_map_80_80[1][2];
+	union {
+		struct {
+			uint8_t num_ppe_th;
+			uint8_t ppe_th[25];
+		} ppe_threshold; /* ppet_present = 1 */
+	} ppet;
+} tDot11fIEhe_cap;
+
+#define DOT11F_EID_HE_CAP (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_HE_CAP_MIN_LEN (21)
+
+#define DOT11F_IE_HE_CAP_MAX_LEN (54)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_he_cap(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEhe_cap*,
+	bool);
+
+uint32_t dot11f_pack_ie_he_cap(
+	tpAniSirGlobal,
+	tDot11fIEhe_cap *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_he_cap(
+	tpAniSirGlobal,
+	tDot11fIEhe_cap *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 255 (0xff) Extended EID 36 (0x24) */
+typedef struct sDot11fIEhe_op {
+	uint8_t             present;
+	uint16_t           default_pe:3;
+	uint16_t         twt_required:1;
+	uint16_t   txop_rts_threshold:10;
+	uint16_t     vht_oper_present:1;
+	uint16_t       co_located_bss:1;
+	uint8_t        er_su_disable:1;
+	uint8_t oper_info_6g_present:1;
+	uint8_t            reserved2:6;
+	uint8_t            bss_color:6;
+	uint8_t      partial_bss_col:1;
+	uint8_t     bss_col_disabled:1;
+	uint8_t             basic_mcs_nss[2];
+	union {
+		struct {
+			uint8_t chan_width;
+			uint8_t center_freq_seg0;
+			uint8_t center_freq_seg1;
+		} info; /* vht_oper_present = 1 */
+	} vht_oper;
+	union {
+		struct {
+			uint8_t data;
+		} info; /* co_located_bss = 1 */
+	} maxbssid_ind;
+	union {
+		struct {
+			uint8_t primary_ch;
+			uint8_t  ch_width:2;
+			uint8_t  dup_bcon:1;
+			uint8_t  reg_info:3;
+			uint8_t  reserved:2;
+			uint8_t center_freq_seg0;
+			uint8_t center_freq_seg1;
+			uint8_t min_rate;
+		} info; /* oper_info_6g_present = 1 */
+	} oper_info_6g;
+} tDot11fIEhe_op;
+
+#define DOT11F_EID_HE_OP (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_HE_OP_MIN_LEN (6)
+
+#define DOT11F_IE_HE_OP_MAX_LEN (15)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_he_op(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEhe_op*,
+	bool);
+
+uint32_t dot11f_pack_ie_he_op(
+	tpAniSirGlobal,
+	tDot11fIEhe_op *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_he_op(
+	tpAniSirGlobal,
+	tDot11fIEhe_op *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
 /* EID 164 (0xa4) */
 typedef struct sDot11fIElast_beacon_report_indication {
 	uint8_t             present;
@@ -4453,6 +5760,99 @@ uint32_t dot11f_pack_ie_max_age(
 uint32_t dot11f_get_packed_ie_max_age(
 	tpAniSirGlobal,
 	tDot11fIEmax_age *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 255 (0xff) Extended EID 52 (0x34) */
+typedef struct sDot11fIEmax_chan_switch_time {
+	uint8_t             present;
+	uint8_t             switch_time[3];
+} tDot11fIEmax_chan_switch_time;
+
+#define DOT11F_EID_MAX_CHAN_SWITCH_TIME (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_MAX_CHAN_SWITCH_TIME_MIN_LEN (3)
+
+#define DOT11F_IE_MAX_CHAN_SWITCH_TIME_MAX_LEN (3)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_max_chan_switch_time(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEmax_chan_switch_time*,
+	bool);
+
+uint32_t dot11f_pack_ie_max_chan_switch_time(
+	tpAniSirGlobal,
+	tDot11fIEmax_chan_switch_time *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_max_chan_switch_time(
+	tpAniSirGlobal,
+	tDot11fIEmax_chan_switch_time *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 0 (0x00) */
+typedef struct sDot11fIEmlo_capabilities {
+	uint8_t             present;
+	uint16_t                  ess:1;
+	uint16_t                 ibss:1;
+	uint16_t           cfPollable:1;
+	uint16_t            cfPollReq:1;
+	uint16_t              privacy:1;
+	uint16_t        shortPreamble:1;
+	uint16_t   criticalUpdateFlag:1;
+	uint16_t       channelAgility:1;
+	uint16_t          spectrumMgt:1;
+	uint16_t                  qos:1;
+	uint16_t        shortSlotTime:1;
+	uint16_t                 apsd:1;
+	uint16_t                  rrm:1;
+	uint16_t             dsssOfdm:1;
+	uint16_t            delayedBA:1;
+	uint16_t          immediateBA:1;
+} tDot11fIEmlo_capabilities;
+
+#define DOT11F_EID_MLO_CAPABILITIES (0)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_MLO_CAPABILITIES_MIN_LEN (2)
+
+#define DOT11F_IE_MLO_CAPABILITIES_MAX_LEN (2)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_mlo_capabilities(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEmlo_capabilities*,
+	bool);
+
+uint32_t dot11f_pack_ie_mlo_capabilities(
+	tpAniSirGlobal,
+	tDot11fIEmlo_capabilities *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_mlo_capabilities(
+	tpAniSirGlobal,
+	tDot11fIEmlo_capabilities *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -4557,6 +5957,93 @@ uint32_t dot11f_get_packed_ie_neighbor_rpt(
 }; /* End extern "C". */
 #endif /* C++ */
 
+/* EID 255 (0xff) Extended EID 56 (0x38) */
+typedef struct sDot11fIEnon_inheritance {
+	uint8_t             present;
+	uint8_t             num_data;
+	uint8_t             data[255];
+} tDot11fIEnon_inheritance;
+
+#define DOT11F_EID_NON_INHERITANCE (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_NON_INHERITANCE_MIN_LEN (0)
+
+#define DOT11F_IE_NON_INHERITANCE_MAX_LEN (255)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_non_inheritance(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEnon_inheritance*,
+	bool);
+
+uint32_t dot11f_pack_ie_non_inheritance(
+	tpAniSirGlobal,
+	tDot11fIEnon_inheritance *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_non_inheritance(
+	tpAniSirGlobal,
+	tDot11fIEnon_inheritance *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 221 (0xdd) {OUI 0x8c, 0xfd, 0xf0, 0x01} (Multi-IE) */
+typedef struct sDot11fIEqcn_ie {
+	uint8_t             present;
+	tDot11fTLVqcn_version qcn_version;
+	tDot11fTLVvht_mcs11_attr vht_mcs11_attr;
+	tDot11fTLVhe_400ns_sgi_attr he_400ns_sgi_attr;
+	tDot11fTLVhe_2xltf_160mhz_supp he_2xltf_160mhz_supp;
+	tDot11fTLVhe_dl_ofdma_attr he_dl_ofdma_attr;
+	tDot11fTLVtrans_reasonp_attr trans_reasonp_attr;
+	tDot11fTLVtrans_rejectp_attr trans_rejectp_attr;
+	tDot11fTLVhe_dl_mumimo_attr he_dl_mumimo_attr;
+	tDot11fTLVhe_mcs13_attr he_mcs13_attr;
+} tDot11fIEqcn_ie;
+
+#define DOT11F_EID_QCN_IE (221)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_QCN_IE_MIN_LEN (4)
+
+#define DOT11F_IE_QCN_IE_MAX_LEN (35)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_qcn_ie(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEqcn_ie*,
+	bool);
+
+uint32_t dot11f_pack_ie_qcn_ie(
+	tpAniSirGlobal,
+	tDot11fIEqcn_ie *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_qcn_ie(
+	tpAniSirGlobal,
+	tDot11fIEqcn_ie *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
 /* EID 2 (0x02) */
 typedef struct sDot11fIEreq_mac_addr {
 	uint8_t             present;
@@ -4596,6 +6083,102 @@ uint32_t dot11f_get_packed_ie_req_mac_addr(
 }; /* End extern "C". */
 #endif /* C++ */
 
+/* EID 0 (0x00) */
+typedef struct sDot11fIEsta_profile {
+	uint8_t                              present;
+	uint16_t                               link_id:4;
+	uint16_t                      complete_profile:1;
+	uint16_t                  sta_mac_addr_present:1;
+	uint16_t               beacon_interval_present:1;
+	uint16_t                     dtim_info_present:1;
+	uint16_t                nstr_link_pair_present:1;
+	uint16_t                      nstr_bitmap_size:1;
+	uint16_t                              reserved:6;
+	union {
+		struct {
+			uint8_t sta_mac_addr[6];
+		} info; /* sta_mac_addr_present = 1 */
+	} sta_mac_addr;
+	union {
+		struct {
+			uint16_t beacon_interval;
+		} info; /* beacon_interval_present = 1 */
+	} beacon_interval;
+	union {
+		struct {
+			uint8_t dtim_count;
+			uint8_t dtim_period;
+		} info; /* dtim_info_present = 1 */
+	} dtim_info;
+	union {
+		struct {
+			uint8_t nstr_link_pair_num;
+		} info; /* nstr_link_pair_present = 1 */
+	} nstr_link_pair;
+	tDot11fIEmlo_capabilities            mlo_capabilities;
+	tDot11fIESuppRates                   SuppRates;
+	tDot11fIEExtSuppRates                ExtSuppRates;
+	tDot11fIESuppOperatingClasses        SuppOperatingClasses;
+	tDot11fIEWPA                         WPA;
+	tDot11fIEChanSwitchAnn               ChanSwitchAnn;
+	tDot11fIEQuiet                       Quiet;
+	tDot11fIEext_chan_switch_ann         ext_chan_switch_ann;
+	tDot11fIERSN                         RSN;
+	tDot11fIEEDCAParamSet                EDCAParamSet;
+	tDot11fIEP2PAssocRes                 P2PAssocRes;
+	tDot11fIEHTCaps                      HTCaps;
+	tDot11fIEHTInfo                      HTInfo;
+	tDot11fIEWMMParams                   WMMParams;
+	tDot11fIEWMMCaps                     WMMCaps;
+	tDot11fIEWMMInfoStation              WMMInfoStation;
+	tDot11fIEVHTCaps                     VHTCaps;
+	tDot11fIEVHTOperation                VHTOperation;
+	tDot11fIEExtCap                      ExtCap;
+	tDot11fIEOperatingMode               OperatingMode;
+	tDot11fIEfils_indication             fils_indication;
+	tDot11fIEqcn_ie                      qcn_ie;
+	tDot11fIEhe_cap                      he_cap;
+	tDot11fIEhe_op                       he_op;
+	tDot11fIEhe_6ghz_band_cap            he_6ghz_band_cap;
+	tDot11fIEeht_cap                     eht_cap;
+	tDot11fIEeht_op                      eht_op;
+	tDot11fIEmax_chan_switch_time        max_chan_switch_time;
+	tDot11fIEnon_inheritance             non_inheritance;
+} tDot11fIEsta_profile;
+
+#define DOT11F_EID_STA_PROFILE (0)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_STA_PROFILE_MIN_LEN (2)
+
+#define DOT11F_IE_STA_PROFILE_MAX_LEN (1249)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_sta_profile(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEsta_profile*,
+	bool);
+
+uint32_t dot11f_pack_ie_sta_profile(
+	tpAniSirGlobal,
+	tDot11fIEsta_profile *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_sta_profile(
+	tpAniSirGlobal,
+	tDot11fIEsta_profile *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
 /* EID 255 (0xff) Extended EID 89 (0x59) */
 typedef struct sDot11fIEtclas_mask {
 	uint8_t             present;
@@ -4603,28 +6186,8 @@ typedef struct sDot11fIEtclas_mask {
 	uint8_t             classifier_mask;
 	union {
 		struct {
-			uint8_t version;
-			union {
-				struct {
-					uint8_t source[4];
-					uint8_t dest[4];
-					uint16_t src_port;
-					uint16_t dest_port;
-					uint8_t DSCP;
-					uint8_t proto;
-					uint8_t reserved;
-				} IpV4Params; /* version = 4 */
-				struct {
-					uint8_t source[16];
-					uint8_t dest[16];
-					uint16_t src_port;
-					uint16_t dest_port;
-					uint8_t DSCP;
-					uint8_t next_header;
-					uint8_t flow_label[3];
-				} IpV6Params; /* version = 6 */
-			} params;
-		} IpParams; /* classifier_type = 4 */
+			uint8_t reserved[16];
+		} ip_param; /* classifier_type = 4 */
 	} info;
 } tDot11fIEtclas_mask;
 
@@ -4633,7 +6196,7 @@ typedef struct sDot11fIEtclas_mask {
 /* N.B. These #defines do *not* include the EID & length */
 #define DOT11F_IE_TCLAS_MASK_MIN_LEN (18)
 
-#define DOT11F_IE_TCLAS_MASK_MAX_LEN (44)
+#define DOT11F_IE_TCLAS_MASK_MAX_LEN (18)
 
 #ifdef __cplusplus
 extern "C" {
@@ -4701,39 +6264,42 @@ uint32_t dot11f_get_packed_ie_tgt_mac_addr(
 #endif /* C++ */
 
 /* EID 195 (0xc3) */
-typedef struct sDot11fIEvht_transmit_power_env {
+typedef struct sDot11fIEtransmit_power_env {
 	uint8_t             present;
-	uint8_t             num_bytes;
-	uint8_t             bytes[5];
-} tDot11fIEvht_transmit_power_env;
+	uint8_t     max_tx_pwr_count:3;
+	uint8_t max_tx_pwr_interpret:3;
+	uint8_t  max_tx_pwr_category:2;
+	uint8_t             num_tx_power;
+	uint8_t             tx_power[8];
+} tDot11fIEtransmit_power_env;
 
-#define DOT11F_EID_VHT_TRANSMIT_POWER_ENV (195)
+#define DOT11F_EID_TRANSMIT_POWER_ENV (195)
 
 /* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_VHT_TRANSMIT_POWER_ENV_MIN_LEN (2)
+#define DOT11F_IE_TRANSMIT_POWER_ENV_MIN_LEN (2)
 
-#define DOT11F_IE_VHT_TRANSMIT_POWER_ENV_MAX_LEN (5)
+#define DOT11F_IE_TRANSMIT_POWER_ENV_MAX_LEN (9)
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_vht_transmit_power_env(
+__must_check uint32_t dot11f_unpack_ie_transmit_power_env(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
-	tDot11fIEvht_transmit_power_env*,
+	tDot11fIEtransmit_power_env*,
 	bool);
 
-uint32_t dot11f_pack_ie_vht_transmit_power_env(
+uint32_t dot11f_pack_ie_transmit_power_env(
 	tpAniSirGlobal,
-	tDot11fIEvht_transmit_power_env *,
+	tDot11fIEtransmit_power_env *,
 	uint8_t *,
 	uint32_t,
 	uint32_t*);
 
-uint32_t dot11f_get_packed_ie_vht_transmit_power_env(
+uint32_t dot11f_get_packed_ie_transmit_power_env(
 	tpAniSirGlobal,
-	tDot11fIEvht_transmit_power_env *,
+	tDot11fIEtransmit_power_env *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -4861,52 +6427,11 @@ uint32_t dot11f_get_packed_ie_ChallengeText(
 }; /* End extern "C". */
 #endif /* C++ */
 
-/* EID 37 (0x25) */
-typedef struct sDot11fIEChanSwitchAnn {
-	uint8_t             present;
-	uint8_t             switchMode;
-	uint8_t             newChannel;
-	uint8_t             switchCount;
-} tDot11fIEChanSwitchAnn;
-
-#define DOT11F_EID_CHANSWITCHANN (37)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_CHANSWITCHANN_MIN_LEN (3)
-
-#define DOT11F_IE_CHANSWITCHANN_MAX_LEN (3)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_chan_switch_ann(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEChanSwitchAnn*,
-	bool);
-
-uint32_t dot11f_pack_ie_chan_switch_ann(
-	tpAniSirGlobal,
-	tDot11fIEChanSwitchAnn *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_ChanSwitchAnn(
-	tpAniSirGlobal,
-	tDot11fIEChanSwitchAnn *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
 /* EID 196 (0xc4) */
 typedef struct sDot11fIEChannelSwitchWrapper {
-	uint8_t                                present;
-	tDot11fIEWiderBWChanSwitchAnn          WiderBWChanSwitchAnn;
-	tDot11fIEvht_transmit_power_env        vht_transmit_power_env;
+	uint8_t                              present;
+	tDot11fIEWiderBWChanSwitchAnn        WiderBWChanSwitchAnn;
+	tDot11fIEtransmit_power_env          transmit_power_env;
 } tDot11fIEChannelSwitchWrapper;
 
 #define DOT11F_EID_CHANNELSWITCHWRAPPER (196)
@@ -4914,7 +6439,7 @@ typedef struct sDot11fIEChannelSwitchWrapper {
 /* N.B. These #defines do *not* include the EID & length */
 #define DOT11F_IE_CHANNELSWITCHWRAPPER_MIN_LEN (0)
 
-#define DOT11F_IE_CHANNELSWITCHWRAPPER_MAX_LEN (12)
+#define DOT11F_IE_CHANNELSWITCHWRAPPER_MAX_LEN (16)
 
 #ifdef __cplusplus
 extern "C" {
@@ -4946,16 +6471,17 @@ uint32_t dot11f_get_packed_ie_channel_switch_wrapper(
 typedef struct sDot11fIECountry {
 	uint8_t             present;
 	uint8_t             country[3];
-	uint8_t             num_triplets;
-	uint8_t             triplets[84][3];
+	uint8_t             first_triplet[3];
+	uint8_t             num_more_triplets;
+	uint8_t             more_triplets[80][3];
 } tDot11fIECountry;
 
 #define DOT11F_EID_COUNTRY (7)
 
 /* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_COUNTRY_MIN_LEN (3)
+#define DOT11F_IE_COUNTRY_MIN_LEN (6)
 
-#define DOT11F_IE_COUNTRY_MAX_LEN (255)
+#define DOT11F_IE_COUNTRY_MAX_LEN (246)
 
 #ifdef __cplusplus
 extern "C" {
@@ -5016,74 +6542,6 @@ uint32_t dot11f_pack_ie_ds_params(
 uint32_t dot11f_get_packed_ie_DSParams(
 	tpAniSirGlobal,
 	tDot11fIEDSParams *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 12 (0x0c) */
-typedef struct sDot11fIEEDCAParamSet {
-	uint8_t             present;
-	uint8_t             qos;
-	uint8_t             reserved;
-	uint8_t           acbe_aifsn:4;
-	uint8_t             acbe_acm:1;
-	uint8_t             acbe_aci:2;
-	uint8_t              unused1:1;
-	uint8_t          acbe_acwmin:4;
-	uint8_t          acbe_acwmax:4;
-	uint16_t            acbe_txoplimit;
-	uint8_t           acbk_aifsn:4;
-	uint8_t             acbk_acm:1;
-	uint8_t             acbk_aci:2;
-	uint8_t              unused2:1;
-	uint8_t          acbk_acwmin:4;
-	uint8_t          acbk_acwmax:4;
-	uint16_t            acbk_txoplimit;
-	uint8_t           acvi_aifsn:4;
-	uint8_t             acvi_acm:1;
-	uint8_t             acvi_aci:2;
-	uint8_t              unused3:1;
-	uint8_t          acvi_acwmin:4;
-	uint8_t          acvi_acwmax:4;
-	uint16_t            acvi_txoplimit;
-	uint8_t           acvo_aifsn:4;
-	uint8_t             acvo_acm:1;
-	uint8_t             acvo_aci:2;
-	uint8_t              unused4:1;
-	uint8_t          acvo_acwmin:4;
-	uint8_t          acvo_acwmax:4;
-	uint16_t            acvo_txoplimit;
-} tDot11fIEEDCAParamSet;
-
-#define DOT11F_EID_EDCAPARAMSET (12)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_EDCAPARAMSET_MIN_LEN (18)
-
-#define DOT11F_IE_EDCAPARAMSET_MAX_LEN (18)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_edca_param_set(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEEDCAParamSet*,
-	bool);
-
-uint32_t dot11f_pack_ie_edca_param_set(
-	tpAniSirGlobal,
-	tDot11fIEEDCAParamSet *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_EDCAParamSet(
-	tpAniSirGlobal,
-	tDot11fIEEDCAParamSet *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -5374,86 +6832,6 @@ uint32_t dot11f_get_packed_ie_ESEVersion(
 }; /* End extern "C". */
 #endif /* C++ */
 
-/* EID 127 (0x7f) */
-typedef struct sDot11fIEExtCap {
-	uint8_t             present;
-	uint8_t             num_bytes;
-	uint8_t             bytes[15];
-} tDot11fIEExtCap;
-
-#define DOT11F_EID_EXTCAP (127)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_EXTCAP_MIN_LEN (1)
-
-#define DOT11F_IE_EXTCAP_MAX_LEN (15)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_ext_cap(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEExtCap*,
-	bool);
-
-uint32_t dot11f_pack_ie_ext_cap(
-	tpAniSirGlobal,
-	tDot11fIEExtCap *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_ExtCap(
-	tpAniSirGlobal,
-	tDot11fIEExtCap *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 50 (0x32) */
-typedef struct sDot11fIEExtSuppRates {
-	uint8_t             present;
-	uint8_t             num_rates;
-	uint8_t             rates[12];
-} tDot11fIEExtSuppRates;
-
-#define DOT11F_EID_EXTSUPPRATES (50)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_EXTSUPPRATES_MIN_LEN (1)
-
-#define DOT11F_IE_EXTSUPPRATES_MAX_LEN (12)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_ext_supp_rates(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEExtSuppRates*,
-	bool);
-
-uint32_t dot11f_pack_ie_ext_supp_rates(
-	tpAniSirGlobal,
-	tDot11fIEExtSuppRates *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_ExtSuppRates(
-	tpAniSirGlobal,
-	tDot11fIEExtSuppRates *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
 /* EID 2 (0x02) */
 typedef struct sDot11fIEFHParamSet {
 	uint8_t             present;
@@ -5621,153 +6999,6 @@ uint32_t dot11f_pack_ie_ft_info(
 uint32_t dot11f_get_packed_ieft_info(
 	tpAniSirGlobal,
 	tDot11fIEFTInfo *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 45 (0x2d) */
-typedef struct sDot11fIEHTCaps {
-	uint8_t             present;
-	uint16_t         advCodingCap:1;
-	uint16_t supportedChannelWidthSet:1;
-	uint16_t        mimoPowerSave:2;
-	uint16_t           greenField:1;
-	uint16_t         shortGI20MHz:1;
-	uint16_t         shortGI40MHz:1;
-	uint16_t               txSTBC:1;
-	uint16_t               rxSTBC:2;
-	uint16_t            delayedBA:1;
-	uint16_t     maximalAMSDUsize:1;
-	uint16_t     dsssCckMode40MHz:1;
-	uint16_t                 psmp:1;
-	uint16_t     stbcControlFrame:1;
-	uint16_t   lsigTXOPProtection:1;
-	uint8_t     maxRxAMPDUFactor:2;
-	uint8_t          mpduDensity:3;
-	uint8_t            reserved1:3;
-	uint8_t             supportedMCSSet[16];
-	uint16_t                  pco:1;
-	uint16_t       transitionTime:2;
-	uint16_t            reserved2:5;
-	uint16_t          mcsFeedback:2;
-	uint16_t            reserved3:6;
-	uint32_t                 txBF:1;
-	uint32_t  rxStaggeredSounding:1;
-	uint32_t  txStaggeredSounding:1;
-	uint32_t                rxZLF:1;
-	uint32_t                txZLF:1;
-	uint32_t         implicitTxBF:1;
-	uint32_t          calibration:2;
-	uint32_t      explicitCSITxBF:1;
-	uint32_t explicitUncompressedSteeringMatrix:1;
-	uint32_t explicitBFCSIFeedback:3;
-	uint32_t explicitUncompressedSteeringMatrixFeedback:3;
-	uint32_t explicitCompressedSteeringMatrixFeedback:3;
-	uint32_t     csiNumBFAntennae:2;
-	uint32_t uncompressedSteeringMatrixBFAntennae:2;
-	uint32_t compressedSteeringMatrixBFAntennae:2;
-	uint32_t            reserved4:7;
-	uint8_t     antennaSelection:1;
-	uint8_t explicitCSIFeedbackTx:1;
-	uint8_t antennaIndicesFeedbackTx:1;
-	uint8_t  explicitCSIFeedback:1;
-	uint8_t antennaIndicesFeedback:1;
-	uint8_t                 rxAS:1;
-	uint8_t      txSoundingPPDUs:1;
-	uint8_t            reserved5:1;
-	uint8_t             num_rsvd;
-	uint8_t             rsvd[32];
-} tDot11fIEHTCaps;
-
-#define DOT11F_EID_HTCAPS (45)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_HTCAPS_MIN_LEN (26)
-
-#define DOT11F_IE_HTCAPS_MAX_LEN (58)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_ht_caps(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEHTCaps*,
-	bool);
-
-uint32_t dot11f_pack_ie_ht_caps(
-	tpAniSirGlobal,
-	tDot11fIEHTCaps *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_HTCaps(
-	tpAniSirGlobal,
-	tDot11fIEHTCaps *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 61 (0x3d) */
-typedef struct sDot11fIEHTInfo {
-	uint8_t             present;
-	uint8_t             primaryChannel;
-	uint8_t secondaryChannelOffset:2;
-	uint8_t recommendedTxWidthSet:1;
-	uint8_t             rifsMode:1;
-	uint8_t controlledAccessOnly:1;
-	uint8_t serviceIntervalGranularity:3;
-	uint16_t               opMode:2;
-	uint16_t  nonGFDevicesPresent:1;
-	uint16_t   transmitBurstLimit:1;
-	uint16_t  obssNonHTStaPresent:1;
-	uint16_t chan_center_freq_seg2:8;
-	uint16_t             reserved:3;
-	uint16_t         basicSTBCMCS:7;
-	uint16_t    dualCTSProtection:1;
-	uint16_t      secondaryBeacon:1;
-	uint16_t lsigTXOPProtectionFullSupport:1;
-	uint16_t            pcoActive:1;
-	uint16_t             pcoPhase:1;
-	uint16_t            reserved2:4;
-	uint8_t             basicMCSSet[16];
-	uint8_t             num_rsvd;
-	uint8_t             rsvd[32];
-} tDot11fIEHTInfo;
-
-#define DOT11F_EID_HTINFO (61)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_HTINFO_MIN_LEN (22)
-
-#define DOT11F_IE_HTINFO_MAX_LEN (54)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_ht_info(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEHTInfo*,
-	bool);
-
-uint32_t dot11f_pack_ie_ht_info(
-	tpAniSirGlobal,
-	tDot11fIEHTInfo *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_HTInfo(
-	tpAniSirGlobal,
-	tDot11fIEHTInfo *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -6193,49 +7424,6 @@ uint32_t dot11f_get_packed_ie_OBSSScanParameters(
 }; /* End extern "C". */
 #endif /* C++ */
 
-/* EID 199 (0xc7) */
-typedef struct sDot11fIEOperatingMode {
-	uint8_t             present;
-	uint8_t            chanWidth:2;
-	uint8_t   vht_160_80p80_supp:1;
-	uint8_t              no_ldpc:1;
-	uint8_t                rxNSS:3;
-	uint8_t            rxNSSType:1;
-} tDot11fIEOperatingMode;
-
-#define DOT11F_EID_OPERATINGMODE (199)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_OPERATINGMODE_MIN_LEN (1)
-
-#define DOT11F_IE_OPERATINGMODE_MAX_LEN (1)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_operating_mode(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEOperatingMode*,
-	bool);
-
-uint32_t dot11f_pack_ie_operating_mode(
-	tpAniSirGlobal,
-	tDot11fIEOperatingMode *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_OperatingMode(
-	tpAniSirGlobal,
-	tDot11fIEOperatingMode *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
 /* EID 221 (0xdd) {OUI 0x50, 0x6f, 0x9a, 0x09} (Multi-IE) */
 typedef struct sDot11fIEP2PAssocReq {
 	uint8_t             present;
@@ -6271,46 +7459,6 @@ uint32_t dot11f_pack_ie_p2_p_assoc_req(
 uint32_t dot11f_get_packed_iep2_p_assoc_req(
 	tpAniSirGlobal,
 	tDot11fIEP2PAssocReq *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 221 (0xdd) {OUI 0x50, 0x6f, 0x9a, 0x09} (Multi-IE) */
-typedef struct sDot11fIEP2PAssocRes {
-	uint8_t             present;
-	tDot11fTLVP2PStatus P2PStatus;
-	tDot11fTLVExtendedListenTiming ExtendedListenTiming;
-} tDot11fIEP2PAssocRes;
-
-#define DOT11F_EID_P2PASSOCRES (221)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_P2PASSOCRES_MIN_LEN (4)
-
-#define DOT11F_IE_P2PASSOCRES_MAX_LEN (15)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_p2_p_assoc_res(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEP2PAssocRes*,
-	bool);
-
-uint32_t dot11f_pack_ie_p2_p_assoc_res(
-	tpAniSirGlobal,
-	tDot11fIEP2PAssocRes *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_iep2_p_assoc_res(
-	tpAniSirGlobal,
-	tDot11fIEP2PAssocRes *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -6977,48 +8125,6 @@ uint32_t dot11f_get_packed_ie_QosMapSet(
 }; /* End extern "C". */
 #endif /* C++ */
 
-/* EID 40 (0x28) */
-typedef struct sDot11fIEQuiet {
-	uint8_t             present;
-	uint8_t             count;
-	uint8_t             period;
-	uint16_t            duration;
-	uint16_t            offset;
-} tDot11fIEQuiet;
-
-#define DOT11F_EID_QUIET (40)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_QUIET_MIN_LEN (6)
-
-#define DOT11F_IE_QUIET_MAX_LEN (6)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_quiet(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEQuiet*,
-	bool);
-
-uint32_t dot11f_pack_ie_quiet(
-	tpAniSirGlobal,
-	tDot11fIEQuiet *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_Quiet(
-	tpAniSirGlobal,
-	tDot11fIEQuiet *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
 /* EID 53 (0x35) */
 typedef struct sDot11fIERCPIIE {
 	uint8_t             present;
@@ -7104,57 +8210,6 @@ uint32_t dot11f_pack_ie_ric_data_desc(
 uint32_t dot11f_get_packed_ieric_data_desc(
 	tpAniSirGlobal,
 	tDot11fIERICDataDesc *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 48 (0x30) */
-typedef struct sDot11fIERSN {
-	uint8_t             present;
-	uint16_t            version /* Must be 1! */;
-	uint8_t             gp_cipher_suite_present;
-	uint8_t             gp_cipher_suite[4];
-	uint16_t            pwise_cipher_suite_count;
-	uint8_t             pwise_cipher_suites[6][4];
-	uint16_t            akm_suite_cnt;
-	uint8_t             akm_suite[6][4];
-	uint8_t             RSN_Cap_present;
-	uint8_t             RSN_Cap[2];
-	uint16_t            pmkid_count;
-	uint8_t             pmkid[4][16];
-	uint8_t             gp_mgmt_cipher_suite_present;
-	uint8_t             gp_mgmt_cipher_suite[4];
-} tDot11fIERSN;
-
-#define DOT11F_EID_RSN (48)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_RSN_MIN_LEN (2)
-
-#define DOT11F_IE_RSN_MAX_LEN (130)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_rsn(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIERSN*,
-	bool);
-
-uint32_t dot11f_pack_ie_rsn(
-	tpAniSirGlobal,
-	tDot11fIERSN *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_iersn(
-	tpAniSirGlobal,
-	tDot11fIERSN *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -7274,99 +8329,6 @@ uint32_t dot11f_pack_ie_supp_channels(
 uint32_t dot11f_get_packed_ie_SuppChannels(
 	tpAniSirGlobal,
 	tDot11fIESuppChannels *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 59 (0x3b) */
-typedef struct sDot11fIESuppOperatingClasses {
-	uint8_t             present;
-	uint8_t             num_classes;
-	uint8_t             classes[32];
-} tDot11fIESuppOperatingClasses;
-
-#define DOT11F_EID_SUPPOPERATINGCLASSES (59)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_SUPPOPERATINGCLASSES_MIN_LEN (1)
-
-#define DOT11F_IE_SUPPOPERATINGCLASSES_MAX_LEN (32)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_supp_operating_classes(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIESuppOperatingClasses*,
-	bool);
-
-uint32_t dot11f_pack_ie_supp_operating_classes(
-	tpAniSirGlobal,
-	tDot11fIESuppOperatingClasses *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_SuppOperatingClasses(
-	tpAniSirGlobal,
-	tDot11fIESuppOperatingClasses *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 1 (0x01) */
-typedef struct sDot11fIESuppRates {
-	uint8_t             present;
-	uint8_t             num_rates;
-	uint8_t             rates[12];
-} tDot11fIESuppRates;
-
-#define DOT11F_EID_SUPPRATES (1)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_SUPPRATES_MIN_LEN (0)
-
-#define DOT11F_IE_SUPPRATES_MAX_LEN (12)
-
-#define DOT11F_IS_BG_RATE(_x)  (((_x) == 02) || \
-				((_x) == 04) || \
-				((_x) == 11) || \
-				((_x) == 22) || \
-				((_x) == 12) || \
-				((_x) == 18) || \
-				((_x) == 24) || \
-				((_x) == 36) || \
-				((_x) == 48) || \
-				((_x) == 72) || \
-				((_x) == 96) || \
-				((_x) == 108))
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_supp_rates(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIESuppRates*,
-	bool);
-
-uint32_t dot11f_pack_ie_supp_rates(
-	tpAniSirGlobal,
-	tDot11fIESuppRates *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_SuppRates(
-	tpAniSirGlobal,
-	tDot11fIESuppRates *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -7862,50 +8824,6 @@ uint32_t dot11f_get_packed_ie_WFDIEOpaque(
 }; /* End extern "C". */
 #endif /* C++ */
 
-/* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x02, 0x05} */
-typedef struct sDot11fIEWMMCaps {
-	uint8_t             present;
-	uint8_t             version /* Must be 1! */;
-	uint8_t             reserved:4;
-	uint8_t                 qack:1;
-	uint8_t        queue_request:1;
-	uint8_t         txop_request:1;
-	uint8_t             more_ack:1;
-} tDot11fIEWMMCaps;
-
-#define DOT11F_EID_WMMCAPS (221)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_WMMCAPS_MIN_LEN (7)
-
-#define DOT11F_IE_WMMCAPS_MAX_LEN (7)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_wmm_caps(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEWMMCaps*,
-	bool);
-
-uint32_t dot11f_pack_ie_wmm_caps(
-	tpAniSirGlobal,
-	tDot11fIEWMMCaps *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_WMMCaps(
-	tpAniSirGlobal,
-	tDot11fIEWMMCaps *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
 /* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x02, 0x00} */
 typedef struct sDot11fIEWMMInfoAp {
 	uint8_t             present;
@@ -7942,168 +8860,6 @@ uint32_t dot11f_pack_ie_wmm_info_ap(
 uint32_t dot11f_get_packed_ie_WMMInfoAp(
 	tpAniSirGlobal,
 	tDot11fIEWMMInfoAp *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x02, 0x00} */
-typedef struct sDot11fIEWMMInfoStation {
-	uint8_t             present;
-	uint8_t             version;
-	uint8_t           acvo_uapsd:1;
-	uint8_t           acvi_uapsd:1;
-	uint8_t           acbk_uapsd:1;
-	uint8_t           acbe_uapsd:1;
-	uint8_t            reserved1:1;
-	uint8_t        max_sp_length:2;
-	uint8_t            reserved2:1;
-} tDot11fIEWMMInfoStation;
-
-#define DOT11F_EID_WMMINFOSTATION (221)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_WMMINFOSTATION_MIN_LEN (7)
-
-#define DOT11F_IE_WMMINFOSTATION_MAX_LEN (7)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_wmm_info_station(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEWMMInfoStation*,
-	bool);
-
-uint32_t dot11f_pack_ie_wmm_info_station(
-	tpAniSirGlobal,
-	tDot11fIEWMMInfoStation *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_WMMInfoStation(
-	tpAniSirGlobal,
-	tDot11fIEWMMInfoStation *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x02, 0x01} */
-typedef struct sDot11fIEWMMParams {
-	uint8_t             present;
-	uint8_t             version /* Must be 1! */;
-	uint8_t             qosInfo;
-	uint8_t             reserved2;
-	uint8_t           acbe_aifsn:4;
-	uint8_t             acbe_acm:1;
-	uint8_t             acbe_aci:2;
-	uint8_t              unused1:1;
-	uint8_t          acbe_acwmin:4;
-	uint8_t          acbe_acwmax:4;
-	uint16_t            acbe_txoplimit;
-	uint8_t           acbk_aifsn:4;
-	uint8_t             acbk_acm:1;
-	uint8_t             acbk_aci:2;
-	uint8_t              unused2:1;
-	uint8_t          acbk_acwmin:4;
-	uint8_t          acbk_acwmax:4;
-	uint16_t            acbk_txoplimit;
-	uint8_t           acvi_aifsn:4;
-	uint8_t             acvi_acm:1;
-	uint8_t             acvi_aci:2;
-	uint8_t              unused3:1;
-	uint8_t          acvi_acwmin:4;
-	uint8_t          acvi_acwmax:4;
-	uint16_t            acvi_txoplimit;
-	uint8_t           acvo_aifsn:4;
-	uint8_t             acvo_acm:1;
-	uint8_t             acvo_aci:2;
-	uint8_t              unused4:1;
-	uint8_t          acvo_acwmin:4;
-	uint8_t          acvo_acwmax:4;
-	uint16_t            acvo_txoplimit;
-} tDot11fIEWMMParams;
-
-#define DOT11F_EID_WMMPARAMS (221)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_WMMPARAMS_MIN_LEN (24)
-
-#define DOT11F_IE_WMMPARAMS_MAX_LEN (24)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_wmm_params(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEWMMParams*,
-	bool);
-
-uint32_t dot11f_pack_ie_wmm_params(
-	tpAniSirGlobal,
-	tDot11fIEWMMParams *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_WMMParams(
-	tpAniSirGlobal,
-	tDot11fIEWMMParams *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 221 (0xdd) {OUI 0x00, 0x50, 0xf2, 0x01} */
-typedef struct sDot11fIEWPA {
-	uint8_t             present;
-	uint16_t            version /* Must be 1! */;
-	/* field added to fix the bug in dot11fPackIEWPA */
-	uint8_t             multicast_cipher_present;
-	uint8_t             multicast_cipher[4];
-	uint16_t            unicast_cipher_count;
-	uint8_t             unicast_ciphers[4][4];
-	uint16_t            auth_suite_count;
-	uint8_t             auth_suites[4][4];
-	uint16_t            caps;
-} tDot11fIEWPA;
-
-#define DOT11F_EID_WPA (221)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_WPA_MIN_LEN (6)
-
-#define DOT11F_IE_WPA_MAX_LEN (48)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_wpa(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEWPA*,
-	bool);
-
-uint32_t dot11f_pack_ie_wpa(
-	tpAniSirGlobal,
-	tDot11fIEWPA *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_iewpa(
-	tpAniSirGlobal,
-	tDot11fIEWPA *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -8665,6 +9421,47 @@ uint32_t dot11f_get_packed_ie_bss_color_change(
 }; /* End extern "C". */
 #endif /* C++ */
 
+/* EID 90 (0x5a) */
+typedef struct sDot11fIEbss_max_idle_period {
+	uint8_t             present;
+	uint16_t            max_idle_period;
+	uint8_t prot_keep_alive_reqd:1;
+	uint8_t             reserved:7;
+} tDot11fIEbss_max_idle_period;
+
+#define DOT11F_EID_BSS_MAX_IDLE_PERIOD (90)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_BSS_MAX_IDLE_PERIOD_MIN_LEN (3)
+
+#define DOT11F_IE_BSS_MAX_IDLE_PERIOD_MAX_LEN (3)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_bss_max_idle_period(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEbss_max_idle_period*,
+	bool);
+
+uint32_t dot11f_pack_ie_bss_max_idle_period(
+	tpAniSirGlobal,
+	tDot11fIEbss_max_idle_period *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_bss_max_idle_period(
+	tpAniSirGlobal,
+	tDot11fIEbss_max_idle_period *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
 /* EID 255 (0xff) Extended EID 88 (0x58) */
 typedef struct sDot11fIEdecriptor_element {
 	uint8_t                     present;
@@ -8680,7 +9477,7 @@ typedef struct sDot11fIEdecriptor_element {
 /* N.B. These #defines do *not* include the EID & length */
 #define DOT11F_IE_DECRIPTOR_ELEMENT_MIN_LEN (7)
 
-#define DOT11F_IE_DECRIPTOR_ELEMENT_MAX_LEN (56)
+#define DOT11F_IE_DECRIPTOR_ELEMENT_MAX_LEN (30)
 
 #ifdef __cplusplus
 extern "C" {
@@ -8789,48 +9586,6 @@ uint32_t dot11f_get_packed_ie_esp_information(
 }; /* End extern "C". */
 #endif /* C++ */
 
-/* EID 60 (0x3c) */
-typedef struct sDot11fIEext_chan_switch_ann {
-	uint8_t             present;
-	uint8_t             switch_mode;
-	uint8_t             new_reg_class;
-	uint8_t             new_channel;
-	uint8_t             switch_count;
-} tDot11fIEext_chan_switch_ann;
-
-#define DOT11F_EID_EXT_CHAN_SWITCH_ANN (60)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_EXT_CHAN_SWITCH_ANN_MIN_LEN (4)
-
-#define DOT11F_IE_EXT_CHAN_SWITCH_ANN_MAX_LEN (4)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_ext_chan_switch_ann(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEext_chan_switch_ann*,
-	bool);
-
-uint32_t dot11f_pack_ie_ext_chan_switch_ann(
-	tpAniSirGlobal,
-	tDot11fIEext_chan_switch_ann *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_ext_chan_switch_ann(
-	tpAniSirGlobal,
-	tDot11fIEext_chan_switch_ann *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
 /* EID 255 (0xff) Extended EID 1 (0x01) */
 typedef struct sDot11fIEfils_assoc_delay_info {
 	uint8_t             present;
@@ -8906,55 +9661,6 @@ uint32_t dot11f_pack_ie_fils_hlp_container(
 uint32_t dot11f_get_packed_ie_fils_hlp_container(
 	tpAniSirGlobal,
 	tDot11fIEfils_hlp_container *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 240 (0xf0) */
-typedef struct sDot11fIEfils_indication {
-	uint8_t             present;
-	uint16_t public_key_identifiers_cnt:3;
-	uint16_t realm_identifiers_cnt:3;
-	uint16_t is_ip_config_supported:1;
-	uint16_t  is_cache_id_present:1;
-	uint16_t    is_hessid_present:1;
-	uint16_t is_fils_sk_auth_supported:1;
-	uint16_t is_fils_sk_auth_pfs_supported:1;
-	uint16_t is_pk_auth_supported:1;
-	uint16_t             reserved:4;
-	uint8_t             num_variable_data;
-	uint8_t             variable_data[255];
-} tDot11fIEfils_indication;
-
-#define DOT11F_EID_FILS_INDICATION (240)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_FILS_INDICATION_MIN_LEN (4)
-
-#define DOT11F_IE_FILS_INDICATION_MAX_LEN (257)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_fils_indication(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEfils_indication*,
-	bool);
-
-uint32_t dot11f_pack_ie_fils_indication(
-	tpAniSirGlobal,
-	tDot11fIEfils_indication *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_fils_indication(
-	tpAniSirGlobal,
-	tDot11fIEfils_indication *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -9241,269 +9947,6 @@ uint32_t dot11f_get_packed_ie_fragment_ie(
 }; /* End extern "C". */
 #endif /* C++ */
 
-/* EID 255 (0xff) Extended EID 59 (0x3b) */
-typedef struct sDot11fIEhe_6ghz_band_cap {
-	uint8_t             present;
-	uint16_t min_mpdu_start_spacing:3;
-	uint16_t    max_ampdu_len_exp:3;
-	uint16_t         max_mpdu_len:3;
-	uint16_t          sm_pow_save:2;
-	uint16_t         rd_responder:1;
-	uint16_t rx_ant_pattern_consistency:1;
-	uint16_t tx_ant_pattern_consistency:1;
-	uint16_t             reserved:2;
-} tDot11fIEhe_6ghz_band_cap;
-
-#define DOT11F_EID_HE_6GHZ_BAND_CAP (255)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_HE_6GHZ_BAND_CAP_MIN_LEN (2)
-
-#define DOT11F_IE_HE_6GHZ_BAND_CAP_MAX_LEN (2)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_he_6ghz_band_cap(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEhe_6ghz_band_cap*,
-	bool);
-
-uint32_t dot11f_pack_ie_he_6ghz_band_cap(
-	tpAniSirGlobal,
-	tDot11fIEhe_6ghz_band_cap *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_he_6ghz_band_cap(
-	tpAniSirGlobal,
-	tDot11fIEhe_6ghz_band_cap *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 255 (0xff) Extended EID 35 (0x23) */
-typedef struct sDot11fIEhe_cap {
-	uint8_t             present;
-	uint32_t               htc_he:1;
-	uint32_t          twt_request:1;
-	uint32_t        twt_responder:1;
-	uint32_t        fragmentation:2;
-	uint32_t max_num_frag_msdu_amsdu_exp:3;
-	uint32_t        min_frag_size:2;
-	uint32_t  trigger_frm_mac_pad:2;
-	uint32_t multi_tid_aggr_rx_supp:3;
-	uint32_t   he_link_adaptation:2;
-	uint32_t              all_ack:1;
-	uint32_t      trigd_rsp_sched:1;
-	uint32_t                a_bsr:1;
-	uint32_t        broadcast_twt:1;
-	uint32_t      ba_32bit_bitmap:1;
-	uint32_t           mu_cascade:1;
-	uint32_t ack_enabled_multitid:1;
-	uint32_t             reserved:1;
-	uint32_t           omi_a_ctrl:1;
-	uint32_t             ofdma_ra:1;
-	uint32_t max_ampdu_len_exp_ext:2;
-	uint32_t           amsdu_frag:1;
-	uint32_t       flex_twt_sched:1;
-	uint32_t        rx_ctrl_frame:1;
-	uint16_t      bsrp_ampdu_aggr:1;
-	uint16_t                  qtp:1;
-	uint16_t                a_bqr:1;
-	uint16_t spatial_reuse_param_rspder:1;
-	uint16_t    ndp_feedback_supp:1;
-	uint16_t             ops_supp:1;
-	uint16_t       amsdu_in_ampdu:1;
-	uint16_t multi_tid_aggr_tx_supp:3;
-	uint16_t he_sub_ch_sel_tx_supp:1;
-	uint16_t ul_2x996_tone_ru_supp:1;
-	uint16_t om_ctrl_ul_mu_data_dis_rx:1;
-	uint16_t      he_dynamic_smps:1;
-	uint16_t punctured_sounding_supp:1;
-	uint16_t ht_vht_trg_frm_rx_supp:1;
-	uint32_t            reserved2:1;
-	uint32_t         chan_width_0:1;
-	uint32_t         chan_width_1:1;
-	uint32_t         chan_width_2:1;
-	uint32_t         chan_width_3:1;
-	uint32_t         chan_width_4:1;
-	uint32_t         chan_width_5:1;
-	uint32_t         chan_width_6:1;
-	uint32_t  rx_pream_puncturing:4;
-	uint32_t         device_class:1;
-	uint32_t          ldpc_coding:1;
-	uint32_t he_1x_ltf_800_gi_ppdu:1;
-	uint32_t midamble_tx_rx_max_nsts:2;
-	uint32_t he_4x_ltf_3200_gi_ndp:1;
-	uint32_t tb_ppdu_tx_stbc_lt_80mhz:1;
-	uint32_t     rx_stbc_lt_80mhz:1;
-	uint32_t              doppler:2;
-	uint32_t                ul_mu:2;
-	uint32_t           dcm_enc_tx:3;
-	uint32_t           dcm_enc_rx:3;
-	uint32_t             ul_he_mu:1;
-	uint32_t        su_beamformer:1;
-	uint32_t        su_beamformee:1;
-	uint32_t        mu_beamformer:1;
-	uint32_t       bfee_sts_lt_80:3;
-	uint32_t       bfee_sts_gt_80:3;
-	uint32_t   num_sounding_lt_80:3;
-	uint32_t   num_sounding_gt_80:3;
-	uint32_t   su_feedback_tone16:1;
-	uint32_t   mu_feedback_tone16:1;
-	uint32_t          codebook_su:1;
-	uint32_t          codebook_mu:1;
-	uint32_t beamforming_feedback:3;
-	uint32_t        he_er_su_ppdu:1;
-	uint32_t   dl_mu_mimo_part_bw:1;
-	uint32_t         ppet_present:1;
-	uint32_t                  srp:1;
-	uint32_t          power_boost:1;
-	uint32_t     he_ltf_800_gi_4x:1;
-	uint32_t               max_nc:3;
-	uint32_t tb_ppdu_tx_stbc_gt_80mhz:1;
-	uint32_t     rx_stbc_gt_80mhz:1;
-	uint16_t  er_he_ltf_800_gi_4x:1;
-	uint16_t he_ppdu_20_in_40Mhz_2G:1;
-	uint16_t he_ppdu_20_in_160_80p80Mhz:1;
-	uint16_t he_ppdu_80_in_160_80p80Mhz:1;
-	uint16_t      er_1x_he_ltf_gi:1;
-	uint16_t midamble_tx_rx_1x_he_ltf:1;
-	uint16_t           dcm_max_bw:2;
-	uint16_t longer_than_16_he_sigb_ofdm_sym:1;
-	uint16_t non_trig_cqi_feedback:1;
-	uint16_t tx_1024_qam_lt_242_tone_ru:1;
-	uint16_t rx_1024_qam_lt_242_tone_ru:1;
-	uint16_t rx_full_bw_su_he_mu_compress_sigb:1;
-	uint16_t rx_full_bw_su_he_mu_non_cmpr_sigb:1;
-	uint16_t            reserved3:2;
-	uint8_t             reserved4;
-	uint16_t            rx_he_mcs_map_lt_80;
-	uint16_t            tx_he_mcs_map_lt_80;
-	uint8_t             rx_he_mcs_map_160[1][2];
-	uint8_t             tx_he_mcs_map_160[1][2];
-	uint8_t             rx_he_mcs_map_80_80[1][2];
-	uint8_t             tx_he_mcs_map_80_80[1][2];
-	union {
-		struct {
-			uint8_t num_ppe_th;
-			uint8_t ppe_th[25];
-		} ppe_threshold; /* ppet_present = 1 */
-	} ppet;
-} tDot11fIEhe_cap;
-
-#define DOT11F_EID_HE_CAP (255)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_HE_CAP_MIN_LEN (21)
-
-#define DOT11F_IE_HE_CAP_MAX_LEN (54)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_he_cap(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEhe_cap*,
-	bool);
-
-uint32_t dot11f_pack_ie_he_cap(
-	tpAniSirGlobal,
-	tDot11fIEhe_cap *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_he_cap(
-	tpAniSirGlobal,
-	tDot11fIEhe_cap *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
-/* EID 255 (0xff) Extended EID 36 (0x24) */
-typedef struct sDot11fIEhe_op {
-	uint8_t             present;
-	uint16_t           default_pe:3;
-	uint16_t         twt_required:1;
-	uint16_t   txop_rts_threshold:10;
-	uint16_t     vht_oper_present:1;
-	uint16_t       co_located_bss:1;
-	uint8_t        er_su_disable:1;
-	uint8_t oper_info_6g_present:1;
-	uint8_t            reserved2:6;
-	uint8_t            bss_color:6;
-	uint8_t      partial_bss_col:1;
-	uint8_t     bss_col_disabled:1;
-	uint8_t             basic_mcs_nss[2];
-	union {
-		struct {
-			uint8_t chan_width;
-			uint8_t center_freq_seg0;
-			uint8_t center_freq_seg1;
-		} info; /* vht_oper_present = 1 */
-	} vht_oper;
-	union {
-		struct {
-			uint8_t data;
-		} info; /* co_located_bss = 1 */
-	} maxbssid_ind;
-	union {
-		struct {
-			uint8_t primary_ch;
-			uint8_t  ch_width:2;
-			uint8_t  dup_bcon:1;
-			uint8_t  reserved:5;
-			uint8_t center_freq_seg0;
-			uint8_t center_freq_seg1;
-			uint8_t min_rate;
-		} info; /* oper_info_6g_present = 1 */
-	} oper_info_6g;
-} tDot11fIEhe_op;
-
-#define DOT11F_EID_HE_OP (255)
-
-/* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_HE_OP_MIN_LEN (6)
-
-#define DOT11F_IE_HE_OP_MAX_LEN (15)
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_he_op(
-	tpAniSirGlobal,
-	uint8_t *,
-	uint8_t,
-	tDot11fIEhe_op*,
-	bool);
-
-uint32_t dot11f_pack_ie_he_op(
-	tpAniSirGlobal,
-	tDot11fIEhe_op *,
-	uint8_t *,
-	uint32_t,
-	uint32_t*);
-
-uint32_t dot11f_get_packed_ie_he_op(
-	tpAniSirGlobal,
-	tDot11fIEhe_op *,
-	uint32_t*);
-
-#ifdef __cplusplus
-}; /* End extern "C". */
-#endif /* C++ */
-
 /* EID 221 (0xdd) {OUI 0x50, 0x6f, 0x9a, 0x10} */
 typedef struct sDot11fIEhs20vendor_ie {
 	uint8_t             present;
@@ -9633,6 +10076,99 @@ uint32_t dot11f_pack_ie_ht2040_bss_intolerant_report(
 uint32_t dot11f_get_packed_ie_ht2040_bss_intolerant_report(
 	tpAniSirGlobal,
 	tDot11fIEht2040_bss_intolerant_report *,
+	uint32_t*);
+
+#ifdef __cplusplus
+}; /* End extern "C". */
+#endif /* C++ */
+
+/* EID 255 (0xff) Extended EID 94 (0x5e) */
+typedef struct sDot11fIEmlo_ie {
+	uint8_t                     present;
+	uint16_t                         type:3;
+	uint16_t                     reserved:1;
+	uint16_t         mld_mac_addr_present:1;
+	uint16_t         link_id_info_present:1;
+	uint16_t bss_param_change_cnt_present:1;
+	uint16_t medium_sync_delay_info_present:1;
+	uint16_t            eml_capab_present:1;
+	uint16_t            mld_capab_present:1;
+	uint16_t                   reserved_1:6;
+	union {
+		struct {
+			uint8_t mld_mac_addr[6];
+		} info; /* mld_mac_addr_present = 1 */
+	} mld_mac_addr;
+	union {
+		struct {
+			uint8_t   link_id:4;
+			uint8_t  reserved:4;
+		} info; /* link_id_info_present = 1 */
+	} link_id_info;
+	union {
+		struct {
+			uint8_t bss_param_change_count;
+		} info; /* bss_param_change_cnt_present = 1 */
+	} bss_param_change_cnt;
+	union {
+		struct {
+			uint16_t        medium_sync_duration:8;
+			uint16_t  medium_sync_ofdm_ed_thresh:4;
+			uint16_t    medium_sync_max_txop_num:4;
+		} info; /* medium_sync_delay_info_present = 1 */
+	} medium_sync_delay_info;
+	union {
+		struct {
+			uint16_t       emlsr_support:1;
+			uint16_t         emlsr_delay:3;
+			uint16_t       emlmr_support:1;
+			uint16_t         emlmr_delay:3;
+			uint16_t  transition_timeout:4;
+			uint16_t            reserved:4;
+			uint8_t  emlmr_rx_nss:4;
+			uint8_t  emlmr_tx_nss:4;
+		} info; /* eml_capab_present = 1 */
+	} eml_capabilities;
+	union {
+		struct {
+			uint16_t  max_simultaneous_link_num:4;
+			uint16_t                srs_support:1;
+			uint16_t     tid_link_map_supported:2;
+			uint16_t        str_freq_separation:5;
+			uint16_t                   reserved:4;
+		} info; /* mld_capab_present = 1 */
+	} mld_capabilities;
+	uint16_t                    num_sta_profile;
+	tDot11fIEsta_profile        sta_profile[2];
+} tDot11fIEmlo_ie;
+
+#define DOT11F_EID_MLO_IE (255)
+
+/* N.B. These #defines do *not* include the EID & length */
+#define DOT11F_IE_MLO_IE_MIN_LEN (2)
+
+#define DOT11F_IE_MLO_IE_MAX_LEN (1268)
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* C++ */
+__must_check uint32_t dot11f_unpack_ie_mlo_ie(
+	tpAniSirGlobal,
+	uint8_t *,
+	uint8_t,
+	tDot11fIEmlo_ie*,
+	bool);
+
+uint32_t dot11f_pack_ie_mlo_ie(
+	tpAniSirGlobal,
+	tDot11fIEmlo_ie *,
+	uint8_t *,
+	uint32_t,
+	uint32_t*);
+
+uint32_t dot11f_get_packed_ie_mlo_ie(
+	tpAniSirGlobal,
+	tDot11fIEmlo_ie *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -9787,47 +10323,122 @@ uint32_t dot11f_get_packed_ie_osen_ie(
 }; /* End extern "C". */
 #endif /* C++ */
 
-/* EID 221 (0xdd) {OUI 0x8c, 0xfd, 0xf0, 0x01} (Multi-IE) */
-typedef struct sDot11fIEqcn_ie {
+/* EID 201 (0xc9) */
+typedef struct sDot11fIEreduced_neighbor_report {
 	uint8_t             present;
-	tDot11fTLVqcn_version qcn_version;
-	tDot11fTLVvht_mcs11_attr vht_mcs11_attr;
-	tDot11fTLVhe_400ns_sgi_attr he_400ns_sgi_attr;
-	tDot11fTLVhe_2xltf_160mhz_supp he_2xltf_160mhz_supp;
-	tDot11fTLVhe_dl_ofdma_attr he_dl_ofdma_attr;
-	tDot11fTLVtrans_reasonp_attr trans_reasonp_attr;
-	tDot11fTLVtrans_rejectp_attr trans_rejectp_attr;
-	tDot11fTLVhe_dl_mumimo_attr he_dl_mumimo_attr;
-	tDot11fTLVhe_mcs13_attr he_mcs13_attr;
-} tDot11fIEqcn_ie;
+	uint16_t            tbtt_type:2;
+	uint16_t filtered_neighbor_ap:1;
+	uint16_t             reserved:1;
+	uint16_t      tbtt_info_count:4;
+	uint16_t        tbtt_info_len:8;
+	uint8_t             op_class;
+	uint8_t             channel_num;
+	union {
+		struct {
+			uint8_t tbtt_offset;
+		} tbtt_info_1; /* tbtt_info_len = 1 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bss_params;
+		} tbtt_info_2; /* tbtt_info_len = 2 */
+		struct {
+			uint8_t tbtt_offset;
+			uint32_t                mld_id:8;
+			uint32_t               link_id:4;
+			uint32_t  bss_param_change_cnt:8;
+			uint32_t              reserved:12;
+		} tbtt_info_4; /* tbtt_info_len = 4 */
+		struct {
+			uint8_t tbtt_offset;
+			uint32_t short_ssid;
+		} tbtt_info_5; /* tbtt_info_len = 5 */
+		struct {
+			uint8_t tbtt_offset;
+			uint32_t short_ssid;
+			uint8_t bss_params;
+		} tbtt_info_6; /* tbtt_info_len = 6 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bssid[6];
+		} tbtt_info_7; /* tbtt_info_len = 7 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bssid[6];
+			uint8_t bss_params;
+		} tbtt_info_8; /* tbtt_info_len = 8 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bssid[6];
+			uint8_t bss_params;
+			uint8_t psd_20mhz;
+		} tbtt_info_9; /* tbtt_info_len = 9 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bssid[6];
+			uint32_t                mld_id:8;
+			uint32_t               link_id:4;
+			uint32_t  bss_param_change_cnt:8;
+			uint32_t              reserved:12;
+		} tbtt_info_10; /* tbtt_info_len = 10 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bssid[6];
+			uint32_t short_ssid;
+		} tbtt_info_11; /* tbtt_info_len = 11 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bssid[6];
+			uint32_t short_ssid;
+			uint8_t bss_params;
+		} tbtt_info_12; /* tbtt_info_len = 12 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bssid[6];
+			uint32_t short_ssid;
+			uint8_t bss_params;
+			uint8_t psd_20mhz;
+		} tbtt_info_13; /* tbtt_info_len = 13 */
+		struct {
+			uint8_t tbtt_offset;
+			uint8_t bssid[6];
+			uint32_t short_ssid;
+			uint8_t bss_params;
+			uint8_t psd_20mhz;
+			uint32_t                mld_id:8;
+			uint32_t               link_id:4;
+			uint32_t  bss_param_change_cnt:8;
+			uint32_t              reserved:12;
+		} tbtt_info_16; /* tbtt_info_len = 16 */
+	} tbtt_info;
+} tDot11fIEreduced_neighbor_report;
 
-#define DOT11F_EID_QCN_IE (221)
+#define DOT11F_EID_REDUCED_NEIGHBOR_REPORT (201)
 
 /* N.B. These #defines do *not* include the EID & length */
-#define DOT11F_IE_QCN_IE_MIN_LEN (4)
+#define DOT11F_IE_REDUCED_NEIGHBOR_REPORT_MIN_LEN (5)
 
-#define DOT11F_IE_QCN_IE_MAX_LEN (35)
+#define DOT11F_IE_REDUCED_NEIGHBOR_REPORT_MAX_LEN (21)
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* C++ */
-__must_check uint32_t dot11f_unpack_ie_qcn_ie(
+__must_check uint32_t dot11f_unpack_ie_reduced_neighbor_report(
 	tpAniSirGlobal,
 	uint8_t *,
 	uint8_t,
-	tDot11fIEqcn_ie*,
+	tDot11fIEreduced_neighbor_report*,
 	bool);
 
-uint32_t dot11f_pack_ie_qcn_ie(
+uint32_t dot11f_pack_ie_reduced_neighbor_report(
 	tpAniSirGlobal,
-	tDot11fIEqcn_ie *,
+	tDot11fIEreduced_neighbor_report *,
 	uint8_t *,
 	uint32_t,
 	uint32_t*);
 
-uint32_t dot11f_get_packed_ie_qcn_ie(
+uint32_t dot11f_get_packed_ie_reduced_neighbor_report(
 	tpAniSirGlobal,
-	tDot11fIEqcn_ie *,
+	tDot11fIEreduced_neighbor_report *,
 	uint32_t*);
 
 #ifdef __cplusplus
@@ -10037,28 +10648,33 @@ typedef struct sDot11fAssocRequest{
 	tDot11fFfListenInterval                ListenInterval;
 	tDot11fIESSID                          SSID;
 	tDot11fIESuppRates                     SuppRates;
-	tDot11fIEOperatingMode                 OperatingMode;
+	tDot11fIEExtSuppRates                  ExtSuppRates;
 	tDot11fIEPowerCaps                     PowerCaps;
 	tDot11fIESuppChannels                  SuppChannels;
-	tDot11fIEHTCaps                        HTCaps;
-	tDot11fIEQOSCapsStation                QOSCapsStation;
 	tDot11fIERSNOpaque                     RSNOpaque;
-	tDot11fIEExtSuppRates                  ExtSuppRates;
-	tDot11fIEMobilityDomain                MobilityDomain;
-	tDot11fIEFTInfo                        FTInfo;
-	tDot11fIESuppOperatingClasses          SuppOperatingClasses;
-	tDot11fIEWAPIOpaque                    WAPIOpaque;
-	tDot11fIEWAPI                          WAPI;
+	tDot11fIEQOSCapsStation                QOSCapsStation;
 	tDot11fIERRMEnabledCap                 RRMEnabledCap;
-	tDot11fIEQosMapSet                     QosMapSet;
+	tDot11fIEMobilityDomain                MobilityDomain;
+	tDot11fIESuppOperatingClasses          SuppOperatingClasses;
+	tDot11fIEHTCaps                        HTCaps;
 	tDot11fIEExtCap                        ExtCap;
 	tDot11fIEVHTCaps                       VHTCaps;
+	tDot11fIEOperatingMode                 OperatingMode;
 	tDot11fIEfils_session                  fils_session;
 	tDot11fIEfils_public_key               fils_public_key;
 	tDot11fIEfils_key_confirmation         fils_key_confirmation;
 	tDot11fIEfils_hlp_container            fils_hlp_container;
+	tDot11fIEbss_max_idle_period           bss_max_idle_period;
+	tDot11fIEFTInfo                        FTInfo;
+	tDot11fIEhe_cap                        he_cap;
+	tDot11fIEhe_6ghz_band_cap              he_6ghz_band_cap;
+	tDot11fIEWAPIOpaque                    WAPIOpaque;
+	tDot11fIEWAPI                          WAPI;
+	tDot11fIEQosMapSet                     QosMapSet;
 	tDot11fIEfragment_ie                   fragment_ie;
 	tDot11fIEdh_parameter_element          dh_parameter_element;
+	tDot11fIEeht_cap                       eht_cap;
+	tDot11fIEmlo_ie                        mlo_ie;
 	tDot11fIEWPAOpaque                     WPAOpaque;
 	tDot11fIEWMMCaps                       WMMCaps;
 	tDot11fIEWMMInfoStation                WMMInfoStation;
@@ -10070,8 +10686,6 @@ typedef struct sDot11fAssocRequest{
 	tDot11fIEvendor_vht_ie                 vendor_vht_ie;
 	tDot11fIEhs20vendor_ie                 hs20vendor_ie;
 	tDot11fIEqcn_ie                        qcn_ie;
-	tDot11fIEhe_cap                        he_cap;
-	tDot11fIEhe_6ghz_band_cap              he_6ghz_band_cap;
 	tDot11fIEosen_ie                       osen_ie;
 	tDot11fIEroaming_consortium_sel        roaming_consortium_sel;
 } tDot11fAssocRequest;
@@ -10097,51 +10711,56 @@ uint32_t dot11f_get_packed_assoc_request_size(tpAniSirGlobal pCtx,
 #endif /* C++ */
 
 typedef struct sDot11fAssocResponse{
-	tDot11fFfCapabilities                 Capabilities;
-	tDot11fFfStatus                       Status;
-	tDot11fFfAID                          AID;
-	tDot11fIESuppRates                    SuppRates;
-	tDot11fIEExtSuppRates                 ExtSuppRates;
-	tDot11fIEEDCAParamSet                 EDCAParamSet;
-	tDot11fIERCPIIE                       RCPIIE;
-	tDot11fIERSNIIE                       RSNIIE;
-	tDot11fIERRMEnabledCap                RRMEnabledCap;
-	tDot11fIEMobilityDomain               MobilityDomain;
-	tDot11fIEFTInfo                       FTInfo;
-	uint16_t                              num_RICDataDesc;
-	tDot11fIERICDataDesc                  RICDataDesc[2];
-	tDot11fIEWPA                          WPA;
-	tDot11fIETimeoutInterval              TimeoutInterval;
-	tDot11fIEHTCaps                       HTCaps;
-	tDot11fIEHTInfo                       HTInfo;
-	tDot11fIEWMMParams                    WMMParams;
-	tDot11fIEWMMCaps                      WMMCaps;
-	tDot11fIEESERadMgmtCap                ESERadMgmtCap;
-	tDot11fIEESETrafStrmMet               ESETrafStrmMet;
-	tDot11fIEESETxmitPower                ESETxmitPower;
-	uint16_t                              num_WMMTSPEC;
-	tDot11fIEWMMTSPEC                     WMMTSPEC[4];
-	tDot11fIEWscAssocRes                  WscAssocRes;
-	tDot11fIEP2PAssocRes                  P2PAssocRes;
-	tDot11fIEVHTCaps                      VHTCaps;
-	tDot11fIEVHTOperation                 VHTOperation;
-	tDot11fIEExtCap                       ExtCap;
-	tDot11fIEOBSSScanParameters           OBSSScanParameters;
-	tDot11fIEQosMapSet                    QosMapSet;
-	tDot11fIEfils_session                 fils_session;
-	tDot11fIEfils_public_key              fils_public_key;
-	tDot11fIEfils_key_confirmation        fils_key_confirmation;
-	tDot11fIEfils_hlp_container           fils_hlp_container;
-	tDot11fIEfragment_ie                  fragment_ie;
-	tDot11fIEfils_kde                     fils_kde;
-	tDot11fIEvendor_vht_ie                vendor_vht_ie;
-	tDot11fIEqcn_ie                       qcn_ie;
-	tDot11fIEhe_cap                       he_cap;
-	tDot11fIEhe_op                        he_op;
-	tDot11fIEhe_6ghz_band_cap             he_6ghz_band_cap;
-	tDot11fIEbss_color_change             bss_color_change;
-	tDot11fIEmu_edca_param_set            mu_edca_param_set;
-	tDot11fIEMBO_IE                       MBO_IE;
+	tDot11fFfCapabilities                   Capabilities;
+	tDot11fFfStatus                         Status;
+	tDot11fFfAID                            AID;
+	tDot11fIESuppRates                      SuppRates;
+	tDot11fIEExtSuppRates                   ExtSuppRates;
+	tDot11fIEEDCAParamSet                   EDCAParamSet;
+	tDot11fIERCPIIE                         RCPIIE;
+	tDot11fIERSNIIE                         RSNIIE;
+	tDot11fIERRMEnabledCap                  RRMEnabledCap;
+	tDot11fIEMobilityDomain                 MobilityDomain;
+	tDot11fIEFTInfo                         FTInfo;
+	tDot11fIETimeoutInterval                TimeoutInterval;
+	tDot11fIEHTCaps                         HTCaps;
+	tDot11fIEHTInfo                         HTInfo;
+	tDot11fIEOBSSScanParameters             OBSSScanParameters;
+	tDot11fIEExtCap                         ExtCap;
+	tDot11fIEbss_max_idle_period            bss_max_idle_period;
+	tDot11fIEQosMapSet                      QosMapSet;
+	tDot11fIEVHTCaps                        VHTCaps;
+	tDot11fIEVHTOperation                   VHTOperation;
+	tDot11fIEfils_session                   fils_session;
+	tDot11fIEfils_public_key                fils_public_key;
+	tDot11fIEfils_key_confirmation          fils_key_confirmation;
+	tDot11fIEfils_hlp_container             fils_hlp_container;
+	tDot11fIEhe_cap                         he_cap;
+	tDot11fIEhe_op                          he_op;
+	tDot11fIEbss_color_change               bss_color_change;
+	tDot11fIEmu_edca_param_set              mu_edca_param_set;
+	tDot11fIEhe_6ghz_band_cap               he_6ghz_band_cap;
+	uint16_t                                num_RICDataDesc;
+	tDot11fIERICDataDesc                    RICDataDesc[2];
+	tDot11fIEESETxmitPower                  ESETxmitPower;
+	tDot11fIEfragment_ie                    fragment_ie;
+	tDot11fIEfils_kde                       fils_kde;
+	tDot11fIEeht_cap                        eht_cap;
+	tDot11fIEeht_op                         eht_op;
+	tDot11fIEmlo_ie                         mlo_ie;
+	tDot11fIEWPA                            WPA;
+	tDot11fIEWMMParams                      WMMParams;
+	tDot11fIEWMMCaps                        WMMCaps;
+	tDot11fIEESERadMgmtCap                  ESERadMgmtCap;
+	tDot11fIEESETrafStrmMet                 ESETrafStrmMet;
+	uint16_t                                num_WMMTSPEC;
+	tDot11fIEWMMTSPEC                       WMMTSPEC[4];
+	tDot11fIEWscAssocRes                    WscAssocRes;
+	tDot11fIEP2PAssocRes                    P2PAssocRes;
+	tDot11fIEvendor_vht_ie                  vendor_vht_ie;
+	tDot11fIEqcn_ie                         qcn_ie;
+	tDot11fIEMBO_IE                         MBO_IE;
+	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
 } tDot11fAssocResponse;
 
 #define DOT11F_ASSOCRESPONSE (4)
@@ -10202,69 +10821,76 @@ uint32_t dot11f_get_packed_authentication_size(tpAniSirGlobal pCtx,
 #endif /* C++ */
 
 typedef struct sDot11fBeacon{
-	tDot11fFfTimeStamp                   TimeStamp;
-	tDot11fFfBeaconInterval              BeaconInterval;
-	tDot11fFfCapabilities                Capabilities;
-	tDot11fIESSID                        SSID;
-	tDot11fIESuppRates                   SuppRates;
-	tDot11fIEFHParamSet                  FHParamSet;
-	tDot11fIEDSParams                    DSParams;
-	tDot11fIECFParams                    CFParams;
-	tDot11fIETIM                         TIM;
-	tDot11fIECountry                     Country;
-	tDot11fIEFHParams                    FHParams;
-	tDot11fIEFHPattTable                 FHPattTable;
-	tDot11fIEPowerConstraints            PowerConstraints;
-	tDot11fIEChanSwitchAnn               ChanSwitchAnn;
-	tDot11fIEext_chan_switch_ann         ext_chan_switch_ann;
-	tDot11fIESuppOperatingClasses        SuppOperatingClasses;
-	tDot11fIEQuiet                       Quiet;
-	tDot11fIETPCReport                   TPCReport;
-	tDot11fIEERPInfo                     ERPInfo;
-	tDot11fIEExtSuppRates                ExtSuppRates;
-	tDot11fIERSN                         RSN;
-	tDot11fIEQBSSLoad                    QBSSLoad;
-	tDot11fIEEDCAParamSet                EDCAParamSet;
-	tDot11fIEQOSCapsAp                   QOSCapsAp;
-	tDot11fIEAPChannelReport             APChannelReport;
-	tDot11fIERRMEnabledCap               RRMEnabledCap;
-	tDot11fIEMobilityDomain              MobilityDomain;
-	tDot11fIEWPA                         WPA;
-	tDot11fIEHTCaps                      HTCaps;
-	tDot11fIEHTInfo                      HTInfo;
-	tDot11fIEsec_chan_offset_ele         sec_chan_offset_ele;
-	tDot11fIEWMMInfoAp                   WMMInfoAp;
-	tDot11fIEWMMParams                   WMMParams;
-	tDot11fIEWMMCaps                     WMMCaps;
-	tDot11fIEWAPI                        WAPI;
-	tDot11fIEESERadMgmtCap               ESERadMgmtCap;
-	tDot11fIEESETrafStrmMet              ESETrafStrmMet;
-	tDot11fIEESETxmitPower               ESETxmitPower;
-	tDot11fIEWscBeacon                   WscBeacon;
-	tDot11fIEP2PBeacon                   P2PBeacon;
-	tDot11fIEVHTCaps                     VHTCaps;
-	tDot11fIEVHTOperation                VHTOperation;
-	tDot11fIEVHTExtBssLoad               VHTExtBssLoad;
-	tDot11fIEExtCap                      ExtCap;
-	tDot11fIEOperatingMode               OperatingMode;
-	tDot11fIEWiderBWChanSwitchAnn        WiderBWChanSwitchAnn;
-	tDot11fIEOBSSScanParameters          OBSSScanParameters;
-	tDot11fIEfils_indication             fils_indication;
-	tDot11fIEVendor1IE                   Vendor1IE;
-	tDot11fIEvendor_vht_ie               vendor_vht_ie;
-	tDot11fIEVendor3IE                   Vendor3IE;
-	tDot11fIEhs20vendor_ie               hs20vendor_ie;
-	tDot11fIEChannelSwitchWrapper        ChannelSwitchWrapper;
-	tDot11fIEQComVendorIE                QComVendorIE;
-	tDot11fIEESEVersion                  ESEVersion;
-	tDot11fIEMBO_IE                      MBO_IE;
-	tDot11fIEqcn_ie                      qcn_ie;
-	tDot11fIEhe_cap                      he_cap;
-	tDot11fIEhe_op                       he_op;
-	tDot11fIEhe_6ghz_band_cap            he_6ghz_band_cap;
-	tDot11fIEbss_color_change            bss_color_change;
-	tDot11fIEmu_edca_param_set           mu_edca_param_set;
-	tDot11fIEesp_information             esp_information;
+	tDot11fFfTimeStamp                      TimeStamp;
+	tDot11fFfBeaconInterval                 BeaconInterval;
+	tDot11fFfCapabilities                   Capabilities;
+	tDot11fIESSID                           SSID;
+	tDot11fIESuppRates                      SuppRates;
+	tDot11fIEFHParamSet                     FHParamSet;
+	tDot11fIEDSParams                       DSParams;
+	tDot11fIECFParams                       CFParams;
+	tDot11fIETIM                            TIM;
+	tDot11fIECountry                        Country;
+	tDot11fIEFHParams                       FHParams;
+	tDot11fIEFHPattTable                    FHPattTable;
+	tDot11fIEPowerConstraints               PowerConstraints;
+	tDot11fIEChanSwitchAnn                  ChanSwitchAnn;
+	tDot11fIEQuiet                          Quiet;
+	tDot11fIETPCReport                      TPCReport;
+	tDot11fIEERPInfo                        ERPInfo;
+	tDot11fIEExtSuppRates                   ExtSuppRates;
+	tDot11fIERSN                            RSN;
+	tDot11fIEQBSSLoad                       QBSSLoad;
+	tDot11fIEEDCAParamSet                   EDCAParamSet;
+	tDot11fIEQOSCapsAp                      QOSCapsAp;
+	tDot11fIEAPChannelReport                APChannelReport;
+	tDot11fIERRMEnabledCap                  RRMEnabledCap;
+	tDot11fIEMobilityDomain                 MobilityDomain;
+	tDot11fIEext_chan_switch_ann            ext_chan_switch_ann;
+	tDot11fIESuppOperatingClasses           SuppOperatingClasses;
+	tDot11fIEHTCaps                         HTCaps;
+	tDot11fIEHTInfo                         HTInfo;
+	tDot11fIEOBSSScanParameters             OBSSScanParameters;
+	tDot11fIEExtCap                         ExtCap;
+	tDot11fIEVHTCaps                        VHTCaps;
+	tDot11fIEVHTOperation                   VHTOperation;
+	uint16_t                                num_transmit_power_env;
+	tDot11fIEtransmit_power_env             transmit_power_env[8];
+	tDot11fIEChannelSwitchWrapper           ChannelSwitchWrapper;
+	tDot11fIEVHTExtBssLoad                  VHTExtBssLoad;
+	tDot11fIEOperatingMode                  OperatingMode;
+	tDot11fIEfils_indication                fils_indication;
+	tDot11fIEmax_chan_switch_time           max_chan_switch_time;
+	tDot11fIEesp_information                esp_information;
+	tDot11fIEhe_cap                         he_cap;
+	tDot11fIEhe_op                          he_op;
+	tDot11fIEbss_color_change               bss_color_change;
+	tDot11fIEmu_edca_param_set              mu_edca_param_set;
+	tDot11fIEhe_6ghz_band_cap               he_6ghz_band_cap;
+	tDot11fIEsec_chan_offset_ele            sec_chan_offset_ele;
+	tDot11fIEWAPI                           WAPI;
+	tDot11fIEESETxmitPower                  ESETxmitPower;
+	tDot11fIEWiderBWChanSwitchAnn           WiderBWChanSwitchAnn;
+	tDot11fIEeht_cap                        eht_cap;
+	tDot11fIEeht_op                         eht_op;
+	tDot11fIEmlo_ie                         mlo_ie;
+	tDot11fIEWPA                            WPA;
+	tDot11fIEWMMInfoAp                      WMMInfoAp;
+	tDot11fIEWMMParams                      WMMParams;
+	tDot11fIEWMMCaps                        WMMCaps;
+	tDot11fIEESEVersion                     ESEVersion;
+	tDot11fIEESERadMgmtCap                  ESERadMgmtCap;
+	tDot11fIEESETrafStrmMet                 ESETrafStrmMet;
+	tDot11fIEWscBeacon                      WscBeacon;
+	tDot11fIEP2PBeacon                      P2PBeacon;
+	tDot11fIEVendor1IE                      Vendor1IE;
+	tDot11fIEvendor_vht_ie                  vendor_vht_ie;
+	tDot11fIEVendor3IE                      Vendor3IE;
+	tDot11fIEhs20vendor_ie                  hs20vendor_ie;
+	tDot11fIEQComVendorIE                   QComVendorIE;
+	tDot11fIEMBO_IE                         MBO_IE;
+	tDot11fIEqcn_ie                         qcn_ie;
+	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
 } tDot11fBeacon;
 
 #define DOT11F_BEACON (6)
@@ -10317,56 +10943,62 @@ uint32_t dot11f_get_packed_beacon1_size(tpAniSirGlobal pCtx,
 #endif /* C++ */
 
 typedef struct sDot11fBeacon2{
-	tDot11fIECountry                       Country;
-	tDot11fIEPowerConstraints              PowerConstraints;
-	tDot11fIEChanSwitchAnn                 ChanSwitchAnn;
-	tDot11fIEext_chan_switch_ann           ext_chan_switch_ann;
-	tDot11fIESuppOperatingClasses          SuppOperatingClasses;
-	tDot11fIEQuiet                         Quiet;
-	tDot11fIETPCReport                     TPCReport;
-	tDot11fIEERPInfo                       ERPInfo;
-	tDot11fIEExtSuppRates                  ExtSuppRates;
-	tDot11fIERSNOpaque                     RSNOpaque;
-	tDot11fIEEDCAParamSet                  EDCAParamSet;
-	tDot11fIEAPChannelReport               APChannelReport;
-	tDot11fIERRMEnabledCap                 RRMEnabledCap;
-	tDot11fIEMobilityDomain                MobilityDomain;
-	tDot11fIEWPA                           WPA;
-	tDot11fIEHTCaps                        HTCaps;
-	tDot11fIEHTInfo                        HTInfo;
-	tDot11fIEsec_chan_offset_ele           sec_chan_offset_ele;
-	tDot11fIEWMMInfoAp                     WMMInfoAp;
-	tDot11fIEWMMParams                     WMMParams;
-	tDot11fIEWMMCaps                       WMMCaps;
-	tDot11fIEWscBeacon                     WscBeacon;
-	tDot11fIEWAPI                          WAPI;
-	tDot11fIEESERadMgmtCap                 ESERadMgmtCap;
-	tDot11fIEESETrafStrmMet                ESETrafStrmMet;
-	tDot11fIEESETxmitPower                 ESETxmitPower;
-	tDot11fIEP2PBeacon                     P2PBeacon;
-	tDot11fIEVHTCaps                       VHTCaps;
-	tDot11fIEVHTOperation                  VHTOperation;
-	tDot11fIEvht_transmit_power_env        vht_transmit_power_env;
-	tDot11fIEChannelSwitchWrapper          ChannelSwitchWrapper;
-	tDot11fIEVHTExtBssLoad                 VHTExtBssLoad;
-	tDot11fIEExtCap                        ExtCap;
-	tDot11fIEOperatingMode                 OperatingMode;
-	tDot11fIEWiderBWChanSwitchAnn          WiderBWChanSwitchAnn;
-	tDot11fIEOBSSScanParameters            OBSSScanParameters;
-	tDot11fIEfils_indication               fils_indication;
-	tDot11fIEVendor1IE                     Vendor1IE;
-	tDot11fIEvendor_vht_ie                 vendor_vht_ie;
-	tDot11fIEVendor3IE                     Vendor3IE;
-	tDot11fIEhs20vendor_ie                 hs20vendor_ie;
-	tDot11fIEQComVendorIE                  QComVendorIE;
-	tDot11fIEESEVersion                    ESEVersion;
-	tDot11fIEqcn_ie                        qcn_ie;
-	tDot11fIEhe_cap                        he_cap;
-	tDot11fIEhe_op                         he_op;
-	tDot11fIEhe_6ghz_band_cap              he_6ghz_band_cap;
-	tDot11fIEbss_color_change              bss_color_change;
-	tDot11fIEmu_edca_param_set             mu_edca_param_set;
-	tDot11fIEesp_information               esp_information;
+	tDot11fIECountry                        Country;
+	tDot11fIEPowerConstraints               PowerConstraints;
+	tDot11fIEChanSwitchAnn                  ChanSwitchAnn;
+	tDot11fIEQuiet                          Quiet;
+	tDot11fIETPCReport                      TPCReport;
+	tDot11fIEERPInfo                        ERPInfo;
+	tDot11fIEExtSuppRates                   ExtSuppRates;
+	tDot11fIERSNOpaque                      RSNOpaque;
+	tDot11fIEEDCAParamSet                   EDCAParamSet;
+	tDot11fIEAPChannelReport                APChannelReport;
+	tDot11fIERRMEnabledCap                  RRMEnabledCap;
+	tDot11fIEMobilityDomain                 MobilityDomain;
+	tDot11fIEext_chan_switch_ann            ext_chan_switch_ann;
+	tDot11fIESuppOperatingClasses           SuppOperatingClasses;
+	tDot11fIEHTCaps                         HTCaps;
+	tDot11fIEHTInfo                         HTInfo;
+	tDot11fIEOBSSScanParameters             OBSSScanParameters;
+	tDot11fIEExtCap                         ExtCap;
+	tDot11fIEVHTCaps                        VHTCaps;
+	tDot11fIEVHTOperation                   VHTOperation;
+	uint16_t                                num_transmit_power_env;
+	tDot11fIEtransmit_power_env             transmit_power_env[8];
+	tDot11fIEChannelSwitchWrapper           ChannelSwitchWrapper;
+	tDot11fIEVHTExtBssLoad                  VHTExtBssLoad;
+	tDot11fIEOperatingMode                  OperatingMode;
+	tDot11fIEfils_indication                fils_indication;
+	tDot11fIEmax_chan_switch_time           max_chan_switch_time;
+	tDot11fIEesp_information                esp_information;
+	tDot11fIEhe_cap                         he_cap;
+	tDot11fIEhe_op                          he_op;
+	tDot11fIEbss_color_change               bss_color_change;
+	tDot11fIEmu_edca_param_set              mu_edca_param_set;
+	tDot11fIEhe_6ghz_band_cap               he_6ghz_band_cap;
+	tDot11fIEsec_chan_offset_ele            sec_chan_offset_ele;
+	tDot11fIEWAPI                           WAPI;
+	tDot11fIEESETxmitPower                  ESETxmitPower;
+	tDot11fIEWiderBWChanSwitchAnn           WiderBWChanSwitchAnn;
+	tDot11fIEeht_cap                        eht_cap;
+	tDot11fIEeht_op                         eht_op;
+	tDot11fIEmlo_ie                         mlo_ie;
+	tDot11fIEWPA                            WPA;
+	tDot11fIEWMMInfoAp                      WMMInfoAp;
+	tDot11fIEWMMParams                      WMMParams;
+	tDot11fIEWMMCaps                        WMMCaps;
+	tDot11fIEESERadMgmtCap                  ESERadMgmtCap;
+	tDot11fIEESETrafStrmMet                 ESETrafStrmMet;
+	tDot11fIEWscBeacon                      WscBeacon;
+	tDot11fIEP2PBeacon                      P2PBeacon;
+	tDot11fIEVendor1IE                      Vendor1IE;
+	tDot11fIEvendor_vht_ie                  vendor_vht_ie;
+	tDot11fIEVendor3IE                      Vendor3IE;
+	tDot11fIEhs20vendor_ie                  hs20vendor_ie;
+	tDot11fIEQComVendorIE                   QComVendorIE;
+	tDot11fIEESEVersion                     ESEVersion;
+	tDot11fIEqcn_ie                         qcn_ie;
+	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
 } tDot11fBeacon2;
 
 #define DOT11F_BEACON2 (8)
@@ -10390,66 +11022,73 @@ uint32_t dot11f_get_packed_beacon2_size(tpAniSirGlobal pCtx,
 #endif /* C++ */
 
 typedef struct sDot11fBeaconIEs{
-	tDot11fIESSID                        SSID;
-	tDot11fIESuppRates                   SuppRates;
-	tDot11fIEFHParamSet                  FHParamSet;
-	tDot11fIEDSParams                    DSParams;
-	tDot11fIECFParams                    CFParams;
-	tDot11fIETIM                         TIM;
-	tDot11fIECountry                     Country;
-	tDot11fIEFHParams                    FHParams;
-	tDot11fIEFHPattTable                 FHPattTable;
-	tDot11fIEPowerConstraints            PowerConstraints;
-	tDot11fIEChanSwitchAnn               ChanSwitchAnn;
-	tDot11fIEext_chan_switch_ann         ext_chan_switch_ann;
-	tDot11fIESuppOperatingClasses        SuppOperatingClasses;
-	tDot11fIEQuiet                       Quiet;
-	tDot11fIETPCReport                   TPCReport;
-	tDot11fIEERPInfo                     ERPInfo;
-	tDot11fIEExtSuppRates                ExtSuppRates;
-	tDot11fIERSN                         RSN;
-	tDot11fIEQBSSLoad                    QBSSLoad;
-	tDot11fIEEDCAParamSet                EDCAParamSet;
-	tDot11fIEQOSCapsAp                   QOSCapsAp;
-	tDot11fIEAPChannelReport             APChannelReport;
-	tDot11fIERRMEnabledCap               RRMEnabledCap;
-	tDot11fIEMobilityDomain              MobilityDomain;
-	tDot11fIEWPA                         WPA;
-	tDot11fIEHTCaps                      HTCaps;
-	tDot11fIEHTInfo                      HTInfo;
-	tDot11fIEsec_chan_offset_ele         sec_chan_offset_ele;
-	tDot11fIEWMMInfoAp                   WMMInfoAp;
-	tDot11fIEWMMParams                   WMMParams;
-	tDot11fIEWMMCaps                     WMMCaps;
-	tDot11fIEWAPI                        WAPI;
-	tDot11fIEESEVersion                  ESEVersion;
-	tDot11fIEESERadMgmtCap               ESERadMgmtCap;
-	tDot11fIEESETrafStrmMet              ESETrafStrmMet;
-	tDot11fIEESETxmitPower               ESETxmitPower;
-	tDot11fIEWscBeaconProbeRes           WscBeaconProbeRes;
-	tDot11fIEP2PBeaconProbeRes           P2PBeaconProbeRes;
-	tDot11fIEVHTCaps                     VHTCaps;
-	tDot11fIEVHTOperation                VHTOperation;
-	tDot11fIEVHTExtBssLoad               VHTExtBssLoad;
-	tDot11fIEExtCap                      ExtCap;
-	tDot11fIEOperatingMode               OperatingMode;
-	tDot11fIEWiderBWChanSwitchAnn        WiderBWChanSwitchAnn;
-	tDot11fIEOBSSScanParameters          OBSSScanParameters;
-	tDot11fIEfils_indication             fils_indication;
-	tDot11fIEVendor1IE                   Vendor1IE;
-	tDot11fIEvendor_vht_ie               vendor_vht_ie;
-	tDot11fIEVendor3IE                   Vendor3IE;
-	tDot11fIEhs20vendor_ie               hs20vendor_ie;
-	tDot11fIEChannelSwitchWrapper        ChannelSwitchWrapper;
-	tDot11fIEQComVendorIE                QComVendorIE;
-	tDot11fIEMBO_IE                      MBO_IE;
-	tDot11fIEqcn_ie                      qcn_ie;
-	tDot11fIEhe_cap                      he_cap;
-	tDot11fIEhe_op                       he_op;
-	tDot11fIEhe_6ghz_band_cap            he_6ghz_band_cap;
-	tDot11fIEbss_color_change            bss_color_change;
-	tDot11fIEmu_edca_param_set           mu_edca_param_set;
-	tDot11fIEesp_information             esp_information;
+	tDot11fIESSID                           SSID;
+	tDot11fIESuppRates                      SuppRates;
+	tDot11fIEFHParamSet                     FHParamSet;
+	tDot11fIEDSParams                       DSParams;
+	tDot11fIECFParams                       CFParams;
+	tDot11fIETIM                            TIM;
+	tDot11fIECountry                        Country;
+	tDot11fIEFHParams                       FHParams;
+	tDot11fIEFHPattTable                    FHPattTable;
+	tDot11fIEPowerConstraints               PowerConstraints;
+	tDot11fIEChanSwitchAnn                  ChanSwitchAnn;
+	tDot11fIEQuiet                          Quiet;
+	tDot11fIETPCReport                      TPCReport;
+	tDot11fIEERPInfo                        ERPInfo;
+	tDot11fIEExtSuppRates                   ExtSuppRates;
+	tDot11fIERSN                            RSN;
+	tDot11fIEQBSSLoad                       QBSSLoad;
+	tDot11fIEEDCAParamSet                   EDCAParamSet;
+	tDot11fIEQOSCapsAp                      QOSCapsAp;
+	tDot11fIEAPChannelReport                APChannelReport;
+	tDot11fIERRMEnabledCap                  RRMEnabledCap;
+	tDot11fIEMobilityDomain                 MobilityDomain;
+	tDot11fIEext_chan_switch_ann            ext_chan_switch_ann;
+	tDot11fIESuppOperatingClasses           SuppOperatingClasses;
+	tDot11fIEHTCaps                         HTCaps;
+	tDot11fIEHTInfo                         HTInfo;
+	tDot11fIEOBSSScanParameters             OBSSScanParameters;
+	tDot11fIEExtCap                         ExtCap;
+	tDot11fIEVHTCaps                        VHTCaps;
+	tDot11fIEVHTOperation                   VHTOperation;
+	uint16_t                                num_transmit_power_env;
+	tDot11fIEtransmit_power_env             transmit_power_env[8];
+	tDot11fIEChannelSwitchWrapper           ChannelSwitchWrapper;
+	tDot11fIEVHTExtBssLoad                  VHTExtBssLoad;
+	tDot11fIEOperatingMode                  OperatingMode;
+	tDot11fIEfils_indication                fils_indication;
+	tDot11fIEmax_chan_switch_time           max_chan_switch_time;
+	tDot11fIEesp_information                esp_information;
+	tDot11fIEhe_cap                         he_cap;
+	tDot11fIEhe_op                          he_op;
+	tDot11fIEbss_color_change               bss_color_change;
+	tDot11fIEmu_edca_param_set              mu_edca_param_set;
+	tDot11fIEhe_6ghz_band_cap               he_6ghz_band_cap;
+	tDot11fIEsec_chan_offset_ele            sec_chan_offset_ele;
+	tDot11fIEWAPI                           WAPI;
+	tDot11fIEESETxmitPower                  ESETxmitPower;
+	tDot11fIEWiderBWChanSwitchAnn           WiderBWChanSwitchAnn;
+	tDot11fIEeht_cap                        eht_cap;
+	tDot11fIEeht_op                         eht_op;
+	tDot11fIEmlo_ie                         mlo_ie;
+	tDot11fIEWPA                            WPA;
+	tDot11fIEWMMInfoAp                      WMMInfoAp;
+	tDot11fIEWMMParams                      WMMParams;
+	tDot11fIEWMMCaps                        WMMCaps;
+	tDot11fIEESEVersion                     ESEVersion;
+	tDot11fIEESERadMgmtCap                  ESERadMgmtCap;
+	tDot11fIEESETrafStrmMet                 ESETrafStrmMet;
+	tDot11fIEWscBeaconProbeRes              WscBeaconProbeRes;
+	tDot11fIEP2PBeaconProbeRes              P2PBeaconProbeRes;
+	tDot11fIEVendor1IE                      Vendor1IE;
+	tDot11fIEvendor_vht_ie                  vendor_vht_ie;
+	tDot11fIEVendor3IE                      Vendor3IE;
+	tDot11fIEhs20vendor_ie                  hs20vendor_ie;
+	tDot11fIEQComVendorIE                   QComVendorIE;
+	tDot11fIEMBO_IE                         MBO_IE;
+	tDot11fIEqcn_ie                         qcn_ie;
+	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
 } tDot11fBeaconIEs;
 
 #define DOT11F_BEACONIES (9)
@@ -10782,14 +11421,16 @@ typedef struct sDot11fProbeRequest{
 	tDot11fIEExtSuppRates            ExtSuppRates;
 	tDot11fIEDSParams                DSParams;
 	tDot11fIEHTCaps                  HTCaps;
+	tDot11fIEExtCap                  ExtCap;
+	tDot11fIEVHTCaps                 VHTCaps;
+	tDot11fIEhe_cap                  he_cap;
+	tDot11fIEhe_6ghz_band_cap        he_6ghz_band_cap;
+	tDot11fIEeht_cap                 eht_cap;
+	tDot11fIEmlo_ie                  mlo_ie;
 	tDot11fIEWscProbeReq             WscProbeReq;
 	tDot11fIEWFATPC                  WFATPC;
 	tDot11fIEP2PProbeReq             P2PProbeReq;
-	tDot11fIEVHTCaps                 VHTCaps;
-	tDot11fIEExtCap                  ExtCap;
 	tDot11fIEqcn_ie                  qcn_ie;
-	tDot11fIEhe_cap                  he_cap;
-	tDot11fIEhe_6ghz_band_cap        he_6ghz_band_cap;
 } tDot11fProbeRequest;
 
 #define DOT11F_PROBEREQUEST (21)
@@ -10813,66 +11454,72 @@ uint32_t dot11f_get_packed_probe_request_size(tpAniSirGlobal pCtx,
 #endif /* C++ */
 
 typedef struct sDot11fProbeResponse{
-	tDot11fFfTimeStamp                     TimeStamp;
-	tDot11fFfBeaconInterval                BeaconInterval;
-	tDot11fFfCapabilities                  Capabilities;
-	tDot11fIESSID                          SSID;
-	tDot11fIESuppRates                     SuppRates;
-	tDot11fIEFHParamSet                    FHParamSet;
-	tDot11fIEDSParams                      DSParams;
-	tDot11fIECFParams                      CFParams;
-	tDot11fIECountry                       Country;
-	tDot11fIEFHParams                      FHParams;
-	tDot11fIEFHPattTable                   FHPattTable;
-	tDot11fIEPowerConstraints              PowerConstraints;
-	tDot11fIEChanSwitchAnn                 ChanSwitchAnn;
-	tDot11fIEext_chan_switch_ann           ext_chan_switch_ann;
-	tDot11fIESuppOperatingClasses          SuppOperatingClasses;
-	tDot11fIEQuiet                         Quiet;
-	tDot11fIETPCReport                     TPCReport;
-	tDot11fIEERPInfo                       ERPInfo;
-	tDot11fIEExtSuppRates                  ExtSuppRates;
-	tDot11fIERSNOpaque                     RSNOpaque;
-	tDot11fIEQBSSLoad                      QBSSLoad;
-	tDot11fIEEDCAParamSet                  EDCAParamSet;
-	tDot11fIERRMEnabledCap                 RRMEnabledCap;
-	tDot11fIEAPChannelReport               APChannelReport;
-	tDot11fIEMobilityDomain                MobilityDomain;
-	tDot11fIEWPA                           WPA;
-	tDot11fIEHTCaps                        HTCaps;
-	tDot11fIEHTInfo                        HTInfo;
-	tDot11fIEsec_chan_offset_ele           sec_chan_offset_ele;
-	tDot11fIEWMMInfoAp                     WMMInfoAp;
-	tDot11fIEWMMParams                     WMMParams;
-	tDot11fIEWMMCaps                       WMMCaps;
-	tDot11fIEWAPI                          WAPI;
-	tDot11fIEESERadMgmtCap                 ESERadMgmtCap;
-	tDot11fIEESETrafStrmMet                ESETrafStrmMet;
-	tDot11fIEESETxmitPower                 ESETxmitPower;
-	tDot11fIEWscProbeRes                   WscProbeRes;
-	tDot11fIEP2PProbeRes                   P2PProbeRes;
-	tDot11fIEVHTCaps                       VHTCaps;
-	tDot11fIEVHTOperation                  VHTOperation;
-	tDot11fIEvht_transmit_power_env        vht_transmit_power_env;
-	tDot11fIEChannelSwitchWrapper          ChannelSwitchWrapper;
-	tDot11fIEVHTExtBssLoad                 VHTExtBssLoad;
-	tDot11fIEExtCap                        ExtCap;
-	tDot11fIEOBSSScanParameters            OBSSScanParameters;
-	tDot11fIEfils_indication               fils_indication;
-	tDot11fIEVendor1IE                     Vendor1IE;
-	tDot11fIEvendor_vht_ie                 vendor_vht_ie;
-	tDot11fIEVendor3IE                     Vendor3IE;
-	tDot11fIEhs20vendor_ie                 hs20vendor_ie;
-	tDot11fIEQComVendorIE                  QComVendorIE;
-	tDot11fIEESEVersion                    ESEVersion;
-	tDot11fIEMBO_IE                        MBO_IE;
-	tDot11fIEqcn_ie                        qcn_ie;
-	tDot11fIEhe_cap                        he_cap;
-	tDot11fIEhe_op                         he_op;
-	tDot11fIEhe_6ghz_band_cap              he_6ghz_band_cap;
-	tDot11fIEbss_color_change              bss_color_change;
-	tDot11fIEmu_edca_param_set             mu_edca_param_set;
-	tDot11fIEesp_information               esp_information;
+	tDot11fFfTimeStamp                      TimeStamp;
+	tDot11fFfBeaconInterval                 BeaconInterval;
+	tDot11fFfCapabilities                   Capabilities;
+	tDot11fIESSID                           SSID;
+	tDot11fIESuppRates                      SuppRates;
+	tDot11fIEFHParamSet                     FHParamSet;
+	tDot11fIEDSParams                       DSParams;
+	tDot11fIECFParams                       CFParams;
+	tDot11fIECountry                        Country;
+	tDot11fIEFHParams                       FHParams;
+	tDot11fIEFHPattTable                    FHPattTable;
+	tDot11fIEPowerConstraints               PowerConstraints;
+	tDot11fIEChanSwitchAnn                  ChanSwitchAnn;
+	tDot11fIEQuiet                          Quiet;
+	tDot11fIETPCReport                      TPCReport;
+	tDot11fIEERPInfo                        ERPInfo;
+	tDot11fIEExtSuppRates                   ExtSuppRates;
+	tDot11fIERSNOpaque                      RSNOpaque;
+	tDot11fIEQBSSLoad                       QBSSLoad;
+	tDot11fIEEDCAParamSet                   EDCAParamSet;
+	tDot11fIERRMEnabledCap                  RRMEnabledCap;
+	tDot11fIEAPChannelReport                APChannelReport;
+	tDot11fIEMobilityDomain                 MobilityDomain;
+	tDot11fIEext_chan_switch_ann            ext_chan_switch_ann;
+	tDot11fIESuppOperatingClasses           SuppOperatingClasses;
+	tDot11fIEHTCaps                         HTCaps;
+	tDot11fIEHTInfo                         HTInfo;
+	tDot11fIEOBSSScanParameters             OBSSScanParameters;
+	tDot11fIEExtCap                         ExtCap;
+	tDot11fIEVHTCaps                        VHTCaps;
+	tDot11fIEVHTOperation                   VHTOperation;
+	uint16_t                                num_transmit_power_env;
+	tDot11fIEtransmit_power_env             transmit_power_env[8];
+	tDot11fIEChannelSwitchWrapper           ChannelSwitchWrapper;
+	tDot11fIEVHTExtBssLoad                  VHTExtBssLoad;
+	tDot11fIEfils_indication                fils_indication;
+	tDot11fIEmax_chan_switch_time           max_chan_switch_time;
+	tDot11fIEesp_information                esp_information;
+	tDot11fIEhe_cap                         he_cap;
+	tDot11fIEhe_op                          he_op;
+	tDot11fIEbss_color_change               bss_color_change;
+	tDot11fIEmu_edca_param_set              mu_edca_param_set;
+	tDot11fIEhe_6ghz_band_cap               he_6ghz_band_cap;
+	tDot11fIEsec_chan_offset_ele            sec_chan_offset_ele;
+	tDot11fIEWAPI                           WAPI;
+	tDot11fIEESETxmitPower                  ESETxmitPower;
+	tDot11fIEeht_cap                        eht_cap;
+	tDot11fIEeht_op                         eht_op;
+	tDot11fIEmlo_ie                         mlo_ie;
+	tDot11fIEWPA                            WPA;
+	tDot11fIEWMMInfoAp                      WMMInfoAp;
+	tDot11fIEWMMParams                      WMMParams;
+	tDot11fIEWMMCaps                        WMMCaps;
+	tDot11fIEESEVersion                     ESEVersion;
+	tDot11fIEESERadMgmtCap                  ESERadMgmtCap;
+	tDot11fIEESETrafStrmMet                 ESETrafStrmMet;
+	tDot11fIEWscProbeRes                    WscProbeRes;
+	tDot11fIEP2PProbeRes                    P2PProbeRes;
+	tDot11fIEVendor1IE                      Vendor1IE;
+	tDot11fIEvendor_vht_ie                  vendor_vht_ie;
+	tDot11fIEVendor3IE                      Vendor3IE;
+	tDot11fIEhs20vendor_ie                  hs20vendor_ie;
+	tDot11fIEQComVendorIE                   QComVendorIE;
+	tDot11fIEMBO_IE                         MBO_IE;
+	tDot11fIEqcn_ie                         qcn_ie;
+	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
 } tDot11fProbeResponse;
 
 #define DOT11F_PROBERESPONSE (22)
@@ -10926,7 +11573,7 @@ typedef struct sDot11fRadioMeasurementReport{
 	tDot11fFfAction                   Action;
 	tDot11fFfDialogToken              DialogToken;
 	uint16_t                          num_MeasurementReport;
-	tDot11fIEMeasurementReport        MeasurementReport[7];
+	tDot11fIEMeasurementReport        MeasurementReport[1];
 } tDot11fRadioMeasurementReport;
 
 #define DOT11F_RADIOMEASUREMENTREPORT (24)
@@ -10995,29 +11642,32 @@ typedef struct sDot11fReAssocRequest{
 	uint16_t                             num_RICDataDesc;
 	tDot11fIERICDataDesc                 RICDataDesc[2];
 	tDot11fIESuppOperatingClasses        SuppOperatingClasses;
-	tDot11fIEWPAOpaque                   WPAOpaque;
 	tDot11fIEHTCaps                      HTCaps;
+	tDot11fIEExtCap                      ExtCap;
+	tDot11fIEVHTCaps                     VHTCaps;
+	tDot11fIEOperatingMode               OperatingMode;
+	tDot11fIEbss_max_idle_period         bss_max_idle_period;
+	tDot11fIEhe_cap                      he_cap;
+	tDot11fIEhe_6ghz_band_cap            he_6ghz_band_cap;
+	tDot11fIEWAPIOpaque                  WAPIOpaque;
+	tDot11fIEWAPI                        WAPI;
+	tDot11fIEQosMapSet                   QosMapSet;
+	tDot11fIEESECckmOpaque               ESECckmOpaque;
+	tDot11fIEeht_cap                     eht_cap;
+	tDot11fIEmlo_ie                      mlo_ie;
+	tDot11fIEWPAOpaque                   WPAOpaque;
 	tDot11fIEWMMCaps                     WMMCaps;
 	tDot11fIEWMMInfoStation              WMMInfoStation;
 	tDot11fIEWscIEOpaque                 WscIEOpaque;
-	tDot11fIEWAPIOpaque                  WAPIOpaque;
-	tDot11fIEWAPI                        WAPI;
 	tDot11fIEESERadMgmtCap               ESERadMgmtCap;
 	tDot11fIEESEVersion                  ESEVersion;
-	tDot11fIEESECckmOpaque               ESECckmOpaque;
 	uint16_t                             num_WMMTSPEC;
 	tDot11fIEWMMTSPEC                    WMMTSPEC[4];
 	tDot11fIEESETrafStrmRateSet          ESETrafStrmRateSet;
 	tDot11fIEP2PIEOpaque                 P2PIEOpaque;
 	tDot11fIEWFDIEOpaque                 WFDIEOpaque;
-	tDot11fIEVHTCaps                     VHTCaps;
-	tDot11fIEExtCap                      ExtCap;
-	tDot11fIEOperatingMode               OperatingMode;
-	tDot11fIEQosMapSet                   QosMapSet;
 	tDot11fIEvendor_vht_ie               vendor_vht_ie;
 	tDot11fIEhs20vendor_ie               hs20vendor_ie;
-	tDot11fIEhe_cap                      he_cap;
-	tDot11fIEhe_6ghz_band_cap            he_6ghz_band_cap;
 } tDot11fReAssocRequest;
 
 #define DOT11F_REASSOCREQUEST (26)
@@ -11041,45 +11691,50 @@ uint32_t dot11f_get_packed_re_assoc_request_size(tpAniSirGlobal pCtx,
 #endif /* C++ */
 
 typedef struct sDot11fReAssocResponse{
-	tDot11fFfCapabilities              Capabilities;
-	tDot11fFfStatus                    Status;
-	tDot11fFfAID                       AID;
-	tDot11fIESuppRates                 SuppRates;
-	tDot11fIEExtSuppRates              ExtSuppRates;
-	tDot11fIEEDCAParamSet              EDCAParamSet;
-	tDot11fIERCPIIE                    RCPIIE;
-	tDot11fIERSNIIE                    RSNIIE;
-	tDot11fIERRMEnabledCap             RRMEnabledCap;
-	tDot11fIERSNOpaque                 RSNOpaque;
-	tDot11fIEMobilityDomain            MobilityDomain;
-	tDot11fIEFTInfo                    FTInfo;
-	uint16_t                           num_RICDataDesc;
-	tDot11fIERICDataDesc               RICDataDesc[2];
-	tDot11fIEWPA                       WPA;
-	tDot11fIETimeoutInterval           TimeoutInterval;
-	tDot11fIEHTCaps                    HTCaps;
-	tDot11fIEHTInfo                    HTInfo;
-	tDot11fIEWMMParams                 WMMParams;
-	tDot11fIEESERadMgmtCap             ESERadMgmtCap;
-	tDot11fIEESETrafStrmMet            ESETrafStrmMet;
-	tDot11fIEESETxmitPower             ESETxmitPower;
-	uint16_t                           num_WMMTSPEC;
-	tDot11fIEWMMTSPEC                  WMMTSPEC[4];
-	tDot11fIEESETrafStrmRateSet        ESETrafStrmRateSet;
-	tDot11fIEWscReassocRes             WscReassocRes;
-	tDot11fIEP2PAssocRes               P2PAssocRes;
-	tDot11fIEVHTCaps                   VHTCaps;
-	tDot11fIEVHTOperation              VHTOperation;
-	tDot11fIEExtCap                    ExtCap;
-	tDot11fIEOBSSScanParameters        OBSSScanParameters;
-	tDot11fIEQosMapSet                 QosMapSet;
-	tDot11fIEvendor_vht_ie             vendor_vht_ie;
-	tDot11fIEhe_cap                    he_cap;
-	tDot11fIEhe_op                     he_op;
-	tDot11fIEhe_6ghz_band_cap          he_6ghz_band_cap;
-	tDot11fIEbss_color_change          bss_color_change;
-	tDot11fIEmu_edca_param_set         mu_edca_param_set;
-	tDot11fIEMBO_IE                    MBO_IE;
+	tDot11fFfCapabilities                   Capabilities;
+	tDot11fFfStatus                         Status;
+	tDot11fFfAID                            AID;
+	tDot11fIESuppRates                      SuppRates;
+	tDot11fIEExtSuppRates                   ExtSuppRates;
+	tDot11fIEEDCAParamSet                   EDCAParamSet;
+	tDot11fIERCPIIE                         RCPIIE;
+	tDot11fIERSNIIE                         RSNIIE;
+	tDot11fIERRMEnabledCap                  RRMEnabledCap;
+	tDot11fIERSNOpaque                      RSNOpaque;
+	tDot11fIEMobilityDomain                 MobilityDomain;
+	tDot11fIEFTInfo                         FTInfo;
+	uint16_t                                num_RICDataDesc;
+	tDot11fIERICDataDesc                    RICDataDesc[2];
+	tDot11fIETimeoutInterval                TimeoutInterval;
+	tDot11fIEHTCaps                         HTCaps;
+	tDot11fIEHTInfo                         HTInfo;
+	tDot11fIEOBSSScanParameters             OBSSScanParameters;
+	tDot11fIEExtCap                         ExtCap;
+	tDot11fIEbss_max_idle_period            bss_max_idle_period;
+	tDot11fIEVHTCaps                        VHTCaps;
+	tDot11fIEVHTOperation                   VHTOperation;
+	tDot11fIEhe_cap                         he_cap;
+	tDot11fIEhe_op                          he_op;
+	tDot11fIEbss_color_change               bss_color_change;
+	tDot11fIEmu_edca_param_set              mu_edca_param_set;
+	tDot11fIEhe_6ghz_band_cap               he_6ghz_band_cap;
+	tDot11fIEQosMapSet                      QosMapSet;
+	tDot11fIEESETxmitPower                  ESETxmitPower;
+	tDot11fIEeht_cap                        eht_cap;
+	tDot11fIEeht_op                         eht_op;
+	tDot11fIEmlo_ie                         mlo_ie;
+	tDot11fIEWPA                            WPA;
+	tDot11fIEWMMParams                      WMMParams;
+	tDot11fIEESERadMgmtCap                  ESERadMgmtCap;
+	tDot11fIEESETrafStrmMet                 ESETrafStrmMet;
+	uint16_t                                num_WMMTSPEC;
+	tDot11fIEWMMTSPEC                       WMMTSPEC[4];
+	tDot11fIEESETrafStrmRateSet             ESETrafStrmRateSet;
+	tDot11fIEWscReassocRes                  WscReassocRes;
+	tDot11fIEP2PAssocRes                    P2PAssocRes;
+	tDot11fIEvendor_vht_ie                  vendor_vht_ie;
+	tDot11fIEMBO_IE                         MBO_IE;
+	tDot11fIEreduced_neighbor_report        reduced_neighbor_report;
 } tDot11fReAssocResponse;
 
 #define DOT11F_REASSOCRESPONSE (27)
@@ -11227,6 +11882,7 @@ typedef struct sDot11fTDLSDisRsp{
 	tDot11fIEht2040_bss_coexistence        ht2040_bss_coexistence;
 	tDot11fIELinkIdentifier                LinkIdentifier;
 	tDot11fIEVHTCaps                       VHTCaps;
+	tDot11fIEhe_cap                        he_cap;
 } tDot11fTDLSDisRsp;
 
 #define DOT11F_TDLSDISRSP (32)
@@ -11319,6 +11975,7 @@ typedef struct sDot11fTDLSSetupCnf{
 	tDot11fIEWMMParams              WMMParams;
 	tDot11fIEVHTOperation           VHTOperation;
 	tDot11fIEOperatingMode          OperatingMode;
+	tDot11fIEhe_op                  he_op;
 } tDot11fTDLSSetupCnf;
 
 #define DOT11F_TDLSSETUPCNF (35)
@@ -11363,6 +12020,8 @@ typedef struct sDot11fTDLSSetupReq{
 	tDot11fIEWMMInfoStation                WMMInfoStation;
 	tDot11fIEAID                           AID;
 	tDot11fIEVHTCaps                       VHTCaps;
+	tDot11fIEhe_cap                        he_cap;
+	tDot11fIEhe_6ghz_band_cap              he_6ghz_band_cap;
 } tDot11fTDLSSetupReq;
 
 #define DOT11F_TDLSSETUPREQ (36)
@@ -11409,6 +12068,8 @@ typedef struct sDot11fTDLSSetupRsp{
 	tDot11fIEAID                           AID;
 	tDot11fIEVHTCaps                       VHTCaps;
 	tDot11fIEOperatingMode                 OperatingMode;
+	tDot11fIEhe_cap                        he_cap;
+	tDot11fIEhe_6ghz_band_cap              he_6ghz_band_cap;
 } tDot11fTDLSSetupRsp;
 
 #define DOT11F_TDLSSETUPRSP (37)

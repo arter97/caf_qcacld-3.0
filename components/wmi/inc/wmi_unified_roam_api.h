@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -58,7 +58,6 @@ wmi_unified_set_rssi_monitoring_cmd(wmi_unified_t wmi_handle,
 				    struct rssi_monitor_param *req);
 #endif
 
-#ifdef ROAM_OFFLOAD_V1
 /**
  * wmi_unified_roam_scan_offload_rssi_thresh_cmd() - set roam scan rssi
  *							parameters
@@ -85,34 +84,6 @@ QDF_STATUS wmi_unified_roam_scan_offload_rssi_thresh_cmd(
  */
 QDF_STATUS wmi_unified_roam_scan_offload_scan_period(
 	wmi_unified_t wmi_handle, struct wlan_roam_scan_period_params *param);
-#else
-/**
- * wmi_unified_roam_scan_offload_rssi_thresh_cmd() - set roam scan rssi
- *                                                      parameters
- * @wmi_handle: wmi handle
- * @roam_req: roam rssi related parameters
- *
- * This function reads the incoming @roam_req and fill in the destination
- * WMI structure and send down the roam scan rssi configs down to the firmware
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS wmi_unified_roam_scan_offload_rssi_thresh_cmd(
-		wmi_unified_t wmi_handle,
-		struct roam_offload_scan_rssi_params *roam_req);
-
-/**
- * wmi_unified_roam_scan_offload_scan_period() - set roam offload scan period
- * @wmi_handle: wmi handle
- * @param: pointer to roam scan period params to be sent to fw
- *
- * Send WMI_ROAM_SCAN_PERIOD parameters to fw.
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS wmi_unified_roam_scan_offload_scan_period(
-	wmi_unified_t wmi_handle, struct roam_scan_period_params *param);
-#endif
 
 /**
  * wmi_unified_roam_mawc_params_cmd() - configure roaming MAWC parameters
@@ -169,6 +140,22 @@ QDF_STATUS wmi_unified_plm_start_cmd(wmi_unified_t wmi_handle,
 				     const struct plm_req_params *plm);
 #endif /* FEATURE_WLAN_ESE */
 
+#if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * wmi_extract_roam_event  - Extract roam event
+ * @wmi_handle: WMI handle
+ * @event: Event data received from firmware
+ * @data_len: Event data length received from firmware
+ * @roam_event: Extract the event and fill in roam_event
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_roam_event(wmi_unified_t wmi_handle, uint8_t *event,
+		       uint32_t data_len,
+		       struct roam_offload_roam_event *roam_event);
+#endif /* WLAN_FEATURE_HOST_ROAM || WLAN_FEATURE_ROAM_OFFLOAD */
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /* wmi_unified_set_ric_req_cmd() - set ric request element
  * @wmi_handle: wmi handle
@@ -198,7 +185,6 @@ QDF_STATUS wmi_unified_roam_synch_complete_cmd(wmi_unified_t wmi_handle,
  * wmi_unified__roam_invoke_cmd() - send roam invoke command to fw.
  * @wmi_handle: wmi handle
  * @roaminvoke: roam invoke command
- * @ch_hz: channel
  *
  * Send roam invoke command to fw for fastreassoc.
  *
@@ -206,8 +192,7 @@ QDF_STATUS wmi_unified_roam_synch_complete_cmd(wmi_unified_t wmi_handle,
  */
 QDF_STATUS
 wmi_unified_roam_invoke_cmd(wmi_unified_t wmi_handle,
-			    struct wmi_roam_invoke_cmd *roaminvoke,
-			    uint32_t ch_hz);
+			    struct roam_invoke_req *roaminvoke);
 
 /**
  * wmi_unified_set_roam_triggers() - send roam trigger bitmap
@@ -268,9 +253,165 @@ wmi_unified_send_roam_preauth_status(wmi_unified_t wmi_handle,
  */
 QDF_STATUS wmi_unified_vdev_set_pcl_cmd(wmi_unified_t wmi_handle,
 					struct set_pcl_cmd_params *params);
+
+/**
+ * wmi_extract_roam_sync_event  - Extract roam sync event
+ * @wmi_handle: WMI handle
+ * @evt_buf: Event buffer
+ * @len: evt buffer data len
+ * @synd_ind: roam sync ptr
+ *
+ * This api will allocate memory for roam sync info, extract
+ * the information sent by FW and pass to CM.The memory will be
+ * freed by target_if_cm_roam_sync_event.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_roam_sync_event(wmi_unified_t wmi_handle, void *evt_buf,
+			    uint32_t len,
+			    struct roam_offload_synch_ind **sync_ind);
+
+/**
+ * wmi_extract_roam_sync_frame_event  - Extract roam sync frame event
+ * @wmi_handle: WMI handle
+ * @event: Event buffer
+ * @len: evt buffer data len
+ * @frame_ptr: roam sync frame ptr
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_roam_sync_frame_event(wmi_unified_t wmi_handle, void *event,
+				  uint32_t len,
+				  struct roam_synch_frame_ind *frame_ptr);
+
+/**
+ * wmi_extract_btm_blacklist_event - Extract btm blacklist event
+ * @wmi_handle: WMI handle
+ * @event: Event data received from firmware
+ * @data_len: Event data length received from firmware
+ * @dst_list: Extract the event and fill in dst_list
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_btm_blacklist_event(wmi_unified_t wmi_handle,
+				uint8_t *event, uint32_t data_len,
+				struct roam_blacklist_event **dst_list);
+
+/**
+ * wmi_extract_vdev_disconnect_event - Extract disconnect event data
+ * @wmi_handle: WMI handle
+ * @event: Event data received from firmware
+ * @data_len: Event data length received from firmware
+ * @data: Extract the event and fill in data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_vdev_disconnect_event(wmi_unified_t wmi_handle,
+				  uint8_t *event, uint32_t data_len,
+				  struct vdev_disconnect_event_data *data);
+
+/**
+ * wmi_extract_roam_scan_chan_list - Extract roam scan chan list
+ * @wmi_handle: WMI handle
+ * @event: Event data received from firmware
+ * @data_len: Event data length received from firmware
+ * @data: Extract the event and fill in data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_roam_scan_chan_list(wmi_unified_t wmi_handle,
+				uint8_t *event, uint32_t data_len,
+				struct cm_roam_scan_ch_resp **data);
+
+/**
+ * wmi_unified_extract_roam_btm_response() - Extract BTM response
+ * @wmi:       wmi handle
+ * @evt_buf:   Pointer to the event buffer
+ * @dst:       Pointer to destination structure to fill data
+ * @idx:       TLV id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_unified_extract_roam_btm_response(wmi_unified_t wmi, void *evt_buf,
+				      struct roam_btm_response_data *dst,
+				      uint8_t idx);
+
+/**
+ * wmi_unified_extract_roam_initial_info() - Extract initial info
+ * @wmi:       wmi handle
+ * @evt_buf:   Pointer to the event buffer
+ * @dst:       Pointer to destination structure to fill data
+ * @idx:       TLV id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_unified_extract_roam_initial_info(wmi_unified_t wmi, void *evt_buf,
+				      struct roam_initial_data *dst,
+				      uint8_t idx);
+
+/**
+ * wmi_unified_extract_roam_msg_info() - Extract roam msg info
+ * @wmi:       wmi handle
+ * @evt_buf:   Pointer to the event buffer
+ * @dst:       Pointer to destination structure to fill data
+ * @idx:       TLV id
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_unified_extract_roam_msg_info(wmi_unified_t wmi, void *evt_buf,
+				  struct roam_msg_info *dst, uint8_t idx);
+
+/**
+ * wmi_extract_roam_stats_event  - Extract roam stats event
+ * @wmi_handle: WMI handle
+ * @event: Event data received from firmware
+ * @data_len: Event data length received from firmware
+ * @stats_info: Extract the event and fill in stats_info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_roam_stats_event(wmi_unified_t wmi_handle,
+			     uint8_t *event, uint32_t data_len,
+			     struct roam_stats_event **stats_info);
+
+/**
+ * wmi_extract_auth_offload_event  - Extract auth offload event
+ * @wmi_handle: WMI handle
+ * @event: Event data received from firmware
+ * @data_len: Event data length received from firmware
+ * @roam_event: Extract the event and fill in auth_event
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_auth_offload_event(wmi_unified_t wmi_handle,
+			       uint8_t *event, uint32_t data_len,
+			       struct auth_offload_event *auth_event);
+
+/**
+ * wmi_extract_roam_pmkid_request - Extract roam pmkid list
+ * @wmi_handle: WMI handle
+ * @event: Event data received from firmware
+ * @data_len: Event data length received from firmware
+ * @data: Extract the event and fill in data
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wmi_extract_roam_pmkid_request(wmi_unified_t wmi_handle,
+			       uint8_t *event, uint32_t data_len,
+			       struct roam_pmkid_req_event **data);
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
-#ifdef ROAM_OFFLOAD_V1
 /**
  * wmi_unified_roam_scan_offload_mode_cmd() - set roam scan parameters
  * @wmi_handle: wmi handle
@@ -285,23 +426,6 @@ QDF_STATUS wmi_unified_vdev_set_pcl_cmd(wmi_unified_t wmi_handle,
 QDF_STATUS wmi_unified_roam_scan_offload_mode_cmd(
 			wmi_unified_t wmi_handle,
 			struct wlan_roam_scan_offload_params *rso_cfg);
-#else
-/**
- * wmi_unified_roam_scan_offload_mode_cmd() - set roam scan parameters
- * @wmi_handle: wmi handle
- * @scan_cmd_fp: scan related parameters
- * @roam_req: roam related parameters
- *
- * This function reads the incoming @roam_req and fill in the destination
- * WMI structure and send down the roam scan configs down to the firmware
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS wmi_unified_roam_scan_offload_mode_cmd(
-				wmi_unified_t wmi_handle,
-				wmi_start_scan_cmd_fixed_param *scan_cmd_fp,
-				struct roam_offload_scan_params *roam_req);
-#endif
 
 /**
  * wmi_unified_send_roam_scan_offload_ap_cmd() - set roam ap profile in fw
@@ -330,7 +454,6 @@ QDF_STATUS wmi_unified_roam_scan_offload_cmd(wmi_unified_t wmi_handle,
 					     uint32_t command,
 					     uint32_t vdev_id);
 
-#ifdef ROAM_OFFLOAD_V1
 /**
  * wmi_unified_roam_scan_offload_chan_list_cmd  - Roam scan offload channel
  * list command
@@ -357,42 +480,6 @@ QDF_STATUS
 wmi_unified_roam_scan_offload_rssi_change_cmd(
 		wmi_unified_t wmi_handle,
 		struct wlan_roam_rssi_change_params *params);
-#else
-/**
- * wmi_unified_roam_scan_offload_rssi_change_cmd() - set roam offload RSSI th
- * @wmi_handle: wmi handle
- * @rssi_change_thresh: RSSI Change threshold
- * @vdev_id: vdev id
- *
- * Send WMI_ROAM_SCAN_RSSI_CHANGE_THRESHOLD parameters to fw.
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS
-wmi_unified_roam_scan_offload_rssi_change_cmd(wmi_unified_t wmi_handle,
-					      uint32_t vdev_id,
-					      int32_t rssi_change_thresh,
-					      uint32_t hirssi_delay_btw_scans);
-
-/**
- * wmi_unified_roam_scan_offload_chan_list_cmd() - set roam offload channel list
- * @wmi_handle: wmi handle
- * @chan_count: channel count
- * @chan_list: channel list
- * @list_type: list type
- * @vdev_id: vdev id
- *
- * Set roam offload channel list.
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-QDF_STATUS
-wmi_unified_roam_scan_offload_chan_list_cmd(wmi_unified_t wmi_handle,
-					    uint8_t chan_count,
-					    uint32_t *chan_list,
-					    uint8_t list_type,
-					    uint32_t vdev_id);
-#endif
 
 /**
  * wmi_unified_set_per_roam_config() - set PER roam config in FW

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,7 @@
 #define P2P_MAC_MGMT_ACTION                     0xD
 #define P2P_PUBLIC_ACTION_VENDOR_SPECIFIC       0x9
 #define P2P_NOA_ATTR                            0xC
+#define WNM_ACTION_FRAME                        0xA
 
 #define P2P_MAX_NOA_ATTR_LEN                    31
 #define P2P_IE_HEADER_LEN                       6
@@ -110,6 +111,7 @@ enum p2p_frame_sub_type {
  * @P2P_PUBLIC_ACTION_GAS_INIT_RSP:  gas initial response
  * @P2P_PUBLIC_ACTION_GAS_COMB_REQ:  gas comeback request
  * @P2P_PUBLIC_ACTION_GAS_COMB_RSP:  gas comeback response
+ * @P2P_PUBLIC_ACTION_WNM_BTM_REQ:   bss transition management request
  * @P2P_PUBLIC_ACTION_NOT_SUPPORT:   not support p2p public action frame
  */
 enum p2p_public_action_type {
@@ -126,6 +128,7 @@ enum p2p_public_action_type {
 	P2P_PUBLIC_ACTION_GAS_INIT_RSP,
 	P2P_PUBLIC_ACTION_GAS_COMB_REQ,
 	P2P_PUBLIC_ACTION_GAS_COMB_RSP,
+	P2P_PUBLIC_ACTION_WNM_BTM_REQ,
 	P2P_PUBLIC_ACTION_NOT_SUPPORT,
 };
 
@@ -156,7 +159,7 @@ struct p2p_frame_info {
  * @scan_id:        Scan id given by scan component for this roc req
  * @roc_cookie:     Cookie for remain on channel request
  * @id:             Identifier of this tx context
- * @chan:           Chan for which this tx has been requested
+ * @chan_freq:      Chan frequency for which this tx has been requested
  * @buf:            tx buffer
  * @buf_len:        Length of tx buffer
  * @off_chan:       Is this off channel tx
@@ -173,7 +176,7 @@ struct tx_action_context {
 	int scan_id;
 	uint64_t roc_cookie;
 	int32_t id;
-	uint8_t chan;
+	qdf_freq_t chan_freq;
 	uint8_t *buf;
 	int buf_len;
 	bool off_chan;
@@ -341,7 +344,6 @@ struct tx_action_context *p2p_find_tx_ctx_by_nbuf(
  * @soc: soc object
  * @vdev_id: vdev id
  * @rnd_cookie: random mac mgmt tx cookie
- * @duration: timeout value to flush the addr in target.
  *
  * This function will del the mac addr filter from vdev random mac addr list.
  * If there is no reference to mac addr, it will set a clear timer to flush it
@@ -352,7 +354,26 @@ struct tx_action_context *p2p_find_tx_ctx_by_nbuf(
  */
 QDF_STATUS
 p2p_del_random_mac(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
-		   uint64_t rnd_cookie, uint32_t duration);
+		   uint64_t rnd_cookie);
+
+/**
+ * p2p_random_mac_handle_tx_done() - del mac filter from given vdev rand mac
+ * list when mgmt tx done
+ * @soc: soc object
+ * @vdev_id: vdev id
+ * @rnd_cookie: random mac mgmt tx cookie
+ * @duration: timeout value to flush the addr in target.
+ *
+ * This function will del the mac addr filter from vdev random mac addr list
+ * and also remove the filter from firmware if duration is zero else start
+ * the timer for that duration.
+ *
+ * Return: QDF_STATUS_SUCCESS - del successfully.
+ *		other : failed to del the mac address entry.
+ */
+QDF_STATUS
+p2p_random_mac_handle_tx_done(struct wlan_objmgr_psoc *soc, uint32_t vdev_id,
+			      uint64_t rnd_cookie, uint32_t duration);
 
 /**
  * p2p_check_random_mac() - check random mac addr or not
@@ -412,6 +433,7 @@ void p2p_del_all_rand_mac_soc(struct wlan_objmgr_psoc *soc);
 
 /**
  * p2p_rand_mac_tx() - handle random mac mgmt tx
+ * @pdev: pdev object
  * @tx_action: tx action context
  *
  * This function will check whether need to set random mac tx filter for a
@@ -419,7 +441,8 @@ void p2p_del_all_rand_mac_soc(struct wlan_objmgr_psoc *soc);
  *
  * Return: void
  */
-void p2p_rand_mac_tx(struct  tx_action_context *tx_action);
+void p2p_rand_mac_tx(struct wlan_objmgr_pdev *pdev,
+		     struct tx_action_context *tx_action);
 
 /**
  * p2p_init_random_mac_vdev() - Init random mac data for vdev

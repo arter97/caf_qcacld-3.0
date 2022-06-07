@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -46,6 +46,81 @@
 
 #include "wma_types.h"
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#include "lim_mlo.h"
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_notify_link_info() - notify partner link to update beacon template
+ * @pe_session: pointer to pe session
+ *
+ * Return: void
+ */
+static void lim_notify_link_info(struct pe_session *pe_session)
+{
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint16_t vdev_count = 0;
+	int link;
+
+	if (!pe_session->mlo_link_info.upt_bcn_mlo_ie &&
+	    pe_session->mlo_link_info.mlo_rnr_updated)
+		return;
+	pe_session->mlo_link_info.mlo_rnr_updated = true;
+	pe_debug("mlo notify beacon change info to partner link");
+	lim_get_mlo_vdev_list(pe_session, &vdev_count,
+			      wlan_vdev_list);
+	for (link = 0; link < vdev_count; link++) {
+		if (!wlan_vdev_list[link])
+			continue;
+		if (wlan_vdev_list[link] == pe_session->vdev) {
+			lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
+			continue;
+		}
+		lim_partner_link_info_change(wlan_vdev_list[link]);
+		lim_mlo_release_vdev_ref(wlan_vdev_list[link]);
+	}
+}
+
+/**
+ * lim_update_sch_mlo_partner() - update partner information needed in mlo IE
+ * @mac: pointer to mac
+ * @pe_session: pointer to pe session
+ * @bcn_param: pointer to tpSendbeaconParams
+ *
+ * Return: void
+ */
+static void lim_update_sch_mlo_partner(struct mac_context *mac,
+				       struct pe_session *pe_session,
+				       tpSendbeaconParams bcn_param)
+{
+	int link;
+	struct ml_sch_partner_info *sch_info;
+	struct ml_bcn_partner_info *bcn_info;
+
+	bcn_param->mlo_partner.num_links = mac->sch.sch_mlo_partner.num_links;
+	for (link = 0; link < mac->sch.sch_mlo_partner.num_links; link++) {
+		sch_info = &mac->sch.sch_mlo_partner.partner_info[link];
+		bcn_info = &bcn_param->mlo_partner.partner_info[link];
+		bcn_info->vdev_id = sch_info->vdev_id;
+		bcn_info->beacon_interval = sch_info->beacon_interval;
+		bcn_info->csa_switch_count_offset = sch_info->bcn_csa_cnt_ofst;
+		bcn_info->ext_csa_switch_count_offset =
+					sch_info->bcn_ext_csa_cnt_ofst;
+	}
+}
+#else
+static void lim_notify_link_info(struct pe_session *pe_session)
+{
+}
+
+static void lim_update_sch_mlo_partner(struct mac_context *mac,
+				       struct pe_session *pe_session,
+				       tpSendbeaconParams bcn_param)
+{
+}
+#endif
+
 QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 			       uint16_t size, struct pe_session *pe_session,
 			       enum sir_bcn_update_reason reason)
@@ -86,7 +161,7 @@ QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 		beaconParams->csa_count_offset = mac->sch.csa_count_offset;
 		beaconParams->ecsa_count_offset = mac->sch.ecsa_count_offset;
 	}
-
+	lim_update_sch_mlo_partner(mac, pe_session, beaconParams);
 	beaconParams->vdev_id = pe_session->smeSessionId;
 	beaconParams->reason = reason;
 
@@ -115,27 +190,16 @@ QDF_STATUS sch_send_beacon_req(struct mac_context *mac, uint8_t *beaconPayload,
 	msgQ.bodyptr = beaconParams;
 	msgQ.bodyval = 0;
 
-	/* Keep a copy of recent beacon frame sent */
-
-	/* free previous copy of the beacon */
-	if (pe_session->beacon) {
-		qdf_mem_free(pe_session->beacon);
-	}
-
-	pe_session->bcnLen = 0;
-	pe_session->beacon = NULL;
-
-	pe_session->beacon = qdf_mem_malloc(size);
-	if (pe_session->beacon) {
-		qdf_mem_copy(pe_session->beacon, beaconPayload, size);
-		pe_session->bcnLen = size;
-	}
-
 	MTRACE(mac_trace_msg_tx(mac, pe_session->peSessionId, msgQ.type));
 	retCode = wma_post_ctrl_msg(mac, &msgQ);
 	if (QDF_STATUS_SUCCESS != retCode)
 		pe_err("Posting SEND_BEACON_REQ to HAL failed, reason=%X",
 			retCode);
+
+	if (QDF_IS_STATUS_SUCCESS(retCode)) {
+		if (wlan_vdev_mlme_is_mlo_ap(pe_session->vdev))
+			lim_notify_link_info(pe_session);
+	}
 
 	return retCode;
 }

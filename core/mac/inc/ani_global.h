@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,7 +30,6 @@
 #include "sir_api.h"
 
 #include "csr_api.h"
-#include "sme_ft_api.h"
 #include "csr_support.h"
 #include "sme_internal.h"
 #include "sap_api.h"
@@ -518,6 +517,9 @@ typedef struct sAniSirLim {
 	tCacheParams protStaOverlapCache[LIM_PROT_STA_OVERLAP_CACHE_SIZE];
 	tCacheParams protStaCache[LIM_PROT_STA_CACHE_SIZE];
 
+	/* Peer RSSI value */
+	int8_t bss_rssi;
+
 	/* ASSOC RELATED END */
 
 	/* //////////////////////////////  HT RELATED           ////////////////////////////////////////// */
@@ -667,19 +669,22 @@ typedef struct sRrmContext {
 } tRrmContext, *tpRrmContext;
 
 /**
- * enum auth_tx_ack_status - Indicate TX status of AUTH
- * @LIM_AUTH_ACK_NOT_RCD : Default status while waiting for ack status.
- * @LIM_AUTH_ACK_RCD_SUCCESS : Ack is received.
- * @LIM_AUTH_ACK_RCD_FAILURE : No Ack received.
+ * enum tx_ack_status - Indicate TX status
+ * @LIM_ACK_NOT_RCD: Default status while waiting for ack status.
+ * @LIM_ACK_RCD_SUCCESS: Ack is received.
+ * @LIM_ACK_RCD_FAILURE: No Ack received.
+ * @LIM_TX_FAILED: Failed to TX
  *
  * Indicate if driver is waiting for ACK status of auth or ACK received for AUTH
  * OR NO ACK is received for the auth sent.
  */
-enum auth_tx_ack_status {
-	LIM_AUTH_ACK_NOT_RCD,
-	LIM_AUTH_ACK_RCD_SUCCESS,
-	LIM_AUTH_ACK_RCD_FAILURE,
+enum tx_ack_status {
+	LIM_ACK_NOT_RCD,
+	LIM_ACK_RCD_SUCCESS,
+	LIM_ACK_RCD_FAILURE,
+	LIM_TX_FAILED,
 };
+
 /**
  * struct vdev_type_nss - vdev type nss structure
  * @sta: STA Nss value.
@@ -740,7 +745,6 @@ struct mac_context {
 	struct wlan_mlme_chain_cfg fw_chain_cfg;
 	struct wlan_mlme_cfg *mlme_cfg;
 	tAniSirLim lim;
-	uint8_t nud_fail_behaviour;
 	struct sch_context sch;
 	tAniSirSys sys;
 
@@ -754,7 +758,6 @@ struct mac_context {
 	tRrmContext rrm;
 	uint8_t beacon_offload;
 	bool pmf_offload;
-	bool is_fils_roaming_supported;
 	uint32_t f_sta_miracast_mcc_rest_time_val;
 #ifdef WLAN_FEATURE_EXTWOW_SUPPORT
 	csr_readyToExtWoWCallback readyToExtWoWCallback;
@@ -769,9 +772,11 @@ struct mac_context {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_objmgr_pdev *pdev;
 	void (*chan_info_cb)(struct scan_chan_info *chan_info);
-	enum  country_src reg_hint_src;
+	void (*del_peers_ind_cb)(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id);
 	uint32_t rx_packet_drop_counter;
-	enum auth_tx_ack_status auth_ack_status;
+	enum tx_ack_status auth_ack_status;
+	enum tx_ack_status assoc_ack_status;
 	uint8_t user_configured_nss;
 	uint32_t peer_rssi;
 	uint32_t peer_txrate;
@@ -781,7 +786,6 @@ struct mac_context {
 	/* 11k Offload Support */
 	bool is_11k_offload_supported;
 	uint8_t reject_addba_req;
-	bool usr_cfg_ps_enable;
 	uint16_t usr_cfg_ba_buff_size;
 	bool is_usr_cfg_amsdu_enabled;
 	uint8_t no_ack_policy_cfg[QCA_WLAN_AC_ALL];
@@ -798,7 +802,9 @@ struct mac_context {
 	bool he_om_ctrl_cfg_tx_nsts_set;
 	uint8_t he_om_ctrl_cfg_tx_nsts;
 	bool he_om_ctrl_ul_mu_data_dis;
+	uint8_t usr_cfg_disable_rsp_tx;
 	uint8_t is_usr_cfg_pmf_wep;
+	uint8_t usr_cfg_ru_242_tone_tx;
 #ifdef WLAN_FEATURE_11AX
 	tDot11fIEhe_cap he_cap_2g;
 	tDot11fIEhe_cap he_cap_5g;
@@ -810,6 +816,11 @@ struct mac_context {
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 	struct ani_level_params ani_params;
 #endif
+#ifdef WLAN_FEATURE_11BE
+	tDot11fIEeht_cap eht_cap_2g;
+	tDot11fIEeht_cap eht_cap_5g;
+#endif
+
 };
 
 #ifdef FEATURE_WLAN_TDLS

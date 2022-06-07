@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -72,7 +72,7 @@
 #define WAIT_TIME_TDLS_LINK_ESTABLISH_REQ      1500
 
 /** Maximum time(ms) to wait for tdls mgmt to complete **/
-#define WAIT_TIME_FOR_TDLS_MGMT         11000
+#define WAIT_TIME_FOR_TDLS_MGMT         3000
 
 /** Maximum time(ms) to wait for tdls mgmt to complete **/
 #define WAIT_TIME_FOR_TDLS_USER_CMD     11000
@@ -87,6 +87,11 @@
 #define TDLS_TEARDOWN_PEER_UNSPEC_REASON 26
 
 #define INVALID_TDLS_PEER_INDEX 0xFF
+
+#ifdef WLAN_FEATURE_11AX
+#define MIN_TDLS_HE_CAP_LEN 17
+#define MAX_TDLS_HE_CAP_LEN 29
+#endif
 
 /**
  * enum tdls_add_oper - add peer type
@@ -761,6 +766,37 @@ struct vhtcap {
 	struct vhtmcsinfo supp_mcs;
 };
 
+/**
+ * struct hecap - HE capabilities
+ *
+ * This structure is the "HE capabilities element" as
+ * described in 802.11ax D4.0 section 9.4.2.232.3
+ * @mac_cap_info: MAC capability info
+ * @phycap_info: Phy Capability info
+ */
+#ifdef WLAN_FEATURE_11AX
+struct hecap {
+	uint8_t mac_cap_info[6];
+	uint8_t phycap_info[11];
+	struct {
+		uint16_t rx_he_mcs_map_lt_80;
+		uint16_t tx_he_mcs_map_lt_80;
+		uint16_t rx_he_mcs_map_160;
+		uint16_t tx_he_mcs_map_160;
+		uint16_t rx_he_mcs_map_80_80;
+		uint16_t tx_he_mcs_map_80_80;
+	} he_cap_mcs_info;
+} qdf_packed;
+
+struct hecap_6ghz {
+	/* Minimum MPDU Start Spacing B0..B2
+	 * Maximum A-MPDU Length Exponent B3..B5
+	 * Maximum MPDU Length B6..B7 */
+	uint8_t a_mpdu_params; /* B0..B7 */
+	uint8_t info; /* B8..B15 */
+};
+#endif
+
 struct tdls_update_peer_params {
 	uint8_t peer_addr[QDF_MAC_ADDR_SIZE];
 	uint32_t peer_type;
@@ -773,6 +809,11 @@ struct tdls_update_peer_params {
 	struct htcap_cmn_ie ht_cap;
 	uint8_t vhtcap_present;
 	struct vhtcap vht_cap;
+#ifdef WLAN_FEATURE_11AX
+	uint8_t he_cap_len;
+	struct hecap he_cap;
+	struct hecap_6ghz he_6ghz_cap;
+#endif
 	uint8_t uapsd_queues;
 	uint8_t max_sp;
 	uint8_t supported_channels_len;
@@ -1295,6 +1336,8 @@ struct tdls_send_mgmt_request {
  * @ht_cap: ht capability
  * @vhtcap_present: vht capability present
  * @vht_cap: vht capability
+ * @he_cap_len: he capability length
+ * @he_cap: he capability
  * @uapsd_queues: uapsd queue as sSirMacQosInfoStation
  * @max_sp: maximum service period
  */
@@ -1314,6 +1357,11 @@ struct tdls_add_sta_req {
 	struct htcap_cmn_ie ht_cap;
 	uint8_t vhtcap_present;
 	struct vhtcap vht_cap;
+#ifdef WLAN_FEATURE_11AX
+	uint8_t he_cap_len;
+	struct hecap he_cap;
+	struct hecap_6ghz he_6ghz_cap;
+#endif
 	uint8_t uapsd_queues;
 	uint8_t max_sp;
 	bool is_pmf;
@@ -1335,6 +1383,14 @@ struct tdls_del_sta_req {
 	uint16_t transaction_id;
 	struct qdf_mac_addr bssid;
 	struct qdf_mac_addr peermac;
+};
+
+/**
+ * struct tdls_link_teardown - TDLS link teardown struct
+ * @psoc: soc object
+ */
+struct tdls_link_teardown {
+	struct wlan_objmgr_psoc *psoc;
 };
 
 #endif

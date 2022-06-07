@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -389,6 +389,8 @@ static void tdls_determine_channel_opclass(struct tdls_soc_priv_obj *soc_obj,
 {
 	uint32_t vdev_id;
 	enum QDF_OPMODE opmode;
+	struct wlan_objmgr_pdev *pdev = NULL;
+
 	/*
 	 * If tdls offchannel is not enabled then we provide base channel
 	 * and in that case pass opclass as 0 since opclass is mainly needed
@@ -399,12 +401,12 @@ static void tdls_determine_channel_opclass(struct tdls_soc_priv_obj *soc_obj,
 	      soc_obj->tdls_fw_off_chan_mode != ENABLE_CHANSWITCH) {
 		vdev_id = wlan_vdev_get_id(vdev_obj->vdev);
 		opmode = wlan_vdev_mlme_get_opmode(vdev_obj->vdev);
+		pdev = wlan_vdev_get_pdev(vdev_obj->vdev);
 
-		*channel = wlan_freq_to_chan(
-			policy_mgr_get_channel(
-			soc_obj->soc,
-			policy_mgr_convert_device_mode_to_qdf_type(opmode),
-			&vdev_id));
+		*channel = wlan_reg_freq_to_chan(pdev, policy_mgr_get_channel(
+						 soc_obj->soc,
+						 policy_mgr_convert_device_mode_to_qdf_type(opmode),
+						 &vdev_id));
 		*opclass = 0;
 	} else {
 		*channel = peer->pref_off_chan_num;
@@ -530,14 +532,15 @@ void tdls_extract_peer_state_param(struct tdls_peer_update_state *peer_param,
 	num = 0;
 	for (i = 0; i < peer->supported_channels_len; i++) {
 		chan_id = peer->supported_channels[i];
-		ch_state = wlan_reg_get_channel_state(pdev, chan_id);
+		ch_freq = wlan_reg_legacy_chan_to_freq(pdev, chan_id);
+		ch_state = wlan_reg_get_channel_state_for_freq(pdev, ch_freq);
 
 		if (CHANNEL_STATE_INVALID != ch_state &&
 		    CHANNEL_STATE_DFS != ch_state &&
-		    !wlan_reg_is_dsrc_chan(pdev, chan_id)) {
+		    !wlan_reg_is_dsrc_freq(ch_freq)) {
 			peer_param->peer_cap.peer_chan[num].chan_id = chan_id;
 			peer_param->peer_cap.peer_chan[num].pwr =
-				wlan_reg_get_channel_reg_power(pdev, chan_id);
+				wlan_reg_get_channel_reg_power_for_freq(pdev, ch_freq);
 			peer_param->peer_cap.peer_chan[num].dfs_set = false;
 			peer_param->peer_cap.peer_chanlen++;
 			num++;

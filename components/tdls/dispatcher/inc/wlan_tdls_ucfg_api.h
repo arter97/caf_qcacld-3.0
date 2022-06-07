@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -73,6 +73,41 @@ QDF_STATUS ucfg_tdls_psoc_close(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 				   struct tdls_start_params *req);
+
+#ifdef WLAN_FEATURE_11AX
+/**
+ * ucfg_tdls_update_fw_11ax_support() - Update FW TDLS 11ax capability in TLDS
+ *                                      Component
+ * @psoc: psoc object
+ * @is_fw_tdls_11ax_capable: bool if fw is tdls 11ax capable then it is true
+ *
+ * Return: void
+ */
+void ucfg_tdls_update_fw_11ax_capability(struct wlan_objmgr_psoc *psoc,
+					 bool is_fw_tdls_11ax_capable);
+
+/**
+ * ucfg_tdls_is_fw_11ax_supported() - Get FW TDLS 11ax capability from TLDS
+ *                                    component.
+ * @psoc: psoc object
+ *
+ * Return: true if fw supports tdls 11ax
+ */
+bool ucfg_tdls_is_fw_11ax_capable(struct wlan_objmgr_psoc *psoc);
+
+#else
+static inline
+void ucfg_tdls_update_fw_11ax_capability(struct wlan_objmgr_psoc *psoc,
+					 bool is_fw_tdls_11ax_capable)
+{
+}
+
+static inline
+bool  ucfg_tdls_is_fw_11ax_capable(struct wlan_objmgr_psoc *psoc)
+{
+return false;
+}
+#endif
 
 /**
  * ucfg_tdls_psoc_enable() - TDLS module enable API
@@ -152,12 +187,20 @@ QDF_STATUS ucfg_tdls_send_mgmt_frame(
 QDF_STATUS ucfg_tdls_responder(struct tdls_set_responder_req *msg_req);
 
 /**
- * ucfg_tdls_teardown_links() - teardown all TDLS links
+ * ucfg_tdls_teardown_links() - notify TDLS modules to teardown all TDLS links.
+ * @psoc: psoc object
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_tdls_teardown_links_sync() - teardown all TDLS links.
  * @psoc: psoc object
  *
  * Return: None
  */
-QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc);
+void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc);
 
 /**
  * ucfg_tdls_notify_reset_adapter() - notify reset adapter
@@ -168,22 +211,35 @@ QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS ucfg_tdls_notify_reset_adapter(struct wlan_objmgr_vdev *vdev);
 
 /**
- * ucfg_tdls_notify_sta_connect() - notify sta connect
- * @notify_info: sta notification info
+ * ucfg_tdls_notify_sta_connect() - notify sta connect to TDLS
+ * @vdev_id: pointer to soc object
+ * @tdls_chan_swit_prohibited: indicates channel switch capability
+ * @tdls_prohibited: indicates tdls allowed or not
+ * @vdev: vdev object manager
  *
- * Return: QDF_STATUS
+ * Notify sta connect event to TDLS component
+ *
+ * Return: None
  */
-QDF_STATUS ucfg_tdls_notify_sta_connect(
-			struct tdls_sta_notify_params *notify_info);
+void ucfg_tdls_notify_sta_connect(uint8_t vdev_id,
+				  bool tdls_chan_swit_prohibited,
+				  bool tdls_prohibited,
+				  struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_tdls_notify_sta_disconnect() - notify sta disconnect
- * @notify_info: sta notification info
+ * @vdev_id: pointer to soc object
+ * @lfr_roam: indicate, whether disconnect due to lfr roam
+ * @bool user_disconnect: disconnect from user space
+ * @vdev: vdev object manager
  *
- * Return: QDF_STATUS
+ * Notify sta disconnect event to TDLS component
+ *
+ * Return: None
  */
-QDF_STATUS ucfg_tdls_notify_sta_disconnect(
-			struct tdls_sta_notify_params *notify_info);
+void ucfg_tdls_notify_sta_disconnect(uint8_t vdev_id,
+				     bool lfr_roam, bool user_disconnect,
+				     struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_tdls_set_operating_mode() - set operating mode
@@ -351,6 +407,11 @@ QDF_STATUS ucfg_tdls_teardown_links(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
+void ucfg_tdls_teardown_links_sync(struct wlan_objmgr_psoc *psoc)
+{
+}
+
+static inline
 QDF_STATUS ucfg_tdls_set_rssi(struct wlan_objmgr_vdev *vdev,
 			      uint8_t *mac, int8_t rssi)
 {
@@ -363,11 +424,36 @@ void ucfg_tdls_notify_connect_failure(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
+void ucfg_tdls_notify_sta_connect(uint8_t vdev_id,
+				  bool tdls_chan_swit_prohibited,
+				  bool tdls_prohibited,
+				  struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void ucfg_tdls_notify_sta_disconnect(uint8_t vdev_id,
+				     bool lfr_roam, bool user_disconnect,
+				     struct wlan_objmgr_vdev *vdev)
+{}
+
+static inline
 struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,
 					    wlan_objmgr_ref_dbgid dbg_id)
 {
 	return NULL;
 }
 
+static inline
+void ucfg_tdls_update_fw_11ax_capability(struct wlan_objmgr_psoc *psoc,
+					 bool is_fw_tdls_11ax_capable)
+{
+}
+
+static inline
+bool  ucfg_tdls_is_fw_11ax_capable(struct wlan_objmgr_psoc *psoc)
+{
+return false;
+}
 #endif /* FEATURE_WLAN_TDLS */
 #endif

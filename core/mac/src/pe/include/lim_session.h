@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -19,6 +19,7 @@
 #if !defined(__LIM_SESSION_H)
 #define __LIM_SESSION_H
 
+#include "wlan_cm_public_struct.h"
 /**=========================================================================
 
    \file  lim_session.h
@@ -34,7 +35,6 @@ typedef struct sPowersaveoffloadInfo {
 	uint8_t bcnmiss;
 } tPowersaveoffloadInfo, tpPowersaveoffloadInfo;
 
-#ifdef WLAN_FEATURE_11W
 struct comeback_timer_info {
 	struct mac_context *mac;
 	uint8_t vdev_id;
@@ -42,7 +42,6 @@ struct comeback_timer_info {
 	tLimMlmStates lim_prev_mlm_state;  /* Previous MLM State */
 	tLimMlmStates lim_mlm_state;       /* MLM State */
 };
-#endif /* WLAN_FEATURE_11W */
 /*--------------------------------------------------------------------------
    Include Files
    ------------------------------------------------------------------------*/
@@ -125,6 +124,74 @@ struct obss_detection_cfg {
 #define ADAPTIVE_11R_DATA_LEN      0x04
 #define ADAPTIVE_11R_OUI_DATA     "\x00\x00\x00\x01"
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * struct mlo_link_ie - IE per link to populate mlo ie
+ * @link_ds: DS IE
+ * @link_edca: ecsa IE
+ * @link_wmm_params: wmm params IE
+ * @link_wmm_caps: wmm caps IE
+ * @link_csa: csa IE
+ * @link_ecsa:ecsa IE
+ * @link_swt_time: switch time IE
+ * @link_quiet: quiet IE
+ * @link_ht_cap: ht cap IE
+ * @link_ht_info: ht info IE
+ * @link_cap: link caps IE
+ * @link_ext_cap: link extend cap IE
+ * @link_vht_cap: vht cap IE
+ * @link_vht_op: vht op IE
+ * @link_qcn_ie: qcn IE
+ * @link_he_cap: he cap IE
+ * @link_he_op: he op IE
+ * @link_he_6ghz_band_cap: 6G band cap IE
+ * @link_eht_cap: eht cap IE
+ * @link_eht_op: eht op IE
+ * @max_chan_swt_time: MLOTD
+ * @bss_param_change_cnt: bss param change count
+ */
+struct mlo_link_ie {
+	tDot11fIEDSParams                    link_ds;
+	tDot11fIEEDCAParamSet                link_edca;
+	tDot11fIEWMMParams                   link_wmm_params;
+	tDot11fIEWMMCaps                     link_wmm_caps;
+	tDot11fIEChanSwitchAnn               link_csa;
+	tDot11fIEext_chan_switch_ann         link_ecsa;
+	tDot11fIEmax_chan_switch_time        link_swt_time;
+	tDot11fIEQuiet                       link_quiet;
+	tDot11fIEHTCaps                      link_ht_cap;
+	tDot11fIEHTInfo                      link_ht_info;
+	tDot11fFfCapabilities                link_cap;
+	tDot11fIEExtCap                      link_ext_cap;
+	tDot11fIEVHTCaps                     link_vht_cap;
+	tDot11fIEVHTOperation                link_vht_op;
+	tDot11fIEqcn_ie                      link_qcn_ie;
+	tDot11fIEhe_cap                      link_he_cap;
+	tDot11fIEhe_op                       link_he_op;
+	tDot11fIEhe_6ghz_band_cap            link_he_6ghz_band_cap;
+	tDot11fIEeht_cap                     link_eht_cap;
+	tDot11fIEeht_op                      link_eht_op;
+	uint32_t                             max_chan_swt_time;
+	uint8_t                              bss_param_change_cnt;
+};
+
+/**
+ * struct mlo_link_ie_info - information per link to populate mlo ie
+ * @upt_bcn_mlo_ie: notify partner links to update their mlo ie of bcn temp
+ * @mlo_rnr_updated: link already notified partner link to update rnr
+ * @bss_param_change: bss param changed
+ * @bcn_tmpl_exist: bcn template is generated or not
+ * @link_ie: IEs which will be used for generating partner mlo IE
+ */
+struct mlo_link_ie_info {
+	bool upt_bcn_mlo_ie;
+	bool mlo_rnr_updated;
+	bool bss_param_change;
+	bool bcn_tmpl_exist;
+	struct mlo_link_ie link_ie;
+};
+#endif
+
 /**
  * struct pe_session - per-vdev PE context
  * @available: true if the entry is available, false if it is in use
@@ -136,10 +203,14 @@ struct obss_detection_cfg {
  * @ap_ecsa_wakelock: wakelock to complete CSA operation.
  * @ap_ecsa_runtime_lock: runtime lock to complete SAP CSA operation.
  * to Adaptive 11R network
+ * @prev_auth_seq_num: Sequence number of previously received auth frame to
+ * detect duplicate frames.
+ * @prev_auth_mac_addr: mac_addr of the sta correspond to @prev_auth_seq_num
  */
 struct pe_session {
 	/* To check session table is in use or free */
 	uint8_t available;
+	wlan_cm_id cm_id;
 	uint16_t peSessionId;
 	union {
 		uint8_t smeSessionId;
@@ -304,12 +375,12 @@ struct pe_session {
 	uint8_t limWmeEnabled:1;        /* WME */
 	uint8_t limWsmEnabled:1;        /* WSM */
 	uint8_t limHcfEnabled:1;
-#ifdef WLAN_FEATURE_11W
 	uint8_t limRmfEnabled:1;        /* 11W */
-#endif
 	uint32_t lim11hEnable;
 
 	int8_t maxTxPower;   /* MIN (Regulatory and local power constraint) */
+	int8_t min_11h_pwr;
+	int8_t max_11h_pwr;
 	enum QDF_OPMODE opmode;
 	int8_t txMgmtPower;
 	bool is11Rconnection;
@@ -383,8 +454,6 @@ struct pe_session {
 	  * AP network
 	  */
 	uint32_t peerAIDBitmap[2];
-	bool tdls_prohibited;
-	bool tdls_chan_swit_prohibited;
 	bool tdls_send_set_state_disable;
 #endif
 	bool fWaitForProbeRsp;
@@ -394,8 +463,8 @@ struct pe_session {
 	int8_t rssi;
 #endif
 	uint8_t max_amsdu_num;
-	struct ht_config ht_config;
-	struct sir_vht_config vht_config;
+	struct mlme_ht_capabilities_info ht_config;
+	struct wlan_vht_config vht_config;
 	/*
 	 * Place holder for StartBssReq message
 	 * received by SME state machine
@@ -476,10 +545,8 @@ struct pe_session {
 	/* Fast Transition (FT) */
 	tftPEContext ftPEContext;
 	bool isNonRoamReassoc;
-#ifdef WLAN_FEATURE_11W
 	qdf_mc_timer_t pmf_retry_timer;
 	struct comeback_timer_info pmf_retry_timer_info;
-#endif /* WLAN_FEATURE_11W */
 	uint8_t  is_key_installed;
 	/* timer for resetting protection fileds at regular intervals */
 	qdf_mc_timer_t protection_fields_reset_timer;
@@ -537,6 +604,7 @@ struct pe_session {
 	uint8_t bss_color_changing;
 #endif
 #endif
+
 	struct deauth_retry_params deauth_retry;
 	bool enable_bcast_probe_rsp;
 	uint8_t ht_client_cnt;
@@ -548,6 +616,7 @@ struct pe_session {
 #endif
 	/* previous auth frame's sequence number */
 	uint16_t prev_auth_seq_num;
+	tSirMacAddr prev_auth_mac_addr;
 	struct obss_detection_cfg obss_offload_cfg;
 	struct obss_detection_cfg current_obss_detection;
 	bool is_session_obss_offload_enabled;
@@ -573,6 +642,20 @@ struct pe_session {
 	uint16_t prot_status_code;
 	tSirResultCodes result_code;
 	uint32_t dfs_regdomain;
+	/* AP power type */
+	uint8_t ap_power_type;
+	bool same_ctry_code;  /* If AP Country IE has same country code as */
+	/* STA programmed country */
+	uint8_t ap_power_type_6g;  /* AP power type for 6G (LPI, SP, or VLP) */
+#ifdef WLAN_FEATURE_11BE
+	bool eht_capable;
+	tDot11fIEeht_cap eht_config;
+	tDot11fIEeht_op eht_op;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct mlo_link_ie_info mlo_link_info;
+	struct mlo_partner_info ml_partner_info;
+#endif
+#endif /* WLAN_FEATURE_11BE */
 };
 
 /*-------------------------------------------------------------------------
@@ -613,7 +696,6 @@ static inline void pe_free_dph_node_array_buffer(void)
  * @numSta: number of stations
  * @bssType: bss type of new session to do conditional memory allocation.
  * @vdev_id: vdev_id
- * @opmode: operating mode
  *
  * This function returns the session context and the session ID if the session
  * corresponding to the passed BSSID is found in the PE session table.
@@ -623,7 +705,7 @@ static inline void pe_free_dph_node_array_buffer(void)
 struct pe_session *pe_create_session(struct mac_context *mac,
 				     uint8_t *bssid, uint8_t *sessionId,
 				     uint16_t numSta, enum bss_type bssType,
-				     uint8_t vdev_id, enum QDF_OPMODE opmode);
+				     uint8_t vdev_id);
 
 /**
  * pe_find_session_by_bssid() - looks up the PE session given the BSSID.

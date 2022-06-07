@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -31,6 +31,7 @@
 #include "wlan_policy_mgr_tables_2x2_dbs_i.h"
 #include "wlan_policy_mgr_tables_2x2_5g_1x1_2g.h"
 #include "wlan_policy_mgr_tables_2x2_2g_1x1_5g.h"
+#include "wlan_policy_mgr_tables_2x2_dbs_sbs_i.h"
 #include "wlan_policy_mgr_i.h"
 #include "qdf_types.h"
 #include "qdf_trace.h"
@@ -338,9 +339,17 @@ QDF_STATUS policy_mgr_psoc_open(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 	pm_ctx->sta_ap_intf_check_work_info->psoc = psoc;
-	qdf_create_work(0, &pm_ctx->sta_ap_intf_check_work,
-			policy_mgr_check_sta_ap_concurrent_ch_intf,
-			pm_ctx->sta_ap_intf_check_work_info);
+	pm_ctx->sta_ap_intf_check_work_info->go_plus_go_force_scc.vdev_id =
+						WLAN_UMAC_VDEV_ID_MAX;
+	if (QDF_IS_STATUS_ERROR(qdf_delayed_work_create(
+				&pm_ctx->sta_ap_intf_check_work,
+				policy_mgr_check_sta_ap_concurrent_ch_intf,
+				pm_ctx))) {
+		policy_mgr_err("Failed to create dealyed work queue");
+		qdf_mutex_destroy(&pm_ctx->qdf_conc_list_lock);
+		qdf_mem_free(pm_ctx->sta_ap_intf_check_work_info);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -369,40 +378,12 @@ QDF_STATUS policy_mgr_psoc_close(struct wlan_objmgr_psoc *psoc)
 	}
 
 	if (pm_ctx->sta_ap_intf_check_work_info) {
-		qdf_cancel_work(&pm_ctx->sta_ap_intf_check_work);
+		qdf_delayed_work_destroy(&pm_ctx->sta_ap_intf_check_work);
 		qdf_mem_free(pm_ctx->sta_ap_intf_check_work_info);
 		pm_ctx->sta_ap_intf_check_work_info = NULL;
 	}
 
 	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * policy_mgr_update_5g_scc_prefer() - Update pcl if 5g scc is preferred
- * @psoc: psoc object
- *
- * Return: void
- */
-static void policy_mgr_update_5g_scc_prefer(struct wlan_objmgr_psoc *psoc)
-{
-	enum policy_mgr_con_mode mode;
-
-	for (mode = PM_STA_MODE; mode < PM_MAX_NUM_OF_MODE; mode++) {
-		if (policy_mgr_get_5g_scc_prefer(psoc, mode)) {
-			(*second_connection_pcl_dbs_table)
-				[PM_STA_5_1x1][mode][PM_THROUGHPUT] =
-					PM_SCC_CH_24G;
-			policy_mgr_info("overwrite pm_second_connection_pcl_dbs_2x2_table, index %d mode %d system prefer %d new pcl %d",
-					PM_STA_5_1x1, mode,
-					PM_THROUGHPUT, PM_SCC_CH_24G);
-			(*second_connection_pcl_dbs_table)
-				[PM_STA_5_2x2][mode][PM_THROUGHPUT] =
-					PM_SCC_CH_24G;
-			policy_mgr_info("overwrite pm_second_connection_pcl_dbs_2x2_table, index %d mode %d system prefer %d new pcl %d",
-					PM_STA_5_2x2, mode,
-					PM_THROUGHPUT, PM_SCC_CH_24G);
-		}
-	}
 }
 
 #ifdef FEATURE_NO_DBS_INTRABAND_MCC_SUPPORT
@@ -474,13 +455,6 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		return status;
 	}
 
-	/* init dual_mac_configuration_complete_evt */
-	status = qdf_event_create(&pm_ctx->dual_mac_configuration_complete_evt);
-	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		policy_mgr_err("dual_mac_configuration_complete_evt init failed");
-		return status;
-	}
-
 	status = qdf_event_create(&pm_ctx->opportunistic_update_done_evt);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		policy_mgr_err("opportunistic_update_done_evt init failed");
@@ -514,19 +488,25 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 		policy_mgr_get_current_pref_hw_mode_ptr =
 		policy_mgr_get_current_pref_hw_mode_dbs_1x1;
 
-	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
+	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+	    policy_mgr_is_hw_sbs_capable(psoc))
+		second_connection_pcl_dbs_table =
+		&pm_second_connection_pcl_dbs_sbs_2x2_table;
+	else if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
 	    policy_mgr_is_hw_dbs_required_for_band(psoc,
 						   HW_MODE_MAC_BAND_2G) ||
-	    policy_mgr_is_2x2_1x1_dbs_capable(psoc)) {
+	    policy_mgr_is_2x2_1x1_dbs_capable(psoc))
 		second_connection_pcl_dbs_table =
 		&pm_second_connection_pcl_dbs_2x2_table;
-		policy_mgr_update_5g_scc_prefer(psoc);
-	} else {
+	else
 		second_connection_pcl_dbs_table =
 		&pm_second_connection_pcl_dbs_1x1_table;
-	}
 
-	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
+	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) &&
+	    policy_mgr_is_hw_sbs_capable(psoc))
+		third_connection_pcl_dbs_table =
+		&pm_third_connection_pcl_dbs_sbs_2x2_table;
+	else if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
 	    policy_mgr_is_hw_dbs_required_for_band(psoc,
 						   HW_MODE_MAC_BAND_2G) ||
 	    policy_mgr_is_2x2_1x1_dbs_capable(psoc))
@@ -539,11 +519,17 @@ QDF_STATUS policy_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
 	/* Initialize non-DBS pcl table pointer to particular table*/
 	policy_mgr_init_non_dbs_pcl(psoc);
 
-	if (policy_mgr_is_hw_dbs_2x2_capable(psoc) ||
-	    policy_mgr_is_hw_dbs_required_for_band(psoc,
-						   HW_MODE_MAC_BAND_2G)) {
-		next_action_two_connection_table =
-		&pm_next_action_two_connection_dbs_2x2_table;
+	if (policy_mgr_is_hw_dbs_2x2_capable(psoc)) {
+		if (policy_mgr_is_hw_dbs_required_for_band(psoc,
+							HW_MODE_MAC_BAND_2G)) {
+			next_action_two_connection_table =
+				&pm_next_action_two_connection_dbs_2x2_table;
+			policy_mgr_debug("using hst/hsp policy manager table");
+		} else {
+			next_action_two_connection_table =
+			      &pm_next_action_two_connection_dbs_2x2_table_v2;
+			policy_mgr_debug("using hmt policy manager table");
+		}
 	} else if (policy_mgr_is_2x2_1x1_dbs_capable(psoc)) {
 		next_action_two_connection_table =
 		&pm_next_action_two_connection_dbs_2x2_5g_1x1_2g_table;
@@ -638,18 +624,26 @@ QDF_STATUS policy_mgr_psoc_disable(struct wlan_objmgr_psoc *psoc)
 		QDF_ASSERT(0);
 	}
 
-	/* destroy dual_mac_configuration_complete_evt */
-	if (!QDF_IS_STATUS_SUCCESS(qdf_event_destroy
-		(&pm_ctx->dual_mac_configuration_complete_evt))) {
-		policy_mgr_err("Failed to destroy dual_mac_configuration_complete_evt");
-		status = QDF_STATUS_E_FAILURE;
-		QDF_ASSERT(0);
-	}
-
 	/* deinit pm_conc_connection_list */
 	qdf_mem_zero(pm_conc_connection_list, sizeof(pm_conc_connection_list));
 
 	return status;
+}
+
+QDF_STATUS policy_mgr_register_conc_cb(struct wlan_objmgr_psoc *psoc,
+				struct policy_mgr_conc_cbacks *conc_cbacks)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid Context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pm_ctx->conc_cbacks.connection_info_update =
+					conc_cbacks->connection_info_update;
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS policy_mgr_register_sme_cb(struct wlan_objmgr_psoc *psoc,
@@ -667,16 +661,13 @@ QDF_STATUS policy_mgr_register_sme_cb(struct wlan_objmgr_psoc *psoc,
 		sme_cbacks->sme_get_nss_for_vdev;
 	pm_ctx->sme_cbacks.sme_nss_update_request =
 		sme_cbacks->sme_nss_update_request;
-	pm_ctx->sme_cbacks.sme_pdev_set_hw_mode =
-		sme_cbacks->sme_pdev_set_hw_mode;
+	if (!policy_mgr_is_hwmode_offload_enabled(psoc))
+		pm_ctx->sme_cbacks.sme_pdev_set_hw_mode =
+			sme_cbacks->sme_pdev_set_hw_mode;
 	pm_ctx->sme_cbacks.sme_soc_set_dual_mac_config =
 		sme_cbacks->sme_soc_set_dual_mac_config;
 	pm_ctx->sme_cbacks.sme_change_mcc_beacon_interval =
 		sme_cbacks->sme_change_mcc_beacon_interval;
-	pm_ctx->sme_cbacks.sme_get_ap_channel_from_scan =
-		sme_cbacks->sme_get_ap_channel_from_scan;
-	pm_ctx->sme_cbacks.sme_scan_result_purge =
-		sme_cbacks->sme_scan_result_purge;
 	pm_ctx->sme_cbacks.sme_rso_start_cb =
 		sme_cbacks->sme_rso_start_cb;
 	pm_ctx->sme_cbacks.sme_rso_stop_cb =
@@ -723,6 +714,8 @@ QDF_STATUS policy_mgr_register_hdd_cb(struct wlan_objmgr_psoc *psoc,
 		hdd_cbacks->hdd_get_ap_6ghz_capable;
 	pm_ctx->hdd_cbacks.wlan_hdd_indicate_active_ndp_cnt =
 		hdd_cbacks->wlan_hdd_indicate_active_ndp_cnt;
+	pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params =
+		hdd_cbacks->wlan_get_ap_prefer_conc_ch_params;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -744,6 +737,7 @@ QDF_STATUS policy_mgr_deregister_hdd_cb(struct wlan_objmgr_psoc *psoc)
 	pm_ctx->hdd_cbacks.hdd_is_chan_switch_in_progress = NULL;
 	pm_ctx->hdd_cbacks.hdd_is_cac_in_progress = NULL;
 	pm_ctx->hdd_cbacks.hdd_get_ap_6ghz_capable = NULL;
+	pm_ctx->hdd_cbacks.wlan_get_ap_prefer_conc_ch_params = NULL;
 
 	return QDF_STATUS_SUCCESS;
 }

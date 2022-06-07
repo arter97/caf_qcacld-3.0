@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -60,6 +60,7 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	tpSirMacMgmtHdr mac_hdr;
 	tSchBeaconStruct *bcn_ptr;
 	uint8_t *frame;
+	const uint8_t *owe_transition_ie;
 	uint16_t frame_len;
 
 	mac_ctx->lim.gLimNumBeaconsRcvd++;
@@ -118,11 +119,15 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (session->limMlmState ==
 			eLIM_MLM_WT_JOIN_BEACON_STATE) {
+		owe_transition_ie = wlan_get_vendor_ie_ptr_from_oui(
+					OWE_TRANSITION_OUI_TYPE,
+					OWE_TRANSITION_OUI_SIZE,
+					frame + SIR_MAC_B_PR_SSID_OFFSET,
+					frame_len - SIR_MAC_B_PR_SSID_OFFSET);
 		if (session->connected_akm == ANI_AKM_TYPE_OWE &&
-		    wlan_get_vendor_ie_ptr_from_oui(OWE_TRANSITION_OUI_TYPE,
-						    OWE_TRANSITION_OUI_SIZE,
-						    frame, frame_len)) {
-			pe_debug("Drop OWE rx beacon. Wait for probe for join success");
+		    owe_transition_ie) {
+			pe_debug("vdev:%d Drop OWE rx beacon. Wait for probe for join success",
+				 session->vdev_id);
 			qdf_mem_free(bcn_ptr);
 			return;
 		}
@@ -132,15 +137,18 @@ lim_process_beacon_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			session->beacon = NULL;
 			session->bcnLen = 0;
 		}
-		session->bcnLen = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+
+		mac_ctx->lim.bss_rssi =
+			(int8_t)WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
+		session->bcnLen = WMA_GET_RX_MPDU_LEN(rx_pkt_info);
 		session->beacon = qdf_mem_malloc(session->bcnLen);
 		if (session->beacon)
 			/*
-			 * Store the Beacon/ProbeRsp. This is sent to
+			 * Store the whole Beacon frame. This is sent to
 			 * csr/hdd in join cnf response.
 			 */
 			qdf_mem_copy(session->beacon,
-				WMA_GET_RX_MPDU_DATA(rx_pkt_info),
+				WMA_GET_RX_MAC_HEADER(rx_pkt_info),
 				session->bcnLen);
 
 		lim_check_and_announce_join_success(mac_ctx, bcn_ptr,

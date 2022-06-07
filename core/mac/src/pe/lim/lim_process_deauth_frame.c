@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,6 +38,7 @@
 #include "lim_ser_des_utils.h"
 #include "sch_api.h"
 #include "lim_send_messages.h"
+#include "wlan_connectivity_logging.h"
 
 /**
  * lim_process_deauth_frame
@@ -66,22 +67,18 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 	tpSirMacMgmtHdr pHdr;
 	struct pe_session *pRoamSessionEntry = NULL;
 	uint8_t roamSessionId;
-#ifdef WLAN_FEATURE_11W
 	uint32_t frameLen;
-#endif
 	int32_t frame_rssi;
 
 	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
 
 	pBody = WMA_GET_RX_MPDU_DATA(pRxPacketInfo);
 	frame_rssi = (int32_t)WMA_GET_RX_RSSI_NORMALIZED(pRxPacketInfo);
-#ifdef WLAN_FEATURE_11W
 	frameLen = WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo);
 	if (frameLen < sizeof(reasonCode)) {
 		pe_err("Deauth Frame length invalid %d", frameLen);
 		return ;
 	}
-#endif
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
 	    ((eLIM_SME_WT_DISASSOC_STATE == pe_session->limSmeState) ||
@@ -117,10 +114,10 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 		pe_err("rx frame doesn't have valid a1 address, drop it");
 		return;
 	}
-#ifdef WLAN_FEATURE_11W
 	/* PMF: If this session is a PMF session, then ensure that this frame was protected */
-	if (pe_session->limRmfEnabled
-	    && (WMA_GET_RX_DPU_FEEDBACK(pRxPacketInfo) &
+	if (pe_session->limRmfEnabled &&
+	    pe_session->is_key_installed &&
+	    (WMA_GET_RX_DPU_FEEDBACK(pRxPacketInfo) &
 		DPU_FEEDBACK_UNPROTECTED_ERROR)) {
 		pe_debug("received an unprotected deauth from AP");
 		/*
@@ -144,18 +141,21 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 							pe_session);
 		return;
 	}
-#endif
 
 	/* Get reasonCode from Deauthentication frame body */
 	reasonCode = sir_read_u16(pBody);
 
-	pe_nofl_info("Deauth RX: vdev %d from "QDF_MAC_ADDR_FMT" for "QDF_MAC_ADDR_FMT" RSSI = %d reason %d mlm state = %d, sme state = %d systemrole = %d ",
-		     pe_session->vdev_id, QDF_MAC_ADDR_REF(pHdr->sa),
-		     QDF_MAC_ADDR_REF(pHdr->da), frame_rssi,
-		     reasonCode, pe_session->limMlmState,
-		     pe_session->limSmeState,
-		     GET_LIM_SYSTEM_ROLE(pe_session));
+	pe_nofl_rl_info("Deauth RX: vdev %d from "QDF_MAC_ADDR_FMT" for "QDF_MAC_ADDR_FMT" RSSI = %d reason %d mlm state = %d, sme state = %d systemrole = %d ",
+			pe_session->vdev_id, QDF_MAC_ADDR_REF(pHdr->sa),
+			QDF_MAC_ADDR_REF(pHdr->da), frame_rssi,
+			reasonCode, pe_session->limMlmState,
+			pe_session->limSmeState,
+			GET_LIM_SYSTEM_ROLE(pe_session));
 
+	wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)pHdr,
+				     pe_session->vdev_id, reasonCode,
+				     0, frame_rssi, 0, 0, 0,
+				     WLAN_DEAUTH_RX);
 	lim_diag_event_report(mac, WLAN_PE_DIAG_DEAUTH_FRAME_EVENT,
 		pe_session, 0, reasonCode);
 
@@ -390,6 +390,7 @@ void lim_perform_deauth(struct mac_context *mac_ctx, struct pe_session *pe_sessi
 			if (lim_search_pre_auth_list(mac_ctx, addr))
 				lim_delete_pre_auth_node(mac_ctx, addr);
 
+			lim_stop_pmfcomeback_timer(pe_session);
 			if (pe_session->pLimMlmJoinReq) {
 				qdf_mem_free(pe_session->pLimMlmJoinReq);
 				pe_session->pLimMlmJoinReq = NULL;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -140,12 +140,12 @@ wlan_hdd_arp_offload_info_debugfs(struct hdd_context *hdd_ctx,
 	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 	if (!vdev)
 		return 0;
 
 	status = ucfg_pmo_get_arp_offload_params(vdev, &info);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		ret_val = scnprintf(buf, buf_avail_len,
 				    "\nARP OFFLOAD QUERY FAILED\n");
@@ -235,12 +235,12 @@ wlan_hdd_ns_offload_info_debugfs(struct hdd_context *hdd_ctx,
 	QDF_STATUS status;
 	uint32_t i;
 
-	vdev = hdd_objmgr_get_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
 	if (!vdev)
 		return 0;
 
 	status = ucfg_pmo_get_ns_offload_params(vdev, &info);
-	hdd_objmgr_put_vdev(vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		ret = scnprintf(buf, buf_avail_len,
 				"\nNS OFFLOAD QUERY FAILED\n");
@@ -390,7 +390,7 @@ wlan_hdd_debugfs_update_filters_info(struct hdd_context *hdd_ctx,
 	}
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (hdd_sta_ctx->conn_info.conn_state != eConnectionState_Associated) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		ret_val = scnprintf(buf + len, buf_avail_len - len,
 				    "\nSTA is not connected\n");
 		if (ret_val <= 0)

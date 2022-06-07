@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -333,6 +333,7 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 				   uint32_t session_id, enum sme_ps_cmd command)
 {
 	struct wlan_mlme_powersave *powersave_params;
+	bool usr_cfg_ps_enable;
 
 	QDF_BUG(session_id < WLAN_MAX_VDEVS);
 	if (session_id >= WLAN_MAX_VDEVS)
@@ -345,8 +346,10 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (command == SME_PS_ENABLE && !mac_ctx->usr_cfg_ps_enable) {
-		sme_debug("Cannot initiate PS. PS is disabled by usr(ioctl)");
+	usr_cfg_ps_enable = mlme_get_user_ps(mac_ctx->psoc, session_id);
+	if (command == SME_PS_ENABLE && !usr_cfg_ps_enable) {
+		sme_debug("vdev:%d Cannot initiate PS. PS is disabled by usr(ioctl)",
+			  session_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -354,21 +357,13 @@ QDF_STATUS sme_enable_sta_ps_check(struct mac_context *mac_ctx,
 	 * also if command is power save disable  there is not need to check
 	 * for connected state as firmware can handle this
 	 */
-	if (!csr_is_conn_state_connected_infra(mac_ctx, session_id)) {
-		sme_debug("STA not infra/connected state Session_id: %d",
+	if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id)) {
+		sme_debug("vdev:%d STA not infra/connected state",
 			  session_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	return QDF_STATUS_SUCCESS;
-}
-
-void sme_save_usr_ps_cfg(mac_handle_t mac_handle, bool val)
-{
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-
-	mac_ctx->usr_cfg_ps_enable = val;
-	sme_debug("usr_cfg_ps_enable  %d", val);
 }
 
 /**
@@ -392,7 +387,7 @@ QDF_STATUS sme_ps_enable_disable(mac_handle_t mac_handle, uint32_t session_id,
 		 * But kernel expects return status success even
 		 * in the disconnected state.
 		 */
-		if (!csr_is_conn_state_connected_infra(mac_ctx, session_id))
+		if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id))
 			status = QDF_STATUS_SUCCESS;
 		return status;
 	}
@@ -617,7 +612,6 @@ QDF_STATUS sme_set_ps_host_offload(mac_handle_t mac_handle,
 	struct sir_host_offload_req *request_buf;
 	struct scheduler_msg msg = {0};
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, session_id);
 
 	QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_DEBUG,
 			"%s: IP address = %d.%d.%d.%d", __func__,
@@ -626,18 +620,17 @@ QDF_STATUS sme_set_ps_host_offload(mac_handle_t mac_handle,
 			request->params.hostIpv4Addr[2],
 			request->params.hostIpv4Addr[3]);
 
-	if (!session) {
-		QDF_TRACE(QDF_MODULE_ID_SME, QDF_TRACE_LEVEL_ERROR,
-				"%s: SESSION not Found", __func__);
-		return QDF_STATUS_E_FAILURE;
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("CSR session is invalid");
+		return QDF_STATUS_E_INVAL;
 	}
 
 	request_buf = qdf_mem_malloc(sizeof(struct sir_host_offload_req));
 	if (!request_buf)
 		return QDF_STATUS_E_NOMEM;
 
-	qdf_copy_macaddr(&request->bssid, &session->connectedProfile.bssid);
-
+	wlan_mlme_get_bssid_vdev_id(mac_ctx->pdev, session_id,
+				    &request->bssid);
 	qdf_mem_copy(request_buf, request, sizeof(struct sir_host_offload_req));
 
 	msg.type = WMA_SET_HOST_OFFLOAD;
@@ -675,14 +668,14 @@ QDF_STATUS sme_set_ps_ns_offload(mac_handle_t mac_handle,
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 	struct sir_host_offload_req *request_buf;
 	struct scheduler_msg msg = {0};
-	struct csr_roam_session *session = CSR_GET_SESSION(mac_ctx, session_id);
 
-	if (!session) {
-		sme_err("Session not found");
-		return QDF_STATUS_E_FAILURE;
+	if (!CSR_IS_SESSION_VALID(mac_ctx, session_id)) {
+		sme_err("CSR session is invalid");
+		return QDF_STATUS_E_INVAL;
 	}
 
-	qdf_copy_macaddr(&request->bssid, &session->connectedProfile.bssid);
+	wlan_mlme_get_bssid_vdev_id(mac_ctx->pdev, session_id,
+				    &request->bssid);
 
 	request_buf = qdf_mem_malloc(sizeof(*request_buf));
 	if (!request_buf)
@@ -751,8 +744,11 @@ QDF_STATUS sme_ps_enable_auto_ps_timer(mac_handle_t mac_handle,
 	struct ps_params *ps_param = &ps_global_info->ps_params[session_id];
 	QDF_STATUS qdf_status;
 	QDF_TIMER_STATE cur_state;
+	bool usr_cfg_ps_enable;
 
-	if (!timeout && !mac_ctx->usr_cfg_ps_enable) {
+	usr_cfg_ps_enable =
+		mlme_get_user_ps(mac_ctx->psoc, session_id);
+	if (!timeout && !usr_cfg_ps_enable) {
 		sme_debug("auto_ps_timer called with timeout 0; ignore");
 		return QDF_STATUS_SUCCESS;
 	}
@@ -810,13 +806,12 @@ QDF_STATUS sme_ps_disable_auto_ps_timer(mac_handle_t mac_handle,
 
 QDF_STATUS sme_ps_open(mac_handle_t mac_handle)
 {
-
 	uint32_t i;
-	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
-
-	mac_ctx->usr_cfg_ps_enable = true;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 
 	for (i = 0; i < WLAN_MAX_VDEVS; i++) {
+		mlme_set_user_ps(mac->psoc, i, true);
+
 		if (QDF_STATUS_SUCCESS != sme_ps_open_per_session(mac_handle,
 								  i)) {
 			sme_err("PMC Init Failed for session: %d", i);

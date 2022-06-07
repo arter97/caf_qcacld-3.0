@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,6 +42,8 @@
 #include "lim_send_messages.h"
 #include "rrm_global.h"
 #include "rrm_api.h"
+#include "wlan_lmac_if_def.h"
+#include "wlan_reg_services_api.h"
 
 /* -------------------------------------------------------------------- */
 /**
@@ -243,11 +245,12 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 				     tDot11fLinkMeasurementRequest *pLinkReq,
 				     struct pe_session *pe_session)
 {
-	tSirMacLinkReport LinkReport;
+	tSirMacLinkReport LinkReport = {0};
 	tpSirMacMgmtHdr pHdr;
 	int8_t currentRSSI = 0;
-	struct lim_max_tx_pwr_attr tx_pwr_attr = {0};
 	struct vdev_mlme_obj *mlme_obj;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	uint8_t ap_pwr_constraint = 0;
 
 	pe_debug("Received Link measurement request");
 
@@ -257,32 +260,60 @@ rrm_process_link_measurement_request(struct mac_context *mac,
 	}
 	pHdr = WMA_GET_RX_MAC_HEADER(pRxPacketInfo);
 
-	tx_pwr_attr.reg_max = pe_session->def_max_tx_pwr;
-	tx_pwr_attr.ap_tx_power = pLinkReq->MaxTxPower.maxTxPower;
-
-	LinkReport.txPower = lim_get_max_tx_power(mac, &tx_pwr_attr);
-
-	/** If firmware updated max tx power is non zero, respond to rrm link
-	 *  measurement request with min of firmware updated ap tx power and
-	 *  max power derived from lim_get_max_tx_power API.
-	 */
 	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
-	if (mlme_obj && mlme_obj->mgmt.generic.tx_pwrlimit)
-		LinkReport.txPower = QDF_MIN(LinkReport.txPower,
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (wlan_reg_is_ext_tpc_supported(mac->psoc)) {
+		ap_pwr_constraint = mlme_obj->reg_tpc_obj.ap_constraint_power;
+		mlme_obj->reg_tpc_obj.ap_constraint_power =
+				pLinkReq->MaxTxPower.maxTxPower;
+		lim_calculate_tpc(mac, pe_session, true, 0, false);
+
+		LinkReport.txPower =
+			mlme_obj->reg_tpc_obj.chan_power_info[0].tx_power;
+		if (LinkReport.txPower < MIN_TX_PWR_CAP)
+			LinkReport.txPower = MIN_TX_PWR_CAP;
+		else if (LinkReport.txPower > MAX_TX_PWR_CAP)
+			LinkReport.txPower = MAX_TX_PWR_CAP;
+
+		if (pLinkReq->MaxTxPower.maxTxPower != ap_pwr_constraint) {
+			tx_ops = wlan_reg_get_tx_ops(mac->psoc);
+
+			if (tx_ops->set_tpc_power)
+				tx_ops->set_tpc_power(mac->psoc,
+						      pe_session->vdev_id,
+						      &mlme_obj->reg_tpc_obj);
+		}
+	} else {
+		mlme_obj->reg_tpc_obj.reg_max[0] =
+				pe_session->def_max_tx_pwr;
+		mlme_obj->reg_tpc_obj.ap_constraint_power =
+				pLinkReq->MaxTxPower.maxTxPower;
+
+		LinkReport.txPower = lim_get_max_tx_power(mac, mlme_obj);
+
+		/** If firmware updated max tx power is non zero, respond to
+		 * rrm link  measurement request with min of firmware updated
+		 * ap tx power and max power derived from lim_get_max_tx_power
+		 * API.
+		 */
+		if (mlme_obj && mlme_obj->mgmt.generic.tx_pwrlimit)
+			LinkReport.txPower = QDF_MIN(LinkReport.txPower,
 					mlme_obj->mgmt.generic.tx_pwrlimit);
 
-	if ((LinkReport.txPower != (uint8_t) (pe_session->maxTxPower)) &&
-	    (QDF_STATUS_SUCCESS == rrm_send_set_max_tx_power_req(mac,
-							   LinkReport.txPower,
-							   pe_session))) {
-		pe_warn("maxTx power in link report is not same as local..."
-			" Local: %d Link Request TxPower: %d"
-			" Link Report TxPower: %d",
-			pe_session->maxTxPower, LinkReport.txPower,
-			pLinkReq->MaxTxPower.maxTxPower);
-		pe_session->maxTxPower =
-			LinkReport.txPower;
+		if ((LinkReport.txPower != (uint8_t)pe_session->maxTxPower) &&
+		    (QDF_STATUS_SUCCESS ==
+			rrm_send_set_max_tx_power_req(mac, LinkReport.txPower,
+						      pe_session))) {
+			pe_warn("Local: %d", pe_session->maxTxPower);
+			pe_session->maxTxPower = LinkReport.txPower;
+		}
 	}
+	pe_warn("Link Request Tx Pwr: %d Link Report Tx Pwr: %d",
+		pLinkReq->MaxTxPower.maxTxPower, LinkReport.txPower);
 
 	LinkReport.dialogToken = pLinkReq->DialogToken.token;
 	LinkReport.rxAntenna = 0;
@@ -486,42 +517,26 @@ rrm_process_neighbor_report_req(struct mac_context *mac,
 	return status;
 }
 
-/**
- * rrm_get_country_code_from_connected_profile() - Get country code
- * from connected profile
- * @mac: Mac context
- * @pe_session: pe session
- * @country_code: country code
- *
- * Return: void
- */
-static inline void
-rrm_get_country_code_from_connected_profile(
-				struct mac_context *mac,
-				struct pe_session *pe_session,
-				uint8_t country_code[WNI_CFG_COUNTRY_CODE_LEN])
+void rrm_get_country_code_from_connected_profile(struct mac_context *mac,
+						 uint8_t vdev_id,
+						 uint8_t *country_code)
 {
-	uint8_t id;
-	uint8_t *country;
+	QDF_STATUS status;
 
-	qdf_mem_zero(country_code, sizeof(country_code[0]) *
-					WNI_CFG_COUNTRY_CODE_LEN);
-	if (!pe_session) {
-		pe_err("pe_session is NULL");
-		return;
-	}
-	id = pe_session->smeSessionId;
-	if (!CSR_IS_SESSION_VALID(mac, id)) {
-		pe_err("smeSessionId %d is invalid", id);
-		return;
-	}
-	country =
-		mac->roam.roamSession[id].connectedProfile.country_code;
-	if (country[0])
-		qdf_mem_copy(country_code, country, sizeof(country_code[0]) *
-						WNI_CFG_COUNTRY_CODE_LEN);
-	else
+	status = wlan_cm_get_country_code(mac->pdev, vdev_id, country_code);
+
+	pe_debug("Country info from bcn:%c%c 0x%x", country_code[0],
+		 country_code[1], country_code[2]);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		qdf_mem_zero(country_code, REG_ALPHA2_LEN + 1);
+
+	if (!country_code[0]) {
+		wlan_reg_read_current_country(mac->psoc, country_code);
 		country_code[2] = OP_CLASS_GLOBAL;
+		pe_debug("Current country info %c%c 0x%x", country_code[0],
+			 country_code[1], country_code[2]);
+	}
 }
 
 #define ABS(x)      ((x < 0) ? -x : x)
@@ -696,7 +711,7 @@ rrm_process_beacon_report_req(struct mac_context *mac,
 		return eRRM_FAILURE;
 	}
 
-	rrm_get_country_code_from_connected_profile(mac, pe_session,
+	rrm_get_country_code_from_connected_profile(mac, pe_session->vdev_id,
 						    country);
 	psbrr->channel_info.chan_num =
 		pBeaconReq->measurement_request.Beacon.channel;
@@ -938,6 +953,9 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 	uint16_t offset = 0;
 	uint8_t frag_id = 0;
 	uint8_t num_frames, num_reports_in_frame, final_measurement_index;
+	uint32_t populated_beacon_report_size = 0;
+	uint32_t max_reports_in_frame = 0;
+	uint32_t radio_meas_rpt_size = 0, dot11_meas_rpt_size = 0;
 	bool is_last_measurement_frame;
 
 
@@ -1113,13 +1131,22 @@ rrm_process_beacon_report_xmit(struct mac_context *mac_ctx,
 		pe_debug("TX: [802.11 BCN_RPT] Total reports filled %d, last bcn_rpt ind:%d",
 			 i , curr_req->request.Beacon.last_beacon_report_indication);
 
-		num_frames = i / RADIO_REPORTS_MAX_IN_A_FRAME;
-		if (i % RADIO_REPORTS_MAX_IN_A_FRAME)
+		/* Calculate size of populated beacon reports */
+		radio_meas_rpt_size =  sizeof(tSirMacRadioMeasureReport);
+		populated_beacon_report_size = (i * radio_meas_rpt_size);
+
+		/* Calculate num of mgmt frames to send */
+		num_frames = populated_beacon_report_size / MAX_MGMT_MPDU_LEN;
+		if (populated_beacon_report_size % MAX_MGMT_MPDU_LEN)
 			num_frames++;
+
+		/* Calculate num of maximum mgmt reports per frame */
+		dot11_meas_rpt_size = sizeof(tDot11fRadioMeasurementReport);
+		max_reports_in_frame = MAX_MGMT_MPDU_LEN / dot11_meas_rpt_size;
 
 		for (j = 0; j < num_frames; j++) {
 			num_reports_in_frame = QDF_MIN((i - report_index),
-						RADIO_REPORTS_MAX_IN_A_FRAME);
+						max_reports_in_frame);
 
 			final_measurement_index =
 				mac_ctx->rrm.rrmPEContext.num_active_request;
@@ -1566,13 +1593,11 @@ void rrm_cleanup(struct mac_context *mac, uint8_t idx)
  *
  * Return: None
  */
-void lim_update_rrm_capability(struct mac_context *mac_ctx,
-			       struct join_req *join_req)
+void lim_update_rrm_capability(struct mac_context *mac_ctx)
 {
-	mac_ctx->rrm.rrmPEContext.rrmEnable = join_req->rrm_config.rrm_enabled;
+	mac_ctx->rrm.rrmPEContext.rrmEnable =
+				mac_ctx->rrm.rrmConfig.rrm_enabled;
 	qdf_mem_copy(&mac_ctx->rrm.rrmPEContext.rrmEnabledCaps,
-		     &join_req->rrm_config.rm_capability,
+		     &mac_ctx->rrm.rrmConfig.rm_capability,
 		     RMENABLEDCAP_MAX_LEN);
-
-	return;
 }

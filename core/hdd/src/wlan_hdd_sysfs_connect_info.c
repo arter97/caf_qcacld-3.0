@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -195,14 +195,17 @@ uint8_t *hdd_auth_type_str(uint32_t auth_type)
 		return "OPEN SYSTEM";
 	case eCSR_AUTH_TYPE_SHARED_KEY:
 		return "SHARED KEY";
+	case eCSR_AUTH_TYPE_SAE:
+		return "SAE";
+	case eCSR_AUTH_TYPE_AUTOSWITCH:
+		return "AUTO SWITCH";
 	case eCSR_AUTH_TYPE_WPA:
 		return "WPA";
 	case eCSR_AUTH_TYPE_WPA_PSK:
 		return "WPA PSK";
-	case eCSR_AUTH_TYPE_AUTOSWITCH:
-		return "AUTO SWITCH";
 	case eCSR_AUTH_TYPE_WPA_NONE:
 		return "WPA NONE";
+
 	case eCSR_AUTH_TYPE_RSN:
 		return "RSN";
 	case eCSR_AUTH_TYPE_RSN_PSK:
@@ -211,10 +214,12 @@ uint8_t *hdd_auth_type_str(uint32_t auth_type)
 		return "FT RSN";
 	case eCSR_AUTH_TYPE_FT_RSN_PSK:
 		return "FT RSN PSK";
+#ifdef FEATURE_WLAN_WAPI
 	case eCSR_AUTH_TYPE_WAPI_WAI_CERTIFICATE:
 		return "WAPI WAI CERTIFICATE";
 	case eCSR_AUTH_TYPE_WAPI_WAI_PSK:
 		return "WAPI WAI PSK";
+#endif /* FEATURE_WLAN_WAPI */
 	case eCSR_AUTH_TYPE_CCKM_WPA:
 		return "CCKM WPA";
 	case eCSR_AUTH_TYPE_CCKM_RSN:
@@ -223,6 +228,24 @@ uint8_t *hdd_auth_type_str(uint32_t auth_type)
 		return "RSN PSK SHA256";
 	case eCSR_AUTH_TYPE_RSN_8021X_SHA256:
 		return "RSN 8021X SHA256";
+	case eCSR_AUTH_TYPE_FILS_SHA256:
+		return "FILS SHA256";
+	case eCSR_AUTH_TYPE_FILS_SHA384:
+		return "FILS SHA384";
+	case eCSR_AUTH_TYPE_FT_FILS_SHA256:
+		return "FT FILS SHA256";
+	case eCSR_AUTH_TYPE_FT_FILS_SHA384:
+		return "FT FILS SHA384";
+	case eCSR_AUTH_TYPE_DPP_RSN:
+		return "DPP RSN";
+	case eCSR_AUTH_TYPE_OWE:
+		return "OWE";
+	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA256:
+		return "SUITEB EAP SHA256";
+	case eCSR_AUTH_TYPE_SUITEB_EAP_SHA384:
+		return "SUITEB EAP SHA384";
+	case eCSR_AUTH_TYPE_OSEN:
+		return "OSEN";
 	case eCSR_AUTH_TYPE_FT_SAE:
 		return "FT SAE";
 	case eCSR_AUTH_TYPE_FT_SUITEB_EAP_SHA384:
@@ -262,42 +285,12 @@ uint8_t *hdd_dot11_mode_str(uint32_t dot11mode)
 		return "DOT11 MODE AUTO";
 	case eCSR_CFG_DOT11_MODE_ABG:
 		return "DOT11 MODE 11ABG";
+	case eCSR_CFG_DOT11_MODE_11AX:
+	case eCSR_CFG_DOT11_MODE_11AX_ONLY:
+		return "DOT11_MODE_11AX";
 	}
 
 	return "UNKNOWN";
-}
-
-/**
- * hdd_ch_width_str() - Get string for channel width
- * @ch_width: channel width from connect info
- *
- * Return: User readable string for channel width
- */
-static
-uint8_t *hdd_ch_width_str(enum phy_ch_width ch_width)
-{
-	switch (ch_width) {
-	case CH_WIDTH_20MHZ:
-		return "20MHz";
-	case CH_WIDTH_40MHZ:
-		return "40MHz";
-	case CH_WIDTH_80MHZ:
-		return "80MHz";
-	case CH_WIDTH_160MHZ:
-		return "160MHz";
-	case CH_WIDTH_80P80MHZ:
-		return "(80 + 80)MHz";
-	case CH_WIDTH_5MHZ:
-		return "5MHz";
-	case CH_WIDTH_10MHZ:
-		return "10MHz";
-	case CH_WIDTH_INVALID:
-		/* Fallthrough */
-	case CH_WIDTH_MAX:
-		/* Fallthrough */
-	default:
-		return "UNKNOWN";
-	}
 }
 
 /**
@@ -318,7 +311,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 	int ret_val;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (hdd_sta_ctx->conn_info.conn_state != eConnectionState_Associated) {
+	if (!hdd_cm_is_vdev_associated(adapter)) {
 		ret_val = scnprintf(buf, buf_avail_len,
 				    "\nSTA is not connected\n");
 		if (ret_val >= 0)
@@ -337,7 +330,7 @@ static ssize_t wlan_hdd_connect_info(struct hdd_adapter *adapter, uint8_t *buf,
 		return buf_avail_len;
 	}
 
-	if (hdd_sta_ctx->hdd_reassoc_scenario) {
+	if (hdd_cm_is_vdev_roaming(adapter)) {
 		ret_val = scnprintf(buf + length, buf_avail_len - length,
 				    "Roaming is in progress");
 		if (ret_val <= 0)

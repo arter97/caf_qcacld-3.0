@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -394,6 +394,44 @@
 	"29,1,31,1,36,1,38,1,46,1,47,1,50,1,52,1,53,1,56,1,60,1,61,1", \
 	"Set modulized firmware debug log level")
 
+/*
+ * <ini>
+ * gFwDebugWowModuleLoglevel - modulized firmware wow debug log level
+ * @Min: N/A
+ * @Max: N/A
+ * @Default: N/A
+ *
+ * This ini is used to set modulized firmware wow debug log level.
+ * FW module log level input string format looks like below:
+ * gFwDebugWowModuleLoglevel="<FW Module ID>,<Log Level>,..."
+ * For example:
+ * gFwDebugWowModuleLoglevel="1,0,2,1,3,2,4,3,5,4,6,5,7,6"
+ * The above input string means:
+ * For FW module ID 1 enable log level 0
+ * For FW module ID 2 enable log level 1
+ * For FW module ID 3 enable log level 2
+ * For FW module ID 4 enable log level 3
+ * For FW module ID 5 enable log level 4
+ * For FW module ID 6 enable log level 5
+ * For FW module ID 7 enable log level 6
+ * For valid values of log levels check enum DBGLOG_LOG_LVL and
+ * for valid values of module ids check enum WLAN_MODULE_ID.
+ *
+ * Related: None
+ *
+ * Supported Feature: Debugging
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_FW_WOW_MODULE_LOG_LEVEL CFG_INI_STRING( \
+	"gFwDebugWowModuleLoglevel", \
+	0, \
+	FW_MODULE_LOG_LEVEL_STRING_LENGTH, \
+	"1,3,5,3,18,1,19,3,31,1,36,1,57,3", \
+	"Set modulized firmware wow debug log level")
+
 #ifdef FEATURE_WLAN_RA_FILTERING
 /* <ini>
  * gRAFilterEnable
@@ -501,6 +539,25 @@
 
 #if defined(WLAN_FEATURE_TSF) && defined(WLAN_FEATURE_TSF_PLUS)
 /* <ini>
+ * g_enable_tsf_sync: Enable TSF sync feature
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * Enable/disable periodic sync of TSF with firmware.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_TSF_SYNC_ENABLE CFG_INI_BOOL( \
+		"g_enable_tsf_sync", \
+		0, \
+		"Enable TSF sync feature")
+
+/* <ini>
  * gtsf_ptp_options: TSF Plus feature options
  * @Min: 0
  * @Max: 0xff
@@ -532,7 +589,9 @@
 		CFG_VALUE_OR_DEFAULT, \
 		"TSF Plus feature options")
 
-#define __CFG_SET_TSF_PTP_OPT CFG(CFG_SET_TSF_PTP_OPT)
+#define __CFG_SET_TSF_PTP_OPT \
+		CFG(CFG_SET_TSF_PTP_OPT) \
+		CFG(CFG_TSF_SYNC_ENABLE)
 #else
 #define __CFG_SET_TSF_PTP_OPT
 #endif
@@ -586,25 +645,6 @@
 #else
 #define CFG_FWOL_DHCP
 #endif
-
-/*
- * <ini>
- * gEnableLPRx - Enable/Disable LPRx
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini Enables or disables the LPRx in FW
- *
- * Usage: External
- *
- * </ini>
- */
-
-#define CFG_LPRX CFG_INI_BOOL( \
-		"gEnableLPRx", \
-		1, \
-		"LPRx control")
 
 #ifdef WLAN_FEATURE_SAE
 /*
@@ -730,10 +770,16 @@
 
 /*
  * <ini>
- * g_enable_ilp - Enable/Disable ILP HW Block
- * @Default: 1
+ * g_enable_ilp - ILP HW Block Configuration
+ * @Min: 0
+ * @Max: 3
+ * @Default: 2
  *
- * This ini is used to enable/disable the ILP HW block
+ * This ini is used to configure ILP HW block with various options
+ * 0: disable
+ * 1: perf settings
+ * 2: max power saving
+ * 3: balanced settings
  *
  * Related: none
  *
@@ -744,10 +790,82 @@
  * <ini>
  */
 
-#define CFG_SET_ENABLE_ILP CFG_INI_BOOL( \
+#define CFG_SET_ENABLE_ILP CFG_INI_UINT( \
 		"g_enable_ilp", \
+		0, \
+		3, \
 		1, \
+		CFG_VALUE_OR_DEFAULT, \
 		"ILP configuration")
+
+/*
+ *
+ * <ini>
+ * sap_sho_config - Bitmap to Enable/Disable SAP HW offload
+ * @Min: 0
+ * @Max: 3
+ * @Default: 0
+ *
+ * This INI is used to configure sap hw offload.
+ *
+ * bit-0: enable/disable SHO
+ * bit-1: enable for Sta connected state as well.
+ * bit-2 to bit-31: Reserved
+ *
+ * Related: None
+ *
+ * Supported Feature: SAP
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_SAP_SHO_CONFIG CFG_INI_UINT(\
+		"sap_sho_config", \
+		0, \
+		3, \
+		1, \
+		CFG_VALUE_OR_DEFAULT, \
+		"enable SHO config")
+
+/*
+ * <ini>
+ * g_disable_hw_assist - Flag to disable HW assist feature
+ * @Default: 0
+ *
+ * This ini is used to enable/disable the HW assist feature in FW
+ *
+ * Related: none
+ *
+ * Supported Feature: STA/SAP
+ *
+ * Usage: External
+ *
+ * <ini>
+ */
+
+#define CFG_DISABLE_HW_ASSIST CFG_INI_BOOL( \
+		"g_disable_hw_assist", \
+		0, \
+		"Disable HW assist feature in FW")
+
+/*
+ * <ini>
+ * g_enable_pci_gen - To enable pci gen switch
+ * @Default: 0
+ *
+ * Related: None
+ *
+ * Supported Feature: PCI
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+
+#define CFG_ENABLE_PCI_GEN CFG_INI_BOOL( \
+		"g_enable_pci_gen", \
+		0, \
+		"enable pci gen")
 
 #define CFG_FWOL_GENERIC_ALL \
 	CFG_FWOL_DHCP \
@@ -770,12 +888,15 @@
 	__CFG_SET_TSF_IRQ_HOST_GPIO_PIN \
 	__CFG_SET_TSF_SYNC_HOST_GPIO_PIN \
 	__CFG_SET_TSF_PTP_OPT \
-	CFG(CFG_LPRX) \
 	__CFG_IS_SAE_ENABLED \
 	CFG(CFG_ENABLE_GCMP) \
 	CFG(CFG_TX_SCH_DELAY) \
 	CFG(CFG_ENABLE_SECONDARY_RATE) \
 	CFG(CFG_SET_SAP_XLNA_BYPASS) \
-	CFG(CFG_SET_ENABLE_ILP)
+	CFG(CFG_SET_ENABLE_ILP) \
+	CFG(CFG_ENABLE_FW_WOW_MODULE_LOG_LEVEL) \
+	CFG(CFG_SAP_SHO_CONFIG) \
+	CFG(CFG_DISABLE_HW_ASSIST) \
+	CFG(CFG_ENABLE_PCI_GEN)
 
 #endif

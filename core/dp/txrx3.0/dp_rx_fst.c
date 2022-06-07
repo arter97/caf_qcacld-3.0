@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,9 +24,12 @@
 #include "dp_htt.h"
 #include "dp_internal.h"
 #include "hif.h"
+#include "dp_txrx.h"
 
 /* Timeout in milliseconds to wait for CMEM FST HTT response */
 #define DP_RX_FST_CMEM_RESP_TIMEOUT 2000
+
+#define INVALID_NAPI 0Xff
 
 #ifdef WLAN_SUPPORT_RX_FISA
 void dp_fisa_rx_fst_update_work(void *arg);
@@ -45,7 +48,7 @@ void dp_rx_dump_fisa_table(struct dp_soc *soc)
 
 	if (hif_force_wake_request(((struct hal_soc *)hal_soc_hdl)->hif_handle)) {
 		dp_err("Wake up request failed");
-		qdf_check_state_before_panic();
+		qdf_check_state_before_panic(__func__, __LINE__);
 		return;
 	}
 
@@ -55,7 +58,7 @@ void dp_rx_dump_fisa_table(struct dp_soc *soc)
 
 	if (hif_force_wake_release(((struct hal_soc *)hal_soc_hdl)->hif_handle)) {
 		dp_err("Wake up release failed");
-		qdf_check_state_before_panic();
+		qdf_check_state_before_panic(__func__, __LINE__);
 		return;
 	}
 }
@@ -103,6 +106,14 @@ static void dp_fisa_fse_cache_flush_timer(void *arg)
 	struct fse_cache_flush_history *fse_cache_flush_rec;
 	QDF_STATUS status;
 
+	if (!fisa_hdl)
+		return;
+
+	if (fisa_hdl->pm_suspended) {
+		qdf_atomic_set(&fisa_hdl->fse_cache_flush_posted, 0);
+		return;
+	}
+
 	fse_cache_flush_rec = &fisa_hdl->cache_fl_rec[fse_cache_flush_rec_idx %
 							MAX_FSE_CACHE_FL_HST];
 	fse_cache_flush_rec->timestamp = qdf_get_log_timestamp();
@@ -112,7 +123,6 @@ static void dp_fisa_fse_cache_flush_timer(void *arg)
 	dp_info("FSE cache flush for %d flows",
 		fse_cache_flush_rec->flows_added);
 
-	qdf_atomic_set(&fisa_hdl->fse_cache_flush_posted, 0);
 	status =
 	 dp_rx_flow_send_htt_operation_cmd(soc->pdev_list[0],
 					   DP_HTT_FST_CACHE_INVALIDATE_FULL,
@@ -123,6 +133,8 @@ static void dp_fisa_fse_cache_flush_timer(void *arg)
 		 * Not big impact cache entry gets updated later
 		 */
 	}
+
+	qdf_atomic_set(&fisa_hdl->fse_cache_flush_posted, 0);
 }
 
 /**
@@ -133,13 +145,24 @@ static void dp_fisa_fse_cache_flush_timer(void *arg)
  */
 static void dp_rx_fst_cmem_deinit(struct dp_rx_fst *fst)
 {
+	struct dp_fisa_rx_fst_update_elem *elem;
+	qdf_list_node_t *node;
 	int i;
 
 	qdf_cancel_work(&fst->fst_update_work);
 	qdf_flush_work(&fst->fst_update_work);
 	qdf_flush_workqueue(0, fst->fst_update_wq);
-
 	qdf_destroy_workqueue(0, fst->fst_update_wq);
+
+	qdf_spin_lock_bh(&fst->dp_rx_fst_lock);
+	while (qdf_list_peek_front(&fst->fst_update_list, &node) ==
+	       QDF_STATUS_SUCCESS) {
+		elem = (struct dp_fisa_rx_fst_update_elem *)node;
+		qdf_list_remove_front(&fst->fst_update_list, &node);
+		qdf_mem_free(elem);
+	}
+	qdf_spin_unlock_bh(&fst->dp_rx_fst_lock);
+
 	qdf_list_destroy(&fst->fst_update_list);
 	qdf_event_destroy(&fst->cmem_resp_event);
 
@@ -175,6 +198,55 @@ static QDF_STATUS dp_rx_fst_cmem_init(struct dp_rx_fst *fst)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_SUPPORT_RX_FISA_HIST
+static
+QDF_STATUS dp_rx_sw_ft_hist_init(struct dp_fisa_rx_sw_ft *sw_ft,
+				 uint32_t max_entries,
+				 uint32_t rx_pkt_tlv_size)
+{
+	int i;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+
+	for (i = 0; i < max_entries; i++) {
+		sw_ft[i].pkt_hist.tlv_hist =
+			(uint8_t *)qdf_mem_malloc(rx_pkt_tlv_size *
+						  FISA_FLOW_MAX_AGGR_COUNT);
+		if (!sw_ft[i].pkt_hist.tlv_hist) {
+			dp_err("unable to allocate tlv history");
+			qdf_status = QDF_STATUS_E_NOMEM;
+			break;
+		}
+	}
+	return qdf_status;
+}
+
+static void dp_rx_sw_ft_hist_deinit(struct dp_fisa_rx_sw_ft *sw_ft,
+				    uint32_t max_entries)
+{
+	int i;
+
+	for (i = 0; i < max_entries; i++) {
+		if (sw_ft[i].pkt_hist.tlv_hist)
+			qdf_mem_free(sw_ft[i].pkt_hist.tlv_hist);
+	}
+}
+
+#else
+
+static
+QDF_STATUS dp_rx_sw_ft_hist_init(struct dp_fisa_rx_sw_ft *sw_ft,
+				 uint32_t max_entries,
+				 uint32_t rx_pkt_tlv_size)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static void dp_rx_sw_ft_hist_deinit(struct dp_fisa_rx_sw_ft *sw_ft,
+				    uint32_t max_entries)
+{
+}
+#endif
+
 /**
  * dp_rx_fst_attach() - Initialize Rx FST and setup necessary parameters
  * @soc: SoC handle
@@ -185,8 +257,10 @@ static QDF_STATUS dp_rx_fst_cmem_init(struct dp_rx_fst *fst)
 QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 {
 	struct dp_rx_fst *fst;
+	struct dp_fisa_rx_sw_ft *ft_entry;
 	uint8_t *hash_key;
 	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
+	int i = 0;
 	QDF_STATUS status;
 
 	/* Check if it is enabled in the INI */
@@ -224,11 +298,21 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 	dp_err("FST setup params FT size %d, hash_mask 0x%x, skid_length %d",
 	       fst->max_entries, fst->hash_mask, fst->max_skid_length);
 
-	fst->base = (uint8_t *)qdf_mem_malloc(DP_RX_GET_SW_FT_ENTRY_SIZE *
-					       fst->max_entries);
+	fst->base = (uint8_t *)dp_context_alloc_mem(soc, DP_FISA_RX_FT_TYPE,
+				DP_RX_GET_SW_FT_ENTRY_SIZE * fst->max_entries);
 
 	if (!fst->base)
-		goto out2;
+		goto free_rx_fst;
+
+	ft_entry = (struct dp_fisa_rx_sw_ft *)fst->base;
+
+	for (i = 0; i < fst->max_entries; i++)
+		ft_entry[i].napi_id = INVALID_NAPI;
+
+	status = dp_rx_sw_ft_hist_init(ft_entry, fst->max_entries,
+				       soc->rx_pkt_tlv_size);
+	if (QDF_IS_STATUS_ERROR(status))
+		goto free_hist;
 
 	fst->hal_rx_fst = hal_rx_fst_attach(soc->osdev,
 					    &fst->hal_rx_fst_base_paddr,
@@ -239,7 +323,7 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 		QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_ERROR,
 			  "Rx Hal fst allocation failed, #entries:%d\n",
 			  fst->max_entries);
-		goto out1;
+		goto free_hist;
 	}
 
 	qdf_spinlock_create(&fst->dp_rx_fst_lock);
@@ -255,6 +339,7 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 
 	qdf_atomic_init(&fst->fse_cache_flush_posted);
 
+	fst->fse_cache_flush_allow = true;
 	fst->soc_hdl = soc;
 	soc->rx_fst = fst;
 	soc->fisa_enable = true;
@@ -269,9 +354,11 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 timer_init_fail:
 	qdf_spinlock_destroy(&fst->dp_rx_fst_lock);
 	hal_rx_fst_detach(fst->hal_rx_fst, soc->osdev);
-out1:
-	qdf_mem_free(fst->base);
-out2:
+free_hist:
+	dp_rx_sw_ft_hist_deinit((struct dp_fisa_rx_sw_ft *)fst->base,
+				fst->max_entries);
+	dp_context_free_mem(soc, DP_FISA_RX_FT_TYPE, fst->base);
+free_rx_fst:
 	qdf_mem_free(fst);
 	return QDF_STATUS_E_NOMEM;
 }
@@ -365,7 +452,9 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 		else
 			hal_rx_fst_detach(dp_fst->hal_rx_fst, soc->osdev);
 
-		qdf_mem_free(dp_fst->base);
+		dp_rx_sw_ft_hist_deinit((struct dp_fisa_rx_sw_ft *)dp_fst->base,
+					dp_fst->max_entries);
+		dp_context_free_mem(soc, DP_FISA_RX_FT_TYPE, dp_fst->base);
 		qdf_spinlock_destroy(&dp_fst->dp_rx_fst_lock);
 		qdf_mem_free(dp_fst);
 	}
@@ -395,6 +484,15 @@ void dp_rx_fst_update_cmem_params(struct dp_soc *soc, uint16_t num_entries,
 	qdf_event_set(&fst->cmem_resp_event);
 }
 
+void dp_rx_fst_update_pm_suspend_status(struct dp_soc *soc, bool suspended)
+{
+	struct dp_rx_fst *fst = soc->rx_fst;
+
+	if (!fst)
+		return;
+
+	fst->pm_suspended = suspended;
+}
 #else /* WLAN_SUPPORT_RX_FISA */
 
 #endif /* !WLAN_SUPPORT_RX_FISA */

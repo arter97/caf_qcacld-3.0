@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -50,6 +50,8 @@ typedef void *WMA_HANDLE;
  * @GEN_VDEV_PARAM_RX_AMPDU: Set rx ampdu size
  * @GEN_VDEV_PARAM_TX_AMSDU: Set tx amsdu size
  * @GEN_VDEV_PARAM_RX_AMSDU: Set rx amsdu size
+ * @GEN_PARAM_TSF_AUTO_REPORT_ENABLE: Enable auto report of clock delta change
+ * @GEN_PARAM_TSF_AUTO_REPORT_DISABLE: Disable auto report of clock delta change
  */
 enum GEN_PARAM {
 	GEN_VDEV_PARAM_AMPDU = 0x1,
@@ -62,6 +64,8 @@ enum GEN_PARAM {
 	GEN_VDEV_PARAM_RX_AMPDU,
 	GEN_VDEV_PARAM_TX_AMSDU,
 	GEN_VDEV_PARAM_RX_AMSDU,
+	GEN_PARAM_TSF_AUTO_REPORT_ENABLE,
+	GEN_PARAM_TSF_AUTO_REPORT_DISABLE,
 };
 
 /**
@@ -128,10 +132,6 @@ int wma_rx_ready_event(void *handle, uint8_t *ev, uint32_t len);
 int  wma_rx_service_ready_event(void *handle, uint8_t *ev, uint32_t len);
 
 int wma_rx_service_ready_ext_event(void *handle, uint8_t *ev, uint32_t len);
-
-void wma_setneedshutdown(void);
-
-bool wma_needshutdown(void);
 
 QDF_STATUS wma_wait_for_ready_event(WMA_HANDLE handle);
 
@@ -296,7 +296,7 @@ bool wma_capability_enhanced_mcast_filter(void);
 void wma_process_pdev_hw_mode_trans_ind(void *wma,
 	wmi_pdev_hw_mode_transition_event_fixed_param *fixed_param,
 	wmi_pdev_set_hw_mode_response_vdev_mac_entry *vdev_mac_entry,
-	struct sir_hw_mode_trans_ind *hw_mode_trans_ind);
+	struct cm_hw_mode_trans_ind *hw_mode_trans_ind);
 
 /**
  * wma_set_cts2self_for_p2p_go() - set CTS2SELF command for P2P GO.
@@ -361,6 +361,19 @@ wma_set_tx_rx_aggr_size_per_ac(WMA_HANDLE wma_handle,
 			       uint8_t vdev_id,
 			       struct wlan_mlme_qos *qos_aggr,
 			       wmi_vdev_custom_aggr_type_t aggr_type);
+
+/**
+ * wma_set_sw_retry_threshold() - set sw retry threshold per vdev
+ * @vdev_id: vdev id
+ * @sw_retry_count: sw retry number
+ * @retry_type: SW vdev retry type
+ *
+ * This function sends WMI command to set the sw retry threshold per vdev.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS wma_set_vdev_sw_retry_th(uint8_t vdev_id, uint8_t sw_retry_count,
+				    wmi_vdev_custom_sw_retry_type_t retry_type);
 
 /**
  * wma_set_sw_retry_threshold_per_ac() - set sw retry threshold per AC for tx
@@ -508,6 +521,7 @@ void wma_wmi_stop(void);
  * wma_get_mcs_idx() - get mcs index
  * @raw_rate: raw rate from fw
  * @rate_flags: rate flags
+ * @is_he_mcs_12_13_supported: is he mcs12/13 supported
  * @nss: nss
  * @dcm: dcm
  * @guard_interval: guard interval
@@ -516,6 +530,7 @@ void wma_wmi_stop(void);
  *  Return: mcs index
  */
 uint8_t wma_get_mcs_idx(uint16_t raw_rate, enum tx_rate_info rate_flags,
+			bool is_he_mcs_12_13_supported,
 			uint8_t *nss, uint8_t *dcm,
 			enum txrate_gi *guard_interval,
 			enum tx_rate_info *mcs_rate_flag);
@@ -550,20 +565,6 @@ bool wma_get_channel_switch_in_progress(struct wma_txrx_node *iface);
  */
 QDF_STATUS wma_sta_mlme_vdev_start_continue(struct vdev_mlme_obj *vdev_mlme,
 					    uint16_t data_len, void *data);
-
-/**
- * wma_sta_mlme_vdev_roam_notify() - VDEV roam notify handling
- * @vdev_mlme_obj:  VDEV MLME comp object
- * @data_len: data size
- * @data: event data
- *
- * API invokes VDEV roam event handling
- *
- * Return: SUCCESS on successful completion of roam event handling
- *         FAILURE, if it fails due to any
- */
-QDF_STATUS wma_sta_mlme_vdev_roam_notify(struct vdev_mlme_obj *vdev_mlme,
-					 uint16_t data_len, void *data);
 
 /**
  * wma_ap_mlme_vdev_start_continue() - VDEV start response handling
@@ -806,26 +807,6 @@ int wma_wlm_stats_req(int vdev_id, uint32_t bitmask, uint32_t max_size,
 int wma_wlm_stats_rsp(void *wma_ctx, uint8_t *event, uint32_t len);
 #endif /* FEATURE_WLM_STATS */
 
-#ifndef ROAM_OFFLOAD_V1
-/**
- * wma_update_roam_offload_flag() -  update roam offload flag to fw
- * @wma:     wma handle
- * @params: Roaming enable/disable params
- *
- * Return: none
- */
-void wma_update_roam_offload_flag(void *handle,
-				  struct roam_init_params *params);
-/**
- * wma_set_roam_disable_cfg() - Set roam module disable cfg to fw
- * @wma: wma handle
- * @params: Roaming module enable/disable params
- *
- * Return: none
- */
-void wma_set_roam_disable_cfg(void *handle, struct roam_disable_cfg *params);
-#endif
-
 /**
  * wma_self_peer_create() - create self peer in objmgr
  * @vdev_mlme: vdev mlme component private object
@@ -846,5 +827,15 @@ QDF_STATUS wma_vdev_self_peer_create(struct vdev_mlme_obj *vdev_mlme);
  * Return: None
  */
 void wma_cleanup_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wma_set_wakeup_logs_to_console() - Enable/disable wakeup logs to console
+ * @value: boolean value
+ *
+ * API to enable/disable wow host wakeup event logs to console.
+ *
+ * Return: None
+ */
+void wma_set_wakeup_logs_to_console(bool value);
 
 #endif /* WMA_API_H */

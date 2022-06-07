@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -31,6 +31,10 @@
 /* For WMI_MAX_CHAINS */
 #include "wmi_unified.h"
 
+#ifdef QCA_SUPPORT_MC_CP_STATS
+#include "wlan_cp_stats_public_structs.h"
+#endif
+
 #ifdef WLAN_SUPPORT_TWT
 
 #include <wmi_unified_twt_param.h>
@@ -57,6 +61,7 @@
  * @TYPE_MIB_STATS: MIB stats was requested
  * @TYPE_PEER_STATS_INFO_EXT: peer stats info ext was requested
  * @TYPE_CONGESTION_STATS: congestion stats was requested
+ * @TYPE_BIG_DATA_STATS: big data stats was requested
  */
 enum stats_req_type {
 	TYPE_CONNECTION_TX_POWER = 0,
@@ -65,6 +70,7 @@ enum stats_req_type {
 	TYPE_MIB_STATS,
 	TYPE_PEER_STATS_INFO_EXT,
 	TYPE_CONGESTION_STATS,
+	TYPE_BIG_DATA_STATS,
 	TYPE_MAX,
 };
 
@@ -131,6 +137,8 @@ enum txrate_gi {
  * @pno_complete_wake_up_count: pno complete wakeup count
  * @pno_match_wake_up_count:    pno match wakeup count
  * @oem_response_wake_up_count: oem response wakeup count
+ * @uc_drop_wake_up_count:      local data uc drop wakeup count
+ * @fatal_event_wake_up_count:  fatal event wakeup count
  * @pwr_save_fail_detected:     pwr save fail detected wakeup count
  * @scan_11d                    11d scan wakeup count
  * @mgmt_assoc: association request management frame
@@ -158,6 +166,8 @@ struct wake_lock_stats {
 	uint32_t pno_complete_wake_up_count;
 	uint32_t pno_match_wake_up_count;
 	uint32_t oem_response_wake_up_count;
+	uint32_t uc_drop_wake_up_count;
+	uint32_t fatal_event_wake_up_count;
 	uint32_t pwr_save_fail_detected;
 	uint32_t scan_11d;
 	uint32_t mgmt_assoc;
@@ -173,11 +183,48 @@ struct wake_lock_stats {
 struct stats_event;
 
 /**
+ * struct big_data_stats_event - big data stats event param
+ * @vdev_id:               vdev id
+ * @tsf_out_of_sync:       tsf out of sync
+ * @ani_level:             ani level
+ * @last_data_tx_pwr:  tx pwr last data frm
+ * @target_power_dsss:  tx power dsss
+ * @target_power_ofdm:  target power ofdm
+ * @last_tx_data_rix:     rx lateset data frame
+ * @last_tx_data_rate_kbps: tx latest data frame
+ */
+struct big_data_stats_event {
+	uint32_t vdev_id;
+	uint32_t tsf_out_of_sync;
+	int32_t ani_level;
+	uint32_t last_data_tx_pwr;
+	uint32_t target_power_dsss;
+	uint32_t target_power_ofdm;
+	uint32_t last_tx_data_rix;
+	uint32_t last_tx_data_rate_kbps;
+};
+
+/**
+ * struct medium_assess_data - medium assess data from firmware
+ * @part1_valid: the flag for part1 data
+ * @cycle_count: accumulative cycle count (total time)
+ * @rx_clear_count: accumulative rx clear count (busy time)
+ * @tx_frame_count: accumulative tx frame count (total time)
+ */
+struct medium_assess_data {
+	/* part1 data */
+	uint8_t part1_valid;
+	uint32_t cycle_count;
+	uint32_t rx_clear_count;
+	uint32_t tx_frame_count;
+};
+
+/**
  * struct request_info: details of each request
  * @cookie: identifier for os_if request
  * @u: unified data type for callback to process tx power/peer rssi/
  *     station stats/mib stats/peer stats request when response comes and
- *     notification callback when congestion is detected.
+ *     congestion notification callback.
  * @vdev_id: vdev_id of request
  * @pdev_id: pdev_id of request
  * @peer_mac_addr: peer mac address
@@ -193,7 +240,12 @@ struct request_info {
 					 void *cookie);
 		void (*get_peer_stats_cb)(struct stats_event *ev,
 					  void *cookie);
-		void (*congestion_notif_cb)(uint8_t congestion);
+		void (*congestion_notif_cb)(uint8_t vdev_id,
+					  struct medium_assess_data *data);
+#ifdef WLAN_FEATURE_BIG_DATA_STATS
+		void (*get_big_data_stats_cb)(struct big_data_stats_event *ev,
+					      void *cookie);
+#endif
 	} u;
 	uint32_t vdev_id;
 	uint32_t pdev_id;
@@ -226,30 +278,32 @@ struct cca_stats {
  * @pending: details of pending requests
  * @wow_unspecified_wake_up_count: number of non-wow related wake ups
  * @wow_stats: wake_lock stats for vdev
+ * @big_data_fw_support_enable: big data feature supported by fw or not
  */
 struct psoc_mc_cp_stats {
 	bool is_cp_stats_suspended;
 	struct pending_stats_requests pending;
 	uint32_t wow_unspecified_wake_up_count;
 	struct wake_lock_stats wow_stats;
+#ifdef WLAN_FEATURE_BIG_DATA_STATS
+	bool big_data_fw_support_enable;
+#endif
 };
 
 /**
  * struct pdev_mc_cp_stats: pdev specific stats
  * @max_pwr: max tx power for pdev
- * @congestion: percentage of congestion = (busy_time / total_time) * 100
- * @congestion_threshold: threshold for congestion precentage of pdev
+ * @pdev_id: pdev id
  * @rx_clear_count: accumulative rx clear count (busy time) of pdev
  * @cycle_count: accumulative cycle count (total time) of pdev
+ * @tx_frame_count: accumulative tx frame count (total time) of pdev
  */
 struct pdev_mc_cp_stats {
 	int32_t max_pwr;
-#ifdef WLAN_FEATURE_MEDIUM_ASSESS
-	uint8_t congestion;
-	uint8_t congestion_threshold;
+	uint32_t pdev_id;
 	uint32_t rx_clear_count;
 	uint32_t cycle_count;
-#endif
+	uint32_t tx_frame_count;
 };
 
 /**

@@ -1404,10 +1404,8 @@ QDF_STATUS wma_update_he_ops_ie(tp_wma_handle wma, uint8_t vdev_id,
 	QDF_STATUS ret;
 	uint32_t dword_he_op = 0;
 
-	if (!wma) {
-		wma_err("wrong wma_handle....");
+	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	WMI_HEOPS_COLOR_SET(dword_he_op, he_op->bss_color);
 	WMI_HEOPS_DEFPE_SET(dword_he_op, he_op->default_pe);
@@ -1441,10 +1439,8 @@ void wma_set_he_txbf_params(uint8_t vdev_id, bool su_bfer,
 	QDF_STATUS status;
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 
-	if (!wma) {
-		wma_err("Invalid WMA handle");
+	if (!wma)
 		return;
-	}
 
 	hemu_mode = DOT11AX_HEMU_MODE;
 	hemu_mode |= ((su_bfer << HE_SUBFER) | (su_bfee << HE_SUBFEE) |
@@ -1478,10 +1474,8 @@ QDF_STATUS wma_get_he_capabilities(struct he_capability *he_cap)
 	tp_wma_handle wma_handle;
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
-	if (!wma_handle) {
-		wma_err("Invalid WMA handle");
+	if (!wma_handle)
 		return QDF_STATUS_E_FAILURE;
-	}
 
 	qdf_mem_copy(he_cap->phy_cap,
 		     &wma_handle->he_cap.phy_cap,

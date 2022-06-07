@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -47,14 +47,18 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_ENABLE_STA_CONNECTION_IN_5GHZ);
 	cfg->allow_mcc_go_diff_bi =
 		cfg_get(psoc, CFG_ALLOW_MCC_GO_DIFF_BI);
-	cfg->enable_overlap_chnl =
-		cfg_get(psoc, CFG_ENABLE_OVERLAP_CH);
 	cfg->dual_mac_feature =
 		cfg_get(psoc, CFG_DUAL_MAC_FEATURE_DISABLE);
 	cfg->is_force_1x1_enable =
 		cfg_get(psoc, CFG_FORCE_1X1_FEATURE);
 	cfg->sta_sap_scc_on_dfs_chnl =
 		cfg_get(psoc, CFG_STA_SAP_SCC_ON_DFS_CHAN);
+
+	/*
+	 * Force set sta_sap_scc_on_dfs_chnl on Non-DBS HW so that standalone
+	 * SAP is not allowed on DFS channel on non-DBS HW, Also, force SCC in
+	 * case of STA+SAP
+	 */
 	if (cfg->sta_sap_scc_on_dfs_chnl == 2 &&
 	    !cfg_get(psoc, CFG_ENABLE_DFS_MASTER_CAPABILITY))
 		cfg->sta_sap_scc_on_dfs_chnl = 0;
@@ -67,7 +71,8 @@ static QDF_STATUS policy_mgr_init_cfg(struct wlan_objmgr_psoc *psoc)
 	cfg->mark_indoor_chnl_disable =
 		cfg_get(psoc, CFG_MARK_INDOOR_AS_DISABLE_FEATURE);
 	cfg->go_force_scc = cfg_get(psoc, CFG_P2P_GO_ENABLE_FORCE_SCC);
-	cfg->prefer_5g_scc_to_dbs = cfg_get(psoc, CFG_PREFER_5G_SCC_TO_DBS);
+	cfg->multi_sap_allowed_on_same_band =
+		cfg_get(psoc, CFG_MULTI_SAP_ALLOWED_ON_SAME_BAND);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -181,13 +186,6 @@ ucfg_policy_mgr_get_allow_mcc_go_diff_bi(struct wlan_objmgr_psoc *psoc,
 					 uint8_t *allow_mcc_go_diff_bi)
 {
 	return policy_mgr_get_allow_mcc_go_diff_bi(psoc, allow_mcc_go_diff_bi);
-}
-
-QDF_STATUS
-ucfg_policy_mgr_get_enable_overlap_chnl(struct wlan_objmgr_psoc *psoc,
-					uint8_t *enable_overlap_chnl)
-{
-	return policy_mgr_get_enable_overlap_chnl(psoc, enable_overlap_chnl);
 }
 
 QDF_STATUS ucfg_policy_mgr_get_dual_mac_feature(struct wlan_objmgr_psoc *psoc,

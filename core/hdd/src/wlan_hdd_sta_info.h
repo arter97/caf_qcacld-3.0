@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -107,6 +107,7 @@ enum dhcp_nego_status {
  * @STA_INFO_CLEAR_CACHED_STA_INFO:     Clear the cached sta info
  * @STA_INFO_ATTACH_DETACH:             Station info attach/detach
  * @STA_INFO_SHOW:     Station info show
+ * @STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK: Update rx mcbc stats for IPA case
  *
  */
 /*
@@ -144,6 +145,7 @@ typedef enum {
 	STA_INFO_CLEAR_CACHED_STA_INFO = 27,
 	STA_INFO_ATTACH_DETACH = 28,
 	STA_INFO_SHOW = 29,
+	STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK = 30,
 
 	STA_INFO_ID_MAX,
 } wlan_sta_info_dbgid;
@@ -282,7 +284,7 @@ struct hdd_station_info {
 	uint32_t tx_retry_fw;
 	uint32_t tx_retry_exhaust_fw;
 	uint32_t rx_fcs_count;
-	struct wlan_ies assoc_req_ies;
+	struct element_info assoc_req_ies;
 	qdf_atomic_t ref_cnt;
 	qdf_atomic_t ref_cnt_dbgid[STA_INFO_ID_MAX];
 	unsigned long pending_eap_frm_type;
