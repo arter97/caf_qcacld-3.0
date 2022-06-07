@@ -652,9 +652,7 @@ enum {
 	IEEE80211_PARAM_STA_MAX_CH_CAP             = 607,
 	IEEE80211_PARAM_RAWMODE_OPEN_WAR           = 608,   /* enable/disable rawmode open war */
 	IEEE80211_PARAM_EXTERNAL_AUTH_STATUS       = 609,   /* To indicate exterbal auth status for SAE */
-#if UMAC_SUPPORT_WPA3_STA
 	IEEE80211_PARAM_SAE_AUTH_ATTEMPTS          = 610,   /* To set/get sae maximum auth attempts */
-#endif
 	IEEE80211_PARAM_GET_FREQUENCY              = 612,   /* Get Frequency */
 	IEEE80211_PARAM_GET_OPMODE                 = 616,   /* Get operation mode of VAP*/
 	IEEE80211_PARAM_HE_BSR_SUPPORT             = 617,   /* HE BSR Support */
@@ -2183,10 +2181,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"g_advertise_ap_maxcap",  IEEE80211_PARAM_MAX_CAP_AP, GET_PARAM, 0},
 	{"rawmode_open_war",    IEEE80211_PARAM_RAWMODE_OPEN_WAR, SET_PARAM, 1},
 	{"g_rawmode_open_war",  IEEE80211_PARAM_RAWMODE_OPEN_WAR, GET_PARAM, 0},
-#if UMAC_SUPPORT_WPA3_STA
 	{"set_sae_auth",    IEEE80211_PARAM_SAE_AUTH_ATTEMPTS, SET_PARAM, 1},
 	{"get_sae_auth",	 IEEE80211_PARAM_SAE_AUTH_ATTEMPTS, GET_PARAM, 0},
-#endif /* UMAC_SUPPORT_WPA3_STA */
 	{"he_bsr_supp",         IEEE80211_PARAM_HE_BSR_SUPPORT, SET_PARAM, 1},
 	{"get_he_bsr_supp",     IEEE80211_PARAM_HE_BSR_SUPPORT, GET_PARAM, 0},
 	{"display_me_info",     IEEE80211_PARAM_DUMP_RA_TABLE, GET_PARAM, 0},
