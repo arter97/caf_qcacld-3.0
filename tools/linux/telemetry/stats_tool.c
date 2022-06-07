@@ -2541,6 +2541,7 @@ void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
 		 monitor->mon_link_desc_invalid);
 	STATS_32(stdout, "mon_rx_desc_invalid", monitor->mon_rx_desc_invalid);
 	STATS_32(stdout, "mon_nbuf_sanity_err", monitor->mon_nbuf_sanity_err);
+	STATS_32(stdout, "mpdu_ppdu_id_mismatch_drop", monitor->mpdu_ppdu_id_mismatch_drop);
 	if (str_buf) {
 		uint32_t index = 0;
 
