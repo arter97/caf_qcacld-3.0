@@ -799,7 +799,7 @@ bool reg_is_freq_width_dfs(struct wlan_objmgr_pdev *pdev,
 	if (ch_width == CH_WIDTH_20MHZ)
 		return reg_is_dfs_for_freq(pdev, freq);
 
-	bonded_chan_ptr = reg_get_bonded_chan_entry(freq, ch_width);
+	bonded_chan_ptr = reg_get_bonded_chan_entry(freq, ch_width, 0);
 
 	if (!bonded_chan_ptr)
 		return false;
@@ -899,7 +899,7 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 		bonded_chan_ptr = NULL;
 		bonded_chan_ptr2 = NULL;
 		bonded_chan_ptr =
-		    reg_get_bonded_chan_entry(freq, ch_params->ch_width);
+		    reg_get_bonded_chan_entry(freq, ch_params->ch_width, 0);
 
 		chan_state =
 		    reg_get_5g_chan_state(pdev, freq, ch_params->ch_width,
@@ -928,7 +928,7 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 			break;
 		} else if (ch_params->ch_width >= CH_WIDTH_40MHZ) {
 			bonded_chan_ptr2 =
-				reg_get_bonded_chan_entry(freq, CH_WIDTH_40MHZ);
+				reg_get_bonded_chan_entry(freq, CH_WIDTH_40MHZ, 0);
 
 			if (!bonded_chan_ptr || !bonded_chan_ptr2)
 				goto update_bw;
@@ -957,7 +957,7 @@ update_bw:
 					   ch_params->mhz_freq_seg1);
 
 		bonded_chan_ptr =
-			reg_get_bonded_chan_entry(freq, CH_WIDTH_80MHZ);
+			reg_get_bonded_chan_entry(freq, CH_WIDTH_80MHZ, 0);
 		if (bonded_chan_ptr) {
 			ch_params->mhz_freq_seg0 =
 				(bonded_chan_ptr->start_freq +
