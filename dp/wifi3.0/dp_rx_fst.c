@@ -437,36 +437,6 @@ QDF_STATUS dp_rx_flow_update_fse_stats(struct dp_pdev *pdev, uint32_t flow_id)
 	return QDF_STATUS_SUCCESS;
 }
 
-/* dp_mon_rx_update_rx_flow_tag_stats() - Update a mon flow's statistics
- * @pdev: pdev handle
- * @flow_id: flow index (truncated hash) in the Rx FST
- *
- * Return: Success when flow statistcs is updated, error on failure
- */
-#ifdef QCA_TEST_MON_PF_TAGS_STATS
-QDF_STATUS dp_mon_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev,
-					      uint32_t flow_id)
-{
-	struct dp_rx_fse *fse;
-
-	fse = dp_rx_flow_find_entry_by_flowid(pdev->rx_fst, flow_id);
-
-	if (!fse) {
-		dp_err("Flow not found, flow ID %u", flow_id);
-		return QDF_STATUS_E_NOENT;
-	}
-
-	fse->stats.mon_msdu_count += 1;
-	return QDF_STATUS_SUCCESS;
-}
-#else
-QDF_STATUS dp_mon_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev,
-					      uint32_t flow_id)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 /**
  * dp_rx_flow_get_fse_stats() - Fetch a flow's stats based on DP flow parameter
  * @pdev: pdev handle
@@ -496,6 +466,7 @@ QDF_STATUS dp_rx_flow_get_fse_stats(struct dp_pdev *pdev,
 	}
 
 	stats->msdu_count = fse->stats.msdu_count;
+	stats->mon_msdu_count = fse->stats.mon_msdu_count;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -764,4 +735,36 @@ QDF_STATUS dp_rx_flow_send_fst_fw_setup(struct dp_soc *soc,
 	dp_rx_fst_detach(pdev->soc, pdev);
 	return status;
 }
+
+/** dp_mon_rx_update_rx_flow_tag_stats() - Update a mon flow's statistics
+ * @pdev: pdev handle
+ * @flow_id: flow index (truncated hash) in the Rx FST
+ *
+ * Return: Success when flow statistcs is updated, error on failure
+ */
+#ifdef QCA_TEST_MON_PF_TAGS_STATS
+QDF_STATUS dp_mon_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev,
+					      uint32_t flow_id)
+{
+	struct dp_rx_fse *fse;
+
+	fse = dp_rx_flow_find_entry_by_flowid(pdev->rx_fst, flow_id);
+
+	if (!fse) {
+		dp_err("Flow not found, flow ID %u", flow_id);
+		return QDF_STATUS_E_NOENT;
+	}
+
+	fse->stats.mon_msdu_count += 1;
+	return QDF_STATUS_SUCCESS;
+}
+#else
+QDF_STATUS dp_mon_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev,
+					      uint32_t flow_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+qdf_export_symbol(dp_mon_rx_update_rx_flow_tag_stats);
+
 #endif /* WLAN_SUPPORT_RX_FLOW_TAG */
