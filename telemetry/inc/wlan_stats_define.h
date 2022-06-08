@@ -404,14 +404,6 @@ struct stats_if_jitter_tid_stats {
 
 struct stats_if_sawf_delay_stats {
 	struct stats_if_hist_stats delay_hist;
-	struct {
-		uint32_t sum;
-		uint32_t count;
-	} avg;
-	struct {
-		uint32_t sum;
-		uint32_t count;
-	} win_avgs[STATS_IF_NUM_AVG_WINDOWS];
 	uint8_t cur_win;
 };
 
