@@ -5291,7 +5291,7 @@ QDF_STATUS wlan_stats_get_pdev_stats(struct wlan_objmgr_psoc *psoc,
 			ret = get_basic_pdev_data(psoc, pdev, stats, cfg->feat);
 		else
 			ret = get_basic_pdev_ctrl(pdev, stats, cfg->feat,
-						  !cfg->recursive);
+						  cfg->aggregate);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
@@ -5300,7 +5300,7 @@ QDF_STATUS wlan_stats_get_pdev_stats(struct wlan_objmgr_psoc *psoc,
 						    stats, cfg->feat);
 		else
 			ret = get_advance_pdev_ctrl(pdev, stats, cfg->feat,
-						    !cfg->recursive);
+						    cfg->aggregate);
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
@@ -5309,7 +5309,7 @@ QDF_STATUS wlan_stats_get_pdev_stats(struct wlan_objmgr_psoc *psoc,
 			ret = get_debug_pdev_data(psoc, pdev, stats, cfg->feat);
 		else
 			ret = get_debug_pdev_ctrl(pdev, stats, cfg->feat,
-						  !cfg->recursive);
+						  cfg->aggregate);
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:
@@ -5330,23 +5330,17 @@ QDF_STATUS wlan_stats_get_psoc_stats(struct wlan_objmgr_psoc *psoc,
 	case STATS_LVL_BASIC:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_basic_psoc_data(psoc, stats, cfg->feat);
-		else if (!cfg->recursive)
-			ret = QDF_STATUS_E_INVAL;
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_advance_psoc_data(psoc, stats, cfg->feat);
-		else if (!cfg->recursive)
-			ret = QDF_STATUS_E_INVAL;
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
 	case STATS_LVL_DEBUG:
 		if (cfg->type == STATS_TYPE_DATA)
 			ret = get_debug_psoc_data(psoc, stats, cfg->feat);
-		else if (!cfg->recursive)
-			ret = QDF_STATUS_E_INVAL;
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:
@@ -5355,136 +5349,6 @@ QDF_STATUS wlan_stats_get_psoc_stats(struct wlan_objmgr_psoc *psoc,
 	}
 
 	return ret;
-}
-
-bool wlan_stats_is_recursive_valid(struct stats_config *cfg,
-				   enum stats_object_e obj)
-{
-	bool recursive = false;
-
-	if (!cfg->recursive)
-		return false;
-	if (cfg->feat == STATS_FEAT_FLG_ALL)
-		return true;
-
-	switch (obj) {
-	case STATS_OBJ_AP:
-		if (cfg->type == STATS_TYPE_DATA) {
-			if ((cfg->lvl == STATS_LVL_BASIC) &&
-			    ((cfg->feat & STATS_BASIC_RADIO_DATA_MASK) ||
-			    (cfg->feat & STATS_BASIC_VAP_DATA_MASK) ||
-			    (cfg->feat & STATS_BASIC_STA_DATA_MASK)))
-				recursive = true;
-#if WLAN_ADVANCE_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_ADVANCE) &&
-				 ((cfg->feat & STATS_ADVANCE_RADIO_DATA_MASK) ||
-				 (cfg->feat & STATS_ADVANCE_VAP_DATA_MASK) ||
-				 (cfg->feat & STATS_ADVANCE_STA_DATA_MASK)))
-				recursive = true;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-#if WLAN_DEBUG_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_DEBUG) &&
-				 ((cfg->feat & STATS_DEBUG_RADIO_DATA_MASK) ||
-				 (cfg->feat & STATS_DEBUG_VAP_DATA_MASK) ||
-				 (cfg->feat & STATS_DEBUG_STA_DATA_MASK)))
-				recursive = true;
-#endif /* WLAN_DEBUG_TELEMETRY */
-		} else if (cfg->type == STATS_TYPE_CTRL) {
-			if ((cfg->lvl == STATS_LVL_BASIC) &&
-			    ((cfg->feat & STATS_BASIC_RADIO_CTRL_MASK) ||
-			    (cfg->feat & STATS_BASIC_VAP_CTRL_MASK) ||
-			    (cfg->feat & STATS_BASIC_STA_CTRL_MASK)))
-				recursive = true;
-#if WLAN_ADVANCE_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_ADVANCE) &&
-				 ((cfg->feat & STATS_ADVANCE_RADIO_CTRL_MASK) ||
-				 (cfg->feat & STATS_ADVANCE_VAP_CTRL_MASK) ||
-				 (cfg->feat & STATS_ADVANCE_STA_CTRL_MASK)))
-				recursive = true;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-#if WLAN_DEBUG_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_DEBUG) &&
-				 ((cfg->feat & STATS_DEBUG_RADIO_CTRL_MASK) ||
-				 (cfg->feat & STATS_DEBUG_VAP_CTRL_MASK) ||
-				 (cfg->feat & STATS_DEBUG_STA_CTRL_MASK)))
-				recursive = true;
-#endif /* WLAN_DEBUG_TELEMETRY */
-		}
-		break;
-	case STATS_OBJ_RADIO:
-		if (cfg->type == STATS_TYPE_DATA) {
-			if ((cfg->lvl == STATS_LVL_BASIC) &&
-			    ((cfg->feat & STATS_BASIC_VAP_DATA_MASK) ||
-			    (cfg->feat & STATS_BASIC_STA_DATA_MASK)))
-				recursive = true;
-#if WLAN_ADVANCE_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_ADVANCE) &&
-				 ((cfg->feat & STATS_ADVANCE_VAP_DATA_MASK) ||
-				 (cfg->feat & STATS_ADVANCE_STA_DATA_MASK)))
-				recursive = true;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-#if WLAN_DEBUG_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_DEBUG) &&
-				 ((cfg->feat & STATS_DEBUG_VAP_DATA_MASK) ||
-				 (cfg->feat & STATS_DEBUG_STA_DATA_MASK)))
-				recursive = true;
-#endif /* WLAN_DEBUG_TELEMETRY */
-		} else if (cfg->type == STATS_TYPE_CTRL) {
-			if ((cfg->lvl == STATS_LVL_BASIC) &&
-			    ((cfg->feat & STATS_BASIC_VAP_CTRL_MASK) ||
-			    (cfg->feat & STATS_BASIC_STA_CTRL_MASK)))
-				recursive = true;
-#if WLAN_ADVANCE_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_ADVANCE) &&
-				 ((cfg->feat & STATS_ADVANCE_VAP_CTRL_MASK) ||
-				 (cfg->feat & STATS_ADVANCE_STA_CTRL_MASK)))
-				recursive = true;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-#if WLAN_DEBUG_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_DEBUG) &&
-				 ((cfg->feat & STATS_DEBUG_VAP_CTRL_MASK) ||
-				 (cfg->feat & STATS_DEBUG_STA_CTRL_MASK)))
-				recursive = true;
-#endif /* WLAN_DEBUG_TELEMETRY */
-		}
-		break;
-	case STATS_OBJ_VAP:
-		if (cfg->type == STATS_TYPE_DATA) {
-			if ((cfg->lvl == STATS_LVL_BASIC) &&
-			    (cfg->feat & STATS_BASIC_STA_DATA_MASK))
-				recursive = true;
-#if WLAN_ADVANCE_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_ADVANCE) &&
-				 (cfg->feat & STATS_ADVANCE_STA_DATA_MASK))
-				recursive = true;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-#if WLAN_DEBUG_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_DEBUG) &&
-				 (cfg->feat & STATS_DEBUG_STA_DATA_MASK))
-				recursive = true;
-#endif /* WLAN_DEBUG_TELEMETRY */
-		} else if (cfg->type == STATS_TYPE_CTRL) {
-			if ((cfg->lvl == STATS_LVL_BASIC) &&
-			    (cfg->feat & STATS_BASIC_STA_CTRL_MASK))
-				recursive = true;
-#if WLAN_ADVANCE_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_ADVANCE) &&
-				 (cfg->feat & STATS_ADVANCE_STA_CTRL_MASK))
-				recursive = true;
-#endif /* WLAN_ADVANCE_TELEMETRY */
-#if WLAN_DEBUG_TELEMETRY
-			else if ((cfg->lvl == STATS_LVL_DEBUG) &&
-				 (cfg->feat & STATS_DEBUG_STA_CTRL_MASK))
-				recursive = true;
-#endif /* WLAN_DEBUG_TELEMETRY */
-		}
-		break;
-	case STATS_OBJ_STA:
-	default:
-		recursive = false;
-	}
-
-	return recursive;
 }
 
 void wlan_stats_free_unified_stats(struct unified_stats *stats)
