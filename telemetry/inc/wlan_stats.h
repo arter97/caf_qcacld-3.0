@@ -42,7 +42,13 @@
  **/
 #define DEF_INX(_x) \
 	INX_FEAT_##_x = (QCA_WLAN_VENDOR_ATTR_FEAT_##_x - 1)
-
+/**
+ * QCA_WLAN_VENDOR_ATTR_RECURSIVE attribute is the last attribute
+ * in qca_wlan_vendor_attr_feat. So the Maximum index should hold
+ * the count of feature index.
+ */
+#define DEF_INX_MAX() \
+	INX_FEAT_MAX = (QCA_WLAN_VENDOR_ATTR_RECURSIVE - 1)
 /**
  * This is to get qca_wlan_vendor_attr_feat attributes from feat_index_e.
  * So, the addition of 1 is required to get corresponding attribute.
@@ -78,7 +84,7 @@ enum stats_feat_index_e {
 	DEF_INX(MONITOR),
 	DEF_INX(SAWFDELAY),
 	DEF_INX(SAWFTX),
-	DEF_INX(MAX),
+	DEF_INX_MAX(),
 };
 
 /**
@@ -88,7 +94,7 @@ enum stats_feat_index_e {
  * @lvl:  Requested level of Stats (i.e. Basic, Advance or Debug)
  * @obj:  Requested stats for object (i.e. AP, Radio, Vap or STA)
  * @type:  Requested stats category
- * @aggregate: Aggregate in driver
+ * @recursive:  Flag for Recursiveness of request
  * @serviceid: service id for checking the level of sawf stats
  */
 struct stats_config {
@@ -97,7 +103,7 @@ struct stats_config {
 	enum stats_level_e     lvl;
 	enum stats_object_e    obj;
 	enum stats_type_e      type;
-	bool                   aggregate;
+	bool                   recursive;
 	u_int8_t               serviceid;
 };
 

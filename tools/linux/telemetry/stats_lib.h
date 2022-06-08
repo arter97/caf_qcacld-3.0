@@ -22,6 +22,12 @@
 
 /* Network Interface name length */
 #define IFNAME_LEN                   IFNAMSIZ
+#define MAX_RADIO_NUM                3
+#define MAX_VAP_NUM                  (17 * MAX_RADIO_NUM)
+/* This path is for network interfaces */
+#define PATH_SYSNET_DEV              "/sys/class/net/"
+#define STATS_IF_MCS_VALID           1
+#define STATS_IF_MCS_INVALID         0
 #define STATS_IF_MAX_MCS_STRING_LEN  34
 
 #ifdef WLAN_FEATURE_11BE
@@ -120,6 +126,20 @@ enum stats_if_delay_bucket_index {
 struct stats_if_rate_debug {
 	char mcs_type[STATS_IF_MAX_MCS_STRING_LEN];
 	uint8_t valid;
+};
+
+/**
+ * struct interface_list: Structure to hold interfaces for Driver Communication
+ * @r_count:  Number of Radio Interfaces
+ * @v_count:  Number of Vap Interfaces
+ * @r_names:  All radio interface names
+ * @v_names:  All vap interface names
+ */
+struct interface_list {
+	u_int8_t r_count;
+	u_int8_t v_count;
+	char *r_names[MAX_RADIO_NUM];
+	char *v_names[MAX_VAP_NUM];
 };
 
 /* Basic peer data stats holder */

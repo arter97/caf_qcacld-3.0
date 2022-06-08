@@ -22,14 +22,13 @@
 #include <stats_lib.h>
 
 #define FL "%s(): %d:"
-#define NAME "wifitelemetry:"
 
 #define STATS_ERR(fmt, args...) \
-	fprintf(stderr, NAME "E:" FL ": "fmt, __func__, __LINE__, ## args)
+	fprintf(stderr, FL "stats: Error: "fmt, __func__, __LINE__, ## args)
 #define STATS_WARN(fmt, args...) \
-	fprintf(stdout, NAME "W:" FL ": "fmt, __func__, __LINE__, ## args)
+	fprintf(stdout, FL "stats: Warn: "fmt, __func__, __LINE__, ## args)
 #define STATS_MSG(fmt, args...) \
-	fprintf(stdout, NAME "M:" FL ": "fmt, __func__, __LINE__, ## args)
+	fprintf(stdout, FL "stats: "fmt, __func__, __LINE__, ## args)
 
 #define STATS_PRINT(fmt, args...) \
 	fprintf(stdout, fmt, ## args)
@@ -64,9 +63,6 @@
 #define STATS_IF_NSS_LENGTH   (6 * STATS_IF_SS_COUNT)
 
 #define MAX_STRING_LEN        500
-
-#define STATS_IF_MCS_VALID           1
-#define STATS_IF_MCS_INVALID         0
 
 #ifdef WLAN_FEATURE_11BE
 static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
@@ -2885,6 +2881,143 @@ void print_response(struct reply_buffer *reply)
 	}
 }
 
+static int is_radio_ifname_valid(const char *ifname)
+{
+	int i;
+
+	assert(ifname);
+	/*
+	 * At this step, we only validate if the string makes sense.
+	 * If the interface doesn't actually exist, we'll throw an
+	 * error at the place where we make system calls to try and
+	 * use the interface.
+	 * Reduces the no. of ioctl calls.
+	 */
+	if (strncmp(ifname, "wifi", 4) != 0)
+		return 0;
+	if (!ifname[4] || !isdigit(ifname[4]))
+		return 0;
+	/*
+	 * We don't make any assumptions on max no. of radio interfaces,
+	 * at this step.
+	 */
+	for (i = 5; i < IFNAMSIZ; i++) {
+		if (!ifname[i])
+			break;
+		if (!isdigit(ifname[i]))
+			return 0;
+	}
+
+	return 1;
+}
+
+static int is_vap_ifname_valid(const char *ifname)
+{
+	char path[100];
+	FILE *fp;
+	ssize_t bufsize = sizeof(path);
+
+	assert(ifname);
+
+	if ((strlcpy(path, PATH_SYSNET_DEV, bufsize) >= bufsize) ||
+	    (strlcat(path, ifname, bufsize) >= bufsize) ||
+	    (strlcat(path, "/parent", bufsize) >= bufsize)) {
+		STATS_ERR("Error creating pathname\n");
+		return -EINVAL;
+	}
+	fp = fopen(path, "r");
+	if (fp) {
+		fclose(fp);
+		return 1;
+	}
+
+	return 0;
+}
+
+static void free_interface_list(struct interface_list *if_list)
+{
+	u_int8_t inx = 0;
+
+	for (inx = 0; inx < MAX_RADIO_NUM; inx++) {
+		if (if_list->r_names[inx])
+			free(if_list->r_names[inx]);
+		if_list->r_names[inx] = NULL;
+	}
+	if_list->r_count = 0;
+	for (inx = 0; inx < MAX_VAP_NUM; inx++) {
+		if (if_list->v_names[inx])
+			free(if_list->v_names[inx]);
+		if_list->v_names[inx] = NULL;
+	}
+	if_list->v_count = 0;
+}
+
+static int fetch_all_interfaces(struct interface_list *if_list)
+{
+	char temp_name[IFNAME_LEN] = {'\0'};
+	DIR *dir = NULL;
+	u_int8_t rinx = 0;
+	u_int8_t vinx = 0;
+
+	dir = opendir(PATH_SYSNET_DEV);
+	if (!dir) {
+		perror(PATH_SYSNET_DEV);
+		return -ENOENT;
+	}
+	while (1) {
+		struct dirent *entry;
+		char *d_name;
+
+		entry = readdir(dir);
+		if (!entry)
+			break;
+		d_name = entry->d_name;
+		if (entry->d_type & (DT_DIR | DT_LNK)) {
+			if (strlcpy(temp_name, d_name, IFNAME_LEN) >=
+				    IFNAME_LEN) {
+				STATS_ERR("Unable to fetch interface name\n");
+				closedir(dir);
+				return -EIO;
+			}
+		} else {
+			continue;
+		}
+		if (is_radio_ifname_valid(temp_name)) {
+			if (rinx >= MAX_RADIO_NUM) {
+				STATS_WARN("Radio Interfaces exceeded limit\n");
+				continue;
+			}
+			if_list->r_names[rinx] = (char *)malloc(IFNAME_LEN);
+			if (!if_list->r_names[rinx]) {
+				STATS_ERR("Unable to Allocate Memory!\n");
+				closedir(dir);
+				return -ENOMEM;
+			}
+			strlcpy(if_list->r_names[rinx], temp_name, IFNAME_LEN);
+			rinx++;
+		} else if (is_vap_ifname_valid(temp_name)) {
+			if (vinx >= MAX_VAP_NUM) {
+				STATS_WARN("Vap Interfaces exceeded limit\n");
+				continue;
+			}
+			if_list->v_names[vinx] = (char *)malloc(IFNAME_LEN);
+			if (!if_list->v_names[vinx]) {
+				STATS_ERR("Unable to Allocate Memory!\n");
+				closedir(dir);
+				return -ENOMEM;
+			}
+			strlcpy(if_list->v_names[vinx], temp_name, IFNAME_LEN);
+			vinx++;
+		}
+	}
+
+	closedir(dir);
+	if_list->r_count = rinx;
+	if_list->v_count = vinx;
+
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	struct stats_command cmd;
@@ -2903,14 +3036,17 @@ int main(int argc, char *argv[])
 	u_int8_t is_stamacaddr_set = 0;
 	u_int8_t is_serviceid_set = 0;
 	u_int8_t is_option_selected = 0;
+	u_int8_t inx = 0;
 	bool recursion_temp = false;
-	char feat_flags[128] = {'\0'};
-	char ifname_temp[IFNAME_LEN] = {'\0'};
-	char stamacaddr_temp[USER_MAC_ADDR_LEN] = {'\0'};
+	char feat_flags[128] = {0};
+	char ifname_temp[IFNAME_LEN] = {0};
+	char stamacaddr_temp[USER_MAC_ADDR_LEN] = {0};
 	struct ether_addr *ret_eth_addr = NULL;
+	struct interface_list if_list;
 	u_int8_t servid_temp = 0;
 
 	memset(&cmd, 0, sizeof(struct stats_command));
+	memset(&if_list, 0, sizeof(struct interface_list));
 
 	ret = getopt_long(argc, argv, opt_string, long_opts, &long_index);
 	while (ret != -1) {
@@ -3095,7 +3231,14 @@ int main(int argc, char *argv[])
 	cmd.recursive = recursion_temp;
 	cmd.serviceid = servid_temp;
 
-	strlcpy(cmd.if_name, ifname_temp, IFNAME_LEN);
+	if (ifname_temp[0])
+		strlcpy(cmd.if_name, ifname_temp, IFNAME_LEN);
+	ret = fetch_all_interfaces(&if_list);
+	if (ret < 0) {
+		STATS_ERR("Unbale to fetch Interfaces!\n");
+		free_interface_list(&if_list);
+		return ret;
+	}
 
 	if (stamacaddr_temp[0] != '\0') {
 		ret_eth_addr = ether_aton_r(stamacaddr_temp, &cmd.sta_mac);
@@ -3113,13 +3256,23 @@ int main(int argc, char *argv[])
 	memset(reply, 0, sizeof(struct reply_buffer));
 	cmd.reply = reply;
 
-	ret = libstats_request_handle(&cmd);
+	if ((cmd.obj == STATS_OBJ_AP) && !cmd.if_name[0]) {
+		for (inx = 0; inx < if_list.r_count; inx++) {
+			strlcpy(cmd.if_name, if_list.r_names[inx], IFNAME_LEN);
+			ret = libstats_request_handle(&cmd);
+			if (ret < 0)
+				break;
+		}
+	} else {
+		ret = libstats_request_handle(&cmd);
+	}
 
 	/* Print Output */
 	if (!ret)
 		print_response(cmd.reply);
 
 	/* Cleanup */
+	free_interface_list(&if_list);
 	libstats_free_reply_buffer(&cmd);
 
 	return 0;
