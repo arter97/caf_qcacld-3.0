@@ -163,19 +163,19 @@ QDF_STATUS telemetry_sawf_update_delay(void *telemetry_ctx, uint8_t tid,
 				       uint64_t fail);
 
 /**
- * telemetry_sawf_update_delay_mov_avg - Update sum of delay-stats of
- * all windows in telemetry-agent
+ * telemetry_sawf_update_delay_mvng - Update sum of delay-stats of
+ * a windows to telemetry-agent
  * @telemetry_ctx: opaque telemetry peer ctx
  * @tid: tid no
  * @queue: queue-id
- * @sum_windows: sum of delay-stats for all windows
+ * @sum_windows: sum of delay-stats for a windows
  *
  * Return: QDF_STATUS_SUCCESS on success
  */
-QDF_STATUS telemetry_sawf_update_delay_mov_avg(void *telemetry_ctx,
-					       uint8_t tid,
-					       uint8_t queue,
-					       uint64_t sum_windows);
+QDF_STATUS telemetry_sawf_update_delay_mvng(void *telemetry_ctx,
+					    uint8_t tid,
+					    uint8_t queue,
+					    uint64_t sum_windows);
 
 /**
  * telemetry_sawf_update_msdu_drop - Update msdu-drop stats in

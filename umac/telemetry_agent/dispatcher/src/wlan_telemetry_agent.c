@@ -318,9 +318,9 @@ QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
 
 qdf_export_symbol(telemetry_sawf_set_sla_detect_cfg);
 
-QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
-				     uint8_t queue, uint64_t pass,
-				     uint64_t fail)
+QDF_STATUS telemetry_sawf_update_delay(void *telemetry_ctx, uint8_t tid,
+				       uint8_t queue, uint64_t pass,
+				       uint64_t fail)
 {
 	if (g_agent_ops) {
 		if (g_agent_ops->sawf_push_delay(telemetry_ctx, tid,
@@ -329,12 +329,11 @@ QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+qdf_export_symbol(telemetry_sawf_update_delay);
 
-qdf_export_symbol(telemetry_sawf_push_delay);
-
-QDF_STATUS telemetry_sawf_push_delay_mvng(void *telemetry_ctx,
-					  uint8_t tid, uint8_t queue,
-					  uint64_t sum_windows)
+QDF_STATUS telemetry_sawf_update_delay_mvng(void *telemetry_ctx,
+					    uint8_t tid, uint8_t queue,
+					    uint64_t sum_windows)
 {
 	if (g_agent_ops) {
 		if (g_agent_ops->sawf_push_delay_mvng(telemetry_ctx,
@@ -344,14 +343,13 @@ QDF_STATUS telemetry_sawf_push_delay_mvng(void *telemetry_ctx,
 	}
 	return QDF_STATUS_SUCCESS;
 }
+qdf_export_symbol(telemetry_sawf_update_delay_mvng);
 
-qdf_export_symbol(telemetry_sawf_push_delay_mvng);
-
-QDF_STATUS telemetry_sawf_pull_msdu_drop(void *telemetry_ctx,
-					 uint8_t tid, uint8_t queue,
-					 uint64_t success,
-					 uint64_t failure_drop,
-					 uint64_t failure_ttl)
+QDF_STATUS telemetry_sawf_update_msdu_drop(void *telemetry_ctx,
+					   uint8_t tid, uint8_t queue,
+					   uint64_t success,
+					   uint64_t failure_drop,
+					   uint64_t failure_ttl)
 {
 	if (g_agent_ops) {
 		if (g_agent_ops->sawf_push_msdu_drop(telemetry_ctx, tid,
@@ -363,7 +361,7 @@ QDF_STATUS telemetry_sawf_pull_msdu_drop(void *telemetry_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-qdf_export_symbol(telemetry_sawf_pull_msdu_drop);
+qdf_export_symbol(telemetry_sawf_update_msdu_drop);
 
 QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
 				    uint8_t queue, uint32_t *rate)
@@ -474,34 +472,34 @@ QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
 
 qdf_export_symbol(telemetry_sawf_set_sla_detect_cfg);
 
-QDF_STATUS telemetry_sawf_push_delay(void *telemetry_ctx, uint8_t tid,
-				     uint8_t queue, uint64_t pass,
-				     uint64_t fail)
+QDF_STATUS telemetry_sawf_update_delay(void *telemetry_ctx, uint8_t tid,
+				       uint8_t queue, uint64_t pass,
+				       uint64_t fail)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
-qdf_export_symbol(telemetry_sawf_push_delay);
+qdf_export_symbol(telemetry_sawf_update_delay);
 
-QDF_STATUS telemetry_sawf_push_delay_mvng(void *telemetry_ctx,
-					  uint8_t tid, uint8_t queue,
-					  uint64_t sum_windows)
+QDF_STATUS telemetry_sawf_update_delay_mvng(void *telemetry_ctx,
+					    uint8_t tid, uint8_t queue,
+					    uint64_t sum_windows)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
-qdf_export_symbol(telemetry_sawf_push_delay_mvng);
+qdf_export_symbol(telemetry_sawf_update_delay_mvng);
 
-QDF_STATUS telemetry_sawf_push_msdu_drop(void *telemetry_ctx,
-					 uint8_t tid, uint8_t queue,
-					 uint64_t success,
-					 uint64_t failure_drop,
-					 uint64_t failure_ttl)
+QDF_STATUS telemetry_sawf_update_msdu_drop(void *telemetry_ctx,
+					   uint8_t tid, uint8_t queue,
+					   uint64_t success,
+					   uint64_t failure_drop,
+					   uint64_t failure_ttl)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
-qdf_export_symbol(telemetry_sawf_push_msdu_drop);
+qdf_export_symbol(telemetry_sawf_update_msdu_drop);
 
 QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
 				    uint8_t queue, uint32_t *rate)
