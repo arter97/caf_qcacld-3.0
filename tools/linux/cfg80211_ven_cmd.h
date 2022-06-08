@@ -816,6 +816,7 @@ enum {
         IEEE80211_PARAM_NEIG_RPT          = 777,   /* disable/enable inclusion of Neighbor Report bit in Beacon/Probe-Rsp */
 	IEEE80211_PARAM_VDEV_TSF          = 778,
 	IEEE80211_PARAM_STEALTHDOWN       = 779,  /* Flag to indicate vap down without sending deauth or disassoc */
+	IEEE80211_PARAM_MODE_EXT          = 780,    /* phy mode (11a, 11b, etc.) */
 };
 
 enum {
