@@ -173,6 +173,25 @@ bool wlan_service_id_valid(uint8_t svc_id);
  */
 bool wlan_service_id_configured(uint8_t svc_id);
 
+/* wlan_delay_bound_configured() - Is delay-bound configured
+ *
+ * Is the service ID configured
+ * @svc_id : service-class id
+ *
+ * Return: true or false
+ */
+bool wlan_delay_bound_configured(uint8_t svc_id);
+
+/* wlan_get_svc_class_params() - Get service-class params
+ *
+ * @svc_id : service-class id
+ *
+ * Return: pointer to service-class params
+ * NULL otherwise
+ */
+struct wlan_sawf_scv_class_params *
+wlan_get_svc_class_params(uint8_t svc_id);
+
 /* wlan_print_service_class() - Print service class params
  *
  * Print service class params
