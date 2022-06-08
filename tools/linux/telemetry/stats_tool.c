@@ -531,9 +531,9 @@ void print_basic_sta_data_link(struct basic_peer_data_link *link)
 void print_basic_sta_data_rate(struct basic_peer_data_rate *rate)
 {
 	STATS_32(stdout, "Rx Rate", rate->rx_rate);
-	STATS_32(stdout, "Last Rx Rate", rate->last_rx_rate);
+	STATS_32(stdout, "Avg Rx Rate", rate->last_rx_rate);
 	STATS_32(stdout, "Tx Rate", rate->tx_rate);
-	STATS_32(stdout, "Last Tx Rate", rate->last_tx_rate);
+	STATS_32(stdout, "Avg Tx Rate", rate->last_tx_rate);
 }
 
 void print_basic_sta_ctrl_tx(struct basic_peer_ctrl_tx *tx)
@@ -642,7 +642,6 @@ void print_basic_radio_ctrl_link(struct basic_pdev_ctrl_link *link)
 	STATS_32(stdout, "Channel Tx Power", link->cs_chan_tx_pwr);
 	STATS_16_SIGNED(stdout, "Channel NF", link->cs_chan_nf);
 	STATS_16_SIGNED(stdout, "Channel NF Sec80", link->cs_chan_nf_sec80);
-	STATS_8(stdout, "DCS Total Util", link->dcs_total_util);
 }
 
 void print_basic_ap_data_tx(struct basic_psoc_data_tx *tx)
@@ -784,9 +783,7 @@ void print_advance_sta_data_rate(struct advance_peer_data_rate *rate)
 {
 	print_basic_sta_data_rate(&rate->b_rate);
 	STATS_32(stdout, "Avg ppdu Rx rate(kbps)", rate->rnd_avg_rx_rate);
-	STATS_32(stdout, "Avg ppdu Rx rate", rate->avg_rx_rate);
 	STATS_32(stdout, "Avg ppdu Tx rate(kbps)", rate->rnd_avg_tx_rate);
-	STATS_32(stdout, "Avg ppdu Tx rate", rate->avg_tx_rate);
 }
 
 void print_advance_sta_data_nawds(struct advance_peer_data_nawds *nawds)
@@ -1286,26 +1283,6 @@ void print_advance_radio_ctrl_link(struct advance_pdev_ctrl_link *link)
 	STATS_8(stdout, "DCS Free Medium", link->dcs_free_medium);
 	STATS_8(stdout, "DCS Non-WiFi Utilized", link->dcs_non_wifi_util);
 	STATS_32(stdout, "DCS Under SS Utilized", link->dcs_ss_under_util);
-	STATS_32(stdout, "DCS Secondary 20 Utilized", link->dcs_sec_20_util);
-	STATS_32(stdout, "DCS Secondary 40 Utilized", link->dcs_sec_40_util);
-	STATS_32(stdout, "DCS Secondary 80 Utilized", link->dcs_sec_80_util);
-	STATS_8(stdout, "Rx RSSI (Chain 0) Pri 20", link->rx_rssi_chain0_pri20);
-	STATS_8(stdout, "Rx RSSI (Chain 0) Sec 20", link->rx_rssi_chain0_sec20);
-	STATS_8(stdout, "Rx RSSI (Chain 0) Sec 40", link->rx_rssi_chain0_sec40);
-	STATS_8(stdout, "Rx RSSI (Chain 0) Sec 80", link->rx_rssi_chain0_sec80);
-	STATS_8(stdout, "Rx RSSI (Chain 1) Pri 20", link->rx_rssi_chain1_pri20);
-	STATS_8(stdout, "Rx RSSI (Chain 1) Sec 20", link->rx_rssi_chain1_sec20);
-	STATS_8(stdout, "Rx RSSI (Chain 1) Sec 40", link->rx_rssi_chain1_sec40);
-	STATS_8(stdout, "Rx RSSI (Chain 1) Sec 80", link->rx_rssi_chain1_sec80);
-	STATS_8(stdout, "Rx RSSI (Chain 2) Pri 20", link->rx_rssi_chain2_pri20);
-	STATS_8(stdout, "Rx RSSI (Chain 2) Sec 20", link->rx_rssi_chain2_sec20);
-	STATS_8(stdout, "Rx RSSI (Chain 2) Sec 40", link->rx_rssi_chain2_sec40);
-	STATS_8(stdout, "Rx RSSI (Chain 2) Sec 80", link->rx_rssi_chain2_sec80);
-	STATS_8(stdout, "Rx RSSI (Chain 3) Pri 20", link->rx_rssi_chain3_pri20);
-	STATS_8(stdout, "Rx RSSI (Chain 3) Sec 20", link->rx_rssi_chain3_sec20);
-	STATS_8(stdout, "Rx RSSI (Chain 3) Sec 40", link->rx_rssi_chain3_sec40);
-	STATS_8(stdout, "Rx RSSI (Chain 3) Sec 80", link->rx_rssi_chain3_sec80);
-	STATS_32(stdout, "Tx RSSI", link->cs_tx_rssi);
 }
 
 void print_advance_ap_data_tx(struct advance_psoc_data_tx *tx)

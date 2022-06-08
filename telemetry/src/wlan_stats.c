@@ -111,7 +111,8 @@ static void fill_basic_peer_data_rate(struct basic_peer_data_rate *data,
 	struct cdp_tx_stats *tx = &peer_stats->tx;
 	struct cdp_rx_stats *rx = &peer_stats->rx;
 
-	data->rx_rate = rx->rx_rate;
+	/* rx_rate from cdp_rx_stats gives MCS number. Use last_rx_rate */
+	data->rx_rate = rx->last_rx_rate;
 	data->last_rx_rate = rx->last_rx_rate;
 	data->tx_rate = tx->tx_rate;
 	data->last_tx_rate = tx->last_tx_rate;
@@ -240,7 +241,6 @@ static void fill_basic_pdev_ctrl_link(struct basic_pdev_ctrl_link *ctrl,
 	ctrl->cs_chan_tx_pwr = cp_stats->stats.cs_chan_tx_pwr;
 	ctrl->cs_chan_nf = cp_stats->stats.cs_chan_nf;
 	ctrl->cs_chan_nf_sec80 = cp_stats->stats.cs_chan_nf_sec80;
-	ctrl->dcs_total_util = cp_stats->stats.chan_stats.dcs_total_util;
 }
 
 static void fill_basic_psoc_data_tx(struct basic_psoc_data_tx *data,
@@ -1648,9 +1648,7 @@ static QDF_STATUS get_advance_peer_data_rate(struct unified_stats *stats,
 	fill_basic_peer_data_rate(&data->b_rate, peer_stats);
 
 	data->rnd_avg_rx_rate = rx->rnd_avg_rx_rate;
-	data->avg_rx_rate = rx->avg_rx_rate;
 	data->rnd_avg_tx_rate = tx->rnd_avg_tx_rate;
-	data->avg_tx_rate = tx->avg_tx_rate;
 
 	stats->feat[INX_FEAT_RATE] = data;
 	stats->size[INX_FEAT_RATE] = sizeof(struct advance_peer_data_rate);
@@ -2933,42 +2931,6 @@ static QDF_STATUS get_advance_pdev_ctrl_link(struct unified_stats *stats,
 	ctrl->dcs_free_medium = cp_stats->stats.chan_stats.dcs_free_medium;
 	ctrl->dcs_non_wifi_util = cp_stats->stats.chan_stats.dcs_non_wifi_util;
 	ctrl->dcs_ss_under_util = cp_stats->stats.chan_stats.dcs_ss_under_util;
-	ctrl->dcs_sec_20_util = cp_stats->stats.chan_stats.dcs_sec_20_util;
-	ctrl->dcs_sec_40_util = cp_stats->stats.chan_stats.dcs_sec_40_util;
-	ctrl->dcs_sec_80_util = cp_stats->stats.chan_stats.dcs_sec_80_util;
-	ctrl->cs_tx_rssi = cp_stats->stats.cs_tx_rssi;
-	ctrl->rx_rssi_chain0_pri20 =
-		cp_stats->stats.cs_rx_rssi_chain0.rx_rssi_pri20;
-	ctrl->rx_rssi_chain0_sec20 =
-		cp_stats->stats.cs_rx_rssi_chain0.rx_rssi_sec20;
-	ctrl->rx_rssi_chain0_sec40 =
-		cp_stats->stats.cs_rx_rssi_chain0.rx_rssi_sec40;
-	ctrl->rx_rssi_chain0_sec80 =
-		cp_stats->stats.cs_rx_rssi_chain0.rx_rssi_sec80;
-	ctrl->rx_rssi_chain1_pri20 =
-		cp_stats->stats.cs_rx_rssi_chain1.rx_rssi_pri20;
-	ctrl->rx_rssi_chain1_sec20 =
-		cp_stats->stats.cs_rx_rssi_chain1.rx_rssi_sec20;
-	ctrl->rx_rssi_chain1_sec40 =
-		cp_stats->stats.cs_rx_rssi_chain1.rx_rssi_sec40;
-	ctrl->rx_rssi_chain1_sec80 =
-		cp_stats->stats.cs_rx_rssi_chain1.rx_rssi_sec80;
-	ctrl->rx_rssi_chain2_pri20 =
-		cp_stats->stats.cs_rx_rssi_chain2.rx_rssi_pri20;
-	ctrl->rx_rssi_chain2_sec20 =
-		cp_stats->stats.cs_rx_rssi_chain2.rx_rssi_sec20;
-	ctrl->rx_rssi_chain2_sec40 =
-		cp_stats->stats.cs_rx_rssi_chain2.rx_rssi_sec40;
-	ctrl->rx_rssi_chain2_sec80 =
-		cp_stats->stats.cs_rx_rssi_chain2.rx_rssi_sec80;
-	ctrl->rx_rssi_chain3_pri20 =
-		cp_stats->stats.cs_rx_rssi_chain3.rx_rssi_pri20;
-	ctrl->rx_rssi_chain3_sec20 =
-		cp_stats->stats.cs_rx_rssi_chain3.rx_rssi_sec20;
-	ctrl->rx_rssi_chain3_sec40 =
-		cp_stats->stats.cs_rx_rssi_chain3.rx_rssi_sec40;
-	ctrl->rx_rssi_chain3_sec80 =
-		cp_stats->stats.cs_rx_rssi_chain3.rx_rssi_sec80;
 
 	stats->feat[INX_FEAT_LINK] = ctrl;
 	stats->size[INX_FEAT_LINK] = sizeof(struct advance_pdev_ctrl_link);
