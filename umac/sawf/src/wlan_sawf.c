@@ -109,6 +109,53 @@ bool wlan_service_id_configured(uint8_t svc_id)
 
 qdf_export_symbol(wlan_service_id_configured);
 
+bool wlan_delay_bound_configured(uint8_t svc_id)
+{
+	struct sawf_ctx *sawf;
+	struct wlan_sawf_scv_class_params *svclass_param;
+
+	sawf = wlan_get_sawf_ctx();
+	if (!sawf) {
+		qdf_err("SAWF ctx is invalid");
+		return false;
+	}
+	if (svc_id <  SAWF_SVC_CLASS_MIN ||
+	    svc_id > SAWF_SVC_CLASS_MAX) {
+		qdf_err("Invalid svc-class id");
+		return false;
+	}
+
+	svclass_param = &sawf->svc_classes[svc_id - 1];
+	if (svclass_param->delay_bound &&
+			svclass_param->delay_bound != SAWF_DEF_PARAM_VAL)
+		return true;
+
+	return false;
+}
+qdf_export_symbol(wlan_delay_bound_configured);
+
+struct wlan_sawf_scv_class_params *
+wlan_get_svc_class_params(uint8_t svc_id)
+{
+	struct sawf_ctx *sawf;
+	struct wlan_sawf_scv_class_params *svclass_param;
+
+	sawf = wlan_get_sawf_ctx();
+	if (!sawf) {
+		qdf_err("SAWF ctx is invalid");
+		return NULL;
+	}
+	if (svc_id <  SAWF_SVC_CLASS_MIN ||
+	    svc_id > SAWF_SVC_CLASS_MAX) {
+		qdf_err("Invalid svc-class id");
+		return NULL;
+	}
+
+	svclass_param = &sawf->svc_classes[svc_id - 1];
+	return svclass_param;
+}
+qdf_export_symbol(wlan_get_svc_class_params);
+
 void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params)
 {
 	struct sawf_ctx *sawf;
