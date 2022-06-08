@@ -1586,6 +1586,11 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 
 	mpdu_meta = (struct hal_rx_mon_mpdu_info *)qdf_nbuf_data(mon_mpdu);
 	if (mpdu_meta->full_pkt) {
+		if (qdf_unlikely(mpdu_meta->truncated)) {
+			qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+			qdf_nbuf_free(mon_mpdu);
+			goto done;
+		}
 		/* full pkt, restitch required */
 		dp_rx_mon_handle_full_mon(pdev, ppdu_info, mon_mpdu);
 	} else {
