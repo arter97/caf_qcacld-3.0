@@ -81,7 +81,7 @@
 	(STATS_BASIC_RADIO_DATA_MASK |                 \
 	 STATS_FEAT_FLG_ME | STATS_FEAT_FLG_RAW |      \
 	 STATS_FEAT_FLG_TSO | STATS_FEAT_FLG_IGMP |    \
-	 STATS_FEAT_FLG_MESH | STATS_FEAT_FLG_NAWDS)
+	 STATS_FEAT_FLG_MESH | STATS_FEAT_FLG_NAWDS | STATS_FEAT_FLG_VOW)
 #define STATS_ADVANCE_VAP_CTRL_MASK    STATS_BASIC_VAP_CTRL_MASK
 #define STATS_ADVANCE_VAP_DATA_MASK                    \
 	(STATS_BASIC_VAP_DATA_MASK |                   \
@@ -357,6 +357,11 @@ struct basic_psoc_data_rx {
 #define STATS_IF_MAX_SAWF_DATA_QUEUE 2
 #define STATS_IF_NUM_AVG_WINDOWS     5
 #define STATS_IF_MAX_PUNCTURED_MODE  STATS_IF_PUNCTURED_MODE_CNT
+#define STATS_IF_MAX_TX_TQM_STATUS   9
+#define STATS_IF_MAX_TX_HTT_STATUS   7
+#define STATS_IF_MAX_VOW_TID         4
+#define STATS_IF_REO_ERR_MAX         15
+#define STATS_IF_RXDMA_ERR_MAX       14
 
 enum stats_if_hist_bucket_index {
 	STATS_IF_HIST_BUCKET_0,
@@ -375,6 +380,23 @@ enum stats_if_hist_bucket_index {
 	STATS_IF_HIST_BUCKET_MAX,
 };
 
+enum stats_if_delay_bucket_index {
+	STATS_IF_DELAY_BUCKET_0,
+	STATS_IF_DELAY_BUCKET_1,
+	STATS_IF_DELAY_BUCKET_2,
+	STATS_IF_DELAY_BUCKET_3,
+	STATS_IF_DELAY_BUCKET_4,
+	STATS_IF_DELAY_BUCKET_5,
+	STATS_IF_DELAY_BUCKET_6,
+	STATS_IF_DELAY_BUCKET_7,
+	STATS_IF_DELAY_BUCKET_8,
+	STATS_IF_DELAY_BUCKET_9,
+	STATS_IF_DELAY_BUCKET_10,
+	STATS_IF_DELAY_BUCKET_11,
+	STATS_IF_DELAY_BUCKET_12,
+	STATS_IF_DELAY_BUCKET_MAX,
+};
+
 /*
  * stats_if_hist_types: Histogram Types
  * @STATS_IF_HIST_TYPE_SW_ENQEUE_DELAY: From stack to HW enqueue delay
@@ -389,6 +411,27 @@ enum stats_if_hist_types {
 	STATS_IF_HIST_TYPE_REAP_STACK,
 	STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY,
 	STATS_IF_HIST_TYPE_MAX,
+};
+
+enum stats_if_tx_sw_drop {
+	STATS_IF_TX_DESC_ERR,
+	STATS_IF_TX_HAL_RING_ACCESS_ERR,
+	STATS_IF_TX_DMA_MAP_ERR,
+	STATS_IF_TX_HW_ENQUEUE,
+	STATS_IF_TX_SW_ENQUEUE,
+	STATS_IF_TX_MAX_DROP,
+};
+
+enum stats_if_rx_sw_drop {
+	STATS_IF_RX_INTRABSS_DROP,
+	STATS_IF_RX_MSDU_DONE_FAILURE,
+	STATS_IF_RX_INVALID_PEER_VDEV,
+	STATS_IF_RX_POLICY_CHECK_DROP,
+	STATS_IF_RX_MEC_DROP,
+	STATS_IF_RX_NAWDS_MCAST_DROP,
+	STATS_IF_RX_MESH_FILTER_DROP,
+	STATS_IF_RX_ENQUEUE_DROP,
+	STATS_IF_RX_MAX_DROP,
 };
 
 struct stats_if_hist_bucket {
@@ -412,6 +455,13 @@ struct stats_if_delay_rx_stats {
 	struct stats_if_hist_stats to_stack_delay;
 };
 
+struct stats_if_delay_stats {
+	u_int64_t delay_bucket[STATS_IF_DELAY_BUCKET_MAX];
+	u_int32_t min_delay;
+	u_int32_t max_delay;
+	u_int32_t avg_delay;
+};
+
 struct stats_if_delay_tid_stats {
 	struct stats_if_delay_tx_stats  tx_delay;
 	struct stats_if_delay_rx_stats  rx_delay;
@@ -423,6 +473,40 @@ struct stats_if_jitter_tid_stats {
 	u_int64_t tx_avg_err;
 	u_int64_t tx_total_success;
 	u_int64_t tx_drop;
+};
+
+struct stats_if_reo_error_stats {
+	u_int64_t err_src_reo_code_inv;
+	u_int64_t err_reo_codes[STATS_IF_REO_ERR_MAX];
+};
+
+struct stats_if_rxdma_error_stats {
+	u_int64_t err_src_rxdma_code_inv;
+	u_int64_t err_dma_codes[STATS_IF_RXDMA_ERR_MAX];
+};
+
+struct stats_if_tid_rx_stats {
+	struct stats_if_delay_stats to_stack_delay;
+	struct stats_if_delay_stats intfrm_delay;
+	u_int64_t delivered_to_stack;
+	u_int64_t intrabss_cnt;
+	u_int64_t msdu_cnt;
+	u_int64_t mcast_msdu_cnt;
+	u_int64_t bcast_msdu_cnt;
+	u_int64_t fail_cnt[STATS_IF_RX_MAX_DROP];
+	struct stats_if_reo_error_stats reo_err;
+	struct stats_if_rxdma_error_stats rxdma_err;
+};
+
+struct stats_if_tid_tx_stats {
+	struct stats_if_delay_stats swq_delay;
+	struct stats_if_delay_stats hwtx_delay;
+	struct stats_if_delay_stats intfrm_delay;
+	u_int64_t success_cnt;
+	u_int64_t comp_fail_cnt;
+	u_int64_t swdrop_cnt[STATS_IF_TX_MAX_DROP];
+	u_int64_t tqm_status_cnt[STATS_IF_MAX_TX_TQM_STATUS];
+	u_int64_t htt_status_cnt[STATS_IF_MAX_TX_HTT_STATUS];
 };
 
 struct stats_if_sawf_delay_stats {
@@ -738,6 +822,13 @@ struct advance_pdev_data_nawds {
 	struct pkt_info tx_nawds_mcast;
 	u_int32_t nawds_mcast_tx_drop;
 	u_int32_t nawds_mcast_rx_drop;
+};
+
+struct advance_pdev_data_vow {
+	u_int64_t ingress_stack;
+	u_int64_t osif_drop;
+	struct stats_if_tid_tx_stats tx_stats[STATS_IF_MAX_DATA_TIDS];
+	struct stats_if_tid_rx_stats rx_stats[STATS_IF_MAX_DATA_TIDS];
 };
 
 /* Advance Pdev Ctrl */

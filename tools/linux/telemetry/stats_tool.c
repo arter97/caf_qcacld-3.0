@@ -68,6 +68,9 @@
 #define STATS_IF_MCS_VALID           1
 #define STATS_IF_MCS_INVALID         0
 
+#define STATS_IF_TX_FW_STATUS_OK     0
+#define STATS_IF_TX_RR_FRAME_ACKED   0
+
 #if defined(WLAN_DEBUG_TELEMETRY) || defined(WLAN_ADVANCE_TELEMETRY)
 #ifdef WLAN_FEATURE_11BE
 static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
@@ -1408,6 +1411,160 @@ void print_advance_radio_data_tso(struct advance_pdev_data_tso *tso)
 	STATS_64(stdout, "  20+ segs", tso->segs_20_plus);
 }
 
+void print_advance_radio_data_vow(struct advance_pdev_data_vow *vow)
+{
+	struct stats_if_tid_tx_stats *total_tx;
+	struct stats_if_tid_rx_stats *total_rx;
+	uint8_t tid, idx;
+	uint64_t count;
+
+	STATS_64(stdout, "Packets received in hardstart", vow->ingress_stack);
+	STATS_64(stdout, "Packets dropped in osif layer", vow->osif_drop);
+
+	STATS_PRINT("\n\tPer TID Video Stats:\n");
+	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
+		total_tx = &vow->tx_stats[tid];
+		total_rx = &vow->rx_stats[tid];
+		STATS_PRINT("\t------------TID: %d------------\n", tid);
+		STATS_64(stdout, "Tx TQM Success Count",
+			 total_tx->tqm_status_cnt[STATS_IF_TX_RR_FRAME_ACKED]);
+		for (idx = 1; idx < STATS_IF_MAX_TX_TQM_STATUS; idx++) {
+			if (total_tx->tqm_status_cnt[idx])
+				STATS_PRINT("\t\tTx TQM Drop Count[%u]: %ju\n",
+					    idx, total_tx->tqm_status_cnt[idx]);
+		}
+		STATS_64(stdout, "Tx HTT Success Count",
+			 total_tx->htt_status_cnt[STATS_IF_TX_FW_STATUS_OK]);
+		for (idx = 1; idx < STATS_IF_MAX_TX_HTT_STATUS; idx++) {
+			if (total_tx->htt_status_cnt[idx])
+				STATS_PRINT("\t\tTx HTT Drop Count[%u]: %ju\n",
+					    idx, total_tx->htt_status_cnt[idx]);
+		}
+		STATS_64(stdout, "Tx Hardware Drop Count",
+			 total_tx->swdrop_cnt[STATS_IF_TX_HW_ENQUEUE]);
+		STATS_64(stdout, "Tx Software Drop Count",
+			 total_tx->swdrop_cnt[STATS_IF_TX_SW_ENQUEUE]);
+		STATS_64(stdout, "Tx Descriptor Error Count",
+			 total_tx->swdrop_cnt[STATS_IF_TX_DESC_ERR]);
+		STATS_64(stdout, "Tx HAL Ring Error Count",
+			 total_tx->swdrop_cnt[STATS_IF_TX_HAL_RING_ACCESS_ERR]);
+		STATS_64(stdout, "Tx Dma Map Error Count",
+			 total_tx->swdrop_cnt[STATS_IF_TX_DMA_MAP_ERR]);
+
+		STATS_64(stdout, "Rx Delievered Count",
+			 total_rx->delivered_to_stack);
+		STATS_64(stdout, "Rx Software Enqueue Drop Count",
+			 total_rx->fail_cnt[STATS_IF_RX_ENQUEUE_DROP]);
+		STATS_64(stdout, "Rx Intrabss Drop Count",
+			 total_rx->fail_cnt[STATS_IF_RX_INTRABSS_DROP]);
+		STATS_64(stdout, "Rx Msdu Done Failure Count",
+			 total_rx->fail_cnt[STATS_IF_RX_MSDU_DONE_FAILURE]);
+		STATS_64(stdout, "Rx Invalid Peer Count",
+			 total_rx->fail_cnt[STATS_IF_RX_INVALID_PEER_VDEV]);
+		STATS_64(stdout, "Rx Policy Check Drop Count",
+			 total_rx->fail_cnt[STATS_IF_RX_POLICY_CHECK_DROP]);
+		STATS_64(stdout, "Rx Mec Drop Count",
+			 total_rx->fail_cnt[STATS_IF_RX_MEC_DROP]);
+		STATS_64(stdout, "Rx Nawds Mcast Drop Count",
+			 total_rx->fail_cnt[STATS_IF_RX_NAWDS_MCAST_DROP]);
+		STATS_64(stdout, "Rx Mesh Filter Drop Count",
+			 total_rx->fail_cnt[STATS_IF_RX_MESH_FILTER_DROP]);
+		STATS_64(stdout, "Rx Intra Bss Deliver Count",
+			 total_rx->intrabss_cnt);
+		STATS_64(stdout, "Rx MSDU Count",
+			 total_rx->msdu_cnt);
+		STATS_64(stdout, "Rx Multicast MSDU Count",
+			 total_rx->mcast_msdu_cnt);
+		STATS_64(stdout, "Rx Broadcast MSDU Count",
+			 total_rx->bcast_msdu_cnt);
+	}
+	STATS_PRINT("\n\tPer TID Delay Non-Zero Stats:\n");
+	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
+		total_tx = &vow->tx_stats[tid];
+		total_rx = &vow->rx_stats[tid];
+		STATS_PRINT("\t-------------TID: %d------------\n", tid);
+		STATS_PRINT("\tSoftware Enqueue Delay:\n");
+		for (idx = 0; idx < STATS_IF_DELAY_BUCKET_MAX; idx++) {
+			count = total_tx->swq_delay.delay_bucket[idx];
+			if (count)
+				STATS_PRINT("\t\t%s:  Packets = %ju\n",
+					    stats_if_sw_enq_delay_bucket[idx],
+					    count);
+		}
+		STATS_32(stdout, "Min", total_tx->swq_delay.min_delay);
+		STATS_32(stdout, "Max", total_tx->swq_delay.max_delay);
+		STATS_32(stdout, "Avg", total_tx->swq_delay.avg_delay);
+
+		STATS_PRINT("\tHardware Transmission Delay:\n");
+		for (idx = 0; idx < STATS_IF_DELAY_BUCKET_MAX; idx++) {
+			count = total_tx->hwtx_delay.delay_bucket[idx];
+			if (count)
+				STATS_PRINT("\t\t%s:  Packets = %ju\n",
+					    stats_if_fw_to_hw_delay_bucket[idx],
+					    count);
+		}
+		STATS_32(stdout, "Min", total_tx->hwtx_delay.min_delay);
+		STATS_32(stdout, "Max", total_tx->hwtx_delay.max_delay);
+		STATS_32(stdout, "Avg", total_tx->hwtx_delay.avg_delay);
+
+		STATS_PRINT("\tTx Interframe Delay:\n");
+		for (idx = 0; idx < STATS_IF_DELAY_BUCKET_MAX; idx++) {
+			count = total_tx->intfrm_delay.delay_bucket[idx];
+			if (count)
+				STATS_PRINT("\t\t%s:  Packets = %ju\n",
+					    stats_if_intfrm_delay_bucket[idx],
+					    count);
+		}
+		STATS_32(stdout, "Min", total_tx->intfrm_delay.min_delay);
+		STATS_32(stdout, "Max", total_tx->intfrm_delay.max_delay);
+		STATS_32(stdout, "Avg", total_tx->intfrm_delay.avg_delay);
+
+		STATS_PRINT("\tRx Interframe Delay:\n");
+		for (idx = 0; idx < STATS_IF_DELAY_BUCKET_MAX; idx++) {
+			count = total_rx->intfrm_delay.delay_bucket[idx];
+			if (count)
+				STATS_PRINT("\t\t%s:  Packets = %ju\n",
+					    stats_if_intfrm_delay_bucket[idx],
+					    count);
+		}
+		STATS_32(stdout, "Min", total_rx->intfrm_delay.min_delay);
+		STATS_32(stdout, "Max", total_rx->intfrm_delay.max_delay);
+		STATS_32(stdout, "Avg", total_rx->intfrm_delay.avg_delay);
+
+		STATS_PRINT("\tRx Reap to Stack Delay:\n");
+		for (idx = 0; idx < STATS_IF_DELAY_BUCKET_MAX; idx++) {
+			count = total_rx->to_stack_delay.delay_bucket[idx];
+			if (count)
+				STATS_PRINT("\t\t%s:  Packets = %ju\n",
+					    stats_if_intfrm_delay_bucket[idx],
+					    count);
+		}
+		STATS_32(stdout, "Min", total_rx->to_stack_delay.min_delay);
+		STATS_32(stdout, "Max", total_rx->to_stack_delay.max_delay);
+		STATS_32(stdout, "Avg", total_rx->to_stack_delay.avg_delay);
+	}
+	STATS_PRINT("\n\tPer TID RX Error Stats:\n");
+	for (tid = 0; tid < STATS_IF_MAX_VOW_TID; tid++) {
+		total_rx = &vow->rx_stats[tid];
+		STATS_PRINT("\t------------TID: %d------------\n", tid + 4);
+		STATS_PRINT("\tRx REO Error stats:\n");
+		STATS_64(stdout, "err_src_reo_code_inv",
+			 total_rx->reo_err.err_src_reo_code_inv);
+		for (idx = 0; idx < STATS_IF_REO_ERR_MAX; idx++) {
+			STATS_PRINT("\t\terr src reo codes: %u = %ju\n",
+				    idx, total_rx->reo_err.err_reo_codes[idx]);
+		}
+		STATS_PRINT("\tRx Rxdma Error stats:\n");
+		STATS_64(stdout, "err_src_rxdma_code_inv",
+			 total_rx->rxdma_err.err_src_rxdma_code_inv);
+		for (idx = 0; idx < STATS_IF_RXDMA_ERR_MAX; idx++) {
+			STATS_PRINT("\t\terr src dma codes: %u = %ju\n",
+				    idx,
+				    total_rx->rxdma_err.err_dma_codes[idx]);
+		}
+	}
+}
+
 void print_advance_radio_data_igmp(struct advance_pdev_data_igmp *igmp)
 {
 	STATS_32(stdout, "IGMP Received", igmp->igmp_rcvd);
@@ -1798,6 +1955,10 @@ void print_advance_radio_data(struct stats_obj *radio)
 	if (data->tso) {
 		STATS_PRINT("TSO Stats\n");
 		print_advance_radio_data_tso(data->tso);
+	}
+	if (data->vow) {
+		STATS_PRINT("VOW Stats\n");
+		print_advance_radio_data_vow(data->vow);
 	}
 	if (data->igmp) {
 		STATS_PRINT("IGMP Stats\n");
