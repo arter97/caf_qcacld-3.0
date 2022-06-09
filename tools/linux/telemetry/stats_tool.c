@@ -68,6 +68,7 @@
 #define STATS_IF_MCS_VALID           1
 #define STATS_IF_MCS_INVALID         0
 
+#if defined(WLAN_DEBUG_TELEMETRY) || defined(WLAN_ADVANCE_TELEMETRY)
 #ifdef WLAN_FEATURE_11BE
 static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
 						   [STATS_IF_MAX_MCS] = {
@@ -185,7 +186,7 @@ static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
 		{"INVALID ", STATS_IF_MCS_INVALID},
 	}
 };
-#else
+#else /* WLAN_FEATURE_11BE */
 static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
 						   [STATS_IF_MAX_MCS] = {
 	{
@@ -266,7 +267,138 @@ static const struct stats_if_rate_debug rate_string[STATS_IF_DOT11_MAX]
 		{"INVALID ", STATS_IF_MCS_INVALID},
 	}
 };
-#endif
+#endif /* WLAN_FEATURE_11BE */
+#endif /* defined(WLAN_DEBUG_TELEMETRY) || defined(WLAN_ADVANCE_TELEMETRY) */
+
+#if WLAN_DEBUG_TELEMETRY
+#ifdef WLAN_FEATURE_11BE
+static const struct stats_if_rate_debug
+mu_rate_string[STATS_IF_TXRX_TYPE_MU_MAX][STATS_IF_MAX_MCS] = {
+	{
+		{"HE MU-MIMO MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"HE OFDMA MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	}
+};
+#else /* WLAN_FEATURE_11BE */
+static const struct stats_if_rate_debug
+mu_rate_string[STATS_IF_TXRX_TYPE_MU_MAX][STATS_IF_MAX_MCS] = {
+	{
+		{"HE MU-MIMO MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE MU-MIMO MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"HE OFDMA MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"HE OFDMA MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	}
+};
+#endif /* WLAN_FEATURE_11BE */
+#endif /* WLAN_DEBUG_TELEMETRY */
+
+#if WLAN_ADVANCE_TELEMETRY
+#ifdef WLAN_FEATURE_11BE
+static const struct stats_if_rate_debug
+mu_be_rate_string[STATS_IF_TXRX_TYPE_MU_MAX][STATS_IF_MAX_MCS] = {
+	{
+		{"EHT MU-MIMO MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 14 (BPSK-DCM 1/2)", STATS_IF_MCS_VALID},
+		{"EHT MU-MIMO MCS 15 (BPSK-DCM 1/2)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	},
+	{
+		{"EHT OFDMA MCS 0 (BPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 1 (QPSK 1/2)     ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 2 (QPSK 3/4)     ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 3 (16-QAM 1/2)   ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 4 (16-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 5 (64-QAM 2/3)   ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 6 (64-QAM 3/4)   ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 7 (64-QAM 5/6)   ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 8 (256-QAM 3/4)  ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 9 (256-QAM 5/6)  ", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 10 (1024-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 11 (1024-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 12 (4096-QAM 3/4)", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 13 (4096-QAM 5/6)", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 14 (BPSK-DCM 1/2)", STATS_IF_MCS_VALID},
+		{"EHT OFDMA MCS 15 (BPSK-DCM 1/2)", STATS_IF_MCS_VALID},
+		{"INVALID ", STATS_IF_MCS_INVALID},
+	}
+};
+#endif /* WLAN_FEATURE_11BE */
+#endif /* WLAN_ADVANCE_TELEMETRY */
 
 #if WLAN_DEBUG_TELEMETRY
 #ifdef WLAN_FEATURE_11BE
@@ -657,6 +789,58 @@ void print_basic_ap_data_rx(struct basic_psoc_data_rx *rx)
 }
 
 #if WLAN_ADVANCE_TELEMETRY
+#if WLAN_FEATURE_11BE
+void print_advance_data_be_punc_stats(u_int32_t *punc_cnt_array)
+{
+	STATS_PRINT("NO_PUNC %d 20MHz %d 40MHz %d 80MHz %d 120MHz %d\n",
+		    punc_cnt_array[STATS_IF_NO_PUNCTURE],
+		    punc_cnt_array[STATS_IF_PUNCTURED_20MHZ],
+		    punc_cnt_array[STATS_IF_PUNCTURED_40MHZ],
+		    punc_cnt_array[STATS_IF_PUNCTURED_80MHZ],
+		    punc_cnt_array[STATS_IF_PUNCTURED_120MHZ]);
+}
+
+void print_advance_data_su_ppdu_be_stats(struct pkt_type *su_be_ppdu_cnt)
+{
+	uint8_t mcs;
+
+	for (mcs = 0; mcs < STATS_IF_MAX_MCS; mcs++) {
+		if (!rate_string[STATS_IF_DOT11_BE][mcs].valid)
+			continue;
+		STATS_PRINT("\t\t%s = %d\n",
+			    rate_string[STATS_IF_DOT11_BE][mcs].mcs_type,
+			    su_be_ppdu_cnt->mcs_count[mcs]);
+	}
+}
+
+void print_advance_data_mu_ppdu_be_stats(struct pkt_type *mu_ppdu_array)
+{
+	uint8_t mcs, pkt_type;
+
+	for (pkt_type = 0; pkt_type < STATS_IF_TXRX_TYPE_MU_MAX; pkt_type++) {
+		for (mcs = 0; mcs < STATS_IF_MAX_MCS; mcs++) {
+			if (!mu_be_rate_string[pkt_type][mcs].valid)
+				continue;
+			STATS_PRINT("\t\t%s = %d\n",
+				    mu_be_rate_string[pkt_type][mcs].mcs_type,
+				    mu_ppdu_array[pkt_type].mcs_count[mcs]);
+		}
+	}
+}
+
+#define print_advance_data_be_stats(src, str)                                  \
+do {                                                                           \
+	STATS_PRINT("\t" str " Punctured BW Counts = ");                       \
+	print_advance_data_be_punc_stats(&src->punc_bw[0]);                    \
+	STATS_PRINT("\t" str " SU PPDU BE Counts\n");                          \
+	print_advance_data_su_ppdu_be_stats(&src->su_be_ppdu_cnt);             \
+	STATS_PRINT("\t" str " MU PPDU BE Counts\n");                          \
+	print_advance_data_mu_ppdu_be_stats(&src->mu_be_ppdu_cnt[0]);          \
+} while (0)
+#else
+#define print_advance_data_be_stats(src, str) {}
+#endif /* WLAN_FEATURE_11BE */
+
 void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 {
 	u_int8_t inx = 0;
@@ -683,6 +867,7 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 	STATS_32(stdout, "MSDU's Part of AMSDU", tx->amsdu_cnt);
 	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
 		 tx->non_amsdu_cnt);
+	print_advance_data_be_stats(tx, "Tx");
 }
 
 void print_advance_data_rx_stats(struct advance_data_rx_stats *rx)
@@ -736,6 +921,7 @@ void print_advance_data_rx_stats(struct advance_data_rx_stats *rx)
 	STATS_32(stdout, "MSDU's Part of AMSDU", rx->amsdu_cnt);
 	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
 		 rx->non_amsdu_cnt);
+	print_advance_data_be_stats(rx, "Rx");
 }
 
 void print_advance_sta_data_tx(struct advance_peer_data_tx *tx)
@@ -1877,8 +2063,6 @@ void print_debug_data_tx_stats(struct debug_data_tx_stats *tx)
 
 void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 {
-	enum stats_if_mu_packet_type rx_mu_type;
-	struct rx_mu_info *rx_mu;
 	uint32_t *pnss;
 	char nss[STATS_IF_NSS_LENGTH];
 	uint8_t i, mcs, ptype;
@@ -1892,34 +2076,41 @@ void print_debug_data_rx_stats(struct debug_data_rx_stats *rx)
 	STATS_32(stdout, "Rx Out of Order Error", rx->oor_err);
 	STATS_64(stdout, "Rx MEC drop packets", rx->mec_drop.num);
 	STATS_64(stdout, "Rx MEC drop bytes", rx->mec_drop.bytes);
-	STATS_PRINT("\tMSDU Reception Type:\n");
+	STATS_PRINT("\tRx MSDU Reception Type:\n");
 	STATS_PRINT("\t\tSU %u MU_MIMO %u MU_OFDMA %u MU_OFDMA_MIMO %u\n",
 		    rx->reception_type[STATS_IF_SU],
 		    rx->reception_type[STATS_IF_MU_MIMO],
 		    rx->reception_type[STATS_IF_MU_OFDMA],
 		    rx->reception_type[STATS_IF_MU_MIMO_OFDMA]);
-	STATS_PRINT("\tPPDU Reception Type:\n");
+	STATS_PRINT("\tRx PPDU Reception Type:\n");
 	STATS_PRINT("\t\tSU %u MU_MIMO %u MU_OFDMA %u MU_OFDMA_MIMO %u\n",
 		    rx->ppdu_cnt[STATS_IF_SU],
 		    rx->ppdu_cnt[STATS_IF_MU_MIMO],
 		    rx->ppdu_cnt[STATS_IF_MU_OFDMA],
 		    rx->ppdu_cnt[STATS_IF_MU_MIMO_OFDMA]);
-	for (rx_mu_type = 0; rx_mu_type < STATS_IF_TXRX_TYPE_MU_MAX;
-	     rx_mu_type++) {
-		STATS_PRINT("\tReception mode %s\n",
-			    mu_reception_mode[rx_mu_type]);
-		rx_mu = &rx->rx_mu[rx_mu_type];
-		pnss = &rx_mu->ppdu_nss[0];
+	STATS_PRINT("\tRx PPDU MU Counts:\n");
+	for (ptype = 0; ptype < STATS_IF_TXRX_TYPE_MU_MAX; ptype++) {
+		for (mcs = 0; mcs < STATS_IF_MAX_MCS; mcs++) {
+			if (!mu_rate_string[ptype][mcs].valid)
+				continue;
+			STATS_PRINT("\t\t%s = %d\n",
+				    mu_rate_string[ptype][mcs].mcs_type,
+				    rx->rx_mu[ptype].ppdu.mcs_count[mcs]);
+		}
+	}
+	for (ptype = 0; ptype < STATS_IF_TXRX_TYPE_MU_MAX; ptype++) {
+		STATS_PRINT("\tReception mode %s\n", mu_reception_mode[ptype]);
+		pnss = &rx->rx_mu[ptype].ppdu_nss[0];
 		index = 0;
 		for (i = 0; i < STATS_IF_SS_COUNT; i++) {
 			index += snprintf(&nss[index],
 					  STATS_IF_NSS_LENGTH - index,
 					  " %u", *(pnss + i));
 		}
-		STATS_PRINT("\t\tPPDU Count\n");
 		STATS_PRINT("\t\t\tNSS(1-8) = %s\n", nss);
 		STATS_PRINT("\t\t\tMPDU OK = %u, MPDU Fail = %u\n",
-			    rx_mu->mpdu_cnt_fcs_ok, rx_mu->mpdu_cnt_fcs_err);
+			    rx->rx_mu[ptype].mpdu_cnt_fcs_ok,
+			    rx->rx_mu[ptype].mpdu_cnt_fcs_err);
 	}
 	STATS_PRINT("\tRx MCS stats:\n");
 	for (ptype = 0; ptype < STATS_IF_DOT11_MAX; ptype++) {
