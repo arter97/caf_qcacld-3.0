@@ -1073,25 +1073,12 @@ static void
 print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 				  uint8_t svc_id)
 {
-	uint8_t idx = 0;
-
 	if (svc_id > 0) {
 		STATS_PRINT("----TIDX: %d----   ", data->tid);
 		STATS_PRINT("----QUEUE: %d---- \n", data->msduq);
-		STATS_PRINT("sliding_window_sum         = %u\n",
-			    data->delay[0][0].avg.sum);
-		STATS_PRINT("sliding_window_count       = %u\n",
-			    data->delay[0][0].avg.count);
 		STATS_PRINT("current_window_index       = %u\n",
 			    data->delay[0][0].cur_win);
 		STATS_PRINT("\ndata_for_each_window\n");
-		for (idx = 0; idx < STATS_IF_NUM_AVG_WINDOWS; idx++) {
-			STATS_PRINT("  WINDOW: %d\n", idx);
-			STATS_PRINT("	sum                = %u\n",
-				    data->delay[0][0].win_avgs[idx].sum);
-			STATS_PRINT("	count              = %u\n",
-				    data->delay[0][0].win_avgs[idx].count);
-		}
 		print_advance_hist_stats(&data->delay[0][0].delay_hist,
 					 STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY);
 	} else {
@@ -1106,21 +1093,8 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 				STATS_PRINT("----TID: %d----   ", tidx);
 				STATS_PRINT("----QUEUES: %d----\n", queues);
 
-				STATS_PRINT("sliding_window_sum         = %u\n",
-					    dly->avg.sum);
-				STATS_PRINT("sliding_window_count       = %u\n",
-					    dly->avg.count);
 				STATS_PRINT("current_window_index       = %u\n",
 					    dly->cur_win);
-				STATS_PRINT("\ndata_for_each_window\n");
-				for (idx = 0; idx < STATS_IF_NUM_AVG_WINDOWS;
-				     idx++) {
-					STATS_PRINT("  WINDOW: %d\n", idx);
-					STATS_PRINT("	sum                = %u\n",
-						    dly->win_avgs[idx].sum);
-					STATS_PRINT("	count              = %u\n",
-						    dly->win_avgs[idx].count);
-				}
 				print_advance_hist_stats(&dly->delay_hist,
 							 hw_comp);
 			}

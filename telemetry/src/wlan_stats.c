@@ -1314,18 +1314,6 @@ fill_advance_peer_sawfdelay_stats(struct advance_peer_data_sawfdelay *data,
 					delay_stats->delay_hist.avg;
 			data->delay[tidx][queues].delay_hist.hist.hist_type =
 					delay_stats->delay_hist.hist.hist_type;
-			data->delay[tidx][queues].avg.sum =
-					delay_stats->avg.sum;
-			data->delay[tidx][queues].avg.count =
-					delay_stats->avg.count;
-			data->delay[tidx][queues].cur_win =
-					delay_stats->cur_win;
-			for (idx = 0; idx < mx_win; idx++) {
-				data->delay[tidx][queues].win_avgs[idx].sum =
-					delay_stats->win_avgs[idx].sum;
-				data->delay[tidx][queues].win_avgs[idx].count =
-					delay_stats->win_avgs[idx].count;
-			}
 			for (idx = 0; idx < mx_buc; idx++)
 				data->delay[tidx][queues].delay_hist.hist.freq[idx] =
 					delay_stats->delay_hist.hist.freq[idx];
@@ -1500,18 +1488,8 @@ get_advance_peer_data_sawfdelay(struct sawf_delay_stats *sawf_delay_stats,
 					sawf_delay_stats->delay_hist.avg;
 		data->delay[0][0].delay_hist.hist.hist_type =
 				sawf_delay_stats->delay_hist.hist.hist_type;
-		data->delay[0][0].avg.sum =
-				sawf_delay_stats->avg.sum;
-		data->delay[0][0].avg.count =
-					sawf_delay_stats->avg.count;
 		data->delay[0][0].cur_win =
 					sawf_delay_stats->cur_win;
-		for (idx = 0; idx < mx_win; idx++) {
-			data->delay[0][0].win_avgs[idx].sum =
-					sawf_delay_stats->win_avgs[idx].sum;
-			data->delay[0][0].win_avgs[idx].count =
-					sawf_delay_stats->win_avgs[idx].count;
-		}
 		for (idx = 0; idx < mx_buc; idx++)
 			data->delay[0][0].delay_hist.hist.freq[idx] =
 				sawf_delay_stats->delay_hist.hist.freq[idx];
