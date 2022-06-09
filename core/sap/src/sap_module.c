@@ -2326,8 +2326,6 @@ wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
 		break;
 	}
 
-	if (sap_phymode_is_eht(config->SapHw_mode))
-		wlan_reg_set_create_punc_bitmap(&config->ch_params, true);
 	if (config->ch_params.ch_width == CH_WIDTH_80P80MHZ &&
 	    ucfg_mlme_get_restricted_80p80_bw_supp(psoc)) {
 		if (!((config->ch_params.center_freq_seg0 == 138 &&
