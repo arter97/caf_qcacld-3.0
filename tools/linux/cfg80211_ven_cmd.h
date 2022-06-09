@@ -817,6 +817,7 @@ enum {
 	IEEE80211_PARAM_VDEV_TSF          = 778,
 	IEEE80211_PARAM_STEALTHDOWN       = 779,  /* Flag to indicate vap down without sending deauth or disassoc */
 	IEEE80211_PARAM_MODE_EXT          = 780,    /* phy mode (11a, 11b, etc.) */
+	IEEE80211_PARAM_ML_PROBE_REQ      = 781,  /* Param to set ML probe request configuration */
 };
 
 enum {
