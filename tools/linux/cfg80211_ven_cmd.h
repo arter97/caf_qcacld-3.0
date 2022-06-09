@@ -1385,6 +1385,8 @@ enum _ol_ath_param_t {
 #ifdef CONFIG_SAWF
 	OL_ATH_PARAM_SAWF_STATS_EN = 512,
 #endif
+	/* Get monitor version */
+	OL_ATH_PARAM_GET_MONITOR_VERSION = 513,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3659,6 +3661,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_dev_deployment_type",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_GET_DEV_DEPLOYMENT_TYPE, GET_PARAM, 0},
 #endif
+	{"g_monitor_version",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_GET_MONITOR_VERSION, GET_PARAM, 0},
 };
 #endif
 
