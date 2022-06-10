@@ -30,12 +30,14 @@ QDF_STATUS wlan_telemetry_agent_deinit(void);
  * telemetry_sawf_peer_ctx_alloc - Allocate sawwf peer
  * @soc: opaque soc handle
  * @sawf_ctx: opaque sawf-peer ctx
+ * @mac_addr: MAC address
  * @svc_id: service-id
  * @hostq_id: queue-id used in host
  *
  * Return: opaque pointer to telemetry-peer, NULL otherwise
  */
 void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
+				    uint8_t *mac_addr,
 				    uint8_t svc_id, uint8_t hostq_id);
 
 /**

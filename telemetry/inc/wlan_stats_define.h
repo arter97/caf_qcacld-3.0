@@ -371,6 +371,9 @@ enum stats_if_hist_bucket_index {
 	STATS_IF_HIST_BUCKET_7,
 	STATS_IF_HIST_BUCKET_8,
 	STATS_IF_HIST_BUCKET_9,
+	STATS_IF_HIST_BUCKET_10,
+	STATS_IF_HIST_BUCKET_11,
+	STATS_IF_HIST_BUCKET_12,
 	STATS_IF_HIST_BUCKET_MAX,
 };
 
@@ -427,6 +430,7 @@ struct stats_if_jitter_tid_stats {
 struct stats_if_sawf_delay_stats {
 	struct stats_if_hist_stats delay_hist;
 	uint8_t cur_win;
+	uint32_t mov_avg;
 };
 
 struct stats_if_sawf_fw_mpdu_stats {
@@ -455,6 +459,8 @@ struct stats_if_sawf_tx_stats {
 	struct stats_if_sawf_fw_mpdu_stats burst_size_stats;
 	uint32_t tx_failed;
 	uint32_t queue_depth;
+	uint32_t throughput;
+	uint32_t ingress_rate;
 };
 
 struct advance_data_tx_stats {

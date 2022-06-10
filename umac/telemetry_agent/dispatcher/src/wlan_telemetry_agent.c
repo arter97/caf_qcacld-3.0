@@ -178,10 +178,12 @@ telemetry_agent_peer_delete_handler(struct wlan_objmgr_peer *peer,
 
 #ifdef CONFIG_SAWF_TELEMETRY
 void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
+				    uint8_t *mac_addr,
 				    uint8_t svc_id, uint8_t hostq_id)
 {
 	if (g_agent_ops)
 		return g_agent_ops->sawf_alloc_peer(soc, sawf_ctx,
+						    mac_addr,
 						    svc_id,
 						    hostq_id);
 
@@ -363,8 +365,8 @@ QDF_STATUS telemetry_sawf_update_msdu_drop(void *telemetry_ctx,
 
 qdf_export_symbol(telemetry_sawf_update_msdu_drop);
 
-QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
-				    uint8_t queue, uint32_t *rate)
+QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
+				   uint8_t queue, uint32_t *rate)
 {
 	if (g_agent_ops) {
 		if (g_agent_ops->sawf_pull_rate(telemetry_ctx, tid,
@@ -374,10 +376,10 @@ QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
 	return QDF_STATUS_SUCCESS;
 }
 
-qdf_export_symbol(telemetry_sawf_pull_rate);
+qdf_export_symbol(telemetry_sawf_get_rate);
 
-QDF_STATUS telemetry_sawf_pull_mov_avg(void *telemetry_ctx, uint8_t tid,
-				       uint8_t queue, uint32_t *mov_avg)
+QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
+				      uint8_t queue, uint32_t *mov_avg)
 {
 	if (g_agent_ops) {
 		if (g_agent_ops->sawf_pull_mov_avg(telemetry_ctx, tid,
@@ -388,9 +390,10 @@ QDF_STATUS telemetry_sawf_pull_mov_avg(void *telemetry_ctx, uint8_t tid,
 
 }
 
-qdf_export_symbol(telemetry_sawf_pull_mov_avg);
+qdf_export_symbol(telemetry_sawf_get_mov_avg);
 #else
 void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
+				    uint8_t *mac_addr,
 				    uint8_t svc_id, uint8_t hostq_id)
 {
 	return NULL;
@@ -501,21 +504,21 @@ QDF_STATUS telemetry_sawf_update_msdu_drop(void *telemetry_ctx,
 
 qdf_export_symbol(telemetry_sawf_update_msdu_drop);
 
-QDF_STATUS telemetry_sawf_pull_rate(void *telemetry_ctx, uint8_t tid,
-				    uint8_t queue, uint32_t *rate)
+QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
+				   uint8_t queue, uint32_t *rate)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
-qdf_export_symbol(telemetry_sawf_pull_rate);
+qdf_export_symbol(telemetry_sawf_get_rate);
 
-QDF_STATUS telemetry_sawf_pull_mov_avg(void *telemetry_ctx, uint8_t tid,
-				       uint8_t queue, uint32_t *mov_avg)
+QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
+				      uint8_t queue, uint32_t *mov_avg)
 {
 	return QDF_STATUS_E_FAILURE;
 }
 
-qdf_export_symbol(telemetry_sawf_pull_mov_avg);
+qdf_export_symbol(telemetry_sawf_get_mov_avg);
 #endif /* CONFIG_SAWF_TELEMETRY */
 
 int register_telemetry_agent_ops(struct telemetry_agent_ops *agent_ops)

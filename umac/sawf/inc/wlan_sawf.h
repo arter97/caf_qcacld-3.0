@@ -93,6 +93,8 @@
 #define SAWF_MIN_MSDU_LOSS_RATE 0
 #define SAWF_MAX_MSDU_LOSS_RATE 10000
 
+#define DEF_SAWF_CONFIG_VALUE 0xFFFFFFFF
+
 /**
  * struct wlan_sawf_scv_class_params- Service Class Parameters
  * @svc_id: Service ID
