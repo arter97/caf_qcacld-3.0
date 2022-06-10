@@ -132,7 +132,7 @@ dp_peer_sawf_ctx_alloc(struct dp_soc *soc,
 
 	sawf_ctx = qdf_mem_malloc(sizeof(struct dp_peer_sawf));
 	if (!sawf_ctx) {
-		qdf_err("Failed to allocate peer SAWF ctx");
+		dp_sawf_err("Failed to allocate peer SAWF ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -152,7 +152,7 @@ dp_peer_sawf_ctx_free(struct dp_soc *soc,
 		if (!dp_peer_is_primary_link_peer(peer)) {
 			return QDF_STATUS_SUCCESS;
 		}
-		qdf_err("Failed to free peer SAWF ctx");
+		dp_sawf_err("Failed to free peer SAWF ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -168,7 +168,7 @@ struct dp_peer_sawf *dp_peer_sawf_ctx_get(struct dp_peer *peer)
 
 	sawf_ctx = peer->sawf;
 	if (!sawf_ctx) {
-		qdf_err("Failed to allocate peer SAWF ctx");
+		dp_sawf_err("Failed to allocate peer SAWF ctx");
 		return NULL;
 	}
 
@@ -187,33 +187,34 @@ dp_sawf_def_queues_get_map_report(struct cdp_soc_t *soc_hdl,
 	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
 
 	if (!dp_soc) {
-		qdf_err("Invalid soc");
+		dp_sawf_err("Invalid soc");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	peer = dp_peer_find_hash_find(dp_soc, mac_addr, 0,
 				      DP_VDEV_ALL, DP_MOD_ID_CDP);
 	if (!peer) {
-		qdf_err("Invalid peer");
+		dp_sawf_err("Invalid peer");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	sawf_ctx = dp_peer_sawf_ctx_get(peer);
 	if (!sawf_ctx) {
-		qdf_err("Invalid SAWF ctx");
+		dp_sawf_err("Invalid SAWF ctx");
 		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	qdf_info("Peer ", QDF_MAC_ADDR_FMT, QDF_MAC_ADDR_REF(mac_addr));
+	dp_sawf_info("Peer ", QDF_MAC_ADDR_FMT,
+		     QDF_MAC_ADDR_REF(mac_addr));
 	qdf_nofl_info("TID\tService Class ID");
 	for (tid = 0; tid < DP_SAWF_TID_MAX; ++tid) {
 		if (sawf_ctx->tid_reports[tid].svc_class_id ==
 				HTT_SAWF_SVC_CLASS_INVALID_ID) {
 			continue;
 		}
-		qdf_nofl_info("%u\t%u", tid,
-			      sawf_ctx->tid_reports[tid].svc_class_id);
+		dp_sawf_nofl_info("%u\t%u", tid,
+				  sawf_ctx->tid_reports[tid].svc_class_id);
 	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
@@ -233,14 +234,14 @@ dp_sawf_def_queues_map_req(struct cdp_soc_t *soc_hdl,
 	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
 
 	if (!dp_soc) {
-		qdf_err("Invalid soc");
+		dp_sawf_err("Invalid soc");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	peer = dp_peer_find_hash_find(dp_soc, mac_addr, 0,
 				      DP_VDEV_ALL, DP_MOD_ID_CDP);
 	if (!peer) {
-		qdf_err("Invalid peer");
+		dp_sawf_err("Invalid peer");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -248,7 +249,7 @@ dp_sawf_def_queues_map_req(struct cdp_soc_t *soc_hdl,
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 
-	qdf_info("peer " QDF_MAC_ADDR_FMT "svc id %u peer id %u",
+	dp_sawf_info("peer " QDF_MAC_ADDR_FMT "svc id %u peer id %u",
 		 QDF_MAC_ADDR_REF(mac_addr), svc_class_id, peer_id);
 
 	status = dp_htt_h2t_sawf_def_queues_map_req(dp_soc->htt_handle,
@@ -273,12 +274,12 @@ dp_sawf_def_queues_unmap_req(struct cdp_soc_t *soc_hdl,
 	uint16_t peer_id;
 	QDF_STATUS status;
 	uint8_t wildcard_mac[QDF_MAC_ADDR_SIZE] = {0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff};
+						   0xff, 0xff, 0xff};
 
 	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
 
 	if (!dp_soc) {
-		qdf_err("Invalid soc");
+		dp_sawf_err("Invalid soc");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -289,15 +290,15 @@ dp_sawf_def_queues_unmap_req(struct cdp_soc_t *soc_hdl,
 		peer = dp_peer_find_hash_find(dp_soc, mac_addr, 0,
 					      DP_VDEV_ALL, DP_MOD_ID_CDP);
 		if (!peer) {
-			qdf_err("Invalid peer");
+			dp_sawf_err("Invalid peer");
 			return QDF_STATUS_E_FAILURE;
 		}
 		peer_id = peer->peer_id;
 		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 	}
 
-	qdf_info("peer " QDF_MAC_ADDR_FMT "svc id %u peer id %u",
-		 QDF_MAC_ADDR_REF(mac_addr), svc_id, peer_id);
+	dp_sawf_info("peer " QDF_MAC_ADDR_FMT "svc id %u peer id %u",
+		     QDF_MAC_ADDR_REF(mac_addr), svc_id, peer_id);
 
 	status =  dp_htt_h2t_sawf_def_queues_unmap_req(dp_soc->htt_handle,
 						       svc_id, peer_id);
@@ -322,7 +323,7 @@ dp_peer_sawf_stats_ctx_alloc(struct dp_soc *soc,
 
 	ctx = qdf_mem_malloc(sizeof(struct dp_peer_sawf_stats));
 	if (!ctx) {
-		qdf_err("Failed to allocate peer SAWF stats");
+		dp_sawf_err("Failed to allocate peer SAWF stats");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -345,7 +346,7 @@ dp_peer_sawf_stats_ctx_free(struct dp_soc *soc,
 			    struct dp_txrx_peer *txrx_peer)
 {
 	if (!txrx_peer->sawf_stats) {
-		qdf_err("Failed to free peer SAWF stats");
+		dp_sawf_err("Failed to free peer SAWF stats");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -362,7 +363,7 @@ dp_peer_sawf_stats_ctx_get(struct dp_txrx_peer *txrx_peer)
 
 	sawf_stats = txrx_peer->sawf_stats;
 	if (!sawf_stats) {
-		qdf_err("Failed to get SAWF stats ctx");
+		dp_sawf_err("Failed to get SAWF stats ctx");
 		return NULL;
 	}
 
@@ -418,8 +419,14 @@ dp_sawf_compute_tx_hw_delay_us(struct dp_soc *soc,
 {
 	uint32_t delay;
 
+	/* Tx_rate_stats_info_valid is 0 and tsf is invalid then */
+	if (!ts->valid) {
+		dp_sawf_info("Invalid Tx rate stats info");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (!vdev) {
-		qdf_err("vdev is null");
+		dp_sawf_err("vdev is null");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -488,18 +495,19 @@ dp_sawf_get_msduq_map_info(struct dp_soc *soc, uint16_t peer_id,
 	mdsuq_index = host_q_idx - DP_SAWF_DEFAULT_Q_MAX;
 
 	if (mdsuq_index >= DP_SAWF_Q_MAX) {
-		qdf_err("Invalid Host Queue Index");
+		dp_sawf_err("Invalid Host Queue Index");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_CDP);
 	if (!peer) {
+		dp_sawf_err("Invalid peer for peer_id %d", peer_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	sawf_ctx = dp_peer_sawf_ctx_get(peer);
 	if (!sawf_ctx) {
-		qdf_err("ctx doesn't exist");
+		dp_sawf_err("ctx doesn't exist");
 		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -547,7 +555,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 	sawf_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
 
 	if (!sawf_ctx) {
-		qdf_err("Invalid SAWF stats ctx");
+		dp_sawf_err("Invalid SAWF stats ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -564,7 +572,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 					    host_msduq_idx,
 					    &tid, &msduq_idx);
 	if (status != QDF_STATUS_SUCCESS) {
-		qdf_err("unable to find tid and msduq idx");
+		dp_sawf_err("unable to find tid and msduq idx");
 		return status;
 	}
 
@@ -643,25 +651,25 @@ dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 					    host_msduq_idx,
 					    &tid, &msduq_idx);
 	if (status != QDF_STATUS_SUCCESS) {
-		qdf_err("unable to find tid and msduq idx");
+		dp_sawf_err("unable to find tid and msduq idx");
 		return status;
 	}
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_TX);
 	if (!peer) {
-		qdf_err("Invalid peer_id %u", peer_id);
+		dp_sawf_err("Invalid peer_id %u", peer_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer) {
-		qdf_err("Invalid peer_id %u", peer_id);
+		dp_sawf_err("Invalid peer_id %u", peer_id);
 		goto fail;
 	}
 
 	sawf_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
 	if (!sawf_ctx) {
-		qdf_err("Invalid SAWF stats ctx");
+		dp_sawf_err("Invalid SAWF stats ctx");
 		goto fail;
 	}
 
@@ -701,26 +709,26 @@ dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 					    host_msduq_idx,
 					    &tid, &msduq_idx);
 	if (status != QDF_STATUS_SUCCESS) {
-		qdf_err("unable to find tid and msduq idx: host_queue %d",
-			host_msduq_idx);
+		dp_sawf_err("unable to find tid and msduq idx: host_queue %d",
+			    host_msduq_idx);
 		return status;
 	}
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_TX);
 	if (!peer) {
-		qdf_err("Invalid peer_id %u", peer_id);
+		dp_sawf_err("Invalid peer_id %u", peer_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer) {
-		qdf_err("Invalid peer_id %u", peer_id);
+		dp_sawf_err("Invalid peer_id %u", peer_id);
 		goto fail;
 	}
 
 	sawf_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
 	if (!sawf_ctx) {
-		qdf_err("Invalid SAWF stats ctx");
+		dp_sawf_err("Invalid SAWF stats ctx");
 		goto fail;
 	}
 
@@ -749,45 +757,45 @@ static void dp_sawf_dump_delay_stats(struct sawf_delay_stats *stats)
 	/* Window average */
 	for (idx = 0; idx < DP_SAWF_NUM_AVG_WINDOWS; idx++) {
 		DP_PRINT_STATS("Window = %u Sum = %u Samples = %u",
-			       idx,
-			       stats->win_avgs[idx].sum,
-			       stats->win_avgs[idx].count);
+				idx,
+				stats->win_avgs[idx].sum,
+				stats->win_avgs[idx].count);
 	}
 
 	/* CDP hist min, max and weighted average */
-	DP_PRINT_STATS("Min  = %d Max  = %d Avg  = %d",
-		       stats->delay_hist.min,
-		       stats->delay_hist.max,
-		       stats->delay_hist.avg);
+	dp_sawf_print_stats("Min  = %d Max  = %d Avg  = %d",
+			    stats->delay_hist.min,
+			    stats->delay_hist.max,
+			    stats->delay_hist.avg);
 
 	/* CDP hist bucket frequency */
 	for (idx = 0; idx < CDP_HIST_BUCKET_MAX; idx++) {
-		DP_PRINT_STATS("%s:  Packets = %llu",
-			       dp_hist_tx_hw_delay_str(idx),
-			       stats->delay_hist.hist.freq[idx]);
+		dp_sawf_print_stats("%s:  Packets = %llu",
+				    dp_hist_tx_hw_delay_str(idx),
+				    stats->delay_hist.hist.freq[idx]);
 	}
 }
 
 static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 {
-	DP_PRINT_STATS("tx_success: num = %u bytes = %lu",
+	dp_sawf_print_stats("tx_success: num = %u bytes = %lu",
 		       tx_stats->tx_success.num,
 		       tx_stats->tx_success.bytes);
-	DP_PRINT_STATS("dropped: fw_rem num = %u bytes = %lu",
+	dp_sawf_print_stats("dropped: fw_rem num = %u bytes = %lu",
 		       tx_stats->dropped.fw_rem.num,
 		       tx_stats->dropped.fw_rem.bytes);
-	DP_PRINT_STATS("dropped: fw_rem_notx = %u",
+	dp_sawf_print_stats("dropped: fw_rem_notx = %u",
 		       tx_stats->dropped.fw_rem_notx);
-	DP_PRINT_STATS("dropped: fw_rem_tx = %u",
+	dp_sawf_print_stats("dropped: fw_rem_tx = %u",
 		       tx_stats->dropped.age_out);
-	DP_PRINT_STATS("dropped: fw_reason1 = %u",
+	dp_sawf_print_stats("dropped: fw_reason1 = %u",
 		       tx_stats->dropped.fw_reason1);
-	DP_PRINT_STATS("dropped: fw_reason2 = %u",
+	dp_sawf_print_stats("dropped: fw_reason2 = %u",
 		       tx_stats->dropped.fw_reason2);
-	DP_PRINT_STATS("dropped: fw_reason3 = %u",
+	dp_sawf_print_stats("dropped: fw_reason3 = %u",
 		       tx_stats->dropped.fw_reason3);
-	DP_PRINT_STATS("tx_failed = %u", tx_stats->tx_failed);
-	DP_PRINT_STATS("queue_depth = %u", tx_stats->queue_depth);
+	dp_sawf_print_stats("tx_failed = %u", tx_stats->tx_failed);
+	dp_sawf_print_stats("queue_depth = %u", tx_stats->queue_depth);
 }
 
 QDF_STATUS
@@ -799,7 +807,7 @@ dp_sawf_dump_peer_stats(struct dp_txrx_peer *txrx_peer)
 
 	ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
 	if (!ctx) {
-		qdf_err("Invalid SAWF stats ctx");
+		dp_sawf_err("Invalid SAWF stats ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -807,14 +815,15 @@ dp_sawf_dump_peer_stats(struct dp_txrx_peer *txrx_peer)
 		for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
 			tx_stats = &ctx->stats.tx_stats[tid][q_idx];
 
-			if (!tx_stats->tx_success.num && !tx_stats->tx_failed)
+			if (!tx_stats->tx_success.num &&
+			    !tx_stats->tx_failed)
 				continue;
 
-			DP_PRINT_STATS("----TID: %u MSDUQ: %u ----",
-				       tid, q_idx);
-			DP_PRINT_STATS("Delay Stats:");
+			dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
+					    tid, q_idx);
+			dp_sawf_print_stats("Delay Stats:");
 			dp_sawf_dump_delay_stats(&ctx->stats.delay[tid][q_idx]);
-			DP_PRINT_STATS("Tx Stats:");
+			dp_sawf_print_stats("Tx Stats:");
 			dp_sawf_dump_tx_stats(&ctx->stats.tx_stats[tid][q_idx]);
 		}
 	}
@@ -898,32 +907,32 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 
 	stats = (struct sawf_delay_stats *)data;
 	if (!stats) {
-		qdf_err("Invalid data to fill");
+		dp_sawf_err("Invalid data to fill");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	dp_soc = cdp_soc_t_to_dp_soc(soc);
 	if (!dp_soc) {
-		qdf_err("Invalid soc");
+		dp_sawf_err("Invalid soc");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	peer = dp_peer_find_hash_find(dp_soc, mac, 0,
 				      DP_VDEV_ALL, DP_MOD_ID_CDP);
 	if (!peer) {
-		qdf_err("Invalid peer");
+		dp_sawf_err("Invalid peer");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer) {
-		qdf_err("txrx peer is NULL");
+		dp_sawf_err("txrx peer is NULL");
 		goto fail;
 	}
 
 	stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
 	if (!stats_ctx) {
-		qdf_err("stats ctx doesn't exist");
+		dp_sawf_err("stats ctx doesn't exist");
 		goto fail;
 	}
 
@@ -932,6 +941,9 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 		for (tid = 0; tid < DP_SAWF_MAX_TIDS; tid++) {
 			for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
 				src = &stats_ctx->stats.delay[tid][q_idx];
+				dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
+					       tid, q_idx);
+				dp_sawf_dump_delay_stats(src);
 				dp_sawf_copy_delay_stats(dst, src);
 				dst++;
 			}
@@ -939,7 +951,7 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 	} else {
 		sawf_ctx = dp_peer_sawf_ctx_get(peer);
 		if (!sawf_ctx) {
-			qdf_err("stats_ctx doesn't exist");
+			dp_sawf_err("stats_ctx doesn't exist");
 			goto fail;
 		}
 
@@ -949,17 +961,18 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 		status = dp_sawf_find_msdu_from_svc_id(sawf_ctx, svc_id,
 						       &tid, &q_idx);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			qdf_err("No MSDU Queue found for svc id %u", svc_id);
+			dp_sawf_err("No MSDU Queue for svc id %u",
+				    svc_id);
 			goto fail;
 		}
 
 		src = &stats_ctx->stats.delay[tid][q_idx];
+		dp_sawf_print_stats("----TID: %u MSDUQ: %u ----", tid, q_idx);
+		dp_sawf_dump_delay_stats(src);
 		dp_sawf_copy_delay_stats(dst, src);
 		dst->tid = tid;
 		dst->msduq = q_idx;
 	}
-
-	dp_sawf_dump_peer_stats(txrx_peer);
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 
@@ -984,32 +997,32 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 
 	stats = (struct sawf_tx_stats *)data;
 	if (!stats) {
-		qdf_err("Invalid data to fill");
+		dp_sawf_err("Invalid data to fill");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	dp_soc = cdp_soc_t_to_dp_soc(soc);
 	if (!dp_soc) {
-		qdf_err("Invalid soc");
+		dp_sawf_err("Invalid soc");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	peer = dp_peer_find_hash_find(dp_soc, mac, 0,
 				      DP_VDEV_ALL, DP_MOD_ID_CDP);
 	if (!peer) {
-		qdf_err("Invalid peer");
+		dp_sawf_err("Invalid peer");
 		return QDF_STATUS_E_INVAL;
 	}
 
 	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer) {
-		qdf_err("txrx peer is NULL");
+		dp_sawf_err("txrx peer is NULL");
 		goto fail;
 	}
 
 	stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
 	if (!stats_ctx) {
-		qdf_err("stats ctx doesn't exist");
+		dp_sawf_err("stats ctx doesn't exist");
 		goto fail;
 	}
 
@@ -1018,6 +1031,9 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 		for (tid = 0; tid < DP_SAWF_MAX_TIDS; tid++) {
 			for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
 				src = &stats_ctx->stats.tx_stats[tid][q_idx];
+				dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
+					       tid, q_idx);
+				dp_sawf_dump_tx_stats(src);
 				dp_sawf_copy_tx_stats(dst, src);
 				dst++;
 			}
@@ -1025,7 +1041,7 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 	} else {
 		sawf_ctx = dp_peer_sawf_ctx_get(peer);
 		if (!sawf_ctx) {
-			qdf_err("stats_ctx doesn't exist");
+			dp_sawf_err("stats_ctx doesn't exist");
 			goto fail;
 		}
 
@@ -1035,17 +1051,19 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 		status = dp_sawf_find_msdu_from_svc_id(sawf_ctx, svc_id,
 						       &tid, &q_idx);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			qdf_err("No MSDU Queue found for svc id %u", svc_id);
+			dp_sawf_err("No MSDU Queue for svc id %u",
+				    svc_id);
 			goto fail;
 		}
 
 		src = &stats_ctx->stats.tx_stats[tid][q_idx];
+		dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
+				    tid, q_idx);
+		dp_sawf_dump_tx_stats(src);
 		dp_sawf_copy_tx_stats(dst, src);
 		dst->tid = tid;
 		dst->msduq = q_idx;
 	}
-
-	dp_sawf_dump_peer_stats(txrx_peer);
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 

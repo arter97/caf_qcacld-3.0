@@ -65,6 +65,9 @@
 	qdf_trace_hex_dump(QDF_MODULE_ID_DP_SAWF, \
 			QDF_TRACE_LEVEL_DEBUG, ptr, size)
 
+#define dp_sawf_print_stats(params ...)\
+	dp_sawf_debug(params)
+
 #define MSDU_QUEUE_LATENCY_WIN_MIN_SAMPLES 20
 #define WLAN_TX_DELAY_UNITS_US 10
 #define WLAN_TX_DELAY_MASK 0x1FFFFFFF
