@@ -405,6 +405,7 @@ dp_sawf_compute_tx_hw_delay_us(struct dp_soc *soc,
 			       struct hal_tx_completion_status *ts,
 			       uint32_t *delay_us)
 {
+	QDF_STATUS status;
 	uint32_t delay;
 
 	/* Tx_rate_stats_info_valid is 0 and tsf is invalid then */
@@ -418,10 +419,14 @@ dp_sawf_compute_tx_hw_delay_us(struct dp_soc *soc,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (QDF_IS_STATUS_ERROR(dp_tx_compute_hw_delay_us(ts,
-							  vdev->delta_tsf,
-							  &delay)))
-		return QDF_STATUS_E_FAILURE;
+	if (soc->arch_ops.dp_tx_compute_hw_delay)
+		status = soc->arch_ops.dp_tx_compute_hw_delay(soc, vdev, ts,
+							      &delay);
+	else
+		status = QDF_STATUS_E_NOSUPPORT;
+
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
 	if (delay_us)
 		*delay_us = delay;
