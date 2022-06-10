@@ -186,6 +186,17 @@ enum _ol_hal_param_t {
 #define DP_SAWF_MAX_QUEUES	2
 #define DP_SAWF_NUM_AVG_WINDOWS	5
 
+/**
+ * struct sawf_delay_stats- sawf Tx-delay stats
+ * @delay_hist: histogram for various delay-buckets
+ * @cur_win: current window-number
+ * @tid: tid no
+ * @msduq: msdu-queue used for Tx
+ * @num_pkt: count of pkts for which delay is calculated
+ * @win_total: total delay for a window
+ * @success: count of pkts that met delay-bound
+ * @failure: count of pkts that did not meet delay-bound
+ */
 struct sawf_delay_stats {
 	struct cdp_hist_stats delay_hist;
 
@@ -202,8 +213,13 @@ struct sawf_delay_stats {
 	} win_avgs[DP_SAWF_NUM_AVG_WINDOWS];
 	/*Index for the current window*/
 	uint8_t cur_win;
+	uint32_t mov_avg;
 	uint8_t tid;
 	uint8_t msduq;
+	uint32_t num_pkt;
+	uint64_t win_total;
+	uint64_t success;
+	uint64_t failure;
 };
 
 /**
@@ -225,6 +241,8 @@ struct sawf_fw_mpdu_stats {
  * @burst_size_stats: success/failure stats per burst-size
  * @tx_failed: tx failure count
  * @queue_depth: transmit queue-depth
+ * @throughput: throughput
+ * @ingress_rate: ingress-rate
  * @tid: tid used for transmit
  * @msduq: msdu-queue used for transmit
  */
@@ -244,6 +262,8 @@ struct sawf_tx_stats {
 	struct sawf_fw_mpdu_stats burst_size_stats;
 	uint32_t tx_failed;
 	uint32_t queue_depth;
+	uint32_t throughput;
+	uint32_t ingress_rate;
 	uint8_t tid;
 	uint8_t msduq;
 };
