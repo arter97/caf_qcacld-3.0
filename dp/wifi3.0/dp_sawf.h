@@ -297,6 +297,55 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 			     uint32_t svc_id, uint8_t *mac, void *data);
 
 /**
+ * dp_sawf_get_tx_stats- get MSDU Tx stats
+ * @arg: argument
+ * @in_bytes: Ingress Bytes
+ * @in_cnt: Ingress Count
+ * @tx_bytes: Transmit Bytes
+ * @tx_cnt: Transmit count
+ * @tid: TID
+ * @msduq: MSDUQ ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_get_tx_stats(void *arg, uint64_t *in_bytes, uint64_t *in_cnt,
+		     uint64_t *tx_bytes, uint64_t *tx_cnt,
+		     uint8_t tid, uint8_t msduq);
+
+/**
+ * dp_sawf_get_mpdu_sched_stats - get MPDU scheduling stats
+ * @arg: argument
+ * @svc_int_pass: MPDU with service interval passed
+ * @svc_int_fail: MPDU with service interval failed
+ * @burst_pass: MPDU with burst size failed
+ * @burst_fail: MPDU with burst size passed
+ * @tid: TID
+ * @msduq: MSDUQ ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_get_mpdu_sched_stats(void *arg, uint64_t *svc_int_pass,
+			     uint64_t *svc_int_fail, uint64_t *burst_pass,
+			     uint64_t *burst_fail, uint8_t tid, uint8_t msduq);
+
+/**
+ * dp_sawf_get_drop_stats- get MSDU drop stats
+ * @arg: argument
+ * @pass: MSDU trasnmitted successfully
+ * @drop: MSDU dropped for any reason
+ * @drop_ttl: MSDU dropped for TTL expiry
+ * @tid: TID
+ * @msduq: MSDUQ ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_get_drop_stats(void *arg, uint64_t *pass, uint64_t *drop,
+		       uint64_t *drop_ttl, uint8_t tid, uint8_t msduq);
+
+/**
  * dp_sawf_get_peer_tx_stats - get Tx stats
  * @soc: soc handle
  * @svc_id: service class ID
@@ -329,6 +378,7 @@ struct dp_peer_sawf {
 	struct dp_sawf_msduq_tid_map
 	       msduq_map[DP_SAWF_TID_MAX][DP_SAWF_DEFINED_Q_PTID_MAX];
 	struct sawf_def_queue_report tid_reports[DP_SAWF_TID_MAX];
+	void *telemetry_ctx;
 };
 
 uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
@@ -428,8 +478,8 @@ static void dp_sawf_update_svc_intval_mpdu_stats(struct dp_soc *soc,
 	}
 
 	stats = &sawf_stats_ctx->stats.tx_stats[tid][q_idx].svc_intval_stats;
-	stats->success_cnt = success_cnt;
-	stats->failure_cnt = failure_cnt;
+	stats->success_cnt += success_cnt;
+	stats->failure_cnt += failure_cnt;
 	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
 }
 
@@ -475,8 +525,8 @@ static void dp_sawf_update_burst_size_mpdu_stats(struct dp_soc *soc,
 	}
 
 	stats = &sawf_stats_ctx->stats.tx_stats[tid][q_idx].burst_size_stats;
-	stats->success_cnt = success_cnt;
-	stats->failure_cnt = failure_cnt;
+	stats->success_cnt += success_cnt;
+	stats->failure_cnt += failure_cnt;
 	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
 }
 #endif /* DP_SAWF_H*/

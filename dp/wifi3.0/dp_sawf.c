@@ -370,29 +370,6 @@ dp_peer_sawf_stats_ctx_get(struct dp_txrx_peer *txrx_peer)
 	return sawf_stats;
 }
 
-static int
-dp_sawf_msduq_delay_window_switch(struct sawf_delay_stats *tx_delay)
-{
-	uint8_t cur_win;
-
-	cur_win = tx_delay->cur_win;
-
-	if (cur_win < DP_SAWF_NUM_AVG_WINDOWS) {
-		if (tx_delay->win_avgs[cur_win].count >=
-			MSDU_QUEUE_LATENCY_WIN_MIN_SAMPLES) {
-			cur_win++;
-			if (cur_win == DP_SAWF_NUM_AVG_WINDOWS) {
-				cur_win = 0;
-			}
-			tx_delay->cur_win = cur_win;
-			tx_delay->win_avgs[cur_win].sum = 0;
-			tx_delay->win_avgs[cur_win].count = 0;
-		}
-	}
-
-	return cur_win;
-}
-
 static QDF_STATUS
 dp_sawf_compute_tx_delay(struct dp_tx_desc_s *tx_desc,
 			 uint32_t *delay)
@@ -452,7 +429,6 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 {
 	struct sawf_delay_stats *tx_delay;
 	uint32_t hw_delay;
-	uint8_t cur_win;
 
 	if (QDF_IS_STATUS_ERROR(dp_sawf_compute_tx_hw_delay_us(soc, vdev, ts,
 							       &hw_delay)))
@@ -462,21 +438,6 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 
 	/* Update hist */
 	dp_hist_update_stats(&tx_delay->delay_hist, hw_delay);
-
-	/* Update total average */
-	tx_delay->avg.sum += hw_delay;
-	tx_delay->avg.count++;
-
-	/* Update window average. Switch window if needed */
-	cur_win = dp_sawf_msduq_delay_window_switch(tx_delay);
-
-	if (cur_win >= DP_SAWF_NUM_AVG_WINDOWS) {
-		qdf_info("Invalid Current Window");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	tx_delay->win_avgs[cur_win].sum += hw_delay;
-	tx_delay->win_avgs[cur_win].count++;
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -852,17 +813,8 @@ static void
 dp_sawf_copy_delay_stats(struct sawf_delay_stats *dst,
 			 struct sawf_delay_stats *src)
 {
-	int win;
-
-	dst->avg.sum = src->avg.sum;
-	dst->avg.count = src->avg.count;
-
-	for (win = 0; win < DP_SAWF_NUM_AVG_WINDOWS; win++) {
-		dst->win_avgs[win].sum = src->win_avgs[win].sum;
-		dst->win_avgs[win].count = src->win_avgs[win].count;
-	}
-
 	dp_copy_hist_stats(&src->delay_hist, &dst->delay_hist);
+	dst->mov_avg = src->mov_avg;
 }
 
 static void
@@ -890,6 +842,8 @@ dp_sawf_copy_tx_stats(struct sawf_tx_stats *dst, struct sawf_tx_stats *src)
 
 	dst->tx_failed = src->tx_failed;
 	dst->queue_depth = src->queue_depth;
+	dst->throughput = src->throughput;
+	dst->ingress_rate = src->ingress_rate;
 }
 
 QDF_STATUS
@@ -1071,6 +1025,61 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 fail:
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+dp_sawf_get_tx_stats(void *arg, uint64_t *in_bytes, uint64_t *in_cnt,
+		     uint64_t *tx_bytes, uint64_t *tx_cnt,
+		     uint8_t tid, uint8_t msduq)
+{
+	struct dp_peer_sawf_stats *stats_ctx;
+	struct sawf_tx_stats *tx_stats;
+
+	stats_ctx = arg;
+	tx_stats = &stats_ctx->stats.tx_stats[tid][msduq];
+
+	*in_bytes = tx_stats->tx_ingress.bytes;
+	*in_cnt = tx_stats->tx_ingress.num;
+	*tx_bytes = tx_stats->tx_success.bytes;
+	*tx_cnt = tx_stats->tx_success.num;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+dp_sawf_get_mpdu_sched_stats(void *arg, uint64_t *svc_int_pass,
+			     uint64_t *svc_int_fail, uint64_t *burst_pass,
+			     uint64_t *burst_fail, uint8_t tid, uint8_t msduq)
+{
+	struct dp_peer_sawf_stats *stats_ctx;
+	struct sawf_tx_stats *tx_stats;
+
+	stats_ctx = arg;
+	tx_stats = &stats_ctx->stats.tx_stats[tid][msduq];
+
+	*svc_int_pass = tx_stats->svc_intval_stats.success_cnt;
+	*svc_int_fail = tx_stats->svc_intval_stats.failure_cnt;
+	*burst_pass = tx_stats->burst_size_stats.success_cnt;
+	*burst_fail = tx_stats->burst_size_stats.failure_cnt;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+dp_sawf_get_drop_stats(void *arg, uint64_t *pass, uint64_t *drop,
+		       uint64_t *drop_ttl, uint8_t tid, uint8_t msduq)
+{
+	struct dp_peer_sawf_stats *stats_ctx;
+	struct sawf_tx_stats *tx_stats;
+
+	stats_ctx = arg;
+	tx_stats = &stats_ctx->stats.tx_stats[tid][msduq];
+
+	*pass = tx_stats->tx_success.num;
+	*drop = tx_stats->dropped.fw_rem.num + tx_stats->tx_failed;
+	*drop_ttl = tx_stats->dropped.age_out;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 uint16_t dp_sawf_get_peerid(struct dp_soc *soc, uint8_t *dest_mac,
