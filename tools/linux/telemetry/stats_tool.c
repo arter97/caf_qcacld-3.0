@@ -1012,7 +1012,7 @@ static void print_advance_hist_stats(struct stats_if_hist_stats *hstats,
 				    count);
 			break;
 		case STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY:
-			STATS_PRINT("%s: Packets = %ju ",
+			STATS_PRINT("%s: Packets = %ju\n",
 				    stats_if_hw_tx_comp_delay_bucket[index],
 				    count);
 			break;
@@ -1021,8 +1021,8 @@ static void print_advance_hist_stats(struct stats_if_hist_stats *hstats,
 		}
 	}
 
-	STATS_PRINT("Min = %d ", hstats->min);
-	STATS_PRINT("Max = %d ", hstats->max);
+	STATS_PRINT("Min = %d\n", hstats->min);
+	STATS_PRINT("Max = %d\n", hstats->max);
 	STATS_PRINT("Avg = %d\n", hstats->avg);
 }
 
@@ -1076,11 +1076,11 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 	if (svc_id > 0) {
 		STATS_PRINT("----TIDX: %d----   ", data->tid);
 		STATS_PRINT("----QUEUE: %d---- \n", data->msduq);
-		STATS_PRINT("current_window_index       = %u\n",
-			    data->delay[0][0].cur_win);
-		STATS_PRINT("\ndata_for_each_window\n");
+		STATS_PRINT("\nDelay Bins\n");
 		print_advance_hist_stats(&data->delay[0][0].delay_hist,
 					 STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY);
+		STATS_PRINT("Moving average = %u\n",
+			    data->delay[0][0].mov_avg);
 	} else {
 		uint8_t tidx = 0, queues = 0;
 		uint8_t max_queue = STATS_IF_MAX_SAWF_DATA_QUEUE;
@@ -1093,10 +1093,11 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 				STATS_PRINT("----TID: %d----   ", tidx);
 				STATS_PRINT("----QUEUES: %d----\n", queues);
 
-				STATS_PRINT("current_window_index       = %u\n",
-					    dly->cur_win);
+				STATS_PRINT("\nDelay Bins\n");
 				print_advance_hist_stats(&dly->delay_hist,
 							 hw_comp);
+				STATS_PRINT("Moving average = %u\n",
+					    data->delay[0][0].mov_avg);
 			}
 		}
 	}
@@ -1118,6 +1119,8 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 			    data->tx[0][0].tx_ingress.num);
 		STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
 			    data->tx[0][0].tx_ingress.bytes);
+		STATS_PRINT("Tx_info_Throughput         = %u\n",
+			    data->tx[0][0].throughput);
 
 		STATS_PRINT("Tx_info_drop_num           = %u\n",
 			    data->tx[0][0].dropped.fw_rem.num);
@@ -1162,6 +1165,12 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 					    sawftx->tx_success.num);
 				STATS_PRINT("Tx_info_success_bytes      = %ju\n",
 					    sawftx->tx_success.bytes);
+				STATS_PRINT("Tx_info_ingress_num        = %u\n",
+					    sawftx->tx_ingress.num);
+				STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
+					    sawftx->tx_ingress.bytes);
+				STATS_PRINT("Tx_info_Throughput        = %u\n",
+					    sawftx->throughput);
 
 
 				STATS_PRINT("Tx_info_drop_num           = %u\n",
