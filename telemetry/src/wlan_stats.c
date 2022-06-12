@@ -1549,9 +1549,9 @@ get_advance_peer_data_sawftx(struct sawf_tx_stats *sawf_tx_stats,
 			sawf_tx_stats->svc_intval_stats.success_cnt;
 		data->tx[0][0].svc_intval_stats.failure_cnt =
 			sawf_tx_stats->svc_intval_stats.failure_cnt;
-		data->tx[0][0].svc_intval_stats.success_cnt =
+		data->tx[0][0].burst_size_stats.success_cnt =
 			sawf_tx_stats->burst_size_stats.success_cnt;
-		data->tx[0][0].svc_intval_stats.failure_cnt =
+		data->tx[0][0].burst_size_stats.failure_cnt =
 			sawf_tx_stats->burst_size_stats.failure_cnt;
 		data->tid = sawf_tx_stats->tid;
 		data->msduq = sawf_tx_stats->msduq;
