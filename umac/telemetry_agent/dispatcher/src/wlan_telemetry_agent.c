@@ -26,11 +26,11 @@
 
 struct telemetry_agent_ops *g_agent_ops;
 
-void wlan_telemetry_agent_application_init_notify(void)
+void wlan_telemetry_agent_application_init_notify(
+		enum agent_notification_event event)
 {
-	qdf_info(">");
 	if (g_agent_ops)
-		g_agent_ops->agent_notify_app_init();
+		g_agent_ops->agent_notify_app_event(event);
 }
 
 static QDF_STATUS
@@ -39,8 +39,6 @@ telemetry_agent_psoc_create_handler(struct wlan_objmgr_psoc *psoc,
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct agent_psoc_obj psoc_obj = {0};
-
-	qdf_info("> soc_id: %d", wlan_psoc_get_id(psoc));
 
 	psoc_obj.psoc_id = wlan_psoc_get_id(psoc);
 	psoc_obj.psoc_back_pointer = psoc;
@@ -59,9 +57,6 @@ telemetry_agent_pdev_create_handler(struct wlan_objmgr_pdev *pdev,
 	struct agent_pdev_obj pdev_obj = {0};
 
 	psoc = wlan_pdev_get_psoc(pdev);
-	qdf_info("> soc_id: %d pdevid: %d",
-		 wlan_psoc_get_id(psoc),
-		 wlan_objmgr_pdev_get_pdev_id(pdev));
 
 	pdev_obj.pdev_back_pointer = pdev;
 	pdev_obj.psoc_back_pointer = psoc;
@@ -85,6 +80,9 @@ telemetry_agent_peer_create_handler(struct wlan_objmgr_peer *peer,
 	struct wlan_objmgr_vdev *vdev = wlan_peer_get_vdev(peer);
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
+	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP) {
+		return status;
+	}
 	peer_obj.peer_back_pointer = peer;
 	peer_obj.pdev_back_pointer = pdev;
 	peer_obj.psoc_back_pointer = psoc;
@@ -92,11 +90,6 @@ telemetry_agent_peer_create_handler(struct wlan_objmgr_peer *peer,
 	peer_obj.psoc_id = wlan_psoc_get_id(psoc);
 	peer_obj.pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 	WLAN_ADDR_COPY(&peer_obj.peer_mac_addr, peer->macaddr);
-
-	qdf_info("> soc_id: %d pdevid: %d peer_mac: %s",
-		 wlan_psoc_get_id(psoc),
-		 wlan_objmgr_pdev_get_pdev_id(pdev),
-		 ether_sprintf(&peer_obj.peer_mac_addr[0]));
 
 	if (g_agent_ops)
 		g_agent_ops->agent_peer_create_handler(peer, &peer_obj);
@@ -112,7 +105,6 @@ telemetry_agent_psoc_delete_handler(struct wlan_objmgr_psoc *psoc,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct agent_psoc_obj psoc_obj = {0};
 
-	qdf_info("> socid: %d", wlan_psoc_get_id(psoc));
 	psoc_obj.psoc_id = wlan_psoc_get_id(psoc);
 	psoc_obj.psoc_back_pointer = psoc;
 
@@ -131,9 +123,6 @@ telemetry_agent_pdev_delete_handler(struct wlan_objmgr_pdev *pdev,
 	struct agent_pdev_obj pdev_obj = {0};
 
 	psoc = wlan_pdev_get_psoc(pdev);
-	qdf_info("> soc_id: %d pdevid: %d",
-		 wlan_psoc_get_id(psoc),
-		 wlan_objmgr_pdev_get_pdev_id(pdev));
 
 	pdev_obj.pdev_back_pointer = pdev;
 	pdev_obj.psoc_back_pointer = psoc;
@@ -157,6 +146,10 @@ telemetry_agent_peer_delete_handler(struct wlan_objmgr_peer *peer,
 	struct wlan_objmgr_vdev *vdev = wlan_peer_get_vdev(peer);
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
+	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP) {
+		return status;
+	}
+
 	peer_obj.peer_back_pointer = peer;
 	peer_obj.pdev_back_pointer = pdev;
 	peer_obj.psoc_back_pointer = psoc;
@@ -164,11 +157,6 @@ telemetry_agent_peer_delete_handler(struct wlan_objmgr_peer *peer,
 	peer_obj.psoc_id = wlan_psoc_get_id(psoc);
 	peer_obj.pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 	WLAN_ADDR_COPY(&peer_obj.peer_mac_addr, peer->macaddr);
-
-	qdf_info("> soc_id: %d pdevid: %d peer_mac: %s",
-		 wlan_psoc_get_id(psoc),
-		 wlan_objmgr_pdev_get_pdev_id(pdev),
-		 ether_sprintf(&peer_obj.peer_mac_addr[0]));
 
 	if (g_agent_ops)
 		g_agent_ops->agent_peer_destroy_handler(peer, &peer_obj);

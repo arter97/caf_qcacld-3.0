@@ -22,7 +22,8 @@
 #define MAX_SOCS 3
 #define MAX_PDEV 3
 
-void wlan_telemetry_agent_application_init_notify(void);
+void wlan_telemetry_agent_application_init_notify
+	(enum agent_notification_event);
 QDF_STATUS wlan_telemetry_agent_init(void);
 QDF_STATUS wlan_telemetry_agent_deinit(void);
 
