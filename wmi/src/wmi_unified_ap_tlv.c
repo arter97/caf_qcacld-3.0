@@ -1104,13 +1104,11 @@ static QDF_STATUS extract_swba_quiet_info_tlv(wmi_unified_t wmi_handle,
 
 	quiet_info_ev = &param_buf->quiet_offload_info[idx];
 
-	if (quiet_info_ev->tbttcount != 0) {
-		quiet_info->vdev_id = quiet_info_ev->vdev_id;
-		quiet_info->tbttcount = quiet_info_ev->tbttcount;
-		quiet_info->period = quiet_info_ev->period;
-		quiet_info->duration = quiet_info_ev->duration;
-		quiet_info->offset = quiet_info_ev->offset;
-	}
+	quiet_info->vdev_id = quiet_info_ev->vdev_id;
+	quiet_info->tbttcount = quiet_info_ev->tbttcount;
+	quiet_info->period = quiet_info_ev->period;
+	quiet_info->duration = quiet_info_ev->duration;
+	quiet_info->offset = quiet_info_ev->offset;
 
 	return QDF_STATUS_SUCCESS;
 }
