@@ -328,6 +328,7 @@ wlan_hdd_ns_offload_info_debugfs(struct hdd_context *hdd_ctx,
 }
 #endif
 
+#ifdef FEATURE_WLAN_APF
 /**
  * wlan_hdd_apf_info_debugfs() - Populate apf offload info
  * @hdd_ctx: pointer to hdd context
@@ -360,6 +361,15 @@ wlan_hdd_apf_info_debugfs(struct hdd_context *hdd_ctx,
 
 	return length;
 }
+#else
+static ssize_t
+wlan_hdd_apf_info_debugfs(struct hdd_context *hdd_ctx,
+			  struct hdd_adapter *adapter, uint8_t *buf,
+			  ssize_t buf_avail_len)
+{
+	return 0;
+}
+#endif
 
 ssize_t
 wlan_hdd_debugfs_update_filters_info(struct hdd_context *hdd_ctx,
