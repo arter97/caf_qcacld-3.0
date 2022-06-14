@@ -919,7 +919,6 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		addr = mon_desc->buf_addr;
 		qdf_assert_always(addr);
 
-		mpdu_info = &ppdu_info->mpdu_info[user_id];
 		if (!mon_desc->unmapped) {
 			qdf_mem_unmap_page(soc->osdev,
 					   (qdf_dma_addr_t)mon_desc->paddr,
@@ -932,13 +931,15 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 
 		nbuf = ppdu_info->mpdu_q[user_id][mpdu_idx];
 
-		mpdu_info->full_pkt = true;
 		if (qdf_unlikely(!nbuf)) {
 
 			/* WAR: RX_HDR is not received for this MPDU, drop this frame */
 			qdf_frag_free(addr);
 			return num_buf_reaped;
 		}
+
+		mpdu_info = &ppdu_info->mpdu_info[user_id];
+		mpdu_info->full_pkt = true;
 
 		tmp_nbuf = qdf_get_nbuf_valid_frag(nbuf);
 
