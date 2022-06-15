@@ -1735,7 +1735,6 @@ static QDF_STATUS wma_update_thermal_mitigation_to_fw(tp_wma_handle wma,
 	therm_data.levelconf[0].dcoffpercent =
 		wma->thermal_mgmt_info.throttle_duty_cycle_tbl[thermal_level];
 	therm_data.levelconf[0].priority = 0;
-	therm_data.num_thermal_conf = 1;
 
 	return wmi_unified_thermal_mitigation_param_cmd_send(wma->wmi_handle,
 							     &therm_data);
