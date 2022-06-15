@@ -397,19 +397,10 @@ bool wlan_is_chan_history_radar(struct wlan_dfs *dfs, struct dfs_channel *chan)
 #if defined(WLAN_DISP_CHAN_INFO)
 void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 {
-	qdf_freq_t freq_list [NUM_CHANNELS_320MHZ];
-	uint8_t nchannels = 0, i;
 	struct dfs_channel *chan;
 
 	chan = dfs->dfs_curchan;
-	nchannels =
-		dfs_get_bonding_channel_without_seg_info_for_freq(chan,
-								  freq_list);
-	for (i = 0; i < nchannels; i++)
-		utils_dfs_deliver_event(dfs->dfs_pdev_obj,
-					freq_list[i],
-					WLAN_EV_CAC_STARTED);
-
+	dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_STARTED);
 	/* The current channel has started CAC, so the CAC_DONE state of the
 	 * previous channel has to reset. So deliver the CAC_RESET event on
 	 * all the sub-channels of previous dfs channel. If the previous
@@ -422,12 +413,14 @@ void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 		return;
 
 	chan = dfs->dfs_prevchan;
-	nchannels =
-		dfs_get_bonding_channel_without_seg_info_for_freq(chan,
-								  freq_list);
-	for (i = 0; i < nchannels; i++)
-		utils_dfs_deliver_event(dfs->dfs_pdev_obj,
-					freq_list[i],
-					WLAN_EV_CAC_RESET);
+
+	/**
+	 * Do not change the state of NOL infected channels to
+	 * "CAC Required" within the NOL duration.
+	 */
+	if (WLAN_IS_CHAN_RADAR(dfs, chan))
+		return;
+
+	dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_RESET);
 }
 #endif
