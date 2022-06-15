@@ -468,7 +468,9 @@ static void dp_peer_tx_link_stats_print(uint8_t *peer_mac,
 	      tx_stats->bw.usage_counter[0], tx_stats->bw.usage_counter[1],
 	      tx_stats->bw.usage_counter[2], tx_stats->bw.usage_counter[3]);
 	PRINT("bw_usage_max:: %u%%", tx_stats->bw.usage_max);
-	PRINT("ack_rssi: %lu", tx_stats->ack_rssi);
+	PRINT("ack_rssi: %d", (int8_t)tx_stats->ack_rssi);
+	PRINT("mpdu_failed: %u", tx_stats->mpdu_failed);
+	PRINT("mpdu_success: %u", tx_stats->mpdu_success);
 	PRINT("pkt_error_rate: %u%%", tx_stats->pkt_error_rate);
 }
 
@@ -515,7 +517,9 @@ static void dp_peer_rx_link_stats_print(uint8_t *peer_mac,
 	      rx_stats->bw.usage_counter[0], rx_stats->bw.usage_counter[1],
 	      rx_stats->bw.usage_counter[2], rx_stats->bw.usage_counter[3]);
 	PRINT("bw_usage_max: %u%%", rx_stats->bw.usage_max);
-	PRINT("su_rssi: %lu", rx_stats->su_rssi);
+	PRINT("su_rssi: %d", (int8_t)rx_stats->su_rssi);
+	PRINT("mpdu_retries: %u", rx_stats->mpdu_retries);
+	PRINT("num_mpdus: %u", rx_stats->num_mpdus);
 	PRINT("pkt_error_rate: %u%%", rx_stats->pkt_error_rate);
 }
 
