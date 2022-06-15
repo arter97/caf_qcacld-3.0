@@ -86,8 +86,6 @@ static struct option long_options[] = {
 	{"peer_remove", 1, 0, 'r'},
 	/* List mac address for peer filtering */
 	{"peer_list", 0, 0, 'L'},
-	/* Specify type of peer (assoc/non-assoc)*/
-	{"type", 1, 0, 't'},
 	/* Vap for issuing the mac address command */
 	{"vap", 1, 0, 'v'},
 	/* Provide debug value */

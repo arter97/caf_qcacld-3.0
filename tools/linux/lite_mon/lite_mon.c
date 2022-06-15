@@ -61,8 +61,6 @@ static void usage(void)
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--peer_list: List the peers added into peer filtering list");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"--type: type of peer to be added/removed/displayed <assoc/non-assoc>");
-	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--vap: ifname to which the peer is to be added");
 	lite_mon_printf(LITE_MON_TRACE_INFO,
 			"--debug: Debug option for lite_mon <0/1/2/3/4>");
@@ -369,25 +367,6 @@ static void lite_mon_sanitize_debug(uint8_t debug)
 }
 
 /*
- * lite_mon_sanitize_type: sanitize the type given by user.
- * @type: filter type given by user.
- * return void
- */
-static void lite_mon_sanitize_type(uint8_t type)
-{
-	lite_mon_printf(LITE_MON_TRACE_DEBUG, "type %d", type);
-	switch (type) {
-	case LITE_MON_PEER_ASSOCIATED:
-	case LITE_MON_PEER_NON_ASSOCIATED:
-		break;
-	default:
-		lite_mon_printf(LITE_MON_TRACE_ERROR, "Invalid type option %d",
-				type);
-		exit(0);
-	}
-}
-
-/*
  * lite_mon_sanitize_count: sanitize the count given by user.
  * @count: filter count given by user.
  * return void
@@ -456,7 +435,6 @@ static void lite_mon_get_filter_sanity(struct lite_mon_config *mon_config)
 static void lite_mon_set_peer_sanity(struct lite_mon_config *mon_config)
 {
 	lite_mon_sanitize_debug(mon_config->debug);
-	lite_mon_sanitize_type(mon_config->data.peer_config.type);
 	lite_mon_sanitize_count(mon_config->data.peer_config.count);
 	lite_mon_sanitize_interface_name(mon_config->data.peer_config.interface_name);
 }
@@ -469,7 +447,6 @@ static void lite_mon_set_peer_sanity(struct lite_mon_config *mon_config)
 static void lite_mon_get_peer_sanity(struct lite_mon_config *mon_config)
 {
 	lite_mon_sanitize_debug(mon_config->debug);
-	lite_mon_sanitize_type(mon_config->data.peer_config.type);
 }
 
 /*
@@ -532,23 +509,6 @@ static char *lite_mon_get_level(uint8_t level)
 }
 
 /*
- * lite_mon_get_type: Convert type value into text string
- * @type: type value given by user
- * return void
- */
-static char *lite_mon_get_type(uint8_t type)
-{
-	switch (type) {
-	case LITE_MON_PEER_ASSOCIATED:
-		return "ASSOCIATED";
-	case LITE_MON_PEER_NON_ASSOCIATED:
-		return "NON-ASSOCIATED";
-	default:
-		return "Wrong type";
-	}
-}
-
-/*
  * lite_mon_display_filter: Display the filter settings given by user
  * @mon_config: mon_config structre given by user
  * return void
@@ -607,8 +567,6 @@ static void lite_mon_display_peer(struct lite_mon_config *mon_config)
 			lite_mon_get_direction(mon_config->direction));
 	lite_mon_printf(LITE_MON_TRACE_INFO, "Debug: %02X",
 			mon_config->debug);
-	lite_mon_printf(LITE_MON_TRACE_INFO, "Type: %s",
-			lite_mon_get_type(mon_config->data.peer_config.type));
 	lite_mon_printf(LITE_MON_TRACE_INFO, "Number of peers in list: %d",
 			mon_config->data.peer_config.count);
 	for (i = 0; i < mon_config->data.peer_config.count; i++) {
@@ -714,9 +672,8 @@ static void lite_mon_dump_structure_content(struct lite_mon_config *mon_config)
 				filter_config->len[2]);
 	} else {
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
-				"action %d type %d count %d vap %s",
+				"action %d count %d vap %s",
 				peer_config->action,
-				peer_config->type,
 				peer_config->count,
 				peer_config->interface_name);
 		for (i = 0; i < peer_config->count; i++)
@@ -795,7 +752,7 @@ int main(int argc, char *argv[])
 			    DEFAULT_NL80211_EVENT_SOCK_ID);
 
 	while (1) {
-		c = getopt_long(argc, argv, "d:e:Dp:m:o:f:j:k:l:O:sa:r:Lhx:M:t:v:",
+		c = getopt_long(argc, argv, "d:e:Dp:m:o:f:j:k:l:O:sa:r:Lhx:M:v:",
 				long_options, &option_index);
 		if (c == -1)
 			break;
@@ -908,21 +865,6 @@ int main(int argc, char *argv[])
 		case 'L': /* peer_list */
 			cmd_bitmask |= LITE_MON_GET_PEER_MASK;
 			mon_config.data.peer_config.action = LITE_MON_PEER_LIST;
-			break;
-		case 't': /* type */
-			if (strncmp(optarg, "assoc", strlen("assoc")) == 0) {
-				mon_config.data.peer_config.type =
-						LITE_MON_PEER_ASSOCIATED;
-			} else if (strncmp(optarg, "non-assoc",
-				   strlen("non-assoc")) == 0) {
-				mon_config.data.peer_config.type =
-						LITE_MON_PEER_NON_ASSOCIATED;
-			} else {
-				lite_mon_printf(LITE_MON_TRACE_ERROR,
-						"Wrong option provided for type %s",
-						optarg);
-				exit(0);
-			}
 			break;
 		case 'v': /* interface name */
 			cmd_bitmask |= LITE_MON_SET_PEER_MASK;

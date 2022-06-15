@@ -64,7 +64,6 @@
 struct dp_lite_mon_peer {
 	union dp_align_mac_addr peer_mac;
 	uint8_t rssi;
-	uint8_t type;
 	TAILQ_ENTRY(dp_lite_mon_peer) peer_list_elem;
 };
 
@@ -100,7 +99,7 @@ struct dp_lite_mon_config {
 	uint8_t metadata;
 	uint8_t debug;
 	struct dp_vdev *lite_mon_vdev;
-	uint8_t peer_count[CDP_LITE_MON_PEER_TYPE_MAX];
+	uint8_t peer_count;
 	TAILQ_HEAD(, dp_lite_mon_peer) peer_list;
 };
 
