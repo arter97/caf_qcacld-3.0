@@ -203,6 +203,42 @@ dp_lite_mon_copy_config(struct dp_lite_mon_config *curr_config,
 }
 
 /**
+ * dp_lite_mon_disable_tx - disables tx lite mon
+ * @pdev: dp pdev
+ *
+ * Return: void
+ */
+void
+dp_lite_mon_disable_tx(struct dp_pdev *pdev)
+{
+	struct dp_mon_pdev_be *be_mon_pdev;
+	struct dp_lite_mon_tx_config *lite_mon_tx_config;
+	struct dp_mon_pdev *mon_pdev;
+	QDF_STATUS status;
+
+	if (!pdev)
+		return;
+
+	mon_pdev = (struct dp_mon_pdev *)pdev->monitor_pdev;
+	if (!mon_pdev)
+		return;
+
+	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	lite_mon_tx_config = be_mon_pdev->lite_mon_tx_config;
+
+	qdf_spin_lock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
+	/* reset filters */
+	dp_mon_filter_reset_tx_lite_mon(be_mon_pdev);
+	status = dp_mon_filter_update(pdev);
+	if (status != QDF_STATUS_SUCCESS)
+		dp_mon_err("Failed to reset tx lite mon filters");
+
+	/* reset tx lite mon config */
+	dp_lite_mon_reset_config(&lite_mon_tx_config->tx_config);
+	qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
+}
+
+/**
  * dp_lite_mon_disable_rx - disables rx lite mon
  * @pdev: dp pdev
  *
@@ -359,23 +395,51 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 	}
 
 	if (config->disable) {
-		/* lite mon pending:
-		 * -reset and update tx filter
-		 * -reset tx lite mon config
-		 */
 		qdf_spin_lock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
+		/* reset lite mon filters */
+		dp_mon_filter_reset_tx_lite_mon(be_mon_pdev);
+		status = dp_tx_mon_filter_update(&be_pdev->pdev);
+		if (status != QDF_STATUS_SUCCESS)
+			dp_mon_err("Failed to reset tx lite mon filters");
+
+		/* reset tx lite mon config */
 		dp_lite_mon_update_config(&be_pdev->pdev,
 					  &lite_mon_tx_config->tx_config,
 					  config);
 		qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
 	} else {
-		/* store tx lite mon config */
+		/* validate configuration */
+		/* if level is MPDU/PPDU and data pkt is full len, then
+		 * this is a contradicting request as full data pkt can span
+		 * multiple mpdus. Whereas Mgmt/Ctrl pkt full len with level
+		 * MPDU/PPDU is supported as they span max one mpdu.
+		 */
+		if ((config->level != CDP_LITE_MON_LEVEL_MSDU) &&
+		    (config->len[WLAN_FC0_TYPE_DATA] ==
+						CDP_LITE_MON_LEN_FULL)) {
+			dp_mon_err("Filter combination not supported "
+				   "level mpdu/ppdu and data full pkt");
+			return QDF_STATUS_E_INVAL;
+		}
+
 		qdf_spin_lock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
+		/* store tx lite mon config */
 		dp_lite_mon_update_config(&be_pdev->pdev,
 					  &lite_mon_tx_config->tx_config,
 					  config);
+
+		/* setupt tx lite mon filters */
+		dp_mon_filter_setup_tx_lite_mon(be_mon_pdev);
+		status = dp_tx_mon_filter_update(&be_pdev->pdev);
+		if (status != QDF_STATUS_SUCCESS) {
+			dp_mon_err("Failed to setup tx lite mon filters");
+			dp_mon_filter_reset_tx_lite_mon(be_mon_pdev);
+			config->disable = 1;
+			dp_lite_mon_update_config(&be_pdev->pdev,
+						  &lite_mon_tx_config->tx_config,
+						  config);
+		}
 		qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
-		/* lite mon pending: setup and update rx filter */
 	}
 
 	return status;
@@ -1750,8 +1814,8 @@ void dp_lite_mon_tx_dealloc(struct dp_pdev_be *be_pdev)
 		(struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
 
 	if (be_mon_pdev->lite_mon_tx_config) {
-		/* delete tx peers from the list */
-		dp_lite_mon_free_peers(&be_mon_pdev->lite_mon_tx_config->tx_config);
+		/* disable tx lite mon */
+		dp_lite_mon_disable_tx(&be_pdev->pdev);
 		qdf_spinlock_destroy(&be_mon_pdev->lite_mon_tx_config->lite_mon_tx_lock);
 		qdf_mem_free(be_mon_pdev->lite_mon_tx_config);
 	}
