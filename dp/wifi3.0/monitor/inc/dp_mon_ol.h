@@ -27,6 +27,19 @@ int ol_ath_set_phyrx_error_mask(void *vscn, uint32_t mask, uint32_t mask_cont);
 int ol_ath_get_phyrx_error_mask(void *vscn, uint32_t *mask,
 				uint32_t *mask_cont);
 #endif
+#ifdef QCA_SUPPORT_LITE_MONITOR
+/* fwd declarations */
+struct lite_mon_config;
+
+int wlan_set_lite_monitor_config(void *vscn,
+				 struct lite_mon_config *mon_config);
+int wlan_get_lite_monitor_config(void *vscn,
+				 struct lite_mon_config *mon_config);
+int wlan_set_lite_monitor_peer_config(void *vscn,
+				      struct lite_mon_config *mon_config);
+int wlan_get_lite_monitor_peer_config(void *vscn,
+				      struct lite_mon_config *mon_config);
+#endif /* QCA_SUPPORT_LITE_MONITOR*/
 
 #if QCN_IE
 int ol_ath_set_bpr_wifi3(struct ol_ath_softc_net80211 *scn, int val);
