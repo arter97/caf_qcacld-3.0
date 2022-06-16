@@ -16,10 +16,12 @@
 
 #include <ol_if_athvar.h>
 #include <cdp_txrx_ctrl.h>
+#include <dp_mon.h>
 
 #ifdef QCA_SUPPORT_LITE_MONITOR
 
 void monitor_osif_process_rx_mpdu(osif_dev *osifp, qdf_nbuf_t mpdu_ind);
+void monitor_osif_deliver_tx_capture_data(osif_dev *osifp, struct sk_buff *skb);
 
 /**
  * wlan_lite_mon_rx_process - rx lite mon wdi event handler
@@ -75,7 +77,50 @@ static void wlan_lite_mon_tx_process(void *pdev_hdl, enum WDI_EVENT event,
 				     void *data, uint16_t peer_id,
 				     uint32_t status)
 {
-	/* lite mon pending: handle tx mpdus */
+	qdf_nbuf_t skb = NULL;
+	struct wlan_objmgr_pdev *pdev_obj =
+		(struct wlan_objmgr_pdev *)pdev_hdl;
+	struct ieee80211com *ic = wlan_pdev_get_mlme_ext_obj(pdev_obj);
+	struct ieee80211vap *vap;
+	osif_dev  *osifp;
+	struct cdp_tx_indication_info *ptr_tx_info;
+
+	ptr_tx_info = (struct cdp_tx_indication_info *)data;
+
+	if (!ptr_tx_info->mpdu_nbuf)
+		return;
+
+	if (!ic) {
+		qdf_nbuf_free(ptr_tx_info->mpdu_nbuf);
+		dp_mon_debug("ic is NULL");
+		return;
+	}
+
+	vap = (struct ieee80211vap *)ic->ic_mon_vap;
+	if (!vap) {
+		qdf_nbuf_free(ptr_tx_info->mpdu_nbuf);
+		ptr_tx_info->mpdu_nbuf = NULL;
+		dp_mon_debug("No monitor vap created, to dump skb");
+		return;
+	}
+
+	osifp = (osif_dev *)vap->iv_ifp;
+
+	dp_mon_info("ppdu_id[%d] frm_type[%d] [%p]sending to stack!!!!",
+		  ptr_tx_info->mpdu_info.ppdu_id,
+		  ptr_tx_info->mpdu_info.frame_type,
+		  ptr_tx_info->mpdu_nbuf);
+
+	skb = ptr_tx_info->mpdu_nbuf;
+
+	if (!ptr_tx_info->mpdu_nbuf) {
+		dp_mon_err("mpdu_nbuf is NULL!!!!");
+		return;
+	}
+
+	ptr_tx_info->mpdu_nbuf = NULL;
+
+	monitor_osif_deliver_tx_capture_data(osifp, skb);
 }
 
 /**
