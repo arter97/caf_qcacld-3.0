@@ -30,7 +30,11 @@
 #define DP_MON_RING_FILL_LEVEL_DEFAULT 2048
 #define DP_MON_DATA_BUFFER_SIZE     2048
 #define DP_MON_DESC_MAGIC 0xdeadabcd
-#define DP_MON_MAX_STATUS_BUF 128
+/*
+ * This is based on 256 MPDU case for a PPDU assuming status buffer
+ * size is 2k
+ */
+#define DP_MON_MAX_STATUS_BUF 280
 #define DP_MON_QUEUE_DEPTH_MAX 16
 #define DP_MON_MSDU_LOGGING 0
 #define DP_MON_MPDU_LOGGING 1

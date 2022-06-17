@@ -392,6 +392,7 @@ enum cdp_mon_phyrx_abort_reason_code {
  *  ring ppdu id
  * @rx_undecoded_count: Received undecoded frame count
  * @rx_undecoded_error: Rx undecoded errors
+ * @rx_hdr_not_received: Rx HDR not received for MPDU
  */
 struct cdp_pdev_mon_stats {
 #ifndef REMOVE_MON_DBG_STATS
@@ -428,6 +429,7 @@ struct cdp_pdev_mon_stats {
 	uint32_t rx_undecoded_count;
 	uint32_t rx_undecoded_error[CDP_PHYRX_ERR_MAX];
 #endif
+	uint32_t rx_hdr_not_received;
 };
 
 #ifdef QCA_SUPPORT_LITE_MONITOR

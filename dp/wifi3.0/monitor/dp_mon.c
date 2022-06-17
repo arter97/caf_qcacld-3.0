@@ -903,6 +903,8 @@ dp_print_pdev_rx_mon_stats(struct dp_pdev *pdev)
 	DP_PRINT_STATS("mon_rx_dest_stuck = %d",
 		       rx_mon_stats->mon_rx_dest_stuck);
 
+	DP_PRINT_STATS("rx_hdr_not_received = %d",
+		       rx_mon_stats->rx_hdr_not_received);
 	dp_pdev_get_undecoded_capture_stats(mon_pdev, rx_mon_stats);
 }
 

@@ -447,17 +447,6 @@ void dp_vdev_set_monitor_mode_buf_rings_2_0(struct dp_pdev *pdev)
 		mon_soc_be->rx_mon_ring_fill_level +=
 					(rx_mon_max_entries - mon_soc_be->rx_mon_ring_fill_level);
 	}
-
-	if (mon_soc_be->tx_mon_ring_fill_level < tx_mon_max_entries) {
-		if (dp_tx_mon_buffers_alloc(soc,
-					    (tx_mon_max_entries - mon_soc_be->tx_mon_ring_fill_level))) {
-			dp_mon_err("%pK: Tx mon buffers allocation failed", soc);
-			return;
-		}
-
-		mon_soc_be->tx_mon_ring_fill_level +=
-					(tx_mon_max_entries - mon_soc_be->tx_mon_ring_fill_level);
-	}
 }
 
 static
@@ -833,7 +822,6 @@ static void dp_mon_soc_deinit_2_0(struct dp_soc *soc)
 		return;
 
 	dp_rx_mon_buffers_free(soc);
-	dp_tx_mon_buffers_free(soc);
 
 	dp_rx_mon_buf_desc_pool_deinit(soc);
 	dp_tx_mon_buf_desc_pool_deinit(soc);
@@ -884,12 +872,6 @@ QDF_STATUS dp_tx_mon_soc_init_2_0(struct dp_soc *soc)
 
 	if (dp_tx_mon_buf_desc_pool_init(soc)) {
 		dp_mon_err("%pK: " RNG_ERR "tx mon desc pool init", soc);
-		goto fail;
-	}
-
-	/* monitor buffers for src */
-	if (dp_tx_mon_buffers_alloc(soc, DP_MON_RING_FILL_LEVEL_DEFAULT)) {
-		dp_mon_err("%pK: Tx mon buffers allocation failed", soc);
 		goto fail;
 	}
 

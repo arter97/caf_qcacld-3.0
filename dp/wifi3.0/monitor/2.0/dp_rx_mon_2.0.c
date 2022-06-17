@@ -363,7 +363,7 @@ void dp_rx_mon_process_ppdu(void *context)
  * Return: SUCCESS or FAILIRE
  */
 
-static QDF_STATUS
+QDF_STATUS
 dp_rx_mon_add_ppdu_info_to_wq(struct dp_mon_pdev *mon_pdev,
 			      struct hal_rx_ppdu_info *ppdu_info)
 {
@@ -867,9 +867,11 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 				break;
 
 			nbuf = ppdu_info->mpdu_q[user_id][mpdu_idx];
+			/* RX_HDR is not received from this MPDU */
 			if (qdf_unlikely(!nbuf)) {
+				mon_pdev->rx_mon_stats.rx_hdr_not_received++;
 				dp_mon_err("nbuf is NULL");
-				qdf_assert_always(0);
+				return num_buf_reaped;
 			}
 
 			tmp_nbuf = qdf_get_nbuf_valid_frag(nbuf);
@@ -1127,12 +1129,8 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		return NULL;
 	}
 
-	ppdu_info = qdf_mem_malloc(sizeof(*ppdu_info));
-
-	if (!ppdu_info) {
-		dp_mon_err("ppdu_info malloc failed pdev: %pK", pdev);
-		return NULL;
-	}
+	ppdu_info = &mon_pdev->ppdu_info;
+	qdf_mem_zero(ppdu_info, sizeof(*ppdu_info));
 
 	status_buf_count = mon_pdev_be->desc_count;
 	for (idx = 0; idx < status_buf_count; idx++) {
@@ -1366,13 +1364,7 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 		if (mon_pdev->enhanced_stats_en && ppdu_info)
 			dp_rx_handle_ppdu_stats(soc, pdev, ppdu_info);
 
-		/* Call API to add PPDU info workqueue */
-		status = dp_rx_mon_add_ppdu_info_to_wq(mon_pdev, ppdu_info);
-
-		if (status != QDF_STATUS_SUCCESS) {
-			if (ppdu_info)
-				qdf_mem_free(ppdu_info);
-		}
+		dp_rx_mon_process_ppdu_info(pdev, ppdu_info);
 
 		work_done++;
 
