@@ -1082,6 +1082,94 @@ enum wlan_phymode dfs_expand_find_max_possible_target_mode(struct wlan_dfs *dfs,
 }
 
 /**
+ * dfs_find_subtract_subchan_list_index() - Find the subchannel index of the
+ * RCAC channel in which CAC check is done.
+ * Example: Target subchans = [100, 104, 108, 112] , current subchannel = [100]
+ * The subtracted n_suchans = [104, 108, 112] and index is returned as 1.
+ * @chan: Pointer to dfs_channel object of target channel.
+ * @subset_chan: Pointer to dfs_channel object of subset channel.
+ * @target_freq_list: Pointer to target_freq_list array.
+ * @cur_freq_list: Pointer to cur_freq_list array.
+ * @n_subchans: Ending value of subchannel list index.
+ */
+static
+uint8_t dfs_find_subtract_subchan_list_index(struct dfs_channel *chan,
+					     struct dfs_channel *subset_chan,
+					     qdf_freq_t *target_freq_list,
+					     qdf_freq_t *cur_freq_list,
+					     uint8_t *n_subchans)
+{
+	uint8_t n_target_channels, n_cur_channels;
+	uint8_t i = 0;
+
+	n_target_channels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(chan,
+								  target_freq_list);
+	n_cur_channels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(subset_chan,
+								  cur_freq_list);
+	while (i < n_cur_channels) {
+		if (target_freq_list[i] == cur_freq_list[i])
+			i++;
+		else
+			break;
+	}
+
+	*n_subchans = n_target_channels - i;
+	return i;
+}
+
+/**
+ * dfs_is_rcac_done_on_subchan_list() - Check if RCAC is completed on
+ * subchannel list.
+ * @dfs: pointer to wlan_dfs.
+ * @target_freq_list: Pointer to target_freq_list array.
+ * @n_subchans: Ending value of subchannel list index.
+ */
+static
+bool dfs_is_rcac_done_on_subchan_list(struct wlan_dfs *dfs,
+				      qdf_freq_t *target_freq_list,
+				      uint8_t n_subchans)
+{
+	uint8_t i;
+
+	for (i = 0; i < n_subchans; i++) {
+		if (!dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(dfs,
+									    target_freq_list[i]))
+			return false;
+	}
+	return true;
+}
+
+/**
+ * dfs_is_rcac_cac_done API checks CAC is completed only on the RCAC channel
+ * and excludes current operating channel.
+ *
+ * Example: Let's consider User configured chan is 100 HT160 and current
+ * operating channel is 100 HT80 and RCAC completed chan is 120 HT80.
+ * There is a possibilty for bandwidth expansion from 80Mhz to 160Mhz.
+ * Check CAC is completed only on RCAC channel because current operating
+ * chan already completed CAC.
+ */
+bool dfs_is_rcac_cac_done(struct wlan_dfs *dfs,
+			  struct dfs_channel *chan,
+			  struct dfs_channel *subset_chan)
+{
+	qdf_freq_t target_freq_list[MAX_20MHZ_SUBCHANS];
+	qdf_freq_t cur_freq_list[MAX_20MHZ_SUBCHANS];
+	uint8_t n_subchans, subtract_chan_idx;
+
+	subtract_chan_idx = dfs_find_subtract_subchan_list_index(chan,
+								 subset_chan,
+								 target_freq_list,
+								 cur_freq_list,
+								 &n_subchans);
+	return dfs_is_rcac_done_on_subchan_list(dfs,
+						&target_freq_list[subtract_chan_idx],
+						n_subchans);
+}
+
+/**
  * WORKING SEQUENCE :
  *
  * 1) When preCAC is completed on a channel. The event DFS_AGILE_SM_EV_AGILE_DONE
@@ -2181,6 +2269,34 @@ dfs_save_rcac_ch_params(struct wlan_dfs *dfs, struct ch_params rcac_ch_params,
 		  rcac_param->rcac_ch_params.center_freq_seg1);
 }
 
+/**
+ * dfs_select_rcac_freq() - Select the RCAC frequency based on BW Expand
+ * feature or user configured RCAC frequency.
+ * @dfs: Pointer to struct wlan_dfs.
+ * @agile_chwidth: Agile channel width.
+ * @is_user_rcac_chan_valid: Boolean value to check validity of user configured
+ * RCAC freq.
+ *
+ * Return: Rolling CAC frequency in MHZ.
+ */
+static
+qdf_freq_t dfs_select_rcac_freq(struct wlan_dfs *dfs,
+				enum phy_ch_width agile_chwidth,
+				bool is_user_rcac_chan_valid)
+{
+	qdf_freq_t rcac_freq;
+
+	rcac_freq = dfs_bwexpand_find_usr_cnf_chan(dfs);
+	if (rcac_freq) {
+		if (agile_chwidth  != CH_WIDTH_20MHZ)
+			rcac_freq = rcac_freq - HALF_20MHZ_BW;
+	} else if (is_user_rcac_chan_valid) {
+		rcac_freq = dfs->dfs_agile_rcac_freq_ucfg;
+	}
+
+	return rcac_freq;
+}
+
 /* dfs_find_rcac_chan() - Find out a rolling CAC channel.
  *
  * @dfs: Pointer to struct wlan_dfs.
@@ -2225,8 +2341,20 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 					   dfs->dfs_agile_rcac_freq_ucfg);
 	}
 
-	if (is_user_rcac_chan_valid) {
-		rcac_freq = dfs->dfs_agile_rcac_freq_ucfg;
+	/*
+	 * In case of BW Expansion, check if user configured frequency is
+	 * free from NOL, CAC not completed and not a current channel.
+	 *
+	 * If the above conditions are satisfied, then set the frequency to
+	 * start Rolling CAC on that frequency.
+	 *
+	 * If not, then set rcac_freq to user configured RCAC channel.
+	 */
+	rcac_freq = dfs_select_rcac_freq(dfs,
+					 agile_chwidth,
+					 is_user_rcac_chan_valid);
+
+	if (rcac_freq) {
 		if (dfs_find_dfschan_for_freq(dfs, rcac_freq, 0,
 					      agile_chwidth,
 					      &dfs_chan) != QDF_STATUS_SUCCESS)

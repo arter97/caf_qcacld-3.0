@@ -653,6 +653,12 @@ static void dfs_agile_state_complete_entry(void *ctx)
 
 	/* Mark the RCAC channel as CAC done. */
 	dfs_mark_adfs_chan_as_cac_done(dfs);
+
+	/* Check if BW_Expansion is already done and CSA sent internally.
+	 * If Yes, then Agile is considered to completed.
+	 */
+	if (dfs_bwexpand_try_jumping_to_target_subchan(dfs))
+		return;
 	/*
 	 * Check if rcac is done on preffered channel.
 	 * If so, change channel from intermediate channel to preffered chan.
