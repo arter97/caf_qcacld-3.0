@@ -153,12 +153,131 @@ struct basic_psoc_data {
 };
 
 #if WLAN_ADVANCE_TELEMETRY
+#define STATS_IF_MAX_CHAIN 8
+#define STATS_IF_DATA_TID_MAX 8
+#define STATS_IF_BW_USAGE_MAX_SIZE 4
+#define STATS_IF_CACHE_SIZE 10
+#define STATS_IF_INVALID_CACHE_IDX (-1)
+#define STATS_IF_INVALID_CACHE_TYPE (~1)
+
+enum stats_if_wlan_rate_ppdu_type {
+	STATS_IF_WLAN_RATE_SU,
+	STATS_IF_WLAN_RATE_MU_MIMO,
+	STATS_IF_WLAN_RATE_MU_OFDMA,
+	STATS_IF_WLAN_RATE_MU_OFDMA_MIMO,
+	STATS_IF_WLAN_RATE_MAX,
+};
+
+enum stats_if_peer_rate_stats_type {
+	STATS_IF_PEER_RX_RATE_STATS,
+	STATS_IF_PEER_TX_RATE_STATS,
+	STATS_IF_PEER_SOJOURN_STATS,
+	STATS_IF_PEER_RX_LINK_STATS,
+	STATS_IF_PEER_TX_LINK_STATS,
+	STATS_IF_PEER_AVG_RATE_STATS,
+};
+
+struct stats_if_rdk_rx_rate_stats {
+	uint32_t ratecode;
+	uint32_t rate;
+	uint32_t num_bytes;
+	uint32_t num_msdus;
+	uint32_t num_mpdus;
+	uint32_t num_ppdus;
+	uint32_t num_retries;
+	uint32_t num_sgi;
+	unsigned long avg_rssi;
+	unsigned long avg_rssi_ant[STATS_IF_MAX_CHAIN][STATS_IF_MAX_BW];
+};
+
+struct stats_if_rdk_tx_rate_stats {
+	uint32_t ratecode;
+	uint32_t rate;
+	uint32_t mpdu_success;
+	uint32_t mpdu_attempts;
+	uint32_t num_ppdus;
+	uint32_t num_msdus;
+	uint32_t num_bytes;
+	uint32_t num_retries;
+};
+
+struct stats_if_rdk_tx_sojourn_stats {
+	uint32_t num_msdus[STATS_IF_DATA_TID_MAX];
+	uint32_t sum_sojourn_msdu[STATS_IF_DATA_TID_MAX];
+	uint32_t avg_sojourn_msdu[STATS_IF_DATA_TID_MAX];
+};
+
+struct stats_if_peer_bw_stats {
+	uint32_t usage_total;
+	uint32_t usage_counter[STATS_IF_BW_USAGE_MAX_SIZE];
+	uint8_t usage_avg;
+	uint8_t usage_max;
+};
+
+struct stats_if_rdk_tx_link_stats {
+	uint64_t bytes;
+	uint32_t num_ppdus;
+	uint32_t phy_rate_lpf_avg_su;
+	uint32_t phy_rate_actual_su;
+	uint32_t phy_rate_lpf_avg_mu;
+	uint32_t phy_rate_actual_mu;
+	uint32_t ofdma_usage;
+	uint32_t mu_mimo_usage;
+	struct stats_if_peer_bw_stats bw;
+	unsigned long ack_rssi;
+	uint32_t mpdu_failed;
+	uint32_t mpdu_success;
+	uint8_t pkt_error_rate;
+};
+
+struct stats_if_rdk_rx_link_stats {
+	uint64_t bytes;
+	uint32_t num_ppdus;
+	uint32_t phy_rate_lpf_avg_su;
+	uint32_t phy_rate_actual_su;
+	uint32_t phy_rate_lpf_avg_mu;
+	uint32_t phy_rate_actual_mu;
+	uint32_t ofdma_usage;
+	uint32_t mu_mimo_usage;
+	struct stats_if_peer_bw_stats bw;
+	unsigned long su_rssi;
+	uint32_t mpdu_retries;
+	uint32_t num_mpdus;
+	uint8_t pkt_error_rate;
+};
+
+struct stats_if_rate_avg {
+	uint32_t num_ppdu;
+	uint32_t sum_mbps;
+	uint32_t num_snr;
+	uint32_t sum_snr;
+	uint64_t num_mpdu;
+	uint32_t num_retry;
+};
+
+struct stats_if_rdk_avg_rate_stats {
+	struct stats_if_rate_avg tx[STATS_IF_WLAN_RATE_MAX];
+	struct stats_if_rate_avg rx[STATS_IF_WLAN_RATE_MAX];
+};
+
+struct advance_peer_data_rdk {
+	struct stats_if_rdk_rx_rate_stats rx_rate[STATS_IF_CACHE_SIZE];
+	struct stats_if_rdk_tx_rate_stats tx_rate[STATS_IF_CACHE_SIZE];
+	struct stats_if_rdk_tx_sojourn_stats tx_sojourn;
+	struct stats_if_rdk_tx_link_stats tx_link;
+	struct stats_if_rdk_rx_link_stats rx_link;
+	struct stats_if_rdk_avg_rate_stats avg_rate;
+	uint64_t peer_cookie;
+	uint32_t cache_type;
+};
+
 /* Advance peer data stats holder */
 struct advance_peer_data {
 	struct advance_peer_data_tx *tx;
 	struct advance_peer_data_rx *rx;
 	struct advance_peer_data_fwd *fwd;
 	struct advance_peer_data_raw *raw;
+	struct advance_peer_data_rdk *rdk;
 	struct advance_peer_data_twt *twt;
 	struct advance_peer_data_link *link;
 	struct advance_peer_data_rate *rate;
@@ -347,6 +466,7 @@ struct stats_command {
 	u_int64_t feat_flag;
 	struct ether_addr sta_mac;
 	struct reply_buffer *reply;
+	void (*async_callback)(struct stats_command *cmd, char *if_name);
 };
 
 /**
@@ -372,4 +492,29 @@ int32_t libstats_request_handle(struct stats_command *cmd);
  * Return: None
  */
 void libstats_free_reply_buffer(struct stats_command *cmd);
+
+/**
+ * libstats_is_ifname_valid(): Function to check interface name
+ * @ifname: Pointer to Interface name to be checked
+ * @obj: Type of object Radio/VAP/SoC
+ *
+ * Return: 1 if valid and 0 if invalid
+ */
+int libstats_is_ifname_valid(const char *ifname, enum stats_object_e obj);
+
+/**
+ * libstats_request_async_start(): Start async stats
+ * @cmd: Filled command structure by Application
+ *
+ * Return: 0 on Success, -1 on Failure
+ */
+int32_t libstats_request_async_start(struct stats_command *cmd);
+
+/**
+ * libstats_request_async_stop(): Stop async stats
+ * @cmd: Filled command structure by Application
+ *
+ * Return: 0 on Success, -1 on Failure
+ */
+int32_t libstats_request_async_stop(struct stats_command *cmd);
 #endif /* _STATS_LIB_H_ */

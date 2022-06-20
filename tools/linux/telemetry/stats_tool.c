@@ -51,10 +51,6 @@
 #define STATS_8(fp, descr, x) \
 	fprintf(fp, "\t%-*s = %hhu\n", DESC_FIELD_PROVISIONING, (descr), (x))
 
-#define STATS_FLT(fp, descr, x, precsn) \
-	fprintf(fp, "\t%-*s = %.*f\n", DESC_FIELD_PROVISIONING, (descr), \
-	(precsn), (x))
-
 #define STATS_UNVLBL(fp, descr, msg) \
 	fprintf(fp, "\t%-*s = %s\n", DESC_FIELD_PROVISIONING, (descr), (msg))
 
@@ -70,6 +66,13 @@
 
 #define STATS_IF_TX_FW_STATUS_OK     0
 #define STATS_IF_TX_RR_FRAME_ACKED   0
+#define STATS_IF_PEER_RIX_MASK       0xffff
+#define STATS_IF_PEER_RIX_OFFSET     0
+#define STATS_IF_GET_PEER_RIX(_val) \
+	(((_val) >> STATS_IF_PEER_RIX_OFFSET) & STATS_IF_PEER_RIX_MASK)
+#define STATS_IF_ASYNC_MODE          "async"
+
+static bool g_run_loop;
 
 #if defined(WLAN_DEBUG_TELEMETRY) || defined(WLAN_ADVANCE_TELEMETRY)
 #ifdef WLAN_FEATURE_11BE
@@ -539,7 +542,9 @@ static void display_help(void)
 {
 	STATS_PRINT("\nwifitelemetry : Displays Statistics of Access Point\n");
 	STATS_PRINT("\nUsage:\n"
-		    "wifitelemetry [Level] [Object] [StatsType] [FeatureFlag] [[-i interface_name] | [-m StationMACAddress]] [-R] [-h | ?]\n"
+		    "Process Mode: wifitelemetry [Level] [Object] [StatsType] [FeatureName] [[-i interface_name] | [-m StationMACAddress]] [-R] [-h | ?]\n"
+		    "Daemon Mode: wifitelemetry async\n"
+		    "    Note: User must run wifitelemetry in background. Excecute another instance in process mode to trigger stats request.\n"
 		    "\n"
 		    "One of the 3 Levels can be selected. The Levels are as follows (catagorised based on purpose or\n"
 		    "the level of details):\n"
@@ -553,63 +558,42 @@ static void display_help(void)
 		    "StatsType specifies the stats category. Catagories are:\n"
 		    "Control and Data. Default is Data category.\n"
 		    "\n"
-		    "Feature flag specifies various specific feature for which Stats is to be displayed. By default ALL will\n"
+		    "Feature Name specifies various specific feature for which Stats is to be displayed. By default ALL will\n"
 		    "be selected. List of feature flags are as follows:\n"
-		    "ALL,RX,TX,AST,CFR,FWD,HTT,RAW,RDK,TSO,TWT,VOW,WDI,WMI,IGMP,LINK,MESH,RATE,DELAY,JITTER,ME,NAWDS,TXCAP,MONITOR,SAWFDELAY and SAWFTX.\n"
+		    "ALL,RX,TX,AST,CFR,FWD,HTT,RAW,EXT,TSO,TWT,VOW,WDI,WMI,IGMP,LINK,MESH,RATE,DELAY,JITTER,ME,NAWDS,TXCAP,MONITOR,SAWFDELAY and SAWFTX.\n"
 		    "\n"
 		    "Levels:\n"
-		    "\n"
-		    "-B or --basic\n"
-		    "    Only Basic level stats are displyed. This is the default level\n"
-		    "-A or --advance\n"
-		    "    Advance level stats are displayed.\n"
-		    "-D or --debug\n"
-		    "    Debug level stats are displayed.\n"
+		    "    -B or --basic:   Only Basic level stats are displyed. This is the default level\n"
+		    "    -A or --advance: Advance level stats are displayed.\n"
+		    "    -D or --debug:   Debug level stats are displayed.\n"
 		    "\n"
 		    "Objects:\n"
+		    "    -a or --ap:      Entire Access Point stats are displayed. No need to specify interface and STA MAC.\n"
+		    "    -r or --radio:   Radio object stats are displayed. Radio interface Name needs to be provided.\n"
+		    "    -v or --vap:     Vap object stats are displayed. Vap interface Name need to be provided.\n"
+		    "    -s or --sta:     STA object stats are displayed. STA MAC Address need to be provided.\n"
 		    "\n"
-		    "-a or --ap\n"
-		    "    Entire Access Point stats are displayed. No need to specify interface and STA MAC.\n"
-		    "-r or --radio\n"
-		    "    Radio object stats are displayed. Radio interface Name needs to be provided.\n"
-		    "-v or --vap\n"
-		    "    Vap object stats are displayed. Vap interface Name need to be provided.\n"
-		    "-s or --sta\n"
-		    "    STA object stats are displayed. STA MAC Address need to be provided.\n"
-		    "\n"
-		    "Feature Flags:\n"
-		    "\n"
-		    "-f <flag1[,flag2,...,flagN]> or --feature=<flag1[,flag2,...,flagN]>\n"
-		    "    Feature flag carries the flags for requested features. Multiple flags can be added with ',' separation.\n"
+		    "Feature Names:\n"
+		    "    -f <flag1[,flag2,...,flagN]> or --feature=<flag1[,flag2,...,flagN]>\n"
+		    "        Feature flag carries the flags for requested features. Multiple flags can be added with ',' separation.\n"
 		    "\n"
 		    "Types:\n"
-		    "\n"
-		    "-d or --data\n"
-		    "    Stats for data is displayed\n"
-		    "-c or --ctrl\n"
-		    "    Stats for control is displayed\n"
+		    "    -d or --data:   Stats for data is displayed\n"
+		    "    -c or --ctrl:   Stats for control is displayed\n"
 		    "\n"
 		    "Interface:\n"
+		    "    -i wifiX or --ifname=wifiX:  For Radio\n"
+		    "    -i athX or --ifname=athX:    For VAP\n"
 		    "\n"
-		    "If Radio object is selected:\n"
-		    "-i wifiX or --ifname=wifiX\n"
+		    "STA MAC Address for STA stats:\n"
+		    "    -m xx:xx:xx:xx:xx:xx or --stamacaddr xx:xx:xx:xx:xx:xx\n"
 		    "\n"
-		    "If VAP object is selected:\n"
-		    "-i <VAP_name> or --ifname=<VAP_name>\n"
-		    "\n"
-		    "STA MAC Address:\n"
-		    "\n"
-		    "Required if STA object is selected:\n"
-		    "-m xx:xx:xx:xx:xx:xx or --stamacaddr xx:xx:xx:xx:xx:xx\n"
-		    "\n"
-		    "Can be set only in STA mode for SAWFDELAY and SWFATX features:\n"
-		    "-t <serviceid>\n"
+		    "Service ID set only in STA mode for SAWFDELAY and SWFATX features:\n"
+		    "    -t <serviceid>\n"
 		    "\n"
 		    "OTHER OPTIONS:\n"
-		    "-R or --recursive\n"
-		    "    Recursive display\n"
-		    "-h or --help\n"
-		    "    Usage display\n");
+		    "    -R or --recursive:  Recursive display\n"
+		    "    -h or --help:       Usage display\n");
 }
 
 static char *macaddr_to_str(u_int8_t *addr)
@@ -952,6 +936,283 @@ void print_advance_sta_data_raw(struct advance_peer_data_raw *raw)
 {
 	STATS_64(stdout, "Raw Packets", raw->raw.num);
 	STATS_64(stdout, "Raw Bytes", raw->raw.bytes);
+}
+
+void print_sta_rdk_rx_rate_stats(struct advance_peer_data_rdk *rdk)
+{
+	struct stats_if_rdk_rx_rate_stats *rx_rate;
+	uint8_t i, chain, bw;
+
+	STATS_PRINT("======================================================\n");
+	STATS_PRINT("\tPEER Cookie    = %016"PRIx64"\n", rdk->peer_cookie);
+	STATS_PRINT("\n\t%10s | %10s | %10s | %10s | %10s | %10s|",
+		    "rate", "rix", "bytes", "msdus", "mpdus", "ppdus");
+	STATS_PRINT(" %10s | %10s | %10s\n", "retries", "sgi", "rssi");
+	for (i = 0; i < STATS_IF_CACHE_SIZE; i++) {
+		rx_rate = &rdk->rx_rate[i];
+		if (rx_rate->ratecode == STATS_IF_INVALID_CACHE_IDX)
+			continue;
+
+		STATS_PRINT("\t%10u | %10u | %10u | %10u | %10u | %10u |",
+			    rx_rate->rate,
+			    STATS_IF_GET_PEER_RIX(rx_rate->ratecode),
+			    rx_rate->num_bytes, rx_rate->num_msdus,
+			    rx_rate->num_mpdus, rx_rate->num_ppdus);
+		STATS_PRINT(" %10u | %10u | %10lu\n", rx_rate->num_retries,
+			    rx_rate->num_sgi, rx_rate->avg_rssi);
+	}
+
+	STATS_PRINT("\n\t%10s | %10s | %10s | %10s | %10s |", "rate",
+		    "rssi 1 p20", "rssi 1 e20", "rssi 1 e40 low20",
+		    "rssi 1 e40 high20");
+	STATS_PRINT(" %10s | %10s | %10s | %10s\n", "rssi 1 ext80 low20",
+		    "rssi 1 ext80 low_high20", "rssi 1 ext80 high_low20",
+		    "rssi 1 ext80 high20");
+	STATS_PRINT("\t\t     %10s | %10s | %10s | %10s |", "rssi 2 p20",
+		    "rssi 2 e20", "rssi 2 e40 low20", "rssi 2 e40 high20");
+	STATS_PRINT(" %10s | %10s | %10s | %10s\n", "rssi 2 ext80 low20",
+		    "rssi 2 ext80 low_high20", "rssi 2 ext80 high_low20",
+		    "rssi 2 ext80 high20");
+	STATS_PRINT("\t\t     %10s | %10s | %10s | %10s |", "rssi 3 p20",
+		    "rssi 3 e20", "rssi 3 e40 low20", "rssi 3 e40 high20");
+	STATS_PRINT(" %10s | %10s | %10s | %10s\n", "rssi 3 ext80 low20",
+		    "rssi 3 ext80 low_high20", "rssi 3 ext80 high_low20",
+		    "rssi 3 ext80 high20");
+	STATS_PRINT("\t\t     %10s | %10s | %10s | %10s |", "rssi 4 p20",
+		    "rssi 4 e20", "rssi 4 e40 low20", "rssi 4 e40 high20");
+	STATS_PRINT(" %10s | %10s | %10s | %10s\n", "rssi 4 ext80 low20",
+		    "rssi 4 ext80 low_high20", "rssi 4 ext80 high_low20",
+		    "rssi 4 ext80 high20");
+	STATS_PRINT("\t\t     %10s | %10s | %10s | %10s |", "rssi 5 p20",
+		    "rssi 5 e20", "rssi 5 e40 low20", "rssi 5 e40 high20");
+	STATS_PRINT(" %10s | %10s | %10s | %10s\n", "rssi 5 ext80 low20",
+		    "rssi 5 ext80 low_high20", "rssi 5 ext80 high_low20",
+		    "rssi 5 ext80 high20");
+	STATS_PRINT("\t\t     %10s | %10s | %10s | %10s |", "rssi 6 p20",
+		    "rssi 6 e20", "rssi 6 e40 low20", "rssi 6 e40 high20");
+	STATS_PRINT(" %10s | %10s | %10s | %10s\n", "rssi 6 ext80 low20",
+		    "rssi 6 ext80 low_high20", "rssi 6 ext80 high_low20",
+		    "rssi 6 ext80 high20");
+	STATS_PRINT("\t\t     %10s | %10s | %10s | %10s |", "rssi 7 p20",
+		    "rssi 7 e20", "rssi 7 e40 low20", "rssi 7 e40 high20");
+	STATS_PRINT(" %10s | %10s | %10s | %10s\n", "rssi 7 ext80 low20",
+		    "rssi 7 ext80 low_high20", "rssi 7 ext80 high_low20",
+		    "rssi 7 ext80 high20");
+	STATS_PRINT("\t\t     %10s | %10s | %10s | %10s |", "rssi 8 p20",
+		    "rssi 8 e20", "rssi 8 e40 low20", "rssi 8 e40 high20");
+	STATS_PRINT(" %10s | %10s | %10s | %10s\n\n", "rssi 8 ext80 low20",
+		    "rssi 8 ext80 low_high20", "rssi 8 ext80 high_low20",
+		    "rssi 8 ext80 high20");
+	for (i = 0; i < STATS_IF_CACHE_SIZE; i++) {
+		rx_rate = &rdk->rx_rate[i];
+		if (rx_rate->ratecode == STATS_IF_INVALID_CACHE_IDX)
+			continue;
+
+		STATS_PRINT("\t%10u", rx_rate->rate);
+		for (chain = 0; chain < STATS_IF_MAX_CHAIN; chain++) {
+			for (bw = 0; bw < STATS_IF_MAX_BW; bw++)
+				STATS_PRINT(" | %10lu",
+					    rx_rate->avg_rssi_ant[chain][bw]);
+			STATS_PRINT("\n\t\t  ");
+		}
+		STATS_PRINT("\n");
+	}
+	STATS_PRINT("======================================================\n");
+}
+
+void print_sta_rdk_tx_sojourn_stats(struct advance_peer_data_rdk *rdk)
+{
+	struct stats_if_rdk_tx_sojourn_stats *tx_sojourn = &rdk->tx_sojourn;
+	uint8_t tid;
+
+	STATS_PRINT("======================================================\n");
+	STATS_PRINT("\n\tSojourn statistics:\n");
+	STATS_PRINT("\t%10s %10s %20s %20s\n", "tid", "ave", "sum", "num");
+	for (tid = 0; tid < STATS_IF_DATA_TID_MAX; tid++)
+		STATS_PRINT("\t%10d %10u %20u %20u\n",
+			    tid, tx_sojourn->avg_sojourn_msdu[tid],
+			    tx_sojourn->sum_sojourn_msdu[tid],
+			    tx_sojourn->num_msdus[tid]);
+	STATS_PRINT("\tsizeof(avg) : %10u\n",
+		    (uint32_t)sizeof(tx_sojourn->avg_sojourn_msdu[tid]));
+	STATS_PRINT("======================================================\n");
+}
+
+void print_sta_rdk_tx_rate_stats(struct advance_peer_data_rdk *rdk)
+{
+	struct stats_if_rdk_tx_rate_stats *tx_rate;
+	uint8_t i;
+
+	STATS_PRINT("======================================================\n");
+	STATS_PRINT("\tPEER Cookie    = %016"PRIx64"\n", rdk->peer_cookie);
+	STATS_PRINT("\t%10s | %10s | %10s | %10s | %10s |", "rate", "rix",
+		    "attempts", "success", "ppdus");
+	STATS_PRINT(" %10s | %10s | %10s\n", "msdus", "bytes", "retries");
+	for (i = 0; i < STATS_IF_CACHE_SIZE; i++) {
+		tx_rate = &rdk->tx_rate[i];
+		if (tx_rate->ratecode == STATS_IF_INVALID_CACHE_IDX)
+			continue;
+		STATS_PRINT("\t%10u | %10u | %10u | %10u | %10u |",
+			    tx_rate->rate,
+			    STATS_IF_GET_PEER_RIX(tx_rate->ratecode),
+			    tx_rate->mpdu_attempts, tx_rate->mpdu_success,
+			    tx_rate->num_ppdus);
+		STATS_PRINT(" %10u | %10u | %10u\n", tx_rate->num_msdus,
+			    tx_rate->num_bytes, tx_rate->num_retries);
+	}
+	STATS_PRINT("======================================================\n");
+	print_sta_rdk_tx_sojourn_stats(rdk);
+}
+
+void print_sta_rdk_tx_link_stats(struct advance_peer_data_rdk *rdk)
+{
+	struct stats_if_rdk_tx_link_stats *tx_link = &rdk->tx_link;
+
+	STATS_PRINT("======================================================\n");
+	STATS_32(stdout, "num_ppdus", tx_link->num_ppdus);
+	STATS_64(stdout, "bytes", tx_link->bytes);
+	STATS_32(stdout, "mpdu_success", tx_link->mpdu_success);
+	STATS_32(stdout, "mpdus_failed", tx_link->mpdu_failed);
+	STATS_32(stdout, "phy_rate_actual_su (kbps)",
+		 tx_link->phy_rate_actual_su);
+	STATS_32(stdout, "phy_rate_actual_mu (kbps)",
+		 tx_link->phy_rate_actual_mu);
+	STATS_32(stdout, "ofdma_usage", tx_link->ofdma_usage);
+	STATS_32(stdout, "mu_mimo_usage", tx_link->mu_mimo_usage);
+	STATS_32(stdout, "bw_usage_avg (MHz)", tx_link->bw.usage_avg);
+	STATS_PRINT("\tbw_usage_packets: 20MHz: %u 40MHz: %u",
+		    tx_link->bw.usage_counter[0], tx_link->bw.usage_counter[1]);
+	STATS_PRINT(" 80MHz: %u 160MHz: %u\n", tx_link->bw.usage_counter[2],
+		    tx_link->bw.usage_counter[3]);
+	STATS_PRINT("\tbw_usage_max                   = %u%%\n",
+		    tx_link->bw.usage_max);
+	STATS_PRINT("\tack_rssi                       = %lu\n",
+		    tx_link->ack_rssi);
+	STATS_PRINT("\tpkt_error_rate                 = %u%%\n",
+		    tx_link->pkt_error_rate);
+	STATS_PRINT("======================================================\n");
+}
+
+void print_sta_rdk_rx_link_stats(struct advance_peer_data_rdk *rdk)
+{
+	struct stats_if_rdk_rx_link_stats *rx_link = &rdk->rx_link;
+
+	STATS_PRINT("======================================================\n");
+	STATS_32(stdout, "num_ppdus", rx_link->num_ppdus);
+	STATS_64(stdout, "bytes", rx_link->bytes);
+	STATS_32(stdout, "num_mpdus", rx_link->num_mpdus);
+	STATS_32(stdout, "mpdu_retries", rx_link->mpdu_retries);
+	STATS_32(stdout, "phy_rate_actual_su (kbps)",
+		 rx_link->phy_rate_actual_su);
+	STATS_32(stdout, "phy_rate_actual_mu (kbps)",
+		 rx_link->phy_rate_actual_mu);
+	STATS_32(stdout, "ofdma_usage", rx_link->ofdma_usage);
+	STATS_32(stdout, "mu_mimo_usage", rx_link->mu_mimo_usage);
+	STATS_32(stdout, "bw_usage_avg (MHz)", rx_link->bw.usage_avg);
+	STATS_PRINT("\tbw_usage_packets: 20MHz: %u 40MHz: %u",
+		    rx_link->bw.usage_counter[0], rx_link->bw.usage_counter[1]);
+	STATS_PRINT(" 80MHz: %u 160MHz: %u\n", rx_link->bw.usage_counter[2],
+		    rx_link->bw.usage_counter[3]);
+	STATS_PRINT("\tbw_usage_max                   = %u%%\n",
+		    rx_link->bw.usage_max);
+	STATS_PRINT("\tsu_rssi                        = %lu\n",
+		    rx_link->su_rssi);
+	STATS_PRINT("\tpkt_error_rate                 = %u%%\n",
+		    rx_link->pkt_error_rate);
+	STATS_PRINT("======================================================\n");
+}
+
+void print_sta_rdk_avg_rate_stats(struct advance_peer_data_rdk *rdk)
+{
+	struct stats_if_rdk_avg_rate_stats *stats = &rdk->avg_rate;
+	enum stats_if_wlan_rate_ppdu_type type;
+	char *type2str[STATS_IF_WLAN_RATE_MAX] = {
+		"SU",
+		"MU-MIMO",
+		"MU-OFDMA",
+		"MU-MIMO-OFDMA",
+	};
+	uint32_t mpdu;
+	uint32_t psr;
+	uint32_t avg_mbps;
+	uint32_t avg_snr;
+
+	STATS_PRINT("======================================================\n");
+	STATS_PRINT("\tAvg tx stats:\n");
+	STATS_PRINT("\t%20s %15s %15s %15s %15s %15s\n", "mode", "rate(mbps)",
+		    "total ppdu", "snr value", "snr count", "psr value");
+	for (type = 0; type < STATS_IF_WLAN_RATE_MAX; type++) {
+		psr = 0;
+		avg_mbps = 0;
+		avg_snr = 0;
+		if (stats->tx[type].num_ppdu > 0)
+			avg_mbps = stats->tx[type].sum_mbps /
+					stats->tx[type].num_ppdu;
+		if (stats->tx[type].num_snr > 0)
+			avg_snr = stats->tx[type].sum_snr /
+					stats->tx[type].num_snr;
+		mpdu = stats->tx[type].num_mpdu +
+			stats->tx[type].num_retry;
+		if (mpdu > 0)
+			psr = (100 * stats->tx[type].num_mpdu) / mpdu;
+		STATS_PRINT("\t%20s %15u %15u %15u %15u %15u\n",
+			    type2str[type], avg_mbps, stats->tx[type].num_ppdu,
+			    avg_snr, stats->tx[type].num_snr, psr);
+	}
+	STATS_PRINT("\tAvg rx stats:\n");
+	STATS_PRINT("\t%20s %15s %15s %15s %15s %15s\n", "mode", "rate(mbps)",
+		    "total ppdu", "snr value", "snr count", "psr value");
+	for (type = 0; type < STATS_IF_WLAN_RATE_MAX; type++) {
+		psr = 0;
+		avg_mbps = 0;
+		avg_snr = 0;
+		if (stats->rx[type].num_ppdu > 0)
+			avg_mbps = stats->rx[type].sum_mbps /
+					stats->rx[type].num_ppdu;
+		if (stats->rx[type].num_snr > 0)
+			avg_snr = stats->rx[type].sum_snr /
+					stats->rx[type].num_snr;
+		mpdu = stats->rx[type].num_mpdu +
+			stats->rx[type].num_retry;
+		if (mpdu > 0)
+			psr = (100 * stats->rx[type].num_mpdu) / mpdu;
+		STATS_PRINT("\t%20s %15u %15u %15u %15u %15u\n",
+			    type2str[type], avg_mbps, stats->rx[type].num_ppdu,
+			    avg_snr, stats->rx[type].num_snr, psr);
+	}
+	STATS_PRINT("======================================================\n");
+}
+
+void print_advance_sta_data_rdk(struct advance_peer_data_rdk *rdk,
+				uint8_t *peer_mac, char *pif_name)
+{
+	switch (rdk->cache_type) {
+	case STATS_IF_PEER_RX_RATE_STATS:
+		STATS_PRINT("Rx Rate Statistics for Peer %s (Radio %s):\n",
+			    macaddr_to_str(peer_mac), pif_name);
+		print_sta_rdk_rx_rate_stats(rdk);
+		break;
+	case STATS_IF_PEER_TX_RATE_STATS:
+		STATS_PRINT("Tx Rate Statistics for Peer %s (Radio %s):\n",
+			    macaddr_to_str(peer_mac), pif_name);
+		print_sta_rdk_tx_rate_stats(rdk);
+		break;
+	case STATS_IF_PEER_TX_LINK_STATS:
+		STATS_PRINT("Tx Link Quality Metrics for Peer %s (Radio %s):\n",
+			    macaddr_to_str(peer_mac), pif_name);
+		print_sta_rdk_tx_link_stats(rdk);
+		break;
+	case STATS_IF_PEER_RX_LINK_STATS:
+		STATS_PRINT("Rx Link Quality Metrics for Peer %s (Radio %s):\n",
+			    macaddr_to_str(peer_mac), pif_name);
+		print_sta_rdk_rx_link_stats(rdk);
+		break;
+	case STATS_IF_PEER_AVG_RATE_STATS:
+		STATS_PRINT("Avrage Rate statistics for Peer %s (Radio %s):\n",
+			    macaddr_to_str(peer_mac), pif_name);
+		print_sta_rdk_avg_rate_stats(rdk);
+		break;
+	}
 }
 
 void print_advance_sta_data_twt(struct advance_peer_data_twt *twt)
@@ -1794,8 +2055,13 @@ void print_advance_sta_data(struct stats_obj *sta)
 {
 	struct advance_peer_data *data = sta->stats;
 
-	STATS_PRINT("Advance Data STATS For STA %s (Parent %s)\n",
-		    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+	if (data->rdk)
+		print_advance_sta_data_rdk(data->rdk, sta->u_id.mac_addr,
+					   sta->pif_name);
+	else
+		STATS_PRINT("Advance Data STATS For STA %s (Parent %s)\n",
+			    macaddr_to_str(sta->u_id.mac_addr), sta->pif_name);
+
 	if (data->tx) {
 		STATS_PRINT("Tx Stats\n");
 		print_advance_sta_data_tx(data->tx);
@@ -3212,6 +3478,63 @@ void print_response(struct reply_buffer *reply)
 	}
 }
 
+void stats_async_response_handler(struct stats_command *cmd, char *ifname)
+{
+	if (!cmd || !cmd->reply)
+		return;
+
+	print_response(cmd->reply);
+}
+
+void stop_handler(int val)
+{
+	g_run_loop = false;
+}
+
+int handle_async_request(int argc, char *argv[])
+{
+	struct stats_command cmd = {0};
+
+	if (argc > 2)
+		return -EINVAL;
+
+	/* Check for Async mode, otherwise allow further parsing */
+	if (!argv[1] || strncmp(argv[1], STATS_IF_ASYNC_MODE,
+				strlen(STATS_IF_ASYNC_MODE)))
+		return -EINVAL;
+
+	cmd.lvl = STATS_LVL_ADVANCE;
+	cmd.obj = STATS_OBJ_RADIO;
+	cmd.async_callback = stats_async_response_handler;
+
+	cmd.reply = malloc(sizeof(struct reply_buffer));
+	if (!cmd.reply) {
+		STATS_ERR("Failed to allocate memory\n");
+		return -ENOMEM;
+	}
+	memset(cmd.reply, 0, sizeof(struct reply_buffer));
+
+	if (libstats_request_async_start(&cmd)) {
+		STATS_ERR("Unable to start Async stats!\n");
+		libstats_request_async_stop(&cmd);
+		free(cmd.reply);
+		cmd.reply = NULL;
+		return 0;
+	}
+	signal(SIGINT, stop_handler);
+	g_run_loop = true;
+	while (g_run_loop)
+		/* sleep for 1 ms */
+		usleep(1000);
+
+	libstats_request_async_stop(&cmd);
+	if (cmd.reply)
+		free(cmd.reply);
+	cmd.reply = NULL;
+
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	struct stats_command cmd;
@@ -3238,6 +3561,10 @@ int main(int argc, char *argv[])
 	u_int8_t servid_temp = 0;
 
 	memset(&cmd, 0, sizeof(struct stats_command));
+
+	ret = handle_async_request(argc, argv);
+	if (!ret)
+		return ret;
 
 	ret = getopt_long(argc, argv, opt_string, long_opts, &long_index);
 	while (ret != -1) {
@@ -3448,6 +3775,9 @@ int main(int argc, char *argv[])
 
 	/* Cleanup */
 	libstats_free_reply_buffer(&cmd);
+	if (cmd.reply)
+		free(cmd.reply);
+	cmd.reply = NULL;
 
 	return 0;
 }

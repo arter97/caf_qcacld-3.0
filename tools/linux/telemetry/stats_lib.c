@@ -20,6 +20,7 @@
 #include <qcatools_lib.h>
 #include <ieee80211_external.h>
 #include <wlan_stats_define.h>
+#include <dp_rate_stats_pub.h>
 #include <stats_lib.h>
 #if UMAC_SUPPORT_CFG80211
 #ifndef BUILD_X86
@@ -66,16 +67,6 @@
 		else                       \
 			(_flg) &= (_mask); \
 	} while (0)
-
-/* Global socket context to create nl80211 command and event interface */
-static struct socket_context g_sock_ctx = {0};
-/* Global parent vap to build child sta object list */
-static struct object_list *g_parent_vap_obj;
-/**
- * Global sta object pointor to avoid sta list traversal to find current
- * sta pointer while building sta object list.
- */
-static struct object_list *g_curr_sta_obj;
 
 /**
  * struct soc_ifnames: Radio interface of a soc
@@ -147,6 +138,23 @@ struct feat_parser_t {
 	u_int64_t id;
 };
 
+struct async_context {
+	bool thread_started;
+	struct stats_command *cmd;
+};
+
+/* Global socket context to create nl80211 command and event interface */
+static struct socket_context g_sock_ctx = {0};
+/* Global parent vap to build child sta object list */
+static struct object_list *g_parent_vap_obj;
+/**
+ * Global sta object pointor to avoid sta list traversal to find current
+ * sta pointer while building sta object list.
+ */
+static struct object_list *g_curr_sta_obj;
+/* Global context to hold async request data */
+static struct async_context g_async_ctx = {0};
+
 /**
  * Mapping for Supported Features
  */
@@ -159,7 +167,7 @@ static struct feat_parser_t g_feat[] = {
 	{ "CFR", STATS_FEAT_FLG_CFR },
 	{ "FWD", STATS_FEAT_FLG_FWD },
 	{ "RAW", STATS_FEAT_FLG_RAW },
-	{ "RDK", STATS_FEAT_FLG_PEER },
+	{ "EXT", STATS_FEAT_FLG_EXT },
 	{ "TSO", STATS_FEAT_FLG_TSO },
 	{ "TWT", STATS_FEAT_FLG_TWT },
 	{ "VOW", STATS_FEAT_FLG_VOW },
@@ -206,7 +214,7 @@ struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_FEAT_SAWFTX] = { .type = NLA_UNSPEC },
 };
 
-static int is_ifname_valid(const char *ifname, enum stats_object_e obj)
+int libstats_is_ifname_valid(const char *ifname, enum stats_object_e obj)
 {
 	int i, ret;
 	ssize_t size = 0;
@@ -409,7 +417,7 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 		} else {
 			continue;
 		}
-		if (is_ifname_valid(temp_name, STATS_OBJ_AP)) {
+		if (libstats_is_ifname_valid(temp_name, STATS_OBJ_AP)) {
 			if (sinx >= MAX_SOC_NUM) {
 				STATS_WARN("SOC Interfaces exceeded limit\n");
 				continue;
@@ -424,7 +432,8 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 			strlcpy(if_list->soc[sinx].name, temp_name, size);
 			if_list->soc[sinx].added = false;
 			sinx++;
-		} else if (is_ifname_valid(temp_name, STATS_OBJ_RADIO)) {
+		} else if (libstats_is_ifname_valid(temp_name,
+						    STATS_OBJ_RADIO)) {
 			if (rinx >= MAX_RADIO_NUM) {
 				STATS_WARN("Radio Interfaces exceeded limit\n");
 				continue;
@@ -439,7 +448,7 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 			strlcpy(if_list->radio[rinx].name, temp_name, size);
 			if_list->radio[rinx].added = false;
 			rinx++;
-		} else if (is_ifname_valid(temp_name, STATS_OBJ_VAP)) {
+		} else if (libstats_is_ifname_valid(temp_name, STATS_OBJ_VAP)) {
 			if (vinx >= MAX_VAP_NUM) {
 				STATS_WARN("Vap Interfaces exceeded limit\n");
 				continue;
@@ -463,43 +472,6 @@ static int fetch_all_interfaces(struct interface_list *if_list)
 	if_list->v_count = vinx;
 
 	return 0;
-}
-
-static int stats_lib_socket_init(void)
-{
-	return init_socket_context(&g_sock_ctx, STATS_NL80211_CMD_SOCK_ID,
-				   STATS_NL80211_EVENT_SOCK_ID);
-}
-
-static int stats_lib_init(void)
-{
-	g_sock_ctx.cfg80211 = is_cfg80211_mode_enabled();
-
-	if (!g_sock_ctx.cfg80211) {
-		STATS_ERR("CFG80211 mode is disabled!\n");
-		return -EINVAL;
-	}
-
-	if (stats_lib_socket_init()) {
-		STATS_ERR("Failed to initialise socket\n");
-		return -EIO;
-	}
-	/* There are few generic IOCTLS, so we need to have sockfd */
-	g_sock_ctx.sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (g_sock_ctx.sock_fd < 0) {
-		STATS_ERR("socket creation failed\n");
-		return -EIO;
-	}
-
-	return 0;
-}
-
-static void stats_lib_deinit(void)
-{
-	if (!g_sock_ctx.cfg80211)
-		return;
-	destroy_socket_context(&g_sock_ctx);
-	close(g_sock_ctx.sock_fd);
 }
 
 static int32_t get_hw_address(const char *if_name, uint8_t *hw_addr)
@@ -582,7 +554,7 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("Radio Interface name not configured.\n");
 			return -EINVAL;
 		}
-		if (!is_ifname_valid(cmd->if_name, STATS_OBJ_RADIO)) {
+		if (!libstats_is_ifname_valid(cmd->if_name, STATS_OBJ_RADIO)) {
 			STATS_ERR("Radio Interface name invalid.\n");
 			return -EINVAL;
 		}
@@ -594,7 +566,7 @@ static int is_valid_cmd(struct stats_command *cmd)
 			STATS_ERR("VAP Interface name not configured.\n");
 			return -EINVAL;
 		}
-		if (!is_ifname_valid(cmd->if_name, STATS_OBJ_VAP)) {
+		if (!libstats_is_ifname_valid(cmd->if_name, STATS_OBJ_VAP)) {
 			STATS_ERR("VAP Interface name invalid.\n");
 			return -EINVAL;
 		}
@@ -1256,6 +1228,293 @@ static void parse_advance_ap(struct nlattr *rattr, struct stats_obj *obj)
 
 	obj->stats = data;
 }
+
+static void
+get_advance_sta_extended_rx_rate_stats(void *buffer, uint32_t buffer_len,
+				       struct stats_if_rdk_rx_rate_stats *rate)
+{
+	struct wlan_rx_rate_stats *rx_stats;
+	uint8_t chain, bw;
+	uint8_t i = 0;
+
+	if (buffer_len < (STATS_IF_CACHE_SIZE *
+			  sizeof(struct wlan_rx_rate_stats)))
+		return;
+
+	rx_stats = (struct wlan_rx_rate_stats *)buffer;
+	for (i = 0; i < STATS_IF_CACHE_SIZE; i++) {
+		rate->ratecode = rx_stats->ratecode;
+		rate->rate = rx_stats->rate;
+		rate->num_bytes = rx_stats->num_bytes;
+		rate->num_msdus = rx_stats->num_msdus;
+		rate->num_mpdus = rx_stats->num_mpdus;
+		rate->num_ppdus = rx_stats->num_ppdus;
+		rate->num_retries = rx_stats->num_retries;
+		rate->num_sgi = rx_stats->num_sgi;
+		rate->avg_rssi = rx_stats->avg_rssi;
+		for (chain = 0; chain < STATS_IF_MAX_CHAIN; chain++) {
+			for (bw = 0; bw < STATS_IF_MAX_BW; bw++) {
+				rate->avg_rssi_ant[chain][bw] =
+					rx_stats->avg_rssi_ant[chain][bw];
+			}
+		}
+		rate = rate + 1;
+		rx_stats = rx_stats + 1;
+	}
+}
+
+static void
+get_advance_sta_extended_tx_rate_stats(void *buffer, uint32_t buffer_len,
+				       struct stats_if_rdk_tx_rate_stats *rate,
+				       struct stats_if_rdk_tx_sojourn_stats *sj)
+{
+	struct wlan_tx_rate_stats *tx_stats;
+	struct wlan_tx_sojourn_stats *sojourn_stats;
+	uint8_t i = 0;
+
+	if (buffer_len < (STATS_IF_CACHE_SIZE *
+			  sizeof(struct wlan_tx_rate_stats))
+			  + sizeof(struct wlan_tx_sojourn_stats))
+		return;
+
+	tx_stats = (struct wlan_tx_rate_stats *)buffer;
+	for (i = 0; i < STATS_IF_CACHE_SIZE; i++) {
+		rate->ratecode = tx_stats->ratecode;
+		rate->rate = tx_stats->rate;
+		rate->mpdu_attempts = tx_stats->mpdu_attempts;
+		rate->mpdu_success = tx_stats->mpdu_success;
+		rate->num_ppdus = tx_stats->num_ppdus;
+		rate->num_msdus = tx_stats->num_msdus;
+		rate->num_bytes = tx_stats->num_bytes;
+		rate->num_retries = tx_stats->num_retries;
+		tx_stats = tx_stats + 1;
+		rate = rate + 1;
+	}
+
+	sojourn_stats =
+		(struct wlan_tx_sojourn_stats *)((uint8_t *)buffer +
+		(STATS_IF_CACHE_SIZE * sizeof(struct wlan_tx_rate_stats)));
+
+	for (i = 0; i < STATS_IF_DATA_TID_MAX; i++) {
+		sj->avg_sojourn_msdu[i] =
+			sojourn_stats->avg_sojourn_msdu[i];
+		sj->sum_sojourn_msdu[i] =
+			sojourn_stats->sum_sojourn_msdu[i];
+		sj->num_msdus[i] = sojourn_stats->num_msdus[i];
+	}
+}
+
+static void
+get_advance_sta_extended_tx_link_stats(void *buffer, uint32_t buffer_len,
+				       struct stats_if_rdk_tx_link_stats *link)
+{
+	struct wlan_tx_link_stats *tx_stats;
+	uint8_t i;
+
+	if (buffer_len < sizeof(struct wlan_tx_link_stats))
+		return;
+
+	tx_stats = (struct wlan_tx_link_stats *)buffer;
+	link->num_ppdus = tx_stats->num_ppdus;
+	link->bytes = tx_stats->bytes;
+	link->phy_rate_actual_su = tx_stats->phy_rate_actual_su;
+	link->phy_rate_actual_mu = tx_stats->phy_rate_actual_mu;
+	link->ofdma_usage = tx_stats->ofdma_usage;
+	link->mu_mimo_usage = tx_stats->mu_mimo_usage;
+	link->bw.usage_avg = tx_stats->bw.usage_avg;
+	link->bw.usage_max = tx_stats->bw.usage_max;
+	for (i = 0; i < STATS_IF_BW_USAGE_MAX_SIZE; i++)
+		link->bw.usage_counter[i] = tx_stats->bw.usage_counter[i];
+	link->ack_rssi = tx_stats->ack_rssi;
+	link->pkt_error_rate = tx_stats->pkt_error_rate;
+}
+
+static void
+get_advance_sta_extended_rx_link_stats(void *buffer, uint32_t buffer_len,
+				       struct stats_if_rdk_rx_link_stats *link)
+{
+	struct wlan_rx_link_stats *rx_stats;
+	uint8_t i;
+
+	if (buffer_len < sizeof(struct wlan_rx_link_stats))
+		return;
+
+	rx_stats = (struct wlan_rx_link_stats *)buffer;
+	link->num_ppdus = rx_stats->num_ppdus;
+	link->bytes = rx_stats->bytes;
+	link->phy_rate_actual_su = rx_stats->phy_rate_actual_su;
+	link->phy_rate_actual_mu = rx_stats->phy_rate_actual_mu;
+	link->ofdma_usage = rx_stats->ofdma_usage;
+	link->mu_mimo_usage = rx_stats->mu_mimo_usage;
+	link->bw.usage_avg = rx_stats->bw.usage_avg;
+	link->bw.usage_max = rx_stats->bw.usage_max;
+	for (i = 0; i < STATS_IF_BW_USAGE_MAX_SIZE; i++)
+		link->bw.usage_counter[i] = rx_stats->bw.usage_counter[i];
+	link->su_rssi = rx_stats->su_rssi;
+	link->pkt_error_rate = rx_stats->pkt_error_rate;
+}
+
+static void
+get_advance_sta_avg_rate_stats(void *buffer, uint32_t buffer_len,
+			       struct stats_if_rdk_avg_rate_stats *rate)
+{
+	struct wlan_avg_rate_stats *stats;
+	uint8_t i;
+
+	if (buffer_len < sizeof(struct wlan_avg_rate_stats))
+		return;
+
+	stats = (struct wlan_avg_rate_stats *)buffer;
+	for (i = 0; i < STATS_IF_WLAN_RATE_MAX; i++) {
+		rate->tx[i].num_ppdu = stats->tx[i].num_ppdu;
+		rate->tx[i].sum_mbps = stats->tx[i].sum_mbps;
+		rate->tx[i].num_snr = stats->tx[i].num_snr;
+		rate->tx[i].sum_snr = stats->tx[i].sum_snr;
+		rate->tx[i].num_mpdu = stats->tx[i].num_mpdu;
+		rate->tx[i].num_retry = stats->tx[i].num_retry;
+		rate->rx[i].num_ppdu = stats->rx[i].num_ppdu;
+		rate->rx[i].sum_mbps = stats->rx[i].sum_mbps;
+		rate->rx[i].num_snr = stats->rx[i].num_snr;
+		rate->rx[i].sum_snr = stats->rx[i].sum_snr;
+		rate->rx[i].num_mpdu = stats->rx[i].num_mpdu;
+		rate->rx[i].num_retry = stats->rx[i].num_retry;
+	}
+}
+
+static void parse_advance_sta_rdk(uint8_t *buf, size_t len, char *ifname)
+{
+	struct nlattr *tb_array[QCA_WLAN_VENDOR_ATTR_PEER_STATS_CACHE_MAX + 1];
+	struct nlattr *tb;
+	struct stats_obj *obj;
+	struct advance_peer_data *data;
+	struct stats_command *cmd = g_async_ctx.cmd;
+	uint64_t peer_cookie;
+	uint32_t cache_type;
+	uint32_t buffer_len = 0;
+	void *buffer = NULL;
+	uint8_t *mac = NULL;
+	bool stats_filled = false;
+
+	if (!cmd || !cmd->async_callback || !cmd->reply)
+		return;
+
+	if (nla_parse(tb_array, QCA_WLAN_VENDOR_ATTR_PEER_STATS_CACHE_MAX,
+		      (struct nlattr *)buf, len, NULL)) {
+		STATS_ERR("Invalid event!\n");
+		return;
+	}
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_PEER_STATS_CACHE_TYPE];
+	if (!tb) {
+		STATS_ERR("Cache type in NULL!\n");
+		return;
+	}
+	cache_type = nla_get_u32(tb);
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_PEER_STATS_CACHE_PEER_MAC];
+	if (!tb) {
+		STATS_ERR("Peer mac addr is null!\n");
+		return;
+	}
+	mac = (uint8_t *)nla_data(tb);
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_PEER_STATS_CACHE_DATA];
+	if (tb) {
+		buffer = (void *)nla_data(tb);
+		buffer_len = nla_len(tb);
+	}
+	if (!buffer) {
+		STATS_ERR("stats buffer is null!\n");
+		return;
+	}
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_PEER_STATS_CACHE_PEER_COOKIE];
+	if (!tb) {
+		STATS_ERR("peer cookie attribute is null!\n");
+		return;
+	}
+	peer_cookie = nla_get_u64(tb);
+
+	obj = allocate_stats_obj();
+	if (!obj) {
+		STATS_ERR("Unable to allocate obj!\n");
+		return;
+	}
+	obj->lvl = cmd->lvl;
+	obj->obj_type = STATS_OBJ_STA;
+	obj->type = cmd->type;
+	strlcpy(obj->pif_name, ifname, IFNAME_LEN);
+	memcpy(obj->u_id.mac_addr, mac, ETH_ALEN);
+
+	obj->stats = malloc(sizeof(struct advance_peer_data));
+	if (!obj->stats) {
+		STATS_ERR("Unable to allocate memory!\n");
+		free(obj);
+		return;
+	}
+	data = obj->stats;
+	memset(data, 0, sizeof(struct advance_peer_data));
+
+	data->rdk = malloc(sizeof(struct advance_peer_data_rdk));
+	if (!data->rdk) {
+		STATS_ERR("Unable to allocate memory!\n");
+		free(data);
+		free(obj);
+		return;
+	}
+	memset(data->rdk, 0, sizeof(struct advance_peer_data_rdk));
+	data->rdk->peer_cookie = peer_cookie;
+	data->rdk->cache_type = STATS_IF_INVALID_CACHE_TYPE;
+
+	switch (cache_type) {
+	case DP_PEER_RX_RATE_STATS:
+		if (getenv("SKIP_RX_RATE_STATS"))
+			break;
+		get_advance_sta_extended_rx_rate_stats(buffer, buffer_len,
+						       &data->rdk->rx_rate[0]);
+		stats_filled = true;
+		break;
+	case DP_PEER_TX_RATE_STATS:
+		if (getenv("SKIP_TX_RATE_STATS"))
+			break;
+		get_advance_sta_extended_tx_rate_stats(buffer, buffer_len,
+						       &data->rdk->tx_rate[0],
+						       &data->rdk->tx_sojourn);
+		stats_filled = true;
+		break;
+	case DP_PEER_TX_LINK_STATS:
+		get_advance_sta_extended_tx_link_stats(buffer, buffer_len,
+						       &data->rdk->tx_link);
+		stats_filled = true;
+		break;
+	case DP_PEER_RX_LINK_STATS:
+		get_advance_sta_extended_rx_link_stats(buffer, buffer_len,
+						       &data->rdk->rx_link);
+		stats_filled = true;
+		break;
+	case DP_PEER_AVG_RATE_STATS:
+		if (getenv("SKIP_AVG_RATE_STATS"))
+			break;
+		get_advance_sta_avg_rate_stats(buffer, buffer_len,
+					       &data->rdk->avg_rate);
+		stats_filled = true;
+		break;
+	default:
+		STATS_ERR("Invalid Peer stats cache type %u!\n", cache_type);
+	}
+
+	if (stats_filled)
+		data->rdk->cache_type = cache_type;
+
+	add_stats_obj(cmd->reply, obj);
+
+	cmd->async_callback(cmd, ifname);
+	libstats_free_reply_buffer(cmd);
+}
+#else
+static void  parse_advance_sta_rdk(uint8_t *buf, size_t len, char *ifname)
+{
+}
 #endif /* WLAN_ADVANCE_TELEMETRY */
 
 #if WLAN_DEBUG_TELEMETRY
@@ -1697,6 +1956,28 @@ static void stats_response_handler(struct cfg80211_data *buffer)
 	/* Add into the list */
 	if (add_pending)
 		add_stats_obj(reply, obj);
+}
+
+static int32_t send_nl_command_no_response(struct stats_command *cmd,
+					   const char *ifname)
+{
+	struct cfg80211_data buffer = {0};
+	int32_t subcmd = QCA_NL80211_VENDOR_SUBCMD_WIFI_PARAMS;
+	int32_t param;
+	int32_t value;
+	size_t len = 0;
+
+	value = 1;
+	param = OL_ATH_PARAM_FLUSH_PEER_RATE_STATS | OL_ATH_PARAM_SHIFT;
+	len = sizeof(int32_t);
+	buffer.data = &value;
+	buffer.length = len;
+	buffer.callback = NULL;
+	buffer.parse_data = 0;
+
+	return wifi_cfg80211_send_setparam_command(&g_sock_ctx.cfg80211_ctxt,
+						   subcmd, param, ifname,
+						   (char *)&buffer, len, 0);
 }
 
 static int32_t send_nl_command(struct stats_command *cmd,
@@ -2301,6 +2582,9 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	}
 	temp_obj = root_obj;
 
+	if (user_cmd->feat_flag == STATS_FEAT_FLG_EXT)
+		return send_nl_command_no_response(user_cmd, temp_obj->ifname);
+
 	memcpy(&cmd, user_cmd, sizeof(struct stats_command));
 	cmd.recursive = user_cmd->recursive;
 	memset(&buffer, 0, sizeof(struct cfg80211_data));
@@ -2348,11 +2632,6 @@ static int32_t process_and_send_stats_request(struct stats_command *cmd)
 {
 	struct object_list *req_obj_list = NULL;
 	int32_t ret = 0;
-
-	if (!g_sock_ctx.cfg80211) {
-		STATS_ERR("cfg80211 interface is not enabled\n");
-		return -EPERM;
-	}
 
 	if (is_valid_cmd(cmd)) {
 		STATS_ERR("Invalid command\n");
@@ -2543,6 +2822,8 @@ static void free_advance_sta(struct stats_obj *sta)
 				free(data->fwd);
 			if (data->raw)
 				free(data->raw);
+			if (data->rdk)
+				free(data->rdk);
 			if (data->twt)
 				free(data->twt);
 			if (data->link)
@@ -3135,8 +3416,56 @@ void libstats_free_reply_buffer(struct stats_command *cmd)
 		}
 	}
 	reply->obj_last = NULL;
-	free(reply);
-	cmd->reply = NULL;
+}
+
+static void
+stats_lib_drv_cfg80211_event_callback(char *ifname, uint32_t cmdid,
+				      uint8_t *data, size_t len)
+{
+	if (cmdid == QCA_NL80211_VENDOR_SUBCMD_PEER_STATS_CACHE_FLUSH)
+		parse_advance_sta_rdk(data, len, ifname);
+}
+
+static int stats_lib_socket_init(void)
+{
+	return init_socket_context(&g_sock_ctx, STATS_NL80211_CMD_SOCK_ID,
+				   STATS_NL80211_EVENT_SOCK_ID);
+}
+
+static int stats_lib_init(bool enable_event)
+{
+	g_sock_ctx.cfg80211 = is_cfg80211_mode_enabled();
+
+	if (!g_sock_ctx.cfg80211) {
+		STATS_ERR("CFG80211 mode is disabled!\n");
+		return -EINVAL;
+	}
+
+	if (enable_event) {
+		g_sock_ctx.cfg80211_ctxt.event_callback =
+				stats_lib_drv_cfg80211_event_callback;
+	}
+
+	if (stats_lib_socket_init()) {
+		STATS_ERR("Failed to initialise socket\n");
+		return -EIO;
+	}
+	/* There are few generic IOCTLS, so we need to have sockfd */
+	g_sock_ctx.sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (g_sock_ctx.sock_fd < 0) {
+		STATS_ERR("socket creation failed\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static void stats_lib_deinit(void)
+{
+	if (!g_sock_ctx.cfg80211)
+		return;
+	destroy_socket_context(&g_sock_ctx);
+	close(g_sock_ctx.sock_fd);
 }
 
 u_int64_t libstats_get_feature_flag(char *feat_flags)
@@ -3177,7 +3506,7 @@ int32_t libstats_request_handle(struct stats_command *cmd)
 		return -EINVAL;
 	}
 
-	ret = stats_lib_init();
+	ret = stats_lib_init(false);
 	if (ret)
 		return ret;
 
@@ -3187,6 +3516,50 @@ int32_t libstats_request_handle(struct stats_command *cmd)
 
 	if (!ret)
 		accumulate_stats(cmd);
+
+	return ret;
+}
+
+int32_t libstats_request_async_start(struct stats_command *cmd)
+{
+	int32_t ret = 0;
+
+	if (!cmd) {
+		STATS_ERR("Invalid Input\n");
+		return -EINVAL;
+	}
+	ret = stats_lib_init(true);
+	if (ret) {
+		STATS_ERR("Unable to initialise (%d)!\n", ret);
+		return ret;
+	}
+
+	if (g_async_ctx.thread_started)
+		return ret;
+
+	ret = start_event_thread(&g_sock_ctx);
+	if (ret) {
+		STATS_ERR("Unable to start event thread (%d)!\n", ret);
+		stats_lib_deinit();
+		return ret;
+	}
+	g_async_ctx.cmd = cmd;
+	g_async_ctx.thread_started = true;
+
+	return ret;
+}
+
+int32_t libstats_request_async_stop(struct stats_command *cmd)
+{
+	int32_t ret = 0;
+
+	if (g_async_ctx.thread_started)
+		stats_lib_deinit();
+
+	g_async_ctx.thread_started = false;
+	g_async_ctx.cmd = NULL;
+
+	libstats_free_reply_buffer(cmd);
 
 	return ret;
 }
