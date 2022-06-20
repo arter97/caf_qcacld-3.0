@@ -818,6 +818,7 @@ enum {
 	IEEE80211_PARAM_STEALTHDOWN       = 779,  /* Flag to indicate vap down without sending deauth or disassoc */
 	IEEE80211_PARAM_MODE_EXT          = 780,    /* phy mode (11a, 11b, etc.) */
 	IEEE80211_PARAM_ML_PROBE_REQ      = 781,  /* Param to set ML probe request configuration */
+	IEEE80211_PARAM_PURE11AX          = 782,  /* pure 11ax (no 11bg, 11a, 11n or 11ac clients */
 };
 
 enum {
@@ -2460,6 +2461,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"eht_ul_ltf",           IEEE80211_PARAM_EHT_UL_LTF, SET_PARAM, 1},
 	{"get_eht_ul_ltf",       IEEE80211_PARAM_EHT_UL_LTF, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
+	{"pure11ax",            IEEE80211_PARAM_PURE11AX, SET_PARAM, 1},
+	{"get_pure11ax",        IEEE80211_PARAM_PURE11AX, GET_PARAM, 0},
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
