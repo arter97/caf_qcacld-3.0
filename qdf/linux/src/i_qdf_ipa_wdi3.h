@@ -285,6 +285,17 @@ typedef struct ipa_wdi_pipe_setup_info_smmu __qdf_ipa_wdi_pipe_setup_info_smmu_t
 #define __QDF_IPA_WDI_SETUP_INFO_SMMU_DESC_FORMAT_TEMPLATE(txrx)	\
 	(((struct ipa_wdi_pipe_setup_info_smmu *)(txrx))->desc_format_template)
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 41))
+#define __QDF_IPA_WDI_SETUP_INFO_RX_BANK_ID(txrx)	\
+	(((struct ipa_wdi_pipe_setup_info *)(txrx))->rx_bank_id)
+
+#define __QDF_IPA_WDI_SETUP_INFO_SMMU_RX_BANK_ID(txrx)	\
+	(((struct ipa_wdi_pipe_setup_info_smmu *)(txrx))->rx_bank_id)
+#else
+#define __QDF_IPA_WDI_SETUP_INFO_RX_BANK_ID(txrx)
+#define __QDF_IPA_WDI_SETUP_INFO_SMMU_RX_BANK_ID(txrx)
+#endif
+
 /**
  * __qdf_ipa_wdi_conn_in_params_t - information provided by
  *		uC offload client
