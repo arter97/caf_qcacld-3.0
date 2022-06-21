@@ -536,7 +536,7 @@ populate_dot11f_ext_supp_rates(tpAniSirGlobal pMac, uint8_t nChannelNum,
 			       tpPESession psessionEntry)
 {
 	QDF_STATUS nSirStatus;
-	uint32_t nRates = 0;
+	uint32_t n_rates = 0;
 	uint8_t rates[SIR_MAC_RATESET_EID_MAX];
 
 	/* Use the ext rates present in session entry whenever nChannelNum is set to OPERATIONAL
@@ -545,21 +545,22 @@ populate_dot11f_ext_supp_rates(tpAniSirGlobal pMac, uint8_t nChannelNum,
 	 */
 	if (POPULATE_DOT11F_RATES_OPERATIONAL == nChannelNum) {
 		if (psessionEntry != NULL) {
-			nRates = psessionEntry->extRateSet.numRates;
+			n_rates = psessionEntry->extRateSet.numRates;
 			qdf_mem_copy(rates, psessionEntry->extRateSet.rate,
-				     nRates);
+				     n_rates);
 		} else {
 			pe_err("no session context exists while populating Operational Rate Set");
 		}
 	} else if (HIGHEST_24GHZ_CHANNEL_NUM >= nChannelNum) {
 		CFG_GET_STR(nSirStatus, pMac,
 			    WNI_CFG_EXTENDED_OPERATIONAL_RATE_SET, rates,
-			    nRates, WNI_CFG_EXTENDED_OPERATIONAL_RATE_SET_LEN);
+			    n_rates, WNI_CFG_EXTENDED_OPERATIONAL_RATE_SET_LEN);
 	}
 
-	if (0 != nRates) {
-		pDot11f->num_rates = (uint8_t) nRates;
-		qdf_mem_copy(pDot11f->rates, rates, nRates);
+	if (0 != n_rates) {
+		pe_debug("ext supp rates present, num %d", (uint8_t)n_rates);
+		pDot11f->num_rates = (uint8_t)n_rates;
+		qdf_mem_copy(pDot11f->rates, rates, n_rates);
 		pDot11f->present = 1;
 	}
 
