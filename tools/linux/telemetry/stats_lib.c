@@ -2088,10 +2088,7 @@ static void get_sta_info(struct cfg80211_data *buffer)
 	remaining_len = buffer->length;
 	cp = buf;
 
-	if (remaining_len < sizeof(struct ieee80211req_sta_info))
-		return;
-
-	do {
+	while (remaining_len >= sizeof(struct ieee80211req_sta_info)) {
 		si = (struct ieee80211req_sta_info *)cp;
 		if (!si || !si->isi_len)
 			break;
@@ -2109,7 +2106,7 @@ static void get_sta_info(struct cfg80211_data *buffer)
 
 		cp += si->isi_len;
 		remaining_len -= si->isi_len;
-	} while (remaining_len >= sizeof(struct ieee80211req_sta_info));
+	}
 
 	buffer->length = LIST_STATION_CFG_ALLOC_SIZE;
 }
@@ -2265,7 +2262,7 @@ static int32_t build_child_radio_list(struct interface_list *if_list,
 	return 0;
 }
 
-static void *build_object_list()
+static void *build_object_list(struct stats_command *cmd)
 {
 	struct interface_list if_list = {0};
 	struct soc_ifnames soc_if[MAX_RADIO_NUM] = {0};
@@ -2275,6 +2272,8 @@ static void *build_object_list()
 	char *ifname = NULL;
 	int32_t ret = 0;
 	uint8_t inx = 0;
+	uint8_t sinx = 0;
+	uint8_t loop_count = 0;
 	uint8_t if_count = 0;
 
 	ret = fetch_all_interfaces(&if_list);
@@ -2306,7 +2305,22 @@ static void *build_object_list()
 		get_hw_address(ifname, if_list.vap[inx].hw_addr);
 	}
 
-	for (inx = 0; inx < if_list.s_count; inx++) {
+	/**
+	 * If user specifies soc, then build object hierarchy only for
+	 * that particular soc.
+	 */
+	if ((cmd->obj == STATS_OBJ_AP) && cmd->if_name[0]) {
+		for (sinx = 0; sinx < if_list.s_count; sinx++) {
+			if (!strncmp(cmd->if_name,
+			    if_list.soc[sinx].name, 4)) {
+				loop_count = sinx + 1;
+				break;
+			}
+		}
+	} else {
+		loop_count = if_list.s_count;
+	}
+	for (inx = sinx; inx < loop_count; inx++) {
 		if (get_active_radio_intf_for_soc(&if_list, soc_if,
 						  if_list.soc[inx].name,
 						  &if_count) || !if_count)
@@ -2347,6 +2361,9 @@ static struct object_list *find_head_object(struct stats_command *cmd,
 					    struct object_list *obj_list)
 {
 	struct object_list *temp_obj = NULL;
+	struct object_list *ap_obj = NULL;
+	struct object_list *radio_obj = NULL;
+	struct object_list *vap_obj = NULL;
 
 	temp_obj = obj_list;
 
@@ -2356,7 +2373,10 @@ static struct object_list *find_head_object(struct stats_command *cmd,
 	case STATS_OBJ_RADIO:
 		while (temp_obj) {
 			if (temp_obj->obj_type != STATS_OBJ_RADIO) {
-				temp_obj = temp_obj->child;
+				if (temp_obj->child)
+					temp_obj = temp_obj->child;
+				else
+					temp_obj = temp_obj->next;
 				continue;
 			}
 			if (!strncmp(temp_obj->ifname, cmd->if_name, 5))
@@ -2369,51 +2389,55 @@ static struct object_list *find_head_object(struct stats_command *cmd,
 		break;
 	case STATS_OBJ_VAP:
 		while (temp_obj) {
-			struct object_list *ap_obj = NULL;
-			struct object_list *radio_obj = NULL;
-
-			if (temp_obj->obj_type != STATS_OBJ_VAP) {
+			if (temp_obj->obj_type == STATS_OBJ_VAP) {
+				if (!strncmp(temp_obj->ifname, cmd->if_name,
+					     IFNAME_LEN))
+					break;
+			} else if (temp_obj->child) {
+				if (temp_obj->obj_type == STATS_OBJ_AP)
+					ap_obj = temp_obj;
+				else
+					radio_obj = temp_obj;
 				temp_obj = temp_obj->child;
 				continue;
 			}
-			if (!strncmp(temp_obj->ifname, cmd->if_name,
-				     IFNAME_LEN))
-				break;
-
-			radio_obj = temp_obj->parent;
-			ap_obj = radio_obj->parent;
 			if (temp_obj->next)
 				temp_obj = temp_obj->next;
-			else if (radio_obj->next)
+			else if (radio_obj && radio_obj->next)
 				temp_obj = radio_obj->next;
-			else
+			else if (ap_obj)
 				temp_obj = ap_obj->next;
+			else
+				temp_obj = NULL;
 		}
 		break;
 	case STATS_OBJ_STA:
 		while (temp_obj) {
-			struct object_list *ap_obj = NULL;
-			struct object_list *radio_obj = NULL;
-			struct object_list *vap_obj = NULL;
-
-			if (temp_obj->obj_type != STATS_OBJ_STA) {
+			if (temp_obj->obj_type == STATS_OBJ_STA) {
+				if (!memcmp(temp_obj->hw_addr,
+					    cmd->sta_mac.ether_addr_octet,
+					    ETH_ALEN))
+					break;
+			} else if (temp_obj->child) {
+				if (temp_obj->obj_type == STATS_OBJ_AP)
+					ap_obj = temp_obj;
+				else if (temp_obj->obj_type == STATS_OBJ_RADIO)
+					radio_obj = temp_obj;
+				else
+					vap_obj = temp_obj;
 				temp_obj = temp_obj->child;
 				continue;
 			}
-			if (!memcmp(temp_obj->hw_addr,
-				    cmd->sta_mac.ether_addr_octet, ETH_ALEN))
-				break;
-			vap_obj = temp_obj->parent;
-			radio_obj = vap_obj->parent;
-			ap_obj = radio_obj->parent;
 			if (temp_obj->next)
 				temp_obj = temp_obj->next;
-			else if (vap_obj->next)
+			else if (vap_obj && vap_obj->next)
 				temp_obj = vap_obj->next;
-			else if (radio_obj->next)
+			else if (radio_obj && radio_obj->next)
 				temp_obj = radio_obj->next;
-			else
+			else if (ap_obj)
 				temp_obj = ap_obj->next;
+			else
+				temp_obj = NULL;
 		}
 		break;
 	default:
@@ -2633,7 +2657,7 @@ static int32_t process_and_send_stats_request(struct stats_command *cmd)
 		return -EINVAL;
 	}
 
-	req_obj_list = build_object_list();
+	req_obj_list = build_object_list(cmd);
 	if (!req_obj_list) {
 		STATS_ERR("Failed to build Object Hierarchy!\n");
 		return -EPERM;
@@ -3231,12 +3255,13 @@ static void aggregate_vap_stats(struct stats_obj *vap)
 		STATS_ERR("Unexpected Level %d!\n", vap->lvl);
 	}
 
-	aggregate_radio_stats(vap->parent);
+	if (!vap->next || (vap->next->obj_type != STATS_OBJ_VAP))
+		aggregate_radio_stats(vap->parent);
 }
 
 static void aggregate_sta_stats(struct stats_obj *sta)
 {
-	if (!sta || sta->parent)
+	if (!sta || !sta->parent)
 		return;
 
 	switch (sta->lvl) {
@@ -3254,7 +3279,8 @@ static void aggregate_sta_stats(struct stats_obj *sta)
 		STATS_ERR("Unexpected Level %d!\n", sta->lvl);
 	}
 
-	aggregate_vap_stats(sta->parent);
+	if (!sta->next || (sta->next->obj_type != STATS_OBJ_STA))
+		aggregate_vap_stats(sta->parent);
 }
 
 static void accumulate_stats(struct stats_command *cmd)
@@ -3265,9 +3291,28 @@ static void accumulate_stats(struct stats_command *cmd)
 		return;
 
 	obj = cmd->reply->obj_head;
+
 	while (obj) {
-		if (obj->obj_type == STATS_OBJ_STA)
+		switch (obj->obj_type) {
+		case STATS_OBJ_STA:
 			aggregate_sta_stats(obj);
+			break;
+		case STATS_OBJ_VAP:
+			/* No STA connected to this vap */
+			if (!obj->next ||
+			    (obj->next->obj_type != STATS_OBJ_STA))
+				aggregate_vap_stats(obj);
+			break;
+		case STATS_OBJ_RADIO:
+			/* No active VAP for this radio */
+			if (!obj->next ||
+			    (obj->next->obj_type != STATS_OBJ_VAP))
+				aggregate_radio_stats(obj);
+			break;
+		case STATS_OBJ_AP:
+		default:
+			break;
+		}
 
 		obj = obj->next;
 	}
