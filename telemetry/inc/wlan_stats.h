@@ -102,10 +102,12 @@ struct stats_config {
 
 /**
  * struct multi_reply_ctx: Structure to manage multi reply message
+ * @next_copy_from: Copy from this index
  * @pending: Flag to detect pending data from previous reply
  * @start_inx: Index from which the stats will be processed
  **/
 struct multi_reply_ctx {
+	size_t next_copy_from;
 	bool pending;
 	uint8_t start_inx;
 };
