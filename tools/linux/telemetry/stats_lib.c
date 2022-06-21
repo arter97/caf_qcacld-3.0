@@ -158,7 +158,6 @@ static struct feat_parser_t g_feat[] = {
 	{ "AST", STATS_FEAT_FLG_AST },
 	{ "CFR", STATS_FEAT_FLG_CFR },
 	{ "FWD", STATS_FEAT_FLG_FWD },
-	{ "HTT", STATS_FEAT_FLG_HTT },
 	{ "RAW", STATS_FEAT_FLG_RAW },
 	{ "RDK", STATS_FEAT_FLG_PEER },
 	{ "TSO", STATS_FEAT_FLG_TSO },
@@ -188,7 +187,6 @@ struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_FEAT_AST] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_CFR] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_FWD] = { .type = NLA_UNSPEC },
-	[QCA_WLAN_VENDOR_ATTR_FEAT_HTT] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_RAW] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_TSO] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_TWT] = { .type = NLA_UNSPEC },
@@ -1708,13 +1706,6 @@ static void parse_debug_radio(struct nlattr *rattr, struct stats_obj *obj)
 				memcpy(data->cfr, nla_data(attr),
 				       sizeof(struct debug_pdev_data_cfr));
 		}
-		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_HTT]) {
-			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_HTT];
-			data->htt = malloc(sizeof(struct debug_pdev_data_htt));
-			if (data->htt)
-				memcpy(data->htt, nla_data(attr),
-				       sizeof(struct debug_pdev_data_htt));
-		}
 		if (tb[QCA_WLAN_VENDOR_ATTR_FEAT_WDI]) {
 			attr = tb[QCA_WLAN_VENDOR_ATTR_FEAT_WDI];
 			data->wdi = malloc(sizeof(struct debug_pdev_data_wdi));
@@ -3130,8 +3121,6 @@ static void free_debug_radio(struct stats_obj *radio)
 				free(data->tso);
 			if (data->cfr)
 				free(data->cfr);
-			if (data->htt)
-				free(data->htt);
 			if (data->wdi)
 				free(data->wdi);
 			if (data->mesh)

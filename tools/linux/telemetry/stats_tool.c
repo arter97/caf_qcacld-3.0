@@ -2561,10 +2561,6 @@ void print_debug_radio_data_cfr(struct debug_pdev_data_cfr *cfr)
 			    cfr->reason_cnt[cnt]);
 }
 
-void print_debug_radio_data_htt(struct debug_pdev_data_htt *htt)
-{
-}
-
 void print_debug_radio_data_wdi(struct debug_pdev_data_wdi *wdi)
 {
 	uint8_t i;
@@ -2668,7 +2664,7 @@ void print_debug_radio_data_monitor(struct debug_pdev_data_monitor *monitor)
 	STATS_32(stdout, "dup_mon_buf_cnt", monitor->dup_mon_buf_cnt);
 	idx = monitor->ppdu_id_hist_idx;
 	STATS_PRINT("\tPPDU Id history:\n");
-	STATS_PRINT("\tstat_ring_ppdu_ids\t dest_ring_ppdu_ids\n");
+	STATS_PRINT("\t\tstat_ring_ppdu_ids\t dest_ring_ppdu_ids\n");
 	for (i = 0; i < STATS_IF_MAX_PPDU_ID_HIST; i++) {
 		idx = (idx + 1) & (STATS_IF_MAX_PPDU_ID_HIST - 1);
 		STATS_PRINT("\t\t%*u\t%*u\n", 16,
@@ -2787,10 +2783,6 @@ void print_debug_radio_data(struct stats_obj *radio)
 		STATS_PRINT("CFR Stats\n");
 		print_debug_radio_data_cfr(data->cfr);
 	}
-	if (data->htt) {
-		STATS_PRINT("HTT Stats\n");
-		print_debug_radio_data_htt(data->htt);
-	}
 	if (data->wdi) {
 		STATS_PRINT("WDI Stats\n");
 		print_debug_radio_data_wdi(data->wdi);
@@ -2849,7 +2841,7 @@ void print_debug_ap_data_tx(struct debug_psoc_data_tx *tx)
 	STATS_32(stdout, "Tx Descriptor in use", tx->desc_in_use);
 	STATS_32(stdout, "Tx packets dropped due to FW removed",
 		 tx->dropped_fw_removed);
-	STATS_PRINT("Tx comp wifi internal error = %u : [%u %u %u %u]\n",
+	STATS_PRINT("\tTx comp wifi internal error = %u : [%u %u %u %u]\n",
 		    tx->wifi_internal_error[0], tx->wifi_internal_error[1],
 		    tx->wifi_internal_error[2], tx->wifi_internal_error[3],
 		    tx->wifi_internal_error[4]);

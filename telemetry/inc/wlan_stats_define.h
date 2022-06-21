@@ -26,31 +26,30 @@
 #define STATS_FEAT_FLG_AST             0x00000004
 #define STATS_FEAT_FLG_CFR             0x00000008
 #define STATS_FEAT_FLG_FWD             0x00000010
-#define STATS_FEAT_FLG_HTT             0x00000020
-#define STATS_FEAT_FLG_RAW             0x00000040
-#define STATS_FEAT_FLG_PEER            0x00000080
-#define STATS_FEAT_FLG_TSO             0x00000100
-#define STATS_FEAT_FLG_TWT             0x00000200
-#define STATS_FEAT_FLG_VOW             0x00000400
-#define STATS_FEAT_FLG_WDI             0x00000800
-#define STATS_FEAT_FLG_WMI             0x00001000
-#define STATS_FEAT_FLG_IGMP            0x00002000
-#define STATS_FEAT_FLG_LINK            0x00004000
-#define STATS_FEAT_FLG_MESH            0x00008000
-#define STATS_FEAT_FLG_RATE            0x00010000
-#define STATS_FEAT_FLG_DELAY           0x00020000
-#define STATS_FEAT_FLG_ME              0x00040000
-#define STATS_FEAT_FLG_NAWDS           0x00080000
-#define STATS_FEAT_FLG_TXCAP           0x00100000
-#define STATS_FEAT_FLG_MONITOR         0x00200000
-#define STATS_FEAT_FLG_JITTER          0x00400000
-#define STATS_FEAT_FLG_SAWFDELAY       0x00800000
-#define STATS_FEAT_FLG_SAWFTX          0x01000000
+#define STATS_FEAT_FLG_RAW             0x00000020
+#define STATS_FEAT_FLG_PEER            0x00000040
+#define STATS_FEAT_FLG_TSO             0x00000080
+#define STATS_FEAT_FLG_TWT             0x00000100
+#define STATS_FEAT_FLG_VOW             0x00000200
+#define STATS_FEAT_FLG_WDI             0x00000400
+#define STATS_FEAT_FLG_WMI             0x00000800
+#define STATS_FEAT_FLG_IGMP            0x00001000
+#define STATS_FEAT_FLG_LINK            0x00002000
+#define STATS_FEAT_FLG_MESH            0x00004000
+#define STATS_FEAT_FLG_RATE            0x00008000
+#define STATS_FEAT_FLG_DELAY           0x00010000
+#define STATS_FEAT_FLG_ME              0x00020000
+#define STATS_FEAT_FLG_NAWDS           0x00040000
+#define STATS_FEAT_FLG_TXCAP           0x00080000
+#define STATS_FEAT_FLG_MONITOR         0x00100000
+#define STATS_FEAT_FLG_JITTER          0x00200000
+#define STATS_FEAT_FLG_SAWFDELAY       0x00400000
+#define STATS_FEAT_FLG_SAWFTX          0x00800000
 
 /* Add new feature flag above and update STATS_FEAT_FLG_ALL */
 #define STATS_FEAT_FLG_ALL             \
 	(STATS_FEAT_FLG_RX | STATS_FEAT_FLG_TX | STATS_FEAT_FLG_AST | \
-	 STATS_FEAT_FLG_CFR | STATS_FEAT_FLG_FWD | STATS_FEAT_FLG_HTT | \
+	 STATS_FEAT_FLG_CFR | STATS_FEAT_FLG_FWD | \
 	 STATS_FEAT_FLG_RAW | STATS_FEAT_FLG_PEER | STATS_FEAT_FLG_TSO | \
 	 STATS_FEAT_FLG_TWT | STATS_FEAT_FLG_VOW | STATS_FEAT_FLG_WDI | \
 	 STATS_FEAT_FLG_WMI | STATS_FEAT_FLG_IGMP | STATS_FEAT_FLG_LINK | \
@@ -110,9 +109,8 @@
 	(STATS_BASIC_RADIO_DATA_MASK |                 \
 	 STATS_FEAT_FLG_ME | STATS_FEAT_FLG_RAW |      \
 	 STATS_FEAT_FLG_TSO | STATS_FEAT_FLG_CFR |     \
-	 STATS_FEAT_FLG_HTT | STATS_FEAT_FLG_TXCAP |   \
-	 STATS_FEAT_FLG_WDI | STATS_FEAT_FLG_MONITOR | \
-	 STATS_FEAT_FLG_MESH)
+	 STATS_FEAT_FLG_TXCAP | STATS_FEAT_FLG_WDI |   \
+	 STATS_FEAT_FLG_MONITOR | STATS_FEAT_FLG_MESH)
 #define STATS_DEBUG_VAP_CTRL_MASK                      \
 	(STATS_BASIC_VAP_CTRL_MASK | STATS_FEAT_FLG_WMI)
 #define STATS_DEBUG_VAP_DATA_MASK                      \
@@ -1235,9 +1233,6 @@ struct debug_pdev_data_cfr {
 	uint64_t rx_loc_info_valid_cnt;
 	uint64_t chan_capture_status[STATS_IF_CAPTURE_MAX];
 	uint64_t reason_cnt[STATS_IF_FREEZE_REASON_MAX];
-};
-
-struct debug_pdev_data_htt {
 };
 
 struct debug_pdev_data_wdi {

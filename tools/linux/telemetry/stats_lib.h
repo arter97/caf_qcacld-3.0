@@ -281,7 +281,6 @@ struct debug_pdev_data {
 	struct debug_pdev_data_raw *raw;
 	struct debug_pdev_data_tso *tso;
 	struct debug_pdev_data_cfr *cfr;
-	struct debug_pdev_data_htt *htt;
 	struct debug_pdev_data_wdi *wdi;
 	struct debug_pdev_data_mesh *mesh;
 	struct debug_pdev_data_txcap *txcap;
