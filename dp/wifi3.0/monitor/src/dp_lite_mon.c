@@ -430,6 +430,11 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 				   "level mpdu/ppdu and data full pkt");
 			return QDF_STATUS_E_INVAL;
 		}
+		/* Check if full monitor is enabled */
+		if (be_mon_pdev->tx_mon_mode) {
+			dp_mon_err("Lite monitor mode cannot be enabled when full monitor mode is enabled");
+			return QDF_STATUS_E_INVAL;
+		}
 
 		qdf_spin_lock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
 		/* store tx lite mon config */
