@@ -26,6 +26,7 @@
 #include <wlan_mlme_dispatcher.h>
 #include <wlan_repeater_internal.h>
 #include <wlan_repeater_api.h>
+#include <cdp_txrx_ctrl.h>
 #if ATH_SUPPORT_WRAP
 #include <dp_wrap.h>
 #endif
@@ -732,6 +733,11 @@ wlan_rptr_vdev_attach(
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
 	struct wlan_rptr_vdev_priv *vdev_priv = NULL;
+	u8 vdev_id;
+	ol_txrx_soc_handle soc_txrx_handle;
+	struct wlan_objmgr_psoc *psoc = NULL;
+	cdp_config_param_type val = {0};
+
 
 	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
 	vdev_priv = wlan_rptr_get_vdev_priv(vdev);
@@ -739,10 +745,19 @@ wlan_rptr_vdev_attach(
 	if (!pdev_priv || !vdev_priv)
 		return;
 
+	psoc = wlan_vdev_get_psoc(vdev);
+	soc_txrx_handle = wlan_psoc_get_dp_handle(psoc);
+	vdev_id = wlan_vdev_get_id(vdev);
+
 	opmode = wlan_vdev_mlme_get_opmode(vdev);
 
-	if ((opmode == QDF_SAP_MODE) && (flags & IEEE80211_WRAP_VAP))
+	if ((opmode == QDF_SAP_MODE) && (flags & IEEE80211_WRAP_VAP)) {
 		wlan_rptr_vdev_set_wrap(vdev);
+		val.cdp_vdev_param_wrap = 1;
+		cdp_txrx_set_vdev_param(soc_txrx_handle, vdev_id,
+							CDP_ENABLE_WRAP, val);
+
+	}
 
 	if ((opmode == QDF_STA_MODE) && (flags & IEEE80211_CLONE_MACADDR)) {
 		if (!(flags & IEEE80211_WRAP_NON_MAIN_STA)) {
