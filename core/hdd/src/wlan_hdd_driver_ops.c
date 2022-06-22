@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -621,6 +622,12 @@ static int __hdd_soc_probe(struct device *dev,
 		goto dp_prealloc_fail;
 	}
 
+	status = hif_ce_debug_history_prealloc_init();
+	if (status != QDF_STATUS_SUCCESS) {
+		errno = qdf_status_to_os_return(status);
+		goto hif_ce_debug_history_prealloc_fail;
+	}
+
 	errno = hdd_wlan_startup(hdd_ctx);
 	if (errno)
 		goto hdd_context_destroy;
@@ -637,6 +644,10 @@ static int __hdd_soc_probe(struct device *dev,
 	hdd_start_complete(0);
 	hdd_thermal_mitigation_register(hdd_ctx, dev);
 
+	errno = hdd_set_suspend_mode(hdd_ctx);
+	if (errno)
+		hdd_err("Failed to set suspend mode in PLD; errno:%d", errno);
+
 	hdd_soc_load_unlock(dev);
 
 	return 0;
@@ -645,6 +656,9 @@ wlan_exit:
 	hdd_wlan_exit(hdd_ctx);
 
 hdd_context_destroy:
+	hif_ce_debug_history_prealloc_deinit();
+
+hif_ce_debug_history_prealloc_fail:
 	dp_prealloc_deinit();
 
 dp_prealloc_fail:
@@ -745,7 +759,6 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	}
 
 	hdd_soc_load_unlock(dev);
-	hdd_start_complete(0);
 
 	return 0;
 
@@ -802,6 +815,7 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 
 
 	osif_psoc_sync_trans_stop(psoc_sync);
+	hdd_start_complete(0);
 
 	return errno;
 }
@@ -845,6 +859,7 @@ static void __hdd_soc_remove(struct device *dev)
 	cds_set_driver_in_bad_state(false);
 	cds_set_unload_in_progress(false);
 
+	hif_ce_debug_history_prealloc_deinit();
 	dp_prealloc_deinit();
 
 	pr_info("%s: Driver De-initialized\n", WLAN_MODULE_NAME);
@@ -969,13 +984,16 @@ static void __hdd_soc_recovery_shutdown(void)
 	struct hdd_context *hdd_ctx;
 	void *hif_ctx;
 
-	/* recovery starts via firmware down indication; ensure we got one */
-	QDF_BUG(cds_is_driver_recovering());
-	hdd_init_start_completion();
-
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return;
+
+	if (wlan_hdd_is_full_power_down_enable(hdd_ctx))
+		cds_set_driver_state(CDS_DRIVER_STATE_RECOVERING);
+
+	/* recovery starts via firmware down indication; ensure we got one */
+	QDF_BUG(cds_is_driver_recovering());
+	hdd_init_start_completion();
 
 	/*
 	 * Perform SSR related cleanup if it has not already been done as a
@@ -1031,6 +1049,7 @@ static void hdd_soc_recovery_shutdown(struct device *dev)
 	if (errno)
 		return;
 
+	hdd_wait_for_dp_tx();
 	osif_psoc_sync_wait_for_ops(psoc_sync);
 
 	__hdd_soc_recovery_shutdown();
@@ -1192,9 +1211,12 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
 	err = wlan_hdd_validate_context(hdd_ctx);
-	if (err)
-		return err;
-
+	if (0 != err) {
+		if (pld_is_low_power_mode(hdd_ctx->parent_dev))
+			hdd_debug("low power mode (Deep Sleep/Hibernate)");
+		else
+			return err;
+	}
 
 	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -1489,10 +1511,11 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 out:
 	hif_system_pm_set_state_suspended(hif_ctx);
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state() ||
-		cds_is_fw_down())
+	    cds_is_fw_down())
 		return 0;
 
-	QDF_BUG(false);
+	if (status != -ETIMEDOUT)
+		QDF_BUG(false);
 
 	return status;
 }
@@ -1888,8 +1911,13 @@ static int wlan_hdd_pld_suspend(struct device *dev,
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
-	if (errno)
-		return errno;
+	if (0 != errno) {
+		if (pld_is_low_power_mode(hdd_ctx->parent_dev))
+			hdd_debug("low power mode (Deep Sleep/Hibernate)");
+		else
+			return errno;
+	}
+
 	/*
 	 * Flush the idle shutdown before ops start.This is done here to avoid
 	 * the deadlock as idle shutdown waits for the dsc ops

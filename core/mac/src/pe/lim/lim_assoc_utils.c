@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -699,11 +700,14 @@ lim_reject_association(struct mac_context *mac_ctx, tSirMacAddr peer_addr,
 		}
 	}
 
+	sta_ds = dph_get_hash_entry(mac_ctx, sta_id,
+				    &session_entry->dph.dphHashTable);
+
 	if (delete_sta == false) {
 		lim_send_assoc_rsp_mgmt_frame(
 				mac_ctx,
 				STATUS_AP_UNABLE_TO_HANDLE_NEW_STA,
-				1, peer_addr, sub_type, 0, session_entry,
+				1, peer_addr, sub_type, sta_ds, session_entry,
 				false);
 		pe_warn("received Re/Assoc req when max associated STAs reached from");
 		lim_print_mac_addr(mac_ctx, peer_addr, LOGW);
@@ -711,9 +715,6 @@ lim_reject_association(struct mac_context *mac_ctx, tSirMacAddr peer_addr,
 					session_entry->smeSessionId);
 		return;
 	}
-
-	sta_ds = dph_get_hash_entry(mac_ctx, sta_id,
-		   &session_entry->dph.dphHashTable);
 
 	if (!sta_ds) {
 		pe_err("No STA context, yet rejecting Association");
@@ -734,7 +735,7 @@ lim_reject_association(struct mac_context *mac_ctx, tSirMacAddr peer_addr,
 	 * status code to requesting STA.
 	 */
 	lim_send_assoc_rsp_mgmt_frame(mac_ctx, result_code, 0, peer_addr,
-				      sub_type, 0, session_entry, false);
+				      sub_type, sta_ds, session_entry, false);
 
 	if (session_entry->parsedAssocReq[sta_ds->assocId]) {
 		lim_free_assoc_req_frm_buf(
@@ -2239,10 +2240,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 	sir_copy_mac_addr(sta_mac, session_entry->self_mac_addr);
 
-	pe_debug("sessionid: %d update_entry = %d limsystemrole = %d",
-		session_entry->smeSessionId, update_entry,
-		GET_LIM_SYSTEM_ROLE(session_entry));
-
 	add_sta_params = qdf_mem_malloc(sizeof(tAddStaParams));
 	if (!add_sta_params)
 		return QDF_STATUS_E_NOMEM;
@@ -2256,9 +2253,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 #endif
 	else
 		sta_Addr = &sta_mac;
-
-	pe_debug(QDF_MAC_ADDR_FMT ": Subtype(Assoc/Reassoc): %d",
-		QDF_MAC_ADDR_REF(*sta_Addr), sta_ds->mlmStaContext.subType);
 
 	qdf_mem_copy((uint8_t *) add_sta_params->staMac,
 		     (uint8_t *) *sta_Addr, sizeof(tSirMacAddr));
@@ -2287,10 +2281,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 	}
 	sta_ds->valid = 0;
 	sta_ds->mlmStaContext.mlmState = eLIM_MLM_WT_ADD_STA_RSP_STATE;
-
-	pe_debug("Assoc ID: %d wmmEnabled: %d listenInterval: %d",
-		 add_sta_params->assocId, add_sta_params->wmmEnabled,
-		 add_sta_params->listenInterval);
 	add_sta_params->staType = sta_ds->staType;
 
 	add_sta_params->updateSta = update_entry;
@@ -2319,11 +2309,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 		add_sta_params->vhtCapable = session_entry->vhtCapability;
 	}
 
-	pe_debug("updateSta: %d htcapable: %d vhtCapable: %d sta mac"
-		 QDF_MAC_ADDR_FMT, add_sta_params->updateSta,
-		 add_sta_params->htCapable, add_sta_params->vhtCapable,
-		 QDF_MAC_ADDR_REF(add_sta_params->staMac));
-
 	/*
 	 * If HT client is connected to SAP DUT and self cap is NSS = 2 then
 	 * disable ASYNC DBS scan by sending WMI_VDEV_PARAM_SMPS_INTOLERANT
@@ -2336,7 +2321,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 		(session_entry->nss == 2)) {
 		session_entry->ht_client_cnt++;
 		if (session_entry->ht_client_cnt == 1) {
-			pe_debug("setting SMPS intolrent vdev_param");
 			wma_cli_set_command(session_entry->smeSessionId,
 				(int)WMI_VDEV_PARAM_SMPS_INTOLERANT,
 				1, VDEV_CMD);
@@ -2356,15 +2340,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 	add_sta_params->fShortGI40Mhz = sta_ds->htShortGI40Mhz;
 	add_sta_params->ch_width = sta_ds->ch_width;
 	add_sta_params->mimoPS = sta_ds->htMIMOPSState;
-
-	pe_debug("maxAmpduDensity: %d maxAmpduDensity: %d",
-		 add_sta_params->maxAmpduDensity, add_sta_params->maxAmpduSize);
-
-	pe_debug("fShortGI20Mhz: %d fShortGI40Mhz: %d",
-		 add_sta_params->fShortGI20Mhz,	add_sta_params->fShortGI40Mhz);
-
-	pe_debug("txChannelWidth: %d mimoPS: %d", add_sta_params->ch_width,
-		 add_sta_params->mimoPS);
 
 	if (add_sta_params->vhtCapable) {
 		if (sta_ds->vhtSupportedChannelWidthSet)
@@ -2394,10 +2369,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 			sta_ds->vht_mcs_10_11_supp;
 	}
 
-	pe_debug("TxChWidth %d vhtTxBFCap %d, su_bfer %d, vht_mcs11 %d",
-		 add_sta_params->ch_width, add_sta_params->vhtTxBFCapable,
-		 add_sta_params->enable_su_tx_bformer,
-		 add_sta_params->vht_mcs_10_11_supp);
 #ifdef FEATURE_WLAN_TDLS
 	if ((STA_ENTRY_PEER == sta_ds->staType) ||
 		(STA_ENTRY_TDLS_PEER == sta_ds->staType))
@@ -2488,9 +2459,6 @@ lim_add_sta(struct mac_context *mac_ctx,
 				SIR_MAC_GET_VHT_MAX_AMPDU_EXPO(
 						sta_ds->vht_caps);
 		}
-		pe_debug("Sta type is TDLS_PEER, ht_caps: 0x%x, vht_caps: 0x%x",
-			  add_sta_params->ht_caps,
-			  add_sta_params->vht_caps);
 		lim_add_tdls_sta_he_config(add_sta_params, sta_ds);
 
 		if (lim_is_he_6ghz_band(session_entry))
@@ -2532,16 +2500,8 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 		add_sta_params->maxSPLen =
 			sta_ds->qos.capability.qosInfo.maxSpLen;
-		pe_debug("uAPSD = 0x%x, maxSpLen = %d",
-			add_sta_params->uAPSD, add_sta_params->maxSPLen);
 	}
 	add_sta_params->rmfEnabled = sta_ds->rmfEnabled;
-	pe_debug("PMF enabled %d", add_sta_params->rmfEnabled);
-
-	pe_debug("htLdpcCapable: %d vhtLdpcCapable: %d "
-			"p2pCapableSta: %d",
-		add_sta_params->htLdpcCapable, add_sta_params->vhtLdpcCapable,
-		add_sta_params->p2pCapableSta);
 
 	if (!add_sta_params->htLdpcCapable)
 		add_sta_params->ht_caps &= ~(1 << SIR_MAC_HT_CAP_ADVCODING_S);
@@ -2614,7 +2574,28 @@ lim_add_sta(struct mac_context *mac_ctx,
 	msg_q.bodyptr = add_sta_params;
 	msg_q.bodyval = 0;
 
-	pe_debug("Sending WMA_ADD_STA_REQ for assocId %d", sta_ds->assocId);
+	pe_debug("vdev %d: " QDF_MAC_ADDR_FMT " opmode %d sta_type %d subtype %d: update %d aid %d wmm %d li %d ht %d vht %d ht client %d",
+		 session_entry->vdev_id,
+		 QDF_MAC_ADDR_REF(add_sta_params->staMac),
+		 session_entry->opmode, sta_ds->staType,
+		 sta_ds->mlmStaContext.subType, add_sta_params->updateSta,
+		 add_sta_params->assocId, add_sta_params->wmmEnabled,
+		 add_sta_params->listenInterval, add_sta_params->htCapable,
+		 add_sta_params->vhtCapable, session_entry->ht_client_cnt);
+	pe_nofl_debug("max_ampdu: density %d size %d, width %d sgi20 %d sgi40 %d mimops %d txbf %d subfer %d vht_mcs11 %d uapsd %d "
+		      "max splen %d pmf %d ht ldpc %d vht ldpc %d isp2p %d",
+		      add_sta_params->maxAmpduDensity,
+		      add_sta_params->maxAmpduSize, add_sta_params->ch_width,
+		      add_sta_params->fShortGI20Mhz,
+		      add_sta_params->fShortGI40Mhz,
+		      add_sta_params->mimoPS, add_sta_params->vhtTxBFCapable,
+		      add_sta_params->enable_su_tx_bformer,
+		      add_sta_params->vht_mcs_10_11_supp, add_sta_params->uAPSD,
+		      add_sta_params->maxSPLen, add_sta_params->rmfEnabled,
+		      add_sta_params->htLdpcCapable,
+		      add_sta_params->vhtLdpcCapable,
+		      add_sta_params->p2pCapableSta);
+
 	MTRACE(mac_trace_msg_tx(mac_ctx, session_entry->peSessionId,
 			 msg_q.type));
 
@@ -4337,7 +4318,6 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 	struct qdf_mac_addr sta_dsaddr;
 	struct lim_sta_context mlmStaContext;
 	bool mlo_conn = false;
-	bool mlo_recv_assoc_frm = false;
 
 	if (!sta) {
 		pe_err("sta is NULL");
@@ -4349,10 +4329,9 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 		     sta->staAddr, QDF_MAC_ADDR_SIZE);
 
 	mlmStaContext = sta->mlmStaContext;
-	mlo_conn = lim_is_mlo_conn(pe_session, sta);
-	mlo_recv_assoc_frm = lim_is_mlo_recv_assoc(sta);
 
 	if (LIM_IS_AP_ROLE(pe_session)) {
+		mlo_conn = lim_is_mlo_conn(pe_session, sta);
 		if (mlo_conn)
 			lim_release_mlo_conn_idx(mac, sta->assocId,
 						 pe_session, false);
@@ -4369,8 +4348,6 @@ lim_prepare_and_send_del_sta_cnf(struct mac_context *mac, tpDphHashNode sta,
 				 pe_session->peSessionId,
 				 pe_session->limMlmState));
 	}
-	if (mlo_conn && !mlo_recv_assoc_frm && LIM_IS_AP_ROLE(pe_session))
-		return;
 
 	lim_send_del_sta_cnf(mac, sta_dsaddr, staDsAssocId, mlmStaContext,
 			     status_code, pe_session);

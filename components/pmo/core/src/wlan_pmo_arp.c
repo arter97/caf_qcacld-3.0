@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -128,6 +129,7 @@ pmo_core_do_enable_arp_offload(struct wlan_objmgr_vdev *vdev,
 		status = pmo_tgt_enable_arp_offload_req(vdev, vdev_id);
 		break;
 	case pmo_apps_suspend:
+	case pmo_arp_ns_offload_dynamic_update:
 		/* enable arp when active offload is false (apps suspend) */
 		status = pmo_tgt_enable_arp_offload_req(vdev, vdev_id);
 		break;
@@ -161,6 +163,7 @@ static QDF_STATUS pmo_core_do_disable_arp_offload(struct wlan_objmgr_vdev *vdev,
 
 	switch (trigger) {
 	case pmo_apps_resume:
+	case pmo_arp_ns_offload_dynamic_update:
 		/* disable arp on apps resume when active offload is disable */
 		status = pmo_tgt_disable_arp_offload_req(vdev, vdev_id);
 		break;
@@ -230,17 +233,29 @@ QDF_STATUS pmo_core_arp_check_offload(struct wlan_objmgr_psoc *psoc,
 
 	vdev_ctx = pmo_vdev_get_priv(vdev);
 	psoc_ctx = vdev_ctx->pmo_psoc_ctx;
+	active_offload_cond = psoc_ctx->psoc_cfg.active_mode_offload;
 
-	if (trigger == pmo_apps_suspend || trigger == pmo_apps_resume) {
-		active_offload_cond = psoc_ctx->psoc_cfg.active_mode_offload;
-
+	if (trigger == pmo_apps_suspend) {
 		qdf_spin_lock_bh(&vdev_ctx->pmo_vdev_lock);
-		is_applied_cond = vdev_ctx->vdev_arp_req.enable &&
-				  vdev_ctx->vdev_arp_req.is_offload_applied;
+		is_applied_cond =
+			vdev_ctx->vdev_arp_req.enable == PMO_OFFLOAD_ENABLE &&
+			vdev_ctx->vdev_arp_req.is_offload_applied;
 		qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
 
 		if (active_offload_cond && is_applied_cond) {
 			pmo_debug("active offload is enabled and offload already sent");
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
+			return QDF_STATUS_E_INVAL;
+		}
+	} else if (trigger == pmo_apps_resume) {
+		qdf_spin_lock_bh(&vdev_ctx->pmo_vdev_lock);
+		is_applied_cond =
+			vdev_ctx->vdev_arp_req.enable == PMO_OFFLOAD_DISABLE &&
+			!vdev_ctx->vdev_arp_req.is_offload_applied;
+		qdf_spin_unlock_bh(&vdev_ctx->pmo_vdev_lock);
+
+		if (active_offload_cond && is_applied_cond) {
+			pmo_debug("active offload is enabled and offload already disabled");
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_PMO_ID);
 			return QDF_STATUS_E_INVAL;
 		}

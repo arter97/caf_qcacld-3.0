@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,8 +33,12 @@
 #include <wlan_vdev_mgr_ucfg_api.h>
 #include <wlan_mlme_ucfg_api.h>
 #include <wlan_reg_services_api.h>
+#include <wlan_scan_ucfg_api.h>
+#include <wlan_dcs_ucfg_api.h>
 
 static struct son_callbacks g_son_os_if_cb;
+static struct wlan_os_if_son_ops g_son_os_if_txrx_ops;
+static void (*os_if_son_ops_cb)(struct wlan_os_if_son_ops *son_ops);
 
 void os_if_son_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				      struct son_callbacks *cb_obj)
@@ -624,6 +629,222 @@ qdf_freq_t os_if_son_get_candidate_freq(struct wlan_objmgr_vdev *vdev)
 }
 qdf_export_symbol(os_if_son_get_candidate_freq);
 
+QDF_STATUS os_if_son_set_acl_policy(struct wlan_objmgr_vdev *vdev,
+				    ieee80211_acl_cmd son_acl_policy)
+{
+	QDF_STATUS ret;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ret = g_son_os_if_cb.os_if_set_acl_policy(vdev, son_acl_policy);
+	osif_debug("set acl policy %d status %d", son_acl_policy, ret);
+
+	return ret;
+}
+qdf_export_symbol(os_if_son_set_acl_policy);
+
+ieee80211_acl_cmd os_if_son_get_acl_policy(struct wlan_objmgr_vdev *vdev)
+{
+	ieee80211_acl_cmd son_acl_policy;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return IEEE80211_MACCMD_DETACH;
+	}
+	son_acl_policy = g_son_os_if_cb.os_if_get_acl_policy(vdev);
+	osif_debug("get acl policy %d", son_acl_policy);
+
+	return son_acl_policy;
+}
+qdf_export_symbol(os_if_son_get_acl_policy);
+
+int os_if_son_add_acl_mac(struct wlan_objmgr_vdev *vdev,
+			  struct qdf_mac_addr *acl_mac)
+{
+	int ret;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+	ret = g_son_os_if_cb.os_if_add_acl_mac(vdev, acl_mac);
+	osif_debug("add_acl_mac " QDF_MAC_ADDR_FMT " ret %d",
+		   QDF_MAC_ADDR_REF(acl_mac->bytes), ret);
+
+	return ret;
+}
+qdf_export_symbol(os_if_son_add_acl_mac);
+
+int os_if_son_del_acl_mac(struct wlan_objmgr_vdev *vdev,
+			  struct qdf_mac_addr *acl_mac)
+{
+	int ret;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+	ret = g_son_os_if_cb.os_if_del_acl_mac(vdev, acl_mac);
+	osif_debug("del_acl_mac " QDF_MAC_ADDR_FMT " ret %d",
+		   QDF_MAC_ADDR_REF(acl_mac->bytes), ret);
+
+	return ret;
+}
+qdf_export_symbol(os_if_son_del_acl_mac);
+
+int os_if_son_kickout_mac(struct wlan_objmgr_vdev *vdev,
+			  struct qdf_mac_addr *mac)
+{
+	int ret;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+	ret = g_son_os_if_cb.os_if_kickout_mac(vdev, mac);
+	osif_debug("kickout mac " QDF_MAC_ADDR_FMT " ret %d",
+		   QDF_MAC_ADDR_REF(mac->bytes), ret);
+
+	return ret;
+}
+qdf_export_symbol(os_if_son_kickout_mac);
+
+uint8_t os_if_son_get_chan_util(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_host_dcs_ch_util_stats dcs_son_stats = {};
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t mac_id;
+	QDF_STATUS status;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return 0;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("null psoc");
+		return 0;
+	}
+	status = policy_mgr_get_mac_id_by_session_id(psoc,
+						     wlan_vdev_get_id(vdev),
+						     &mac_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to get mac_id");
+		return 0;
+	}
+
+	ucfg_dcs_get_ch_util(psoc, mac_id, &dcs_son_stats);
+	osif_debug("get_chan_util %d", dcs_son_stats.total_cu);
+
+	return dcs_son_stats.total_cu;
+}
+qdf_export_symbol(os_if_son_get_chan_util);
+
+void os_if_son_get_phy_stats(struct wlan_objmgr_vdev *vdev,
+			     struct ol_ath_radiostats *phy_stats)
+{
+	struct wlan_host_dcs_ch_util_stats dcs_son_stats = {};
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t mac_id;
+	QDF_STATUS status;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("null psoc");
+		return;
+	}
+	status = policy_mgr_get_mac_id_by_session_id(psoc,
+						     wlan_vdev_get_id(vdev),
+						     &mac_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		osif_err("Failed to get mac_id");
+		return;
+	}
+
+	ucfg_dcs_get_ch_util(psoc, mac_id, &dcs_son_stats);
+
+	phy_stats->ap_rx_util = dcs_son_stats.rx_cu;
+	phy_stats->ap_tx_util = dcs_son_stats.tx_cu;
+	phy_stats->obss_rx_util = dcs_son_stats.obss_rx_cu;
+	if (dcs_son_stats.total_cu < 100)
+		phy_stats->free_medium = 100 - dcs_son_stats.total_cu;
+	else
+		phy_stats->free_medium = 0;
+	phy_stats->chan_nf = dcs_son_stats.chan_nf;
+	osif_debug("rx_util %d tx_util %d obss_rx_util %d free_medium %d noise floor %d",
+		   phy_stats->ap_rx_util, phy_stats->ap_tx_util,
+		   phy_stats->obss_rx_util, phy_stats->free_medium,
+		   phy_stats->chan_nf);
+}
+qdf_export_symbol(os_if_son_get_phy_stats);
+
+int os_if_son_cbs_init(void)
+{
+	int ret;
+
+	ret = ucfg_son_cbs_init();
+
+	return ret;
+}
+
+qdf_export_symbol(os_if_son_cbs_init);
+
+int os_if_son_cbs_deinit(void)
+{
+	int ret;
+
+	ret = ucfg_son_cbs_deinit();
+
+	return ret;
+}
+
+qdf_export_symbol(os_if_son_cbs_deinit);
+
+int os_if_son_set_cbs(struct wlan_objmgr_vdev *vdev,
+		      bool enable)
+{
+	int ret;
+
+	ret = ucfg_son_set_cbs(vdev, enable);
+
+	return ret;
+}
+
+qdf_export_symbol(os_if_son_set_cbs);
+
+int os_if_son_set_cbs_wait_time(struct wlan_objmgr_vdev *vdev,
+				uint32_t val)
+{
+	int ret;
+
+	ret = ucfg_son_set_cbs_wait_time(vdev, val);
+
+	return ret;
+}
+
+qdf_export_symbol(os_if_son_set_cbs_wait_time);
+
+int os_if_son_set_cbs_dwell_split_time(struct wlan_objmgr_vdev *vdev,
+				       uint32_t val)
+{
+	int ret;
+
+	ret = ucfg_son_set_cbs_dwell_split_time(vdev, val);
+
+	return ret;
+}
+
+qdf_export_symbol(os_if_son_set_cbs_dwell_split_time);
+
 int os_if_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 			  enum ieee80211_phymode mode)
 {
@@ -658,3 +879,768 @@ enum ieee80211_phymode os_if_son_get_phymode(struct wlan_objmgr_vdev *vdev)
 	return phymode;
 }
 qdf_export_symbol(os_if_son_get_phymode);
+
+QDF_STATUS os_if_son_vdev_ops(struct wlan_objmgr_vdev *vdev,
+			      enum wlan_mlme_vdev_param type,
+			      void *data, void *ret)
+{
+	union wlan_mlme_vdev_data *in = (union wlan_mlme_vdev_data *)data;
+	union wlan_mlme_vdev_data *out = (union wlan_mlme_vdev_data *)ret;
+
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+	switch (type) {
+	case VDEV_SET_IE:
+		break;
+	case VDEV_CLR_IE:
+		break;
+	case VDEV_SET_ACL:
+		break;
+	case VDEV_CLR_ACL:
+		break;
+	case VDEV_SET_ACL_TIMER:
+		break;
+	case VDEV_SET_PEER_ACT_STATS:
+		break;
+	case VDEV_SET_SEC_STA_WDS:
+		break;
+	case VDEV_SET_MEC:
+		break;
+	case VDEV_SET_MBO_IE_BSTM:
+		break;
+	case VDEV_SET_WPS_ACL_ENABLE:
+		break;
+	case VDEV_SET_WNM_BSS_PREF:
+		break;
+	case VDEV_GET_NSS:
+		break;
+	case VDEV_GET_CHAN:
+		if (!out)
+			return QDF_STATUS_E_INVAL;
+		qdf_mem_copy(&out->chan,
+			     wlan_vdev_get_active_channel(vdev),
+			     sizeof(out->chan));
+		break;
+	case VDEV_GET_CHAN_WIDTH:
+		break;
+	case VDEV_GET_CHAN_UTIL:
+		if (!out)
+			return QDF_STATUS_E_INVAL;
+		out->chan_util = os_if_son_get_chan_uti(vdev, NULL);
+		break;
+	case VDEV_GET_APCAP:
+		break;
+	case VDEV_GET_CONNECT_N_TX:
+		break;
+	case VDEV_GET_SSID:
+		break;
+	case VDEV_GET_MAX_PHYRATE:
+		break;
+	case VDEV_GET_ACL:
+		break;
+	case VDEV_GET_ACL_RSSI_THRESHOLDS:
+		break;
+	case VDEV_GET_NODE_CAP:
+		if (!out || !in)
+			return QDF_STATUS_E_INVAL;
+		os_if_son_get_node_datarate_info(vdev, in->mac, &out->nodeinfo);
+		break;
+	case VDEV_GET_WDS:
+		break;
+	default:
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(os_if_son_vdev_ops);
+
+static QDF_STATUS os_if_son_get_peer_capability(struct wlan_objmgr_vdev *vdev,
+						struct wlan_objmgr_peer *peer,
+						wlan_peer_cap *peer_cap)
+{
+	if (g_son_os_if_cb.os_if_get_peer_capability)
+		return g_son_os_if_cb.os_if_get_peer_capability(vdev, peer,
+								peer_cap);
+	return QDF_STATUS_E_INVAL;
+}
+
+QDF_STATUS os_if_son_peer_ops(struct wlan_objmgr_peer *peer,
+			      enum wlan_mlme_peer_param type,
+			      union wlan_mlme_peer_data *in,
+			      union wlan_mlme_peer_data *out)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!peer) {
+		osif_err("null peer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev) {
+		osif_err("null vdev");
+		return QDF_STATUS_E_INVAL;
+	}
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		osif_err("null pdev");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		osif_err("null psoc");
+		return QDF_STATUS_E_INVAL;
+	}
+	osif_debug("type %d", type);
+	/* All PEER MLME operations exported to SON component */
+	switch (type) {
+	case PEER_SET_KICKOUT_ALLOW:
+		if (!in) {
+			osif_err("invalid input parameter");
+			return QDF_STATUS_E_INVAL;
+		}
+		status = ucfg_son_set_peer_kickout_allow(vdev, peer,
+							 in->enable);
+		break;
+	case PEER_GET_CAPABILITY:
+		if (!out)
+			return QDF_STATUS_E_INVAL;
+		status = os_if_son_get_peer_capability(vdev, peer,
+						       &out->peercap);
+		break;
+	default:
+		osif_err("invalid type: %d", type);
+		status = QDF_STATUS_E_INVAL;
+	}
+
+	return status;
+}
+
+qdf_export_symbol(os_if_son_peer_ops);
+
+QDF_STATUS os_if_son_scan_db_iterate(struct wlan_objmgr_pdev *pdev,
+				     scan_iterator_func handler, void *arg)
+{
+	return ucfg_scan_db_iterate(pdev, handler, arg);
+}
+
+qdf_export_symbol(os_if_son_scan_db_iterate);
+
+bool os_if_son_acl_is_probe_wh_set(struct wlan_objmgr_vdev *vdev,
+				   const uint8_t *mac_addr,
+				   uint8_t probe_rssi)
+{
+	return false;
+}
+
+qdf_export_symbol(os_if_son_acl_is_probe_wh_set);
+
+int os_if_son_set_chwidth(struct wlan_objmgr_vdev *vdev,
+			  enum ieee80211_cwm_width son_chwidth)
+{
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+
+	return g_son_os_if_cb.os_if_set_chwidth(vdev, son_chwidth);
+}
+qdf_export_symbol(os_if_son_set_chwidth);
+
+enum ieee80211_cwm_width os_if_son_get_chwidth(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev) {
+		osif_err("null vdev");
+		return 0;
+	}
+
+	return g_son_os_if_cb.os_if_get_chwidth(vdev);
+}
+qdf_export_symbol(os_if_son_get_chwidth);
+
+u_int8_t os_if_son_get_rx_streams(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev) {
+		osif_err("null vdev");
+		return 0;
+	}
+
+	return g_son_os_if_cb.os_if_get_rx_nss(vdev);
+}
+
+qdf_export_symbol(os_if_son_get_rx_streams);
+
+QDF_STATUS os_if_son_cfg80211_reply(qdf_nbuf_t sk_buf)
+{
+	return wlan_cfg80211_qal_devcfg_send_response(sk_buf);
+}
+
+qdf_export_symbol(os_if_son_cfg80211_reply);
+
+bool os_if_son_vdev_is_wds(struct wlan_objmgr_vdev *vdev)
+{
+	return true;
+}
+
+qdf_export_symbol(os_if_son_vdev_is_wds);
+
+uint32_t os_if_son_get_sta_space(struct wlan_objmgr_vdev *vdev)
+{
+	uint32_t sta_space;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return 0;
+	}
+
+	sta_space = g_son_os_if_cb.os_if_get_sta_space(vdev);
+	osif_debug("need space %u", sta_space);
+
+	return sta_space;
+}
+
+qdf_export_symbol(os_if_son_get_sta_space);
+
+void os_if_son_get_sta_list(struct wlan_objmgr_vdev *vdev,
+			    struct ieee80211req_sta_info *si, uint32_t *space)
+{
+	if (!vdev) {
+		osif_err("null vdev");
+		return;
+	}
+
+	if (!si) {
+		osif_err("null si");
+		return;
+	}
+	if (!space || *space == 0) {
+		osif_err("invalid input space");
+		return;
+	}
+
+	g_son_os_if_cb.os_if_get_sta_list(vdev, si, space);
+
+	osif_debug("left space %u", *space);
+}
+
+qdf_export_symbol(os_if_son_get_sta_list);
+
+void os_if_son_deauth_peer_sta(struct wlan_objmgr_vdev *vdev,
+			       uint8_t *peer_mac,
+			       bool ignore_frame)
+{
+	if (!vdev || !peer_mac) {
+		osif_err("null vdev / peer_mac");
+		return;
+	}
+	if (g_son_os_if_cb.os_if_deauth_sta)
+		g_son_os_if_cb.os_if_deauth_sta(vdev, peer_mac, ignore_frame);
+}
+
+qdf_export_symbol(os_if_son_deauth_peer_sta);
+
+void os_if_son_modify_acl(struct wlan_objmgr_vdev *vdev,
+			  uint8_t *peer_mac,
+			  bool allow_auth)
+{
+	if (!vdev || !peer_mac) {
+		osif_err("null vdev / peer_mac");
+		return;
+	}
+	if (g_son_os_if_cb.os_if_modify_acl)
+		g_son_os_if_cb.os_if_modify_acl(vdev, peer_mac, allow_auth);
+}
+
+qdf_export_symbol(os_if_son_modify_acl);
+
+static
+int os_if_son_reg_get_ap_hw_cap(struct wlan_objmgr_pdev *pdev,
+				struct wlan_radio_basic_capabilities *hwcap)
+{
+	QDF_STATUS status;
+	uint8_t idx;
+	uint8_t max_supp_op_class = REG_MAX_SUPP_OPER_CLASSES;
+	uint8_t n_opclasses = 0;
+	/* nsoc = Number of supported operating classes */
+	uint8_t nsoc = 0;
+	struct regdmn_ap_cap_opclass_t *reg_ap_cap;
+
+	if (!pdev || !hwcap)
+		return nsoc;
+
+	reg_ap_cap = qdf_mem_malloc(max_supp_op_class * sizeof(*reg_ap_cap));
+	if (!reg_ap_cap) {
+		osif_err("Memory allocation failure");
+		return nsoc;
+	}
+	status = wlan_reg_get_opclass_details(pdev, reg_ap_cap, &n_opclasses,
+					      max_supp_op_class, true);
+	if (status == QDF_STATUS_E_FAILURE) {
+		osif_err("Failed to get SAP regulatory capabilities");
+		goto end_reg_get_ap_hw_cap;
+	}
+	osif_debug("n_opclasses: %u", n_opclasses);
+
+	for (idx = 0; reg_ap_cap[idx].op_class && idx < n_opclasses; idx++) {
+		osif_debug("idx: %d op_class: %u ch_width: %d  max_tx_pwr_dbm: %u",
+			   idx, reg_ap_cap[idx].op_class,
+			   reg_ap_cap[idx].ch_width,
+			   reg_ap_cap[idx].max_tx_pwr_dbm);
+		if (reg_ap_cap[idx].ch_width == BW_160_MHZ)
+			continue;
+		hwcap->opclasses[nsoc].opclass = reg_ap_cap[idx].op_class;
+		hwcap->opclasses[nsoc].max_tx_pwr_dbm =
+					reg_ap_cap[idx].max_tx_pwr_dbm;
+		hwcap->opclasses[nsoc].num_non_oper_chan =
+					reg_ap_cap[idx].num_non_supported_chan;
+		qdf_mem_copy(hwcap->opclasses[nsoc].non_oper_chan_num,
+			     reg_ap_cap[idx].non_sup_chan_list,
+			     reg_ap_cap[idx].num_non_supported_chan);
+		hwcap->wlan_radio_basic_capabilities_valid = 1;
+		nsoc++;
+	}
+	hwcap->num_supp_op_classes = nsoc;
+
+end_reg_get_ap_hw_cap:
+
+	qdf_mem_free(reg_ap_cap);
+	return nsoc;
+}
+
+static void os_if_son_reg_get_op_channels(struct wlan_objmgr_pdev *pdev,
+					  struct wlan_op_chan *op_chan,
+					  bool dfs_required)
+{
+	QDF_STATUS status;
+	uint8_t idx;
+	uint8_t max_supp_op_class = REG_MAX_SUPP_OPER_CLASSES;
+	uint8_t n_opclasses = 0;
+	/* nsoc = Number of supported operating classes */
+	uint8_t nsoc = 0;
+	struct regdmn_ap_cap_opclass_t *reg_ap_cap =
+		qdf_mem_malloc(max_supp_op_class * sizeof(*reg_ap_cap));
+
+	if (!reg_ap_cap) {
+		osif_err("Memory allocation failure");
+		return;
+	}
+	status = wlan_reg_get_opclass_details(pdev, reg_ap_cap, &n_opclasses,
+					      max_supp_op_class, true);
+	if (status == QDF_STATUS_E_FAILURE) {
+		osif_err("Failed to get SAP regulatory capabilities");
+		goto end_reg_get_op_channels;
+	}
+	osif_debug("n_opclasses: %u op_chan->opclass: %u",
+		   n_opclasses, op_chan->opclass);
+	for (idx = 0; reg_ap_cap[idx].op_class && idx < n_opclasses; idx++) {
+		osif_debug("idx: %d op_class: %u ch_width: %d  max_tx_pwr_dbm: %u",
+			   idx, reg_ap_cap[idx].op_class,
+			   reg_ap_cap[idx].ch_width,
+			   reg_ap_cap[idx].max_tx_pwr_dbm);
+		if ((reg_ap_cap[idx].ch_width == BW_160_MHZ) ||
+		    (op_chan->opclass != reg_ap_cap[idx].op_class))
+			continue;
+		if (reg_ap_cap[idx].op_class == op_chan->opclass) {
+			switch (reg_ap_cap[idx].ch_width) {
+			case BW_20_MHZ:
+			case BW_25_MHZ:
+				op_chan->ch_width = CH_WIDTH_20MHZ;
+				break;
+			case BW_40_MHZ:
+				op_chan->ch_width = CH_WIDTH_40MHZ;
+				break;
+			case BW_80_MHZ:
+				if (reg_ap_cap[idx].behav_limit ==
+				    BIT(BEHAV_BW80_PLUS))
+					op_chan->ch_width = CH_WIDTH_80P80MHZ;
+				else
+					op_chan->ch_width = CH_WIDTH_80MHZ;
+				break;
+			case BW_160_MHZ:
+				op_chan->ch_width  = CH_WIDTH_160MHZ;
+				break;
+			default:
+				op_chan->ch_width = INVALID_WIDTH;
+				break;
+			}
+			op_chan->num_oper_chan =
+					reg_ap_cap[idx].num_supported_chan;
+			qdf_mem_copy(op_chan->oper_chan_num,
+				     reg_ap_cap[idx].sup_chan_list,
+				     reg_ap_cap[idx].num_supported_chan);
+			osif_debug("num of supported channel: %u",
+				   op_chan->num_oper_chan);
+		}
+	}
+	/*
+	 * TBD: DFS channel support needs to be added
+	 * Variable nsoc will be update whenever we add DFS
+	 * channel support for Easymesh.
+	 */
+	op_chan->num_supp_op_classes = nsoc;
+
+end_reg_get_op_channels:
+
+	qdf_mem_free(reg_ap_cap);
+}
+
+/* size of sec chan offset element */
+#define IEEE80211_SEC_CHAN_OFFSET_BYTES             3
+/* no secondary channel */
+#define IEEE80211_SEC_CHAN_OFFSET_SCN               0
+/* secondary channel above */
+#define IEEE80211_SEC_CHAN_OFFSET_SCA               1
+/* secondary channel below */
+#define IEEE80211_SEC_CHAN_OFFSET_SCB               3
+
+static void os_if_son_reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
+					      struct wlan_op_class *op_class)
+{
+	QDF_STATUS status;
+	uint8_t i;
+	uint8_t idx;
+	uint8_t n_opclasses = 0;
+	uint8_t chan_idx;
+	uint8_t max_supp_op_class = REG_MAX_SUPP_OPER_CLASSES;
+	struct regdmn_ap_cap_opclass_t *reg_ap_cap =
+			qdf_mem_malloc(max_supp_op_class * sizeof(*reg_ap_cap));
+
+	if (!reg_ap_cap) {
+		osif_err("Memory allocation failure");
+		return;
+	}
+	status = wlan_reg_get_opclass_details(pdev, reg_ap_cap, &n_opclasses,
+					      max_supp_op_class, true);
+	if (status == QDF_STATUS_E_FAILURE) {
+		osif_err("Failed to get SAP regulatory capabilities");
+		goto end_reg_get_opclass_details;
+	}
+	osif_debug("n_opclasses: %u", n_opclasses);
+
+	for (idx = 0; reg_ap_cap[idx].op_class && idx < n_opclasses; idx++) {
+		osif_debug("idx: %d op_class: %u ch_width: %d",
+			   idx, reg_ap_cap[idx].op_class,
+			   reg_ap_cap[idx].ch_width);
+		if ((op_class->opclass != reg_ap_cap[idx].op_class) ||
+		    (reg_ap_cap[idx].ch_width == BW_160_MHZ))
+			continue;
+		switch (reg_ap_cap[idx].ch_width) {
+		case BW_20_MHZ:
+		case BW_25_MHZ:
+			op_class->ch_width = CH_WIDTH_20MHZ;
+			break;
+		case BW_40_MHZ:
+			op_class->ch_width = CH_WIDTH_40MHZ;
+			break;
+		case BW_80_MHZ:
+			if (reg_ap_cap[idx].behav_limit == BIT(BEHAV_BW80_PLUS))
+				op_class->ch_width = CH_WIDTH_80P80MHZ;
+			else
+				op_class->ch_width = CH_WIDTH_80MHZ;
+			break;
+		case BW_160_MHZ:
+			op_class->ch_width  = CH_WIDTH_160MHZ;
+			break;
+		default:
+			op_class->ch_width = CH_WIDTH_INVALID;
+			break;
+		}
+		switch (reg_ap_cap[idx].behav_limit) {
+		case BIT(BEHAV_NONE):
+			op_class->sc_loc = IEEE80211_SEC_CHAN_OFFSET_SCN;
+			break;
+		case BIT(BEHAV_BW40_LOW_PRIMARY):
+			op_class->sc_loc = IEEE80211_SEC_CHAN_OFFSET_SCA;
+			break;
+		case BIT(BEHAV_BW40_HIGH_PRIMARY):
+			op_class->sc_loc = IEEE80211_SEC_CHAN_OFFSET_SCB;
+			break;
+		case BIT(BEHAV_BW80_PLUS):
+			op_class->sc_loc = IEEE80211_SEC_CHAN_OFFSET_SCN;
+			break;
+		default:
+			op_class->sc_loc = IEEE80211_SEC_CHAN_OFFSET_SCN;
+			break;
+		}
+		osif_debug("num_supported_chan: %u num_non_supported_chan: %u",
+			   reg_ap_cap[idx].num_supported_chan,
+			   reg_ap_cap[idx].num_non_supported_chan);
+		i = 0;
+		chan_idx = 0;
+		while ((i < reg_ap_cap[idx].num_supported_chan) &&
+		       (chan_idx < MAX_CHANNELS_PER_OP_CLASS))
+			op_class->channels[chan_idx++] =
+				reg_ap_cap[idx].sup_chan_list[i++];
+		i = 0;
+		while ((i < reg_ap_cap[idx].num_non_supported_chan) &&
+		       (chan_idx < MAX_CHANNELS_PER_OP_CLASS))
+			op_class->channels[chan_idx++] =
+				reg_ap_cap[idx].non_sup_chan_list[i++];
+
+		 op_class->num_chan = chan_idx;
+	}
+
+end_reg_get_opclass_details:
+
+	qdf_mem_free(reg_ap_cap);
+}
+
+QDF_STATUS os_if_son_pdev_ops(struct wlan_objmgr_pdev *pdev,
+			      enum wlan_mlme_pdev_param type,
+			      void *data, void *ret)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	union wlan_mlme_pdev_data *in = (union wlan_mlme_pdev_data *)data;
+	union wlan_mlme_pdev_data *out = (union wlan_mlme_pdev_data *)ret;
+	wlan_esp_data *esp_info;
+
+	if (!out)
+		return QDF_STATUS_E_INVAL;
+
+	osif_debug("Type: %d", type);
+	switch (type) {
+	case PDEV_GET_ESP_INFO:
+		esp_info = &out->esp_info;
+		/* BA Window Size of 16 */
+		esp_info->per_ac[WME_AC_BE].ba_window_size = ba_window_size_16;
+		esp_info->per_ac[WME_AC_BE].est_air_time_fraction = 0;
+		/* Default : 250us PPDU Duration in native format */
+		esp_info->per_ac[WME_AC_BE].data_ppdu_dur_target =
+			MAP_DEFAULT_PPDU_DURATION * MAP_PPDU_DURATION_UNITS;
+		break;
+	case PDEV_GET_CAPABILITY:
+		os_if_son_reg_get_ap_hw_cap(pdev, &out->cap);
+		break;
+	case PDEV_GET_OPERABLE_CHAN:
+		memcpy(&out->op_chan, &in->op_chan,
+		       sizeof(struct wlan_op_chan));
+		os_if_son_reg_get_op_channels(pdev, &out->op_chan,
+					      in->op_chan.dfs_required);
+		break;
+	case PDEV_GET_OPERABLE_CLASS:
+		memcpy(&out->op_class, &in->op_class,
+		       sizeof(struct wlan_op_class));
+		os_if_son_reg_get_opclass_details(pdev, &out->op_class);
+		break;
+	default:
+		break;
+	}
+
+	return status;
+}
+
+qdf_export_symbol(os_if_son_pdev_ops);
+
+int os_if_son_deliver_ald_event(struct wlan_objmgr_vdev *vdev,
+				struct wlan_objmgr_peer *peer,
+				enum ieee80211_event_type event,
+				void *event_data)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_rx_ops *rx_ops;
+	int ret;
+
+	if (!vdev) {
+		osif_err("null vdev");
+		return -EINVAL;
+	}
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("null posc");
+		return -EINVAL;
+	}
+	rx_ops = wlan_psoc_get_lmac_if_rxops(psoc);
+	if (rx_ops && rx_ops->son_rx_ops.deliver_event)
+		ret = rx_ops->son_rx_ops.deliver_event(vdev, peer, event,
+						       event_data);
+	else
+		ret = -EINVAL;
+
+	return ret;
+}
+
+qdf_export_symbol(os_if_son_deliver_ald_event);
+
+struct wlan_objmgr_vdev *
+os_if_son_get_vdev_by_netdev(struct net_device *dev)
+{
+	return g_son_os_if_cb.os_if_get_vdev_by_netdev(dev);
+}
+
+qdf_export_symbol(os_if_son_get_vdev_by_netdev);
+
+QDF_STATUS os_if_son_trigger_objmgr_object_creation(enum wlan_umac_comp_id id)
+{
+	return g_son_os_if_cb.os_if_trigger_objmgr_object_creation(id);
+}
+
+qdf_export_symbol(os_if_son_trigger_objmgr_object_creation);
+
+QDF_STATUS os_if_son_trigger_objmgr_object_deletion(enum wlan_umac_comp_id id)
+{
+	return g_son_os_if_cb.os_if_trigger_objmgr_object_deletion(id);
+}
+
+qdf_export_symbol(os_if_son_trigger_objmgr_object_deletion);
+
+int os_if_son_start_acs(struct wlan_objmgr_vdev *vdev, uint8_t enable)
+{
+	if (!vdev) {
+		osif_err("null vdev");
+		return 0;
+	}
+
+	return g_son_os_if_cb.os_if_start_acs(vdev, enable);
+}
+
+qdf_export_symbol(os_if_son_start_acs);
+
+int os_if_son_set_acs_chan(struct wlan_objmgr_vdev *vdev,
+			   struct ieee80211req_athdbg *req)
+{
+	if (!vdev) {
+		osif_err("null vdev");
+		return 0;
+	}
+
+	return g_son_os_if_cb.os_if_set_acs_channels(vdev, req);
+}
+
+qdf_export_symbol(os_if_son_set_acs_chan);
+
+int os_if_son_get_acs_report(struct wlan_objmgr_vdev *vdev,
+			     struct ieee80211_acs_dbg *acs_r)
+{
+	if (!vdev) {
+		osif_err("null vdev");
+		return 0;
+	}
+
+	return g_son_os_if_cb.os_if_get_acs_report(vdev, acs_r);
+}
+
+qdf_export_symbol(os_if_son_get_acs_report);
+
+void
+wlan_os_if_son_ops_register_cb(void (*handler)(struct wlan_os_if_son_ops *))
+{
+	os_if_son_ops_cb = handler;
+}
+
+qdf_export_symbol(wlan_os_if_son_ops_register_cb);
+
+static void wlan_son_register_os_if_ops(struct wlan_os_if_son_ops *son_ops)
+{
+	if (os_if_son_ops_cb)
+		os_if_son_ops_cb(son_ops);
+	else
+		osif_err("\n***** OS_IF: SON MODULE NOT LOADED *****\n");
+}
+
+void os_if_son_register_lmac_if_ops(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_lmac_if_rx_ops *rx_ops;
+
+	if (!psoc) {
+		osif_err("psoc is NULL");
+		return;
+	}
+
+	rx_ops = wlan_psoc_get_lmac_if_rxops(psoc);
+	if (!rx_ops) {
+		osif_err("rx_ops is null");
+		return;
+	}
+
+	wlan_lmac_if_son_mod_register_rx_ops(rx_ops);
+}
+
+qdf_export_symbol(os_if_son_register_lmac_if_ops);
+
+void os_if_son_register_osif_ops(void)
+{
+	wlan_son_register_os_if_ops(&g_son_os_if_txrx_ops);
+}
+
+qdf_export_symbol(os_if_son_register_osif_ops);
+
+int os_if_son_parse_generic_nl_cmd(struct wiphy *wiphy,
+				   struct wireless_dev *wdev,
+				   struct nlattr **tb,
+				   enum os_if_son_vendor_cmd_type type)
+{
+	struct os_if_son_rx_ops *rx_ops = &g_son_os_if_txrx_ops.son_osif_rx_ops;
+	struct wlan_cfg8011_genric_params param = {};
+
+	if (!rx_ops->parse_generic_nl_cmd)
+		return -EINVAL;
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND])
+		param.command = nla_get_u32(tb
+				[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_COMMAND]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_VALUE])
+		param.value = nla_get_u32(tb
+				[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_VALUE]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA])
+		param.data = nla_data(tb
+				[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA]);
+		param.data_len = nla_len(tb
+				[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_DATA]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_LENGTH])
+		param.length = nla_get_u32(tb
+				[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_LENGTH]);
+
+	if (tb[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_FLAGS])
+		param.flags = nla_get_u32(tb
+				[QCA_WLAN_VENDOR_ATTR_CONFIG_GENERIC_FLAGS]);
+
+	return rx_ops->parse_generic_nl_cmd(wiphy, wdev, &param, type);
+}
+
+QDF_STATUS os_if_son_get_node_datarate_info(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *mac_addr,
+					    wlan_node_info *node_info)
+{
+	int8_t max_tx_power;
+	int8_t min_tx_power;
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("null posc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (WLAN_ADDR_EQ(wlan_vdev_mlme_get_macaddr(vdev), mac_addr) ==
+							   QDF_STATUS_SUCCESS) {
+		node_info->max_chwidth = os_if_son_get_chwidth(vdev);
+		node_info->phymode = os_if_son_get_phymode(vdev);
+		node_info->num_streams = os_if_son_get_rx_streams(vdev);
+		ucfg_son_get_min_and_max_power(psoc, &max_tx_power,
+					       &min_tx_power);
+		node_info->max_txpower = max_tx_power;
+		node_info->max_MCS = MAX_HE_MCS_IDX;
+		osif_debug("node info: max_chwidth: %u, phymode: %u, num_streams: %d, max_mcs: %d, max_txpower: %d",
+			   node_info->max_chwidth, node_info->phymode,
+			   node_info->num_streams, node_info->max_MCS,
+			   node_info->max_txpower);
+	} else {
+		if (!g_son_os_if_cb.os_if_get_node_info) {
+			osif_err("Callback not registered");
+			return QDF_STATUS_E_INVAL;
+		}
+		status = g_son_os_if_cb.os_if_get_node_info(vdev, mac_addr,
+							    node_info);
+	}
+	return status;
+}

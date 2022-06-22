@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -87,6 +88,9 @@
 #endif
 #include "wlan_cm_roam_api.h"
 #include "wlan_cm_api.h"
+
+/* Max debug string size for WMM in bytes */
+#define WMA_WMM_DEBUG_STRING_SIZE    512
 
 /**
  * wma_send_bcn_buf_ll() - prepare and send beacon buffer to fw for LL
@@ -1989,12 +1993,18 @@ QDF_STATUS wma_process_update_edca_param_req(WMA_HANDLE handle,
 	uint8_t vdev_id;
 	QDF_STATUS status;
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint8_t *debug_str;
+	uint32_t len = 0;
 
 	vdev_id = edca_params->vdev_id;
 	if (!wma_is_vdev_valid(vdev_id)) {
 		wma_err("vdev id:%d is not active ", vdev_id);
 		goto fail;
 	}
+
+	debug_str = qdf_mem_malloc(WMA_WMM_DEBUG_STRING_SIZE);
+	if (!debug_str)
+		goto fail;
 
 	for (ac = 0; ac < QCA_WLAN_AC_ALL; ac++) {
 		switch (ac) {
@@ -2011,16 +2021,22 @@ QDF_STATUS wma_process_update_edca_param_req(WMA_HANDLE handle,
 			edca_record = &edca_params->acvo;
 			break;
 		default:
+			qdf_mem_free(debug_str);
 			goto fail;
 		}
 
 		wma_update_edca_params_for_ac(edca_record, &wmm_param[ac], ac,
-				edca_params->mu_edca_params);
+					      edca_params->mu_edca_params,
+					      debug_str,
+					      WMA_WMM_DEBUG_STRING_SIZE, &len);
 
 		ol_tx_wmm_param.ac[ac].aifs = wmm_param[ac].aifs;
 		ol_tx_wmm_param.ac[ac].cwmin = wmm_param[ac].cwmin;
 		ol_tx_wmm_param.ac[ac].cwmax = wmm_param[ac].cwmax;
 	}
+
+	wma_nofl_debug("WMM params: %s", debug_str);
+	qdf_mem_free(debug_str);
 
 	status = wmi_unified_process_update_edca_param(wma_handle->wmi_handle,
 						vdev_id,
@@ -2550,6 +2566,7 @@ void wma_beacon_miss_handler(tp_wma_handle wma, uint32_t vdev_id, int32_t rssi)
 	beacon_miss_ind->messageType = WMA_MISSED_BEACON_IND;
 	beacon_miss_ind->length = sizeof(*beacon_miss_ind);
 	beacon_miss_ind->bss_idx = vdev_id;
+	beacon_miss_ind->rssi = rssi;
 
 	wma_send_msg(wma, WMA_MISSED_BEACON_IND, beacon_miss_ind, 0);
 	if (!wmi_service_enabled(wma->wmi_handle,
@@ -3352,8 +3369,8 @@ wma_get_peer_pmf_status(tp_wma_handle wma, uint8_t *peer_mac)
 				    wlan_objmgr_pdev_get_pdev_id(wma->pdev),
 				    peer_mac, WLAN_LEGACY_WMA_ID);
 	if (!peer) {
-		wma_err("Peer of peer_mac "QDF_MAC_ADDR_FMT" not found",
-			 QDF_MAC_ADDR_REF(peer_mac));
+		wma_debug("Peer of peer_mac " QDF_MAC_ADDR_FMT " not found",
+			  QDF_MAC_ADDR_REF(peer_mac));
 		return false;
 	}
 	is_pmf_enabled = mlme_get_peer_pmf_status(peer);

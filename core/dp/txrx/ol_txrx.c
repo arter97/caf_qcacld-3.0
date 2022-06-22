@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -857,7 +858,7 @@ static inline void ol_txrx_debugfs_exit(ol_txrx_pdev_handle pdev)
  */
 static QDF_STATUS
 ol_txrx_pdev_attach(ol_txrx_soc_handle soc,
-		    HTC_HANDLE htc_pdev, qdf_device_t osdev, uint8_t pdev_id)
+		    struct cdp_pdev_attach_params *params)
 {
 	struct ol_txrx_soc_t *ol_soc = cdp_soc_t_to_ol_txrx_soc_t(soc);
 	struct ol_txrx_pdev_t *pdev;
@@ -865,7 +866,7 @@ ol_txrx_pdev_attach(ol_txrx_soc_handle soc,
 	QDF_STATUS status;
 	int i, tid;
 
-	if (pdev_id == OL_TXRX_INVALID_PDEV_ID)
+	if (params->pdev_id == OL_TXRX_INVALID_PDEV_ID)
 		return QDF_STATUS_E_INVAL;
 
 	pdev = qdf_mem_malloc(sizeof(*pdev));
@@ -891,10 +892,10 @@ ol_txrx_pdev_attach(ol_txrx_soc_handle soc,
 
 	/* store provided params */
 	pdev->ctrl_pdev = cfg_pdev;
-	pdev->osdev = osdev;
-	pdev->id = pdev_id;
+	pdev->osdev = params->qdf_osdev;
+	pdev->id = params->pdev_id;
 	pdev->soc = ol_soc;
-	ol_soc->pdev_list[pdev_id] = pdev;
+	ol_soc->pdev_list[params->pdev_id] = pdev;
 
 	for (i = 0; i < htt_num_sec_types; i++)
 		pdev->sec_types[i] = (enum ol_sec_type)i;
@@ -936,7 +937,8 @@ ol_txrx_pdev_attach(ol_txrx_soc_handle soc,
 	ol_txrx_pdev_grp_stats_init(pdev);
 
 	pdev->htt_pdev =
-		htt_pdev_alloc(pdev, cfg_pdev, htc_pdev, osdev);
+		htt_pdev_alloc(pdev, cfg_pdev,
+			       params->htc_handle, params->qdf_osdev);
 	if (!pdev->htt_pdev) {
 		status = QDF_STATUS_E_FAILURE;
 		goto fail3;
@@ -1925,13 +1927,15 @@ ol_txrx_vdev_per_vdev_tx_desc_init(struct ol_txrx_vdev_t *vdev)
  */
 static QDF_STATUS
 ol_txrx_vdev_attach(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
-		    uint8_t *vdev_mac_addr,
-		    uint8_t vdev_id, enum wlan_op_mode op_mode,
-		    enum wlan_op_subtype subtype)
+		    struct cdp_vdev_info *vdev_info)
 {
 	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
 	struct ol_txrx_pdev_t *pdev = ol_txrx_get_pdev_from_pdev_id(soc,
 								    pdev_id);
+	uint8_t *vdev_mac_addr = vdev_info->vdev_mac_addr;
+	uint8_t vdev_id = vdev_info->vdev_id;
+	enum wlan_op_mode op_mode = vdev_info->op_mode;
+	enum wlan_op_subtype subtype = vdev_info->subtype;
 
 	struct ol_txrx_vdev_t *vdev;
 	QDF_STATUS qdf_status;
@@ -2408,7 +2412,7 @@ static void ol_txrx_dump_peer_access_list(ol_txrx_peer_handle peer)
  */
 static QDF_STATUS
 ol_txrx_peer_attach(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
-		    uint8_t *peer_mac_addr)
+		    uint8_t *peer_mac_addr, enum cdp_peer_type peer_type)
 {
 	struct ol_txrx_soc_t *soc = cdp_soc_t_to_ol_txrx_soc_t(soc_hdl);
 	ol_txrx_vdev_handle vdev = ol_txrx_get_vdev_from_soc_vdev_id(soc,
@@ -4243,7 +4247,7 @@ ol_txrx_fw_stats_handler(ol_txrx_pdev_handle pdev,
 				bytes = 0;
 				/* TO DO: specify how many bytes are present */
 				/* TO DO: add copying to the requestor's buf */
-
+				/* fallthrough */
 			case HTT_DBG_STATS_RX_REMOTE_RING_BUFFER_INFO:
 				bytes = sizeof(struct
 						rx_remote_buffer_mgmt_stats);

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -94,17 +95,32 @@ struct pwr_channel_info {
 };
 
 /**
+ * struct peer_disconnect_stats_param -Peer disconnect stats params
+ * @vdev_id: vdev_id of the SAP vdev on which disconnect stats request is sent
+ * @is_disconn_stats_completed: Indicates if disconnect stats request is
+ * completed or not
+ * @disconn_stats_timer: Disconnect stats timer
+ */
+struct peer_disconnect_stats_param {
+	uint8_t vdev_id;
+	qdf_atomic_t is_disconn_stats_completed;
+	qdf_mc_timer_t disconn_stats_timer;
+};
+
+/**
  * struct wlan_mlme_psoc_ext_obj -MLME ext psoc priv object
  * @cfg:     cfg items
  * @rso_tx_ops: Roam Tx ops to send roam offload commands to firmware
  * @rso_rx_ops: Roam Rx ops to receive roam offload events from firmware
  * @wfa_testcmd: WFA config tx ops to send to FW
+ * @disconnect_stats_param: Peer disconnect stats related params for SAP case
  */
 struct wlan_mlme_psoc_ext_obj {
 	struct wlan_mlme_cfg cfg;
 	struct wlan_cm_roam_tx_ops rso_tx_ops;
 	struct wlan_cm_roam_rx_ops rso_rx_ops;
 	struct wlan_mlme_wfa_cmd wfa_testcmd;
+	struct peer_disconnect_stats_param disconnect_stats_param;
 };
 
 /**
@@ -138,6 +154,8 @@ struct sae_auth_retry {
  * @last_assoc_received_time: last assoc received time
  * @last_disassoc_deauth_received_time: last disassoc/deauth received time
  * @twt_ctx: TWT context
+ * @allow_kickout: True if the peer can be kicked out. Peer can't be kicked
+ *                 out if it is being steered
  */
 struct peer_mlme_priv_obj {
 	uint8_t last_pn_valid;
@@ -148,6 +166,9 @@ struct peer_mlme_priv_obj {
 	qdf_time_t last_disassoc_deauth_received_time;
 #ifdef WLAN_SUPPORT_TWT
 	struct twt_context twt_ctx;
+#endif
+#ifdef WLAN_FEATURE_SON
+	bool allow_kickout;
 #endif
 };
 
@@ -335,6 +356,7 @@ struct ft_context {
  * @cckm_ie: cck IE
  * @cckm_ie_len: cckm_ie len
  * @ese_tspec_info: ese tspec info
+ * @ext_cap_ie: Ext CAP IE
  */
 struct mlme_connect_info {
 	uint8_t timing_meas_cap;
@@ -358,6 +380,7 @@ struct mlme_connect_info {
 	tESETspecInfo ese_tspec_info;
 #endif
 #endif
+	uint8_t ext_cap_ie[DOT11F_IE_EXTCAP_MAX_LEN + 2];
 };
 
 /** struct wait_for_key_timer - wait for key timer object
@@ -407,6 +430,7 @@ struct wait_for_key_timer {
  *			  requests from some IOT APs
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
  * @is_usr_ps_enabled: Is Power save enabled
+ * @notify_co_located_ap_upt_rnr: Notify co located AP to update RNR or not
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -447,6 +471,7 @@ struct mlme_legacy_priv {
 	qdf_time_t last_delba_sent_time;
 	bool ba_2k_jump_iot_ap;
 	bool is_usr_ps_enabled;
+	bool notify_co_located_ap_upt_rnr;
 };
 
 /**
@@ -1026,6 +1051,13 @@ QDF_STATUS mlme_get_cfg_wlm_reset(struct wlan_objmgr_psoc *psoc,
 #define MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) (false)
 #endif
 
+#if defined (WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+#define MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) \
+		(mlme_get_roam_state(psoc, vdev_id) == WLAN_MLO_ROAM_SYNCH_IN_PROG)
+#else
+#define MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id) (false)
+#endif
+
 /**
  * mlme_reinit_control_config_lfr_params() - Reinitialize roam control config
  * @psoc: PSOC pointer
@@ -1038,6 +1070,28 @@ QDF_STATUS mlme_get_cfg_wlm_reset(struct wlan_objmgr_psoc *psoc,
  */
 void mlme_reinit_control_config_lfr_params(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_mlme_lfr_cfg *lfr);
+
+/**
+ * wlan_mlme_mlo_sta_mlo_concurency_set_link() - Set links for MLO STA
+ *
+ * @vdev: vdev object
+ * @reason: Reason for which link is forced
+ * @mode: Force reason
+ * @num_mlo_vdev: number of mlo vdev
+ * @mlo_vdev_lst: MLO STA vdev list
+
+ * Interface manager Set links for MLO STA
+ *
+ * Return: void
+ */
+#ifdef WLAN_FEATURE_11BE_MLO
+void
+wlan_mlo_sta_mlo_concurency_set_link(struct wlan_objmgr_vdev *vdev,
+				     enum mlo_link_force_reason reason,
+				     enum mlo_link_force_mode mode,
+				     uint8_t num_mlo_vdev,
+				     uint8_t *mlo_vdev_lst);
+#endif
 
 /**
  * wlan_mlme_get_mac_vdev_id() - get vdev self mac address using vdev id
