@@ -180,6 +180,7 @@
 #include "wlan_hdd_son.h"
 #include "wlan_hdd_mcc_quota.h"
 #include "wlan_cfg80211_wifi_pos.h"
+#include "wlan_osif_features.h"
 
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
@@ -2269,6 +2270,9 @@ hdd_update_reg_chan_info(struct hdd_adapter *adapter,
 			wlan_hdd_find_opclass(mac_handle, chan, bw_offset);
 
 		if (WLAN_REG_IS_5GHZ_CH_FREQ(freq_list[i])) {
+			if (sap_phymode_is_eht(sap_config->SapHw_mode))
+				wlan_reg_set_create_punc_bitmap(&ch_params,
+								true);
 			ch_params.ch_width = sap_config->acs_cfg.ch_width;
 			wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
 							     icv->freq,
@@ -2982,6 +2986,38 @@ void wlan_hdd_trim_acs_channel_list(uint32_t *pcl, uint8_t pcl_count,
 	*org_ch_list_count = ch_list_count;
 }
 
+/* wlan_hdd_dump_freq_list() - Dump the ACS master frequency list
+ *
+ * @freq_list: Frequency list
+ * @num_freq: num of frequencies in list
+ *
+ * Dump the ACS master frequency list.
+ */
+static inline
+void wlan_hdd_dump_freq_list(uint32_t *freq_list, uint8_t num_freq)
+{
+	uint32_t buf_len = 0;
+	uint32_t i = 0, j = 0;
+	uint8_t *master_chlist;
+
+	if (num_freq >= NUM_CHANNELS)
+		return;
+
+	buf_len = NUM_CHANNELS * 4;
+	master_chlist = qdf_mem_malloc(buf_len);
+
+	if (!master_chlist)
+		return;
+
+	for (i = 0; i < num_freq && j < buf_len; i++) {
+		j += qdf_scnprintf(master_chlist + j, buf_len - j,
+				   "%d ", freq_list[i]);
+	}
+
+	hdd_debug("Master channel list: %s", master_chlist);
+	qdf_mem_free(master_chlist);
+}
+
 void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
 				   uint32_t *acs_freq_list,
 				   uint8_t *acs_ch_list_count,
@@ -3010,12 +3046,22 @@ void wlan_hdd_handle_zero_acs_list(struct hdd_context *hdd_ctx,
 	if (!sta_count && !force_sap_allowed)
 		return;
 
+	wlan_hdd_dump_freq_list(org_freq_list, org_ch_list_count);
+
 	for (i = 0; i < org_ch_list_count; i++) {
-		if (!wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
-					      org_freq_list[i])) {
-			acs_chan_default = org_freq_list[i];
-			break;
-		}
+		if (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
+					     org_freq_list[i]))
+			continue;
+
+		if (wlan_reg_is_6ghz_chan_freq(org_freq_list[i]) &&
+		    !wlan_reg_is_6ghz_psc_chan_freq(org_freq_list[i]))
+			continue;
+
+		if (!policy_mgr_is_safe_channel(hdd_ctx->psoc,
+						org_freq_list[i]))
+			continue;
+		acs_chan_default = org_freq_list[i];
+		break;
 	}
 	if (!acs_chan_default)
 		acs_chan_default = org_freq_list[0];
@@ -3155,6 +3201,59 @@ static void wlan_hdd_acs_set_eht_enabled(struct sap_config *sap_config,
 {
 }
 #endif /* WLAN_FEATURE_11BE */
+
+static uint16_t wlan_hdd_update_bw_from_mlme(struct hdd_context *hdd_ctx,
+					     struct sap_config *sap_config)
+{
+	uint16_t ch_width, temp_ch_width = 0;
+	QDF_STATUS status;
+	uint8_t hw_mode = HW_MODE_DBS;
+	struct wma_caps_per_phy caps_per_phy = {0};
+
+	ch_width = sap_config->acs_cfg.ch_width;
+
+	if (ch_width > CH_WIDTH_80P80MHZ)
+		return ch_width;
+
+	/* 2.4ghz is already handled for acs */
+	if (sap_config->acs_cfg.end_ch_freq <=
+	    WLAN_REG_CH_TO_FREQ(CHAN_ENUM_2484))
+		return ch_width;
+
+	if (!policy_mgr_is_dbs_enable(hdd_ctx->psoc))
+		hw_mode = HW_MODE_DBS_NONE;
+
+	status = wma_get_caps_for_phyidx_hwmode(&caps_per_phy, hw_mode,
+						CDS_BAND_5GHZ);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		return ch_width;
+
+	switch (ch_width) {
+	case CH_WIDTH_80P80MHZ:
+		if (!(caps_per_phy.vht_5g & WMI_VHT_CAP_CH_WIDTH_80P80_160MHZ))
+		{
+			if (caps_per_phy.vht_5g & WMI_VHT_CAP_CH_WIDTH_160MHZ)
+				temp_ch_width = CH_WIDTH_160MHZ;
+			else
+				temp_ch_width = CH_WIDTH_80MHZ;
+		}
+		break;
+	case CH_WIDTH_160MHZ:
+		if (!((caps_per_phy.vht_5g & WMI_VHT_CAP_CH_WIDTH_80P80_160MHZ)
+		      || (caps_per_phy.vht_5g & WMI_VHT_CAP_CH_WIDTH_160MHZ)))
+				temp_ch_width = CH_WIDTH_80MHZ;
+		break;
+	default:
+		break;
+	}
+
+	if (!temp_ch_width)
+		return ch_width;
+
+	hdd_debug("ch_width updated from %d to %d vht_5g: %x", ch_width,
+		  temp_ch_width, caps_per_phy.vht_5g);
+	return temp_ch_width;
+}
 
 /**
  * __wlan_hdd_cfg80211_do_acs(): CFG80211 handler function for DO_ACS Vendor CMD
@@ -3383,6 +3482,8 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 		goto out;
 	}
 
+	hdd_handle_acs_2g_preferred_sap_conc(hdd_ctx->psoc, adapter,
+					     sap_config);
 	hdd_avoid_acs_channels(hdd_ctx, sap_config);
 
 	pm_mode =
@@ -3493,6 +3594,9 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 			  sap_config->acs_cfg.ch_width,
 			  channel_bonding_mode_2g);
 	}
+
+	sap_config->acs_cfg.ch_width = wlan_hdd_update_bw_from_mlme(hdd_ctx,
+								    sap_config);
 
 	hdd_nofl_debug("ACS Config country %s ch_width %d hw_mode %d ACS_BW: %d HT: %d VHT: %d EHT: %d START_CH: %d END_CH: %d band %d",
 		       hdd_ctx->reg.alpha2, ch_width,
@@ -6330,11 +6434,14 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 			 *  with SAP on DFS, there cannot be conurrency on
 			 *  single radio. But then we can have multiple
 			 *  radios !!
+			 *
+			 *  Indoor channels are also marked DFS, therefore
+			 *  check if the channel has REGULATORY_CHAN_RADAR
+			 *  channel flag to identify if the channel is DFS
 			 */
-			if (CHANNEL_STATE_DFS ==
-			    wlan_reg_get_channel_state_from_secondary_list_for_freq(
-				hdd_ctx->pdev,
-				ap_ctx->operating_chan_freq)) {
+			if (wlan_reg_is_dfs_for_freq(
+						hdd_ctx->pdev,
+						ap_ctx->operating_chan_freq)) {
 				hdd_err("SAP running on DFS channel");
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
@@ -6350,13 +6457,16 @@ static bool wlan_hdd_check_dfs_channel_for_adapter(struct hdd_context *hdd_ctx,
 				WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 			/*
 			 *  if STA is already connected on DFS channel,
-			 *  do not disable scan on dfs channels
+			 *  do not disable scan on dfs channels.
+			 *
+			 *  Indoor channels are also marked DFS, therefore
+			 *  check if the channel has REGULATORY_CHAN_RADAR
+			 *  channel flag to identify if the channel is DFS
 			 */
 			if (hdd_cm_is_vdev_associated(adapter) &&
-			    (CHANNEL_STATE_DFS ==
-			     wlan_reg_get_channel_state_for_freq(
-				hdd_ctx->pdev,
-				sta_ctx->conn_info.chan_freq))) {
+			    wlan_reg_is_dfs_for_freq(
+				    hdd_ctx->pdev,
+				    sta_ctx->conn_info.chan_freq)) {
 				hdd_err("client connected on DFS channel");
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
@@ -9063,7 +9173,7 @@ QDF_STATUS wlan_hdd_set_wlm_latency_level(struct hdd_adapter *adapter,
 
 	ret = osif_request_wait_for_response(request);
 	if (ret) {
-		hdd_err("Timedout while retrieving oem get data");
+		hdd_err("SME timed out while retrieving latency level");
 		status = qdf_status_from_os_return(ret);
 		goto err;
 	}
@@ -9074,8 +9184,7 @@ QDF_STATUS wlan_hdd_set_wlm_latency_level(struct hdd_adapter *adapter,
 		goto err;
 	}
 
-	hdd_debug("[MULTI_CLIENT] latency received from FW:%d",
-		  priv->latency_level);
+	hdd_debug("latency level received from FW:%d", priv->latency_level);
 	adapter->latency_level = priv->latency_level;
 err:
 	if (request)
@@ -10742,6 +10851,7 @@ static int hdd_test_config_6ghz_security_test_mode(struct hdd_context *hdd_ctx,
 
 	cfg_val = nla_get_u8(attr);
 	hdd_debug("safe mode setting %d", cfg_val);
+	wlan_mlme_set_safe_mode_enable(hdd_ctx->psoc, cfg_val);
 	if (cfg_val) {
 		wlan_cm_set_check_6ghz_security(hdd_ctx->psoc, false);
 		wlan_cm_set_6ghz_key_mgmt_mask(hdd_ctx->psoc,
@@ -13713,6 +13823,9 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 					ap_ctx->sap_config.ch_width_orig;
 		ap_ctx->bss_stop_reason = BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN;
 
+		if (sap_phymode_is_eht(ap_ctx->sap_config.SapHw_mode))
+			wlan_reg_set_create_punc_bitmap(
+				&ap_ctx->sap_config.ch_params, true);
 		wlan_reg_set_channel_params_for_freq(
 				hdd_ctx->pdev, chan_freq,
 				ap_ctx->sap_config.sec_ch_freq,
@@ -24103,14 +24216,16 @@ static int wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 }
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
-static void wlan_hdd_select_queue(struct net_device *dev, struct sk_buff *skb)
+static uint16_t wlan_hdd_select_queue(struct net_device *dev,
+				      struct sk_buff *skb)
 {
-	hdd_select_queue(dev, skb, NULL);
+	return hdd_select_queue(dev, skb, NULL);
 }
 #else
-static void wlan_hdd_select_queue(struct net_device *dev, struct sk_buff *skb)
+static uint16_t wlan_hdd_select_queue(struct net_device *dev,
+				      struct sk_buff *skb)
 {
-	hdd_select_queue(dev, skb, NULL, NULL);
+	return hdd_select_queue(dev, skb, NULL, NULL);
 }
 #endif
 
@@ -24146,9 +24261,9 @@ static int __wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 	nbuf->protocol = htons(ETH_P_PAE);
 	skb_reset_network_header(nbuf);
 	skb_reset_mac_header(nbuf);
+	skb_set_queue_mapping(nbuf, wlan_hdd_select_queue(dev, nbuf));
 
 	netif_tx_lock(dev);
-	wlan_hdd_select_queue(dev, nbuf);
 	dev->netdev_ops->ndo_start_xmit(nbuf, dev);
 	netif_tx_unlock(dev);
 

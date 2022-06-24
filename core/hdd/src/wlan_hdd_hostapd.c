@@ -109,6 +109,9 @@
 #include "wlan_hdd_son.h"
 #include "wlan_hdd_mcc_quota.h"
 #include "wlan_hdd_wds.h"
+#include "wlan_hdd_pre_cac.h"
+#include "wlan_osif_features.h"
+#include "wlan_pre_cac_ucfg_api.h"
 
 #define ACS_SCAN_EXPIRY_TIMEOUT_S 4
 
@@ -1079,194 +1082,6 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef PRE_CAC_SUPPORT
-/**
- * hdd_send_conditional_chan_switch_status() - Send conditional channel switch
- * status
- * @hdd_ctx: HDD context
- * @wdev: Wireless device structure
- * @status: Status of conditional channel switch
- * (0: Success, Non-zero: Failure)
- *
- * Sends the status of conditional channel switch to user space. This is named
- * conditional channel switch because the SAP will move to the provided channel
- * after some condition (pre-cac) is met.
- *
- * Return: None
- */
-static void hdd_send_conditional_chan_switch_status(struct hdd_context *hdd_ctx,
-						struct wireless_dev *wdev,
-						bool status)
-{
-	struct sk_buff *event;
-
-	hdd_enter_dev(wdev->netdev);
-
-	if (!hdd_ctx) {
-		hdd_err("Invalid HDD context pointer");
-		return;
-	}
-
-	event = cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
-		  wdev, sizeof(uint32_t) + NLMSG_HDRLEN,
-		  QCA_NL80211_VENDOR_SUBCMD_SAP_CONDITIONAL_CHAN_SWITCH_INDEX,
-		  GFP_KERNEL);
-	if (!event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
-		return;
-	}
-
-	if (nla_put_u32(event,
-			QCA_WLAN_VENDOR_ATTR_SAP_CONDITIONAL_CHAN_SWITCH_STATUS,
-			status)) {
-		hdd_err("nla put failed");
-		kfree_skb(event);
-		return;
-	}
-
-	cfg80211_vendor_event(event, GFP_KERNEL);
-}
-
-/**
- * wlan_hdd_set_pre_cac_complete_status() - Set pre cac complete status
- * @ap_adapter: AP adapter
- * @status: Status which can be true or false
- *
- * Sets the status of pre cac i.e., whether it is complete or not
- *
- * Return: Zero on success, non-zero on failure
- */
-static int wlan_hdd_set_pre_cac_complete_status(struct hdd_adapter *ap_adapter,
-		bool status)
-{
-	QDF_STATUS ret;
-
-	ret = wlan_sap_set_pre_cac_complete_status(
-			WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter), status);
-	if (QDF_IS_STATUS_ERROR(ret))
-		return -EINVAL;
-
-	return 0;
-}
-
-/**
- * __wlan_hdd_sap_pre_cac_failure() - Process the pre cac failure
- * @adapter: AP adapter
- *
- * Deletes the pre cac adapter
- *
- * Return: None
- */
-static void __wlan_hdd_sap_pre_cac_failure(struct hdd_adapter *adapter)
-{
-	struct hdd_context *hdd_ctx;
-
-	hdd_enter();
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (wlan_hdd_validate_context(hdd_ctx))
-		return;
-
-	hdd_stop_adapter(hdd_ctx, adapter);
-
-	hdd_exit();
-}
-
-/**
- * wlan_hdd_sap_pre_cac_failure() - Process the pre cac failure
- * @data: AP adapter
- *
- * Deletes the pre cac adapter
- *
- * Return: None
- */
-void wlan_hdd_sap_pre_cac_failure(void *data)
-{
-	struct hdd_adapter *adapter = data;
-	struct osif_vdev_sync *vdev_sync;
-	int errno;
-
-	errno = osif_vdev_sync_trans_start_wait(adapter->dev, &vdev_sync);
-	if (errno)
-		return;
-
-
-	__wlan_hdd_sap_pre_cac_failure(data);
-
-	osif_vdev_sync_trans_stop(vdev_sync);
-}
-
-/**
- * __wlan_hdd_sap_pre_cac_success() - Process the pre cac result
- * @adapter: AP adapter
- *
- * Deletes the pre cac adapter and moves the existing SAP to the pre cac
- * channel
- *
- * Return: None
- */
-static void __wlan_hdd_sap_pre_cac_success(struct hdd_adapter *adapter)
-{
-	struct hdd_adapter *ap_adapter;
-	int i;
-	struct hdd_context *hdd_ctx;
-	enum phy_ch_width pre_cac_ch_width;
-
-	hdd_enter();
-
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx) {
-		hdd_err("HDD context is null");
-		return;
-	}
-
-	pre_cac_ch_width = wlansap_get_chan_width(
-				WLAN_HDD_GET_SAP_CTX_PTR(adapter));
-
-	hdd_stop_adapter(hdd_ctx, adapter);
-
-	/* Prepare to switch AP from 2.4GHz channel to the pre CAC channel */
-	ap_adapter = hdd_get_adapter(hdd_ctx, QDF_SAP_MODE);
-	if (!ap_adapter) {
-		hdd_err("failed to get SAP adapter, no restart on pre CAC channel");
-		return;
-	}
-
-	/*
-	 * Setting of the pre cac complete status will ensure that on channel
-	 * switch to the pre CAC DFS channel, there is no CAC again.
-	 */
-	wlan_hdd_set_pre_cac_complete_status(ap_adapter, true);
-
-	wlan_hdd_set_sap_csa_reason(hdd_ctx->psoc, ap_adapter->vdev_id,
-				    CSA_REASON_PRE_CAC_SUCCESS);
-	i = hdd_softap_set_channel_change(ap_adapter->dev,
-					  ap_adapter->pre_cac_freq,
-					  pre_cac_ch_width, false);
-	if (0 != i) {
-		hdd_err("failed to change channel");
-		wlan_hdd_set_pre_cac_complete_status(ap_adapter, false);
-	}
-
-	hdd_exit();
-}
-
-static void wlan_hdd_sap_pre_cac_success(void *data)
-{
-	struct hdd_adapter *adapter = data;
-	struct osif_vdev_sync *vdev_sync;
-	int errno;
-
-	errno = osif_vdev_sync_trans_start_wait(adapter->dev, &vdev_sync);
-	if (errno)
-		return;
-
-	__wlan_hdd_sap_pre_cac_success(adapter);
-
-	osif_vdev_sync_trans_stop(vdev_sync);
-}
-#endif
-
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 /**
  * hdd_handle_acs_scan_event() - handle acs scan event for SAP
@@ -1966,6 +1781,79 @@ hdd_hostapd_sap_register_mlo_sta(struct hdd_adapter *adapter,
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 
+static inline void
+hdd_hostapd_update_beacon_country_ie(struct hdd_adapter *adapter)
+{
+	struct hdd_station_info *sta_info, *tmp = NULL;
+	struct hdd_context *hdd_ctx;
+	struct hdd_ap_ctx *ap_ctx;
+	struct action_oui_search_attr attr;
+	QDF_STATUS status;
+	bool found = false;
+
+	if (!adapter) {
+		hdd_err("invalid adapter");
+		return;
+	}
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	if (!hdd_ctx) {
+		hdd_err("HDD context is null");
+		return;
+	}
+
+	ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+
+	hdd_for_each_sta_ref_safe(adapter->sta_info_list, sta_info, tmp,
+				  STA_INFO_HOSTAPD_SAP_EVENT_CB) {
+		if (!sta_info->assoc_req_ies.len)
+			goto release_ref;
+
+		qdf_mem_zero(&attr, sizeof(struct action_oui_search_attr));
+		attr.ie_data = sta_info->assoc_req_ies.ptr;
+		attr.ie_length = sta_info->assoc_req_ies.len;
+
+		found = ucfg_action_oui_search(hdd_ctx->psoc,
+					       &attr,
+					       ACTION_OUI_TAKE_ALL_BAND_INFO);
+		if (found) {
+			if (!ap_ctx->country_ie_updated) {
+				status = sme_update_beacon_country_ie(
+						hdd_ctx->mac_handle,
+						adapter->vdev_id,
+						true);
+				if (status == QDF_STATUS_SUCCESS)
+					ap_ctx->country_ie_updated = true;
+				else
+					hdd_err("fail to update country ie");
+			}
+			hdd_put_sta_info_ref(&adapter->sta_info_list,
+					     &sta_info, true,
+					     STA_INFO_HOSTAPD_SAP_EVENT_CB);
+			if (tmp)
+				hdd_put_sta_info_ref(
+					&adapter->sta_info_list,
+					&tmp, true,
+					STA_INFO_HOSTAPD_SAP_EVENT_CB);
+			return;
+		}
+release_ref:
+		hdd_put_sta_info_ref(&adapter->sta_info_list,
+				     &sta_info, true,
+				     STA_INFO_HOSTAPD_SAP_EVENT_CB);
+	}
+
+	if (ap_ctx->country_ie_updated) {
+		status = sme_update_beacon_country_ie(
+						hdd_ctx->mac_handle,
+						adapter->vdev_id, false);
+		if (status == QDF_STATUS_SUCCESS)
+			ap_ctx->country_ie_updated = false;
+		else
+			hdd_err("fail to update country ie");
+	}
+}
+
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				    void *context)
 {
@@ -2090,13 +1978,16 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		wlansap_get_dfs_cac_state(mac_handle, &cac_state);
 
 		/* DFS requirement: DO NOT transmit during CAC. */
-		if (CHANNEL_STATE_DFS !=
-		    wlan_reg_get_channel_state_from_secondary_list_for_freq(
-			hdd_ctx->pdev, ap_ctx->operating_chan_freq) ||
-			ignoreCAC ||
-			(hdd_ctx->dev_dfs_cac_status ==
-			DFS_CAC_ALREADY_DONE) ||
-			(eSAP_DFS_SKIP_CAC == cac_state))
+
+		/* Indoor channels are also marked DFS, therefore
+		 * check if the channel has REGULATORY_CHAN_RADAR
+		 * channel flag to identify if the channel is DFS
+		 */
+		if (!wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
+					      ap_ctx->operating_chan_freq) ||
+		    ignoreCAC ||
+		    hdd_ctx->dev_dfs_cac_status == DFS_CAC_ALREADY_DONE ||
+		    eSAP_DFS_SKIP_CAC == cac_state)
 			ap_ctx->dfs_cac_block_tx = false;
 		else
 			ap_ctx->dfs_cac_block_tx = true;
@@ -2359,7 +2250,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
  * The code under this macro will be removed
  * once pre_cac componentization is done
  */
-#ifdef PRE_CAC_SUPPORT
+#if defined(PRE_CAC_SUPPORT) && !defined(PRE_CAC_COMP)
 	case eSAP_DFS_RADAR_DETECT_DURING_PRE_CAC:
 		hdd_debug("notification for radar detect during pre cac:%d",
 			adapter->vdev_id);
@@ -2387,7 +2278,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				(void *)adapter);
 		qdf_sched_work(0, &hdd_ctx->sap_pre_cac_work);
 		break;
-#endif
+#endif /* PRE_CAC_SUPPORT and PRE_CAC_COMP */
 	case eSAP_DFS_NO_AVAILABLE_CHANNEL:
 		wlan_hdd_send_svc_nlink_msg
 			(hdd_ctx->radio_index,
@@ -2563,6 +2454,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			hdd_bus_bw_compute_timer_start(hdd_ctx);
 		}
 		ap_ctx->ap_active = true;
+
+		hdd_hostapd_update_beacon_country_ie(adapter);
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 		wlan_hdd_auto_shutdown_enable(hdd_ctx, false);
@@ -2740,6 +2633,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 					     &stainfo, true,
 					     STA_INFO_HOSTAPD_SAP_EVENT_CB);
 		}
+
+		hdd_hostapd_update_beacon_country_ie(adapter);
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
 		wlan_hdd_auto_shutdown_enable(hdd_ctx, true);
@@ -2967,10 +2862,13 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		policy_mgr_set_chan_switch_complete_evt(hdd_ctx->psoc);
 		wlan_hdd_enable_roaming(adapter,
 					RSO_SAP_CHANNEL_CHANGE);
-		if (CHANNEL_STATE_DFS !=
-		    wlan_reg_get_channel_state_from_secondary_list_for_freq(
-						hdd_ctx->pdev,
-						ap_ctx->operating_chan_freq))
+
+		/* Indoor channels are also marked DFS, therefore
+		 * check if the channel has REGULATORY_CHAN_RADAR
+		 * channel flag to identify if the channel is DFS
+		 */
+		if (!wlan_reg_is_dfs_for_freq(hdd_ctx->pdev,
+					      ap_ctx->operating_chan_freq))
 			ap_ctx->dfs_cac_block_tx = false;
 
 		/* Check any other sap need restart */
@@ -2981,6 +2879,9 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			hdd_dcs_hostapd_set_chan(
 				hdd_ctx, adapter->vdev_id,
 				adapter->session.ap.operating_chan_freq);
+		policy_mgr_check_sap_go_force_scc(
+				hdd_ctx->psoc, adapter->vdev,
+				ap_ctx->sap_context->csa_reason);
 		qdf_status = qdf_event_set(&hostapd_state->qdf_event);
 		if (!QDF_IS_STATUS_SUCCESS(qdf_status))
 			hdd_err("qdf_event_set failed! status: %d",
@@ -3369,6 +3270,10 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	}
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_P2P_GO_MODE)
 		is_p2p_go_session = true;
+	else
+		forced = wlansap_override_csa_strict_for_sap(
+					hdd_ctx->mac_handle, sap_ctx,
+					target_chan_freq, forced);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	strict = is_p2p_go_session;
@@ -3561,6 +3466,40 @@ QDF_STATUS hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
 						   ap_adapter,
 						   ch_freq,
 						   channel_bw, forced);
+}
+
+QDF_STATUS wlan_hdd_check_cc_intf_cb(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint32_t *ch_freq)
+{
+	struct hdd_adapter *ap_adapter;
+	struct sap_context *sap_context;
+
+	ap_adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
+	if (!ap_adapter) {
+		hdd_err("ap_adapter is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!test_bit(SOFTAP_BSS_STARTED, &ap_adapter->event_flags)) {
+		hdd_err("SOFTAP_BSS_STARTED not set");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sap_context = WLAN_HDD_GET_SAP_CTX_PTR(ap_adapter);
+	if (!sap_context) {
+		hdd_err("sap_context is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (QDF_IS_STATUS_ERROR(wlansap_context_get(sap_context))) {
+		hdd_err("sap_context is invalid");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*ch_freq = wlansap_check_cc_intf(sap_context);
+	wlansap_context_put(sap_context);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 void wlan_hdd_set_sap_csa_reason(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
@@ -5329,6 +5268,97 @@ hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
 	wlan_hdd_cm_issue_disconnect(sta_adapter, reason, false);
 }
 
+/**
+ * hdd_handle_acs_2g_preferred_sap_conc() - Handle 2G pereferred SAP
+ * concurrency with GO
+ * @psoc: soc object
+ * @sap_ctx: sap context
+ * @sap_config: sap config
+ *
+ * In SAP+GO concurrency, if GO is started on 2G and SAP is doing ACS
+ * with 2G preferred channel list, then we will move GO to 5G band.
+ * The purpose is to have more selection for SAP instead of starting on
+ * GO home channel for SCC.
+ *
+ * Return: void
+ */
+void
+hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
+				     struct hdd_adapter *adapter,
+				     struct sap_config *sap_config)
+{
+	uint32_t i;
+	int ret;
+	QDF_STATUS status;
+	uint32_t *ch_freq_list;
+	struct sap_acs_cfg *acs_cfg;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint32_t freq_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+	uint8_t vdev_num;
+	struct hdd_hostapd_state *hostapd_state;
+	uint8_t go_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	qdf_freq_t go_ch_freq = 0, go_new_ch_freq;
+	struct hdd_adapter *go_adapter;
+
+	if (adapter->device_mode != QDF_SAP_MODE)
+		return;
+	if (!policy_mgr_is_hw_dbs_capable(psoc))
+		return;
+
+	acs_cfg = &sap_config->acs_cfg;
+	if (!acs_cfg->master_ch_list_count)
+		return;
+	ch_freq_list = acs_cfg->master_freq_list;
+	for (i = 0; i < acs_cfg->master_ch_list_count; i++)
+		if (!WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq_list[i]))
+			return;
+
+	/* Move existing GO interface to 5G band */
+	vdev_num = policy_mgr_get_mode_specific_conn_info(
+			psoc, freq_list, vdev_id_list,
+			PM_P2P_GO_MODE);
+	if (!vdev_num)
+		return;
+	for (i = 0; i < vdev_num; i++) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq_list[i])) {
+			go_vdev_id = vdev_id_list[i];
+			go_ch_freq = freq_list[i];
+			break;
+		}
+	}
+	if (!go_ch_freq)
+		return;
+	go_new_ch_freq =
+		policy_mgr_get_alternate_channel_for_sap(psoc,
+							 go_vdev_id,
+							 go_ch_freq,
+							 REG_BAND_UNKNOWN);
+	if (!go_new_ch_freq || WLAN_REG_IS_24GHZ_CH_FREQ(go_new_ch_freq)) {
+		hdd_err("no available 5G channel");
+		return;
+	}
+	go_adapter = hdd_get_adapter_by_vdev(adapter->hdd_ctx, go_vdev_id);
+	if (hdd_validate_adapter(go_adapter))
+		return;
+
+	wlan_hdd_set_sap_csa_reason(psoc, go_vdev_id,
+				    CSA_REASON_SAP_ACS);
+	hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(go_adapter);
+	qdf_event_reset(&hostapd_state->qdf_event);
+
+	ret = hdd_softap_set_channel_change(go_adapter->dev, go_new_ch_freq,
+					    CH_WIDTH_80MHZ, false);
+	if (ret) {
+		hdd_err("CSA failed to %d, ret %d", go_new_ch_freq, ret);
+		return;
+	}
+
+	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
+					       SME_CMD_START_BSS_TIMEOUT);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		hdd_err("wait for qdf_event failed!!");
+}
+
 #ifdef DISABLE_CHANNEL_LIST
 /**
  * wlan_hdd_get_wiphy_channel() - Get wiphy channel
@@ -6597,8 +6627,17 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	mutex_unlock(&hdd_ctx->sap_lock);
 
 	mac_handle = hdd_ctx->mac_handle;
+/*
+ * Code under PRE_CAC_COMP will be cleaned up
+ * once pre cac component is done
+ */
+#ifndef PRE_CAC_COMP
 	if (wlan_sap_is_pre_cac_active(mac_handle))
 		hdd_clean_up_pre_cac_interface(hdd_ctx);
+#else
+	if (ucfg_pre_cac_is_active(hdd_ctx->psoc))
+		ucfg_pre_cac_clean_up(hdd_ctx->psoc);
+#endif
 
 	if (status != QDF_STATUS_SUCCESS) {
 		hdd_err("Stopping the BSS");

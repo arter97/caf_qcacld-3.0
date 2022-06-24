@@ -73,6 +73,7 @@
 #include <wlan_crypto_global_api.h>
 #include "cdp_txrx_host_stats.h"
 #include "target_if_cm_roam_event.h"
+#include <wlan_mlo_mgr_cmn.h>
 
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
@@ -3267,6 +3268,59 @@ QDF_STATUS wma_process_del_periodic_tx_ptrn_ind(WMA_HANDLE handle,
 }
 
 #ifdef WLAN_FEATURE_STATS_EXT
+#ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * wma_stats_ext_req_vdev_id_bitmap() -API to calculate connected links bitmap
+ * in case of MLO.
+ * psoc: psoc common object
+ * vdev_id: vdev_id for the stats ext request
+ * bitmap: connected links bitmap
+ *
+ * Return None
+ */
+static void wma_stats_ext_req_vdev_id_bitmap(struct wlan_objmgr_psoc *psoc,
+					     uint32_t vdev_id, uint32_t *bitmap)
+{
+	struct wlan_objmgr_vdev *vdev, *link_vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	uint32_t i, connected_links_bitmap = 0;
+	uint8_t connected_vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev) {
+		wma_err("vdev object is NULL for vdev_id %d", vdev_id);
+		return;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		goto end;
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		link_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!link_vdev)
+			continue;
+
+		connected_vdev_id = wlan_vdev_get_id(link_vdev);
+		if (wlan_cm_is_vdev_connected(link_vdev))
+			connected_links_bitmap |= BIT(connected_vdev_id);
+	}
+
+	wma_debug("mlo connected links bitmap[0x%x]", connected_links_bitmap);
+	*bitmap = connected_links_bitmap;
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+}
+#else
+static void wma_stats_ext_req_vdev_id_bitmap(struct wlan_objmgr_psoc *psoc,
+					     uint32_t vdev_id, uint32_t *bitmap)
+{
+	*bitmap = 0;
+}
+#endif
+
 QDF_STATUS wma_stats_ext_req(void *wma_ptr, tpStatsExtRequest preq)
 {
 	tp_wma_handle wma = (tp_wma_handle) wma_ptr;
@@ -3289,6 +3343,9 @@ QDF_STATUS wma_stats_ext_req(void *wma_ptr, tpStatsExtRequest preq)
 	if (preq->request_data_len > 0)
 		qdf_mem_copy(params->request_data, preq->request_data,
 			     params->request_data_len);
+
+	wma_stats_ext_req_vdev_id_bitmap(wma->psoc, params->vdev_id,
+					 &params->vdev_id_bitmap);
 
 	status = wmi_unified_stats_ext_req_cmd(wma->wmi_handle, params);
 	qdf_mem_free(params);
@@ -5274,6 +5331,7 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 			     QDF_MAC_ADDR_SIZE);
 		wma_send_msg_high_priority(wma, WMA_SET_STAKEY_RSP,
 					   key_info_uc, 0);
+		wlan_release_peer_key_wakelock(wma->pdev, crypto_key->macaddr);
 	} else {
 		key_info_mc = qdf_mem_malloc(sizeof(*key_info_mc));
 		if (!key_info_mc)
@@ -5333,14 +5391,6 @@ void wma_update_set_key(uint8_t session_id, bool pairwise,
 
 	if (iface)
 		iface->is_waiting_for_key = false;
-
-	if (!pairwise && iface) {
-		/* Its GTK release the wake lock */
-		wma_debug("Release set key wake lock");
-		qdf_runtime_pm_allow_suspend(
-				&iface->vdev_set_key_runtime_wakelock);
-		wma_release_wakelock(&iface->vdev_set_key_wakelock);
-	}
 
 	wma_send_set_key_rsp(session_id, pairwise, key_index);
 }

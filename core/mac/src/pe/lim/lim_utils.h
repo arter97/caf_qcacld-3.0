@@ -1997,6 +1997,19 @@ void lim_update_stads_eht_caps(struct mac_context *mac_ctx,
 			       struct pe_session *session_entry,
 			       tSchBeaconStruct *beacon);
 
+/**
+ * lim_update_stads_eht_bw_320mhz() - Set ch_width to 320MHz for sta_ds
+ * @session: pointer to PE session
+ * @sta_ds: pointer to sta dph hash table entry
+ *
+ * Set ch_width to 320 MHz only when session is in 320 MHz and peer eht
+ * caps support 320 MHz after eht caps intersection.
+ *
+ * Return: None
+ */
+void lim_update_stads_eht_bw_320mhz(struct pe_session *session,
+				    tpDphHashNode sta_ds);
+
 #else
 static inline bool lim_is_session_eht_capable(struct pe_session *session)
 {
@@ -2150,6 +2163,12 @@ lim_update_stads_eht_caps(struct mac_context *mac_ctx,
 			  tpDphHashNode sta_ds, tpSirAssocRsp assoc_rsp,
 			  struct pe_session *session_entry,
 			  tSchBeaconStruct *beacon)
+{
+}
+
+static inline void
+lim_update_stads_eht_bw_320mhz(struct pe_session *session,
+			       tpDphHashNode sta_ds)
 {
 }
 #endif /* WLAN_FEATURE_11BE */
@@ -2867,4 +2886,50 @@ uint8_t lim_get_ht_max_mcs_idx(tDot11fIEHTCaps *ht_cap);
  * Return: max rate index from tSirMacRateSet
  */
 uint8_t lim_get_max_rate_idx(tSirMacRateSet *rateset);
+
+/**
+ * lim_update_nss() - Function to update NSS
+ * @mac_ctx: pointer to Global Mac structure
+ * @sta_ds: pointer to tpDphHashNode
+ * @rx_nss: Rx NSS in operating mode notification
+ * @session: pointer to pe_session
+ *
+ * function to update NSS
+ *
+ * Return: None
+ */
+void lim_update_nss(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
+		    uint8_t rx_nss, struct pe_session *session);
+
+/**
+ * lim_update_channel_width() - Function to update channel width
+ * @mac_ctx: pointer to Global Mac structure
+ * @sta_ptr: pointer to tpDphHashNode
+ * @session: pointer to pe_session
+ * @ch_width: Channel width in operating mode notification
+ * @new_ch_width: Final channel bandwifdth
+ *
+ * function to update channel width
+ *
+ * Return: Success or Failure
+ */
+bool lim_update_channel_width(struct mac_context *mac_ctx,
+			      tpDphHashNode sta_ptr,
+			      struct pe_session *session,
+			      uint8_t ch_width,
+			      uint8_t *new_ch_width);
+
+/**
+ * lim_get_vht_ch_width() - Function to get the VHT
+ * operating channel width based on frequency params
+ *
+ * @vht_cap: Pointer to VHT Caps IE.
+ * @vht_op: Pointer to VHT Operation IE.
+ * @ht_info: Pointer to HT Info IE.
+ *
+ * Return: VHT channel width
+ */
+uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
+			     tDot11fIEVHTOperation *vht_op,
+			     tDot11fIEHTInfo *ht_info);
 #endif /* __LIM_UTILS_H */

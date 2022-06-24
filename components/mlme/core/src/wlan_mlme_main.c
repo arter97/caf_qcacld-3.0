@@ -30,6 +30,7 @@
 #include "wlan_mlme_api.h"
 #include <wlan_crypto_global_api.h>
 #include <wlan_mlo_mgr_cmn.h>
+#include "wlan_mlme_ucfg_api.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -176,6 +177,89 @@ QDF_STATUS mlme_get_peer_mic_len(struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
 	return QDF_STATUS_SUCCESS;
 }
 
+void
+wlan_acquire_peer_key_wakelock(struct wlan_objmgr_pdev *pdev, uint8_t *mac_addr)
+{
+	uint8_t pdev_id;
+	struct wlan_objmgr_peer *peer;
+	struct peer_mlme_priv_obj *peer_priv;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return;
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
+				    WLAN_LEGACY_MAC_ID);
+	if (!peer)
+		return;
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_MLME);
+	if (!peer_priv) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	if (peer_priv->is_key_wakelock_set) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	mlme_debug(QDF_MAC_ADDR_FMT ": Acquire set key wake lock for %d ms",
+		   QDF_MAC_ADDR_REF(mac_addr),
+		   MLME_PEER_SET_KEY_WAKELOCK_TIMEOUT);
+	qdf_wake_lock_timeout_acquire(&peer_priv->peer_set_key_wakelock,
+				      MLME_PEER_SET_KEY_WAKELOCK_TIMEOUT);
+	qdf_runtime_pm_prevent_suspend(
+			&peer_priv->peer_set_key_runtime_wakelock);
+	peer_priv->is_key_wakelock_set = true;
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+}
+
+void
+wlan_release_peer_key_wakelock(struct wlan_objmgr_pdev *pdev, uint8_t *mac_addr)
+{
+	uint8_t pdev_id;
+	struct wlan_objmgr_peer *peer;
+	struct peer_mlme_priv_obj *peer_priv;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return;
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
+				    WLAN_LEGACY_MAC_ID);
+	if (!peer)
+		return;
+
+	peer_priv = wlan_objmgr_peer_get_comp_private_obj(peer,
+							  WLAN_UMAC_COMP_MLME);
+	if (!peer_priv) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	if (!peer_priv->is_key_wakelock_set) {
+		wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+		return;
+	}
+
+	peer_priv->is_key_wakelock_set = false;
+	mlme_debug(QDF_MAC_ADDR_FMT ": Release set key wake lock",
+		   QDF_MAC_ADDR_REF(mac_addr));
+	qdf_wake_lock_release(&peer_priv->peer_set_key_wakelock,
+			      WIFI_POWER_EVENT_WAKELOCK_WMI_CMD_RSP);
+	qdf_runtime_pm_allow_suspend(
+			&peer_priv->peer_set_key_runtime_wakelock);
+
+	wlan_objmgr_peer_release_ref(peer, WLAN_LEGACY_MAC_ID);
+}
+
 QDF_STATUS
 mlme_peer_object_created_notification(struct wlan_objmgr_peer *peer,
 				      void *arg)
@@ -202,6 +286,10 @@ mlme_peer_object_created_notification(struct wlan_objmgr_peer *peer,
 		qdf_mem_free(peer_priv);
 	}
 
+	qdf_wake_lock_create(&peer_priv->peer_set_key_wakelock, "peer_set_key");
+	qdf_runtime_lock_init(&peer_priv->peer_set_key_runtime_wakelock);
+	peer_priv->is_key_wakelock_set = false;
+
 	return status;
 }
 
@@ -223,6 +311,10 @@ mlme_peer_object_destroyed_notification(struct wlan_objmgr_peer *peer,
 		mlme_legacy_err(" peer MLME component object is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	peer_priv->is_key_wakelock_set = false;
+	qdf_runtime_lock_deinit(&peer_priv->peer_set_key_runtime_wakelock);
+	qdf_wake_lock_destroy(&peer_priv->peer_set_key_wakelock);
 
 	status = wlan_objmgr_peer_component_obj_detach(peer,
 						       WLAN_UMAC_COMP_MLME,
@@ -1611,6 +1703,9 @@ static void mlme_init_sta_cfg(struct wlan_objmgr_psoc *psoc,
 	sta->allow_tpc_from_ap = cfg_get(psoc, CFG_TX_POWER_CTRL);
 	sta->sta_keepalive_method =
 		cfg_get(psoc, CFG_STA_KEEPALIVE_METHOD);
+	sta->max_li_modulated_dtim_time_ms =
+		cfg_get(psoc, CFG_MAX_LI_MODULATED_DTIM_MS);
+
 	mlme_init_sta_mlo_cfg(psoc, sta);
 }
 
@@ -1681,6 +1776,8 @@ mlme_init_sae_single_pmk_cfg(struct wlan_objmgr_psoc *psoc,
 static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 				       struct wlan_mlme_lfr_cfg *lfr)
 {
+	bool val = false;
+
 	lfr->lfr3_roaming_offload =
 		cfg_get(psoc, CFG_LFR3_ROAMING_OFFLOAD);
 	lfr->lfr3_dual_sta_roaming_enabled =
@@ -1694,8 +1791,16 @@ static void mlme_init_roam_offload_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_LFR_ENABLE_IDLE_ROAM);
 	lfr->idle_roam_rssi_delta =
 		cfg_get(psoc, CFG_LFR_IDLE_ROAM_RSSI_DELTA);
-	lfr->idle_roam_inactive_time =
-		cfg_get(psoc, CFG_LFR_IDLE_ROAM_INACTIVE_TIME);
+
+	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
+	if (val) {
+		lfr->idle_roam_inactive_time =
+			cfg_get(psoc, CFG_ROAM_IDLE_INACTIVE_TIME) * 1000;
+	} else {
+		lfr->idle_roam_inactive_time =
+			cfg_get(psoc, CFG_LFR_IDLE_ROAM_INACTIVE_TIME);
+	}
+
 	lfr->idle_data_packet_count =
 		cfg_get(psoc, CFG_LFR_IDLE_ROAM_PACKET_COUNT);
 	lfr->idle_roam_min_rssi = cfg_get(psoc, CFG_LFR_IDLE_ROAM_MIN_RSSI);
@@ -1981,14 +2086,23 @@ static void mlme_init_power_cfg(struct wlan_objmgr_psoc *psoc,
 static void mlme_init_roam_scoring_cfg(struct wlan_objmgr_psoc *psoc,
 				struct wlan_mlme_roam_scoring_cfg *scoring_cfg)
 {
+	bool val = false;
+
 	scoring_cfg->enable_scoring_for_roam =
 		cfg_get(psoc, CFG_ENABLE_SCORING_FOR_ROAM);
 	scoring_cfg->roam_trigger_bitmap =
 			cfg_get(psoc, CFG_ROAM_SCORE_DELTA_TRIGGER_BITMAP);
 	scoring_cfg->roam_score_delta = cfg_get(psoc, CFG_ROAM_SCORE_DELTA);
 	scoring_cfg->apsd_enabled = (bool)cfg_default(CFG_APSD_ENABLED);
-	scoring_cfg->min_roam_score_delta =
-				cfg_get(psoc, CFG_CAND_MIN_ROAM_SCORE_DELTA);
+
+	ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
+	if (val) {
+		scoring_cfg->min_roam_score_delta =
+			cfg_get(psoc, CFG_ROAM_COMMON_MIN_ROAM_DELTA) * 100;
+	} else {
+		scoring_cfg->min_roam_score_delta =
+			cfg_get(psoc, CFG_CAND_MIN_ROAM_SCORE_DELTA);
+	}
 }
 
 static void mlme_init_oce_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2300,13 +2414,6 @@ mlme_get_cfg_multi_client_ll_ini_support(struct wlan_objmgr_psoc *psoc,
 
 	return QDF_STATUS_SUCCESS;
 }
-
-bool wlan_mlme_get_wlm_multi_client_ll_caps(struct wlan_objmgr_psoc *psoc)
-{
-	return wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					WLAN_SOC_WLM_MULTI_CLIENT_LL_SUPPORT);
-}
-
 #else
 static inline void
 mlme_init_wlm_multi_client_ll_support(struct wlan_objmgr_psoc *psoc,
@@ -3883,6 +3990,8 @@ wlan_mlo_sta_mlo_concurency_set_link(struct wlan_objmgr_vdev *vdev,
 	req->ctx.vdev = vdev;
 	req->param.reason = reason;
 	req->param.force_mode = mode;
+	req->ctx.set_mlo_link_cb = policy_mgr_handle_link_enable_disable_resp;
+	req->ctx.cb_arg = req;
 
 	/* set MLO vdev bit mask for all case */
 	wlan_mlo_fill_active_link_vdev_bitmap(req, mlo_vdev_lst, num_mlo_vdev);

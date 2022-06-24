@@ -1358,6 +1358,8 @@ struct wlan_user_mcc_quota {
  * @tx_retry_multiplier: TX xretry extension parameter
  * @mgmt_hw_tx_retry_count: MGMT HW tx retry count for frames
  * @relaxed_6ghz_conn_policy: 6GHz relaxed connection policy
+ * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
+ * connection, bypass strict power levels
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1411,6 +1413,7 @@ struct wlan_mlme_generic {
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	struct wlan_user_mcc_quota user_mcc_quota;
 #endif
+	bool safe_mode_enable;
 };
 
 /*
@@ -1640,6 +1643,7 @@ enum station_prefer_bw {
  * @usr_disabled_roaming:           User config for roaming disable
  * @usr_scan_probe_unicast_ra:      User config unicast probe req in scan
  * @single_link_mlo_conn:           Single link mlo connection is configured
+ * @max_li_modulated_dtim_time_ms: Max modulated DTIM time in ms.
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1669,6 +1673,7 @@ struct wlan_mlme_sta_cfg {
 #ifdef WLAN_FEATURE_11BE_MLO
 	bool single_link_mlo_conn;
 #endif
+	uint16_t max_li_modulated_dtim_time_ms;
 };
 
 /**
@@ -1897,8 +1902,8 @@ struct wlan_mlme_lfr_cfg {
 	uint8_t mawc_roam_rssi_low_adjust;
 	uint32_t roam_rssi_abs_threshold;
 	uint8_t rssi_threshold_offset_5g;
-	uint8_t early_stop_scan_min_threshold;
-	uint8_t early_stop_scan_max_threshold;
+	int8_t early_stop_scan_min_threshold;
+	int8_t early_stop_scan_max_threshold;
 	uint32_t roam_dense_traffic_threshold;
 	uint32_t roam_dense_rssi_thre_offset;
 	uint32_t roam_dense_min_aps;

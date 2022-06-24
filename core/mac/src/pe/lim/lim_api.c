@@ -377,7 +377,7 @@ QDF_STATUS lim_start(struct mac_context *mac)
 	}
 
 	mac->lim.req_id =
-		ucfg_scan_register_requester(mac->psoc,
+		wlan_scan_register_requester(mac->psoc,
 					     "LIM",
 					     lim_process_rx_scan_handler,
 					     mac);
@@ -526,7 +526,7 @@ void lim_cleanup(struct mac_context *mac)
 
 	lim_ft_cleanup_all_ft_sessions(mac);
 
-	ucfg_scan_unregister_requester(mac->psoc, mac->lim.req_id);
+	wlan_scan_unregister_requester(mac->psoc, mac->lim.req_id);
 } /*** end lim_cleanup() ***/
 
 #ifdef WLAN_FEATURE_MEMDUMP_ENABLE
@@ -634,18 +634,8 @@ static void pe_shutdown_notifier_cb(void *ctx)
 	}
 }
 
-/**
- * is_mgmt_protected - check RMF enabled for the peer
- * @vdev_id: vdev id
- * @peer_mac_addr: peer mac address
- *
- * The function check the mgmt frame protection enabled or not
- * for station mode and AP mode
- *
- * Return: true, if the connection is RMF enabled.
- */
-static bool is_mgmt_protected(uint32_t vdev_id,
-				  const uint8_t *peer_mac_addr)
+bool is_mgmt_protected(uint32_t vdev_id,
+		       const uint8_t *peer_mac_addr)
 {
 	uint16_t aid;
 	tpDphHashNode sta_ds;

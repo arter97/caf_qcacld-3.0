@@ -121,6 +121,7 @@
 #include "wlan_hdd_bus_bandwidth.h"
 #include <wlan_hdd_cm_api.h>
 #include "wlan_hdd_mlo.h"
+#include "wlan_osif_features.h"
 
 /*
  * Preprocessor definitions and constants
@@ -544,6 +545,7 @@ typedef enum {
 	NET_DEV_HOLD_BUS_BW_MGR = 59,
 	NET_DEV_HOLD_START_PRE_CAC_TRANS = 60,
 	NET_DEV_HOLD_IS_ANY_STA_CONNECTED = 61,
+	NET_DEV_HOLD_GET_ADAPTER_BY_BSSID = 62,
 
 	/* Keep it at the end */
 	NET_DEV_HOLD_ID_MAX
@@ -1083,6 +1085,7 @@ struct hdd_fw_txrx_stats {
  * @bss_stop_reason: Reason why the BSS was stopped
  * @acs_in_progress: In progress acs flag for an adapter
  * @client_count: client count per dot11_mode
+ * @country_ie_updated: country ie is updated or not by hdd hostapd
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -1102,6 +1105,7 @@ struct hdd_ap_ctx {
 	enum bss_stop_reason bss_stop_reason;
 	qdf_atomic_t acs_in_progress;
 	uint16_t client_count[QCA_WLAN_802_11_MODE_INVALID];
+	bool country_ie_updated;
 };
 
 /**
@@ -1518,12 +1522,6 @@ struct hdd_adapter {
 	/* debugfs entry */
 	struct dentry *debugfs_phy;
 	/*
-	 * The pre cac channel frequency is saved here and will be used when
-         * the SAP's channel needs to be moved from the existing 2.4GHz channel.
-	 */
-	uint32_t pre_cac_freq;
-
-	/*
 	 * Indicate if HO fails during disconnect so that
 	 * disconnect is not initiated by HDD as its already
 	 * initiated by CSR
@@ -1597,8 +1595,19 @@ struct hdd_adapter {
 	qdf_work_t netdev_features_update_work;
 	enum hdd_work_status netdev_features_update_work_status;
 	qdf_atomic_t net_dev_hold_ref_count[NET_DEV_HOLD_ID_MAX];
+/*
+ * Code under PRE_CAC_COMP will be cleaned up
+ * once pre cac component is done
+ */
+#ifndef PRE_CAC_COMP
 	/* Flag to indicate whether it is a pre cac adapter or not */
 	bool is_pre_cac_adapter;
+	/*
+	 * The pre cac channel frequency is saved here and will be used when
+	 * the SAP's channel needs to be moved from the existing 2.4GHz channel.
+	 */
+	uint32_t pre_cac_freq;
+#endif
 	bool delete_in_progress;
 	bool is_virtual_iface;
 #ifdef WLAN_FEATURE_BIG_DATA_STATS
@@ -1609,6 +1618,7 @@ struct hdd_adapter {
 #endif
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 	struct hdd_mlo_adapter_info mlo_adapter_info;
+	struct wifi_interface_stats ll_iface_stats;
 #endif
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	void *set_mac_addr_req_ctx;
@@ -2233,7 +2243,13 @@ struct hdd_context {
 
 	/* the radio index assigned by cnss_logger */
 	int radio_index;
+/*
+ * Code under PRE_CAC_COMP will be cleaned up
+ * once pre cac component is done
+ */
+#ifndef PRE_CAC_COMP
 	qdf_work_t sap_pre_cac_work;
+#endif
 	bool hbw_requested;
 	bool pm_qos_request;
 	enum RX_OFFLOAD ol_enable;
@@ -3754,36 +3770,6 @@ static inline int wlan_hdd_get_cpu(void)
 	return 0;
 }
 #endif
-
-#ifdef PRE_CAC_SUPPORT
-/**
- * wlan_hdd_sap_pre_cac_failure() - Process the pre cac failure
- * @data: AP adapter
- *
- * Deletes the pre cac adapter
- *
- * Return: None
- */
-void wlan_hdd_sap_pre_cac_failure(void *data);
-/**
- * hdd_clean_up_pre_cac_interface() - Clean up the pre cac interface
- * @hdd_ctx: HDD context
- *
- * Cleans up the pre cac interface, if it exists
- *
- * Return: None
- */
-void hdd_clean_up_pre_cac_interface(struct hdd_context *hdd_ctx);
-#else
-static inline void wlan_hdd_sap_pre_cac_failure(void *data)
-{
-}
-
-static inline void
-hdd_clean_up_pre_cac_interface(struct hdd_context *hdd_ctx)
-{
-}
-#endif /* PRE_CAC_SUPPORT */
 
 void wlan_hdd_txrx_pause_cb(uint8_t vdev_id,
 	enum netif_action_type action, enum netif_reason_type reason);

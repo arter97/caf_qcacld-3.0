@@ -695,9 +695,10 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 	QDF_STATUS status;
 	struct scheduler_msg cds_msg = {0};
 	uint8_t *buf_ptr;
-	uint32_t alloc_len;
+	uint32_t alloc_len = 0, i, partner_links_data_len = 0;
 	struct cdp_txrx_ext_stats ext_stats = {0};
 	struct cdp_soc_t *soc_hdl = cds_get_context(QDF_MODULE_ID_SOC);
+	wmi_partner_link_stats *link_stats;
 
 	wma_debug("Posting stats ext event to SME");
 
@@ -707,12 +708,29 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 		return -EINVAL;
 	}
 
+	if (param_buf->num_partner_link_stats)
+		wma_debug("number of partner link stats:%d",
+			  param_buf->num_partner_link_stats);
+
 	stats_ext_info = param_buf->fixed_param;
 	buf_ptr = (uint8_t *)stats_ext_info;
 
-	alloc_len = sizeof(tSirStatsExtEvent);
+	alloc_len += sizeof(tSirStatsExtEvent);
 	alloc_len += stats_ext_info->data_len;
 	alloc_len += sizeof(struct cdp_txrx_ext_stats);
+
+	if (param_buf->num_partner_link_stats) {
+		link_stats = param_buf->partner_link_stats;
+		if (link_stats) {
+			for (i = 0; i < param_buf->num_partner_link_stats; i++) {
+				partner_links_data_len += link_stats->data_length;
+				link_stats++;
+			}
+		alloc_len += partner_links_data_len;
+		alloc_len += param_buf->num_partner_link_stats *
+			     sizeof(struct cdp_txrx_ext_stats);
+		}
+	}
 
 	if (stats_ext_info->data_len > (WMI_SVC_MSG_MAX_SIZE -
 	    WMI_TLV_HDR_SIZE - sizeof(*stats_ext_info)) ||
@@ -738,6 +756,30 @@ int wma_stats_ext_event_handler(void *handle, uint8_t *event_buf,
 		     &ext_stats, sizeof(struct cdp_txrx_ext_stats));
 
 	stats_ext_event->event_data_len += sizeof(struct cdp_txrx_ext_stats);
+
+	if (param_buf->num_partner_link_stats) {
+		link_stats = param_buf->partner_link_stats;
+		if (link_stats) {
+			for (i = 0; i < param_buf->num_partner_link_stats; i++) {
+				qdf_mem_copy(((uint8_t *)stats_ext_event->event_data) +
+					     stats_ext_event->event_data_len,
+					     param_buf->partner_link_data +
+					     link_stats->offset,
+					     link_stats->data_length);
+
+				stats_ext_event->event_data_len +=
+							link_stats->data_length;
+
+				qdf_mem_copy(stats_ext_event->event_data +
+						stats_ext_event->event_data_len,
+						&ext_stats,
+						sizeof(struct cdp_txrx_ext_stats));
+				stats_ext_event->event_data_len +=
+					sizeof(struct cdp_txrx_ext_stats);
+				link_stats++;
+			}
+		}
+	}
 
 	cds_msg.type = eWNI_SME_STATS_EXT_EVENT;
 	cds_msg.bodyptr = (void *)stats_ext_event;
@@ -2597,9 +2639,7 @@ wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
 	if (!(cfg_get(wma_handle->psoc, CFG_CLUB_LL_STA_AND_GET_STATION) &&
 	      wmi_service_enabled(wma_handle->wmi_handle,
 				  wmi_service_get_station_in_ll_stats_req) &&
-	      (wma_handle->interfaces[cmd->vdev_id].type ==
-							WMI_VDEV_TYPE_STA) &&
-	      cm_is_vdevid_connected(wma_handle->pdev, cmd->vdev_id)))
+	      wma_handle->interfaces[cmd->vdev_id].type == WMI_VDEV_TYPE_STA))
 		return wmi_unified_process_ll_stats_get_cmd(
 						wma_handle->wmi_handle, cmd);
 
@@ -2616,6 +2656,46 @@ wma_send_ll_stats_get_cmd(tp_wma_handle wma_handle,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static QDF_STATUS
+wma_update_params_for_mlo_stats(tp_wma_handle wma,
+				const tpSirLLStatsGetReq getReq,
+				struct ll_stats_get_params *cmd)
+{
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t *mld_addr;
+
+	cmd->is_mlo_req = getReq->is_mlo_req;
+
+	vdev = wma->interfaces[getReq->staId].vdev;
+	if (!vdev) {
+		wma_err("Failed to get vdev for vdev_%d", getReq->staId);
+		return QDF_STATUS_E_FAILURE;
+	}
+	if (getReq->is_mlo_req) {
+		cmd->vdev_id_bitmap = getReq->mlo_vdev_id_bitmap;
+		mld_addr = wlan_vdev_mlme_get_mldaddr(vdev);
+		if (!mld_addr) {
+			wma_err("Failed to get mld_macaddr for vdev_%d",
+				getReq->staId);
+			return QDF_STATUS_E_FAILURE;
+		}
+		qdf_mem_copy(cmd->mld_macaddr.bytes, mld_addr,
+			     QDF_MAC_ADDR_SIZE);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static QDF_STATUS
+wma_update_params_for_mlo_stats(tp_wma_handle wma,
+				const tpSirLLStatsGetReq getReq,
+				struct ll_stats_get_params *cmd)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 				 const tpSirLLStatsGetReq getReq)
 {
@@ -2623,6 +2703,7 @@ QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 	uint8_t *addr;
 	struct ll_stats_get_params cmd = {0};
 	int ret;
+	QDF_STATUS status;
 
 	if (!getReq || !wma) {
 		wma_err("input pointer is NULL");
@@ -2649,6 +2730,13 @@ QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 		return QDF_STATUS_E_FAILURE;
 	}
 	qdf_mem_copy(cmd.peer_macaddr.bytes, addr, QDF_MAC_ADDR_SIZE);
+
+	status = wma_update_params_for_mlo_stats(wma, getReq, &cmd);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wma_err("Failed to update params for mlo_stats");
+		return status;
+	}
+
 	ret = wma_send_ll_stats_get_cmd(wma, &cmd);
 	if (ret) {
 		wma_err("Failed to send get link stats request");
@@ -2808,6 +2896,9 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 		offload_stats++;
 		iface_offload_stats++;
 	}
+
+	/* Copying vdev_id info into the iface_stat for MLO*/
+	iface_stat->vdev_id = fixed_param->vdev_id;
 
 	/* call hdd callback with Link Layer Statistics
 	 * vdev_id/ifacId in link_stats_results will be
@@ -4863,11 +4954,23 @@ int wma_latency_level_event_handler(void *wma_ctx, uint8_t *event_buff,
 		(struct mac_context *)cds_get_context(QDF_MODULE_ID_PE);
 	wmi_vdev_latency_event_fixed_param *event;
 	struct latency_level_data event_data;
+	bool multi_client_ll_support, multi_client_ll_caps;
 
 	if (!pmac) {
 		wma_err("NULL mac handle");
 		return -EINVAL;
 	}
+
+	multi_client_ll_support =
+		pmac->mlme_cfg->wlm_config.multi_client_ll_support;
+	multi_client_ll_caps =
+		wlan_mlme_get_wlm_multi_client_ll_caps(pmac->psoc);
+
+	wma_debug("multi client ll INI:%d, caps:%d", multi_client_ll_support,
+		  multi_client_ll_caps);
+
+	if ((!multi_client_ll_support) || (!multi_client_ll_caps))
+		return -EINVAL;
 
 	if (!pmac->sme.latency_level_event_handler_cb) {
 		wma_err("latency level data handler cb is not registered");
@@ -4888,7 +4991,7 @@ int wma_latency_level_event_handler(void *wma_ctx, uint8_t *event_buff,
 
 	event_data.vdev_id = event->vdev_id;
 	event_data.latency_level = event->latency_level;
-	wma_debug("[MULTI_CLIENT]received event latency level :%d, vdev_id:%d",
+	wma_debug("received event latency level :%d, vdev_id:%d",
 		  event->latency_level, event->vdev_id);
 	pmac->sme.latency_level_event_handler_cb(&event_data,
 						     event->vdev_id);
@@ -4952,28 +5055,24 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 #ifdef WLAN_FEATURE_11BE
 uint32_t wma_get_eht_ch_width(void)
 {
-#ifdef TBD
-	uint32_t fw_ch_wd = WNI_CFG_EHT_CHANNEL_WIDTH_80MHZ;
-	tp_wma_handle wm_hdl = cds_get_context(QDF_MODULE_ID_WMA);
-	struct target_psoc_info *tgt_hdl;
-	int eht_cap_info;
+	tDot11fIEeht_cap eht_cap;
+	tp_wma_handle wma;
 
-	if (!wm_hdl)
-		return fw_ch_wd;
+	wma = cds_get_context(QDF_MODULE_ID_WMA);
+	if (qdf_unlikely(!wma)) {
+		wma_err_rl("wma handle is NULL");
+		goto vht_ch_width;
+	}
 
-	tgt_hdl = wlan_psoc_get_tgt_if_handle(wm_hdl->psoc);
-	if (!tgt_hdl)
-		return fw_ch_wd;
+	if (QDF_IS_STATUS_ERROR(mlme_cfg_get_eht_caps(wma->psoc, &eht_cap))) {
+		wma_err_rl("Failed to get eht caps");
+		goto vht_ch_width;
+	}
 
-	eht_cap_info = target_if_get_eht_cap_info(tgt_hdl);
-	if (eht_cap_info & WMI_EHT_CAP_CH_WIDTH_160MHZ)
-		fw_ch_wd = WNI_CFG_EHT_CHANNEL_WIDTH_160MHZ;
-	else if (eht_cap_info & WMI_EHT_CAP_CH_WIDTH_320MHZ)
-		fw_ch_wd = WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ;
+	if (eht_cap.support_320mhz_6ghz)
+		return WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ;
 
-	return fw_ch_wd;
-#else
-	return WNI_CFG_EHT_CHANNEL_WIDTH_320MHZ;
-#endif
+vht_ch_width:
+	return wma_get_vht_ch_width();
 }
 #endif

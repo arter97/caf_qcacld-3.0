@@ -778,14 +778,18 @@ SME_INC_DIR :=	$(SME_DIR)/inc
 SME_SRC_DIR :=	$(SME_DIR)/src
 
 SME_INC := 	-I$(WLAN_ROOT)/$(SME_INC_DIR) \
-		-I$(WLAN_ROOT)/$(SME_SRC_DIR)/csr
+		-I$(WLAN_ROOT)/$(SME_SRC_DIR)/csr \
+		-I$(WLAN_ROOT)/$(SME_SRC_DIR)/qos \
+		-I$(WLAN_ROOT)/$(SME_SRC_DIR)/common \
+		-I$(WLAN_ROOT)/$(SME_SRC_DIR)/rrm \
+		-I$(WLAN_ROOT)/$(SME_SRC_DIR)/nan
 
+ifeq ($(KERNEL_SUPPORTS_NESTED_COMPOSITES),y)
 SME_CSR_OBJS := $(SME_SRC_DIR)/csr/csr_api_roam.o \
 		$(SME_SRC_DIR)/csr/csr_api_scan.o \
 		$(SME_SRC_DIR)/csr/csr_cmd_process.o \
 		$(SME_SRC_DIR)/csr/csr_link_list.o \
 		$(SME_SRC_DIR)/csr/csr_util.o \
-
 
 SME_QOS_OBJS := $(SME_SRC_DIR)/qos/sme_qos.o
 
@@ -805,7 +809,9 @@ SME_OBJS :=	$(SME_CMN_OBJS) \
 		$(SME_RRM_OBJS) \
 		$(SME_NAN_OBJS) \
 		$(SME_NDP_OBJS)
-
+else # KERNEL_SUPPORTS_NESTED_COMPOSITES
+SME_OBJS := $(SME_SRC_DIR)/sme.o
+endif
 $(call add-wlan-objs,sme,$(SME_OBJS))
 
 ############ NLINK ############
@@ -1660,6 +1666,24 @@ FTM_TIME_SYNC_OBJS := $(FTM_TIME_SYNC_DIR)/core/src/ftm_time_sync_main.o \
 endif
 
 $(call add-wlan-objs,ftm_time_sync,$(FTM_TIME_SYNC_OBJS))
+
+########## WLAN PRE_CAC ##########
+
+WLAN_PRE_CAC_DIR := components/pre_cac
+WLAN_PRE_CAC_INC := -I$(WLAN_ROOT)/$(WLAN_PRE_CAC_DIR)/dispatcher/inc
+PRE_CAC_OSIF_DIR := os_if/pre_cac
+WLAN_PRE_CAC_INC := -I$(WLAN_ROOT)/$(WLAN_PRE_CAC_DIR)/dispatcher/inc \
+		  -I$(WLAN_ROOT)/$(PRE_CAC_OSIF_DIR)/inc
+
+ifeq ($(CONFIG_FEATURE_WLAN_PRE_CAC), y)
+WLAN_PRE_CAC_OBJS := $(HDD_SRC_DIR)/wlan_hdd_pre_cac.o \
+		$(WLAN_PRE_CAC_DIR)/core/src/wlan_pre_cac_main.o \
+		$(WLAN_PRE_CAC_DIR)/dispatcher/src/wlan_pre_cac_ucfg_api.o \
+		$(WLAN_PRE_CAC_DIR)/dispatcher/src/wlan_pre_cac_api.o \
+		$(PRE_CAC_OSIF_DIR)/src/osif_pre_cac.o
+endif
+
+$(call add-wlan-objs,wlan_pre_cac,$(WLAN_PRE_CAC_OBJS))
 
 ########## CLD TARGET_IF #######
 CLD_TARGET_IF_DIR := components/target_if
@@ -2987,6 +3011,7 @@ INCS +=		$(DISA_INC)
 INCS +=		$(ACTION_OUI_INC)
 INCS +=		$(PKT_CAPTURE_INC)
 INCS +=		$(FTM_TIME_SYNC_INC)
+INCS +=		$(WLAN_PRE_CAC_INC)
 
 INCS +=		$(UMAC_DISP_INC)
 INCS +=		$(UMAC_SCAN_INC)
@@ -3753,8 +3778,11 @@ cppflags-$(CONFIG_WLAN_FEATURE_PKT_CAPTURE) += -DWLAN_FEATURE_PKT_CAPTURE
 
 cppflags-$(CONFIG_WLAN_FEATURE_PKT_CAPTURE_V2) += -DWLAN_FEATURE_PKT_CAPTURE_V2
 
+cppflags-$(CONFIG_DP_RX_UDP_OVER_PEER_ROAM) += -DDP_RX_UDP_OVER_PEER_ROAM
+
 cppflags-$(CONFIG_QCA_WIFI_EMULATION) += -DQCA_WIFI_EMULATION
 cppflags-$(CONFIG_SHADOW_V2) += -DCONFIG_SHADOW_V2
+cppflags-$(CONFIG_SHADOW_V3) += -DCONFIG_SHADOW_V3
 cppflags-$(CONFIG_QCA6290_HEADERS_DEF) += -DQCA6290_HEADERS_DEF
 cppflags-$(CONFIG_QCA_WIFI_QCA6290) += -DQCA_WIFI_QCA6290
 cppflags-$(CONFIG_QCA6390_HEADERS_DEF) += -DQCA6390_HEADERS_DEF

@@ -380,7 +380,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 		ucfg_pmo_get_sap_mode_bus_suspend(wma_handle->psoc);
 	tgt_cfg->is_go_connected_d3wow_enabled =
 		ucfg_pmo_get_go_mode_bus_suspend(wma_handle->psoc);
-
+	tgt_cfg->num_max_active_vdevs =
+		policy_mgr_get_max_conc_cxns(wma_handle->psoc);
 	cfg_nan_get_max_ndi(wma_handle->psoc,
 			    &tgt_cfg->max_ndi);
 
@@ -2710,8 +2711,6 @@ static int wma_unified_phyerr_rx_event_handler(void *handle,
 
 void wma_vdev_init(struct wma_txrx_node *vdev)
 {
-	qdf_wake_lock_create(&vdev->vdev_set_key_wakelock, "vdev_set_key");
-	qdf_runtime_lock_init(&vdev->vdev_set_key_runtime_wakelock);
 	vdev->is_waiting_for_key = false;
 }
 
@@ -2780,8 +2779,6 @@ void wma_vdev_deinit(struct wma_txrx_node *vdev)
 		vdev->plink_status_req = NULL;
 	}
 
-	qdf_runtime_lock_deinit(&vdev->vdev_set_key_runtime_wakelock);
-	qdf_wake_lock_destroy(&vdev->vdev_set_key_wakelock);
 	vdev->is_waiting_for_key = false;
 }
 
@@ -3442,6 +3439,7 @@ QDF_STATUS wma_open(struct wlan_objmgr_psoc *psoc,
 	wma_handle->powersave_mode =
 			ucfg_pmo_power_save_offload_enabled(wma_handle->psoc);
 	wma_handle->staMaxLIModDtim = cds_cfg->sta_maxlimod_dtim;
+	wma_handle->sta_max_li_mod_dtim_ms = cds_cfg->sta_maxlimod_dtim_ms;
 	wma_handle->staModDtim = ucfg_pmo_get_sta_mod_dtim(wma_handle->psoc);
 	wma_handle->staDynamicDtim =
 			ucfg_pmo_get_sta_dynamic_dtim(wma_handle->psoc);
@@ -5687,6 +5685,8 @@ static int wma_update_hdd_cfg(tp_wma_handle wma_handle)
 	tgt_cfg.eeprom_rd_ext = wma_handle->reg_cap.eeprom_rd_ext;
 
 	tgt_cfg.max_intf_count = wlan_res_cfg->num_vdevs;
+	policy_mgr_set_max_conc_cxns(wma_handle->psoc,
+				     wlan_res_cfg->num_max_active_vdevs);
 
 	qdf_mem_copy(tgt_cfg.hw_macaddr.bytes, wma_handle->hwaddr,
 		     ATH_MAC_LEN);
@@ -9181,6 +9181,7 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 {
 	uint32_t i;
 	QDF_STATUS status;
+	bool is_channel_allowed;
 
 	if (wma_validate_handle(wma_handle))
 		return QDF_STATUS_E_NULL_VALUE;
@@ -9216,6 +9217,16 @@ QDF_STATUS wma_send_set_pcl_cmd(tp_wma_handle wma_handle,
 		msg->chan_weights.weighed_valid_list[i] =
 			wma_map_pcl_weights(
 				msg->chan_weights.weighed_valid_list[i]);
+
+		is_channel_allowed =
+			policy_mgr_is_sta_chan_valid_for_connect_and_roam(
+					wma_handle->pdev,
+					msg->chan_weights.saved_chan_list[i]);
+		if (!is_channel_allowed) {
+			msg->chan_weights.weighed_valid_list[i] =
+					WEIGHT_OF_DISALLOWED_CHANNELS;
+			continue;
+		}
 
 		if (msg->band_mask ==
 		      (BIT(REG_BAND_2G) | BIT(REG_BAND_5G) | BIT(REG_BAND_6G)))

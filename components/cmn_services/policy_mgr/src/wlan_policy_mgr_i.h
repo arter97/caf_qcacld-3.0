@@ -193,6 +193,11 @@
 extern struct policy_mgr_conc_connection_info
 	pm_conc_connection_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
 
+#ifdef WLAN_FEATURE_11BE_MLO
+extern struct policy_mgr_disabled_ml_link_info
+	pm_disabled_ml_links[MAX_NUMBER_OF_DISABLE_LINK];
+#endif
+
 extern const enum policy_mgr_pcl_type
 	first_connection_pcl_table[PM_MAX_NUM_OF_MODE]
 			[PM_MAX_CONC_PRIORITY_MODE];
@@ -355,7 +360,6 @@ struct policy_mgr_psoc_priv_obj {
 	struct policy_mgr_conc_cbacks conc_cbacks;
 	uint32_t sap_mandatory_channels[NUM_CHANNELS];
 	uint32_t sap_mandatory_channels_len;
-	bool do_sap_unsafe_ch_check;
 	qdf_freq_t last_disconn_sta_freq;
 	uint32_t concurrency_mode;
 	uint8_t no_of_open_sessions[QDF_MAX_NO_OF_MODE];
@@ -580,6 +584,15 @@ void policy_mgr_pdev_set_hw_mode_cb(uint32_t status,
 				enum policy_mgr_conn_update_reason reason,
 				uint32_t session_id, void *context,
 				uint32_t request_id);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void
+policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx);
+#else
+static inline void
+policy_mgr_dump_disabled_ml_links(struct policy_mgr_psoc_priv_obj *pm_ctx) {}
+#endif
+
 void policy_mgr_dump_current_concurrency(struct wlan_objmgr_psoc *psoc);
 
 /**
@@ -846,4 +859,19 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       uint32_t ch_freq,
 				       enum hw_mode_bandwidth bw,
 				       uint32_t ext_flags);
+
+/**
+ * policy_mgr_2_freq_same_mac_in_sbs() - to check provided frequencies are
+ * in sbs freq range or not
+ *
+ * @pm_ctx: policy mgr psoc priv object
+ * @freq_1: first frequency
+ * @freq_2: second frequency
+ *
+ * This API is used to check provided frequencies are in sbs freq range or not
+ *
+ * Return: true/false.
+ */
+bool policy_mgr_2_freq_same_mac_in_sbs(struct policy_mgr_psoc_priv_obj *pm_ctx,
+				       qdf_freq_t freq_1, qdf_freq_t freq_2);
 #endif
