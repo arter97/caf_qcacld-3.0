@@ -1389,6 +1389,7 @@ enum _ol_ath_param_t {
 #endif
 	/* Get monitor version */
 	OL_ATH_PARAM_GET_MONITOR_VERSION = 513,
+	OL_ATH_PARAM_DFS_BW_EXPAND = 514,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3199,6 +3200,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_NOL_SUBCHANNEL_MARKING, SET_PARAM, 1},
 	{"g_mark_subchan",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_NOL_SUBCHANNEL_MARKING, GET_PARAM, 0},
+	{"bw_expand",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_BW_EXPAND, SET_PARAM, 1},
+	{"g_bw_expand",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_BW_EXPAND, GET_PARAM, 0},
 	{"get_bandinfo",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_BAND_INFO, GET_PARAM, 0},
 	{"bw_reduceEn",
