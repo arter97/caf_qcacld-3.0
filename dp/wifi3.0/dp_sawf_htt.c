@@ -23,6 +23,7 @@
 #include <dp_sawf.h>
 #include <dp_sawf_htt.h>
 #include "cdp_txrx_cmn_reg.h"
+#include <wlan_telemetry_agent.h>
 
 #define HTT_MSG_BUF_SIZE(msg_bytes) \
 	((msg_bytes) + HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING)
@@ -411,6 +412,9 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 		msduq = &sawf_ctx->msduq[msduq_index];
 		msduq->remapped_tid = remapped_tid;
 		msduq->htt_msduq = host_tid_queue;
+		telemetry_sawf_updt_tid_msduq(peer->sawf->telemetry_ctx,
+					      msduq_index,
+					      remapped_tid, host_tid_queue);
 	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
