@@ -19,10 +19,6 @@
 #ifdef WLAN_CONFIG_TELEMETRY
 #include <telemetry_agent_wifi_driver_if.h>
 
-#define MAX_PEERS 128
-#define MAX_SOCS 3
-#define MAX_PDEV 3
-
 void wlan_telemetry_agent_application_init_notify
 	(enum agent_notification_event);
 QDF_STATUS wlan_telemetry_agent_init(void);
