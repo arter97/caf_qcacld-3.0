@@ -17821,6 +17821,7 @@ static QDF_STATUS hdd_qdf_init(void)
 	}
 
 	qdf_trace_init();
+	qdf_minidump_init();
 	qdf_register_debugcb_init();
 
 	return QDF_STATUS_SUCCESS;
@@ -17848,7 +17849,7 @@ exit:
 static void hdd_qdf_deinit(void)
 {
 	/* currently, no debugcb deinit */
-
+	qdf_minidump_deinit();
 	qdf_trace_deinit();
 
 	/* currently, no trace spinlock deinit */
