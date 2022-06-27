@@ -961,11 +961,12 @@ QDF_STATUS send_bcn_offload_control_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param evt_buf: pointer to event buffer
  * @param num_vdevs: Pointer to hold num vdevs
+ * @param num_quiet_active_vdevs: Pointer to hold number of Quiet active vdevs
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS extract_swba_num_vdevs_tlv(wmi_unified_t wmi_handle,
-	void *evt_buf, uint32_t *num_vdevs)
+	void *evt_buf, uint32_t *num_vdevs, uint32_t *num_quiet_active_vdevs)
 {
 	WMI_HOST_SWBA_EVENTID_param_tlvs *param_buf;
 	wmi_host_swba_event_fixed_param *swba_event;
@@ -983,6 +984,8 @@ static QDF_STATUS extract_swba_num_vdevs_tlv(wmi_unified_t wmi_handle,
 		vdev_map = swba_event->vdev_map;
 		*num_vdevs = wmi_vdev_map_to_num_vdevs(vdev_map);
 	}
+
+	*num_quiet_active_vdevs = param_buf->num_quiet_offload_info;
 
 	return QDF_STATUS_SUCCESS;
 }

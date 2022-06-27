@@ -450,11 +450,13 @@ QDF_STATUS wmi_extract_offchan_data_tx_compl_param(
  * @wmi_handle: wmi handle
  * @evt_buf: pointer to event buffer
  * @num_vdevs: Pointer to hold num vdevs
+ * @param num_quiet_active_vdevs: Pointer to hold number of Quiet active vdevs
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
 QDF_STATUS wmi_extract_swba_num_vdevs(wmi_unified_t wmi_handle, void *evt_buf,
-				      uint32_t *num_vdevs);
+				      uint32_t *num_vdevs,
+				      uint32_t *num_quiet_active_vdevs);
 
 /**
  * wmi_extract_swba_tim_info() - extract swba tim info from event
