@@ -181,7 +181,7 @@ dp_sawf_def_queues_get_map_report(struct cdp_soc_t *soc_hdl,
 {
 	struct dp_soc *dp_soc;
 	struct dp_peer *peer;
-	uint8_t tid;
+	uint8_t tid, tid_active, svc_id;
 	struct dp_peer_sawf *sawf_ctx;
 
 	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
@@ -207,14 +207,13 @@ dp_sawf_def_queues_get_map_report(struct cdp_soc_t *soc_hdl,
 
 	dp_sawf_info("Peer ", QDF_MAC_ADDR_FMT,
 		     QDF_MAC_ADDR_REF(mac_addr));
-	qdf_nofl_info("TID\tService Class ID");
+	dp_sawf_nofl_err("TID    Active    Service Class ID");
 	for (tid = 0; tid < DP_SAWF_TID_MAX; ++tid) {
-		if (sawf_ctx->tid_reports[tid].svc_class_id ==
-				HTT_SAWF_SVC_CLASS_INVALID_ID) {
-			continue;
-		}
-		dp_sawf_nofl_info("%u\t%u", tid,
-				  sawf_ctx->tid_reports[tid].svc_class_id);
+		svc_id = sawf_ctx->tid_reports[tid].svc_class_id;
+		tid_active = svc_id &&
+			     (svc_id != HTT_SAWF_SVC_CLASS_INVALID_ID);
+		dp_sawf_nofl_err("%u        %u            %u",
+				 tid, tid_active, svc_id);
 	}
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
