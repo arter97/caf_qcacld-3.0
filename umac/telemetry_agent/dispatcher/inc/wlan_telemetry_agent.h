@@ -16,7 +16,8 @@
 #ifndef WLAN_TELEMETRY_AGENT
 #define WLAN_TELEMETRY_AGENT
 
-#include<telemetry_agent_wifi_driver_if.h>
+#ifdef WLAN_CONFIG_TELEMETRY
+#include <telemetry_agent_wifi_driver_if.h>
 
 #define MAX_PEERS 128
 #define MAX_SOCS 3
@@ -221,4 +222,133 @@ QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
  */
 QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
 				      uint8_t queue, uint32_t *mov_avg);
+#else
+#define wlan_telemetry_agent_application_init_notify(param)
+
+static inline
+QDF_STATUS wlan_telemetry_agent_init(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_telemetry_agent_deinit(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void *telemetry_sawf_peer_ctx_alloc(void *soc, void *sawf_ctx,
+				    uint8_t *mac_addr,
+				    uint8_t svc_id, uint8_t hostq_id)
+{
+	return NULL;
+}
+
+static inline
+void telemetry_sawf_peer_ctx_free(void *telemetry_ctx) {}
+
+static inline
+QDF_STATUS telemetry_sawf_updt_tid_msduq(void *telemetry_ctx,
+					 uint8_t hostq_id,
+					 uint8_t tid,
+					 uint8_t msduq_idx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_set_mov_avg_params(uint32_t num_pkt,
+					     uint32_t num_win)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_set_sla_params(uint32_t num_pkt,
+					 uint32_t time_sec)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_set_sla_cfg(uint8_t svc_id,
+				      uint8_t min_tput_rate,
+				      uint8_t max_tput_rate,
+				      uint8_t burst_size,
+				      uint8_t svc_interval,
+				      uint8_t delay_bound,
+				      uint8_t msdu_ttl,
+				      uint8_t msdu_rate_loss)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_set_svclass_cfg(bool enable, uint8_t svc_id,
+					  uint32_t min_tput_rate,
+					  uint32_t max_tput_rate,
+					  uint32_t burst_size,
+					  uint32_t svc_interval,
+					  uint32_t delay_bound,
+					  uint32_t msdu_ttl,
+					  uint32_t msdu_rate_loss)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_set_sla_detect_cfg(uint8_t detect_type,
+					     uint8_t min_tput_rate,
+					     uint8_t max_tput_rate,
+					     uint8_t burst_size,
+					     uint8_t svc_intval,
+					     uint8_t delay_bound,
+					     uint8_t msdu_ttl,
+					     uint8_t msdu_rate_loss)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_update_delay(void *telemetry_ctx, uint8_t tid,
+				       uint8_t queue, uint64_t pass,
+				       uint64_t fail)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_update_delay_mvng(void *telemetry_ctx,
+					    uint8_t tid,
+					    uint8_t queue,
+					    uint64_t sum_windows)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_update_msdu_drop(void *telemetry_ctx,
+					   uint8_t tid, uint8_t queue,
+					   uint64_t success,
+					   uint64_t failure_drop,
+					   uint64_t failure_ttl)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
+				   uint8_t queue, uint32_t *rate)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
+				      uint8_t queue, uint32_t *mov_avg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* WLAN_TELEMETRY_AGENT */
