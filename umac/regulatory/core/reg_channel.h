@@ -291,4 +291,37 @@ reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				qdf_freq_t chan_freq,
 				bool *is_psd, uint16_t *reg_eirp,
 				uint16_t *reg_psd);
+
+/**
+ * reg_get_reg_chan_list_based_on_freq() - Chan list returned  based on freq
+ * @pdev: Pointer to pdev.
+ * @freq: Channel center frequency.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
+ *
+ * Return: regulatory_channel.
+ */
+struct regulatory_channel
+reg_get_reg_chan_list_based_on_freq(struct wlan_objmgr_pdev *pdev,
+				    qdf_freq_t freq,
+				    enum supported_6g_pwr_types
+				    in_6g_pwr_mode);
+
+/**
+ * reg_get_first_valid_freq() - Get the first valid freq based
+ * on cur chan list.
+ * @pdev: Pointer to pdev.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
+ * @first_valid_freq: channel center frequency.
+ * @bw: Bandwidth.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
+			 enum supported_6g_pwr_types
+			 in_6g_pwr_mode,
+			 qdf_freq_t *first_valid_freq,
+			 int bw);
 #endif /* __REG_CHANNEL_H_ */

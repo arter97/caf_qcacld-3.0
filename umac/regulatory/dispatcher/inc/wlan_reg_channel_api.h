@@ -177,6 +177,8 @@ void wlan_reg_get_txpow_ant_gain(struct wlan_objmgr_pdev *pdev,
  * @freq2: Frequency in secondary segment.
  * @sec_flags: Secondary flags to be filled.
  * @pri_flags: Primary flags to be filled.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
  * @reg_chan_list: regulatory channel list.
  */
 void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
@@ -184,6 +186,7 @@ void wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 			     qdf_freq_t freq2,
 			     uint16_t *sec_flags,
 			     uint64_t *pri_flags,
+			     enum supported_6g_pwr_types in_6g_pwr_mode,
 			     struct regulatory_channel *reg_chan_list);
 
 /**
@@ -269,6 +272,7 @@ wlan_reg_get_chan_flags(struct wlan_objmgr_pdev *pdev,
 			qdf_freq_t freq2,
 			uint16_t *sec_flags,
 			uint64_t *pri_flags,
+			enum supported_6g_pwr_types in_6g_pwr_mode,
 			struct regulatory_channel *reg_chan_list)
 {
 }
@@ -382,4 +386,55 @@ wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				     qdf_freq_t chan_freq,
 				     bool *is_psd, uint16_t *reg_eirp,
 				     uint16_t *reg_psd);
+
+/**
+ * wlan_reg_get_reg_chan_list_based_on_freq() - Chan list returned  based on
+ * freq
+ * @pdev: Pointer to pdev.
+ * @freq: channel center frequency.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
+ *
+ * Return: regulatory_channel.
+ */
+struct regulatory_channel
+wlan_reg_get_reg_chan_list_based_on_freq(struct wlan_objmgr_pdev *pdev,
+					 qdf_freq_t freq,
+					 enum supported_6g_pwr_types
+					 in_6g_pwr_mode);
+
+/**
+ * wlan_reg_get_first_valid_freq_on_cur_chan() - Get the first valid freq based
+ * on cur chan list.
+ * @pdev: Pointer to pdev.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
+ * @first_valid_freq: channel center frequency.
+ * @bw: Bandwidth.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
+			      enum supported_6g_pwr_types
+			      in_6g_pwr_mode,
+			      qdf_freq_t *first_valid_freq,
+			      int bw);
+
+/**
+ * wlan_reg_get_first_valid_freq_on_power_mode() - Get the first valid freq
+ * based on pwr mode.
+ * @pdev: Pointer to pdev.
+ * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
+ * is determined.
+ * @freq: channel center frequency.
+ * @bw: Bandwidth.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_reg_get_first_valid_freq_on_power_mode(struct wlan_objmgr_pdev *pdev,
+					    enum supported_6g_pwr_types in_6g_pwr_mode,
+					    qdf_freq_t *first_valid_freq,
+					    int bw);
 #endif /* __WLAN_REG_CHANNEL_API_H */
