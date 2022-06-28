@@ -259,6 +259,7 @@
 #include "wlan_dfs_init_deinit_api.h"
 #include "../dfs_precac_forest.h"
 #include "dfs_zero_cac.h"
+#include <wlan_reg_channel_api.h>
 
 static const
 uint8_t dfs_phymode_decoupler[WLAN_PHYMODE_MAX][2] = {
@@ -1056,8 +1057,7 @@ void dfs_bwexpand_do_csa(struct wlan_dfs *dfs,
  */
 static
 enum wlan_phymode dfs_expand_find_max_possible_target_mode(struct wlan_dfs *dfs,
-							   enum wlan_phymode
-							   target_mode)
+							   enum wlan_phymode target_mode)
 {
 	while (target_mode < WLAN_PHYMODE_MAX) {
 		struct dfs_channel user_chan;
@@ -2815,4 +2815,146 @@ exit:
 }
 #endif
 
+#ifdef QCA_DFS_BW_EXPAND
+/**
+ * dfs_find_bonded_chanset_cen() - Find the center frequency for BW Expand.
+ * @target_freq_list: Pointer to target_freq_list array.
+ * @offset: Starting frequency of the subchannel.
+ * @n_agile_subchans: Number of agile subchannels.
+ */
+static
+qdf_freq_t dfs_find_bonded_chanset_cen(qdf_freq_t *target_freq_list,
+				       uint8_t offset,
+				       uint8_t n_agile_subchans)
+{
+	uint8_t i;
+	qdf_freq_t sum;
+
+	if (!n_agile_subchans)
+	    return 0;
+
+	for (sum = 0, i = 0; i < n_agile_subchans; i++)
+		sum += target_freq_list[offset + i];
+
+	return sum / n_agile_subchans;
+}
+
+/**
+ * dfs_bwexpand_is_chanset_agile_eligible() - Checks if the subchannel satifies
+ * the condtions for BW Expand.
+ * @dfs: Pointer to wlan_dfs.
+ * @n_agile_subchans: Number of agile subchannels.
+ * @n_cur_channels: Number of current subchannels.
+ * @target_freq_list: Pointer to target_freq_list array.
+ * @cur_freq_list: Pointer to cur_freq_list array.
+ * @offset: Starting frequency of the subchannel.
+ */
+static
+bool dfs_bwexpand_is_chanset_agile_eligible(struct wlan_dfs *dfs,
+					    uint8_t n_agile_subchans,
+					    uint8_t n_cur_channels,
+					    qdf_freq_t *target_freq_list,
+					    qdf_freq_t *cur_freq_list,
+					    uint8_t offset)
+{
+	uint8_t temp = 0;
+
+	while (temp < n_agile_subchans) {
+		qdf_freq_t *p_tgt_freq = &target_freq_list[temp + offset];
+
+		if (dfs_is_freq_in_nol(dfs, *p_tgt_freq) ||
+		    dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(dfs, *p_tgt_freq) ||
+		    dfs_is_subset_channel_for_freq(cur_freq_list,
+						   n_cur_channels,
+						   p_tgt_freq,
+						   1))
+			return false;
+
+		temp++;
+	}
+	return true;
+}
+
+/**
+ * Working Sequence of dfs_bwexpand_find_usr_cnf_chan is as follows:
+ *
+ * Consider User enabled BW Expand through UCI or cfgcommand, then
+ * for both Rolling CAC and preCAC, the next channel in which Agile
+ * SM needs to run is chosen by dfs_bwexpand_find_usr_cnf_chan API.
+ *
+ *  1) Find out current Agile Channel width and number of 20BW agile sub-chans.
+ *  2) Create a DFS channel with user configured frequency and bandwidth.
+ *     Example: User configured Chan 100 HT160 and current agile chanwidth is
+ *              40Mhz.
+ *  3) Get bonding channel list for both current chan and the target chan.
+ *  4) Loop through the target channel list by number of agile bw subchans.
+ *     Example: Consider the previous case, 100 HT160 is the target channel
+ *              and current agile BW is 40Mhz. The loop should iterate through
+ *              102 HT40, 110 HT40, 118 HT40 and 126 HT40 subchans.
+ *  5) Check if any of subchans is non-DFS, then Skip to next subchan of agile
+ *     BW.
+ *  6) All the frequencies in the subchan of agile BW, must satisfy the
+ *     following three condtions:
+ *               i) The frequency must not be in NOL.
+ *               ii) The frequency must not be already CAC completed.
+ *               iii) The frequency must not be current channel frequency.
+ *  7) If any agile BW subchans satisy the above all conditions, then return
+ *     center frequency of the subchan with agile BW.
+ */
+qdf_freq_t dfs_bwexpand_find_usr_cnf_chan(struct wlan_dfs *dfs)
+{
+	struct dfs_channel user_chan;
+	uint8_t n_target_channels, n_cur_channels, i;
+	enum phy_ch_width agile_chwidth = CH_WIDTH_INVALID;
+	enum phy_ch_width curchan_chwidth = CH_WIDTH_INVALID;
+	qdf_freq_t target_freq_list[MAX_20MHZ_SUBCHANS];
+	qdf_freq_t cur_freq_list[MAX_20MHZ_SUBCHANS];
+	uint16_t agile_bw;
+	uint8_t n_agile_subchans;
+
+	if (!dfs->dfs_use_bw_expand)
+		return 0;
+
+	dfs_get_configured_bwexpand_dfs_chan(dfs,
+					     &user_chan,
+					     dfs->dfs_bw_expand_des_mode);
+	n_target_channels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(&user_chan,
+								  target_freq_list);
+	n_cur_channels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(dfs->dfs_curchan,
+								  cur_freq_list);
+	dfs_compute_agile_and_curchan_width(dfs, &agile_chwidth,
+					    &curchan_chwidth);
+	agile_bw = wlan_reg_get_bw_value(agile_chwidth);
+	n_agile_subchans = agile_bw / MIN_DFS_SUBCHAN_BW;
+
+	/*
+	 * For every bonded channel set (of the agile bandwidth), starting
+	 * from the left, check if the bonded channel set is eligible to become
+	 * an agile channel, if not repeat the same for the next bonded
+	 * channel set.
+	 */
+	for (i = 0; i < n_target_channels ; i = i + n_agile_subchans) {
+		bool isfound;
+
+		if (!wlan_reg_is_freq_width_dfs(dfs->dfs_pdev_obj,
+						target_freq_list[i],
+						agile_chwidth))
+			continue;
+
+		isfound = dfs_bwexpand_is_chanset_agile_eligible(dfs,
+								 n_agile_subchans,
+								 n_cur_channels,
+								 target_freq_list,
+								 cur_freq_list,
+								 i);
+		if (isfound)
+			return dfs_find_bonded_chanset_cen(target_freq_list,
+							   i,
+							   n_agile_subchans);
+	}
+	return 0;
+}
+#endif /* QCA_DFS_BW_EXPAND */
 #endif
