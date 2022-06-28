@@ -277,8 +277,12 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 						continue;
 					}
 
-					dp_rx_mon_handle_full_mon(pdev,
-								  ppdu_info, mpdu);
+					status = dp_rx_mon_handle_full_mon(pdev,
+									   ppdu_info, mpdu);
+					if (status != QDF_STATUS_SUCCESS) {
+						qdf_nbuf_free(mpdu);
+						continue;
+					}
 				} else {
 					qdf_nbuf_free(mpdu);
 					continue;
@@ -390,7 +394,7 @@ dp_rx_mon_add_ppdu_info_to_wq(struct dp_mon_pdev *mon_pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-void
+QDF_STATUS
 dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 			  struct hal_rx_ppdu_info *ppdu_info,
 			  qdf_nbuf_t mpdu)
@@ -422,7 +426,7 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 
 	if (!mpdu) {
 		dp_mon_debug("nbuf is NULL, return");
-		return;
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	head_msdu = mpdu;
@@ -433,7 +437,13 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 		qdf_nbuf_trim_add_frag_size(mpdu,
 					    qdf_nbuf_get_nr_frags(mpdu) - 1,
 					    -HAL_RX_FCS_LEN, 0);
-		return;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	num_frags = qdf_nbuf_get_nr_frags(mpdu);
+	if (qdf_unlikely(num_frags < DP_MON_MIN_FRAGS_FOR_RESTITCH)) {
+		dp_mon_debug("not enough frags(%d) for restitch", num_frags);
+		return QDF_STATUS_E_FAILURE;
 	}
 
 	l2_hdr_offset = DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE;
@@ -701,6 +711,8 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 			msdu_cur = qdf_nbuf_queue_next(msdu_cur);
 		}
 	}
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -856,6 +868,9 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 			}
 			ppdu_info->mpdu_info[ppdu_info->user_id].mpdu_start_received = true;
 			ppdu_info->mpdu_info[user_id].first_rx_hdr_rcvd = true;
+			/* initialize decap type to invalid, this will be set to appropriate
+			 * value once the mpdu start tlv is received */
+			ppdu_info->mpdu_info[user_id].decap_type = DP_MON_DECAP_FORMAT_INVALID;
 		} else {
 			if (ppdu_info->mpdu_info[user_id].decap_type ==
 					HAL_HW_RX_DECAP_FORMAT_RAW) {
@@ -941,6 +956,16 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		}
 
 		mpdu_info = &ppdu_info->mpdu_info[user_id];
+		if (mpdu_info->decap_type == DP_MON_DECAP_FORMAT_INVALID) {
+			/* decap type is invalid, drop the frame */
+			qdf_frag_free(addr);
+			qdf_nbuf_free(nbuf);
+			/* we have freed the nbuf mark the q entry null */
+			ppdu_info->mpdu_q[user_id][mpdu_idx] = NULL;
+			mon_pdev->rx_mon_stats.mon_nbuf_decap_type_invalid++;
+			return num_buf_reaped;
+		}
+
 		mpdu_info->full_pkt = true;
 
 		tmp_nbuf = qdf_get_nbuf_valid_frag(nbuf);
@@ -954,6 +979,8 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 				dp_mon_err("nbuf is NULL");
 				qdf_frag_free(addr);
 				qdf_nbuf_free(nbuf);
+				/* we have freed the nbuf mark the q entry null */
+				ppdu_info->mpdu_q[user_id][mpdu_idx] = NULL;
 				return num_buf_reaped;
 			}
 			/* add new skb to frag list */
@@ -1018,6 +1045,8 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		/* update msdu metadata at last buffer of msdu in MPDU */
 		nbuf = ppdu_info->mpdu_q[user_id][mpdu_idx];
 		if (!nbuf) {
+			/* reset msdu info for next msdu for same user */
+			qdf_mem_zero(msdu_info, sizeof(*msdu_info));
 			dp_mon_err(" <%d> nbuf is NULL, return user: %d mpdu_idx: %d", __LINE__, user_id, mpdu_idx);
 			break;
 		}
@@ -1043,7 +1072,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		dp_rx_mon_pf_tag_to_buf_headroom_2_0(nbuf, ppdu_info, pdev,
 						     soc);
 		/* reset msdu info for next msdu for same user */
-		qdf_mem_zero(msdu_info, sizeof(msdu_info));
+		qdf_mem_zero(msdu_info, sizeof(*msdu_info));
 
 		/* If flow classification is enabled,
 		 * update cce_metadata and fse_metadata
@@ -1071,6 +1100,13 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		mpdu_info = &ppdu_info->mpdu_info[user_id];
 		nbuf = ppdu_info->mpdu_q[user_id][mpdu_idx];
 		if (!nbuf) {
+			/* reset mpdu info for next mpdu for same user,
+			 * this is necessary because mpdu info may have
+			 * stale information if mpdu buf is freed in between
+			 * tlv processing due to error condition.
+			 */
+			qdf_mem_zero(mpdu_info, sizeof(*mpdu_info));
+
 			dp_mon_err(" <%d> nbuf is NULL, return user: %d mpdu_idx: %d", __LINE__, user_id, mpdu_idx);
 			break;
 		}
@@ -1081,11 +1117,10 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		mpdu_meta->overflow_err = mpdu_info->overflow_err;
 		mpdu_meta->decrypt_err = mpdu_info->decrypt_err;
 		mpdu_meta->full_pkt = mpdu_info->full_pkt;
-		num_frags = qdf_nbuf_get_nr_frags(nbuf);
+		mpdu_meta->truncated = mpdu_info->truncated;
 
-		num_frags = qdf_nbuf_get_nr_frags(nbuf);
 		/* reset mpdu info for next mpdu for same user */
-		qdf_mem_zero(mpdu_info, sizeof(mpdu_info));
+		qdf_mem_zero(mpdu_info, sizeof(*mpdu_info));
 		ppdu_info->mpdu_info[ppdu_info->user_id].mpdu_start_received = false;
 		ppdu_info->mpdu_count[user_id]++;
 	}
