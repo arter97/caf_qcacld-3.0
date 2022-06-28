@@ -4439,4 +4439,18 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
 			      struct qdf_mac_addr *bssid,
 			      qdf_freq_t chan_freq,
 			      enum phy_ch_width chan_width);
+
+/**
+ * sme_update_beacon_country_ie() - SME API to update beacon
+ * country ie
+ * @mac_handle: mac handle
+ * @vdev_id: vdev id
+ * @country_ie_for_all_band: country ie should take all band channel
+ *			     or only the current band channel
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
+					uint8_t vdev_id,
+					bool country_ie_for_all_band);
 #endif /* #if !defined( __SME_API_H ) */
