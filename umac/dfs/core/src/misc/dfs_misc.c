@@ -470,3 +470,27 @@ void dfs_deliver_cac_state_events(struct wlan_dfs *dfs)
 	dfs_send_dfs_events_for_chan(dfs, chan, WLAN_EV_CAC_RESET);
 }
 #endif
+
+#ifdef QCA_DFS_BW_EXPAND
+void dfs_set_bw_expand_channel(struct wlan_dfs *dfs,
+			       qdf_freq_t user_freq,
+			       enum wlan_phymode user_mode)
+{
+	dfs->dfs_bw_expand_target_freq = user_freq;
+	dfs->dfs_bw_expand_des_mode = user_mode;
+}
+
+void dfs_set_bw_expand(struct wlan_dfs *dfs,
+		      bool bw_expand)
+{
+	dfs->dfs_use_bw_expand = bw_expand;
+	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "BW Expand Feature is %s ",
+		 (bw_expand) ? "set" : "disabled");
+}
+
+void dfs_get_bw_expand(struct wlan_dfs *dfs,
+		      bool *bw_expand)
+{
+	(*bw_expand) = dfs->dfs_use_bw_expand;
+}
+#endif /* QCA_DFS_BW_EXPAND */

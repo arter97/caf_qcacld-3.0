@@ -105,3 +105,38 @@ dfs_get_postnol_cfreq2(struct wlan_dfs *dfs, qdf_freq_t *postnol_cfreq2)
 	*postnol_cfreq2 = 0;
 }
 #endif /* QCA_SUPPORT_DFS_CHAN_POSTNOL */
+
+#ifdef QCA_DFS_BW_EXPAND
+/**
+ * dfs_set_bw_expand_channel() - DFS API to set user frequency and user
+ *                               configured phymode.
+ * @dfs: Pointer to wlan_dfs object.
+ * @user_freq: frequency value configured by the user.
+ * @user_mode: Phymode value configured by the user.
+ *
+ * Return: Nothing.
+ */
+void dfs_set_bw_expand_channel(struct wlan_dfs *dfs,
+			       qdf_freq_t user_freq,
+			       enum wlan_phymode user_mode);
+
+/**
+ * dfs_set_bw_expand() - Set or unset BW Expansion feature.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @bw_expand: - Configure BW Expansion feature.
+ *
+ * Return: Nothing.
+ */
+void dfs_set_bw_expand(struct wlan_dfs *dfs,
+		       bool bw_expand);
+
+/**
+ * dfs_get_bw_expand() - Get the value of BW Expansion feature.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @bw_expand: - Read and store the value of BW Expansion feature.
+ *
+ * Return: Nothing.
+ */
+void dfs_get_bw_expand(struct wlan_dfs *dfs,
+		       bool *bw_expand);
+#endif /* QCA_DFS_BW_EXPAND */

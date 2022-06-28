@@ -392,3 +392,54 @@ void utils_dfs_reset_intercac(struct wlan_objmgr_pdev *pdev)
 	dfs->dfs_autoswitch_chan = NULL;
 }
 #endif
+
+#ifdef QCA_DFS_BW_EXPAND
+QDF_STATUS utils_dfs_set_bw_expand_channel(struct wlan_objmgr_pdev *pdev,
+					   qdf_freq_t user_freq,
+					   enum wlan_phymode user_mode)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "null dfs");
+		return QDF_STATUS_E_FAILURE;
+	}
+	dfs_set_bw_expand_channel(dfs, user_freq, user_mode);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_dfs_set_bw_expand(struct wlan_objmgr_pdev *pdev,
+		       bool bw_expand)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs)
+		return  QDF_STATUS_E_FAILURE;
+
+	dfs_set_bw_expand(dfs, bw_expand);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(ucfg_dfs_set_bw_expand);
+
+QDF_STATUS ucfg_dfs_get_bw_expand(struct wlan_objmgr_pdev *pdev,
+				  bool *bw_expand)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs)
+		return  QDF_STATUS_E_FAILURE;
+
+	dfs_get_bw_expand(dfs, bw_expand);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(ucfg_dfs_get_bw_expand);
+#endif /* QCA_DFS_BW_EXPAND */

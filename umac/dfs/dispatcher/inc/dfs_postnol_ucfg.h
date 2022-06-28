@@ -139,3 +139,49 @@ utils_dfs_reset_intercac(struct wlan_objmgr_pdev *pdev)
 {
 }
 #endif
+
+#ifdef QCA_DFS_BW_EXPAND
+/**
+ * utils_dfs_set_bw_expand_channel() - API to set user frequency and user
+ *                                     configured phymode.
+ * @pdev: Pointer to DFS pdev object.
+ * @user_freq: frequency value configured by the user.
+ * @user_mode: Phymode value configured by the user.
+ *
+ * Return: Success on storing user frequency and mode
+ *         Failure on dfs object is null.
+ */
+QDF_STATUS utils_dfs_set_bw_expand_channel(struct wlan_objmgr_pdev *pdev,
+					   qdf_freq_t user_freq,
+					   enum wlan_phymode user_mode);
+
+/**
+ * ucfg_dfs_set_bw_expand() - Set the value of BW Expand feature.
+ * @pdev: Pointer to DFS pdev object.
+ * @bw_expand: Set BW Expand based on this value.
+ *
+ * Wrapper function for dfs_set_bw_expand() which enables/disables
+ * the BW reduction feature.
+ * This function is called from outside of dfs component.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dfs_set_bw_expand(struct wlan_objmgr_pdev *pdev,
+		       bool bw_expand);
+
+/**
+ * ucfg_dfs_get_bw_expand() - Get the value of BW Expand feature.
+ * @pdev: Pointer to DFS pdev object.
+ * @bw_expand: Store the value of BW Expand feature
+ *
+ * Wrapper function for dfs_get_bw_expand() which displays value
+ * of the BW reduction feature whether it is enabled or disabled.
+ * This function is called from outside of dfs component.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dfs_get_bw_expand(struct wlan_objmgr_pdev *pdev,
+		       bool *bw_expand);
+#endif /* QCA_DFS_BW_EXPAND */
