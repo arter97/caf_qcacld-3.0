@@ -1251,11 +1251,11 @@ fill_advance_peer_sawftx_stats(struct advance_peer_data_sawftx *data,
 			data->tx[tidx][queues].tx_success.num =
 					tx_stats->tx_success.num;
 			data->tx[tidx][queues].tx_success.bytes =
-					tx_stats->tx_ingress.bytes;
-			data->tx[tidx][queues].tx_ingress.num =
-					tx_stats->tx_success.num;
-			data->tx[tidx][queues].tx_success.bytes =
 					tx_stats->tx_success.bytes;
+			data->tx[tidx][queues].tx_ingress.num =
+					tx_stats->tx_ingress.num;
+			data->tx[tidx][queues].tx_ingress.bytes =
+					tx_stats->tx_ingress.bytes;
 			data->tx[tidx][queues].dropped.fw_rem.num =
 					tx_stats->dropped.fw_rem.num;
 			data->tx[tidx][queues].dropped.fw_rem.bytes =
@@ -1280,9 +1280,9 @@ fill_advance_peer_sawftx_stats(struct advance_peer_data_sawftx *data,
 					tx_stats->svc_intval_stats.success_cnt;
 			data->tx[tidx][queues].svc_intval_stats.failure_cnt =
 					tx_stats->svc_intval_stats.failure_cnt;
-			data->tx[tidx][queues].svc_intval_stats.success_cnt =
+			data->tx[tidx][queues].burst_size_stats.success_cnt =
 					tx_stats->burst_size_stats.success_cnt;
-			data->tx[tidx][queues].svc_intval_stats.failure_cnt =
+			data->tx[tidx][queues].burst_size_stats.failure_cnt =
 					tx_stats->burst_size_stats.failure_cnt;
 			tx_stats++;
 		}
