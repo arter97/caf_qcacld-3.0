@@ -288,8 +288,9 @@ void dfs_start_agile_rcac_timer(struct wlan_dfs *dfs)
 	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS,
 		 "Host RCAC timeout = %d ms", rcac_timeout);
 
-	qdf_timer_mod(&dfs_soc_obj->dfs_rcac_timer,
-		      rcac_timeout);
+	qdf_hrtimer_start(&dfs_soc_obj->dfs_rcac_timer,
+			  qdf_time_ms_to_ktime(rcac_timeout),
+			  QDF_HRTIMER_MODE_REL);
 }
 
 
@@ -302,7 +303,7 @@ void dfs_stop_agile_rcac_timer(struct wlan_dfs *dfs)
 	struct dfs_soc_priv_obj *dfs_soc_obj;
 
 	dfs_soc_obj = dfs->dfs_soc_obj;
-	qdf_timer_sync_cancel(&dfs_soc_obj->dfs_rcac_timer);
+	qdf_hrtimer_cancel(&dfs_soc_obj->dfs_rcac_timer);
 }
 
 
@@ -949,32 +950,38 @@ QDF_STATUS dfs_get_rcac_freq(struct wlan_dfs *dfs, qdf_freq_t *rcac_freq)
  * If the rolling CAC state is completed, the RCAC freq and its sub-channels
  * are marked as 'CAC Done' in the preCAC tree.
  */
-static os_timer_func(dfs_rcac_timeout)
+static enum qdf_hrtimer_restart_status
+dfs_rcac_timeout(qdf_hrtimer_data_t *arg)
 {
 	struct wlan_dfs *dfs;
 	struct dfs_soc_priv_obj *dfs_soc_obj;
 
-	OS_GET_TIMER_ARG(dfs_soc_obj, struct dfs_soc_priv_obj *);
-
+	dfs_soc_obj = container_of(arg,
+				   struct dfs_soc_priv_obj,
+				   dfs_rcac_timer);
 	dfs = dfs_soc_obj->dfs_priv[dfs_soc_obj->cur_agile_dfs_index].dfs;
 
 	dfs_agile_sm_deliver_evt(dfs_soc_obj,
 				DFS_AGILE_SM_EV_AGILE_DONE,
 				0,
 				(void *)dfs);
+
+	return QDF_HRTIMER_NORESTART;
 }
 
 void dfs_rcac_timer_init(struct dfs_soc_priv_obj *dfs_soc_obj)
 {
-	qdf_timer_init(NULL, &dfs_soc_obj->dfs_rcac_timer,
-		       dfs_rcac_timeout,
-		       (void *)dfs_soc_obj,
-		       QDF_TIMER_TYPE_WAKE_APPS);
+
+	qdf_hrtimer_init(&dfs_soc_obj->dfs_rcac_timer,
+			 dfs_rcac_timeout,
+			 QDF_CLOCK_MONOTONIC,
+			 QDF_HRTIMER_MODE_REL,
+			 QDF_CONTEXT_TASKLET);
 }
 
 void dfs_rcac_timer_deinit(struct dfs_soc_priv_obj *dfs_soc_obj)
 {
-	qdf_timer_free(&dfs_soc_obj->dfs_rcac_timer);
+	qdf_hrtimer_kill(&dfs_soc_obj->dfs_rcac_timer);
 }
 
 /* dfs_prepare_agile_rcac_channel() - Find a valid Rolling CAC channel if

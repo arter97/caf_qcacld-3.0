@@ -497,8 +497,6 @@ void dfs_set_precac_enable(struct wlan_dfs *dfs, uint32_t value)
 void dfs_zero_cac_timer_detach(struct dfs_soc_priv_obj *dfs_soc_obj)
 {
 	qdf_hrtimer_kill(&dfs_soc_obj->dfs_precac_timer);
-	qdf_flush_work(&dfs_soc_obj->dfs_precac_completion_work);
-	qdf_destroy_work(NULL, &dfs_soc_obj->dfs_precac_completion_work);
 }
 #endif
 
@@ -1251,12 +1249,22 @@ bool dfs_precac_check_home_chan_change(struct wlan_dfs *dfs)
 }
 #endif
 
-void dfs_process_precac_completion(void *context)
+/**
+ * dfs_precac_timeout() - Precac timeout.
+ *
+ * Removes the channel from precac_required list and adds it to the
+ * precac_done_list. Triggers a precac channel change.
+ */
+static enum qdf_hrtimer_restart_status
+dfs_precac_timeout(qdf_hrtimer_data_t *arg)
 {
-	struct dfs_soc_priv_obj *dfs_soc_obj =
-					(struct dfs_soc_priv_obj *)context;
-	struct wlan_dfs *dfs = NULL;
+	struct dfs_soc_priv_obj *dfs_soc_obj;
 	uint32_t current_time;
+	struct wlan_dfs *dfs;
+
+	dfs_soc_obj = container_of(arg,
+				   struct dfs_soc_priv_obj,
+				   dfs_precac_timer);
 
 	dfs_soc_obj->dfs_precac_timer_running = 0;
 	dfs = dfs_soc_obj->dfs_priv[dfs_soc_obj->cur_agile_dfs_index].dfs;
@@ -1271,29 +1279,6 @@ void dfs_process_precac_completion(void *context)
 					 DFS_AGILE_SM_EV_AGILE_DONE,
 					 0, (void *)dfs);
 	}
-}
-
-/**
- * dfs_precac_timeout() - Precac timeout.
- *
- * Removes the channel from precac_required list and adds it to the
- * precac_done_list. Triggers a precac channel change.
- */
-static enum qdf_hrtimer_restart_status
-dfs_precac_timeout(qdf_hrtimer_data_t *arg)
-{
-	struct dfs_soc_priv_obj *dfs_soc_obj = NULL;
-	uint32_t current_time;
-
-	dfs_soc_obj = container_of(arg,
-				   struct dfs_soc_priv_obj,
-				   dfs_precac_timer);
-	current_time = qdf_system_ticks_to_msecs(qdf_system_ticks());
-	dfs_info(NULL, WLAN_DEBUG_DFS_ALWAYS,
-		 "inside precactimer: current time %d",
-		 current_time / 1000);
-
-	qdf_sched_work(NULL, &dfs_soc_obj->dfs_precac_completion_work);
 
 	return QDF_HRTIMER_NORESTART;
 }
@@ -1301,17 +1286,14 @@ dfs_precac_timeout(qdf_hrtimer_data_t *arg)
 #if defined(ATH_SUPPORT_ZERO_CAC_DFS) && !defined(QCA_MCL_DFS_SUPPORT)
 void dfs_zero_cac_timer_init(struct dfs_soc_priv_obj *dfs_soc_obj)
 {
+
 	dfs_soc_obj->precac_state_started = false;
+
 	qdf_hrtimer_init(&dfs_soc_obj->dfs_precac_timer,
 			 dfs_precac_timeout,
 			 QDF_CLOCK_MONOTONIC,
 			 QDF_HRTIMER_MODE_REL,
-			 QDF_CONTEXT_HARDWARE);
-	qdf_create_work(NULL,
-			&dfs_soc_obj->dfs_precac_completion_work,
-			dfs_process_precac_completion,
-			dfs_soc_obj);
-
+			 QDF_CONTEXT_TASKLET);
 }
 #endif
 
