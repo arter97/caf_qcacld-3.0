@@ -22,6 +22,7 @@ obj-m += monitor.o
 include $(obj)/$(DEPTH)/os/linux/Makefile-linux.common
 
 INCS += -I$(obj)/$(DEPTH)/include \
+        -I$(obj)/$(DEPTH)/telemetry_agent/inc \
         -I$(obj)/$(DEPTH)/os/linux/src \
         -I$(obj)/$(DEPTH)/umac/base/ \
         -I$(obj)/$(DEPTH)/ini_cfg/inc/ \
@@ -77,6 +78,7 @@ INCS += -I$(obj)/$(DEPTH)/include \
         -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/core/src \
         -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/dispatcher/inc \
         -I$(obj)/$(HOST_CMN_CONVG_SRC)/ipa/dispatcher/src \
+        -I$(obj)/$(HOST_COMP_CONVG_SRC)/umac/telemetry_agent/dispatcher/inc \
         -I$(obj)/$(DEPTH)/cmn_dev/target_if/ipa/inc \
         -I$(obj)/$(DEPTH)/cmn_dev/target_if/ipa/src \
         -I$(obj)/$(DEPTH)/pld/inc  \
