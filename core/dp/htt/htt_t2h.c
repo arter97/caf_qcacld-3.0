@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -706,6 +707,7 @@ static void htt_t2h_lp_msg_handler(void *context, qdf_nbuf_t htt_t2h_msg,
 		break;
 		}
 		}
+		break;
 	}
 #ifdef WLAN_CFR_ENABLE
 	case HTT_T2H_MSG_TYPE_CFR_DUMP_COMPL_IND:
