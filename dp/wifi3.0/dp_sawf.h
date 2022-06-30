@@ -81,15 +81,17 @@
 #define DP_SAWF_PEER_Q_INVALID 0xffff
 #define DP_SAWF_INVALID_AST_IDX 0xffff
 
+#define DP_SAWF_DELAY_BOUND_MS_MULTIPLER 1000
+
 /**
  * sawf_stats - sawf stats
- * @delay: delay stats per-TID per-queue
- * @tx_stats: Tx stats per-TID per-queue
+ * @delay: delay stats per host msdu queue
+ * @tx_stats: Tx stats per host msdu queue
  * @lock: Protection for sawf-stats
  */
 struct sawf_stats {
-	struct sawf_delay_stats delay[DP_SAWF_MAX_TIDS][DP_SAWF_MAX_QUEUES];
-	struct sawf_tx_stats tx_stats[DP_SAWF_MAX_TIDS][DP_SAWF_MAX_QUEUES];
+	struct sawf_delay_stats delay[DP_SAWF_Q_MAX];
+	struct sawf_tx_stats tx_stats[DP_SAWF_Q_MAX];
 	struct qdf_spinlock lock;
 };
 

@@ -332,7 +332,7 @@ dp_peer_sawf_stats_ctx_alloc(struct dp_soc *soc,
 {
 	struct dp_peer_sawf_stats *ctx;
 	struct sawf_stats *stats;
-	uint8_t tid, q_idx;
+	uint8_t q_idx;
 
 	ctx = qdf_mem_malloc(sizeof(struct dp_peer_sawf_stats));
 	if (!ctx) {
@@ -344,11 +344,9 @@ dp_peer_sawf_stats_ctx_alloc(struct dp_soc *soc,
 	stats = &ctx->stats;
 
 	/* Initialize delay stats hist */
-	for (tid = 0; tid < DP_SAWF_MAX_TIDS; tid++) {
-		for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
-			dp_hist_init(&stats->delay[tid][q_idx].delay_hist,
-				     CDP_HIST_TYPE_HW_TX_COMP_DELAY);
-		}
+	for (q_idx = 0; q_idx < DP_SAWF_Q_MAX; ++q_idx) {
+		dp_hist_init(&stats->delay[q_idx].delay_hist,
+			     CDP_HIST_TYPE_HW_TX_COMP_DELAY);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -441,75 +439,64 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 			struct dp_vdev *vdev,
 			struct hal_tx_completion_status *ts,
 			struct dp_tx_desc_s *tx_desc,
+			struct dp_peer_sawf *sawf_ctx,
 			struct sawf_stats *stats,
 			uint8_t tid,
-			uint8_t msduq_idx)
+			uint8_t host_q_idx)
 {
 	struct sawf_delay_stats *tx_delay;
 	struct wlan_sawf_scv_class_params *svclass_params;
-	struct dp_peer_sawf *sawf_ctx;
-	struct dp_peer *dp_peer;
-	uint32_t hw_delay, peer_id;
+	uint32_t hw_delay;
 	uint8_t svc_id;
 	uint32_t num_pkt_win;
 	uint32_t win_avg;
 
-	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
-	dp_peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
-	if (!dp_peer) {
-		dp_sawf_err("No dp_peer for id %d", peer_id);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	if (QDF_IS_STATUS_ERROR(dp_sawf_compute_tx_hw_delay_us(soc, vdev, ts,
 							       &hw_delay))) {
-		dp_peer_unref_delete(dp_peer, DP_MOD_ID_SAWF);
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	/* Update hist */
-	tx_delay = &stats->delay[tid][msduq_idx];
+	tx_delay = &stats->delay[host_q_idx];
 	dp_hist_update_stats(&tx_delay->delay_hist, hw_delay);
 
 	tx_delay->num_pkt++;
 	tx_delay->win_total += hw_delay;
 
-	sawf_ctx = dp_peer->sawf;
 	num_pkt_win = dp_sawf_get_mov_avg_num_pkt();
 	if (!(tx_delay->num_pkt % num_pkt_win)) {
 		win_avg = qdf_do_div(tx_delay->win_total, num_pkt_win);
 		/* Update the avg per window */
 		telemetry_sawf_update_delay_mvng(
 				sawf_ctx->telemetry_ctx,
-				tid, msduq_idx,
+				tid, host_q_idx,
 				win_avg);
 		tx_delay->win_total = 0;
 	}
 
-	svc_id = sawf_ctx->msduq[msduq_idx].svc_id;
+	svc_id = sawf_ctx->msduq[host_q_idx].svc_id;
 	if (!wlan_delay_bound_configured(svc_id))
 		goto cont;
 
 	svclass_params = wlan_get_svc_class_params(svc_id);
 	if (svclass_params) {
-		(hw_delay > svclass_params->delay_bound) ?
-		tx_delay->failure++ : tx_delay->success++;
+		(hw_delay > svclass_params->delay_bound *
+		 DP_SAWF_DELAY_BOUND_MS_MULTIPLER) ?
+			tx_delay->failure++ : tx_delay->success++;
 
 		if (!(tx_delay->num_pkt % dp_sawf_get_sla_num_pkt())) {
 			/* Update the success/failre count */
 			telemetry_sawf_update_delay(sawf_ctx->telemetry_ctx,
-						    tid, msduq_idx,
+						    tid, host_q_idx,
 						    tx_delay->success,
 						    tx_delay->failure);
 			tx_delay->failure = 0;
 			tx_delay->success = 0;
 		}
 	}
+
 cont:
-	dp_peer_unref_delete(dp_peer, DP_MOD_ID_SAWF);
-
 	return QDF_STATUS_SUCCESS;
-
 }
 
 QDF_STATUS
@@ -570,9 +557,11 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 				   struct hal_tx_completion_status *ts,
 				   uint8_t host_tid)
 {
-	struct dp_peer_sawf_stats *sawf_ctx;
+	struct dp_peer *peer;
+	struct dp_peer_sawf *sawf_ctx;
+	struct dp_peer_sawf_stats *stats_ctx;
 	struct sawf_tx_stats *tx_stats;
-	uint8_t tid, msduq_idx, host_msduq_idx;
+	uint8_t host_msduq_idx, host_q_idx;
 	uint16_t peer_id;
 	qdf_size_t length;
 	QDF_STATUS status;
@@ -583,60 +572,66 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 	if (!ts || !ts->valid)
 		return QDF_STATUS_E_INVAL;
 
-	sawf_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
+	stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
 
-	if (!sawf_ctx) {
+	if (!stats_ctx) {
 		dp_sawf_err("Invalid SAWF stats ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
-	/*
-	 * Find remaped tid and target msdu queue idx to fill the stats
-	 */
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
-
-	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID)
+	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
+	    host_msduq_idx < DP_SAWF_DEFAULT_Q_MAX)
 		return QDF_STATUS_E_FAILURE;
 
-	status = dp_sawf_get_msduq_map_info(soc, peer_id,
-					    host_msduq_idx,
-					    &tid, &msduq_idx);
-	if (status != QDF_STATUS_SUCCESS) {
-		dp_sawf_err("unable to find tid and msduq idx");
-		return status;
+	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
+	if (!peer) {
+		dp_sawf_err("No peer for id %u", peer_id);
+		return QDF_STATUS_E_FAILURE;
 	}
 
-	qdf_assert(tid < DP_SAWF_MAX_TIDS);
-	qdf_assert(msduq_idx < DP_SAWF_MAX_QUEUES);
+	sawf_ctx = dp_peer_sawf_ctx_get(peer);
+	if (!sawf_ctx) {
+		dp_sawf_err("No SAWF ctx for peer_id %u", peer_id);
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	host_q_idx = host_msduq_idx - DP_SAWF_DEFAULT_Q_MAX;
+	if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+		dp_sawf_err("Invalid host queue idx %u", host_q_idx);
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	length = qdf_nbuf_len(tx_desc->nbuf);
 
-	DP_STATS_INCC_PKT(sawf_ctx, tx_stats[tid][msduq_idx].tx_success, 1,
+	DP_STATS_INCC_PKT(stats_ctx, tx_stats[host_q_idx].tx_success, 1,
 			  length, (ts->status == HAL_TX_TQM_RR_FRAME_ACKED));
 
-	DP_STATS_INCC_PKT(sawf_ctx, tx_stats[tid][msduq_idx].dropped.fw_rem, 1,
+	DP_STATS_INCC_PKT(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem, 1,
 			  length, (ts->status == HAL_TX_TQM_RR_REM_CMD_REM));
 
-	DP_STATS_INCC(sawf_ctx, tx_stats[tid][msduq_idx].dropped.fw_rem_notx, 1,
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem_notx, 1,
 		      (ts->status == HAL_TX_TQM_RR_REM_CMD_NOTX));
 
-	DP_STATS_INCC(sawf_ctx, tx_stats[tid][msduq_idx].dropped.fw_rem_tx, 1,
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_rem_tx, 1,
 		      (ts->status == HAL_TX_TQM_RR_REM_CMD_TX));
 
-	DP_STATS_INCC(sawf_ctx, tx_stats[tid][msduq_idx].dropped.age_out, 1,
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.age_out, 1,
 		      (ts->status == HAL_TX_TQM_RR_REM_CMD_AGED));
 
-	DP_STATS_INCC(sawf_ctx, tx_stats[tid][msduq_idx].dropped.fw_reason1, 1,
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason1, 1,
 		      (ts->status == HAL_TX_TQM_RR_FW_REASON1));
 
-	DP_STATS_INCC(sawf_ctx, tx_stats[tid][msduq_idx].dropped.fw_reason2, 1,
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason2, 1,
 		      (ts->status == HAL_TX_TQM_RR_FW_REASON2));
 
-	DP_STATS_INCC(sawf_ctx, tx_stats[tid][msduq_idx].dropped.fw_reason3, 1,
+	DP_STATS_INCC(stats_ctx, tx_stats[host_q_idx].dropped.fw_reason3, 1,
 		      (ts->status == HAL_TX_TQM_RR_FW_REASON3));
 
-	tx_stats = &sawf_ctx->stats.tx_stats[tid][msduq_idx];
+	tx_stats = &stats_ctx->stats.tx_stats[host_q_idx];
 
 	tx_stats->tx_failed = tx_stats->dropped.fw_rem.num +
 				tx_stats->dropped.fw_rem_notx +
@@ -646,15 +641,22 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 				tx_stats->dropped.fw_reason2 +
 				tx_stats->dropped.fw_reason3;
 
-	if (tx_stats->queue_depth > 0)
-		tx_stats->queue_depth--;
+	DP_STATS_DEC(stats_ctx, tx_stats[host_q_idx].queue_depth, 1);
+
+	telemetry_sawf_update_msdu_drop(sawf_ctx->telemetry_ctx,
+					host_tid, host_q_idx,
+					tx_stats->tx_success.num,
+					tx_stats->tx_failed,
+					tx_stats->dropped.age_out);
 
 	status = dp_sawf_update_tx_delay(soc, vdev, ts, tx_desc,
-					 &sawf_ctx->stats, tid, msduq_idx);
-	if (QDF_IS_STATUS_ERROR(status))
-		return QDF_STATUS_E_FAILURE;
+					 sawf_ctx,
+					 &stats_ctx->stats,
+					 host_tid, host_q_idx);
 
-	return QDF_STATUS_SUCCESS;
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return status;
 }
 
 QDF_STATUS
@@ -662,29 +664,20 @@ dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 				   struct dp_tx_desc_s *tx_desc)
 {
 	struct dp_peer_sawf_stats *sawf_ctx;
-	struct sawf_tx_stats *tx_stats;
 	struct dp_peer *peer;
 	struct dp_txrx_peer *txrx_peer;
-	uint8_t tid, msduq_idx, host_msduq_idx;
+	uint8_t host_msduq_idx, host_q_idx;
 	uint16_t peer_id;
-	QDF_STATUS status;
+
+	if (!dp_sawf_tag_valid_get(tx_desc->nbuf))
+		return QDF_STATUS_E_INVAL;
 
 	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
 
-	/*
-	 * Find remaped tid and target msdu queue idx to fill the stats
-	 */
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
-	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID)
+	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
+	    host_msduq_idx < DP_SAWF_DEFAULT_Q_MAX)
 		return QDF_STATUS_E_FAILURE;
-
-	status = dp_sawf_get_msduq_map_info(soc, peer_id,
-					    host_msduq_idx,
-					    &tid, &msduq_idx);
-	if (status != QDF_STATUS_SUCCESS) {
-		dp_sawf_err("unable to find tid and msduq idx");
-		return status;
-	}
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_TX);
 	if (!peer) {
@@ -704,8 +697,13 @@ dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 		goto fail;
 	}
 
-	tx_stats = &sawf_ctx->stats.tx_stats[tid][msduq_idx];
-	tx_stats->queue_depth--;
+	host_q_idx = host_msduq_idx - DP_SAWF_DEFAULT_Q_MAX;
+	if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+		dp_sawf_err("Invalid host queue idx %u", host_q_idx);
+		goto fail;
+	}
+
+	DP_STATS_DEC(sawf_ctx, tx_stats[host_q_idx].queue_depth, 1);
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_TX);
 
@@ -720,30 +718,20 @@ dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 			      struct dp_tx_desc_s *tx_desc)
 {
 	struct dp_peer_sawf_stats *sawf_ctx;
-	struct sawf_tx_stats *tx_stats;
 	struct dp_peer *peer;
 	struct dp_txrx_peer *txrx_peer;
-	uint8_t tid, msduq_idx, host_msduq_idx;
+	uint8_t host_msduq_idx, host_q_idx;
 	uint16_t peer_id;
-	QDF_STATUS status;
+
+	if (!dp_sawf_tag_valid_get(tx_desc->nbuf))
+		return QDF_STATUS_E_INVAL;
 
 	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
 
-	/*
-	 * Find remaped tid and target msdu queue idx to fill the stats
-	 */
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
-	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID)
+	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
+	    host_msduq_idx < DP_SAWF_DEFAULT_Q_MAX)
 		return QDF_STATUS_E_FAILURE;
-
-	status = dp_sawf_get_msduq_map_info(soc, peer_id,
-					    host_msduq_idx,
-					    &tid, &msduq_idx);
-	if (status != QDF_STATUS_SUCCESS) {
-		dp_sawf_err("unable to find tid and msduq idx: host_queue %d",
-			    host_msduq_idx);
-		return status;
-	}
 
 	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_TX);
 	if (!peer) {
@@ -763,11 +751,15 @@ dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 		goto fail;
 	}
 
-	tx_stats = &sawf_ctx->stats.tx_stats[tid][msduq_idx];
-	tx_stats->queue_depth++;
-	DP_STATS_INC_PKT(sawf_ctx, tx_stats[tid][msduq_idx].tx_ingress, 1,
+	host_q_idx = host_msduq_idx - DP_SAWF_DEFAULT_Q_MAX;
+	if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+		dp_sawf_err("Invalid host queue idx %u", host_q_idx);
+		goto fail;
+	}
+
+	DP_STATS_INC(sawf_ctx, tx_stats[host_q_idx].queue_depth, 1);
+	DP_STATS_INC_PKT(sawf_ctx, tx_stats[host_q_idx].tx_ingress, 1,
 			 tx_desc->length);
-	tx_desc->timestamp = qdf_ktime_to_ms(qdf_ktime_real_get());
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_TX);
 
@@ -800,6 +792,9 @@ static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 	dp_sawf_print_stats("tx_success: num = %u bytes = %lu",
 		       tx_stats->tx_success.num,
 		       tx_stats->tx_success.bytes);
+	dp_sawf_print_stats("tx_ingress: num = %u bytes = %lu",
+			    tx_stats->tx_ingress.num,
+			    tx_stats->tx_ingress.bytes);
 	dp_sawf_print_stats("dropped: fw_rem num = %u bytes = %lu",
 		       tx_stats->dropped.fw_rem.num,
 		       tx_stats->dropped.fw_rem.bytes);
@@ -817,39 +812,6 @@ static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 	dp_sawf_print_stats("queue_depth = %u", tx_stats->queue_depth);
 }
 
-QDF_STATUS
-dp_sawf_dump_peer_stats(struct dp_txrx_peer *txrx_peer)
-{
-	struct dp_peer_sawf_stats *ctx;
-	uint8_t tid, q_idx;
-	struct sawf_tx_stats *tx_stats;
-
-	ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
-	if (!ctx) {
-		dp_sawf_err("Invalid SAWF stats ctx");
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	for (tid = 0; tid < DP_SAWF_MAX_TIDS; tid++) {
-		for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
-			tx_stats = &ctx->stats.tx_stats[tid][q_idx];
-
-			if (!tx_stats->tx_success.num &&
-			    !tx_stats->tx_failed)
-				continue;
-
-			dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
-					    tid, q_idx);
-			dp_sawf_print_stats("Delay Stats:");
-			dp_sawf_dump_delay_stats(&ctx->stats.delay[tid][q_idx]);
-			dp_sawf_print_stats("Tx Stats:");
-			dp_sawf_dump_tx_stats(&ctx->stats.tx_stats[tid][q_idx]);
-		}
-	}
-
-	return QDF_STATUS_SUCCESS;
-}
-
 static QDF_STATUS
 dp_sawf_find_msdu_from_svc_id(struct dp_peer_sawf *ctx, uint8_t svc_id,
 			      uint8_t *tid, uint8_t *q_idx)
@@ -865,6 +827,21 @@ dp_sawf_find_msdu_from_svc_id(struct dp_peer_sawf *ctx, uint8_t svc_id,
 	}
 
 	return QDF_STATUS_E_FAILURE;
+}
+
+static uint16_t
+dp_sawf_get_host_msduq_id(struct dp_peer_sawf *sawf_ctx,
+			  uint8_t tid, uint8_t queue)
+{
+	uint8_t host_q_id;
+
+	if (tid < DP_SAWF_TID_MAX && queue < DP_SAWF_DEFINED_Q_PTID_MAX) {
+		host_q_id = sawf_ctx->msduq_map[tid][queue].host_queue_id;
+		if (host_q_id)
+			return host_q_id;
+	}
+
+	return DP_SAWF_PEER_Q_INVALID;
 }
 
 static void
@@ -915,6 +892,7 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 	struct dp_peer_sawf_stats *stats_ctx;
 	struct sawf_delay_stats *stats, *dst, *src;
 	uint8_t tid, q_idx;
+	uint16_t host_q_id, host_q_idx;
 	QDF_STATUS status;
 	uint32_t mov_avg;
 
@@ -959,15 +937,31 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 	if (svc_id == DP_SAWF_STATS_SVC_CLASS_ID_ALL) {
 		for (tid = 0; tid < DP_SAWF_MAX_TIDS; tid++) {
 			for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
-				src = &stats_ctx->stats.delay[tid][q_idx];
+				host_q_id = dp_sawf_get_host_msduq_id(sawf_ctx,
+								      tid,
+								      q_idx);
+				if (host_q_id == DP_SAWF_PEER_Q_INVALID ||
+				    host_q_id < DP_SAWF_DEFAULT_Q_MAX) {
+					dst++;
+					continue;
+				}
+				host_q_idx = host_q_id - DP_SAWF_DEFAULT_Q_MAX;
+				if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+					dst++;
+					continue;
+				}
+
+				src = &stats_ctx->stats.delay[host_q_idx];
 				telemetry_sawf_get_mov_avg(
-					sawf_ctx->telemetry_ctx,
-					tid, q_idx, &mov_avg);
-				stats_ctx->stats.delay[tid][q_idx].mov_avg = mov_avg;
-				dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
-					       tid, q_idx);
+						sawf_ctx->telemetry_ctx,
+						tid, host_q_idx, &mov_avg);
+				src->mov_avg = mov_avg;
+
+				dp_sawf_print_stats("-- TID: %u MSDUQ: %u --",
+						    tid, q_idx);
 				dp_sawf_dump_delay_stats(src);
 				dp_sawf_copy_delay_stats(dst, src);
+
 				dst++;
 			}
 		}
@@ -983,14 +977,30 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 			goto fail;
 		}
 
-		src = &stats_ctx->stats.delay[tid][q_idx];
-		telemetry_sawf_get_mov_avg(
-			sawf_ctx->telemetry_ctx,
-			tid, q_idx, &mov_avg);
-		stats_ctx->stats.delay[tid][q_idx].mov_avg = mov_avg;
+		host_q_id = dp_sawf_get_host_msduq_id(sawf_ctx,
+						      tid,
+						      q_idx);
+		if (host_q_id == DP_SAWF_PEER_Q_INVALID ||
+		    host_q_id < DP_SAWF_DEFAULT_Q_MAX) {
+			dp_sawf_err("No host queue for tid %u queue %u",
+				    tid, q_idx);
+			goto fail;
+		}
+		host_q_idx = host_q_id - DP_SAWF_DEFAULT_Q_MAX;
+		if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+			dp_sawf_err("Invalid host queue idx %u", host_q_idx);
+			goto fail;
+		}
+
+		src = &stats_ctx->stats.delay[host_q_idx];
+		telemetry_sawf_get_mov_avg(sawf_ctx->telemetry_ctx,
+					   tid, host_q_idx, &mov_avg);
+		src->mov_avg = mov_avg;
+
 		dp_sawf_print_stats("----TID: %u MSDUQ: %u ----", tid, q_idx);
 		dp_sawf_dump_delay_stats(src);
 		dp_sawf_copy_delay_stats(dst, src);
+
 		dst->tid = tid;
 		dst->msduq = q_idx;
 	}
@@ -1014,6 +1024,7 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 	struct dp_peer_sawf_stats *stats_ctx;
 	struct sawf_tx_stats *stats, *dst, *src;
 	uint8_t tid, q_idx;
+	uint16_t host_q_id, host_q_idx;
 	uint32_t throughput;
 	QDF_STATUS status;
 
@@ -1058,16 +1069,31 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 	if (svc_id == DP_SAWF_STATS_SVC_CLASS_ID_ALL) {
 		for (tid = 0; tid < DP_SAWF_MAX_TIDS; tid++) {
 			for (q_idx = 0; q_idx < DP_SAWF_MAX_QUEUES; q_idx++) {
-				src = &stats_ctx->stats.tx_stats[tid][q_idx];
-				telemetry_sawf_get_rate(
-					sawf_ctx->telemetry_ctx,
-					tid, q_idx,
-					&throughput);
-				stats_ctx->stats.tx_stats[tid][q_idx].throughput = throughput;
-				dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
-					       tid, q_idx);
+				host_q_id = dp_sawf_get_host_msduq_id(sawf_ctx,
+								      tid,
+								      q_idx);
+				if (host_q_id == DP_SAWF_PEER_Q_INVALID ||
+				    host_q_id < DP_SAWF_DEFAULT_Q_MAX) {
+					dst++;
+					continue;
+				}
+				host_q_idx = host_q_id - DP_SAWF_DEFAULT_Q_MAX;
+				if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+					dst++;
+					continue;
+				}
+
+				src = &stats_ctx->stats.tx_stats[host_q_idx];
+				telemetry_sawf_get_rate(sawf_ctx->telemetry_ctx,
+							tid, host_q_idx,
+							&throughput);
+				src->throughput = throughput;
+
+				dp_sawf_print_stats("-- TID: %u MSDUQ: %u --",
+						    tid, q_idx);
 				dp_sawf_dump_tx_stats(src);
 				dp_sawf_copy_tx_stats(dst, src);
+
 				dst++;
 			}
 		}
@@ -1083,11 +1109,26 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 			goto fail;
 		}
 
-		src = &stats_ctx->stats.tx_stats[tid][q_idx];
-		telemetry_sawf_get_rate(
-			sawf_ctx->telemetry_ctx,
-			tid, q_idx, &throughput);
-		stats_ctx->stats.tx_stats[tid][q_idx].throughput = throughput;
+		host_q_id = dp_sawf_get_host_msduq_id(sawf_ctx,
+						      tid,
+						      q_idx);
+		if (host_q_id == DP_SAWF_PEER_Q_INVALID ||
+		    host_q_id < DP_SAWF_DEFAULT_Q_MAX) {
+			dp_sawf_err("No host queue for tid %u queue %u",
+				    tid, q_idx);
+			goto fail;
+		}
+		host_q_idx = host_q_id - DP_SAWF_DEFAULT_Q_MAX;
+		if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+			dp_sawf_err("Invalid host queue idx %u", host_q_idx);
+			goto fail;
+		}
+
+		src = &stats_ctx->stats.tx_stats[host_q_idx];
+		telemetry_sawf_get_rate(sawf_ctx->telemetry_ctx,
+					tid, host_q_idx, &throughput);
+		src->throughput = throughput;
+
 		dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
 				    tid, q_idx);
 		dp_sawf_dump_tx_stats(src);
@@ -1113,7 +1154,7 @@ dp_sawf_get_tx_stats(void *arg, uint64_t *in_bytes, uint64_t *in_cnt,
 	struct sawf_tx_stats *tx_stats;
 
 	stats_ctx = arg;
-	tx_stats = &stats_ctx->stats.tx_stats[tid][msduq];
+	tx_stats = &stats_ctx->stats.tx_stats[msduq];
 
 	*in_bytes = tx_stats->tx_ingress.bytes;
 	*in_cnt = tx_stats->tx_ingress.num;
@@ -1132,7 +1173,7 @@ dp_sawf_get_mpdu_sched_stats(void *arg, uint64_t *svc_int_pass,
 	struct sawf_tx_stats *tx_stats;
 
 	stats_ctx = arg;
-	tx_stats = &stats_ctx->stats.tx_stats[tid][msduq];
+	tx_stats = &stats_ctx->stats.tx_stats[msduq];
 
 	*svc_int_pass = tx_stats->svc_intval_stats.success_cnt;
 	*svc_int_fail = tx_stats->svc_intval_stats.failure_cnt;
@@ -1150,10 +1191,10 @@ dp_sawf_get_drop_stats(void *arg, uint64_t *pass, uint64_t *drop,
 	struct sawf_tx_stats *tx_stats;
 
 	stats_ctx = arg;
-	tx_stats = &stats_ctx->stats.tx_stats[tid][msduq];
+	tx_stats = &stats_ctx->stats.tx_stats[msduq];
 
 	*pass = tx_stats->tx_success.num;
-	*drop = tx_stats->dropped.fw_rem.num + tx_stats->tx_failed;
+	*drop = tx_stats->tx_failed;
 	*drop_ttl = tx_stats->dropped.age_out;
 
 	return QDF_STATUS_SUCCESS;
@@ -1439,20 +1480,33 @@ QDF_STATUS dp_sawf_update_mpdu_basic_stats(struct dp_soc *soc,
 					   uint64_t burst_size_success_cnt,
 					   uint64_t burst_size_failue_cnt)
 {
+	struct dp_peer *peer;
 	struct dp_txrx_peer *txrx_peer;
-	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	struct dp_peer_sawf *sawf_ctx;
 	struct dp_peer_sawf_stats *sawf_stats_ctx;
+	uint8_t host_q_id, host_q_idx;
 
 	if (!soc) {
 		dp_sawf_err("Invalid soc context");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	txrx_peer = dp_txrx_peer_get_ref_by_id(soc, peer_id, &txrx_ref_handle,
-					       DP_MOD_ID_SAWF);
-	if (!txrx_peer) {
-		dp_sawf_err("No txrx-peer for id %d", peer_id);
+	peer = dp_peer_get_ref_by_id(soc, peer_id, DP_MOD_ID_SAWF);
+	if (!peer) {
+		dp_sawf_err("Invalid peer");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(peer);
+	if (!sawf_ctx) {
+		dp_sawf_err("stats_ctx doesn't exist");
+		goto fail;
+	}
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer) {
+		dp_sawf_err("txrx peer is NULL");
+		goto fail;
 	}
 
 	sawf_stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
@@ -1461,23 +1515,35 @@ QDF_STATUS dp_sawf_update_mpdu_basic_stats(struct dp_soc *soc,
 		goto fail;
 	}
 
+	host_q_id = sawf_ctx->msduq_map[tid][q_idx].host_queue_id;
+	if (!host_q_id || host_q_id < DP_SAWF_DEFAULT_Q_MAX) {
+		dp_sawf_err("Invalid host queue id %u", host_q_id);
+		goto fail;
+	}
+
+	host_q_idx = host_q_id - DP_SAWF_DEFAULT_Q_MAX;
+	if (host_q_idx > DP_SAWF_Q_MAX - 1) {
+		dp_sawf_err("Invalid host queue idx %u", host_q_idx);
+		goto fail;
+	}
+
 	DP_STATS_INC(sawf_stats_ctx,
-		     tx_stats[tid][q_idx].svc_intval_stats.success_cnt,
+		     tx_stats[host_q_idx].svc_intval_stats.success_cnt,
 		     svc_intval_success_cnt);
 	DP_STATS_INC(sawf_stats_ctx,
-		     tx_stats[tid][q_idx].svc_intval_stats.failure_cnt,
+		     tx_stats[host_q_idx].svc_intval_stats.failure_cnt,
 		     svc_intval_failure_cnt);
 	DP_STATS_INC(sawf_stats_ctx,
-		     tx_stats[tid][q_idx].burst_size_stats.success_cnt,
+		     tx_stats[host_q_idx].burst_size_stats.success_cnt,
 		     burst_size_success_cnt);
 	DP_STATS_INC(sawf_stats_ctx,
-		     tx_stats[tid][q_idx].burst_size_stats.failure_cnt,
+		     tx_stats[host_q_idx].burst_size_stats.failure_cnt,
 		     burst_size_failue_cnt);
 
-	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 	return QDF_STATUS_SUCCESS;
 fail:
-	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 	return QDF_STATUS_E_FAILURE;
 }
 
