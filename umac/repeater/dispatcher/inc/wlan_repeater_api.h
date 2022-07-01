@@ -589,6 +589,40 @@ uint8_t wlan_rptr_get_qwrap_peers_for_pdev_id(struct wlan_objmgr_psoc *psoc,
 					      uint16_t pdev_id);
 #endif
 
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * wlan_rptr_afc_is_stop_ap_allowed - is stop_ap allowed
+ * @vdev - vdev object manager
+ * @freq - curr chan freq
+ * return true if allowed; false if not allowed
+ */
+bool
+wlan_rptr_afc_is_stop_ap_allowed(struct wlan_objmgr_vdev *vdev,
+				 u_int16_t freq);
+
+/**
+ * wlan_rptr_afc_get_ap_power_mode - get ap power mode
+ * @vdev - vdev object manager
+ * @bssid - bssid
+ * @pwr_mode - power mode
+ * return QDF_STATUS_SUCCESS if pwr_mode is obtained; otherwise non-zero
+ */
+QDF_STATUS
+wlan_rptr_afc_get_ap_power_mode(struct wlan_objmgr_vdev *vdev,
+				uint8_t *bssid, uint8_t *pwr_mode);
+
+/**
+ * wlan_rptr_afc_parse_scan_entries - afc parse scan entries
+ * @vdev- vdev object manager
+ * @event - scan event
+ * return void
+ */
+void
+wlan_rptr_afc_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
+				 struct scan_event *event);
+#endif
+
+#if REPEATER_SAME_SSID
 /**
  * wlan_rptr_same_ssid_check - Check same SSID feature support
  * @vdev- vdev object manager
@@ -596,10 +630,10 @@ uint8_t wlan_rptr_get_qwrap_peers_for_pdev_id(struct wlan_objmgr_psoc *psoc,
  * @ssid_len- ssid length
  * return void
  */
-#if REPEATER_SAME_SSID
 void
 wlan_rptr_same_ssid_check(struct wlan_objmgr_vdev *vdev,
 			  u8 *ssid, u_int32_t ssid_len);
+
 /**
  * wlan_rptr_ss_parse_scan_entries - parse scan entries
  * @vdev- vdev object manager
@@ -609,6 +643,7 @@ wlan_rptr_same_ssid_check(struct wlan_objmgr_vdev *vdev,
 void
 wlan_rptr_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 				struct scan_event *event);
+
 /**
  * wlan_rptr_validate_stavap_bssid - validate stavap bssid
  * when same ssid feature is enabled

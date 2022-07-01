@@ -139,6 +139,19 @@ struct wlan_rptr_move {
 	struct qdf_mac_addr bssid;
 };
 
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * struct afc_list_node - afc list node structure
+ * @power_mode:               power mode info of ap
+ * @bssid:                    ap bssid
+ */
+struct wlan_rptr_afc_list_node {
+	qdf_list_node_t node;
+	u8 power_mode;
+	u8 bssid[QDF_MAC_ADDR_SIZE];
+};
+#endif
+
 /**
  * struct wlan_rptr_pdev_priv - reapeter pdev priv structure
  * @pdev:                     objmgr pdev
@@ -147,6 +160,7 @@ struct wlan_rptr_move {
  * @preferred_bssid:          preferred bssid for same ssid feature
  * @preferredUplink:          preferred uplink for Tri-radio fastlane feature
  * @nscanpsta:                number scan psta
+ * @afc_list:                 afc list
  * @rptr_pdev_lock:           rptr pdev private spinlock
  */
 struct wlan_rptr_pdev_priv {
@@ -158,6 +172,9 @@ struct wlan_rptr_pdev_priv {
 #endif
 	u8     preferredUplink;
 	u8     nscanpsta;
+#ifdef CONFIG_AFC_SUPPORT
+	qdf_list_t afc_list;
+#endif
 	qdf_spinlock_t  rptr_pdev_lock;
 	struct wlan_rptr_move rptr_move;
 };
@@ -216,6 +233,14 @@ struct wlan_rptr_global_priv *wlan_rptr_get_global_ctx(void);
 void wlan_rptr_core_global_same_ssid_disable(u_int32_t value);
 void wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 					  struct scan_event *event);
+#endif
+#ifdef CONFIG_AFC_SUPPORT
+void
+wlan_rptr_afc_core_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
+				      struct scan_event *event);
+QDF_STATUS
+wlan_rptr_afc_core_get_ap_power_mode(struct wlan_objmgr_vdev *vdev,
+				     uint8_t *bssid, uint8_t *pwr_mode);
 #endif
 void
 wlan_rptr_core_pdev_pref_uplink_set(struct wlan_objmgr_pdev *pdev,
