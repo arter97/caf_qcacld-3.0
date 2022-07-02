@@ -51,7 +51,7 @@ dp_lite_mon_free_peers(struct dp_lite_mon_config *config)
 			   peer_list_elem, temp_peer) {
 		/* delete peer from the list */
 		TAILQ_REMOVE(&config->peer_list, peer, peer_list_elem);
-		config->peer_count[peer->type]--;
+		config->peer_count--;
 		qdf_mem_free(peer);
 	}
 }
@@ -569,13 +569,9 @@ dp_lite_mon_update_peers(struct dp_lite_mon_config *config,
 	struct dp_lite_mon_peer *peer;
 	bool peer_deleted = false;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint8_t total_peers = 0;
 
 	if (peer_config->action == CDP_LITE_MON_PEER_ADD) {
-		total_peers =
-			config->peer_count[CDP_LITE_MON_PEER_TYPE_ASSOCIATED] +
-			config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED];
-		if (total_peers >= CDP_LITE_MON_PEER_MAX) {
+		if (config->peer_count >= CDP_LITE_MON_PEER_MAX) {
 			dp_mon_err("cannot add peer, max peer limit reached");
 			return QDF_STATUS_E_NOMEM;
 		}
@@ -592,12 +588,11 @@ dp_lite_mon_update_peers(struct dp_lite_mon_config *config,
 
 		qdf_mem_copy(&new_peer->peer_mac.raw[0],
 			     peer_config->mac, QDF_MAC_ADDR_SIZE);
-		new_peer->type = peer_config->type;
 
 		/* add peer to lite mon peer list */
 		TAILQ_INSERT_TAIL(&config->peer_list,
 				  new_peer, peer_list_elem);
-		config->peer_count[peer_config->type]++;
+		config->peer_count++;
 	} else if (peer_config->action == CDP_LITE_MON_PEER_REMOVE) {
 		TAILQ_FOREACH(peer, &config->peer_list,
 			      peer_list_elem) {
@@ -606,7 +601,7 @@ dp_lite_mon_update_peers(struct dp_lite_mon_config *config,
 				/* delete peer from lite mon peer list */
 				TAILQ_REMOVE(&config->peer_list,
 					     peer, peer_list_elem);
-				config->peer_count[peer->type]--;
+				config->peer_count--;
 				qdf_mem_free(peer);
 				peer_deleted = true;
 				break;
@@ -652,11 +647,6 @@ dp_lite_mon_set_tx_peer_config(struct dp_soc *soc,
 	if (!lite_mon_tx_config) {
 		dp_mon_err("lite mon tx config is null");
 		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (peer_config->type != CDP_LITE_MON_PEER_TYPE_ASSOCIATED) {
-		dp_mon_err("Invalid tx peer type");
-		return QDF_STATUS_E_INVAL;
 	}
 
 	if (peer_config->action == CDP_LITE_MON_PEER_ADD) {
@@ -716,12 +706,6 @@ dp_lite_mon_set_rx_peer_config(struct dp_soc *soc,
 	if (!lite_mon_rx_config) {
 		dp_mon_err("lite mon rx config is null");
 		return QDF_STATUS_E_FAILURE;
-	}
-
-	if ((peer_config->type != CDP_LITE_MON_PEER_TYPE_ASSOCIATED) &&
-	    (peer_config->type != CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED)) {
-		dp_mon_err("Invalid rx peer type");
-		return QDF_STATUS_E_INVAL;
 	}
 
 	if (peer_config->action == CDP_LITE_MON_PEER_ADD) {
@@ -808,8 +792,6 @@ dp_lite_mon_get_peers(struct dp_lite_mon_config *config,
 
 	peer_info->count = 0;
 	TAILQ_FOREACH(peer, &config->peer_list, peer_list_elem) {
-		if (peer->type != peer_info->type)
-			continue;
 		if (peer_info->count < CDP_LITE_MON_PEER_MAX) {
 			qdf_mem_copy(&peer_info->mac[peer_info->count],
 				     &peer->peer_mac.raw[0],
@@ -1036,7 +1018,6 @@ dp_lite_mon_config_nac_peer(struct cdp_soc_t *soc_hdl,
 	qdf_mem_zero(&peer_config,
 		     sizeof(struct cdp_lite_mon_peer_config));
 	peer_config.direction = CDP_LITE_MON_DIRECTION_RX;
-	peer_config.type = CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED;
 	peer_config.vdev_id = vdev_id;
 	qdf_mem_copy(peer_config.mac, macaddr, QDF_MAC_ADDR_SIZE);
 	if (cmd == DP_NAC_PARAM_ADD)
@@ -1047,7 +1028,7 @@ dp_lite_mon_config_nac_peer(struct cdp_soc_t *soc_hdl,
 	rx_config = &be_mon_pdev->lite_mon_rx_config->rx_config;
 	if (peer_config.action == CDP_LITE_MON_PEER_ADD) {
 		/* first neighbor */
-		if (!rx_config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED]) {
+		if (!rx_config->peer_count) {
 			struct cdp_lite_mon_filter_config filter_config;
 
 			/* setup filter settings */
@@ -1081,7 +1062,7 @@ dp_lite_mon_config_nac_peer(struct cdp_soc_t *soc_hdl,
 			goto fail;
 
 		/* last neighbor */
-		if (!rx_config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED]) {
+		if (!rx_config->peer_count) {
 			struct cdp_lite_mon_filter_config filter_config;
 
 			/* reset filter settings */
@@ -1147,10 +1128,6 @@ dp_lite_mon_get_nac_peer_rssi(struct cdp_soc_t *soc_hdl,
 	rx_config = &lite_mon_rx_config->rx_config;
 	qdf_spin_lock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 	TAILQ_FOREACH(peer, &rx_config->peer_list, peer_list_elem) {
-		if (peer->type !=
-			CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED)
-			continue;
-
 		if (qdf_mem_cmp(&peer->peer_mac.raw[0],
 				macaddr,
 				QDF_MAC_ADDR_SIZE) == 0) {
@@ -1214,8 +1191,7 @@ dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 	switch (filter_category) {
 	case DP_MPDU_FILTER_CATEGORY_FP:
 		if (config->fp_enabled &&
-		    (!config->peer_count[CDP_LITE_MON_PEER_TYPE_ASSOCIATED] ||
-		     !config->fpmo_enabled))
+		    (!config->peer_count || !config->fpmo_enabled))
 			return QDF_STATUS_SUCCESS;
 		break;
 	case DP_MPDU_FILTER_CATEGORY_MD:
@@ -1224,8 +1200,7 @@ dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 		break;
 	case DP_MPDU_FILTER_CATEGORY_MO:
 		if (config->mo_enabled &&
-		    (!config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED] ||
-		     !config->md_enabled))
+		    (!config->peer_count || !config->md_enabled))
 			return QDF_STATUS_SUCCESS;
 		break;
 	case DP_MPDU_FILTER_CATEGORY_FP_MO:
@@ -1639,7 +1614,7 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 	/* update rssi for nac client, we can do this only for
 	 * first mpdu as rssi is at ppdu level */
 	if (mpdu_id == 0 &&
-	    config->peer_count[CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED]) {
+	    config->peer_count) {
 		struct dp_lite_mon_peer *peer = NULL;
 
 		TAILQ_FOREACH(peer, &config->peer_list,

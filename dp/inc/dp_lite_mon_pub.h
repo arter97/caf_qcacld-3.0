@@ -93,14 +93,12 @@ struct lite_mon_filter_config {
 /**
  * struct lite_mon_peer_config - Lite monitor peer filter configuration
  * @action: action whether to add/remove
- * @type: type of peer
  * @count: Total count of mac addresses added
  * @mac_addr: Mac address of peer
  * @interface_name: Interface name to send command
  */
 struct lite_mon_peer_config {
 	uint8_t action;
-	uint8_t type;
 	uint8_t count;
 	uint8_t mac_addr[LITE_MON_MAX_PEER_COUNT][IEEE80211_ADDR_LEN];
 	char interface_name[IFNAMSIZ];

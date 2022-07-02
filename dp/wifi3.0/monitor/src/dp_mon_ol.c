@@ -1249,34 +1249,17 @@ fail:
 }
 
 /**
- * wlan_validate_lite_mon_peer - validate peer type and mac
+ * wlan_validate_lite_mon_peer - validate peer mac
  * @ic: ic hdl
  * @mac: peer mac
- * @type: peer type
  *
  * Return: 0 if success else appropriate error code
  */
 static int
 wlan_validate_lite_mon_peer(struct ieee80211com *ic,
-			    uint8_t *mac, uint8_t type)
+			    uint8_t *mac)
 {
-	struct ieee80211_node *ni = NULL;
 	struct ieee80211vap *tmpvap = NULL;
-
-	ni = ieee80211_find_node(ic, mac, WLAN_LITE_MON_ID);
-	if (ni) {
-		if (type == LITE_MON_PEER_NON_ASSOCIATED) {
-			dp_mon_err("Error! %pM is self peer", mac);
-			ieee80211_free_node(ni, WLAN_LITE_MON_ID);
-			return -EINVAL;
-		}
-		ieee80211_free_node(ni, WLAN_LITE_MON_ID);
-	} else {
-		if (type == LITE_MON_PEER_ASSOCIATED) {
-			dp_mon_err("Error! %pM is not self peer", mac);
-			return -EINVAL;
-		}
-	}
 
 	TAILQ_FOREACH(tmpvap, &ic->ic_vaps, iv_next) {
 		if (IEEE80211_ADDR_EQ(mac, tmpvap->iv_myaddr)) {
@@ -1287,23 +1270,6 @@ wlan_validate_lite_mon_peer(struct ieee80211com *ic,
 	}
 
 	return EOK;
-}
-
-/**
- * wlan_get_lite_mon_peer_type - get cdp lite mon peer type
- * @config_type: appln sent peer type
- *
- * Return: valid peer type on success else max peer type
- */
-static inline
-uint8_t wlan_get_lite_mon_peer_type(uint8_t config_type)
-{
-	if (config_type == LITE_MON_PEER_ASSOCIATED)
-		return CDP_LITE_MON_PEER_TYPE_ASSOCIATED;
-	else if (config_type == LITE_MON_PEER_NON_ASSOCIATED)
-		return CDP_LITE_MON_PEER_TYPE_NON_ASSOCIATED;
-	else
-		return CDP_LITE_MON_PEER_TYPE_MAX;
 }
 
 /**
@@ -1365,14 +1331,6 @@ int wlan_set_lite_monitor_peer_config(void *vscn,
 
 	peer_config->direction = mon_config->direction;
 	peer_config->action = mon_config->data.peer_config.action;
-	peer_config->type =
-		wlan_get_lite_mon_peer_type(mon_config->data.peer_config.type);
-	if (peer_config->type  == CDP_LITE_MON_PEER_TYPE_MAX) {
-		dp_mon_err("Invalid peer type");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_LITE_MON_ID);
-		retval = -EINVAL;
-		goto fail;
-	}
 	peer_count = mon_config->data.peer_config.count;
 	if (peer_count > CDP_LITE_MON_PEER_MAX) {
 		dp_mon_err("Invalid peer count");
@@ -1386,8 +1344,7 @@ int wlan_set_lite_monitor_peer_config(void *vscn,
 	for (i = 0; i < peer_count; ++i) {
 		if (mon_config->data.peer_config.action == LITE_MON_PEER_ADD) {
 			if (EOK != wlan_validate_lite_mon_peer(&scn->sc_ic,
-					mon_config->data.peer_config.mac_addr[i],
-					mon_config->data.peer_config.type)) {
+					mon_config->data.peer_config.mac_addr[i])) {
 				retval = -EINVAL;
 				continue;
 			}
@@ -1438,8 +1395,6 @@ int wlan_get_lite_monitor_peer_config(void *vscn,
 	}
 
 	peer_info->direction = mon_config->direction;
-	peer_info->type =
-		wlan_get_lite_mon_peer_type(mon_config->data.peer_config.type);
 	soc_txrx_handle = wlan_psoc_get_dp_handle(scn->soc->psoc_obj);
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(scn->sc_pdev);
 	if (QDF_STATUS_SUCCESS !=
