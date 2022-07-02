@@ -78,11 +78,10 @@ static void wlan_lite_mon_tx_process(void *pdev_hdl, enum WDI_EVENT event,
 				     uint32_t status)
 {
 	qdf_nbuf_t skb = NULL;
-	struct wlan_objmgr_pdev *pdev_obj =
-		(struct wlan_objmgr_pdev *)pdev_hdl;
-	struct ieee80211com *ic = wlan_pdev_get_mlme_ext_obj(pdev_obj);
+	struct wlan_objmgr_pdev *pdev_obj = (struct wlan_objmgr_pdev *)pdev_hdl;
+	struct ieee80211com *ic;
 	struct ieee80211vap *vap;
-	osif_dev  *osifp;
+	osif_dev  *osifp = NULL;
 	struct cdp_tx_indication_info *ptr_tx_info;
 
 	ptr_tx_info = (struct cdp_tx_indication_info *)data;
@@ -90,21 +89,31 @@ static void wlan_lite_mon_tx_process(void *pdev_hdl, enum WDI_EVENT event,
 	if (!ptr_tx_info->mpdu_nbuf)
 		return;
 
-	if (!ic) {
-		qdf_nbuf_free(ptr_tx_info->mpdu_nbuf);
-		dp_mon_debug("ic is NULL");
-		return;
+	/* If vap is configured, deliver to that vap, else deliver to monitor
+	 * vap. If vap is not configured and monitor vap is also not present,
+	 * then free the skb
+	 */
+	if (ptr_tx_info->osif_vdev) {
+		osifp = (osif_dev *)ptr_tx_info->osif_vdev;
+	} else {
+		ic = wlan_pdev_get_mlme_ext_obj(pdev_obj);
+		if (!ic) {
+			qdf_nbuf_free(ptr_tx_info->mpdu_nbuf);
+			ptr_tx_info->mpdu_nbuf = NULL;
+			dp_mon_err("ic is NULL");
+			return;
+		}
+		vap = (struct ieee80211vap *)ic->ic_mon_vap;
+		if (vap)
+			osifp = (osif_dev *)vap->iv_ifp;
 	}
 
-	vap = (struct ieee80211vap *)ic->ic_mon_vap;
-	if (!vap) {
+	if (!osifp) {
 		qdf_nbuf_free(ptr_tx_info->mpdu_nbuf);
 		ptr_tx_info->mpdu_nbuf = NULL;
-		dp_mon_debug("No monitor vap created, to dump skb");
+		dp_mon_debug("No vap to deliver data");
 		return;
 	}
-
-	osifp = (osif_dev *)vap->iv_ifp;
 
 	dp_mon_info("ppdu_id[%d] frm_type[%d] [%p]sending to stack!!!!",
 		  ptr_tx_info->mpdu_info.ppdu_id,
@@ -112,14 +121,7 @@ static void wlan_lite_mon_tx_process(void *pdev_hdl, enum WDI_EVENT event,
 		  ptr_tx_info->mpdu_nbuf);
 
 	skb = ptr_tx_info->mpdu_nbuf;
-
-	if (!ptr_tx_info->mpdu_nbuf) {
-		dp_mon_err("mpdu_nbuf is NULL!!!!");
-		return;
-	}
-
 	ptr_tx_info->mpdu_nbuf = NULL;
-
 	monitor_osif_deliver_tx_capture_data(osifp, skb);
 }
 
