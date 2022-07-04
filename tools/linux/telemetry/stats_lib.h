@@ -100,23 +100,6 @@ struct stats_if_ru_debug {
 	char *ru_type;
 };
 
-enum stats_if_delay_bucket_index {
-	STATS_IF_DELAY_BUCKET_0,
-	STATS_IF_DELAY_BUCKET_1,
-	STATS_IF_DELAY_BUCKET_2,
-	STATS_IF_DELAY_BUCKET_3,
-	STATS_IF_DELAY_BUCKET_4,
-	STATS_IF_DELAY_BUCKET_5,
-	STATS_IF_DELAY_BUCKET_6,
-	STATS_IF_DELAY_BUCKET_7,
-	STATS_IF_DELAY_BUCKET_8,
-	STATS_IF_DELAY_BUCKET_9,
-	STATS_IF_DELAY_BUCKET_10,
-	STATS_IF_DELAY_BUCKET_11,
-	STATS_IF_DELAY_BUCKET_12,
-	STATS_IF_DELAY_BUCKET_MAX,
-};
-
 struct stats_if_rate_debug {
 	char mcs_type[STATS_IF_MAX_MCS_STRING_LEN];
 	uint8_t valid;
@@ -220,6 +203,7 @@ struct advance_pdev_data {
 	struct advance_pdev_data_rx *rx;
 	struct advance_pdev_data_raw *raw;
 	struct advance_pdev_data_tso *tso;
+	struct advance_pdev_data_vow *vow;
 	struct advance_pdev_data_igmp *igmp;
 	struct advance_pdev_data_mesh *mesh;
 	struct advance_pdev_data_nawds *nawds;

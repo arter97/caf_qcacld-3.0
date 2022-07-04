@@ -64,6 +64,7 @@ enum stats_feat_index_e {
 	DEF_INX(RAW),
 	DEF_INX(TSO),
 	DEF_INX(TWT),
+	DEF_INX(VOW),
 	DEF_INX(WDI),
 	DEF_INX(WMI),
 	DEF_INX(IGMP),

@@ -2790,6 +2790,149 @@ static QDF_STATUS get_advance_pdev_data_tso(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS get_advance_pdev_data_vow(struct unified_stats *stats,
+					    struct cdp_tid_stats_intf *vow)
+{
+	uint8_t tidx;
+	uint8_t tids_count;
+	uint8_t bk_max;
+	uint8_t tx_drop;
+	uint8_t rx_drop;
+	uint8_t tqm_status;
+	uint8_t htt_status;
+	uint8_t reo_code;
+	uint8_t dma_code;
+	struct advance_pdev_data_vow *data;
+	struct stats_if_tid_tx_stats *tx_stats;
+	struct stats_if_tid_rx_stats *rx_stats;
+	struct cdp_tid_tx_stats *tx_total;
+	struct cdp_tid_rx_stats *rx_total;
+
+	if (!stats || !vow) {
+		qdf_err("Invalid Input!");
+		return QDF_STATUS_E_INVAL;
+	}
+	data = qdf_mem_malloc(sizeof(struct advance_pdev_data_vow));
+	if (!data) {
+		qdf_err("Allocation Failed!");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	tids_count = qdf_min((uint8_t)STATS_IF_MAX_DATA_TIDS,
+			     (uint8_t)CDP_MAX_DATA_TIDS);
+	bk_max = qdf_min((uint8_t)STATS_IF_DELAY_BUCKET_MAX,
+			 (uint8_t)CDP_DELAY_BUCKET_MAX);
+	tqm_status = qdf_min((uint8_t)STATS_IF_MAX_TX_TQM_STATUS,
+			     (uint8_t)CDP_MAX_TX_TQM_STATUS);
+	htt_status = qdf_min((uint8_t)STATS_IF_MAX_TX_HTT_STATUS,
+			     (uint8_t)CDP_MAX_TX_HTT_STATUS);
+	reo_code = qdf_min((uint8_t)STATS_IF_REO_ERR_MAX,
+			   (uint8_t)CDP_REO_CODE_MAX);
+	dma_code = qdf_min((uint8_t)STATS_IF_RXDMA_ERR_MAX,
+			   (uint8_t)CDP_DMA_CODE_MAX);
+	tx_drop = qdf_min((uint8_t)TX_MAX_DROP,
+			  (uint8_t)STATS_IF_TX_MAX_DROP);
+	rx_drop = qdf_min((uint8_t)RX_MAX_DROP,
+			  (uint8_t)STATS_IF_RX_MAX_DROP);
+
+	data->ingress_stack = vow->ingress_stack;
+	data->osif_drop = vow->osif_drop;
+	for (tidx = 0; tidx < tids_count; tidx++) {
+		tx_stats = &data->tx_stats[tidx];
+		rx_stats = &data->rx_stats[tidx];
+		tx_total = &vow->tx_total[tidx];
+		rx_total = &vow->rx_total[tidx];
+
+		tx_stats->swq_delay.min_delay = tx_total->swq_delay.min_delay;
+		tx_stats->swq_delay.max_delay = tx_total->swq_delay.max_delay;
+		tx_stats->swq_delay.avg_delay = tx_total->swq_delay.avg_delay;
+		qdf_mem_copy(&tx_stats->swq_delay.delay_bucket,
+			     &tx_total->swq_delay.delay_bucket,
+			     sizeof(tx_stats->swq_delay.delay_bucket[0]) *
+			     bk_max);
+
+		tx_stats->hwtx_delay.min_delay = tx_total->hwtx_delay.min_delay;
+		tx_stats->hwtx_delay.max_delay = tx_total->hwtx_delay.max_delay;
+		tx_stats->hwtx_delay.avg_delay = tx_total->hwtx_delay.avg_delay;
+		qdf_mem_copy(&tx_stats->hwtx_delay.delay_bucket,
+			     &tx_total->hwtx_delay.delay_bucket,
+			     sizeof(tx_stats->hwtx_delay.delay_bucket[0]) *
+			     bk_max);
+
+		tx_stats->intfrm_delay.min_delay =
+			tx_total->intfrm_delay.min_delay;
+		tx_stats->intfrm_delay.max_delay =
+			tx_total->intfrm_delay.max_delay;
+		tx_stats->intfrm_delay.avg_delay =
+			tx_total->intfrm_delay.avg_delay;
+		qdf_mem_copy(&tx_stats->intfrm_delay.delay_bucket,
+			     &tx_total->intfrm_delay.delay_bucket,
+			     sizeof(tx_stats->intfrm_delay.delay_bucket[0]) *
+			     bk_max);
+
+		tx_stats->success_cnt = tx_total->success_cnt;
+		tx_stats->comp_fail_cnt = tx_total->comp_fail_cnt;
+		qdf_mem_copy(&tx_stats->swdrop_cnt, &tx_total->swdrop_cnt,
+			     sizeof(tx_stats->swdrop_cnt[0]) * tx_drop);
+
+		qdf_mem_copy(&tx_stats->tqm_status_cnt,
+			     &tx_total->tqm_status_cnt,
+			     sizeof(tx_stats->tqm_status_cnt[0]) * tqm_status);
+		qdf_mem_copy(&tx_stats->htt_status_cnt,
+			     &tx_total->htt_status_cnt,
+			     sizeof(tx_stats->htt_status_cnt[0]) * htt_status);
+
+		rx_stats->delivered_to_stack = rx_total->delivered_to_stack;
+		rx_stats->intrabss_cnt = rx_total->intrabss_cnt;
+		rx_stats->msdu_cnt = rx_total->msdu_cnt;
+		rx_stats->mcast_msdu_cnt = rx_total->mcast_msdu_cnt;
+		rx_stats->bcast_msdu_cnt = rx_total->bcast_msdu_cnt;
+		qdf_mem_copy(&rx_stats->fail_cnt, &rx_total->fail_cnt,
+			     sizeof(rx_stats->fail_cnt[0]) * rx_drop);
+
+		rx_stats->to_stack_delay.min_delay =
+			rx_total->to_stack_delay.min_delay;
+		rx_stats->to_stack_delay.max_delay =
+			rx_total->to_stack_delay.max_delay;
+		rx_stats->to_stack_delay.avg_delay =
+			rx_total->to_stack_delay.avg_delay;
+		qdf_mem_copy(&rx_stats->to_stack_delay.delay_bucket,
+			     &rx_total->to_stack_delay.delay_bucket,
+			     sizeof(rx_stats->to_stack_delay.delay_bucket[0]) *
+			     bk_max);
+
+		rx_stats->intfrm_delay.min_delay =
+			rx_total->intfrm_delay.min_delay;
+		rx_stats->intfrm_delay.max_delay =
+			rx_total->intfrm_delay.max_delay;
+		rx_stats->intfrm_delay.avg_delay =
+			rx_total->intfrm_delay.avg_delay;
+		qdf_mem_copy(&rx_stats->intfrm_delay.delay_bucket,
+			     &rx_total->intfrm_delay.delay_bucket,
+			     sizeof(rx_stats->intfrm_delay.delay_bucket[0]) *
+			     bk_max);
+
+		rx_stats->reo_err.err_src_reo_code_inv =
+			rx_total->reo_err.err_src_reo_code_inv;
+		qdf_mem_copy(&rx_stats->reo_err.err_reo_codes,
+			     &rx_total->reo_err.err_reo_codes,
+			     sizeof(rx_stats->reo_err.err_reo_codes[0]) *
+			     reo_code);
+
+		rx_stats->rxdma_err.err_src_rxdma_code_inv =
+			rx_total->rxdma_err.err_src_rxdma_code_inv;
+		qdf_mem_copy(&rx_stats->rxdma_err.err_dma_codes,
+			     &rx_total->rxdma_err.err_dma_codes,
+			     sizeof(rx_stats->rxdma_err.err_dma_codes[0]) *
+			     dma_code);
+	}
+
+	stats->feat[INX_FEAT_VOW] = data;
+	stats->size[INX_FEAT_VOW] = sizeof(struct advance_pdev_data_vow);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS get_advance_pdev_data_igmp(struct unified_stats *stats,
 					     struct cdp_pdev_stats *pdev_stats)
 {
@@ -3023,8 +3166,12 @@ static QDF_STATUS get_advance_pdev_data(struct wlan_objmgr_psoc *psoc,
 					uint32_t feat)
 {
 	struct cdp_pdev_stats *pdev_stats = NULL;
+	struct cdp_tid_stats_intf *vow = NULL;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	bool stats_collected = false;
+	void *dp_soc = NULL;
+	uint8_t pdev_id = 0;
+	uint32_t size;
 
 	if (!psoc || !pdev) {
 		qdf_err("Invalid pdev and psoc!");
@@ -3035,9 +3182,11 @@ static QDF_STATUS get_advance_pdev_data(struct wlan_objmgr_psoc *psoc,
 		qdf_err("Allocation Failed!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	ret = cdp_host_get_pdev_stats(wlan_psoc_get_dp_handle(psoc),
-				      wlan_objmgr_pdev_get_pdev_id(pdev),
-				      pdev_stats);
+
+	dp_soc = wlan_psoc_get_dp_handle(psoc);
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+
+	ret = cdp_host_get_pdev_stats(dp_soc, pdev_id, pdev_stats);
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to get Pdev stats!");
 		goto get_failed;
@@ -3077,6 +3226,22 @@ static QDF_STATUS get_advance_pdev_data(struct wlan_objmgr_psoc *psoc,
 		else
 			stats_collected = true;
 	}
+	if (feat & STATS_FEAT_FLG_VOW) {
+		size = sizeof(struct cdp_tid_stats_intf);
+		vow = qdf_mem_malloc(size);
+		if (!vow) {
+			qdf_err("Allocation failed");
+			ret = QDF_STATUS_E_NOMEM;
+			goto get_failed;
+		}
+		ret = cdp_get_pdev_tid_stats(dp_soc, pdev_id, vow);
+		if (ret == QDF_STATUS_SUCCESS)
+			ret = get_advance_pdev_data_vow(stats, vow);
+		if (ret != QDF_STATUS_SUCCESS)
+			qdf_err("Unable to fetch pdev Advance VOW Stats!");
+		else
+			stats_collected = true;
+	}
 	if (feat & STATS_FEAT_FLG_IGMP) {
 		ret = get_advance_pdev_data_igmp(stats, pdev_stats);
 		if (ret != QDF_STATUS_SUCCESS)
@@ -3101,6 +3266,9 @@ static QDF_STATUS get_advance_pdev_data(struct wlan_objmgr_psoc *psoc,
 
 get_failed:
 	qdf_mem_free(pdev_stats);
+	if (vow)
+		qdf_mem_free(vow);
+
 	if (stats_collected)
 		ret = QDF_STATUS_SUCCESS;
 
@@ -3309,7 +3477,7 @@ static void fill_debug_data_tx_stats(struct debug_data_tx_stats *tx,
 				     struct cdp_tx_stats *cdp_tx)
 {
 	uint8_t inx = 0;
-	uint8_t loop_cnt;
+	uint8_t loop_cnt, mcs_cnt;
 
 	tx->inactive_time = cdp_tx->inactive_time;
 	tx->ofdma = cdp_tx->ofdma;
@@ -3340,10 +3508,11 @@ static void fill_debug_data_tx_stats(struct debug_data_tx_stats *tx,
 	for (inx = 0; inx < QDF_PROTO_SUBTYPE_MAX; inx++)
 		tx->no_ack_count[inx] = cdp_tx->no_ack_count[inx];
 	loop_cnt = qdf_min((uint8_t)DOT11_MAX, (uint8_t)STATS_IF_DOT11_MAX);
+	mcs_cnt = qdf_min((uint8_t)MAX_MCS, (uint8_t)STATS_IF_MAX_MCS);
 	for (inx = 0; inx < loop_cnt; inx++)
 		qdf_mem_copy(tx->pkt_type[inx].mcs_count,
 			     cdp_tx->pkt_type[inx].mcs_count,
-			     (sizeof(uint32_t) * STATS_IF_MAX_MCS));
+			     (sizeof(uint32_t) * mcs_cnt));
 	loop_cnt = qdf_min((uint8_t)MAX_TRANSMIT_TYPES,
 			   (uint8_t)STATS_IF_MAX_TRANSMIT_TYPES);
 	for (inx = 0; inx < loop_cnt; inx++) {
@@ -3368,7 +3537,7 @@ static void fill_debug_data_rx_stats(struct debug_data_rx_stats *rx,
 				     struct cdp_rx_stats *cdp_rx)
 {
 	uint8_t inx;
-	uint8_t loop_cnt, max_ss, cnt;
+	uint8_t loop_cnt, max_ss, cnt, mcs_cnt;
 
 	rx->rx_discard = cdp_rx->rx_discard;
 	rx->mic_err = cdp_rx->err.mic_err;
@@ -3385,14 +3554,15 @@ static void fill_debug_data_rx_stats(struct debug_data_rx_stats *rx,
 		rx->reception_type[inx] = cdp_rx->reception_type[inx];
 	}
 	loop_cnt = qdf_min((uint8_t)DOT11_MAX, (uint8_t)STATS_IF_DOT11_MAX);
+	mcs_cnt = qdf_min((uint8_t)MAX_MCS, (uint8_t)STATS_IF_MAX_MCS);
 	for (inx = 0; inx < loop_cnt; inx++)
 		qdf_mem_copy(rx->pkt_type[inx].mcs_count,
 			     cdp_rx->pkt_type[inx].mcs_count,
-			     (sizeof(uint32_t) * STATS_IF_MAX_MCS));
+			     (sizeof(uint32_t) * mcs_cnt));
 	loop_cnt = qdf_min((uint8_t)TXRX_TYPE_MU_MAX,
 			   (uint8_t)STATS_IF_TXRX_TYPE_MU_MAX);
+	max_ss = qdf_min((uint8_t)SS_COUNT, (uint8_t)STATS_IF_SS_COUNT);
 	for (inx = 0; inx < loop_cnt; inx++) {
-		max_ss = qdf_min((uint8_t)SS_COUNT, (uint8_t)STATS_IF_SS_COUNT);
 		for (cnt = 0; cnt < max_ss; cnt++)
 			rx->rx_mu[inx].ppdu_nss[cnt] =
 					cdp_rx->rx_mu[inx].ppdu_nss[cnt];
@@ -3402,7 +3572,7 @@ static void fill_debug_data_rx_stats(struct debug_data_rx_stats *rx,
 					cdp_rx->rx_mu[inx].mpdu_cnt_fcs_err;
 		qdf_mem_copy(rx->rx_mu[inx].ppdu.mcs_count,
 			     cdp_rx->rx_mu[inx].ppdu.mcs_count,
-			     (sizeof(uint32_t) * STATS_IF_MAX_MCS));
+			     (sizeof(uint32_t) * mcs_cnt));
 	}
 	loop_cnt = qdf_min((uint8_t)CDP_MAX_RX_RINGS,
 			   (uint8_t)STATS_IF_MAX_RX_RINGS);

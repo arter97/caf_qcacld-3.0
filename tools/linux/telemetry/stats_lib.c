@@ -190,6 +190,7 @@ struct nla_policy g_policy[QCA_WLAN_VENDOR_ATTR_FEAT_MAX] = {
 	[QCA_WLAN_VENDOR_ATTR_FEAT_RAW] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_TSO] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_TWT] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_FEAT_VOW] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_WDI] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_WMI] = { .type = NLA_UNSPEC },
 	[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP] = { .type = NLA_UNSPEC },
@@ -1176,6 +1177,10 @@ static void parse_advance_radio(struct nlattr *rattr, struct stats_obj *obj)
 		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_TSO],
 				(void **)&data->tso,
 				sizeof(struct advance_pdev_data_tso));
+
+		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_VOW],
+				(void **)&data->vow,
+				sizeof(struct advance_pdev_data_vow));
 
 		extract_nl_data(tb[QCA_WLAN_VENDOR_ATTR_FEAT_IGMP],
 				(void **)&data->igmp,
@@ -2644,6 +2649,8 @@ static void free_advance_radio(struct stats_obj *radio)
 				free(data->raw);
 			if (data->tso)
 				free(data->tso);
+			if (data->vow)
+				free(data->vow);
 			if (data->igmp)
 				free(data->igmp);
 			if (data->mesh)
