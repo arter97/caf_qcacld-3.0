@@ -41,6 +41,7 @@
 #define TREE_DEPTH_2 2
 #define TREE_DEPTH_3 3
 #define TREE_DEPTH_4 4
+#define HALF_20MHZ_BW 10
 
 /**
  * struct dfs_channel_bw - Structure to store the information about precac
