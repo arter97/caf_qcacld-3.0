@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -51,6 +52,8 @@ extern "C" {
 #define       MAX_ACL_MAC_ADDRESS          32
 #define       AUTO_CHANNEL_SELECT          0
 #define       MAX_ASSOC_IND_IE_LEN         255
+#define       MAX_ASSOC_REQ_IE_LEN         2000
+#define       ASSOC_REQ_IE_OFFSET          4
 
 /* defines for WPS config states */
 #define       SAP_WPS_DISABLED             0
@@ -252,14 +255,16 @@ typedef struct sap_StationAssocIndication_s {
 	eCsrEncryptionType negotiatedMCEncryptionType;
 	bool fAuthRequired;
 	uint8_t      ecsa_capable;
+	uint32_t owe_ie_len;
+	uint8_t *owe_ie;
 } tSap_StationAssocIndication;
 
 typedef struct sap_StationAssocReassocCompleteEvent_s {
 	struct qdf_mac_addr staMac;
 	uint8_t staId;
 	uint8_t status;
-	uint8_t ies[MAX_ASSOC_IND_IE_LEN];
-	uint16_t iesLen;
+	uint8_t *ies;
+	uint32_t ies_len;
 	uint32_t statusCode;
 	eSapAuthType SapAuthType;
 	bool wmmEnabled;
@@ -573,6 +578,7 @@ typedef struct sap_Config {
 	uint8_t RSNEncryptType;
 	uint8_t mcRSNEncryptType;
 	eSapAuthType authType;
+	tCsrAuthList akm_list;
 	bool privacy;
 	bool UapsdEnable;
 	bool fwdWPSPBCProbeReq;
@@ -893,7 +899,7 @@ typedef QDF_STATUS (*tpWLAN_SAPEventCB)(tpSap_Event pSapEvent,
 					void *pUsrContext);
 QDF_STATUS wlansap_start(void *p_cds_gctx, tpWLAN_SAPEventCB pSapEventCallback,
 			 enum tQDF_ADAPTER_MODE mode, uint8_t *addr,
-			 uint32_t *session_id, void *pUsrContext);
+			 uint32_t *session_id, void *pUsrContext, bool reinit);
 uint8_t wlansap_get_state(void *p_cds_gctx);
 
 QDF_STATUS wlansap_start_bss(void *p_cds_gctx,
@@ -1075,6 +1081,20 @@ QDF_STATUS wlansap_filter_ch_based_acs(void *sap_ctx,
  */
 uint8_t wlansap_get_safe_channel_from_pcl_and_acs_range(void *cds_ctx);
 #endif
+
+/*
+ * wlansap_update_owe_info() - Update OWE info
+ * @sap_ctx: sap context
+ * @peer: peer mac
+ * @ie: IE from hostapd
+ * @ie_len: IE length
+ * @owe_status: status from hostapd
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlansap_update_owe_info(void *sap_ctx,
+				   uint8_t *peer, const uint8_t *ie,
+				   uint32_t ie_len, uint16_t owe_status);
 
 #ifdef __cplusplus
 }

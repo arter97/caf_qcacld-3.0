@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -267,6 +268,7 @@ typedef struct sSapContext {
 	bool is_chan_change_inprogress;
 	bool enable_etsi_srd_chan_support;
 	bool stop_bss_in_progress;
+	qdf_list_t owe_pending_assoc_ind_list;
 } *ptSapContext;
 
 /*----------------------------------------------------------------------------

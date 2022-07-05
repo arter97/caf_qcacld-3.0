@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -2870,6 +2871,196 @@ static void sap_handle_acs_scan_event(ptSapContext sap_context,
 {
 }
 #endif
+/**
+ * get_ext_ie_ptr_from_ext_id() - Find out ext ie
+ * @eid: element id
+ * @oui: oui buffer
+ * @oui_size: oui size
+ * @ie: source ie address
+ * @ie_len: source ie length
+ *
+ * This function find out ext ie from ext id (passed oui)
+ *
+ * Return: vendor ie address - success
+ *         NULL - failure
+ */
+static const uint8_t *get_ie_ptr_from_eid_n_oui(uint8_t eid,
+						const uint8_t *oui,
+						uint8_t oui_size,
+						const uint8_t *ie,
+						uint16_t ie_len)
+{
+	int32_t left = ie_len;
+	const uint8_t *ptr = ie;
+	uint8_t elem_id, elem_len;
+
+	while (left >= 2) {
+		elem_id  = ptr[0];
+		elem_len = ptr[1];
+		left -= 2;
+
+		if (elem_len > left)
+			return NULL;
+
+		if (eid == elem_id) {
+			/* if oui is not provide eid match is enough */
+			if (!oui)
+				return ptr;
+
+			/*
+			 * if oui is provided and oui_size is more than left
+			 * bytes, then we cannot have match
+			 */
+			if (oui_size > left)
+				return NULL;
+
+			if (qdf_mem_cmp(&ptr[2], oui, oui_size) == 0)
+				return ptr;
+		}
+
+		left -= elem_len;
+		ptr += (elem_len + 2);
+	}
+
+	return NULL;
+}
+/**
+ * get_ie_ptr_from_eid() - Find out ie from eid
+ * @eid: element id
+ * @ie: source ie address
+ * @ie_len: source ie length
+ *
+ * Return: vendor ie address - success
+ *         NULL - failure
+ */
+static const uint8_t *get_ie_ptr_from_eid(uint8_t eid,
+				   const uint8_t *ie,
+				   int ie_len)
+{
+	return get_ie_ptr_from_eid_n_oui(eid, NULL, 0, ie, ie_len);
+}
+
+/**
+ * get_ext_ie_ptr_from_ext_id() - Find out ext ie
+ * @oui: oui buffer
+ * @oui_size: oui size
+ * @ie: source ie address
+ * @ie_len: source ie length
+ *
+ * This function find out ext ie from ext id (passed oui)
+ *
+ * Return: vendor ie address - success
+ *         NULL - failure
+ */
+static const uint8_t *get_ext_ie_ptr_from_ext_id(const uint8_t *oui,
+					  uint8_t oui_size,
+					  const uint8_t *ie,
+					  uint16_t ie_len)
+{
+	return get_ie_ptr_from_eid_n_oui(SIR_MAC_EID_EXT,
+					 oui, oui_size, ie, ie_len);
+}
+
+
+#define DH_OUI_TYPE      "\x20"
+#define DH_OUI_TYPE_SIZE (1)
+/**
+ * sap_fill_owe_ie_in_assoc_ind() - Fill OWE IE in assoc indication
+ * Function to fill OWE IE in assoc indication
+ * @assoc_ind: SAP STA association indication
+ * @sme_assoc_ind: SME association indication
+ *
+ * This function is to get OWE IEs (RSN IE, DH IE etc) from assoc request
+ * and fill them in association indication.
+ *
+ * Return: true for success and false for failure
+ */
+static bool sap_fill_owe_ie_in_assoc_ind(tSap_StationAssocIndication *assoc_ind,
+					 tSirSmeAssocInd *sme_assoc_ind)
+{
+	uint32_t owe_ie_len, rsn_ie_len, dh_ie_len;
+	const uint8_t *rsn_ie, *dh_ie;
+
+	if (assoc_ind->assocReqLength < ASSOC_REQ_IE_OFFSET) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid assoc req");
+		return false;
+	}
+
+	rsn_ie = get_ie_ptr_from_eid(DOT11F_EID_RSN,
+			       assoc_ind->assocReqPtr + ASSOC_REQ_IE_OFFSET,
+			       assoc_ind->assocReqLength - ASSOC_REQ_IE_OFFSET);
+	if (!rsn_ie) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "RSN IE is not present");
+		return false;
+	}
+	rsn_ie_len = rsn_ie[1] + 2;
+	if (rsn_ie_len < DOT11F_IE_RSN_MIN_LEN ||
+	    rsn_ie_len > DOT11F_IE_RSN_MAX_LEN) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid RSN IE len %d",
+				rsn_ie_len);
+		return false;
+	}
+
+	dh_ie = get_ext_ie_ptr_from_ext_id(DH_OUI_TYPE, DH_OUI_TYPE_SIZE,
+		   assoc_ind->assocReqPtr + ASSOC_REQ_IE_OFFSET,
+		   (uint16_t)(assoc_ind->assocReqLength - ASSOC_REQ_IE_OFFSET));
+	if (!dh_ie) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "DH IE is not present");
+		return false;
+	}
+	dh_ie_len = dh_ie[1] + 2;
+	if (dh_ie_len < DOT11F_IE_DH_PARAMETER_ELEMENT_MIN_LEN ||
+	    dh_ie_len > DOT11F_IE_DH_PARAMETER_ELEMENT_MAX_LEN) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid DH IE len %d",
+				dh_ie_len);
+		return false;
+	}
+
+	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO,
+		  FL("rsn_ie_len = %d, dh_ie_len = %d"), rsn_ie_len, dh_ie_len);
+
+	owe_ie_len = rsn_ie_len + dh_ie_len;
+	assoc_ind->owe_ie = qdf_mem_malloc(owe_ie_len);
+	if (!assoc_ind->owe_ie)
+		return false;
+
+	qdf_mem_copy(assoc_ind->owe_ie, rsn_ie, rsn_ie_len);
+	qdf_mem_copy(assoc_ind->owe_ie + rsn_ie_len, dh_ie, dh_ie_len);
+	assoc_ind->owe_ie_len = owe_ie_len;
+
+	return true;
+}
+
+/**
+ * sap_save_owe_pending_assoc_ind() - Save pending assoc indication
+ * Function to save pending assoc indication in SAP context
+ * @sap_ctx: SAP context
+ * @sme_assoc_ind: SME association indication
+ *
+ * This function is to save pending assoc indication in linked list
+ * in SAP context.
+ *
+ * Return: true for success and false for failure
+ */
+static bool sap_save_owe_pending_assoc_ind(ptSapContext sap_ctx,
+					   tSirSmeAssocInd *sme_assoc_ind)
+{
+	struct owe_assoc_ind *assoc_ind;
+	QDF_STATUS status;
+
+	assoc_ind = qdf_mem_malloc(sizeof(*assoc_ind));
+	if (!assoc_ind)
+		return false;
+	assoc_ind->assoc_ind = sme_assoc_ind;
+	status = qdf_list_insert_back(&sap_ctx->owe_pending_assoc_ind_list,
+				      &assoc_ind->node);
+	if (QDF_STATUS_SUCCESS != status) {
+		qdf_mem_free(assoc_ind);
+		return false;
+	}
+
+	return true;
+}
 
 /**
  * sap_signal_hdd_event() - send event notification
@@ -2925,6 +3116,7 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 		/*  TODO - Indicate the assoc request indication to OS */
 		sap_ap_event.sapHddEventCode = eSAP_STA_ASSOC_IND;
 		assoc_ind = &sap_ap_event.sapevt.sapAssocIndication;
+		qdf_mem_set(assoc_ind, sizeof(*assoc_ind), 0);
 
 		qdf_copy_macaddr(&assoc_ind->staMac, &csr_roaminfo->peerMac);
 		assoc_ind->staId = csr_roaminfo->staId;
@@ -2944,6 +3136,29 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 			assoc_ind->negotiatedMCEncryptionType =
 			    csr_roaminfo->u.pConnectedProfile->mcEncryptionType;
 			assoc_ind->fAuthRequired = csr_roaminfo->fAuthRequired;
+		}
+		if (csr_roaminfo->owe_pending_assoc_ind) {
+			if (!sap_fill_owe_ie_in_assoc_ind(assoc_ind,
+					 csr_roaminfo->owe_pending_assoc_ind)) {
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					  QDF_TRACE_LEVEL_ERROR,
+					  FL("Failed to fill OWE IE"));
+				qdf_mem_free(csr_roaminfo->
+					     owe_pending_assoc_ind);
+				csr_roaminfo->owe_pending_assoc_ind = NULL;
+				return QDF_STATUS_E_INVAL;
+			}
+			if (!sap_save_owe_pending_assoc_ind(sap_ctx,
+					 csr_roaminfo->owe_pending_assoc_ind)) {
+				QDF_TRACE(QDF_MODULE_ID_SAP,
+					  QDF_TRACE_LEVEL_ERROR,
+					  FL("Failed to save assoc ind"));
+				qdf_mem_free(csr_roaminfo->
+					     owe_pending_assoc_ind);
+				csr_roaminfo->owe_pending_assoc_ind = NULL;
+				return QDF_STATUS_E_INVAL;
+			}
+			csr_roaminfo->owe_pending_assoc_ind = NULL;
 		}
 		break;
 	case eSAP_START_BSS_EVENT:
@@ -3024,28 +3239,17 @@ QDF_STATUS sap_signal_hdd_event(ptSapContext sap_ctx,
 				 &csr_roaminfo->peerMac);
 		reassoc_complete->staId = csr_roaminfo->staId;
 		reassoc_complete->statusCode = csr_roaminfo->statusCode;
-		reassoc_complete->iesLen = csr_roaminfo->rsnIELen;
-		qdf_mem_copy(reassoc_complete->ies, csr_roaminfo->prsnIE,
-			     csr_roaminfo->rsnIELen);
 
-#ifdef FEATURE_WLAN_WAPI
-		if (csr_roaminfo->wapiIELen) {
-			uint8_t len = reassoc_complete->iesLen;
-
-			reassoc_complete->iesLen += csr_roaminfo->wapiIELen;
-			qdf_mem_copy(&reassoc_complete->ies[len],
-				     csr_roaminfo->pwapiIE,
-				     csr_roaminfo->wapiIELen);
+		if (csr_roaminfo->assocReqLength < ASSOC_REQ_IE_OFFSET) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+				  FL("Invalid assoc request length:%d"),
+				  csr_roaminfo->assocReqLength);
+			return QDF_STATUS_E_INVAL;
 		}
-#endif
-		if (csr_roaminfo->addIELen) {
-			uint8_t len = reassoc_complete->iesLen;
-
-			reassoc_complete->iesLen += csr_roaminfo->addIELen;
-			qdf_mem_copy(&reassoc_complete->ies[len],
-				     csr_roaminfo->paddIE,
-				     csr_roaminfo->addIELen);
-		}
+		reassoc_complete->ies_len = csr_roaminfo->assocReqLength -
+					    ASSOC_REQ_IE_OFFSET;
+		reassoc_complete->ies = csr_roaminfo->assocReqPtr +
+					ASSOC_REQ_IE_OFFSET;
 
 		/* also fill up the channel info from the csr_roamInfo */
 		chaninfo = &reassoc_complete->chan_info;
@@ -4457,6 +4661,8 @@ sapconvert_to_csr_profile(tsap_Config_t *pconfig_params, eCsrRoamBssType bssType
 
 	profile->AuthType.numEntries = 1;
 	profile->AuthType.authType[0] = eCSR_AUTH_TYPE_OPEN_SYSTEM;
+
+	profile->akm_list = pconfig_params->akm_list;
 
 	/* Always set the Encryption Type */
 	profile->EncryptionType.numEntries = 1;

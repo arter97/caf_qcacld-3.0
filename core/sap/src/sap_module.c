@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -287,6 +288,72 @@ void *wlansap_open(void *p_cds_gctx)
 	return pSapCtx;
 } /* wlansap_open */
 
+static QDF_STATUS wlansap_owe_init(ptSapContext sap_ctx)
+{
+	qdf_list_create(&sap_ctx->owe_pending_assoc_ind_list, 0);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void wlansap_owe_cleanup(ptSapContext sap_ctx)
+{
+	tHalHandle hal;
+	tpAniSirGlobal mac;
+	struct owe_assoc_ind *owe_assoc_ind;
+	tSirSmeAssocInd *assoc_ind = NULL;
+	qdf_list_node_t *node = NULL, *next_node = NULL;
+	QDF_STATUS status;
+
+	if (!sap_ctx) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid SAP context");
+		return;
+	}
+
+	hal = CDS_GET_HAL_CB();
+	mac = (tpAniSirGlobal)hal;
+	if (!mac) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid MAC context");
+		return;
+	}
+
+	if (QDF_STATUS_SUCCESS !=
+	    qdf_list_peek_front(&sap_ctx->owe_pending_assoc_ind_list,
+				&node)) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			  "Failed to find assoc ind list");
+		return;
+	}
+
+	while (node) {
+		qdf_list_peek_next(&sap_ctx->owe_pending_assoc_ind_list,
+				   node, &next_node);
+		owe_assoc_ind = qdf_container_of(node, struct owe_assoc_ind,
+						 node);
+		status = qdf_list_remove_node(
+					   &sap_ctx->owe_pending_assoc_ind_list,
+					   node);
+		if (status == QDF_STATUS_SUCCESS) {
+			assoc_ind = owe_assoc_ind->assoc_ind;
+			qdf_mem_free(owe_assoc_ind);
+			assoc_ind->owe_ie = NULL;
+			assoc_ind->owe_ie_len = 0;
+			assoc_ind->owe_status = eSIR_MAC_UNSPEC_FAILURE_STATUS;
+			status = sme_update_owe_info(mac, assoc_ind);
+			qdf_mem_free(assoc_ind);
+		} else {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+					"Failed to remove assoc ind");
+		}
+		node = next_node;
+		next_node = NULL;
+	}
+}
+
+static void wlansap_owe_deinit(ptSapContext sap_ctx)
+{
+	qdf_list_destroy(&sap_ctx->owe_pending_assoc_ind_list);
+}
+
 /**
  * wlansap_start() - wlan start SAP.
  * @pCtx: Pointer to the global cds context; a handle to SAP's
@@ -309,7 +376,7 @@ void *wlansap_open(void *p_cds_gctx)
  */
 QDF_STATUS wlansap_start(void *pCtx, tpWLAN_SAPEventCB pSapEventCallback,
 			 enum tQDF_ADAPTER_MODE mode, uint8_t *addr,
-			 uint32_t *session_id, void *pUsrContext)
+			 uint32_t *session_id, void *pUsrContext, bool reinit)
 {
 	ptSapContext pSapCtx = NULL;
 	QDF_STATUS qdf_ret_status;
@@ -329,6 +396,15 @@ QDF_STATUS wlansap_start(void *pCtx, tpWLAN_SAPEventCB pSapEventCallback,
 		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
 			  "%s: Invalid SAP pointer from pCtx", __func__);
 		return QDF_STATUS_E_FAULT;
+	}
+
+	if (!reinit) {
+		qdf_ret_status = wlansap_owe_init(pSapCtx);
+		if (QDF_STATUS_SUCCESS != qdf_ret_status) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+				  "SAP OWE init fail");
+			return QDF_STATUS_E_FAILURE;
+		}
 	}
 
 	/*------------------------------------------------------------------------
@@ -453,6 +529,9 @@ QDF_STATUS wlansap_close(void *pCtx)
 			  "%s: Invalid SAP pointer from pCtx", __func__);
 		return QDF_STATUS_E_FAULT;
 	}
+
+	wlansap_owe_cleanup(pSapCtx);
+	wlansap_owe_deinit(pSapCtx);
 
 	/* Cleanup SAP control block */
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
@@ -4016,3 +4095,168 @@ uint8_t wlansap_get_safe_channel_from_pcl_and_acs_range(void *cds_ctx)
 	return wlansap_get_safe_channel(cds_ctx);
 }
 #endif
+
+#define DH_OUI_TYPE	(0x20)
+/**
+ * wlansap_validate_owe_ie() - validate OWE IE
+ * @ie: IE buffer
+ * @remaining_ie_len: remaining IE length
+ *
+ * Return: validated IE length, -1 for failure
+ */
+static int wlansap_validate_owe_ie(const uint8_t *ie, uint32_t remaining_ie_len)
+{
+	uint8_t ie_id, ie_len, ie_ext_id = 0;
+
+	if (remaining_ie_len < 2) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "IE too short");
+		return -EINVAL;
+	}
+
+	ie_id = ie[0];
+	ie_len = ie[1];
+
+	/* IEs that we are expecting in OWE IEs
+	 * - RSN IE
+	 * - DH IE
+	 */
+	switch (ie_id) {
+	case DOT11F_EID_RSN:
+		if (ie_len < DOT11F_IE_RSN_MIN_LEN ||
+		    ie_len > DOT11F_IE_RSN_MAX_LEN) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+					"Invalid RSN IE len %d", ie_len);
+			return -EINVAL;
+		}
+		ie_len += 2;
+		break;
+	case DOT11F_EID_DH_PARAMETER_ELEMENT:
+		ie_ext_id = ie[2];
+		if (ie_ext_id != DH_OUI_TYPE) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+					"Invalid DH IE ID %d", ie_ext_id);
+			return -EINVAL;
+		}
+		if (ie_len < DOT11F_IE_DH_PARAMETER_ELEMENT_MIN_LEN ||
+		    ie_len > DOT11F_IE_DH_PARAMETER_ELEMENT_MAX_LEN) {
+			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+					"Invalid DH IE len %d", ie_len);
+			return -EINVAL;
+		}
+		ie_len += 2;
+		break;
+	default:
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid IE %d", ie_id);
+		return -EINVAL;
+	}
+
+	if (ie_len > remaining_ie_len) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR, "Invalid IE len");
+		return -EINVAL;
+	}
+
+	return ie_len;
+}
+
+/**
+ * wlansap_validate_owe_ies() - validate OWE IEs
+ * @ie: IE buffer
+ * @ie_len: IE length
+ *
+ * Return: true if validated
+ */
+static bool wlansap_validate_owe_ies(const uint8_t *ie, uint32_t ie_len)
+{
+	const uint8_t *remaining_ie = ie;
+	uint32_t remaining_ie_len = ie_len;
+	int validated_len;
+	bool validated = true;
+
+	while (remaining_ie_len) {
+		validated_len = wlansap_validate_owe_ie(remaining_ie,
+							remaining_ie_len);
+		if (validated_len < 0) {
+			validated = false;
+			break;
+		}
+		remaining_ie += validated_len;
+		remaining_ie_len -= validated_len;
+	}
+
+	return validated;
+}
+
+QDF_STATUS wlansap_update_owe_info(void *pctx,
+				   uint8_t *peer, const uint8_t *ie,
+				   uint32_t ie_len, uint16_t owe_status)
+{
+	ptSapContext sap_ctx;
+	tHalHandle hal;
+	tpAniSirGlobal mac;
+	struct owe_assoc_ind *owe_assoc_ind;
+	tSirSmeAssocInd *assoc_ind = NULL;
+	qdf_list_node_t *node = NULL, *next_node = NULL;
+	QDF_STATUS status;
+
+	sap_ctx = CDS_GET_SAP_CB(pctx);
+	if (!sap_ctx) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			  "Invalid SAP context from pctx");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (!wlansap_validate_owe_ies(ie, ie_len)) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			  "Invalid OWE IE");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	hal = CDS_GET_HAL_CB();
+	mac = (tpAniSirGlobal)hal;
+	if (!mac) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			  "Invalid MAC context");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (QDF_STATUS_SUCCESS !=
+		qdf_list_peek_front(&sap_ctx->owe_pending_assoc_ind_list,
+				    &next_node)) {
+		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+			  "Failed to find assoc ind list");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	do {
+		node = next_node;
+		owe_assoc_ind = qdf_container_of(node, struct owe_assoc_ind,
+						 node);
+		if (qdf_mem_cmp(peer,
+				owe_assoc_ind->assoc_ind->peerMacAddr,
+				QDF_MAC_ADDR_SIZE) == 0) {
+			status = qdf_list_remove_node(
+					   &sap_ctx->owe_pending_assoc_ind_list,
+					   node);
+			if (status != QDF_STATUS_SUCCESS) {
+				QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_ERROR,
+					  "Failed to remove assoc ind");
+				return status;
+			}
+			assoc_ind = owe_assoc_ind->assoc_ind;
+			qdf_mem_free(owe_assoc_ind);
+			break;
+		}
+	} while (QDF_STATUS_SUCCESS ==
+		 qdf_list_peek_next(&sap_ctx->owe_pending_assoc_ind_list,
+				    node, &next_node));
+
+	if (assoc_ind) {
+		assoc_ind->owe_ie = ie;
+		assoc_ind->owe_ie_len = ie_len;
+		assoc_ind->owe_status = owe_status;
+		status = sme_update_owe_info(mac, assoc_ind);
+		qdf_mem_free(assoc_ind);
+	}
+
+	return status;
+}

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2011-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -931,6 +932,7 @@ typedef struct tagCsrRoamProfile {
 	eCsrRoamBssType BSSType;
 	tCsrAuthList AuthType;
 	eCsrAuthType negotiatedAuthType;
+	tCsrAuthList akm_list;
 	tCsrEncryptionList EncryptionType;
 	/* This field is for output only, not for input */
 	eCsrEncryptionType negotiatedUCEncryptionType;
@@ -1041,6 +1043,7 @@ typedef struct tagCsrRoamConnectedProfile {
 	eCsrRoamBssType BSSType;
 	eCsrAuthType AuthType;
 	tCsrAuthList AuthInfo;
+	tCsrAuthList akm_list;
 	eCsrEncryptionType EncryptionType;
 	tCsrEncryptionList EncryptionInfo;
 	eCsrEncryptionType mcEncryptionType;
@@ -1602,6 +1605,7 @@ typedef struct tagCsrRoamInfo {
 	tSirMacCapabilityInfo capability_info;
 	uint32_t rx_mc_bc_cnt;
 	uint16_t roam_reason;
+	tSirSmeAssocInd *owe_pending_assoc_ind;
 } tCsrRoamInfo;
 
 typedef struct tagCsrFreqScanInfo {
@@ -1643,6 +1647,8 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 
+	uint32_t ies_len;
+	uint8_t *ies;
 	tDot11fIEHTCaps HTCaps;
 	tDot11fIEVHTCaps VHTCaps;
 	tSirMacCapabilityInfo capability_info;
@@ -1932,4 +1938,14 @@ struct lim_channel_status *csr_get_channel_status(void *p_mac,
  * Return: none
  */
 void csr_clear_channel_status(void *p_mac);
+
+/**
+ * csr_update_owe_info() - Update OWE info
+ * @mac: mac context
+ * @assoc_ind: assoc ind
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS csr_update_owe_info(tpAniSirGlobal mac,
+			       tSirSmeAssocInd *assoc_ind);
 #endif

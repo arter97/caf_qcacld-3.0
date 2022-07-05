@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -774,13 +775,13 @@ static tSirMacStatusCodes lim_check_sae_pmf_cap(tpPESession session,
   */
 static bool lim_check_wpa_rsn_ie(tpPESession session, tpAniSirGlobal mac_ctx,
 				 uint8_t sub_type, tpSirMacMgmtHdr hdr,
-				 tpSirAssocReq assoc_req, bool *pmf_connection)
+				 tpSirAssocReq assoc_req, bool *pmf_connection,
+				 enum ani_akm_type *akm_type)
 {
 	uint32_t ret;
 	tDot11fIEWPA dot11f_ie_wpa = {0};
 	tDot11fIERSN dot11f_ie_rsn = {0};
 	tSirRetStatus status = eSIR_SUCCESS;
-	enum ani_akm_type akm_type;
 	tSirMacStatusCodes mac_status;
 
 	/*
@@ -869,11 +870,11 @@ static bool lim_check_wpa_rsn_ie(tpPESession session, tpAniSirGlobal mac_ctx,
 				session);
 			return false;
 		}
-		akm_type = lim_translate_rsn_oui_to_akm_type(
+		*akm_type = lim_translate_rsn_oui_to_akm_type(
 				dot11f_ie_rsn.akm_suite[0]);
 
 		mac_status = lim_check_sae_pmf_cap(session, &dot11f_ie_rsn,
-						   akm_type);
+						   *akm_type);
 		if (eSIR_MAC_SUCCESS_STATUS != mac_status) {
 			/* Reject pmf disable SAE STA */
 			pe_warn("Re/Assoc rejected from: " MAC_ADDRESS_STR,
@@ -935,6 +936,8 @@ static bool lim_check_wpa_rsn_ie(tpPESession session, tpAniSirGlobal mac_ctx,
 				session);
 			return false;
 		}
+		*akm_type = lim_translate_rsn_oui_to_akm_type(
+					dot11f_ie_wpa.auth_suites[0]);
 	}
 	return true;
 }
@@ -947,6 +950,7 @@ static bool lim_check_wpa_rsn_ie(tpPESession session, tpAniSirGlobal mac_ctx,
  * @assoc_req: pointer to ASSOC/REASSOC Request frame
  * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
  * @pmf_connection: flag indicating pmf connection
+ * @akm_type: AKM type
  *
  * wpa ie related checks
  *
@@ -956,7 +960,9 @@ static bool lim_chk_n_process_wpa_rsn_ie(tpAniSirGlobal mac_ctx,
 					 tpSirMacMgmtHdr hdr,
 					 tpPESession session,
 					 tpSirAssocReq assoc_req,
-					 uint8_t sub_type, bool *pmf_connection)
+					 uint8_t sub_type,
+					 bool *pmf_connection,
+					 enum ani_akm_type *akm_type)
 {
 	uint8_t *wps_ie = NULL;
 
@@ -980,7 +986,7 @@ static bool lim_chk_n_process_wpa_rsn_ie(tpAniSirGlobal mac_ctx,
 		/* check whether RSN IE is present */
 		return lim_check_wpa_rsn_ie(
 			session, mac_ctx, sub_type,
-			hdr, assoc_req, pmf_connection);
+			hdr, assoc_req, pmf_connection, akm_type);
 	}
 
 	return true;
@@ -1264,6 +1270,7 @@ static bool lim_chk_wmm(tpAniSirGlobal mac_ctx, tpSirMacMgmtHdr hdr,
  * @sub_type: Assoc(=0) or Reassoc(=1) Requestframe
  * @sta_ds: station dph entry
  * @auth_type: indicates security type
+ * @akm_type: indicates security type in akm
  * @assoc_req_copied: boolean to indicate if assoc req was copied to tmp above
  * @peer_idx: peer index
  * @qos_mode: qos mode
@@ -1279,6 +1286,7 @@ static bool lim_update_sta_ds(tpAniSirGlobal mac_ctx, tpSirMacMgmtHdr hdr,
 			      tpPESession session, tpSirAssocReq assoc_req,
 			      uint8_t sub_type, tpDphHashNode sta_ds,
 			      tAniAuthType auth_type,
+			      enum ani_akm_type akm_type,
 			      bool *assoc_req_copied, uint16_t peer_idx,
 			      tHalBitVal qos_mode, bool pmf_connection,
 			      bool force_1x1)
@@ -1344,8 +1352,10 @@ static bool lim_update_sta_ds(tpAniSirGlobal mac_ctx, tpSirMacMgmtHdr hdr,
 
 	sta_ds->valid = 0;
 	sta_ds->mlmStaContext.authType = auth_type;
+	sta_ds->mlmStaContext.akm_type = akm_type;
 	sta_ds->staType = STA_ENTRY_PEER;
 	sta_ds->mlmStaContext.force_1x1 = force_1x1;
+	pe_debug("auth_type = %d, akm_type = %d", auth_type, akm_type);
 
 	/*
 	 * TODO: If listen interval is more than certain limit, reject the
@@ -1823,6 +1833,7 @@ bool lim_send_assoc_ind_to_sme(tpAniSirGlobal mac_ctx,
 			       uint8_t sub_type,
 			       tpSirMacMgmtHdr hdr,
 			       tpSirAssocReq assoc_req,
+			       enum ani_akm_type akm_type,
 			       bool pmf_connection,
 			       bool *assoc_req_copied,
 			       bool dup_entry, bool force_1x1)
@@ -1908,7 +1919,7 @@ bool lim_send_assoc_ind_to_sme(tpAniSirGlobal mac_ctx,
 
 send_ind_to_sme:
 	if (!lim_update_sta_ds(mac_ctx, hdr, session, assoc_req,
-			       sub_type, sta_ds, auth_type,
+			       sub_type, sta_ds, auth_type, akm_type,
 			       assoc_req_copied, peer_idx, qos_mode,
 			       pmf_connection, force_1x1))
 		return false;
@@ -1963,6 +1974,7 @@ void lim_process_assoc_req_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 	tHalBitVal qos_mode;
 	tpSirMacMgmtHdr hdr;
 	struct tLimPreAuthNode *sta_pre_auth_ctx;
+	enum ani_akm_type akm_type = ANI_AKM_TYPE_NONE;
 	tSirMacCapabilityInfo local_cap;
 	tpDphHashNode sta_ds = NULL;
 	tpSirAssocReq assoc_req;
@@ -2161,7 +2173,9 @@ void lim_process_assoc_req_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 	lim_print_ht_cap(mac_ctx, session, assoc_req);
 
 	if (false == lim_chk_n_process_wpa_rsn_ie(mac_ctx, hdr, session,
-				assoc_req, sub_type, &pmf_connection))
+						  assoc_req, sub_type,
+						  &pmf_connection,
+						  &akm_type))
 		goto error;
 
 	if (session->pePersona == QDF_P2P_GO_MODE) {
@@ -2207,7 +2221,7 @@ void lim_process_assoc_req_frame(tpAniSirGlobal mac_ctx, uint8_t *rx_pkt_info,
 
 	/* Send assoc indication to SME */
 	if (!lim_send_assoc_ind_to_sme(mac_ctx, session, sub_type, hdr,
-				       assoc_req, pmf_connection,
+				       assoc_req, akm_type, pmf_connection,
 				       &assoc_req_copied, dup_entry, force_1x1))
 		goto error;
 
@@ -2441,6 +2455,7 @@ QDF_STATUS lim_send_mlm_assoc_ind(tpAniSirGlobal mac_ctx,
 			assoc_req->ssId.length + 1);
 		assoc_ind->sessionId = session_entry->peSessionId;
 		assoc_ind->authType = sta_ds->mlmStaContext.authType;
+		assoc_ind->akm_type = sta_ds->mlmStaContext.akm_type;
 		assoc_ind->capabilityInfo = assoc_req->capabilityInfo;
 
 		/* Fill in RSN IE information */
