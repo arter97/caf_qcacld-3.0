@@ -862,7 +862,7 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 			ch_params->ch_width = CH_WIDTH_160MHZ;
 	}
 
-	if (reg_get_min_max_bw_cur_chan_list(pdev, chan_enum, in_6g_pwr_mode,
+	if (reg_get_min_max_bw_reg_chan_list(pdev, chan_enum, in_6g_pwr_mode,
 					     NULL, &max_bw)) {
 		ch_params->ch_width = CH_WIDTH_INVALID;
 		return;
@@ -880,7 +880,7 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 			return;
 		}
 
-		if (reg_get_min_max_bw_cur_chan_list(pdev, chan_enum,
+		if (reg_get_min_max_bw_reg_chan_list(pdev, chan_enum,
 						     in_6g_pwr_mode, NULL,
 						     &sec_5g_freq_max_bw)) {
 			ch_params->ch_width = CH_WIDTH_INVALID;
@@ -1180,4 +1180,204 @@ reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 							reg_psd);
 
 	return status;
+}
+
+static struct regulatory_channel
+reg_create_empty_reg_chan_obj(void)
+{
+	struct regulatory_channel reg_chan = {0};
+
+	reg_chan.chan_flags = REGULATORY_CHAN_DISABLED;
+	reg_chan.state = CHANNEL_STATE_DISABLE;
+
+	return reg_chan;
+}
+
+struct regulatory_channel
+reg_get_reg_chan_list_based_on_freq(struct wlan_objmgr_pdev *pdev,
+				    qdf_freq_t freq,
+				    enum supported_6g_pwr_types
+				    in_6g_pwr_mode)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel reg_chan;
+	enum channel_enum chan_enum;
+	uint16_t sup_idx;
+
+	reg_chan = reg_create_empty_reg_chan_obj();
+
+	if (!freq) {
+		reg_debug("Input freq is zero");
+		return reg_chan;
+	}
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev private obj is NULL");
+		return reg_chan;
+	}
+
+	chan_enum = reg_get_chan_enum_for_freq(freq);
+	if (chan_enum == INVALID_CHANNEL) {
+		reg_err_rl("Invalid chan enum %d", chan_enum);
+		return reg_chan;
+	}
+
+	if (chan_enum < MIN_6GHZ_CHANNEL) {
+		reg_chan = pdev_priv_obj->cur_chan_list[chan_enum];
+		return reg_chan;
+	} else if (chan_enum >= MIN_6GHZ_CHANNEL && chan_enum <= MAX_6GHZ_CHANNEL) {
+		if (!pdev_priv_obj->is_6g_channel_list_populated) {
+			reg_debug("6G channel list is empty");
+			return reg_chan;
+		}
+	}
+	switch (in_6g_pwr_mode) {
+	case REG_CURRENT_PWR_MODE:
+		reg_chan = pdev_priv_obj->cur_chan_list[chan_enum];
+		return reg_chan;
+	case REG_BEST_PWR_MODE:
+	default:
+		sup_idx = reg_convert_enum_to_6g_idx(chan_enum);
+		if (sup_idx >= NUM_6GHZ_CHANNELS) {
+			reg_debug("sup_idx is out of bounds");
+			return reg_chan;
+		}
+		reg_chan = pdev_priv_obj->cur_chan_list[chan_enum];
+		reg_copy_from_super_chan_info_to_reg_channel(
+							&reg_chan,
+							pdev_priv_obj->super_chan_list[sup_idx],
+							in_6g_pwr_mode);
+		return reg_chan;
+	}
+}
+
+static QDF_STATUS
+reg_get_first_valid_freq_on_power_mode(struct wlan_regulatory_pdev_priv_obj
+				       *pdev_priv_obj,
+				       enum channel_enum freq_idx,
+				       struct regulatory_channel *reg_chan,
+				       enum supported_6g_pwr_types
+				       in_6g_pwr_mode,
+				       qdf_freq_t *first_valid_freq,
+				       int bw)
+{
+	const struct super_chan_info *sup_chan_entry;
+	enum channel_state pm_state_arr;
+	uint32_t pm_chan_flag;
+	QDF_STATUS status;
+
+	status = reg_get_superchan_entry(pdev_priv_obj->pdev_ptr, freq_idx,
+					 &sup_chan_entry);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		reg_debug("Failed to get super channel entry for freq_idx %d",
+			  freq_idx);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (in_6g_pwr_mode == REG_BEST_PWR_MODE)
+		in_6g_pwr_mode = sup_chan_entry->best_power_mode;
+
+	if (reg_is_supp_pwr_mode_invalid(in_6g_pwr_mode))
+		return QDF_STATUS_E_INVAL;
+
+	pm_state_arr = sup_chan_entry->state_arr[in_6g_pwr_mode];
+	pm_chan_flag = sup_chan_entry->chan_flags_arr[in_6g_pwr_mode];
+
+	if ((pm_chan_flag & REGULATORY_CHAN_DISABLED) &&
+	    (pm_state_arr == CHANNEL_STATE_DISABLE) &&
+	    (!reg_chan->nol_chan) &&
+	    (!reg_chan->nol_history))
+		return QDF_STATUS_SUCCESS;
+
+	if (!*first_valid_freq)
+		*first_valid_freq = reg_chan->center_freq;
+
+	if (!bw)
+		return QDF_STATUS_SUCCESS;
+
+	if (sup_chan_entry->min_bw[in_6g_pwr_mode] <= bw &&
+	    sup_chan_entry->max_bw[in_6g_pwr_mode]  >= bw) {
+		*first_valid_freq = reg_chan->center_freq;
+		return QDF_STATUS_SUCCESS;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+reg_get_first_valid_freq_on_cur_chan(struct regulatory_channel *cur_chan_list,
+				     qdf_freq_t *first_valid_freq,
+				     int bw)
+{
+	if (wlan_reg_is_chan_disabled_and_not_nol(cur_chan_list))
+		return QDF_STATUS_SUCCESS;
+
+	if (!*first_valid_freq)
+		*first_valid_freq = cur_chan_list->center_freq;
+
+	if (!bw)
+		return QDF_STATUS_SUCCESS;
+
+	if (cur_chan_list->min_bw <= bw &&
+	    cur_chan_list->max_bw >= bw)
+		*first_valid_freq = cur_chan_list->center_freq;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
+			 enum supported_6g_pwr_types
+			 in_6g_pwr_mode,
+			 qdf_freq_t *first_valid_freq,
+			 int bw)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *cur_chan_list;
+	enum channel_enum freq_idx;
+
+	if (!pdev) {
+		reg_err_rl("invalid pdev");
+		return QDF_STATUS_E_INVAL;
+	}
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err_rl("reg pdev priv obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+
+	for (freq_idx = 0; freq_idx < NUM_CHANNELS; freq_idx++) {
+		if (freq_idx < MIN_6GHZ_CHANNEL) {
+			reg_get_first_valid_freq_on_cur_chan(&cur_chan_list[freq_idx],
+							     first_valid_freq,
+							     bw);
+			if (*first_valid_freq)
+				break;
+		} else {
+			switch (in_6g_pwr_mode) {
+			case REG_CURRENT_PWR_MODE:
+				reg_get_first_valid_freq_on_cur_chan(&cur_chan_list[freq_idx],
+								     first_valid_freq,
+								     bw);
+				if (*first_valid_freq)
+					break;
+			case REG_BEST_PWR_MODE:
+			default:
+				reg_get_first_valid_freq_on_power_mode(pdev_priv_obj,
+								       freq_idx,
+								       &cur_chan_list[freq_idx],
+								       in_6g_pwr_mode,
+								       first_valid_freq,
+								       bw);
+				if (*first_valid_freq)
+					break;
+			}
+		}
+	}
+	return QDF_STATUS_SUCCESS;
 }
