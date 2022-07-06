@@ -38,6 +38,9 @@
 #include <wlan_pdev_mlme.h>
 #define IE_CONTENT_SIZE 1
 #include <ieee80211_api.h>
+#if QCA_AIRTIME_FAIRNESS
+#include <wlan_atf_utils_api.h>
+#endif
 
 extern bool
 wlan_rptr_is_psta_vdev(struct wlan_objmgr_vdev *vdev);
@@ -1080,6 +1083,9 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	u8 disconnect_rptr_clients = 0;
 	struct iterate_info iterate_msg;
 #endif
+#if QCA_AIRTIME_FAIRNESS
+	struct ieee80211vap *vap = wlan_vdev_get_vap(vdev);
+#endif
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1096,6 +1102,11 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	g_priv->num_stavaps_up++;
 	RPTR_LOGI("Number of STA VAPs connected:%d", g_priv->num_stavaps_up);
+#if QCA_AIRTIME_FAIRNESS
+	/* Trigger peer join leave for atf peer nodes */
+	if (vap && vap->iv_bss)
+		wlan_atf_peer_join_leave(vap->iv_bss->peer_obj, 1);
+#endif
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
 	if (wiphy && dev)
@@ -1180,6 +1191,9 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
 	bool max_priority_stavap_disconnected = 0;
 	struct dbdc_flags flags;
+#if QCA_AIRTIME_FAIRNESS
+	struct ieee80211vap *vap = wlan_vdev_get_vap(vdev);
+#endif
 
 	g_priv = wlan_rptr_get_global_ctx();
 	ext_cb = &g_priv->ext_cbacks;
@@ -1197,6 +1211,12 @@ wlan_rptr_conn_down_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 	g_priv->num_stavaps_up--;
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+
+#if QCA_AIRTIME_FAIRNESS
+	/* Trigger peer join leave for atf peers */
+	if (vap && vap->iv_bss)
+		wlan_atf_peer_join_leave(vap->iv_bss->peer_obj, 0);
+#endif
 
 	if (wiphy && dev)
 		qca_multi_link_remove_station_vap(wiphy);
