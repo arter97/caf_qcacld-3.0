@@ -2483,4 +2483,14 @@ reg_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
 	return false;
 }
 #endif
+
+/**
+ * reg_get_max_bw_5g_for_fo() - get max_5g_bw for FullOffload
+ * @pdev: PDEV object
+ *
+ * API to get max_bw_5g from pdev object
+ *
+ * Return: @max_bw_5g
+ */
+uint16_t reg_get_max_bw_5G_for_fo(struct wlan_objmgr_pdev *pdev);
 #endif
