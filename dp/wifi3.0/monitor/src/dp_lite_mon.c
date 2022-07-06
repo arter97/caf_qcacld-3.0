@@ -1654,7 +1654,12 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 			goto done;
 		}
 		/* full pkt, restitch required */
-		dp_rx_mon_handle_full_mon(pdev, ppdu_info, mon_mpdu);
+		status = dp_rx_mon_handle_full_mon(pdev, ppdu_info, mon_mpdu);
+		if (status != QDF_STATUS_SUCCESS) {
+			qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
+			dp_mon_debug("mpdu restitch failed");
+			goto done;
+		}
 	} else {
 		/* not a full pkt contains only headers, adjust header
 		 * lengths as per user configured value */
