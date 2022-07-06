@@ -429,6 +429,12 @@ static inline void
 ucfg_mc_cp_big_data_fw_support(struct wlan_objmgr_psoc *psoc,
 			       bool *enable)
 {}
+
+static inline void
+ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
+			      int *dbm)
+{}
+
 #endif /* QCA_SUPPORT_CP_STATS */
 
 #endif /* __WLAN_CP_STATS_MC_UCFG_API_H__ */
