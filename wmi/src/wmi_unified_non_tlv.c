@@ -7934,12 +7934,14 @@ static QDF_STATUS extract_pdev_reserve_ast_ev_param_non_tlv(
  * @wmi_handle: wmi handle
  * @param evt_buf: pointer to event buffer
  * @param num_vdevs: Pointer to hold num vdevs
+ * @param num_quiet_active_vdevs: Pointer to hold number of Quiet active vdevs
  *
  * Return: 0 for success or error code
  */
 static QDF_STATUS extract_swba_num_vdevs_non_tlv(wmi_unified_t wmi_handle,
 		void *evt_buf,
-		uint32_t *num_vdevs)
+		uint32_t *num_vdevs,
+		uint32_t *num_quiet_active_vdevs)
 {
 	wmi_host_swba_event *swba_event = (wmi_host_swba_event *)evt_buf;
 	uint32_t vdev_map;

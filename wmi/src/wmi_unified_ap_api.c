@@ -218,11 +218,13 @@ QDF_STATUS wmi_extract_offchan_data_tx_compl_param(
 }
 
 QDF_STATUS wmi_extract_swba_num_vdevs(wmi_unified_t wmi_handle, void *evt_buf,
-				      uint32_t *num_vdevs)
+				      uint32_t *num_vdevs,
+				      uint32_t *num_quiet_active_vdevs)
 {
 	if (wmi_handle->ops->extract_swba_num_vdevs)
 		return wmi_handle->ops->extract_swba_num_vdevs(wmi_handle,
-					evt_buf, num_vdevs);
+					evt_buf, num_vdevs,
+					num_quiet_active_vdevs);
 
 	return QDF_STATUS_E_FAILURE;
 }
