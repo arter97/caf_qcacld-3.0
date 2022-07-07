@@ -1429,6 +1429,56 @@ dp_sawf_mpdu_details_stats_req(struct cdp_soc_t *soc_hdl, uint8_t enable)
 					   0, 0, 0, 0);
 }
 
+QDF_STATUS dp_sawf_update_mpdu_basic_stats(struct dp_soc *soc,
+					   uint16_t peer_id,
+					   uint8_t tid, uint8_t q_idx,
+					   uint64_t svc_intval_success_cnt,
+					   uint64_t svc_intval_failure_cnt,
+					   uint64_t burst_size_success_cnt,
+					   uint64_t burst_size_failue_cnt)
+{
+	struct dp_txrx_peer *txrx_peer;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	struct dp_peer_sawf_stats *sawf_stats_ctx;
+
+	if (!soc) {
+		dp_sawf_err("Invalid soc context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	txrx_peer = dp_txrx_peer_get_ref_by_id(soc, peer_id, &txrx_ref_handle,
+					       DP_MOD_ID_SAWF);
+	if (!txrx_peer) {
+		dp_sawf_err("No txrx-peer for id %d", peer_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	sawf_stats_ctx = dp_peer_sawf_stats_ctx_get(txrx_peer);
+	if (!sawf_stats_ctx) {
+		dp_sawf_err("No sawf stats ctx for peer_id %d", peer_id);
+		goto fail;
+	}
+
+	DP_STATS_INC(sawf_stats_ctx,
+		     tx_stats[tid][q_idx].svc_intval_stats.success_cnt,
+		     svc_intval_success_cnt);
+	DP_STATS_INC(sawf_stats_ctx,
+		     tx_stats[tid][q_idx].svc_intval_stats.failure_cnt,
+		     svc_intval_failure_cnt);
+	DP_STATS_INC(sawf_stats_ctx,
+		     tx_stats[tid][q_idx].burst_size_stats.success_cnt,
+		     burst_size_success_cnt);
+	DP_STATS_INC(sawf_stats_ctx,
+		     tx_stats[tid][q_idx].burst_size_stats.failure_cnt,
+		     burst_size_failue_cnt);
+
+	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
+	return QDF_STATUS_SUCCESS;
+fail:
+	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_SAWF);
+	return QDF_STATUS_E_FAILURE;
+}
+
 QDF_STATUS dp_sawf_set_mov_avg_params(uint32_t num_pkt,
 				      uint32_t num_win)
 {

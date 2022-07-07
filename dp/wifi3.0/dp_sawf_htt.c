@@ -540,18 +540,13 @@ static void dp_sawf_htt_gen_mpdus_tlv(struct dp_soc *soc, uint8_t *tlv_buf)
 		return;
 	}
 
-	dp_sawf_update_svc_intval_mpdu_stats(soc,
-					     tlv->queue_id.peer_id,
-					     remapped_tid,
-					     host_tid_queue,
-					     tlv->svc_interval.success,
-					     tlv->svc_interval.fail);
-	dp_sawf_update_burst_size_mpdu_stats(soc,
-					     tlv->queue_id.peer_id,
-					     remapped_tid,
-					     host_tid_queue,
-					     tlv->burst_size.success,
-					     tlv->burst_size.fail);
+	dp_sawf_update_mpdu_basic_stats(soc,
+					tlv->queue_id.peer_id,
+					remapped_tid, host_tid_queue,
+					tlv->svc_interval.success,
+					tlv->svc_interval.fail,
+					tlv->burst_size.success,
+					tlv->burst_size.fail);
 }
 
 /*
