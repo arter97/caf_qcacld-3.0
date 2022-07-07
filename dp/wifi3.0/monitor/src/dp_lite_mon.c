@@ -639,6 +639,7 @@ dp_lite_mon_set_tx_peer_config(struct dp_soc *soc,
 	struct dp_lite_mon_peer *peer = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	enum cdp_tx_filter_action cmd;
+	uint8_t peer_count;
 
 	if (!be_mon_pdev)
 		return QDF_STATUS_E_FAILURE;
@@ -662,10 +663,24 @@ dp_lite_mon_set_tx_peer_config(struct dp_soc *soc,
 
 	if (status == QDF_STATUS_SUCCESS) {
 		/* configure peer to fw */
-		if (peer_config->action == CDP_LITE_MON_PEER_ADD)
-			cmd = CDP_TX_FILTER_ACTION_ADD;
-		else if (peer_config->action == CDP_LITE_MON_PEER_REMOVE)
-			cmd = CDP_TX_FILTER_ACTION_DEL;
+		peer_count = lite_mon_tx_config->tx_config.peer_count;
+		if (peer_config->action == CDP_LITE_MON_PEER_ADD) {
+			/* Indicate the first peer addition using
+			 * ENABLE_FILTERING command.
+			 */
+			if (peer_count == 1)
+				cmd = CDP_TX_FILTER_ACTION_ENABLE_FILTERING;
+			else
+				cmd = CDP_TX_FILTER_ACTION_ADD;
+		} else if (peer_config->action == CDP_LITE_MON_PEER_REMOVE) {
+			/* Indicate the last peer deletion using
+			 * CLEAR_FILTERING command.
+			 */
+			if (peer_count == 0)
+				cmd = CDP_TX_FILTER_ACTION_CLEAR_FILTERING;
+			else
+				cmd = CDP_TX_FILTER_ACTION_DEL;
+		}
 		if (soc->cdp_soc.ol_ops->config_lite_mon_tx_peer)
 			soc->cdp_soc.ol_ops->config_lite_mon_tx_peer(soc->ctrl_psoc,
 								     be_pdev->pdev.pdev_id,
