@@ -99,6 +99,7 @@
 
 #include <cdp_txrx_cmn.h>
 #include <cdp_txrx_misc.h>
+#include <cdp_txrx_ctrl.h>
 #include <qca_vendor.h>
 #include "wlan_pmo_ucfg_api.h"
 #include "os_if_wifi_pos.h"
@@ -17548,22 +17549,6 @@ wlan_hdd_update_akm_suit_info(struct wiphy *wiphy)
 }
 #endif
 
-#ifdef WLAN_FEATURE_11BE_MLO
-static void wlan_hdd_update_eapol_over_nl80211_flags(struct wiphy *wiphy)
-{
-	wiphy_ext_feature_set(wiphy,
-			      NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211);
-	wiphy_ext_feature_set(wiphy,
-		       NL80211_EXT_FEATURE_CONTROL_PORT_OVER_NL80211_TX_STATUS);
-	wiphy_ext_feature_set(wiphy,
-			      NL80211_EXT_FEATURE_CONTROL_PORT_NO_PREAUTH);
-}
-#else
-static void wlan_hdd_update_eapol_over_nl80211_flags(struct wiphy *wiphy)
-{
-}
-#endif
-
 /*
  * FUNCTION: wlan_hdd_cfg80211_init
  * This function is called by hdd_wlan_startup()
@@ -17703,8 +17688,6 @@ int wlan_hdd_cfg80211_init(struct device *dev,
 	wlan_hdd_cfg80211_action_frame_randomization_init(wiphy);
 
 	wlan_hdd_set_nan_supported_bands(wiphy);
-
-	wlan_hdd_update_eapol_over_nl80211_flags(wiphy);
 
 	hdd_exit();
 	return 0;
@@ -18381,6 +18364,8 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 	int ret = 0;
 	QDF_STATUS qdf_ret_status;
 	mac_handle_t mac_handle;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	cdp_config_param_type vdev_param;
 
 	hdd_enter();
 
@@ -18430,6 +18415,12 @@ static int __wlan_hdd_cfg80211_change_bss(struct wiphy *wiphy,
 					 adapter->vdev_id,
 					 adapter->session.ap.
 					 disable_intrabss_fwd);
+
+		vdev_param.cdp_vdev_param_ap_brdg_en =
+			!adapter->session.ap.disable_intrabss_fwd;
+		cdp_txrx_set_vdev_param(soc, adapter->vdev_id,
+					CDP_ENABLE_AP_BRIDGE,
+					vdev_param);
 	}
 
 	hdd_exit();
@@ -23110,62 +23101,6 @@ static int wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 	return errno;
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO
-static int __wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
-					       struct net_device *dev,
-					       const u8 *buf,
-					       size_t len, const u8 *dest,
-						__be16 proto, bool unencrypted)
-{
-	qdf_nbuf_t nbuf;
-	struct ethhdr *ehdr;
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-
-	nbuf = qdf_nbuf_alloc(NULL, (len + sizeof(struct ethhdr)), 0, 4, false);
-	if (!nbuf)
-		return -ENOMEM;
-	qdf_nbuf_reserve(nbuf, sizeof(struct ethhdr));
-	skb_put_data(nbuf, buf, len);
-	ehdr = skb_push(nbuf, sizeof(struct ethhdr));
-	qdf_mem_copy(ehdr->h_dest, dest, ETH_ALEN);
-	qdf_mem_copy(ehdr->h_source, adapter->mac_addr.bytes, ETH_ALEN);
-	ehdr->h_proto = proto;
-
-	nbuf->dev = dev;
-	nbuf->protocol = htons(ETH_P_PAE);
-	skb_reset_network_header(nbuf);
-	skb_reset_mac_header(nbuf);
-	hdd_select_queue(dev, nbuf, NULL, NULL);
-
-	netif_tx_lock(dev);
-	dev->netdev_ops->ndo_start_xmit(nbuf, dev);
-	netif_tx_unlock(dev);
-
-	return 0;
-}
-
-static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
-					     struct net_device *dev,
-					     const u8 *buf,
-					     size_t len, const u8 *dest,
-					     __be16 proto, bool unencrypted)
-{
-	int errno;
-	struct osif_vdev_sync *vdev_sync;
-
-	errno = osif_vdev_sync_op_start(dev, &vdev_sync);
-	if (errno)
-		return errno;
-
-	errno = __wlan_hdd_cfg80211_tx_control_port(wiphy, dev, buf, len, dest,
-						    proto, unencrypted);
-
-	osif_vdev_sync_op_stop(vdev_sync);
-
-	return errno;
-}
-#endif
-
 /**
  * struct cfg80211_ops - cfg80211_ops
  *
@@ -23315,7 +23250,4 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.get_antenna = wlan_hdd_cfg80211_get_chainmask,
 	.get_channel = wlan_hdd_cfg80211_get_channel,
 	.set_bitrate_mask = wlan_hdd_cfg80211_set_bitrate_mask,
-#ifdef WLAN_FEATURE_11BE_MLO
-	.tx_control_port = wlan_hdd_cfg80211_tx_control_port,
-#endif
 };

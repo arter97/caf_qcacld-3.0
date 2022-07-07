@@ -95,6 +95,7 @@
  * New Firmware related "ACTION" needs to be added before this placeholder.
  * @ACTION_OUI_HOST_RECONN: reconnect to the same BSSID when wait for
  * association response timeout from AP
+ * @ACTION_OUI_TAKE_ALL_BAND_INFO: let AP country ie take all band info
  * @ACTION_OUI_MAXIMUM_ID: maximum number of action oui types
  */
 enum action_oui_id {
@@ -110,6 +111,7 @@ enum action_oui_id {
 	ACTION_OUI_DISABLE_TWT = 9,
 	ACTION_OUI_HOST_ONLY,
 	ACTION_OUI_HOST_RECONN = ACTION_OUI_HOST_ONLY,
+	ACTION_OUI_TAKE_ALL_BAND_INFO,
 	ACTION_OUI_MAXIMUM_ID
 };
 
