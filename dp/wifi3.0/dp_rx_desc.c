@@ -384,6 +384,7 @@ void dp_rx_desc_nbuf_free(struct dp_soc *soc,
 
 	qdf_spin_lock_bh(&rx_desc_pool->lock);
 	for (i = 0; i < rx_desc_pool->pool_size; i++) {
+		dp_rx_desc_free_dbg_info(&rx_desc_pool->array[i].rx_desc);
 		if (rx_desc_pool->array[i].rx_desc.in_use) {
 			nbuf = rx_desc_pool->array[i].rx_desc.nbuf;
 
@@ -422,6 +423,7 @@ void dp_rx_desc_frag_free(struct dp_soc *soc,
 
 	qdf_spin_lock_bh(&rx_desc_pool->lock);
 	for (i = 0; i < rx_desc_pool->pool_size; i++) {
+		dp_rx_desc_free_dbg_info(&rx_desc_pool->array[i].rx_desc);
 		if (rx_desc_pool->array[i].rx_desc.in_use) {
 			paddr = rx_desc_pool->array[i].rx_desc.paddr_buf_start;
 			vaddr = rx_desc_pool->array[i].rx_desc.rx_buf_start;
