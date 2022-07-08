@@ -26,11 +26,19 @@
 #include <wlan_mlme_dispatcher.h>
 #include <wlan_repeater_internal.h>
 #include <wlan_repeater_api.h>
+#ifdef CONFIG_AFC_SUPPORT
+#include <qdf_util.h>
+#include <ieee80211_var.h>
+#include <ieee80211_proto.h>
+#endif
 #if ATH_SUPPORT_WRAP
 #include <dp_wrap.h>
 #endif
 
 #define SKIP_SCAN_ENTRIES 10000
+#ifdef CONFIG_AFC_SUPPORT
+#define AFC_MAX_BSSID 10
+#endif
 
 static struct wlan_rptr_global_priv g_rptr_ctx;
 static struct wlan_rptr_global_priv *gp_rptr_ctx;
@@ -371,7 +379,6 @@ void wlan_rptr_core_reset_global_flags(void)
 	}
 }
 
-#if REPEATER_SAME_SSID
 static bool
 wlan_rptr_dessired_ssid_found(struct wlan_objmgr_vdev *vdev,
 			      wlan_scan_entry_t se)
@@ -392,6 +399,97 @@ wlan_rptr_dessired_ssid_found(struct wlan_objmgr_vdev *vdev,
 	return 0;
 }
 
+#ifdef CONFIG_AFC_SUPPORT
+QDF_STATUS
+wlan_rptr_clear_afc_list(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_afc_list_node *afc_node;
+	qdf_list_node_t *del_node = NULL;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv)
+		return QDF_STATUS_E_FAILURE;
+
+	if (qdf_list_empty(&pdev_priv->afc_list))
+		return QDF_STATUS_SUCCESS;
+
+	qdf_spin_lock(&pdev_priv->rptr_pdev_lock);
+
+	while (qdf_list_remove_front(&pdev_priv->afc_list, &del_node)
+	       == QDF_STATUS_SUCCESS) {
+		afc_node = qdf_container_of(del_node,
+					    struct wlan_rptr_afc_list_node,
+					    node);
+		RPTR_LOGI("Clear afc node for scan entry %s\n",
+			  ether_sprintf(afc_node->bssid));
+		qdf_mem_free(afc_node);
+	}
+
+	qdf_spin_unlock(&pdev_priv->rptr_pdev_lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_rptr_get_rootap_power_mode(void *arg, wlan_scan_entry_t se)
+{
+	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)arg;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct ieee80211_ie_heop *heop = NULL;
+	struct heop_6g_param *heop_6g = NULL;
+	u8 *bssid = NULL;
+	struct wlan_rptr_afc_list_node *afc_node = NULL;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv)
+		return QDF_STATUS_E_FAILURE;
+
+	if (wlan_rptr_dessired_ssid_found(vdev, se)) {
+		heop = (struct ieee80211_ie_heop *)util_scan_entry_heop(se);
+		heop_6g = ieee80211_get_he_6g_opinfo(heop);
+
+		if (!heop_6g) {
+			RPTR_LOGE("Couldnt retrieve HE 6GHz opinfo\n");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		afc_node = qdf_mem_malloc(sizeof
+					  (struct wlan_rptr_afc_list_node));
+
+		if (!afc_node) {
+			RPTR_LOGE("Couldnt allocate afc node for scan entry\n");
+			return QDF_STATUS_E_NOMEM;
+		}
+
+		bssid = util_scan_entry_bssid(se);
+		qdf_mem_copy(afc_node->bssid, bssid, QDF_MAC_ADDR_SIZE);
+
+		afc_node->power_mode = heop_6g->regulatory_info;
+
+		qdf_spin_lock(&pdev_priv->rptr_pdev_lock);
+
+		if (qdf_list_insert_front(&pdev_priv->afc_list, &afc_node->node)
+			== QDF_STATUS_SUCCESS) {
+			RPTR_LOGI("Adding afc node for scan entry %s\n",
+				  ether_sprintf(bssid));
+			status = QDF_STATUS_SUCCESS;
+		} else {
+			RPTR_LOGI("Failed to add afc node for scan entry %s\n",
+				  ether_sprintf(bssid));
+
+			qdf_mem_free(afc_node);
+			status = QDF_STATUS_E_FAILURE;
+		}
+		qdf_spin_unlock(&pdev_priv->rptr_pdev_lock);
+	}
+	return status;
+}
+#endif
+
+#if REPEATER_SAME_SSID
 QDF_STATUS
 wlan_rptr_get_rootap_bssid(void *arg, wlan_scan_entry_t se)
 {
@@ -612,6 +710,99 @@ wlan_rptr_core_validate_stavap_bssid(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+#ifdef CONFIG_AFC_SUPPORT
+static inline struct wlan_rptr_afc_list_node *
+wlan_rptr_afc_core_find_node(struct wlan_rptr_pdev_priv *pdev_priv,
+			     uint8_t *bssid)
+{
+	struct wlan_rptr_afc_list_node *afc_node;
+	qdf_list_node_t *node = NULL, *next_node = NULL;
+
+	if (!bssid) {
+		RPTR_LOGI("bssid is NULL\n");
+		return NULL;
+	}
+
+	if (qdf_list_empty(&pdev_priv->afc_list)) {
+		RPTR_LOGI("AFC LIST is empty\n");
+		return NULL;
+	}
+
+	qdf_spin_lock(&pdev_priv->rptr_pdev_lock);
+	qdf_list_peek_front(&pdev_priv->afc_list,
+			    (qdf_list_node_t **)&next_node);
+
+	while (next_node) {
+		afc_node = (struct wlan_rptr_afc_list_node *)next_node;
+
+		if (qdf_mem_cmp(bssid, afc_node->bssid,
+				QDF_MAC_ADDR_SIZE) == 0) {
+			qdf_spin_unlock(&pdev_priv->rptr_pdev_lock);
+			return afc_node;
+		}
+
+		node = next_node;
+		next_node = NULL;
+		qdf_list_peek_next(&pdev_priv->afc_list, node,
+				   (qdf_list_node_t **)&next_node);
+	}
+
+	qdf_spin_unlock(&pdev_priv->rptr_pdev_lock);
+	RPTR_LOGI("Match not found in AFC list\n");
+	return NULL;
+}
+
+QDF_STATUS
+wlan_rptr_afc_core_get_ap_power_mode(struct wlan_objmgr_vdev *vdev,
+				     uint8_t *bssid, uint8_t *pwr_mode)
+{
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_afc_list_node *afc_node = NULL;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (!pdev_priv)
+		return QDF_STATUS_E_FAILURE;
+
+	afc_node = wlan_rptr_afc_core_find_node(pdev_priv, bssid);
+	if (!afc_node)
+		return QDF_STATUS_E_FAILURE;
+
+	*pwr_mode = afc_node->power_mode;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void
+wlan_rptr_afc_core_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
+				      struct scan_event *event)
+{
+	static u32 last_scanid;
+	enum QDF_OPMODE opmode;
+	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
+
+	if (event->type == SCAN_EVENT_TYPE_COMPLETED) {
+		opmode = wlan_vdev_mlme_get_opmode(vdev);
+		if (opmode == QDF_STA_MODE) {
+			if (wlan_rptr_is_psta_vdev(vdev))
+				return;
+
+			if (last_scanid == event->scan_id)
+				return;
+
+			last_scanid = event->scan_id;
+			/* clear the AFC list */
+			wlan_rptr_clear_afc_list(pdev);
+
+			/* Populate AFC list by parsing scan table */
+			ucfg_scan_db_iterate(pdev,
+					     wlan_rptr_get_rootap_power_mode,
+					     (void *)vdev);
+		}
+	}
 }
 #endif
 
@@ -899,7 +1090,11 @@ QDF_STATUS wlan_repeater_pdev_create_handler(struct wlan_objmgr_pdev *pdev,
 		status = QDF_STATUS_E_FAILURE;
 		goto attach_failure;
 	}
+
 	qdf_spinlock_create(&pdev_priv->rptr_pdev_lock);
+#ifdef CONFIG_AFC_SUPPORT
+	qdf_list_create(&pdev_priv->afc_list, AFC_MAX_BSSID);
+#endif
 
 	return status;
 
@@ -1067,6 +1262,12 @@ QDF_STATUS wlan_repeater_pdev_delete_handler(struct wlan_objmgr_pdev *pdev,
 
 	if (pdev_priv) {
 		qdf_spinlock_destroy(&pdev_priv->rptr_pdev_lock);
+
+#ifdef CONFIG_AFC_SUPPORT
+		/* clear the AFC list */
+		wlan_rptr_clear_afc_list(pdev);
+		qdf_list_destroy(&pdev_priv->afc_list);
+#endif
 
 		if (wlan_objmgr_pdev_component_obj_detach(pdev,
 							  WLAN_UMAC_COMP_REPEATER,

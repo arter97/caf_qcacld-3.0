@@ -1332,7 +1332,76 @@ wlan_rptr_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 }
 
 qdf_export_symbol(wlan_rptr_ss_parse_scan_entries);
+#endif
 
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * wlan_rptr_afc_is_stop_ap_allowed - is stop_ap allowed
+ * @vdev- vdev object manager
+ * @freq - current chan freq
+ * return true if allowed; false if not allowed
+ */
+bool
+wlan_rptr_afc_is_stop_ap_allowed(struct wlan_objmgr_vdev *vdev,
+				 qdf_freq_t freq)
+{
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+	struct rptr_ext_cbacks *ext_cb = &g_priv->ext_cbacks;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_vdev *sta_vdev;
+	enum reg_afc_dev_deploy_type reg_afc_deploy_type;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	sta_vdev = ext_cb->get_stavap(pdev);
+	wlan_reg_get_afc_dev_deploy_type(pdev, &reg_afc_deploy_type);
+
+	if (wlan_reg_is_6ghz_chan_freq(freq) &&
+	    reg_afc_deploy_type == AFC_DEPLOYMENT_OUTDOOR) {
+		if (wlan_reg_is_afc_power_event_received(pdev) &&
+		    !wlan_reg_is_afc_done(pdev, freq)) {
+			/* For standalone AP dont process stop_ap */
+			if (!sta_vdev)
+				return false;
+		}
+	}
+	return true;
+}
+
+qdf_export_symbol(wlan_rptr_afc_is_stop_ap_allowed);
+
+/**
+ * wlan_rptr_afc_parse_scan_entries - afc parse scan entries
+ * @vdev- vdev object manager
+ * @event - scan event
+ * return void
+ */
+void
+wlan_rptr_afc_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
+				 struct scan_event *event)
+{
+	wlan_rptr_afc_core_parse_scan_entries(vdev, event);
+}
+
+qdf_export_symbol(wlan_rptr_afc_parse_scan_entries);
+
+/**
+ * wlan_rptr_afc_get_ap_power_mode - get ap power mode
+ * @vdev - vdev object manager
+ * @bssid - bssid
+ * @pwr_mode - power mode
+ * return QDF_STATUS_SUCCESS if pwr_mode is obtained; otherwise non-zero
+ */
+QDF_STATUS
+wlan_rptr_afc_get_ap_power_mode(struct wlan_objmgr_vdev *vdev,
+				uint8_t *bssid, uint8_t *pwr_mode)
+{
+	return wlan_rptr_afc_core_get_ap_power_mode(vdev, bssid, pwr_mode);
+}
+
+qdf_export_symbol(wlan_rptr_afc_get_ap_power_mode);
+#endif
+
+#if REPEATER_SAME_SSID
 /**
  * wlan_rptr_validate_stavap_bssid - validate stavap bssid
  * when same ssid feature is enabled
