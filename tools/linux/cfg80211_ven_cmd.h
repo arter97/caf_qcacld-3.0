@@ -1390,6 +1390,7 @@ enum _ol_ath_param_t {
 	/* Get monitor version */
 	OL_ATH_PARAM_GET_MONITOR_VERSION = 513,
 	OL_ATH_PARAM_DFS_BW_EXPAND = 514,
+	OL_ATH_PARAM_BCN_MAX_COUNT = 515,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3672,6 +3673,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 #endif
 	{"g_monitor_version",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_GET_MONITOR_VERSION, GET_PARAM, 0},
+	{"set_max_bcn_cnt",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_BCN_MAX_COUNT, SET_PARAM, 1},
+	{"g_max_bcn_cnt",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_BCN_MAX_COUNT, GET_PARAM, 0},
 };
 #endif
 
