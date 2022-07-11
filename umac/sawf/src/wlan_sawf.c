@@ -110,6 +110,24 @@ bool wlan_service_id_configured(uint8_t svc_id)
 
 qdf_export_symbol(wlan_service_id_configured);
 
+uint8_t wlan_service_id_tid(uint8_t svc_id)
+{
+	struct sawf_ctx *sawf;
+
+	sawf = wlan_get_sawf_ctx();
+	if (!sawf) {
+		qdf_err("SAWF ctx is invalid");
+		goto err;
+	}
+
+	if (wlan_service_id_configured(svc_id))
+		return sawf->svc_classes[svc_id - 1].tid;
+err:
+	return SAWF_INVALID_TID;
+}
+
+qdf_export_symbol(wlan_service_id_tid);
+
 bool wlan_delay_bound_configured(uint8_t svc_id)
 {
 	struct sawf_ctx *sawf;
