@@ -299,8 +299,9 @@ wlan_reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 			      enum supported_6g_pwr_types
 			      in_6g_pwr_mode,
 			      qdf_freq_t *first_valid_freq,
-			      int bw)
+			      int bw,
+			      int sec_40_offset)
 {
 	return reg_get_first_valid_freq(pdev, in_6g_pwr_mode, first_valid_freq,
-					bw);
+					bw, sec_40_offset);
 }

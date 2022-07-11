@@ -1327,12 +1327,120 @@ reg_get_first_valid_freq_on_cur_chan(struct regulatory_channel *cur_chan_list,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * reg_get_first_valid_6ghz_freq() - Get first valid 6 GHz frequency for
+ * the given input bw.
+ * @pdev_priv_obj: pointer to regulatory pdev private object
+ * @freq_idx: channel enum
+ * @in_6g_pwr_mode: Input 6g power mode
+ * @first_valid_freq: Pointer to first valid frequency
+ * @bw: Bandwidth
+ *
+ * Return: First valid 6 GHz frequency
+ */
+static qdf_freq_t
+reg_get_first_valid_6ghz_freq(struct wlan_regulatory_pdev_priv_obj
+			      *pdev_priv_obj,
+			      enum channel_enum freq_idx,
+			      enum supported_6g_pwr_types
+			      in_6g_pwr_mode,
+			      qdf_freq_t *first_valid_freq,
+			      int bw)
+{
+	struct regulatory_channel *cur_chan_list;
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+
+	switch (in_6g_pwr_mode) {
+	case REG_CURRENT_PWR_MODE:
+		reg_get_first_valid_freq_on_cur_chan(&cur_chan_list[freq_idx],
+						     first_valid_freq,
+						     bw);
+		break;
+
+	case REG_BEST_PWR_MODE:
+	default:
+		reg_get_first_valid_freq_on_power_mode(pdev_priv_obj,
+						       freq_idx,
+						       &cur_chan_list[freq_idx],
+						       in_6g_pwr_mode,
+						       first_valid_freq,
+						       bw);
+		break;
+	}
+	return *first_valid_freq;
+}
+
+/**
+ * reg_get_first_valid_frequency() - Find first valid frequency for the
+ * given input bw. In case of 2.4 GHz/ 5 GHz, use current channel to
+ * find the first valid frequency. In case of 6 GHz band, use super channel
+ * list to find the first valid channel based on the input power mode.
+ *
+ * @pdev_priv_obj: Pointer to struct wlan_regulatory_pdev_priv_obj
+ * @freq_idx: Frequency index
+ * @in_6g_pwr_mode: Input 6 GHz power type
+ * @first_valid_freq: First valid freq
+ * @bw: Bandwidth
+ */
+static void
+reg_get_first_valid_frequency(struct wlan_regulatory_pdev_priv_obj
+			      *pdev_priv_obj,
+			      enum channel_enum freq_idx,
+			      enum supported_6g_pwr_types
+			      in_6g_pwr_mode,
+			      qdf_freq_t *first_valid_freq,
+			      int bw)
+{
+	struct regulatory_channel *cur_chan_list = pdev_priv_obj->cur_chan_list;
+
+	if (freq_idx < MIN_6GHZ_CHANNEL)
+		reg_get_first_valid_freq_on_cur_chan(&cur_chan_list[freq_idx],
+						     first_valid_freq,
+						     bw);
+	else
+		reg_get_first_valid_6ghz_freq(pdev_priv_obj, freq_idx,
+					      in_6g_pwr_mode,
+					      first_valid_freq,
+					      bw);
+}
+
+/**
+ * reg_is_sec_40_valid_for_freq() - Return true if the secondary frequency
+ * of HT40 channel is valid, false otherwise.
+ * @pdev_priv_obj: Pointer to struct wlan_regulatory_pdev_priv_obj
+ * @freq: Primary frequency
+ * @sec_40_offset: Offset of HT40 chan
+ * @in_6g_pwr_mode: Input 6 GHz power mode
+ * @bw: Bandwidth
+ */
+static bool
+reg_is_sec_40_valid_for_freq(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
+			     qdf_freq_t freq, int8_t sec_40_offset,
+			     enum supported_6g_pwr_types in_6g_pwr_mode)
+{
+	enum channel_enum sec_chan_enum;
+	qdf_freq_t sec_40mhz_freq = freq + sec_40_offset;
+	qdf_freq_t first_valid_sec_freq = 0;
+
+	if (!sec_40_offset)
+		return true;
+
+	sec_chan_enum = reg_get_chan_enum_for_freq(sec_40mhz_freq);
+
+	reg_get_first_valid_frequency(pdev_priv_obj, sec_chan_enum,
+				      in_6g_pwr_mode,
+				      &first_valid_sec_freq, BW_40_MHZ);
+
+	return !!first_valid_sec_freq;
+}
+
 QDF_STATUS
 reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 			 enum supported_6g_pwr_types
 			 in_6g_pwr_mode,
 			 qdf_freq_t *first_valid_freq,
-			 int bw)
+			 int bw, int sec_40_offset)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	struct regulatory_channel *cur_chan_list;
@@ -1352,32 +1460,19 @@ reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 	cur_chan_list = pdev_priv_obj->cur_chan_list;
 
 	for (freq_idx = 0; freq_idx < NUM_CHANNELS; freq_idx++) {
-		if (freq_idx < MIN_6GHZ_CHANNEL) {
-			reg_get_first_valid_freq_on_cur_chan(&cur_chan_list[freq_idx],
-							     first_valid_freq,
-							     bw);
-			if (*first_valid_freq)
-				break;
-		} else {
-			switch (in_6g_pwr_mode) {
-			case REG_CURRENT_PWR_MODE:
-				reg_get_first_valid_freq_on_cur_chan(&cur_chan_list[freq_idx],
-								     first_valid_freq,
-								     bw);
-				if (*first_valid_freq)
-					break;
-			case REG_BEST_PWR_MODE:
-			default:
-				reg_get_first_valid_freq_on_power_mode(pdev_priv_obj,
-								       freq_idx,
-								       &cur_chan_list[freq_idx],
-								       in_6g_pwr_mode,
-								       first_valid_freq,
-								       bw);
-				if (*first_valid_freq)
-					break;
-			}
-		}
+	    reg_get_first_valid_frequency(pdev_priv_obj, freq_idx,
+					  in_6g_pwr_mode,
+					  first_valid_freq, bw);
+	    if (*first_valid_freq) {
+		if (!reg_is_sec_40_valid_for_freq(pdev_priv_obj,
+						  *first_valid_freq,
+						  sec_40_offset,
+						  in_6g_pwr_mode))
+		    *first_valid_freq = 0;
+	    }
+	    if (*first_valid_freq)
+		break;
 	}
+
 	return QDF_STATUS_SUCCESS;
 }

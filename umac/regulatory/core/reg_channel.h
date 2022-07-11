@@ -315,6 +315,7 @@ reg_get_reg_chan_list_based_on_freq(struct wlan_objmgr_pdev *pdev,
  * is determined.
  * @first_valid_freq: channel center frequency.
  * @bw: Bandwidth.
+ * @sec_40_offset: 40 MHz channel's secondary offset
  *
  * Return: QDF_STATUS.
  */
@@ -323,5 +324,5 @@ reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 			 enum supported_6g_pwr_types
 			 in_6g_pwr_mode,
 			 qdf_freq_t *first_valid_freq,
-			 int bw);
+			 int bw, int sec_40_offset);
 #endif /* __REG_CHANNEL_H_ */
