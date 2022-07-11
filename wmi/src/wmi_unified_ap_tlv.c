@@ -24,6 +24,32 @@
 #include "wmi_unified_rtt.h"
 #include <wmi_unified_ap_11be_api.h>
 
+wmi_channel_width convert_host_to_target_chwidth(uint32_t chan_width)
+{
+	switch (chan_width) {
+	case CH_WIDTH_20MHZ:
+		return WMI_CHAN_WIDTH_20;
+	case CH_WIDTH_40MHZ:
+		return WMI_CHAN_WIDTH_40;
+	case CH_WIDTH_80MHZ:
+		return WMI_CHAN_WIDTH_80;
+	case CH_WIDTH_160MHZ:
+		return WMI_CHAN_WIDTH_160;
+	case CH_WIDTH_80P80MHZ:
+		return WMI_CHAN_WIDTH_80P80;
+	case CH_WIDTH_5MHZ:
+		return WMI_CHAN_WIDTH_5;
+	case CH_WIDTH_10MHZ:
+		return WMI_CHAN_WIDTH_10;
+#ifdef WLAN_FEATURE_11BE
+	case CH_WIDTH_320MHZ:
+		return WMI_CHAN_WIDTH_320;
+#endif
+	default:
+		return WMI_CHAN_WIDTH_MAX;
+	}
+}
+
 /**
  * send_peer_add_wds_entry_cmd_tlv() - send peer add command to fw
  * @wmi_handle: wmi handle
@@ -2690,7 +2716,7 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 					   &cmd_peer_list[ix].peer_macaddr);
 
 			cmd_peer_list[ix].chan_width =
-					param_peer_list[ix].chan_width;
+				convert_host_to_target_chwidth(param_peer_list[ix].chan_width);
 
 			wmi_debug("Peer[%u]: chan_width = %u", ix,
 				  cmd_peer_list[ix].chan_width);
