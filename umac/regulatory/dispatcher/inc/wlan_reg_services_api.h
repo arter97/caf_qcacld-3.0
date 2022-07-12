@@ -2376,4 +2376,30 @@ static inline QDF_STATUS wlan_reg_psd_2_eirp(struct wlan_objmgr_pdev *pdev,
  * Return: phy_ch_width
  */
 enum phy_ch_width wlan_reg_find_chwidth_from_bw(uint16_t bw);
+
+/**
+ * wlan_is_sup_chan_entry_afc_done() - Checks if the super chan entry of given
+ * channel idx and power mode has REGULATORY_CHAN_AFC_NOT_DONE flag cleared.
+ *
+ * @pdev: pdev pointer
+ * @freq: input channel idx
+ * @in_6g_pwr_mode: input power mode
+ *
+ * Return: True if REGULATORY_CHAN_AFC_NOT_DONE flag is clear for the super
+ * chan entry.
+ */
+#ifdef CONFIG_BAND_6GHZ
+bool
+wlan_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
+				enum channel_enum chan_idx,
+				enum supported_6g_pwr_types in_6g_pwr_mode);
+#else
+static inline bool
+wlan_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
+				enum channel_enum chan_idx,
+				enum supported_6g_pwr_types in_6g_pwr_mode)
+{
+	return false;
+}
+#endif
 #endif
