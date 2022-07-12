@@ -291,22 +291,4 @@ reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				qdf_freq_t chan_freq,
 				bool *is_psd, uint16_t *reg_eirp,
 				uint16_t *reg_psd);
-
-/**
- * reg_is_freq_present_in_reg_chan_list() - Check the input frequency
- * @pdev: Pointer to pdev
- * @freq: Channel center frequency in MHz
- * @in_6g_pwr_mode: Input 6G power type which will determine the 6G channel
- *
- * Check if the input channel center frequency is present in the current/super
- * channel list
- *
- * Return: Return true if channel center frequency is present in the current/super
- * channel list, else return false.
- */
-bool
-reg_is_freq_present_in_reg_chan_list(struct wlan_objmgr_pdev *pdev,
-				     qdf_freq_t freq,
-				     enum supported_6g_pwr_types in_6g_pwr_mode);
-
 #endif /* __REG_CHANNEL_H_ */
