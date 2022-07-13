@@ -1363,6 +1363,10 @@ bool dp_peer_tx_cap_search(struct dp_pdev *pdev,
 
 	tx_capture = &mon_pdev->tx_capture;
 
+	if (!tx_capture || !(tx_capture->ptr_peer_mgmt_list)) {
+		return found;
+	}
+
 	/* search based on mac address */
 	for (i = 0; i < MAX_MGMT_PEER_FILTER; i++) {
 		uint8_t *peer_mac_addr;
@@ -1370,6 +1374,7 @@ bool dp_peer_tx_cap_search(struct dp_pdev *pdev,
 		ptr_peer_mgmt_list = &tx_capture->ptr_peer_mgmt_list[i];
 		if (ptr_peer_mgmt_list->avail)
 			continue;
+
 		peer_mac_addr = ptr_peer_mgmt_list->mac_addr;
 		if (!dp_peer_compare_mac_addr(mac_addr,
 					      peer_mac_addr)) {
