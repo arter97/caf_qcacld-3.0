@@ -157,7 +157,6 @@ dp_peer_sawf_ctx_free(struct dp_soc *soc,
 		      struct dp_peer *peer)
 {
 	if (!peer->sawf) {
-
 		/*
 		 * In MLO case, primary link peer holds SAWF ctx.
 		 */
@@ -167,6 +166,9 @@ dp_peer_sawf_ctx_free(struct dp_soc *soc,
 		dp_sawf_err("Failed to free peer SAWF ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (peer->sawf->telemetry_ctx)
+		telemetry_sawf_peer_ctx_free(peer->sawf->telemetry_ctx);
 
 	if (peer->sawf)
 		qdf_mem_free(peer->sawf);
