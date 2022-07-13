@@ -4339,8 +4339,9 @@ static void dp_pdev_deinit(struct cdp_pdev *txrx_pdev, int force)
 	dp_rx_pdev_buffers_free(pdev);
 	dp_rx_pdev_mon_desc_pool_deinit(pdev);
 	dp_rx_pdev_desc_pool_deinit(pdev);
-	dp_tx_ppdu_stats_detach(pdev);
+	dp_pdev_bkp_stats_detach(pdev);
 	dp_htt_ppdu_stats_detach(pdev);
+	dp_tx_ppdu_stats_detach(pdev);
 	qdf_event_destroy(&pdev->fw_peer_stats_event);
 	dp_cal_client_detach(&pdev->cal_client_ctx);
 	if (pdev->sojourn_buf)
@@ -13589,6 +13590,12 @@ static inline QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 		goto fail9;
 	}
 
+	if (dp_pdev_bkp_stats_attach(pdev) != QDF_STATUS_SUCCESS) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  FL("dp_pdev_bkp_stats_attach failed"));
+		goto fail10;
+	}
+
 	/* initialize sw rx descriptors */
 	dp_rx_pdev_desc_pool_init(pdev);
 	/* initialize sw monitor rx descriptors */
@@ -13607,6 +13614,8 @@ static inline QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 		qdf_skb_mem_stats_read());
 
 	return QDF_STATUS_SUCCESS;
+fail10:
+	dp_rx_fst_detach(soc, pdev);
 fail9:
 	dp_ipa_uc_detach(soc, pdev);
 fail8:

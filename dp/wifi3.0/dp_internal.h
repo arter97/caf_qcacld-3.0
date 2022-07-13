@@ -2599,4 +2599,23 @@ void dp_desc_multi_pages_mem_free(struct dp_soc *soc,
  */
 void dp_peer_flush_frags(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			 uint8_t *peer_mac);
+
+/*
+ * dp_pdev_bkp_stats_detach() - detach resources for back pressure stats
+ *				processing
+ * @pdev: Datapath PDEV handle
+ *
+ */
+void dp_pdev_bkp_stats_detach(struct dp_pdev *pdev);
+
+/*
+ * dp_pdev_bkp_stats_attach() - attach resources for back pressure stats
+ *				processing
+ * @pdev: Datapath PDEV handle
+ *
+ * Return: QDF_STATUS_SUCCESS: Success
+ *         QDF_STATUS_E_NOMEM: Error
+ */
+
+QDF_STATUS dp_pdev_bkp_stats_attach(struct dp_pdev *pdev);
 #endif /* #ifndef _DP_INTERNAL_H_ */
