@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -44,24 +45,26 @@ ucfg_coex_register_cfg_updated_handler(struct wlan_objmgr_psoc *psoc,
 }
 
 QDF_STATUS
-ucfg_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc, uint8_t val)
+ucfg_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode val)
 {
 	return wlan_coex_psoc_set_btc_chain_mode(psoc, val);
 }
 
 QDF_STATUS
-ucfg_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc, uint8_t *val)
+ucfg_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode *val)
 {
 	return wlan_coex_psoc_get_btc_chain_mode(psoc, val);
 }
 
 QDF_STATUS
-ucfg_coex_send_btc_chain_mode(struct wlan_objmgr_vdev *vdev, uint8_t mode)
+ucfg_coex_send_btc_chain_mode(struct wlan_objmgr_vdev *vdev,
+			      enum coex_btc_chain_mode mode)
 {
 	struct coex_config_params param = {0};
 
-	if (mode != WLAN_COEX_BTC_CHAIN_MODE_SHARED &&
-	    mode != WLAN_COEX_BTC_CHAIN_MODE_SEPARATED)
+	if (mode > WLAN_COEX_BTC_CHAIN_MODE_HYBRID)
 		return QDF_STATUS_E_INVAL;
 
 	param.vdev_id = wlan_vdev_get_id(vdev);
