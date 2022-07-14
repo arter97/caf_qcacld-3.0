@@ -886,7 +886,7 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 			     uint32_t svc_id, uint8_t *mac, void *data)
 {
 	struct dp_soc *dp_soc;
-	struct dp_peer *peer;
+	struct dp_peer *peer = NULL, *primary_link_peer = NULL;
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_sawf *sawf_ctx;
 	struct dp_peer_sawf_stats *stats_ctx;
@@ -928,7 +928,16 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 	}
 
 	dst = stats;
-	sawf_ctx = dp_peer_sawf_ctx_get(peer);
+
+	primary_link_peer = dp_get_primary_link_peer_by_id(dp_soc,
+							   txrx_peer->peer_id,
+							   DP_MOD_ID_CDP);
+	if (!primary_link_peer) {
+		dp_sawf_err("No primary link peer found");
+		goto fail;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(primary_link_peer);
 	if (!sawf_ctx) {
 		dp_sawf_err("stats_ctx doesn't exist");
 		goto fail;
@@ -1005,11 +1014,15 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 		dst->msduq = q_idx;
 	}
 
+	dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_CDP);
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 
 	return QDF_STATUS_SUCCESS;
 fail:
-	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+	if (primary_link_peer)
+		dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_CDP);
+	if (peer)
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 	return QDF_STATUS_E_FAILURE;
 }
 
@@ -1018,7 +1031,7 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 			  uint32_t svc_id, uint8_t *mac, void *data)
 {
 	struct dp_soc *dp_soc;
-	struct dp_peer *peer;
+	struct dp_peer *peer = NULL, *primary_link_peer = NULL;
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_sawf *sawf_ctx;
 	struct dp_peer_sawf_stats *stats_ctx;
@@ -1060,7 +1073,16 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 	}
 
 	dst = stats;
-	sawf_ctx = dp_peer_sawf_ctx_get(peer);
+
+	primary_link_peer = dp_get_primary_link_peer_by_id(dp_soc,
+							   txrx_peer->peer_id,
+							   DP_MOD_ID_CDP);
+	if (!primary_link_peer) {
+		dp_sawf_err("No primary link peer found");
+		goto fail;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(primary_link_peer);
 	if (!sawf_ctx) {
 		dp_sawf_err("stats_ctx doesn't exist");
 		goto fail;
@@ -1137,11 +1159,15 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 		dst->msduq = q_idx;
 	}
 
+	dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_CDP);
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 
 	return QDF_STATUS_SUCCESS;
 fail:
-	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+	if (primary_link_peer)
+		dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_CDP);
+	if (peer)
+		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 	return QDF_STATUS_E_FAILURE;
 }
 
