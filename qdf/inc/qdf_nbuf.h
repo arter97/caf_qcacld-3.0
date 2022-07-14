@@ -1055,6 +1055,11 @@ enum cb_ftype {
 typedef __qdf_nbuf_t qdf_nbuf_t;
 
 /**
+ * @qdf_nbuf_shared_info_t- Platform indepedent shared info
+ */
+typedef __qdf_nbuf_shared_info_t qdf_nbuf_shared_info_t;
+
+/**
  * struct qdf_nbuf_track_t - Network buffer track structure
  *
  * @p_next: Pointer to next
@@ -3001,6 +3006,17 @@ static inline qdf_nbuf_t qdf_nbuf_get_ext_list(qdf_nbuf_t head_buf)
 }
 
 /**
+ * qdf_nbuf_get_shinfo() - gets the shared info of head buf
+ * @head_buf: Network buffer
+ *
+ * Return: shared info of head buf
+ */
+static inline qdf_nbuf_shared_info_t qdf_nbuf_get_shinfo(qdf_nbuf_t head_buf)
+{
+	return (qdf_nbuf_shared_info_t)__qdf_nbuf_get_shinfo(head_buf);
+}
+
+/**
  * qdf_nbuf_get_tx_cksum() - gets the tx checksum offload demand
  * @buf: Network buffer
  *
@@ -4248,6 +4264,41 @@ static inline uint16_t qdf_nbuf_get_gso_segs(qdf_nbuf_t nbuf)
 }
 
 /**
+ * qdf_nbuf_set_gso_segs() - set the number of gso segments in
+ * nbuf
+ * @nbuf: Network buffer
+ * @val: val to be set
+ *
+ * Return: None
+ */
+static inline void qdf_nbuf_set_gso_segs(qdf_nbuf_t nbuf, uint16_t val)
+{
+	__qdf_nbuf_set_gso_segs(nbuf, val);
+}
+
+/**
+ * qdf_nbuf_set_gso_type_udp_l4() - set the gso type to GSO UDP L4
+ * @nbuf: Network buffer
+ *
+ * Return: None
+ */
+static inline void qdf_nbuf_set_gso_type_udp_l4(qdf_nbuf_t nbuf)
+{
+	__qdf_nbuf_set_gso_type_udp_l4(nbuf);
+}
+
+/**
+ * qdf_nbuf_set_ip_summed_partial() - set the ip summed to CHECKSUM_PARTIAL
+ * @nbuf: Network buffer
+ *
+ * Return: None
+ */
+static inline void qdf_nbuf_set_ip_summed_partial(qdf_nbuf_t nbuf)
+{
+	__qdf_nbuf_set_ip_summed_partial(nbuf);
+}
+
+/**
  * qdf_nbuf_get_gso_size() - Return the number of gso size in
  * nbuf
  * @nbuf: Network buffer
@@ -4683,6 +4734,77 @@ static inline uint32_t qdf_nbuf_get_mark(qdf_nbuf_t nbuf)
 static inline qdf_size_t qdf_nbuf_get_data_len(qdf_nbuf_t nbuf)
 {
 	return __qdf_nbuf_get_data_len(nbuf);
+}
+
+/**
+ * qdf_nbuf_set_data_len() - Return the data_len of the nbuf
+ * @nbuf: qdf_nbuf_t
+ * @len: data_len to be set
+ *
+ * Return: set data_len value
+ */
+static inline qdf_size_t qdf_nbuf_set_data_len(qdf_nbuf_t nbuf, uint32_t len)
+{
+	return __qdf_nbuf_set_data_len(nbuf, len);
+}
+
+/**
+ * qdf_nbuf_get_only_data_len() - Return the data_len of the nbuf
+ * @nbuf: qdf_nbuf_t
+ *
+ * Return: data_len value
+ */
+static inline qdf_size_t qdf_nbuf_get_only_data_len(qdf_nbuf_t nbuf)
+{
+	return __qdf_nbuf_get_only_data_len(nbuf);
+}
+
+/**
+ * qdf_nbuf_set_hash() - set the hash of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_set_hash(qdf_nbuf_t buf, uint32_t len)
+{
+	__qdf_nbuf_set_hash(buf, len);
+}
+
+/**
+ * qdf_nbuf_set_sw_hash() - set the sw hash of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_set_sw_hash(qdf_nbuf_t buf, uint32_t len)
+{
+	__qdf_nbuf_set_sw_hash(buf, len);
+}
+
+/**
+ * qdf_nbuf_set_csum_start() - set the csum start of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_set_csum_start(qdf_nbuf_t buf, uint16_t len)
+{
+	__qdf_nbuf_set_csum_start(buf, len);
+}
+
+/**
+ * qdf_nbuf_set_csum_offset() - set the csum offset of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_set_csum_offset(qdf_nbuf_t buf, uint16_t len)
+{
+	__qdf_nbuf_set_csum_offset(buf, len);
 }
 
 /**
