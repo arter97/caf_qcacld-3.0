@@ -4371,7 +4371,7 @@ struct dp_fisa_rx_sw_ft {
 	/* last aggregate count fetched from RX PKT TLV */
 	uint32_t last_hal_aggr_count;
 	uint32_t cur_aggr_gso_size;
-	struct udphdr *head_skb_udp_hdr;
+	qdf_net_udphdr_t *head_skb_udp_hdr;
 	uint16_t frags_cumulative_len;
 	/* CMEM parameters */
 	uint32_t cmem_offset;

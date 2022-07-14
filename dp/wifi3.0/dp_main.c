@@ -48,7 +48,7 @@
 #include "htt_stats.h"
 #include "dp_htt.h"
 #ifdef WLAN_SUPPORT_RX_FISA
-#include <dp_fisa_rx.h>
+#include <wlan_dp_fisa_rx.h>
 #endif
 #include "htt_ppdu_stats.h"
 #include "qdf_mem.h"   /* qdf_mem_malloc,free */
