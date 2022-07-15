@@ -137,15 +137,15 @@ struct iterator_ctx {
 
 /**
  * wlan_stats_get_peer_stats(): Function to get peer specific stats
- * @psoc:  Pointer to Psoc object
- * @peer:  Pointer to Peer object
+ * @psoc:  Pointer to Vdev object
+ * @peer_mac:  Pointer to Peer mac
  * @cfg:  Pointer to stats config came as part of user request
  * @stats:  Pointer to unified stats object
  *
  * Return: QDF_STATUS_SUCCESS for success and Error code for failure
  */
-QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_psoc *psoc,
-				     struct wlan_objmgr_peer *peer,
+QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
+				     uint8_t *peer_mac,
 				     struct stats_config *cfg,
 				     struct unified_stats *stats);
 

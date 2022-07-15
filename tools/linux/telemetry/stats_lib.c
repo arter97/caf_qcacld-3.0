@@ -111,8 +111,11 @@ struct interface_list {
 /**
  * struct object_list: Holds request object hierarchy
  * @nlsent: Flag to indicate nl request is sent
+ * @is_mlo: Flag to indicate Multi Link device
+ * @take_mld_addr: Flag to indicate to take MLD address as driver input
  * @obj_type: Specifies stats_object_e type
  * @ifname: Interface to be used for sending nl command
+ * @mldaddr: MLD address
  * @hw_addr: Hardware address if it is a STA type object
  * @parent: Pionter to parent object list
  * @child: Pointer to child object list
@@ -120,8 +123,11 @@ struct interface_list {
  */
 struct object_list {
 	bool nlsent;
+	bool is_mlo;
+	bool take_mld_addr;
 	enum stats_object_e obj_type;
 	char ifname[IFNAME_LEN];
+	uint8_t mldaddr[ETH_ALEN];
 	uint8_t hw_addr[ETH_ALEN];
 	struct object_list *parent;
 	struct object_list *child;
@@ -2059,6 +2065,23 @@ static void free_object_list(struct object_list *temp_obj)
 	}
 }
 
+#if WLAN_FEATURE_11BE_MLO
+static void copy_sta_mld_details(struct object_list *obj,
+				 struct ieee80211req_sta_info *si)
+{
+	if (si->isi_is_mlo) {
+		obj->is_mlo = true;
+		memcpy(obj->mldaddr, si->isi_mldaddr, ETH_ALEN);
+	}
+}
+#else
+static void copy_sta_mld_details(struct object_list *obj,
+				 struct ieee80211req_sta_info *si)
+{
+	obj->is_mlo = false;
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 static void get_sta_info(struct cfg80211_data *buffer)
 {
 	struct ieee80211req_sta_info *si = NULL;
@@ -2086,6 +2109,7 @@ static void get_sta_info(struct cfg80211_data *buffer)
 		g_curr_sta_obj = temp_obj;
 
 		memcpy(g_curr_sta_obj->hw_addr, si->isi_macaddr, ETH_ALEN);
+		copy_sta_mld_details(g_curr_sta_obj, si);
 
 		cp += si->isi_len;
 		remaining_len -= si->isi_len;
@@ -2399,8 +2423,16 @@ static struct object_list *find_head_object(struct stats_command *cmd,
 			if (temp_obj->obj_type == STATS_OBJ_STA) {
 				if (!memcmp(temp_obj->hw_addr,
 					    cmd->sta_mac.ether_addr_octet,
-					    ETH_ALEN))
+					    ETH_ALEN)) {
+					temp_obj->take_mld_addr = false;
 					break;
+				} else if (temp_obj->is_mlo &&
+					   !memcmp(temp_obj->mldaddr,
+					   cmd->sta_mac.ether_addr_octet,
+					   ETH_ALEN)) {
+					temp_obj->take_mld_addr = true;
+					break;
+				}
 			} else if (temp_obj->child) {
 				if (temp_obj->obj_type == STATS_OBJ_AP)
 					ap_obj = temp_obj;
@@ -2585,6 +2617,12 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 	if (user_cmd->feat_flag == STATS_FEAT_FLG_EXT)
 		return send_nl_command_no_response(user_cmd, temp_obj->ifname);
 
+	if ((user_cmd->obj == STATS_OBJ_STA) &&
+	    (user_cmd->type == STATS_TYPE_CTRL) && root_obj->take_mld_addr) {
+		STATS_ERR("MLD MAC! Control Stats needs Link MAC!\n");
+		return -EINVAL;
+	}
+
 	memcpy(&cmd, user_cmd, sizeof(struct stats_command));
 	cmd.recursive = user_cmd->recursive;
 	memset(&buffer, 0, sizeof(struct cfg80211_data));
@@ -2597,9 +2635,14 @@ static int32_t send_request_per_object(struct stats_command *user_cmd,
 		if (!temp_obj->nlsent) {
 			temp_obj->nlsent = true;
 			cmd.obj = temp_obj->obj_type;
-			if (temp_obj->obj_type == STATS_OBJ_STA)
-				memcpy(cmd.sta_mac.ether_addr_octet,
-				       temp_obj->hw_addr, ETH_ALEN);
+			if (temp_obj->obj_type == STATS_OBJ_STA) {
+				if (temp_obj->take_mld_addr)
+					memcpy(cmd.sta_mac.ether_addr_octet,
+					       temp_obj->mldaddr, ETH_ALEN);
+				else
+					memcpy(cmd.sta_mac.ether_addr_octet,
+					       temp_obj->hw_addr, ETH_ALEN);
+			}
 			if (is_feat_valid_for_obj(&cmd)) {
 				ret = send_nl_command(&cmd, &buffer,
 						      temp_obj->ifname);

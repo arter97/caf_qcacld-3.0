@@ -680,7 +680,8 @@ static QDF_STATUS get_basic_psoc_data_rx(struct unified_stats *stats,
 }
 
 static QDF_STATUS get_basic_peer_data(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_objmgr_peer *peer,
+				      struct wlan_objmgr_vdev *vdev,
+				      uint8_t *peer_mac,
 				      struct unified_stats *stats,
 				      uint32_t feat)
 {
@@ -689,18 +690,14 @@ static QDF_STATUS get_basic_peer_data(struct wlan_objmgr_psoc *psoc,
 	uint8_t vdev_id = 0;
 	bool stats_collected = false;
 
-	if (!psoc || !peer) {
-		qdf_err("Invalid Psoc or Peer!");
-		return QDF_STATUS_E_INVAL;
-	}
 	peer_stats = qdf_mem_malloc(sizeof(struct cdp_peer_stats));
 	if (!peer_stats) {
 		qdf_err("Failed allocation!");
 		return QDF_STATUS_E_NOMEM;
 	}
-	vdev_id = wlan_vdev_get_id(peer->peer_objmgr.vdev);
+	vdev_id = wlan_vdev_get_id(vdev);
 	ret = cdp_host_get_peer_stats(wlan_psoc_get_dp_handle(psoc), vdev_id,
-				      peer->macaddr, peer_stats);
+				      peer_mac, peer_stats);
 	if (ret != QDF_STATUS_SUCCESS) {
 		qdf_err("Unable to fetch stats!");
 		goto get_failed;
@@ -742,22 +739,26 @@ get_failed:
 	return ret;
 }
 
-static QDF_STATUS get_basic_peer_ctrl(struct wlan_objmgr_peer *peer,
+static QDF_STATUS get_basic_peer_ctrl(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *peer_mac,
 				      struct unified_stats *stats,
 				      uint32_t feat)
 {
+	struct wlan_objmgr_peer *peer;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct peer_ic_cp_stats *peer_cp_stats = NULL;
 	bool stats_collected = false;
 
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_MLME_SB_ID);
 	if (!peer) {
-		qdf_err("Invalid Peer!");
-		return QDF_STATUS_E_INVAL;
+		qdf_err("Peer (%s) not found!", ether_sprintf(peer_mac));
+		return QDF_STATUS_E_FAILURE;
 	}
 	peer_cp_stats = qdf_mem_malloc(sizeof(struct peer_ic_cp_stats));
 	if (!peer_cp_stats) {
 		qdf_err("Allocation Failed!");
-		return QDF_STATUS_E_NOMEM;
+		ret = QDF_STATUS_E_NOMEM;
+		goto get_failed;
 	}
 	ret = wlan_cfg80211_get_peer_cp_stats(peer, peer_cp_stats);
 	if (QDF_STATUS_SUCCESS != ret) {
@@ -794,7 +795,9 @@ static QDF_STATUS get_basic_peer_ctrl(struct wlan_objmgr_peer *peer,
 	}
 
 get_failed:
-	qdf_mem_free(peer_cp_stats);
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_SB_ID);
+	if (peer_cp_stats)
+		qdf_mem_free(peer_cp_stats);
 	if (stats_collected)
 		ret = QDF_STATUS_SUCCESS;
 
@@ -1974,16 +1977,16 @@ static bool  get_advance_sawf_stats(uint32_t feat,
 	return false;
 }
 #endif
+
 static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
-					struct wlan_objmgr_peer *peer,
+					struct wlan_objmgr_vdev *vdev,
+					uint8_t *peer_mac,
 					struct unified_stats *stats,
 					struct stats_config *cfg)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct cdp_peer_stats *peer_stats = NULL;
-	struct wlan_objmgr_vdev *vdev = NULL;
 	void *dp_soc = NULL;
-	uint8_t *peer_mac = NULL;
 	uint8_t vdev_id = 0;
 	struct cdp_delay_tid_stats *delay = NULL;
 	struct cdp_peer_tid_stats *jitter = NULL;
@@ -1994,19 +1997,8 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 
 	feat = cfg->feat;
 	service_id = cfg->serviceid;
-	if (!psoc || !peer) {
-		qdf_err("Invalid Psoc or Peer!");
-		return QDF_STATUS_E_INVAL;
-	}
-
-	vdev = wlan_peer_get_vdev(peer);
-	if (!vdev) {
-		qdf_err("Invalid vdev!");
-		return QDF_STATUS_E_INVAL;
-	}
 
 	dp_soc = wlan_psoc_get_dp_handle(psoc);
-	peer_mac = wlan_peer_get_macaddr(peer);
 	vdev_id = wlan_vdev_get_id(vdev);
 	if (feat & ~(STATS_FEAT_FLG_DELAY | STATS_FEAT_FLG_JITTER)) {
 		peer_stats = qdf_mem_malloc(sizeof(struct cdp_peer_stats));
@@ -2090,13 +2082,18 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_advance_peer_data_delay(delay, stats);
 		if (ret != QDF_STATUS_SUCCESS)
-			qdf_err("Unable to fetch peer Advance Delay stats!");
+			qdf_debug("Unable to fetch peer Advance Delay stats!");
 		else
 			stats_collected = true;
 	}
 	if (feat & STATS_FEAT_FLG_JITTER) {
 		uint8_t pdev_id = 0;
+		struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
+		if (!pdev) {
+			qdf_err("Pdev not found!");
+			goto get_failed;
+		}
 		size = sizeof(struct cdp_peer_tid_stats) * CDP_MAX_DATA_TIDS;
 		jitter = qdf_mem_malloc(size);
 		if (!jitter) {
@@ -2104,18 +2101,22 @@ static QDF_STATUS get_advance_peer_data(struct wlan_objmgr_psoc *psoc,
 			ret = QDF_STATUS_E_NOMEM;
 			goto get_failed;
 		}
-		pdev_id = wlan_peer_get_pdev_id(peer);
+		pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 		ret = cdp_get_peer_jitter_stats(dp_soc, pdev_id, vdev_id,
 						peer_mac, jitter);
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_advance_peer_jitter_stats(jitter, stats);
 		if (ret != QDF_STATUS_SUCCESS)
-			qdf_err("Unable to fetch peer Advance Jitter Stats!");
+			qdf_debug("Unable to fetch peer Advance Jitter Stats!");
 		else
 			stats_collected = true;
 	}
-	stats_collected = get_advance_sawf_stats(feat, dp_soc, stats,
-						 service_id, peer_mac);
+	if (feat & (STATS_FEAT_FLG_SAWFDELAY | STATS_FEAT_FLG_SAWFTX)) {
+		if (get_advance_sawf_stats(feat, dp_soc, stats,
+					   service_id, peer_mac))
+			stats_collected = true;
+	}
+
 get_failed:
 	if (peer_stats)
 		qdf_mem_free(peer_stats);
@@ -2129,22 +2130,26 @@ get_failed:
 	return ret;
 }
 
-static QDF_STATUS get_advance_peer_ctrl(struct wlan_objmgr_peer *peer,
+static QDF_STATUS get_advance_peer_ctrl(struct wlan_objmgr_psoc *psoc,
+					uint8_t *peer_mac,
 					struct unified_stats *stats,
 					uint32_t feat)
 {
+	struct wlan_objmgr_peer *peer;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct peer_ic_cp_stats *peer_cp_stats = NULL;
 	bool stats_collected = false;
 
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_MLME_SB_ID);
 	if (!peer) {
-		qdf_err("Invalid Peer!");
-		return QDF_STATUS_E_INVAL;
+		qdf_err("Peer (%s) not found!", ether_sprintf(peer_mac));
+		return QDF_STATUS_E_FAILURE;
 	}
 	peer_cp_stats = qdf_mem_malloc(sizeof(struct peer_ic_cp_stats));
 	if (!peer_cp_stats) {
 		qdf_err("Allocation Failed!");
-		return QDF_STATUS_E_NOMEM;
+		ret = QDF_STATUS_E_NOMEM;
+		goto get_failed;
 	}
 	ret = wlan_cfg80211_get_peer_cp_stats(peer, peer_cp_stats);
 	if (QDF_STATUS_SUCCESS != ret) {
@@ -2188,7 +2193,9 @@ static QDF_STATUS get_advance_peer_ctrl(struct wlan_objmgr_peer *peer,
 	}
 
 get_failed:
-	qdf_mem_free(peer_cp_stats);
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_SB_ID);
+	if (peer_cp_stats)
+		qdf_mem_free(peer_cp_stats);
 	if (stats_collected)
 		ret = QDF_STATUS_SUCCESS;
 
@@ -3779,27 +3786,18 @@ get_pdev_tx_capture_stats(void *dp_soc_handle, uint8_t pdev_id,
 #endif /* WLAN_TX_PKT_CAPTURE_ENH */
 
 static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
-				      struct wlan_objmgr_peer *peer,
+				      struct wlan_objmgr_vdev *vdev,
+				      uint8_t *peer_mac,
 				      struct unified_stats *stats,
 				      uint32_t feat)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
-	struct wlan_objmgr_vdev *vdev = NULL;
 	struct cdp_peer_stats *peer_stats = NULL;
 	struct cdp_peer_tx_capture_stats *cap = NULL;
 	uint8_t vdev_id = 0;
 	void *dp_soc = NULL;
 	bool stats_collected = false;
 
-	if (!psoc || !peer) {
-		qdf_err("Invalid Psoc or Peer!");
-		return QDF_STATUS_E_INVAL;
-	}
-	vdev = wlan_peer_get_vdev(peer);
-	if (!vdev) {
-		qdf_err("Vdev is null!");
-		return QDF_STATUS_E_INVAL;
-	}
 	vdev_id = wlan_vdev_get_id(vdev);
 	dp_soc = wlan_psoc_get_dp_handle(psoc);
 	if (feat & ~STATS_FEAT_FLG_TXCAP) {
@@ -3808,8 +3806,7 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 			qdf_err("Failed allocation!");
 			return QDF_STATUS_E_NOMEM;
 		}
-		ret = cdp_host_get_peer_stats(dp_soc, vdev_id,
-					      wlan_peer_get_macaddr(peer),
+		ret = cdp_host_get_peer_stats(dp_soc, vdev_id, peer_mac,
 					      peer_stats);
 		if (ret != QDF_STATUS_SUCCESS) {
 			qdf_err("Unable to fetch stats!");
@@ -3850,9 +3847,7 @@ static QDF_STATUS get_debug_peer_data(struct wlan_objmgr_psoc *psoc,
 			ret = QDF_STATUS_E_NOMEM;
 			goto get_failed;
 		}
-		ret = get_peer_tx_capture_stats(dp_soc, vdev_id,
-						wlan_peer_get_macaddr(peer),
-						cap);
+		ret = get_peer_tx_capture_stats(dp_soc, vdev_id, peer_mac, cap);
 		if (ret == QDF_STATUS_SUCCESS)
 			ret = get_debug_peer_data_txcap(stats, cap);
 		if (ret != QDF_STATUS_SUCCESS)
@@ -3969,22 +3964,26 @@ static QDF_STATUS get_debug_peer_ctrl_rate(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS get_debug_peer_ctrl(struct wlan_objmgr_peer *peer,
+static QDF_STATUS get_debug_peer_ctrl(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *peer_mac,
 				      struct unified_stats *stats,
 				      uint32_t feat)
 {
+	struct wlan_objmgr_peer *peer;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct peer_ic_cp_stats *peer_cp_stats = NULL;
 	bool stats_collected = false;
 
+	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_MLME_SB_ID);
 	if (!peer) {
-		qdf_err("Invalid Peer!");
-		return QDF_STATUS_E_INVAL;
+		qdf_err("Peer (%s) not found!", ether_sprintf(peer_mac));
+		return QDF_STATUS_E_FAILURE;
 	}
 	peer_cp_stats = qdf_mem_malloc(sizeof(struct peer_ic_cp_stats));
 	if (!peer_cp_stats) {
 		qdf_err("Allocation Failed!");
-		return QDF_STATUS_E_NOMEM;
+		ret = QDF_STATUS_E_NOMEM;
+		goto get_failed;
 	}
 
 	ret = wlan_cfg80211_get_peer_cp_stats(peer, peer_cp_stats);
@@ -4022,7 +4021,9 @@ static QDF_STATUS get_debug_peer_ctrl(struct wlan_objmgr_peer *peer,
 	}
 
 get_failed:
-	qdf_mem_free(peer_cp_stats);
+	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_SB_ID);
+	if (peer_cp_stats)
+		qdf_mem_free(peer_cp_stats);
 	if (stats_collected)
 		ret = QDF_STATUS_SUCCESS;
 
@@ -5390,35 +5391,47 @@ get_failed:
 #endif /* WLAM_DEBUG_TELEMETRY */
 
 /* Public APIs */
-QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_psoc *psoc,
-				     struct wlan_objmgr_peer *peer,
+QDF_STATUS wlan_stats_get_peer_stats(struct wlan_objmgr_vdev *vdev,
+				     uint8_t *peer_mac,
 				     struct stats_config *cfg,
 				     struct unified_stats *stats)
 {
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		qdf_err("Invalid Psoc!");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	switch (cfg->lvl) {
 	case STATS_LVL_BASIC:
 		if (cfg->type == STATS_TYPE_DATA)
-			ret = get_basic_peer_data(psoc, peer, stats, cfg->feat);
+			ret = get_basic_peer_data(psoc, vdev, peer_mac, stats,
+						  cfg->feat);
 		else
-			ret = get_basic_peer_ctrl(peer, stats, cfg->feat);
+			ret = get_basic_peer_ctrl(psoc, peer_mac, stats,
+						  cfg->feat);
 		break;
 #if WLAN_ADVANCE_TELEMETRY
 	case STATS_LVL_ADVANCE:
 		if (cfg->type == STATS_TYPE_DATA)
-			ret = get_advance_peer_data(psoc, peer,
-						    stats, cfg);
+			ret = get_advance_peer_data(psoc, vdev, peer_mac, stats,
+						    cfg);
 		else
-			ret = get_advance_peer_ctrl(peer, stats, cfg->feat);
+			ret = get_advance_peer_ctrl(psoc, peer_mac, stats,
+						    cfg->feat);
 		break;
 #endif /* WLAN_ADVANCE_TELEMETRY */
 #if WLAN_DEBUG_TELEMETRY
 	case STATS_LVL_DEBUG:
 		if (cfg->type == STATS_TYPE_DATA)
-			ret = get_debug_peer_data(psoc, peer, stats, cfg->feat);
+			ret = get_debug_peer_data(psoc, vdev, peer_mac, stats,
+						  cfg->feat);
 		else
-			ret = get_debug_peer_ctrl(peer, stats, cfg->feat);
+			ret = get_debug_peer_ctrl(psoc, peer_mac, stats,
+						  cfg->feat);
 		break;
 #endif /* WLAN_DEBUG_TELEMETRY */
 	default:
