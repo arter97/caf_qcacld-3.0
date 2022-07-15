@@ -20,6 +20,10 @@
 #ifndef _STATS_LIB_H_
 #define _STATS_LIB_H_
 
+#ifdef WLAN_ODD_HOST_PLUGIN
+#include <ieee80211_external_config.h>
+#endif
+
 /* Network Interface name length */
 #define IFNAME_LEN                   IFNAMSIZ
 #define STATS_IF_MAX_MCS_STRING_LEN  34
