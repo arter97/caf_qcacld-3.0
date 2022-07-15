@@ -1428,6 +1428,9 @@ reg_is_sec_40_valid_for_freq(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj
 
 	sec_chan_enum = reg_get_chan_enum_for_freq(sec_40mhz_freq);
 
+	if (sec_chan_enum >= NUM_CHANNELS)
+	    return false;
+
 	reg_get_first_valid_frequency(pdev_priv_obj, sec_chan_enum,
 				      in_6g_pwr_mode,
 				      &first_valid_sec_freq, BW_40_MHZ);
