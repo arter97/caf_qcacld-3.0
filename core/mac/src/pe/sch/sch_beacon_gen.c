@@ -742,11 +742,8 @@ sch_set_fixed_beacon_fields(struct mac_context *mac_ctx, struct pe_session *sess
 		populate_dot11f_rsn_opaque(mac_ctx,
 					   &session->pLimStartBssReq->rsnIE,
 					   &bcn_2->RSNOpaque);
-#if defined(FEATURE_WLAN_WAPI)
-		populate_dot11f_wapi(mac_ctx,
-				     (tpSirWAPIie)&session->pLimStartBssReq->wapiIE,
+		populate_dot11f_wapi(mac_ctx, &session->pLimStartBssReq->rsnIE,
 				     &bcn_2->WAPI);
-#endif
 	}
 
 	if (session->limWmeEnabled)
@@ -1088,7 +1085,7 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 			     (void *)&beacon2->RSNOpaque,
 			     sizeof(beacon2->RSNOpaque));
 	}
-#if defined(FEATURE_WLAN_WAPI)
+
 	/* WAPI */
 	if (beacon2->WAPI.present) {
 		set_probe_rsp_ie_bitmap(DefProbeRspIeBitmap, WLAN_ELEMID_WAPI);
@@ -1096,7 +1093,6 @@ void lim_update_probe_rsp_template_ie_bitmap_beacon2(struct mac_context *mac,
 			     (void *)&beacon2->WAPI,
 			     sizeof(beacon2->WAPI));
 	}
-#endif
 
 	/* EDCA Parameter set */
 	if (beacon2->EDCAParamSet.present) {

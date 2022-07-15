@@ -587,6 +587,7 @@ populate_dot11f_country(struct mac_context *mac,
 	uint8_t chan_spacing_for_2ghz = 1;
 	uint8_t chan_spacing_for_5ghz_6ghz = 4;
 	struct mlme_legacy_priv *mlme_priv = NULL;
+	bool always_take_all_band = true;
 
 	sec_cur_chan_list = qdf_mem_malloc(NUM_CHANNELS *
 					   sizeof(*sec_cur_chan_list));
@@ -602,7 +603,7 @@ populate_dot11f_country(struct mac_context *mac,
 		}
 	}
 
-	if (!pe_session ||
+	if (!pe_session || always_take_all_band ||
 	    (mlme_priv && mlme_priv->country_ie_for_all_band)) {
 		status = wlan_mlme_get_band_capability(mac->psoc,
 						       &band_capability);
@@ -1887,21 +1888,20 @@ QDF_STATUS populate_dot11f_rsn_opaque(struct mac_context *mac,
 } /* End populate_dot11f_rsn_opaque. */
 
 #if defined(FEATURE_WLAN_WAPI)
+
 QDF_STATUS
 populate_dot11f_wapi(struct mac_context *mac,
-		     tpSirWAPIie pWapiIe, tDot11fIEWAPI *pDot11f)
+		     tpSirRSNie pRsnIe, tDot11fIEWAPI *pDot11f)
 {
 	uint32_t status;
 	int idx;
 
-	if (pWapiIe->length) {
-		idx = find_ie_location(mac, (tpSirRSNie)pWapiIe, DOT11F_EID_WAPI);
+	if (pRsnIe->length) {
+		idx = find_ie_location(mac, pRsnIe, DOT11F_EID_WAPI);
 		if (0 <= idx) {
-			status =
-			    dot11f_unpack_ie_wapi(mac,
-						  pWapiIe->wapiIEdata + idx + 2,
-						  pWapiIe->wapiIEdata[idx + 1],
-						  pDot11f, false);
+			status = dot11f_unpack_ie_wapi(mac, pRsnIe->rsnIEdata + idx + 2,  /* EID, length */
+						       pRsnIe->rsnIEdata[idx + 1],
+						       pDot11f, false);
 			if (DOT11F_FAILED(status)) {
 				pe_err("Parse failure (0x%08x)", status);
 				return QDF_STATUS_E_FAILURE;
@@ -1932,6 +1932,7 @@ QDF_STATUS populate_dot11f_wapi_opaque(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 
 } /* End populate_dot11f_wapi_opaque. */
+
 #endif /* defined(FEATURE_WLAN_WAPI) */
 
 void

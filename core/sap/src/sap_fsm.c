@@ -3366,21 +3366,6 @@ sapconvert_to_csr_profile(struct sap_config *config, eCsrRoamBssType bssType,
 		profile->nRSNReqIELength = config->RSNWPAReqIELength;
 	}
 
-#ifdef FEATURE_WLAN_WAPI
-	/* set the WAPI IE */
-	profile->nWAPIReqIELength = config->WAPIReqIELength;
-	if (config->WAPIReqIELength) {
-		profile->pWAPIReqIE =
-			qdf_mem_malloc(config->WAPIReqIELength);
-		if (!profile->pWAPIReqIE) {
-			sap_debug("pWAPIReqIE allocate fail.");
-			return eSAP_STATUS_FAILURE;
-		}
-		qdf_mem_copy(profile->pWAPIReqIE, config->WAPIReqIE,
-			     config->WAPIReqIELength);
-		profile->nWAPIReqIELength = config->WAPIReqIELength;
-	}
-#endif
 	/* set the phyMode to accept anything */
 	/* Best means everything because it covers all the things we support */
 	/* eCSR_DOT11_MODE_BEST */
@@ -3489,11 +3474,6 @@ void sap_free_roam_profile(struct csr_roam_profile *profile)
 	if (profile->pRSNReqIE) {
 		qdf_mem_free(profile->pRSNReqIE);
 		profile->pRSNReqIE = NULL;
-	}
-
-	if (profile->pWAPIReqIE) {
-		qdf_mem_free(profile->pWAPIReqIE);
-		profile->pWAPIReqIE = NULL;
 	}
 }
 

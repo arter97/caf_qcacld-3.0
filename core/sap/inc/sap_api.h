@@ -486,10 +486,6 @@ struct sap_config {
 	uint16_t num_deny_mac;
 	/* Max ie length 255 * 2(WPA+RSN) + 2 bytes(vendor specific ID) * 2 */
 	uint8_t RSNWPAReqIE[(WLAN_MAX_IE_LEN * 2) + 4];
-#ifdef FEATURE_WLAN_WAPI
-	uint32_t WAPIReqIELength;
-	uint8_t WAPIReqIE[(WLAN_MAX_IE_LEN * 2) + 4];
-#endif /* FEATURE_WLAN_WAPI */
 	eSapAuthType authType;
 	tCsrAuthList akm_list;
 	bool privacy;
