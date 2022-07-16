@@ -30,6 +30,7 @@
  */
 
 #include "../dfs_precac_forest.h"
+#include <dfs_zero_cac.h>
 #include "wlan_reg_services_api.h"
 #ifdef QCA_SUPPORT_AGILE_DFS
 #include <wlan_sm_engine.h> /* for struct wlan_sm */
@@ -576,6 +577,37 @@ static bool dfs_agile_state_running_event(void *ctx,
 				dfs_mark_adfs_chan_as_cac_done(dfs);
 			}
 			dfs_agile_sm_transition_to(dfs_soc, DFS_AGILE_S_INIT);
+			/*
+			 *  When preCAC is completed on a channel. The event
+			 *  DFS_AGILE_SM_EV_AGILE_DONE is received and AGILE SM
+			 *  moved to INIT STATE. Next it will try to continue
+			 *  preCAC on other channels.
+			 *
+			 *  If BW_EXPAND feature is enabled, Check if there is
+			 *  a possibility of BW Expansion, by calling API
+			 *  dfs_bwexpand_try_jumping_to_target_subchan.
+			 *
+			 *  Example: User configured Channel and BW is stored
+			 *  in DFS structure.
+			 *  User configured channel - dfs_bw_expand_target_freq
+			 *  User configured mode    - dfs_bw_expand_des_mode
+			 *
+			 *  If Bandwidth Expansion is possible, then AP will
+			 *  move to the Channel with Expanded Bandwidth using
+			 *  mlme_precac_chan_change_csa_for_freq.
+			 *
+			 *  The API will send WLAN_VDEV_SM_EV_CSA_RESTART event
+			 *  So there is no need to send
+			 *  DFS_AGILE_SM_EV_AGILE_START.
+			 *
+			 *  Therefore, Once Bandwidth Expansion is completed.
+			 *  Return the status - True.
+			 */
+			if (dfs_bwexpand_try_jumping_to_target_subchan(dfs)) {
+				dfs_agile_precac_cleanup(dfs);
+				status = true;
+				break;
+			}
 			dfs_agile_precac_cleanup(dfs);
 			is_cac_done_on_des_chan =
 				dfs_precac_check_home_chan_change(dfs);
@@ -621,6 +653,12 @@ static void dfs_agile_state_complete_entry(void *ctx)
 
 	/* Mark the RCAC channel as CAC done. */
 	dfs_mark_adfs_chan_as_cac_done(dfs);
+
+	/* Check if BW_Expansion is already done and CSA sent internally.
+	 * If Yes, then Agile is considered to completed.
+	 */
+	if (dfs_bwexpand_try_jumping_to_target_subchan(dfs))
+		return;
 	/*
 	 * Check if rcac is done on preffered channel.
 	 * If so, change channel from intermediate channel to preffered chan.

@@ -1135,6 +1135,16 @@ uint16_t dfs_get_ieeechan_for_precac_for_freq(struct wlan_dfs *dfs,
 		 exclude_pri_ch_freq,
 		 exclude_sec_ch_freq);
 
+	/*
+	 * If bw expand is enabled, try to pick the user configured target
+	 * channel (or a subset of that channel) for the bw expansion. The
+	 * The channel picked should match the current agile bandwidth.
+	 */
+	ieee_chan_freq = dfs_bwexpand_find_usr_cnf_chan(dfs);
+
+	if (ieee_chan_freq)
+		goto exit;
+
 	/* If interCAC is enabled, prioritize the desired channel first before
 	 * using the normal logic to find a channel for preCAC.
 	 */

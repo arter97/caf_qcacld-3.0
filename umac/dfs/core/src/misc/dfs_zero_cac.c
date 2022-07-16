@@ -259,6 +259,101 @@
 #include "wlan_dfs_init_deinit_api.h"
 #include "../dfs_precac_forest.h"
 #include "dfs_zero_cac.h"
+#include <wlan_reg_channel_api.h>
+
+static const
+uint8_t dfs_phymode_decoupler[WLAN_PHYMODE_MAX][2] = {
+	{ REG_PHYMODE_11AX, CH_WIDTH_160MHZ   }, /* WLAN_PHYMODE_AUTO */
+	{ REG_PHYMODE_11A,  CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11A */
+	{ REG_PHYMODE_11B,  CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11B */
+	{ REG_PHYMODE_11G,  CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11G */
+	{ REG_PHYMODE_11G,  CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11G_ONLY */
+	{ REG_PHYMODE_11N,  CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11NA_HT20 */
+	{ REG_PHYMODE_11N,  CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11NG_HT20 */
+	{ REG_PHYMODE_11N,  CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11NA_HT40 */
+	{ REG_PHYMODE_11N,  CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11NG_HT40PLUS */
+	{ REG_PHYMODE_11N,  CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11NG_HT40MINUS */
+	{ REG_PHYMODE_11N,  CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11NG_HT40 */
+	{ REG_PHYMODE_11AC, CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11AC_VHT20 */
+	{ REG_PHYMODE_11AC, CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11AC_VHT20_2G */
+	{ REG_PHYMODE_11AC, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11AC_VHT40 */
+	{ REG_PHYMODE_11AC, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11AC_VHT40PLUS_2G */
+	{ REG_PHYMODE_11AC, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11AC_VHT40MINUS_2G */
+	{ REG_PHYMODE_11AC, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11AC_VHT40_2G */
+	{ REG_PHYMODE_11AC, CH_WIDTH_80MHZ    }, /* WLAN_PHYMODE_11AC_VHT80 */
+	{ REG_PHYMODE_11AC, CH_WIDTH_80MHZ    }, /* WLAN_PHYMODE_11AC_VHT80_2G */
+	{ REG_PHYMODE_11AC, CH_WIDTH_160MHZ   }, /* WLAN_PHYMODE_11AC_VHT160 */
+	{ REG_PHYMODE_11AC, CH_WIDTH_80P80MHZ }, /* WLAN_PHYMODE_11AC_VHT80_80 */
+	{ REG_PHYMODE_11AX, CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11AXA_HE20 */
+	{ REG_PHYMODE_11AX, CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11AXG_HE20 */
+	{ REG_PHYMODE_11AX, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11AXA_HE40 */
+	{ REG_PHYMODE_11AX, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11AXG_HE40PLUS */
+	{ REG_PHYMODE_11AX, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11AXG_HE40MINUS */
+	{ REG_PHYMODE_11AX, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11AXG_HE40 */
+	{ REG_PHYMODE_11AX, CH_WIDTH_80MHZ    }, /* WLAN_PHYMODE_11AXA_HE80 */
+	{ REG_PHYMODE_11AX, CH_WIDTH_80MHZ    }, /* WLAN_PHYMODE_11AXG_HE80 */
+	{ REG_PHYMODE_11AX, CH_WIDTH_160MHZ   }, /* WLAN_PHYMODE_11AXA_HE160 */
+	{ REG_PHYMODE_11AX, CH_WIDTH_80P80MHZ }, /* WLAN_PHYMODE_11AXA_HE80_80 */
+#ifdef WLAN_FEATURE_11BE
+	{ REG_PHYMODE_11BE, CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11BEA_EHT20 */
+	{ REG_PHYMODE_11BE, CH_WIDTH_20MHZ    }, /* WLAN_PHYMODE_11BEG_EHT20 */
+	{ REG_PHYMODE_11BE, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11BEA_EHT40 */
+	{ REG_PHYMODE_11BE, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11BEG_EHT40PLUS */
+	{ REG_PHYMODE_11BE, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11BEG_EHT40MINUS */
+	{ REG_PHYMODE_11BE, CH_WIDTH_40MHZ    }, /* WLAN_PHYMODE_11BEG_EHT40 */
+	{ REG_PHYMODE_11BE, CH_WIDTH_80MHZ    }, /* WLAN_PHYMODE_11BEA_EHT80 */
+	{ REG_PHYMODE_11BE, CH_WIDTH_80MHZ    }, /* WLAN_PHYMODE_11BEG_EHT80 */
+	{ REG_PHYMODE_11BE, CH_WIDTH_160MHZ   }, /* WLAN_PHYMODE_11BEA_EHT160 */
+	{ REG_PHYMODE_11BE, CH_WIDTH_320MHZ   }, /* WLAN_PHYMODE_11BEA_EHT320 */
+#endif
+};
+
+static const
+uint8_t dfs_phymode_converter[WLAN_PHYMODE_MAX] = {
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_AUTO */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11A */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11B */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11G */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11G_ONLY */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11NA_HT20 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11NG_HT20 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11NA_HT40 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11NG_HT40PLUS */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11NG_HT40MINUS */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11NG_HT40 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AC_VHT20 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AC_VHT20_2G */
+	WLAN_PHYMODE_11AC_VHT20,            /* WLAN_PHYMODE_11AC_VHT40 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AC_VHT40PLUS_2G */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AC_VHT40MINUS_2G */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AC_VHT40_2G */
+	WLAN_PHYMODE_11AC_VHT40,            /* WLAN_PHYMODE_11AC_VHT80 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AC_VHT80_2G */
+	WLAN_PHYMODE_11AC_VHT80,            /* WLAN_PHYMODE_11AC_VHT160 */
+	WLAN_PHYMODE_11AC_VHT80,            /* WLAN_PHYMODE_11AC_VHT80_80 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AXA_HE20 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AXG_HE20 */
+	WLAN_PHYMODE_11AXA_HE20,            /* WLAN_PHYMODE_11AXA_HE40 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AXG_HE40PLUS */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AXG_HE40MINUS */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AXG_HE40 */
+	WLAN_PHYMODE_11AXA_HE40,            /* WLAN_PHYMODE_11AXA_HE80 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11AXG_HE80 */
+	WLAN_PHYMODE_11AXA_HE80,            /* WLAN_PHYMODE_11AXA_HE160 */
+	WLAN_PHYMODE_11AXA_HE80,            /* WLAN_PHYMODE_11AXA_HE80_80 */
+#ifdef WLAN_FEATURE_11BE
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11BEA_EHT20 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11BEG_EHT20 */
+	WLAN_PHYMODE_11BEA_EHT20,           /* WLAN_PHYMODE_11BEA_EHT40 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11BEG_EHT40PLUS */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11BEG_EHT40MINUS */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11BEG_EHT40 */
+	WLAN_PHYMODE_11BEA_EHT40,           /* WLAN_PHYMODE_11BEA_EHT80 */
+	WLAN_PHYMODE_MAX,                   /* WLAN_PHYMODE_11BEG_EHT80 */
+	WLAN_PHYMODE_11BEA_EHT80,           /* WLAN_PHYMODE_11BEA_EHT160 */
+	WLAN_PHYMODE_11BEA_EHT160,          /* WLAN_PHYMODE_11BEA_EHT320 */
+#endif
+};
 
  /*dfs_zero_cac_reset() - Reset zero cac variables.
   *@dfs: Pointer to wlan_dfs
@@ -832,6 +927,313 @@ void dfs_precac_csa(struct wlan_dfs *dfs)
 			 dfs->dfs_autoswitch_des_mode);
 	qdf_mem_free(dfs->dfs_autoswitch_chan);
 	dfs->dfs_autoswitch_chan = NULL;
+}
+#endif
+
+#ifdef QCA_DFS_BW_EXPAND
+/**
+ * dfs_is_completed_agile_within_target_band() - Check the frequency of last
+ * agile completed channel is within the range of User configured channel.
+ * @dfs: pointer to wlan_dfs.
+ * @target_ch_width: User configured target channel width.
+ */
+static
+bool dfs_is_completed_agile_within_target_band(struct wlan_dfs *dfs,
+					       enum phy_ch_width target_ch_width)
+{
+	const struct bonded_channel_freq *target_bonded_chan_ptr;
+	qdf_freq_t agile_precac_freq = dfs->dfs_agile_precac_freq_mhz;
+
+	/*
+	 * For BW 20MHz, Check if the last completed agile frequency is
+	 * same as user configured frequency. If both are same frequency,
+	 * check if CAC is completed in the user configured frequency.
+	 */
+	if (target_ch_width == CH_WIDTH_20MHZ)
+	    return agile_precac_freq == dfs->dfs_bw_expand_target_freq;
+
+	/*
+	 * For BW greater than 20Mhz, check if the last completed agile frequency
+	 * is within the range of user configured channel.
+	 */
+	wlan_reg_get_5g_bonded_channel_and_state_for_freq(dfs->dfs_pdev_obj,
+							  dfs->dfs_bw_expand_target_freq,
+							  target_ch_width,
+							  &target_bonded_chan_ptr);
+
+	if (target_bonded_chan_ptr)
+		return agile_precac_freq >= target_bonded_chan_ptr->start_freq &&
+			agile_precac_freq <= target_bonded_chan_ptr->end_freq;
+	else
+		return false;
+}
+
+/**
+ * dfs_bwexpand_determine_primary_freq() - Find the primary frequency for
+ * expanding the bandwidth and channel change.
+ * @dfs: pointer to wlan_dfs.
+ * @target_mode: phymode of type wlan_phymode.
+ */
+static
+qdf_freq_t dfs_bwexpand_determine_primary_freq(struct wlan_dfs *dfs,
+					       enum wlan_phymode target_mode)
+{
+	qdf_freq_t primary_freq;
+
+	/* User configured phymode is found and set to target mode. */
+	if (target_mode == dfs->dfs_bw_expand_des_mode)
+		primary_freq = dfs->dfs_bw_expand_target_freq;
+	else if (dfs->dfs_precac_chwidth == CH_WIDTH_20MHZ)
+		primary_freq = dfs->dfs_agile_precac_freq_mhz;
+	else
+		primary_freq = dfs->dfs_agile_precac_freq_mhz - HALF_20MHZ_BW;
+
+	return primary_freq;
+}
+
+/**
+ * dfs_get_configured_bwexpand_dfs_chan() - Get a DFS chan when frequency and
+ * phymode is provided.
+ * @dfs: pointer to wlan_dfs.
+ * @user_chan: pointer to dfs_channel.
+ * @target_mode: phymode of type wlan_phymode.
+ */
+bool dfs_get_configured_bwexpand_dfs_chan(struct wlan_dfs *dfs,
+					  struct dfs_channel *user_chan,
+					  enum wlan_phymode target_mode)
+{
+	qdf_freq_t primary_freq = dfs_bwexpand_determine_primary_freq(dfs,
+								  target_mode);
+	qdf_mem_zero(user_chan, sizeof(struct dfs_channel));
+	if (QDF_STATUS_SUCCESS !=
+		dfs_mlme_find_dot11_chan_for_freq(dfs->dfs_pdev_obj,
+						  primary_freq,
+						  0,
+						  target_mode,
+						  &user_chan->dfs_ch_freq,
+						  &user_chan->dfs_ch_flags,
+						  &user_chan->dfs_ch_flagext,
+						  &user_chan->dfs_ch_ieee,
+						  &user_chan->dfs_ch_vhtop_ch_freq_seg1,
+						  &user_chan->dfs_ch_vhtop_ch_freq_seg2,
+						  &user_chan->dfs_ch_mhz_freq_seg1,
+						  &user_chan->dfs_ch_mhz_freq_seg2)) {
+		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS,
+			"Channel %d not found for mode %d and cfreq2 %d",
+			dfs->dfs_bw_expand_target_freq,
+			target_mode,
+			0);
+		return false;
+	}
+	return true;
+}
+
+/**
+ * dfs_bwexpand_do_csa() - Execute BW Expansion by moving to Channel with
+ * higher bandwidth.
+ * @dfs: pointer to wlan_dfs.
+ * @primary_freq: Frequency of type qdf_freq_t.
+ * @target_mode: phymode of type wlan_phymode.
+ */
+static
+void dfs_bwexpand_do_csa(struct wlan_dfs *dfs,
+			 qdf_freq_t primary_freq,
+			 enum wlan_phymode target_mode)
+{
+	if (global_dfs_to_mlme.mlme_postnol_chan_switch)
+		global_dfs_to_mlme.mlme_postnol_chan_switch(
+				dfs->dfs_pdev_obj,
+				primary_freq,
+				0,
+				target_mode);
+}
+
+/**
+ * dfs_expand_find_max_possible_target_mode() - Find the target mode to perform
+ * BW Expand based on certain conditions. If the conditions are not met, reduce
+ * the target mode and check the conditions again.
+ * @dfs: pointer to wlan_dfs.
+ * @target_mode: phymode of type wlan_phymode.
+ */
+static
+enum wlan_phymode dfs_expand_find_max_possible_target_mode(struct wlan_dfs *dfs,
+							   enum wlan_phymode target_mode)
+{
+	while (target_mode < WLAN_PHYMODE_MAX) {
+		struct dfs_channel user_chan;
+		bool is_chan_found;
+
+		is_chan_found =
+			dfs_get_configured_bwexpand_dfs_chan(dfs,
+							     &user_chan,
+							     target_mode);
+		if (!is_chan_found)
+			return WLAN_PHYMODE_MAX;
+
+		if (dfs_is_agile_rcac_enabled(dfs) &&
+		    dfs_is_rcac_cac_done(dfs, &user_chan, dfs->dfs_curchan))
+			break;
+		else if (dfs_is_precac_done(dfs, &user_chan))
+			break;
+
+		target_mode = dfs_phymode_converter[target_mode];
+	}
+	return target_mode;
+}
+
+/**
+ * dfs_find_subtract_subchan_list_index() - Find the subchannel index of the
+ * RCAC channel in which CAC check is done.
+ * Example: Target subchans = [100, 104, 108, 112] , current subchannel = [100]
+ * The subtracted n_suchans = [104, 108, 112] and index is returned as 1.
+ * @chan: Pointer to dfs_channel object of target channel.
+ * @subset_chan: Pointer to dfs_channel object of subset channel.
+ * @target_freq_list: Pointer to target_freq_list array.
+ * @cur_freq_list: Pointer to cur_freq_list array.
+ * @n_subchans: Ending value of subchannel list index.
+ */
+static
+uint8_t dfs_find_subtract_subchan_list_index(struct dfs_channel *chan,
+					     struct dfs_channel *subset_chan,
+					     qdf_freq_t *target_freq_list,
+					     qdf_freq_t *cur_freq_list,
+					     uint8_t *n_subchans)
+{
+	uint8_t n_target_channels, n_cur_channels;
+	uint8_t i = 0;
+
+	n_target_channels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(chan,
+								  target_freq_list);
+	n_cur_channels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(subset_chan,
+								  cur_freq_list);
+	while (i < n_cur_channels) {
+		if (target_freq_list[i] == cur_freq_list[i])
+			i++;
+		else
+			break;
+	}
+
+	*n_subchans = n_target_channels - i;
+	return i;
+}
+
+/**
+ * dfs_is_rcac_done_on_subchan_list() - Check if RCAC is completed on
+ * subchannel list.
+ * @dfs: pointer to wlan_dfs.
+ * @target_freq_list: Pointer to target_freq_list array.
+ * @n_subchans: Ending value of subchannel list index.
+ */
+static
+bool dfs_is_rcac_done_on_subchan_list(struct wlan_dfs *dfs,
+				      qdf_freq_t *target_freq_list,
+				      uint8_t n_subchans)
+{
+	uint8_t i;
+
+	for (i = 0; i < n_subchans; i++) {
+		if (!dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(dfs,
+									    target_freq_list[i]))
+			return false;
+	}
+	return true;
+}
+
+/**
+ * dfs_is_rcac_cac_done API checks CAC is completed only on the RCAC channel
+ * and excludes current operating channel.
+ *
+ * Example: Let's consider User configured chan is 100 HT160 and current
+ * operating channel is 100 HT80 and RCAC completed chan is 120 HT80.
+ * There is a possibilty for bandwidth expansion from 80Mhz to 160Mhz.
+ * Check CAC is completed only on RCAC channel because current operating
+ * chan already completed CAC.
+ */
+bool dfs_is_rcac_cac_done(struct wlan_dfs *dfs,
+			  struct dfs_channel *chan,
+			  struct dfs_channel *subset_chan)
+{
+	qdf_freq_t target_freq_list[MAX_20MHZ_SUBCHANS];
+	qdf_freq_t cur_freq_list[MAX_20MHZ_SUBCHANS];
+	uint8_t n_subchans, subtract_chan_idx;
+
+	subtract_chan_idx = dfs_find_subtract_subchan_list_index(chan,
+								 subset_chan,
+								 target_freq_list,
+								 cur_freq_list,
+								 &n_subchans);
+	return dfs_is_rcac_done_on_subchan_list(dfs,
+						&target_freq_list[subtract_chan_idx],
+						n_subchans);
+}
+
+/**
+ * WORKING SEQUENCE :
+ *
+ * 1) When preCAC is completed on a channel. The event DFS_AGILE_SM_EV_AGILE_DONE
+ * is received and AGILE SM moved to INIT STATE. If BW_EXPAND feature is enabled,
+ * dfs_bwexpand_try_jumping_to_target_subchan is called.
+ *
+ * 2) Calculate the Target Channel width Using a dfs_phymode_decoupler similar to
+ * phymode_decoupler to get Channel width from wlan_phymode.
+ *
+ * 3) Get the Start and end freq of the bonded channel of User configured freq.
+ * Check if the freq of last completed agileCAC is in between the target bonded
+ * channel.
+ *
+ * Example : Lets assume, the preCAC is completed in Chan 140 HT20, Then the
+ * last agileCAC completed chan info is stored in dfs_agile_precac_freq_mhz.
+ *
+ * The API wlan_reg_get_5g_bonded_channel_and_state_for_freq takes User configured
+ * freq (dfs_bw_expand_target_freq) as input and provides a bonded channel pointer
+ * with Start and end freq of the bonded channel.
+ *
+ * For example, User configured chan is 100 HT160, then the bonded channel ptr
+ * will return start freq as 5490Mhz and end freq as 5650Mhz
+ *
+ * Check the dfs_agile_precac_freq_mhz is in the range of bonded channel ptr.
+ * In this case, 5500Mhz is in between 5490Mhz and 5650Mhz. Therefore goto
+ * step 4.
+ *
+ * 4) Create DFS channel for User configured freq and reduced User configured mode.
+ *
+ * 5) Check if the DFS channel is done preCAC or not
+ *    i) If preCAC is done -> Break
+ *    ii) If preCAC is not done -> Reduce the Target phymode
+ *
+ * 6) Do Channel change by calling mlme_precac_chan_change_csa_for_freq.
+ */
+bool dfs_bwexpand_try_jumping_to_target_subchan(struct wlan_dfs *dfs)
+{
+	qdf_freq_t primary_freq;
+	enum phy_ch_width target_ch_width;
+	enum wlan_phymode target_mode;
+
+	if (!dfs->dfs_use_bw_expand)
+		return false;
+
+	target_mode = dfs->dfs_bw_expand_des_mode;
+	if (target_mode >= WLAN_PHYMODE_MAX) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS, "target_mode =%d", target_mode);
+		return false;
+	}
+
+	target_ch_width = dfs_phymode_decoupler[target_mode][CH_WIDTH_COL];
+	if (!dfs_is_completed_agile_within_target_band(dfs, target_ch_width))
+		return false;
+
+	target_mode = dfs_expand_find_max_possible_target_mode(dfs, target_mode);
+	if (target_mode >= WLAN_PHYMODE_MAX) {
+		dfs_debug(dfs, WLAN_DEBUG_DFS, "target_mode =%d", target_mode);
+		return false;
+	}
+
+	primary_freq = dfs_bwexpand_determine_primary_freq(dfs, target_mode);
+	dfs_bwexpand_do_csa(dfs, primary_freq, target_mode);
+
+	return true;
 }
 #endif
 
@@ -1867,6 +2269,34 @@ dfs_save_rcac_ch_params(struct wlan_dfs *dfs, struct ch_params rcac_ch_params,
 		  rcac_param->rcac_ch_params.center_freq_seg1);
 }
 
+/**
+ * dfs_select_rcac_freq() - Select the RCAC frequency based on BW Expand
+ * feature or user configured RCAC frequency.
+ * @dfs: Pointer to struct wlan_dfs.
+ * @agile_chwidth: Agile channel width.
+ * @is_user_rcac_chan_valid: Boolean value to check validity of user configured
+ * RCAC freq.
+ *
+ * Return: Rolling CAC frequency in MHZ.
+ */
+static
+qdf_freq_t dfs_select_rcac_freq(struct wlan_dfs *dfs,
+				enum phy_ch_width agile_chwidth,
+				bool is_user_rcac_chan_valid)
+{
+	qdf_freq_t rcac_freq;
+
+	rcac_freq = dfs_bwexpand_find_usr_cnf_chan(dfs);
+	if (rcac_freq) {
+		if (agile_chwidth  != CH_WIDTH_20MHZ)
+			rcac_freq = rcac_freq - HALF_20MHZ_BW;
+	} else if (is_user_rcac_chan_valid) {
+		rcac_freq = dfs->dfs_agile_rcac_freq_ucfg;
+	}
+
+	return rcac_freq;
+}
+
 /* dfs_find_rcac_chan() - Find out a rolling CAC channel.
  *
  * @dfs: Pointer to struct wlan_dfs.
@@ -1911,8 +2341,20 @@ static qdf_freq_t dfs_find_rcac_chan(struct wlan_dfs *dfs,
 					   dfs->dfs_agile_rcac_freq_ucfg);
 	}
 
-	if (is_user_rcac_chan_valid) {
-		rcac_freq = dfs->dfs_agile_rcac_freq_ucfg;
+	/*
+	 * In case of BW Expansion, check if user configured frequency is
+	 * free from NOL, CAC not completed and not a current channel.
+	 *
+	 * If the above conditions are satisfied, then set the frequency to
+	 * start Rolling CAC on that frequency.
+	 *
+	 * If not, then set rcac_freq to user configured RCAC channel.
+	 */
+	rcac_freq = dfs_select_rcac_freq(dfs,
+					 agile_chwidth,
+					 is_user_rcac_chan_valid);
+
+	if (rcac_freq) {
 		if (dfs_find_dfschan_for_freq(dfs, rcac_freq, 0,
 					      agile_chwidth,
 					      &dfs_chan) != QDF_STATUS_SUCCESS)
@@ -2501,4 +2943,146 @@ exit:
 }
 #endif
 
+#ifdef QCA_DFS_BW_EXPAND
+/**
+ * dfs_find_bonded_chanset_cen() - Find the center frequency for BW Expand.
+ * @target_freq_list: Pointer to target_freq_list array.
+ * @offset: Starting frequency of the subchannel.
+ * @n_agile_subchans: Number of agile subchannels.
+ */
+static
+qdf_freq_t dfs_find_bonded_chanset_cen(qdf_freq_t *target_freq_list,
+				       uint8_t offset,
+				       uint8_t n_agile_subchans)
+{
+	uint8_t i;
+	qdf_freq_t sum;
+
+	if (!n_agile_subchans)
+	    return 0;
+
+	for (sum = 0, i = 0; i < n_agile_subchans; i++)
+		sum += target_freq_list[offset + i];
+
+	return sum / n_agile_subchans;
+}
+
+/**
+ * dfs_bwexpand_is_chanset_agile_eligible() - Checks if the subchannel satifies
+ * the condtions for BW Expand.
+ * @dfs: Pointer to wlan_dfs.
+ * @n_agile_subchans: Number of agile subchannels.
+ * @n_cur_channels: Number of current subchannels.
+ * @target_freq_list: Pointer to target_freq_list array.
+ * @cur_freq_list: Pointer to cur_freq_list array.
+ * @offset: Starting frequency of the subchannel.
+ */
+static
+bool dfs_bwexpand_is_chanset_agile_eligible(struct wlan_dfs *dfs,
+					    uint8_t n_agile_subchans,
+					    uint8_t n_cur_channels,
+					    qdf_freq_t *target_freq_list,
+					    qdf_freq_t *cur_freq_list,
+					    uint8_t offset)
+{
+	uint8_t temp = 0;
+
+	while (temp < n_agile_subchans) {
+		qdf_freq_t *p_tgt_freq = &target_freq_list[temp + offset];
+
+		if (dfs_is_freq_in_nol(dfs, *p_tgt_freq) ||
+		    dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(dfs, *p_tgt_freq) ||
+		    dfs_is_subset_channel_for_freq(cur_freq_list,
+						   n_cur_channels,
+						   p_tgt_freq,
+						   1))
+			return false;
+
+		temp++;
+	}
+	return true;
+}
+
+/**
+ * Working Sequence of dfs_bwexpand_find_usr_cnf_chan is as follows:
+ *
+ * Consider User enabled BW Expand through UCI or cfgcommand, then
+ * for both Rolling CAC and preCAC, the next channel in which Agile
+ * SM needs to run is chosen by dfs_bwexpand_find_usr_cnf_chan API.
+ *
+ *  1) Find out current Agile Channel width and number of 20BW agile sub-chans.
+ *  2) Create a DFS channel with user configured frequency and bandwidth.
+ *     Example: User configured Chan 100 HT160 and current agile chanwidth is
+ *              40Mhz.
+ *  3) Get bonding channel list for both current chan and the target chan.
+ *  4) Loop through the target channel list by number of agile bw subchans.
+ *     Example: Consider the previous case, 100 HT160 is the target channel
+ *              and current agile BW is 40Mhz. The loop should iterate through
+ *              102 HT40, 110 HT40, 118 HT40 and 126 HT40 subchans.
+ *  5) Check if any of subchans is non-DFS, then Skip to next subchan of agile
+ *     BW.
+ *  6) All the frequencies in the subchan of agile BW, must satisfy the
+ *     following three condtions:
+ *               i) The frequency must not be in NOL.
+ *               ii) The frequency must not be already CAC completed.
+ *               iii) The frequency must not be current channel frequency.
+ *  7) If any agile BW subchans satisy the above all conditions, then return
+ *     center frequency of the subchan with agile BW.
+ */
+qdf_freq_t dfs_bwexpand_find_usr_cnf_chan(struct wlan_dfs *dfs)
+{
+	struct dfs_channel user_chan;
+	uint8_t n_target_channels, n_cur_channels, i;
+	enum phy_ch_width agile_chwidth = CH_WIDTH_INVALID;
+	enum phy_ch_width curchan_chwidth = CH_WIDTH_INVALID;
+	qdf_freq_t target_freq_list[MAX_20MHZ_SUBCHANS];
+	qdf_freq_t cur_freq_list[MAX_20MHZ_SUBCHANS];
+	uint16_t agile_bw;
+	uint8_t n_agile_subchans;
+
+	if (!dfs->dfs_use_bw_expand)
+		return 0;
+
+	dfs_get_configured_bwexpand_dfs_chan(dfs,
+					     &user_chan,
+					     dfs->dfs_bw_expand_des_mode);
+	n_target_channels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(&user_chan,
+								  target_freq_list);
+	n_cur_channels =
+		dfs_get_bonding_channel_without_seg_info_for_freq(dfs->dfs_curchan,
+								  cur_freq_list);
+	dfs_compute_agile_and_curchan_width(dfs, &agile_chwidth,
+					    &curchan_chwidth);
+	agile_bw = wlan_reg_get_bw_value(agile_chwidth);
+	n_agile_subchans = agile_bw / MIN_DFS_SUBCHAN_BW;
+
+	/*
+	 * For every bonded channel set (of the agile bandwidth), starting
+	 * from the left, check if the bonded channel set is eligible to become
+	 * an agile channel, if not repeat the same for the next bonded
+	 * channel set.
+	 */
+	for (i = 0; i < n_target_channels ; i = i + n_agile_subchans) {
+		bool isfound;
+
+		if (!wlan_reg_is_freq_width_dfs(dfs->dfs_pdev_obj,
+						target_freq_list[i],
+						agile_chwidth))
+			continue;
+
+		isfound = dfs_bwexpand_is_chanset_agile_eligible(dfs,
+								 n_agile_subchans,
+								 n_cur_channels,
+								 target_freq_list,
+								 cur_freq_list,
+								 i);
+		if (isfound)
+			return dfs_find_bonded_chanset_cen(target_freq_list,
+							   i,
+							   n_agile_subchans);
+	}
+	return 0;
+}
+#endif /* QCA_DFS_BW_EXPAND */
 #endif
