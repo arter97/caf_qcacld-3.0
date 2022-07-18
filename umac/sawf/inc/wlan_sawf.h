@@ -95,6 +95,7 @@
 
 #define DEF_SAWF_CONFIG_VALUE 0xFFFFFFFF
 
+#define SAWF_INVALID_TID 0xFF
 /**
  * struct wlan_sawf_scv_class_params- Service Class Parameters
  * @svc_id: Service ID
@@ -174,6 +175,15 @@ bool wlan_service_id_valid(uint8_t svc_id);
  * Return: true or false
  */
 bool wlan_service_id_configured(uint8_t svc_id);
+
+/* wlan_service_id_tid() - TID for the service class
+ *
+ * TID for a service class
+ *
+ * Return: TID
+ */
+uint8_t wlan_service_id_tid(uint8_t svc_id);
+
 
 /* wlan_delay_bound_configured() - Is delay-bound configured
  *
