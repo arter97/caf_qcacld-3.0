@@ -1376,6 +1376,18 @@ void qdf_nbuf_queue_head_purge(qdf_nbuf_queue_head_t *nbuf_queue_head)
 }
 
 /**
+ * qdf_nbuf_queue_empty() - dequeue nbuf from the head of queue
+ * @nbuf_queue_head: pointer to nbuf queue head
+ *
+ * Return: true if queue is empty else false
+ */
+static inline
+int qdf_nbuf_queue_empty(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	return __qdf_nbuf_queue_empty(nbuf_queue_head);
+}
+
+/**
  * qdf_nbuf_queue_head_lock() - Acquire the nbuf_queue_head lock
  * @head: nbuf_queue_head of the nbuf_list for which lock is to be acquired
  *
@@ -2233,6 +2245,21 @@ qdf_nbuf_t
 qdf_nbuf_unshare_debug(qdf_nbuf_t buf, const char *func_name,
 		       uint32_t line_num);
 
+/**
+ * qdf_nbuf_kfree_list() - Free nbuf list using kfree
+ * @buf: Pointer to network buffer head
+ *
+ * This function is called to free the nbuf list on failure cases
+ *
+ * Return: None
+ */
+#define qdf_nbuf_dev_kfree_list(d) \
+	qdf_nbuf_dev_kfree_list_debug(d, __func__, __LINE__)
+
+void
+qdf_nbuf_dev_kfree_list_debug(qdf_nbuf_queue_head_t *nbuf_queue_head,
+			      const char *func_name,
+			      uint32_t line_num);
 #else /* NBUF_MEMORY_DEBUG */
 
 static inline void qdf_net_buf_debug_init(void) {}
@@ -2362,7 +2389,37 @@ static inline qdf_nbuf_t qdf_nbuf_unshare(qdf_nbuf_t buf)
 {
 	return __qdf_nbuf_unshare(buf);
 }
+
+/**
+ * qdf_nbuf_kfree_list() - Free nbuf list using kfree
+ * @buf: Pointer to network buffer head
+ *
+ * This function is called to free the nbuf list on failure cases
+ *
+ * Return: None
+ */
+static inline void
+qdf_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	__qdf_nbuf_dev_kfree_list(nbuf_queue_head);
+}
 #endif /* NBUF_MEMORY_DEBUG */
+
+/**
+ * qdf_nbuf_dev_queue_head() - Queue a buffer at the list head
+ * @nbuf_queue_head: Pointer to buffer list head
+ * @buff: Pointer to network buffer head
+ *
+ * This function is called to queue a buffer at the list head
+ *
+ * Return: None
+ */
+static inline void
+qdf_nbuf_dev_queue_head(qdf_nbuf_queue_head_t *nbuf_queue_head,
+			qdf_nbuf_t buf)
+{
+	__qdf_nbuf_dev_queue_head(nbuf_queue_head, buf);
+}
 
 /**
  * qdf_nbuf_kfree() - Free nbuf using kfree
