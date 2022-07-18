@@ -346,7 +346,7 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 	uint8_t tid_queue;
 	uint8_t host_queue, remapped_tid;
 	struct dp_sawf_msduq *msduq;
-	struct dp_sawf_msduq_tid_map msduq_map;
+	struct dp_sawf_msduq_tid_map *msduq_map;
 	uint8_t host_tid_queue;
 	uint8_t msduq_index = 0;
 	struct dp_peer *primary_link_peer = NULL;
@@ -402,8 +402,8 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 
 	if (remapped_tid < DP_SAWF_TID_MAX &&
 	    host_tid_queue < DP_SAWF_DEFINED_Q_PTID_MAX) {
-		msduq_map = sawf_ctx->msduq_map[remapped_tid][host_tid_queue];
-		msduq_map.host_queue_id = host_queue;
+		msduq_map = &sawf_ctx->msduq_map[remapped_tid][host_tid_queue];
+		msduq_map->host_queue_id = host_queue;
 	}
 
 	msduq_index = host_queue - DP_SAWF_DEFAULT_Q_MAX;

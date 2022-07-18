@@ -189,37 +189,25 @@ enum _ol_hal_param_t {
 /**
  * struct sawf_delay_stats- sawf Tx-delay stats
  * @delay_hist: histogram for various delay-buckets
- * @cur_win: current window-number
- * @tid: tid no
- * @msduq: msdu-queue used for Tx
+ * @mov_avg: moving average
  * @num_pkt: count of pkts for which delay is calculated
  * @win_total: total delay for a window
  * @success: count of pkts that met delay-bound
  * @failure: count of pkts that did not meet delay-bound
+ * @tid: tid no
+ * @msduq: msdu-queue used for Tx
  */
 struct sawf_delay_stats {
 	struct cdp_hist_stats delay_hist;
 
-	/* Sliding Window Average */
-	struct {
-		u_int32_t sum;
-		u_int32_t count;
-	} avg;
-
-	/* Data for each windows */
-	struct {
-		u_int32_t sum;
-		u_int32_t count;
-	} win_avgs[DP_SAWF_NUM_AVG_WINDOWS];
-	/*Index for the current window*/
-	uint8_t cur_win;
 	uint32_t mov_avg;
-	uint8_t tid;
-	uint8_t msduq;
 	uint32_t num_pkt;
 	uint64_t win_total;
 	uint64_t success;
 	uint64_t failure;
+
+	uint8_t tid;
+	uint8_t msduq;
 };
 
 /**
