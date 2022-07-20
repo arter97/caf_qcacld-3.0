@@ -1188,17 +1188,66 @@ dp_lite_mon_config_nac_rssi_peer(struct cdp_soc_t *soc_hdl,
 }
 
 /**
+ * dp_lite_mon_type_subtype_check - validate type/subtype filter
+ * @ppdu_info: ppdu info context
+ * @config: lite mon filter config
+ * @filter_mode: filter mode
+ * @mpdu: mpdu nbuf
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+dp_lite_mon_type_subtype_check(struct hal_rx_ppdu_info *ppdu_info,
+			       struct dp_lite_mon_config *config,
+			       uint8_t filter_mode,
+			       qdf_nbuf_t mpdu)
+{
+	struct ieee80211_frame *wh;
+	uint16_t filter = 0;
+	uint8_t type;
+	uint8_t sub_type;
+	uint8_t is_mcast = 0;
+
+	wh = (struct ieee80211_frame *)qdf_nbuf_get_frag_addr(mpdu, 0);
+	type = (wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK);
+	sub_type = ((wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK) >>
+					IEEE80211_FC0_SUBTYPE_SHIFT);
+	switch (type) {
+	case IEEE80211_FC0_TYPE_MGT:
+		filter = config->mgmt_filter[filter_mode];
+		if (filter && ((filter >> sub_type) & 0x1))
+			return QDF_STATUS_SUCCESS;
+	break;
+	case IEEE80211_FC0_TYPE_CTL:
+		filter = config->ctrl_filter[filter_mode];
+		if (filter && (filter >> sub_type) & 0x1)
+			return QDF_STATUS_SUCCESS;
+	break;
+	case IEEE80211_FC0_TYPE_DATA:
+		filter = config->data_filter[filter_mode];
+		is_mcast = DP_FRAME_IS_MULTICAST(wh->i_addr1);
+		if ((is_mcast && (filter & FILTER_DATA_MCAST)) ||
+		    (!is_mcast && (filter & FILTER_DATA_UCAST)))
+			return QDF_STATUS_SUCCESS;
+	break;
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
  * dp_lite_mon_rx_filter_check - check if mpdu rcvd match filter setting
  * @ppdu_info: ppdu info context
  * @config: current lite mon config
  * @user: user id
+ * @mpdu: mpdu nbuf
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
 dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 			    struct dp_lite_mon_config *config,
-			    uint8_t user)
+			    uint8_t user, qdf_nbuf_t mpdu)
 {
 	uint8_t filter_category;
 
@@ -1207,7 +1256,9 @@ dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 	case DP_MPDU_FILTER_CATEGORY_FP:
 		if (config->fp_enabled &&
 		    (!config->peer_count || !config->fpmo_enabled))
-			return QDF_STATUS_SUCCESS;
+			return dp_lite_mon_type_subtype_check(ppdu_info, config,
+							      DP_MON_FRM_FILTER_MODE_FP,
+							      mpdu);
 		break;
 	case DP_MPDU_FILTER_CATEGORY_MD:
 		if (config->md_enabled)
@@ -1648,16 +1699,17 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 	if (config->level == CDP_LITE_MON_LEVEL_PPDU && mpdu_id != 0) {
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 		dp_mon_debug("level is PPDU drop subsequent mpdu");
-		qdf_nbuf_free(mon_mpdu);
+		dp_mon_free_parent_nbuf(&be_mon_pdev->mon_pdev, mon_mpdu);
 		goto done;
 	}
 
 	if (QDF_STATUS_SUCCESS !=
-		dp_lite_mon_rx_filter_check(ppdu_info, config, user)) {
+		dp_lite_mon_rx_filter_check(ppdu_info, config,
+					    user, mon_mpdu)) {
 		/* mpdu did not pass filter check drop and return success */
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
 		dp_mon_debug("filter check did not pass, drop mpdu");
-		qdf_nbuf_free(mon_mpdu);
+		dp_mon_free_parent_nbuf(&be_mon_pdev->mon_pdev, mon_mpdu);
 		goto done;
 	}
 
@@ -1665,7 +1717,7 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 	if (mpdu_meta->full_pkt) {
 		if (qdf_unlikely(mpdu_meta->truncated)) {
 			qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
-			qdf_nbuf_free(mon_mpdu);
+			dp_mon_free_parent_nbuf(&be_mon_pdev->mon_pdev, mon_mpdu);
 			goto done;
 		}
 		/* full pkt, restitch required */
