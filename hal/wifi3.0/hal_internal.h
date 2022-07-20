@@ -1470,7 +1470,8 @@ struct hal_srng *hal_ring_handle_to_hal_srng(hal_ring_handle_t hal_ring)
 /*
  * REO2PPE destination indication
  */
-#define REO2PPE_DST_IND 11
+#define REO2PPE_DST_IND 6
+#define REO2PPE_DST_RING 11
 #define REO2PPE_RULE_FAIL_FB 0x2000
 
 /**

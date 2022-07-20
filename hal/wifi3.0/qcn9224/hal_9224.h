@@ -1422,7 +1422,7 @@ void hal_compute_reo_remap_ix0_9224(struct hal_soc *soc)
 			      (REO_REG_REG_BASE));
 
 	remap0 &= ~(HAL_REO_REMAP_IX0(0xF, 6));
-	remap0 |= HAL_REO_REMAP_IX0(REO2PPE_DST_IND, 6);
+	remap0 |= HAL_REO_REMAP_IX0(REO2PPE_DST_RING, 6);
 
 	HAL_REG_WRITE(soc, HWIO_REO_R0_DESTINATION_RING_CTRL_IX_0_ADDR
 		      (REO_REG_REG_BASE), remap0);
