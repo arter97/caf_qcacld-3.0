@@ -3304,4 +3304,64 @@ void *hal_srng_dst_get_next_32_byte_desc(hal_soc_handle_t hal_soc_hdl,
 
 	return (void *)last_prefetched_hw_desc;
 }
+
+/**
+ * hal_srng_src_set_hp() - set head idx.
+ * @hal_soc_hdl: HAL SOC handle
+ * @idx: head idx
+ *
+ * return: none
+ */
+static inline
+void hal_srng_src_set_hp(hal_ring_handle_t hal_ring_hdl, uint16_t idx)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+
+	srng->u.src_ring.hp = idx * srng->entry_size;
+}
+
+/**
+ * hal_srng_dst_set_tp() - set tail idx.
+ * @hal_soc_hdl: HAL SOC handle
+ * @idx: tail idx
+ *
+ * return: none
+ */
+static inline
+void hal_srng_dst_set_tp(hal_ring_handle_t hal_ring_hdl, uint16_t idx)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+
+	srng->u.dst_ring.tp = idx * srng->entry_size;
+}
+
+/**
+ * hal_srng_src_get_tpidx() - get tail idx
+ * @hal_soc_hdl: HAL SOC handle
+ *
+ * return: tail idx
+ */
+static inline
+uint16_t hal_srng_src_get_tpidx(hal_ring_handle_t hal_ring_hdl)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+	uint32_t tp = *(volatile uint32_t *)(srng->u.src_ring.tp_addr);
+
+	return tp / srng->entry_size;
+}
+
+/**
+ * hal_srng_dst_get_hpidx() - get head idx
+ * @hal_soc_hdl: HAL SOC handle
+ *
+ * return: head idx
+ */
+static inline
+uint16_t hal_srng_dst_get_hpidx(hal_ring_handle_t hal_ring_hdl)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+	uint32_t hp = *(volatile uint32_t *)(srng->u.dst_ring.hp_addr);
+
+	return hp / srng->entry_size;
+}
 #endif /* _HAL_APIH_ */
