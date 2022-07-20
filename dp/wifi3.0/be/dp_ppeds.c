@@ -29,6 +29,8 @@
 #include <ppeds_wlan.h>
 #include <wlan_osif_priv.h>
 #include <dp_tx_desc.h>
+#include "dp_rx.h"
+#include "dp_rx_buffer_pool.h"
 
 /**
  * dp_ppeds_deinit_ppe_vp_tbl_be - PPE VP table dealoc
@@ -291,6 +293,63 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppeds_wlan_handle_t *ppeds_handle,
 }
 
 /**
+ * dp_ppeds_release_rx_desc() - Release the Rx descriptors from buffer array
+ * @ppeds_handle: PPE-DS WLAN handle
+ * @arr: Rx buffer array containing Rx descriptors
+ * @count: Number of Rx descriptors to be freed
+ *
+ * Return: void
+ */
+static void dp_ppeds_release_rx_desc(ppeds_wlan_handle_t *ppeds_handle,
+					struct ppeds_wlan_rxdesc_elem *arr, uint16_t count)
+{
+	struct dp_rx_desc *rx_desc;
+	struct dp_soc *soc = *((struct dp_soc **)ppeds_wlan_priv(ppeds_handle));
+	union dp_rx_desc_list_elem_t *head[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = {0};
+	union dp_rx_desc_list_elem_t *tail[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = {0};
+	uint32_t rx_bufs_reaped[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = {0};
+	struct dp_srng *dp_rxdma_srng;
+	struct rx_desc_pool *rx_desc_pool;
+	struct dp_soc *replenish_soc;
+	uint32_t i, mac_id;
+	uint8_t chip_id;
+
+	for (i = 0; i < count; i++) {
+		rx_desc = (struct dp_rx_desc *)arr[i].cookie;
+		if (rx_desc == NULL) {
+			dp_err("Rx descriptor is NULL\n");
+			continue;
+		}
+		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
+
+		dp_rx_nbuf_unmap(soc, rx_desc, REO2PPE_DST_IND);
+		rx_desc->unmapped = 1;
+		dp_rx_buffer_pool_nbuf_free(soc, rx_desc->nbuf, rx_desc->pool_id);
+
+		dp_rx_add_to_free_desc_list(&head[rx_desc->chip_id][rx_desc->pool_id],
+				&tail[rx_desc->chip_id][rx_desc->pool_id], rx_desc);
+	}
+
+	for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
+		for (mac_id = 0; mac_id < MAX_PDEV_CNT; mac_id++) {
+
+			if (!rx_bufs_reaped[chip_id][mac_id])
+				continue;
+
+			replenish_soc = dp_rx_replensih_soc_get(soc, chip_id);
+
+			dp_rxdma_srng = &replenish_soc->rx_refill_buf_ring[mac_id];
+			rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
+
+			dp_rx_buffers_replenish(replenish_soc, mac_id, dp_rxdma_srng,
+					rx_desc_pool, rx_bufs_reaped[chip_id][mac_id],
+					&head[chip_id][mac_id], &tail[chip_id][mac_id],
+					true);
+		}
+	}
+}
+
+/**
  * dp_ppeds_release_tx_desc_single() - Release the Tx descriptor
  * @ppeds_handle: PPE-DS WLAN handle
  * @cookie: Cookie to get the descriptor to be freed
@@ -393,6 +452,7 @@ static struct ppeds_wlan_ops ppeds_ops = {
 	.set_reo_cons_idx = dp_ppeds_set_reo_cons_idx,
 	.get_tcl_cons_idx = dp_ppeds_get_tcl_cons_idx,
 	.get_reo_prod_idx = dp_ppeds_get_reo_prod_idx,
+	.release_rx_desc = dp_ppeds_release_rx_desc,
 };
 
 /**
