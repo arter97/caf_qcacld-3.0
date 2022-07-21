@@ -20,6 +20,10 @@
 #ifndef _WLAN_STATS_DEFINE_H_
 #define _WLAN_STATS_DEFINE_H_
 
+#ifdef WLAN_ODD_HOST_PLUGIN
+#include <ieee80211_external_config.h>
+#endif
+
 /* Flags for Feature specific stats */
 #define STATS_FEAT_FLG_RX              0x00000001
 #define STATS_FEAT_FLG_TX              0x00000002
