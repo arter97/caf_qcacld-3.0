@@ -19400,6 +19400,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	int errno;
 	int32_t cipher_cap, ucast_cipher = 0;
 	struct qdf_mac_addr mac_address;
+	struct hdd_ap_ctx *hdd_ap_ctx;
 
 	hdd_enter();
 
@@ -19466,6 +19467,11 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	switch (adapter->device_mode) {
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
+		hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		if (hdd_ap_ctx->during_auth_offload) {
+			hdd_err("don't need install key during auth");
+			return -EINVAL;
+		}
 		errno = wlan_hdd_add_key_sap(adapter, pairwise,
 					     key_index, cipher);
 		break;
