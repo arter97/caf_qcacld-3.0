@@ -158,4 +158,13 @@ void dp_ppeds_dump_ppe_vp_tbl_be(struct cdp_soc_t *soc_hdl);
 QDF_STATUS dp_ppeds_vdev_enable_pri2tid_be(struct cdp_soc_t *soc_hdl,
 				       uint8_t vdev_id,
 				       bool val);
+
+/*
+ * dp_ppeds_handle_tx_comp: Handle tx completions interrupt
+ * @irq: IRQ number
+ * @ctxr: IRQ handler context
+ *
+ * Return: IRQ handle status
+ */
+irqreturn_t dp_ppeds_handle_tx_comp(int irq, void *ctxr);
 #endif /* _DP_PPEDS_H_ */
