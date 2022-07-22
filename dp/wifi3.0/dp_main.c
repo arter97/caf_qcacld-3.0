@@ -1528,6 +1528,14 @@ static int dp_srng_calculate_msi_group(struct dp_soc *soc,
 		grp_mask = &soc->wlan_cfg_ctx->int_host2txmon_ring_mask[0];
 	break;
 
+	case REO2PPE:
+		grp_mask = &soc->wlan_cfg_ctx->int_reo2ppe_ring_mask[0];
+	break;
+
+	case PPE2TCL:
+		grp_mask = &soc->wlan_cfg_ctx->int_ppe2tcl_ring_mask[0];
+	break;
+
 	case TCL_DATA:
 	/* CMD_CREDIT_RING is used as command in 8074 and credit in 9000 */
 	case TCL_CMD_CREDIT:
@@ -1893,7 +1901,7 @@ dp_srng_configure_interrupt_thresholds(struct dp_soc *soc,
 
 	wbm2_sw_rx_rel_ring_id = wlan_cfg_get_rx_rel_ring_id(soc->wlan_cfg_ctx);
 
-	if (ring_type == REO_DST) {
+	if (ring_type == REO_DST || ring_type == REO2PPE) {
 		ring_params->intr_timer_thres_us =
 			wlan_cfg_get_int_timer_threshold_rx(soc->wlan_cfg_ctx);
 		ring_params->intr_batch_cntr_thres_entries =
@@ -1934,10 +1942,15 @@ dp_srng_configure_interrupt_thresholds(struct dp_soc *soc,
 	case TCL_STATUS:
 	case WBM_IDLE_LINK:
 	case SW2WBM_RELEASE:
-	case PPE2TCL:
 	case SW2RXDMA_NEW:
 		ring_params->intr_timer_thres_us = 0;
 		ring_params->intr_batch_cntr_thres_entries = 0;
+		break;
+	case PPE2TCL:
+		ring_params->intr_timer_thres_us =
+			wlan_cfg_get_int_timer_threshold_other(soc->wlan_cfg_ctx);
+		ring_params->intr_batch_cntr_thres_entries =
+			wlan_cfg_get_int_batch_threshold_ppe2tcl(soc->wlan_cfg_ctx);
 		break;
 	}
 

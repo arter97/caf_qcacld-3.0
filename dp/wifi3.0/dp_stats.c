@@ -5619,6 +5619,11 @@ void dp_print_soc_cfg_params(struct dp_soc *soc)
 		       soc_cfg_ctx->int_batch_threshold_other);
 	DP_PRINT_STATS("Int timer threshold other: %u ",
 		       soc_cfg_ctx->int_timer_threshold_other);
+	DP_PRINT_STATS("Int batch threshold ppe2tcl: %u ",
+		       soc_cfg_ctx->int_batch_threshold_ppe2tcl);
+	DP_PRINT_STATS("Int timer threshold ppe2tcl: %u ",
+		       soc_cfg_ctx->int_timer_threshold_ppe2tcl);
+
 	DP_PRINT_STATS("DP NAPI scale factor: %u ",
 		       soc_cfg_ctx->napi_scale_factor);
 
