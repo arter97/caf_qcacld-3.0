@@ -283,6 +283,7 @@ struct dp_ppeds_napi {
  * @mld_peer_hash: peer hash table for ML peers
  *           Associated peer with this MAC address)
  * @mld_peer_hash_lock: lock to protect mld_peer_hash
+ * @ppe_ds_int_mode_enabled: PPE DS interrupt mode enabled
  * @reo2ppe_ring: REO2PPE ring
  * @ppe2tcl_ring: PPE2TCL ring
  * @ppe_release_ring: PPE release ring
@@ -308,6 +309,7 @@ struct dp_soc_be {
 	struct dp_hw_cookie_conversion_t tx_cc_ctx[MAX_TXDESC_POOLS];
 	struct dp_hw_cookie_conversion_t rx_cc_ctx[MAX_RXDESC_POOLS];
 #ifdef WLAN_SUPPORT_PPEDS
+	bool ppeds_int_mode_enabled;
 	struct dp_srng reo2ppe_ring;
 	struct dp_srng ppe2tcl_ring;
 	struct dp_srng ppe_release_ring;

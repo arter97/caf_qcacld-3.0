@@ -96,6 +96,8 @@
 #define WLAN_CFG_UMAC_RESET_INTR_MASK_0 0x1
 
 #define WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0 0x1
+#define WLAN_CFG_REO2PPE_RING_MASK_0 0x1
+#define WLAN_CFG_PPE2TCL_RING_MASK_0 0x1
 
 struct dp_int_mask_assignment {
 	uint8_t tx_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
@@ -114,6 +116,8 @@ struct dp_int_mask_assignment {
 	uint8_t host2txmon_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t tx_mon_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t ppeds_wbm_release_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
+	uint8_t reo2ppe_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
+	uint8_t ppe2tcl_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t umac_reset_intr_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 };
 
@@ -789,6 +793,20 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		  WLAN_CFG_REO_STATUS_RING_MASK_2,
 		  WLAN_CFG_REO_STATUS_RING_MASK_3,
 		  0, 0, 0, 0},
+		/* ppe2tcl ring masks */
+		{ 0, 0, 0,
+		  WLAN_CFG_REO_STATUS_RING_MASK_0,
+		  WLAN_CFG_REO_STATUS_RING_MASK_1,
+		  WLAN_CFG_REO_STATUS_RING_MASK_2,
+		  WLAN_CFG_REO_STATUS_RING_MASK_3,
+		  0, 0, 0, 0},
+		/* reo2ppe ring masks */
+		{ 0, 0, 0,
+		  WLAN_CFG_REO_STATUS_RING_MASK_0,
+		  WLAN_CFG_REO_STATUS_RING_MASK_1,
+		  WLAN_CFG_REO_STATUS_RING_MASK_2,
+		  WLAN_CFG_REO_STATUS_RING_MASK_3,
+		  0, 0, 0, 0},
 	},
 };
 #else
@@ -944,6 +962,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		{ WLAN_CFG_TX_MON_RING_MASK_0 |
 		  WLAN_CFG_TX_MON_RING_MASK_1,
 		  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{WLAN_CFG_REO2PPE_RING_MASK_0, 0, 0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, WLAN_CFG_PPE2TCL_RING_MASK_0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0, 0, 0, 0, 0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1020,6 +1044,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		{ WLAN_CFG_TX_MON_RING_MASK_0,
 		  WLAN_CFG_TX_MON_RING_MASK_1,
 		  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{WLAN_CFG_REO2PPE_RING_MASK_0, 0, 0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, WLAN_CFG_PPE2TCL_RING_MASK_0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0, 0, 0, 0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1104,6 +1134,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		{ WLAN_CFG_TX_MON_RING_MASK_0,
 		  WLAN_CFG_TX_MON_RING_MASK_1,
 		  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{WLAN_CFG_REO2PPE_RING_MASK_0, 0, 0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, WLAN_CFG_PPE2TCL_RING_MASK_0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0, 0, 0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1180,6 +1216,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		{ WLAN_CFG_TX_MON_RING_MASK_0,
 		  WLAN_CFG_TX_MON_RING_MASK_1,
 		  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, WLAN_CFG_REO2PPE_RING_MASK_0, 0, 0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, WLAN_CFG_PPE2TCL_RING_MASK_0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0, 0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1267,6 +1309,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0,
 		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, WLAN_CFG_REO2PPE_RING_MASK_0, 0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, WLAN_CFG_PPE2TCL_RING_MASK_0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1347,6 +1395,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0,
 		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, WLAN_CFG_PPE2TCL_RING_MASK_0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1435,6 +1489,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0,
 		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, WLAN_CFG_PPE2TCL_RING_MASK_0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1523,6 +1583,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, 0, WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0,
 		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, WLAN_CFG_PPE2TCL_RING_MASK_0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
@@ -1611,6 +1677,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, 0, 0, WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0,
 		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, 0, WLAN_CFG_PPE2TCL_RING_MASK_0,
+		 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, 0,
 		 WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0, 0, 0, 0, 0},
@@ -1699,6 +1771,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, 0, 0, 0, WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0,
 		 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0,
+		 0, 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0,
+		 WLAN_CFG_PPE2TCL_RING_MASK_0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, 0,
 		 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0, 0, 0, 0},
@@ -1787,6 +1865,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe wbm ds release ring ring mask */
 		{ 0, 0, 0, 0, 0, 0, 0, WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0,
 		 0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0,
+		 0, 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 WLAN_CFG_PPE2TCL_RING_MASK_0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, 0,
 		 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0, 0, 0},
@@ -1866,6 +1950,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, 0, 0, 0, 0, 0,
 		  WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0, 0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0,
+		 0, 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 WLAN_CFG_PPE2TCL_RING_MASK_0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, 0,
 		 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0, 0},
@@ -1945,6 +2035,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		  WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0, 0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0,
+		 0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 WLAN_CFG_PPE2TCL_RING_MASK_0, 0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, 0,
 		 0, 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0, 0},
@@ -2024,6 +2120,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		  WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0, 0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 WLAN_CFG_REO2PPE_RING_MASK_0, 0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 0, WLAN_CFG_PPE2TCL_RING_MASK_0, 0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, 0,
 		 0, 0, 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0, 0},
@@ -2103,6 +2205,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		  WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0, 0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 0, WLAN_CFG_REO2PPE_RING_MASK_0, 0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 0, 0, WLAN_CFG_PPE2TCL_RING_MASK_0, 0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, 0,
 		 0, 0, 0, 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0, 0},
@@ -2182,6 +2290,12 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* ppe ds wbm release ring ring mask */
 		{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		  0, WLAN_CFG_PPEDS_WBM_RELEASE_RING_MASK_0, 0, 0, 0},
+		/* Reo2ppe ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 0, 0, WLAN_CFG_REO2PPE_RING_MASK_0, 0, 0},
+		/* ppe2tcl ring mask */
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 0, 0, 0, WLAN_CFG_PPE2TCL_RING_MASK_0, 0},
 		/* umac reset mask */
 		{0, 0, 0, 0, 0, 0, 0, 0,
 		 0, 0, 0, 0, 0, 0, 0, WLAN_CFG_UMAC_RESET_INTR_MASK_0},
@@ -2289,6 +2403,8 @@ void wlan_set_srng_cfg(struct wlan_srng_cfg **wlan_cfg)
 	g_wlan_srng_cfg[RXDMA_MONITOR_STATUS] =
 			wlan_srng_rxdma_monitor_status_cfg;
 	g_wlan_srng_cfg[RXDMA_MONITOR_DST] = wlan_srng_default_cfg;
+	g_wlan_srng_cfg[REO2PPE] = wlan_srng_default_cfg;
+	g_wlan_srng_cfg[PPE2TCL] = wlan_srng_default_cfg;
 	g_wlan_srng_cfg[RXDMA_MONITOR_DESC] = wlan_srng_default_cfg;
 	g_wlan_srng_cfg[DIR_BUF_RX_DMA_SRC] = wlan_srng_default_cfg;
 #ifdef WLAN_FEATURE_CIF_CFR
@@ -2392,6 +2508,10 @@ void wlan_cfg_fill_interrupt_mask(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 			dp_mask_assignment[interrupt_index].reo_status_ring_mask[i];
 		wlan_cfg_ctx->int_ppeds_wbm_release_ring_mask[i] =
 			dp_mask_assignment[interrupt_index].ppeds_wbm_release_ring_mask[i];
+		wlan_cfg_ctx->int_ppe2tcl_ring_mask[i] =
+			dp_mask_assignment[interrupt_index].ppe2tcl_ring_mask[i];
+		wlan_cfg_ctx->int_reo2ppe_ring_mask[i] =
+			dp_mask_assignment[interrupt_index].reo2ppe_ring_mask[i];
 		if (is_monitor_mode) {
 			wlan_cfg_ctx->int_rx_ring_mask[i] = 0;
 			wlan_cfg_ctx->int_rxdma2host_ring_mask[i] = 0;
@@ -2785,6 +2905,11 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 		cfg_get(psoc, CFG_DP_INT_BATCH_THRESHOLD_OTHER);
 	wlan_cfg_ctx->int_timer_threshold_other =
 		cfg_get(psoc, CFG_DP_INT_TIMER_THRESHOLD_OTHER);
+	wlan_cfg_ctx->int_batch_threshold_ppe2tcl =
+			cfg_get(psoc, CFG_DP_INT_BATCH_THRESHOLD_PPE2TCL);
+	wlan_cfg_ctx->int_timer_threshold_ppe2tcl =
+			cfg_get(psoc, CFG_DP_INT_TIMER_THRESHOLD_PPE2TCL);
+
 	wlan_cfg_ctx->pktlog_buffer_size =
 		cfg_get(psoc, CFG_DP_PKTLOG_BUFFER_SIZE);
 
@@ -3537,6 +3662,16 @@ void wlan_cfg_set_dp_soc_nss_cfg(struct wlan_cfg_dp_soc_ctxt *cfg, int nss_cfg)
 	cfg->nss_cfg = nss_cfg;
 	if (cfg->nss_cfg)
 		cfg->tx_comp_ring_size = cfg->tx_comp_ring_size_nss;
+}
+
+int wlan_cfg_get_int_batch_threshold_ppe2tcl(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->int_batch_threshold_ppe2tcl;
+}
+
+int wlan_cfg_get_int_timer_threshold_ppe2tcl(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->int_timer_threshold_ppe2tcl;
 }
 
 int wlan_cfg_get_int_batch_threshold_tx(struct wlan_cfg_dp_soc_ctxt *cfg)

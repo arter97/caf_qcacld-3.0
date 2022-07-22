@@ -946,6 +946,9 @@ void dp_free_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
 		if (ring_type == WBM2SW_RELEASE &&
 		    ring_num == WBM2_SW_PPE_REL_RING_ID)
 			pld_pfrm_free_irq(soc->osdev->dev, srng->irq, soc);
+		else if (ring_type == REO2PPE || ring_type == PPE2TCL)
+			pld_pfrm_free_irq(soc->osdev->dev, srng->irq,
+					  dp_get_ppe_ds_ctxt(soc));
 	}
 }
 
@@ -953,14 +956,15 @@ static
 int dp_register_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
 				 int vector, int ring_type, int ring_num)
 {
-	int irq, ret = 0;
+	int irq = -1, ret = 0;
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	int pci_slot = pld_get_pci_slot(soc->osdev->dev);
-	void *ctxt;
+
+	srng->irq = -1;
+	irq = pld_get_msi_irq(soc->osdev->dev, vector);
 
 	if (ring_type == WBM2SW_RELEASE &&
 	    ring_num == WBM2_SW_PPE_REL_RING_ID) {
-		irq = pld_get_msi_irq(soc->osdev->dev, vector);
 		snprintf(be_soc->irq_name[2], DP_PPE_INTR_STRNG_LEN,
 			 "pci%d_ppe_wbm_rel", pci_slot);
 
@@ -971,6 +975,29 @@ int dp_register_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
 
 		if (ret)
 			goto fail;
+	} else if (ring_type == REO2PPE && be_soc->ppeds_int_mode_enabled) {
+		snprintf(be_soc->irq_name[0], DP_PPE_INTR_STRNG_LEN,
+			 "pci%d_reo2ppe", pci_slot);
+		ret = pld_pfrm_request_irq(soc->osdev->dev, irq,
+					   dp_ppe_ds_reo2ppe_irq_handler,
+					   IRQF_SHARED | IRQF_NO_SUSPEND,
+					   be_soc->irq_name[0],
+					   dp_get_ppe_ds_ctxt(soc));
+
+		if (ret)
+			goto fail;
+	} else if (ring_type == PPE2TCL && be_soc->ppeds_int_mode_enabled) {
+		snprintf(be_soc->irq_name[1], DP_PPE_INTR_STRNG_LEN,
+			 "pci%d_ppe2tcl", pci_slot);
+		ret = pld_pfrm_request_irq(soc->osdev->dev, irq,
+					   dp_ppe_ds_ppe2tcl_irq_handler,
+					   IRQF_SHARED | IRQF_NO_SUSPEND,
+					   be_soc->irq_name[1],
+					   dp_get_ppe_ds_ctxt(soc));
+		if (ret)
+			goto fail;
+
+		pld_pfrm_disable_irq_nosync(soc->osdev->dev, irq);
 	} else {
 		return 0;
 	}
@@ -982,8 +1009,8 @@ int dp_register_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
 
 	return 0;
 fail:
-	dp_err("Unable to config irq : ring type %d irq %d vector %d ctxt %pK",
-	       ring_type, irq, vector, ctxt);
+	dp_err("Unable to config irq : ring type %d irq %d vector %d",
+	       ring_type, irq, vector);
 
 	return ret;
 }

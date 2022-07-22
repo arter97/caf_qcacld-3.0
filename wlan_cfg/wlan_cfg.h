@@ -291,6 +291,8 @@ struct wlan_cfg_dp_soc_ctxt {
 	int num_tx_ext_desc;
 	int max_peer_id;
 	int htt_packet_type;
+	int int_batch_threshold_ppe2tcl;
+	int int_timer_threshold_ppe2tcl;
 	int int_batch_threshold_tx;
 	int int_timer_threshold_tx;
 	int int_batch_threshold_rx;
@@ -319,6 +321,8 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t int_tx_ring_near_full_irq_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t int_host2txmon_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t int_ppeds_wbm_release_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
+	uint8_t int_ppe2tcl_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
+	uint8_t int_reo2ppe_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t int_umac_reset_intr_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	int hw_macid[MAX_PDEV_CNT];
 	int hw_macid_pdev_id_map[MAX_NUM_LMAC_HW];
@@ -1294,6 +1298,22 @@ int wlan_cfg_get_dp_soc_nss_cfg(struct wlan_cfg_dp_soc_ctxt *cfg);
  *
  */
 void wlan_cfg_set_dp_soc_nss_cfg(struct wlan_cfg_dp_soc_ctxt *cfg, int nss_cfg);
+
+/*
+ * wlan_cfg_get_int_timer_threshold_ppe2tcl - Get intr mitigation for ppe2tcl
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: Timer threshold
+ */
+int wlan_cfg_get_int_timer_threshold_ppe2tcl(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_int_batch_threshold_ppe2tcl - Get intr mitigation for ppe2tcl
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: Batch threshold
+ */
+int wlan_cfg_get_int_batch_threshold_ppe2tcl(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /*
  * wlan_cfg_get_int_batch_threshold_tx - Get interrupt mitigation cfg for Tx
