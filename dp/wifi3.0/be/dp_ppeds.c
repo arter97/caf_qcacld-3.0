@@ -32,6 +32,9 @@
 #include "dp_rx.h"
 #include "dp_rx_buffer_pool.h"
 
+#define DS_NAPI_BUDGET_TO_INTERNAL_BUDGET(n, s) (((n) << (s)) - 1)
+#define DS_INTERNAL_BUDGET_TO_NAPI_BUDGET(n, s) (((n) + 1) >> (s))
+
 /**
  * dp_ppeds_deinit_ppe_vp_tbl_be - PPE VP table dealoc
  * @be_soc: BE SoC
@@ -223,6 +226,75 @@ static void dp_ppeds_dealloc_vp_tbl_entry_be(struct dp_soc_be *be_soc,
 	be_soc->ppe_vp_tbl[ppe_vp_num_idx].is_configured = false;
 	be_soc->num_ppe_vp_entries--;
 	qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+}
+
+/**
+ * dp_ppeds_tx_comp_poll() - ppeds tx completion napi poll
+ * @napi: napi handle
+ * @budget: Budget
+ *
+ * Ppeds tx completion napi poll funciton
+ *
+ * Return: Work done
+ */
+static int dp_ppeds_tx_comp_poll(struct napi_struct *napi, int budget)
+{
+	int work_done;
+	int shift = 2;
+	int norm_budget = DS_NAPI_BUDGET_TO_INTERNAL_BUDGET(budget, shift);
+	struct dp_soc_be *be_soc =
+		qdf_container_of(napi, struct dp_soc_be, ppeds_napi_ctxt.napi);
+
+	work_done = dp_ppeds_tx_comp_handler(be_soc, norm_budget);
+	work_done = DS_INTERNAL_BUDGET_TO_NAPI_BUDGET(work_done, shift);
+
+	if (budget > work_done) {
+		napi_complete(napi);
+		dp_ppeds_enable_irq(&be_soc->soc,
+				    &be_soc->ppe_wbm_release_ring);
+	}
+
+	return (work_done > budget) ? budget : work_done;
+}
+
+/**
+ * dp_ppeds_del_napi_ctxt() - delete ppeds tx completion napi context
+ * @be_soc: BE SoC
+ *
+ * Delete ppeds tx completion napi context
+ *
+ * Return: None
+ */
+static void dp_ppeds_del_napi_ctxt(struct dp_soc_be *be_soc)
+{
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+
+	napi_disable(&napi_ctxt->napi);
+
+	netif_napi_del(&napi_ctxt->napi);
+}
+
+/**
+ * dp_ppeds_add_napi_ctxt() - Add ppeds tx completion napi context
+ * @be_soc: BE SoC
+ *
+ * Add ppeds tx completion napi context
+ *
+ * Return: None
+ */
+static void dp_ppeds_add_napi_ctxt(struct dp_soc_be *be_soc)
+{
+	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+	int napi_budget =
+		wlan_cfg_get_dp_soc_ppe_tx_comp_napi_budget(soc->wlan_cfg_ctx);
+
+	qdf_net_if_create_dummy_if((struct qdf_net_if *)&napi_ctxt->ndev);
+
+	netif_napi_add(&napi_ctxt->ndev, &napi_ctxt->napi,
+		       dp_ppeds_tx_comp_poll, napi_budget);
+
+	napi_enable(&napi_ctxt->napi);
 }
 
 /**
@@ -1134,7 +1206,9 @@ QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc)
 	/*
 	 * Implicit tx to tx complete mapping for PPE2TCL ring
 	 */
-	hal_tx_config_rbm_mapping_be(soc->hal_soc, be_soc->ppe2tcl_ring.hal_srng, 6);
+	hal_tx_config_rbm_mapping_be(soc->hal_soc,
+				     be_soc->ppe2tcl_ring.hal_srng,
+				     WBM2_SW_PPE_REL_MAP_ID);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1152,12 +1226,35 @@ void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
 	if (!be_soc->ppeds_handle)
 		return;
 
+	dp_ppeds_del_napi_ctxt(be_soc);
 	dp_ppeds_tx_desc_pool_free(soc);
 	dp_hw_cookie_conversion_detach(be_soc, &be_soc->ppeds_tx_cc_ctx);
 	nss_ppe_ds_wlan_inst_del(be_soc->ppeds_handle);
 	be_soc->ppeds_handle = NULL;
 
 	dp_ppeds_deinit_ppe_vp_tbl_be(be_soc);
+}
+
+/**
+ * dp_ppeds_handle_tx_comp() - PPE DS handle irq
+ * @irq: irq number
+ * @ctxt: irq context
+ *
+ * PPE DS handle irq function
+ *
+ * Return: irq status
+ */
+irqreturn_t dp_ppeds_handle_tx_comp(int irq, void *ctxt)
+{
+	struct dp_soc_be *be_soc =
+			dp_get_be_soc_from_dp_soc((struct dp_soc *)ctxt);
+	struct napi_struct *napi = &be_soc->ppeds_napi_ctxt.napi;
+
+	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe_wbm_release_ring);
+
+	napi_schedule(napi);
+
+	return IRQ_HANDLED;
 }
 
 QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
@@ -1220,8 +1317,12 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 		goto fail4;
 	}
 
-	 besocptr = (struct dp_soc_be **)ppeds_wlan_priv(be_soc->ppeds_handle);
-	 *besocptr = be_soc;
+	dp_ppeds_add_napi_ctxt(be_soc);
+
+	dp_info("Allocated PPEDS handle\n");
+
+	besocptr = (struct dp_soc_be **)ppeds_wlan_priv(be_soc->ppeds_handle);
+	*besocptr = be_soc;
 
 	 return QDF_STATUS_SUCCESS;
 
@@ -1232,6 +1333,7 @@ fail3:
 fail2:
 	dp_hw_cookie_conversion_detach(be_soc, &be_soc->ppeds_tx_cc_ctx);
 fail1:
+	dp_err("Could not allocate PPEDS handle\n");
 	return QDF_STATUS_E_FAILURE;
 
 }
