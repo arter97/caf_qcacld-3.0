@@ -2032,10 +2032,7 @@ static void *alloc_object(enum stats_object_e obj_type, char *ifname)
 		return NULL;
 	}
 
-	temp_obj->nlsent = false;
-	temp_obj->next = NULL;
-	temp_obj->parent = NULL;
-	temp_obj->child = NULL;
+	memset(temp_obj, 0, sizeof(struct object_list));
 	temp_obj->obj_type = obj_type;
 	strlcpy(temp_obj->ifname, ifname, IFNAME_LEN);
 
