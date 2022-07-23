@@ -38,12 +38,6 @@
 #define IS_DP_ETHERTYPE_WAI(_nbuf) (false)
 #endif
 
-#ifdef CFG80211_CTRL_FRAME_SRC_ADDR_TA_ADDR
-#define SEND_EAPOL_OVER_NL true
-#else
-#define SEND_EAPOL_OVER_NL  false
-#endif
-
 #define DP_CONNECTIVITY_CHECK_SET_ARP		1
 #define DP_CONNECTIVITY_CHECK_SET_DNS		2
 #define DP_CONNECTIVITY_CHECK_SET_TCP_HANDSHAKE	3
@@ -429,6 +423,7 @@ void dp_get_tx_resource(struct wlan_dp_intf *dp_intf,
 			struct qdf_mac_addr *mac_addr);
 
 #else
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 /**
  * dp_nbuf_orphan() - skb_unshare a cloned packed else skb_orphan
  * @dp_intf: pointer to DP interface
@@ -440,17 +435,13 @@ static inline
 qdf_nbuf_t dp_nbuf_orphan(struct wlan_dp_intf *dp_intf,
 			  qdf_nbuf_t nbuf)
 {
-	qdf_nbuf_t nskb;
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
-#endif
 	int cpu;
 
 	dp_nbuf_fill_gso_size(dp_intf->dev, nbuf);
 
-	nskb =  __qdf_nbuf_unshare(nbuf);
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
-	if (unlikely(dp_ctx->dp_cfg.tx_orphan_enable) && nskb == nbuf) {
+	if (unlikely(dp_ctx->dp_cfg.tx_orphan_enable) ||
+	    qdf_nbuf_is_cloned(nbuf)) {
 		/*
 		 * For UDP packets we want to orphan the packet to allow the app
 		 * to send more packets. The flow would ultimately be controlled
@@ -460,9 +451,21 @@ qdf_nbuf_t dp_nbuf_orphan(struct wlan_dp_intf *dp_intf,
 		++dp_intf->dp_stats.tx_rx_stats.per_cpu[cpu].tx_orphaned;
 		qdf_nbuf_orphan(nbuf);
 	}
-#endif
+	return nbuf;
+}
+#else
+static inline
+qdf_nbuf_t dp_nbuf_orphan(struct wlan_dp_intf *dp_intf,
+			  qdf_nbuf_t nbuf)
+{
+	qdf_nbuf_t nskb;
+
+	dp_nbuf_fill_gso_size(dp_intf->dev, nbuf);
+	nskb =  __qdf_nbuf_unshare(nbuf);
+
 	return nskb;
 }
+#endif
 
 /**
  * dp_get_tx_resource() - check tx resources and take action

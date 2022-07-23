@@ -310,49 +310,78 @@ ucfg_mlme_set_fine_time_meas_cap(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+ucfg_mlme_set_vdev_traffic_type(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev, bool set,
+				uint8_t bit_mask)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	struct vdev_mlme_obj *vdev_mlme;
+	struct vdev_set_params param = {0};
+	enum QDF_OPMODE mode;
+	QDF_STATUS status;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	uint8_t prev_traffic_type;
+
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (mode != QDF_SAP_MODE && mode != QDF_P2P_CLIENT_MODE &&
+	    mode != QDF_P2P_GO_MODE) {
+		mlme_legacy_debug("vdev %d: not supported for opmode %d",
+				  vdev_id, mode);
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlme_legacy_err("vdev %d: bit_mask 0x%x, set %d, vdev mlme is null",
+				vdev_id, bit_mask, set);
+		return QDF_STATUS_E_FAILURE;
+	}
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev %d: bit_mask 0x%x, set %d, vmlme_priv is null",
+				vdev_id, bit_mask, set);
+		return QDF_STATUS_E_FAILURE;
+	}
+	prev_traffic_type = mlme_priv->vdev_traffic_type;
+	if (set)
+		mlme_priv->vdev_traffic_type |= bit_mask;
+	else
+		mlme_priv->vdev_traffic_type &= ~bit_mask;
+
+	if (prev_traffic_type == mlme_priv->vdev_traffic_type) {
+		mlme_legacy_debug("vdev %d: No change in value 0x%x, set %d mask 0x%x",
+				  vdev_id, mlme_priv->vdev_traffic_type, set,
+				  bit_mask);
+		return QDF_STATUS_SUCCESS;
+	}
+	mlme_legacy_debug("vdev %d: vdev_traffic_type 0x%x (set %d with bit_mask 0x%x)",
+			  vdev_id, mlme_priv->vdev_traffic_type, set, bit_mask);
+	param.param_id = WMI_VDEV_PARAM_VDEV_TRAFFIC_CONFIG;
+	param.vdev_id = vdev_id;
+	param.param_value = mlme_priv->vdev_traffic_type;
+	status = tgt_vdev_mgr_set_param_send(vdev_mlme, &param);
+	policy_mgr_handle_ml_sta_link_on_traffic_type_change(psoc, vdev);
+
+	return status;
+}
+
 QDF_STATUS
 ucfg_mlme_set_vdev_traffic_low_latency(struct wlan_objmgr_psoc *psoc,
 				       uint8_t vdev_id, bool set)
 {
 	struct wlan_objmgr_vdev *vdev;
-	struct mlme_legacy_priv *mlme_priv;
-	struct vdev_mlme_obj *vdev_mlme;
-	struct vdev_set_params param = {0};
 	QDF_STATUS status;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_OBJMGR_ID);
 	if (!vdev) {
-		mlme_legacy_err("vdev object is NULL for vdev %d",
+		mlme_legacy_err("vdev %d: vdev not found",
 				vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
-	if (!vdev_mlme) {
-		mlme_legacy_err("vdev vdev_mlme object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-		return QDF_STATUS_E_FAILURE;
-	}
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (set)
-		mlme_priv->vdev_traffic_type |= PM_VDEV_TRAFFIC_LOW_LATENCY;
-	else
-		mlme_priv->vdev_traffic_type &= ~PM_VDEV_TRAFFIC_LOW_LATENCY;
-
-	mlme_legacy_debug("low_latency flag 0x%x set %d on vdev %d",
-			  mlme_priv->vdev_traffic_type, set, vdev_id);
-	param.param_id = WMI_VDEV_PARAM_VDEV_TRAFFIC_CONFIG;
-	param.vdev_id = vdev_id;
-	param.param_value = mlme_priv->vdev_traffic_type;
-	status = tgt_vdev_mgr_set_param_send(vdev_mlme, &param);
-
+	status = ucfg_mlme_set_vdev_traffic_type(psoc, vdev, set,
+						 PM_VDEV_TRAFFIC_LOW_LATENCY);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return status;
@@ -363,44 +392,17 @@ ucfg_mlme_set_vdev_traffic_high_throughput(struct wlan_objmgr_psoc *psoc,
 					   uint8_t vdev_id, bool set)
 {
 	struct wlan_objmgr_vdev *vdev;
-	struct mlme_legacy_priv *mlme_priv;
-	struct vdev_mlme_obj *vdev_mlme;
-	struct vdev_set_params param = {0};
 	QDF_STATUS status;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						    WLAN_MLME_OBJMGR_ID);
 	if (!vdev) {
-		mlme_legacy_err("vdev object is NULL for vdev %d",
+		mlme_legacy_err("vdev %d: vdev not found",
 				vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
-
-	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
-	if (!vdev_mlme) {
-		mlme_legacy_err("vdev vdev_mlme object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-		return QDF_STATUS_E_FAILURE;
-	}
-	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
-	if (!mlme_priv) {
-		mlme_legacy_err("vdev legacy private object is NULL");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
-		return QDF_STATUS_E_FAILURE;
-	}
-
-	if (set)
-		mlme_priv->vdev_traffic_type |= PM_VDEV_TRAFFIC_HIGH_TPUT;
-	else
-		mlme_priv->vdev_traffic_type &= ~PM_VDEV_TRAFFIC_HIGH_TPUT;
-
-	mlme_legacy_debug("high_throughput flag 0x%x set %d on vdev %d",
-			  mlme_priv->vdev_traffic_type, set, vdev_id);
-	param.param_id = WMI_VDEV_PARAM_VDEV_TRAFFIC_CONFIG;
-	param.vdev_id = vdev_id;
-	param.param_value = mlme_priv->vdev_traffic_type;
-	status = tgt_vdev_mgr_set_param_send(vdev_mlme, &param);
-
+	status = ucfg_mlme_set_vdev_traffic_type(psoc, vdev, set,
+						 PM_VDEV_TRAFFIC_HIGH_TPUT);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return status;
@@ -1062,6 +1064,13 @@ ucfg_mlme_cfg_get_multi_client_ll_ini_support(struct wlan_objmgr_psoc *psoc,
 {
 	return mlme_get_cfg_multi_client_ll_ini_support(psoc,
 						multi_client_ll_support);
+}
+#endif
+
+#ifdef WLAN_VENDOR_HANDOFF_CONTROL
+bool ucfg_mlme_get_vendor_handoff_control_caps(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_vendor_handoff_control_caps(psoc);
 }
 #endif
 
@@ -1780,16 +1789,24 @@ bool ucfg_mlme_validate_full_roam_scan_period(uint32_t full_roam_scan_period)
 	return is_valid;
 }
 
-bool ucfg_mlme_validate_scan_period(uint32_t roam_scan_period)
+bool ucfg_mlme_validate_scan_period(struct wlan_objmgr_psoc *psoc,
+				    uint32_t roam_scan_period)
 {
-	bool is_valid = true;
+	bool is_valid = true, val = false;
 
 	if (!cfg_in_range(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD,
 			  roam_scan_period)) {
-		mlme_legacy_err("Roam scan period value %d msec is out of range (Min: %d msec Max: %d msec)",
-				roam_scan_period,
-				cfg_min(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD),
-				cfg_max(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD));
+		ucfg_mlme_get_connection_roaming_ini_present(psoc, &val);
+		if (val)
+			mlme_legacy_err("Roam scan period value %d msec is out of range (Min: %d msec Max: %d msec)",
+					roam_scan_period,
+					cfg_min(CFG_ROAM_SCAN_FIRST_TIMER) * 1000,
+					cfg_max(CFG_ROAM_SCAN_FIRST_TIMER) * 1000);
+		else
+			mlme_legacy_err("Roam scan period value %d msec is out of range (Min: %d msec Max: %d msec)",
+					roam_scan_period,
+					cfg_min(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD),
+					cfg_max(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD));
 		is_valid = false;
 	}
 
@@ -1856,3 +1873,31 @@ ucfg_mlme_get_connection_roaming_ini_present(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+enum wlan_phymode
+ucfg_mlme_get_vdev_phy_mode(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *mlme_obj;
+	enum wlan_phymode phymode;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev) {
+		mlme_err("get vdev failed for vdev_id: %d", vdev_id);
+		return WLAN_PHYMODE_AUTO;
+	}
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!mlme_obj) {
+		mlme_err("failed to get mlme_obj vdev_id: %d", vdev_id);
+		phymode = WLAN_PHYMODE_AUTO;
+		goto done;
+	}
+	phymode = mlme_obj->mgmt.generic.phy_mode;
+
+done:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+
+	return phymode;
+}

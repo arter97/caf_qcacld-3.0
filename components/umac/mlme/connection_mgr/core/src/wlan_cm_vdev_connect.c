@@ -36,6 +36,9 @@
 #include "wlan_roam_debug.h"
 #include "wlan_mlo_mgr_sta.h"
 #include "wlan_mlo_mgr_roam.h"
+#include "wlan_reg_ucfg_api.h"
+#include "wlan_mlme_api.h"
+#include "wlan_reg_services_api.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -1071,11 +1074,62 @@ QDF_STATUS cm_flush_join_req(struct scheduler_msg *msg)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
+static  QDF_STATUS
+cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
+		       struct mlo_partner_info *partner_info)
+{
+	uint8_t i, j = 0;
+	uint8_t mlo_support_link_num;
+	struct wlan_objmgr_psoc *psoc;
+
+	if (!scan_entry->ml_info.num_links)
+		return QDF_STATUS_E_FAILURE;
+
+	psoc = wlan_objmgr_get_psoc_by_id(0, WLAN_MLME_CM_ID);
+	if (!psoc) {
+		mlme_debug("psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+	mlo_support_link_num = wlan_mlme_get_sta_mlo_conn_max_num(psoc);
+	mlme_debug("mlo support link num: %d", mlo_support_link_num);
+
+	/* TODO: Make sure that scan_entry->ml_info->link_info is a sorted
+	 * list.
+	 * When candidates are selected by filter, partner link is set as
+	 * valid in scan entry when mlo band match, then valid partner link is
+	 * copied to join request, after that partner link valid bit in scan
+	 * entry should be cleared to not affect next connect request.
+	 */
+	for (i = 0; i < scan_entry->ml_info.num_links; i++) {
+		mlme_debug("freq: %d, link id: %d",
+			   partner_info->partner_link_info[i].chan_freq,
+			   scan_entry->ml_info.link_info[i].link_id);
+		if (j >= mlo_support_link_num - 1)
+			break;
+		if (scan_entry->ml_info.link_info[i].is_valid_link) {
+			partner_info->partner_link_info[j].link_addr =
+				scan_entry->ml_info.link_info[i].link_addr;
+			partner_info->partner_link_info[j].link_id =
+				scan_entry->ml_info.link_info[i].link_id;
+			j++;
+		} else {
+			scan_entry->ml_info.link_info[i].is_valid_link = false;
+		}
+	}
+	partner_info->num_partner_links = j;
+	mlme_debug("partner link num: %d", j);
+
+	wlan_objmgr_psoc_release_ref(psoc, WLAN_MLME_CM_ID);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void cm_fill_ml_info(struct cm_vdev_join_req *join_req)
 {
-	if (QDF_IS_STATUS_SUCCESS(
-		util_scan_get_ml_partner_info(join_req->entry,
-					      &join_req->partner_info))) {
+	QDF_STATUS ret;
+
+	ret = cm_get_ml_partner_info(join_req->entry, &join_req->partner_info);
+	if (QDF_IS_STATUS_SUCCESS(ret)) {
 		join_req->assoc_link_id = join_req->entry->ml_info.self_link_id;
 		mlme_debug("Assoc link ID:%d", join_req->assoc_link_id);
 	}
@@ -1568,4 +1622,54 @@ bool cm_is_vdevid_active(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id)
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
 
 	return active;
+}
+
+static
+QDF_STATUS cm_handle_hw_mode_change_resp_cb(struct scheduler_msg *msg)
+{
+	struct cm_vdev_hw_mode_rsp *rsp;
+
+	if (!msg || !msg->bodyptr)
+		return QDF_STATUS_E_FAILURE;
+
+	rsp = msg->bodyptr;
+	wlan_cm_hw_mode_change_resp(rsp->pdev, rsp->vdev_id, rsp->cm_id,
+				    rsp->status);
+
+	qdf_mem_free(rsp);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_cm_handle_hw_mode_change_resp(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id,
+				   wlan_cm_id cm_id, QDF_STATUS status)
+{
+	struct cm_vdev_hw_mode_rsp *rsp;
+	struct scheduler_msg rsp_msg = {0};
+	QDF_STATUS qdf_status;
+
+	rsp = qdf_mem_malloc(sizeof(*rsp));
+	if (!rsp)
+		return QDF_STATUS_E_FAILURE;
+
+	rsp->pdev = pdev;
+	rsp->vdev_id = vdev_id;
+	rsp->cm_id = cm_id;
+	rsp->status = status;
+
+	rsp_msg.bodyptr = rsp;
+	rsp_msg.callback = cm_handle_hw_mode_change_resp_cb;
+
+	qdf_status = scheduler_post_message(QDF_MODULE_ID_MLME,
+					    QDF_MODULE_ID_TARGET_IF,
+					    QDF_MODULE_ID_TARGET_IF, &rsp_msg);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		mlme_err(CM_PREFIX_FMT "Failed to post HW mode change rsp",
+			 CM_PREFIX_REF(vdev_id, cm_id));
+		qdf_mem_free(rsp);
+	}
+
+	return qdf_status;
 }

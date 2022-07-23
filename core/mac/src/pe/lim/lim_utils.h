@@ -110,6 +110,11 @@
 #define MAX_WAIT_FOR_BCN_TX_COMPLETE 4000
 #define MAX_WAKELOCK_FOR_CSA         5000
 
+#ifdef WLAN_FEATURE_11BE
+#define MAX_NUM_PWR_LEVELS 16
+#else
+#define MAX_NUM_PWR_LEVELS 8
+#endif
 typedef union uPmfSaQueryTimerId {
 	struct {
 		uint8_t sessionId;
@@ -1499,6 +1504,33 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 			       uint8_t vdev_id);
 
 /**
+ * lim_populate_he_mcs_per_bw() - pouldate HE mcs set per BW (le 80, 160, 80+80)
+ * @mac_ctx: Global MAC context
+ * @self_rx: self rx mcs set
+ * @self_tx: self tx mcs set
+ * @peer_rx: peer rx mcs set
+ * @peer_tx: peer tx mcs set
+ * @nss: nss
+ * @cfg_rx_param: rx wni param to read
+ * @cfg_tx_param: tx wni param to read
+ *
+ * MCS values are interpreted as in IEEE 11ax-D1.4 spec onwards
+ * +-----------------------------------------------------+
+ * |  SS8  |  SS7  |  SS6  | SS5 | SS4 | SS3 | SS2 | SS1 |
+ * +-----------------------------------------------------+
+ * | 15-14 | 13-12 | 11-10 | 9-8 | 7-6 | 5-4 | 3-2 | 1-0 |
+ * +-----------------------------------------------------+
+ *
+ * Return: status of operation
+ */
+QDF_STATUS lim_populate_he_mcs_per_bw(struct mac_context *mac_ctx,
+				      uint16_t *supp_rx_mcs,
+				      uint16_t *supp_tx_mcs,
+				      uint16_t peer_rx, uint16_t peer_tx,
+				      uint8_t nss, uint16_t rx_mcs,
+				      uint16_t tx_mcs);
+
+/**
  * lim_populate_he_mcs_set() - function to populate HE mcs rate set
  * @mac_ctx: pointer to global mac structure
  * @rates: pointer to supported rate set
@@ -1726,6 +1758,11 @@ static inline bool lim_is_sta_eht_capable(tpDphHashNode sta_ds)
 {
 	return sta_ds->mlmStaContext.eht_capable;
 }
+
+QDF_STATUS lim_strip_eht_op_ie(struct mac_context *mac_ctx,
+			       uint8_t *frame_ies,
+			       uint16_t *ie_buf_size,
+			       uint8_t *eht_op_ie);
 
 QDF_STATUS lim_strip_eht_cap_ie(struct mac_context *mac_ctx,
 				uint8_t *frame_ies,
@@ -2022,6 +2059,15 @@ static inline bool lim_is_sta_eht_capable(tpDphHashNode sta_ds)
 }
 
 static inline
+QDF_STATUS lim_strip_eht_op_ie(struct mac_context *mac_ctx,
+			       uint8_t *frame_ies,
+			       uint16_t *ie_buf_size,
+			       uint8_t *eht_op_ie)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
 QDF_STATUS lim_strip_eht_cap_ie(struct mac_context *mac_ctx,
 				uint8_t *frame_ies,
 				uint16_t *ie_buf_size,
@@ -2172,6 +2218,28 @@ lim_update_stads_eht_bw_320mhz(struct pe_session *session,
 {
 }
 #endif /* WLAN_FEATURE_11BE */
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_intersect_ap_emlsr_caps() - Intersect AP and self STA EHT capabilities
+ * @session: pointer to PE session
+ * @add_bss: pointer to ADD BSS params
+ * @beacon: pointer to beacon
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_intersect_ap_emlsr_caps(struct pe_session *session,
+				 struct bss_params *add_bss,
+				 tpSirAssocRsp assoc_rsp);
+#else
+static inline void
+lim_intersect_ap_emlsr_caps(struct pe_session *session,
+			    struct bss_params *add_bss,
+			    tpSirAssocRsp assoc_rsp)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
 
 #if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)
 /**

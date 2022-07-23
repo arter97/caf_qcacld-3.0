@@ -1174,7 +1174,7 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 		hdd_warn("Reach the max continuous error count");
 
 		/* If reach MAX_CONTINUOUS_ERROR_CNT, treat it as valid pair */
-		/* fallthrough */
+		fallthrough;
 	case HDD_TS_STATUS_READY:
 		adapter->last_target_time = adapter->cur_target_time;
 		adapter->last_target_global_tsf_time =
@@ -2659,6 +2659,11 @@ static int __wlan_hdd_cfg80211_handle_tsf_cmd(struct wiphy *wiphy,
 	uint32_t tsf_cmd;
 
 	hdd_enter_dev(wdev->netdev);
+
+	if (QDF_GLOBAL_FTM_MODE == hdd_get_conparam()) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
+	}
 
 	status = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != status)

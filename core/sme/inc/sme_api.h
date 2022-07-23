@@ -800,6 +800,43 @@ QDF_STATUS sme_oem_data_cmd(mac_handle_t mac_handle,
 			     uint8_t vdev_id),
 			     struct oem_data *oem_data,
 			     uint8_t vdev_id);
+
+/**
+ * sme_oem_event_deinit() - function to deregister cb for oem event
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: None
+ */
+void sme_oem_event_deinit(mac_handle_t mac_handle);
+
+/**
+ * sme_async_oem_event_init() - function to register cb for async oem event
+ * @mac_handle: Opaque handle to the global MAC context
+ * @@oem_data_async_event_handler_cb: callback to be registered
+ *
+ * Return: None
+ */
+void sme_async_oem_event_init(mac_handle_t mac_handle,
+			      void (*oem_data_async_event_handler_cb)
+			      (const struct oem_data *oem_event_data));
+/**
+ * sme_async_oem_event_deinit() - function to deregister cb for async oem event
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: None
+ */
+void sme_async_oem_event_deinit(mac_handle_t mac_handle);
+#else
+static inline void sme_async_oem_event_init(
+				mac_handle_t mac_handle,
+				void (*oem_data_async_event_handler_cb)
+				(void *oem_event_data))
+{
+}
+
+static inline void sme_async_oem_event_deinit(mac_handle_t mac_handle)
+{
+}
 #endif
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -981,8 +1018,6 @@ QDF_STATUS sme_get_roam_scan_home_away_time(mac_handle_t mac_handle,
 					    uint16_t *roam_scan_home_away_time);
 QDF_STATUS sme_update_wes_mode(mac_handle_t mac_handle, bool isWESModeEnabled,
 		uint8_t sessionId);
-QDF_STATUS sme_set_roam_scan_control(mac_handle_t mac_handle, uint8_t sessionId,
-		bool roamScanControl);
 
 QDF_STATUS sme_update_is_fast_roam_ini_feature_enabled(mac_handle_t mac_handle,
 		uint8_t sessionId,
@@ -1191,7 +1226,6 @@ QDF_STATUS sme_get_roam_scan_channel_list(mac_handle_t mac_handle,
 
 bool sme_get_is_ese_feature_enabled(mac_handle_t mac_handle);
 bool sme_get_wes_mode(mac_handle_t mac_handle);
-bool sme_get_roam_scan_control(mac_handle_t mac_handle);
 bool sme_get_is_lfr_feature_enabled(mac_handle_t mac_handle);
 bool sme_get_is_ft_feature_enabled(mac_handle_t mac_handle);
 bool sme_is_feature_supported_by_fw(enum cap_bitmap feature);
@@ -4572,4 +4606,5 @@ QDF_STATUS sme_send_channel_change_req(mac_handle_t mac_handle,
 QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
 					uint8_t vdev_id,
 					bool country_ie_for_all_band);
+
 #endif /* #if !defined( __SME_API_H ) */

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -192,6 +193,10 @@ struct tdls_set_state_info {
  * @tdls_osif_init_cb: Callback to initialize the tdls private
  * @tdls_osif_deinit_cb: Callback to deinitialize the tdls private
  * @fw_tdls_11ax_capablity: bool for tdls 11ax fw capability
+ * @fw_tdls_6g_capability: bool for tdls 6g fw capability
+ * @bss_sta_power: bss sta power
+ * @@bss_sta_power_type: bss sta power type
+ * @fw_tdls_wideband_capability: bool for tdls wideband fw capability
  */
 struct tdls_soc_priv_obj {
 	struct wlan_objmgr_psoc *soc;
@@ -242,7 +247,11 @@ struct tdls_soc_priv_obj {
 	tdls_vdev_deinit_cb tdls_osif_deinit_cb;
 #ifdef WLAN_FEATURE_11AX
 	bool fw_tdls_11ax_capability;
+	bool fw_tdls_6g_capability;
+	uint8_t bss_sta_power;
+	uint8_t bss_sta_power_type;
 #endif
+	bool fw_tdls_wideband_capability;
 };
 
 /**
@@ -311,6 +320,7 @@ struct tdls_peer_mlme_info {
  * @is_forced_peer: is forced peer
  * @op_class_for_pref_off_chan: op class for preferred off channel
  * @pref_off_chan_num: preferred off channel number
+ * @pref_off_chan_width: preferred off channel width
  * @peer_idle_timer: time to check idle traffic in tdls peers
  * @is_peer_idle_timer_initialised: Flag to check idle timer init
  * @spatial_streams: Number of TX/RX spatial streams for TDLS
@@ -342,6 +352,7 @@ struct tdls_peer {
 	bool is_forced_peer;
 	uint8_t op_class_for_pref_off_chan;
 	uint8_t pref_off_chan_num;
+	uint8_t pref_off_chan_width;
 	qdf_mc_timer_t peer_idle_timer;
 	bool is_peer_idle_timer_initialised;
 	uint8_t spatial_streams;
@@ -656,6 +667,32 @@ void tdls_send_update_to_fw(struct tdls_vdev_priv_obj *tdls_vdev_obj,
  * Return: None
  */
 void tdls_notify_increment_session(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * tdls_get_6g_pwr_for_power_type() - get power for a 6g freq for paticular
+ *                                    power type
+ * @vdev: vdev object
+ * @freq: 6g freq
+ * @pwr_typ: power type
+ *
+ * Function that gets power for a 6g freq for paticular power type
+ *
+ * Return: true or false
+ */
+uint32_t tdls_get_6g_pwr_for_power_type(struct wlan_objmgr_vdev *vdev,
+					qdf_freq_t freq,
+					enum supported_6g_pwr_types pwr_typ);
+
+/**
+ * tdls_is_6g_freq_allowed() - check is tdls 6ghz allowed or not
+ * @vdev: vdev object
+ * @freq: 6g freq
+ *
+ * Function determines the whether TDLS on 6ghz is allowed in the system
+ *
+ * Return: true or false
+ */
+bool tdls_is_6g_freq_allowed(struct wlan_objmgr_vdev *vdev, qdf_freq_t freq);
 
 /**
  * tdls_check_is_tdls_allowed() - check is tdls allowed or not

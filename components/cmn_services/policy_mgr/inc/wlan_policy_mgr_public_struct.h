@@ -166,6 +166,16 @@ enum hw_mode_sbs_capab {
 };
 
 /**
+ * enum hw_mode_emlsr_capab - EMLSR HW mode capability
+ * @HW_MODE_EMLSR_NONE: Non EMLSR capable
+ * @HW_MODE_EMLSR: EMLSR capable
+ */
+enum hw_mode_emlsr_capab {
+	HW_MODE_EMLSR_NONE,
+	HW_MODE_EMLSR,
+};
+
+/**
  * enum hw_mode_mac_band_cap - mac band capability
  * @HW_MODE_MAC_BAND_NONE: No band requirement.
  * @HW_MODE_MAC_BAND_2G: 2G band supported.
@@ -379,10 +389,10 @@ enum policy_mgr_mac_use {
  *      SBS channels & rest of the 5G channels
  * @PM_24G_SBS_CH_MCC_CH: 2.4 Ghz channels, SBS channels & MCC channels
  * @PM_SBS_CH_2G: SBS channels & 2.4 Ghz channels
- * @PM_SCC_ON_5G_LOW_5G_LOW: 5G low SCC channel followed by
- * 5G frequencies < sbs cut off freq
- * @PM_SCC_ON_5G_HIGH_5G_HIGH: 5G high SCC channel followed by
- * frequencies > sbs cut off freq
+ * @PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G: 5 GHz low SCC channel followed by
+ * 5 GHz low frequencies, add 2.4 GHz if its shared with 5 GHz low
+ * @PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G: 5GHZ high SCC channel followed by
+ * 5 GHz high frequencies, add 2.4 GHZ if its shared with 5GHz high
  *
  * @PM_MAX_PCL_TYPE: Max place holder
  *
@@ -424,8 +434,8 @@ enum policy_mgr_pcl_type {
 	PM_SBS_CH_SCC_CH_5G_24G,
 	PM_SCC_CH_MCC_CH_SBS_CH_24G,
 	PM_SBS_CH_2G,
-	PM_SCC_ON_5G_LOW_5G_LOW,
-	PM_SCC_ON_5G_HIGH_5G_HIGH,
+	PM_SCC_ON_5G_LOW_5G_LOW_PLUS_SHARED_2G,
+	PM_SCC_ON_5G_HIGH_5G_HIGH_PLUS_SHARED_2G,
 
 	PM_MAX_PCL_TYPE
 };
@@ -896,16 +906,18 @@ enum policy_mgr_two_connection_mode {
  * enum policy_mgr_three_connection_mode - Combination of first three
  * connections type, concurrency state, band used.
  *
- * @PM_STA_SAP_SCC_24_SAP_5_DBS: STA & SAP connection on 2.4 Ghz SCC, another
- * SAP on 5 G
- * @PM_STA_SAP_SCC_5_SAP_24_DBS: STA & SAP connection on 5 Ghz SCC, another
- * SAP on 2.4 G
- * @PM_STA_SAP_24_STA_5_DBS: STA & SAP connection on 2.4 Ghz SCC/MCC, another
- * STA on 5G
- * @PM_STA_STA_24_SAP_5_DBS: STA & STA connection on 2.4 GHZ SCC/MCC,
+ * @PM_STA_SAP_SCC_24_SAP_5_DBS: STA & SAP connection on 2.4 GHZ, another
  * SAP on 5 GHZ
- * @PM_STA_SAP_5_STA_24_DBS: STA & SAP connection on 5 Ghz SCC/MCC, another
- * STA on 2.4 G
+ * @PM_STA_SAP_SCC_5_SAP_24_DBS: STA & SAP connection on 5 GHZ,
+ * another SAP on 2.4 GHZ
+ * @PM_24_SCC_MCC_PLUS_5_DBS: ANY 2 link on 2.4 GHZ SCC/MCC mac and one link on
+ * 5 GHZ doing DBS
+ * @PM_STA_SAP_24_STA_5_DBS: STA & SAP connection on 2.4 GHZ SCC/MCC,
+ * another STA on 5 GHZ
+ * @PM_5_SCC_MCC_PLUS_24_DBS: ANY 2 link on 5 GHZ SCC/MCC mac and one link on
+ * 2.4 GHZ doing DBS
+ * @PM_STA_SAP_5_STA_24_DBS: STA & SAP connection on 5 GHZ SCC/MCC,
+ * STA on 2.4 GHZ
  * @PM_STA_STA_5_SAP_24_DBS: STA & STA connection on 5 GHZ SCC/MCC,
  * SAP on 2.4 GHZ
  * @PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS: NAN_DISC & SAP connection on 2.4 Ghz SCC,
@@ -944,7 +956,7 @@ enum policy_mgr_two_connection_mode {
  * and second STA on 5Ghz SMM
  * @PM_NAN_DISC_24_STA_24_STA_5_DBS: NAN Disc on 2.4Ghz and first STA on 2.4Ghz
  * and second STA on 5Ghz DBS
- * @PM_STA_STA_SAP_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS: ANY 2 link on 5 GHZ high mac
+ * @PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS: ANY 2 link on 5 GHZ high mac
  * and one link on 5 GHZ low doing SBS
  * @PM_STA_24_SAP_5_HIGH_MCC_STA_5_LOW_SBS : First STA on 2.4 GHZ & SAP on high
  * 5 GHZ MCC on mac 0 and second STA on low 5 GHZ on mac1 doing SBS
@@ -956,7 +968,7 @@ enum policy_mgr_two_connection_mode {
  * 2.4 GHZ MCC on mac0 and second STA on low 5 GHZ on mac1 doing SBS
  * @PM_STA_STA_5_HIGH_MCC_SAP_5_LOW_SBS : First STA on high 5 GHZ & Second STA
  * on high 5 GHZ MCC on mac0 and SAP on low 5 GHZ on mac1 doing SBS
- * @PM_STA_STA_SAP_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS: Any 2 link on low 5 GHZ mac
+ * @PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS: Any 2 link on low 5 GHZ mac
  * and one link on high 5 GHZ freq doing SBS
  * @PM_STA_24_SAP_5_LOW_MCC_STA_5_HIGH_SBS : First STA on 2.4 GHZ & SAP on low
  * 5 GHZ MCC on mac 0 and second STA on high 5 GHZ on mac1 doing SBS
@@ -968,15 +980,25 @@ enum policy_mgr_two_connection_mode {
  * 2.4 GHZ MCC on mac0 and second STA on high 5 GHZ on mac1 doing SBS
  * @PM_STA_STA_5_LOW_MCC_SAP_5_HIGH_SBS : First STA on high 5 GHZ & Second STA
  * on high 5 GHZ MCC on mac0 and SAP on low 5 GHZ on mac1 doing SBS
+ * @PM_24_5_MCC_SCC_PLUS_5_SBS: The 2.4 GHZ vdev creating MCC/SCC with low 5 GHZ
+ * or high 5 GHZ (dynamic SBS) on mac 0 and one vdev on high 5 GHZ or low 5 GHZ
+ * freq respectively on mac 1 doing SBS
+ * @PM_SAP_24_STA_5_STA_5_LOW_N_HIGH_SHARE_SBS: The 2.4 GHZ SAP creating MCC/SCC
+ * with STA of low 5 GHZ or high 5 GHZ (dynamic SBS) on mac 0 and one STA on
+ * high 5 GHZ or low 5 GHZ freq respectively on mac 1 doing SBS
+ * @PM_STA_24_SAP_5_STA_5_LOW_N_HIGH_SHARE_SBS: The 2.4 GHZ STA creating MCC/SCC
+ * with SAP of low 5 GHZ or high 5 GHZ (dynamic SBS) on mac 0 and one STA on
+ * high 5 GHZ or low 5 GHZ freq respectively on mac 1 doing SBS
  *
  */
 enum policy_mgr_three_connection_mode {
 	PM_STA_SAP_SCC_24_SAP_5_DBS,
 	PM_STA_SAP_SCC_5_SAP_24_DBS,
-	PM_STA_SAP_24_STA_5_DBS,
-	PM_STA_STA_24_SAP_5_DBS = PM_STA_SAP_24_STA_5_DBS,
-	PM_STA_SAP_5_STA_24_DBS,
-	PM_STA_STA_5_SAP_24_DBS = PM_STA_SAP_5_STA_24_DBS,
+	PM_24_SCC_MCC_PLUS_5_DBS,
+	PM_STA_SAP_24_STA_5_DBS = PM_24_SCC_MCC_PLUS_5_DBS,
+	PM_5_SCC_MCC_PLUS_24_DBS,
+	PM_STA_SAP_5_STA_24_DBS = PM_5_SCC_MCC_PLUS_24_DBS,
+	PM_STA_STA_5_SAP_24_DBS = PM_5_SCC_MCC_PLUS_24_DBS,
 	PM_NAN_DISC_SAP_SCC_24_NDI_5_DBS,
 	PM_NAN_DISC_NDI_SCC_24_SAP_5_DBS,
 	PM_SAP_NDI_SCC_5_NAN_DISC_24_DBS,
@@ -1001,28 +1023,33 @@ enum policy_mgr_three_connection_mode {
 	PM_NAN_DISC_24_STA_5_STA_24_DBS,
 	PM_NAN_DISC_24_STA_24_STA_5_SMM,
 	PM_NAN_DISC_24_STA_24_STA_5_DBS,
-	PM_STA_STA_SAP_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
+	PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_24_SAP_5_HIGH_MCC_STA_5_LOW_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
+		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_24_STA_5_HIGH_MCC_SAP_5_LOW_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
+		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_SAP_5_HIGH_STA_5_LOW_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
+		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_5_HIGH_SAP_24_MCC_STA_5_LOW_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
+		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
 	PM_STA_STA_5_HIGH_MCC_SAP_5_LOW_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
-	PM_STA_STA_SAP_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
+		PM_MCC_SCC_5G_HIGH_PLUS_5_LOW_SBS,
+	PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_24_SAP_5_LOW_MCC_STA_5_HIGH_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
+		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_24_STA_5_LOW_MCC_SAP_5_HIGH_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
+		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_SAP_5_LOW_STA_5_HIGH_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
+		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_5_LOW_SAP_24_MCC_STA_5_HIGH_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
+		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
 	PM_STA_STA_5_LOW_MCC_SAP_5_HIGH_SBS =
-		PM_STA_STA_SAP_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
+		PM_MCC_SCC_5G_LOW_PLUS_5_HIGH_SBS,
+	PM_24_5_PLUS_5_LOW_N_HIGH_SHARE_SBS,
+	PM_SAP_24_STA_5_STA_5_LOW_N_HIGH_SHARE_SBS =
+			PM_24_5_PLUS_5_LOW_N_HIGH_SHARE_SBS,
+	PM_STA_24_SAP_5_STA_5_LOW_N_HIGH_SHARE_SBS =
+			PM_24_5_PLUS_5_LOW_N_HIGH_SHARE_SBS,
 
 	PM_MAX_THREE_CONNECTION_MODE,
 };
@@ -1307,6 +1334,7 @@ struct policy_mgr_disabled_ml_link_info {
  * @mac0_band_cap: mac0 band (5g/2g) capability
  * @dbs_cap: DBS capabality
  * @agile_dfs_cap: Agile DFS capabality
+ * @emlsr_cap: eMLSR capability
  * @action_type: for dbs mode, the field indicates the "Action type" to be
  * used to switch to the mode. To help the hw mode validation.
  */
@@ -1321,6 +1349,7 @@ struct policy_mgr_hw_mode_params {
 	uint8_t dbs_cap;
 	uint8_t agile_dfs_cap;
 	uint8_t sbs_cap;
+	uint8_t emlsr_cap;
 	enum policy_mgr_conc_next_action action_type;
 };
 
@@ -1432,6 +1461,7 @@ struct policy_mgr_freq_range {
  * @MODE_SBS:               SBS mode with either high share or low share
  * @MODE_SBS_UPPER_SHARE:   Higher 5Ghz shared with 2.4Ghz
  * @MODE_SBS_LOWER_SHARE:   LOWER 5Ghz shared with 2.4Ghz
+ * #MODE_EMLSR:             eMLSR mode
  * @MODE_HW_MAX: MAX
  */
 enum policy_mgr_mode {
@@ -1440,6 +1470,7 @@ enum policy_mgr_mode {
 	MODE_SBS,
 	MODE_SBS_UPPER_SHARE,
 	MODE_SBS_LOWER_SHARE,
+	MODE_EMLSR,
 	MODE_HW_MAX,
 };
 
@@ -1454,7 +1485,7 @@ enum policy_mgr_mode {
  *                      and current HW mode.
  */
 struct dbs_hw_mode_info {
-	uint32_t *hw_mode_list;
+	uint64_t *hw_mode_list;
 	qdf_freq_t sbs_lower_band_end_freq;
 	struct policy_mgr_freq_range freq_range_caps[MODE_HW_MAX][MAX_MAC];
 	struct policy_mgr_freq_range cur_mac_freq_range[MAX_MAC];
@@ -1527,6 +1558,23 @@ struct dbs_nss {
 	enum hw_mode_ss_config mac0_ss;
 	enum hw_mode_ss_config mac1_ss;
 	uint32_t single_mac0_band_cap;
+};
+
+/**
+ * Max radio combination numbers
+ */
+#define MAX_RADIO_COMBINATION 16
+
+/**
+ * struct radio_combination - Radio combination
+ * @hw_mode: hw mode type
+ * @band_mask: band support type for each mac
+ * @antenna: antenna support for each mac
+ */
+struct radio_combination {
+	enum policy_mgr_mode hw_mode;
+	uint8_t band_mask[MAX_MAC];
+	uint8_t antenna[MAX_MAC];
 };
 
 /**

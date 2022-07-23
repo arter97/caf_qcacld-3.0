@@ -80,6 +80,7 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 	dp_intf->dev = ndev;
 	dp_intf->intf_id = WLAN_UMAC_VDEV_ID_MAX;
 	qdf_copy_macaddr(&dp_intf->mac_addr, intf_addr);
+	qdf_spinlock_create(&dp_intf->vdev_lock);
 
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
 	qdf_list_insert_front(&dp_ctx->intf_list, &dp_intf->node);
@@ -116,6 +117,7 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 	dp_periodic_sta_stats_mutex_destroy(dp_intf);
 	dp_nud_deinit_tracking(dp_intf);
 	dp_mic_deinit_work(dp_intf);
+	qdf_spinlock_destroy(&dp_intf->vdev_lock);
 
 	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
 	qdf_list_remove_node(&dp_ctx->intf_list, &dp_intf->node);
@@ -1914,11 +1916,9 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 		cb_obj->osif_dp_send_tcp_param_update_event;
 	dp_ctx->dp_ops.os_if_dp_nud_stats_info =
 		cb_obj->os_if_dp_nud_stats_info;
-	dp_ctx->dp_ops.osif_dp_process_sta_mic_error =
-		cb_obj->osif_dp_process_sta_mic_error;
-	dp_ctx->dp_ops.osif_dp_process_sap_mic_error =
-		cb_obj->osif_dp_process_sap_mic_error;
-}
+	dp_ctx->dp_ops.osif_dp_process_mic_error =
+		cb_obj->osif_dp_process_mic_error;
+	}
 
 void ucfg_dp_register_event_handler(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_dp_psoc_nb_ops *cb_obj)

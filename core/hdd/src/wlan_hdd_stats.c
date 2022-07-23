@@ -1715,6 +1715,7 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 		adapter = hdd_get_adapter_by_vdev(hdd_ctx, results->ifaceId);
 		if (!adapter) {
 			hdd_err("invalid vdev %d", results->ifaceId);
+			osif_request_put(request);
 			return;
 		}
 
@@ -5484,6 +5485,8 @@ static void wlan_hdd_fill_os_rate_info(enum tx_rate_info rate_flags,
 	hdd_set_rate_bw(os_rate, HDD_RATE_BW_20);
 	os_rate->mcs = mcs_index;
 
+	wlan_hdd_fill_os_eht_rateflags(os_rate, rate_flags, dcm,
+				       guard_interval);
 	wlan_hdd_fill_os_he_rateflags(os_rate, rate_flags, dcm, guard_interval);
 
 	if (rate_flags & (TX_RATE_VHT160 | TX_RATE_VHT80 | TX_RATE_VHT40 |

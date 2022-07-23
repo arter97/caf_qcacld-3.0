@@ -7840,10 +7840,12 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
  *
  * Return: status of operation
  */
-static QDF_STATUS lim_populate_he_mcs_per_bw(struct mac_context *mac_ctx,
-				uint16_t *supp_rx_mcs, uint16_t *supp_tx_mcs,
-				uint16_t peer_rx, uint16_t peer_tx, uint8_t nss,
-				uint16_t rx_mcs, uint16_t tx_mcs)
+QDF_STATUS lim_populate_he_mcs_per_bw(struct mac_context *mac_ctx,
+				      uint16_t *supp_rx_mcs,
+				      uint16_t *supp_tx_mcs,
+				      uint16_t peer_rx, uint16_t peer_tx,
+				      uint8_t nss, uint16_t rx_mcs,
+				      uint16_t tx_mcs)
 {
 
 	pe_debug("peer rates: rx_mcs - 0x%04x tx_mcs - 0x%04x",
@@ -7996,13 +7998,10 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		      uint8_t *ie_start, uint32_t num_bytes)
 {
 	const uint8_t *ie = NULL;
-	tDot11fIEmlo_ie dot11_cap;
+	struct wlan_mlo_ie dot11_cap;
 	struct wlan_mlo_ie_info *mlo_ie_info;
 
 	populate_dot11f_mlo_caps(mac, session, &dot11_cap);
-
-	if (!dot11_cap.present)
-		return;
 
 	ie = wlan_get_ext_ie_ptr_from_ext_id(MLO_IE_OUI_TYPE,
 					     MLO_IE_OUI_SIZE,
@@ -8021,7 +8020,8 @@ void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		mlo_ie_info->medium_sync_delay_info_present =
 				dot11_cap.medium_sync_delay_info_present;
 		mlo_ie_info->eml_capab_present = dot11_cap.eml_capab_present;
-		mlo_ie_info->mld_capab_present = dot11_cap.mld_capab_present;
+		mlo_ie_info->mld_capab_and_op_present = dot11_cap.mld_capab_and_op_present;
+		mlo_ie_info->mld_id_present = dot11_cap.mld_id_present;
 		mlo_ie_info->reserved_1 = dot11_cap.reserved_1;
 		mlo_ie_info->common_info_length = dot11_cap.common_info_length;
 		qdf_mem_copy(&mlo_ie_info->mld_mac_addr,
@@ -8204,10 +8204,10 @@ QDF_STATUS lim_populate_eht_mcs_set(struct mac_context *mac_ctx,
 	switch (session_entry->ch_width) {
 	case CH_WIDTH_320MHZ:
 		lim_populate_eht_320_mcs_set(mac_ctx, rates, peer_eht_caps);
-			/* fall through */
+		fallthrough;
 	case CH_WIDTH_160MHZ:
 		lim_populate_eht_160_mcs_set(mac_ctx, rates, peer_eht_caps);
-			/*fall through */
+		fallthrough;
 	case CH_WIDTH_80MHZ:
 	case CH_WIDTH_40MHZ:
 		lim_populate_eht_le80_mcs_set(mac_ctx, rates, peer_eht_caps);
@@ -8601,7 +8601,11 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 	tDot11fIEeht_cap dot11_cap;
 	tDot11fIEhe_cap dot11_he_cap;
 	struct wlan_eht_cap_info *eht_cap;
-	bool is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq);
+	bool is_band_2g = false;
+
+	/* If session = NULL, set 5G capabilities from mlme_cfg. */
+	if (session)
+		is_band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq);
 
 	populate_dot11f_eht_caps(mac, session, &dot11_cap);
 	populate_dot11f_he_caps(mac, session, &dot11_he_cap);
@@ -8627,6 +8631,11 @@ void lim_set_eht_caps(struct mac_context *mac, struct pe_session *session,
 			dot11_cap.scs_traffic_desc;
 		eht_cap->max_mpdu_len =
 			dot11_cap.max_mpdu_len;
+		eht_cap->max_a_mpdu_len_exponent_ext =
+			dot11_cap.max_a_mpdu_len_exponent_ext;
+		eht_cap->eht_trs_support = dot11_cap.eht_trs_support;
+		eht_cap->txop_return_support_txop_share_m2 =
+			dot11_cap.txop_return_support_txop_share_m2;
 		eht_cap->support_320mhz_6ghz = dot11_cap.support_320mhz_6ghz;
 		eht_cap->ru_242tone_wt_20mhz = dot11_cap.ru_242tone_wt_20mhz;
 		eht_cap->ndp_4x_eht_ltf_3dot2_us_gi =
@@ -8792,12 +8801,8 @@ QDF_STATUS lim_send_eht_caps_ie(struct mac_context *mac_ctx,
 
 	qdf_mem_copy(&eht_caps[2], EHT_CAP_OUI_TYPE, EHT_CAP_OUI_SIZE);
 
-	if (!session)
-		session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
-	if (session)
-		lim_set_eht_caps(mac_ctx, session, eht_caps, eht_cap_total_len);
-	else
-		pe_err("session not found for given vdev_id %d", vdev_id);
+	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+	lim_set_eht_caps(mac_ctx, session, eht_caps, eht_cap_total_len);
 
 	status_2g = lim_send_ie(mac_ctx, vdev_id, DOT11F_EID_EHT_CAP,
 				CDS_BAND_2GHZ, &eht_caps[2],
@@ -8861,6 +8866,31 @@ void lim_update_stads_eht_bw_320mhz(struct pe_session *session,
 	}
 }
 
+#endif
+
+#ifdef WLAN_FEATURE_11BE_MLO
+void lim_intersect_ap_emlsr_caps(struct pe_session *session,
+				 struct bss_params *add_bss,
+				 tpSirAssocRsp assoc_rsp)
+{
+	struct vdev_mlme_obj *mlme_obj;
+
+	mlme_obj = wlan_vdev_mlme_get_cmpt_obj(session->vdev);
+	if (!mlme_obj) {
+		pe_err("vdev component object is NULL");
+		return;
+	}
+
+	if (wlan_vdev_mlme_cap_get(session->vdev, WLAN_VDEV_C_EMLSR_CAP)) {
+		add_bss->staContext.emlsr_support = true;
+		add_bss->staContext.link_id =
+		    assoc_rsp->mlo_ie.mlo_ie.link_id;
+		add_bss->staContext.emlsr_trans_timeout =
+		    assoc_rsp->mlo_ie.mlo_ie.eml_capabilities_info.transition_timeout;
+	} else {
+		add_bss->staContext.emlsr_support = false;
+	}
+}
 #endif
 
 #if defined(CONFIG_BAND_6GHZ) && defined(WLAN_FEATURE_11AX)
@@ -10128,9 +10158,9 @@ static void lim_update_ap_puncture(struct pe_session *session,
 				   struct ch_params *ch_params)
 {
 	if (ch_params->reg_punc_bitmap) {
-		*(uint16_t *)session->eht_op.disable_sub_chan_bitmap =
+		*(uint16_t *)session->eht_op.disabled_sub_chan_bitmap =
 					ch_params->reg_punc_bitmap;
-		session->eht_op.disable_sub_chan_bitmap_present = true;
+		session->eht_op.disabled_sub_chan_bitmap_present = true;
 		pe_debug("vdev %d, puncture %d", session->vdev_id,
 			 ch_params->reg_punc_bitmap);
 	}

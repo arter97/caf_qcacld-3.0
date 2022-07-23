@@ -1621,6 +1621,32 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Empty scan refresh period")
 
+ /*
+  * <ini>
+  * RoamScan_FirstTimer - Set empty scan refresh period
+  * @Min: 0
+  * @Max: 20
+  * @Default: 10
+  *
+  * This ini is used by firmware to set scan period in secs
+  * following empty scan results.
+  *
+  * Related: None
+  *
+  * Supported Feature: LFR Scan
+  *
+  * Usage: External
+  *
+  * </ini>
+  */
+#define CFG_ROAM_SCAN_FIRST_TIMER CFG_INI_UINT( \
+	"RoamScan_FirstTimer", \
+	0, \
+	20, \
+	10, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Empty scan refresh period")
+
 /*
  * <ini>
  * gRoamBmissFirstBcnt - Beacon miss count to trigger 1st bmiss event
@@ -1669,6 +1695,59 @@
 	20, \
 	CFG_VALUE_OR_DEFAULT, \
 	"Final beacon miss count")
+
+/*
+ * <ini>
+ * BeaconLoss_TimeoutOnWakeUp - Consecutive Beaconloss timeout on wakeup to
+ * trigger timeout
+ * @Min: 0
+ * @Max: 20
+ * @Default: 6
+ *
+ * This ini is used to control the beacon miss timeout when the system is awake.
+ * On the timeout, BMISS event will be triggered by FW.
+ * The units of this timeout is in seconds.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP CFG_INI_UINT( \
+	"ConBeaconLoss_TimeoutOnWakeUp", \
+	0, \
+	20, \
+	6, \
+	CFG_VALUE_OR_DEFAULT, \
+	"ConBeaconloss timeout on wakeup")
+
+/*
+ * <ini>
+ * BeaconLoss_TimeoutOnSleep - Consecutive Beaconloss timeout on sleep to
+ * trigger timeout
+ * @Min: 0
+ * @Max: 20
+ * @Default: 10
+ *
+ * This ini is used to control the beacon miss timeout
+ * when the system is in sleep.
+ * On the timeout, BMISS event will be triggered by FW.
+ * The units of this timeout is in seconds.
+ *
+ * Related: None
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP CFG_INI_UINT( \
+	"ConBeaconLoss_TimeoutOnSleep", \
+	0, \
+	20, \
+	10, \
+	CFG_VALUE_OR_DEFAULT, \
+	"ConBeaconloss timeout on sleep")
 
 /*
  * <ini>
@@ -1990,6 +2069,59 @@
 			10000, \
 			CFG_VALUE_OR_DEFAULT, \
 			"bss load sampling time")
+
+/*
+ * <ini>
+ * RoamCU_MonitorTime - Time in seconds for which the bss load values
+ * obtained from the beacons is sampled.
+ * @Min: 0
+ * @Max: 20
+ * @Default: 10
+ *
+ * Related: None
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_CU_MONITOR_TIME CFG_INI_UINT( \
+			"RoamCU_MonitorTime", \
+			0, \
+			20, \
+			10, \
+			CFG_VALUE_OR_DEFAULT, \
+			"bss load sampling time")
+
+/*
+ * <ini>
+ * bss_load_trigger_6g_rssi_threshold/RoamCU_6GRSSIRange -
+ * Current AP minimum RSSI in dBm below
+ * which roaming can be triggered if BSS load exceeds bss_load_threshold.
+ * @Min: -120
+ * @Max: 0
+ * @Default: -70
+ *
+ * If connected AP is in 6Ghz, then consider bss load roam triggered only if
+ * load % > bss_load_threshold && connected AP rssi is worse than
+ * bss_load_trigger_6g_rssi_threshold
+ *
+ * Related: "bss_load_threshold"
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_BSS_LOAD_TRIG_6G_RSSI_THRES CFG_INI_INT( \
+	"bss_load_trigger_6g_rssi_threshold RoamCU_6GRSSIRange", \
+	-120, \
+	0, \
+	-70, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Minimum RSSI of current AP in 6GHz band for BSS load roam trigger")
 
 /*
  * <ini>
@@ -2801,6 +2933,43 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"Device inactivity monitoring time")
 
+ /*
+  * <ini>
+  * RoamScan_SecondTimer - Device inactivity monitoring time in
+  * seconds for which the device is considered to be inactive with data
+  * packets count is less than configured RoamScan_InactiveCount.
+  *
+  * @Min: 60
+  * @Max: 300
+  * @Default: 120
+  *
+  * The below three ini values are used to control the roam scan after the
+  * firmware gets empty roam scan results during periodic roam scans.
+  * 1. RoamScan_SecondTimer
+  * 2. RoamScan_InactiveCount
+  * 3. RoamScan_InactiveTimer
+  * The first two ini "RoamScan_SecondTimer" and "RoamScan_InactiveCount"
+  * is frames the criteria to detect if the DUT is inactive. If the device is
+  * identified to be inactive based on the above two ini, then the value,
+  * "RoamScan_InactiveTimer" will be used as periodic roam scan
+  * duration.
+  *
+  * Related: RoamScan_InactiveCount
+  *
+  * Supported Feature: Roaming
+  *
+  * Usage: External
+  *
+  * </ini>
+  */
+#define CFG_ROAM_SCAN_SECOND_TIMER CFG_INI_UINT( \
+	"RoamScan_SecondTimer", \
+	60, \
+	300, \
+	120, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Device inactivity monitoring time")
+
 /*
  * <ini>
  * roam_inactive_data_count/RoamScan_InactiveCount - Maximum allowed data
@@ -2858,6 +3027,37 @@
 	0, \
 	0xFFFFFFFF, \
 	120000, \
+	CFG_VALUE_OR_DEFAULT, \
+	"Roam scan period post inactivity")
+
+/*
+ * <ini>
+ * RoamScan_InactiveTimer - Roam scan duration in sec after device is
+ * out of inactivity state.
+ *
+ * @Min: 0
+ * @Max: 20
+ * @Default: 10
+ *
+ * If there is empty scan results during roam scan, firmware will move to
+ * roam scan inactive state if roam_scan_inactivity and
+ * roam_inactive_data_count criteria are met.
+ * This ini is used to configure the roam scan duration in sec once the
+ * inactivity is finished and roam scan can be started.
+ *
+ * Related: roam_scan_inactivity_time, roam_inactive_data_count
+ *
+ * Supported Feature: Roaming
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ROAM_SCAN_INACTIVE_TIMER CFG_INI_UINT( \
+	"RoamScan_InactiveTimer", \
+	0, \
+	20, \
+	10, \
 	CFG_VALUE_OR_DEFAULT, \
 	"Roam scan period post inactivity")
 
@@ -2950,6 +3150,7 @@
 	CFG(CFG_LFR_NEIGHBOR_SCAN_MAX_CHAN_TIME) \
 	CFG(CFG_LFR_NEIGHBOR_SCAN_RESULTS_REFRESH_PERIOD) \
 	CFG(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD) \
+	CFG(CFG_ROAM_SCAN_FIRST_TIMER) \
 	CFG(CFG_LFR_ROAM_BMISS_FIRST_BCNT) \
 	CFG(CFG_LFR_ROAM_BMISS_FINAL_BCNT) \
 	CFG(CFG_LFR_ROAMING_DFS_CHANNEL) \
@@ -2965,6 +3166,7 @@
 	CFG(CFG_ENABLE_BSS_LOAD_TRIGGERED_ROAM) \
 	CFG(CFG_BSS_LOAD_THRESHOLD) \
 	CFG(CFG_BSS_LOAD_SAMPLE_TIME) \
+	CFG(CFG_ROAM_CU_MONITOR_TIME) \
 	CFG(CFG_LFR3_ROAM_HO_DELAY_FOR_RX) \
 	CFG(CFG_LFR_MIN_DELAY_BTW_ROAM_SCAN) \
 	CFG(CFG_LFR_ROAM_SCAN_TRIGGER_REASON_BITMASK) \
@@ -2972,9 +3174,12 @@
 	CFG(CFG_LFR_ROAM_FORCE_RSSI_TRIGGER) \
 	CFG(CFG_ROAM_SCAN_SCAN_POLICY) \
 	CFG(CFG_ROAM_SCAN_INACTIVITY_TIME) \
+	CFG(CFG_ROAM_SCAN_SECOND_TIMER) \
 	CFG(CFG_FT_IM_ROAMING) \
 	CFG(CFG_ROAM_INACTIVE_COUNT) \
 	CFG(CFG_POST_INACTIVITY_ROAM_SCAN_PERIOD) \
+	CFG(CFG_ROAM_SCAN_INACTIVE_TIMER) \
+	CFG(CFG_BSS_LOAD_TRIG_6G_RSSI_THRES) \
 	CFG(CFG_BSS_LOAD_TRIG_5G_RSSI_THRES) \
 	CFG(CFG_BSS_LOAD_TRIG_2G_RSSI_THRES) \
 	CFG(CFG_LFR_FULL_ROAM_SCAN_REFRESH_PERIOD) \
@@ -2983,6 +3188,8 @@
 	LFR_ESE_ALL \
 	LFR_SUBNET_DETECTION_ALL \
 	SAE_SINGLE_PMK_ALL \
-	ROAM_REASON_VSIE_ALL
+	ROAM_REASON_VSIE_ALL \
+	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_WAKEUP) \
+	CFG(CFG_LFR_BEACONLOSS_TIMEOUT_ON_SLEEP)
 
 #endif /* CFG_MLME_LFR_H__ */

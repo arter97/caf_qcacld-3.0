@@ -404,6 +404,8 @@ static void wma_set_default_tgt_config(tp_wma_handle wma_handle,
 
 	wma_set_ipa_disable_config(tgt_cfg);
 	wma_set_peer_map_unmap_v2_config(wma_handle->psoc, tgt_cfg);
+
+	tgt_cfg->notify_frame_support = DP_MARK_NOTIFY_FRAME_SUPPORT;
 }
 
 /**
@@ -4063,9 +4065,32 @@ static int wma_pdev_hw_mode_transition_evt_handler(void *handle,
 	wma_process_pdev_hw_mode_trans_ind(wma, wmi_event, vdev_mac_entry,
 		hw_mode_trans_ind);
 	wma_process_mac_freq_mapping(hw_mode_trans_ind, param_buf);
-	/* Pass the message to PE */
-	wma_send_msg(wma, SIR_HAL_PDEV_HW_MODE_TRANS_IND,
-		     (void *) hw_mode_trans_ind, 0);
+
+	if (policy_mgr_is_hwmode_offload_enabled(wma->psoc)) {
+		policy_mgr_hw_mode_transition_cb(
+			hw_mode_trans_ind->old_hw_mode_index,
+			hw_mode_trans_ind->new_hw_mode_index,
+			hw_mode_trans_ind->num_vdev_mac_entries,
+			hw_mode_trans_ind->vdev_mac_map,
+			hw_mode_trans_ind->num_freq_map,
+			hw_mode_trans_ind->mac_freq_map,
+			wma->psoc);
+		qdf_mem_free(hw_mode_trans_ind);
+	} else {
+		struct scheduler_msg sme_msg = {0};
+		QDF_STATUS status;
+
+		wma_debug("post eWNI_SME_HW_MODE_TRANS_IND");
+		sme_msg.type = eWNI_SME_HW_MODE_TRANS_IND;
+		sme_msg.bodyptr = hw_mode_trans_ind;
+		sme_msg.flush_callback = wma_discard_fw_event;
+
+		status = scheduler_post_message(QDF_MODULE_ID_WMA,
+						QDF_MODULE_ID_SME,
+						QDF_MODULE_ID_SME, &sme_msg);
+		if (QDF_IS_STATUS_ERROR(status))
+			qdf_mem_free(hw_mode_trans_ind);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4692,8 +4717,25 @@ wma_get_igmp_offload_enable(struct wmi_unified *wmi_handle,
 {}
 #endif
 
-#ifdef WLAN_FEATURE_11AX
 #ifdef FEATURE_WLAN_TDLS
+/**
+ * wma_get_tdls_wideband_support() - update tgt service with service tdls
+ *                                   wideband support
+ * @wmi_handle: Unified wmi handle
+ * @cfg: target services
+ *
+ * Return: none
+ */
+static inline void
+wma_get_tdls_wideband_support(struct wmi_unified *wmi_handle,
+			      struct wma_tgt_services *cfg)
+{
+	cfg->en_tdls_wideband_support = wmi_service_enabled(
+					     wmi_handle,
+					     wmi_service_tdls_wideband_support);
+}
+
+#ifdef WLAN_FEATURE_11AX
 /**
  * wma_get_tdls_ax_support() - update tgt service with service tdls ax support
  * @wmi_handle: Unified wmi handle
@@ -4709,16 +4751,42 @@ wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
 						wmi_handle,
 						wmi_service_tdls_ax_support);
 }
+
+static inline void
+wma_get_tdls_6g_support(struct wmi_unified *wmi_handle,
+			struct wma_tgt_services *cfg)
+{
+	cfg->en_tdls_6g_support = wmi_service_enabled(
+						wmi_handle,
+						wmi_service_tdls_6g_support);
+}
+
 #else
 static inline void
 wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
 			struct wma_tgt_services *cfg)
 {}
+
+static inline void
+wma_get_tdls_6g_support(struct wmi_unified *wmi_handle,
+			struct wma_tgt_services *cfg)
+{}
+
 #endif
 #else
 static inline void
 wma_get_tdls_ax_support(struct wmi_unified *wmi_handle,
 			struct wma_tgt_services *cfg)
+{}
+
+static inline void
+wma_get_tdls_6g_support(struct wmi_unified *wmi_handle,
+			struct wma_tgt_services *cfg)
+{}
+
+static inline void
+wma_get_tdls_wideband_support(struct wmi_unified *wmi_handle,
+			      struct wma_tgt_services *cfg)
 {}
 #endif
 
@@ -4881,7 +4949,8 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 
 	wma_get_igmp_offload_enable(wmi_handle, cfg);
 	wma_get_tdls_ax_support(wmi_handle, cfg);
-
+	wma_get_tdls_6g_support(wmi_handle, cfg);
+	wma_get_tdls_wideband_support(wmi_handle, cfg);
 	wma_get_dynamic_vdev_macaddr_support(wmi_handle, cfg);
 }
 

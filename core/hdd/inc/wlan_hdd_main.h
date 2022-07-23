@@ -1240,6 +1240,20 @@ struct wlm_multi_client_info_table {
 };
 #endif
 
+#ifdef WLAN_FEATURE_DYNAMIC_RX_AGGREGATION
+/**
+ * enum qdisc_filter_status - QDISC filter status
+ * @QDISC_FILTER_RTNL_LOCK_FAIL: rtnl lock acquire failed
+ * @QDISC_FILTER_PRIO_MATCH: qdisc filter with priority match
+ * @QDISC_FILTER_PRIO_MISMATCH: no filter match with configured priority
+ */
+enum qdisc_filter_status {
+	QDISC_FILTER_RTNL_LOCK_FAIL,
+	QDISC_FILTER_PRIO_MATCH,
+	QDISC_FILTER_PRIO_MISMATCH,
+};
+#endif
+
 /**
  * struct hdd_adapter - hdd vdev/net_device context
  * @vdev: object manager vdev context
@@ -1364,11 +1378,6 @@ struct hdd_adapter {
 	/* completion variable for Linkup Event */
 	struct completion linkup_event_var;
 
-	/* completion variable for off channel  remain on channel Event */
-	struct completion offchannel_tx_event;
-	/* Completion variable for action frame */
-	struct completion tx_action_cnf_event;
-
 	struct completion sta_authorized_event;
 
 	/* Track whether the linkup handling is needed  */
@@ -1453,10 +1462,6 @@ struct hdd_adapter {
 	uint8_t psb_changed;
 	/* UAPSD psb value configured through framework */
 	uint8_t configured_psb;
-	/* Use delayed work for Sec AP ACS as Pri AP Startup need to complete
-	 * since CSR (PMAC Struct) Config is same for both AP
-	 */
-	struct delayed_work acs_pending_work;
 
 	struct work_struct scan_block_work;
 	qdf_list_t blocked_scan_request_q;
@@ -1484,8 +1489,6 @@ struct hdd_adapter {
 	unsigned int tx_flow_low_watermark;
 	unsigned int tx_flow_hi_watermark_offset;
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
-
-	bool offloads_configured;
 
 	/* DSCP to UP QoS Mapping */
 	enum sme_qos_wmmuptype dscp_to_up_map[WLAN_MAX_DSCP + 1];
@@ -1521,12 +1524,6 @@ struct hdd_adapter {
 	ol_txrx_tx_fp tx_fn;
 	/* debugfs entry */
 	struct dentry *debugfs_phy;
-	/*
-	 * Indicate if HO fails during disconnect so that
-	 * disconnect is not initiated by HDD as its already
-	 * initiated by CSR
-	 */
-	bool roam_ho_fail;
 	struct lfr_firmware_status lfr_fw_status;
 	bool con_status;
 	bool dad;
@@ -1584,7 +1581,7 @@ struct hdd_adapter {
 	void *cookie;
 	bool response_expected;
 #endif
-	uint8_t gro_disallowed[DP_MAX_RX_THREADS];
+	qdf_atomic_t gro_disallowed;
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 	bool handle_feature_update;
 	/* Indicate if TSO and checksum offload features are enabled or not */
@@ -1978,7 +1975,7 @@ struct hdd_rtpm_tput_policy_context {
 };
 #endif
 
-#ifdef FEATURE_WLAN_DYNAMIC_IFACE_CTRL
+#ifdef FEATURE_CNSS_HW_SECURE_DISABLE
 /**
  * hdd_get_wlan_driver_status() - get status of soft driver unload
  *
@@ -2025,7 +2022,8 @@ enum wlan_state_ctrl_str_id {
  * @country_change_work: work for updating vdev when country changes
  * @rx_aggregation: rx aggregation enable or disable state
  * @gro_force_flush: gro force flushed indication flag
- * @force_gro_enable: force GRO enable or disable flag
+ * @tc_based_dyn_gro: TC based dynamic GRO enable/disable flag
+ * @tc_ingress_prio: TC ingress priority
  * @current_pcie_gen_speed: current pcie gen speed
  * @pm_qos_req: pm_qos request for all cpu cores
  * @qos_cpu_mask: voted cpu core mask
@@ -2038,7 +2036,6 @@ enum wlan_state_ctrl_str_id {
  * @twt_en_dis_work: work to send twt enable/disable cmd on MCC/SCC concurrency
  * @dump_in_progress: Stores value of dump in progress
  * @hdd_dual_sta_policy: Concurrent STA policy configuration
- * @rx_skip_qdisc_chk_conc: flag to skip ingress qdisc check in concurrency
  * @is_wlan_disabled: if wlan is disabled by userspace
  */
 struct hdd_context {
@@ -2115,9 +2112,6 @@ struct hdd_context {
 
 	/* Flag keeps track of wiphy suspend/resume */
 	bool is_wiphy_suspended;
-
-	/* Flag keeps track of idle shutdown triggered by suspend */
-	bool shutdown_in_suspend;
 
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 	struct qdf_periodic_work bus_bw_work;
@@ -2259,6 +2253,7 @@ struct hdd_context {
 	/* Present state of driver cds modules */
 	enum driver_modules_status driver_status;
 	struct qdf_delayed_work psoc_idle_timeout_work;
+	struct notifier_block pm_notifier;
 	bool rps;
 	bool dynamic_rps;
 	bool enable_rxthread;
@@ -2386,7 +2381,8 @@ struct hdd_context {
 	struct {
 		qdf_atomic_t rx_aggregation;
 		uint8_t gro_force_flush[DP_MAX_RX_THREADS];
-		bool force_gro_enable;
+		bool tc_based_dyn_gro;
+		uint32_t tc_ingress_prio;
 	} dp_agg_param;
 	int current_pcie_gen_speed;
 	qdf_workqueue_t *adapter_ops_wq;
@@ -2420,8 +2416,6 @@ struct hdd_context {
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
 #endif
-	qdf_atomic_t rx_skip_qdisc_chk_conc;
-
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 	bool is_vdev_macaddr_dynamic_update_supported;
 #endif
@@ -5429,31 +5423,6 @@ hdd_is_dynamic_set_mac_addr_allowed(struct hdd_adapter *adapter)
 }
 
 #endif /* WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE */
-
-#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
-/**
- * hdd_set_suspend_mode: set the suspend_mode state to pld based on the
- *                       configuration option from INI file
- * @hdd_ctx: HDD context
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
-int hdd_set_suspend_mode(struct hdd_context *hdd_ctx);
-#else
-static inline int hdd_set_suspend_mode(struct hdd_context *hdd_ctx)
-{
-	return 0;
-}
-#endif
-/*
- * hdd_shutdown_wlan_in_suspend: shutdown wlan chip when suspend called
- * @hdd_ctx: HDD context
- *
- * this function called by __wlan_hdd_cfg80211_suspend_wlan(), and it
- * schedule idle shutdown work queue when no interface open.
- */
-void hdd_shutdown_wlan_in_suspend(struct hdd_context *hdd_ctx);
 
 #define HDD_DATA_STALL_ENABLE      BIT(0)
 #define HDD_HOST_STA_TX_TIMEOUT    BIT(16)

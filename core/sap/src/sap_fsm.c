@@ -505,7 +505,10 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 	uint8_t sta_cnt, i;
 
 	if (ch_params->ch_width == CH_WIDTH_160MHZ) {
-		is_ch_dfs = true;
+		if (wlan_reg_get_bonded_channel_state_for_freq(
+		    mac_ctx->pdev, chan_freq,
+		    ch_params->ch_width, 0) == CHANNEL_STATE_DFS)
+			is_ch_dfs = true;
 	} else if (ch_params->ch_width == CH_WIDTH_80P80MHZ) {
 		if (wlan_reg_get_channel_state_for_freq(
 						mac_ctx->pdev,
@@ -1309,7 +1312,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 		}
 
 		sap_get_freq_list(sap_context, &freq_list, &num_of_channels);
-		if (!num_of_channels) {
+		if (!num_of_channels || !freq_list) {
 			sap_err("No freq sutiable for SAP in current list, SAP failed");
 			return QDF_STATUS_E_FAILURE;
 		}
@@ -4247,8 +4250,8 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 			continue;
 		}
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
-		if ((sap_ctx->acs_cfg->skip_scan_status ==
-			eSAP_DO_PAR_ACS_SCAN)) {
+		if (sap_ctx->acs_cfg->skip_scan_status ==
+			eSAP_DO_PAR_ACS_SCAN) {
 			uint32_t ch_freq;
 
 			ch_freq = WLAN_REG_CH_TO_FREQ(loop_count);

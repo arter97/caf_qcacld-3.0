@@ -43,23 +43,32 @@ $(foreach cfg, $(WLAN_CFG_OVERRIDE), \
 
 # KERNEL_SUPPORTS_NESTED_COMPOSITES := y is used to enable nested
 # composite support. The nested composite support is available in some
-# MSM kernels, and is available in all GKI kernels beginning with
+# MSM kernels, and is available in 5.10 GKI kernels beginning with
 # 5.10.20, but unfortunately is not available in any upstream kernel.
 #
 # When the feature is present in an MSM kernel, the flag is explicitly
 # set in the kernel sources.  When a GKI kernel is used, there isn't a
 # flag set in the sources, so set the flag here if we are building
-# with GKI kernel 5.10.20 or greater
+# with GKI kernel where the feature is present
 KERNEL_VERSION = $(shell echo $$(( ( $1 << 16 ) + ( $2 << 8 ) + $3 )))
 LINUX_CODE := $(call KERNEL_VERSION,$(VERSION),$(PATCHLEVEL),$(SUBLEVEL))
-COMPOSITE_CODE := 330260 # hardcoded $(call KERNEL_VERSION,5,10,20)
+
+# Comosite feature was added to GKI 5.10.20
+COMPOSITE_CODE_ADDED := 330260 # hardcoded $(call KERNEL_VERSION,5,10,20)
+
+# Comosite feature was not ported beyond 5.10.x
+COMPOSITE_CODE_REMOVED := 330496 # hardcoded $(call KERNEL_VERSION,5,11,0)
+
 ifeq ($(KERNEL_SUPPORTS_NESTED_COMPOSITES),)
   #flag is not explicitly present
   ifneq ($(findstring gki,$(CONFIG_LOCALVERSION))$(findstring qki,$(CONFIG_LOCALVERSION)),)
     # GKI kernel
-    ifeq ($(shell test $(LINUX_CODE) -ge $(COMPOSITE_CODE); echo $$?),0)
+    ifeq ($(shell test $(LINUX_CODE) -ge $(COMPOSITE_CODE_ADDED); echo $$?),0)
       # version >= 5.10.20
-      KERNEL_SUPPORTS_NESTED_COMPOSITES := y
+      ifeq ($(shell test $(LINUX_CODE) -lt $(COMPOSITE_CODE_REMOVED); echo $$?),0)
+        # version < 5.11.0
+        KERNEL_SUPPORTS_NESTED_COMPOSITES := y
+      endif
     endif
   endif
 endif
@@ -499,11 +508,14 @@ ifeq ($(CONFIG_WLAN_FEATURE_11BE_MLO), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_mlo.o
 endif
 
+
 ifeq ($(CONFIG_WLAN_FEATURE_MDNS_OFFLOAD),y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_mdns_offload.o
 endif
 
-ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING), y)
+ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_EVENT), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_connectivity_logging.o
+else ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_connectivity_logging.o
 endif
 
@@ -517,6 +529,10 @@ endif
 
 ifeq ($(CONFIG_DP_HW_TX_DELAY_STATS_ENABLE), y)
 HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_sysfs_dp_tx_delay_stats.o
+endif
+
+ifeq ($(CONFIG_WLAN_FEATURE_PEER_TXQ_FLUSH_CONF), y)
+HDD_OBJS += $(HDD_SRC_DIR)/wlan_hdd_peer_txq_flush.o
 endif
 
 $(call add-wlan-objs,hdd,$(HDD_OBJS))
@@ -1004,6 +1020,7 @@ cppflags-$(CONFIG_WLAN_HANG_EVENT) += -DWLAN_HANG_EVENT
 
 #Flag to enable pre_cac
 cppflags-$(CONFIG_FEATURE_WLAN_PRE_CAC)  += -DPRE_CAC_SUPPORT
+cppflags-$(CONFIG_FEATURE_WLAN_PRE_CAC)  += -DPRE_CAC_COMP
 
 ############ WBUFF ############
 WBUFF_OS_DIR :=	wbuff
@@ -1608,7 +1625,9 @@ $(call add-wlan-objs,dlm,$(DLM_OBJS))
 CONN_LOGGING_DIR := components/cmn_services/logging
 CONN_LOGGING_INC := -I$(WLAN_ROOT)/$(CONN_LOGGING_DIR)/inc
 
-ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING), y)
+ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_EVENT), y)
+CONN_LOGGING_OBJS := $(CONN_LOGGING_DIR)/src/wlan_connectivity_logging.o
+else ifeq ($(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING), y)
 CONN_LOGGING_OBJS := $(CONN_LOGGING_DIR)/src/wlan_connectivity_logging.o
 endif
 
@@ -3203,6 +3222,8 @@ cppflags-$(CONFIG_WLAN_FASTPATH) +=	-DWLAN_FEATURE_FASTPATH
 
 cppflags-$(CONFIG_FEATURE_PKTLOG) +=     -DFEATURE_PKTLOG
 
+cppflags-$(CONFIG_CONNECTIVITY_PKTLOG) += -DCONNECTIVITY_PKTLOG
+
 ifeq ($(CONFIG_WLAN_NAPI), y)
 cppflags-y += -DFEATURE_NAPI
 cppflags-y += -DHIF_IRQ_AFFINITY
@@ -3322,6 +3343,7 @@ cppflags-y += -DCONN_MGR_ADV_FEATURE
 
 cppflags-$(CONFIG_QCACLD_WLAN_LFR3) += -DWLAN_FEATURE_ROAM_OFFLOAD
 cppflags-$(CONFIG_QCACLD_WLAN_CONNECTIVITY_LOGGING) += -DWLAN_FEATURE_CONNECTIVITY_LOGGING
+cppflags-$(CONFIG_QCACLD_WLAN_CONNECTIVITY_DIAG_EVENT) += -DCONNECTIVITY_DIAG_EVENT
 cppflags-$(CONFIG_OFDM_SCRAMBLER_SEED) += -DWLAN_FEATURE_OFDM_SCRAMBLER_SEED
 
 cppflags-$(CONFIG_WLAN_FEATURE_MBSSID) += -DWLAN_FEATURE_MBSSID
@@ -3492,11 +3514,12 @@ cppflags-$(CONFIG_AR6320_SUPPORT) += -DCONFIG_AR6320_SUPPORT
 
 ifeq ($(CONFIG_WLAN_FEATURE_DSRC), y)
 cppflags-y += -DWLAN_FEATURE_DSRC
-
 ifeq ($(CONFIG_OCB_UT_FRAMEWORK), y)
 cppflags-y += -DWLAN_OCB_UT
 endif
 
+else ifeq ($(CONFIG_WLAN_REG_AUTO), y)
+cppflags-y += -DWLAN_REG_AUTO
 endif
 
 cppflags-$(CONFIG_FEATURE_SKB_PRE_ALLOC) += -DFEATURE_SKB_PRE_ALLOC
@@ -3794,6 +3817,7 @@ cppflags-$(CONFIG_QCA_WIFI_QCA6490) += -DQCA_WIFI_QCA6490
 cppflags-$(CONFIG_QCA_WIFI_QCA6750) += -DQCA_WIFI_QCA6750
 cppflags-$(CONFIG_QCA_WIFI_KIWI) += -DQCA_WIFI_KIWI
 cppflags-$(CONFIG_CNSS_KIWI_V2) += -DQCA_WIFI_KIWI_V2
+cppflags-$(CONFIG_CNSS_MANGO) += -DQCA_WIFI_MANGO
 cppflags-$(CONFIG_QCA_WIFI_QCA8074) += -DQCA_WIFI_QCA8074
 cppflags-$(CONFIG_SCALE_INCLUDES) += -DSCALE_INCLUDES
 cppflags-$(CONFIG_QCA_WIFI_QCA8074_VP) += -DQCA_WIFI_QCA8074_VP
@@ -3852,6 +3876,7 @@ cppflags-$(CONFIG_TX_AGGREGATION_SIZE_ENABLE) += -DTX_AGGREGATION_SIZE_ENABLE
 cppflags-$(CONFIG_TX_MULTI_TCL) += -DTX_MULTI_TCL
 cppflags-$(CONFIG_WLAN_DP_DISABLE_TCL_CMD_CRED_SRNG) += -DWLAN_DP_DISABLE_TCL_CMD_CRED_SRNG
 cppflags-$(CONFIG_WLAN_DP_DISABLE_TCL_STATUS_SRNG) += -DWLAN_DP_DISABLE_TCL_STATUS_SRNG
+cppflags-$(CONFIG_DP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE) += -DDP_WAR_VALIDATE_RX_ERR_MSDU_COOKIE
 
 # Enable Low latency
 cppflags-$(CONFIG_WLAN_FEATURE_LL_MODE) += -DWLAN_FEATURE_LL_MODE
@@ -3982,6 +4007,9 @@ cppflags-$(CONFIG_SAE_SINGLE_PMK) += -DWLAN_SAE_SINGLE_PMK
 #Flag to enable/disable multi client low latency feature support
 cppflags-$(CONFIG_MULTI_CLIENT_LL_SUPPORT) += -DMULTI_CLIENT_LL_SUPPORT
 
+#Flag to enable/disable vendor handoff control feature support
+cppflags-$(CONFIG_WLAN_VENDOR_HANDOFF_CONTROL) += -DWLAN_VENDOR_HANDOFF_CONTROL
+
 #Flag to enable/disable mscs feature
 cppflags-$(CONFIG_FEATURE_MSCS) += -DWLAN_FEATURE_MSCS
 
@@ -4041,6 +4069,7 @@ cppflags-$(CONFIG_CONNECTION_ROAMING_CFG) += -DCONNECTION_ROAMING_CFG
 cppflags-$(CONFIG_WLAN_FEATURE_NEAR_FULL_IRQ) += -DWLAN_FEATURE_NEAR_FULL_IRQ
 cppflags-$(CONFIG_WLAN_FEATURE_DP_EVENT_HISTORY) += -DWLAN_FEATURE_DP_EVENT_HISTORY
 cppflags-$(CONFIG_WLAN_FEATURE_DP_RX_RING_HISTORY) += -DWLAN_FEATURE_DP_RX_RING_HISTORY
+cppflags-$(CONFIG_WLAN_FEATURE_DP_MON_STATUS_RING_HISTORY) += -DWLAN_FEATURE_DP_MON_STATUS_RING_HISTORY
 cppflags-$(CONFIG_WLAN_FEATURE_DP_TX_DESC_HISTORY) += -DWLAN_FEATURE_DP_TX_DESC_HISTORY
 cppflags-$(CONFIG_REO_QDESC_HISTORY) += -DREO_QDESC_HISTORY
 cppflags-$(CONFIG_DP_TX_HW_DESC_HISTORY) += -DDP_TX_HW_DESC_HISTORY
@@ -4352,10 +4381,6 @@ endif
 
 cppflags-$(CONFIG_DP_FT_LOCK_HISTORY) += -DDP_FT_LOCK_HISTORY
 
-ifeq ($(CONFIG_WLAN_FULL_POWER_DOWN), y)
-cppflags-y += -DFEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
-endif
-
 ccflags-$(CONFIG_INTRA_BSS_FWD_OFFLOAD) += -DINTRA_BSS_FWD_OFFLOAD
 ccflags-$(CONFIG_GET_DRIVER_MODE) += -DFEATURE_GET_DRIVER_MODE
 
@@ -4404,12 +4429,14 @@ ccflags-y += -DWLAN_MCC_MIN_CHANNEL_QUOTA=$(CONFIG_WLAN_MCC_MIN_CHANNEL_QUOTA)
 endif
 endif
 
+cppflags-$(CONFIG_WLAN_FEATURE_PEER_TXQ_FLUSH_CONF) += -DWLAN_FEATURE_PEER_TXQ_FLUSH_CONF
+
 ifeq ($(CONFIG_DP_HW_TX_DELAY_STATS_ENABLE), y)
 cppflags-y += -DHW_TX_DELAY_STATS_ENABLE
 endif
 
 #Flags to enable/disable Dynamic WLAN interface control feature
-cppflags-$(CONFIG_WLAN_DYNAMIC_IFACE_CTRL) += -DFEATURE_WLAN_DYNAMIC_IFACE_CTRL
+cppflags-$(CONFIG_CNSS_HW_SECURE_DISABLE) += -DFEATURE_CNSS_HW_SECURE_DISABLE
 
 KBUILD_CPPFLAGS += $(cppflags-y)
 

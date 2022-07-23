@@ -227,13 +227,12 @@ QDF_STATUS hdd_rx_pkt_thread_enqueue_cbk(void *adapter_context,
 int hdd_rx_ol_init(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_rx_handle_concurrency() - Handle concurrency related operations
- *  for rx
- * @is_concurrency: true if there are concurrenct connections else false
+ * hdd_disable_rx_ol_in_concurrency() - Disable Rx offload due to concurrency
+ * @disable: true/false to disable/enable the Rx offload
  *
  * Return: none
  */
-void hdd_rx_handle_concurrency(bool is_concurrency);
+void hdd_disable_rx_ol_in_concurrency(bool disable);
 
 /**
  * hdd_disable_rx_ol_for_low_tput() - Disable Rx offload in low TPUT scenario
@@ -578,16 +577,6 @@ void hdd_print_netdev_txq_status(struct net_device *dev);
 uint32_t
 wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
 				  char *buf, uint32_t size);
-
-/**
- * wlan_hdd_rx_rpm_mark_last_busy() - Check if dp rx marked last busy
- * @hdd_ctx: Pointer to hdd context
- * @hif_ctx: Pointer to hif context
- *
- * Return: dp mark last busy less than runtime delay value
- */
-bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
-				    void *hif_ctx);
 
 /**
  * hdd_sta_notify_tx_comp_cb() - notify tx comp callback registered with dp

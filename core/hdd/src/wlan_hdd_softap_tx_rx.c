@@ -502,7 +502,7 @@ int hdd_softap_inspect_dhcp_packet(struct hdd_adapter *adapter,
 						hdd_sta_info->sta_mac.bytes,
 						WMA_DHCP_START_IND);
 			hdd_sta_info->dhcp_nego_status = DHCP_NEGO_IN_PROGRESS;
-			/* fallthrough */
+			fallthrough;
 		case QDF_PROTO_DHCP_DECLINE:
 			if (dir == QDF_RX)
 				hdd_sta_info->dhcp_phase = DHCP_PHASE_REQUEST;
@@ -611,8 +611,9 @@ static QDF_STATUS hdd_softap_validate_peer_state(struct hdd_adapter *adapter,
 	}
 
 	if (peer_state == OL_TXRX_PEER_STATE_CONN) {
-		if (ntohs(skb->protocol) != HDD_ETHERTYPE_802_1_X) {
-			hdd_sapd_debug_rl("NON-EAPOL packet in non-Authenticated state");
+		if (ntohs(skb->protocol) != HDD_ETHERTYPE_802_1_X &&
+			!IS_HDD_ETHERTYPE_WAI(skb)) {
+			hdd_sapd_debug_rl("NON EAPOL/WAPI pkt in non-Auth");
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
@@ -1334,6 +1335,7 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 	bool wmm_enabled = false;
 	enum qca_wlan_802_11_mode dot11mode = QCA_WLAN_802_11_MODE_INVALID;
 	bool is_macaddr_broadcast = false;
+	enum phy_ch_width ch_width;
 
 	if (event) {
 		wmm_enabled = event->wmmEnabled;
@@ -1399,6 +1401,9 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 		adapter->tx_fn = txrx_ops.tx.tx;
 	}
 
+	ch_width = ucfg_mlme_get_peer_ch_width(adapter->hdd_ctx->psoc,
+					       txrx_desc.peer_addr.bytes);
+	txrx_desc.bw = hdd_convert_ch_width_to_cdp_peer_bw(ch_width);
 	qdf_status = cdp_peer_register(soc, OL_TXRX_PDEV_ID, &txrx_desc);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		hdd_debug("cdp_peer_register() failed to register.  Status = %d [0x%08X]",

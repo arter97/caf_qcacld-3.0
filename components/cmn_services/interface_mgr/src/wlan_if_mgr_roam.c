@@ -443,7 +443,7 @@ static bool if_mgr_validate_sta_bcn_intrvl(struct wlan_objmgr_vdev *vdev,
 			bss_arg->status = QDF_STATUS_SUCCESS;
 			return true;
 		case ALLOW_MCC_GO_DIFF_BI_WORKAROUND:
-			/* fall through */
+			fallthrough;
 		case ALLOW_MCC_GO_DIFF_BI_NO_DISCONNECT:
 			policy_mgr_get_conc_rule1(psoc, &conc_rule1);
 			policy_mgr_get_conc_rule2(psoc, &conc_rule2);
@@ -814,7 +814,7 @@ QDF_STATUS if_mgr_validate_candidate(struct wlan_objmgr_vdev *vdev,
 	 * disabled in peer assoc.
 	 */
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
-	    !policy_mgr_allow_concurrency(psoc, mode, chan_freq,
+	    !policy_mgr_is_concurrency_allowed(psoc, mode, chan_freq,
 					  HW_MODE_20_MHZ, conc_ext_flags)) {
 		ifmgr_info("Concurrency not allowed for this channel freq %d bssid "QDF_MAC_ADDR_FMT", selecting next",
 			   chan_freq,

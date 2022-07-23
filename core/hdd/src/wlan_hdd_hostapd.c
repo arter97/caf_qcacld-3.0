@@ -2992,6 +2992,7 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 	uint16_t rsn_ie_len, i;
 	tDot11fIERSN dot11_rsn_ie = {0};
 	tDot11fIEWPA dot11_wpa_ie = {0};
+	tDot11fIEWAPI dot11_wapi_ie = {0};
 
 	if (!mac_handle) {
 		hdd_err("NULL mac Handle");
@@ -3081,6 +3082,47 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		*mc_encrypt_type =
 			hdd_translate_wpa_to_csr_encryption_type(dot11_wpa_ie.
 								 multicast_cipher);
+		*mfp_capable = false;
+		*mfp_required = false;
+	} else if (gen_ie[0] == DOT11F_EID_WAPI) {
+		/* Validity checks */
+		if ((gen_ie_len < DOT11F_IE_WAPI_MIN_LEN) ||
+		    (gen_ie_len > DOT11F_IE_WAPI_MAX_LEN))
+			return QDF_STATUS_E_FAILURE;
+
+		/* Skip past the EID byte and length byte */
+		rsn_ie = gen_ie + 2;
+		rsn_ie_len = gen_ie_len - 2;
+		/* Unpack the WAPI IE */
+		memset(&dot11_wapi_ie, 0, sizeof(tDot11fIEWPA));
+		ret = dot11f_unpack_ie_wapi(MAC_CONTEXT(mac_handle),
+					    rsn_ie, rsn_ie_len,
+					    &dot11_wapi_ie, false);
+		if (DOT11F_FAILED(ret)) {
+			hdd_err("unpack failed, 0x%x", ret);
+			return -EINVAL;
+		}
+		/* Copy out the encryption and authentication types */
+		hdd_debug("WAPI unicast cipher suite count: %d akm count: %d",
+			  dot11_wapi_ie.unicast_cipher_suite_count,
+			  dot11_wapi_ie.akm_suite_count);
+		/*
+		 * Translate akms in akm suite
+		 */
+		for (i = 0; i < dot11_wapi_ie.akm_suite_count; i++)
+			akm_list->authType[i] =
+				hdd_translate_wapi_to_csr_auth_type(
+						dot11_wapi_ie.akm_suites[i]);
+
+		akm_list->numEntries = dot11_wapi_ie.akm_suite_count;
+		/* dot11_wapi_ie.akm_suite_count */
+		*encrypt_type =
+			hdd_translate_wapi_to_csr_encryption_type(
+				dot11_wapi_ie.unicast_cipher_suites[0]);
+		/* dot11_wapi_ie.unicast_cipher_count */
+		*mc_encrypt_type =
+			hdd_translate_wapi_to_csr_encryption_type(
+				dot11_wapi_ie.multicast_cipher_suite);
 		*mfp_capable = false;
 		*mfp_required = false;
 	} else {
@@ -4163,7 +4205,6 @@ struct hdd_adapter *hdd_wlan_create_ap_dev(struct hdd_context *hdd_ctx,
 	qdf_mem_copy(dev->dev_addr, mac_addr, sizeof(tSirMacAddr));
 	qdf_mem_copy(adapter->mac_addr.bytes, mac_addr, sizeof(tSirMacAddr));
 
-	adapter->offloads_configured = false;
 	hdd_update_dynamic_tsf_sync(adapter);
 	hdd_dev_setup_destructor(dev);
 	dev->ieee80211_ptr = &adapter->wdev;
@@ -5749,6 +5790,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	enum reg_phymode reg_phy_mode, updated_phy_mode;
 	struct sap_context *sap_ctx;
 	struct wlan_objmgr_vdev *vdev;
+	uint32_t user_config_freq = 0;
 
 	hdd_enter();
 
@@ -5817,6 +5859,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		goto free;
 	}
 
+	user_config_freq = config->chan_freq;
+
 	if (QDF_STATUS_SUCCESS !=
 	    ucfg_policy_mgr_get_indoor_chnl_marking(hdd_ctx->psoc,
 						    &indoor_chnl_marking))
@@ -5873,8 +5917,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 		config->acs_dfs_mode = wlan_hdd_get_dfs_mode(mode);
 	}
 
-	policy_mgr_update_user_config_sap_chan(hdd_ctx->psoc,
-					       config->chan_freq);
 	ucfg_policy_mgr_get_mcc_scc_switch(hdd_ctx->psoc, &mcc_to_scc_switch);
 
 	if (adapter->device_mode == QDF_SAP_MODE ||
@@ -5995,13 +6037,20 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	memset(&config->RSNWPAReqIE[0], 0, sizeof(config->RSNWPAReqIE));
 	ie = wlan_get_ie_ptr_from_eid(WLAN_EID_RSN, beacon->tail,
 				      beacon->tail_len);
+	/* the RSN and WAPI are not coexisting, so we can check the
+	 * WAPI IE if the RSN IE is not set.
+	 */
+	if (!ie)
+		ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_WAPI, beacon->tail,
+					      beacon->tail_len);
+
 	if (ie && ie[1]) {
 		config->RSNWPAReqIELength = ie[1] + 2;
 		if (config->RSNWPAReqIELength < sizeof(config->RSNWPAReqIE))
 			memcpy(&config->RSNWPAReqIE[0], ie,
 			       config->RSNWPAReqIELength);
 		else
-			hdd_err("RSNWPA IE MAX Length exceeded; length =%d",
+			hdd_err("RSN/WPA/WAPI IE MAX Length exceeded; length =%d",
 			       config->RSNWPAReqIELength);
 		/* The actual processing may eventually be more extensive than
 		 * this. Right now, just consume any PMKIDs that are sent in
@@ -6412,6 +6461,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    true);
+		wlan_set_sap_user_config_freq(vdev, user_config_freq);
 	}
 
 	wlan_hdd_dhcp_offload_enable(hdd_ctx, adapter);
@@ -6607,6 +6657,7 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 		hdd_green_ap_start_state_mc(hdd_ctx, adapter->device_mode,
 					    false);
 		wlan_twt_concurrency_update(hdd_ctx);
+		wlan_set_sap_user_config_freq(adapter->vdev, 0);
 		status = ucfg_if_mgr_deliver_event(adapter->vdev,
 				WLAN_IF_MGR_EV_AP_STOP_BSS_COMPLETE,
 				NULL);
@@ -6817,9 +6868,77 @@ static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
 #endif
 
 /**
- * wlan_hdd_ap_ap_force_scc_override() - force Same band SCC chan override
+ * wlan_hdd_get_sap_ch_params() - Get channel parameters of SAP
+ * @hdd_ctx: HDD context pointer
+ * @vdev_id: vdev id
+ * @freq: channel frequency (MHz)
+ * @ch_params: pointer to channel parameters
+ *
+ * The function gets channel parameters of SAP by vdev id.
+ *
+ * Return: QDF_STATUS_SUCCESS if get channel parameters successful
+ */
+static QDF_STATUS
+wlan_hdd_get_sap_ch_params(struct hdd_context *hdd_ctx,
+			   uint8_t vdev_id, uint32_t freq,
+			   struct ch_params *ch_params)
+{
+	struct hdd_adapter *adapter;
+
+	if (!hdd_ctx || !ch_params) {
+		hdd_err("invalid hdd_ctx or ch_params");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+	if (!adapter)
+		return QDF_STATUS_E_INVAL;
+
+	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+				    ch_params))
+		wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
+						     freq, 0,
+						     ch_params);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_hdd_is_same_freq_seg() - Check freq segment is same or not
+ * @chandef: channel of new SAP
+ * @ch_params: channel parameters of existed SAP
+ *
+ * If two SAP on same channel, and channel type is NL80211_CHAN_HT40MINUS or
+ * NL80211_CHAN_HT40PLUS, or channel offset is PHY_DOUBLE_CHANNEL_HIGH_PRIMARY
+ * or PHY_DOUBLE_CHANNEL_LOW_PRIMARY, then check freq segment is same or not.
+ *
+ * Return: true if freq segment is same
+ */
+static bool
+wlan_hdd_is_same_freq_seg(struct cfg80211_chan_def *chandef,
+			  struct ch_params *ch_params)
+{
+	if (!chandef || !ch_params)
+		return false;
+
+	/* they are equal if NL80211_CHAN_NO_HT or NL80211_CHAN_HT20 */
+	if (chandef->center_freq1 == chandef->chan->center_freq)
+		return true;
+
+	if ((ch_params->sec_ch_offset != PHY_DOUBLE_CHANNEL_HIGH_PRIMARY) &&
+	    (ch_params->sec_ch_offset != PHY_DOUBLE_CHANNEL_LOW_PRIMARY))
+		return true;
+
+	if ((chandef->center_freq1 != ch_params->mhz_freq_seg0) ||
+	    (chandef->center_freq2 != ch_params->mhz_freq_seg1))
+		return false;
+
+	return true;
+}
+
+/**
+ * wlan_hdd_is_ap_ap_force_scc_override() - force Same band SCC chan override
  * @adapter: SAP adapter pointer
- * @freq: SAP starting channel freq
+ * @chandef: SAP starting channel
  * @new_chandef: new override SAP channel
  *
  * The function will override the second SAP chan to the first SAP's home
@@ -6828,9 +6947,9 @@ static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
  * Return: true if channel override
  */
 static bool
-wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
-				  uint32_t freq,
-				  struct cfg80211_chan_def *new_chandef)
+wlan_hdd_is_ap_ap_force_scc_override(struct hdd_adapter *adapter,
+				     struct cfg80211_chan_def *chandef,
+				     struct cfg80211_chan_def *new_chandef)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t cc_count, i;
@@ -6838,32 +6957,29 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct ch_params ch_params;
 	enum nl80211_channel_type channel_type;
-	struct hdd_adapter *con_adapter;
 	uint8_t con_vdev_id;
 	uint32_t con_freq;
-	uint8_t mcc_to_scc_switch;
 	struct ieee80211_channel *ieee_chan;
+	uint32_t freq;
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 
-	if (!hdd_ctx) {
-		hdd_err("hdd context is NULL");
+	if (!hdd_ctx || !chandef) {
+		hdd_err("hdd context or chandef is NULL");
 		return false;
 	}
+	freq = chandef->chan->center_freq;
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("failed to get vdev");
+		return false;
+	}
+	if (policy_mgr_is_ap_ap_mcc_allow(hdd_ctx->psoc, vdev)) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+		return false;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
-	if (adapter->device_mode == QDF_P2P_GO_MODE &&
-	    policy_mgr_is_p2p_p2p_conc_supported(hdd_ctx->psoc))
-		return false;
-	if (!policy_mgr_concurrent_beaconing_sessions_running(hdd_ctx->psoc))
-		return false;
-	if (policy_mgr_dual_beacon_on_single_mac_mcc_capable(hdd_ctx->psoc))
-		return false;
-	if (!policy_mgr_dual_beacon_on_single_mac_scc_capable(hdd_ctx->psoc))
-		return false;
-	ucfg_policy_mgr_get_mcc_scc_switch(hdd_ctx->psoc,
-					   &mcc_to_scc_switch);
-	if ((mcc_to_scc_switch !=
-		QDF_MCC_TO_SCC_SWITCH_FORCE_WITHOUT_DISCONNECTION) &&
-	    (mcc_to_scc_switch != QDF_MCC_TO_SCC_WITH_PREFERRED_BAND))
-		return false;
 	cc_count = policy_mgr_get_mode_specific_conn_info(hdd_ctx->psoc,
 							  &op_freq[0],
 							  &vdev_id[0],
@@ -6876,8 +6992,16 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 					&vdev_id[cc_count],
 					PM_P2P_GO_MODE);
 	for (i = 0 ; i < cc_count; i++) {
-		if (freq == op_freq[i])
+		if (freq == op_freq[i]) {
+			status = wlan_hdd_get_sap_ch_params(hdd_ctx,
+							    vdev_id[i],
+							    op_freq[i],
+							    &ch_params);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    (!wlan_hdd_is_same_freq_seg(chandef, &ch_params)))
+				break;
 			continue;
+		}
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
 			break;
 		if (wlan_reg_is_same_band_freqs(freq, op_freq[i]) &&
@@ -6888,9 +7012,6 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 		return false;
 	con_freq = op_freq[i];
 	con_vdev_id = vdev_id[i];
-	con_adapter = hdd_get_adapter_by_vdev(hdd_ctx, con_vdev_id);
-	if (!con_adapter)
-		return false;
 	ieee_chan = ieee80211_get_channel(hdd_ctx->wiphy,
 					  con_freq);
 	if (!ieee_chan) {
@@ -6898,11 +7019,11 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 		return false;
 	}
 
-	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(con_adapter),
-				    &ch_params))
-		wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
-						     con_freq, 0,
-						     &ch_params);
+	status = wlan_hdd_get_sap_ch_params(hdd_ctx, con_vdev_id, con_freq,
+					    &ch_params);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
 	switch (ch_params.sec_ch_offset) {
 	case PHY_SINGLE_CHANNEL_CENTERED:
 		channel_type = NL80211_CHAN_HT20;
@@ -7083,9 +7204,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	chandef = &params->chandef;
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    wlan_hdd_ap_ap_force_scc_override(adapter,
-					      chandef->chan->center_freq,
-					      &new_chandef)) {
+	    wlan_hdd_is_ap_ap_force_scc_override(adapter,
+						 chandef,
+						 &new_chandef)) {
 		chandef = &new_chandef;
 		freq = (qdf_freq_t)chandef->chan->center_freq;
 		channel_width = wlan_hdd_get_channel_bw(chandef->width);

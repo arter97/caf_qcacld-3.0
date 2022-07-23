@@ -288,6 +288,23 @@ wlan_mlme_get_wlm_multi_client_ll_caps(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS wlan_mlme_set_band_capability(struct wlan_objmgr_psoc *psoc,
 					 uint32_t band_capability);
 
+#ifdef WLAN_VENDOR_HANDOFF_CONTROL
+/**
+ * wlan_mlme_get_vendor_handoff_control_caps() - Get the vendor handoff control
+ * capability flag
+ * @psoc: pointer to psoc object
+ *
+ * Return: True if vendor handoff control caps present
+ */
+bool wlan_mlme_get_vendor_handoff_control_caps(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+wlan_mlme_get_vendor_handoff_control_caps(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
 /**
  * wlan_mlme_set_dual_sta_policy() - Set the dual sta config
  * @psoc: pointer to psoc object
@@ -981,6 +998,16 @@ QDF_STATUS mlme_update_tgt_he_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
  */
 QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 					  struct wma_tgt_cfg *cfg);
+
+/**
+ * wlan_mlme_convert_eht_op_bw_to_phy_ch_width() - convert channel width in eht
+ *                                                 operation IE to phy_ch_width
+ * @channel_width: channel width in eht operation IE
+ *
+ * Return: phy_ch_width
+ */
+enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
+						uint8_t channel_width);
 #endif
 
 /**
@@ -1095,6 +1122,18 @@ QDF_STATUS wlan_mlme_set_primary_interface(struct wlan_objmgr_psoc *psoc,
  * Return: QDF Status
  */
 QDF_STATUS wlan_mlme_set_default_primary_iface(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_is_primary_interface_configured() - Check if primary iface is set
+ * @psoc: pointer to psoc object
+ *
+ * Check if primary iface is configured from userspace through vendor command.
+ * Return true if it's configured. If it's not configured, default value would
+ * be 0xFF and return false then.
+ *
+ * Return: True or False
+ */
+bool wlan_mlme_is_primary_interface_configured(struct wlan_objmgr_psoc *psoc);
 
 /**
  * wlan_mlme_get_mcc_duty_cycle_percentage() - Get primary STA iface duty
@@ -2288,6 +2327,41 @@ wlan_mlme_set_relaxed_6ghz_conn_policy(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_mlme_get_emlsr_mode_enabled() - Get the eMLSR mode flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value ptr.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
+
+/**
+ * wlan_mlme_set_emlsr_mode_enabled() - Set the eMLSR mode flag
+ * @psoc: psoc context
+ * @value: Enable/Disable value.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mlme_set_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
+#else
+static inline QDF_STATUS
+wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
+{
+	*value = false;
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+wlan_mlme_set_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * wlan_mlme_get_sta_miracast_mcc_rest_time() - Get STA/MIRACAST MCC rest time
  * @psoc: pointer to psoc object
@@ -3047,6 +3121,28 @@ wlan_mlme_get_roam_bmiss_first_bcnt(struct wlan_objmgr_psoc *psoc,
 				    uint8_t *val);
 
 /**
+ * wlan_mlme_get_bmiss_timeout_on_wakeup() - Get bmiss timeout
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_bmiss_timeout_on_wakeup(struct wlan_objmgr_psoc *psoc,
+				      uint8_t *val);
+
+/**
+ * wlan_mlme_get_bmiss_timeout_on_sleep() - Get roam conbmiss timeout
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_bmiss_timeout_on_sleep(struct wlan_objmgr_psoc *psoc,
+				     uint8_t *val);
+
+/**
  * wlan_mlme_adaptive_11r_enabled() - check if adaptive 11r feature is enaled
  * or not
  * @psoc: pointer to psoc object
@@ -3160,6 +3256,18 @@ wlan_mlme_get_bss_load_threshold(struct wlan_objmgr_psoc *psoc, uint32_t *val);
 QDF_STATUS
 wlan_mlme_get_bss_load_sample_time(struct wlan_objmgr_psoc *psoc,
 				   uint32_t *val);
+
+/**
+ * wlan_mlme_get_bss_load_rssi_threshold_6ghz() - Get bss load RSSI
+ * threshold on 6G
+ * @psoc: pointer to psoc object
+ * @val:  Pointer to the value which will be filled for the caller
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+wlan_mlme_get_bss_load_rssi_threshold_6ghz(struct wlan_objmgr_psoc *psoc,
+					   int32_t *val);
 
 /**
  * wlan_mlme_get_bss_load_rssi_threshold_5ghz() - Get bss load RSSI
@@ -3370,23 +3478,44 @@ QDF_STATUS mlme_cfg_get_eht_caps(struct wlan_objmgr_psoc *psoc,
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
- * wlan_mlme_is_sta_single_mlo_conn() - Is single mlo connection for sta
- *                                      set or not
+ * wlan_mlme_get_sta_mlo_conn_max_num() - get max number of links that sta mlo
+ *                                        connection can support
  * @psoc: pointer to psoc object
  *
- * Return: True if single mlo connection for sta is set
+ * Return: max number of links that sta mlo connection can support
  */
-bool wlan_mlme_is_sta_single_mlo_conn(struct wlan_objmgr_psoc *psoc);
+uint8_t wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc);
 
 /**
- * wlan_mlme_set_sta_single_mlo_conn() - Set single mlo connection for sta
+ * wlan_mlme_set_sta_mlo_conn_max_num() - set max number of links that sta mlo
+ *                                        connection can support
  * @psoc: pointer to psoc object
  * @value: value to set
  *
  * Return: QDF Status
  */
-QDF_STATUS wlan_mlme_set_sta_single_mlo_conn(struct wlan_objmgr_psoc *psoc,
-					     bool value);
+QDF_STATUS wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
+					      bool value);
+
+/**
+ * wlan_mlme_get_sta_mlo_conn_band_bmp() - get band bitmap that sta mlo
+ *                                         connection can support
+ * @psoc: pointer to psoc object
+ *
+ * Return: band bitmap that sta mlo connection can support
+ */
+uint8_t wlan_mlme_get_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * wlan_mlme_set_sta_mlo_conn_band_bmp() - set band bitmap that sta mlo
+ *                                         connection can support
+ * @psoc: pointer to psoc object
+ * @value: value to set
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
+					       bool value);
 #endif
 
 /**
@@ -3658,4 +3787,28 @@ void wlan_mlme_get_safe_mode_enable(struct wlan_objmgr_psoc *psoc,
  * Return: 6g_power_type
  */
 uint32_t wlan_mlme_get_6g_ap_power_type(struct wlan_objmgr_vdev *vdev);
+
+QDF_STATUS wlan_connect_hw_mode_change_resp(struct wlan_objmgr_pdev *pdev,
+					    uint8_t vdev_id,
+					    wlan_cm_id cm_id,
+					    QDF_STATUS status);
+
+/**
+ * wlan_mlme_get_ch_width_from_phymode() - Convert phymode to ch_width
+ * @phy_mode: Phy mode
+ *
+ * Return: enum phy_ch_width
+ */
+enum phy_ch_width
+wlan_mlme_get_ch_width_from_phymode(enum wlan_phymode phy_mode);
+
+/**
+ * wlan_mlme_get_peer_ch_width() - get ch_width of the given peer
+ * @psoc: psoc context
+ * @mac: peer mac
+ *
+ * Return: enum phy_ch_width
+ */
+enum phy_ch_width
+wlan_mlme_get_peer_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t *mac);
 #endif /* _WLAN_MLME_API_H_ */
