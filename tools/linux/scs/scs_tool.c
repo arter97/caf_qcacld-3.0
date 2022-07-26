@@ -37,7 +37,6 @@
 enum scs_rule_config_request {
 	SCS_RULE_CONFIG_REQUEST_TYPE_ADD,
 	SCS_RULE_CONFIG_REQUEST_TYPE_REMOVE,
-	SCS_RULE_CONFIG_REQUEST_TYPE_CHANGE,
 };
 
 enum scs_spm_cmd {
@@ -125,6 +124,21 @@ static void scs_tool_get_flow_label(void *data, uint8_t *flow_label)
 	memcpy(flow_label, data, SCS_ATTR_FLOW_LABEL_LENGTH);
 }
 
+static void scs_tool_get_filter_attr(void *data, uint32_t *attr_val)
+{
+	uint32_t val;
+
+	/*
+	 * SCS classifier in ECM supports SPI rule match only.
+	 * Copy LSB 4 bytes of Filter value and mask buffer for SPI
+	 */
+	memcpy(&val, data, sizeof(val));
+
+	val = htonl(val);
+
+	*attr_val = val;
+}
+
 static char *scs_tool_ipv4_str(uint32_t addr)
 {
 	struct in_addr ip_addr;
@@ -151,6 +165,7 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 	uint32_t val32;
 	uint8_t fl[SCS_ATTR_FLOW_LABEL_LENGTH];
 	uint8_t rule_precedence = 0;
+	uint8_t scs_classifier_type;
 
 	nla_parse(tb_array,
 		  QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_MAX,
@@ -161,6 +176,9 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 		val32 = nla_get_u32(tb);
 		PRINT_IF_VERB("Rule ID                 %u", val32);
 		rule->attr_id = val32;
+	} else {
+		PRINT_IF_VERB("No Rule ID");
+		return -EINVAL;
 	}
 
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_REQUEST_TYPE];
@@ -177,10 +195,8 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 		case SCS_RULE_CONFIG_REQUEST_TYPE_REMOVE:
 			spm_cmd = SCS_SPM_CMD_DELETE;
 			break;
-		case SCS_RULE_CONFIG_REQUEST_TYPE_CHANGE:
-			spm_cmd = SCS_SPM_CMD_ADD;
-			break;
 		default:
+			PRINT_IF_VERB("Invalid Request type %u", val8);
 			return -EINVAL;
 		}
 
@@ -188,6 +204,9 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 
 		if (rule->add_del_rule == SCS_SPM_CMD_DELETE)
 			goto done;
+	} else {
+		PRINT_IF_VERB("No Request Type");
+		return -EINVAL;
 	}
 
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_OUTPUT_TID];
@@ -196,14 +215,28 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 		PRINT_IF_VERB("TID                     %u", val8);
 		rule->flags |= SP_RULE_FLAG_MATCH_RULE_OUTPUT;
 		rule->rule_output = val8;
+	} else {
+		PRINT_IF_VERB("No TID");
+		return -EINVAL;
 	}
 
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_CLASSIFIER_TYPE];
 	if (tb) {
 		val8 = nla_get_u8(tb);
+		if (val8 != SCS_ATTR_CLASSIFIER_TYPE_TCLAS4 &&
+		    val8 != SCS_ATTR_CLASSIFIER_TYPE_TCLAS10 &&
+		    val8 != (SCS_ATTR_CLASSIFIER_TYPE_TCLAS4 |
+			    SCS_ATTR_CLASSIFIER_TYPE_TCLAS10)) {
+			PRINT_IF_VERB("Invalid SCS Classifier Type %u", val8);
+			return -EINVAL;
+		}
 		PRINT_IF_VERB("SCS Classifier Type     %u", val8);
-		if (val8 == SCS_ATTR_CLASSIFIER_TYPE_TCLAS10)
-			rule_precedence++;
+		scs_classifier_type = val8;
+		if (scs_classifier_type == SCS_ATTR_CLASSIFIER_TYPE_TCLAS10)
+			goto parse_tclas10;
+	} else {
+		PRINT_IF_VERB("No SCS classifier Type");
+		return -EINVAL;
 	}
 
 	/*
@@ -216,6 +249,9 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 		rule->ip_version_type = val8;
 		rule->flags |= SP_RULE_FLAG_MATCH_IP_VERSION_TYPE;
 		rule_precedence++;
+	} else {
+		PRINT_IF_VERB("No IP Version");
+		return -EINVAL;
 	}
 
 	tb = tb_array[
@@ -297,10 +333,11 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_TCLAS4_FLOW_LABEL];
 	if (tb) {
 		scs_tool_get_flow_label(nla_data(tb), fl);
-		PRINT_IF_VERB("Flow Label:");
+		PRINT_IF_VERB("Flow Label: %x %x %x", fl[0], fl[1], fl[2]);
 		rule_precedence++;
 	}
 
+parse_tclas10:
 	/*
 	 * Parse tclas10 attributes
 	 */
@@ -315,16 +352,32 @@ scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 	if (tb) {
 		val8 = nla_get_u8(tb);
 		PRINT_IF_VERB("Next Header / Protocol  %u", val8);
+		rule->proto_num = val8;
+		rule->flags |= SP_RULE_FLAG_MATCH_PROTO_NUM;
 	}
 
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_TCLAS10_FILTER_MASK];
-	if (tb)
-		PRINT_IF_VERB("Filter Mask:");
+	if (tb) {
+		scs_tool_get_filter_attr(nla_data(tb), &rule->filter_mask);
+		rule->flags |= SP_RULE_FLAG_MATCH_SPI;
+		PRINT_IF_VERB("Filter Mask: %x", rule->filter_mask);
+	}
 
 	tb = tb_array[
 		QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_TCLAS10_FILTER_VALUE];
-	if (tb)
-		PRINT_IF_VERB("Filter Value:");
+	if (tb) {
+		scs_tool_get_filter_attr(nla_data(tb), &rule->filter_value);
+		rule->flags |= SP_RULE_FLAG_MATCH_SPI;
+		PRINT_IF_VERB("Filter Value: %x", rule->filter_value);
+	}
+
+	/*
+	 * All the attributes of TCLAS10 are mandatory,
+	 * so set precedence to 1 for all TCLAS10 rules.
+	 */
+	if ((scs_classifier_type & SCS_ATTR_CLASSIFIER_TYPE_TCLAS10) ==
+			SCS_ATTR_CLASSIFIER_TYPE_TCLAS10)
+		rule_precedence++;
 
 	PRINT_IF_VERB("Rule Precedence                  %u", rule_precedence);
 	rule->precedence = rule_precedence;
@@ -340,6 +393,7 @@ done:
 static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len)
 {
 	struct sal_ctxt *ctxt = (struct sal_ctxt *)cbd;
+	int r;
 
 	if (!ctxt->rs->sk)
 		return;
@@ -347,7 +401,12 @@ static void scs_tool_nl_sal_cb(void *cbd, uint8_t *data, size_t len)
 	PRINT_IF_VERB(".......... SCS EVENT RECEIVED .........\n");
 
 	memset(&ctxt->rs->rule, 0, sizeof(struct sp_rule));
-	scs_tool_fill_sal_rule(data, len, &ctxt->rs->rule);
+	r = scs_tool_fill_sal_rule(data, len, &ctxt->rs->rule);
+	if (r < 0) {
+		PRINT_IF_VERB("Unable to set SPM rule");
+		return;
+	}
+
 	scs_tool_send_sal_rule(ctxt);
 }
 
@@ -402,8 +461,8 @@ static void display_help(void)
 
 int main(int argc, char *argv[])
 {
-	struct sal_ctxt *sal_ctxt;
-	struct nl_ctxt *nl_ctxt;
+	struct sal_ctxt *sal_ctxt = NULL;
+	struct nl_ctxt *nl_ctxt = NULL;
 	int c;
 	int long_index = 0;
 
@@ -429,19 +488,22 @@ int main(int argc, char *argv[])
 	sal_ctxt = scs_tool_sal_init();
 	if (!sal_ctxt) {
 		PRINT("Unable to create SAL context");
-		goto done;
+		goto fail1;
 	}
 
 	nl_ctxt = scs_tool_nl_init();
 	if (!nl_ctxt) {
 		PRINT("Unable to create NL receive context");
-		goto done;
+		goto fail2;
 	}
 
 	while (1)
 		usleep(1000);
-done:
-	scs_tool_sal_exit(sal_ctxt);
-	scs_tool_nl_exit(nl_ctxt);
+fail2:
+	if (nl_ctxt)
+		scs_tool_nl_exit(nl_ctxt);
+fail1:
+	if (sal_ctxt)
+		scs_tool_sal_exit(sal_ctxt);
 	return 0;
 }
