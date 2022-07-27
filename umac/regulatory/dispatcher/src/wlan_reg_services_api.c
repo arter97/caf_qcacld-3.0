@@ -2013,6 +2013,12 @@ wlan_reg_get_num_afc_freq_obj(struct wlan_objmgr_pdev *pdev,
 {
 	return reg_get_num_afc_freq_obj(pdev, num_freq_obj);
 }
+
+QDF_STATUS wlan_reg_set_afc_power_event_received(struct wlan_objmgr_pdev *pdev,
+						 bool val)
+{
+	return reg_set_afc_power_event_received(pdev, val);
+}
 #endif
 
 #endif

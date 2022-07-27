@@ -2833,6 +2833,17 @@ wlan_reg_get_afc_freq_range_and_psd_limits(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS
 wlan_reg_get_num_afc_freq_obj(struct wlan_objmgr_pdev *pdev,
 			      uint8_t *num_freq_obj);
+
+/**
+ * wlan_reg_set_afc_power_event_received() - Set power event received flag with
+ * given val.
+ * @pdev: pdev pointer.
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_reg_set_afc_power_event_received(struct wlan_objmgr_pdev *pdev,
+						 bool val);
 #endif
 
 #else

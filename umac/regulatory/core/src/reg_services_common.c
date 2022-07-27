@@ -10356,3 +10356,20 @@ reg_get_num_afc_freq_obj(struct wlan_objmgr_pdev *pdev, uint8_t *num_freq_obj)
 #endif
 
 #endif
+
+#ifdef CONFIG_AFC_SUPPORT
+QDF_STATUS reg_set_afc_power_event_received(struct wlan_objmgr_pdev *pdev,
+					    bool val)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!pdev_priv_obj) {
+		reg_err("pdev priv obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	pdev_priv_obj->is_6g_afc_power_event_received = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

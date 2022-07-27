@@ -2958,6 +2958,17 @@ bool
 reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
 			qdf_freq_t freq,
 			enum supported_6g_pwr_types in_6ghz_pwr_mode);
+
+/**
+ * reg_set_afc_power_event_received() - Set power event received flag with
+ * given val.
+ * @pdev: pdev pointer.
+ * @val: value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS reg_set_afc_power_event_received(struct wlan_objmgr_pdev *pdev,
+					    bool val);
 #else
 static inline bool
 reg_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
@@ -2973,6 +2984,12 @@ reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
 			enum supported_6g_pwr_types in_6ghz_pwr_mode)
 {
 	return false;
+}
+
+static inline QDF_STATUS
+reg_set_afc_power_event_received(struct wlan_objmgr_pdev *pdev, bool val)
+{
+	return QDF_STATUS_E_FAILURE;
 }
 #endif
 
