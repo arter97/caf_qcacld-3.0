@@ -546,6 +546,16 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppeds_wlan_handle_t *ppeds_handle,
 		tx_desc->pdev = NULL;
 		tx_desc->nbuf = nbuf;
 
+		/*
+		 * If the skb is from recycler, then add the FAST flag in
+		 * the Tx descriptor so that at the skb's can be freed in
+		 * the batched mode rather than the conventional mode (freed
+		 * one at a time).
+		 */
+		if (nbuf->is_from_recycler) {
+			tx_desc->flags |= DP_TX_DESC_FLAG_FAST;
+		}
+
 		arr[i].opaque_lo = tx_desc->id;
 		arr[i].opaque_hi = 0;
 		arr[i].buff_addr = paddr;
