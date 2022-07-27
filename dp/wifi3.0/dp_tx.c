@@ -5169,7 +5169,12 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 							      desc->length,
 							      desc->tx_status,
 							      false);
-			qdf_nbuf_free(desc->nbuf);
+			nbuf = desc->nbuf;
+			if (qdf_likely(desc->flags & DP_TX_DESC_FLAG_FAST))
+				qdf_nbuf_dev_queue_head(&h, nbuf);
+			else
+				qdf_nbuf_free(nbuf);
+
 			dp_ppeds_tx_desc_free(soc, desc);
 			desc = next;
 			continue;
