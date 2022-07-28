@@ -82,7 +82,7 @@ ce_buffer_addr_hi_set(struct CE_src_desc *shadow_src_desc,
 		      uint32_t user_flags)
 {
 	shadow_src_desc->buffer_addr_hi =
-			(uint32_t)((dma_addr >> 32) & 0x1F);
+		(uint32_t)((dma_addr >> 32) & CE_RING_BASE_ADDR_HIGH_MASK);
 	user_flags |= shadow_src_desc->buffer_addr_hi;
 	memcpy(&(((uint32_t *)shadow_src_desc)[1]), &user_flags,
 	       sizeof(uint32_t));
@@ -560,9 +560,11 @@ ce_send_nolock_legacy(struct CE_handle *copyeng,
 		/* Update low 32 bits source descriptor address */
 		shadow_src_desc->buffer_addr =
 			(uint32_t)(dma_addr & 0xFFFFFFFF);
+
 #ifdef QCA_WIFI_3_0
 		shadow_src_desc->buffer_addr_hi =
-			(uint32_t)((dma_addr >> 32) & 0x1F);
+			(uint32_t)((dma_addr >> 32) &
+				   CE_RING_BASE_ADDR_HIGH_MASK);
 		user_flags |= shadow_src_desc->buffer_addr_hi;
 		memcpy(&(((uint32_t *)shadow_src_desc)[1]), &user_flags,
 		       sizeof(uint32_t));
@@ -739,7 +741,8 @@ ce_recv_buf_enqueue_legacy(struct CE_handle *copyeng,
 		dest_desc->buffer_addr = (uint32_t)(dma_addr & 0xFFFFFFFF);
 #ifdef QCA_WIFI_3_0
 		dest_desc->buffer_addr_hi =
-			(uint32_t)((dma_addr >> 32) & 0x1F);
+			(uint32_t)((dma_addr >> 32) &
+				   CE_RING_BASE_ADDR_HIGH_MASK);
 #endif
 		dest_desc->nbytes = 0;
 
@@ -1140,8 +1143,9 @@ static void ce_legacy_src_ring_setup(struct hif_softc *scn, uint32_t ce_id,
 
 		tmp = CE_SRC_RING_BASE_ADDR_HIGH_GET(
 				scn, ctrl_addr);
-		tmp &= ~0x1F;
-		dma_addr = ((dma_addr >> 32) & 0x1F) | tmp;
+		tmp &= ~CE_RING_BASE_ADDR_HIGH_MASK;
+		dma_addr =
+			((dma_addr >> 32) & CE_RING_BASE_ADDR_HIGH_MASK) | tmp;
 		CE_SRC_RING_BASE_ADDR_HIGH_SET(scn,
 					ctrl_addr, (uint32_t)dma_addr);
 	}
@@ -1178,8 +1182,9 @@ static void ce_legacy_dest_ring_setup(struct hif_softc *scn, uint32_t ce_id,
 
 		tmp = CE_DEST_RING_BASE_ADDR_HIGH_GET(scn,
 						      ctrl_addr);
-		tmp &= ~0x1F;
-		dma_addr = ((dma_addr >> 32) & 0x1F) | tmp;
+		tmp &= ~CE_RING_BASE_ADDR_HIGH_MASK;
+		dma_addr =
+			((dma_addr >> 32) & CE_RING_BASE_ADDR_HIGH_MASK) | tmp;
 		CE_DEST_RING_BASE_ADDR_HIGH_SET(scn,
 				ctrl_addr, (uint32_t)dma_addr);
 	}

@@ -328,6 +328,12 @@ unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
 	A_TARGET_READ(scn, (CE_ctrl_addr) + CURRENT_SRRI_ADDRESS)
 #endif
 
+#ifdef WLAN_40BIT_ADDRESSING_SUPPORT
+#define CE_RING_BASE_ADDR_HIGH_MASK 0xFF
+#else
+#define CE_RING_BASE_ADDR_HIGH_MASK 0x1F
+#endif
+
 #define CE_SRC_RING_BASE_ADDR_SET(scn, CE_ctrl_addr, addr) \
 	A_TARGET_WRITE(scn, (CE_ctrl_addr) + SR_BA_ADDRESS, (addr))
 
