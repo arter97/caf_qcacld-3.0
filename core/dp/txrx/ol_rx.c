@@ -2024,7 +2024,7 @@ void ol_rx_cfr_capture_msg_handler(qdf_nbuf_t htt_t2h_msg)
 		ol_txrx_err("Invalid req id in cfr capture msg");
 		return;
 	}
-	cfr_hdr.start_magic_num = 0xDEADBEAF;
+	cfr_hdr.cmn.start_magic_num = 0xDEADBEAF;
 	cfr_hdr.u.meta_v1.status = HTT_T2H_CFR_DUMP_TYPE1_STATUS_GET(
 					*msg_word);
 	cfr_hdr.u.meta_v1.capture_bw = HTT_T2H_CFR_DUMP_TYPE1_CAP_BW_GET(

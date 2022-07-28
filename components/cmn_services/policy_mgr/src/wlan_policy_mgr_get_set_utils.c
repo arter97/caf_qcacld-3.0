@@ -988,7 +988,7 @@ policy_mgr_update_mac_freq_info(struct wlan_objmgr_psoc *psoc,
 	case WMI_HW_MODE_DBS_2G_5G:
 		if (!policy_mgr_both_phy_range_updated(pm_ctx, MODE_DBS))
 			policy_mgr_update_freq_info(pm_ctx, mac_cap,
-				MODE_DBS, phy_id);
+						    MODE_DBS, phy_id);
 		break;
 	case WMI_HW_MODE_DBS_SBS:
 	case WMI_HW_MODE_DBS_OR_SBS:
