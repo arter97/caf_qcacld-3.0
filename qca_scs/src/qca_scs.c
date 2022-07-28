@@ -17,8 +17,11 @@
  */
 
 #include <qdf_module.h>
-#include <ol_if_athvar.h>
 #include "qca_scs_if.h"
+
+#ifdef WLAN_SUPPORT_SCS
+
+#include <ol_if_athvar.h>
 
 #define QCA_SCS_RULE_SOC_ID_MASK  0xF0000000
 #define QCA_SCS_RULE_SOC_ID_SHIFT 28
@@ -64,5 +67,11 @@ bool qca_scs_peer_lookup_n_rule_match(uint32_t rule_id, uint8_t *dst_mac_addr)
 	return cdp_scs_peer_lookup_n_rule_match(soc_txrx_handle, rule_id,
 						dst_mac_addr);
 }
+#else
+bool qca_scs_peer_lookup_n_rule_match(uint32_t rule_id, uint8_t *dst_mac_addr)
+{
+	return false;
+}
+#endif
 
 qdf_export_symbol(qca_scs_peer_lookup_n_rule_match);
