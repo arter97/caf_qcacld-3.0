@@ -32,6 +32,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 extern ol_ath_soc_softc_t *ol_global_soc[GLOBAL_SOC_SIZE];
 extern int ol_num_global_soc;
+extern unsigned int is_monitor_installed;
 #ifdef ATH_AHB
 extern int wifi_exit_in_progress;
 #endif
@@ -182,6 +183,8 @@ int monitor_mod_init(void)
 		dp_mon_register_intr_ops(soc);
 		dp_mon_cdp_ops_register(soc);
 	}
+
+	is_monitor_installed = 1;
 	return 0;
 }
 
@@ -209,6 +212,7 @@ void monitor_mod_exit(void)
 	struct dp_mon_ops *mon_ops;
 	ol_ath_soc_softc_t *temp_soc = NULL;
 
+	is_monitor_installed = 0;
 	for (index = 0; index < ol_num_global_soc; index++) {
 		temp_soc = ol_global_soc[index];
 		if (!temp_soc)
