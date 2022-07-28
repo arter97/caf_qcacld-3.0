@@ -44,7 +44,6 @@
 #include "wlan_ipa_ucfg_api.h"
 #include "wlan_dp_ucfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
-#include "wlan_mlme_twt_ucfg_api.h"
 #include <wma_types.h>
 #include "wlan_hdd_sta_info.h"
 #include "ol_defines.h"
@@ -56,6 +55,8 @@
 #include <net/llc_pdu.h>
 #endif
 #include <os_if_dp.h>
+#include <cfg_ucfg_api.h>
+#include <wlan_twt_ucfg_ext_api.h>
 
 /* Preprocessor definitions and constants */
 #undef QCA_HDD_SAP_DUMP_SK_BUFF
@@ -646,8 +647,8 @@ QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
 					     WLAN_CONTROL_PATH);
 	}
 	ucfg_mlme_update_oce_flags(hdd_ctx->pdev);
-	ucfg_mlme_init_twt_context(hdd_ctx->psoc, sta_mac,
-				   TWT_ALL_SESSIONS_DIALOG_ID);
+	ucfg_twt_init_context(hdd_ctx->psoc, sta_mac,
+			      TWT_ALL_SESSIONS_DIALOG_ID);
 	return qdf_status;
 }
 
