@@ -4336,8 +4336,8 @@ static void dp_pdev_deinit(struct cdp_pdev *txrx_pdev, int force)
 	dp_tx_me_exit(pdev);
 	dp_rx_fst_detach(pdev->soc, pdev);
 	dp_rx_pdev_mon_buffers_free(pdev);
-	dp_rx_pdev_buffers_free(pdev);
 	dp_rx_pdev_mon_desc_pool_deinit(pdev);
+	dp_rx_pdev_buffers_free(pdev);
 	dp_rx_pdev_desc_pool_deinit(pdev);
 	dp_pdev_bkp_stats_detach(pdev);
 	dp_htt_ppdu_stats_detach(pdev);
@@ -13600,10 +13600,11 @@ static inline QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 
 	/* initialize sw rx descriptors */
 	dp_rx_pdev_desc_pool_init(pdev);
-	/* initialize sw monitor rx descriptors */
-	dp_rx_pdev_mon_desc_pool_init(pdev);
 	/* allocate buffers and replenish the RxDMA ring */
 	dp_rx_pdev_buffers_alloc(pdev);
+
+	/* initialize sw monitor rx descriptors */
+	dp_rx_pdev_mon_desc_pool_init(pdev);
 	/* allocate buffers and replenish the monitor RxDMA ring */
 	dp_rx_pdev_mon_buffers_alloc(pdev);
 

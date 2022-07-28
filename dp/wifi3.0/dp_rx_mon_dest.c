@@ -1804,6 +1804,9 @@ dp_rx_pdev_mon_buf_desc_pool_deinit(struct dp_pdev *pdev, uint32_t mac_id)
 
 	/* Detach full monitor mode resources */
 	dp_full_mon_detach(pdev);
+
+	/* Disable frag processing if feature is enabled */
+	dp_rx_enable_mon_dest_frag(rx_desc_pool, false);
 }
 
 static void
