@@ -34,6 +34,10 @@
 #define SCS_ATTR_CLASSIFIER_TYPE_TCLAS4      4
 #define SCS_ATTR_CLASSIFIER_TYPE_TCLAS10     10
 
+#define SCS_FILTER_ATTR_LEN_MIN              4
+#define SCS_FILTER_ATTR_LEN_MAX              12
+#define SCS_TCLAS10_SPI_SIZE                 4
+
 enum scs_rule_config_request {
 	SCS_RULE_CONFIG_REQUEST_TYPE_ADD,
 	SCS_RULE_CONFIG_REQUEST_TYPE_REMOVE,
@@ -124,15 +128,23 @@ static void scs_tool_get_flow_label(void *data, uint8_t *flow_label)
 	memcpy(flow_label, data, SCS_ATTR_FLOW_LABEL_LENGTH);
 }
 
-static void scs_tool_get_filter_attr(void *data, uint32_t *attr_val)
+static void scs_tool_get_filter_attr(void *data, size_t len, uint32_t *attr_val)
 {
 	uint32_t val;
+	uint8_t spi_idx;
+
+	if (len < SCS_FILTER_ATTR_LEN_MIN || len > SCS_FILTER_ATTR_LEN_MAX) {
+		PRINT_IF_VERB("Invalid attribute length %zu", len);
+		return;
+	}
+
+	spi_idx = len - SCS_TCLAS10_SPI_SIZE;
 
 	/*
 	 * SCS classifier in ECM supports SPI rule match only.
-	 * Copy LSB 4 bytes of Filter value and mask buffer for SPI
+	 * Copy MSB 4 bytes of Filter value and mask buffer for SPI
 	 */
-	memcpy(&val, data, sizeof(val));
+	memcpy(&val, data + spi_idx, sizeof(val));
 
 	val = htonl(val);
 
@@ -358,7 +370,8 @@ parse_tclas10:
 
 	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_TCLAS10_FILTER_MASK];
 	if (tb) {
-		scs_tool_get_filter_attr(nla_data(tb), &rule->filter_mask);
+		scs_tool_get_filter_attr(nla_data(tb), nla_len(tb),
+					 &rule->filter_mask);
 		rule->flags |= SP_RULE_FLAG_MATCH_SPI;
 		PRINT_IF_VERB("Filter Mask: %x", rule->filter_mask);
 	}
@@ -366,7 +379,8 @@ parse_tclas10:
 	tb = tb_array[
 		QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_TCLAS10_FILTER_VALUE];
 	if (tb) {
-		scs_tool_get_filter_attr(nla_data(tb), &rule->filter_value);
+		scs_tool_get_filter_attr(nla_data(tb), nla_len(tb),
+					 &rule->filter_value);
 		rule->flags |= SP_RULE_FLAG_MATCH_SPI;
 		PRINT_IF_VERB("Filter Value: %x", rule->filter_value);
 	}
