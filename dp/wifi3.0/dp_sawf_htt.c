@@ -250,6 +250,10 @@ dp_htt_h2t_sawf_def_queues_map_report_req(struct htt_soc *soc,
 	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_SAWF_DEF_QUEUES_MAP_REPORT_REQ);
 	HTT_RX_SAWF_DEF_QUEUES_MAP_REPORT_REQ_TID_MASK_SET(*msg_word, tid_mask);
 	HTT_RX_SAWF_DEF_QUEUES_MAP_REPORT_REQ_PEER_ID_SET(*msg_word, peer_id);
+	msg_word++;
+	*msg_word = 0;
+	HTT_RX_SAWF_DEF_QUEUES_MAP_REPORT_REQ_EXISTING_TIDS_ONLY_SET(*msg_word,
+								     0);
 
 	pkt = htt_htc_pkt_alloc(soc);
 	if (!pkt) {
