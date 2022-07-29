@@ -1441,6 +1441,8 @@ static struct mon_ops monitor_ops = {
 #ifdef QCA_SUPPORT_LITE_MONITOR
 	.mon_cfg80211_lite_monitor_config =
 		wlan_cfg80211_lite_monitor_config,
+	.mon_set_lite_monitor_config = wlan_set_lite_monitor_config,
+	.mon_get_lite_monitor_config = wlan_get_lite_monitor_config,
 #endif /* QCA_SUPPORT_LITE_MONITOR */
 };
 
