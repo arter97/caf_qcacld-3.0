@@ -123,7 +123,11 @@ int initialize_cfr_dump_file(char *iface)
 	if (tm_val) {
 		strftime(time, 50, "%Y_%m_%d_%T", tm_val);
 		snprintf(filename, sizeof(filename), CFR_DUMP_FILE, iface, time);
+#ifdef QCA_GCC7_0_SUPPORT
+		fd = open(filename, O_WRONLY | O_CREAT, 0600);
+#else
 		fd = open(filename, O_WRONLY | O_CREAT);
+#endif
 	} else {
 		perror("Unable to get time value to generate filename \n");
 	}
