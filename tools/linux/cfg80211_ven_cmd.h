@@ -820,6 +820,9 @@ enum {
 	IEEE80211_PARAM_ML_PROBE_REQ      = 781,  /* Param to set ML probe request configuration */
 	IEEE80211_PARAM_PURE11AX          = 782,  /* pure 11ax (no 11bg, 11a, 11n or 11ac clients */
 	IEEE80211_PARAM_SCS_RULES         = 783,  /* Get SCS rules */
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_EHT_LTF           = 784,   /* Set 11be - EHT LTF Support */
+#endif
 };
 
 enum {
@@ -2463,6 +2466,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_ul_mcs",       IEEE80211_PARAM_EHT_UL_FIXED_RATE, GET_PARAM, 0},
 	{"eht_ul_ltf",           IEEE80211_PARAM_EHT_UL_LTF, SET_PARAM, 1},
 	{"get_eht_ul_ltf",       IEEE80211_PARAM_EHT_UL_LTF, GET_PARAM, 0},
+	{"eht_ltf",              IEEE80211_PARAM_EHT_LTF, SET_PARAM, 1},
+	{"get_eht_ltf",          IEEE80211_PARAM_EHT_LTF, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 	{"pure11ax",            IEEE80211_PARAM_PURE11AX, SET_PARAM, 1},
 	{"get_pure11ax",        IEEE80211_PARAM_PURE11AX, GET_PARAM, 0},
