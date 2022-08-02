@@ -128,22 +128,30 @@ dp_lite_mon_update_config(struct dp_pdev *pdev,
 		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_MO])
 			curr_config->mo_enabled = true;
 
+		if (new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_FP_MO] ||
+		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_FP_MO] ||
+		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_FP_MO])
+			curr_config->fpmo_enabled = true;
+
 		/* set appropriate lengths */
 		if (new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_FP] ||
 		    new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_MD] ||
-		    new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_MO])
+		    new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_MO] ||
+		    new_config->mgmt_filter[DP_MON_FRM_FILTER_MODE_FP_MO])
 			curr_config->len[WLAN_FC0_TYPE_MGMT] =
 				new_config->len[WLAN_FC0_TYPE_MGMT];
 
 		if (new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_FP] ||
 		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_MD] ||
-		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_MO])
+		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_MO] ||
+		    new_config->ctrl_filter[DP_MON_FRM_FILTER_MODE_FP_MO])
 			curr_config->len[WLAN_FC0_TYPE_CTRL] =
 				new_config->len[WLAN_FC0_TYPE_CTRL];
 
 		if (new_config->data_filter[DP_MON_FRM_FILTER_MODE_FP] ||
 		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_MD] ||
-		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_MO])
+		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_MO] ||
+		    new_config->data_filter[DP_MON_FRM_FILTER_MODE_FP_MO])
 			curr_config->len[WLAN_FC0_TYPE_DATA] =
 				new_config->len[WLAN_FC0_TYPE_DATA];
 
