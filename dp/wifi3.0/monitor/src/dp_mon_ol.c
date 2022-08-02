@@ -668,6 +668,11 @@ static int ol_set_lite_mode(struct ol_ath_softc_net80211 *scn,
 	cdp_config_param_type val = {0};
 	struct ieee80211com *ic = &scn->sc_ic;
 
+	if (ic->ic_monitor_version == MONITOR_VERSION_2) {
+		dp_mon_err("cmd not supported");
+		return -EINVAL;
+	}
+
 	val.cdp_pdev_param_en_tx_cap = value;
 	if (QDF_STATUS_SUCCESS !=
 	    cdp_txrx_set_pdev_param(soc_txrx_handle, pdev_id,
