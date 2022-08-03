@@ -69,34 +69,6 @@ void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 	pdev->reo_proto_tag_stats[ring_index][protocol_index].tag_ctr++;
 }
 
-/* dp_mon_rx_update_rx_protocol_tag_stats() - Update mon protocols's
- *					      statistics
- * @pdev: pdev handle
- * @protocol_index: Protocol index for which the stats should be incremented
- * @ring_index: REO ring number from which this tag was received.
- *
- * Return: void
- */
-#if QCA_TEST_MON_PF_TAGS_STATS
-void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
-					    uint16_t protocol_index,
-					    uint16_t ring_index)
-{
-	if (ring_index >= MAX_REO_DEST_RINGS) {
-		dp_err("Ring Index: %d exceeds Max Number of dest rings",
-		       ring_index);
-		return;
-	}
-
-	pdev->reo_proto_tag_stats[ring_index][protocol_index].mon_tag_ctr++;
-}
-#else
-void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
-					    uint16_t protocol_index,
-					    uint16_t ring_index)
-{
-}
-#endif
 #else
 void dp_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 					uint16_t protocol_index,
@@ -126,27 +98,6 @@ void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
 	pdev->rx_err_proto_tag_stats[protocol_index].tag_ctr++;
 }
 
-/* dp_mon_rx_update_rx_protocol_tag_stats() - Update mon protocols's
- *					      statistics from given protocol
- *					      type
- * @pdev: pdev handle
- * @pdev: TXRX pdev context for which stats should be incremented
- * @protocol_index: Protocol index for which the stats should be incremented
- *
- * Return: void
- */
-#if QCA_TEST_MON_PF_TAGS_STATS
-void dp_mon_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
-						uint16_t protocol_index)
-{
-	pdev->rx_err_proto_tag_stats[protocol_index].mon_tag_ctr++;
-}
-#else
-void dp_mon_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
-						uint16_t protocol_index)
-{
-}
-#endif
 #else
 void dp_rx_update_rx_err_protocol_tag_stats(struct dp_pdev *pdev,
 					    uint16_t protocol_index)
@@ -513,10 +464,16 @@ uint64_t dp_summarize_tag_stats(struct dp_pdev *pdev,
 		pdev->reo_proto_tag_stats[ring_idx][protocol_type].tag_ctr;
 	}
 	total_tag_cnt += pdev->rx_err_proto_tag_stats[protocol_type].tag_ctr;
+	DP_PRINT_STATS("Data Path...");
 	DP_PRINT_STATS("ProtoID: %d, Tag: %u Tagged MSDU cnt: %llu",
 		       protocol_type,
 		       pdev->rx_proto_tag_map[protocol_type].tag,
 		       total_tag_cnt);
+	DP_PRINT_STATS("Monitor Path...");
+	DP_PRINT_STATS("ProtoID: %d, Tag: %u Tagged MSDU cnt: %llu",
+		       protocol_type,
+		       pdev->rx_proto_tag_map[protocol_type].tag,
+		       pdev->mon_proto_tag_stats[protocol_type].tag_ctr);
 	return total_tag_cnt;
 }
 
@@ -569,6 +526,7 @@ __dp_reset_pdev_rx_protocol_tag_stats(struct dp_pdev *pdev,
 	for (ring_idx = 0; ring_idx < MAX_REO_DEST_RINGS; ring_idx++)
 		pdev->reo_proto_tag_stats[ring_idx][protocol_type].tag_ctr = 0;
 	pdev->rx_err_proto_tag_stats[protocol_type].tag_ctr = 0;
+	pdev->mon_proto_tag_stats[protocol_type].tag_ctr = 0;
 }
 #else
 static void
@@ -739,6 +697,7 @@ dp_dump_rx_flow_tag_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 		       flow_info->flow_tuple_info.src_port,
 		       flow_info->flow_tuple_info.l4_protocol);
 	DP_PRINT_STATS("MSDU Count: %u", stats.msdu_count);
+	DP_PRINT_STATS("MON MSDU Count: %u", stats.mon_msdu_count);
 
 	return status;
 }
