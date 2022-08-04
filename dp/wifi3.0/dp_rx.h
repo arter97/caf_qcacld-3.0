@@ -44,6 +44,18 @@
 #define DP_DEFRAG_RBM(sw0_bm_id)	HAL_RX_BUF_RBM_SW3_BM(sw0_bm_id)
 #endif
 
+/* Max buffer in invalid peer SG list*/
+#define DP_MAX_INVALID_BUFFERS 10
+#ifdef DP_INVALID_PEER_ASSERT
+#define DP_PDEV_INVALID_PEER_MSDU_CHECK(head, tail) \
+		do {                                \
+			qdf_assert_always(!(head)); \
+			qdf_assert_always(!(tail)); \
+		} while (0)
+#else
+#define DP_PDEV_INVALID_PEER_MSDU_CHECK(head, tail) /* no op */
+#endif
+
 #define RX_BUFFER_RESERVATION   0
 #ifdef BE_PKTLOG_SUPPORT
 #define BUFFER_RESIDUE 1

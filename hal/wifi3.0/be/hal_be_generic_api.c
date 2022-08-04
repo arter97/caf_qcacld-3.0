@@ -970,7 +970,9 @@ void hal_hw_txrx_default_ops_attach_be(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_reset_rx_reo_tid_q = hal_reset_rx_reo_tid_q_be;
 #endif
 	hal_soc->ops->hal_rx_tlv_get_pn_num = hal_rx_tlv_get_pn_num_be;
+#ifndef CONFIG_WORD_BASED_TLV
 	hal_soc->ops->hal_rx_get_qdesc_addr = hal_rx_get_qdesc_addr_be;
+#endif
 	hal_soc->ops->hal_set_reo_ent_desc_reo_dest_ind =
 					hal_set_reo_ent_desc_reo_dest_ind_be;
 	hal_soc->ops->hal_get_reo_ent_desc_qdesc_addr =

@@ -1925,6 +1925,8 @@ struct dp_arch_ops {
 				    uint8_t bm_id);
 	uint16_t (*dp_rx_peer_metadata_peer_id_get)(struct dp_soc *soc,
 						    uint32_t peer_metadata);
+	bool (*dp_rx_chain_msdus)(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				  uint8_t *rx_tlv_hdr, uint8_t mac_id);
 	/* Control Arch Ops */
 	QDF_STATUS (*txrx_set_vdev_param)(struct dp_soc *soc,
 					  struct dp_vdev *vdev,

@@ -81,6 +81,20 @@ uint32_t dp_rx_process_be(struct dp_intr *int_ctx,
 			  uint32_t quota);
 
 /**
+ * dp_rx_chain_msdus_be() - Function to chain all msdus of a mpdu
+ *			    to pdev invalid peer list
+ *
+ * @soc: core DP main context
+ * @nbuf: Buffer pointer
+ * @rx_tlv_hdr: start of rx tlv header
+ * @mac_id: mac id
+ *
+ *  Return: bool: true for last msdu of mpdu
+ */
+bool dp_rx_chain_msdus_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			  uint8_t *rx_tlv_hdr, uint8_t mac_id);
+
+/**
  * dp_rx_desc_pool_init_be() - Initialize Rx Descriptor pool(s)
  * @soc: Handle to DP Soc structure
  * @rx_desc_pool: Rx descriptor pool handler
