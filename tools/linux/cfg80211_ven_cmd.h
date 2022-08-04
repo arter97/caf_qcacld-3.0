@@ -823,6 +823,7 @@ enum {
 #ifdef WLAN_FEATURE_11BE
 	IEEE80211_PARAM_EHT_LTF           = 784,   /* Set 11be - EHT LTF Support */
 #endif
+	IEEE80211_PARAM_UPTIME            = 785,  /* Get VAP uptime */
 };
 
 enum {
