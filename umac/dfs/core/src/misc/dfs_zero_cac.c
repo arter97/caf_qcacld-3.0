@@ -1284,10 +1284,8 @@ dfs_precac_timeout(qdf_hrtimer_data_t *arg)
 {
 	struct dfs_soc_priv_obj *dfs_soc_obj = NULL;
 	uint32_t current_time;
-	void *ptr = (void *)arg;
-	qdf_hrtimer_data_t *thr = container_of(ptr, qdf_hrtimer_data_t, u);
 
-	dfs_soc_obj = container_of(thr,
+	dfs_soc_obj = container_of(arg,
 				   struct dfs_soc_priv_obj,
 				   dfs_precac_timer);
 	current_time = qdf_system_ticks_to_msecs(qdf_system_ticks());
