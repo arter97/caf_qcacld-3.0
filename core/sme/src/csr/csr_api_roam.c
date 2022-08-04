@@ -58,6 +58,7 @@
 #include "wlan_mlme_main.h"
 #include "wlan_pkt_capture_ucfg_api.h"
 
+#define RSN_AUTH_KEY_MGMT_SAE           WLAN_RSN_SEL(WLAN_AKM_SAE)
 #define MAX_PWR_FCC_CHAN_12 8
 #define MAX_PWR_FCC_CHAN_13 2
 
@@ -1501,6 +1502,7 @@ QDF_STATUS csr_roam_copy_connect_profile(tpAniSirGlobal pMac,
 		}
 		connected_prof = &(pSession->connectedProfile);
 		pProfile->AuthType = connected_prof->AuthType;
+		pProfile->akm_list = connected_prof->akm_list;
 		pProfile->EncryptionType = connected_prof->EncryptionType;
 		pProfile->mcEncryptionType = connected_prof->mcEncryptionType;
 		pProfile->BSSType = connected_prof->BSSType;
@@ -8648,6 +8650,7 @@ QDF_STATUS csr_roam_copy_profile(tpAniSirGlobal pMac,
 			pSrcProfile->ChannelInfo.numOfChannels);
 	}
 	pDstProfile->AuthType = pSrcProfile->AuthType;
+	pDstProfile->akm_list = pSrcProfile->akm_list;
 	pDstProfile->EncryptionType = pSrcProfile->EncryptionType;
 	pDstProfile->mcEncryptionType = pSrcProfile->mcEncryptionType;
 	pDstProfile->negotiatedUCEncryptionType =
@@ -8805,6 +8808,7 @@ QDF_STATUS csr_roam_copy_connected_profile(tpAniSirGlobal pMac,
 	pDstProfile->AuthType.numEntries = 1;
 	pDstProfile->AuthType.authType[0] = pSrcProfile->AuthType;
 	pDstProfile->negotiatedAuthType = pSrcProfile->AuthType;
+	pDstProfile->akm_list = pSrcProfile->akm_list;
 	pDstProfile->EncryptionType.numEntries = 1;
 	pDstProfile->EncryptionType.encryptionType[0] =
 		pSrcProfile->EncryptionType;
@@ -9759,6 +9763,7 @@ QDF_STATUS csr_roam_save_connected_information(tpAniSirGlobal pMac,
 				sizeof(tCsrRoamConnectedProfile));
 		pConnectProfile->AuthType = pProfile->negotiatedAuthType;
 		pConnectProfile->AuthInfo = pProfile->AuthType;
+		pConnectProfile->akm_list = pProfile->akm_list;
 		pConnectProfile->EncryptionType =
 			pProfile->negotiatedUCEncryptionType;
 		pConnectProfile->EncryptionInfo = pProfile->EncryptionType;
@@ -11028,14 +11033,11 @@ void csr_roam_joined_state_msg_processor(tpAniSirGlobal pMac, void *pMsgBuf)
 	{
 		struct csr_roam_session *pSession;
 		tSirSmeAssocIndToUpperLayerCnf *pUpperLayerAssocCnf;
-		struct csr_roam_info roamInfo;
 		struct csr_roam_info *roam_info = NULL;
 		uint32_t sessionId;
 		QDF_STATUS status;
 
 		sme_debug("ASSOCIATION confirmation can be given to upper layer ");
-		qdf_mem_zero(&roamInfo, sizeof(struct csr_roam_info));
-		roam_info = &roamInfo;
 		pUpperLayerAssocCnf =
 			(tSirSmeAssocIndToUpperLayerCnf *) pMsgBuf;
 		status = csr_roam_get_session_id_from_bssid(pMac,
@@ -11046,6 +11048,16 @@ void csr_roam_joined_state_msg_processor(tpAniSirGlobal pMac, void *pMsgBuf)
 
 		if (!pSession) {
 			sme_err("session %d not found", sessionId);
+			 if (pUpperLayerAssocCnf->ies)
+				 qdf_mem_free(pUpperLayerAssocCnf->ies);
+			return;
+		}
+
+		roam_info = qdf_mem_malloc(sizeof(*roam_info));
+		if (!roam_info) {
+			sme_err("roam_info not allocated");
+			if (pUpperLayerAssocCnf->ies)
+				 qdf_mem_free(pUpperLayerAssocCnf->ies);
 			return;
 		}
 		/* send the status code as Success */
@@ -11102,6 +11114,12 @@ void csr_roam_joined_state_msg_processor(tpAniSirGlobal pMac, void *pMsgBuf)
 					pUpperLayerAssocCnf->he_caps_present;
 
 		if (CSR_IS_INFRA_AP(roam_info->u.pConnectedProfile)) {
+			if (pUpperLayerAssocCnf->ies_len > 0) {
+				roam_info->assocReqLength =
+						pUpperLayerAssocCnf->ies_len;
+				roam_info->assocReqPtr =
+						pUpperLayerAssocCnf->ies;
+			}
 			pMac->roam.roamSession[sessionId].connectState =
 				eCSR_ASSOC_STATE_TYPE_INFRA_CONNECTED;
 			roam_info->fReassocReq =
@@ -11111,6 +11129,9 @@ void csr_roam_joined_state_msg_processor(tpAniSirGlobal pMac, void *pMsgBuf)
 						       eCSR_ROAM_INFRA_IND,
 					eCSR_ROAM_RESULT_INFRA_ASSOCIATION_CNF);
 		}
+		if (pUpperLayerAssocCnf->ies)
+			 qdf_mem_free(pUpperLayerAssocCnf->ies);
+		qdf_mem_free(roam_info);
 	}
 	break;
 	default:
@@ -11921,6 +11942,127 @@ static QDF_STATUS csr_send_reset_ap_caps_changed(tpAniSirGlobal pMac,
 	return status;
 }
 
+static eCsrAuthType csr_translate_akm_type(enum ani_akm_type akm_type)
+{
+	eCsrAuthType csr_akm_type;
+
+	switch (akm_type) {
+	case ANI_AKM_TYPE_NONE:
+		csr_akm_type = eCSR_AUTH_TYPE_NONE;
+		break;
+#ifdef WLAN_FEATURE_SAE
+	case ANI_AKM_TYPE_SAE:
+		csr_akm_type = eCSR_AUTH_TYPE_SAE;
+		break;
+#endif
+	case ANI_AKM_TYPE_WPA:
+		csr_akm_type = eCSR_AUTH_TYPE_WPA;
+		break;
+	case ANI_AKM_TYPE_WPA_PSK:
+		csr_akm_type = eCSR_AUTH_TYPE_WPA_PSK;
+		break;
+	case ANI_AKM_TYPE_RSN:
+		csr_akm_type = eCSR_AUTH_TYPE_RSN;
+		break;
+	case ANI_AKM_TYPE_RSN_PSK:
+		csr_akm_type = eCSR_AUTH_TYPE_RSN_PSK;
+		break;
+	case ANI_AKM_TYPE_FT_RSN:
+		csr_akm_type = eCSR_AUTH_TYPE_FT_RSN;
+		break;
+	case ANI_AKM_TYPE_FT_RSN_PSK:
+		csr_akm_type = eCSR_AUTH_TYPE_FT_RSN_PSK;
+		break;
+#ifdef FEATURE_WLAN_ESE
+	case ANI_AKM_TYPE_CCKM:
+		csr_akm_type = eCSR_AUTH_TYPE_CCKM_RSN;
+		break;
+#endif
+	case ANI_AKM_TYPE_RSN_PSK_SHA256:
+		csr_akm_type = eCSR_AUTH_TYPE_RSN_PSK_SHA256;
+		break;
+	case ANI_AKM_TYPE_RSN_8021X_SHA256:
+		csr_akm_type = eCSR_AUTH_TYPE_RSN_8021X_SHA256;
+		break;
+	case ANI_AKM_TYPE_FILS_SHA256:
+		csr_akm_type = eCSR_AUTH_TYPE_FILS_SHA256;
+		break;
+	case ANI_AKM_TYPE_FILS_SHA384:
+		csr_akm_type = eCSR_AUTH_TYPE_FILS_SHA384;
+		break;
+	case ANI_AKM_TYPE_FT_FILS_SHA256:
+		csr_akm_type = eCSR_AUTH_TYPE_FT_FILS_SHA256;
+		break;
+	case ANI_AKM_TYPE_FT_FILS_SHA384:
+		csr_akm_type = eCSR_AUTH_TYPE_FT_FILS_SHA384;
+		break;
+	case ANI_AKM_TYPE_DPP_RSN:
+		csr_akm_type = eCSR_AUTH_TYPE_DPP_RSN;
+		break;
+	case ANI_AKM_TYPE_OWE:
+		csr_akm_type = eCSR_AUTH_TYPE_OWE;
+		break;
+	case ANI_AKM_TYPE_SUITEB_EAP_SHA256:
+		csr_akm_type = eCSR_AUTH_TYPE_SUITEB_EAP_SHA256;
+		break;
+	case ANI_AKM_TYPE_SUITEB_EAP_SHA384:
+		csr_akm_type = eCSR_AUTH_TYPE_SUITEB_EAP_SHA384;
+		break;
+	default:
+		csr_akm_type = eCSR_AUTH_TYPE_UNKNOWN;
+	}
+
+	return csr_akm_type;
+}
+
+static bool csr_is_sae_akm_present(tDot11fIERSN * const rsn_ie)
+{
+	uint16_t i;
+
+	if (rsn_ie->akm_suite_cnt > 6) {
+		sme_debug("Invalid akm_suite_cnt in Rx RSN IE");
+		return false;
+	}
+
+	for (i = 0; i < rsn_ie->akm_suite_cnt; i++) {
+		if (LE_READ_4(rsn_ie->akm_suite[i]) == RSN_AUTH_KEY_MGMT_SAE) {
+			sme_debug("SAE AKM present");
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool csr_is_sae_peer_allowed(tpAniSirGlobal mac_ctx,
+				    tSirSmeAssocInd *assoc_ind,
+				    struct csr_roam_session *session,
+				    tSirMacAddr peer_mac_addr,
+				    tDot11fIERSN *rsn_ie,
+				    tSirMacStatusCodes *mac_status_code)
+{
+	bool is_allowed = false;
+
+	/* Allow the peer if it's SAE authenticated */
+	if (assoc_ind->is_sae_authenticated)
+		return true;
+
+	/* Allow the peer with valid PMKID */
+	if (!rsn_ie->pmkid_count) {
+		*mac_status_code = eSIR_MAC_AUTH_ALGO_NOT_SUPPORTED_STATUS;
+		sme_debug("No PMKID present in RSNIE; Tried to use SAE AKM after non-SAE authentication");
+	} else if (csr_is_pmkid_found_for_peer(mac_ctx, session, peer_mac_addr,
+					       &rsn_ie->pmkid[0][0],
+					       rsn_ie->pmkid_count)) {
+		sme_debug("Valid PMKID found for SAE peer");
+		is_allowed = true;
+	} else {
+		*mac_status_code = eSIR_MAC_INVALID_PMKID;
+		sme_debug("No valid PMKID found for SAE peer");
+	}
+
+	return is_allowed;
+}
+
 static void
 csr_roam_chk_lnk_assoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 {
@@ -11930,6 +12072,8 @@ csr_roam_chk_lnk_assoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 	struct csr_roam_info *roam_info_ptr = NULL;
 	tSirSmeAssocInd *pAssocInd;
 	struct csr_roam_info roam_info;
+	tSirMacStatusCodes mac_status_code = eSIR_MAC_SUCCESS_STATUS;
+	eCsrAuthType csr_akm_type;
 
 	qdf_mem_zero(&roam_info, sizeof(roam_info));
 	sme_debug("Receive WNI_SME_ASSOC_IND from SME");
@@ -11946,6 +12090,8 @@ csr_roam_chk_lnk_assoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 		sme_err("session %d not found", sessionId);
 		return;
 	}
+	csr_akm_type = csr_translate_akm_type(pAssocInd->akm_type);
+
 	roam_info_ptr = &roam_info;
 	/* Required for indicating the frames to upper layer */
 	roam_info_ptr->assocReqLength = pAssocInd->assocReqLength;
@@ -12004,13 +12150,37 @@ csr_roam_chk_lnk_assoc_ind(tpAniSirGlobal mac_ctx, tSirSmeRsp *msg_ptr)
 		status = csr_roam_call_callback(mac_ctx, sessionId,
 					roam_info_ptr, 0, eCSR_ROAM_INFRA_IND,
 					eCSR_ROAM_RESULT_INFRA_ASSOCIATION_IND);
-		if (!QDF_IS_STATUS_SUCCESS(status))
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			/* Refused due to Mac filtering */
 			roam_info_ptr->statusCode = eSIR_SME_ASSOC_REFUSED;
+                } else if (pAssocInd->rsnIE.length  && SIR_MAC_RSN_EID ==
+			   pAssocInd->rsnIE.rsnIEdata[0]) {
+			tDot11fIERSN rsn_ie = {0};
+
+			if (dot11f_unpack_ie_rsn(mac_ctx,
+						 pAssocInd->rsnIE.rsnIEdata + 2,
+						 pAssocInd->rsnIE.length - 2,
+						 &rsn_ie, false)
+			    != DOT11F_PARSE_SUCCESS ||
+			    (csr_is_sae_akm_present(&rsn_ie) &&
+			     !csr_is_sae_peer_allowed(mac_ctx, pAssocInd,
+						      session,
+						      pAssocInd->peerMacAddr,
+						      &rsn_ie,
+						      &mac_status_code))) {
+				status = QDF_STATUS_E_INVAL;
+				roam_info_ptr->statusCode =
+						    eSIR_SME_ASSOC_REFUSED;
+				sme_debug("SAE peer not allowed: Status: %d",
+					   mac_status_code);
+			}
+		}
+
 	}
 
 	/* Send Association completion message to PE */
-	status = csr_send_assoc_cnf_msg(mac_ctx, pAssocInd, status);
+	status = csr_send_assoc_cnf_msg(mac_ctx, pAssocInd, status,
+					mac_status_code);
 	/*
 	 * send a message to CSR itself just to avoid the EAPOL frames going
 	 * OTA before association response
@@ -16994,8 +17164,10 @@ QDF_STATUS csr_send_mb_deauth_cnf_msg(tpAniSirGlobal pMac,
 	return status;
 }
 
-QDF_STATUS csr_send_assoc_cnf_msg(tpAniSirGlobal pMac, tpSirSmeAssocInd
-				pAssocInd, QDF_STATUS Halstatus)
+QDF_STATUS csr_send_assoc_cnf_msg(tpAniSirGlobal pMac,
+				  tpSirSmeAssocInd pAssocInd,
+				  QDF_STATUS Halstatus,
+				  tSirMacStatusCodes mac_status_code)
 {
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	tSirSmeAssocCnf *pMsg;
@@ -17007,11 +17179,13 @@ QDF_STATUS csr_send_assoc_cnf_msg(tpAniSirGlobal pMac, tpSirSmeAssocInd
 		if (NULL == pMsg)
 			return QDF_STATUS_E_NOMEM;
 		pMsg->messageType = eWNI_SME_ASSOC_CNF;
-		pMsg->length = sizeof(tSirSmeAssocCnf);
-		if (QDF_IS_STATUS_SUCCESS(Halstatus))
+		pMsg->length = sizeof(*pMsg);
+		if (QDF_IS_STATUS_SUCCESS(Halstatus)) {
 			pMsg->statusCode = eSIR_SME_SUCCESS;
-		else
+		} else {
 			pMsg->statusCode = eSIR_SME_ASSOC_REFUSED;
+			pMsg->mac_status_code = mac_status_code;
+		}
 		/* bssId */
 		qdf_mem_copy(pMsg->bssid.bytes, pAssocInd->bssId,
 			     QDF_MAC_ADDR_SIZE);
@@ -17157,6 +17331,21 @@ QDF_STATUS csr_send_assoc_ind_to_upper_layer_cnf_msg(tpAniSirGlobal pMac,
 		pMsg->capability_info = pAssocInd->capability_info;
 		pMsg->he_caps_present = pAssocInd->he_caps_present;
 		msgQ.type = eWNI_SME_UPPER_LAYER_ASSOC_CNF;
+		if (pAssocInd->assocReqPtr) {
+			if (pAssocInd->assocReqLength < MAX_ASSOC_REQ_IE_LEN) {
+				pMsg->ies = qdf_mem_malloc(
+						pAssocInd->assocReqLength);
+				if (pMsg->ies == NULL) {
+					qdf_mem_free(pMsg);
+					return QDF_STATUS_E_NOMEM;
+				}
+				pMsg->ies_len = pAssocInd->assocReqLength;
+				qdf_mem_copy(pMsg->ies , pAssocInd->assocReqPtr,
+					     pMsg->ies_len);
+			} else {
+				sme_err("Assoc Ie length is too long");
+			}
+		}
 		msgQ.bodyptr = pMsg;
 		msgQ.bodyval = 0;
 		sys_process_mmh_msg(pMac, &msgQ);

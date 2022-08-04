@@ -2248,32 +2248,28 @@ QDF_STATUS hdd_hostapd_sap_event_cb(tpSap_Event pSapEvent,
 					      HDD_SAP_WAKE_LOCK_DURATION);
 		{
 			struct station_info *sta_info;
-			uint16_t iesLen = event->iesLen;
+			uint32_t ies_len = event->ies_len;
 
 			sta_info = qdf_mem_malloc(sizeof(*sta_info));
 			if (!sta_info) {
 				hdd_err("Failed to allocate station info");
 				return QDF_STATUS_E_FAILURE;
 			}
-			if (iesLen <= MAX_ASSOC_IND_IE_LEN) {
-				sta_info->assoc_req_ies =
-					(const u8 *)&event->ies[0];
-				sta_info->assoc_req_ies_len = iesLen;
+
+			sta_info->assoc_req_ies = event->ies;
+			sta_info->assoc_req_ies_len = ies_len;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
-				/*
-				 * After Kernel 4.0, it's no longer need to set
-				 * STATION_INFO_ASSOC_REQ_IES flag, as it
-				 * changed to use assoc_req_ies_len length to
-				 * check the existence of request IE.
-				 */
-				sta_info->filled |= STATION_INFO_ASSOC_REQ_IES;
+			/*
+			 * After Kernel 4.0, it's no longer need to set
+			 * STATION_INFO_ASSOC_REQ_IES flag, as it
+			 * changed to use assoc_req_ies_len length to
+			 * check the existence of request IE.
+			 */
+			sta_info->filled |= STATION_INFO_ASSOC_REQ_IES;
 #endif
-				cfg80211_new_sta(dev,
-					(const u8 *)&event->staMac.bytes[0],
-					sta_info, GFP_KERNEL);
-			} else {
-				hdd_err("Assoc Ie length is too long");
-			}
+			cfg80211_new_sta(dev,
+				(const u8 *)&event->staMac.bytes[0],
+				sta_info, GFP_KERNEL);
 			qdf_mem_free(sta_info);
 		}
 
@@ -2698,14 +2694,14 @@ stopbss:
 static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 				eCsrEncryptionType *pEncryptType,
 				eCsrEncryptionType *mcEncryptType,
-				eCsrAuthType *pAuthType,
+				tCsrAuthList *akm_list,
 				bool *pMFPCapable,
 				bool *pMFPRequired,
 				uint16_t gen_ie_len, uint8_t *gen_ie)
 {
 	uint32_t ret;
 	uint8_t *pRsnIe;
-	uint16_t RSNIeLen;
+	uint16_t RSNIeLen, i;
 	tDot11fIERSN dot11RSNIE = {0};
 	tDot11fIEWPA dot11WPAIE = {0};
 
@@ -2742,13 +2738,13 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		hdd_debug("authentication suite count: %d",
 		       dot11RSNIE.akm_suite_cnt);
 		/*
-		 * Here we have followed the apple base code,
-		 * but probably I suspect we can do something different
-		 * dot11RSNIE.akm_suite_cnt
-		 * Just translate the FIRST one
+		 * Translate akms in akm suite
 		 */
-		*pAuthType =
-		    hdd_translate_rsn_to_csr_auth_type(dot11RSNIE.akm_suite[0]);
+		for (i = 0; i < dot11RSNIE.akm_suite_cnt; i++)
+			akm_list->authType[i] =
+				hdd_translate_rsn_to_csr_auth_type(
+						       dot11RSNIE.akm_suite[i]);
+		akm_list->numEntries = dot11RSNIE.akm_suite_cnt;
 		/* dot11RSNIE.pwise_cipher_suite_count */
 		*pEncryptType =
 			hdd_translate_rsn_to_csr_encryption_type(dot11RSNIE.
@@ -2783,9 +2779,14 @@ static int hdd_softap_unpack_ie(mac_handle_t mac_handle,
 		hdd_debug("WPA authentication suite count: %d",
 		       dot11WPAIE.auth_suite_count);
 		/* dot11WPAIE.auth_suite_count */
-		/* Just translate the FIRST one */
-		*pAuthType =
-			hdd_translate_wpa_to_csr_auth_type(dot11WPAIE.auth_suites[0]);
+		/*
+		 * Translate akms in akm suite
+		 */
+		for (i = 0; i < dot11WPAIE.auth_suite_count; i++)
+			akm_list->authType[i] =
+				hdd_translate_wpa_to_csr_auth_type(
+						     dot11WPAIE.auth_suites[i]);
+		akm_list->numEntries = dot11WPAIE.auth_suite_count;
 		/* dot11WPAIE.unicast_cipher_count */
 		*pEncryptType =
 			hdd_translate_wpa_to_csr_encryption_type(dot11WPAIE.
@@ -7230,6 +7231,8 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen,
 			      WLAN_EID_INTERWORKING);
 
+	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen, WLAN_ELEMID_RSNXE);
+
 #ifdef FEATURE_WLAN_WAPI
 	if (QDF_SAP_MODE == adapter->device_mode) {
 		wlan_hdd_add_extra_ie(adapter, genie, &total_ielen,
@@ -7285,6 +7288,9 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 
 	wlan_hdd_add_sap_obss_scan_ie(adapter, proberesp_ies,
 				     &proberesp_ies_len);
+
+	wlan_hdd_add_extra_ie(adapter, proberesp_ies, &proberesp_ies_len,
+			      WLAN_ELEMID_RSNXE);
 
 	if (test_bit(SOFTAP_BSS_STARTED, &adapter->event_flags)) {
 		updateIE.ieBufferlength = proberesp_ies_len;
@@ -7846,7 +7852,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	struct ieee80211_mgmt mgmt;
 	const uint8_t *pIe = NULL;
 	uint16_t capab_info;
-	eCsrAuthType RSNAuthType;
+
 	eCsrEncryptionType RSNEncryptType;
 	eCsrEncryptionType mcRSNEncryptType;
 	int status = QDF_STATUS_SUCCESS, ret;
@@ -7856,6 +7862,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 	mac_handle_t mac_handle;
 	int32_t i;
 	struct hdd_config *iniConfig;
+	uint32_t ii;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	tSmeConfigParams *sme_config;
 	bool MFPCapable = false;
@@ -8152,7 +8159,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 			hdd_softap_unpack_ie(cds_get_context
 						     (QDF_MODULE_ID_SME),
 					     &RSNEncryptType, &mcRSNEncryptType,
-					     &RSNAuthType, &MFPCapable,
+					     &pConfig->akm_list,
+					     &MFPCapable,
 					     &MFPRequired,
 					     pConfig->RSNWPAReqIE[1] + 2,
 					     pConfig->RSNWPAReqIE);
@@ -8165,8 +8173,14 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 			pConfig->mcRSNEncryptType = mcRSNEncryptType;
 			(WLAN_HDD_GET_AP_CTX_PTR(adapter))->
 			encryption_type = RSNEncryptType;
-			hdd_debug("CSR AuthType = %d, EncryptionType = %d mcEncryptionType = %d",
-			       RSNAuthType, RSNEncryptType, mcRSNEncryptType);
+			hdd_debug("CSR EncryptionType = %d mcEncryptionType = %d",
+				  RSNEncryptType, mcRSNEncryptType);
+			hdd_debug("CSR AKM Suites %d",
+				  pConfig->akm_list.numEntries);
+			for (ii = 0; ii < pConfig->akm_list.numEntries;
+			     ii++)
+				hdd_debug("CSR AKM Suite [%d] = %d", ii,
+					  pConfig->akm_list.authType[ii]);
 		}
 	}
 
@@ -8197,7 +8211,8 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 			status = hdd_softap_unpack_ie
 					(cds_get_context(QDF_MODULE_ID_SME),
 					 &RSNEncryptType,
-					 &mcRSNEncryptType, &RSNAuthType,
+					 &mcRSNEncryptType,
+					 &pConfig->akm_list,
 					 &MFPCapable, &MFPRequired,
 					 pConfig->RSNWPAReqIE[1] + 2,
 					 pConfig->RSNWPAReqIE);
@@ -8211,9 +8226,15 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 				pConfig->mcRSNEncryptType = mcRSNEncryptType;
 				(WLAN_HDD_GET_AP_CTX_PTR(adapter))->
 				encryption_type = RSNEncryptType;
-				hdd_debug("CSR AuthType = %d, EncryptionType = %d mcEncryptionType = %d",
-				       RSNAuthType, RSNEncryptType,
-				       mcRSNEncryptType);
+				hdd_debug("CSR EncryptionType = %d mcEncryptionType = %d",
+					  RSNEncryptType, mcRSNEncryptType);
+				hdd_debug("CSR AKM Suites %d",
+					  pConfig->akm_list.numEntries);
+				for (ii = 0; ii < pConfig->akm_list.numEntries;
+				     ii++)
+					hdd_debug("CSR AKM Suite [%d] = %d", ii,
+						  pConfig->akm_list.
+						  authType[ii]);
 			}
 		}
 	}
@@ -8650,8 +8671,14 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	 */
 	hdd_abort_ongoing_sta_connection(hdd_ctx);
 
-	if (adapter->device_mode == QDF_SAP_MODE)
+	if (adapter->device_mode == QDF_SAP_MODE) {
 		wlan_hdd_del_station(adapter);
+		status = sme_roam_del_pmkid_from_cache(hdd_ctx->mac_handle,
+						       adapter->session_id,
+						       NULL, true);
+		if (QDF_IS_STATUS_ERROR(status))
+			hdd_debug("Cannot flush PMKIDCache");
+	}
 
 	cds_flush_work(&adapter->sap_stop_bss_work);
 	/*

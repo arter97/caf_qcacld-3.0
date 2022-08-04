@@ -2263,11 +2263,17 @@ QDF_STATUS sme_send_mgmt_tx(tHalHandle hal, uint8_t session_id,
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS sme_handle_sae_msg(tHalHandle hal, uint8_t session_id,
-		uint8_t sae_status);
+QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
+			      uint8_t session_id,
+			      uint8_t sae_status,
+			      struct qdf_mac_addr peer_mac_addr,
+			      const uint8_t *pmkid);
 #else
-static inline QDF_STATUS sme_handle_sae_msg(tHalHandle hal, uint8_t session_id,
-		uint8_t sae_status)
+QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
+			      uint8_t session_id,
+			      uint8_t sae_status,
+			      struct qdf_mac_addr peer_mac_addr,
+			      const uint8_t *pmkid)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -811,6 +811,7 @@ struct csr_roam_profile {
 	eCsrRoamBssType BSSType;
 	tCsrAuthList AuthType;
 	eCsrAuthType negotiatedAuthType;
+	tCsrAuthList akm_list;
 	tCsrEncryptionList EncryptionType;
 	/* This field is for output only, not for input */
 	eCsrEncryptionType negotiatedUCEncryptionType;
@@ -925,6 +926,7 @@ typedef struct tagCsrRoamConnectedProfile {
 	eCsrRoamBssType BSSType;
 	eCsrAuthType AuthType;
 	tCsrAuthList AuthInfo;
+	tCsrAuthList akm_list;
 	eCsrEncryptionType EncryptionType;
 	tCsrEncryptionList EncryptionInfo;
 	eCsrEncryptionType mcEncryptionType;
@@ -1506,6 +1508,8 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	/* Extended capabilities of STA */
 	uint8_t              ecsa_capable;
 
+	uint32_t ies_len;
+	uint8_t *ies;
 	tDot11fIEHTCaps ht_caps;
 	tDot11fIEVHTCaps vht_caps;
 	tSirMacCapabilityInfo capability_info;
