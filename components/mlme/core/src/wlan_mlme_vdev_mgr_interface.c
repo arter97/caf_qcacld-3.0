@@ -37,6 +37,7 @@
 #include <cm_utf.h>
 #include "target_if_cm_roam_event.h"
 #include "wlan_cm_roam_api.h"
+#include "wifi_pos_api.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_public_structs.h>
 #include <wlan_mlo_mgr_cmn.h>
@@ -1687,11 +1688,31 @@ static QDF_STATUS
 vdevmgr_vdev_peer_delete_all_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 					struct peer_delete_all_response *rsp)
 {
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_wifi_pos_rx_ops *rx_ops;
 	QDF_STATUS status;
+
+	psoc = wlan_vdev_get_psoc(vdev_mlme->vdev);
+	if (!psoc)
+		return -QDF_STATUS_E_INVAL;
+
+	if (QDF_HAS_PARAM(rsp->peer_type_bitmap, WLAN_PEER_RTT_PASN)) {
+		rx_ops = wifi_pos_get_rx_ops(psoc);
+		if (!rx_ops ||
+		    !rx_ops->wifi_pos_vdev_delete_all_ranging_peers_rsp_cb) {
+			mlme_err("rx_ops is NULL");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		status = rx_ops->wifi_pos_vdev_delete_all_ranging_peers_rsp_cb(
+							psoc, rsp->vdev_id);
+		return status;
+	}
 
 	status = lim_process_mlm_del_all_sta_rsp(vdev_mlme, rsp);
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("Failed to call lim_process_mlm_del_all_sta_rsp");
+
 	return status;
 }
 
@@ -1850,6 +1871,8 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
  *                                      to INIT state
  * @mlme_vdev_sta_disconn_start         callback to trigger vdev stop to
  *                                      firmware when resaaoc failure
+ * @mlme_vdev_ext_peer_delete_all_rsp:  Callback to trigger Delete all
+ *                                      peers for the given vdev
  */
 static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_start_send = sta_mlme_vdev_start_send,
@@ -1868,6 +1891,8 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_ext_stop_rsp = vdevmgr_vdev_stop_rsp_handle,
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
 	.mlme_vdev_sta_disconn_start = sta_mlme_vdev_sta_disconnect_start,
+	.mlme_vdev_ext_peer_delete_all_rsp =
+			vdevmgr_vdev_peer_delete_all_rsp_handle,
 };
 
 /**

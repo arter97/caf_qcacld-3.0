@@ -47,6 +47,7 @@
 #include "cdp_txrx_host_stats.h"
 #include "wlan_hdd_object_manager.h"
 #include "wlan_hdd_eht.h"
+#include "wlan_dp_ucfg_api.h"
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)) && !defined(WITH_BACKPORTS)
 #define HDD_INFO_SIGNAL                 STATION_INFO_SIGNAL
@@ -819,6 +820,17 @@ static bool put_wifi_iface_stats(struct wifi_interface_stats *if_stat,
 		nla_nest_end(vendor_event, wmm_stats);
 	}
 	nla_nest_end(vendor_event, wmm_info);
+
+	if (nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_TIM_BEACON,
+			if_stat->powersave_stats.tot_tim_bcn) ||
+	    nla_put_u32(vendor_event,
+			QCA_WLAN_VENDOR_ATTR_LL_STATS_TIM_BEACON_ERR,
+			if_stat->powersave_stats.tot_err_tim_bcn)) {
+		hdd_err("QCA_WLAN_VENDOR_ATTR put powersave_stat fail");
+		return false;
+	}
+
 	return true;
 }
 
@@ -2012,8 +2024,16 @@ static void cache_station_stats_cb(struct stats_event *ev, void *cookie)
 {
 	struct hdd_adapter *adapter = cookie, *next_adapter = NULL;
 	struct hdd_context *hdd_ctx = adapter->hdd_ctx;
-	uint8_t vdev_id = ev->vdev_summary_stats->vdev_id;
+	uint8_t vdev_id;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DISPLAY_TXRX_STATS;
+
+	if (!ev->vdev_summary_stats || !ev->vdev_chain_rssi ||
+	    !ev->peer_adv_stats) {
+		hdd_debug("Invalid stats");
+		return;
+	}
+
+	vdev_id = ev->vdev_summary_stats->vdev_id;
 
 	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
 					   dbgid) {
@@ -5978,6 +5998,8 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 
 	wlan_hdd_get_station_stats(adapter);
 
+	wlan_hdd_get_peer_rx_rate_stats(adapter);
+
 	adapter->rssi = adapter->hdd_stats.summary_stat.rssi;
 	snr = adapter->hdd_stats.summary_stat.snr;
 
@@ -6455,7 +6477,7 @@ struct net_device_stats *hdd_get_stats(struct net_device *dev)
 {
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 
-	return &adapter->stats;
+	return (struct net_device_stats *)ucfg_dp_get_dev_stats(&adapter->mac_addr);
 }
 
 
@@ -7218,6 +7240,44 @@ int wlan_hdd_get_link_speed(struct hdd_adapter *adapter, uint32_t *link_speed)
 	return 0;
 }
 
+#ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
+void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
+{
+	struct cdp_peer_stats *peer_stats;
+	QDF_STATUS status;
+	ol_txrx_soc_handle soc;
+	uint8_t *peer_mac_addr;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	/*
+	 *  If througput is high, do not get rx rate
+	 *  info to avoid the performance penalty
+	 */
+	if (cdp_get_bus_lvl_high(soc) == true)
+		return;
+
+	peer_stats = qdf_mem_malloc(sizeof(*peer_stats));
+	if (!peer_stats)
+		return;
+
+	peer_mac_addr = adapter->session.station.conn_info.bssid.bytes;
+
+	status = cdp_host_get_peer_stats(soc,
+					 adapter->vdev_id,
+					 peer_mac_addr,
+					 peer_stats);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(peer_stats);
+		osif_err("cdp_host_get_peer_stats failed. error: %d", status);
+		return;
+	}
+
+	adapter->hdd_stats.class_a_stat.rx_rate = peer_stats->rx.last_rx_rate;
+	qdf_mem_free(peer_stats);
+}
+#endif
+
 int wlan_hdd_get_station_stats(struct hdd_adapter *adapter)
 {
 	int ret = 0;
@@ -7369,14 +7429,28 @@ int wlan_hdd_get_temperature(struct hdd_adapter *adapter, int *temperature)
 }
 
 #ifdef TX_MULTIQ_PER_AC
-static inline
-void wlan_hdd_display_tx_multiq_stats(struct hdd_tx_rx_stats *stats)
+void wlan_hdd_display_tx_multiq_stats(hdd_cb_handle context, uint8_t vdev_id)
 {
+	struct hdd_context *hdd_ctx;
+	struct hdd_adapter *adapter;
+	struct hdd_tx_rx_stats *stats;
 	uint32_t total_inv_sk_and_skb_hash = 0;
 	uint32_t total_qselect_existing_skb_hash = 0;
 	uint32_t total_qselect_sk_tx_map = 0;
 	uint32_t total_qselect_skb_hash = 0;
 	uint8_t i;
+
+	hdd_ctx = hdd_cb_handle_to_context(context);
+	if (!hdd_ctx) {
+		hdd_err("hdd_ctx is null");
+		return;
+	}
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+	if (!adapter) {
+		hdd_err("adapter is null");
+		return;
+	}
+	stats = &adapter->hdd_stats.tx_rx_stats;
 
 	for (i = 0; i < NUM_CPUS; i++) {
 		total_inv_sk_and_skb_hash +=
@@ -7392,93 +7466,7 @@ void wlan_hdd_display_tx_multiq_stats(struct hdd_tx_rx_stats *stats)
 		  total_inv_sk_and_skb_hash, total_qselect_existing_skb_hash,
 		  total_qselect_sk_tx_map, total_qselect_skb_hash);
 }
-#else
-static inline
-void wlan_hdd_display_tx_multiq_stats(struct hdd_tx_rx_stats *stats)
-{
-}
 #endif
-
-void wlan_hdd_display_txrx_stats(struct hdd_context *ctx)
-{
-	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
-	struct hdd_tx_rx_stats *stats;
-	int i = 0;
-	uint32_t total_rx_pkt, total_rx_dropped,
-		 total_rx_delv, total_rx_refused;
-	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CACHE_STATION_STATS_CB;
-	uint32_t total_tx_pkt;
-	uint32_t total_tx_dropped;
-	uint32_t total_tx_orphaned;
-
-	hdd_for_each_adapter_dev_held_safe(ctx, adapter, next_adapter,
-					   dbgid) {
-		total_rx_pkt = 0;
-		total_rx_dropped = 0;
-		total_rx_delv = 0;
-		total_rx_refused = 0;
-		total_tx_pkt = 0;
-		total_tx_dropped = 0;
-		total_tx_orphaned = 0;
-		stats = &adapter->hdd_stats.tx_rx_stats;
-
-		if (adapter->vdev_id == WLAN_INVALID_VDEV_ID) {
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			continue;
-		}
-
-		hdd_debug("adapter: %u", adapter->vdev_id);
-		for (i = 0; i < NUM_CPUS; i++) {
-			total_rx_pkt += stats->per_cpu[i].rx_packets;
-			total_rx_dropped += stats->per_cpu[i].rx_dropped;
-			total_rx_delv += stats->per_cpu[i].rx_delivered;
-			total_rx_refused += stats->per_cpu[i].rx_refused;
-			total_tx_pkt += stats->per_cpu[i].tx_called;
-			total_tx_dropped += stats->per_cpu[i].tx_dropped;
-			total_tx_orphaned += stats->per_cpu[i].tx_orphaned;
-		}
-
-		/* dev_put has to be done here */
-		hdd_adapter_dev_put_debug(adapter, dbgid);
-
-		for (i = 0; i < NUM_CPUS; i++) {
-			if (!stats->per_cpu[i].tx_called)
-				continue;
-
-			hdd_debug("Tx CPU[%d]: called %u, dropped %u, orphaned %u",
-				  i, stats->per_cpu[i].tx_called,
-				  stats->per_cpu[i].tx_dropped,
-				  stats->per_cpu[i].tx_orphaned);
-		}
-
-		hdd_debug("TX - called %u, dropped %u orphan %u",
-			  total_tx_pkt, total_tx_dropped,
-			  total_tx_orphaned);
-
-		wlan_hdd_display_tx_multiq_stats(stats);
-
-		for (i = 0; i < NUM_CPUS; i++) {
-			if (stats->per_cpu[i].rx_packets == 0)
-				continue;
-			hdd_debug("Rx CPU[%d]: packets %u, dropped %u, delivered %u, refused %u",
-				  i, stats->per_cpu[i].rx_packets,
-				  stats->per_cpu[i].rx_dropped,
-				  stats->per_cpu[i].rx_delivered,
-				  stats->per_cpu[i].rx_refused);
-		}
-
-		hdd_debug("RX - packets %u, dropped %u, unsolict_arp_n_mcast_drp %u, delivered %u, refused %u GRO - agg %u drop %u non-agg %u flush_skip %u low_tput_flush %u disabled(conc %u low-tput %u)",
-			  total_rx_pkt, total_rx_dropped,
-			  qdf_atomic_read(&stats->rx_usolict_arp_n_mcast_drp),
-			  total_rx_delv,
-			  total_rx_refused, stats->rx_aggregated,
-			  stats->rx_gro_dropped, stats->rx_non_aggregated,
-			  stats->rx_gro_flush_skip,
-			  stats->rx_gro_low_tput_flush,
-			  qdf_atomic_read(&ctx->disable_rx_ol_in_concurrency),
-			  qdf_atomic_read(&ctx->disable_rx_ol_in_low_tput));
-	}
-}
 
 #ifdef QCA_SUPPORT_CP_STATS
 /**

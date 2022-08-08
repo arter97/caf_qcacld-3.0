@@ -69,6 +69,7 @@
 #include <wlan_vdev_mgr_utils_api.h>
 #include "cfg_ucfg_api.h"
 #include "wlan_twt_cfg_ext_api.h"
+#include <spatial_reuse_api.h>
 
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
@@ -2620,14 +2621,15 @@ static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)
 {
 	struct s_ext_cap *ext_cap;
 	bool twt_support_in_11n = false;
+	bool twt_request = false;
 
 	if (!ie) {
 		pe_debug("ie is null");
 		return false;
 	}
 
-	if (mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request &&
-	    (ie->qcn_ie.present || ie->he_cap.twt_responder)) {
+	wlan_twt_cfg_get_support_requestor(mac_ctx->psoc, &twt_request);
+	if (twt_request && (ie->qcn_ie.present || ie->he_cap.twt_responder)) {
 		pe_debug("TWT is supported, hence disable UAPSD; twt req supp: %d,twt respon supp: %d, QCN_IE: %d",
 			  mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request,
 			  ie->he_cap.twt_responder,
@@ -3880,9 +3882,42 @@ static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 	}
 	pe_join_req->assoc_link_id = req->assoc_link_id;
 }
+
+static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+			       struct pe_session *session)
+{
+	bool emlsr_cap, emlsr_allowed, emlsr_enabled = false;
+
+	/* Check if HW supports eMLSR mode */
+	emlsr_cap = policy_mgr_is_hw_emlsr_capable(mac_ctx->psoc);
+	if (!emlsr_cap)
+		return;
+
+	/* Check if vendor command chooses eMLSR mode */
+	wlan_mlme_get_emlsr_mode_enabled(mac_ctx->psoc, &emlsr_enabled);
+
+	emlsr_allowed = emlsr_cap && emlsr_enabled;
+
+	if (emlsr_allowed) {
+		wlan_vdev_obj_lock(session->vdev);
+		wlan_vdev_mlme_cap_set(session->vdev, WLAN_VDEV_C_EMLSR_CAP);
+		wlan_vdev_obj_unlock(session->vdev);
+	} else {
+		wlan_vdev_obj_lock(session->vdev);
+		wlan_vdev_mlme_cap_clear(session->vdev, WLAN_VDEV_C_EMLSR_CAP);
+		wlan_vdev_obj_unlock(session->vdev);
+	}
+
+	pe_debug("eMLSR vdev cap: %d", emlsr_allowed);
+}
 #else
 static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 			     struct join_req *pe_join_req)
+{
+}
+
+static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+			       struct pe_session *session)
 {
 }
 #endif
@@ -4082,6 +4117,8 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 		 pe_session->wps_registration,
 		 pe_session->isOSENConnection,
 		 lim_is_fils_connection(pe_session));
+
+	lim_set_emlsr_caps(mac_ctx, pe_session);
 
 	status = lim_send_connect_req_to_mlm(pe_session);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -9356,6 +9393,12 @@ void lim_process_set_he_bss_color(struct mac_context *mac_ctx, uint32_t *msg_buf
 	beacon_params.bss_color_disabled = 1;
 	beacon_params.bss_color = session_entry->he_op.bss_color;
 	session_entry->bss_color_changing = 1;
+
+	if (wlan_vdev_mlme_get_he_spr_enabled(session_entry->vdev)) {
+		/* Disable spatial reuse during BSS color change */
+		wlan_spatial_reuse_config_set(session_entry->vdev, 0, 0);
+		wlan_vdev_mlme_set_he_spr_enabled(session_entry->vdev, false);
+	}
 
 	if (sch_set_fixed_beacon_fields(mac_ctx, session_entry) !=
 			QDF_STATUS_SUCCESS) {

@@ -2200,12 +2200,27 @@ static bool lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
 	return add_sta_params->eht_capable;
 }
 
+static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
+						  tpSirAssocRsp assoc_rsp)
+{
+	if (IS_DOT11_MODE_EHT(pe_session->dot11mode) &&
+	    assoc_rsp->eht_op.present &&
+	    assoc_rsp->eht_op.eht_op_information_present)
+		return true;
+
+	return false;
+}
 #else
 static bool lim_is_add_sta_params_eht_capable(tpAddStaParams add_sta_params)
 {
 	return false;
 }
 
+static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
+						  tpSirAssocRsp assoc_rsp)
+{
+	return false;
+}
 #endif
 
 #ifdef WLAN_SUPPORT_TWT
@@ -3612,7 +3627,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		    ((pAssocRsp->HTCaps.present &&
 		      pAssocRsp->HTCaps.supportedChannelWidthSet) ||
 		     (pBeaconStruct->HTCaps.present &&
-		      pBeaconStruct->HTCaps.supportedChannelWidthSet))) {
+		      pBeaconStruct->HTCaps.supportedChannelWidthSet) ||
+		     lim_is_eht_connection_op_info_present(pe_session,
+							   pAssocRsp))) {
 			pAddBssParams->ch_width =
 					pe_session->ch_width;
 			pAddBssParams->staContext.ch_width =
@@ -3695,6 +3712,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 			QDF_MAC_ADDR_FMT,
 			QDF_MAC_ADDR_REF(
 				pAddBssParams->staContext.staMac));
+			qdf_mem_free(pAddBssParams);
 			return QDF_STATUS_E_FAILURE;
 	}
 
@@ -3876,7 +3894,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		}
 	}
 
-	lim_intersect_ap_emlsr_caps(pe_session, pAddBssParams, pAssocRsp);
+	lim_intersect_ap_emlsr_caps(mac, pe_session, pAddBssParams, pAssocRsp);
 
 	pAddBssParams->staContext.smesessionId =
 		pe_session->smeSessionId;

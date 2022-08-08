@@ -1217,6 +1217,39 @@ wlansap_5g_original_bw_validate(
 	return ch_width;
 }
 
+/**
+ * wlansap_2g_original_bw_validate() - validate bw for sap on 2.4 GHz
+ * @sap_context: sap context
+ * @chan_freq: channel frequency
+ * @ch_width: band width
+ * @sec_ch_freq: secondary channel frequency
+ *
+ * If initial SAP starts on 2.4 GHz HT40/HT20 mode, driver honors it.
+ *
+ * Return: new bandwidth
+ */
+static enum phy_ch_width
+wlansap_2g_original_bw_validate(struct sap_context *sap_context,
+				uint32_t chan_freq,
+				enum phy_ch_width ch_width,
+				qdf_freq_t *sec_ch_freq)
+{
+	if (sap_context->csa_reason == CSA_REASON_UNKNOWN &&
+	    WLAN_REG_IS_24GHZ_CH_FREQ(chan_freq) &&
+	    sap_context->ch_width_orig == CH_WIDTH_40MHZ) {
+		ch_width = CH_WIDTH_40MHZ;
+		if (sap_context->ch_params.sec_ch_offset == LOW_PRIMARY_CH)
+			*sec_ch_freq = chan_freq + 20;
+		else if (sap_context->ch_params.sec_ch_offset ==
+						HIGH_PRIMARY_CH)
+			*sec_ch_freq = chan_freq - 20;
+		else
+			*sec_ch_freq = 0;
+	}
+
+	return ch_width;
+}
+
 enum phy_ch_width
 wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 				       uint32_t chan_freq,
@@ -1226,6 +1259,7 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	struct mac_context *mac;
 	struct ch_params ch_params = {0};
 	uint32_t channel_bonding_mode = 0;
+	qdf_freq_t sec_ch_freq = 0;
 
 	mac = sap_get_mac_context();
 	if (!mac) {
@@ -1239,7 +1273,9 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 		 * SAP coming up in HT40 on channel switch we are
 		 * disabling channel bonding in 2.4Ghz.
 		 */
-		ch_width = CH_WIDTH_20MHZ;
+		ch_width = wlansap_2g_original_bw_validate(
+				sap_context, chan_freq, CH_WIDTH_20MHZ,
+				&sec_ch_freq);
 	} else {
 		wlan_mlme_get_channel_bonding_5ghz(mac->psoc,
 						   &channel_bonding_mode);
@@ -1261,7 +1297,7 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	ch_params.ch_width = ch_width;
 	if (sap_phymode_is_eht(sap_context->phyMode))
 		wlan_reg_set_create_punc_bitmap(&ch_params, true);
-	wlan_reg_set_channel_params_for_freq(mac->pdev, chan_freq, 0,
+	wlan_reg_set_channel_params_for_freq(mac->pdev, chan_freq, sec_ch_freq,
 					     &ch_params);
 	ch_width = ch_params.ch_width;
 	if (tgt_ch_params)
@@ -1660,129 +1696,6 @@ QDF_STATUS wlan_sap_update_next_channel(struct sap_context *sap_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
- * Code under PRE_CAC_COMP will be cleaned up
- * once pre cac component is done
- */
-#ifndef PRE_CAC_COMP
-#if defined(FEATURE_SAP_COND_CHAN_SWITCH) && defined(PRE_CAC_SUPPORT)
-QDF_STATUS wlan_sap_set_pre_cac_status(struct sap_context *sap_ctx,
-				       bool status)
-{
-	if (!sap_ctx) {
-		sap_err("Invalid SAP pointer");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	sap_ctx->is_pre_cac_on = status;
-	sap_debug("is_pre_cac_on:%d", sap_ctx->is_pre_cac_on);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-QDF_STATUS
-wlan_sap_set_chan_freq_before_pre_cac(struct sap_context *sap_ctx,
-				      qdf_freq_t freq_before_pre_cac)
-{
-	if (!sap_ctx) {
-		sap_err("Invalid SAP pointer");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	sap_ctx->freq_before_pre_cac = freq_before_pre_cac;
-	return QDF_STATUS_SUCCESS;
-}
-#endif /* FEATURE_SAP_COND_CHAN_SWITCH */
-#endif /* PRE_CAC_COMP */
-
-#ifdef PRE_CAC_SUPPORT
-/*
- * Code under PRE_CAC_COMP will be cleaned up
- * once pre cac component is done
- */
-#ifndef PRE_CAC_COMP
-QDF_STATUS wlan_sap_set_pre_cac_complete_status(struct sap_context *sap_ctx,
-						bool status)
-{
-	if (!sap_ctx) {
-		sap_err("Invalid SAP pointer");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	sap_ctx->pre_cac_complete = status;
-	sap_debug("pre cac complete status:%d session:%d",
-		  status, sap_ctx->sessionId);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-bool wlan_sap_is_pre_cac_context(struct sap_context *context)
-{
-	return context && context->is_pre_cac_on;
-}
-
-/**
- * wlan_sap_is_pre_cac_active() - Checks if pre cac in in progress
- * @handle: Global MAC handle
- *
- * Checks if pre cac is in progress in any of the SAP contexts
- *
- * Return: True is pre cac is active, false otherwise
- */
-bool wlan_sap_is_pre_cac_active(mac_handle_t handle)
-{
-	struct mac_context *mac = NULL;
-	struct sap_ctx_list *ctx_list;
-	int i;
-
-	mac = MAC_CONTEXT(handle);
-	if (!mac) {
-		sap_err("Invalid mac context");
-		return false;
-	}
-
-	ctx_list = mac->sap.sapCtxList;
-	for (i = 0; i < SAP_MAX_NUM_SESSION; i++) {
-		if (wlan_sap_is_pre_cac_context(ctx_list[i].sap_context))
-			return true;
-	}
-
-	return false;
-}
-
-/**
- * wlan_sap_get_pre_cac_vdev_id() - Get vdev id of the pre cac interface
- * @handle: Global handle
- * @vdev_id: vdev id
- *
- * Fetches the vdev id of the pre cac interface
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_sap_get_pre_cac_vdev_id(mac_handle_t handle, uint8_t *vdev_id)
-{
-	struct mac_context *mac = NULL;
-	uint8_t i;
-
-	mac = MAC_CONTEXT(handle);
-	if (!mac) {
-		sap_err("Invalid mac context");
-		return QDF_STATUS_E_FAULT;
-	}
-
-	for (i = 0; i < SAP_MAX_NUM_SESSION; i++) {
-		struct sap_context *context =
-			mac->sap.sapCtxList[i].sap_context;
-		if (context && context->is_pre_cac_on) {
-			*vdev_id = i;
-			return QDF_STATUS_SUCCESS;
-		}
-	}
-	return QDF_STATUS_E_FAILURE;
-}
-#endif /* PRE_CAC_COMP */
-#endif /* PRE_CAC_SUPPORT */
-
 void wlansap_get_sec_channel(uint8_t sec_ch_offset,
 			     uint32_t op_chan_freq,
 			     uint32_t *sec_chan_freq)
@@ -2003,15 +1916,7 @@ QDF_STATUS wlansap_start_beacon_req(struct sap_context *sap_ctx)
 	if (mac->sap.SapDfsInfo.sap_radar_found_status == false) {
 		/* CAC Wait done without any Radar Detection */
 		dfs_cac_wait_status = true;
-/*
- * Code under PRE_CAC_COMP will be cleaned up
- * once pre cac component is done
- */
-#ifndef PRE_CAC_COMP
-		sap_ctx->pre_cac_complete = false;
-#else
 		wlan_pre_cac_complete_set(sap_ctx->vdev, false);
-#endif
 		status = sme_roam_start_beacon_req(MAC_HANDLE(mac),
 						   sap_ctx->bssid,
 						   dfs_cac_wait_status);
