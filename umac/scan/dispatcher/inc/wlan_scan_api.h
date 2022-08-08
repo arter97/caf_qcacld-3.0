@@ -170,6 +170,26 @@ void wlan_scan_cfg_get_passive_dwelltime(struct wlan_objmgr_psoc *psoc,
 void wlan_scan_update_pno_dwell_time(struct wlan_objmgr_vdev *vdev,
 				     struct pno_scan_req_params *req,
 				     struct scan_default_params *scan_def);
+
+/*
+ * wlan_scan_update_low_latency_profile_chnlist() - Low latency SAP + scan
+ * concurrencies
+ * @vdev: vdev object pointer
+ * @req: scan request
+ *
+ * Return: void
+ */
+void wlan_scan_update_low_latency_profile_chnlist(
+				struct wlan_objmgr_vdev *vdev,
+				struct scan_start_request *req);
+#else
+static inline
+void wlan_scan_update_low_latency_profile_chnlist(
+				struct wlan_objmgr_vdev *vdev,
+				struct scan_start_request *req)
+{
+}
+
 #endif
 
 /**

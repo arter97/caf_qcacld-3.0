@@ -703,3 +703,45 @@ void wlan_scan_get_feature_info(struct wlan_objmgr_psoc *psoc,
 				wlan_scan_is_connected_scan_enabled(psoc);
 }
 #endif
+
+#ifdef WLAN_POLICY_MGR_ENABLE
+void wlan_scan_update_low_latency_profile_chnlist(
+				struct wlan_objmgr_vdev *vdev,
+				struct scan_start_request *req)
+{
+	uint32_t num_scan_channels = 0, i;
+	struct wlan_objmgr_psoc *psoc;
+	qdf_freq_t freq, ll_sap_freq;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		scm_err("psoc is null");
+		return;
+	}
+
+	ll_sap_freq = policy_mgr_get_ll_sap_freq(psoc);
+	if (!ll_sap_freq)
+		return;
+
+	/*
+	 * Scenario: LL SAP is present and scan is requested.
+	 * Allow scan on freq on mutually exclusive mac.
+	 */
+	for (i = 0; i < req->scan_req.chan_list.num_chan; i++) {
+		freq = req->scan_req.chan_list.chan[i].freq;
+		if (policy_mgr_2_freq_always_on_same_mac(psoc,
+							 ll_sap_freq,
+							 freq))
+			continue;
+
+		req->scan_req.chan_list.chan[num_scan_channels++] =
+					req->scan_req.chan_list.chan[i];
+	}
+	if (num_scan_channels < req->scan_req.chan_list.num_chan)
+		scm_debug("For DBS: only 2.4Ghz chan and for SBS: mutually exclusive ll-sap 5GHz chan allowed, total-chan %d, remaining-chan %d, ll-sap chan %d",
+			  req->scan_req.chan_list.num_chan,
+			  num_scan_channels,
+			  ll_sap_freq);
+	req->scan_req.chan_list.num_chan = num_scan_channels;
+}
+#endif
