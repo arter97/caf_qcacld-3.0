@@ -21095,6 +21095,10 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_feature_set_event_support] =
 				WMI_SERVICE_FEATURE_SET_EVENT_SUPPORT;
 #endif
+#ifdef WLAN_FEATURE_SR
+	wmi_service[wmi_service_obss_per_packet_sr_support] =
+				WMI_SERVICE_OBSS_PER_PACKET_SR_SUPPORT;
+#endif
 }
 
 /**

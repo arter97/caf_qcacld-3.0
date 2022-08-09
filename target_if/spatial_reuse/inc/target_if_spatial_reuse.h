@@ -26,7 +26,7 @@
 #include <wlan_lmac_if_def.h>
 #include <target_if.h>
 
-#if defined WLAN_FEATURE_11AX
+#if defined WLAN_FEATURE_SR
 
 #define NON_SRG_PD_SR_DISALLOWED 0x02
 #define NON_SRG_OFFSET_PRESENT 0x04
@@ -38,6 +38,8 @@
 #define NON_SRG_PARAM_VAL_DBM_SIZE 1
 #define NON_SRG_MAX_PD_OFFSET_POS 0
 #define NON_SRG_MAX_PD_OFFSET_SIZE 8
+#define NON_SR_PD_THRESHOLD_MIN -82
+#define NON_SR_PD_THRESHOLD_DISABLED 0x80
 #define WILDCARD_PDEV_ID 0x0
 
 /**

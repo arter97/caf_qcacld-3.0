@@ -302,7 +302,7 @@ static void target_if_son_tx_ops_register(
 }
 #endif
 
-#if defined WLAN_FEATURE_11AX
+#if defined WLAN_FEATURE_SR
 static void target_if_spatial_reuse_tx_ops_register(
 			struct wlan_lmac_if_tx_ops *tx_ops)
 {

@@ -5897,6 +5897,9 @@ typedef enum {
 #ifdef WLAN_PDEV_VDEV_SEND_MULTI_PARAM
 	wmi_service_combined_set_param_support,
 #endif
+#ifdef WLAN_FEATURE_SR
+	wmi_service_obss_per_packet_sr_support,
+#endif
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF

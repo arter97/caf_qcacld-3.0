@@ -361,6 +361,7 @@ enum qcn_attribute_id {
 
 #define WLAN_HE_NON_SRG_PD_SR_DISALLOWED 0x02
 #define WLAN_HE_NON_SRG_OFFSET_PRESENT 0x04
+#define WLAN_HE_SIGA_SR_VAL15_ALLOWED  0x10
 
 #ifdef WLAN_FEATURE_11BE
 #define WLAN_EHT_CHWIDTH_20           0 /* 20MHz Oper Ch width */
