@@ -46,11 +46,12 @@ static void dp_peer_rx_rate_stats_print(uint8_t *peer_mac,
 {
 	int i = 0;
 	struct wlan_rx_rate_stats *rx_stats;
-	uint8_t is_lithium;
 	uint8_t chain, max_chain, bw, max_bw;
 	struct wlan_rx_rate_stats *tmp_rx_stats;;
 
 	rx_stats = tmp_rx_stats = (struct wlan_rx_rate_stats *)buffer;
+	max_chain = 8;
+	max_bw = 8;
 	PRINT("\n......................................");
 	PRINT("......................................");
 	PRINT("PEER %02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx\n",
@@ -61,15 +62,6 @@ static void dp_peer_rx_rate_stats_print(uint8_t *peer_mac,
 	      peer_mac[4],
 	      peer_mac[5]);
 	PRINT("\tPEER Cookie: %016"PRIx64"\n", peer_cookie);
-	is_lithium =  (peer_cookie & WLANSTATS_COOKIE_PLATFORM_OFFSET)
-					>> WLANSTATS_PEER_COOKIE_LSB;
-	if (is_lithium) {
-		max_chain = 8;
-		max_bw = 8;
-	} else {
-		max_chain = 4;
-		max_bw = 4;
-	}
 	PRINT("\n..............................................");
 	PRINT("................................");
 	PRINT("................................................");
@@ -103,7 +95,6 @@ static void dp_peer_rx_rate_stats_print(uint8_t *peer_mac,
 		}
 		rx_stats = rx_stats + 1;
 	}
-	if (is_lithium) {
 	PRINT("\n %10s | %10s | %10s | %10s | %10s |",
 	      "rate",
 	      "rssi 1 p20",
@@ -185,29 +176,7 @@ static void dp_peer_rx_rate_stats_print(uint8_t *peer_mac,
 	      "rssi 8 ext80 low_high20",
 	      "rssi 8 ext80 high_low20",
 	      "rssi 8 ext80 high20");
-	} else {
-	PRINT("\n %10s | %10s | %10s | %10s | %10s |",
-	      "rate",
-	      "rssi 1 p20",
-	      "rssi 1 e20",
-	      "rssi 1 e40",
-	      "rssi 1 e80");
-	PRINT("            | %10s | %10s | %10s | %10s |",
-	      "rssi 2 p20",
-	      "rssi 2 e20",
-	      "rssi 2 e40",
-	      "rssi 2 e80");
-	PRINT("            | %10s | %10s | %10s | %10s |",
-	      "rssi 3 p20",
-	      "rssi 3 e20",
-	      "rssi 3 e40",
-	      "rssi 3 e80");
-	PRINT("            | %10s | %10s | %10s | %10s |\n\n\n",
-	      "rssi 4 p20",
-	      "rssi 4 e20",
-	      "rssi 4 e40",
-	      "rssi 4 e80");
-	}
+
 	for (i = 0; i < WLANSTATS_CACHE_SIZE; i++) {
 		if (tmp_rx_stats->ratecode != INVALID_CACHE_IDX) {
 			printf(" %10u |", tmp_rx_stats->rate);
@@ -431,15 +400,6 @@ static void dp_peer_tx_link_stats_print(uint8_t *peer_mac,
 					uint32_t buffer_len)
 {
 	struct wlan_tx_link_stats *tx_stats;
-	uint8_t is_lithium;
-
-	is_lithium =  (peer_cookie & WLANSTATS_COOKIE_PLATFORM_OFFSET)
-					>> WLANSTATS_PEER_COOKIE_LSB;
-
-	if (!is_lithium) {
-		PRINT("Not supported in non-lithium platforms\n");
-		return;
-	}
 
 	if (buffer_len < sizeof(struct wlan_tx_link_stats)) {
 		PRINT("invalid buffer len, return");
@@ -464,9 +424,33 @@ static void dp_peer_tx_link_stats_print(uint8_t *peer_mac,
 	PRINT("ofdma_usage: %u", tx_stats->ofdma_usage);
 	PRINT("mu_mimo_usage: %u", tx_stats->mu_mimo_usage);
 	PRINT("bw_usage_avg: %u MHz", tx_stats->bw.usage_avg);
-	PRINT("bw_usage_packets: 20MHz: %u 40MHz: %u 80MHz: %u 160MHz: %u",
-	      tx_stats->bw.usage_counter[0], tx_stats->bw.usage_counter[1],
-	      tx_stats->bw.usage_counter[2], tx_stats->bw.usage_counter[3]);
+
+#ifdef WLAN_FEATURE_11BE
+	uint8_t is_lithium;
+
+	is_lithium =  (peer_cookie & WLANSTATS_COOKIE_PLATFORM_OFFSET)
+					>> WLANSTATS_PEER_COOKIE_LSB;
+	if (!is_lithium) {
+	    PRINT("bw_usage_packets: 20MHz: %u 40MHz: %u 80MHz: %u 160MHz: %u 320MHz: %u",
+		  tx_stats->bw.usage_counter[0], tx_stats->bw.usage_counter[1],
+		  tx_stats->bw.usage_counter[2], tx_stats->bw.usage_counter[3],
+		  tx_stats->bw.usage_counter[5]);
+	    PRINT("punc_bw_usage_packets: NO_PUNCTURE: %u PUNCTURED_20MHZ: %u PUNCTURED_40MHZ: %u PUNCTURED_80MHZ: %u PUNCTURED_120MHZ: %u",
+		  tx_stats->punc_bw.usage_counter[0],
+		  tx_stats->punc_bw.usage_counter[1],
+		  tx_stats->punc_bw.usage_counter[2],
+		  tx_stats->punc_bw.usage_counter[3],
+		  tx_stats->punc_bw.usage_counter[4]);
+	    PRINT("punc_bw_usage_avg: %u MHz", tx_stats->punc_bw.usage_avg);
+	    PRINT("punc_bw_usage_max:: %u%%", tx_stats->punc_bw.usage_max);
+	} else
+#endif
+	{
+	    PRINT("bw_usage_packets: 20MHz: %u 40MHz: %u 80MHz: %u 160MHz: %u",
+		  tx_stats->bw.usage_counter[0], tx_stats->bw.usage_counter[1],
+		  tx_stats->bw.usage_counter[2], tx_stats->bw.usage_counter[3]);
+	}
+
 	PRINT("bw_usage_max:: %u%%", tx_stats->bw.usage_max);
 	PRINT("ack_rssi: %d", (int8_t)tx_stats->ack_rssi);
 	PRINT("mpdu_failed: %u", tx_stats->mpdu_failed);
@@ -480,15 +464,6 @@ static void dp_peer_rx_link_stats_print(uint8_t *peer_mac,
 					uint32_t buffer_len)
 {
 	struct wlan_rx_link_stats *rx_stats;
-	uint8_t is_lithium;
-
-	is_lithium =  (peer_cookie & WLANSTATS_COOKIE_PLATFORM_OFFSET)
-					>> WLANSTATS_PEER_COOKIE_LSB;
-
-	if (!is_lithium) {
-		PRINT("Not supported in non-lithium platforms\n");
-		return;
-	}
 
 	if (buffer_len < sizeof(struct wlan_rx_link_stats)) {
 		PRINT("invalid buffer len, return");
@@ -513,9 +488,33 @@ static void dp_peer_rx_link_stats_print(uint8_t *peer_mac,
 	PRINT("ofdma_usage: %u", rx_stats->ofdma_usage);
 	PRINT("mu_mimo_usage: %u", rx_stats->mu_mimo_usage);
 	PRINT("bw_usage_avg: %u MHz", rx_stats->bw.usage_avg);
-	PRINT("bw_usage_packets: 20MHz: %u 40MHz: %u 80MHz: %u 160MHz: %u",
-	      rx_stats->bw.usage_counter[0], rx_stats->bw.usage_counter[1],
-	      rx_stats->bw.usage_counter[2], rx_stats->bw.usage_counter[3]);
+
+#ifdef WLAN_FEATURE_11BE
+	uint8_t is_lithium;
+
+	is_lithium =  (peer_cookie & WLANSTATS_COOKIE_PLATFORM_OFFSET)
+					>> WLANSTATS_PEER_COOKIE_LSB;
+	if (!is_lithium) {
+	    PRINT("bw_usage_packets: 20MHz: %u 40MHz: %u 80MHz: %u 160MHz: %u 320MHz: %u",
+		  rx_stats->bw.usage_counter[0], rx_stats->bw.usage_counter[1],
+		  rx_stats->bw.usage_counter[2], rx_stats->bw.usage_counter[3],
+		  rx_stats->bw.usage_counter[5]);
+	    PRINT("punc_bw_usage_packets: NO_PUNCTURE: %u PUNCTURED_20MHZ: %u PUNCTURED_40MHZ: %u PUNCTURED_80MHZ: %u PUNCTURED_120MHZ: %u",
+		  rx_stats->punc_bw.usage_counter[0],
+		  rx_stats->punc_bw.usage_counter[1],
+		  rx_stats->punc_bw.usage_counter[2],
+		  rx_stats->punc_bw.usage_counter[3],
+		  rx_stats->punc_bw.usage_counter[4]);
+	    PRINT("punc_bw_usage_avg: %u MHz", rx_stats->punc_bw.usage_avg);
+	    PRINT("punc_bw_usage_max:: %u%%", rx_stats->punc_bw.usage_max);
+	} else
+#endif
+	{
+	    PRINT("bw_usage_packets: 20MHz: %u 40MHz: %u 80MHz: %u 160MHz: %u",
+		  rx_stats->bw.usage_counter[0], rx_stats->bw.usage_counter[1],
+		  rx_stats->bw.usage_counter[2], rx_stats->bw.usage_counter[3]);
+	}
+
 	PRINT("bw_usage_max: %u%%", rx_stats->bw.usage_max);
 	PRINT("su_rssi: %d", (int8_t)rx_stats->su_rssi);
 	PRINT("mpdu_retries: %u", rx_stats->mpdu_retries);
