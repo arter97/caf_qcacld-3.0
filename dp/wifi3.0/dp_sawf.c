@@ -810,6 +810,8 @@ static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
 		       tx_stats->dropped.fw_reason3);
 	dp_sawf_print_stats("tx_failed = %u", tx_stats->tx_failed);
 	dp_sawf_print_stats("queue_depth = %u", tx_stats->queue_depth);
+	dp_sawf_print_stats("throughput = %u", tx_stats->throughput);
+	dp_sawf_print_stats("ingress rate = %u", tx_stats->ingress_rate);
 }
 
 static QDF_STATUS
@@ -1038,7 +1040,7 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 	struct sawf_tx_stats *stats, *dst, *src;
 	uint8_t tid, q_idx;
 	uint16_t host_q_id, host_q_idx;
-	uint32_t throughput;
+	uint32_t throughput, ingress_rate;
 	QDF_STATUS status;
 
 	stats = (struct sawf_tx_stats *)data;
@@ -1108,8 +1110,10 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 				src = &stats_ctx->stats.tx_stats[host_q_idx];
 				telemetry_sawf_get_rate(sawf_ctx->telemetry_ctx,
 							tid, host_q_idx,
-							&throughput);
+							&throughput,
+							&ingress_rate);
 				src->throughput = throughput;
+				src->ingress_rate = ingress_rate;
 
 				dp_sawf_print_stats("-- TID: %u MSDUQ: %u --",
 						    tid, q_idx);
@@ -1148,8 +1152,10 @@ dp_sawf_get_peer_tx_stats(struct cdp_soc_t *soc,
 
 		src = &stats_ctx->stats.tx_stats[host_q_idx];
 		telemetry_sawf_get_rate(sawf_ctx->telemetry_ctx,
-					tid, host_q_idx, &throughput);
+					tid, host_q_idx,
+					&throughput, &ingress_rate);
 		src->throughput = throughput;
+		src->ingress_rate = ingress_rate;
 
 		dp_sawf_print_stats("----TID: %u MSDUQ: %u ----",
 				    tid, q_idx);

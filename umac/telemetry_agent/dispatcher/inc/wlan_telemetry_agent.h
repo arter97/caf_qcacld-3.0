@@ -200,12 +200,14 @@ QDF_STATUS telemetry_sawf_update_msdu_drop(void *telemetry_ctx,
  * @telemetry_ctx: opaque telemetry peer ctx
  * @tid: tid no
  * @queue: queue-id
- * @rate: pointer to memory to fill rate-stats
+ * @egress_rate: pointer to memory to fill egress rate
+ * @ingress_rate: pointer to memory to fill ingress rate
  *
  * Return: QDF_STATUS_SUCCESS on success
  */
 QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
-				   uint8_t queue, uint32_t *rate);
+				   uint8_t queue, uint32_t *egress_rate,
+				   uint32_t *ingress_rate);
 
 /**
  * telemetry_sawf_get_mov_avg - Fetch moving avg stats from upper-layer
@@ -335,7 +337,8 @@ QDF_STATUS telemetry_sawf_update_msdu_drop(void *telemetry_ctx,
 
 static inline
 QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
-				   uint8_t queue, uint32_t *rate)
+				   uint8_t queue, uint32_t *egress_rate,
+				   uint32_t *ingress_rate)
 {
 	return QDF_STATUS_SUCCESS;
 }

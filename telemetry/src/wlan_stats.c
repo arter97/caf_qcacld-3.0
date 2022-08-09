@@ -1287,6 +1287,10 @@ fill_advance_peer_sawftx_stats(struct advance_peer_data_sawftx *data,
 					tx_stats->burst_size_stats.success_cnt;
 			data->tx[tidx][queues].burst_size_stats.failure_cnt =
 					tx_stats->burst_size_stats.failure_cnt;
+			data->tx[tidx][queues].throughput =
+					tx_stats->throughput;
+			data->tx[tidx][queues].ingress_rate =
+					tx_stats->ingress_rate;
 			tx_stats++;
 		}
 	}
