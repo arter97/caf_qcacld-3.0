@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -101,18 +102,22 @@ enum wlan_green_ap_ps_event {
 
 /**
  * struct wlan_pdev_green_ap_ctx - green ap context
- * @pdev - Pdev pointer
- * @ps_enable  - Enable PS
- * @ps_mode - No sta or Multistream sta mode
- * @ps_on_time - PS on time, once enabled
- * @ps_trans_time - PS transition time
- * @num_nodes - Number of nodes associated to radio
- * @num_nodes_multistream - Multistream nodes associated to radio
- * @ps_state - PS state
- * @ps_event - PS event
- * @ps_timer - Timer
+ * @pdev: Pdev pointer
+ * @ps_enable: Enable PS
+ * @ps_mode: No sta or Multistream sta mode
+ * @ps_on_time: PS on time, once enabled
+ * @ps_trans_time: PS transition time
+ * @num_nodes: Number of nodes associated to radio
+ * @num_nodes_multistream: Multistream nodes associated to radio
+ * @ps_state: PS state
+ * @ps_event: PS event
+ * @ps_timer: Timer
  * @lock: green ap spinlock
- * @egap_params - Enhanced green ap params
+ * @bcn_mult: beacon multiplier
+ * @ps_en_cmd_cnt: Power save enable command count
+ * @ps_dis_cmd_cnt: Power save disable command count
+ * @egap_params: Enhanced green ap params
+ * @dbg_enable: Debug Enable
  */
 struct wlan_pdev_green_ap_ctx {
 	struct wlan_objmgr_pdev *pdev;
@@ -126,6 +131,11 @@ struct wlan_pdev_green_ap_ctx {
 	enum wlan_green_ap_ps_event ps_event;
 	qdf_timer_t ps_timer;
 	qdf_spinlock_t lock;
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+	uint32_t bcn_mult;
+	qdf_atomic_t ps_en_cmd_cnt;
+	qdf_atomic_t ps_dis_cmd_cnt;
+#endif
 	struct wlan_green_ap_egap_params egap_params;
 	bool dbg_enable;
 };

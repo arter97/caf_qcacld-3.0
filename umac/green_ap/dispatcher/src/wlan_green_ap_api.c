@@ -218,6 +218,41 @@ QDF_STATUS wlan_green_ap_deinit(void)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+/**
+ * wlan_green_ap_set_bcn_mult() - API to set Green AP beacon
+ * multiplier
+ * @pdev: Pdev pointer
+ *
+ */
+static void wlan_green_ap_set_bcn_mult(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_pdev_green_ap_ctx *green_ap_ctx;
+	struct wlan_objmgr_psoc *psoc;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc) {
+		green_ap_err("psoc is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	green_ap_ctx = wlan_objmgr_pdev_get_comp_private_obj(
+			pdev, WLAN_UMAC_COMP_GREEN_AP);
+	if (!green_ap_ctx) {
+		green_ap_err("green ap context obtained is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	green_ap_ctx->bcn_mult = cfg_get(psoc,
+					 CFG_GAP_LL_PS_LOW_BEACON_MULT);
+}
+#else
+static inline void wlan_green_ap_set_bcn_mult(struct wlan_objmgr_pdev *pdev)
+{
+}
+#endif
+
 QDF_STATUS wlan_green_ap_pdev_open(struct wlan_objmgr_pdev *pdev)
 {
 	struct wlan_pdev_green_ap_ctx *green_ap_ctx;
@@ -253,6 +288,8 @@ QDF_STATUS wlan_green_ap_pdev_open(struct wlan_objmgr_pdev *pdev)
 					CFG_EGAP_WAIT_TIME_FEATURE);
 	green_ap_ctx->egap_params.egap_feature_flags = cfg_get(psoc,
 					CFG_EGAP_FLAGS_FEATURE);
+
+	wlan_green_ap_set_bcn_mult(pdev);
 
 	qdf_spin_unlock_bh(&green_ap_ctx->lock);
 
