@@ -824,6 +824,10 @@ enum {
 	IEEE80211_PARAM_EHT_LTF           = 784,   /* Set 11be - EHT LTF Support */
 #endif
 	IEEE80211_PARAM_UPTIME            = 785,  /* Get VAP uptime */
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_EHT_SUP_MCS15     = 786,   /* Set 11be - EHT MCS15 Support */
+	IEEE80211_PARAM_EHT_MCS14_DUP_IN_6GHZ                   = 787, /* Set 11be - EHT MCS14 Duplicate in 6GHz */
+#endif /* WLAN_FEATURE_11BE */
 };
 
 enum {
@@ -2469,6 +2473,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_ul_ltf",       IEEE80211_PARAM_EHT_UL_LTF, GET_PARAM, 0},
 	{"eht_ltf",              IEEE80211_PARAM_EHT_LTF, SET_PARAM, 1},
 	{"get_eht_ltf",          IEEE80211_PARAM_EHT_LTF, GET_PARAM, 0},
+	{"eht_mcs15_supp",       IEEE80211_PARAM_EHT_SUP_MCS15, SET_PARAM, 1},
+	{"get_eht_mcs15_supp",   IEEE80211_PARAM_EHT_SUP_MCS15, GET_PARAM, 0},
+	{"eht_mcs14_dup_6ghz",   IEEE80211_PARAM_EHT_MCS14_DUP_IN_6GHZ, SET_PARAM, 1},
+	{"get_eht_mcs14_dup_6ghz", IEEE80211_PARAM_EHT_MCS14_DUP_IN_6GHZ, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 	{"pure11ax",            IEEE80211_PARAM_PURE11AX, SET_PARAM, 1},
 	{"get_pure11ax",        IEEE80211_PARAM_PURE11AX, GET_PARAM, 0},
