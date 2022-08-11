@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,7 +30,6 @@
 #include "wlan_objmgr_pdev_obj.h"
 #include "wlan_objmgr_vdev_obj.h"
 #include "nan_ucfg_api.h"
-#include <wlan_mlme_api.h>
 
 static QDF_STATUS nan_psoc_obj_created_notification(
 		struct wlan_objmgr_psoc *psoc, void *arg_list)
@@ -40,10 +39,8 @@ static QDF_STATUS nan_psoc_obj_created_notification(
 
 	nan_debug("nan_psoc_create_notif called");
 	nan_obj = qdf_mem_malloc(sizeof(*nan_obj));
-	if (!nan_obj) {
-		nan_alert("malloc failed for nan prv obj");
+	if (!nan_obj)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	qdf_spinlock_create(&nan_obj->lock);
 	status = wlan_objmgr_psoc_component_obj_attach(psoc, WLAN_UMAC_COMP_NAN,
@@ -114,10 +111,8 @@ static QDF_STATUS nan_vdev_obj_created_notification(
 	}
 
 	nan_obj = qdf_mem_malloc(sizeof(*nan_obj));
-	if (!nan_obj) {
-		nan_err("malloc failed for nan prv obj");
+	if (!nan_obj)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	qdf_spinlock_create(&nan_obj->lock);
 	status = wlan_objmgr_vdev_component_obj_attach(vdev, WLAN_UMAC_COMP_NAN,
@@ -185,10 +180,8 @@ static QDF_STATUS nan_peer_obj_created_notification(
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	nan_peer_obj = qdf_mem_malloc(sizeof(*nan_peer_obj));
-	if (!nan_peer_obj) {
-		nan_err("malloc failed for nan prv obj");
+	if (!nan_peer_obj)
 		return QDF_STATUS_E_NOMEM;
-	}
 
 	qdf_spinlock_create(&nan_peer_obj->lock);
 	status = wlan_objmgr_peer_component_obj_attach(peer, WLAN_UMAC_COMP_NAN,
@@ -414,25 +407,4 @@ QDF_STATUS nan_psoc_disable(struct wlan_objmgr_psoc *psoc)
 		nan_err("target_if_nan_deregister_events failed");
 
 	return QDF_STATUS_SUCCESS;
-}
-
-bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
-{
-	bool nan_allowed = true;
-
-	/* Check for SRD channels */
-	if (wlan_reg_is_etsi13_srd_chan_for_freq(pdev, freq))
-		wlan_mlme_get_srd_master_mode_for_vdev(wlan_pdev_get_psoc(pdev),
-						       QDF_NAN_DISC_MODE,
-						       &nan_allowed);
-
-	/* Check for Indoor channels */
-	if (wlan_reg_is_freq_indoor(pdev, freq))
-		wlan_mlme_get_indoor_support_for_nan(wlan_pdev_get_psoc(pdev),
-						     &nan_allowed);
-	/* Check for dfs only if channel is not indoor */
-	else if (wlan_reg_is_dfs_for_freq(pdev, freq))
-		nan_allowed = false;
-
-	return nan_allowed;
 }

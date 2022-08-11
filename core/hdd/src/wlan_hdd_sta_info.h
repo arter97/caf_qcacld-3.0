@@ -85,8 +85,8 @@ enum dhcp_nego_status {
  * @STA_INFO_SOFTAP_REGISTER_STA:       Register a SoftAP STA
  * @STA_INFO_GET_CACHED_STATION_REMOTE: Get cached peer's info
  * @STA_INFO_HDD_GET_STATION_REMOTE:    Get remote peer's info
- * @STA_INFO_WLAN_HDD_GET_STATION_REMOTE: NL80211_CMD_GET_STATION handler for
- *                                        SoftAP
+ * @STA_INFO_WLAN_HDD_CFG80211_GET_STATION: NL80211_CMD_GET_STATION handler for
+ *                                          SoftAP
  * @STA_INFO_SOFTAP_DEAUTH_CURRENT_STA: Deauth current sta
  * @STA_INFO_SOFTAP_DEAUTH_ALL_STA:     Deauth all sta in the sta list
  * @STA_INFO_CFG80211_DEL_STATION:      CFG80211 del station handler
@@ -107,6 +107,9 @@ enum dhcp_nego_status {
  * @STA_INFO_CLEAR_CACHED_STA_INFO:     Clear the cached sta info
  * @STA_INFO_ATTACH_DETACH:             Station info attach/detach
  * @STA_INFO_SHOW:     Station info show
+ * @STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK: Update rx mcbc stats for IPA case
+ * @STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION: NL80211_CMD_GET_STATION dumpit
+ *                                           handler for SoftAP
  *
  */
 /*
@@ -125,7 +128,7 @@ typedef enum {
 	STA_INFO_SOFTAP_REGISTER_STA = 8,
 	STA_INFO_GET_CACHED_STATION_REMOTE = 9,
 	STA_INFO_HDD_GET_STATION_REMOTE = 10,
-	STA_INFO_WLAN_HDD_GET_STATION_REMOTE = 11,
+	STA_INFO_WLAN_HDD_CFG80211_GET_STATION = 11,
 	STA_INFO_SOFTAP_DEAUTH_CURRENT_STA = 12,
 	STA_INFO_SOFTAP_DEAUTH_ALL_STA = 13,
 	STA_INFO_CFG80211_DEL_STATION = 14,
@@ -144,6 +147,8 @@ typedef enum {
 	STA_INFO_CLEAR_CACHED_STA_INFO = 27,
 	STA_INFO_ATTACH_DETACH = 28,
 	STA_INFO_SHOW = 29,
+	STA_INFO_SOFTAP_IPA_RX_PKT_CALLBACK = 30,
+	STA_INFO_WLAN_HDD_CFG80211_DUMP_STATION = 31,
 
 	STA_INFO_ID_MAX,
 } wlan_sta_info_dbgid;
@@ -161,6 +166,7 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
 /**
  * struct hdd_station_info - Per station structure kept in HDD for
  *                                     multiple station support for SoftAP
+ * @sta_node: The sta_info node for the station info list maintained in adapter
  * @in_use: Is the station entry in use?
  * @sta_id: Station ID reported back from HAL (through SAP).
  *           Broadcast uses station ID zero by default.
@@ -184,6 +190,7 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * @rx_rate: Rx rate with current station reported from F/W
  * @ampdu: Ampdu enable or not of the station
  * @sgi_enable: Short GI enable or not of the station
+ * @guard_interval: Guard interval
  * @tx_stbc: Tx Space-time block coding enable/disable
  * @rx_stbc: Rx Space-time block coding enable/disable
  * @ch_width: Channel Width of the connection
@@ -211,25 +218,23 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
  * feature or not, if first bit is 1 it indicates that FW supports this
  * feature, if it is 0 it indicates FW doesn't support this feature
- * @tx_failed: the number of tx failed frames
- * @peer_rssi_per_chain: the average value of RSSI (dbm) per chain
  * @tx_retry_succeed: the number of frames retried but successfully transmit
- * @rx_last_pkt_rssi: the rssi (dbm) calculate by last packet
- * @tx_retry: the number of retried frames from host to firmware
  * @tx_retry_exhaust: the number of frames retried but finally failed
  *                    from host to firmware
  * @tx_total_fw: the number of all frames from firmware to remote station
  * @tx_retry_fw: the number of retried frames from firmware to remote station
  * @tx_retry_exhaust_fw: the number of frames retried but finally failed from
  *                    firmware to remote station
- * @sta_info: The sta_info node for the station info list maintained in adapter
+ * @rx_fcs_count: the number of frames received with fcs error
  * @assoc_req_ies: Assoc request IEs of the peer station
  * @ref_cnt: Reference count to synchronize sta_info access
  * @ref_cnt_dbgid: Reference count to debug sta_info synchronization issues
  * @pending_eap_frm_type: EAP frame type in tx queue without tx completion
  * @is_attached: Flag to check if the stainfo is attached/detached
+ * @peer_rssi_per_chain: Average value of RSSI (dbm) per chain
  */
 struct hdd_station_info {
+	qdf_list_node_t sta_node;
 	bool in_use;
 	uint8_t sta_id;
 	eStationType sta_type;
@@ -252,6 +257,7 @@ struct hdd_station_info {
 	uint32_t rx_rate;
 	bool ampdu;
 	bool sgi_enable;
+	enum txrate_gi guard_interval;
 	bool tx_stbc;
 	bool rx_stbc;
 	tSirMacHTChannelWidth ch_width;
@@ -275,21 +281,18 @@ struct hdd_station_info {
 	uint8_t support_mode;
 	uint32_t rx_retry_cnt;
 	uint32_t rx_mc_bc_cnt;
-	uint32_t tx_failed;
-	uint32_t peer_rssi_per_chain[WMI_MAX_CHAINS];
 	uint32_t tx_retry_succeed;
-	uint32_t rx_last_pkt_rssi;
-	uint32_t tx_retry;
 	uint32_t tx_retry_exhaust;
 	uint32_t tx_total_fw;
 	uint32_t tx_retry_fw;
 	uint32_t tx_retry_exhaust_fw;
-	qdf_list_node_t sta_node;
+	uint32_t rx_fcs_count;
 	struct wlan_ies assoc_req_ies;
 	qdf_atomic_t ref_cnt;
 	qdf_atomic_t ref_cnt_dbgid[STA_INFO_ID_MAX];
 	unsigned long pending_eap_frm_type;
 	bool is_attached;
+	int32_t peer_rssi_per_chain[WMI_MAX_CHAINS];
 };
 
 /**
@@ -466,8 +469,8 @@ hdd_get_next_sta_info_no_lock(struct hdd_sta_info_obj *sta_info_container,
 #define __hdd_take_ref_and_fetch_next_sta_info_safe(sta_info_container, \
 						    sta_info, next_sta_info, \
 						    sta_info_dbgid) \
-	sta_info = next_sta_info, \
 	qdf_spin_lock_bh(&sta_info_container.sta_obj_lock), \
+	sta_info = next_sta_info, \
 	hdd_get_next_sta_info_no_lock(&sta_info_container, sta_info, \
 				      &next_sta_info), \
 	(next_sta_info) ? hdd_take_sta_info_ref(&sta_info_container, \
@@ -557,6 +560,21 @@ void hdd_sta_info_detach(struct hdd_sta_info_obj *sta_info_container,
  */
 QDF_STATUS hdd_sta_info_attach(struct hdd_sta_info_obj *sta_info_container,
 			       struct hdd_station_info *sta_info);
+
+/**
+ * hdd_get_sta_info_by_id() - Find the sta_info structure by index
+ * @sta_info_container: The station info container obj that stores and maintains
+ *                      the sta_info obj.
+ * @idx: The index which the sta_info has to be fetched.
+ * @sta_info_dbgid: Debug ID of the caller API
+ *
+ * Return: Reference-counted Pointer to the hdd_station_info structure which
+ *         contains the mac address passed
+ */
+struct hdd_station_info *hdd_get_sta_info_by_id(
+				struct hdd_sta_info_obj *sta_info_container,
+				const int idx,
+				wlan_sta_info_dbgid sta_info_dbgid);
 
 /**
  * hdd_get_sta_info_by_mac() - Find the sta_info structure by mac addr

@@ -42,7 +42,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -68,7 +68,7 @@
  *
  * Supported Feature: DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -89,7 +89,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -147,7 +147,7 @@
  *
  * Supported Feature: DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -186,7 +186,7 @@
  *
  * Supported Feature: DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -210,7 +210,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -236,7 +236,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -258,14 +258,13 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
-#define CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME CFG_INI_UINT(\
+#define CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME CFG_INI_BOOL(\
 					"gEnableMCCAdaptiveScheduler", \
-					0, 1, 1, \
-					CFG_VALUE_OR_DEFAULT, \
+					true, \
 					"Enable/Disable MCC Adaptive Scheduler")
 
 /*
@@ -281,7 +280,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -319,7 +318,7 @@
  *
  * Supported Feature: Concurrency
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -341,7 +340,7 @@ CFG_INI_UINT("gAllowMCCGODiffBI", 0, 4, 4, CFG_VALUE_OR_DEFAULT, \
  *
  * Supported Feature: STA
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -376,7 +375,7 @@ CFG_INI_UINT("gEnableOverLapCh", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  *
  * Supported Feature: DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -396,6 +395,9 @@ CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 6, CFG_VALUE_OR_DEFAULT, \
  * support disabled, the value is defined by enum PM_AP_DFS_MASTER_MODE.
  * 0 - Disallow STA+SAP SCC on DFS channel
  * 1 - Allow STA+SAP SCC on DFS channel with master mode disabled
+ *       This needs gEnableDFSMasterCap enabled to allow SAP SCC with
+ *       STA on DFS but dfs master mode disabled. Single SAP is not allowed
+ *       on DFS.
  * 2 - enhance "1" with below requirement
  *	 a. Allow single SAP (GO) start on DFS channel.
  *	 b. Allow CAC process on DFS channel in single SAP (GO) mode
@@ -409,7 +411,7 @@ CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 6, CFG_VALUE_OR_DEFAULT, \
  *
  * Supported Feature: Non-DBS, DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -460,7 +462,7 @@ CFG_INI_UINT("gForce1x1Exception", 0, 2, 1, CFG_VALUE_OR_DEFAULT, \
  * Supported Feature: SAP
  *
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -484,7 +486,7 @@ CFG_INI_UINT("gEnableSAPManadatoryChanList", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  *
  * Supported Feature: Non-DBS, DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -507,7 +509,7 @@ CFG_INI_BOOL("g_nan_sap_scc_on_lte_coex_chan", 1, \
  *
  * Supported Feature: Non-DBS, DBS
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */
@@ -546,11 +548,18 @@ CFG_INI_UINT("g_mark_sap_indoor_as_disable", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  * <ini>
  * g_enable_go_force_scc - Enable/Disable force SCC on P2P GO
  * @Min: 0
- * @Max: 1
+ * @Max: 2
  * @Default: 0
  *
  * This ini and along with "gWlanMccToSccSwitchMode" is used to enable
  * force SCC on P2P GO interface.
+ *
+ * GO_FORCE_SCC_DISABLED (value 0): GO force scc disabled and GO can come up
+ * in MCC mode
+ * GO_FORCE_SCC_STRICT (value 1): New GO will be forced to form on existing
+ * GO/STA/GC channel in start bss itself.
+ * GO_FORCE_SCC_LIBERAL (value 2): After SET KEY is done, do force SCC for the
+ * first GO to move to new GO channel.
  *
  * Supported Feature: P2P GO
  *
@@ -560,7 +569,7 @@ CFG_INI_UINT("g_mark_sap_indoor_as_disable", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  */
 
 #define CFG_P2P_GO_ENABLE_FORCE_SCC \
-CFG_INI_UINT("g_enable_go_force_scc", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
+CFG_INI_UINT("g_enable_go_force_scc", 0, 2, 0, CFG_VALUE_OR_DEFAULT, \
 	     "Enable/Disable P2P GO force SCC")
 
 /**
@@ -581,7 +590,7 @@ CFG_INI_UINT("g_enable_go_force_scc", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
  * Supported Feature: STA, SAP
  *
  *
- * Usage: Internal/External
+ * Usage: External
  *
  * </ini>
  */

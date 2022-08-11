@@ -1,6 +1,5 @@
 /*
- * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -58,6 +57,7 @@ QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev);
 /**
  * hdd_softap_tx_timeout() - TX timeout handler
  * @dev: pointer to network device
+ * @txqueue: tx queue
  *
  * Function registered as a net_device .ndo_tx_timeout() method for
  * master mode interfaces (SoftAP/P2P GO), called by the OS if the
@@ -65,8 +65,11 @@ QDF_STATUS hdd_softap_ipa_start_xmit(qdf_nbuf_t nbuf, qdf_netdev_t dev);
  *
  * Return: None
  */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+void hdd_softap_tx_timeout(struct net_device *dev, unsigned int txqueue);
+#else
 void hdd_softap_tx_timeout(struct net_device *dev);
-
+#endif
 /**
  * hdd_softap_init_tx_rx() - Initialize Tx/Rx module
  * @adapter: pointer to adapter context
@@ -125,15 +128,16 @@ QDF_STATUS hdd_softap_deregister_sta(struct hdd_adapter *adapter,
  * @auth_required: is additional authentication required?
  * @privacy_required: should 802.11 privacy bit be set?
  * @sta_mac: station MAC address
- * @wmm_enabled: is WMM enabled for this STA?
+ * @event: STA assoc complete event (Can be NULL)
  *
  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
  */
-QDF_STATUS hdd_softap_register_sta(struct hdd_adapter *adapter,
-				   bool auth_required,
-				   bool privacy_required,
-				   struct qdf_mac_addr *sta_mac,
-				   bool wmm_enabled);
+QDF_STATUS
+hdd_softap_register_sta(struct hdd_adapter *adapter,
+			bool auth_required,
+			bool privacy_required,
+			struct qdf_mac_addr *sta_mac,
+			tSap_StationAssocReassocCompleteEvent *event);
 
 /**
  * hdd_softap_register_bc_sta() - Register the SoftAP broadcast STA
@@ -199,6 +203,21 @@ void hdd_softap_tx_resume_cb(void *adapter_context, bool tx_resume)
 {
 }
 #endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
+
+/**
+ * hdd_ipa_update_rx_mcbc_stats() - Update broadcast multicast stats
+ * @adapter: pointer to hdd adapter
+ * @skb: pointer to netbuf
+ *
+ * Check if multicast or broadcast pkt was received and increment
+ * the stats accordingly. This is required only if IPA is enabled
+ * as in case of regular Rx path mcast/bcast stats are processed
+ * in the dp layer.
+ *
+ * Return: None
+ */
+void hdd_ipa_update_rx_mcbc_stats(struct hdd_adapter *adapter,
+				  struct sk_buff *skb);
 
 #ifdef SAP_DHCP_FW_IND
 /**
@@ -271,52 +290,4 @@ int hdd_softap_inspect_dhcp_packet(struct hdd_adapter *adapter,
  */
 void hdd_softap_check_wait_for_tx_eap_pkt(struct hdd_adapter *adapter,
 					  struct qdf_mac_addr *mac_addr);
-
-#ifndef QCA_LL_LEGACY_TX_FLOW_CONTROL
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
-/**
- * hdd_skb_orphan() - skb_unshare a cloned packed else skb_orphan
- * @adapter: pointer to HDD adapter
- * @skb: pointer to skb data packet
- *
- * Return: pointer to skb structure
- */
-static inline struct sk_buff *hdd_skb_orphan(struct hdd_adapter *adapter,
-					     struct sk_buff *skb)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
-	hdd_skb_fill_gso_size(adapter->dev, skb);
-
-	if (skb_cloned(skb)) {
-		++adapter->hdd_stats.tx_rx_stats.tx_orphaned;
-		skb_orphan(skb);
-		return skb;
-	}
-
-	if (unlikely(hdd_ctx->config->tx_orphan_enable)) {
-		/*
-		 * For UDP packets we want to orphan the packet to allow the app
-		 * to send more packets. The flow would ultimately be controlled
-		 * by the limited number of tx descriptors for the vdev.
-		 */
-		++adapter->hdd_stats.tx_rx_stats.tx_orphaned;
-		skb_orphan(skb);
-	}
-
-	return skb;
-}
-#else
-static inline struct sk_buff *hdd_skb_orphan(struct hdd_adapter *adapter,
-					     struct sk_buff *skb)
-{
-	struct sk_buff *nskb;
-
-	hdd_skb_fill_gso_size(adapter->dev, skb);
-	nskb = skb_unshare(skb, GFP_ATOMIC);
-
-	return nskb;
-}
-#endif
-#endif /* QCA_LL_LEGACY_TX_FLOW_CONTROL */
 #endif /* end #if !defined(WLAN_HDD_SOFTAP_TX_RX_H) */

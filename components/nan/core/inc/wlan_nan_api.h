@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -209,16 +209,12 @@ bool wlan_nan_get_sap_conc_support(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc);
 
 /**
- * wlan_is_nan_allowed_on_freq() - Check if NAN is allowed on given freq
- * @pdev: pdev context
- * @freq: Frequency to be checked
+ * wlan_nan_is_beamforming_supported- Get support for beamforing
+ * @psoc: pointer to psoc object
  *
- * Check if NAN/NDP can be enabled on given frequency.
- *
- * Return: True if NAN is allowed on the given frequency
+ * Return: True if beamforming is supported, false if not.
  */
-bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq);
-
+bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc);
 #else /* WLAN_FEATURE_NAN */
 static inline QDF_STATUS nan_init(void)
 {
@@ -266,7 +262,7 @@ QDF_STATUS nan_disable_cleanup(struct wlan_objmgr_psoc *psoc)
 }
 
 static inline
-bool wlan_is_nan_allowed_on_freq(struct wlan_objmgr_pdev *pdev, uint32_t freq)
+bool wlan_nan_is_beamforming_supported(struct wlan_objmgr_psoc *psoc)
 {
 	return false;
 }

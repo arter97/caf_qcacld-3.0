@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012, 2014-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -31,6 +31,7 @@
 
 #define HDD_WAKELOCK_TIMEOUT_CONNECT 1000
 #define HDD_WAKELOCK_TIMEOUT_RESUME 1000
+#define DISABLE_KRAIT_IDLE_PS_VAL      1
 
 /*
  * HDD_WAKELOCK_CONNECT_COMPLETE = CSR_JOIN_FAILURE_TIMEOUT_DEFAULT (3000) +
@@ -184,6 +185,16 @@ QDF_STATUS hdd_wlan_shutdown(void);
  *	or an error status otherwise
  */
 QDF_STATUS hdd_wlan_re_init(void);
+
+/**
+ * hdd_handle_cached_commands() - Handle north bound commands during SSR
+ *
+ * This api will be invoked afte SSR re-initialization to execute the north
+ * bound commands received during SSR.
+ *
+ * Return: None
+ */
+void hdd_handle_cached_commands(void);
 
 /**
  * hdd_enable_arp_offload() - API to enable ARP offload
@@ -472,11 +483,13 @@ void hdd_wlan_suspend_resume_event(uint8_t state) {}
  * @adapter: adapter upon which the request was received
  * @allow_power_save: is wlan allowed to go into power save mode
  * @timeout: timeout period in ms
+ * @usr_ps_cfg_update: User PS config update required or not
  *
  * Return: 0 on success, non-zero on any error
  */
 int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
-			   bool allow_power_save, uint32_t timeout);
+			   bool allow_power_save, uint32_t timeout,
+			   bool usr_ps_cfg_update);
 
 /**
  * wlan_hdd_inc_suspend_stats() - Prints, then increments, then prints suspend
@@ -549,36 +562,6 @@ hdd_wlan_fake_apps_suspend(struct wiphy *wiphy, struct net_device *dev,
 	return 0;
 }
 #endif /* WLAN_SUSPEND_RESUME_TEST */
-
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-/**
- * wlan_hdd_mon_thread_resume() - Resume MON thread
- * @hdd_ctx: HDD context
- *
- * Check if MON thread is suspended, and resume if yes.
- *
- * Return: None
- */
-void wlan_hdd_mon_thread_resume(struct hdd_context *hdd_ctx);
-
-/**
- * wlan_hdd_mon_thread_suspend() - Suspend MON thread
- * @hdd_ctx: HDD context
- *
- * To suspend MON thread
- *
- * Return: 0 for success
- */
-int wlan_hdd_mon_thread_suspend(struct hdd_context *hdd_ctx);
-
-#else
-static inline void wlan_hdd_mon_thread_resume(struct hdd_context *hdd_ctx) {}
-static inline int wlan_hdd_mon_thread_suspend(struct hdd_context *hdd_ctx)
-{
-	return 0;
-}
-
-#endif /* WLAN_FEATURE_PKT_CAPTURE */
 
 #ifdef QCA_CONFIG_SMP
 /**

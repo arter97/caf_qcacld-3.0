@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -30,6 +31,7 @@
 #include <cds_api.h>
 #include <linux/skbuff.h>
 #include "cdp_txrx_flow_ctrl_legacy.h"
+#include <qdf_pkt_add_timestamp.h>
 
 struct hdd_netif_queue_history;
 struct hdd_context;
@@ -83,7 +85,23 @@ struct hdd_context;
 #define SME_QOS_UAPSD_CFG_VO_CHANGED_MASK     0xF8
 
 netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
+
+/**
+ * hdd_tx_timeout() - Wrapper function to protect __hdd_tx_timeout from SSR
+ * @net_dev: pointer to net_device structure
+ * @txqueue: tx queue
+ *
+ * Function called by OS if there is any timeout during transmission.
+ * Since HDD simply enqueues packet and returns control to OS right away,
+ * this would never be invoked
+ *
+ * Return: none
+ */
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+void hdd_tx_timeout(struct net_device *dev, unsigned int txqueue);
+#else
 void hdd_tx_timeout(struct net_device *dev);
+#endif
 
 QDF_STATUS hdd_init_tx_rx(struct hdd_adapter *adapter);
 QDF_STATUS hdd_deinit_tx_rx(struct hdd_adapter *adapter);
@@ -355,43 +373,29 @@ void wlan_hdd_netif_queue_control(struct hdd_adapter *adapter,
 
 #ifdef FEATURE_MONITOR_MODE_SUPPORT
 int hdd_set_mon_rx_cb(struct net_device *dev);
+/**
+ * hdd_mon_rx_packet_cbk() - Receive callback registered with OL layer.
+ * @context: pointer to qdf context
+ * @rxBuf: pointer to rx qdf_nbuf
+ *
+ * TL will call this to notify the HDD when one or more packets were
+ * received for a registered STA.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf);
 #else
 static inline
 int hdd_set_mon_rx_cb(struct net_device *dev)
 {
 	return 0;
 }
+static inline
+QDF_STATUS hdd_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
-
-#ifdef WLAN_FEATURE_PKT_CAPTURE
-/**
- * hdd_set_pktcapture_cb() - Set pkt capture mode callback
- * @dev: Pointer to net_device structure
- * @pdev_id: pdev id
- *
- * Return: 0 on success; non-zero for failure
- */
-int hdd_set_pktcapture_cb(struct net_device *dev, uint8_t pdev_id);
-
-/**
- * hdd_reset_pktcapture_cb() - Reset pkt capture mode callback
- * @pdev_id: pdev id
- *
- * Return: None
- */
-void hdd_reset_pktcapture_cb(uint8_t pdev_id);
-#else
-static inline
-int hdd_set_pktcapture_cb(struct net_device *dev, uint8_t pdev_id)
-{
-	return -ENOTSUPP;
-}
-
-static inline
-void hdd_reset_pktcapture_cb(uint8_t pdev_id)
-{
-}
-#endif /* WLAN_FEATURE_PKT_CAPTURE */
 
 void hdd_send_rps_ind(struct hdd_adapter *adapter);
 void hdd_send_rps_disable_ind(struct hdd_adapter *adapter);
@@ -568,5 +572,39 @@ wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
  */
 bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
 				    void *hif_ctx);
+
+/**
+ * hdd_sta_notify_tx_comp_cb() - notify tx comp callback registered with dp
+ * @skb: pointer to skb
+ * @ctx: osif context
+ * @flag: tx status flag
+ *
+ * Return: None
+ */
+void hdd_sta_notify_tx_comp_cb(qdf_nbuf_t skb, void *ctx, uint16_t flag);
+
+#ifdef CONFIG_DP_PKT_ADD_TIMESTAMP
+
+/**
+ * hdd_pkt_add_timestamp() - add timestamp in data payload
+ *
+ * @adapter - adapter context
+ * @index - timestamp index which decides offset in payload
+ * @time - time to update in payload
+ * @skb - socket buffer
+ *
+ * Return: none
+ */
+void hdd_pkt_add_timestamp(struct hdd_adapter *adapter,
+			   enum qdf_pkt_timestamp_index index, uint64_t time,
+			   struct sk_buff *skb);
+#else
+static inline
+void hdd_pkt_add_timestamp(struct hdd_adapter *adapter,
+			   enum qdf_pkt_timestamp_index index, uint64_t time,
+			   struct sk_buff *skb)
+{
+}
+#endif
 
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

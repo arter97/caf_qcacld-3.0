@@ -339,16 +339,33 @@ enum hdd_dot11_mode {
 
 /*
  * <ini>
- * wlanLoggingToConsole - Wlan logging to console
- * @Min: 0
- * @Max: 1
- * @Default: 1
+ * wlanConsoleLogLevelsBitmap - Bitmap to enable/disable console log levels
+ * @Min: 0x00000000
+ * @Max: 0x000003ff
+ * @Default: 0x0000001e
+ *
+ * This INI is used to enable/disable console logs for specific log level.
+ *
+ * bit-0: Reserved
+ * bit-1: QDF_TRACE_LEVEL_FATAL
+ * bit-2: QDF_TRACE_LEVEL_ERROR
+ * bit-3: QDF_TRACE_LEVEL_WARN
+ * bit-4: QDF_TRACE_LEVEL_INFO
+ * bit-5: QDF_TRACE_LEVEL_INFO_HIGH
+ * bit-6: QDF_TRACE_LEVEL_INFO_MED
+ * bit-7: QDF_TRACE_LEVEL_INFO_LOW
+ * bit-8: QDF_TRACE_LEVEL_DEBUG
+ * bit-9: QDF_TRACE_LEVEL_TRACE
+ * bit-10 to bit-31: Reserved
  *
  * </ini>
  */
-#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT CFG_INI_BOOL( \
-				"wlanLoggingToConsole", \
-				1, \
+#define CFG_WLAN_LOGGING_CONSOLE_SUPPORT CFG_INI_UINT( \
+				"wlanConsoleLogLevelsBitmap", \
+				0x00000000, \
+				0x000003ff, \
+				0x0000001e, \
+				CFG_VALUE_OR_DEFAULT, \
 				"Wlan logging to console")
 
 #define CFG_WLAN_LOGGING_SUPPORT_ALL \
@@ -753,6 +770,26 @@ struct dhcp_server {
 	"enable_mac_provision", \
 	0, \
 	"enable/disable MAC address provisioning feature")
+
+/*
+ * </ini>
+ * read_mac_addr_from_mac_file - Use/ignore MAC address from mac cfg file
+ * @Min: 0
+ * @Max: 1
+ * @Default: 0
+ *
+ * This ini is used whether to configure MAC address from the cfg file or not
+ *
+ * Supported Feature: STA/SAP/P2P
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_READ_MAC_ADDR_FROM_MAC_FILE CFG_INI_BOOL( \
+	"read_mac_addr_from_mac_file", \
+	0, \
+	"Use/ignore MAC address from cfg file")
 
 /*
  * <ini>
@@ -1556,6 +1593,64 @@ struct dhcp_server {
 #define CFG_WLAN_STA_PERIODIC_STATS
 #endif /* WLAN_FEATURE_PERIODIC_STA_STATS */
 
+#ifdef FEATURE_CLUB_LL_STATS_AND_GET_STATION
+/*
+ * <ini>
+ * club_get_sta_in_ll_stats_req - Flag used to club ll_stats and get_station
+ *                                requests in the driver
+ *
+ * @Min: 0
+ * @Max: 1
+ * Default: 1
+ *
+ * This ini param is used to enable/disable the feature for clubbing ll stats
+ * and get station requests.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_CLUB_LL_STA_AND_GET_STATION  CFG_INI_BOOL( \
+			"club_get_sta_in_ll_stats_req", \
+			1, \
+			"Club ll_stats and get station requests")
+
+/*
+ * <ini>
+ * sta_stats_cache_expiry_time - Expiry time for cached station stats
+ *
+ * @Min: 0
+ * @Max: 5000
+ * Default: 200
+ *
+ * This ini is used as duration in milliseconds for which cached station stats
+ * are valid. Driver sends the cached information as response, if it gets the
+ * get_station request with in this duration. Otherwise driver sends new
+ * request to the firmware to get the updated stats.
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_STA_STATS_CACHE_EXPIRY  CFG_INI_UINT( \
+			"sta_stats_cache_expiry_time", \
+			0, \
+			5000, \
+			200, \
+			CFG_VALUE_OR_DEFAULT, \
+			"Station stats cache expiry")
+
+#define CFG_WLAN_CLUB_GET_STA_IN_LL_STA_REQ \
+	 CFG(CFG_CLUB_LL_STA_AND_GET_STATION) \
+	 CFG(CFG_STA_STATS_CACHE_EXPIRY)
+#else
+#define CFG_WLAN_CLUB_GET_STA_IN_LL_STA_REQ
+#endif /* FEATURE_CLUB_LL_STATS_AND_GET_STATION */
+
 /**
  * enum host_log_level - Debug verbose level imposed by user
  * @HOST_LOG_LEVEL_NONE: no trace will be logged.
@@ -1672,6 +1767,7 @@ enum host_log_level {
 	CFG_ENABLE_QMI_STATS_ALL \
 	CFG_VC_MODE_BITMAP_ALL \
 	CFG_WLAN_AUTO_SHUTDOWN_ALL \
+	CFG_WLAN_CLUB_GET_STA_IN_LL_STA_REQ \
 	CFG_WLAN_LOGGING_SUPPORT_ALL \
 	CFG_WLAN_STA_PERIODIC_STATS \
 	CFG(CFG_ACTION_OUI_CCKM_1X1) \
@@ -1708,6 +1804,7 @@ enum host_log_level {
 	CFG(CFG_NB_COMMANDS_RATE_LIMIT) \
 	CFG(CFG_HDD_DOT11_MODE) \
 	CFG(CFG_ENABLE_DISABLE_CHANNEL) \
+	CFG(CFG_READ_MAC_ADDR_FROM_MAC_FILE) \
 	CFG(CFG_SAR_CONVERSION) \
 	CFG(CFG_WOW_DISABLE) \
 	CFG(CFG_ENABLE_HOST_MODULE_LOG_LEVEL) \
