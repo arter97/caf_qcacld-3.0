@@ -243,6 +243,7 @@ dp_lite_mon_disable_tx(struct dp_pdev *pdev)
 
 	/* reset tx lite mon config */
 	dp_lite_mon_reset_config(&lite_mon_tx_config->tx_config);
+	lite_mon_tx_config->subtype_filtering = false;
 	qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
 }
 
