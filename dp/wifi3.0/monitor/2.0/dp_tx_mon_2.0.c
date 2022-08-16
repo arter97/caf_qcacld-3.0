@@ -517,9 +517,11 @@ struct dp_tx_ppdu_info *dp_tx_mon_get_ppdu_info(struct dp_pdev *pdev,
 
 	/* assign tx_ppdu_info to monitor pdev for reference */
 	if (type == TX_PROT_PPDU_INFO) {
+		qdf_mem_zero(&tx_mon_be->prot_status_info, sizeof(struct hal_tx_status_info));
 		tx_mon_be->tx_prot_ppdu_info = tx_ppdu_info;
 		TXMON_PPDU_HAL(tx_ppdu_info, is_data) = 0;
 	} else {
+		qdf_mem_zero(&tx_mon_be->data_status_info, sizeof(struct hal_tx_status_info));
 		tx_mon_be->tx_data_ppdu_info = tx_ppdu_info;
 		TXMON_PPDU_HAL(tx_ppdu_info, is_data) = 1;
 	}
@@ -951,6 +953,10 @@ dp_populate_tsft_from_phy_timestamp(struct dp_pdev *pdev,
 		tx_mon_be->last_ppdu_timestamp = ppdu_timestamp;
 	}
 
+	if (!TXMON_PPDU_COM(ppdu_info, tsft) &&
+	    !TXMON_PPDU_COM(ppdu_info, ppdu_timestamp))
+		return QDF_STATUS_E_EMPTY;
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -965,11 +971,6 @@ static void
 dp_tx_mon_update_radiotap(struct dp_pdev *pdev,
 			  struct dp_tx_ppdu_info *ppdu_info)
 {
-	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
-	struct dp_mon_pdev_be *mon_pdev_be =
-			dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
-	struct dp_pdev_tx_monitor_be *tx_mon_be =
-			&mon_pdev_be->tx_monitor_be;
 	uint32_t usr_idx = 0;
 	uint32_t num_users = 0;
 
@@ -984,11 +985,8 @@ dp_tx_mon_update_radiotap(struct dp_pdev *pdev,
 				pdev->operating_channel.freq;
 
 	if (QDF_STATUS_SUCCESS !=
-	    dp_populate_tsft_from_phy_timestamp(pdev, ppdu_info)) {
-		/* free the ppdu_info */
-		dp_tx_mon_free_ppdu_info(ppdu_info, tx_mon_be);
+	    dp_populate_tsft_from_phy_timestamp(pdev, ppdu_info))
 		return;
-	}
 
 	for (usr_idx = 0; usr_idx < num_users; usr_idx++) {
 		qdf_nbuf_queue_t *mpdu_q = NULL;

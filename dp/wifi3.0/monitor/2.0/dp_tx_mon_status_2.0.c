@@ -335,7 +335,11 @@ dp_tx_mon_generate_cts2self_frm(struct dp_pdev *pdev,
 		return;
 
 	tx_mon_be = &mon_pdev_be->tx_monitor_be;
-	tx_status_info = &tx_mon_be->prot_status_info;
+
+	if (window_flag == INITIATOR_WINDOW)
+		tx_status_info = &tx_mon_be->prot_status_info;
+	else
+		tx_status_info = &tx_mon_be->data_status_info;
 
 	/*
 	 * for radiotap we allocate new skb,
@@ -723,6 +727,7 @@ dp_tx_mon_generate_mu_block_ack_frm(struct dp_pdev *pdev,
 	struct hal_tx_status_info *tx_status_info;
 	struct ieee80211_ctlframe_addr2 *wh_addr2 = NULL;
 	qdf_nbuf_t mpdu_nbuf = NULL;
+	uint16_t ba_control = 0;
 	uint8_t *frm = NULL;
 	uint32_t ba_sz = 0;
 	uint8_t num_users = TXMON_PPDU_HAL(tx_ppdu_info, num_users);
@@ -775,18 +780,30 @@ dp_tx_mon_generate_mu_block_ack_frm(struct dp_pdev *pdev,
 
 	*(u_int16_t *)(&wh_addr2->i_aidordur) = qdf_cpu_to_le16(0x0000);
 
-	qdf_mem_copy(wh_addr2->i_addr2,
-		     TXMON_STATUS_INFO(tx_status_info, addr2),
-		     QDF_MAC_ADDR_SIZE);
-	qdf_mem_copy(wh_addr2->i_addr1,
-		     TXMON_STATUS_INFO(tx_status_info, addr1),
-		     QDF_MAC_ADDR_SIZE);
+	if (window_flag == RESPONSE_WINDOW) {
+		qdf_mem_copy(wh_addr2->i_addr2,
+			     TXMON_STATUS_INFO(tx_status_info, addr2),
+			     QDF_MAC_ADDR_SIZE);
+		if (num_users > 1)
+			qdf_mem_set(wh_addr2->i_addr1, QDF_MAC_ADDR_SIZE, 0xFF);
+		else
+			qdf_mem_copy(wh_addr2->i_addr1,
+				     TXMON_STATUS_INFO(tx_status_info, addr1),
+				     QDF_MAC_ADDR_SIZE);
+	} else {
+		qdf_mem_copy(wh_addr2->i_addr2,
+			     TXMON_STATUS_INFO(tx_status_info, addr1),
+			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(wh_addr2->i_addr1,
+			     TXMON_STATUS_INFO(tx_status_info, addr2),
+			     QDF_MAC_ADDR_SIZE);
+	}
 
 	frm = (uint8_t *)&wh_addr2[1];
 
 	/* BA control */
-	*((uint16_t *)frm) = qdf_cpu_to_le16(TXMON_PPDU_USR(tx_ppdu_info,
-							    0, ba_control));
+	ba_control = 0x0016;
+	*((uint16_t *)frm) = qdf_cpu_to_le16(ba_control);
 	frm += 2;
 
 	for (i = 0; i < num_users; i++) {
@@ -796,8 +813,8 @@ dp_tx_mon_generate_mu_block_ack_frm(struct dp_pdev *pdev,
 					(TXMON_PPDU_USR(tx_ppdu_info, i,
 							aid) & 0x7FF));
 		frm += 2;
-		*((uint16_t *)frm) = TXMON_PPDU_USR(tx_ppdu_info,
-						    i, start_seq) & 0xFFF;
+		*((uint16_t *)frm) = qdf_cpu_to_le16(
+				TXMON_PPDU_USR(tx_ppdu_info, i, start_seq));
 		frm += 2;
 		qdf_mem_copy(frm,
 			     TXMON_PPDU_USR(tx_ppdu_info, i, ba_bitmap),
@@ -813,6 +830,8 @@ dp_tx_mon_generate_mu_block_ack_frm(struct dp_pdev *pdev,
 	/* always enqueue to first active user */
 	dp_tx_mon_enqueue_mpdu_nbuf(pdev, tx_ppdu_info, 0, mpdu_nbuf);
 	TXMON_PPDU_HAL(tx_ppdu_info, is_used) = 1;
+	/* HE MU fields not required for Multi Sta Block ack frame */
+	TXMON_PPDU_COM(tx_ppdu_info, he_mu_flags) = 0;
 }
 
 /**
@@ -936,7 +955,7 @@ dp_tx_mon_generate_block_ack_frm(struct dp_pdev *pdev,
 	frm += 2;
 	*((uint16_t *)frm) = qdf_cpu_to_le16(TXMON_PPDU_USR(tx_ppdu_info,
 							    user_id,
-							    start_seq) & 0xFFF);
+							    start_seq));
 	frm += 2;
 	qdf_mem_copy(frm,
 		     TXMON_PPDU_USR(tx_ppdu_info, user_id, ba_bitmap),
@@ -1164,6 +1183,8 @@ dp_tx_mon_generated_response_frm(struct dp_pdev *pdev,
 	}
 	case TXMON_GEN_RESP_SELFGEN_MBA:
 	{
+		dp_tx_mon_generate_mu_block_ack_frm(pdev, tx_ppdu_info,
+						    RESPONSE_WINDOW);
 		break;
 	}
 	case TXMON_GEN_RESP_SELFGEN_CBF:
@@ -1262,9 +1283,6 @@ dp_tx_mon_update_ppdu_info_status(struct dp_pdev *pdev,
 	}
 	case HAL_MON_RX_FRAME_BITMAP_ACK:
 	{
-		/* this comes for each user */
-		dp_tx_mon_generate_ack_frm(pdev, tx_data_ppdu_info,
-					   INITIATOR_WINDOW);
 		break;
 	}
 	case HAL_MON_RX_FRAME_BITMAP_BLOCK_ACK_256:

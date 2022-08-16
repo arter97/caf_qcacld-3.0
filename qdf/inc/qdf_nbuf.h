@@ -338,8 +338,6 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @ba_bitmap: 256 bit block ack bitmap
  * @mpdu_retry_cnt: Rx mpdu retry count
  * @punctured_pattern: punctured pattern (0 means the band is punctured)
- * @rx_user_status: pointer to mon_rx_user_status, when set update
- * radiotap header will use userinfo from this structure.
  * @usig_common: U-SIG property of received frame
  * @usig_value: U-SIG property of received frame
  * @usig_mask: U-SIG property of received frame
@@ -367,6 +365,8 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @min_nf_dbm: min noise floor in active chains per channel
  * @xbar_config: 4 bytes, used for BB to RF Chain mapping
  * @rssi_dbm_conv_support: Rssi dbm converstion support param
+ * @rx_user_status: pointer to mon_rx_user_status, when set update
+ * radiotap header will use userinfo from this structure.
  */
 struct mon_rx_status {
 	uint64_t tsft;
@@ -439,7 +439,7 @@ struct mon_rx_status {
 	uint8_t he_per_user_known;
 	uint16_t he_flags1;
 	uint16_t he_flags2;
-	uint8_t he_RU[4];
+	uint8_t he_RU[8];
 	uint16_t he_data1;
 	uint16_t he_data2;
 	uint16_t he_data3;
@@ -460,7 +460,6 @@ struct mon_rx_status {
 #ifdef WLAN_FEATURE_11BE
 	uint16_t punctured_pattern;
 #endif
-	struct mon_rx_user_status *rx_user_status;
 	uint32_t usig_common;
 	uint32_t usig_value;
 	uint32_t usig_mask;
@@ -492,6 +491,7 @@ struct mon_rx_status {
 	uint32_t xbar_config;
 	bool rssi_dbm_conv_support;
 #endif
+	struct mon_rx_user_status *rx_user_status;
 };
 
 /**
@@ -584,7 +584,7 @@ struct mon_rx_user_status {
 	uint16_t vht_flag_values6;
 	uint16_t he_flags1;
 	uint16_t he_flags2;
-	uint8_t he_RU[4];
+	uint8_t he_RU[8];
 	uint16_t he_data1;
 	uint16_t he_data2;
 	uint16_t he_data3;

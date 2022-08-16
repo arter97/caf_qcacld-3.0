@@ -705,6 +705,9 @@ void hal_mon_buff_addr_info_set(hal_soc_handle_t hal_soc_hdl,
 
 #define HAL_INVALID_PPDU_ID    0xFFFFFFFF
 
+#define HAL_MAX_DL_MU_USERS	37
+#define HAL_MAX_RU_INDEX	7
+
 enum hal_tx_tlv_status {
 	HAL_MON_TX_FES_SETUP,
 	HAL_MON_TX_FES_STATUS_END,
@@ -794,6 +797,8 @@ enum txmon_generated_response {
 	TXMON_GEN_RESP_SELFGEN_NDP_LMR
 };
 
+#define IS_MULTI_USERS(num_users)	(!!(0xFFFE & num_users))
+
 #define TXMON_HAL(hal_tx_ppdu_info, field)		\
 			hal_tx_ppdu_info->field
 #define TXMON_HAL_STATUS(hal_tx_ppdu_info, field)	\
@@ -843,8 +848,14 @@ struct hal_tx_status_info {
 		num_users		:8,
 		reserved		:10;
 
+	uint8_t mba_count;
+	uint8_t mba_fake_bitmap_count;
+
 	uint8_t sw_frame_group_id;
 	uint32_t r2r_to_follow;
+
+	uint16_t phy_abort_reason;
+	uint8_t phy_abort_user_number;
 
 	void *buffer;
 	uint32_t offset;
