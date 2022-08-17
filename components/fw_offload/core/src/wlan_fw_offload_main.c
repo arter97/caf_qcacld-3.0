@@ -858,12 +858,12 @@ QDF_STATUS fwol_set_ilp_config(struct wlan_objmgr_pdev *pdev,
 	QDF_STATUS status;
 	struct pdev_params pdev_param = {};
 
-	pdev_param.param_id = WMI_PDEV_PARAM_PCIE_HW_ILP;
+	pdev_param.param_id = wmi_pdev_param_pcie_hw_ilp;
 	pdev_param.param_value = enable_ilp;
 
 	status = tgt_fwol_pdev_param_send(pdev, pdev_param);
 	if (QDF_IS_STATUS_ERROR(status))
-		fwol_err("WMI_PDEV_PARAM_PCIE_HW_ILP failed %d", status);
+		fwol_err("wmi_pdev_param_pcie_hw_ilp failed %d", status);
 
 	return status;
 }
@@ -875,12 +875,12 @@ QDF_STATUS fwol_set_sap_sho(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	struct vdev_set_params vdev_param;
 
 	vdev_param.vdev_id = vdev_id;
-	vdev_param.param_id = WMI_VDEV_PARAM_SHO_CONFIG;
+	vdev_param.param_id = wmi_vdev_param_sho_config;
 	vdev_param.param_value = sap_sho;
 
 	status = tgt_fwol_vdev_param_send(psoc, vdev_param);
 	if (QDF_IS_STATUS_ERROR(status))
-		fwol_err("WMI_VDEV_PARAM_SHO_CONFIG failed %d", status);
+		fwol_err("wmi_vdev_param_sho_config failed %d", status);
 
 	return status;
 }
@@ -891,12 +891,12 @@ QDF_STATUS fwol_configure_hw_assist(struct wlan_objmgr_pdev *pdev,
 	QDF_STATUS status;
 	struct pdev_params pdev_param = {};
 
-	pdev_param.param_id = WMI_PDEV_PARAM_DISABLE_HW_ASSIST;
+	pdev_param.param_id = wmi_pdev_param_disable_hw_assist;
 	pdev_param.param_value = disable_hw_assist;
 
 	status = tgt_fwol_pdev_param_send(pdev, pdev_param);
 	if (QDF_IS_STATUS_ERROR(status))
-		fwol_err("WMI_PDEV_PARAM_DISABLE_HW_ASSIST failed %d", status);
+		fwol_err("wmi_pdev_param_disable_hw_assist failed %d", status);
 
 	return status;
 }
@@ -912,12 +912,12 @@ fwol_set_sap_wds_config(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		return QDF_STATUS_SUCCESS;
 
 	vdev_param.vdev_id = vdev_id;
-	vdev_param.param_id = WMI_VDEV_PARAM_WDS;
+	vdev_param.param_id = wmi_vdev_param_wds;
 	vdev_param.param_value = true;
 
 	status = tgt_fwol_vdev_param_send(psoc, vdev_param);
 	if (QDF_IS_STATUS_ERROR(status))
-		fwol_err("WMI_VDEV_PARAM_WDS failed %d", status);
+		fwol_err("wmi_vdev_param_wds failed %d", status);
 
 	return status;
 }

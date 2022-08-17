@@ -8334,7 +8334,7 @@ static int hdd_set_roam_reason_vsie_status(struct hdd_adapter *adapter,
 
 	errno = sme_cli_set_command
 			(adapter->vdev_id,
-			 WMI_VDEV_PARAM_ENABLE_DISABLE_ROAM_REASON_VSIE,
+			 wmi_vdev_param_enable_disable_roam_reason_vsie,
 			 roam_reason_vsie_enabled, VDEV_CMD);
 	if (errno) {
 		hdd_err("Failed to set beacon report error vsie");
@@ -8781,7 +8781,7 @@ static int hdd_config_ani(struct hdd_adapter *adapter,
 		enable_ani = 0;
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_ANI_ENABLE,
+				    wmi_pdev_param_ani_enable,
 				    enable_ani, PDEV_CMD);
 	if (errno) {
 		hdd_err("Failed to set ani enable, errno %d", errno);
@@ -8790,7 +8790,7 @@ static int hdd_config_ani(struct hdd_adapter *adapter,
 
 	if (ani_setting_type == QCA_WLAN_ANI_SETTING_FIXED) {
 		errno = wma_cli_set_command(adapter->vdev_id,
-					    WMI_PDEV_PARAM_ANI_OFDM_LEVEL,
+					    wmi_pdev_param_ani_ofdm_level,
 					    ani_level, PDEV_CMD);
 		if (errno) {
 			hdd_err("Failed to set ani level, errno %d", errno);
@@ -8827,7 +8827,7 @@ static int hdd_config_ant_div_period(struct hdd_adapter *adapter,
 	ant_div_usrcfg = ANT_DIV_SET_PERIOD(probe_period, stay_period);
 	hdd_debug("ant div set period: %x", ant_div_usrcfg);
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_ANT_DIV_USRCFG,
+				    wmi_pdev_param_ant_div_usrcfg,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set ant div period, %d", errno);
@@ -8863,7 +8863,7 @@ static int hdd_config_ant_div_snr_weight(struct hdd_adapter *adapter,
 	ant_div_usrcfg = ANT_DIV_SET_WEIGHT(mgmt_snr, data_snr, ack_snr);
 	hdd_debug("ant div set weight: %x", ant_div_usrcfg);
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_ANT_DIV_USRCFG,
+				    wmi_pdev_param_ant_div_usrcfg,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set ant div weight, %d", errno);
@@ -9091,7 +9091,7 @@ static int hdd_config_mgmt_retry(struct hdd_adapter *adapter,
 	max_mgmt_retry = (cfg_max(CFG_MGMT_RETRY_MAX));
 	retry = retry > max_mgmt_retry ?
 		max_mgmt_retry : retry;
-	param_id = WMI_PDEV_PARAM_MGMT_RETRY_LIMIT;
+	param_id = wmi_pdev_param_mgmt_retry_limit;
 
 	return wma_cli_set_command(adapter->vdev_id, param_id,
 				   retry, PDEV_CMD);
@@ -9106,7 +9106,7 @@ static int hdd_config_ctrl_retry(struct hdd_adapter *adapter,
 	retry = nla_get_u8(attr);
 	retry = retry > CFG_CTRL_RETRY_MAX ?
 		CFG_CTRL_RETRY_MAX : retry;
-	param_id = WMI_PDEV_PARAM_CTRL_RETRY_LIMIT;
+	param_id = wmi_pdev_param_ctrl_retry_limit;
 
 	return wma_cli_set_command(adapter->vdev_id, param_id,
 				   retry, PDEV_CMD);
@@ -9123,7 +9123,7 @@ static int hdd_config_propagation_delay(struct hdd_adapter *adapter,
 	delay = delay > CFG_PROPAGATION_DELAY_MAX ?
 				CFG_PROPAGATION_DELAY_MAX : delay;
 	abs_delay = delay + CFG_PROPAGATION_DELAY_BASE;
-	param_id = WMI_PDEV_PARAM_PROPAGATION_DELAY;
+	param_id = wmi_pdev_param_propagation_delay;
 
 	return  wma_cli_set_command(adapter->vdev_id, param_id,
 				    abs_delay, PDEV_CMD);
@@ -9136,7 +9136,7 @@ static int hdd_config_propagation_abs_delay(struct hdd_adapter *adapter,
 	int param_id;
 
 	abs_delay = nla_get_u32(attr);
-	param_id = WMI_PDEV_PARAM_PROPAGATION_DELAY;
+	param_id = wmi_pdev_param_propagation_delay;
 
 	return wma_cli_set_command(adapter->vdev_id, param_id,
 				   abs_delay, PDEV_CMD);
@@ -9248,7 +9248,7 @@ static int hdd_config_ant_div_ena(struct hdd_adapter *adapter,
 	antdiv_enable = nla_get_u32(attr);
 	hdd_debug("antdiv_enable: %d", antdiv_enable);
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_ENA_ANT_DIV,
+				    wmi_pdev_param_ena_ant_div,
 				    antdiv_enable, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set antdiv_enable, %d", errno);
@@ -9270,7 +9270,7 @@ static int hdd_config_ant_div_snr_diff(struct hdd_adapter *adapter,
 	hdd_debug("usrcfg: %x", ant_div_usrcfg);
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_ANT_DIV_USRCFG,
+				    wmi_pdev_param_ant_div_usrcfg,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set snr diff, %d", errno);
@@ -9292,7 +9292,7 @@ static int hdd_config_ant_div_probe_dwell_time(struct hdd_adapter *adapter,
 	hdd_debug("usrcfg: %x", ant_div_usrcfg);
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_ANT_DIV_USRCFG,
+				    wmi_pdev_param_ant_div_usrcfg,
 				    ant_div_usrcfg, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set probe dwell time, %d", errno);
@@ -9310,7 +9310,7 @@ static int hdd_config_ant_div_chain(struct hdd_adapter *adapter,
 	hdd_debug("antdiv_chain: %d", antdiv_chain);
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_FORCE_CHAIN_ANT,
+				    wmi_pdev_param_force_chain_ant,
 				    antdiv_chain, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set chain, %d", errno);
@@ -9328,7 +9328,7 @@ static int hdd_config_ant_div_selftest(struct hdd_adapter *adapter,
 	hdd_debug("antdiv_selftest: %d", antdiv_selftest);
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_ANT_DIV_SELFTEST,
+				    wmi_pdev_param_ant_div_selftest,
 				    antdiv_selftest, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set selftest, %d", errno);
@@ -9346,7 +9346,7 @@ static int hdd_config_ant_div_selftest_intvl(struct hdd_adapter *adapter,
 	hdd_debug("antdiv_selftest_intvl: %d", antdiv_selftest_intvl);
 
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_ANT_DIV_SELFTEST_INTVL,
+				    wmi_pdev_param_ant_div_selftest_intvl,
 				    antdiv_selftest_intvl, PDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set selftest interval, %d", errno);
@@ -9854,7 +9854,7 @@ static int hdd_config_disable_fils(struct hdd_adapter *adapter,
 			status);
 
 	status = wma_cli_set_command(adapter->vdev_id,
-				     WMI_VDEV_PARAM_ENABLE_BCAST_PROBE_RESPONSE,
+				     wmi_vdev_param_enable_bcast_probe_response,
 				     !disable_fils, VDEV_CMD);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("failed to set enable bcast probe resp, %d",
@@ -10014,7 +10014,7 @@ static int hdd_config_gtx(struct hdd_adapter *adapter,
 	}
 
 	errno = sme_cli_set_command(adapter->vdev_id,
-				    WMI_VDEV_PARAM_GTX_ENABLE,
+				    wmi_vdev_param_gtx_enable,
 				    config_gtx, VDEV_CMD);
 	if (errno)
 		hdd_err("Failed to set GTX, %d", errno);
@@ -10151,7 +10151,7 @@ static int hdd_set_dynamic_bw(struct hdd_adapter *adapter,
 
 	enable = nla_get_u8(attr);
 
-	return wma_cli_set_command(adapter->vdev_id, WMI_PDEV_PARAM_DYNAMIC_BW,
+	return wma_cli_set_command(adapter->vdev_id, wmi_pdev_param_dynamic_bw,
 				   enable, PDEV_CMD);
 }
 
@@ -10176,7 +10176,7 @@ static int hdd_set_nss(struct hdd_adapter *adapter,
 	ret = qdf_status_to_os_return(status);
 
 	if (ret == 0 && adapter->device_mode == QDF_SAP_MODE)
-		ret = wma_cli_set_command(adapter->vdev_id, WMI_VDEV_PARAM_NSS,
+		ret = wma_cli_set_command(adapter->vdev_id, wmi_vdev_param_nss,
 					  nss, VDEV_CMD);
 
 	return ret;
@@ -10910,7 +10910,7 @@ static int hdd_get_channel_width(struct hdd_adapter *adapter,
 	enum eSirMacHTChannelWidth chwidth;
 	uint8_t nl80211_chwidth;
 
-	chwidth = wma_cli_get_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
+	chwidth = wma_cli_get_command(adapter->vdev_id, wmi_vdev_param_chwidth,
 				      VDEV_CMD);
 	if (chwidth < 0) {
 		hdd_err("Failed to get chwidth");
@@ -10942,7 +10942,7 @@ static int hdd_get_dynamic_bw(struct hdd_adapter *adapter,
 	int enable;
 
 	enable = wma_cli_get_command(adapter->vdev_id,
-				     WMI_PDEV_PARAM_DYNAMIC_BW, PDEV_CMD);
+				     wmi_pdev_param_dynamic_bw, PDEV_CMD);
 	if (enable < 0) {
 		hdd_err("Failed to get dynamic_bw");
 		return -EINVAL;
@@ -10976,7 +10976,7 @@ static int hdd_get_nss_config(struct hdd_adapter *adapter,
 		int value;
 
 		value = wma_cli_get_command(adapter->vdev_id,
-					    WMI_VDEV_PARAM_NSS, VDEV_CMD);
+					    wmi_vdev_param_nss, VDEV_CMD);
 		if (value < 0) {
 			hdd_err("Failed to get nss");
 			return -EINVAL;
@@ -11734,14 +11734,14 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		}
 
 		ret_val = wma_cli_set_command(adapter->vdev_id,
-				WMI_VDEV_PARAM_BA_MODE, set_val, VDEV_CMD);
+				wmi_vdev_param_set_ba_mode, set_val, VDEV_CMD);
 		if (ret_val) {
 			hdd_err("Set BA operating mode failed");
 			goto send_err;
 		}
 		if (!cfg_val) {
 			ret_val = wma_cli_set_command(adapter->vdev_id,
-				WMI_VDEV_PARAM_AMSDU_AGGREGATION_SIZE_OPTIMIZATION,
+				wmi_vdev_param_amsdu_aggregation_size_optimization,
 				0, VDEV_CMD);
 		}
 	}
@@ -11816,7 +11816,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			/* Configure ADDBA req buffer size to 64 */
 			set_val = HDD_BA_MODE_64;
 		ret_val = wma_cli_set_command(adapter->vdev_id,
-				WMI_VDEV_PARAM_BA_MODE, set_val, VDEV_CMD);
+				wmi_vdev_param_set_ba_mode, set_val, VDEV_CMD);
 		if (ret_val)
 			hdd_err("Failed to set BA operating mode %d", set_val);
 		ret_val = wma_cli_set_command(adapter->vdev_id,
@@ -11905,7 +11905,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			sme_err("Failed to set auto rate HE LTF");
 
 		ret_val = wma_cli_set_command(adapter->vdev_id,
-					      WMI_VDEV_PARAM_HE_LTF,
+					      wmi_vdev_param_set_he_ltf,
 					      cfg_val, VDEV_CMD);
 		if (ret_val)
 			goto send_err;
@@ -11973,7 +11973,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 		if (cfg_val) {
 			hdd_debug("Set HE mac padding dur to %d", cfg_val);
 			ret_val = sme_cli_set_command(adapter->vdev_id,
-					WMI_VDEV_PARAM_MU_EDCA_FW_UPDATE_EN,
+					wmi_vdev_param_mu_edca_fw_update_en,
 					0, VDEV_CMD);
 			if (ret_val)
 				hdd_err("MU_EDCA update disable failed");
@@ -11984,7 +11984,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				hdd_err("Failed to send mu edca params");
 		} else {
 			ret_val = sme_cli_set_command(adapter->vdev_id,
-					WMI_VDEV_PARAM_MU_EDCA_FW_UPDATE_EN,
+					wmi_vdev_param_mu_edca_fw_update_en,
 					1, VDEV_CMD);
 			sme_set_usr_cfg_mu_edca(hdd_ctx->mac_handle, false);
 		}
@@ -12000,7 +12000,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				     QCA_WLAN_VENDOR_ATTR_WIFI_TEST_CONFIG_OVERRIDE_MU_EDCA]);
 		if (cfg_val) {
 			ret_val = sme_cli_set_command(adapter->vdev_id,
-					WMI_VDEV_PARAM_MU_EDCA_FW_UPDATE_EN,
+					wmi_vdev_param_mu_edca_fw_update_en,
 					0, VDEV_CMD);
 			if (ret_val)
 				hdd_err("MU_EDCA update disable failed");
@@ -12011,7 +12011,7 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 				hdd_err("Failed to send mu edca params");
 		} else {
 			ret_val = sme_cli_set_command(adapter->vdev_id,
-					WMI_VDEV_PARAM_MU_EDCA_FW_UPDATE_EN,
+					wmi_vdev_param_mu_edca_fw_update_en,
 					1, VDEV_CMD);
 			sme_set_usr_cfg_mu_edca(hdd_ctx->mac_handle, false);
 		}
@@ -12288,13 +12288,13 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			hdd_set_tx_stbc(adapter, 0);
 			hdd_set_11ax_rate(adapter, 0x400, NULL);
 			status = wma_cli_set_command(adapter->vdev_id,
-					WMI_VDEV_PARAM_HE_RANGE_EXT,
+					wmi_vdev_param_he_range_ext,
 					1, VDEV_CMD);
 			if (QDF_IS_STATUS_ERROR(status))
 				hdd_err("failed to set HE_RANGE_EXT, %d",
 					status);
 			status = wma_cli_set_command(adapter->vdev_id,
-					WMI_VDEV_PARAM_NON_DATA_HE_RANGE_EXT,
+					wmi_vdev_param_non_data_he_range_ext,
 					1, VDEV_CMD);
 			if (QDF_IS_STATUS_ERROR(status))
 				hdd_err("fail to set NON_DATA_HE_RANGE_EXT %d",
@@ -12306,13 +12306,13 @@ __wlan_hdd_cfg80211_set_wifi_test_config(struct wiphy *wiphy,
 			hdd_set_tx_stbc(adapter, 1);
 			hdd_set_11ax_rate(adapter, 0xFFFF, NULL);
 			status = wma_cli_set_command(adapter->vdev_id,
-					WMI_VDEV_PARAM_HE_RANGE_EXT,
+					wmi_vdev_param_he_range_ext,
 					0, VDEV_CMD);
 			if (QDF_IS_STATUS_ERROR(status))
 				hdd_err("failed to set HE_RANGE_EXT, %d",
 					status);
 			status = wma_cli_set_command(adapter->vdev_id,
-					WMI_VDEV_PARAM_NON_DATA_HE_RANGE_EXT,
+					wmi_vdev_param_non_data_he_range_ext,
 					0, VDEV_CMD);
 			if (QDF_IS_STATUS_ERROR(status))
 				hdd_err("fail to set NON_DATA_HE_RANGE_EXT %d",
@@ -25126,6 +25126,11 @@ void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
 }
 #endif
 
+#define MAX_PDEV_TXRX_PARAMS 2
+/* params being sent:
+ * 1.wmi_pdev_param_tx_chain_mask
+ * 2.wmi_pdev_param_rx_chain_mask
+ */
 static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 					     uint32_t tx_mask,
 					     uint32_t rx_mask)
@@ -25133,6 +25138,8 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 	int ret;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	enum hdd_chain_mode chains;
+	struct dev_set_param setparam[MAX_PDEV_TXRX_PARAMS] = {};
+	uint8_t index = 0;
 
 	ret = wlan_hdd_validate_context(hdd_ctx);
 	if (ret)
@@ -25152,15 +25159,33 @@ static int __wlan_hdd_cfg80211_set_chainmask(struct wiphy *wiphy,
 		return -EINVAL;
 	}
 
-	ret = wma_cli_set_command(0, WMI_PDEV_PARAM_TX_CHAIN_MASK,
-				  tx_mask, PDEV_CMD);
-	if (ret)
-		hdd_err_rl("Failed to set TX the mask");
+	if (sme_validate_txrx_chain_mask(wmi_pdev_param_tx_chain_mask, tx_mask))
+		return -EINVAL;
 
-	ret = wma_cli_set_command(0, WMI_PDEV_PARAM_RX_CHAIN_MASK,
-				  rx_mask, PDEV_CMD);
-	if (ret)
-		hdd_err_rl("Failed to set RX the mask");
+	ret = mlme_check_index_setparam(
+				setparam, wmi_pdev_param_tx_chain_mask,
+				tx_mask, index++, MAX_PDEV_TXRX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_tx_chain_mask");
+		return -EINVAL;
+	}
+
+	if (sme_validate_txrx_chain_mask(wmi_pdev_param_rx_chain_mask, rx_mask))
+		return -EINVAL;
+
+	ret = mlme_check_index_setparam(
+				setparam, wmi_pdev_param_rx_chain_mask,
+				rx_mask, index++, MAX_PDEV_TXRX_PARAMS);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		hdd_err("failed at wmi_pdev_param_rx_chain_mask");
+		return -EINVAL;
+	}
+
+	ret = wma_send_multi_pdev_vdev_set_params(MLME_PDEV_SETPARAM,
+						  WMI_PDEV_ID_SOC, setparam,
+						  index);
+	if (QDF_IS_STATUS_ERROR(ret))
+		hdd_err("failed to send TX, RX chain mask params");
 
 	return ret;
 }
@@ -25194,9 +25219,9 @@ static int __wlan_hdd_cfg80211_get_chainmask(struct wiphy *wiphy,
 	if (ret)
 		return -EINVAL;
 
-	*tx_mask = wma_cli_get_command(0, WMI_PDEV_PARAM_TX_CHAIN_MASK,
+	*tx_mask = wma_cli_get_command(0, wmi_pdev_param_tx_chain_mask,
 				       PDEV_CMD);
-	*rx_mask = wma_cli_get_command(0, WMI_PDEV_PARAM_RX_CHAIN_MASK,
+	*rx_mask = wma_cli_get_command(0, wmi_pdev_param_rx_chain_mask,
 				       PDEV_CMD);
 
 	/* if 0 return max value as 0 mean no set cmnd received yet */
@@ -25539,10 +25564,10 @@ static int __wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 
 configure_fw:
 		if (bit_rate != -1) {
-			hdd_debug("WMI_VDEV_PARAM_FIXED_RATE val %d", bit_rate);
+			hdd_debug("wmi_vdev_param_fixed_rate val %d", bit_rate);
 
 			errno = wma_cli_set_command(adapter->vdev_id,
-						    WMI_VDEV_PARAM_FIXED_RATE,
+						    wmi_vdev_param_fixed_rate,
 						    bit_rate, VDEV_CMD);
 
 			if (errno)
