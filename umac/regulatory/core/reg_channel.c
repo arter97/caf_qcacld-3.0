@@ -551,7 +551,7 @@ bool reg_is_nol_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 
 	chan_enum = reg_get_chan_enum_for_freq(freq);
-	if (chan_enum == INVALID_CHANNEL) {
+	if (reg_is_chan_enum_invalid(chan_enum)) {
 		reg_err("chan freq is not valid");
 		return false;
 	}
@@ -572,7 +572,7 @@ bool reg_is_nol_hist_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 
 	chan_enum = reg_get_chan_enum_for_freq(freq);
-	if (chan_enum == INVALID_CHANNEL) {
+	if (reg_is_chan_enum_invalid(chan_enum)) {
 		reg_err("chan freq is not valid");
 		return false;
 	}
@@ -844,7 +844,7 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 	}
 
 	chan_enum = reg_get_chan_enum_for_freq(freq);
-	if (chan_enum == INVALID_CHANNEL) {
+	if (reg_is_chan_enum_invalid(chan_enum)) {
 		reg_err("chan freq is not valid");
 		return;
 	}
@@ -875,7 +875,7 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 			reg_get_chan_enum_for_freq(
 				ch_params->mhz_freq_seg1 -
 				NEAREST_20MHZ_CHAN_FREQ_OFFSET);
-		if (sec_5g_chan_enum == INVALID_CHANNEL) {
+		if (reg_is_chan_enum_invalid(sec_5g_chan_enum)) {
 			reg_err("secondary channel freq is not valid");
 			return;
 		}
@@ -1218,7 +1218,7 @@ reg_get_reg_chan_list_based_on_freq(struct wlan_objmgr_pdev *pdev,
 	}
 
 	chan_enum = reg_get_chan_enum_for_freq(freq);
-	if (chan_enum == INVALID_CHANNEL) {
+	if (reg_is_chan_enum_invalid(chan_enum)) {
 		reg_err_rl("Invalid chan enum %d", chan_enum);
 		return reg_chan;
 	}
