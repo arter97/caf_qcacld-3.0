@@ -635,7 +635,7 @@ int hdd_init_nan_data_mode(struct hdd_adapter *adapter)
 		hdd_err("FAILED TO GET RTSCTS Profile status:%d", status);
 
 	ret_val = sme_cli_set_command(adapter->vdev_id,
-				      WMI_VDEV_PARAM_ENABLE_RTSCTS, rts_profile,
+				      wmi_vdev_param_enable_rtscts, rts_profile,
 				      VDEV_CMD);
 	if (ret_val)
 		hdd_err("FAILED TO SET RTSCTS Profile ret:%d", ret_val);

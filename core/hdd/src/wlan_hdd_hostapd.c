@@ -6068,7 +6068,7 @@ hdd_softap_update_pasn_vdev_params(struct hdd_context *hdd_ctx,
 		pasn_vdev_param |= WLAN_CRYPTO_URNM_MFPR;
 
 	wlan_crypto_vdev_set_param(hdd_ctx->psoc, vdev_id,
-				   WMI_VDEV_PARAM_11AZ_SECURITY_CONFIG,
+				   wmi_vdev_param_11az_security_config,
 				   pasn_vdev_param);
 }
 

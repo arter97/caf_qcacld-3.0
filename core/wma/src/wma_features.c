@@ -661,7 +661,7 @@ static void wma_sr_send_pd_threshold(tp_wma_handle wma,
 
 	if (sr_supported) {
 		vparam.vdev_id = vdev_id;
-		vparam.param_id = WMI_VDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD;
+		vparam.param_id = wmi_vdev_param_set_cmd_obss_pd_threshold;
 		vparam.param_value = val;
 		wmi_unified_vdev_set_param_send(wmi_handle, &vparam);
 	} else {

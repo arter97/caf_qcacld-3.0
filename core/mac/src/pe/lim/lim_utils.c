@@ -5302,11 +5302,11 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 	     sap_session->curr_op_freq)) {
 	/* RTS profile update to FW */
 		wma_cli_set_command(sap_session->vdev_id,
-				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    wmi_vdev_param_enable_rtscts,
 				    A_EDCA_SCC_RTS_PROFILE_VALUE,
 				    VDEV_CMD);
 		wma_cli_set_command(sta_session->vdev_id,
-				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    wmi_vdev_param_enable_rtscts,
 				    A_EDCA_SCC_RTS_PROFILE_VALUE,
 				    VDEV_CMD);
 
@@ -5374,7 +5374,7 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 	 */
 
 		wma_cli_set_command(sta_session->vdev_id,
-				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    wmi_vdev_param_enable_rtscts,
 				    cfg_get(mac->psoc,
 					    CFG_ENABLE_FW_RTS_PROFILE),
 				    VDEV_CMD);
@@ -5398,13 +5398,13 @@ static void lim_check_conc_and_send_edca(struct mac_context *mac,
 	 */
 
 		wma_cli_set_command(sap_session->vdev_id,
-				    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+				    wmi_vdev_param_enable_rtscts,
 				    cfg_get(mac->psoc,
 					    CFG_ENABLE_FW_RTS_PROFILE),
 				    VDEV_CMD);
 		if (sta_session)
 			wma_cli_set_command(sta_session->vdev_id,
-					    WMI_VDEV_PARAM_ENABLE_RTSCTS,
+					    wmi_vdev_param_enable_rtscts,
 					    cfg_get(mac->psoc,
 						    CFG_ENABLE_FW_RTS_PROFILE),
 					    VDEV_CMD);
