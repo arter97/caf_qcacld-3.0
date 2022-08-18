@@ -2884,6 +2884,7 @@ cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
 #endif
 
 #ifdef ENABLE_SMMU_S1_TRANSLATION
+#ifdef IPA_OFFLOAD
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 {
@@ -2977,6 +2978,93 @@ exit_with_success:
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
+#else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
+{
+	struct iommu_domain *domain;
+	bool wlan_smmu_enabled;
+
+	domain = pld_smmu_get_domain(osdev->dev);
+	if (domain) {
+		int attr = 0;
+		int errno = iommu_domain_get_attr(domain,
+						  DOMAIN_ATTR_S1_BYPASS, &attr);
+
+		wlan_smmu_enabled = !errno && !attr;
+	} else {
+		cds_info("No SMMU mapping present");
+		wlan_smmu_enabled = false;
+	}
+
+	if (!wlan_smmu_enabled) {
+		osdev->smmu_s1_enabled = false;
+		goto exit_with_success;
+	}
+
+	if (!ipa_present) {
+		osdev->smmu_s1_enabled = true;
+		goto exit_with_success;
+	}
+
+	osdev->smmu_s1_enabled = wlan_smmu_enabled;
+	if (!wlan_smmu_enabled) {
+		cds_err("SMMU disabled; WLAN: disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+exit_with_success:
+	osdev->domain = domain;
+
+	cds_info("SMMU S1 %s", osdev->smmu_s1_enabled ? "enabled" : "disabled");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#else
+QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
+{
+	struct dma_iommu_mapping *mapping;
+	bool wlan_smmu_enabled;
+
+	mapping = pld_smmu_get_mapping(osdev->dev);
+	if (mapping) {
+		int attr = 0;
+		int errno = iommu_domain_get_attr(mapping->domain,
+						  DOMAIN_ATTR_S1_BYPASS, &attr);
+
+		wlan_smmu_enabled = !errno && !attr;
+	} else {
+		cds_info("No SMMU mapping present");
+		wlan_smmu_enabled = false;
+	}
+
+	if (!wlan_smmu_enabled) {
+		osdev->smmu_s1_enabled = false;
+		goto exit_with_success;
+	}
+
+	if (!ipa_present) {
+		osdev->smmu_s1_enabled = true;
+		goto exit_with_success;
+	}
+
+	osdev->smmu_s1_enabled = wlan_smmu_enabled;
+	if (!wlan_smmu_enabled) {
+		cds_err("SMMU disabled; WLAN:disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+exit_with_success:
+	osdev->iommu_mapping = mapping;
+
+	cds_info("SMMU S1 %s", osdev->smmu_s1_enabled ? "enabled" : "disabled");
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #endif
 
 #ifdef IPA_OFFLOAD
