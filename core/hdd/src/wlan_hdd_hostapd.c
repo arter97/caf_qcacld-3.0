@@ -4219,11 +4219,11 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 		hdd_err("Failed to get sifs burst value, use default");
 
 	ret = wma_cli_set_command(adapter->vdev_id,
-				  WMI_PDEV_PARAM_BURST_ENABLE,
+				  wmi_pdev_param_burst_enable,
 				  enable_sifs_burst,
 				  PDEV_CMD);
 	if (0 != ret)
-		hdd_err("WMI_PDEV_PARAM_BURST_ENABLE set failed: %d", ret);
+		hdd_err("wmi_pdev_param_burst_enable set failed: %d", ret);
 
 
 	ucfg_mlme_is_6g_sap_fd_enabled(hdd_ctx->psoc, &is_6g_sap_fd_enabled);

@@ -300,7 +300,7 @@ int hdd_set_11be_rate_code(struct hdd_adapter *adapter, uint16_t rate_code)
 		  rate_code, rix, preamble, nss);
 
 	ret = wma_cli_set_command(adapter->vdev_id,
-				  WMI_VDEV_PARAM_FIXED_RATE,
+				  wmi_vdev_param_fixed_rate,
 				  rate_code, VDEV_CMD);
 
 	return ret;
