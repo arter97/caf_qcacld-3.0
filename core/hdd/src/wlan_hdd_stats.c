@@ -3861,7 +3861,7 @@ set_thresh:
 set_period:
 	hdd_info("send period to target");
 	errno = wma_cli_set_command(adapter->vdev_id,
-				    WMI_PDEV_PARAM_STATS_OBSERVATION_PERIOD,
+				    wmi_pdev_param_stats_observation_period,
 				    period, PDEV_CMD);
 	if (errno) {
 		hdd_err("wma_cli_set_command set_period failed.");

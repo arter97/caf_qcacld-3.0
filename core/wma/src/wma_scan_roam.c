@@ -474,6 +474,12 @@ void wma_process_set_pdev_vht_ie_req(tp_wma_handle wma,
 		wmi_buf_free(buf);
 }
 
+#define MAX_VDEV_ROAM_SCAN_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_bmiss_first_bcnt
+ * wmi_vdev_param_bmiss_final_bcnt
+ */
+
 /**
  * wma_roam_scan_bmiss_cnt() - set bmiss count to fw
  * @wma_handle: wma handle
@@ -489,28 +495,33 @@ QDF_STATUS wma_roam_scan_bmiss_cnt(tp_wma_handle wma_handle,
 				   A_INT32 first_bcnt,
 				   A_UINT32 final_bcnt, uint32_t vdev_id)
 {
-	QDF_STATUS status;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dev_set_param setparam[MAX_VDEV_ROAM_SCAN_PARAMS] = {};
+	uint8_t index = 0;
 
 	wma_debug("first_bcnt: %d, final_bcnt: %d", first_bcnt, final_bcnt);
 
-	status = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
-				    WMI_VDEV_PARAM_BMISS_FIRST_BCNT,
-				    first_bcnt);
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_bmiss_first_bcnt,
+					   first_bcnt, index++,
+					   MAX_VDEV_ROAM_SCAN_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("wma_vdev_set_param WMI_VDEV_PARAM_BMISS_FIRST_BCNT returned Error %d",
-			status);
-		return status;
+		wma_err("failed to set wmi_vdev_param_bmiss_first_bcnt");
+		goto error;
 	}
-
-	status = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
-				    WMI_VDEV_PARAM_BMISS_FINAL_BCNT,
-				    final_bcnt);
+	status = mlme_check_index_setparam(setparam,
+					   wmi_vdev_param_bmiss_final_bcnt,
+					   final_bcnt, index++,
+					   MAX_VDEV_ROAM_SCAN_PARAMS);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		wma_err("wma_vdev_set_param WMI_VDEV_PARAM_BMISS_FINAL_BCNT returned Error %d",
-			status);
-		return status;
+		wma_err("failed to set wmi_vdev_param_bmiss_final_bcnt");
+		goto error;
 	}
-
+	status = wma_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+						     vdev_id, setparam, index);
+	if (QDF_IS_STATUS_ERROR(status))
+		wma_err("Failed to set BMISS FIRST and FINAL vdev set params");
+error:
 	return status;
 }
 
