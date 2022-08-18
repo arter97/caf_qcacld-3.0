@@ -1653,6 +1653,7 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 	struct dp_vdev *lite_mon_vdev;
 	struct dp_mon_vdev *mon_vdev;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint8_t filter_category;
 
 	if (qdf_unlikely(!mon_mpdu || !ppdu_info)) {
 		dp_mon_debug("mon mpdu or ppdu info is NULL");
@@ -1686,23 +1687,6 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 		goto done;
 	}
 
-	/* update rssi for nac client, we can do this only for
-	 * first mpdu as rssi is at ppdu level */
-	if (mpdu_id == 0 &&
-	    config->peer_count) {
-		struct dp_lite_mon_peer *peer = NULL;
-
-		TAILQ_FOREACH(peer, &config->peer_list,
-			      peer_list_elem) {
-			if (!qdf_mem_cmp(&peer->peer_mac,
-					 &ppdu_info->nac_info.mac_addr2,
-					 QDF_MAC_ADDR_SIZE)) {
-				peer->rssi = ppdu_info->rx_status.rssi_comb;
-				break;
-			}
-		}
-	}
-
 	/* if level is PPDU we need only first MPDU, drop others
 	 * and return success*/
 	if (config->level == CDP_LITE_MON_LEVEL_PPDU && mpdu_id != 0) {
@@ -1720,6 +1704,26 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 		dp_mon_debug("filter check did not pass, drop mpdu");
 		dp_mon_free_parent_nbuf(&be_mon_pdev->mon_pdev, mon_mpdu);
 		goto done;
+	}
+
+	/* update rssi for nac client */
+	filter_category =  ppdu_info->rx_user_status[user].filter_category;
+	if (filter_category == DP_MPDU_FILTER_CATEGORY_MD &&
+	    config->peer_count &&
+	    ppdu_info->nac_info.fc_valid &&
+	    ppdu_info->nac_info.to_ds_flag &&
+	    ppdu_info->nac_info.mac_addr2_valid) {
+		struct dp_lite_mon_peer *peer = NULL;
+
+		TAILQ_FOREACH(peer, &config->peer_list,
+			      peer_list_elem) {
+			if (!qdf_mem_cmp(&peer->peer_mac,
+					 &ppdu_info->nac_info.mac_addr2,
+					 QDF_MAC_ADDR_SIZE)) {
+				peer->rssi = ppdu_info->rx_status.rssi_comb;
+				break;
+			}
+		}
 	}
 
 	mpdu_meta = (struct hal_rx_mon_mpdu_info *)qdf_nbuf_data(mon_mpdu);
