@@ -1008,7 +1008,7 @@ void wma_set_eht_txbf_params(uint8_t vdev_id, bool su_bfer,
 	WMI_VDEV_EHT_ULOFDMA_ENABLE(ehtmu_mode);
 
 	status = wma_vdev_set_param(wma->wmi_handle, vdev_id,
-				    WMI_VDEV_PARAM_SET_EHT_MU_MODE, ehtmu_mode);
+				    wmi_vdev_param_set_eht_mu_mode, ehtmu_mode);
 	wma_debug("set EHTMU_MODE (ehtmu_mode = 0x%x)", ehtmu_mode);
 
 	if (QDF_IS_STATUS_ERROR(status))
@@ -1155,5 +1155,33 @@ rate_found:
 		*p_index = index;
 	}
 	return match_rate;
+}
+
+QDF_STATUS
+wma_set_eht_txbf_vdev_params(struct mac_context *mac, uint32_t *mode)
+{
+	uint32_t ehtmu_mode = 0;
+	bool su_bfer = mac->mlme_cfg->eht_caps.dot11_eht_cap.su_beamformer;
+	bool su_bfee = mac->mlme_cfg->eht_caps.dot11_eht_cap.su_beamformee;
+	bool mu_bfer =
+		(mac->mlme_cfg->eht_caps.dot11_eht_cap.mu_bformer_le_80mhz ||
+		 mac->mlme_cfg->eht_caps.dot11_eht_cap.mu_bformer_160mhz ||
+		 mac->mlme_cfg->eht_caps.dot11_eht_cap.mu_bformer_320mhz);
+
+	if (su_bfer)
+		WMI_VDEV_EHT_SUBFER_ENABLE(ehtmu_mode);
+	if (su_bfee) {
+		WMI_VDEV_EHT_SUBFEE_ENABLE(ehtmu_mode);
+		WMI_VDEV_EHT_MUBFEE_ENABLE(ehtmu_mode);
+	}
+	if (mu_bfer)
+		WMI_VDEV_EHT_MUBFER_ENABLE(ehtmu_mode);
+	WMI_VDEV_EHT_DLOFDMA_ENABLE(ehtmu_mode);
+	WMI_VDEV_EHT_ULOFDMA_ENABLE(ehtmu_mode);
+	wma_debug("set EHTMU_MODE (ehtmu_mode = 0x%x)",
+		  ehtmu_mode);
+	*mode = ehtmu_mode;
+
+	return QDF_STATUS_SUCCESS;
 }
 #endif
