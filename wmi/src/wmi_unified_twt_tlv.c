@@ -327,11 +327,14 @@ send_twt_nudge_dialog_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->dialog_id = params->dialog_id;
 	cmd->suspend_duration_ms = params->suspend_duration / 1000;
 	cmd->next_twt_size = params->next_twt_size;
+	cmd->sp_start_offset = params->sp_start_offset;
 
 	wmi_debug("vdev_id: %d dialog_id: %d duration(in ms): %u next_twt_size: %d "
-		  "peer_macaddr: "QDF_MAC_ADDR_FMT, cmd->vdev_id,
-		  cmd->dialog_id, cmd->suspend_duration_ms, cmd->next_twt_size,
-		  QDF_MAC_ADDR_REF(params->peer_macaddr.bytes));
+		  "peer_macaddr: " QDF_MAC_ADDR_FMT " sp_start_offset: %d",
+		  cmd->vdev_id, cmd->dialog_id, cmd->suspend_duration_ms,
+		  cmd->next_twt_size,
+		  QDF_MAC_ADDR_REF(params->peer_macaddr.bytes),
+		  cmd->sp_start_offset);
 
 	status = wmi_unified_cmd_send(wmi_handle, buf, sizeof(*cmd),
 				      WMI_TWT_NUDGE_DIALOG_CMDID);
