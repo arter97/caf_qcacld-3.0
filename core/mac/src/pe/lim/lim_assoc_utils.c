@@ -2376,7 +2376,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 
 	/*
 	 * If HT client is connected to SAP DUT and self cap is NSS = 2 then
-	 * disable ASYNC DBS scan by sending WMI_VDEV_PARAM_SMPS_INTOLERANT
+	 * disable ASYNC DBS scan by sending wmi_vdev_param_smps_intolerant
 	 * to FW, because HT client's can't drop down chain using SMPS frames.
 	 */
 	if (!policy_mgr_is_hw_dbs_2x2_capable(mac_ctx->psoc) &&
@@ -2387,7 +2387,7 @@ lim_add_sta(struct mac_context *mac_ctx,
 		session_entry->ht_client_cnt++;
 		if (session_entry->ht_client_cnt == 1) {
 			wma_cli_set_command(session_entry->smeSessionId,
-				(int)WMI_VDEV_PARAM_SMPS_INTOLERANT,
+				(int)wmi_vdev_param_smps_intolerant,
 				1, VDEV_CMD);
 		}
 	}
@@ -2729,7 +2729,7 @@ lim_del_sta(struct mac_context *mac,
 		if (pe_session->ht_client_cnt == 0) {
 			pe_debug("clearing SMPS intolrent vdev_param");
 			wma_cli_set_command(pe_session->smeSessionId,
-				(int)WMI_VDEV_PARAM_SMPS_INTOLERANT,
+				(int)wmi_vdev_param_smps_intolerant,
 				0, VDEV_CMD);
 		}
 	}

@@ -1784,17 +1784,17 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 
 	/*
 	 * If CCK WAR is set for current AP, update to firmware via
-	 * WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM
+	 * wmi_vdev_param_abg_mode_tx_chain_num
 	 */
 	is_vendor_ap_present =
 			wlan_action_oui_search(mac_ctx->psoc,
 					       &vendor_ap_search_attr,
 					       ACTION_OUI_CCKM_1X1);
 	if (is_vendor_ap_present) {
-		pe_debug("vdev: %d WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM 1",
+		pe_debug("vdev: %d wmi_vdev_param_abg_mode_tx_chain_num 1",
 			 session->vdev_id);
 		wma_cli_set_command(session->vdev_id,
-			(int)WMI_VDEV_PARAM_ABG_MODE_TX_CHAIN_NUM, 1,
+			(int)wmi_vdev_param_abg_mode_tx_chain_num, 1,
 			VDEV_CMD);
 	}
 
