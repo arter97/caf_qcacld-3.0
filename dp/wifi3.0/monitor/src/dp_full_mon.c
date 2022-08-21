@@ -906,7 +906,7 @@ uint32_t dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 							 dp_rx_get_mon_desc_pool(soc, mac_id,
 										 pdev->pdev_id),
 										 rx_bufs_reaped,
-										 &head_desc, &tail_desc);
+										 &head_desc, &tail_desc, false);
 			if (status != QDF_STATUS_SUCCESS)
 				qdf_assert_always(0);
 
