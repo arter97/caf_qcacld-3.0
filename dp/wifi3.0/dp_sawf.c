@@ -490,8 +490,6 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 						    tid, host_q_idx,
 						    tx_delay->success,
 						    tx_delay->failure);
-			tx_delay->failure = 0;
-			tx_delay->success = 0;
 		}
 	}
 
@@ -785,6 +783,9 @@ static void dp_sawf_dump_delay_stats(struct sawf_delay_stats *stats)
 				    dp_hist_tx_hw_delay_str(idx),
 				    stats->delay_hist.hist.freq[idx]);
 	}
+
+	dp_sawf_print_stats("Delay bound success = %llu", stats->success);
+	dp_sawf_print_stats("Delay bound failure = %llu", stats->failure);
 }
 
 static void dp_sawf_dump_tx_stats(struct sawf_tx_stats *tx_stats)
@@ -850,6 +851,8 @@ dp_sawf_copy_delay_stats(struct sawf_delay_stats *dst,
 {
 	dp_copy_hist_stats(&src->delay_hist, &dst->delay_hist);
 	dst->mov_avg = src->mov_avg;
+	dst->success = src->success;
+	dst->failure = dst->failure;
 }
 
 static void
