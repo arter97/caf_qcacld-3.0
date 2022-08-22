@@ -1402,6 +1402,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_BCN_MAX_COUNT = 515,
 	/* Display super channel list */
 	OL_ATH_PARAM_DISPLAY_SUPER_CHANNEL_LIST = 516,
+	OL_ATH_PARAM_DFS_PUNCTURE = 517,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3223,6 +3224,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_BW_EXPAND, SET_PARAM, 1},
 	{"g_bw_expand",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_BW_EXPAND, GET_PARAM, 0},
+	{"dfs_puncture_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_PUNCTURE, SET_PARAM, 1},
+	{"g_dfs_puncture_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_PUNCTURE, GET_PARAM, 0},
 	{"get_bandinfo",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_BAND_INFO, GET_PARAM, 0},
 	{"bw_reduceEn",

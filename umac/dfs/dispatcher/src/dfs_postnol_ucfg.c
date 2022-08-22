@@ -443,3 +443,38 @@ QDF_STATUS ucfg_dfs_get_bw_expand(struct wlan_objmgr_pdev *pdev,
 
 qdf_export_symbol(ucfg_dfs_get_bw_expand);
 #endif /* QCA_DFS_BW_EXPAND */
+
+#ifdef QCA_DFS_BW_PUNCTURE
+QDF_STATUS
+ucfg_dfs_set_dfs_puncture(struct wlan_objmgr_pdev *pdev,
+			  bool is_dfs_punc_en)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs)
+		return  QDF_STATUS_E_FAILURE;
+
+	dfs_set_dfs_puncture(dfs, is_dfs_punc_en);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(ucfg_dfs_set_dfs_puncture);
+
+QDF_STATUS ucfg_dfs_get_dfs_puncture(struct wlan_objmgr_pdev *pdev,
+				     bool *is_dfs_punc_en)
+{
+	struct wlan_dfs *dfs;
+
+	dfs = wlan_pdev_get_dfs_obj(pdev);
+	if (!dfs)
+		return  QDF_STATUS_E_FAILURE;
+
+	dfs_get_dfs_puncture(dfs, is_dfs_punc_en);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(ucfg_dfs_get_dfs_puncture);
+#endif /* QCA_DFS_BW_PUNCTURE */
