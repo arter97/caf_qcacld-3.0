@@ -2984,20 +2984,30 @@ bool dfs_bwexpand_is_chanset_agile_eligible(struct wlan_dfs *dfs,
 					    uint8_t offset)
 {
 	uint8_t temp = 0;
+	uint8_t n_cac_done_chan = 0;
 
 	while (temp < n_agile_subchans) {
 		qdf_freq_t *p_tgt_freq = &target_freq_list[temp + offset];
 
 		if (dfs_is_freq_in_nol(dfs, *p_tgt_freq) ||
-		    dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(dfs, *p_tgt_freq) ||
 		    dfs_is_subset_channel_for_freq(cur_freq_list,
 						   n_cur_channels,
 						   p_tgt_freq,
 						   1))
 			return false;
 
+		if (dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(dfs, *p_tgt_freq))
+			n_cac_done_chan++;
+
 		temp++;
 	}
+
+	/* If there is at least one channel on which cac is not done,
+	 * it is agile CAC eligible
+	 */
+	if (n_cac_done_chan == n_agile_subchans)
+		return false;
+
 	return true;
 }
 
