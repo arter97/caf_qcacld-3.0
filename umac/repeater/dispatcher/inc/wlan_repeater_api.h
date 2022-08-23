@@ -135,10 +135,8 @@ struct rptr_ext_cbacks {
 	void (*peer_disassoc)(struct wlan_objmgr_peer *peer);
 	void (*pdev_update_beacon)(struct wlan_objmgr_pdev *pdev);
 	bool (*target_lithium)(struct wlan_objmgr_pdev *pdev);
-#if REPEATER_SAME_SSID
 	bool (*dessired_ssid_found)(struct wlan_objmgr_vdev *vdev,
 				    u8 *ssid, u8 ssid_len);
-#endif
 #if DBDC_REPEATER_SUPPORT
 	void (*legacy_dbdc_flags_get)(struct wlan_objmgr_pdev *pdev,
 				      struct dbdc_flags *flags);

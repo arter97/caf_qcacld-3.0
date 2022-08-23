@@ -166,10 +166,8 @@ wlan_rptr_core_register_ext_cb(struct rptr_ext_cbacks *ext_cbacks)
 		g_priv->ext_cbacks.pdev_update_beacon =
 				ext_cbacks->pdev_update_beacon;
 		g_priv->ext_cbacks.target_lithium = ext_cbacks->target_lithium;
-#if REPEATER_SAME_SSID
 		g_priv->ext_cbacks.dessired_ssid_found =
 				ext_cbacks->dessired_ssid_found;
-#endif
 #if DBDC_REPEATER_SUPPORT
 		g_priv->ext_cbacks.legacy_dbdc_flags_get =
 				ext_cbacks->legacy_dbdc_flags_get;
@@ -1400,9 +1398,7 @@ QDF_STATUS wlan_repeater_init(void)
 	rptr_ext_cbacks.target_lithium = wlan_target_lithium;
 	rptr_ext_cbacks.peer_disassoc = wlan_peer_disassoc;
 	rptr_ext_cbacks.pdev_update_beacon = wlan_pdev_update_beacon;
-#if REPEATER_SAME_SSID
 	rptr_ext_cbacks.dessired_ssid_found = wlan_dessired_ssid_found;
-#endif
 #if DBDC_REPEATER_SUPPORT
 	rptr_ext_cbacks.legacy_dbdc_flags_get = wlan_legacy_dbdc_flags_get;
 	rptr_ext_cbacks.max_pri_stavap_process_up = wlan_max_pri_stavap_process_up;
