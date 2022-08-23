@@ -148,6 +148,15 @@ QDF_STATUS pe_start(struct mac_context *mac);
 void pe_stop(struct mac_context *mac);
 
 /**
+ * is_mgmt_protected  -  check RMF enabled for the peer
+ * @vdev_id: vdev id
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: True if RMF enabled and key is installed
+ */
+bool is_mgmt_protected(uint32_t vdev_id, const uint8_t *peer_mac_addr);
+
+/**
  * lim_stop_pmfcomeback_timer() - stop pmf comeback timer
  * @session: Pointer to PE session
  *
@@ -510,6 +519,17 @@ void lim_set_twt_peer_capabilities(struct mac_context *mac_ctx,
 				   struct qdf_mac_addr *peer_mac,
 				   tDot11fIEhe_cap *he_cap,
 				   tDot11fIEhe_op *he_op);
+
+/**
+ * lim_set_twt_ext_capabilities() - Update twt caps for 11n devices
+ * @mac_ctx: Pointer to mac context
+ * @peer_mac: peer mac address
+ * @ext_cap: pointer to Extended capabilities IE
+ *
+ */
+void lim_set_twt_ext_capabilities(struct mac_context *mac_ctx,
+				  struct qdf_mac_addr *peer_mac,
+				  struct s_ext_cap *ext_cap);
 #else
 static inline
 void lim_fill_roamed_peer_twt_caps(struct mac_context *mac_ctx, uint8_t vdev_id,
@@ -521,6 +541,12 @@ void lim_set_twt_peer_capabilities(struct mac_context *mac_ctx,
 				    struct qdf_mac_addr *peer_mac,
 				    tDot11fIEhe_cap *he_cap,
 				    tDot11fIEhe_op *he_op)
+{}
+
+static inline
+void lim_set_twt_ext_capabilities(struct mac_context *mac_ctx,
+				  struct qdf_mac_addr *peer_mac,
+				  struct s_ext_cap *ext_cap)
 {}
 #endif
 
@@ -539,6 +565,41 @@ QDF_STATUS
 lim_fill_pe_session(struct mac_context *mac_ctx,
 		    struct pe_session *session,
 		    struct bss_description *bss_desc);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * lim_gen_link_specific_probe_rsp() - Generate link specific prb response
+ * @mac_ctx: Pointer to mac context
+ * @session_entry: pe session
+ * @rcvd_probe_resp: Pointer to received prb resp from AP.
+ * @probe_rsp: ptr to prb rsp
+ * @probe_rsp_len: length of prb rsp
+ * @rssi : rssi for link
+ *
+ * This api will generate link specific probe response
+ * and save in scan database.
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
+				struct pe_session *session_entry,
+				tpSirProbeRespBeacon rcvd_probe_resp,
+				uint8_t *probe_rsp,
+				uint32_t probe_rsp_len,
+				int32_t rssi);
+#else
+static inline QDF_STATUS
+lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
+				struct pe_session *session_entry,
+				tpSirProbeRespBeacon rcvd_probe_resp,
+				uint8_t *probe_rsp,
+				uint32_t probe_rsp_len,
+				int32_t rssi)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 
 #if defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(WLAN_FEATURE_11BE_MLO)
 /**

@@ -574,6 +574,7 @@ struct csr_roam_info {
 	enum sir_sme_phy_mode mode;
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t max_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
@@ -620,6 +621,7 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
 	uint8_t max_mcs_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	/* Extended capabilities of STA */
@@ -816,7 +818,7 @@ typedef void (*sme_get_raom_scan_ch_callback)(
 				void *context);
 
 #if defined(WLAN_LOGGING_SOCK_SVC_ENABLE) && \
-	defined(FEATURE_PKTLOG) && !defined(REMOVE_PKT_LOG)
+	defined(CONNECTIVITY_PKTLOG)
 /**
  * csr_packetdump_timer_stop() - stops packet dump timer
  *

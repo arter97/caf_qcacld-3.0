@@ -25,6 +25,7 @@
 #include "wlan_hdd_main.h"
 #include "wlan_hdd_mlo.h"
 #include "osif_vdev_sync.h"
+#include "wlan_osif_features.h"
 
 #if defined(CFG80211_11BE_BASIC)
 void hdd_update_mld_mac_addr(struct hdd_context *hdd_ctx,
@@ -89,8 +90,8 @@ void hdd_register_wdev(struct hdd_adapter *sta_adapter,
 	link_adapter->wdev.iftype = NL80211_IFTYPE_MLO_LINK;
 
 	mutex_lock(&sta_adapter->wdev.mtx);
-	ret = cfg80211_register_mlo_link(&sta_adapter->wdev,
-					 &link_adapter->wdev);
+	ret = cfg80211_register_sta_mlo_link(&sta_adapter->wdev,
+					     &link_adapter->wdev);
 	mutex_unlock(&sta_adapter->wdev.mtx);
 	if (ret) {
 		hdd_err("Failed to register ml link wdev %d", ret);

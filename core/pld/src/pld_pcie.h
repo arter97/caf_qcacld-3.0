@@ -76,10 +76,27 @@ static inline int pld_pcie_wlan_disable(struct device *dev,
 {
 	return 0;
 }
+
+static inline int pld_pcie_wlan_hw_enable(void)
+{
+	return 0;
+}
+
 #else
 int pld_pcie_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 			 enum pld_driver_mode mode, const char *host_version);
 int pld_pcie_wlan_disable(struct device *dev, enum pld_driver_mode mode);
+#ifdef FEATURE_CNSS_HW_SECURE_DISABLE
+static inline int pld_pcie_wlan_hw_enable(void)
+{
+	return cnss_wlan_hw_enable();
+}
+#else
+static inline int pld_pcie_wlan_hw_enable(void)
+{
+	return -EINVAL;
+}
+#endif
 #endif
 
 #if defined(CONFIG_PLD_PCIE_CNSS)
@@ -133,23 +150,6 @@ static inline int pld_pcie_wlan_pm_control(struct device *dev, bool vote)
 }
 #else
 static inline int pld_pcie_wlan_pm_control(struct device *dev, bool vote)
-{
-	return 0;
-}
-#endif
-
-#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
-/**
- * pld_pcie_set_suspend_mode() - Set current WLAN suspend mode
- *
- * This function is to set current wlan suspend mode for CNSS2
- *
- * Return: 0 for success
- *         Non zero failure code for errors
- */
-int pld_pcie_set_suspend_mode(enum pld_suspend_mode mode);
-#else
-static inline int pld_pcie_set_suspend_mode(enum pld_suspend_mode mode)
 {
 	return 0;
 }

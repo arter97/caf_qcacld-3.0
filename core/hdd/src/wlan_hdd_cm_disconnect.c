@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,6 +49,7 @@
 #include "wlan_hdd_cfr.h"
 #include "wlan_roam_debug.h"
 #include "wma_api.h"
+#include "wlan_hdd_hostapd.h"
 
 void hdd_handle_disassociation_event(struct hdd_adapter *adapter,
 				     struct qdf_mac_addr *peer_macaddr)
@@ -217,7 +219,6 @@ QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
 {
 	QDF_STATUS status;
 	struct wlan_objmgr_vdev *vdev;
-	void *hif_ctx;
 	struct hdd_station_ctx *sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_CM_ID);
@@ -225,16 +226,12 @@ QDF_STATUS wlan_hdd_cm_issue_disconnect(struct hdd_adapter *adapter,
 		return QDF_STATUS_E_INVAL;
 	hdd_place_marker(adapter, "TRY TO DISCONNECT", NULL);
 	reset_mscs_params(adapter);
+	hdd_conn_set_authenticated(adapter, false);
 	wlan_hdd_netif_queue_control(adapter,
 				     WLAN_STOP_ALL_NETIF_QUEUE_N_CARRIER,
 				     WLAN_CONTROL_PATH);
 
-	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (hif_ctx)
-		/*
-		 * Trigger runtime sync resume before sending disconneciton
-		 */
-		hif_pm_runtime_sync_resume(hif_ctx, RTPM_ID_CONN_DISCONNECT);
+	qdf_rtpm_sync_resume();
 
 	wlan_rec_conn_info(adapter->vdev_id, DEBUG_CONN_DISCONNECT,
 			   sta_ctx->conn_info.bssid.bytes, 0, reason);
@@ -318,6 +315,8 @@ hdd_cm_disconnect_complete_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
+
+	hdd_conn_set_authenticated(adapter, false);
 	hdd_napi_serialize(0);
 	hdd_disable_and_flush_mc_addr_list(adapter, pmo_peer_disconnect);
 	__hdd_cm_disconnect_handler_pre_user_update(adapter);
@@ -353,8 +352,7 @@ static void hdd_cm_set_default_wlm_mode(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	bool reset;
 	uint8_t def_level;
-	mac_handle_t mac_handle;
-	uint16_t vdev_id;
+	uint32_t client_id_bitmap;
 
 	if (!hdd_ctx) {
 		hdd_err("hdd_ctx is NULL");
@@ -373,15 +371,24 @@ static void hdd_cm_set_default_wlm_mode(struct hdd_adapter *adapter)
 	if (QDF_IS_STATUS_ERROR(status))
 		def_level = QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_NORMAL;
 
-	mac_handle = hdd_ctx->mac_handle;
-	vdev_id = adapter->vdev_id;
-
-	status = sme_set_wlm_latency_level(mac_handle, vdev_id, def_level);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		hdd_debug("reset wlm mode %x on disconnection", def_level);
-		adapter->latency_level = def_level;
+	if (hdd_get_multi_client_ll_support(adapter)) {
+		client_id_bitmap = wlan_hdd_get_client_id_bitmap(adapter);
+		hdd_debug("client_id_bitmap: 0x%x", client_id_bitmap);
+		status = wlan_hdd_set_wlm_latency_level(adapter, def_level,
+							client_id_bitmap, true);
+		wlan_hdd_deinit_multi_client_info_table(adapter);
 	} else {
-		hdd_err("reset wlm mode failed: %d", status);
+		status =
+			sme_set_wlm_latency_level(hdd_ctx->mac_handle,
+						  adapter->vdev_id, def_level,
+						  0, false);
+		if (QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_debug("reset wlm mode %x on disconnection",
+				  def_level);
+			adapter->latency_level = def_level;
+		} else {
+			hdd_err("reset wlm mode failed: %d", status);
+		}
 	}
 }
 
@@ -433,6 +440,7 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 		hdd_err("adapter is NULL for vdev %d", wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
+
 	if (adapter->device_mode == QDF_STA_MODE) {
 	/* Inform FTM TIME SYNC about the disconnection with the AP */
 		hdd_ftm_time_sync_sta_state_notify(
@@ -442,6 +450,7 @@ hdd_cm_disconnect_complete_post_user_update(struct wlan_objmgr_vdev *vdev,
 	hdd_cm_set_default_wlm_mode(adapter);
 	__hdd_cm_disconnect_handler_post_user_update(adapter, vdev);
 	wlan_twt_concurrency_update(hdd_ctx);
+	hdd_update_he_obss_pd(adapter, NULL, false);
 	hdd_cm_reset_udp_qos_upgrade_config(adapter);
 
 	return QDF_STATUS_SUCCESS;
@@ -473,7 +482,7 @@ wlan_hdd_runtime_pm_wow_disconnect_handler(struct hdd_context *hdd_ctx)
 	hdd_debug("Runtime allowed : %d", hdd_ctx->runtime_pm_prevented);
 	qdf_spin_lock_irqsave(&hdd_ctx->pm_qos_lock);
 	if (hdd_ctx->runtime_pm_prevented) {
-		hif_pm_runtime_put(hif_ctx, RTPM_ID_QOS_NOTIFY);
+		qdf_rtpm_put(QDF_RTPM_PUT, QDF_RTPM_ID_PM_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = false;
 	}
 	qdf_spin_unlock_irqrestore(&hdd_ctx->pm_qos_lock);

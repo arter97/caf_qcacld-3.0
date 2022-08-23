@@ -327,7 +327,7 @@ static void __hdd_nud_failure_work(struct hdd_adapter *adapter)
 		return;
 	}
 
-	if (soc && cdp_cfg_get(soc, cfg_dp_enable_data_stall)) {
+	if (soc && hdd_is_data_stall_event_enabled(HDD_HOST_NUD_FAILURE)) {
 		hdd_dp_err("Data stall due to NUD failure");
 		cdp_post_data_stall_event
 			(soc,
@@ -460,6 +460,13 @@ static void hdd_nud_filter_netevent(struct neighbour *neigh)
 
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not in Connected State");
+		return;
+	}
+
+	if (!hdd_is_sta_authenticated(adapter)) {
+		hdd_debug("client " QDF_MAC_ADDR_FMT
+			  " is in the middle of WPS/EAPOL exchange.",
+			  QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
 		return;
 	}
 

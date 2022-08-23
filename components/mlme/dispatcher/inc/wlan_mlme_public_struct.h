@@ -104,6 +104,11 @@
 /* Default beacon interval of 100 ms */
 #define CUSTOM_CONC_GO_BI 100
 
+#define HECAP_TXRX_MCS_NSS_IDX_80    (0)
+#define HECAP_TXRX_MCS_NSS_IDX_160   (1)
+#define HECAP_TXRX_MCS_NSS_IDX_80_80 (2)
+#define INVALID_MCS_NSS_INDEX         0xff
+
 enum diagwlan_status_eventsubtype {
 	DIAG_WLAN_STATUS_CONNECT = 0,
 	DIAG_WLAN_STATUS_DISCONNECT
@@ -1353,6 +1358,9 @@ struct wlan_user_mcc_quota {
  * @tx_retry_multiplier: TX xretry extension parameter
  * @mgmt_hw_tx_retry_count: MGMT HW tx retry count for frames
  * @relaxed_6ghz_conn_policy: 6GHz relaxed connection policy
+ * @enable_emlsr_mode: 11BE eMLSR mode support
+ * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
+ * connection, bypass strict power levels
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1403,9 +1411,13 @@ struct wlan_mlme_generic {
 #ifdef CONFIG_BAND_6GHZ
 	bool relaxed_6ghz_conn_policy;
 #endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	bool enable_emlsr_mode;
+#endif
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	struct wlan_user_mcc_quota user_mcc_quota;
 #endif
+	bool safe_mode_enable;
 };
 
 /*
@@ -1634,6 +1646,9 @@ enum station_prefer_bw {
  * @allow_tpc_from_ap:              Support for AP power constraint
  * @usr_disabled_roaming:           User config for roaming disable
  * @usr_scan_probe_unicast_ra:      User config unicast probe req in scan
+ * @max_li_modulated_dtim_time_ms: Max modulated DTIM time in ms.
+ * @mlo_support_link_num:           max number of links that sta mlo supports
+ * @mlo_support_link_band:          band bitmap that sta mlo supports
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1659,6 +1674,11 @@ struct wlan_mlme_sta_cfg {
 	bool usr_scan_probe_unicast_ra;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT_CSR
 	host_event_wlan_status_payload_type event_payload;
+#endif
+	uint16_t max_li_modulated_dtim_time_ms;
+#ifdef WLAN_FEATURE_11BE_MLO
+	uint8_t mlo_support_link_num;
+	uint8_t mlo_support_link_band;
 #endif
 };
 
@@ -1696,6 +1716,9 @@ enum roaming_dfs_channel_type {
  * @threshold: Bss load threshold value above which roaming should start
  * @sample_time: Time duration in milliseconds for which the bss load value
  * should be monitored
+ * @rssi_threshold_6ghz: RSSI threshold of the current connected AP below which
+ * roam should be triggered if bss load threshold exceeds the configured value.
+ * This value is applicable only when we are connected in 6GHz band.
  * @rssi_threshold_5ghz: RSSI threshold of the current connected AP below which
  * roam should be triggered if bss load threshold exceeds the configured value.
  * This value is applicable only when we are connected in 5GHz band.
@@ -1707,6 +1730,7 @@ struct bss_load_trigger {
 	bool enabled;
 	uint32_t threshold;
 	uint32_t sample_time;
+	uint32_t rssi_threshold_6ghz;
 	int32_t rssi_threshold_5ghz;
 	int32_t rssi_threshold_24ghz;
 };
@@ -1852,6 +1876,10 @@ struct fw_scan_channels {
  * @sae_single_pmk_feature_enabled: Contains value of ini
  * sae_single_pmk_feature_enabled
  * @rso_user_config: RSO user config
+ * @beaconloss_timeout_onwakeup: time in sec to configure FW BMISS event
+ * during wakeup.
+ * @beaconloss_timeout_onsleep: time in sec to configure FW BMISS event
+ * during sleep.
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -1888,8 +1916,8 @@ struct wlan_mlme_lfr_cfg {
 	uint8_t mawc_roam_rssi_low_adjust;
 	uint32_t roam_rssi_abs_threshold;
 	uint8_t rssi_threshold_offset_5g;
-	uint8_t early_stop_scan_min_threshold;
-	uint8_t early_stop_scan_max_threshold;
+	int8_t early_stop_scan_min_threshold;
+	int8_t early_stop_scan_max_threshold;
 	uint32_t roam_dense_traffic_threshold;
 	uint32_t roam_dense_rssi_thre_offset;
 	uint32_t roam_dense_min_aps;
@@ -1929,6 +1957,7 @@ struct wlan_mlme_lfr_cfg {
 	uint32_t roam_rescan_rssi_diff;
 	uint16_t neighbor_scan_min_chan_time;
 	uint16_t neighbor_scan_max_chan_time;
+	uint32_t passive_max_channel_time;
 	uint32_t neighbor_scan_results_refresh_period;
 	uint32_t empty_scan_refresh_period;
 	uint8_t roam_bmiss_first_bcnt;
@@ -1971,6 +2000,8 @@ struct wlan_mlme_lfr_cfg {
 #endif
 	struct rso_config_params rso_user_config;
 	bool enable_ft_over_ds;
+	uint8_t beaconloss_timeout_onwakeup;
+	uint8_t beaconloss_timeout_onsleep;
 };
 
 /**
@@ -2405,6 +2436,7 @@ struct wlan_mlme_btm {
  * @latency_level: WLM latency level
  * @latency_flags: WLM latency flags setting
  * @latency_host_flags: WLM latency host flags setting
+ * @multi_client_ll_support: To check whether host support multi client feature
  */
 struct wlan_mlme_fe_wlm {
 	bool latency_enable;
@@ -2412,6 +2444,9 @@ struct wlan_mlme_fe_wlm {
 	uint8_t latency_level;
 	uint32_t latency_flags[MLME_NUM_WLM_LATENCY_LEVEL];
 	uint32_t latency_host_flags[MLME_NUM_WLM_LATENCY_LEVEL];
+#ifdef MULTI_CLIENT_LL_SUPPORT
+	bool multi_client_ll_support;
+#endif
 };
 
 /**
@@ -2581,6 +2616,8 @@ struct wlan_mlme_iot {
  * @trig_min_rssi: Expected minimum RSSI value of candidate AP for
  * various roam triggers
  * @iot: IOT related CFG items
+ * @connection_roaming_ini_flag: To indicate whether connection_roaming related
+ * ini file is present or not.
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -2629,6 +2666,7 @@ struct wlan_mlme_cfg {
 	struct roam_trigger_min_rssi trig_min_rssi[NUM_OF_ROAM_MIN_RSSI];
 	struct wlan_mlme_ratemask ratemask_cfg;
 	struct wlan_mlme_iot iot;
+	bool connection_roaming_ini_flag;
 };
 
 enum pkt_origin {
@@ -2701,31 +2739,4 @@ struct wlan_change_bi {
 	uint8_t session_id;
 };
 
-/**
- * struct mgmt_frame_data  - Management frame related info
- * @mac_hdr: 802.11 Frame MAC header
- * @status_code: Frame status code values as defined in
- * IEEE 802.11 - 2020 standard Table 9-41
- * @vdev_id: Vdev id
- * @frame_subtype: Frame subtype as defined in IEEE 802.11 - 2020
- * standard section 9.2.4.1.3
- * @auth_algo: Authentication algorithm number field as defined in
- * IEEE 802.11 - 2020 standard section 9.4.1.1
- * @auth_type: indicates SAE authentication frame type. Possible values are:
- * 1 - SAE commit frame
- * 2 - SAE confirm frame
- * @auth_seq: Authentication frame transaction sequence number as defined in
- * IEEE 802.11 - 2020 standard section 9.4.1.2
- * @rssi: RSSI in dBm
- */
-struct mgmt_frame_data {
-	struct wlan_frame_hdr mac_hdr;
-	uint16_t status_code;
-	uint8_t vdev_id;
-	uint8_t frame_subtype;
-	uint8_t auth_algo;
-	uint8_t auth_type;
-	uint8_t auth_seq;
-	int16_t rssi;
-};
 #endif

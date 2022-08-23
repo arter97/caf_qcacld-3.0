@@ -145,39 +145,6 @@ int pld_set_mode(u8 mode)
 	return 0;
 }
 
-#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
-int pld_set_suspend_mode(enum pld_suspend_mode mode)
-{
-	struct pld_context *pld_context;
-	int ret;
-
-	pld_context = pld_get_global_context();
-	if (!pld_context)
-		return -ENOMEM;
-
-	pld_context->suspend_mode = mode;
-
-	ret = pld_pcie_set_suspend_mode(mode);
-
-	return ret;
-}
-
-bool pld_is_full_power_down_enable(void)
-{
-	struct pld_context *pld_context;
-
-	pld_context = pld_get_global_context();
-	if (!pld_context)
-		goto out;
-
-	if (pld_context->suspend_mode == PLD_FULL_POWER_DOWN)
-		return true;
-
-out:
-	return false;
-}
-#endif
-
 /**
  * pld_get_global_context() - Get global context of PLD
  *
@@ -542,6 +509,21 @@ int pld_wlan_disable(struct device *dev, enum pld_driver_mode mode)
 	}
 
 	return ret;
+}
+
+/**
+ * pld_wlan_hw_enable() - Enable WLAN HW
+ *
+ * This function enables WLAN HW. If WLAN is secured disabled at boot all wlan
+ * boot time activities are deferred. This is used to run deferred activities
+ * after wlan is enabled.
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_wlan_hw_enable(void)
+{
+	return pld_pcie_wlan_hw_enable();
 }
 
 /**
@@ -3307,7 +3289,7 @@ const char *pld_bus_width_type_to_str(enum pld_bus_width_type level)
 		return "LOW_LAT";
 	default:
 		if (level > PLD_BUS_WIDTH_ULTRA_HIGH)
-			return "ULTRA_HIGH+";
+			return "SUPER_HIGH";
 		else
 			return "INVAL";
 	}

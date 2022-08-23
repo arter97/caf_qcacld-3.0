@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,6 +50,8 @@
 #define WLAN_TDLS_PREFERRED_OFF_CHANNEL_NUM_MIN      1
 #define WLAN_TDLS_PREFERRED_OFF_CHANNEL_NUM_MAX      165
 #define WLAN_TDLS_PREFERRED_OFF_CHANNEL_NUM_DEF      36
+#define WLAN_TDLS_PREFERRED_OFF_CHANNEL_FRQ_DEF     5180
+
 
 #define AC_PRIORITY_NUM                 4
 
@@ -467,6 +470,7 @@ enum tdls_feature_bit {
  * @tdls_uapsd_ptr_timeout: tdls peer response timeout
  * @tdls_feature_flags: tdls feature flags
  * @tdls_pre_off_chan_num: tdls off channel number
+ * @tdls_pre_off_chan_freq_6g: tdls pref off channel freq for 6g band
  * @tdls_pre_off_chan_bw: tdls off channel bandwidth
  * @tdls_peer_kickout_threshold: sta kickout threshold for tdls peer
  * @tdls_discovery_wake_timeout: tdls discovery wake timeout
@@ -499,6 +503,7 @@ struct tdls_user_config {
 	uint32_t tdls_uapsd_ptr_timeout;
 	uint32_t tdls_feature_flags;
 	uint32_t tdls_pre_off_chan_num;
+	uint32_t tdls_pre_off_chan_freq_6g;
 	uint32_t tdls_pre_off_chan_bw;
 	uint32_t tdls_peer_kickout_threshold;
 	uint32_t tdls_discovery_wake_timeout;
@@ -817,7 +822,7 @@ struct tdls_update_peer_params {
 	uint8_t uapsd_queues;
 	uint8_t max_sp;
 	uint8_t supported_channels_len;
-	uint8_t supported_channels[WLAN_MAC_MAX_SUPP_CHANNELS];
+	qdf_freq_t supported_chan_freq[WLAN_MAC_MAX_SUPP_CHANNELS];
 	uint8_t supported_oper_classes_len;
 	uint8_t supported_oper_classes[WLAN_MAX_SUPP_OPER_CLASSES];
 	bool is_qos_wmm_sta;
@@ -844,6 +849,7 @@ struct tdls_oper_request {
  * @vdev: vdev object
  * @peer_addr: MAC address of the TDLS peer
  * @chan: channel
+ * @ch_freq: ch_freq
  * @max_latency: maximum latency
  * @op_class: operation class
  * @min_bandwidth: minimal bandwidth
@@ -853,6 +859,7 @@ struct tdls_oper_config_force_peer_request {
 	struct wlan_objmgr_vdev *vdev;
 	uint8_t peer_addr[QDF_MAC_ADDR_SIZE];
 	uint32_t chan;
+	qdf_freq_t ch_freq;
 	uint32_t max_latency;
 	uint32_t op_class;
 	uint32_t min_bandwidth;
@@ -901,14 +908,14 @@ struct tdls_info {
 
 /**
  * struct tdls_ch_params - channel parameters
- * @chan_id: ID of the channel
+ * @ch_freq: Channel frequency
  * @pwr: power level
  * @dfs_set: is dfs supported or not
  * @half_rate: is the channel operating at 10MHz
  * @quarter_rate: is the channel operating at 5MHz
  */
 struct tdls_ch_params {
-	uint8_t chan_id;
+	qdf_freq_t ch_freq;
 	uint8_t pwr;
 	bool dfs_set;
 	bool half_rate;

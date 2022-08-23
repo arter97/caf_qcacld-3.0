@@ -836,6 +836,13 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	cm_process_roam_keys(vdev, rsp, cm_id);
+	/*
+	 * Re-enable the disabled link on roaming as desision
+	 * will be taken again to disable the link on roam sync completion.
+	 */
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		policy_mgr_move_vdev_from_disabled_to_connection_tbl(psoc,
+								     vdev_id);
 	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 
 	/**
@@ -895,6 +902,32 @@ rel_ref:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      struct roam_offload_synch_ind *synch_data)
+{
+	uint8_t i;
+
+	for (i = 0; i < synch_data->num_setup_links; i++) {
+		if (synch_data->ml_link[i].vdev_id == vdev_id &&
+		    synch_data->ml_link[i].flags & CM_ROAM_LINK_FLAG_DISABLE) {
+			mlme_info("Vdev %d: link flags 0x%x, indicate link disable",
+				  vdev_id, synch_data->ml_link[i].flags);
+			policy_mgr_move_vdev_from_connection_to_disabled_tbl(
+								psoc, vdev_id);
+			break;
+		}
+	}
+}
+#else
+static inline void
+cm_get_and_disable_link_from_roam_ind(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id,
+				      struct roam_offload_synch_ind *synch_data)
+{}
+#endif
 QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 {
 	struct roam_offload_synch_ind *roam_synch_data;
@@ -934,6 +967,8 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		goto end;
 	}
 
+	/* Check if FW as indicated this link as disabled */
+	cm_get_and_disable_link_from_roam_ind(psoc, vdev_id, roam_synch_data);
 	/*
 	 * Following operations need to be done once roam sync
 	 * completion is sent to FW, hence called here:
@@ -952,7 +987,11 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 		roam_synch_data->hw_mode_trans_ind.vdev_mac_map,
 		0, NULL, psoc);
 
-	cm_check_and_set_sae_single_pmk_cap(psoc, vdev_id);
+	if (roam_synch_data->pmk_len)
+		cm_check_and_set_sae_single_pmk_cap(psoc, vdev_id,
+						    roam_synch_data->pmk,
+						    roam_synch_data->pmk_len);
+
 	cm_csr_send_set_ie(cm_ctx->vdev);
 
 	if (ucfg_pkt_capture_get_pktcap_mode(psoc))
@@ -1012,6 +1051,7 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 	enum wlan_cm_source source;
 	struct cnx_mgr *cm_ctx;
 	struct cm_roam_req *roam_req = NULL;
+	struct qdf_mac_addr bssid;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
 						    vdev_id,
@@ -1037,6 +1077,7 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 
 	cm_id = roam_req->cm_id;
 	source = roam_req->req.source;
+	bssid = roam_req->req.bssid;
 
 	status = cm_sm_deliver_event(vdev, WLAN_CM_SM_EV_ROAM_INVOKE_FAIL,
 				     sizeof(wlan_cm_id), &cm_id);
@@ -1051,7 +1092,7 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 	 * highest score. It is requirement from customer which can avoid
 	 * ping-pong roaming.
 	 */
-	if (qdf_is_macaddr_broadcast(&roam_req->req.bssid))
+	if (qdf_is_macaddr_broadcast(&bssid))
 		mlme_debug("Keep current connection");
 	else if (source == CM_ROAMING_HOST || source == CM_ROAMING_NUD_FAILURE)
 		status = mlo_disconnect(vdev, CM_ROAM_DISCONNECT,

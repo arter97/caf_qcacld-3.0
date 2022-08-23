@@ -512,6 +512,93 @@
 			CFG_VALUE_OR_DEFAULT, \
 			"Max modulated dtim")
 
+/*
+ * <ini>
+ * @Min: 0
+ * @Max: 2000
+ * @Default: 500
+ *
+ * This ini is used to set default ConDTIMSkipping_MaxTime in ms
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_MAX_LI_MODULATED_DTIM_MS CFG_INI_UINT( \
+			"ConDTIMSkipping_MaxTime", \
+			0, \
+			2000, \
+			500, \
+			CFG_VALUE_OR_DEFAULT, \
+			"DTIM skipping max time")
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * <cfg>
+ * mlo_support_link_num - Set number of link mlo connection supports for sta
+ * @Min: 1
+ * @Max: 3
+ * @Default: 2
+ *
+ * This cfg is used to configure the number of link mlo connection supports
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ * </cfg>
+ */
+#define CFG_MLO_SUPPORT_LINK_NUM CFG_UINT( \
+			"mlo_support_link_num", \
+			1, \
+			3, \
+			2, \
+			CFG_VALUE_OR_DEFAULT, \
+			"supported mlo link number")
+
+#define CFG_MLO_SUPPORT_LINK_NUM_CFG CFG(CFG_MLO_SUPPORT_LINK_NUM)
+
+/*
+ * <cfg>
+ * mlo_support_link_band - Set band bitmap of mlo connection supports for sta
+ * @Min: 1
+ * @Max: 7
+ * @Default: 7
+ *
+ * This cfg is used to configure the band bitmap of mlo connection supports
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal
+ *
+ * bits 0: REG_BAND_2G
+ * bits 1: REG_BAND_5G
+ * bits 2: REG_BAND_6G
+ *
+ * </cfg>
+ */
+#define CFG_MLO_SUPPORT_LINK_BAND CFG_UINT( \
+			"mlo_support_link_band", \
+			1, \
+			7, \
+			7, \
+			CFG_VALUE_OR_DEFAULT, \
+			"supported mlo link band")
+
+#define CFG_MLO_SUPPORT_LINK_BAND_CFG CFG(CFG_MLO_SUPPORT_LINK_BAND)
+#else
+#define CFG_MLO_SUPPORT_LINK_NUM_CFG
+#define CFG_MLO_SUPPORT_LINK_BAND_CFG
+#endif
+
 #define CFG_STA_ALL \
 	CFG(CFG_INFRA_STA_KEEP_ALIVE_PERIOD) \
 	CFG(CFG_STA_BSS_MAX_IDLE_PERIOD) \
@@ -531,6 +618,9 @@
 	CFG(CFG_STA_KEEPALIVE_METHOD) \
 	CFG(CFG_WT_CNF_TIMEOUT) \
 	CFG(CFG_CURRENT_RSSI) \
-	CFG(CFG_TX_POWER_CTRL)
+	CFG(CFG_TX_POWER_CTRL) \
+	CFG(CFG_MAX_LI_MODULATED_DTIM_MS) \
+	CFG_MLO_SUPPORT_LINK_NUM_CFG \
+	CFG_MLO_SUPPORT_LINK_BAND_CFG
 
 #endif /* CFG_MLME_STA_H__ */

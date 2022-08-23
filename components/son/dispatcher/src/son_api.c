@@ -69,26 +69,21 @@ wlan_son_register_mlme_deliver_cb(struct wlan_objmgr_psoc *psoc,
 /**
  * wlan_son_is_he_supported() - is he supported or not
  * @psoc: pointer to psoc
- * @he_supported: he supported or not
  *
- * Return: void
+ * Return: true if supports, false otherwise
  */
 #ifdef WLAN_FEATURE_11AX
-static void wlan_son_is_he_supported(struct wlan_objmgr_psoc *psoc,
-				     bool *he_supported)
+static bool wlan_son_is_he_supported(struct wlan_objmgr_psoc *psoc)
 {
-	tDot11fIEhe_cap *he_cap = NULL;
+	tDot11fIEhe_cap he_cap = {0};
 
-	*he_supported = false;
-	mlme_cfg_get_he_caps(psoc, he_cap);
-	if (he_cap && he_cap->present)
-		*he_supported = true;
+	mlme_cfg_get_he_caps(psoc, &he_cap);
+	return !!he_cap.present;
 }
 #else
-static void wlan_son_is_he_supported(struct wlan_objmgr_psoc *psoc,
-				     bool *he_supported)
+static bool wlan_son_is_he_supported(struct wlan_objmgr_psoc *psoc)
 {
-	*he_supported = false;
+	return false;
 }
 #endif /*WLAN_FEATURE_11AX*/
 
@@ -173,8 +168,7 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 		return flags;
 	}
 
-	wlan_son_is_he_supported(psoc, &is_he_enabled);
-
+	is_he_enabled = wlan_son_is_he_supported(psoc);
 	wlan_mlme_get_sub_20_chan_width(wlan_pdev_get_psoc(pdev),
 					&sub_20_channel_width);
 
@@ -203,7 +197,7 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 			flags |= QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_VHT80_80;
 		}
 		bandwidth = CH_WIDTH_160MHZ;
-	/* FALLTHROUGH */
+		fallthrough;
 	case CH_WIDTH_160MHZ:
 		if (wlan_reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
 								  bandwidth) !=
@@ -219,7 +213,7 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 			flags |= QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_VHT160;
 		}
 		bandwidth = CH_WIDTH_80MHZ;
-	/* FALLTHROUGH */
+		fallthrough;
 	case CH_WIDTH_80MHZ:
 		if (wlan_reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
 								  bandwidth) !=
@@ -236,7 +230,7 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 			flags |= QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_VHT80;
 		}
 		bandwidth = CH_WIDTH_40MHZ;
-	/* FALLTHROUGH */
+		fallthrough;
 	case CH_WIDTH_40MHZ:
 		ch_width40_ch_params.ch_width = bandwidth;
 		wlan_reg_set_channel_params_for_freq(pdev, freq, 0,
@@ -274,14 +268,14 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 			}
 		}
 		bandwidth = CH_WIDTH_20MHZ;
-	/* FALLTHROUGH */
+		fallthrough;
 	case CH_WIDTH_20MHZ:
 		flags |= QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_HT20;
 		flags |= QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_VHT20;
 		if (is_he_enabled)
 			flags |= QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_HE20;
 		bandwidth = CH_WIDTH_10MHZ;
-	/* FALLTHROUGH */
+		fallthrough;
 	case CH_WIDTH_10MHZ:
 		if (wlan_reg_get_bonded_channel_state_for_freq(pdev, freq,
 							       bandwidth,
@@ -290,7 +284,7 @@ uint32_t wlan_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 		     sub_20_channel_width == WLAN_SUB_20_CH_WIDTH_10)
 			flags |= QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_HALF;
 		bandwidth = CH_WIDTH_5MHZ;
-	/* FALLTHROUGH */
+		fallthrough;
 	case CH_WIDTH_5MHZ:
 		if (wlan_reg_get_bonded_channel_state_for_freq(pdev, freq,
 							       bandwidth,
@@ -990,9 +984,11 @@ static int wlan_cbs_iterate(struct son_cbs *cbs)
 	int offset_array_idx;
 	struct wlan_objmgr_psoc *psoc;
 
-	if (!cbs || !cbs->vdev)
-		return -EINVAL;
 	qdf_spin_lock_bh(&g_cbs_lock);
+	if (!cbs || !cbs->vdev) {
+		qdf_spin_unlock_bh(&g_cbs_lock);
+		return -EINVAL;
+	}
 	son_debug("dwell_split_cnt: %d", cbs->dwell_split_cnt);
 	if (cbs->dwell_split_cnt < 0) {
 		psoc = wlan_vdev_get_psoc(cbs->vdev);
@@ -1339,29 +1335,6 @@ uint8_t wlan_son_get_node_tx_power(struct element_info assoc_req_ies)
 		return *(power_cap_ie_data + 3);
 	else
 		return 0;
-}
-
-uint8_t wlan_son_get_max_mcs(uint8_t mode, uint8_t supp_idx, uint8_t ext_idx,
-			     uint8_t ht_mcs_idx, uint8_t vht_mcs_map)
-{
-	uint8_t maxidx = MAX_HE_MCS_IDX;
-
-	/* check supported rates */
-	if (supp_idx != 0xff && maxidx < supp_idx)
-		maxidx = supp_idx;
-
-	/* check extended rates */
-	if (ext_idx != 0xff && maxidx < ext_idx)
-		maxidx = ext_idx;
-
-	/* check for HT Mode */
-	if (mode == SIR_SME_PHY_MODE_HT)
-		maxidx = ht_mcs_idx;
-
-	if (mode == SIR_SME_PHY_MODE_VHT)
-		maxidx = (vht_mcs_map & DATA_RATE_11AC_MCS_MASK);
-
-	return maxidx;
 }
 
 QDF_STATUS wlan_son_get_peer_rrm_info(struct element_info assoc_req_ies,

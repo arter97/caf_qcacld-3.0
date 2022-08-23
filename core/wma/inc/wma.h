@@ -179,6 +179,9 @@
 /* send connect respone after bss peer is deleted */
 #define WMA_DELETE_STA_CONNECT_RSP 0x09
 
+/* Peer create response for 11az PASN peer */
+#define WMA_PASN_PEER_CREATE_RESPONSE 0x0a
+
 /* FW response timeout values in milli seconds */
 #define WMA_VDEV_PLCY_MGR_TIMEOUT        SIR_VDEV_PLCY_MGR_TIMEOUT
 #define WMA_VDEV_HW_MODE_REQUEST_TIMEOUT WMA_VDEV_PLCY_MGR_TIMEOUT
@@ -687,8 +690,6 @@ struct wma_invalid_peer_params {
  * @ns_offload_req: cached ns offload request
  * @rcpi_req: rcpi request
  * @in_bmps: Whether bmps for this interface has been enabled
- * @vdev_set_key_wakelock: wakelock to protect vdev set key op with firmware
- * @vdev_set_key_runtime_wakelock: runtime pm wakelock for set key
  * @ch_freq: channel frequency
  * @roam_scan_stats_req: cached roam scan stats request
  * @wma_invalid_peer_params: structure storing invalid peer params
@@ -735,8 +736,6 @@ struct wma_txrx_node {
 	bool in_bmps;
 	struct beacon_filter_param beacon_filter;
 	bool beacon_filter_enabled;
-	qdf_wake_lock_t vdev_set_key_wakelock;
-	qdf_runtime_lock_t vdev_set_key_runtime_wakelock;
 	struct roam_synch_frame_ind roam_synch_frame_ind;
 	bool is_waiting_for_key;
 	uint32_t ch_freq;
@@ -819,8 +818,6 @@ struct wma_wlm_stats_data {
  *   set this and wait will timeout, and code will poll the pending tx
  *   descriptors number to be zero.
  * @umac_ota_ack_cb: Ack Complete Callback registered by umac
- * @is_mgmt_data_valid: Is management frame data valid
- * @mgmt_data: Management frame related data
  * @umac_data_ota_ack_cb: ack complete callback
  * @last_umac_data_ota_timestamp: timestamp when OTA of last umac data
  *   was done
@@ -858,6 +855,7 @@ struct wma_wlm_stats_data {
  * @RArateLimitInterval: RA rate limit interval
  * @is_lpass_enabled: Flag to indicate if LPASS feature is enabled or not
  * @staMaxLIModDtim: station max listen interval
+ * @sta_max_li_mod_dtim_ms: station max listen interval in ms
  * @staModDtim: station mode DTIM
  * @staDynamicDtim: station dynamic DTIM
  * @hw_bd_id: hardware board id
@@ -944,8 +942,6 @@ typedef struct {
 	qdf_event_t tx_frm_download_comp_event;
 	qdf_event_t tx_queue_empty_event;
 	wma_tx_ota_comp_callback umac_data_ota_ack_cb;
-	bool is_mgmt_data_valid;
-	struct mgmt_frame_data mgmt_data;
 	unsigned long last_umac_data_ota_timestamp;
 	qdf_nbuf_t last_umac_data_nbuf;
 	wma_tgt_cfg_cb tgt_cfg_update_cb;
@@ -983,6 +979,7 @@ typedef struct {
 	bool is_lpass_enabled;
 #endif
 	uint8_t staMaxLIModDtim;
+	uint16_t sta_max_li_mod_dtim_ms;
 	uint8_t staModDtim;
 	uint8_t staDynamicDtim;
 	uint32_t hw_bd_id;
@@ -1124,6 +1121,7 @@ struct wma_tx_ack_work_ctx {
  * @event_timeout: event timeout
  * @node: list
  * @user_data: user data
+ * @addr: Mac address
  * @msg_type: message type
  * @vdev_id: vdev id
  * @type: type
@@ -1132,6 +1130,7 @@ struct wma_target_req {
 	qdf_mc_timer_t event_timeout;
 	qdf_list_node_t node;
 	void *user_data;
+	struct qdf_mac_addr addr;
 	uint32_t msg_type;
 	uint8_t vdev_id;
 	uint8_t type;
@@ -1668,6 +1667,32 @@ QDF_STATUS wma_create_peer(tp_wma_handle wma,
 			   u_int32_t peer_type, u_int8_t vdev_id,
 			   uint8_t peer_mld_addr[QDF_MAC_ADDR_SIZE],
 			   bool is_assoc_peer);
+
+/**
+ * wma_create_objmgr_peer() - create objmgr peer information in host driver
+ * @wma: wma handle
+ * @vdev_id: vdev id
+ * @peer_addr: peer mac address
+ * @wma_peer_type: peer type of enum wmi_peer_type
+ *
+ * Return: Pointer to objmgr_peer
+ */
+struct wlan_objmgr_peer *wma_create_objmgr_peer(tp_wma_handle wma,
+						uint8_t vdev_id,
+						uint8_t *peer_addr,
+						uint32_t wma_peer_type);
+
+/**
+ * wma_remove_objmgr_peer() - Remove Object manager peer
+ * @wma:  WMA handle
+ * @obj_vdev: Vdev object pointer
+ * @peer_addr: Peer mac address
+ *
+ * Return: None
+ */
+void wma_remove_objmgr_peer(tp_wma_handle wma,
+			    struct wlan_objmgr_vdev *obj_vdev,
+			    uint8_t *peer_addr);
 
 QDF_STATUS wma_peer_unmap_conf_cb(uint8_t vdev_id,
 				  uint32_t peer_id_cnt,

@@ -99,7 +99,7 @@ static void lim_process_sae_msg_sta(struct mac_context *mac,
 						    session);
 		else
 			lim_restore_from_auth_state(mac, sae_msg->result_code,
-						    STATUS_UNSPECIFIED_FAILURE,
+						    sae_msg->sae_status,
 						    session);
 		break;
 	default:
@@ -455,65 +455,6 @@ scan_ie_send_fail:
 }
 
 /**
- * lim_process_hw_mode_trans_ind() - Process set HW mode transition indication
- * @mac: Global MAC pointer
- * @body: Set HW mode response in cm_hw_mode_trans_ind format
- *
- * Process the set HW mode transition indication and post the message
- * to SME to invoke the HDD callback
- * command list
- *
- * Return: None
- */
-static void lim_process_hw_mode_trans_ind(struct mac_context *mac, void *body)
-{
-	struct cm_hw_mode_trans_ind *ind, *param;
-	uint32_t len, i;
-	struct scheduler_msg msg = {0};
-
-	ind = (struct cm_hw_mode_trans_ind *)body;
-	if (!ind) {
-		pe_err("Set HW mode trans ind param is NULL");
-		return;
-	}
-
-	len = sizeof(*param);
-
-	param = qdf_mem_malloc(len);
-	if (!param)
-		return;
-
-	param->old_hw_mode_index = ind->old_hw_mode_index;
-	param->new_hw_mode_index = ind->new_hw_mode_index;
-	param->num_vdev_mac_entries = ind->num_vdev_mac_entries;
-
-	for (i = 0; i < ind->num_vdev_mac_entries; i++) {
-		param->vdev_mac_map[i].vdev_id =
-			ind->vdev_mac_map[i].vdev_id;
-		param->vdev_mac_map[i].mac_id =
-			ind->vdev_mac_map[i].mac_id;
-	}
-
-	param->num_freq_map = ind->num_freq_map;
-	for (i = 0; i < param->num_freq_map; i++) {
-		param->mac_freq_map[i].mac_id =
-			ind->mac_freq_map[i].mac_id;
-		param->mac_freq_map[i].start_freq =
-			ind->mac_freq_map[i].start_freq;
-		param->mac_freq_map[i].end_freq =
-			ind->mac_freq_map[i].end_freq;
-	}
-	/* TODO: Update this HW mode info in any UMAC params, if needed */
-
-	msg.type = eWNI_SME_HW_MODE_TRANS_IND;
-	msg.bodyptr = param;
-	msg.bodyval = 0;
-	pe_err("Send eWNI_SME_HW_MODE_TRANS_IND to SME");
-	lim_sys_process_mmh_msg_api(mac, &msg);
-	return;
-}
-
-/**
  * def_msg_decision() - Should a message be deferred?
  * @mac_ctx: The global MAC context
  * @lim_msg: The message to check for potential deferral
@@ -598,8 +539,7 @@ static bool def_msg_decision(struct mac_context *mac_ctx,
 				 lim_msg_str(lim_msg->type));
 			/* Defer processing this message */
 			if (lim_defer_msg(mac_ctx, lim_msg) != TX_SUCCESS) {
-				QDF_TRACE(QDF_MODULE_ID_PE, LOGE,
-					  FL("Unable to Defer Msg"));
+				pe_err("Unable to Defer Msg");
 				lim_log_session_states(mac_ctx);
 				lim_handle_defer_msg_error(mac_ctx, lim_msg);
 			}
@@ -1053,14 +993,12 @@ static void lim_handle_unknown_a2_index_frames(struct mac_context *mac_ctx,
 	mac_hdr = WMA_GET_RX_MPDUHEADER3A(rx_pkt_buffer);
 
 	if (IEEE80211_IS_MULTICAST(mac_hdr->addr2)) {
-		QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			FL("Ignoring A2 Invalid Packet received for MC/BC:"));
+		pe_debug("Ignoring A2 Invalid Packet received for MC/BC:");
 		lim_print_mac_addr(mac_ctx, mac_hdr->addr2, LOGD);
 		return;
 	}
-	QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			FL("type=0x%x, subtype=0x%x"),
-		mac_hdr->fc.type, mac_hdr->fc.subType);
+	pe_debug("type=0x%x, subtype=0x%x",
+		 mac_hdr->fc.type, mac_hdr->fc.subType);
 	/* Currently only following type and subtype are handled.
 	 * If there are more combinations, then add switch-case
 	 * statements.
@@ -1121,9 +1059,7 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 		if ((type == SIR_MAC_MGMT_FRAME)
 		    && (fc.type == SIR_MAC_MGMT_FRAME)
 		    && (sub_type == SIR_MAC_MGMT_RESERVED15)) {
-			QDF_TRACE(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-				FL
-				("rcvd frm match for SIR_MAC_MGMT_RESERVED15"));
+			pe_debug("rcvd frm match for SIR_MAC_MGMT_RESERVED15");
 			match = true;
 			break;
 		}
@@ -1305,19 +1241,24 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_ERROR, pHdr,
 			   WMA_GET_RX_MPDU_HEADER_LEN(pRxPacketInfo));
 #endif
-	if (mac->mlme_cfg->gen.debug_packet_log & 0x1) {
-		if ((fc.type == SIR_MAC_MGMT_FRAME) &&
+	if (fc.type == SIR_MAC_MGMT_FRAME) {
+		if ((mac->mlme_cfg->gen.debug_packet_log &
+		    DEBUG_PKTLOG_TYPE_MGMT) &&
 		    (fc.subType != SIR_MAC_MGMT_PROBE_REQ) &&
 		    (fc.subType != SIR_MAC_MGMT_PROBE_RSP) &&
-		    (fc.subType != SIR_MAC_MGMT_BEACON)) {
+		    (fc.subType != SIR_MAC_MGMT_BEACON) &&
+		    (fc.subType != SIR_MAC_MGMT_ACTION)) {
 			pe_debug("RX MGMT - Type %hu, SubType %hu, seq num[%d]",
-				   fc.type,
-				   fc.subType,
-				   ((pHdr->seqControl.seqNumHi <<
-				   HIGH_SEQ_NUM_OFFSET) |
-				   pHdr->seqControl.seqNumLo));
+				 fc.type, fc.subType,
+				 ((pHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET) |
+				 pHdr->seqControl.seqNumLo));
+			QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
+					   QDF_TRACE_LEVEL_DEBUG, pHdr,
+					   WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo)
+					   + SIR_MAC_HDR_LEN_3A);
 		}
 	}
+
 #ifdef FEATURE_WLAN_EXTSCAN
 	if (WMA_IS_EXTSCAN_SCAN_SRC(pRxPacketInfo) ||
 		WMA_IS_EPNO_SCAN_SRC(pRxPacketInfo)) {
@@ -1483,6 +1424,19 @@ lim_handle80211_frames(struct mac_context *mac, struct scheduler_msg *limMsg,
 				lim_process_action_frame_no_session(mac,
 								    pRxPacketInfo);
 			else {
+				if (mac->mlme_cfg->gen.debug_packet_log &
+				    DEBUG_PKTLOG_TYPE_ACTION) {
+					pe_debug("RX MGMT - Type %hu, SubType %hu, seq num[%d]",
+						 fc.type, fc.subType,
+						 ((pHdr->seqControl.seqNumHi << HIGH_SEQ_NUM_OFFSET) |
+						 pHdr->seqControl.seqNumLo));
+					QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE,
+							   QDF_TRACE_LEVEL_DEBUG,
+							   pHdr,
+							   WMA_GET_RX_PAYLOAD_LEN(pRxPacketInfo)
+							   + SIR_MAC_HDR_LEN_3A);
+				}
+
 				if (WMA_GET_RX_UNKNOWN_UCAST
 					    (pRxPacketInfo))
 					lim_handle_unknown_a2_index_frames
@@ -1689,11 +1643,9 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		lim_handle80211_frames(mac_ctx, &new_msg, &defer_msg);
 
 		if (defer_msg == true) {
-			QDF_TRACE(QDF_MODULE_ID_PE, LOGD,
-					FL("Defer Msg type=%x"), msg->type);
+			pe_debug("Defer Msg type=%x", msg->type);
 			if (lim_defer_msg(mac_ctx, msg) != TX_SUCCESS) {
-				QDF_TRACE(QDF_MODULE_ID_PE, LOGE,
-						FL("Unable to Defer Msg"));
+				pe_err("Unable to Defer Msg %x", msg->type);
 				lim_log_session_states(mac_ctx);
 				lim_decrement_pending_mgmt_count(mac_ctx);
 				cds_pkt_return_packet(body_ptr);
@@ -1756,7 +1708,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #endif  /* FEATURE_WLAN_ESE */
 	case eWNI_SME_REGISTER_MGMT_FRAME_CB:
 	case eWNI_SME_EXT_CHANGE_CHANNEL:
-		/* fall through */
 	case eWNI_SME_SET_ADDBA_ACCEPT:
 	case eWNI_SME_UPDATE_EDCA_PROFILE:
 	case WNI_SME_UPDATE_MU_EDCA_PARAMS:
@@ -2012,11 +1963,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 #endif
 	case SIR_HAL_PDEV_SET_HW_MODE_RESP:
 		lim_process_set_hw_mode_resp(mac_ctx, msg->bodyptr);
-		qdf_mem_free((void *)msg->bodyptr);
-		msg->bodyptr = NULL;
-		break;
-	case SIR_HAL_PDEV_HW_MODE_TRANS_IND:
-		lim_process_hw_mode_trans_ind(mac_ctx, msg->bodyptr);
 		qdf_mem_free((void *)msg->bodyptr);
 		msg->bodyptr = NULL;
 		break;
@@ -2319,11 +2265,9 @@ void lim_log_session_states(struct mac_context *mac_ctx)
 
 	for (i = 0; i < mac_ctx->lim.maxBssId; i++) {
 		if (mac_ctx->lim.gpSession[i].valid) {
-			QDF_TRACE(QDF_MODULE_ID_PE, LOGD,
-				FL("sysRole(%d) Session (%d)"),
+			pe_debug("sysRole(%d) Session (%d)",
 				mac_ctx->lim.gLimSystemRole, i);
-			QDF_TRACE(QDF_MODULE_ID_PE, LOGD,
-				FL("SME: Curr %s,Prev %s,MLM: Curr %s,Prev %s"),
+			pe_debug("SME: Curr %s,Prev %s,MLM: Curr %s,Prev %s",
 				lim_sme_state_str(
 				mac_ctx->lim.gpSession[i].limSmeState),
 				lim_sme_state_str(

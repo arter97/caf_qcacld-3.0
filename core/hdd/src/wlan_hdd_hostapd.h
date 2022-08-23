@@ -111,6 +111,21 @@ QDF_STATUS hdd_sap_restart_with_channel_switch(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS hdd_sap_restart_chan_switch_cb(struct wlan_objmgr_psoc *psoc,
 					  uint8_t vdev_id, uint32_t ch_freq,
 					  uint32_t channel_bw, bool forced);
+
+/**
+ * wlan_hdd_check_cc_intf_cb() - Check force SCC for vdev interface.
+ * @psoc: PSOC object information
+ * @vdev_id: vdev id
+ * @ch_freq: channel frequency to switch to
+ *
+ * This function will return a channel frequency to avoid MCC for SAP/GO.
+ *
+ * Return: QDF_STATUS_SUCCESS if successfully
+ *
+ */
+QDF_STATUS wlan_hdd_check_cc_intf_cb(struct wlan_objmgr_psoc *psoc,
+				     uint8_t vdev_id, uint32_t *ch_freq);
+
 /**
  * wlan_hdd_get_channel_for_sap_restart() - Function to get
  * suitable channel and restart SAP
@@ -307,8 +322,21 @@ static inline QDF_STATUS hdd_get_sap_ht2040_mode(
 }
 #endif
 
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+/**
+ * wlan_hdd_cfg80211_stop_ap() - stop sap
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to netdev
+ * @link_id: Link id for which this stop_ap is recevied.
+ *
+ * Return: zero for success non-zero for failure
+ */
+int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+			      unsigned int link_id);
+#else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			      struct net_device *dev);
+#endif
 
 int wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			       struct net_device *dev,
@@ -337,6 +365,26 @@ QDF_STATUS wlan_hdd_config_acs(struct hdd_context *hdd_ctx,
 			       struct hdd_adapter *adapter);
 
 void hdd_sap_indicate_disconnect_for_sta(struct hdd_adapter *adapter);
+
+/**
+ * hdd_handle_acs_2g_preferred_sap_conc() - Handle 2G pereferred SAP
+ * concurrency with GO
+ * @psoc: soc object
+ * @sap_ctx: sap context
+ * @sap_config: sap config
+ *
+ * In SAP+GO concurrency, if GO is started on 2G and SAP is
+ * doing ACS with 2G preferred channel list, then we will
+ * move GO to 5G band. The purpose is to have more choice
+ * in SAP ACS instead of starting on GO home channel for SCC.
+ * This API is to check such condition and move GO to 5G.
+ *
+ * Return: void
+ */
+void
+hdd_handle_acs_2g_preferred_sap_conc(struct wlan_objmgr_psoc *psoc,
+				     struct hdd_adapter *adapter,
+				     struct sap_config *sap_config);
 
 /**
  * wlan_hdd_disable_channels() - Cache the channels
@@ -400,6 +448,27 @@ void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
  * Return: true if any sta is connecting
  */
 bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
+
+#ifdef WLAN_FEATURE_11AX
+/**
+ * hdd_update_he_obss_pd() - Enable or disable spatial reuse
+ * based on user space input and concurrency combination.
+ * @adapter:  Pointer to hostapd adapter
+ * @params: Pointer to AP configuration from cfg80211
+ * @iface_start: Interface start or not
+ *
+ * Return: void
+ */
+void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
+			   struct cfg80211_ap_settings *params,
+			   bool iface_start);
+#else
+static inline void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
+					 struct cfg80211_ap_settings *params,
+					 bool iface_start)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**

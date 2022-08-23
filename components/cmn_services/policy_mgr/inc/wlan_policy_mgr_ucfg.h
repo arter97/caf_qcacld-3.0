@@ -21,7 +21,7 @@
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_objmgr_global_obj.h"
 #include "qdf_status.h"
-
+#include "wlan_policy_mgr_public_struct.h"
 
 /**
  * ucfg_policy_mgr_psoc_open() - This API sets CFGs to policy manager context
@@ -62,6 +62,25 @@ QDF_STATUS ucfg_policy_mgr_get_mcc_scc_switch(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 #endif //FEATURE_WLAN_MCC_TO_SCC_SWITCH
+
+/**
+ * ucfg_policy_mgr_get_radio_combinations() - Query the supported radio
+ * combinations
+ * @psoc: soc object
+ * @comb: combination buffer
+ * @comb_max: max combination number can be saved to comb buffer
+ * @comb_num: returned combination number
+ *
+ * This function returns the radio combination information supported by target.
+ *
+ * Return: QDF_STATUS_SUCCESS if query successfully
+ */
+QDF_STATUS
+ucfg_policy_mgr_get_radio_combinations(struct wlan_objmgr_psoc *psoc,
+				       struct radio_combination *comb,
+				       uint32_t comb_max,
+				       uint32_t *comb_num);
+
 /**
  * ucfg_policy_mgr_get_sys_pref() - to get system preference
  * @psoc: pointer to psoc
@@ -228,6 +247,35 @@ bool ucfg_policy_mgr_get_dual_sta_feature(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS ucfg_policy_mgr_get_force_1x1(struct wlan_objmgr_psoc *psoc,
 					 uint8_t *force_1x1);
+
+/**
+ * ucfg_policy_mgr_get_max_conc_cxns() - to get configured max concurrent active
+ * connection count
+ *
+ * @psoc: pointer to psoc
+ *
+ * This API is used to query the configured max concurrent active connection
+ * count.
+ *
+ * Return: max active connection count
+ */
+uint32_t ucfg_policy_mgr_get_max_conc_cxns(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_policy_mgr_set_max_conc_cxns() - to set supported max concurrent active
+ * connection count to policy mgr
+ *
+ * @psoc: pointer to psoc
+ * @max_conc_cxns: max active connection count
+ *
+ * This API is used to update the max concurrent active connection
+ * count to policy mgr
+ *
+ * Return: QDF_STATUS_SUCCESS if set successfully
+ */
+QDF_STATUS ucfg_policy_mgr_set_max_conc_cxns(struct wlan_objmgr_psoc *psoc,
+					     uint32_t max_conc_cxns);
+
 /**
  * ucfg_policy_mgr_get_sta_sap_scc_on_dfs_chnl() - to find out if STA and SAP
  *						   SCC is allowed on DFS channel
@@ -323,4 +371,18 @@ QDF_STATUS ucfg_policy_mgr_get_sap_mandt_chnl(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_policy_mgr_get_indoor_chnl_marking(struct wlan_objmgr_psoc *psoc,
 					uint8_t *indoor_chnl_marking);
+
+/**
+ * ucfg_policy_mgr_get_sta_sap_scc_on_indoor_chnl() - to get if
+ * sta sap scc on indoor channel is allowed
+ * @psoc: pointer to psoc
+ * @sap_scc_on_indoor: value to be filled
+ *
+ * This API is used to get the value of  sta+sap scc on indoor channel
+ *
+ * Return: TRUE or FALSE
+ */
+
+bool
+ucfg_policy_mgr_get_sta_sap_scc_on_indoor_chnl(struct wlan_objmgr_psoc *psoc);
 #endif //__WLAN_POLICY_MGR_UCFG

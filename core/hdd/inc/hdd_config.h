@@ -1309,6 +1309,42 @@ struct dhcp_server {
 
 /*
  * <ini>
+ * gActionOUIDisableMuEDCA - Used to specify action OUIs to control
+ * MU EDCA configuration when join the candidate AP
+ *
+ * Note: User should strictly add new action OUIs at the end of this
+ * default value.
+ *
+ * One special AP sets MU EDCA timer as 255 wrongly in both beacon and assoc
+ * rsp, lead to 2 sec SU UL data stall periodically.
+ * This ini is used to specify AP OUIs. Don't follow mu edca in assoc rsp
+ * when connecting to those AP, just reset mu edca timer to 1.
+ * For default:
+ *     gActionOUIDisableMuEDCA=000CE7 08 00000000BF0CB101 FF 01
+ *          Explain: 000CE7: OUI
+ *                   08: data length
+ *                   00000000BF0CB101: data
+ *                   FF: OUI data mask: 11111111
+ *                   01: info mask, only OUI present in info mask
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_DISABLE_MU_EDCA CFG_INI_STRING( \
+	"gActionOUIDisableMuEDCA", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"000CE7 08 00000000BF0CB101 FF 01", \
+	"Used to specify action OUIs to control mu edca configuration")
+
+/*
+ * <ini>
  * gActionOUIReconnAssocTimeout - Used to specify action OUIs to
  * reconnect to same BSSID when wait for association response timeout
  *
@@ -1360,6 +1396,14 @@ struct dhcp_server {
  *   OUI data Len: 00
  *   Info Mask : 01 - only OUI present in Info mask
  *
+ * OUI 3: 000ce7
+ *   OUI data Len: 00
+ *   Info Mask : 01 - only OUI present in Info mask
+ *
+ * OUI 4: 00e0fc
+ *   OUI data Len: 00
+ *   Info Mask : 01 - only OUI present in Info mask
+ *
  * Refer to gEnableActionOUI for more detail about the format.
  *
  * Related: gEnableActionOUI
@@ -1374,8 +1418,44 @@ struct dhcp_server {
 	"gActionOUIDisableTWT", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
-	"001018 00 01 000986 00 01", \
+	"001018 00 01 000986 00 01 000ce7 00 01 00e0fc 00 01", \
 	"Used to specify action OUIs to control TWT configuration")
+
+/*
+ * <ini>
+ * gActionOUITakeAllBandInfo - Used to specify action OUIs to check
+ * whether country ie need take all band channel information.
+ *
+ * This ini is used to specify STA association request OUIs. Some STA
+ * need AP country ie take all band channel information when do BSS
+ * transition across band. Thus, AP will take all band channel info
+ * when we receive association request with this OUIs.
+ * Note: User should strictly add new action OUIs at the end of this
+ * default value.
+ *
+ * Default OUIs: (All values in Hex)
+ * OUI 1: 0017f2
+ *   OUI data Len: 01
+ *   OUI Data : 0a
+ *   OUI data Mask: 80 - 10000000
+ *   Info Mask : 01 - only OUI present in Info mask
+ *
+ * Refer to gEnableActionOUI for more detail about the format.
+ *
+ * Related: gEnableActionOUI
+ *
+ * Supported Feature: Action OUIs
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ACTION_OUI_TAKE_ALL_BAND_INFO CFG_INI_STRING( \
+	"gActionOUITakeAllBandInfo", \
+	0, \
+	ACTION_OUI_MAX_STR_LEN, \
+	"0017f2 01 0a 80 01", \
+	"Used to specify action OUIs to control country ie")
 
 /* End of action oui inis */
 
@@ -1610,7 +1690,7 @@ struct dhcp_server {
  *
  * @Min: 0
  * @Max: 5000
- * Default: 200
+ * Default: 400
  *
  * This ini is used as duration in milliseconds for which cached station stats
  * are valid. Driver sends the cached information as response, if it gets the
@@ -1627,7 +1707,7 @@ struct dhcp_server {
 			"sta_stats_cache_expiry_time", \
 			0, \
 			5000, \
-			200, \
+			400, \
 			CFG_VALUE_OR_DEFAULT, \
 			"Station stats cache expiry")
 
@@ -1795,9 +1875,11 @@ enum host_log_level {
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_TX) \
 	CFG(CFG_ACTION_OUI_FORCE_MAX_NSS) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA) \
+	CFG(CFG_ACTION_OUI_DISABLE_MU_EDCA) \
 	CFG(CFG_ACTION_OUI_SWITCH_TO_11N_MODE) \
 	CFG(CFG_ACTION_OUI_RECONN_ASSOCTIMEOUT) \
 	CFG(CFG_ACTION_OUI_DISABLE_TWT) \
+	CFG(CFG_ACTION_OUI_TAKE_ALL_BAND_INFO) \
 	CFG(CFG_ADVERTISE_CONCURRENT_OPERATION) \
 	CFG(CFG_BUG_ON_REINIT_FAILURE) \
 	CFG(CFG_DBS_SCAN_SELECTION) \

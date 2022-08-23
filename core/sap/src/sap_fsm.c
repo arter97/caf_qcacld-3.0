@@ -53,13 +53,14 @@
 #include <linux/netdevice.h>
 #include <net/cfg80211.h>
 #include <qca_vendor.h>
-#include <wlan_scan_ucfg_api.h>
+#include <wlan_scan_api.h>
 #include "wlan_reg_services_api.h"
 #include "wlan_mlme_ucfg_api.h"
 #include "wlan_policy_mgr_ucfg.h"
 #include "cfg_ucfg_api.h"
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_vdev_mgr_utils_api.h"
+#include "wlan_pre_cac_api.h"
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -154,9 +155,7 @@ static uint8_t *sap_hdd_event_to_string(eSapHddEvent event)
 	CASE_RETURN_STRING(eSAP_DFS_CAC_START);
 	CASE_RETURN_STRING(eSAP_DFS_CAC_INTERRUPTED);
 	CASE_RETURN_STRING(eSAP_DFS_CAC_END);
-	CASE_RETURN_STRING(eSAP_DFS_PRE_CAC_END);
 	CASE_RETURN_STRING(eSAP_DFS_RADAR_DETECT);
-	CASE_RETURN_STRING(eSAP_DFS_RADAR_DETECT_DURING_PRE_CAC);
 	CASE_RETURN_STRING(eSAP_DFS_NO_AVAILABLE_CHANNEL);
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
 	CASE_RETURN_STRING(eSAP_ACS_SCAN_SUCCESS_EVENT);
@@ -252,6 +251,8 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 	    sap_ctx->chan_freq != sap_ctx->candidate_freq &&
 	    !utils_dfs_is_freq_in_nol(pdev, sap_ctx->candidate_freq)) {
 		chan_freq = sap_ctx->candidate_freq;
+		if (sap_phymode_is_eht(sap_ctx->phyMode))
+			wlan_reg_set_create_punc_bitmap(ch_params, true);
 		wlan_reg_set_channel_params_for_freq(pdev, chan_freq, 0,
 						     ch_params);
 		sap_debug("random chan select candidate freq=%d", chan_freq);
@@ -496,7 +497,10 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 	uint8_t sta_cnt, i;
 
 	if (ch_params->ch_width == CH_WIDTH_160MHZ) {
-		is_ch_dfs = true;
+		if (wlan_reg_get_bonded_channel_state_for_freq(
+		    mac_ctx->pdev, chan_freq,
+		    ch_params->ch_width, 0) == CHANNEL_STATE_DFS)
+			is_ch_dfs = true;
 	} else if (ch_params->ch_width == CH_WIDTH_80P80MHZ) {
 		if (wlan_reg_get_channel_state_for_freq(
 						mac_ctx->pdev,
@@ -508,10 +512,11 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 				CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else {
-		if (wlan_reg_get_channel_state_for_freq(
-						mac_ctx->pdev,
-						chan_freq) ==
-		    CHANNEL_STATE_DFS)
+		/* Indoor channels are also marked DFS, therefore
+		 * check if the channel has REGULATORY_CHAN_RADAR
+		 * channel flag to identify if the channel is DFS
+		 */
+		if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev, chan_freq))
 			is_ch_dfs = true;
 	}
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(chan_freq))
@@ -519,10 +524,11 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 
 	sap_debug("vdev id %d chan %d is_ch_dfs %d pre_cac_complete %d ignore_cac %d cac_state %d",
 		  sap_ctx->sessionId, chan_freq, is_ch_dfs,
-		  sap_ctx->pre_cac_complete, mac_ctx->sap.SapDfsInfo.ignore_cac,
+		  wlan_pre_cac_complete_get(sap_ctx->vdev),
+		  mac_ctx->sap.SapDfsInfo.ignore_cac,
 		  mac_ctx->sap.SapDfsInfo.cac_state);
 
-	if (!is_ch_dfs || sap_ctx->pre_cac_complete ||
+	if (!is_ch_dfs || wlan_pre_cac_complete_get(sap_ctx->vdev) ||
 	    mac_ctx->sap.SapDfsInfo.ignore_cac ||
 	    mac_ctx->sap.SapDfsInfo.cac_state == eSAP_DFS_SKIP_CAC)
 		cac_required = false;
@@ -888,6 +894,42 @@ static bool is_mcc_preferred(struct sap_context *sap_context,
 	return false;
 }
 
+/**
+ * sap_process_force_scc_with_go_start - Check GO force SCC or not
+ * psoc: psoc object
+ * sap_context: sap_context
+ *
+ * This function checks the current SAP MCC or not with the GO's home channel.
+ * If it is, skip the GO's force SCC. The SAP will do force SCC after
+ * GO's started.
+ *
+ * Return: true if skip GO's force SCC
+ */
+static bool
+sap_process_force_scc_with_go_start(struct wlan_objmgr_psoc *psoc,
+				    struct sap_context *sap_context)
+{
+	uint8_t existing_vdev_id = WLAN_UMAC_VDEV_ID_MAX;
+	enum policy_mgr_con_mode existing_vdev_mode = PM_MAX_NUM_OF_MODE;
+	uint32_t con_freq;
+	enum phy_ch_width ch_width;
+
+	existing_vdev_id =
+		policy_mgr_fetch_existing_con_info(psoc,
+						   sap_context->sessionId,
+						   sap_context->chan_freq,
+						   &existing_vdev_mode,
+						   &con_freq, &ch_width);
+	if (existing_vdev_id < WLAN_UMAC_VDEV_ID_MAX &&
+	    existing_vdev_mode == PM_SAP_MODE) {
+		sap_debug("concurrent sap vdev: %d on freq %d, skip GO force scc",
+			  existing_vdev_id, con_freq);
+		return true;
+	}
+
+	return false;
+}
+
 #ifdef WLAN_FEATURE_P2P_P2P_STA
 /**
  * sap_set_forcescc_required - set force scc flag for provided p2p go vdev
@@ -1044,6 +1086,11 @@ sap_validate_chan(struct sap_context *sap_context,
 		*/
 		go_force_scc = policy_mgr_go_scc_enforced(mac_ctx->psoc);
 		sap_debug("go force scc enabled %d", go_force_scc);
+
+		if (sap_process_force_scc_with_go_start(mac_ctx->psoc,
+							sap_context))
+			goto validation_done;
+
 		if (go_force_scc) {
 			is_go_scc_strict =
 				policy_mgr_is_go_scc_strict(mac_ctx->psoc);
@@ -1177,7 +1224,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 	struct mac_context *mac_ctx;
 	struct scan_start_request *req;
 	struct wlan_objmgr_vdev *vdev = NULL;
-	uint8_t i;
+	uint8_t i, j;
 	uint32_t *freq_list = NULL;
 	uint8_t num_of_channels = 0;
 	mac_handle_t mac_handle;
@@ -1238,7 +1285,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 		}
 
 		sap_get_freq_list(sap_context, &freq_list, &num_of_channels);
-		if (!num_of_channels) {
+		if (!num_of_channels || !freq_list) {
 			sap_err("No freq sutiable for SAP in current list, SAP failed");
 			return QDF_STATUS_E_FAILURE;
 		}
@@ -1261,24 +1308,27 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 		}
 
 		/* Initiate a SCAN request */
-		ucfg_scan_init_default_params(vdev, req);
-		scan_id = ucfg_scan_get_scan_id(mac_ctx->psoc);
+		wlan_scan_init_default_params(vdev, req);
+		scan_id = wlan_scan_get_scan_id(mac_ctx->psoc);
 		req->scan_req.scan_id = scan_id;
 		req->scan_req.vdev_id = vdev_id;
 		req->scan_req.scan_f_passive = false;
 		req->scan_req.scan_req_id = sap_context->req_id;
 		req->scan_req.scan_priority = SCAN_PRIORITY_HIGH;
 		req->scan_req.scan_f_bcast_probe = true;
-
-		req->scan_req.chan_list.num_chan = num_of_channels;
-		for (i = 0; i < num_of_channels; i++)
-			req->scan_req.chan_list.chan[i].freq = freq_list[i];
+		for (i = 0, j = 0; i < num_of_channels; i++) {
+			if (wlan_reg_is_6ghz_chan_freq(freq_list[i]) &&
+			    !wlan_reg_is_6ghz_psc_chan_freq(freq_list[i]))
+				continue;
+			req->scan_req.chan_list.chan[j++].freq = freq_list[i];
+		}
+		req->scan_req.chan_list.num_chan = j;
 		sap_context->freq_list = freq_list;
 		sap_context->num_of_channel = num_of_channels;
 		/* Set requestType to Full scan */
 
 		sap_context->acs_req_timestamp = qdf_get_time_of_the_day_ms();
-		qdf_ret_status = ucfg_scan_start(req);
+		qdf_ret_status = wlan_scan_start(req);
 		if (qdf_ret_status != QDF_STATUS_SUCCESS) {
 			sap_err("scan request  fail %d!!!", qdf_ret_status);
 			sap_info("SAP Configuring default ch, Ch_freq=%d",
@@ -1428,9 +1478,9 @@ QDF_STATUS sap_set_session_param(mac_handle_t mac_handle,
 	int i;
 
 	sapctx->sessionId = session_id;
-	sapctx->is_pre_cac_on = false;
-	sapctx->pre_cac_complete = false;
-	sapctx->freq_before_pre_cac = 0;
+	wlan_pre_cac_set_status(sapctx->vdev, false);
+	wlan_pre_cac_complete_set(sapctx->vdev, false);
+	wlan_pre_cac_set_freq_before_pre_cac(sapctx->vdev, 0);
 
 	/* When SSR, SAP will restart, clear the old context,sessionId */
 	for (i = 0; i < SAP_MAX_NUM_SESSION; i++) {
@@ -2068,6 +2118,24 @@ QDF_STATUS sap_populate_peer_assoc_info(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+sap_reassoc_mld_copy(struct csr_roam_info *csr_roaminfo,
+		     tSap_StationAssocReassocCompleteEvent *reassoc_complete)
+{
+	qdf_copy_macaddr(&reassoc_complete->sta_mld,
+			 &csr_roaminfo->peer_mld);
+	sap_debug("reassoc_complete->staMld: " QDF_MAC_ADDR_FMT,
+		  QDF_MAC_ADDR_REF(reassoc_complete->sta_mld.bytes));
+}
+#else /* WLAN_FEATURE_11BE_MLO */
+static inline void
+sap_reassoc_mld_copy(struct csr_roam_info *csr_roaminfo,
+		     tSap_StationAssocReassocCompleteEvent *reassoc_complete)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 /**
  * sap_signal_hdd_event() - send event notification
  * @sap_ctx: Sap Context
@@ -2167,7 +2235,7 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		bss_complete->status = (eSapStatus) context;
 		bss_complete->staId = sap_ctx->sap_sta_id;
 
-		sap_info("(eSAP_START_BSS_EVENT): staId = %d",
+		sap_debug("(eSAP_START_BSS_EVENT): staId = %d",
 			  bss_complete->staId);
 
 		bss_complete->operating_chan_freq = sap_ctx->chan_freq;
@@ -2181,9 +2249,7 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 	case eSAP_DFS_CAC_START:
 	case eSAP_DFS_CAC_INTERRUPTED:
 	case eSAP_DFS_CAC_END:
-	case eSAP_DFS_PRE_CAC_END:
 	case eSAP_DFS_RADAR_DETECT:
-	case eSAP_DFS_RADAR_DETECT_DURING_PRE_CAC:
 	case eSAP_DFS_NO_AVAILABLE_CHANNEL:
 		sap_ap_event->sapHddEventCode = sap_hddevent;
 		sap_ap_event->sapevt.sapStopBssCompleteEvent.status =
@@ -2250,12 +2316,7 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 
 		qdf_copy_macaddr(&reassoc_complete->staMac,
 				 &csr_roaminfo->peerMac);
-#ifdef WLAN_FEATURE_11BE_MLO
-		qdf_copy_macaddr(&reassoc_complete->sta_mld,
-				 &csr_roaminfo->peer_mld);
-		sap_debug("reassoc_complete->staMld: " QDF_MAC_ADDR_FMT,
-			  QDF_MAC_ADDR_REF(reassoc_complete->sta_mld.bytes));
-#endif
+		sap_reassoc_mld_copy(csr_roaminfo, reassoc_complete);
 		reassoc_complete->staId = csr_roaminfo->staId;
 		reassoc_complete->status_code = csr_roaminfo->status_code;
 
@@ -2287,6 +2348,8 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		reassoc_complete->max_supp_idx = csr_roaminfo->max_supp_idx;
 		reassoc_complete->max_ext_idx = csr_roaminfo->max_ext_idx;
 		reassoc_complete->max_mcs_idx = csr_roaminfo->max_mcs_idx;
+		reassoc_complete->max_real_mcs_idx =
+						csr_roaminfo->max_real_mcs_idx;
 		reassoc_complete->rx_mcs_map = csr_roaminfo->rx_mcs_map;
 		reassoc_complete->tx_mcs_map = csr_roaminfo->tx_mcs_map;
 		reassoc_complete->ecsa_capable = csr_roaminfo->ecsa_capable;
@@ -2633,48 +2696,31 @@ static QDF_STATUS sap_cac_start_notify(mac_handle_t mac_handle)
 	return qdf_status;
 }
 
+#ifdef PRE_CAC_SUPPORT
 /**
- * wlansap_update_pre_cac_end() - Update pre cac end to upper layer
+ * wlansap_pre_cac_end_notify() - Update pre cac end to upper layer
  * @sap_context: SAP context
  * @mac: Global MAC structure
  * @intf: Interface number
  *
  * Notifies pre cac end to upper layer
  *
- * Return: QDF_STATUS
+ * Return: None
  */
-static QDF_STATUS wlansap_update_pre_cac_end(struct sap_context *sap_context,
-		struct mac_context *mac, uint8_t intf)
+static void wlansap_pre_cac_end_notify(struct sap_context *sap_context,
+				       struct mac_context *mac,
+				       uint8_t intf)
 {
-	QDF_STATUS qdf_status;
-
 	sap_context->isCacEndNotified = true;
 	mac->sap.SapDfsInfo.sap_radar_found_status = false;
 	sap_context->fsm_state = SAP_STARTED;
 
 	sap_warn("pre cac end notify on %d: move to state SAP_STARTED", intf);
-	qdf_status = sap_signal_hdd_event(sap_context,
-			NULL, eSAP_DFS_PRE_CAC_END,
-			(void *)eSAP_STATUS_SUCCESS);
-	if (QDF_IS_STATUS_ERROR(qdf_status)) {
-		sap_err("pre cac notify failed on intf %d", intf);
-		return qdf_status;
-	}
-
-	return QDF_STATUS_SUCCESS;
+	wlan_pre_cac_handle_cac_end(sap_context->vdev);
 }
 
-/**
- * sap_cac_end_notify() - Notify CAC end to HDD
- * @mac_handle: Opaque handle to the global MAC context
- *
- * Function will be called to notify eSAP_DFS_CAC_END event to HDD
- *
- * Return: QDF_STATUS_SUCCESS if the notification was sent, otherwise
- *         an appropriate QDF_STATUS error
- */
-static QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
-				     struct csr_roam_info *roamInfo)
+QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
+			      struct csr_roam_info *roamInfo)
 {
 	uint8_t intf;
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
@@ -2708,11 +2754,9 @@ static QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 			 * temporary interface created for pre cac and switch
 			 * the original SAP to the pre CAC channel.
 			 */
-			if (sap_context->is_pre_cac_on) {
-				qdf_status = wlansap_update_pre_cac_end(
-						sap_context, mac, intf);
-				if (QDF_IS_STATUS_ERROR(qdf_status))
-					return qdf_status;
+			if (wlan_pre_cac_get_status(mac->psoc)) {
+				wlansap_pre_cac_end_notify(sap_context,
+							   mac, intf);
 				/* pre CAC is not allowed with any concurrency.
 				 * So, we can break from here.
 				 */
@@ -2768,6 +2812,7 @@ static QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 	mac->sap.SapDfsInfo.cac_state = eSAP_DFS_SKIP_CAC;
 	return qdf_status;
 }
+#endif
 
 /**
  * sap_validate_dfs_nol() - Validate SAP channel with NOL list
@@ -2804,7 +2849,7 @@ static QDF_STATUS sap_validate_dfs_nol(struct sap_context *sap_ctx,
 	 * has leakage to the channels in NOL
 	 */
 
-	if (wlan_vdev_mlme_is_mlo_ap(sap_ctx->vdev)) {
+	if (sap_phymode_is_eht(sap_ctx->phyMode)) {
 		ch_state =
 			wlan_reg_get_channel_state_from_secondary_list_for_freq(
 						mac_ctx->pdev, sap_freq);
@@ -2838,6 +2883,9 @@ static QDF_STATUS sap_validate_dfs_nol(struct sap_context *sap_ctx,
 			  sap_ctx->chan_freq, chan_freq);
 
 		sap_ctx->chan_freq = chan_freq;
+		if (sap_phymode_is_eht(sap_ctx->phyMode))
+			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
+							true);
 		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
 						     sap_ctx->chan_freq,
 						     sap_ctx->sec_ch_freq,
@@ -2948,6 +2996,9 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 		     wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
 					      con_ch_freq)) {
 			sap_ctx->chan_freq = con_ch_freq;
+			if (sap_phymode_is_eht(sap_ctx->phyMode))
+				wlan_reg_set_create_punc_bitmap(
+					&sap_ctx->ch_params, true);
 			wlan_reg_set_channel_params_for_freq(
 						    mac_ctx->pdev,
 						    con_ch_freq, 0,
@@ -3141,6 +3192,9 @@ static QDF_STATUS sap_fsm_handle_radar_during_cac(struct sap_context *sap_ctx,
 	uint8_t intf;
 
 	if (mac_ctx->sap.SapDfsInfo.target_chan_freq) {
+		if (sap_phymode_is_eht(sap_ctx->phyMode))
+			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
+							true);
 		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
 				    mac_ctx->sap.SapDfsInfo.target_chan_freq, 0,
 				    &sap_ctx->ch_params);
@@ -3376,10 +3430,12 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 					CHANNEL_STATE_DFS)
 				is_dfs = true;
 		} else {
-			if (wlan_reg_get_channel_state_for_freq(
-							mac_ctx->pdev,
-							sap_chan_freq) ==
-			    CHANNEL_STATE_DFS)
+			/* Indoor channels are also marked DFS, therefore
+			 * check if the channel has REGULATORY_CHAN_RADAR
+			 * channel flag to identify if the channel is DFS
+			 */
+			if (wlan_reg_is_dfs_for_freq(mac_ctx->pdev,
+						     sap_chan_freq))
 				is_dfs = true;
 		}
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_ctx->chan_freq))
@@ -3391,7 +3447,7 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 			if ((false == sap_dfs_info->ignore_cac) &&
 			    (eSAP_DFS_DO_NOT_SKIP_CAC ==
 			    sap_dfs_info->cac_state) &&
-			    !sap_ctx->pre_cac_complete &&
+			    !wlan_pre_cac_complete_get(sap_ctx->vdev) &&
 			    policy_mgr_get_dfs_master_dynamic_enabled(
 					mac_ctx->psoc,
 					sap_ctx->sessionId)) {
@@ -4087,8 +4143,8 @@ static QDF_STATUS sap_get_freq_list(struct sap_context *sap_ctx,
 			continue;
 		}
 #ifdef FEATURE_WLAN_AP_AP_ACS_OPTIMIZE
-		if ((sap_ctx->acs_cfg->skip_scan_status ==
-			eSAP_DO_PAR_ACS_SCAN)) {
+		if (sap_ctx->acs_cfg->skip_scan_status ==
+			eSAP_DO_PAR_ACS_SCAN) {
 			uint32_t ch_freq;
 
 			ch_freq = WLAN_REG_CH_TO_FREQ(loop_count);
@@ -4180,10 +4236,11 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 	/* set the Radar Found flag in SapDfsInfo */
 	mac->sap.SapDfsInfo.sap_radar_found_status = true;
 
-	if (sap_ctx->freq_before_pre_cac) {
+	chan_freq = wlan_pre_cac_get_freq_before_pre_cac(sap_ctx->vdev);
+	if (chan_freq) {
 		sap_info("sapdfs: set chan freq before pre cac %d as target chan",
-			 sap_ctx->freq_before_pre_cac);
-		return sap_ctx->freq_before_pre_cac;
+			 chan_freq);
+		return chan_freq;
 	}
 
 	if (sap_ctx->vendor_acs_dfs_lte_enabled && (QDF_STATUS_SUCCESS ==

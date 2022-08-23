@@ -31,6 +31,7 @@
 #include "qc_sap_ioctl.h"
 #include "wma_api.h"
 #include "wlan_hdd_sysfs.h"
+#include "wlan_osif_features.h"
 
 #if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC)
 #define CHAN_WIDTH_SET_40MHZ_IN_2G \
@@ -64,22 +65,24 @@ void wlan_hdd_get_mlo_link_id(struct hdd_beacon_data *beacon,
 	if (ie) {
 		hdd_debug("find a mlo ie in beacon data");
 		*num_link = 1;
-		ie++; //WLAN_MAC_EID_EXT
-		len = *ie++; //length
-		ie++; //MLO_IE_OUI_TYPE
+		ie++; /* WLAN_MAC_EID_EXT */
+		len = *ie++; /* length */
+		ie++; /* MLO_IE_OUI_TYPE */
 		len--;
-		ie++; //Multi-Link Control field 2octets
+		ie++; /* Multi-Link Control field 2octets */
 		ie++;
 		len--;
 		len--;
-		ie += QDF_MAC_ADDR_SIZE; //mld mac addr
+		ie++; /* Common Info Length */
+		len--;
+		ie += QDF_MAC_ADDR_SIZE; /* mld mac addr */
 		len -= QDF_MAC_ADDR_SIZE;
-		*link_id = *ie++; //link id
+		*link_id = *ie++; /* link id */
 		len--;
 		while (len > 0) {
-			ie++; //sub element ID
+			ie++; /* sub element ID */
 			len--;
-			link_len = *ie++; //length of sub element ID
+			link_len = *ie++; /* length of sub element ID */
 			len--;
 			ie += link_len;
 			len -= link_len;
@@ -133,6 +136,9 @@ hdd_update_wiphy_eht_caps_6ghz(struct hdd_context *hdd_ctx,
 		phy_info[0] |= CHAN_WIDTH_SET_160MHZ_IN_5G;
 	if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80_PLUS_80MHZ)
 		phy_info[0] |= CHAN_WIDTH_SET_80PLUS80_MHZ_IN_5G;
+
+	if (eht_cap.support_320mhz_6ghz)
+		phy_info[0] |= IEEE80211_EHT_PHY_CAP0_320MHZ_IN_6GHZ;
 }
 
 #ifdef CFG80211_RU_PUNCT_SUPPORT
@@ -203,10 +209,10 @@ void hdd_update_wiphy_eht_cap(struct hdd_context *hdd_ctx)
 		hdd_ctx->iftype_data_5g->eht_cap.has_eht = eht_cap_cfg.present;
 		if (hdd_ctx->iftype_data_5g->eht_cap.has_eht) {
 			hdd_ctx->iftype_data_5g->he_cap.has_he = true;
-			if (max_fw_bw >= WNI_CFG_EHT_CHANNEL_WIDTH_80MHZ)
+			if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_80MHZ)
 				phy_info_5g[0] |=
 					CHAN_WIDTH_SET_40MHZ_80MHZ_IN_5G;
-			if (max_fw_bw >= WNI_CFG_EHT_CHANNEL_WIDTH_160MHZ)
+			if (max_fw_bw >= WNI_CFG_VHT_CHANNEL_WIDTH_160MHZ)
 				phy_info_5g[0] |=
 					CHAN_WIDTH_SET_160MHZ_IN_5G;
 		}
@@ -340,4 +346,55 @@ void hdd_sysfs_11be_rate_destroy(struct hdd_adapter *adapter)
 	device_remove_file(&adapter->dev->dev, &dev_attr_11be_rate);
 }
 
+/**
+ * hdd_map_eht_gi_to_os() - map txrate_gi to os guard interval
+ * @guard_interval: guard interval get from fw rate
+ *
+ * Return: os guard interval value
+ */
+static inline uint8_t hdd_map_eht_gi_to_os(enum txrate_gi guard_interval)
+{
+	switch (guard_interval) {
+	case TXRATE_GI_0_8_US:
+		return NL80211_RATE_INFO_EHT_GI_0_8;
+	case TXRATE_GI_1_6_US:
+		return NL80211_RATE_INFO_EHT_GI_1_6;
+	case TXRATE_GI_3_2_US:
+		return NL80211_RATE_INFO_EHT_GI_3_2;
+	default:
+		return NL80211_RATE_INFO_EHT_GI_0_8;
+	}
+}
+
+/**
+ * wlan_hdd_fill_os_eht_rateflags() - Fill EHT related rate_info
+ * @os_rate: rate info for os
+ * @rate_flags: rate flags
+ * @dcm: dcm from rate
+ * @guard_interval: guard interval from rate
+ *
+ * Return: none
+ */
+void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
+				    enum tx_rate_info rate_flags,
+				    uint8_t dcm,
+				    enum txrate_gi guard_interval)
+{
+	/* as fw not yet report ofdma to host, so don't
+	 * fill RATE_INFO_BW_EHT_RU.
+	 */
+	if (rate_flags & (TX_RATE_EHT80 | TX_RATE_EHT40 |
+	    TX_RATE_EHT20 | TX_RATE_EHT160 | TX_RATE_EHT320)) {
+		if (rate_flags & TX_RATE_EHT320)
+			hdd_set_rate_bw(os_rate, HDD_RATE_BW_320);
+		else if (rate_flags & TX_RATE_EHT160)
+			hdd_set_rate_bw(os_rate, HDD_RATE_BW_160);
+		else if (rate_flags & TX_RATE_EHT80)
+			hdd_set_rate_bw(os_rate, HDD_RATE_BW_80);
+		else if (rate_flags & TX_RATE_EHT40)
+			hdd_set_rate_bw(os_rate, HDD_RATE_BW_40);
+
+		os_rate->flags |= RATE_INFO_FLAGS_EHT_MCS;
+	}
+}
 #endif

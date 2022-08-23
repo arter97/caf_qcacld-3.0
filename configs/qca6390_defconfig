@@ -219,7 +219,10 @@ CONFIG_WLAN_OFFLOAD_PACKETS := y
 CONFIG_WLAN_SYNC_TSF := y
 #Enable DSRC feature
 ifeq ($(CONFIG_QCA_WIFI_SDIO), y)
-CONFIG_WLAN_FEATURE_DSRC := y
+	#Enable DSRC feature
+	CONFIG_WLAN_FEATURE_DSRC := y
+else
+	CONFIG_WLAN_REG_AUTO := y
 endif
 
 ifneq ($(CONFIG_ROME_IF),usb)
@@ -267,7 +270,6 @@ CONFIG_MCC_TO_SCC_SWITCH := y
 ifeq ($(CONFIG_SLUB_DEBUG), y)
 	# Enable Obj Mgr Degug services if slub build
 	CONFIG_WLAN_OBJMGR_DEBUG:= y
-	CONFIG_MPC_UT_FRAMEWORK := y
 	CONFIG_LOCK_STATS_ON:= y
 endif
 

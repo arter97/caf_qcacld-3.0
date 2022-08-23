@@ -1223,11 +1223,11 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 	if (!hdd_ctx->runtime_pm_prevented &&
 	    is_any_sta_connected &&
 	    !wlan_hdd_is_cpu_cxpc_allowed(curr_val)) {
-		hif_pm_runtime_get_noresume(hif_ctx, RTPM_ID_QOS_NOTIFY);
+		hif_rtpm_get(HIF_RTPM_GET_NORESUME, HIF_RTPM_ID_PM_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = true;
 	} else if (hdd_ctx->runtime_pm_prevented &&
 		   wlan_hdd_is_cpu_cxpc_allowed(curr_val)) {
-		hif_pm_runtime_put(hif_ctx, RTPM_ID_QOS_NOTIFY);
+		hif_rtpm_put(HIF_RTPM_PUT_NOIDLE, HIF_RTPM_ID_PM_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = false;
 	}
 
@@ -1791,7 +1791,9 @@ static void hdd_ssr_restart_sap(struct hdd_context *hdd_ctx)
 					   NET_DEV_HOLD_SSR_RESTART_SAP) {
 		if (adapter->device_mode == QDF_SAP_MODE) {
 			if (test_bit(SOFTAP_INIT_DONE, &adapter->event_flags)) {
-				hdd_debug("Restart prev SAP session");
+				hdd_debug(
+				"Restart prev SAP session, event_flags 0x%lx(%s)",
+				adapter->event_flags, (adapter->dev)->name);
 				wlan_hdd_start_sap(adapter, true);
 			}
 		}
@@ -2259,18 +2261,6 @@ hdd_sched_scan_results(struct wiphy *wiphy, uint64_t reqid)
 }
 #endif
 
-#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
-bool wlan_hdd_is_full_power_down_enable(struct hdd_context *hdd_ctx)
-{
-	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_FULL_POWER_DOWN) {
-		hdd_info_rl("Wlan full power down is enabled while suspend");
-		return true;
-	}
-
-	return false;
-}
-#endif
-
 /**
  * __wlan_hdd_cfg80211_resume_wlan() - cfg80211 resume callback
  * @wiphy: Pointer to wiphy
@@ -2307,12 +2297,6 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
 		hdd_info_rl("Suspend is not supported");
 		return -EINVAL;
-	}
-
-	if (wlan_hdd_is_full_power_down_enable(hdd_ctx)) {
-		hdd_debug("Driver has been re-initialized; Skipping resume");
-		exit_code = 0;
-		goto exit_with_code;
 	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -2379,13 +2363,10 @@ exit_with_code:
 
 static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 {
-	void *hif_ctx;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 	int errno;
 
-	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (hif_ctx)
-		hif_pm_runtime_put(hif_ctx, RTPM_ID_SUSPEND_RESUME);
+	qdf_rtpm_put(QDF_RTPM_PUT, QDF_RTPM_ID_WIPHY_SUSPEND);
 
 	if (!hdd_ctx) {
 		hdd_err_rl("hdd context is null");
@@ -2467,7 +2448,6 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	int rc;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CFG80211_SUSPEND_WLAN;
 	struct hdd_hostapd_state *hapd_state;
-	enum pmo_suspend_mode suspend_mode;
 	struct csr_del_sta_params params = {
 		.peerMacAddr = QDF_MAC_ADDR_BCAST_INIT,
 		.reason_code = REASON_DEAUTH_NETWORK_LEAVING,
@@ -2491,22 +2471,9 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 			return rc;
 	}
 
-	suspend_mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
-	if (suspend_mode == PMO_SUSPEND_NONE) {
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
 		hdd_info_rl("Suspend is not supported");
 		return -EINVAL;
-	}
-
-	if (suspend_mode == PMO_SUSPEND_SHUTDOWN) {
-		if (hdd_ctx->shutdown_in_suspend)
-			return -EAGAIN;
-
-		hdd_info_rl("Shutdown WLAN in Suspend");
-		hdd_shutdown_wlan_in_suspend(hdd_ctx);
-		/* shutdown must be excute in active, so return -EAGAIN
-		 * to PM to exit and try again
-		 */
-		return -EAGAIN;
 	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -2737,8 +2704,7 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
 	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
-		hdd_info("Driver Modules not Enabled");
-		hdd_ctx->shutdown_in_suspend = false;
+		hdd_debug("Driver Modules not Enabled ");
 		return 0;
 	}
 
@@ -2754,13 +2720,13 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	if (!hif_ctx)
 		return -EINVAL;
 
-	errno = hif_pm_runtime_get_sync(hif_ctx, RTPM_ID_SUSPEND_RESUME);
+	errno = qdf_rtpm_get(QDF_RTPM_GET_SYNC, QDF_RTPM_ID_WIPHY_SUSPEND);
 	if (errno)
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_suspend_wlan(wiphy, wow);
 	if (errno) {
-		hif_pm_runtime_put(hif_ctx, RTPM_ID_SUSPEND_RESUME);
+		qdf_rtpm_put(QDF_RTPM_PUT, QDF_RTPM_ID_WIPHY_SUSPEND);
 		return errno;
 	}
 
@@ -2787,8 +2753,7 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	 * the deadlock as idle shutdown waits for the dsc ops
 	 * to complete.
 	 */
-	if (!hdd_ctx->shutdown_in_suspend)
-		hdd_psoc_idle_timer_stop(hdd_ctx);
+	hdd_psoc_idle_timer_stop(hdd_ctx);
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
 	if (errno)
@@ -3017,7 +2982,6 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 	switch (type) {
 	/* Automatically determine transmit power */
 	case NL80211_TX_POWER_AUTOMATIC:
-	/* Fall through */
 	case NL80211_TX_POWER_LIMITED:
 	/* Limit TX power by the mBm parameter */
 		status = sme_set_max_tx_power(mac_handle, bssid, selfmac, dbm);

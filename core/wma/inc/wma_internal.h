@@ -738,6 +738,26 @@ void wma_set_sta_keep_alive(tp_wma_handle wma, uint8_t vdev_id,
 void wma_objmgr_set_peer_mlme_phymode(tp_wma_handle wma, uint8_t *mac_addr,
 				      enum wlan_phymode phymode);
 
+/**
+ * wma_objmgr_set_peer_mlme_nss() - set nss to peer object
+ * @wma:      wma handle
+ * @mac_addr: mac addr of peer
+ * @nss:  nss value to set
+ *
+ * Return: None
+ */
+void wma_objmgr_set_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr,
+				  uint8_t nss);
+
+/**
+ * wma_objmgr_get_peer_mlme_nss() - set nss to peer object
+ * @wma:      wma handle
+ * @mac_addr: mac addr of peer
+ *
+ * Return: Peer NSS
+ */
+uint8_t wma_objmgr_get_peer_mlme_nss(tp_wma_handle wma, uint8_t *mac_addr);
+
 QDF_STATUS wma_send_peer_assoc(tp_wma_handle wma,
 					   tSirNwType nw_type,
 					   tpAddStaParams params);
@@ -1315,6 +1335,25 @@ static inline QDF_STATUS wma_set_tsf_gpio_pin(WMA_HANDLE handle, uint32_t pin)
 	return QDF_STATUS_E_INVAL;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11AX
+/**
+ * wma_spr_update() - enable/disable spatial reuse
+ * @wma: wma handle
+ * @vdev_id: vdev id
+ * @enable: indicates spatial reuse enable/disable
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+QDF_STATUS wma_spr_update(tp_wma_handle wma, uint8_t vdev_id, bool enable);
+#else
+static inline QDF_STATUS wma_spr_update(tp_wma_handle wma, uint8_t vdev_id,
+					bool enable)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 QDF_STATUS wma_set_wisa_params(tp_wma_handle wma, struct sir_wisa_params *wisa);
 
 #ifdef DHCP_SERVER_OFFLOAD
@@ -1393,8 +1432,20 @@ int wma_peer_create_confirm_handler(void *handle, uint8_t *evt_param_info,
 
 int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 				uint32_t len);
+
 void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
-			    uint8_t type);
+		    uint8_t type);
+
+/**
+ * wma_remove_peer_req  - Remove the peer create
+ * request from WMA queue
+ * @wma: wma handle
+ * @vdev_id: vdev id
+ * @type: peer type
+ * @peer_addr: peer address
+ */
+void wma_remove_peer_req(tp_wma_handle wma, uint8_t vdev_id,
+			 uint8_t type, struct qdf_mac_addr *peer_addr);
 
 QDF_STATUS wma_process_hal_pwr_dbg_cmd(WMA_HANDLE handle,
 				       struct sir_mac_pwr_dbg_cmd *
@@ -1710,6 +1761,19 @@ int wma_cold_boot_cal_event_handler(void *wma_ctx, uint8_t *event_buff,
 int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len);
 #endif
 
+#ifdef MULTI_CLIENT_LL_SUPPORT
+/**
+ * wma_latency_level_event_handler() - latency level event handler
+ * @wma_ctx: wma handle
+ * @event_buff: event data
+ * @len: length of event buffer
+ *
+ * Return: Success or Failure status
+ */
+int wma_latency_level_event_handler(void *wma_ctx, uint8_t *event_buff,
+				    uint32_t len);
+#endif
+
 /**
  * wma_get_ani_level_evt_handler - event handler to fetch ani level
  * @handle: the wma handle
@@ -1723,4 +1787,22 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len);
  */
 int wma_get_ani_level_evt_handler(void *handle, uint8_t *event_buf,
 				  uint32_t len);
+/**
+ * wma_mcs_rate_match() - find the match mcs rate
+ * @raw_rate: the rate to look up
+ * @is_he: if it is he rate
+ * @nss1_rate: the nss1 rate
+ * @nss2_rate: the nss2 rate
+ * @nss: the nss in use
+ * @guard_interval: to get guard interval from rate
+ *
+ * This is a helper function to find the match of the tx_rate
+ * and return nss/guard interval.
+ *
+ * Return: the found rate or 0 otherwise
+ */
+uint16_t wma_mcs_rate_match(uint16_t raw_rate, bool is_he,
+			    const uint16_t *nss1_rate,
+			    const uint16_t *nss2_rate,
+			    uint8_t *nss, enum txrate_gi *guard_interval);
 #endif

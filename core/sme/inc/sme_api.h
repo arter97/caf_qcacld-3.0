@@ -543,6 +543,44 @@ QDF_STATUS sme_roam_disconnect_sta(mac_handle_t mac_handle, uint8_t sessionId,
 QDF_STATUS sme_roam_deauth_sta(mac_handle_t mac_handle, uint8_t sessionId,
 		struct csr_del_sta_params *pDelStaParams);
 
+#ifdef MULTI_CLIENT_LL_SUPPORT
+/**
+ * sme_multi_client_ll_rsp_register_callback() - Register multi client low
+ * latency callback
+ * @mac_handle: Opaque handle to the MAC context
+ * @latency_level_event_handler_cb: Function to be invoked for low latency
+ * event
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_multi_client_ll_rsp_register_callback(mac_handle_t mac_handle,
+				void (*latency_level_event_handler_cb)
+				(const struct latency_level_data *event_data,
+				 uint8_t vdev_id));
+
+/**
+ * sme_multi_client_ll_rsp_deregister_callback() - De Register multi client
+ * low latency callback
+ * @mac_handle: Opaque handle to the MAC context
+ *
+ * Return: void
+ */
+void sme_multi_client_ll_rsp_deregister_callback(mac_handle_t mac_handle);
+#else
+static inline QDF_STATUS
+sme_multi_client_ll_rsp_register_callback(mac_handle_t mac_handle,
+				void (*latency_level_event_handler_cb)
+				(const void *event_data,
+				 uint8_t vdev_id))
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+void sme_multi_client_ll_rsp_deregister_callback(mac_handle_t mac_handle)
+{}
+#endif
+
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * sme_set_roam_scan_ch_event_cb() - Register roam scan ch callback
@@ -762,6 +800,43 @@ QDF_STATUS sme_oem_data_cmd(mac_handle_t mac_handle,
 			     uint8_t vdev_id),
 			     struct oem_data *oem_data,
 			     uint8_t vdev_id);
+
+/**
+ * sme_oem_event_deinit() - function to deregister cb for oem event
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: None
+ */
+void sme_oem_event_deinit(mac_handle_t mac_handle);
+
+/**
+ * sme_async_oem_event_init() - function to register cb for async oem event
+ * @mac_handle: Opaque handle to the global MAC context
+ * @@oem_data_async_event_handler_cb: callback to be registered
+ *
+ * Return: None
+ */
+void sme_async_oem_event_init(mac_handle_t mac_handle,
+			      void (*oem_data_async_event_handler_cb)
+			      (const struct oem_data *oem_event_data));
+/**
+ * sme_async_oem_event_deinit() - function to deregister cb for async oem event
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Return: None
+ */
+void sme_async_oem_event_deinit(mac_handle_t mac_handle);
+#else
+static inline void sme_async_oem_event_init(
+				mac_handle_t mac_handle,
+				void (*oem_data_async_event_handler_cb)
+				(void *oem_event_data))
+{
+}
+
+static inline void sme_async_oem_event_deinit(mac_handle_t mac_handle)
+{
+}
 #endif
 
 #ifdef FEATURE_OEM_DATA_SUPPORT
@@ -943,8 +1018,6 @@ QDF_STATUS sme_get_roam_scan_home_away_time(mac_handle_t mac_handle,
 					    uint16_t *roam_scan_home_away_time);
 QDF_STATUS sme_update_wes_mode(mac_handle_t mac_handle, bool isWESModeEnabled,
 		uint8_t sessionId);
-QDF_STATUS sme_set_roam_scan_control(mac_handle_t mac_handle, uint8_t sessionId,
-		bool roamScanControl);
 
 QDF_STATUS sme_update_is_fast_roam_ini_feature_enabled(mac_handle_t mac_handle,
 		uint8_t sessionId,
@@ -1153,7 +1226,6 @@ QDF_STATUS sme_get_roam_scan_channel_list(mac_handle_t mac_handle,
 
 bool sme_get_is_ese_feature_enabled(mac_handle_t mac_handle);
 bool sme_get_wes_mode(mac_handle_t mac_handle);
-bool sme_get_roam_scan_control(mac_handle_t mac_handle);
 bool sme_get_is_lfr_feature_enabled(mac_handle_t mac_handle);
 bool sme_get_is_ft_feature_enabled(mac_handle_t mac_handle);
 bool sme_is_feature_supported_by_fw(enum cap_bitmap feature);
@@ -1172,16 +1244,20 @@ QDF_STATUS sme_send_rate_update_ind(mac_handle_t mac_handle,
 void sme_get_command_q_status(mac_handle_t mac_handle);
 
 /**
- * sme_set_wlm_latency_level_ind() - Used to set the latency level to fw
- * @mac_handle
- * @session_id
- * @latency_level
+ * sme_set_wlm_latency_level() - Used to set the latency level to fw
+ * @mac_handle: mac handle
+ * @vdev_id: vdev id
+ * @latency_level: latency level to be set in FW
+ * @client_id_bitmap: client id bitmap
+ * @force_reset: flag to reset latency level
  *
  * Return QDF_STATUS
  */
 QDF_STATUS sme_set_wlm_latency_level(mac_handle_t mac_handle,
-				     uint16_t session_id,
-				     uint16_t latency_level);
+				uint16_t vdev_id, uint16_t latency_level,
+				uint32_t client_id_bitmap,
+				bool force_reset);
+
 /*
  * SME API to enable/disable idle mode powersave
  * This should be called only if powersave offload
@@ -4516,4 +4592,19 @@ void sme_fill_channel_change_request(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_send_channel_change_req(mac_handle_t mac_handle,
 				      struct channel_change_req *req);
+
+/**
+ * sme_update_beacon_country_ie() - SME API to update beacon
+ * country ie
+ * @mac_handle: mac handle
+ * @vdev_id: vdev id
+ * @country_ie_for_all_band: country ie should take all band channel
+ *			     or only the current band channel
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_update_beacon_country_ie(mac_handle_t mac_handle,
+					uint8_t vdev_id,
+					bool country_ie_for_all_band);
+
 #endif /* #if !defined( __SME_API_H ) */

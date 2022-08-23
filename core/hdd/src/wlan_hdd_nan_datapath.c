@@ -105,6 +105,7 @@ static int hdd_close_ndi(struct hdd_adapter *adapter)
 	if (errno)
 		hdd_err("failed to destroy vdev: %d", errno);
 
+	adapter->is_virtual_iface = true;
 	/* We are good to close the adapter */
 	hdd_close_adapter(hdd_ctx, adapter, true);
 
@@ -676,7 +677,7 @@ error_init_txrx:
 	return ret_val;
 }
 
-int hdd_ndi_open(char *iface_name)
+int hdd_ndi_open(const char *iface_name, bool is_add_virtual_iface)
 {
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	struct qdf_mac_addr random_ndi_mac;
@@ -700,6 +701,10 @@ int hdd_ndi_open(char *iface_name)
 			MAX_NDI_ADAPTERS);
 		return -EINVAL;
 	}
+
+	params.is_add_virtual_iface = is_add_virtual_iface;
+
+	hdd_debug("is_add_virtual_iface %d", is_add_virtual_iface);
 
 	if (cfg_nan_get_ndi_mac_randomize(hdd_ctx->psoc)) {
 		if (hdd_get_random_nan_mac_addr(hdd_ctx, &random_ndi_mac)) {
@@ -730,7 +735,51 @@ int hdd_ndi_open(char *iface_name)
 	return 0;
 }
 
-int hdd_ndi_start(char *iface_name, uint16_t transaction_id)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+int hdd_ndi_set_mode(const char *iface_name)
+{
+	struct hdd_adapter *adapter;
+	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	struct qdf_mac_addr random_ndi_mac;
+	uint8_t *ndi_mac_addr = NULL;
+
+	hdd_enter();
+	if (!hdd_ctx)
+		return -EINVAL;
+
+	adapter = hdd_get_adapter_by_iface_name(hdd_ctx, iface_name);
+	if (!adapter) {
+		hdd_err("adapter is null");
+		return -EINVAL;
+	}
+
+	if (cfg_nan_get_ndi_mac_randomize(hdd_ctx->psoc)) {
+		if (hdd_get_random_nan_mac_addr(hdd_ctx, &random_ndi_mac)) {
+			hdd_err("get random mac address failed");
+			return -EFAULT;
+		}
+		ndi_mac_addr = &random_ndi_mac.bytes[0];
+	}
+
+	if (!ndi_mac_addr) {
+		hdd_err("ndi mac address is null");
+		return -EINVAL;
+	}
+
+	hdd_update_dynamic_mac(hdd_ctx, &adapter->mac_addr,
+			       (struct qdf_mac_addr *)ndi_mac_addr);
+	qdf_mem_copy(&adapter->mac_addr, ndi_mac_addr, ETH_ALEN);
+	qdf_mem_copy(adapter->dev->dev_addr, ndi_mac_addr, ETH_ALEN);
+
+	adapter->device_mode = QDF_NDI_MODE;
+	hdd_debug("Created NDI with device mode:%d and iface_name:%s",
+		  adapter->device_mode, iface_name);
+
+	return 0;
+}
+#endif
+
+int hdd_ndi_start(const char *iface_name, uint16_t transaction_id)
 {
 	int ret;
 	QDF_STATUS status;
@@ -786,7 +835,29 @@ err_handler:
 	return ret;
 }
 
-int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0))
+static int hdd_delete_ndi_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	return 0;
+}
+#else
+static int hdd_delete_ndi_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
+{
+	int ret;
+
+	ret = __wlan_hdd_del_virtual_intf(wiphy, wdev);
+
+	if (ret)
+		hdd_err("NDI delete request failed");
+	else
+		hdd_err("NDI delete request successfully issued");
+
+	return ret;
+}
+#endif
+
+int hdd_ndi_delete(uint8_t vdev_id, const char *iface_name,
+		   uint16_t transaction_id)
 {
 	int ret;
 	struct hdd_adapter *adapter;
@@ -821,11 +892,7 @@ int hdd_ndi_delete(uint8_t vdev_id, char *iface_name, uint16_t transaction_id)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 	/* Delete the interface */
 	adapter->is_virtual_iface = true;
-	ret = __wlan_hdd_del_virtual_intf(hdd_ctx->wiphy, &adapter->wdev);
-	if (ret)
-		hdd_err("NDI delete request failed");
-	else
-		hdd_err("NDI delete request successfully issued");
+	ret = hdd_delete_ndi_intf(hdd_ctx->wiphy, &adapter->wdev);
 
 	return ret;
 }
@@ -979,15 +1046,6 @@ void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 }
 
-/**
- * hdd_ndp_new_peer_handler() - NDP new peer indication handler
- * @vdev_id: vdev id
- * @sta_id: station id
- * @peer_mac_addr: peer mac address
- * @first_peer: first peer
- *
- * Return: none
- */
 int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 			struct qdf_mac_addr *peer_mac_addr, bool first_peer)
 {
@@ -1034,7 +1092,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		if (hdd_ctx->ol_enable &&
 		    !NAN_CONCURRENCY_SUPPORTED(hdd_ctx->psoc)) {
 			hdd_debug("Disable LRO/GRO in NDI Mode");
-			hdd_rx_handle_concurrency(true);
+			hdd_disable_rx_ol_in_concurrency(true);
 		}
 
 		hdd_bus_bw_compute_prev_txrx_stats(adapter);
@@ -1085,17 +1143,10 @@ void hdd_cleanup_ndi(struct hdd_context *hdd_ctx,
 						PM_STA_MODE,
 						NULL) == 1)))) {
 		hdd_debug("Enable LRO/GRO");
-		hdd_rx_handle_concurrency(false);
+		hdd_disable_rx_ol_in_concurrency(false);
 	}
 }
 
-/**
- * hdd_ndp_peer_departed_handler() - Handle NDP peer departed indication
- * @adapter: pointer to adapter context
- * @ind_params: indication parameters
- *
- * Return: none
- */
 void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 			struct qdf_mac_addr *peer_mac_addr, bool last_peer)
 {

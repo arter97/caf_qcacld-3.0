@@ -30,8 +30,8 @@
 #include <wlan_cmn.h>
 #include <wlan_objmgr_vdev_obj.h>
 #include <wlan_objmgr_peer_obj.h>
-#include "wlan_cm_roam_public_struct.h"
 #include "wlan_wfa_config_public_struct.h"
+#include "wlan_connectivity_logging.h"
 
 #define MAC_MAX_ADD_IE_LENGTH       2048
 
@@ -49,6 +49,7 @@
 /* 120 seconds, for WPS */
 #define WAIT_FOR_WPS_KEY_TIMEOUT_PERIOD (120 * QDF_MC_TIMER_TO_SEC_UNIT)
 
+#define MLME_PEER_SET_KEY_WAKELOCK_TIMEOUT WAKELOCK_DURATION_RECOMMENDED
 /* QCN IE definitions */
 #define QCN_IE_HDR_LEN     6
 
@@ -61,7 +62,6 @@
 #define QCN_IE_ATTR_ID_VERSION 1
 #define QCN_IE_ATTR_ID_VHT_MCS11 2
 #define QCN_IE_ATTR_ID_ALL 0xFF
-
 
 #define mlme_legacy_fatal(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_MLME, params)
 #define mlme_legacy_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_MLME, params)
@@ -156,6 +156,10 @@ struct sae_auth_retry {
  * @twt_ctx: TWT context
  * @allow_kickout: True if the peer can be kicked out. Peer can't be kicked
  *                 out if it is being steered
+ * @nss: Peer NSS
+ * @peer_set_key_wakelock: wakelock to protect peer set key op with firmware
+ * @peer_set_key_runtime_wakelock: runtime pm wakelock for set key
+ * @is_key_wakelock_set: flag to check if key wakelock is pending to release
  */
 struct peer_mlme_priv_obj {
 	uint8_t last_pn_valid;
@@ -170,6 +174,10 @@ struct peer_mlme_priv_obj {
 #ifdef WLAN_FEATURE_SON
 	bool allow_kickout;
 #endif
+	uint8_t nss;
+	qdf_wake_lock_t peer_set_key_wakelock;
+	qdf_runtime_lock_t peer_set_key_runtime_wakelock;
+	bool is_key_wakelock_set;
 };
 
 /**
@@ -214,6 +222,7 @@ struct wlan_mlme_roaming_config {
  * @roam_sm: Structure containing roaming state related details
  * @roam_config: Roaming configurations structure
  * @sae_single_pmk: Details for sae roaming using single pmk
+ * @set_pmk_pending: RSO update status of PMK from set_key
  */
 struct wlan_mlme_roam {
 	struct wlan_mlme_roam_state_info roam_sm;
@@ -221,6 +230,7 @@ struct wlan_mlme_roam {
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	struct wlan_mlme_sae_single_pmk sae_single_pmk;
 #endif
+	bool set_pmk_pending;
 };
 
 #ifdef WLAN_FEATURE_MSCS
@@ -393,6 +403,15 @@ struct wait_for_key_timer {
 };
 
 /**
+ * struct mlme_ap_config - VDEV MLME legacy private SAP
+ * related configurations
+ * @user_config_sap_ch_freq : Frequency from userspace to start SAP
+ */
+struct mlme_ap_config {
+	qdf_freq_t user_config_sap_ch_freq;
+};
+
+/**
  * struct mlme_legacy_priv - VDEV MLME legacy priv object
  * @chan_switch_in_progress: flag to indicate that channel switch is in progress
  * @hidden_ssid_restart_in_progress: flag to indicate hidden ssid restart is
@@ -410,6 +429,8 @@ struct wait_for_key_timer {
  * @vdev_stop_type: vdev stop type request
  * @roam_off_state: Roam offload state
  * @cm_roam: Roaming configuration
+ * @auth_log: Cached log records for SAE authentication frame
+ * related information.
  * @bigtk_vdev_support: BIGTK feature support for this vdev (SAP)
  * @sae_auth_retry: SAE auth retry information
  * @roam_reason_better_ap: roam due to better AP found
@@ -431,6 +452,10 @@ struct wait_for_key_timer {
  * @ba_2k_jump_iot_ap: This is set to true if connected to the ba 2k jump IOT AP
  * @is_usr_ps_enabled: Is Power save enabled
  * @notify_co_located_ap_upt_rnr: Notify co located AP to update RNR or not
+ * @max_mcs_index: Max supported mcs index of vdev
+ * @vdev_traffic_type: to set if vdev is LOW_LATENCY or HIGH_TPUT
+ * @country_ie_for_all_band: take all band channel info in country ie
+ * @mlme_ap: SAP related vdev private configurations
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -448,6 +473,9 @@ struct mlme_legacy_priv {
 	uint32_t vdev_stop_type;
 	struct wlan_mlme_roam mlme_roam;
 	struct wlan_cm_roam cm_roam;
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+	struct wlan_log_record auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
+#endif
 	bool bigtk_vdev_support;
 	struct sae_auth_retry sae_retry;
 	bool roam_reason_better_ap;
@@ -472,6 +500,12 @@ struct mlme_legacy_priv {
 	bool ba_2k_jump_iot_ap;
 	bool is_usr_ps_enabled;
 	bool notify_co_located_ap_upt_rnr;
+#ifdef WLAN_FEATURE_SON
+	uint8_t max_mcs_index;
+#endif
+	uint8_t vdev_traffic_type;
+	bool country_ie_for_all_band;
+	struct mlme_ap_config mlme_ap;
 };
 
 /**
@@ -1013,6 +1047,27 @@ mlme_clear_operations_bitmap(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
 QDF_STATUS mlme_get_cfg_wlm_level(struct wlan_objmgr_psoc *psoc,
 				  uint8_t *level);
 
+#ifdef MULTI_CLIENT_LL_SUPPORT
+/**
+ * mlme_get_cfg_multi_client_ll_ini_support() - Get the ini value of wlm multi
+ * client latency level feature
+ * @psoc: pointer to psoc object
+ * @multi_client_ll_support: parameter that needs to be filled.
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS
+mlme_get_cfg_multi_client_ll_ini_support(struct wlan_objmgr_psoc *psoc,
+					 bool *multi_client_ll_support);
+#else
+static inline QDF_STATUS
+mlme_get_cfg_multi_client_ll_ini_support(struct wlan_objmgr_psoc *psoc,
+					 bool *multi_client_ll_support)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
+
 /**
  * mlme_get_cfg_wlm_reset() - Get the WLM reset flag
  * @psoc: pointer to psoc object
@@ -1072,28 +1127,6 @@ void mlme_reinit_control_config_lfr_params(struct wlan_objmgr_psoc *psoc,
 					   struct wlan_mlme_lfr_cfg *lfr);
 
 /**
- * wlan_mlme_mlo_sta_mlo_concurency_set_link() - Set links for MLO STA
- *
- * @vdev: vdev object
- * @reason: Reason for which link is forced
- * @mode: Force reason
- * @num_mlo_vdev: number of mlo vdev
- * @mlo_vdev_lst: MLO STA vdev list
-
- * Interface manager Set links for MLO STA
- *
- * Return: void
- */
-#ifdef WLAN_FEATURE_11BE_MLO
-void
-wlan_mlo_sta_mlo_concurency_set_link(struct wlan_objmgr_vdev *vdev,
-				     enum mlo_link_force_reason reason,
-				     enum mlo_link_force_mode mode,
-				     uint8_t num_mlo_vdev,
-				     uint8_t *mlo_vdev_lst);
-#endif
-
-/**
  * wlan_mlme_get_mac_vdev_id() - get vdev self mac address using vdev id
  * @pdev: pdev
  * @vdev_id: vdev_id
@@ -1108,4 +1141,92 @@ wlan_mlo_sta_mlo_concurency_set_link(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS wlan_mlme_get_mac_vdev_id(struct wlan_objmgr_pdev *pdev,
 				     uint8_t vdev_id,
 				     struct qdf_mac_addr *self_mac);
+
+/**
+ * wlan_acquire_peer_key_wakelock -api to get key wakelock
+ * @pdev: pdev
+ * @mac_addr: peer mac addr
+ *
+ * This function acquires wakelock and prevent runtime pm during key
+ * installation
+ *
+ * Return: None
+ */
+void wlan_acquire_peer_key_wakelock(struct wlan_objmgr_pdev *pdev,
+				    uint8_t *mac_addr);
+
+/**
+ * wlan_release_peer_key_wakelock -api to release key wakelock
+ * @pdev: pdev
+ * @mac_addr: peer mac addr
+ *
+ * This function releases wakelock and allow runtime pm after key
+ * installation
+ *
+ * Return: None
+ */
+void wlan_release_peer_key_wakelock(struct wlan_objmgr_pdev *pdev,
+				    uint8_t *mac_addr);
+
+/**
+ * wlan_get_sap_user_config_freq() - Get the user configured frequency
+ *
+ * @vdev: pointer to vdev
+ *
+ * Return: User configured sap frequency.
+ */
+qdf_freq_t
+wlan_get_sap_user_config_freq(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_set_sap_user_config_freq() - Set the user configured frequency
+ *
+ * @vdev: pointer to vdev
+ * @freq: user configured SAP frequency
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
+			      qdf_freq_t freq);
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+/**
+ * wlan_mlme_defer_pmk_set_in_roaming() - Set the set_key pending status
+ *
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
+ * @set_pmk_pending: set_key pending status
+ *
+ * Return: None
+ */
+void
+wlan_mlme_defer_pmk_set_in_roaming(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, bool set_pmk_pending);
+
+/**
+ * wlan_mlme_is_pmk_set_deferred() - Get the set_key pending status
+ *
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
+ *
+ * Return : set_key pending status
+ */
+bool
+wlan_mlme_is_pmk_set_deferred(struct wlan_objmgr_psoc *psoc,
+			      uint8_t vdev_id);
+#else
+static inline void
+wlan_mlme_defer_pmk_set_in_roaming(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id, bool set_pmk_pending)
+{
+}
+
+static inline bool
+wlan_mlme_is_pmk_set_deferred(struct wlan_objmgr_psoc *psoc,
+			      uint8_t vdev_id)
+{
+	return false;
+}
+#endif
 #endif

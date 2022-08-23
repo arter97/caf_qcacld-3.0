@@ -538,4 +538,44 @@ wlan_hdd_ft_set_key_delay(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
+#ifdef FEATURE_WLAN_WAPI
+/**
+ * hdd_translate_wapi_to_csr_auth_type() - Translate WAPI to CSR auth type
+ * @auth_suite: auth suite
+ *
+ * Return: enum csr_akm_type enumeration
+ */
+enum csr_akm_type hdd_translate_wapi_to_csr_auth_type(uint8_t auth_suite[4]);
+
+/**
+ * hdd_translate_wapi_to_csr_encryption_type() -
+ *	Translate WAPI to CSR encryption type
+ * @cipher_suite: cipher suite
+ *
+ * Return: eCsrEncryptionType enumeration
+ */
+eCsrEncryptionType
+hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4]);
+#else
+enum csr_akm_type hdd_translate_wapi_to_csr_auth_type(uint8_t auth_suite[4])
+{
+	return eCSR_AUTH_TYPE_UNKNOWN;
+}
+
+eCsrEncryptionType
+hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4])
+{
+	return eCSR_AUTH_TYPE_UNKNOWN;
+}
+#endif
+
+/**
+ * hdd_convert_ch_width_to_cdp_peer_bw() - Convert ch_width to DP format
+ * @ch_width: ch_width
+ *
+ * Return: cdp_peer_bw enumeration
+ */
+enum cdp_peer_bw
+hdd_convert_ch_width_to_cdp_peer_bw(enum phy_ch_width ch_width);
+
 #endif

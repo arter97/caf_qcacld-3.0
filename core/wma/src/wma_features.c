@@ -73,6 +73,7 @@
 #include <wlan_crypto_global_api.h>
 #include "cdp_txrx_host_stats.h"
 #include "target_if_cm_roam_event.h"
+#include <wlan_mlo_mgr_cmn.h>
 
 /**
  * WMA_SET_VDEV_IE_SOURCE_HOST - Flag to identify the source of VDEV SET IE
@@ -636,6 +637,77 @@ QDF_STATUS wma_process_dhcp_ind(WMA_HANDLE handle,
 					    &peer_set_param_fp);
 }
 
+#if defined WLAN_FEATURE_11AX
+
+#define NON_SRG_PD_SR_DISALLOWED 0x02
+#define NON_SRG_OFFSET_PRESENT 0x04
+#define NON_SRG_SPR_ENABLE_POS 24
+#define NON_SRG_PARAM_VAL_DBM_UNIT 0x20
+#define NON_SRG_SPR_ENABLE 0x80
+
+QDF_STATUS wma_spr_update(tp_wma_handle wma,
+			  uint8_t vdev_id,
+			  bool enable)
+{
+	struct pdev_params pparam;
+	uint32_t val = 0;
+	wmi_unified_t wmi_handle = wma->wmi_handle;
+	uint8_t mac_id;
+	uint32_t conc_vdev_id;
+	struct wlan_objmgr_vdev *vdev;
+	uint8_t sr_ctrl, non_srg_pd_max_offset;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(wma->psoc, vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev) {
+		wma_err("Can't get vdev by vdev_id:%d", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
+	non_srg_pd_max_offset = wlan_vdev_mlme_get_pd_offset(vdev);
+	if (!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
+	    (sr_ctrl & NON_SRG_OFFSET_PRESENT)) {
+		policy_mgr_get_mac_id_by_session_id(wma->psoc,
+						    vdev_id,
+						    &mac_id);
+		conc_vdev_id =
+			policy_mgr_get_conc_vdev_on_same_mac(wma->psoc,
+							     vdev_id,
+							     mac_id);
+		if (conc_vdev_id != WLAN_INVALID_VDEV_ID) {
+			wma_debug("Concurrent intf present,SR PD not enabled");
+			goto release_ref;
+		}
+		qdf_mem_zero(&pparam, sizeof(pparam));
+		pparam.param_id = WMI_PDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD;
+		if (enable) {
+			val = NON_SRG_SPR_ENABLE;
+			val |= NON_SRG_PARAM_VAL_DBM_UNIT;
+			val = val << NON_SRG_SPR_ENABLE_POS;
+			val |= non_srg_pd_max_offset;
+			wlan_vdev_mlme_set_he_spr_enabled(vdev, true);
+		} else {
+			wlan_vdev_mlme_set_he_spr_enabled(vdev, false);
+		}
+
+		pparam.param_value = val;
+
+		wma_debug("non-srg param val: %u, enable: %d",
+			  pparam.param_value, enable);
+
+		wmi_unified_pdev_param_send(wmi_handle, &pparam,
+					    WMA_WILDCARD_PDEV_ID);
+	} else {
+		wma_debug("Spatial reuse not enabled");
+	}
+
+release_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #if defined(WLAN_FEATURE_11BE)
 static enum wlan_phymode
 wma_eht_chan_phy_mode(uint32_t freq, uint8_t dot11_mode, uint16_t bw_val,
@@ -684,8 +756,10 @@ enum wlan_phymode wma_chan_phy_mode(uint32_t freq, enum phy_ch_width chan_width,
 	if (!wma)
 		return WLAN_PHYMODE_AUTO;
 
-	if (chan_width >= CH_WIDTH_INVALID) {
-		wma_err_rl("Invalid channel width %d", chan_width);
+	if (chan_width >= CH_WIDTH_INVALID || !bw_val ||
+	    (wlan_reg_is_24ghz_ch_freq(freq) && bw_val > 40)) {
+		wma_err_rl("Invalid channel width %d freq %d",
+			   chan_width, freq);
 		return WLAN_PHYMODE_AUTO;
 	}
 
@@ -1650,6 +1724,10 @@ static const uint8_t *wma_wow_wake_reason_str(A_INT32 wake_reason)
 		return "ROAM_STATS";
 	case WOW_REASON_RTT_11AZ:
 		return "WOW_REASON_RTT_11AZ";
+	case WOW_REASON_DELAYED_WAKEUP_HOST_CFG_TIMER_ELAPSED:
+		return "DELAYED_WAKEUP_TIMER_ELAPSED";
+	case WOW_REASON_DELAYED_WAKEUP_DATA_STORE_LIST_FULL:
+		return "DELAYED_WAKEUP_DATA_STORE_LIST_FULL";
 	default:
 		return "unknown";
 	}
@@ -2600,8 +2678,10 @@ static int wma_wake_event_packet(
 	case WOW_REASON_RA_MATCH:
 	case WOW_REASON_RECV_MAGIC_PATTERN:
 	case WOW_REASON_PACKET_FILTER_MATCH:
-		wma_debug("Wake event packet:");
-		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
+	case WOW_REASON_DELAYED_WAKEUP_HOST_CFG_TIMER_ELAPSED:
+	case WOW_REASON_DELAYED_WAKEUP_DATA_STORE_LIST_FULL:
+		wma_info("Wake event packet:");
+		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_INFO,
 				   packet, packet_len);
 
 		vdev = &wma->interfaces[wake_info->vdev_id];
@@ -3265,6 +3345,59 @@ QDF_STATUS wma_process_del_periodic_tx_ptrn_ind(WMA_HANDLE handle,
 }
 
 #ifdef WLAN_FEATURE_STATS_EXT
+#ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * wma_stats_ext_req_vdev_id_bitmap() -API to calculate connected links bitmap
+ * in case of MLO.
+ * psoc: psoc common object
+ * vdev_id: vdev_id for the stats ext request
+ * bitmap: connected links bitmap
+ *
+ * Return None
+ */
+static void wma_stats_ext_req_vdev_id_bitmap(struct wlan_objmgr_psoc *psoc,
+					     uint32_t vdev_id, uint32_t *bitmap)
+{
+	struct wlan_objmgr_vdev *vdev, *link_vdev;
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	uint32_t i, connected_links_bitmap = 0;
+	uint8_t connected_vdev_id;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_LEGACY_WMA_ID);
+	if (!vdev) {
+		wma_err("vdev object is NULL for vdev_id %d", vdev_id);
+		return;
+	}
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		goto end;
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		link_vdev = mlo_dev_ctx->wlan_vdev_list[i];
+		if (!link_vdev)
+			continue;
+
+		connected_vdev_id = wlan_vdev_get_id(link_vdev);
+		if (wlan_cm_is_vdev_connected(link_vdev))
+			connected_links_bitmap |= BIT(connected_vdev_id);
+	}
+
+	wma_debug("mlo connected links bitmap[0x%x]", connected_links_bitmap);
+	*bitmap = connected_links_bitmap;
+
+end:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
+}
+#else
+static void wma_stats_ext_req_vdev_id_bitmap(struct wlan_objmgr_psoc *psoc,
+					     uint32_t vdev_id, uint32_t *bitmap)
+{
+	*bitmap = 0;
+}
+#endif
+
 QDF_STATUS wma_stats_ext_req(void *wma_ptr, tpStatsExtRequest preq)
 {
 	tp_wma_handle wma = (tp_wma_handle) wma_ptr;
@@ -3287,6 +3420,9 @@ QDF_STATUS wma_stats_ext_req(void *wma_ptr, tpStatsExtRequest preq)
 	if (preq->request_data_len > 0)
 		qdf_mem_copy(params->request_data, preq->request_data,
 			     params->request_data_len);
+
+	wma_stats_ext_req_vdev_id_bitmap(wma->psoc, params->vdev_id,
+					 &params->vdev_id_bitmap);
 
 	status = wmi_unified_stats_ext_req_cmd(wma->wmi_handle, params);
 	qdf_mem_free(params);
@@ -3661,7 +3797,6 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 	int ret = 0;
 	uint32_t *ch_mhz = NULL;
 	size_t ch_mhz_len;
-	uint8_t chan_id;
 	bool restore_last_peer = false;
 	QDF_STATUS qdf_status;
 	struct wmi_unified *wmi_handle;
@@ -3682,8 +3817,8 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 		goto end_tdls_peer_state;
 	}
 
-	if (MLME_IS_ROAM_SYNCH_IN_PROGRESS(wma_handle->psoc,
-					   peer_state->vdev_id)) {
+	if (wlan_cm_is_roam_sync_in_progress(wma_handle->psoc,
+					     peer_state->vdev_id)) {
 		wma_err("roaming in progress, reject peer update cmd!");
 		ret = -EPERM;
 		goto end_tdls_peer_state;
@@ -3712,10 +3847,8 @@ int wma_update_tdls_peer_state(WMA_HANDLE handle,
 			goto end_tdls_peer_state;
 		}
 
-		for (i = 0; i < peer_cap->peer_chanlen; ++i) {
-			chan_id = peer_cap->peer_chan[i].chan_id;
-			ch_mhz[i] = cds_chan_to_freq(chan_id);
-		}
+		for (i = 0; i < peer_cap->peer_chanlen; ++i)
+			ch_mhz[i] = peer_cap->peer_chan[i].ch_freq;
 	}
 
 	cdp_peer_set_tdls_offchan_enabled(soc, peer_state->vdev_id,
@@ -5272,6 +5405,7 @@ static void wma_send_set_key_rsp(uint8_t vdev_id, bool pairwise,
 			     QDF_MAC_ADDR_SIZE);
 		wma_send_msg_high_priority(wma, WMA_SET_STAKEY_RSP,
 					   key_info_uc, 0);
+		wlan_release_peer_key_wakelock(wma->pdev, crypto_key->macaddr);
 	} else {
 		key_info_mc = qdf_mem_malloc(sizeof(*key_info_mc));
 		if (!key_info_mc)
@@ -5331,14 +5465,6 @@ void wma_update_set_key(uint8_t session_id, bool pairwise,
 
 	if (iface)
 		iface->is_waiting_for_key = false;
-
-	if (!pairwise && iface) {
-		/* Its GTK release the wake lock */
-		wma_debug("Release set key wake lock");
-		qdf_runtime_pm_allow_suspend(
-				&iface->vdev_set_key_runtime_wakelock);
-		wma_release_wakelock(&iface->vdev_set_key_wakelock);
-	}
 
 	wma_send_set_key_rsp(session_id, pairwise, key_index);
 }

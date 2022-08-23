@@ -37,6 +37,7 @@
 #include <cm_utf.h>
 #include "target_if_cm_roam_event.h"
 #include "wlan_cm_roam_api.h"
+#include "wifi_pos_api.h"
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_public_structs.h>
 #include <wlan_mlo_mgr_cmn.h>
@@ -465,9 +466,8 @@ static QDF_STATUS ap_mlme_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static inline void
-wlan_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_vdev *vdev,
-				    bool is_ap_up)
+void wlan_handle_emlsr_sta_concurrency(struct wlan_objmgr_vdev *vdev,
+				       bool ap_coming_up, bool sta_coming_up)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
 
@@ -476,13 +476,8 @@ wlan_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	policy_mgr_handle_sap_mlo_sta_concurrency(psoc, vdev, is_ap_up);
-}
-#else
-static inline void
-wlan_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_vdev *vdev,
-				    bool is_ap_up)
-{
+	policy_mgr_handle_emlsr_sta_concurrency(psoc, vdev, ap_coming_up,
+						sta_coming_up);
 }
 #endif
 
@@ -506,8 +501,6 @@ ap_mlme_vdev_notify_up_complete(struct vdev_mlme_obj *vdev_mlme,
 	}
 
 	pe_debug("Vdev %d is up", wlan_vdev_get_id(vdev_mlme->vdev));
-	if (wlan_vdev_mlme_get_opmode(vdev_mlme->vdev) == QDF_SAP_MODE)
-		wlan_handle_sap_mlo_sta_concurrency(vdev_mlme->vdev, true);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -608,8 +601,7 @@ static QDF_STATUS vdevmgr_notify_down_complete(struct vdev_mlme_obj *vdev_mlme,
 {
 	mlme_legacy_debug("vdev id = %d ",
 			  vdev_mlme->vdev->vdev_objmgr.vdev_id);
-	if (wlan_vdev_mlme_get_opmode(vdev_mlme->vdev) == QDF_SAP_MODE)
-		wlan_handle_sap_mlo_sta_concurrency(vdev_mlme->vdev, false);
+
 	return wma_mlme_vdev_notify_down_complete(vdev_mlme, data_len, data);
 }
 
@@ -1051,6 +1043,23 @@ bool mlme_is_notify_co_located_ap_update_rnr(struct wlan_objmgr_vdev *vdev)
 	}
 
 	return mlme_priv->notify_co_located_ap_upt_rnr;
+}
+
+bool wlan_is_vdev_traffic_ll_ht(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	if (mlme_priv->vdev_traffic_type & PM_VDEV_TRAFFIC_LOW_LATENCY ||
+	    mlme_priv->vdev_traffic_type & PM_VDEV_TRAFFIC_HIGH_TPUT)
+		return true;
+
+	return false;
 }
 
 enum vdev_assoc_type  mlme_get_assoc_type(struct wlan_objmgr_vdev *vdev)
@@ -1679,11 +1688,31 @@ static QDF_STATUS
 vdevmgr_vdev_peer_delete_all_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 					struct peer_delete_all_response *rsp)
 {
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_lmac_if_wifi_pos_rx_ops *rx_ops;
 	QDF_STATUS status;
+
+	psoc = wlan_vdev_get_psoc(vdev_mlme->vdev);
+	if (!psoc)
+		return -QDF_STATUS_E_INVAL;
+
+	if (rsp->peer_type_bitmap == BIT(WLAN_PEER_RTT_PASN)) {
+		rx_ops = wifi_pos_get_rx_ops(psoc);
+		if (!rx_ops ||
+		    !rx_ops->wifi_pos_vdev_delete_all_ranging_peers_rsp_cb) {
+			mlme_err("rx_ops is NULL");
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		status = rx_ops->wifi_pos_vdev_delete_all_ranging_peers_rsp_cb(
+							psoc, rsp->vdev_id);
+		return status;
+	}
 
 	status = lim_process_mlm_del_all_sta_rsp(vdev_mlme, rsp);
 	if (QDF_IS_STATUS_ERROR(status))
 		mlme_err("Failed to call lim_process_mlm_del_all_sta_rsp");
+
 	return status;
 }
 

@@ -217,12 +217,9 @@ struct sap_context {
 	eSapHddEvent sap_state;
 	eSapStatus sap_status;
 	uint32_t roc_ind_scan_id;
-	bool is_pre_cac_on;
-	bool pre_cac_complete;
 	bool vendor_acs_dfs_lte_enabled;
 	uint8_t dfs_vendor_channel;
 	uint8_t dfs_vendor_chan_bw;
-	qdf_freq_t freq_before_pre_cac;
 	uint16_t beacon_tx_rate;
 	enum sap_acs_dfs_mode dfs_mode;
 	wlan_scan_requester req_id;

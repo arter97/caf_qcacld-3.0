@@ -206,7 +206,7 @@ int dp_rx_tm_get_pending(ol_txrx_soc_handle soc)
 #ifdef DP_MEM_PRE_ALLOC
 
 /* Max entries in FISA Flow table */
-#define FISA_RX_FT_SIZE 128
+#define FISA_RX_FT_SIZE 256
 
 /* Num elements in REO ring */
 #define REO_DST_RING_SIZE 1024
@@ -337,6 +337,10 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 #ifdef WLAN_SUPPORT_RX_FISA
 	{DP_FISA_RX_FT_TYPE, sizeof(struct dp_fisa_rx_sw_ft) * FISA_RX_FT_SIZE,
 	 false, true, NULL},
+#endif
+#ifdef WLAN_FEATURE_DP_MON_STATUS_RING_HISTORY
+	{DP_MON_STATUS_BUF_HIST_TYPE, sizeof(struct dp_mon_status_ring_history),
+	 false, false, NULL},
 #endif
 };
 
@@ -510,7 +514,11 @@ void dp_prealloc_deinit(void)
 						p->size,
 						p->va_unaligned,
 						p->pa_unaligned, 0);
-			qdf_mem_zero(p, sizeof(*p));
+			p->in_use = false;
+			p->va_unaligned = NULL;
+			p->va_aligned = NULL;
+			p->pa_unaligned = 0;
+			p->pa_aligned = 0;
 		}
 	}
 
@@ -528,7 +536,8 @@ void dp_prealloc_deinit(void)
 				mp->pages.num_pages);
 			qdf_mem_multi_pages_free(qdf_ctx, &mp->pages,
 						 0, mp->cacheable);
-			qdf_mem_zero(mp, sizeof(*mp));
+			mp->in_use = false;
+			qdf_mem_zero(&mp->pages, sizeof(mp->pages));
 		}
 	}
 
@@ -546,7 +555,9 @@ void dp_prealloc_deinit(void)
 						up->size,
 						up->va_unaligned,
 						up->pa_unaligned, 0);
-			qdf_mem_zero(up, sizeof(*up));
+			up->in_use = false;
+			up->va_unaligned = NULL;
+			up->pa_unaligned = 0;
 		}
 	}
 

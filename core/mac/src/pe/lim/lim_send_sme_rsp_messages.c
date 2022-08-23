@@ -57,6 +57,7 @@
 #include "wma.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
 #include <wlan_mlo_mgr_sta.h>
+#include <spatial_reuse_api.h>
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -437,15 +438,23 @@ static void lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
 						  link_id, &chan, &op_class);
 		if (chan) {
 			rsp_partner_info->partner_link_info[i].chan_freq =
-				wlan_reg_chan_opclass_to_freq(chan, op_class,
-							      true);
+				wlan_reg_chan_opclass_to_freq_auto(chan,
+								   op_class,
+								   false);
 		} else {
 			pe_debug("Failed to get channel info for link ID:%d",
 				 link_id);
 		}
 	}
 }
-#endif
+#else /* WLAN_FEATURE_11BE_MLO */
+static inline void
+lim_copy_ml_partner_info(struct cm_vdev_join_rsp *rsp,
+			 struct pe_session *pe_session)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO */
+
 void lim_cm_send_connect_rsp(struct mac_context *mac_ctx,
 			     struct pe_session *pe_session,
 			     struct cm_vdev_join_req *req,
@@ -478,9 +487,7 @@ void lim_cm_send_connect_rsp(struct mac_context *mac_ctx,
 								connect_status,
 								status_code);
 		lim_free_pession_ies(pe_session);
-#ifdef WLAN_FEATURE_11BE_MLO
 		lim_copy_ml_partner_info(rsp, pe_session);
-#endif
 		if (QDF_IS_STATUS_ERROR(status)) {
 			pe_err("vdev_id: %d cm_id 0x%x : fail to prepare rsp",
 			       rsp->connect_rsp.vdev_id,
@@ -2219,7 +2226,10 @@ lim_send_sme_ap_channel_switch_resp(struct mac_context *mac,
 				BIT(band));
 
 	if (ch_width == CH_WIDTH_160MHZ) {
-		is_ch_dfs = true;
+		if (wlan_reg_get_bonded_channel_state_for_freq(
+		    mac->pdev, pe_session->curr_op_freq,
+		    ch_width, 0) == CHANNEL_STATE_DFS)
+			is_ch_dfs = true;
 	} else if (ch_width == CH_WIDTH_80P80MHZ) {
 		if (wlan_reg_get_channel_state_for_freq(
 						mac->pdev,
@@ -2231,10 +2241,12 @@ lim_send_sme_ap_channel_switch_resp(struct mac_context *mac,
 				CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else {
-		if (wlan_reg_get_channel_state_for_freq(
-						mac->pdev,
-						pe_session->curr_op_freq) ==
-		    CHANNEL_STATE_DFS)
+		/* Indoor channels are also marked DFS, therefore
+		 * check if the channel has REGULATORY_CHAN_RADAR
+		 * channel flag to identify if the channel is DFS
+		 */
+		if (wlan_reg_is_dfs_for_freq(mac->pdev,
+					     pe_session->curr_op_freq))
 			is_ch_dfs = true;
 	}
 	if (WLAN_REG_IS_6GHZ_CHAN_FREQ(pe_session->curr_op_freq))
@@ -2278,6 +2290,37 @@ lim_send_bss_color_change_ie_update(struct mac_context *mac_ctx,
 }
 
 static void
+lim_update_spatial_reuse(struct pe_session *session)
+{
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t conc_vdev_id;
+	uint8_t mac_id, sr_ctrl, non_srg_pd_max_offset;
+	uint8_t vdev_id = session->vdev_id;
+
+	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(session->vdev);
+	non_srg_pd_max_offset = wlan_vdev_mlme_get_pd_offset(session->vdev);
+	if (non_srg_pd_max_offset && sr_ctrl &&
+	    !wlan_vdev_mlme_get_he_spr_enabled(session->vdev)) {
+		psoc = wlan_vdev_get_psoc(session->vdev);
+		policy_mgr_get_mac_id_by_session_id(psoc,
+						    vdev_id,
+						    &mac_id);
+		conc_vdev_id = policy_mgr_get_conc_vdev_on_same_mac(psoc,
+								    vdev_id,
+								    mac_id);
+		if (conc_vdev_id == WLAN_INVALID_VDEV_ID) {
+		/*
+		 * Enable spatial reuse only if no concurrent
+		 * vdev running on same mac
+		 */
+			wlan_spatial_reuse_config_set(session->vdev, sr_ctrl,
+						      non_srg_pd_max_offset);
+			wlan_vdev_mlme_set_he_spr_enabled(session->vdev, true);
+		}
+	}
+}
+
+static void
 lim_handle_bss_color_change_ie(struct mac_context *mac_ctx,
 					struct pe_session *session)
 {
@@ -2294,6 +2337,12 @@ lim_handle_bss_color_change_ie(struct mac_context *mac_ctx,
 			session->he_bss_color_change.countdown--;
 		} else {
 			session->bss_color_changing = 0;
+			/*
+			 * On OBSS color collision detection, spatial reuse
+			 * gets disabled. Enable spatial reuse if it was
+			 * enabled during AP start
+			 */
+			lim_update_spatial_reuse(session);
 			qdf_mem_zero(&beacon_params, sizeof(beacon_params));
 			session->he_op.bss_col_disabled = 0;
 			session->he_op.bss_color =

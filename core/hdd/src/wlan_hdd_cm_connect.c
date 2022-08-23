@@ -52,6 +52,8 @@
 #include "wlan_hdd_hostapd.h"
 #include <wlan_twt_ucfg_ext_api.h>
 #include <osif_twt_internal.h>
+#include "wlan_osif_features.h"
+#include "wlan_osif_request_manager.h"
 
 bool hdd_cm_is_vdev_associated(struct hdd_adapter *adapter)
 {
@@ -744,6 +746,7 @@ hdd_cm_connect_failure_post_user_update(struct wlan_objmgr_vdev *vdev,
 				     WLAN_CONTROL_PATH);
 	hdd_periodic_sta_stats_start(adapter);
 	wlan_twt_concurrency_update(hdd_ctx);
+	hdd_update_he_obss_pd(adapter, NULL, false);
 }
 
 static void hdd_cm_connect_failure(struct wlan_objmgr_vdev *vdev,
@@ -1261,6 +1264,9 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 		if (is_roam)
 			is_auth_required =
 				hdd_cm_is_roam_auth_required(sta_ctx, rsp);
+		if (is_auth_required)
+			wlan_acquire_peer_key_wakelock(hdd_ctx->pdev,
+						       rsp->bssid.bytes);
 		hdd_roam_register_sta(adapter, &rsp->bssid, is_auth_required);
 	} else {
 		/* for host roam/LFR2 */
@@ -1346,6 +1352,7 @@ hdd_cm_connect_success_post_user_update(struct wlan_objmgr_vdev *vdev,
 	}
 	hdd_periodic_sta_stats_start(adapter);
 	wlan_twt_concurrency_update(hdd_ctx);
+	hdd_update_he_obss_pd(adapter, NULL, true);
 }
 
 static void hdd_cm_connect_success(struct wlan_objmgr_vdev *vdev,
@@ -1376,6 +1383,75 @@ QDF_STATUS hdd_cm_connect_complete(struct wlan_objmgr_vdev *vdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef WLAN_VENDOR_HANDOFF_CONTROL
+#define WLAN_WAIT_TIME_HANDOFF_PARAMS 1000
+
+QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
+				    struct hdd_adapter *adapter,
+				    uint8_t vdev_id, uint32_t param_id)
+{
+	QDF_STATUS status;
+	int retval;
+	void *vendor_handoff_context;
+	struct osif_request *request;
+	static const struct osif_request_params params = {
+		.priv_size = 0,
+		.timeout_ms = WLAN_WAIT_TIME_HANDOFF_PARAMS,
+	};
+
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		status = QDF_STATUS_E_NOMEM;
+		goto error;
+	}
+
+	vendor_handoff_context = osif_request_cookie(request);
+
+	hdd_debug("sending vendor handoff param request for :0x%x", param_id);
+	status = ucfg_cm_roam_send_vendor_handoff_param_req(psoc, vdev_id,
+							param_id,
+							vendor_handoff_context);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Unable to get vendor handoff param");
+		goto error;
+	}
+
+	retval = osif_request_wait_for_response(request);
+	if (retval) {
+		hdd_err("Target response timed out");
+		status = qdf_status_from_os_return(retval);
+	}
+error:
+	if (request)
+		osif_request_put(request);
+
+	return status;
+}
+
+QDF_STATUS
+hdd_cm_get_vendor_handoff_params(struct wlan_objmgr_psoc *psoc,
+				 void *vendor_handoff_context)
+{
+	struct osif_request *request;
+
+	hdd_debug("Received vendor handoff event from FW");
+
+	request = osif_request_get(vendor_handoff_context);
+	if (!request) {
+		hdd_err("Invalid request");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	osif_request_complete(request);
+	osif_request_put(request);
+
+	hdd_exit();
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #ifdef WLAN_FEATURE_FILS_SK

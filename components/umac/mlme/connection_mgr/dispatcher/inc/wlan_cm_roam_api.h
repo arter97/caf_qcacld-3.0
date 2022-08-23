@@ -1052,6 +1052,16 @@ QDF_STATUS
 cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 				struct roam_scan_candidate_frame *candidate);
 
+/** wlan_cm_is_roam_sync_in_progress() - Check if the vdev is in roam sync
+ * substate
+ *
+ * @psoc: psoc pointer
+ * @vdev_id: vdev_id
+ *
+ * Return: bool
+ */
+bool wlan_cm_is_roam_sync_in_progress(struct wlan_objmgr_psoc *psoc,
+				      uint8_t vdev_id);
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1232,6 +1242,13 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 				 struct roam_synch_frame_ind *frame_ind)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline bool
+wlan_cm_is_roam_sync_in_progress(struct wlan_objmgr_psoc *psoc,
+				 uint8_t vdev_id)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
@@ -1450,6 +1467,19 @@ cm_roam_auth_offload_event_handler(struct auth_offload_event *auth_event);
 QDF_STATUS
 cm_roam_pmkid_request_handler(struct roam_pmkid_req_event *data);
 
+#ifdef WLAN_VENDOR_HANDOFF_CONTROL
+/**
+ * cm_roam_vendor_handoff_event_handler() - vendor handoff event handler
+ * @psoc: psoc object
+ * @data: vendor handoff params
+ *
+ * Return: None
+ */
+void
+cm_roam_vendor_handoff_event_handler(struct wlan_objmgr_psoc *psoc,
+				     struct roam_vendor_handoff_params *data);
+#endif
+
 /**
  * cm_roam_update_vdev() - Update the STA and BSS
  * @sync_ind: Information needed for roam sync propagation
@@ -1541,4 +1571,6 @@ bool wlan_cm_same_band_sta_allowed(struct wlan_objmgr_psoc *psoc);
  * Return: qdf_status
  */
 QDF_STATUS cm_cleanup_mlo_link(struct wlan_objmgr_vdev *vdev);
+
+bool wlan_is_roaming_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 #endif  /* WLAN_CM_ROAM_API_H__ */

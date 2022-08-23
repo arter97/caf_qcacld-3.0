@@ -227,13 +227,12 @@ QDF_STATUS hdd_rx_pkt_thread_enqueue_cbk(void *adapter_context,
 int hdd_rx_ol_init(struct hdd_context *hdd_ctx);
 
 /**
- * hdd_rx_handle_concurrency() - Handle concurrency related operations
- *  for rx
- * @is_concurrency: true if there are concurrenct connections else false
+ * hdd_disable_rx_ol_in_concurrency() - Disable Rx offload due to concurrency
+ * @disable: true/false to disable/enable the Rx offload
  *
  * Return: none
  */
-void hdd_rx_handle_concurrency(bool is_concurrency);
+void hdd_disable_rx_ol_in_concurrency(bool disable);
 
 /**
  * hdd_disable_rx_ol_for_low_tput() - Disable Rx offload in low TPUT scenario
@@ -580,16 +579,6 @@ wlan_hdd_dump_queue_history_state(struct hdd_netif_queue_history *q_hist,
 				  char *buf, uint32_t size);
 
 /**
- * wlan_hdd_rx_rpm_mark_last_busy() - Check if dp rx marked last busy
- * @hdd_ctx: Pointer to hdd context
- * @hif_ctx: Pointer to hif context
- *
- * Return: dp mark last busy less than runtime delay value
- */
-bool wlan_hdd_rx_rpm_mark_last_busy(struct hdd_context *hdd_ctx,
-				    void *hif_ctx);
-
-/**
  * hdd_sta_notify_tx_comp_cb() - notify tx comp callback registered with dp
  * @skb: pointer to skb
  * @ctx: osif context
@@ -635,4 +624,21 @@ void hdd_pkt_add_timestamp(struct hdd_adapter *adapter,
 }
 #endif
 
+static inline
+void hdd_debug_pkt_dump(struct sk_buff *skb, int size,
+			uint16_t *dump_level)
+{
+	if (qdf_unlikely(qdf_nbuf_is_ipv4_eapol_pkt(skb)))
+		*dump_level &= DEBUG_PKTLOG_TYPE_EAPOL;
+	else if (qdf_unlikely(qdf_nbuf_is_ipv4_arp_pkt(skb)))
+		*dump_level &= DEBUG_PKTLOG_TYPE_ARP;
+	else if (qdf_unlikely(qdf_nbuf_is_ipv4_dhcp_pkt(skb)))
+		*dump_level &= DEBUG_PKTLOG_TYPE_DHCP;
+	else
+		return;
+
+	if (*dump_level)
+		qdf_trace_hex_dump(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   qdf_nbuf_data(skb), size);
+}
 #endif /* end #if !defined(WLAN_HDD_TX_RX_H) */

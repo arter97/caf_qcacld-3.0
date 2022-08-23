@@ -51,7 +51,11 @@
 #include "wlan_hdd_bus_bandwidth.h"
 
 #ifdef MODULE
+#ifdef WLAN_WEAR_CHIPSET
+#define WLAN_MODULE_NAME  "wlan"
+#else
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
+#endif
 #else
 #define WLAN_MODULE_NAME  "wlan"
 #endif
@@ -204,6 +208,36 @@ static bool hdd_is_recovery_in_progress(void *data)
 static bool hdd_is_target_ready(void *data)
 {
 	return cds_is_target_ready();
+}
+
+/**
+ * hdd_send_driver_ready_to_user() - API to indicate driver ready
+ * to userspace.
+ */
+static void hdd_send_driver_ready_to_user(void)
+{
+	struct sk_buff *nl_event;
+	struct hdd_context *hdd_ctx;
+	int flags = cds_get_gfp_flags();
+
+	hdd_enter();
+
+	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx) {
+		hdd_err("HDD Context is NULL");
+		return;
+	}
+
+	nl_event = cfg80211_vendor_event_alloc(
+			hdd_ctx->wiphy, NULL, 0,
+			QCA_NL80211_VENDOR_SUBCMD_DRIVER_READY_INDEX,
+			flags);
+	if (!nl_event) {
+		hdd_err("cfg80211_vendor_event_alloc failed");
+		return;
+	}
+
+	cfg80211_vendor_event(nl_event, flags);
 }
 
 /**
@@ -622,12 +656,6 @@ static int __hdd_soc_probe(struct device *dev,
 		goto dp_prealloc_fail;
 	}
 
-	status = hif_ce_debug_history_prealloc_init();
-	if (status != QDF_STATUS_SUCCESS) {
-		errno = qdf_status_to_os_return(status);
-		goto hif_ce_debug_history_prealloc_fail;
-	}
-
 	errno = hdd_wlan_startup(hdd_ctx);
 	if (errno)
 		goto hdd_context_destroy;
@@ -644,10 +672,6 @@ static int __hdd_soc_probe(struct device *dev,
 	hdd_start_complete(0);
 	hdd_thermal_mitigation_register(hdd_ctx, dev);
 
-	errno = hdd_set_suspend_mode(hdd_ctx);
-	if (errno)
-		hdd_err("Failed to set suspend mode in PLD; errno:%d", errno);
-
 	hdd_soc_load_unlock(dev);
 
 	return 0;
@@ -656,9 +680,6 @@ wlan_exit:
 	hdd_wlan_exit(hdd_ctx);
 
 hdd_context_destroy:
-	hif_ce_debug_history_prealloc_deinit();
-
-hif_ce_debug_history_prealloc_fail:
 	dp_prealloc_deinit();
 
 dp_prealloc_fail:
@@ -759,6 +780,7 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	}
 
 	hdd_soc_load_unlock(dev);
+	hdd_send_driver_ready_to_user();
 
 	return 0;
 
@@ -823,7 +845,6 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 static void __hdd_soc_remove(struct device *dev)
 {
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
-	void *hif_ctx;
 
 	QDF_BUG(hdd_ctx);
 	if (!hdd_ctx)
@@ -832,15 +853,7 @@ static void __hdd_soc_remove(struct device *dev)
 	pr_info("%s: Removing driver v%s\n", WLAN_MODULE_NAME,
 		QWLAN_VERSIONSTR);
 
-	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
-	if (hif_ctx) {
-		/*
-		 * Trigger runtime sync resume before setting unload in progress
-		 * such that resume can happen successfully
-		 */
-		hif_pm_runtime_sync_resume(hif_ctx, RTPM_ID_SOC_REMOVE);
-	}
-
+	qdf_rtpm_sync_resume();
 	cds_set_driver_loaded(false);
 	cds_set_unload_in_progress(true);
 	if (!hdd_wait_for_debugfs_threads_completion())
@@ -859,7 +872,6 @@ static void __hdd_soc_remove(struct device *dev)
 	cds_set_driver_in_bad_state(false);
 	cds_set_unload_in_progress(false);
 
-	hif_ce_debug_history_prealloc_deinit();
 	dp_prealloc_deinit();
 
 	pr_info("%s: Driver De-initialized\n", WLAN_MODULE_NAME);
@@ -984,16 +996,12 @@ static void __hdd_soc_recovery_shutdown(void)
 	struct hdd_context *hdd_ctx;
 	void *hif_ctx;
 
+	/* recovery starts via firmware down indication; ensure we got one */
+	QDF_BUG(cds_is_driver_recovering());
+
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 	if (!hdd_ctx)
 		return;
-
-	if (wlan_hdd_is_full_power_down_enable(hdd_ctx))
-		cds_set_driver_state(CDS_DRIVER_STATE_RECOVERING);
-
-	/* recovery starts via firmware down indication; ensure we got one */
-	QDF_BUG(cds_is_driver_recovering());
-	hdd_init_start_completion();
 
 	/*
 	 * Perform SSR related cleanup if it has not already been done as a
@@ -1647,7 +1655,8 @@ static int wlan_hdd_runtime_suspend(struct device *dev)
 		return -EBUSY;
 	}
 
-	if (wlan_hdd_is_cpu_pm_qos_in_progress(hdd_ctx)) {
+	if (hdd_ctx->config->runtime_pm == hdd_runtime_pm_dynamic &&
+	    wlan_hdd_is_cpu_pm_qos_in_progress(hdd_ctx)) {
 		hdd_debug("PM QoS Latency constraint, ignore runtime suspend");
 		return -EBUSY;
 	}
@@ -2090,6 +2099,7 @@ wlan_hdd_pld_uevent(struct device *dev, struct pld_uevent_data *event_data)
 		hdd_dump_log_buffer();
 		cds_set_target_ready(false);
 		cds_set_recovery_in_progress(true);
+		hdd_init_start_completion();
 
 		/* Notify external threads currently waiting on firmware
 		 * by forcefully completing waiting events with a "reset"

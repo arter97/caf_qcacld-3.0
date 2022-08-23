@@ -32,7 +32,39 @@
 #include <wlan_hdd_son.h>
 #include <wlan_hdd_object_manager.h>
 #include <wlan_hdd_stats.h>
+#include "wlan_cfg80211_mc_cp_stats.h"
 
+static const struct son_chan_width {
+	enum ieee80211_cwm_width son_chwidth;
+	enum phy_ch_width phy_chwidth;
+} son_chwidth_info[] = {
+	{
+		.son_chwidth = IEEE80211_CWM_WIDTH20,
+		.phy_chwidth = CH_WIDTH_20MHZ,
+	},
+	{
+		.son_chwidth = IEEE80211_CWM_WIDTH40,
+		.phy_chwidth = CH_WIDTH_40MHZ,
+	},
+	{
+		.son_chwidth = IEEE80211_CWM_WIDTH80,
+		.phy_chwidth = CH_WIDTH_80MHZ,
+	},
+	{
+		.son_chwidth = IEEE80211_CWM_WIDTH160,
+		.phy_chwidth = CH_WIDTH_160MHZ,
+	},
+	{
+		.son_chwidth = IEEE80211_CWM_WIDTH80_80,
+		.phy_chwidth = CH_WIDTH_80P80MHZ,
+	},
+#ifdef WLAN_FEATURE_11BE
+	{
+		.son_chwidth = IEEE80211_CWM_WIDTH320,
+		.phy_chwidth = CH_WIDTH_320MHZ,
+	},
+#endif
+};
 
 /**
  * hdd_son_is_acs_in_progress() - whether acs is in progress or not
@@ -164,6 +196,27 @@ static enum ieee80211_cwm_width hdd_chan_width_to_son_chwidth(
 }
 
 /**
+ * hdd_phy_chwidth_to_son_chwidth() - translate phy chan width
+ *                                    to son chan width
+ * @chwidth: phy chan width
+ *
+ * Return: son chan width
+ */
+static enum ieee80211_cwm_width
+hdd_phy_chwidth_to_son_chwidth(enum phy_ch_width chwidth)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(son_chwidth_info); i++) {
+		if (son_chwidth_info[i].phy_chwidth == chwidth)
+			return son_chwidth_info[i].son_chwidth;
+	}
+
+	hdd_err("Unsupported channel width %d", chwidth);
+	return IEEE80211_CWM_WIDTHINVALID;
+}
+
+/**
  * hdd_son_get_chwidth() - get chan width
  * @vdev: vdev
  *
@@ -172,29 +225,16 @@ static enum ieee80211_cwm_width hdd_chan_width_to_son_chwidth(
 static enum ieee80211_cwm_width hdd_son_get_chwidth(
 						struct wlan_objmgr_vdev *vdev)
 {
-	enum eSirMacHTChannelWidth chwidth;
-	struct hdd_adapter *adapter;
-	enum ieee80211_cwm_width son_chwidth = IEEE80211_CWM_WIDTHINVALID;
+	struct wlan_channel *des_chan;
 
 	if (!vdev) {
 		hdd_err("null vdev");
-		return son_chwidth;
-	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
-		hdd_err("null adapter");
-		return son_chwidth;
+		return IEEE80211_CWM_WIDTHINVALID;
 	}
 
-	chwidth = wma_cli_get_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
-				      VDEV_CMD);
+	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
 
-	if (chwidth < 0) {
-		hdd_err("Failed to get chwidth");
-		return son_chwidth;
-	}
-
-	return hdd_chan_width_to_son_chwidth(chwidth);
+	return hdd_phy_chwidth_to_son_chwidth(des_chan->ch_width);
 }
 
 /**
@@ -849,6 +889,9 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 {
 	struct hdd_adapter *adapter;
 	enum qca_wlan_vendor_phy_mode vendor_phy_mode;
+	QDF_STATUS status;
+	struct hdd_ap_ctx *hdd_ap_ctx;
+	struct sap_config *sap_config;
 
 	if (!vdev) {
 		hdd_err("null vdev");
@@ -860,9 +903,25 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 		return -EINVAL;
 	}
 
+	if (!hdd_adapter_is_ap(adapter)) {
+		hdd_err("vdev id %d is not AP", adapter->vdev_id);
+		return -EINVAL;
+	}
+
 	vendor_phy_mode = hdd_son_phy_mode_to_vendor_phy_mode(mode);
 
-	return hdd_set_phy_mode(adapter, vendor_phy_mode);
+	hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+	sap_config = &hdd_ap_ctx->sap_config;
+	status = wlansap_son_update_sap_config_phymode(vdev, sap_config,
+						       vendor_phy_mode);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("update son phy mode error");
+		return -EINVAL;
+	}
+
+	hdd_restart_sap(adapter);
+
+	return 0;
 }
 
 /**
@@ -2276,9 +2335,36 @@ wlan_hdd_son_get_ieee_phymode(enum wlan_phymode wlan_phymode)
 	return wlanphymode2ieeephymode[wlan_phymode];
 }
 
-static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
-					uint8_t *mac_addr,
-					wlan_node_info *node_info)
+static QDF_STATUS hdd_son_get_node_info_sta(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *mac_addr,
+					    wlan_node_info *node_info)
+{
+	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+	struct hdd_station_ctx *sta_ctx;
+	struct hdd_context *hdd_ctx;
+
+	hdd_ctx = adapter->hdd_ctx;
+	if (wlan_hdd_validate_context(hdd_ctx))
+		return QDF_STATUS_E_FAILURE;
+
+	if (!hdd_cm_is_vdev_associated(adapter)) {
+		hdd_debug_rl("STA adapter not connected");
+		/* Still return success and framework will see default stats */
+		return QDF_STATUS_SUCCESS;
+	}
+
+	hdd_get_max_tx_bitrate(hdd_ctx, adapter);
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	node_info->tx_bitrate = cfg80211_calculate_bitrate(
+			&sta_ctx->cache_conn_info.max_tx_bitrate);
+	hdd_debug("tx_bitrate %u", node_info->tx_bitrate);
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS hdd_son_get_node_info_sap(struct wlan_objmgr_vdev *vdev,
+					    uint8_t *mac_addr,
+					    wlan_node_info *node_info)
 {
 	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
 	struct hdd_station_info *sta_info;
@@ -2303,11 +2389,11 @@ static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
 	ucfg_mlme_get_peer_phymode(psoc, mac_addr, &peer_phymode);
 	node_info->phymode = wlan_hdd_son_get_ieee_phymode(peer_phymode);
 	node_info->max_txpower = ucfg_son_get_tx_power(sta_info->assoc_req_ies);
-	node_info->max_MCS = ucfg_son_get_max_mcs(sta_info->mode,
-						  sta_info->max_supp_idx,
-						  sta_info->max_ext_idx,
-						  sta_info->max_mcs_idx,
-						  sta_info->rx_mcs_map);
+	node_info->max_MCS = sta_info->max_real_mcs_idx;
+	if (node_info->max_MCS == INVALID_MCS_NSS_INDEX) {
+		hdd_err("invalid mcs");
+		return QDF_STATUS_E_FAILURE;
+	}
 	if (sta_info->vht_present)
 		node_info->is_mu_mimo_supported =
 				sta_info->vht_caps.vht_cap_info
@@ -2319,6 +2405,20 @@ static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
 	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 			     STA_INFO_SON_GET_DATRATE_INFO);
 	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS hdd_son_get_node_info(struct wlan_objmgr_vdev *vdev,
+					uint8_t *mac_addr,
+					wlan_node_info *node_info)
+{
+	struct hdd_adapter *adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
+
+	if (adapter->device_mode == QDF_STA_MODE)
+		return hdd_son_get_node_info_sta(vdev, mac_addr, node_info);
+	else if (adapter->device_mode == QDF_SAP_MODE)
+		return hdd_son_get_node_info_sap(vdev, mac_addr, node_info);
+	else
+		return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS hdd_son_get_peer_capability(struct wlan_objmgr_vdev *vdev,
@@ -2397,12 +2497,46 @@ uint32_t hdd_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
 		return ret;
 	}
 
-	ret = sta_info->max_mcs_idx;
+	ret = sta_info->max_real_mcs_idx;
 
 	hdd_put_sta_info_ref(&adapter->sta_info_list, &sta_info, true,
 			     STA_INFO_SOFTAP_GET_STA_INFO);
 	hdd_debug("Peer " QDF_MAC_ADDR_FMT " max MCS index: %u",
 		  QDF_MAC_ADDR_REF(peer->macaddr), ret);
+
+	return ret;
+}
+
+/**
+ * hdd_son_sta_stats() - get connected sta rssi and estimated data rate
+ * @vdev: pointer to vdev
+ * @mac_addr: connected sta mac addr
+ * @stats: pointer to ieee80211_nodestats
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+static int hdd_son_get_sta_stats(struct wlan_objmgr_vdev *vdev,
+				 uint8_t *mac_addr,
+				 struct ieee80211_nodestats *stats)
+{
+	struct stats_event *stats_info;
+	int ret = 0;
+
+	stats_info = wlan_cfg80211_mc_cp_stats_get_peer_rssi(
+			vdev, mac_addr, &ret);
+	if (ret || !stats_info) {
+		hdd_err("get peer rssi fail");
+		wlan_cfg80211_mc_cp_stats_free_stats_event(stats_info);
+		return ret;
+	}
+	stats->ns_rssi = stats_info->peer_stats[0].peer_rssi;
+	stats->ns_last_tx_rate = stats_info->peer_stats[0].tx_rate;
+	stats->ns_last_rx_rate = stats_info->peer_stats[0].rx_rate;
+	hdd_debug("sta " QDF_MAC_ADDR_FMT " rssi %d tx %u kbps, rx %u kbps",
+		  QDF_MAC_ADDR_REF(mac_addr), stats->ns_rssi,
+		  stats->ns_last_tx_rate,
+		  stats->ns_last_rx_rate);
+	wlan_cfg80211_mc_cp_stats_free_stats_event(stats_info);
 
 	return ret;
 }
@@ -2445,6 +2579,7 @@ void hdd_son_register_callbacks(struct hdd_context *hdd_ctx)
 	cb_obj.os_if_get_node_info = hdd_son_get_node_info;
 	cb_obj.os_if_get_peer_capability = hdd_son_get_peer_capability;
 	cb_obj.os_if_get_peer_max_mcs_idx = hdd_son_get_peer_max_mcs_idx;
+	cb_obj.os_if_get_sta_stats = hdd_son_get_sta_stats;
 
 	os_if_son_register_hdd_callbacks(hdd_ctx->psoc, &cb_obj);
 

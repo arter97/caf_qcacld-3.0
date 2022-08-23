@@ -784,6 +784,7 @@ struct nan_datapath_host_event {
  * request processing is complete
  * @ndi_open: HDD callback for creating the NAN Datapath Interface
  * @ndi_start: HDD callback for starting the NAN Datapath Interface
+ * @ndi_set_mode: HDD callback for setting the adapter mode to NDI
  * @ndi_close: HDD callback for closing the NAN Datapath Interface
  * @ndi_delete: HDD callback for deleting the NAN Datapath Interface
  * @drv_ndi_create_rsp_handler: HDD callback for handling NDI interface creation
@@ -803,10 +804,11 @@ struct nan_callbacks {
 					struct wlan_objmgr_vdev *vdev,
 					uint32_t type, void *msg);
 	void (*ucfg_nan_request_process_cb)(void *cookie);
-	int (*ndi_open)(char *iface_name);
-	int (*ndi_start)(char *iface_name, uint16_t);
+	int (*ndi_open)(const char *iface_name, bool is_add_virtual_iface);
+	int (*ndi_set_mode)(const char *iface_name);
+	int (*ndi_start)(const char *iface_name, uint16_t);
 	void (*ndi_close)(uint8_t);
-	int (*ndi_delete)(uint8_t, char *iface_name, uint16_t transaction_id);
+	int (*ndi_delete)(uint8_t, const char *iface_name, uint16_t transaction_id);
 	void (*drv_ndi_create_rsp_handler)
 				(uint8_t, struct nan_datapath_inf_create_rsp *);
 	void (*drv_ndi_delete_rsp_handler)(uint8_t);

@@ -314,11 +314,12 @@ static QDF_STATUS send_roam_scan_offload_rssi_thresh_cmd_tlv(
 		       WMITLV_TAG_STRUC_wmi_roam_data_rssi_roaming_param,
 		       WMITLV_GET_STRUCT_TLVLEN
 		       (wmi_roam_data_rssi_roaming_param));
-	wmi_debug("vdev %d Data rssi threshold: %d, triggers: 0x%x, rx time: %d",
+	wmi_debug("vdev %d Data rssi threshold: %d, triggers: 0x%x, rx time: %d, rssi_thresh:%d",
 		  rssi_threshold_fp->vdev_id,
 		  data_rssi_param->roam_data_rssi_thres,
 		  data_rssi_param->flags,
-		  data_rssi_param->rx_inactivity_ms);
+		  data_rssi_param->rx_inactivity_ms,
+		  rssi_threshold_fp->roam_scan_rssi_thresh);
 
 	wmi_mtrace(WMI_ROAM_SCAN_RSSI_THRESHOLD, NO_SESSION, 0);
 	status = wmi_unified_cmd_send(wmi_handle, buf,
@@ -1993,7 +1994,13 @@ wmi_get_converted_tx_status(
 	return QDF_TX_RX_STATUS_INVALID;
 }
 
-#define WLAN_FC0_SUBTYPE_SHIFT         4
+#define WLAN_FC0_SUBTYPE_SHIFT              4
+#define WLAN_FRAME_INFO_TYPE_OFFSET         0
+#define WLAN_FRAME_INFO_SUBTYPE_OFFSET      2
+#define WLAN_FRAME_INFO_RESP_OFFSET         6
+#define WLAN_FRAME_INFO_AUTH_ALG_OFFSET     7
+#define WLAN_FRAME_INFO_SEQ_NUM_OFFSET      16
+
 /**
  * extract_roam_frame_info_tlv() - Extract the frame exchanges during roaming
  * info from the WMI_ROAM_STATS_EVENTID
@@ -2032,9 +2039,13 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	dst_buf = dst->frame_info;
 	for (i = 0; i < num_frames; i++) {
 		dst_buf->timestamp = src_data->timestamp;
-		dst_buf->type = WMI_GET_BITS(src_data->frame_info, 0, 2);
+		WMI_MAC_ADDR_TO_CHAR_ARRAY(&src_data->bssid,
+					   dst_buf->bssid.bytes);
+		dst_buf->type = WMI_GET_BITS(src_data->frame_info,
+					     WLAN_FRAME_INFO_TYPE_OFFSET, 2);
 
-		subtype = WMI_GET_BITS(src_data->frame_info, 2, 4);
+		subtype = WMI_GET_BITS(src_data->frame_info,
+				       WLAN_FRAME_INFO_SUBTYPE_OFFSET, 4);
 		if (dst_buf->type == WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT) {
 			dst_buf->type = ROAM_FRAME_INFO_FRAME_TYPE_EXT;
 			dst_buf->subtype =
@@ -2043,18 +2054,27 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			dst_buf->subtype = subtype << WLAN_FC0_SUBTYPE_SHIFT;
 		}
 
-		dst_buf->is_rsp = WMI_GET_BITS(src_data->frame_info, 6, 1);
-		dst_buf->is_rsp &=
-			(dst_buf->type != WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT &&
-			 dst_buf->subtype == MGMT_SUBTYPE_AUTH);
-		dst_buf->seq_num = WMI_GET_BITS(src_data->frame_info, 7, 16);
+		dst_buf->is_rsp = WMI_GET_BITS(src_data->frame_info,
+					       WLAN_FRAME_INFO_RESP_OFFSET, 1);
+		dst_buf->seq_num = WMI_GET_BITS(src_data->frame_info,
+						WLAN_FRAME_INFO_SEQ_NUM_OFFSET,
+						16);
 		dst_buf->status_code = src_data->status_code;
+		if (dst_buf->type != WMI_ROAM_FRAME_INFO_FRAME_TYPE_EXT &&
+		    dst_buf->subtype == MGMT_SUBTYPE_AUTH)
+			dst_buf->auth_algo =
+				WMI_GET_BITS(src_data->frame_info,
+					     WLAN_FRAME_INFO_AUTH_ALG_OFFSET,
+					     4);
+
 		if (!dst_buf->is_rsp)
 			dst_buf->tx_status = wmi_get_converted_tx_status(
 							src_data->status_code);
 
 		dst_buf->retry_count = src_data->retry_count;
 		dst_buf->rssi = (-1) * src_data->rssi_dbm_abs;
+		dst_buf->assoc_id =
+			WMI_GET_ASSOC_ID(src_data->frame_info_ext);
 
 		dst_buf++;
 		src_data++;
@@ -2238,6 +2258,7 @@ wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
 			  WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf)
 {
 	wmi_roam_synch_event_fixed_param *synch_event;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	wmi_channel *chan = NULL;
 	wmi_key_material *key;
 	wmi_key_material_ext *key_ft;
@@ -2262,6 +2283,9 @@ wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
 		  roam_sync_ind->rssi,
 		  roam_sync_ind->isBeacon);
 
+	cdp_update_roaming_peer_in_vdev(soc, synch_event->vdev_id,
+					roam_sync_ind->bssid.bytes,
+					synch_event->auth_status);
 	/*
 	 * If lengths of bcn_probe_rsp, reassoc_req and reassoc_rsp are zero in
 	 * synch_event driver would have received bcn_probe_rsp, reassoc_req
@@ -3352,6 +3376,142 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_VENDOR_HANDOFF_CONTROL
+static QDF_STATUS
+extract_roam_vendor_control_param_event_tlv(wmi_unified_t wmi_handle,
+				uint8_t *event, uint32_t len,
+				struct roam_vendor_handoff_params **list)
+{
+	WMI_ROAM_GET_VENDOR_CONTROL_PARAM_EVENTID_param_tlvs *param_buf = NULL;
+	wmi_roam_get_vendor_control_param_event_fixed_param *fixed_param = NULL;
+	uint32_t num_entries, i;
+	wmi_vendor_control_param *src_list;
+	struct roam_vendor_handoff_params *dst_list;
+	struct roam_param_info *param_info;
+
+	if (!event || !len) {
+		wmi_debug("Empty roam vendor control param event");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	param_buf =
+		(WMI_ROAM_GET_VENDOR_CONTROL_PARAM_EVENTID_param_tlvs *)event;
+	if (!param_buf) {
+		wmi_err("received null buf from target");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	fixed_param = (wmi_roam_get_vendor_control_param_event_fixed_param *)
+					param_buf->fixed_param;
+	if (!fixed_param) {
+		wmi_err("received null event data from target");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (fixed_param->vdev_id >= WLAN_MAX_VDEVS) {
+		wmi_debug("Invalid VDEV id %d", fixed_param->vdev_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	num_entries = param_buf->num_vendor_control_param;
+	src_list = param_buf->vendor_control_param;
+
+	if (len < (sizeof(*fixed_param) + (num_entries * sizeof(*src_list)))) {
+		wmi_err("Invalid length: %d", len);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	dst_list = qdf_mem_malloc(sizeof(struct roam_vendor_handoff_params));
+	if (!dst_list)
+		return QDF_STATUS_E_FAILURE;
+
+	dst_list->vdev_id = fixed_param->vdev_id;
+	wmi_debug("vdev_id:%d, num_tlv:%d", dst_list->vdev_id, num_entries);
+
+	param_info = &dst_list->param_info[0];
+	for (i = 0; i < num_entries; i++) {
+		param_info->param_id = src_list->param_id;
+		param_info->param_value = src_list->param_value;
+		wmi_debug("param_info->param_id:%d, param_info->param_value:%d",
+			  param_info->param_id, param_info->param_value);
+		param_info++;
+		src_list++;
+	}
+
+	dst_list->num_entries = num_entries;
+	*list = dst_list;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * send_process_roam_vendor_handoff_req_cmd_tlv() - Send vendor handoff command
+ * to fw.
+ * @wmi_handle: wmi handle
+ * @vdev_id: vdev id
+ *
+ * Return: QDF STATUS
+ */
+static QDF_STATUS
+send_process_roam_vendor_handoff_req_cmd_tlv(wmi_unified_t wmi_handle,
+					     uint8_t vdev_id,
+					     uint32_t param_id)
+{
+	wmi_roam_get_vendor_control_param_cmd_fixed_param *cmd;
+	wmi_buf_t wmi_buf;
+	uint8_t *buf_ptr;
+	uint16_t len;
+
+	len = sizeof(wmi_roam_get_vendor_control_param_cmd_fixed_param);
+
+	wmi_buf = wmi_buf_alloc(wmi_handle, len);
+	if (!wmi_buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_roam_get_vendor_control_param_cmd_fixed_param *)wmi_buf_data(
+								wmi_buf);
+	buf_ptr = (uint8_t *)cmd;
+	WMITLV_SET_HDR(&cmd->tlv_header,
+	     WMITLV_TAG_STRUC_wmi_roam_get_vendor_control_param_cmd_fixed_param,
+	     WMITLV_GET_STRUCT_TLVLEN
+		       (wmi_roam_get_vendor_control_param_cmd_fixed_param));
+	cmd->vdev_id = vdev_id;
+	cmd->param_id = param_id;
+	wmi_debug("Send GET_VENDOR_CONTROL_PARAM cmd vdev_id:%d, param_id:0x%x",
+		cmd->vdev_id, cmd->param_id);
+	wmi_mtrace(WMI_ROAM_GET_VENDOR_CONTROL_PARAM_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, wmi_buf, len,
+				 WMI_ROAM_GET_VENDOR_CONTROL_PARAM_CMDID)) {
+		wmi_err("Failed to send get vendor control param command");
+		wmi_buf_free(wmi_buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wmi_roam_offload_attach_vendor_handoff_tlv() - register wmi ops for vendor
+ * handoff related command and event
+ * @ops: wmi ops
+ *
+ * Return: none
+ */
+static inline void
+wmi_roam_offload_attach_vendor_handoff_tlv(struct wmi_ops *ops)
+{
+	ops->extract_roam_vendor_control_param_event =
+				extract_roam_vendor_control_param_event_tlv;
+	ops->send_process_roam_vendor_handoff_req_cmd =
+			send_process_roam_vendor_handoff_req_cmd_tlv;
+}
+#else
+static inline void
+wmi_roam_offload_attach_vendor_handoff_tlv(struct wmi_ops *ops)
+{
+}
+#endif
+
 void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -3377,6 +3537,7 @@ void wmi_roam_offload_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_vdev_set_pcl_cmd = send_vdev_set_pcl_cmd_tlv;
 	ops->send_set_roam_trigger_cmd = send_set_roam_trigger_cmd_tlv;
 	ops->extract_roam_candidate_frame = extract_roam_candidate_frame_tlv;
+	wmi_roam_offload_attach_vendor_handoff_tlv(ops);
 }
 #else
 static inline QDF_STATUS
@@ -3443,8 +3604,9 @@ static void wmi_fill_roam_offload_11r_params(
 
 	src_11r_params = &roam_req->rso_11r_info;
 
-	if (akm == WMI_AUTH_FT_RSNA_FILS_SHA256 ||
-	    akm == WMI_AUTH_FT_RSNA_FILS_SHA384) {
+	if ((akm == WMI_AUTH_FT_RSNA_FILS_SHA256 ||
+	     akm == WMI_AUTH_FT_RSNA_FILS_SHA384) &&
+	    roam_req->fils_roam_config.fils_ft_len) {
 		psk_msk = roam_req->fils_roam_config.fils_ft;
 		len = roam_req->fils_roam_config.fils_ft_len;
 	} else {
@@ -4027,7 +4189,8 @@ wmi_fill_rso_start_scan_tlv(struct wlan_roam_scan_offload_params *rso_req,
 	src_scan_params = &rso_req->rso_scan_params;
 	scan_tlv->scan_ctrl_flags = WMI_SCAN_ADD_CCK_RATES |
 				    WMI_SCAN_ADD_OFDM_RATES |
-				    WMI_SCAN_ADD_DS_IE_IN_PROBE_REQ;
+				    WMI_SCAN_ADD_DS_IE_IN_PROBE_REQ |
+				    WMI_SCAN_FILTER_PROBE_REQ;
 	if (rso_req->is_rso_stop) {
 		scan_tlv->dwell_time_active =
 			ROAM_SCAN_DWELL_TIME_ACTIVE_DEFAULT;
@@ -4074,8 +4237,9 @@ wmi_fill_rso_start_scan_tlv(struct wlan_roam_scan_offload_params *rso_req,
 		scan_tlv->scan_ctrl_flags_ext |=
 			WMI_SCAN_DBS_POLICY_DEFAULT;
 
-	wmi_debug("RSO_CFG: dwell time: active %d passive %d, active 6g %d passive 6g %d, minrest %d max rest %d repeat probe time %d probe_spacing:%d",
+	wmi_debug("RSO_CFG: dwell time: active %d passive %d, burst_duration:%d, active 6g %d passive 6g %d, min_rest_time %d max rest %d repeat probe time %d probe_spacing:%d",
 		  scan_tlv->dwell_time_active, scan_tlv->dwell_time_passive,
+		  scan_tlv->burst_duration,
 		  scan_tlv->dwell_time_active_6ghz,
 		  scan_tlv->dwell_time_passive_6ghz,
 		  scan_tlv->min_rest_time, scan_tlv->max_rest_time,
@@ -5056,11 +5220,12 @@ send_roam_bss_load_config_tlv(wmi_unified_t wmi_handle,
 	cmd->monitor_time_window = params->bss_load_sample_time;
 	cmd->rssi_2g_threshold = params->rssi_threshold_24ghz;
 	cmd->rssi_5g_threshold = params->rssi_threshold_5ghz;
+	cmd->rssi_6g_threshold = params->rssi_threshold_6ghz;
 
-	wmi_debug("RSO_CFG: vdev:%d bss_load_thres:%d monitor_time:%d rssi_2g:%d rssi_5g:%d",
+	wmi_debug("RSO_CFG: vdev:%d bss_load_thres:%d monitor_time:%d rssi_2g:%d rssi_5g:%d, rssi_6g:%d",
 		  cmd->vdev_id, cmd->bss_load_threshold,
 		  cmd->monitor_time_window, cmd->rssi_2g_threshold,
-		  cmd->rssi_5g_threshold);
+		  cmd->rssi_5g_threshold, cmd->rssi_6g_threshold);
 
 	wmi_mtrace(WMI_ROAM_BSS_LOAD_CONFIG_CMDID, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, buf, len,

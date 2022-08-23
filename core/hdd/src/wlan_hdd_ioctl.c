@@ -2801,8 +2801,18 @@ static int drv_cmd_set_roam_scan_period(struct hdd_adapter *adapter,
 	int ret = 0;
 	uint8_t *value = command;
 	uint8_t roam_scan_period = 0;
-	uint16_t empty_scan_refresh_period =
-		cfg_default(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD);
+	uint16_t empty_scan_refresh_period;
+	bool flag = false, val = false;
+
+	ucfg_mlme_get_connection_roaming_ini_present(hdd_ctx->psoc, &val);
+	if (val) {
+		flag = true;
+		empty_scan_refresh_period =
+			cfg_default(CFG_ROAM_SCAN_FIRST_TIMER) * 1000;
+	} else {
+		empty_scan_refresh_period =
+			cfg_default(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD);
+	}
 
 	/* input refresh period is in terms of seconds */
 
@@ -2816,14 +2826,20 @@ static int drv_cmd_set_roam_scan_period(struct hdd_adapter *adapter,
 		 * If the input value is greater than max value of datatype,
 		 * then also kstrtou8 fails
 		 */
-		hdd_err("kstrtou8 failed Input value may be out of range[%d - %d]",
-			(cfg_min(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD) / 1000),
-			(cfg_max(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD) / 1000));
+		if (flag)
+			hdd_err("kstrtou8 failed Input value may be out of range[%d - %d]",
+				cfg_min(CFG_ROAM_SCAN_FIRST_TIMER),
+				cfg_max(CFG_ROAM_SCAN_FIRST_TIMER));
+		else
+			hdd_err("kstrtou8 failed Input value may be out of range[%d - %d]",
+				(cfg_min(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD) / 1000),
+				(cfg_max(CFG_LFR_EMPTY_SCAN_REFRESH_PERIOD) / 1000));
 		ret = -EINVAL;
 		goto exit;
 	}
 
-	if (!ucfg_mlme_validate_scan_period(roam_scan_period * 1000)) {
+	if (!ucfg_mlme_validate_scan_period(hdd_ctx->psoc,
+					    roam_scan_period * 1000)) {
 		ret = -EINVAL;
 		goto exit;
 	}
@@ -4248,47 +4264,6 @@ exit:
 	return ret;
 }
 
-static int drv_cmd_set_roam_scan_control(struct hdd_adapter *adapter,
-					 struct hdd_context *hdd_ctx,
-					 uint8_t *command,
-					 uint8_t command_len,
-					 struct hdd_priv_data *priv_data)
-{
-	int ret = 0;
-	uint8_t *value = command;
-	uint8_t roam_scan_control = 0;
-
-	/* Move pointer to ahead of SETROAMSCANCONTROL<delimiter> */
-	value = value + command_len + 1;
-
-	/* Convert the value from ascii to integer */
-	ret = kstrtou8(value, 10, &roam_scan_control);
-	if (ret < 0) {
-		/*
-		 * If the input value is greater than max value of datatype,
-		 * then also kstrtou8 fails
-		 */
-		hdd_err("kstrtou8 failed");
-		ret = -EINVAL;
-		goto exit;
-	}
-
-	hdd_debug("Received Command to Set roam scan control = %d",
-		  roam_scan_control);
-
-	if (0 != roam_scan_control) {
-		ret = 0; /* return success but ignore param value "true" */
-		goto exit;
-	}
-
-	sme_set_roam_scan_control(hdd_ctx->mac_handle,
-				  adapter->vdev_id,
-				  roam_scan_control);
-
-exit:
-	return ret;
-}
-
 static int drv_cmd_set_okc_mode(struct hdd_adapter *adapter,
 				struct hdd_context *hdd_ctx,
 				uint8_t *command,
@@ -4362,28 +4337,6 @@ static int drv_cmd_set_okc_mode(struct hdd_adapter *adapter,
 		hdd_err("set pmkid modes failed");
 	}
 exit:
-	return ret;
-}
-
-static int drv_cmd_get_roam_scan_control(struct hdd_adapter *adapter,
-					 struct hdd_context *hdd_ctx,
-					 uint8_t *command,
-					 uint8_t command_len,
-					 struct hdd_priv_data *priv_data)
-{
-	int ret = 0;
-	bool roam_scan_control = sme_get_roam_scan_control(hdd_ctx->mac_handle);
-	char extra[32];
-	uint8_t len = 0;
-
-	len = scnprintf(extra, sizeof(extra), "%s %d",
-			command, roam_scan_control);
-	len = QDF_MIN(priv_data->total_len, len + 1);
-	if (copy_to_user(priv_data->buf, &extra, len)) {
-		hdd_err("failed to copy data to user buffer");
-		ret = -EFAULT;
-	}
-
 	return ret;
 }
 
@@ -4532,6 +4485,9 @@ static int drv_cmd_miracast(struct hdd_adapter *adapter,
 
 	/* Filtertype value should be either 0-Disabled, 1-Source, 2-sink */
 	hdd_ctx->miracast_value = filter_type;
+	ucfg_mlme_set_vdev_traffic_low_latency(hdd_ctx->psoc, adapter->vdev_id,
+					       filter_type !=
+					       MIRACAST_DISABLED);
 
 	ret_status = sme_set_miracast(hdd_ctx->mac_handle, filter_type);
 	if (QDF_STATUS_SUCCESS != ret_status) {
@@ -5966,8 +5922,8 @@ static int drv_cmd_invalid(struct hdd_adapter *adapter,
 		   TRACE_CODE_HDD_UNSUPPORTED_IOCTL,
 		   adapter->vdev_id, 0);
 
-	hdd_warn("%s: Unsupported driver command \"%s\"",
-		 adapter->dev->name, command);
+	hdd_debug("%s: Unsupported driver command \"%s\"",
+		  adapter->dev->name, command);
 
 	return -ENOTSUPP;
 }
@@ -6876,9 +6832,7 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"SETFASTROAM",               drv_cmd_set_fast_roam, true},
 	{"SETFASTTRANSITION",         drv_cmd_set_fast_transition, true},
 	{"FASTREASSOC",               drv_cmd_fast_reassoc, true},
-	{"SETROAMSCANCONTROL",        drv_cmd_set_roam_scan_control, true},
 	{"SETOKCMODE",                drv_cmd_set_okc_mode, true},
-	{"GETROAMSCANCONTROL",        drv_cmd_get_roam_scan_control, false},
 	{"BTCOEXMODE",                drv_cmd_bt_coex_mode, true},
 	{"SCAN-ACTIVE",               drv_cmd_scan_active, false},
 	{"SCAN-PASSIVE",              drv_cmd_scan_passive, false},

@@ -161,9 +161,7 @@ typedef enum {
 	eSAP_DFS_CAC_START,
 	eSAP_DFS_CAC_INTERRUPTED,
 	eSAP_DFS_CAC_END,
-	eSAP_DFS_PRE_CAC_END,
 	eSAP_DFS_RADAR_DETECT,
-	eSAP_DFS_RADAR_DETECT_DURING_PRE_CAC,
 	/* No ch available after DFS RADAR detect */
 	eSAP_DFS_NO_AVAILABLE_CHANNEL,
 	eSAP_STOP_BSS_DUE_TO_NO_CHNL,
@@ -275,6 +273,7 @@ typedef struct sap_StationAssocReassocCompleteEvent_s {
 	uint8_t max_supp_idx;
 	uint8_t max_ext_idx;
 	uint8_t max_mcs_idx;
+	uint8_t max_real_mcs_idx;
 	uint8_t rx_mcs_map;
 	uint8_t tx_mcs_map;
 	uint8_t ecsa_capable;
@@ -854,68 +853,6 @@ QDF_STATUS wlan_sap_update_next_channel(struct sap_context *sap_ctx,
 					uint8_t channel,
 					enum phy_ch_width chan_bw);
 
-#ifdef FEATURE_SAP_COND_CHAN_SWITCH
-/**
- * wlan_sap_set_pre_cac_status() - Set the pre cac status
- * @sap_ctx: SAP context
- * @status: Status of pre cac
- *
- * Updates the state of pre cac in the SAP context
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_sap_set_pre_cac_status(struct sap_context *sap_ctx,
-				       bool status);
-
-/**
- * wlan_sap_set_chan_freq_before_pre_cac() - Save the channel before pre cac
- * @sap_ctx: SAP context
- * @freq_before_pre_cac: Channel frequency before pre cac
- *
- * Saves the channel frequency that was in use before pre cac operation
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS
-wlan_sap_set_chan_freq_before_pre_cac(struct sap_context *sap_ctx,
-				      qdf_freq_t freq_before_pre_cac);
-#else
-static inline QDF_STATUS
-wlan_sap_set_pre_cac_status(struct sap_context *sap_ctx, bool status)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline QDF_STATUS
-wlan_sap_set_chan_freq_before_pre_cac(struct sap_context *sap_ctx,
-				      qdf_freq_t freq_before_pre_cac)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
-/**
- * wlan_sap_set_pre_cac_complete_status() - Sets pre cac complete status
- * @sap_ctx: SAP context
- * @status: Status of pre cac complete
- *
- * Sets the status of pre cac i.e., whether pre cac is complete or not
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS wlan_sap_set_pre_cac_complete_status(struct sap_context *sap_ctx,
-						bool status);
-
-/**
- * wlan_sap_is_pre_cac_context() - checks if @context is for a pre-cac adapter
- * @context: the SAP context to check
- *
- * Return: true if @context is for a pre-cac adapter
- */
-bool wlan_sap_is_pre_cac_context(struct sap_context *context);
-
-bool wlan_sap_is_pre_cac_active(mac_handle_t handle);
-QDF_STATUS wlan_sap_get_pre_cac_vdev_id(mac_handle_t handle, uint8_t *vdev_id);
 #ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
 /**
  * wlansap_check_cc_intf() - Get interfering concurrent channel
@@ -1331,6 +1268,24 @@ void wlansap_extend_to_acs_range(mac_handle_t mac_handle,
 				 uint32_t *bandStartChannel,
 				 uint32_t *bandEndChannel);
 
+#ifdef WLAN_FEATURE_SON
+/**
+ * wlansap_son_update_sap_config_phymode() - update sap config according to
+ *                                           phy_mode. This API is for son,
+ *                                           There is no band switching when
+ *                                           son phy mode is changed.
+ * @sap_ctx:  Pointer to Sap Context
+ * @sap_config:  Pointer to sap config
+ * @phy_mode: pointer to phy mode
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
+				      struct sap_config *config,
+				      enum qca_wlan_vendor_phy_mode phy_mode);
+#endif
+
 /**
  * wlansap_set_dfs_nol() - Set dfs nol
  * @sap_ctx: SAP context
@@ -1590,6 +1545,27 @@ uint32_t wlansap_get_safe_channel_from_pcl_for_sap(struct sap_context *sap_ctx);
 qdf_freq_t wlansap_get_chan_band_restrict(struct sap_context *sap_ctx,
 					  enum sap_csa_reason_code *csa_reason);
 
+/**
+ * wlansap_override_csa_strict_for_sap() - check user CSA strict or not
+ * @mac: mac ctx
+ * @sap_ctx: sap context
+ * @target_chan_freq: target channel frequency in MHz
+ * @strict: CSA strict flag
+ *
+ * If force SCC enabled, user trigger SAP CSA and target channel
+ * doesn't cause MCC with existing STA/CLI, then override strict flag to
+ * true, so that driver can skip the overlap interference check and
+ * allow the CSA go through. This is to allow SAP/GO force SCC in
+ * same band.
+ *
+ * Return: true if CSA is strict, otherwise false
+ */
+bool
+wlansap_override_csa_strict_for_sap(mac_handle_t mac_handle,
+				    struct sap_context *sap_ctx,
+				    uint32_t target_chan_freq,
+				    bool strict);
+
 #ifdef FEATURE_RADAR_HISTORY
 /**
  * wlansap_query_radar_history() -  get radar history info
@@ -1779,6 +1755,14 @@ void sap_release_vdev_ref(struct sap_context *sap_ctx);
 
 #ifdef WLAN_FEATURE_11BE
 /**
+ * sap_phymode_is_eht() - Is sap phymode EHT
+ * @phymode: phy mode
+ *
+ * Return: true if phy mode is EHT
+ */
+bool sap_phymode_is_eht(eCsrPhyMode phymode);
+
+/**
  * sap_acs_is_puncture_applicable() - Is static puncturing applicable according
  *                                    to ACS configure of given sap acs config.
  * @acs_cfg: pointer to sap_acs_cfg
@@ -1798,6 +1782,11 @@ bool sap_acs_is_puncture_applicable(struct sap_acs_cfg *acs_cfg);
 void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 				  struct ch_params *ch_params);
 #else
+static inline bool sap_phymode_is_eht(eCsrPhyMode phymode)
+{
+	return false;
+}
+
 static inline bool sap_acs_is_puncture_applicable(struct sap_acs_cfg *acs_cfg)
 {
 	return false;
@@ -1808,6 +1797,28 @@ static inline void sap_acs_set_puncture_support(struct sap_context *sap_ctx,
 {
 }
 #endif /* WLAN_FEATURE_11BE */
+
+#ifdef PRE_CAC_SUPPORT
+/**
+ * sap_cac_end_notify() - Notify CAC end to HDD
+ * @mac_handle: Opaque handle to the global MAC context
+ *
+ * Function will be called to notify eSAP_DFS_CAC_END event to HDD
+ *
+ * Return: QDF_STATUS_SUCCESS if the notification was sent, otherwise
+ *         an appropriate QDF_STATUS error
+ */
+QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
+			      struct csr_roam_info *roamInfo);
+#else
+static inline QDF_STATUS
+sap_cac_end_notify(mac_handle_t mac_handle,
+		   struct csr_roam_info *roamInfo)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif /* PRE_CAC_SUPPORT */
+
 #ifdef __cplusplus
 }
 #endif

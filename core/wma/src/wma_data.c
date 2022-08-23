@@ -82,6 +82,7 @@
 #include <wlan_mlme_main.h>
 #include <wlan_cm_api.h>
 #include "wlan_pkt_capture_ucfg_api.h"
+#include "wma_eht.h"
 
 struct wma_search_rate {
 	int32_t rate;
@@ -759,24 +760,6 @@ static void wma_cp_stats_set_rate_flag(tp_wma_handle wma, uint8_t vdev_id)
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 }
 
-#ifdef WLAN_FEATURE_11BE
-/**
- * wma_get_bss_eht_capable() - whether bss is eht capable or not
- * @add_bss: add_bss params
- *
- * Return: true if eht capable is present
- */
-static bool wma_get_bss_eht_capable(struct bss_params *add_bss)
-{
-	return add_bss->eht_capable;
-}
-#else
-static bool wma_get_bss_eht_capable(struct bss_params *add_bss)
-{
-	return false;
-}
-#endif
-
 #ifdef WLAN_FEATURE_11AX
 /**
  * wma_set_bss_rate_flags_he() - set rate flags based on BSS capability
@@ -870,7 +853,7 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 	struct wma_txrx_node *iface = &wma->interfaces[vdev_id];
 	struct vdev_mlme_obj *vdev_mlme;
 	enum tx_rate_info *rate_flags;
-
+	QDF_STATUS qdf_status;
 
 	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(iface->vdev);
 	if (!vdev_mlme) {
@@ -880,14 +863,15 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 	rate_flags = &vdev_mlme->mgmt.rate_info.rate_flags;
 	*rate_flags = 0;
 
-	if (QDF_STATUS_SUCCESS !=
-		wma_set_bss_rate_flags_he(rate_flags, add_bss)) {
-		if (add_bss->vhtCapable) {
-			*rate_flags = wma_get_vht_rate_flags(add_bss->ch_width);
-		}
-		/* avoid to conflict with htCapable flag */
-		else if (add_bss->htCapable) {
-			*rate_flags |= wma_get_ht_rate_flags(add_bss->ch_width);
+	qdf_status = wma_set_bss_rate_flags_eht(rate_flags, add_bss);
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		if (QDF_STATUS_SUCCESS !=
+			wma_set_bss_rate_flags_he(rate_flags, add_bss)) {
+			if (add_bss->vhtCapable)
+				*rate_flags = wma_get_vht_rate_flags(add_bss->ch_width);
+			/* avoid to conflict with htCapable flag */
+			else if (add_bss->htCapable)
+				*rate_flags |= wma_get_ht_rate_flags(add_bss->ch_width);
 		}
 	}
 
@@ -2276,7 +2260,6 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 			 wma_tx_dwnld_comp_callback tx_frm_download_comp_cb,
 			 void *pData,
 			 wma_tx_ota_comp_callback tx_frm_ota_comp_cb,
-			 struct mgmt_frame_data *ota_comp_data,
 			 uint8_t tx_flag, uint8_t vdev_id, bool tdls_flag,
 			 uint16_t channel_freq, enum rateid rid,
 			 int8_t peer_rssi)
@@ -2609,12 +2592,6 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 				GENERIC_NODOWNLD_NOACK_COMP_INDEX;
 		}
 
-		if (ota_comp_data) {
-			wma_handle->is_mgmt_data_valid = true;
-			wma_handle->mgmt_data = *ota_comp_data;
-		} else {
-			wma_handle->is_mgmt_data_valid = false;
-		}
 	}
 
 	/*
@@ -2658,14 +2635,29 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		chanfreq = 0;
 	}
 
-	if (mac->mlme_cfg->gen.debug_packet_log & 0x1) {
-		if ((pFc->type == SIR_MAC_MGMT_FRAME) &&
+	if (pFc->type == SIR_MAC_MGMT_FRAME) {
+		if ((mac->mlme_cfg->gen.debug_packet_log &
+		    DEBUG_PKTLOG_TYPE_MGMT) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&
-		    (pFc->subType != SIR_MAC_MGMT_PROBE_RSP)) {
+		    (pFc->subType != SIR_MAC_MGMT_PROBE_RSP) &&
+		    (pFc->subType != SIR_MAC_MGMT_ACTION)) {
 			wma_debug("TX MGMT - Type %hu, SubType %hu seq_num[%d]",
-				 pFc->type, pFc->subType,
+				  pFc->type, pFc->subType,
+				  ((mHdr->seqControl.seqNumHi << 4) |
+				  mHdr->seqControl.seqNumLo));
+			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
+					   QDF_TRACE_LEVEL_DEBUG, pData,
+					   frmLen);
+		} else if ((mac->mlme_cfg->gen.debug_packet_log &
+			   DEBUG_PKTLOG_TYPE_ACTION) &&
+			   (pFc->subType == SIR_MAC_MGMT_ACTION)) {
+			wma_debug("TX MGMT - Type %hu, SubType %hu seq_num[%d]",
+				  pFc->type, pFc->subType,
 				 ((mHdr->seqControl.seqNumHi << 4) |
 				 mHdr->seqControl.seqNumLo));
+			qdf_trace_hex_dump(QDF_MODULE_ID_WMA,
+					   QDF_TRACE_LEVEL_DEBUG, pData,
+					   frmLen);
 		}
 	}
 

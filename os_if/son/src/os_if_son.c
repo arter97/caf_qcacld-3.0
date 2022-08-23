@@ -1763,7 +1763,11 @@ QDF_STATUS os_if_son_get_node_datarate_info(struct wlan_objmgr_vdev *vdev,
 		ucfg_son_get_min_and_max_power(psoc, &max_tx_power,
 					       &min_tx_power);
 		node_info->max_txpower = max_tx_power;
-		node_info->max_MCS = MAX_HE_MCS_IDX;
+		node_info->max_MCS = ucfg_mlme_get_vdev_max_mcs_idx(vdev);
+		if (node_info->max_MCS == INVALID_MCS_NSS_INDEX) {
+			osif_err("invalid mcs index");
+			return QDF_STATUS_E_INVAL;
+		}
 		osif_debug("node info: max_chwidth: %u, phymode: %u, num_streams: %d, max_mcs: %d, max_txpower: %d",
 			   node_info->max_chwidth, node_info->phymode,
 			   node_info->num_streams, node_info->max_MCS,
@@ -1779,6 +1783,8 @@ QDF_STATUS os_if_son_get_node_datarate_info(struct wlan_objmgr_vdev *vdev,
 	return status;
 }
 
+qdf_export_symbol(os_if_son_get_node_datarate_info);
+
 uint32_t os_if_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
 					struct wlan_objmgr_peer *peer)
 {
@@ -1787,3 +1793,14 @@ uint32_t os_if_son_get_peer_max_mcs_idx(struct wlan_objmgr_vdev *vdev,
 
 	return 0;
 }
+
+int os_if_son_get_sta_stats(struct wlan_objmgr_vdev *vdev, uint8_t *mac_addr,
+			    struct ieee80211_nodestats *stats)
+{
+	if (g_son_os_if_cb.os_if_get_sta_stats)
+		return g_son_os_if_cb.os_if_get_sta_stats(vdev, mac_addr,
+							  stats);
+
+	return 0;
+}
+qdf_export_symbol(os_if_son_get_sta_stats);

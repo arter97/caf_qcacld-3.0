@@ -54,6 +54,8 @@
 #include "nan_ucfg_api.h"
 #include "wlan_pkt_capture_ucfg_api.h"
 #include "wlan_hdd_object_manager.h"
+#include "wlan_hdd_pre_cac.h"
+#include "wlan_pre_cac_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -786,6 +788,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 			hdd_debug("change mode to p2p device");
 			mode = QDF_P2P_DEVICE_MODE;
 		}
+
 		device_address = wlan_hdd_get_intf_addr(hdd_ctx, mode);
 		if (!device_address)
 			return ERR_PTR(-EINVAL);
@@ -799,7 +802,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 	}
 
 	if (!adapter) {
-		hdd_err("hdd_open_adapter failed");
+		hdd_err("hdd_open_adapter failed with iftype %d", type);
 		return ERR_PTR(-ENOSPC);
 	}
 
@@ -939,9 +942,9 @@ int __wlan_hdd_del_virtual_intf(struct wiphy *wiphy, struct wireless_dev *wdev)
 		return errno;
 
 	if (adapter->device_mode == QDF_SAP_MODE &&
-	    wlan_sap_is_pre_cac_active(hdd_ctx->mac_handle)) {
+	    ucfg_pre_cac_is_active(hdd_ctx->psoc)) {
 		hdd_clean_up_interface(hdd_ctx, adapter);
-		hdd_clean_up_pre_cac_interface(hdd_ctx);
+		ucfg_pre_cac_clean_up(hdd_ctx->psoc);
 	} else if (wlan_hdd_is_session_type_monitor(
 					adapter->device_mode) &&
 		   ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
