@@ -6390,9 +6390,77 @@ static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
 #endif
 
 /**
- * wlan_hdd_ap_ap_force_scc_override() - force Same band SCC chan override
+ * wlan_hdd_get_sap_ch_params() - Get channel parameters of SAP
+ * @hdd_ctx: HDD context pointer
+ * @vdev_id: vdev id
+ * @freq: channel frequency (MHz)
+ * @ch_params: pointer to channel parameters
+ *
+ * The function gets channel parameters of SAP by vdev id.
+ *
+ * Return: QDF_STATUS_SUCCESS if get channel parameters successful
+ */
+static QDF_STATUS
+wlan_hdd_get_sap_ch_params(struct hdd_context *hdd_ctx,
+			   uint8_t vdev_id, uint32_t freq,
+			   struct ch_params *ch_params)
+{
+	struct hdd_adapter *adapter;
+
+	if (!hdd_ctx || !ch_params) {
+		hdd_err("invalid hdd_ctx or ch_params");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	adapter = hdd_get_adapter_by_vdev(hdd_ctx, vdev_id);
+	if (!adapter)
+		return QDF_STATUS_E_INVAL;
+
+	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+				    ch_params))
+		wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
+						     freq, 0,
+						     ch_params);
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * wlan_hdd_is_same_freq_seg() - Check freq segment is same or not
+ * @chandef: channel of new SAP
+ * @ch_params: channel parameters of existed SAP
+ *
+ * If two SAP on same channel, and channel type is NL80211_CHAN_HT40MINUS or
+ * NL80211_CHAN_HT40PLUS, or channel offset is PHY_DOUBLE_CHANNEL_HIGH_PRIMARY
+ * or PHY_DOUBLE_CHANNEL_LOW_PRIMARY, then check freq segment is same or not.
+ *
+ * Return: true if freq segment is same
+ */
+static bool
+wlan_hdd_is_same_freq_seg(struct cfg80211_chan_def *chandef,
+			  struct ch_params *ch_params)
+{
+	if (!chandef || !ch_params)
+		return false;
+
+	/* they are equal if NL80211_CHAN_NO_HT or NL80211_CHAN_HT20 */
+	if (chandef->center_freq1 == chandef->chan->center_freq)
+		return true;
+
+	if ((ch_params->sec_ch_offset != PHY_DOUBLE_CHANNEL_HIGH_PRIMARY) &&
+	    (ch_params->sec_ch_offset != PHY_DOUBLE_CHANNEL_LOW_PRIMARY))
+		return true;
+
+	if ((chandef->center_freq1 != ch_params->mhz_freq_seg0) ||
+	    (chandef->center_freq2 != ch_params->mhz_freq_seg1))
+		return false;
+
+	return true;
+}
+
+/**
+ * wlan_hdd_is_ap_ap_force_scc_override() - force Same band SCC chan override
  * @adapter: SAP adapter pointer
- * @freq: SAP starting channel freq
+ * @chandef: SAP starting channel
  * @new_chandef: new override SAP channel
  *
  * The function will override the second SAP chan to the first SAP's home
@@ -6401,9 +6469,9 @@ static void hdd_update_beacon_rate(struct hdd_adapter *adapter,
  * Return: true if channel override
  */
 static bool
-wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
-				  uint32_t freq,
-				  struct cfg80211_chan_def *new_chandef)
+wlan_hdd_is_ap_ap_force_scc_override(struct hdd_adapter *adapter,
+				     struct cfg80211_chan_def *chandef,
+				     struct cfg80211_chan_def *new_chandef)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	uint32_t cc_count, i;
@@ -6411,29 +6479,30 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 	uint8_t vdev_id[MAX_NUMBER_OF_CONC_CONNECTIONS];
 	struct ch_params ch_params;
 	enum nl80211_channel_type channel_type;
-	struct hdd_adapter *con_adapter;
 	uint8_t con_vdev_id;
 	uint32_t con_freq;
-	uint8_t mcc_to_scc_switch;
 	struct ieee80211_channel *ieee_chan;
+	uint32_t freq;
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
 
-	if (!hdd_ctx) {
-		hdd_err("hdd context is NULL");
+	if (!hdd_ctx || !chandef) {
+		hdd_err("hdd context or chandef is NULL");
 		return false;
 	}
 
-	if (!policy_mgr_concurrent_beaconing_sessions_running(hdd_ctx->psoc))
+	freq = chandef->chan->center_freq;
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("failed to get vdev");
 		return false;
-	if (policy_mgr_dual_beacon_on_single_mac_mcc_capable(hdd_ctx->psoc))
+	}
+	if (policy_mgr_is_ap_ap_mcc_allow(hdd_ctx->psoc, vdev)) {
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		return false;
-	if (!policy_mgr_dual_beacon_on_single_mac_scc_capable(hdd_ctx->psoc))
-		return false;
-	ucfg_policy_mgr_get_mcc_scc_switch(hdd_ctx->psoc,
-					   &mcc_to_scc_switch);
-	if ((mcc_to_scc_switch !=
-		QDF_MCC_TO_SCC_SWITCH_FORCE_WITHOUT_DISCONNECTION) &&
-	    (mcc_to_scc_switch != QDF_MCC_TO_SCC_WITH_PREFERRED_BAND))
-		return false;
+	}
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
 	cc_count = policy_mgr_get_mode_specific_conn_info(hdd_ctx->psoc,
 							  &op_freq[0],
 							  &vdev_id[0],
@@ -6446,8 +6515,16 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 					&vdev_id[cc_count],
 					PM_P2P_GO_MODE);
 	for (i = 0 ; i < cc_count; i++) {
-		if (freq == op_freq[i])
+		if (freq == op_freq[i]) {
+			status = wlan_hdd_get_sap_ch_params(hdd_ctx,
+							    vdev_id[i],
+							    op_freq[i],
+							    &ch_params);
+			if (QDF_IS_STATUS_SUCCESS(status) &&
+			    (!wlan_hdd_is_same_freq_seg(chandef, &ch_params)))
+				break;
 			continue;
+		}
 		if (!policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc))
 			break;
 		if (wlan_reg_is_same_band_freqs(freq,
@@ -6458,9 +6535,6 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 		return false;
 	con_freq = op_freq[i];
 	con_vdev_id = vdev_id[i];
-	con_adapter = hdd_get_adapter_by_vdev(hdd_ctx, con_vdev_id);
-	if (!con_adapter)
-		return false;
 	ieee_chan = ieee80211_get_channel(hdd_ctx->wiphy,
 					  con_freq);
 	if (!ieee_chan) {
@@ -6468,11 +6542,11 @@ wlan_hdd_ap_ap_force_scc_override(struct hdd_adapter *adapter,
 		return false;
 	}
 
-	if (!wlan_sap_get_ch_params(WLAN_HDD_GET_SAP_CTX_PTR(con_adapter),
-				    &ch_params))
-		wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
-						     con_freq, 0,
-						     &ch_params);
+	status = wlan_hdd_get_sap_ch_params(hdd_ctx, con_vdev_id, con_freq,
+					    &ch_params);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
 	switch (ch_params.sec_ch_offset) {
 	case PHY_SINGLE_CHANNEL_CENTERED:
 		channel_type = NL80211_CHAN_HT20;
@@ -6647,9 +6721,9 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	chandef = &params->chandef;
 	if ((adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
-	    wlan_hdd_ap_ap_force_scc_override(adapter,
-					      chandef->chan->center_freq,
-					      &new_chandef)) {
+	    wlan_hdd_is_ap_ap_force_scc_override(adapter,
+						 chandef,
+						 &new_chandef)) {
 		chandef = &new_chandef;
 		freq = (qdf_freq_t)chandef->chan->center_freq;
 		channel_width = wlan_hdd_get_channel_bw(chandef->width);

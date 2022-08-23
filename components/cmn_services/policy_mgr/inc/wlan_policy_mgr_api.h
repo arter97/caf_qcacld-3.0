@@ -652,6 +652,25 @@ policy_mgr_change_sap_channel_with_csa(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_P2P_P2P_STA
+/**
+ * policy_mgr_is_p2p_p2p_conc_supported() - p2p concurrency support
+ * @psoc: pointer to psoc
+ *
+ * This API is used to check whether firmware supports p2p concurrency
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+bool
+policy_mgr_is_p2p_p2p_conc_supported(struct wlan_objmgr_psoc *psoc);
+#else
+static inline bool
+policy_mgr_is_p2p_p2p_conc_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+#endif
+
 /**
  * policy_mgr_set_pcl_for_existing_combo() - SET PCL for existing combo
  * @psoc: PSOC object information
@@ -3809,4 +3828,17 @@ bool policy_mgr_is_hwmode_offload_enabled(struct wlan_objmgr_psoc *psoc);
  */
 bool policy_mgr_is_3rd_conn_on_same_band_allowed(struct wlan_objmgr_psoc *psoc,
 						 enum policy_mgr_con_mode mode);
+
+/**
+ * policy_mgr_is_ap_ap_mcc_allow() - Check AP AP MCC allow or not
+ * @psoc: psoc object
+ * @vdev: vdev object of new SAP or P2P GO
+ *
+ * Check if AP AP MCC allow or not when new SAP or P2P GO creating
+ *
+ * Return: True if the target allow AP AP MCC,
+ *         False otherwise.
+ */
+bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev);
 #endif /* __WLAN_POLICY_MGR_API_H */

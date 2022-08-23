@@ -2705,6 +2705,13 @@ bool policy_mgr_is_mlo_sap_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+#ifdef WLAN_FEATURE_P2P_P2P_STA
+bool policy_mgr_is_p2p_p2p_conc_supported(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_p2p_p2p_conc_support(psoc);
+}
+#endif
+
 bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 				       enum policy_mgr_con_mode mode,
 				       uint32_t ch_freq,
@@ -2730,15 +2737,14 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 
 	if (num_connections && policy_mgr_is_sub_20_mhz_enabled(psoc)) {
 		policy_mgr_rl_debug("dont allow concurrency if Sub 20 MHz is enabled");
-		status = false;
-		goto done;
+		return status;
 	}
 
 	if (policy_mgr_max_concurrent_connections_reached(psoc)) {
 		policy_mgr_rl_debug("Reached max concurrent connections: %d",
 				    pm_ctx->cfg.max_conc_cxns);
 		policy_mgr_validate_conn_info(psoc);
-		goto done;
+		return status;
 	}
 
 	if (ch_freq) {
@@ -2754,7 +2760,7 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 		if (!policy_mgr_allow_new_home_channel(psoc, mode, ch_freq,
 						       num_connections,
 						       is_dfs_ch))
-			goto done;
+			return status;
 
 		/*
 		 * 1) DFS MCC is not yet supported
@@ -2771,13 +2777,13 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 		 */
 		if (!policy_mgr_is_5g_channel_allowed(psoc,
 			ch_freq, list, PM_P2P_GO_MODE))
-			goto done;
+			return status;
 		if (!policy_mgr_is_5g_channel_allowed(psoc,
 			ch_freq, list, PM_SAP_MODE))
-			goto done;
+			return status;
 		if (!policy_mgr_is_6g_channel_allowed(psoc, mode,
 						      ch_freq))
-			goto done;
+			return status;
 
 		sta_sap_scc_on_dfs_chan =
 			policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(psoc);
@@ -2790,14 +2796,14 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 		}
 		if (true == match) {
 			policy_mgr_rl_debug("No MCC, SAP/GO about to come up on DFS channel");
-			goto done;
+			return status;
 		}
 		if ((policy_mgr_is_hw_dbs_capable(psoc) != true) &&
 		    num_connections) {
 			if (WLAN_REG_IS_24GHZ_CH_FREQ(ch_freq)) {
 				if (policy_mgr_is_sap_p2pgo_on_dfs(psoc)) {
 					policy_mgr_rl_debug("MCC not allowed: SAP/P2PGO on DFS");
-					goto done;
+					return status;
 				}
 			}
 		}
@@ -2809,21 +2815,26 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	if (mode == PM_STA_MODE && count) {
 		if (count >= 2) {
 			policy_mgr_rl_debug("3rd STA isn't permitted");
-			goto done;
+			return status;
 		}
 		sta_freq = pm_conc_connection_list[list[0]].freq;
 		if (!policy_mgr_allow_multiple_sta_connections(psoc, ch_freq,
 							       sta_freq))
-			goto done;
+			return status;
 	}
 
 	if (!policy_mgr_allow_sap_go_concurrency(psoc, mode, ch_freq,
 						 WLAN_INVALID_VDEV_ID)) {
 		policy_mgr_rl_debug("This concurrency combination is not allowed");
-		goto done;
+		return status;
 	}
-	/* don't allow two P2P GO on same band */
-	if (ch_freq && mode == PM_P2P_GO_MODE && num_connections) {
+
+	/*
+	 * don't allow two P2P GO on same band, if fw doesn't
+	 * support p2p +p2p concurrency
+	 */
+	if (ch_freq && mode == PM_P2P_GO_MODE && num_connections &&
+	    !policy_mgr_is_p2p_p2p_conc_supported(psoc)) {
 		index = 0;
 		count = policy_mgr_mode_specific_connection_count(
 				psoc, PM_P2P_GO_MODE, list);
@@ -2834,7 +2845,7 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 			    pm_conc_connection_list[list[index]].freq)) {
 				policy_mgr_rl_debug("Don't allow P2P GO on same band");
 				qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
-				goto done;
+				return status;
 			}
 			index++;
 		}
@@ -2843,12 +2854,11 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 
 	if (!policy_mgr_allow_wapi_concurrency(pm_ctx)) {
 		policy_mgr_rl_debug("Don't allow new conn when wapi security conn existing");
-		goto done;
+		return status;
 	}
 
 	status = true;
 
-done:
 	return status;
 }
 
@@ -4339,8 +4349,6 @@ bool policy_mgr_allow_sap_go_concurrency(struct wlan_objmgr_psoc *psoc,
 
 	if (mode != PM_SAP_MODE && mode != PM_P2P_GO_MODE)
 		return true;
-	if (policy_mgr_dual_beacon_on_single_mac_mcc_capable(psoc))
-		return true;
 	dbs = policy_mgr_is_hw_dbs_capable(psoc);
 	for (id = 0; id < MAX_NUMBER_OF_CONC_CONNECTIONS; id++) {
 		if (!pm_conc_connection_list[id].in_use)
@@ -4352,6 +4360,18 @@ bool policy_mgr_allow_sap_go_concurrency(struct wlan_objmgr_psoc *psoc,
 		if (con_mode != PM_SAP_MODE && con_mode != PM_P2P_GO_MODE)
 			continue;
 		con_freq = pm_conc_connection_list[id].freq;
+
+		if (policy_mgr_is_p2p_p2p_conc_supported(psoc) &&
+		    (mode == PM_P2P_GO_MODE) && (con_mode == PM_P2P_GO_MODE)) {
+			policy_mgr_debug("GO+GO scc is allowed freq = %d ",
+					 ch_freq);
+			return true;
+		}
+
+		if (policy_mgr_dual_beacon_on_single_mac_mcc_capable(psoc) &&
+		    (mode == PM_SAP_MODE) && (con_mode == PM_SAP_MODE))
+			return true;
+
 		if (policy_mgr_dual_beacon_on_single_mac_scc_capable(psoc) &&
 		    (ch_freq == con_freq)) {
 			policy_mgr_debug("SCC enabled, 2 AP on same channel, allow 2nd AP");
@@ -4887,4 +4907,35 @@ bool policy_mgr_is_hwmode_offload_enabled(struct wlan_objmgr_psoc *psoc)
 
 	return wmi_service_enabled(wmi_handle,
 				   wmi_service_hw_mode_policy_offload_support);
+}
+
+bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev)
+{
+	enum QDF_OPMODE mode;
+	uint8_t mcc_to_scc_switch;
+
+	if (!psoc || !vdev) {
+		policy_mgr_debug("psoc or vdev is NULL");
+		return false;
+	}
+
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	policy_mgr_get_mcc_scc_switch(psoc, &mcc_to_scc_switch);
+
+	if (mode == QDF_P2P_GO_MODE &&
+	    policy_mgr_is_p2p_p2p_conc_supported(psoc))
+		return true;
+	if (!policy_mgr_concurrent_beaconing_sessions_running(psoc))
+		return true;
+	if (policy_mgr_dual_beacon_on_single_mac_mcc_capable(psoc))
+		return true;
+	if (!policy_mgr_dual_beacon_on_single_mac_scc_capable(psoc))
+		return true;
+	if ((mcc_to_scc_switch !=
+		QDF_MCC_TO_SCC_SWITCH_FORCE_WITHOUT_DISCONNECTION) &&
+	    (mcc_to_scc_switch != QDF_MCC_TO_SCC_WITH_PREFERRED_BAND))
+		return true;
+
+	return false;
 }
