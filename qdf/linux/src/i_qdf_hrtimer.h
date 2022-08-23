@@ -378,6 +378,7 @@ static inline uint64_t __qdf_hrtimer_forward(__qdf_hrtimer_data_t *timer,
 
 	return hrtimer_forward(hrtimer, now, interval);
 }
+
 #else
 static inline uint64_t __qdf_hrtimer_forward(__qdf_hrtimer_data_t *timer,
 					     ktime_t now,
@@ -393,4 +394,18 @@ static inline uint64_t __qdf_hrtimer_forward(__qdf_hrtimer_data_t *timer,
 }
 #endif
 
+/**
+ * __qdf_hrtimer_add_expires() - Add expiry to hrtimer with given interval
+ * @timer: pointer to the __qdf_hrtimer_data_t object
+ * @interval: interval to add as ktime_t object
+ *
+ * Add the timer expiry so it will expire in the future
+ *
+ * Return: None
+ */
+static inline
+void __qdf_hrtimer_add_expires(__qdf_hrtimer_data_t *timer, ktime_t interval)
+{
+	hrtimer_add_expires(&timer->u.hrtimer, interval);
+}
 #endif /* _I_QDF_HRTIMER_H */
