@@ -353,11 +353,12 @@ QDF_STATUS telemetry_sawf_update_msdu_drop(void *telemetry_ctx,
 qdf_export_symbol(telemetry_sawf_update_msdu_drop);
 
 QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
-				   uint8_t queue, uint32_t *rate)
+				   uint8_t queue, uint32_t *egress_rate,
+				   uint32_t *ingress_rate)
 {
 	if (g_agent_ops) {
-		if (g_agent_ops->sawf_pull_rate(telemetry_ctx, tid,
-						queue, rate))
+		if (g_agent_ops->sawf_pull_rate(telemetry_ctx, tid, queue,
+						egress_rate, ingress_rate))
 			return QDF_STATUS_E_FAILURE;
 	}
 	return QDF_STATUS_SUCCESS;

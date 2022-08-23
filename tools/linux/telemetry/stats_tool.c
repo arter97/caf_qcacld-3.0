@@ -1385,6 +1385,8 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 			    data->tx[0][0].tx_ingress.bytes);
 		STATS_PRINT("Tx_info_Throughput         = %u\n",
 			    data->tx[0][0].throughput);
+		STATS_PRINT("Tx_info_ingress_rate       = %u\n",
+			    data->tx[0][0].ingress_rate);
 
 		STATS_PRINT("Tx_info_drop_num           = %u\n",
 			    data->tx[0][0].dropped.fw_rem.num);
@@ -1433,9 +1435,10 @@ print_advance_sta_data_sawf_tx(struct advance_peer_data_sawftx *data,
 					    sawftx->tx_ingress.num);
 				STATS_PRINT("Tx_info_ingress_bytes      = %ju\n",
 					    sawftx->tx_ingress.bytes);
-				STATS_PRINT("Tx_info_Throughput        = %u\n",
+				STATS_PRINT("Tx_info_Throughput         = %u\n",
 					    sawftx->throughput);
-
+				STATS_PRINT("Tx_info_ingress_rate       = %u\n",
+					    sawftx->ingress_rate);
 
 				STATS_PRINT("Tx_info_drop_num           = %u\n",
 					    sawftx->dropped.fw_rem.num);
