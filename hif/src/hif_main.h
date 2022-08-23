@@ -43,6 +43,7 @@
 #ifdef HIF_CE_LOG_INFO
 #include "qdf_notifier.h"
 #endif
+#include "pld_common.h"
 
 #define HIF_MIN_SLEEP_INACTIVITY_TIME_MS     50
 #define HIF_SLEEP_INACTIVITY_TIMER_PERIOD_MS 60
@@ -250,6 +251,8 @@ struct hif_umac_reset_ctx {
 };
 #endif
 
+#define MAX_SHADOW_REGS 40
+
 struct hif_softc {
 	struct hif_opaque_softc osc;
 	struct hif_config_info hif_config;
@@ -372,6 +375,10 @@ struct hif_softc {
 	uint64_t cmem_size;
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 	struct hif_umac_reset_ctx umac_reset_ctx;
+#endif
+#ifdef CONFIG_SHADOW_V3
+	struct pld_shadow_reg_v3_cfg shadow_regs[MAX_SHADOW_REGS];
+	int num_shadow_registers_configured;
 #endif
 };
 

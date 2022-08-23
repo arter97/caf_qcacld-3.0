@@ -3725,6 +3725,39 @@ void hif_ce_stop(struct hif_softc *scn)
 	hif_state->started = false;
 }
 
+#ifdef CONFIG_SHADOW_V3
+void hif_preare_shadow_register_cfg_v3(struct hif_softc *scn)
+{
+	int shadow_cfg_idx = scn->num_shadow_registers_configured;
+	int i;
+
+	/* shadow reg config for CE SRC registers */
+	for (i = 0; i < scn->ce_count; i++) {
+		scn->shadow_regs[shadow_cfg_idx].addr =
+				CE_BASE_ADDRESS(i) + SR_WR_INDEX_ADDRESS;
+		shadow_cfg_idx++;
+	}
+
+	/* shadow reg config for CE DST registers */
+	for (i = 0; i < scn->ce_count; i++) {
+		scn->shadow_regs[shadow_cfg_idx].addr =
+				CE_BASE_ADDRESS(i) + DST_WR_INDEX_ADDRESS;
+		shadow_cfg_idx++;
+	}
+
+	scn->num_shadow_registers_configured = shadow_cfg_idx;
+}
+
+void hif_get_shadow_reg_config_v3(struct hif_softc *scn,
+				  struct pld_shadow_reg_v3_cfg **shadow_config,
+				  int *num_shadow_registers_configured)
+{
+	*shadow_config = scn->shadow_regs;
+	*num_shadow_registers_configured =
+				scn->num_shadow_registers_configured;
+}
+#endif
+
 static void hif_get_shadow_reg_cfg(struct hif_softc *scn,
 				   struct shadow_reg_cfg
 				   **target_shadow_reg_cfg_ret,
@@ -4006,6 +4039,7 @@ int hif_wlan_enable(struct hif_softc *scn)
 	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_MANGO:
 	case TARGET_TYPE_PEACH:
+	case TARGET_TYPE_WCN6450:
 		hif_prepare_hal_shadow_reg_cfg_v3(scn, &cfg);
 		break;
 	default:

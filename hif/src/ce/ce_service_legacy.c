@@ -1439,6 +1439,25 @@ int ce_get_index_info_legacy(struct hif_softc *scn, void *ce_state,
 }
 #endif
 
+#ifdef CONFIG_SHADOW_V3
+static void ce_prepare_shadow_register_v3_cfg_legacy(struct hif_softc *scn,
+				struct pld_shadow_reg_v3_cfg **shadow_config,
+				int *num_shadow_registers_configured)
+{
+	hif_get_shadow_reg_config_v3(scn, shadow_config,
+				     num_shadow_registers_configured);
+
+	if (*num_shadow_registers_configured != 0) {
+		hif_err("shadow register configuration already constructed");
+		return;
+	}
+
+	hif_preare_shadow_register_cfg_v3(scn);
+	hif_get_shadow_reg_config_v3(scn, shadow_config,
+				     num_shadow_registers_configured);
+}
+#endif
+
 struct ce_ops ce_service_legacy = {
 	.ce_get_desc_size = ce_get_desc_size_legacy,
 	.ce_ring_setup = ce_ring_setup_legacy,
@@ -1458,6 +1477,10 @@ struct ce_ops ce_service_legacy = {
 #ifdef HIF_CE_LOG_INFO
 	.ce_get_index_info =
 		ce_get_index_info_legacy,
+#endif
+#ifdef CONFIG_SHADOW_V3
+	.ce_prepare_shadow_register_v3_cfg =
+		ce_prepare_shadow_register_v3_cfg_legacy,
 #endif
 };
 
