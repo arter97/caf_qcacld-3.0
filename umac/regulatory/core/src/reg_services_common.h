@@ -1329,17 +1329,6 @@ reg_get_5g_bonded_channel_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 				      in_6g_pwr_mode);
 #endif
 
-/**
- * reg_is_disable_for_freq() - Check if the given channel frequency in
- * disable state
- * @pdev: Pointer to pdev
- * @freq: Channel frequency
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
- *
- * Return: True if channel state is disabled, else false
- */
-bool reg_is_disable_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
-
 #ifdef CONFIG_REG_6G_PWRMODE
 /**
  * reg_is_disable_for_pwrmode() - Check if the given channel frequency in

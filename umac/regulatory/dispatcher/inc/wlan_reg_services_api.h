@@ -1743,15 +1743,6 @@ bool wlan_reg_is_dsrc_freq(qdf_freq_t freq);
 bool wlan_reg_is_passive_or_disable_for_freq(struct wlan_objmgr_pdev *pdev,
 					     qdf_freq_t freq);
 
-/**
- * wlan_reg_is_disable_for_freq() - Checks chan state for disabled
- * @pdev: pdev ptr
- * @freq: Channel center frequency
- *
- * Return: true or false
- */
-bool wlan_reg_is_disable_for_freq(struct wlan_objmgr_pdev *pdev,
-				  qdf_freq_t freq);
 #ifdef CONFIG_REG_6G_PWRMODE
 /**
  * wlan_reg_is_disable_for_pwrmode() - Checks chan state for disabled

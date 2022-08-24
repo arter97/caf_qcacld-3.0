@@ -1096,12 +1096,6 @@ bool wlan_reg_is_passive_or_disable_for_freq(struct wlan_objmgr_pdev *pdev,
 	return reg_is_passive_or_disable_for_freq(pdev, freq);
 }
 
-bool wlan_reg_is_disable_for_freq(struct wlan_objmgr_pdev *pdev,
-				  qdf_freq_t freq)
-{
-	return reg_is_disable_for_freq(pdev, freq);
-}
-
 #ifdef CONFIG_REG_6G_PWRMODE
 bool wlan_reg_is_disable_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 				     qdf_freq_t freq,
