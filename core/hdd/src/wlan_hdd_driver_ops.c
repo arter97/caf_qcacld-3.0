@@ -50,7 +50,11 @@
 #include "wlan_hdd_thermal.h"
 
 #ifdef MODULE
+#ifdef WLAN_WEAR_CHIPSET
+#define WLAN_MODULE_NAME  "wlan"
+#else
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
+#endif
 #else
 #define WLAN_MODULE_NAME  "wlan"
 #endif
@@ -750,7 +754,6 @@ static int __hdd_soc_recovery_reinit(struct device *dev,
 	}
 
 	hdd_soc_load_unlock(dev);
-	hdd_start_complete(0);
 
 	return 0;
 
@@ -807,6 +810,7 @@ static int hdd_soc_recovery_reinit(struct device *dev,
 
 
 	osif_psoc_sync_trans_stop(psoc_sync);
+	hdd_start_complete(0);
 
 	return errno;
 }
@@ -1200,6 +1204,8 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params)
 	hdd_info("starting bus suspend");
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return -ENODEV;
 
 	err = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != err) {
@@ -1912,6 +1918,8 @@ static int wlan_hdd_pld_suspend(struct device *dev,
 	struct hdd_context *hdd_ctx;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
+	if (!hdd_ctx)
+		return -ENODEV;
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (0 != errno) {

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -262,6 +262,7 @@ enum roam_invoke_source_entity {
 struct mlme_roam_after_data_stall {
 	bool roam_invoke_in_progress;
 	enum roam_invoke_source_entity source;
+	struct qdf_mac_addr mac_addr;
 };
 
 /**
@@ -1719,6 +1720,7 @@ struct fw_scan_channels {
  * @saved_freq_list: Valid channel list
  * @sae_single_pmk_feature_enabled: Contains value of ini
  * sae_single_pmk_feature_enabled
+ * @enable_ft_over_ds: Flag to enable/disable FT-over-DS
  */
 struct wlan_mlme_lfr_cfg {
 	bool mawc_roam_enabled;
@@ -1755,8 +1757,8 @@ struct wlan_mlme_lfr_cfg {
 	uint8_t mawc_roam_rssi_low_adjust;
 	uint32_t roam_rssi_abs_threshold;
 	uint8_t rssi_threshold_offset_5g;
-	uint8_t early_stop_scan_min_threshold;
-	uint8_t early_stop_scan_max_threshold;
+	int8_t early_stop_scan_min_threshold;
+	int8_t early_stop_scan_max_threshold;
 	uint32_t roam_dense_traffic_threshold;
 	uint32_t roam_dense_rssi_thre_offset;
 	uint32_t roam_dense_min_aps;
@@ -1836,6 +1838,7 @@ struct wlan_mlme_lfr_cfg {
 #if defined(WLAN_SAE_SINGLE_PMK) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
 	bool sae_single_pmk_feature_enabled;
 #endif
+	bool enable_ft_over_ds;
 };
 
 /**

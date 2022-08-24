@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2081,6 +2081,12 @@ void lim_calculate_tpc(struct mac_context *mac,
 							session->ch_width);
 	}
 
+	if (num_pwr_levels > MAX_NUM_PWR_LEVELS) {
+		pe_debug("reset num_pwr_levels %d to MAX_NUM_PWR_LEVELS %d",
+			 num_pwr_levels, MAX_NUM_PWR_LEVELS);
+		num_pwr_levels = MAX_NUM_PWR_LEVELS;
+	}
+
 	ch_params.ch_width = CH_WIDTH_20MHZ;
 
 	for (i = 0; i < num_pwr_levels; i++) {
@@ -3544,7 +3550,7 @@ __lim_process_sme_addts_req(struct mac_context *mac, uint32_t *msg_buf)
 	/* ship out the message now */
 	lim_send_addts_req_action_frame(mac, peerMac, &pSirAddts->req,
 					pe_session);
-	pe_err("Sent ADDTS request");
+	pe_debug("Sent ADDTS request");
 	/* start a timer to wait for the response */
 	if (pSirAddts->timeout)
 		timeout = pSirAddts->timeout;
