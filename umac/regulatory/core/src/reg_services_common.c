@@ -4511,44 +4511,6 @@ decide_power_type:
 #endif
 
 /**
- * reg_get_5g_bonded_chan_array_for_freq()- Return the channel state for a
- * 5G or 6G channel frequency based on the bonded channel.
- * @pdev: Pointer to pdev.
- * @freq: Channel center frequency.
- * @bonded_chan_ptr: Pointer to bonded_channel_freq.
- *
- * Return: Channel State
- */
-static enum channel_state
-reg_get_5g_bonded_chan_array_for_freq(struct wlan_objmgr_pdev *pdev,
-				      uint16_t freq,
-				      const struct bonded_channel_freq *
-				      bonded_chan_ptr)
-{
-	uint16_t chan_cfreq;
-	enum channel_state chan_state = CHANNEL_STATE_INVALID;
-	enum channel_state temp_chan_state;
-
-	if (!bonded_chan_ptr) {
-		reg_debug("bonded chan ptr is NULL");
-		return chan_state;
-	}
-
-	chan_cfreq =  bonded_chan_ptr->start_freq;
-	while (chan_cfreq <= bonded_chan_ptr->end_freq) {
-		temp_chan_state = reg_get_channel_state_for_pwrmode(
-						pdev, chan_cfreq,
-						REG_CURRENT_PWR_MODE);
-		if (temp_chan_state < chan_state)
-			chan_state = temp_chan_state;
-		chan_cfreq = chan_cfreq + 20;
-	}
-
-	return chan_state;
-}
-
-#ifdef CONFIG_REG_6G_PWRMODE
-/**
  * reg_get_5g_bonded_chan_array_for_pwrmode()- Return the channel state for a
  * 5G or 6G channel frequency based on the bonded channel.
  * @pdev: Pointer to pdev.
@@ -4595,7 +4557,6 @@ reg_get_5g_bonded_chan_array_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 
 	return chan_state;
 }
-#endif
 
 #ifdef WLAN_FEATURE_11BE
 
