@@ -1473,18 +1473,6 @@ QDF_STATUS
 wlan_reg_get_channel_list_with_power_for_freq(struct wlan_objmgr_pdev *pdev,
 					      struct channel_power *ch_list,
 					      uint8_t *num_chan);
-/**
- * wlan_reg_get_5g_bonded_channel_state_for_freq() - Get 5G bonded channel state
- * @pdev: The physical dev to program country code or regdomain
- * @freq: channel frequency.
- * @bw: channel band width
- *
- * Return: channel state
- */
-enum channel_state
-wlan_reg_get_5g_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
-					      qdf_freq_t freq,
-					      enum phy_ch_width bw);
 
 #ifdef CONFIG_REG_6G_PWRMODE
 /**

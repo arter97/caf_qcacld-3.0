@@ -1020,21 +1020,6 @@ QDF_STATUS reg_get_channel_list_with_power(
 				enum supported_6g_pwr_types in_6g_pwr_type);
 #endif
 
-/**
- * reg_get_5g_bonded_channel_state_for_freq() - Get channel state for
- * 5G bonded channel using the channel frequency
- * @pdev: Pointer to pdev
- * @freq: channel center frequency.
- * @ch_params: channel parameters
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
- *
- * Return: channel state
- */
-enum channel_state
-reg_get_5g_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
-					 qdf_freq_t freq,
-					 struct ch_params *ch_params);
-
 #ifdef CONFIG_REG_6G_PWRMODE
 enum channel_state
 reg_get_5g_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
