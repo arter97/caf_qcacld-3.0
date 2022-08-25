@@ -455,6 +455,9 @@ int wma_cli_get_command(int vdev_id, int param_id, int vpdev)
 		case WMI_PDEV_PARAM_TXPOWER_LIMIT5G:
 			ret = wma->pdevconfig.txpow5g;
 			break;
+		case WMI_PDEV_PARAM_BURST_ENABLE:
+			ret = wma->pdevconfig.burst_enable;
+			break;
 		default:
 			WMA_LOGE("Invalid cli_get pdev command/Not yet implemented 0x%x",
 				 param_id);
@@ -1560,6 +1563,9 @@ static void wma_process_cli_set_cmd(tp_wma_handle wma,
 			break;
 		case WMI_PDEV_PARAM_RX_CHAIN_MASK:
 			wma->pdevconfig.rxchainmask = privcmd->param_value;
+			break;
+		case WMI_PDEV_PARAM_BURST_ENABLE:
+			wma->pdevconfig.burst_enable = privcmd->param_value;
 			break;
 		case WMI_PDEV_PARAM_TXPOWER_LIMIT2G:
 			wma->pdevconfig.txpow2g = privcmd->param_value;

@@ -6438,7 +6438,7 @@ QDF_STATUS hdd_init_ap_mode(struct hdd_adapter *adapter, bool reinit)
 
 	ret = wma_cli_set_command(adapter->session_id,
 				  WMI_PDEV_PARAM_BURST_ENABLE,
-				  HDD_ENABLE_SIFS_BURST_DEFAULT,
+				  hdd_ctx->config->enableSifsBurst,
 				  PDEV_CMD);
 
 	if (0 != ret)
