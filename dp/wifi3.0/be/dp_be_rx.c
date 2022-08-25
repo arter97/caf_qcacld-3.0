@@ -1218,6 +1218,14 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 	      qdf_nbuf_is_ipv6_igmp_pkt(nbuf)))
 		return false;
 
+	if (qdf_unlikely(vdev->multipass_en)) {
+		if (dp_rx_multipass_process(peer, nbuf, tid) == false) {
+			DP_PEER_PER_PKT_STATS_INC(peer,
+						  rx.multipass_rx_pkt_drop, 1);
+			return false;
+		}
+	}
+
 	if (!peer->bss_peer) {
 		if (dp_rx_intrabss_mcbc_fwd(soc, peer, NULL, nbuf, tid_stats))
 			dp_rx_err("forwarding failed");
