@@ -1403,6 +1403,7 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		mon_pdev->rx_mon_stats.status_buf_count++;
 	}
 
+	dp_mon_rx_stats_update_rssi_dbm_params(mon_pdev, ppdu_info);
 	if (work_done) {
 		mon_pdev->rx_mon_stats.mon_rx_bufs_replenished_dest +=
 				work_done;

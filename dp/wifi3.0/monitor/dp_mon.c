@@ -5941,11 +5941,13 @@ dp_mon_pdev_params_rssi_dbm_conv(struct cdp_soc_t *cdp_soc,
 	}
 
 	mon_pdev = pdev->monitor_pdev;
+	mon_pdev->rssi_dbm_conv_support =
+				soc->features.rssi_dbm_conv_support;
 
 	if (dp_rssi_params->rssi_temp_off_present) {
 		temp_off_param = dp_rssi_params->temp_off_param;
-		mon_pdev->ppdu_info.rx_status.rssi_temp_offset =
-					temp_off_param.rssi_temp_offset;
+		mon_pdev->rssi_offsets.rssi_temp_offset =
+				temp_off_param.rssi_temp_offset;
 	}
 	if (dp_rssi_params->rssi_dbm_info_present) {
 		conv_params = dp_rssi_params->rssi_dbm_param;
@@ -5958,16 +5960,15 @@ dp_mon_pdev_params_rssi_dbm_conv(struct cdp_soc_t *cdp_soc,
 				continue;
 			}
 		}
-		mon_pdev->ppdu_info.rx_status.xlna_bypass_offset =
+		mon_pdev->rssi_offsets.xlna_bypass_offset =
 					conv_params.xlna_bypass_offset;
-		mon_pdev->ppdu_info.rx_status.xlna_bypass_threshold =
+		mon_pdev->rssi_offsets.xlna_bypass_threshold =
 					conv_params.xlna_bypass_threshold;
-		mon_pdev->ppdu_info.rx_status.xbar_config =
-					conv_params.xbar_config;
-
-		mon_pdev->ppdu_info.rx_status.min_nf_dbm = min_nf;
-		mon_pdev->ppdu_info.rx_status.rssi_dbm_conv_support =
-					soc->features.rssi_dbm_conv_support;
+		mon_pdev->rssi_offsets.xbar_config = conv_params.xbar_config;
+		mon_pdev->rssi_offsets.min_nf_dbm = min_nf;
+		mon_pdev->rssi_offsets.rssi_offset =
+					mon_pdev->rssi_offsets.min_nf_dbm +
+				     mon_pdev->rssi_offsets.rssi_temp_offset;
 	}
 	return QDF_STATUS_SUCCESS;
 }
