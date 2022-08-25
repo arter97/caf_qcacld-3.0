@@ -749,8 +749,8 @@ static QDF_STATUS send_setup_install_key_cmd_non_tlv(wmi_unified_t wmi_handle,
 	if ((wmi_cipher_type == WMI_CIPHER_TKIP) ||
 			(wmi_cipher_type == WMI_CIPHER_AES_OCB)
 		|| (wmi_cipher_type == WMI_CIPHER_AES_CCM)) {
-		qdf_mem_copy(&cmd->key_rsc_counter, &param->key_rsc_counter[0],
-			sizeof(param->key_rsc_counter[0]));
+		qdf_mem_copy(&cmd->key_rsc_counter, &param->key_rsc_counter,
+			sizeof(param->key_rsc_counter));
 		qdf_mem_copy(&cmd->key_tsc_counter, &param->key_tsc_counter,
 				sizeof(param->key_tsc_counter));
 	}
