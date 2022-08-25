@@ -750,6 +750,7 @@ enum hal_tx_tlv_status {
 	HAL_MON_MACTX_USER_DESC_COMMON,
 	HAL_MON_MACTX_PHY_DESC,
 
+	HAL_MON_TX_FW2SW,
 	HAL_MON_TX_STATUS_PPDU_NOT_DONE,
 };
 
@@ -839,6 +840,12 @@ struct hal_tx_status_info {
 	uint8_t transmission_type;
 	uint8_t medium_prot_type;
 	uint8_t generated_response;
+
+	uint16_t band_center_freq1;
+	uint16_t band_center_freq2;
+	uint16_t freq;
+	uint16_t phy_mode;
+	uint32_t schedule_id;
 
 	uint32_t no_bitmap_avail	:1,
 		explicit_ack		:1,

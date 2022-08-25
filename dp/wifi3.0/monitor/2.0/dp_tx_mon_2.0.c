@@ -1039,6 +1039,37 @@ dp_populate_tsft_from_phy_timestamp(struct dp_pdev *pdev,
 }
 
 /**
+ * dp_tx_mon_update_channel_freq() - API to update channel frequency and number
+ * @pdev: pdev Handle
+ * @soc: soc Handle
+ * @freq: Frequency
+ *
+ * Return: void
+ */
+static inline void
+dp_tx_mon_update_channel_freq(struct dp_pdev *pdev, struct dp_soc *soc,
+			      uint16_t freq)
+{
+	if (soc && soc->cdp_soc.ol_ops->freq_to_channel) {
+		uint8_t c_num;
+
+		c_num = soc->cdp_soc.ol_ops->freq_to_channel(soc->ctrl_psoc,
+							     pdev->pdev_id,
+							     freq);
+		pdev->operating_channel.num = c_num;
+	}
+
+	if (soc && soc->cdp_soc.ol_ops->freq_to_band) {
+		uint8_t band;
+
+		band = soc->cdp_soc.ol_ops->freq_to_band(soc->ctrl_psoc,
+							 pdev->pdev_id,
+							 freq);
+		pdev->operating_channel.band = band;
+	}
+}
+
+/**
  * dp_tx_mon_update_radiotap() - API to update radiotap information
  * @pdev: pdev Handle
  * @ppdu_info: pointer to dp_tx_ppdu_info
@@ -1054,13 +1085,23 @@ dp_tx_mon_update_radiotap(struct dp_pdev *pdev,
 
 	num_users = TXMON_PPDU_HAL(ppdu_info, num_users);
 
-	if (qdf_unlikely(TXMON_PPDU_COM(ppdu_info, chan_num) == 0))
-		TXMON_PPDU_COM(ppdu_info, chan_num) =
-				pdev->operating_channel.num;
-
-	if (qdf_unlikely(TXMON_PPDU_COM(ppdu_info, chan_freq) == 0))
+	if (qdf_unlikely(TXMON_PPDU_COM(ppdu_info, chan_freq) == 0 &&
+			 TXMON_PPDU_COM(ppdu_info, chan_num) == 0)) {
 		TXMON_PPDU_COM(ppdu_info, chan_freq) =
 				pdev->operating_channel.freq;
+		TXMON_PPDU_COM(ppdu_info, chan_num) =
+				pdev->operating_channel.num;
+	} else if (TXMON_PPDU_COM(ppdu_info, chan_freq) != 0 &&
+		   TXMON_PPDU_COM(ppdu_info, chan_num) == 0) {
+		uint16_t freq = TXMON_PPDU_COM(ppdu_info, chan_freq);
+
+		if (qdf_unlikely(pdev->operating_channel.freq != freq)) {
+			dp_tx_mon_update_channel_freq(pdev, pdev->soc, freq);
+			pdev->operating_channel.freq = freq;
+		}
+		TXMON_PPDU_COM(ppdu_info,
+			       chan_num) = pdev->operating_channel.num;
+	}
 
 	if (QDF_STATUS_SUCCESS !=
 	    dp_populate_tsft_from_phy_timestamp(pdev, ppdu_info))

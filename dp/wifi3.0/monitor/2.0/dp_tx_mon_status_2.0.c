@@ -1389,6 +1389,19 @@ dp_tx_mon_update_ppdu_info_status(struct dp_pdev *pdev,
 		/* No action for Queue Extension TLV */
 		break;
 	}
+	case HAL_MON_TX_FW2SW:
+	{
+		/* update the frequency */
+		tx_status_info = &tx_mon_be->data_status_info;
+
+		TXMON_PPDU_COM(tx_data_ppdu_info,
+			       chan_freq) = TXMON_STATUS_INFO(tx_status_info,
+							      freq);
+		TXMON_PPDU_COM(tx_prot_ppdu_info,
+			       chan_freq) = TXMON_STATUS_INFO(tx_status_info,
+							      freq);
+		break;
+	}
 	default:
 	{
 		/* return or break in default case */
