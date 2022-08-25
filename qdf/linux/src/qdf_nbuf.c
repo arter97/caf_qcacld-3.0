@@ -1714,6 +1714,56 @@ bool __qdf_nbuf_is_ipv4_wapi_pkt(struct sk_buff *skb)
 qdf_export_symbol(__qdf_nbuf_is_ipv4_wapi_pkt);
 
 /**
+ * qdf_nbuf_is_ipv6_vlan_pkt() - check wheather packet is vlan IPV6
+ * @data: Pointer to network data buffer
+ *
+ * This api is for vlan header included ipv6 packet.
+ *
+ * Return: true if packet is vlan header included IPV6
+ *	   false otherwise.
+ */
+static bool qdf_nbuf_is_ipv6_vlan_pkt(uint8_t *data)
+{
+	uint16_t ether_type;
+
+	ether_type = *(uint16_t *)(data + QDF_NBUF_TRAC_ETH_TYPE_OFFSET);
+
+	if (unlikely(ether_type == QDF_SWAP_U16(QDF_ETH_TYPE_8021Q))) {
+		ether_type = *(uint16_t *)(data +
+					   QDF_NBUF_TRAC_VLAN_ETH_TYPE_OFFSET);
+
+		if (ether_type == QDF_SWAP_U16(QDF_NBUF_TRAC_IPV6_ETH_TYPE))
+			return true;
+	}
+	return false;
+}
+
+/**
+ * qdf_nbuf_is_ipv4_vlan_pkt() - check wheather packet is vlan IPV4
+ * @data: Pointer to network data buffer
+ *
+ * This api is for vlan header included ipv4 packet.
+ *
+ * Return: true if packet is vlan header included IPV4
+ *	   false otherwise.
+ */
+static bool qdf_nbuf_is_ipv4_vlan_pkt(uint8_t *data)
+{
+	uint16_t ether_type;
+
+	ether_type = *(uint16_t *)(data + QDF_NBUF_TRAC_ETH_TYPE_OFFSET);
+
+	if (unlikely(ether_type == QDF_SWAP_U16(QDF_ETH_TYPE_8021Q))) {
+		ether_type = *(uint16_t *)(data +
+					   QDF_NBUF_TRAC_VLAN_ETH_TYPE_OFFSET);
+
+		if (ether_type == QDF_SWAP_U16(QDF_NBUF_TRAC_IPV4_ETH_TYPE))
+			return true;
+	}
+	return false;
+}
+
+/**
  * __qdf_nbuf_data_is_ipv4_igmp_pkt() - check if skb data is a igmp packet
  * @data: Pointer to network data buffer
  *
@@ -1724,15 +1774,26 @@ qdf_export_symbol(__qdf_nbuf_is_ipv4_wapi_pkt);
  */
 bool __qdf_nbuf_data_is_ipv4_igmp_pkt(uint8_t *data)
 {
-	if (__qdf_nbuf_data_is_ipv4_pkt(data)) {
-		uint8_t pkt_type;
+	uint8_t pkt_type;
 
+	if (__qdf_nbuf_data_is_ipv4_pkt(data)) {
 		pkt_type = (uint8_t)(*(uint8_t *)(data +
 				QDF_NBUF_TRAC_IPV4_PROTO_TYPE_OFFSET));
-
-		if (pkt_type == QDF_NBUF_TRAC_IGMP_TYPE)
-			return true;
+		goto is_igmp;
 	}
+
+	if (qdf_nbuf_is_ipv4_vlan_pkt(data)) {
+		pkt_type = (uint8_t)(*(uint8_t *)(
+				data +
+				QDF_NBUF_TRAC_VLAN_IPV4_PROTO_TYPE_OFFSET));
+		goto is_igmp;
+	}
+
+	return false;
+is_igmp:
+	if (pkt_type == QDF_NBUF_TRAC_IGMP_TYPE)
+		return true;
+
 	return false;
 }
 
@@ -1749,21 +1810,38 @@ qdf_export_symbol(__qdf_nbuf_data_is_ipv4_igmp_pkt);
  */
 bool __qdf_nbuf_data_is_ipv6_igmp_pkt(uint8_t *data)
 {
-	if (__qdf_nbuf_data_is_ipv6_pkt(data)) {
-		uint8_t pkt_type;
-		uint8_t next_hdr;
+	uint8_t pkt_type;
+	uint8_t next_hdr;
 
+	if (__qdf_nbuf_data_is_ipv6_pkt(data)) {
 		pkt_type = (uint8_t)(*(uint8_t *)(data +
 				QDF_NBUF_TRAC_IPV6_PROTO_TYPE_OFFSET));
-		next_hdr = (uint8_t)(*(uint8_t *)(data +
+		next_hdr = (uint8_t)(*(uint8_t *)(
+				data +
+				QDF_NBUF_TRAC_IPV6_OFFSET +
 				QDF_NBUF_TRAC_IPV6_HEADER_SIZE));
-
-		if (pkt_type == QDF_NBUF_TRAC_ICMPV6_TYPE)
-			return true;
-		if ((pkt_type == QDF_NBUF_TRAC_HOPOPTS_TYPE) &&
-		    (next_hdr == QDF_NBUF_TRAC_HOPOPTS_TYPE))
-			return true;
+		goto is_mld;
 	}
+
+	if (qdf_nbuf_is_ipv6_vlan_pkt(data)) {
+		pkt_type = (uint8_t)(*(uint8_t *)(
+				data +
+				QDF_NBUF_TRAC_VLAN_IPV6_PROTO_TYPE_OFFSET));
+		next_hdr = (uint8_t)(*(uint8_t *)(
+				data +
+				QDF_NBUF_TRAC_VLAN_IPV6_OFFSET +
+				QDF_NBUF_TRAC_IPV6_HEADER_SIZE));
+		goto is_mld;
+	}
+
+	return false;
+is_mld:
+	if (pkt_type == QDF_NBUF_TRAC_ICMPV6_TYPE)
+		return true;
+	if ((pkt_type == QDF_NBUF_TRAC_HOPOPTS_TYPE) &&
+	    (next_hdr == QDF_NBUF_TRAC_ICMPV6_TYPE))
+		return true;
+
 	return false;
 }
 
