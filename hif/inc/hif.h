@@ -443,6 +443,38 @@ struct hif_opaque_softc {
 };
 
 /**
+ * struct hif_ce_ring_info - CE ring information
+ * @ring_id: ring id
+ * @ring_dir: ring direction
+ * @num_entries: number of entries in ring
+ * @entry_size: ring entry size
+ * @ring_base_paddr: srng base physical address
+ * @hp_paddr: head pointer physical address
+ * @tp_paddr: tail pointer physical address
+ */
+struct hif_ce_ring_info {
+	uint8_t ring_id;
+	uint8_t ring_dir;
+	uint32_t num_entries;
+	uint32_t entry_size;
+	uint64_t ring_base_paddr;
+	uint64_t hp_paddr;
+	uint64_t tp_paddr;
+};
+
+/**
+ * struct hif_direct_link_ce_info - Direct Link CE information
+ * @ce_id: CE ide
+ * @pipe_dir: Pipe direction
+ * @ring_info: ring information
+ */
+struct hif_direct_link_ce_info {
+	uint8_t ce_id;
+	uint8_t pipe_dir;
+	struct hif_ce_ring_info ring_info;
+};
+
+/**
  * enum hif_event_type - Type of DP events to be recorded
  * @HIF_EVENT_IRQ_TRIGGER: IRQ trigger event
  * @HIF_EVENT_TIMER_ENTRY: Monitor Timer entry event
@@ -2450,10 +2482,48 @@ QDF_STATUS hif_unregister_umac_reset_handler(struct hif_opaque_softc *hif_scn)
 QDF_STATUS
 hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
 			   uint64_t addr, uint32_t data);
+
+/**
+ * hif_get_direct_link_ce_dest_srng_buffers() - Get Direct Link ce dest srng
+ *  buffer information
+ * @hif_ctx: hif opaque handle
+ * @dma_addr: pointer to array of dma addresses
+ *
+ * Return: Number of buffers attached to the dest srng.
+ */
+uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn,
+						  uint64_t **dma_addr);
+
+/**
+ * hif_get_direct_link_ce_srng_info() - Get Direct Link CE srng information
+ * @hif_ctx: hif opaque handle
+ * @info: Direct Link CEs information
+ * @max_ce_info_len: max array size of ce info
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+hif_get_direct_link_ce_srng_info(struct hif_opaque_softc *scn,
+				 struct hif_direct_link_ce_info *info,
+				 uint8_t max_ce_info_len);
 #else
 static inline QDF_STATUS
 hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
 			   uint64_t addr, uint32_t data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn)
+{
+	return 0;
+}
+
+static inline QDF_STATUS
+hif_get_direct_link_ce_srng_info(struct hif_opaque_softc *scn,
+				 struct hif_direct_link_ce_info *info,
+				 uint8_t max_ce_info_len)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -1431,14 +1431,6 @@ static inline void hal_srng_hw_init(struct hal_soc *hal,
 		hal_srng_dst_hw_init(hal, srng, idle_check);
 }
 
-#if defined(CONFIG_SHADOW_V2) || defined(CONFIG_SHADOW_V3)
-#define ignore_shadow false
-#define CHECK_SHADOW_REGISTERS true
-#else
-#define ignore_shadow true
-#define CHECK_SHADOW_REGISTERS false
-#endif
-
 #ifdef WLAN_FEATURE_NEAR_FULL_IRQ
 /**
  * hal_srng_is_near_full_irq_supported() - Check if near full irq is

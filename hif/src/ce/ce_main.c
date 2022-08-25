@@ -5322,5 +5322,36 @@ hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
 
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn,
+						  uint64_t **dma_addr)
+{
+	struct hif_softc *hif_ctx = HIF_GET_SOFTC(scn);
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct ce_ops *ce_services = hif_state->ce_services;
+
+	if (ce_services->ce_get_direct_link_dest_buffers)
+		return ce_services->ce_get_direct_link_dest_buffers(hif_ctx,
+								    dma_addr);
+
+	return 0;
+}
+
+QDF_STATUS
+hif_get_direct_link_ce_srng_info(struct hif_opaque_softc *scn,
+				 struct hif_direct_link_ce_info *info,
+				 uint8_t max_ce_info_len)
+{
+	struct hif_softc *hif_ctx = HIF_GET_SOFTC(scn);
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct ce_ops *ce_services = hif_state->ce_services;
+
+	if (ce_services->ce_get_direct_link_ring_info)
+		return ce_services->ce_get_direct_link_ring_info(hif_ctx,
+							       info,
+							       max_ce_info_len);
+
+	return QDF_STATUS_E_NOSUPPORT;
+}
 #endif
 #endif

@@ -1153,6 +1153,136 @@ ce_set_srng_msi_irq_config_by_ceid(struct hif_softc *scn, uint8_t ce_id,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+static
+uint16_t ce_get_direct_link_dest_srng_buffers(struct hif_softc *scn,
+					      uint64_t **dma_addr)
+{
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct CE_state *ce_state;
+	struct service_to_pipe *tgt_svc_cfg;
+	qdf_nbuf_t nbuf;
+	uint64_t *nbuf_dmaaddr = NULL;
+	uint32_t i;
+	uint32_t j = 0;
+
+	tgt_svc_cfg = hif_state->tgt_svc_map;
+
+	for (i = 0; i < hif_state->sz_tgt_svc_map; i++) {
+		if (tgt_svc_cfg[i].service_id != LPASS_DATA_MSG_SVC ||
+		    tgt_svc_cfg[i].pipedir != PIPEDIR_IN)
+			continue;
+
+		ce_state = scn->ce_id_to_state[tgt_svc_cfg[i].pipenum];
+		if (!ce_state || !ce_state->dest_ring) {
+			hif_err("Direct Link CE pipe %d not initialized",
+				tgt_svc_cfg[i].pipenum);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		nbuf_dmaaddr = qdf_mem_malloc(sizeof(*nbuf_dmaaddr) *
+					      ce_state->dest_ring->nentries);
+		if (!nbuf_dmaaddr)
+			return 0;
+
+		for (j = 0; j < ce_state->dest_ring->nentries; j++) {
+			nbuf = ce_state->dest_ring->per_transfer_context[j];
+			if (!nbuf)
+				break;
+
+			nbuf_dmaaddr[j] = QDF_NBUF_CB_PADDR(nbuf);
+		}
+
+		break;
+	}
+
+	*dma_addr = nbuf_dmaaddr;
+
+	return j;
+}
+
+/**
+ * ce_save_srng_info() - Get and save srng information
+ * @hif_ctx: hif context
+ * @srng_info: Direct Link CE srng information
+ * @srng_ctx: Direct Link CE srng context
+ *
+ * Return: QDF status
+ */
+static void
+ce_save_srng_info(struct hif_softc *hif_ctx, struct hif_ce_ring_info *srng_info,
+		  void *srng_ctx)
+{
+	struct hal_srng_params params;
+
+	hal_get_srng_params(hif_ctx->hal_soc, srng_ctx, &params);
+
+	srng_info->ring_id = params.ring_id;
+	srng_info->ring_dir = params.ring_dir;
+	srng_info->num_entries = params.num_entries;
+	srng_info->entry_size = params.entry_size;
+	srng_info->ring_base_paddr = params.ring_base_paddr;
+	srng_info->hp_paddr =
+		      hal_srng_get_hp_addr(hif_ctx->hal_soc, srng_ctx);
+	srng_info->tp_paddr =
+		      hal_srng_get_tp_addr(hif_ctx->hal_soc, srng_ctx);
+}
+
+static
+QDF_STATUS ce_get_direct_link_srng_info(struct hif_softc *scn,
+					struct hif_direct_link_ce_info *info,
+					uint8_t max_ce_info_len)
+{
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+	struct CE_state *ce_state;
+	struct service_to_pipe *tgt_svc_cfg;
+	uint8_t ce_info_idx = 0;
+	uint32_t i;
+
+	tgt_svc_cfg = hif_state->tgt_svc_map;
+
+	for (i = 0; i < hif_state->sz_tgt_svc_map; i++) {
+		if (tgt_svc_cfg[i].service_id != LPASS_DATA_MSG_SVC)
+			continue;
+
+		ce_state = scn->ce_id_to_state[tgt_svc_cfg[i].pipenum];
+		if (!ce_state) {
+			hif_err("Direct Link CE pipe %d not initialized",
+				tgt_svc_cfg[i].pipenum);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		if (ce_info_idx > max_ce_info_len)
+			return QDF_STATUS_E_FAILURE;
+
+		info[ce_info_idx].ce_id = ce_state->id;
+		info[ce_info_idx].pipe_dir = tgt_svc_cfg[i].pipedir;
+
+		if (ce_state->src_ring)
+			ce_save_srng_info(scn, &info[ce_info_idx].ring_info,
+					  ce_state->src_ring->srng_ctx);
+		else
+			ce_save_srng_info(scn, &info[ce_info_idx].ring_info,
+					  ce_state->dest_ring->srng_ctx);
+
+		ce_info_idx++;
+
+		if (!ce_state->status_ring)
+			continue;
+
+		if (ce_info_idx > max_ce_info_len)
+			return QDF_STATUS_E_FAILURE;
+
+		info[ce_info_idx].ce_id = ce_state->id;
+		info[ce_info_idx].pipe_dir = tgt_svc_cfg[i].pipedir;
+
+		ce_save_srng_info(scn, &info[ce_info_idx].ring_info,
+				  ce_state->status_ring->srng_ctx);
+		ce_info_idx++;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 static struct ce_ops ce_service_srng = {
@@ -1182,6 +1312,8 @@ static struct ce_ops ce_service_srng = {
 #endif
 #ifdef FEATURE_DIRECT_LINK
 	.ce_set_irq_config_by_ceid = ce_set_srng_msi_irq_config_by_ceid,
+	.ce_get_direct_link_dest_buffers = ce_get_direct_link_dest_srng_buffers,
+	.ce_get_direct_link_ring_info = ce_get_direct_link_srng_info,
 #endif
 };
 

@@ -35,6 +35,14 @@
 /* Ring index for WBM2SW2 release ring */
 #define HAL_IPA_TX_COMP_RING_IDX 2
 
+#if defined(CONFIG_SHADOW_V2) || defined(CONFIG_SHADOW_V3)
+#define ignore_shadow false
+#define CHECK_SHADOW_REGISTERS true
+#else
+#define ignore_shadow true
+#define CHECK_SHADOW_REGISTERS false
+#endif
+
 /* calculate the register address offset from bar0 of shadow register x */
 #if defined(QCA_WIFI_QCA6390) || defined(QCA_WIFI_QCA6490) || \
     defined(QCA_WIFI_KIWI)
@@ -2606,9 +2614,17 @@ hal_srng_get_hp_addr(void *hal_soc,
 	struct hal_soc *hal = (struct hal_soc *)hal_soc;
 
 	if (srng->ring_dir == HAL_SRNG_SRC_RING) {
-		return hal->shadow_wrptr_mem_paddr +
-		  ((unsigned long)(srng->u.src_ring.hp_addr) -
-		  (unsigned long)(hal->shadow_wrptr_mem_vaddr));
+		if (srng->flags & HAL_SRNG_LMAC_RING)
+			return hal->shadow_wrptr_mem_paddr +
+				 ((unsigned long)(srng->u.src_ring.hp_addr) -
+				  (unsigned long)(hal->shadow_wrptr_mem_vaddr));
+		else if (ignore_shadow)
+			return (qdf_dma_addr_t)srng->u.src_ring.hp_addr;
+		else
+			return ((struct hif_softc *)hal->hif_handle)->mem_pa +
+				((unsigned long)srng->u.src_ring.hp_addr -
+				 (unsigned long)hal->dev_base_addr);
+
 	} else {
 		return hal->shadow_rdptr_mem_paddr +
 		  ((unsigned long)(srng->u.dst_ring.hp_addr) -
@@ -2634,9 +2650,16 @@ hal_srng_get_tp_addr(void *hal_soc, hal_ring_handle_t hal_ring_hdl)
 			((unsigned long)(srng->u.src_ring.tp_addr) -
 			(unsigned long)(hal->shadow_rdptr_mem_vaddr));
 	} else {
-		return hal->shadow_wrptr_mem_paddr +
-			((unsigned long)(srng->u.dst_ring.tp_addr) -
-			(unsigned long)(hal->shadow_wrptr_mem_vaddr));
+		if (srng->flags & HAL_SRNG_LMAC_RING)
+			return hal->shadow_wrptr_mem_paddr +
+				((unsigned long)(srng->u.dst_ring.tp_addr) -
+				 (unsigned long)(hal->shadow_wrptr_mem_vaddr));
+		else if (ignore_shadow)
+			return (qdf_dma_addr_t)srng->u.dst_ring.tp_addr;
+		else
+			return ((struct hif_softc *)hal->hif_handle)->mem_pa +
+				((unsigned long)srng->u.dst_ring.tp_addr -
+				 (unsigned long)hal->dev_base_addr);
 	}
 }
 
