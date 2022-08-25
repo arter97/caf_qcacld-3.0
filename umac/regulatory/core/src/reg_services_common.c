@@ -4866,89 +4866,6 @@ reg_get_endchan_cen_from_bandstart(qdf_freq_t band_start,
 
 	return left_edge_freq + bw - BW_10_MHZ;
 }
-
-/**
- * reg_get_320_bonded_channel_state() - Given a bonded channel
- * pointer and freq, determine if the subchannels of the bonded pair
- * are valid and supported by the current regulatory.
- *
- * @pdev: Pointer to struct wlan_objmgr_pdev.
- * @freq: Frequency in MHZ.
- * @bonded_chan_ptr: Pointer to const struct bonded_channel_freq.
- * @bw: channel bandwidth
- * @out_punc_bitmap: Output puncturing bitmap
- * @treat_nol_chan_as_disabled: Bool to treat nol as disabled/enabled
- *
- * Return - The channel state of the bonded pair.
- */
-static enum channel_state
-reg_get_320_bonded_channel_state(struct wlan_objmgr_pdev *pdev,
-				 qdf_freq_t freq,
-				 const struct bonded_channel_freq
-				 *bonded_chan_ptr,
-				 enum phy_ch_width bw,
-				 uint16_t *out_punc_bitmap,
-				 bool treat_nol_chan_as_disabled)
-{
-	enum channel_state chan_state = CHANNEL_STATE_INVALID;
-	enum channel_state temp_chan_state, prim_chan_state;
-	uint16_t startchan_cfreq, endchan_cfreq;
-	uint16_t max_cont_bw, i;
-
-	*out_punc_bitmap = ALL_SCHANS_PUNC;
-
-	if (!bonded_chan_ptr)
-		return chan_state;
-
-	startchan_cfreq =  bonded_chan_ptr->start_freq;
-	endchan_cfreq =
-		reg_get_endchan_cen_from_bandstart(startchan_cfreq,
-						   BW_320_MHZ);
-	max_cont_bw = 0;
-	i = 0;
-
-	while (startchan_cfreq <= endchan_cfreq) {
-		temp_chan_state =
-		    reg_get_20mhz_channel_state_based_on_nol(pdev,
-							     startchan_cfreq,
-							     treat_nol_chan_as_disabled,
-							     REG_CURRENT_PWR_MODE);
-
-		if (reg_is_state_allowed(temp_chan_state)) {
-			max_cont_bw += SUB_CHAN_BW;
-			*out_punc_bitmap &= ~BIT(i);
-		}
-
-		if (temp_chan_state < chan_state)
-			chan_state = temp_chan_state;
-
-		startchan_cfreq = startchan_cfreq + SUB_CHAN_BW;
-		i++;
-	}
-
-	prim_chan_state =
-		reg_get_20mhz_channel_state_based_on_nol(pdev,
-							 freq,
-							 treat_nol_chan_as_disabled,
-							 REG_CURRENT_PWR_MODE);
-
-	/* After iterating through all the subchannels, if the final channel
-	 * state is invalid/disable, it means all our subchannels are not
-	 * valid and we could not find a 320 MHZ channel.
-	 * If we have found a channel where the max width is:
-	 * 1. Less than 160: there is no puncturing needed. Hence return
-	 * the chan state as invalid. Or if the primary freq given is not
-	 * supported by regulatory, the channel cannot be enabled as a
-	 * punctured channel. So return channel state as invalid.
-	 * 2. If greater than 160: Mark the invalid channels as punctured.
-	 * and return channel state as ENABLE.
-	 */
-	if (REG_IS_TOT_CHAN_BW_BELOW_160(chan_state, max_cont_bw) ||
-		!reg_is_state_allowed(prim_chan_state))
-		return CHANNEL_STATE_INVALID;
-
-	return chan_state;
-}
 #endif
 
 #ifdef WLAN_FEATURE_11BE
@@ -5203,10 +5120,12 @@ reg_fill_channel_list_for_320(struct wlan_objmgr_pdev *pdev,
 		 * pair of channels.
 		 */
 		chan_state =
-		    reg_get_320_bonded_channel_state(pdev, freq,
+		    reg_get_320_bonded_channel_state_for_pwrmode(
+						     pdev, freq,
 						     bonded_ch_ptr[i],
 						     *in_ch_width,
 						     &out_punc_bitmap,
+						     REG_CURRENT_PWR_MODE,
 						     treat_nol_chan_as_disabled);
 
 		if (reg_is_state_allowed(chan_state)) {
