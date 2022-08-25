@@ -1334,13 +1334,6 @@ void wlan_reg_set_create_punc_bitmap(struct ch_params *ch_params,
 }
 #endif /* WLAN_FEATURE_11BE */
 
-enum channel_state
-wlan_reg_get_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
-				    qdf_freq_t freq)
-{
-	return reg_get_channel_state_for_freq(pdev, freq);
-}
-
 #ifdef CONFIG_REG_6G_PWRMODE
 enum channel_state
 wlan_reg_get_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
