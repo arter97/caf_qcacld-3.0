@@ -5191,6 +5191,9 @@ void dp_print_peer_txrx_stats_be(struct cdp_peer_stats *peer_stats,
 void dp_print_peer_txrx_stats_li(struct cdp_peer_stats *peer_stats,
 				 enum peer_stats_type stats_type);
 
+void dp_print_peer_txrx_stats_rh(struct cdp_peer_stats *peer_stats,
+				 enum peer_stats_type stats_type);
+
 /**
  * dp_should_timer_irq_yield() - Decide if the bottom half should yield
  * @soc: DP soc handle

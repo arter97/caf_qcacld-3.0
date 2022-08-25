@@ -282,6 +282,7 @@ struct wlan_srng_cfg {
  * @is_tso_desc_attach_defer:
  * @delayed_replenish_entries:
  * @reo_rings_mapping:
+ * @rx_rings_mapping: DP RX rings mapping mask
  * @pext_stats_enabled: Flag to enable and disabled peer extended stats
  * @is_rx_buff_pool_enabled: flag to enable/disable emergency RX buffer
  *                           pool support
@@ -465,6 +466,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	bool is_tso_desc_attach_defer;
 	uint32_t delayed_replenish_entries;
 	uint32_t reo_rings_mapping;
+	uint32_t rx_rings_mapping;
 	bool pext_stats_enabled;
 	bool is_rx_buff_pool_enabled;
 	bool is_rx_refill_buff_pool_enabled;
@@ -1928,6 +1930,15 @@ bool wlan_cfg_is_tso_desc_attach_defer(struct wlan_cfg_dp_soc_ctxt *cfg);
  * Return: reo ring bitmap.
  */
 uint32_t wlan_cfg_get_reo_rings_mapping(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_get_rx_rings_mapping() - Get RX ring bitmap
+ *
+ * @cfg: soc configuration context
+ *
+ * Return: rx ring bitmap.
+ */
+uint32_t wlan_cfg_get_rx_rings_mapping(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /**
  * wlan_cfg_set_peer_ext_stats() - set peer extended stats

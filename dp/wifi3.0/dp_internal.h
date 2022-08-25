@@ -2769,6 +2769,7 @@ QDF_STATUS dp_umac_reset_notify_asserted_soc(struct dp_soc *soc)
 }
 #endif
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 QDF_STATUS dp_reo_send_cmd(struct dp_soc *soc, enum hal_reo_cmd_type type,
 			   struct hal_reo_cmd_params *params,
 			   void (*callback_fn), void *data);
@@ -2790,6 +2791,7 @@ void dp_reo_cmdlist_destroy(struct dp_soc *soc);
  */
 uint32_t dp_reo_status_ring_handler(struct dp_intr *int_ctx,
 				    struct dp_soc *soc);
+#endif
 
 /**
  * dp_aggregate_vdev_stats() - Consolidate stats at VDEV level

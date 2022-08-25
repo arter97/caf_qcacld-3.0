@@ -26,9 +26,205 @@
 #include "dp_rh_rx.h"
 #include "dp_peer.h"
 #include <wlan_utility.h>
+#include <dp_rings.h>
+
+static QDF_STATUS
+dp_srng_init_rh(struct dp_soc *soc, struct dp_srng *srng, int ring_type,
+		int ring_num, int mac_id)
+{
+	hal_soc_handle_t hal_soc = soc->hal_soc;
+	struct hal_srng_params ring_params;
+
+	if (srng->hal_srng) {
+		dp_init_err("%pK: Ring type: %d, num:%d is already initialized",
+			    soc, ring_type, ring_num);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	/* memset the srng ring to zero */
+	qdf_mem_zero(srng->base_vaddr_unaligned, srng->alloc_size);
+
+	qdf_mem_zero(&ring_params, sizeof(struct hal_srng_params));
+	ring_params.ring_base_paddr = srng->base_paddr_aligned;
+	ring_params.ring_base_vaddr = srng->base_vaddr_aligned;
+
+	ring_params.num_entries = srng->num_entries;
+
+	dp_info("Ring type: %d, num:%d vaddr %pK paddr %pK entries %u",
+		ring_type, ring_num,
+		(void *)ring_params.ring_base_vaddr,
+		(void *)ring_params.ring_base_paddr,
+		ring_params.num_entries);
+
+	srng->hal_srng = hal_srng_setup(hal_soc, ring_type, ring_num,
+					mac_id, &ring_params, 0);
+
+	if (!srng->hal_srng) {
+		dp_srng_free(soc, srng);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+dp_peer_setup_rh(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+		 uint8_t *peer_mac,
+		 struct cdp_peer_setup_info *setup_info)
+{
+	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct dp_pdev *pdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct dp_vdev *vdev = NULL;
+	struct dp_peer *peer =
+			dp_peer_find_hash_find(soc, peer_mac, 0, vdev_id,
+					       DP_MOD_ID_CDP);
+	enum wlan_op_mode vdev_opmode;
+
+	if (!peer)
+		return QDF_STATUS_E_FAILURE;
+
+	vdev = peer->vdev;
+	if (!vdev) {
+		status = QDF_STATUS_E_FAILURE;
+		goto fail;
+	}
+
+	/* save vdev related member in case vdev freed */
+	vdev_opmode = vdev->opmode;
+	pdev = vdev->pdev;
+
+	dp_info("pdev: %d vdev :%d opmode:%u",
+		pdev->pdev_id, vdev->vdev_id, vdev->opmode);
+
+	/*
+	 * There are corner cases where the AD1 = AD2 = "VAPs address"
+	 * i.e both the devices have same MAC address. In these
+	 * cases we want such pkts to be processed in NULL Q handler
+	 * which is REO2TCL ring. for this reason we should
+	 * not setup reo_queues and default route for bss_peer.
+	 */
+	dp_monitor_peer_tx_init(pdev, peer);
+
+	if (!setup_info)
+		if (dp_peer_legacy_setup(soc, peer) !=
+				QDF_STATUS_SUCCESS) {
+			status = QDF_STATUS_E_RESOURCES;
+			goto fail;
+		}
+
+	if (peer->bss_peer && vdev->opmode == wlan_op_mode_ap) {
+		status = QDF_STATUS_E_FAILURE;
+		goto fail;
+	}
+
+	if (vdev_opmode != wlan_op_mode_monitor)
+		dp_peer_rx_init(pdev, peer);
+
+	dp_peer_ppdu_delayed_ba_init(peer);
+
+fail:
+	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+	return status;
+}
+
+#ifdef AST_OFFLOAD_ENABLE
+static void dp_peer_map_detach_rh(struct dp_soc *soc)
+{
+	dp_soc_wds_detach(soc);
+	dp_peer_ast_table_detach(soc);
+	dp_peer_ast_hash_detach(soc);
+	dp_peer_mec_hash_detach(soc);
+}
+
+static QDF_STATUS dp_peer_map_attach_rh(struct dp_soc *soc)
+{
+	QDF_STATUS status;
+
+	soc->max_peer_id = soc->max_peers;
+
+	status = dp_peer_ast_table_attach(soc);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		return status;
+
+	status = dp_peer_ast_hash_attach(soc);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		goto ast_table_detach;
+
+	status = dp_peer_mec_hash_attach(soc);
+	if (!QDF_IS_STATUS_SUCCESS(status))
+		goto hash_detach;
+
+	dp_soc_wds_attach(soc);
+
+	return QDF_STATUS_SUCCESS;
+
+hash_detach:
+	dp_peer_ast_hash_detach(soc);
+ast_table_detach:
+	dp_peer_ast_table_detach(soc);
+
+	return status;
+}
+#else
+static void dp_peer_map_detach_rh(struct dp_soc *soc)
+{
+}
+
+static QDF_STATUS dp_peer_map_attach_rh(struct dp_soc *soc)
+{
+	soc->max_peer_id = soc->max_peers;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+/**
+ * dp_soc_cfg_init_rh() - initialize target specific configuration
+ *		       during dp_soc_init
+ * @soc: dp soc handle
+ */
+static void dp_soc_cfg_init_rh(struct dp_soc *soc)
+{
+	uint32_t target_type;
+
+	target_type = hal_get_target_type(soc->hal_soc);
+	switch (target_type) {
+	case TARGET_TYPE_WCN6450:
+		wlan_cfg_set_raw_mode_war(soc->wlan_cfg_ctx, true);
+		soc->ast_override_support = 1;
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
+		break;
+	default:
+		qdf_print("%s: Unknown tgt type %d\n", __func__, target_type);
+		qdf_assert_always(0);
+		break;
+	}
+}
 
 static void dp_soc_cfg_attach_rh(struct dp_soc *soc)
 {
+	int target_type;
+
+	target_type = hal_get_target_type(soc->hal_soc);
+	switch (target_type) {
+	case TARGET_TYPE_WCN6450:
+		soc->wlan_cfg_ctx->rxdma1_enable = 0;
+		break;
+	default:
+		qdf_print("%s: Unknown tgt type %d\n", __func__, target_type);
+		qdf_assert_always(0);
+		break;
+	}
+
+	/*
+	 * keeping TCL and completion rings number, this data
+	 * is equivalent number of TX interface rings.
+	 */
+	soc->num_tx_comp_rings =
+		wlan_cfg_num_tx_comp_rings(soc->wlan_cfg_ctx);
+	soc->num_tcl_data_rings =
+		wlan_cfg_num_tcl_data_rings(soc->wlan_cfg_ctx);
 }
 
 qdf_size_t dp_get_context_size_rh(enum dp_context_type context_type)
@@ -70,20 +266,204 @@ static QDF_STATUS dp_soc_detach_rh(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS dp_soc_init_rh(struct dp_soc *soc)
+static QDF_STATUS dp_soc_deinit_rh(struct dp_soc *soc)
 {
-	/*Register RX offload flush handlers*/
-	hif_offld_flush_cb_register(soc->hif_handle, dp_rx_data_flush);
+	struct htt_soc *htt_soc = soc->htt_handle;
+	struct dp_mon_ops *mon_ops;
+
+	qdf_atomic_set(&soc->cmn_init_done, 0);
+
+	/*Degister RX offload flush handlers*/
+	hif_offld_flush_cb_deregister(soc->hif_handle);
+
+	mon_ops = dp_mon_ops_get(soc);
+	if (mon_ops && mon_ops->mon_soc_deinit)
+		mon_ops->mon_soc_deinit(soc);
+
+	/* free peer tables & AST tables allocated during peer_map_attach */
+	if (soc->peer_map_attach_success) {
+		dp_peer_find_detach(soc);
+		dp_peer_map_detach_rh(soc);
+		soc->peer_map_attach_success = FALSE;
+	}
+
+	qdf_flush_work(&soc->htt_stats.work);
+	qdf_disable_work(&soc->htt_stats.work);
+
+	qdf_spinlock_destroy(&soc->htt_stats.lock);
+
+	qdf_spinlock_destroy(&soc->ast_lock);
+
+	dp_peer_mec_spinlock_destroy(soc);
+
+	qdf_nbuf_queue_free(&soc->htt_stats.msg);
+
+	qdf_nbuf_queue_free(&soc->invalid_buf_queue);
+
+	qdf_spinlock_destroy(&soc->rx.defrag.defrag_lock);
+
+	qdf_spinlock_destroy(&soc->vdev_map_lock);
+
+	dp_soc_tx_desc_sw_pools_deinit(soc);
+
+	dp_soc_srng_deinit(soc);
+
+	dp_hw_link_desc_ring_deinit(soc);
+
+	dp_soc_print_inactive_objects(soc);
+	qdf_spinlock_destroy(&soc->inactive_peer_list_lock);
+	qdf_spinlock_destroy(&soc->inactive_vdev_list_lock);
+
+	htt_soc_htc_dealloc(soc->htt_handle);
+
+	htt_soc_detach(htt_soc);
+
+	wlan_minidump_remove(soc, sizeof(*soc), soc->ctrl_psoc,
+			     WLAN_MD_DP_SOC, "dp_soc");
 
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS dp_soc_deinit_rh(struct dp_soc *soc)
+static void *dp_soc_init_rh(struct dp_soc *soc, HTC_HANDLE htc_handle,
+			    struct hif_opaque_softc *hif_handle)
 {
-	/*Degister RX offload flush handlers*/
-	hif_offld_flush_cb_deregister(soc->hif_handle);
+	struct htt_soc *htt_soc = (struct htt_soc *)soc->htt_handle;
+	bool is_monitor_mode = false;
+	uint8_t i;
+	struct dp_mon_ops *mon_ops;
 
-	return QDF_STATUS_SUCCESS;
+	wlan_minidump_log(soc, sizeof(*soc), soc->ctrl_psoc,
+			  WLAN_MD_DP_SOC, "dp_soc");
+
+	soc->hif_handle = hif_handle;
+
+	soc->hal_soc = hif_get_hal_handle(soc->hif_handle);
+	if (!soc->hal_soc)
+		goto fail1;
+
+	htt_soc = htt_soc_attach(soc, htc_handle);
+	if (!htt_soc)
+		goto fail1;
+
+	soc->htt_handle = htt_soc;
+
+	if (htt_soc_htc_prealloc(htt_soc) != QDF_STATUS_SUCCESS)
+		goto fail2;
+
+	htt_set_htc_handle(htt_soc, htc_handle);
+
+	dp_soc_cfg_init_rh(soc);
+
+	dp_monitor_soc_cfg_init(soc);
+
+	/* Note: Any SRNG ring initialization should happen only after
+	 * Interrupt mode is set and followed by filling up the
+	 * interrupt mask. IT SHOULD ALWAYS BE IN THIS ORDER.
+	 */
+	dp_soc_set_interrupt_mode(soc);
+	if (soc->cdp_soc.ol_ops->get_con_mode &&
+	    soc->cdp_soc.ol_ops->get_con_mode() ==
+	    QDF_GLOBAL_MONITOR_MODE)
+		is_monitor_mode = true;
+
+	if (dp_soc_srng_init(soc)) {
+		dp_init_err("%pK: dp_soc_srng_init failed", soc);
+		goto fail3;
+	}
+
+	if (dp_htt_soc_initialize_rh(soc->htt_handle, soc->ctrl_psoc,
+				     htt_get_htc_handle(htt_soc),
+				     soc->hal_soc, soc->osdev) == NULL)
+		goto fail4;
+
+	/* Initialize descriptors in TCL Rings */
+	for (i = 0; i < soc->num_tcl_data_rings; i++) {
+		hal_tx_init_data_ring(soc->hal_soc,
+				      soc->tcl_data_ring[i].hal_srng);
+	}
+
+	if (dp_soc_tx_desc_sw_pools_init(soc)) {
+		dp_init_err("%pK: dp_tx_soc_attach failed", soc);
+		goto fail5;
+	}
+
+	wlan_cfg_set_rx_hash(soc->wlan_cfg_ctx,
+			     cfg_get(soc->ctrl_psoc, CFG_DP_RX_HASH));
+	soc->cce_disable = false;
+	soc->max_ast_ageout_count = MAX_AST_AGEOUT_COUNT;
+
+	soc->sta_mode_search_policy = DP_TX_ADDR_SEARCH_ADDR_POLICY;
+	qdf_mem_zero(&soc->vdev_id_map, sizeof(soc->vdev_id_map));
+	qdf_spinlock_create(&soc->vdev_map_lock);
+	qdf_atomic_init(&soc->num_tx_outstanding);
+	qdf_atomic_init(&soc->num_tx_exception);
+	soc->num_tx_allowed =
+		wlan_cfg_get_dp_soc_tx_device_limit(soc->wlan_cfg_ctx);
+
+	if (soc->cdp_soc.ol_ops->get_dp_cfg_param) {
+		int ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
+				CDP_CFG_MAX_PEER_ID);
+
+		if (ret != -EINVAL)
+			wlan_cfg_set_max_peer_id(soc->wlan_cfg_ctx, ret);
+
+		ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
+				CDP_CFG_CCE_DISABLE);
+		if (ret == 1)
+			soc->cce_disable = true;
+	}
+
+	/* setup the global rx defrag waitlist */
+	TAILQ_INIT(&soc->rx.defrag.waitlist);
+	soc->rx.defrag.timeout_ms =
+		wlan_cfg_get_rx_defrag_min_timeout(soc->wlan_cfg_ctx);
+	soc->rx.defrag.next_flush_ms = 0;
+	soc->rx.flags.defrag_timeout_check =
+		wlan_cfg_get_defrag_timeout_check(soc->wlan_cfg_ctx);
+	qdf_spinlock_create(&soc->rx.defrag.defrag_lock);
+
+	mon_ops = dp_mon_ops_get(soc);
+	if (mon_ops && mon_ops->mon_soc_init)
+		mon_ops->mon_soc_init(soc);
+
+	qdf_atomic_set(&soc->cmn_init_done, 1);
+
+	qdf_nbuf_queue_init(&soc->htt_stats.msg);
+
+	qdf_spinlock_create(&soc->ast_lock);
+	dp_peer_mec_spinlock_create(soc);
+
+	qdf_nbuf_queue_init(&soc->invalid_buf_queue);
+
+	TAILQ_INIT(&soc->inactive_peer_list);
+	qdf_spinlock_create(&soc->inactive_peer_list_lock);
+	TAILQ_INIT(&soc->inactive_vdev_list);
+	qdf_spinlock_create(&soc->inactive_vdev_list_lock);
+	qdf_spinlock_create(&soc->htt_stats.lock);
+	/* initialize work queue for stats processing */
+	qdf_create_work(0, &soc->htt_stats.work, htt_t2h_stats_handler, soc);
+
+	/*Register RX offload flush handlers*/
+	hif_offld_flush_cb_register(soc->hif_handle, dp_rx_data_flush);
+
+	dp_info("Mem stats: DMA = %u HEAP = %u SKB = %u",
+		qdf_dma_mem_stats_read(),
+		qdf_heap_mem_stats_read(),
+		qdf_skb_total_mem_stats_read());
+
+	soc->vdev_stats_id_map = 0;
+
+	return soc;
+fail5:
+	htt_soc_htc_dealloc(soc->htt_handle);
+fail4:
+	dp_soc_srng_deinit(soc);
+fail3:
+	htt_htc_pkt_pool_free(htt_soc);
+fail2:
+	htt_soc_detach(htt_soc);
+fail1:
+	return NULL;
 }
 
 /**
@@ -145,57 +525,6 @@ static QDF_STATUS dp_vdev_detach_rh(struct dp_soc *soc, struct dp_vdev *vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
-
-#ifdef AST_OFFLOAD_ENABLE
-static void dp_peer_map_detach_rh(struct dp_soc *soc)
-{
-	dp_soc_wds_detach(soc);
-	dp_peer_ast_table_detach(soc);
-	dp_peer_ast_hash_detach(soc);
-	dp_peer_mec_hash_detach(soc);
-}
-
-static QDF_STATUS dp_peer_map_attach_rh(struct dp_soc *soc)
-{
-	QDF_STATUS status;
-
-	soc->max_peer_id = soc->max_peers;
-
-	status = dp_peer_ast_table_attach(soc);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		return status;
-
-	status = dp_peer_ast_hash_attach(soc);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		goto ast_table_detach;
-
-	status = dp_peer_mec_hash_attach(soc);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		goto hash_detach;
-
-	dp_soc_wds_attach(soc);
-
-	return QDF_STATUS_SUCCESS;
-
-hash_detach:
-	dp_peer_ast_hash_detach(soc);
-ast_table_detach:
-	dp_peer_ast_table_detach(soc);
-
-	return status;
-}
-#else
-static void dp_peer_map_detach_rh(struct dp_soc *soc)
-{
-}
-
-static QDF_STATUS dp_peer_map_attach_rh(struct dp_soc *soc)
-{
-	soc->max_peer_id = soc->max_peers;
-
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 qdf_size_t dp_get_soc_context_size_rh(void)
 {
@@ -495,4 +824,6 @@ void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_find_peer_by_destmac = dp_find_peer_by_destmac_rh;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_rh;
 	arch_ops->reo_remap_config = dp_reo_remap_config_rh;
+	arch_ops->txrx_peer_setup = dp_peer_setup_rh;
+	arch_ops->txrx_srng_init = dp_srng_init_rh;
 }

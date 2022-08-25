@@ -604,6 +604,7 @@ qdf_nbuf_t dp_tx_non_std(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
  */
 int dp_tx_frame_is_drop(struct dp_vdev *vdev, uint8_t *srcmac, uint8_t *dstmac);
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 /**
  * dp_tx_comp_handler() - Tx completion handler
  * @int_ctx: pointer to DP interrupt context
@@ -621,6 +622,7 @@ int dp_tx_frame_is_drop(struct dp_vdev *vdev, uint8_t *srcmac, uint8_t *dstmac);
 uint32_t dp_tx_comp_handler(struct dp_intr *int_ctx, struct dp_soc *soc,
 			    hal_ring_handle_t hal_srng, uint8_t ring_id,
 			    uint32_t quota);
+#endif
 
 QDF_STATUS
 dp_tx_prepare_send_me(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
@@ -1076,6 +1078,7 @@ void dp_soc_tx_desc_sw_pools_free(struct dp_soc *soc);
  */
 void dp_soc_tx_desc_sw_pools_deinit(struct dp_soc *soc);
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 /**
  * dp_handle_wbm_internal_error() - handles wbm_internal_error case
  * @soc: core DP main context
@@ -1098,6 +1101,7 @@ void dp_soc_tx_desc_sw_pools_deinit(struct dp_soc *soc);
 void
 dp_handle_wbm_internal_error(struct dp_soc *soc, void *hal_desc,
 			     uint32_t buf_type);
+#endif
 #else /* QCA_HOST_MODE_WIFI_DISABLED */
 
 static inline

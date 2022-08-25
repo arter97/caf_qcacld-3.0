@@ -6848,6 +6848,7 @@ static QDF_STATUS dp_set_pdev_param(struct cdp_soc_t *cdp_soc, uint8_t pdev_id,
 	target_type = hal_get_target_type(soc->hal_soc);
 	switch (target_type) {
 	case TARGET_TYPE_QCA6750:
+	case TARGET_TYPE_WCN6450:
 		pdev->ch_band_lmac_id_mapping[REG_BAND_2G] = DP_MAC0_LMAC_ID;
 		pdev->ch_band_lmac_id_mapping[REG_BAND_5G] = DP_MAC0_LMAC_ID;
 		pdev->ch_band_lmac_id_mapping[REG_BAND_6G] = DP_MAC0_LMAC_ID;
@@ -10151,6 +10152,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_get_vdev_mac_addr = dp_get_vdev_mac_addr_wifi3,
 	.txrx_get_ctrl_pdev_from_vdev = dp_get_ctrl_pdev_from_vdev_wifi3,
 	.txrx_ath_getstats = dp_get_device_stats,
+#ifndef WLAN_SOFTUMAC_SUPPORT
 	.addba_requestprocess = dp_addba_requestprocess_wifi3,
 	.addba_responsesetup = dp_addba_responsesetup_wifi3,
 	.addba_resp_tx_completion = dp_addba_resp_tx_completion_wifi3,
@@ -10158,6 +10160,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.set_addba_response = dp_set_addba_response,
 	.flush_cache_rx_queue = NULL,
 	.tid_update_ba_win_size = dp_rx_tid_update_ba_win_size,
+#endif
 	/* TODO: get API's for dscp-tid need to be added*/
 	.set_vdev_dscp_tid_map = dp_set_vdev_dscp_tid_map_wifi3,
 	.set_pdev_dscp_tid_map = dp_set_pdev_dscp_tid_map_wifi3,
@@ -10169,7 +10172,6 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_intr_attach = dp_soc_interrupt_attach_wrapper,
 	.txrx_intr_detach = dp_soc_interrupt_detach,
 	.txrx_ppeds_stop = dp_soc_ppeds_stop,
-	.set_pn_check = dp_set_pn_check_wifi3,
 	.set_key_sec_type = dp_set_key_sec_type_wifi3,
 	.update_config_parameters = dp_update_config_parameters,
 	/* TODO: Add other functions */
@@ -10183,8 +10185,6 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.map_pdev_to_lmac = dp_soc_map_pdev_to_lmac,
 	.handle_mode_change = dp_soc_handle_pdev_mode_change,
 	.set_pdev_status_down = dp_soc_set_pdev_status_down,
-	.txrx_set_ba_aging_timeout = dp_set_ba_aging_timeout,
-	.txrx_get_ba_aging_timeout = dp_get_ba_aging_timeout,
 	.txrx_peer_reset_ast = dp_wds_reset_ast_wifi3,
 	.txrx_peer_reset_ast_table = dp_wds_reset_ast_table_wifi3,
 	.txrx_peer_flush_ast_table = dp_wds_flush_ast_table_wifi3,
@@ -10192,7 +10192,14 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.set_soc_param = dp_soc_set_param,
 	.txrx_get_os_rx_handles_from_vdev =
 					dp_get_os_rx_handles_from_vdev_wifi3,
+#ifndef WLAN_SOFTUMAC_SUPPORT
+	.set_pn_check = dp_set_pn_check_wifi3,
+	.txrx_set_ba_aging_timeout = dp_set_ba_aging_timeout,
+	.txrx_get_ba_aging_timeout = dp_get_ba_aging_timeout,
 	.delba_tx_completion = dp_delba_tx_completion_wifi3,
+	.set_pdev_pcp_tid_map = dp_set_pdev_pcp_tid_map_wifi3,
+	.set_vdev_pcp_tid_map = dp_set_vdev_pcp_tid_map_wifi3,
+#endif
 	.get_dp_capabilities = dp_get_cfg_capabilities,
 	.txrx_get_cfg = dp_get_cfg,
 	.set_rate_stats_ctx = dp_soc_set_rate_stats_ctx,
@@ -10200,9 +10207,6 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_peer_flush_rate_stats = dp_peer_flush_rate_stats,
 	.txrx_flush_rate_stats_request = dp_flush_rate_stats_req,
 	.txrx_peer_get_peerstats_ctx = dp_peer_get_peerstats_ctx,
-
-	.set_pdev_pcp_tid_map = dp_set_pdev_pcp_tid_map_wifi3,
-	.set_vdev_pcp_tid_map = dp_set_vdev_pcp_tid_map_wifi3,
 
 	.txrx_cp_peer_del_response = dp_cp_peer_del_resp_handler,
 #ifdef QCA_MULTIPASS_SUPPORT
@@ -10251,8 +10255,10 @@ static struct cdp_ctrl_ops dp_ops_ctrl = {
 	.txrx_set_vdev_param = dp_set_vdev_param,
 	.txrx_set_psoc_param = dp_set_psoc_param,
 	.txrx_get_psoc_param = dp_get_psoc_param,
+#ifndef WLAN_SOFTUMAC_SUPPORT
 	.txrx_set_pdev_reo_dest = dp_set_pdev_reo_dest,
 	.txrx_get_pdev_reo_dest = dp_get_pdev_reo_dest,
+#endif
 	.txrx_get_sec_type = dp_get_sec_type,
 	.txrx_wdi_event_sub = dp_wdi_event_sub,
 	.txrx_wdi_event_unsub = dp_wdi_event_unsub,
@@ -10887,8 +10893,10 @@ static struct cdp_misc_ops dp_ops_misc = {
 
 #ifdef WLAN_FEATURE_STATS_EXT
 	.txrx_ext_stats_request = dp_txrx_ext_stats_request,
+#ifndef WLAN_SOFTUMAC_SUPPORT
 	.request_rx_hw_stats = dp_request_rx_hw_stats,
 	.reset_rx_hw_ext_stats = dp_reset_rx_hw_ext_stats,
+#endif
 #endif /* WLAN_FEATURE_STATS_EXT */
 	.vdev_inform_ll_conn = dp_vdev_inform_ll_conn,
 #ifdef WLAN_DP_FEATURE_SW_LATENCY_MGR
@@ -10896,7 +10904,9 @@ static struct cdp_misc_ops dp_ops_misc = {
 	.is_swlm_enabled = dp_soc_is_swlm_enabled,
 #endif
 	.display_txrx_hw_info = dp_display_srng_info,
+#ifndef WLAN_SOFTUMAC_SUPPORT
 	.get_tx_rings_grp_bitmap = dp_get_tx_rings_grp_bitmap,
+#endif
 #ifdef WLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET
 	.mark_first_wakeup_packet = dp_mark_first_wakeup_packet,
 #endif
@@ -11211,6 +11221,7 @@ dp_get_link_desc_id_start(uint16_t arch_id)
 {
 	switch (arch_id) {
 	case CDP_ARCH_TYPE_LI:
+	case CDP_ARCH_TYPE_RH:
 		return LINK_DESC_ID_START_21_BITS_COOKIE;
 	case CDP_ARCH_TYPE_BE:
 		return LINK_DESC_ID_START_20_BITS_COOKIE;

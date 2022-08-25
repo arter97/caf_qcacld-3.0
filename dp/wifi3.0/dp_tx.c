@@ -5769,6 +5769,7 @@ void dp_tx_desc_check_corruption(struct dp_tx_desc_s *tx_desc)
 }
 #endif
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 uint32_t dp_tx_comp_handler(struct dp_intr *int_ctx, struct dp_soc *soc,
 			    hal_ring_handle_t hal_ring_hdl, uint8_t ring_id,
 			    uint32_t quota)
@@ -6035,6 +6036,7 @@ next_desc:
 
 	return num_processed;
 }
+#endif
 
 #ifdef FEATURE_WLAN_TDLS
 qdf_nbuf_t dp_tx_non_std(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
@@ -6395,6 +6397,7 @@ static void dp_tx_tso_cmn_desc_pool_free(struct dp_soc *soc, uint8_t num_pool)
 	dp_tx_tso_num_seg_pool_free(soc, num_pool);
 }
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 void dp_soc_tx_desc_sw_pools_free(struct dp_soc *soc)
 {
 	uint8_t num_pool;
@@ -6417,6 +6420,26 @@ void dp_soc_tx_desc_sw_pools_deinit(struct dp_soc *soc)
 	dp_tx_ext_desc_pool_deinit(soc, num_pool);
 	dp_tx_deinit_static_pools(soc, num_pool);
 }
+#else
+void dp_soc_tx_desc_sw_pools_free(struct dp_soc *soc)
+{
+	uint8_t num_pool;
+
+	num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
+
+	dp_tx_delete_static_pools(soc, num_pool);
+}
+
+void dp_soc_tx_desc_sw_pools_deinit(struct dp_soc *soc)
+{
+	uint8_t num_pool;
+
+	num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
+
+	dp_tx_flow_control_deinit(soc);
+	dp_tx_deinit_static_pools(soc, num_pool);
+}
+#endif /*WLAN_SOFTUMAC_SUPPORT*/
 
 /**
  * dp_tx_tso_cmn_desc_pool_alloc() - TSO cmn desc pool allocator
@@ -6475,6 +6498,7 @@ static QDF_STATUS dp_tx_tso_cmn_desc_pool_init(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 QDF_STATUS dp_soc_tx_desc_sw_pools_alloc(struct dp_soc *soc)
 {
 	uint8_t num_pool;
@@ -6548,6 +6572,46 @@ fail2:
 fail1:
 	return QDF_STATUS_E_RESOURCES;
 }
+
+#else
+QDF_STATUS dp_soc_tx_desc_sw_pools_alloc(struct dp_soc *soc)
+{
+	uint8_t num_pool;
+	uint32_t num_desc;
+
+	num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
+	num_desc = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
+
+	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_INFO,
+		  "%s Tx Desc Alloc num_pool = %d, descs = %d",
+		  __func__, num_pool, num_desc);
+
+	if ((num_pool > MAX_TXDESC_POOLS) ||
+	    (num_desc > WLAN_CFG_NUM_TX_DESC_MAX))
+		return QDF_STATUS_E_RESOURCES;
+
+	if (dp_tx_alloc_static_pools(soc, num_pool, num_desc))
+		return QDF_STATUS_E_RESOURCES;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS dp_soc_tx_desc_sw_pools_init(struct dp_soc *soc)
+{
+	uint8_t num_pool;
+	uint32_t num_desc;
+
+	num_pool = wlan_cfg_get_num_tx_desc_pool(soc->wlan_cfg_ctx);
+	num_desc = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
+
+	if (dp_tx_init_static_pools(soc, num_pool, num_desc))
+		return QDF_STATUS_E_RESOURCES;
+
+	dp_tx_flow_control_init(soc);
+	soc->process_tx_status = CONFIG_PROCESS_TX_STATUS;
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 QDF_STATUS dp_tso_soc_attach(struct cdp_soc_t *txrx_soc)
 {

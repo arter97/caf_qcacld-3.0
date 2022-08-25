@@ -126,7 +126,8 @@ dp_rx_frag_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
 static inline bool
 dp_rx_intrabss_handle_nawds_rh(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			       qdf_nbuf_t nbuf_copy,
-			       struct cdp_tid_rx_stats *tid_stats)
+			       struct cdp_tid_rx_stats *tid_stats,
+			       uint8_t link_id)
 {
 	return false;
 }

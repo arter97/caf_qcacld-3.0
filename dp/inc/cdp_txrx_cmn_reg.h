@@ -33,6 +33,9 @@
 #define LITHIUM_DP		0xfffd
 /* Beryllium device IDs */
 #define BERYLLIUM_DP		0xaffe
+
+/* RHINE device IDs */
+#define RHINE_DP		0xbff0
 /* Use device IDs for attach in future */
 
 /* enum cdp_arch_type - enum for DP arch type
@@ -44,6 +47,7 @@ enum cdp_arch_type {
 	CDP_ARCH_TYPE_NONE = -1,
 	CDP_ARCH_TYPE_LI,
 	CDP_ARCH_TYPE_BE,
+	CDP_ARCH_TYPE_RH,
 };
 
 #if defined(DP_TXRX_SOC_ATTACH)
@@ -138,6 +142,8 @@ static inline int cdp_get_arch_type_from_devid(uint16_t devid)
 	case MANGO_DEVICE_ID:
 	case PEACH_DEVICE_ID:
 		return CDP_ARCH_TYPE_BE;
+	case RHINE_DP:
+		return CDP_ARCH_TYPE_RH;
 	default:
 		return CDP_ARCH_TYPE_NONE;
 	}
@@ -162,6 +168,7 @@ ol_txrx_soc_handle cdp_soc_attach(u_int16_t devid,
 	switch (devid) {
 	case LITHIUM_DP: /*FIXME Add lithium device IDs */
 	case BERYLLIUM_DP:
+	case RHINE_DP:
 	case QCA8074_DEVICE_ID: /* Hawekeye */
 	case QCA8074V2_DEVICE_ID: /* Hawekeye V2*/
 	case QCA5018_DEVICE_ID:

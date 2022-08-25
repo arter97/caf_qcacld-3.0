@@ -5453,6 +5453,7 @@ QDF_STATUS dp_mon_soc_cfg_init(struct dp_soc *soc)
 	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_MANGO:
 	case TARGET_TYPE_PEACH:
+	case TARGET_TYPE_WCN6450:
 		/* do nothing */
 		break;
 	case TARGET_TYPE_QCA8074:
@@ -6164,6 +6165,7 @@ void dp_mon_ops_register(struct dp_soc *soc)
 	case TARGET_TYPE_QCN9000:
 	case TARGET_TYPE_QCA5018:
 	case TARGET_TYPE_QCN6122:
+	case TARGET_TYPE_WCN6450:
 		dp_mon_ops_register_1_0(mon_soc);
 		break;
 	case TARGET_TYPE_QCN9224:
@@ -6226,6 +6228,7 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 	case TARGET_TYPE_QCN9000:
 	case TARGET_TYPE_QCA5018:
 	case TARGET_TYPE_QCN6122:
+	case TARGET_TYPE_WCN6450:
 		dp_mon_cdp_ops_register_1_0(ops);
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 		dp_cfr_filter_register_1_0(ops);
