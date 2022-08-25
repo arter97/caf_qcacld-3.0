@@ -6574,6 +6574,7 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 	bool go_force_scc;
 	enum channel_state chan_state;
 	bool is_dfs_ch = false;
+	struct ch_params ch_params;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -6597,10 +6598,12 @@ bool policy_mgr_is_concurrency_allowed(struct wlan_objmgr_psoc *psoc,
 
 	if (ch_freq) {
 		if (wlan_reg_is_5ghz_ch_freq(ch_freq)) {
+			qdf_mem_zero(&ch_params, sizeof(ch_params));
+			ch_params.ch_width = policy_mgr_get_ch_width(bw);
 			chan_state =
-			wlan_reg_get_5g_bonded_channel_state_for_freq(
+			wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
 					pm_ctx->pdev, ch_freq,
-					policy_mgr_get_ch_width(bw));
+					&ch_params, REG_CURRENT_PWR_MODE);
 			if (chan_state == CHANNEL_STATE_DFS)
 				is_dfs_ch = true;
 		}
@@ -9251,6 +9254,7 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 	uint8_t mcc_to_scc_switch;
 	uint32_t num_connections;
 	bool is_dfs_ch = false;
+	struct ch_params ch_params;
 
 	if (!psoc || !vdev || !pdev) {
 		policy_mgr_debug("psoc or vdev or pdev is NULL");
@@ -9259,9 +9263,12 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 
 	mode = wlan_vdev_mlme_get_opmode(vdev);
 	con_mode = policy_mgr_convert_device_mode_to_qdf_type(mode);
+	qdf_mem_zero(&ch_params, sizeof(ch_params));
+	ch_params.ch_width = ch_wdith;
 	if (WLAN_REG_IS_5GHZ_CH_FREQ(ch_freq) &&
-	    wlan_reg_get_5g_bonded_channel_state_for_freq(
-			pdev, ch_freq, ch_wdith) == CHANNEL_STATE_DFS)
+	    wlan_reg_get_5g_bonded_channel_state_for_pwrmode(
+			pdev, ch_freq, &ch_params,
+			REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS)
 		is_dfs_ch = true;
 	/*
 	 * For 3Vif concurrency we only support SCC in same MAC
