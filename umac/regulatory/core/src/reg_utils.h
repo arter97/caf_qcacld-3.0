@@ -57,16 +57,20 @@ bool reg_is_world_ctry_code(uint16_t ctry_code);
  */
 bool reg_chan_has_dfs_attribute_for_freq(struct wlan_objmgr_pdev *pdev,
 					 qdf_freq_t freq);
+
 /**
- * reg_is_passive_or_disable_for_freq() - Check if the given channel is
+ * reg_is_passive_or_disable_for_pwrmode() - Check if the given channel is
  * passive or disabled.
  * @pdev: Pointer to physical dev
  * @chan: Channel frequency
+ * @in_6g_pwr_mode: Input 6GHz power mode
  *
  * Return: true if channel frequency is passive or disabled, else false.
  */
-bool reg_is_passive_or_disable_for_freq(struct wlan_objmgr_pdev *pdev,
-					qdf_freq_t freq);
+bool reg_is_passive_or_disable_for_pwrmode(
+				struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq,
+				enum supported_6g_pwr_types in_6g_pwr_mode);
 #else
 static inline bool
 reg_chan_has_dfs_attribute_for_freq(struct wlan_objmgr_pdev *pdev,
@@ -76,8 +80,10 @@ reg_chan_has_dfs_attribute_for_freq(struct wlan_objmgr_pdev *pdev,
 }
 
 static inline bool
-reg_is_passive_or_disable_for_freq(struct wlan_objmgr_pdev *pdev,
-				   qdf_freq_t freq)
+reg_is_passive_or_disable_for_pwrmode(
+				struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq,
+				enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	return false;
 }

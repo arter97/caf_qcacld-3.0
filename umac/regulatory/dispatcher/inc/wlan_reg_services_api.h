@@ -1742,15 +1742,18 @@ bool wlan_reg_is_dfs_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq);
 bool wlan_reg_is_dsrc_freq(qdf_freq_t freq);
 
 /**
- * wlan_reg_is_passive_or_disable_for_freq() - Checks chan state for passive
+ * wlan_reg_is_passive_or_disable_for_pwrmode() - Checks chan state for passive
  * and disabled
  * @pdev: pdev ptr
  * @freq: Channel center frequency
+ * @in_6g_pwr_mode: Input 6GHz power mode
  *
  * Return: true or false
  */
-bool wlan_reg_is_passive_or_disable_for_freq(struct wlan_objmgr_pdev *pdev,
-					     qdf_freq_t freq);
+bool wlan_reg_is_passive_or_disable_for_pwrmode(
+				struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq,
+				enum supported_6g_pwr_types in_6g_pwr_mode);
 
 #ifdef CONFIG_REG_6G_PWRMODE
 /**

@@ -1103,10 +1103,13 @@ bool wlan_reg_is_dfs_for_freq(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq)
 	return reg_is_dfs_for_freq(pdev, freq);
 }
 
-bool wlan_reg_is_passive_or_disable_for_freq(struct wlan_objmgr_pdev *pdev,
-					     qdf_freq_t freq)
+bool wlan_reg_is_passive_or_disable_for_pwrmode(
+				struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq,
+				enum supported_6g_pwr_types in_6g_pwr_mode)
 {
-	return reg_is_passive_or_disable_for_freq(pdev, freq);
+	return reg_is_passive_or_disable_for_pwrmode(pdev, freq,
+						     in_6g_pwr_mode);
 }
 
 #ifdef CONFIG_REG_6G_PWRMODE

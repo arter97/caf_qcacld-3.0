@@ -901,20 +901,9 @@ reg_get_channel_list_with_power_for_freq(struct wlan_objmgr_pdev *pdev,
 					 struct channel_power *ch_list,
 					 uint8_t *num_chan);
 
-/**
- * reg_get_channel_state_for_freq() - Get channel state from regulatory
- * @pdev: Pointer to pdev
- * @freq: channel center frequency.
- *
- * Return: channel state
- */
-enum channel_state
-reg_get_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
-			       qdf_freq_t freq);
-
 #ifdef CONFIG_REG_6G_PWRMODE
 /**
- * reg_get_channel_state_for_freq() - Get channel state from regulatory
+ * reg_get_channel_state_for_pwrmode() - Get channel state from regulatory
  * @pdev: Pointer to pdev
  * @freq: channel center frequency.
  * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.

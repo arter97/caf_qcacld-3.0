@@ -490,12 +490,15 @@ void reg_get_coex_unsafe_chan_reg_disable(
 #endif
 
 #ifdef CONFIG_CHAN_FREQ_API
-bool reg_is_passive_or_disable_for_freq(struct wlan_objmgr_pdev *pdev,
-					qdf_freq_t freq)
+bool reg_is_passive_or_disable_for_pwrmode(
+				struct wlan_objmgr_pdev *pdev,
+				qdf_freq_t freq,
+				enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	enum channel_state chan_state;
 
-	chan_state = reg_get_channel_state_for_freq(pdev, freq);
+	chan_state = reg_get_channel_state_for_pwrmode(pdev, freq,
+						       in_6g_pwr_mode);
 
 	return (chan_state == CHANNEL_STATE_DFS) ||
 		(chan_state == CHANNEL_STATE_DISABLE);

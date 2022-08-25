@@ -3938,27 +3938,6 @@ wlan_reg_get_usable_channel(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
-enum channel_state reg_get_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
-						  qdf_freq_t freq)
-{
-	enum channel_enum ch_idx;
-	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
-
-	ch_idx = reg_get_chan_enum_for_freq(freq);
-
-	if (reg_is_chan_enum_invalid(ch_idx))
-		return CHANNEL_STATE_INVALID;
-
-	pdev_priv_obj = reg_get_pdev_obj(pdev);
-
-	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
-		reg_err("pdev reg obj is NULL");
-		return CHANNEL_STATE_INVALID;
-	}
-
-	return pdev_priv_obj->cur_chan_list[ch_idx].state;
-}
-
 /**
  * reg_get_nol_channel_state () - Get channel state from regulatory
  * and treat NOL channels as enabled channels
@@ -4240,8 +4219,9 @@ reg_get_5g_bonded_chan_array_for_freq(struct wlan_objmgr_pdev *pdev,
 
 	chan_cfreq =  bonded_chan_ptr->start_freq;
 	while (chan_cfreq <= bonded_chan_ptr->end_freq) {
-		temp_chan_state = reg_get_channel_state_for_freq(pdev,
-								 chan_cfreq);
+		temp_chan_state = reg_get_channel_state_for_pwrmode(
+						pdev, chan_cfreq,
+						REG_CURRENT_PWR_MODE);
 		if (temp_chan_state < chan_state)
 			chan_state = temp_chan_state;
 		chan_cfreq = chan_cfreq + 20;
@@ -4463,9 +4443,10 @@ static void reg_update_5g_bonded_channel_state_punc_for_freq(
 
 	chan_cfreq =  bonded_chan_ptr->start_freq;
 	while (chan_cfreq <= bonded_chan_ptr->end_freq) {
-		temp_chan_state =
-				reg_get_channel_state_for_freq(pdev,
-							       chan_cfreq);
+		temp_chan_state = reg_get_channel_state_for_pwrmode(
+							pdev,
+							chan_cfreq,
+							REG_CURRENT_PWR_MODE);
 		if (!reg_is_state_allowed(temp_chan_state))
 			puncture_bitmap |= BIT(i);
 		/* Remember of any of the sub20 channel is a DFS channel */
@@ -5458,7 +5439,8 @@ reg_get_5g_bonded_channel_for_freq(struct wlan_objmgr_pdev *pdev,
 				   **bonded_chan_ptr_ptr)
 {
 	if (ch_width == CH_WIDTH_20MHZ)
-		return reg_get_channel_state_for_freq(pdev, freq);
+		return reg_get_channel_state_for_pwrmode(pdev, freq,
+							 REG_CURRENT_PWR_MODE);
 
 	if (reg_is_ch_width_320(ch_width)) {
 		return reg_get_chan_state_for_320(pdev, freq, 0,
