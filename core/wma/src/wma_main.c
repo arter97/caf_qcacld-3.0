@@ -4682,6 +4682,9 @@ static inline void wma_update_target_services(struct wmi_unified *wmi_handle,
 
 	cfg->is_fw_therm_throt_supp = wmi_service_enabled(wmi_handle,
 							  wmi_service_tt);
+	if (!cfg->is_fw_therm_throt_supp)
+		cfg->is_fw_therm_throt_supp = wmi_service_enabled(wmi_handle,
+						wmi_service_thermal_mgmt);
 
 #ifdef FEATURE_WLAN_SCAN_PNO
 	/* PNO offload */
