@@ -3928,6 +3928,12 @@ dp_process_ppdu_stats_sch_cmd_status_tlv(struct dp_pdev *pdev,
 				continue;
 			}
 
+			if (!peer->monitor_peer) {
+				dp_peer_unref_delete(peer,
+						     DP_MOD_ID_TX_PPDU_STATS);
+				continue;
+			}
+
 			mon_peer = peer->monitor_peer;
 			if (ppdu_desc->user[i].completion_status !=
 			    HTT_PPDU_STATS_USER_STATUS_OK) {
