@@ -9035,11 +9035,13 @@ dp_txrx_get_peer_jitter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	struct dp_peer *peer = NULL;
 	uint8_t tid;
 	struct cdp_peer_info peer_info = { 0 };
+	struct cdp_peer_tid_stats *jitter_stats;
+	uint8_t ring_id;
 
 	if (!pdev)
 		return QDF_STATUS_E_FAILURE;
 
-	if (!wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx))
+	if (!wlan_cfg_is_peer_jitter_stats_enabled(soc->wlan_cfg_ctx))
 		return QDF_STATUS_E_FAILURE;
 
 	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
@@ -9054,16 +9056,40 @@ dp_txrx_get_peer_jitter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	for (tid = 0; tid < qdf_min(CDP_DATA_TID_MAX, DP_MAX_TIDS); tid++) {
-		struct cdp_peer_tid_stats *rx_tid =
+	if (wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx)) {
+		for (tid = 0; tid < qdf_min(CDP_DATA_TID_MAX, DP_MAX_TIDS); tid++) {
+			struct cdp_peer_tid_stats *rx_tid =
 					&peer->txrx_peer->jitter_stats[tid];
 
-		tid_stats[tid].tx_avg_jitter = rx_tid->tx_avg_jitter;
-		tid_stats[tid].tx_avg_delay = rx_tid->tx_avg_delay;
-		tid_stats[tid].tx_avg_err = rx_tid->tx_avg_err;
-		tid_stats[tid].tx_total_success = rx_tid->tx_total_success;
-		tid_stats[tid].tx_drop = rx_tid->tx_drop;
+			tid_stats[tid].tx_avg_jitter = rx_tid->tx_avg_jitter;
+			tid_stats[tid].tx_avg_delay = rx_tid->tx_avg_delay;
+			tid_stats[tid].tx_avg_err = rx_tid->tx_avg_err;
+			tid_stats[tid].tx_total_success = rx_tid->tx_total_success;
+			tid_stats[tid].tx_drop = rx_tid->tx_drop;
+		}
+
+	} else {
+		jitter_stats = peer->txrx_peer->jitter_stats;
+		for (tid = 0; tid < qdf_min(CDP_DATA_TID_MAX, DP_MAX_TIDS); tid++) {
+			for (ring_id = 0; ring_id < CDP_MAX_TXRX_CTX; ring_id++) {
+				struct cdp_peer_tid_stats *rx_tid =
+					&jitter_stats[tid *
+					CDP_MAX_TXRX_CTX + ring_id];
+				tid_stats[tid].tx_avg_jitter =
+					(rx_tid->tx_avg_jitter +
+					tid_stats[tid].tx_avg_jitter) >> 1;
+				tid_stats[tid].tx_avg_delay =
+					(rx_tid->tx_avg_delay +
+					tid_stats[tid].tx_avg_delay) >> 1;
+				tid_stats[tid].tx_avg_err = (rx_tid->tx_avg_err
+					+ tid_stats[tid].tx_avg_err) >> 1;
+				tid_stats[tid].tx_total_success +=
+						rx_tid->tx_total_success;
+				tid_stats[tid].tx_drop += rx_tid->tx_drop;
+			}
+		}
 	}
+
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 
 	return QDF_STATUS_SUCCESS;

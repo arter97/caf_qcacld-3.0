@@ -1355,6 +1355,10 @@
 		CFG_INI_BOOL("peer_ext_stats", \
 		false, "Peer extended stats")
 
+#define CFG_DP_PEER_JITTER_STATS \
+		CFG_INI_BOOL("peer_jitter_stats", \
+		false, "Peer Jitter stats")
+
 #define CFG_DP_NAPI_SCALE_FACTOR \
 		CFG_INI_UINT("dp_napi_scale_factor", \
 		WLAN_CFG_DP_NAPI_SCALE_FACTOR_MIN, \
@@ -1826,6 +1830,7 @@
 		CFG(CFG_DP_FULL_MON_MODE) \
 		CFG(CFG_DP_REO_RINGS_MAP) \
 		CFG(CFG_DP_PEER_EXT_STATS) \
+		CFG(CFG_DP_PEER_JITTER_STATS) \
 		CFG(CFG_DP_RX_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_REFILL_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_PENDING_HL_THRESHOLD) \

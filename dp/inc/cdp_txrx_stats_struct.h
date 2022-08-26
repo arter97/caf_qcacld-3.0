@@ -1929,6 +1929,7 @@ struct cdp_peer_stats {
 };
 
 /* struct cdp_peer_tid_stats - Per peer and per TID stats
+ * @tx_prev_delay: tx previous delay
  * @tx_avg_jitter: tx average jitter
  * @tx_avg_delay: tx average delay
  * @tx_avg_err: tx average error
@@ -1937,6 +1938,7 @@ struct cdp_peer_stats {
  */
 struct cdp_peer_tid_stats {
 #ifdef WLAN_PEER_JITTER
+	uint32_t tx_prev_delay;
 	uint32_t tx_avg_jitter;
 	uint32_t tx_avg_delay;
 	uint64_t tx_avg_err;

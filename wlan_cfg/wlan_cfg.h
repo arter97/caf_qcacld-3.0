@@ -401,6 +401,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t radio1_rx_default_reo;
 	uint8_t radio2_rx_default_reo;
 	bool wow_check_rx_pending_enable;
+	bool jitter_stats_enabled;
 #ifdef IPA_OFFLOAD
 	uint32_t ipa_tx_ring_size;
 	uint32_t ipa_tx_comp_ring_size;
@@ -1792,6 +1793,18 @@ wlan_cfg_set_peer_ext_stats(struct wlan_cfg_dp_soc_ctxt *cfg,
 			    bool val);
 
 /**
+ * wlan_cfg_set_peer_jitter_stats() - set peer jitter stats
+ *
+ * @wlan_cfg_dp_soc_ctxt: soc configuration context
+ * @val: Flag value read from INI
+ *
+ * Return: bool
+ */
+void
+wlan_cfg_set_peer_jitter_stats(struct wlan_cfg_dp_soc_ctxt *cfg,
+			       bool val);
+
+/**
  * wlan_cfg_is_peer_ext_stats_enabled() - Check if peer extended
  *                                        stats are enabled
  *
@@ -1801,6 +1814,16 @@ wlan_cfg_set_peer_ext_stats(struct wlan_cfg_dp_soc_ctxt *cfg,
  */
 bool
 wlan_cfg_is_peer_ext_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_is_peer_jitter_stats_enabled() - check if jitter stats are enabled
+ *
+ * @wlan_cfg_dp_soc_ctxt: soc configuration context
+ *
+ * Return: bool
+ */
+bool
+wlan_cfg_is_peer_jitter_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /**
  * wlan_cfg_is_poll_mode_enabled() - Check if poll mode is enabled

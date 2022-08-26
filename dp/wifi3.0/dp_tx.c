@@ -68,6 +68,10 @@
 #define DP_INVALID_PEER 0XFFFE
 
 #define DP_RETRY_COUNT 7
+#ifdef WLAN_PEER_JITTER
+#define DP_AVG_JITTER_WEIGHT_DENOM 4
+#define DP_AVG_DELAY_WEIGHT_DENOM 3
+#endif
 
 #ifdef QCA_DP_TX_FW_METADATA_V2
 #define DP_TX_TCL_METADATA_PDEV_ID_SET(_var, _val)\
@@ -4121,6 +4125,188 @@ void dp_tx_update_peer_delay_stats(struct dp_txrx_peer *txrx_peer,
 }
 #endif
 
+#ifdef WLAN_PEER_JITTER
+/*
+ * dp_tx_jitter_get_avg_jitter() - compute the average jitter
+ * @curr_delay: Current delay
+ * @prev_Delay: Previous delay
+ * @avg_jitter: Average Jitter
+ * Return: Newly Computed Average Jitter
+ */
+static uint32_t dp_tx_jitter_get_avg_jitter(uint32_t curr_delay,
+					    uint32_t prev_delay,
+					    uint32_t avg_jitter)
+{
+	uint32_t curr_jitter;
+	int32_t jitter_diff;
+
+	curr_jitter = qdf_abs(curr_delay - prev_delay);
+	if (!avg_jitter)
+		return curr_jitter;
+
+	jitter_diff = curr_jitter - avg_jitter;
+	if (jitter_diff < 0)
+		avg_jitter = avg_jitter -
+			(qdf_abs(jitter_diff) >> DP_AVG_JITTER_WEIGHT_DENOM);
+	else
+		avg_jitter = avg_jitter +
+			(qdf_abs(jitter_diff) >> DP_AVG_JITTER_WEIGHT_DENOM);
+
+	return avg_jitter;
+}
+
+/*
+ * dp_tx_jitter_get_avg_delay() - compute the average delay
+ * @curr_delay: Current delay
+ * @avg_Delay: Average delay
+ * Return: Newly Computed Average Delay
+ */
+static uint32_t dp_tx_jitter_get_avg_delay(uint32_t curr_delay,
+					   uint32_t avg_delay)
+{
+	int32_t delay_diff;
+
+	if (!avg_delay)
+		return curr_delay;
+
+	delay_diff = curr_delay - avg_delay;
+	if (delay_diff < 0)
+		avg_delay = avg_delay - (qdf_abs(delay_diff) >>
+					DP_AVG_DELAY_WEIGHT_DENOM);
+	else
+		avg_delay = avg_delay + (qdf_abs(delay_diff) >>
+					DP_AVG_DELAY_WEIGHT_DENOM);
+
+	return avg_delay;
+}
+
+#ifdef WLAN_CONFIG_TX_DELAY
+/*
+ * dp_tx_compute_cur_delay() - get the current delay
+ * @soc: soc handle
+ * @vdev: vdev structure for data path state
+ * @ts: Tx completion status
+ * @curr_delay: current delay
+ * @tx_desc: tx descriptor
+ * Return: void
+ */
+static
+QDF_STATUS dp_tx_compute_cur_delay(struct dp_soc *soc,
+				   struct dp_vdev *vdev,
+				   struct hal_tx_completion_status *ts,
+				   uint32_t *curr_delay,
+				   struct dp_tx_desc_s *tx_desc)
+{
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (soc->arch_ops.dp_tx_compute_hw_delay)
+		status = soc->arch_ops.dp_tx_compute_hw_delay(soc, vdev, ts,
+							      curr_delay);
+	return status;
+}
+#else
+static
+QDF_STATUS dp_tx_compute_cur_delay(struct dp_soc *soc,
+				   struct dp_vdev *vdev,
+				   struct hal_tx_completion_status *ts,
+				   uint32_t *curr_delay,
+				   struct dp_tx_desc_s *tx_desc)
+{
+	int64_t current_timestamp, timestamp_hw_enqueue;
+
+	current_timestamp = qdf_ktime_to_us(qdf_ktime_real_get());
+	timestamp_hw_enqueue = qdf_ktime_to_us(tx_desc->timestamp);
+	*curr_delay = (uint32_t)(current_timestamp - timestamp_hw_enqueue);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
+/* dp_tx_compute_tid_jitter() - compute per tid per ring jitter
+ * @jiiter - per tid per ring jitter stats
+ * @ts: Tx completion status
+ * @vdev - vdev structure for data path state
+ * @tx_desc - tx descriptor
+ * Return: void
+ */
+static void dp_tx_compute_tid_jitter(struct cdp_peer_tid_stats *jitter,
+				     struct hal_tx_completion_status *ts,
+				     struct dp_vdev *vdev,
+				     struct dp_tx_desc_s *tx_desc)
+{
+	uint32_t curr_delay, avg_delay, avg_jitter, prev_delay;
+	struct dp_soc *soc = vdev->pdev->soc;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (ts->status !=  HAL_TX_TQM_RR_FRAME_ACKED) {
+		jitter->tx_drop += 1;
+		return;
+	}
+
+	status = dp_tx_compute_cur_delay(soc, vdev, ts, &curr_delay,
+					 tx_desc);
+
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		avg_delay = jitter->tx_avg_delay;
+		avg_jitter = jitter->tx_avg_jitter;
+		prev_delay = jitter->tx_prev_delay;
+		avg_jitter = dp_tx_jitter_get_avg_jitter(curr_delay,
+							 prev_delay,
+							 avg_jitter);
+		avg_delay = dp_tx_jitter_get_avg_delay(curr_delay, avg_delay);
+		jitter->tx_avg_delay = avg_delay;
+		jitter->tx_avg_jitter = avg_jitter;
+		jitter->tx_prev_delay = curr_delay;
+		jitter->tx_total_success += 1;
+	} else if (status == QDF_STATUS_E_FAILURE) {
+		jitter->tx_avg_err += 1;
+	}
+}
+
+/* dp_tx_update_peer_jitter_stats() - Update the peer jitter stats
+ * @txrx_peer: DP peer context
+ * @tx_desc: Tx software descriptor
+ * @ts: Tx completion status
+ * @ring_id: Rx CPU context ID/CPU_ID
+ * Return: void
+ */
+static void dp_tx_update_peer_jitter_stats(struct dp_txrx_peer *txrx_peer,
+					   struct dp_tx_desc_s *tx_desc,
+					   struct hal_tx_completion_status *ts,
+					   uint8_t ring_id)
+{
+	struct dp_pdev *pdev = txrx_peer->vdev->pdev;
+	struct dp_soc *soc = pdev->soc;
+	struct cdp_peer_tid_stats *jitter_stats = NULL;
+	uint8_t tid;
+	struct cdp_peer_tid_stats *rx_tid = NULL;
+
+	if (qdf_likely(!wlan_cfg_is_peer_jitter_stats_enabled(soc->wlan_cfg_ctx)))
+		return;
+
+	tid = ts->tid;
+	jitter_stats = txrx_peer->jitter_stats;
+	qdf_assert_always(jitter_stats);
+	qdf_assert(ring < CDP_MAX_TXRX_CTX);
+	/*
+	 * For non-TID packets use the TID 9
+	 */
+	if (qdf_unlikely(tid >= CDP_MAX_DATA_TIDS))
+		tid = CDP_MAX_DATA_TIDS - 1;
+
+	rx_tid = &jitter_stats[tid * CDP_MAX_TXRX_CTX + ring_id];
+	dp_tx_compute_tid_jitter(rx_tid,
+				 ts, txrx_peer->vdev, tx_desc);
+}
+#else
+static void dp_tx_update_peer_jitter_stats(struct dp_txrx_peer *txrx_peer,
+					   struct dp_tx_desc_s *tx_desc,
+					   struct hal_tx_completion_status *ts,
+					   uint8_t ring_id)
+{
+}
+#endif
+
 #ifdef HW_TX_DELAY_STATS_ENABLE
 /**
  * dp_update_tx_delay_stats() - update the delay stats
@@ -5022,6 +5208,7 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 
 	dp_tx_update_peer_stats(tx_desc, ts, txrx_peer, ring_id);
 	dp_tx_update_peer_delay_stats(txrx_peer, tx_desc, ts, ring_id);
+	dp_tx_update_peer_jitter_stats(txrx_peer, tx_desc, ts, ring_id);
 	dp_tx_update_peer_sawf_stats(soc, vdev, txrx_peer, tx_desc,
 				     ts, ts->tid);
 	dp_tx_send_pktlog(soc, vdev->pdev, tx_desc, nbuf, dp_status);
