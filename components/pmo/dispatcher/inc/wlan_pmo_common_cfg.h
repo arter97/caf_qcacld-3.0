@@ -305,7 +305,7 @@
  * 0 - Does not support suspend.
  * 1 - Legency suspend mode, PDEV suspend.
  * 2 - WOW suspend mode.
- * 3 - Shutdown suspend mode.
+ * 3 - Shutdown wlan while suspend.
  *
  * Related: None
  *
