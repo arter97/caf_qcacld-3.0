@@ -2884,7 +2884,7 @@ static void qdf_nbuf_track_free(QDF_NBUF_TRACK *node)
 	/* Try to shrink the freelist if free_list_count > than FREEQ_POOLSIZE
 	 * only shrink the freelist if it is bigger than twice the number of
 	 * nbufs in use. If the driver is stalling in a consistent bursty
-	 * fasion, this will keep 3/4 of thee allocations from the free list
+	 * fashion, this will keep 3/4 of thee allocations from the free list
 	 * while also allowing the system to recover memory as less frantic
 	 * traffic occurs.
 	 */
@@ -3950,7 +3950,7 @@ static inline void qdf_nbuf_tso_unmap_frag(
  * information
  * @osdev: qdf device handle
  * @skb: skb buffer
- * @tso_info: Parameters common to all segements
+ * @tso_info: Parameters common to all segments
  *
  * Get the TSO information that is common across all the TCP
  * segments of the jumbo packet
@@ -4000,7 +4000,7 @@ static uint8_t __qdf_nbuf_get_tso_cmn_seg_info(qdf_device_t osdev,
 		return 1;
 
 	if (tso_info->ethproto == htons(ETH_P_IP)) {
-		/* inlcude IPv4 header length for IPV4 (total length) */
+		/* include IPv4 header length for IPV4 (total length) */
 		tso_info->ip_tcp_hdr_len =
 			tso_info->eit_hdr_len - tso_info->l2_len;
 	} else if (tso_info->ethproto == htons(ETH_P_IPV6)) {
@@ -4026,7 +4026,7 @@ static uint8_t __qdf_nbuf_get_tso_cmn_seg_info(qdf_device_t osdev,
  * __qdf_nbuf_fill_tso_cmn_seg_info() - Init function for each TSO nbuf segment
  *
  * @curr_seg: Segment whose contents are initialized
- * @tso_cmn_info: Parameters common to all segements
+ * @tso_cmn_info: Parameters common to all segments
  *
  * Return: None
  */
@@ -4413,7 +4413,7 @@ uint32_t __qdf_nbuf_get_tso_num_seg(struct sk_buff *skb)
 	 * Remainder non-zero and nr_frags zero implies end of skb data.
 	 * In that case, one more tso seg is required to accommodate
 	 * remaining data, hence num_segs++. If nr_frags is non-zero,
-	 * then remaining data will be accomodated while doing the calculation
+	 * then remaining data will be accommodated while doing the calculation
 	 * for nr_frags data. Hence, frags_per_tso++.
 	 */
 	if (remainder) {
@@ -4453,7 +4453,7 @@ uint32_t __qdf_nbuf_get_tso_num_seg(struct sk_buff *skb)
 			 * positive. If frags_per_tso reaches the (max-1),
 			 * [First frags always have EIT header, therefore max-1]
 			 * increment the num_segs as no more data can be
-			 * accomodated in the curr tso seg. Reset the remainder
+			 * accommodated in the curr tso seg. Reset the remainder
 			 * and frags per tso and keep looping.
 			 */
 			frags_per_tso++;
@@ -4650,7 +4650,7 @@ __qdf_nbuf_dmamap_create(qdf_device_t osdev, __qdf_dma_map_t *dmap)
 {
 	QDF_STATUS error = QDF_STATUS_SUCCESS;
 	/*
-	 * driver can tell its SG capablity, it must be handled.
+	 * driver can tell its SG capability, it must be handled.
 	 * Bounce buffers if they are there
 	 */
 	(*dmap) = kzalloc(sizeof(struct __qdf_dma_map), GFP_KERNEL);
@@ -5879,7 +5879,7 @@ qdf_export_symbol(qdf_nbuf_init_fast);
 
 #ifdef QDF_NBUF_GLOBAL_COUNT
 /**
- * __qdf_nbuf_mod_init() - Intialization routine for qdf_nuf
+ * __qdf_nbuf_mod_init() - Initialization routine for qdf_nuf
  *
  * Return void
  */

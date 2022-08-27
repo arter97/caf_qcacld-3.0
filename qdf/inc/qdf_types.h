@@ -289,7 +289,7 @@ typedef void (*qdf_defer_fn_t)(void *);
 
 /*
  * Prototype of the critical region function that is to be
- * executed with spinlock held and interrupt disalbed
+ * executed with spinlock held and interrupt disabled
  */
 typedef bool (*qdf_irqlocked_func_t)(void *);
 
@@ -327,7 +327,7 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_XRATE: rate set handling
  * @QDF_MODULE_ID_INPUT: input handling
  * @QDF_MODULE_ID_CRYPTO: crypto work
- * @QDF_MODULE_ID_DUMPPKTS: IFF_LINK2 equivalant
+ * @QDF_MODULE_ID_DUMPPKTS: IFF_LINK2 equivalent
  * @QDF_MODULE_ID_DEBUG: IFF_DEBUG equivalent
  * @QDF_MODULE_ID_MLME: MLME
  * @QDF_MODULE_ID_RRM: Radio resource measurement
@@ -363,8 +363,8 @@ typedef bool (*qdf_irqlocked_func_t)(void *);
  * @QDF_MODULE_ID_HAL: Hal abstraction module ID
  * @QDF_MODULE_ID_SOC: SOC module ID
  * @QDF_MODULE_ID_OS_IF: OS-interface module ID
- * @QDF_MODULE_ID_TARGET_IF: targer interface module ID
- * @QDF_MODULE_ID_SCHEDULER: schduler module ID
+ * @QDF_MODULE_ID_TARGET_IF: target interface module ID
+ * @QDF_MODULE_ID_SCHEDULER: scheduler module ID
  * @QDF_MODULE_ID_MGMT_TXRX: management TX/RX module ID
  * @QDF_MODULE_ID_SERIALIZATION: serialization module ID
  * @QDF_MODULE_ID_PMO: PMO (power manager and offloads) Module ID
@@ -1387,7 +1387,7 @@ struct qdf_tso_info_t {
 #define QDF_CE_TX_PKT_TYPE_BIT_S   6
 
 /**
- * QDF_CE_TX_PKT_OFFSET_BIT_S - 12 bits --> 16-27, in the CE desciptor
+ * QDF_CE_TX_PKT_OFFSET_BIT_S - 12 bits --> 16-27, in the CE descriptor
  *  the length of HTT/HTC descriptor
  */
 #define QDF_CE_TX_PKT_OFFSET_BIT_S  16
@@ -1599,7 +1599,7 @@ enum qdf_dp_a_status {
  * @QDF_DOMAIN_ATTR_SECURE_VMID: Domain attribute secure cmid
  * @QDF_DOMAIN_ATTR_FAST: Domain attribute fast
  * @QDF_DOMAIN_ATTR_PGTBL_INFO: Domain attribute pgtbl info
- * @QDF_DOMAIN_ATTR_USE_UPSTREAM_HINT: Domain attribute use upsteram hint
+ * @QDF_DOMAIN_ATTR_USE_UPSTREAM_HINT: Domain attribute use upstream hint
  * @QDF_DOMAIN_ATTR_EARLY_MAP: Domain attribute early map
  * @QDF_DOMAIN_ATTR_PAGE_TABLE_IS_COHERENT: Domain attribute page table
  * is coherrent

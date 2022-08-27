@@ -111,7 +111,7 @@ enum list_type {
  * @type:            type of the list to be parsed
  * @threshold:       configured by user by overwriting the respective debugfs
  *                   sys entry. This is to list the functions which requested
- *                   memory/dma allocations more than threshold nubmer of times.
+ *                   memory/dma allocations more than threshold number of times.
  */
 struct major_alloc_priv {
 	enum list_type type;
@@ -1491,7 +1491,7 @@ static void qdf_mem_debug_init(void)
 	if (is_initial_mem_debug_disabled)
 		return;
 
-	/* Initalizing the list with maximum size of 60000 */
+	/* Initializing the list with maximum size of 60000 */
 	for (i = 0; i < QDF_DEBUG_DOMAIN_COUNT; ++i)
 		qdf_list_create(&qdf_mem_domains[i], 60000);
 	qdf_spinlock_create(&qdf_mem_list_lock);

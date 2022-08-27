@@ -364,7 +364,7 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @rssi_temp_offset: Temperature based rssi offset
  * @min_nf_dbm: min noise floor in active chains per channel
  * @xbar_config: 4 bytes, used for BB to RF Chain mapping
- * @rssi_dbm_conv_support: Rssi dbm converstion support param
+ * @rssi_dbm_conv_support: Rssi dbm conversion support param
  * @rx_user_status: pointer to mon_rx_user_status, when set update
  * radiotap header will use userinfo from this structure.
  */
@@ -1050,7 +1050,7 @@ enum cb_ftype {
 };
 
 /**
- * @qdf_nbuf_t - Platform indepedent packet abstraction
+ * @qdf_nbuf_t - Platform independent packet abstraction
  */
 typedef __qdf_nbuf_t qdf_nbuf_t;
 
@@ -1111,7 +1111,7 @@ struct qdf_nbuf_track_t {
 typedef struct qdf_nbuf_track_t QDF_NBUF_TRACK;
 
 /**
- * typedef qdf_nbuf_queue_head_t - Platform indepedent nbuf queue head
+ * typedef qdf_nbuf_queue_head_t - Platform independent nbuf queue head
  */
 typedef __qdf_nbuf_queue_head_t qdf_nbuf_queue_head_t;
 
@@ -2126,7 +2126,7 @@ void qdf_net_buf_debug_acquire_skb(qdf_nbuf_t net_buf,
 				   uint32_t line_num);
 void qdf_net_buf_debug_release_skb(qdf_nbuf_t net_buf);
 
-/* nbuf allocation rouines */
+/* nbuf allocation routines */
 
 #define qdf_nbuf_alloc_simple(d, s, r, a, p) \
 	__qdf_nbuf_alloc_simple(d, s, __func__, __LINE__)
@@ -2267,7 +2267,7 @@ qdf_net_buf_debug_update_unmap_node(qdf_nbuf_t net_buf,
 				    uint32_t line_num)
 {
 }
-/* Nbuf allocation rouines */
+/* Nbuf allocation routines */
 
 #define qdf_nbuf_alloc_simple(osdev, size, reserve, align, prio) \
 	qdf_nbuf_alloc_fl(osdev, size, reserve, align, prio, \
@@ -2857,7 +2857,7 @@ static inline qdf_nbuf_t qdf_nbuf_queue_next(qdf_nbuf_t buf)
  * @nbq: Network buf queue handle
  *
  * Return: true  if queue is empty
- *	   false if queue is not emty
+ *	   false if queue is not empty
  */
 static inline bool qdf_nbuf_is_queue_empty(qdf_nbuf_queue_t *nbq)
 {
@@ -4628,7 +4628,7 @@ static inline void qdf_nbuf_count_dec(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_mod_init() - Intialization routine for qdf_nbuf
+ * qdf_nbuf_mod_init() - Initialization routine for qdf_nbuf
  *
  * Return void
  */
@@ -5221,8 +5221,8 @@ static inline qdf_ktime_t qdf_nbuf_net_timedelta(qdf_ktime_t t)
 
 #ifdef NBUF_MEMORY_DEBUG
 /**
- * qdf_set_smmu_fault_state() - Set smmu fault sate
- * @smmu_fault_state: state of the wlan smmy
+ * qdf_set_smmu_fault_state() - Set smmu fault state
+ * @smmu_fault_state: state of the wlan smmu
  *
  * Return: void
  */

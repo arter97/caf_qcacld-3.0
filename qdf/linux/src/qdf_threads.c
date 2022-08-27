@@ -44,7 +44,7 @@
 #include <qdf_defer.h>
 #include <qdf_module.h>
 
-/* Function declarations and documenation */
+/* Function declarations and documentation */
 
 typedef int (*qdf_thread_os_func)(void *data);
 

@@ -113,7 +113,7 @@ __qdf_queue_work(__qdf_workqueue_t *wqueue, __qdf_work_t *work)
 /**
  * __qdf_sched_work - Schedule a deferred task on non-interrupt context
  * @work: pointer to work
- * Retrun: none
+ * Return: none
  */
 static inline QDF_STATUS __qdf_sched_work(__qdf_work_t *work)
 {

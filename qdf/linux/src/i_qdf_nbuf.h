@@ -126,7 +126,7 @@ typedef union {
  *
  * Notes:
  *   1. Hard limited to 48 bytes. Please count your bytes
- *   2. The size of this structure has to be easily calculatable and
+ *   2. The size of this structure has to be easily calculable and
  *      consistently so: do not use any conditional compile flags
  *   3. Split into a common part followed by a tx/rx overlay
  *   4. There is only one extra frag, which represents the HTC/HTT header
@@ -155,7 +155,7 @@ typedef union {
  * @rx.dev.priv_cb_m.exc_frm: exception frame
  * @rx.dev.priv_cb_m.ipa_smmu_map: do IPA smmu map
  * @rx.dev.priv_cb_m.reo_dest_ind_or_sw_excpt: reo destination indication or
-					     sw execption bit from ring desc
+					     sw exception bit from ring desc
  * @rx.dev.priv_cb_m.lmac_id: lmac id for RX packet
  * @rx.dev.priv_cb_m.tcp_seq_num: TCP sequence number
  * @rx.dev.priv_cb_m.tcp_ack_num: TCP ACK number
