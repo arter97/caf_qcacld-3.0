@@ -1725,11 +1725,17 @@ void wlan_hdd_cfg80211_link_layer_stats_callback(hdd_handle_t hdd_handle,
 		}
 
 		adapter = hdd_get_adapter_by_vdev(hdd_ctx, results->ifaceId);
-		if (!adapter) {
-			hdd_err("invalid vdev %d", results->ifaceId);
-			osif_request_put(request);
-			return;
-		}
+		if (!adapter)
+			hdd_debug_rl("invalid vdev_id %d sent by FW",
+				     results->ifaceId);
+			/* for peer stats FW doesn't update the vdev_id info*/
+			adapter = hdd_get_adapter_by_vdev(hdd_ctx,
+							  priv->vdev_id);
+			if (!adapter) {
+				hdd_err("invalid vdev %d", priv->vdev_id);
+				osif_request_put(request);
+				return;
+			}
 
 		wlan_hdd_update_ll_stats_request_bitmap(hdd_ctx, request,
 							results);
@@ -1768,6 +1774,11 @@ void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 	adapter = hdd_get_adapter_by_vdev(hdd_ctx, lost_link_info->vdev_id);
 	if (!adapter) {
 		hdd_err("invalid adapter");
+		return;
+	}
+
+	if (lost_link_info->rssi == 0) {
+		hdd_debug_rl("Invalid rssi on disconnect sent by FW");
 		return;
 	}
 
@@ -5963,6 +5974,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	int link_speed_rssi_low = 0;
 	uint32_t link_speed_rssi_report = 0;
 	struct wlan_objmgr_vdev *vdev;
+	qdf_net_dev_stats stats = {0};
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_GET_STA,
@@ -6092,15 +6104,16 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 		  (int)rx_mcs_index, (int)tx_nss, (int)rx_nss,
 		  (int)tx_dcm, (int)rx_dcm, (int)tx_gi, (int)rx_gi);
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter,
+					   WLAN_OSIF_STATS_ID);
+	if (!vdev)
+		/* Keep GUI happy */
+		return 0;
+
 	if (!ucfg_mlme_stats_is_link_speed_report_actual(hdd_ctx->psoc)) {
 		bool tx_rate_calc, rx_rate_calc;
 		uint8_t tx_nss_max, rx_nss_max;
 
-		vdev = hdd_objmgr_get_vdev_by_user(adapter,
-						   WLAN_OSIF_STATS_ID);
-		if (!vdev)
-			/* Keep GUI happy */
-			return 0;
 		/*
 		 * Take static NSS for reporting max rates. NSS from the FW
 		 * is not reliable as it changes as per the environment
@@ -6108,7 +6121,6 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 		 */
 		tx_nss_max = wlan_vdev_mlme_get_nss(vdev);
 		rx_nss_max = wlan_vdev_mlme_get_nss(vdev);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
 		hdd_check_and_update_nss(hdd_ctx, &tx_nss_max, &rx_nss_max);
 
@@ -6128,9 +6140,11 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 						   my_rx_rate,
 						   rx_nss_max);
 
-		if (!tx_rate_calc || !rx_rate_calc)
+		if (!tx_rate_calc || !rx_rate_calc) {
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 			/* Keep GUI happy */
 			return 0;
+		}
 	} else {
 
 		/* Fill TX stats */
@@ -6148,9 +6162,13 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	wlan_hdd_fill_summary_stats(&adapter->hdd_stats.summary_stat,
 				    sinfo,
 				    adapter->vdev_id);
-	sinfo->tx_bytes = adapter->stats.tx_bytes;
-	sinfo->rx_bytes = adapter->stats.rx_bytes;
-	sinfo->rx_packets = adapter->stats.rx_packets;
+
+	ucfg_dp_get_net_dev_stats(vdev, &stats);
+	sinfo->tx_bytes = stats.tx_bytes;
+	sinfo->rx_bytes = stats.rx_bytes;
+	sinfo->rx_packets = stats.rx_packets;
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
 
 	hdd_fill_fcs_and_mpdu_count(adapter, sinfo);
 
@@ -6247,6 +6265,14 @@ static int __wlan_hdd_cfg80211_get_station(struct wiphy *wiphy,
 
 	if (wlan_hdd_validate_vdev_id(adapter->vdev_id))
 		return -EINVAL;
+	if (!mac) {
+		hdd_err("Received NULL mac address");
+		return -EINVAL;
+	}
+	if (qdf_is_macaddr_zero((struct qdf_mac_addr *)mac)) {
+		hdd_err("MAC is all zero");
+		return -EINVAL;
+	}
 
 	if (adapter->device_mode == QDF_SAP_MODE ||
 	    adapter->device_mode == QDF_P2P_GO_MODE) {
@@ -6475,9 +6501,7 @@ int wlan_hdd_cfg80211_dump_station(struct wiphy *wiphy,
  */
 struct net_device_stats *hdd_get_stats(struct net_device *dev)
 {
-	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
-
-	return (struct net_device_stats *)ucfg_dp_get_dev_stats(&adapter->mac_addr);
+	return (struct net_device_stats *)ucfg_dp_get_dev_stats(dev);
 }
 
 
@@ -7486,6 +7510,7 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 	struct hdd_adapter *adapter;
 	struct stats_event *ev = stats_ev;
 	uint8_t i;
+	int8_t rssi;
 	struct hdd_station_ctx *sta_ctx;
 
 	if (wlan_hdd_validate_context(hdd_ctx))
@@ -7499,16 +7524,20 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 			hdd_debug("invalid adapter");
 			continue;
 		}
-		adapter->rssi_on_disconnect =
-					ev->vdev_summary_stats[i].stats.rssi;
+
+		rssi = ev->vdev_summary_stats[i].stats.rssi;
+		if (rssi == 0) {
+			hdd_debug_rl("Invalid RSSI value sent by FW");
+			return;
+		}
+		adapter->rssi_on_disconnect = rssi;
 		hdd_debug("rssi %d for " QDF_MAC_ADDR_FMT,
 			  adapter->rssi_on_disconnect,
 			  QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
 
 		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 		if (sta_ctx)
-			sta_ctx->cache_conn_info.signal =
-					ev->vdev_summary_stats[i].stats.rssi;
+			sta_ctx->cache_conn_info.signal = rssi;
 	}
 }
 

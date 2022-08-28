@@ -1133,10 +1133,8 @@ lim_decide_ap_protection(struct mac_context *mac, tSirMacAddr peerMacAddr,
 	sta =
 		dph_lookup_hash_entry(mac, peerMacAddr, &tmpAid,
 				      &pe_session->dph.dphHashTable);
-	if (!sta) {
-		pe_err("sta is NULL");
+	if (!sta)
 		return;
-	}
 	lim_get_rf_band_new(mac, &rfBand, pe_session);
 	/* if we are in 5 GHZ band */
 	if (REG_BAND_5G == rfBand) {
@@ -7813,6 +7811,7 @@ QDF_STATUS lim_send_he_caps_ie(struct mac_context *mac_ctx,
 		pe_err("Unable send HE Cap IE for 5GHZ band, status: %d",
 			status_5g);
 
+	he_caps[1] = SIR_MAC_HE_CAP_MIN_LEN;
 	lim_set_he_caps(mac_ctx, session, he_caps, he_cap_total_len,
 			CDS_BAND_2GHZ);
 	he_cap = (struct he_capability_info *)(&he_caps[2 + HE_CAP_OUI_SIZE]);
@@ -8506,6 +8505,7 @@ void lim_update_session_eht_capable(struct mac_context *mac,
 {
 	session->eht_capable = true;
 	pe_debug("eht_capable: %d", session->eht_capable);
+	pe_debug("Draft 2.0 support enabled");
 }
 
 void lim_add_bss_eht_cfg(struct bss_params *add_bss, struct pe_session *session)
@@ -8967,9 +8967,9 @@ void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
 
 	if (wlan_vdev_mlme_is_mlo_link_vdev(session->vdev)) {
 		add_bss->staContext.emlsr_support =
-				mlo_peer_ctx->eml_caps.emlsr_support;
+				mlo_peer_ctx->mlpeer_emlcap.emlsr_supp;
 		add_bss->staContext.emlsr_trans_timeout =
-				mlo_peer_ctx->eml_caps.transition_timeout;
+				mlo_peer_ctx->mlpeer_emlcap.trans_timeout;
 		add_bss->staContext.link_id =
 				wlan_vdev_get_link_id(session->vdev);
 	} else {
@@ -8979,9 +8979,9 @@ void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
 		add_bss->staContext.link_id =
 				assoc_rsp->mlo_ie.mlo_ie.link_id;
 
-		mlo_peer_ctx->eml_caps.emlsr_support =
+		mlo_peer_ctx->mlpeer_emlcap.emlsr_supp =
 				add_bss->staContext.emlsr_support;
-		mlo_peer_ctx->eml_caps.transition_timeout =
+		mlo_peer_ctx->mlpeer_emlcap.trans_timeout =
 				add_bss->staContext.emlsr_trans_timeout;
 	}
 

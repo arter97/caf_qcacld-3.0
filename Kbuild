@@ -2103,10 +2103,6 @@ TXRX3.0_OBJS += $(TXRX3.0_DIR)/dp_fisa_rx.o
 TXRX3.0_OBJS += $(TXRX3.0_DIR)/dp_rx_fst.o
 endif
 
-ifeq ($(CONFIG_DP_SWLM), y)
-TXRX3.0_OBJS += $(TXRX3.0_DIR)/dp_swlm.o
-endif
-
 endif #LITHIUM
 
 $(call add-wlan-objs,txrx30,$(TXRX3.0_OBJS))
@@ -2536,6 +2532,10 @@ endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_PERIODIC_STA_STATS), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_periodic_sta_stats.o
+endif
+
+ifeq ($(CONFIG_DP_SWLM), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_swlm.o
 endif
 
 $(call add-wlan-objs,dp_comp,$(WLAN_DP_COMP_OBJS))
@@ -3928,6 +3928,7 @@ cppflags-$(CONFIG_DP_HW_COOKIE_CONVERT_EXCEPTION) += -DDP_HW_COOKIE_CONVERT_EXCE
 cppflags-$(CONFIG_TX_ADDR_INDEX_SEARCH) += -DTX_ADDR_INDEX_SEARCH
 cppflags-$(CONFIG_QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES) += -DQCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES
 cppflags-$(CONFIG_RX_HASH_DEBUG) += -DRX_HASH_DEBUG
+cppflags-$(CONFIG_DP_PKT_STATS_PER_LMAC) += -DDP_PKT_STATS_PER_LMAC
 
 ifeq ($(CONFIG_QCA6290_11AX), y)
 cppflags-y += -DQCA_WIFI_QCA6290_11AX -DQCA_WIFI_QCA6290_11AX_MU_UL

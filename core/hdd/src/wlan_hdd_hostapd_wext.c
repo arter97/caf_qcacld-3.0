@@ -48,6 +48,7 @@
 #include "wlan_hdd_sta_info.h"
 #include "wlan_hdd_object_manager.h"
 #include "wlan_dp_ucfg_api.h"
+#include "cfg_ucfg_api.h"
 
 #define WE_WLAN_VERSION     1
 
@@ -426,17 +427,17 @@ static __iw_softap_setparam(struct net_device *dev,
 		break;
 
 	case QCSAP_PARAM_MAX_ASSOC:
-		if (WNI_CFG_ASSOC_STA_LIMIT_STAMIN > set_value) {
+		if (set_value < cfg_min(CFG_ASSOC_STA_LIMIT)) {
 			hdd_err("Invalid setMaxAssoc value %d",
 			       set_value);
 			ret = -EINVAL;
 		} else {
-			if (WNI_CFG_ASSOC_STA_LIMIT_STAMAX < set_value) {
+			if (set_value > cfg_max(CFG_ASSOC_STA_LIMIT)) {
 				hdd_warn("setMaxAssoc %d > max allowed %d.",
-				       set_value,
-				       WNI_CFG_ASSOC_STA_LIMIT_STAMAX);
+					 set_value,
+					 cfg_max(CFG_ASSOC_STA_LIMIT));
 				hdd_warn("Setting it to max allowed and continuing");
-				set_value = WNI_CFG_ASSOC_STA_LIMIT_STAMAX;
+				set_value = cfg_max(CFG_ASSOC_STA_LIMIT);
 			}
 			if (ucfg_mlme_set_assoc_sta_limit(hdd_ctx->psoc,
 							  set_value) !=
@@ -956,8 +957,7 @@ static __iw_softap_setparam(struct net_device *dev,
 		hdd_debug("QCASAP_CLEAR_STATS val %d", set_value);
 		switch (set_value) {
 		case CDP_HDD_STATS:
-			memset(&adapter->stats, 0,
-						sizeof(adapter->stats));
+			ucfg_dp_clear_net_dev_stats(adapter->dev);
 			memset(&adapter->hdd_stats, 0,
 					sizeof(adapter->hdd_stats));
 			break;

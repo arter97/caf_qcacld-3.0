@@ -1489,6 +1489,7 @@ static void dp_pld_request_bus_bandwidth(struct wlan_dp_psoc_context *dp_ctx,
 
 	param.policy = BBM_TPUT_POLICY;
 	param.policy_info.tput_level = tput_level;
+	dp_bbm_apply_independent_policy(dp_ctx->psoc, &param);
 
 	dp_rtpm_tput_policy_apply(dp_ctx, tput_level);
 
@@ -1725,7 +1726,7 @@ static void __dp_bus_bw_work_handler(struct wlan_dp_psoc_context *dp_ctx)
 	if (wlan_dp_validate_context(dp_ctx))
 		goto stop_work;
 
-	if (dp_ctx->is_wiphy_suspended)
+	if (dp_ctx->is_suspend)
 		return;
 
 	bw_interval_us = dp_ctx->dp_cfg.bus_bw_compute_interval * 1000;
