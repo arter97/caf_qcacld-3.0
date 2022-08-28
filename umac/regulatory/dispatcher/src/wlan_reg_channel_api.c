@@ -40,7 +40,8 @@ bool wlan_reg_is_phymode_chwidth_allowed(struct wlan_objmgr_pdev *pdev,
 					 enum phy_ch_width ch_width,
 					 qdf_freq_t primary_freq,
 					 enum supported_6g_pwr_types
-					 in_6g_pwr_mode)
+					 in_6g_pwr_mode,
+					 uint16_t input_puncture_bitmap)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 
@@ -53,7 +54,8 @@ bool wlan_reg_is_phymode_chwidth_allowed(struct wlan_objmgr_pdev *pdev,
 
 	return reg_is_phymode_chwidth_allowed(pdev_priv_obj, phy_in, ch_width,
 					      primary_freq,
-					      in_6g_pwr_mode);
+					      in_6g_pwr_mode,
+					      input_puncture_bitmap);
 }
 
 QDF_STATUS wlan_reg_get_max_phymode_and_chwidth(struct wlan_objmgr_pdev *pdev,

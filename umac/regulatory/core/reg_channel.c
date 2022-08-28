@@ -196,6 +196,7 @@ static uint16_t chwd_2_contbw_lst[CH_WIDTH_MAX + 1] = {
  * @pdev: Pointer to PDEV object.
  * @freq: Input frequency.
  * @g_max_width: Global maximum channel width.
+ * @input_puncture_bitmap: Input puncture bitmap
  *
  * Return: Maximum channel width of type phy_ch_width.
  */
@@ -204,11 +205,16 @@ static enum phy_ch_width
 reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 			  qdf_freq_t freq,
 			  enum phy_ch_width g_max_width,
-			  enum supported_6g_pwr_types in_6g_pwr_mode)
+			  enum supported_6g_pwr_types in_6g_pwr_mode,
+			  uint16_t input_puncture_bitmap)
 {
 	struct reg_channel_list chan_list = {0};
 	uint16_t i, max_bw = 0;
 	enum phy_ch_width output_width = CH_WIDTH_INVALID;
+
+	for (i = 0; i < MAX_NUM_CHAN_PARAM; i++) {
+	    chan_list.chan_param[i].input_punc_bitmap = input_puncture_bitmap;
+	}
 
 	wlan_reg_fill_channel_list_for_pwrmode(pdev, freq, 0,
 					       g_max_width, 0,
@@ -231,7 +237,8 @@ static enum phy_ch_width
 reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 			  qdf_freq_t freq,
 			  enum phy_ch_width g_max_width,
-			  enum supported_6g_pwr_types in_6g_pwr_mode)
+			  enum supported_6g_pwr_types in_6g_pwr_mode,
+			  uint16_t input_puncture_bitmap)
 {
 	struct ch_params chan_params = {0};
 
@@ -270,7 +277,8 @@ void reg_modify_chan_list_for_max_chwidth_for_pwrmode(
 		 */
 		output_width = reg_get_max_channel_width(pdev, freq,
 							 g_max_width,
-							 in_6g_pwr_mode);
+							 in_6g_pwr_mode,
+							 NO_SCHANS_PUNC);
 
 		if (output_width != CH_WIDTH_INVALID)
 			cur_chan_list[i].max_bw =
@@ -305,7 +313,8 @@ bool reg_is_phymode_chwidth_allowed(
 		enum reg_phymode phy_in,
 		enum phy_ch_width ch_width,
 		qdf_freq_t freq,
-		enum supported_6g_pwr_types in_6g_pwr_mode)
+		enum supported_6g_pwr_types in_6g_pwr_mode,
+		uint16_t input_puncture_bitmap)
 {
 	uint32_t phymode_bitmap;
 	uint64_t wireless_modes;
@@ -324,7 +333,8 @@ bool reg_is_phymode_chwidth_allowed(
 	output_width = reg_get_max_channel_width(pdev_priv_obj->pdev_ptr,
 						 freq,
 						 ch_width,
-						 in_6g_pwr_mode);
+						 in_6g_pwr_mode,
+						 input_puncture_bitmap);
 
 	if (output_width != ch_width)
 		return false;
@@ -837,6 +847,7 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 	enum channel_enum chan_enum, sec_5g_chan_enum;
 	uint16_t bw_80, sec_5g_freq_max_bw = 0;
 	uint16_t max_bw;
+	uint16_t in_punc_bitmap = reg_fetch_punc_bitmap(ch_params);
 
 	if (!ch_params) {
 		reg_err("ch_params is NULL");
@@ -903,14 +914,16 @@ reg_get_5g_channel_params(struct wlan_objmgr_pdev *pdev,
 
 		chan_state =
 		    reg_get_5g_chan_state(pdev, freq, ch_params->ch_width,
-					  in_6g_pwr_mode);
+					  in_6g_pwr_mode,
+					  in_punc_bitmap);
 
 		if (ch_params->ch_width == CH_WIDTH_80P80MHZ) {
 			chan_state2 = reg_get_5g_chan_state(
 					pdev, ch_params->mhz_freq_seg1 -
 					NEAREST_20MHZ_CHAN_FREQ_OFFSET,
 					CH_WIDTH_80MHZ,
-					in_6g_pwr_mode);
+					in_6g_pwr_mode,
+					in_punc_bitmap);
 
 			chan_state = reg_combine_channel_states(
 					chan_state, chan_state2);

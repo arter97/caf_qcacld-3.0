@@ -131,6 +131,7 @@ void wlan_reg_clear_allchan_ht40intol(struct wlan_objmgr_pdev *pdev);
  * @ch_width: Channel width that the user requested.
  * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
  * is determined.
+ * @input_puncture_bitmap: Input puncture bitmap
  *
  * Return: true if phymode is allowed, else false.
  */
@@ -139,7 +140,8 @@ bool wlan_reg_is_phymode_chwidth_allowed(struct wlan_objmgr_pdev *pdev,
 					 enum phy_ch_width ch_width,
 					 qdf_freq_t primary_freq,
 					 enum supported_6g_pwr_types
-					 in_6g_pwr_mode);
+					 in_6g_pwr_mode,
+					 uint16_t input_puncture_bitmap);
 
 /**
  * wlan_reg_get_max_phymode_and_chwidth() - Find the maximum regmode and
@@ -244,7 +246,8 @@ static inline bool
 wlan_reg_is_phymode_chwidth_allowed(struct wlan_objmgr_pdev *pdev,
 				    enum reg_phymode phy_in,
 				    enum phy_ch_width ch_width,
-				    qdf_freq_t primary_freq)
+				    qdf_freq_t primary_freq,
+				    uint16_t input_puncture_bitmap)
 {
 	return false;
 }

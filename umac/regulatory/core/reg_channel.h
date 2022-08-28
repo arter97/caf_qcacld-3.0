@@ -39,6 +39,7 @@
  * @primary_freq: Input primary frequency.
  * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
  * is determined.
+ * @input_puncture_bitmap: Input puncture bitmap
  *
  * Return: true if phymode is allowed, else false.
  */
@@ -47,7 +48,8 @@ bool reg_is_phymode_chwidth_allowed(
 		enum reg_phymode phy_in,
 		enum phy_ch_width ch_width,
 		qdf_freq_t primary_freq,
-		enum supported_6g_pwr_types in_6g_pwr_mode);
+		enum supported_6g_pwr_types in_6g_pwr_mode,
+		uint16_t input_puncture_bitmap);
 
 /**
  * reg_set_chan_blocked() - Set is_chan_hop_blocked to true for a frequency
@@ -139,7 +141,8 @@ static inline bool reg_is_phymode_chwidth_allowed(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
 		enum reg_phymode phy_in,
 		enum phy_ch_width ch_width,
-		qdf_freq_t primary_freq)
+		qdf_freq_t primary_freq,
+		uint16_t input_puncture_bitmap)
 {
 	return false;
 }
