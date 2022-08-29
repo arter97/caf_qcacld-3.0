@@ -2699,6 +2699,7 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 
 		WMI_PEER_CHAN_WIDTH_SWITCH_SET_VDEV_ID(cmd->vdev_var, param->vdev_id);
 		WMI_PEER_CHAN_WIDTH_SWITCH_SET_VALID_VDEV_ID(cmd->vdev_var);
+		WMI_PEER_CHAN_WIDTH_SWITCH_SET_VALID_PUNCTURE_BITMAP(cmd->vdev_var);
 
 		WMITLV_SET_HDR(((void *)cmd + sizeof(*cmd)),
                                WMITLV_TAG_ARRAY_STRUC,
@@ -2716,13 +2717,18 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 					wmi_chan_width_peer_list));
 
 			WMI_CHAR_ARRAY_TO_MAC_ADDR(param_peer_list[ix].mac_addr,
-					   &cmd_peer_list[ix].peer_macaddr);
+						   &cmd_peer_list[ix].peer_macaddr);
 
 			cmd_peer_list[ix].chan_width =
 				convert_host_to_target_chwidth(param_peer_list[ix].chan_width);
 
-			wmi_debug("Peer[%u]: chan_width = %u", ix,
-				  cmd_peer_list[ix].chan_width);
+			cmd_peer_list[ix].puncture_20mhz_bitmap =
+					~param_peer_list[ix].puncture_bitmap;
+
+			wmi_debug("Peer[%u]: chan_width = %u"
+				   " puncture bitmap %x", ix,
+				  cmd_peer_list[ix].chan_width,
+				  cmd_peer_list[ix].puncture_20mhz_bitmap);
 		}
 
 		pending_peers -= cmd->num_peers;
