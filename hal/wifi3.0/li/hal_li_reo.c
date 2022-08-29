@@ -1345,6 +1345,8 @@ uint8_t hal_get_tlv_hdr_size_li(void)
 
 uint64_t hal_rx_get_qdesc_addr_li(uint8_t *dst_ring_desc, uint8_t *buf)
 {
-	return *(uint64_t *)dst_ring_desc +
+	uint8_t *dst_qdesc_addr = dst_ring_desc +
 		REO_DESTINATION_RING_6_RX_REO_QUEUE_DESC_ADDR_31_0_OFFSET;
+
+	return *(uint64_t *)dst_qdesc_addr;
 }

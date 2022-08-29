@@ -1167,6 +1167,8 @@ static void hal_hw_txrx_ops_attach_6290(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_mpdu_get_fr_ds = hal_rx_mpdu_get_fr_ds_6290;
 	hal_soc->ops->hal_rx_get_mpdu_frame_control_valid =
 				hal_rx_get_mpdu_frame_control_valid_6290;
+	hal_soc->ops->hal_rx_get_frame_ctrl_field =
+				hal_rx_get_frame_ctrl_field_li;
 	hal_soc->ops->hal_rx_mpdu_get_addr1 = hal_rx_mpdu_get_addr1_6290;
 	hal_soc->ops->hal_rx_mpdu_get_addr2 = hal_rx_mpdu_get_addr2_6290;
 	hal_soc->ops->hal_rx_mpdu_get_addr3 = hal_rx_mpdu_get_addr3_6290;
