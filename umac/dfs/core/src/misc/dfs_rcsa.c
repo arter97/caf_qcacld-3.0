@@ -41,31 +41,30 @@ dfs_prepare_nol_ie_bitmap_for_freq(struct wlan_dfs *dfs,
 				   uint16_t *in_sub_channels,
 				   uint8_t n_in_sub_channels)
 {
-	uint16_t cur_subchans[MAX_20MHZ_SUBCHANS];
-	uint8_t n_cur_subchans;
 	uint8_t i;
-	uint8_t j;
-	uint8_t bits = 0x01;
+	uint8_t bits;
 
-	n_cur_subchans =
-	    dfs_get_bonding_channels_for_freq(dfs, dfs->dfs_curchan,
-					      radar_found->segment_id,
-					      radar_found->detector_id,
-					      cur_subchans);
 	dfs->dfs_nol_ie_bandwidth = MIN_DFS_SUBCHAN_BW;
-	dfs->dfs_nol_ie_startfreq = cur_subchans[0];
+	dfs->dfs_nol_ie_startfreq = in_sub_channels[0];
 
-	/* Search through the array list of radar affected subchannels
-	 * to find if the subchannel in our current channel has radar hit.
-	 * Break if found to reduce loop count.
+	/* Number of radar infected channels cannot more than 3 */
+	if (n_in_sub_channels > 3)
+	    return;
+
+	/* The maximum number of radar infected channels at an instant
+	 * can be 3 (if it is a chirp) as per the current radar detection
+	 * logic. Also, these radar infected channels will be contiguous in
+	 * frequency spectrum. Hence marking the start_freq of NOL IE as
+	 * the first subchannel in in_sub_channels. And then setting
+	 * "n_in_sub_channels" contiguous bit to indicate the other radar
+	 * channels.
+	 *
+	 * In the receiver side, NOL channels are computed based on the
+	 * start_freq specified. Hence no changes needed in the parsing logic.
 	 */
-	for (i = 0; i < n_cur_subchans; i++) {
-		for (j = 0; j < n_in_sub_channels; j++) {
-			if (cur_subchans[i] == in_sub_channels[j]) {
-				dfs->dfs_nol_ie_bitmap |= bits;
-				break;
-			}
-		}
+	bits = 0x01;
+	for (i = 0; i < n_in_sub_channels; i++) {
+		dfs->dfs_nol_ie_bitmap |= bits;
 		bits <<= 1;
 	}
 }
