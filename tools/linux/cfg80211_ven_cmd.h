@@ -1400,6 +1400,8 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_GET_MONITOR_VERSION = 513,
 	OL_ATH_PARAM_DFS_BW_EXPAND = 514,
 	OL_ATH_PARAM_BCN_MAX_COUNT = 515,
+	/* Display super channel list */
+	OL_ATH_PARAM_DISPLAY_SUPER_CHANNEL_LIST = 516,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3693,6 +3695,8 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_BCN_MAX_COUNT, SET_PARAM, 1},
 	{"g_max_bcn_cnt",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_BCN_MAX_COUNT, GET_PARAM, 0},
+	{"display_super_chan_list",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_SUPER_CHANNEL_LIST, GET_PARAM, 0},
 };
 #endif
 
