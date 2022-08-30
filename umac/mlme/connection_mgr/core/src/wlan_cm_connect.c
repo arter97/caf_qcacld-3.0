@@ -2130,8 +2130,11 @@ static void cm_update_partner_link_scan_db(struct cnx_mgr *cm_ctx,
 		    bss->ml_info.num_links &&
 		    cur_bss->ml_info.num_links &&
 		    qdf_is_macaddr_equal(&bss->ml_info.mld_mac_addr,
-					 &cur_bss->ml_info.mld_mac_addr))
+					 &cur_bss->ml_info.mld_mac_addr)) {
+			mlme_debug("Inform Partner bssid: " QDF_MAC_ADDR_FMT " to kernel",
+					QDF_MAC_ADDR_REF(bss->bssid.bytes));
 			cm_inform_bcn_probe_handler(cm_ctx, bss, cm_id);
+		}
 		cur_node = next_node;
 		next_node = NULL;
 	}
