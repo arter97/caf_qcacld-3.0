@@ -22,6 +22,9 @@
 #define _WLAN_MLO_MGR_PEER_H_
 
 #include "wlan_objmgr_peer_obj.h"
+
+#define WLAN_LINK_ID_INVALID    0xff
+
 /**
  * mlo_peer_create - Initiatiate peer create on secondary link(s)
  * by posting a message
@@ -342,6 +345,17 @@ void wlan_mlo_peer_free_all_link_assoc_resp_buf(struct wlan_objmgr_peer *peer);
  */
 void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 				  struct mlo_tgt_partner_info *ml_links);
+
+/**
+ * wlan_mlo_peer_get_primary_peer_link_id() - get vdev link ID of primary peer
+ * @peer: Link peer
+ *
+ * This function checks for the peers and returns vdev link id of the primary
+ * peer.
+ *
+ * Return: link id of primary vdev
+ */
+uint8_t wlan_mlo_peer_get_primary_peer_link_id(struct wlan_objmgr_peer *peer);
 
 /**
  * wlan_mlo_peer_get_partner_links_info() - get MLO peer partner links info
