@@ -1395,7 +1395,7 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	chan_info->band_center_freq1 = tchan_info->cfreq1;
 	chan_info->band_center_freq2 = tchan_info->cfreq2;
 #ifdef WLAN_FEATURE_11BE
-	cmd->puncture_20mhz_bitmap = tchan_info->puncture_bitmap;
+	cmd->puncture_20mhz_bitmap = ~tchan_info->puncture_bitmap;
 #endif
 	if (tchan_info->is_chan_passive)
 		WMI_SET_CHANNEL_FLAG(chan_info,
