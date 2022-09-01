@@ -5270,143 +5270,6 @@ reg_fill_chan320mhz_seg0_center(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
- * reg_fill_channel_list_for_320() - Fill 320MHZ channel list. If we
- * are unable to find a channel whose width is greater than 160MHZ and less
- * than 320 with the help of puncturing, using the given freq, set "update_bw"
- * variable to be true, lower the channel width and return to the caller.
- * The caller fetches a channel of reduced mode based on "update_bw" flag.
- *
- * If 320 band center is 0, return all the 320 channels
- * that match the primary frequency else return only channel
- * that matches 320 band center.
- *
- * @pdev: Pointer to struct wlan_objmgr_pdev.
- * @freq: Input frequency in MHZ.
- * @ch_width: Input channel width, if a channel of the given width is not
- * found, reduce the channel width to the next lower mode and pass it to the
- * caller.
- * @band_center_320: Center of 320MHZ channel.
- * @chan_list: Pointer to reg_channel_list to be filled.
- * @update_bw: Flag to hold if bw is updated.
- * @treat_nol_chan_as_disabled: Bool to treat NOL channels as disabled/enabled
- *
- * Return - None.
- */
-static void
-reg_fill_channel_list_for_320(struct wlan_objmgr_pdev *pdev,
-			      qdf_freq_t freq,
-			      enum phy_ch_width *in_ch_width,
-			      qdf_freq_t band_center_320,
-			      struct reg_channel_list *chan_list,
-			      bool *update_bw,
-			      bool treat_nol_chan_as_disabled)
-{
-	uint8_t num_bonded_pairs, i, num_ch_params;
-	enum channel_state chan_state;
-	uint16_t array_size = QDF_ARRAY_SIZE(bonded_chan_320mhz_list_freq);
-	uint16_t out_punc_bitmap;
-	uint16_t max_reg_bw;
-	enum channel_enum chan_enum;
-	const struct bonded_channel_freq *bonded_ch_ptr[2] = {NULL, NULL};
-	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
-
-	*update_bw = false;
-
-	chan_enum = reg_get_chan_enum_for_freq(freq);
-	if (reg_is_chan_enum_invalid(chan_enum)) {
-		reg_err("chan freq is not valid");
-		return;
-	}
-
-	pdev_priv_obj = reg_get_pdev_obj(pdev);
-	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
-		reg_err("reg pdev priv obj is NULL");
-		return;
-	}
-
-	/* Maximum bandwidth of the channel supported by regulatory for
-	 * the given freq.
-	 */
-	max_reg_bw = pdev_priv_obj->cur_chan_list[chan_enum].max_bw;
-
-	/* Regulatory does not support BW greater than 160.
-	 * Try finding a channel in a lower mode.
-	 */
-	if (max_reg_bw <= BW_160MHZ) {
-		*in_ch_width =  get_next_lower_bandwidth(*in_ch_width);
-		*update_bw = true;
-		return;
-	}
-
-	num_bonded_pairs =
-		reg_get_320_bonded_chan_array(pdev, freq, band_center_320,
-					      bonded_chan_320mhz_list_freq,
-					      array_size,
-					      bonded_ch_ptr);
-
-	if (!num_bonded_pairs) {
-		if (band_center_320) {
-			reg_debug("No bonded pair for the given band_center\n");
-			chan_list->num_ch_params = 0;
-		} else {
-			/* Could not find a 320 MHZ bonded channel pair,
-			 * find a channel of lower BW.
-			 */
-			*in_ch_width =  get_next_lower_bandwidth(*in_ch_width);
-			*update_bw = true;
-		}
-		return;
-	}
-
-	for (i = 0, num_ch_params = 0 ; i < num_bonded_pairs; i++) {
-		/* Chan_state to hold the channel state of bonding
-		 * pair of channels.
-		 */
-		uint16_t in_punc_bitmap =
-			chan_list->chan_param[i].input_punc_bitmap;
-
-		chan_state =
-		    reg_get_320_bonded_channel_state_for_pwrmode(
-						     pdev, freq,
-						     bonded_ch_ptr[i],
-						     *in_ch_width,
-						     &out_punc_bitmap,
-						     REG_CURRENT_PWR_MODE,
-						     treat_nol_chan_as_disabled,
-						     in_punc_bitmap);
-
-		if (reg_is_state_allowed(chan_state)) {
-			struct ch_params *t_chan_param =
-			    &chan_list->chan_param[num_ch_params];
-
-			t_chan_param->mhz_freq_seg1 =
-				(bonded_ch_ptr[i]->start_freq +
-				 bonded_ch_ptr[i]->end_freq) / 2;
-			t_chan_param->center_freq_seg1 =
-				reg_freq_to_chan(pdev,
-						 t_chan_param->mhz_freq_seg1);
-			t_chan_param->ch_width = *in_ch_width;
-			t_chan_param->reg_punc_bitmap = out_punc_bitmap;
-
-			reg_fill_chan320mhz_seg0_center(pdev,
-							t_chan_param,
-							freq);
-			num_ch_params++;
-			chan_list->num_ch_params = num_ch_params;
-		}
-	}
-
-	/* The bonded pairs could not create any channels,
-	 * lower the bandwidth to find a channel.
-	 */
-	if (!chan_list->num_ch_params) {
-		*in_ch_width =  get_next_lower_bandwidth(*in_ch_width);
-		*update_bw = true;
-	}
-}
-
-#ifdef CONFIG_REG_6G_PWRMODE
-/**
  * reg_fill_channel_list_for_320_for_pwrmode() - Fill 320MHZ channel list. If we
  * are unable to find a channel whose width is greater than 160MHZ and less
  * than 320 with the help of puncturing, using the given freq, set "update_bw"
@@ -5547,36 +5410,7 @@ reg_fill_channel_list_for_320_for_pwrmode(
 		*update_bw = true;
 	}
 }
-#endif
 
-/**
- * reg_fill_pre320mhz_channel() - Fill channel params for channel width
- * less than 320.
- * @pdev: Pointer to struct wlan_objmgr_pdev
- * @chan_list: Pointer to struct reg_channel_list
- * @ch_width: Channel width
- * @freq: Center frequency of the primary channel in MHz
- * @sec_ch_2g_freq:  Secondary 2G channel frequency in MHZ
- * @treat_nol_chan_as_disabled: Bool to treat NOL channels as
- * disabled/enabled
- */
-static void
-reg_fill_pre320mhz_channel(struct wlan_objmgr_pdev *pdev,
-			   struct reg_channel_list *chan_list,
-			   enum phy_ch_width ch_width,
-			   qdf_freq_t freq,
-			   qdf_freq_t sec_ch_2g_freq,
-			   bool treat_nol_chan_as_disabled)
-{
-	chan_list->num_ch_params = 1;
-	chan_list->chan_param[0].ch_width = ch_width;
-	chan_list->chan_param[0].reg_punc_bitmap = NO_SCHANS_PUNC;
-	reg_set_channel_params_for_freq(pdev, freq, sec_ch_2g_freq,
-					&chan_list->chan_param[0],
-					treat_nol_chan_as_disabled);
-}
-
-#ifdef CONFIG_REG_6G_PWRMODE
 /**
  * reg_fill_pre320mhz_channel_for_pwrmode() - Fill channel params for channel
  * width less than 320.
@@ -5607,48 +5441,7 @@ reg_fill_pre320mhz_channel_for_pwrmode(
 					   in_6g_pwr_mode,
 					   treat_nol_chan_as_disabled);
 }
-#endif
 
-void
-reg_fill_channel_list(struct wlan_objmgr_pdev *pdev,
-		      qdf_freq_t freq,
-		      qdf_freq_t sec_ch_2g_freq,
-		      enum phy_ch_width in_ch_width,
-		      qdf_freq_t band_center_320,
-		      struct reg_channel_list *chan_list,
-		      bool treat_nol_chan_as_disabled)
-{
-	bool update_bw;
-
-	if (!chan_list) {
-		reg_err("channel params is NULL");
-		return;
-	}
-
-	if (in_ch_width >= CH_WIDTH_MAX)
-		in_ch_width = CH_WIDTH_320MHZ;
-
-	if (in_ch_width == CH_WIDTH_320MHZ) {
-		update_bw = 0;
-		reg_fill_channel_list_for_320(pdev, freq, &in_ch_width,
-					      band_center_320, chan_list,
-					      &update_bw,
-					      treat_nol_chan_as_disabled);
-		if (!update_bw)
-			return;
-	}
-
-	/* A 320 channel is not available (or) user has not requested
-	 * for a 320MHZ channel, look for channels in lower modes,
-	 * reg_set_5g_channel_params_for_freq() finds for the
-	 * next available mode and fills ch_params.
-	 */
-	reg_fill_pre320mhz_channel(pdev, chan_list, in_ch_width, freq,
-				   sec_ch_2g_freq,
-				   treat_nol_chan_as_disabled);
-}
-
-#ifdef CONFIG_REG_6G_PWRMODE
 void
 reg_fill_channel_list_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 				  qdf_freq_t freq,
@@ -5690,7 +5483,6 @@ reg_fill_channel_list_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 				   sec_ch_2g_freq, in_6g_pwr_mode,
 				   treat_nol_chan_as_disabled);
 }
-#endif
 #endif
 
 enum channel_state
@@ -6057,10 +5849,12 @@ void reg_set_channel_params_for_freq(struct wlan_objmgr_pdev *pdev,
 
 			qdf_mem_zero(&chan_list, sizeof(chan_list));
 			/* For now sending center freq as 0 */
-			reg_fill_channel_list(pdev, freq, sec_ch_2g_freq,
-					      ch_params->ch_width, 0,
-					      &chan_list,
-					      treat_nol_chan_as_disabled);
+			reg_fill_channel_list_for_pwrmode(
+						pdev, freq, sec_ch_2g_freq,
+						ch_params->ch_width, 0,
+						&chan_list,
+						REG_CURRENT_PWR_MODE,
+						treat_nol_chan_as_disabled);
 			reg_copy_ch_params(ch_params, chan_list);
 		} else {
 			reg_set_5g_channel_params_for_pwrmode(
