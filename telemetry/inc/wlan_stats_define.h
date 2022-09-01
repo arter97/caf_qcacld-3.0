@@ -517,6 +517,8 @@ struct stats_if_sawf_delay_stats {
 	struct stats_if_hist_stats delay_hist;
 	uint8_t cur_win;
 	uint32_t mov_avg;
+	uint64_t delay_bound_success;
+	uint64_t delay_bound_failure;
 };
 
 struct stats_if_sawf_fw_mpdu_stats {

@@ -1345,6 +1345,10 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 					 STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY);
 		STATS_PRINT("Moving average = %u\n",
 			    data->delay[0][0].mov_avg);
+		STATS_PRINT("Delay bound success = %ju \n",
+			    data->delay[0][0].delay_bound_success);
+		STATS_PRINT("Delay bound failure = %ju \n",
+			    data->delay[0][0].delay_bound_failure);
 	} else {
 		uint8_t tidx = 0, queues = 0;
 		uint8_t max_queue = STATS_IF_MAX_SAWF_DATA_QUEUE;
@@ -1361,7 +1365,11 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 				print_advance_hist_stats(&dly->delay_hist,
 							 hw_comp);
 				STATS_PRINT("Moving average = %u\n",
-					    data->delay[0][0].mov_avg);
+					    data->delay[tidx][queues].mov_avg);
+				STATS_PRINT("Delay bound success = %ju\n",
+					    data->delay[tidx][queues].delay_bound_success);
+				STATS_PRINT("Delay bound failure = %ju\n",
+					    data->delay[tidx][queues].delay_bound_failure);
 			}
 		}
 	}
