@@ -4074,6 +4074,7 @@ static int dp_rx_tid_delete_wifi3(struct dp_peer *peer, int tid)
 	if (!freedesc) {
 		dp_peer_err("%pK: malloc failed for freedesc: tid %d",
 			    soc, tid);
+		qdf_assert(0);
 		return -ENOMEM;
 	}
 
