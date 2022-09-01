@@ -1450,32 +1450,16 @@ bool wlan_reg_is_freq_in_country_opclass(struct wlan_objmgr_pdev *pdev,
 }
 
 enum channel_state
-wlan_reg_get_5g_bonded_channel_and_state_for_freq(struct wlan_objmgr_pdev *pdev,
-						  uint16_t freq,
-						  enum phy_ch_width bw,
-						  const
-						  struct bonded_channel_freq
-						  **bonded_chan_ptr_ptr)
-{
-	/*
-	 * Get channel frequencies and state from regulatory
-	 */
-	return reg_get_5g_bonded_channel_for_freq(pdev, freq, bw,
-						  bonded_chan_ptr_ptr);
-}
-
-#ifdef CONFIG_REG_6G_PWRMODE
-enum channel_state
 wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode(
-						  struct wlan_objmgr_pdev *pdev,
-						  uint16_t freq,
-						  enum phy_ch_width bw,
-						  const
-						  struct bonded_channel_freq
-						  **bonded_chan_ptr_ptr,
-						  enum supported_6g_pwr_types
-						  in_6g_pwr_mode,
-						  uint16_t input_puncture_bitmap)
+					struct wlan_objmgr_pdev *pdev,
+					uint16_t freq,
+					enum phy_ch_width bw,
+					const
+					struct bonded_channel_freq
+					**bonded_chan_ptr_ptr,
+					enum supported_6g_pwr_types
+					in_6g_pwr_mode,
+					uint16_t input_puncture_bitmap)
 {
 	/*
 	 * Get channel frequencies and state from regulatory
@@ -1487,14 +1471,15 @@ wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode(
 }
 
 qdf_export_symbol(wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode);
-#endif
 
 #if defined(WLAN_FEATURE_11BE) && defined(CONFIG_REG_CLIENT)
 enum channel_state
-wlan_reg_get_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
-					   qdf_freq_t freq,
-					   enum phy_ch_width bw,
-					   qdf_freq_t sec_freq)
+wlan_reg_get_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
+					      qdf_freq_t freq,
+					      enum phy_ch_width bw,
+					      qdf_freq_t sec_freq,
+					      enum supported_6g_pwr_types
+					      in_6g_pwr_mode)
 {
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq))
 		return reg_get_2g_bonded_channel_state_for_freq(pdev, freq,
@@ -1502,68 +1487,23 @@ wlan_reg_get_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
 	if (bw == CH_WIDTH_320MHZ) {
 		const struct bonded_channel_freq *bonded_chan_ptr_ptr = NULL;
 
-		return reg_get_5g_bonded_channel_for_freq(pdev, freq, bw,
-							  &bonded_chan_ptr_ptr);
+		return reg_get_chan_state_for_320(pdev, freq, 0,
+						  bw,
+						  &bonded_chan_ptr_ptr,
+						  in_6g_pwr_mode, true,
+						  NO_SCHANS_PUNC);
 	} else {
 		struct ch_params params = {0};
 
 		params.ch_width = bw;
 
-		return reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
-								&params);
-	}
-}
-
-qdf_export_symbol(wlan_reg_get_5g_bonded_channel_and_state_for_freq);
-
-#else
-enum channel_state
-wlan_reg_get_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
-					   qdf_freq_t freq,
-					   enum phy_ch_width bw,
-					   qdf_freq_t sec_freq)
-{
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq)) {
-		return reg_get_2g_bonded_channel_state_for_freq(pdev, freq,
-						       sec_freq, bw);
-	} else {
-		struct ch_params params = {0};
-
-		params.ch_width = bw;
-
-		return reg_get_5g_bonded_channel_state_for_freq(pdev, freq,
-								&params);
-	}
-}
-
-qdf_export_symbol(wlan_reg_get_5g_bonded_channel_and_state_for_freq);
-
-#ifdef CONFIG_REG_6G_PWRMODE
-enum channel_state
-wlan_reg_get_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
-					      qdf_freq_t freq,
-					      enum phy_ch_width bw,
-					      qdf_freq_t sec_freq,
-					      enum supported_6g_pwr_types
-					      in_6g_pwr_mode,
-					      uint16_t input_punc_bitmap)
-{
-	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq)) {
-		return reg_get_2g_bonded_channel_state_for_freq(pdev, freq,
-						       sec_freq, bw);
-	} else {
-		struct ch_params params = {0};
-
-		params.ch_width = bw;
-
-		return reg_get_5g_bonded_channel_state_for_pwrmode(pdev, freq,
-								&params,
-								in_6g_pwr_mode);
+		return reg_get_5g_bonded_channel_state_for_pwrmode(
+						pdev, freq,
+						&params, in_6g_pwr_mode);
 	}
 }
 
 qdf_export_symbol(wlan_reg_get_bonded_channel_state_for_pwrmode);
-#endif
 #endif
 #endif /* CONFIG CHAN FREQ API */
 

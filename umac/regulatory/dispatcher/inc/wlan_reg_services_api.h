@@ -892,21 +892,7 @@ wlan_reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
-/**
- * wlan_reg_get_bonded_channel_state_for_freq() - Get bonded channel freq state
- * @freq: channel frequency
- * @bw: channel band width
- * @sec_freq: secondary frequency
- *
- * Return: channel state
- */
-enum channel_state
-wlan_reg_get_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
-					   qdf_freq_t freq,
-					   enum phy_ch_width bw,
-					   qdf_freq_t sec_freq);
-
-#ifdef CONFIG_REG_6G_PWRMODE
+#if defined(WLAN_FEATURE_11BE) && defined(CONFIG_REG_CLIENT)
 /**
  * wlan_reg_get_bonded_channel_state_for_pwrmode() - Get bonded channel freq
  * state
@@ -924,8 +910,18 @@ wlan_reg_get_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 					      enum phy_ch_width bw,
 					      qdf_freq_t sec_freq,
 					      enum supported_6g_pwr_types
-					      in_6g_pwr_mode,
-					      uint16_t input_puncture_bitmap);
+					      in_6g_pwr_mode);
+#else
+static inline enum channel_state
+wlan_reg_get_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
+					      qdf_freq_t freq,
+					      enum phy_ch_width bw,
+					      qdf_freq_t sec_freq,
+					      enum supported_6g_pwr_types
+					      in_6g_pwr_mode)
+{
+	return CHANNEL_STATE_INVALID;
+}
 #endif
 
 /**
@@ -2019,26 +2015,6 @@ bool wlan_reg_is_freq_in_country_opclass(struct wlan_objmgr_pdev *pdev,
 					 uint8_t op_class,
 					 qdf_freq_t chan_freq);
 /**
- * wlan_reg_get_5g_bonded_channel_and_state_for_freq()- Return the channel
- * state for a 5G or 6G channel frequency based on the channel width and
- * bonded channel.
- * @pdev: Pointer to pdev.
- * @freq: Channel center frequency.
- * @bw Channel Width.
- * @bonded_chan_ptr_ptr: Pointer to bonded_channel_freq.
- *
- * Return: Channel State
- */
-enum channel_state
-wlan_reg_get_5g_bonded_channel_and_state_for_freq(struct wlan_objmgr_pdev *pdev,
-						  uint16_t freq,
-						  enum phy_ch_width bw,
-						  const
-						  struct bonded_channel_freq
-						  **bonded_chan_ptr_ptr);
-
-#ifdef CONFIG_REG_6G_PWRMODE
-/**
  * wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode()- Return the channel
  * state for a 5G or 6G channel frequency based on the channel width and
  * bonded channel.
@@ -2053,16 +2029,15 @@ wlan_reg_get_5g_bonded_channel_and_state_for_freq(struct wlan_objmgr_pdev *pdev,
  */
 enum channel_state
 wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode(
-						  struct wlan_objmgr_pdev *pdev,
-						  uint16_t freq,
-						  enum phy_ch_width bw,
-						  const
-						  struct bonded_channel_freq
-						  **bonded_chan_ptr_ptr,
-						  enum supported_6g_pwr_types
-						  in_6g_pwr_mode,
-						  uint16_t input_puncture_bitmap);
-#endif
+					struct wlan_objmgr_pdev *pdev,
+					uint16_t freq,
+					enum phy_ch_width bw,
+					const
+					struct bonded_channel_freq
+					**bonded_chan_ptr_ptr,
+					enum supported_6g_pwr_types
+					in_6g_pwr_mode,
+					uint16_t input_puncture_bitmap);
 #endif /*CONFIG_CHAN_FREQ_API */
 
 /**
