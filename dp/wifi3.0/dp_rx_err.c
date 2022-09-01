@@ -1354,13 +1354,17 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 
 	if (hal_rx_is_unicast(soc->hal_soc, rx_tlv_hdr)) {
 		struct dp_peer *peer;
+		struct dp_rx_tid *rx_tid;
 		tid = hal_rx_tid_get(soc->hal_soc, rx_tlv_hdr);
 		peer = dp_peer_get_ref_by_id(soc, txrx_peer->peer_id,
 					     DP_MOD_ID_RX_ERR);
 		if (peer) {
+			rx_tid = &peer->rx_tid[tid];
+			qdf_spin_lock_bh(&rx_tid->tid_lock);
 			if (!peer->rx_tid[tid].hw_qdesc_vaddr_unaligned)
 				dp_rx_tid_setup_wifi3(peer, tid, 1,
 						      IEEE80211_SEQ_MAX);
+			qdf_spin_unlock_bh(&rx_tid->tid_lock);
 			/* IEEE80211_SEQ_MAX indicates invalid start_seq */
 			dp_peer_unref_delete(peer, DP_MOD_ID_RX_ERR);
 		}
