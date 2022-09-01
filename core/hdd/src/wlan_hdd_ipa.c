@@ -36,6 +36,8 @@
 	IS_ENABLED(CONFIG_SCHED_WALT)
 #include <linux/sched/walt.h>
 #endif
+#include "wlan_hdd_object_manager.h"
+#include "wlan_dp_ucfg_api.h"
 
 void hdd_ipa_set_tx_flow_info(void)
 {
@@ -452,10 +454,14 @@ static int hdd_ipa_aggregated_rx_ind(qdf_nbuf_t skb)
 void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 {
 	struct hdd_adapter *adapter = (struct hdd_adapter *) netdev_priv(dev);
+	struct wlan_objmgr_vdev *vdev;
 	int result;
-	unsigned int cpu_index;
+	bool delivered = false;
 	uint32_t enabled;
 	struct hdd_tx_rx_stats *stats;
+	struct hdd_station_ctx *sta_ctx;
+	bool is_eapol;
+	u8 *ta_addr = NULL;
 
 	if (hdd_validate_adapter(adapter)) {
 		kfree_skb(nbuf);
@@ -473,12 +479,18 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	if ((adapter->device_mode == QDF_SAP_MODE) &&
 	    (qdf_nbuf_is_ipv4_dhcp_pkt(nbuf) == true)) {
 		/* Send DHCP Indication to FW */
-		hdd_softap_inspect_dhcp_packet(adapter, nbuf, QDF_RX);
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+		if (vdev) {
+			ucfg_dp_softap_inspect_dhcp_packet(vdev, nbuf, QDF_RX);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+		}
 	}
+
+	is_eapol = qdf_nbuf_is_ipv4_eapol_pkt(nbuf);
 
 	qdf_dp_trace_set_track(nbuf, QDF_RX);
 
-	hdd_event_eapol_log(nbuf, QDF_RX);
+	ucfg_dp_event_eapol_log(nbuf, QDF_RX);
 	qdf_dp_trace_log_pkt(adapter->vdev_id,
 			     nbuf, QDF_RX, QDF_TRACE_DEFAULT_PDEV_ID);
 	DPTRACE(qdf_dp_trace(nbuf,
@@ -502,24 +514,47 @@ void hdd_ipa_send_nbuf_to_network(qdf_nbuf_t nbuf, qdf_netdev_t dev)
 	nbuf->protocol = eth_type_trans(nbuf, nbuf->dev);
 	nbuf->ip_summed = CHECKSUM_NONE;
 
-	cpu_index = wlan_hdd_get_cpu();
-
-	++stats->per_cpu[cpu_index].rx_packets;
-
 	/*
 	 * Update STA RX exception packet stats.
 	 * For SAP as part of IPA HW stats are updated.
 	 */
 
-	++adapter->stats.rx_packets;
-	adapter->stats.rx_bytes += nbuf->len;
+	if (is_eapol && SEND_EAPOL_OVER_NL) {
+		if (adapter->device_mode == QDF_SAP_MODE) {
+			ta_addr = adapter->mac_addr.bytes;
+		} else if (adapter->device_mode == QDF_STA_MODE) {
+			sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+			ta_addr = (u8 *)&sta_ctx->conn_info.peer_macaddr;
+		}
 
-	result = hdd_ipa_aggregated_rx_ind(nbuf);
+		if (ta_addr) {
+			if (wlan_hdd_cfg80211_rx_control_port(adapter->dev,
+							      ta_addr, nbuf,
+							      false))
+				result = NET_RX_SUCCESS;
+			else
+				result = NET_RX_DROP;
+		} else {
+			result = NET_RX_DROP;
+		}
+
+		dev_kfree_skb(nbuf);
+	} else {
+		result = hdd_ipa_aggregated_rx_ind(nbuf);
+	}
+
 	if (result == NET_RX_SUCCESS)
-		++stats->per_cpu[cpu_index].rx_delivered;
-	else
-		++stats->per_cpu[cpu_index].rx_refused;
-
+		delivered = true;
+	/*
+	 * adapter->vdev is directly dereferenced because this is per packet
+	 * path, hdd_get_vdev_by_user() usage will be very costly as it involves
+	 * lock access.
+	 * Expectation here is vdev will be present during TX/RX processing
+	 * and also DP internally maintaining vdev ref count
+	 */
+	ucfg_dp_inc_rx_pkt_stats(adapter->vdev,
+				 nbuf->len,
+				 delivered);
 	/*
 	 * Restore PF_WAKE_UP_IDLE flag in the task structure
 	 */

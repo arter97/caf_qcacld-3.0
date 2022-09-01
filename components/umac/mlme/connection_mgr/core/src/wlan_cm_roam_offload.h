@@ -29,7 +29,59 @@
 #include "qdf_str.h"
 #include "wlan_cm_roam_public_struct.h"
 
-#if defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) && \
+#if defined(CONNECTIVITY_DIAG_EVENT) && \
+	defined(WLAN_FEATURE_ROAM_OFFLOAD)
+/**
+ * cm_roam_scan_info_event() - send scan info to userspace
+ * @psoc: psoc common object
+ * @scan: roam scan data
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
+			     struct wmi_roam_scan_data *scan, uint8_t vdev_id);
+
+/**
+ * cm_roam_trigger_info_event() - send trigger info to userspace
+ * @data: roam trigger data
+ * @scan_data: Roam scan data
+ * @vdev_id: vdev id
+ * @is_full_scan: is full scan or partial scan
+ *
+ * Return: None
+ */
+void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
+				struct wmi_roam_scan_data *scan_data,
+				uint8_t vdev_id, bool is_full_scan);
+
+/**
+ * cm_roam_candidate_info_event() - send trigger info to userspace
+ * @ap: roam candidate info
+ * @cand_ap_idx: Candidate AP index
+ *
+ * Return: void
+ */
+void cm_roam_candidate_info_event(struct wmi_roam_candidate_info *ap,
+				  uint8_t cand_ap_idx);
+
+/**
+ * cm_roam_result_info_event() - send scan results info to userspace
+ * @psoc: Pointer to PSOC object
+ * @trigger: Roam trigger data
+ * @res: roam result data
+ * @scan_data: Roam scan info
+ * @vdev_id: vdev id
+ *
+ * Return: void
+ */
+void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
+			       struct wmi_roam_trigger_info *trigger,
+			       struct wmi_roam_result *res,
+			       struct wmi_roam_scan_data *scan_data,
+			       uint8_t vdev_id);
+
+#elif defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) && \
     defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
  * cm_roam_scan_info_event() - send scan info to userspace
@@ -283,10 +335,12 @@ QDF_STATUS cm_roam_control_restore_default_config(struct wlan_objmgr_pdev *pdev,
  * cm_update_pmk_cache_ft - API to update MDID in PMKSA cache entry
  * @psoc: psoc pointer
  * @vdev_id: dvev ID
+ * @pmk_cache: pmksa from the userspace
  *
  * Return: None
  */
-void cm_update_pmk_cache_ft(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+void cm_update_pmk_cache_ft(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    struct wlan_crypto_pmksa *pmk_cache);
 
 /**
  * cm_lookup_pmkid_using_bssid() - lookup pmkid using bssid
@@ -441,7 +495,8 @@ cm_handle_mlo_rso_state_change(struct wlan_objmgr_pdev *pdev,
 
 #endif
 
-#if defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) && \
+#if (defined(WLAN_FEATURE_CONNECTIVITY_LOGGING) || \
+	defined(CONNECTIVITY_DIAG_EVENT)) && \
 	defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
  * cm_roam_mgmt_frame_event() - Roam management frame event

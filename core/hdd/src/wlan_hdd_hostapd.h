@@ -322,8 +322,21 @@ static inline QDF_STATUS hdd_get_sap_ht2040_mode(
 }
 #endif
 
+#ifdef CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT
+/**
+ * wlan_hdd_cfg80211_stop_ap() - stop sap
+ * @wiphy: Pointer to wiphy
+ * @dev: Pointer to netdev
+ * @link_id: Link id for which this stop_ap is recevied.
+ *
+ * Return: zero for success non-zero for failure
+ */
+int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+			      unsigned int link_id);
+#else
 int wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 			      struct net_device *dev);
+#endif
 
 int wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			       struct net_device *dev,
@@ -435,6 +448,27 @@ void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
  * Return: true if any sta is connecting
  */
 bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
+
+#ifdef WLAN_FEATURE_11AX
+/**
+ * hdd_update_he_obss_pd() - Enable or disable spatial reuse
+ * based on user space input and concurrency combination.
+ * @adapter:  Pointer to hostapd adapter
+ * @params: Pointer to AP configuration from cfg80211
+ * @iface_start: Interface start or not
+ *
+ * Return: void
+ */
+void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
+			   struct cfg80211_ap_settings *params,
+			   bool iface_start);
+#else
+static inline void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
+					 struct cfg80211_ap_settings *params,
+					 bool iface_start)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**

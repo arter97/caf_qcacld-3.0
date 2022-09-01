@@ -321,7 +321,7 @@ struct wlan_dp_intf {
 	qdf_atomic_t num_active_task;
 	uint32_t sap_tx_block_mask;
 
-	uint8_t gro_disallowed[DP_MAX_RX_THREADS];
+	qdf_atomic_t gro_disallowed;
 	uint8_t gro_flushed[DP_MAX_RX_THREADS];
 
 	bool runtime_disable_rx_thread;
@@ -386,7 +386,7 @@ struct wlan_dp_psoc_context {
 	uint64_t no_rx_offload_pkt_cnt;
 	uint64_t no_tx_offload_pkt_cnt;
 
-	bool wlan_suspended;
+	bool is_suspend;
 	/* Flag keeps track of wiphy suspend/resume */
 	bool is_wiphy_suspended;
 
@@ -430,7 +430,8 @@ struct wlan_dp_psoc_context {
 	struct {
 		qdf_atomic_t rx_aggregation;
 		uint8_t gro_force_flush[DP_MAX_RX_THREADS];
-		bool force_gro_enable;
+		bool tc_based_dyn_gro;
+		uint32_t tc_ingress_prio;
 	}
 	dp_agg_param;
 

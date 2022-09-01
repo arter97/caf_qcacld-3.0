@@ -562,8 +562,8 @@ union wlan_tp_data {
 /**
  * struct wlan_dp_psoc_callbacks - struct containing callback
  * to non-converged driver
- * @os_if_dp_gro_rx: OS IF Callback to handle GRO packet to n/w stack
  * @callback_ctx : Opaque callback context
+ * @dp_get_netdev_by_vdev_mac: Callback to get netdev from vdev mac address
  * @wlan_dp_sta_get_dot11mode: Callback to get dot11 mode
  * @wlan_dp_get_ap_client_count: Callback to get client count connected to AP
  * @wlan_dp_sta_ndi_connected: Callback to get NDI connected status
@@ -591,8 +591,7 @@ union wlan_tp_data {
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
 
-	QDF_STATUS (*dp_get_nw_intf_mac_by_vdev_mac)(struct qdf_mac_addr *mac_addr,
-						     struct qdf_mac_addr *intf_mac);
+	qdf_netdev_t (*dp_get_netdev_by_vdev_mac)(struct qdf_mac_addr *mac_addr);
 	unsigned int (*dp_get_tx_flow_low_watermark)(hdd_cb_handle cb_ctx,
 						     uint8_t intf_id);
 	void (*dp_get_tx_resource)(uint8_t intf_id, struct qdf_mac_addr *mac_addr);
@@ -618,7 +617,7 @@ struct wlan_dp_psoc_callbacks {
 	void (*dp_register_rx_offld_flush_cb)(enum dp_rx_offld_flush_cb type);
 
 	QDF_STATUS (*dp_rx_check_qdisc_configured)(qdf_netdev_t dev,
-						   uint8_t rx_ctx_id);
+						   uint32_t prio);
 
 	bool (*dp_is_gratuitous_arp_unsolicited_na)(qdf_nbuf_t nbuf);
 

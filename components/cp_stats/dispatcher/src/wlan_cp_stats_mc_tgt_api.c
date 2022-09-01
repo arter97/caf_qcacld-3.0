@@ -589,10 +589,8 @@ extd2_stats:
 
 	/* no matched peer */
 	if (!QDF_IS_ADDR_BROADCAST(last_req.peer_mac_addr) &&
-	    selected == ev->num_peer_adv_stats) {
+	    selected == ev->num_peer_adv_stats)
 		cp_stats_debug("peer not found for extd stats");
-		return;
-	}
 
 complete:
 	if (is_station_stats)
@@ -711,8 +709,10 @@ tgt_mc_cp_stats_extract_congestion_stats(struct wlan_objmgr_psoc *psoc,
 	uint8_t i, index;
 	struct request_info last_req = {0};
 	struct medium_assess_data data[WLAN_UMAC_MAX_RP_PID] = { {0} };
+	bool is_last_event = tgt_mc_cp_stats_is_last_event(ev,
+					TYPE_CONGESTION_STATS);
 
-	if (!ev->num_pdev_stats) {
+	if (!(ev->num_pdev_stats || ev->num_pdev_extd_stats)) {
 		cp_stats_err("no congestion sta for pdev");
 		return;
 	}
@@ -732,14 +732,26 @@ tgt_mc_cp_stats_extract_congestion_stats(struct wlan_objmgr_psoc *psoc,
 			cp_stats_err("part1 pdev id error");
 			continue;
 		}
-		data[index].part1_valid = 1;
+		data[index].part1_valid = true;
 		data[index].cycle_count = ev->pdev_stats[i].cycle_count;
 		data[index].rx_clear_count = ev->pdev_stats[i].rx_clear_count;
 		data[index].tx_frame_count = ev->pdev_stats[i].tx_frame_count;
 	}
 
+	for (i = 0; (i < ev->num_pdev_extd_stats) && (i < WLAN_UMAC_MAX_RP_PID);
+	     i++){
+		index = ev->pdev_extd_stats[i].pdev_id;
+		if (index >= WLAN_UMAC_MAX_RP_PID) {
+			cp_stats_err("part2 pdev id error");
+			continue;
+		}
+		data[index].part2_valid = true;
+		data[index].my_rx_count = ev->pdev_extd_stats[i].my_rx_count;
+	}
+
 	if (last_req.u.congestion_notif_cb)
-		last_req.u.congestion_notif_cb(last_req.vdev_id, data);
+		last_req.u.congestion_notif_cb(last_req.vdev_id, data,
+						is_last_event);
 
 }
 #else
@@ -1090,8 +1102,7 @@ tgt_mc_cp_stats_send_raw_station_stats(struct wlan_objmgr_psoc *psoc,
 	wlan_cp_stats_peer_obj_unlock(peer_cp_stats_priv);
 
 end:
-	if (info.vdev_summary_stats && info.vdev_chain_rssi)
-		get_station_stats_cb(&info, last_req->cookie);
+	get_station_stats_cb(&info, last_req->cookie);
 
 	ucfg_mc_cp_stats_free_stats_resources(&info);
 

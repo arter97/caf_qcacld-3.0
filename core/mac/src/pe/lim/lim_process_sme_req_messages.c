@@ -69,6 +69,7 @@
 #include <wlan_vdev_mgr_utils_api.h>
 #include "cfg_ucfg_api.h"
 #include "wlan_twt_cfg_ext_api.h"
+#include <spatial_reuse_api.h>
 
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
@@ -2620,14 +2621,15 @@ static bool lim_enable_twt(struct mac_context *mac_ctx, tDot11fBeaconIEs *ie)
 {
 	struct s_ext_cap *ext_cap;
 	bool twt_support_in_11n = false;
+	bool twt_request = false;
 
 	if (!ie) {
 		pe_debug("ie is null");
 		return false;
 	}
 
-	if (mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request &&
-	    (ie->qcn_ie.present || ie->he_cap.twt_responder)) {
+	wlan_twt_cfg_get_support_requestor(mac_ctx->psoc, &twt_request);
+	if (twt_request && (ie->qcn_ie.present || ie->he_cap.twt_responder)) {
 		pe_debug("TWT is supported, hence disable UAPSD; twt req supp: %d,twt respon supp: %d, QCN_IE: %d",
 			  mac_ctx->mlme_cfg->he_caps.dot11_he_cap.twt_request,
 			  ie->he_cap.twt_responder,
@@ -3659,6 +3661,117 @@ static inline void lim_update_pmksa_to_profile(struct wlan_objmgr_vdev *vdev,
 }
 #endif
 
+static inline bool
+lim_is_rsnxe_cap_set(struct mac_context *mac_ctx,
+		     struct cm_vdev_join_req *req)
+{
+	const uint8_t *rsnxe, *rsnxe_cap;
+	uint8_t cap_len, cap_index;
+	uint32_t cap_mask;
+
+	rsnxe = wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE,
+					 req->assoc_ie.ptr,
+					 req->assoc_ie.len);
+	if (!rsnxe)
+		return false;
+
+	rsnxe_cap = wlan_crypto_parse_rsnxe_ie(rsnxe, &cap_len);
+	if (!rsnxe_cap) {
+		mlme_debug("RSNXE caps not present");
+		return false;
+	}
+
+	/*
+	 * Below is the definition of RSNXE capabilities defined
+	 * in (IEEE Std 802.11-2020, 9.4.2.241, Table 9-780).
+	 * The Extended RSN Capabilities field, except its first 4 bits, is a
+	 * bit field indicating the extended RSN capabilities being advertised
+	 * by the STA transmitting the element. The length of the Extended
+	 * RSN Capabilities field is a variable n, in octets, as indicated by
+	 * the first 4 bits in the field.
+	 * Let's consider a uint32_t cap_mask which can accommodate 28(32-4)
+	 * bits to check if those bits are set or not. This is to keep it
+	 * simple as current supported bits are only 11.
+	 * TODO: If spec supports more than this range in future, this needs to
+	 * be an array to hold the complete bitmap/bitmask.
+	 */
+	cap_mask = ~(WLAN_CRYPTO_RSNX_CAP_SAE_H2E |
+		     WLAN_CRYPTO_RSNX_CAP_SAE_PK |
+		     WLAN_CRYPTO_RSNX_CAP_SECURE_LTF |
+		     WLAN_CRYPTO_RSNX_CAP_SECURE_RTT |
+		     WLAN_CRYPTO_RSNX_CAP_PROT_RANGE_NEG);
+
+	/* Check if any other bits are set than cap_mask */
+	for (cap_index = 0; cap_index <= cap_len; cap_index++) {
+		if (rsnxe_cap[cap_index] & (cap_mask & 0xFF))
+			return true;
+		cap_mask >>= 8;
+	}
+
+	return false;
+}
+
+/**
+ * lim_is_akm_wpa_wpa2() - Check if the AKM is legacy than wpa3
+ *
+ * @session: PE session
+ *
+ * This is to check if the AKM is older than WPA3. This helps to determine if
+ * RSNXE needs to be carried or not.
+ *
+ * return true - If AKM is WPA/WPA2 which means it's older than WPA3
+ *        false - If AKM is not older than WPA3
+ */
+static inline bool
+lim_is_akm_wpa_wpa2(struct pe_session *session)
+{
+	int32_t akm;
+
+	akm = wlan_crypto_get_param(session->vdev, WLAN_CRYPTO_PARAM_KEY_MGMT);
+	if (akm == -1)
+		return false;
+
+	if (WLAN_CRYPTO_IS_WPA_WPA2(akm))
+		return true;
+
+	return false;
+}
+
+static inline void
+lim_strip_rsnx_ie(struct mac_context *mac_ctx,
+		  struct pe_session *session,
+		  struct cm_vdev_join_req *req)
+{
+	/*
+	 * Userspace may send RSNXE also in connect request irrespective
+	 * of the connecting AP capabilities. This allows the driver to chose
+	 * best candidate based on score. But the chosen candidate may
+	 * not support the RSNXE feature and may not advertise RSNXE
+	 * in beacon/probe response. Station is not supposed to include
+	 * the RSNX IE in assoc request in such cases as legacy APs
+	 * may misbahave due to the new IE. It's observed that few
+	 * legacy APs which don't support the RSNXE reject the
+	 * connection at EAPOL stage.
+	 * So, strip the IE when below conditions are met to avoid
+	 * sending the RSNXE to legacy APs,
+	 * 1. If AP doesn't support/advertise the RSNXE
+	 * 2. If the connection is in a older mode than WPA3 i.e. WPA/WPA2 mode
+	 * 3. If no other bits are set than SAE_H2E, SAE_PK, SECURE_LTF,
+	 * SECURE_RTT, PROT_RANGE_NEGOTIOATION in RSNXE capabilities
+	 * field.
+
+	 */
+	if (!util_scan_entry_rsnxe(req->entry) &&
+	    lim_is_akm_wpa_wpa2(session) &&
+	    !lim_is_rsnxe_cap_set(mac_ctx, req)) {
+		mlme_debug("Strip RSNXE as it's not supported by AP");
+		lim_strip_ie(mac_ctx, req->assoc_ie.ptr,
+			     (uint16_t *)&req->assoc_ie.len,
+			     WLAN_ELEMID_RSNXE, ONE_BYTE,
+			     NULL, 0, NULL, WLAN_MAX_IE_LEN);
+	}
+}
+
 static QDF_STATUS
 lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		struct cm_vdev_join_req *req)
@@ -3739,6 +3852,8 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 				    pmksa_peer->pmk, pmksa_peer->pmk_len);
 		lim_update_pmksa_to_profile(session->vdev, pmksa_peer);
 	}
+
+	lim_strip_rsnx_ie(mac_ctx, session, req);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3880,9 +3995,42 @@ static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 	}
 	pe_join_req->assoc_link_id = req->assoc_link_id;
 }
+
+static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+			       struct pe_session *session)
+{
+	bool emlsr_cap, emlsr_allowed, emlsr_enabled = false;
+
+	/* Check if HW supports eMLSR mode */
+	emlsr_cap = policy_mgr_is_hw_emlsr_capable(mac_ctx->psoc);
+	if (!emlsr_cap)
+		return;
+
+	/* Check if vendor command chooses eMLSR mode */
+	wlan_mlme_get_emlsr_mode_enabled(mac_ctx->psoc, &emlsr_enabled);
+
+	emlsr_allowed = emlsr_cap && emlsr_enabled;
+
+	if (emlsr_allowed) {
+		wlan_vdev_obj_lock(session->vdev);
+		wlan_vdev_mlme_cap_set(session->vdev, WLAN_VDEV_C_EMLSR_CAP);
+		wlan_vdev_obj_unlock(session->vdev);
+	} else {
+		wlan_vdev_obj_lock(session->vdev);
+		wlan_vdev_mlme_cap_clear(session->vdev, WLAN_VDEV_C_EMLSR_CAP);
+		wlan_vdev_obj_unlock(session->vdev);
+	}
+
+	pe_debug("eMLSR vdev cap: %d", emlsr_allowed);
+}
 #else
 static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 			     struct join_req *pe_join_req)
+{
+}
+
+static void lim_set_emlsr_caps(struct mac_context *mac_ctx,
+			       struct pe_session *session)
 {
 }
 #endif
@@ -4083,6 +4231,8 @@ lim_cm_handle_join_req(struct cm_vdev_join_req *req)
 		 pe_session->isOSENConnection,
 		 lim_is_fils_connection(pe_session));
 
+	lim_set_emlsr_caps(mac_ctx, pe_session);
+
 	status = lim_send_connect_req_to_mlm(pe_session);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("Failed to send mlm req vdev id %d",
@@ -4241,6 +4391,13 @@ static void lim_process_sb_disconnect_req(struct mac_context *mac_ctx,
 {
 	struct scheduler_msg msg = {0};
 	struct disassoc_cnf disassoc_cnf = {0};
+
+	/* For SB disconnect smeState should be in Deauth state
+	 * One scenario where the smeState is not updated is when
+	 * AP sends deauth on link vdev and disconnect req is triggered
+	 */
+	if (pe_session->limSmeState == eLIM_SME_LINK_EST_STATE)
+		pe_session->limSmeState = eLIM_SME_WT_DEAUTH_STATE;
 
 	if (pe_session->limSmeState == eLIM_SME_WT_DEAUTH_STATE)
 		disassoc_cnf.messageType = eWNI_SME_DEAUTH_CNF;
@@ -5066,7 +5223,8 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 
 		ch_params.ch_width = CH_WIDTH_20MHZ;
 
-		for (i = 0; i < single_tpe.max_tx_pwr_count + 1; i++) {
+		for (i = 0; i < single_tpe.max_tx_pwr_count + 1 &&
+		     (ch_params.ch_width != CH_WIDTH_INVALID); i++) {
 			wlan_reg_set_channel_params_for_freq(mac->pdev,
 							     curr_op_freq, 0,
 							     &ch_params);
@@ -5078,8 +5236,9 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 			vdev_mlme->reg_tpc_obj.frequency[i] =
 							ch_params.mhz_freq_seg0;
 			vdev_mlme->reg_tpc_obj.tpe[i] = single_tpe.tx_power[i];
-			ch_params.ch_width =
-				get_next_higher_bw[ch_params.ch_width];
+			if (ch_params.ch_width != CH_WIDTH_INVALID)
+				ch_params.ch_width =
+					get_next_higher_bw[ch_params.ch_width];
 		}
 	}
 
@@ -5397,7 +5556,8 @@ void lim_calculate_tpc(struct mac_context *mac,
 		if (mlme_obj->reg_tpc_obj.ap_constraint_power) {
 			local_constraint =
 				mlme_obj->reg_tpc_obj.ap_constraint_power;
-			reg_max = mlme_obj->reg_tpc_obj.reg_max[i];
+			pe_debug("local constraint: %d power constraint absolute %d",
+				 local_constraint, is_pwr_constraint_absolute);
 			if (is_pwr_constraint_absolute)
 				max_tx_power = QDF_MIN(reg_max,
 						       local_constraint);
@@ -9356,6 +9516,12 @@ void lim_process_set_he_bss_color(struct mac_context *mac_ctx, uint32_t *msg_buf
 	beacon_params.bss_color_disabled = 1;
 	beacon_params.bss_color = session_entry->he_op.bss_color;
 	session_entry->bss_color_changing = 1;
+
+	if (wlan_vdev_mlme_get_he_spr_enabled(session_entry->vdev)) {
+		/* Disable spatial reuse during BSS color change */
+		wlan_spatial_reuse_config_set(session_entry->vdev, 0, 0);
+		wlan_vdev_mlme_set_he_spr_enabled(session_entry->vdev, false);
+	}
 
 	if (sch_set_fixed_beacon_fields(mac_ctx, session_entry) !=
 			QDF_STATUS_SUCCESS) {
