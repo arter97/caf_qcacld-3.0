@@ -2082,9 +2082,10 @@ void sap_append_cac_history(struct mac_context *mac_ctx,
 		enum channel_state state;
 		const struct bonded_channel_freq *bonded_chan_ptr = NULL;
 
-		state = wlan_reg_get_5g_bonded_channel_and_state_for_freq
+		state = wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode
 			(mac_ctx->pdev, ch_param.mhz_freq_seg0,
-			 ch_param.ch_width, &bonded_chan_ptr);
+			 ch_param.ch_width, &bonded_chan_ptr,
+			 REG_CURRENT_PWR_MODE, NO_SCHANS_PUNC);
 		if (!bonded_chan_ptr || state == CHANNEL_STATE_INVALID) {
 			sap_debug("invalid freq %d", ch_param.mhz_freq_seg0);
 			return;
