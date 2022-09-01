@@ -1601,7 +1601,7 @@ wlan_rptr_process_extender_ie(struct wlan_objmgr_peer *peer,
 			apvaps_cnt = *ie++;
 			stavaps_cnt = *ie++;
 			mac_list = (u_int8_t *)ss_info->preferred_bssid_list;
-			for (i = 0; ((i < apvaps_cnt) && (i < MAX_RADIO_CNT) &&
+			for (i = 0; ((i < apvaps_cnt) && (i < RPTR_MAX_RADIO_CNT) &&
 				     (ie_len > 0)); i++) {
 				WLAN_ADDR_COPY((mac_list + (i * QDF_MAC_ADDR_SIZE)),
 					       ie);
@@ -1611,7 +1611,7 @@ wlan_rptr_process_extender_ie(struct wlan_objmgr_peer *peer,
 				ie_len -= QDF_MAC_ADDR_SIZE;
 			}
 			mac_list = (u_int8_t *)ss_info->denied_client_list;
-			for (i = 0; ((i < stavaps_cnt) && (i < MAX_RADIO_CNT) &&
+			for (i = 0; ((i < stavaps_cnt) && (i < RPTR_MAX_RADIO_CNT) &&
 				     (ie_len > 0)); i++) {
 				WLAN_ADDR_COPY((mac_list + (i * QDF_MAC_ADDR_SIZE)),
 						ie);
@@ -1741,7 +1741,7 @@ wlan_rptr_validate_stavap_connection(struct wlan_objmgr_vdev *vdev,
 			/* When stavap connected to RootAP, clear preferred and
 			 *  denied mac list
 			*/
-			for (i = 0; i < MAX_RADIO_CNT; i++) {
+			for (i = 0; i < RPTR_MAX_RADIO_CNT; i++) {
 				OS_MEMZERO(&ss_info->preferred_bssid_list[i][0],
 					   QDF_MAC_ADDR_SIZE);
 				OS_MEMZERO(&ss_info->denied_client_list[i][0],
@@ -1789,7 +1789,7 @@ wlan_rptr_validate_stavap_connection(struct wlan_objmgr_vdev *vdev,
 			}
 			/*make sure connecting to RE whose mac present in preferred bssid*/
 			flag = QDF_STATUS_E_INVAL;
-			for (i = 0; i < MAX_RADIO_CNT; i++) {
+			for (i = 0; i < RPTR_MAX_RADIO_CNT; i++) {
 				if (OS_MEMCMP(bssid, &ss_info->preferred_bssid_list[i][0],
 					      QDF_MAC_ADDR_SIZE) == 0) {
 					flag = QDF_STATUS_SUCCESS;
