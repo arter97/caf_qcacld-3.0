@@ -1565,27 +1565,6 @@ wlan_reg_get_channel_list_with_power(
 
 #ifdef WLAN_FEATURE_11BE
 /**
- * wlan_reg_fill_channel_list() - Fills the reg_channel_list (list of channels)
- * @pdev: Pointer to struct wlan_objmgr_pdev.
- * @freq: Center frequency of the primary channel in MHz
- * @sec_ch_2g_freq: Secondary channel center frequency.
- * @ch_width: Channel width of type 'enum phy_ch_width'.
- * @band_center_320: Center frequency of 320MHZ channel.
- * @chan_list: Pointer to struct reg_channel_list to be filled (Output param).
- * @treat_nol_chan_as_disabled: bool to treat nol channel as enabled or
- * disabled. If set to true, nol chan is considered as disabled in chan search.
- *
- * Return: None
- */
-void wlan_reg_fill_channel_list(struct wlan_objmgr_pdev *pdev,
-				qdf_freq_t freq,
-				qdf_freq_t sec_ch_2g_freq,
-				enum phy_ch_width ch_width,
-				qdf_freq_t band_center_320,
-				struct reg_channel_list *chan_list,
-				bool treat_nol_chan_as_disabled);
-
-/**
  * wlan_reg_is_punc_bitmap_valid() - is puncture bitmap valid or not
  * @bw: Input channel width.
  * @puncture_bitmap Input puncture bitmap.

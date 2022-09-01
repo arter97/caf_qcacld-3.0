@@ -439,10 +439,11 @@ QDF_STATUS wlan_cm_sta_set_chan_param(struct wlan_objmgr_vdev *vdev,
 	if (chan_param->ch_width != CH_WIDTH_320MHZ)
 		center_freq_320 = 0;
 	qdf_mem_zero(&chan_list, sizeof(chan_list));
-	wlan_reg_fill_channel_list(pdev, ch_freq,
-				   sec_ch_2g_freq, chan_param->ch_width,
-				   center_freq_320, &chan_list,
-				   true);
+	wlan_reg_fill_channel_list_for_pwrmode(pdev, ch_freq,
+					       sec_ch_2g_freq,
+					       chan_param->ch_width,
+					       center_freq_320, &chan_list,
+					       REG_CURRENT_PWR_MODE, true);
 	*chan_param = chan_list.chan_param[0];
 	if (chan_param->ch_width == ori_bw)
 		new_punc = ori_punc;
