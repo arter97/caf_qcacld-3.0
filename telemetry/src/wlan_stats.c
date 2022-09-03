@@ -1324,6 +1324,12 @@ fill_advance_peer_sawfdelay_stats(struct advance_peer_data_sawfdelay *data,
 			for (idx = 0; idx < mx_buc; idx++)
 				data->delay[tidx][queues].delay_hist.hist.freq[idx] =
 					delay_stats->delay_hist.hist.freq[idx];
+			data->delay[tidx][queues].mov_avg =
+					delay_stats->mov_avg;
+			data->delay[tidx][queues].delay_bound_success =
+					delay_stats->success;
+			data->delay[tidx][queues].delay_bound_failure =
+					delay_stats->failure;
 			delay_stats++;
 		}
 	}
@@ -1500,6 +1506,10 @@ get_advance_peer_data_sawfdelay(struct sawf_delay_stats *sawf_delay_stats,
 		for (idx = 0; idx < mx_buc; idx++)
 			data->delay[0][0].delay_hist.hist.freq[idx] =
 				sawf_delay_stats->delay_hist.hist.freq[idx];
+		data->delay[0][0].delay_bound_success =
+				sawf_delay_stats->success;
+		data->delay[0][0].delay_bound_failure =
+			sawf_delay_stats->failure;
 		data->tid = sawf_delay_stats->tid;
 		data->msduq = sawf_delay_stats->msduq;
 	}
