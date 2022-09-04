@@ -124,7 +124,7 @@ void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf)
 	DP_TX_TCL_METADATA_TYPE_SET(*htt_tcl_metadata,
 				    DP_TCL_METADATA_TYPE_SVC_ID_BASED);
 	HTT_TX_FLOW_METADATA_TID_OVERRIDE_SET(*htt_tcl_metadata, 1);
-	HTT_TX_TCL_METADATA_SVC_CLASS_ID_SET(*htt_tcl_metadata, service_id);
+	HTT_TX_TCL_METADATA_SVC_CLASS_ID_SET(*htt_tcl_metadata, service_id - 1);
 }
 
 QDF_STATUS

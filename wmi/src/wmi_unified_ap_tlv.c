@@ -3657,7 +3657,7 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 
 	sawf_create_set_defaults(param);
 
-	cmd->svc_class_id = param->svc_id;
+	cmd->svc_class_id = param->svc_id - 1;
 	cmd->min_thruput_kbps = param->min_thruput_rate;
 	cmd->max_thruput_kbps = param->max_thruput_rate;
 	cmd->burst_size_bytes = param->burst_size;
@@ -3703,7 +3703,7 @@ QDF_STATUS send_sawf_disable_cmd_tlv(wmi_unified_t wmi_handle,
 		       WMITLV_GET_STRUCT_TLVLEN
 		       (wmi_sawf_svc_class_disable_cmd_fixed_param));
 
-	cmd->svc_class_id = svc_id;
+	cmd->svc_class_id = svc_id - 1;
 
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 			WMI_SAWF_SVC_CLASS_DISABLE_CMDID);
