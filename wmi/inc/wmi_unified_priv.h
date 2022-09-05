@@ -2107,6 +2107,16 @@ QDF_STATUS (*extract_peer_stats_count)(wmi_unified_t wmi_handle, void *evt_buf,
 
 QDF_STATUS (*extract_peer_stats_info)(wmi_unified_t wmi_handle, void *evt_buf,
 		uint32_t index, wmi_host_peer_stats_info *peer_stats_info);
+
+QDF_STATUS
+(*extract_peer_tx_pkt_per_mcs)(wmi_unified_t wmi_handle, void *evt_buf,
+			       uint32_t index,
+			       wmi_host_peer_stats_info *peer_stats_info);
+QDF_STATUS
+(*extract_peer_rx_pkt_per_mcs)(wmi_unified_t wmi_handle, void *evt_buf,
+			       uint32_t index,
+			       wmi_host_peer_stats_info *peer_stats_info);
+
 #endif /* QCA_SUPPORT_MC_CP_STATS */
 
 QDF_STATUS
