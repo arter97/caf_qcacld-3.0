@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -111,6 +111,9 @@ struct mlme_cm_ops {
 	QDF_STATUS (*mlme_cm_roam_start_cb)(struct wlan_objmgr_vdev *vdev);
 	QDF_STATUS (*mlme_cm_roam_abort_cb)(struct wlan_objmgr_vdev *vdev);
 	QDF_STATUS (*mlme_cm_roam_cmpl_cb)(struct wlan_objmgr_vdev *vdev);
+	QDF_STATUS (*mlme_cm_roam_get_scan_ie_cb)(struct wlan_objmgr_vdev *vdev,
+				struct element_info *scan_ie,
+				enum dot11_mode_filter *dot11mode_filter);
 #endif
 #ifdef WLAN_FEATURE_PREAUTH_ENABLE
 	QDF_STATUS (*mlme_cm_ft_preauth_cmpl_cb)(
@@ -901,6 +904,21 @@ QDF_STATUS mlme_cm_osif_roam_abort_ind(struct wlan_objmgr_vdev *vdev);
  * Return: QDF_STATUS
  */
 QDF_STATUS mlme_cm_osif_roam_complete(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlme_cm_osif_roam_get_scan_params() - osif Roam get scan params callback
+ * @vdev: vdev pointer
+ * @scan_ie: Pointer to scan_ie
+ * @dot11mode_filter: Pointer to dot11mode_filter
+ *
+ * Get scan IE params from adapter corresponds to given vdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mlme_cm_osif_roam_get_scan_params(struct wlan_objmgr_vdev *vdev,
+				  struct element_info *scan_ie,
+				  enum dot11_mode_filter *dot11mode_filter);
 #endif
 
 #ifdef WLAN_FEATURE_PREAUTH_ENABLE

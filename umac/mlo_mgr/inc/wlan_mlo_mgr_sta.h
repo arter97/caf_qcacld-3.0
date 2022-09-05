@@ -91,6 +91,25 @@ void mlo_sta_link_disconn_notify(struct wlan_objmgr_vdev *vdev,
 				 struct wlan_cm_discon_rsp *resp);
 
 /**
+ * mlo_handle_sta_link_connect_failure - Notifies that STA link connect failure
+ * @vdev: pointer to vdev
+ * @rsp: connect resp
+ *
+ * Return: none
+ */
+void mlo_handle_sta_link_connect_failure(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_cm_connect_resp *rsp);
+
+/**
+ * mlo_handle_pending_disconnect - Handle pending disconnect if received
+ * while link connect is ongoing.
+ * @vdev: pointer to vdev
+ *
+ * Return: none
+ */
+void mlo_handle_pending_disconnect(struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlo_is_mld_sta - Check if MLD associated with the vdev is a station
  * @vdev: pointer to vdev
  *
@@ -585,6 +604,25 @@ void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
 				struct scan_cache_entry *scan_entry,
 				uint8_t *ml_ie, qdf_size_t ml_ie_len,
 				struct mlo_partner_info *partner_info);
+/**
+ * mlo_allocate_and_copy_ies() - allocate and copy ies
+ * @target: target connect req pointer
+ * @source: source connect req pointer
+ *
+ * Return: None
+ */
+void
+mlo_allocate_and_copy_ies(struct wlan_cm_connect_req *target,
+			  struct wlan_cm_connect_req *source);
+
+/**
+ * mlo_free_connect_ies() - free connect ies
+ * @connect_req: connect req pointer
+ *
+ * Return: None
+ */
+void
+mlo_free_connect_ies(struct wlan_cm_connect_req *connect_req);
 #else
 static inline
 QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,

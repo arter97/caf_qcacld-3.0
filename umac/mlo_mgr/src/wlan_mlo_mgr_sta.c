@@ -36,13 +36,13 @@
 #include <wlan_scan_api.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static QDF_STATUS mlo_disocnnect_req(struct wlan_objmgr_vdev *vdev,
+static QDF_STATUS mlo_disconnect_req(struct wlan_objmgr_vdev *vdev,
 				     enum wlan_cm_source source,
 				     enum wlan_reason_code reason_code,
 				     struct qdf_mac_addr *bssid,
 				     bool validate_req);
 
-static inline void
+void
 mlo_allocate_and_copy_ies(struct wlan_cm_connect_req *target,
 			  struct wlan_cm_connect_req *source)
 {
@@ -68,7 +68,7 @@ mlo_allocate_and_copy_ies(struct wlan_cm_connect_req *target,
 	}
 }
 
-static inline void
+void
 mlo_free_connect_ies(struct wlan_cm_connect_req *connect_req)
 {
 	if (connect_req->scan_ie.ptr) {
@@ -874,7 +874,7 @@ static QDF_STATUS ml_activate_pend_disconn_req_cb(struct scheduler_msg *msg)
 
 	mlo_dev_ctx = vdev->mlo_dev_ctx;
 	sta_ctx = mlo_dev_ctx->sta_ctx;
-	mlo_disocnnect_req(vdev, sta_ctx->disconn_req->source,
+	mlo_disconnect_req(vdev, sta_ctx->disconn_req->source,
 			   sta_ctx->disconn_req->reason_code,
 			   &sta_ctx->disconn_req->bssid, false);
 
@@ -921,7 +921,6 @@ QDF_STATUS mlo_post_disconnect_msg(struct scheduler_msg *msg)
 }
 #endif
 
-static inline
 void mlo_handle_sta_link_connect_failure(struct wlan_objmgr_vdev *vdev,
 					 struct wlan_cm_connect_resp *rsp)
 {
@@ -974,7 +973,6 @@ void mlo_handle_sta_link_connect_failure(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
-static inline
 void mlo_handle_pending_disconnect(struct wlan_objmgr_vdev *vdev)
 {
 	struct scheduler_msg msg = {0};
@@ -1106,7 +1104,7 @@ mlo_send_link_disconnect_sync(struct wlan_mlo_dev_context *mlo_dev_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS mlo_disocnnect_req(struct wlan_objmgr_vdev *vdev,
+static QDF_STATUS mlo_disconnect_req(struct wlan_objmgr_vdev *vdev,
 				     enum wlan_cm_source source,
 				     enum wlan_reason_code reason_code,
 				     struct qdf_mac_addr *bssid,
@@ -1163,7 +1161,7 @@ QDF_STATUS mlo_disconnect(struct wlan_objmgr_vdev *vdev,
 			  enum wlan_reason_code reason_code,
 			  struct qdf_mac_addr *bssid)
 {
-	return mlo_disocnnect_req(vdev, source, reason_code, bssid, true);
+	return mlo_disconnect_req(vdev, source, reason_code, bssid, true);
 }
 
 QDF_STATUS mlo_sync_disconnect(struct wlan_objmgr_vdev *vdev,

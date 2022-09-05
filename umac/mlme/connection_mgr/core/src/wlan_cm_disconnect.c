@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015,2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -590,8 +590,13 @@ QDF_STATUS cm_disconnect_complete(struct cnx_mgr *cm_ctx,
 
 	/* Set the disconnect wait event once all disconnect are completed */
 	if (!cm_ctx->disconnect_count) {
-		/* Clear MLO cap only when it is the last disconnect req */
-		cm_clear_vdev_mlo_cap(cm_ctx->vdev, resp);
+		/*
+		 * Clear MLO cap only when it is the last disconnect req
+		 * For 1x/owe roaming, link vdev mlo flags are not cleared
+		 * as connect req is queued on link vdev after this.
+		 */
+		if (!wlan_cm_check_mlo_roam_auth_status(cm_ctx->vdev))
+			cm_clear_vdev_mlo_cap(cm_ctx->vdev, resp);
 		qdf_event_set(&cm_ctx->disconnect_complete);
 	}
 

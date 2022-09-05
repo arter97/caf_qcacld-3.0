@@ -1891,8 +1891,12 @@ QDF_STATUS cm_connect_active(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 				qdf_mc_timer_get_system_time();
 	req = &cm_req->connect_req.req;
 	wlan_vdev_mlme_set_ssid(cm_ctx->vdev, req->ssid.ssid, req->ssid.length);
-	/* free vdev keys before setting crypto params */
-	if (!wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev))
+	/*
+	 * free vdev keys before setting crypto params for 1x/ owe roaming,
+	 * link vdev keys would be cleaned in osif
+	 */
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(cm_ctx->vdev) &&
+	    !wlan_cm_check_mlo_roam_auth_status(cm_ctx->vdev))
 		wlan_crypto_free_vdev_key(cm_ctx->vdev);
 	cm_fill_vdev_crypto_params(cm_ctx, req);
 	cm_store_wep_key(cm_ctx, &req->crypto, *cm_id);
@@ -2462,7 +2466,6 @@ QDF_STATUS cm_notify_connect_complete(struct cnx_mgr *cm_ctx,
 	cm_if_mgr_inform_connect_complete(cm_ctx->vdev,
 					  resp->connect_status);
 	cm_inform_dlm_connect_complete(cm_ctx->vdev, resp);
-
 	if (QDF_IS_STATUS_ERROR(resp->connect_status) &&
 	    sm_state == WLAN_CM_S_INIT)
 		cm_clear_vdev_mlo_cap(cm_ctx->vdev);

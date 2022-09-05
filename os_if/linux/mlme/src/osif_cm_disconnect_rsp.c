@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,7 +50,8 @@ osif_validate_disconnect_and_reset_src_id(struct vdev_osif_priv *osif_priv,
 
 	/* Always drop internal disconnect */
 	qdf_spinlock_acquire(&osif_priv->cm_info.cmd_id_lock);
-	if (rsp->req.req.source == CM_INTERNAL_DISCONNECT) {
+	if (rsp->req.req.source == CM_INTERNAL_DISCONNECT ||
+	    rsp->req.req.source == CM_MLO_ROAM_INTERNAL_DISCONNECT) {
 		osif_debug("ignore internal disconnect");
 		status = QDF_STATUS_E_INVAL;
 		goto rel_lock;

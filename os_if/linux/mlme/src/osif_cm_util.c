@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -419,6 +419,50 @@ osif_cm_roam_cmpl_cb(struct wlan_objmgr_vdev *vdev)
 {
 	return osif_cm_napi_serialize(false);
 }
+
+/**
+ * osif_cm_get_scan_ie_params() - Function to get scan ie params
+ * @vdev: vdev pointer
+ * @scan_ie: Pointer to scan_ie
+ * @dot11mode_filter: Pointer to dot11mode_filter
+ *
+ * Get scan IE params from adapter corresponds to given vdev
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+osif_cm_get_scan_ie_params(struct wlan_objmgr_vdev *vdev,
+			   struct element_info *scan_ie,
+			   enum dot11_mode_filter *dot11mode_filter)
+{
+	osif_cm_get_scan_ie_params_cb cb = NULL;
+
+	if (osif_cm_legacy_ops)
+		cb = osif_cm_legacy_ops->get_scan_ie_params_cb;
+	if (cb)
+		return cb(vdev, scan_ie, dot11mode_filter);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * osif_cm_get_scan_ie_info_cb() - Roam get scan ie params callback
+ * @vdev: vdev pointer
+ * @scan_ie: pointer to scan ie
+ * @dot11mode_filter: pointer to dot11 mode filter
+ *
+ * This callback gets scan ie params from os_if
+ *
+ * Return: QDF_STATUS
+ */
+
+static QDF_STATUS
+osif_cm_get_scan_ie_info_cb(struct wlan_objmgr_vdev *vdev,
+			    struct element_info *scan_ie,
+			    enum dot11_mode_filter *dot11mode_filter)
+{
+	return osif_cm_get_scan_ie_params(vdev, scan_ie, dot11mode_filter);
+}
 #endif
 
 #ifdef WLAN_FEATURE_PREAUTH_ENABLE
@@ -493,6 +537,7 @@ static struct mlme_cm_ops cm_ops = {
 	.mlme_cm_roam_start_cb = osif_cm_roam_start_cb,
 	.mlme_cm_roam_abort_cb = osif_cm_roam_abort_cb,
 	.mlme_cm_roam_cmpl_cb = osif_cm_roam_cmpl_cb,
+	.mlme_cm_roam_get_scan_ie_cb = osif_cm_get_scan_ie_info_cb,
 #endif
 #ifdef WLAN_FEATURE_PREAUTH_ENABLE
 	.mlme_cm_ft_preauth_cmpl_cb = osif_cm_ft_preauth_cmpl_cb,

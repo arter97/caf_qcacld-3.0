@@ -34,6 +34,7 @@ static uint32_t cm_get_prefix_for_cm_id(enum wlan_cm_source source) {
 	switch (source) {
 	case CM_OSIF_CONNECT:
 	case CM_OSIF_CFG_CONNECT:
+	case CM_MLO_LINK_VDEV_CONNECT:
 		return CONNECT_REQ_PREFIX;
 	case CM_ROAMING_HOST:
 	case CM_ROAMING_FW:

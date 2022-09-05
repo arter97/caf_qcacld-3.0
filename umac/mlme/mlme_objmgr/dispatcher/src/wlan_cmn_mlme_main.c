@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -601,6 +601,22 @@ mlme_cm_osif_roam_complete(struct wlan_objmgr_vdev *vdev)
 
 	return ret;
 }
+
+QDF_STATUS
+mlme_cm_osif_roam_get_scan_params(struct wlan_objmgr_vdev *vdev,
+				  struct element_info *scan_ie,
+				  enum dot11_mode_filter *dot11mode_filter)
+{
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+
+	if (glbl_cm_ops &&
+	    glbl_cm_ops->mlme_cm_roam_get_scan_ie_cb)
+		ret = glbl_cm_ops->mlme_cm_roam_get_scan_ie_cb(vdev,
+						scan_ie, dot11mode_filter);
+
+	return ret;
+}
+
 #endif
 
 #ifdef WLAN_FEATURE_PREAUTH_ENABLE

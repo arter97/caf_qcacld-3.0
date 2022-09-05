@@ -147,6 +147,8 @@ struct wlan_fils_con_info {
  * @CM_OSIF_CFG_CONNECT: Connect request initiated due to config change
  * @CM_OSIF_CFG_DISCONNECT: Disconnect request initiated due to config change
  * @CM_MLO_LINK_VDEV_DISCONNECT: Disconnect req for ML link
+ * @CM_MLO_LINK_VDEV_CONNECT: Connect req for ML link
+ * @CM_MLO_ROAM_INTERNAL_DISCONNECT: Disconnect req triggered for mlo roaming
  * @CM_SOURCE_MAX: max value of connection manager source
  * @CM_SOURCE_INVALID: Invalid connection manager req source
  */
@@ -164,6 +166,8 @@ enum wlan_cm_source {
 	CM_OSIF_CFG_CONNECT,
 	CM_OSIF_CFG_DISCONNECT,
 	CM_MLO_LINK_VDEV_DISCONNECT,
+	CM_MLO_LINK_VDEV_CONNECT,
+	CM_MLO_ROAM_INTERNAL_DISCONNECT,
 	CM_SOURCE_MAX,
 	CM_SOURCE_INVALID = CM_SOURCE_MAX,
 };

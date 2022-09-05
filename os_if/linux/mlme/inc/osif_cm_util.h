@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -215,6 +215,19 @@ typedef QDF_STATUS
 
 #ifdef CONN_MGR_ADV_FEATURE
 /**
+ * typedef osif_cm_get_scan_ie_params_cb  - get scan ie params cb
+ * @vdev: vdev pointer
+ * @scan_ie: pointer to scan ie element struct
+ * @dot11mode_filter: Pointer to dot11mode_filter enum
+ *
+ * Return: QDF_STATUS
+ */
+typedef QDF_STATUS
+(*osif_cm_get_scan_ie_params_cb)(struct wlan_objmgr_vdev *vdev,
+				 struct element_info *scan_ie,
+				 enum dot11_mode_filter *dot11mode_filter);
+
+/**
  * typedef osif_cm_netif_queue_ctrl_cb: Callback to update netif queue
  * @vdev: vdev pointer
  * @action: Action to take on netif queue
@@ -332,6 +345,7 @@ typedef QDF_STATUS
  * actions on napi serialization
  * @save_gtk_cb : callback to legacy module to save gtk
  * @send_vdev_keys_cb: callback to send vdev keys
+ * @osif_cm_get_scan_ie_params_cb: callback to get scan ie params
  * @set_hlp_data_cb: callback to legacy module to save hlp data
  * @ft_preauth_complete_cb: callback to legacy module to send fast
  * transition event
@@ -348,6 +362,7 @@ struct osif_cm_ops {
 	os_if_cm_napi_serialize_ctrl_cb napi_serialize_control_cb;
 	osif_cm_save_gtk_cb save_gtk_cb;
 	osif_cm_send_vdev_keys_cb send_vdev_keys_cb;
+	osif_cm_get_scan_ie_params_cb get_scan_ie_params_cb;
 #endif
 #ifdef WLAN_FEATURE_FILS_SK
 	osif_cm_set_hlp_data_cb set_hlp_data_cb;
@@ -519,5 +534,4 @@ void osif_cm_set_legacy_cb(struct osif_cm_ops *osif_legacy_ops);
  * Return: void
  */
 void osif_cm_reset_legacy_cb(void);
-
 #endif /* __OSIF_CM_UTIL_H */
