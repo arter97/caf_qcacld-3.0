@@ -1434,7 +1434,8 @@ process_peer:
 			dp_sawf(peer, i, ref_count)++;
 			if (!peer->sawf->telemetry_ctx) {
 				telemetry_ctx = telemetry_sawf_peer_ctx_alloc(
-					soc, txrx_peer->sawf_stats, dest_mac,
+					soc, txrx_peer->sawf_stats,
+					peer->mac_addr.raw,
 					service_id, i);
 				if (telemetry_ctx)
 					peer->sawf->telemetry_ctx = telemetry_ctx;
