@@ -140,3 +140,25 @@ void dfs_set_bw_expand(struct wlan_dfs *dfs,
 void dfs_get_bw_expand(struct wlan_dfs *dfs,
 		       bool *bw_expand);
 #endif /* QCA_DFS_BW_EXPAND */
+
+#ifdef QCA_DFS_BW_PUNCTURE
+/**
+ * dfs_set_dfs_puncture() - Set or unset DFS puncturing feature.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @is_dfs_punc_en: - Configure DFS puncturing feature.
+ *
+ * Return: Nothing.
+ */
+void dfs_set_dfs_puncture(struct wlan_dfs *dfs,
+			  bool is_dfs_punc_en);
+
+/**
+ * dfs_get_dfs_puncture() - Get the value of DFS puncturing feature.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @is_dfs_punc_en: - Read and store the value of DFS puncturing feature.
+ *
+ * Return: Nothing.
+ */
+void dfs_get_dfs_puncture(struct wlan_dfs *dfs,
+			  bool *is_dfs_punc_en);
+#endif /* QCA_DFS_BW_PUNCTURE */

@@ -494,3 +494,19 @@ void dfs_get_bw_expand(struct wlan_dfs *dfs,
 	(*bw_expand) = dfs->dfs_use_bw_expand;
 }
 #endif /* QCA_DFS_BW_EXPAND */
+
+#ifdef QCA_DFS_BW_PUNCTURE
+void dfs_set_dfs_puncture(struct wlan_dfs *dfs,
+			  bool is_dfs_punc_en)
+{
+	dfs->dfs_use_puncture = is_dfs_punc_en;
+	dfs_info(dfs, WLAN_DEBUG_DFS_ALWAYS, "DFS Puncturing Feature is %s ",
+		 (is_dfs_punc_en) ? "enabled" : "disabled");
+}
+
+void dfs_get_dfs_puncture(struct wlan_dfs *dfs,
+			  bool *is_dfs_punc_en)
+{
+	*is_dfs_punc_en = dfs->dfs_use_puncture;
+}
+#endif /* QCA_DFS_BW_PUNCTURE */
