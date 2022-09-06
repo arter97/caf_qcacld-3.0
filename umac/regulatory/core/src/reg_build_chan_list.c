@@ -4291,6 +4291,22 @@ reg_client_afc_populate_channels(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
+ * reg_reset_chan_list_and_power_event() - Reset AFC master chan list and
+ * super channel list. Set is_6g_afc_power_event_received to false
+ * @pdev_priv_obj: Pointer to pdev_priv_obj
+ *
+ * Return: void
+ */
+static void reg_reset_chan_list_and_power_event(
+		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
+{
+	reg_debug("Resetting the afc mas chan list and disabling SP channels");
+	pdev_priv_obj->is_6g_afc_power_event_received = false;
+	reg_disable_afc_mas_chan_list_channels(pdev_priv_obj);
+	reg_disable_sp_channels_in_super_chan_list(pdev_priv_obj);
+}
+
+/**
  * reg_process_afc_expiry_event() - Process the afc expiry event and get the
  * afc request id
  * @afc_info: Pointer to afc info
@@ -4357,9 +4373,7 @@ reg_process_afc_expiry_event(struct afc_regulatory_info *afc_info)
 		break;
 	case REG_AFC_EXPIRY_EVENT_SWITCH_TO_LPI:
 	case REG_AFC_EXPIRY_EVENT_STOP_TX:
-		pdev_priv_obj->is_6g_afc_power_event_received = false;
-		reg_disable_afc_mas_chan_list_channels(pdev_priv_obj);
-		reg_disable_sp_channels_in_super_chan_list(pdev_priv_obj);
+		reg_reset_chan_list_and_power_event(pdev_priv_obj);
 		reg_client_afc_populate_channels(psoc, pdev);
 		if (tx_ops->trigger_acs_for_afc)
 			tx_ops->trigger_acs_for_afc(pdev);
@@ -4965,13 +4979,6 @@ reg_process_afc_power_event(struct afc_regulatory_info *afc_info)
 	QDF_TRACE(QDF_MODULE_ID_AFC, QDF_TRACE_LEVEL_DEBUG,
 		  "Processing AFC Power event");
 
-	if (afc_info->power_info->fw_status_code !=
-	    REG_FW_AFC_POWER_EVENT_SUCCESS) {
-		reg_err_rl("AFC Power event failure status code %d",
-			   afc_info->power_info->fw_status_code);
-		return QDF_STATUS_E_FAILURE;
-	}
-
 	psoc = afc_info->psoc;
 	soc_reg = reg_get_psoc_obj(psoc);
 
@@ -4993,13 +5000,6 @@ reg_process_afc_power_event(struct afc_regulatory_info *afc_info)
 	else
 		dbg_id = WLAN_REGULATORY_SB_ID;
 
-	reg_debug("process reg afc master chan list");
-	this_mchan_params = &soc_reg->mas_chan_params[phy_id];
-	afc_mas_chan_list = this_mchan_params->mas_chan_list_6g_afc;
-	qdf_mem_zero(afc_mas_chan_list,
-		     NUM_6GHZ_CHANNELS * sizeof(struct regulatory_channel));
-	reg_init_6ghz_master_chan(afc_mas_chan_list, soc_reg);
-	soc_reg->mas_chan_params[phy_id].is_6g_afc_power_event_received = true;
 	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id, dbg_id);
 
 	if (!pdev) {
@@ -5014,6 +5014,24 @@ reg_process_afc_power_event(struct afc_regulatory_info *afc_info)
 		wlan_objmgr_pdev_release_ref(pdev, dbg_id);
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (afc_info->power_info->fw_status_code !=
+	    REG_FW_AFC_POWER_EVENT_SUCCESS) {
+		reg_err_rl("AFC Power event failure status code %d",
+			   afc_info->power_info->fw_status_code);
+		reg_reset_chan_list_and_power_event(pdev_priv_obj);
+		reg_send_afc_power_event(pdev, afc_info->power_info);
+		wlan_objmgr_pdev_release_ref(pdev, dbg_id);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	reg_debug("process reg afc master chan list");
+	this_mchan_params = &soc_reg->mas_chan_params[phy_id];
+	afc_mas_chan_list = this_mchan_params->mas_chan_list_6g_afc;
+	qdf_mem_zero(afc_mas_chan_list,
+		     NUM_6GHZ_CHANNELS * sizeof(struct regulatory_channel));
+	reg_init_6ghz_master_chan(afc_mas_chan_list, soc_reg);
+	soc_reg->mas_chan_params[phy_id].is_6g_afc_power_event_received = true;
 
 	reg_init_pdev_super_chan_list(pdev_priv_obj);
 	reg_init_6ghz_master_chan(pdev_priv_obj->afc_chan_list, soc_reg);
