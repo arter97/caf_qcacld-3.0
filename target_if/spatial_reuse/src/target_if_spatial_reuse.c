@@ -20,6 +20,7 @@
 #include <target_if_spatial_reuse.h>
 #include <wlan_lmac_if_def.h>
 #include <wmi_unified_api.h>
+#include <wmi_unified_vdev_api.h>
 #include <target_if_vdev_mgr_tx_ops.h>
 
 static QDF_STATUS spatial_reuse_send_cfg(struct wlan_objmgr_vdev *vdev,
@@ -53,8 +54,28 @@ static QDF_STATUS spatial_reuse_send_cfg(struct wlan_objmgr_vdev *vdev,
 					   WILDCARD_PDEV_ID);
 }
 
+static QDF_STATUS
+spatial_reuse_send_sr_prohibit_cfg(struct wlan_objmgr_vdev *vdev,
+				   bool he_siga_va15_allowed)
+{
+	struct sr_prohibit_param srp_param;
+	wmi_unified_t wmi_handle;
+
+	wmi_handle = target_if_vdev_mgr_wmi_handle_get(vdev);
+	if (!wmi_handle) {
+		mlme_err("Failed to get WMI handle!");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	srp_param.vdev_id = wlan_vdev_get_id(vdev);
+	srp_param.sr_he_siga_val15_allowed = he_siga_va15_allowed;
+
+	return wmi_unified_vdev_param_sr_prohibit_send(wmi_handle, &srp_param);
+}
+
 void target_if_spatial_reuse_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 {
 	tx_ops->spatial_reuse_tx_ops.send_cfg = spatial_reuse_send_cfg;
+	tx_ops->spatial_reuse_tx_ops.send_sr_prohibit_cfg =
+					spatial_reuse_send_sr_prohibit_cfg;
 }
-
