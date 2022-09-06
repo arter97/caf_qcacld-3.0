@@ -1174,7 +1174,9 @@ wlan_reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
 					      bool *is_psd,
 					      uint16_t *min_tx_power,
 					      int16_t *min_psd_eirp,
-					      enum reg_6g_ap_type *power_type)
+					      enum reg_6g_ap_type *power_type,
+					      enum supported_6g_pwr_types pwr_mode,
+					      uint16_t input_punc_bitmap)
 {
 	return reg_decide_6ghz_power_within_bw_for_freq(pdev,
 							freq,
@@ -1182,7 +1184,9 @@ wlan_reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
 							is_psd,
 							min_tx_power,
 							min_psd_eirp,
-							power_type);
+							power_type,
+							pwr_mode,
+							input_punc_bitmap);
 }
 #endif
 

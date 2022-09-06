@@ -1345,6 +1345,8 @@ reg_get_channel_power_attr_from_secondary_list_for_freq(
  * @min_tx_power: pointer to retrieve value of minimum eirp tx power in bw
  * @min_psd_eirp: pointer to retrieve value of minimum psd eirp power in bw
  * @power_type: pointer to retrieve value of 6 GHz power type
+ * pwr_mode: 6g power type which decides 6G channel list lookup.
+ * input_punc_bitmap: Input  puncture bitmap
  *
  * Return: QDF STATUS
  */
@@ -1353,14 +1355,18 @@ reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
 					 qdf_freq_t freq, enum phy_ch_width bw,
 					 bool *is_psd, uint16_t *min_tx_power,
 					 int16_t *min_psd_eirp,
-					 enum reg_6g_ap_type *power_type);
+					 enum reg_6g_ap_type *power_type,
+					 enum supported_6g_pwr_types pwr_mode,
+					 uint16_t input_punc_bitmap);
 #else
 static inline QDF_STATUS
 reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
 					 qdf_freq_t freq, enum phy_ch_width bw,
 					 bool *is_psd, uint16_t *min_tx_power,
 					 int16_t *min_psd_eirp,
-					 enum reg_6g_ap_type *power_type)
+					 enum reg_6g_ap_type *power_type,
+					 enum supported_6g_pwr_types pwr_mode,
+					 uint16_t input_punc_bitmap)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -1425,25 +1431,6 @@ qdf_freq_t reg_min_chan_freq(void);
 qdf_freq_t reg_max_chan_freq(void);
 
 /**
- * reg_get_5g_bonded_channel_for_freq()- Return the channel state for a
- * 5G or 6G channel frequency based on the channel width and bonded channel
- * @pdev: Pointer to pdev.
- * @freq: Channel center frequency.
- * @ch_width: Channel Width.
- * @bonded_chan_ptr_ptr: Pointer to bonded_channel_freq.
- * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
- *
- * Return: Channel State
- */
-enum channel_state
-reg_get_5g_bonded_channel_for_freq(struct wlan_objmgr_pdev *pdev,
-				   uint16_t freq,
-				   enum phy_ch_width ch_width,
-				   const struct bonded_channel_freq
-				   **bonded_chan_ptr_ptr);
-
-#ifdef CONFIG_REG_6G_PWRMODE
-/**
  * reg_get_5g_bonded_channel_for_pwrmode()- Return the channel state for a
  * 5G or 6G channel frequency based on the channel width and bonded channel
  * @pdev: Pointer to pdev.
@@ -1464,7 +1451,6 @@ reg_get_5g_bonded_channel_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 				      enum supported_6g_pwr_types
 				      in_6g_pwr_mode,
 				      uint16_t input_puncture_bitmap);
-#endif
 
 #ifdef CONFIG_REG_6G_PWRMODE
 /**

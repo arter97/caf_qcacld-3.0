@@ -1899,6 +1899,8 @@ wlan_reg_get_chan_pwr_attr_from_secondary_list_for_freq(
  * @min_tx_power: pointer to retrieve minimum tx power in bandwidth
  * @min_psd_eirp: pointer to retrieve minimum psd eirp in bandwidth
  * @power_type: pointer to retrieve 6 GHz power type
+ * @pwr_mode: 6g power type which decides 6G channel list lookup.
+ * @input_punc_bitmap: Input  puncture bitmap
  *
  * Return: QDF STATUS
  */
@@ -1909,7 +1911,9 @@ wlan_reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
 					      bool *is_psd,
 					      uint16_t *min_tx_power,
 					      int16_t *min_psd_eirp,
-					      enum reg_6g_ap_type *power_type);
+					      enum reg_6g_ap_type *power_type,
+					      enum supported_6g_pwr_types pwr_mode,
+					      uint16_t input_punc_bitmap);
 #endif
 
 /**

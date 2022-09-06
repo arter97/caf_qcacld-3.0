@@ -4422,7 +4422,9 @@ reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
 					 qdf_freq_t freq, enum phy_ch_width bw,
 					 bool *is_psd, uint16_t *min_tx_power,
 					 int16_t *min_psd_eirp,
-					 enum reg_6g_ap_type *power_type)
+					 enum reg_6g_ap_type *power_type,
+					 enum supported_6g_pwr_types pwr_mode,
+					 uint16_t input_punc_bitmap)
 {
 	const struct bonded_channel_freq *bonded_chan_ptr = NULL;
 	enum channel_state state;
@@ -4451,10 +4453,12 @@ reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	state = reg_get_5g_bonded_channel_for_freq(pdev,
-						   freq,
-						   bw,
-						   &bonded_chan_ptr);
+	state = reg_get_5g_bonded_channel_for_pwrmode(pdev,
+						      freq,
+						      bw,
+						      &bonded_chan_ptr,
+						      pwr_mode,
+						      input_punc_bitmap);
 	if (state != CHANNEL_STATE_ENABLE &&
 	    state != CHANNEL_STATE_DFS) {
 		reg_err("invalid channel state %d", state);
@@ -5689,37 +5693,6 @@ reg_fill_channel_list_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 #endif
 
 enum channel_state
-reg_get_5g_bonded_channel_for_freq(struct wlan_objmgr_pdev *pdev,
-				   uint16_t freq,
-				   enum phy_ch_width ch_width,
-				   const struct bonded_channel_freq
-				   **bonded_chan_ptr_ptr)
-{
-	if (ch_width == CH_WIDTH_20MHZ)
-		return reg_get_channel_state_for_pwrmode(pdev, freq,
-							 REG_CURRENT_PWR_MODE);
-
-	if (reg_is_ch_width_320(ch_width)) {
-		return reg_get_chan_state_for_320(pdev, freq, 0,
-						  ch_width,
-						  bonded_chan_ptr_ptr,
-						  REG_CURRENT_PWR_MODE,
-						  true,
-						  NO_SCHANS_PUNC);
-	} else {
-		*bonded_chan_ptr_ptr = reg_get_bonded_chan_entry(freq,
-								 ch_width, 0);
-		if (!(*bonded_chan_ptr_ptr))
-			return CHANNEL_STATE_INVALID;
-
-		return reg_get_5g_bonded_chan_array_for_freq(
-							pdev, freq,
-							*bonded_chan_ptr_ptr);
-	}
-}
-
-#ifdef CONFIG_REG_6G_PWRMODE
-enum channel_state
 reg_get_5g_bonded_channel_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 				      uint16_t freq,
 				      enum phy_ch_width ch_width,
@@ -5752,7 +5725,6 @@ reg_get_5g_bonded_channel_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 						     in_6g_pwr_mode,
 						     input_punc_bitmap);
 }
-#endif
 
 #ifdef CONFIG_REG_6G_PWRMODE
 /**
