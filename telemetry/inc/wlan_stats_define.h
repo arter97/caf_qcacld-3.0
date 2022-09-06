@@ -516,7 +516,9 @@ struct stats_if_tid_tx_stats {
 struct stats_if_sawf_delay_stats {
 	struct stats_if_hist_stats delay_hist;
 	uint8_t cur_win;
-	uint32_t mov_avg;
+	uint32_t nwdelay_avg;
+	uint32_t swdelay_avg;
+	uint32_t hwdelay_avg;
 	uint64_t delay_bound_success;
 	uint64_t delay_bound_failure;
 };

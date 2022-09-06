@@ -189,7 +189,9 @@ enum _ol_hal_param_t {
 /**
  * struct sawf_delay_stats- sawf Tx-delay stats
  * @delay_hist: histogram for various delay-buckets
- * @mov_avg: moving average
+ * @nwdelay_avg: moving average for nwdelay
+ * @swdelay_avg: moving average for swdelay
+ * @hwdelay_avg: moving average for hwdelay
  * @num_pkt: count of pkts for which delay is calculated
  * @win_total: total delay for a window
  * @success: count of pkts that met delay-bound
@@ -200,7 +202,9 @@ enum _ol_hal_param_t {
 struct sawf_delay_stats {
 	struct cdp_hist_stats delay_hist;
 
-	uint32_t mov_avg;
+	uint32_t nwdelay_avg;
+	uint32_t swdelay_avg;
+	uint32_t hwdelay_avg;
 	uint32_t num_pkt;
 	uint64_t win_total;
 	uint64_t success;
