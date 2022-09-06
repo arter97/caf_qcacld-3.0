@@ -497,6 +497,9 @@ wlan_rptr_get_rootap_bssid(void *arg, wlan_scan_entry_t se)
 	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)arg;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+#endif
 	u8 *extender_ie;
 	u8 *bssid;
 
@@ -516,6 +519,15 @@ wlan_rptr_get_rootap_bssid(void *arg, wlan_scan_entry_t se)
 			bssid = util_scan_entry_bssid(se);
 			qdf_mem_copy(pdev_priv->preferred_bssid, bssid,
 				  QDF_MAC_ADDR_SIZE);
+#ifdef WLAN_FEATURE_11BE_MLO
+			if (!IS_NULL_ADDR(se->ml_info.mld_mac_addr.bytes)) {
+				RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
+				qdf_mem_copy(g_priv->preferred_mlo_bssid,
+					     se->ml_info.mld_mac_addr.bytes,
+					     QDF_MAC_ADDR_SIZE);
+				RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+			}
+#endif
 		}
 	}
 	return QDF_STATUS_SUCCESS;
@@ -600,6 +612,13 @@ wlan_rptr_process_scan_entries(void *arg, wlan_scan_entry_t se)
 		}
 	}
 	OS_MEMCPY(pdev_priv->preferred_bssid, bssid, QDF_MAC_ADDR_SIZE);
+#ifdef WLAN_FEATURE_11BE_MLO
+	if (!IS_NULL_ADDR(se->ml_info.mld_mac_addr.bytes)) {
+		qdf_mem_copy(g_priv->preferred_mlo_bssid,
+			     se->ml_info.mld_mac_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+	}
+#endif
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 	return QDF_STATUS_SUCCESS;
 }
@@ -638,11 +657,19 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 			ucfg_scan_db_iterate(pdev, wlan_rptr_get_rootap_bssid,
 					     (void *)vdev);
 			if (!IS_NULL_ADDR(pdev_priv->preferred_bssid)) {
-				RPTR_LOGI("RPTR sending event with preferred RootAP bssid:%s vdev_id:%d",
-					  ether_sprintf(pdev_priv->preferred_bssid),
-					  wlan_vdev_get_id(vdev));
-				ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
+				if (!IS_NULL_ADDR(g_priv->preferred_mlo_bssid)) {
+					RPTR_LOGI("RPTR sending event with preferred MLO RootAP bssid:%s vdev_id:%d",
+							ether_sprintf(g_priv->preferred_mlo_bssid),
+							wlan_vdev_get_id(vdev));
+					ext_cb->rptr_send_event(vdev, g_priv->preferred_mlo_bssid,
+							QDF_MAC_ADDR_SIZE, IEEE80211_EV_PREFERRED_MLO_BSSID);
+				} else {
+					RPTR_LOGI("RPTR sending event with preferred RootAP bssid:%s vdev_id:%d",
+							ether_sprintf(pdev_priv->preferred_bssid),
+							wlan_vdev_get_id(vdev));
+					ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
 							QDF_MAC_ADDR_SIZE, IEEE80211_EV_PREFERRED_BSSID);
+				}
 			} else {
 				RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 				ss_info = &g_priv->ss_info;
@@ -664,11 +691,19 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 				RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 				ucfg_scan_db_iterate(pdev, wlan_rptr_process_scan_entries, (void *)vdev);
 				if (!IS_NULL_ADDR(pdev_priv->preferred_bssid)) {
-					RPTR_LOGI("RPTR sending event with preferred Repeater bssid:%s vdev_id:%d",
-						  ether_sprintf(pdev_priv->preferred_bssid),
-						  wlan_vdev_get_id(vdev));
-					ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
+					if (!IS_NULL_ADDR(g_priv->preferred_mlo_bssid)) {
+						RPTR_LOGI("RPTR sending event with preferred Repeater MLO bssid:%s vdev_id:%d",
+								ether_sprintf(g_priv->preferred_mlo_bssid),
+								wlan_vdev_get_id(vdev));
+						ext_cb->rptr_send_event(vdev, g_priv->preferred_mlo_bssid,
+								QDF_MAC_ADDR_SIZE, IEEE80211_EV_PREFERRED_MLO_BSSID);
+					} else {
+						RPTR_LOGI("RPTR sending event with preferred Repeater bssid:%s vdev_id:%d",
+								ether_sprintf(pdev_priv->preferred_bssid),
+								wlan_vdev_get_id(vdev));
+						ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
 								QDF_MAC_ADDR_SIZE, IEEE80211_EV_PREFERRED_BSSID);
+					}
 				}
 			}
 		}
