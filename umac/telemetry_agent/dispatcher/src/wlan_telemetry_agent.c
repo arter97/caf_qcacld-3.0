@@ -322,12 +322,16 @@ qdf_export_symbol(telemetry_sawf_update_delay);
 
 QDF_STATUS telemetry_sawf_update_delay_mvng(void *telemetry_ctx,
 					    uint8_t tid, uint8_t queue,
-					    uint64_t sum_windows)
+					    uint64_t nwdelay_winavg,
+					    uint64_t swdelay_winavg,
+					    uint64_t hwdelay_winavg)
 {
 	if (g_agent_ops) {
 		if (g_agent_ops->sawf_push_delay_mvng(telemetry_ctx,
 						      tid, queue,
-						      sum_windows))
+						      nwdelay_winavg,
+						      swdelay_winavg,
+						      hwdelay_winavg))
 			return QDF_STATUS_E_FAILURE;
 	}
 	return QDF_STATUS_SUCCESS;
@@ -367,11 +371,14 @@ QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
 qdf_export_symbol(telemetry_sawf_get_rate);
 
 QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
-				      uint8_t queue, uint32_t *mov_avg)
+				      uint8_t queue, uint32_t *nwdelay_avg,
+				      uint32_t *swdelay_avg,
+				      uint32_t *hwdelay_avg)
 {
 	if (g_agent_ops) {
 		if (g_agent_ops->sawf_pull_mov_avg(telemetry_ctx, tid,
-						   queue, mov_avg))
+						   queue, nwdelay_avg,
+						   swdelay_avg, hwdelay_avg))
 			return QDF_STATUS_E_FAILURE;
 	}
 	return QDF_STATUS_SUCCESS;
