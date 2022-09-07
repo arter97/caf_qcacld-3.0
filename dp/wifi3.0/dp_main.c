@@ -5927,6 +5927,7 @@ static void dp_pdev_deinit(struct cdp_pdev *txrx_pdev, int force)
 	dp_pdev_bkp_stats_detach(pdev);
 	qdf_event_destroy(&pdev->fw_peer_stats_event);
 	qdf_event_destroy(&pdev->fw_stats_event);
+	qdf_event_destroy(&pdev->fw_obss_stats_event);
 	if (pdev->sojourn_buf)
 		qdf_nbuf_free(pdev->sojourn_buf);
 
@@ -11460,6 +11461,95 @@ dp_txrx_stats_publish(struct cdp_soc_t *soc, uint8_t pdev_id,
 	return TXRX_STATS_LEVEL;
 }
 
+/*
+ * dp_get_obss_stats(): Get Pdev OBSS stats from Fw
+ * @soc: DP soc handle
+ * @pdev_id: id of DP_PDEV handle
+ * @buf: to hold pdev obss stats
+ *
+ * Return: status
+ */
+static QDF_STATUS
+dp_get_obss_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
+		  struct cdp_pdev_obss_pd_stats_tlv *buf)
+{
+	struct cdp_txrx_stats_req req = {0};
+	QDF_STATUS status;
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
+						   pdev_id);
+
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	if (pdev->pending_fw_obss_stats_response)
+		return QDF_STATUS_E_AGAIN;
+
+	pdev->pending_fw_obss_stats_response = true;
+	req.stats = (enum cdp_stats)HTT_DBG_EXT_STATS_PDEV_OBSS_PD_STATS;
+	req.cookie_val = DBG_STATS_COOKIE_HTT_OBSS;
+	qdf_event_reset(&pdev->fw_obss_stats_event);
+	status = dp_h2t_ext_stats_msg_send(pdev, req.stats, req.param0,
+					   req.param1, req.param2, req.param3,
+					   0, req.cookie_val, 0);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		pdev->pending_fw_obss_stats_response = false;
+		return status;
+	}
+	status =
+		qdf_wait_single_event(&pdev->fw_obss_stats_event,
+				      DP_MAX_SLEEP_TIME);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		if (status == QDF_STATUS_E_TIMEOUT)
+			qdf_debug("TIMEOUT_OCCURS");
+		pdev->pending_fw_obss_stats_response = false;
+		return QDF_STATUS_E_TIMEOUT;
+	}
+	qdf_mem_copy(buf, &pdev->stats.htt_tx_pdev_stats.obss_pd_stats_tlv,
+		     sizeof(struct cdp_pdev_obss_pd_stats_tlv));
+	pdev->pending_fw_obss_stats_response = false;
+	return status;
+}
+
+/*
+ * dp_clear_pdev_obss_pd_stats(): Clear pdev obss stats
+ * @soc: DP soc handle
+ * @pdev_id: id of DP_PDEV handle
+ *
+ * Return: status
+ */
+static QDF_STATUS
+dp_clear_pdev_obss_pd_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
+{
+	struct cdp_txrx_stats_req req = {0};
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
+						   pdev_id);
+	uint32_t cookie_val = DBG_STATS_COOKIE_DEFAULT;
+
+	if (!pdev)
+		return QDF_STATUS_E_INVAL;
+
+	/*
+	 * For HTT_DBG_EXT_STATS_RESET command, FW need to config
+	 * from param0 to param3 according to below rule:
+	 *
+	 * PARAM:
+	 *   - config_param0 : start_offset (stats type)
+	 *   - config_param1 : stats bmask from start offset
+	 *   - config_param2 : stats bmask from start offset + 32
+	 *   - config_param3 : stats bmask from start offset + 64
+	 */
+	req.stats = (enum cdp_stats)HTT_DBG_EXT_STATS_RESET;
+	req.param0 = HTT_DBG_EXT_STATS_PDEV_OBSS_PD_STATS;
+	req.param1 = 0x00000001;
+
+	return dp_h2t_ext_stats_msg_send(pdev, req.stats, req.param0,
+				  req.param1, req.param2, req.param3, 0,
+				cookie_val, 0);
+}
+
 /**
  * dp_set_pdev_dscp_tid_map_wifi3(): update dscp tid map in pdev
  * @soc: soc handle
@@ -13880,6 +13970,8 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 #endif
 	.txrx_get_peer_extd_rate_link_stats =
 					dp_get_peer_extd_rate_link_stats,
+	.get_pdev_obss_stats = dp_get_obss_stats,
+	.clear_pdev_obss_pd_stats = dp_clear_pdev_obss_pd_stats,
 	/* TODO */
 };
 
@@ -16942,6 +17034,7 @@ static QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 
 	qdf_event_create(&pdev->fw_peer_stats_event);
 	qdf_event_create(&pdev->fw_stats_event);
+	qdf_event_create(&pdev->fw_obss_stats_event);
 
 	pdev->num_tx_allowed = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
 

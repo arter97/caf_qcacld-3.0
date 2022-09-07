@@ -2245,6 +2245,116 @@ struct cdp_htt_tx_pdev_stats_cmn_tlv {
 	uint32_t tx_active_dur_us_high;
 };
 
+#define DP_NUM_AC_WMM 4
+
+struct cdp_pdev_obss_pd_stats_tlv {
+	struct cdp_htt_tlv_hdr tlv_hdr;
+
+	uint32_t num_obss_tx_ppdu_success;
+	uint32_t num_obss_tx_ppdu_failure;
+	/** num_sr_tx_transmissions:
+	 * Counter of TX done by aborting other BSS RX with spatial reuse
+	 * (for cases where rx RSSI from other BSS is below the packet-detection
+	 * threshold for doing spatial reuse)
+	 */
+	uint32_t num_sr_tx_transmissions;
+	/**
+	 * Count the number of times the RSSI from an other-BSS signal
+	 * is below the spatial reuse power threshold, thus providing an
+	 * opportunity for spatial reuse since OBSS interference will be
+	 * inconsequential.
+	 */
+	uint32_t num_spatial_reuse_opportunities;
+	/**
+	 * Count of number of times OBSS frames were aborted and non-SRG
+	 * opportunities were created. Non-SRG opportunities are created when
+	 * incoming OBSS RSSI is lesser than the global configured non-SRG RSSI
+	 * threshold and non-SRG OBSS color / non-SRG OBSS BSSID registers
+	 * allow non-SRG TX.
+	 */
+	uint32_t num_non_srg_opportunities;
+	/**
+	 * Count of number of times TX PPDU were transmitted using non-SRG
+	 * opportunities created. Incoming OBSS frame RSSI is compared with per
+	 * PPDU non-SRG RSSI threshold configured in each PPDU. If incoming OBSS
+	 * RSSI < non-SRG RSSI threshold configured in each PPDU, then non-SRG
+	 * tranmission happens.
+	 */
+	uint32_t num_non_srg_ppdu_tried;
+	/**
+	 * Count of number of times non-SRG based TX transmissions were
+	 * successful
+	 */
+	uint32_t num_non_srg_ppdu_success;
+	/**
+	 * Count of number of times OBSS frames were aborted and SRG
+	 * opportunities were created. Srg opportunities are created when
+	 * incoming OBSS RSSI is less than the global configured SRG RSSI
+	 * threshold and SRC OBSS color / SRG OBSS BSSID / SRG partial bssid /
+	 * SRG BSS color bitmap registers allow SRG TX.
+	 */
+	uint32_t num_srg_opportunities;
+	/**
+	 * Count of number of times TX PPDU were transmitted using SRG
+	 * opportunities created.
+	 * Incoming OBSS frame RSSI is compared with per PPDU SRG RSSI
+	 * threshold configured in each PPDU.
+	 * If incoming OBSS RSSI < SRG RSSI threshold configured in each PPDU,
+	 * then SRG tranmission happens.
+	 */
+	uint32_t num_srg_ppdu_tried;
+	/**
+	 * Count of number of times SRG based TX transmissions were successful
+	 */
+	uint32_t num_srg_ppdu_success;
+	/**
+	 * Count of number of times PSR opportunities were created by aborting
+	 * OBSS UL OFDMA HE-TB PPDU frame. HE-TB ppdu frames are aborted if the
+	 * spatial reuse info in the OBSS trigger common field is set to allow
+	 * PSR based spatial reuse.
+	 */
+	uint32_t num_psr_opportunities;
+	/**
+	 * Count of number of times TX PPDU were transmitted using PSR
+	 * opportunities created.
+	 */
+	uint32_t num_psr_ppdu_tried;
+	/**
+	 * Count of number of times PSR based TX transmissions were successful.
+	 */
+	uint32_t num_psr_ppdu_success;
+	/**
+	 * Count of number of times TX PPDU per access category were transmitted
+	 * using non-SRG opportunities created.
+	 */
+	uint32_t num_non_srg_ppdu_tried_per_ac[DP_NUM_AC_WMM];
+	/**
+	 * Count of number of times non-SRG based TX transmissions per access
+	 * category were successful
+	 */
+	uint32_t num_non_srg_ppdu_success_per_ac[DP_NUM_AC_WMM];
+	/**
+	 * Count of number of times TX PPDU per access category were transmitted
+	 * using SRG opportunities created.
+	 */
+	uint32_t num_srg_ppdu_tried_per_ac[DP_NUM_AC_WMM];
+	/**
+	 * Count of number of times SRG based TX transmissions per access
+	 * category were successful
+	 */
+	uint32_t num_srg_ppdu_success_per_ac[DP_NUM_AC_WMM];
+	/**
+	 * Count of number of times ppdu was flushed due to ongoing OBSS
+	 * frame duration value lesser than minimum required frame duration.
+	 */
+	uint32_t num_obss_min_duration_check_flush_cnt;
+	/**
+	 * Count of number of times ppdu was flushed due to ppdu duration
+	 * exceeding aborted OBSS frame duration
+	 */
+	uint32_t num_sr_ppdu_abort_flush_cnt;
+};
+
 struct cdp_htt_tx_pdev_stats_urrn_tlv_v {
     struct cdp_htt_tlv_hdr tlv_hdr;
     uint32_t urrn_stats[1]; /* HTT_TX_PDEV_MAX_URRN_STATS */
@@ -2376,6 +2486,7 @@ struct cdp_htt_tx_pdev_stats {
     struct cdp_htt_tx_pdev_stats_sifs_tlv_v sifs_tlv;
     struct cdp_htt_tx_pdev_stats_flush_tlv_v flush_tlv;
     struct cdp_htt_tx_pdev_stats_phy_err_tlv_v phy_err_tlv;
+	struct cdp_pdev_obss_pd_stats_tlv obss_pd_stats_tlv;
 };
 
 struct cdp_htt_rx_soc_stats_t {

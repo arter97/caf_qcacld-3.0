@@ -1863,6 +1863,26 @@ dp_htt_stats_sysfs_set_event(struct dp_soc *dp_soc, uint32_t *msg_word)
 }
 #endif /* WLAN_SYSFS_DP_STATS */
 
+/* dp_htt_set_pdev_obss_stats() - Function to set pdev obss stats.
+ * @pdev: dp pdev handle
+ * @tag_type: HTT TLV tag type
+ * @tag_buf: TLV buffer pointer
+ *
+ * Return: None
+ */
+static inline void
+dp_htt_set_pdev_obss_stats(struct dp_pdev *pdev, uint32_t tag_type,
+			   uint32_t *tag_buf)
+{
+	if (tag_type != HTT_STATS_PDEV_OBSS_PD_TAG) {
+		dp_err("Tag mismatch");
+		return;
+	}
+	qdf_mem_copy(&pdev->stats.htt_tx_pdev_stats.obss_pd_stats_tlv,
+		     tag_buf, sizeof(struct cdp_pdev_obss_pd_stats_tlv));
+	qdf_event_set(&pdev->fw_obss_stats_event);
+}
+
 /**
  * dp_process_htt_stat_msg(): Process the list of buffers of HTT EXT stats
  * @htt_stats: htt stats info
@@ -1991,6 +2011,11 @@ static inline void dp_process_htt_stat_msg(struct htt_stats_context *htt_stats,
 					dp_peer_update_inactive_time(pdev,
 								     tlv_type,
 								     tlv_start);
+
+				if (cookie_msb & DBG_STATS_COOKIE_HTT_OBSS)
+					dp_htt_set_pdev_obss_stats(pdev,
+								   tlv_type,
+								   tlv_start);
 
 				msg_remain_len -= tlv_remain_len;
 

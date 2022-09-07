@@ -1213,6 +1213,11 @@ struct cdp_host_stats_ops {
 	QDF_STATUS
 		(*txrx_get_peer_extd_rate_link_stats)
 				(struct cdp_soc_t *soc, uint8_t *mac_addr);
+	QDF_STATUS
+		(*get_pdev_obss_stats)(struct cdp_soc_t *soc, uint8_t pdev_id,
+				       struct cdp_pdev_obss_pd_stats_tlv *buf);
+	QDF_STATUS (*clear_pdev_obss_pd_stats)(struct cdp_soc_t *soc,
+					       uint8_t pdev_id);
 };
 
 struct cdp_wds_ops {

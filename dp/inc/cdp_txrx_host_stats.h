@@ -1061,4 +1061,56 @@ static inline QDF_STATUS cdp_get_peer_extd_rate_link_stats(
 	return soc->ops->host_stats_ops->txrx_get_peer_extd_rate_link_stats(
 								soc, mac_addr);
 }
+
+/*
+ * cdp_get_pdev_obss_pd_stats(): function to get pdev obss stats
+ * @soc: soc handle
+ * @pdev_id: pdev id
+ * @stats: pointer to pdev obss stats
+ *
+ * return: status
+ */
+static inline QDF_STATUS cdp_get_pdev_obss_pd_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_obss_pd_stats_tlv *stats)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->get_pdev_obss_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->get_pdev_obss_stats(
+					soc, pdev_id, stats);
+}
+
+/**
+ * cdp_clear_pdev_obss_pd_stats(): function to clear pdev obss stats
+ * @soc: soc handle
+ * @pdev_id: pdev id
+ *
+ * return: status
+ */
+static inline QDF_STATUS cdp_clear_pdev_obss_pd_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->clear_pdev_obss_pd_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->clear_pdev_obss_pd_stats(
+					soc, pdev_id);
+}
 #endif /* _CDP_TXRX_HOST_STATS_H_ */

@@ -3058,6 +3058,12 @@ struct dp_pdev {
 	/* qdf_event for fw_stats */
 	qdf_event_t fw_stats_event;
 
+	/* qdf_event for fw__obss_stats */
+	qdf_event_t fw_obss_stats_event;
+
+	/* To check if request is already sent for obss stats */
+	bool pending_fw_obss_stats_response;
+
 	/* User configured max number of tx buffers */
 	uint32_t num_tx_allowed;
 

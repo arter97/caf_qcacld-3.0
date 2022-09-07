@@ -71,6 +71,9 @@ struct htt_dbgfs_cfg {
 /*Reserve for HTT Stats debugfs support: 5th bit */
 #define DBG_SYSFS_STATS_COOKIE BIT(5)
 
+/* Reserve for HTT Stats OBSS PD support: 6th bit */
+#define DBG_STATS_COOKIE_HTT_OBSS BIT(6)
+
 /**
  * Bitmap of HTT PPDU TLV types for Default mode
  */
