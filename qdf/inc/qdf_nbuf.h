@@ -4912,6 +4912,14 @@ void qdf_nbuf_set_timestamp(qdf_nbuf_t buf);
 uint64_t qdf_nbuf_get_timestamp(qdf_nbuf_t buf);
 
 /**
+ * qdf_nbuf_get_timestamp_us() - get the timestamp for frame
+ * @buf: pointer to network buffer
+ *
+ * Return: timestamp stored in nbuf in us
+ */
+uint64_t qdf_nbuf_get_timestamp_us(qdf_nbuf_t buf);
+
+/**
  * qdf_nbuf_get_timedelta_ms() - get time difference in ms
  * @buf: pointer to network buffer
  *
@@ -4945,6 +4953,12 @@ static inline uint64_t
 qdf_nbuf_get_timestamp(struct sk_buff *skb)
 {
 	return __qdf_nbuf_get_timestamp(skb);
+}
+
+static inline uint64_t
+qdf_nbuf_get_timestamp_us(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_get_timestamp_us(buf);
 }
 
 static inline uint64_t
