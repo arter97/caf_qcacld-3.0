@@ -26,6 +26,13 @@
 #include <qdf_trace.h>
 #include <qdf_module.h>
 #include <cdp_txrx_sawf.h>
+#include <wlan_cfg80211.h>
+#include <wlan_objmgr_vdev_obj.h>
+#include <wlan_objmgr_pdev_obj.h>
+#include <wlan_objmgr_peer_obj.h>
+#include <wlan_objmgr_global_obj.h>
+#include <wlan_osif_priv.h>
+#include <cfg80211_external.h>
 
 static struct sawf_ctx *g_wlan_sawf_ctx;
 
@@ -301,3 +308,107 @@ int wlan_sawf_get_drop_stats(void *soc, void *arg, uint64_t *pass,
 	return cdp_get_drop_stats(soc, arg, pass, drop, drop_ttl, tid, msduq);
 }
 qdf_export_symbol(wlan_sawf_get_drop_stats);
+
+static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
+				     struct psoc_peer_iter *itr)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	struct vdev_osif_priv *osif_vdev;
+	struct sk_buff *vendor_event;
+
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev) {
+		qdf_info("Unable to find vdev");
+		return;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		qdf_info("Unable to find pdev");
+		return;
+	}
+
+	osif_vdev  = wlan_vdev_get_ospriv(vdev);
+	if (!osif_vdev) {
+		qdf_info("Unable to find osif_vdev");
+		return;
+	}
+
+	vendor_event =
+		wlan_cfg80211_vendor_event_alloc(
+				osif_vdev->wdev->wiphy, osif_vdev->wdev,
+				4000,
+				QCA_NL80211_VENDOR_SUBCMD_SAWF_SLA_BREACH_INDEX,
+				GFP_ATOMIC);
+
+	if (!vendor_event) {
+		qdf_info("Failed to allocate vendor event");
+		return;
+	}
+
+	if (nla_put(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_PEER_MAC,
+		    QDF_MAC_ADDR_SIZE,
+		    (void *)(wlan_peer_get_macaddr(peer)))) {
+		qdf_err("nla put fail");
+		goto error_cleanup;
+	}
+
+	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_SVC_ID,
+		       itr->svc_id)) {
+		qdf_err("nla put fail");
+		goto error_cleanup;
+	}
+
+	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_PARAM,
+		       itr->param)) {
+		qdf_err("nla put fail");
+		goto error_cleanup;
+	}
+
+	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_SET_CLEAR,
+		       itr->set_clear)) {
+		qdf_err("nla put fail");
+		goto error_cleanup;
+	}
+
+	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+error_cleanup:
+	wlan_cfg80211_vendor_free_skb(vendor_event);
+}
+
+static void wlan_sawf_get_psoc_peer(struct wlan_objmgr_psoc *psoc,
+				    void *arg,
+				    uint8_t index)
+{
+	struct wlan_objmgr_peer *peer;
+	struct psoc_peer_iter *itr;
+
+	itr = (struct psoc_peer_iter *)arg;
+
+	peer = wlan_objmgr_get_peer_by_mac(
+			psoc, itr->mac_addr, WLAN_SAWF_ID);
+
+	if (peer) {
+		wlan_sawf_send_breach_nl(peer, itr);
+		wlan_objmgr_peer_release_ref(peer, WLAN_SAWF_ID);
+	}
+}
+
+void wlan_sawf_notify_breach(uint8_t *mac_addr,
+			     uint8_t svc_id,
+			     uint8_t param, bool set_clear)
+{
+	struct psoc_peer_iter itr = {0};
+
+	itr.mac_addr = mac_addr;
+	itr.set_clear = set_clear;
+	itr.svc_id = svc_id;
+	itr.param = param;
+
+	wlan_objmgr_iterate_psoc_list(wlan_sawf_get_psoc_peer,
+				      &itr, WLAN_SAWF_ID);
+}
+
+qdf_export_symbol(wlan_sawf_notify_breach);
+

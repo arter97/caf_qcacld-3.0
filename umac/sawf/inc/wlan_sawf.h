@@ -135,6 +135,13 @@ struct sawf_ctx {
 	struct wlan_sawf_scv_class_params svc_classes[SAWF_SVC_CLASS_MAX];
 };
 
+struct psoc_peer_iter {
+	uint8_t *mac_addr;
+	bool set_clear;
+	uint8_t svc_id;
+	uint8_t param;
+};
+
 /* wlan_sawf_init() - Initialize SAWF subsytem
  *
  * Initialize the SAWF context
