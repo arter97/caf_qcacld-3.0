@@ -852,7 +852,7 @@ dp_sawf_copy_delay_stats(struct sawf_delay_stats *dst,
 			 struct sawf_delay_stats *src)
 {
 	dp_copy_hist_stats(&src->delay_hist, &dst->delay_hist);
-	dst->mov_avg = src->mov_avg;
+	dst->hwdelay_avg = src->hwdelay_avg;
 	dst->success = src->success;
 	dst->failure = dst->failure;
 }
@@ -969,7 +969,7 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 				telemetry_sawf_get_mov_avg(
 						sawf_ctx->telemetry_ctx,
 						tid, host_q_idx, &mov_avg);
-				src->mov_avg = mov_avg;
+				src->hwdelay_avg = mov_avg;
 
 				dp_sawf_print_stats("-- TID: %u MSDUQ: %u --",
 						    tid, q_idx);
@@ -1009,7 +1009,7 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 		src = &stats_ctx->stats.delay[host_q_idx];
 		telemetry_sawf_get_mov_avg(sawf_ctx->telemetry_ctx,
 					   tid, host_q_idx, &mov_avg);
-		src->mov_avg = mov_avg;
+		src->hwdelay_avg = mov_avg;
 
 		dp_sawf_print_stats("----TID: %u MSDUQ: %u ----", tid, q_idx);
 		dp_sawf_dump_delay_stats(src);
