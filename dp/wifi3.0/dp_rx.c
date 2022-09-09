@@ -1505,12 +1505,6 @@ out:
 	if (soc->cdp_soc.ol_ops->rx_invalid_peer)
 		soc->cdp_soc.ol_ops->rx_invalid_peer(vdev->vdev_id, wh);
 free:
-	/* reset the head and tail pointers */
-	pdev = dp_get_pdev_for_lmac_id(soc, mac_id);
-	if (pdev) {
-		pdev->invalid_peer_head_msdu = NULL;
-		pdev->invalid_peer_tail_msdu = NULL;
-	}
 
 	/* Drop and free packet */
 	curr_nbuf = mpdu;
