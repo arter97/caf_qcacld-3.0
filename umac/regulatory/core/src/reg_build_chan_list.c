@@ -2901,7 +2901,7 @@ static void reg_set_pdev_fcc_rules(
 		     sizeof(struct cur_fcc_rule) * MAX_NUM_FCC_RULES);
 }
 #else
-static void reg_set_pdev_fcc_rules(
+static inline void reg_set_pdev_fcc_rules(
 		struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj,
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {

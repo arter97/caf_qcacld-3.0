@@ -15167,41 +15167,6 @@ static uint16_t wmi_set_htc_tx_tag_tlv(wmi_unified_t wmi_handle,
 }
 
 #ifdef CONFIG_BAND_6GHZ
-#ifdef CONFIG_REG_CLIENT
-/**
- * extract_ext_fcc_rules_from_wmi - extract fcc rules from WMI TLV
- * @num_fcc_rules: Number of FCC rules
- * @wmi_fcc_rule:  WMI FCC rules TLV
- *
- * Return fcc_rule_ptr
- */
-static struct cur_fcc_rule
-*extract_ext_fcc_rules_from_wmi(uint32_t num_fcc_rules,
-		wmi_regulatory_fcc_rule_struct *wmi_fcc_rule)
-{
-	struct cur_fcc_rule *fcc_rule_ptr;
-	uint32_t count;
-
-	if (!wmi_fcc_rule)
-		return NULL;
-
-	fcc_rule_ptr = qdf_mem_malloc(num_fcc_rules *
-				      sizeof(*fcc_rule_ptr));
-	if (!fcc_rule_ptr)
-		return NULL;
-
-	for (count = 0; count < num_fcc_rules; count++) {
-		fcc_rule_ptr[count].center_freq =
-			WMI_REG_FCC_RULE_CHAN_FREQ_GET(
-					wmi_fcc_rule[count].freq_info);
-		fcc_rule_ptr[count].tx_power =
-			WMI_REG_FCC_RULE_FCC_TX_POWER_GET(
-					wmi_fcc_rule[count].freq_info);
-	}
-
-	return fcc_rule_ptr;
-}
-#endif
 
 static struct cur_reg_rule
 *create_ext_reg_rules_from_wmi(uint32_t num_reg_rules,
@@ -15314,6 +15279,40 @@ static enum cc_setting_code wmi_reg_status_to_reg_status(
 
 #ifdef CONFIG_REG_CLIENT
 #define MAX_NUM_FCC_RULES 2
+
+/**
+ * extract_ext_fcc_rules_from_wmi - extract fcc rules from WMI TLV
+ * @num_fcc_rules: Number of FCC rules
+ * @wmi_fcc_rule:  WMI FCC rules TLV
+ *
+ * Return fcc_rule_ptr
+ */
+static struct cur_fcc_rule
+*extract_ext_fcc_rules_from_wmi(uint32_t num_fcc_rules,
+				wmi_regulatory_fcc_rule_struct *wmi_fcc_rule)
+{
+	struct cur_fcc_rule *fcc_rule_ptr;
+	uint32_t count;
+
+	if (!wmi_fcc_rule)
+		return NULL;
+
+	fcc_rule_ptr = qdf_mem_malloc(num_fcc_rules *
+				      sizeof(*fcc_rule_ptr));
+	if (!fcc_rule_ptr)
+		return NULL;
+
+	for (count = 0; count < num_fcc_rules; count++) {
+		fcc_rule_ptr[count].center_freq =
+			WMI_REG_FCC_RULE_CHAN_FREQ_GET(
+				wmi_fcc_rule[count].freq_info);
+		fcc_rule_ptr[count].tx_power =
+			WMI_REG_FCC_RULE_FCC_TX_POWER_GET(
+				wmi_fcc_rule[count].freq_info);
+	}
+
+	return fcc_rule_ptr;
+}
 
 /**
  * extract_reg_fcc_rules_tlv - Extract reg fcc rules TLV
