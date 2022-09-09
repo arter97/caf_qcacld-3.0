@@ -606,6 +606,7 @@ dp_update_pdev_rx_protocol_tag(struct cdp_soc_t  *soc, uint8_t pdev_id,
 
 	pdev->rx_proto_tag_map[protocol_type].tag = tag;
 
+	dp_pdev_update_fast_rx_flag((struct dp_soc *)soc, pdev);
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
