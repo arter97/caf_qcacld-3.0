@@ -2647,16 +2647,18 @@ void dp_peer_tx_wds_addr_add(struct dp_peer *peer, uint8_t *addr4_mac_addr)
 }
 
 /*
- * dp_peer_tx_update_80211_wds_hdr() – Update 80211 frame header to include a
+ * dp_tx_update_80211_wds_hdr() – Update 80211 frame header to include a
  * 4 address frame, and set QoS related information if necessary
  * @pdev: Physical device reference
  * @peer: Datapath peer
  * @data: ppdu_descriptor
  * @nbuf: 802.11 frame
  * @ether_type: ethernet type
- * @src_addr: ether shost address
+ * @dst_addr: ether destination address
  * @usr_idx: user index
+ * @is_amsdu: amsdu flag
  *
+ * return: status
  */
 static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 					   struct dp_peer *peer,
@@ -2706,6 +2708,7 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 		qdf_mem_copy(ptr_wh->i_addr4, ptr_wh->i_addr2,
 			     QDF_MAC_ADDR_SIZE);
 	} else {
+		ptr_wh->i_qos[0] &= ~IEEE80211_QOS_AMSDU;
 		/* Update Addr 3 (DA) with DA derived from ether packet */
 		qdf_mem_copy(ptr_wh->i_addr3, dst_addr, QDF_MAC_ADDR_SIZE);
 	}
@@ -2756,7 +2759,10 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
  * @nbuf: 802.11 frame
  * @ether_type: ethernet type
  * @src_addr: ether shost address
+ * @usr_idx: user index
+ * @is_amsdu: amsdu flag
  *
+ * return: status
  */
 static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 				       struct dp_peer *peer,
@@ -2805,6 +2811,7 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 		qdf_mem_copy(ptr_wh->i_addr3, ptr_wh->i_addr2,
 			     QDF_MAC_ADDR_SIZE);
 	} else {
+		ptr_wh->i_qos[0] &= ~IEEE80211_QOS_AMSDU;
 		/* Update Addr 3 (SA) with SA derived from ether packet */
 		qdf_mem_copy(ptr_wh->i_addr3, src_addr, QDF_MAC_ADDR_SIZE);
 	}
