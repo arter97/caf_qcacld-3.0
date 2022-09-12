@@ -1304,6 +1304,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	hal_ring_handle_t hal_ring_hdl = NULL;
 	uint32_t *hal_tx_desc_cached;
 	void *hal_tx_desc;
+	uint8_t desc_size = DP_TX_FAST_DESC_SIZE;
 
 	if (qdf_unlikely(vdev_id >= MAX_VDEV_CNT))
 		return nbuf;
@@ -1372,6 +1373,13 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	hal_tx_desc_cached[5] = vdev->lmac_id << TCL_DATA_CMD_PMAC_ID_LSB;
 	hal_tx_desc_cached[5] |= vdev->vdev_id << TCL_DATA_CMD_VDEV_ID_LSB;
 
+	if (vdev->opmode == wlan_op_mode_sta) {
+		hal_tx_desc_cached[6] = vdev->bss_ast_idx |
+			((vdev->bss_ast_hash & 0xF) <<
+			 TCL_DATA_CMD_CACHE_SET_NUM_LSB);
+		desc_size = DP_TX_FAST_DESC_SIZE + 4;
+	}
+
 	hal_ring_hdl = dp_tx_get_hal_ring_hdl(soc, desc_pool_id);
 
 	if (qdf_unlikely(dp_tx_hal_ring_access_start(soc, hal_ring_hdl))) {
@@ -1392,7 +1400,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	tx_desc->flags |= DP_TX_DESC_FLAG_QUEUED_TX;
 
 	/* Sync cached descriptor with HW */
-	qdf_mem_copy(hal_tx_desc, hal_tx_desc_cached, DP_TX_FAST_DESC_SIZE);
+	qdf_mem_copy(hal_tx_desc, hal_tx_desc_cached, desc_size);
 	qdf_dsb();
 
 	DP_STATS_INC_PKT(vdev, tx_i.processed, 1, tx_desc->length);
