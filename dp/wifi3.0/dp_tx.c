@@ -3122,6 +3122,21 @@ dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		goto fail;
 	}
 
+	/* for peer based metadata check if peer is valid */
+	if (tx_exc_metadata->peer_id != CDP_INVALID_PEER) {
+		struct dp_peer *peer = NULL;
+
+		 peer = dp_peer_get_ref_by_id(vdev->pdev->soc,
+					      tx_exc_metadata->peer_id,
+					      DP_MOD_ID_TX_EXCEPTION);
+		if (qdf_unlikely(!peer)) {
+			DP_STATS_INC(vdev,
+				     tx_i.dropped.invalid_peer_id_in_exc_path,
+				     1);
+			goto fail;
+		}
+		dp_peer_unref_delete(peer, DP_MOD_ID_TX_EXCEPTION);
+	}
 	/* Basic sanity checks for unsupported packets */
 
 	/* MESH mode */
