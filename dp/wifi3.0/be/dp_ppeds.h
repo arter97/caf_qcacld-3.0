@@ -38,6 +38,26 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc);
 void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc);
 
 /**
+ * dp_ppeds_init_soc_be - Initialize ppeds soc instance
+ * @soc: SoC
+ *
+ * Initialize ppeds soc instance
+ *
+ * Return: status
+ */
+QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc);
+
+/**
+ * dp_ppeds_deinit_soc_be - Deinitialize ppeds soc instance
+ * @soc: SoC
+ *
+ * Deinitialize ppeds soc instance
+ *
+ * Return: status
+ */
+QDF_STATUS dp_ppeds_deinit_soc_be(struct dp_soc *soc);
+
+/**
  * dp_ppeds_register_soc_be - Registers ppeds soc instance
  * @be_soc: BE SoC
  *

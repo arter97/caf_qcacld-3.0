@@ -227,6 +227,267 @@ static void dp_ppeds_dealloc_vp_tbl_entry_be(struct dp_soc_be *be_soc,
 }
 
 /**
+ * dp_ppeds_tx_desc_pool_alloc() - PPE DS allocate tx desc pool
+ * @soc: SoC
+ * @num_elem: num of dec elements
+ *
+ * PPE DS allocate tx desc pool
+ *
+ * Return: status
+ */
+static QDF_STATUS
+dp_ppeds_tx_desc_pool_alloc(struct dp_soc *soc, uint16_t num_elem)
+{
+	uint32_t desc_size;
+	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	desc_size =  qdf_get_pwr2(sizeof(struct dp_tx_desc_s));
+	tx_desc_pool = &be_soc->ppeds_tx_desc;
+	dp_desc_multi_pages_mem_alloc(soc, DP_TX_PPEDS_DESC_TYPE,
+				      &tx_desc_pool->desc_pages,
+				      desc_size, num_elem,
+				      0, true);
+
+	if (!tx_desc_pool->desc_pages.num_pages) {
+		dp_err("Multi page alloc fail, tx desc");
+		return QDF_STATUS_E_NOMEM;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_ppeds_tx_desc_pool_free() - PPE DS free tx desc pool
+ * @soc: SoC
+ *
+ * PPE DS free tx desc pool
+ *
+ * Return: none
+ */
+static void dp_ppeds_tx_desc_pool_free(struct dp_soc *soc)
+{
+	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	tx_desc_pool = &be_soc->ppeds_tx_desc;
+
+	if (tx_desc_pool->desc_pages.num_pages)
+		dp_desc_multi_pages_mem_free(soc, DP_TX_PPEDS_DESC_TYPE,
+					     &tx_desc_pool->desc_pages, 0,
+					     true);
+}
+
+/**
+ * dp_ppeds_tx_desc_pool_setup() - PPE DS tx desc pool setup
+ * @soc: SoC
+ * @num_elem: num of dec elements
+ * @pool_id: Pool id
+ *
+ * PPE DS tx desc pool setup
+ *
+ * Return: status
+ */
+static QDF_STATUS dp_ppeds_tx_desc_pool_setup(struct dp_soc *soc,
+					      uint16_t num_elem,
+					      uint8_t pool_id)
+{
+	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	struct dp_hw_cookie_conversion_t *cc_ctx;
+	struct dp_soc_be *be_soc;
+	struct dp_spt_page_desc *page_desc;
+	struct dp_tx_desc_s *tx_desc;
+	uint32_t ppt_idx = 0;
+	uint32_t avail_entry_index = 0;
+
+	if (!num_elem) {
+		dp_err("desc_num 0 !!");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	be_soc = dp_get_be_soc_from_dp_soc(soc);
+	tx_desc_pool = &be_soc->ppeds_tx_desc;
+	cc_ctx  = &be_soc->ppeds_tx_cc_ctx;
+
+	tx_desc = tx_desc_pool->freelist;
+	page_desc = &cc_ctx->page_desc_base[0];
+	while (tx_desc) {
+		if (avail_entry_index == 0) {
+			if (ppt_idx >= cc_ctx->total_page_num) {
+				dp_alert("insufficient secondary page tables");
+				qdf_assert_always(0);
+			}
+			page_desc = &cc_ctx->page_desc_base[ppt_idx++];
+		}
+
+		/* put each TX Desc VA to SPT pages and
+		 * get corresponding ID
+		 */
+		DP_CC_SPT_PAGE_UPDATE_VA(page_desc->page_v_addr,
+					 avail_entry_index,
+					 tx_desc);
+		tx_desc->id =
+			dp_cc_desc_id_generate(page_desc->ppt_index,
+					       avail_entry_index);
+		tx_desc->pool_id = pool_id;
+		dp_tx_desc_set_magic(tx_desc, DP_TX_MAGIC_PATTERN_FREE);
+		tx_desc = tx_desc->next;
+		avail_entry_index = (avail_entry_index + 1) &
+					DP_CC_SPT_PAGE_MAX_ENTRIES_MASK;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_ppeds_tx_desc_pool_init() - PPE DS tx desc pool init
+ * @soc: SoC
+ *
+ * PPE DS tx desc pool init
+ *
+ * Return: status
+ */
+static QDF_STATUS dp_ppeds_tx_desc_pool_init(struct dp_soc *soc)
+{
+	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	uint32_t desc_size, num_elem;
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	desc_size = qdf_get_pwr2(sizeof(struct dp_tx_desc_s));
+	num_elem = wlan_cfg_get_dp_soc_ppe_num_tx_desc(soc->wlan_cfg_ctx);
+	tx_desc_pool = &be_soc->ppeds_tx_desc;
+
+	if (qdf_mem_multi_page_link(soc->osdev,
+				    &tx_desc_pool->desc_pages,
+				    desc_size, num_elem, true)) {
+		dp_err("invalid tx desc allocation -overflow num link");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	tx_desc_pool->freelist = (struct dp_tx_desc_s *)
+		*tx_desc_pool->desc_pages.cacheable_pages;
+
+	/* Set unique IDs for each Tx descriptor */
+	if (dp_ppeds_tx_desc_pool_setup(soc, num_elem, DP_TX_PPEDS_POOL_ID) !=
+					QDF_STATUS_SUCCESS) {
+		dp_err("ppeds_tx_desc_pool_setup failed");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	tx_desc_pool->elem_size = desc_size;
+	tx_desc_pool->num_free = num_elem;
+	tx_desc_pool->num_allocated = 0;
+
+	TX_DESC_LOCK_CREATE(&tx_desc_pool->lock);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_ppeds_tx_desc_pool_cleanup() - PPE DS tx desc pool cleanup
+ * @soc: SoC
+ * @tx_desc_pool: TX desc pool
+ *
+ * PPE DS tx desc pool cleanup
+ *
+ * Return: void
+ */
+static void
+dp_ppeds_tx_desc_pool_cleanup(struct dp_soc_be *be_soc,
+			      struct dp_ppe_tx_desc_pool_s *tx_desc_pool)
+{
+	struct dp_spt_page_desc *page_desc;
+	int i = 0;
+	struct dp_hw_cookie_conversion_t *cc_ctx;
+
+	cc_ctx  = &be_soc->ppeds_tx_cc_ctx;
+
+	for (i = 0; i < cc_ctx->total_page_num; i++) {
+		page_desc = &cc_ctx->page_desc_base[i];
+		qdf_mem_zero(page_desc->page_v_addr, qdf_page_size);
+	}
+}
+
+/**
+ * dp_ppeds_tx_desc_pool_deinit() - PPE DS tx desc pool deinitialize
+ * @be_soc: SoC
+ *
+ * PPE DS tx desc pool deinit
+ *
+ * Return: void
+ */
+static void dp_ppeds_tx_desc_pool_deinit(struct dp_soc_be *be_soc)
+{
+	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+
+	tx_desc_pool = &be_soc->ppeds_tx_desc;
+	dp_ppeds_tx_desc_pool_cleanup(be_soc, tx_desc_pool);
+	TX_DESC_POOL_MEMBER_CLEAN(tx_desc_pool);
+	TX_DESC_LOCK_DESTROY(&tx_desc_pool->lock);
+}
+
+/**
+ * dp_ppeds_tx_desc_alloc() - PPE DS tx desc alloc
+ * @be_soc: SoC
+ *
+ * PPE DS tx desc alloc
+ *
+ * Return: tx desc
+ */
+static inline
+struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
+{
+	struct dp_tx_desc_s *tx_desc = NULL;
+	struct dp_ppe_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
+
+	TX_DESC_LOCK_LOCK(&pool->lock);
+
+	tx_desc = pool->freelist;
+
+	/* Pool is exhausted */
+	if (!tx_desc) {
+		TX_DESC_LOCK_UNLOCK(&pool->lock);
+		return NULL;
+	}
+
+	pool->freelist = pool->freelist->next;
+	pool->num_allocated++;
+	pool->num_free--;
+	dp_tx_prefetch_desc(pool->freelist);
+
+	tx_desc->flags = DP_TX_DESC_FLAG_ALLOCATED;
+
+	TX_DESC_LOCK_UNLOCK(&pool->lock);
+
+	return tx_desc;
+}
+
+/**
+ * dp_ppeds_tx_desc_free() - PPE DS tx desc free
+ * @be_soc: SoC
+ * @tx_desc: tx desc
+ *
+ * PPE DS tx desc free
+ *
+ * Return: void
+ */
+void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppe_tx_desc_pool_s *pool = NULL;
+
+	tx_desc->nbuf = NULL;
+	tx_desc->flags = 0;
+
+	pool = &be_soc->ppeds_tx_desc;
+	TX_DESC_LOCK_LOCK(&pool->lock);
+	tx_desc->next = pool->freelist;
+	pool->freelist = tx_desc;
+	pool->num_allocated--;
+	pool->num_free++;
+	TX_DESC_LOCK_UNLOCK(&pool->lock);
+}
+
+/**
  * dp_ppeds_get_batched_tx_desc() - Get Tx descriptors in a buffer array
  * @ppeds_handle: PPE-DS WLAN handle
  * @arr: Tx buffer array to be filled
@@ -249,6 +510,7 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppeds_wlan_handle_t *ppeds_handle,
 	unsigned int cpu;
 	struct dp_tx_desc_s *tx_desc;
 	struct dp_soc *soc = *((struct dp_soc **)ppeds_wlan_priv(ppeds_handle));
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	qdf_dma_addr_t paddr;
 
 	cpu = qdf_get_cpu();
@@ -274,7 +536,7 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppeds_wlan_handle_t *ppeds_handle,
 				(void *)(nbuf->data + buff_size - headroom));
 		paddr = (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
 
-		tx_desc = dp_tx_desc_alloc(soc, cpu);
+		tx_desc = dp_ppeds_tx_desc_alloc(be_soc);
 		if (!tx_desc) {
 			qdf_nbuf_free_simple(nbuf);
 			dp_err("ran out of txdesc");
@@ -778,6 +1040,7 @@ void dp_ppeds_stop_soc_be(struct dp_soc *soc)
 		return;
 
 	nss_ppe_ds_wlan_inst_stop(be_soc->ppeds_handle);
+	dp_ppeds_tx_desc_pool_deinit(be_soc);
 }
 
 /**
@@ -795,8 +1058,14 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 		return QDF_STATUS_SUCCESS;
 	}
 
+	if (dp_ppeds_tx_desc_pool_init(soc) != QDF_STATUS_SUCCESS) {
+		dp_err("%p: ppeds tx desc pool init failed", soc);
+		return QDF_STATUS_SUCCESS;
+	}
+
 	if (nss_ppe_ds_wlan_inst_start(be_soc->ppeds_handle) != 0) {
 		dp_err("%p: ppeds start failed", soc);
+		dp_ppeds_tx_desc_pool_deinit(be_soc);
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -844,13 +1113,37 @@ QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc)
  */
 void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
 {
+	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
+
 	if (!be_soc->ppeds_handle)
 		return;
 
+	dp_ppeds_tx_desc_pool_free(soc);
+	dp_hw_cookie_conversion_detach(be_soc, &be_soc->ppeds_tx_cc_ctx);
 	nss_ppe_ds_wlan_inst_del(be_soc->ppeds_handle);
 	be_soc->ppeds_handle = NULL;
 
 	dp_ppeds_deinit_ppe_vp_tbl_be(be_soc);
+}
+
+QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (!wlan_cfg_get_dp_soc_is_ppe_enabled(soc->wlan_cfg_ctx))
+		return QDF_STATUS_SUCCESS;
+
+	return dp_hw_cookie_conversion_init(be_soc, &be_soc->ppeds_tx_cc_ctx);
+}
+
+QDF_STATUS dp_ppeds_deinit_soc_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (!wlan_cfg_get_dp_soc_is_ppe_enabled(soc->wlan_cfg_ctx))
+		return QDF_STATUS_SUCCESS;
+
+	return dp_hw_cookie_conversion_deinit(be_soc, &be_soc->ppeds_tx_cc_ctx);
 }
 
 /**
@@ -861,11 +1154,28 @@ void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
  */
 QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 {
+	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	struct dp_soc_be **besocptr;
+	uint32_t num_elem;
+
+	num_elem = wlan_cfg_get_dp_soc_ppe_num_tx_desc(soc->wlan_cfg_ctx);
+
+	qdf_status =
+		dp_hw_cookie_conversion_attach(be_soc, &be_soc->ppeds_tx_cc_ctx,
+					       num_elem, DP_TX_PPEDS_DESC_TYPE,
+					       DP_TX_PPEDS_POOL_ID);
+	if (!QDF_IS_STATUS_SUCCESS(qdf_status))
+		goto fail1;
+
+	if (dp_ppeds_tx_desc_pool_alloc(soc, num_elem) != QDF_STATUS_SUCCESS) {
+		dp_err("%p: Failed to allocate ppeds tx desc pool", be_soc);
+		goto fail2;
+	}
 
 	if (dp_ppeds_init_ppe_vp_tbl_be(be_soc) != QDF_STATUS_SUCCESS) {
 		dp_err("%p: Failed to init ppe vp tbl", be_soc);
-		goto fail2;
+		goto fail3;
 	}
 
 	be_soc->ppeds_handle =
@@ -873,7 +1183,7 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 						   sizeof(struct dp_soc_be *));
 	if (!be_soc->ppeds_handle) {
 		dp_err("%p: Failed to allocate ppeds soc instance", be_soc);
-		goto fail3;
+		goto fail4;
 	}
 
 	 besocptr = (struct dp_soc_be **)ppeds_wlan_priv(be_soc->ppeds_handle);
@@ -881,9 +1191,13 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 
 	 return QDF_STATUS_SUCCESS;
 
-fail3:
+fail4:
 	dp_ppeds_deinit_ppe_vp_tbl_be(be_soc);
+fail3:
+	dp_ppeds_tx_desc_pool_free(soc);
 fail2:
+	dp_hw_cookie_conversion_detach(be_soc, &be_soc->ppeds_tx_cc_ctx);
+fail1:
 	return QDF_STATUS_E_FAILURE;
 
 }
