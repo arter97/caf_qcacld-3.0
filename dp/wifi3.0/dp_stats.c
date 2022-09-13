@@ -5819,7 +5819,7 @@ dp_print_pdev_cfg_params(struct dp_pdev *pdev)
  *
  * Return: void
  */
-static void
+void
 dp_print_ring_stat_from_hal(struct dp_soc *soc,  struct dp_srng *srng,
 			    enum hal_ring_type ring_type)
 {
@@ -6031,6 +6031,11 @@ dp_print_ring_stats(struct dp_pdev *pdev)
 					    [lmac_id],
 					    RXDMA_DST);
 	}
+
+#ifdef WLAN_SUPPORT_PPEDS
+	if (pdev->soc->arch_ops.dp_txrx_ppeds_rings_status)
+		pdev->soc->arch_ops.dp_txrx_ppeds_rings_status(pdev->soc);
+#endif
 	hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_DP_RING_STATS);
 }
 

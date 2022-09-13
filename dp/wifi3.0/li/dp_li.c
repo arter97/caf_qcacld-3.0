@@ -621,6 +621,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_find_peer_by_destmac = dp_find_peer_by_destmac_li;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_li;
 	arch_ops->reo_remap_config = dp_reo_remap_config_li;
+	arch_ops->dp_txrx_ppeds_rings_status = NULL;
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH
