@@ -3155,10 +3155,13 @@ dp_mon_filter_setup_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 		if ((config->tx_config.level == CDP_LITE_MON_LEVEL_MPDU) ||
 		    (config->tx_config.level == CDP_LITE_MON_LEVEL_PPDU))
 			tx_tlv_filter->ctrl_mpdu_log = 1;
-		if (config->tx_config.ctrl_filter[DP_MON_FRM_FILTER_MODE_FP] !=
-		    CDP_LITE_MON_FILTER_ALL)
-			config->subtype_filtering = true;
 	}
+	/* Since ctrl frames are generated in host, we need to do subtype
+	 * filtering even though ctrl filters are not enabled
+	 */
+	if (config->tx_config.ctrl_filter[DP_MON_FRM_FILTER_MODE_FP] !=
+	    CDP_LITE_MON_FILTER_ALL)
+		config->subtype_filtering = true;
 	/* configure data filters */
 	if (config->tx_config.data_filter[DP_MON_FRM_FILTER_MODE_FP]) {
 		tx_tlv_filter->data_filter = 1;
