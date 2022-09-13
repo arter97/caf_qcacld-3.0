@@ -1804,7 +1804,8 @@ static void hdd_extract_fw_version_info(struct hdd_context *hdd_ctx)
 }
 
 #if defined(WLAN_FEATURE_11AX) && \
-	   (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+	(defined(CFG80211_SBAND_IFTYPE_DATA_BACKPORT) || \
+	 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)))
 static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 {
 	tDot11fIEhe_cap he_cap_cfg;
@@ -1813,6 +1814,9 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 	struct ieee80211_supported_band *band_5g =
 			hdd_ctx->wiphy->bands[HDD_NL80211_BAND_5GHZ];
 	QDF_STATUS status;
+	uint32_t channel_bonding_mode_2g;
+	uint8_t *phy_info_2g =
+		hdd_ctx->iftype_data_2g->he_cap.he_cap_elem.phy_cap_info;
 
 	status = ucfg_mlme_cfg_get_he_caps(hdd_ctx->psoc, &he_cap_cfg);
 
@@ -1825,6 +1829,12 @@ static void hdd_update_wiphy_he_cap(struct hdd_context *hdd_ctx)
 		hdd_ctx->iftype_data_2g->he_cap.has_he = he_cap_cfg.present;
 		band_2g->n_iftype_data = 1;
 		band_2g->iftype_data = hdd_ctx->iftype_data_2g;
+
+		ucfg_mlme_get_channel_bonding_24ghz(hdd_ctx->psoc,
+						    &channel_bonding_mode_2g);
+		if (channel_bonding_mode_2g)
+			phy_info_2g[0] |=
+				IEEE80211_HE_PHY_CAP0_CHANNEL_WIDTH_SET_40MHZ_IN_2G;
 	}
 	if (band_5g) {
 		hdd_ctx->iftype_data_5g->types_mask =

@@ -14626,7 +14626,9 @@ wlan_hdd_populate_srd_chan_info(struct hdd_context *hdd_ctx, uint32_t index)
 
 #endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#if defined(WLAN_FEATURE_11AX) && \
+	(defined(CFG80211_SBAND_IFTYPE_DATA_BACKPORT) || \
+	 (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)))
 static QDF_STATUS
 wlan_hdd_iftype_data_alloc(struct hdd_context *hdd_ctx)
 {
@@ -14649,15 +14651,7 @@ wlan_hdd_iftype_data_alloc(struct hdd_context *hdd_ctx)
 
 	return QDF_STATUS_SUCCESS;
 }
-#else
-static inline QDF_STATUS
-wlan_hdd_iftype_data_alloc(struct hdd_context *hdd_ctx)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 static void
 wlan_hdd_iftype_data_mem_free(struct hdd_context *hdd_ctx)
 {
@@ -14667,6 +14661,12 @@ wlan_hdd_iftype_data_mem_free(struct hdd_context *hdd_ctx)
 	hdd_ctx->iftype_data_2g = NULL;
 }
 #else
+static inline QDF_STATUS
+wlan_hdd_iftype_data_alloc(struct hdd_context *hdd_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
 static inline void
 wlan_hdd_iftype_data_mem_free(struct hdd_context *hdd_ctx)
 {
