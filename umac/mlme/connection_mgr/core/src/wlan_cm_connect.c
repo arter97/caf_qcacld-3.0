@@ -35,6 +35,7 @@
 #include <wlan_utility.h>
 #include <wlan_mlo_mgr_sta.h>
 #include <wlan_objmgr_vdev_obj.h>
+#include "wlan_psoc_mlme_api.h"
 
 static void
 cm_fill_failure_resp_from_cm_id(struct cnx_mgr *cm_ctx,
@@ -460,8 +461,14 @@ static void cm_update_vdev_mlme_macaddr(struct cnx_mgr *cm_ctx,
 					struct cm_connect_req *req)
 {
 	struct qdf_mac_addr *mac;
+	bool eht_capab;
 
 	if (wlan_vdev_mlme_get_opmode(cm_ctx->vdev) != QDF_STA_MODE)
+		return;
+
+	wlan_psoc_mlme_get_11be_capab(wlan_vdev_get_psoc(cm_ctx->vdev),
+				      &eht_capab);
+	if (!eht_capab)
 		return;
 
 	if (req->cur_candidate->entry->ie_list.multi_link) {
@@ -572,8 +579,9 @@ static void cm_create_bss_peer(struct cnx_mgr *cm_ctx,
 {
 	QDF_STATUS status;
 	struct qdf_mac_addr *bssid;
-	struct qdf_mac_addr *mld_mac;
+	struct qdf_mac_addr *mld_mac = NULL;
 	bool is_assoc_link = false;
+	bool eht_capab;
 
 	if (!cm_ctx) {
 		mlme_err("invalid cm_ctx");
@@ -583,10 +591,16 @@ static void cm_create_bss_peer(struct cnx_mgr *cm_ctx,
 		mlme_err("invalid req");
 		return;
 	}
+
+	wlan_psoc_mlme_get_11be_capab(wlan_vdev_get_psoc(cm_ctx->vdev),
+				      &eht_capab);
+	if (eht_capab) {
+		cm_set_vdev_link_id(cm_ctx, req);
+		mld_mac = cm_get_bss_peer_mld_addr(req);
+		is_assoc_link = cm_bss_peer_is_assoc_peer(req);
+	}
+
 	bssid = &req->cur_candidate->entry->bssid;
-	cm_set_vdev_link_id(cm_ctx, req);
-	mld_mac = cm_get_bss_peer_mld_addr(req);
-	is_assoc_link = cm_bss_peer_is_assoc_peer(req);
 	status = mlme_cm_bss_peer_create_req(cm_ctx->vdev, bssid,
 					     mld_mac, is_assoc_link);
 	if (QDF_IS_STATUS_ERROR(status)) {

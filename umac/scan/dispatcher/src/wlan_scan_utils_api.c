@@ -33,6 +33,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_utility.h>
 #endif
+#include "wlan_psoc_mlme_api.h"
 
 #define MAX_IE_LEN 1024
 #define SHORT_SSID_LEN 4
@@ -953,17 +954,35 @@ util_scan_parse_rnr_ie(struct scan_cache_entry *scan_entry,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE
 #ifdef WLAN_FEATURE_11BE_MLO
+static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
+				  struct extn_ie_header *extn_ie)
+{
+	if (extn_ie->ie_extn_id == WLAN_EXTN_ELEMID_MULTI_LINK)
+		scan_params->ie_list.multi_link = (uint8_t *)extn_ie;
+}
+#else
+static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
+				  struct extn_ie_header *extn_ie)
+{
+}
+#endif
 static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
 				   struct extn_ie_header *extn_ie)
 {
 	switch (extn_ie->ie_extn_id) {
-	case WLAN_EXTN_ELEMID_MULTI_LINK:
-		scan_params->ie_list.multi_link = (uint8_t *)extn_ie;
+	case WLAN_EXTN_ELEMID_EHTCAP:
+		scan_params->ie_list.ehtcap = (uint8_t *)extn_ie;
+		break;
+	case WLAN_EXTN_ELEMID_EHTOP:
+		scan_params->ie_list.ehtop  = (uint8_t *)extn_ie;
 		break;
 	default:
 		break;
 	}
+
+	util_scan_parse_ml_ie(scan_params, extn_ie);
 }
 #else
 static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
@@ -973,10 +992,14 @@ static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
 #endif
 
 static QDF_STATUS
-util_scan_parse_extn_ie(struct scan_cache_entry *scan_params,
-	struct ie_header *ie)
+util_scan_parse_extn_ie(struct wlan_objmgr_psoc *psoc,
+			struct scan_cache_entry *scan_params,
+			struct ie_header *ie)
 {
 	struct extn_ie_header *extn_ie = (struct extn_ie_header *) ie;
+	bool eht_capab;
+
+	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
 
 	switch (extn_ie->ie_extn_id) {
 	case WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME:
@@ -1010,18 +1033,11 @@ util_scan_parse_extn_ie(struct scan_cache_entry *scan_params,
 			return QDF_STATUS_E_INVAL;
 		scan_params->ie_list.hecap_6g = (uint8_t *)ie;
 		break;
-#ifdef WLAN_FEATURE_11BE
-	case WLAN_EXTN_ELEMID_EHTCAP:
-		scan_params->ie_list.ehtcap = (uint8_t *)ie;
-		break;
-	case WLAN_EXTN_ELEMID_EHTOP:
-		scan_params->ie_list.ehtop  = (uint8_t *)ie;
-		break;
-#endif
 	default:
 		break;
 	}
-	util_scan_parse_eht_ie(scan_params, extn_ie);
+	if (eht_capab)
+		util_scan_parse_eht_ie(scan_params, extn_ie);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1400,7 +1416,7 @@ util_scan_populate_bcn_ie_list(struct wlan_objmgr_pdev *pdev,
 			scan_params->ie_list.rsnxe = (uint8_t *)ie;
 			break;
 		case WLAN_ELEMID_EXTN_ELEM:
-			status = util_scan_parse_extn_ie(scan_params, ie);
+			status = util_scan_parse_extn_ie(psoc, scan_params, ie);
 			if (QDF_IS_STATUS_ERROR(status))
 				goto err_status;
 			break;
