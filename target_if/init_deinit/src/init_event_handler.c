@@ -453,6 +453,9 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 	}
 
 	info = (&tgt_hdl->info);
+	if (info->wmi_service_status ==
+			wmi_init_ext_processing_failed)
+		return -EINVAL;
 
 	err_code = init_deinit_populate_service_ready_ext2_param(wmi_handle,
 								 event, info);
@@ -517,9 +520,11 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 
 	legacy_callback = target_if_get_psoc_legacy_service_ready_cb();
 	if (legacy_callback)
-		legacy_callback(wmi_service_ready_ext2_event_id,
-				scn_handle, event, data_len);
-
+		if (legacy_callback(wmi_service_ready_ext2_event_id,
+				    scn_handle, event, data_len)) {
+			target_if_err("Legacy callback return error!");
+			goto exit;
+		}
 	target_if_regulatory_set_ext_tpc(psoc);
 
 	target_if_reg_set_lower_6g_edge_ch_info(psoc);
@@ -531,7 +536,10 @@ static int init_deinit_service_ext2_ready_event_handler(ol_scn_t scn_handle,
 	/* send init command */
 	init_deinit_set_send_init_cmd(psoc, tgt_hdl);
 
+	return 0;
 exit:
+	info->wmi_ready = false;
+	info->wmi_service_status = wmi_init_ext2_processing_failed;
 	return err_code;
 }
 
@@ -582,7 +590,7 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 			== FALSE) {
 		target_if_err("Preferred mode %d not supported",
 			      info->preferred_hw_mode);
-		return -EINVAL;
+		goto exit;
 	}
 
 	num_radios = target_psoc_get_num_radios_for_mode(tgt_hdl,
@@ -630,9 +638,13 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 		goto exit;
 
 	legacy_callback = target_if_get_psoc_legacy_service_ready_cb();
-	if (legacy_callback)
-		legacy_callback(wmi_service_ready_ext_event_id,
-				scn_handle, event, data_len);
+	if (legacy_callback) {
+		if (legacy_callback(wmi_service_ready_ext_event_id,
+				    scn_handle, event, data_len)) {
+			target_if_err("Error Code %d", err_code);
+			goto exit;
+		}
+	}
 
 	target_if_set_twt_ap_pdev_count(info, tgt_hdl);
 
@@ -646,7 +658,11 @@ static int init_deinit_service_ext_ready_event_handler(ol_scn_t scn_handle,
 		init_deinit_set_send_init_cmd(psoc, tgt_hdl);
 	}
 
+	return 0;
 exit:
+	info->wmi_ready = false;
+	info->wmi_service_status = wmi_init_ext_processing_failed;
+	init_deinit_wakeup_host_wait(psoc, tgt_hdl);
 	return err_code;
 }
 
@@ -827,7 +843,7 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 		if (legacy_callback(wmi_ready_event_id,
 				    scn_handle, event, data_len)) {
 			target_if_err("Legacy callback returned error!");
-			tgt_hdl->info.wmi_ready = FALSE;
+			tgt_hdl->info.wmi_ready = false;
 			goto exit;
 		}
 
@@ -952,7 +968,7 @@ static int init_deinit_ready_event_handler(ol_scn_t scn_handle,
 
 out:
 	target_if_btcoex_cfg_enable(psoc, tgt_hdl, event);
-	tgt_hdl->info.wmi_ready = TRUE;
+	tgt_hdl->info.wmi_ready = true;
 	init_deinit_mlo_update_pdev_ready(psoc, num_radios);
 exit:
 	init_deinit_wakeup_host_wait(psoc, tgt_hdl);
