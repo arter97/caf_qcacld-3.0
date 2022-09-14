@@ -1434,8 +1434,8 @@ QDF_STATUS wlan_vdev_get_bss_peer_mac(struct wlan_objmgr_vdev *vdev,
 
 	peer = wlan_objmgr_vdev_try_get_bsspeer(vdev, WLAN_MLME_OBJMGR_ID);
 	if (!peer) {
-		obj_mgr_err("not able to find bss peer for vdev %d",
-			    wlan_vdev_get_id(vdev));
+		obj_mgr_debug("not able to find bss peer for vdev %d",
+			      wlan_vdev_get_id(vdev));
 		return QDF_STATUS_E_INVAL;
 	}
 	wlan_peer_obj_lock(peer);
