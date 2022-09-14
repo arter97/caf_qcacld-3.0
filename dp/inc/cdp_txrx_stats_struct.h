@@ -2657,10 +2657,12 @@ struct cdp_soc_stats {
  * struct cdp_pdev_telemetry_stats- Structure to hold pdev telemetry stats
  * @tx_mpdu_failed: Tx mpdu failed
  * @tx_mpdu_total: Total tx mpdus
+ * @link_airtime: pdev airtime usage per ac per sec
  */
 struct cdp_pdev_telemetry_stats {
 	uint32_t tx_mpdu_failed;
 	uint32_t tx_mpdu_total;
+	uint32_t link_airtime[WME_AC_MAX];
 };
 
 /**
@@ -2677,7 +2679,7 @@ struct cdp_peer_telemetry_stats {
 	uint32_t tx_mpdu_total;
 	uint32_t rx_mpdu_retried;
 	uint32_t rx_mpdu_total;
-	uint8_t airtime_consumption;
+	uint8_t airtime_consumption[WME_AC_MAX];
 	uint8_t snr;
 };
 #endif
