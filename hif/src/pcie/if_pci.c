@@ -3081,7 +3081,7 @@ static int hif_ce_msi_configure_irq(struct hif_softc *scn)
 	struct HIF_CE_state *ce_sc = HIF_GET_CE_STATE(scn);
 	struct CE_attr *host_ce_conf = ce_sc->host_ce_config;
 
-	if (!scn->disable_wake_irq) {
+	if (!scn->ini_cfg.disable_wake_irq) {
 		/* do wake irq assignment */
 		ret = pld_get_user_msi_assignment(scn->qdf_dev->dev, "WAKE",
 						  &msi_data_count,
@@ -3149,7 +3149,7 @@ free_irq:
 	}
 
 free_wake_irq:
-	if (!scn->disable_wake_irq) {
+	if (!scn->ini_cfg.disable_wake_irq) {
 		pfrm_free_irq(scn->qdf_dev->dev,
 			      scn->wake_irq, scn->qdf_dev->dev);
 		scn->wake_irq = 0;

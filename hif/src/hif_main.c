@@ -54,9 +54,7 @@
 #endif
 #include <linux/cpumask.h>
 
-#if defined(HIF_IPCI) && defined(FEATURE_HAL_DELAYED_REG_WRITE)
 #include <pld_common.h>
-#endif
 
 void hif_dump(struct hif_opaque_softc *hif_ctx, uint8_t cmd_id, bool start)
 {
@@ -543,15 +541,15 @@ void hif_rtpm_lock_deinit(struct hif_softc *scn)
 
 #ifdef WLAN_CE_INTERRUPT_THRESHOLD_CONFIG
 /**
- * hif_get_cfg_from_psoc() - Retrieve ini cfg from psoc
+ * hif_get_interrupt_threshold_cfg_from_psoc() - Retrieve ini cfg from psoc
  * @scn: hif context
  * @psoc: psoc objmgr handle
  *
  * Return: None
  */
 static inline
-void hif_get_cfg_from_psoc(struct hif_softc *scn,
-			   struct wlan_objmgr_psoc *psoc)
+void hif_get_interrupt_threshold_cfg_from_psoc(struct hif_softc *scn,
+					       struct wlan_objmgr_psoc *psoc)
 {
 	if (psoc) {
 		scn->ini_cfg.ce_status_ring_timer_threshold =
@@ -564,11 +562,41 @@ void hif_get_cfg_from_psoc(struct hif_softc *scn,
 }
 #else
 static inline
-void hif_get_cfg_from_psoc(struct hif_softc *scn,
-			   struct wlan_objmgr_psoc *psoc)
+void hif_get_interrupt_threshold_cfg_from_psoc(struct hif_softc *scn,
+					       struct wlan_objmgr_psoc *psoc)
 {
 }
 #endif /* WLAN_CE_INTERRUPT_THRESHOLD_CONFIG */
+
+/**
+ * hif_get_cfg_from_psoc() - Retrieve ini cfg from psoc
+ * @scn: hif context
+ * @psoc: psoc objmgr handle
+ *
+ * Return: None
+ */
+static inline
+void hif_get_cfg_from_psoc(struct hif_softc *scn,
+			   struct wlan_objmgr_psoc *psoc)
+{
+	if (psoc) {
+		scn->ini_cfg.disable_wake_irq =
+			cfg_get(psoc, CFG_DISABLE_WAKE_IRQ);
+		/**
+		 * Wake IRQ can't share the same IRQ with the copy engines
+		 * In one MSI mode, we don't know whether wake IRQ is triggered
+		 * or not in wake IRQ handler. known issue CR 2055359
+		 * If you want to support Wake IRQ. Please allocate at least
+		 * 2 MSI vector. The first is for wake IRQ while the others
+		 * share the second vector
+		 */
+		if (pld_is_one_msi(scn->qdf_dev->dev)) {
+			hif_debug("Disable wake IRQ once it is one MSI mode");
+			scn->ini_cfg.disable_wake_irq = true;
+		}
+		hif_get_interrupt_threshold_cfg_from_psoc(scn, psoc);
+	}
+}
 
 #if defined(HIF_CE_LOG_INFO) || defined(HIF_BUS_LOG_INFO)
 /**
