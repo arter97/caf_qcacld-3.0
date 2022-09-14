@@ -631,9 +631,10 @@ int wlan_cfg80211_sched_scan_start(struct wlan_objmgr_vdev *vdev,
 		   req->band_rssi_pref.rssi);
 
 	for (i = 0; i < req->networks_cnt; i++)
-		osif_debug("[%d] ssid: %.*s, RSSI th %d bc NW type %u",
-			   i, req->networks_list[i].ssid.length,
-			   req->networks_list[i].ssid.ssid,
+		osif_debug("[%d] ssid: " QDF_SSID_FMT ", RSSI th %d bc NW type %u",
+			   i,
+			   QDF_SSID_REF(req->networks_list[i].ssid.length,
+					req->networks_list[i].ssid.ssid),
 			   req->networks_list[i].rssi_thresh,
 			   req->networks_list[i].bc_new_type);
 
@@ -2198,8 +2199,9 @@ QDF_STATUS  __wlan_cfg80211_unlink_bss_list(struct wiphy *wiphy,
 		osif_info("BSS "QDF_MAC_ADDR_FMT" not found",
 			  QDF_MAC_ADDR_REF(bssid));
 	} else {
-		osif_debug("unlink entry for ssid:%.*s and BSSID "QDF_MAC_ADDR_FMT,
-			   ssid_len, ssid, QDF_MAC_ADDR_REF(bssid));
+		osif_debug("unlink entry for ssid:" QDF_SSID_FMT " and BSSID " QDF_MAC_ADDR_FMT,
+			   QDF_SSID_REF(ssid_len, ssid),
+			   QDF_MAC_ADDR_REF(bssid));
 		cfg80211_unlink_bss(wiphy, bss);
 		wlan_cfg80211_put_bss(wiphy, bss);
 	}
@@ -2215,11 +2217,13 @@ QDF_STATUS  __wlan_cfg80211_unlink_bss_list(struct wiphy *wiphy,
 	 */
 	bss = wlan_cfg80211_get_bss(wiphy, NULL, bssid, NULL, 0);
 	if (!bss) {
-		osif_debug("Hidden bss not found for Ssid:%.*s BSSID: "QDF_MAC_ADDR_FMT" sid_len %d",
-			   ssid_len, ssid, QDF_MAC_ADDR_REF(bssid), ssid_len);
+		osif_debug("Hidden bss not found for ssid:" QDF_SSID_FMT " BSSID: " QDF_MAC_ADDR_FMT " sid_len %d",
+			   QDF_SSID_REF(ssid_len, ssid),
+			   QDF_MAC_ADDR_REF(bssid), ssid_len);
 	} else {
-		osif_debug("unlink entry for Hidden ssid:%.*s and BSSID "QDF_MAC_ADDR_FMT,
-			   ssid_len, ssid, QDF_MAC_ADDR_REF(bssid));
+		osif_debug("unlink entry for Hidden ssid:" QDF_SSID_FMT " and BSSID " QDF_MAC_ADDR_FMT,
+			   QDF_SSID_REF(ssid_len, ssid),
+			   QDF_MAC_ADDR_REF(bssid));
 
 		cfg80211_unlink_bss(wiphy, bss);
 		/* cfg80211_get_bss get bss with ref count so release it */

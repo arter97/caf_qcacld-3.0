@@ -2085,10 +2085,10 @@ cm_resume_connect_after_peer_create(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 	}
 
 	wlan_reg_get_cc_and_src(psoc, country_code);
-	mlme_nofl_info(CM_PREFIX_FMT "Connecting to %.*s " QDF_MAC_ADDR_FMT " rssi: %d freq: %d akm 0x%x cipher: uc 0x%x mc 0x%x, wps %d osen %d force RSN %d CC: %c%c",
+	mlme_nofl_info(CM_PREFIX_FMT "Connecting to " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT " rssi: %d freq: %d akm 0x%x cipher: uc 0x%x mc 0x%x, wps %d osen %d force RSN %d CC: %c%c",
 		       CM_PREFIX_REF(req.vdev_id, req.cm_id),
-		       cm_req->connect_req.req.ssid.length,
-		       cm_req->connect_req.req.ssid.ssid,
+		       QDF_SSID_REF(cm_req->connect_req.req.ssid.length,
+				    cm_req->connect_req.req.ssid.ssid),
 		       QDF_MAC_ADDR_REF(req.bss->entry->bssid.bytes),
 		       req.bss->entry->rssi_raw,
 		       req.bss->entry->channel.chan_freq,

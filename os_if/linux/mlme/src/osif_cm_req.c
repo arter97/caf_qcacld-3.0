@@ -408,11 +408,11 @@ osif_cm_dump_connect_req(struct net_device *dev, uint8_t vdev_id,
 	num_akm_suites = osif_cm_get_num_akm_suites(req);
 	akm_suites = osif_cm_get_akm_suites(req);
 
-	osif_nofl_debug("connect req for %s(vdevid-%d) freq %d SSID %.*s auth type %d WPA ver %d n_akm %d n_cipher %d grp_cipher %x mfp %d freq hint %d",
+	osif_nofl_debug("connect req for %s(vdevid-%d) freq %d SSID " QDF_SSID_FMT " auth type %d WPA ver %d n_akm %d n_cipher %d grp_cipher %x mfp %d freq hint %d",
 			dev->name, vdev_id,
 			req->channel ? req->channel->center_freq : 0,
-			(int)req->ssid_len, req->ssid, req->auth_type,
-			req->crypto.wpa_versions,
+			QDF_SSID_REF((int)req->ssid_len, req->ssid),
+			req->auth_type, req->crypto.wpa_versions,
 			num_akm_suites,
 			req->crypto.n_ciphers_pairwise,
 			req->crypto.cipher_group, req->mfp,
