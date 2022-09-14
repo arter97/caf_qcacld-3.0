@@ -3496,22 +3496,6 @@ target_if_consume_spectral_report_gen3(
 		goto fail_no_print;
 	}
 
-	ret = target_if_spectral_is_finite_scan(spectral, spectral_mode,
-						&finite_scan);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		spectral_err_rl("Failed to check scan is finite");
-		goto fail;
-	}
-
-	if (finite_scan) {
-		ret = target_if_spectral_finite_scan_update(spectral,
-							    spectral_mode);
-		if (QDF_IS_STATUS_ERROR(ret)) {
-			spectral_err_rl("Failed to update scan count");
-			goto fail;
-		}
-	}
-
 	/* Validate and Process the search FFT report */
 	ret = target_if_process_sfft_report_gen3(
 					data, p_sfft,
@@ -3589,8 +3573,24 @@ target_if_consume_spectral_report_gen3(
 		goto fail;
 	}
 
+	ret = target_if_spectral_is_finite_scan(spectral, spectral_mode,
+						&finite_scan);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		spectral_err_rl("Failed to check scan is finite");
+		goto fail;
+	}
+
+	if (finite_scan) {
+		ret = target_if_spectral_finite_scan_update(spectral,
+							    spectral_mode);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			spectral_err_rl("Failed to update scan count");
+			goto fail;
+		}
+	}
+
 	return 0;
- fail:
+fail:
 	spectral_err_rl("Error while processing Spectral report");
 fail_no_print:
 	if (spectral_mode != SPECTRAL_SCAN_MODE_INVALID)
