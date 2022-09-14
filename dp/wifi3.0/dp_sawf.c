@@ -45,6 +45,8 @@
 #define SAWF_SERVICE_CLASS_MASK 0xff
 #define SAWF_PEER_ID_SHIFT 0x6
 #define SAWF_PEER_ID_MASK 0x3ff
+#define SAWF_NW_DELAY_MASK 0x3ffff
+#define SAWF_NW_DELAY_SHIFT 0x6
 #define SAWF_MSDUQ_MASK 0x3f
 
 /**
@@ -58,6 +60,11 @@
 #define SAWF_MSDUQ_GET(x) ((x) & SAWF_MSDUQ_MASK)
 #define SAWF_TAG_IS_VALID(x) \
 	((SAWF_TAG_GET(x) == SAWF_VALID_TAG) ? true : false)
+
+#define SAWF_NW_DELAY_SET(x, nw_delay) ((SAWF_VALID_TAG << SAWF_TAG_SHIFT) | \
+	((nw_delay) << SAWF_NW_DELAY_SHIFT) | (SAWF_MSDUQ_GET(x)))
+#define SAWF_NW_DELAY_GET(x) (((x) >> SAWF_NW_DELAY_SHIFT) \
+	& SAWF_NW_DELAY_MASK)
 
 #define DP_TX_TCL_METADATA_TYPE_SET(_var, _val) \
 	HTT_TX_TCL_METADATA_TYPE_V2_SET(_var, _val)
@@ -446,7 +453,7 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 	struct sawf_delay_stats *tx_delay;
 	struct wlan_sawf_scv_class_params *svclass_params;
 	uint8_t svc_id;
-	uint32_t num_pkt_win, hw_delay, sw_delay;
+	uint32_t num_pkt_win, hw_delay, sw_delay, nw_delay;
 	uint64_t nwdelay_win_avg, swdelay_win_avg, hwdelay_win_avg;
 
 	if (QDF_IS_STATUS_ERROR(dp_sawf_compute_tx_hw_delay_us(soc, vdev, ts,
@@ -459,7 +466,11 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 	dp_hist_update_stats(&tx_delay->delay_hist, hw_delay);
 
 	tx_delay->num_pkt++;
+
 	tx_delay->hwdelay_win_total += hw_delay;
+	nw_delay = SAWF_NW_DELAY_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
+
+	tx_delay->nwdelay_win_total += nw_delay;
 
 	dp_sawf_compute_tx_delay_us(tx_desc, &sw_delay);
 	tx_delay->swdelay_win_total += sw_delay;
@@ -587,7 +598,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
+	peer_id = tx_desc->peer_id;
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
 	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
 	    host_msduq_idx < DP_SAWF_DEFAULT_Q_MAX)
@@ -731,7 +742,7 @@ dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 	if (!dp_sawf_tag_valid_get(tx_desc->nbuf))
 		return QDF_STATUS_E_INVAL;
 
-	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
+	peer_id = tx_desc->peer_id;
 
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
 	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
@@ -772,6 +783,29 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
+static void dp_sawf_set_nw_delay(qdf_nbuf_t nbuf)
+{
+	uint32_t mark;
+	uint32_t nw_delay = 0;
+	uint32_t msduq;
+
+	if ((qdf_nbuf_get_tx_ftype(nbuf) != CB_FTYPE_SAWF)) {
+		goto set_delay;
+	}
+	nw_delay = (uint32_t)((uintptr_t)qdf_nbuf_get_tx_fctx(nbuf));
+	if (nw_delay > SAWF_NW_DELAY_MASK) {
+		nw_delay = 0;
+		goto set_delay;
+	}
+
+set_delay:
+	mark = qdf_nbuf_get_mark(nbuf);
+	msduq = SAWF_MSDUQ_GET(mark);
+	mark = SAWF_NW_DELAY_SET(mark, nw_delay) | msduq;
+
+	qdf_nbuf_set_mark(nbuf, mark);
+}
+
 QDF_STATUS
 dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 			      struct dp_tx_desc_s *tx_desc)
@@ -786,6 +820,17 @@ dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 		return QDF_STATUS_E_INVAL;
 
 	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
+	tx_desc->peer_id = peer_id;
+
+	/*
+	 * Set n/w-delay into mark field and process the same in the
+	 * completion-path.If n/w-delay is invalid for any reason,
+	 * move forward and process the other stats.
+	 */
+	dp_sawf_set_nw_delay(tx_desc->nbuf);
+
+	/* Set enqueue tstamp in tx_desc */
+	tx_desc->timestamp = qdf_ktime_real_get();
 
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
 	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
@@ -916,7 +961,8 @@ dp_sawf_copy_delay_stats(struct sawf_delay_stats *dst,
 	dst->nwdelay_avg = src->nwdelay_avg;
 	dst->swdelay_avg = src->swdelay_avg;
 	dst->hwdelay_avg = src->hwdelay_avg;
-	dst->failure = dst->failure;
+	dst->success = src->success;
+	dst->failure = src->failure;
 }
 
 static void
