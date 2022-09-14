@@ -1076,4 +1076,11 @@ static inline int pfrm_write_config_dword(struct pci_dev *pdev, int offset,
 	return pld_pci_write_config_dword(pdev, offset, val);
 }
 
+/**
+ * pld_is_one_msi()- whether one MSI is used or not
+ * @dev: device structure
+ *
+ * Return: true if it is one MSI
+ */
+bool pld_is_one_msi(struct device *dev);
 #endif
