@@ -902,7 +902,7 @@ dp_set_rtpm_tput_policy_requirement(struct cdp_soc_t *soc_hdl,
 static inline void
 dp_tx_hw_desc_update_evt(uint8_t *hal_tx_desc_cached,
 			 hal_ring_handle_t hal_ring_hdl,
-			 struct dp_soc *soc)
+			 struct dp_soc *soc, uint8_t ring_id)
 {
 	struct dp_tx_hw_desc_history *tx_hw_desc_history =
 						&soc->tx_hw_desc_history;
@@ -922,13 +922,14 @@ dp_tx_hw_desc_update_evt(uint8_t *hal_tx_desc_cached,
 	evt = &tx_hw_desc_history->entry[slot][idx];
 	qdf_mem_copy(evt->tcl_desc, hal_tx_desc_cached, HAL_TX_DESC_LEN_BYTES);
 	evt->posted = qdf_get_log_timestamp();
+	evt->tcl_ring_id = ring_id;
 	hal_get_sw_hptp(soc->hal_soc, hal_ring_hdl, &evt->tp, &evt->hp);
 }
 #else
 static inline void
 dp_tx_hw_desc_update_evt(uint8_t *hal_tx_desc_cached,
 			 hal_ring_handle_t hal_ring_hdl,
-			 struct dp_soc *soc)
+			 struct dp_soc *soc, uint8_t ring_id)
 {
 }
 #endif

@@ -1398,6 +1398,7 @@ struct rx_refill_buff_pool {
 
 struct dp_tx_hw_desc_evt {
 	uint8_t tcl_desc[HAL_TX_DESC_LEN_BYTES];
+	uint8_t tcl_ring_id;
 	uint64_t posted;
 	uint32_t hp;
 	uint32_t tp;
