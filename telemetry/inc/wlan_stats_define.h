@@ -453,6 +453,9 @@ struct stats_if_hist_stats {
 struct stats_if_delay_tx_stats {
 	struct stats_if_hist_stats tx_swq_delay;
 	struct stats_if_hist_stats hwtx_delay;
+	uint32_t nwdelay_avg;
+	uint32_t swdelay_avg;
+	uint32_t hwdelay_avg;
 };
 
 struct stats_if_delay_rx_stats {
