@@ -1790,4 +1790,41 @@ void mlo_sta_get_vdev_list(struct wlan_objmgr_vdev *vdev, uint16_t *vdev_count,
 	mlo_dev_lock_release(dev_ctx);
 }
 
+void mlo_set_keys_saved(struct wlan_objmgr_vdev *vdev,
+			struct qdf_mac_addr *mac_address, bool value)
+{
+	struct wlan_mlo_sta *sta_ctx;
+
+	if (!vdev || !vdev->mlo_dev_ctx)
+		return;
+
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx)
+		return;
+
+	sta_ctx->key_mgmt[0].vdev_id = wlan_vdev_get_id(vdev);
+	sta_ctx->key_mgmt[0].keys_saved = value;
+	qdf_copy_macaddr(&sta_ctx->key_mgmt[0].link_mac_address,
+			 mac_address);
+}
+
+bool mlo_get_keys_saved(struct wlan_objmgr_vdev *vdev,
+			uint8_t *mac_address)
+{
+	struct wlan_mlo_sta *sta_ctx;
+
+	if (!vdev || !vdev->mlo_dev_ctx)
+		return false;
+
+	sta_ctx = vdev->mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx)
+		return false;
+
+	if ((qdf_is_macaddr_equal(&sta_ctx->key_mgmt[0].link_mac_address,
+				  (struct qdf_mac_addr *)mac_address)) &&
+	     (wlan_vdev_get_id(vdev) == sta_ctx->key_mgmt[0].vdev_id))
+		return sta_ctx->key_mgmt[0].keys_saved;
+
+	return false;
+}
 #endif
