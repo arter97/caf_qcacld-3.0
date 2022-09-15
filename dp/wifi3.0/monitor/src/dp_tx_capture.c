@@ -399,6 +399,11 @@ dp_tx_peer_get_ref(const char *func, uint32_t line, struct dp_pdev *cur_pdev,
 	if (!peer)
 		return NULL;
 
+	if (qdf_unlikely(!(peer->monitor_peer))) {
+		DP_TX_PEER_DEL_REF(peer);
+		return NULL;
+	}
+
 	/* sanity check vdev NULL */
 	vdev = peer->vdev;
 	if (qdf_unlikely(!vdev)) {
@@ -774,6 +779,8 @@ void dp_peer_tid_queue_init(struct dp_peer *peer)
 
 	mon_pdev = pdev->monitor_pdev;
 	mon_peer = peer->monitor_peer;
+	if (qdf_unlikely(!mon_peer))
+		return;
 
 	/* only if tx capture is turned on we will initialize the tid */
 	if (qdf_atomic_read(&mon_pdev->tx_capture.tx_cap_usr_mode) ==
@@ -1969,6 +1976,12 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 	    (peer->bss_peer && ts->tid == DP_NON_QOS_TID)) {
 		dp_tx_capture_err("%pK: peer_id %d, tid %d > NON_QOS_TID!",
 				  soc, ts->peer_id, ts->tid);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!(peer->monitor_peer)) {
+		dp_tx_capture_err("%pK: peer[%d] bss[%d] monitor_peer is NULL!",
+				  soc, peer->peer_id, peer->bss_peer);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -5927,13 +5940,13 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 			peer = DP_TX_PEER_GET_REF(pdev, peer_id);
 
 			/**
-			 * peer can be NULL
+			 *  peer and monitor_peer can be NULL
 			 */
-			if (!peer ||
-			    !(peer->monitor_peer->tx_capture.is_tid_initialized)) {
+			if (!peer || !(peer->monitor_peer)) {
 				user->skip = 1;
 				goto free_nbuf_dec_ref;
 			}
+
 			mon_peer = peer->monitor_peer;
 
 			/**
@@ -5944,6 +5957,7 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 			 * or globally for all peers
 			 */
 			if (peer->bss_peer ||
+			    !(mon_peer->tx_capture.is_tid_initialized) ||
 			    !dp_peer_or_pdev_tx_cap_enabled(pdev,
 				peer, peer->mac_addr.raw) || user->is_mcast) {
 				user->skip = 1;
