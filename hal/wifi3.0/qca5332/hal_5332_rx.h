@@ -92,7 +92,7 @@
 			    HAL_REO_R0_MISC_CTL_SPARE_CONTROL_SHFT);	\
 		HAL_REG_WRITE(soc,					\
 			      HWIO_REO_R0_MISC_CTL_ADDR(REO_REG_REG_BASE), \
-			      reg_val);
+			      reg_val);					\
 	} while (0)
 
 #define HAL_RX_MSDU_DESC_INFO_GET(msdu_details_ptr) \
