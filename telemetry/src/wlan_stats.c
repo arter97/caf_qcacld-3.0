@@ -1231,6 +1231,7 @@ fill_advance_peer_jitter_stats(struct advance_peer_data_jitter *data,
 			     (uint8_t)CDP_MAX_DATA_TIDS);
 	for (tidx = 0; tidx < tids_count; tidx++) {
 		jitter_stats = &data->jitter_stats[tidx];
+		jitter_stats->tx_avg_jitter = cdp_jitter[tidx].tx_avg_jitter;
 		jitter_stats->tx_avg_delay = cdp_jitter[tidx].tx_avg_delay;
 		jitter_stats->tx_avg_err = cdp_jitter[tidx].tx_avg_err;
 		jitter_stats->tx_total_success = cdp_jitter[tidx].tx_total_success;
