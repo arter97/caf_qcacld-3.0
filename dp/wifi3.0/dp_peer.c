@@ -4545,7 +4545,7 @@ static void dp_check_ba_buffersize(struct dp_peer *peer,
 	buffersize = QDF_MIN(buffersize, max_ba_window);
 
 	dp_info(QDF_MAC_ADDR_FMT" per_tid_basize_max_tid %d tid %d buffersize %d hw_buffer_size %d",
-		peer->mac_addr.raw,
+		QDF_MAC_ADDR_REF(peer->mac_addr.raw),
 		soc->per_tid_basize_max_tid, tid, buffersize,
 		peer->hw_buffer_size);
 
