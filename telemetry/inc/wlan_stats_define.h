@@ -569,6 +569,7 @@ struct advance_data_tx_stats {
 	u_int32_t ampdu_cnt;
 	u_int32_t non_ampdu_cnt;
 	u_int32_t per;
+	u_int32_t tx_rate;
 };
 
 struct advance_data_rx_stats {

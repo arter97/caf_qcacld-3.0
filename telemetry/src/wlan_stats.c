@@ -1388,6 +1388,7 @@ static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
 		tx->bw[inx] = cdp_tx->bw[inx];
 	tx->retries = cdp_tx->retries;
 	tx->per = cdp_tx->per;
+	tx->tx_rate = cdp_tx->tx_byte_rate;
 	tx->non_amsdu_cnt = cdp_tx->non_amsdu_cnt;
 	tx->amsdu_cnt = cdp_tx->amsdu_cnt;
 	tx->ampdu_cnt = cdp_tx->ampdu_cnt;
