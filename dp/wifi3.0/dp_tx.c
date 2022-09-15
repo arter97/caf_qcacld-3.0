@@ -3958,6 +3958,16 @@ static void dp_tx_update_peer_sawf_stats(struct dp_soc *soc,
 					   ts, tid);
 }
 
+static void dp_tx_compute_delay_avg(struct cdp_delay_tx_stats  *tx_delay,
+				    uint32_t nw_delay,
+				    uint32_t sw_delay,
+				    uint32_t hw_delay)
+{
+	dp_peer_tid_delay_avg(tx_delay,
+			      nw_delay,
+			      sw_delay,
+			      hw_delay);
+}
 #else
 static void dp_tx_update_peer_sawf_stats(struct dp_soc *soc,
 					 struct dp_vdev *vdev,
@@ -3968,6 +3978,12 @@ static void dp_tx_update_peer_sawf_stats(struct dp_soc *soc,
 {
 }
 
+static inline void
+dp_tx_compute_delay_avg(struct cdp_delay_tx_stats *tx_delay,
+			uint32_t nw_delay, uint32_t sw_delay,
+			uint32_t hw_delay)
+{
+}
 #endif
 
 #ifdef QCA_PEER_EXT_STATS
@@ -3996,6 +4012,9 @@ static void dp_tx_compute_tid_delay(struct cdp_delay_tid_stats *stats,
 							  &fwhw_transmit_delay))
 			dp_hist_update_stats(&tx_delay->hwtx_delay,
 					     fwhw_transmit_delay);
+
+	dp_tx_compute_delay_avg(tx_delay, 0, sw_enqueue_delay,
+				fwhw_transmit_delay);
 }
 #else
 /*

@@ -6350,6 +6350,54 @@ static void dp_print_hist_stats(struct cdp_hist_stats *hstats,
 	}
 }
 
+#ifdef CONFIG_SAWF
+/*
+ * dp_accumulate_delay_avg_stats(): Accumulate the delay average stats
+ * @stats: cdp_delay_tid stats
+ * @dst_hstats: Destination delay Tx stats
+ * @tid: TID value
+ *
+ * Return: void
+ */
+static void dp_accumulate_delay_avg_stats(struct cdp_delay_tid_stats stats[]
+					  [CDP_MAX_TXRX_CTX],
+					  struct cdp_delay_tx_stats *dst_stats,
+					  uint8_t tid)
+{
+	uint32_t num_rings = 0;
+	uint8_t ring_id;
+
+	for (ring_id = 0; ring_id < CDP_MAX_TXRX_CTX; ring_id++) {
+		struct cdp_delay_tx_stats *dstats =
+				&stats[tid][ring_id].tx_delay;
+
+		if (dstats->swdelay_avg || dstats->hwdelay_avg) {
+			dst_stats->nwdelay_avg += dstats->nwdelay_avg;
+			dst_stats->swdelay_avg += dstats->swdelay_avg;
+			dst_stats->hwdelay_avg += dstats->hwdelay_avg;
+			num_rings++;
+		}
+	}
+
+	if (!num_rings)
+		return;
+
+	dst_stats->nwdelay_avg = qdf_do_div(dst_stats->nwdelay_avg,
+					    num_rings);
+	dst_stats->swdelay_avg = qdf_do_div(dst_stats->swdelay_avg,
+					    num_rings);
+	dst_stats->hwdelay_avg = qdf_do_div(dst_stats->hwdelay_avg,
+					    num_rings);
+}
+#else
+static void dp_accumulate_delay_avg_stats(struct cdp_delay_tid_stats stats[]
+					  [CDP_MAX_TXRX_CTX],
+					  struct cdp_delay_tx_stats *dst_stats,
+					  uint8_t tid)
+{
+}
+#endif
+
 /*
  * dp_accumulate_delay_tid_stats(): Accumulate the tid stats to the
  *                                  hist stats.
@@ -8931,6 +8979,9 @@ dp_txrx_get_peer_delay_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 					      &rx_delay->to_stack_delay, tid,
 					      CDP_HIST_TYPE_REAP_STACK);
 		tx_delay = &delay_stats[tid].tx_delay;
+		dp_accumulate_delay_avg_stats(pext_stats->delay_tid_stats,
+					      tx_delay,
+					      tid);
 		dp_accumulate_delay_tid_stats(soc, pext_stats->delay_tid_stats,
 					      &tx_delay->tx_swq_delay, tid,
 					      CDP_HIST_TYPE_SW_ENQEUE_DELAY);
