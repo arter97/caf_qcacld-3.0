@@ -60,7 +60,9 @@ bool wmi_get_action_oui_id(enum action_oui_id action_id,
 	case ACTION_OUI_EXTEND_WOW_ITO:
 		*id = WMI_VENDOR_OUI_ACTION_EXTEND_WOW_ITO;
 		return true;
-
+	case ACTION_OUI_11BE_OUI_ALLOW:
+		*id = WMI_VENDOR_OUI_ACTION_ALLOW_11BE;
+		return true;
 	default:
 		return false;
 	}

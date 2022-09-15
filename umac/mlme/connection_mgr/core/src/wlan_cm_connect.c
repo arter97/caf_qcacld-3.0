@@ -545,6 +545,7 @@ cm_candidate_mlo_update(struct scan_cache_entry *scan_entry,
 			struct validate_bss_data *validate_bss_info)
 {
 	validate_bss_info->is_mlo = !!scan_entry->ie_list.multi_link;
+	validate_bss_info->scan_entry = scan_entry;
 }
 #else
 static inline
