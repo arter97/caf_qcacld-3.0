@@ -1033,6 +1033,7 @@ enum qdf_reception_type {
  * @CB_FTYPE_MESH_RX_INFO - Mesh Rx information
  * @CB_FTYPE_MESH_TX_INFO - Mesh Tx information
  * @CB_FTYPE_DMS - Directed Multicast Service
+ * @CB_FTYPE_SAWF - SAWF information
  */
 enum cb_ftype {
 	CB_FTYPE_INVALID = 0,
@@ -1045,6 +1046,7 @@ enum cb_ftype {
 	CB_FTYPE_MESH_RX_INFO = 7,
 	CB_FTYPE_MESH_TX_INFO = 8,
 	CB_FTYPE_DMS = 9,
+	CB_FTYPE_SAWF = 10,
 };
 
 /**
