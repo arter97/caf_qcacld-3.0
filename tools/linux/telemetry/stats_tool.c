@@ -35,6 +35,9 @@
 
 #define DESC_FIELD_PROVISIONING         31
 
+#define STATS_UL(fp, descr, x) \
+	fprintf(fp, "\t%-*s = %lu\n", DESC_FIELD_PROVISIONING, (descr), (x))
+
 #define STATS_64(fp, descr, x) \
 	fprintf(fp, "\t%-*s = %ju\n", DESC_FIELD_PROVISIONING, (descr), (x))
 
@@ -764,7 +767,7 @@ void print_advance_sta_data_twt(struct advance_peer_data_twt *twt)
 void print_advance_sta_data_link(struct advance_peer_data_link *link)
 {
 	print_basic_sta_data_link(&link->b_link);
-	STATS_32(stdout, "Rx SNR Time", link->rx_snr_measured_time);
+	STATS_UL(stdout, "Rx SNR Time", link->rx_snr_measured_time);
 }
 
 void print_advance_sta_data_rate(struct advance_peer_data_rate *rate)

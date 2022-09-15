@@ -499,7 +499,7 @@ struct advance_peer_data_rate {
 
 struct advance_peer_data_link {
 	struct basic_peer_data_link b_link;
-	u_int32_t rx_snr_measured_time;
+	unsigned long rx_snr_measured_time;
 };
 
 struct advance_peer_data_nawds {
