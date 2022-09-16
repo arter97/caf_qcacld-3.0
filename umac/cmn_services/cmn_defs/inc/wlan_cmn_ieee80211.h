@@ -526,6 +526,7 @@ enum ext_chan_offset {
  * @WLAN_ELEMID_AID: AID
  * @WLAN_ELEMID_QUIET_CHANNEL: Quiet Channel
  * @WLAN_ELEMID_OP_MODE_NOTIFY: Operating Mode Notification
+ * @WLAN_ELEMID_TWT: Target wake time IE
  * @WLAN_ELEMID_VENDOR: vendor private
  * @WLAN_ELEMID_FRAGMENT: Fragment
  * @WLAN_ELEMID_EXTN_ELEM: extended IE
@@ -604,6 +605,7 @@ enum element_ie {
 	WLAN_ELEMID_QUIET_CHANNEL    = 198,
 	WLAN_ELEMID_OP_MODE_NOTIFY   = 199,
 	WLAN_ELEMID_REDUCED_NEIGHBOR_REPORT = 201,
+	WLAN_ELEMID_TWT              = 216,
 	WLAN_ELEMID_VENDOR           = 221,
 	WLAN_ELEMID_FILS_INDICATION  = 240,
 	WLAN_ELEMID_FRAGMENT         = 242,
@@ -615,9 +617,11 @@ enum element_ie {
  * enum extn_element_ie :- extended management information element
  * @WLAN_EXTN_ELEMID_HECAP:  HE capabilities IE
  * @WLAN_EXTN_ELEMID_HEOP:   HE Operation IE
+ * @WLAN_EXTN_ELEMID_UORA: UL OFDMA-based random access Parameter Set element
  * @WLAN_EXTN_ELEMID_MUEDCA: MU-EDCA IE
  * @WLAN_EXTN_ELEMID_HE_6G_CAP: HE 6GHz Band Capabilities IE
  * @WLAN_EXTN_ELEMID_SRP:    spatial reuse parameter IE
+ * @WLAN_EXTN_ELEMID_BSS_COLOR_CHANGE_ANNOUNCE: BSS Color Change Announcement IE
  * @WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME: Maximum Channel Switch Time IE
  * @WLAN_EXTN_ELEMID_NONINHERITANCE: Non inheritance IE
  * @WLAN_EXTN_ELEMID_EHTOP: EHT Operation IE
@@ -629,8 +633,10 @@ enum element_ie {
 enum extn_element_ie {
 	WLAN_EXTN_ELEMID_HECAP       = 35,
 	WLAN_EXTN_ELEMID_HEOP        = 36,
+	WLAN_EXTN_ELEMID_UORA        = 37,
 	WLAN_EXTN_ELEMID_MUEDCA      = 38,
 	WLAN_EXTN_ELEMID_SRP         = 39,
+	WLAN_EXTN_ELEMID_BSS_COLOR_CHANGE_ANNOUNCE = 42,
 	WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME = 52,
 	WLAN_EXTN_ELEMID_NONINHERITANCE = 56,
 	WLAN_EXTN_ELEMID_HE_6G_CAP   = 59,
