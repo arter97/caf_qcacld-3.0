@@ -126,6 +126,7 @@ QDF_STATUS wlan_regulatory_psoc_obj_created_notification(
 	soc_reg_obj->retain_nol_across_regdmn_update = false;
 	soc_reg_obj->is_ext_tpc_supported = false;
 	soc_reg_obj->sta_sap_scc_on_indoor_channel = true;
+	soc_reg_obj->set_fcc_channel = false;
 
 	for (i = 0; i < MAX_STA_VDEV_CNT; i++)
 		soc_reg_obj->vdev_ids_11d[i] = INVALID_VDEV_ID;
@@ -342,7 +343,7 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 
 	pdev_priv_obj->pdev_ptr = pdev;
 	pdev_priv_obj->dfs_enabled = psoc_priv_obj->dfs_enabled;
-	pdev_priv_obj->set_fcc_channel = false;
+	pdev_priv_obj->set_fcc_channel = psoc_priv_obj->set_fcc_channel;
 	pdev_priv_obj->band_capability = psoc_priv_obj->band_capability;
 	pdev_priv_obj->indoor_chan_enabled =
 		psoc_priv_obj->indoor_chan_enabled;
