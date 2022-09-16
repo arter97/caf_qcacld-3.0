@@ -1340,6 +1340,15 @@ cm_handle_connect_req_in_non_init_state(struct cnx_mgr *cm_ctx,
 					struct cm_connect_req *cm_req,
 					enum wlan_cm_sm_state cm_state_substate)
 {
+	if (cm_state_substate != WLAN_CM_S_CONNECTED &&
+	    cm_is_connect_req_reassoc(&cm_req->req)) {
+		cm_req->req.reassoc_in_non_connected = true;
+		mlme_debug(CM_PREFIX_FMT "Reassoc received in %d state",
+			   CM_PREFIX_REF(wlan_vdev_get_id(cm_ctx->vdev),
+					 cm_req->cm_id),
+			   cm_state_substate);
+	}
+
 	switch (cm_state_substate) {
 	case WLAN_CM_S_ROAMING:
 		/* for FW roam/LFR3 remove the req from the list */
@@ -2236,11 +2245,69 @@ cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev)
 { }
 #endif /*WLAN_FEATURE_11BE_MLO*/
 
+/**
+ * cm_is_connect_id_reassoc_in_non_connected()
+ * @cm_ctx: connection manager context
+ * @cm_id: cm id
+ *
+ * If connect req is a reassoc req and received in not connected state
+ *
+ * Return: bool
+ */
+static bool cm_is_connect_id_reassoc_in_non_connected(struct cnx_mgr *cm_ctx,
+						      wlan_cm_id cm_id)
+{
+	qdf_list_node_t *cur_node = NULL, *next_node = NULL;
+	struct cm_req *cm_req;
+	uint32_t prefix = CM_ID_GET_PREFIX(cm_id);
+	bool is_reassoc = false;
+
+	if (prefix != CONNECT_REQ_PREFIX)
+		return is_reassoc;
+
+	cm_req_lock_acquire(cm_ctx);
+	qdf_list_peek_front(&cm_ctx->req_list, &cur_node);
+	while (cur_node) {
+		qdf_list_peek_next(&cm_ctx->req_list, cur_node, &next_node);
+		cm_req = qdf_container_of(cur_node, struct cm_req, node);
+
+		if (cm_req->cm_id == cm_id) {
+			if (cm_req->connect_req.req.reassoc_in_non_connected)
+				is_reassoc = true;
+			cm_req_lock_release(cm_ctx);
+			return is_reassoc;
+		}
+
+		cur_node = next_node;
+		next_node = NULL;
+	}
+	cm_req_lock_release(cm_ctx);
+
+	return is_reassoc;
+}
+
 QDF_STATUS cm_notify_connect_complete(struct cnx_mgr *cm_ctx,
 				      struct wlan_cm_connect_resp *resp)
 {
+	enum wlan_cm_sm_state sm_state;
+
+	sm_state = cm_get_state(cm_ctx);
+
 	mlme_cm_connect_complete_ind(cm_ctx->vdev, resp);
 	mlo_sta_link_connect_notify(cm_ctx->vdev, resp);
+	/*
+	 * If connect req was a reassoc req and was received in not connected
+	 * state send disconnect instead of connect resp to kernel to cleanup
+	 * kernel flags
+	 */
+	if (QDF_IS_STATUS_ERROR(resp->connect_status) &&
+	    sm_state == WLAN_CM_S_INIT &&
+	    cm_is_connect_id_reassoc_in_non_connected(cm_ctx, resp->cm_id)) {
+		resp->send_disconnect = true;
+		mlme_debug(CM_PREFIX_FMT "Set send disconnect to true to indicate disconnect instaed of connect resp",
+			   CM_PREFIX_REF(wlan_vdev_get_id(cm_ctx->vdev),
+					 resp->cm_id));
+	}
 	mlme_cm_osif_connect_complete(cm_ctx->vdev, resp);
 	cm_if_mgr_inform_connect_complete(cm_ctx->vdev,
 					  resp->connect_status);

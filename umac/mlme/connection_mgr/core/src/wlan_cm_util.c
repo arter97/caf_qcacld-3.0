@@ -1256,6 +1256,17 @@ void cm_fill_ml_partner_info(struct wlan_cm_connect_req *req,
 }
 #endif
 
+bool cm_is_connect_req_reassoc(struct wlan_cm_connect_req *req)
+{
+	if (!qdf_is_macaddr_zero(&req->prev_bssid) &&
+	    (!qdf_is_macaddr_zero(&req->bssid) ||
+	     !qdf_is_macaddr_zero(&req->bssid_hint)) &&
+	    (req->chan_freq || req->chan_freq_hint))
+		return true;
+
+	return false;
+}
+
 bool cm_get_active_connect_req(struct wlan_objmgr_vdev *vdev,
 			       struct wlan_cm_vdev_connect_req *req)
 {
