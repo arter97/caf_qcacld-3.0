@@ -264,7 +264,7 @@ static struct net_device *qca_multi_link_get_fast_lane_station_vap(struct wiphy 
  *
  * Return: station vap netdevice pointer
  */
-static struct net_device *qca_multi_link_get_station_vap(struct wiphy *wiphy)
+struct net_device *qca_multi_link_get_station_vap(struct wiphy *wiphy)
 {
 	qca_multi_link_radio_node_t *radio_node = NULL;
 
