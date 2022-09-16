@@ -9874,9 +9874,11 @@ void dp_get_peer_extd_stats(struct dp_peer *peer,
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_extd_stats *extd_stats;
 
-	txrx_peer = peer->txrx_peer;
-	if (!txrx_peer)
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (qdf_unlikely(!txrx_peer)) {
+		dp_err_rl("txrx_peer NULL");
 		return;
+	}
 
 	extd_stats = &txrx_peer->stats.extd_stats;
 	DP_UPDATE_EXTD_STATS(peer_stats, extd_stats);

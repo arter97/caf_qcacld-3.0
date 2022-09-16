@@ -2291,7 +2291,7 @@ dp_rx_rates_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	DP_PEER_EXTD_STATS_UPD(txrx_peer, rx.rx_rate, mcs);
 
 	/* In 11b mode, the nss we get from tlv is 0, invalid and should be 1 */
-	if (pkt_type == DOT11_B)
+	if (qdf_unlikely(pkt_type == DOT11_B))
 		nss = 1;
 
 	/* here pkt_type corresponds to preamble */
