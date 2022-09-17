@@ -871,6 +871,7 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 		    tx->bw[0], tx->bw[1], tx->bw[2], tx->bw[3]);
 	STATS_32(stdout, "Tx Retries", tx->retries);
 	STATS_32(stdout, "Tx PER", tx->per);
+	STATS_32(stdout, "Tx Rate", tx->tx_rate);
 	STATS_PRINT("\tTx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", tx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
@@ -1327,6 +1328,12 @@ static void print_advance_sta_data_delay(struct advance_peer_data_delay *delay)
 		STATS_PRINT("\t\tHardware Transmission Delay: ");
 		print_advance_hist_stats(&delay->delay_stats[tid].tx_delay.hwtx_delay,
 					 STATS_IF_HIST_TYPE_HW_COMP_DELAY);
+		STATS_PRINT("\t\tNW Delay Average: %d",
+				delay->delay_stats[tid].tx_delay.nwdelay_avg);
+		STATS_PRINT("\t\tSW Delay Average: %d",
+				delay->delay_stats[tid].tx_delay.swdelay_avg);
+		STATS_PRINT("\t\tHW Delay Average: %d\n",
+				delay->delay_stats[tid].tx_delay.hwdelay_avg);
 	}
 	STATS_PRINT("\nRx Delay Stats:\n");
 	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {

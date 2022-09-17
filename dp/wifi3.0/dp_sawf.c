@@ -388,7 +388,7 @@ dp_sawf_compute_tx_delay_us(struct dp_tx_desc_s *tx_desc,
 	int64_t wifi_entry_ts, timestamp_hw_enqueue;
 
 	timestamp_hw_enqueue = qdf_ktime_to_us(tx_desc->timestamp);
-	wifi_entry_ts = 1000 * qdf_nbuf_get_timestamp(tx_desc->nbuf);
+	wifi_entry_ts = qdf_nbuf_get_timestamp_us(tx_desc->nbuf);
 
 	if (timestamp_hw_enqueue == 0)
 		return QDF_STATUS_E_FAILURE;
@@ -665,6 +665,57 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
 
 	return status;
+}
+
+void dp_peer_tid_delay_avg(struct cdp_delay_tx_stats *tx_delay,
+			   uint32_t nw_delay,
+			   uint32_t sw_delay,
+			   uint32_t hw_delay)
+{
+	uint64_t sw_avg_sum = 0;
+	uint64_t hw_avg_sum = 0;
+	uint64_t nw_avg_sum = 0;
+	uint32_t cur_win, idx;
+
+	cur_win = tx_delay->curr_win_idx;
+	tx_delay->sw_delay_win_avg[cur_win] += (uint64_t)sw_delay;
+	tx_delay->hw_delay_win_avg[cur_win] += (uint64_t)hw_delay;
+	tx_delay->nw_delay_win_avg[cur_win] += (uint64_t)nw_delay;
+	tx_delay->cur_win_num_pkts++;
+
+	if (!(tx_delay->cur_win_num_pkts % CDP_MAX_PKT_PER_WIN)) {
+		/* Update the average of the completed window */
+		tx_delay->sw_delay_win_avg[cur_win] = qdf_do_div(
+					tx_delay->sw_delay_win_avg[cur_win],
+					CDP_MAX_PKT_PER_WIN);
+		tx_delay->hw_delay_win_avg[cur_win] = qdf_do_div(
+				tx_delay->hw_delay_win_avg[cur_win],
+				CDP_MAX_PKT_PER_WIN);
+		tx_delay->nw_delay_win_avg[cur_win] = qdf_do_div(
+				tx_delay->nw_delay_win_avg[cur_win],
+				CDP_MAX_PKT_PER_WIN);
+		tx_delay->curr_win_idx++;
+		tx_delay->cur_win_num_pkts = 0;
+
+		/* Compute the moving average from all windows */
+		if (tx_delay->curr_win_idx == CDP_MAX_WIN_MOV_AVG) {
+			for (idx = 0; idx < CDP_MAX_WIN_MOV_AVG; idx++) {
+				sw_avg_sum += tx_delay->sw_delay_win_avg[idx];
+				hw_avg_sum += tx_delay->hw_delay_win_avg[idx];
+				nw_avg_sum += tx_delay->nw_delay_win_avg[idx];
+				tx_delay->sw_delay_win_avg[idx] = 0;
+				tx_delay->hw_delay_win_avg[idx] = 0;
+				tx_delay->nw_delay_win_avg[idx] = 0;
+			}
+			tx_delay->swdelay_avg = qdf_do_div(sw_avg_sum,
+							   CDP_MAX_WIN_MOV_AVG);
+			tx_delay->hwdelay_avg = qdf_do_div(hw_avg_sum,
+							   CDP_MAX_WIN_MOV_AVG);
+			tx_delay->nwdelay_avg = qdf_do_div(nw_avg_sum,
+							   CDP_MAX_WIN_MOV_AVG);
+			tx_delay->curr_win_idx = 0;
+		}
+	}
 }
 
 QDF_STATUS

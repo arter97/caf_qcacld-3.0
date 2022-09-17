@@ -1158,6 +1158,22 @@ get_failed:
 	return ret;
 }
 
+#if CONFIG_SAWF
+static void fill_advance_peer_if_delay_avg_stats(
+		struct stats_if_delay_tid_stats *delay_stats,
+		struct cdp_delay_tx_stats *ptx_delay)
+{
+	delay_stats->tx_delay.nwdelay_avg =
+					ptx_delay->nwdelay_avg;
+	delay_stats->tx_delay.swdelay_avg =
+					ptx_delay->swdelay_avg;
+	delay_stats->tx_delay.hwdelay_avg =
+					ptx_delay->hwdelay_avg;
+}
+#else
+#define fill_advance_peer_if_delay_avg_stats(delay_stats, ptx_delay)
+#endif
+
 #if WLAN_ADVANCE_TELEMETRY
 static void
 fill_advance_peer_if_delay_stats(struct advance_peer_data_delay *data,
@@ -1185,7 +1201,6 @@ fill_advance_peer_if_delay_stats(struct advance_peer_data_delay *data,
 						ptx_delay->tx_swq_delay.min;
 		delay_stats->tx_delay.tx_swq_delay.avg =
 						ptx_delay->tx_swq_delay.avg;
-
 		delay_stats->tx_delay.tx_swq_delay.hist.hist_type =
 					ptx_delay->tx_swq_delay.hist.hist_type;
 		delay_stats->tx_delay.hwtx_delay.max =
@@ -1194,6 +1209,8 @@ fill_advance_peer_if_delay_stats(struct advance_peer_data_delay *data,
 						ptx_delay->hwtx_delay.min;
 		delay_stats->tx_delay.hwtx_delay.avg =
 						ptx_delay->hwtx_delay.avg;
+		fill_advance_peer_if_delay_avg_stats(delay_stats, ptx_delay);
+
 		delay_stats->tx_delay.hwtx_delay.hist.hist_type =
 					ptx_delay->hwtx_delay.hist.hist_type;
 
@@ -1389,6 +1406,7 @@ static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
 		tx->bw[inx] = cdp_tx->bw[inx];
 	tx->retries = cdp_tx->retries;
 	tx->per = cdp_tx->per;
+	tx->tx_rate = cdp_tx->tx_byte_rate;
 	tx->non_amsdu_cnt = cdp_tx->non_amsdu_cnt;
 	tx->amsdu_cnt = cdp_tx->amsdu_cnt;
 	tx->ampdu_cnt = cdp_tx->ampdu_cnt;
@@ -1593,6 +1611,7 @@ get_advance_peer_data_sawftx(struct sawf_tx_stats *sawf_tx_stats,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
 static QDF_STATUS get_advance_peer_data_tx(struct unified_stats *stats,
 					   struct cdp_peer_stats *peer_stats)
 {
