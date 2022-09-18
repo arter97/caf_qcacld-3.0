@@ -38,6 +38,10 @@ extern int wifi_exit_in_progress;
 #endif
 QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc);
 void mon_soc_ol_detach(struct wlan_objmgr_psoc *psoc);
+bool dp_mon_is_soc_attached(struct wlan_objmgr_psoc *psoc);
+
+#define SOC_ATTACH_DELAY 20
+#define SOC_ATTACH_SLEEP_TIME 1000
 
 static inline QDF_STATUS
 dp_mon_soc_ring_config(struct dp_soc *soc)
@@ -86,6 +90,7 @@ int monitor_mod_init(void)
 	qdf_size_t soc_context_size;
 
 	for (index = 0; index < WLAN_OBJMGR_MAX_DEVICES; index++) {
+		uint16_t count = 0;
 		psoc = g_umac_glb_obj->psoc[index];
 		if (!psoc)
 			continue;
@@ -94,6 +99,18 @@ int monitor_mod_init(void)
 		if (!soc) {
 			dp_mon_err("dp_soc is NULL, psoc = %pK", psoc);
 			continue;
+		}
+		while (1) {
+			if (!dp_mon_is_soc_attached(psoc)) {
+				msleep(SOC_ATTACH_SLEEP_TIME);
+				if (++count > SOC_ATTACH_DELAY) {
+					dp_mon_err("SoC attach timed-out %d seconds",
+						   count);
+					return 0;
+				}
+			} else {
+				break;
+			}
 		}
 
 		if (soc->arch_ops.txrx_get_mon_context_size) {
