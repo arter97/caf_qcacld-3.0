@@ -2494,6 +2494,48 @@ uint32_t hal_rx_mpdu_end_offset_get(hal_soc_handle_t hal_soc_hdl)
 	return hal_soc->ops->hal_rx_mpdu_end_offset_get();
 }
 
+#ifdef CONFIG_WORD_BASED_TLV
+/**
+ * hal_rx_mpdu_start_wmask_get(): Get the MPDU start word mask
+ *
+ * @hal_soc_hdl: HAL SOC handle
+ * return: mpdu_start_tlv word mask value
+ */
+static inline
+uint32_t hal_rx_mpdu_start_wmask_get(hal_soc_handle_t hal_soc_hdl)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (!hal_soc || !hal_soc->ops) {
+		hal_err("hal handle is NULL");
+		QDF_BUG(0);
+		return 0;
+	}
+
+	return hal_soc->ops->hal_rx_mpdu_start_wmask_get();
+}
+
+/**
+ * hal_rx_msdu_end_wmask_get(): Get the MSDU END word mask
+ *
+ * @hal_soc_hdl: HAL SOC handle
+ * return: msdu_end_tlv word mask value
+ */
+static inline
+uint32_t hal_rx_msdu_end_wmask_get(hal_soc_handle_t hal_soc_hdl)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (!hal_soc || !hal_soc->ops) {
+		hal_err("hal handle is NULL");
+		QDF_BUG(0);
+		return 0;
+	}
+
+	return hal_soc->ops->hal_rx_msdu_end_wmask_get();
+}
+#endif
+
 /**
  * hal_rx_attn_offset_get(): Get the ATTENTION offset from
  * rx_pkt_tlvs structure

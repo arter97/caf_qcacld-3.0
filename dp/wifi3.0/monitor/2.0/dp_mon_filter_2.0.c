@@ -179,11 +179,6 @@ void
 dp_rx_mon_word_mask_subscribe(uint32_t *msg_word,
 				  struct htt_rx_ring_tlv_filter *tlv_filter)
 {
-	if (!msg_word || !tlv_filter)
-		return;
-
-	HTT_RX_RING_SELECTION_CFG_RX_MPDU_START_WORD_MASK_SET(*msg_word,
-			tlv_filter->rx_mpdu_start_wmask);
 
 #ifdef QCA_MONITOR_2_0_SUPPORT_WAR /* Yet to get FW support */
 	HTT_RX_RING_SELECTION_CFG_RX_MPDU_END_WORD_MASK_SET(*msg_word,
@@ -191,9 +186,6 @@ dp_rx_mon_word_mask_subscribe(uint32_t *msg_word,
 #endif
 	/* word 15 */
 	msg_word++;
-	*msg_word = 0;
-	HTT_RX_RING_SELECTION_CFG_RX_MSDU_END_WORD_MASK_SET(*msg_word,
-			tlv_filter->rx_msdu_end_wmask);
 
 	/* word 16 */
 	msg_word++;

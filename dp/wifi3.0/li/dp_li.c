@@ -515,6 +515,12 @@ dp_rx_intrabss_handle_nawds_li(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 	return false;
 }
 
+static void dp_rx_word_mask_subscribe_li(struct dp_soc *soc,
+					 uint32_t *msg_word,
+					 void *rx_filter)
+{
+}
+
 static struct dp_peer *dp_find_peer_by_destmac_li(struct dp_soc *soc,
 						  uint8_t *dest_mac,
 						  uint8_t vdev_id)
@@ -609,6 +615,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_li;
 	arch_ops->dp_rx_intrabss_handle_nawds = dp_rx_intrabss_handle_nawds_li;
+	arch_ops->dp_rx_word_mask_subscribe = dp_rx_word_mask_subscribe_li;
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_li;
 	arch_ops->dp_rx_peer_metadata_peer_id_get =
 					dp_rx_peer_metadata_peer_id_get_li;

@@ -1908,6 +1908,11 @@ struct dp_arch_ops {
 				       qdf_nbuf_t nbuf_copy,
 				       struct cdp_tid_rx_stats *tid_stats);
 
+	void (*dp_rx_word_mask_subscribe)(
+				struct dp_soc *soc,
+				uint32_t *msg_word,
+				void *rx_filter);
+
 	struct dp_rx_desc *(*dp_rx_desc_cookie_2_va)(struct dp_soc *soc,
 						     uint32_t cookie);
 	uint32_t (*dp_service_near_full_srngs)(struct dp_soc *soc,

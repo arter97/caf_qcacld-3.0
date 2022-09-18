@@ -1531,6 +1531,52 @@ rel_da_peer:
 #endif /* WLAN_MLO_MULTI_CHIP */
 #endif /* INTRA_BSS_FWD_OFFLOAD */
 
+#if defined(QCA_MONITOR_2_0_SUPPORT) || defined(CONFIG_WORD_BASED_TLV)
+void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
+				  uint32_t *msg_word,
+				  void *rx_filter)
+{
+	struct htt_rx_ring_tlv_filter *tlv_filter =
+				(struct htt_rx_ring_tlv_filter *)rx_filter;
+
+	if (!msg_word || !tlv_filter)
+		return;
+
+	/* if word mask is zero, FW will set the default values */
+	if (!(tlv_filter->rx_mpdu_start_wmask > 0 &&
+	      tlv_filter->rx_msdu_end_wmask > 0)) {
+		msg_word += 4;
+		*msg_word = 0;
+		goto config_mon;
+	}
+
+	HTT_RX_RING_SELECTION_CFG_WORD_MASK_COMPACTION_ENABLE_SET(*msg_word, 1);
+
+	/* word 14 */
+	msg_word += 3;
+	*msg_word = 0;
+
+	HTT_RX_RING_SELECTION_CFG_RX_MPDU_START_WORD_MASK_SET(
+				*msg_word,
+				tlv_filter->rx_mpdu_start_wmask);
+
+	/* word 15 */
+	msg_word++;
+	*msg_word = 0;
+	HTT_RX_RING_SELECTION_CFG_RX_MSDU_END_WORD_MASK_SET(
+				*msg_word,
+				tlv_filter->rx_msdu_end_wmask);
+config_mon:
+	msg_word--;
+	dp_mon_rx_wmask_subscribe(soc, msg_word, tlv_filter);
+}
+#else
+void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
+				  uint32_t *msg_word,
+				  void *rx_filter)
+{
+}
+#endif
 /*
  * dp_rx_intrabss_handle_nawds_be() - Forward mcbc intrabss pkts in nawds case
  * @soc: core txrx main context

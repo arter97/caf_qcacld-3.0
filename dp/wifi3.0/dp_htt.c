@@ -1659,6 +1659,11 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 		*msg_word = 0;
 	}
 
+	soc->dp_soc->arch_ops.dp_rx_word_mask_subscribe(
+						soc->dp_soc,
+						msg_word,
+						(void *)htt_tlv_filter);
+
 	if (mon_drop_th > 0)
 		HTT_RX_RING_SELECTION_CFG_RX_DROP_THRESHOLD_SET(*msg_word,
 								mon_drop_th);
@@ -1668,9 +1673,8 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 
 	/* word 14*/
 	msg_word += 3;
-	*msg_word = 0;
-
-	dp_mon_rx_wmask_subscribe(soc->dp_soc, msg_word, htt_tlv_filter);
+	/* word 15*/
+	msg_word++;
 
 #ifdef FW_SUPPORT_NOT_YET
 	/* word 17*/

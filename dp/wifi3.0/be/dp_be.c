@@ -753,6 +753,31 @@ qdf_size_t dp_get_soc_context_size_be(void)
 	return sizeof(struct dp_soc_be);
 }
 
+#ifdef CONFIG_WORD_BASED_TLV
+/**
+ * dp_rxdma_ring_wmask_cfg_be() - Setup RXDMA ring word mask config
+ * @soc: Common DP soc handle
+ * @htt_tlv_filter: Rx SRNG TLV and filter setting
+ *
+ * Return: none
+ */
+static inline void
+dp_rxdma_ring_wmask_cfg_be(struct dp_soc *soc,
+			   struct htt_rx_ring_tlv_filter *htt_tlv_filter)
+{
+	htt_tlv_filter->rx_msdu_end_wmask =
+				 hal_rx_msdu_end_wmask_get(soc->hal_soc);
+	htt_tlv_filter->rx_mpdu_start_wmask =
+				 hal_rx_mpdu_start_wmask_get(soc->hal_soc);
+}
+#else
+static inline void
+dp_rxdma_ring_wmask_cfg_be(struct dp_soc *soc,
+			   struct htt_rx_ring_tlv_filter *htt_tlv_filter)
+{
+}
+#endif
+
 #ifdef NO_RX_PKT_HDR_TLV
 /**
  * dp_rxdma_ring_sel_cfg_be() - Setup RXDMA ring config
@@ -824,6 +849,8 @@ dp_rxdma_ring_sel_cfg_be(struct dp_soc *soc)
 				hal_rx_mpdu_start_offset_get(soc->hal_soc);
 	htt_tlv_filter.rx_msdu_end_offset =
 				hal_rx_msdu_end_offset_get(soc->hal_soc);
+
+	dp_rxdma_ring_wmask_cfg_be(soc, &htt_tlv_filter);
 
 	for (i = 0; i < MAX_PDEV_CNT; i++) {
 		struct dp_pdev *pdev = soc->pdev_list[i];
@@ -2000,6 +2027,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_be;
 	arch_ops->dp_rx_intrabss_handle_nawds = dp_rx_intrabss_handle_nawds_be;
+	arch_ops->dp_rx_word_mask_subscribe = dp_rx_word_mask_subscribe_be;
 
 	arch_ops->txrx_soc_attach = dp_soc_attach_be;
 	arch_ops->txrx_soc_detach = dp_soc_detach_be;

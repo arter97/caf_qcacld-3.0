@@ -2093,6 +2093,12 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 		hal_tx_populate_bank_register_be;
 	hal_soc->ops->hal_tx_vdev_mcast_ctrl_set =
 		hal_tx_vdev_mcast_ctrl_set_be;
+#ifdef CONFIG_WORD_BASED_TLV
+	hal_soc->ops->hal_rx_mpdu_start_wmask_get =
+					hal_rx_mpdu_start_wmask_get_be;
+	hal_soc->ops->hal_rx_msdu_end_wmask_get =
+					hal_rx_msdu_end_wmask_get_be;
+#endif
 };
 
 /**

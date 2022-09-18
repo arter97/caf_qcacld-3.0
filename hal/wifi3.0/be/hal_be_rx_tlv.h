@@ -1767,6 +1767,31 @@ static inline  uint32_t hal_rx_pkt_tlv_offset_get_generic(void)
 }
 #endif
 
+#ifdef CONFIG_WORD_BASED_TLV
+#define MPDU_START_WMASK 0x074C
+#define MSDU_END_WMASK 0x13FC1
+
+/**
+ * hal_rx_mpdu_start_wmask_get_be(): API to get the mpdu_start_tlv word mask
+ *
+ * return: Word mask for MPDU start tlv
+ */
+static inline uint32_t hal_rx_mpdu_start_wmask_get_be(void)
+{
+	return MPDU_START_WMASK;
+}
+
+/**
+ * hal_rx_msdu_end_wmask_get_be(): API to get the msdu_end_tlv word mask
+ *
+ * return: Word mask for MSDU end tlv
+ */
+static inline uint32_t hal_rx_msdu_end_wmask_get_be(void)
+{
+	return MSDU_END_WMASK;
+}
+#endif
+
 #ifdef RECEIVE_OFFLOAD
 static inline int
 hal_rx_tlv_get_offload_info_be(uint8_t *rx_tlv,
