@@ -6374,25 +6374,18 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 }
 
 void
-hdd_store_nss_chains_cfg_in_vdev(struct hdd_adapter *adapter)
+hdd_store_nss_chains_cfg_in_vdev(struct hdd_context *hdd_ctx,
+				 struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_mlme_nss_chains vdev_ini_cfg;
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	struct wlan_objmgr_vdev *vdev;
 
 	/* Populate the nss chain params from ini for this vdev type */
 	sme_populate_nss_chain_params(hdd_ctx->mac_handle, &vdev_ini_cfg,
-				      adapter->device_mode,
+				      wlan_vdev_mlme_get_opmode(vdev),
 				      hdd_ctx->num_rf_chains);
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 	/* Store the nss chain config into the vdev */
-	if (vdev) {
-		sme_store_nss_chains_cfg_in_vdev(vdev, &vdev_ini_cfg);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	} else {
-		hdd_err("Vdev is NULL");
-	}
+	sme_store_nss_chains_cfg_in_vdev(vdev, &vdev_ini_cfg);
 }
 
 bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter)
@@ -6518,6 +6511,98 @@ static void hdd_vdev_set_ht_vht_ies(mac_handle_t mac_handle,
 				  wlan_vdev_mlme_get_opmode(vdev));
 }
 
+static void
+hdd_vdev_configure_rtt_mac_randomization(struct wlan_objmgr_psoc *psoc,
+					 struct wlan_objmgr_vdev *vdev)
+{
+	int errno;
+	QDF_STATUS status;
+	bool bval = false;
+
+	status = ucfg_mlme_get_rtt_mac_randomization(psoc, &bval);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("unable to get RTT MAC randomization value");
+
+	hdd_debug("setting RTT mac randomization param: %d", bval);
+	errno = sme_cli_set_command(
+			wlan_vdev_get_id(vdev),
+			wmi_vdev_param_enable_disable_rtt_initiator_random_mac,
+			bval, VDEV_CMD);
+
+	if (errno)
+		hdd_err("RTT mac randomization param set failed %d", errno);
+}
+
+static void
+hdd_vdev_configure_max_tdls_params(struct wlan_objmgr_psoc *psoc,
+				   struct wlan_objmgr_vdev *vdev)
+{
+	uint16_t max_peer_count;
+	bool target_bigtk_support = false;
+
+	/* Max peer can be tdls peers + self peer + bss peer */
+	max_peer_count = cfg_tdls_get_max_peer_count(psoc);
+	max_peer_count += 2;
+	wlan_vdev_set_max_peer_count(vdev, max_peer_count);
+
+	ucfg_mlme_get_bigtk_support(psoc, &target_bigtk_support);
+	if (target_bigtk_support)
+		mlme_set_bigtk_support(vdev, true);
+}
+
+static inline void
+hdd_vdev_configure_nan_params(struct wlan_objmgr_psoc *psoc,
+			      struct wlan_objmgr_vdev *vdev)
+{
+	sme_cli_set_command(
+		wlan_vdev_get_id(vdev),
+		wmi_vdev_param_allow_nan_initial_discovery_of_mp0_cluster,
+		cfg_nan_get_support_mp0_discovery(psoc), VDEV_CMD);
+}
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_EXTERNAL_AUTH_MLO_SUPPORT)
+static void
+hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
+					      enum QDF_OPMODE mode)
+{
+	if (mode == QDF_STA_MODE || mode == QDF_SAP_MODE)
+		wlan_vdev_set_mlo_external_sae_auth_conversion(vdev, true);
+}
+#else
+static inline void
+hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
+					      enum QDF_OPMODE mode)
+{
+}
+#endif
+
+static void
+hdd_vdev_configure_opmode_params(struct hdd_context *hdd_ctx,
+				 struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc = hdd_ctx->psoc;
+	enum QDF_OPMODE opmode = wlan_vdev_mlme_get_opmode(vdev);
+
+	switch (opmode) {
+	case QDF_STA_MODE:
+		hdd_vdev_configure_rtt_mac_randomization(psoc, vdev);
+		hdd_vdev_configure_max_tdls_params(psoc, vdev);
+		break;
+	case QDF_P2P_CLIENT_MODE:
+		hdd_vdev_configure_max_tdls_params(psoc, vdev);
+		break;
+	case QDF_NAN_DISC_MODE:
+		hdd_vdev_configure_nan_params(psoc, vdev);
+		break;
+	default:
+		break;
+	}
+
+	ucfg_fwol_configure_vdev_params(psoc, vdev);
+	hdd_set_vdev_mlo_external_sae_auth_conversion(vdev, opmode);
+	hdd_store_nss_chains_cfg_in_vdev(hdd_ctx, vdev);
+}
+
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 static void
 hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
@@ -6567,32 +6652,13 @@ hdd_populate_vdev_create_params(struct hdd_adapter *adapter,
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_EXTERNAL_AUTH_MLO_SUPPORT)
-static void
-hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
-					      enum QDF_OPMODE mode)
-{
-	if (mode == QDF_STA_MODE || mode == QDF_SAP_MODE)
-		wlan_vdev_set_mlo_external_sae_auth_conversion(vdev, true);
-}
-#else
-static inline void
-hdd_set_vdev_mlo_external_sae_auth_conversion(struct wlan_objmgr_vdev *vdev,
-					      enum QDF_OPMODE mode)
-{
-}
-#endif
-
 int hdd_vdev_create(struct hdd_adapter *adapter)
 {
 	QDF_STATUS status;
 	int errno = 0;
-	bool bval;
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_vdev_create_params vdev_params = {0};
-	bool target_bigtk_support = false;
-	uint16_t max_peer_count;
 
 	hdd_nofl_debug("creating new vdev");
 
@@ -6639,57 +6705,7 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 		goto hdd_vdev_destroy_procedure;
 	}
 
-	if (adapter->device_mode == QDF_STA_MODE) {
-		bval = false;
-		status = ucfg_mlme_get_rtt_mac_randomization(hdd_ctx->psoc,
-							     &bval);
-		if (QDF_IS_STATUS_ERROR(status))
-			hdd_err("unable to get RTT MAC randomization value");
-
-		hdd_debug("setting RTT mac randomization param: %d", bval);
-		errno = sme_cli_set_command(
-			adapter->deflink->vdev_id,
-			wmi_vdev_param_enable_disable_rtt_initiator_random_mac,
-			bval,
-			VDEV_CMD);
-		if (0 != errno)
-			hdd_err("RTT mac randomization param set failed %d",
-				errno);
-	}
-
-	if (adapter->device_mode == QDF_STA_MODE ||
-	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
-		if (!vdev)
-			goto hdd_vdev_destroy_procedure;
-
-		/* Max peer can be tdls peers + self peer + bss peer */
-		max_peer_count = cfg_tdls_get_max_peer_count(hdd_ctx->psoc);
-		max_peer_count += 2;
-		wlan_vdev_set_max_peer_count(vdev, max_peer_count);
-
-		ucfg_mlme_get_bigtk_support(hdd_ctx->psoc, &target_bigtk_support);
-		if (target_bigtk_support)
-			mlme_set_bigtk_support(vdev, true);
-		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
-	}
-
-	if (QDF_NAN_DISC_MODE == adapter->device_mode) {
-		sme_cli_set_command(
-		adapter->deflink->vdev_id,
-		wmi_vdev_param_allow_nan_initial_discovery_of_mp0_cluster,
-		cfg_nan_get_support_mp0_discovery(hdd_ctx->psoc),
-		VDEV_CMD);
-	}
-	hdd_store_nss_chains_cfg_in_vdev(adapter);
-
-	hdd_set_vdev_mlo_external_sae_auth_conversion(vdev,
-						      adapter->device_mode);
-
-	/* Configure vdev params */
-	ucfg_fwol_configure_vdev_params(hdd_ctx->psoc, hdd_ctx->pdev,
-					adapter->device_mode,
-					adapter->deflink->vdev_id);
+	hdd_vdev_configure_opmode_params(hdd_ctx, vdev);
 
 	hdd_nofl_debug("vdev %d created successfully",
 		       adapter->deflink->vdev_id);

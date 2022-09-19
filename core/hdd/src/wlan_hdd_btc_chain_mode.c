@@ -83,9 +83,14 @@ wlan_hdd_btc_chain_mode_handler(struct wlan_objmgr_vdev *vdev)
 	sme_update_nss_in_mlme_cfg(mac_handle, nss, nss,
 				   adapter->device_mode, band);
 	sme_update_vdev_type_nss(mac_handle, nss, band);
-	hdd_store_nss_chains_cfg_in_vdev(adapter);
-	sme_update_he_cap_nss(mac_handle, adapter->deflink->vdev_id, nss);
 
+	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_OSIF_ID);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_store_nss_chains_cfg_in_vdev(adapter->hdd_ctx, vdev);
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_OSIF_ID);
+	}
+
+	sme_update_he_cap_nss(mac_handle, adapter->deflink->vdev_id, nss);
 	freq = hdd_get_adapter_home_channel(adapter);
 
 	/*

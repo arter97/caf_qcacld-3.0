@@ -1135,6 +1135,7 @@ hdd_update_nss_in_vdev(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 		       uint8_t tx_nss, uint8_t rx_nss)
 {
 	uint8_t band, max_supp_nss = MAX_VDEV_NSS;
+	struct wlan_objmgr_vdev *vdev;
 
 	for (band = NSS_CHAINS_BAND_2GHZ; band < NSS_CHAINS_BAND_MAX;
 	     band++) {
@@ -1152,7 +1153,12 @@ hdd_update_nss_in_vdev(struct hdd_adapter *adapter, mac_handle_t mac_handle,
 	 * This API will change the ini and dynamic nss params in
 	 * mlme vdev priv obj.
 	 */
-	hdd_store_nss_chains_cfg_in_vdev(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev)
+		return;
+
+	hdd_store_nss_chains_cfg_in_vdev(adapter->hdd_ctx, vdev);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 }
 
 static void hdd_set_sap_nss_params(struct hdd_context *hdd_ctx,
