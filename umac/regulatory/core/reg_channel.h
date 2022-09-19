@@ -25,6 +25,7 @@
 #ifndef __REG_CHANNEL_H_
 #define __REG_CHANNEL_H_
 
+#include <reg_db.h>
 #include <wlan_reg_channel_api.h>
 
 #define NEXT_20_CH_OFFSET 20
@@ -291,4 +292,13 @@ reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				qdf_freq_t chan_freq,
 				bool *is_psd, uint16_t *reg_eirp,
 				uint16_t *reg_psd);
+
+/**
+ * reg_is_6g_domain_jp() - Check if current 6GHz regdomain is a JP domain
+ * or not.
+ * @pdev: Pointer to pdev.
+ *
+ * Return: true if 6GHz regdomain is a JP domain else false.
+ */
+bool reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev);
 #endif /* __REG_CHANNEL_H_ */
