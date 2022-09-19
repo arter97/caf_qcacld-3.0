@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,6 +24,12 @@
 #include <linux/interrupt.h>
 #include <linux/pm.h>
 #include <osapi_linux.h>
+
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#include "cnss2.h"
+#else
+#include <net/cnss2.h>
+#endif
 
 #ifdef CNSS_UTILS
 #ifdef CONFIG_CNSS_OUT_OF_TREE
@@ -549,6 +555,13 @@ struct pld_driver_ops {
 			     enum pld_bus_type bus_type,
 			     int state);
 	void (*uevent)(struct device *dev, struct pld_uevent_data *uevent);
+#ifdef WLAN_FEATURE_SSR_DRIVER_DUMP
+	int (*collect_driver_dump)(struct device *dev,
+				   enum pld_bus_type bus_type,
+				   struct cnss_ssr_driver_dump_entry
+				   *input_array,
+				   size_t *num_entries_loaded);
+#endif
 	int (*runtime_suspend)(struct device *dev,
 			       enum pld_bus_type bus_type);
 	int (*runtime_resume)(struct device *dev,
