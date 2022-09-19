@@ -952,6 +952,14 @@ QDF_STATUS qdf_uint64_parse(const char *int_str, uint64_t *out_int);
 #define QDF_MAC_ADDR_REF(a) (a)
 #endif /* WLAN_TRACE_HIDE_MAC_ADDRESS */
 
+#define QDF_SSID_FMT "%.*s"
+
+#if defined(WLAN_TRACE_HIDE_SSID)
+#define QDF_SSID_REF(_l, _s) 1, "*"
+#else
+#define QDF_SSID_REF(_l, _s) (_l), (_s)
+#endif /* WLAN_TRACE_HIDE_SSID */
+
 #define QDF_MAC_ADDR_BCAST_INIT { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } }
 #define QDF_MAC_ADDR_ZERO_INIT { { 0, 0, 0, 0, 0, 0 } }
 
