@@ -2710,13 +2710,15 @@ hal_rx_tlv_get_freq(hal_soc_handle_t hal_soc_hdl, uint8_t *buf)
 }
 
 static inline void hal_mpdu_desc_info_set(hal_soc_handle_t hal_soc_hdl,
-					  void *mpdu_desc_info, uint32_t val)
+					  void *desc,
+					  void *mpdu_desc_info,
+					  uint32_t val)
 {
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	if (hal_soc->ops->hal_mpdu_desc_info_set)
 		return hal_soc->ops->hal_mpdu_desc_info_set(
-				hal_soc_hdl, mpdu_desc_info, val);
+				hal_soc_hdl, desc, mpdu_desc_info, val);
 }
 
 static inline void hal_msdu_desc_info_set(hal_soc_handle_t hal_soc_hdl,
