@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -44,6 +44,7 @@
 #include <wlan_connectivity_logging.h>
 #endif
 
+#include "qdf_ssr_driver_dump.h"
 #ifdef CNSS_GENL
 #ifdef CONFIG_CNSS_OUT_OF_TREE
 #include "cnss_nl.h"
@@ -252,11 +253,17 @@ static struct log_msg gplog_msg[MAX_LOGMSG_COUNT];
 static inline QDF_STATUS allocate_log_msg_buffer(void)
 {
 	qdf_minidump_log(gplog_msg, sizeof(gplog_msg), "wlan_logs");
+	qdf_ssr_driver_dump_register_region("gwlan_logging", &gwlan_logging,
+					    sizeof(gwlan_logging));
+	qdf_ssr_driver_dump_register_region("wlan_logs", gplog_msg,
+					    sizeof(gplog_msg));
 	return QDF_STATUS_SUCCESS;
 }
 
 static inline void free_log_msg_buffer(void)
 {
+	qdf_ssr_driver_dump_unregister_region("wlan_logs");
+	qdf_ssr_driver_dump_unregister_region("gwlan_logging");
 	qdf_minidump_remove(gplog_msg, sizeof(gplog_msg), "wlan_logs");
 }
 #endif

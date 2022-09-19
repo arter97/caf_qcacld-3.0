@@ -24,6 +24,7 @@
 #include "qdf_module.h"
 #include "wcss_version.h"
 #include <qdf_tracepoint.h>
+#include "qdf_ssr_driver_dump.h"
 
 struct tcl_data_cmd gtcl_data_symbol __attribute__((used));
 
@@ -1161,23 +1162,29 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 
 	qdf_minidump_log(hal, sizeof(*hal), "hal_soc");
 
+	qdf_ssr_driver_dump_register_region("hal_soc", hal, sizeof(*hal));
+
 	qdf_atomic_init(&hal->active_work_cnt);
 	if (hal_delayed_reg_write_init(hal) != QDF_STATUS_SUCCESS) {
 		hal_err("unable to initialize delayed reg write");
-		goto fail3;
+		goto fail4;
 	}
 
 	if (hal_reo_shared_qaddr_setup((hal_soc_handle_t)hal)
 	    != QDF_STATUS_SUCCESS) {
 		hal_err("unable to setup reo shared qaddr");
-		goto fail4;
+		goto fail5;
 	}
 
 	hif_rtpm_register(HIF_RTPM_ID_HAL_REO_CMD, NULL);
 
 	return (void *)hal;
-fail4:
+fail5:
 	hal_delayed_reg_write_deinit(hal);
+fail4:
+	qdf_ssr_driver_dump_unregister_region("hal_soc");
+	qdf_minidump_remove(hal, sizeof(*hal), "hal_soc");
+	qdf_mem_free(hal->ops);
 fail3:
 	qdf_mem_free_consistent(qdf_dev, qdf_dev->dev,
 				sizeof(*hal->shadow_wrptr_mem_vaddr) *
@@ -1234,6 +1241,8 @@ extern void hal_detach(void *hal_soc)
 	hif_rtpm_deregister(HIF_RTPM_ID_HAL_REO_CMD);
 	hal_delayed_reg_write_deinit(hal);
 	hal_reo_shared_qaddr_detach((hal_soc_handle_t)hal);
+	qdf_ssr_driver_dump_unregister_region("hal_soc");
+	qdf_minidump_remove(hal, sizeof(*hal), "hal_soc");
 	qdf_mem_free(hal->ops);
 
 	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
@@ -1242,8 +1251,6 @@ extern void hal_detach(void *hal_soc)
 	qdf_mem_free_consistent(hal->qdf_dev, hal->qdf_dev->dev,
 		sizeof(*(hal->shadow_wrptr_mem_vaddr)) * HAL_MAX_LMAC_RINGS,
 		hal->shadow_wrptr_mem_vaddr, hal->shadow_wrptr_mem_paddr, 0);
-	qdf_minidump_remove(hal, sizeof(*hal), "hal_soc");
-
 	qdf_mem_free(hal);
 
 	return;

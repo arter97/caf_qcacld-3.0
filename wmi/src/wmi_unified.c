@@ -26,6 +26,7 @@
 #include "wmi_unified_api.h"
 #include "qdf_module.h"
 #include "qdf_platform.h"
+#include "qdf_ssr_driver_dump.h"
 #ifdef WMI_EXT_DBG
 #include "qdf_list.h"
 #include "qdf_atomic.h"
@@ -155,6 +156,15 @@ static void wmi_minidump_detach(struct wmi_unified *wmi_handle)
 		&wmi_handle->log_info.wmi_command_tx_cmp_log_buf_info;
 	uint32_t buf_size = info->size * sizeof(struct wmi_command_cmp_debug);
 
+	qdf_ssr_driver_dump_unregister_region("wmi_debug_log_info");
+	qdf_ssr_driver_dump_unregister_region("wmi_rx_event_idx");
+	qdf_ssr_driver_dump_unregister_region("wmi_rx_event");
+	qdf_ssr_driver_dump_unregister_region("wmi_event_log_idx");
+	qdf_ssr_driver_dump_unregister_region("wmi_event_log");
+	qdf_ssr_driver_dump_unregister_region("wmi_command_log_idx");
+	qdf_ssr_driver_dump_unregister_region("wmi_command_log");
+	qdf_ssr_driver_dump_unregister_region("wmi_tx_cmp_idx");
+	qdf_ssr_driver_dump_unregister_region("wmi_tx_cmp");
 	qdf_minidump_remove(info->buf, buf_size, "wmi_tx_cmp");
 }
 
@@ -165,6 +175,42 @@ static void wmi_minidump_attach(struct wmi_unified *wmi_handle)
 	uint32_t buf_size = info->size * sizeof(struct wmi_command_cmp_debug);
 
 	qdf_minidump_log(info->buf, buf_size, "wmi_tx_cmp");
+
+	qdf_ssr_driver_dump_register_region("wmi_tx_cmp", info->buf, buf_size);
+	qdf_ssr_driver_dump_register_region("wmi_tx_cmp_idx",
+					    info->p_buf_tail_idx,
+					    sizeof(*info->p_buf_tail_idx));
+
+	info = &wmi_handle->log_info.wmi_command_log_buf_info;
+	buf_size = info->size * sizeof(struct wmi_command_debug);
+
+	qdf_ssr_driver_dump_register_region("wmi_command_log", info->buf,
+					    buf_size);
+	qdf_ssr_driver_dump_register_region("wmi_command_log_idx",
+					    info->p_buf_tail_idx,
+					    sizeof(*info->p_buf_tail_idx));
+
+	info = &wmi_handle->log_info.wmi_event_log_buf_info;
+	buf_size = info->size * sizeof(struct wmi_event_debug);
+
+	qdf_ssr_driver_dump_register_region("wmi_event_log", info->buf,
+					    buf_size);
+	qdf_ssr_driver_dump_register_region("wmi_event_log_idx",
+					    info->p_buf_tail_idx,
+					    sizeof(*info->p_buf_tail_idx));
+
+	info = &wmi_handle->log_info.wmi_rx_event_log_buf_info;
+	buf_size = info->size * sizeof(struct wmi_event_debug);
+
+	qdf_ssr_driver_dump_register_region("wmi_rx_event", info->buf,
+					    buf_size);
+	qdf_ssr_driver_dump_register_region("wmi_rx_event_idx",
+					    info->p_buf_tail_idx,
+					    sizeof(*info->p_buf_tail_idx));
+
+	qdf_ssr_driver_dump_register_region("wmi_debug_log_info",
+					    &wmi_handle->log_info,
+					    sizeof(wmi_handle->log_info));
 }
 
 #define WMI_COMMAND_RECORD(h, a, b) {					\

@@ -23,6 +23,7 @@
 #include <qdf_lock.h>
 #include <qdf_hang_event_notifier.h>
 #include <qdf_notifier.h>
+#include "qdf_ssr_driver_dump.h"
 
 struct HTC_CREDIT_HISTORY {
 	enum htc_credit_exchange_type type;
@@ -64,6 +65,9 @@ static inline void htc_add_emulation_delay(void)
 
 void htc_credit_history_deinit(void)
 {
+	qdf_ssr_driver_dump_unregister_region("htc_credit_history_length");
+	qdf_ssr_driver_dump_unregister_region("htc_credit_history_idx");
+	qdf_ssr_driver_dump_unregister_region("htc_credit");
 	qdf_minidump_remove(&htc_credit_history_buffer,
 			    sizeof(htc_credit_history_buffer), "htc_credit");
 }
@@ -74,6 +78,15 @@ void htc_credit_history_init(void)
 	g_htc_credit_history_length = 0;
 	qdf_minidump_log(&htc_credit_history_buffer,
 			 sizeof(htc_credit_history_buffer), "htc_credit");
+	qdf_ssr_driver_dump_register_region("htc_credit",
+					    htc_credit_history_buffer,
+					    sizeof(htc_credit_history_buffer));
+	qdf_ssr_driver_dump_register_region("htc_credit_history_idx",
+					    &g_htc_credit_history_idx,
+					    sizeof(g_htc_credit_history_idx));
+	qdf_ssr_driver_dump_register_region("htc_credit_history_length",
+					    &g_htc_credit_history_length,
+					    sizeof(g_htc_credit_history_length));
 }
 
 /**
