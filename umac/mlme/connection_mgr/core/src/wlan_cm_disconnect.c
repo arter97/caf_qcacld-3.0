@@ -438,6 +438,8 @@ cm_disconnect_continue_after_rso_stop(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_INVAL;
 
 	wlan_vdev_get_bss_peer_mac(cm_ctx->vdev, &bssid);
+
+	qdf_copy_macaddr(&req->req.bssid, &bssid);
 	/*
 	 * for northbound req, bssid is not provided so update it from vdev
 	 * in case bssid is not present
@@ -446,8 +448,6 @@ cm_disconnect_continue_after_rso_stop(struct wlan_objmgr_vdev *vdev,
 	    qdf_is_macaddr_broadcast(&cm_req->discon_req.req.bssid))
 		qdf_copy_macaddr(&cm_req->discon_req.req.bssid,
 				 &req->req.bssid);
-
-	qdf_copy_macaddr(&req->req.bssid, &bssid);
 	cm_update_scan_mlme_on_disconnect(cm_ctx->vdev,
 					  &cm_req->discon_req);
 

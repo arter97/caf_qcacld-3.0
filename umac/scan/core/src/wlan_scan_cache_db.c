@@ -1973,6 +1973,10 @@ QDF_STATUS scm_scan_update_mlme_by_bssinfo(struct wlan_objmgr_pdev *pdev,
 			qdf_spin_lock_bh(&scan_db->scan_db_lock);
 			qdf_mem_copy(&entry->mlme_info, mlme,
 					sizeof(struct mlme_info));
+			scm_debug("BSSID: "QDF_MAC_ADDR_FMT" set assoc_state to %d with age %lu ms",
+				  QDF_MAC_ADDR_REF(entry->bssid.bytes),
+				  mlme->assoc_state,
+				  util_scan_entry_age(entry));
 			scm_scan_entry_put_ref(scan_db,
 					cur_node, false);
 			qdf_spin_unlock_bh(&scan_db->scan_db_lock);
