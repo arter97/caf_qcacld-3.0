@@ -2041,4 +2041,199 @@ reg_get_opclass_for_cur_hwmode(struct wlan_objmgr_pdev *pdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifndef CONFIG_REG_CLIENT
+/**
+ * reg_enable_disable_freq_in_mas_chan_list() - Mark the opclass flag of the
+ * freq/channel as disabled in the master channel list. Then based on that
+ * regulatory disable/enable the freq/channel in the current channel list
+ * @pdev: Pointer to pdev
+ * @chan_num:  2.4Ghz or 5Ghz channel number
+ * @is_disable: Boolean to disable or enable
+ *
+ * Return: void
+ */
+static void
+reg_enable_disable_chan_in_mas_chan_list(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
+					 uint8_t chan_num,
+					 bool is_disable)
+{
+	enum channel_enum chan_enum;
+	struct regulatory_channel *mas_chan_list;
+	qdf_freq_t freq;
+
+	freq = reg_legacy_chan_to_freq(pdev_priv_obj->pdev_ptr, chan_num);
+
+	/*
+	 * freq = 0 represent a regulatory disabled channel in master channel
+	 * list. Do not apply opclass disable/enable on a channel disabled in
+	 * the master channel list.
+	 */
+	if (!freq) {
+		reg_err("Frequency should not be zero");
+		return;
+	}
+
+	chan_enum = reg_get_chan_enum_for_freq(freq);
+	if (reg_is_chan_enum_invalid(chan_enum)) {
+		reg_err("Invalid chan enum %d", chan_enum);
+		return;
+	}
+
+	mas_chan_list = pdev_priv_obj->mas_chan_list;
+
+	if (is_disable) {
+		mas_chan_list[chan_enum].opclass_chan_disable = true;
+	} else {
+		/* A channel can be enabled only if its not in NOL */
+		if (!mas_chan_list[chan_enum].nol_chan)
+			mas_chan_list[chan_enum].opclass_chan_disable = false;
+	}
+}
+
+/**
+ * reg_enable_disable_chan_freq() - Disable or enable a channel in the master
+ * channel list, that is present in the operating class table's channel set.
+ * @pdev: Pointer to pdev.
+ * @is_disable: Boolean to disable or enable
+ * @ieee_chan_list: Pointer to ieee_chan_list
+ * @chan_list_size: Size of ieee_chan_list
+ *
+ * Return: void.
+ */
+static void
+reg_enable_disable_chan_freq(struct wlan_objmgr_pdev *pdev,
+			     bool is_disable,
+			     uint8_t *ieee_chan_list,
+			     uint8_t chan_list_size)
+{
+	uint8_t i;
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!pdev_priv_obj) {
+		reg_err("pdev priv obj is NULL");
+		return;
+	}
+
+	for (i = 0; i < chan_list_size; i++) {
+		reg_enable_disable_chan_in_mas_chan_list(pdev_priv_obj,
+							 ieee_chan_list[i],
+							 is_disable);
+	}
+
+	reg_compute_pdev_current_chan_list(pdev_priv_obj);
+}
+
+/**
+ * reg_is_chan_in_opclass_chan_list() - Check if a channel is present in the
+ * operating class table's channel set
+ * @chan: IEEE channel number
+ * @opclass_chan_list: Pointer to opclass_chan_list
+ *
+ * Return: bool.
+ */
+static bool
+reg_is_chan_in_opclass_chan_list(uint8_t chan, const uint8_t *opclass_chan_list)
+{
+	uint8_t j;
+
+	for (j = 0; j < REG_MAX_CHANNELS_PER_OPERATING_CLASS &&
+	     opclass_chan_list[j]; j++) {
+		if (chan == opclass_chan_list[j])
+			return true;
+	}
+
+	return false;
+}
+
+/**
+ * reg_is_inlst_subset_of_opchanlst() - Check if a channel present
+ * in the input ieee_chan_list, is absent in the operating class table
+ * channel set.
+ * @opclass_chan_list: Pointer to opclass_chan_list
+ * @ieee_chan_list: Pointer to ieee_chan_list
+ * @ieee_chan_list_size: Size of ieee_chan_list
+ *
+ * Return: True if channel is absent in operating class table channel set.
+ */
+static bool
+reg_is_inlst_subset_of_opchanlst(const uint8_t *opclass_chan_list,
+				 uint8_t *ieee_chan_list,
+				 uint8_t ieee_chan_list_size)
+{
+	uint8_t i;
+
+	for (i = 0; i < ieee_chan_list_size; i++) {
+		if (!reg_is_chan_in_opclass_chan_list(ieee_chan_list[i],
+						      opclass_chan_list))
+			return true;
+	}
+
+	return false;
+}
+
+static bool reg_is_opclass_20mhz(uint8_t opclass)
+{
+	return (opclass >= BW_20_MHZ) && (opclass <= BW_25_MHZ);
+}
+
+QDF_STATUS reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
+					    bool is_disable, uint8_t opclass,
+					    uint8_t *ieee_chan_list,
+					    uint8_t chan_list_size,
+					    bool global_tbl_lookup)
+{
+	const struct reg_dmn_op_class_map_t *op_class_tbl;
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	if (!ieee_chan_list) {
+		reg_err("IEEE channel list is empty");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (global_tbl_lookup)
+		op_class_tbl = global_op_class;
+	else
+		reg_get_op_class_tbl_by_chan_map(&op_class_tbl);
+
+	if (reg_is_6ghz_op_class(pdev, opclass)) {
+		reg_err("6GHz operating class is not supported");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	while (op_class_tbl->op_class) {
+		if (opclass == op_class_tbl->op_class) {
+			if (!reg_is_opclass_20mhz(opclass)) {
+				reg_err("Opclass should only be 20 MHz opclass");
+				return QDF_STATUS_E_INVAL;
+			}
+
+			if (reg_is_inlst_subset_of_opchanlst(op_class_tbl->channels,
+							     ieee_chan_list,
+							     chan_list_size)) {
+				reg_err("Invalid channel present in chan list");
+				return QDF_STATUS_E_INVAL;
+			}
+
+			reg_enable_disable_chan_freq(pdev, is_disable,
+						     ieee_chan_list,
+						     chan_list_size);
+
+			return QDF_STATUS_SUCCESS;
+		}
+
+		op_class_tbl++;
+	}
+
+	reg_err("The opclass is not found %d", opclass);
+	return QDF_STATUS_E_INVAL;
+}
+#endif /* #ifndef CONFIG_REG_CLIENT */
 #endif

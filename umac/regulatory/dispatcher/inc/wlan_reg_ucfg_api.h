@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -686,4 +686,37 @@ ucfg_reg_send_afc_resp_rx_ind(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS ucfg_reg_afc_start(struct wlan_objmgr_pdev *pdev, uint64_t req_id);
 #endif
+
+#ifndef CONFIG_REG_CLIENT
+/**
+ * ucfg_reg_enable_disable_opclass_chans() - Disable or enable the input 20 MHz
+ * operating channels in the radio's current channel list.
+ * @pdev: Pointer to pdev
+ * @is_disable: Boolean to disable or enable the channels
+ * @opclass: Operating class. Only 20MHz opclasses are supported.
+ * @ieee_chan_list: Pointer to ieee_chan_list
+ * @chan_list_size: Size of ieee_chan_list
+ * @global_tbl_lookup: Whether to lookup global op class table
+ *
+ * Return - Return QDF_STATUS
+ */
+QDF_STATUS ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
+						 bool is_disable,
+						 uint8_t opclass,
+						 uint8_t *ieee_chan_list,
+						 uint8_t chan_list_size,
+						 bool global_tbl_lookup);
+#else
+static inline QDF_STATUS
+ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
+				      bool is_disable,
+				      uint8_t opclass,
+				      uint8_t *ieee_chan_list,
+				      uint8_t chan_list_size,
+				      bool global_tbl_lookup)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
+
 #endif

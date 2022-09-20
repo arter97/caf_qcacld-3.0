@@ -2864,6 +2864,35 @@ reg_compute_super_chan_list(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 }
 #endif /* CONFIG_BAND_6GHZ */
 
+#ifndef CONFIG_REG_CLIENT
+/**
+ * reg_disable_enable_opclass_channels() - Disable the channels in the
+ * current channel list that have opclass_chan_disable flag set.
+ * @pdev_priv_obj: Pointer to pdev_priv_obj
+ *
+ * Return: void
+ */
+static void
+reg_disable_enable_opclass_channels(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
+{
+	uint8_t i;
+	struct regulatory_channel *cur_chan_list;
+
+	cur_chan_list = pdev_priv_obj->cur_chan_list;
+	for (i = 0; i < NUM_CHANNELS; i++) {
+		if (cur_chan_list[i].opclass_chan_disable) {
+			cur_chan_list[i].state = CHANNEL_STATE_DISABLE;
+			cur_chan_list[i].chan_flags |= REGULATORY_CHAN_DISABLED;
+		}
+	}
+}
+#else
+static void
+reg_disable_enable_opclass_channels(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
+{
+}
+#endif
+
 void reg_compute_pdev_current_chan_list(struct wlan_regulatory_pdev_priv_obj
 					*pdev_priv_obj)
 {
@@ -2925,6 +2954,8 @@ void reg_compute_pdev_current_chan_list(struct wlan_regulatory_pdev_priv_obj
 	reg_modify_chan_list_for_avoid_chan_ext(pdev_priv_obj);
 
 	reg_modify_sec_chan_list_for_6g_edge_chan(pdev_priv_obj);
+
+	reg_disable_enable_opclass_channels(pdev_priv_obj);
 }
 
 void reg_reset_reg_rules(struct reg_rule_info *reg_rules)

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -29,6 +29,7 @@
 #include <../../core/src/reg_priv_objs.h>
 #include <../../core/src/reg_utils.h>
 #include <../../core/src/reg_services_common.h>
+#include <../../core/src/reg_opclass.h>
 #include <../../core/src/reg_lte.h>
 #include <../../core/src/reg_offload_11d_scan.h>
 #include <../../core/src/reg_build_chan_list.h>
@@ -490,5 +491,19 @@ QDF_STATUS
 ucfg_reg_afc_start(struct wlan_objmgr_pdev *pdev, uint64_t req_id)
 {
 	return reg_afc_start(pdev, req_id);
+}
+#endif
+
+#ifndef CONFIG_REG_CLIENT
+QDF_STATUS ucfg_reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
+						 bool is_disable,
+						 uint8_t opclass,
+						 uint8_t *ieee_chan_list,
+						 uint8_t chan_list_size,
+						 bool global_tbl_lookup)
+{
+	return reg_enable_disable_opclass_chans(pdev, is_disable, opclass,
+						ieee_chan_list, chan_list_size,
+						global_tbl_lookup);
 }
 #endif

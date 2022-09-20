@@ -533,4 +533,24 @@ void reg_dmn_free_6g_opclasses_and_channels(struct wlan_objmgr_pdev *pdev,
 					    uint8_t *chansize_lst,
 					    uint8_t *channel_lists[]);
 #endif
+
+#ifndef CONFIG_REG_CLIENT
+/**
+ * reg_enable_disable_opclass_chans() - Disable or enable the input 20 MHz
+ * operating channels in the radio's current channel list
+ * @pdev: Pointer to pdev
+ * @is_disable: Boolean to disable or enable the channels
+ * @opclass: Operating class. Only 20MHz opclasses are supported.
+ * @ieee_chan_list: Pointer to ieee_chan_list
+ * @chan_list_size: Size of ieee_chan_list
+ * @global_tbl_lookup: Whether to lookup global op class table
+ *
+ * Return - Return QDF_STATUS
+ */
+QDF_STATUS reg_enable_disable_opclass_chans(struct wlan_objmgr_pdev *pdev,
+					    bool is_disable, uint8_t opclass,
+					    uint8_t *ieee_chan_list,
+					    uint8_t chan_list_size,
+					    bool global_tbl_lookup);
+#endif
 #endif

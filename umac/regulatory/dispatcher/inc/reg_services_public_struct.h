@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -972,6 +972,11 @@ struct get_usable_chan_req_params {
  * @psd_flag: is PSD channel or not
  * @psd_eirp: PSD power level
  * @is_static_punctured: is static punctured
+ * @opclass_chan_disable: Whether the channel is disabled/enabled by a user
+ *                        command. The command provides an opclass and a
+ *                        subset of the channels belonging to that opclass
+ *                        as inputs and expects the driver to disable/enable
+ *                        the channels in the subset.
  */
 struct regulatory_channel {
 	qdf_freq_t center_freq;
@@ -994,6 +999,9 @@ struct regulatory_channel {
 #endif
 #ifdef CONFIG_REG_CLIENT
 	uint8_t is_static_punctured;
+#endif
+#ifndef CONFIG_REG_CLIENT
+	bool opclass_chan_disable;
 #endif
 };
 
