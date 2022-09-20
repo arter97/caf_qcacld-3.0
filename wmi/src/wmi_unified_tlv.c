@@ -9180,7 +9180,7 @@ static WMI_BAND_CONCURRENCY convert_host_to_target_band_concurrency(
 	case WMI_HOST_BAND_CONCURRENCY_DBS_SBS:
 		return WMI_HOST_DBS_SBS;
 	default:
-		return 0;
+		return WMI_HOST_NONE;
 	}
 }
 
@@ -9205,6 +9205,24 @@ static WMI_NUM_ANTENNAS convert_host_to_target_num_antennas(
 }
 
 /**
+ * convert_host_to_target_band_capability() -Convert host band capability to
+ * target band capability
+ * @host_band_capability: Host band capability
+ *
+ * Return: Target band capability bitmap
+ */
+static uint8_t
+convert_host_to_target_band_capability(uint32_t host_band_capability)
+{
+	uint8_t band_capability;
+
+	band_capability = (host_band_capability & WMI_HOST_BAND_CAP_2GHZ) |
+			  (host_band_capability & WMI_HOST_BAND_CAP_5GHZ) |
+			  (host_band_capability & WMI_HOST_BAND_CAP_6GHZ);
+	return band_capability;
+}
+
+/**
  * copy_feature_set_info() -Copy feaure set info from host to target
  * @feature_set_bitmap: Target feature set pointer
  * @feature_set: Host feature set structure
@@ -9219,6 +9237,7 @@ static inline void copy_feature_set_info(uint32_t *feature_set_bitmap,
 	WMI_WIFI_STANDARD wifi_standard;
 	WMI_VENDOR1_REQ1_VERSION vendor1_req1_version;
 	WMI_VENDOR1_REQ2_VERSION vendor1_req2_version;
+	uint8_t band_capability;
 
 	num_antennas = convert_host_to_target_num_antennas(
 					feature_set->num_antennas);
@@ -9230,6 +9249,10 @@ static inline void copy_feature_set_info(uint32_t *feature_set_bitmap,
 					feature_set->vendor_req_1_version);
 	vendor1_req2_version = convert_host_to_target_vendor1_req2_version(
 					feature_set->vendor_req_2_version);
+
+	band_capability =
+		convert_host_to_target_band_capability(
+						feature_set->band_capability);
 
 	WMI_SET_WIFI_STANDARD(feature_set_bitmap, wifi_standard);
 	WMI_SET_BAND_CONCURRENCY_SUPPORT(feature_set_bitmap, band_concurrency);
@@ -9346,6 +9369,7 @@ static inline void copy_feature_set_info(uint32_t *feature_set_bitmap,
 	WMI_SET_FEATURE_SET_VERSION(feature_set_bitmap,
 				    feature_set->feature_set_version);
 	WMI_SET_NUM_ANTENNAS(feature_set_bitmap, num_antennas);
+	WMI_SET_HOST_BAND_CAP(feature_set_bitmap, band_capability);
 }
 
 /**
@@ -9389,6 +9413,11 @@ static QDF_STATUS feature_set_cmd_send_tlv(
 	WMITLV_SET_HDR(buf_ptr + sizeof(*cmd), WMITLV_TAG_ARRAY_UINT32,
 		       (WMI_FEATURE_SET_BITMAP_ARRAY_LEN32 * sizeof(uint32_t)));
 	copy_feature_set_info(feature_set_bitmap, feature_set);
+
+	qdf_trace_hex_dump(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+			   feature_set_bitmap,
+			   WMI_FEATURE_SET_BITMAP_ARRAY_LEN32 *
+			   sizeof(uint32_t));
 
 	wmi_mtrace(WMI_PDEV_FEATURESET_CMDID, NO_SESSION, 0);
 

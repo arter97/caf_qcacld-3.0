@@ -6023,6 +6023,7 @@ typedef enum {
  * @enable_rfc835: indicates rfc835 is enabled or disabled
  * @sap_5g_supported: Indicates SAP 5g is supported or not
  * @sap_6g_supported: Indicates SAP 6g is supported or not
+ * @band_capability: Band capability bit map
  * @sap_max_num_clients: Max clients supported by SAP
  * @set_country_code_hal_supported: Indicates country code hal supported or not
  * @get_valid_channel_supported: Indicates get vaid channel supported or not
@@ -6084,6 +6085,7 @@ struct target_feature_set {
 	bool enable_rfc835;
 	bool sap_5g_supported;
 	bool sap_6g_supported;
+	uint32_t band_capability;
 	uint8_t sap_max_num_clients;
 	bool set_country_code_hal_supported;
 	bool get_valid_channel_supported;
