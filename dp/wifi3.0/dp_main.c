@@ -13578,6 +13578,21 @@ dp_get_tsf_time(struct cdp_soc_t *soc_hdl, uint32_t tsf_id, uint32_t mac_id,
 }
 #endif
 
+/**
+ * dp_set_tx_pause() - Pause or resume tx path
+ * @soc_hdl: Datapath soc handle
+ * @flag: set or clear is_tx_pause
+ *
+ * Return: None.
+ */
+static inline
+void dp_set_tx_pause(struct cdp_soc_t *soc_hdl, bool flag)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+
+	soc->is_tx_pause = flag;
+}
+
 static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_soc_attach_target = dp_soc_attach_target_wifi3,
 	.txrx_vdev_attach = dp_vdev_attach_wifi3,
@@ -13616,6 +13631,7 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.tx_send = dp_tx_send,
 	.tx_send_exc = dp_tx_send_exception,
 #endif
+	.set_tx_pause = dp_set_tx_pause,
 	.txrx_pdev_init = dp_pdev_init_wifi3,
 	.txrx_get_vdev_mac_addr = dp_get_vdev_mac_addr_wifi3,
 	.txrx_get_ctrl_pdev_from_vdev = dp_get_ctrl_pdev_from_vdev_wifi3,

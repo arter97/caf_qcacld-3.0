@@ -2564,6 +2564,7 @@ struct dp_soc {
 	/* A flag using to decide the switch of rx link speed  */
 	bool high_throughput;
 #endif
+	bool is_tx_pause;
 };
 
 #ifdef IPA_OFFLOAD
