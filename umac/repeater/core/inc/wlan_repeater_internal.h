@@ -79,6 +79,7 @@ typedef struct wlan_rptr_same_ssid_feature {
  * struct wlan_rptr_global_priv - reapeter global priv structure
  * @global_feature_caps:    global feature caps
  * @ss_info:                same ssid info
+ * @preferred_mlo_bssid     preferred mlo bssid
  * @num_stavaps_up:         number stavaps up
  * @disconnect_timeout:     Interface manager app uses this timeout to bring
  *                          down AP VAPs after STAVAP disconnection
@@ -91,6 +92,7 @@ struct wlan_rptr_global_priv {
 	u32 global_feature_caps;
 #if REPEATER_SAME_SSID
 	wlan_rptr_same_ssid_feature_t   ss_info;
+	u8     preferred_mlo_bssid[QDF_MAC_ADDR_SIZE];
 #endif
 	u8     num_stavaps_up;
 	u16    disconnect_timeout;
