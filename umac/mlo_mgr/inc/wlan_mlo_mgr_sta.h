@@ -207,6 +207,96 @@ void mlo_iterate_connected_vdev_list(struct wlan_objmgr_vdev *vdev,
 }
 
 /*
+ * call_handler_for_standalone_ap: Iterate on all standalone ML vdevs in
+ * ML AP context and call handler only for standalone AP
+ *
+ * @vdev: vdev object
+ * @handler: the handler will be called for each object in ML list
+ * @arg: argument to be passed to handler
+ *
+ * Return: none
+ */
+static inline void
+call_handler_for_standalone_ap(struct wlan_mlo_dev_context *ap_dev_ctx,
+			       mlo_vdev_op_handler handler, void *arg)
+{
+	struct wlan_objmgr_vdev *ml_ap_vdev = NULL;
+	int i;
+
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		/* For each vdev in ML AP context, check if its PDEV has any
+		 * STA. If it doesn't, call the handler for that particular
+		 * VDEV.
+		 */
+		if (!ap_dev_ctx->wlan_vdev_list[i])
+			continue;
+		ml_ap_vdev = ap_dev_ctx->wlan_vdev_list[i];
+		handler(ml_ap_vdev, arg);
+	}
+}
+
+/*
+ * mlo_iterate_ml_standalone_vdev_list: Iterate on all standalone ML vdevs in
+ * ML link
+ *
+ * @vdev: vdev object
+ * @handler: the handler will be called for each object in ML list
+ * @arg: argument to be passed to handler
+ *
+ * Return: none
+ */
+static inline
+void mlo_iterate_ml_standalone_vdev_list(struct wlan_objmgr_vdev *vdev,
+					 mlo_vdev_op_handler handler,
+					 void *arg)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
+	struct wlan_mlo_sta *sta_ctx = NULL;
+	uint8_t i = 0;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_vdev *vdev_temp = NULL;
+	struct wlan_mlo_dev_context *ap_ml_ctx;
+	qdf_list_t *vdev_list;
+
+	if (!mlo_dev_ctx || !(wlan_vdev_mlme_is_mlo_vdev(vdev)) || !handler)
+		return;
+
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx)
+		return;
+
+	/* If repeater is configured as dependent WDS repeater,
+	 * bring up/bring down all the standalone AP vaps in it once all
+	 * the other AP vaps present in the AP ML context are up/down.
+	 */
+
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!mlo_dev_ctx->wlan_vdev_list[i])
+			continue;
+
+		pdev = wlan_vdev_get_pdev(mlo_dev_ctx->wlan_vdev_list[i]);
+		vdev_list = &pdev->pdev_objmgr.wlan_vdev_list;
+		vdev_temp = wlan_pdev_vdev_list_peek_head(vdev_list);
+		while (vdev_temp) {
+			// Get all VDEVs of the STA vap from its PDEV
+			if ((vdev_temp != vdev) &&
+			    wlan_vdev_mlme_get_opmode(vdev_temp) ==
+			    QDF_SAP_MODE) {
+				ap_ml_ctx = vdev_temp->mlo_dev_ctx;
+				if (!ap_ml_ctx)
+					return;
+
+				call_handler_for_standalone_ap(ap_ml_ctx,
+							       handler, arg);
+			}
+
+			vdev_temp = wlan_vdev_get_next_vdev_of_pdev(
+							vdev_list, vdev_temp);
+		}
+	}
+}
+
+/*
  * mlo_update_connect_req_links: update connect req links index
  *
  * @vdev: vdev object
