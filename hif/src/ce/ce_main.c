@@ -2284,6 +2284,9 @@ struct CE_handle *ce_init(struct hif_softc *scn,
 
 		malloc_CE_state = true;
 		qdf_spinlock_create(&CE_state->ce_index_lock);
+#ifdef CE_TASKLET_SCHEDULE_ON_FULL
+		qdf_spinlock_create(&CE_state->ce_interrupt_lock);
+#endif
 
 		CE_state->id = CE_id;
 		CE_state->ctrl_addr = ctrl_addr;
@@ -2757,6 +2760,9 @@ void ce_fini(struct CE_handle *copyeng)
 	ce_deinit_ce_desc_event_log(scn, CE_id);
 
 	qdf_spinlock_destroy(&CE_state->ce_index_lock);
+#ifdef CE_TASKLET_SCHEDULE_ON_FULL
+	qdf_spinlock_destroy(&CE_state->ce_interrupt_lock);
+#endif
 	qdf_mem_free(CE_state);
 }
 
@@ -2902,7 +2908,7 @@ void hif_send_complete_check(struct hif_opaque_softc *hif_ctx, uint8_t pipe,
 void hif_schedule_ce_tasklet(struct hif_opaque_softc *hif_ctx, uint8_t pipe)
 {
 	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(hif_ctx);
-	uint64_t diff_time = qdf_get_log_timestamp_usecs() -
+	int64_t diff_time = qdf_get_log_timestamp_usecs() -
 			hif_state->stats.tasklet_sched_entry_ts[pipe];
 
 	hif_state->stats.ce_ring_full_count[pipe]++;
