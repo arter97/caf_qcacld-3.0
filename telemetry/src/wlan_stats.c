@@ -1945,7 +1945,7 @@ static QDF_STATUS get_advance_peer_ctrl_rate(struct unified_stats *stats,
 	return QDF_STATUS_SUCCESS;
 }
 
-#if CONFIG_SAWF
+#if CONFIG_SAWF_STATS
 static bool get_advance_sawf_stats(uint32_t feat,
 				   void *dp_soc,
 				   struct unified_stats *stats,
@@ -1976,7 +1976,7 @@ static bool get_advance_sawf_stats(uint32_t feat,
 			ret = get_advance_peer_data_sawfdelay(sawf_delay, stats,
 							      service_id);
 		if (ret != QDF_STATUS_SUCCESS)
-			qdf_err("Unable to fetch peer Sawf Delay Stats!");
+			qdf_nofl_err("Unable to fetch peer Sawf Delay Stats!");
 		else
 			stats_collected = true;
 	}
@@ -1998,7 +1998,7 @@ static bool get_advance_sawf_stats(uint32_t feat,
 			ret = get_advance_peer_data_sawftx(sawf_tx, stats,
 							   service_id);
 		if (ret != QDF_STATUS_SUCCESS)
-			qdf_err("Unable to fetch peer Sawf Tx Stats!");
+			qdf_nofl_err("Unable to fetch peer Sawf Tx Stats!");
 		else
 			stats_collected = true;
 	}
@@ -2018,6 +2018,7 @@ static bool  get_advance_sawf_stats(uint32_t feat,
 				    uint8_t service_id,
 				    uint8_t *peer_mac)
 {
+	qdf_nofl_err("Sawf Stats collection is disabled");
 	return false;
 }
 #endif
