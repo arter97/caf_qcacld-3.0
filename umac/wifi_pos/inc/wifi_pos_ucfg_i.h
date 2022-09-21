@@ -90,5 +90,11 @@ ucfg_wifi_pos_is_ltf_keyseed_required_for_peer(struct wlan_objmgr_peer *peer)
 {
 	return wifi_pos_is_ltf_keyseed_required_for_peer(peer);
 }
+
+static inline
+bool ucfg_wifi_pos_get_rsta_11az_ranging_cap(void)
+{
+	return wifi_pos_get_rsta_11az_ranging_cap();
+}
 #endif
 #endif /* _WIFI_POS_UCFG_H_ */

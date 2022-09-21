@@ -678,7 +678,7 @@ wifi_pos_get_osif_callbacks(struct wlan_objmgr_psoc *psoc);
  * Return: None
  **/
 void
-wifi_pos_set_rsta_sec_ltf_cap(uint32_t val);
+wifi_pos_set_rsta_sec_ltf_cap(bool val);
 
 /**
  * wifi_pos_get_rsta_sec_ltf_cap  - Get RSTA secure LTF capability
@@ -686,5 +686,18 @@ wifi_pos_set_rsta_sec_ltf_cap(uint32_t val);
  * Return: True or false
  */
 bool wifi_pos_get_rsta_sec_ltf_cap(void);
+
+/**
+ * wifi_pos_set_rsta_11az_ranging_cap() - Enable/Disable R-STA 11az ranging
+ * @val: Value to set
+ */
+void wifi_pos_set_rsta_11az_ranging_cap(bool val);
+
+/**
+ * wifi_pos_get_rsta_11az_ranging_cap() - Get if RSTA 11az ranging is enabled
+ *
+ * Return: True if 11az ranging is enabled
+ */
+bool wifi_pos_get_rsta_11az_ranging_cap(void);
 #endif
 #endif /* _WIFI_POS_API_H_ */
