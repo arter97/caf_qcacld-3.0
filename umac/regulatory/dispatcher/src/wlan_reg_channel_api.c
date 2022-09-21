@@ -252,3 +252,8 @@ wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 					       chan_freq, is_psd, reg_eirp,
 					       reg_psd);
 }
+
+bool wlan_reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev)
+{
+	return reg_is_6g_domain_jp(pdev);
+}

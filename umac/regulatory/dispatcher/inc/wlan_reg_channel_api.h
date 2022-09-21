@@ -390,4 +390,13 @@ wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				     qdf_freq_t chan_freq,
 				     bool *is_psd, uint16_t *reg_eirp,
 				     uint16_t *reg_psd);
+
+/**
+ * wlan_reg_is_6g_domain_jp() - Check if current 6GHz regdomain is a JP domain
+ * or not.
+ * @pdev: Pointer to pdev.
+ *
+ * Return: true if 6GHz regdomain is a JP domain else false.
+ */
+bool wlan_reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev);
 #endif /* __WLAN_REG_CHANNEL_API_H */
