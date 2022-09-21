@@ -1407,6 +1407,10 @@ enum _ol_ath_param_t {
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
 	OL_ATH_PARAM_MGMT_RX_REO_STATUS = 518,
 #endif
+
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	OL_ATH_PARAM_UMAC_RST_SKEL = 519,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3712,6 +3716,12 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_mgmt_rx_reo_status",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_RX_REO_STATUS,
 		GET_PARAM, 0},
+#endif
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	{"umac_rst_skel",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UMAC_RST_SKEL, SET_PARAM, 1},
+	{"g_umac_rst_skel",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UMAC_RST_SKEL, GET_PARAM, 0},
 #endif
 };
 #endif
