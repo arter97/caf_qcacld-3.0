@@ -10063,6 +10063,42 @@ static void dp_txrx_stats_help(void)
 	dp_info(" 37 -- Host SRNG usage watermark stats");
 }
 
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+/**
+ * dp_umac_rst_skel_enable_update(): Update skel dbg flag for umac reset
+ * @soc: dp soc handle
+ * @en: ebable/disable
+ *
+ * Return: void
+ */
+static void dp_umac_rst_skel_enable_update(struct dp_soc *soc, bool en)
+{
+	soc->umac_reset_ctx.skel_enable = en;
+	dp_cdp_debug("UMAC HW reset debug skelton code enabled :%u",
+		     soc->umac_reset_ctx.skel_enable);
+}
+
+/**
+ * dp_umac_rst_skel_enable_get(): Get skel dbg flag for umac reset
+ * @soc: dp soc handle
+ *
+ * Return: enable/disable flag
+ */
+static bool dp_umac_rst_skel_enable_get(struct dp_soc *soc)
+{
+	return soc->umac_reset_ctx.skel_enable;
+}
+#else
+static void dp_umac_rst_skel_enable_update(struct dp_soc *soc, bool en)
+{
+}
+
+static bool dp_umac_rst_skel_enable_get(struct dp_soc *soc)
+{
+	return false;
+}
+#endif
+
 /**
  * dp_print_host_stats()- Function to print the stats aggregated at host
  * @vdev_handle: DP_VDEV handle
@@ -10953,6 +10989,9 @@ dp_set_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_SAWF_ENABLE:
 		wlan_cfg_set_sawf_config(wlan_cfg_ctx, val.cdp_sawf_enabled);
 		break;
+	case CDP_UMAC_RST_SKEL_ENABLE:
+		dp_umac_rst_skel_enable_update(soc, val.cdp_umac_rst_skel);
+		break;
 	default:
 		break;
 	}
@@ -10985,6 +11024,9 @@ static QDF_STATUS dp_get_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_CFG_VDEV_STATS_HW_OFFLOAD:
 		val->cdp_psoc_param_vdev_stats_hw_offload =
 			wlan_cfg_get_vdev_stats_hw_offload_config(soc->wlan_cfg_ctx);
+		break;
+	case CDP_UMAC_RST_SKEL_ENABLE:
+		val->cdp_umac_rst_skel = dp_umac_rst_skel_enable_get(soc);
 		break;
 	default:
 		dp_warn("Invalid param");
@@ -13426,19 +13468,21 @@ static QDF_STATUS dp_umac_reset_handle_pre_reset(struct dp_soc *soc)
  */
 static QDF_STATUS dp_umac_reset_handle_post_reset(struct dp_soc *soc)
 {
-	qdf_nbuf_t *nbuf_list = &soc->umac_reset_ctx.nbuf_list;
+	if (!soc->umac_reset_ctx.skel_enable) {
+		qdf_nbuf_t *nbuf_list = &soc->umac_reset_ctx.nbuf_list;
 
-	dp_set_umac_regs(soc);
+		dp_set_umac_regs(soc);
 
-	dp_reinit_rings(soc);
+		dp_reinit_rings(soc);
 
-	dp_rx_desc_reuse(soc, nbuf_list);
+		dp_rx_desc_reuse(soc, nbuf_list);
 
-	dp_cleanup_reo_cmd_module(soc);
+		dp_cleanup_reo_cmd_module(soc);
 
-	dp_tx_desc_pool_cleanup(soc, nbuf_list);
+		dp_tx_desc_pool_cleanup(soc, nbuf_list);
 
-	dp_reset_tid_q_setup(soc);
+		dp_reset_tid_q_setup(soc);
+	}
 
 	return dp_umac_reset_notify_action_completion(soc,
 					UMAC_RESET_ACTION_DO_POST_RESET_START);

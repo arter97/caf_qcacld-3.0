@@ -136,6 +136,7 @@ struct umac_reset_rx_actions {
  * @rx_actions: callbacks for handling UMAC reset actions
  * @intr_ctx_bkp: DP Interrupts ring masks backup
  * @nbuf_list: skb list for delayed free
+ * @skel_enable: Enable skeleton code for umac reset
  */
 struct dp_soc_umac_reset_ctx {
 	qdf_dma_addr_t shmem_paddr_unaligned;
@@ -149,6 +150,7 @@ struct dp_soc_umac_reset_ctx {
 	struct umac_reset_rx_actions rx_actions;
 	struct dp_intr_bkp *intr_ctx_bkp;
 	qdf_nbuf_t nbuf_list;
+	bool skel_enable;
 };
 
 /**

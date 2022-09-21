@@ -1288,6 +1288,7 @@ enum cdp_pdev_param_type {
  * @cdp_psoc_param_vdev_stats_hw_offload: Configure HW vdev stats offload
  * @cdp_pdev_param_undecoded_metadata_enable: Undecoded metadata capture enable
  * @cdp_vdev_param_traffic_end_ind: Traffic end indication enable/disable
+ * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1374,6 +1375,7 @@ typedef union cdp_config_param_t {
 	bool cdp_sawf_enabled;
 	bool cdp_drop_3addr_mcast;
 	bool cdp_vdev_param_traffic_end_ind;
+	bool cdp_umac_rst_skel;
 } cdp_config_param_type;
 
 /**
@@ -1510,6 +1512,7 @@ enum cdp_vdev_param_type {
  * @CDP_CFG_PEER_EXT_STATS: Peer extended stats mode.
  * @CDP_IPA_ENABLE : set IPA enable mode.
  * @CDP_CFG_VDEV_STATS_HW_OFFLOAD: HW Vdev stats config
+ * @CDP_UMAC_RST_SKEL_ENABLE: Enable Umac reset skeleton code for debug
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1519,6 +1522,7 @@ enum cdp_psoc_param_type {
 	CDP_IPA_ENABLE,
 	CDP_CFG_VDEV_STATS_HW_OFFLOAD,
 	CDP_SAWF_ENABLE,
+	CDP_UMAC_RST_SKEL_ENABLE,
 };
 
 #define TXRX_FW_STATS_TXSTATS                     1
