@@ -148,6 +148,8 @@
  * @QCA_NL80211_VENDOR_SUBCMD_DRIVER_READY_INDEX: Driver Ready after SSR index
  * @QCA_NL80211_VENDOR_SUBCMD_SCS_RULE_CONFIG_INDEX: SCS rule config index
  * @QCA_NL80211_VENDOR_SUBCMD_SR_INDEX: SR Event index
+ * @QCA_NL80211_VENDOR_SUBCMD_MLO_PEER_PRIM_NETDEV_EVENT_INDEX: primary netdev
+ *     event index
  */
 
 enum qca_nl80211_vendor_subcmds_index {
@@ -263,6 +265,7 @@ enum qca_nl80211_vendor_subcmds_index {
 #ifdef WLAN_FEATURE_SR
 	QCA_NL80211_VENDOR_SUBCMD_SR_INDEX,
 #endif
+	QCA_NL80211_VENDOR_SUBCMD_MLO_PEER_PRIM_NETDEV_EVENT_INDEX,
 };
 
 #if !defined(SUPPORT_WDEV_CFG80211_VENDOR_EVENT_ALLOC) && \
