@@ -754,6 +754,7 @@ static inline bool hif_tasklet_schedule(struct hif_opaque_softc *hif_ctx,
 	return true;
 }
 
+#ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7
 /**
  * ce_poll_reap_by_id() - reap the available frames from CE by polling per ce_id
  * @scn: hif context
@@ -811,6 +812,7 @@ int hif_drain_fw_diag_ce(struct hif_softc *scn)
 
 	return ce_poll_reap_by_id(scn, ce_id);
 }
+#endif
 
 #ifdef CE_TASKLET_SCHEDULE_ON_FULL
 static inline int ce_check_tasklet_status(int ce_id,
