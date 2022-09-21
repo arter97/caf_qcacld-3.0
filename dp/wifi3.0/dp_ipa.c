@@ -403,6 +403,62 @@ static QDF_STATUS dp_ipa_get_shared_mem_info(qdf_device_t osdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * dp_ipa_get_tx_bank_id - API to get TCL bank id
+ * @soc: dp_soc handle
+ * @bank_id: out parameter for bank id
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS dp_ipa_get_tx_bank_id(struct dp_soc *soc, uint8_t *bank_id)
+{
+	if (soc->arch_ops.ipa_get_bank_id) {
+		*bank_id = soc->arch_ops.ipa_get_bank_id(soc);
+		if (*bank_id < 0) {
+			return QDF_STATUS_E_INVAL;
+		} else {
+			dp_info("bank_id %u", *bank_id);
+			return QDF_STATUS_SUCCESS;
+		}
+	} else {
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+}
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)) || \
+	defined(CONFIG_IPA_WDI_UNIFIED_API)
+static void dp_ipa_setup_tx_params_bank_id(struct dp_soc *soc,
+					   qdf_ipa_wdi_pipe_setup_info_t *tx)
+{
+	uint8_t bank_id;
+
+	if (QDF_IS_STATUS_SUCCESS(dp_ipa_get_tx_bank_id(soc, &bank_id)))
+		QDF_IPA_WDI_SETUP_INFO_RX_BANK_ID(tx, bank_id);
+}
+
+static void
+dp_ipa_setup_tx_smmu_params_bank_id(struct dp_soc *soc,
+				    qdf_ipa_wdi_pipe_setup_info_smmu_t *tx_smmu)
+{
+	uint8_t bank_id;
+
+	if (QDF_IS_STATUS_SUCCESS(dp_ipa_get_tx_bank_id(soc, &bank_id)))
+		QDF_IPA_WDI_SETUP_INFO_SMMU_RX_BANK_ID(tx_smmu, bank_id);
+}
+#else
+static inline void
+dp_ipa_setup_tx_params_bank_id(struct dp_soc *soc,
+			       qdf_ipa_wdi_pipe_setup_info_t *tx)
+{
+}
+
+static inline void
+dp_ipa_setup_tx_smmu_params_bank_id(struct dp_soc *soc,
+				    qdf_ipa_wdi_pipe_setup_info_smmu_t *tx_smmu)
+{
+}
+#endif
+
 #ifdef IPA_WDI3_TX_TWO_PIPES
 static void dp_ipa_tx_alt_pool_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 {
@@ -788,6 +844,8 @@ static void dp_ipa_wdi_tx_alt_pipe_params(struct dp_soc *soc,
 		ipa_res->tx_alt_ring_num_alloc_buffer;
 
 	QDF_IPA_WDI_SETUP_INFO_PKT_OFFSET(tx) = 0;
+
+	dp_ipa_setup_tx_params_bank_id(soc, tx);
 }
 
 static void
@@ -822,6 +880,8 @@ dp_ipa_wdi_tx_alt_pipe_smmu_params(struct dp_soc *soc,
 	QDF_IPA_WDI_SETUP_INFO_SMMU_NUM_PKT_BUFFERS(tx_smmu) =
 		ipa_res->tx_alt_ring_num_alloc_buffer;
 	QDF_IPA_WDI_SETUP_INFO_SMMU_PKT_OFFSET(tx_smmu) = 0;
+
+	dp_ipa_setup_tx_smmu_params_bank_id(soc, tx_smmu);
 }
 
 static void dp_ipa_setup_tx_alt_pipe(struct dp_soc *soc,
@@ -2164,6 +2224,8 @@ static void dp_ipa_wdi_tx_params(struct dp_soc *soc,
 		ipa_res->tx_num_alloc_buffer;
 
 	QDF_IPA_WDI_SETUP_INFO_PKT_OFFSET(tx) = 0;
+
+	dp_ipa_setup_tx_params_bank_id(soc, tx);
 }
 
 static void dp_ipa_wdi_rx_params(struct dp_soc *soc,
@@ -2251,6 +2313,7 @@ dp_ipa_wdi_tx_smmu_params(struct dp_soc *soc,
 		ipa_res->tx_num_alloc_buffer;
 	QDF_IPA_WDI_SETUP_INFO_SMMU_PKT_OFFSET(tx_smmu) = 0;
 
+	dp_ipa_setup_tx_smmu_params_bank_id(soc, tx_smmu);
 }
 
 static void
