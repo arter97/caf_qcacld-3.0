@@ -155,4 +155,5 @@ bool qca_multi_link_sta_tx(struct net_device *net_dev, qdf_nbuf_t nbuf);
 void qca_multi_link_set_dbdc_loop_detection_cb(qca_multi_link_set_loop_detection_fn_t qca_ml_cb,
 			void *ctx);
 bool qca_multi_link_is_primary_radio(struct wiphy *dev_wiphy);
+struct net_device *qca_multi_link_get_station_vap(struct wiphy *wiphy);
 #endif
