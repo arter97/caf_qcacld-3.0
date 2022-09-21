@@ -1940,11 +1940,17 @@ struct wlan_ml_probe_req {
  * determination should be changed.
  * @WLAN_ML_VARIANT_BASIC: Basic variant
  * @WLAN_ML_VARIANT_PROBEREQ: Probe Request variant
+ * @WLAN_ML_VARIANT_RECONFIG: Reconfiguration variant
+ * @WLAN_ML_VARIANT_TDLS: TDLS variant
+ * @WLAN_ML_VARIANT_PRIORITYACCESS: Priority Access variant
  * @WLAN_ML_VARIANT_INVALIDSTART: Start of invalid value range
  */
 enum wlan_ml_variant {
 	WLAN_ML_VARIANT_BASIC = 0,
 	WLAN_ML_VARIANT_PROBEREQ = 1,
+	WLAN_ML_VARIANT_RECONFIG = 2,
+	WLAN_ML_VARIANT_TDLS = 3,
+	WLAN_ML_VARIANT_PRIORITYACCESS = 4,
 	WLAN_ML_VARIANT_INVALIDSTART,
 };
 
@@ -2402,6 +2408,30 @@ struct wlan_ml_prv_linfo_perstaprof {
 	 WLAN_ML_PRV_CINFO_MLDID_SIZE)
 
 /* End of definitions related to Probe Request variant Multi-Link element. */
+
+/* Definitions related to Reconfiguration variant Multi-Link element (per
+ * IEEE802.11be D2.1.1)
+ */
+
+/* Definitions for bits in the Presence Bitmap subfield in Reconfiguration
+ * variant Multi-Link element Control field. Any unused bits are reserved.
+ */
+/* MLD MAC Address Present */
+#define WLAN_ML_RV_CTRL_PBM_MLDMACADDR_P               ((uint16_t)BIT(0))
+
+/* Definitions related to Reconfiguration variant Multi-Link element Common Info
+ * field.
+ */
+
+/* Size in octets of Common Info Length subfield of Common Info field in
+ * Reconfiguration variant Multi-Link element.
+ */
+#define WLAN_ML_RV_CINFO_LENGTH_SIZE                               1
+
+/* End of definitions related to Reconfiguration variant Multi-Link element
+ * Common Info field.
+ */
+/* End of definitions related to Reconfiguration variant Multi-Link element. */
 
 /*
  * Definitions related to MLO specific aspects of Reduced Neighbor Report
