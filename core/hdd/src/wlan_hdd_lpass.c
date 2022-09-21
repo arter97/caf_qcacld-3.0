@@ -160,7 +160,7 @@ static int wlan_hdd_gen_wlan_status_pack(struct wlan_status_data *data,
 	data->vdev_mode = adapter->device_mode;
 	if (sta_ctx) {
 		data->is_connected = is_connected;
-		data->rssi = adapter->rssi;
+		data->rssi = adapter->deflink->rssi;
 		data->freq = sta_ctx->conn_info.chan_freq;
 		if (WLAN_SVC_MAX_SSID_LEN >=
 		    sta_ctx->conn_info.ssid.SSID.length) {
@@ -366,14 +366,14 @@ void hdd_lpass_notify_connect(struct hdd_adapter *adapter)
 	struct hdd_station_ctx *sta_ctx;
 
 	/* only send once per connection */
-	if (adapter->rssi_send)
+	if (adapter->deflink->rssi_send)
 		return;
 
 	/* don't send if driver is unloading */
 	if (cds_is_driver_unloading())
 		return;
 
-	adapter->rssi_send = true;
+	adapter->deflink->rssi_send = true;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	wlan_hdd_send_status_pkg(adapter, sta_ctx, 1, 1);
 }
@@ -386,7 +386,7 @@ void hdd_lpass_notify_disconnect(struct hdd_adapter *adapter)
 {
 	struct hdd_station_ctx *sta_ctx;
 
-	adapter->rssi_send = false;
+	adapter->deflink->rssi_send = false;
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 	wlan_hdd_send_status_pkg(adapter, sta_ctx, 1, 0);
 }

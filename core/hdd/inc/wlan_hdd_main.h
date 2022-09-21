@@ -1013,6 +1013,10 @@ enum udp_qos_upgrade {
  * @session: union of @ap and @station specific structs
  * @session.station: station mode information
  * @session.ap: ap mode specific information
+ * @rssi: The signal strength (dBm)
+ * @snr: SNR measured from @rssi
+ * @rssi_on_disconnect: Rssi at disconnection time in STA mode
+ * @rssi_send: Notify RSSI over lpass
  */
 struct wlan_hdd_link_info {
 	uint8_t vdev_id;
@@ -1024,6 +1028,13 @@ struct wlan_hdd_link_info {
 		struct hdd_station_ctx station;
 		struct hdd_ap_ctx ap;
 	} session;
+
+	int8_t rssi;
+	uint8_t snr;
+	int32_t rssi_on_disconnect;
+#ifdef WLAN_FEATURE_LPSS
+	bool rssi_send;
+#endif
 };
 
 /**
@@ -1062,10 +1073,6 @@ struct wlan_hdd_link_info {
  * @cache_sta_info_list:
  * @cache_sta_count: number of currently cached stations
  * @wapi_info:
- * @rssi:
- * @rssi_on_disconnect:
- * @rssi_send:
- * @snr:
  * @sap_stop_bss_work:
  * @ch_switch_in_progress:
  * @acs_complete_event: acs complete event
@@ -1212,14 +1219,6 @@ struct hdd_adapter {
 #ifdef FEATURE_WLAN_WAPI
 	struct hdd_wapi_info wapi_info;
 #endif
-
-	int8_t rssi;
-	int32_t rssi_on_disconnect;
-#ifdef WLAN_FEATURE_LPSS
-	bool rssi_send;
-#endif
-
-	uint8_t snr;
 
 	struct work_struct  sap_stop_bss_work;
 

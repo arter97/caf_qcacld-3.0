@@ -1799,25 +1799,22 @@ void hdd_lost_link_info_cb(hdd_handle_t hdd_handle,
 		return;
 	}
 
+	if (lost_link_info->rssi == 0) {
+		hdd_debug_rl("Invalid rssi on disconnect sent by FW");
+		return;
+	}
+
 	adapter = hdd_get_adapter_by_vdev(hdd_ctx, lost_link_info->vdev_id);
 	if (!adapter) {
 		hdd_err("invalid adapter");
 		return;
 	}
 
-	if (lost_link_info->rssi == 0) {
-		hdd_debug_rl("Invalid rssi on disconnect sent by FW");
-		return;
-	}
-
-	adapter->rssi_on_disconnect = lost_link_info->rssi;
-	hdd_debug("rssi on disconnect %d", adapter->rssi_on_disconnect);
-
 	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-	if (!sta_ctx) {
-		hdd_err("invalid sta context");
-		return;
-	}
+
+	adapter->deflink->rssi_on_disconnect = lost_link_info->rssi;
+	hdd_debug("rssi on disconnect %d",
+		  adapter->deflink->rssi_on_disconnect);
 
 	sta_ctx->cache_conn_info.signal = lost_link_info->rssi;
 }
@@ -5660,7 +5657,7 @@ void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 
 	qdf_mem_zero(&sinfo, sizeof(struct station_info));
 
-	sinfo.signal = adapter->rssi;
+	sinfo.signal = adapter->deflink->rssi;
 	tx_rate_flags = adapter->hdd_stats.class_a_stat.tx_rx_rate_flags;
 	tx_mcs_index = adapter->hdd_stats.class_a_stat.tx_mcs_index;
 	my_tx_rate = adapter->hdd_stats.class_a_stat.tx_rate;
@@ -6204,14 +6201,14 @@ static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 	}
 
 stat_update:
-	adapter->rssi = *rssi;
-	adapter->snr = *snr;
+	adapter->deflink->rssi = *rssi;
+	adapter->deflink->snr = *snr;
 }
 #else
 static inline void wlan_hdd_mlo_update_stats_info(struct hdd_adapter *adapter)
 {
-	adapter->rssi = adapter->hdd_stats.summary_stat.rssi;
-	adapter->snr = adapter->hdd_stats.summary_stat.snr;
+	adapter->deflink->rssi = adapter->hdd_stats.summary_stat.rssi;
+	adapter->deflink->snr = adapter->hdd_stats.summary_stat.snr;
 }
 #endif
 
@@ -6266,7 +6263,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 		 * and handover happens to cellular.
 		 * send the cached rssi when get_station
 		 */
-		sinfo->signal = adapter->rssi;
+		sinfo->signal = adapter->deflink->rssi;
 		sinfo->filled |= HDD_INFO_SIGNAL;
 		return 0;
 	}
@@ -6286,23 +6283,23 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	wlan_hdd_get_peer_rx_rate_stats(adapter);
 
 	wlan_hdd_mlo_update_stats_info(adapter);
-	snr = adapter->snr;
+	snr = adapter->deflink->snr;
 
 	/* for new connection there might be no valid previous RSSI */
-	if (!adapter->rssi) {
+	if (!adapter->deflink->rssi) {
 		hdd_get_rssi_snr_by_bssid(adapter,
 				sta_ctx->conn_info.bssid.bytes,
-				&adapter->rssi, &snr);
+				&adapter->deflink->rssi, &snr);
 	}
 
 	/* If RSSi is reported as positive then it is invalid */
-	if (adapter->rssi > 0) {
-		hdd_debug_rl("RSSI invalid %d", adapter->rssi);
-		adapter->rssi = 0;
+	if (adapter->deflink->rssi > 0) {
+		hdd_debug_rl("RSSI invalid %d", adapter->deflink->rssi);
+		adapter->deflink->rssi = 0;
 		adapter->hdd_stats.summary_stat.rssi = 0;
 	}
 
-	sinfo->signal = adapter->rssi;
+	sinfo->signal = adapter->deflink->rssi;
 	hdd_debug("snr: %d, rssi: %d",
 		adapter->hdd_stats.summary_stat.snr,
 		adapter->hdd_stats.summary_stat.rssi);
@@ -7280,32 +7277,33 @@ QDF_STATUS wlan_hdd_get_rssi(struct hdd_adapter *adapter, int8_t *rssi_value)
 		hdd_err("Invalid context, adapter");
 		return QDF_STATUS_E_FAULT;
 	}
+
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
 	if (cds_is_driver_recovering() || cds_is_driver_in_bad_state()) {
 		hdd_err("Recovery in Progress. State: 0x%x Ignore!!!",
 			cds_get_driver_state());
 		/* return a cached value */
-		*rssi_value = adapter->rssi;
+		*rssi_value = adapter->deflink->rssi;
 		return QDF_STATUS_SUCCESS;
 	}
 
-	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-
 	if (!hdd_cm_is_vdev_associated(adapter)) {
 		hdd_debug("Not associated!, rssi on disconnect %d",
-			  adapter->rssi_on_disconnect);
-		*rssi_value = adapter->rssi_on_disconnect;
+			  adapter->deflink->rssi_on_disconnect);
+		*rssi_value = adapter->deflink->rssi_on_disconnect;
 		return QDF_STATUS_SUCCESS;
 	}
 
 	if (hdd_cm_is_vdev_roaming(adapter)) {
 		hdd_debug("Roaming in progress, return cached RSSI");
-		*rssi_value = adapter->rssi;
+		*rssi_value = adapter->deflink->rssi;
 		return QDF_STATUS_SUCCESS;
 	}
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_STATS_ID);
 	if (!vdev) {
-		*rssi_value = adapter->rssi;
+		*rssi_value = adapter->deflink->rssi;
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -7415,7 +7413,7 @@ QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr)
 		} else {
 			/* update the adapter with the fresh results */
 			priv = osif_request_priv(request);
-			adapter->snr = priv->snr;
+			adapter->deflink->snr = priv->snr;
 		}
 	}
 
@@ -7426,7 +7424,7 @@ QDF_STATUS wlan_hdd_get_snr(struct hdd_adapter *adapter, int8_t *snr)
 	 */
 	osif_request_put(request);
 
-	*snr = adapter->snr;
+	*snr = adapter->deflink->snr;
 	hdd_exit();
 	return QDF_STATUS_SUCCESS;
 }
@@ -7856,19 +7854,19 @@ static void hdd_lost_link_cp_stats_info_cb(void *stats_ev)
 			continue;
 		}
 
+		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+
 		rssi = ev->vdev_summary_stats[i].stats.rssi;
 		if (rssi == 0) {
 			hdd_debug_rl("Invalid RSSI value sent by FW");
 			return;
 		}
-		adapter->rssi_on_disconnect = rssi;
+		adapter->deflink->rssi_on_disconnect = rssi;
 		hdd_debug("rssi %d for " QDF_MAC_ADDR_FMT,
-			  adapter->rssi_on_disconnect,
+			  adapter->deflink->rssi_on_disconnect,
 			  QDF_MAC_ADDR_REF(adapter->mac_addr.bytes));
 
-		sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
-		if (sta_ctx)
-			sta_ctx->cache_conn_info.signal = rssi;
+		sta_ctx->cache_conn_info.signal = rssi;
 	}
 }
 
