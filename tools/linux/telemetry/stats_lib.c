@@ -55,6 +55,10 @@
 #define CFG80211_MODE_FILE_PATH      "/sys/class/net/wifi%d/phy80211/"
 /* Radio interface name size */
 #define RADIO_IFNAME_SIZE            5
+/* To check platform is lithium or not */
+#define IS_LITHIUM(value)             \
+	((value) & WLANSTATS_COOKIE_PLATFORM_OFFSET) \
+		>> WLANSTATS_PEER_COOKIE_LSB
 
 /* NL80211 command and event socket IDs */
 #define STATS_NL80211_CMD_SOCK_ID    DEFAULT_NL80211_CMD_SOCK_ID
@@ -1310,8 +1314,51 @@ get_advance_sta_extended_tx_rate_stats(void *buffer, uint32_t buffer_len,
 	}
 }
 
+#if WLAN_FEATURE_11BE_MLO
+void
+get_advance_sta_punc_bw_tx_link_stats(struct wlan_tx_link_stats *tx_stats,
+				      struct stats_if_rdk_tx_link_stats *link)
+{
+	int i;
+
+	if (!link->is_lithium) {
+		link->punc_bw.usage_avg = tx_stats->punc_bw.usage_avg;
+		link->punc_bw.usage_max = tx_stats->punc_bw.usage_max;
+		for (i = 0; i < STATS_IF_PUNC_BW_USAGE_MAX_SIZE; i++)
+			link->punc_bw.usage_counter[i] =
+				tx_stats->punc_bw.usage_counter[i];
+	}
+}
+
+void
+get_advance_sta_punc_bw_rx_link_stats(struct wlan_rx_link_stats *rx_stats,
+				      struct stats_if_rdk_rx_link_stats *link)
+{
+	int i;
+
+	if (!link->is_lithium) {
+		link->punc_bw.usage_avg = rx_stats->punc_bw.usage_avg;
+		link->punc_bw.usage_max = rx_stats->punc_bw.usage_max;
+		for (i = 0; i < STATS_IF_PUNC_BW_USAGE_MAX_SIZE; i++)
+			link->punc_bw.usage_counter[i] =
+				rx_stats->punc_bw.usage_counter[i];
+	}
+}
+#else
+void
+get_advance_sta_punc_bw_tx_link_stats(struct wlan_tx_link_stats *tx_stats,
+				      struct stats_if_rdk_tx_link_stats *link)
+{ }
+
+void
+get_advance_sta_punc_bw_rx_link_stats(struct wlan_rx_link_stats *rx_stats,
+				      struct stats_if_rdk_rx_link_stats *link)
+{ }
+#endif
+
 static void
 get_advance_sta_extended_tx_link_stats(void *buffer, uint32_t buffer_len,
+				       uint64_t peer_cookie,
 				       struct stats_if_rdk_tx_link_stats *link)
 {
 	struct wlan_tx_link_stats *tx_stats;
@@ -1321,6 +1368,7 @@ get_advance_sta_extended_tx_link_stats(void *buffer, uint32_t buffer_len,
 		return;
 
 	tx_stats = (struct wlan_tx_link_stats *)buffer;
+	link->is_lithium = IS_LITHIUM(peer_cookie);
 	link->num_ppdus = tx_stats->num_ppdus;
 	link->bytes = tx_stats->bytes;
 	link->phy_rate_actual_su = tx_stats->phy_rate_actual_su;
@@ -1331,12 +1379,14 @@ get_advance_sta_extended_tx_link_stats(void *buffer, uint32_t buffer_len,
 	link->bw.usage_max = tx_stats->bw.usage_max;
 	for (i = 0; i < STATS_IF_BW_USAGE_MAX_SIZE; i++)
 		link->bw.usage_counter[i] = tx_stats->bw.usage_counter[i];
+	get_advance_sta_punc_bw_tx_link_stats(tx_stats, link);
 	link->ack_rssi = tx_stats->ack_rssi;
 	link->pkt_error_rate = tx_stats->pkt_error_rate;
 }
 
 static void
 get_advance_sta_extended_rx_link_stats(void *buffer, uint32_t buffer_len,
+				       uint64_t peer_cookie,
 				       struct stats_if_rdk_rx_link_stats *link)
 {
 	struct wlan_rx_link_stats *rx_stats;
@@ -1346,6 +1396,7 @@ get_advance_sta_extended_rx_link_stats(void *buffer, uint32_t buffer_len,
 		return;
 
 	rx_stats = (struct wlan_rx_link_stats *)buffer;
+	link->is_lithium = IS_LITHIUM(peer_cookie);
 	link->num_ppdus = rx_stats->num_ppdus;
 	link->bytes = rx_stats->bytes;
 	link->phy_rate_actual_su = rx_stats->phy_rate_actual_su;
@@ -1356,6 +1407,7 @@ get_advance_sta_extended_rx_link_stats(void *buffer, uint32_t buffer_len,
 	link->bw.usage_max = rx_stats->bw.usage_max;
 	for (i = 0; i < STATS_IF_BW_USAGE_MAX_SIZE; i++)
 		link->bw.usage_counter[i] = rx_stats->bw.usage_counter[i];
+	get_advance_sta_punc_bw_rx_link_stats(rx_stats, link);
 	link->su_rssi = rx_stats->su_rssi;
 	link->pkt_error_rate = rx_stats->pkt_error_rate;
 }
@@ -1490,11 +1542,13 @@ static void parse_advance_sta_rdk(uint8_t *buf, size_t len, char *ifname)
 		break;
 	case DP_PEER_TX_LINK_STATS:
 		get_advance_sta_extended_tx_link_stats(buffer, buffer_len,
+						       peer_cookie,
 						       &data->rdk->tx_link);
 		stats_filled = true;
 		break;
 	case DP_PEER_RX_LINK_STATS:
 		get_advance_sta_extended_rx_link_stats(buffer, buffer_len,
+						       peer_cookie,
 						       &data->rdk->rx_link);
 		stats_filled = true;
 		break;
