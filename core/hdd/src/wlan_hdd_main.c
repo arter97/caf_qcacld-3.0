@@ -6021,7 +6021,8 @@ int hdd_vdev_create(struct hdd_adapter *adapter)
 
 		/* Max peer can be tdls peers + self peer + bss peer */
 		max_peer_count = cfg_tdls_get_max_peer_count(hdd_ctx->psoc);
-		max_peer_count += 2;
+		/* Add one temp peer for roaming */
+		max_peer_count += 3;
 		wlan_vdev_set_max_peer_count(vdev, max_peer_count);
 
 		ucfg_mlme_get_bigtk_support(hdd_ctx->psoc, &target_bigtk_support);
