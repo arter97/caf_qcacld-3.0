@@ -953,7 +953,6 @@ enum timer_yield_status {
 };
 
 #if DP_PRINT_ENABLE
-#include <stdarg.h>       /* va_list */
 #include <qdf_types.h> /* qdf_vprint */
 #include <cdp_txrx_handle.h>
 
