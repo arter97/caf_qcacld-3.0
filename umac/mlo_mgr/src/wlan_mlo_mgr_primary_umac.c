@@ -361,6 +361,9 @@ static void mlo_peer_calculate_avg_rssi(
 								 rssi);
 	}
 
+	if (!num_psocs)
+		return;
+
 	ml_peer->avg_link_rssi = total_rssi / num_psocs;
 }
 
