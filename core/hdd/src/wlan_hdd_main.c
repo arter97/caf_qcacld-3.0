@@ -81,6 +81,7 @@
 #include "wlan_hdd_p2p.h"
 #include <linux/rtnetlink.h>
 #include "sap_api.h"
+#include <sap_internal.h>
 #include <linux/semaphore.h>
 #include <linux/ctype.h>
 #include <linux/compat.h>
@@ -6413,6 +6414,64 @@ bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter)
 	return 0;
 }
 
+#define MAX_VDEV_RTT_PARAMS 2
+/* params being sent:
+ * wmi_vdev_param_enable_disable_rtt_responder_role
+ * wmi_vdev_param_enable_disable_rtt_initiator_role
+ */
+static QDF_STATUS
+hdd_vdev_configure_rtt_params(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	struct wlan_objmgr_psoc *psoc;
+	uint32_t fine_time_meas_cap = 0;
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	struct dev_set_param vdevsetparam[MAX_VDEV_RTT_PARAMS] = {};
+	uint8_t index = 0;
+	WMI_FW_SUB_FEAT_CAPS wmi_fw_rtt_respr, wmi_fw_rtt_initr;
+
+	switch (wlan_vdev_mlme_get_opmode(vdev)) {
+	case QDF_STA_MODE:
+		wmi_fw_rtt_respr = WMI_FW_STA_RTT_RESPR;
+		wmi_fw_rtt_initr = WMI_FW_STA_RTT_INITR;
+		break;
+	case QDF_SAP_MODE:
+		wmi_fw_rtt_respr = WMI_FW_AP_RTT_RESPR;
+		wmi_fw_rtt_initr = WMI_FW_AP_RTT_INITR;
+		break;
+	default:
+		return QDF_STATUS_SUCCESS;
+	}
+
+	psoc = wlan_vdev_get_psoc(vdev);
+
+	ucfg_mlme_get_fine_time_meas_cap(psoc, &fine_time_meas_cap);
+	status = mlme_check_index_setparam(
+			vdevsetparam,
+			wmi_vdev_param_enable_disable_rtt_responder_role,
+			(fine_time_meas_cap & wmi_fw_rtt_respr), index++,
+			MAX_VDEV_RTT_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = mlme_check_index_setparam(
+			vdevsetparam,
+			wmi_vdev_param_enable_disable_rtt_initiator_role,
+			(fine_time_meas_cap & wmi_fw_rtt_respr), index++,
+			MAX_VDEV_RTT_PARAMS);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	status = sme_send_multi_pdev_vdev_set_params(MLME_VDEV_SETPARAM,
+						     vdev_id, vdevsetparam,
+						     index);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("failed to set RTT_RESPONDER,INITIATOR params:%d",
+			status);
+
+	return status;
+}
+
 static void hdd_store_vdev_info(struct hdd_adapter *adapter,
 				struct wlan_objmgr_vdev *vdev)
 {
@@ -6643,11 +6702,6 @@ hdd_vdev_destroy_procedure:
 	return errno;
 }
 
-#define MAX_VDEV_RTT_PARAMS 2
-/* params being sent:
- * wmi_vdev_param_enable_disable_rtt_responder_role
- * wmi_vdev_param_enable_disable_rtt_initiator_role
- */
 QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
@@ -6655,10 +6709,8 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 	int ret_val;
 	mac_handle_t mac_handle;
 	uint8_t enable_sifs_burst = 0;
-	uint32_t fine_time_meas_cap = 0, roam_triggers;
+	uint32_t roam_triggers;
 	struct wlan_objmgr_vdev *vdev;
-	struct dev_set_param vdevsetparam[MAX_VDEV_RTT_PARAMS] = {};
-	uint8_t index = 0;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	mac_handle = hdd_ctx->mac_handle;
@@ -6711,30 +6763,10 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 		mlme_set_roam_trigger_bitmap(hdd_ctx->psoc,
 					     adapter->deflink->vdev_id,
 					     roam_triggers);
-		ucfg_mlme_get_fine_time_meas_cap(hdd_ctx->psoc,
-						 &fine_time_meas_cap);
-		status = mlme_check_index_setparam(vdevsetparam,
-			wmi_vdev_param_enable_disable_rtt_responder_role,
-			(fine_time_meas_cap & WMI_FW_STA_RTT_RESPR), index++,
-			MAX_VDEV_RTT_PARAMS);
+
+		status = hdd_vdev_configure_rtt_params(vdev);
 		if (QDF_IS_STATUS_ERROR(status))
 			goto error_wmm_init;
-
-		status = mlme_check_index_setparam(vdevsetparam,
-			wmi_vdev_param_enable_disable_rtt_initiator_role,
-			(fine_time_meas_cap & WMI_FW_STA_RTT_INITR), index++,
-			MAX_VDEV_RTT_PARAMS);
-		if (QDF_IS_STATUS_ERROR(status))
-			goto error_wmm_init;
-
-		status = sme_send_multi_pdev_vdev_set_params(
-						MLME_VDEV_SETPARAM,
-						adapter->deflink->vdev_id,
-						vdevsetparam, index);
-		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("failed to set RTT_RESPONDER,INITIATOR params:%d", status);
-			goto error_wmm_init;
-		}
 	}
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_INIT_DEINIT_ID);
@@ -13193,7 +13225,6 @@ int hdd_start_station_adapter(struct hdd_adapter *adapter)
 	return 0;
 }
 
-#define MAX_VDEV_AP_RTT_PARAMS 2
 /**
  * hdd_start_ap_adapter()- Start AP Adapter
  * @adapter: HDD adapter
@@ -13208,9 +13239,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	bool is_ssr = false;
 	int ret;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	uint32_t fine_time_meas_cap = 0;
-	struct dev_set_param setparam[MAX_VDEV_AP_RTT_PARAMS] = {};
-	uint8_t index = 0;
+	struct sap_context *sap_ctx;
 
 	hdd_enter();
 
@@ -13238,8 +13267,8 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 		goto sap_destroy_ctx;
 	}
 
-	status = sap_acquire_vdev_ref(hdd_ctx->psoc,
-				      WLAN_HDD_GET_SAP_CTX_PTR(adapter),
+	sap_ctx = WLAN_HDD_GET_SAP_CTX_PTR(adapter);
+	status = sap_acquire_vdev_ref(hdd_ctx->psoc, sap_ctx,
 				      adapter->deflink->vdev_id);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("Failed to get vdev ref for sap for session_id: %u",
@@ -13249,32 +13278,9 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	}
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
-		ucfg_mlme_get_fine_time_meas_cap(hdd_ctx->psoc,
-						 &fine_time_meas_cap);
-		ret = mlme_check_index_setparam(
-			setparam,
-			wmi_vdev_param_enable_disable_rtt_responder_role,
-			(fine_time_meas_cap & WMI_FW_STA_RTT_RESPR), index++,
-			MAX_VDEV_AP_RTT_PARAMS);
-		if (QDF_IS_STATUS_ERROR(ret)) {
-			hdd_err("failed at wmi_vdev_param_enable_disable_rtt_responder_role");
+		status = hdd_vdev_configure_rtt_params(sap_ctx->vdev);
+		if (QDF_IS_STATUS_ERROR(status))
 			goto sap_release_ref;
-		}
-		ret = mlme_check_index_setparam(
-			setparam,
-			wmi_vdev_param_enable_disable_rtt_initiator_role,
-			(fine_time_meas_cap & WMI_FW_STA_RTT_INITR), index++,
-			MAX_VDEV_AP_RTT_PARAMS);
-		if (QDF_IS_STATUS_ERROR(ret)) {
-			hdd_err("failed at wmi_vdev_param_enable_disable_rtt_initiator_role");
-			goto sap_release_ref;
-		}
-		ret = sme_send_multi_pdev_vdev_set_params(
-						MLME_VDEV_SETPARAM,
-						adapter->deflink->vdev_id,
-						setparam, index);
-		if (QDF_IS_STATUS_ERROR(ret))
-			hdd_err("failed to send vdev RTT set params");
 	}
 
 	status = hdd_init_ap_mode(adapter, is_ssr);
@@ -13296,7 +13302,7 @@ int hdd_start_ap_adapter(struct hdd_adapter *adapter)
 	return 0;
 
 sap_release_ref:
-	sap_release_vdev_ref(WLAN_HDD_GET_SAP_CTX_PTR(adapter));
+	sap_release_vdev_ref(sap_ctx);
 sap_vdev_destroy:
 	hdd_vdev_destroy(adapter);
 sap_destroy_ctx:
