@@ -6430,6 +6430,18 @@ static void hdd_store_vdev_info(struct hdd_adapter *adapter,
 	qdf_spin_unlock_bh(&adapter->deflink->vdev_lock);
 }
 
+static void hdd_init_station_context(struct hdd_adapter *adapter)
+{
+	struct hdd_station_ctx *sta_ctx;
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+
+	/* Set the default operation channel freq and auth type to open */
+	sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	sta_ctx->conn_info.chan_freq = hdd_ctx->config->operating_chan_freq;
+	sta_ctx->conn_info.auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
+	hdd_roam_profile_init(adapter);
+}
+
 static void hdd_vdev_set_ht_vht_ies(mac_handle_t mac_handle,
 				    struct wlan_objmgr_vdev *vdev)
 {
@@ -6638,7 +6650,6 @@ hdd_vdev_destroy_procedure:
  */
 QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 {
-	struct hdd_station_ctx *sta_ctx = &adapter->deflink->session.station;
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
 	int ret_val;
@@ -6657,14 +6668,8 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 		return QDF_STATUS_E_NULL_VALUE;
 
 	hdd_vdev_set_ht_vht_ies(mac_handle, vdev);
-	hdd_roam_profile_init(adapter);
+	hdd_init_station_context(adapter);
 	hdd_register_wext(adapter->dev);
-
-	/* Set the default operation channel freq*/
-	sta_ctx->conn_info.chan_freq = hdd_ctx->config->operating_chan_freq;
-
-	/* Make the default Auth Type as OPEN */
-	sta_ctx->conn_info.auth_type = eCSR_AUTH_TYPE_OPEN_SYSTEM;
 
 	status = ucfg_dp_init_txrx(vdev);
 	if (QDF_STATUS_SUCCESS != status) {
