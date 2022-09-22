@@ -28,6 +28,19 @@
 #include <wlan_cmn.h>
 #include "sme_api.h"
 
+#ifdef FEATURE_SET
+/**
+ * wlan_mlme_get_feature_info() - Get mlme features
+ * @psoc: psoc context
+ * @mlme_feature_set: MLME feature set info structure
+ *
+ * Return: None
+ */
+void wlan_mlme_get_feature_info(
+				struct wlan_objmgr_psoc *psoc,
+				struct wlan_mlme_features *mlme_feature_set);
+#endif
+
 /**
  * wlan_mlme_get_cfg_str() - Copy the uint8_t array for a particular CFG
  * @dst:       pointer to the destination buffer.
@@ -2347,6 +2360,29 @@ wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value);
  */
 QDF_STATUS
 wlan_mlme_set_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value);
+
+/**
+ * wlan_mlme_set_eml_params() - Set EML subfields in psoc mlme obj that
+ * are received from FW
+ * @psoc: psoc context
+ * @cap: psoc mac/phy capability ptr
+ *
+ * Return: none
+ */
+void
+wlan_mlme_set_eml_params(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_psoc_host_mac_phy_caps_ext2 *cap);
+
+/**
+ * wlan_mlme_get_eml_params() - Get EML subfields from psoc mlme obj
+ * @psoc: psoc context
+ * @cap: EML capability subfield ptr
+ *
+ * Return: none
+ */
+void
+wlan_mlme_get_eml_params(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_mlo_eml_cap *cap);
 #else
 static inline QDF_STATUS
 wlan_mlme_get_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool *value)
@@ -2359,6 +2395,18 @@ static inline QDF_STATUS
 wlan_mlme_set_emlsr_mode_enabled(struct wlan_objmgr_psoc *psoc, bool value)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+wlan_mlme_set_eml_params(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_psoc_host_mac_phy_caps_ext2 *cap)
+{
+}
+
+static inline void
+wlan_mlme_get_eml_params(struct wlan_objmgr_psoc *psoc,
+			 struct wlan_mlo_eml_cap *cap)
+{
 }
 #endif
 

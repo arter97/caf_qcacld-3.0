@@ -135,7 +135,14 @@ QDF_STATUS wma_find_vdev_id_by_addr(tp_wma_handle wma, uint8_t *addr,
 			*vdev_id = i;
 			return QDF_STATUS_SUCCESS;
 		}
+
+		if (qdf_is_macaddr_equal((struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev),
+					 (struct qdf_mac_addr *)addr) == true) {
+				*vdev_id = i;
+				return QDF_STATUS_SUCCESS;
+		}
 	}
+
 	return QDF_STATUS_E_FAILURE;
 }
 
@@ -3135,7 +3142,7 @@ QDF_STATUS wma_vdev_pre_start(uint8_t vdev_id, bool restart)
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_channel *des_chan;
 	QDF_STATUS status;
-	uint8_t btc_chain_mode;
+	enum coex_btc_chain_mode btc_chain_mode;
 	struct wlan_mlme_qos *qos_aggr;
 	uint8_t amsdu_val;
 

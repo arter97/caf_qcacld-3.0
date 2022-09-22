@@ -35,6 +35,8 @@
 #include "wlan_dp_txrx.h"
 #include "wlan_nlink_common.h"
 #include "wlan_pkt_capture_ucfg_api.h"
+#include <cdp_txrx_ctrl.h>
+#include <qdf_net_stats.h>
 
 void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
 			    struct qdf_mac_addr *cur_mac,
@@ -965,6 +967,7 @@ QDF_STATUS ucfg_dp_sta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef FEATURE_WLAN_TDLS
 QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 {
 	struct ol_txrx_ops txrx_ops;
@@ -1013,6 +1016,7 @@ QDF_STATUS ucfg_dp_tdlsta_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
 
 QDF_STATUS ucfg_dp_ocb_register_txrx_ops(struct wlan_objmgr_vdev *vdev)
 {
@@ -1296,8 +1300,8 @@ void ucfg_dp_inc_rx_pkt_stats(struct wlan_objmgr_vdev *vdev,
 	stats = &dp_intf->dp_stats.tx_rx_stats;
 
 	++stats->per_cpu[cpu_index].rx_packets;
-	QDF_NET_DEV_STATS_INC_RX_PKTS(&dp_intf->stats);
-	QDF_NET_DEV_STATS_RX_BYTES(&dp_intf->stats) += pkt_len;
+	qdf_net_stats_add_rx_pkts(&dp_intf->stats, 1);
+	qdf_net_stats_add_rx_bytes(&dp_intf->stats, pkt_len);
 
 	if (delivered)
 		++stats->per_cpu[cpu_index].rx_delivered;
@@ -1913,6 +1917,7 @@ void ucfg_dp_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 		cb_obj->os_if_dp_nud_stats_info;
 	dp_ctx->dp_ops.osif_dp_process_mic_error =
 		cb_obj->osif_dp_process_mic_error;
+	dp_ctx->dp_ops.link_monitoring_cb = cb_obj->link_monitoring_cb;
 	}
 
 void ucfg_dp_register_event_handler(struct wlan_objmgr_psoc *psoc,
@@ -2151,3 +2156,109 @@ ucfg_dp_softap_inspect_dhcp_packet(struct wlan_objmgr_vdev *vdev,
 
 	return dp_softap_inspect_dhcp_packet(dp_intf, nbuf, dir);
 }
+
+void
+dp_ucfg_enable_link_monitoring(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       uint32_t threshold)
+{
+	struct wlan_dp_intf *dp_intf;
+
+	dp_intf = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_intf)) {
+		dp_err("DP interface not found");
+		return;
+	}
+	dp_intf->link_monitoring.rx_linkspeed_threshold = threshold;
+	dp_intf->link_monitoring.enabled = true;
+}
+
+void
+dp_ucfg_disable_link_monitoring(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_dp_intf *dp_intf;
+
+	dp_intf = dp_get_vdev_priv_obj(vdev);
+	if (unlikely(!dp_intf)) {
+		dp_err("DP interface not found");
+		return;
+	}
+	dp_intf->link_monitoring.enabled = false;
+	dp_intf->link_monitoring.rx_linkspeed_threshold = 0;
+}
+
+#ifdef DP_TRAFFIC_END_INDICATION
+QDF_STATUS
+ucfg_dp_traffic_end_indication_get(struct wlan_objmgr_vdev *vdev,
+				   struct dp_traffic_end_indication *info)
+{
+	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	info->enabled = dp_intf->traffic_end_ind.enabled;
+	info->def_dscp = dp_intf->traffic_end_ind.def_dscp;
+	info->spl_dscp = dp_intf->traffic_end_ind.spl_dscp;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+ucfg_dp_traffic_end_indication_set(struct wlan_objmgr_vdev *vdev,
+				   struct dp_traffic_end_indication info)
+{
+	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+	cdp_config_param_type vdev_param;
+
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	dp_intf->traffic_end_ind = info;
+
+	dp_debug("enabled:%u default dscp:%u special dscp:%u",
+		 dp_intf->traffic_end_ind.enabled,
+		 dp_intf->traffic_end_ind.def_dscp,
+		 dp_intf->traffic_end_ind.spl_dscp);
+
+	vdev_param.cdp_vdev_param_traffic_end_ind = info.enabled;
+	if (cdp_txrx_set_vdev_param(cds_get_context(QDF_MODULE_ID_SOC),
+				    dp_intf->intf_id,
+				    CDP_ENABLE_TRAFFIC_END_INDICATION,
+				    vdev_param))
+		dp_err("Failed to set traffic end indication param on DP vdev");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void ucfg_dp_traffic_end_indication_update_dscp(struct wlan_objmgr_psoc *psoc,
+						uint8_t vdev_id,
+						unsigned char *dscp)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_dp_intf *dp_intf;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id, WLAN_DP_ID);
+	if (vdev) {
+		dp_intf = dp_get_vdev_priv_obj(vdev);
+
+		if (!dp_intf) {
+			dp_err("Unable to get DP interface");
+			goto end;
+		}
+
+		if (!dp_intf->traffic_end_ind.enabled)
+			goto end;
+
+		if (*dscp == dp_intf->traffic_end_ind.spl_dscp)
+			*dscp = dp_intf->traffic_end_ind.def_dscp;
+end:
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_DP_ID);
+	}
+}
+#endif

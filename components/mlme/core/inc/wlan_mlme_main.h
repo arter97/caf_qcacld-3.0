@@ -767,23 +767,6 @@ enum QDF_OPMODE wlan_get_opmode_from_vdev_id(struct wlan_objmgr_pdev *pdev,
 					     uint8_t vdev_id);
 
 /**
- * wlan_mlme_get_ssid_vdev_id() - get ssid
- * @pdev: pdev object
- * @vdev_id: vdev id
- * @ssid: SSID
- * @ssid_len: Length of SSID
- *
- * API to get the SSID of vdev id, it updates the SSID and its length
- * in @ssid, @ssid_len respectively
- *
- * Return: SUCCESS, if update is done
- *          FAILURE, if ssid length is > max ssid len
- */
-QDF_STATUS wlan_mlme_get_ssid_vdev_id(struct wlan_objmgr_pdev *pdev,
-				      uint8_t vdev_id,
-				      uint8_t *ssid, uint8_t *ssid_len);
-
-/**
  * wlan_mlme_get_bssid_vdev_id() - get bss peer mac address(BSSID) using vdev id
  * @pdev: pdev
  * @vdev_id: vdev_id
@@ -1229,4 +1212,14 @@ wlan_mlme_is_pmk_set_deferred(struct wlan_objmgr_psoc *psoc,
 	return false;
 }
 #endif
+
+#ifdef WLAN_FEATURE_SAE
+/**
+ * wlan_vdev_is_sae_auth_type() - is vdev SAE auth type
+ * @vdev: pointer to vdev
+ *
+ * Return: true if vdev is SAE auth type
+ */
+bool wlan_vdev_is_sae_auth_type(struct wlan_objmgr_vdev *vdev);
+#endif /* WLAN_FEATURE_SAE */
 #endif

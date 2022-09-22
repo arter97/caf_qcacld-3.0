@@ -3887,10 +3887,11 @@ bool policy_mgr_allow_same_mac_same_freq(struct wlan_objmgr_psoc *psoc,
 		 * and therefore a 3rd connection with the
 		 * same MAC is possible.
 		 */
-	} else if (policy_mgr_2_freq_always_on_same_mac(psoc, ch_freq,
-					pm_conc_connection_list[0].freq) &&
-		   !policy_mgr_is_3rd_conn_on_same_band_allowed(psoc, mode)) {
-			policy_mgr_rl_debug("don't allow 3rd home channel on same MAC – for sta+multi-AP");
+	} else if (policy_mgr_2_freq_always_on_same_mac(
+			psoc, ch_freq, pm_conc_connection_list[0].freq) &&
+		   !policy_mgr_is_3rd_conn_on_same_band_allowed(
+			psoc, mode, ch_freq)) {
+			policy_mgr_rl_debug("don't allow 3rd home channel on same MAC for sta+multi-AP");
 			allow = false;
 	}
 
@@ -4394,6 +4395,14 @@ void policy_mgr_check_scc_sbs_channel(struct wlan_objmgr_psoc *psoc,
 					   NULL, NULL)))
 		sbs_mlo_present = true;
 
+	if (pm_ctx->hdd_cbacks.wlan_get_sap_acs_band) {
+		status = pm_ctx->hdd_cbacks.wlan_get_sap_acs_band(psoc,
+								  vdev_id,
+								  &acs_band);
+		if (QDF_IS_STATUS_SUCCESS(status))
+			policy_mgr_debug("acs_band: %d", acs_band);
+	}
+
 	/*
 	 * Different band, this also mean that there is no other interface on
 	 * on same band as csr_check_concurrent_channel_overlap
@@ -4414,11 +4423,14 @@ void policy_mgr_check_scc_sbs_channel(struct wlan_objmgr_psoc *psoc,
 		sta_sap_scc_on_indoor_channel_allowed =
 			policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
 
-		if (sta_sap_scc_on_indoor_channel_allowed &&
+		if (sta_count &&
+		    sta_sap_scc_on_indoor_channel_allowed &&
 		    ((wlan_reg_is_freq_indoor(pm_ctx->pdev, sap_ch_freq) &&
 		    WLAN_REG_IS_24GHZ_CH_FREQ(*intf_ch_freq)) ||
 		    (wlan_reg_is_freq_indoor(pm_ctx->pdev, *intf_ch_freq) &&
-		     WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq)))) {
+		     WLAN_REG_IS_24GHZ_CH_FREQ(sap_ch_freq) &&
+		     !(acs_band == QCA_ACS_MODE_IEEE80211B ||
+		       acs_band == QCA_ACS_MODE_IEEE80211G)))) {
 			status = policy_mgr_get_sap_mandatory_channel(
 							psoc, sap_ch_freq,
 							intf_ch_freq, vdev_id);
@@ -4490,14 +4502,6 @@ sbs_check:
 	if (sap_ch_freq && !WLAN_REG_IS_6GHZ_CHAN_FREQ(sap_ch_freq) &&
 	    !policy_mgr_get_ap_6ghz_capable(psoc, vdev_id, NULL))
 		allow_6ghz = false;
-
-	if (pm_ctx->hdd_cbacks.wlan_get_sap_acs_band) {
-		status = pm_ctx->hdd_cbacks.wlan_get_sap_acs_band(psoc,
-								  vdev_id,
-								  &acs_band);
-		if (QDF_IS_STATUS_SUCCESS(status))
-			policy_mgr_debug("acs_band: %d", acs_band);
-	}
 
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
 	/*
