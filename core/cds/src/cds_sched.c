@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -40,6 +41,15 @@
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 #include <linux/sched/types.h>
 #endif
+#endif
+
+/*
+ * The following commit was introduced in v5.17:
+ * cead18552660 ("exit: Rename complete_and_exit to kthread_complete_and_exit")
+ * Use the old name for kernels before 5.17
+ */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
+#define kthread_complete_and_exit(c, s) complete_and_exit(c, s)
 #endif
 
 static spinlock_t ssr_protect_lock;
@@ -864,7 +874,7 @@ static int cds_ol_rx_thread(void *arg)
 	}
 
 	cds_debug("Exiting CDS OL rx thread");
-	complete_and_exit(&pSchedContext->ol_rx_shutdown, 0);
+	kthread_complete_and_exit(&pSchedContext->ol_rx_shutdown, 0);
 
 	return 0;
 }
