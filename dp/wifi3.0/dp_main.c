@@ -14130,6 +14130,7 @@ static struct cdp_sawf_ops dp_ops_sawf = {
 	.telemetry_get_throughput_stats = dp_sawf_get_tx_stats,
 	.telemetry_get_mpdu_stats = dp_sawf_get_mpdu_sched_stats,
 	.telemetry_get_drop_stats = dp_sawf_get_drop_stats,
+	.peer_config_ul = dp_sawf_peer_config_ul,
 #endif
 };
 #endif

@@ -1464,6 +1464,15 @@ struct ol_if_ops {
 				   uint32_t service_interval_ul, uint32_t burst_size_ul,
 				   uint8_t add_or_sub, uint8_t ac);
 #endif
+#ifdef CONFIG_SAWF
+	QDF_STATUS
+	(*peer_update_sawf_ul_params)(struct cdp_ctrl_objmgr_psoc *soc,
+				      uint8_t vdev_id, uint8_t *peer_mac,
+				      uint8_t tid, uint8_t ac,
+				      uint32_t service_interval,
+				      uint32_t burst_size,
+				      uint8_t add_sub);
+#endif
 	uint32_t (*dp_get_tx_inqueue)(ol_txrx_soc_handle soc);
 	QDF_STATUS(*dp_send_unit_test_cmd)(uint32_t vdev_id,
 					   uint32_t module_id,
@@ -2171,6 +2180,10 @@ struct cdp_sawf_ops {
 	(*telemetry_get_drop_stats)(void *arg, uint64_t *pass, uint64_t *drop,
 				    uint64_t *drop_ttl, uint8_t tid,
 				    uint8_t msduq);
+	QDF_STATUS
+	(*peer_config_ul)(struct cdp_soc_t *hdl, uint8_t *mac_addr, uint8_t tid,
+			  uint32_t service_interval, uint32_t burst_size,
+			  uint8_t add_or_sub);
 #endif
 };
 #endif
