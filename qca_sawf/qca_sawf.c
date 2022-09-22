@@ -28,6 +28,12 @@ uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 
 	return dp_sawf_get_msduq(netdev, peer_mac, service_id);
 }
+
+void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
+			uint8_t fw_service_id, uint8_t rv_service_id,
+			uint8_t add_or_sub)
+{
+}
 #else
 
 #include "qdf_module.h"
@@ -37,6 +43,12 @@ uint16_t qca_sawf_get_msduq(struct net_device *netdev, uint8_t *peer_mac,
 {
 	return DP_SAWF_PEER_Q_INVALID;
 }
+
+void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
+			uint8_t fw_service_id, uint8_t rv_service_id,
+			uint8_t add_or_sub)
+{}
 #endif
 
 qdf_export_symbol(qca_sawf_get_msduq);
+qdf_export_symbol(qca_sawf_config_ul);

@@ -20,4 +20,18 @@
 uint16_t qca_sawf_get_msduq(struct net_device *netdev,
 			    uint8_t *peer_mac, uint32_t service_id);
 
+/*
+ * qca_sawf_config_ul() - Set Uplink QoS parameters
+ *
+ * @dst_mac: Destination MAC address
+ * @src_mac: Source MAC address
+ * @fw_service_id: Service class ID in forward direction
+ * @rv_service_id: Service class ID in reverse direction
+ * @add_or_sub: Add or Sub param
+ *
+ * Return: void
+ */
+void qca_sawf_config_ul(uint8_t *dst_mac, uint8_t *src_mac,
+			uint8_t fw_service_id, uint8_t rv_service_id,
+			uint8_t add_or_sub);
 #endif
