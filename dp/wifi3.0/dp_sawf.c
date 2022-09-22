@@ -577,6 +577,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 				   uint8_t host_tid)
 {
 	struct dp_peer *peer;
+	struct dp_peer *primary_link_peer = NULL;
 	struct dp_peer_sawf *sawf_ctx;
 	struct dp_peer_sawf_stats *stats_ctx;
 	struct sawf_tx_stats *tx_stats;
@@ -608,6 +609,19 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 	if (!peer) {
 		dp_sawf_err("No peer for id %u", peer_id);
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (IS_MLO_DP_MLD_PEER(peer)) {
+		primary_link_peer = dp_get_primary_link_peer_by_id(
+						soc, peer->peer_id,
+						DP_MOD_ID_SAWF);
+		if (!primary_link_peer) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			qdf_warn("NULL peer");
+			return QDF_STATUS_E_FAILURE;
+		}
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		peer = primary_link_peer;
 	}
 
 	sawf_ctx = dp_peer_sawf_ctx_get(peer);
