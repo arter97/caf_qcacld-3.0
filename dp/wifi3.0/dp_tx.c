@@ -4751,6 +4751,26 @@ dp_tx_compute_hw_delay_us(struct hal_tx_completion_status *ts,
 	buffer_ts = ts->buffer_timestamp << 10;
 
 	delay = ts->tsf - buffer_ts - delta_tsf;
+
+	if (qdf_unlikely(delay & 0x80000000)) {
+		dp_err_rl("delay = 0x%x (-ve)\n"
+			  "release_src = %d\n"
+			  "ppdu_id = 0x%x\n"
+			  "peer_id = 0x%x\n"
+			  "tid = 0x%x\n"
+			  "release_reason = %d\n"
+			  "tsf = %u (0x%x)\n"
+			  "buffer_timestamp = %u (0x%x)\n"
+			  "delta_tsf = %u (0x%x)\n",
+			  delay, ts->release_src, ts->ppdu_id, ts->peer_id,
+			  ts->tid, ts->status, ts->tsf, ts->tsf,
+			  ts->buffer_timestamp, ts->buffer_timestamp,
+			  delta_tsf, delta_tsf);
+
+		delay = 0;
+		goto end;
+	}
+
 	delay &= 0x1FFFFFFF; /* mask 29 BITS */
 	if (delay > 0x1000000) {
 		dp_info_rl("----------------------\n"
@@ -4768,6 +4788,8 @@ dp_tx_compute_hw_delay_us(struct hal_tx_completion_status *ts,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+
+end:
 	*delay_us = delay;
 
 	return QDF_STATUS_SUCCESS;
