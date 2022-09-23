@@ -9795,7 +9795,7 @@ void dp_get_peer_basic_stats(struct dp_peer *peer,
 {
 	struct dp_txrx_peer *txrx_peer;
 
-	txrx_peer = peer->txrx_peer;
+	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer)
 		return;
 
@@ -9837,7 +9837,7 @@ void dp_get_peer_per_pkt_stats(struct dp_peer *peer,
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_peer_per_pkt_stats *per_pkt_stats;
 
-	txrx_peer = peer->txrx_peer;
+	txrx_peer = dp_get_txrx_peer(peer);
 	if (!txrx_peer)
 		return;
 
