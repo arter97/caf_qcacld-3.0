@@ -168,14 +168,18 @@ QDF_STATUS telemetry_sawf_update_delay(void *telemetry_ctx, uint8_t tid,
  * @telemetry_ctx: opaque telemetry peer ctx
  * @tid: tid no
  * @queue: queue-id
- * @sum_windows: sum of delay-stats for a windows
+ * @nwdelay_win_avg: average nwdelay-stats for windows
+ * @swdelay_win_avg: average swdelay-stats for windows
+ * @hwdelay_win_avg: average hwdelay-stats for windows
  *
  * Return: QDF_STATUS_SUCCESS on success
  */
 QDF_STATUS telemetry_sawf_update_delay_mvng(void *telemetry_ctx,
 					    uint8_t tid,
 					    uint8_t queue,
-					    uint64_t sum_windows);
+					    uint64_t nwdelay_win_avg,
+					    uint64_t swdelay_win_avg,
+					    uint64_t hwdelay_win_avg);
 
 /**
  * telemetry_sawf_update_msdu_drop - Update msdu-drop stats in
@@ -214,12 +218,17 @@ QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
  * @telemetry_ctx: opaque telemetry peer ctx
  * @tid: tid no
  * @queue: queue-id
- * @mov_avg: pointer to memory to fill moving-average stats
+ * @nwdelaymov_avg: pointer to nwdelay moving-avg data
+ * @swdelaymov_avg: pointer to swdelay moving-avg data
+ * @hwdelaymov_avg: pointer to hwdelay moving-avg data
+ *
  *
  * Return: QDF_STATUS_SUCCESS on success
  */
 QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
-				      uint8_t queue, uint32_t *mov_avg);
+				      uint8_t queue, uint32_t *nwdelaymov_avg,
+				      uint32_t *swdelaymov_avg,
+				      uint32_t *hwdelaymov_avg);
 #else
 #define wlan_telemetry_agent_application_init_notify(param)
 
@@ -320,7 +329,9 @@ static inline
 QDF_STATUS telemetry_sawf_update_delay_mvng(void *telemetry_ctx,
 					    uint8_t tid,
 					    uint8_t queue,
-					    uint64_t sum_windows)
+					    uint64_t nwdelay_win_avg,
+					    uint64_t swdelay_win_avg,
+					    uint64_t hwdelay_win_avg)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -345,7 +356,9 @@ QDF_STATUS telemetry_sawf_get_rate(void *telemetry_ctx, uint8_t tid,
 
 static inline
 QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
-				      uint8_t queue, uint32_t *mov_avg)
+				      uint8_t queue, uint32_t *nwdelay_mov_avg,
+				      uint32_t *swdelay_mov_avg,
+				      uint32_t *hwdelay_mov_avg)
 {
 	return QDF_STATUS_SUCCESS;
 }

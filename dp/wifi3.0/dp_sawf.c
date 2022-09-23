@@ -382,19 +382,18 @@ dp_peer_sawf_stats_ctx_get(struct dp_txrx_peer *txrx_peer)
 }
 
 static QDF_STATUS
-dp_sawf_compute_tx_delay(struct dp_tx_desc_s *tx_desc,
-			 uint32_t *delay)
+dp_sawf_compute_tx_delay_us(struct dp_tx_desc_s *tx_desc,
+			    uint32_t *delay)
 {
-	int64_t current_timestamp, timestamp_hw_enqueue;
+	int64_t wifi_entry_ts, timestamp_hw_enqueue;
 
-	timestamp_hw_enqueue = tx_desc->timestamp;
-	current_timestamp = qdf_ktime_to_ms(qdf_ktime_real_get());
+	timestamp_hw_enqueue = qdf_ktime_to_us(tx_desc->timestamp);
+	wifi_entry_ts = 1000 * qdf_nbuf_get_timestamp(tx_desc->nbuf);
 
 	if (timestamp_hw_enqueue == 0)
 		return QDF_STATUS_E_FAILURE;
 
-	*delay = (uint32_t)(current_timestamp -
-			    timestamp_hw_enqueue);
+	*delay = (uint32_t)(timestamp_hw_enqueue - wifi_entry_ts);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -446,10 +445,9 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 {
 	struct sawf_delay_stats *tx_delay;
 	struct wlan_sawf_scv_class_params *svclass_params;
-	uint32_t hw_delay;
 	uint8_t svc_id;
-	uint32_t num_pkt_win;
-	uint32_t win_avg;
+	uint32_t num_pkt_win, hw_delay, sw_delay;
+	uint64_t nwdelay_win_avg, swdelay_win_avg, hwdelay_win_avg;
 
 	if (QDF_IS_STATUS_ERROR(dp_sawf_compute_tx_hw_delay_us(soc, vdev, ts,
 							       &hw_delay))) {
@@ -461,17 +459,29 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 	dp_hist_update_stats(&tx_delay->delay_hist, hw_delay);
 
 	tx_delay->num_pkt++;
-	tx_delay->win_total += hw_delay;
+	tx_delay->hwdelay_win_total += hw_delay;
+
+	dp_sawf_compute_tx_delay_us(tx_desc, &sw_delay);
+	tx_delay->swdelay_win_total += sw_delay;
 
 	num_pkt_win = dp_sawf_get_mov_avg_num_pkt();
 	if (!(tx_delay->num_pkt % num_pkt_win)) {
-		win_avg = qdf_do_div(tx_delay->win_total, num_pkt_win);
+		nwdelay_win_avg = qdf_do_div(tx_delay->nwdelay_win_total,
+					     num_pkt_win);
+		swdelay_win_avg = qdf_do_div(tx_delay->swdelay_win_total,
+					     num_pkt_win);
+		hwdelay_win_avg = qdf_do_div(tx_delay->hwdelay_win_total,
+					     num_pkt_win);
 		/* Update the avg per window */
-		telemetry_sawf_update_delay_mvng(
-				sawf_ctx->telemetry_ctx,
-				tid, host_q_idx,
-				win_avg);
-		tx_delay->win_total = 0;
+		telemetry_sawf_update_delay_mvng(sawf_ctx->telemetry_ctx,
+						 tid, host_q_idx,
+						 nwdelay_win_avg,
+						 swdelay_win_avg,
+						 hwdelay_win_avg);
+
+		tx_delay->nwdelay_win_total = 0;
+		tx_delay->swdelay_win_total = 0;
+		tx_delay->hwdelay_win_total = 0;
 	}
 
 	svc_id = sawf_ctx->msduq[host_q_idx].svc_id;
@@ -485,7 +495,7 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 			tx_delay->failure++ : tx_delay->success++;
 
 		if (!(tx_delay->num_pkt % dp_sawf_get_sla_num_pkt())) {
-			/* Update the success/failre count */
+			/* Update the success/failure count */
 			telemetry_sawf_update_delay(sawf_ctx->telemetry_ctx,
 						    tid, host_q_idx,
 						    tx_delay->success,
@@ -852,8 +862,9 @@ dp_sawf_copy_delay_stats(struct sawf_delay_stats *dst,
 			 struct sawf_delay_stats *src)
 {
 	dp_copy_hist_stats(&src->delay_hist, &dst->delay_hist);
+	dst->nwdelay_avg = src->nwdelay_avg;
+	dst->swdelay_avg = src->swdelay_avg;
 	dst->hwdelay_avg = src->hwdelay_avg;
-	dst->success = src->success;
 	dst->failure = dst->failure;
 }
 
@@ -899,7 +910,7 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 	uint8_t tid, q_idx;
 	uint16_t host_q_id, host_q_idx;
 	QDF_STATUS status;
-	uint32_t mov_avg;
+	uint32_t nwdelay_avg, swdelay_avg, hwdelay_avg;
 
 	stats = (struct sawf_delay_stats *)data;
 	if (!stats) {
@@ -968,8 +979,11 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 				src = &stats_ctx->stats.delay[host_q_idx];
 				telemetry_sawf_get_mov_avg(
 						sawf_ctx->telemetry_ctx,
-						tid, host_q_idx, &mov_avg);
-				src->hwdelay_avg = mov_avg;
+						tid, host_q_idx, &nwdelay_avg,
+						&swdelay_avg, &hwdelay_avg);
+				src->nwdelay_avg = nwdelay_avg;
+				src->swdelay_avg = swdelay_avg;
+				src->hwdelay_avg = hwdelay_avg;
 
 				dp_sawf_print_stats("-- TID: %u MSDUQ: %u --",
 						    tid, q_idx);
@@ -1008,8 +1022,11 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 
 		src = &stats_ctx->stats.delay[host_q_idx];
 		telemetry_sawf_get_mov_avg(sawf_ctx->telemetry_ctx,
-					   tid, host_q_idx, &mov_avg);
-		src->hwdelay_avg = mov_avg;
+					   tid, host_q_idx, &nwdelay_avg,
+					   &swdelay_avg, &hwdelay_avg);
+		src->nwdelay_avg = nwdelay_avg;
+		src->swdelay_avg = swdelay_avg;
+		src->hwdelay_avg = hwdelay_avg;
 
 		dp_sawf_print_stats("----TID: %u MSDUQ: %u ----", tid, q_idx);
 		dp_sawf_dump_delay_stats(src);
