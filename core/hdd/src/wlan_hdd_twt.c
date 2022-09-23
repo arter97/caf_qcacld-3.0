@@ -38,6 +38,7 @@
 #include <wlan_mlme_twt_ucfg_api.h>
 
 #define TWT_DISABLE_COMPLETE_TIMEOUT 4000
+#define TWT_ENABLE_COMPLETE_TIMEOUT  4000
 
 #define TWT_FLOW_TYPE_ANNOUNCED 0
 #define TWT_FLOW_TYPE_UNANNOUNCED 1
@@ -300,6 +301,7 @@ int hdd_test_config_twt_setup_session(struct hdd_adapter *adapter,
 	uint32_t congestion_timeout = 0;
 	int ret = 0;
 	int cmd_id;
+	QDF_STATUS qdf_status;
 
 	if (adapter->device_mode != QDF_STA_MODE &&
 	    adapter->device_mode != QDF_P2P_CLIENT_MODE) {
@@ -343,8 +345,17 @@ int hdd_test_config_twt_setup_session(struct hdd_adapter *adapter,
 				hdd_err("Failed to disable TWT");
 				return ret;
 			}
+
 			ucfg_mlme_set_twt_congestion_timeout(adapter->hdd_ctx->psoc, 0);
-			hdd_send_twt_enable_cmd(adapter->hdd_ctx);
+
+			qdf_status = hdd_send_twt_requestor_enable_cmd(
+							adapter->hdd_ctx);
+
+			ret = qdf_status_to_os_return(qdf_status);
+			if (ret) {
+				hdd_err("Failed to Enable TWT");
+				return ret;
+			}
 		}
 
 		ret = qdf_status_to_os_return(sme_test_config_twt_setup(&params));
@@ -1361,8 +1372,15 @@ static int hdd_twt_setup_session(struct hdd_adapter *adapter,
 			hdd_err("Failed to disable TWT");
 			return ret;
 		}
+
 		ucfg_mlme_set_twt_congestion_timeout(adapter->hdd_ctx->psoc, 0);
-		hdd_send_twt_enable_cmd(adapter->hdd_ctx);
+
+		ret = qdf_status_to_os_return(
+			hdd_send_twt_requestor_enable_cmd(adapter->hdd_ctx));
+		if (ret) {
+			hdd_err("Failed to Enable TWT");
+			return ret;
+		}
 	}
 
 	if (ucfg_mlme_is_twt_setup_in_progress(adapter->hdd_ctx->psoc,
@@ -3120,29 +3138,29 @@ void hdd_update_tgt_twt_cap(struct hdd_context *hdd_ctx,
 					     cfg->twt_stats_enabled);
 }
 
-void hdd_send_twt_enable_cmd(struct hdd_context *hdd_ctx)
+QDF_STATUS hdd_send_twt_requestor_enable_cmd(struct hdd_context *hdd_ctx)
 {
 	uint8_t pdev_id = hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id;
 	struct twt_enable_disable_conf twt_en_dis = {0};
-	bool is_requestor_en;
-	bool is_responder_en;
 	bool twt_bcast_en;
+	bool is_requestor_en, twt_bcast_requestor = false;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
-	/* Get MLME TWT config */
 	ucfg_mlme_get_twt_requestor(hdd_ctx->psoc, &is_requestor_en);
-	ucfg_mlme_get_twt_responder(hdd_ctx->psoc, &is_responder_en);
-	ucfg_mlme_get_bcast_twt(hdd_ctx->psoc, &twt_en_dis.bcast_en);
+	ucfg_mlme_get_twt_bcast_requestor(hdd_ctx->psoc, &twt_bcast_requestor);
+	twt_en_dis.bcast_en = twt_bcast_requestor;
+
 	ucfg_mlme_get_twt_congestion_timeout(hdd_ctx->psoc,
 					     &twt_en_dis.congestion_timeout);
-	hdd_debug("TWT mlme cfg:req: %d, res:%d, bcast:%d, cong:%d, pdev:%d",
-		  is_requestor_en, is_responder_en, twt_en_dis.bcast_en,
-		   twt_en_dis.congestion_timeout, pdev_id);
+	hdd_debug("TWT mlme cfg:req: %d, bcast:%d, cong:%d, pdev:%d",
+		  is_requestor_en, twt_en_dis.bcast_en,
+		  twt_en_dis.congestion_timeout, pdev_id);
 
 	/* The below code takes care of the following :
-	 * If user wants to separately enable requestor and responder roles,
-	 * and also the broadcast TWT capaibilities separately for each role.
-	 * This is done by reusing the INI configuration to indicate the user
-	 * preference and sending the command accordingly.
+	 * If user wants to separately enable requestor role, and also the
+	 * broadcast TWT capabilities separately for each role. This is done
+	 * by reusing the INI configuration to indicate the user preference
+	 * and sending the command accordingly.
 	 * Legacy targets did not provide this. Newer targets provide this.
 	 *
 	 * 1. The MLME config holds the intersection of fw cap and user config
@@ -3163,8 +3181,50 @@ void hdd_send_twt_enable_cmd(struct hdd_context *hdd_ctx)
 		else
 			twt_en_dis.oper = WMI_TWT_OPERATION_INDIVIDUAL;
 
+		ucfg_mlme_set_twt_requestor_flag(hdd_ctx->psoc, true);
+		qdf_event_reset(&hdd_ctx->twt_enable_comp_evt);
 		wma_send_twt_enable_cmd(pdev_id, &twt_en_dis);
+		status = qdf_wait_single_event(&hdd_ctx->twt_enable_comp_evt,
+					       TWT_ENABLE_COMPLETE_TIMEOUT);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_warn("TWT Requestor Enable timedout");
+			ucfg_mlme_set_twt_requestor_flag(hdd_ctx->psoc, false);
+		}
 	}
+
+	return status;
+}
+
+QDF_STATUS hdd_send_twt_responder_enable_cmd(struct hdd_context *hdd_ctx)
+{
+	uint8_t pdev_id = hdd_ctx->pdev->pdev_objmgr.wlan_pdev_id;
+	struct twt_enable_disable_conf twt_en_dis = {0};
+	bool is_responder_en, twt_bcast_responder = false;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	bool twt_bcast_en;
+
+	ucfg_mlme_get_twt_responder(hdd_ctx->psoc, &is_responder_en);
+	ucfg_mlme_get_twt_bcast_responder(hdd_ctx->psoc, &twt_bcast_responder);
+	twt_en_dis.bcast_en = twt_bcast_responder;
+
+	hdd_debug("TWT responder mlme cfg:res:%d, bcast:%d, pdev:%d",
+		  is_responder_en, twt_en_dis.bcast_en, pdev_id);
+
+	/* The below code takes care of the following :
+	 * If user wants to separately enable responder roles, and also the
+	 * broadcast TWT capabilities separately for each role. This is done
+	 * by reusing the INI configuration to indicate the user preference
+	 * and sending the command accordingly.
+	 * Legacy targets did not provide this. Newer targets provide this.
+	 *
+	 * 1. The MLME config holds the intersection of fw cap and user config
+	 * 2. This may result in two enable commands sent for legacy, but
+	 *    that's fine, since the firmware returns harmlessly for the
+	 *    second command.
+	 * 3. The new two parameters in the enable command are ignored
+	 *    by legacy targets, and honored by new targets.
+	 */
 
 	/* If responder configured, send responder bcast/ucast config */
 	if (is_responder_en) {
@@ -3176,10 +3236,19 @@ void hdd_send_twt_enable_cmd(struct hdd_context *hdd_ctx)
 		else
 			twt_en_dis.oper = WMI_TWT_OPERATION_INDIVIDUAL;
 
+		ucfg_mlme_set_twt_responder_flag(hdd_ctx->psoc, true);
+		qdf_event_reset(&hdd_ctx->twt_enable_comp_evt);
 		wma_send_twt_enable_cmd(pdev_id, &twt_en_dis);
+		status = qdf_wait_single_event(&hdd_ctx->twt_enable_comp_evt,
+					       TWT_ENABLE_COMPLETE_TIMEOUT);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			hdd_warn("TWT Responder Enable timedout");
+			ucfg_mlme_set_twt_responder_flag(hdd_ctx->psoc, false);
+		}
 	}
 
-	return;
+	return status;
 }
 
 QDF_STATUS hdd_send_twt_disable_cmd(struct hdd_context *hdd_ctx)
@@ -3219,6 +3288,7 @@ hdd_twt_enable_comp_cb(hdd_handle_t hdd_handle,
 {
 	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
 	enum twt_status prev_state;
+	QDF_STATUS status;
 
 	prev_state = hdd_ctx->twt_state;
 	if (params->status == WMI_HOST_ENABLE_TWT_STATUS_OK ||
@@ -3234,6 +3304,7 @@ hdd_twt_enable_comp_cb(hdd_handle_t hdd_handle,
 			break;
 		}
 	}
+
 	if (params->status == WMI_HOST_ENABLE_TWT_INVALID_PARAM ||
 	    params->status == WMI_HOST_ENABLE_TWT_STATUS_UNKNOWN_ERROR)
 		hdd_ctx->twt_state = TWT_INIT;
@@ -3241,6 +3312,10 @@ hdd_twt_enable_comp_cb(hdd_handle_t hdd_handle,
 	hdd_debug("TWT: pdev ID:%d, status:%d State transitioned from %d to %d",
 		  params->pdev_id, params->status,
 		  prev_state, hdd_ctx->twt_state);
+
+	status = qdf_event_set(&hdd_ctx->twt_enable_comp_evt);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to set twt_enable_comp_evt");
 }
 
 /**
@@ -3338,6 +3413,13 @@ void wlan_hdd_twt_init(struct hdd_context *hdd_ctx)
 		return;
 	}
 
+	status = qdf_event_create(&hdd_ctx->twt_enable_comp_evt);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		sme_clear_twt_complete_cb(hdd_ctx->mac_handle);
+		hdd_err("twt_enable_comp_evt init failed");
+		return;
+	}
+
 	status = qdf_event_create(&hdd_ctx->twt_disable_comp_evt);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		sme_clear_twt_complete_cb(hdd_ctx->mac_handle);
@@ -3345,7 +3427,7 @@ void wlan_hdd_twt_init(struct hdd_context *hdd_ctx)
 		return;
 	}
 
-	hdd_send_twt_enable_cmd(hdd_ctx);
+	hdd_send_twt_requestor_enable_cmd(hdd_ctx);
 }
 
 void wlan_hdd_twt_deinit(struct hdd_context *hdd_ctx)
@@ -3355,6 +3437,10 @@ void wlan_hdd_twt_deinit(struct hdd_context *hdd_ctx)
 	status = qdf_event_destroy(&hdd_ctx->twt_disable_comp_evt);
 	if (QDF_IS_STATUS_ERROR(status))
 		hdd_err("Failed to destroy twt_disable_comp_evt");
+
+	status = qdf_event_destroy(&hdd_ctx->twt_enable_comp_evt);
+	if (QDF_IS_STATUS_ERROR(status))
+		hdd_err("Failed to destroy twt_enable_comp_evt");
 
 	status = sme_clear_twt_complete_cb(hdd_ctx->mac_handle);
 	if (QDF_IS_STATUS_ERROR(status))
