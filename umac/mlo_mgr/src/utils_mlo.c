@@ -2606,7 +2606,7 @@ QDF_STATUS util_gen_link_reqrsp_cmn(uint8_t *frame, qdf_size_t frame_len,
 		link_frame_hdr->i_fc[0] = MLO_LINKSPECIFIC_ASSOC_REQ_FC0;
 		link_frame_hdr->i_fc[1] = MLO_LINKSPECIFIC_ASSOC_REQ_FC1;
 	} else if (subtype == WLAN_FC0_STYPE_PROBE_RESP) {
-		qdf_mem_copy(link_frame_hdr->i_addr3, &link_addr,
+		qdf_mem_copy(link_frame_hdr->i_addr3, reportedmacaddr.bytes,
 			     QDF_MAC_ADDR_SIZE);
 		qdf_mem_copy(link_frame_hdr->i_addr2, reportedmacaddr.bytes,
 			     QDF_MAC_ADDR_SIZE);
@@ -2628,6 +2628,13 @@ QDF_STATUS util_gen_link_reqrsp_cmn(uint8_t *frame, qdf_size_t frame_len,
 		link_frame_hdr->i_fc[0] = MLO_LINKSPECIFIC_ASSOC_RESP_FC0;
 		link_frame_hdr->i_fc[1] = MLO_LINKSPECIFIC_ASSOC_RESP_FC1;
 	}
+
+	mlo_debug("subtype:%u addr3:" QDF_MAC_ADDR_FMT " addr2:"
+		  QDF_MAC_ADDR_FMT " addr1:" QDF_MAC_ADDR_FMT,
+		  subtype,
+		  QDF_MAC_ADDR_REF(link_frame_hdr->i_addr3),
+		  QDF_MAC_ADDR_REF(link_frame_hdr->i_addr2),
+		  QDF_MAC_ADDR_REF(link_frame_hdr->i_addr1));
 
 	/* Seq num not used so not populated */
 
