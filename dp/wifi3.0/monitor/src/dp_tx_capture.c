@@ -6587,10 +6587,11 @@ void dp_ppdu_desc_deliver_1_0(struct dp_pdev *pdev,
 
 		qdf_spin_lock_bh(&mon_pdev->tx_capture.ppdu_stats_lock);
 
-		if (qdf_unlikely(!mon_pdev->tx_capture_enabled &&
-				 (mon_pdev->tx_capture.ppdu_stats_queue_depth +
-				  mon_pdev->tx_capture.ppdu_stats_defer_queue_depth) >
-				 DP_TX_PPDU_PROC_MAX_DEPTH)) {
+		if (qdf_unlikely((!mon_pdev->tx_capture_enabled &&
+				  (mon_pdev->tx_capture.ppdu_stats_queue_depth +
+				   mon_pdev->tx_capture.ppdu_stats_defer_queue_depth) >
+				  DP_TX_PPDU_PROC_MAX_DEPTH) ||
+				 !ppdu_desc->num_users)) {
 			qdf_nbuf_free(s_ppdu_info->nbuf);
 			qdf_mem_free(s_ppdu_info);
 			mon_pdev->tx_capture.ppdu_dropped++;
