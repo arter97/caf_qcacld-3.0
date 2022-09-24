@@ -1269,17 +1269,6 @@ wlan_reg_get_2g_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
 							bw);
 }
 
-void wlan_reg_set_channel_params_for_freq(struct wlan_objmgr_pdev *pdev,
-					  qdf_freq_t freq,
-					  qdf_freq_t sec_ch_2g_freq,
-					  struct ch_params *ch_params)
-{
-	reg_set_channel_params_for_freq(pdev, freq, sec_ch_2g_freq, ch_params,
-					true);
-}
-
-qdf_export_symbol(wlan_reg_set_channel_params_for_freq);
-
 #ifdef CONFIG_REG_6G_PWRMODE
 void wlan_reg_set_channel_params_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 					     qdf_freq_t freq,

@@ -1693,21 +1693,6 @@ uint16_t wlan_reg_find_nearest_puncture_pattern(enum phy_ch_width bw,
 }
 #endif
 
-/**
- * wlan_reg_set_channel_params_for_freq() - Sets channel parameteres for
- * given bandwidth
- * @pdev: The physical dev to program country code or regdomain
- * @freq: channel center frequency.
- * @sec_ch_2g_freq: Secondary channel center frequency.
- * @ch_params: pointer to the channel parameters.
- *
- * Return: None
- */
-void wlan_reg_set_channel_params_for_freq(struct wlan_objmgr_pdev *pdev,
-					  qdf_freq_t freq,
-					  qdf_freq_t sec_ch_2g_freq,
-					  struct ch_params *ch_params);
-
 #ifdef CONFIG_REG_6G_PWRMODE
 /**
  * wlan_reg_set_channel_params_for_pwrmode() - Sets channel parameteres for
