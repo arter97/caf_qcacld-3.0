@@ -61,8 +61,8 @@ struct wifi_pos_req_msg;
 #define wifipos_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_WIFIPOS, params)
 
-#define OEM_APP_SIGNATURE_LEN      16
 #define OEM_APP_SIGNATURE_STR      "QUALCOMM-OEM-APP"
+#define OEM_APP_SIGNATURE_LEN      (sizeof(OEM_APP_SIGNATURE_STR) - 1)
 
 #ifndef OEM_DATA_RSP_SIZE
 #define OEM_DATA_RSP_SIZE 1724
