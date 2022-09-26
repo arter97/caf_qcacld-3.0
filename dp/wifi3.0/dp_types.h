@@ -1986,6 +1986,7 @@ struct dp_arch_ops {
 #ifdef IPA_OFFLOAD
 	int8_t (*ipa_get_bank_id)(struct dp_soc *soc);
 #endif
+	void (*dp_txrx_ppeds_rings_status)(struct dp_soc *soc);
 };
 
 /**

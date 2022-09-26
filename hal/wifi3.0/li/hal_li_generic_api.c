@@ -1022,7 +1022,9 @@ hal_rx_msdu_reo_dst_ind_get_li(hal_soc_handle_t hal_soc_hdl,
 
 static inline void
 hal_mpdu_desc_info_set_li(hal_soc_handle_t hal_soc_hdl,
-			  void *mpdu_desc, uint32_t seq_no)
+			  void *ent_desc,
+			  void *mpdu_desc,
+			  uint32_t seq_no)
 {
 	struct rx_mpdu_desc_info *mpdu_desc_info =
 			(struct rx_mpdu_desc_info *)mpdu_desc;

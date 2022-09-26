@@ -24,6 +24,7 @@
 #include "hal_tx.h"	//HAL_SET_FLD
 #include "hal_be_rx.h"	//HAL_RX_BUF_RBM_GET
 #include "rx_reo_queue_1k.h"
+#include "hal_be_rx_tlv.h"
 
 /*
  * The 4 bits REO destination ring value is defined as: 0: TCL
@@ -640,10 +641,16 @@ hal_msdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
 
 static inline void
 hal_mpdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
-			  void *mpdu_desc, uint32_t seq_no)
+			  void *ent_desc,
+			  void *mpdu_desc,
+			  uint32_t seq_no)
 {
 	struct rx_mpdu_desc_info *mpdu_desc_info =
 			(struct rx_mpdu_desc_info *)mpdu_desc;
+	uint8_t *desc = (uint8_t *)ent_desc;
+
+	HAL_RX_FLD_SET(desc, REO_ENTRANCE_RING,
+		       MPDU_SEQUENCE_NUMBER, seq_no);
 
 	HAL_RX_MPDU_DESC_INFO_SET(mpdu_desc_info,
 				  MSDU_COUNT, 0x1);
@@ -958,4 +965,10 @@ void hal_hw_txrx_default_ops_attach_be(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_register_reo_send_cmd = hal_register_reo_send_cmd_be;
 	hal_soc->ops->hal_reset_rx_reo_tid_q = hal_reset_rx_reo_tid_q_be;
 #endif
+	hal_soc->ops->hal_rx_tlv_get_pn_num = hal_rx_tlv_get_pn_num_be;
+	hal_soc->ops->hal_rx_get_qdesc_addr = hal_rx_get_qdesc_addr_be;
+	hal_soc->ops->hal_set_reo_ent_desc_reo_dest_ind =
+					hal_set_reo_ent_desc_reo_dest_ind_be;
+	hal_soc->ops->hal_get_reo_ent_desc_qdesc_addr =
+					hal_get_reo_ent_desc_qdesc_addr_be;
 }
