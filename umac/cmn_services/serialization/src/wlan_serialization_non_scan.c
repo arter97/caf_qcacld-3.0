@@ -736,3 +736,27 @@ wlan_ser_cancel_non_scan_cmd(
 
 	return status;
 }
+
+bool
+wlan_serialization_is_blocking_non_scan_cmd_waiting(
+				struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_serialization_pdev_queue *pdev_queue;
+	struct wlan_ser_pdev_obj *ser_pdev_obj;
+	bool blocking_cmd_active = 0;
+	uint8_t blocking_cmd_waiting = 0;
+
+	ser_pdev_obj = wlan_serialization_get_pdev_obj(pdev);
+
+	pdev_queue = wlan_serialization_get_pdev_queue_obj(
+					ser_pdev_obj,
+					WLAN_SER_CMD_NONSCAN);
+
+	blocking_cmd_active = pdev_queue->blocking_cmd_active;
+	blocking_cmd_waiting = pdev_queue->blocking_cmd_waiting;
+
+	if (blocking_cmd_active || blocking_cmd_waiting)
+		return true;
+
+	return false;
+}
