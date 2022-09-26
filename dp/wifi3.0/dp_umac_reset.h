@@ -124,6 +124,24 @@ struct umac_reset_rx_actions {
 };
 
 /**
+ * struct reset_ts - timestamps of for umac reset events for debug
+ * @pre_reset_start: Umac prereset start event timestamp
+ * @pre_reset_done: Umac prereset done timestamp
+ * @post_reset_start: Umac postreset start event timestamp
+ * @post_reset_done: Umac postreset done timestamp
+ * @post_reset_complete_start: Umac postreset complete event timestamp
+ * @post_reset_complete_done: Umac postreset complete done timestamp
+ */
+struct reset_ts {
+	uint64_t pre_reset_start;
+	uint64_t pre_reset_done;
+	uint64_t post_reset_start;
+	uint64_t post_reset_done;
+	uint64_t post_reset_complete_start;
+	uint64_t post_reset_complete_done;
+};
+
+/**
  * struct dp_soc_umac_reset_ctx - UMAC reset context at soc level
  * @shmem_paddr_unaligned: Physical address of the shared memory (unaligned)
  * @shmem_vaddr_unaligned: Virtual address of the shared memory (unaligned)
@@ -137,6 +155,7 @@ struct umac_reset_rx_actions {
  * @intr_ctx_bkp: DP Interrupts ring masks backup
  * @nbuf_list: skb list for delayed free
  * @skel_enable: Enable skeleton code for umac reset
+ * @ts: timestamps debug
  */
 struct dp_soc_umac_reset_ctx {
 	qdf_dma_addr_t shmem_paddr_unaligned;
@@ -151,6 +170,7 @@ struct dp_soc_umac_reset_ctx {
 	struct dp_intr_bkp *intr_ctx_bkp;
 	qdf_nbuf_t nbuf_list;
 	bool skel_enable;
+	struct reset_ts ts;
 };
 
 /**

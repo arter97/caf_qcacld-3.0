@@ -13518,6 +13518,16 @@ static QDF_STATUS dp_umac_reset_handle_post_reset_complete(struct dp_soc *soc)
 		nbuf_list = nbuf;
 	}
 
+	dp_umac_reset_info("Umac reset done on soc %pK\n prereset : %u us\n"
+			   "postreset : %u us \n postreset complete: %u us \n",
+			   soc,
+			   soc->umac_reset_ctx.ts.pre_reset_done -
+			   soc->umac_reset_ctx.ts.pre_reset_start,
+			   soc->umac_reset_ctx.ts.post_reset_done -
+			   soc->umac_reset_ctx.ts.post_reset_start,
+			   soc->umac_reset_ctx.ts.post_reset_complete_done -
+			   soc->umac_reset_ctx.ts.post_reset_complete_start);
+
 	return status;
 }
 #endif
