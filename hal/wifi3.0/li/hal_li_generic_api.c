@@ -229,24 +229,6 @@ static uint32_t hal_rx_msdu_start_msdu_len_get_li(uint8_t *buf)
 }
 
 /**
- * hal_rx_get_frame_ctrl_field(): Function to retrieve frame control field
- *
- * @nbuf: Network buffer
- * Returns: rx more fragment bit
- *
- */
-static uint16_t hal_rx_get_frame_ctrl_field_li(uint8_t *buf)
-{
-	struct rx_pkt_tlvs *pkt_tlvs = hal_rx_get_pkt_tlvs(buf);
-	struct rx_mpdu_info *rx_mpdu_info = hal_rx_get_mpdu_info(pkt_tlvs);
-	uint16_t frame_ctrl = 0;
-
-	frame_ctrl = HAL_RX_MPDU_GET_FRAME_CONTROL_FIELD(rx_mpdu_info);
-
-	return frame_ctrl;
-}
-
-/**
  * hal_rx_get_proto_params_li() - Get l4 proto values from TLV
  * @buf: rx tlv address
  * @proto_params: Buffer to store proto parameters
@@ -1204,8 +1186,6 @@ void hal_hw_txrx_default_ops_attach_li(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_tlv_msdu_done_get = hal_rx_attn_msdu_done_get_li;
 	hal_soc->ops->hal_rx_tlv_msdu_len_get =
 					hal_rx_msdu_start_msdu_len_get_li;
-	hal_soc->ops->hal_rx_get_frame_ctrl_field =
-						hal_rx_get_frame_ctrl_field_li;
 	hal_soc->ops->hal_rx_get_proto_params = hal_rx_get_proto_params_li;
 	hal_soc->ops->hal_rx_get_l3_l4_offsets = hal_rx_get_l3_l4_offsets_li;
 

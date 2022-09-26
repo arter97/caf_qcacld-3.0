@@ -2635,4 +2635,22 @@ hal_rx_fst_get_fse_size_li(void)
 	return 0;
 }
 #endif /* WLAN_SUPPORT_RX_FISA */
+
+/**
+ * hal_rx_get_frame_ctrl_field(): Function to retrieve frame control field
+ *
+ * @nbuf: Network buffer
+ * Returns: rx more fragment bit
+ *
+ */
+static uint16_t hal_rx_get_frame_ctrl_field_li(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = hal_rx_get_pkt_tlvs(buf);
+	struct rx_mpdu_info *rx_mpdu_info = hal_rx_get_mpdu_info(pkt_tlvs);
+	uint16_t frame_ctrl = 0;
+
+	frame_ctrl = HAL_RX_MPDU_GET_FRAME_CONTROL_FIELD(rx_mpdu_info);
+
+	return frame_ctrl;
+}
 #endif /* _HAL_LI_GENERIC_API_H_ */
