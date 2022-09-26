@@ -23,6 +23,16 @@
 #define _WLAN_VDEV_MLME_API_H_
 
 #include <wlan_ext_mlme_obj_types.h>
+
+/**
+ * wlan_mlme_peer_param_id - peer param id in mlme layer
+ * @WLAN_MLME_PEER_BW_PUNCTURE: update puncture 20 MHz bitmap
+ */
+enum wlan_mlme_peer_param_id {
+	WLAN_MLME_PEER_BW_PUNCTURE,
+	WLAN_MLME_PEER_MAX
+};
+
 /**
  * wlan_vdev_mlme_get_cmpt_obj - Retrieves MLME component object
  * from VDEV object

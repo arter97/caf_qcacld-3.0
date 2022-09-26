@@ -1110,6 +1110,36 @@ static void hal_rx_dump_pkt_tlvs_kiwi(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
+ * hal_rx_get_mpdu_flags_from_tlv() - Populate the local mpdu_flags elements
+ *				      from the rx tlvs
+ * @mpdu_info: buf address to rx_mpdu_info
+ *
+ * Return: mpdu_flags.
+ */
+static inline uint32_t
+hal_rx_get_mpdu_flags_from_tlv(struct rx_mpdu_info *mpdu_info)
+{
+	uint32_t mpdu_flags = 0;
+
+	if (mpdu_info->fragment_flag)
+		mpdu_flags |= HAL_MPDU_F_FRAGMENT;
+
+	if (mpdu_info->mpdu_retry)
+		mpdu_flags |= HAL_MPDU_F_RETRY_BIT;
+
+	if (mpdu_info->ampdu_flag)
+		mpdu_flags |= HAL_MPDU_F_AMPDU_FLAG;
+
+	if (mpdu_info->raw_mpdu)
+		mpdu_flags |= HAL_MPDU_F_RAW_AMPDU;
+
+	if (mpdu_info->mpdu_qos_control_valid)
+		mpdu_flags |= HAL_MPDU_F_QOS_CONTROL_VALID;
+
+	return mpdu_flags;
+}
+
+/**
  * hal_rx_tlv_populate_mpdu_desc_info_kiwi() - Populate the local mpdu_desc_info
  *			elements from the rx tlvs
  * @buf: start address of rx tlvs [Validated by caller]
@@ -1130,8 +1160,7 @@ hal_rx_tlv_populate_mpdu_desc_info_kiwi(uint8_t *buf,
 	struct rx_mpdu_info *mpdu_info = &mpdu_start->rx_mpdu_info_details;
 
 	mpdu_desc_info->mpdu_seq = mpdu_info->mpdu_sequence_number;
-	mpdu_desc_info->mpdu_flags = hal_rx_get_mpdu_flags((uint32_t *)
-							    mpdu_info);
+	mpdu_desc_info->mpdu_flags = hal_rx_get_mpdu_flags_from_tlv(mpdu_info);
 	mpdu_desc_info->peer_meta_data = mpdu_info->peer_meta_data;
 	mpdu_desc_info->bar_frame = mpdu_info->bar_frame;
 }

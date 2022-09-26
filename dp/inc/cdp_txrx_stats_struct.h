@@ -2650,6 +2650,7 @@ struct cdp_soc_stats {
 			uint32_t rx_hw_err_msdu_buf_rcved;
 			uint32_t rx_hw_err_msdu_buf_invalid_cookie;
 			uint32_t rx_hw_err_oor_drop;
+			uint32_t rx_hw_err_raw_mpdu_drop;
 			uint32_t rx_hw_err_oor_to_stack;
 			uint32_t rx_hw_err_oor_sg_count;
 			uint32_t msdu_count_mismatch;

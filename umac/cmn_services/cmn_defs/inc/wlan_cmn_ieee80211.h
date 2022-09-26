@@ -1940,11 +1940,17 @@ struct wlan_ml_probe_req {
  * determination should be changed.
  * @WLAN_ML_VARIANT_BASIC: Basic variant
  * @WLAN_ML_VARIANT_PROBEREQ: Probe Request variant
+ * @WLAN_ML_VARIANT_RECONFIG: Reconfiguration variant
+ * @WLAN_ML_VARIANT_TDLS: TDLS variant
+ * @WLAN_ML_VARIANT_PRIORITYACCESS: Priority Access variant
  * @WLAN_ML_VARIANT_INVALIDSTART: Start of invalid value range
  */
 enum wlan_ml_variant {
 	WLAN_ML_VARIANT_BASIC = 0,
 	WLAN_ML_VARIANT_PROBEREQ = 1,
+	WLAN_ML_VARIANT_RECONFIG = 2,
+	WLAN_ML_VARIANT_TDLS = 3,
+	WLAN_ML_VARIANT_PRIORITYACCESS = 4,
 	WLAN_ML_VARIANT_INVALIDSTART,
 };
 
@@ -2402,6 +2408,99 @@ struct wlan_ml_prv_linfo_perstaprof {
 	 WLAN_ML_PRV_CINFO_MLDID_SIZE)
 
 /* End of definitions related to Probe Request variant Multi-Link element. */
+
+/* Definitions related to Reconfiguration variant Multi-Link element (per
+ * IEEE802.11be D2.1.1)
+ */
+
+/* Definitions for bits in the Presence Bitmap subfield in Reconfiguration
+ * variant Multi-Link element Control field. Any unused bits are reserved.
+ */
+/* MLD MAC Address Present */
+#define WLAN_ML_RV_CTRL_PBM_MLDMACADDR_P               ((uint16_t)BIT(0))
+
+/* Definitions related to Reconfiguration variant Multi-Link element Common Info
+ * field.
+ */
+
+/* Size in octets of Common Info Length subfield of Common Info field in
+ * Reconfiguration variant Multi-Link element.
+ */
+#define WLAN_ML_RV_CINFO_LENGTH_SIZE                               1
+
+/* End of definitions related to Reconfiguration variant Multi-Link element
+ * Common Info field.
+ */
+
+/* Definitions related to Reconfiguration variant Multi-Link element Link Info
+ * field
+ */
+
+/**
+ * struct wlan_ml_rv_linfo_perstaprof - Fixed fields of Per-STA Profile
+ * subelement in Reconfiguration variant Multi-Link element Link Info field
+ * @subelem_id: Subelement ID
+ * @subelem_len: Subelement length
+ * @stacontrol: STA Control
+ */
+struct wlan_ml_rv_linfo_perstaprof {
+	uint8_t subelem_id;
+	uint8_t subelem_len;
+	uint16_t stacontrol;
+} qdf_packed;
+
+/* The above fixed fields may be followed by:
+ * STA Info (variable size)
+ */
+
+/* Size in octets of STA Control field of Per-STA Profile subelement in
+ * Reconfiguration variant Multi-Link element Link Info field.
+ */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_SIZE                   2
+
+/* Definitions for subfields in STA Control field of Per-STA Profile subelement
+ * in Reconfiguration variant Multi-Link element Link Info field. Any unused
+ * bits are reserved.
+ */
+/* Link ID */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX              0
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS             4
+/* Complete Profile */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_IDX           4
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_BITS          1
+/* MAC Address Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_MACADDRP_IDX            5
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_MACADDRP_BITS           1
+/* Delete Timer Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_DELTIMERP_IDX           6
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_DELTIMERP_BITS          1
+
+/* Definitions for subfields in STA Info field of Per-STA Profile subelement
+ * in Reconfiguration variant Multi-Link element Link Info field.
+ */
+
+/* STA Info Length */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE             1
+
+/* Size in octets of the Delete Timer subfield in STA info field of Per-STA
+ * Profile subelement in Reconfiguration variant Multi-Link element Link Info
+ * field.
+ */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_DELTIMER_SIZE           2
+
+/* Max value in octets of STA Info Length in STA Info field of Per-STA Profile
+ * subelement in Reconfiguration variant Multi-Link element Link Info field.
+ */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_MAX \
+	(WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE + \
+	 QDF_MAC_ADDR_SIZE + \
+	 WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_DELTIMER_SIZE)
+
+/* End of definitions related to Reconfiguration variant Multi-Link element Link
+ * Info field.
+ */
+
+/* End of definitions related to Reconfiguration variant Multi-Link element. */
 
 /*
  * Definitions related to MLO specific aspects of Reduced Neighbor Report

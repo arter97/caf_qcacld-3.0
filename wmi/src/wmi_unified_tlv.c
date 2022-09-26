@@ -1630,6 +1630,87 @@ static inline uint32_t convert_host_peer_param_id_to_target_id_tlv(
 }
 #endif
 
+/**
+ * wmi_host_chan_bw_to_target_chan_bw - convert wmi_host_channel_width to
+ *                                      wmi_channel_width
+ * @bw: wmi_host_channel_width channel width
+ *
+ * Return: wmi_channel_width
+ */
+static wmi_channel_width wmi_host_chan_bw_to_target_chan_bw(
+						wmi_host_channel_width bw)
+{
+	wmi_channel_width target_bw = WMI_CHAN_WIDTH_20;
+
+	switch (bw) {
+	case WMI_HOST_CHAN_WIDTH_20:
+		target_bw = WMI_CHAN_WIDTH_20;
+		break;
+	case WMI_HOST_CHAN_WIDTH_40:
+		target_bw = WMI_CHAN_WIDTH_40;
+		break;
+	case WMI_HOST_CHAN_WIDTH_80:
+		target_bw = WMI_CHAN_WIDTH_80;
+		break;
+	case WMI_HOST_CHAN_WIDTH_160:
+		target_bw = WMI_CHAN_WIDTH_160;
+		break;
+	case WMI_HOST_CHAN_WIDTH_80P80:
+		target_bw = WMI_CHAN_WIDTH_80P80;
+		break;
+	case WMI_HOST_CHAN_WIDTH_5:
+		target_bw = WMI_CHAN_WIDTH_5;
+		break;
+	case WMI_HOST_CHAN_WIDTH_10:
+		target_bw = WMI_CHAN_WIDTH_10;
+		break;
+	case WMI_HOST_CHAN_WIDTH_165:
+		target_bw = WMI_CHAN_WIDTH_165;
+		break;
+	case WMI_HOST_CHAN_WIDTH_160P160:
+		target_bw = WMI_CHAN_WIDTH_160P160;
+		break;
+	case WMI_HOST_CHAN_WIDTH_320:
+		target_bw = WMI_CHAN_WIDTH_320;
+		break;
+	default:
+		break;
+	}
+
+	return target_bw;
+}
+
+/**
+ * convert_host_peer_param_value_to_target_value_tlv() - convert host peer
+ *                                                       param value to target
+ * @param_id: target param id
+ * @param_value: host param value
+ *
+ * @Return: target param value
+ */
+static uint32_t convert_host_peer_param_value_to_target_value_tlv(
+				uint32_t param_id, uint32_t param_value)
+{
+	uint32_t fw_param_value = 0;
+	wmi_host_channel_width bw;
+	uint16_t punc;
+
+	switch (param_id) {
+	case WMI_PEER_CHWIDTH_PUNCTURE_20MHZ_BITMAP:
+		bw = QDF_GET_BITS(param_value, 0, 8);
+		punc = QDF_GET_BITS(param_value, 8, 16);
+		QDF_SET_BITS(fw_param_value, 0, 8,
+			     wmi_host_chan_bw_to_target_chan_bw(bw));
+		QDF_SET_BITS(fw_param_value, 8, 16, ~punc);
+		break;
+	default:
+		fw_param_value = param_value;
+		break;
+	}
+
+	return fw_param_value;
+}
+
 #ifdef WLAN_SUPPORT_PPEDS
 /**
  * peer_ppe_ds_param_send_tlv() - Set peer PPE DS config
@@ -1709,13 +1790,15 @@ static QDF_STATUS send_peer_param_cmd_tlv(wmi_unified_t wmi,
 	wmi_buf_t buf;
 	int32_t err;
 	uint32_t param_id;
+	uint32_t param_value;
 
 	param_id = convert_host_peer_param_id_to_target_id_tlv(param->param_id);
 	if (param_id == WMI_UNAVAILABLE_PARAM) {
 		wmi_err("Unavailable param %d", param->param_id);
 		return QDF_STATUS_E_NOSUPPORT;
 	}
-
+	param_value = convert_host_peer_param_value_to_target_value_tlv(
+						param_id, param->param_value);
 	buf = wmi_buf_alloc(wmi, sizeof(*cmd));
 	if (!buf)
 		return QDF_STATUS_E_NOMEM;
@@ -1728,7 +1811,7 @@ static QDF_STATUS send_peer_param_cmd_tlv(wmi_unified_t wmi,
 	cmd->vdev_id = param->vdev_id;
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(peer_addr, &cmd->peer_macaddr);
 	cmd->param_id = param_id;
-	cmd->param_value = param->param_value;
+	cmd->param_value = param_value;
 
 	wmi_debug("vdev_id %d peer_mac: "QDF_MAC_ADDR_FMT" param_id: %u param_value: %x",
 		 cmd->vdev_id,

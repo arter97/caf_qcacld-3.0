@@ -1217,6 +1217,8 @@ struct dp_soc_stats {
 			uint32_t reo_err_oor_to_stack;
 			/* REO OOR scattered msdu count */
 			uint32_t reo_err_oor_sg_count;
+			/* REO ERR RAW mpdu drops */
+			uint32_t reo_err_raw_mpdu_drop;
 			/* RX msdu rejected count on delivery to vdev stack_fn*/
 			uint32_t rejected;
 			/* Incorrect msdu count in MPDU desc info */

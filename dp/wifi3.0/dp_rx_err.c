@@ -1557,6 +1557,17 @@ more_msdu_link_desc:
 			goto process_next_msdu;
 		}
 
+		hal_rx_tlv_populate_mpdu_desc_info(soc->hal_soc,
+						   qdf_nbuf_data(head_nbuf),
+						   mpdu_desc_info);
+		if (qdf_unlikely(mpdu_desc_info->mpdu_flags &
+				 HAL_MPDU_F_RAW_AMPDU)) {
+			dp_err_rl("RAW ampdu in REO error not expected");
+			DP_STATS_INC(soc, rx.err.reo_err_raw_mpdu_drop, 1);
+			qdf_nbuf_list_free(head_nbuf);
+			goto process_next_msdu;
+		}
+
 		rx_tlv_hdr_first = qdf_nbuf_data(head_nbuf);
 		rx_tlv_hdr_last = qdf_nbuf_data(tail_nbuf);
 
