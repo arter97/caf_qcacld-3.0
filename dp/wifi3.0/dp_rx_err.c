@@ -1015,6 +1015,16 @@ dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
 	}
 	return false;
 }
+#else
+static inline bool
+dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
+					      uint8_t pool_id,
+					      uint8_t *rx_tlv_hdr,
+					      qdf_nbuf_t nbuf)
+{
+	return false;
+}
+#endif
 
 /**
  * dp_rx_check_pkt_len() - Check for pktlen validity
@@ -1035,24 +1045,6 @@ bool dp_rx_check_pkt_len(struct dp_soc *soc, uint32_t pkt_len)
 		return false;
 	}
 }
-
-#else
-static inline bool
-dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
-					      uint8_t pool_id,
-					      uint8_t *rx_tlv_hdr,
-					      qdf_nbuf_t nbuf)
-{
-	return false;
-}
-
-static inline
-bool dp_rx_check_pkt_len(struct dp_soc *soc, uint32_t pkt_len)
-{
-	return false;
-}
-
-#endif
 
 /*
  * dp_rx_deliver_to_osif_stack() - function to deliver rx pkts to stack
