@@ -181,7 +181,7 @@ static void wlan_crypto_free_key(struct wlan_crypto_comp_priv *crypto_priv)
 		return;
 	}
 
-	for (i = 0; i < WLAN_CRYPTO_MAXKEYIDX; i++) {
+	for (i = 0; i < WLAN_CRYPTO_MAX_VLANKEYIX; i++) {
 		if (crypto_priv->key[i]) {
 			qdf_mem_free(crypto_priv->key[i]);
 			crypto_priv->key[i] = NULL;
