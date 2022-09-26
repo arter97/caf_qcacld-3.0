@@ -77,6 +77,13 @@ typedef int (*wmi_legacy_service_ready_callback)(uint32_t event_id,
 						uint8_t *event_data,
 						uint32_t length);
 
+/* Enum for ext and ext2 processing status */
+enum wmi_init_status {
+	wmi_init_success,
+	wmi_init_ext_processing_failed,
+	wmi_init_ext2_processing_failed,
+};
+
 /**
  * struct target_if_ctx - target_interface context
  * @magic: magic for target if ctx
@@ -169,6 +176,7 @@ struct target_version_info {
  * @wmi_ready: is ready event received
  * @total_mac_phy_cnt: num of mac phys
  * @num_radios: number of radios
+ * @wmi_service_status: wmi service status success or failed
  * @wlan_init_status: Target init status
  * @target_type: Target type
  * @max_descs: Max descriptors
@@ -200,6 +208,7 @@ struct tgt_info {
 	bool wmi_ready;
 	uint8_t total_mac_phy_cnt;
 	uint8_t num_radios;
+	enum wmi_init_status wmi_service_status;
 	uint32_t wlan_init_status;
 	uint32_t target_type;
 	uint32_t max_descs;
