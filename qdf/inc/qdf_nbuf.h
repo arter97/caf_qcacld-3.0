@@ -374,7 +374,7 @@ struct mon_rx_status {
 	qdf_freq_t chan_freq;
 	uint16_t chan_num;
 	uint16_t chan_flags;
-	uint16_t ht_flags : 1,
+	uint32_t ht_flags : 1,
 		 vht_flags : 1,
 		 he_flags : 1,
 		 he_mu_flags : 1,
@@ -385,7 +385,7 @@ struct mon_rx_status {
 		 nss : 3,
 		 bw : 4,
 		 is_stbc : 1,
-		 sgi : 1,
+		 sgi : 2,
 		 he_re : 1,
 		 ldpc : 1,
 		 beamformed : 1,

@@ -527,8 +527,10 @@ mlo_prepare_and_send_connect(struct wlan_objmgr_vdev *vdev,
 
 	sta_ctx = mlo_dev_ctx->sta_ctx;
 
-	mlo_debug("Partner link connect mac:" QDF_MAC_ADDR_FMT " vdev_id:%d",
+	mlo_debug("Partner link connect mac:" QDF_MAC_ADDR_FMT
+		  " bssid:" QDF_MAC_ADDR_FMT " vdev_id:%d",
 		  QDF_MAC_ADDR_REF(wlan_vdev_mlme_get_macaddr(vdev)),
+		  QDF_MAC_ADDR_REF(link_info.link_addr.bytes),
 		  wlan_vdev_get_id(vdev));
 
 	qdf_mem_copy(&req, sta_ctx->copied_conn_req,
