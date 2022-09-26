@@ -2451,7 +2451,7 @@ TWT_CONV_INCS := -I$(WLAN_COMMON_INC)/umac \
 		 -I$(WLAN_ROOT)/components/target_if/twt/inc
 
 
-ifeq ($(CONFIG_WLAN_TWT_CONVERGED), y)
+ifeq ($(CONFIG_WLAN_FEATURE_TWT), y)
 TWT_CONV_OBJS := $(TWT_CONV_CMN_OSIF_SRC)/osif_twt_req.o \
 		 $(TWT_CONV_CMN_OSIF_SRC)/osif_twt_rsp.o \
 		 $(TWT_CONV_CMN_DISPATCHER_SRC)/wlan_twt_api.o \
