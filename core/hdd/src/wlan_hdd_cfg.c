@@ -3206,6 +3206,13 @@ struct reg_table_entry g_registry_table[] = {
 		     CFG_HOST_LOG_CUSTOM_NETLINK_PROTO_MAX),
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */
 
+	REG_VARIABLE(CFG_ENABLE_SIFS_BURST, WLAN_PARAM_Integer,
+				 struct hdd_config, enableSifsBurst,
+				 VAR_FLAGS_OPTIONAL | VAR_FLAGS_RANGE_CHECK_ASSUME_DEFAULT,
+				 CFG_ENABLE_SIFS_BURST_DEFAULT,
+				 CFG_ENABLE_SIFS_BURST_MIN,
+				 CFG_ENABLE_SIFS_BURST_MAX),
+
 #ifdef WLAN_FEATURE_LPSS
 	REG_VARIABLE(CFG_ENABLE_LPASS_SUPPORT, WLAN_PARAM_Integer,
 		     struct hdd_config, enable_lpass_support,
@@ -7452,6 +7459,9 @@ void hdd_cfg_print(struct hdd_context *hdd_ctx)
 	hdd_debug("Name = [isRoamOffloadEnabled] Value = [%u]",
 		  hdd_ctx->config->isRoamOffloadEnabled);
 #endif
+
+	hdd_debug("Name = [gEnableSifsBurst] Value = [%u]",
+				  hdd_ctx->config->enableSifsBurst);
 
 #ifdef WLAN_FEATURE_LPSS
 	hdd_debug("Name = [gEnableLpassSupport] Value = [%u] ",

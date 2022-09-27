@@ -8243,6 +8243,31 @@ enum hdd_link_speed_rpt_type {
 
 /*
  * <ini>
+ * gEnableSifsBurst - Enables Sifs Burst
+ * @Min: 0
+ * @Max: 3
+ * @Default: 0
+ *
+ * Sifs burst mode configuration
+ *     0) disabled
+ *     1) enabled, but disabled for legacy mode
+ *     3) enabled
+ *
+ * Related: None
+ *
+ * Supported Feature: STA
+ *
+ * Usage: Internal/External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SIFS_BURST                      "gEnableSifsBurst"
+#define CFG_ENABLE_SIFS_BURST_MIN                  (0)
+#define CFG_ENABLE_SIFS_BURST_MAX                  (3)
+#define CFG_ENABLE_SIFS_BURST_DEFAULT              (0)
+
+/*
+ * <ini>
  * host_log_custom_nl_proto - Host log netlink protocol
  * @Min: 0
  * @Max: 32
@@ -16791,6 +16816,8 @@ struct hdd_config {
 	bool wlan_logging_to_console;
 	uint8_t host_log_custom_nl_proto;
 #endif /* WLAN_LOGGING_SOCK_SVC_ENABLE */
+
+	uint8_t enableSifsBurst;
 
 #ifdef WLAN_FEATURE_LPSS
 	bool enable_lpass_support;
