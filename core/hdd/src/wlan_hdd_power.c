@@ -1189,10 +1189,10 @@ int wlan_hdd_ipv4_changed(struct notifier_block *nb,
  * CPU can enter CXPC mode.
  * The vote value is in microseconds.
  */
-#define HDD_CPU_CXPC_THRESHOLD (10000)
-static bool wlan_hdd_is_cpu_cxpc_allowed(unsigned long vote)
+static bool wlan_hdd_is_cpu_cxpc_allowed(struct hdd_context *hdd_ctx,
+					 unsigned long vote)
 {
-	if (vote >= HDD_CPU_CXPC_THRESHOLD)
+	if (vote >= hdd_ctx->config->cpu_cxpc_threshold)
 		return true;
 	else
 		return false;
@@ -1224,11 +1224,11 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 
 	if (!hdd_ctx->runtime_pm_prevented &&
 	    is_any_sta_connected &&
-	    !wlan_hdd_is_cpu_cxpc_allowed(curr_val)) {
+	    !wlan_hdd_is_cpu_cxpc_allowed(hdd_ctx, curr_val)) {
 		hif_rtpm_get(HIF_RTPM_GET_NORESUME, HIF_RTPM_ID_PM_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = true;
 	} else if (hdd_ctx->runtime_pm_prevented &&
-		   wlan_hdd_is_cpu_cxpc_allowed(curr_val)) {
+		   wlan_hdd_is_cpu_cxpc_allowed(hdd_ctx, curr_val)) {
 		hif_rtpm_put(HIF_RTPM_PUT_NOIDLE, HIF_RTPM_ID_PM_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = false;
 	}
@@ -1258,7 +1258,7 @@ bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 	curr_val_ns = cpuidle_governor_latency_req(max_cpu_num);
 	curr_val_us = curr_val_ns / NSEC_PER_USEC;
 	hdd_debug("PM QoS current value: %lld", curr_val_us);
-	if (!wlan_hdd_is_cpu_cxpc_allowed(curr_val_us))
+	if (!wlan_hdd_is_cpu_cxpc_allowed(hdd_ctx, curr_val_us))
 		return true;
 	else
 		return false;
@@ -2353,9 +2353,8 @@ exit_with_code:
 static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	qdf_runtime_lock_t *suspend_lock;
 	int errno;
-
-	qdf_rtpm_put(QDF_RTPM_PUT, QDF_RTPM_ID_WIPHY_SUSPEND);
 
 	if (!hdd_ctx) {
 		hdd_err_rl("hdd context is null");
@@ -2372,6 +2371,10 @@ static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	if (errno)
 		return errno;
 
+	suspend_lock = &hdd_ctx->runtime_context.system_suspend;
+	errno = qdf_runtime_pm_allow_suspend(suspend_lock);
+	if (errno)
+		return errno;
 
 	errno = __wlan_hdd_cfg80211_resume_wlan(wiphy);
 
@@ -2689,6 +2692,7 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 {
 	void *hif_ctx;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	qdf_runtime_lock_t *suspend_lock;
 	int errno;
 
 	if (!hdd_ctx) {
@@ -2714,13 +2718,14 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	if (!hif_ctx)
 		return -EINVAL;
 
-	errno = qdf_rtpm_get(QDF_RTPM_GET_SYNC, QDF_RTPM_ID_WIPHY_SUSPEND);
+	suspend_lock = &hdd_ctx->runtime_context.system_suspend;
+	errno = qdf_runtime_pm_prevent_suspend_sync(suspend_lock);
 	if (errno)
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_suspend_wlan(wiphy, wow);
 	if (errno) {
-		qdf_rtpm_put(QDF_RTPM_PUT, QDF_RTPM_ID_WIPHY_SUSPEND);
+		qdf_runtime_pm_allow_suspend(suspend_lock);
 		return errno;
 	}
 
@@ -2803,6 +2808,63 @@ static void hdd_start_dhcp_ind(struct hdd_adapter *adapter)
 			   adapter->vdev_id);
 }
 
+static int wlan_hdd_set_ps(struct wlan_objmgr_psoc *psoc,
+			   struct hdd_adapter *adapter,
+			   bool allow_power_save, int timeout)
+{
+	int status;
+
+	ucfg_mlme_set_user_ps(psoc, adapter->vdev_id,
+			      allow_power_save);
+
+	status = wlan_hdd_set_powersave(adapter, allow_power_save, timeout);
+
+	if (!hdd_cm_is_vdev_associated(adapter)) {
+		hdd_debug("vdev[%d] mode %d disconnected ignore dhcp protection",
+			  adapter->vdev_id, adapter->device_mode);
+		return status;
+	}
+
+	hdd_debug("vdev[%d] mode %d enable dhcp protection",
+		  adapter->vdev_id, adapter->device_mode);
+	allow_power_save ? hdd_stop_dhcp_ind(adapter) :
+			   hdd_start_dhcp_ind(adapter);
+
+	return status;
+}
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+static int wlan_hdd_set_mlo_ps(struct wlan_objmgr_psoc *psoc,
+			       struct hdd_adapter *adapter,
+			       bool allow_power_save, int timeout)
+{
+	struct hdd_adapter *link_adapter;
+	struct hdd_mlo_adapter_info *mlo_adapter_info;
+	int i, status;
+
+	mlo_adapter_info = &adapter->mlo_adapter_info;
+	for (i = 0; i < WLAN_MAX_MLD; i++) {
+		link_adapter = mlo_adapter_info->link_adapter[i];
+		if (!link_adapter)
+			continue;
+
+		status = wlan_hdd_set_ps(psoc, link_adapter, allow_power_save,
+					 timeout);
+		if (status)
+			return status;
+	}
+
+	return status;
+}
+#else
+static int wlan_hdd_set_mlo_ps(struct wlan_objmgr_psoc *psoc,
+			       struct hdd_adapter *adapter,
+			       bool allow_power_save, int timeout)
+{
+	return 0;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_set_power_mgmt() - set cfg80211 power management config
  * @wiphy: Pointer to wiphy
@@ -2820,6 +2882,8 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
 	int status;
+	struct wlan_objmgr_vdev *vdev;
+	bool is_mlo_vdev;
 
 	hdd_enter();
 
@@ -2852,21 +2916,26 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 		return 0;
 	}
 
-	ucfg_mlme_set_user_ps(hdd_ctx->psoc, adapter->vdev_id,
-			      allow_power_save);
-
-	status = wlan_hdd_set_powersave(adapter, allow_power_save, timeout);
-
-	if (hdd_cm_is_vdev_associated(adapter)) {
-		hdd_debug("vdev mode %d enable dhcp protection",
-			  adapter->device_mode);
-		allow_power_save ? hdd_stop_dhcp_ind(adapter) :
-			hdd_start_dhcp_ind(adapter);
-	} else {
-		hdd_debug("vdev mod %d disconnected ignore dhcp protection",
-			  adapter->device_mode);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_info("vdev is NULL");
+		return -EINVAL;
 	}
 
+	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+
+	if (is_mlo_vdev) {
+		status = wlan_hdd_set_mlo_ps(hdd_ctx->psoc, adapter,
+					     allow_power_save, timeout);
+		goto exit;
+	}
+
+	status = wlan_hdd_set_ps(hdd_ctx->psoc, adapter,
+				 allow_power_save, timeout);
+
+exit:
 	hdd_exit();
 	return status;
 }

@@ -3701,6 +3701,15 @@ cm_roam_switch_to_rso_stop(struct wlan_objmgr_pdev *pdev,
 	switch (cur_state) {
 	case WLAN_ROAM_RSO_ENABLED:
 	case WLAN_ROAMING_IN_PROG:
+		/*
+		 * Set the roam state to RSO_STOPPED for RSO_ENABLED
+		 * and ROAMING_IN_PROGRESS. cm_roam_stop_req() has a check
+		 * for ROAM_SYNC_IN_PROGRESS and return.
+		 * This is moved here i.e. before calling cm_roam_stop_req()
+		 * as the state may get modified from another thread while
+		 * cm_roam_stop_req is sending commands to firmware.
+		 */
+		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_STOPPED);
 	case WLAN_ROAM_SYNCH_IN_PROG:
 		status = cm_roam_stop_req(psoc, vdev_id, reason,
 					  send_resp, start_timer);
@@ -3721,6 +3730,11 @@ cm_roam_switch_to_rso_stop(struct wlan_objmgr_pdev *pdev,
 
 		return QDF_STATUS_SUCCESS;
 	}
+	/*
+	 * This shall make sure the state is set to STOPPED in
+	 * ROAM_SYNC_IN_PROGRESS state also.
+	 * No harm in setting the state again to STOPPED in other cases.
+	 */
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_STOPPED);
 
 	return QDF_STATUS_SUCCESS;
@@ -4885,6 +4899,7 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 {
 	struct rso_config *rso_cfg;
 	struct rso_cfg_params *cfg_params;
+	uint32_t current_band = REG_BAND_MASK_ALL;
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (!rso_cfg)
@@ -4919,6 +4934,8 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
 	cfg_params->roam_scan_period_after_inactivity =
 			mlme_obj->cfg.lfr.roam_scan_period_after_inactivity;
+	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
+	rso_cfg->roam_band_bitmask = current_band;
 }
 
 QDF_STATUS cm_roam_control_restore_default_config(struct wlan_objmgr_pdev *pdev,
@@ -5381,10 +5398,12 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	 */
 	cm_store_sae_single_pmk_to_global_cache(psoc, pdev, vdev);
 
-	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
+	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id)) {
+		wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_ENABLED,
 					  REASON_CTX_INIT);
+	}
 }
 
 void cm_roam_start_init_on_connect(struct wlan_objmgr_pdev *pdev,
@@ -6622,7 +6641,8 @@ cm_roam_btm_candidate_event(struct wmi_btm_req_candidate_info *btm_data,
 
 QDF_STATUS
 cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
-		      uint8_t vdev_id)
+		      struct wmi_roam_trigger_info *trigger_info,
+		      uint8_t vdev_id, bool is_wtc)
 {
 	uint8_t i;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -6650,6 +6670,10 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 	wlan_diag_event.cand_lst_cnt = btm_data->candidate_list_count;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
+
+	if (is_wtc)
+		cm_roam_wtc_btm_event(trigger_info, NULL, vdev_id, true);
+
 	for (i = 0; i < btm_data->candidate_list_count; i++)
 		cm_roam_btm_candidate_event(&btm_data->btm_cand[i], vdev_id, i);
 
@@ -6676,7 +6700,8 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 	wlan_diag_event.sn = frame_data->seq_num;
 	wlan_diag_event.auth_algo = frame_data->auth_algo;
 	wlan_diag_event.rssi = (-1) * frame_data->rssi;
-	wlan_diag_event.tx_status = frame_data->tx_status;
+	wlan_diag_event.tx_status =
+				wlan_get_diag_tx_status(frame_data->tx_status);
 	wlan_diag_event.status = frame_data->status_code;
 	wlan_diag_event.assoc_id = frame_data->assoc_id;
 
@@ -6893,7 +6918,8 @@ cm_roam_btm_candidate_event(struct wmi_btm_req_candidate_info *btm_data,
 
 QDF_STATUS
 cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
-		      uint8_t vdev_id)
+		      struct wmi_roam_trigger_info *trigger_info,
+		      uint8_t vdev_id, bool is_wtc)
 {
 	struct wlan_log_record *log_record = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -6924,6 +6950,10 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 				btm_data->candidate_list_count;
 
 	status = wlan_connectivity_log_enqueue(log_record);
+
+	if (is_wtc)
+		cm_roam_wtc_btm_event(trigger_info, NULL, vdev_id, true);
+
 	for (i = 0; i < log_record->btm_info.candidate_list_count; i++)
 		cm_roam_btm_candidate_event(&btm_data->btm_cand[i], vdev_id, i);
 

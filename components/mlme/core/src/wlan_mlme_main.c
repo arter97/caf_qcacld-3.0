@@ -1447,6 +1447,21 @@ static bool is_sae_sap_enabled(struct wlan_objmgr_psoc *psoc)
 {
 	return cfg_get(psoc, CFG_IS_SAP_SAE_ENABLED);
 }
+
+bool wlan_vdev_is_sae_auth_type(struct wlan_objmgr_vdev *vdev)
+{
+	int32_t auth_mode;
+
+	auth_mode = wlan_crypto_get_param(vdev, WLAN_CRYPTO_PARAM_AUTH_MODE);
+
+	if (auth_mode == -1)
+		return false;
+
+	if (QDF_HAS_PARAM(auth_mode, WLAN_CRYPTO_AUTH_SAE))
+		return true;
+
+	return false;
+}
 #else
 static bool is_sae_sap_enabled(struct wlan_objmgr_psoc *psoc)
 {
@@ -1679,6 +1694,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SUPPORT_LINK_NUM);
 	sta->mlo_support_link_band =
 		cfg_default(CFG_MLO_SUPPORT_LINK_BAND);
+	sta->mlo_max_simultaneous_links =
+		cfg_default(CFG_MLO_MAX_SIMULTANEOUS_LINKS);
 }
 #else
 static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2084,7 +2101,7 @@ static void mlme_init_lfr_cfg(struct wlan_objmgr_psoc *psoc,
 	lfr->neighbor_scan_max_chan_time =
 		cfg_get(psoc, CFG_LFR_NEIGHBOR_SCAN_MAX_CHAN_TIME);
 	lfr->passive_max_channel_time =
-		cfg_get(psoc, CFG_PASSIVE_MAX_CHANNEL_TIME);
+		cfg_get(psoc, CFG_ROAM_PASSIVE_MAX_CHANNEL_TIME);
 	lfr->neighbor_scan_results_refresh_period =
 		cfg_get(psoc, CFG_LFR_NEIGHBOR_SCAN_RESULTS_REFRESH_PERIOD);
 
@@ -3260,29 +3277,6 @@ enum QDF_OPMODE wlan_get_opmode_from_vdev_id(struct wlan_objmgr_pdev *pdev,
 	return opmode;
 }
 
-QDF_STATUS wlan_mlme_get_ssid_vdev_id(struct wlan_objmgr_pdev *pdev,
-				      uint8_t vdev_id,
-				      uint8_t *ssid, uint8_t *ssid_len)
-{
-	struct wlan_objmgr_vdev *vdev;
-	QDF_STATUS status;
-
-	*ssid_len = 0;
-
-	if (!pdev)
-		return QDF_STATUS_E_INVAL;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
-						    WLAN_LEGACY_MAC_ID);
-	if (!vdev)
-		return QDF_STATUS_E_INVAL;
-
-	status = wlan_vdev_mlme_get_ssid(vdev, ssid, ssid_len);
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
-
-	return status;
-}
-
 QDF_STATUS wlan_mlme_get_bssid_vdev_id(struct wlan_objmgr_pdev *pdev,
 				       uint8_t vdev_id,
 				       struct qdf_mac_addr *bss_peer_mac)
@@ -4121,3 +4115,50 @@ wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 	mlme_priv->mlme_ap.user_config_sap_ch_freq = freq;
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef CONFIG_BAND_6GHZ
+bool
+wlan_get_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid opmode %d", opmode);
+		return false;
+	}
+
+	return mlme_priv->mlme_ap.update_required_scc_sta_power;
+}
+
+QDF_STATUS
+wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid mode %d", opmode);
+		QDF_ASSERT(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->mlme_ap.update_required_scc_sta_power = value;
+	mlme_debug("Set change scc power as %d", value);
+	return QDF_STATUS_SUCCESS;
+}
+#endif

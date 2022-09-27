@@ -204,6 +204,12 @@ struct hdd_config {
 	uint32_t sta_stats_cache_expiry_time;
 #endif
 	bool read_mac_addr_from_mac_file;
+#ifdef FEATURE_SET
+	bool get_wifi_features;
+#endif
+#ifdef FEATURE_RUNTIME_PM
+	uint16_t cpu_cxpc_threshold;
+#endif
 };
 
 /**

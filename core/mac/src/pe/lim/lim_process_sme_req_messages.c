@@ -3695,7 +3695,7 @@ lim_is_rsnxe_cap_set(struct mac_context *mac_ctx,
 	 * TODO: If spec supports more than this range in future, this needs to
 	 * be an array to hold the complete bitmap/bitmask.
 	 */
-	cap_mask = ~(WLAN_CRYPTO_RSNX_CAP_SAE_H2E |
+	cap_mask = ~(0xF | WLAN_CRYPTO_RSNX_CAP_SAE_H2E |
 		     WLAN_CRYPTO_RSNX_CAP_SAE_PK |
 		     WLAN_CRYPTO_RSNX_CAP_SECURE_LTF |
 		     WLAN_CRYPTO_RSNX_CAP_SECURE_RTT |
@@ -3772,6 +3772,26 @@ lim_strip_rsnx_ie(struct mac_context *mac_ctx,
 	}
 }
 
+void
+lim_update_connect_rsn_ie(struct pe_session *session,
+			  uint8_t *rsn_ie_buf, struct wlan_crypto_pmksa *pmksa)
+{
+	uint8_t *rsn_ie_end;
+	uint16_t rsn_ie_len = 0;
+
+	rsn_ie_end = wlan_crypto_build_rsnie_with_pmksa(session->vdev,
+							rsn_ie_buf, pmksa);
+	if (!rsn_ie_end) {
+		pe_debug("Build RSN IE failed");
+		return;
+	}
+
+	rsn_ie_len = rsn_ie_end - rsn_ie_buf;
+	session->lim_join_req->rsnIE.length = rsn_ie_len;
+	qdf_mem_copy(session->lim_join_req->rsnIE.rsnIEdata,
+		     rsn_ie_buf, rsn_ie_len);
+}
+
 static QDF_STATUS
 lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		struct cm_vdev_join_req *req)
@@ -3779,7 +3799,6 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 	QDF_STATUS status;
 	uint8_t *rsn_ie;
 	uint8_t rsn_ie_len = 0;
-	uint8_t *rsn_ie_end = NULL;
 	struct wlan_crypto_pmksa pmksa, *pmksa_peer;
 	struct bss_description *bss_desc;
 
@@ -3831,17 +3850,9 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 			 session->vdev_id, pmksa.ssid_len, pmksa.ssid,
 			 bss_desc->fils_info_element.is_cache_id_present);
 
-	/* TODO: Add support for Adaptive 11r connection */
-	rsn_ie_end = wlan_crypto_build_rsnie_with_pmksa(session->vdev, rsn_ie,
-							pmksa_peer);
-	if (rsn_ie_end)
-		rsn_ie_len = rsn_ie_end - rsn_ie;
-
-	session->lim_join_req->rsnIE.length = rsn_ie_len;
-	qdf_mem_copy(session->lim_join_req->rsnIE.rsnIEdata,
-		     rsn_ie, rsn_ie_len);
-
+	lim_update_connect_rsn_ie(session, rsn_ie, pmksa_peer);
 	qdf_mem_free(rsn_ie);
+
 	/*
 	 * If a PMK cache is found for the BSSID, then
 	 * update the PMK in CSR session also as this
@@ -5143,6 +5154,11 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 	if (!vdev_mlme)
 		return;
 
+	if (session->sta_follows_sap_power) {
+		pe_debug_rl("STA operates in 6 GHz power of SAP, do not update STA power");
+		return;
+	}
+
 	vdev_mlme->reg_tpc_obj.num_pwr_levels = 0;
 	*has_tpe_updated = false;
 
@@ -5296,6 +5312,7 @@ void lim_parse_tpe_ie(struct mac_context *mac, struct pe_session *session,
 		single_tpe = tpe_ies[non_psd_index];
 		vdev_mlme->reg_tpc_obj.eirp_power =
 			single_tpe.tx_power[single_tpe.max_tx_pwr_count];
+		vdev_mlme->reg_tpc_obj.is_psd_power = false;
 	}
 }
 
@@ -5443,6 +5460,11 @@ void lim_calculate_tpc(struct mac_context *mac,
 		return;
 	}
 
+	if (session->sta_follows_sap_power) {
+		pe_debug_rl("STA operates in 6 GHz power of SAP, do not update STA power");
+		return;
+	}
+
 	oper_freq = session->curr_op_freq;
 	bw_val = wlan_reg_get_bw_value(session->ch_width);
 
@@ -5461,7 +5483,6 @@ void lim_calculate_tpc(struct mac_context *mac,
 		skip_tpe = wlan_mlme_skip_tpe(mac->psoc);
 	} else {
 		is_6ghz_freq = true;
-		is_psd_power = wlan_reg_is_6g_psd_power(mac->pdev);
 		/* Power mode calculation for 6G*/
 		ap_power_type_6g = session->ap_power_type;
 		if (LIM_IS_STA_ROLE(session)) {
@@ -5491,6 +5512,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 	if (mlme_obj->reg_tpc_obj.num_pwr_levels) {
 		is_tpe_present = true;
 		num_pwr_levels = mlme_obj->reg_tpc_obj.num_pwr_levels;
+		is_psd_power = mlme_obj->reg_tpc_obj.is_psd_power;
 	} else {
 		num_pwr_levels = lim_get_num_pwr_levels(is_psd_power,
 							session->ch_width);
@@ -5509,10 +5531,16 @@ void lim_calculate_tpc(struct mac_context *mac,
 		i++) {
 		if (is_tpe_present) {
 			if (is_6ghz_freq) {
-				wlan_reg_get_client_power_for_connecting_ap(
-				mac->pdev, ap_power_type_6g,
-				mlme_obj->reg_tpc_obj.frequency[i],
-				&is_psd_power, &reg_max, &psd_power);
+				if (is_psd_power) {
+					wlan_reg_get_client_power_for_connecting_ap(
+					mac->pdev, ap_power_type_6g,
+					mlme_obj->reg_tpc_obj.frequency[i],
+					is_psd_power, &reg_max, &psd_power);
+				} else {
+					wlan_reg_get_client_power_for_connecting_ap(
+					mac->pdev, ap_power_type_6g, oper_freq,
+					is_psd_power, &reg_max, &psd_power);
+				}
 			}
 		} else {
 			/* center frequency calculation */
@@ -5533,10 +5561,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 					wlan_reg_get_client_power_for_connecting_ap
 					(mac->pdev, ap_power_type_6g,
 					 mlme_obj->reg_tpc_obj.frequency[i],
-					 &is_psd_power, &reg_max, &psd_power);
+					 is_psd_power, &reg_max, &psd_power);
 				} else {
-					ap_power_type_6g =
-						wlan_reg_get_cur_6g_ap_pwr_type(
+					wlan_reg_get_cur_6g_ap_pwr_type(
 							mac->pdev,
 							&ap_power_type_6g);
 					wlan_reg_get_6g_chan_ap_power(
@@ -5593,7 +5620,6 @@ void lim_calculate_tpc(struct mac_context *mac,
 	}
 
 	mlme_obj->reg_tpc_obj.num_pwr_levels = num_pwr_levels;
-	mlme_obj->reg_tpc_obj.is_psd_power = is_psd_power;
 	mlme_obj->reg_tpc_obj.eirp_power = reg_max;
 	mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
 
@@ -7838,7 +7864,7 @@ static void lim_process_set_vdev_ies_per_band(struct mac_context *mac_ctx,
 
 	pe_debug("rcvd set vdev ie per band req vdev_id = %d",
 		p_msg->vdev_id);
-	/* intentionally using NULL here so that self capabilty are sent */
+	/* intentionally using NULL here so that self capability are sent */
 	if (lim_send_ies_per_band(mac_ctx, NULL, p_msg->vdev_id,
 				  p_msg->dot11_mode, p_msg->device_mode) !=
 	    QDF_STATUS_SUCCESS)
@@ -8529,6 +8555,7 @@ static void lim_process_sme_channel_change_request(struct mac_context *mac_ctx,
 		     &ch_change_req->ext_rates,
 		     sizeof(session_entry->extRateSet));
 	lim_change_channel(mac_ctx, session_entry);
+	lim_check_conc_power_for_csa(mac_ctx, session_entry);
 }
 
 /******************************************************************************
@@ -9328,7 +9355,7 @@ send_ie:
  * @mac_ctx: Pointer to Global MAC structure
  * @session: pointer to session
  *
- * This function will disbale bss color.
+ * This function will disable bss color.
  *
  * Return: None
  */

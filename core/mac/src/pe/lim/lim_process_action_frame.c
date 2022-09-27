@@ -1156,8 +1156,12 @@ __lim_process_link_measurement_req(struct mac_context *mac, uint8_t *pRxPacketIn
 		pe_debug("There were warnings while unpacking a Link Measure request (0x%08x, %d bytes):",
 			nStatus, frameLen);
 	}
-	/* Call rrm function to handle the request. */
 
+	if (pe_session->sta_follows_sap_power) {
+		pe_debug("STA power has changed, reject the link measurement request");
+		return QDF_STATUS_E_FAILURE;
+	}
+	/* Call rrm function to handle the request. */
 	return rrm_process_link_measurement_request(mac, pRxPacketInfo, &frm,
 					     pe_session);
 
@@ -1214,6 +1218,9 @@ lim_check_oci_match(struct mac_context *mac, struct pe_session *pe_session,
 {
 	const uint8_t *oci_ie;
 	tDot11fIEoci self_oci, *peer_oci;
+	uint16_t peer_chan_width;
+	uint16_t local_peer_chan_width = 0;
+	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 
 	if (!lim_is_self_and_peer_ocv_capable(mac, peer, pe_session))
 		return true;
@@ -1233,18 +1240,29 @@ lim_check_oci_match(struct mac_context *mac, struct pe_session *pe_session,
 	 * Freq_seg_1_ch_num    : 1 byte
 	 */
 	peer_oci = (tDot11fIEoci *)&oci_ie[2];
-	lim_fill_oci_params(mac, pe_session, &self_oci);
 
-	if ((self_oci.op_class != peer_oci->op_class) ||
+	wlan_reg_read_current_country(mac->psoc, country_code);
+	peer_chan_width =
+	wlan_reg_dmn_get_chanwidth_from_opclass_auto(
+			country_code,
+			peer_oci->prim_ch_num,
+			peer_oci->op_class);
+
+	lim_fill_oci_params(mac, pe_session, &self_oci, peer,
+			    &local_peer_chan_width);
+	if (((self_oci.op_class != peer_oci->op_class) &&
+	     (local_peer_chan_width > peer_chan_width)) ||
 	    (self_oci.prim_ch_num != peer_oci->prim_ch_num) ||
 	    (self_oci.freq_seg_1_ch_num != peer_oci->freq_seg_1_ch_num)) {
-		pe_err("OCI mismatch,self %d %d %d, peer %d %d %d",
+		pe_err("OCI mismatch,self %d %d %d %d, peer %d %d %d %d",
 		       self_oci.op_class,
 		       self_oci.prim_ch_num,
 		       self_oci.freq_seg_1_ch_num,
+		       local_peer_chan_width,
 		       peer_oci->op_class,
 		       peer_oci->prim_ch_num,
-		       peer_oci->freq_seg_1_ch_num);
+		       peer_oci->freq_seg_1_ch_num,
+		       peer_chan_width);
 		return false;
 	}
 
