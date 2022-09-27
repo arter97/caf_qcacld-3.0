@@ -340,6 +340,28 @@ void dp_rx_mon_pf_tag_to_buf_headroom_2_0(void *nbuf,
 #endif
 
 /**
+ * dp_rx_mon_free_mpdu_queue() - Free MPDU queue
+ * @mon_pdev: monitor pdev
+ * @ppdu_info: PPDU info
+ *
+ * Return: Void
+ */
+
+static void dp_rx_mon_free_mpdu_queue(struct dp_mon_pdev *mon_pdev,
+				      struct hal_rx_ppdu_info *ppdu_info)
+{
+	uint8_t user;
+	qdf_nbuf_t mpdu;
+
+	for (user = 0; user < HAL_MAX_UL_MU_USERS; user++) {
+		if (!qdf_nbuf_is_queue_empty(&ppdu_info->mpdu_q[user])) {
+			while ((mpdu = qdf_nbuf_queue_remove(&ppdu_info->mpdu_q[user])) != NULL)
+				dp_mon_free_parent_nbuf(mon_pdev, mpdu);
+		}
+	}
+}
+
+/**
  * dp_rx_mon_free_ppdu_info () - Free PPDU info
  * @pdev: DP pdev
  * @ppdu_info: PPDU info
@@ -350,23 +372,10 @@ static void
 dp_rx_mon_free_ppdu_info(struct dp_pdev *pdev,
 			 struct hal_rx_ppdu_info *ppdu_info)
 {
-	uint8_t user;
 	struct dp_mon_pdev *mon_pdev;
 
 	mon_pdev = (struct dp_mon_pdev *)pdev->monitor_pdev;
-	for (user = 0; user < ppdu_info->com_info.num_users; user++) {
-		uint16_t mpdu_count  = ppdu_info->mpdu_count[user];
-		uint16_t mpdu_idx;
-		qdf_nbuf_t mpdu;
-
-		for (mpdu_idx = 0; mpdu_idx < mpdu_count; mpdu_idx++) {
-			mpdu = qdf_nbuf_queue_remove(&ppdu_info->mpdu_q[user]);
-
-			if (!mpdu)
-				continue;
-			dp_mon_free_parent_nbuf(mon_pdev, mpdu);
-		}
-	}
+	dp_rx_mon_free_mpdu_queue(mon_pdev, ppdu_info);
 	__dp_rx_mon_free_ppdu_info(mon_pdev, ppdu_info);
 }
 
@@ -399,7 +408,7 @@ void dp_rx_mon_drain_wq(struct dp_pdev *pdev)
 		TAILQ_REMOVE(&mon_pdev_be->rx_mon_queue,
 			     ppdu_info, ppdu_list_elem);
 
-		__dp_rx_mon_free_ppdu_info(mon_pdev, ppdu_info);
+		dp_rx_mon_free_ppdu_info(pdev, ppdu_info);
 	}
 	qdf_spin_unlock_bh(&mon_pdev_be->rx_mon_wq_lock);
 }
@@ -451,6 +460,7 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 {
 	struct dp_mon_pdev *mon_pdev = (struct dp_mon_pdev *)pdev->monitor_pdev;
 	uint8_t user;
+	qdf_nbuf_t mpdu;
 
 	if (!ppdu_info)
 		return;
@@ -460,7 +470,6 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 	for (user = 0; user < ppdu_info->com_info.num_users; user++) {
 		uint16_t mpdu_count  = ppdu_info->mpdu_count[user];
 		uint16_t mpdu_idx;
-		qdf_nbuf_t mpdu;
 		struct hal_rx_mon_mpdu_info *mpdu_meta;
 		QDF_STATUS status;
 
@@ -519,6 +528,8 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 			}
 		}
 	}
+
+	dp_rx_mon_free_mpdu_queue(mon_pdev, ppdu_info);
 }
 
 /**
