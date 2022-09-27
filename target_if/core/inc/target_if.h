@@ -66,6 +66,12 @@
 #define targetif_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_TARGET_IF, params)
 
+#ifdef SERIALIZE_WMI_RX_EXECUTION_CTX
+#define WMI_RX_EXECUTION_CTX WMI_RX_SERIALIZER_CTX
+#else
+#define WMI_RX_EXECUTION_CTX WMI_RX_UMAC_CTX
+#endif /* SERIALIZE_WMI_RX_EXECUTION_CTX */
+
 typedef struct wlan_objmgr_psoc *(*get_psoc_handle_callback)(
 			void *scn_handle);
 

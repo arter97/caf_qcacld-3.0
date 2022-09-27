@@ -1237,6 +1237,8 @@ void wifi_pos_register_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 
 	wifi_pos_rx_ops = &rx_ops->wifi_pos_rx_ops;
 	wifi_pos_rx_ops->oem_rsp_event_rx = wifi_pos_oem_rsp_handler;
+	wifi_pos_rx_ops->wifi_pos_vdev_delete_all_ranging_peers_cb =
+			wifi_pos_vdev_delete_all_ranging_peers;
 }
 
 QDF_STATUS wifi_pos_populate_caps(struct wlan_objmgr_psoc *psoc,

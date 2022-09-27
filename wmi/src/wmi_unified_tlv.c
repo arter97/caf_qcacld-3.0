@@ -1874,6 +1874,23 @@ static QDF_STATUS send_vdev_up_cmd_tlv(wmi_unified_t wmi,
 	return 0;
 }
 
+#ifdef ENABLE_HOST_TO_TARGET_CONVERSION
+static uint32_t convert_peer_type_host_to_target(uint32_t peer_type)
+{
+	/* Host sets the peer_type as 0 for the peer create command sent to FW
+	 * other than PASN peer create command.
+	 */
+	if (peer_type == WLAN_PEER_RTT_PASN)
+		return WMI_PEER_TYPE_PASN;
+
+	return peer_type;
+}
+#else
+static uint32_t convert_peer_type_host_to_target(uint32_t peer_type)
+{
+	return peer_type;
+}
+#endif
 /**
  * send_peer_create_cmd_tlv() - send peer create command to fw
  * @wmi: wmi handle
@@ -1902,7 +1919,7 @@ static QDF_STATUS send_peer_create_cmd_tlv(wmi_unified_t wmi,
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (wmi_peer_create_cmd_fixed_param));
 	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->peer_addr, &cmd->peer_macaddr);
-	cmd->peer_type = param->peer_type;
+	cmd->peer_type = convert_peer_type_host_to_target(param->peer_type);
 	cmd->vdev_id = param->vdev_id;
 
 	buf_ptr = (uint8_t *)wmi_buf_data(buf);

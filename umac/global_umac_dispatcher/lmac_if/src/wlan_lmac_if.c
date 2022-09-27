@@ -91,6 +91,9 @@
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 #include "target_if_coex.h"
 #endif
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+#include <wifi_pos_pasn_api.h>
+#endif
 
 #include "target_if.h"
 
@@ -321,7 +324,17 @@ wlan_lmac_if_crypto_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 static void
 wlan_lmac_if_wifi_pos_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 {
-	target_if_wifi_pos_register_rx_ops(rx_ops);
+	struct wlan_lmac_if_wifi_pos_rx_ops *wifi_pos_rx_ops =
+		&rx_ops->wifi_pos_rx_ops;
+
+	wifi_pos_rx_ops->wifi_pos_ranging_peer_create_cb =
+			wifi_pos_handle_ranging_peer_create;
+	wifi_pos_rx_ops->wifi_pos_ranging_peer_create_rsp_cb =
+			wifi_pos_handle_ranging_peer_create_rsp;
+	wifi_pos_rx_ops->wifi_pos_ranging_peer_delete_cb =
+			wifi_pos_handle_ranging_peer_delete;
+	wifi_pos_rx_ops->wifi_pos_vdev_delete_all_ranging_peers_rsp_cb =
+			wifi_pos_vdev_delete_all_ranging_peers_rsp;
 }
 #else
 static inline void
