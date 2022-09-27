@@ -1423,6 +1423,14 @@ bool ucfg_cfr_get_rcc_enabled(struct wlan_objmgr_vdev *vdev)
 	if (status != QDF_STATUS_SUCCESS)
 		return false;
 
+	if ((pcfr->rcc_param.vdev_id != CFR_INVALID_VDEV_ID) &&
+	    (pcfr->rcc_param.vdev_id != wlan_vdev_get_id(vdev))) {
+		cfr_debug("vdev id mismatch, input %d, pcfr %d",
+			  wlan_vdev_get_id(vdev),
+			  pcfr->rcc_param.vdev_id);
+		return false;
+	}
+
 	rcc_enabled = cfr_is_filter_enabled(&pcfr->rcc_param);
 	wlan_objmgr_pdev_release_ref(pdev, WLAN_CFR_ID);
 
