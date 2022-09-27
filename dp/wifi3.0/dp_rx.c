@@ -2406,6 +2406,16 @@ dp_peer_update_rx_pkt_per_lmac(struct dp_txrx_peer *txrx_peer,
 {
 	uint8_t lmac_id = qdf_nbuf_get_lmac_id(nbuf);
 
+	if (qdf_unlikely(lmac_id >= CDP_MAX_LMACS)) {
+		dp_err_rl("Invalid lmac_id: %u vdev_id: %u",
+			  lmac_id, QDF_NBUF_CB_RX_VDEV_ID(nbuf));
+
+		if (qdf_likely(txrx_peer))
+			dp_err_rl("peer_id: %u", txrx_peer->peer_id);
+
+		return;
+	}
+
 	/* only count stats per lmac for MLO connection*/
 	DP_PEER_PER_PKT_STATS_INCC_PKT(txrx_peer, rx.rx_lmac[lmac_id], 1,
 				       QDF_NBUF_CB_RX_PKT_LEN(nbuf),
