@@ -6138,7 +6138,7 @@ void qdf_nbuf_add_rx_frag_debug(qdf_frag_t buf, qdf_nbuf_t nbuf,
 	fragp = qdf_nbuf_get_frag_addr(nbuf, num_nr_frags - 1);
 
 	/* Update frag address in frag debug tracking table */
-	if (fragp != buf)
+	if (fragp != buf && !take_frag_ref)
 		qdf_frag_debug_update_addr(buf, fragp, func, line);
 
 	/* Update frag refcount in frag debug tracking table */
