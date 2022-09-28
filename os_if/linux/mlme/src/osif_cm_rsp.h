@@ -156,4 +156,52 @@ osif_cm_indicate_disconnect(struct wlan_objmgr_vdev *vdev,
 			    bool locally_generated, const u8 *ie,
 			    size_t ie_len, gfp_t gfp);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * osif_get_partner_info_from_mlie() - API to get partner information
+ * from basic variant mlo ie
+ * @rsp: Connection manager connect response for the candidate
+ * @partner_info: mlo partner info pointer
+ *
+ * The API is is used get partner information from basic variant ml ie.
+ *
+ * Context: Any context.
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+osif_get_partner_info_from_mlie(struct wlan_cm_connect_resp *connect_rsp,
+				struct mlo_partner_info *partner_info);
+/**
+ * osif_get_link_id_from_assoc_ml_ie() - API to get link id from assoc rsp
+ * ml ie.
+ * @rsp_link_info: pointer to mlo link info
+ * @partner_info: mlo partner info pointer
+ * @link_id: Link id information
+ *
+ * The API is used to get link id from assoc response basic variant mlo ie
+ *
+ * Context: Any context.
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+osif_get_link_id_from_assoc_ml_ie(struct mlo_link_info *rsp_link_info,
+				  struct mlo_partner_info *assoc_partner_info,
+				  uint8_t *link_id);
+
+/**
+ * osif_get_chan_bss_from_kernel() - API to get chan bss from kernel
+ * @vdev: vdev pointer
+ * @rsp_link_info: pointer to mlo link info
+ * @rsp: Connection manager connect response for the candidate
+ *
+ * The API is used to get chan bss from kernel.
+ *
+ * Context: Any context.
+ * Return: QDF_STATUS
+ */
+struct cfg80211_bss *
+osif_get_chan_bss_from_kernel(struct wlan_objmgr_vdev *vdev,
+			      struct mlo_link_info *rsp_link_info,
+			      struct wlan_cm_connect_resp *rsp);
+#endif
 #endif /* __OSIF_CM_RSP_H */
