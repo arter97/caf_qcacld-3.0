@@ -901,3 +901,5 @@ QDF_STATUS wlan_util_vdev_peer_set_param_send(struct wlan_objmgr_vdev *vdev,
 	return tgt_vdev_peer_set_param_send(vdev, peer_mac_addr,
 					    param_id, param_value);
 }
+
+qdf_export_symbol(wlan_util_vdev_peer_set_param_send);
