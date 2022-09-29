@@ -81,6 +81,8 @@ static void dp_ppeds_rings_status(struct dp_soc *soc)
 
 	dp_print_ring_stat_from_hal(soc, &be_soc->reo2ppe_ring, REO2PPE);
 	dp_print_ring_stat_from_hal(soc, &be_soc->ppe2tcl_ring, PPE2TCL);
+	dp_print_ring_stat_from_hal(soc, &be_soc->ppe_wbm_release_ring,
+				    WBM2SW_RELEASE);
 }
 #endif
 
@@ -935,6 +937,69 @@ dp_rxdma_ring_wmask_cfg_be(struct dp_soc *soc,
 {
 }
 #endif
+#ifdef WLAN_SUPPORT_PPEDS
+static
+void dp_free_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
+			      int ring_type, int ring_num)
+{
+	if (srng->irq >= 0) {
+		if (ring_type == WBM2SW_RELEASE &&
+		    ring_num == WBM2_SW_PPE_REL_RING_ID)
+			pld_pfrm_free_irq(soc->osdev->dev, srng->irq, soc);
+	}
+}
+
+static
+int dp_register_ppeds_interrupts(struct dp_soc *soc, struct dp_srng *srng,
+				 int vector, int ring_type, int ring_num)
+{
+	int irq, ret = 0;
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	int pci_slot = pld_get_pci_slot(soc->osdev->dev);
+	void *ctxt;
+
+	if (ring_type == WBM2SW_RELEASE &&
+	    ring_num == WBM2_SW_PPE_REL_RING_ID) {
+		irq = pld_get_msi_irq(soc->osdev->dev, vector);
+		snprintf(be_soc->irq_name[2], DP_PPE_INTR_STRNG_LEN,
+			 "pci%d_ppe_wbm_rel", pci_slot);
+
+		ret = pld_pfrm_request_irq(soc->osdev->dev, irq,
+					   dp_ppeds_handle_tx_comp,
+					   IRQF_SHARED | IRQF_NO_SUSPEND,
+					   be_soc->irq_name[2], (void *)soc);
+
+		if (ret)
+			goto fail;
+	} else {
+		return 0;
+	}
+
+	srng->irq = irq;
+
+	dp_info("Registered irq %d for soc %pK ring type %d",
+		irq, soc, ring_type);
+
+	return 0;
+fail:
+	dp_err("Unable to config irq : ring type %d irq %d vector %d ctxt %pK",
+	       ring_type, irq, vector, ctxt);
+
+	return ret;
+}
+
+void dp_ppeds_disable_irq(struct dp_soc *soc, struct dp_srng *srng)
+{
+	if (srng->irq >= 0)
+		pld_pfrm_disable_irq_nosync(soc->osdev->dev, srng->irq);
+}
+
+void dp_ppeds_enable_irq(struct dp_soc *soc, struct dp_srng *srng)
+{
+	if (srng->irq >= 0)
+		pld_pfrm_enable_irq(soc->osdev->dev, srng->irq);
+}
+#endif
 
 #ifdef NO_RX_PKT_HDR_TLV
 /**
@@ -1317,6 +1382,15 @@ static void dp_soc_ppe_srng_deinit(struct dp_soc *soc)
 			     soc->ctrl_psoc,
 			     WLAN_MD_DP_SRNG_REO2PPE,
 			     "reo2ppe_ring");
+
+	dp_srng_deinit(soc, &be_soc->ppe_wbm_release_ring, WBM2SW_RELEASE,
+		       WBM2_SW_PPE_REL_RING_ID);
+	wlan_minidump_remove(be_soc->ppe_wbm_release_ring.base_vaddr_unaligned,
+			     be_soc->ppe_wbm_release_ring.alloc_size,
+			     soc->ctrl_psoc,
+			     WLAN_MD_DP_SRNG_PPE_WBM2SW_RELEASE,
+			     "ppe_wbm_release_ring");
+
 }
 
 static void dp_soc_ppe_srng_free(struct dp_soc *soc)
@@ -1330,6 +1404,8 @@ static void dp_soc_ppe_srng_free(struct dp_soc *soc)
 		return;
 
 	dp_srng_free(soc, &be_soc->ppe_release_ring);
+
+	dp_srng_free(soc, &be_soc->ppe_wbm_release_ring);
 
 	dp_srng_free(soc, &be_soc->ppe2tcl_ring);
 
@@ -1365,6 +1441,13 @@ static QDF_STATUS dp_soc_ppe_srng_alloc(struct dp_soc *soc)
 	entries = wlan_cfg_get_dp_soc_ppe_release_ring_size(soc_cfg_ctx);
 	if (dp_srng_alloc(soc, &be_soc->ppe_release_ring, PPE_RELEASE,
 			  entries, 0)) {
+		dp_err("%pK: dp_srng_alloc failed for ppe_release_ring", soc);
+		goto fail;
+	}
+
+	entries = wlan_cfg_tx_comp_ring_size(soc_cfg_ctx);
+	if (dp_srng_alloc(soc, &be_soc->ppe_wbm_release_ring, WBM2SW_RELEASE,
+			  entries, 1)) {
 		dp_err("%pK: dp_srng_alloc failed for ppe_release_ring", soc);
 		goto fail;
 	}
@@ -1420,12 +1503,23 @@ static QDF_STATUS dp_soc_ppe_srng_init(struct dp_soc *soc)
 			  soc->ctrl_psoc,
 			  WLAN_MD_DP_SRNG_PPE_RELEASE,
 			  "ppe_release_ring");
-#ifdef WLAN_SUPPORT_PPEDS
+
+	if (dp_srng_init(soc, &be_soc->ppe_wbm_release_ring, WBM2SW_RELEASE,
+			 WBM2_SW_PPE_REL_RING_ID, 0)) {
+		dp_err("%pK: dp_srng_init failed for ppe_release_ring", soc);
+		goto fail;
+	}
+
+	wlan_minidump_remove(be_soc->ppe_wbm_release_ring.base_vaddr_unaligned,
+			     be_soc->ppe_wbm_release_ring.alloc_size,
+			     soc->ctrl_psoc,
+			     WLAN_MD_DP_SRNG_PPE_WBM2SW_RELEASE,
+			     "ppe_wbm_release_ring");
+
 	if (dp_ppeds_register_soc_be(be_soc)) {
 		dp_err("%pK: ppeds registration failed", soc);
 		goto fail;
 	}
-#endif
 
 	return QDF_STATUS_SUCCESS;
 fail:
@@ -2233,12 +2327,9 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_txrx_ppeds_rings_status = dp_ppeds_rings_status;
 	arch_ops->txrx_soc_ppeds_start = dp_ppeds_start_soc_be;
 	arch_ops->txrx_soc_ppeds_stop = dp_ppeds_stop_soc_be;
-#else
-	arch_ops->dp_txrx_ppeds_rings_status = NULL;
-	arch_ops->txrx_soc_ppeds_start = NULL;
-	arch_ops->txrx_soc_ppeds_stop = NULL;
+	arch_ops->dp_register_ppeds_interrupts = dp_register_ppeds_interrupts;
+	arch_ops->dp_free_ppeds_interrupts = dp_free_ppeds_interrupts;
 #endif
-
 	dp_init_near_full_arch_ops_be(arch_ops);
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_be;
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_be;
