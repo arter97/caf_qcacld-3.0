@@ -3456,12 +3456,142 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+/*
+ * util_scan_gen_txvap_scan_entry() - Strip out the MBSSID tag from the received
+ * frame and update the modified frame length before generating a scan entry.
+ * It is redundant to have MBSSID information as part of the TX vap/ profile
+ * specific scan entry.
+ *
+ * @pdev: pdev context
+ * @frame: Unsoiled frame passed from util_scan_parse_beacon_frame()
+ * @frame_len: Length of the unsoiled frame
+ * @ie_list: Points to the start of IE list in parent/ unsoiled frame
+ * @ielen: Length of the complete IE list from parent/ unsoiled frame
+ * @frm_subtype: Frame subtype
+ * @rx_param: host mgmt header params
+ * @scan_list: Scan entry list of bss candidates after filtering
+ * @mbssid_info: Data structure to carry MBSSID information
+ *
+ * Return: False if the scan entry generation is not successful
+ */
+static QDF_STATUS
+util_scan_gen_txvap_scan_entry(struct wlan_objmgr_pdev *pdev,
+			       uint8_t *frame, qdf_size_t frame_len,
+			       uint8_t *ie_list, uint32_t ielen,
+			       uint32_t frm_subtype,
+			       struct mgmt_rx_event_params *rx_param,
+			       qdf_list_t *scan_list,
+			       struct scan_mbssid_info *mbssid_info)
+{
+	uint8_t *src_ie, *dest_ptr, *container;
+	uint16_t new_frame_len, new_ie_len = 0;
+	uint8_t *trimmed_frame, fixed_len = 0;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	/*
+	 * Allocate a buffer to copy only the TX VAP information after
+	 * stripping out the MBSSID IE from the parent beacon.
+	 * The allocation size should be the size of a frame as at
+	 * this point it is unknown what would be the new frame length
+	 * after stripping the MBSSID IE.
+	 */
+	container = qdf_mem_malloc(frame_len);
+	if (!container) {
+		scm_err_rl("Malloc for container failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	dest_ptr = &container[0];
+	fixed_len = sizeof(struct wlan_frame_hdr) +
+		offsetof(struct wlan_bcn_frame, ie);
+
+	/*Copy the data till IE list before procesisng the IE one by one*/
+	qdf_mem_copy(dest_ptr, frame, fixed_len);
+
+	dest_ptr += fixed_len;
+	src_ie = ie_list;
+
+	/*
+	 * Go through the IE list from the parent beacon and copy one by one.
+	 * Skip copying it to the container if it's an MBSSID tag.
+	 */
+	while (((src_ie + src_ie[TAG_LEN_POS] + MIN_IE_LEN) -
+		ie_list) <= ielen) {
+		if (src_ie[ID_POS] == WLAN_ELEMID_MULTIPLE_BSSID) {
+			src_ie += src_ie[TAG_LEN_POS] + MIN_IE_LEN;
+			continue;
+		}
+
+		qdf_mem_copy(dest_ptr, src_ie,
+			     (src_ie[TAG_LEN_POS] + MIN_IE_LEN));
+
+		dest_ptr += src_ie[TAG_LEN_POS] + MIN_IE_LEN;
+		if (((src_ie + src_ie[TAG_LEN_POS] +
+		      MIN_IE_LEN) - ie_list) >= ielen)
+			break;
+
+		src_ie += src_ie[TAG_LEN_POS] + MIN_IE_LEN;
+	}
+
+	if (dest_ptr > container)
+		new_ie_len = dest_ptr - (container + fixed_len);
+
+	new_frame_len = frame_len - ielen + new_ie_len;
+
+	/*
+	 * At the start of this handler, we have allocated a memory block
+	 * of size same as a full beacon frame size, as we are not sure
+	 * of what would be the size of the new frame. After stripping out
+	 * the MBSSID tag from the parent beacon, there are some unused
+	 * memory. Hence do another malloc of the new frame length
+	 * (length of the new frame which has only TX VAP information)
+	 * and copy the needed data from the container, then free the
+	 * memory corresponds to container.
+	 * Post copy, use the trimmed frame and the new frame length
+	 * to generate scan entry for the TX profile.
+	 */
+	trimmed_frame = qdf_mem_malloc(new_frame_len);
+	if (!trimmed_frame) {
+		scm_err_rl("Malloc for trimmed frame failed");
+		qdf_mem_free(container);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(trimmed_frame, container, new_frame_len);
+	qdf_mem_free(container);
+
+	status = util_scan_gen_scan_entry(pdev, trimmed_frame,
+					  new_frame_len,
+					  frm_subtype,
+					  rx_param,
+					  mbssid_info,
+					  scan_list);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		scm_debug_rl("Failed to create a scan entry");
+
+	qdf_mem_free(trimmed_frame);
+	return status;
+}
 #else
 static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 					 uint8_t *frame, qdf_size_t frame_len,
 					 uint32_t frm_subtype,
 					 struct mgmt_rx_event_params *rx_param,
 					 qdf_list_t *scan_list)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+util_scan_gen_txvap_scan_entry(struct wlan_objmgr_pdev *pdev,
+			       uint8_t *frame, qdf_size_t frame_len,
+			       uint8_t *ie_list, uint32_t ielen,
+			       uint32_t frm_subtype,
+			       struct mgmt_rx_event_params *rx_param,
+			       qdf_list_t *scan_list,
+			       struct scan_mbssid_info *mbssid_info)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -3481,13 +3611,15 @@ util_scan_parse_beacon_frame(struct wlan_objmgr_pdev *pdev,
 	uint32_t ie_len = 0;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct scan_mbssid_info mbssid_info = { 0 };
+	uint8_t *ie_list;
 
 	hdr = (struct wlan_frame_hdr *)frame;
 	bcn = (struct wlan_bcn_frame *)
-			   (frame + sizeof(struct wlan_frame_hdr));
+		(frame + sizeof(struct wlan_frame_hdr));
+	ie_list = (uint8_t *)&bcn->ie;
 	ie_len = (uint16_t)(frame_len -
-		sizeof(struct wlan_frame_hdr) -
-		offsetof(struct wlan_bcn_frame, ie));
+			    sizeof(struct wlan_frame_hdr) -
+			    offsetof(struct wlan_bcn_frame, ie));
 
 	extcap_ie = util_scan_find_ie(WLAN_ELEMID_XCAPS,
 				      (uint8_t *)&bcn->ie, ie_len);
@@ -3509,23 +3641,45 @@ util_scan_parse_beacon_frame(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 
+	/*
+	 * IF MBSSID IE is present in the beacon then
+	 * scan component will create a new entry for
+	 * each BSSID found in the MBSSID
+	 * util_scan_parse_mbssid() takes care of creating
+	 * scan entries for every non tx profile present in
+	 * the MBSSID tag.
+	 * util_scan_gen_txvap_scan_entry() helps in generating
+	 * scan entry for the tx profile.
+	 */
+	if (mbssid_ie) {
+		status = util_scan_parse_mbssid(pdev, frame, frame_len,
+						frm_subtype, rx_param,
+						scan_list);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			scm_debug_rl("NonTx prof: Failed to create scan entry");
+			return status;
+		}
+
+		status = util_scan_gen_txvap_scan_entry(pdev, frame,
+							frame_len, ie_list,
+							ie_len, frm_subtype,
+							rx_param, scan_list,
+							&mbssid_info);
+		if (QDF_IS_STATUS_ERROR(status))
+			scm_debug_rl("TX prof: Failed to create scan entry");
+
+		return status;
+	}
+
+	/*For Non MBSSIE case*/
 	status = util_scan_gen_scan_entry(pdev, frame, frame_len,
 					  frm_subtype, rx_param,
 					  &mbssid_info,
 					  scan_list);
 
-	/*
-	 * IF MBSSID IE is present in the beacon then
-	 * scan component will create a new entry for
-	 * each BSSID found in the MBSSID
-	 */
-	if (mbssid_ie)
-		status = util_scan_parse_mbssid(pdev, frame, frame_len,
-						frm_subtype, rx_param,
-						scan_list);
-
 	if (QDF_IS_STATUS_ERROR(status))
-		scm_debug_rl("Failed to create a scan entry");
+		scm_debug_rl("Non-MBSSIE frame: Failed to create scan entry");
 
 	return status;
 }
