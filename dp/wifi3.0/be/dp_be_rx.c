@@ -729,12 +729,15 @@ done:
 							      rx.raw, 1,
 							      msdu_len);
 			} else {
-				dp_rx_nbuf_free(nbuf);
 				DP_STATS_INC(soc, rx.err.scatter_msdu, 1);
-				dp_info_rl("scatter msdu len %d, dropped",
-					   msdu_len);
-				nbuf = next;
-				continue;
+
+				if (!dp_rx_is_sg_supported()) {
+					dp_rx_nbuf_free(nbuf);
+					dp_info_rl("sg msdu len %d, dropped",
+						   msdu_len);
+					nbuf = next;
+					continue;
+				}
 			}
 		} else {
 			msdu_len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
