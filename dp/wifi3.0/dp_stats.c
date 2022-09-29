@@ -8966,20 +8966,22 @@ dp_txrx_get_peer_delay_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			     struct cdp_delay_tid_stats *delay_stats)
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
-	struct dp_peer *peer = dp_peer_find_hash_find(soc, peer_mac, 0, vdev_id,
-						      DP_MOD_ID_CDP);
+	struct dp_peer *peer = NULL;
 	struct dp_peer_delay_stats *pext_stats;
 	struct cdp_delay_rx_stats *rx_delay;
 	struct cdp_delay_tx_stats *tx_delay;
 	uint8_t tid;
+	struct cdp_peer_info peer_info = { 0 };
 
+	if (!wlan_cfg_is_peer_ext_stats_enabled(soc->wlan_cfg_ctx))
+		return QDF_STATUS_E_FAILURE;
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper(soc, &peer_info, DP_MOD_ID_CDP);
 	if (!peer)
 		return QDF_STATUS_E_FAILURE;
-
-	if (!wlan_cfg_is_peer_ext_stats_enabled(soc->wlan_cfg_ctx)) {
-		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
-		return QDF_STATUS_E_FAILURE;
-	}
 
 	if (!peer->txrx_peer) {
 		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
@@ -9030,8 +9032,9 @@ dp_txrx_get_peer_jitter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 {
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
 	struct dp_pdev *pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
-	struct dp_peer *peer;
+	struct dp_peer *peer = NULL;
 	uint8_t tid;
+	struct cdp_peer_info peer_info = { 0 };
 
 	if (!pdev)
 		return QDF_STATUS_E_FAILURE;
@@ -9039,7 +9042,10 @@ dp_txrx_get_peer_jitter_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	if (!wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx))
 		return QDF_STATUS_E_FAILURE;
 
-	peer = dp_peer_find_hash_find(soc, peer_mac, 0, vdev_id, DP_MOD_ID_CDP);
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper(soc, &peer_info, DP_MOD_ID_CDP);
 	if (!peer)
 		return QDF_STATUS_E_FAILURE;
 

@@ -9949,6 +9949,7 @@ dp_get_host_peer_stats(struct cdp_soc_t *soc, uint8_t *mac_addr)
 {
 	struct dp_peer *peer = NULL;
 	struct cdp_peer_stats *peer_stats = NULL;
+	struct cdp_peer_info peer_info = { 0 };
 
 	if (!mac_addr) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
@@ -9956,10 +9957,11 @@ dp_get_host_peer_stats(struct cdp_soc_t *soc, uint8_t *mac_addr)
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	peer = dp_peer_find_hash_find((struct dp_soc *)soc,
-				      mac_addr, 0,
-				      DP_VDEV_ALL,
-				      DP_MOD_ID_CDP);
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, DP_VDEV_ALL, mac_addr, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper((struct dp_soc *)soc, &peer_info,
+					 DP_MOD_ID_CDP);
 	if (!peer) {
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 			  "%s: Invalid peer\n", __func__);
@@ -11236,10 +11238,14 @@ static QDF_STATUS
 dp_txrx_get_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
 		       uint8_t *peer_mac, struct cdp_peer_stats *peer_stats)
 {
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct dp_peer *peer = dp_peer_find_hash_find((struct dp_soc *)soc,
-						       peer_mac, 0, vdev_id,
-						       DP_MOD_ID_CDP);
+	struct dp_peer *peer = NULL;
+	struct cdp_peer_info peer_info = { 0 };
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper((struct dp_soc *)soc, &peer_info,
+					 DP_MOD_ID_CDP);
 
 	qdf_mem_zero(peer_stats, sizeof(struct cdp_peer_stats));
 
@@ -11250,7 +11256,7 @@ dp_txrx_get_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
 
 	dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 
-	return status;
+	return QDF_STATUS_SUCCESS;
 }
 
 /* dp_txrx_get_peer_stats_param - will return specified cdp_peer_stats
@@ -11267,9 +11273,14 @@ dp_txrx_get_peer_stats_param(struct cdp_soc_t *soc, uint8_t vdev_id,
 			     cdp_peer_stats_param_t *buf)
 {
 	QDF_STATUS ret;
-	struct dp_peer *peer = dp_peer_find_hash_find((struct dp_soc *)soc,
-						      peer_mac, 0, vdev_id,
-						      DP_MOD_ID_CDP);
+	struct dp_peer *peer = NULL;
+	struct cdp_peer_info peer_info = { 0 };
+
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, vdev_id, peer_mac, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper((struct dp_soc *)soc, &peer_info,
+				         DP_MOD_ID_CDP);
 
 	if (!peer) {
 		dp_peer_err("%pK: Invalid Peer for Mac " QDF_MAC_ADDR_FMT,
