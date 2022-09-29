@@ -118,6 +118,7 @@ static inline int cdp_get_arch_type_from_devid(uint16_t devid)
 	case QCA6290_DEVICE_ID:
 	case QCN9000_DEVICE_ID:
 	case QCN6122_DEVICE_ID:
+	case QCN9160_DEVICE_ID:
 	case QCA6390_DEVICE_ID:
 	case QCA6490_DEVICE_ID:
 	case QCA6750_DEVICE_ID:
@@ -165,6 +166,7 @@ ol_txrx_soc_handle cdp_soc_attach(u_int16_t devid,
 	case QCA6290_DEVICE_ID:
 	case QCN9000_DEVICE_ID:
 	case QCN6122_DEVICE_ID:
+	case QCN9160_DEVICE_ID:
 	case QCA6390_DEVICE_ID:
 	case QCA6490_DEVICE_ID:
 	case QCA6750_DEVICE_ID:
