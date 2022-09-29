@@ -2916,8 +2916,12 @@ dp_mon_filter_reset_rx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 				DP_MON_FILTER_LITE_MON_MODE;
 	enum dp_mon_filter_srng_type srng_type =
 				DP_MON_FILTER_SRNG_TYPE_RXMON_DEST;
+	struct dp_lite_mon_rx_config *config = NULL;
 
 	be_mon_pdev->filter_be[filter_mode][srng_type] = filter;
+	config = be_mon_pdev->lite_mon_rx_config;
+	if (config)
+		config->fp_type_subtype_filter_all = false;
 }
 
 void
@@ -2950,6 +2954,13 @@ dp_mon_filter_setup_rx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 			config->rx_config.ctrl_filter[DP_MON_FRM_FILTER_MODE_FP];
 		rx_tlv_filter->tlv_filter.fp_data_filter =
 			config->rx_config.data_filter[DP_MON_FRM_FILTER_MODE_FP];
+		if ((config->rx_config.mgmt_filter[DP_MON_FRM_FILTER_MODE_FP] ==
+		     CDP_LITE_MON_FILTER_ALL) &&
+		    (config->rx_config.ctrl_filter[DP_MON_FRM_FILTER_MODE_FP] ==
+		     CDP_LITE_MON_FILTER_ALL) &&
+		    (config->rx_config.data_filter[DP_MON_FRM_FILTER_MODE_FP] ==
+		     CDP_LITE_MON_FILTER_ALL))
+			config->fp_type_subtype_filter_all = true;
 	}
 
 	/* configure md filters if enabled */
