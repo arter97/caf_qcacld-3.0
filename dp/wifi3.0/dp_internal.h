@@ -28,7 +28,8 @@
 #define DP_PEER_WDS_COUNT_INVALID UINT_MAX
 
 #define DP_BLOCKMEM_SIZE 4096
-
+#define WBM2_SW_PPE_REL_RING_ID 6
+#define WBM2_SW_PPE_REL_MAP_ID 11
 /* Alignment for consistent memory for DP rings*/
 #define DP_RING_BASE_ALIGN 32
 

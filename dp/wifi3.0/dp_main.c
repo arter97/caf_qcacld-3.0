@@ -1461,7 +1461,10 @@ static int dp_srng_calculate_msi_group(struct dp_soc *soc,
 			/* dp_rx_wbm_err_process - soc->rx_rel_ring */
 			grp_mask = &cfg_ctx->int_rx_wbm_rel_ring_mask[0];
 			ring_num = 0;
-		} else { /* dp_tx_comp_handler - soc->tx_comp_ring */
+		} else if (ring_num == WBM2_SW_PPE_REL_RING_ID) {
+			grp_mask = &cfg_ctx->int_ppeds_wbm_release_ring_mask[0];
+			ring_num = 0;
+		}  else { /* dp_tx_comp_handler - soc->tx_comp_ring */
 			grp_mask = &soc->wlan_cfg_ctx->int_tx_ring_mask[0];
 			nf_irq_mask = dp_srng_get_near_full_irq_mask(soc,
 								     ring_type,
@@ -1607,8 +1610,9 @@ static int dp_get_num_msi_available(struct dp_soc *soc, int interrupt_mode)
 }
 #endif
 
-static void dp_srng_msi_setup(struct dp_soc *soc, struct hal_srng_params
-			      *ring_params, int ring_type, int ring_num)
+static void dp_srng_msi_setup(struct dp_soc *soc, struct dp_srng *srng,
+			      struct hal_srng_params *ring_params,
+			      int ring_type, int ring_num)
 {
 	int reg_msi_grp_num;
 	/*
@@ -1620,6 +1624,7 @@ static void dp_srng_msi_setup(struct dp_soc *soc, struct hal_srng_params
 	int ret;
 	uint32_t msi_data_start, msi_irq_start, addr_low, addr_high;
 	bool nf_irq_support;
+	int vector;
 
 	ret = pld_get_user_msi_assignment(soc->osdev->dev, "DP",
 					    &msi_data_count, &msi_data_start,
@@ -1669,6 +1674,14 @@ static void dp_srng_msi_setup(struct dp_soc *soc, struct hal_srng_params
 	dp_debug("ring type %u ring_num %u msi->data %u msi_addr %llx",
 		 ring_type, ring_num, ring_params->msi_data,
 		 (uint64_t)ring_params->msi_addr);
+
+	vector = msi_irq_start + (reg_msi_grp_num % msi_data_count);
+	if (soc->arch_ops.dp_register_ppeds_interrupts)
+		if (soc->arch_ops.dp_register_ppeds_interrupts(soc, srng,
+							       vector,
+							       ring_type,
+							       ring_num))
+			return;
 
 configure_msi2:
 	if (!nf_irq_support) {
@@ -1887,7 +1900,8 @@ dp_srng_configure_interrupt_thresholds(struct dp_soc *soc,
 			wlan_cfg_get_int_batch_threshold_rx(soc->wlan_cfg_ctx);
 	} else if (ring_type == WBM2SW_RELEASE &&
 		   (ring_num < wbm2_sw_rx_rel_ring_id ||
-		   ring_num == WBM2SW_TXCOMP_RING4_NUM)) {
+		   ring_num == WBM2SW_TXCOMP_RING4_NUM ||
+		   ring_num == WBM2_SW_PPE_REL_RING_ID)) {
 		ring_params->intr_timer_thres_us =
 			wlan_cfg_get_int_timer_threshold_tx(soc->wlan_cfg_ctx);
 		ring_params->intr_batch_cntr_thres_entries =
@@ -2327,7 +2341,7 @@ QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng,
 		ring_params.num_entries);
 
 	if (soc->intr_mode == DP_INTR_MSI && !dp_skip_msi_cfg(soc, ring_type)) {
-		dp_srng_msi_setup(soc, &ring_params, ring_type, ring_num);
+		dp_srng_msi_setup(soc, srng, &ring_params, ring_type, ring_num);
 		dp_verbose_debug("Using MSI for ring_type: %d, ring_num %d",
 				 ring_type, ring_num);
 	} else {
@@ -2431,6 +2445,10 @@ void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 			    soc, ring_type, ring_num);
 		return;
 	}
+
+	if (soc->arch_ops.dp_free_ppeds_interrupts)
+		soc->arch_ops.dp_free_ppeds_interrupts(soc, srng, ring_type,
+						       ring_num);
 
 	hal_srng_cleanup(soc->hal_soc, srng->hal_srng);
 	srng->hal_srng = NULL;
