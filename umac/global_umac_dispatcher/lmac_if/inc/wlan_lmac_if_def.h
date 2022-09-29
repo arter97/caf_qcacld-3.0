@@ -1225,6 +1225,7 @@ struct wlan_lmac_if_target_tx_ops {
 	bool (*tgt_is_tgt_type_adrastea)(uint32_t);
 	bool (*tgt_is_tgt_type_qcn9000)(uint32_t);
 	bool (*tgt_is_tgt_type_qcn6122)(uint32_t);
+	bool (*tgt_is_tgt_type_qcn9160)(uint32_t);
 	bool (*tgt_is_tgt_type_qcn7605)(uint32_t);
 	uint32_t (*tgt_get_tgt_type)(struct wlan_objmgr_psoc *psoc);
 	uint32_t (*tgt_get_tgt_version)(struct wlan_objmgr_psoc *psoc);
