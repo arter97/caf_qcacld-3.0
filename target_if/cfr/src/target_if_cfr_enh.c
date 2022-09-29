@@ -716,7 +716,8 @@ static QDF_STATUS check_dma_length(struct look_up_table *lut,
 		    lut->payload_length <= PINE_MAX_DATA_LENGTH_BYTES) {
 			return QDF_STATUS_SUCCESS;
 		}
-	} else if (target_type == TARGET_TYPE_QCN6122) {
+	} else if (target_type == TARGET_TYPE_QCN6122 ||
+		   target_type == TARGET_TYPE_QCN9160) {
 		if (lut->header_length <= SPRUCE_MAX_HEADER_LENGTH_WORDS &&
 		    lut->payload_length <= SPRUCE_MAX_DATA_LENGTH_BYTES) {
 			return QDF_STATUS_SUCCESS;
@@ -2200,7 +2201,8 @@ QDF_STATUS cfr_enh_init_pdev(struct wlan_objmgr_psoc *psoc,
 		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_MAPLE;
 		pcfr->chip_type = CFR_CAPTURE_RADIO_MAPLE;
 		pcfr->max_mu_users = MAPLE_CFR_MU_USERS;
-	} else if (target_type == TARGET_TYPE_QCN6122) {
+	} else if (target_type == TARGET_TYPE_QCN6122 ||
+		   target_type == TARGET_TYPE_QCN9160) {
 		pcfr->subbuf_size = STREAMFS_MAX_SUBBUF_SPRUCE;
 		pcfr->num_subbufs = STREAMFS_NUM_SUBBUF_SPRUCE;
 		pcfr->chip_type = CFR_CAPTURE_RADIO_SPRUCE;

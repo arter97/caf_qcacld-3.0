@@ -2115,6 +2115,7 @@ target_if_init_spectral_param_min_max(
 				SPECTRAL_PARAM_FFT_SIZE_MAX_GEN3_DEFAULT;
 		if (target_type == TARGET_TYPE_QCN9000 ||
 		    target_type == TARGET_TYPE_QCN6122 ||
+		    target_type == TARGET_TYPE_QCN9160 ||
 		    target_type == TARGET_TYPE_QCA5018 ||
 		    target_type == TARGET_TYPE_QCA6490 ||
 		    target_type == TARGET_TYPE_KIWI ||
@@ -2477,6 +2478,7 @@ target_if_init_spectral_capability(struct target_if_spectral *spectral,
 	pcap->num_detectors_80mhz = 1;
 	if (target_type == TARGET_TYPE_QCN9000 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
+	    target_type == TARGET_TYPE_QCN9160 ||
 	    target_type == TARGET_TYPE_QCA6490 ||
 	    target_type == TARGET_TYPE_KIWI ||
 	    target_type == TARGET_TYPE_MANGO) {
@@ -3133,6 +3135,7 @@ target_if_spectral_len_adj_swar_init(struct spectral_fft_bin_len_adj_swar *swar,
 	    target_type == TARGET_TYPE_QCA9574 ||
 	    target_type == TARGET_TYPE_QCN9000 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
+	    target_type == TARGET_TYPE_QCN9160 ||
 	    target_type == TARGET_TYPE_QCA5018 ||
 	    target_type == TARGET_TYPE_QCA6750 ||
 	    target_type == TARGET_TYPE_QCA6490 ||
@@ -3155,6 +3158,7 @@ target_if_spectral_len_adj_swar_init(struct spectral_fft_bin_len_adj_swar *swar,
 	    target_type == TARGET_TYPE_QCA9574 ||
 	    target_type == TARGET_TYPE_QCA6018 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
+	    target_type == TARGET_TYPE_QCN9160 ||
 	    target_type == TARGET_TYPE_QCA5332 ||
 	    target_type == TARGET_TYPE_QCA5018 ||
 	    target_type == TARGET_TYPE_QCN9000 ||
@@ -3200,6 +3204,7 @@ target_if_spectral_report_params_init(
 	 */
 	if (target_type == TARGET_TYPE_QCN9000 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
+	    target_type == TARGET_TYPE_QCN9160 ||
 	    target_type == TARGET_TYPE_QCA5018 ||
 	    target_type == TARGET_TYPE_QCA6750 ||
 	    target_type == TARGET_TYPE_QCA6490 ||
@@ -3244,6 +3249,7 @@ target_if_spectral_report_params_init(
 	if (target_type == TARGET_TYPE_QCN9000 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
 	    target_type == TARGET_TYPE_QCN9224 ||
+	    target_type == TARGET_TYPE_QCN9160 ||
 	    target_type == TARGET_TYPE_QCA6490 ||
 	    target_type == TARGET_TYPE_KIWI ||
 	    target_type == TARGET_TYPE_MANGO) {
@@ -3657,6 +3663,7 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	    target_type == TARGET_TYPE_QCA5018 ||
 	    target_type == TARGET_TYPE_QCA6390 ||
 	    target_type == TARGET_TYPE_QCN6122 ||
+	    target_type == TARGET_TYPE_QCN9160 ||
 	    target_type == TARGET_TYPE_QCA6490 ||
 	    target_type == TARGET_TYPE_QCN9000 ||
 	    target_type == TARGET_TYPE_QCA6750 ||
@@ -3678,6 +3685,7 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	    (target_type == TARGET_TYPE_QCA5018) ||
 	    (target_type == TARGET_TYPE_QCA5332) ||
 	    (target_type == TARGET_TYPE_QCN6122) ||
+	    (target_type == TARGET_TYPE_QCN9160) ||
 	    (target_type == TARGET_TYPE_QCN9000) ||
 	    (target_type == TARGET_TYPE_QCA6290) ||
 	    (target_type == TARGET_TYPE_QCA6390) ||
