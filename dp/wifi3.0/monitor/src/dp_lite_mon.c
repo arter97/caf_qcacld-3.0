@@ -1255,7 +1255,7 @@ dp_lite_mon_type_subtype_check(struct hal_rx_ppdu_info *ppdu_info,
 /**
  * dp_lite_mon_rx_filter_check - check if mpdu rcvd match filter setting
  * @ppdu_info: ppdu info context
- * @config: current lite mon config
+ * @config: current lite mon rx config
  * @user: user id
  * @mpdu: mpdu nbuf
  *
@@ -1263,7 +1263,7 @@ dp_lite_mon_type_subtype_check(struct hal_rx_ppdu_info *ppdu_info,
  */
 static QDF_STATUS
 dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
-			    struct dp_lite_mon_config *config,
+			    struct dp_lite_mon_rx_config *config,
 			    uint8_t user, qdf_nbuf_t mpdu)
 {
 	uint8_t filter_category;
@@ -1271,23 +1271,30 @@ dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 	filter_category = ppdu_info->rx_user_status[user].filter_category;
 	switch (filter_category) {
 	case DP_MPDU_FILTER_CATEGORY_FP:
-		if (config->fp_enabled &&
-		    (!config->peer_count || !config->fpmo_enabled))
-			return dp_lite_mon_type_subtype_check(ppdu_info, config,
-							      DP_MON_FRM_FILTER_MODE_FP,
-							      mpdu);
+		if (config->rx_config.fp_enabled &&
+		    (!config->rx_config.peer_count ||
+		     !config->rx_config.fpmo_enabled)) {
+			if (config->fp_type_subtype_filter_all)
+				return QDF_STATUS_SUCCESS;
+			else
+				return dp_lite_mon_type_subtype_check(ppdu_info,
+								      &config->rx_config,
+								      DP_MON_FRM_FILTER_MODE_FP,
+								      mpdu);
+		}
 		break;
 	case DP_MPDU_FILTER_CATEGORY_MD:
-		if (config->md_enabled)
+		if (config->rx_config.md_enabled)
 			return QDF_STATUS_SUCCESS;
 		break;
 	case DP_MPDU_FILTER_CATEGORY_MO:
-		if (config->mo_enabled &&
-		    (!config->peer_count || !config->md_enabled))
+		if (config->rx_config.mo_enabled &&
+		    (!config->rx_config.peer_count ||
+		     !config->rx_config.md_enabled))
 			return QDF_STATUS_SUCCESS;
 		break;
 	case DP_MPDU_FILTER_CATEGORY_FP_MO:
-		if (config->fpmo_enabled)
+		if (config->rx_config.fpmo_enabled)
 			return QDF_STATUS_SUCCESS;
 		break;
 	}
@@ -1572,7 +1579,8 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 	}
 
 	if (QDF_STATUS_SUCCESS !=
-		dp_lite_mon_rx_filter_check(ppdu_info, config,
+		dp_lite_mon_rx_filter_check(ppdu_info,
+					    lite_mon_rx_config,
 					    user, mon_mpdu)) {
 		/* mpdu did not pass filter check drop and return success */
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);
