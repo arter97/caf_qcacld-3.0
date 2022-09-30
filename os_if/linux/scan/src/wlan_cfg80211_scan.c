@@ -55,7 +55,7 @@ const struct nla_policy cfg80211_scan_policy[
 /**
  * wlan_cfg80211_is_colocated_6ghz_scan_supported() - Check whether colocated
  * 6ghz scan flag present in scan request or not
- * @scan_flag: Flags bitmap comming from kernel
+ * @scan_flag: Flags bitmap coming from kernel
  *
  * Return: True if colocated 6ghz scan flag present in scan req
  */

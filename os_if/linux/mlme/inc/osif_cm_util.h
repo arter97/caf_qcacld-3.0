@@ -198,7 +198,7 @@ typedef QDF_STATUS (*osif_cm_set_hlp_data_cb)(struct net_device *dev,
 #endif
 
 /**
- * typedef  osif_cm_disconnect_comp_cb: Disonnect complete callback
+ * typedef  osif_cm_disconnect_comp_cb: Disconnect complete callback
  * @vdev: vdev pointer
  * @rsp: disconnect response
  * @type: indicates update type

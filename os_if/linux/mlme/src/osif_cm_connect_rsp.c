@@ -94,7 +94,7 @@ osif_validate_connect_and_reset_src_id(struct vdev_osif_priv *osif_priv,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	/*
-	 * Do not send to kernel if last osif cookie doesnt match or
+	 * Do not send to kernel if last osif cookie doesn't match or
 	 * or source is CM_OSIF_CFG_CONNECT with success status.
 	 * If cookie matches reset the cookie and source.
 	 */
@@ -363,7 +363,7 @@ osif_populate_fils_params(struct cfg80211_connect_resp_params *rsp_params,
 	if (!connect_ies->fils_ie)
 		return;
 
-	/* Increament seq number to be used for next FILS */
+	/* Increment seq number to be used for next FILS */
 	rsp_params->fils.erp_next_seq_num =
 					connect_ies->fils_ie->fils_seq_num + 1;
 	rsp_params->fils.update_erp_next_seq_num = true;

@@ -29,7 +29,7 @@
 #include "wlan_cm_public_struct.h"
 
 /**
- * osif_disconnect_handler() - Indicate disconnnect to userspace
+ * osif_disconnect_handler() - Indicate disconnect to userspace
  * @vdev: vdev pointer
  * @rsp: Disconnect response from connection manager
  *

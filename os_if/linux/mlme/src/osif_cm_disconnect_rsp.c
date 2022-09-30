@@ -19,7 +19,7 @@
  * DOC: osif_cm_disconnect_rsp.c
  *
  * This file maintains definitaions of disconnect response
- * fucntions.
+ * functions.
  */
 
 #include <wlan_cfg80211.h>

@@ -2121,7 +2121,7 @@ enum qca_vendor_attr_interop_issues_ap {
  * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_INVALID: Invalid initial value
  * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_MPDU_SIZE_THRESHOLD: Size threshold
  * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_CONFIG_AGGRESSIVE_STATS_GATHERING:
- *	Aggresive stats gathering
+ *	Aggressive stats gathering
  * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_AFTER_LAST: After last
  * @QCA_WLAN_VENDOR_ATTR_LL_STATS_SET_MAX: Max value
  */
@@ -2770,7 +2770,7 @@ enum qca_roaming_policy {
  * deauthentication or disassociation frames received from the connected AP.
  *
  * @QCA_ROAM_REASON_PERIODIC_TIMER: Roam triggered as part of the periodic
- * scan that happens when there is no candiate AP found during the poor
+ * scan that happens when there is no candidate AP found during the poor
  * RSSI scan trigger.
  *
  * @QCA_ROAM_REASON_BACKGROUND_SCAN: Roam triggered based on the scan
@@ -3910,21 +3910,21 @@ enum qca_attr_nud_stats_set {
  * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_STATS_PKT_INFO_TYPE: set pkt info stats
  *	Bitmap to Flag to Start / Stop the NUD stats collection
  *	Start - If included , Stop - If not included
- * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_DNS_DOMAIN_NAME: set gatway ipv4 address
+ * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_DNS_DOMAIN_NAME: set gateway ipv4 address
  *	IPv4 address of Default Gateway (in network byte order)
  *	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_SET. This carry the requisite
  *	information to start / stop the NUD stats collection.
  * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_SRC_PORT: set nud debug stats
  *	Flag to Start / Stop the NUD stats collection
  *	Start - If included , Stop - If not included
- * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_DEST_PORT: set gatway ipv4 address
+ * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_DEST_PORT: set gateway ipv4 address
  *	IPv4 address of Default Gateway (in network byte order)
  *	QCA_NL80211_VENDOR_SUBCMD_NUD_STATS_SET. This carry the requisite
  *	information to start / stop the NUD stats collection.
  * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_DEST_IPV4: set nud debug stats
  *	Flag to Start / Stop the NUD stats collection
  *	Start - If included , Stop - If not included
- * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_DEST_IPV6: set gatway ipv4 address
+ * @QCA_ATTR_CONNECTIVITY_CHECK_STATS_DEST_IPV6: set gateway ipv4 address
  *	IPv4 address of Default Gateway (in network byte order)
  */
 enum qca_attr_connectivity_check_stats_set {
@@ -5309,7 +5309,7 @@ enum qca_wlan_vendor_attr_rssi_monitoring {
  * @QCA_WLAN_VENDOR_ATTR_NDP_PARAM_INVALID
  * @QCA_WLAN_VENDOR_ATTR_NDP_SUBCMD: sub commands values in qca_wlan_ndp_sub_cmd
  * @QCA_WLAN_VENDOR_ATTR_NDP_TRANSACTION_ID:
- * @QCA_WLAN_VENDOR_ATTR_NDP_SERVICE_INSTANCE_ID: indicats a service info
+ * @QCA_WLAN_VENDOR_ATTR_NDP_SERVICE_INSTANCE_ID: indicates a service info
  * @QCA_WLAN_VENDOR_ATTR_NDP_CHANNEL: channel frequency in MHz
  * @QCA_WLAN_VENDOR_ATTR_NDP_PEER_DISCOVERY_MAC_ADDR: Interface Discovery MAC
  * address
@@ -6906,7 +6906,7 @@ enum qca_wlan_vendor_attr_dmg_rf_sector_cfg {
  *	packets within a duration.
  *	QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_TX_STATS_PERIOD to initiate
  *	a TDLS setup.
- * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_DISCOVERY_PERIOD: Time (u32) to inititate
+ * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_DISCOVERY_PERIOD: Time (u32) to initiate
  *	a TDLS Discovery to the Peer.
  * @QCA_WLAN_VENDOR_ATTR_TDLS_CONFIG_MAX_DISCOVERY_ATTEMPT: Max number (u32) of
  *	discovery attempts to know the TDLS capability of the peer. A peer is
@@ -8143,7 +8143,7 @@ enum qca_wlan_vendor_attr_spectral_scan_status {
  *      Use XR level to benefit XR (extended reality) application to achieve
  *      latency and power by via constraint scan/roaming/adaptive PS.
  * @QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_LOW:
- *      Use low latency level to benifit application like concurrent
+ *      Use low latency level to benefit application like concurrent
  *      downloading or video streaming via constraint scan/adaptive PS.
  * @QCA_WLAN_VENDOR_ATTR_CONFIG_LATENCY_LEVEL_ULTRALOW:
  *      Use ultra low latency level to benefit for gaming/voice
@@ -9256,7 +9256,7 @@ enum qca_wlan_vendor_attr_wifi_test_config {
  * peer. Refers the enum qca_wlan_vendor_attr_twt_capability. It's a synchronous
  * operation.
  *
- * @QCA_WLAN_TWT_SETUP_READY_NOTIFY: Notify userspace that the firmare is
+ * @QCA_WLAN_TWT_SETUP_READY_NOTIFY: Notify userspace that the firmware is
  * ready for a new TWT session setup after it issued a twt teardown.
  *
  * @QCA_WLAN_TWT_SET_PARAM: Configure TWT related parameters. Required
@@ -10121,7 +10121,7 @@ enum qca_wlan_vendor_attr_nan_params {
  * @QCA_WLAN_VENDOR_CFR_DATA_RELAY_FS: Use RELAY FS to send CFR data.
  * @QCA_WLAN_VENDOR_CFR_DATA_NETLINK_EVENTS: Use netlink events to send CFR
  * data. The data shall be encapsulated within
- * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA along withe vendor sub command
+ * QCA_WLAN_VENDOR_ATTR_PEER_CFR_RESP_DATA along with vendor sub command
  * QCA_NL80211_VENDOR_SUBCMD_PEER_CFR_CAPTURE_CFG as an asynchronous event.
  */
 enum qca_wlan_vendor_cfr_data_transport_modes {
