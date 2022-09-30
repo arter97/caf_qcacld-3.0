@@ -759,7 +759,7 @@ static void cm_get_vdev_id_from_bssid(struct wlan_objmgr_pdev *pdev,
  * @cm_req: Connect request.
  *
  * As Connect is a blocking call this API will make sure the disconnect
- * doesnt timeout on any vdev and thus make sure that PEER/VDEV SM are cleaned
+ * doesn't timeout on any vdev and thus make sure that PEER/VDEV SM are cleaned
  * before vdev delete is sent.
  *
  * Return : true if disconnection is on any vdev_id
@@ -1423,7 +1423,7 @@ cm_handle_connect_req_in_non_init_state(struct cnx_mgr *cm_ctx,
 		 *    required to cleanup.
 		 *    so just add the connect request to the list.
 		 * 2. There is a connect request activated, followed by
-		 *    disconnect in pending queue. So keep the disconenct
+		 *    disconnect in pending queue. So keep the disconnect
 		 *    to cleanup the active connect and no action required to
 		 *    cleanup.
 		 */
@@ -1845,7 +1845,7 @@ static inline void cm_set_fils_connection(struct cnx_mgr *cm_ctx,
 
 	/*
 	 * Check and set only in case of failure and when
-	 * resp->is_fils_connection is not alredy set, else return.
+	 * resp->is_fils_connection is not already set, else return.
 	 */
 	if (QDF_IS_STATUS_SUCCESS(resp->connect_status) ||
 	    resp->is_fils_connection)
@@ -2182,7 +2182,7 @@ inline void cm_update_partner_link_scan_db(struct cnx_mgr *cm_ctx,
  * the connected AP entry.
  *
  * Context: Can be called from any context and to be used only if connect
- * is successful and SM is in conencted state. i.e. SM lock is hold.
+ * is successful and SM is in connected state. i.e. SM lock is hold.
  *
  * Return: void
  */
@@ -2318,7 +2318,7 @@ QDF_STATUS cm_notify_connect_complete(struct cnx_mgr *cm_ctx,
 	    sm_state == WLAN_CM_S_INIT &&
 	    cm_is_connect_id_reassoc_in_non_connected(cm_ctx, resp->cm_id)) {
 		resp->send_disconnect = true;
-		mlme_debug(CM_PREFIX_FMT "Set send disconnect to true to indicate disconnect instaed of connect resp",
+		mlme_debug(CM_PREFIX_FMT "Set send disconnect to true to indicate disconnect instead of connect resp",
 			   CM_PREFIX_REF(wlan_vdev_get_id(cm_ctx->vdev),
 					 resp->cm_id));
 	}

@@ -167,7 +167,7 @@
 
 /*
  * <ini>
- * chan_band_weightage - Channel Band perferance to 5GHZ to
+ * chan_band_weightage - Channel Band preference to 5GHZ to
  * calculate best candidate
  * @Min: 0
  * @Max: 100

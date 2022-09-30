@@ -134,7 +134,7 @@ static inline QDF_STATUS mlme_vdev_validate_basic_params(
  * @event_data_len: data size
  * @event_data: event data
  *
- * API resets the protocol params fo vdev
+ * API resets the protocol params of vdev
  *
  * Return: SUCCESS on successful reset
  *         FAILURE, if it fails due to any
@@ -668,7 +668,7 @@ static inline void mlme_vdev_start_rsp_notify_mlo_mgr(
 }
 
 /**
- * mlme_vdev_down_cmpl_notify_mlo_mgr - notify mlo link is down complate
+ * mlme_vdev_down_cmpl_notify_mlo_mgr - notify mlo link is down complete
  * @vdev_mlme_obj:  VDEV MLME comp object
  *
  * Return: VOID.

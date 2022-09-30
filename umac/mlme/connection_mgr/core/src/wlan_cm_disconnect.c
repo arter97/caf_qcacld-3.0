@@ -687,7 +687,7 @@ cm_handle_discon_req_in_non_connected_state(struct cnx_mgr *cm_ctx,
 		 * So no need to do anything here, just return failure and drop
 		 * disconnect.
 		 */
-		mlme_info("vdev %d droping disconnect req from source %d in INIT state",
+		mlme_info("vdev %d dropping disconnect req from source %d in INIT state",
 			  wlan_vdev_get_id(cm_ctx->vdev), cm_req->req.source);
 		return QDF_STATUS_E_ALREADY;
 	default:

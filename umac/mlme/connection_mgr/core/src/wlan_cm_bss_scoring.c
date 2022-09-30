@@ -1394,7 +1394,7 @@ cm_calculate_etp_score(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
- * cm_get_band_score() - Get band prefernce weightage
+ * cm_get_band_score() - Get band preference weightage
  * freq: Operating frequency of the AP
  * @score_config: Score configuration
  *
@@ -2122,7 +2122,7 @@ static int cm_calculate_bss_score(struct wlan_objmgr_psoc *psoc,
 	if (congestion_pct < CM_CONGESTION_THRSHOLD_FOR_BAND_OCE_SCORE) {
 		/*
 		 * If AP is on 5/6 GHZ channel , extra weigtage is added to BSS
-		 * score. if RSSI is greater tha 5g rssi threshold or fall in
+		 * score. if RSSI is greater than 5g rssi threshold or fall in
 		 * same bucket else give weigtage to 2.4 GHZ AP.
 		 */
 		if ((entry->rssi_raw > rssi_pref_5g_rssi_thresh) &&
@@ -2465,7 +2465,7 @@ bool wlan_cm_6ghz_allowed_for_akm(struct wlan_objmgr_psoc *psoc,
 		 * Check if any AKM is allowed as per user 6Ghz allowed AKM mask
 		 */
 		if (!(config->key_mgmt_mask_6ghz & key_mgmt)) {
-			mlme_debug("user configured mask %x didnt match AKM %x",
+			mlme_debug("user configured mask %x didn't match AKM %x",
 				   config->key_mgmt_mask_6ghz , key_mgmt);
 			return false;
 		}

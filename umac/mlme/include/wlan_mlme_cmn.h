@@ -482,7 +482,7 @@ QDF_STATUS mlme_vdev_enqueue_exp_ser_cmd(struct vdev_mlme_obj *vdev_mlme,
 					 uint8_t cmd_type);
 
 /**
- * mlme_vdev_ops_start_fw_send - Send WMI START/RESTART commmand to FW
+ * mlme_vdev_ops_start_fw_send - Send WMI START/RESTART command to FW
  * @vdev:  VDEV object
  *
  * API to send WMI start/restart command to FW
@@ -495,7 +495,7 @@ QDF_STATUS mlme_vdev_ops_start_fw_send(struct wlan_objmgr_vdev *vdev,
 
 /**
  * mlme_vdev_ops_multivdev_restart_fw_cmd_send - Send WMI Multivdev restart
- *                                              commmand to FW
+ *                                              command to FW
  * @pdev:  PDEV object
  *
  * API to send WMI multivdev restart command to FW
@@ -507,7 +507,7 @@ QDF_STATUS mlme_vdev_ops_multivdev_restart_fw_cmd_send(
 						struct wlan_objmgr_pdev *pdev);
 
 /**
- * mlme_vdev_ops_stop_fw_send - Send WMI STOP commmand to FW
+ * mlme_vdev_ops_stop_fw_send - Send WMI STOP command to FW
  * @vdev:  VDEV object
  *
  * API to send WMI stop command to FW
@@ -518,7 +518,7 @@ QDF_STATUS mlme_vdev_ops_multivdev_restart_fw_cmd_send(
 QDF_STATUS mlme_vdev_ops_stop_fw_send(struct wlan_objmgr_vdev *vdev);
 
 /**
- * mlme_vdev_ops_down_fw_send - Send WMI Down commmand to FW
+ * mlme_vdev_ops_down_fw_send - Send WMI Down command to FW
  * @vdev:  VDEV object
  *
  * API to send WMI down command to FW

@@ -906,7 +906,7 @@ bool cm_is_vdev_connected(struct wlan_objmgr_vdev *vdev);
 bool cm_is_vdev_active(struct wlan_objmgr_vdev *vdev);
 
 /**
- * cm_is_vdev_disconnecting() - check if vdev is in disconneting state
+ * cm_is_vdev_disconnecting() - check if vdev is in disconnecting state
  * @vdev: vdev pointer
  *
  * Return: bool
@@ -983,7 +983,7 @@ cm_get_active_req_type(struct wlan_objmgr_vdev *vdev);
  * @vdev: vdev pointer
  * @req: pointer to the copy of the active connect request
  * *
- * Context: Should be called only in the conext of the
+ * Context: Should be called only in the context of the
  * cm request activation
  *
  * Return: true and connect req if any request is active
@@ -996,7 +996,7 @@ bool cm_get_active_connect_req(struct wlan_objmgr_vdev *vdev,
  * @vdev: vdev pointer
  * @req: pointer to the copy of the active disconnect request
  * *
- * Context: Should be called only in the conext of the
+ * Context: Should be called only in the context of the
  * cm request activation
  *
  * Return: true and disconnect req if any request is active

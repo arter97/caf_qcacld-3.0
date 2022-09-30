@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -57,7 +58,7 @@
  * @WLAN_CM_SS_IDLE:                    Idle state (no substate)
  * @WLAN_CM_SS_JOIN_PENDING:            Connect request not serialized
  * @WLAN_CM_SS_SCAN:                    Scan for SSID state
- * @WLAN_CM_SS_JOIN_ACTIVE:             Conenct request activated
+ * @WLAN_CM_SS_JOIN_ACTIVE:             Connect request activated
  * @WLAN_CM_SS_PREAUTH:                 Roam substate of preauth stage
  * @WLAN_CM_SS_REASSOC:                 Roam substate for reassoc state
  * @WLAN_CM_SS_ROAM_STARTED:            Roaming in progress (LFR 3.0)
@@ -231,7 +232,7 @@ struct cm_req_history {
  * this is used to get which command to flush from serialization during
  * host roaming.
  * @req_list: connect/disconnect req list
- * @cm_req_lock: lock to manupulate/read the cm req list
+ * @cm_req_lock: lock to manipulate/read the cm req list
  * @disconnect_count: disconnect count
  * @connect_count: connect count
  * @force_rsne_override: if QCA_WLAN_VENDOR_ATTR_CONFIG_RSN_IE is set by

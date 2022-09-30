@@ -425,7 +425,7 @@ struct fils_connect_rsp_params {
 /**
  * struct connect_rsp_ies - connect rsp ies stored in vdev filled during connect
  * @bcn_probe_rsp: Raw beacon or probe rsp of connected AP
- * @assoc_req: assoc req IE pointer send during conenct
+ * @assoc_req: assoc req IE pointer send during connect
  * @assoc_rsq: assoc rsp IE received during connection
  * @fills_ie: fills connection ie received during connection
  */
