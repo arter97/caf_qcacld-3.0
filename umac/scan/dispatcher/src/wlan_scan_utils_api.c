@@ -3242,7 +3242,18 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
+					 uint8_t *frame, qdf_size_t frame_len,
+					 uint32_t frm_subtype,
+					 struct mgmt_rx_event_params *rx_param,
+					 qdf_list_t *scan_list)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
+#if defined(WLAN_FEATURE_11BE) && defined(WLAN_FEATURE_11BE_MLO_MBSSID)
 /*
  * util_scan_gen_txvap_scan_entry() - Strip out the MBSSID tag from the received
  * frame and update the modified frame length before generating a scan entry.
@@ -3360,26 +3371,112 @@ util_scan_gen_txvap_scan_entry(struct wlan_objmgr_pdev *pdev,
 	qdf_mem_free(trimmed_frame);
 	return status;
 }
+
+/*
+ * util_scan_parse_eht_beacon() : This API will be executed
+ * only for 11BE platforms as per current design.
+ * IF MBSSID IE is present in the beacon then
+ * scan component will create a new entry for
+ * each BSSID found in the MBSSID
+ * util_scan_parse_mbssid() takes care of creating
+ * scan entries for every non tx profile present in
+ * the MBSSID tag.
+ * util_scan_gen_txvap_scan_entry() helps in generating
+ * scan entry for the tx profile.
+ */
+static QDF_STATUS
+util_scan_parse_eht_beacon(struct wlan_objmgr_pdev *pdev,
+			   uint8_t *frame, qdf_size_t frame_len,
+			   uint8_t *ie_list, uint32_t ielen,
+			   uint32_t frm_subtype,
+			   struct mgmt_rx_event_params *rx_param,
+			   qdf_list_t *scan_list,
+			   struct scan_mbssid_info *mbssid_info,
+			   uint8_t *mbssid_ie)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (mbssid_ie) {
+		status = util_scan_parse_mbssid(pdev, frame, frame_len,
+						frm_subtype, rx_param,
+						scan_list);
+
+		if (QDF_IS_STATUS_ERROR(status)) {
+			scm_debug_rl("NonTx prof: Failed to create scan entry");
+			return status;
+		}
+
+		status = util_scan_gen_txvap_scan_entry(pdev, frame,
+							frame_len, ie_list,
+							ielen, frm_subtype,
+							rx_param, scan_list,
+							mbssid_info);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			scm_debug_rl("TX prof: Failed to create scan entry");
+
+		return status;
+	}
+
+	/*For Non MBSSIE case*/
+	status = util_scan_gen_scan_entry(pdev, frame, frame_len,
+					  frm_subtype, rx_param,
+					  mbssid_info, scan_list);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		scm_debug_rl("Non-MBSSIE frame: Failed to create scan entry");
+
+	return status;
+}
+
+static bool
+util_scan_is_platform_eht_capable(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_lmac_if_tx_ops *tx_ops = NULL;
+	struct wlan_lmac_if_scan_tx_ops *scan_ops = NULL;
+	uint8_t pdev_id;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc) {
+		scm_debug_rl("psoc is null");
+		return false;
+	}
+	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
+	if (!tx_ops) {
+		scm_debug_rl("tx_ops is null");
+		return false;
+	}
+	scan_ops = &tx_ops->scan;
+	if (!scan_ops) {
+		scm_debug_rl("scan_ops is null");
+		return false;
+	}
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+
+	if (scan_ops->is_platform_eht_capable)
+		return scan_ops->is_platform_eht_capable;
+
+	return false;
+}
 #else
-static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
-					 uint8_t *frame, qdf_size_t frame_len,
-					 uint32_t frm_subtype,
-					 struct mgmt_rx_event_params *rx_param,
-					 qdf_list_t *scan_list)
+static QDF_STATUS
+util_scan_parse_eht_beacon(struct wlan_objmgr_pdev *pdev,
+			   uint8_t *frame, qdf_size_t frame_len,
+			   uint8_t *ie_list, uint32_t ielen,
+			   uint32_t frm_subtype,
+			   struct mgmt_rx_event_params *rx_param,
+			   qdf_list_t *scan_list,
+			   struct scan_mbssid_info *mbssid_info,
+			   uint8_t *mbssid_ie)
 {
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS
-util_scan_gen_txvap_scan_entry(struct wlan_objmgr_pdev *pdev,
-			       uint8_t *frame, qdf_size_t frame_len,
-			       uint8_t *ie_list, uint32_t ielen,
-			       uint32_t frm_subtype,
-			       struct mgmt_rx_event_params *rx_param,
-			       qdf_list_t *scan_list,
-			       struct scan_mbssid_info *mbssid_info)
+static bool
+util_scan_is_platform_eht_capable(struct wlan_objmgr_pdev *pdev)
 {
-	return QDF_STATUS_SUCCESS;
+	return false;
 }
 #endif
 
@@ -3398,6 +3495,7 @@ util_scan_parse_beacon_frame(struct wlan_objmgr_pdev *pdev,
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct scan_mbssid_info mbssid_info = { 0 };
 	uint8_t *ie_list;
+	bool eht_support = false;
 
 	hdr = (struct wlan_frame_hdr *)frame;
 	bcn = (struct wlan_bcn_frame *)
@@ -3427,45 +3525,29 @@ util_scan_parse_beacon_frame(struct wlan_objmgr_pdev *pdev,
 		}
 	}
 
-	/*
-	 * IF MBSSID IE is present in the beacon then
-	 * scan component will create a new entry for
-	 * each BSSID found in the MBSSID
-	 * util_scan_parse_mbssid() takes care of creating
-	 * scan entries for every non tx profile present in
-	 * the MBSSID tag.
-	 * util_scan_gen_txvap_scan_entry() helps in generating
-	 * scan entry for the tx profile.
-	 */
-	if (mbssid_ie) {
-		status = util_scan_parse_mbssid(pdev, frame, frame_len,
-						frm_subtype, rx_param,
-						scan_list);
+	eht_support = util_scan_is_platform_eht_capable(pdev);
 
-		if (QDF_IS_STATUS_ERROR(status)) {
-			scm_debug_rl("NonTx prof: Failed to create scan entry");
-			return status;
-		}
-
-		status = util_scan_gen_txvap_scan_entry(pdev, frame,
-							frame_len, ie_list,
-							ie_len, frm_subtype,
-							rx_param, scan_list,
-							&mbssid_info);
-		if (QDF_IS_STATUS_ERROR(status))
-			scm_debug_rl("TX prof: Failed to create scan entry");
-
+	if (eht_support) {
+		status = util_scan_parse_eht_beacon(pdev, frame, frame_len,
+						    ie_list, ie_len,
+						    frm_subtype, rx_param,
+						    scan_list, &mbssid_info,
+						    mbssid_ie);
 		return status;
 	}
 
-	/*For Non MBSSIE case*/
 	status = util_scan_gen_scan_entry(pdev, frame, frame_len,
 					  frm_subtype, rx_param,
 					  &mbssid_info,
 					  scan_list);
 
+	if (mbssid_ie)
+		status = util_scan_parse_mbssid(pdev, frame, frame_len,
+						frm_subtype, rx_param,
+						scan_list);
+
 	if (QDF_IS_STATUS_ERROR(status))
-		scm_debug_rl("Non-MBSSIE frame: Failed to create scan entry");
+		scm_debug_rl("Failed to create scan entry");
 
 	return status;
 }

@@ -408,6 +408,8 @@ struct wlan_lmac_if_scan_tx_ops {
 	QDF_STATUS (*scan_unreg_ev_handler)(struct wlan_objmgr_psoc *psoc,
 			void *arg);
 	QDF_STATUS (*set_chan_list)(struct wlan_objmgr_pdev *pdev, void *arg);
+	bool (*is_platform_eht_capable)(struct wlan_objmgr_psoc *psoc,
+					uint8_t pdev_id);
 };
 
 /**
