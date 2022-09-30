@@ -1243,7 +1243,7 @@ static void hnc_cpu_online_cb(void *context, uint32_t cpu)
  * @context: the associated HIF context
  * @cpu: the CPU Id of the CPU the event happened on
  *
- * On transtion to offline, we act on PREP events, because we may need to move
+ * On transition to offline, we act on PREP events, because we may need to move
  * the irqs/NAPIs to another CPU before it is actually off-lined.
  *
  * Return: None
@@ -1488,7 +1488,7 @@ static int hncm_migrate_to(struct qca_napi_data *napid,
  * @napid: pointer to NAPI block
  * @act  : RELOCATE | COLLAPSE | DISPERSE
  *
- * Finds the designated destionation for the next IRQ.
+ * Finds the designated destination for the next IRQ.
  * RELOCATE: translated to either COLLAPSE or DISPERSE based
  *           on napid->napi_mode (throughput state)
  * COLLAPSE: All have the same destination: the first online CPU in lilcl
@@ -1542,7 +1542,7 @@ retry_disperse:
 			}
 			i = napid->napi_cpu[i].cluster_nxt;
 		}
-		/* Check if matches with user sepecified CPU mask */
+		/* Check if matches with user specified CPU mask */
 		smallidx = ((1 << smallidx) & napid->user_cpu_affin_mask) ?
 								smallidx : -1;
 

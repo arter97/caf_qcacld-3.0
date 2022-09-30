@@ -385,8 +385,8 @@ struct ce_srng_dest_status_desc {
  * union ce_desc - unified data type for ce descriptors
  *
  * Both src and destination descriptors follow the same format.
- * They use different data structures for different access symantics.
- * Here we provice a unifying data type.
+ * They use different data structures for different access semantics.
+ * Here we provide a unifying data type.
  */
 union ce_desc {
 	struct CE_src_desc src_desc;
@@ -420,7 +420,7 @@ union ce_srng_desc {
  *	index of the RX ring in fastpath
  * @FAST_TX_WRITE_INDEX_UPDATE: event recorded before updating the write index
  *	of the TX ring in fastpath
- * @FAST_TX_WRITE_INDEX_SOFTWARE_UPDATE: recored when dropping a write to
+ * @FAST_TX_WRITE_INDEX_SOFTWARE_UPDATE: recorded when dropping a write to
  *	the write index in fastpath
  * @FAST_TX_SOFTWARE_INDEX_UPDATE: event recorded before updating the software
  *	index of the RX ring in fastpath
@@ -432,7 +432,7 @@ union ce_srng_desc {
  * @HIF_CE_REAP_EXIT:  records when we process completion outside of a bh
  * @NAPI_SCHEDULE: records when napi is scheduled from the irq context
  * @NAPI_POLL_ENTER: records the start of the napi poll function
- * @NAPI_COMPLETE: records when interrupts are reenabled
+ * @NAPI_COMPLETE: records when interrupts are re-enabled
  * @NAPI_POLL_EXIT: records when the napi poll function returns
  * @HIF_RX_NBUF_ALLOC_FAILURE: record the packet when nbuf fails to allocate
  * @HIF_RX_NBUF_MAP_FAILURE: record the packet when dma map fails

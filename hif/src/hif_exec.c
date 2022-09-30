@@ -927,7 +927,7 @@ hif_check_and_trigger_sys_resume(struct hif_softc *scn, int irq)
  * @irq: irq number of the interrupt
  * @context: the associated hif_exec_group context
  *
- * This callback function takes care of dissabling the associated interrupts
+ * This callback function takes care of disabling the associated interrupts
  * and scheduling the expected bottom half for the exec_context.
  * This callback function also helps keep track of the count running contexts.
  */

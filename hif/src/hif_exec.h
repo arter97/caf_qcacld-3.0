@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -58,14 +58,14 @@ struct hif_execution_ops {
  * @context_name: a pointer to a const string for debugging.
  *		this should help whenever there could be ambiguity
  *		in what type of context the void* context points to
- * @irq: irq handle coresponding to hw block
- * @os_irq: irq handle for irq_afinity
+ * @irq: irq handle corresponding to hw block
+ * @os_irq: irq handle for irq_affinity
  * @cpu: the cpu this context should be affined to
  * @work_complete: Function call called when leaving the execution context to
  *	determine if this context should reschedule or wait for an interrupt.
  *	This function may be used as a hook for post processing.
  *
- * @sched_latency_stats: schdule latency stats for different latency buckets
+ * @sched_latency_stats: schedule latency stats for different latency buckets
  * @tstamp: timestamp when napi poll happens
  * @irq_disable: called before scheduling the context.
  * @irq_enable: called when the context leaves polling mode

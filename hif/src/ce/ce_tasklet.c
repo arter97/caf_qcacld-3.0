@@ -566,7 +566,7 @@ static void ce_tasklet_entry_dump(struct HIF_CE_state *hif_ce_state)
  * hif_drain_tasklets(): wait until no tasklet is pending
  * @scn: hif context
  *
- * Let running tasklets clear pending trafic.
+ * Let running tasklets clear pending traffic.
  *
  * Return: 0 if no bottom half is in progress when it returns.
  *   -EFAULT if it times out.
@@ -959,7 +959,7 @@ const char *ce_name[CE_COUNT_MAX] = {
 /**
  * ce_unregister_irq() - ce_unregister_irq
  * @hif_ce_state: hif_ce_state copy engine device handle
- * @mask: which coppy engines to unregister for.
+ * @mask: which copy engines to unregister for.
  *
  * Unregisters copy engine irqs matching mask.  If a 1 is set at bit x,
  * unregister for copy engine x.
@@ -1007,7 +1007,7 @@ QDF_STATUS ce_unregister_irq(struct HIF_CE_state *hif_ce_state, uint32_t mask)
 /**
  * ce_register_irq() - ce_register_irq
  * @hif_ce_state: hif_ce_state
- * @mask: which coppy engines to unregister for.
+ * @mask: which copy engines to unregister for.
  *
  * Registers copy engine irqs matching mask.  If a 1 is set at bit x,
  * Register for copy engine x.

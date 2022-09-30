@@ -1536,7 +1536,7 @@ uint8_t hif_get_max_wmi_ep(struct hif_opaque_softc *hif_ctx)
  * @type: "src_ring" or "dest_ring" string for identifying the ring
  *
  * Warns on non-zero index values.
- * Causes a kernel panic if the ring is not empty durring initialization.
+ * Causes a kernel panic if the ring is not empty during initialization.
  */
 static void ce_ring_test_initial_indexes(int ce_id, struct CE_ring_state *ring,
 					 char *type)
@@ -2258,8 +2258,8 @@ void ce_disable_polling(void *cestate)
  * initialization. It may be that only one side or the other is
  * initialized by software/firmware.
  *
- * This should be called durring the initialization sequence before
- * interupts are enabled, so we don't have to worry about thread safety.
+ * This should be called during the initialization sequence before
+ * interrupts are enabled, so we don't have to worry about thread safety.
  */
 struct CE_handle *ce_init(struct hif_softc *scn,
 			  unsigned int CE_id, struct CE_attr *attr)
@@ -2519,7 +2519,7 @@ static int hif_get_pktlog_ce_num(struct hif_softc *scn)
  *
  * For use in data path
  *
- * Retrun: void
+ * Return: void
  */
 void hif_enable_fastpath(struct hif_opaque_softc *hif_ctx)
 {
@@ -2574,7 +2574,7 @@ qdf_export_symbol(hif_get_ce_handle);
  *
  * This is called while dismantling CE structures. No other thread
  * should be using these structures while dismantling is occurring
- * therfore no locking is needed.
+ * therefore no locking is needed.
  *
  * Return: none
  */
@@ -2899,7 +2899,7 @@ void hif_send_complete_check(struct hif_opaque_softc *hif_ctx, uint8_t pipe,
 #if defined(CE_TASKLET_SCHEDULE_ON_FULL) && defined(CE_TASKLET_DEBUG_ENABLE)
 #define CE_RING_FULL_THRESHOLD_TIME 3000000
 #define CE_RING_FULL_THRESHOLD 1024
-/* Ths function is called from htc_send path. If there is no resourse to send
+/* This function is called from htc_send path. If there is no resourse to send
  * packet via HTC, then check if interrupts are not processed from that
  * CE for last 3 seconds. If so, schedule a tasklet to reap available entries.
  * Also if Queue has reached 1024 entries within 3 seconds, then also schedule

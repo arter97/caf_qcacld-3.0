@@ -276,12 +276,12 @@ struct CE_state;
  * qca_napi_stat - stats structure for execution contexts
  * @napi_schedules - number of times the schedule function is called
  * @napi_polls - number of times the execution context runs
- * @napi_completes - number of times that the generating interrupt is reenabled
+ * @napi_completes - number of times that the generating interrupt is re-enabled
  * @napi_workdone - cumulative of all work done reported by handler
  * @cpu_corrected - incremented when execution context runs on a different core
  *			than the one that its irq is affined to.
  * @napi_budget_uses - histogram of work done per execution run
- * @time_limit_reache - count of yields due to time limit threshholds
+ * @time_limit_reache - count of yields due to time limit thresholds
  * @rxpkt_thresh_reached - count of yields due to a work limit
  * @poll_time_buckets - histogram of poll times for the napi
  *
@@ -375,7 +375,7 @@ struct qca_napi_cpu {
  * @lock: spinlock used in the event state machine
  * @state: state variable used in the napi stat machine
  * @ce_map: bit map indicating which ce's have napis running
- * @exec_map: bit map of instanciated exec contexts
+ * @exec_map: bit map of instantiated exec contexts
  * @user_cpu_affin_map: CPU affinity map from INI config.
  * @napi_cpu: cpu info for irq affinty
  * @lilcl_head:
@@ -909,7 +909,7 @@ static inline void *hif_get_ce_handle(struct hif_opaque_softc *hif_ctx, int ret)
 
 /*
  * Enable/disable CDC max performance workaround
- * For max-performace set this to 0
+ * For max-performance set this to 0
  * To allow SoC to enter sleep set this to 1
  */
 #define CONFIG_DISABLE_CDC_MAX_PERF_WAR 0
@@ -1172,7 +1172,7 @@ enum hif_ep_vote_type {
 /**
  * enum hif_ep_vote_access - hif ep vote access
  * HIF_EP_VOTE_ACCESS_ENABLE: Enable ep voting
- * HIF_EP_VOTE_INTERMEDIATE_ACCESS: allow during transistion
+ * HIF_EP_VOTE_INTERMEDIATE_ACCESS: allow during transition
  * HIF_EP_VOTE_ACCESS_DISABLE: disable ep voting
  */
 enum hif_ep_vote_access {
@@ -1214,7 +1214,7 @@ enum  hif_rtpm_client_id {
  * HIF_RTPM_GET_ASYNC: Increment usage count and when system is suspended
  *		      schedule resume process, return depends on pm state.
  * HIF_RTPM_GET_FORCE: Increment usage count and when system is suspended
- *		      shedule resume process, returns success irrespective of
+ *		      schedule resume process, returns success irrespective of
  *		      pm_state.
  * HIF_RTPM_GET_SYNC: Increment usage count and when system is suspended,
  *		     wait till process is resumed.
@@ -1414,7 +1414,7 @@ void hif_rtpm_set_monitor_wake_intr(int val);
  * hif_pre_runtime_suspend() - book keeping before beginning runtime suspend.
  * @hif_ctx: HIF context
  *
- * Makes sure that the pci link will be taken down by the suspend opperation.
+ * Makes sure that the pci link will be taken down by the suspend operation.
  * If the hif layer is configured to leave the bus on, runtime suspend will
  * not save any power.
  *
@@ -1807,7 +1807,7 @@ int32_t hif_get_int_ctx_irq_num(struct hif_opaque_softc *softc,
 				uint8_t id);
 
 /**
- * hif_configure_ext_group_interrupts() - Congigure ext group intrrupts
+ * hif_configure_ext_group_interrupts() - Configure ext group interrupts
  * @hif_ctx: hif opaque context
  *
  * Return: QDF_STATUS
@@ -1815,7 +1815,7 @@ int32_t hif_get_int_ctx_irq_num(struct hif_opaque_softc *softc,
 QDF_STATUS hif_configure_ext_group_interrupts(struct hif_opaque_softc *hif_ctx);
 
 /**
- * hif_deconfigure_ext_group_interrupts() - Deconfigure ext group intrrupts
+ * hif_deconfigure_ext_group_interrupts() - Deconfigure ext group interrupts
  * @hif_ctx: hif opaque context
  *
  * Return: None

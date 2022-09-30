@@ -226,7 +226,7 @@ static void hif_rtpm_debugfs_remove(void)
 /**
  * hif_rtpm_init() - Initialize Runtime PM
  * @dev: device structure
- * @delay: delay to be confgured for auto suspend
+ * @delay: delay to be configured for auto suspend
  *
  * This function will init all the Runtime PM config.
  *

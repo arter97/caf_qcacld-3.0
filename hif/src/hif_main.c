@@ -143,7 +143,7 @@ void hif_vote_link_down(struct hif_opaque_softc *hif_ctx)
  * hif_vote_link_up(): vote to prevent bus from suspending
  *
  * Makes hif guarantee that fw can message the host normally
- * durring suspend.
+ * during suspend.
  *
  * SYNCHRONIZE WITH hif_vote_link_up by only calling in MC thread
  * and initialization deinitialization sequencences.
@@ -171,7 +171,7 @@ void hif_vote_link_up(struct hif_opaque_softc *hif_ctx)
  * we don't need extra locking to ensure votes dont change while
  * we are in the process of suspending or resuming.
  *
- * Return: false if hif will guarantee link up durring suspend.
+ * Return: false if hif will guarantee link up during suspend.
  */
 bool hif_can_suspend_link(struct hif_opaque_softc *hif_ctx)
 {
@@ -857,12 +857,12 @@ static void hif_latency_detect_timeout_handler(void *arg)
 				    BIT(HIF_DETECT_TASKLET) |
 				    BIT(HIF_DETECT_CREDIT));
 
-	/* it need to make sure timer start on a differnt cpu,
+	/* it need to make sure timer start on a different cpu,
 	 * so it can detect the tasklet schedule stall, but there
 	 * is still chance that, after timer has been started, then
 	 * irq/tasklet happens on the same cpu, then tasklet will
 	 * execute before softirq timer, if this tasklet stall, the
-	 * timer can't detect it, we can accept this as a limition,
+	 * timer can't detect it, we can accept this as a limitation,
 	 * if tasklet stall, anyway other place will detect it, just
 	 * a little later.
 	 */
@@ -2085,7 +2085,7 @@ void hif_mem_free_consistent_unaligned(struct hif_softc *scn,
  * @osc: HIF Context
  * @msdu : list of msdus to be sent
  * @transfer_id : transfer id
- * @len : donwloaded length
+ * @len : downloaded length
  *
  * Return: list of msds not sent
  */

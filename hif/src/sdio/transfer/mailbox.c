@@ -276,7 +276,7 @@ void hif_dev_get_block_size(void *config)
 /**
  * hif_dev_map_service_to_pipe() - maps ul/dl pipe to service id.
  * @pDev: SDIO HIF object
- * @ServiceId: sevice index
+ * @ServiceId: service index
  * @ULPipe: uplink pipe id
  * @DLPipe: down-linklink pipe id
  *
@@ -618,7 +618,7 @@ void hif_fixup_write_param(struct hif_sdio_dev *pdev, uint32_t req,
 }
 
 /**
- * hif_dev_recv_packet() - Receieve HTC packet/packet information from device
+ * hif_dev_recv_packet() - Receive HTC packet/packet information from device
  * @pdev : HIF device object
  * @packet : The HTC packet pointer
  * @recv_length : The length of information to be received
@@ -1362,7 +1362,7 @@ QDF_STATUS hif_dev_process_pending_irqs(struct hif_sdio_device *pdev,
 	} while (false);
 
 	/* an optimization to bypass reading the IRQ status registers
-	 * unecessarily which can re-wake the target, if upper layers
+	 * unnecessarily which can re-wake the target, if upper layers
 	 * determine that we are in a low-throughput mode, we can
 	 * rely on taking another interrupt rather than re-checking
 	 * the status registers which can re-wake the target.

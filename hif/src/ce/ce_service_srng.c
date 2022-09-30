@@ -225,7 +225,7 @@ ce_send_nolock_srng(struct CE_handle *copyeng,
 		hal_srng_access_end(scn->hal_soc, src_ring->srng_ctx);
 
 		/* src_ring->write index hasn't been updated event though
-		 * the register has allready been written to.
+		 * the register has already been written to.
 		 */
 		hif_record_ce_srng_desc_event(scn, CE_state->id, event_type,
 					      (union ce_srng_desc *)src_desc,
@@ -835,7 +835,7 @@ static inline bool ce_is_status_ring_timer_thresh_war_needed(void)
  * @ring_params: pointer to initialized parameters
  *
  * For Napier & Hawkeye v1, the status ring timer interrupts do not work
- * As a work arround host configures the destination rings to be a proxy for
+ * As a workaround host configures the destination rings to be a proxy for
  * work needing to be done.
  *
  * The interrupts are setup such that if the destination ring is less than fully
@@ -844,7 +844,7 @@ static inline bool ce_is_status_ring_timer_thresh_war_needed(void)
  *
  * There is a timing bug in srng based copy engines such that a fully posted
  * srng based copy engine has 2 empty entries instead of just one.  The copy
- * engine data sturctures work with 1 empty entry, but the software frequently
+ * engine data structures work with 1 empty entry, but the software frequently
  * fails to post the last entry due to the race condition.
  */
 static void ce_srng_initialize_dest_timer_interrupt_war(
@@ -1017,7 +1017,7 @@ static void ce_prepare_shadow_register_v2_cfg_srng(struct hif_softc *scn,
 			      num_shadow_registers_configured);
 
 	if (*num_shadow_registers_configured != 0) {
-		hif_err("hal shadow register configuration allready constructed");
+		hif_err("hal shadow register configuration already constructed");
 
 		/* return with original configuration*/
 		return;
@@ -1045,7 +1045,7 @@ static void ce_prepare_shadow_register_v3_cfg_srng(struct hif_softc *scn,
 				 num_shadow_registers_configured);
 
 	if (*num_shadow_registers_configured != 0) {
-		hif_err("hal shadow register configuration allready constructed");
+		hif_err("hal shadow register configuration already constructed");
 
 		/* return with original configuration*/
 		return;

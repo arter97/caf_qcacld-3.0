@@ -440,7 +440,7 @@ void hif_ahb_disable_bus(struct hif_softc *scn)
  * @type: bus type
  *
  * This function enables the radio bus by enabling necessary
- * clocks and waits for the target to get ready to proceed futher
+ * clocks and waits for the target to get ready to proceed further
  *
  * Return: QDF_STATUS
  */
