@@ -1343,7 +1343,7 @@ struct wlan_dfs_priv {
  * @pdev: pointer to PDEV object information
  * @dfs_is_phyerr_filter_offload: For some chip like Rome indicates too many
  *                                phyerr packets in a short time, which causes
- *                                OS hang. If this feild is configured as true,
+ *                                OS hang. If this field is configured as true,
  *                                FW will do the pre-check, filter out some
  *                                kinds of invalid phyerrors and indicate
  *                                radar detection related information to host.
@@ -1714,7 +1714,7 @@ int dfs_bin5_addpulse(struct wlan_dfs *dfs,
  * dfs_bin5_check() - BIN5 check.
  * @dfs: Pointer to wlan_dfs structure.
  *
- * If the dfs structure is NULL (which should be illegal if everyting is working
+ * If the dfs structure is NULL (which should be illegal if everything is working
  * properly, then signify that a bin5 radar was found.
  */
 int dfs_bin5_check(struct wlan_dfs *dfs);
@@ -2959,7 +2959,7 @@ void dfs_start_mode_switch_defer_timer(struct wlan_dfs *dfs);
 
 /**
  * dfs_complete_deferred_tasks() - Process mode switch completion event and
- * handle deffered tasks.
+ * handle deferred tasks.
  * @dfs: Pointer to wlan_dfs object.
  *
  * Return: void.

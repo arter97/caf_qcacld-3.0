@@ -701,7 +701,7 @@ void dfs_get_po_radars(struct wlan_dfs *dfs)
 			tgt_tx_ops->tgt_is_tgt_type_qca9984(target_type) ||
 			tgt_tx_ops->tgt_is_tgt_type_qca9888(target_type)) {
 		/* Beeliner WAR: lower RSSI threshold to improve detection of
-		 * certian radar types
+		 * certain radar types
 		 */
 		/* Cascade WAR:
 		 * Cascade can report lower RSSI near the channel boundary then
@@ -817,7 +817,7 @@ void dfs_extract_radar_found_params(struct wlan_dfs *dfs,
 
 	/* Bangradar will not populate any of these average
 	 * parameters as pulse is not received. If these variables
-	 * are not resetted here, these go as radar_found params
+	 * are not reset here, these go as radar_found params
 	 * for bangradar if bangradar is issued after real radar.
 	 */
 	dfs->dfs_average_sidx = 0;

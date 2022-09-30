@@ -468,7 +468,7 @@ bool dfs_is_cac_required(struct wlan_dfs *dfs,
 	/* If the channel has completed PRE-CAC then CAC can be skipped here. */
 	if (dfs_is_precac_done(dfs, cur_chan)) {
 		dfs_debug(dfs, WLAN_DEBUG_DFS,
-			  "PRE-CAC alreay done on this channel %d",
+			  "PRE-CAC already done on this channel %d",
 			  cur_chan->dfs_ch_ieee);
 		return false;
 	}
@@ -511,7 +511,7 @@ bool dfs_is_cac_required(struct wlan_dfs *dfs,
 		 * (as 52 and 64 HT80 are subsets of each other)
 		 * is not expected to be preserved as VAP has come up
 		 * from DOWN state. Hence do not skip CAC on 64 HT80.
-		 * is_vap_restart flag is used as an identifer to indicate if
+		 * is_vap_restart flag is used as an identifier to indicate if
 		 * vap has come up from a DOWN state or UP state (vap restart).
 		 */
 		if (!is_vap_restart) {
