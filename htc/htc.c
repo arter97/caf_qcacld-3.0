@@ -217,7 +217,7 @@ static void htc_cleanup(HTC_TARGET *target)
 
 #ifdef FEATURE_RUNTIME_PM
 /**
- * htc_runtime_pm_init(): runtime pm related intialization
+ * htc_runtime_pm_init(): runtime pm related initialization
  *
  * need to initialize a work item.
  */
@@ -594,7 +594,7 @@ A_STATUS htc_setup_target_buffer_assignments(HTC_TARGET *target)
 
 	status = A_OK;
 	/*
-	 * Allocate all credists/HTC buffers to WMI.
+	 * Allocate all credits/HTC buffers to WMI.
 	 * no buffers are used/required for data. data always
 	 * remains on host.
 	 */
@@ -1233,7 +1233,7 @@ int htc_pm_runtime_put(HTC_HANDLE htc_handle)
 /**
  * htc_set_wmi_endpoint_count: Set number of WMI endpoint
  * @htc_handle: HTC handle
- * @wmi_ep_count: WMI enpoint count
+ * @wmi_ep_count: WMI endpoint count
  *
  * return: None
  */
@@ -1248,7 +1248,7 @@ void htc_set_wmi_endpoint_count(HTC_HANDLE htc_handle, uint8_t wmi_ep_count)
  * htc_get_wmi_endpoint_count: Get number of WMI endpoint
  * @htc_handle: HTC handle
  *
- * return: WMI enpoint count
+ * return: WMI endpoint count
  */
 uint8_t htc_get_wmi_endpoint_count(HTC_HANDLE htc_handle)
 {
