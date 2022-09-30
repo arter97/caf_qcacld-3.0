@@ -204,7 +204,7 @@ struct wlan_logging {
 	bool is_active;
 	/* Flush completion check */
 	bool is_flush_complete;
-	/* paramaters  for pkt stats */
+	/* parameters  for pkt stats */
 	struct list_head pkt_stat_free_list;
 	struct list_head pkt_stat_filled_list;
 	struct pkt_stats_msg *pkt_stats_pcur_node;
@@ -1197,7 +1197,7 @@ int wlan_logging_sock_init_svc(void)
 		(gwlan_logging.pkt_stat_free_list.next);
 	list_del_init(gwlan_logging.pkt_stat_free_list.next);
 	spin_unlock_irqrestore(&gwlan_logging.pkt_stats_lock, irq_flag);
-	/* Pkt Stats intialization done */
+	/* Pkt Stats initialization done */
 
 	init_waitqueue_head(&gwlan_logging.wait_queue);
 	gwlan_logging.exit = false;
@@ -1368,7 +1368,7 @@ static uint8_t grx_count;
  * wlan_get_pkt_stats_free_node() - Get the free node for pkt stats
  *
  * This function is used to get the free node for pkt stats from
- * free list/filles list
+ * free list/filled list
  *
  * Return: int
  *

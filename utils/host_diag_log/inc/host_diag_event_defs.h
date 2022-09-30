@@ -320,7 +320,7 @@ typedef enum {
 	 * 20 - CHANNEL SCAN
 	 * 21 - NORMAL CHANNEL SCAN
 	 *
-	 * MLM State: offset: 10 legth: 2
+	 * MLM State: offset: 10 length: 2
 	 * 0  - MLM OFFLINE
 	 * 1  - MLM IDLE
 	 * 2  - MLM WT PROBE RESP
@@ -382,7 +382,7 @@ typedef enum {
 	 * 2 - Reset Fail
 	 * 3 - Reset Success
 	 * 4 - Device Removed
-	 * 5 - Devide Inserted
+	 * 5 - Device Inserted
 	 * 6 - Driver Unloaded
 	 * 7 - Driver Loaded
 	 * 8 - bus/link down
@@ -446,7 +446,7 @@ typedef enum {
 	 * 0 - Enter
 	 * 1 - Exit
 	 * 2 - Del Pattern
-	 * 3 - Wakup
+	 * 3 - Wakeup
 	 *
 	 * WOW Type: offset: 1 length: 1
 	 * 0 - None
@@ -636,7 +636,7 @@ typedef enum {
 	 * @ reason: Reason for triggering status
 	 * @ reasonDisconnect:Reason for disconnection
 	 *
-	 * This event is used to send varius wlan status
+	 * This event is used to send various wlan status
 	 * Values for parameters are defined below:
 	 * eventId: offset: 0 length: 1
 	 * ssid[0] - ssid[31]: offset: 1 to 32, length: 1
@@ -954,7 +954,7 @@ typedef enum {
 	 * Table 12-10—Integrity and key wrap algorithms.
 	 * @grp_cipher: Group cipher suite value as defined in
 	 * Table 12-10—Integrity and key wrap algorithm in IEEE 802.11 2020.
-	 * grp_mgmt: Group manangement cipher suite as defined in
+	 * grp_mgmt: Group management cipher suite as defined in
 	 * Table 12-10—Integrity and key wrap algorithms in IEEE 802.11 2020.
 	 *
 	 * This event is used to send connection parameters for
