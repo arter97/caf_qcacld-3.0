@@ -1613,7 +1613,7 @@ reg_populate_secondary_cur_chan_list(struct wlan_regulatory_pdev_priv_obj
 
 #ifdef CONFIG_AFC_SUPPORT
 /* reg_intersect_6g_afc_chan_list() - Do intersection of tx_powers of AFC master
- * channel list and SP channe list and store the power in the AFC channel list.
+ * channel list and SP channel list and store the power in the AFC channel list.
  * @pdev_priv_obj: pointer to pdev_priv_obj.
  *
  * Return type: void.
@@ -1652,7 +1652,7 @@ reg_intersect_6g_afc_chan_list(struct wlan_regulatory_pdev_priv_obj
 			   (sp_chan_list[i].chan_flags &
 			    REGULATORY_CHAN_AFC_NOT_DONE)) {
 			/* This is for the SP channels supported by
-			 * regulatory list that are mot supported by AFC i.e.
+			 * regulatory list that are not supported by AFC i.e.
 			 * SP channel list - AFC Channel list.
 			 */
 			afc_chan_list[i].tx_power = sp_chan_list[i].tx_power;
@@ -1919,7 +1919,7 @@ reg_modify_5g_maxbw(struct regulatory_channel *chan,
  * then channel 1, 2 and 3 will be disabled. Same logic apply for 5g.
  * For 5G, if the max bandwidth of the channel affected by avoid frequency
  * range then need to reduce the bandwidth or finally disabled.
- * For other bands, to-do in furture if need.
+ * For other bands, to-do in future if need.
  *
  * Return: void.
  */

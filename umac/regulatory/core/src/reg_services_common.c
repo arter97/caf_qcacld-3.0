@@ -2647,7 +2647,7 @@ static inline bool BAND_6G_PRESENT(uint8_t band_mask)
  * @band_mask: Input bitmap with band set
  * @channel_list: Pointer to Channel List
  * @cur_chan_list: Pointer to primary current channel list for non-beaconing
- * entites (STA, p2p client) and secondary channel list for beaconing entities
+ * entities (STA, p2p client) and secondary channel list for beaconing entities
  * (SAP, p2p GO)
  *
  * Get the given channel list and number of channels from the current channel
@@ -3447,7 +3447,7 @@ reg_update_usable_chan_resp(struct wlan_objmgr_pdev *pdev,
 		/* In case usable channels are required for multiple filter
 		 * mask, Some frequencies may present in res_msg . To avoid
 		 * frequency duplication, only mode mask is updated for
-		 * existing freqency.
+		 * existing frequency.
 		 */
 		if (is_freq_present_in_resp_list(pcl_ch[i], res_msg, *count))
 			continue;
@@ -5977,7 +5977,7 @@ bool reg_is_dfs_in_secondary_list_for_freq(struct wlan_objmgr_pdev *pdev,
  * @pdev: pointer to pdev object
  * @psoc: pointer to psoc object
  *
- * Return: psoc master chanel list
+ * Return: psoc master channel list
  */
 static struct regulatory_channel *reg_get_psoc_mas_chan_list(
 						struct wlan_objmgr_pdev *pdev,
@@ -6744,7 +6744,7 @@ reg_intersect_ranges(struct freq_range *first_range,
 /**
  * reg_act_sp_rule_cb -  A function pointer type that calculate something
  * from the input frequency range
- * @rule_fr: Pointer to frequencey range
+ * @rule_fr: Pointer to frequency range
  * @arg: Pointer to generic argument (a.k.a. context)
  *
  * Return: Void
@@ -7098,7 +7098,7 @@ reg_fill_afc_opclasses_arr(struct wlan_objmgr_pdev *pdev,
 /**
  * reg_next_opcls_ptr() - Get the pointer to the next opclass object
  * @p_cur_opcls_obj: Pointer to the current operating class object
- * @num_cfis: number of center frequencey indices
+ * @num_cfis: number of center frequency indices
  *
  * Return: Pointer to next opclss object
  */

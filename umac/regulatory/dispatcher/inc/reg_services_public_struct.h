@@ -625,8 +625,8 @@ enum ctl_value {
 /**
  * struct freq_range: The range/band of frequencies, indicated by left and right
  * edge frequencies.
- * @left: Left edge freqency(inclusive)
- * @right: Right edge freqency(inclusive)
+ * @left: Left edge frequency(inclusive)
+ * @right: Right edge frequency(inclusive)
  */
 struct freq_range {
 	qdf_freq_t left;
@@ -722,7 +722,7 @@ enum behav_limit {
 };
 
 /**
- * struct c_freq_lst: The list data strucuture for the center frequencies
+ * struct c_freq_lst: The list data structure for the center frequencies
  * @num_cfis: Number of center frequencies
  * @p_cfis_arr: Start address of the array of center frequency indices. Center
  *              for 40/80/160/320MHz band channel opclasses. For 20MHz the list

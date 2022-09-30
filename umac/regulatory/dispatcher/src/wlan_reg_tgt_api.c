@@ -20,7 +20,7 @@
 
  /**
  * @file wlan_req_tgt_api.c
- * @brief contains regulatory target interface definations
+ * @brief contains regulatory target interface definitions
  */
 
 #include <qdf_status.h>
