@@ -854,8 +854,8 @@ bool wlan_get_connected_vdev_by_mld_addr(struct wlan_objmgr_psoc *psoc,
  * @rssi: rssi
  *
  * This function gets the rssi based on db2dbm support. If this feature is
- * present in hw then it means firmware directly sends rssi and no converstion
- * is required. If this capablity is not present then host needs to convert
+ * present in hw then it means firmware directly sends rssi and no conversion
+ * is required. If this capability is not present then host needs to convert
  * snr to rssi
  *
  * Return: None

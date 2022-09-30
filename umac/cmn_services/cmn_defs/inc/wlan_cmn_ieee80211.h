@@ -1176,7 +1176,7 @@ struct wlan_rsn_ie_hdr {
 
 /**
  * struct wlan_wpa_ie_hdr: wpa ie header
- * @elem_id: Wpa element id, vender specific.
+ * @elem_id: Wpa element id, vendor specific.
  * @len: wpa ie length
  * @oui: 24-bit OUI followed by 8-bit OUI type
  * @version: wpa ver
@@ -1432,7 +1432,7 @@ struct wlan_vendor_ie_htcap {
 } qdf_packed;
 
 /**
- * struct wlan_ie_htinfo_cmn: ht info comman
+ * struct wlan_ie_htinfo_cmn: ht info command
  * @hi_ctrlchannel: control channel
  * @hi_extchoff: B0-1 extension channel offset
  * @hi_txchwidth: B2 recommended xmiss width set
@@ -3712,7 +3712,7 @@ wlan_parse_oce_reduced_wan_metrics_ie(uint8_t *mbo_oce_ie,
  * While parsing vendor IE, is_mbo_oce_oui() API does sanity of
  * length and attribute ID for MBO_OCE_OUI and after passing the
  * sanity only mbo_oce IE is stored in scan cache.
- * It is a callers responsiblity to get the mbo_oce_ie pointer
+ * It is a callers responsibility to get the mbo_oce_ie pointer
  * using util_scan_entry_mbo_oce() API, which points to mbo_oce
  * stored in scan cache. Thus caller is responsible for ensuring
  * the length of the IE is consistent with the embedded length.

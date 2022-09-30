@@ -18,7 +18,7 @@
  */
 
  /**
- * DOC: Public definations  for crypto service
+ * DOC: Public definitions  for crypto service
  */
 
 #ifndef _WLAN_CRYPTO_GLOBAL_DEF_H_
@@ -311,7 +311,7 @@ struct mobility_domain_params {
  * @ssid: ssid information
  * @cache_id: cache id
  * @pmk_lifetime: Duration in seconds for which the pmk is valid
- * @pmk_lifetime_threshold: Percentage of pmk liftime within which
+ * @pmk_lifetime_threshold: Percentage of pmk lifetime within which
  * full authentication is expected to avoid disconnection.
  * @pmk_entry_ts: System timestamp at which the PMK entry was created.
  * @single_pmk_supported: SAE single pmk supported BSS

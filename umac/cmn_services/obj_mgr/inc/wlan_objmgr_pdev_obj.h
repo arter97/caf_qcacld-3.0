@@ -275,7 +275,7 @@ struct wlan_objmgr_pdev {
  * @psoc: PSOC object
  * @scn: os private object
  *
- * Creates PDEV object, intializes with default values
+ * Creates PDEV object, initializes with default values
  * Invokes the registered notifiers to create component object
  *
  * Return: Handle to struct wlan_objmgr_psoc on successful creation,
@@ -349,7 +349,7 @@ typedef void (*wlan_objmgr_pdev_op_handler)(struct wlan_objmgr_pdev *pdev,
  * @obj_type: VDEV_OP/PEER_OP
  * @handler: the handler will be called for each object of requested type
  *           the handler should be implemented to perform required operation
- * @arg: agruments passed by caller
+ * @arg: arguments passed by caller
  * @lock_free_op: its obsolete
  * @dbg_id: id of the caller
  *

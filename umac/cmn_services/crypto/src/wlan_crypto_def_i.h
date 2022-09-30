@@ -18,7 +18,7 @@
  */
 
  /**
- * DOC: Private definations for handling crypto params
+ * DOC: Private definitions for handling crypto params
  */
 #ifndef _WLAN_CRYPTO_DEF_I_H_
 #define _WLAN_CRYPTO_DEF_I_H_
@@ -115,7 +115,7 @@ static inline void wlan_crypto_put_be64(u8 *a, u64 val)
 #define WLAN_CRYPTO_TX_OPS_DEREGISTER_EVENTS(tx_ops) \
 	((tx_ops)->crypto_tx_ops.deregister_events)
 
-/* unalligned little endian access */
+/* unaligned little endian access */
 #ifndef LE_READ_2
 #define LE_READ_2(p) \
 	((uint16_t)                          \

@@ -310,7 +310,7 @@ QDF_STATUS wlan_objmgr_pdev_component_obj_attach(
 		return QDF_STATUS_SUCCESS;
 	/**
 	 * If PDEV object status is partially created means, this API is
-	 * invoked with differnt context, this block should be executed for
+	 * invoked with different context, this block should be executed for
 	 * async components only
 	 */
 	/* Derive status */
@@ -325,7 +325,7 @@ QDF_STATUS wlan_objmgr_pdev_component_obj_attach(
 	/* Notify components about the CREATION success/failure */
 	if ((obj_status == QDF_STATUS_SUCCESS) ||
 	    (obj_status == QDF_STATUS_E_FAILURE)) {
-		/* nofity object status */
+		/* notify object status */
 		for (i = 0; i < WLAN_UMAC_MAX_COMPONENTS; i++) {
 			s_hlr = g_umac_glb_obj->pdev_status_handler[i];
 			a = g_umac_glb_obj->pdev_status_handler_arg[i];
@@ -361,7 +361,7 @@ QDF_STATUS wlan_objmgr_pdev_component_obj_detach(
 	wlan_pdev_obj_unlock(pdev);
 
 	/* If PDEV object status is partially destroyed means, this API is
-	invoked with differnt context, this block should be executed for async
+	invoked with different context, this block should be executed for async
 	components only */
 	if ((pdev->obj_state == WLAN_OBJ_STATE_PARTIALLY_DELETED) ||
 	    (pdev->obj_state == WLAN_OBJ_STATE_COMP_DEL_PROGRESS)) {

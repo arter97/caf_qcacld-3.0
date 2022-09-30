@@ -231,10 +231,10 @@ enum block_ack_actioncode {
  * @PUB_ACTION_GAS_INITIAL_REQUEST: GAS initial request action frame
  * @PUB_ACTION_GAS_INITIAL_RESPONSE: GAS initial response action frame
  * @PUB_ACTION_GAS_COMEBACK_REQUEST: GAS comeback request action frame
- * @PUB_ACTION_GAS_COMEBACK_RESPONSE: GAS comeback respose action frame
+ * @PUB_ACTION_GAS_COMEBACK_RESPONSE: GAS comeback response action frame
  * @PUB_ACTION_TDLS_DISCRESP: tdls discovery response public action frame
  * @PUB_ACTION_FTM_REQUEST: FTM request action frame
- * @PUB_ACTION_FTM_RESPONSE: FTM respose action frame
+ * @PUB_ACTION_FTM_RESPONSE: FTM response action frame
  */
 enum pub_actioncode {
 	PUB_ACTION_2040_BSS_COEXISTENCE = 0,
@@ -1095,7 +1095,7 @@ QDF_STATUS wlan_mgmt_txrx_beacon_frame_tx(struct wlan_objmgr_peer *peer,
  * @buf: buffer to be transmitted
  * @comp_id: umac component id
  *
- * This function transmits the FILS Dicovery Action frame to
+ * This function transmits the FILS Discovery Action frame to
  * southbound interface.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success

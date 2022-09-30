@@ -415,7 +415,7 @@ QDF_STATUS wlan_objmgr_vdev_component_obj_attach(
 		return QDF_STATUS_SUCCESS;
 	/*
 	 * If VDEV object status is partially created means, this API is
-	 * invoked with differnt context, this block should be executed for
+	 * invoked with different context, this block should be executed for
 	 * async components only
 	 */
 	/* Derive status */
@@ -468,7 +468,7 @@ QDF_STATUS wlan_objmgr_vdev_component_obj_detach(
 
 	/**
 	 *If VDEV object status is partially destroyed means, this API is
-	 * invoked with differnt context, this block should be executed for
+	 * invoked with different context, this block should be executed for
 	 * async components only
 	 */
 	if ((vdev->obj_state == WLAN_OBJ_STATE_PARTIALLY_DELETED) ||

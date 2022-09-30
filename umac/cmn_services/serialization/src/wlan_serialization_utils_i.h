@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -561,7 +562,7 @@ bool wlan_serialization_match_cmd_blocking(
 		enum wlan_serialization_node node_type);
 
 /**
- * wlan_serialization_find_cmd() - Find the cmd matching the given criterias
+ * wlan_serialization_find_cmd() - Find the cmd matching the given criteria
  * @cmd: Serialization command information
  * @cmd_type: Command type to be matched
  * @pdev: pdev object that needs to be matched

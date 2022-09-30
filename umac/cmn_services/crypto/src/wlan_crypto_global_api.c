@@ -2481,7 +2481,7 @@ bool wlan_crypto_is_mmie_valid(struct wlan_objmgr_vdev *vdev,
 
 	if (ret < 0) {
 		qdf_mem_free(mic);
-		crypto_err("genarate mmie failed");
+		crypto_err("generate mmie failed");
 		return false;
 	}
 
@@ -3727,7 +3727,7 @@ exit:
  * wlan_crypto_register_crypto_rx_ops - set crypto_rx_ops
  * @crypto_rx_ops: crypto_rx_ops
  *
- * This function gets called by object manger to register crypto rx ops.
+ * This function gets called by object manager to register crypto rx ops.
  *
  * Return: QDF_STATUS
  */

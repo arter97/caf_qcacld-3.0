@@ -18,7 +18,7 @@
  */
 
  /**
- * DOC: Public API intialization of crypto service with object manager
+ * DOC: Public API initialization of crypto service with object manager
  */
 #include <qdf_types.h>
 #include <wlan_cmn.h>
