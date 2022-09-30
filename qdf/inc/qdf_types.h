@@ -796,11 +796,15 @@ enum QDF_GLOBAL_MODE {
 #define qdf_kstrtoint __qdf_kstrtoint
 #define qdf_kstrtouint __qdf_kstrtouint
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#define QDF_MAX_CONCURRENCY_PERSONA  (WLAN_MAX_VDEVS + 1)
+#else
 #ifdef WLAN_OPEN_P2P_INTERFACE
 /* This should match with WLAN_MAX_INTERFACES */
 #define QDF_MAX_CONCURRENCY_PERSONA  (WLAN_MAX_VDEVS)
 #else
 #define QDF_MAX_CONCURRENCY_PERSONA  (WLAN_MAX_VDEVS - 1)
+#endif
 #endif
 
 #define QDF_STA_MASK (1 << QDF_STA_MODE)
