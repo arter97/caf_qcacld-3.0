@@ -145,7 +145,7 @@ struct qdf_packed wifi_pos_err_rpt {
  * @req_id: id corresponding to the request.
  * @fragment_info: Valid only for fragments.
  * @pdev_id: pdev_id of radion.
- * @time_left: time left in the measurment req.
+ * @time_left: time left in the measurement req.
  * @err_rpt: Error report data.
  */
 struct qdf_packed wifi_pos_err_msg_report {
@@ -163,7 +163,7 @@ struct qdf_packed wifi_pos_err_msg_report {
  * @pdev_id: pdev_id or mac_id of ring
  * @min_num_ptr: minimum depth of ring required
  * @min_buf_size: minimum size of each buffer
- * @min_buf_align: minimum allignment of buffer memory
+ * @min_buf_align: minimum alignment of buffer memory
  */
 struct wifi_pos_dma_rings_cap {
 	uint32_t pdev_id;

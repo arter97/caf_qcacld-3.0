@@ -325,7 +325,7 @@ struct twt_ack_context {
 /**
  * twt_en_dis_context - twt enable/disable private context
  * @twt_role: twt role. When the upper layer is invoking requestor/responder
- * enable/disable command via the TWT component API, Firmare WMI event
+ * enable/disable command via the TWT component API, Firmware WMI event
  * doesn't have the info in the event params to distinguish if this enable or
  * disable is for requestor or responder, hence TWT component stores this role
  * before the request is sent to the firmware.

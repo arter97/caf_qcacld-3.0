@@ -940,7 +940,7 @@ wlan_dcs_get_chan_width_for_seg(enum wlan_dcs_chan_seg seg_idx)
  * @awgn_info: pointer to awgn info
  * @width: pointer to channel width
  *
- * This function trys to get max no interference band width according to
+ * This function tries to get max no interference band width according to
  * awgn event.
  *
  * Return: true if valid no interference band width is found, false otherwise.
@@ -1101,7 +1101,7 @@ wlan_dcs_get_available_chan_for_bw(struct wlan_objmgr_pdev *pdev,
  * @tgt_width: band width of the selected channel
  * @random: request for random channel
  *
- * This function trys to get no-interference chan with max possible bandwidth
+ * This function tries to get no-interference chan with max possible bandwidth
  * from pcl for sap according to awgn info.
  *
  * Return: true if available channel is found, false otherwise.
@@ -1472,7 +1472,7 @@ void wlan_dcs_set_algorithm_process(struct wlan_objmgr_psoc *psoc,
 	}
 
 	if (dcs_pdev_priv->dcs_host_params.force_disable_algorithm) {
-		dcs_debug("dcs alorithm is disabled forcely");
+		dcs_debug("dcs algorithm is disabled forcely");
 		dcs_pdev_priv->dcs_host_params.dcs_algorithm_process = false;
 		return;
 	}

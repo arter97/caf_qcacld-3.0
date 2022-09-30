@@ -232,7 +232,7 @@ void wifi_pos_move_peers_to_fail_list(struct wlan_objmgr_vdev *vdev,
 	 */
 	for (i = 0; i < WLAN_MAX_11AZ_PEERS; i++) {
 		/*
-		 * Clear the indvidual entry that exist for the given
+		 * Clear the individual entry that exist for the given
 		 * mac address in secure/unsecure list
 		 */
 		if (qdf_is_macaddr_equal(peer_mac, &secure_list[i].peer_mac)) {
@@ -527,7 +527,7 @@ QDF_STATUS wifi_pos_handle_ranging_peer_delete(struct wlan_objmgr_psoc *psoc,
 
 	if (vdev_pos_obj->is_delete_all_pasn_peer_in_progress) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_WIFI_POS_CORE_ID);
-		wifi_pos_err("Vdev delete all peer in progress. Ignore indvidual peer delete");
+		wifi_pos_err("Vdev delete all peer in progress. Ignore individual peer delete");
 		return QDF_STATUS_SUCCESS;
 	}
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_WIFI_POS_CORE_ID);

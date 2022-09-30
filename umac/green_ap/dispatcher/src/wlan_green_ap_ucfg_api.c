@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -48,7 +49,7 @@ QDF_STATUS ucfg_green_ap_enable_egap(struct wlan_objmgr_pdev *pdev)
 	}
 
 	if (!green_ap_tx_ops->enable_egap) {
-		green_ap_err("tx op for sending enbale/disable green ap is NULL");
+		green_ap_err("tx op for sending enable/disable green ap is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 

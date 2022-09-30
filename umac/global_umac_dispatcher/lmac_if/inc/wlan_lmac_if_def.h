@@ -352,7 +352,7 @@ struct wlan_lmac_if_mgmt_rx_reo_rx_ops {
  * @mgmt_tx_send: function pointer to transmit mgmt tx frame
  * @beacon_send:  function pointer to transmit beacon frame
  * @fd_action_frame_send: function pointer to transmit FD action frame
- * @tx_drain_nbuf_op: function pointer for any umac nbuf realted ops for
+ * @tx_drain_nbuf_op: function pointer for any umac nbuf related ops for
  *                    pending mgmt frames cleanup
  * @reg_ev_handler: function pointer to register event handlers
  * @unreg_ev_handler: function pointer to unregister event handlers
@@ -936,7 +936,7 @@ struct wlan_lmac_if_wifi_pos_tx_ops {
 
 #ifdef DIRECT_BUF_RX_ENABLE
 /**
- * struct wlan_lmac_if_direct_buf_rx_tx_ops - structire of direct buf rx txops
+ * struct wlan_lmac_if_direct_buf_rx_tx_ops - structure of direct buf rx txops
  * @direct_buf_rx_module_register: Registration API callback for modules
  *                                 to register with direct buf rx framework
  * @direct_buf_rx_module_unregister: Unregistration API to clean up module
