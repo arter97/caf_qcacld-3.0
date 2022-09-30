@@ -400,7 +400,7 @@
 
 /**
  * AP use cases need to allocate more RX Descriptors than the number of
- * entries avaialable in the SW2RXDMA buffer replenish ring. This is to account
+ * entries available in the SW2RXDMA buffer replenish ring. This is to account
  * for frames sitting in REO queues, HW-HW DMA rings etc. Hence using a
  * multiplication factor of 3, to allocate three times as many RX descriptors
  * as RX buffers.
@@ -1288,7 +1288,7 @@
 		WLAN_CFG_RXDMA_MONITOR_RX_DROP_THRESH_SIZE_MIN, \
 		WLAN_CFG_RXDMA_MONITOR_RX_DROP_THRESH_SIZE_MAX, \
 		WLAN_CFG_RXDMA_MONITOR_RX_DROP_THRESH_SIZE, \
-		CFG_VALUE_OR_DEFAULT, "RXDMA monitor rx drop theshold")
+		CFG_VALUE_OR_DEFAULT, "RXDMA monitor rx drop threshold")
 
 #define CFG_DP_PKTLOG_BUFFER_SIZE \
 		CFG_INI_UINT("PktlogBufSize", \
