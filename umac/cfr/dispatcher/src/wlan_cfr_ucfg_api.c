@@ -148,7 +148,7 @@ int ucfg_cfr_start_capture_probe_req(struct wlan_objmgr_pdev *pdev,
 	}
 
 	if (pa->cfr_current_sta_count == pa->cfr_max_sta_count) {
-		cfr_err("max cfr cleint reached");
+		cfr_err("max cfr client reached");
 		return -EINVAL;
 	}
 
@@ -452,7 +452,7 @@ void ucfg_cfr_capture_data(struct wlan_objmgr_psoc *psoc, uint32_t vdev_id,
 	 * help in writing next capture.
 	 * ignoring 4 byte for FW magic number from the actual allocated memory
 	 * length to avoid corruption in magic number. This memory is circular
-	 * so after complation of one round, Skipping the first 8 byte as they
+	 * so after completion of one round, Skipping the first 8 byte as they
 	 * are for read index and write index.
 	 */
 	if (((*rindex) + payload_len) <= (pcfr->cfr_mem_chunk.len - 4))
