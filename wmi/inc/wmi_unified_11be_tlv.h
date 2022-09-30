@@ -21,14 +21,14 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  *  vdev_create_mlo_params_size() - Get MLO params size in vdev create
- *  @param: ponter to vdev create request param
+ *  @param: pointer to vdev create request param
  *  Return: size of MLO params in vdev create
  */
 size_t vdev_create_mlo_params_size(struct vdev_create_params *param);
 /**
  *  vdev_create_add_mlo_params() - Add MLO params in vdev create cmd
  *  @buf_ptr: pointer to vdev create buffer.
- *  @param: ponter to vdev create request param
+ *  @param: pointer to vdev create request param
  *
  *  Return: pointer to new offset of vdev create buffer
  */
@@ -44,7 +44,7 @@ size_t vdev_start_mlo_params_size(struct vdev_start_params *req);
 /**
  *  vdev_start_add_mlo_params() - Add MLO params in vdev start cmd
  *  @buf_ptr: pointer to vdev start buffer.
- *  @req: ponter to vdev create request param
+ *  @req: pointer to vdev create request param
  *
  *  Return: pointer to new offset of cmd buffer
  */
@@ -53,7 +53,7 @@ uint8_t *vdev_start_add_mlo_params(uint8_t *buf_ptr,
 /**
  *  vdev_start_add_ml_partner_links() - Add MLO partner links in vdev start cmd
  *  @buf_ptr: pointer to vdev start cmd buffer.
- *  @req: ponter to vdev start request param
+ *  @req: pointer to vdev start request param
  *
  *  Return: pointer to new offset of cmd buffer
  */
@@ -165,7 +165,7 @@ size_t peer_delete_mlo_params_size(struct peer_delete_cmd_params *req);
 /**
  *  peer_delete_add_mlo_params() - Add MLO params in peer delete cmd
  *  @buf_ptr: pointer to peer delete cmd  buffer.
- *  @req: ponter to peer delete request param
+ *  @req: pointer to peer delete request param
  *
  *  Return: pointer to new offset of cmd buffer
  */

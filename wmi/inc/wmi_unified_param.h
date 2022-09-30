@@ -1232,7 +1232,7 @@ struct peer_assoc_ml_partner_links {
  * @need_gtk_2_way: Needs 2 way GTK
  * @auth_flag: Is peer authenticated
  * @safe_mode_enabled: Safe enabled for this peer
- * @amsdu_disable: AMSDU disble
+ * @amsdu_disable: AMSDU disable
  * @peer_mac: Peer mac address
  * @he_flag: HE flags
  * @eht_flag: EHT flags
@@ -1390,7 +1390,7 @@ struct scan_chan_list_params {
 #ifdef QCA_SUPPORT_AGILE_DFS
 /**
  * struct vdev_adfs_ch_cfg_params - Agile dfs channel set request params
- * @vdev_id: Vdev indentifier
+ * @vdev_id: Vdev identifier
  * @ocac_mode: Off Channel CAC mode
  * @min_duration_ms: Minimum Off channel CAC duration
  * @max_duration_ms: Maximum Off channel CAC duration
@@ -1415,7 +1415,7 @@ struct vdev_adfs_ch_cfg_params {
 
 /**
  * struct vdev_adfs_ch_cfg_params - Agile dfs ocac abort command to stop precac.
- * @vdev_id: Vdev indentifier
+ * @vdev_id: Vdev identifier
  */
 struct vdev_adfs_abort_params {
 	uint32_t vdev_id;
@@ -1741,8 +1741,8 @@ enum thermal_mgmt_action_code {
 
 /**
  * struct thermal_cmd_params - thermal command parameters
- * @min_temp: minimum temprature
- * @max_temp: maximum temprature
+ * @min_temp: minimum temperature
+ * @max_temp: maximum temperature
  * @thermal_enable: thermal enable
  * @thermal_action: thermal action code
  */
@@ -1958,7 +1958,7 @@ enum wmi_extscan_report_events_type {
 };
 
 /**
- * struct extscan_capabilities_params - ext scan capablities
+ * struct extscan_capabilities_params - ext scan capabilities
  * @request_id: request_id
  * @vdev_id: vdev id
  */
@@ -1968,7 +1968,7 @@ struct extscan_capabilities_params {
 };
 
 /**
- * struct extscan_capabilities_reset_params - ext scan capablities reset
+ * struct extscan_capabilities_reset_params - ext scan capabilities reset
  *                                            parameter
  * @request_id: request_id
  * @vdev_id: vdev id
@@ -2798,7 +2798,7 @@ typedef struct {
 
 /**
  * struct wmi_host_ext_resource_config - Extended resource config
- * @host_platform_config: Host plaform configuration.
+ * @host_platform_config: Host platform configuration.
  * @fw_featuew_bitmap: FW feature requested bitmap.
  */
 typedef struct {
@@ -3064,7 +3064,7 @@ struct thermal_mitigation_params {
 };
 
 /**
- * struct smart_ant_enable_tx_feedback_params - SA tx feeback params
+ * struct smart_ant_enable_tx_feedback_params - SA tx feedback params
  * @enable: Enable TX feedback for SA
  */
 struct smart_ant_enable_tx_feedback_params {
@@ -3512,7 +3512,7 @@ struct acparams_params {
 /**
  * struct vap_dscp_tid_map_params - DSCP tid map params
  * @vdev_id: vdev id
- * @dscp_to_tid_map: pointer to arry of tid to dscp map table
+ * @dscp_to_tid_map: pointer to array of tid to dscp map table
  */
 struct vap_dscp_tid_map_params {
 	uint8_t vdev_id;
@@ -3660,7 +3660,7 @@ struct periodic_chan_stats_params {
  * @WMI_HOST_FLAG_MU2: MU2 data
  * @WMI_HOST_FLAG_MU3: MU3 data
  * @WMI_HOST_FLAG_SERIES1: Rate series 1
- * @WMI_HOST_FLAG_SGI: Short gaurd interval
+ * @WMI_HOST_FLAG_SGI: Short guard interval
  */
 enum wmi_host_packet_power_rate_flags {
 	WMI_HOST_FLAG_RTSENA        =  0x0001,
@@ -4105,8 +4105,8 @@ struct rtt_keepalive_req_params {
  * @peer_mac_addr: Peer mac address
  * @tid: TID
  * @vdev_id: vdev id
- * @hw_qdesc_paddr_lo: lower 32 bits of queue desc adddress
- * @hw_qdesc_paddr_hi: upper 32 bits of queue desc adddress
+ * @hw_qdesc_paddr_lo: lower 32 bits of queue desc address
+ * @hw_qdesc_paddr_hi: upper 32 bits of queue desc address
  * @queue_no: 16-bit number assigned by host for queue
  * @ba_window_size_valid: BA window size validity flag
  * @ba_window_size: BA window size
@@ -4634,7 +4634,7 @@ struct wmi_host_vdev_nac_rssi_event {
  * @msdu_retried: Retried msdus
  * @msdu_mul_retried: msdus retried for more than once
  * @msdu_failed: msdus failed
- * @reserved: for furure extensions
+ * @reserved: for future extensions
  */
 struct wmi_host_peer_retry_stats {
 	wmi_host_mac_addr peer_macaddr;
@@ -5927,7 +5927,7 @@ typedef enum {
 
 /**
  * struct wmi_host_fw_ver - FW version in non-tlv target
- * @sw_version: Versin info
+ * @sw_version: Version info
  * @sw_version_1: Second dword of version
  */
 struct wmi_host_fw_ver {
@@ -5937,7 +5937,7 @@ struct wmi_host_fw_ver {
 
 /**
  * struct wmi_host_fw_abi_ver - FW version in non-tlv target
- * @sw_version: Versin info
+ * @sw_version: Version info
  * @abi_version: ABI version
  */
 struct wmi_host_fw_abi_ver {
@@ -6028,7 +6028,7 @@ typedef enum {
  * @band_capability: Band capability bit map
  * @sap_max_num_clients: Max clients supported by SAP
  * @set_country_code_hal_supported: Indicates country code hal supported or not
- * @get_valid_channel_supported: Indicates get vaid channel supported or not
+ * @get_valid_channel_supported: Indicates get valid channel supported or not
  * @supported_dot11mode: Indicates supported dot11 mode
  * @sap_wpa3_support: Indicates wpa3 support for SAP
  * @vendor_req_1_version: Indicates vendor1 req1 version
@@ -6385,9 +6385,9 @@ typedef struct {
  * Enum replicated for host abstraction with FW
  */
 typedef enum {
-	/* Event respose of START CMD */
+	/* Event response of START CMD */
 	WMI_HOST_VDEV_START_RESP_EVENT = 0,
-	/* Event respose of RESTART CMD */
+	/* Event response of RESTART CMD */
 	WMI_HOST_VDEV_RESTART_RESP_EVENT,
 } WMI_HOST_START_EVENT_PARAM;
 
@@ -7004,7 +7004,7 @@ enum wmi_host_sta_ps_param_rx_wake_policy {
 };
 enum wmi_host_sta_ps_param_pspoll_count {
 	WMI_HOST_STA_PS_PSPOLL_COUNT_NO_MAX = 0,
-	/* Values greater than 0 indicate the maximum numer of PS-Poll frames FW
+	/* Values greater than 0 indicate the maximum number of PS-Poll frames FW
 	* will send before waking up.
 	*/
 };
@@ -7070,7 +7070,7 @@ typedef struct _hp_dcs_mib_stats  {
  * struct wmi_host_dcs_im_tgt_stats - DCS IM target stats
  * @reg_tsf32: current running TSF from the TSF-1
  * @last_ack_rssi: Known last frame rssi, in case of multiple stations, if
- *      and at different ranges, this would not gaurantee that
+ *      and at different ranges, this would not guarantee that
  *      this is the least rssi.
  * @tx_waste_time: Sum of all the failed durations in the last
  *      one second interval.
@@ -7315,7 +7315,7 @@ typedef enum {
 	/* whole RTT measurement timer expire-terminate
 	** current STA measurement */
 	WMI_HOST_RTT_TIMER_EXPIRE,
-	/* channel swicth failed */
+	/* channel switch failed */
 	WMI_HOST_RTT_CHAN_SWITCH_ERROR,
 	/* TMR trans error, this dest peer will be skipped */
 	WMI_HOST_RTT_TMR_TRANS_ERROR,
@@ -8160,7 +8160,7 @@ struct wmi_host_obss_spatial_reuse_set_def_thresh {
 
 /**
  * struct wmi_host_injector_frame_params - Injector frame configuration params
- * @vdev_id: vdev identifer of VAP
+ * @vdev_id: vdev identifier of VAP
  * @enable: Enable/disable flag for the frame
  * @frame_type: Frame type to be enabled
  * @frame_inject_period: Periodicity of injector frame transmission in msecs
@@ -8687,7 +8687,7 @@ struct wmi_obss_color_collision_info {
 /**
  * struct vap_pcp_tid_map_params - PCP tid map params
  * @vdev_id: vdev id
- * @pcp_to_tid_map: pointer to arry of pcp to tid map table
+ * @pcp_to_tid_map: pointer to array of pcp to tid map table
  */
 struct vap_pcp_tid_map_params {
 	uint32_t vdev_id;
@@ -8840,7 +8840,7 @@ struct wifi_pos_pasn_peer_data {
  * struct mws_coex_state - Modem Wireless Subsystem(MWS) coex info
  * @vdev_id : vdev id
  * @coex_scheme_bitmap: LTE-WLAN coexistence scheme bitmap
- * Indicates the final schemes applied for the currrent Coex scenario.
+ * Indicates the final schemes applied for the current Coex scenario.
  * Bit 0 - TDM policy
  * Bit 1 - Forced TDM policy
  * Bit 2 - Dynamic Power Back-off policy
@@ -9004,7 +9004,7 @@ struct wmi_raw_event_buffer {
 	void *evt_processed_buf;
 };
 
-/* dpd_status fron WMI_PDEV_GET_DPD_STATUS_EVENTID */
+/* dpd_status from WMI_PDEV_GET_DPD_STATUS_EVENTID */
 enum wmi_host_dpd_status {
 	WMI_HOST_DPD_STATUS_FAIL = 0,
 	WMI_HOST_DPD_STATUS_PASS = 1,

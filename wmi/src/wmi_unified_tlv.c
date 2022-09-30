@@ -1142,7 +1142,7 @@ send_vdev_nss_chain_params_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi: wmi handle
  * @vdev_id: vdev id
  *
- * Return: QDF_STATUS_SUCCESS for success or erro code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_vdev_stop_cmd_tlv(wmi_unified_t wmi,
 					uint8_t vdev_id)
@@ -1246,7 +1246,7 @@ static inline void copy_channel_info(
 }
 
 /**
- * vdev_start_cmd_fill_11be() - 11be information fiiling in vdev_ststart
+ * vdev_start_cmd_fill_11be() - 11be information filling in vdev_start
  * @cmd: wmi cmd
  * @req: vdev start params
  *
@@ -2763,7 +2763,7 @@ send_dbglog_cmd_tlv(wmi_unified_t wmi_handle,
 	int32_t i;
 	int32_t len;
 	int8_t *buf_ptr;
-	int32_t *module_id_bitmap_array;     /* Used to fomr the second tlv */
+	int32_t *module_id_bitmap_array;     /* Used to form the second tlv */
 
 	ASSERT(dbglog_param->bitmap_len < MAX_MODULE_ID_BITMAP_WORDS);
 
@@ -3128,7 +3128,7 @@ static QDF_STATUS send_packet_log_disable_cmd_tlv(wmi_unified_t wmi_handle,
 #define WMI_FW_TIME_STAMP_LOW_MASK 0xffffffff
 /**
  *  send_time_stamp_sync_cmd_tlv() - Send WMI command to
- *  sync time between bwtween host and firmware
+ *  sync time between between host and firmware
  *  @param wmi_handle      : handle to WMI.
  *
  *  Return: None
@@ -3161,7 +3161,7 @@ static void send_time_stamp_sync_cmd_tlv(wmi_unified_t wmi_handle)
 		WMI_FW_TIME_STAMP_LOW_MASK;
 	/*
 	 * Send time_stamp_high 0 as the time converted from HR:MIN:SEC:MS to ms
-	 * wont exceed 27 bit
+	 * won't exceed 27 bit
 	 */
 	time_stamp->time_stamp_high = 0;
 	wmi_debug("WMA --> DBGLOG_TIME_STAMP_SYNC_CMDID mode %d time_stamp low %d high %d",
@@ -4074,7 +4074,7 @@ static QDF_STATUS send_scan_start_cmd_tlv(wmi_unified_t wmi_handle,
 				WMI_SCAN_CHAN_SET_MODE(params->chan_list.chan[i].phymode);
 		buf_ptr += phymode_roundup;
 	} else {
-		/* Add ZERO legth phy mode TLV */
+		/* Add ZERO length phy mode TLV */
 		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, 0);
 		buf_ptr += WMI_TLV_HDR_SIZE;
 	}
@@ -9225,7 +9225,7 @@ convert_host_to_target_band_capability(uint32_t host_band_capability)
 }
 
 /**
- * copy_feature_set_info() -Copy feaure set info from host to target
+ * copy_feature_set_info() -Copy feature set info from host to target
  * @feature_set_bitmap: Target feature set pointer
  * @feature_set: Host feature set structure
  *
@@ -9379,7 +9379,7 @@ static inline void copy_feature_set_info(uint32_t *feature_set_bitmap,
  * @wmi_handle: WMI handle
  * @feature_set: Feature set structure
  *
- * Return: QDF_STATUS_SUCCESS on success else reurn failure
+ * Return: QDF_STATUS_SUCCESS on success else return failure
  */
 static QDF_STATUS feature_set_cmd_send_tlv(
 				struct wmi_unified *wmi_handle,
@@ -9609,8 +9609,8 @@ static QDF_STATUS save_fw_version_cmd_tlv(wmi_unified_t wmi_handle, void *evt_bu
  * wmi_unified_save_fw_version_cmd() - save fw version
  * @wmi_handle:      pointer to wmi handle
  * @res_cfg:	 resource config
- * @num_mem_chunks:  no of mem chunck
- * @mem_chunk:       pointer to mem chunck structure
+ * @num_mem_chunks:  no of mem chunk
+ * @mem_chunk:       pointer to mem chunk structure
  *
  * This function sends IE information to firmware
  *
@@ -12066,7 +12066,7 @@ QDF_STATUS save_ext_service_bitmap_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 static inline void copy_ht_cap_info(uint32_t ev_target_cap,
 		struct wlan_psoc_target_capability_info *cap)
 {
-       /* except LDPC all flags are common betwen legacy and here
+       /* except LDPC all flags are common between legacy and here
 	*  also IBFEER is not defined for TLV
 	*/
 	cap->ht_cap_info |= ev_target_cap & (
@@ -13839,7 +13839,7 @@ extract_svc_rdy_ext2_afc_tlv(wmi_service_ready_ext2_event_fixed_param *ev,
 		reg_afc_dev_type = AFC_DEPLOYMENT_OUTDOOR;
 		break;
 	default:
-		wmi_err("invalid afc deloyment %d", tgt_afc_dev_type);
+		wmi_err("invalid afc deployment %d", tgt_afc_dev_type);
 		reg_afc_dev_type = AFC_DEPLOYMENT_UNKNOWN;
 		break;
 	}
@@ -14755,7 +14755,7 @@ static QDF_STATUS fips_conv_data_be(uint32_t data_len, uint8_t *data)
 	if (!data_unaligned)
 		return QDF_STATUS_E_FAILURE;
 
-	/* Checking if space is alligned */
+	/* Checking if space is aligned */
 	if (!FIPS_IS_ALIGNED(data_unaligned, FIPS_ALIGN)) {
 		/* align the data space */
 		data_aligned =
@@ -18847,7 +18847,7 @@ extract_time_sync_ftm_offset_event_tlv(wmi_unified_t wmi, void *buf,
  * @vdev_id: vdev id
  *
  * TSF_TSTAMP_READ_VALUE is the only operation supported
- * Return: QDF_STATUS_SUCCESS for success or erro code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_vdev_tsf_tstamp_action_cmd_tlv(wmi_unified_t wmi, uint8_t vdev_id)

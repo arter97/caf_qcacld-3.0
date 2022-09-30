@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -317,7 +317,7 @@ static void fill_arp_offload_params_tlv(wmi_unified_t wmi_handle,
 			WMITLV_TAG_STRUC_WMI_ARP_OFFLOAD_TUPLE,
 			WMITLV_GET_STRUCT_TLVLEN(WMI_ARP_OFFLOAD_TUPLE));
 
-		/* Fill data for ARP and NS in the first tupple for LA */
+		/* Fill data for ARP and NS in the first tuple for LA */
 		if ((enable_or_disable & PMO_OFFLOAD_ENABLE) && (i == 0)) {
 			/* Copy the target ip addr and flags */
 			arp_tuple->flags = WMI_ARPOFF_FLAGS_VALID;

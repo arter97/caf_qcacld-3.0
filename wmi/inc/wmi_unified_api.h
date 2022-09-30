@@ -296,7 +296,7 @@ wmi_buf_t wmi_buf_alloc_fl(wmi_unified_t wmi_handle, uint32_t len,
 /**
  * generic function frees WMI net buffer
  *
- *  @param net_buf : Pointer ot net_buf to be freed
+ *  @param net_buf : Pointer to net_buf to be freed
  */
 void wmi_buf_free(wmi_buf_t net_buf);
 
@@ -409,7 +409,7 @@ wmi_unified_register_event_handler(wmi_unified_t wmi_handle,
 
 /**
  * wmi_unified_unregister_event() - WMI event handler unregister function
- * for converged componets
+ * for converged components
  * @wmi_handle:    handle to WMI.
  * @event_id:      WMI event ID
  *
@@ -1353,7 +1353,7 @@ QDF_STATUS wmi_unified_set_sta_ps_mode(wmi_unified_t wmi_handle,
 /**
  * wmi_unified_set_sta_uapsd_auto_trig_cmd() - set uapsd auto trigger command
  * @wmi_handle: wmi handle
- * @param: uapsd cmd parameter strcture
+ * @param: uapsd cmd parameter structure
  *
  * This function sets the trigger
  * uapsd params such as service interval, delay interval
@@ -1950,7 +1950,7 @@ QDF_STATUS wmi_unified_send_apf_read_work_memory_cmd(wmi_unified_t wmi,
 				struct wmi_apf_read_memory_params *read_params);
 
 /**
- * wmi_extract_apf_read_memory_resp_event() - exctract read mem resp event
+ * wmi_extract_apf_read_memory_resp_event() - extract read mem resp event
  * @wmi: wmi handle
  * @evt_buf: Pointer to the event buffer
  * @resp: pointer to memory to extract event parameters into
@@ -4381,7 +4381,7 @@ QDF_STATUS wmi_unified_extract_measreq_chan_info(
  *  color change enable to FW.
  * @wmi_handle: wmi handle
  * @vdev_id: vdev ID
- * @enable: enable or disable color change handeling within firmware
+ * @enable: enable or disable color change handling within firmware
  *
  * Send WMI_BSS_COLOR_CHANGE_ENABLE_CMDID parameters to fw,
  * thereby firmware updates bss color when AP announces bss color change.

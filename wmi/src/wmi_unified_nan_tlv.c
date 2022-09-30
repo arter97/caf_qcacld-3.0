@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
@@ -364,7 +363,7 @@ static QDF_STATUS nan_ndp_initiator_req_tlv(wmi_unified_t wmi_handle,
 	wmi_ndp_transport_ip_param *tcp_ip_param;
 
 	/*
-	 * WMI command expects 4 byte alligned len:
+	 * WMI command expects 4 byte aligned len:
 	 * round up ndp_cfg_len and ndp_app_info_len to 4 bytes
 	 */
 	ndp_cfg_len = qdf_roundup(ndp_req->ndp_config.ndp_cfg_len, 4);
@@ -491,7 +490,7 @@ static QDF_STATUS nan_ndp_responder_req_tlv(wmi_unified_t wmi_handle,
 		 req->ndp_info.ndp_app_info_len);
 
 	/*
-	 * WMI command expects 4 byte alligned len:
+	 * WMI command expects 4 byte aligned len:
 	 * round up ndp_cfg_len and ndp_app_info_len to 4 bytes
 	 */
 	ndp_cfg_len = qdf_roundup(req->ndp_config.ndp_cfg_len, 4);
@@ -604,7 +603,7 @@ static QDF_STATUS nan_ndp_end_req_tlv(wmi_unified_t wmi_handle,
 
 	/* len of tlv following fixed param  */
 	ndp_end_req_len = sizeof(wmi_ndp_end_req) * req->num_ndp_instances;
-	/* above comes out to 4 byte alligned already, no need of padding */
+	/* above comes out to 4 byte aligned already, no need of padding */
 	len = sizeof(*cmd) + ndp_end_req_len + WMI_TLV_HDR_SIZE;
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
