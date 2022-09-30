@@ -79,7 +79,7 @@
  * the configuration component itself will hold one ref count on the global
  * config store. All psocs for which psoc-specific configurations have *not*
  * been provided will reference the global config store. Psocs for which psoc-
- * specific configurations *have* been provded will check for existings stores
+ * specific configurations *have* been provided will check for existings stores
  * with a matching path to use, before parsing the specified configuration file.
  *
  * If, at some point in time, it is known that no further psocs will ever be
@@ -108,7 +108,7 @@
  * Note: A matching cfg_release() call is required to release allocated
  * resources.
  *
- * The *.ini file format is a simple format consiting of a list of key/value
+ * The *.ini file format is a simple format consisting of a list of key/value
  * pairs, separated by an '=' character. e.g.
  *
  *	gConfigItem1=some string value
