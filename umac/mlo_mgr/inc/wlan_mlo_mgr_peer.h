@@ -382,7 +382,7 @@ typedef QDF_STATUS (*wlan_mlo_op_handler)(struct wlan_mlo_dev_context *ml_dev,
  * @ml_dev: MLO DEV object
  * @handler: the handler will be called for each ml peer
  *            the handler should be implemented to perform required operation
- * @arg:     agruments passed by caller
+ * @arg:     arguments passed by caller
  *
  * API to be used for performing the operations on all ML PEER objects
  *

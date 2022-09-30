@@ -468,7 +468,7 @@ mlo_link_set_active(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * mlo_release_ser_link_set_active_cmd() - relases serialization command for
+ * mlo_release_ser_link_set_active_cmd() - releases serialization command for
  *  forcing MLO link active/inactive
  * @vdev: Object manager vdev
  *

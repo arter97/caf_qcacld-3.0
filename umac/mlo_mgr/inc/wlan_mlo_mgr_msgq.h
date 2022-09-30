@@ -150,7 +150,7 @@ struct mlo_ctxt_switch_msg_s {
  * @ml_dev: MLO dev context
  * @payload: msg buf
  *
- * This function post message to defer conext queue for defer processing
+ * This function post message to defer context queue for defer processing
  *
  * Return: SUCCESS if msg is posted
  */

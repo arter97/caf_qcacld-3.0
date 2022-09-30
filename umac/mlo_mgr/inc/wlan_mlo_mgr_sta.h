@@ -176,7 +176,7 @@ typedef void (*mlo_vdev_op_handler)(struct wlan_objmgr_vdev *vdev,
  *
  * @vdev: vdev object
  * @handler: the handler will be called for each object in ML list
- * @arg: argumet to be passed to handler
+ * @arg: argument to be passed to handler
  *
  * Return: none
  */
@@ -395,7 +395,7 @@ void mlo_get_assoc_rsp(struct wlan_objmgr_vdev *vdev,
  * mlo_sta_save_quiet_status - save quiet status for given link of mlo station
  * @mlo_dev_ctx: mlo context
  * @link_id: link id
- * @quiet_status: True if quiet starts. False if quiet stopps.
+ * @quiet_status: True if quiet starts. False if quiet stops.
  *
  * Return: QDF_STATUS
  */
