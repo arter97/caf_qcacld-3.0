@@ -872,6 +872,24 @@ wlan_rptr_core_pdev_pref_uplink_get(struct wlan_objmgr_pdev *pdev,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+struct wlan_objmgr_vdev *
+wlan_rptr_core_pdev_get_stavdev(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_vdev_priv *vdev_priv = NULL;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (pdev_priv) {
+		vdev_priv = pdev_priv->sta_vdev;
+		if (vdev_priv)
+			return vdev_priv->vdev;
+		return NULL;
+	}
+	return NULL;
+}
+#endif
+
 void wlan_rptr_core_global_disconnect_timeout_set(u32 value)
 {
 	struct wlan_rptr_global_priv *g_priv = NULL;
@@ -983,33 +1001,47 @@ wlan_rptr_vdev_attach(
 
 	}
 
-	if ((opmode == QDF_STA_MODE) && (flags & IEEE80211_CLONE_MACADDR)) {
-		if (!(flags & IEEE80211_WRAP_NON_MAIN_STA)) {
-			/*
-			 * Main ProxySTA VAP for uplink WPS PBC and
-			 * downlink multicast receive.
-			 */
-			wlan_rptr_vdev_set_mpsta(vdev);
-			wlan_rptr_pdev_set_qwrap(pdev);
-		} else {
-			/*
-			 * Generally, non-Main ProxySTA VAP's don't need to
-			 * register umac event handlers. We can save some memory
-			 * space by doing so. This is required to be done before
-			 * ieee80211_vap_setup. However we still give the scan
-			 * capability to the first ATH_NSCAN_PSTA_VAPS non-Main
-			 * PSTA VAP's. This optimizes the association speed for
-			 * the first several PSTA VAP's (common case).
-			 */
-			if (pdev_priv) {
-				if (pdev_priv->nscanpsta >= ATH_NSCAN_PSTA_VAPS)
-					wlan_rptr_vdev_set_no_event(vdev);
-				else
-					pdev_priv->nscanpsta++;
+	if (opmode == QDF_STA_MODE) {
+		if (flags & IEEE80211_CLONE_MACADDR) {
+			if (!(flags & IEEE80211_WRAP_NON_MAIN_STA)) {
+				/*
+				 * Main ProxySTA VAP for uplink WPS PBC and
+				 * downlink multicast receive.
+				 */
+				wlan_rptr_vdev_set_mpsta(vdev);
+				wlan_rptr_pdev_set_qwrap(pdev);
+#ifdef WLAN_FEATURE_11BE_MLO
+				pdev_priv->sta_vdev = vdev_priv;
+#endif
+			} else {
+				/*
+				 * Generally, non-Main ProxySTA VAP's don't
+				 * need to register umac event handlers. We can
+				 * save some memory space by doing so. This is
+				 * required to be done before
+				 * ieee80211_vap_setup. However we still give
+				 * the scan capability to the first
+				 * ATH_NSCAN_PSTA_VAPS non-Main PSTA VAP's.
+				 * This optimizes the association speed for
+				 * the first several PSTA VAP's (common case).
+				 */
+				if (pdev_priv) {
+					if (pdev_priv->nscanpsta >=
+					    ATH_NSCAN_PSTA_VAPS)
+						wlan_rptr_vdev_set_no_event(
+									vdev);
+					else
+						pdev_priv->nscanpsta++;
+				}
 			}
+			wlan_rptr_vdev_set_psta(vdev);
+		} else {
+#ifdef WLAN_FEATURE_11BE_MLO
+			pdev_priv->sta_vdev = vdev_priv;
+#endif
 		}
-		wlan_rptr_vdev_set_psta(vdev);
 	}
+
 	if (flags & IEEE80211_CLONE_MATADDR)
 		wlan_rptr_vdev_set_mat(vdev);
 
@@ -1031,6 +1063,9 @@ void wlan_rptr_vdev_detach(
 {
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+#ifdef WLAN_FEATURE_11BE_MLO
+	enum QDF_OPMODE opmode;
+#endif
 
 	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
 	if (pdev_priv) {
@@ -1041,6 +1076,19 @@ void wlan_rptr_vdev_detach(
 			}
 		}
 	}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (pdev_priv && opmode == QDF_STA_MODE) {
+		if (wlan_rptr_vdev_is_psta(vdev)) {
+			if (wlan_rptr_vdev_is_mpsta(vdev)) {
+				pdev_priv->sta_vdev = NULL;
+			}
+		} else {
+			pdev_priv->sta_vdev = NULL;
+		}
+	}
+#endif
 }
 #endif
 

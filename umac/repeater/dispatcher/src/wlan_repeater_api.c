@@ -926,6 +926,20 @@ wlan_rptr_pdev_ucfg_config_get(struct wlan_objmgr_pdev *pdev, int param)
 }
 qdf_export_symbol(wlan_rptr_pdev_ucfg_config_get);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_rptr_pdev_get_stavdev - check if pdev had sta vdev
+ * @pdev- pdev object manager
+ * return vdev if sta vdev is present; otherwise NULL
+ */
+struct wlan_objmgr_vdev *
+wlan_rptr_pdev_get_stavdev(struct wlan_objmgr_pdev *pdev)
+{
+	return wlan_rptr_core_pdev_get_stavdev(pdev);
+}
+qdf_export_symbol(wlan_rptr_pdev_get_stavdev);
+#endif
+
 /**
  * wlan_rptr_vdev_is_scan_allowed - check if scan is allowed for vdev
  * @vdev- vdev object manager
