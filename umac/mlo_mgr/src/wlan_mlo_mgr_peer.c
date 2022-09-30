@@ -851,12 +851,26 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 			}
 		}
 	}
-
+	/* When roam to MLO AP, partner link vdev1 is updated first,
+	 * ml peer need be created and attached for partner link peer.
+	 *
+	 * When roam target AP and current AP have same MLD address, don't
+	 * delete old ML peer and re-create new one, just update different
+	 * info.
+	 */
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
 		ml_peer = wlan_mlo_get_mlpeer(ml_dev,
 				 (struct qdf_mac_addr *)&link_peer->mldaddr[0]);
-		if (ml_peer)
+		if (ml_peer) {
+			mlo_debug("ML Peer " QDF_MAC_ADDR_FMT
+				" existed, state %d",
+				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
+				ml_peer->mlpeer_state);
+			ml_peer->mlpeer_state = ML_PEER_CREATED;
+			ml_peer->max_links = ml_info->num_partner_links;
+			wlan_mlo_peer_set_t2lm_enable_val(ml_peer, ml_info);
 			is_ml_peer_attached = true;
+		}
 	}
 	if (!ml_peer) {
 		/* Allocate MLO peer */
