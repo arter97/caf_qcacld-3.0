@@ -631,7 +631,7 @@ static inline uint32_t hal_rx_tlv_toeplitz_get_be(uint8_t *buf)
 }
 
 /**
- * hal_rx_tlv_msdu_sgi_get(): API to get the Short Gaurd
+ * hal_rx_tlv_msdu_sgi_get(): API to get the Short Guard
  * Interval from rx_msdu_start TLV
  *
  * @buf: pointer to the start of RX PKT TLV headers
@@ -780,7 +780,7 @@ static inline uint32_t hal_rx_tlv_mic_err_get_be(uint8_t *buf)
  * entrance ring desc
  *
  * @desc: reo entrance ring descriptor
- * Return: qdesc adrress
+ * Return: qdesc address
  */
 static inline uint8_t *hal_get_reo_ent_desc_qdesc_addr_be(uint8_t *desc)
 {
@@ -793,7 +793,7 @@ static inline uint8_t *hal_get_reo_ent_desc_qdesc_addr_be(uint8_t *desc)
  *
  * @dst_ring_desc: reo dest ring descriptor (used for Lithium DP)
  * @buf: pointer to the start of RX PKT TLV headers
- * Return: qdesc adrress in reo destination ring buffer
+ * Return: qdesc address in reo destination ring buffer
  */
 static inline uint64_t hal_rx_get_qdesc_addr_be(uint8_t *dst_ring_desc,
 						uint8_t *buf)
@@ -1724,7 +1724,7 @@ bool hal_rx_get_fisa_timeout_be(uint8_t *buf)
  *
  *@rx_tlv_hdr: start address of rx_pkt_tlvs
  *
- * Return: true if RX_MPDU_START is valied, else false.
+ * Return: true if RX_MPDU_START is valid, else false.
  */
 static inline uint8_t hal_rx_mpdu_start_tlv_tag_valid_be(void *rx_tlv_hdr)
 {

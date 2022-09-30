@@ -318,7 +318,7 @@ static inline void hal_write32_mb(struct hal_soc *hal_soc, uint32_t offset,
 }
 
 /**
- * hal_write32_mb_confirm() - write register and check wirting result
+ * hal_write32_mb_confirm() - write register and check writing result
  *
  */
 static inline void hal_write32_mb_confirm(struct hal_soc *hal_soc,
@@ -931,11 +931,11 @@ enum hal_srng_dir hal_srng_get_dir(void *hal_soc, int ring_type);
 
 /* HAL memory information */
 struct hal_mem_info {
-	/* dev base virutal addr */
+	/* dev base virtual addr */
 	void *dev_base_addr;
 	/* dev base physical addr */
 	void *dev_base_paddr;
-	/* dev base ce virutal addr - applicable only for qca5018  */
+	/* dev base ce virtual addr - applicable only for qca5018  */
 	/* In qca5018 CE register are outside wcss block */
 	/* using a separate address space to access CE registers */
 	void *dev_base_addr_ce;
@@ -3194,7 +3194,7 @@ void *hal_srng_dst_prefetch(hal_soc_handle_t hal_soc_hdl,
 	uint32_t cnt;
 	/*
 	 * prefetching 4 HW descriptors will ensure atleast by the time
-	 * 5th HW descriptor is being processed it is guranteed that the
+	 * 5th HW descriptor is being processed it is guaranteed that the
 	 * 5th HW descriptor, its SW Desc, its nbuf and its nbuf's data
 	 * are in cache line. basically ensuring all the 4 (HW, SW, nbuf
 	 * & nbuf->data) are prefetched.

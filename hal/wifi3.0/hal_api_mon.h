@@ -776,7 +776,7 @@ struct hal_rx_ppdu_cfr_user_info {
  *    6: 18 Mbps
  *    7: 9 Mbps
  *
- * @gi_type: Indicates the gaurd interval.
+ * @gi_type: Indicates the guard interval.
  *    0: 0.8 us
  *    1: 0.4 us
  *    2: 1.6 us
@@ -1323,7 +1323,7 @@ static inline void hal_rx_proc_phyrx_other_receive_info_tlv(struct hal_soc *hal_
  * @rx_tlv_hdr: pointer to TLV header
  * @ppdu_info: pointer to ppdu_info
  * @hal_soc: HAL soc handle
- * @nbuf: PPDU status netowrk buffer
+ * @nbuf: PPDU status network buffer
  *
  * Return: HAL_TLV_STATUS_PPDU_NOT_DONE or HAL_TLV_STATUS_PPDU_DONE from tlv
  */

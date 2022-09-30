@@ -1167,7 +1167,7 @@ hal_rx_tlv_populate_mpdu_desc_info_kiwi(uint8_t *buf,
 
 /**
  * hal_reo_status_get_header_kiwi - Process reo desc info
- * @d - Pointer to reo descriptior
+ * @d - Pointer to reo descriptor
  * @b - tlv type info
  * @h1 - Pointer to hal_reo_status_header where info to be stored
  *
@@ -1693,10 +1693,10 @@ static uint32_t hal_rx_flow_get_cmem_fse_ts_kiwi(struct hal_soc *hal_soc,
  * hal_rx_flow_get_cmem_fse_kiwi() - Get FSE from CMEM
  * @hal_soc: hal_soc reference
  * @fse_offset: CMEM FSE offset
- * @fse: referece where FSE will be copied
+ * @fse: reference where FSE will be copied
  * @len: length of FSE
  *
- * Return: If read is succesfull or not
+ * Return: If read is successful or not
  */
 static void
 hal_rx_flow_get_cmem_fse_kiwi(struct hal_soc *hal_soc, uint32_t fse_offset,
@@ -1986,7 +1986,7 @@ uint64_t hal_fw_qtime_to_usecs(uint64_t time)
 }
 
 /**
- * hal_get_tsf_time_kiwi() - Get tsf time from scatch register
+ * hal_get_tsf_time_kiwi() - Get tsf time from scratch register
  * @hal_soc_hdl: HAL soc handle
  * @mac_id: mac_id
  * @tsf: pointer to update tsf value

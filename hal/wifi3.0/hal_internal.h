@@ -160,7 +160,7 @@ struct rx_msdu_desc_info;
 typedef struct rx_msdu_desc_info *rx_msdu_desc_info_t;
 
 /**
- * Opaque hanlder for PPE VP config.
+ * Opaque handler for PPE VP config.
  */
 union hal_tx_ppe_vp_config;
 union hal_tx_cmn_config_ppe;
@@ -1397,7 +1397,7 @@ struct hal_soc {
 
 #if defined(FEATURE_HAL_DELAYED_REG_WRITE)
 /**
- *  hal_delayed_reg_write() - delayed regiter write
+ *  hal_delayed_reg_write() - delayed register write
  * @hal_soc: HAL soc handle
  * @srng: hal srng
  * @addr: iomem address

@@ -136,7 +136,7 @@ do {                                            \
 
 /*
  * Offset of HTT Tx Descriptor in WBM Completion
- * HTT Tx Desc structure is passed from firmware to host overlayed
+ * HTT Tx Desc structure is passed from firmware to host overlaid
  * on wbm_release_ring DWORDs 2,3 ,4 and 5for software based completions
  * (Exception frames and TQM bypass frames)
  */
@@ -372,7 +372,7 @@ static inline void hal_tx_ext_desc_set_tso_enable(void *desc,
 /**
  * hal_tx_ext_desc_set_tso_flags() - Set TSO Flags
  * @desc: Handle to Tx MSDU Extension Descriptor
- * @falgs: 32-bit word with all TSO flags consolidated
+ * @flags: 32-bit word with all TSO flags consolidated
  *
  * Return: none
  */
@@ -481,7 +481,7 @@ static inline void hal_tx_ext_desc_set_buffer(void *desc,
  * @desc: Handle to Tx MSDU Extension Descriptor
  * @frag_num: fragment number (value can be 0 to 5)
  * @iova: fragment dma address
- * @len: fragement Length
+ * @len: fragment Length
  *
  * Return: None
  */

@@ -686,7 +686,7 @@ uint32_t hal_rx_msdu_reo_dst_ind_get_be(hal_soc_handle_t hal_soc_hdl,
 
 	msdu_details = hal_rx_link_desc_msdu0_ptr(msdu_link, hal_soc);
 
-	/* The first msdu in the link should exsist */
+	/* The first msdu in the link should exist */
 	msdu_desc_info = hal_rx_msdu_ext_desc_info_get_ptr(&msdu_details[0],
 							   hal_soc);
 	dst_ind = HAL_RX_MSDU_REO_DST_IND_GET(msdu_desc_info);

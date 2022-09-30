@@ -279,7 +279,7 @@ static uint8_t hal_rx_get_tlv_6122(void *rx_tlv)
  *
  *@rx_tlv_hdr: start address of rx_pkt_tlvs
  *
- * Return: true if RX_MPDU_START is valied, else false.
+ * Return: true if RX_MPDU_START is valid, else false.
  */
 uint8_t hal_rx_mpdu_start_tlv_tag_valid_6122(void *rx_tlv_hdr)
 {

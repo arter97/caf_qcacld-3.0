@@ -875,7 +875,7 @@ struct hal_tx_status_info {
  * @is_used: boolean flag to identify valid ppdu info
  * @is_data: boolean flag to identify data frame
  * @cur_usr_idx: Current user index of the PPDU
- * @reserved: for furture purpose
+ * @reserved: for future purpose
  * @prot_tlv_status: protection tlv status
  * @packet_info: packet information
  * @rx_status: monitor mode rx status information

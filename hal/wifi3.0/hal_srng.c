@@ -109,7 +109,7 @@ static void hal_reg_write_fail_history_init(struct hal_soc *hal)
 #endif
 
 /**
- * hal_get_srng_ring_id() - get the ring id of a descriped ring
+ * hal_get_srng_ring_id() - get the ring id of a described ring
  * @hal: hal_soc data structure
  * @ring_type: type enum describing the ring
  * @ring_num: which ring of the ring type
@@ -399,7 +399,7 @@ static bool hal_validate_shadow_register(struct hal_soc *hal,
 	}
 	return true;
 error:
-	qdf_print("baddr %pK, desination %pK, shadow_address %pK s0offset %pK index %x",
+	qdf_print("baddr %pK, destination %pK, shadow_address %pK s0offset %pK index %x",
 		  hal->dev_base_addr, destination, shadow_address,
 		  shadow_0_offset, index);
 	QDF_BUG(0);
@@ -628,9 +628,9 @@ int hal_get_reg_write_pending_work(void *hal_soc)
 #endif
 
 /**
- * hal_process_reg_write_q_elem() - process a regiter write queue element
+ * hal_process_reg_write_q_elem() - process a register write queue element
  * @hal: hal_soc pointer
- * @q_elem: pointer to hal regiter write queue element
+ * @q_elem: pointer to hal register write queue element
  *
  * Return: The value which was written to the address
  */
@@ -845,7 +845,7 @@ void hal_flush_reg_write_work(hal_soc_handle_t hal_handle)
  * hal_reg_write_enqueue() - enqueue register writes into kworker
  * @hal_soc: hal_soc pointer
  * @srng: srng pointer
- * @addr: iomem address of regiter
+ * @addr: iomem address of register
  * @value: value to be written to iomem address
  *
  * This function executes from within the SRNG LOCK

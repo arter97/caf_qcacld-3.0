@@ -1000,7 +1000,7 @@ static void hal_rx_dump_msdu_end_tlv_5332(void *msduend,
 
 /**
  * hal_reo_status_get_header_5332 - Process reo desc info
- * @d - Pointer to reo descriptior
+ * @d - Pointer to reo descriptor
  * @b - tlv type info
  * @h1 - Pointer to hal_reo_status_header where info to be stored
  *

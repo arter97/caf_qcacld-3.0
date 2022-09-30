@@ -226,7 +226,7 @@ struct hal_rx_mpdu_desc_info {
 	uint16_t msdu_count;
 	uint16_t mpdu_seq; /* 12 bits for length */
 	uint32_t mpdu_flags;
-	uint32_t peer_meta_data; /* sw progamed meta-data:MAC Id & peer Id */
+	uint32_t peer_meta_data; /* sw programmed meta-data:MAC Id & peer Id */
 	uint16_t bar_frame;
 	uint8_t tid:4,
 		reserved:4;
@@ -1780,7 +1780,7 @@ uint32_t hal_rx_msdu_start_reception_type_get(hal_soc_handle_t hal_soc_hdl,
 
 /**
  * hal_reo_status_get_header_generic - Process reo desc info
- * @d - Pointer to reo descriptior
+ * @d - Pointer to reo descriptor
  * @b - tlv type info
  * @h - Pointer to hal_reo_status_header where info to be stored
  * @hal- pointer to hal_soc structure
@@ -2927,7 +2927,7 @@ hal_rx_reo_buf_type_get(hal_soc_handle_t hal_soc_hdl, hal_ring_desc_t rx_desc)
  * hal_rx_reo_prev_pn_get() - Get the previous pn from ring descriptor.
  * @hal_soc_hdl: HAL SoC handle
  * @ring_desc: REO ring descriptor
- * @prev_pn: Buffer to populate the previos PN
+ * @prev_pn: Buffer to populate the previous PN
  *
  * Return: None
  */
