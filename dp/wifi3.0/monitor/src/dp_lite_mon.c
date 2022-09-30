@@ -399,14 +399,18 @@ static QDF_STATUS
 dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 			  struct cdp_lite_mon_filter_config *config)
 {
+	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 	struct dp_mon_pdev_be *be_mon_pdev =
 			(struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
 	struct dp_lite_mon_tx_config *lite_mon_tx_config;
+	struct dp_soc *soc = (struct dp_soc *)be_pdev->pdev.soc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint16_t num_of_buffers;
 
 	if (!be_mon_pdev)
 		return QDF_STATUS_E_FAILURE;
 
+	soc_cfg_ctx = soc->wlan_cfg_ctx;
 	lite_mon_tx_config = be_mon_pdev->lite_mon_tx_config;
 	if (lite_mon_tx_config->tx_config.enable == !config->disable) {
 		dp_mon_err("Tx lite mon already enabled/disabled");
@@ -458,7 +462,10 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 		if (dp_lite_mon_is_full_len_configured(config->len[WLAN_FC0_TYPE_DATA],
 						       config->len[WLAN_FC0_TYPE_MGMT],
 						       config->len[WLAN_FC0_TYPE_CTRL])) {
-			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev);
+			num_of_buffers = wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
+			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev, num_of_buffers);
+		} else {
+			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev, DP_MON_RING_FILL_LEVEL_DEFAULT);
 		}
 
 		/* setupt tx lite mon filters */

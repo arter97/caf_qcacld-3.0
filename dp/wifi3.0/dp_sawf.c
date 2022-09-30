@@ -45,6 +45,8 @@
 #define SAWF_SERVICE_CLASS_MASK 0xff
 #define SAWF_PEER_ID_SHIFT 0x6
 #define SAWF_PEER_ID_MASK 0x3ff
+#define SAWF_NW_DELAY_MASK 0x3ffff
+#define SAWF_NW_DELAY_SHIFT 0x6
 #define SAWF_MSDUQ_MASK 0x3f
 
 /**
@@ -58,6 +60,11 @@
 #define SAWF_MSDUQ_GET(x) ((x) & SAWF_MSDUQ_MASK)
 #define SAWF_TAG_IS_VALID(x) \
 	((SAWF_TAG_GET(x) == SAWF_VALID_TAG) ? true : false)
+
+#define SAWF_NW_DELAY_SET(x, nw_delay) ((SAWF_VALID_TAG << SAWF_TAG_SHIFT) | \
+	((nw_delay) << SAWF_NW_DELAY_SHIFT) | (SAWF_MSDUQ_GET(x)))
+#define SAWF_NW_DELAY_GET(x) (((x) >> SAWF_NW_DELAY_SHIFT) \
+	& SAWF_NW_DELAY_MASK)
 
 #define DP_TX_TCL_METADATA_TYPE_SET(_var, _val) \
 	HTT_TX_TCL_METADATA_TYPE_V2_SET(_var, _val)
@@ -382,19 +389,18 @@ dp_peer_sawf_stats_ctx_get(struct dp_txrx_peer *txrx_peer)
 }
 
 static QDF_STATUS
-dp_sawf_compute_tx_delay(struct dp_tx_desc_s *tx_desc,
-			 uint32_t *delay)
+dp_sawf_compute_tx_delay_us(struct dp_tx_desc_s *tx_desc,
+			    uint32_t *delay)
 {
-	int64_t current_timestamp, timestamp_hw_enqueue;
+	int64_t wifi_entry_ts, timestamp_hw_enqueue;
 
-	timestamp_hw_enqueue = tx_desc->timestamp;
-	current_timestamp = qdf_ktime_to_ms(qdf_ktime_real_get());
+	timestamp_hw_enqueue = qdf_ktime_to_us(tx_desc->timestamp);
+	wifi_entry_ts = qdf_nbuf_get_timestamp_us(tx_desc->nbuf);
 
 	if (timestamp_hw_enqueue == 0)
 		return QDF_STATUS_E_FAILURE;
 
-	*delay = (uint32_t)(current_timestamp -
-			    timestamp_hw_enqueue);
+	*delay = (uint32_t)(timestamp_hw_enqueue - wifi_entry_ts);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -446,10 +452,9 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 {
 	struct sawf_delay_stats *tx_delay;
 	struct wlan_sawf_scv_class_params *svclass_params;
-	uint32_t hw_delay;
 	uint8_t svc_id;
-	uint32_t num_pkt_win;
-	uint32_t win_avg;
+	uint32_t num_pkt_win, hw_delay, sw_delay, nw_delay;
+	uint64_t nwdelay_win_avg, swdelay_win_avg, hwdelay_win_avg;
 
 	if (QDF_IS_STATUS_ERROR(dp_sawf_compute_tx_hw_delay_us(soc, vdev, ts,
 							       &hw_delay))) {
@@ -461,17 +466,33 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 	dp_hist_update_stats(&tx_delay->delay_hist, hw_delay);
 
 	tx_delay->num_pkt++;
-	tx_delay->win_total += hw_delay;
+
+	tx_delay->hwdelay_win_total += hw_delay;
+	nw_delay = SAWF_NW_DELAY_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
+
+	tx_delay->nwdelay_win_total += nw_delay;
+
+	dp_sawf_compute_tx_delay_us(tx_desc, &sw_delay);
+	tx_delay->swdelay_win_total += sw_delay;
 
 	num_pkt_win = dp_sawf_get_mov_avg_num_pkt();
 	if (!(tx_delay->num_pkt % num_pkt_win)) {
-		win_avg = qdf_do_div(tx_delay->win_total, num_pkt_win);
+		nwdelay_win_avg = qdf_do_div(tx_delay->nwdelay_win_total,
+					     num_pkt_win);
+		swdelay_win_avg = qdf_do_div(tx_delay->swdelay_win_total,
+					     num_pkt_win);
+		hwdelay_win_avg = qdf_do_div(tx_delay->hwdelay_win_total,
+					     num_pkt_win);
 		/* Update the avg per window */
-		telemetry_sawf_update_delay_mvng(
-				sawf_ctx->telemetry_ctx,
-				tid, host_q_idx,
-				win_avg);
-		tx_delay->win_total = 0;
+		telemetry_sawf_update_delay_mvng(sawf_ctx->telemetry_ctx,
+						 tid, host_q_idx,
+						 nwdelay_win_avg,
+						 swdelay_win_avg,
+						 hwdelay_win_avg);
+
+		tx_delay->nwdelay_win_total = 0;
+		tx_delay->swdelay_win_total = 0;
+		tx_delay->hwdelay_win_total = 0;
 	}
 
 	svc_id = sawf_ctx->msduq[host_q_idx].svc_id;
@@ -485,7 +506,7 @@ dp_sawf_update_tx_delay(struct dp_soc *soc,
 			tx_delay->failure++ : tx_delay->success++;
 
 		if (!(tx_delay->num_pkt % dp_sawf_get_sla_num_pkt())) {
-			/* Update the success/failre count */
+			/* Update the success/failure count */
 			telemetry_sawf_update_delay(sawf_ctx->telemetry_ctx,
 						    tid, host_q_idx,
 						    tx_delay->success,
@@ -556,6 +577,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 				   uint8_t host_tid)
 {
 	struct dp_peer *peer;
+	struct dp_peer *primary_link_peer = NULL;
 	struct dp_peer_sawf *sawf_ctx;
 	struct dp_peer_sawf_stats *stats_ctx;
 	struct sawf_tx_stats *tx_stats;
@@ -577,7 +599,7 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
+	peer_id = tx_desc->peer_id;
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
 	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
 	    host_msduq_idx < DP_SAWF_DEFAULT_Q_MAX)
@@ -587,6 +609,19 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 	if (!peer) {
 		dp_sawf_err("No peer for id %u", peer_id);
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (IS_MLO_DP_MLD_PEER(peer)) {
+		primary_link_peer = dp_get_primary_link_peer_by_id(
+						soc, peer->peer_id,
+						DP_MOD_ID_SAWF);
+		if (!primary_link_peer) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+			qdf_warn("NULL peer");
+			return QDF_STATUS_E_FAILURE;
+		}
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+		peer = primary_link_peer;
 	}
 
 	sawf_ctx = dp_peer_sawf_ctx_get(peer);
@@ -657,6 +692,57 @@ dp_sawf_tx_compl_update_peer_stats(struct dp_soc *soc,
 	return status;
 }
 
+void dp_peer_tid_delay_avg(struct cdp_delay_tx_stats *tx_delay,
+			   uint32_t nw_delay,
+			   uint32_t sw_delay,
+			   uint32_t hw_delay)
+{
+	uint64_t sw_avg_sum = 0;
+	uint64_t hw_avg_sum = 0;
+	uint64_t nw_avg_sum = 0;
+	uint32_t cur_win, idx;
+
+	cur_win = tx_delay->curr_win_idx;
+	tx_delay->sw_delay_win_avg[cur_win] += (uint64_t)sw_delay;
+	tx_delay->hw_delay_win_avg[cur_win] += (uint64_t)hw_delay;
+	tx_delay->nw_delay_win_avg[cur_win] += (uint64_t)nw_delay;
+	tx_delay->cur_win_num_pkts++;
+
+	if (!(tx_delay->cur_win_num_pkts % CDP_MAX_PKT_PER_WIN)) {
+		/* Update the average of the completed window */
+		tx_delay->sw_delay_win_avg[cur_win] = qdf_do_div(
+					tx_delay->sw_delay_win_avg[cur_win],
+					CDP_MAX_PKT_PER_WIN);
+		tx_delay->hw_delay_win_avg[cur_win] = qdf_do_div(
+				tx_delay->hw_delay_win_avg[cur_win],
+				CDP_MAX_PKT_PER_WIN);
+		tx_delay->nw_delay_win_avg[cur_win] = qdf_do_div(
+				tx_delay->nw_delay_win_avg[cur_win],
+				CDP_MAX_PKT_PER_WIN);
+		tx_delay->curr_win_idx++;
+		tx_delay->cur_win_num_pkts = 0;
+
+		/* Compute the moving average from all windows */
+		if (tx_delay->curr_win_idx == CDP_MAX_WIN_MOV_AVG) {
+			for (idx = 0; idx < CDP_MAX_WIN_MOV_AVG; idx++) {
+				sw_avg_sum += tx_delay->sw_delay_win_avg[idx];
+				hw_avg_sum += tx_delay->hw_delay_win_avg[idx];
+				nw_avg_sum += tx_delay->nw_delay_win_avg[idx];
+				tx_delay->sw_delay_win_avg[idx] = 0;
+				tx_delay->hw_delay_win_avg[idx] = 0;
+				tx_delay->nw_delay_win_avg[idx] = 0;
+			}
+			tx_delay->swdelay_avg = qdf_do_div(sw_avg_sum,
+							   CDP_MAX_WIN_MOV_AVG);
+			tx_delay->hwdelay_avg = qdf_do_div(hw_avg_sum,
+							   CDP_MAX_WIN_MOV_AVG);
+			tx_delay->nwdelay_avg = qdf_do_div(nw_avg_sum,
+							   CDP_MAX_WIN_MOV_AVG);
+			tx_delay->curr_win_idx = 0;
+		}
+	}
+}
+
 QDF_STATUS
 dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 				   struct dp_tx_desc_s *tx_desc)
@@ -670,7 +756,7 @@ dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 	if (!dp_sawf_tag_valid_get(tx_desc->nbuf))
 		return QDF_STATUS_E_INVAL;
 
-	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
+	peer_id = tx_desc->peer_id;
 
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
 	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
@@ -711,6 +797,29 @@ fail:
 	return QDF_STATUS_E_FAILURE;
 }
 
+static void dp_sawf_set_nw_delay(qdf_nbuf_t nbuf)
+{
+	uint32_t mark;
+	uint32_t nw_delay = 0;
+	uint32_t msduq;
+
+	if ((qdf_nbuf_get_tx_ftype(nbuf) != CB_FTYPE_SAWF)) {
+		goto set_delay;
+	}
+	nw_delay = (uint32_t)((uintptr_t)qdf_nbuf_get_tx_fctx(nbuf));
+	if (nw_delay > SAWF_NW_DELAY_MASK) {
+		nw_delay = 0;
+		goto set_delay;
+	}
+
+set_delay:
+	mark = qdf_nbuf_get_mark(nbuf);
+	msduq = SAWF_MSDUQ_GET(mark);
+	mark = SAWF_NW_DELAY_SET(mark, nw_delay) | msduq;
+
+	qdf_nbuf_set_mark(nbuf, mark);
+}
+
 QDF_STATUS
 dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 			      struct dp_tx_desc_s *tx_desc)
@@ -725,6 +834,17 @@ dp_sawf_tx_enqueue_peer_stats(struct dp_soc *soc,
 		return QDF_STATUS_E_INVAL;
 
 	peer_id = SAWF_PEER_ID_GET(qdf_nbuf_get_mark(tx_desc->nbuf));
+	tx_desc->peer_id = peer_id;
+
+	/*
+	 * Set n/w-delay into mark field and process the same in the
+	 * completion-path.If n/w-delay is invalid for any reason,
+	 * move forward and process the other stats.
+	 */
+	dp_sawf_set_nw_delay(tx_desc->nbuf);
+
+	/* Set enqueue tstamp in tx_desc */
+	tx_desc->timestamp = qdf_ktime_real_get();
 
 	host_msduq_idx = dp_sawf_queue_id_get(tx_desc->nbuf);
 	if (host_msduq_idx == DP_SAWF_DEFAULT_Q_INVALID ||
@@ -852,9 +972,11 @@ dp_sawf_copy_delay_stats(struct sawf_delay_stats *dst,
 			 struct sawf_delay_stats *src)
 {
 	dp_copy_hist_stats(&src->delay_hist, &dst->delay_hist);
-	dst->mov_avg = src->mov_avg;
+	dst->nwdelay_avg = src->nwdelay_avg;
+	dst->swdelay_avg = src->swdelay_avg;
+	dst->hwdelay_avg = src->hwdelay_avg;
 	dst->success = src->success;
-	dst->failure = dst->failure;
+	dst->failure = src->failure;
 }
 
 static void
@@ -899,7 +1021,7 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 	uint8_t tid, q_idx;
 	uint16_t host_q_id, host_q_idx;
 	QDF_STATUS status;
-	uint32_t mov_avg;
+	uint32_t nwdelay_avg, swdelay_avg, hwdelay_avg;
 
 	stats = (struct sawf_delay_stats *)data;
 	if (!stats) {
@@ -968,8 +1090,11 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 				src = &stats_ctx->stats.delay[host_q_idx];
 				telemetry_sawf_get_mov_avg(
 						sawf_ctx->telemetry_ctx,
-						tid, host_q_idx, &mov_avg);
-				src->mov_avg = mov_avg;
+						tid, host_q_idx, &nwdelay_avg,
+						&swdelay_avg, &hwdelay_avg);
+				src->nwdelay_avg = nwdelay_avg;
+				src->swdelay_avg = swdelay_avg;
+				src->hwdelay_avg = hwdelay_avg;
 
 				dp_sawf_print_stats("-- TID: %u MSDUQ: %u --",
 						    tid, q_idx);
@@ -1008,8 +1133,11 @@ dp_sawf_get_peer_delay_stats(struct cdp_soc_t *soc,
 
 		src = &stats_ctx->stats.delay[host_q_idx];
 		telemetry_sawf_get_mov_avg(sawf_ctx->telemetry_ctx,
-					   tid, host_q_idx, &mov_avg);
-		src->mov_avg = mov_avg;
+					   tid, host_q_idx, &nwdelay_avg,
+					   &swdelay_avg, &hwdelay_avg);
+		src->nwdelay_avg = nwdelay_avg;
+		src->swdelay_avg = swdelay_avg;
+		src->hwdelay_avg = hwdelay_avg;
 
 		dp_sawf_print_stats("----TID: %u MSDUQ: %u ----", tid, q_idx);
 		dp_sawf_dump_delay_stats(src);

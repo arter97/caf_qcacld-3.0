@@ -264,6 +264,20 @@ dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 				   struct dp_tx_desc_s *tx_desc);
 
 /**
+ * dp_peer_tid_delay_avg - Compute per peer TID delay average
+ * @tx_delay: Delay structure
+ * @nw_delay: Networking Delay
+ * @sw_delay: Wifi Software Delay
+ * @hw_delay: Wifi HW delay
+ *
+ * Return: None
+ */
+void dp_peer_tid_delay_avg(struct cdp_delay_tx_stats *tx_delay,
+			   uint32_t nw_delay,
+			   uint32_t sw_delay,
+			   uint32_t hw_delay);
+
+/**
  * dp_sawf_tx_enqueue_peer_stats - update SAWF stats in Tx enqueue
  * @soc: soc handle
  * @tx_desc: Tx descriptor

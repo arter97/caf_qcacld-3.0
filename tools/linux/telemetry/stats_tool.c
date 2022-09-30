@@ -505,6 +505,7 @@ static const struct option long_opts[] = {
 	{ NULL, no_argument, NULL, 0 },
 };
 
+#ifndef WLAN_CONFIG_TX_DELAY
 const char *stats_if_fw_to_hw_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 	"0 to 10 ms", "11 to 20 ms",
 	"21 to 30 ms", "31 to 40 ms",
@@ -522,6 +523,25 @@ const char *stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 	"8 to 9 ms", "9 to 10 ms",
 	"10 to 11 ms", "11 to 12 ms", "12+ ms"
 };
+#else
+const char *stats_if_fw_to_hw_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 250 us", "250 to 500 us",
+	"500 to 750 us", "750 to 1000 us",
+	"1000 to 1500 us", "1500 to 2000 us",
+	"2000 to 2500 us", "2500 to 5000 us",
+	"5000 to 6000 us", "6000 to 7000 ms",
+	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
+};
+
+const char *stats_if_sw_enq_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
+	"0 to 250 us", "250 to 500 us",
+	"500 to 750 us", "750 to 1000 us",
+	"1000 to 1500 us", "1500 to 2000 us",
+	"2000 to 2500 us", "2500 to 5000 us",
+	"5000 to 6000 us", "6000 to 7000 ms",
+	"7000 to 8000 us", "8000 to 9000 us", "9000+ us"
+};
+#endif
 
 const char *stats_if_intfrm_delay_bucket[STATS_IF_DELAY_BUCKET_MAX + 1] = {
 	"0 to 5 ms", "6 to 10 ms",
@@ -850,6 +870,8 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 	STATS_PRINT("\n\tTx BW Counts = 20MHZ %u 40MHZ %u 80MHZ %u 160MHZ %u\n",
 		    tx->bw[0], tx->bw[1], tx->bw[2], tx->bw[3]);
 	STATS_32(stdout, "Tx Retries", tx->retries);
+	STATS_32(stdout, "Tx PER", tx->per);
+	STATS_32(stdout, "Tx Rate", tx->tx_rate);
 	STATS_PRINT("\tTx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", tx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
@@ -1306,6 +1328,12 @@ static void print_advance_sta_data_delay(struct advance_peer_data_delay *delay)
 		STATS_PRINT("\t\tHardware Transmission Delay: ");
 		print_advance_hist_stats(&delay->delay_stats[tid].tx_delay.hwtx_delay,
 					 STATS_IF_HIST_TYPE_HW_COMP_DELAY);
+		STATS_PRINT("\t\tNW Delay Average: %d",
+				delay->delay_stats[tid].tx_delay.nwdelay_avg);
+		STATS_PRINT("\t\tSW Delay Average: %d",
+				delay->delay_stats[tid].tx_delay.swdelay_avg);
+		STATS_PRINT("\t\tHW Delay Average: %d\n",
+				delay->delay_stats[tid].tx_delay.hwdelay_avg);
 	}
 	STATS_PRINT("\nRx Delay Stats:\n");
 	for (tid = 0; tid < STATS_IF_MAX_DATA_TIDS; tid++) {
@@ -1346,8 +1374,12 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 		STATS_PRINT("\nDelay Bins\n");
 		print_advance_hist_stats(&data->delay[0][0].delay_hist,
 					 STATS_IF_HIST_TYPE_HW_TX_COMP_DELAY);
-		STATS_PRINT("Moving average = %u\n",
-			    data->delay[0][0].mov_avg);
+		STATS_PRINT("NwDelay Moving average = %u\n",
+			    data->delay[0][0].nwdelay_avg);
+		STATS_PRINT("SwDelay Moving average = %u\n",
+			    data->delay[0][0].swdelay_avg);
+		STATS_PRINT("HwDelay Moving average = %u\n",
+			    data->delay[0][0].hwdelay_avg);
 		STATS_PRINT("Delay bound success = %ju \n",
 			    data->delay[0][0].delay_bound_success);
 		STATS_PRINT("Delay bound failure = %ju \n",
@@ -1367,12 +1399,21 @@ print_advance_sta_data_sawf_delay(struct advance_peer_data_sawfdelay *data,
 				STATS_PRINT("\nDelay Bins\n");
 				print_advance_hist_stats(&dly->delay_hist,
 							 hw_comp);
-				STATS_PRINT("Moving average = %u\n",
-					    data->delay[tidx][queues].mov_avg);
+				STATS_PRINT("NwDelay Moving average = %u\n",
+					    data->delay[tidx][queues].
+					    nwdelay_avg);
+				STATS_PRINT("SwDelay Moving average = %u\n",
+					    data->delay[tidx][queues].
+					    swdelay_avg);
+				STATS_PRINT("HwDelay Moving average = %u\n",
+					    data->delay[tidx][queues].
+					    hwdelay_avg);
 				STATS_PRINT("Delay bound success = %ju\n",
-					    data->delay[tidx][queues].delay_bound_success);
+					    data->delay[tidx][queues].
+					    delay_bound_success);
 				STATS_PRINT("Delay bound failure = %ju\n",
-					    data->delay[tidx][queues].delay_bound_failure);
+					    data->delay[tidx][queues].
+					    delay_bound_failure);
 			}
 		}
 	}

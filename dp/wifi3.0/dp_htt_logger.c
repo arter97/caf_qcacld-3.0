@@ -25,6 +25,7 @@
 #include "dp_htt_logger.h"
 #include "dp_types.h"
 #include "dp_internal.h"
+#include <htt.h>
 
 #define HTT_DBG_FILE_PERM           (QDF_FILE_USR_READ | QDF_FILE_USR_WRITE | \
 					 QDF_FILE_GRP_READ | \
@@ -34,35 +35,6 @@
  * read at one shot through wdf debugfs framework
  */
 #define HTT_DISPLAY_SIZE 25
-
-/**
- * Host messages which needs to be enabled by default
- *
- * Note: Below macro definition is cloned from
- * enum htt_t2h_msg_type fw_hdr/fw/htt.h and any
- * change in enum htt_t2h_msg_type for below field
- * will need a change here as well.
- */
-#define HTT_T2H_MSG_TYPE_PEER_MAP_C       0x3
-#define HTT_T2H_MSG_TYPE_PEER_UNMAP_C     0x4
-#define HTT_T2H_MSG_TYPE_RX_ADDBA_C       0x5
-#define HTT_T2H_MSG_TYPE_RX_DELBA_C       0x6
-#define HTT_T2H_MSG_TYPE_PEER_MAP_V2_C    0x1e
-#define HTT_T2H_MSG_TYPE_PEER_UNMAP_V2_C  0x1f
-
-/**
- * HTT commands sent by Host to FW which needs to be
- * enabled by default
- *
- * Note: Below macro definition is cloned from
- * enum htt_h2t_msg_type fw_hdr/fw/htt.h and any
- * change in enum htt_h2t_msg_type for below field
- * will need a change here as well.
- */
-#define HTT_H2T_MSG_TYPE_RX_RING_CFG_C              0x2
-#define HTT_H2T_MSG_TYPE_SRING_SETUP_C              0xb
-#define HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG_C    0xc
-#define HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE_C     0x17
 
 /**
  * disable_all_command(): Disable all command
@@ -79,14 +51,14 @@
 	htt_logger_handle->log_info.htt_logging_enable = 1
 #define enable_event(htt_logger_handle, eventid) \
 do { \
-	htt_disable_mask = ~(0x1 << eventid); \
+	htt_disable_mask = ~(0x1ULL << eventid); \
 	htt_logger_handle->log_info.htt_event_disable_list &= \
 		htt_disable_mask; \
 } while (0)
 
 #define enable_command(htt_logger_handle, cmd_id) \
 do { \
-	htt_disable_mask = ~(0x1 << cmd_id); \
+	htt_disable_mask = ~(0x1ULL << cmd_id); \
 	htt_logger_handle->log_info.htt_cmd_disable_list &= \
 		htt_disable_mask; \
 } while (0)
@@ -963,12 +935,12 @@ void htt_interface_logging_init(struct htt_logger **phtt_logger_handle,
 	 * HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG, HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE
 	 */
 	disable_all_command(htt_logger_handle);
-	enable_command(htt_logger_handle, HTT_H2T_MSG_TYPE_RX_RING_CFG_C);
-	enable_command(htt_logger_handle, HTT_H2T_MSG_TYPE_SRING_SETUP_C);
+	enable_command(htt_logger_handle, HTT_H2T_MSG_TYPE_RX_RING_CFG);
+	enable_command(htt_logger_handle, HTT_H2T_MSG_TYPE_SRING_SETUP);
 	enable_command(htt_logger_handle,
-		       HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG_C);
+		       HTT_H2T_MSG_TYPE_RX_RING_SELECTION_CFG);
 	enable_command(htt_logger_handle,
-		       HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE_C);
+		       HTT_H2T_MSG_TYPE_RX_FULL_MONITOR_MODE);
 
 	/* Disable all event except:
 	 * HTT_T2H_MSG_TYPE_PEER_MAP, HTT_T2H_MSG_TYPE_PEER_UNMAP
@@ -976,12 +948,13 @@ void htt_interface_logging_init(struct htt_logger **phtt_logger_handle,
 	 * HTT_T2H_MSG_TYPE_PEER_MAP_V2 HTT_T2H_MSG_TYPE_PEER_UNMAP_V2
 	 */
 	disable_all_event(htt_logger_handle);
-	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP_C);
-	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_UNMAP_C);
-	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_RX_ADDBA_C);
-	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_RX_DELBA_C);
-	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP_V2_C);
-	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_UNMAP_V2_C);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_UNMAP);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_RX_ADDBA);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_RX_DELBA);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP_V2);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_UNMAP_V2);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP_V3);
 
 	/* Disable success status*/
 	disable_wbm_success_status(htt_logger_handle);

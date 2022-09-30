@@ -453,6 +453,9 @@ struct stats_if_hist_stats {
 struct stats_if_delay_tx_stats {
 	struct stats_if_hist_stats tx_swq_delay;
 	struct stats_if_hist_stats hwtx_delay;
+	uint32_t nwdelay_avg;
+	uint32_t swdelay_avg;
+	uint32_t hwdelay_avg;
 };
 
 struct stats_if_delay_rx_stats {
@@ -516,7 +519,9 @@ struct stats_if_tid_tx_stats {
 struct stats_if_sawf_delay_stats {
 	struct stats_if_hist_stats delay_hist;
 	uint8_t cur_win;
-	uint32_t mov_avg;
+	uint32_t nwdelay_avg;
+	uint32_t swdelay_avg;
+	uint32_t hwdelay_avg;
 	uint64_t delay_bound_success;
 	uint64_t delay_bound_failure;
 };
@@ -566,6 +571,8 @@ struct advance_data_tx_stats {
 	u_int32_t amsdu_cnt;
 	u_int32_t ampdu_cnt;
 	u_int32_t non_ampdu_cnt;
+	u_int32_t per;
+	u_int32_t tx_rate;
 };
 
 struct advance_data_rx_stats {
