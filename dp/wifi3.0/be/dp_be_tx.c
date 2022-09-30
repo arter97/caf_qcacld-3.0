@@ -1068,7 +1068,7 @@ int dp_tx_get_bank_profile(struct dp_soc_be *be_soc,
 	dp_tx_get_vdev_bank_config(be_vdev, &vdev_config);
 
 	DP_TX_BANK_LOCK_ACQUIRE(&be_soc->tx_bank_lock);
-	/* go over all banks and find a matching/unconfigured/unsed bank */
+	/* go over all banks and find a matching/unconfigured/unused bank */
 	for (i = 0; i < be_soc->num_bank_profiles; i++) {
 		if (be_soc->bank_profiles[i].is_configured &&
 		    (be_soc->bank_profiles[i].bank_config.val ^

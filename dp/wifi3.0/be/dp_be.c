@@ -172,7 +172,7 @@ static QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
  * dp_cc_reg_cfg_init() - initialize and configure HW cookie
 			  conversion register
  * @soc: SOC handle
- * @is_4k_align: page address 4k alignd
+ * @is_4k_align: page address 4k aligned
  *
  * Return: None
  */

@@ -58,7 +58,7 @@ static inline int cdp_host_stats_get(ol_txrx_soc_handle soc,
  * @preamb: Preamble
  * @mcs: Modulation and Coding scheme index
  * @htflag: Flag to identify HT or VHT
- * @gintval: Gaurd Interval value
+ * @gintval: Guard Interval value
  *
  * return: 0 for Failure, Returns rate on Success
  */

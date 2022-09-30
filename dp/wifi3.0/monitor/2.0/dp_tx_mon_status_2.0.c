@@ -989,7 +989,7 @@ dp_tx_mon_alloc_mpdu(struct dp_pdev *pdev, struct dp_tx_ppdu_info *tx_ppdu_info)
 	/*
 	 * payload will be added as a frag to buffer
 	 * and we allocate new skb for radiotap header
-	 * we allocate a dummy bufffer size
+	 * we allocate a dummy buffer size
 	 */
 	mpdu_nbuf = qdf_nbuf_alloc(pdev->soc->osdev,
 				   MAX_MONITOR_HEADER, MAX_MONITOR_HEADER,
@@ -1620,7 +1620,7 @@ dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
  *
  * @mon_pdev - DP_MON_PDEV handle
  * @ppdu_id - ppdu_id
- * @end_reason - monitor destiantion descriptor end reason
+ * @end_reason - monitor destination descriptor end reason
  *
  * Return: void
  */
@@ -1817,7 +1817,7 @@ dp_tx_mon_process_status_tlv(struct dp_soc *soc,
  *
  * @mon_pdev - DP_MON_PDEV handle
  * @ppdu_id - ppdu_id
- * @end_reason - monitor destiantion descriptor end reason
+ * @end_reason - monitor destination descriptor end reason
  *
  * Return: void
  */

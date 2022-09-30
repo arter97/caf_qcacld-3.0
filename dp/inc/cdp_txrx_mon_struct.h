@@ -184,7 +184,7 @@ struct cdp_mon_status {
 /* holes in flags here between, ATH_RX_XXXX to IEEE80211_RX_XXX */
 #define IEEE80211_RX_KEYMISS        0x200
 #define IEEE80211_RX_PN_ERROR       0x400
-	int rs_rssi;       /* RSSI (noise floor ajusted) */
+	int rs_rssi;       /* RSSI (noise floor adjusted) */
 	int rs_abs_rssi;   /* absolute RSSI */
 	int rs_datarate;   /* data rate received */
 	int rs_rateieee;
@@ -194,9 +194,9 @@ struct cdp_mon_status {
 
 /* Keep the same as ATH_MAX_ANTENNA */
 #define IEEE80211_MAX_ANTENNA       3
-	/* RSSI (noise floor ajusted) */
+	/* RSSI (noise floor adjusted) */
 	u_int8_t    rs_rssictl[IEEE80211_MAX_ANTENNA];
-	/* RSSI (noise floor ajusted) */
+	/* RSSI (noise floor adjusted) */
 	u_int8_t    rs_rssiextn[IEEE80211_MAX_ANTENNA];
 	/* rs_rssi is valid or not */
 	u_int8_t    rs_isvalidrssi;
@@ -393,7 +393,7 @@ enum cdp_mon_phyrx_abort_reason_code {
  * @total_ppdu_info_enq: Number of PPDUs enqueued to wq
  * @total_ppdu_info_drop: Number of PPDUs dropped
  * @total_ppdu_info_alloc: Number of PPDU info allocated
- * @total_ppdu_info_free: Number of PPDU info freeed
+ * @total_ppdu_info_free: Number of PPDU info freed
  */
 struct cdp_pdev_mon_stats {
 #ifndef REMOVE_MON_DBG_STATS
@@ -543,7 +543,7 @@ struct cdp_rssi_dbm_conv_param_dp {
  * struct cdp_rssi_db2dbm_param_dp
  * @pdev_id: pdev_id
  * @rssi_temp_off_present: to check temp offset values present or not
- * @rssi_dbm_info_present: to check rssi dbm converstion parameters
+ * @rssi_dbm_info_present: to check rssi dbm conversion parameters
  *						   present or not
  * @temp_off_param: cdp_rssi_temp_off_param_dp structure value
  * @rssi_dbm_param: cdp_rssi_dbm_conv_param_dp staructure value

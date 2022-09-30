@@ -483,7 +483,7 @@ dp_rx_pn_error_handle(struct dp_soc *soc, hal_ring_desc_t ring_desc,
  * @soc: Datapath soc handler
  * @peer: pointer to DP peer
  * @nbuf: pointer to the skb of RX frame
- * @frame_mask: the mask for speical frame needed
+ * @frame_mask: the mask for special frame needed
  * @rx_tlv_hdr: start of rx tlv header
  *
  * note: Msdu_len must have been stored in QDF_NBUF_CB_RX_PKT_LEN(nbuf) and
@@ -1451,7 +1451,7 @@ drop_nbuf:
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: pointer to mpdu level description info
  * @link_desc_va: pointer to msdu_link_desc virtual address
- * @err_code: reo erro code fetched from ring entry
+ * @err_code: reo error code fetched from ring entry
  *
  * Function to handle msdus fetched from msdu link desc, currently
  * support REO error NULL queue, 2K jump, OOR.
@@ -2606,7 +2606,7 @@ done:
 /**
  * dp_handle_rxdma_decrypt_err() - Check if decrypt err frames can be handled
  *
- * Return: true if rxdma decrypt err frames are handled and false otheriwse
+ * Return: true if rxdma decrypt err frames are handled and false otherwise
  */
 static inline bool dp_handle_rxdma_decrypt_err(void)
 {

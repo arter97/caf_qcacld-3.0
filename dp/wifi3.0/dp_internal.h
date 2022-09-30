@@ -3177,7 +3177,7 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 /**
  * dp_rx_flow_add_entry() - Add a flow entry to flow search table
  * @pdev: DP pdev instance
- * @rx_flow_info: DP flow paramaters
+ * @rx_flow_info: DP flow parameters
  *
  * Return: Success when flow is added, no-memory or already exists on error
  */
@@ -4140,7 +4140,7 @@ void dp_rx_send_pktlog(struct dp_soc *soc, struct dp_pdev *pdev,
  * This API should only be called when we have not removed
  * Rx TLV from head, and head is pointing to rx_tlv
  *
- * This function is used to send rx packet from erro path
+ * This function is used to send rx packet from error path
  * for logging for which rx packet tlv is not removed.
  *
  * Return: None

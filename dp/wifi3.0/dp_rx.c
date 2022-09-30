@@ -1157,7 +1157,7 @@ void dp_rx_fill_mesh_stats(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	/* fill recv mesh stats */
 	rx_info = qdf_mem_malloc(sizeof(struct mesh_recv_hdr_s));
 
-	/* upper layers are resposible to free this memory */
+	/* upper layers are responsible to free this memory */
 
 	if (!rx_info) {
 		dp_rx_err("%pK: Memory allocation failed for mesh rx stats",
@@ -1607,7 +1607,7 @@ void dp_rx_fill_gro_info(struct dp_soc *soc, uint8_t *rx_tlv,
  * @mpdu_len: mpdu length
  * @l3_pad_len: L3 padding length by HW
  *
- * Return: returns true if nbuf is last msdu of mpdu else retuns false.
+ * Return: returns true if nbuf is last msdu of mpdu else returns false.
  */
 static inline bool dp_rx_adjust_nbuf_len(struct dp_soc *soc,
 					 qdf_nbuf_t nbuf,

@@ -1345,7 +1345,7 @@ dp_rx_intrabss_fwd_mlo_allow(struct dp_txrx_peer *ta_peer,
 /**
  * dp_rx_intrabss_ucast_check_be() - Check if intrabss is allowed
 				     for unicast frame
- * @soc: SOC hanlde
+ * @soc: SOC handle
  * @nbuf: RX packet buffer
  * @ta_peer: transmitter DP peer handle
  * @msdu_metadata: MSDU meta data info

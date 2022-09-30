@@ -742,7 +742,7 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 		RX_MONITOR_BUFFER_SIZE - (frag_size + DP_RX_MON_PACKET_OFFSET + DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE);
 
 	if (msdu_meta->first_buffer && msdu_meta->last_buffer) {
-		/* MSDU with single bufffer */
+		/* MSDU with single buffer */
 		amsdu_pad = frag_size & 0x3;
 		amsdu_pad = amsdu_pad ? (4 - amsdu_pad) : 0;
 		if (amsdu_pad && (amsdu_pad <= pad_byte_pholder)) {
@@ -891,13 +891,13 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 			 * 2. Last buffer of MSDU in case of multiple buf MSDU
 			 */
 
-			/* This flag is used to identify msdu boundry */
+			/* This flag is used to identify msdu boundary */
 			prev_msdu_end_received = true;
 			/* Check size of buffer if amsdu padding required */
 			amsdu_pad = tot_msdu_len & 0x3;
 			amsdu_pad = amsdu_pad ? (4 - amsdu_pad) : 0;
 
-			/* Create placeholder if current bufer can
+			/* Create placeholder if current buffer can
 			 * accommodate padding.
 			 */
 			if (amsdu_pad && (amsdu_pad <= pad_byte_pholder)) {

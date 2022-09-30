@@ -5903,7 +5903,7 @@ dp_mon_compute_min_nf(struct cdp_rssi_dbm_conv_param_dp *conv_params,
 }
 
 /*
- * dp_mon_pdev_params_rssi_dbm_conv() --> to set rssi in dbm converstion
+ * dp_mon_pdev_params_rssi_dbm_conv() --> to set rssi in dbm conversion
  *                                      params into monitor pdev.
  *@cdp_soc: dp soc handle.
  *@params: cdp_rssi_db2dbm_param_dp structure value.
@@ -5927,7 +5927,7 @@ dp_mon_pdev_params_rssi_dbm_conv(struct cdp_soc_t *cdp_soc,
 	int i;
 
 	if (!soc->features.rssi_dbm_conv_support) {
-		dp_cdp_err("rssi dbm converstion support is false");
+		dp_cdp_err("rssi dbm conversion support is false");
 		return QDF_STATUS_E_INVAL;
 	}
 	if (!pdev || !pdev->monitor_pdev) {

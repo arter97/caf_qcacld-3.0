@@ -258,7 +258,7 @@ const struct DP_CMN_RATE_TABLE {
 
 static const struct DP_CMN_RATE_TABLE dp_11abgnratetable = {
 	{
-	  /* When number of spatial strams > 4 or 11AX support is enabled */
+	  /* When number of spatial streams > 4 or 11AX support is enabled */
 
 	  /*     0  11 Mb  */ { CCK_MODE_VALID_MASK, DP_CMN_MOD_IEEE80211_T_CCK,
 		  11000,    11000,        0,        0,        0,    11000,
@@ -531,7 +531,7 @@ static const struct DP_CMN_RATE_TABLE dp_11abgnratetable = {
 	  /*      85 MCS-09 */ { VHT20_LDPC_ONLY_MASKS,
 		  DP_CMN_MOD_IEEE80211_T_VHT_20,                          86500,
 		  96000,        0,        0,        0,    86500,  0x309 },
-	  /* When we support very hight throughput MCS */
+	  /* When we support very high throughput MCS */
 	  /* 86 MCS-10 */ { VHT20_LDPC_ONLY_MASKS,
 		  DP_CMN_MOD_IEEE80211_T_VHT_20,
 		  97500,   108300,	    0,        0,	 0,
@@ -6534,7 +6534,7 @@ dp_getrateindex(uint32_t gi, uint16_t mcs, uint8_t nss, uint8_t preamble,
 	uint16_t rc;
 	enum DP_CMN_MODULATION_TYPE mod;
 
-	/* For error case, where idx exceeds bountry limit */
+	/* For error case, where idx exceeds boundary limit */
 	*ratecode = 0;
 	mod = dp_getmodulation(preamble, bw, punc_bw);
 	rc = mcs;
@@ -6604,7 +6604,7 @@ dp_getrateindex(uint32_t gi, uint16_t mcs, uint8_t nss, uint8_t preamble,
 	uint16_t rc;
 	enum DP_CMN_MODULATION_TYPE mod;
 
-	/* For error case, where idx exceeds bountry limit */
+	/* For error case, where idx exceeds boundary limit */
 	*ratecode = 0;
 	mod = dp_getmodulation(preamble, bw, punc_bw);
 	rc = mcs;

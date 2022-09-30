@@ -372,7 +372,7 @@ enum cdp_host_reo_dest_ring {
 };
 
 enum htt_cmn_t2h_en_stats_type {
-    /* keep this alwyas first */
+    /* keep this always first */
     HTT_CMN_T2H_EN_STATS_TYPE_START     = 0,
 
     /** ppdu_common_stats is the payload */
@@ -920,8 +920,8 @@ typedef QDF_STATUS(*ol_txrx_get_key_fp)(void *osif_dev, uint8_t *key_buf, uint8_
  * ol_txrx_rsim_rx_decap_fp - raw mode simulation function to decap the
  * packets in receive path.
  * @osif_dev  - the virtual device's OS shim object
- * @list_head - poniter to head of receive packet queue to decap
- * @list_tail - poniter to tail of receive packet queue to decap
+ * @list_head - pointer to head of receive packet queue to decap
+ * @list_tail - pointer to tail of receive packet queue to decap
  * @peer_mac  - mac address of peer handler
  */
 typedef QDF_STATUS(*ol_txrx_rsim_rx_decap_fp)(void *osif_dev,
@@ -2188,7 +2188,7 @@ struct cdp_tx_completion_ppdu {
  * @tx_errors : Tx error due to FW tx failure, Ring failure DMA etc
  * @tx_dropped: Tx dropped is same as tx errors as above
  * @rx_packets: Rx total packets transmitted
- * @rx_errors : Rx erros
+ * @rx_errors : Rx errors
  * @rx_dropped: Rx dropped stats
  * @tx_bytes  : Tx total bytes transmitted
  * @rx_bytes  : Rx total bytes transmitted
@@ -2812,7 +2812,7 @@ struct cdp_scan_spcl_vap_stats {
  * @qdf_osdev: QDF device
  * @ol_ops: Offload Operations
  * @device_id: Device ID
- * @ml_context: DP ML object conext
+ * @ml_context: DP ML object context
  * @mlo_chip_id: MLO chip id, for legacy SOCs chip_id need to 0
  * @mlo_enabled: MLO enable bit
  */

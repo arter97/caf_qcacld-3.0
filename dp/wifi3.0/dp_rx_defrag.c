@@ -1344,7 +1344,7 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 					  true, __func__, __LINE__);
 
 	/*
-	 * As part of rx frag handler bufffer was unmapped and rx desc
+	 * As part of rx frag handler buffer was unmapped and rx desc
 	 * unmapped is set to 1. So again for defrag reinject frame reset
 	 * it back to 0.
 	 */

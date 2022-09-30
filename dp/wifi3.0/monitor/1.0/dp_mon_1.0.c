@@ -411,7 +411,7 @@ QDF_STATUS dp_vdev_set_monitor_mode_rings(struct dp_pdev *pdev,
 
 	pdev_cfg_ctx = pdev->wlan_cfg_ctx;
 
-	/* If monitor rings are aleady initilized, return from here */
+	/* If monitor rings are already initialized, return from here */
 	if (mon_pdev->pdev_mon_init)
 		return QDF_STATUS_SUCCESS;
 

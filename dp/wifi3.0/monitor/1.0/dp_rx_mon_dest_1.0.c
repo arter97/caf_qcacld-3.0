@@ -395,7 +395,7 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 
 			dp_rx_mon_buffer_set_pktlen(msdu, rx_buf_size);
 #if 0
-			/* Disble it.see packet on msdu done set to 0 */
+			/* Disable it.see packet on msdu done set to 0 */
 			/*
 			 * Check if DMA completed -- msdu_done is the
 			 * last bit to be written
@@ -1396,7 +1396,7 @@ dp_rx_mon_restitch_mpdu_from_msdus(struct dp_soc *soc,
 
 	/* Allocate a new nbuf for holding the 802.11 header retrieved from the
 	 * status of the now decapped first msdu. Leave enough headroom for
-	 * accomodating any radio-tap /prism like PHY header
+	 * accommodating any radio-tap /prism like PHY header
 	 */
 	mpdu_buf = qdf_nbuf_alloc(soc->osdev,
 				  MAX_MONITOR_HEADER + mpdu_buf_len,
@@ -1769,7 +1769,7 @@ dp_rx_mon_frag_restitch_mpdu_from_msdus(struct dp_soc *soc,
 	frag_size = qdf_nbuf_get_frag_size_by_idx(head_msdu, 0);
 
 	if (buf_info.first_buffer && buf_info.last_buffer) {
-		/* MSDU with single bufffer */
+		/* MSDU with single buffer */
 		amsdu_pad = frag_size & 0x3;
 		amsdu_pad = amsdu_pad ? (4 - amsdu_pad) : 0;
 		if (amsdu_pad && (amsdu_pad <= pad_byte_pholder)) {
@@ -1944,7 +1944,7 @@ dp_rx_mon_frag_restitch_mpdu_from_msdus(struct dp_soc *soc,
 			amsdu_pad = tot_msdu_len & 0x3;
 			amsdu_pad = amsdu_pad ? (4 - amsdu_pad) : 0;
 
-			/* Create placeholder if current bufer can
+			/* Create placeholder if current buffer can
 			 * accommodate padding.
 			 */
 			if (amsdu_pad && (amsdu_pad <= pad_byte_pholder)) {

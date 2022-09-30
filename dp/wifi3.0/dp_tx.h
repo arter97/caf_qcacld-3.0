@@ -112,7 +112,7 @@ do {                                                           \
 
 /**
  * struct dp_tx_frag_info_s
- * @vaddr: hlos vritual address for buffer
+ * @vaddr: hlos virtual address for buffer
  * @paddr_lo: physical address lower 32bits
  * @paddr_hi: physical address higher bits
  * @len: length of the buffer

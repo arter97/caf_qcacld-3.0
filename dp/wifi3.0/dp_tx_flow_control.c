@@ -37,8 +37,8 @@
 /**
  * dp_tx_initialize_threshold() - Threshold of flow Pool initialization
  * @pool: flow_pool
- * @stop_threshold: stop threshold of certian AC
- * @start_threshold: start threshold of certian AC
+ * @stop_threshold: stop threshold of certain AC
+ * @start_threshold: start threshold of certain AC
  * @flow_pool_size: flow pool size
  *
  * Return: none
@@ -55,19 +55,19 @@ dp_tx_initialize_threshold(struct dp_tx_desc_pool_s *pool,
 	pool->stop_th[DP_TH_BE_BK] = (stop_threshold
 					* flow_pool_size) / 100;
 
-	/* Update VI threshold based on BE_BK threashold */
+	/* Update VI threshold based on BE_BK threshold */
 	pool->start_th[DP_TH_VI] = (pool->start_th[DP_TH_BE_BK]
 					* FL_TH_VI_PERCENTAGE) / 100;
 	pool->stop_th[DP_TH_VI] = (pool->stop_th[DP_TH_BE_BK]
 					* FL_TH_VI_PERCENTAGE) / 100;
 
-	/* Update VO threshold based on BE_BK threashold */
+	/* Update VO threshold based on BE_BK threshold */
 	pool->start_th[DP_TH_VO] = (pool->start_th[DP_TH_BE_BK]
 					* FL_TH_VO_PERCENTAGE) / 100;
 	pool->stop_th[DP_TH_VO] = (pool->stop_th[DP_TH_BE_BK]
 					* FL_TH_VO_PERCENTAGE) / 100;
 
-	/* Update High Priority threshold based on BE_BK threashold */
+	/* Update High Priority threshold based on BE_BK threshold */
 	pool->start_th[DP_TH_HI] = (pool->start_th[DP_TH_BE_BK]
 					* FL_TH_HI_PERCENTAGE) / 100;
 	pool->stop_th[DP_TH_HI] = (pool->stop_th[DP_TH_BE_BK]
@@ -110,7 +110,7 @@ dp_tx_flow_pool_dump_threshold(struct dp_tx_desc_pool_s *pool)
 			  "Level %d :: Start threshold %d :: Stop threshold %d",
 			  i, pool->start_th[i], pool->stop_th[i]);
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "Level %d :: Maximun pause time %lu ms",
+			  "Level %d :: Maximum pause time %lu ms",
 			  i, pool->max_pause_time[i]);
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  "Level %d :: Latest pause timestamp %lu",
@@ -119,7 +119,7 @@ dp_tx_flow_pool_dump_threshold(struct dp_tx_desc_pool_s *pool)
 }
 
 /**
- * dp_tx_flow_ctrl_reset_subqueues() - Reset subqueues to orginal state
+ * dp_tx_flow_ctrl_reset_subqueues() - Reset subqueues to original state
  * @soc: dp soc
  * @pool: flow pool
  * @pool_status: flow pool status
@@ -450,7 +450,7 @@ int dp_tx_delete_flow_pool(struct dp_soc *soc, struct dp_tx_desc_pool_s *pool,
 	qdf_spin_lock_bh(&pool->flow_pool_lock);
 	if (!pool->pool_create_cnt) {
 		qdf_spin_unlock_bh(&pool->flow_pool_lock);
-		dp_err("flow pool either not created or alread deleted");
+		dp_err("flow pool either not created or already deleted");
 		return -ENOENT;
 	}
 	pool->pool_create_cnt--;

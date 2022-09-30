@@ -859,7 +859,7 @@ struct cdp_tidq_stats {
  *    6: 18 Mbps
  *    7: 9 Mbps
  *
- * @gi_type: Indicates the gaurd interval.
+ * @gi_type: Indicates the guard interval.
  *    0: 0.8 us
  *    1: 0.4 us
  *    2: 1.6 us
@@ -1002,7 +1002,7 @@ struct cdp_tid_tx_stats {
 /*
  * cdp_reo_error_stats
  * @err_src_reo_code_inv: Wireless Buffer Manager source receive reorder ring reason unknown
- * @err_reo_codes: Receive reoder error codes
+ * @err_reo_codes: Receive reorder error codes
  */
 struct cdp_reo_error_stats {
 	uint64_t err_src_reo_code_inv;
@@ -1012,7 +1012,7 @@ struct cdp_reo_error_stats {
 /*
  * cdp_rxdma_error_stats
  * @err_src_rxdma_code_inv: DMA reason unknown count
- * @err_reo_codes: Receive reoder error codes count
+ * @err_reo_codes: Receive reorder error codes count
  */
 struct cdp_rxdma_error_stats {
 	uint64_t err_src_rxdma_code_inv;
@@ -1080,7 +1080,7 @@ struct cdp_tid_stats_intf {
 /*
  * struct cdp_delay_tx_stats: Tx delay stats
  * @tx_swq_delay: software enqueue delay
- * @hwtx_delay: HW enque to completion delay
+ * @hwtx_delay: HW enqueue to completion delay
  * @nwdelay_avg: Network delay average
  * @swdelay_avg: Wifi SW Delay Average
  * @hwdelay_avg: Wifi HW delay Average
@@ -1509,7 +1509,7 @@ struct cdp_tx_stats {
 	struct cdp_pkt_info is_tx_no_ack;
 	uint16_t tx_ratecode;
 
-	/*add for peer and upadted from ppdu*/
+	/*add for peer and updated from ppdu*/
 	uint32_t ampdu_cnt;
 	uint32_t non_ampdu_cnt;
 	uint32_t failed_retry_count;
@@ -1733,7 +1733,7 @@ struct cdp_rx_stats {
  * @bcast: Number of broadcast packets
  * @raw_pkt: Total Raw packets
  * @dma_map_error: DMA map error
- * @num_frags_overflow_err: msdu's nbuf count exceeds num of segemnts
+ * @num_frags_overflow_err: msdu's nbuf count exceeds num of segments
  * @num_seg: No of segments in TSO packets
  * @tso_pkt:total no of TSO packets
  * @non_tso_pkts: non - TSO packets
@@ -3052,7 +3052,7 @@ enum CDP_PEER_MPDU_DESC {
 
 /**
  * struct cdp_tid_q_len - Structure to hold consolidated queue length
- * @defer_msdu_len: Defered MSDU queue length
+ * @defer_msdu_len: Deferred MSDU queue length
  * @tasklet_msdu_len: MSDU complete queue length
  * @pending_q_len: MSDU pending queue length
  */
@@ -3064,7 +3064,7 @@ struct cdp_tid_q_len {
 
 /**
  * struct cdp_peer_tx_capture_stats - Structure to hold peer tx capture stats
- * @len_stats: Per TID defered, pending and completed msdu queue length
+ * @len_stats: Per TID deferred, pending and completed msdu queue length
  * @mpdu: Mpdu success and restich count
  * @msdu: Msdu success and restich count
  */
@@ -3081,7 +3081,7 @@ struct cdp_peer_tx_capture_stats {
  * @peer_mismatch: Peer mismatched
  * @last_rcv_ppdu: Last received PPDU stats in ms
  * @ppdu_stats_queue_depth: PPDU stats queue depth
- * @ppdu_stats_defer_queue_depth: PPDU stats defered queue depth
+ * @ppdu_stats_defer_queue_depth: PPDU stats deferred queue depth
  * @ppdu_dropped: PPDU dropped count
  * @pend_ppdu_dropped: Pending PPDU dropped count
  * @ppdu_flush_count: PPDU flush count

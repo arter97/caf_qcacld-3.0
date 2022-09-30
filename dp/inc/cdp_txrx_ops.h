@@ -1019,7 +1019,7 @@ struct cdp_mon_ops {
 				    uint8_t pdev_id,
 				    uint8_t direction);
 #endif
-	/*To set RSSI dbm converstion params in monitor pdev */
+	/*To set RSSI dbm conversion params in monitor pdev */
 	QDF_STATUS (*txrx_set_mon_pdev_params_rssi_dbm_conv)
 		(struct cdp_soc_t *soc,
 		 struct cdp_rssi_db2dbm_param_dp *params);
@@ -1828,7 +1828,7 @@ struct cdp_flowctl_ops {
  * @set_vdev_os_queue_status: Set vdev queue status
  * @deregister_tx_flow_control_cb: Deregister tx flow control callback
  * @flow_control_cb: Call osif flow control callback
- * @get_tx_resource: Get tx resources and comapre with watermark
+ * @get_tx_resource: Get tx resources and compare with watermark
  * @ll_set_tx_pause_q_depth: set pause queue depth
  * @vdev_flush: Flush all packets on a particular vdev
  * @vdev_pause: Pause a particular vdev

@@ -112,7 +112,7 @@ void htt_htc_pkt_pool_free(struct htt_soc *soc);
 
 /*
  * Set the base misclist size to HTT copy engine source ring size
- * to guarantee that a packet on the misclist wont be freed while it
+ * to guarantee that a packet on the misclist won't be freed while it
  * is sitting in the copy engine.
  */
 #define DP_HTT_HTC_PKT_MISCLIST_SIZE          2048
@@ -522,7 +522,7 @@ struct dp_tx_mon_wordmask_config {
  * enable/disable.
  * @dtlvs: enable/disable downstream TLVs
  * @utlvs: enable/disable upstream TLVs
- * @wmask: enable/disbale word mask subscription
+ * @wmask: enable/disable word mask subscription
  * @mgmt_filter: enable/disable mgmt packets
  * @data_filter: enable/disable data packets
  * @ctrl_filter: enable/disable ctrl packets
@@ -798,7 +798,7 @@ htt_htc_misc_pkt_list_add(struct htt_soc *soc, struct dp_htt_htc_pkt *pkt);
  * @soc : HTT SOC handle
  * @pkt: pkt to be send
  * @cmd : command to be recorded in dp htt logger
- * @buf : Pointer to buffer needs to be recored for above cmd
+ * @buf : Pointer to buffer needs to be recorded for above cmd
  *
  * Return: None
  */
@@ -1003,7 +1003,7 @@ dp_htt_rx_flow_fse_operation(struct dp_pdev *pdev,
 			     struct dp_htt_rx_flow_fst_operation *op_info);
 
 /**
- * htt_h2t_full_mon_cfg() - Send full monitor configuarion msg to FW
+ * htt_h2t_full_mon_cfg() - Send full monitor configuration msg to FW
  *
  * @htt_soc: HTT Soc handle
  * @pdev_id: Radio id

@@ -118,7 +118,7 @@ cdp_dump_flow_pool_info(struct cdp_soc_t *soc)
 #endif
 
 #ifdef WLAN_SYSFS_DP_STATS
-/* sysfs event wait time for firmware stat request unit millseconds */
+/* sysfs event wait time for firmware stat request unit milliseconds */
 #define WLAN_SYSFS_STAT_REQ_WAIT_MS 3000
 #endif
 
@@ -503,7 +503,7 @@ static int dp_get_num_rx_contexts(struct cdp_soc_t *soc_hdl)
 		reo_ring_map &=  ~BIT(3);
 		break;
 	default:
-		dp_err("unkonwn arch_id 0x%x", soc->arch_id);
+		dp_err("unknown arch_id 0x%x", soc->arch_id);
 		QDF_BUG(0);
 	}
 	/*
@@ -4493,7 +4493,7 @@ bool dp_reo_remap_config(struct dp_soc *soc, uint32_t *remap0,
 		hal_compute_reo_remap_ix0(soc->hal_soc, remap0);
 		break;
 	default:
-		dp_err("unkonwn arch_id 0x%x", soc->arch_id);
+		dp_err("unknown arch_id 0x%x", soc->arch_id);
 		QDF_BUG(0);
 
 	}
@@ -4676,7 +4676,7 @@ static uint8_t dp_reo_ring_selection(uint32_t value, uint32_t *ring)
 		ring[0] = REO_REMAP_SW1;
 		break;
 	default:
-		dp_err("unkonwn reo ring map 0x%x", value);
+		dp_err("unknown reo ring map 0x%x", value);
 		QDF_BUG(0);
 	}
 	return num;
@@ -5851,7 +5851,7 @@ static void dp_pdev_flush_pending_vdevs(struct dp_pdev *pdev)
  *                                          for enable/disable of HW vdev stats
  * @soc: Datapath soc handle
  * @pdev_id: INVALID_PDEV_ID for all pdevs or 0,1,2 for individual pdev
- * @enable: flag to reprsent enable/disable of hw vdev stats
+ * @enable: flag to represent enable/disable of hw vdev stats
  *
  * Return: none
  */
@@ -8035,7 +8035,7 @@ QDF_STATUS dp_peer_mlo_setup(
 			 */
 			qdf_atomic_set(&mld_peer->is_default_route_set, 1);
 		} else {
-			/* free link peer origial rx_tids mem */
+			/* free link peer original rx_tids mem */
 			dp_peer_rx_tids_destroy(peer);
 			/* assign mld peer rx_tid to link peer */
 			peer->rx_tid = mld_peer->rx_tid;
@@ -8050,7 +8050,7 @@ QDF_STATUS dp_peer_mlo_setup(
 			 * during mld peer creation.
 			 */
 
-			/* relase the ref to original dp_vdev */
+			/* release the ref to original dp_vdev */
 			dp_vdev_unref_delete(soc, mld_peer->vdev,
 					     DP_MOD_ID_CHILD);
 			/*
@@ -10075,7 +10075,7 @@ static void dp_txrx_stats_help(void)
 static void dp_umac_rst_skel_enable_update(struct dp_soc *soc, bool en)
 {
 	soc->umac_reset_ctx.skel_enable = en;
-	dp_cdp_debug("UMAC HW reset debug skelton code enabled :%u",
+	dp_cdp_debug("UMAC HW reset debug skeleton code enabled :%u",
 		     soc->umac_reset_ctx.skel_enable);
 }
 
@@ -11612,7 +11612,7 @@ dp_sysfs_event_trigger(struct dp_soc *soc, uint32_t cookie_val)
 		else if (status == QDF_STATUS_E_TIMEOUT)
 			dp_cdp_warn("sysfs_txrx_fw_request_done event expired");
 		else
-			dp_cdp_warn("sysfs_txrx_fw_request_done event erro code %d", status);
+			dp_cdp_warn("sysfs_txrx_fw_request_done event error code %d", status);
 	}
 
 	return status;
@@ -12034,7 +12034,7 @@ QDF_STATUS dp_sysfs_deinitialize_stats(struct dp_soc *soc_hdl)
 
 	status = qdf_event_destroy(&soc->sysfs_config->sysfs_txrx_fw_request_done);
 	if (status != QDF_STATUS_SUCCESS)
-		dp_cdp_err("Failed to detroy event sysfs_txrx_fw_request_done ");
+		dp_cdp_err("Failed to destroy event sysfs_txrx_fw_request_done ");
 
 	qdf_mutex_destroy(&soc->sysfs_config->sysfs_read_lock);
 	qdf_spinlock_destroy(&soc->sysfs_config->rw_stats_lock);
@@ -12801,7 +12801,7 @@ static QDF_STATUS dp_soc_set_param(struct cdp_soc_t  *soc_hdl,
 		break;
 	case DP_SOC_PARAM_RSSI_DBM_CONV_SUPPORT:
 		soc->features.rssi_dbm_conv_support = value;
-		dp_info("Rssi dbm converstion support:%u",
+		dp_info("Rssi dbm conversion support:%u",
 			soc->features.rssi_dbm_conv_support);
 		break;
 	case DP_SOC_PARAM_UMAC_HW_RESET_SUPPORT:
@@ -15176,7 +15176,7 @@ dp_get_link_desc_id_start(uint16_t arch_id)
 	case CDP_ARCH_TYPE_BE:
 		return LINK_DESC_ID_START_20_BITS_COOKIE;
 	default:
-		dp_err("unkonwn arch_id 0x%x", arch_id);
+		dp_err("unknown arch_id 0x%x", arch_id);
 		QDF_BUG(0);
 		return LINK_DESC_ID_START_21_BITS_COOKIE;
 	}

@@ -986,7 +986,7 @@ dp_tx_send_traffic_end_indication_pkt(struct dp_vdev *vdev,
 
 /**
  * dp_tx_traffic_end_indication_set_desc_flag() - Set tx descriptor flag to
- *                                                mark it trafic end indication
+ *                                                mark it traffic end indication
  *                                                packet.
  * @tx_desc: Tx descriptor pointer
  * @msdu_info: msdu_info structure pointer
@@ -1254,7 +1254,7 @@ failure:
  * @desc_pool_id : Descriptor Pool ID
  *
  * Allocate and prepare Tx descriptor with msdu and fragment descritor
- * information. For frames wth fragments, allocate and prepare
+ * information. For frames with fragments, allocate and prepare
  * an MSDU extension descriptor
  *
  * Return: Pointer to Tx Descriptor on success,
@@ -3290,7 +3290,7 @@ dp_tx_send_exception_vdev_id_check(struct cdp_soc_t *soc_hdl,
 		goto fail;
 	}
 
-	/* Unref count as it will agin be taken inside dp_tx_exception */
+	/* Unref count as it will again be taken inside dp_tx_exception */
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_TX_EXCEPTION);
 
 	return dp_tx_send_exception(soc_hdl, vdev_id, nbuf, tx_exc_metadata);
@@ -4875,7 +4875,7 @@ static void dp_tx_update_uplink_delay(struct dp_soc *soc, struct dp_vdev *vdev,
 	uint32_t ul_delay;
 
 	if (qdf_unlikely(!vdev)) {
-		dp_info_rl("vdev is null or delete in progrss");
+		dp_info_rl("vdev is null or delete in progress");
 		return;
 	}
 
@@ -5213,7 +5213,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			dp_tx_outstanding_dec(pdev);
 
 			/*
-			 * Calling a QDF WRAPPER here is creating signifcant
+			 * Calling a QDF WRAPPER here is creating significant
 			 * performance impact so avoided the wrapper call here
 			 */
 			dp_tx_desc_history_add(soc, desc->dma_addr, desc->nbuf,
@@ -5533,7 +5533,7 @@ next_desc:
 	 * 2) Ring entries are still near high threshold
 	 * 3) Ring entries are below the safe level
 	 *
-	 * One more loop will move te state to normal processing and yield
+	 * One more loop will move the state to normal processing and yield
 	 */
 	if (ring_near_full)
 		goto more_data;
