@@ -1042,11 +1042,11 @@ target_if_log_read_spectral_params(
 
 /**
  * target_if_log_read_spectral_active_catch_validate() - Helper function to
- * log whether spectral is active after intializing the cache
+ * log whether spectral is active after initializing the cache
  * @function_name: Function name
  * @output: whether spectral is active or not
  *
- * Helper function to log whether spectral is active after intializing cache
+ * Helper function to log whether spectral is active after initializing cache
  *
  * Return: none
  */
@@ -1061,11 +1061,11 @@ target_if_log_read_spectral_active_catch_validate(
 
 /**
  * target_if_log_read_spectral_enabled_catch_validate() - Helper function to
- * log whether spectral is enabled after intializing the cache
+ * log whether spectral is enabled after initializing the cache
  * @function_name: Function name
  * @output: whether spectral is enabled or not
  *
- * Helper function to log whether spectral is enabled after intializing cache
+ * Helper function to log whether spectral is enabled after initializing cache
  *
  * Return: none
  */
@@ -1080,11 +1080,11 @@ target_if_log_read_spectral_enabled_catch_validate(
 
 /**
  * target_if_log_read_spectral_params_catch_validate() - Helper function to
- * log spectral parameters after intializing the cache
+ * log spectral parameters after initializing the cache
  * @function_name: Function name
  * @pparam: Spectral parameters
  *
- * Helper function to log spectral parameters after intializing the cache
+ * Helper function to log spectral parameters after initializing the cache
  *
  * Return: none
  */
@@ -3386,7 +3386,7 @@ struct target_if_sscan_pdev_phy_info {
 /**
  * target_if_find_sscan_pdev_phya1() - This is an iterator function to
  * wlan_objmgr_iterate_obj_list(). It checks whether a given sscan_pdev (pdev on
- * which sscan is currenly issued) is using PHYA1 by comparing against the pdev
+ * which sscan is currently issued) is using PHYA1 by comparing against the pdev
  * argument given by the wlan_objmgr_iterate_obj_list()
  * @psoc: Pointer to psoc
  * @object: Pointer to pdev
@@ -3636,11 +3636,11 @@ target_if_pdev_spectral_init(struct wlan_objmgr_pdev *pdev)
 	if (p_sops->get_capability(spectral, SPECTRAL_CAP_PHYDIAG))
 		spectral_info("HAL_CAP_PHYDIAG : Capable");
 
-	/* TODO: Need to fix the capablity check for RADAR */
+	/* TODO: Need to fix the capability check for RADAR */
 	if (p_sops->get_capability(spectral, SPECTRAL_CAP_RADAR))
 		spectral_info("HAL_CAP_RADAR   : Capable");
 
-	/* TODO : Need to fix the capablity check for SPECTRAL */
+	/* TODO : Need to fix the capability check for SPECTRAL */
 	/* TODO : Should this be called here of after ath_attach ? */
 	if (p_sops->get_capability(spectral, SPECTRAL_CAP_SPECTRAL_SCAN))
 		spectral_info("HAL_CAP_SPECTRAL_SCAN : Capable");
@@ -7382,7 +7382,7 @@ target_if_spectral_get_psoc_from_scn_handle(ol_scn_t scn)
  * function to extract channel information for a spectral scan session
  * @psoc: Pointer to psoc object
  * @evt_buf: Event buffer
- * @chan_info: Spectral session channel information data structure to be fille
+ * @chan_info: Spectral session channel information data structure to be filled
  * by this API
  *
  * Return: QDF_STATUS of operation

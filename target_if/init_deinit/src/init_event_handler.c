@@ -135,8 +135,8 @@ init_deinit_update_roam_stats_cap(struct wmi_unified *wmi_handle,
 /**
  * init_deinit_update_multi_client_ll_caps() - Update multi client service
  * capability bit
- * @wmi_handle: wmi hanle
- * @psoc: psoc commom object
+ * @wmi_handle: wmi handle
+ * @psoc: psoc common object
  *
  * Return: none
  */
@@ -160,8 +160,8 @@ init_deinit_update_multi_client_ll_caps(struct wmi_unified *wmi_handle,
 /**
  * init_deinit_update_vendor_handoff_control_caps() - Update vendor handoff
  * control service capability bit
- * @wmi_handle: wmi hanle
- * @psoc: psoc commom object
+ * @wmi_handle: wmi handle
+ * @psoc: psoc common object
  *
  * Return: none
  */

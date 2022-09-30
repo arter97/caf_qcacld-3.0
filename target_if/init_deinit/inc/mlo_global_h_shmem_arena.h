@@ -140,7 +140,7 @@ QDF_STATUS mlo_glb_h_shmem_arena_ctx_deinit(void);
  * mlo_glb_h_shmem_arena_get_crash_reason_address(): get the address of crash
  * reason associated with chip_id
  *
- * Return: Address of crash_reason field fron global shmem arena in case of
+ * Return: Address of crash_reason field from global shmem arena in case of
  * success, else returns NULL
  */
 void *mlo_glb_h_shmem_arena_get_crash_reason_address(uint8_t chip_id);

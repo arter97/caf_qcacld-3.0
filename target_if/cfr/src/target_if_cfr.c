@@ -392,7 +392,7 @@ target_if_cfr_init_pdev(struct wlan_objmgr_psoc *psoc,
 	} else if (target_type == TARGET_TYPE_ADRASTEA) {
 		status = cfr_adrastea_init_pdev(psoc, pdev);
 	} else {
-		cfr_info("unsupport chip");
+		cfr_info("unsupported chip");
 		status = QDF_STATUS_SUCCESS;
 	}
 
@@ -416,7 +416,7 @@ target_if_cfr_deinit_pdev(struct wlan_objmgr_psoc *psoc,
 	} else if (target_type == TARGET_TYPE_ADRASTEA) {
 		status = cfr_adrastea_deinit_pdev(psoc, pdev);
 	} else {
-		cfr_info("unsupport chip");
+		cfr_info("unsupported chip");
 		status = QDF_STATUS_SUCCESS;
 	}
 
