@@ -265,7 +265,7 @@ QDF_STATUS scheduler_post_msg_by_priority(uint32_t qid,
 		sched_err("Src_id/Dest_id invalid, cannot post message");
 		return QDF_STATUS_E_FAILURE;
 	}
-	/* Target_If is a special message queue in phase 3 convergence beacause
+	/* Target_If is a special message queue in phase 3 convergence because
 	 * its used by both legacy WMA and as well as new UMAC components which
 	 * directly populate callback handlers in message body.
 	 * 1) WMA legacy messages should not have callback
@@ -417,7 +417,7 @@ QDF_STATUS scheduler_target_if_mq_handler(struct scheduler_msg *msg)
 
 	target_if_msg_handler = msg->callback;
 
-	/* Target_If is a special message queue in phase 3 convergence beacause
+	/* Target_If is a special message queue in phase 3 convergence because
 	 * its used by both legacy WMA and as well as new UMAC components. New
 	 * UMAC components directly pass their message handlers as callback in
 	 * message body.
