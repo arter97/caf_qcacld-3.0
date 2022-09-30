@@ -798,9 +798,9 @@ scm_copy_info_from_dup_entry(struct wlan_objmgr_pdev *pdev,
 			scan_entry->rssi_timestamp;
 	} else {
 		/* If elapsed time since last rssi and snr update for this
-		 * entry is smaller than a thresold, calculate a
+		 * entry is smaller than a threshold, calculate a
 		 * running average of the RSSI and SNR values.
-		 * Otherwise new frames RSSI and SNR are more representive
+		 * Otherwise new frames RSSI and SNR are more representative
 		 * of the signal strength.
 		 */
 		time_gap =

@@ -794,7 +794,7 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 				cfg_get(psoc, CFG_GO_SCAN_BURST_DURATION);
 	scan_obj->scan_def.ap_scan_burst_duration =
 				cfg_get(psoc, CFG_AP_SCAN_BURST_DURATION);
-	/* scan contrl flags */
+	/* scan control flags */
 	scan_obj->scan_def.scan_f_passive = true;
 	scan_obj->scan_def.scan_f_ofdm_rates = true;
 	scan_obj->scan_def.scan_f_2ghz = true;
@@ -1001,10 +1001,10 @@ ucfg_scan_init_bssid_params(struct scan_start_request *req,
  * is allowed to scan.
  * @pdev: pointer to pdev
  * @reg_chan: regulatory_channel object
- * @low_2g: lower 2.4 GHz frequency thresold
- * @high_2g: upper 2.4 GHz frequency thresold
- * @low_5g: lower 5 GHz frequency thresold
- * @high_5g: upper 5 GHz frequency thresold
+ * @low_2g: lower 2.4 GHz frequency threshold
+ * @high_2g: upper 2.4 GHz frequency threshold
+ * @low_5g: lower 5 GHz frequency threshold
+ * @high_5g: upper 5 GHz frequency threshold
  *
  * Return: true if scan is allowed. false otherwise.
  */

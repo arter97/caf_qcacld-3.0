@@ -328,7 +328,7 @@ scm_scan_serialize_callback(struct wlan_serialization_command *cmd,
 	switch (reason) {
 	case WLAN_SER_CB_ACTIVATE_CMD:
 		/* command moved to active list
-		 * modify the params if required for concurency case.
+		 * modify the params if required for concurrency case.
 		 */
 		status = scm_activate_scan_request(req);
 		break;
@@ -1189,7 +1189,7 @@ scm_scan_req_update_params(struct wlan_objmgr_vdev *vdev,
 		req->scan_req.scan_f_wide_band = false;
 
 	/*
-	 * Overwrite scan channles with custom scan channel
+	 * Overwrite scan channels with custom scan channel
 	 * list if configured.
 	 */
 	custom_chan_list = &scan_obj->pdev_info[pdev_id].custom_chan_list;
@@ -1229,7 +1229,7 @@ static inline void scm_print_scan_req_info(struct scan_req_params *req)
 	if (!chan_lst->num_chan)
 		return;
 	/*
-	 * Buffer of (num channl * 11) + 1  to consider the 4 char freq, 6 char
+	 * Buffer of (num channel * 11) + 1  to consider the 4 char freq, 6 char
 	 * flags and 1 space after it for each channel and 1 to end the string
 	 * with NULL.
 	 */

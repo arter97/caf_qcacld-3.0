@@ -358,11 +358,11 @@ struct extscan_def_config {
  * @scan_f_chan_stat_evnt: enable indication of chan load and noise floor
  * @scan_f_filter_prb_req: filter Probe request frames
  * @scan_f_bypass_dfs_chn: when set, do not scan DFS channels
- * @scan_f_continue_on_err:continue scan even if few certain erros have occurred
+ * @scan_f_continue_on_err:continue scan even if few certain errors have occurred
  * @scan_f_offchan_mgmt_tx: allow mgmt transmission during off channel scan
  * @scan_f_offchan_data_tx: allow data transmission during off channel scan
  * @scan_f_promisc_mode: scan with promiscuous mode
- * @scan_f_capture_phy_err: enable capture ppdu with phy errrors
+ * @scan_f_capture_phy_err: enable capture ppdu with phy errors
  * @scan_f_strict_passive_pch: do passive scan on passive channels
  * @scan_f_half_rate: enable HALF (10MHz) rate support
  * @scan_f_quarter_rate: set Quarter (5MHz) rate support
@@ -382,7 +382,7 @@ struct extscan_def_config {
  * @scan_ev_completed: notify scan completed event
  * @scan_ev_bss_chan: notify bss chan event
  * @scan_ev_foreign_chan: notify foreign chan event
- * @scan_ev_dequeued: notify scan request dequed event
+ * @scan_ev_dequeued: notify scan request dequeued event
  * @scan_ev_preempted: notify scan preempted event
  * @scan_ev_start_failed: notify scan start failed event
  * @scan_ev_restarted: notify scan restarted event

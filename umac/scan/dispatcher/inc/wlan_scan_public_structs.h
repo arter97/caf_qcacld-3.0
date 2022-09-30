@@ -18,7 +18,7 @@
  */
 
 /*
- * DOC: contains scan structure definations
+ * DOC: contains scan structure definitions
  */
 
 #ifndef _WLAN_SCAN_STRUCTS_H_
@@ -202,7 +202,7 @@ struct channel_info {
  * @rsnxe: Pointer to rsnxe IE
  * @ehtcap: pointer to ehtcap ie
  * @ehtop: pointer to eht op ie
- * @multi_link: pointer to multi lik IE
+ * @multi_link: pointer to multi link IE
  * @bwnss_map: pointer to NSS map IE
  * @secchanoff: pointer to secondary chan IE
  * @mdie: pointer to md IE
@@ -274,7 +274,7 @@ struct ie_list {
 	uint8_t *qcn;
 
 /**
- * For any new IEs in this structre, add handling in
+ * For any new IEs in this structure, add handling in
  * util_scan_copy_beacon_data API.
  */
 };
@@ -455,7 +455,7 @@ struct rnr_bss_info {
  * @tbbt_info_fieldtype: TBTT information field type
  * @filter_neighbor_ap: filtered neighbor ap
  * @tbbt_info_count: TBTT information count
- * @tbtt_info_length: TBTT informaiton length
+ * @tbtt_info_length: TBTT information length
  */
 struct tbtt_information_header {
 	uint16_t tbbt_info_fieldtype:2;
@@ -599,7 +599,7 @@ struct ml_info {
  * @rnr: Reduced neighbor report information
  * @channel: channel info on which AP is present
  * @channel_mismatch: if channel received in metadata
- *                    doesnot match the one in beacon
+ *                    doesn't match the one in beacon
  * @tsf_delta: TSF delta
  * @bss_score: bss score calculated on basis of RSSI/caps etc.
  * @neg_sec_info: negotiated security info
@@ -1011,7 +1011,7 @@ enum scan_request_type {
  * @scan_ev_completed: notify scan completed event
  * @scan_ev_bss_chan: notify bss chan event
  * @scan_ev_foreign_chan: notify foreign chan event
- * @scan_ev_dequeued: notify scan request dequed event
+ * @scan_ev_dequeued: notify scan request dequeued event
  * @scan_ev_preempted: notify scan preempted event
  * @scan_ev_start_failed: notify scan start failed event
  * @scan_ev_restarted: notify scan restarted event
@@ -1044,11 +1044,11 @@ enum scan_request_type {
  * @scan_f_chan_stat_evnt: enable indication of chan load and noise floor
  * @scan_f_filter_prb_req: filter Probe request frames
  * @scan_f_bypass_dfs_chn: when set, do not scan DFS channels
- * @scan_f_continue_on_err:continue scan even if few certain erros have occurred
+ * @scan_f_continue_on_err:continue scan even if few certain errors have occurred
  * @scan_f_offchan_mgmt_tx: allow mgmt transmission during off channel scan
  * @scan_f_offchan_data_tx: allow data transmission during off channel scan
  * @scan_f_promisc_mode: scan with promiscuous mode
- * @scan_f_capture_phy_err: enable capture ppdu with phy errrors
+ * @scan_f_capture_phy_err: enable capture ppdu with phy errors
  * @scan_f_strict_passive_pch: do passive scan on passive channels
  * @scan_f_half_rate: enable HALF (10MHz) rate support
  * @scan_f_quarter_rate: set Quarter (5MHz) rate support
@@ -1289,12 +1289,12 @@ enum scan_event_type {
  * @SCAN_REASON_COMPLETED: scan successfully completed
  * @SCAN_REASON_CANCELLED: scan got cancelled
  * @SCAN_REASON_PREEMPTED: scan got preempted
- * @SCAN_REASON_TIMEDOUT: couldnt complete within specified time
+ * @SCAN_REASON_TIMEDOUT: couldn't complete within specified time
  * @SCAN_REASON_INTERNAL_FAILURE: cancelled because of some failure
  * @SCAN_REASON_SUSPENDED: scan suspended
  * @SCAN_REASON_RUN_FAILED: run failed
  * @SCAN_REASON_TERMINATION_FUNCTION: termination function
- * @SCAN_REASON_MAX_OFFCHAN_RETRIES: max retries exceeded thresold
+ * @SCAN_REASON_MAX_OFFCHAN_RETRIES: max retries exceeded threshold
  * @SCAN_REASON_DFS_VIOLATION: Scan start failure due to DFS violation.
  * @SCAN_REASON_MAX: invalid completion reason marker
  */
@@ -1375,8 +1375,8 @@ typedef void (*scan_event_handler) (struct wlan_objmgr_vdev *vdev,
 
 /**
  * enum scan_cb_type - update beacon cb type
- * @SCAN_CB_TYPE_INFORM_BCN: Calback to indicate beacon to OS
- * @SCAN_CB_TYPE_UPDATE_BCN: Calback to indicate beacon
+ * @SCAN_CB_TYPE_INFORM_BCN: Callback to indicate beacon to OS
+ * @SCAN_CB_TYPE_UPDATE_BCN: Callback to indicate beacon
  * @SCAN_CB_TYPE_UNLINK_BSS: cb to unlink bss entry
  *                    to MLME and update MLME info
  *
