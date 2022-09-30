@@ -2891,7 +2891,7 @@ QDF_STATUS dp_tx_mon_filter_update_2_0(struct dp_pdev *pdev)
 
 QDF_STATUS dp_rx_mon_filter_update_2_0(struct dp_pdev *pdev)
 {
-	struct dp_soc *soc = pdev->soc;
+	struct dp_soc *soc;
 	struct dp_mon_filter_be filter = {0};
 	struct htt_rx_ring_tlv_filter *rx_tlv_filter;
 	enum dp_mon_filter_srng_type srng_type =
@@ -2901,6 +2901,7 @@ QDF_STATUS dp_rx_mon_filter_update_2_0(struct dp_pdev *pdev)
 		dp_mon_filter_err("pdev Context is null");
 		return QDF_STATUS_E_FAILURE;
 	}
+	soc = pdev->soc;
 
 	rx_tlv_filter = &filter.rx_tlv_filter.tlv_filter;
 	dp_rx_mon_filter_h2t_setup(soc, pdev, srng_type, &filter.rx_tlv_filter);
@@ -3155,10 +3156,13 @@ dp_mon_filter_setup_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 		if ((config->tx_config.level == CDP_LITE_MON_LEVEL_MPDU) ||
 		    (config->tx_config.level == CDP_LITE_MON_LEVEL_PPDU))
 			tx_tlv_filter->ctrl_mpdu_log = 1;
-		if (config->tx_config.ctrl_filter[DP_MON_FRM_FILTER_MODE_FP] !=
-		    CDP_LITE_MON_FILTER_ALL)
-			config->subtype_filtering = true;
 	}
+	/* Since ctrl frames are generated in host, we need to do subtype
+	 * filtering even though ctrl filters are not enabled
+	 */
+	if (config->tx_config.ctrl_filter[DP_MON_FRM_FILTER_MODE_FP] !=
+	    CDP_LITE_MON_FILTER_ALL)
+		config->subtype_filtering = true;
 	/* configure data filters */
 	if (config->tx_config.data_filter[DP_MON_FRM_FILTER_MODE_FP]) {
 		tx_tlv_filter->data_filter = 1;

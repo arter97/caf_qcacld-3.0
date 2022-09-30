@@ -163,6 +163,9 @@
 
 #define CDP_MAX_TIDS 17
 
+#define CDP_MAX_PKT_PER_WIN 1000
+#define CDP_MAX_WIN_MOV_AVG 10
+
 #define CDP_WDI_NUM_EVENTS WDI_NUM_EVENTS
 
 #define CDP_FCTL_RETRY 0x0800
@@ -1078,10 +1081,32 @@ struct cdp_tid_stats_intf {
  * struct cdp_delay_tx_stats: Tx delay stats
  * @tx_swq_delay: software enqueue delay
  * @hwtx_delay: HW enque to completion delay
+ * @nwdelay_avg: Network delay average
+ * @swdelay_avg: Wifi SW Delay Average
+ * @hwdelay_avg: Wifi HW delay Average
+ * @sw_delay_win_total: total NW delay for each window
+ * @hw_delay_win_total: total Wifi SW delay for each window
+ * @nw_delay_win_total: total Wifi HW delay for each window
+ *
+ * @cur_win_num_pkts: number of packets processed in current window
+ * @cur_win_index: current windows index
  */
 struct cdp_delay_tx_stats {
 	struct cdp_hist_stats    tx_swq_delay;
 	struct cdp_hist_stats    hwtx_delay;
+
+#ifdef CONFIG_SAWF
+	uint32_t nwdelay_avg;
+	uint32_t swdelay_avg;
+	uint32_t hwdelay_avg;
+
+	uint64_t nw_delay_win_avg[CDP_MAX_WIN_MOV_AVG];
+	uint64_t sw_delay_win_avg[CDP_MAX_WIN_MOV_AVG];
+	uint64_t hw_delay_win_avg[CDP_MAX_WIN_MOV_AVG];
+
+	uint32_t cur_win_num_pkts;
+	uint32_t curr_win_idx;
+#endif
 };
 
 /*
@@ -1801,6 +1826,7 @@ struct cdp_tx_ingress_stats {
 		uint32_t headroom_insufficient;
 		uint32_t fail_per_pkt_vdev_id_check;
 		uint32_t drop_ingress;
+		uint32_t invalid_peer_id_in_exc_path;
 	} dropped;
 
 	/* Mesh packets info */
