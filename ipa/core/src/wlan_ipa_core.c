@@ -887,7 +887,7 @@ wlan_ipa_rx_intrabss_fwd(struct wlan_ipa_priv *ipa_ctx,
 	bool fwd_success;
 	int ret;
 
-	/* legacy intra-bss fowarding for WDI 1.0 and 2.0 */
+	/* legacy intra-bss forwarding for WDI 1.0 and 2.0 */
 	if (ipa_ctx->wdi_version < IPA_WDI_3) {
 		fw_desc = (uint8_t)nbuf->cb[1];
 		return wlan_ipa_intrabss_forward(ipa_ctx, iface_ctx, fw_desc,
@@ -4204,7 +4204,7 @@ static void wlan_ipa_uc_loaded_handler(struct wlan_ipa_priv *ipa_ctx)
 			status);
 		goto connect_pipe_fail;
 	}
-	/* Setup the Tx buffer SMMU mapings */
+	/* Setup the Tx buffer SMMU mappings */
 	status = cdp_ipa_tx_buf_smmu_mapping(ipa_ctx->dp_soc,
 					     ipa_ctx->dp_pdev_id,
 					     __func__, __LINE__);
@@ -4488,7 +4488,7 @@ QDF_STATUS wlan_ipa_uc_ol_init(struct wlan_ipa_priv *ipa_ctx,
 			goto fail_return;
 		}
 
-		/* Setup the Tx buffer SMMU mapings */
+		/* Setup the Tx buffer SMMU mappings */
 		status = cdp_ipa_tx_buf_smmu_mapping(ipa_ctx->dp_soc,
 						     ipa_ctx->dp_pdev_id,
 						     __func__, __LINE__);

@@ -448,7 +448,7 @@ struct op_msg_type {
  * @txpkts_completed: TX packets completed
  * @tx_is_suspend: TX suspend flag
  * @tx_reserved: Reserved for TX stat
- * @rx_ind_ring_base: RX indication ring base addess
+ * @rx_ind_ring_base: RX indication ring base address
  * @rx_ind_ring_size: RX indication ring size
  * @rx_ind_ring_dbell_addr: RX indication ring doorbell address
  * @rx_ind_ring_dbell_ind_val: RX indication ring doorbell indication
@@ -524,7 +524,7 @@ struct uc_rm_work_struct {
  * struct uc_op_work_struct
  * @work: uC OP work
  * @msg: OP message
- * @osdev: poiner to qdf net device, used by osif_psoc_sync_trans_start_wait
+ * @osdev: pointer to qdf net device, used by osif_psoc_sync_trans_start_wait
  * @ipa_priv_bp: back pointer to ipa_obj
  */
 struct uc_op_work_struct {

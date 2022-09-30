@@ -90,7 +90,7 @@ ipa_pdev_obj_destroy_notification(struct wlan_objmgr_pdev *pdev,
 						       WLAN_UMAC_COMP_IPA,
 						       ipa_obj);
 	if (QDF_IS_STATUS_ERROR(status))
-		ipa_err("Failed to detatch ipa pdev object");
+		ipa_err("Failed to detach ipa pdev object");
 
 	qdf_mem_free(ipa_obj);
 
@@ -202,7 +202,7 @@ static void ipa_register_ready_cb(void *user_data)
 		goto out;
 	}
 
-	/* Update instace_id for current pdev */
+	/* Update instance_id for current pdev */
 	ipa_obj->instance_id = psoc->soc_objmgr.psoc_id;
 
 	qdf_dev = wlan_psoc_get_qdf_dev(psoc);
