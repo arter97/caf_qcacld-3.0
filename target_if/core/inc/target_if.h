@@ -2813,6 +2813,15 @@ QDF_STATUS target_if_mlo_teardown_req(struct wlan_objmgr_pdev **pdev,
 				      uint8_t num_pdevs, uint32_t reason);
 #endif /*WLAN_FEATURE_11BE_MLO && WLAN_MLO_MULTI_CHIP*/
 
+/**
+ * target_if_is_platform_eht_capable():
+ * API to check if the platform is EHT capable
+ * @pdev: pdev object
+ *
+ * Return: True if platform is 11BE capable; else False
+ */
+bool target_if_is_platform_eht_capable(struct wlan_objmgr_psoc *psoc,
+				       uint8_t pdev_id);
 #ifdef REO_SHARED_QREF_TABLE_EN
 static inline void target_if_set_reo_shared_qref_feature(struct wlan_objmgr_psoc *psoc,
 							 struct tgt_info *info)
