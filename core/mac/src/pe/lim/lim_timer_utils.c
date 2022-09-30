@@ -767,7 +767,7 @@ lim_deactivate_and_change_per_sta_id_timer(struct mac_context *mac, uint32_t tim
 			return;
 		}
 
-		if (tx_timer_deactivate(&mac->lim.lim_timers.gpLimCnfWaitTimer[staId])
+		if (tx_timer_deactivate(&mac->lim.limTimers.gpLimCnfWaitTimer[staId])
 					!= TX_SUCCESS) {
 			pe_err("unable to deactivate CNF wait timer");
 		}
