@@ -216,5 +216,26 @@ QDF_STATUS
 mbss_start_restart_ap_monitor_vdevs(struct wlan_objmgr_pdev *vdev,
 				    void *arg);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/* mbss_start_standalone_ap_vdevs() - start all the standalone AP vdevs
+ *
+ * @vdev: vdev object
+ * @arg: argument to vdev start/stop function
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mbss_start_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
+			       void *arg);
+
+/* mbss_stop_standalone_ap_vdevs() - stop all the standalone AP vdevs
+ *
+ * @pdev: vdev object
+ * @arg: argument to vdev start/stop function
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+mbss_stop_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
+			      void *arg);
+#endif
 #endif
 

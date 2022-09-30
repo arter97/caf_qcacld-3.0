@@ -93,6 +93,8 @@ struct wlan_mbss_ev_data {
  * @mbss_stop_vdevs: stop all the vdevs
  * @mbss_start_sta_vdevs: start STA vdevs
  * @mbss_start_restart_ap_monitor_vdevs: restart AP monitor vdevs
+ * @mbss_start_standalone_ap_vdevs: start standalone AP vdevs
+ * @mbss_stop_standalone_ap_vdevs: stop standalone AP vdevs
  */
 struct wlan_mbss_ext_cb {
 	QDF_STATUS (*mbss_start_acs)(
@@ -126,6 +128,12 @@ struct wlan_mbss_ext_cb {
 		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
 	void (*mbss_start_restart_ap_monitor_vdevs_cb)(
 		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+#ifdef WLAN_FEATURE_11BE_MLO
+	void (*mbss_start_standalone_ap_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+	void (*mbss_stop_standalone_ap_vdevs_cb)(
+		struct wlan_objmgr_pdev *pdev, void *object, void *arg);
+#endif
 };
 
 /**
@@ -152,6 +160,18 @@ enum wlan_mbss_sched_actions {
 	MBSS_SCHED_STA_VDEVS_START = 4,
 	MBSS_SCHED_MAX = 5,
 };
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * enum wlan_mbss_standalone_sched_actions: MBSS standalone scheduler actions
+ * @MBSS_SCHED_STANDALONE_AP_VDEVS_START: schedule standalone AP VDEV start
+ * @MBSS_SCHED_STANDALONE_AP_VDEVS_STOP: schedule standalone AP VDEV stop
+ */
+enum wlan_mbss_standalone_sched_actions {
+	MBSS_SCHED_STANDALONE_AP_VDEVS_START = 1,
+	MBSS_SCHED_STANDALONE_AP_VDEVS_STOP = 2,
+};
+#endif
 
 /**
  *  struct mbss_ops - MBSS callbacks
@@ -418,6 +438,28 @@ QDF_STATUS
 wlan_mbss_start_restart_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev,
 					 void *arg);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/* wlan_mbss_start_standalone_ap_vdevs() - start all the standalone AP vdevs
+ *
+ * @vdev: vdev object
+ * @arg: argument to standalone ap vdev start function
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_start_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
+				    void *arg);
+
+/* wlan_mbss_stop_standalone_ap_vdevs() - stop all the standalone AP vdevs
+ *
+ * @vdev: vdev object
+ * @arg: argument to standalone ap vdev stop function
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_stop_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
+				   void *arg);
+#endif
+
 /* wlan_mbss_sched_action_flush() - flush callback to for scheduler mbss msg
  *
  * @msg: scheduler msg
@@ -442,6 +484,29 @@ wlan_mbss_sched_action(struct scheduler_msg *msg);
 QDF_STATUS
 wlan_mbss_sched_start_stop(struct wlan_objmgr_vdev *vdev,
 			   enum wlan_mbss_sched_actions action);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/* wlan_mbss_standalone_sched_action() - callback to handle standalone vdev's
+ * scheduler mbss msg
+ *
+ * @msg: scheduler msg
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_standalone_sched_action(struct scheduler_msg *msg);
+
+/* wlan_mbss_standalone_sched_start_stop() - handle standalone vdev's
+ * scheduler mbss start stop
+ *
+ * @vdev: vdev object
+ * @action: mbss action to be scheduled
+ * return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_mbss_standalone_sched_start_stop(struct wlan_objmgr_vdev *vdev,
+				      enum wlan_mbss_standalone_sched_actions
+				      action);
+#endif
 
 #if defined WLAN_MBSS_DEBUG
 /* wlan_mbss_debug_print_history() - Print MBSS framework history
