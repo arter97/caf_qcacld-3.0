@@ -1551,4 +1551,42 @@ void wlan_vdev_mlme_clear_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 
 	wlan_release_vdev_mlo_lock(vdev);
 }
+
+void wlan_vdev_mlme_set_mlo_link_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return;
+	}
+
+	wlan_acquire_vdev_mlo_lock(vdev);
+
+	if (wlan_vdev_mlme_feat_ext2_cap_get(vdev,
+					     WLAN_VDEV_FEXT2_MLO_STA_LINK)) {
+		wlan_release_vdev_mlo_lock(vdev);
+		return;
+	}
+	wlan_vdev_mlme_feat_ext2_cap_set(vdev, WLAN_VDEV_FEXT2_MLO_STA_LINK);
+
+	wlan_release_vdev_mlo_lock(vdev);
+}
+
+void wlan_vdev_mlme_clear_mlo_link_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	if (!vdev) {
+		obj_mgr_err("vdev is NULL");
+		return;
+	}
+
+	wlan_acquire_vdev_mlo_lock(vdev);
+
+	if (!wlan_vdev_mlme_feat_ext2_cap_get(vdev,
+					      WLAN_VDEV_FEXT2_MLO_STA_LINK)) {
+		wlan_release_vdev_mlo_lock(vdev);
+		return;
+	}
+	wlan_vdev_mlme_feat_ext2_cap_clear(vdev, WLAN_VDEV_FEXT2_MLO_STA_LINK);
+
+	wlan_release_vdev_mlo_lock(vdev);
+}
 #endif /* WLAN_FEATURE_11BE_MLO */

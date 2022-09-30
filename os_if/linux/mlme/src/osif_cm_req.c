@@ -501,8 +501,7 @@ void osif_update_partner_vdev_info(struct wlan_objmgr_vdev *vdev,
 		if (tmp_vdev) {
 			mlo_update_connect_req_links(tmp_vdev, 1);
 			wlan_vdev_mlme_set_mlo_vdev(tmp_vdev);
-			wlan_vdev_mlme_feat_ext2_cap_set(
-					tmp_vdev, WLAN_VDEV_FEXT2_MLO_STA_LINK);
+			wlan_vdev_mlme_set_mlo_link_vdev(tmp_vdev);
 			wlan_vdev_set_link_id(
 				tmp_vdev,
 				partner_info.partner_link_info[i].link_id);
