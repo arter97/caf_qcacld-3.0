@@ -74,6 +74,75 @@ spatial_reuse_send_sr_prohibit_cfg(struct wlan_objmgr_vdev *vdev,
 	return wmi_unified_vdev_param_sr_prohibit_send(wmi_handle, &srp_param);
 }
 
+#ifdef OBSS_PD
+static QDF_STATUS
+spatial_reuse_send_bss_color_bit_map(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_objmgr_pdev *pdev)
+{
+	uint64_t srg_color_bit_map = 0;
+	uint32_t bit_map_0 = 0;
+	uint32_t bit_map_1 = 0;
+	struct wmi_unified *wmi_handle;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	wmi_handle = lmac_get_pdev_wmi_handle(pdev);
+	if (!wmi_handle)
+		return QDF_STATUS_E_INVAL;
+
+	wlan_vdev_obj_lock(vdev);
+	wlan_vdev_mlme_get_srg_bss_color_bit_map(vdev, &srg_color_bit_map);
+	wlan_vdev_obj_unlock(vdev);
+	bit_map_0 = (uint32_t) srg_color_bit_map;
+	bit_map_1 = (uint32_t) (srg_color_bit_map >> 32);
+
+	status = wmi_unified_send_self_srg_bss_color_bitmap_set_cmd(
+					wmi_handle, bit_map_0, bit_map_1,
+					pdev->pdev_objmgr.wlan_pdev_id);
+	return status;
+}
+
+static QDF_STATUS
+spatial_reuse_send_partial_bssid_bit_map(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_objmgr_pdev *pdev)
+{
+	uint64_t partial_bssid_bit_map = 0;
+	uint32_t bit_map_0 = 0;
+	uint32_t bit_map_1 = 0;
+	struct wmi_unified *wmi_handle;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	wmi_handle = lmac_get_pdev_wmi_handle(pdev);
+	if (!wmi_handle)
+		return QDF_STATUS_E_INVAL;
+
+	wlan_vdev_obj_lock(vdev);
+	wlan_vdev_mlme_get_srg_partial_bssid_bit_map(vdev,
+						     &partial_bssid_bit_map);
+	wlan_vdev_obj_unlock(vdev);
+	bit_map_0 = (uint32_t) partial_bssid_bit_map;
+	bit_map_1 = (uint32_t) (partial_bssid_bit_map >> 32);
+
+	status = wmi_unified_send_self_srg_partial_bssid_bitmap_set_cmd(
+					wmi_handle, bit_map_0, bit_map_1,
+					pdev->pdev_objmgr.wlan_pdev_id);
+	return status;
+}
+#else
+static QDF_STATUS
+spatial_reuse_send_bss_color_bit_map(struct wlan_objmgr_vdev *vdev,
+				     struct wlan_objmgr_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+spatial_reuse_send_partial_bssid_bit_map(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_objmgr_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static QDF_STATUS
 spatial_reuse_send_pd_threshold(struct wlan_objmgr_pdev *pdev,
 				uint8_t vdev_id,
@@ -143,11 +212,23 @@ spatial_reuse_set_sr_enable_disable(struct wlan_objmgr_vdev *vdev,
 			wlan_vdev_obj_unlock(vdev);
 		}
 
-		mlme_debug("non-srg param val: %u, enable: %d",
+		mlme_debug("srp param val: %u, enable: %d",
 			   val, is_sr_enable);
+		if (is_sr_enable) {
+			status = spatial_reuse_send_bss_color_bit_map(vdev,
+								      pdev);
+			if (status != QDF_STATUS_SUCCESS)
+				return status;
+			status = spatial_reuse_send_partial_bssid_bit_map(vdev,
+									  pdev);
+			if (status != QDF_STATUS_SUCCESS)
+				return status;
+		}
 		status =
 		spatial_reuse_send_pd_threshold(pdev, vdev->vdev_objmgr.vdev_id,
 						val);
+		if (status != QDF_STATUS_SUCCESS)
+			return status;
 	} else {
 		mlme_debug("Spatial reuse not enabled");
 	}

@@ -348,6 +348,8 @@ struct vdev_mlme_proto {
  * @he_spr_enabled:     Spatial reuse enabled or not
  * @pd_threshold: pd threshold sent by userspace
  * @he_spr_disabled_due_conc: spr disabled due to concurrency
+ * @srg_bss_color: srg bss color
+ * @srg_partial_bssid: srg partial bssid
  */
 struct vdev_mlme_mgmt_generic {
 	uint32_t rts_threshold;
@@ -382,6 +384,8 @@ struct vdev_mlme_mgmt_generic {
 	bool he_spr_enabled;
 	int32_t pd_threshold;
 	bool he_spr_disabled_due_conc;
+	uint64_t srg_bss_color;
+	uint64_t srg_partial_bssid;
 #endif
 };
 
@@ -1415,6 +1419,106 @@ void wlan_vdev_mlme_get_srg_pd_offset(struct wlan_objmgr_vdev *vdev,
 
 	*srg_max_pd_offset = vdev_mlme->mgmt.generic.he_spr_srg_max_pd_offset;
 	*srg_min_pd_offset = vdev_mlme->mgmt.generic.he_spr_srg_min_pd_offset;
+}
+
+/**
+ * wlan_vdev_mlme_set_srg_bss_color() - set spatial reuse bss
+ *					colorbitmap
+ * @vdev: VDEV object
+ * @srg_bss_color: SRG BSS color bitmap
+ *
+ * API to set the spatial reuse bss color bit map
+ *
+ * Caller need to acquire lock with wlan_vdev_obj_lock()
+ *
+ * Return: void
+ */
+static inline
+void wlan_vdev_mlme_set_srg_bss_color_bit_map(struct wlan_objmgr_vdev *vdev,
+					      uint64_t srg_bss_color)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.generic.srg_bss_color = srg_bss_color;
+}
+
+/**
+ * wlan_vdev_mlme_set_srg_partial_bssid_bit_map() - set spatial reuse
+ *						srg partial bitmap
+ * @vdev: VDEV object
+ * @srg_partial_bssid: SRG partial BSSID bitmap
+ *
+ * API to set the spatial reuse partial bssid bitmap
+ *
+ * Caller need to acquire lock with wlan_vdev_obj_lock()
+ *
+ * Return: void
+ */
+static inline
+void wlan_vdev_mlme_set_srg_partial_bssid_bit_map(struct wlan_objmgr_vdev *vdev,
+						  uint64_t srg_partial_bssid)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.generic.srg_partial_bssid = srg_partial_bssid;
+}
+
+/**
+ * wlan_vdev_mlme_get_srg_bss_color_bit_map() - get spatial reuse bss
+ *						colorbitmap
+ * @vdev: VDEV object
+ * @srg_bss_color: SRG BSS color bitmap
+ *
+ * API to get the spatial reuse bss color bit map
+ *
+ * Caller need to acquire lock with wlan_vdev_obj_lock()
+ *
+ * Return: void
+ */
+static inline
+void wlan_vdev_mlme_get_srg_bss_color_bit_map(struct wlan_objmgr_vdev *vdev,
+					      uint64_t *srg_bss_color)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	*srg_bss_color = vdev_mlme->mgmt.generic.srg_bss_color;
+}
+
+/**
+ * wlan_vdev_mlme_get_srg_partial_bssid_bit_map() - get spatial reuse
+ *						    srg partial bitmap
+ * @vdev: VDEV object
+ * @srg_partial_bssid: SRG partial BSSID bitmap
+ *
+ * API to get the spatial reuse partial bssid bitmap
+ *
+ * Caller need to acquire lock with wlan_vdev_obj_lock()
+ *
+ * Return: void
+ */
+static inline void
+wlan_vdev_mlme_get_srg_partial_bssid_bit_map(struct wlan_objmgr_vdev *vdev,
+					     uint64_t *srg_partial_bssid)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	*srg_partial_bssid = vdev_mlme->mgmt.generic.srg_partial_bssid;
 }
 #else
 static inline uint8_t wlan_vdev_mlme_get_sr_ctrl(struct wlan_objmgr_vdev *vdev)
