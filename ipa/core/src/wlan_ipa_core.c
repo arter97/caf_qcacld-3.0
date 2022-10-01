@@ -1177,7 +1177,8 @@ wlan_ipa_eapol_intrabss_fwd_check(struct wlan_ipa_priv *ipa_ctx,
 
 #ifdef MDM_PLATFORM
 static inline void
-wlan_ipa_set_sap_client_auth(struct wlan_ipa_priv *ipa_ctx, uint8_t *peer_mac,
+wlan_ipa_set_sap_client_auth(struct wlan_ipa_priv *ipa_ctx,
+			     const uint8_t *peer_mac,
 			     uint8_t is_authenticated)
 {
 	uint8_t idx;
@@ -1286,7 +1287,8 @@ wlan_ipa_is_peer_authenticated(ol_txrx_soc_handle dp_soc,
 }
 #else /* !MDM_PLATFORM */
 static inline void
-wlan_ipa_set_sap_client_auth(struct wlan_ipa_priv *ipa_ctx, uint8_t *peer_mac,
+wlan_ipa_set_sap_client_auth(struct wlan_ipa_priv *ipa_ctx,
+			     const uint8_t *peer_mac,
 			     uint8_t is_authenticated)
 {}
 
@@ -1764,7 +1766,7 @@ end:
  */
 static bool wlan_ipa_uc_find_add_assoc_sta(struct wlan_ipa_priv *ipa_ctx,
 					   bool sta_add,
-					   uint8_t *mac_addr)
+					   const uint8_t *mac_addr)
 {
 	bool sta_found = false;
 	uint8_t idx;
@@ -1847,7 +1849,7 @@ static int wlan_ipa_get_ifaceid(struct wlan_ipa_priv *ipa_ctx,
  * Return: None
  */
 static void wlan_ipa_cleanup_iface(struct wlan_ipa_iface_context *iface_context,
-				   uint8_t *mac_addr)
+				   const uint8_t *mac_addr)
 {
 	struct wlan_ipa_priv *ipa_ctx = iface_context->ipa_ctx;
 
@@ -2009,7 +2011,7 @@ static QDF_STATUS wlan_ipa_setup_iface(struct wlan_ipa_priv *ipa_ctx,
 				       qdf_netdev_t net_dev,
 				       uint8_t device_mode,
 				       uint8_t session_id,
-				       uint8_t *mac_addr,
+				       const uint8_t *mac_addr,
 				       bool is_2g_iface)
 {
 	struct wlan_ipa_iface_context *iface_context = NULL;
@@ -2509,7 +2511,7 @@ void wlan_ipa_uc_bw_monitor(struct wlan_ipa_priv *ipa_ctx, bool stop)
  */
 static QDF_STATUS wlan_ipa_send_msg(qdf_netdev_t net_dev,
 				    qdf_ipa_wlan_event type,
-				    uint8_t *mac_addr)
+				    const uint8_t *mac_addr)
 {
 	qdf_ipa_msg_meta_t meta;
 	qdf_ipa_wlan_msg_t *msg;
@@ -2584,7 +2586,7 @@ void wlan_ipa_handle_multiple_sap_evt(struct wlan_ipa_priv *ipa_ctx,
 
 static inline void
 wlan_ipa_save_bssid_iface_ctx(struct wlan_ipa_priv *ipa_ctx, uint8_t iface_id,
-			      uint8_t *mac_addr)
+			      const uint8_t *mac_addr)
 {
 	qdf_mem_copy(ipa_ctx->iface_context[iface_id].bssid.bytes,
 		     mac_addr, QDF_MAC_ADDR_SIZE);
@@ -2605,7 +2607,7 @@ wlan_ipa_set_peer_id(struct wlan_ipa_priv *ipa_ctx,
 		     qdf_ipa_msg_meta_t *meta,
 		     qdf_netdev_t net_dev,
 		     qdf_ipa_wlan_event type,
-		     uint8_t *mac_addr)
+		     const uint8_t *mac_addr)
 {
 	uint8_t ta_peer_id;
 	struct cdp_ast_entry_info peer_ast_info = {0};
@@ -2638,7 +2640,8 @@ wlan_ipa_set_peer_id(struct wlan_ipa_priv *ipa_ctx,
 
 	msg_ex->attribs[1].attrib_type = WLAN_HDR_ATTRIB_TA_PEER_ID;
 	cdp_soc = (struct cdp_soc_t *)ipa_ctx->dp_soc;
-	status = cdp_peer_get_ast_info_by_soc(cdp_soc, mac_addr,
+	status = cdp_peer_get_ast_info_by_soc(cdp_soc,
+					      msg_ex->attribs[0].u.mac_addr,
 					      &peer_ast_info);
 
 	if (!status) {
@@ -2666,7 +2669,7 @@ wlan_ipa_set_peer_id(struct wlan_ipa_priv *ipa_ctx,
 		     qdf_ipa_msg_meta_t *meta,
 		     qdf_netdev_t net_dev,
 		     qdf_ipa_wlan_event type,
-		     uint8_t *mac_addr)
+		     const uint8_t *mac_addr)
 {
 	qdf_ipa_wlan_msg_ex_t *msg_ex;
 
@@ -2719,7 +2722,7 @@ wlan_ipa_set_peer_id(struct wlan_ipa_priv *ipa_ctx,
 static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 				      uint8_t session_id,
 				      qdf_ipa_wlan_event type,
-				      uint8_t *mac_addr, bool is_2g_iface,
+				      const uint8_t *mac_addr, bool is_2g_iface,
 				      struct wlan_ipa_priv *ipa_obj)
 {
 	struct wlan_ipa_priv *ipa_ctx;
@@ -3216,7 +3219,7 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 		QDF_IPA_SET_META_MSG_TYPE(&meta, type);
 
 		status = wlan_ipa_set_peer_id(ipa_ctx, &meta, net_dev,
-					      type, (uint8_t *)mac_addr);
+					      type, mac_addr);
 		if (QDF_IS_STATUS_ERROR(status))
 			return QDF_STATUS_E_FAILURE;
 
@@ -3427,7 +3430,7 @@ static uint8_t wlan_ipa_device_mode_switch(uint8_t device_mode)
 QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 		      uint8_t session_id,
 		      enum wlan_ipa_wlan_event ipa_event_type,
-		      uint8_t *mac_addr, bool is_2g_iface,
+		      const uint8_t *mac_addr, bool is_2g_iface,
 		      struct wlan_ipa_priv *ipa_obj)
 {
 	qdf_ipa_wlan_event type = wlan_host_to_ipa_wlan_event(ipa_event_type);
