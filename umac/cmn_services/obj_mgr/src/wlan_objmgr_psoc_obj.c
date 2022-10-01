@@ -1192,7 +1192,7 @@ struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_opmode_from_psoc(
 #ifdef WLAN_OBJMGR_REF_ID_TRACE
 struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_macaddr_from_psoc_debug(
 		struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-		uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id,
+		const uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id,
 		const char *func, int line)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -1222,7 +1222,7 @@ qdf_export_symbol(wlan_objmgr_get_vdev_by_macaddr_from_psoc_debug);
 #else
 struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_macaddr_from_psoc(
 		struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-		uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id)
+		const uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
@@ -1252,7 +1252,7 @@ qdf_export_symbol(wlan_objmgr_get_vdev_by_macaddr_from_psoc);
 struct wlan_objmgr_vdev
 	*wlan_objmgr_get_vdev_by_macaddr_from_psoc_no_state_debug(
 		struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-		uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id,
+		const uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id,
 		const char *func, int line)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -1284,7 +1284,7 @@ qdf_export_symbol(wlan_objmgr_get_vdev_by_macaddr_from_psoc_no_state_debug);
 #else
 struct wlan_objmgr_vdev *wlan_objmgr_get_vdev_by_macaddr_from_psoc_no_state(
 		struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-		uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id)
+		const uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id)
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_objmgr_pdev *pdev;
