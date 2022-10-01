@@ -344,6 +344,7 @@ struct vdev_mlme_proto {
  * @he_spr_sr_ctrl:     Spatial reuse SR control
  * @he_spr_non_srg_pd_max_offset: Non-SRG PD max offset
  * @he_spr_enabled:     Spatial reuse enabled or not
+ * @pd_threshold: pd threshold sent by userspace
  */
 struct vdev_mlme_mgmt_generic {
 	uint32_t rts_threshold;
@@ -370,10 +371,11 @@ struct vdev_mlme_mgmt_generic {
 	uint8_t bssid[QDF_MAC_ADDR_SIZE];
 	uint32_t phy_mode;
 	bool special_vdev_mode;
-#ifdef WLAN_FEATURE_11AX
+#ifdef WLAN_FEATURE_SR
 	uint8_t he_spr_sr_ctrl;
 	uint8_t he_spr_non_srg_pd_max_offset;
 	bool he_spr_enabled;
+	int32_t pd_threshold;
 #endif
 };
 

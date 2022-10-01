@@ -26,6 +26,9 @@
 #include <wlan_vdev_mlme_api.h>
 #include <include/wlan_mlme_cmn.h>
 #include <qdf_module.h>
+#include "wlan_objmgr_vdev_obj.h"
+#include "wlan_policy_mgr_api.h"
+#include "wlan_policy_mgr_i.h"
 
 struct vdev_mlme_obj *wlan_vdev_mlme_get_cmpt_obj(struct wlan_objmgr_vdev *vdev)
 {
@@ -394,5 +397,54 @@ wlan_vdev_mlme_get_is_mlo_vdev(struct wlan_objmgr_psoc *psoc,
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	return is_mlo_vdev;
+}
+#endif
+#ifdef WLAN_FEATURE_SR
+void
+wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
+			 int32_t pd_threshold, bool is_sr_enable)
+{
+	uint8_t non_srg_pd_threshold;
+	/*To do initialization removal*/
+	uint8_t srg_pd_threshold = 0;
+
+	non_srg_pd_threshold =
+		wlan_vdev_mlme_get_pd_offset(vdev) + NON_SR_PD_THRESHOLD_MIN;
+	/*
+	 * To do
+	 * set srg_pd_min and max offset in lim_update_vdev_sr_elements
+	 * srp_ie->srg_info.info.srg_pd_min_offset.
+	 * Get here and chcek provided threshold is in range or not
+	 */
+
+	/**
+	 * Update non_srg_pd_threshold with provide
+	 * pd_threshold, if pd threshold is with in the
+	 * range else keep the same as advertised by AP.
+	 */
+	if (pd_threshold && non_srg_pd_threshold > pd_threshold)
+		non_srg_pd_threshold = pd_threshold;
+	/* bit    | purpose
+	 * -----------------
+	 * 0  - 7 | Param Value for non-SRG based Spatial Reuse
+	 * 8  - 15| Param value for SRG based Spatial Reuse
+	 * 16 - 28| Reserved
+	 * 29     | Param value is in dBm units rather than dB units
+	 * 30     | Enable/Disable SRG based spatial reuse.
+	 *        | If set to 0, ignore bits 8-15.
+	 * 16 - 28| Reserved
+	 * 29     | Param value is in dBm units rather than dB units
+	 * 30     | Enable/Disable SRG based spatial reuse.
+	 *        | If set to 0, ignore bits 8-15.
+	 * 31     | Enable/Disable Non-SRG based spatial reuse.
+	 *        | If set to 0, ignore bits 0-7.
+	 */
+	*val |=
+		(uint8_t)(non_srg_pd_threshold << NON_SRG_MAX_PD_OFFSET_POS);
+	*val |=
+		(uint8_t)(srg_pd_threshold << SRG_THRESHOLD_MAX_PD_POS);
+	*val |= SR_PARAM_VAL_DBM_UNIT << SR_PARAM_VAL_DBM_POS;
+	*val |= is_sr_enable << NON_SRG_SPR_ENABLE_POS;
+	*val |= is_sr_enable << SRG_SPR_ENABLE_POS;
 }
 #endif

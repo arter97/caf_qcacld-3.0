@@ -1480,7 +1480,11 @@ struct wlan_lmac_if_spatial_reuse_tx_ops {
 			       uint8_t non_srg_max_pd_offset);
 	QDF_STATUS (*send_sr_prohibit_cfg)(struct wlan_objmgr_vdev *vdev,
 					   bool he_siga_val15_allowed);
-	};
+	QDF_STATUS(*target_if_set_sr_enable_disable)(
+				struct wlan_objmgr_vdev *vdev,
+				struct wlan_objmgr_pdev *pdev,
+				bool is_sr_enable, int32_t pd_threshold);
+};
 #endif
 
 #ifdef WLAN_FEATURE_COAP
