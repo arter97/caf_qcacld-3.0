@@ -850,15 +850,22 @@ QDF_STATUS send_gtk_offload_cmd_tlv(wmi_unified_t wmi_handle, uint8_t vdev_id,
 				    uint32_t gtk_offload_opcode)
 {
 	int len;
+	uint8_t *buf_ptr;
 	wmi_buf_t buf;
 	WMI_GTK_OFFLOAD_CMD_fixed_param *cmd;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	len = sizeof(*cmd);
 
+	len += WMI_TLV_HDR_SIZE;
 	if (params->is_fils_connection)
+		len += sizeof(wmi_gtk_offload_fils_tlv_param);
+
+	if (params->kck_len > 16)
 		len += WMI_TLV_HDR_SIZE +
-		       sizeof(wmi_gtk_offload_fils_tlv_param);
+		       roundup(params->kek_len, sizeof(uint32_t)) +
+		       WMI_TLV_HDR_SIZE +
+		       roundup(params->kck_len, sizeof(uint32_t));
 
 	/* alloc wmi buffer */
 	buf = wmi_buf_alloc(wmi_handle, len);
@@ -873,6 +880,7 @@ QDF_STATUS send_gtk_offload_cmd_tlv(wmi_unified_t wmi_handle, uint8_t vdev_id,
 		       WMITLV_GET_STRUCT_TLVLEN
 			       (WMI_GTK_OFFLOAD_CMD_fixed_param));
 
+	buf_ptr = wmi_buf_data(buf);
 	cmd->vdev_id = vdev_id;
 
 	/* Request target to enable GTK offload */
@@ -887,8 +895,32 @@ QDF_STATUS send_gtk_offload_cmd_tlv(wmi_unified_t wmi_handle, uint8_t vdev_id,
 	} else {
 		cmd->flags = gtk_offload_opcode;
 	}
-	if (params->is_fils_connection)
+
+	buf_ptr = (uint8_t *)cmd + sizeof(*cmd);
+
+	if (params->is_fils_connection) {
 		fill_fils_tlv_params(cmd, vdev_id, params);
+		buf_ptr += sizeof(wmi_gtk_offload_fils_tlv_param);
+	} else {
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC, 0);
+		buf_ptr += WMI_TLV_HDR_SIZE;
+	}
+
+	if (params->kck_len > 16) {
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE,
+			       roundup(params->kek_len, sizeof(uint32_t)));
+		buf_ptr += WMI_TLV_HDR_SIZE;
+
+		qdf_mem_copy(buf_ptr, params->kek, params->kek_len);
+		buf_ptr += roundup(params->kek_len, sizeof(uint32_t));
+
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE,
+			       roundup(params->kck_len, sizeof(uint32_t)));
+		buf_ptr += WMI_TLV_HDR_SIZE;
+
+		qdf_mem_copy(buf_ptr, params->kck, params->kck_len);
+		buf_ptr += roundup(params->kck_len, sizeof(uint32_t));
+	}
 
 	wmi_debug("VDEVID: %d, GTK_FLAGS: x%x kek len %d",
 		 vdev_id, cmd->flags, params->kek_len);
