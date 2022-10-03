@@ -393,7 +393,6 @@ struct sme_context {
 	/* following pointer contains array of pointers for tSmeCmd* */
 	void **sme_cmd_buf_addr;
 	tDblLinkList sme_cmd_freelist;    /* preallocated roam cmd list */
-	enum QDF_OPMODE curr_device_mode;
 	void *ll_stats_context;
 	link_layer_stats_cb link_layer_stats_cb;
 	void (*link_layer_stats_ext_cb)(hdd_handle_t callback_ctx,
@@ -525,6 +524,8 @@ struct sme_context {
 	void (*roam_rt_stats_cb)(hdd_handle_t hdd_handle, uint8_t idx,
 				 struct roam_stats_event *roam_stats);
 #endif
+	QDF_STATUS (*sme_vdev_del_cb)(mac_handle_t mac_handle,
+				      struct wlan_objmgr_vdev *vdev);
 };
 
 #endif /* #if !defined( __SMEINTERNAL_H ) */

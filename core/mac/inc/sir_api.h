@@ -127,6 +127,10 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 #define SIR_KEK_KEY_LEN 16
 #define SIR_KEK_KEY_LEN_FILS 64
 
+#define SIR_FILS_HLP_OUI_TYPE  "\x5"
+#define SIR_FILS_HLP_OUI_LEN   1
+#define SIR_FILS_HLP_IE_LEN    2048
+
 #define SIR_REPLAY_CTR_LEN 8
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 #define SIR_UAPSD_BITOFFSET_ACVO     0
@@ -1513,49 +1517,6 @@ typedef struct sSmeIbssPeerInd {
 	/* Beacon will be appended for new Peer indication. */
 } tSmeIbssPeerInd, *tpSmeIbssPeerInd;
 
-/**
- * struct lim_channel_status
- * @channelfreq: Channel freq
- * @noise_floor: Noise Floor value
- * @rx_clear_count: rx clear count
- * @cycle_count: cycle count
- * @chan_tx_pwr_range: channel tx power per range in 0.5dBm steps
- * @chan_tx_pwr_throughput: channel tx power per throughput
- * @rx_frame_count: rx frame count (cumulative)
- * @bss_rx_cycle_count: BSS rx cycle count
- * @rx_11b_mode_data_duration: b-mode data rx time (units are microseconds)
- * @tx_frame_count: BSS tx cycle count
- * @mac_clk_mhz: sample frequency
- * @channel_id: channel index
- * @cmd_flags: indicate which stat event is this status coming from
- */
-struct lim_channel_status {
-	uint32_t    channelfreq;
-	uint32_t    noise_floor;
-	uint32_t    rx_clear_count;
-	uint32_t    cycle_count;
-	uint32_t    chan_tx_pwr_range;
-	uint32_t    chan_tx_pwr_throughput;
-	uint32_t    rx_frame_count;
-	uint32_t    bss_rx_cycle_count;
-	uint32_t    rx_11b_mode_data_duration;
-	uint32_t    tx_frame_count;
-	uint32_t    mac_clk_mhz;
-	uint32_t    channel_id;
-	uint32_t    cmd_flags;
-};
-
-/**
- * struct lim_scan_channel_status
- * @total_channel: total number of be scanned channel
- * @channel_status_list: channel status info store in this array
- */
-struct lim_scan_channel_status {
-	uint8_t total_channel;
-	struct lim_channel_status
-		 channel_status_list[SIR_MAX_SUPPORTED_CHANNEL_LIST];
-};
-
 typedef struct sSmeMaxAssocInd {
 	uint16_t mesgType;      /* eWNI_SME_MAX_ASSOC_EXCEEDED */
 	uint16_t mesgLen;
@@ -1654,19 +1615,9 @@ typedef struct sSirWPSBeaconIE {
 	uint8_t RFBand;         /* RF bands available on the AP */
 } tSirWPSBeaconIE;
 
-#define SIR_WPS_ASSOCRSP_VER_PRESENT    0x00000001
-#define SIR_WPS_ASSOCRSP_RESPONSETYPE_PRESENT    0x00000002
-
-typedef struct sSirWPSAssocRspIE {
-	uint32_t FieldPresent;
-	uint32_t Version;
-	uint8_t ResposeType;
-} tSirWPSAssocRspIE;
-
 typedef struct sSirAPWPSIEs {
 	tSirWPSProbeRspIE SirWPSProbeRspIE;     /*WPS Set Probe Respose IE */
 	tSirWPSBeaconIE SirWPSBeaconIE; /*WPS Set Beacon IE */
-	tSirWPSAssocRspIE SirWPSAssocRspIE;     /*WPS Set Assoc Response IE */
 } tSirAPWPSIEs, *tpSiriAPWPSIEs;
 
 struct update_config {
@@ -3144,6 +3095,7 @@ struct wifi_peer_info {
  * @ac_stats: per-Access Category statistics
  * @num_offload_stats: @offload_stats record count
  * @offload_stats: per-offload statistics
+ * @powersave_stats: powersave statistics
  * @vdev_id: vdev id
  *
  * Statistics corresponding to 2nd most LSB in wifi statistics bitmap
@@ -3159,6 +3111,7 @@ struct wifi_interface_stats {
 	wmi_wmm_ac_stats ac_stats[WIFI_AC_MAX];
 	uint32_t num_offload_stats;
 	wmi_iface_offload_stats offload_stats[WMI_OFFLOAD_STATS_TYPE_MAX];
+	wmi_iface_powersave_stats powersave_stats;
 	uint8_t vdev_id;
 };
 
@@ -3929,8 +3882,10 @@ struct sir_sme_ext_cng_chan_ind {
  * @global_tsf_high: high 32bits of tsf64
  * @mac_id: MAC identifier
  * @mac_id_valid: Indicate if mac_id is valid or not
+ * @tsf_id: TSF-ID corresponding to the TSF value
+ * @tsf_id_valid: flag indicating whether TSD-ID is valid
  *
- * driver use this struct to store the tsf info
+ * Driver uses this structure to store the tsf information.
  */
 struct stsf {
 	uint32_t vdev_id;
@@ -3940,10 +3895,10 @@ struct stsf {
 	uint32_t soc_timer_high;
 	uint32_t global_tsf_low;
 	uint32_t global_tsf_high;
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
 	uint32_t mac_id;
 	uint32_t mac_id_valid;
-#endif
+	uint32_t tsf_id;
+	uint32_t tsf_id_valid;
 };
 
 #define SIR_BCN_FLT_MAX_ELEMS_IE_LIST 8
@@ -5187,6 +5142,7 @@ struct sir_sae_info {
  * @length: message length
  * @vdev_id: vdev id
  * @sae_status: SAE status, 0: Success, Non-zero: Failure.
+ * @pmkid: PMKID derived as part of SAE authentication
  * @peer_mac_addr: peer MAC address
  * @result_code: This carries the reason of the SAE auth failure.
  *               Currently, SAE authentication failure may happen due to
@@ -5199,6 +5155,7 @@ struct sir_sae_msg {
 	uint16_t message_type;
 	uint16_t length;
 	uint16_t vdev_id;
+	uint8_t pmkid[PMKID_LEN];
 	uint8_t sae_status;
 	tSirMacAddr peer_mac_addr;
 	tSirResultCodes result_code;

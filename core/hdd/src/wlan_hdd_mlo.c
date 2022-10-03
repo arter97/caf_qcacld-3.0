@@ -26,6 +26,8 @@
 #include "wlan_hdd_mlo.h"
 #include "osif_vdev_sync.h"
 #include "wlan_osif_features.h"
+#include "wlan_dp_ucfg_api.h"
+#include "wlan_psoc_mlme_ucfg_api.h"
 
 #if defined(CFG80211_11BE_BASIC)
 void hdd_update_mld_mac_addr(struct hdd_context *hdd_ctx,
@@ -79,25 +81,60 @@ uint8_t *wlan_hdd_get_mld_addr(struct hdd_context *hdd_ctx, uint8_t device_mode)
 	return mac_info->mld_mac_list[i].mld_addr.bytes;
 }
 
-void hdd_register_wdev(struct hdd_adapter *sta_adapter,
-		       struct hdd_adapter *link_adapter,
-		       struct hdd_adapter_create_param *adapter_params)
+#ifdef CFG80211_IFTYPE_MLO_LINK_SUPPORT
+static
+void wlan_hdd_register_ml_link(struct hdd_adapter *sta_adapter,
+			       struct hdd_adapter *link_adapter)
 {
-	int ret, i;
+	int ret;
 
-	hdd_enter_dev(sta_adapter->dev);
-	/* Set the relation between adapters*/
 	link_adapter->wdev.iftype = NL80211_IFTYPE_MLO_LINK;
-
 	mutex_lock(&sta_adapter->wdev.mtx);
 	ret = cfg80211_register_sta_mlo_link(&sta_adapter->wdev,
 					     &link_adapter->wdev);
 	mutex_unlock(&sta_adapter->wdev.mtx);
+
 	if (ret) {
 		hdd_err("Failed to register ml link wdev %d", ret);
 		return;
 	}
+}
 
+static
+void wlan_hdd_unregister_ml_link(struct hdd_adapter *link_adapter,
+				 bool rtnl_held)
+{
+	if (rtnl_held)
+		rtnl_unlock();
+
+	cfg80211_unregister_wdev(&link_adapter->wdev);
+
+	if (rtnl_held)
+		rtnl_lock();
+}
+#else
+static
+void wlan_hdd_register_ml_link(struct hdd_adapter *sta_adapter,
+			       struct hdd_adapter *link_adapter)
+{
+}
+
+static
+void wlan_hdd_unregister_ml_link(struct hdd_adapter *link_adapter,
+				 bool rtnl_held)
+{
+}
+#endif
+
+void hdd_register_wdev(struct hdd_adapter *sta_adapter,
+		       struct hdd_adapter *link_adapter,
+		       struct hdd_adapter_create_param *adapter_params)
+{
+	int  i;
+
+	hdd_enter_dev(sta_adapter->dev);
+	/* Set the relation between adapters*/
+	wlan_hdd_register_ml_link(sta_adapter, link_adapter);
 	sta_adapter->mlo_adapter_info.is_ml_adapter = true;
 	sta_adapter->mlo_adapter_info.is_link_adapter = false;
 	link_adapter->mlo_adapter_info.is_link_adapter = true;
@@ -135,14 +172,8 @@ void hdd_mlo_close_adapter(struct hdd_adapter *link_adapter, bool rtnl_held)
 					  link_adapter->device_mode);
 	link_adapter->wdev.netdev = NULL;
 
-	if (rtnl_held)
-		rtnl_unlock();
-
-	cfg80211_unregister_wdev(&link_adapter->wdev);
+	wlan_hdd_unregister_ml_link(link_adapter, rtnl_held);
 	free_netdev(link_adapter->dev);
-
-	if (rtnl_held)
-		rtnl_lock();
 
 	if (vdev_sync)
 		osif_vdev_sync_destroy(vdev_sync);
@@ -154,10 +185,13 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 	int i;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_adapter *link_adapter;
+	struct qdf_mac_addr adapter_mac;
 
 	mlo_adapter_info = &adapter->mlo_adapter_info;
 
 	if (mlo_adapter_info->is_link_adapter) {
+		qdf_copy_macaddr(&adapter_mac, &adapter->mac_addr);
+		ucfg_dp_destroy_intf(adapter->hdd_ctx->psoc, &adapter_mac);
 		hdd_remove_front_adapter(adapter->hdd_ctx, &adapter);
 		return QDF_STATUS_E_AGAIN;
 	}
@@ -166,6 +200,9 @@ QDF_STATUS hdd_wlan_unregister_mlo_interfaces(struct hdd_adapter *adapter,
 		link_adapter = mlo_adapter_info->link_adapter[i];
 		if (!link_adapter)
 			continue;
+		qdf_copy_macaddr(&adapter_mac, &link_adapter->mac_addr);
+		ucfg_dp_destroy_intf(link_adapter->hdd_ctx->psoc, &adapter_mac);
+		hdd_remove_adapter(link_adapter->hdd_ctx, link_adapter);
 		hdd_mlo_close_adapter(link_adapter, rtnl_held);
 	}
 
@@ -257,6 +294,21 @@ QDF_STATUS hdd_check_for_existing_mldaddr(struct hdd_context *hdd_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef CFG80211_MLD_MAC_IN_WDEV
+static inline
+void wlan_hdd_populate_mld_address(struct hdd_adapter *adapter,
+				   uint8_t *mld_addr)
+{
+	qdf_mem_copy(adapter->wdev.mld_address, mld_addr,
+		     QDF_NET_MAC_ADDR_MAX_LEN);
+}
+#else
+static inline
+void wlan_hdd_populate_mld_address(struct hdd_adapter *adapter,
+				   uint8_t *mld_addr)
+{
+}
+#endif
 void
 hdd_populate_mld_vdev_params(struct hdd_adapter *adapter,
 			     struct wlan_vdev_create_params *vdev_params)
@@ -288,10 +340,9 @@ hdd_populate_mld_vdev_params(struct hdd_adapter *adapter,
 		}
 		qdf_mem_copy(vdev_params->mldaddr, mld_addr,
 			     QDF_NET_MAC_ADDR_MAX_LEN);
-		qdf_mem_copy(adapter->wdev.mld_address, mld_addr,
-			     QDF_NET_MAC_ADDR_MAX_LEN);
 		qdf_mem_copy(adapter->mld_addr.bytes, mld_addr,
 			     QDF_NET_MAC_ADDR_MAX_LEN);
+		wlan_hdd_populate_mld_address(adapter, mld_addr);
 	}
 }
 
@@ -329,8 +380,10 @@ int hdd_update_vdev_mac_address(struct hdd_context *hdd_ctx,
 	int i, ret = 0;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
 	struct hdd_adapter *link_adapter;
+	bool eht_capab;
 
-	if (hdd_adapter_is_ml_adapter(adapter)) {
+	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+	if (hdd_adapter_is_ml_adapter(adapter) && eht_capab) {
 		mlo_adapter_info = &adapter->mlo_adapter_info;
 
 		for (i = 0; i < WLAN_MAX_MLD; i++) {

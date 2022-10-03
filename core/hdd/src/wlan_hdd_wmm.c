@@ -60,6 +60,7 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_hdd_object_manager.h"
 #include "wlan_hdd_cm_api.h"
+#include "wlan_dp_ucfg_api.h"
 
 #define HDD_WMM_UP_TO_AC_MAP_SIZE 8
 #define DSCP(x)	x
@@ -1629,7 +1630,7 @@ static inline QDF_STATUS hdd_custom_dscp_up_map(
  * hdd_wmm_dscp_initial_state() - initialize the WMM DSCP configuration
  * @adapter : [in]  pointer to Adapter context
  *
- * This function will initialize the WMM DSCP configuation of an
+ * This function will initialize the WMM DSCP configuration of an
  * adapter to an initial state.  The configuration can later be
  * overwritten via application APIs or via QoS Map sent OTA.
  *
@@ -1660,7 +1661,7 @@ QDF_STATUS hdd_wmm_dscp_initial_state(struct hdd_adapter *adapter)
  * hdd_wmm_adapter_init() - initialize the WMM configuration of an adapter
  * @adapter: [in]  pointer to Adapter context
  *
- * This function will initialize the WMM configuation and status of an
+ * This function will initialize the WMM configuration and status of an
  * adapter to an initial state.  The configuration can later be
  * overwritten via application APIs
  *
@@ -1806,7 +1807,6 @@ hdd_check_and_upgrade_udp_qos(struct hdd_adapter *adapter,
 
 /**
  * hdd_wmm_classify_critical_pkt() - Function checks and classifies critical skb
- * @adapter: adapter for which skb is being transmitted
  * @skb: pointer to network buffer
  * @user_pri: user priority of the OS packet to be determined
  * @is_critical: pointer to be marked true for a critical packet
@@ -1822,8 +1822,7 @@ hdd_check_and_upgrade_udp_qos(struct hdd_adapter *adapter,
  * Return: None
  */
 static
-void hdd_wmm_classify_critical_pkt(struct hdd_adapter *adapter,
-				   struct sk_buff *skb,
+void hdd_wmm_classify_critical_pkt(struct sk_buff *skb,
 				   enum sme_qos_wmmuptype *user_pri,
 				   bool *is_critical)
 {
@@ -1857,6 +1856,27 @@ void hdd_wmm_classify_critical_pkt(struct hdd_adapter *adapter,
 	}
 }
 
+#ifdef DP_TRAFFIC_END_INDICATION
+/**
+ * hdd_wmm_traffic_end_indication_is_enable() - Get feature enable/disable
+ *                                              status
+ * @adapter: hdd adapter handle
+ *
+ * Return: true if feature is enable else false
+ */
+static inline bool
+hdd_wmm_traffic_end_indication_is_enable(struct hdd_adapter *adapter)
+{
+	return qdf_unlikely(adapter->traffic_end_ind_en);
+}
+#else
+static inline bool
+hdd_wmm_traffic_end_indication_is_enable(struct hdd_adapter *adapter)
+{
+	return false;
+}
+#endif
+
 static
 void hdd_wmm_get_user_priority_from_ip_tos(struct hdd_adapter *adapter,
 					   struct sk_buff *skb,
@@ -1869,6 +1889,7 @@ void hdd_wmm_get_user_priority_from_ip_tos(struct hdd_adapter *adapter,
 	struct iphdr *ip_hdr;
 	struct ipv6hdr *ipv6hdr;
 	unsigned char *pkt;
+	struct wlan_objmgr_psoc *psoc;
 
 	/* this code is executed for every packet therefore
 	 * all debug code is kept conditional
@@ -1964,6 +1985,12 @@ void hdd_wmm_get_user_priority_from_ip_tos(struct hdd_adapter *adapter,
 	}
 
 	dscp = (tos >> 2) & 0x3f;
+	if (hdd_wmm_traffic_end_indication_is_enable(adapter)) {
+		psoc = adapter->hdd_ctx->psoc;
+		ucfg_dp_traffic_end_indication_update_dscp(psoc,
+							   adapter->vdev_id,
+							   &dscp);
+	}
 	*user_pri = adapter->dscp_to_up_map[dscp];
 
 #ifdef HDD_WMM_DEBUG
@@ -1990,7 +2017,7 @@ void hdd_wmm_classify_pkt(struct hdd_adapter *adapter,
 			  enum sme_qos_wmmuptype *user_pri,
 			  bool *is_critical)
 {
-	hdd_wmm_classify_critical_pkt(adapter, skb, user_pri, is_critical);
+	hdd_wmm_classify_critical_pkt(skb, user_pri, is_critical);
 
 	if (false == *is_critical) {
 		hdd_wmm_get_user_priority_from_ip_tos(adapter, skb, user_pri);
@@ -2005,7 +2032,7 @@ void hdd_wmm_classify_pkt_cb(void *adapter,
 	enum sme_qos_wmmuptype user_pri;
 	bool is_critical;
 
-	hdd_wmm_classify_critical_pkt(adapter, skb, &user_pri, &is_critical);
+	hdd_wmm_classify_critical_pkt(skb, &user_pri, &is_critical);
 
 	if (is_critical) {
 		skb->priority = user_pri;

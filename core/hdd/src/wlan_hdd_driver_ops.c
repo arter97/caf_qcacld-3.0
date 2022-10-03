@@ -48,7 +48,7 @@
 #include <qdf_notifier.h>
 #include <qdf_hang_event_notifier.h>
 #include "wlan_hdd_thermal.h"
-#include "wlan_hdd_bus_bandwidth.h"
+#include "wlan_dp_ucfg_api.h"
 
 #ifdef MODULE
 #ifdef WLAN_WEAR_CHIPSET
@@ -99,7 +99,7 @@ static int hdd_get_bandwidth_level(void *data)
 	struct hdd_context *hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
 	if (hdd_ctx)
-		ret = hdd_get_current_throughput_level(hdd_ctx);
+		ret = ucfg_dp_get_current_throughput_level(hdd_ctx->psoc);
 
 	return ret;
 }
@@ -119,8 +119,8 @@ void *hdd_get_consistent_mem_unaligned(size_t size,
 				       qdf_dma_addr_t *paddr,
 				       uint32_t ring_type)
 {
-	return dp_prealloc_get_consistent_mem_unaligned(size, paddr,
-							ring_type);
+	return ucfg_dp_prealloc_get_consistent_mem_unaligned(size, paddr,
+							     ring_type);
 }
 
 /**
@@ -132,7 +132,7 @@ void *hdd_get_consistent_mem_unaligned(size_t size,
 static
 void hdd_put_consistent_mem_unaligned(void *vaddr)
 {
-	dp_prealloc_put_consistent_mem_unaligned(vaddr);
+	ucfg_dp_prealloc_put_consistent_mem_unaligned(vaddr);
 }
 
 #else
@@ -464,7 +464,7 @@ int hdd_hif_open(struct device *dev, void *bdev, const struct hif_bus_id *bid,
 			goto mark_target_not_ready;
 		} else {
 			hdd_napi_event(NAPI_EVT_INI_FILE,
-				(void *)hdd_ctx->napi_enable);
+				       (void *)ucfg_dp_get_napi_enabled(hdd_ctx->psoc));
 		}
 	}
 
@@ -649,7 +649,8 @@ static int __hdd_soc_probe(struct device *dev,
 		goto assert_fail_count;
 	}
 
-	status = dp_prealloc_init((struct cdp_ctrl_objmgr_psoc *)hdd_ctx->psoc);
+	status = ucfg_dp_prealloc_init((struct cdp_ctrl_objmgr_psoc *)
+					hdd_ctx->psoc);
 
 	if (status != QDF_STATUS_SUCCESS) {
 		errno = qdf_status_to_os_return(status);
@@ -680,7 +681,7 @@ wlan_exit:
 	hdd_wlan_exit(hdd_ctx);
 
 hdd_context_destroy:
-	dp_prealloc_deinit();
+	ucfg_dp_prealloc_deinit();
 
 dp_prealloc_fail:
 	hdd_context_destroy(hdd_ctx);
@@ -872,7 +873,7 @@ static void __hdd_soc_remove(struct device *dev)
 	cds_set_driver_in_bad_state(false);
 	cds_set_unload_in_progress(false);
 
-	dp_prealloc_deinit();
+	ucfg_dp_prealloc_deinit();
 
 	pr_info("%s: Driver De-initialized\n", WLAN_MODULE_NAME);
 }
@@ -975,7 +976,7 @@ static void hdd_soc_recovery_cleanup(void)
 
 	/* cancel/flush any pending/active idle shutdown work */
 	hdd_psoc_idle_timer_stop(hdd_ctx);
-	hdd_bus_bw_compute_timer_stop(hdd_ctx);
+	ucfg_dp_bus_bw_compute_timer_stop(hdd_ctx->psoc);
 
 	/* nothing to do if the soc is already unloaded */
 	if (hdd_ctx->driver_status == DRIVER_MODULES_CLOSED) {
@@ -1057,7 +1058,7 @@ static void hdd_soc_recovery_shutdown(struct device *dev)
 	if (errno)
 		return;
 
-	hdd_wait_for_dp_tx();
+	ucfg_dp_wait_complete_tasks();
 	osif_psoc_sync_wait_for_ops(psoc_sync);
 
 	__hdd_soc_recovery_shutdown();
@@ -1199,7 +1200,7 @@ hdd_to_pmo_wow_enable_params(struct wow_enable_params *in_params,
  *	hif (bus) suspend
  *
  * Return: 0 for success, -EFAULT for null pointers,
- *     -EBUSY or -EAGAIN if another opperation is in progress and
+ *     -EBUSY or -EAGAIN if another operation is in progress and
  *     wlan will not be ready to suspend in time.
  */
 static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
@@ -1307,7 +1308,7 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 	 */
 	param.policy = BBM_NON_PERSISTENT_POLICY;
 	param.policy_info.flag = BBM_APPS_SUSPEND;
-	hdd_bbm_apply_independent_policy(hdd_ctx, &param);
+	ucfg_dp_bbm_apply_independent_policy(hdd_ctx->psoc, &param);
 
 	hdd_info("bus suspend succeeded");
 	return 0;
@@ -1430,7 +1431,7 @@ done:
  * Does precondtion validation. Ensures that a subsystem restart isn't in
  * progress.  Ensures that no load or unload is in progress.  Ensures that
  * it has valid pointers for the required contexts.
- * Calls into hif to resume the bus opperation.
+ * Calls into hif to resume the bus operation.
  * Calls into wma to handshake with firmware and notify it that the bus is up.
  * Calls into ol_txrx for symetry.
  * Failures are treated as catastrophic.
@@ -1474,7 +1475,7 @@ int wlan_hdd_bus_resume(enum qdf_suspend_type type)
 	 */
 	param.policy = BBM_NON_PERSISTENT_POLICY;
 	param.policy_info.flag = BBM_APPS_RESUME;
-	hdd_bbm_apply_independent_policy(hdd_ctx, &param);
+	ucfg_dp_bbm_apply_independent_policy(hdd_ctx->psoc, &param);
 
 	status = hif_bus_resume(hif_ctx);
 	if (status) {
@@ -1676,7 +1677,7 @@ static int wlan_hdd_runtime_suspend(struct device *dev)
 			  err, delta);
 
 	if (status == QDF_STATUS_SUCCESS)
-		hdd_bus_bw_compute_timer_stop(hdd_ctx);
+		ucfg_dp_bus_bw_compute_timer_stop(hdd_ctx->psoc);
 
 	hdd_debug("Runtime suspend done result: %d", err);
 
@@ -1752,7 +1753,7 @@ static int wlan_hdd_runtime_resume(struct device *dev)
 		hdd_err("PMO Runtime resume failed: %d", status);
 	} else {
 		if (policy_mgr_get_connection_count(hdd_ctx->psoc))
-			hdd_bus_bw_compute_timer_try_start(hdd_ctx);
+			ucfg_dp_bus_bw_compute_timer_try_start(hdd_ctx->psoc);
 	}
 
 	hdd_debug("Runtime resume done");

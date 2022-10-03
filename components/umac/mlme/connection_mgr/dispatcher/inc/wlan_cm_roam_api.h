@@ -29,6 +29,7 @@
 #include "wlan_mlme_main.h"
 #include "wlan_mlme_api.h"
 #include "wlan_reg_ucfg_api.h"
+#include "wlan_cm_tgt_if_tx_api.h"
 
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
 /**
@@ -362,7 +363,7 @@ void wlan_cm_set_ese_assoc(struct wlan_objmgr_pdev *pdev,
  */
 bool wlan_cm_get_ese_assoc(struct wlan_objmgr_pdev *pdev,
 			   uint8_t vdev_id);
-void wlan_cm_ese_populate_addtional_ies(struct wlan_objmgr_pdev *pdev,
+void wlan_cm_ese_populate_additional_ies(struct wlan_objmgr_pdev *pdev,
 			struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			uint8_t vdev_id,
 			struct wlan_roam_scan_offload_params *rso_mode_cfg);
@@ -375,7 +376,7 @@ bool wlan_cm_get_ese_assoc(struct wlan_objmgr_pdev *pdev,
 {
 	return false;
 }
-static inline void wlan_cm_ese_populate_addtional_ies(
+static inline void wlan_cm_ese_populate_additional_ies(
 		struct wlan_objmgr_pdev *pdev,
 		struct wlan_mlme_psoc_ext_obj *mlme_obj,
 		uint8_t vdev_id,
@@ -573,6 +574,24 @@ static inline bool cm_is_open_mode(struct wlan_objmgr_vdev *vdev)
 {
 	return wlan_vdev_is_open_mode(vdev);
 }
+
+#ifdef WLAN_FEATURE_SAE
+/**
+ * cm_is_auth_type_sae() - is vdev SAE auth type
+ * @vdev: pointer to vdev
+ *
+ * Return: true if vdev is SAE auth type
+ */
+static inline bool cm_is_auth_type_sae(struct wlan_objmgr_vdev *vdev)
+{
+	return wlan_vdev_is_sae_auth_type(vdev);
+}
+#else
+static inline bool cm_is_auth_type_sae(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+#endif
 
 #ifdef FEATURE_WLAN_ESE
 bool
@@ -840,6 +859,48 @@ QDF_STATUS wlan_cm_set_roam_band_bitmask(struct wlan_objmgr_psoc *psoc,
 					 uint8_t vdev_id,
 					 uint32_t roam_band_bitmask);
 
+#ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
+/**
+ * struct link_speed_cfg - link speed state config
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
+ * @is_link_speed_good: true means link speed good, false means bad
+ */
+struct roam_link_speed_cfg {
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t vdev_id;
+	uint8_t is_link_speed_good;
+};
+
+/**
+ * wlan_cm_send_roam_linkspeed_state() - Send link speed state to target
+ * @msg: Pointer to schedule message
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_send_roam_linkspeed_state(struct scheduler_msg *msg);
+
+/**
+ * wlan_cm_roam_link_speed_update() - Update link speed state for roaming
+ * @psoc: psoc pointer
+ * @vdev_id: vdev id
+ * @is_link_speed_good: true means link speed good, false means bad
+ *
+ * Return: None
+ */
+void wlan_cm_roam_link_speed_update(struct wlan_objmgr_psoc *psoc,
+				    uint8_t vdev_id,
+				    bool is_link_speed_good);
+
+/**
+ * wlan_mlme_is_linkspeed_roam_trigger_supported() - Get roam linkspeed check
+ * @psoc: pointer to psoc object
+ *
+ * Return: bool, true: Linkspeed check for low rssi roaming supported
+ */
+bool wlan_cm_is_linkspeed_roam_trigger_supported(struct wlan_objmgr_psoc *psoc);
+#endif
+
 /**
  * wlan_cm_set_roam_band_update() - send rso update on set band
  * @psoc: psoc pointer
@@ -1062,6 +1123,32 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
  */
 bool wlan_cm_is_roam_sync_in_progress(struct wlan_objmgr_psoc *psoc,
 				      uint8_t vdev_id);
+
+/**
+ * wlan_cm_set_roam_offload_ssid() - Set the roam offload candidate ssid
+ *
+ * @vdev: pointer to vdev
+ * @ssid_ie: ssid ie of the candidate
+ *
+ * Return: None
+ */
+void
+wlan_cm_set_roam_offload_ssid(struct wlan_objmgr_vdev *vdev, uint8_t *ssid_ie);
+
+/**
+ * wlan_cm_get_roam_offload_ssid() - Get the roam offload candidate ssid
+ *
+ * @psoc: pointer to psoc
+ * @vdev_id: vdev id
+ * @ssid: ssid of the candidate
+ * @len: length of the ssid
+ *
+ * Return: None
+ */
+void
+wlan_cm_get_roam_offload_ssid(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			      uint8_t *ssid, uint8_t *len);
+
 #else
 static inline
 void wlan_cm_roam_activate_pcl_per_vdev(struct wlan_objmgr_psoc *psoc,
@@ -1250,6 +1337,18 @@ wlan_cm_is_roam_sync_in_progress(struct wlan_objmgr_psoc *psoc,
 {
 	return false;
 }
+
+static inline void
+wlan_cm_set_roam_offload_ssid(struct wlan_objmgr_vdev *vdev, uint8_t *ssid_ie)
+{
+}
+
+static inline void
+wlan_cm_get_roam_offload_ssid(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			      uint8_t *ssid, uint8_t *len)
+{
+}
+
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
 #ifdef WLAN_FEATURE_FIPS
@@ -1515,15 +1614,15 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
  * cm_update_phymode_on_roam() - Update new phymode after
  * ROAM SYNCH event is received from firmware
  * @vdev_id: roamed vdev id
- * @bssid: bssid
- * @chan: wmi channel
+ * @sync_ind: Structure with roam synch parameters
  *
  * This api will update the phy mode after roam sync is received.
  *
  * Return: none
  */
-void cm_update_phymode_on_roam(uint8_t vdev_id, uint8_t *bssid,
-			       wmi_channel *chan);
+void
+cm_update_phymode_on_roam(uint8_t vdev_id,
+			  struct roam_offload_synch_ind *sync_ind);
 
 /**
  * wlan_cm_fw_to_host_phymode() - Convert fw phymode to host
@@ -1573,4 +1672,28 @@ bool wlan_cm_same_band_sta_allowed(struct wlan_objmgr_psoc *psoc);
 QDF_STATUS cm_cleanup_mlo_link(struct wlan_objmgr_vdev *vdev);
 
 bool wlan_is_roaming_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
+
+/**
+ * wlan_cm_set_sae_auth_ta() - Set SAE auth tx address
+ * @vdev_id : Vdev id
+ * @sae_auth_ta: SAE auth tx address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_set_sae_auth_ta(struct wlan_objmgr_pdev *pdev,
+			uint8_t vdev_id,
+			struct qdf_mac_addr sae_auth_ta);
+
+/**
+ * wlan_cm_get_sae_auth_ta() - Get SAE auth tx address
+ * @vdev_id: Vdev id
+ * @sae_auth_ta: SAE auth tx address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_get_sae_auth_ta(struct wlan_objmgr_pdev *pdev,
+			uint8_t vdev_id,
+			struct qdf_mac_addr *sae_auth_ta);
 #endif  /* WLAN_CM_ROAM_API_H__ */

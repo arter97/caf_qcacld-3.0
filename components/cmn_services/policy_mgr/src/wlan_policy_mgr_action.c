@@ -363,7 +363,7 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 		/* err msg */
 		policy_mgr_err("can't find vdev_id %d in pm_conc_connection_list",
 			vdev_id);
-		return status;
+		return QDF_STATUS_NOT_INITIALIZED;
 	}
 	if (pm_ctx->wma_cbacks.wma_get_connection_info) {
 		status = pm_ctx->wma_cbacks.wma_get_connection_info(
@@ -1449,6 +1449,11 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 				 uint32_t request_id)
 {
 	QDF_STATUS status;
+	uint8_t num_cxn_del = 0;
+	struct policy_mgr_conc_connection_info info = {0};
+
+	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, session_id,
+						      &info, &num_cxn_del);
 
 	if (!policy_mgr_check_for_session_conc(psoc, session_id, ch_freq)) {
 		policy_mgr_err("Conc not allowed for the session %d",
@@ -1463,10 +1468,12 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 	status = policy_mgr_current_connections_update(psoc, session_id,
 						       ch_freq, reason,
 						       request_id);
-	if (QDF_STATUS_E_FAILURE == status) {
+	if (QDF_STATUS_E_FAILURE == status)
 		policy_mgr_err("connections update failed");
-		return status;
-	}
+
+	if (num_cxn_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, &info,
+						     num_cxn_del);
 
 	return status;
 }
@@ -1534,6 +1541,38 @@ static bool policy_mgr_is_sap_go_existed(struct wlan_objmgr_psoc *psoc)
 	return false;
 }
 
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
+				uint32_t ch_freq)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	bool is_safe = true;
+	uint8_t j;
+	unsigned long restriction_mask;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("Invalid context");
+		return is_safe;
+	}
+
+	if (pm_ctx->unsafe_channel_count == 0)
+		return is_safe;
+
+	restriction_mask =
+		(unsigned long)policy_mgr_get_freq_restriction_mask(pm_ctx);
+	for (j = 0; j < pm_ctx->unsafe_channel_count; j++) {
+		if ((ch_freq == pm_ctx->unsafe_channel_list[j]) &&
+		    (qdf_test_bit(QDF_SAP_MODE, &restriction_mask))) {
+			is_safe = false;
+			policy_mgr_warn("Freq %d is not safe, restriction mask %lu", ch_freq, restriction_mask);
+			break;
+		}
+	}
+
+	return is_safe;
+}
+#else
 bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 				uint32_t ch_freq)
 {
@@ -1546,7 +1585,6 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 		policy_mgr_err("Invalid context");
 		return is_safe;
 	}
-
 
 	if (pm_ctx->unsafe_channel_count == 0)
 		return is_safe;
@@ -1561,6 +1599,7 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 
 	return is_safe;
 }
+#endif
 
 bool policy_mgr_is_sap_freq_allowed(struct wlan_objmgr_psoc *psoc,
 				    uint32_t sap_freq)
@@ -2524,10 +2563,17 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	/*
 	 * If interference is 0, it could be STA/SAP SCC,
 	 * check further if SAP can start on STA home channel or
-	 * select other band channel if not .
+	 * select other band channel if not.
 	 */
-	if (!ch_freq)
+	if (!ch_freq) {
+		if (!policy_mgr_any_other_vdev_on_same_mac_as_freq(psoc,
+								   sap_ch_freq,
+								   sap_vdev_id))
+			return QDF_STATUS_SUCCESS;
+
 		ch_freq = sap_ch_freq;
+	}
+
 	if (!ch_freq)
 		return QDF_STATUS_SUCCESS;
 
@@ -2950,6 +2996,14 @@ QDF_STATUS policy_mgr_reset_connection_update(struct wlan_objmgr_psoc *psoc)
 	}
 
 	return QDF_STATUS_SUCCESS;
+}
+
+void policy_mgr_reset_hw_mode_change(struct wlan_objmgr_psoc *psoc)
+{
+	policy_mgr_err("Clear hw mode change and connection update evt");
+	policy_mgr_set_hw_mode_change_in_progress(
+			psoc, POLICY_MGR_HW_MODE_NOT_IN_PROGRESS);
+	policy_mgr_reset_connection_update(psoc);
 }
 
 QDF_STATUS policy_mgr_set_connection_update(struct wlan_objmgr_psoc *psoc)

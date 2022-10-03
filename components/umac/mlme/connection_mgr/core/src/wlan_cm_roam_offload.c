@@ -2653,8 +2653,8 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 						  power_cap_ie_data);
 	}
 
-	wlan_cm_ese_populate_addtional_ies(pdev, mlme_obj, vdev_id,
-					  rso_mode_cfg);
+	wlan_cm_ese_populate_additional_ies(pdev, mlme_obj, vdev_id,
+					    rso_mode_cfg);
 
 	/* Append QCN IE if g_support_qcn_ie INI is enabled */
 	if (mlme_obj->cfg.sta.qcn_ie_support)
@@ -2841,6 +2841,41 @@ cm_roam_scan_btm_offload(struct wlan_objmgr_psoc *psoc,
 	params->btm_candidate_min_score = btm_cfg->btm_trig_min_candidate_score;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * cm_roam_mlo_config() - set roam mlo offload parameters
+ * @psoc: psoc ctx
+ * @vdev: vdev
+ * @params:  roam mlo offload parameters
+ * @rso_cfg: rso config
+ *
+ * This function is used to set roam mlo offload related parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+		   struct wlan_objmgr_vdev *vdev,
+		   struct wlan_roam_start_config *start_req)
+{
+	struct wlan_roam_mlo_config *roam_mlo_params;
+
+	roam_mlo_params = &start_req->roam_mlo_params;
+	roam_mlo_params->vdev_id = wlan_vdev_get_id(vdev);
+	roam_mlo_params->support_link_num =
+		wlan_mlme_get_sta_mlo_conn_max_num(psoc);
+	roam_mlo_params->support_link_band =
+		wlan_mlme_get_sta_mlo_conn_band_bmp(psoc);
+}
+#else
+static void
+cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+		   struct wlan_objmgr_vdev *vdev,
+		   struct wlan_roam_start_config *start_req)
+{
+}
+#endif
+
 /**
  * cm_roam_offload_11k_params() - set roam 11k offload parameters
  * @psoc: psoc ctx
@@ -3015,6 +3050,7 @@ cm_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				   true);
 	start_req->wlan_roam_rt_stats_config =
 			wlan_cm_get_roam_rt_stats(psoc, ROAM_RT_STATS_ENABLE);
+	cm_roam_mlo_config(psoc, vdev, start_req);
 
 	status = wlan_cm_tgt_send_roam_start_req(psoc, vdev_id, start_req);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -4885,6 +4921,7 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 {
 	struct rso_config *rso_cfg;
 	struct rso_cfg_params *cfg_params;
+	uint32_t current_band = REG_BAND_MASK_ALL;
 
 	rso_cfg = wlan_cm_get_rso_config(vdev);
 	if (!rso_cfg)
@@ -4919,6 +4956,8 @@ cm_restore_default_roaming_params(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			mlme_obj->cfg.lfr.roam_inactive_data_packet_count;
 	cfg_params->roam_scan_period_after_inactivity =
 			mlme_obj->cfg.lfr.roam_scan_period_after_inactivity;
+	ucfg_reg_get_band(wlan_vdev_get_pdev(vdev), &current_band);
+	rso_cfg->roam_band_bitmask = current_band;
 }
 
 QDF_STATUS cm_roam_control_restore_default_config(struct wlan_objmgr_pdev *pdev,
@@ -4983,7 +5022,8 @@ out:
 	return status;
 }
 
-void cm_update_pmk_cache_ft(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
+void cm_update_pmk_cache_ft(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    struct wlan_crypto_pmksa *pmk_cache)
 {
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct wlan_objmgr_vdev *vdev;
@@ -5016,8 +5056,12 @@ void cm_update_pmk_cache_ft(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 	 */
 	wlan_vdev_get_bss_peer_mac(vdev, &pmksa.bssid);
 	wlan_vdev_mlme_get_ssid(vdev, pmksa.ssid, &pmksa.ssid_len);
-	wlan_cm_roam_cfg_get_value(psoc, vdev_id,
-				   MOBILITY_DOMAIN, &src_cfg);
+	wlan_cm_roam_cfg_get_value(psoc, vdev_id, MOBILITY_DOMAIN, &src_cfg);
+
+	if (pmk_cache)
+		qdf_mem_copy(pmksa.cache_id, pmk_cache->cache_id,
+			     WLAN_CACHE_ID_LEN);
+
 	if (src_cfg.bool_value) {
 		pmksa.mdid.mdie_present = 1;
 		pmksa.mdid.mobility_domain = src_cfg.uint_value;
@@ -5376,10 +5420,12 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	 */
 	cm_store_sae_single_pmk_to_global_cache(psoc, pdev, vdev);
 
-	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
+	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id)) {
+		wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_ENABLED,
 					  REASON_CTX_INIT);
+	}
 }
 
 void cm_roam_start_init_on_connect(struct wlan_objmgr_pdev *pdev,
@@ -5547,6 +5593,83 @@ bool wlan_is_valid_frequency(uint32_t freq, uint32_t band_capability,
 
 #if defined(CONNECTIVITY_DIAG_EVENT) && \
 	defined(WLAN_FEATURE_ROAM_OFFLOAD)
+static enum diag_roam_reason
+cm_get_diag_roam_reason(enum roam_trigger_reason roam_reason)
+{
+	switch (roam_reason) {
+	case ROAM_TRIGGER_REASON_PER:
+		return DIAG_ROAM_REASON_PER;
+	case ROAM_TRIGGER_REASON_BMISS:
+		return DIAG_ROAM_REASON_BEACON_MISS;
+	case ROAM_TRIGGER_REASON_LOW_RSSI:
+		return DIAG_ROAM_REASON_POOR_RSSI;
+	case ROAM_TRIGGER_REASON_HIGH_RSSI:
+		return DIAG_ROAM_REASON_BETTER_RSSI;
+	case ROAM_TRIGGER_REASON_PERIODIC:
+		return DIAG_ROAM_REASON_PERIODIC_TIMER;
+	case ROAM_TRIGGER_REASON_DENSE:
+		return DIAG_ROAM_REASON_CONGESTION;
+	case ROAM_TRIGGER_REASON_BACKGROUND:
+		return DIAG_ROAM_REASON_BACKGROUND_SCAN;
+	case ROAM_TRIGGER_REASON_FORCED:
+		return DIAG_ROAM_REASON_USER_TRIGGER;
+	case ROAM_TRIGGER_REASON_BTM:
+		return DIAG_ROAM_REASON_BTM;
+	case ROAM_TRIGGER_REASON_BSS_LOAD:
+		return DIAG_ROAM_REASON_BSS_LOAD;
+	case ROAM_TRIGGER_REASON_DEAUTH:
+		return DIAG_ROAM_REASON_DISCONNECTION;
+	case ROAM_TRIGGER_REASON_IDLE:
+		return DIAG_ROAM_REASON_IDLE;
+	case ROAM_TRIGGER_REASON_WTC_BTM:
+		return DIAG_ROAM_REASON_WTC;
+	case ROAM_TRIGGER_REASON_BTC:
+		return DIAG_ROAM_REASON_BT_ACTIVITY;
+	default:
+		break;
+	}
+
+	return DIAG_ROAM_REASON_UNKNOWN;
+}
+
+static enum diag_roam_sub_reason
+cm_get_diag_roam_sub_reason(enum roam_trigger_sub_reason sub_reason)
+{
+	switch (sub_reason) {
+	case ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER:
+		return DIAG_ROAM_SUB_REASON_PERIODIC_TIMER;
+
+	case ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_LOW_RSSI:
+		return DIAG_ROAM_SUB_REASON_INACTIVITY_TIMER_LOW_RSSI;
+
+	case ROAM_TRIGGER_SUB_REASON_BTM_DI_TIMER:
+		return DIAG_ROAM_SUB_REASON_BTM_DI_TIMER;
+
+	case ROAM_TRIGGER_SUB_REASON_FULL_SCAN:
+		return DIAG_ROAM_SUB_REASON_FULL_SCAN;
+
+	case ROAM_TRIGGER_SUB_REASON_LOW_RSSI_PERIODIC:
+		return DIAG_ROAM_SUB_REASON_LOW_RSSI_PERIODIC;
+
+	case ROAM_TRIGGER_SUB_REASON_CU_PERIODIC:
+		return DIAG_ROAM_SUB_REASON_CU_PERIODIC;
+
+	case ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY:
+		return DIAG_ROAM_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY_LOW_RSSI;
+
+	case ROAM_TRIGGER_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY_CU:
+		return DIAG_ROAM_SUB_REASON_PERIODIC_TIMER_AFTER_INACTIVITY_CU;
+
+	case ROAM_TRIGGER_SUB_REASON_INACTIVITY_TIMER_CU:
+		return DIAG_ROAM_SUB_REASON_INACTIVITY_TIMER_CU;
+
+	default:
+		break;
+	}
+
+	return DIAG_ROAM_SUB_REASON_UNKNOWN;
+}
+
 
 static void populate_diag_cmn(struct wlan_connectivity_log_diag_cmn *cmn,
 			      uint8_t vdev_id, uint64_t fw_timestamp,
@@ -5568,21 +5691,29 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 {
 	int i;
 	struct wmi_roam_candidate_info *ap = scan->ap;
-	uint32_t chan_freq[NUM_CHANNELS];
+	uint32_t *chan_freq = NULL;
 	uint8_t count = 0, status, num_chan;
 	uint32_t band_capability = 0, band_mask = 0;
 	bool is_full_scan;
-	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_diag_roam_scan_done *wlan_diag_event = NULL;
 
-	WLAN_HOST_DIAG_EVENT_DEF(wlan_diag_event,
-				 struct wlan_diag_roam_scan_done);
+	wlan_diag_event = qdf_mem_malloc(sizeof(*wlan_diag_event));
+	if (!wlan_diag_event) {
+		mlme_err("Mem malloc failed for wlan_diag_event");
+		return;
+	}
 
-	qdf_mem_zero(&wlan_diag_event, sizeof(wlan_diag_event));
+	chan_freq = qdf_mem_malloc(sizeof(uint32_t) * NUM_CHANNELS);
+	if (!chan_freq) {
+		qdf_mem_free(wlan_diag_event);
+		mlme_err("Mem malloc failed for chan_freq");
+		return;
+	}
 
-	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
+	populate_diag_cmn(&wlan_diag_event->diag_cmn, vdev_id,
 			  (uint64_t)scan->ap->timestamp, &ap->bssid);
 
-	wlan_diag_event.version = DIAG_SCAN_DONE_VERSION;
+	wlan_diag_event->version = DIAG_SCAN_DONE_VERSION;
 
 	/*
 	 * scan->num_ap includes current connected AP also
@@ -5590,9 +5721,9 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 	 */
 
 	if (scan->num_ap)
-		wlan_diag_event.cand_ap_count = scan->num_ap - 1;
+		wlan_diag_event->cand_ap_count = scan->num_ap - 1;
 
-	is_full_scan = scan->type & scan->present;
+	is_full_scan = scan->type && scan->present;
 
 	if (is_full_scan) {
 		status = mlme_get_fw_scan_channels(psoc, chan_freq, &num_chan);
@@ -5603,14 +5734,12 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 		if (QDF_IS_STATUS_ERROR(status))
 			goto out;
 
-		vdev =
-		wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
-						     WLAN_MLME_OBJMGR_ID);
-		if (!vdev)
-			goto out;
+		band_mask =
+			policy_mgr_get_connected_roaming_vdev_band_mask(psoc,
+									vdev_id);
 
-		band_mask = policy_mgr_get_connected_vdev_band_mask(vdev);
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
+		if (num_chan > WLAN_MAX_LOGGING_FREQ)
+			num_chan = WLAN_MAX_LOGGING_FREQ;
 
 		for (i = 0; i < num_chan; i++) {
 			if (!wlan_is_valid_frequency(chan_freq[i],
@@ -5618,25 +5747,27 @@ void cm_roam_scan_info_event(struct wlan_objmgr_psoc *psoc,
 						     band_mask))
 				continue;
 
-			wlan_diag_event.scan_freq[count] = chan_freq[i];
+			wlan_diag_event->scan_freq[count] = chan_freq[i];
 			count++;
 		}
 
-		wlan_diag_event.num_scanned_freq = count;
+		wlan_diag_event->num_scanned_freq = count;
 	} else {
 		if (scan->num_chan > MAX_ROAM_SCAN_CHAN)
 			scan->num_chan = MAX_ROAM_SCAN_CHAN;
 
-		wlan_diag_event.num_scanned_freq = scan->num_chan;
+		wlan_diag_event->num_scanned_freq = scan->num_chan;
 		for (i = 0; i < scan->num_chan; i++)
-			wlan_diag_event.scan_freq[i] = scan->chan_freq[i];
+			wlan_diag_event->scan_freq[i] = scan->chan_freq[i];
 	}
 
-	wlan_diag_event.btcoex_active = scan->is_btcoex_active;
+	wlan_diag_event->btcoex_active = scan->is_btcoex_active;
 
 out:
-	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event,
+	WLAN_HOST_DIAG_EVENT_REPORT(wlan_diag_event,
 				    EVENT_WLAN_ROAM_SCAN_DONE);
+	qdf_mem_free(chan_freq);
+	qdf_mem_free(wlan_diag_event);
 }
 
 void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
@@ -5653,8 +5784,10 @@ void cm_roam_trigger_info_event(struct wmi_roam_trigger_info *data,
 	populate_diag_cmn(&wlan_diag_event.diag_cmn, vdev_id,
 			  (uint64_t)data->timestamp, NULL);
 
-	wlan_diag_event.trigger_reason = data->trigger_reason;
-	wlan_diag_event.trigger_sub_reason = data->trigger_sub_reason;
+	wlan_diag_event.trigger_reason =
+		cm_get_diag_roam_reason(data->trigger_reason);
+	wlan_diag_event.trigger_sub_reason =
+		cm_get_diag_roam_sub_reason(data->trigger_sub_reason);
 
 	wlan_diag_event.version = DIAG_ROAM_SCAN_START_VERSION;
 
@@ -5740,8 +5873,8 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_scan_data *scan_data,
 			       uint8_t vdev_id)
 {
-	struct qdf_mac_addr bssid = {0};
 	uint8_t i;
+	struct qdf_mac_addr bssid = {0};
 	bool ap_found_in_roam_scan = false, bmiss_skip_full_scan = false;
 	bool roam_abort = (res->fail_reason == ROAM_FAIL_REASON_SYNC ||
 			   res->fail_reason == ROAM_FAIL_REASON_DISCONNECT ||
@@ -5789,21 +5922,20 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	for (i = 0; i < scan_data->num_ap; i++) {
 		if (i >= MAX_ROAM_CANDIDATE_AP)
 			break;
-
-		if (res->status == 0 &&
-		    scan_data->ap[i].type == WLAN_ROAM_SCAN_ROAMED_AP) {
-			qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
-				     scan_data->ap[i].bssid.bytes,
-				     QDF_MAC_ADDR_SIZE);
-			break;
-		} else if (scan_data->ap[i].type ==
-			   WLAN_ROAM_SCAN_CURRENT_AP) {
+		if (scan_data->ap[i].type ==
+		    WLAN_ROAM_SCAN_CURRENT_AP) {
 			qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
 				     scan_data->ap[i].bssid.bytes,
 				     QDF_MAC_ADDR_SIZE);
 			bssid = scan_data->ap[i].bssid;
 			break;
 		}
+	}
+
+	if (!qdf_is_macaddr_zero(&res->fail_bssid)) {
+		qdf_mem_copy(wlan_diag_event.diag_cmn.bssid,
+			     res->fail_bssid.bytes,
+			     QDF_MAC_ADDR_SIZE);
 	}
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_ROAM_RESULT);
@@ -6027,8 +6159,8 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 			       struct wmi_roam_scan_data *scan_data,
 			       uint8_t vdev_id)
 {
-	struct wlan_log_record *log_record = NULL;
 	struct qdf_mac_addr bssid = {0};
+	struct wlan_log_record *log_record = NULL;
 	uint8_t i;
 	bool ap_found_in_roam_scan = false, bmiss_skip_full_scan = false;
 	bool roam_abort = (res->fail_reason == ROAM_FAIL_REASON_SYNC ||
@@ -6080,17 +6212,16 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 		if (i >= MAX_ROAM_CANDIDATE_AP)
 			break;
 
-		if (res->status == 0 &&
-		    scan_data->ap[i].type == WLAN_ROAM_SCAN_ROAMED_AP) {
-			log_record->bssid = scan_data->ap[i].bssid;
-			break;
-		} else if (scan_data->ap[i].type ==
-			   WLAN_ROAM_SCAN_CURRENT_AP) {
+		if (scan_data->ap[i].type ==
+		    WLAN_ROAM_SCAN_CURRENT_AP) {
 			log_record->bssid = scan_data->ap[i].bssid;
 			bssid = scan_data->ap[i].bssid;
 			break;
 		}
 	}
+
+	if (!qdf_is_macaddr_zero(&res->fail_bssid))
+		log_record->bssid = res->fail_bssid;
 
 	wlan_connectivity_log_enqueue(log_record);
 	qdf_mem_zero(log_record, sizeof(*log_record));
@@ -6532,7 +6663,8 @@ cm_roam_btm_candidate_event(struct wmi_btm_req_candidate_info *btm_data,
 
 QDF_STATUS
 cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
-		      uint8_t vdev_id)
+		      struct wmi_roam_trigger_info *trigger_info,
+		      uint8_t vdev_id, bool is_wtc)
 {
 	uint8_t i;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -6560,6 +6692,10 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 	wlan_diag_event.cand_lst_cnt = btm_data->candidate_list_count;
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, EVENT_WLAN_BTM);
+
+	if (is_wtc)
+		cm_roam_wtc_btm_event(trigger_info, NULL, vdev_id, true);
+
 	for (i = 0; i < btm_data->candidate_list_count; i++)
 		cm_roam_btm_candidate_event(&btm_data->btm_cand[i], vdev_id, i);
 
@@ -6586,7 +6722,8 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 	wlan_diag_event.sn = frame_data->seq_num;
 	wlan_diag_event.auth_algo = frame_data->auth_algo;
 	wlan_diag_event.rssi = (-1) * frame_data->rssi;
-	wlan_diag_event.tx_status = frame_data->tx_status;
+	wlan_diag_event.tx_status =
+				wlan_get_diag_tx_status(frame_data->tx_status);
 	wlan_diag_event.status = frame_data->status_code;
 	wlan_diag_event.assoc_id = frame_data->assoc_id;
 
@@ -6622,6 +6759,11 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 					 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
 	}
+
+	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
+	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
+		wlan_diag_event.reason = frame_data->status_code;
+
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
 
 	return status;
@@ -6803,7 +6945,8 @@ cm_roam_btm_candidate_event(struct wmi_btm_req_candidate_info *btm_data,
 
 QDF_STATUS
 cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
-		      uint8_t vdev_id)
+		      struct wmi_roam_trigger_info *trigger_info,
+		      uint8_t vdev_id, bool is_wtc)
 {
 	struct wlan_log_record *log_record = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -6834,6 +6977,10 @@ cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
 				btm_data->candidate_list_count;
 
 	status = wlan_connectivity_log_enqueue(log_record);
+
+	if (is_wtc)
+		cm_roam_wtc_btm_event(trigger_info, NULL, vdev_id, true);
+
 	for (i = 0; i < log_record->btm_info.candidate_list_count; i++)
 		cm_roam_btm_candidate_event(&btm_data->btm_cand[i], vdev_id, i);
 
@@ -6955,12 +7102,10 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 			     &send_resp, start_timer);
 	/*
 	 * RSO stop resp is not supported or RSO STOP timer/req failed,
-	 * then send resp from here
+	 * send QDF_STATUS_E_NOSUPPORT so that we continue from the caller
 	 */
 	if (send_resp)
-		wlan_cm_rso_stop_continue_disconnect(wlan_vdev_get_psoc(vdev),
-						     wlan_vdev_get_id(vdev),
-						     false);
+		return QDF_STATUS_E_NOSUPPORT;
 
 	return QDF_STATUS_SUCCESS;
 }

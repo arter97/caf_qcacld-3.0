@@ -335,10 +335,12 @@ QDF_STATUS cm_roam_control_restore_default_config(struct wlan_objmgr_pdev *pdev,
  * cm_update_pmk_cache_ft - API to update MDID in PMKSA cache entry
  * @psoc: psoc pointer
  * @vdev_id: dvev ID
+ * @pmk_cache: pmksa from the userspace
  *
  * Return: None
  */
-void cm_update_pmk_cache_ft(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+void cm_update_pmk_cache_ft(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
+			    struct wlan_crypto_pmksa *pmk_cache);
 
 /**
  * cm_lookup_pmkid_using_bssid() - lookup pmkid using bssid
@@ -510,14 +512,17 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 
 /**
  * cm_roam_btm_req_event  - Send BTM request related logging event
- * @btm_data: BTM trigger related data
  * @vdev_id: Vdev id
+ * @btm_data: BTM trigger related data
+ * @trigger_info: Roam trigger related info
+ * @is_wtc: Is WTC or BTM response
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
-		      uint8_t vdev_id);
+		      struct wmi_roam_trigger_info *trigger_info,
+		      uint8_t vdev_id, bool is_wtc);
 
 /**
  * cm_roam_btm_resp_event() - Send BTM response logging event
@@ -567,7 +572,8 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 
 static inline QDF_STATUS
 cm_roam_btm_req_event(struct wmi_roam_btm_trigger_data *btm_data,
-		      uint8_t vdev_id)
+		      struct wmi_roam_trigger_info *trigger_info,
+		      uint8_t vdev_id, bool is_wtc)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

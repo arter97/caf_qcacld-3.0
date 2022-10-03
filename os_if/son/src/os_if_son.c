@@ -298,7 +298,7 @@ static void os_if_son_update_chan_info(
 int os_if_son_get_chan_list(struct wlan_objmgr_vdev *vdev,
 			    struct ieee80211_ath_channel *chan_list,
 			    struct ieee80211_channel_info *chan_info,
-			    uint8_t *nchans, bool flag_160)
+			    uint8_t *nchans, bool flag_160, bool flag_6ghz)
 {
 	struct regulatory_channel *cur_chan_list;
 	int i;
@@ -364,7 +364,8 @@ int os_if_son_get_chan_list(struct wlan_objmgr_vdev *vdev,
 		    !chan->nol_chan && !chan->nol_history)
 			continue;
 		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(primary_freq)) {
-			if (!(reg_wifi_band_bitmap & BIT(REG_BAND_6G)))
+			if (!flag_6ghz ||
+			    !(reg_wifi_band_bitmap & BIT(REG_BAND_6G)))
 				continue;
 			band_flags = VENDOR_CHAN_FLAG2(
 				QCA_WLAN_VENDOR_CHANNEL_PROP_FLAG_6GHZ);
@@ -945,6 +946,23 @@ static QDF_STATUS os_if_son_get_apcap(struct wlan_objmgr_vdev *vdev,
 		apcap->hecap.he_su_bfer = he_cap.su_beamformer;
 		apcap->hecap.he_su_bfee = he_cap.su_beamformee;
 		apcap->hecap.he_mu_bfer = he_cap.mu_beamformer;
+		apcap->hecap.supported_he_mcs[0] = he_cap.rx_he_mcs_map_lt_80;
+		apcap->hecap.supported_he_mcs[1] = he_cap.tx_he_mcs_map_lt_80;
+		apcap->hecap.supported_he_mcs[2] =
+					he_cap.rx_he_mcs_map_160[0][0] |
+					(he_cap.rx_he_mcs_map_160[0][1] << 8);
+		apcap->hecap.supported_he_mcs[3] =
+					he_cap.tx_he_mcs_map_160[0][0] |
+					(he_cap.tx_he_mcs_map_160[0][1] << 8);
+		apcap->hecap.supported_he_mcs[4] =
+					he_cap.rx_he_mcs_map_80_80[0][0] |
+					(he_cap.rx_he_mcs_map_80_80[0][1] << 8);
+		apcap->hecap.supported_he_mcs[5] =
+					he_cap.tx_he_mcs_map_80_80[0][0] |
+					(he_cap.tx_he_mcs_map_80_80[0][1] << 8);
+		apcap->hecap.he_ul_mumimo = QDF_GET_BITS(he_cap.ul_mu, 0, 1);
+		apcap->hecap.he_ul_muofdma = QDF_GET_BITS(he_cap.ul_mu, 1, 1);
+		apcap->hecap.he_dl_muofdma = he_cap.dl_mu_mimo_part_bw;
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -1283,7 +1301,8 @@ qdf_export_symbol(os_if_son_modify_acl);
 
 static
 int os_if_son_reg_get_ap_hw_cap(struct wlan_objmgr_pdev *pdev,
-				struct wlan_radio_basic_capabilities *hwcap)
+				struct wlan_radio_basic_capabilities *hwcap,
+				bool skip_6ghz)
 {
 	QDF_STATUS status;
 	uint8_t idx;
@@ -1316,6 +1335,12 @@ int os_if_son_reg_get_ap_hw_cap(struct wlan_objmgr_pdev *pdev,
 			   reg_ap_cap[idx].max_tx_pwr_dbm);
 		if (reg_ap_cap[idx].ch_width == BW_160_MHZ)
 			continue;
+		if (skip_6ghz &&
+		    wlan_reg_is_6ghz_op_class(pdev, reg_ap_cap[idx].op_class)) {
+			osif_debug("ignore 6 GHz op_class: %d to son",
+				   reg_ap_cap[idx].op_class);
+			continue;
+		}
 		hwcap->opclasses[nsoc].opclass = reg_ap_cap[idx].op_class;
 		hwcap->opclasses[nsoc].max_tx_pwr_dbm =
 					reg_ap_cap[idx].max_tx_pwr_dbm;
@@ -1548,7 +1573,7 @@ QDF_STATUS os_if_son_pdev_ops(struct wlan_objmgr_pdev *pdev,
 			MAP_DEFAULT_PPDU_DURATION * MAP_PPDU_DURATION_UNITS;
 		break;
 	case PDEV_GET_CAPABILITY:
-		os_if_son_reg_get_ap_hw_cap(pdev, &out->cap);
+		os_if_son_reg_get_ap_hw_cap(pdev, &out->cap, in->skip_6ghz);
 		break;
 	case PDEV_GET_OPERABLE_CHAN:
 		memcpy(&out->op_chan, &in->op_chan,

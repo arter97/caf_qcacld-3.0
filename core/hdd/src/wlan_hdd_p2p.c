@@ -56,6 +56,8 @@
 #include "wlan_hdd_object_manager.h"
 #include "wlan_hdd_pre_cac.h"
 #include "wlan_pre_cac_ucfg_api.h"
+#include "wlan_dp_ucfg_api.h"
+#include "wlan_psoc_mlme_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -312,7 +314,8 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	if ((adapter->device_mode == QDF_STA_MODE ||
 	     adapter->device_mode == QDF_SAP_MODE ||
 	     adapter->device_mode == QDF_P2P_CLIENT_MODE ||
-	     adapter->device_mode == QDF_P2P_GO_MODE) &&
+	     adapter->device_mode == QDF_P2P_GO_MODE ||
+	     adapter->device_mode == QDF_NAN_DISC_MODE) &&
 	    (type == SIR_MAC_MGMT_FRAME &&
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
 		/* Request ROC for PASN authentication frame */
@@ -617,7 +620,7 @@ int hdd_set_p2p_opps(struct net_device *dev, uint8_t *command)
 	if (ctwindow != -1)
 		adapter->ctw = ctwindow;
 
-	/* Send command to FW when OppPS is either enabled(1)/disbaled(0) */
+	/* Send command to FW when OppPS is either enabled(1)/disabled(0) */
 	if (opp_ps != -1) {
 		adapter->ops = opp_ps;
 		noa.opp_ps = adapter->ops;
@@ -815,8 +818,11 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 		goto close_adapter;
 	}
 
-	if (hdd_ctx->rps)
-		hdd_send_rps_ind(adapter);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	if (vdev) {
+		ucfg_dp_try_send_rps_ind(vdev);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+	}
 
 	hdd_exit();
 
@@ -1052,8 +1058,12 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	uint8_t type = 0;
 	uint8_t sub_type = 0;
 	struct hdd_context *hdd_ctx;
-	uint8_t *dest_addr;
+	uint8_t *dest_addr = NULL;
+	uint16_t auth_algo;
 	enum nl80211_rxmgmt_flags nl80211_flag = 0;
+	bool is_pasn_auth_frame = false;
+	struct hdd_adapter *assoc_adapter;
+	bool eht_capab;
 
 	hdd_debug("Frame Type = %d Frame Length = %d freq = %d",
 		  frame_type, frm_len, rx_freq);
@@ -1076,10 +1086,19 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 
 	type = WLAN_HDD_GET_TYPE_FRM_FC(pb_frames[0]);
 	sub_type = WLAN_HDD_GET_SUBTYPE_FRM_FC(pb_frames[0]);
+	if (type == SIR_MAC_MGMT_FRAME &&
+	    sub_type == SIR_MAC_MGMT_AUTH &&
+	    frm_len > (sizeof(struct wlan_frame_hdr) +
+		       WLAN_AUTH_FRAME_MIN_LEN)) {
+		auth_algo = *(uint16_t *)(pb_frames +
+					  sizeof(struct wlan_frame_hdr));
+		if (auth_algo == eSIR_AUTH_TYPE_PASN)
+			is_pasn_auth_frame = true;
+	}
 
 	/* Get adapter from Destination mac address of the frame */
-	if ((type == SIR_MAC_MGMT_FRAME) &&
-	    (sub_type != SIR_MAC_MGMT_PROBE_REQ) &&
+	if (type == SIR_MAC_MGMT_FRAME &&
+	    sub_type != SIR_MAC_MGMT_PROBE_REQ && !is_pasn_auth_frame &&
 	    !qdf_is_macaddr_broadcast(
 	     (struct qdf_mac_addr *)&pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET])) {
 		dest_addr = &pb_frames[WLAN_HDD_80211_FRM_DA_OFFSET];
@@ -1133,23 +1152,34 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 					      adapter->dscp_to_up_map,
 					      adapter->vdev_id);
 
+	assoc_adapter = adapter;
+	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+	if (hdd_adapter_is_link_adapter(adapter) && eht_capab) {
+		hdd_debug("adapter is not ml adapter move to ml adapter");
+		assoc_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
+		if (!assoc_adapter) {
+			hdd_err("Assoc adapter is NULL");
+			return;
+		}
+	}
+
 	/* Indicate Frame Over Normal Interface */
 	hdd_debug("Indicate Frame over NL80211 sessionid : %d, idx :%d",
-		   adapter->vdev_id, adapter->dev->ifindex);
+		   assoc_adapter->vdev_id, assoc_adapter->dev->ifindex);
 
 	wlan_hdd_cfg80211_convert_rxmgmt_flags(rx_flags, &nl80211_flag);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 18, 0))
-	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr,
+	cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr,
 			 rx_freq, rx_rssi * 100, pb_frames,
 			 frm_len, NL80211_RXMGMT_FLAG_ANSWERED | nl80211_flag);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0))
-	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr,
+	cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr,
 			 rx_freq, rx_rssi * 100, pb_frames,
 			 frm_len, NL80211_RXMGMT_FLAG_ANSWERED,
 			 GFP_ATOMIC);
 #else
-	cfg80211_rx_mgmt(adapter->dev->ieee80211_ptr, rx_freq,
+	cfg80211_rx_mgmt(assoc_adapter->dev->ieee80211_ptr, rx_freq,
 			 rx_rssi * 100,
 			 pb_frames, frm_len, GFP_ATOMIC);
 #endif /* LINUX_VERSION_CODE */
@@ -1323,7 +1353,7 @@ static uint32_t set_first_connection_operating_channel(
 
 	oper_chan_freq = hdd_get_operating_chan_freq(hdd_ctx, dev_mode);
 	if (!oper_chan_freq) {
-		hdd_err(" First adpter operating channel is invalid");
+		hdd_err(" First adapter operating channel is invalid");
 		return -EINVAL;
 	}
 	operating_channel = wlan_reg_freq_to_chan(hdd_ctx->pdev,

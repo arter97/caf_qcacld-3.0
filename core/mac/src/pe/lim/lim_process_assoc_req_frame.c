@@ -715,7 +715,7 @@ lim_process_for_spectrum_mgmt(struct mac_context *mac_ctx, tSirMacAddr sa,
 		} /* if(assoc.capabilityInfo.spectrumMgt) */
 		else {
 			/*
-			 * As per the capabiities, the spectrum management is
+			 * As per the capabilities, the spectrum management is
 			 * not enabled on the station. The AP may allow the
 			 * associations to happen even if spectrum management
 			 * is not allowed, if the transmit power of station is
@@ -1235,8 +1235,8 @@ static bool lim_process_assoc_req_no_sta_ctx(struct mac_context *mac_ctx,
 		 * Maximum number of STAs that AP can handle reached.
 		 * Send Association response to peer MAC entity
 		 */
-		pe_err("Max Sta count reached : %d",
-				mac_ctx->lim.maxStation);
+		pe_info_rl("Max Sta count reached : %d",
+			   mac_ctx->lim.maxStation);
 		lim_reject_association(mac_ctx, sa, sub_type, false,
 				       (tAniAuthType)0, 0, false,
 				       STATUS_UNSPECIFIED_FAILURE,
@@ -1895,6 +1895,8 @@ static bool lim_update_sta_ds(struct mac_context *mac_ctx, tSirMacAddr sa,
 	if (sta_ds->rmfEnabled) {
 		sta_ds->ocv_enabled = lim_is_ocv_enable_in_assoc_req(mac_ctx,
 								     assoc_req);
+		if (sta_ds->ocv_enabled)
+			sta_ds->last_ocv_done_freq = session->curr_op_freq;
 		/* Try to delete it before, creating.*/
 		lim_delete_pmf_query_timer(sta_ds);
 		if (tx_timer_create(mac_ctx, &sta_ds->pmfSaQueryTimer,
@@ -2207,14 +2209,14 @@ bool lim_send_assoc_ind_to_sme(struct mac_context *mac_ctx,
 
 	if (!peer_idx && !partner_peer_idx) {
 		/* Could not assign AID. Reject association */
-		pe_err("PeerIdx not avaialble. Reject associaton");
+		pe_err("PeerIdx not available. Reject associaton");
 		lim_reject_association(mac_ctx, sa, sub_type,
 				       true, auth_type, peer_idx, false,
 				       STATUS_UNSPECIFIED_FAILURE,
 				       session);
 		return false;
 	} else if (!peer_idx) {
-		pe_err("mlo partner PeerIdx not avaialble. Reject associaton");
+		pe_err("mlo partner PeerIdx not available. Reject associaton");
 		lim_send_sme_max_assoc_exceeded_ntf(mac_ctx, sa,
 						    session->smeSessionId);
 		return false;
@@ -2570,7 +2572,7 @@ QDF_STATUS lim_proc_assoc_req_frm_cmn(struct mac_context *mac_ctx,
 		 * WAR: In P2P GO mode, if the P2P client device
 		 * is only HT capable and not VHT capable, but the P2P
 		 * GO device is VHT capable and advertises 2x2 NSS with
-		 * HT capablity client device, which results in IOT
+		 * HT capability client device, which results in IOT
 		 * issues.
 		 * When GO is operating in DBS mode, GO beacons
 		 * advertise 2x2 capability but include OMN IE to
@@ -2982,10 +2984,8 @@ lim_convert_channel_width_enum(enum phy_ch_width ch_width)
 		return eHT_CHANNEL_WIDTH_160MHZ;
 	case CH_WIDTH_80P80MHZ:
 		return eHT_CHANNEL_WIDTH_80P80MHZ;
-#if defined(WLAN_FEATURE_11BE)
 	case CH_WIDTH_320MHZ:
 		return eHT_CHANNEL_WIDTH_320MHZ;
-#endif
 	case CH_WIDTH_MAX:
 		return eHT_MAX_CHANNEL_WIDTH;
 	case CH_WIDTH_5MHZ:

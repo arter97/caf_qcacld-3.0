@@ -330,14 +330,6 @@ static inline int pld_pcie_force_wake_release(struct device *dev)
 	return 0;
 }
 
-static inline void pld_pcie_lock_pm_sem(struct device *dev)
-{
-}
-
-static inline void pld_pcie_release_pm_sem(struct device *dev)
-{
-}
-
 static inline void pld_pcie_lock_reg_window(struct device *dev,
 					    unsigned long *flags)
 {
@@ -351,6 +343,11 @@ static inline void pld_pcie_unlock_reg_window(struct device *dev,
 static inline int pld_pcie_get_pci_slot(struct device *dev)
 {
 	return 0;
+}
+
+static inline struct kobject *pld_pcie_get_wifi_kobj(struct device *dev)
+{
+	return NULL;
 }
 
 static inline int pld_pcie_power_on(struct device *dev)
@@ -629,16 +626,6 @@ static inline int pld_pcie_force_wake_release(struct device *dev)
 	return cnss_pci_force_wake_release(dev);
 }
 
-static inline void pld_pcie_lock_pm_sem(struct device *dev)
-{
-	cnss_lock_pm_sem(dev);
-}
-
-static inline void pld_pcie_release_pm_sem(struct device *dev)
-{
-	cnss_release_pm_sem(dev);
-}
-
 static inline void pld_pcie_lock_reg_window(struct device *dev,
 					    unsigned long *flags)
 {
@@ -660,6 +647,18 @@ static inline int pld_pcie_get_pci_slot(struct device *dev)
 static inline int pld_pcie_get_pci_slot(struct device *dev)
 {
 	return 0;
+}
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+static inline struct kobject *pld_pcie_get_wifi_kobj(struct device *dev)
+{
+	return cnss_get_wifi_kobj(dev);
+}
+#else
+static inline struct kobject *pld_pcie_get_wifi_kobj(struct device *dev)
+{
+	return NULL;
 }
 #endif
 

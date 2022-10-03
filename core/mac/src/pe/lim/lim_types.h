@@ -388,10 +388,64 @@ void lim_set_cfg_protection(struct mac_context *mac, struct pe_session *pesessio
 /* Function to Initialize MLM state machine on STA */
 QDF_STATUS lim_init_mlm(struct mac_context *);
 
+/**
+ * struct pasn_peer_delete_msg  - PASN peer delete request message
+ * @message_type: Message type
+ * @length: message length
+ * @vdev_id: Vdev id
+ */
+struct pasn_peer_delete_msg {
+	uint16_t message_type;
+	uint16_t length;
+	uint8_t vdev_id;
+};
+
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+/**
+ * lim_process_pasn_delete_all_peers() - Process delete all PASN peers
+ * request
+ * @mac: Pointer to mac address
+ * @msg: Peer delete message
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_process_pasn_delete_all_peers(struct mac_context *mac,
+				  struct pasn_peer_delete_msg *msg);
+#else
+static inline QDF_STATUS
+lim_process_pasn_delete_all_peers(struct mac_context *mac,
+				  struct pasn_peer_delete_msg *msg)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /* Function to cleanup MLM state machine */
 void lim_cleanup_mlm(struct mac_context *);
 
 /* Management frame handling functions */
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * lim_process_beacon_eht() - process beacon 11be IE
+ * @mac_ctx: global mac context
+ * @session: pe session
+ * @bcn_ptr: pointer to tSchBeaconStruct
+ *
+ * Return none
+ */
+void lim_process_beacon_eht(struct mac_context *mac_ctx,
+			    struct pe_session *session,
+			    tSchBeaconStruct *bcn_ptr);
+#else
+static inline
+void lim_process_beacon_eht(struct mac_context *mac_ctx,
+			    struct pe_session *session,
+			    tSchBeaconStruct *bcn_ptr)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
@@ -885,6 +939,16 @@ void lim_process_tdls_del_sta_rsp(struct mac_context *mac_ctx,
  */
 void lim_update_tdls_set_state_for_fw(struct pe_session *session_entry,
 				      bool value);
+
+/**
+ * lim_update_tdls_2g_bw() - Update TDLS peer bw to fw
+ *
+ * @session_entry - PE sessions
+ *
+ * Return: void
+ */
+void lim_update_tdls_2g_bw(struct pe_session *session);
+
 #else
 static inline QDF_STATUS lim_delete_tdls_peers(struct mac_context *mac_ctx,
 						struct pe_session *session_entry)
@@ -899,6 +963,10 @@ static inline void lim_init_tdls_data(struct mac_context *mac,
 
 static inline void lim_update_tdls_set_state_for_fw(struct pe_session
 						    *session_entry, bool value)
+{
+}
+
+static inline void lim_update_tdls_2g_bw(struct pe_session *session)
 {
 }
 #endif
@@ -1425,8 +1493,35 @@ void lim_process_mlm_start_req(struct mac_context *mac_ctx,
 void lim_process_mlm_join_req(struct mac_context *mac_ctx,
 			      tLimMlmJoinReq *mlm_join_req);
 
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+/**
+ * lim_pasn_peer_del_all_resp_vdev_delete_resume() - Delete all PASN peers is
+ * complete resume vdev delete.
+ * @mac: Mac context pointer
+ * @vdev: Vdev object pointer
+ *
+ * Return: None
+ */
+void
+lim_pasn_peer_del_all_resp_vdev_delete_resume(struct mac_context *mac,
+					      struct wlan_objmgr_vdev *vdev);
+#else
+static inline void
+lim_pasn_peer_del_all_resp_vdev_delete_resume(struct mac_context *mac,
+					      struct wlan_objmgr_vdev *vdev)
+{}
+#endif
+
+/**
+ * lim_send_peer_create_resp() -  Send peer create response
+ * @mac:     Pointer to MAC context
+ * @vdev_id: vdev id
+ * @status:  Status of peer create
+ * @peer_mac: Peer mac address
+ */
 void lim_send_peer_create_resp(struct mac_context *mac, uint8_t vdev_id,
 			       QDF_STATUS status, uint8_t *peer_mac);
+
 /*
  * lim_process_mlm_deauth_req() - This function is called to process
  * MLM_DEAUTH_REQ message from SME

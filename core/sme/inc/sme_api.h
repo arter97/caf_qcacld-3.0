@@ -129,7 +129,8 @@
 #define SME_CMD_POLICY_MGR_CMD_TIMEOUT (SIR_VDEV_PLCY_MGR_TIMEOUT + 1000)
 #define SME_POLICY_MGR_CMD_TIMEOUT (SME_CMD_POLICY_MGR_CMD_TIMEOUT + 1000)
 
-#define SME_VDEV_DELETE_CMD_TIMEOUT (DELETE_RESPONSE_TIMER + 2000)
+#define SME_VDEV_DELETE_CMD_TIMEOUT (DELETE_RESPONSE_TIMER + \
+				     PEER_DELETE_ALL_RESPONSE_TIMER + 2000)
 #define SME_CMD_VDEV_CREATE_DELETE_TIMEOUT QDF_MAX(13000, \
 						SME_VDEV_DELETE_CMD_TIMEOUT + 1)
 
@@ -442,13 +443,6 @@ QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle,
  */
 void sme_cleanup_session(mac_handle_t mac_handle, uint8_t vdev_id);
 
-/**
- * sme_set_curr_device_mode() - Sets the current operating device mode.
- * @mac_handle: The handle returned by mac_open.
- * @curr_device_mode: Current operating device mode.
- */
-void sme_set_curr_device_mode(mac_handle_t mac_handle,
-			      enum QDF_OPMODE curr_device_mode);
 /**
  * sme_update_roam_params() - Store/Update the roaming params
  * @mac_handle: Opaque handle to the global MAC context
@@ -3624,6 +3618,8 @@ void sme_set_bss_max_idle_period(mac_handle_t mac_handle, uint16_t cfg_val);
 #ifdef WLAN_FEATURE_11AX
 void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id);
 void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id);
+void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
+		       enum eSirMacHTChannelWidth chwidth);
 /**
  * sme_set_ru_242_tone_tx_cfg() - set ru 242 tone tx user cfg
  * @mac_handle: Opaque handle to the global MAC context
@@ -3651,6 +3647,10 @@ static inline void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 }
 
+static inline void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
+				     enum eSirMacHTChannelWidth chwidth)
+{
+}
 static inline void sme_check_enable_ru_242_tx(mac_handle_t mac_handle,
 					      uint8_t vdev_id)
 {
@@ -3681,13 +3681,65 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id);
  * Return: None
  */
 void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id);
+
+/**
+ * sme_set_mlo_max_links() - set mlo max links
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @val: value to be set
+ *
+ * Return: None
+ */
+void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
+			   uint8_t val);
+
+/**
+ * sme_set_mlo_max_simultaneous_links() - set mlo max simultaneous links
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @val: value to set
+ *
+ * Return: None
+ */
+void sme_set_mlo_max_simultaneous_links(mac_handle_t mac_handle,
+					uint8_t vdev_id, uint8_t val);
+
+/**
+ * sme_set_mlo_assoc_link_band() - set mlo assoc link band
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @val: value to be set
+ *
+ * Return: None
+ */
+void sme_set_mlo_assoc_link_band(mac_handle_t mac_handle, uint8_t vdev_id,
+				 uint8_t val);
 #else
 static inline void sme_set_eht_testbed_def(mac_handle_t mac_handle,
 					   uint8_t vdev_id)
 {
 }
 
-static inline void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
+static inline
+void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+}
+
+static inline
+void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
+			   uint8_t val)
+{
+}
+
+static inline
+void sme_set_mlo_assoc_link_band(mac_handle_t mac_handle, uint8_t vdev_id,
+				 uint8_t val)
+{
+}
+
+static inline
+void sme_set_mlo_max_simultaneous_links(mac_handle_t mac_handle,
+					uint8_t vdev_id, uint8_t val)
 {
 }
 #endif
@@ -4346,21 +4398,6 @@ QDF_STATUS sme_get_ani_level(mac_handle_t mac_handle, uint32_t *freqs,
 			     void *context), void *context);
 #endif /* FEATURE_ANI_LEVEL_REQUEST */
 
-/**
- * sme_get_prev_connected_bss_ies() - Get the previous connected AP IEs
- * @mac_handle: The handle returned by mac_open.
- * @vdev_id: vdev id
- * @ies: IEs of the disconnected AP. Currently to carry beacon IEs.
- * @ie_len: Length of the @ies
- *
- * This API extracts the IEs from the previous connected AP info and update
- * them to the ies and ie_len.
- *
- * Return: QDF_STATUS
- */
-QDF_STATUS sme_get_prev_connected_bss_ies(mac_handle_t mac_handle,
-					  uint8_t vdev_id,
-					  uint8_t **ies, uint32_t *ie_len);
 /*
  * sme_vdev_self_peer_delete_resp() - Response for self peer delete
  * @del_vdev_params: parameters for which vdev self peer has been deleted
@@ -4477,10 +4514,22 @@ enum csr_cfgdot11mode sme_phy_mode_to_dot11mode(enum wlan_phymode phy_mode);
  * Return: Max EHT channel width supported by FW (eg. 80, 160, 320)
  */
 uint32_t sme_get_eht_ch_width(void);
+
+/**
+ * sme_is_11be_capable() - Check if 11 be is supported or not
+ *
+ * Return: True if 11be is supported
+ */
+bool sme_is_11be_capable(void);
 #else /* !WLAN_FEATURE_11BE */
 static inline uint32_t sme_get_eht_ch_width(void)
 {
 	return 0;
+}
+
+static inline bool sme_is_11be_capable(void)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_11BE */
 
@@ -4504,6 +4553,7 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
  * @mac_addr: VDEV MAC address
  * @mld_addr: VDEV MLD address
  * @vdev: Pointer to object manager VDEV
+ * @update_mld_addr: Flag to check whether to update MLD addr or not
  *
  * API to send set MAC address request command to FW
  *
@@ -4511,7 +4561,8 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 				 struct qdf_mac_addr mld_addr,
-				 struct wlan_objmgr_vdev *vdev);
+				 struct wlan_objmgr_vdev *vdev,
+				 bool update_mld_addr);
 
 /**
  * sme_update_vdev_mac_addr() - Update VDEV MAC address
@@ -4519,6 +4570,7 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
  * @mac_addr: VDEV MAC address
  * @vdev: Pointer to object manager VDEV
  * @update_sta_self_peer: Flag to check self peer MAC address or not.
+ * @update_mld_addr: Flag to check if MLD address update needed or not.
  * @req_status: Status of the set MAC address request to the FW
  *
  * API to update MLME structures with new MAC address. This will be invoked
@@ -4530,7 +4582,8 @@ QDF_STATUS sme_send_set_mac_addr(struct qdf_mac_addr mac_addr,
 QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 				    struct qdf_mac_addr mac_addr,
 				    struct wlan_objmgr_vdev *vdev,
-				    bool update_sta_self_peer, int req_status);
+				    bool update_sta_self_peer,
+				    bool update_mld_addr, int req_status);
 #endif
 
 /**

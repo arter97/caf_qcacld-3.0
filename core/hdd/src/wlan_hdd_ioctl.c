@@ -1415,7 +1415,7 @@ static void wlan_hdd_ready_to_extwow(void *cookie, bool is_success)
 
 	request = osif_request_get(cookie);
 	if (!request) {
-		hdd_err("Obselete request");
+		hdd_err("obsolete request");
 		return;
 	}
 	priv = osif_request_priv(request);
@@ -1768,11 +1768,13 @@ static int hdd_get_dwell_time_6g(struct wlan_objmgr_psoc *psoc,
 
 	if (strncmp(command, "GETDWELLTIME 6G MAX", 19) == 0) {
 		status = ucfg_scan_cfg_get_active_6g_dwelltime(psoc, &val);
+		hdd_debug("active 6g dwelltime:%d", val);
 		if (QDF_IS_STATUS_SUCCESS(status))
 			*len = scnprintf(extra, n, "GETDWELLTIME 6G MAX %u\n",
 					 val);
 	} else if (strncmp(command, "GETDWELLTIME PASSIVE 6G MAX", 27) == 0) {
 		status = ucfg_scan_cfg_get_passive_6g_dwelltime(psoc, &val);
+		hdd_debug("passive 6g dwelltime:%d", val);
 		if (QDF_IS_STATUS_SUCCESS(status))
 			*len = scnprintf(extra, n,
 					 "GETDWELLTIME PASSIVE 6G MAX %u\n",
@@ -1845,23 +1847,27 @@ static int hdd_get_dwell_time(struct wlan_objmgr_psoc *psoc, uint8_t *command,
 
 	if (strncmp(command, "GETDWELLTIME ACTIVE MAX", 23) == 0) {
 		ucfg_scan_cfg_get_active_dwelltime(psoc, &val);
+		hdd_debug("active max dwelltime:%d", val);
 		*len = scnprintf(extra, n, "GETDWELLTIME ACTIVE MAX %u\n", val);
 		return 0;
 	}
 	if (strncmp(command, "GETDWELLTIME PASSIVE MAX", 24) == 0) {
 		ucfg_scan_cfg_get_passive_dwelltime(psoc, &val);
+		hdd_debug("passive dwelltime:%d", val);
 		*len = scnprintf(extra, n, "GETDWELLTIME PASSIVE MAX %u\n",
 				 val);
 		return 0;
 	}
 	if (strncmp(command, "GETDWELLTIME 2G MAX", 19) == 0) {
 		ucfg_scan_cfg_get_active_2g_dwelltime(psoc, &val);
+		hdd_debug("active 2g dwelltime:%d", val);
 		*len = scnprintf(extra, n, "GETDWELLTIME 2G MAX %u\n",
 				 val);
 		return 0;
 	}
 	if (strncmp(command, "GETDWELLTIME", 12) == 0) {
 		ucfg_scan_cfg_get_active_dwelltime(psoc, &val);
+		hdd_debug("active dwelltime:%d", val);
 		*len = scnprintf(extra, n, "GETDWELLTIME %u\n", val);
 		return 0;
 	}
@@ -3234,6 +3240,59 @@ struct roam_ch_priv {
 	struct roam_scan_ch_resp roam_ch;
 };
 
+/**
+ * hdd_dump_roam_scan_ch_list() - Function to dump roam scan chan list content
+ * @chan_list: pointer to channel list received from FW via an event
+ * WMI_ROAM_SCAN_CHANNEL_LIST_EVENTID
+ * @num_channels: Number of channels
+ *
+ * Return: none
+ */
+static void
+hdd_dump_roam_scan_ch_list(uint32_t *chan_list, uint16_t num_channels)
+{
+	uint8_t i, j;
+	uint8_t ch_cache_str[128] = {0};
+
+	/* print channel list after sorting in ascending order */
+	for (i = 0, j = 0; i < num_channels; i++) {
+		if (j < sizeof(ch_cache_str))
+			j += snprintf(ch_cache_str + j,
+				      sizeof(ch_cache_str) - j, " %d",
+				      chan_list[i]);
+		else
+			break;
+	}
+
+	hdd_debug("No of freq:%d, freq list : %s", num_channels, ch_cache_str);
+}
+
+/**
+ * hdd_sort_roam_scan_ch_list() - Function to sort roam scan channel list in
+ * ascending order before sending it to supplicant
+ * @chan_list: pointer to channel list received from FW via an event
+ * WMI_ROAM_SCAN_CHANNEL_LIST_EVENTID
+ * @num_channels: Number of channels
+ *
+ * Return: none
+ */
+static void
+hdd_sort_roam_scan_ch_list(uint32_t *chan_list, uint16_t num_channels)
+{
+	uint8_t i, j, swap = 0;
+
+	for (i = 0; i < (num_channels - 1) &&
+	     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++) {
+		for (j = 0; j < (num_channels - i - 1); j++) {
+			if (chan_list[j] > chan_list[j + 1]) {
+				swap = chan_list[j];
+				chan_list[j] = chan_list[j + 1];
+				chan_list[j + 1] = swap;
+			}
+		}
+	}
+}
+
 void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 			     struct roam_scan_ch_resp *roam_ch,
 			     void *context)
@@ -3248,7 +3307,7 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 		  roam_ch->vdev_id, roam_ch->command_resp);
 	/**
 	 * If command response is set in the response message, then it is
-	 * getroamscanchannels command response else this event is asyncronous
+	 * getroamscanchannels command response else this event is asynchronous
 	 * event raised by firmware.
 	 */
 	if (!roam_ch->command_resp) {
@@ -3262,6 +3321,10 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 			return;
 
 		freq = (uint32_t *)event;
+		hdd_sort_roam_scan_ch_list(roam_ch->chan_list,
+					   roam_ch->num_channels);
+		hdd_dump_roam_scan_ch_list(roam_ch->chan_list,
+					   roam_ch->num_channels);
 		for (i = 0; i < roam_ch->num_channels &&
 		     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++) {
 			freq[i] = roam_ch->chan_list[i];
@@ -3279,6 +3342,9 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 		return;
 	}
 	priv = osif_request_priv(request);
+
+	hdd_sort_roam_scan_ch_list(roam_ch->chan_list, roam_ch->num_channels);
+	hdd_dump_roam_scan_ch_list(roam_ch->chan_list, roam_ch->num_channels);
 
 	priv->roam_ch.num_channels = roam_ch->num_channels;
 	for (i = 0; i < priv->roam_ch.num_channels &&
@@ -3651,6 +3717,8 @@ static int drv_cmd_get_scan_channel_time(struct hdd_adapter *adapter,
 	char extra[32];
 	uint8_t len = 0;
 
+	hdd_debug("vdev_id: %u, scan channel time: %u", adapter->vdev_id, val);
+
 	/* value is interms of msec */
 	len = scnprintf(extra, sizeof(extra), "%s %d",
 			"GETSCANCHANNELTIME", val);
@@ -3721,6 +3789,8 @@ static int drv_cmd_get_scan_home_time(struct hdd_adapter *adapter,
 						    adapter->vdev_id);
 	char extra[32];
 	uint8_t len = 0;
+
+	hdd_debug("vdev_id: %u, scan home time: %u", adapter->vdev_id, val);
 
 	/* value is interms of msec */
 	len = scnprintf(extra, sizeof(extra), "%s %d",
@@ -5683,7 +5753,7 @@ wlan_hdd_soc_set_antenna_mode_cb(enum set_antenna_mode_status status,
 
 	request = osif_request_get(context);
 	if (!request) {
-		hdd_err("obselete request");
+		hdd_err("obsolete request");
 		return;
 	}
 

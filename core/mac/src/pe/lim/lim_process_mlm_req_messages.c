@@ -48,6 +48,7 @@
 #include <lim_mlo.h>
 #include "wlan_mlo_mgr_peer.h"
 #include <son_api.h>
+#include "wifi_pos_pasn_api.h"
 
 static void lim_process_mlm_auth_req(struct mac_context *, uint32_t *);
 static void lim_process_mlm_assoc_req(struct mac_context *, uint32_t *);
@@ -403,6 +404,33 @@ lim_send_peer_create_resp_mlo(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
 
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+void
+lim_pasn_peer_del_all_resp_vdev_delete_resume(struct mac_context *mac,
+					      struct wlan_objmgr_vdev *vdev)
+{
+	if (!mac) {
+		pe_err("Mac ctx is NULL");
+		return;
+	}
+
+	/*
+	 * If PASN peer delete all command to firmware timedout, then
+	 * the PASN peers will not be cleaned up. So cleanup the
+	 * objmgr peers from here and reset the peer delete all in
+	 * progress flag.
+	 */
+	if (wifi_pos_get_pasn_peer_count(vdev))
+		wifi_pos_cleanup_pasn_peers(mac->psoc, vdev);
+
+	wifi_pos_set_delete_all_peer_in_progress(vdev, false);
+
+	pe_debug("Resume vdev delete");
+	if (mac->sme.sme_vdev_del_cb)
+		mac->sme.sme_vdev_del_cb(MAC_HANDLE(mac), vdev);
+}
+#endif
+
 void lim_send_peer_create_resp(struct mac_context *mac, uint8_t vdev_id,
 			       QDF_STATUS qdf_status, uint8_t *peer_mac)
 {
@@ -563,18 +591,9 @@ static bool lim_is_preauth_ctx_exists(struct mac_context *mac_ctx,
 }
 
 #ifdef WLAN_FEATURE_SAE
-/**
- * lim_process_mlm_auth_req_sae() - Handle SAE authentication
- * @mac_ctx: global MAC context
- * @session: PE session entry
- *
- * This function is called by lim_process_mlm_auth_req to handle SAE
- * authentication.
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
-		struct pe_session *session)
+QDF_STATUS lim_trigger_auth_req_sae(struct mac_context *mac_ctx,
+				    struct pe_session *session,
+				    struct qdf_mac_addr *peer_bssid)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	struct sir_sae_info *sae_info;
@@ -588,9 +607,7 @@ static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
 	sae_info->msg_len = sizeof(*sae_info);
 	sae_info->vdev_id = session->smeSessionId;
 
-	qdf_mem_copy(sae_info->peer_mac_addr.bytes,
-		session->bssId,
-		QDF_MAC_ADDR_SIZE);
+	qdf_copy_macaddr(&sae_info->peer_mac_addr, peer_bssid);
 
 	sae_info->ssid.length = session->ssId.length;
 	qdf_mem_copy(sae_info->ssid.ssId,
@@ -613,6 +630,31 @@ static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
 		qdf_mem_free(sae_info);
 		return qdf_status;
 	}
+
+	return qdf_status;
+}
+
+/**
+ * lim_process_mlm_auth_req_sae() - Handle SAE authentication
+ * @mac_ctx: global MAC context
+ * @session: PE session entry
+ *
+ * This function is called by lim_process_mlm_auth_req to handle SAE
+ * authentication.
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS lim_process_mlm_auth_req_sae(struct mac_context *mac_ctx,
+					       struct pe_session *session)
+{
+	QDF_STATUS qdf_status;
+
+	qdf_status = lim_trigger_auth_req_sae(
+					mac_ctx, session,
+					(struct qdf_mac_addr *)session->bssId);
+	if (QDF_IS_STATUS_ERROR(qdf_status))
+		return qdf_status;
+
 	session->limMlmState = eLIM_MLM_WT_SAE_AUTH_STATE;
 
 	MTRACE(mac_trace(mac_ctx, TRACE_CODE_MLM_STATE, session->peSessionId,
@@ -1515,6 +1557,7 @@ end:
  */
 void lim_process_deauth_ack_timeout(struct mac_context *mac_ctx)
 {
+	pe_debug("Deauth Ack timeout");
 	lim_send_deauth_cnf(mac_ctx);
 }
 

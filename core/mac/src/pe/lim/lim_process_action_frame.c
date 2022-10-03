@@ -1156,8 +1156,12 @@ __lim_process_link_measurement_req(struct mac_context *mac, uint8_t *pRxPacketIn
 		pe_debug("There were warnings while unpacking a Link Measure request (0x%08x, %d bytes):",
 			nStatus, frameLen);
 	}
-	/* Call rrm function to handle the request. */
 
+	if (pe_session->sta_follows_sap_power) {
+		pe_debug("STA power has changed, reject the link measurement request");
+		return QDF_STATUS_E_FAILURE;
+	}
+	/* Call rrm function to handle the request. */
 	return rrm_process_link_measurement_request(mac, pRxPacketInfo, &frm,
 					     pe_session);
 
@@ -1214,6 +1218,9 @@ lim_check_oci_match(struct mac_context *mac, struct pe_session *pe_session,
 {
 	const uint8_t *oci_ie;
 	tDot11fIEoci self_oci, *peer_oci;
+	uint16_t peer_chan_width;
+	uint16_t local_peer_chan_width = 0;
+	uint8_t country_code[CDS_COUNTRY_CODE_LEN + 1];
 
 	if (!lim_is_self_and_peer_ocv_capable(mac, peer, pe_session))
 		return true;
@@ -1233,18 +1240,29 @@ lim_check_oci_match(struct mac_context *mac, struct pe_session *pe_session,
 	 * Freq_seg_1_ch_num    : 1 byte
 	 */
 	peer_oci = (tDot11fIEoci *)&oci_ie[2];
-	lim_fill_oci_params(mac, pe_session, &self_oci);
 
-	if ((self_oci.op_class != peer_oci->op_class) ||
+	wlan_reg_read_current_country(mac->psoc, country_code);
+	peer_chan_width =
+	wlan_reg_dmn_get_chanwidth_from_opclass_auto(
+			country_code,
+			peer_oci->prim_ch_num,
+			peer_oci->op_class);
+
+	lim_fill_oci_params(mac, pe_session, &self_oci, peer,
+			    &local_peer_chan_width);
+	if (((self_oci.op_class != peer_oci->op_class) &&
+	     (local_peer_chan_width > peer_chan_width)) ||
 	    (self_oci.prim_ch_num != peer_oci->prim_ch_num) ||
 	    (self_oci.freq_seg_1_ch_num != peer_oci->freq_seg_1_ch_num)) {
-		pe_err("OCI mismatch,self %d %d %d, peer %d %d %d",
+		pe_err("OCI mismatch,self %d %d %d %d, peer %d %d %d %d",
 		       self_oci.op_class,
 		       self_oci.prim_ch_num,
 		       self_oci.freq_seg_1_ch_num,
+		       local_peer_chan_width,
 		       peer_oci->op_class,
 		       peer_oci->prim_ch_num,
-		       peer_oci->freq_seg_1_ch_num);
+		       peer_oci->freq_seg_1_ch_num,
+		       peer_chan_width);
 		return false;
 	}
 
@@ -1278,6 +1296,8 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 	uint8_t *p_body;
 	uint32_t frame_len;
 	uint8_t transId[2];
+	tpDphHashNode sta_ds;
+	uint16_t aid;
 
 	/* Prima  --- Below Macro not available in prima
 	   pHdr = SIR_MAC_BD_TO_MPDUHEADER(pBd);
@@ -1309,11 +1329,33 @@ static void __lim_process_sa_query_request_action_frame(struct mac_context *mac,
 	   Transaction ID : 2 bytes */
 	qdf_mem_copy(&transId[0], &p_body[2], 2);
 
+	sta_ds = dph_lookup_hash_entry(mac, mac_header->sa, &aid,
+				       &pe_session->dph.dphHashTable);
+
 	if (!lim_check_oci_match(mac, pe_session,
 				 p_body + SA_QUERY_IE_OFFSET,
 				 mac_header->sa,
-				 frame_len - SA_QUERY_IE_OFFSET))
+				 frame_len - SA_QUERY_IE_OFFSET)) {
+		/*
+		 * In case of channel switch, last ocv frequency will be
+		 * different from current frquency.
+		 * If there is channel switch and OCI is inavlid in sa_query,
+		 * deauth STA on new channel.
+		 */
+		if (sta_ds && sta_ds->ocv_enabled &&
+		    sta_ds->last_ocv_done_freq != pe_session->curr_op_freq)
+			lim_send_deauth_mgmt_frame(mac, REASON_OCI_MISMATCH,
+						   mac_header->sa, pe_session,
+						   false);
 		return;
+	}
+
+	/*
+	 * Update the last ocv done freq when OCI is valid.
+	 * To support above algo, if it is moved to the current freq.
+	 */
+	if (sta_ds && sta_ds->ocv_enabled)
+		sta_ds->last_ocv_done_freq = pe_session->curr_op_freq;
 
 	/* Send 11w SA query response action frame */
 	if (lim_send_sa_query_response_frame(mac,
@@ -1605,7 +1647,7 @@ static void lim_process_delba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 
-	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
 			   body_ptr, frame_len);
 
 	delba_req = qdf_mem_malloc(sizeof(*delba_req));
@@ -1629,7 +1671,7 @@ static void lim_process_delba_req(struct mac_context *mac_ctx, uint8_t *rx_pkt_i
 			delba_req->delba_param_set.tid, delba_req->Reason.code);
 
 	if (QDF_STATUS_SUCCESS != qdf_status)
-		pe_err("Failed to process delba request");
+		pe_err_rl("Failed to process delba request");
 
 error:
 	qdf_mem_free(delba_req);
@@ -1865,6 +1907,25 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					action_hdr->actionID);
 				break;
 
+			}
+		} else if (LIM_IS_AP_ROLE(session)) {
+			switch (action_hdr->actionID) {
+			case RRM_NEIGHBOR_REQ:
+			case RRM_RADIO_MEASURE_RPT:
+				rssi = WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
+				mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+				lim_send_sme_mgmt_frame_ind(mac_ctx,
+						mac_hdr->fc.subType,
+						(uint8_t *)mac_hdr,
+						frame_len + sizeof(tSirMacMgmtHdr),
+						session->smeSessionId,
+						WMA_GET_RX_FREQ(rx_pkt_info),
+						rssi, RXMGMT_FLAG_NONE);
+				break;
+			default:
+				pe_warn("Action ID: %d not handled in RRM",
+					action_hdr->actionID);
+				break;
 			}
 		} else {
 			/* Else we will just ignore the RRM messages. */

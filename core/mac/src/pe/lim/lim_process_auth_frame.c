@@ -487,10 +487,11 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 					      SAE_AUTH_STATUS_CODE_OFFSET);
 		}
 		wlan_connectivity_mgmt_event(
+			mac_ctx->psoc,
 			(struct wlan_frame_hdr *)mac_hdr, pe_session->vdev_id,
 			sae_status_code, 0,
-			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info), auth_algo, 0,
-			sae_auth_seq, sae_auth_seq, WLAN_AUTH_RESP);
+			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info), auth_algo,
+			sae_auth_seq, sae_auth_seq, 0, WLAN_AUTH_RESP);
 	}
 
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
@@ -507,7 +508,26 @@ static inline void  lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 {}
 #endif
 
-#ifdef WLAN_FEATURE_RTT_11AZ_SUPPORT
+static uint8_t
+lim_get_pasn_peer_vdev_id(struct mac_context *mac, uint8_t *bssid)
+{
+	struct wlan_objmgr_peer *peer;
+	uint8_t vdev_id;
+
+	peer = wlan_objmgr_get_peer_by_mac(mac->psoc, bssid,
+					   WLAN_MGMT_RX_ID);
+	if (!peer) {
+		pe_err("PASN peer doesn't exist for bssid: " QDF_MAC_ADDR_FMT,
+		       QDF_MAC_ADDR_REF(bssid));
+		return WLAN_UMAC_VDEV_ID_MAX;
+	}
+
+	vdev_id = wlan_vdev_get_id(wlan_peer_get_vdev(peer));
+	wlan_objmgr_peer_release_ref(peer, WLAN_MGMT_RX_ID);
+
+	return vdev_id;
+}
+
 /**
  * lim_process_pasn_auth_frame()- Process PASN authentication frame
  * @mac_ctx: MAC context
@@ -530,6 +550,7 @@ lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
 	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
 
+	pe_debug("vdev_id:%d", vdev_id);
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
 				    (uint8_t *)mac_hdr,
 				    frame_len + sizeof(tSirMacMgmtHdr),
@@ -539,15 +560,6 @@ lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
 
 	return QDF_STATUS_SUCCESS;
 }
-#else
-static inline QDF_STATUS
-lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
-			    uint8_t vdev_id,
-			    uint8_t *rx_pkt_info)
-{
-	return QDF_STATUS_SUCCESS;
-}
-#endif
 
 static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		tpSirMacMgmtHdr mac_hdr,
@@ -1704,7 +1716,8 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			SIR_MAC_AUTH_FRAME_4;
 	}
 
-	wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)mac_hdr,
+	wlan_connectivity_mgmt_event(mac_ctx->psoc,
+				     (struct wlan_frame_hdr *)mac_hdr,
 				     pe_session->vdev_id,
 				     rx_auth_frm_body->authStatusCode,
 				     0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
@@ -1800,7 +1813,8 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	}
 
-	wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)dot11_hdr,
+	wlan_connectivity_mgmt_event(mac->psoc,
+				     (struct wlan_frame_hdr *)dot11_hdr,
 				     vdev_id, sae_status_code,
 				     0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt),
 				     auth_alg, sae_auth_seq,
@@ -1817,6 +1831,40 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 }
 
 #define WLAN_MIN_AUTH_FRM_ALGO_FIELD_LEN 2
+
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static void lim_process_ft_sae_auth_frame(struct mac_context *mac,
+					  struct pe_session *pe_session,
+					  uint8_t *body, uint16_t frame_len)
+{
+}
+#else
+/**
+ * lim_process_ft_sae_auth_frame() - process SAE pre auth frame for LFR2
+ * @mac: pointer to mac_context
+ * @pe_session: pointer to pe session
+ * @body: auth frame body
+ * @frame_len: auth frame length
+ *
+ * Return: void
+ */
+static void lim_process_ft_sae_auth_frame(struct mac_context *mac,
+					  struct pe_session *pe_session,
+					  uint8_t *body, uint16_t frame_len)
+{
+	tpSirMacAuthFrameBody auth = (tpSirMacAuthFrameBody)body;
+
+	if (!pe_session || !pe_session->ftPEContext.pFTPreAuthReq) {
+		pe_debug("cannot find session or FT in FT pre-auth phase");
+		return;
+	}
+
+	if (auth->authTransactionSeqNumber == SIR_MAC_AUTH_FRAME_2)
+		lim_handle_ft_pre_auth_rsp(mac, QDF_STATUS_SUCCESS, body,
+					   frame_len, pe_session);
+}
+#endif
+
 /**
  *
  * Pass the received Auth frame. This is possibly the pre-auth from the
@@ -1831,6 +1879,7 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 	tpSirMacMgmtHdr mac_hdr;
 	struct pe_session *pe_session = NULL;
 	uint8_t *pBody;
+	uint8_t vdev_id;
 	uint16_t frameLen, curr_seq_num, auth_alg = 0;
 	tSirMacAuthFrameBody *rx_auth_frame;
 	QDF_STATUS ret_status = QDF_STATUS_E_FAILURE;
@@ -1856,13 +1905,6 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 		 (uint)abs((int8_t)WMA_GET_RX_RSSI_NORMALIZED(pBd)),
 		 auth_alg, curr_seq_num);
 
-	sae_auth_frame = lim_process_sae_preauth_frame(mac, pBd);
-	if (sae_auth_frame)
-		return QDF_STATUS_SUCCESS;
-
-	if (auth_alg == eSIR_AUTH_TYPE_PASN)
-		return lim_process_pasn_auth_frame(mac, 0, pBd);
-
 	/* Auth frame has come on a new BSS, however, we need to find the session
 	 * from where the auth-req was sent to the new AP
 	 */
@@ -1876,6 +1918,20 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 			mac->lim.gpSession[i].ftPEContext.ftPreAuthSession =
 				false;
 		}
+	}
+
+	sae_auth_frame = lim_process_sae_preauth_frame(mac, pBd);
+	if (sae_auth_frame) {
+		lim_process_ft_sae_auth_frame(mac, pe_session, pBody, frameLen);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	if (auth_alg == eSIR_AUTH_TYPE_PASN) {
+		vdev_id = lim_get_pasn_peer_vdev_id(mac, mac_hdr->bssId);
+		if (vdev_id == WLAN_UMAC_VDEV_ID_MAX)
+			return QDF_STATUS_E_FAILURE;
+
+		return lim_process_pasn_auth_frame(mac, vdev_id, pBd);
 	}
 
 	if (!pe_session) {

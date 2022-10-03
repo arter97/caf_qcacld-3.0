@@ -22,7 +22,23 @@ CONFIG_CHIP_VERSION := 2
 CONFIG_WLAN_DP_DISABLE_TCL_CMD_CRED_SRNG := y
 CONFIG_WLAN_DP_DISABLE_TCL_STATUS_SRNG := y
 
-# Enable seprate FW iamge
+# Enable separate FW image
 CONFIG_GET_DRIVER_MODE := y
 
 CONFIG_QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES := y
+
+#Enable COEX feature
+CONFIG_FEATURE_COEX := y
+
+#Enable DBAM feature
+ifeq ($(CONFIG_FEATURE_COEX), y)
+CONFIG_WLAN_FEATURE_COEX_DBAM := y
+endif
+
+CONFIG_DP_TRAFFIC_END_INDICATION := y
+
+#Enable Constrained Application Protocol feature
+CONFIG_WLAN_FEATURE_COAP := y
+
+#Enable TSF read using scratch register
+CONFIG_QCA_GET_TSF_VIA_REG := y

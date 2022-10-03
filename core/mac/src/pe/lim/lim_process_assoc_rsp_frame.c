@@ -49,7 +49,6 @@
 #include <lim_mlo.h>
 #include "parser_api.h"
 #include "wlan_twt_cfg_ext_api.h"
-#include "wlan_action_oui_main.h"
 
 /**
  * lim_update_stads_htcap() - Updates station Descriptor HT capability
@@ -455,7 +454,7 @@ static void lim_update_ese_tsm(struct mac_context *mac_ctx,
  * @assoc_rsp:  pointer to assoc response
  *
  * This function is called by lim_process_assoc_rsp_frame() to
- * update STA DS with ext capablities.
+ * update STA DS with ext capabilities.
  *
  * Return: None
  */
@@ -765,7 +764,7 @@ lim_update_iot_aggr_sz(struct mac_context *mac_ctx, uint8_t *ie_ptr,
 /**
  * hdd_cm_update_mcs_rate_set() - Update MCS rate set from HT capability
  * @vdev: Pointer to vdev boject
- * @ht_cap: pointer to parsed HT capablity
+ * @ht_cap: pointer to parsed HT capability
  *
  * Return: None.
  */
@@ -806,6 +805,8 @@ lim_update_sta_vdev_punc(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	enum phy_ch_width ori_bw;
 	uint16_t ori_puncture_bitmap;
 	uint16_t primary_puncture_bitmap = 0;
+	qdf_freq_t center_freq_320;
+	uint8_t band_mask;
 
 	if (!assoc_resp->eht_op.disabled_sub_chan_bitmap_present)
 		return QDF_STATUS_SUCCESS;
@@ -822,9 +823,24 @@ lim_update_sta_vdev_punc(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	ori_bw = wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 					assoc_resp->eht_op.channel_width);
+
+	if (ori_bw == CH_WIDTH_320MHZ) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq))
+			band_mask = BIT(REG_BAND_2G);
+		else if (WLAN_REG_IS_6GHZ_CHAN_FREQ(des_chan->ch_freq))
+			band_mask = BIT(REG_BAND_6G);
+		else
+			band_mask = BIT(REG_BAND_5G);
+		center_freq_320 = wlan_reg_chan_band_to_freq(
+						wlan_vdev_get_pdev(vdev),
+						assoc_resp->eht_op.ccfs1,
+						band_mask);
+	} else {
+		center_freq_320 = 0;
+	}
 	wlan_reg_extract_puncture_by_bw(ori_bw, ori_puncture_bitmap,
 					des_chan->ch_freq,
-					assoc_resp->eht_op.ccfs1,
+					center_freq_320,
 					CH_WIDTH_20MHZ,
 					&primary_puncture_bitmap);
 	if (primary_puncture_bitmap) {
@@ -838,12 +854,12 @@ lim_update_sta_vdev_punc(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	else
 		wlan_reg_extract_puncture_by_bw(ori_bw, ori_puncture_bitmap,
 						des_chan->ch_freq,
-						assoc_resp->eht_op.ccfs1,
+						center_freq_320,
 						des_chan->ch_width,
 						&des_chan->puncture_bitmap);
-	pe_debug("sta vdev %d freq %d assoc rsp bw %d puncture 0x%x center frequency %d intersect bw %d puncture 0x%x",
+	pe_debug("sta vdev %d freq %d assoc rsp bw %d puncture 0x%x 320M center frequency %d intersect bw %d puncture 0x%x",
 		 vdev_id, des_chan->ch_freq, ori_bw, ori_puncture_bitmap,
-		 assoc_resp->eht_op.ccfs1, des_chan->ch_width,
+		 center_freq_320, des_chan->ch_width,
 		 des_chan->puncture_bitmap);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 
@@ -931,8 +947,6 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	enum ani_akm_type auth_type;
 	bool sha384_akm, twt_support_in_11n = false;
 	struct s_ext_cap *ext_cap;
-	bool bad_ap;
-	struct action_oui_search_attr attr = {0};
 
 	assoc_cnf.resultCode = eSIR_SME_SUCCESS;
 	/* Update PE session Id */
@@ -1249,7 +1263,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	if (subtype != LIM_REASSOC) {
 		aid = assoc_rsp->aid & 0x3FFF;
-		wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)hdr,
+		wlan_connectivity_mgmt_event(mac_ctx->psoc,
+					     (struct wlan_frame_hdr *)hdr,
 					     session_entry->vdev_id,
 					     assoc_rsp->status_code, 0, rssi,
 					     0, 0, 0, aid,
@@ -1433,25 +1448,8 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	lim_update_assoc_sta_datas(mac_ctx, sta_ds, assoc_rsp,
 				   session_entry, beacon);
 
-	/*
-	 * One special AP sets MU EDCA timer as 255 wrongly in both beacon and
-	 * assoc rsp, lead to 2 sec SU upload data stall periodically.
-	 * To fix it, reset MU EDCA timer to 1 and config to F/W for such AP.
-	 */
 	if (lim_is_session_he_capable(session_entry)) {
-		attr.ie_data = ie;
-		attr.ie_length = ie_len;
-		bad_ap = wlan_action_oui_search(mac_ctx->psoc,
-						&attr,
-						ACTION_OUI_DISABLE_MU_EDCA);
 		session_entry->mu_edca_present = assoc_rsp->mu_edca_present;
-		if (session_entry->mu_edca_present && bad_ap) {
-			pe_debug("IoT AP with bad mu edca timer, reset to 1");
-			assoc_rsp->mu_edca.acbe.mu_edca_timer = 1;
-			assoc_rsp->mu_edca.acbk.mu_edca_timer = 1;
-			assoc_rsp->mu_edca.acvi.mu_edca_timer = 1;
-			assoc_rsp->mu_edca.acvo.mu_edca_timer = 1;
-		}
 		if (session_entry->mu_edca_present) {
 			pe_debug("Save MU EDCA params to session");
 			session_entry->ap_mu_edca_params[QCA_WLAN_AC_BE] =

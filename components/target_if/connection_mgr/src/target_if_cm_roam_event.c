@@ -122,7 +122,8 @@ int target_if_cm_roam_event(ol_scn_t scn, uint8_t *event, uint32_t len)
 	 * Stop the timer upon RSO stop status success. The timer shall continue
 	 * to run upon HO_FAIL status and would be stopped upon HO_FAILED event
 	 */
-	if (roam_event->reason == ROAM_REASON_RSO_STATUS ||
+	if ((roam_event->reason == ROAM_REASON_RSO_STATUS &&
+	     roam_event->notif_params == WMI_ROAM_SCAN_MODE_NONE) ||
 	    roam_event->reason == ROAM_REASON_HO_FAILED)
 		target_if_stop_rso_stop_timer(roam_event);
 
@@ -662,13 +663,13 @@ int target_if_get_roam_vendor_control_param_event_handler(ol_scn_t scn,
 	psoc = target_if_get_psoc_from_scn_hdl(scn);
 	if (!psoc) {
 		target_if_err("psoc is null");
-		ret = -EINVAL;
+		return -EINVAL;
 	}
 
 	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
 	if (!wmi_handle) {
 		target_if_err("wmi_handle is null");
-		ret = -EINVAL;
+		return -EINVAL;
 	}
 
 	qdf_status = wmi_extract_roam_vendor_control_param_event(wmi_handle,

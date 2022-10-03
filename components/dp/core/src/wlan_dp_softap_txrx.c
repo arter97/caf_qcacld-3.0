@@ -41,6 +41,7 @@
 #include <wlan_tdls_ucfg_api.h>
 #include <qdf_trace.h>
 #include <qdf_nbuf.h>
+#include <qdf_net_stats.h>
 
 /* Preprocessor definitions and constants */
 #undef QCA_DP_SAP_DUMP_SK_BUFF
@@ -215,7 +216,7 @@ int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf, uint8_t *mac_addr,
 		     bool dhcp_start)
 {
 	struct dp_dhcp_ind msg;
-	struct wlan_dp_psoc_sb_ops *sb_ops = &dp_intf->dp_ctx->sb_ops;
+	struct wlan_dp_psoc_sb_ops *sb_ops;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	dp_info("Post DHCP indication,sta_mac=" QDF_MAC_ADDR_FMT
@@ -226,6 +227,7 @@ int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf, uint8_t *mac_addr,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	sb_ops = &dp_intf->dp_ctx->sb_ops;
 	msg.dhcp_start = dhcp_start;
 	msg.device_mode = dp_intf->device_mode;
 	qdf_mem_copy(msg.intf_mac_addr.bytes,
@@ -472,8 +474,9 @@ static QDF_STATUS dp_softap_validate_peer_state(struct wlan_dp_intf *dp_intf,
 	}
 
 	if (peer_state == OL_TXRX_PEER_STATE_CONN) {
-		if (qdf_ntohs(qdf_nbuf_get_protocol(nbuf)) != ETHERTYPE_PAE) {
-			dp_debug_rl("NON-EAPOL packet in non-Authenticated state");
+		if (qdf_ntohs(qdf_nbuf_get_protocol(nbuf)) != ETHERTYPE_PAE &&
+		    qdf_ntohs(qdf_nbuf_get_protocol(nbuf)) != ETHERTYPE_WAI) {
+			dp_debug_rl("NON-EAPOL/WAPI pkt in non-Auth state");
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
@@ -519,6 +522,94 @@ static void dp_softap_config_tx_pkt_tracing(struct wlan_dp_intf *dp_intf,
 			     QDF_TX));
 }
 
+#ifdef DP_TRAFFIC_END_INDICATION
+/**
+ * wlan_dp_traffic_end_indication_update_dscp() - Compare dscp derived from
+ *                                                provided tos value with
+ *                                                stored value and update if
+ *                                                it's equal to special dscp
+ * @dp_intf: pointer to DP interface
+ * @tos: pointer to tos
+ *
+ * Return: True if tos is updated else False
+ */
+static inline bool
+wlan_dp_traffic_end_indication_update_dscp(struct wlan_dp_intf *dp_intf,
+					   uint8_t *tos)
+{
+	bool update;
+	uint8_t dscp, ecn;
+
+	ecn = (*tos & ~QDF_NBUF_PKT_IPV4_DSCP_MASK);
+	dscp = (*tos & QDF_NBUF_PKT_IPV4_DSCP_MASK) >>
+		QDF_NBUF_PKT_IPV4_DSCP_SHIFT;
+	update = (dp_intf->traffic_end_ind.spl_dscp == dscp);
+	if (update)
+		*tos = ((dp_intf->traffic_end_ind.def_dscp <<
+			 QDF_NBUF_PKT_IPV4_DSCP_SHIFT) | ecn);
+	return update;
+}
+
+/**
+ * dp_softap_inspect_traffic_end_indication_pkt() - Restore tos field for last
+ *                                                  packet in data stream
+ * @dp_intf: pointer to DP interface
+ * @nbuf: pointer to OS packet
+ *
+ * Return: None
+ */
+static inline void
+dp_softap_inspect_traffic_end_indication_pkt(struct wlan_dp_intf *dp_intf,
+					     qdf_nbuf_t nbuf)
+{
+	uint8_t tos, tc;
+	bool ret;
+
+	if (qdf_nbuf_data_is_ipv4_pkt(qdf_nbuf_data(nbuf))) {
+		tos = qdf_nbuf_data_get_ipv4_tos(qdf_nbuf_data(nbuf));
+		ret = wlan_dp_traffic_end_indication_update_dscp(dp_intf, &tos);
+		if (ret) {
+			qdf_nbuf_data_set_ipv4_tos(qdf_nbuf_data(nbuf), tos);
+			if (qdf_nbuf_is_ipv4_last_fragment(nbuf))
+				QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) =
+					QDF_NBUF_CB_PACKET_TYPE_END_INDICATION;
+		}
+	} else if (qdf_nbuf_is_ipv6_pkt(nbuf)) {
+		tc = qdf_nbuf_data_get_ipv6_tc(qdf_nbuf_data(nbuf));
+		ret = wlan_dp_traffic_end_indication_update_dscp(dp_intf, &tc);
+		if (ret) {
+			qdf_nbuf_data_set_ipv6_tc(qdf_nbuf_data(nbuf), tc);
+			QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) =
+				QDF_NBUF_CB_PACKET_TYPE_END_INDICATION;
+		}
+	}
+}
+
+/**
+ * dp_softap_traffic_end_indication_enabled() - Check if traffic end indication
+ *                                              is enabled or not
+ * @dp_intf: pointer to DP interface
+ *
+ * Return: True or False
+ */
+static inline bool
+dp_softap_traffic_end_indication_enabled(struct wlan_dp_intf *dp_intf)
+{
+	return qdf_unlikely(dp_intf->traffic_end_ind.enabled);
+}
+#else
+static inline bool
+dp_softap_traffic_end_indication_enabled(struct wlan_dp_intf *dp_intf)
+{
+	return false;
+}
+
+static inline void
+dp_softap_inspect_traffic_end_indication_pkt(struct wlan_dp_intf *dp_intf,
+					     qdf_nbuf_t nbuf)
+{}
+#endif
+
 /**
  * dp_softap_start_xmit() - Transmit a frame
  * @nbuf: pointer to Network buffer
@@ -556,13 +647,13 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_intf *dp_intf)
 
 	qdf_net_buf_debug_acquire_skb(nbuf, __FILE__, __LINE__);
 
-	QDF_NET_DEV_STATS_TX_BYTES(&dp_intf->stats) += qdf_nbuf_len(nbuf);
+	qdf_net_stats_add_tx_bytes(&dp_intf->stats, qdf_nbuf_len(nbuf));
 
 	if (qdf_nbuf_is_tso(nbuf)) {
 		num_seg = qdf_nbuf_get_tso_num_seg(nbuf);
-		QDF_NET_DEV_STATS_TX_PKTS(&dp_intf->stats) += num_seg;
+		qdf_net_stats_add_tx_pkts(&dp_intf->stats, num_seg);
 	} else {
-		QDF_NET_DEV_STATS_INC_TX_PKTS(&dp_intf->stats);
+		qdf_net_stats_add_tx_pkts(&dp_intf->stats, 1);
 		dp_ctx->no_tx_offload_pkt_cnt++;
 	}
 
@@ -577,6 +668,9 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_intf *dp_intf)
 		dp_softap_inspect_tx_eap_pkt(dp_intf, nbuf, false);
 		dp_event_eapol_log(nbuf, QDF_TX);
 	}
+
+	if (dp_softap_traffic_end_indication_enabled(dp_intf))
+		dp_softap_inspect_traffic_end_indication_pkt(dp_intf, nbuf);
 
 	dp_softap_config_tx_pkt_tracing(dp_intf, nbuf);
 
@@ -603,7 +697,7 @@ drop_pkt:
 			      QDF_TX);
 	qdf_nbuf_kfree(nbuf);
 drop_pkt_accounting:
-	QDF_NET_DEV_STATS_INC_TX_DROPEED(&dp_intf->stats);
+	qdf_net_stats_inc_tx_dropped(&dp_intf->stats);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -622,7 +716,7 @@ void dp_softap_tx_timeout(struct wlan_dp_intf *dp_intf)
 		dp_err("Detected data stall due to continuous TX timeouts");
 		dp_intf->dp_stats.tx_rx_stats.cont_txtimeout_cnt = 0;
 
-		if (cdp_cfg_get(soc, cfg_dp_enable_data_stall))
+		if (dp_is_data_stall_event_enabled(DP_HOST_SAP_TX_TIMEOUT))
 			cdp_post_data_stall_event(soc,
 					  DATA_STALL_LOG_INDICATOR_HOST_DRIVER,
 					  DATA_STALL_LOG_HOST_SOFTAP_TX_TIMEOUT,
@@ -735,12 +829,12 @@ QDF_STATUS dp_softap_rx_packet_cbk(void *intf_ctx, qdf_nbuf_t rx_buf)
 
 		cpu_index = qdf_get_cpu();
 		++stats->per_cpu[cpu_index].rx_packets;
-		QDF_NET_DEV_STATS_INC_RX_PKTS(&dp_intf->stats);
+		qdf_net_stats_add_rx_pkts(&dp_intf->stats, 1);
 		/* count aggregated RX frame into stats */
-		QDF_NET_DEV_STATS_RX_PKTS(&dp_intf->stats) +=
-			qdf_nbuf_get_gso_segs(nbuf);
-		QDF_NET_DEV_STATS_RX_BYTES(&dp_intf->stats) +=
-			qdf_nbuf_len(nbuf);
+		qdf_net_stats_add_rx_pkts(&dp_intf->stats,
+					  qdf_nbuf_get_gso_segs(nbuf));
+		qdf_net_stats_add_rx_bytes(&dp_intf->stats,
+					   qdf_nbuf_len(nbuf));
 
 		dp_softap_inspect_dhcp_packet(dp_intf, nbuf, QDF_RX);
 

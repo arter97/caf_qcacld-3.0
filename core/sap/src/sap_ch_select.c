@@ -50,6 +50,8 @@
 #include "pld_common.h"
 #include "wlan_reg_services_api.h"
 #include <wlan_scan_utils_api.h>
+#include <wlan_cp_stats_mc_ucfg_api.h>
+#include <wlan_policy_mgr_api.h>
 
 /*--------------------------------------------------------------------------
    Function definitions
@@ -416,6 +418,8 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	bool include_dfs_ch = true;
 	uint8_t sta_sap_scc_on_dfs_chnl_config_value;
 	bool ch_support_puncture;
+	bool is_sta_sap_scc;
+	bool sta_sap_scc_on_indoor_channel;
 
 	pSpectInfoParams->numSpectChans =
 		mac->scan.base_channels.numChannels;
@@ -440,6 +444,9 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	if (!mac->mlme_cfg->dfs_cfg.dfs_master_capable ||
 	    ACS_DFS_MODE_DISABLE == sap_ctx->dfs_mode)
 		include_dfs_ch = false;
+
+	sta_sap_scc_on_indoor_channel =
+		policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(mac->psoc);
 
 	/* Fill the channel number in the spectrum in the operating freq band */
 	for (channelnum = 0;
@@ -467,7 +474,10 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 		}
 
 		if (!include_dfs_ch ||
-		    sta_sap_scc_on_dfs_chnl_config_value == 1) {
+		    (sta_sap_scc_on_dfs_chnl_config_value ==
+				PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED &&
+		     !policy_mgr_is_sta_sap_scc(mac->psoc,
+						pSpectCh->chan_freq))) {
 			if (wlan_reg_is_dfs_for_freq(mac->pdev,
 						     pSpectCh->chan_freq)) {
 				sap_debug("DFS Ch %d not considered for ACS. include_dfs_ch %u, sta_sap_scc_on_dfs_chnl_config_value %d",
@@ -496,6 +506,18 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 		/* Skip DSRC channels */
 		if (wlan_reg_is_dsrc_freq(pSpectCh->chan_freq))
 			continue;
+
+		/* Skip indoor channels for non-scc indoor scenario*/
+		is_sta_sap_scc = policy_mgr_is_sta_sap_scc(mac->psoc,
+							   *pChans);
+		if (!(is_sta_sap_scc && sta_sap_scc_on_indoor_channel) &&
+		    !policy_mgr_sap_allowed_on_indoor_freq(mac->psoc,
+							   mac->pdev,
+							   *pChans)) {
+			sap_debug("Do not allow SAP on indoor frequency %u",
+				  *pChans);
+			continue;
+		}
 
 		/*
 		 * Skip the channels which are not in ACS config from user
@@ -583,12 +605,16 @@ uint32_t sapweight_rssi_count(struct sap_context *sap_ctx, int8_t rssi,
  *
  * Return: chan status info
  */
-static struct lim_channel_status *sap_get_channel_status
+static struct channel_status *sap_get_channel_status
 	(struct mac_context *p_mac, uint32_t chan_freq)
 {
-	return csr_get_channel_status(p_mac, chan_freq);
+	if (!p_mac->sap.acs_with_more_param)
+		return NULL;
+
+	return ucfg_mc_cp_stats_get_channel_status(p_mac->pdev, chan_freq);
 }
 
+#ifndef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 /**
  * sap_clear_channel_status() - clear chan info
  * @p_mac: Pointer to Global MAC structure
@@ -597,8 +623,16 @@ static struct lim_channel_status *sap_get_channel_status
  */
 static void sap_clear_channel_status(struct mac_context *p_mac)
 {
-	csr_clear_channel_status(p_mac);
+	if (!p_mac->sap.acs_with_more_param)
+		return;
+
+	ucfg_mc_cp_stats_clear_channel_status(p_mac->pdev);
 }
+#else
+static void sap_clear_channel_status(struct mac_context *p_mac)
+{
+}
+#endif
 
 /**
  * sap_weight_channel_noise_floor() - compute noise floor weight
@@ -608,7 +642,7 @@ static void sap_clear_channel_status(struct mac_context *p_mac)
  * Return: channel noise floor weight
  */
 static uint32_t sap_weight_channel_noise_floor(struct sap_context *sap_ctx,
-					       struct lim_channel_status
+					       struct channel_status
 						*channel_stat)
 {
 	uint32_t    noise_floor_weight;
@@ -623,7 +657,7 @@ static uint32_t sap_weight_channel_noise_floor(struct sap_context *sap_ctx,
 	    ACS_WEIGHT_CFG_TO_LOCAL(sap_ctx->auto_channel_select_weight,
 				    softap_nf_weight_cfg);
 
-	if (!channel_stat || channel_stat->channelfreq == 0)
+	if (!channel_stat || channel_stat->channel_freq == 0)
 		return softap_nf_weight_local;
 
 	noise_floor_weight = (channel_stat->noise_floor == 0) ? 0 :
@@ -640,7 +674,7 @@ static uint32_t sap_weight_channel_noise_floor(struct sap_context *sap_ctx,
 	sap_debug("nf=%d, nfwc=%d, nfwl=%d, nfw=%d freq=%d",
 		  channel_stat->noise_floor,
 		  softap_nf_weight_cfg, softap_nf_weight_local,
-		  noise_floor_weight, channel_stat->channelfreq);
+		  noise_floor_weight, channel_stat->channel_freq);
 
 	return noise_floor_weight;
 }
@@ -653,7 +687,7 @@ static uint32_t sap_weight_channel_noise_floor(struct sap_context *sap_ctx,
  * Return: channel free weight
  */
 static uint32_t sap_weight_channel_free(struct sap_context *sap_ctx,
-					struct lim_channel_status
+					struct channel_status
 					*channel_stat)
 {
 	uint32_t     channel_free_weight;
@@ -670,7 +704,7 @@ static uint32_t sap_weight_channel_free(struct sap_context *sap_ctx,
 	    ACS_WEIGHT_CFG_TO_LOCAL(sap_ctx->auto_channel_select_weight,
 				    softap_channel_free_weight_cfg);
 
-	if (!channel_stat || channel_stat->channelfreq == 0)
+	if (!channel_stat || channel_stat->channel_freq == 0)
 		return softap_channel_free_weight_local;
 
 	rx_clear_count = channel_stat->rx_clear_count -
@@ -711,7 +745,7 @@ static uint32_t sap_weight_channel_free(struct sap_context *sap_ctx,
  * Return: tx power range weight
  */
 static uint32_t sap_weight_channel_txpwr_range(struct sap_context *sap_ctx,
-					       struct lim_channel_status
+					       struct channel_status
 					       *channel_stat)
 {
 	uint32_t     txpwr_weight_low_speed;
@@ -726,7 +760,7 @@ static uint32_t sap_weight_channel_txpwr_range(struct sap_context *sap_ctx,
 	    ACS_WEIGHT_CFG_TO_LOCAL(sap_ctx->auto_channel_select_weight,
 				    softap_txpwr_range_weight_cfg);
 
-	if (!channel_stat || channel_stat->channelfreq == 0)
+	if (!channel_stat || channel_stat->channel_freq == 0)
 		return softap_txpwr_range_weight_local;
 
 
@@ -759,7 +793,7 @@ static uint32_t sap_weight_channel_txpwr_range(struct sap_context *sap_ctx,
  * Return: tx power throughput weight
  */
 static uint32_t sap_weight_channel_txpwr_tput(struct sap_context *sap_ctx,
-					      struct lim_channel_status
+					      struct channel_status
 					      *channel_stat)
 {
 	uint32_t     txpwr_weight_high_speed;
@@ -774,7 +808,7 @@ static uint32_t sap_weight_channel_txpwr_tput(struct sap_context *sap_ctx,
 	    ACS_WEIGHT_CFG_TO_LOCAL(sap_ctx->auto_channel_select_weight,
 				    softap_txpwr_tput_weight_cfg);
 
-	if (!channel_stat || channel_stat->channelfreq == 0)
+	if (!channel_stat || channel_stat->channel_freq == 0)
 		return softap_txpwr_tput_weight_local;
 
 	txpwr_weight_high_speed = (channel_stat->chan_tx_pwr_throughput == 0)
@@ -806,7 +840,7 @@ static uint32_t sap_weight_channel_txpwr_tput(struct sap_context *sap_ctx,
  */
 static
 uint32_t sap_weight_channel_status(struct sap_context *sap_ctx,
-				   struct lim_channel_status *channel_stat)
+				   struct channel_status *channel_stat)
 {
 	return sap_weight_channel_noise_floor(sap_ctx, channel_stat) +
 	       sap_weight_channel_free(sap_ctx, channel_stat) +
@@ -1403,8 +1437,8 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 				SAPDFS_NORMALISE_1000 *
 				(sapweight_rssi_count(sap_ctx, rssi,
 				pSpectCh->bssCount) + sap_weight_channel_status(
-				sap_ctx, sap_get_channel_status(mac,
-							 pSpectCh->chan_freq)));
+				sap_ctx, sap_get_channel_status(
+						mac, pSpectCh->chan_freq)));
 		else {
 			pSpectCh->weight = SAP_ACS_WEIGHT_MAX;
 			pSpectCh->rssiAgr = SOFTAP_MIN_RSSI;

@@ -75,7 +75,7 @@ void wlan_hdd_check_11be_support(struct hdd_beacon_data *beacon,
  * hdd_update_wiphy_eht_cap() - update the wiphy with eht capabilities
  * @hdd_ctx: HDD context
  *
- * update wiphy with the eht capabilties.
+ * update wiphy with the eht capabilities.
  *
  * Return: None
  */
@@ -171,6 +171,43 @@ void wlan_hdd_fill_os_eht_rateflags(struct rate_info *os_rate,
 				    enum tx_rate_info rate_flags,
 				    uint8_t dcm,
 				    enum txrate_gi guard_interval)
+{
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BE) && defined(CFG80211_11BE_BASIC) && \
+	defined(FEATURE_RX_LINKSPEED_ROAM_TRIGGER)
+/**
+ * wlan_hdd_refill_os_eht_rateflags() - Refill EHT rate flag
+ * @os_rate: rate info for os
+ * @preamble: Use to acquire wlan mode, whether in EHT mode
+ *
+ * Fill out os ETH MCS rate flag according to preamble.
+ *
+ * Return: none
+ */
+void
+wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble);
+
+/**
+ * wlan_hdd_refill_os_eht_bw() - Refill EHT bandwidth
+ * @os_rate: rate info for os
+ * @bw: Bandwidth of the frame
+ *
+ * Fill out os ETH BW flag according to CMN BW from driver.
+ *
+ * Return: none
+ */
+void
+wlan_hdd_refill_os_eht_bw(struct rate_info *os_rate, enum rx_tlv_bw bw);
+#else
+static inline void
+wlan_hdd_refill_os_eht_rateflags(struct rate_info *os_rate, uint8_t preamble)
+{
+}
+
+static inline void
+wlan_hdd_refill_os_eht_bw(struct rate_info *os_rate, enum rx_tlv_bw bw)
 {
 }
 #endif

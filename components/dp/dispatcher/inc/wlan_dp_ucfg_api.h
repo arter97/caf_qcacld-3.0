@@ -373,11 +373,11 @@ ucfg_dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_dp_get_dev_stats() - Get netdev stats info
- * @intf_addr: DP interface MAC address
+ * @dev: Pointer to network device
  *
  * Return: qdf_net_dev_stats info
  */
-qdf_net_dev_stats *ucfg_dp_get_dev_stats(struct qdf_mac_addr *intf_addr);
+qdf_net_dev_stats *ucfg_dp_get_dev_stats(qdf_netdev_t dev);
 
 /**
  * ucfg_dp_inc_rx_pkt_stats() - DP increment RX pkt stats
@@ -1059,7 +1059,7 @@ uint32_t ucfg_dp_get_bus_bw_compute_interval(struct wlan_objmgr_psoc *psoc);
 int ucfg_dp_get_current_throughput_level(struct wlan_objmgr_psoc *psoc);
 
 /**
- * ucfg_dp_get_txrx_stats() - get current bandwidth level
+ * ucfg_dp_get_txrx_stats() - get dp txrx stats
  * @vdev: vdev handle
  * @dp_stats : dp_stats pointer
  *
@@ -1069,6 +1069,24 @@ int ucfg_dp_get_current_throughput_level(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS ucfg_dp_get_txrx_stats(struct wlan_objmgr_vdev *vdev,
 				  struct dp_tx_rx_stats *dp_stats);
+
+/*
+ * ucfg_dp_get_net_dev_stats(): Get netdev stats
+ * @vdev: vdev handle
+ * @stats: To hold netdev stats
+ *
+ * Return: None
+ */
+void ucfg_dp_get_net_dev_stats(struct wlan_objmgr_vdev *vdev,
+			       qdf_net_dev_stats *stats);
+
+/*
+ * ucfg_dp_clear_net_dev_stats(): Clear netdev stats
+ * @dev: Pointer to netdev
+ *
+ * Return: None
+ */
+void ucfg_dp_clear_net_dev_stats(qdf_netdev_t dev);
 
 /**
  * ucfg_dp_reset_cont_txtimeout_cnt() - Reset Tx Timeout count
@@ -1155,4 +1173,156 @@ bool ucfg_dp_get_napi_enabled(struct wlan_objmgr_psoc *psoc);
  * Return: None
  */
 void ucfg_dp_set_tc_ingress_prio(struct wlan_objmgr_psoc *psoc, uint32_t value);
-#endif /* _WLAN_DP_UCFG_API_H_ */
+
+/**
+ * ucfg_dp_nud_fail_data_stall_evt_enabled() - Check if NUD failuire data stall
+ * detection is enabled
+ *
+ * Return: True if the data stall event is enabled
+ */
+bool ucfg_dp_nud_fail_data_stall_evt_enabled(void);
+
+/**
+ * ucfg_dp_fw_data_stall_evt_enabled() - Check if Fw data stall
+ * detection is enabled
+ *
+ * Return: data stall event mask
+ */
+uint32_t ucfg_dp_fw_data_stall_evt_enabled(void);
+
+/**
+ * ucfg_dp_get_bus_bw_high_threshold() - Get the bus bw high threshold
+ * @psoc: psoc handle
+ *
+ * Return: current bus bw high threshold
+ */
+uint32_t ucfg_dp_get_bus_bw_high_threshold(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_event_eapol_log() - send event to wlan diag
+ * @nbuf: Network buffer ptr
+ * @dir: direction
+ * @eapol_key_info: eapol key info
+ *
+ * Return: None
+ */
+void ucfg_dp_event_eapol_log(qdf_nbuf_t nbuf, enum qdf_proto_dir dir);
+
+/**
+ * ucfg_dp_softap_inspect_dhcp_packet() - Inspect DHCP packet
+ * @vdev: Vdev handle
+ * @nbuf: pointer to network buffer
+ * @dir: direction
+ *
+ * Inspect the Tx/Rx frame, and send DHCP START/STOP notification to the FW
+ * through WMI message, during DHCP based IP address acquisition phase.
+ *
+ * Return: error number
+ */
+QDF_STATUS
+ucfg_dp_softap_inspect_dhcp_packet(struct wlan_objmgr_vdev *vdev,
+				   qdf_nbuf_t nbuf, enum qdf_proto_dir dir);
+
+void
+dp_ucfg_enable_link_monitoring(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_objmgr_vdev *vdev,
+			       uint32_t threshold);
+
+void
+dp_ucfg_disable_link_monitoring(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev);
+
+#ifdef DP_TRAFFIC_END_INDICATION
+/**
+ * ucfg_dp_traffic_end_indication_get() - Get data end indication info
+ * @vdev: vdev handle
+ * @info: variable to hold stored data end indication info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dp_traffic_end_indication_get(struct wlan_objmgr_vdev *vdev,
+				   struct dp_traffic_end_indication *info);
+/**
+ * ucfg_dp_traffic_end_indication_set() - Store data end indication info
+ * @vdev: vdev handle
+ * @info: variable holding new data end indication info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dp_traffic_end_indication_set(struct wlan_objmgr_vdev *vdev,
+				   struct dp_traffic_end_indication info);
+/**
+ * ucfg_dp_traffic_end_indication_update_dscp() - update dscp value to default
+ * @psoc: psoc handle
+ * @vdev_id: vdev id
+ * @dscp: dscp value to be updated
+ *
+ * Return: void
+ */
+void
+ucfg_dp_traffic_end_indication_update_dscp(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id,
+					   unsigned char *dscp);
+#else
+static inline QDF_STATUS
+ucfg_dp_traffic_end_indication_get(struct wlan_objmgr_vdev *vdev,
+				   struct dp_traffic_end_indication *info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+ucfg_dp_traffic_end_indication_set(struct wlan_objmgr_vdev *vdev,
+				   struct dp_traffic_end_indication info)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void
+ucfg_dp_traffic_end_indication_update_dscp(struct wlan_objmgr_psoc *psoc,
+					   uint8_t vdev_id,
+					   unsigned char *dscp)
+{}
+#endif
+
+/*
+ * ucfg_dp_prealloc_init() - Pre-allocate DP memory
+ * @ctrl_psoc: objmgr psoc
+ *
+ * Return: QDF_STATUS_SUCCESS on success, error qdf status on failure
+ */
+QDF_STATUS ucfg_dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc);
+
+/*
+ * ucfg_dp_prealloc_deinit() - Free pre-alloced DP memory
+ *
+ * Return: None
+ */
+void ucfg_dp_prealloc_deinit(void);
+
+#ifdef DP_MEM_PRE_ALLOC
+/**
+ * ucfg_dp_prealloc_get_consistent_mem_unaligned() - gets pre-alloc unaligned
+ *						     consistent memory
+ * @size: total memory size
+ * @base_addr: pointer to dma address
+ * @ring_type: HAL ring type that requires memory
+ *
+ * Return: memory virtual address pointer on success, NULL on failure
+ */
+void *ucfg_dp_prealloc_get_consistent_mem_unaligned(qdf_size_t size,
+						    qdf_dma_addr_t *base_addr,
+						    uint32_t ring_type);
+
+/**
+ * ucfg_dp_prealloc_put_consistent_mem_unaligned() - puts back pre-alloc
+ * unaligned consistent memory
+ * @va_unaligned: memory virtual address pointer
+ *
+ * Return: None
+ */
+void ucfg_dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned);
+#endif
+#endif /* _WLAN_DP_UCFGi_API_H_ */

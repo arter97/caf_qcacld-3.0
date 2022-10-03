@@ -63,7 +63,7 @@ void dp_free_ctx(void)
 
 	qdf_spinlock_destroy(&dp_ctx->intf_list_lock);
 	qdf_list_destroy(&dp_ctx->intf_list);
-	dp_dettach_ctx();
+	dp_detach_ctx();
 	qdf_mem_free(dp_ctx);
 }
 
@@ -119,6 +119,24 @@ dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 	for (dp_get_front_intf_no_lock(dp_ctx, &dp_intf); dp_intf;
 	     dp_get_next_intf_no_lock(dp_ctx, dp_intf, &dp_intf)) {
 		if (qdf_is_macaddr_equal(&dp_intf->mac_addr, addr)) {
+			qdf_spin_unlock_bh(&dp_ctx->intf_list_lock);
+			return dp_intf;
+		}
+	}
+	qdf_spin_unlock_bh(&dp_ctx->intf_list_lock);
+
+	return NULL;
+}
+
+struct wlan_dp_intf*
+dp_get_intf_by_netdev(struct wlan_dp_psoc_context *dp_ctx, qdf_netdev_t dev)
+{
+	struct wlan_dp_intf *dp_intf;
+
+	qdf_spin_lock_bh(&dp_ctx->intf_list_lock);
+	for (dp_get_front_intf_no_lock(dp_ctx, &dp_intf); dp_intf;
+	     dp_get_next_intf_no_lock(dp_ctx, dp_intf, &dp_intf)) {
+		if (dp_intf->dev == dev) {
 			qdf_spin_unlock_bh(&dp_ctx->intf_list_lock);
 			return dp_intf;
 		}
@@ -824,6 +842,7 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("DP peer attach failed");
 		qdf_mem_free(sta_info);
+		return status;
 	}
 
 	qdf_mem_copy(sta_info->sta_mac.bytes, peer->macaddr,
@@ -868,7 +887,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	struct wlan_dp_intf *dp_intf;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct qdf_mac_addr *mac_addr;
-	struct qdf_mac_addr intf_mac;
+	qdf_netdev_t dev;
 
 	dp_info("DP VDEV OBJ create notification");
 
@@ -881,18 +900,18 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	dp_ctx =  dp_psoc_get_priv(psoc);
 	mac_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_macaddr(vdev);
 
-	status = dp_ctx->dp_ops.dp_get_nw_intf_mac_by_vdev_mac(mac_addr,
-							       &intf_mac);
-	if (QDF_IS_STATUS_ERROR(status)) {
+	dev = dp_ctx->dp_ops.dp_get_netdev_by_vdev_mac(mac_addr);
+	if (!dev) {
 		dp_err("Failed to get intf mac:" QDF_MAC_ADDR_FMT,
 		       QDF_MAC_ADDR_REF(mac_addr));
 		return QDF_STATUS_E_INVAL;
 	}
 
-	dp_intf = dp_get_intf_by_macaddr(dp_ctx, &intf_mac);
+	dp_intf = dp_get_intf_by_netdev(dp_ctx, dev);
 	if (!dp_intf) {
-		dp_err("Failed to get dp intf mac:" QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(mac_addr));
+		dp_err("Failed to get dp intf dev: %s",
+		       qdf_netdev_get_devname(dev));
+
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1095,10 +1114,10 @@ void dp_attach_ctx(struct wlan_dp_psoc_context *dp_ctx)
 	gp_dp_ctx = dp_ctx;
 }
 
-void dp_dettach_ctx(void)
+void dp_detach_ctx(void)
 {
 	if (!gp_dp_ctx) {
-		dp_err("global dp ctx is already dettached");
+		dp_err("global dp ctx is already detached");
 		return;
 	}
 	gp_dp_ctx = NULL;
@@ -1359,7 +1378,9 @@ void dp_try_set_rps_cpu_mask(struct wlan_objmgr_psoc *psoc)
 		dp_err("dp context is NULL");
 		return;
 	}
-	dp_set_rps_cpu_mask(dp_ctx);
+
+	if (dp_ctx->dynamic_rps)
+		dp_set_rps_cpu_mask(dp_ctx);
 }
 
 void dp_clear_rps_cpu_mask(struct wlan_dp_psoc_context *dp_ctx)
@@ -1508,3 +1529,13 @@ __dp_objmgr_put_vdev_by_user(struct wlan_objmgr_vdev *vdev,
 }
 #endif /* WLAN_OBJMGR_REF_ID_TRACE */
 
+bool dp_is_data_stall_event_enabled(uint32_t evt)
+{
+	uint32_t bitmap = cdp_cfg_get(cds_get_context(QDF_MODULE_ID_SOC),
+				      cfg_dp_enable_data_stall);
+
+	if (bitmap & DP_DATA_STALL_ENABLE || bitmap & evt)
+		return true;
+
+	return false;
+}

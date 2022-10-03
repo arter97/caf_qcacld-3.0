@@ -134,6 +134,16 @@ struct wlan_dp_intf*
 dp_get_intf_by_macaddr(struct wlan_dp_psoc_context *dp_ctx,
 		       struct qdf_mac_addr *addr);
 
+/**
+ * dp_get_intf_by_netdev() - Api to Get interface from netdev
+ * @dp_ctx: DP context
+ * @dev: Pointer to network device
+ *
+ * Return: Pointer to DP interface.
+ */
+struct wlan_dp_intf*
+dp_get_intf_by_netdev(struct wlan_dp_psoc_context *dp_ctx, qdf_netdev_t dev);
+
 /* MAX iteration count to wait for dp packet process to complete */
 #define DP_TASK_MAX_WAIT_CNT  100
 /* Milli seconds to wait when packet is getting processed */
@@ -273,13 +283,13 @@ dp_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc, void *arg);
 void dp_attach_ctx(struct wlan_dp_psoc_context *dp_ctx);
 
 /**
- * dp_dettach_ctx() - to dettach dp context
+ * dp_detach_ctx() - to detach dp context
  *
- * Helper function to dettach dp context
+ * Helper function to detach dp context
  *
  * Return: None.
  */
-void dp_dettach_ctx(void);
+void dp_detach_ctx(void);
 
 /**
  * dp_get_context() - to get dp context
@@ -306,6 +316,11 @@ dp_add_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
 	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return;
+	}
 
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
@@ -339,6 +354,11 @@ dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
 	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return;
+	}
 
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
@@ -596,4 +616,45 @@ dp_is_low_tput_gro_enable(struct wlan_dp_psoc_context *dp_ctx)
 	return false;
 }
 #endif
+
+#define DP_DATA_STALL_ENABLE      BIT(0)
+#define DP_HOST_STA_TX_TIMEOUT    BIT(16)
+#define DP_HOST_SAP_TX_TIMEOUT    BIT(17)
+#define DP_HOST_NUD_FAILURE       BIT(18)
+#define DP_TIMEOUT_WLM_MODE       BIT(31)
+#define FW_DATA_STALL_EVT_MASK     0x8000FFFF
+
+/**
+ * dp_is_data_stall_event_enabled() - Check if data stall detection is enabled
+ * @evt: Data stall event to be checked
+ *
+ * Return: True if the data stall event is enabled
+ */
+bool dp_is_data_stall_event_enabled(uint32_t evt);
+
+/*
+ * dp_get_net_dev_stats(): Get netdev stats
+ * @dp_intf: DP interface handle
+ * @stats: To hold netdev stats
+ *
+ * Return: None
+ */
+static inline void
+dp_get_net_dev_stats(struct wlan_dp_intf *dp_intf, qdf_net_dev_stats *stats)
+{
+	qdf_mem_copy(stats, &dp_intf->stats, sizeof(dp_intf->stats));
+}
+
+/*
+ * dp_clear_net_dev_stats(): Clear netdev stats
+ * @dp_intf: DP interface handle
+ *
+ * Return: None
+ */
+static inline
+void dp_clear_net_dev_stats(struct wlan_dp_intf *dp_intf)
+{
+	qdf_mem_set(&dp_intf->stats, sizeof(dp_intf->stats), 0);
+}
+
 #endif

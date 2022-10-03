@@ -779,7 +779,7 @@ bool hdd_get_multi_client_ll_support(struct hdd_adapter *adapter);
  * wlan_hdd_set_wlm_client_latency_level() - Set latency level to FW
  * @adapter: pointer to network adapter
  * @port_id: port id for which host sends latency level to FW
- * @latency_level: lavel to be set in fw
+ * @latency_level: level to be set in fw
  *
  * Return: QDF_STATUS
  */
@@ -790,9 +790,9 @@ QDF_STATUS wlan_hdd_set_wlm_client_latency_level(struct hdd_adapter *adapter,
 /**
  * wlan_hdd_set_wlm_latency_level() - Set latency level to FW
  * @adapter: pointer to network adapter
- * @latency_level: lavel to be set in fw
+ * @latency_level: level to be set in fw
  * @client_id_bitmap: client id bitmap
- * @force_reset: flag to reset latency lavel in fw
+ * @force_reset: flag to reset latency level in fw
  *
  * Return: QDF_STATUS
  */
@@ -971,4 +971,15 @@ bool wlan_hdd_cfg80211_rx_control_port(struct net_device *dev,
 				       struct sk_buff *skb,
 				       bool unencrypted);
 
+#ifdef WLAN_FEATURE_DBAM_CONFIG
+/**
+ * hdd_send_dbam_config() - send DBAM config
+ * @adapter: hdd adapter
+ * @dbam_mode: dbam mode configuration
+ *
+ * Return: 0 on success, negative errno on failure
+ */
+int hdd_send_dbam_config(struct hdd_adapter *adapter,
+			 enum coex_dbam_config_mode dbam_mode);
+#endif
 #endif

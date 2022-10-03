@@ -221,19 +221,6 @@ wma_roam_pmkid_request_event_handler(void *handle,
 #endif /* WLAN_FEATURE_FIPS */
 
 /**
- * wma_roam_auth_offload_event_handler() - Handle LFR-3.0 Roam authentication
- * offload event.
- * @handle: wma_handle
- * @event:  rso auth offload event data pointer
- * @len: length of the data
- *
- * Handles roam authentication offload event from firmware which is triggered
- * after roam candidate selection.
- */
-int wma_roam_auth_offload_event_handler(WMA_HANDLE handle, uint8_t *event,
-					uint32_t len);
-
-/**
  * wma_roam_stats_event_handler() - Handle the WMI_ROAM_STATS_EVENTID
  * from target
  * @handle: wma_handle
@@ -1435,6 +1422,21 @@ int wma_peer_delete_handler(void *handle, uint8_t *cmd_param_info,
 
 void wma_remove_req(tp_wma_handle wma, uint8_t vdev_id,
 		    uint8_t type);
+
+/**
+ * wma_find_remove_req_msgtype() - find and remove request for vdev id
+ * @wma: wma handle
+ * @vdev_id: vdev id
+ * @msg_type: message request type
+ *
+ * Find target request for given vdev id & sub type of request.
+ * Remove the same from active list.
+ *
+ * Return: Success if request found, failure other wise
+ */
+struct wma_target_req *wma_find_remove_req_msgtype(tp_wma_handle wma,
+						   uint8_t vdev_id,
+						   uint32_t msg_type);
 
 /**
  * wma_remove_peer_req  - Remove the peer create

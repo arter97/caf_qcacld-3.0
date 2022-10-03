@@ -173,7 +173,6 @@ lim_populate_ml_probe_req(struct mac_context *mac,
 	*ml_prb_req_ie = (uint8_t *)ml_prb_req;
 	/* Fill the Element ID IE Type (0xFF) */
 	ml_prb_req->ml_ie_ff.elem_id = WLAN_ELEMID_EXTN_ELEM;
-	ml_probe_len += sizeof(struct ie_header);
 	/* Fill the Multi link extn Element ID IE Type (0x6B) */
 	ml_prb_req->ml_ie_ff.elem_id_ext = WLAN_EXTN_ELEMID_MULTI_LINK;
 	ml_probe_len++;
@@ -221,11 +220,11 @@ lim_populate_ml_probe_req(struct mac_context *mac,
 		ml_probe_len += WLAN_ML_BV_LINFO_PERSTAPROF_STACTRL_SIZE;
 	}
 	ml_prb_req->ml_ie_ff.elem_len = ml_probe_len;
-	*ml_probe_req_len = ml_probe_len;
+	*ml_probe_req_len = ml_probe_len + MIN_IE_LEN;
 
-	pe_nofl_debug("Send ML probe req %d", ml_probe_len);
+	pe_nofl_debug("Send ML probe req %zu", ml_probe_len);
 	QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_PE, QDF_TRACE_LEVEL_DEBUG,
-			   ml_probe, ml_probe_len);
+			   ml_probe, ml_probe_len + MIN_IE_LEN);
 
 	session->lim_join_req->is_ml_probe_req_sent = true;
 
@@ -297,6 +296,9 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t *ml_probe_req_ie = NULL;
 	uint16_t ml_probe_req_ie_len = 0;
 	int ret;
+	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
+	bool is_band_2g;
+	uint16_t ie_buf_size;
 
 	if (additional_ielen)
 		addn_ielen = *additional_ielen;
@@ -546,6 +548,40 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		pe_warn("There were warnings while packing a Probe Request (0x%08x)", status);
 	}
 
+	/* Strip EHT capabilities IE */
+	if (lim_is_session_eht_capable(pesession)) {
+		ie_buf_size = payload;
+
+		eht_cap_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
+		if (!eht_cap_ie) {
+			pe_err("malloc failed for eht_cap_ie");
+			goto skip_eht_ie_update;
+		}
+
+		qdf_status = lim_strip_eht_cap_ie(mac_ctx, frame +
+						  sizeof(tSirMacMgmtHdr),
+						  &ie_buf_size, eht_cap_ie);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("Failed to strip EHT cap IE");
+			qdf_mem_free(eht_cap_ie);
+			goto skip_eht_ie_update;
+		}
+
+		is_band_2g =
+			WLAN_REG_IS_24GHZ_CH_FREQ(pesession->curr_op_freq);
+
+		lim_ieee80211_pack_ehtcap(eht_cap_ie, pr->eht_cap, pr->he_cap,
+					  is_band_2g);
+		eht_cap_ie_len = eht_cap_ie[1] + 2;
+
+		/* Copy the EHT IE to the end of the frame */
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) +
+			     ie_buf_size,
+			     eht_cap_ie, eht_cap_ie_len);
+		qdf_mem_free(eht_cap_ie);
+		payload = ie_buf_size +  eht_cap_ie_len;
+	}
+skip_eht_ie_update:
 	qdf_mem_free(pr);
 
 	/* Append any AddIE if present. */
@@ -1704,7 +1740,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			 * WAR: In P2P GO mode, if the P2P client device
 			 * is only HT capable and not VHT capable, but the P2P
 			 * GO device is VHT capable and advertises 2x2 NSS with
-			 * HT capablity client device, which results in IOT
+			 * HT capability client device, which results in IOT
 			 * issues.
 			 * When GO is operating in DBS mode, GO beacons
 			 * advertise 2x2 capability but include OMN IE to
@@ -2253,6 +2289,7 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 				type = seq;
 
 			wlan_connectivity_mgmt_event(
+					mac->psoc,
 					mac_hdr, params->vdev_id, status,
 					qdf_tx_complete, mac->lim.bss_rssi,
 					algo, type, seq, 0, WLAN_AUTH_REQ);
@@ -2263,6 +2300,7 @@ static void wlan_send_tx_complete_event(struct mac_context *mac, qdf_nbuf_t buf,
 			reason_code = pe_session->deauth_disassoc_rc;
 
 		wlan_connectivity_mgmt_event(
+					mac->psoc,
 					mac_hdr, params->vdev_id, reason_code,
 					qdf_tx_complete, mac->lim.bss_rssi,
 					0, 0, 0, 0, tag);
@@ -2444,11 +2482,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	uint8_t mbo_ie_len = 0, adaptive_11r_ie_len = 0, rsnx_ie_len = 0;
 	uint8_t mscs_ext_ie_len = 0;
 	uint8_t *eht_cap_ie = NULL, eht_cap_ie_len = 0;
-	bool bss_mfp_capable;
+	bool bss_mfp_capable, frag_ie_present = false;
 	int8_t peer_rssi = 0;
 	bool is_band_2g;
 	uint16_t ie_buf_size;
-	uint16_t mlo_ie_len;
+	uint16_t mlo_ie_len, fils_hlp_ie_len = 0;
+	uint8_t *fils_hlp_ie = NULL;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -2667,6 +2706,9 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	populate_dot11f_bss_max_idle(mac_ctx, pe_session,
 				     &frm->bss_max_idle_period);
 
+	if (IS_DOT11_MODE_HE(pe_session->dot11mode))
+		lim_update_session_he_capable(mac_ctx, pe_session);
+
 	if (lim_is_session_he_capable(pe_session)) {
 		populate_dot11f_he_caps(mac_ctx, pe_session,
 					&frm->he_cap);
@@ -2678,8 +2720,10 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 					    &frm->he_6ghz_band_cap);
 	}
 
-	if (lim_is_session_eht_capable(pe_session))
+	if (lim_is_session_eht_capable(pe_session)) {
 		populate_dot11f_eht_caps(mac_ctx, pe_session, &frm->eht_cap);
+		lim_strip_mlo_ie(mac_ctx, add_ie, &add_ie_len);
+	}
 
 	mlo_ie_len =
 		 lim_send_assoc_req_mgmt_frame_mlo(mac_ctx, pe_session, frm);
@@ -2775,10 +2819,48 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	if (lim_is_fils_connection(pe_session)) {
 		populate_dot11f_fils_params(mac_ctx, frm, pe_session);
 		aes_block_size_len = AES_BLOCK_SIZE;
+		if (add_ie && wlan_get_ie_ptr_from_eid(WLAN_ELEMID_FRAGMENT,
+						       add_ie, add_ie_len))
+			frag_ie_present = true;
+	}
+
+	/* Strip and append HLP container IE only if it is fragmented */
+	if (frag_ie_present &&
+	    wlan_get_ext_ie_ptr_from_ext_id(SIR_FILS_HLP_OUI_TYPE,
+					    SIR_FILS_HLP_OUI_LEN, add_ie,
+					    add_ie_len)) {
+		fils_hlp_ie = qdf_mem_malloc(SIR_FILS_HLP_IE_LEN);
+		if (!fils_hlp_ie)
+			goto end;
+
+		qdf_status =
+			lim_strip_ie(mac_ctx, add_ie, &add_ie_len,
+				     WLAN_ELEMID_EXTN_ELEM, ONE_BYTE,
+				     SIR_FILS_HLP_OUI_TYPE,
+				     SIR_FILS_HLP_OUI_LEN, fils_hlp_ie,
+				     SIR_FILS_HLP_IE_LEN - 2);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("Failed to strip FILS HLP container IE");
+			goto end;
+		}
+		fils_hlp_ie_len = fils_hlp_ie[1] + 2;
+
+		current_len = add_ie_len;
+		qdf_status =
+			lim_strip_ie(mac_ctx, add_ie, &add_ie_len,
+				     WLAN_ELEMID_FRAGMENT, ONE_BYTE,
+				     NULL, 0, &fils_hlp_ie[fils_hlp_ie_len],
+				     SIR_FILS_HLP_IE_LEN - fils_hlp_ie_len - 2);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("Failed to strip fragment IE of HLP container IE");
+			goto end;
+		}
+		fils_hlp_ie_len += current_len - add_ie_len;
 	}
 
 	/* RSNX IE for SAE PWE derivation based on H2E */
-	if (wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE, add_ie, add_ie_len)) {
+	if (add_ie &&
+	    wlan_get_ie_ptr_from_eid(WLAN_ELEMID_RSNXE, add_ie, add_ie_len)) {
 		rsnx_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
 		if (!rsnx_ie)
 			goto end;
@@ -2910,7 +2992,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	bytes = payload + sizeof(tSirMacMgmtHdr) + aes_block_size_len +
 		rsnx_ie_len + mbo_ie_len + adaptive_11r_ie_len +
-		mscs_ext_ie_len + vendor_ie_len + mlo_ie_len;
+		mscs_ext_ie_len + vendor_ie_len + mlo_ie_len + fils_hlp_ie_len;
 
 
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
@@ -2949,6 +3031,12 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		goto end;
 	} else if (DOT11F_WARNED(status)) {
 		pe_warn("Assoc request pack warning (0x%08x)", status);
+	}
+
+	if (fils_hlp_ie && fils_hlp_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     fils_hlp_ie, fils_hlp_ie_len);
+		payload = payload + fils_hlp_ie_len;
 	}
 
 	/* Strip EHT capabilities IE */
@@ -3106,6 +3194,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 end:
+	qdf_mem_free(fils_hlp_ie);
 	qdf_mem_free(rsnx_ie);
 	qdf_mem_free(vendor_ies);
 	qdf_mem_free(mbo_ie);
@@ -4188,7 +4277,8 @@ lim_send_disassoc_mgmt_frame(struct mac_context *mac,
 		lim_diag_mgmt_tx_event_report(mac, pMacHdr,
 					      pe_session,
 					      QDF_STATUS_SUCCESS, QDF_STATUS_SUCCESS);
-		wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)pMacHdr,
+		wlan_connectivity_mgmt_event(mac->psoc,
+					     (struct wlan_frame_hdr *)pMacHdr,
 					     pe_session->vdev_id, nReason,
 					     QDF_TX_RX_STATUS_OK,
 					     mac->lim.bss_rssi, 0, 0, 0, 0,
@@ -4434,7 +4524,8 @@ lim_send_deauth_mgmt_frame(struct mac_context *mac,
 					      QDF_STATUS_SUCCESS,
 					      QDF_STATUS_SUCCESS);
 
-		wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)pMacHdr,
+		wlan_connectivity_mgmt_event(mac->psoc,
+					     (struct wlan_frame_hdr *)pMacHdr,
 					     pe_session->vdev_id, nReason,
 					     QDF_TX_RX_STATUS_OK,
 					     mac->lim.bss_rssi, 0, 0, 0, 0,
@@ -5577,8 +5668,10 @@ lim_is_self_and_peer_ocv_capable(struct mac_context *mac,
 
 void
 lim_fill_oci_params(struct mac_context *mac, struct pe_session *session,
-		    tDot11fIEoci *oci)
+		    tDot11fIEoci *oci, uint8_t *peer, uint16_t *tx_chan_width)
 {
+	tpDphHashNode sta_ds;
+	uint16_t aid;
 	uint8_t ch_offset;
 	uint8_t prim_ch_num = wlan_reg_freq_to_chan(mac->pdev,
 						    session->curr_op_freq);
@@ -5604,6 +5697,30 @@ lim_fill_oci_params(struct mac_context *mac, struct pe_session *session,
 	oci->prim_ch_num = prim_ch_num;
 	oci->freq_seg_1_ch_num = session->ch_center_freq_seg1;
 	oci->present = 1;
+	if (tx_chan_width)
+		*tx_chan_width = ch_width_in_mhz(session->ch_width);
+	if (LIM_IS_STA_ROLE(session))
+		return;
+
+	if (!peer || !tx_chan_width)
+		return;
+
+	sta_ds = dph_lookup_hash_entry(mac, peer, &aid,
+				       &session->dph.dphHashTable);
+	if (!sta_ds) {
+		pe_nofl_debug("no find sta ds "QDF_MAC_ADDR_FMT,
+			      QDF_MAC_ADDR_REF(peer));
+		return;
+	}
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(session->curr_op_freq)) {
+		if (*tx_chan_width > 20 &&
+		    !sta_ds->htSupportedChannelWidthSet) {
+			*tx_chan_width = 20;
+			pe_nofl_debug("peer no support ht40 in 2g, %d :"QDF_MAC_ADDR_FMT,
+				      sta_ds->ch_width,
+				      QDF_MAC_ADDR_REF(peer));
+		}
+	}
 }
 
 /**
@@ -5649,7 +5766,7 @@ QDF_STATUS lim_send_sa_query_request_frame(struct mac_context *mac, uint8_t *tra
 	qdf_mem_copy(&frm.TransactionId.transId[0], &transId[0], 2);
 
 	if (lim_is_self_and_peer_ocv_capable(mac, peer, pe_session))
-		lim_fill_oci_params(mac, pe_session, &frm.oci);
+		lim_fill_oci_params(mac, pe_session, &frm.oci, NULL, NULL);
 
 	nStatus = dot11f_get_packed_sa_query_req_size(mac, &frm, &nPayload);
 	if (DOT11F_FAILED(nStatus)) {
@@ -5781,7 +5898,7 @@ QDF_STATUS lim_send_sa_query_response_frame(struct mac_context *mac,
 	   SA query request transId */
 	qdf_mem_copy(&frm.TransactionId.transId[0], &transId[0], 2);
 	if (lim_is_self_and_peer_ocv_capable(mac, peer, pe_session))
-		lim_fill_oci_params(mac, pe_session, &frm.oci);
+		lim_fill_oci_params(mac, pe_session, &frm.oci, NULL, NULL);
 
 	nStatus = dot11f_get_packed_sa_query_rsp_size(mac, &frm, &nPayload);
 	if (DOT11F_FAILED(nStatus)) {
@@ -6311,31 +6428,58 @@ static void lim_tx_mgmt_frame(struct mac_context *mac_ctx, uint8_t vdev_id,
 {
 	tpSirMacFrameCtl fc = (tpSirMacFrameCtl)frame;
 	QDF_STATUS qdf_status;
-	struct pe_session *session;
+	struct pe_session *session = NULL;
 	uint16_t auth_ack_status;
 	enum rateid min_rid = RATEID_DEFAULT;
+	enum QDF_OPMODE opmode;
+	uint16_t session_id;
+	uint16_t channel_freq = 0;
 
-	session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
-	if (!session) {
-		cds_packet_free((void *)packet);
-		pe_err("session not found for given vdev_id %d",
-		       vdev_id);
-		return;
+	opmode = wlan_get_opmode_from_vdev_id(mac_ctx->pdev, vdev_id);
+	if (opmode != QDF_NAN_DISC_MODE) {
+		session = pe_find_session_by_vdev_id(mac_ctx, vdev_id);
+		if (!session) {
+			cds_packet_free((void *)packet);
+			pe_err("session not found for given vdev_id %d",
+			       vdev_id);
+			return;
+		}
+		session_id = session->peSessionId;
+	} else {
+		session_id = vdev_id;
 	}
 
 	qdf_mtrace(QDF_MODULE_ID_PE, QDF_MODULE_ID_WMA, TRACE_CODE_TX_MGMT,
-		   session->peSessionId, 0);
+		   session_id, 0);
 
-	min_rid = lim_get_min_session_txrate(session);
+	if (opmode != QDF_NAN_DISC_MODE) {
+		min_rid = lim_get_min_session_txrate(session);
+		if (fc->subType == SIR_MAC_MGMT_AUTH) {
+			tpSirFTPreAuthReq pre_auth_req;
+			uint16_t auth_algo = *(uint16_t *)(frame +
+						sizeof(tSirMacMgmtHdr));
+
+			if ((auth_algo == eSIR_AUTH_TYPE_SAE) &&
+			    (session->ftPEContext.pFTPreAuthReq)) {
+				pre_auth_req =
+					session->ftPEContext.pFTPreAuthReq;
+				channel_freq =
+					pre_auth_req->pre_auth_channel_freq;
+			}
+			pe_debug("TX SAE pre-auth frame on freq %d",
+				 channel_freq);
+		}
+	}
 
 	qdf_status = wma_tx_frameWithTxComplete(mac_ctx, packet,
 					 (uint16_t)msg_len,
 					 TXRX_FRM_802_11_MGMT, ANI_TXDIR_TODS,
 					 7, lim_tx_complete, frame,
 					 lim_auth_tx_complete_cnf,
-					 0, vdev_id, false, 0, min_rid, 0);
+					 0, vdev_id, false, channel_freq,
+					 min_rid, 0);
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_COMPLETE,
-		session->peSessionId, qdf_status));
+		session_id, qdf_status));
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		pe_err("*** Could not send Auth frame (subType: %d), retCode=%X ***",
 			fc->subType, qdf_status);

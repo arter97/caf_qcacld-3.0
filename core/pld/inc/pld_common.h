@@ -854,8 +854,6 @@ int pld_get_mhi_state(struct device *dev);
 int pld_is_pci_ep_awake(struct device *dev);
 int pld_get_ce_id(struct device *dev, int irq);
 int pld_get_irq(struct device *dev, int ce_id);
-void pld_lock_pm_sem(struct device *dev);
-void pld_release_pm_sem(struct device *dev);
 void pld_lock_reg_window(struct device *dev, unsigned long *flags);
 void pld_unlock_reg_window(struct device *dev, unsigned long *flags);
 int pld_get_pci_slot(struct device *dev);
@@ -872,6 +870,14 @@ void *pld_smmu_get_mapping(struct device *dev);
 #endif
 int pld_smmu_map(struct device *dev, phys_addr_t paddr,
 		 uint32_t *iova_addr, size_t size);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+struct kobject *pld_get_wifi_kobj(struct device *dev);
+#else
+static inline struct kobject *pld_get_wifi_kobj(struct device *dev)
+{
+	return NULL;
+}
+#endif
 #ifdef CONFIG_SMMU_S1_UNMAP
 int pld_smmu_unmap(struct device *dev,
 		   uint32_t iova_addr, size_t size);

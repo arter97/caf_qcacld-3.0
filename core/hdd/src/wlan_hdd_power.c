@@ -90,6 +90,8 @@
 #include "qdf_types.h"
 #include <linux/cpuidle.h>
 #include <cdp_txrx_ctrl.h>
+#include <wlan_cp_stats_mc_ucfg_api.h>
+#include "wlan_dp_ucfg_api.h"
 
 /* Preprocessor definitions and constants */
 #ifdef QCA_WIFI_EMULATION
@@ -1187,10 +1189,10 @@ int wlan_hdd_ipv4_changed(struct notifier_block *nb,
  * CPU can enter CXPC mode.
  * The vote value is in microseconds.
  */
-#define HDD_CPU_CXPC_THRESHOLD (10000)
-static bool wlan_hdd_is_cpu_cxpc_allowed(unsigned long vote)
+static bool wlan_hdd_is_cpu_cxpc_allowed(struct hdd_context *hdd_ctx,
+					 unsigned long vote)
 {
-	if (vote >= HDD_CPU_CXPC_THRESHOLD)
+	if (vote >= hdd_ctx->config->cpu_cxpc_threshold)
 		return true;
 	else
 		return false;
@@ -1222,11 +1224,11 @@ int wlan_hdd_pm_qos_notify(struct notifier_block *nb, unsigned long curr_val,
 
 	if (!hdd_ctx->runtime_pm_prevented &&
 	    is_any_sta_connected &&
-	    !wlan_hdd_is_cpu_cxpc_allowed(curr_val)) {
+	    !wlan_hdd_is_cpu_cxpc_allowed(hdd_ctx, curr_val)) {
 		hif_rtpm_get(HIF_RTPM_GET_NORESUME, HIF_RTPM_ID_PM_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = true;
 	} else if (hdd_ctx->runtime_pm_prevented &&
-		   wlan_hdd_is_cpu_cxpc_allowed(curr_val)) {
+		   wlan_hdd_is_cpu_cxpc_allowed(hdd_ctx, curr_val)) {
 		hif_rtpm_put(HIF_RTPM_PUT_NOIDLE, HIF_RTPM_ID_PM_QOS_NOTIFY);
 		hdd_ctx->runtime_pm_prevented = false;
 	}
@@ -1256,7 +1258,7 @@ bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 	curr_val_ns = cpuidle_governor_latency_req(max_cpu_num);
 	curr_val_us = curr_val_ns / NSEC_PER_USEC;
 	hdd_debug("PM QoS current value: %lld", curr_val_us);
-	if (!wlan_hdd_is_cpu_cxpc_allowed(curr_val_us))
+	if (!wlan_hdd_is_cpu_cxpc_allowed(hdd_ctx, curr_val_us))
 		return true;
 	else
 		return false;
@@ -1695,6 +1697,8 @@ hdd_suspend_wlan(void)
 
 	hdd_ctx->hdd_wlan_suspended = true;
 
+	ucfg_dp_suspend_wlan(hdd_ctx->psoc);
+
 	hdd_configure_sar_sleep_index(hdd_ctx);
 
 	hdd_wlan_suspend_resume_event(HDD_WLAN_EARLY_SUSPEND);
@@ -1754,6 +1758,7 @@ static int hdd_resume_wlan(void)
 	}
 
 	ucfg_ipa_resume(hdd_ctx->pdev);
+	ucfg_dp_resume_wlan(hdd_ctx->psoc);
 	status = ucfg_pmo_psoc_user_space_resume_req(hdd_ctx->psoc,
 						     QDF_SYSTEM_SUSPEND);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -1853,20 +1858,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 		}
 	}
 
-	/*
-	 * After SSR, FW clear its txrx stats. In host,
-	 * as adapter is intact so those counts are still
-	 * available. Now if agains Set stats command comes,
-	 * then host will increment its counts start from its
-	 * last saved value, i.e., count before SSR, and FW will
-	 * increment its count from 0. This will finally sends a
-	 * mismatch of packet counts b/w host and FW to framework
-	 * that will create ambiquity. Therfore, Resetting the host
-	 * counts here so that after SSR both FW and host start
-	 * increment their counts from 0.
-	 */
-	hdd_reset_all_adapters_connectivity_stats(hdd_ctx);
-
 	hdd_reset_all_adapters(hdd_ctx);
 
 	ucfg_ipa_uc_ssr_cleanup(hdd_ctx->pdev);
@@ -1908,6 +1899,34 @@ static void hdd_wlan_ssr_reinit_event(void)
 static inline void hdd_wlan_ssr_reinit_event(void)
 {
 
+}
+#endif
+
+#ifdef WLAN_FEATURE_DBAM_CONFIG
+/**
+ * hdd_retore_dbam_config - restore and send dbam config to fw
+ *
+ * This function is used to send  store dbam config to fw
+ * in case of wlan re-init
+ *
+ * Return: void
+ */
+static void hdd_restore_dbam_config(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (hdd_is_interface_up(adapter) &&
+		    adapter->is_dbam_configured)
+			hdd_send_dbam_config(adapter, hdd_ctx->dbam_mode);
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+}
+#else
+static inline void hdd_restore_dbam_config(struct hdd_context *hdd_ctx)
+{
 }
 #endif
 
@@ -2063,8 +2082,6 @@ QDF_STATUS hdd_wlan_re_init(void)
 	if (!adapter)
 		hdd_err("Failed to get adapter");
 
-	hdd_dp_trace_init(hdd_ctx->config);
-
 	ret = hdd_wlan_start_modules(hdd_ctx, true);
 	if (ret) {
 		hdd_err("Failed to start wlan after error");
@@ -2093,6 +2110,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 
 	hdd_send_default_scan_ies(hdd_ctx);
 	hdd_restore_dual_sta_config(hdd_ctx);
+	hdd_restore_dbam_config(hdd_ctx);
 	hdd_info("WLAN host driver reinitiation completed!");
 
 	ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc, &value);
@@ -2323,10 +2341,10 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		goto exit_with_code;
 	}
 	/* Resume tlshim Rx thread */
-	if (hdd_ctx->enable_rxthread)
+	if (ucfg_dp_is_rx_common_thread_enabled(hdd_ctx->psoc))
 		wlan_hdd_rx_thread_resume(hdd_ctx);
 
-	if (hdd_ctx->enable_dp_rx_threads)
+	if (ucfg_dp_is_rx_threads_enabled(hdd_ctx->psoc))
 		dp_txrx_resume(cds_get_context(QDF_MODULE_ID_SOC));
 
 	if (ucfg_pkt_capture_get_mode(hdd_ctx->psoc) !=
@@ -2364,9 +2382,8 @@ exit_with_code:
 static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 {
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	qdf_runtime_lock_t *suspend_lock;
 	int errno;
-
-	qdf_rtpm_put(QDF_RTPM_PUT, QDF_RTPM_ID_WIPHY_SUSPEND);
 
 	if (!hdd_ctx) {
 		hdd_err_rl("hdd context is null");
@@ -2383,6 +2400,10 @@ static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	if (errno)
 		return errno;
 
+	suspend_lock = &hdd_ctx->runtime_context.system_suspend;
+	errno = qdf_runtime_pm_allow_suspend(suspend_lock);
+	if (errno)
+		return errno;
 
 	errno = __wlan_hdd_cfg80211_resume_wlan(wiphy);
 
@@ -2445,6 +2466,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
+	enum pmo_suspend_mode mode;
 	int rc;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CFG80211_SUSPEND_WLAN;
 	struct hdd_hostapd_state *hapd_state;
@@ -2471,14 +2493,18 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 			return rc;
 	}
 
-	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
-		hdd_info_rl("Suspend is not supported");
-		return -EINVAL;
-	}
-
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Modules not Enabled ");
 		return 0;
+	}
+
+	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	if (mode == PMO_SUSPEND_NONE) {
+		hdd_info_rl("Suspend is not supported");
+		return -EINVAL;
+	} else if (mode == PMO_SUSPEND_SHUTDOWN) {
+		hdd_info_rl("shutdown suspend should complete in prepare");
+		return -EINVAL;
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
@@ -2612,12 +2638,12 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	}
 	hdd_ctx->is_scheduler_suspended = true;
 
-	if (hdd_ctx->enable_rxthread) {
+	if (ucfg_dp_is_rx_common_thread_enabled(hdd_ctx->psoc)) {
 		if (wlan_hdd_rx_thread_suspend(hdd_ctx))
 			goto resume_ol_rx;
 	}
 
-	if (hdd_ctx->enable_dp_rx_threads) {
+	if (ucfg_dp_is_rx_threads_enabled(hdd_ctx->psoc)) {
 		if (dp_txrx_suspend(cds_get_context(QDF_MODULE_ID_SOC)))
 			goto resume_ol_rx;
 	}
@@ -2656,7 +2682,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	return 0;
 
 resume_dp_thread:
-	if (hdd_ctx->enable_dp_rx_threads)
+	if (ucfg_dp_is_rx_threads_enabled(hdd_ctx->psoc))
 		dp_txrx_resume(cds_get_context(QDF_MODULE_ID_SOC));
 
 	/* Resume packet capture MON thread */
@@ -2695,6 +2721,7 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 {
 	void *hif_ctx;
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
+	qdf_runtime_lock_t *suspend_lock;
 	int errno;
 
 	if (!hdd_ctx) {
@@ -2720,13 +2747,14 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	if (!hif_ctx)
 		return -EINVAL;
 
-	errno = qdf_rtpm_get(QDF_RTPM_GET_SYNC, QDF_RTPM_ID_WIPHY_SUSPEND);
+	suspend_lock = &hdd_ctx->runtime_context.system_suspend;
+	errno = qdf_runtime_pm_prevent_suspend_sync(suspend_lock);
 	if (errno)
 		return errno;
 
 	errno = __wlan_hdd_cfg80211_suspend_wlan(wiphy, wow);
 	if (errno) {
-		qdf_rtpm_put(QDF_RTPM_PUT, QDF_RTPM_ID_WIPHY_SUSPEND);
+		qdf_runtime_pm_allow_suspend(suspend_lock);
 		return errno;
 	}
 
@@ -2809,6 +2837,63 @@ static void hdd_start_dhcp_ind(struct hdd_adapter *adapter)
 			   adapter->vdev_id);
 }
 
+static int wlan_hdd_set_ps(struct wlan_objmgr_psoc *psoc,
+			   struct hdd_adapter *adapter,
+			   bool allow_power_save, int timeout)
+{
+	int status;
+
+	ucfg_mlme_set_user_ps(psoc, adapter->vdev_id,
+			      allow_power_save);
+
+	status = wlan_hdd_set_powersave(adapter, allow_power_save, timeout);
+
+	if (!hdd_cm_is_vdev_associated(adapter)) {
+		hdd_debug("vdev[%d] mode %d disconnected ignore dhcp protection",
+			  adapter->vdev_id, adapter->device_mode);
+		return status;
+	}
+
+	hdd_debug("vdev[%d] mode %d enable dhcp protection",
+		  adapter->vdev_id, adapter->device_mode);
+	allow_power_save ? hdd_stop_dhcp_ind(adapter) :
+			   hdd_start_dhcp_ind(adapter);
+
+	return status;
+}
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+static int wlan_hdd_set_mlo_ps(struct wlan_objmgr_psoc *psoc,
+			       struct hdd_adapter *adapter,
+			       bool allow_power_save, int timeout)
+{
+	struct hdd_adapter *link_adapter;
+	struct hdd_mlo_adapter_info *mlo_adapter_info;
+	int i, status;
+
+	mlo_adapter_info = &adapter->mlo_adapter_info;
+	for (i = 0; i < WLAN_MAX_MLD; i++) {
+		link_adapter = mlo_adapter_info->link_adapter[i];
+		if (!link_adapter)
+			continue;
+
+		status = wlan_hdd_set_ps(psoc, link_adapter, allow_power_save,
+					 timeout);
+		if (status)
+			return status;
+	}
+
+	return status;
+}
+#else
+static int wlan_hdd_set_mlo_ps(struct wlan_objmgr_psoc *psoc,
+			       struct hdd_adapter *adapter,
+			       bool allow_power_save, int timeout)
+{
+	return 0;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_set_power_mgmt() - set cfg80211 power management config
  * @wiphy: Pointer to wiphy
@@ -2826,6 +2911,8 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx;
 	int status;
+	struct wlan_objmgr_vdev *vdev;
+	bool is_mlo_vdev;
 
 	hdd_enter();
 
@@ -2858,21 +2945,26 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 		return 0;
 	}
 
-	ucfg_mlme_set_user_ps(hdd_ctx->psoc, adapter->vdev_id,
-			      allow_power_save);
-
-	status = wlan_hdd_set_powersave(adapter, allow_power_save, timeout);
-
-	if (hdd_cm_is_vdev_associated(adapter)) {
-		hdd_debug("vdev mode %d enable dhcp protection",
-			  adapter->device_mode);
-		allow_power_save ? hdd_stop_dhcp_ind(adapter) :
-			hdd_start_dhcp_ind(adapter);
-	} else {
-		hdd_debug("vdev mod %d disconnected ignore dhcp protection",
-			  adapter->device_mode);
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_info("vdev is NULL");
+		return -EINVAL;
 	}
 
+	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+
+	if (is_mlo_vdev) {
+		status = wlan_hdd_set_mlo_ps(hdd_ctx->psoc, adapter,
+					     allow_power_save, timeout);
+		goto exit;
+	}
+
+	status = wlan_hdd_set_ps(hdd_ctx->psoc, adapter,
+				 allow_power_save, timeout);
+
+exit:
 	hdd_exit();
 	return status;
 }
@@ -3167,6 +3259,7 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	int status;
 	static bool is_rate_limited;
+	struct wlan_objmgr_vdev *vdev;
 
 	hdd_enter_dev(ndev);
 
@@ -3215,7 +3308,13 @@ static int __wlan_hdd_cfg80211_get_txpower(struct wiphy *wiphy,
 	    is_rate_limited) {
 		hdd_debug("Modules not enabled/rate limited, use cached stats");
 		/* Send cached data to upperlayer*/
-		*dbm = adapter->hdd_stats.class_a_stat.max_pwr;
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+		if (!vdev) {
+			hdd_err("vdev is NULL");
+			return -EINVAL;
+		}
+		ucfg_mc_cp_stats_get_tx_power(vdev, dbm);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
 		return 0;
 	}
 

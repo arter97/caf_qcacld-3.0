@@ -110,7 +110,7 @@ enum hdd_wmm_linuxac {
  *
  * @node: list node which can be used to put the context into a list
  *	of contexts
- * @handle: identifer which uniquely identifies this context to userspace
+ * @handle: identifier which uniquely identifies this context to userspace
  * @flow_id: identifier which uniquely identifies this flow to SME
  * @adapter: adapter upon which this flow was configured
  * @ac_type: access category for this flow
@@ -141,7 +141,7 @@ struct hdd_wmm_qos_context {
  * @has_access_failed - has implicit QoS negotiation already failed?
  * @was_access_granted - has implicit QoS negotiation already succeeded?
  * @is_access_allowed - is access to this AC allowed, either because we
- *	are not doing WMM, we are not doing implicit QoS, implict QoS has
+ *	are not doing WMM, we are not doing implicit QoS, implicit QoS has
  *	completed, or explicit QoS has completed?
  * @is_tspec_valid - is the tspec valid?
  * @is_uapsd_info_valid - are the UAPSD-related fields valid?
@@ -221,7 +221,7 @@ QDF_STATUS hdd_send_dscp_up_map_to_fw(struct hdd_adapter *adapter);
  * hdd_wmm_dscp_initial_state() - initialize the WMM DSCP configuration
  * @adapter : [in]  pointer to Adapter context
  *
- * This function will initialize the WMM DSCP configuation of an
+ * This function will initialize the WMM DSCP configuration of an
  * adapter to an initial state.  The configuration can later be
  * overwritten via application APIs or via QoS Map sent OTA.
  *
@@ -233,7 +233,7 @@ QDF_STATUS hdd_wmm_dscp_initial_state(struct hdd_adapter *adapter);
  * hdd_wmm_adapter_init() - initialize the WMM configuration of an adapter
  * @adapter: [in]  pointer to Adapter context
  *
- * This function will initialize the WMM configuation and status of an
+ * This function will initialize the WMM configuration and status of an
  * adapter to an initial state.  The configuration can later be
  * overwritten via application APIs
  *

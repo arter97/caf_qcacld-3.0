@@ -1227,6 +1227,37 @@ int8_t mlme_get_max_reg_power(struct wlan_objmgr_vdev *vdev)
 	return vdev_mlme->mgmt.generic.maxregpower;
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+QDF_STATUS
+mlme_set_single_link_mlo_roaming(struct wlan_objmgr_vdev *vdev, bool val)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->is_single_link_mlo_roam = val;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+bool mlme_get_single_link_mlo_roaming(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	return mlme_priv->is_single_link_mlo_roam;
+}
+#endif
+
 /**
  * mlme_get_vdev_types() - get vdev type and subtype from its operation mode
  * @mode: operation mode of vdev
@@ -1696,7 +1727,7 @@ vdevmgr_vdev_peer_delete_all_rsp_handle(struct vdev_mlme_obj *vdev_mlme,
 	if (!psoc)
 		return -QDF_STATUS_E_INVAL;
 
-	if (rsp->peer_type_bitmap == BIT(WLAN_PEER_RTT_PASN)) {
+	if (QDF_HAS_PARAM(rsp->peer_type_bitmap, WLAN_PEER_RTT_PASN)) {
 		rx_ops = wifi_pos_get_rx_ops(psoc);
 		if (!rx_ops ||
 		    !rx_ops->wifi_pos_vdev_delete_all_ranging_peers_rsp_cb) {
@@ -1871,6 +1902,8 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
  *                                      to INIT state
  * @mlme_vdev_sta_disconn_start         callback to trigger vdev stop to
  *                                      firmware when resaaoc failure
+ * @mlme_vdev_ext_peer_delete_all_rsp:  Callback to trigger Delete all
+ *                                      peers for the given vdev
  */
 static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_start_send = sta_mlme_vdev_start_send,
@@ -1889,6 +1922,8 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 	.mlme_vdev_ext_stop_rsp = vdevmgr_vdev_stop_rsp_handle,
 	.mlme_vdev_ext_start_rsp = vdevmgr_vdev_start_rsp_handle,
 	.mlme_vdev_sta_disconn_start = sta_mlme_vdev_sta_disconnect_start,
+	.mlme_vdev_ext_peer_delete_all_rsp =
+			vdevmgr_vdev_peer_delete_all_rsp_handle,
 };
 
 /**

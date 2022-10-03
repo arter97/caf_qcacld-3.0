@@ -42,6 +42,7 @@
 #include <wlan_dp_bus_bandwidth.h>
 #include <wlan_tdls_ucfg_api.h>
 #include <qdf_trace.h>
+#include <qdf_net_stats.h>
 
 uint32_t wlan_dp_intf_get_pkt_type_bitmap_value(void *intf_ctx)
 {
@@ -565,7 +566,7 @@ dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 		goto drop_pkt;
 	}
 
-	if (qdf_unlikely(dp_ctx->wlan_suspended)) {
+	if (qdf_unlikely(dp_ctx->is_suspend)) {
 		dp_err_rl("Device is system suspended, drop pkt");
 		goto drop_pkt;
 	}
@@ -632,13 +633,13 @@ dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 	 */
 	qdf_net_buf_debug_acquire_skb(nbuf, __FILE__, __LINE__);
 
-	QDF_NET_DEV_STATS_TX_BYTES(&dp_intf->stats) += qdf_nbuf_len(nbuf);
+	qdf_net_stats_add_tx_bytes(&dp_intf->stats, qdf_nbuf_len(nbuf));
 
 	if (qdf_nbuf_is_tso(nbuf)) {
-		QDF_NET_DEV_STATS_TX_PKTS(&dp_intf->stats) +=
-			qdf_nbuf_get_tso_num_seg(nbuf);
+		qdf_net_stats_add_tx_pkts(&dp_intf->stats,
+					  qdf_nbuf_get_tso_num_seg(nbuf));
 	} else {
-		QDF_NET_DEV_STATS_INC_TX_PKTS(&dp_intf->stats);
+		qdf_net_stats_add_tx_pkts(&dp_intf->stats, 1);
 		dp_ctx->no_tx_offload_pkt_cnt++;
 	}
 
@@ -678,8 +679,8 @@ dp_start_xmit(struct wlan_dp_intf *dp_intf, qdf_nbuf_t nbuf)
 	dp_fix_broadcast_eapol(dp_intf, nbuf);
 
 	if (dp_intf->tx_fn(soc, dp_intf->intf_id, nbuf)) {
-		dp_debug("Failed to send packet from adapter %u",
-			 dp_intf->intf_id);
+		dp_debug_rl("Failed to send packet from adapter %u",
+			    dp_intf->intf_id);
 		goto drop_pkt_and_release_nbuf;
 	}
 
@@ -701,7 +702,7 @@ drop_pkt:
 
 drop_pkt_accounting:
 
-	QDF_NET_DEV_STATS_INC_TX_DROPEED(&dp_intf->stats);
+	qdf_net_stats_inc_tx_dropped(&dp_intf->stats);
 	++stats->per_cpu[cpu].tx_dropped;
 	if (is_arp) {
 		++dp_intf->dp_stats.arp_stats.tx_dropped;
@@ -755,7 +756,7 @@ void dp_tx_timeout(struct wlan_dp_intf *dp_intf)
 		dp_err("Data stall due to continuous TX timeouts");
 		dp_intf->dp_stats.tx_rx_stats.cont_txtimeout_cnt = 0;
 
-		if (cdp_cfg_get(soc, cfg_dp_enable_data_stall))
+		if (dp_is_data_stall_event_enabled(DP_HOST_STA_TX_TIMEOUT))
 			cdp_post_data_stall_event(soc,
 					  DATA_STALL_LOG_INDICATOR_HOST_DRIVER,
 					  DATA_STALL_LOG_HOST_STA_TX_TIMEOUT,
@@ -839,9 +840,9 @@ QDF_STATUS dp_mon_rx_packet_cbk(void *context, qdf_nbuf_t rxbuf)
 		qdf_nbuf_set_dev(nbuf, dp_intf->dev);
 
 		++stats->per_cpu[cpu_index].rx_packets;
-		QDF_NET_DEV_STATS_INC_RX_PKTS(&dp_intf->stats);
-		QDF_NET_DEV_STATS_RX_BYTES(&dp_intf->stats) +=
-			qdf_nbuf_len(nbuf);
+		qdf_net_stats_add_rx_pkts(&dp_intf->stats, 1);
+		qdf_net_stats_add_rx_bytes(&dp_intf->stats,
+					   qdf_nbuf_len(nbuf));
 
 		/* Remove SKB from internal tracking table before submitting
 		 * it to stack
@@ -1652,6 +1653,9 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context,
 		} else if (qdf_nbuf_is_ipv4_eapol_pkt(nbuf)) {
 			subtype = qdf_nbuf_get_eapol_subtype(nbuf);
 			send_over_nl = true;
+
+			/* Mac address check between RX packet DA and dp_intf's */
+			dp_rx_pkt_da_check(dp_intf, nbuf);
 			if (subtype == QDF_PROTO_EAPOL_M1) {
 				++dp_intf->dp_stats.eapol_stats.
 						eapol_m1_count;
@@ -1727,12 +1731,12 @@ QDF_STATUS dp_rx_packet_cbk(void *dp_intf_context,
 		qdf_nbuf_set_dev(nbuf, dp_intf->dev);
 		qdf_nbuf_set_protocol_eth_tye_trans(nbuf);
 		++stats->per_cpu[cpu_index].rx_packets;
-		QDF_NET_DEV_STATS_INC_RX_PKTS(&dp_intf->stats);
+		qdf_net_stats_add_rx_pkts(&dp_intf->stats, 1);
 		/* count aggregated RX frame into stats */
-		QDF_NET_DEV_STATS_RX_PKTS(&dp_intf->stats) +=
-			qdf_nbuf_get_gso_segs(nbuf);
-		QDF_NET_DEV_STATS_RX_BYTES(&dp_intf->stats) +=
-			qdf_nbuf_len(nbuf);
+		qdf_net_stats_add_rx_pkts(&dp_intf->stats,
+					  qdf_nbuf_get_gso_segs(nbuf));
+		qdf_net_stats_add_rx_bytes(&dp_intf->stats,
+					   qdf_nbuf_len(nbuf));
 
 		/* Incr GW Rx count for NUD tracking based on GW mac addr */
 		dp_nud_incr_gw_rx_pkt_cnt(dp_intf, mac_addr);

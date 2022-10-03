@@ -218,7 +218,7 @@ QDF_STATUS hdd_update_mac_config(struct hdd_context *hdd_ctx)
 	char *name, *value;
 	int max_mac_addr = QDF_MAX_CONCURRENCY_PERSONA;
 	struct hdd_cfg_entry mac_table[QDF_MAX_CONCURRENCY_PERSONA];
-	tSirMacAddr custom_mac_addr;
+	struct qdf_mac_addr custom_mac_addr;
 
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 
@@ -310,15 +310,16 @@ QDF_STATUS hdd_update_mac_config(struct hdd_context *hdd_ctx)
 	hdd_populate_random_mac_addr(hdd_ctx, max_mac_addr - i);
 
 	if (hdd_ctx->num_provisioned_addr)
-		qdf_mem_copy(&custom_mac_addr,
+		qdf_mem_copy(custom_mac_addr.bytes,
 			     &hdd_ctx->provisioned_mac_addr[0].bytes[0],
-			     sizeof(tSirMacAddr));
+			     sizeof(custom_mac_addr));
 	else
-		qdf_mem_copy(&custom_mac_addr,
+		qdf_mem_copy(custom_mac_addr.bytes,
 			     &hdd_ctx->derived_mac_addr[0].bytes[0],
-			     sizeof(tSirMacAddr));
+			     sizeof(custom_mac_addr));
 
-	sme_set_custom_mac_addr(custom_mac_addr);
+	hdd_update_mld_mac_addr(hdd_ctx, custom_mac_addr);
+	sme_set_custom_mac_addr(custom_mac_addr.bytes);
 
 config_exit:
 	qdf_mem_free(temp);
@@ -599,7 +600,7 @@ static void hdd_set_oem_6g_supported(struct hdd_context *hdd_ctx)
 	ucfg_wifi_pos_set_oem_6g_supported(hdd_ctx->psoc,
 					   set_wifi_pos_6g_disabled);
 	hdd_debug("oem 6g support is - %s",
-		  set_wifi_pos_6g_disabled ? "Disbaled" : "Enabled");
+		  set_wifi_pos_6g_disabled ? "Disabled" : "Enabled");
 }
 
 /**
@@ -718,7 +719,7 @@ bool hdd_update_config_cfg(struct hdd_context *hdd_ctx)
 
 	/*
 	 * During the initialization both 2G and 5G capabilities should be same.
-	 * So read 5G HT capablity and update 2G and 5G capablities.
+	 * So read 5G HT capability and update 2G and 5G capabilities.
 	 */
 
 	if (0 != hdd_update_he_cap_in_cfg(hdd_ctx)) {
@@ -2125,6 +2126,9 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 	sme_config->csr_config.channelBondingMode5GHz = bonding_mode;
 	sme_config->csr_config.channelBondingMode24GHz = bonding_mode;
 	sme_update_config(hdd_ctx->mac_handle, sme_config);
+	sme_set_he_bw_cap(hdd_ctx->mac_handle, adapter->vdev_id, chwidth);
+	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle, adapter->vdev_id,
+				  adapter->device_mode);
 
 free_config:
 	qdf_mem_free(sme_config);

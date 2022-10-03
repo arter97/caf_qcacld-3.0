@@ -1794,6 +1794,27 @@ static void __hdd_country_change_work_handle(struct hdd_context *hdd_ctx)
 }
 
 /**
+ * hdd_handle_country_change_work_error() - handle country code change error
+ * @hdd_ctx: Global HDD context
+ * @errno: country code change error number
+ *
+ * This function handles error code in country code change worker
+ *
+ * Return: none
+ */
+static void hdd_handle_country_change_work_error(struct hdd_context *hdd_ctx,
+						 int errno)
+{
+	if (errno == -EAGAIN) {
+		qdf_sleep(COUNTRY_CHANGE_WORK_RESCHED_WAIT_TIME);
+		hdd_debug("rescheduling country change work");
+		qdf_sched_work(0, &hdd_ctx->country_change_work);
+	} else {
+		hdd_err("can not handle country change %d", errno);
+	}
+}
+
+/**
  * hdd_country_change_work_handle() - handle country code change
  * @arg: Global HDD context
  *
@@ -1810,21 +1831,16 @@ static void hdd_country_change_work_handle(void *arg)
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
-		return;
+		return hdd_handle_country_change_work_error(hdd_ctx, errno);
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy), &psoc_sync);
+	if (errno)
+		return hdd_handle_country_change_work_error(hdd_ctx, errno);
 
-	if (errno == -EAGAIN) {
-		qdf_sleep(COUNTRY_CHANGE_WORK_RESCHED_WAIT_TIME);
-		hdd_debug("rescheduling country change work");
-		qdf_sched_work(0, &hdd_ctx->country_change_work);
-		return;
-	} else if (errno) {
-		hdd_err("can not handle country change %d", errno);
-		return;
-	}
-
-	__hdd_country_change_work_handle(hdd_ctx);
+	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED)
+		hdd_err("Driver disabled, ignore country code change");
+	else
+		__hdd_country_change_work_handle(hdd_ctx);
 
 	osif_psoc_sync_op_stop(psoc_sync);
 }
@@ -1907,7 +1923,6 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {
 	bool offload_enabled;
 	struct regulatory_channel *cur_chan_list;
-	enum country_src cc_src;
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
 	int ret;
 
@@ -1940,21 +1955,17 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	wiphy->reg_notifier = hdd_reg_notifier;
 	offload_enabled = ucfg_reg_is_regdb_offloaded(hdd_ctx->psoc);
 	hdd_debug("regulatory offload_enabled %d", offload_enabled);
-	if (offload_enabled) {
+	if (offload_enabled)
 		hdd_ctx->reg_offload = true;
-		ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
-					       cur_chan_list);
-		hdd_regulatory_chanlist_dump(cur_chan_list);
-		fill_wiphy_band_channels(wiphy, cur_chan_list,
-					 NL80211_BAND_2GHZ);
-		fill_wiphy_band_channels(wiphy, cur_chan_list,
-					 NL80211_BAND_5GHZ);
-		fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
-		cc_src = ucfg_reg_get_cc_and_src(hdd_ctx->psoc, alpha2);
-		qdf_mem_copy(hdd_ctx->reg.alpha2, alpha2, REG_ALPHA2_LEN + 1);
-	} else {
+	else
 		hdd_ctx->reg_offload = false;
-	}
+
+	ucfg_reg_get_current_chan_list(hdd_ctx->pdev, cur_chan_list);
+	hdd_regulatory_chanlist_dump(cur_chan_list);
+	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_2GHZ);
+	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_5GHZ);
+	fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
+	qdf_mem_copy(hdd_ctx->reg.alpha2, alpha2, REG_ALPHA2_LEN + 1);
 
 	qdf_mem_free(cur_chan_list);
 	return 0;

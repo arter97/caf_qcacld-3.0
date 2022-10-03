@@ -211,6 +211,21 @@ enum roam_trigger_sub_reason {
 };
 
 /**
+ * enum roam_stats_scan_type  - Roam scan type defines
+ * @ROAM_STATS_SCAN_TYPE_PARTIAL: Partial scan
+ * @ROAM_STATS_SCAN_TYPE_FULL: Full scan
+ * @ROAM_STATS_SCAN_TYPE_NO_SCAN: No roam scan was triggered. This is generally
+ * used in BTM events to indicate BTM frame exchange logs.
+ * @ROAM_STATS_SCAN_TYPE_HIGHER_BAND: Higher band roam scan
+ */
+enum roam_stats_scan_type {
+	ROAM_STATS_SCAN_TYPE_PARTIAL = 0,
+	ROAM_STATS_SCAN_TYPE_FULL = 1,
+	ROAM_STATS_SCAN_TYPE_NO_SCAN = 2,
+	ROAM_STATS_SCAN_TYPE_HIGHER_BAND = 3,
+};
+
+/**
  * enum wlan_roam_frame_subtype - Roam frame subtypes
  * @ROAM_FRAME_SUBTYPE_M1: EAPOL M1 Frame
  * @ROAM_FRAME_SUBTYPE_M2: EAPOL M2 Frame
@@ -1720,6 +1735,25 @@ enum roam_rt_stats_params {
 	ROAM_RT_STATS_SUSPEND_MODE_ENABLE,
 };
 
+/*
+ * struct wlan_roam_mlo_config - Roam MLO config parameters
+ * @vdev_id: VDEV id
+ * @partner_link_addr: Assigned link address which can be used as self
+ *  link addr when vdev is not created
+ * @support_link_num: Configure max number of link mlo connection supports.
+ *  Invalid value or 0 will use max supported value by fw.
+ * @support_link_band: Configure the band bitmap of mlo connection supports
+ *  Bit 0: 2G band support if 1
+ *  Bit 1: 5G band support if 1
+ *  Bit 2: 6G band support if 1
+ */
+struct wlan_roam_mlo_config {
+	uint8_t vdev_id;
+	struct qdf_mac_addr partner_link_addr;
+	uint32_t support_link_num;
+	uint32_t support_link_band;
+};
+
 /**
  * struct wlan_roam_start_config - structure containing parameters for
  * roam start config
@@ -1740,6 +1774,7 @@ enum roam_rt_stats_params {
  * @disconnect_params: disconnect params
  * @idle_params: idle params
  * @wlan_roam_rt_stats_config: roam events stats config
+ * @roam_mlo_params: roam mlo config params
  */
 struct wlan_roam_start_config {
 	struct wlan_roam_offload_scan_rssi_params rssi_params;
@@ -1760,6 +1795,7 @@ struct wlan_roam_start_config {
 	struct wlan_roam_disconnect_params disconnect_params;
 	struct wlan_roam_idle_params idle_params;
 	uint8_t wlan_roam_rt_stats_config;
+	struct wlan_roam_mlo_config roam_mlo_params;
 	/* other wmi cmd structures */
 };
 
@@ -2260,11 +2296,13 @@ struct roam_stats_event {
 /*
  * struct auth_offload_event - offload data carried by roam event
  * @vdev_id: vdev id
- * @ap_bssid: SAE authentication offload MAC Addess
+ * @ap_bssid: SAE authentication offload AP MAC Addess
+ * @ta: SAE authentication offload Tx MAC Addess
  */
 struct auth_offload_event {
 	uint8_t vdev_id;
 	struct qdf_mac_addr ap_bssid;
+	struct qdf_mac_addr ta;
 };
 
 /*
@@ -2293,6 +2331,7 @@ struct roam_pmkid_req_event {
  * @send_roam_abort: send roam abort
  * @send_roam_disable_config: send roam disable config
  * @send_roam_rt_stats_config: Send roam events vendor command param value to FW
+ * @send_roam_linkspeed_state: Send roam link speed good/poor state to FW
  * @send_roam_vendor_handoff_config: send vendor handoff config command to FW
  */
 struct wlan_cm_roam_tx_ops {
@@ -2324,11 +2363,19 @@ struct wlan_cm_roam_tx_ops {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	QDF_STATUS (*send_roam_rt_stats_config)(struct wlan_objmgr_vdev *vdev,
 						uint8_t vdev_id, uint8_t value);
+#ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
+	QDF_STATUS (*send_roam_linkspeed_state)(struct wlan_objmgr_vdev *vdev,
+						uint8_t vdev_id, bool value);
+#endif
 #endif
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 	QDF_STATUS (*send_roam_vendor_handoff_config)(
 					struct wlan_objmgr_vdev *vdev,
 					uint8_t vdev_id, uint32_t param_id);
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	QDF_STATUS (*send_roam_mlo_config)(struct wlan_objmgr_vdev *vdev,
+					   struct wlan_roam_mlo_config *req);
 #endif
 };
 
@@ -2367,12 +2414,14 @@ struct wlan_cm_vendor_handoff_param {
  * @pcl_vdev_cmd_active:  Flag to check if vdev level pcl command needs to be
  * sent or PDEV level PCL command needs to be sent
  * @vendor_handoff_param: vendor handoff params
+ * @sae_offload_ssid: SSID of the roam auth offload bssid
  */
 struct wlan_cm_roam {
 	bool pcl_vdev_cmd_active;
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 	struct wlan_cm_vendor_handoff_param vendor_handoff_param;
 #endif
+	struct wlan_ssid sae_offload_ssid;
 };
 
 /**
@@ -2536,6 +2585,7 @@ struct roam_offload_synch_ind {
 	uint16_t hlp_data_len;
 	uint8_t hlp_data[FILS_MAX_HLP_DATA_LEN];
 	bool is_ft_im_roam;
+	uint8_t is_assoc;
 	enum wlan_phymode phy_mode; /*phy mode sent by fw */
 	wmi_channel chan;
 #ifdef WLAN_FEATURE_11BE_MLO

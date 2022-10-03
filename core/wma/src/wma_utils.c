@@ -173,15 +173,15 @@ static const struct index_he_data_rate_type he_mcs_nss1[] = {
 	{9,  {{1147, 1083, 975 }, {0} },
 	     {{2294, 2167, 1950}, {0} },
 	     {{4804, 4537, 4083}, {0} },
-	     {{9607, 9074, 8166}, {0} } },
+	     {{9608, 9074, 8167}, {0} } },
 	{10, {{1290, 1219, 1097}, {0} },
 	     {{2581, 2438, 2194}, {0} },
 	     {{5404, 5104, 4594}, {0} },
 	     {{10809, 10208, 9188}, {0} } },
 	{11, {{1434, 1354, 1219}, {0} },
 	     {{2868, 2708, 2438}, {0} },
-	     {{6004, 5671, 5104}, {0} },
-	     {{12010, 11342, 10208}, {0} } },
+	     {{6005, 5671, 5104}, {0} },
+	     {{12010, 11343, 10208}, {0} } },
 	{12, {{1549, 1463, 1316}, {0} },
 	     {{3097, 2925, 2633}, {0} },
 	     {{6485, 6125, 5513}, {0} },
@@ -233,8 +233,8 @@ static const struct index_he_data_rate_type he_mcs_nss2[] = {
 	     {{17294, 16333, 14700}, {0} } },
 	{9,  {{2294,  2167,  1950}, {0} },
 	     {{4588,  4333,  3900}, {0} },
-	     {{9607,  9074,  8166}, {0} },
-	     {{19215, 18148, 16333}, {0} } },
+	     {{9608,  9074,  8167}, {0} },
+	     {{19216, 18148, 16333}, {0} } },
 	{10, {{2581,  2438,  2194}, {0} },
 	     {{5162,  4875,  4388}, {0} },
 	     {{10809, 10208, 9188}, {0} },
@@ -242,7 +242,7 @@ static const struct index_he_data_rate_type he_mcs_nss2[] = {
 	{11, {{2868,  2708,  2438}, {0} },
 	     {{5735,  5417,  4875}, {0} },
 	     {{12010, 11343, 10208}, {0} },
-	     {{24019, 22685, 20416}, {0} } },
+	     {{24020, 22685, 20417}, {0} } },
 	{12, {{3097,  2925,  2633}, {0} },
 	     {{6194,  5850,  5265}, {0} },
 	     {{12971, 12250, 11025}, {0} },
@@ -2755,6 +2755,7 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 	wmi_iface_link_stats *link_stats, *iface_link_stats;
 	wmi_wmm_ac_stats *ac_stats, *iface_ac_stats;
 	wmi_iface_offload_stats *offload_stats, *iface_offload_stats;
+	wmi_iface_powersave_stats *powersave_stats;
 	tSirLLStatsResults *link_stats_results;
 	struct wifi_interface_stats *iface_stat;
 	uint32_t count;
@@ -2887,6 +2888,10 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 		offload_stats++;
 		iface_offload_stats++;
 	}
+
+	powersave_stats = param_tlvs->iface_powersave_stats;
+	if (powersave_stats)
+		iface_stat->powersave_stats = *powersave_stats;
 
 	/* Copying vdev_id info into the iface_stat for MLO*/
 	iface_stat->vdev_id = fixed_param->vdev_id;
@@ -5026,6 +5031,11 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 
 	oem_event_data.data_len = event->data_len;
 	oem_event_data.data = param_buf->data;
+
+	if (param_buf->num_file_name) {
+		oem_event_data.file_name = param_buf->file_name;
+		oem_event_data.file_name_len = param_buf->num_file_name;
+	}
 
 	if (pmac->sme.oem_data_event_handler_cb)
 		pmac->sme.oem_data_event_handler_cb(&oem_event_data,

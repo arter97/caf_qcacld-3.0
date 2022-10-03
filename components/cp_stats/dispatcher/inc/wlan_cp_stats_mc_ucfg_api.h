@@ -378,6 +378,36 @@ wlan_cfg80211_mc_bmiss_get_infra_cp_stats(
 }
 #endif /* CONFIG_WLAN_BMISS */
 
+/**
+ * wlan_cp_stats_update_chan_info() - API to update chan stats
+ * @psoc: pointer to psoc
+ * @chan_stat: channel stats
+ * @vdev_id: vdev id
+ *
+ * Return: None
+ */
+void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
+				    struct channel_status *chan_stat,
+				    uint8_t vdev_id);
+
+/**
+ * ucfg_mc_cp_stats_clear_channel_status() - API to clear chan stats
+ * @pdev: pointer to pdev object
+ *
+ * Return: None
+ */
+void ucfg_mc_cp_stats_clear_channel_status(struct wlan_objmgr_pdev *pdev);
+
+/**
+ * ucfg_mc_cp_stats_get_channel_status() - API to get chan stats
+ * @pdev: pointer to pdev object
+ * @chan_freq: channel freq of which stats are needed
+ *
+ * Return: channel status
+ */
+struct channel_status *
+ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
+				    uint32_t chan_freq);
 #else /* QCA_SUPPORT_CP_STATS */
 
 void static inline ucfg_mc_cp_stats_register_pmo_handler(void) { };
@@ -456,6 +486,30 @@ wlan_cfg80211_mc_bmiss_get_infra_cp_stats(
 				struct wlan_objmgr_vdev *vdev,
 				uint8_t bmiss_peer_mac[QDF_MAC_ADDR_SIZE],
 				int *errno)
+{
+	return NULL;
+}
+
+static inline void
+ucfg_mc_cp_stats_get_tx_power(struct wlan_objmgr_vdev *vdev,
+			      int *dbm)
+{}
+
+static inline
+void wlan_cp_stats_update_chan_info(struct wlan_objmgr_psoc *psoc,
+				    struct channel_status *chan_stat,
+				    uint8_t vdev_id)
+{
+}
+
+static inline
+void ucfg_mc_cp_stats_clear_channel_status(struct wlan_objmgr_pdev *pdev)
+{
+}
+
+static inline struct channel_status *
+ucfg_mc_cp_stats_get_channel_status(struct wlan_objmgr_pdev *pdev,
+				    uint32_t chan_freq)
 {
 	return NULL;
 }

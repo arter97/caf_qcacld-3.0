@@ -155,7 +155,7 @@ lim_process_deauth_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 			pe_session->limSmeState,
 			GET_LIM_SYSTEM_ROLE(pe_session));
 
-	wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)pHdr,
+	wlan_connectivity_mgmt_event(mac->psoc, (struct wlan_frame_hdr *)pHdr,
 				     pe_session->vdev_id, reasonCode,
 				     0, frame_rssi, 0, 0, 0, 0,
 				     WLAN_DEAUTH_RX);
@@ -342,7 +342,7 @@ static void lim_process_sae_auth_msg(struct mac_context *mac_ctx,
 		return;
 
 	sae_msg->vdev_id = pe_session->vdev_id;
-	sae_msg->sae_status = IEEE80211_STATUS_UNSPECIFIED;
+	sae_msg->sae_status = STATUS_UNSPECIFIED_FAILURE;
 	sae_msg->result_code = eSIR_SME_AUTH_REFUSED;
 	qdf_mem_copy(sae_msg->peer_mac_addr, addr, QDF_MAC_ADDR_SIZE);
 	lim_process_sae_msg(mac_ctx, sae_msg);

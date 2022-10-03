@@ -82,6 +82,9 @@ static void lim_process_sae_msg_sta(struct mac_context *mac,
 				    struct pe_session *session,
 				    struct sir_sae_msg *sae_msg)
 {
+	struct wlan_crypto_pmksa *pmksa;
+	uint8_t *rsn_ie_buf;
+
 	switch (session->limMlmState) {
 	case eLIM_MLM_WT_SAE_AUTH_STATE:
 		/* SAE authentication is completed.
@@ -92,15 +95,45 @@ static void lim_process_sae_msg_sta(struct mac_context *mac,
 							eLIM_AUTH_SAE_TIMER);
 		lim_sae_auth_cleanup_retry(mac, session->vdev_id);
 		/* success */
-		if (sae_msg->sae_status == IEEE80211_STATUS_SUCCESS)
+		if (sae_msg->sae_status == STATUS_SUCCESS) {
+			uint8_t zero_pmkid[PMKID_LEN] = {0};
+
+			if (!qdf_mem_cmp(sae_msg->pmkid, zero_pmkid,
+					 PMKID_LEN)) {
+				pe_debug("pmkid not received in ext auth");
+				goto restore_auth_state;
+			}
+
+			pmksa = qdf_mem_malloc(sizeof(*pmksa));
+			if (!pmksa)
+				goto restore_auth_state;
+
+			rsn_ie_buf = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
+			if (!rsn_ie_buf) {
+				qdf_mem_free(pmksa);
+				goto restore_auth_state;
+			}
+
+			qdf_mem_copy(pmksa->pmkid, sae_msg->pmkid, PMKID_LEN);
+			qdf_mem_copy(pmksa->bssid.bytes, sae_msg->peer_mac_addr,
+				     QDF_MAC_ADDR_SIZE);
+
+			qdf_mem_zero(session->lim_join_req->rsnIE.rsnIEdata,
+				     WLAN_MAX_IE_LEN + 2);
+			lim_update_connect_rsn_ie(session, rsn_ie_buf, pmksa);
+
+			qdf_mem_free(pmksa);
+			qdf_mem_free(rsn_ie_buf);
+restore_auth_state:
 			lim_restore_from_auth_state(mac,
 						    eSIR_SME_SUCCESS,
 						    STATUS_SUCCESS,
 						    session);
-		else
+		} else {
 			lim_restore_from_auth_state(mac, sae_msg->result_code,
 						    sae_msg->sae_status,
 						    session);
+		}
 		break;
 	default:
 		/* SAE msg is received in unexpected state */
@@ -141,7 +174,7 @@ static void lim_process_sae_msg_ap(struct mac_context *mac,
 
 	assoc_req = &sta_pre_auth_ctx->assoc_req;
 
-	if (sae_msg->sae_status != IEEE80211_STATUS_SUCCESS) {
+	if (sae_msg->sae_status != STATUS_SUCCESS) {
 		pe_debug("SAE authentication failed for "
 			 QDF_MAC_ADDR_FMT " status: %u",
 			 QDF_MAC_ADDR_REF(sae_msg->peer_mac_addr),
@@ -1868,9 +1901,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case WMA_AGGR_QOS_RSP:
 		lim_process_ft_aggr_qos_rsp(mac_ctx, msg);
 		break;
-	case WMA_RX_CHN_STATUS_EVENT:
-		lim_process_rx_channel_status_event(mac_ctx, msg->bodyptr);
-		break;
 	case WMA_DFS_BEACON_TX_SUCCESS_IND:
 		lim_process_beacon_tx_success_ind(mac_ctx, msg->type,
 				(void *)msg->bodyptr);
@@ -2045,6 +2075,11 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 		break;
 	case CM_ABORT_CONN_TIMER:
 		lim_deactivate_timers_for_vdev(mac_ctx, msg->bodyval);
+		break;
+	case WIFI_POS_PASN_PEER_DELETE_ALL:
+		lim_process_pasn_delete_all_peers(mac_ctx, msg->bodyptr);
+		qdf_mem_free(msg->bodyptr);
+		msg->bodyptr = NULL;
 		break;
 	default:
 		qdf_mem_free((void *)msg->bodyptr);

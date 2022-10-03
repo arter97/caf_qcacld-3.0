@@ -562,8 +562,8 @@ union wlan_tp_data {
 /**
  * struct wlan_dp_psoc_callbacks - struct containing callback
  * to non-converged driver
- * @os_if_dp_gro_rx: OS IF Callback to handle GRO packet to n/w stack
  * @callback_ctx : Opaque callback context
+ * @dp_get_netdev_by_vdev_mac: Callback to get netdev from vdev mac address
  * @wlan_dp_sta_get_dot11mode: Callback to get dot11 mode
  * @wlan_dp_get_ap_client_count: Callback to get client count connected to AP
  * @wlan_dp_sta_ndi_connected: Callback to get NDI connected status
@@ -587,12 +587,12 @@ union wlan_tp_data {
  * @os_if_dp_nud_stats_info: osif callback to print nud stats info
  * @dp_get_pause_map: Callback API to get pause map count
  * @dp_nud_failure_work: Callback API to handle NUD failuire work
+ * @link_monitoring_cb: Callback API to handle link speed change
  */
 struct wlan_dp_psoc_callbacks {
 	hdd_cb_handle callback_ctx;
 
-	QDF_STATUS (*dp_get_nw_intf_mac_by_vdev_mac)(struct qdf_mac_addr *mac_addr,
-						     struct qdf_mac_addr *intf_mac);
+	qdf_netdev_t (*dp_get_netdev_by_vdev_mac)(struct qdf_mac_addr *mac_addr);
 	unsigned int (*dp_get_tx_flow_low_watermark)(hdd_cb_handle cb_ctx,
 						     uint8_t intf_id);
 	void (*dp_get_tx_resource)(uint8_t intf_id, struct qdf_mac_addr *mac_addr);
@@ -667,6 +667,9 @@ struct wlan_dp_psoc_callbacks {
 	void (*os_if_dp_nud_stats_info)(struct wlan_objmgr_vdev *vdev);
 	uint32_t (*dp_get_pause_map)(hdd_cb_handle context, uint8_t vdev_id);
 	void (*dp_nud_failure_work)(hdd_cb_handle context, uint8_t vdev_id);
+	void (*link_monitoring_cb)(struct wlan_objmgr_psoc *psoc,
+				   uint8_t vdev_id,
+				   bool is_link_speed_good);
 };
 
 /**
@@ -717,4 +720,16 @@ struct wlan_dp_user_config {
 	uint32_t arp_connectivity_map;
 };
 
+/**
+ * struct dp_traffic_end_indication - Trafic end indication
+ * @enabled: Feature enabled/disabled config
+ * @def_dscp: Default DSCP value in regular packets in traffic
+ * @spl_dscp: Special DSCP value to be used by packet to mark
+ *            end of data stream
+ */
+struct dp_traffic_end_indication {
+	bool enabled;
+	uint8_t def_dscp;
+	uint8_t spl_dscp;
+};
 #endif /* end  of _WLAN_DP_PUBLIC_STRUCT_H_ */

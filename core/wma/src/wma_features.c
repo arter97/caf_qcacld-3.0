@@ -315,22 +315,29 @@ end:
 
 #ifdef WLAN_FEATURE_TSF
 
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
-static void wma_vdev_tsf_set_mac_id(struct stsf *ptsf, uint32_t mac_id,
-				    uint32_t mac_id_valid)
+#if defined(WLAN_FEATURE_TSF_UPLINK_DELAY) || defined(QCA_GET_TSF_VIA_REG)
+static inline void
+wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
+			       uint32_t mac_id_valid, uint32_t tsf_id,
+			       uint32_t tsf_id_valid)
 {
 	ptsf->mac_id = mac_id;
 	ptsf->mac_id_valid = mac_id_valid;
+	ptsf->tsf_id = tsf_id;
+	ptsf->tsf_id_valid = tsf_id_valid;
 
-	wma_nofl_debug("mac_id %d mac_id_valid %d", ptsf->mac_id,
-		       ptsf->mac_id_valid);
+	wma_nofl_debug("mac_id %d mac_id_valid %d tsf_id %d tsf_id_valid %d",
+		       ptsf->mac_id, ptsf->mac_id_valid, ptsf->tsf_id,
+		       ptsf->tsf_id_valid);
 }
-#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY */
-static inline void wma_vdev_tsf_set_mac_id(struct stsf *ptsf, uint32_t mac_id,
-					   uint32_t mac_id_valid)
+#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY || !QCA_GET_TSF_VIA_REG*/
+static inline void
+wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
+			       uint32_t mac_id_valid, uint32_t tsf_id,
+			       uint32_t tsf_id_valid)
 {
 }
-#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY || QCA_GET_TSF_VIA_REG*/
 
 /**
  * wma_vdev_tsf_handler() - handle tsf event indicated by FW
@@ -372,9 +379,10 @@ int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len)
 		       ptsf->global_tsf_low, ptsf->global_tsf_high,
 			   ptsf->soc_timer_low, ptsf->soc_timer_high);
 
-	wma_vdev_tsf_set_mac_id(ptsf, tsf_event->mac_id,
-				tsf_event->mac_id_valid);
-
+	wma_vdev_tsf_set_mac_id_tsf_id(ptsf, tsf_event->mac_id,
+				       tsf_event->mac_id_valid,
+				       tsf_event->tsf_id,
+				       tsf_event->tsf_id_valid);
 	tsf_msg.type = eWNI_SME_TSF_EVENT;
 	tsf_msg.bodyptr = ptsf;
 	tsf_msg.bodyval = 0;
@@ -4152,6 +4160,9 @@ QDF_STATUS wma_send_apf_enable_cmd(WMA_HANDLE handle, uint8_t vdev_id,
 	tp_wma_handle wma = (tp_wma_handle) handle;
 	struct wmi_unified *wmi_handle;
 
+	if (!wma_is_vdev_valid(vdev_id))
+		return QDF_STATUS_E_INVAL;
+
 	if (wma_validate_handle(wma))
 		return QDF_STATUS_E_INVAL;
 
@@ -5068,10 +5079,11 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf,
 	wmi_chan_info_event_fixed_param *event;
 	struct scan_chan_info buf;
 	struct mac_context *mac = NULL;
-	struct lim_channel_status *channel_status;
+	struct channel_status *channel_status;
 	bool snr_monitor_enabled;
 	struct wlan_objmgr_vdev *vdev;
 	enum QDF_OPMODE mode;
+	struct scheduler_msg sme_msg = {0};
 
 	if (wma && wma->cds_context)
 		mac = (struct mac_context *)cds_get_context(QDF_MODULE_ID_PE);
@@ -5112,7 +5124,8 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf,
 	mode = wlan_vdev_mlme_get_opmode(vdev);
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_WMA_ID);
 
-	if (mac->sap.acs_with_more_param && mode == QDF_SAP_MODE) {
+	if ((mac->sap.acs_with_more_param && mode == QDF_SAP_MODE) ||
+	    sap_is_acs_scan_optimize_enable()) {
 		channel_status = qdf_mem_malloc(sizeof(*channel_status));
 		if (!channel_status)
 			return -ENOMEM;
@@ -5122,7 +5135,7 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf,
 			  event->rx_clear_count, event->cycle_count,
 			  event->chan_tx_pwr_range, event->chan_tx_pwr_tp);
 
-		channel_status->channelfreq = event->freq;
+		channel_status->channel_freq = event->freq;
 		channel_status->noise_floor = event->noise_floor;
 		channel_status->rx_clear_count =
 			 event->rx_clear_count;
@@ -5144,8 +5157,16 @@ int wma_chan_info_event_handler(void *handle, uint8_t *event_buf,
 		channel_status->cmd_flags =
 			event->cmd_flags;
 
-		wma_send_msg(handle, WMA_RX_CHN_STATUS_EVENT,
-			     (void *)channel_status, 0);
+		sme_msg.type = eWNI_SME_CHAN_INFO_EVENT;
+		sme_msg.bodyptr = channel_status;
+		sme_msg.bodyval = event->vdev_id;
+
+		if (QDF_STATUS_SUCCESS !=
+			scheduler_post_message(QDF_MODULE_ID_WMA,
+					       QDF_MODULE_ID_SME,
+					       QDF_MODULE_ID_SME, &sme_msg))
+			qdf_mem_free(channel_status);
+
 	}
 
 	return 0;

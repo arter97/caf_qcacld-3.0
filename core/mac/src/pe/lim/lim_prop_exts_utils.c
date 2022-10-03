@@ -398,6 +398,17 @@ static void lim_extract_eht_op(struct pe_session *session,
 void lim_update_eht_bw_cap_mcs(struct pe_session *session,
 			       tSirProbeRespBeacon *beacon)
 {
+	if (!session->eht_capable)
+		return;
+
+	if ((session->opmode == QDF_STA_MODE ||
+	     session->opmode == QDF_P2P_CLIENT_MODE) &&
+	    beacon && beacon->eht_cap.present) {
+		if (!beacon->eht_cap.support_320mhz_6ghz) {
+			pe_debug("Session 6G 320M unsupported");
+			session->eht_config.support_320mhz_6ghz = 0;
+		}
+	}
 }
 #else
 static void lim_extract_eht_op(struct pe_session *session,
@@ -420,18 +431,28 @@ void lim_objmgr_update_emlsr_caps(struct wlan_objmgr_psoc *psoc,
 		return;
 	}
 
-	ap_emlsr_cap =
-		assoc_rsp->mlo_ie.mlo_ie.eml_capabilities_info.emlsr_support;
-	if (!ap_emlsr_cap) {
-		pe_debug("eMLSR cap not present in assoc rsp");
-		wlan_vdev_obj_lock(vdev);
-		wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
-		wlan_vdev_obj_unlock(vdev);
+	/* Check for assoc link vdev to extract emlsr cap from assoc rsp */
+	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev)) {
+		ap_emlsr_cap =
+			assoc_rsp->mlo_ie.mlo_ie.eml_capabilities_info.emlsr_support;
+
+		if (!(wlan_vdev_mlme_cap_get(vdev, WLAN_VDEV_C_EMLSR_CAP) &&
+		      ap_emlsr_cap)) {
+			if (!wlan_vdev_mlme_cap_get(vdev, WLAN_VDEV_C_EMLSR_CAP)
+			    && ap_emlsr_cap)
+				pe_debug("No eMLSR STA supp but recvd EML caps in assc rsp");
+			else
+				pe_debug("EML caps not present in assoc rsp");
+			wlan_vdev_obj_lock(vdev);
+			wlan_vdev_mlme_cap_clear(vdev, WLAN_VDEV_C_EMLSR_CAP);
+			wlan_vdev_obj_unlock(vdev);
+		} else {
+			pe_debug("EML caps present in assoc rsp");
+		}
 	} else {
-		wlan_vdev_obj_lock(vdev);
-		wlan_vdev_mlme_cap_set(vdev, WLAN_VDEV_C_EMLSR_CAP);
-		wlan_vdev_obj_unlock(vdev);
+		pe_debug("no change required for link vdev");
 	}
+
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
 }
 #endif
@@ -794,8 +815,9 @@ void lim_extract_ap_capability(struct mac_context *mac_ctx, uint8_t *p_ie,
 	lim_check_is_he_mcs_valid(session, beacon_struct);
 	lim_check_peer_ldpc_and_update(session, beacon_struct);
 	lim_extract_he_op(session, beacon_struct);
-	lim_update_he_bw_cap_mcs(session, beacon_struct);
 	lim_extract_eht_op(session, beacon_struct);
+	if (!mac_ctx->usr_eht_testbed_cfg)
+		lim_update_he_bw_cap_mcs(session, beacon_struct);
 	lim_update_eht_bw_cap_mcs(session, beacon_struct);
 	/* Extract the UAPSD flag from WMM Parameter element */
 	if (beacon_struct->wmeEdcaPresent)

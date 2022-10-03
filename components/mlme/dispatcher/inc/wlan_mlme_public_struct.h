@@ -1087,7 +1087,7 @@ struct wlan_mlme_chain_cfg {
  * @dual_sta_roam_fw_support: Firmware support for dual sta roaming feature
  * @ocv_support: FW supports OCV
  *
- * Add all the mlme-tgt related capablities here, and the public API would fill
+ * Add all the mlme-tgt related capabilities here, and the public API would fill
  * the related capability in the required mlme cfg structure.
  */
 struct mlme_tgt_caps {
@@ -1339,6 +1339,7 @@ struct wlan_user_mcc_quota {
  * @disable_4way_hs_offload: enable/disable 4 way handshake offload to firmware
  * @as_enabled: antenna sharing enabled or not (FW capability)
  * @mgmt_retry_max: maximum retries for management frame
+ * @enable_he_mcs0_for_6ghz_mgmt: HE MCS0 rate for mgmt frames in 6GHz band
  * @bmiss_skip_full_scan: Decide if full scan can be skipped in firmware if no
  * candidate is found in partial scan based on channel map
  * @enable_ring_buffer: Decide to enable/disable ring buffer for bug report
@@ -1392,6 +1393,7 @@ struct wlan_mlme_generic {
 	uint32_t disable_4way_hs_offload;
 	bool as_enabled;
 	uint8_t mgmt_retry_max;
+	bool enable_he_mcs0_for_6ghz_mgmt;
 	bool bmiss_skip_full_scan;
 	bool enable_ring_buffer;
 	bool enable_peer_unmap_conf_support;
@@ -1557,6 +1559,26 @@ struct wlan_mlme_obss_ht40 {
 };
 
 /**
+ * struct wlan_mlme_eml_cap - EML capabilities of MLD
+ * @emlsr_supp: eMLSR Support
+ * @emlsr_pad_delay: eMLSR Padding Delay
+ * @emlsr_trans_delay: eMLSR transition delay
+ * @emlmr_supp: eMLMR Support
+ * @emlmr_delay: eMLMR Delay
+ * @trans_timeout: Transition Timeout
+ * @reserved: Reserved
+ */
+struct wlan_mlme_eml_cap {
+	uint16_t emlsr_supp:1,
+		 emlsr_pad_delay:3,
+		 emlsr_trans_delay:3,
+		 emlmr_supp:1,
+		 emlmr_delay:3,
+		 trans_timeout:4,
+		 reserved:1;
+};
+
+/**
  * enum dot11p_mode - The 802.11p mode of operation
  * @WLAN_HDD_11P_DISABLED:   802.11p mode is disabled
  * @WLAN_HDD_11P_STANDALONE: 802.11p-only operation
@@ -1649,6 +1671,7 @@ enum station_prefer_bw {
  * @max_li_modulated_dtim_time_ms: Max modulated DTIM time in ms.
  * @mlo_support_link_num:           max number of links that sta mlo supports
  * @mlo_support_link_band:          band bitmap that sta mlo supports
+ * @mlo_max_simultaneous_links      number of simultaneous links
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1679,6 +1702,7 @@ struct wlan_mlme_sta_cfg {
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t mlo_support_link_num;
 	uint8_t mlo_support_link_band;
+	uint8_t mlo_max_simultaneous_links;
 #endif
 };
 
@@ -1758,7 +1782,8 @@ struct fw_scan_channels {
 	uint32_t freq[NUM_CHANNELS];
 };
 
-/*
+/**
+ * struct wlan_mlme_lfr_cfg - MLME LMAC fast roaming config
  * @mawc_roam_enabled:              Enable/Disable MAWC during roaming
  * @enable_fast_roam_in_concurrency:Enable LFR roaming on STA during concurrency
  * @vendor_btm_param:               Vendor WTC roam trigger parameters
@@ -2618,6 +2643,7 @@ struct wlan_mlme_iot {
  * @iot: IOT related CFG items
  * @connection_roaming_ini_flag: To indicate whether connection_roaming related
  * ini file is present or not.
+ * @eml_cap: EML capability subfield present in ML IE common info
  */
 struct wlan_mlme_cfg {
 	struct wlan_mlme_chainmask chainmask_cfg;
@@ -2667,6 +2693,7 @@ struct wlan_mlme_cfg {
 	struct wlan_mlme_ratemask ratemask_cfg;
 	struct wlan_mlme_iot iot;
 	bool connection_roaming_ini_flag;
+	struct wlan_mlme_eml_cap eml_cap;
 };
 
 enum pkt_origin {
@@ -2739,4 +2766,47 @@ struct wlan_change_bi {
 	uint8_t session_id;
 };
 
+#ifdef FEATURE_SET
+/**
+ * struct wlan_mlme_features - Mlme feature set structure
+ * @enable_wifi_optimizer: indicates wifi optimizer is enabled or disabled
+ * @roaming_high_cu_roam_trigger: Roaming high CPU trigger enabled or disabled
+ * @roaming_emergency_trigger: Roaming emergency trigger enabled or disabled
+ * @roaming_btm_trihgger: Roaming btm trigger enabled or disabled
+ * @roaming_idle_trigger: Roaming idle trigger enabled or disabled
+ * @roaming_wtc_trigger: Roaming wtc trigger enabled or disabled
+ * @roaming_btcoex_trigger: Roaming btcoex trigger enabled or disabled
+ * @roaming_btw_wpa_wpa2: Roaming btw wpa wpa2 enabled or disabled
+ * @roaming_manage_chan_list_api: Roaming manage chan list api enabled or
+ * disabled
+ * @roaming_adaptive_11r: Roaming adaptive 11r enabled or disabled
+ * @roaming_ctrl_api_get_set: Roaming ctrl api get set enabled or disabled
+ * @roaming_ctrl_api_reassoc: Roaming ctrl api reassoc enabled or disabled
+ * @roaming_ctrl_get_cu: Roaming ctrl get cu enabled or disabled
+ * @vendor_req_1_version: Vendor requirement version 1
+ * @vendor_req_2_version: Vendor requirement version 2
+ * @sta_dual_p2p_support: STA + dual p2p support enabled or not
+ * @enable2x2: Enable 2x2
+ */
+struct wlan_mlme_features {
+	bool enable_wifi_optimizer;
+	uint8_t sap_max_num_clients;
+	bool roaming_high_cu_roam_trigger;
+	bool roaming_emergency_trigger;
+	bool roaming_btm_trihgger;
+	bool roaming_idle_trigger;
+	bool roaming_wtc_trigger;
+	bool roaming_btcoex_trigger;
+	bool roaming_btw_wpa_wpa2;
+	bool roaming_manage_chan_list_api;
+	bool roaming_adaptive_11r;
+	bool roaming_ctrl_api_get_set;
+	bool roaming_ctrl_api_reassoc;
+	bool roaming_ctrl_get_cu;
+	WMI_HOST_VENDOR1_REQ1_VERSION vendor_req_1_version;
+	WMI_HOST_VENDOR1_REQ2_VERSION vendor_req_2_version;
+	bool sta_dual_p2p_support;
+	bool enable2x2;
+};
+#endif
 #endif

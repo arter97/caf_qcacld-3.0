@@ -287,6 +287,18 @@ QDF_STATUS lim_send_mlo_caps_ie(struct mac_context *mac_ctx,
 				struct pe_session *session,
 				enum QDF_OPMODE device_mode,
 				uint8_t vdev_id);
+
+/**
+ * lim_strip_mlo_ie() - Removes the MLO IE data from additional IE data
+ *
+ * @mac_ctx: global MAC context
+ * @add_ie: Additional IE buffer
+ * @add_ielen: Pointer to length of additional IE
+ *
+ * Return: Void
+ */
+void lim_strip_mlo_ie(struct mac_context *mac_ctx,
+		      uint8_t *add_ie, uint16_t *add_ielen);
 #else
 static inline uint16_t lim_assign_mlo_conn_idx(struct mac_context *mac,
 					       struct pe_session *pe_session,
@@ -310,6 +322,12 @@ static inline void lim_update_sta_mlo_info(struct pe_session *session,
 static inline
 void lim_set_mlo_caps(struct mac_context *mac, struct pe_session *session,
 		      uint8_t *ie_start, uint32_t num_bytes)
+{
+}
+
+static inline
+void lim_strip_mlo_ie(struct mac_context *mac_ctx,
+		      uint8_t *addn_ie, uint16_t *addn_ielen)
 {
 }
 
@@ -692,19 +710,6 @@ void lim_delete_sta_context(struct mac_context *mac, struct scheduler_msg *limMs
 void lim_delete_dialogue_token_list(struct mac_context *mac);
 
 /**
- * lim_add_channel_status_info() - store
- * chan status info into Global MAC structure
- * @p_mac: Pointer to Global MAC structure
- * @channel_stat: Pointer to chan status info reported by firmware
- * @channel_id: current channel id
- *
- * Return: None
- */
-void lim_add_channel_status_info(struct mac_context *p_mac,
-				 struct lim_channel_status *channel_stat,
-				 uint8_t channel_id);
-
-/**
  * lim_get_channel_from_beacon() - extract channel number
  * from beacon and convert to channel frequency
  * @mac: Pointer to Global MAC structure
@@ -789,10 +794,8 @@ static inline uint16_t ch_width_in_mhz(enum phy_ch_width ch_width)
 		return 5;
 	case CH_WIDTH_10MHZ:
 		return 10;
-#if defined(WLAN_FEATURE_11BE)
 	case CH_WIDTH_320MHZ:
 		return 320;
-#endif
 	default:
 		return 20;
 	}
@@ -1040,6 +1043,18 @@ QDF_STATUS lim_send_ies_per_band(struct mac_context *mac_ctx,
 				 struct pe_session *session, uint8_t vdev_id,
 				 enum csr_cfgdot11mode dot11_mode,
 				 enum QDF_OPMODE device_mode);
+
+/**
+ * lim_update_connect_rsn_ie() - Update the connection RSN IE
+ * @session: PE session
+ * @rsn_ie_buf: RSN IE buffer
+ * @pmksa: PMKSA entry for the connecting AP
+ *
+ * Return: None
+ */
+void
+lim_update_connect_rsn_ie(struct pe_session *session, uint8_t *rsn_ie_buf,
+			  struct wlan_crypto_pmksa *pmksa);
 
 /**
  * lim_send_action_frm_tb_ppdu_cfg() - sets action frame in TB PPDU cfg to FW
@@ -2050,6 +2065,15 @@ void lim_update_stads_eht_caps(struct mac_context *mac_ctx,
 void lim_update_stads_eht_bw_320mhz(struct pe_session *session,
 				    tpDphHashNode sta_ds);
 
+/**
+ * lim_is_session_chwidth_320mhz() - Check if session chan width is 320 MHz
+ * @session: pointer to PE session
+ *
+ * Check if session channel width is 320 MHz
+ *
+ * Return: bool
+ */
+bool lim_is_session_chwidth_320mhz(struct pe_session *session);
 #else
 static inline bool lim_is_session_eht_capable(struct pe_session *session)
 {
@@ -2220,26 +2244,57 @@ lim_update_stads_eht_bw_320mhz(struct pe_session *session,
 			       tpDphHashNode sta_ds)
 {
 }
+
+static inline bool
+lim_is_session_chwidth_320mhz(struct pe_session *session)
+{
+	return false;
+}
 #endif /* WLAN_FEATURE_11BE */
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * lim_intersect_ap_emlsr_caps() - Intersect AP and self STA EHT capabilities
+ * @mac_ctx: Global MAC context
  * @session: pointer to PE session
  * @add_bss: pointer to ADD BSS params
- * @beacon: pointer to beacon
  * @assoc_rsp: pointer to assoc response
  *
  * Return: None
  */
-void lim_intersect_ap_emlsr_caps(struct pe_session *session,
+void lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
+				 struct pe_session *session,
 				 struct bss_params *add_bss,
 				 tpSirAssocRsp assoc_rsp);
+
+/**
+ * lim_extract_msd_caps() - Extract MLD AP MSD capabilities and assign
+ * the same caps to link vdev
+ * @mac_ctx: Global MAC context
+ * @session: pointer to PE session
+ * @add_bss: pointer to ADD BSS params
+ * @assoc_rsp: pointer to assoc response
+ *
+ * Return: None
+ */
+void lim_extract_msd_caps(struct mac_context *mac_ctx,
+			  struct pe_session *session,
+			  struct bss_params *add_bss,
+			  tpSirAssocRsp assoc_rsp);
 #else
 static inline void
-lim_intersect_ap_emlsr_caps(struct pe_session *session,
+lim_intersect_ap_emlsr_caps(struct mac_context *mac_ctx,
+			    struct pe_session *session,
 			    struct bss_params *add_bss,
 			    tpSirAssocRsp assoc_rsp)
+{
+}
+
+static inline void
+lim_extract_msd_caps(struct mac_context *mac_ctx,
+		     struct pe_session *session,
+		     struct bss_params *add_bss,
+		     tpSirAssocRsp assoc_rsp)
 {
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
@@ -2903,12 +2958,14 @@ lim_is_self_and_peer_ocv_capable(struct mac_context *mac,
  * @mac:        pointer to mac data
  * @session: pointer to pe session
 .* @oci:       pointer of tDot11fIEoci
+ * @peer: peer mac address
+ * @tx_chan_width: tx channel width in MHz
  *
  * Return: void
  */
 void
 lim_fill_oci_params(struct mac_context *mac, struct pe_session *session,
-		    tDot11fIEoci *oci);
+		    tDot11fIEoci *oci, uint8_t *peer, uint16_t *tx_chan_width);
 
 #ifdef WLAN_FEATURE_SAE
 /**
@@ -2919,8 +2976,26 @@ lim_fill_oci_params(struct mac_context *mac, struct pe_session *session,
  * Return: None
  */
 void lim_process_sae_msg(struct mac_context *mac, struct sir_sae_msg *body);
+
+/**
+ * lim_trigger_auth_req_sae() - sends SAE auth request to sme
+ * @mac_ctx: Global MAC pointer
+ * @session: pointer to pe session
+ * @peer_bssid: bssid to do SAE auth
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS lim_trigger_auth_req_sae(struct mac_context *mac_ctx,
+				    struct pe_session *session,
+				    struct qdf_mac_addr *peer_bssid);
 #else
-static inline void lim_process_sae_msg(struct mac_context *mac, void *body);
+static inline void lim_process_sae_msg(struct mac_context *mac, void *body)
+{}
+
+static inline QDF_STATUS lim_trigger_auth_req_sae(
+					struct mac_context *mac_ctx,
+					struct pe_session *session,
+					struct qdf_mac_addr *peer_bssid)
 {}
 #endif
 
@@ -3003,4 +3078,86 @@ bool lim_update_channel_width(struct mac_context *mac_ctx,
 uint8_t lim_get_vht_ch_width(tDot11fIEVHTCaps *vht_cap,
 			     tDot11fIEVHTOperation *vht_op,
 			     tDot11fIEHTInfo *ht_info);
+
+/**
+ * lim_update_tx_power() - Function to update the TX power for
+ * the STA interface based on the SAP concurrency
+ *
+ * @mac_ctx: Pointer to Global mac structure
+ * @sap_session: Session pointer of the SAP
+ * @sta_session: Session pointer of the STA
+ * @restore_sta_power: Flag to update the new Tx power for STA
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+lim_update_tx_power(struct mac_context *mac_ctx, struct pe_session *sap_session,
+		    struct pe_session *sta_session, bool restore_sta_power);
+
+/**
+ * lim_skip_tpc_update_for_sta() - Function to check if the TPC set power
+ * needs to be skipped for STA.
+ *
+ * @mac_ctx: Pointer to Global mac structure
+ * @sta_session: Session pointer of the STA.
+ * @sap_session: Session pointer of the SAP
+ *
+ * Return: skip tpc for sta
+ */
+bool
+lim_skip_tpc_update_for_sta(struct mac_context *mac,
+			    struct pe_session *sta_session,
+			    struct pe_session *sap_session);
+
+/**
+ * lim_get_concurrent_session() - Function to get the concurrent session pointer
+ *
+ * @mac_ctx: Pointer to Global mac structure
+ * @vdev_id: vdev id
+ * @opmode: opmode of the interface
+ *
+ * Return: pe_session
+ */
+struct pe_session *
+lim_get_concurrent_session(struct mac_context *mac_ctx, uint8_t vdev_id,
+			   enum QDF_OPMODE opmode);
+
+/**
+ * lim_check_conc_power_for_csa() - Function to change the TX power
+ * of STA when channel switch happens in SAP
+ *
+ * @mac_ctx: Pointer to Global mac structure.
+ * @session: Session pointer of the SAP.
+ *
+ * Return: None
+ */
+void
+lim_check_conc_power_for_csa(struct mac_context *mac_ctx,
+			     struct pe_session *session);
+
+/**
+ * lim_cleanup_power_change() - Function to reset the change_scc_power
+ * flag in concurrent SAP vdev
+ *
+ * @mac_ctx: Pointer to Global mac structure.
+ * @session: Session pointer of the interface
+ */
+void
+lim_cleanup_power_change(struct mac_context *mac_ctx,
+			 struct pe_session *session);
+
+/**
+ * lim_is_power_change_required_for_sta() - Function to check if the 6 GHz
+ * STA power level has to be changed
+ *
+ * @mac_ctx: Pointer to Global mac structure.
+ * @sta_session: Session pointer of STA.
+ * @sap_session: Session pointer of SAP.
+ *
+ * Return: restart required for sta
+ */
+bool
+lim_is_power_change_required_for_sta(struct mac_context *mac_ctx,
+				     struct pe_session *sta_session,
+				     struct pe_session *sap_session);
 #endif /* __LIM_UTILS_H */

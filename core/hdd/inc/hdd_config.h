@@ -37,12 +37,12 @@
 
 /**
  * enum hdd_wext_control - knob for wireless extensions
- * @hdd_wext_disabled - interface is completely disabled. An access
+ * @hdd_wext_disabled: interface is completely disabled. An access
  *      control error log will be generated for each attempted use.
- * @hdd_wext_deprecated - interface is available but should not be
+ * @hdd_wext_deprecated: interface is available but should not be
  *      used. An access control warning log will be generated for each
  *      use.
- * @hdd_wext_enabled - interface is available without restriction. No
+ * @hdd_wext_enabled: interface is available without restriction. No
  *      access control logs will be generated.
  *
  * enum hdd_wext_control is used to enable coarse grained control on
@@ -66,7 +66,7 @@ enum hdd_wext_control {
  * Values are per enum hdd_wext_control.
  * This ini is used to control access to private wireless extensions
  * ioctls SIOCIWFIRSTPRIV (0x8BE0) thru SIOCIWLASTPRIV (0x8BFF). The
- * functionality provided by some of these ioctls has been superceeded
+ * functionality provided by some of these ioctls has been superseded
  * by cfg80211 (either standard commands or vendor commands), but many
  * of the private ioctls do not have a cfg80211-based equivalent, so
  * by default support for these ioctls is deprecated.
@@ -132,6 +132,63 @@ enum hdd_dot11_mode {
 			eHDD_DOT11_MODE_11ax, \
 			CFG_VALUE_OR_DEFAULT, \
 			"dot11 mode")
+
+#ifdef FEATURE_SET
+  /*
+   * <ini>
+   * get_wifi_features  - Get wifi features info from fw
+   * @Min: 0
+   * @Max: 1
+   * @Default: 0
+   *
+   * This ini is used to enable feature to get wifi supported features from fw
+   *
+   * Related: None
+   *
+   * Supported Feature: All
+   *
+   * Usage: External
+   *
+   * </ini>
+   */
+#define CFG_GET_WIFI_FEATURES CFG_INI_BOOL( \
+		"get_wifi_features", \
+		0, \
+		"Get wifi features")
+#define CFG_GET_WIFI_FEATURES_ALL CFG(CFG_GET_WIFI_FEATURES)
+#else
+#define CFG_GET_WIFI_FEATURES_ALL
+#endif
+
+#ifdef FEATURE_RUNTIME_PM
+/*
+ * <ini>
+ * cpu_cxpc_threshold - PM QOS threshold
+ * @Min: 0
+ * @Max: 15000
+ * @Default: 10000
+ *
+ * This ini is used to set PM QOS threshold value
+ *
+ * Related: None.
+ *
+ * Supported Feature: ALL
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+ #define CFG_CPU_CXPC_THRESHOLD CFG_INI_UINT( \
+			"cpu_cxpc_threshold", \
+			0, \
+			15000, \
+			10000, \
+			CFG_VALUE_OR_DEFAULT, \
+			"PM QOS threshold")
+#define CFG_CPU_CXPC_THRESHOLD_ALL CFG(CFG_CPU_CXPC_THRESHOLD)
+#else
+#define CFG_CPU_CXPC_THRESHOLD_ALL
+#endif
 
 #ifdef QCA_WIFI_EMULATION
 #define CFG_INTERFACE_CHANGE_WAIT_DEFAULT	300000
@@ -947,9 +1004,9 @@ struct dhcp_server {
  * Example 1:
  *
  * OUI is 00-10-18, data length is 05 (hex form), data is 02-11-04-5C-DE and
- * need to consider first 3 bytes and last byte of data for comparision
+ * need to consider first 3 bytes and last byte of data for comparison
  * mac-addr EE-1A-59-FE-FD-AF is present and first 3 bytes and last byte of
- * mac address should be considered for comparision
+ * mac address should be considered for comparison
  * capability is not present
  * then action OUI for gActionOUIITOExtension is as follows:
  *
@@ -1309,23 +1366,24 @@ struct dhcp_server {
 
 /*
  * <ini>
- * gActionOUIDisableMuEDCA - Used to specify action OUIs to control
- * MU EDCA configuration when join the candidate AP
+ * gActionOUIExtendWowITO - Used to extend ITO(Inactivity Time-Out) value under
+ * WoWLAN mode for specified APs.
  *
- * Note: User should strictly add new action OUIs at the end of this
- * default value.
+ * @Default: NULL
  *
- * One special AP sets MU EDCA timer as 255 wrongly in both beacon and assoc
- * rsp, lead to 2 sec SU UL data stall periodically.
- * This ini is used to specify AP OUIs. Don't follow mu edca in assoc rsp
- * when connecting to those AP, just reset mu edca timer to 1.
- * For default:
- *     gActionOUIDisableMuEDCA=000CE7 08 00000000BF0CB101 FF 01
- *          Explain: 000CE7: OUI
- *                   08: data length
- *                   00000000BF0CB101: data
- *                   FF: OUI data mask: 11111111
- *                   01: info mask, only OUI present in info mask
+ * Some APs sometimes don't honor Qos null frames under WoWLAN mode if
+ * station's ITO is too small. This ini is used to specify AP OUIs which
+ * exhibit this behavior. When connected to such an AP, the station's ITO
+ * value will be extended when in WoWLAN mode.
+ * For example, it extends the ITO value(under WoWLAN mode) when connected
+ * to AP whose OUI is 001018 and vendor specific data is 0201009C0000 with
+ * the following setting:
+ *     gActionOUIExtendWowITO=001018 06 0201009C0000 FC 01
+ *         OUI: 001018
+ *         OUI data Len : 06
+ *         OUI Data : 0201009C0000
+ *         OUI data Mask: FC - 11111100
+ *         Info Mask : 01 - only OUI present in Info mask
  * Refer to gEnableActionOUI for more detail about the format.
  *
  * Related: gEnableActionOUI
@@ -1336,12 +1394,12 @@ struct dhcp_server {
  *
  * </ini>
  */
-#define CFG_ACTION_OUI_DISABLE_MU_EDCA CFG_INI_STRING( \
-	"gActionOUIDisableMuEDCA", \
+#define CFG_ACTION_OUI_EXTEND_WOW_ITO CFG_INI_STRING( \
+	"gActionOUIExtendWowITO", \
 	0, \
 	ACTION_OUI_MAX_STR_LEN, \
-	"000CE7 08 00000000BF0CB101 FF 01", \
-	"Used to specify action OUIs to control mu edca configuration")
+	"", \
+	"Used to extend inactivity time out under WoWLAN mode for specified APs")
 
 /*
  * <ini>
@@ -1875,7 +1933,7 @@ enum host_log_level {
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_TX) \
 	CFG(CFG_ACTION_OUI_FORCE_MAX_NSS) \
 	CFG(CFG_ACTION_OUI_DISABLE_AGGRESSIVE_EDCA) \
-	CFG(CFG_ACTION_OUI_DISABLE_MU_EDCA) \
+	CFG(CFG_ACTION_OUI_EXTEND_WOW_ITO) \
 	CFG(CFG_ACTION_OUI_SWITCH_TO_11N_MODE) \
 	CFG(CFG_ACTION_OUI_RECONN_ASSOCTIMEOUT) \
 	CFG(CFG_ACTION_OUI_DISABLE_TWT) \
@@ -1906,5 +1964,7 @@ enum host_log_level {
 	CFG(CFG_READ_MAC_ADDR_FROM_MAC_FILE) \
 	CFG(CFG_SAR_CONVERSION) \
 	CFG(CFG_ENABLE_HOST_MODULE_LOG_LEVEL) \
-	SAR_SAFETY_FEATURE_ALL
+	SAR_SAFETY_FEATURE_ALL \
+	CFG_GET_WIFI_FEATURES_ALL \
+	CFG_CPU_CXPC_THRESHOLD_ALL
 #endif

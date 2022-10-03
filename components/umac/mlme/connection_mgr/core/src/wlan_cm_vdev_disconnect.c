@@ -80,7 +80,7 @@ QDF_STATUS cm_disconnect_start_ind(struct wlan_objmgr_vdev *vdev,
 
 	user_disconnect = req->source == CM_OSIF_DISCONNECT ? true : false;
 	if (user_disconnect) {
-		wlan_p2p_cleanup_roc_by_vdev(vdev);
+		wlan_p2p_cleanup_roc_by_vdev(vdev, false);
 		wlan_tdls_notify_sta_disconnect(req->vdev_id, false,
 						user_disconnect, vdev);
 	}
@@ -422,6 +422,14 @@ wlan_cm_mlo_update_disconnecting_vdev_id(struct wlan_objmgr_psoc *psoc,
 		goto done;
 	}
 
+	/*
+	 * During the link vdev disconnection the RSO stop vdev id will be of
+	 * assoc vdev (changed during cm_handle_mlo_rso_state_change), So try
+	 * to get the link vdev on which disconnect was actually happening i.e
+	 * the one with active disconnecting state from the mlo links, so that
+	 * continue disconnect is initiated on a proper vdev in connection
+	 * manager.
+	 */
 	mlo_get_ml_vdev_list(vdev, &num_links, vdev_list);
 	if (!num_links) {
 		mlme_err("No VDEVs under vdev id: %d", *vdev_id);
@@ -437,6 +445,8 @@ wlan_cm_mlo_update_disconnecting_vdev_id(struct wlan_objmgr_psoc *psoc,
 
 	for (i = 0; i < num_links; i++) {
 		if (wlan_vdev_mlme_is_mlo_link_vdev(vdev_list[i]) &&
+		    (wlan_cm_is_vdev_disconnecting(vdev_list[i]) ||
+		     wlan_cm_is_vdev_connecting(vdev_list[i])) &&
 		    wlan_cm_get_active_req_type(vdev_list[i]) ==
 							CM_DISCONNECT_ACTIVE) {
 			/*
@@ -494,7 +504,15 @@ wlan_cm_rso_stop_continue_disconnect(struct wlan_objmgr_psoc *psoc,
 		status = QDF_STATUS_E_EXISTS;
 		goto done;
 	}
-	wlan_cm_disc_cont_after_rso_stop(vdev, is_ho_fail, req);
+
+	if (is_ho_fail) {
+		req->req.source = CM_MLME_DISCONNECT;
+		req->req.reason_code = REASON_FW_TRIGGERED_ROAM_FAILURE;
+		mlme_debug(CM_PREFIX_FMT "Updating source(%d) and reason code (%d) to RSO reason and source as ho fail is received in RSO stop",
+			   CM_PREFIX_REF(req->req.vdev_id, req->cm_id),
+			   req->req.source, req->req.reason_code);
+	}
+	wlan_cm_disc_cont_after_rso_stop(vdev, req);
 
 done:
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);

@@ -669,6 +669,35 @@ static uint32_t hdd_get_he_op_len(struct hdd_station_ctx *hdd_sta_ctx)
 }
 #endif
 
+static uint32_t hdd_get_prev_connected_bss_ies_len(
+					struct hdd_station_ctx *hdd_sta_ctx)
+{
+	return hdd_sta_ctx->conn_info.prev_ap_bcn_ie.len;
+}
+
+static uint32_t hdd_add_prev_connected_bss_ies(
+					struct sk_buff *skb,
+					struct hdd_station_ctx *hdd_sta_ctx)
+{
+	struct element_info *bcn_ie = &hdd_sta_ctx->conn_info.prev_ap_bcn_ie;
+
+	if (bcn_ie->len) {
+		if (nla_put(skb, BEACON_IES, bcn_ie->len, bcn_ie->ptr)) {
+			hdd_err("Failed to put beacon IEs: bytes left: %d, ie_len: %u ",
+				skb_tailroom(skb), bcn_ie->len);
+			return -EINVAL;
+		}
+
+		hdd_nofl_debug("Beacon IEs len: %u", bcn_ie->len);
+
+		qdf_mem_free(bcn_ie->ptr);
+		bcn_ie->ptr = NULL;
+		bcn_ie->len = 0;
+	}
+
+	return 0;
+}
+
 /**
  * hdd_get_station_info() - send BSS information to supplicant
  * @hdd_ctx: pointer to hdd context
@@ -680,10 +709,9 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 				struct hdd_adapter *adapter)
 {
 	struct sk_buff *skb = NULL;
-	uint8_t *tmp_hs20 = NULL, *ies = NULL;
-	uint32_t nl_buf_len, ie_len = 0, hdd_he_op_len = 0;
+	uint8_t *tmp_hs20 = NULL;
+	uint32_t nl_buf_len, hdd_he_op_len = 0;
 	struct hdd_station_ctx *hdd_sta_ctx;
-	QDF_STATUS status;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 
@@ -721,11 +749,7 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_op_present)
 		nl_buf_len += sizeof(hdd_sta_ctx->
 						cache_conn_info.vht_operation);
-	status = sme_get_prev_connected_bss_ies(hdd_ctx->mac_handle,
-						adapter->vdev_id,
-						&ies, &ie_len);
-	if (QDF_IS_STATUS_SUCCESS(status))
-		nl_buf_len += ie_len;
+	nl_buf_len += hdd_get_prev_connected_bss_ies_len(hdd_sta_ctx);
 
 	hdd_he_op_len = hdd_get_he_op_len(hdd_sta_ctx);
 	nl_buf_len += hdd_he_op_len;
@@ -809,16 +833,9 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 		goto fail;
 	}
 
-	if (ie_len) {
-		if (nla_put(skb, BEACON_IES, ie_len, ies)) {
-			hdd_err("Failed to put beacon IEs: bytes left: %d, ie_len: %u total buf_len: %u",
-				skb_tailroom(skb), ie_len, nl_buf_len);
-			goto fail;
-		}
-
-		hdd_nofl_debug("Beacon IEs len: %u", ie_len);
-
-		qdf_mem_free(ies);
+	if (hdd_add_prev_connected_bss_ies(skb, hdd_sta_ctx)) {
+		hdd_err("put fail total buf_len: %u", nl_buf_len);
+		goto fail;
 	}
 
 	hdd_nofl_debug(
@@ -840,7 +857,6 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 fail:
 	if (skb)
 		kfree_skb(skb);
-	qdf_mem_free(ies);
 	return -EINVAL;
 }
 
@@ -1598,6 +1614,7 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 {
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct cdp_peer_stats *peer_stats;
+	struct cds_vdev_dp_stats dp_stats;
 	struct stats_event *stats;
 	QDF_STATUS status;
 	int i, ret = 0;
@@ -1634,8 +1651,12 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	stainfo->tx_retry_succeed = stats->peer_stats_info_ext->tx_retries -
-				    stats->peer_stats_info_ext->tx_failed;
+	if (cds_dp_get_vdev_stats(adapter->vdev_id, &dp_stats))
+		stainfo->tx_retry_succeed =
+					dp_stats.tx_mpdu_success_with_retries;
+	else
+		hdd_err("failed to get dp vdev stats");
+
 	/* This host counter is not supported
 	 * since currently tx retry is not done in host side
 	 */
@@ -1643,6 +1664,33 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 	stainfo->tx_total_fw = stats->peer_stats_info_ext->tx_packets;
 	stainfo->tx_retry_fw = stats->peer_stats_info_ext->tx_retries;
 	stainfo->tx_retry_exhaust_fw = stats->peer_stats_info_ext->tx_failed;
+
+	if (stats->peer_stats_info_ext->num_tx_rate_counts) {
+		stainfo->tx_pkt_per_mcs = qdf_mem_malloc(
+				stats->peer_stats_info_ext->num_tx_rate_counts *
+				sizeof(uint32_t));
+		if (stainfo->tx_pkt_per_mcs) {
+			stainfo->num_tx_rate_count =
+				stats->peer_stats_info_ext->num_tx_rate_counts;
+			qdf_mem_copy(
+				stainfo->tx_pkt_per_mcs,
+				stats->peer_stats_info_ext->tx_pkt_per_mcs,
+				stainfo->num_tx_rate_count * sizeof(uint32_t));
+		}
+	}
+	if (stats->peer_stats_info_ext->num_rx_rate_counts) {
+		stainfo->rx_pkt_per_mcs = qdf_mem_malloc(
+				stats->peer_stats_info_ext->num_rx_rate_counts *
+				sizeof(uint32_t));
+		if (stainfo->rx_pkt_per_mcs) {
+			stainfo->num_rx_rate_count =
+				stats->peer_stats_info_ext->num_rx_rate_counts;
+			qdf_mem_copy(
+				stainfo->rx_pkt_per_mcs,
+				stats->peer_stats_info_ext->rx_pkt_per_mcs,
+				stainfo->num_rx_rate_count * sizeof(uint32_t));
+		}
+	}
 
 	/* Optional, just print logs here */
 	if (!stats->num_peer_adv_stats) {
@@ -1666,6 +1714,25 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 }
 
 /**
+ * hdd_free_tx_rx_pkts_per_mcs - Free memory for tx packets per MCS and
+ * rx packets per MCS
+ * @stainfo: station information
+ *
+ * Return: None
+ */
+static void hdd_free_tx_rx_pkts_per_mcs(struct hdd_station_info *stainfo)
+{
+	if (stainfo->tx_pkt_per_mcs) {
+		qdf_mem_free(stainfo->tx_pkt_per_mcs);
+		stainfo->tx_pkt_per_mcs = NULL;
+	}
+	if (stainfo->rx_pkt_per_mcs) {
+		qdf_mem_free(stainfo->rx_pkt_per_mcs);
+		stainfo->rx_pkt_per_mcs = NULL;
+	}
+}
+
+/**
  * hdd_add_peer_stats_get_len - get data length used in
  * hdd_add_peer_stats()
  * @stainfo: station information
@@ -1678,6 +1745,15 @@ static int hdd_get_peer_stats(struct hdd_adapter *adapter,
 static uint32_t
 hdd_add_peer_stats_get_len(struct hdd_station_info *stainfo)
 {
+	uint32_t tx_count_size = 0;
+	uint32_t rx_count_size = 0;
+	uint16_t i;
+
+	for (i = 0; i < stainfo->num_tx_rate_count; i++)
+		tx_count_size += nla_attr_size(sizeof(uint32_t));
+	for (i = 0; i < stainfo->num_rx_rate_count; i++)
+		rx_count_size += nla_attr_size(sizeof(uint32_t));
+
 	return (nla_attr_size(sizeof(stainfo->rx_retry_cnt)) +
 		nla_attr_size(sizeof(stainfo->rx_mc_bc_cnt)) +
 		nla_attr_size(sizeof(stainfo->tx_retry_succeed)) +
@@ -1685,7 +1761,8 @@ hdd_add_peer_stats_get_len(struct hdd_station_info *stainfo)
 		nla_attr_size(sizeof(stainfo->tx_total_fw)) +
 		nla_attr_size(sizeof(stainfo->tx_retry_fw)) +
 		nla_attr_size(sizeof(stainfo->tx_retry_exhaust_fw)) +
-		nla_attr_size(sizeof(stainfo->rx_fcs_count)));
+		nla_attr_size(sizeof(stainfo->rx_fcs_count)) +
+		tx_count_size + rx_count_size);
 }
 
 /**
@@ -1953,6 +2030,9 @@ static int hdd_add_connect_fail_reason_code(struct sk_buff *skb,
 static int hdd_add_peer_stats(struct sk_buff *skb,
 			      struct hdd_station_info *stainfo)
 {
+	struct nlattr *nla_attr;
+	uint8_t i;
+
 	if (nla_put_u32(skb, QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_RX_RETRY_COUNT,
 			stainfo->rx_retry_cnt)) {
 		hdd_err("Failed to put rx_retry_cnt");
@@ -2004,8 +2084,42 @@ static int hdd_add_peer_stats(struct sk_buff *skb,
 		goto fail;
 	}
 
+	nla_attr = nla_nest_start(skb,
+			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_PER_MCS_TX_PACKETS);
+	if (!nla_attr) {
+		hdd_err("nla nest start for tx packets fail");
+		goto fail;
+	}
+
+	for (i = 0; i < stainfo->num_tx_rate_count; i++)
+		if (nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_PER_MCS_TX_PACKETS,
+			stainfo->tx_pkt_per_mcs[i])) {
+			hdd_err("Failed to put tx_rate_count for MCS[%d]", i);
+			goto fail;
+		}
+	nla_nest_end(skb, nla_attr);
+
+	nla_attr = nla_nest_start(skb,
+			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_PER_MCS_RX_PACKETS);
+	if (!nla_attr) {
+		hdd_err("nla nest start for rx packets fail");
+		goto fail;
+	}
+
+	for (i = 0; i < stainfo->num_rx_rate_count; i++)
+		if (nla_put_u32(skb,
+			QCA_WLAN_VENDOR_ATTR_GET_STA_INFO_PER_MCS_TX_PACKETS,
+			stainfo->rx_pkt_per_mcs[i])) {
+			hdd_err("Failed to put rx_rate_count for MCS[%d]", i);
+			goto fail;
+		}
+	nla_nest_end(skb, nla_attr);
+
+	hdd_free_tx_rx_pkts_per_mcs(stainfo);
 	return 0;
 fail:
+	hdd_free_tx_rx_pkts_per_mcs(stainfo);
 	return -EINVAL;
 }
 
@@ -2237,6 +2351,8 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	if (wlan_hdd_get_station_stats(adapter))
 		hdd_err_rl("wlan_hdd_get_station_stats fail");
 
+	wlan_hdd_get_peer_rx_rate_stats(adapter);
+
 	if (big_data_stats_req) {
 		if (wlan_hdd_get_big_data_station_stats(adapter)) {
 			hdd_err_rl("wlan_hdd_get_big_data_station_stats fail");
@@ -2273,6 +2389,7 @@ static int hdd_get_station_info_ex(struct hdd_context *hdd_ctx,
 	if (connect_fail_rsn_len) {
 		if (hdd_add_connect_fail_reason_code(skb, adapter)) {
 			hdd_err_rl("hdd_add_connect_fail_reason_code fail");
+			kfree_skb(skb);
 			return -ENOMEM;
 		}
 	}

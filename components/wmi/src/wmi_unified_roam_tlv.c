@@ -1057,10 +1057,11 @@ extract_roam_event_tlv(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 					  QDF_PROTO_TYPE_EVENT,
 					  QDF_ROAM_EVENTID));
 
-	wmi_debug("FW_ROAM_EVT: Reason:%s[%d], Notif %x for vdevid %x, rssi %d",
+	wmi_debug("FW_ROAM_EVT: Reason:%s[%d], Notif %x for vdevid %x, rssi %d, params %d, params1 %d",
 		  wmi_get_roam_event_reason_string(roam_event->reason),
 		  roam_event->reason,
-		  roam_event->notif, roam_event->vdev_id, roam_event->rssi);
+		  roam_event->notif, roam_event->vdev_id, roam_event->rssi,
+		  roam_event->notif_params, roam_event->notif_params1);
 
 	if (param_buf->hw_mode_transition_fixed_param) {
 		hw_mode_trans_ind = qdf_mem_malloc(sizeof(*hw_mode_trans_ind));
@@ -3233,6 +3234,8 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&rso_auth_start_ev->candidate_ap_bssid,
 				   auth_event->ap_bssid.bytes);
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&rso_auth_start_ev->transmit_addr,
+				   auth_event->ta.bytes);
 	if (qdf_is_macaddr_zero(&auth_event->ap_bssid) ||
 	    qdf_is_macaddr_broadcast(&auth_event->ap_bssid) ||
 	    qdf_is_macaddr_group(&auth_event->ap_bssid)) {
@@ -3240,8 +3243,11 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 		return -EINVAL;
 	}
 
-	wmi_debug("Received Roam auth offload event for bss:"QDF_MAC_ADDR_FMT" vdev_id:%d",
-		  QDF_MAC_ADDR_REF(auth_event->ap_bssid.bytes), auth_event->vdev_id);
+	wmi_debug("Received Roam auth offload event for bss:"
+		  QDF_MAC_ADDR_FMT " ta:" QDF_MAC_ADDR_FMT " vdev_id: %d",
+		  QDF_MAC_ADDR_REF(auth_event->ap_bssid.bytes),
+		  QDF_MAC_ADDR_REF(auth_event->ta.bytes),
+		  auth_event->vdev_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4384,10 +4390,87 @@ send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
 		  score_param->eht_weightage_pcnt,
 		  score_param->mlo_weightage_pcnt);
 }
+
+static uint32_t convert_support_link_band_to_wmi(uint32_t bands)
+{
+	uint32_t target_bands = 0;
+
+	if (bands & BIT(REG_BAND_2G))
+		target_bands |= BIT(0);
+	if (bands & BIT(REG_BAND_5G))
+		target_bands |= BIT(1);
+	if (bands & BIT(REG_BAND_6G))
+		target_bands |= BIT(2);
+
+	return target_bands;
+}
+
+/**
+ * send_roam_mlo_config_tlv() - send roam mlo config parameters
+ * @wmi_handle: wmi handle
+ * @req: pointer to wlan roam mlo config parameters
+ *
+ * This function sends the roam mlo config parameters to fw.
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+send_roam_mlo_config_tlv(wmi_unified_t wmi_handle,
+			 struct wlan_roam_mlo_config *req)
+{
+	wmi_roam_mlo_config_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_roam_mlo_config_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(
+	    &cmd->tlv_header,
+	    WMITLV_TAG_STRUC_wmi_roam_mlo_config_cmd_fixed_param,
+	    WMITLV_GET_STRUCT_TLVLEN(wmi_roam_mlo_config_cmd_fixed_param));
+
+	cmd->vdev_id = req->vdev_id;
+	cmd->support_link_num = req->support_link_num;
+	cmd->support_link_band = convert_support_link_band_to_wmi(
+						req->support_link_band);
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(req->partner_link_addr.bytes,
+				   &cmd->partner_link_addr);
+
+	wmi_debug("RSO_CFG MLO: vdev_id:%d support_link_num:%d support_link_band:0x%0x link addr:"QDF_MAC_ADDR_FMT,
+		  cmd->vdev_id, cmd->support_link_num,
+		  cmd->support_link_band,
+		  QDF_MAC_ADDR_REF(req->partner_link_addr.bytes));
+
+	wmi_mtrace(WMI_ROAM_MLO_CONFIG_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_ROAM_MLO_CONFIG_CMDID)) {
+		wmi_err("Failed to send WMI_ROAM_MLO_CONFIG_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
+{
+	struct wmi_ops *ops = wmi_handle->ops;
+
+	ops->send_roam_mlo_config = send_roam_mlo_config_tlv;
+}
+
 #else
 static void
 send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
 			    struct ap_profile_params *ap_profile)
+{
+}
+
+static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
 {
 }
 #endif
@@ -5283,6 +5366,7 @@ send_disconnect_roam_params_tlv(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 
+#define WLAN_TIME_IN_MS 1000
 /**
  * send_idle_roam_params_tlv() - send idle roam trigger parameters
  * @wmi_handle: wmi handle
@@ -5317,7 +5401,7 @@ send_idle_roam_params_tlv(wmi_unified_t wmi_handle,
 	cmd->band = idle_roam_params->band;
 	cmd->rssi_delta = idle_roam_params->conn_ap_rssi_delta;
 	cmd->min_rssi = idle_roam_params->conn_ap_min_rssi;
-	cmd->idle_time = idle_roam_params->inactive_time;
+	cmd->idle_time = idle_roam_params->inactive_time / WLAN_TIME_IN_MS;
 	cmd->data_packet_count = idle_roam_params->data_pkt_count;
 	wmi_debug("RSO_CFG: vdev_id:%d enable:%d band:%d rssi_delta:%d min_rssi:%d idle_time:%d data_pkt:%d",
 		 cmd->vdev_id, cmd->enable,
@@ -5594,6 +5678,7 @@ void wmi_roam_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_roam_preauth_status = send_roam_preauth_status_tlv;
 	ops->extract_roam_event = extract_roam_event_tlv;
 
+	wmi_roam_mlo_attach_tlv(wmi_handle);
 	wmi_lfr_subnet_detection_attach_tlv(wmi_handle);
 	wmi_rssi_monitor_attach_tlv(wmi_handle);
 	wmi_ese_attach_tlv(wmi_handle);

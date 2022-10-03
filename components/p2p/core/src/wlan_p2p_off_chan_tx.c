@@ -662,6 +662,7 @@ static QDF_STATUS p2p_populate_mac_header(
 	uint16_t seq_num;
 	uint8_t pdev_id;
 	struct wlan_objmgr_vdev *vdev;
+	enum QDF_OPMODE opmode;
 
 	psoc = tx_ctx->p2p_soc_obj->soc;
 
@@ -680,14 +681,25 @@ static QDF_STATUS p2p_populate_mac_header(
 		peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
 					    WLAN_P2P_ID);
 	}
-	if (!peer && tx_ctx->rand_mac_tx) {
+	if (!peer) {
 		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
 							    tx_ctx->vdev_id,
 							    WLAN_P2P_ID);
 		if (vdev) {
-			mac_addr = wlan_vdev_mlme_get_macaddr(vdev);
-			peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
-						    WLAN_P2P_ID);
+			opmode = wlan_vdev_mlme_get_opmode(vdev);
+			/*
+			 * For NAN iface, retrieves mac address from vdev
+			 * as it is self peer. Also, rand_mac_tx would be
+			 * false as tx channel is not available.
+			 */
+			if (opmode == QDF_NAN_DISC_MODE ||
+			    tx_ctx->rand_mac_tx) {
+				mac_addr = wlan_vdev_mlme_get_macaddr(vdev);
+				peer = wlan_objmgr_get_peer(psoc, pdev_id,
+							    mac_addr,
+							    WLAN_P2P_ID);
+			}
+
 			wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		}
 	}
@@ -758,6 +770,10 @@ static char *p2p_get_frame_type_str(struct p2p_frame_info *frame_info)
 		return "GAS come back response";
 	case P2P_PUBLIC_ACTION_WNM_BTM_REQ:
 		return "BTM request";
+	case P2P_PUBLIC_ACTION_RRM_BEACON_REQ:
+		return "BEACON request";
+	case P2P_PUBLIC_ACTION_RRM_NEIGHBOR_RSP:
+		return "NEIGHBOR response";
 	default:
 		return "Other frame";
 	}
@@ -840,6 +856,17 @@ static QDF_STATUS p2p_get_frame_info(uint8_t *data_buf, uint32_t length,
 				action_type = buf[0];
 				frame_info->public_action_type =
 					P2P_PUBLIC_ACTION_WNM_BTM_REQ;
+			}
+			break;
+		case RRM_ACTION_FRAME:
+			if (buf[1] == RRM_RADIO_MEASURE_REQ) {
+				action_type = buf[0];
+				frame_info->public_action_type =
+					P2P_PUBLIC_ACTION_RRM_BEACON_REQ;
+			} else if (buf[1] == RRM_NEIGHBOR_RPT) {
+				action_type = buf[0];
+				frame_info->public_action_type =
+					P2P_PUBLIC_ACTION_RRM_NEIGHBOR_RSP;
 			}
 			break;
 		default:
@@ -1161,31 +1188,17 @@ static QDF_STATUS p2p_mgmt_tx(struct tx_action_context *tx_ctx,
 	void *mac_addr;
 	uint8_t pdev_id;
 	struct wlan_objmgr_vdev *vdev;
-	struct wlan_objmgr_pdev *pdev;
+	enum QDF_OPMODE opmode;
 
 	psoc = tx_ctx->p2p_soc_obj->soc;
 	mgmt_param.tx_frame = packet;
 	mgmt_param.frm_len = buf_len;
 	mgmt_param.vdev_id = tx_ctx->vdev_id;
 	mgmt_param.pdata = frame;
-
-	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, tx_ctx->vdev_id,
-						    WLAN_P2P_ID);
-	if (!vdev)
-		return QDF_STATUS_E_INVAL;
-
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
-		return QDF_STATUS_E_INVAL;
-	}
-
 	mgmt_param.chanfreq = tx_ctx->chan_freq;
-
 	mgmt_param.qdf_ctx = wlan_psoc_get_qdf_dev(psoc);
 	if (!(mgmt_param.qdf_ctx)) {
 		p2p_err("qdf ctx is null");
-		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		return QDF_STATUS_E_INVAL;
 	}
 	p2p_mgmt_set_hw_retry_count(psoc, tx_ctx, &mgmt_param);
@@ -1200,15 +1213,33 @@ static QDF_STATUS p2p_mgmt_tx(struct tx_action_context *tx_ctx,
 		peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
 					    WLAN_P2P_ID);
 	}
-	if (!peer && tx_ctx->rand_mac_tx) {
+	if (!peer) {
+		vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+							    tx_ctx->vdev_id,
+							    WLAN_P2P_ID);
 		if (vdev) {
-			mac_addr = wlan_vdev_mlme_get_macaddr(vdev);
-			peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
-						    WLAN_P2P_ID);
+			opmode = wlan_vdev_mlme_get_opmode(vdev);
+			/*
+			 * For NAN iface, retrieves mac address from vdev
+			 * as it is self peer. Also, rand_mac_tx would be
+			 * false as tx channel is not available.
+			 */
+			if (opmode == QDF_NAN_DISC_MODE ||
+			    tx_ctx->rand_mac_tx) {
+				mac_addr = wlan_vdev_mlme_get_mldaddr(vdev);
+				/* for non-MLO case, mld address will zero */
+				if (qdf_is_macaddr_zero(
+					(struct qdf_mac_addr *)mac_addr))
+					mac_addr =
+					wlan_vdev_mlme_get_macaddr(vdev);
+
+				peer = wlan_objmgr_get_peer(psoc, pdev_id,
+							    mac_addr,
+							    WLAN_P2P_ID);
+			}
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		}
 	}
-	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
-
 	if (!peer) {
 		p2p_err("no valid peer");
 		return QDF_STATUS_E_INVAL;
@@ -2816,7 +2847,8 @@ p2p_is_vdev_support_rand_mac(struct wlan_objmgr_vdev *vdev)
 	mode = wlan_vdev_mlme_get_opmode(vdev);
 	if (mode == QDF_STA_MODE ||
 	    mode == QDF_P2P_CLIENT_MODE ||
-	    mode == QDF_P2P_DEVICE_MODE)
+	    mode == QDF_P2P_DEVICE_MODE ||
+	    mode == QDF_NAN_DISC_MODE)
 		return true;
 	return false;
 }
@@ -3018,18 +3050,35 @@ void p2p_rand_mac_tx(struct wlan_objmgr_pdev *pdev,
 		     struct tx_action_context *tx_action)
 {
 	struct wlan_objmgr_psoc *soc;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS status;
+	bool is_vdev_up;
 
 	if (!tx_action || !tx_action->p2p_soc_obj ||
 	    !tx_action->p2p_soc_obj->soc)
 		return;
 	soc = tx_action->p2p_soc_obj->soc;
 
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, tx_action->vdev_id,
+						    WLAN_P2P_ID);
+	if (!vdev) {
+		p2p_err("vdev is null id:%d", tx_action->vdev_id);
+		return;
+	}
+
+	/*
+	 * For PASN authentication frames, fw may request PASN authentication
+	 * with source address same as vdev mac address when vdev is not already
+	 * started. Allow RX_FILTER configuration for vdev mac address also if
+	 * vdev is not started to prevent PASN authentication frame drops.
+	 */
+	is_vdev_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
 	if (!tx_action->no_ack && tx_action->chan_freq &&
 	    tx_action->buf_len > MIN_MAC_HEADER_LEN &&
 	    p2p_is_vdev_support_rand_mac_by_id(soc, tx_action->vdev_id) &&
-	    p2p_is_random_mac(soc, tx_action->vdev_id,
-			      &tx_action->buf[SRC_MAC_ADDR_OFFSET])) {
+	    (p2p_is_random_mac(soc, tx_action->vdev_id,
+			      &tx_action->buf[SRC_MAC_ADDR_OFFSET]) ||
+	     !is_vdev_up)) {
 		status = p2p_request_random_mac(
 			soc, tx_action->vdev_id,
 			&tx_action->buf[SRC_MAC_ADDR_OFFSET],
@@ -3041,6 +3090,8 @@ void p2p_rand_mac_tx(struct wlan_objmgr_pdev *pdev,
 		else
 			tx_action->rand_mac_tx = false;
 	}
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 }
 
 void
