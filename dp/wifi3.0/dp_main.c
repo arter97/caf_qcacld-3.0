@@ -12898,14 +12898,17 @@ dp_get_peer_extd_rate_link_stats(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
 	struct dp_mld_link_peers link_peers_info;
 	struct dp_peer *peer = NULL;
 	struct dp_soc *soc = (struct dp_soc *)soc_hdl;
+	struct cdp_peer_info peer_info = { 0 };
 
 	if (!mac_addr) {
 		dp_err("NULL peer mac addr\n");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	peer = dp_peer_find_hash_find(soc, mac_addr, 0,
-				      DP_VDEV_ALL, DP_MOD_ID_CDP);
+	DP_PEER_INFO_PARAMS_INIT(&peer_info, DP_VDEV_ALL, mac_addr, false,
+				 CDP_WILD_PEER_TYPE);
+
+	peer = dp_peer_hash_find_wrapper(soc, &peer_info, DP_MOD_ID_CDP);
 	if (!peer) {
 		dp_err("Invalid peer\n");
 		return QDF_STATUS_E_FAILURE;
