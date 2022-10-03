@@ -3669,7 +3669,7 @@ util_scan_is_platform_eht_capable(struct wlan_objmgr_pdev *pdev)
 	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
 
 	if (scan_ops->is_platform_eht_capable)
-		return scan_ops->is_platform_eht_capable;
+		return scan_ops->is_platform_eht_capable(psoc, pdev_id);
 
 	return false;
 }
