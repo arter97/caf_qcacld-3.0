@@ -400,8 +400,11 @@ osif_send_roam_auth_mlo_links_event(struct sk_buff *skb,
 		if (nla_put(skb, QCA_WLAN_VENDOR_ATTR_MLO_LINK_MAC_ADDR,
 			    ETH_ALEN, wlan_vdev_mlme_get_macaddr(link_vdev))) {
 			osif_err("nla put fail");
+			wlan_objmgr_vdev_release_ref(link_vdev,
+						     WLAN_OSIF_CM_ID);
 			return -EINVAL;
 		}
+		wlan_objmgr_vdev_release_ref(link_vdev, WLAN_OSIF_CM_ID);
 		nla_nest_end(skb, mlo_links_info);
 	}
 
