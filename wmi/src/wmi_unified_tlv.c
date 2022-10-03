@@ -19550,6 +19550,57 @@ extract_pdev_telemetry_stats_tlv(
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+send_set_mac_addr_rx_filter_cmd_tlv(wmi_unified_t wmi_handle,
+				    struct set_rx_mac_filter *param)
+{
+	wmi_vdev_add_mac_addr_to_rx_filter_cmd_fixed_param *cmd;
+	uint32_t len;
+	wmi_buf_t buf;
+	int ret;
+
+	if (!wmi_handle) {
+		wmi_err("WMA context is invalid!");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("Failed allocate wmi buffer");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	cmd = (wmi_vdev_add_mac_addr_to_rx_filter_cmd_fixed_param *)
+		wmi_buf_data(buf);
+
+	WMITLV_SET_HDR(
+	   &cmd->tlv_header,
+	   WMITLV_TAG_STRUC_wmi_vdev_add_mac_addr_to_rx_filter_cmd_fixed_param,
+	WMITLV_GET_STRUCT_TLVLEN(
+			wmi_vdev_add_mac_addr_to_rx_filter_cmd_fixed_param));
+
+	cmd->vdev_id = param->vdev_id;
+	cmd->freq = param->freq;
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(param->mac, &cmd->mac_addr);
+	if (param->set)
+		cmd->enable = 1;
+	else
+		cmd->enable = 0;
+	wmi_debug("set random mac rx vdev:%d freq:%d set:%d " QDF_MAC_ADDR_FMT,
+		  param->vdev_id, param->freq, param->set,
+		 QDF_MAC_ADDR_REF(param->mac));
+	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
+				   WMI_VDEV_ADD_MAC_ADDR_TO_RX_FILTER_CMDID);
+	if (ret) {
+		wmi_err("Failed to send action frame random mac cmd");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 struct wmi_ops tlv_ops =  {
 	.send_vdev_create_cmd = send_vdev_create_cmd_tlv,
 	.send_vdev_delete_cmd = send_vdev_delete_cmd_tlv,
@@ -20025,6 +20076,7 @@ struct wmi_ops tlv_ops =  {
 		extract_health_mon_init_done_info_event_tlv,
 #endif /* HEALTH_MON_SUPPORT */
 	.send_multiple_vdev_param_cmd = send_multiple_vdev_param_cmd_tlv,
+	.set_mac_addr_rx_filter = send_set_mac_addr_rx_filter_cmd_tlv,
 };
 
 #ifdef WLAN_FEATURE_11BE_MLO

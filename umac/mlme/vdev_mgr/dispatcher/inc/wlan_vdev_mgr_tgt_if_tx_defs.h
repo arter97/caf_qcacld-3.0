@@ -702,6 +702,20 @@ struct set_multiple_pdev_vdev_param {
 	struct dev_set_param *params;
 };
 
+/**
+ * struct set_rx_mac_filter - Set rx mac filter command parameters
+ * @vdev_id: Vdev id
+ * @mac: mac addr
+ * @freq: frequency
+ * @set: set or clear
+ */
+struct set_rx_mac_filter {
+	uint32_t vdev_id;
+	uint8_t mac[QDF_MAC_ADDR_SIZE];
+	uint32_t freq;
+	bool set;
+};
+
 static inline
 QDF_STATUS mlme_check_index_setparam(struct dev_set_param *param,
 				     uint32_t paramid, uint32_t paramvalue,

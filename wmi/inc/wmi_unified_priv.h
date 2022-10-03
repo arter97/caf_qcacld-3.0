@@ -1977,13 +1977,14 @@ QDF_STATUS (*extract_p2p_lo_stop_ev_param)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_p2p_noa_ev_param)(wmi_unified_t wmi_handle,
 	void *evt_buf, struct p2p_noa_info *param);
 
-QDF_STATUS (*set_mac_addr_rx_filter)(wmi_unified_t wmi_handle,
-				     struct p2p_set_mac_filter *param);
 QDF_STATUS
 (*extract_mac_addr_rx_filter_evt_param)(wmi_unified_t wmi_handle,
 					void *evt_buf,
 					struct p2p_set_mac_filter_evt *param);
 #endif
+
+QDF_STATUS (*set_mac_addr_rx_filter)(wmi_unified_t wmi_handle,
+				     struct set_rx_mac_filter *param);
 
 #ifdef WLAN_FEATURE_INTEROP_ISSUES_AP
 QDF_STATUS

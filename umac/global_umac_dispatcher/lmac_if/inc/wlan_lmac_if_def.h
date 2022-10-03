@@ -587,7 +587,6 @@ struct wlan_lmac_if_scan_rx_ops {
 /* forward declarations for p2p tx ops */
 struct p2p_ps_config;
 struct p2p_lo_start;
-struct p2p_set_mac_filter;
 
 /**
  * struct wlan_lmac_if_p2p_tx_ops - structure of tx function pointers
@@ -628,7 +627,7 @@ struct wlan_lmac_if_p2p_tx_ops {
 			struct wlan_objmgr_psoc *psoc, bool reg);
 	QDF_STATUS (*set_mac_addr_rx_filter_cmd)(
 			struct wlan_objmgr_psoc *psoc,
-			struct p2p_set_mac_filter *param);
+			struct set_rx_mac_filter *param);
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	QDF_STATUS (*reg_mcc_quota_ev_handler)(struct wlan_objmgr_psoc *psoc,
 					       bool reg);

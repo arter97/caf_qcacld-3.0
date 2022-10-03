@@ -904,6 +904,16 @@ wmi_unified_multiple_vdev_param_send(wmi_unified_t wmi_handle,
 				     struct set_multiple_pdev_vdev_param *params);
 
 /**
+ * wmi_unified_set_mac_addr_rx_filter() - set mac addr rx filter cmd
+ * @wmi_handle: wmi handle
+ * @param: Pointer to set mac filter struct
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_set_mac_addr_rx_filter(wmi_unified_t wmi_handle,
+				   struct set_rx_mac_filter *param);
+/**
  * wmi_unified_multiple_pdev_param_send() - sends multiple pdev set params
  * @wmi_handle: handle to WMI.
  * @params: pointer to hold set_multiple_pdev_vdev_param info
