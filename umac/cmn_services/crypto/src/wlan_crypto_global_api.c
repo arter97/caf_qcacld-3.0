@@ -2755,6 +2755,8 @@ static int32_t wlan_crypto_rsn_suite_to_keymgmt(const uint8_t *sel)
 		return WLAN_CRYPTO_KEY_MGMT_FT_PSK_SHA384;
 	case RSN_AUTH_KEY_MGMT_PSK_SHA384:
 		return WLAN_CRYPTO_KEY_MGMT_PSK_SHA384;
+	case RSN_AUTH_KEY_MGMT_SAE_EXT_KEY:
+		return WLAN_CRYPTO_KEY_MGMT_SAE_EXT_KEY;
 	}
 
 	return status;
