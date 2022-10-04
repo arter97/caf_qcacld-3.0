@@ -603,6 +603,11 @@ enum {
 	HAL_RX_TYPE_MU_OFDMA_MIMO,
 };
 
+enum {
+	HAL_RX_TYPE_DL,
+	HAL_RX_TYPE_UL,
+};
+
 /*
  * enum
  * @HAL_RECEPTION_TYPE_SU: Basic SU reception
@@ -1294,6 +1299,10 @@ struct hal_rx_ppdu_info {
 	uint8_t rx_hdr_rcvd[HAL_MAX_UL_MU_USERS];
 	/* Per user BAR and NDPA bit flag */
 	struct hal_rx_user_ctrl_frm_info ctrl_frm_info[HAL_MAX_UL_MU_USERS];
+	/* PPDU end user stats count */
+	uint8_t end_user_stats_cnt;
+	/* PPDU start user info count */
+	uint8_t start_user_info_cnt;
 };
 
 static inline uint32_t

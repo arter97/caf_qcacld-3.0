@@ -291,6 +291,7 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @reception_type: PPDU reception type
  * @ltf_size: ltf size
  * @tx_status: packet tx status
+ * @mu_dl_ul: MU down or up link, 0 downlink, 1 uplink
  * @rx_antenna: rx antenna
  * @vht_flag_values6: VHT flag value6
  * @he_mu_other_flags: HE MU other flag
@@ -407,7 +408,8 @@ struct mon_rx_status {
 		 add_rtap_ext2 : 1,
 		 reception_type : 4,
 		 ltf_size : 2,
-		 tx_status : 4;
+		 tx_status : 4,
+		 mu_dl_ul : 1;
 	uint32_t rx_antenna : 24;
 	uint16_t vht_flag_values6;
 	uint16_t he_mu_other_flags;

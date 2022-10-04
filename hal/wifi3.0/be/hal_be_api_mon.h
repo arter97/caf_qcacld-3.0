@@ -1682,17 +1682,30 @@ hal_rx_parse_receive_user_info(struct hal_soc *hal_soc, uint8_t *tlv,
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_SU;
 		break;
 	case HAL_RECEPTION_TYPE_DL_MU_MIMO:
+		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_DL;
+		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_MIMO;
+		break;
 	case HAL_RECEPTION_TYPE_UL_MU_MIMO:
+		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_UL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_MIMO;
 		break;
 	case HAL_RECEPTION_TYPE_DL_MU_OFMA:
+		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_DL;
+		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA;
+		break;
 	case HAL_RECEPTION_TYPE_UL_MU_OFDMA:
+		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_UL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA;
 		break;
 	case HAL_RECEPTION_TYPE_DL_MU_OFDMA_MIMO:
+		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_DL;
+		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA_MIMO;
 	case HAL_RECEPTION_TYPE_UL_MU_OFDMA_MIMO:
+		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_UL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA_MIMO;
 	}
+
+	ppdu_info->start_user_info_cnt++;
 
 	ppdu_info->rx_status.is_stbc = rx_usr_info->stbc;
 	ppdu_info->rx_status.ldpc = rx_usr_info->ldpc;
@@ -2067,6 +2080,9 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		ppdu_info->rx_status.preamble_type =
 			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
 				      HT_CONTROL_FIELD_PKT_TYPE);
+
+		ppdu_info->end_user_stats_cnt++;
+
 		switch (ppdu_info->rx_status.preamble_type) {
 		case HAL_RX_PKT_TYPE_11N:
 			ppdu_info->rx_status.ht_flags = 1;

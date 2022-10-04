@@ -1520,6 +1520,96 @@ void dp_rx_mon_update_peer_id(struct dp_pdev *pdev,
 }
 #endif
 
+/*
+ * HAL_RX_PKT_TYPE_11A     0 -> CDP_PKT_TYPE_OFDM
+ * HAL_RX_PKT_TYPE_11B     1 -> CDP_PKT_TYPE_CCK
+ * HAL_RX_PKT_TYPE_11N     2 -> CDP_PKT_TYPE_HT
+ * HAL_RX_PKT_TYPE_11AC    3 -> CDP_PKT_TYPE_VHT
+ * HAL_RX_PKT_TYPE_11AX    4 -> CDP_PKT_TYPE_HE
+ * HAL_RX_PKT_TYPE_11BE    6 -> CDP_PKT_TYPE_EHT
+ */
+
+static uint32_t const cdp_preamble_type_map[] = {
+	CDP_PKT_TYPE_OFDM,
+	CDP_PKT_TYPE_CCK,
+	CDP_PKT_TYPE_HT,
+	CDP_PKT_TYPE_VHT,
+	CDP_PKT_TYPE_HE,
+	CDP_PKT_TYPE_NO_SUP,
+#ifdef WLAN_FEATURE_11BE
+	CDP_PKT_TYPE_EHT,
+#endif
+	CDP_PKT_TYPE_MAX,
+};
+
+/*
+ * HAL_RX_RECEPTION_TYPE_SU       -> CDP_RX_TYPE_SU
+ * HAL_RX_RECEPTION_TYPE_MU_MIMO  -> CDP_RX_TYPE_MU_MIMO
+ * HAL_RX_RECEPTION_TYPE_OFDMA    -> CDP_RX_TYPE_MU_OFDMA
+ * HAL_RX_RECEPTION_TYPE_MU_OFDMA -> CDP_RX_TYPE_MU_OFDMA_MIMO
+ */
+static uint32_t const cdp_reception_type_map[] = {
+	CDP_RX_TYPE_SU,
+	CDP_RX_TYPE_MU_MIMO,
+	CDP_RX_TYPE_MU_OFDMA,
+	CDP_RX_TYPE_MU_OFDMA_MIMO,
+};
+
+static uint32_t const cdp_mu_dl_up_map[] = {
+	CDP_MU_TYPE_DL,
+	CDP_MU_TYPE_UL,
+};
+
+static inline void
+dp_rx_mu_stats_update(
+	struct hal_rx_ppdu_info *ppdu_info,
+	struct cdp_pdev_mon_stats *rx_mon_sts,
+	uint32_t preamble_type,
+	uint32_t  recept_type,
+	uint32_t  mu_dl_ul,
+	uint32_t i
+)
+{
+	struct mon_rx_user_status *rx_user_status;
+
+	rx_user_status =  &ppdu_info->rx_user_status[i];
+	rx_mon_sts->mpdu_cnt_fcs_ok[preamble_type][recept_type][mu_dl_ul][i]
+			+= rx_user_status->mpdu_cnt_fcs_ok;
+	rx_mon_sts->mpdu_cnt_fcs_err[preamble_type][recept_type][mu_dl_ul][i]
+			+= rx_user_status->mpdu_cnt_fcs_err;
+}
+
+static inline void
+dp_rx_mu_stats(struct dp_pdev *pdev, struct hal_rx_ppdu_info *ppdu_info)
+{
+	struct dp_mon_pdev *mon_pdev;
+	struct cdp_pdev_mon_stats *rx_mon_stats;
+	struct mon_rx_status *rx_status;
+	uint32_t preamble_type, reception_type, mu_dl_ul, num_users, i;
+
+	mon_pdev = pdev->monitor_pdev;
+	rx_mon_stats = &mon_pdev->rx_mon_stats;
+	rx_status = &ppdu_info->rx_status;
+
+	num_users = ppdu_info->com_info.num_users;
+
+	if (rx_status->preamble_type < CDP_PKT_TYPE_MAX)
+		preamble_type = cdp_preamble_type_map[rx_status->preamble_type];
+	else
+		preamble_type = CDP_PKT_TYPE_NO_SUP;
+
+	reception_type = cdp_reception_type_map[rx_status->reception_type];
+	mu_dl_ul = cdp_mu_dl_up_map[rx_status->mu_dl_ul];
+
+	for (i = 0; i < num_users; i++) {
+		if (i >= CDP_MU_SNIF_USER_MAX)
+			return;
+
+		dp_rx_mu_stats_update(ppdu_info, rx_mon_stats, preamble_type,
+				      reception_type, mu_dl_ul, i);
+	}
+}
+
 static inline uint32_t
 dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 			   uint32_t mac_id, uint32_t quota)
@@ -1639,8 +1729,18 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 
 		ppdu_info = dp_rx_mon_process_status_tlv(pdev);
 
-		if (ppdu_info)
+		if (ppdu_info) {
+			mon_pdev->rx_mon_stats.start_user_info_cnt +=
+				ppdu_info->start_user_info_cnt;
+			ppdu_info->start_user_info_cnt = 0;
+
+			mon_pdev->rx_mon_stats.end_user_stats_cnt +=
+				ppdu_info->end_user_stats_cnt;
+			ppdu_info->end_user_stats_cnt = 0;
+
 			dp_rx_mon_update_peer_id(pdev, ppdu_info);
+			dp_rx_mu_stats(pdev, ppdu_info);
+		}
 
 		/* Call enhanced stats update API */
 		if (mon_pdev->enhanced_stats_en && ppdu_info)

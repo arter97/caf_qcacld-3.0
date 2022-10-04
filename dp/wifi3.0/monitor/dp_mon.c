@@ -819,6 +819,124 @@ dp_pdev_get_undecoded_capture_stats(struct dp_mon_pdev *mon_pdev,
 }
 #endif
 
+static const char *
+dp_preamble_type_str[] = {
+	"preamble OFDMA     ",
+	"preamble CCK       ",
+	"preamble HT        ",
+	"preamble VHT       ",
+	"preamble HE        ",
+	"preamble EHT       ",
+	"preamble NO SUPPORT",
+};
+
+static const char *
+dp_reception_type_str[] = {
+	"reception su        ",
+	"reception mu_mimo   ",
+	"reception ofdma     ",
+	"reception ofdma mimo",
+};
+
+static const char *
+dp_mu_dl_ul_str[] = {
+	"MU DL",
+	"MU UL",
+};
+
+static inline void
+dp_print_pdev_mpdu_fcs_ok_cnt(struct cdp_pdev_mon_stats *rx_mon_sts,
+			      uint32_t pkt_t, uint32_t rx_t,
+			      uint32_t dl_ul, uint32_t user)
+{
+	DP_PRINT_STATS("%s, %s, %s, user=%d, mpdu_fcs_ok=%d",
+		       dp_preamble_type_str[pkt_t],
+		       dp_reception_type_str[rx_t],
+		       dp_mu_dl_ul_str[dl_ul],
+		       user,
+		       rx_mon_sts->mpdu_cnt_fcs_ok[pkt_t][rx_t][dl_ul][user]);
+}
+
+static inline void
+dp_print_pdev_mpdu_fcs_err_cnt(struct cdp_pdev_mon_stats *rx_mon_sts,
+			       uint32_t pkt_t, uint32_t rx_t,
+			       uint32_t dl_ul, uint32_t user)
+{
+	DP_PRINT_STATS("%s, %s, %s, user=%d, mpdu_fcs_err=%d",
+		       dp_preamble_type_str[pkt_t],
+		       dp_reception_type_str[rx_t],
+		       dp_mu_dl_ul_str[dl_ul],
+		       user,
+		       rx_mon_sts->mpdu_cnt_fcs_err[pkt_t][rx_t][dl_ul][user]);
+}
+
+static inline void
+dp_print_pdev_mpdu_cnt(struct cdp_pdev_mon_stats *rx_mon_sts,
+		       uint32_t pkt_t, uint32_t rx_t,
+		       uint32_t dl_ul, uint32_t user)
+{
+	if (rx_mon_sts->mpdu_cnt_fcs_ok[pkt_t][rx_t][dl_ul][user])
+		dp_print_pdev_mpdu_fcs_ok_cnt(rx_mon_sts, pkt_t, rx_t,
+					      dl_ul, user);
+
+	if (rx_mon_sts->mpdu_cnt_fcs_err[pkt_t][rx_t][dl_ul][user])
+		dp_print_pdev_mpdu_fcs_err_cnt(rx_mon_sts, pkt_t, rx_t,
+					       dl_ul, user);
+}
+
+static inline void
+dp_print_pdev_mpdu_user(struct cdp_pdev_mon_stats *rx_mon_sts,
+			uint32_t pkt_t, uint32_t rx_t,
+			uint32_t dl_ul)
+{
+	uint32_t user;
+
+	for (user = 0; user < CDP_MU_SNIF_USER_MAX; user++)
+		dp_print_pdev_mpdu_cnt(rx_mon_sts, pkt_t, rx_t,
+				       dl_ul, user);
+}
+
+static inline void
+dp_print_pdev_mpdu_dl_ul(struct cdp_pdev_mon_stats *rx_mon_sts,
+			 uint32_t pkt_t, uint32_t rx_t)
+{
+	uint32_t dl_ul;
+
+	for (dl_ul = CDP_MU_TYPE_DL; dl_ul < CDP_MU_TYPE_MAX; dl_ul++)
+		dp_print_pdev_mpdu_user(rx_mon_sts, pkt_t, rx_t,
+					dl_ul);
+}
+
+static inline void
+dp_print_pdev_mpdu_rx_type(struct cdp_pdev_mon_stats *rx_mon_sts,
+			   uint32_t pkt_t)
+{
+	uint32_t rx_t;
+
+	for (rx_t = CDP_RX_TYPE_SU; rx_t < CDP_RX_TYPE_MAX; rx_t++)
+		dp_print_pdev_mpdu_dl_ul(rx_mon_sts, pkt_t, rx_t);
+}
+
+static inline void
+dp_print_pdev_mpdu_pkt_type(struct cdp_pdev_mon_stats *rx_mon_sts)
+{
+	uint32_t pkt_t;
+
+	for (pkt_t = CDP_PKT_TYPE_OFDM; pkt_t < CDP_PKT_TYPE_MAX; pkt_t++)
+		dp_print_pdev_mpdu_rx_type(rx_mon_sts, pkt_t);
+}
+
+static inline void
+dp_print_pdev_mpdu_stats(struct dp_pdev *pdev)
+{
+	struct cdp_pdev_mon_stats *rx_mon_stats;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+
+	rx_mon_stats = &mon_pdev->rx_mon_stats;
+	DP_PRINT_STATS("Monitor MPDU Count");
+	dp_print_pdev_mpdu_pkt_type(rx_mon_stats);
+}
+
 void
 dp_print_pdev_rx_mon_stats(struct dp_pdev *pdev)
 {
@@ -842,6 +960,12 @@ dp_print_pdev_rx_mon_stats(struct dp_pdev *pdev)
 		       rx_mon_stats->status_ppdu_start_mis);
 	DP_PRINT_STATS("status_ppdu_end_mis_cnt = %d",
 		       rx_mon_stats->status_ppdu_end_mis);
+
+	DP_PRINT_STATS("start_user_info_cnt = %d",
+		       rx_mon_stats->start_user_info_cnt);
+	DP_PRINT_STATS("end_user_stats_cnt = %d",
+		       rx_mon_stats->end_user_stats_cnt);
+
 	DP_PRINT_STATS("status_ppdu_done_cnt = %d",
 		       rx_mon_stats->status_ppdu_done);
 	DP_PRINT_STATS("dest_ppdu_done_cnt = %d",
@@ -907,6 +1031,9 @@ dp_print_pdev_rx_mon_stats(struct dp_pdev *pdev)
 
 	dp_pdev_get_undecoded_capture_stats(mon_pdev, rx_mon_stats);
 	dp_mon_rx_print_advanced_stats(pdev->soc, pdev);
+
+	dp_print_pdev_mpdu_stats(pdev);
+
 }
 
 #ifdef QCA_SUPPORT_BPR
