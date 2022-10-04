@@ -516,6 +516,26 @@ void mlo_ap_vdev_quiet_clear(struct wlan_objmgr_vdev *vdev);
  */
 bool mlo_ap_vdev_quiet_is_any_idx_set(struct wlan_objmgr_vdev *vdev);
 
+#if defined(MESH_MODE_SUPPORT) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * mlo_peer_populate_mesh_params() - Populate mesh parameters in ml_peer
+ * @ml_peer: ml_peer to which mesh config parameters need to be populated
+ * @ml_info: ml_info with mesh config associated with this link
+ *
+ * Return: void
+ */
+void mlo_peer_populate_mesh_params(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct mlo_partner_info *ml_info);
+#else
+static inline
+void mlo_peer_populate_mesh_params(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct mlo_partner_info *ml_info)
+{
+}
+#endif
+
 #ifdef UMAC_SUPPORT_MLNAWDS
 /**
  * mlo_peer_populate_nawds_params() - Populate nawds parameters in ml_peer

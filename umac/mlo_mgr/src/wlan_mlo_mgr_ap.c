@@ -26,6 +26,7 @@
 #ifdef WLAN_MLO_MULTI_CHIP
 #include "cdp_txrx_mlo.h"
 #endif
+#include "wlan_mlo_mgr_peer.h"
 
 #ifdef WLAN_MLO_MULTI_CHIP
 bool mlo_ap_vdev_attach(struct wlan_objmgr_vdev *vdev,
@@ -480,17 +481,20 @@ bool mlo_ap_vdev_quiet_is_any_idx_set(struct wlan_objmgr_vdev *vdev)
 			sizeof(mld_ctx->ap_ctx->mlo_vdev_quiet_bmap));
 }
 
-#ifdef UMAC_SUPPORT_MLNAWDS
 QDF_STATUS
 mlo_peer_create_get_frm_buf(
 		struct wlan_mlo_peer_context *ml_peer,
 		struct peer_create_notif_s *peer_create,
 		qdf_nbuf_t frm_buf)
 {
-	if (ml_peer->is_nawds_ml_peer) {
+	if (wlan_mlo_peer_is_nawds(ml_peer) ||
+	    wlan_mlo_peer_is_mesh(ml_peer)) {
 		peer_create->frm_buf = NULL;
 		return QDF_STATUS_SUCCESS;
 	}
+
+	if (!frm_buf)
+		return QDF_STATUS_E_FAILURE;
 
 	peer_create->frm_buf = qdf_nbuf_clone(frm_buf);
 	if (!peer_create->frm_buf)
@@ -499,6 +503,7 @@ mlo_peer_create_get_frm_buf(
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef UMAC_SUPPORT_MLNAWDS
 void mlo_peer_populate_nawds_params(
 		struct wlan_mlo_peer_context *ml_peer,
 		struct mlo_partner_info *ml_info)
@@ -512,7 +517,7 @@ void mlo_peer_populate_nawds_params(
 	ml_peer->is_nawds_ml_peer = false;
 	for (i = 0; i < ml_info->num_partner_links; i++) {
 		nawds_config = ml_info->partner_link_info[i].nawds_config;
-		/**
+		/*
 		 * if ml_info->partner_link_info[i].nawds_config has valid
 		 * config(check for non-null mac or non-0 caps), then mark
 		 * ml_peer's is_nawds_ml_peer true & copy the config
@@ -527,17 +532,34 @@ void mlo_peer_populate_nawds_params(
 	}
 	mlo_peer_lock_release(ml_peer);
 }
-#else
-QDF_STATUS
-mlo_peer_create_get_frm_buf(
-		struct wlan_mlo_peer_context *ml_peer,
-		struct peer_create_notif_s *peer_create,
-		qdf_nbuf_t frm_buf)
-{
-	peer_create->frm_buf = qdf_nbuf_clone(frm_buf);
-	if (!peer_create->frm_buf)
-		return QDF_STATUS_E_NOMEM;
+#endif
 
-	return QDF_STATUS_SUCCESS;
+#ifdef MESH_MODE_SUPPORT
+void mlo_peer_populate_mesh_params(
+		struct wlan_mlo_peer_context *ml_peer,
+		struct mlo_partner_info *ml_info)
+{
+	uint8_t i;
+	uint8_t null_mac[QDF_MAC_ADDR_SIZE] = {0};
+	struct mlnawds_config mesh_config;
+
+	mlo_peer_lock_acquire(ml_peer);
+	ml_peer->is_mesh_ml_peer = false;
+	for (i = 0; i < ml_info->num_partner_links; i++) {
+		mesh_config = ml_info->partner_link_info[i].mesh_config;
+		/*
+		 * if ml_info->partner_link_info[i].mesh_config has valid
+		 * config(check for non-null mac or non-0 caps), then mark
+		 * ml_peer's is_mesh_ml_peer true & copy the config
+		 */
+		if ((mesh_config.caps) ||
+		    (qdf_mem_cmp(null_mac,
+				 mesh_config.mac,
+				 sizeof(null_mac)))) {
+			ml_peer->is_mesh_ml_peer = true;
+			ml_peer->mesh_config[i] = mesh_config;
+		}
+	}
+	mlo_peer_lock_release(ml_peer);
 }
 #endif

@@ -412,6 +412,20 @@ struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_linkmac(
 				struct qdf_mac_addr *link_mac);
 
 /**
+ * wlan_mlo_get_mlpeer_by_mld_mac() - find ML peer by MLD MAC address
+ * @ml_dev: MLO DEV object
+ * @mld_mac:  Peer MLD MAC address
+ *
+ * API to get ML peer using link MAC address
+ *
+ * Return: ML peer object, if it is found
+ *         otherwise, returns NULL
+ */
+struct wlan_mlo_peer_context *wlan_mlo_get_mlpeer_by_mld_mac(
+				struct wlan_mlo_dev_context *ml_dev,
+				struct qdf_mac_addr *mld_mac);
+
+/**
  * wlan_mlo_get_mlpeer_by_aid() - find ML peer by AID
  * @ml_dev: MLO DEV object
  * @aid:  AID
@@ -538,6 +552,22 @@ static inline void wlan_peer_clear_mlo(struct wlan_objmgr_peer *peer)
 {
 	return wlan_peer_mlme_flag_ext_clear(peer, WLAN_PEER_FEXT_MLO);
 }
+
+#if defined(MESH_MODE_SUPPORT) && defined(WLAN_FEATURE_11BE_MLO)
+/**
+ * wlan_mlo_peer_is_mesh() - Check if ml_peer is configured to operate as MESH
+ * @ml_peer: MLO peer
+ *
+ * Return: TRUE if ml peer is configured as MESH
+ */
+bool wlan_mlo_peer_is_mesh(struct wlan_mlo_peer_context *ml_peer);
+#else
+static inline
+bool wlan_mlo_peer_is_mesh(struct wlan_mlo_peer_context *ml_peer)
+{
+	return false;
+}
+#endif
 
 #ifdef UMAC_SUPPORT_MLNAWDS
 /**

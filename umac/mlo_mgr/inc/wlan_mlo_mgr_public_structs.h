@@ -460,7 +460,7 @@ enum mlo_peer_state {
 	ML_PEER_DISCONN_INITIATED,
 };
 
-#ifdef UMAC_SUPPORT_MLNAWDS
+#if defined(UMAC_SUPPORT_MLNAWDS) || defined(MESH_MODE_SUPPORT)
 /*
  * struct mlnawds_config - MLO NAWDS configuration
  * @caps: Bandwidth & NSS capabilities to be configured on NAWDS peer
@@ -697,6 +697,8 @@ struct wlan_mlo_mld_cap {
  * @msd_cap_present: Medium Sync Capability present bit
  * @mlpeer_emlcap: EML capability information for ML peer
  * @mlpeer_msdcap: Medium Sync Delay capability information for ML peer
+ * @is_mesh_ml_peer: flag to indicate if ml_peer is MESH configured
+ * @mesh_config: eack link peer's MESH configuration
  */
 struct wlan_mlo_peer_context {
 	qdf_list_node_t peer_node;
@@ -730,6 +732,10 @@ struct wlan_mlo_peer_context {
 	bool msd_cap_present;
 	struct wlan_mlo_eml_cap mlpeer_emlcap;
 	struct wlan_mlo_msd_cap mlpeer_msdcap;
+#ifdef MESH_MODE_SUPPORT
+	bool is_mesh_ml_peer;
+	struct mlnawds_config mesh_config[MAX_MLO_LINK_PEERS];
+#endif
 };
 
 /*
@@ -739,6 +745,7 @@ struct wlan_mlo_peer_context {
  * @chan_freq: Operating channel frequency
  * @nawds_config: peer's NAWDS configurarion
  * @vdev_id: VDEV ID
+ * @mesh_config: peer's MESH configurarion
  */
 struct mlo_link_info {
 	struct qdf_mac_addr link_addr;
@@ -748,6 +755,9 @@ struct mlo_link_info {
 	struct mlnawds_config nawds_config;
 #endif
 	uint8_t vdev_id;
+#ifdef MESH_MODE_SUPPORT
+	struct mlnawds_config mesh_config;
+#endif
 };
 
 /*

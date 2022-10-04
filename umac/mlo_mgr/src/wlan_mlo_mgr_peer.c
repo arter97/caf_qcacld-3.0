@@ -958,6 +958,7 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 	mlo_peer_populate_link_peer(ml_peer, link_peer);
 
 	mlo_peer_populate_nawds_params(ml_peer, ml_info);
+	mlo_peer_populate_mesh_params(ml_peer, ml_info);
 
 	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) ||
 		((wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) &&
@@ -1265,6 +1266,25 @@ bool wlan_mlo_peer_is_nawds(struct wlan_mlo_peer_context *ml_peer)
 }
 
 qdf_export_symbol(wlan_mlo_peer_is_nawds);
+#endif
+
+#ifdef MESH_MODE_SUPPORT
+bool wlan_mlo_peer_is_mesh(struct wlan_mlo_peer_context *ml_peer)
+{
+	bool status = false;
+
+	if (!ml_peer)
+		return status;
+
+	mlo_peer_lock_acquire(ml_peer);
+	if (ml_peer->is_mesh_ml_peer)
+		status = true;
+	mlo_peer_lock_release(ml_peer);
+
+	return status;
+}
+
+qdf_export_symbol(wlan_mlo_peer_is_mesh);
 #endif
 
 #ifdef UMAC_MLO_AUTH_DEFER
