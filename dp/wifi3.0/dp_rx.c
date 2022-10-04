@@ -568,7 +568,7 @@ static inline
 qdf_dma_addr_t dp_rx_rep_retrieve_paddr(struct dp_soc *dp_soc, qdf_nbuf_t nbuf,
 					uint32_t buf_size)
 {
-	return dp_rx_nbuf_sync_no_dsb(soc, nbuf, rx_desc_pool->buf_size);
+	return dp_rx_nbuf_sync_no_dsb(dp_soc, nbuf, buf_size);
 }
 #else
 static inline
