@@ -1057,6 +1057,7 @@ util_parse_probereq_info_from_linkinfo(uint8_t *linkinfo,
 			probereq_info->link_id[probereq_info->num_links] = linkid;
 
 			probereq_info->num_links++;
+			mlo_debug("LINK ID requested is = %u", linkid);
 		}
 
 		linkinfo_remlen -= (sizeof(struct subelem_header) +
@@ -3558,8 +3559,12 @@ util_get_bvmlie_persta_partner_info(uint8_t *mlieseq,
 		return ret;
 	}
 
-	/* In case Link Info is absent, the number of partner links will remain
-	 * zero.
+	/*
+	 * If Probe Request variant Multi-Link element in the Multi-Link probe
+	 * request does not include any per-STA profile, then all APs affiliated
+	 * with the same AP MLD as the AP identified in the Addr 1 or Addr 3
+	 * field or AP MLD ID of the Multi-Link probe request are requested
+	 * APs return success here
 	 */
 	if (!linkinfo) {
 		qdf_mem_free(mlieseqpayload_copy);
@@ -3592,7 +3597,6 @@ util_get_prvmlie_persta_link_id(uint8_t *mlieseq,
 	enum wlan_ml_variant variant;
 	uint8_t *linkinfo;
 	qdf_size_t linkinfo_len;
-	struct mlo_probereq_info pinfo = {0};
 	qdf_size_t mlieseqpayloadlen;
 	uint8_t *mlieseqpayload_copy;
 	bool is_elemfragseq;
@@ -3726,20 +3730,19 @@ util_get_prvmlie_persta_link_id(uint8_t *mlieseq,
 	 * zero.
 	 */
 	if (!linkinfo) {
+		mlo_debug("No link info present");
 		qdf_mem_free(mlieseqpayload_copy);
 		return QDF_STATUS_SUCCESS;
 	}
 
 	ret = util_parse_probereq_info_from_linkinfo(linkinfo,
 						     linkinfo_len,
-						     &pinfo);
+						     probereq_info);
 
 	if (QDF_IS_STATUS_ERROR(ret)) {
 		qdf_mem_free(mlieseqpayload_copy);
 		return ret;
 	}
-
-	qdf_mem_copy(probereq_info, &pinfo, sizeof(*probereq_info));
 
 	qdf_mem_free(mlieseqpayload_copy);
 

@@ -691,13 +691,18 @@ struct mlo_partner_info {
 
 /*
  * struct mlo_probereq_info – mlo probe req link info
+ * mlid: MLID requested in the probe req
  * @num_links: no. of link info in probe req
  * @link_id: target link id of APs
+ * @is_mld_id_valid: Indicates if mld_id is valid for a given request
+ * @skip_mbssid: Skip mbssid IE
  */
 struct mlo_probereq_info {
 	uint8_t mlid;
 	uint8_t num_links;
 	uint8_t link_id[WLAN_UMAC_MLO_MAX_VDEVS];
+	bool is_mld_id_valid;
+	bool skip_mbssid;
 };
 
 /*
