@@ -416,6 +416,7 @@ uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 uint32_t dp_sawf_queue_id_get(qdf_nbuf_t nbuf);
 void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf);
 bool dp_sawf_tag_valid_get(qdf_nbuf_t nbuf);
+uint8_t dp_sawf_tid_get(uint16_t queue_id);
 
 /*
  * dp_sawf_mpdu_stats_req() - Send MPDU basic stats request to target
