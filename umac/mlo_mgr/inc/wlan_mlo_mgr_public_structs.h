@@ -550,16 +550,18 @@ enum wlan_t2lm_resp_frm_type {
  * enum wlan_t2lm_enable - TID-to-link negotiation supported by the mlo peer
  *
  * @WLAN_T2LM_NOT_SUPPORTED: T2LM is not supported by the MLD
- * @WLAN_MAP_EACH_TID_TO_SAME_OR_DIFFERENET_LINK_SET: MLD supports the mapping
- *             of each TID to the same or different link set (Disjoint mapping).
- * @WLAN_MAP_ALL_TIDS_TO_SAME_LINK_SET: MLD only supports the mapping of all
- *             TIDs to the same link set.
+ * @WLAN_T2LM_MAP_ALL_TIDS_TO_SAME_LINK_SET: MLD only supports the mapping of
+ *    all TIDs to the same link set.
+ * @WLAN_T2LM_MAP_RESERVED: reserved value
+ * @WLAN_T2LM_MAP_EACH_TID_TO_SAME_OR_DIFFERENET_LINK_SET: MLD supports the
+ *    mapping of each TID to the same or different link set (Disjoint mapping).
  * @WLAN_T2LM_ENABLE_INVALID: invalid
  */
 enum wlan_t2lm_enable {
 	WLAN_T2LM_NOT_SUPPORTED = 0,
-	WLAN_MAP_EACH_TID_TO_SAME_OR_DIFFERENET_LINK_SET = 1,
-	WLAN_MAP_ALL_TIDS_TO_SAME_LINK_SET = 2,
+	WLAN_T2LM_MAP_ALL_TIDS_TO_SAME_LINK_SET = 1,
+	WLAN_T2LM_MAP_RESERVED = 2,
+	WLAN_T2LM_MAP_EACH_TID_TO_SAME_OR_DIFFERENET_LINK_SET = 3,
 	WLAN_T2LM_ENABLE_INVALID,
 };
 
