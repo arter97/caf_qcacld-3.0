@@ -6564,6 +6564,31 @@ enum band_info reg_band_bitmap_to_band_info(uint32_t band_bitmap)
 	else
 		return BAND_UNKNOWN;
 }
+
+QDF_STATUS
+reg_update_tx_power_on_ctry_change(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+	reg_ctry_change_callback callback = NULL;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+	if (!psoc_priv_obj) {
+		reg_err("reg psoc private obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	qdf_spin_lock_bh(&psoc_priv_obj->cbk_list_lock);
+	if (psoc_priv_obj->cc_cbk.cbk)
+		callback = psoc_priv_obj->cc_cbk.cbk;
+	qdf_spin_unlock_bh(&psoc_priv_obj->cbk_list_lock);
+	if (callback)
+		callback(vdev_id);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 #if defined(CONFIG_BAND_6GHZ)

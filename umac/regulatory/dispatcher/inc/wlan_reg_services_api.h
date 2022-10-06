@@ -1206,6 +1206,26 @@ void wlan_reg_unregister_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 					      void *cbk);
 
 /**
+ * wlan_reg_register_ctry_change_callback () - add country change cbk
+ * @psoc: psoc ptr
+ * @cbk: callback
+ *
+ * Return: None
+ */
+void wlan_reg_register_ctry_change_callback(struct wlan_objmgr_psoc *psoc,
+					    void *cbk);
+
+/**
+ * wlan_reg_unregister_ctry_change_callback () - remove country change cbk
+ * @psoc: psoc ptr
+ * @cbk:callback
+ *
+ * Return: None
+ */
+void wlan_reg_unregister_ctry_change_callback(struct wlan_objmgr_psoc *psoc,
+					      void *cbk);
+
+/**
  * wlan_reg_is_11d_offloaded() - 11d offloaded supported
  * @psoc: psoc ptr
  *
@@ -2072,6 +2092,18 @@ wlan_reg_get_max_phymode(struct wlan_objmgr_pdev *pdev,
  *	BAND_5G if 5G is enabled but 2G isn't
  */
 enum band_info wlan_reg_band_bitmap_to_band_info(uint32_t band_bitmap);
+
+/**
+ * wlan_reg_update_tx_power_on_ctry_change() - Update tx power during
+ * country code change (without channel change) OR if fcc constraint is set
+ * @pdev: Pointer to pdev
+ * @vdev_id: vdev ID
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_reg_update_tx_power_on_ctry_change(struct wlan_objmgr_pdev *pdev,
+					uint8_t vdev_id);
 #endif
 
 #if defined(CONFIG_BAND_6GHZ)

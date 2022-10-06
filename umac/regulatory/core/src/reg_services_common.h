@@ -1537,6 +1537,10 @@ reg_get_max_phymode(struct wlan_objmgr_pdev *pdev,
  *	BAND_5G if 5G is enabled but 2G isn't
  */
 enum band_info reg_band_bitmap_to_band_info(uint32_t band_bitmap);
+
+QDF_STATUS
+reg_update_tx_power_on_ctry_change(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id);
 #endif
 
 #if defined(CONFIG_BAND_6GHZ)

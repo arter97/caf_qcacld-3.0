@@ -85,6 +85,22 @@ struct chan_change_cbk_entry {
 };
 
 /**
+ * typedef reg_ctry_change_callback() - Regulatory country change callback
+ * @mac_ctx: Pointer to mac context
+ * @vdev_id: vdev ID
+ */
+typedef void (*reg_ctry_change_callback)(
+		uint8_t vdev_id);
+
+/**
+ * struct ctry_change_cbk_entry - Country change callback entry
+ * @cbk: Callback
+ */
+struct ctry_change_cbk_entry {
+	reg_ctry_change_callback cbk;
+};
+
+/**
  * struct wlan_regulatory_psoc_priv_obj - wlan regulatory psoc private object
  * @mas_chan_params: master channel parameters list
  * @chan_list_recvd: whether channel list has been received
@@ -164,6 +180,7 @@ struct wlan_regulatory_psoc_priv_obj {
 	bool user_ctry_set;
 	struct chan_change_cbk_entry cbk_list[REG_MAX_CHAN_CHANGE_CBKS];
 	uint8_t num_chan_change_cbks;
+	struct ctry_change_cbk_entry cc_cbk;
 	uint8_t ch_avoid_ind;
 	struct unsafe_ch_list unsafe_chan_list;
 	struct ch_avoid_ind_type avoid_freq_list;
