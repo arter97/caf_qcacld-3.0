@@ -72,11 +72,17 @@ static QDF_STATUS dp_soc_detach_rh(struct dp_soc *soc)
 
 static QDF_STATUS dp_soc_init_rh(struct dp_soc *soc)
 {
+	/*Register RX offload flush handlers*/
+	hif_offld_flush_cb_register(soc->hif_handle, dp_rx_data_flush);
+
 	return QDF_STATUS_SUCCESS;
 }
 
 static QDF_STATUS dp_soc_deinit_rh(struct dp_soc *soc)
 {
+	/*Degister RX offload flush handlers*/
+	hif_offld_flush_cb_deregister(soc->hif_handle);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -241,6 +247,10 @@ dp_rxdma_ring_sel_cfg_rh(struct dp_soc *soc)
 					    &htt_tlv_filter);
 		}
 	}
+
+	if (QDF_IS_STATUS_SUCCESS(status))
+		status = dp_htt_h2t_rx_ring_rfs_cfg(soc->htt_handle);
+
 	return status;
 }
 #else
@@ -322,6 +332,10 @@ dp_rxdma_ring_sel_cfg_rh(struct dp_soc *soc)
 					    &htt_tlv_filter);
 		}
 	}
+
+	if (QDF_IS_STATUS_SUCCESS(status))
+		status = dp_htt_h2t_rx_ring_rfs_cfg(soc->htt_handle);
+
 	return status;
 }
 #endif
@@ -425,7 +439,8 @@ void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_rh;
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_rh;
-	arch_ops->dp_rx_intrabss_handle_nawds = dp_rx_intrabss_handle_nawds_rh;
+	arch_ops->dp_rx_intrabss_mcast_handler =
+					dp_rx_intrabss_handle_nawds_rh;
 	arch_ops->dp_rx_word_mask_subscribe = dp_rx_word_mask_subscribe_rh;
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_rh;
 	arch_ops->dp_rx_peer_metadata_peer_id_get =

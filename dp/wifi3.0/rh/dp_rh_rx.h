@@ -83,6 +83,46 @@ dp_rx_peer_metadata_peer_id_get_rh(struct dp_soc *soc, uint32_t peer_metadata)
 	return metadata->peer_id;
 }
 
+/**
+ * dp_rx_data_flush() - Flush RX data after reaping from RX rings
+ *
+ * @data: reference to flush RX data
+ *
+ * Return: None
+ */
+void
+dp_rx_data_flush(void *data);
+
+/**
+ * dp_rx_data_indication_handler() - Indicate when RX data is available in rings
+ *
+ * @soc:DP soc reference
+ * @data_ind: Data indication message info
+ * @vdev_id: Vdev id
+ * @peer_id: Peer id
+ * @msdu_count: Number of MSDUs available in message
+ *
+ * Return: None
+ */
+void
+dp_rx_data_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
+			      uint16_t vdev_id, uint16_t peer_id,
+			      uint16_t msdu_count);
+
+/**
+ * dp_rx_frag_indication_handler() - Indicate when RX frag data is available in ring
+ *
+ * @soc:DP soc reference
+ * @data_ind: Data indication message info
+ * @vdev_id: Vdev id
+ * @peer_id: Peer id
+ *
+ * Return: None
+ */
+void
+dp_rx_frag_indication_handler(struct dp_soc *soc, qdf_nbuf_t data_ind,
+			      uint16_t vdev_id, uint16_t peer_id);
+
 static inline bool
 dp_rx_intrabss_handle_nawds_rh(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			       qdf_nbuf_t nbuf_copy,

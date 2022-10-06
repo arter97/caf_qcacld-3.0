@@ -27,6 +27,14 @@
 #include "cdp_txrx_cmn_struct.h"
 
 /*
+ * dp_htt_h2t_rx_ring_rfs_cfg() - RFS config for RX DATA indication
+ * @htt_soc: Opaque htt SOC handle
+ *
+ * Return: QDF_STATUS success or failure
+ */
+QDF_STATUS dp_htt_h2t_rx_ring_rfs_cfg(struct htt_soc *soc);
+
+/*
  * dp_htt_soc_initialize_rh() - SOC level HTT initialization
  * @htt_soc: Opaque htt SOC handle
  * @ctrl_psoc: Opaque ctrl SOC handle

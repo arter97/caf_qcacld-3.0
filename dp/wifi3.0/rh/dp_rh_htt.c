@@ -52,6 +52,87 @@ dp_htt_h2t_send_complete_free_netbuf(
 	qdf_nbuf_free(netbuf);
 }
 
+QDF_STATUS dp_htt_h2t_rx_ring_rfs_cfg(struct htt_soc *soc)
+{
+	struct dp_htt_htc_pkt *pkt;
+	qdf_nbuf_t msg;
+	uint32_t *msg_word;
+	QDF_STATUS status;
+	uint8_t *htt_logger_bufp;
+
+	/*
+	 * TODO check do we need ini support in Evros
+	 * Receive flow steering configuration,
+	 * disable gEnableFlowSteering(=0) in ini if
+	 * FW doesn't support it
+	 */
+
+	/* reserve room for the HTC header */
+	msg = qdf_nbuf_alloc(soc->osdev,
+			     HTT_MSG_BUF_SIZE(HTT_RFS_CFG_REQ_BYTES),
+			     HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING, 4,
+			     true);
+	if (!msg) {
+		dp_err("htt_msg alloc failed for RFS config");
+		return QDF_STATUS_E_NOMEM;
+	}
+	/*
+	 * Set the length of the message.
+	 * The contribution from the HTC_HDR_ALIGNMENT_PADDING is added
+	 * separately during the below call to qdf_nbuf_push_head.
+	 * The contribution from the HTC header is added separately inside HTC.
+	 */
+	qdf_nbuf_put_tail(msg, HTT_RFS_CFG_REQ_BYTES);
+
+	/* fill in the message contents */
+	msg_word = (uint32_t *)qdf_nbuf_data(msg);
+
+	/* rewind beyond alignment pad to get to the HTC header reserved area */
+	qdf_nbuf_push_head(msg, HTC_HDR_ALIGNMENT_PADDING);
+
+	/* word 0 */
+	*msg_word = 0;
+	htt_logger_bufp = (uint8_t *)msg_word;
+	HTT_H2T_MSG_TYPE_SET(*msg_word, HTT_H2T_MSG_TYPE_RFS_CONFIG);
+	HTT_RX_RFS_CONFIG_SET(*msg_word, 1);
+
+	/*
+	 * TODO value should be obtained from ini maxMSDUsPerRxInd
+	 * currently this ini is legacy ol and available only from cds
+	 * make this ini common to HL and evros DP
+	 */
+	*msg_word |= ((32 & 0xff) << 16);
+
+	dp_htt_info("RFS sent to F.W: 0x%08x", *msg_word);
+
+	/*start*/
+	pkt = htt_htc_pkt_alloc(soc);
+	if (!pkt) {
+		qdf_nbuf_free(msg);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	pkt->soc_ctxt = NULL; /* not used during send-done callback */
+	SET_HTC_PACKET_INFO_TX(
+		&pkt->htc_pkt,
+		dp_htt_h2t_send_complete_free_netbuf,
+		qdf_nbuf_data(msg),
+		qdf_nbuf_len(msg),
+		soc->htc_endpoint,
+		HTC_TX_PACKET_TAG_RUNTIME_PUT); /* tag for no FW response msg */
+
+	SET_HTC_PACKET_NET_BUF_CONTEXT(&pkt->htc_pkt, msg);
+	status = DP_HTT_SEND_HTC_PKT(soc, pkt, HTT_H2T_MSG_TYPE_RFS_CONFIG,
+				     htt_logger_bufp);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		qdf_nbuf_free(msg);
+		htt_htc_pkt_free(soc, pkt);
+	}
+
+	return status;
+}
+
 static void
 dp_htt_rx_addba_handler_rh(struct dp_soc *soc, uint16_t peer_id,
 			   uint8_t tid, uint16_t win_sz)
@@ -101,6 +182,25 @@ dp_htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 		switch (msg_type) {
 		case HTT_T2H_MSG_TYPE_RX_DATA_IND:
 		{
+			uint16_t vdev_id, msdu_cnt;
+			uint16_t peer_id, frag_ind;
+
+			peer_id = HTT_RX_DATA_IND_PEER_ID_GET(*msg_word);
+			frag_ind = HTT_RX_DATA_IND_FRAG_GET(*(msg_word + 1));
+			vdev_id = HTT_RX_DATA_IND_VDEV_ID_GET(*msg_word);
+
+			if (qdf_unlikely(frag_ind)) {
+				dp_rx_frag_indication_handler(soc->dp_soc,
+							      htt_t2h_msg,
+							      vdev_id, peer_id);
+				break;
+			}
+
+			msdu_cnt =
+				HTT_RX_DATA_IND_MSDU_CNT_GET(*(msg_word + 1));
+			dp_rx_data_indication_handler(soc->dp_soc, htt_t2h_msg,
+						      vdev_id, peer_id,
+						      msdu_cnt);
 			break;
 		}
 		/* TODO add support for TX completion handling */
