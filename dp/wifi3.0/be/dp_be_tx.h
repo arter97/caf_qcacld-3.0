@@ -70,6 +70,7 @@ QDF_STATUS dp_tx_hw_enqueue_be(struct dp_soc *soc, struct dp_vdev *vdev,
 				struct cdp_tx_exception_metadata *metadata,
 				struct dp_tx_msdu_info_s *msdu_info);
 
+#ifdef QCA_DP_TX_NBUF_LIST_FREE
 /**
  * dp_tx_hw_enqueue_be() - This is a fast send API to directly enqueue to HW
  * @soc: DP Soc Handle
@@ -82,9 +83,15 @@ QDF_STATUS dp_tx_hw_enqueue_be(struct dp_soc *soc, struct dp_vdev *vdev,
  * Return: NULL for success
  *         nbuf for failure
  */
-
 qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc, uint8_t vdev_id,
 			      qdf_nbuf_t nbuf);
+#else
+static inline qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc, uint8_t vdev_id,
+					    qdf_nbuf_t nbuf)
+{
+	return NULL;
+}
+#endif
 
 /**
  * dp_tx_comp_get_params_from_hal_desc_be() - Get TX desc from HAL comp desc

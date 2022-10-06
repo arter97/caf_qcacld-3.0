@@ -1349,6 +1349,7 @@ void dp_tx_nbuf_unmap_be(struct dp_soc *soc,
  * Return: NULL on success,
  *         nbuf when it fails to send
  */
+#ifdef QCA_DP_TX_NBUF_LIST_FREE
 qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			      qdf_nbuf_t nbuf)
 {
@@ -1404,6 +1405,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	tx_desc->pkt_offset = 0;
 	tx_desc->length = pkt_len;
 	tx_desc->flags |= DP_TX_DESC_FLAG_SIMPLE;
+	tx_desc->nbuf->fast_recycled = 1;
 
 	paddr =  dp_tx_nbuf_map_be(vdev, tx_desc, nbuf);
 	if (!paddr) {
@@ -1483,3 +1485,4 @@ release_desc:
 
 	return nbuf;
 }
+#endif
