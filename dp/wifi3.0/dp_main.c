@@ -7936,8 +7936,10 @@ dp_peer_create_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	/* Initialize the peer state */
 	peer->state = OL_TXRX_PEER_STATE_DISC;
 
-	dp_info("vdev %pK created peer %pK ("QDF_MAC_ADDR_FMT") ref_cnt: %d",
+	dp_info("vdev %pK created peer %pK ("QDF_MAC_ADDR_FMT") vdev_ref_cnt "
+		"%d peer_ref_cnt: %d",
 		vdev, peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw),
+		qdf_atomic_read(&vdev->ref_cnt),
 		qdf_atomic_read(&peer->ref_cnt));
 	/*
 	 * For every peer MAp message search and set if bss_peer
@@ -8049,8 +8051,10 @@ QDF_STATUS dp_peer_mlo_setup(
 			 * primary link dp_vdev is not same one
 			 * during mld peer creation.
 			 */
-
-			/* release the ref to original dp_vdev */
+			dp_info("Primary link is not the first link. vdev: %pK,"
+				"vdev_ref_cnt %d", mld_peer->vdev,
+				 mld_peer->vdev->ref_cnt);
+			/* relase the ref to original dp_vdev */
 			dp_vdev_unref_delete(soc, mld_peer->vdev,
 					     DP_MOD_ID_CHILD);
 			/*
@@ -8774,8 +8778,8 @@ void dp_peer_unref_delete(struct dp_peer *peer, enum dp_mod_id mod_id)
 		 */
 		QDF_ASSERT(peer_id == HTT_INVALID_PEER);
 
-		dp_peer_debug("Deleting peer %pK ("QDF_MAC_ADDR_FMT")", peer,
-			      QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+		dp_peer_info("Deleting peer %pK ("QDF_MAC_ADDR_FMT")", peer,
+			     QDF_MAC_ADDR_REF(peer->mac_addr.raw));
 
 		dp_peer_sawf_ctx_free(soc, peer);
 
@@ -8812,6 +8816,8 @@ void dp_peer_unref_delete(struct dp_peer *peer, enum dp_mod_id mod_id)
 		/*
 		 * Decrement ref count taken at peer create
 		 */
+		dp_peer_info("Deleted peer. Unref vdev %pK, vdev_ref_cnt %d",
+			     vdev, qdf_atomic_read(&vdev->ref_cnt));
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CHILD);
 	}
 }
