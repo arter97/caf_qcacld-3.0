@@ -719,6 +719,7 @@ static int target_if_vdev_mgr_multi_vdev_restart_resp_handler(
 	}
 
 	qdf_mem_zero(&restart_resp, sizeof(restart_resp));
+	restart_resp.timestamp = qdf_get_log_timestamp();
 	if (wmi_extract_multi_vdev_restart_resp_event(wmi_handle, data,
 						      &restart_resp)) {
 		mlme_err("WMI extract failed");
