@@ -390,7 +390,8 @@ void dp_sawf_config_li(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 
 	search_index = dp_sawf_get_search_index(soc, nbuf, vdev_id,
 						q_id);
-	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached, (q_id & 0x7));
+	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached,
+				 (q_id & (CDP_DATA_TID_MAX - 1)));
 	hal_tx_desc_set_search_type_li(soc->hal_soc, hal_tx_desc_cached,
 				       HAL_TX_ADDR_INDEX_SEARCH);
 	hal_tx_desc_set_search_index_li(soc->hal_soc, hal_tx_desc_cached,

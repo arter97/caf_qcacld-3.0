@@ -751,7 +751,8 @@ void dp_sawf_config_be(struct dp_soc *soc, uint32_t *hal_tx_desc_cached,
 
 	if (q_id == DP_SAWF_DEFAULT_Q_INVALID)
 		return;
-	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached, DP_TX_HLOS_TID_GET(q_id));
+	hal_tx_desc_set_hlos_tid(hal_tx_desc_cached,
+				 (q_id & (CDP_DATA_TID_MAX - 1)));
 	hal_tx_desc_set_flow_override_enable(hal_tx_desc_cached,
 					     DP_TX_FLOW_OVERRIDE_ENABLE);
 	hal_tx_desc_set_flow_override(hal_tx_desc_cached,
