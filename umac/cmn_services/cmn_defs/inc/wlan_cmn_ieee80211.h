@@ -191,6 +191,22 @@
 #define QCA_OUI_WHC_TYPE  0x00
 #define QCA_OUI_WHC_REPT_TYPE 0x01
 
+/* QCN IE attribute types */
+enum qcn_attribute_id {
+	QCN_ATTRIB_VERSION                  = 0x01,
+	QCN_ATTRIB_VHT_MCS10_11_SUPP        = 0X02,
+	QCN_ATTRIB_HE_400NS_SGI_SUPP        = 0X03,
+	QCN_ATTRIB_HE_2XLTF_160_80P80_SUPP  = 0X04,
+	QCN_ATTRIB_HE_DL_OFDMA_SUPP         = 0X05,
+	QCN_ATTRIB_TRANSITION_REASON        = 0x06,
+	QCN_ATTRIB_TRANSITION_REJECTION     = 0x07,
+	QCN_ATTRIB_HE_DL_MUMIMO_SUPP        = 0X08,
+	QCN_ATTRIB_HE_MCS12_13_SUPP         = 0X09,
+	QCN_ATTRIB_REPEATER_INFO            = 0X0A,
+	QCN_ATTRIB_HE_240_MHZ_SUPP          = 0X0B,
+	QCN_ATTRIB_MAX                      = 0x0C
+};
+
 /* Extender vendor specific IE */
 #define QCA_OUI_EXTENDER_TYPE           0x03
 
