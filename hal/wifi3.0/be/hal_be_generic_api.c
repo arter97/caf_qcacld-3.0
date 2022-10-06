@@ -624,6 +624,8 @@ hal_msdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
 {
 	struct rx_msdu_desc_info *msdu_desc_info =
 		(struct rx_msdu_desc_info *)msdu_desc;
+	struct rx_msdu_ext_desc_info *msdu_ext_desc_info =
+		(struct rx_msdu_ext_desc_info *)(msdu_desc_info + 1);
 
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
 				  FIRST_MSDU_IN_MPDU_FLAG, 1);
@@ -637,6 +639,8 @@ hal_msdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
 				  SA_IS_VALID, 1);
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
 				  DA_IS_VALID, 1);
+	HAL_RX_MSDU_REO_DST_IND_SET(msdu_ext_desc_info,
+				    REO_DESTINATION_INDICATION, dst_ind);
 }
 
 static inline void
