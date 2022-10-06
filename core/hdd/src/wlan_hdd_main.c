@@ -6326,11 +6326,18 @@ static int hdd_vdev_destroy_event_wait(struct hdd_context *hdd_ctx,
 	return 0;
 }
 
+static inline
+void hdd_vdev_deinit_components(struct wlan_objmgr_vdev *vdev)
+{
+	ucfg_pmo_del_wow_pattern(vdev);
+	ucfg_reg_11d_vdev_delete_update(vdev);
+	ucfg_son_disable_cbs(vdev);
+}
+
 int hdd_vdev_destroy(struct hdd_adapter *adapter)
 {
 	int ret;
 	uint8_t vdev_id;
-	QDF_STATUS status;
 	struct hdd_context *hdd_ctx;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -6351,12 +6358,10 @@ int hdd_vdev_destroy(struct hdd_adapter *adapter)
 
 	hdd_stop_last_active_connection(hdd_ctx, vdev);
 	hdd_check_wait_for_hw_mode_completion(hdd_ctx);
-	ucfg_pmo_del_wow_pattern(vdev);
-	status = ucfg_reg_11d_vdev_delete_update(vdev);
 	ucfg_scan_vdev_set_disable(vdev, REASON_VDEV_DOWN);
 	wlan_hdd_scan_abort(adapter);
+	hdd_vdev_deinit_components(vdev);
 	wlan_cfg80211_cleanup_scan_queue(hdd_ctx->pdev, adapter->dev);
-	ucfg_son_disable_cbs(vdev);
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 
 	qdf_spin_lock_bh(&adapter->deflink->vdev_lock);
@@ -8126,6 +8131,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 				     WLAN_CONTROL_PATH);
 
 	mac_handle = hdd_ctx->mac_handle;
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 
 	switch (adapter->device_mode) {
 	case QDF_STA_MODE:
@@ -8212,20 +8218,14 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 #endif
 
 		if (adapter->device_mode == QDF_STA_MODE) {
-			struct wlan_objmgr_vdev *vdev;
-
-			vdev = hdd_objmgr_get_vdev_by_user(adapter,
-							   WLAN_OSIF_SCAN_ID);
-			if (vdev) {
+			if (vdev)
 				wlan_cfg80211_sched_scan_stop(vdev);
-				hdd_objmgr_put_vdev_by_user(vdev,
-							    WLAN_OSIF_SCAN_ID);
-			}
 
 			ucfg_ipa_flush_pending_vdev_events(
 						hdd_ctx->pdev,
 						adapter->deflink->vdev_id);
 		}
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
 		break;
 
@@ -8269,6 +8269,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		if (QDF_IS_STATUS_ERROR(status))
 			hdd_err_rl("stop failed montior mode");
 		sme_delete_mon_session(mac_handle, adapter->deflink->vdev_id);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
 		break;
 
@@ -8293,10 +8294,8 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			ucfg_pre_cac_stop(hdd_ctx->psoc);
 			hdd_close_pre_cac_adapter(hdd_ctx);
 		} else {
-			if (ucfg_pre_cac_set_status(adapter->deflink->vdev,
-						    false)) {
+			if (ucfg_pre_cac_set_status(vdev, false))
 				hdd_err("Failed to set is_pre_cac_on to false");
-			}
 		}
 
 		fallthrough;
@@ -8394,11 +8393,9 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 		/*
 		 * If Do_Not_Break_Stream was enabled clear avoid channel list.
 		 */
-		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
 		if (vdev) {
 			if (policy_mgr_is_dnsc_set(vdev))
 				wlan_hdd_send_avoid_freq_for_dnbs(hdd_ctx, 0);
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		}
 
 #ifdef WLAN_OPEN_SOURCE
@@ -8414,7 +8411,7 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 						hdd_ctx->pdev,
 						adapter->deflink->vdev_id);
 		}
-
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
 
 		mutex_unlock(&hdd_ctx->sap_lock);
@@ -8426,9 +8423,11 @@ QDF_STATUS hdd_stop_adapter_ext(struct hdd_context *hdd_ctx,
 			       sta_ctx->conn_info.peer_macaddr[0]);
 		hdd_deregister_hl_netdev_fc_timer(adapter);
 		hdd_deregister_tx_flow_control(adapter);
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		hdd_vdev_destroy(adapter);
 		break;
 	default:
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 		break;
 	}
 
@@ -8587,11 +8586,11 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
 
 			vdev = hdd_objmgr_get_vdev_by_user(adapter,
 							   WLAN_OSIF_SCAN_ID);
-			if (vdev) {
-				wlan_cfg80211_sched_scan_stop(vdev);
-				hdd_objmgr_put_vdev_by_user(vdev,
-							    WLAN_OSIF_SCAN_ID);
-			}
+			if (!vdev)
+				break;
+
+			wlan_cfg80211_sched_scan_stop(vdev);
+			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_SCAN_ID);
 		}
 		break;
 	case QDF_P2P_GO_MODE:

@@ -2981,6 +2981,12 @@ bool hdd_is_5g_supported(struct hdd_context *hdd_ctx);
  */
 bool hdd_is_2g_supported(struct hdd_context *hdd_ctx);
 
+/**
+ * wlan_hdd_scan_abort() - abort ongoing scan
+ * @adapter: Pointer to interface adapter
+ *
+ * Return: 0 for success, non zero for failure
+ */
 int wlan_hdd_scan_abort(struct hdd_adapter *adapter);
 
 /**

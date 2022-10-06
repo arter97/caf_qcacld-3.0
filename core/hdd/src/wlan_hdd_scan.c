@@ -1252,12 +1252,6 @@ int wlan_hdd_vendor_abort_scan(struct wiphy *wiphy, struct wireless_dev *wdev,
 	return errno;
 }
 
-/**
- * wlan_hdd_scan_abort() - abort ongoing scan
- * @adapter: Pointer to interface adapter
- *
- * Return: 0 for success, non zero for failure
- */
 int wlan_hdd_scan_abort(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
