@@ -108,6 +108,7 @@ static void wlan_cfg80211_mc_cp_stats_dealloc(void *priv)
 	}
 
 	qdf_mem_free(stats->pdev_stats);
+	qdf_mem_free(stats->pdev_extd_stats);
 	qdf_mem_free(stats->peer_stats);
 	qdf_mem_free(stats->cca_stats);
 	qdf_mem_free(stats->vdev_summary_stats);
@@ -711,15 +712,15 @@ wlan_cfg80211_mc_twt_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
 	out->twt_infra_cp_stats =
 			qdf_mem_malloc(sizeof(*out->twt_infra_cp_stats));
 	if (!out->twt_infra_cp_stats) {
+		qdf_mem_free(out);
 		*errno = -ENOMEM;
 		return NULL;
 	}
 
 	request = osif_request_alloc(&params);
 	if (!request) {
-		qdf_mem_free(out);
 		*errno = -ENOMEM;
-		return NULL;
+		goto free_stats_event;
 	}
 
 	cookie = osif_request_cookie(request);
@@ -729,7 +730,7 @@ wlan_cfg80211_mc_twt_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
 			qdf_mem_malloc(sizeof(*priv->twt_infra_cp_stats));
 	if (!priv->twt_infra_cp_stats) {
 		*errno = -ENOMEM;
-		return NULL;
+		goto get_twt_stats_fail;
 	}
 	twt_event = priv->twt_infra_cp_stats;
 
@@ -798,6 +799,8 @@ wlan_cfg80211_mc_twt_get_infra_cp_stats(struct wlan_objmgr_vdev *vdev,
 
 get_twt_stats_fail:
 	osif_request_put(request);
+
+free_stats_event:
 	wlan_cfg80211_mc_infra_cp_stats_free_stats_event(out);
 
 	osif_debug("Exit");

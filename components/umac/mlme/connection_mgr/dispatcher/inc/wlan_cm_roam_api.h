@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,6 +60,19 @@ QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
 				     uint8_t vdev_id, uint8_t rso_command,
 				     uint8_t reason);
 
+/*
+ * wlan_cm_handle_sta_sta_roaming_enablement() - Handle roaming in case
+ * of STA + STA
+ * @psoc: psoc common object
+ * @vdev_id: Vdev id
+ *
+ * Wrapper function to cm_handle_sta_sta_roaming_enablement
+ *
+ * Return: none
+ */
+void wlan_cm_handle_sta_sta_roaming_enablement(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id);
+
 /**
  * wlan_cm_roam_state_change() - Post roam state change to roam state machine
  * @pdev: pdev pointer
@@ -111,6 +125,12 @@ QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
 				     uint8_t reason)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+wlan_cm_handle_sta_sta_roaming_enablement(struct wlan_objmgr_psoc *psoc,
+					  uint8_t vdev_id)
+{
 }
 
 static inline QDF_STATUS
@@ -1209,6 +1229,21 @@ static inline QDF_STATUS
 cm_handle_scan_ch_list_data(struct cm_roam_scan_ch_resp *data)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+cm_roam_sync_event_handler(struct wlan_objmgr_psoc *psoc,
+			   uint8_t *event, uint32_t len,
+			   struct roam_offload_synch_ind *sync_ind)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS
+cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
+				 struct roam_synch_frame_ind *frame_ind)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 

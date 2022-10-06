@@ -316,9 +316,6 @@ enum hdd_nb_cmd_id {
 #define P2P_OUI_TYPE   "\x50\x6f\x9a\x09"
 #define P2P_OUI_TYPE_SIZE  4
 
-#define HS20_OUI_TYPE   "\x50\x6f\x9a\x10"
-#define HS20_OUI_TYPE_SIZE  4
-
 #define OSEN_OUI_TYPE   "\x50\x6f\x9a\x12"
 #define OSEN_OUI_TYPE_SIZE  4
 
@@ -1055,6 +1052,7 @@ struct hdd_fw_txrx_stats {
  * @bss_stop_reason: Reason why the BSS was stopped
  * @acs_in_progress: In progress acs flag for an adapter
  * @client_count: client count per dot11_mode
+ * @country_ie_updated: country ie is updated or not by hdd hostapd
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -1074,6 +1072,7 @@ struct hdd_ap_ctx {
 	enum bss_stop_reason bss_stop_reason;
 	qdf_atomic_t acs_in_progress;
 	uint16_t client_count[QCA_WLAN_802_11_MODE_INVALID];
+	bool country_ie_updated;
 };
 
 /**
@@ -2082,6 +2081,7 @@ struct hdd_context {
 	/* Present state of driver cds modules */
 	enum driver_modules_status driver_status;
 	struct qdf_delayed_work psoc_idle_timeout_work;
+	struct notifier_block pm_notifier;
 	bool rps;
 	bool dynamic_rps;
 	bool enable_rxthread;

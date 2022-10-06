@@ -33,6 +33,7 @@
 #define P2P_MAC_MGMT_ACTION                     0xD
 #define P2P_PUBLIC_ACTION_VENDOR_SPECIFIC       0x9
 #define P2P_NOA_ATTR                            0xC
+#define WNM_ACTION_FRAME                        0xA
 
 #define P2P_MAX_NOA_ATTR_LEN                    31
 #define P2P_IE_HEADER_LEN                       6
@@ -110,6 +111,7 @@ enum p2p_frame_sub_type {
  * @P2P_PUBLIC_ACTION_GAS_INIT_RSP:  gas initial response
  * @P2P_PUBLIC_ACTION_GAS_COMB_REQ:  gas comeback request
  * @P2P_PUBLIC_ACTION_GAS_COMB_RSP:  gas comeback response
+ * @P2P_PUBLIC_ACTION_WNM_BTM_REQ:   bss transition management request
  * @P2P_PUBLIC_ACTION_NOT_SUPPORT:   not support p2p public action frame
  */
 enum p2p_public_action_type {
@@ -126,6 +128,7 @@ enum p2p_public_action_type {
 	P2P_PUBLIC_ACTION_GAS_INIT_RSP,
 	P2P_PUBLIC_ACTION_GAS_COMB_REQ,
 	P2P_PUBLIC_ACTION_GAS_COMB_RSP,
+	P2P_PUBLIC_ACTION_WNM_BTM_REQ,
 	P2P_PUBLIC_ACTION_NOT_SUPPORT,
 };
 

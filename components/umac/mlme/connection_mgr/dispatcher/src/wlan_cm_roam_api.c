@@ -102,6 +102,12 @@ QDF_STATUS wlan_cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
 	return cm_roam_send_rso_cmd(psoc, vdev_id, rso_command, reason);
 }
 
+void wlan_cm_handle_sta_sta_roaming_enablement(struct wlan_objmgr_psoc *psoc,
+					       uint8_t vdev_id)
+{
+	return cm_handle_sta_sta_roaming_enablement(psoc, vdev_id);
+}
+
 QDF_STATUS
 wlan_roam_update_cfg(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 		     uint8_t reason)
@@ -2398,6 +2404,12 @@ cm_vdev_disconnect_event_handler(struct vdev_disconnect_event_data *data)
 }
 
 QDF_STATUS
+cm_roam_auth_offload_event_handler(struct auth_offload_event *auth_event)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
 cm_roam_pmkid_request_handler(struct roam_pmkid_req_event *data)
 {
 	return QDF_STATUS_SUCCESS;
@@ -3083,6 +3095,13 @@ err:
 		qdf_mem_free(stats_info->roam_msg_info);
 	qdf_mem_free(stats_info);
 	return status;
+}
+#else
+QDF_STATUS
+cm_roam_stats_event_handler(struct wlan_objmgr_psoc *psoc,
+			    struct roam_stats_event *stats_info)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
