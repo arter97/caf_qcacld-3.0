@@ -1938,9 +1938,6 @@ struct hdd_context {
 	/* Flag keeps track of wiphy suspend/resume */
 	bool is_wiphy_suspended;
 
-	/* Flag keeps track of idle shutdown triggered by suspend */
-	bool shutdown_in_suspend;
-
 #ifdef WLAN_FEATURE_DP_BUS_BANDWIDTH
 	struct qdf_periodic_work bus_bw_work;
 	int cur_vote_level;
@@ -2070,6 +2067,7 @@ struct hdd_context {
 	/* Present state of driver cds modules */
 	enum driver_modules_status driver_status;
 	struct qdf_delayed_work psoc_idle_timeout_work;
+	struct notifier_block pm_notifier;
 	bool rps;
 	bool dynamic_rps;
 	bool enable_rxthread;
@@ -2142,6 +2140,7 @@ struct hdd_context {
 #ifdef WLAN_SUPPORT_TWT
 	enum twt_status twt_state;
 	qdf_event_t twt_disable_comp_evt;
+	qdf_event_t twt_enable_comp_evt;
 #endif
 #ifdef FEATURE_WLAN_APF
 	uint32_t apf_version;
@@ -4935,13 +4934,4 @@ void wlan_hdd_set_pm_qos_request(struct hdd_context *hdd_ctx,
 {
 }
 #endif
-
-/*
- * hdd_shutdown_wlan_in_suspend: shutdown wlan chip when suspend called
- * @hdd_ctx: HDD context
- *
- * this function called by __wlan_hdd_cfg80211_suspend_wlan(), and it
- * schedule idle shutdown work queue when no interface open.
- */
-void hdd_shutdown_wlan_in_suspend(struct hdd_context *hdd_ctx);
 #endif /* end #if !defined(WLAN_HDD_MAIN_H) */

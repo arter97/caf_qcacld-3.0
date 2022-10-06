@@ -2022,9 +2022,9 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
+	enum pmo_suspend_mode mode;
 	int rc;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CFG80211_SUSPEND_WLAN;
-	enum pmo_suspend_mode suspend_mode;
 
 	hdd_enter();
 
@@ -2039,27 +2039,18 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	if (0 != rc)
 		return rc;
 
-	suspend_mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
-	if (suspend_mode == PMO_SUSPEND_NONE) {
-		hdd_info_rl("Suspend is not supported");
-		return -EINVAL;
-	}
-
-	if (suspend_mode == PMO_SUSPEND_SHUTDOWN) {
-		if (hdd_ctx->shutdown_in_suspend)
-			return -EAGAIN;
-
-		hdd_info_rl("Shutdown WLAN in Suspend");
-		hdd_shutdown_wlan_in_suspend(hdd_ctx);
-		/* shutdown must be excute in active, so return -EAGAIN
-		 * to PM to exit and try again
-		 */
-		return -EAGAIN;
-	}
-
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Modules not Enabled ");
 		return 0;
+	}
+
+	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	if (mode == PMO_SUSPEND_NONE) {
+		hdd_info_rl("Suspend is not supported");
+		return -EINVAL;
+	} else if (mode == PMO_SUSPEND_SHUTDOWN) {
+		hdd_info_rl("shutdown suspend should complete in prepare");
+		return -EINVAL;
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
@@ -2262,8 +2253,7 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
 	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
-		hdd_info("Driver Modules not Enabled");
-		hdd_ctx->shutdown_in_suspend = false;
+		hdd_debug("Driver Modules not Enabled ");
 		return 0;
 	}
 
@@ -2304,8 +2294,7 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	 * the deadlock as idle shutdown waits for the dsc ops
 	 * to complete.
 	 */
-	if (!hdd_ctx->shutdown_in_suspend)
-		hdd_psoc_idle_timer_stop(hdd_ctx);
+	hdd_psoc_idle_timer_stop(hdd_ctx);
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
 	if (errno)

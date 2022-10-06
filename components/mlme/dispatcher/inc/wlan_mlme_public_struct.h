@@ -1432,6 +1432,8 @@ struct wlan_mlme_acs {
  * @is_all_twt_tgt_cap_enabled: support for all twt enable/disable
  * @is_twt_statistics_tgt_cap_enabled: support for twt statistics
  * @twt_congestion_timeout: congestion timeout value
+ * @req_flag: requestor flag enable/disable
+ * @res_flag: responder flag enable/disable
  */
 struct wlan_mlme_cfg_twt {
 	bool is_twt_enabled;
@@ -1443,6 +1445,8 @@ struct wlan_mlme_cfg_twt {
 	bool is_all_twt_tgt_cap_enabled;
 	bool is_twt_statistics_tgt_cap_enabled;
 	uint32_t twt_congestion_timeout;
+	bool req_flag;
+	bool res_flag;
 };
 
 /**

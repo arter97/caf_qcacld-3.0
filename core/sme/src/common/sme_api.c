@@ -7498,7 +7498,7 @@ void sme_get_command_q_status(mac_handle_t mac_handle)
  * @timestamp_offset: return for the offset of the timestamp field
  * @time_value_offset: return for the time_value field in the TA IE
  *
- * Return: the length of the buffer.
+ * Return: the length of the buffer on success and error code on failure.
  */
 int sme_ocb_gen_timing_advert_frame(mac_handle_t mac_handle,
 				    tSirMacAddr self_addr, uint8_t **buf,
@@ -13786,10 +13786,6 @@ QDF_STATUS sme_add_dialog_cmd(mac_handle_t mac_handle,
 		return status;
 	}
 
-	mlme_set_twt_command_in_progress(mac->psoc,
-				(struct qdf_mac_addr *)twt_params->peer_macaddr,
-				twt_params->dialog_id, WLAN_TWT_SETUP);
-
 	/*
 	 * Add the dialog id to TWT context to drop back to back
 	 * commands
@@ -13797,6 +13793,10 @@ QDF_STATUS sme_add_dialog_cmd(mac_handle_t mac_handle,
 	mlme_add_twt_session(mac->psoc,
 			     (struct qdf_mac_addr *)twt_params->peer_macaddr,
 			     twt_params->dialog_id);
+
+	mlme_set_twt_command_in_progress(mac->psoc,
+				(struct qdf_mac_addr *)twt_params->peer_macaddr,
+				twt_params->dialog_id, WLAN_TWT_SETUP);
 
 	/* Serialize the req through MC thread */
 	mac->sme.twt_add_dialog_cb = twt_add_dialog_cb;

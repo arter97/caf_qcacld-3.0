@@ -1272,10 +1272,9 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	wlan_hdd_fix_broadcast_eapol(adapter, skb);
 
 	if (adapter->tx_fn(soc, adapter->vdev_id, (qdf_nbuf_t)skb)) {
-		QDF_TRACE(QDF_MODULE_ID_HDD_DATA, QDF_TRACE_LEVEL_INFO_HIGH,
-			  "%s: Failed to send packet to txrx for sta_id: "
-			  QDF_MAC_ADDR_FMT,
-			  __func__, QDF_MAC_ADDR_REF(mac_addr.bytes));
+		hdd_debug_rl("%s: Failed to send packet to txrx for sta_id: "
+			     QDF_MAC_ADDR_FMT,
+			     __func__, QDF_MAC_ADDR_REF(mac_addr.bytes));
 		++adapter->hdd_stats.tx_rx_stats.tx_dropped_ac[ac];
 		goto drop_pkt_and_release_skb;
 	}
