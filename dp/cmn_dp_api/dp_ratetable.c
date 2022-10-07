@@ -6990,3 +6990,307 @@ int dp_get_supported_rates(int mode, int shortgi, int nss,
 #endif
 
 qdf_export_symbol(dp_get_supported_rates);
+
+#if ALL_POSSIBLE_RATES_SUPPORTED
+/* dp_get_kbps_to_mcs - Identify the mcs value based on the rate
+ * @kbps_rate - rate in kbps
+ * @shortgi - gi setting
+ * @htflag - The type of standard configured
+ *
+ * return - MCS value identified with help of the rate
+ */
+int dp_get_kbps_to_mcs(int kbps_rate, int shortgi, int htflag)
+{
+	int i = 0, nss = 0, num_mcs = 0;
+	int start_index = -1, end_index = -1;
+	int ratekbpssgi = 0, ratekbps = 0;
+
+	/* Convert kbps to mbps for comparison */
+	kbps_rate *= 1000;
+
+	switch (htflag) {
+	/* 11b CCK Rates */
+	case DP_11B_CCK_RATE:
+		start_index = CCK_RATE_TABLE_INDEX;
+		end_index = CCK_RATE_TABLE_END_INDEX;
+		break;
+
+	/* 11a OFDM Rates */
+	case DP_11A_OFDM_RATE:
+		start_index = OFDM_RATE_TABLE_INDEX;
+		end_index = OFDMA_RATE_TABLE_END_INDEX;
+		break;
+
+	/* 11g CCK/OFDM Rates */
+	case DP_11G_CCK_OFDM_RATE:
+		start_index = CCK_RATE_TABLE_INDEX;
+		end_index = OFDMA_RATE_TABLE_END_INDEX;
+		break;
+
+	/* HT rates only */
+	case DP_HT_RATE:
+		nss = NUM_HT_SPATIAL_STREAM;
+		start_index = dp_get_start_index(CMN_BW_20MHZ,
+						 HW_RATECODE_PREAM_HT, 1);
+		end_index = dp_get_end_index(CMN_BW_40MHZ,
+					     HW_RATECODE_PREAM_HT, nss);
+		num_mcs = NUM_HT_MCS;
+		break;
+
+	/* VHT rates only */
+	case DP_VHT_RATE:
+		nss = MAX_SPATIAL_STREAMS_SUPPORTED_AT_160MHZ;
+		start_index = dp_get_start_index(CMN_BW_20MHZ,
+						 HW_RATECODE_PREAM_VHT, 1);
+		end_index = dp_get_end_index(CMN_BW_160MHZ,
+					     HW_RATECODE_PREAM_VHT, nss);
+		num_mcs = NUM_VHT_MCS;
+		break;
+
+	/* HE rates only */
+	case DP_HE_RATE:
+		nss = MAX_SPATIAL_STREAMS_SUPPORTED_AT_160MHZ;
+		start_index = dp_get_start_index(CMN_BW_20MHZ,
+						 HW_RATECODE_PREAM_HE, 1);
+		end_index = dp_get_end_index(CMN_BW_160MHZ,
+					     HW_RATECODE_PREAM_HE, nss);
+		num_mcs = NUM_HE_MCS;
+		break;
+	}
+
+	/* Check if the index calculation is out of array bounds */
+	if (start_index < 0 ||
+	    start_index >= DP_RATE_TABLE_SIZE ||
+	    end_index < 0 ||
+	    end_index >= DP_RATE_TABLE_SIZE) {
+		return 0;
+	}
+
+	if (shortgi) {
+		i = OFDM_RATE_TABLE_INDEX;
+		for ( ; i >= CCK_RATE_TABLE_INDEX; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbpssgi = RATE_ROUNDOUT(DP_RATEKBPS_SGI(i));
+				if (ratekbpssgi == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+
+		/*
+		 * The below loop is to find the MCS value for the rate
+		 * passed which will be between:
+		 * For HT: 7200 and 600000 kbps
+		 * For VHT: 7200 and 4333300 kbps
+		 * For HE: 8900 and 5939400 kbps
+		 */
+		for (i = end_index; i >= start_index; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbpssgi = RATE_ROUNDOUT(DP_RATEKBPS_SGI(i));
+				if (ratekbpssgi == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+
+		/*
+		 * The below loop is to find the MCS value for the rate
+		 * passed which will be between:
+		 * For HT: 6500 and 540000 kbps
+		 * For VHT: 6500 and 3900000 kbps
+		 * For HE: 8600 and 5764700 kbps
+		 */
+		for (i = end_index; i >= start_index; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbps = RATE_ROUNDOUT(DP_RATEKBPS(i));
+				if (ratekbps == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+	} else {
+		i = OFDM_RATE_TABLE_INDEX;
+		for ( ; i >= CCK_RATE_TABLE_INDEX; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbps = RATE_ROUNDOUT(DP_RATEKBPS(i));
+				if (ratekbps == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+
+		/*
+		 * The below loop is to find the MCS value for the rate
+		 * passed which will be between:
+		 * For HT: 6500 and 540000 kbps
+		 * For VHT: 6500 and 3900000 kbps
+		 * For HE: 8600 and 5764700 kbps
+		 */
+		for (i = end_index; i >= start_index; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbps = RATE_ROUNDOUT(DP_RATEKBPS(i));
+				if (ratekbps == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+	}
+
+	return INVALID_RATE_ERR;
+}
+#else
+/* dp_get_kbps_to_mcs - Identify the mcs value based on the rate
+ * @kbps_rate - rate in kbps
+ * @shortgi - gi setting
+ * @htflag - The type of standard configured
+ * @nss - no. of spatial streams
+ * @ch_width - channel bandwidth
+ *
+ * return - MCS value identified with help of the rate
+ */
+int dp_get_kbps_to_mcs(int kbps_rate, int shortgi, int htflag,
+		       int nss, int ch_width);
+{
+	int i = 0, num_mcs = 0;
+	int start_index = -1, end_index = -1;
+	int ratekbpssgi = 0, ratekbps = 0;
+
+	/* Convert kbps to mbps for comparison */
+	kbps_rate *= 1000;
+
+	switch (htflag) {
+	/* 11b CCK Rates */
+	case DP_11B_CCK_RATE:
+		start_index = CCK_RATE_TABLE_INDEX;
+		end_index = CCK_RATE_TABLE_END_INDEX;
+		break;
+
+	/* 11a OFDM Rates */
+	case DP_11A_OFDM_RATE:
+		start_index = OFDM_RATE_TABLE_INDEX;
+		end_index = OFDMA_RATE_TABLE_END_INDEX;
+		break;
+
+	/* 11g CCK/OFDM Rates */
+	case DP_11G_CCK_OFDM_RATE:
+		start_index = CCK_RATE_TABLE_INDEX;
+		end_index = OFDMA_RATE_TABLE_END_INDEX;
+		break;
+
+	/* HT rates only */
+	case DP_HT_RATE:
+		start_index = dp_get_start_index(ch_width,
+						 HW_RATECODE_PREAM_HT, nss);
+		end_index = dp_get_end_index(ch_width,
+					     HW_RATECODE_PREAM_HT, nss);
+		num_mcs = NUM_HT_MCS;
+		break;
+
+	/* VHT rates only */
+	case DP_VHT_RATE:
+		start_index = dp_get_start_index(ch_width,
+						 HW_RATECODE_PREAM_VHT, nss);
+		end_index = dp_get_end_index(ch_width,
+					     HW_RATECODE_PREAM_VHT, nss);
+		num_mcs = NUM_VHT_MCS;
+		break;
+
+	/* HE rates only */
+	case DP_HE_RATE:
+		start_index = dp_get_start_index(ch_width,
+						 HW_RATECODE_PREAM_HE, nss);
+		end_index = dp_get_end_index(ch_width,
+					     HW_RATECODE_PREAM_HE, nss);
+		num_mcs = NUM_HE_MCS;
+		break;
+	}
+
+	/* Check if the index calculation is out of array bounds */
+	if (start_index < 0 ||
+	    start_index >= DP_RATE_TABLE_SIZE ||
+	    end_index < 0 ||
+	    end_index >= DP_RATE_TABLE_SIZE) {
+		return 0;
+	}
+
+	if (shortgi) {
+		i = OFDM_RATE_TABLE_INDEX;
+		for ( ; i >= CCK_RATE_TABLE_INDEX; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbpssgi = RATE_ROUNDOUT(DP_RATEKBPS_SGI(i));
+				if (ratekbpssgi == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+
+		/*
+		 * The below loop is to find the MCS value for the rate
+		 * passed which will be between:
+		 * For HT: 7200 and 600000 kbps
+		 * For VHT: 7200 and 4333300 kbps
+		 * For HE: 8900 and 5939400 kbps
+		 * and is also based on the channel bandwidth and nss
+		 * passed.
+		 */
+		for (i = end_index; i >= start_index; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbpssgi = RATE_ROUNDOUT(DP_RATEKBPS_SGI(i));
+				if (ratekbpssgi == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+
+		/*
+		 * The below loop is to find the MCS value for the rate
+		 * passed which will be between:
+		 * For HT: 6500 and 540000 kbps
+		 * For VHT: 6500 and 3900000 kbps
+		 * For HE: 8600 and 5764700 kbps
+		 * and is also based on the channel bandwidth and nss
+		 * passed.
+		 */
+		for (i = end_index; i >= start_index; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbps = RATE_ROUNDOUT(DP_RATEKBPS(i));
+				if (ratekbps == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+	} else {
+		i = OFDM_RATE_TABLE_INDEX;
+		for ( ; i >= CCK_RATE_TABLE_INDEX; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbps = RATE_ROUNDOUT(DP_RATEKBPS(i));
+				if (ratekbps == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+
+		/*
+		 * The below loop is to find the MCS value for the rate
+		 * passed which will be between:
+		 * For HT: 6500 and 540000 kbps
+		 * For VHT: 6500 and 3900000 kbps
+		 * For HE: 8600 and 5764700 kbps
+		 * and is also based on the channel bandwidth and nss
+		 * passed.
+		 */
+		for (i = end_index; i >= start_index; i--) {
+			if (dp_11abgnratetable.info[i].validmodemask
+			    != HE_INVALID_RATES_MASK) {
+				ratekbps = RATE_ROUNDOUT(DP_RATEKBPS(i));
+				if (ratekbps == kbps_rate)
+					return (i - start_index) % num_mcs;
+			}
+		}
+	}
+
+	return INVALID_RATE_ERR;
+}
+#endif
+
+qdf_export_symbol(dp_get_kbps_to_mcs);
