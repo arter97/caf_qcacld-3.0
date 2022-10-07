@@ -1414,6 +1414,7 @@ enum _ol_ath_param_t {
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 	OL_ATH_PARAM_UMAC_RST_SKEL = 519,
 #endif
+	OL_ATH_PARAM_MON_MAC_FILTER = 520,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3730,6 +3731,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_umac_rst_skel",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UMAC_RST_SKEL, GET_PARAM, 0},
 #endif
+	{"mon_mac_filter",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, SET_PARAM, 1},
+	{"get_mon_mac_filter",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, GET_PARAM, 0},
 };
 #endif
 
