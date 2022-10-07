@@ -462,6 +462,9 @@ dp_peer_print_tid_qlen(struct dp_soc *soc,
 	uint32_t ppdu_len;
 	struct tid_q_len *c_tid_q_len = (struct tid_q_len *)arg;
 
+	if (qdf_unlikely(!(peer->monitor_peer)))
+		return;
+
 	for (tid = 0; tid < DP_MAX_TIDS; tid++) {
 		tx_tid = &peer->monitor_peer->tx_capture.tx_tid[tid];
 		msdu_len = qdf_nbuf_queue_len(&tx_tid->defer_msdu_q);
@@ -873,7 +876,8 @@ void dp_peer_tx_cap_tid_queue_flush(struct dp_soc *soc, struct dp_peer *peer,
 	if (qdf_unlikely(!pdev))
 		return;
 
-	if (!dp_peer_or_pdev_tx_cap_enabled(pdev, peer, peer->mac_addr.raw))
+	if (!dp_peer_or_pdev_tx_cap_enabled(pdev, peer, peer->mac_addr.raw) ||
+	    qdf_unlikely(!mon_peer))
 		return;
 
 	if (!mon_peer->tx_capture.is_tid_initialized)
