@@ -529,6 +529,16 @@ QDF_STATUS
 wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 			   uint8_t value);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_rptr_pdev_get_stavdev - check if pdev had sta vdev
+ * @pdev- pdev object manager
+ * return vdev if sta vdev is present; otherwise NULL
+ */
+struct wlan_objmgr_vdev *
+wlan_rptr_pdev_get_stavdev(struct wlan_objmgr_pdev *pdev);
+#endif
+
 /**
  * wlan_rptr_vdev_is_scan_allowed - check if scan is allowed for vdev
  * @vdev- vdev object manager

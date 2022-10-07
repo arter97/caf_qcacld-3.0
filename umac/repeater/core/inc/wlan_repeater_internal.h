@@ -164,6 +164,7 @@ struct wlan_rptr_afc_list_node {
  * @nscanpsta:                number scan psta
  * @afc_list:                 afc list
  * @rptr_pdev_lock:           rptr pdev private spinlock
+ * @sta_vdev:                 rptr sta vdev
  */
 struct wlan_rptr_pdev_priv {
 	struct wlan_objmgr_pdev  *pdev;
@@ -179,6 +180,9 @@ struct wlan_rptr_pdev_priv {
 #endif
 	qdf_spinlock_t  rptr_pdev_lock;
 	struct wlan_rptr_move rptr_move;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct wlan_rptr_vdev_priv *sta_vdev;
+#endif
 };
 
 /**
@@ -250,6 +254,10 @@ wlan_rptr_core_pdev_pref_uplink_set(struct wlan_objmgr_pdev *pdev,
 void
 wlan_rptr_core_pdev_pref_uplink_get(struct wlan_objmgr_pdev *pdev,
 				    u32 *val);
+#ifdef WLAN_FEATURE_11BE_MLO
+struct wlan_objmgr_vdev *
+wlan_rptr_core_pdev_get_stavdev(struct wlan_objmgr_pdev *pdev);
+#endif
 void
 wlan_rptr_core_global_disconnect_timeout_set(u_int32_t value);
 void
