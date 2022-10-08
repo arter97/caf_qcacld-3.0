@@ -382,8 +382,9 @@ struct vdev_mlme_mgmt_generic {
 	uint8_t he_spr_srg_max_pd_offset;
 	uint8_t he_spr_srg_min_pd_offset;
 	bool he_spr_enabled;
-	int32_t pd_threshold;
 	bool he_spr_disabled_due_conc;
+	bool sr_prohibit_enabled;
+	int32_t pd_threshold;
 	uint64_t srg_bss_color;
 	uint64_t srg_partial_bssid;
 #endif
@@ -1276,6 +1277,30 @@ bool wlan_vdev_mlme_is_sr_disable_due_conc(struct wlan_objmgr_vdev *vdev)
 }
 
 /**
+ * wlan_vdev_mlme_is_sr_prohibit_en() - spatial reuse PD prohibit enabled
+ *					/ disabled (HE_SIGA_Val15_Allowed)
+ * @vdev: VDEV object
+ *
+ * API to check whether the spatial reuse PD prohibit is enabled / disabled
+ *
+ * Caller need to acquire lock with wlan_vdev_obj_lock()
+ *
+ * Return:
+ * @sr_prohibit_enabled: Spatial reuse PD prohibit enabled / disabled
+ */
+static inline
+bool wlan_vdev_mlme_is_sr_prohibit_en(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return false;
+
+	return vdev_mlme->mgmt.generic.sr_prohibit_enabled;
+}
+
+/**
  * wlan_vdev_mlme_set_sr_ctrl() - set spatial reuse SR control
  * @vdev: VDEV object
  *
@@ -1365,6 +1390,31 @@ void wlan_vdev_mlme_set_sr_disable_due_conc(struct wlan_objmgr_vdev *vdev,
 
 	vdev_mlme->mgmt.generic.he_spr_disabled_due_conc =
 						he_spr_disabled_due_conc;
+}
+
+/**
+ * wlan_vdev_mlme_set_sr_prohibit_en() - set spatial reuse PD prohibit enabled
+ *					 / disabled (HE_SIGA_Val15_Allowed)
+ * @vdev: VDEV object
+ * @sr_prohibit_enabled: True / False - PD Prohibit enabled / disabled
+ *
+ * API to set spatial reuse PD prohibit enabled / disabled
+ *
+ * Caller need to acquire lock with wlan_vdev_obj_lock()
+ *
+ * Return: void
+ */
+static inline
+void wlan_vdev_mlme_set_sr_prohibit_en(struct wlan_objmgr_vdev *vdev,
+				       bool sr_prohibit_enabled)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	vdev_mlme->mgmt.generic.sr_prohibit_enabled = sr_prohibit_enabled;
 }
 
 /**
@@ -1544,6 +1594,12 @@ bool wlan_vdev_mlme_is_sr_disable_due_conc(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
+static inline
+bool wlan_vdev_mlme_is_sr_prohibit_en(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
 static inline void wlan_vdev_mlme_set_sr_ctrl(struct wlan_objmgr_vdev *vdev,
 					      uint8_t sr_ctrl)
 {
@@ -1563,6 +1619,12 @@ static inline void wlan_vdev_mlme_set_he_spr_enabled(
 static inline
 void wlan_vdev_mlme_set_sr_disable_due_conc(struct wlan_objmgr_vdev *vdev,
 					    bool he_spr_disabled_due_conc)
+{
+}
+
+static inline
+void wlan_vdev_mlme_set_sr_prohibit_en(struct wlan_objmgr_vdev *vdev,
+				       bool sr_prohibit_enabled)
 {
 }
 #endif

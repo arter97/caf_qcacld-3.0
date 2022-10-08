@@ -448,6 +448,7 @@ vdev_param_sr_prohibit_send_tlv(struct wmi_unified *wmi_handle,
 	cmd->vdev_id = param->vdev_id;
 	cmd->tidmap = 0;
 	cmd->prohibit_enable = param->sr_he_siga_val15_allowed;
+	wmi_debug("SR Prohibit enabled: %d", cmd->prohibit_enable);
 
 	wmi_mtrace(WMI_VDEV_PARAM_ENABLE_SR_PROHIBIT_CMDID, cmd->vdev_id, 0);
 	if (wmi_unified_cmd_send(wmi_handle, buf, len,
