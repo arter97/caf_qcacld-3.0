@@ -1921,4 +1921,23 @@ wlan_reg_display_super_chan_list(struct wlan_objmgr_pdev *pdev)
 {
 	return reg_display_super_chan_list(pdev);
 }
+
+#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
+QDF_STATUS
+wlan_reg_get_afc_freq_range_and_psd_limits(struct wlan_objmgr_pdev *pdev,
+					   uint8_t num_freq_obj,
+					   struct afc_freq_obj *afc_obj)
+{
+	return reg_get_afc_freq_range_and_psd_limits(pdev, num_freq_obj,
+						     afc_obj);
+}
+
+QDF_STATUS
+wlan_reg_get_num_afc_freq_obj(struct wlan_objmgr_pdev *pdev,
+			      uint8_t *num_freq_obj)
+{
+	return reg_get_num_afc_freq_obj(pdev, num_freq_obj);
+}
+#endif
+
 #endif

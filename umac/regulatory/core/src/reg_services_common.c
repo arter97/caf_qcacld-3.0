@@ -9387,4 +9387,87 @@ reg_display_super_chan_list(struct wlan_objmgr_pdev *pdev)
 
 	return QDF_STATUS_SUCCESS;
 }
+
+#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
+QDF_STATUS
+reg_get_afc_freq_range_and_psd_limits(struct wlan_objmgr_pdev *pdev,
+				      uint8_t num_freq_obj,
+				      struct afc_freq_obj *afc_freq_info)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct reg_fw_afc_power_event *power_info;
+	uint8_t i;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!reg_is_afc_power_event_received(pdev)) {
+		reg_err("afc power event is not received\n");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	power_info = pdev_priv_obj->power_info;
+	if (!power_info) {
+		reg_err("power_info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!num_freq_obj) {
+		reg_err("num freq objs cannot be zero");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!afc_freq_info)
+		return QDF_STATUS_E_FAILURE;
+
+	for (i = 0; i < num_freq_obj; i++) {
+		struct afc_freq_obj *reg_afc_info =
+			&power_info->afc_freq_info[i];
+
+		afc_freq_info[i].low_freq = reg_afc_info->low_freq;
+		afc_freq_info[i].high_freq = reg_afc_info->high_freq;
+		afc_freq_info[i].max_psd  = reg_afc_info->max_psd;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+reg_get_num_afc_freq_obj(struct wlan_objmgr_pdev *pdev, uint8_t *num_freq_obj)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct reg_fw_afc_power_event *power_info;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!reg_is_afc_power_event_received(pdev)) {
+		reg_err("afc power event is not received\n");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	power_info = pdev_priv_obj->power_info;
+	if (!power_info) {
+		reg_err("power_info is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!power_info->num_freq_objs) {
+		reg_err("num freq objs cannot be zero");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*num_freq_obj = power_info->num_freq_objs;
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #endif

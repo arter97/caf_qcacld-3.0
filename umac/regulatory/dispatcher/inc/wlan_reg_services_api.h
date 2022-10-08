@@ -2602,6 +2602,37 @@ wlan_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
  */
 QDF_STATUS
 wlan_reg_display_super_chan_list(struct wlan_objmgr_pdev *pdev);
+
+#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
+/**
+ * wlan_reg_get_afc_freq_range_and_psd_limits() - Get freq range and psd
+ * limits from afc server response.
+ *
+ * @pdev: Pointer to pdev
+ * @num_freq_obj: Number of frequency objects
+ * @afc_obj: Pointer to struct afc_freq_obj
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+wlan_reg_get_afc_freq_range_and_psd_limits(struct wlan_objmgr_pdev *pdev,
+					   uint8_t num_freq_obj,
+					   struct afc_freq_obj *afc_obj);
+
+/**
+ * wlan_reg_get_num_afc_freq_obj() - Get number of afc frequency objects
+ *
+ * @pdev: Pointer to pdev
+ * @num_freq_obj: Number of frequency objects
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_reg_get_num_afc_freq_obj(struct wlan_objmgr_pdev *pdev,
+			      uint8_t *num_freq_obj);
+#endif
+
 #else
 static inline bool
 wlan_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
@@ -2616,5 +2647,7 @@ wlan_reg_display_super_chan_list(struct wlan_objmgr_pdev *pdev)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
 #endif
+
 #endif
