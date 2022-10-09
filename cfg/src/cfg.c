@@ -645,7 +645,7 @@ cfg_store_print(struct wlan_objmgr_psoc *psoc)
 		case CFG_MAC_ITEM:
 			cfg_nofl_debug("%pK %s " QDF_MAC_ADDR_FMT,
 				       offset, meta->name,
-				       QDF_MAC_ADDR_REF(offset));
+				       QDF_MAC_ADDR_REF((uint8_t *)offset));
 			break;
 		case CFG_IPV4_ITEM:
 			cfg_nofl_debug("%pK %s %pI4",
@@ -720,7 +720,8 @@ cfg_ini_config_print(struct wlan_objmgr_psoc *psoc, uint8_t *buf,
 			len = qdf_scnprintf(buf, buflen,
 					    "%s " QDF_MAC_ADDR_FMT "\n",
 					    meta->name,
-					    QDF_MAC_ADDR_REF(offset));
+					    QDF_MAC_ADDR_REF(
+						(uint8_t *)offset));
 			buf += len;
 			buflen -= len;
 			break;
