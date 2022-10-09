@@ -915,6 +915,39 @@ htt_soc_initialize(struct htt_soc *htt_soc,
 		   hal_soc_handle_t hal_soc_hdl, qdf_device_t osdev);
 
 /**
+ * dp_htt_h2t_full() - Send full handler (called from HTC)
+ * @context:	Opaque context (HTT SOC handle)
+ * @pkt:	HTC packet
+ *
+ * Return: enum htc_send_full_action
+ */
+enum htc_send_full_action
+dp_htt_h2t_full(void *context, HTC_PACKET *pkt);
+
+/**
+ * dp_htt_h2t_send_complete() - H2T completion handler
+ * @context:	Opaque context (HTT SOC handle)
+ * @htc_pkt:	HTC packet
+ */
+void
+dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt);
+
+/**
+ * dp_htt_hif_t2h_hp_callback() - HIF callback for high priority T2H messages
+ * @context:	Opaque context (HTT SOC handle)
+ * @nbuf:	nbuf containing T2H message
+ * @pipe_id:	HIF pipe ID
+ *
+ * Return: QDF_STATUS
+ *
+ * TODO: Temporary change to bypass HTC connection for this new HIF pipe, which
+ * will be used for packet log and other high-priority HTT messages. Proper
+ * HTC connection to be added later once required FW changes are available
+ */
+QDF_STATUS
+dp_htt_hif_t2h_hp_callback(void *context, qdf_nbuf_t nbuf, uint8_t pipe_id);
+
+/**
  * htt_soc_attach() - attach DP and HTT SOC
  * @soc: DP SOC handle
  * @htc_hdl: HTC handle
@@ -1000,6 +1033,13 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 			hal_ring_handle_t hal_ring_hdl,
 			int hal_ring_type, int ring_buf_size,
 			struct htt_rx_ring_tlv_filter *htt_tlv_filter);
+
+/**
+ * dp_htt_t2h_msg_handler() - Generic Target to host Msg/event handler
+ * @context:	Opaque context (HTT SOC handle)
+ * @pkt:	HTC packet
+ */
+void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt);
 
 /**
  * htt_t2h_stats_handler() - target to host stats work handler

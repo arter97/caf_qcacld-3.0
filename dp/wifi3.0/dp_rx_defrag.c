@@ -227,17 +227,8 @@ void dp_rx_defrag_waitlist_flush(struct dp_soc *soc)
 	}
 }
 
-/**
- * dp_rx_defrag_waitlist_add() - Update per-PDEV defrag wait list
- * @txrx_peer: Pointer to the peer data structure
- * @tid: Transmit ID (TID)
- *
- * Appends per-tid fragments to global fragment wait list
- *
- * Return: None
- */
-static void dp_rx_defrag_waitlist_add(struct dp_txrx_peer *txrx_peer,
-				      unsigned int tid)
+void dp_rx_defrag_waitlist_add(struct dp_txrx_peer *txrx_peer,
+			       unsigned int tid)
 {
 	struct dp_soc *psoc = txrx_peer->vdev->pdev->soc;
 	struct dp_rx_tid_defrag *waitlist_elem = &txrx_peer->rx_tid[tid];
@@ -291,20 +282,7 @@ void dp_rx_defrag_waitlist_remove(struct dp_txrx_peer *txrx_peer,
 	qdf_spin_unlock_bh(&soc->rx.defrag.defrag_lock);
 }
 
-/**
- * dp_rx_defrag_fraglist_insert() - Create a per-sequence fragment list
- * @txrx_peer: Pointer to the peer data structure
- * @tid: Transmit ID (TID)
- * @head_addr: Pointer to head list
- * @tail_addr: Pointer to tail list
- * @frag: Incoming fragment
- * @all_frag_present: Flag to indicate whether all fragments are received
- *
- * Build a per-tid, per-sequence fragment list.
- *
- * Return: Success, if inserted
- */
-static QDF_STATUS
+QDF_STATUS
 dp_rx_defrag_fraglist_insert(struct dp_txrx_peer *txrx_peer, unsigned int tid,
 			     qdf_nbuf_t *head_addr, qdf_nbuf_t *tail_addr,
 			     qdf_nbuf_t frag, uint8_t *all_frag_present)
@@ -1429,20 +1407,9 @@ static QDF_STATUS dp_rx_defrag_gcmp_demic(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_rx_defrag() - Defragment the fragment chain
- * @txrx_peer: Pointer to the peer
- * @tid: Transmit Identifier
- * @frag_list_head: Pointer to head list
- * @frag_list_tail: Pointer to tail list
- *
- * Defragment the fragment chain
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS dp_rx_defrag(struct dp_txrx_peer *txrx_peer, unsigned int tid,
-			       qdf_nbuf_t frag_list_head,
-			       qdf_nbuf_t frag_list_tail)
+QDF_STATUS dp_rx_defrag(struct dp_txrx_peer *txrx_peer, unsigned int tid,
+			qdf_nbuf_t frag_list_head,
+			qdf_nbuf_t frag_list_tail)
 {
 	qdf_nbuf_t tmp_next;
 	qdf_nbuf_t cur = frag_list_head, msdu;

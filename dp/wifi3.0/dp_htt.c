@@ -263,12 +263,7 @@ dp_htt_h2t_send_complete_free_netbuf(
 }
 
 #ifdef ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST
-/**
- * dp_htt_h2t_send_complete() - H2T completion handler
- * @context:	Opaque context (HTT SOC handle)
- * @htc_pkt:	HTC packet
- */
-static void
+void
 dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 {
 	struct htt_soc *soc =  (struct htt_soc *) context;
@@ -290,7 +285,7 @@ dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 
 #else /* ENABLE_CE4_COMP_DISABLE_HTT_HTC_MISC_LIST */
 
-static void
+void
 dp_htt_h2t_send_complete(void *context, HTC_PACKET *htc_pkt)
 {
 	void (*send_complete_part2)(
@@ -3483,12 +3478,7 @@ static void dp_ipa_rx_cce_super_rule_setup_done_handler(struct htt_soc *soc,
 }
 #endif
 
-/*
- * dp_htt_t2h_msg_handler() - Generic Target to host Msg/event handler
- * @context:	Opaque context (HTT SOC handle)
- * @pkt:	HTC packet
- */
-static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
+void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 {
 	struct htt_soc *soc = (struct htt_soc *) context;
 	qdf_nbuf_t htt_t2h_msg = (qdf_nbuf_t) pkt->pPktContext;
@@ -3944,32 +3934,13 @@ static void dp_htt_t2h_msg_handler(void *context, HTC_PACKET *pkt)
 		qdf_nbuf_free(htt_t2h_msg);
 }
 
-/**
- * dp_htt_h2t_full() - Send full handler (called from HTC)
- * @context:	Opaque context (HTT SOC handle)
- * @pkt:	HTC packet
- *
- * Return: enum htc_send_full_action
- */
-static enum htc_send_full_action
+enum htc_send_full_action
 dp_htt_h2t_full(void *context, HTC_PACKET *pkt)
 {
 	return HTC_SEND_FULL_KEEP;
 }
 
-/**
- * dp_htt_hif_t2h_hp_callback() - HIF callback for high priority T2H messages
- * @context:	Opaque context (HTT SOC handle)
- * @nbuf:	nbuf containing T2H message
- * @pipe_id:	HIF pipe ID
- *
- * Return: QDF_STATUS
- *
- * TODO: Temporary change to bypass HTC connection for this new HIF pipe, which
- * will be used for packet log and other high-priority HTT messages. Proper
- * HTC connection to be added later once required FW changes are available
- */
-static QDF_STATUS
+QDF_STATUS
 dp_htt_hif_t2h_hp_callback (void *context, qdf_nbuf_t nbuf, uint8_t pipe_id)
 {
 	QDF_STATUS rc = QDF_STATUS_SUCCESS;
