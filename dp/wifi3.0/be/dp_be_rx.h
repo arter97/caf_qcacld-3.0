@@ -55,7 +55,8 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
 			   struct dp_txrx_peer *ta_txrx_peer,
 			   uint8_t *rx_tlv_hdr,
 			   qdf_nbuf_t nbuf,
-			   struct hal_rx_msdu_metadata msdu_metadata);
+			   struct cdp_tid_rx_stats *tid_stats,
+			   uint32_t *msdu_desc_info);
 #endif
 
 /*
@@ -129,16 +130,17 @@ struct dp_rx_desc *dp_rx_desc_cookie_2_va_be(struct dp_soc *soc,
  * dp_rx_desc_sw_cc_check() - check if RX desc VA is got correctly,
 			      if not, do SW cookie conversion.
  * @soc:Handle to DP Soc structure
- * @rx_buf_cookie: RX desc cookie ID
+ * @ring_desc: Rx ring handle
  * @r_rx_desc: double pointer for RX desc
  *
  * Return: None
  */
 static inline void
 dp_rx_desc_sw_cc_check(struct dp_soc *soc,
-		       uint32_t rx_buf_cookie,
+		       hal_ring_desc_t ring_desc,
 		       struct dp_rx_desc **r_rx_desc)
 {
+	uint32_t rx_buf_cookie = HAL_RX_REO_BUF_COOKIE_GET(ring_desc);
 	if (qdf_unlikely(!(*r_rx_desc))) {
 		*r_rx_desc = (struct dp_rx_desc *)
 				dp_cc_desc_find(soc,
@@ -148,7 +150,7 @@ dp_rx_desc_sw_cc_check(struct dp_soc *soc,
 #else
 static inline void
 dp_rx_desc_sw_cc_check(struct dp_soc *soc,
-		       uint32_t rx_buf_cookie,
+		       hal_ring_desc_t ring_desc,
 		       struct dp_rx_desc **r_rx_desc)
 {
 }
@@ -470,4 +472,27 @@ dp_rx_prefetch_hw_sw_nbuf_32_byte_desc(struct dp_soc *soc,
 {
 }
 #endif
+
+static inline void
+dp_rx_set_mpdu_msdu_desc_info_in_nbuf(qdf_nbuf_t nbuf,
+				      uint32_t mpdu_desc_info,
+				      uint32_t peer_mdata,
+				      uint32_t msdu_desc_info)
+{
+	QDF_NBUF_CB_RX_MPDU_DESC_INFO_1(nbuf) = mpdu_desc_info;
+	QDF_NBUF_CB_RX_MPDU_DESC_INFO_2(nbuf) = peer_mdata;
+	QDF_NBUF_CB_RX_MSDU_DESC_INFO(nbuf) = msdu_desc_info;
+}
+
+static inline void
+dp_rx_get_mpdu_msdu_desc_info_from_nbuf(qdf_nbuf_t nbuf,
+					uint32_t *mpdu_desc_info,
+					uint32_t *peer_mdata,
+					uint32_t *msdu_desc_info)
+{
+	*mpdu_desc_info = QDF_NBUF_CB_RX_MPDU_DESC_INFO_1(nbuf);
+	*peer_mdata = QDF_NBUF_CB_RX_MPDU_DESC_INFO_2(nbuf);
+	*msdu_desc_info = QDF_NBUF_CB_RX_MSDU_DESC_INFO(nbuf);
+}
 #endif
+

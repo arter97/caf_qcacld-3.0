@@ -66,6 +66,16 @@ static inline uint8_t qdf_nbuf_tx_notify_comp_get(qdf_nbuf_t buf)
 	return QDF_NBUF_CB_TX_EXTRA_FRAG_FLAGS_NOTIFY_COMP(buf);
 }
 
+static inline void
+qdf_nbuf_set_rx_ftype(qdf_nbuf_t buf, enum cb_ftype type)
+{
+}
+
+static inline enum cb_ftype qdf_nbuf_get_rx_ftype(qdf_nbuf_t buf)
+{
+	return 0;
+}
+
 /**
  * qdf_nbuf_set_rx_protocol_tag()
  * @buf: Network buffer

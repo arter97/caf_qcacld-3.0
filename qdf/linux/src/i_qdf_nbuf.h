@@ -240,10 +240,11 @@ struct qdf_nbuf_cb {
 				struct {
 					void *ext_cb_ptr;
 					void *fctx;
-					uint16_t msdu_len : 14,
+					uint16_t ftype :4,
+						 rsvd8:10,
 						 flag_intra_bss : 1,
 						 ipa_smmu_map : 1;
-					uint16_t peer_id;
+					uint16_t rsvd10;
 					uint16_t protocol_tag;
 					uint16_t flow_tag;
 				} priv_cb_w;
@@ -252,7 +253,7 @@ struct qdf_nbuf_cb {
 					 * control block and tx control block.
 					 * Do not change location of this bit.
 					 */
-					uint32_t ipa_owned:1,
+					uint16_t ipa_owned:1,
 						 peer_cached_buf_frm:1,
 						 flush_ind:1,
 						 packet_buf_pool:1,
@@ -261,14 +262,13 @@ struct qdf_nbuf_cb {
 						 exc_frm:1,
 						 ipa_smmu_map:1,
 						 reo_dest_ind_or_sw_excpt:5,
-						 lmac_id:2,
-						 reserved1:16;
+						 rsvd11:2;
+					uint16_t tcp_udp_chksum;
 					uint32_t tcp_seq_num;
 					uint32_t tcp_ack_num;
 					union {
 						struct {
-							uint16_t msdu_len;
-							uint16_t peer_id;
+							uint32_t flow_id;
 						} wifi3;
 						struct {
 							uint32_t map_index;
@@ -277,36 +277,60 @@ struct qdf_nbuf_cb {
 					unsigned char *lro_ctx;
 				} priv_cb_m;
 			} dev;
-			uint32_t lro_eligible:1,
-				tcp_proto:1,
-				tcp_pure_ack:1,
-				ipv6_proto:1,
-				ip_offset:7,
-				tcp_offset:7,
-				rx_ctx_id:4,
-				fcs_err:1,
-				is_raw_frame:1,
-				num_elements_in_list:8;
-			uint32_t tcp_udp_chksum:16,
-				 tcp_win:16;
-			uint32_t flow_id;
-			uint8_t flag_chfrag_start:1,
-				flag_chfrag_cont:1,
-				flag_chfrag_end:1,
-				flag_retry:1,
-				flag_da_mcbc:1,
-				flag_da_valid:1,
-				flag_sa_valid:1,
-				flag_is_frag:1;
+			union {
+				struct {
+					/* do not re-arrange the fields in
+					 * the below 3 uint32_t words as
+					 * they map exactly to the desc info
+					 */
+					/* 1st word rx_mpdu_desc_info */
+					/* uint32_t msdu_count:8  */
+					uint32_t lro_eligible:1,
+						 tcp_proto:1,
+						 tcp_pure_ack:1,
+						 ipv6_proto:1,
+						 rx_ctx_id:4,
+						 fragment_flag:1,
+						 flag_retry:1,
+						 fcs_err:1,
+						 rsvd1:2,
+						 is_raw_frame:1,
+						 ip_offset:7,
+						 tcp_offset:7,
+						 tid_val:4;
+					/* 2nd word rx_mpdu_desc_info */
+					uint32_t peer_id:13,
+						 ml_peer_valid:1,
+						 reserved1:2,
+						 vdev_id:8,
+						 lmac_id:2,
+						 chip_id:3,
+						 reserved2:3;
+					/* 1st word of rx_msdu_desc_info */
+					uint32_t flag_chfrag_start:1,
+						 flag_chfrag_end:1,
+						 flag_chfrag_cont:1,
+						 msdu_len:14,
+						 flag_is_frag:1,
+						 flag_sa_valid:1,
+						 flag_da_valid:1,
+						 flag_da_mcbc:1,
+						 l3_hdr_pad_msb:1,
+						 rsvd4:10;
+				} desc_tlv_members;
+				struct {
+					uint32_t mpdu_desc_info[2];
+					uint32_t msdu_desc_info;
+				} desc_info;
+			} hw_info;
+			uint8_t num_elements_in_list;
 			union {
 				uint8_t packet_state;
 				uint8_t dp_trace:1,
 					packet_track:3,
 					rsrvd:4;
 			} trace;
-			uint16_t vdev_id:8,
-				 tid_val:4,
-				 ftype:4;
+			uint16_t tcp_win;
 		} rx;
 
 		/* Note: MAX: 40 bytes */
@@ -394,82 +418,117 @@ QDF_COMPILE_TIME_ASSERT(qdf_nbuf_cb_size,
 	(((struct qdf_nbuf_cb *)((skb)->cb))->paddr.dma_addr)
 
 #define QDF_NBUF_CB_RX_LRO_ELIGIBLE(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.lro_eligible)
-#define QDF_NBUF_CB_RX_TCP_PROTO(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.tcp_proto)
-#define QDF_NBUF_CB_RX_TCP_PURE_ACK(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.tcp_pure_ack)
-#define QDF_NBUF_CB_RX_IPV6_PROTO(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.ipv6_proto)
-#define QDF_NBUF_CB_RX_IP_OFFSET(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.ip_offset)
-#define QDF_NBUF_CB_RX_TCP_OFFSET(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.tcp_offset)
-#define QDF_NBUF_CB_RX_CTX_ID(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.rx_ctx_id)
-#define QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(skb) \
-		(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.num_elements_in_list)
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.lro_eligible)
 
-#define QDF_NBUF_CB_RX_TCP_CHKSUM(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.tcp_udp_chksum)
+#define QDF_NBUF_CB_RX_TCP_PROTO(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.tcp_proto)
+
+#define QDF_NBUF_CB_RX_TCP_PURE_ACK(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.tcp_pure_ack)
+
+#define QDF_NBUF_CB_RX_IPV6_PROTO(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.ipv6_proto)
+
+#define QDF_NBUF_CB_RX_IP_OFFSET(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.ip_offset)
+
+#define QDF_NBUF_CB_RX_TCP_OFFSET(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.tcp_offset)
+
+#define QDF_NBUF_CB_RX_CTX_ID(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.rx_ctx_id)
+
 #define QDF_NBUF_CB_RX_TCP_WIN(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.tcp_win)
-
-#define QDF_NBUF_CB_RX_FLOW_ID(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.flow_id)
 
 #define QDF_NBUF_CB_RX_PACKET_STATE(skb)\
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.trace.packet_state)
 #define QDF_NBUF_CB_RX_DP_TRACE(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.trace.dp_trace)
 
-#define QDF_NBUF_CB_RX_FTYPE(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.ftype)
-
-#define QDF_NBUF_CB_RX_VDEV_ID(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.vdev_id)
-
 #define QDF_NBUF_CB_RX_CHFRAG_START(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.flag_chfrag_start)
+	((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_chfrag_start)
 #define QDF_NBUF_CB_RX_CHFRAG_CONT(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.flag_chfrag_cont)
+	((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_chfrag_cont)
 #define QDF_NBUF_CB_RX_CHFRAG_END(skb) \
 		(((struct qdf_nbuf_cb *) \
-		((skb)->cb))->u.rx.flag_chfrag_end)
+		((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_chfrag_end)
 
 #define QDF_NBUF_CB_RX_DA_MCBC(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.flag_da_mcbc)
+	((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_da_mcbc)
 
 #define QDF_NBUF_CB_RX_DA_VALID(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.flag_da_valid)
+	((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_da_valid)
 
 #define QDF_NBUF_CB_RX_SA_VALID(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.flag_sa_valid)
+	((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_sa_valid)
 
 #define QDF_NBUF_CB_RX_RETRY_FLAG(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.flag_retry)
+	((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_retry)
 
 #define QDF_NBUF_CB_RX_RAW_FRAME(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.is_raw_frame)
-
-#define QDF_NBUF_CB_RX_TID_VAL(skb) \
-	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.tid_val)
+	((skb)->cb))->u.rx.hw_info.desc_tlv_members.is_raw_frame)
 
 #define QDF_NBUF_CB_RX_IS_FRAG(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.flag_is_frag)
+	((skb)->cb))->u.rx.hw_info.desc_tlv_members.flag_is_frag)
 
 #define QDF_NBUF_CB_RX_FCS_ERR(skb) \
 	(((struct qdf_nbuf_cb *) \
-	((skb)->cb))->u.rx.fcs_err)
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.fcs_err)
+
+#define QDF_NBUF_CB_RX_MSDU_DESC_INFO(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_info.msdu_desc_info)
+
+#define QDF_NBUF_CB_RX_MPDU_DESC_INFO(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_info.mpdu_desc_info)
+
+#define QDF_NBUF_CB_RX_MPDU_DESC_INFO_1(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_info.mpdu_desc_info[0])
+
+#define QDF_NBUF_CB_RX_MPDU_DESC_INFO_2(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_info.mpdu_desc_info[1])
+
+#define QDF_NBUF_CB_RX_PEER_ID(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.peer_id)
+
+#define QDF_NBUF_CB_RX_VDEV_ID(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.vdev_id)
+
+#define  QDF_NBUF_CB_RX_PACKET_LMAC_ID(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.lmac_id)
+
+#define QDF_NBUF_CB_RX_PKT_LEN(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.msdu_len)
+
+#define QDF_NBUF_CB_RX_TID_VAL(skb) \
+	(((struct qdf_nbuf_cb *) \
+	  ((skb)->cb))->u.rx.hw_info.desc_tlv_members.tid_val)
+
+#define QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST(skb) \
+		(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.num_elements_in_list)
 
 #define QDF_NBUF_UPDATE_TX_PKT_COUNT(skb, PACKET_STATE) \
 	qdf_nbuf_set_state(skb, PACKET_STATE)
@@ -651,15 +710,6 @@ typedef void (*qdf_nbuf_free_t)(__qdf_nbuf_t);
 
 #define __qdf_nbuf_get_tx_ftype(skb) \
 		 QDF_NBUF_CB_TX_FTYPE((skb))
-
-
-#define __qdf_nbuf_set_rx_ftype(skb, type) \
-	do { \
-		QDF_NBUF_CB_RX_FTYPE((skb)) = (type); \
-	} while (0)
-
-#define __qdf_nbuf_get_rx_ftype(skb) \
-		 QDF_NBUF_CB_RX_FTYPE((skb))
 
 #define __qdf_nbuf_set_rx_chfrag_start(skb, val) \
 	((QDF_NBUF_CB_RX_CHFRAG_START((skb))) = val)

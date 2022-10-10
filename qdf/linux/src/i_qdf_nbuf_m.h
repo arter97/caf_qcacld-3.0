@@ -50,13 +50,13 @@
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.tx.dev.priv_cb_m. \
 	flag_notify_comp)
 
-#define QDF_NBUF_CB_RX_PEER_ID(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev.priv_cb_m.dp. \
-	wifi3.peer_id)
+#define QDF_NBUF_CB_RX_TCP_CHKSUM(skb) \
+	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev. \
+	 priv_cb_m.tcp_udp_chksum)
 
-#define QDF_NBUF_CB_RX_PKT_LEN(skb) \
+#define QDF_NBUF_CB_RX_FLOW_ID(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev.priv_cb_m.dp. \
-	wifi3.msdu_len)
+	wifi3.flow_id)
 
 #define QDF_NBUF_CB_RX_MAP_IDX(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev.priv_cb_m.dp. \
@@ -88,10 +88,6 @@
 #define  QDF_NBUF_CB_RX_PACKET_REO_DEST_IND_OR_SW_EXCPT(skb) \
 	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev.priv_cb_m. \
 	reo_dest_ind_or_sw_excpt)
-
-#define  QDF_NBUF_CB_RX_PACKET_LMAC_ID(skb) \
-	(((struct qdf_nbuf_cb *)((skb)->cb))->u.rx.dev.priv_cb_m. \
-	lmac_id)
 
 #define __qdf_nbuf_ipa_owned_get(skb) \
 	QDF_NBUF_CB_TX_IPA_OWNED(skb)

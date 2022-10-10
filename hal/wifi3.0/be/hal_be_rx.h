@@ -481,13 +481,12 @@ hal_rx_msdu_desc_info_get_be(void *desc_addr,
 static inline uintptr_t hal_rx_get_reo_desc_va(void *reo_desc)
 {
 	uint64_t va_from_desc;
+	struct reo_destination_ring *reo_dst_rng;
 
-	va_from_desc = HAL_RX_GET(reo_desc,
-				  REO_DESTINATION_RING,
-				  BUFFER_VIRT_ADDR_31_0) |
-		(((uint64_t)HAL_RX_GET(reo_desc,
-				       REO_DESTINATION_RING,
-				       BUFFER_VIRT_ADDR_63_32)) << 32);
+	reo_dst_rng = (struct reo_destination_ring *)reo_desc;
+
+	va_from_desc = (((uint64_t)reo_dst_rng->buffer_virt_addr_63_32) << 32) |
+		reo_dst_rng->buffer_virt_addr_31_0;
 
 	return (uintptr_t)va_from_desc;
 }
@@ -505,4 +504,140 @@ static inline uint8_t hal_rx_sw_exception_get_be(void *reo_desc)
 {
 	return HAL_RX_GET(reo_desc, REO_DESTINATION_RING, SW_EXCEPTION);
 }
+
+static inline uint8_t hal_rx_get_reo_push_rsn(void *desc_addr)
+{
+	struct reo_destination_ring *reo_dst_ring;
+
+	reo_dst_ring = (struct reo_destination_ring *)desc_addr;
+	return reo_dst_ring->reo_push_reason;
+}
+
+/**
+ * hal_rx_mpdu_msdu_desc_info_store_nbuf_cb() - store msdu and mpdu desc info
+ *						in nbuf cb
+ * @desc_addr: REO ring descriptor addr
+ * @qdf_nbuf_t: skb handle
+ *
+ * Return: void
+ */
+static inline void
+hal_rx_get_mpdu_msdu_desc_info_be(void *desc_addr,
+				  uint32_t *mpdu_info,
+				  uint32_t *peer_mdata,
+				  uint32_t *msdu_info)
+{
+	struct reo_destination_ring *reo_dst_ring;
+
+	reo_dst_ring = (struct reo_destination_ring *)desc_addr;
+	*mpdu_info = *(uint32_t *)(&reo_dst_ring->rx_mpdu_desc_info_details);
+	*peer_mdata = *((uint32_t *)
+			&reo_dst_ring->rx_mpdu_desc_info_details + 1);
+	*msdu_info = *(uint32_t *)(&reo_dst_ring->rx_msdu_desc_info_details);
+}
+
+static inline bool
+hal_rx_desc_msdu_cont_get_be(uint32_t *msdu_info)
+{
+	struct rx_msdu_desc_info *msdu_desc_info =
+		(struct rx_msdu_desc_info *)msdu_info;
+
+	return msdu_desc_info->msdu_continuation;
+}
+
+static inline bool
+hal_rx_desc_msdu_first_get_be(uint32_t *msdu_info)
+{
+	struct rx_msdu_desc_info *msdu_desc_info =
+		(struct rx_msdu_desc_info *)msdu_info;
+
+	return msdu_desc_info->first_msdu_in_mpdu_flag;
+}
+
+static inline bool
+hal_rx_desc_msdu_last_get_be(uint32_t *msdu_info)
+{
+	struct rx_msdu_desc_info *msdu_desc_info =
+		(struct rx_msdu_desc_info *)msdu_info;
+
+	return msdu_desc_info->last_msdu_in_mpdu_flag;
+}
+
+static inline uint16_t
+hal_rx_desc_msdu_len_get_be(uint32_t *msdu_info)
+{
+	struct rx_msdu_desc_info *msdu_desc_info =
+		(struct rx_msdu_desc_info *)msdu_info;
+
+	return msdu_desc_info->msdu_length;
+}
+
+static inline bool
+hal_rx_desc_msdu_fr_ds_get_be(uint32_t *msdu_info)
+{
+	struct rx_msdu_desc_info *msdu_desc_info =
+		(struct rx_msdu_desc_info *)msdu_info;
+
+	return msdu_desc_info->fr_ds;
+}
+
+static inline bool
+hal_rx_desc_msdu_to_ds_get_be(uint32_t *msdu_info)
+{
+	struct rx_msdu_desc_info *msdu_desc_info =
+		(struct rx_msdu_desc_info *)msdu_info;
+
+	return msdu_desc_info->to_ds;
+}
+
+static inline uint8_t
+hal_rx_desc_msdu_l3_pad_bytes_get_be(uint32_t *msdu_info)
+{
+	uint8_t pad_bytes;
+	struct rx_msdu_desc_info *msdu_desc_info =
+		(struct rx_msdu_desc_info *)msdu_info;
+
+	pad_bytes = msdu_desc_info->l3_header_padding_msb ? 2 : 0;
+	return pad_bytes;
+}
+
+static inline bool
+hal_rx_desc_mpdu_retry_get_be(uint32_t *mpdu_info)
+{
+	struct rx_mpdu_desc_info *mpdu_desc_info =
+		(struct rx_mpdu_desc_info *)mpdu_info;
+
+	return mpdu_desc_info->mpdu_retry_bit;
+}
+
+static inline bool
+hal_rx_desc_mpdu_raw_get_be(uint32_t *mpdu_info)
+{
+	struct rx_mpdu_desc_info *mpdu_desc_info =
+		(struct rx_mpdu_desc_info *)mpdu_info;
+
+	return mpdu_desc_info->raw_mpdu;
+}
+
+static inline bool
+hal_rx_desc_mpdu_frag_get_be(uint32_t *mpdu_info)
+{
+	struct rx_mpdu_desc_info *mpdu_desc_info =
+		(struct rx_mpdu_desc_info *)mpdu_info;
+
+	return mpdu_desc_info->fragment_flag;
+}
+
+static inline uint8_t
+hal_rx_desc_mpdu_tid_get_be(uint32_t *mpdu_info)
+{
+	struct rx_mpdu_desc_info *mpdu_desc_info =
+		(struct rx_mpdu_desc_info *)mpdu_info;
+
+	if (mpdu_desc_info->mpdu_qos_control_valid)
+		return mpdu_desc_info->tid;
+	else
+		return 0;
+}
+
 #endif /* _HAL_BE_RX_H_ */
