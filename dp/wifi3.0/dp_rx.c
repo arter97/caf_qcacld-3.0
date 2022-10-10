@@ -421,8 +421,8 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *soc, uint32_t mac_id,
 		next = (*desc_list)->next;
 		qdf_prefetch(next);
 		rxdma_ring_entry = (struct dp_buffer_addr_info *)
-			hal_srng_src_get_next(soc->hal_soc, rxdma_srng);
-		if (!rxdma_ring_entry)
+			hal_srng_src_peek(soc->hal_soc, rxdma_srng);
+		if (qdf_unlikely(!rxdma_ring_entry))
 			break;
 
 		nbuf = dp_rx_nbuf_alloc(soc, rx_desc_pool);
@@ -450,6 +450,7 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *soc, uint32_t mac_id,
 					     rx_desc_pool->owner);
 
 		*desc_list = next;
+		hal_srng_src_get_next(soc->hal_soc, rxdma_srng);
 	}
 	qdf_dsb();
 	hal_srng_access_end(soc->hal_soc, rxdma_srng);

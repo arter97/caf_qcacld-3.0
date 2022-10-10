@@ -1976,6 +1976,29 @@ void *hal_srng_src_get_next_consumed(void *hal_soc,
 #endif /* CLEAR_SW2TCL_CONSUMED_DESC */
 
 /**
+ * hal_srng_src_peek - get the HP of the SRC ring
+ * @hal_soc: Opaque HAL SOC handle
+ * @hal_ring_hdl: Source ring pointer
+ *
+ * get the head pointer in the src ring but do not increment it
+ */
+static inline
+void *hal_srng_src_peek(void *hal_soc, hal_ring_handle_t hal_ring_hdl)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+	uint32_t *desc;
+	uint32_t next_hp = (srng->u.src_ring.hp + srng->entry_size) %
+		srng->ring_size;
+
+	if (next_hp != srng->u.src_ring.cached_tp) {
+		desc = &(srng->ring_base_vaddr[srng->u.src_ring.hp]);
+		return (void *)desc;
+	}
+
+	return NULL;
+}
+
+/**
  * hal_srng_src_get_next - Get next entry from a source ring and move cached tail pointer
  *
  * @hal_soc: Opaque HAL SOC handle
