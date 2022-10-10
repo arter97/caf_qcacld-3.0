@@ -23,6 +23,7 @@
 #include "hal_tx.h"
 #include "hal_rh_tx.h"
 #include "hal_rh_rx.h"
+#include <htt.h>
 
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
 static inline void
@@ -2147,5 +2148,82 @@ static uint16_t hal_rx_get_frame_ctrl_field_rh(uint8_t *buf)
 	frame_ctrl = HAL_RX_MPDU_GET_FRAME_CONTROL_FIELD(rx_mpdu_info);
 
 	return frame_ctrl;
+}
+
+#if defined(WLAN_FEATURE_TSF_UPLINK_DELAY) || defined(WLAN_CONFIG_TX_DELAY)
+static inline void
+hal_tx_comp_get_buffer_timestamp_rh(void *desc,
+				    struct hal_tx_completion_status *ts)
+{
+	uint32_t *msg_word = (struct uint32_t *)desc;
+
+	ts->buffer_timestamp =
+		HTT_TX_MSDU_INFO_BUFFER_TIMESTAMP_GET(*(msg_word + 4));
+}
+#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY || WLAN_CONFIG_TX_DELAY */
+static inline void
+hal_tx_comp_get_buffer_timestamp_rh(void *desc,
+				    struct hal_tx_completion_status *ts)
+{
+}
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY || WLAN_CONFIG_TX_DELAY */
+
+/* TODO: revalidate the assignments below after HTT interfaces
+ * changes are in.
+ */
+static inline void
+hal_tx_comp_get_status_generic_rh(void *desc, void *ts1, struct hal_soc *hal)
+{
+	uint8_t tx_status;
+	uint8_t rate_stats_valid = 0;
+	struct hal_tx_completion_status *ts =
+		(struct hal_tx_completion_status *)ts1;
+	uint32_t *msg_word = (uint32_t *)desc;
+
+	if (HTT_TX_BUFFER_ADDR_INFO_RELEASE_SOURCE_GET(*(msg_word + 1)) ==
+	    HTT_TX_MSDU_RELEASE_SOURCE_FW)
+		ts->release_src = HAL_TX_COMP_RELEASE_SOURCE_FW;
+	else
+		ts->release_src = HAL_TX_COMP_RELEASE_SOURCE_TQM;
+
+	if (HTT_TX_MSDU_INFO_VALID_GET(*(msg_word + 2))) {
+		ts->peer_id = HTT_TX_MSDU_INFO_SW_PEER_ID_GET(*(msg_word + 2));
+		ts->tid = HTT_TX_MSDU_INFO_TID_GET(*(msg_word + 2));
+	} else {
+		ts->peer_id = HTT_INVALID_PEER;
+		ts->tid = HTT_INVALID_TID;
+	}
+	ts->transmit_cnt = HTT_TX_MSDU_INFO_TRANSMIT_CNT_GET(*(msg_word + 2));
+
+	tx_status = HTT_TX_MSDU_INFO_RELEASE_REASON_GET(*(msg_word + 3));
+	ts->status = (tx_status == HTT_TX_MSDU_RELEASE_REASON_FRAME_ACKED ?
+		      HAL_TX_TQM_RR_FRAME_ACKED : HAL_TX_TQM_RR_REM_CMD_REM);
+	ts->ppdu_id = HTT_TX_MSDU_INFO_TQM_STATUS_NUMBER_GET(*(msg_word + 3));
+
+	ts->ack_frame_rssi =
+		HTT_TX_MSDU_INFO_ACK_FRAME_RSSI_GET(*(msg_word + 4));
+	ts->first_msdu = HTT_TX_MSDU_INFO_FIRST_MSDU_GET(*(msg_word + 4));
+	ts->last_msdu = HTT_TX_MSDU_INFO_LAST_MSDU_GET(*(msg_word + 4));
+	ts->msdu_part_of_amsdu =
+		HTT_TX_MSDU_INFO_MSDU_PART_OF_AMSDU_GET(*(msg_word + 4));
+
+	rate_stats_valid = HTT_TX_RATE_STATS_INFO_VALID_GET(*(msg_word + 5));
+	ts->valid = rate_stats_valid;
+
+	if (rate_stats_valid) {
+		ts->bw = HTT_TX_RATE_STATS_INFO_TRANSMIT_BW_GET(*(msg_word + 5));
+		ts->pkt_type =
+			HTT_TX_RATE_STATS_INFO_TRANSMIT_PKT_TYPE_GET(*(msg_word + 5));
+		ts->stbc = HTT_TX_RATE_STATS_INFO_TRANSMIT_STBC_GET(*(msg_word + 5));
+		ts->ldpc = HTT_TX_RATE_STATS_INFO_TRANSMIT_LDPC_GET(*(msg_word + 5));
+		ts->sgi = HTT_TX_RATE_STATS_INFO_TRANSMIT_SGI_GET(*(msg_word + 5));
+		ts->mcs = HTT_TX_RATE_STATS_INFO_TRANSMIT_MCS_GET(*(msg_word + 5));
+		ts->ofdma =
+			HTT_TX_RATE_STATS_INFO_OFDMA_TRANSMISSION_GET(*(msg_word + 5));
+		ts->tones_in_ru = HTT_TX_RATE_STATS_INFO_TONES_IN_RU_GET(*(msg_word + 5));
+	}
+
+	ts->tsf = HTT_TX_RATE_STATS_INFO_PPDU_TRANSMISSION_TSF_GET(*(msg_word + 6));
+	hal_tx_comp_get_buffer_timestamp_rh(desc, ts);
 }
 #endif /* _HAL_RH_GENERIC_API_H_ */

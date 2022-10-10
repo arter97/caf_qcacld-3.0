@@ -140,11 +140,18 @@ do {                                            \
  * on wbm_release_ring DWORDs 2,3 ,4 and 5for software based completions
  * (Exception frames and TQM bypass frames)
  */
+#if defined(CONFIG_BERYLLIUM) || defined(CONFIG_LITHIUM)
 #define HAL_TX_COMP_HTT_STATUS_OFFSET 8
+#else
+#define HAL_TX_COMP_HTT_STATUS_OFFSET 0 /* Rhine */
+#endif
+
 #ifdef CONFIG_BERYLLIUM
 #define HAL_TX_COMP_HTT_STATUS_LEN 20
-#else
+#elif defined(CONFIG_LITHIUM)
 #define HAL_TX_COMP_HTT_STATUS_LEN 16
+#else
+#define HAL_TX_COMP_HTT_STATUS_LEN 32 /* Rhine */
 #endif
 
 #define HAL_TX_BUF_TYPE_BUFFER 0

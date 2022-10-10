@@ -217,11 +217,6 @@ static void hal_tx_update_dscp_tid_6450(struct hal_soc *hal_soc, uint8_t tid,
 {
 }
 
-static void hal_tx_comp_get_status_6450(void *desc, void *ts1,
-					struct hal_soc *hal)
-{
-}
-
 static uint8_t hal_tx_comp_get_release_reason_6450(void *hal_desc)
 {
 	return 0;
@@ -1755,7 +1750,7 @@ static void hal_hw_txrx_ops_attach_wcn6450(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_tx_desc_set_cache_set_num =
 				hal_tx_desc_set_cache_set_num_generic_rh;
 	hal_soc->ops->hal_tx_comp_get_status =
-				hal_tx_comp_get_status_6450;
+				hal_tx_comp_get_status_generic_rh;
 	hal_soc->ops->hal_tx_comp_get_release_reason =
 				hal_tx_comp_get_release_reason_6450;
 	hal_soc->ops->hal_get_wbm_internal_error =
