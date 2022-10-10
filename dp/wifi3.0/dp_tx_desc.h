@@ -31,12 +31,23 @@
  * 5 bits offset id 0 ~ 31 (Desc size = 128, Num descs per page = 4096/128 = 32)
  */
 /* ???Ring ID needed??? */
+
+/* TODO: Need to revisit this change for Rhine */
+#ifdef WLAN_SOFTUMAC_SUPPORT
+#define DP_TX_DESC_ID_POOL_MASK    0x018000
+#define DP_TX_DESC_ID_POOL_OS      15
+#define DP_TX_DESC_ID_PAGE_MASK    0x007FF0
+#define DP_TX_DESC_ID_PAGE_OS      4
+#define DP_TX_DESC_ID_OFFSET_MASK  0x00000F
+#define DP_TX_DESC_ID_OFFSET_OS    0
+#else
 #define DP_TX_DESC_ID_POOL_MASK    0x018000
 #define DP_TX_DESC_ID_POOL_OS      15
 #define DP_TX_DESC_ID_PAGE_MASK    0x007FE0
 #define DP_TX_DESC_ID_PAGE_OS      5
 #define DP_TX_DESC_ID_OFFSET_MASK  0x00001F
 #define DP_TX_DESC_ID_OFFSET_OS    0
+#endif /* WLAN_SOFTUMAC_SUPPORT */
 
 /*
  * Compilation assert on tx desc size

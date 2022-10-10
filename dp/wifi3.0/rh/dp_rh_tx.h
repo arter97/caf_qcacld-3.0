@@ -20,6 +20,27 @@
 
 #include <dp_types.h>
 
+#define DP_RH_TX_TLV_HDR_SIZE	sizeof(struct tlv_32_hdr)
+#define DP_RH_TX_TCL_DESC_SIZE	(HAL_TX_DESC_LEN_BYTES + DP_RH_TX_TLV_HDR_SIZE)
+
+/*
+ * NB: intentionally not using kernel-doc comment because the kernel-doc
+ *     script does not handle the qdf_dma_mem_context macro
+ * struct dp_tx_tcl_desc_pool_s - Tx Extension Descriptor Pool
+ * @elem_count: Number of descriptors in the pool
+ * @elem_size: Size of each descriptor
+ * @desc_pages: multiple page allocation information for actual descriptors
+ * @freelist: freelist of TCL descriptors
+ * @memctx:
+ */
+struct dp_tx_tcl_desc_pool_s {
+	uint16_t elem_count;
+	int elem_size;
+	struct qdf_mem_multi_page_t desc_pages;
+	uint32_t *freelist;
+	qdf_dma_mem_context(memctx);
+};
+
 /**
  * dp_tx_hw_enqueue_rh() - Enqueue to TCL HW for transmit
  * @soc: DP Soc Handle
@@ -105,4 +126,24 @@ QDF_STATUS dp_tx_compute_tx_delay_rh(struct dp_soc *soc,
 				     struct dp_vdev *vdev,
 				     struct hal_tx_completion_status *ts,
 				     uint32_t *delay_us);
+
+/**
+ * dp_tx_desc_pool_alloc_rh() - Allocate coherent memory for TCL descriptors
+ * @soc: Handle to DP Soc structure
+ * @num_elem: Number of elements to allocate
+ * @pool_id: TCL descriptor pool ID
+ *
+ * Return: QDF_STATUS_SUCCESS - success, others - failure
+ */
+QDF_STATUS dp_tx_desc_pool_alloc_rh(struct dp_soc *soc, uint32_t num_elem,
+				    uint8_t pool_id);
+
+/**
+ * dp_tx_desc_pool_free_rh() - Free TCL descriptor memory
+ * @soc: Handle to DP Soc structure
+ * @pool_id: TCL descriptor pool ID
+ *
+ * Return: none
+ */
+void dp_tx_desc_pool_free_rh(struct dp_soc *soc, uint8_t pool_id);
 #endif

@@ -518,6 +518,7 @@ enum dp_ctxt_type {
  * @DP_RX_DESC_STATUS_TYPE: DP RX SW descriptor for monitor status
  * @DP_HW_LINK_DESC_TYPE: DP HW link descriptor
  * @DP_HW_CC_SPT_PAGE_TYPE: DP pages for HW CC secondary page table
+ * @DP_TX_TCL_DESC_TYPE: DP TCL descriptor
  */
 enum dp_desc_type {
 	DP_TX_DESC_TYPE,
@@ -530,6 +531,7 @@ enum dp_desc_type {
 	DP_RX_DESC_STATUS_TYPE,
 	DP_HW_LINK_DESC_TYPE,
 	DP_HW_CC_SPT_PAGE_TYPE,
+	DP_TX_TCL_DESC_TYPE,
 };
 
 /**
@@ -638,6 +640,8 @@ struct dp_tx_ext_desc_pool_s {
  * @msdu_ext_desc: MSDU extension descriptor
  * @timestamp:
  * @comp:
+ * @tcl_cmd_vaddr: VADDR of the TCL descriptor, valid for soft-umac arch
+ * @tcl_cmd_paddr: PADDR of the TCL descriptor, valid for soft-umac arch
  */
 struct dp_tx_desc_s {
 	struct dp_tx_desc_s *next;
@@ -664,6 +668,10 @@ struct dp_tx_desc_s {
 	struct dp_tx_ext_desc_elem_s *msdu_ext_desc;
 	qdf_ktime_t timestamp;
 	struct hal_tx_desc_comp_s comp;
+#ifdef WLAN_SOFTUMAC_SUPPORT
+	void *tcl_cmd_vaddr;
+	qdf_dma_addr_t tcl_cmd_paddr;
+#endif
 };
 
 #ifdef QCA_AC_BASED_FLOW_CONTROL
@@ -2205,6 +2213,8 @@ enum dp_context_type {
  * @dp_free_ppeds_interrupts:
  * @dp_rx_wbm_err_reap_desc: Reap WBM Error Ring Descriptor
  * @dp_rx_null_q_desc_handle: Handle Null Queue Exception Error
+ * @dp_tx_desc_pool_alloc: Allocate arch specific TX descriptor pool
+ * @dp_tx_desc_pool_free: Free arch specific TX descriptor pool
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2433,6 +2443,11 @@ struct dp_arch_ops {
 					       struct dp_txrx_peer *txrx_peer,
 					       bool is_reo_exception,
 					       uint8_t link_id);
+
+	QDF_STATUS (*dp_tx_desc_pool_alloc)(struct dp_soc *soc,
+					    uint32_t num_elem,
+					    uint8_t pool_id);
+	void (*dp_tx_desc_pool_free)(struct dp_soc *soc, uint8_t pool_id);
 };
 
 /**

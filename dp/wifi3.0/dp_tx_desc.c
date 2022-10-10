@@ -120,6 +120,7 @@ QDF_STATUS dp_tx_desc_pool_alloc(struct dp_soc *soc, uint8_t pool_id,
 {
 	uint32_t desc_size;
 	struct dp_tx_desc_pool_s *tx_desc_pool;
+	QDF_STATUS status;
 
 	desc_size = DP_TX_DESC_SIZE(sizeof(struct dp_tx_desc_s));
 	tx_desc_pool = &((soc)->tx_desc[(pool_id)]);
@@ -133,6 +134,14 @@ QDF_STATUS dp_tx_desc_pool_alloc(struct dp_soc *soc, uint8_t pool_id,
 		dp_err("Multi page alloc fail, tx desc");
 		return QDF_STATUS_E_NOMEM;
 	}
+
+	/* Arch specific TX descriptor allocation */
+	status = soc->arch_ops.dp_tx_desc_pool_alloc(soc, num_elem, pool_id);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("failed to allocate arch specific descriptors");
+		return QDF_STATUS_E_NOMEM;
+	}
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -146,6 +155,9 @@ void dp_tx_desc_pool_free(struct dp_soc *soc, uint8_t pool_id)
 		dp_desc_multi_pages_mem_free(soc, DP_TX_DESC_TYPE,
 					     &tx_desc_pool->desc_pages, 0,
 					     true);
+
+	/* Free arch specific TX descriptor */
+	soc->arch_ops.dp_tx_desc_pool_free(soc, pool_id);
 }
 
 QDF_STATUS dp_tx_desc_pool_init(struct dp_soc *soc, uint8_t pool_id,

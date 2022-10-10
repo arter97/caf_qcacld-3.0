@@ -415,6 +415,8 @@ void dp_initialize_arch_ops_rh(struct dp_arch_ops *arch_ops)
 			dp_tx_process_htt_completion_rh;
 	arch_ops->dp_wbm_get_rx_desc_from_hal_desc =
 			dp_wbm_get_rx_desc_from_hal_desc_rh;
+	arch_ops->dp_tx_desc_pool_alloc = dp_tx_desc_pool_alloc_rh;
+	arch_ops->dp_tx_desc_pool_free = dp_tx_desc_pool_free_rh;
 	arch_ops->dp_tx_desc_pool_init = dp_tx_desc_pool_init_rh;
 	arch_ops->dp_tx_desc_pool_deinit = dp_tx_desc_pool_deinit_rh;
 	arch_ops->dp_rx_desc_pool_init = dp_rx_desc_pool_init_rh;

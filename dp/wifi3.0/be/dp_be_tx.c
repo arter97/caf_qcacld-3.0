@@ -1844,3 +1844,13 @@ release_desc:
 	return nbuf;
 }
 #endif
+
+QDF_STATUS dp_tx_desc_pool_alloc_be(struct dp_soc *soc, uint32_t num_elem,
+				    uint8_t pool_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+void dp_tx_desc_pool_free_be(struct dp_soc *soc, uint8_t pool_id)
+{
+}

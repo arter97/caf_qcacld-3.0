@@ -23,13 +23,16 @@
 #include <hal_rh_tx.h>
 #include <hal_rh_rx.h>
 #include <qdf_pkt_add_timestamp.h>
+#include "dp_rh_tx.h"
 
 /**
  * struct dp_soc_rh - Extended DP soc for RH targets
  * @soc: dp soc structure
+ * @tcl_desc_pool: A pool of TCL descriptors that are allocated for RH targets
  */
 struct dp_soc_rh {
 	struct dp_soc soc;
+	struct dp_tx_tcl_desc_pool_s tcl_desc_pool[MAX_TXDESC_POOLS];
 };
 
 /**
@@ -105,4 +108,14 @@ qdf_size_t dp_get_context_size_rh(enum dp_context_type context_type);
 
 qdf_size_t dp_mon_get_context_size_rh(enum dp_context_type context_type);
 
+/**
+ * dp_get_rh_soc_from_dp_soc() - get dp_soc_rh from dp_soc
+ * @soc: dp_soc pointer
+ *
+ * Return: dp_soc_rh pointer
+ */
+static inline struct dp_soc_rh *dp_get_rh_soc_from_dp_soc(struct dp_soc *soc)
+{
+	return (struct dp_soc_rh *)soc;
+}
 #endif
