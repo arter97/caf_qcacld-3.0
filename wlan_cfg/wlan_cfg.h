@@ -269,6 +269,8 @@ struct wlan_srng_cfg {
  * @mpdu_retry_threshold_2: MPDU retry threshold 2 to increment tx bad count
  * napi_scale_factor: scaling factor to be used for napi polls
  * @notify_frame_support: flag indicating capability to mark notify frames
+ * @is_handle_invalid_decap_type_disabled: flag to indicate if invalid decap type
+ *                                         handling is disabled
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -449,6 +451,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t mpdu_retry_threshold_2;
 	uint8_t napi_scale_factor;
 	uint8_t notify_frame_support;
+	bool is_handle_invalid_decap_type_disabled;
 };
 
 /**

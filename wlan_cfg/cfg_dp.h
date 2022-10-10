@@ -1263,6 +1263,10 @@
 	CFG_INI_BOOL("dp_tx_allow_per_pkt_vdev_id_check", false, \
 		     "Enable/Disable tx Per Pkt vdev id check")
 
+#define CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE \
+	CFG_INI_BOOL("dp_handle_invalid_decap_type_disable", false, \
+		     "Enable/Disable DP TLV out of order WAR")
+
 /*
  * <ini>
  * dp_rx_fisa_enable - Control Rx datapath FISA
@@ -1859,5 +1863,6 @@
 		CFG(CFG_DP_TX_CAPT_MAX_MEM_MB) \
 		CFG(CFG_DP_NAPI_SCALE_FACTOR) \
 		CFG(CFG_DP_HOST_AST_DB_ENABLE) \
-		CFG_DP_SAWF_STATS_CONFIG
+		CFG_DP_SAWF_STATS_CONFIG \
+		CFG(CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE)
 #endif /* _CFG_DP_H_ */

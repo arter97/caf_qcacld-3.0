@@ -2898,6 +2898,8 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 	wlan_cfg_ctx->napi_scale_factor = cfg_get(psoc,
 						  CFG_DP_NAPI_SCALE_FACTOR);
 	wlan_soc_sawf_stats_cfg_attach(psoc, wlan_cfg_ctx);
+	wlan_cfg_ctx->is_handle_invalid_decap_type_disabled =
+			cfg_get(psoc, CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE);
 	return wlan_cfg_ctx;
 }
 

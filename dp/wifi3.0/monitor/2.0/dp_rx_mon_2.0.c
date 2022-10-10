@@ -1190,7 +1190,11 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 			qdf_frag_free(addr);
 			qdf_nbuf_queue_remove_last(&ppdu_info->mpdu_q[user_id]);
 			qdf_nbuf_free(nbuf);
-			/* we have freed the nbuf mark the q entry null */
+			/* if invalid decap type handling is disabled, assert */
+			if (soc->wlan_cfg_ctx->is_handle_invalid_decap_type_disabled) {
+				dp_mon_err("Decap type invalid");
+				qdf_assert_always(0);
+			}
 			return num_buf_reaped;
 		}
 
