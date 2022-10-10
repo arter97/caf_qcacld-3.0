@@ -1865,6 +1865,14 @@ static uint8_t dp_htt_tx_comp_get_status(struct dp_soc *soc, char *htt_desc)
 		tx_status = HTT_TX_WBM_COMPLETION_V3_TX_STATUS_GET(htt_desc[0]);
 		break;
 
+	case CDP_ARCH_TYPE_RH:
+		{
+			uint32_t *msg_word = (uint32_t *)htt_desc;
+
+			tx_status = HTT_TX_MSDU_INFO_RELEASE_REASON_GET(
+							*(msg_word + 3));
+		}
+		break;
 	default:
 		dp_err("Incorrect CDP_ARCH %d", soc->arch_id);
 		QDF_BUG(0);

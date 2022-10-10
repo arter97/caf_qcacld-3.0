@@ -285,7 +285,21 @@ dp_htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 						      msdu_cnt);
 			break;
 		}
-		/* TODO add support for TX completion handling */
+		case HTT_T2H_MSG_TYPE_SOFT_UMAC_TX_COMPL_IND:
+		{
+			uint32_t num_msdus;
+
+			num_msdus = HTT_SOFT_UMAC_TX_COMP_IND_MSDU_COUNT_GET(*msg_word);
+
+			if ((num_msdus * HTT_TX_MSDU_INFO_SIZE +
+			     HTT_SOFT_UMAC_TX_COMPL_IND_SIZE) > msg_len) {
+				dp_htt_err("Invalid msdu count in tx compl indication %d", num_msdus);
+				break;
+			}
+
+			dp_tx_compl_handler_rh(soc->dp_soc, htt_t2h_msg);
+			break;
+		}
 		case HTT_T2H_MSG_TYPE_RX_PN_IND:
 		{
 			/* TODO check and add PN IND handling */

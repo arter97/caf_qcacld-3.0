@@ -155,4 +155,13 @@ QDF_STATUS dp_tx_desc_pool_alloc_rh(struct dp_soc *soc, uint32_t num_elem,
  * Return: none
  */
 void dp_tx_desc_pool_free_rh(struct dp_soc *soc, uint8_t pool_id);
+
+/**
+ * dp_tx_compl_handler_rh() - TX completion handler for Rhine
+ * @soc: Handle to DP Soc structure
+ * @htt_msg: TX completion HTT message
+ *
+ * Return: none
+ */
+void dp_tx_compl_handler_rh(struct dp_soc *soc, qdf_nbuf_t htt_msg);
 #endif

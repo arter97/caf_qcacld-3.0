@@ -26,6 +26,12 @@
 #include "qdf_mem.h"
 #include "cdp_txrx_cmn_struct.h"
 
+/* sizeof(struct htt_t2h_soft_umac_tx_compl_ind) */
+#define HTT_SOFT_UMAC_TX_COMPL_IND_SIZE	(1 * 4) //in bytes
+
+/* sizeof(struct htt_t2h_tx_msdu_info) */
+#define HTT_TX_MSDU_INFO_SIZE	(8 * 4) //in bytes
+
 /*
  * dp_htt_h2t_rx_ring_rfs_cfg() - RFS config for RX DATA indication
  * @htt_soc: Opaque htt SOC handle

@@ -624,6 +624,10 @@ uint32_t dp_tx_comp_handler(struct dp_intr *int_ctx, struct dp_soc *soc,
 			    uint32_t quota);
 #endif
 
+void
+dp_tx_comp_process_desc_list(struct dp_soc *soc,
+			     struct dp_tx_desc_s *comp_head, uint8_t ring_id);
+
 QDF_STATUS
 dp_tx_prepare_send_me(struct dp_vdev *vdev, qdf_nbuf_t nbuf);
 
