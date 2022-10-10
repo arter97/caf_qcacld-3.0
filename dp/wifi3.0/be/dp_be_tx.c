@@ -1345,6 +1345,9 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	tx_desc->length = pkt_len;
 	tx_desc->flags |= DP_TX_DESC_FLAG_SIMPLE;
 
+	if (nbuf->is_from_recycler && nbuf->fast_xmit)
+		tx_desc->flags |= DP_TX_DESC_FLAG_FAST;
+
 	paddr =  dp_tx_nbuf_map_be(vdev, tx_desc, nbuf);
 	if (!paddr) {
 		/* Handle failure */

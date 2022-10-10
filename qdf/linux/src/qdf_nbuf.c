@@ -742,6 +742,14 @@ __qdf_nbuf_t __qdf_nbuf_clone(__qdf_nbuf_t skb)
 
 qdf_export_symbol(__qdf_nbuf_clone);
 
+void
+__qdf_nbuf_dev_kfree_list(__qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	dev_kfree_skb_list_fast(nbuf_queue_head);
+}
+
+qdf_export_symbol(__qdf_nbuf_dev_kfree_list);
+
 #ifdef NBUF_MEMORY_DEBUG
 struct qdf_nbuf_event {
 	qdf_nbuf_t nbuf;
@@ -3568,6 +3576,23 @@ unshare_buf:
 
 qdf_export_symbol(qdf_nbuf_unshare_debug);
 
+void
+qdf_nbuf_dev_kfree_list_debug(__qdf_nbuf_queue_head_t *nbuf_queue_head,
+			      const char *func, uint32_t line)
+{
+	qdf_nbuf_t  buf;
+
+	if (qdf_nbuf_queue_empty(nbuf_queue_head))
+		return;
+
+	if (is_initial_mem_debug_disabled)
+		return __qdf_nbuf_dev_kfree_list(nbuf_queue_head);
+
+	while ((buf = qdf_nbuf_queue_head_dequeue(nbuf_queue_head)) != NULL)
+		qdf_nbuf_free_debug(buf, func, line);
+}
+
+qdf_export_symbol(qdf_nbuf_dev_kfree_list_debug);
 #endif /* NBUF_MEMORY_DEBUG */
 
 #if defined(FEATURE_TSO)

@@ -2264,7 +2264,6 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 					 !pdev->enhanced_stats_en);
 
 	dp_tx_update_mesh_flags(soc, vdev, tx_desc);
-
 	paddr =  dp_tx_nbuf_map(vdev, tx_desc, nbuf);
 	if (!paddr) {
 		/* Handle failure */
@@ -5062,14 +5061,8 @@ void dp_tx_prefetch_next_nbuf_data(struct dp_tx_desc_s *next)
 
 	if (next)
 		nbuf = next->nbuf;
-	if (nbuf) {
-		/* prefetch skb->next and first few bytes of skb->cb */
-		qdf_prefetch(next->shinfo_addr);
+	if (nbuf)
 		qdf_prefetch(nbuf);
-		/* prefetch skb fields present in different cachelines */
-		qdf_prefetch(&nbuf->len);
-		qdf_prefetch(&nbuf->users);
-	}
 }
 #else
 static inline
@@ -5143,8 +5136,12 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 	struct dp_txrx_peer *txrx_peer = NULL;
 	uint16_t peer_id = DP_INVALID_PEER;
 	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	qdf_nbuf_t nbuf = NULL;
+	qdf_nbuf_queue_head_t h;
 
 	desc = comp_head;
+
+	qdf_nbuf_queue_head_init(&h);
 
 	while (desc) {
 		next = desc->next;
@@ -5183,7 +5180,11 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			dp_tx_desc_history_add(soc, desc->dma_addr, desc->nbuf,
 					       desc->id, DP_TX_COMP_UNMAP);
 			dp_tx_nbuf_unmap(soc, desc);
-			qdf_nbuf_free_simple(desc->nbuf);
+			nbuf = desc->nbuf;
+			if (qdf_likely(desc->flags & DP_TX_DESC_FLAG_FAST))
+				qdf_nbuf_dev_queue_head(&h, nbuf);
+			else
+				qdf_nbuf_free(nbuf);
 			dp_tx_desc_free(soc, desc, desc->pool_id);
 			desc = next;
 			continue;
@@ -5199,6 +5200,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 		dp_tx_desc_release(desc, desc->pool_id);
 		desc = next;
 	}
+	qdf_nbuf_dev_kfree_list(&h);
 	if (txrx_peer)
 		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_TX_COMP);
 }
