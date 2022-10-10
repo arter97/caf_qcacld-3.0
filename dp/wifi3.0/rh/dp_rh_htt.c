@@ -24,6 +24,7 @@
 #include "qdf_mem.h"
 #include "cdp_txrx_cmn_struct.h"
 #include "dp_tx_desc.h"
+#include "dp_rh.h"
 
 #define HTT_MSG_BUF_SIZE(msg_bytes) \
 	((msg_bytes) + HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING)
@@ -420,6 +421,7 @@ dp_htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 static QDF_STATUS
 dp_htt_htc_attach(struct htt_soc *soc, uint16_t service_id)
 {
+	struct dp_soc_rh *rh_soc = dp_get_rh_soc_from_dp_soc(soc->dp_soc);
 	struct htc_service_connect_req connect;
 	struct htc_service_connect_resp response;
 	QDF_STATUS status;
@@ -463,11 +465,10 @@ dp_htt_htc_attach(struct htt_soc *soc, uint16_t service_id)
 	if (service_id == HTT_DATA_MSG_SVC)
 		soc->htc_endpoint = response.Endpoint;
 
-	/*
-	 * TODO do we need to set tx_svc end point
-	 * hif_save_htc_htt_config_endpoint(dpsoc->hif_handle,
-	 * soc->htc_endpoint);
-	 */
+	/* Save the EP_ID of the TX pipe that to be used during TX enqueue */
+	if (service_id == HTT_DATA2_MSG_SVC)
+		rh_soc->tx_endpoint = response.Endpoint;
+
 	return QDF_STATUS_SUCCESS;
 }
 

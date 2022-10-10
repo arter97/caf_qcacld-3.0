@@ -25,12 +25,54 @@
 #include <hal_rh_api.h>
 #include <hal_rh_tx.h>
 #include "dp_peer.h"
-#ifdef FEATURE_WDS
-#include "dp_txrx_wds.h"
-#endif
 #include "dp_rh.h"
+#include <ce_api.h>
+#include <ce_internal.h>
 
 extern uint8_t sec_type_map[MAX_CDP_SEC_TYPE];
+
+#if defined(FEATURE_TSO)
+/**
+ * dp_tx_adjust_tso_download_len_rh() - Adjust download length for TSO packet
+ * @nbuf: socket buffer
+ * @msdu_info: handle to struct dp_tx_msdu_info_s
+ * @download_len: Packet download length that needs adjustment
+ *
+ * Return: uint32_t (Adjusted packet download length)
+ */
+static uint32_t
+dp_tx_adjust_tso_download_len_rh(qdf_nbuf_t nbuf,
+				 struct dp_tx_msdu_info_s *msdu_info,
+				 uint32_t download_len)
+{
+	uint32_t frag0_len;
+	uint32_t delta;
+	uint32_t eit_hdr_len;
+
+	frag0_len = qdf_nbuf_get_frag_len(nbuf, 0);
+	download_len -= frag0_len;
+
+	eit_hdr_len = msdu_info->u.tso_info.curr_seg->seg.tso_frags[0].length;
+
+	/* If EIT header length is less than the MSDU download length, then
+	 * adjust the download length to just hold EIT header.
+	 */
+	if (eit_hdr_len < download_len) {
+		delta = download_len - eit_hdr_len;
+		download_len -= delta;
+	}
+
+	return download_len;
+}
+#else
+static uint32_t
+dp_tx_adjust_tso_download_len_rh(qdf_nbuf_t nbuf,
+				 struct dp_tx_msdu_info_s *msdu_info,
+				 uint32_t download_len)
+{
+	return download_len;
+}
+#endif /* FEATURE_TSO */
 
 void dp_tx_comp_get_params_from_hal_desc_rh(struct dp_soc *soc,
 					    void *tx_comp_hal_desc,
@@ -45,13 +87,154 @@ void dp_tx_process_htt_completion_rh(struct dp_soc *soc,
 {
 }
 
+static inline uint32_t
+dp_tx_adjust_download_len_rh(qdf_nbuf_t nbuf, uint32_t download_len)
+{
+	uint32_t frag0_len; /* TCL_DATA_CMD */
+	uint32_t frag1_len; /* 64 byte payload */
+
+	frag0_len = qdf_nbuf_get_frag_len(nbuf, 0);
+	frag1_len = download_len - frag0_len;
+
+	if (qdf_unlikely(qdf_nbuf_len(nbuf) < frag1_len))
+		frag1_len = qdf_nbuf_len(nbuf);
+
+	return frag0_len + frag1_len;
+}
+
+static inline void dp_tx_fill_nbuf_data_attr_rh(qdf_nbuf_t nbuf)
+{
+	uint32_t pkt_offset;
+	uint32_t tx_classify;
+	uint32_t data_attr;
+
+	/* Enable tx_classify bit in CE SRC DESC for all data packets */
+	tx_classify = 1;
+	pkt_offset = qdf_nbuf_get_frag_len(nbuf, 0);
+
+	data_attr = tx_classify << CE_DESC_TX_CLASSIFY_BIT_S;
+	data_attr |= pkt_offset  << CE_DESC_PKT_OFFSET_BIT_S;
+
+	qdf_nbuf_data_attr_set(nbuf, data_attr);
+}
+
 QDF_STATUS
 dp_tx_hw_enqueue_rh(struct dp_soc *soc, struct dp_vdev *vdev,
 		    struct dp_tx_desc_s *tx_desc, uint16_t fw_metadata,
 		    struct cdp_tx_exception_metadata *tx_exc_metadata,
 		    struct dp_tx_msdu_info_s *msdu_info)
 {
-	return QDF_STATUS_SUCCESS;
+	struct dp_pdev_rh *rh_pdev = dp_get_rh_pdev_from_dp_pdev(vdev->pdev);
+	struct dp_tx_ep_info_rh *tx_ep_info = &rh_pdev->tx_ep_info;
+	uint32_t download_len = tx_ep_info->download_len;
+	qdf_nbuf_t nbuf = tx_desc->nbuf;
+	uint8_t tid = msdu_info->tid;
+	uint32_t *hal_tx_desc_cached;
+	int ret;
+
+	/*
+	 * Setting it initialization statically here to avoid
+	 * a memset call jump with qdf_mem_set call
+	 */
+	uint8_t cached_desc[HAL_TX_DESC_LEN_BYTES] = { 0 };
+
+	enum cdp_sec_type sec_type = ((tx_exc_metadata &&
+			tx_exc_metadata->sec_type != CDP_INVALID_SEC_TYPE) ?
+			tx_exc_metadata->sec_type : vdev->sec_type);
+
+	QDF_STATUS status = QDF_STATUS_E_RESOURCES;
+
+	if (!dp_tx_is_desc_id_valid(soc, tx_desc->id)) {
+		dp_err_rl("Invalid tx desc id:%d", tx_desc->id);
+		return QDF_STATUS_E_RESOURCES;
+	}
+
+	hal_tx_desc_cached = (void *)cached_desc;
+
+	hal_tx_desc_set_buf_addr(soc->hal_soc, hal_tx_desc_cached,
+				 tx_desc->dma_addr, 0, tx_desc->id,
+				 (tx_desc->flags & DP_TX_DESC_FLAG_FRAG));
+	hal_tx_desc_set_lmac_id(soc->hal_soc, hal_tx_desc_cached,
+				vdev->lmac_id);
+	hal_tx_desc_set_search_type(soc->hal_soc, hal_tx_desc_cached,
+				    vdev->search_type);
+	hal_tx_desc_set_search_index(soc->hal_soc, hal_tx_desc_cached,
+				     vdev->bss_ast_idx);
+
+	hal_tx_desc_set_encrypt_type(hal_tx_desc_cached,
+				     sec_type_map[sec_type]);
+	hal_tx_desc_set_cache_set_num(soc->hal_soc, hal_tx_desc_cached,
+				      (vdev->bss_ast_hash & 0xF));
+
+	hal_tx_desc_set_fw_metadata(hal_tx_desc_cached, fw_metadata);
+	hal_tx_desc_set_buf_length(hal_tx_desc_cached, tx_desc->length);
+	hal_tx_desc_set_buf_offset(hal_tx_desc_cached, tx_desc->pkt_offset);
+	hal_tx_desc_set_encap_type(hal_tx_desc_cached, tx_desc->tx_encap_type);
+	hal_tx_desc_set_addr_search_flags(hal_tx_desc_cached,
+					  vdev->hal_desc_addr_search_flags);
+
+	if (tx_desc->flags & DP_TX_DESC_FLAG_TO_FW)
+		hal_tx_desc_set_to_fw(hal_tx_desc_cached, 1);
+
+	/* verify checksum offload configuration*/
+	if ((qdf_nbuf_get_tx_cksum(nbuf) == QDF_NBUF_TX_CKSUM_TCP_UDP) ||
+	    qdf_nbuf_is_tso(nbuf))  {
+		hal_tx_desc_set_l3_checksum_en(hal_tx_desc_cached, 1);
+		hal_tx_desc_set_l4_checksum_en(hal_tx_desc_cached, 1);
+	}
+
+	if (tid != HTT_TX_EXT_TID_INVALID)
+		hal_tx_desc_set_hlos_tid(hal_tx_desc_cached, tid);
+
+	if (tx_desc->flags & DP_TX_DESC_FLAG_MESH)
+		hal_tx_desc_set_mesh_en(soc->hal_soc, hal_tx_desc_cached, 1);
+
+	if (!dp_tx_desc_set_ktimestamp(vdev, tx_desc))
+		dp_tx_desc_set_timestamp(tx_desc);
+
+	dp_verbose_debug("length:%d , type = %d, dma_addr %llx, offset %d desc id %u",
+			 tx_desc->length,
+			 (tx_desc->flags & DP_TX_DESC_FLAG_FRAG),
+			 (uint64_t)tx_desc->dma_addr, tx_desc->pkt_offset,
+			 tx_desc->id);
+
+	hal_tx_desc_sync(hal_tx_desc_cached, tx_desc->tcl_cmd_vaddr);
+
+	qdf_nbuf_frag_push_head(nbuf, DP_RH_TX_TCL_DESC_SIZE,
+				(char *)tx_desc->tcl_cmd_vaddr,
+				tx_desc->tcl_cmd_paddr);
+
+	download_len = dp_tx_adjust_download_len_rh(nbuf, download_len);
+
+	if (qdf_nbuf_is_tso(nbuf)) {
+		QDF_NBUF_CB_PADDR(nbuf) =
+			msdu_info->u.tso_info.curr_seg->seg.tso_frags[0].paddr;
+		download_len = dp_tx_adjust_tso_download_len_rh(nbuf, msdu_info,
+								download_len);
+	}
+
+	dp_tx_fill_nbuf_data_attr_rh(nbuf);
+
+	ret = ce_send_fast(tx_ep_info->ce_tx_hdl, nbuf,
+			   tx_ep_info->tx_endpoint, download_len);
+	if (!ret) {
+		dp_verbose_debug("CE tx ring full");
+		/* TODO: Should this be a separate ce_ring_full stat? */
+		DP_STATS_INC(soc, tx.tcl_ring_full[0], 1);
+		DP_STATS_INC(vdev, tx_i.dropped.enqueue_fail, 1);
+		goto enqueue_fail;
+	}
+
+	tx_desc->flags |= DP_TX_DESC_FLAG_QUEUED_TX;
+	dp_vdev_peer_stats_update_protocol_cnt_tx(vdev, nbuf);
+	DP_STATS_INC_PKT(vdev, tx_i.processed, 1, tx_desc->length);
+	status = QDF_STATUS_SUCCESS;
+
+enqueue_fail:
+	dp_pkt_add_timestamp(vdev, QDF_PKT_TX_DRIVER_EXIT,
+			     qdf_get_log_timestamp(), tx_desc->nbuf);
+
+	return status;
 }
 
 /**

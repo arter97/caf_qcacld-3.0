@@ -30,18 +30,34 @@
  * struct dp_soc_rh - Extended DP soc for RH targets
  * @soc: dp soc structure
  * @tcl_desc_pool: A pool of TCL descriptors that are allocated for RH targets
+ * @tx_endpoint: HTC endpoint ID for TX
  */
 struct dp_soc_rh {
 	struct dp_soc soc;
 	struct dp_tx_tcl_desc_pool_s tcl_desc_pool[MAX_TXDESC_POOLS];
+	HTC_ENDPOINT_ID tx_endpoint;
+};
+
+/**
+ * struct dp_tx_ep_info_rh - TX endpoint info
+ * @tx_endpoint: HTC endpoint ID for TX
+ * @ce_tx_hdl: CE TX handle for enqueueing TX commands
+ * @download_len: Length of the packet that gets downloaded over CE
+ */
+struct dp_tx_ep_info_rh {
+	HTC_ENDPOINT_ID tx_endpoint;
+	struct CE_handle *ce_tx_hdl;
+	uint32_t download_len;
 };
 
 /**
  * struct dp_pdev_rh - Extended DP pdev for RH targets
  * @pdev: dp_pdev structure
+ * @tx_ep_info: TX endpoint info
  */
 struct dp_pdev_rh {
 	struct dp_pdev pdev;
+	struct dp_tx_ep_info_rh tx_ep_info;
 };
 
 /**
@@ -108,6 +124,18 @@ qdf_size_t dp_get_context_size_rh(enum dp_context_type context_type);
  */
 
 qdf_size_t dp_mon_get_context_size_rh(enum dp_context_type context_type);
+
+/**
+ * dp_get_rh_pdev_from_dp_pdev() - get dp_pdev_rh from dp_pdev
+ * @pdev: dp_pdev pointer
+ *
+ * Return: dp_pdev_rh pointer
+ */
+static inline
+struct dp_pdev_rh *dp_get_rh_pdev_from_dp_pdev(struct dp_pdev *pdev)
+{
+	return (struct dp_pdev_rh *)pdev;
+}
 
 /**
  * dp_get_rh_soc_from_dp_soc() - get dp_soc_rh from dp_soc

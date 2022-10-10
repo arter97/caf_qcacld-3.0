@@ -86,10 +86,49 @@ static QDF_STATUS dp_soc_deinit_rh(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * dp_pdev_fill_tx_endpoint_info_rh() - Prefill fixed TX endpoint information
+ *					that is used during packet transmit
+ * @pdev: Handle to DP pdev struct
+ *
+ * Return: QDF_STATUS_SUCCESS/QDF_STATUS_E_NOENT
+ */
+static QDF_STATUS dp_pdev_fill_tx_endpoint_info_rh(struct dp_pdev *pdev)
+{
+	struct dp_pdev_rh *rh_pdev = dp_get_rh_pdev_from_dp_pdev(pdev);
+	struct dp_soc_rh *rh_soc = dp_get_rh_soc_from_dp_soc(pdev->soc);
+	struct dp_tx_ep_info_rh *tx_ep_info = &rh_pdev->tx_ep_info;
+	struct hif_opaque_softc *hif_handle = pdev->soc->hif_handle;
+	int ul_is_polled, dl_is_polled;
+	uint8_t ul_pipe, dl_pipe;
+	int status;
+
+	status = hif_map_service_to_pipe(hif_handle, HTT_DATA2_MSG_SVC,
+					 &ul_pipe, &dl_pipe,
+					 &ul_is_polled, &dl_is_polled);
+	if (status) {
+		hif_err("Failed to map tx pipe: %d", status);
+		return QDF_STATUS_E_NOENT;
+	}
+
+	tx_ep_info->ce_tx_hdl = hif_get_ce_handle(hif_handle, ul_pipe);
+
+	tx_ep_info->download_len = HAL_TX_DESC_LEN_BYTES +
+				   sizeof(struct tlv_32_hdr) +
+				   DP_RH_TX_HDR_SIZE_OUTER_HDR_MAX +
+				   DP_RH_TX_HDR_SIZE_802_1Q +
+				   DP_RH_TX_HDR_SIZE_LLC_SNAP +
+				   DP_RH_TX_HDR_SIZE_IP;
+
+	tx_ep_info->tx_endpoint = rh_soc->tx_endpoint;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static QDF_STATUS dp_pdev_attach_rh(struct dp_pdev *pdev,
 				    struct cdp_pdev_attach_params *params)
 {
-	return QDF_STATUS_SUCCESS;
+	return dp_pdev_fill_tx_endpoint_info_rh(pdev);
 }
 
 static QDF_STATUS dp_pdev_detach_rh(struct dp_pdev *pdev)
