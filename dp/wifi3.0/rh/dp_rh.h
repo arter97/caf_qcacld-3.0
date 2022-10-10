@@ -20,6 +20,7 @@
 
 #include <dp_types.h>
 #include <dp_mon.h>
+#include <dp_htt.h>
 #include <hal_rh_tx.h>
 #include <hal_rh_rx.h>
 #include <qdf_pkt_add_timestamp.h>

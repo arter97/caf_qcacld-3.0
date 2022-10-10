@@ -15253,8 +15253,10 @@ static struct cdp_misc_ops dp_ops_misc = {
 static struct cdp_flowctl_ops dp_ops_flowctl = {
 	/* WIFI 3.0 DP implement as required. */
 #ifdef QCA_LL_TX_FLOW_CONTROL_V2
+#ifndef WLAN_SOFTUMAC_SUPPORT
 	.flow_pool_map_handler = dp_tx_flow_pool_map,
 	.flow_pool_unmap_handler = dp_tx_flow_pool_unmap,
+#endif /*WLAN_SOFTUMAC_SUPPORT */
 	.register_pause_cb = dp_txrx_register_pause_cb,
 	.dump_flow_pool_info = dp_tx_dump_flow_pool_info,
 	.tx_desc_thresh_reached = dp_tx_desc_thresh_reached,

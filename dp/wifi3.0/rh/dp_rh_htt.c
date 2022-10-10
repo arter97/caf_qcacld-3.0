@@ -23,6 +23,7 @@
 #include "dp_rh_rx.h"
 #include "qdf_mem.h"
 #include "cdp_txrx_cmn_struct.h"
+#include "dp_tx_desc.h"
 
 #define HTT_MSG_BUF_SIZE(msg_bytes) \
 	((msg_bytes) + HTC_HEADER_LEN + HTC_HDR_ALIGNMENT_PADDING)
@@ -38,6 +39,86 @@
 					(_buf)->data),			\
 					PCI_DMA_FROMDEVICE);		\
 	} while (0)
+
+/**
+ * dp_htt_flow_pool_map_handler_rh() - HTT_T2H_MSG_TYPE_FLOW_POOL_MAP handler
+ * @soc: Handle to DP Soc structure
+ * @flow_id: flow id
+ * @flow_type: flow type
+ * @flow_pool_id: pool id
+ * @flow_pool_size: pool size
+ *
+ * Return: QDF_STATUS_SUCCESS - success, others - failure
+ */
+static QDF_STATUS
+dp_htt_flow_pool_map_handler_rh(struct dp_soc *soc, uint8_t flow_id,
+				uint8_t flow_type, uint8_t flow_pool_id,
+				uint32_t flow_pool_size)
+{
+	struct dp_vdev *vdev;
+	struct dp_pdev *pdev;
+	QDF_STATUS status;
+
+	if (flow_pool_id >= MAX_TXDESC_POOLS) {
+		dp_err("invalid flow_pool_id %d", flow_pool_id);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	vdev = dp_vdev_get_ref_by_id(soc, flow_id, DP_MOD_ID_HTT);
+	if (vdev) {
+		pdev = vdev->pdev;
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT);
+	} else {
+		pdev = soc->pdev_list[0];
+	}
+
+	status = dp_tx_flow_pool_map_handler(pdev, flow_id, flow_type,
+					     flow_pool_id, flow_pool_size);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("failed to create tx flow pool %d\n", flow_pool_id);
+		goto err_out;
+	}
+
+	return QDF_STATUS_SUCCESS;
+
+err_out:
+	/* TODO: is assert needed ? */
+	qdf_assert_always(0);
+	return status;
+}
+
+/**
+ * dp_htt_flow_pool_unmap_handler_rh() - HTT_T2H_MSG_TYPE_FLOW_POOL_UNMAP handler
+ * @soc: Handle to DP Soc structure
+ * @flow_id: flow id
+ * @flow_type: flow type
+ * @flow_pool_id: pool id
+ *
+ * Return: none
+ */
+static void
+dp_htt_flow_pool_unmap_handler_rh(struct dp_soc *soc, uint8_t flow_id,
+				  uint8_t flow_type, uint8_t flow_pool_id)
+{
+	struct dp_vdev *vdev;
+	struct dp_pdev *pdev;
+
+	if (flow_pool_id >= MAX_TXDESC_POOLS) {
+		dp_err("invalid flow_pool_id %d", flow_pool_id);
+		return;
+	}
+
+	vdev = dp_vdev_get_ref_by_id(soc, flow_id, DP_MOD_ID_HTT);
+	if (vdev) {
+		pdev = vdev->pdev;
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_HTT);
+	} else {
+		pdev = soc->pdev_list[0];
+	}
+
+	dp_tx_flow_pool_unmap_handler(pdev, flow_id, flow_type,
+				      flow_pool_id);
+}
 
 /*
  * dp_htt_h2t_send_complete_free_netbuf() - Free completed buffer
@@ -263,6 +344,54 @@ dp_htt_t2h_msg_handler_fast(void *context, qdf_nbuf_t *cmpl_msdus,
 			htc_pkt.Status = QDF_STATUS_SUCCESS;
 			htc_pkt.pPktContext = (void *)nbuf_copy;
 			dp_htt_t2h_msg_handler(context, &htc_pkt);
+			break;
+		}
+		case HTT_T2H_MSG_TYPE_FLOW_POOL_MAP:
+		{
+			uint8_t num_flows;
+			struct htt_flow_pool_map_payload_t *pool_map;
+
+			num_flows = HTT_FLOW_POOL_MAP_NUM_FLOWS_GET(*msg_word);
+
+			if (((HTT_FLOW_POOL_MAP_PAYLOAD_SZ /
+			      HTT_FLOW_POOL_MAP_HEADER_SZ) * num_flows + 1) * sizeof(*msg_word) > msg_len) {
+				dp_htt_err("Invalid flow count in flow pool map message");
+				WARN_ON(1);
+				break;
+			}
+
+			msg_word++;
+
+			while (num_flows) {
+				pool_map = (struct htt_flow_pool_map_payload_t *)msg_word;
+				dp_htt_flow_pool_map_handler_rh(
+					soc->dp_soc, pool_map->flow_id,
+					pool_map->flow_type,
+					pool_map->flow_pool_id,
+					pool_map->flow_pool_size);
+
+				msg_word += (HTT_FLOW_POOL_MAP_PAYLOAD_SZ /
+							 HTT_FLOW_POOL_MAP_HEADER_SZ);
+				num_flows--;
+			}
+
+			break;
+		}
+		case HTT_T2H_MSG_TYPE_FLOW_POOL_UNMAP:
+		{
+			struct htt_flow_pool_unmap_t *pool_unmap;
+
+			if (msg_len < sizeof(struct htt_flow_pool_unmap_t)) {
+				dp_htt_err("Invalid length in flow pool unmap message %d", msg_len);
+				WARN_ON(1);
+				break;
+			}
+
+			pool_unmap = (struct htt_flow_pool_unmap_t *)msg_word;
+			dp_htt_flow_pool_unmap_handler_rh(
+				soc->dp_soc, pool_unmap->flow_id,
+				pool_unmap->flow_type,
+				pool_unmap->flow_pool_id);
 			break;
 		}
 		default:
