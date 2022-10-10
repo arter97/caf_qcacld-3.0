@@ -167,6 +167,19 @@ void dp_tx_desc_pool_free(struct dp_soc *soc, uint8_t pool_id);
 void dp_tx_desc_pool_deinit(struct dp_soc *soc, uint8_t pool_id);
 
 /**
+ * dp_tx_ext_desc_pool_alloc_by_id() - allocate TX extension Descriptor pool
+ *                                     based on pool ID
+ * @soc: Handle to DP SoC structure
+ * @num_elem: Number of descriptor elements per pool
+ * @pool_id: Pool ID
+ *
+ * Return - QDF_STATUS_SUCCESS
+ *	    QDF_STATUS_E_NOMEM
+ */
+QDF_STATUS dp_tx_ext_desc_pool_alloc_by_id(struct dp_soc *soc,
+					   uint32_t num_elem,
+					   uint8_t pool_id);
+/**
  * dp_tx_ext_desc_pool_alloc() - allocate Tx extension Descriptor pool(s)
  * @soc: Handle to DP SoC structure
  * @num_pool: Number of pools to allocate
@@ -177,6 +190,19 @@ void dp_tx_desc_pool_deinit(struct dp_soc *soc, uint8_t pool_id);
  */
 QDF_STATUS dp_tx_ext_desc_pool_alloc(struct dp_soc *soc, uint8_t num_pool,
 				     uint32_t num_elem);
+
+/**
+ * dp_tx_ext_desc_pool_init_by_id() - initialize Tx extension Descriptor pool
+ *                                    based on pool ID
+ * @soc: Handle to DP SoC structure
+ * @num_elem: Number of descriptor elements per pool
+ * @pool_id: Pool ID
+ *
+ * Return - QDF_STATUS_SUCCESS
+ *	    QDF_STATUS_E_FAULT
+ */
+QDF_STATUS dp_tx_ext_desc_pool_init_by_id(struct dp_soc *soc, uint32_t num_elem,
+					  uint8_t pool_id);
 
 /**
  * dp_tx_ext_desc_pool_init() - initialize Tx extension Descriptor pool(s)
@@ -191,6 +217,15 @@ QDF_STATUS dp_tx_ext_desc_pool_init(struct dp_soc *soc, uint8_t num_pool,
 				    uint32_t num_elem);
 
 /**
+ * dp_tx_ext_desc_pool_free_by_id() - free TX extension Descriptor pool
+ *                                    based on pool ID
+ * @soc: Handle to DP SoC structure
+ * @pool_id: Pool ID
+ *
+ */
+void dp_tx_ext_desc_pool_free_by_id(struct dp_soc *soc, uint8_t pool_id);
+
+/**
  * dp_tx_ext_desc_pool_free() -  free Tx extension Descriptor pool(s)
  * @soc: Handle to DP SoC structure
  * @num_pool: Number of pools to free
@@ -199,12 +234,34 @@ QDF_STATUS dp_tx_ext_desc_pool_init(struct dp_soc *soc, uint8_t num_pool,
 void dp_tx_ext_desc_pool_free(struct dp_soc *soc, uint8_t num_pool);
 
 /**
+ * dp_tx_ext_desc_pool_deinit_by_id() - deinit Tx extension Descriptor pool
+ *                                      based on pool ID
+ * @soc: Handle to DP SoC structure
+ * @pool_id: Pool ID
+ *
+ */
+void dp_tx_ext_desc_pool_deinit_by_id(struct dp_soc *soc, uint8_t pool_id);
+
+/**
  * dp_tx_ext_desc_pool_deinit() -  deinit Tx extension Descriptor pool(s)
  * @soc: Handle to DP SoC structure
  * @num_pool: Number of pools to de-initialize
  *
  */
 void dp_tx_ext_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
+
+/**
+ * dp_tx_tso_desc_pool_alloc_by_id() - allocate TSO Descriptor pool based
+ *                                     on pool ID
+ * @soc: Handle to DP SoC structure
+ * @num_elem: Number of descriptor elements per pool
+ * @pool_id: Pool ID
+ *
+ * Return - QDF_STATUS_SUCCESS
+ *	    QDF_STATUS_E_NOMEM
+ */
+QDF_STATUS dp_tx_tso_desc_pool_alloc_by_id(struct dp_soc *soc, uint32_t num_elem,
+					   uint8_t pool_id);
 
 /**
  * dp_tx_tso_desc_pool_alloc() - allocate TSO Descriptor pool(s)
@@ -219,6 +276,19 @@ QDF_STATUS dp_tx_tso_desc_pool_alloc(struct dp_soc *soc, uint8_t num_pool,
 				     uint32_t num_elem);
 
 /**
+ * dp_tx_tso_desc_pool_init_by_id() - initialize TSO Descriptor pool
+ *                                    based on pool ID
+ * @soc: Handle to DP SoC structure
+ * @num_elem: Number of descriptor elements per pool
+ * @pool_id: Pool ID
+ *
+ * Return - QDF_STATUS_SUCCESS
+ *	    QDF_STATUS_E_NOMEM
+ */
+QDF_STATUS dp_tx_tso_desc_pool_init_by_id(struct dp_soc *soc, uint32_t num_elem,
+					  uint8_t pool_id);
+
+/**
  * dp_tx_tso_desc_pool_init() - initialize TSO Descriptor pool(s)
  * @soc: Handle to DP SoC structure
  * @num_pool: Number of pools to initialize
@@ -231,6 +301,13 @@ QDF_STATUS dp_tx_tso_desc_pool_init(struct dp_soc *soc, uint8_t num_pool,
 				    uint32_t num_elem);
 
 /**
+ * dp_tx_tso_desc_pool_free_by_id() - free TSO Descriptor pool based on pool ID
+ * @soc: Handle to DP SoC structure
+ * @pool_id: Pool ID
+ */
+void dp_tx_tso_desc_pool_free_by_id(struct dp_soc *soc, uint8_t pool_id);
+
+/**
  * dp_tx_tso_desc_pool_free() - free TSO Descriptor pool(s)
  * @soc: Handle to DP SoC structure
  * @num_pool: Number of pools to free
@@ -239,12 +316,34 @@ QDF_STATUS dp_tx_tso_desc_pool_init(struct dp_soc *soc, uint8_t num_pool,
 void dp_tx_tso_desc_pool_free(struct dp_soc *soc, uint8_t num_pool);
 
 /**
+ * dp_tx_tso_desc_pool_deinit_by_id() - deinitialize TSO Descriptor pool
+ *                                      based on pool ID
+ * @soc: Handle to DP SoC structure
+ * @pool_id: Pool ID
+ */
+void dp_tx_tso_desc_pool_deinit_by_id(struct dp_soc *soc, uint8_t pool_id);
+
+/**
  * dp_tx_tso_desc_pool_deinit() - deinitialize TSO Descriptor pool(s)
  * @soc: Handle to DP SoC structure
  * @num_pool: Number of pools to free
  *
  */
 void dp_tx_tso_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
+
+/**
+ * dp_tx_tso_num_seg_pool_alloc_by_id() - Allocate descriptors that tracks the
+ *                             fragments in each tso segment based on pool ID
+ * @soc: handle to dp soc structure
+ * @num_elem: total number of descriptors to be allocated
+ * @pool_id: Pool ID
+ *
+ * Return - QDF_STATUS_SUCCESS
+ *	    QDF_STATUS_E_NOMEM
+ */
+QDF_STATUS dp_tx_tso_num_seg_pool_alloc_by_id(struct dp_soc *soc,
+					      uint32_t num_elem,
+					      uint8_t pool_id);
 
 /**
  * dp_tx_tso_num_seg_pool_alloc() - Allocate descriptors that tracks the
@@ -261,6 +360,21 @@ QDF_STATUS dp_tx_tso_num_seg_pool_alloc(struct dp_soc *soc, uint8_t num_pool,
 					uint32_t num_elem);
 
 /**
+ * dp_tx_tso_num_seg_pool_init_by_id() - Initialize descriptors that tracks the
+ *                              fragments in each tso segment based on pool ID
+ *
+ * @soc: handle to dp soc structure
+ * @num_elem: total number of descriptors to be initialized
+ * @pool_id: Pool ID
+ *
+ * Return - QDF_STATUS_SUCCESS
+ *	    QDF_STATUS_E_FAULT
+ */
+QDF_STATUS dp_tx_tso_num_seg_pool_init_by_id(struct dp_soc *soc,
+					     uint32_t num_elem,
+					     uint8_t pool_id);
+
+/**
  * dp_tx_tso_num_seg_pool_init() - Initialize descriptors that tracks the
  *                              fragments in each tso segment
  *
@@ -275,6 +389,15 @@ QDF_STATUS dp_tx_tso_num_seg_pool_init(struct dp_soc *soc, uint8_t num_pool,
 				       uint32_t num_elem);
 
 /**
+ * dp_tx_tso_num_seg_pool_free_by_id() - free descriptors that tracks the
+ *                              fragments in each tso segment based on pool ID
+ *
+ * @soc: handle to dp soc structure
+ * @pool_id: Pool ID
+ */
+void dp_tx_tso_num_seg_pool_free_by_id(struct dp_soc *soc, uint8_t pool_id);
+
+/**
  * dp_tx_tso_num_seg_pool_free() - free descriptors that tracks the
  *                              fragments in each tso segment
  *
@@ -282,6 +405,14 @@ QDF_STATUS dp_tx_tso_num_seg_pool_init(struct dp_soc *soc, uint8_t num_pool,
  * @num_pool: number of pools to free
  */
 void dp_tx_tso_num_seg_pool_free(struct dp_soc *soc, uint8_t num_pool);
+
+/**
+ * dp_tx_tso_num_seg_pool_deinit_by_id() - de-initialize descriptors that tracks
+ *                           the fragments in each tso segment based on pool ID
+ * @soc: handle to dp soc structure
+ * @pool_id: Pool ID
+ */
+void dp_tx_tso_num_seg_pool_deinit_by_id(struct dp_soc *soc, uint8_t pool_id);
 
 /**
  * dp_tx_tso_num_seg_pool_deinit() - de-initialize descriptors that tracks the
