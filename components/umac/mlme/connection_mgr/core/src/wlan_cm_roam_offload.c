@@ -42,6 +42,9 @@
 #include "connection_mgr/core/src/wlan_cm_sm.h"
 #include "wlan_reg_ucfg_api.h"
 #include "wlan_connectivity_logging.h"
+#include "wlan_if_mgr_roam.h"
+
+#include "wlan_roam_debug.h"
 
 #ifdef WLAN_FEATURE_SAE
 #define CM_IS_FW_FT_SAE_SUPPORTED(fw_akm_bitmap) \
@@ -3221,6 +3224,69 @@ static QDF_STATUS cm_is_rso_allowed(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
+void cm_handle_sta_sta_roaming_enablement(struct wlan_objmgr_psoc *psoc,
+					  uint8_t curr_vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_pdev *pdev;
+	uint32_t sta_count, conn_idx = 0;
+	struct dual_sta_policy *dual_sta_policy;
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	uint8_t temp_vdev_id;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS];
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, curr_vdev_id,
+						    WLAN_MLME_CM_ID);
+	if (!vdev) {
+		mlme_debug("vdev object is NULL");
+		return;
+	}
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		goto rel_ref;
+
+	dual_sta_policy = &mlme_obj->cfg.gen.dual_sta_policy;
+	sta_count = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+							   vdev_id_list,
+							   PM_STA_MODE);
+
+	if (!(wlan_mlme_get_dual_sta_roaming_enabled(psoc) && sta_count == 2)) {
+		mlme_debug("Dual sta roaming is not enabled or count:%d",
+			   sta_count);
+		goto rel_ref;
+	}
+
+	if (!(policy_mgr_current_concurrency_is_mcc(psoc) ||
+	    policy_mgr_current_concurrency_is_scc(psoc))) {
+		mlme_debug("After roam on vdev_id:%d, STA + STA concurrency is in DBS:%d",
+			   curr_vdev_id, sta_count);
+		for (conn_idx = 0; conn_idx < sta_count; conn_idx++) {
+			temp_vdev_id = vdev_id_list[conn_idx];
+			if (temp_vdev_id == curr_vdev_id) {
+				wlan_cm_roam_activate_pcl_per_vdev(psoc,
+								   curr_vdev_id,
+								   true);
+				/* Set PCL after sending roam complete */
+				policy_mgr_set_pcl_for_existing_combo(psoc,
+								PM_STA_MODE,
+								curr_vdev_id);
+			} else {
+				/* Enable roaming on secondary vdev */
+				if_mgr_enable_roaming(pdev, vdev, RSO_SET_PCL);
+			}
+		}
+	} else {
+		mlme_debug("After roam STA + STA concurrency is in MCC/SCC");
+	}
+rel_ref:
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_CM_ID);
+}
+
 QDF_STATUS cm_roam_send_rso_cmd(struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id, uint8_t rso_command,
 				uint8_t reason)
@@ -3584,6 +3650,8 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 	control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
 
 	cur_state = mlme_get_roam_state(psoc, vdev_id);
+	mlme_debug("CM_RSO: vdev%d: cur_state : %d", vdev_id, cur_state);
+
 	switch (cur_state) {
 	case WLAN_ROAM_INIT:
 	case WLAN_ROAM_RSO_STOPPED:
@@ -3787,6 +3855,156 @@ cm_roam_switch_to_roam_sync(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef FEATURE_ROAM_DEBUG
+/**
+ * union rso_rec_arg1 - argument 1 record rso state change
+ * @request_st: requested rso state
+ * @cur_st: current rso state
+ * @new_st: new rso state
+ * @status: qdf status for the request
+ */
+union rso_rec_arg1 {
+	uint32_t value;
+	struct {
+		uint32_t request_st:4,
+			 cur_st:4,
+			 new_st:4,
+			 status:8;
+	};
+};
+
+/**
+ * get_rso_arg1 - get argument 1 record rso state change
+ * @request_st: requested rso state
+ * @cur_st: current rso state
+ * @new_st: new rso state
+ * @status: qdf status for the request
+ *
+ * Return: u32 value of rso information
+ */
+static uint32_t get_rso_arg1(enum roam_offload_state request_st,
+			     enum roam_offload_state cur_st,
+			     enum roam_offload_state new_st,
+			     QDF_STATUS status)
+{
+	union rso_rec_arg1 rso_arg1;
+
+	rso_arg1.value = 0;
+	rso_arg1.request_st = request_st;
+	rso_arg1.cur_st = cur_st;
+	rso_arg1.new_st = new_st;
+	rso_arg1.status = status;
+
+	return rso_arg1.value;
+}
+
+/**
+ * union rso_rec_arg2 - argument 2 record rso state change
+ * @is_up: vdev is up
+ * @supp_dis_roam: supplicant disable roam
+ * @roam_progress: roam in progress
+ * @ctrl_bitmap: control bitmap
+ * @reason: reason code
+ *
+ * Return: u32 value of rso information
+ */
+union rso_rec_arg2 {
+	uint32_t value;
+	struct {
+		uint32_t is_up: 1,
+			 supp_dis_roam:1,
+			 roam_progress:1,
+			 ctrl_bitmap:8,
+			 reason:8;
+	};
+};
+
+/**
+ * get_rso_arg2 - get argument 2 record rso state change
+ * @is_up: vdev is up
+ * @supp_dis_roam: supplicant disable roam
+ * @roam_progress: roam in progress
+ * @ctrl_bitmap: control bitmap
+ * @reason: reason code
+ */
+static uint32_t get_rso_arg2(bool is_up,
+			     bool supp_dis_roam,
+			     bool roam_progress,
+			     uint8_t ctrl_bitmap,
+			     uint8_t reason)
+{
+	union rso_rec_arg2 rso_arg2;
+
+	rso_arg2.value = 0;
+	if (is_up)
+		rso_arg2.is_up = 1;
+	if (supp_dis_roam)
+		rso_arg2.supp_dis_roam = 1;
+	if (roam_progress)
+		rso_arg2.roam_progress = 1;
+	rso_arg2.ctrl_bitmap = ctrl_bitmap;
+	rso_arg2.reason = reason;
+
+	return rso_arg2.value;
+}
+
+/**
+ * cm_record_state_change() - record rso state change to roam history log
+ * @pdev: pdev object
+ * @vdev_id: vdev id
+ * @cur_st: current state
+ * @request_state: requested state
+ * @reason: reason
+ * @is_up: vdev is up
+ * @status: request result code
+ *
+ * This function will record the RSO state change to roam history log.
+ *
+ * Return: void
+ */
+static void
+cm_record_state_change(struct wlan_objmgr_pdev *pdev,
+		       uint8_t vdev_id,
+		       enum roam_offload_state cur_st,
+		       enum roam_offload_state requested_state,
+		       uint8_t reason,
+		       bool is_up,
+		       QDF_STATUS status)
+{
+	enum roam_offload_state new_state;
+	bool supp_dis_roam;
+	bool roam_progress;
+	uint8_t control_bitmap;
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc)
+		return;
+
+	new_state = mlme_get_roam_state(psoc, vdev_id);
+	control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
+	supp_dis_roam = mlme_get_supplicant_disabled_roaming(psoc, vdev_id);
+	roam_progress = wlan_cm_roaming_in_progress(pdev, vdev_id);
+	wlan_rec_conn_info(vdev_id, DEBUG_CONN_RSO,
+			   NULL,
+			   get_rso_arg1(requested_state, cur_st,
+					new_state, status),
+			   get_rso_arg2(is_up,
+					supp_dis_roam, roam_progress,
+					control_bitmap, reason));
+}
+#else
+static inline void
+cm_record_state_change(struct wlan_objmgr_pdev *pdev,
+		       uint8_t vdev_id,
+		       enum roam_offload_state cur_st,
+		       enum roam_offload_state requested_state,
+		       uint8_t reason,
+		       bool is_up,
+		       QDF_STATUS status)
+{
+}
+#endif
+
 QDF_STATUS
 cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		     uint8_t vdev_id,
@@ -3796,6 +4014,11 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct wlan_objmgr_vdev *vdev;
 	bool is_up;
+	enum roam_offload_state cur_state;
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(pdev, vdev_id,
 						    WLAN_MLME_NB_ID);
@@ -3805,9 +4028,11 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 	is_up = QDF_IS_STATUS_SUCCESS(wlan_vdev_is_up(vdev));
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_NB_ID);
 
+	cur_state = mlme_get_roam_state(psoc, vdev_id);
+
 	if (requested_state != WLAN_ROAM_DEINIT && !is_up) {
 		mlme_debug("ROAM: roam state change requested in disconnected state");
-		return status;
+		goto end;
 	}
 
 	switch (requested_state) {
@@ -3833,6 +4058,9 @@ cm_roam_state_change(struct wlan_objmgr_pdev *pdev,
 		mlme_debug("ROAM: Invalid roam state %d", requested_state);
 		break;
 	}
+end:
+	cm_record_state_change(pdev, vdev_id, cur_state, requested_state,
+			       reason, is_up, status);
 
 	return status;
 }
