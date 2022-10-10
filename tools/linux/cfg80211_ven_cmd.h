@@ -828,6 +828,10 @@ enum {
 	IEEE80211_PARAM_EHT_SUP_MCS15     = 786,   /* Set 11be - EHT MCS15 Support */
 	IEEE80211_PARAM_EHT_MCS14_DUP_IN_6GHZ                   = 787, /* Set 11be - EHT MCS14 Duplicate in 6GHz */
 #endif /* WLAN_FEATURE_11BE */
+	IEEE80211_PARAM_DROP_3ADDR_MCAST  = 788,  /* Flag to enable/disable 3address multicast pkt drops */
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_EHT_CONFIG_CCFS0 =789, /* Set 11be - EHT Config CCFS0 in 6GHz */
+#endif /* WLAN_FEATURE_11BE */
 };
 
 enum {
@@ -2484,6 +2488,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"pure11ax",            IEEE80211_PARAM_PURE11AX, SET_PARAM, 1},
 	{"get_pure11ax",        IEEE80211_PARAM_PURE11AX, GET_PARAM, 0},
 	{"get_scs_rules",       IEEE80211_PARAM_SCS_RULES, GET_PARAM, 0},
+	{"drop3addrmcast",      IEEE80211_PARAM_DROP_3ADDR_MCAST, SET_PARAM, 1},
+	{"get_drop3addrmcast",  IEEE80211_PARAM_DROP_3ADDR_MCAST, GET_PARAM, 0},
+#ifdef WLAN_FEATURE_11BE
+	{"eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, SET_PARAM, 1},
+	{"get_eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, GET_PARAM, 0},
+#endif /* WLAN_FEATURE_11BE */
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
