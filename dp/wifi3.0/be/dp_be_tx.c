@@ -1344,6 +1344,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	tx_desc->pkt_offset = 0;
 	tx_desc->length = pkt_len;
 	tx_desc->flags |= DP_TX_DESC_FLAG_SIMPLE;
+	tx_desc->nbuf->fast_recycled = 1;
 
 	if (nbuf->is_from_recycler && nbuf->fast_xmit)
 		tx_desc->flags |= DP_TX_DESC_FLAG_FAST;
