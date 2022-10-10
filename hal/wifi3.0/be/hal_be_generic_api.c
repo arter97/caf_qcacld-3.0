@@ -36,6 +36,21 @@ uint32_t reo_dest_ring_remap[] = {REO_REMAP_SW1, REO_REMAP_SW2,
 				  REO_REMAP_SW3, REO_REMAP_SW4,
 				  REO_REMAP_SW5, REO_REMAP_SW6,
 				  REO_REMAP_SW7, REO_REMAP_SW8};
+/*
+ * WBM idle link descriptor for Return Buffer Manager in case of
+ * multi-chip configuration.
+ */
+#define HAL_NUM_CHIPS 4
+#define HAL_WBM_CHIP_INVALID	    0
+#define HAL_WBM_CHIP0_IDLE_DESC_MAP 1
+#define HAL_WBM_CHIP1_IDLE_DESC_MAP 2
+#define HAL_WBM_CHIP2_IDLE_DESC_MAP 3
+#define HAL_WBM_CHIP3_IDLE_DESC_MAP 12
+
+uint8_t wbm_idle_link_bm_map[] = {HAL_WBM_CHIP0_IDLE_DESC_MAP,
+				  HAL_WBM_CHIP1_IDLE_DESC_MAP,
+				  HAL_WBM_CHIP2_IDLE_DESC_MAP,
+				  HAL_WBM_CHIP3_IDLE_DESC_MAP};
 
 #if defined(QDF_BIG_ENDIAN_MACHINE)
 void hal_setup_reo_swap(struct hal_soc *soc)
@@ -749,7 +764,10 @@ qdf_export_symbol(hal_reo_ring_remap_value_get_be);
 
 uint8_t hal_get_idle_link_bm_id_be(uint8_t chip_id)
 {
-	return (WBM_IDLE_DESC_LIST + chip_id);
+	if (chip_id >= HAL_NUM_CHIPS)
+		return HAL_WBM_CHIP_INVALID;
+
+	return wbm_idle_link_bm_map[chip_id];
 }
 
 #ifdef DP_FEATURE_HW_COOKIE_CONVERSION
