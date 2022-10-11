@@ -399,4 +399,28 @@ wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
  * Return: true if 6GHz regdomain is a JP domain else false.
  */
 bool wlan_reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev);
+
+#ifdef CONFIG_AFC_SUPPORT
+/**
+* wlan_reg_get_power_from_afc_list() - For a given frequency, fetch the EIRP
+* power and PSD from the AFC channel list
+* @pdev: Pointer to pdev.
+* @freq - Channel frequency in MHz.
+* @reg_eirp: EIRP power
+* @reg_psd - PSD.
+*
+* Return: QDF_STATUS.
+*/
+QDF_STATUS
+wlan_reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
+				 qdf_freq_t freq, uint16_t *reg_eirp,
+				 uint16_t *reg_psd);
+#else
+static inline QDF_STATUS
+wlan_reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
+				 qdf_freq_t freq, uint16_t *reg_eirp,
+				 uint16_t *reg_psd) {
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif /* __WLAN_REG_CHANNEL_API_H */
