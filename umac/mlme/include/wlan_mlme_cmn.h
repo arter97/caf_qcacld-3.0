@@ -1224,4 +1224,11 @@ mlme_twt_vdev_destroy_notification(struct wlan_objmgr_vdev *vdev)
 
 #endif /* WLAN_SUPPORT_TWT && WLAN_TWT_CONV_SUPPORTED */
 
+/**
+ * mlme_vdev_reconfig_timer_cb() - vdev ml reconfig timer callback
+ * @arg: timer argument
+ *
+ * Return: None
+ */
+void mlme_vdev_reconfig_timer_cb(void *arg);
 #endif

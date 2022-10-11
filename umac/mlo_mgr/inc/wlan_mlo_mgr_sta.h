@@ -561,6 +561,19 @@ void mlo_internal_disconnect_links(struct wlan_objmgr_vdev *vdev);
  */
 void mlo_sta_get_vdev_list(struct wlan_objmgr_vdev *vdev, uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list);
+
+/**
+ * mlo_process_ml_reconfig_ie() - process ml reconfig ie for vdev
+ * @vdev: vdev pointer
+ * @scan_entry: RootAP scan entry
+ * @ml_ie: Pointer to ML IE
+ * @ml_ie_len: Length of ML IE
+ *
+ * Return: None
+ */
+void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
+				struct scan_cache_entry *scan_entry,
+				uint8_t *ml_ie, qdf_size_t ml_ie_len);
 #else
 static inline
 QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
@@ -707,5 +720,11 @@ bool mlo_get_keys_saved(struct wlan_objmgr_vdev *vdev,
 {
 	return false;
 }
+
+static inline
+void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
+				struct scan_cache_entry *scan_entry,
+				uint8_t *ml_ie, qdf_size_t ml_ie_len)
+{ }
 #endif
 #endif

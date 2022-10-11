@@ -28,6 +28,9 @@
 #include <wlan_scan_api.h>
 #include <scheduler_api.h>
 #include <wlan_crypto_global_api.h>
+#include <utils_mlo.h>
+#include <qdf_time.h>
+#include <wlan_objmgr_peer_obj.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline void
@@ -1910,5 +1913,152 @@ bool mlo_get_keys_saved(struct wlan_objmgr_vdev *vdev,
 		return sta_ctx->key_mgmt[0].keys_saved;
 
 	return false;
+}
+
+static uint16_t
+mlo_get_bcn_interval_by_bssid(struct wlan_objmgr_pdev *pdev,
+			      uint8_t *bssid)
+{
+	struct scan_filter *scan_filter;
+	uint16_t bcn_int = 0;
+	qdf_list_t *list = NULL;
+	struct scan_cache_node *first_node = NULL;
+	qdf_list_node_t *cur_node = NULL;
+
+	scan_filter = qdf_mem_malloc(sizeof(*scan_filter));
+	if (!scan_filter)
+		return bcn_int;
+
+	scan_filter->num_of_bssid = 1;
+	qdf_mem_copy(scan_filter->bssid_list[0].bytes,
+		     bssid, sizeof(struct qdf_mac_addr));
+	list = wlan_scan_get_result(pdev, scan_filter);
+	qdf_mem_free(scan_filter);
+
+	if (!list || (list && !qdf_list_size(list))) {
+		mlo_debug("scan list empty");
+		goto error;
+	}
+
+	qdf_list_peek_front(list, &cur_node);
+	first_node = qdf_container_of(cur_node,
+				      struct scan_cache_node,
+				      node);
+	if (first_node && first_node->entry)
+		bcn_int = first_node->entry->bcn_int;
+error:
+	if (list)
+		wlan_scan_purge_results(list);
+
+	return bcn_int;
+}
+
+static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
+				    struct ml_rv_partner_link_info *link_info)
+{
+	struct vdev_mlme_obj *vdev_mlme = NULL;
+	struct wlan_objmgr_peer *bss_peer = NULL;
+	uint16_t bcn_int = 0;
+	uint16_t tbtt_count = 0;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
+		return;
+
+	if (vdev_mlme->ml_reconfig_started == true)
+		return;
+
+	bss_peer = wlan_vdev_get_bsspeer(vdev);
+	if (!bss_peer)
+		return;
+
+	/* Link delete triggered from AP,
+	 * start timer with tbtt count * beacon interval
+	 */
+	tbtt_count = link_info->delete_timer;
+	bcn_int = mlo_get_bcn_interval_by_bssid(
+			wlan_vdev_get_pdev(vdev),
+			wlan_peer_get_macaddr(bss_peer));
+	if (!bcn_int)
+		return;
+
+	vdev_mlme->ml_reconfig_started = true;
+	qdf_timer_mod(&vdev_mlme->ml_reconfig_timer,
+		      qdf_time_uint_to_ms(tbtt_count * bcn_int));
+}
+
+void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
+				struct scan_cache_entry *scan_entry,
+				uint8_t *ml_ie, qdf_size_t ml_ie_len)
+{
+	struct wlan_objmgr_vdev *co_mld_vdev = NULL;
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
+	uint16_t vdev_count = 0;
+	uint8_t idx = 0;
+	uint8_t i = 0;
+	uint8_t link_ix = 0;
+	struct ml_rv_info reconfig_info = {0};
+	uint8_t *ml_rv_ie = NULL;
+	qdf_size_t ml_rv_ie_len = 0;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!vdev || !mlo_is_mld_sta(vdev))
+		return;
+
+	mlo_get_ml_vdev_list(vdev, &vdev_count, wlan_vdev_list);
+	if (!vdev_count) {
+		mlo_debug("Number of VDEVs under MLD is reported as 0");
+		return;
+	}
+
+	/* Add code for link add here */
+
+	/* Processing for ML Reconfig IE */
+	if (vdev_count == 1) {
+		/* Single link MLO, no need to process link delete */
+		goto err_release_refs;
+	}
+
+	status = util_find_mlie_by_variant(ml_ie,
+					   ml_ie_len,
+					   &ml_rv_ie,
+					   &ml_rv_ie_len,
+					   WLAN_ML_VARIANT_RECONFIG);
+	if (QDF_IS_STATUS_ERROR(status) || !ml_rv_ie) {
+		mlo_debug("ML IE for reconfig variant not found");
+		goto err_release_refs;
+	}
+
+	status = util_get_rvmlie_persta_link_info(ml_rv_ie, ml_rv_ie_len,
+						  &reconfig_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mlo_err("Unable to get persta link info from ML RV IE");
+		goto err_release_refs;
+	}
+
+	if (!reconfig_info.num_links) {
+		mlo_err("No. of links is 0 in ML reconfig IE");
+		goto err_release_refs;
+	}
+
+	for (idx = 0; idx < vdev_count; idx++) {
+		co_mld_vdev = wlan_vdev_list[idx];
+		if (!co_mld_vdev) {
+			mlo_debug("VDEV in MLD VDEV list is NULL");
+			goto err_release_refs;
+		}
+
+		link_ix = wlan_vdev_get_link_id(co_mld_vdev);
+		for (i = 0; i < reconfig_info.num_links; i++) {
+			if (link_ix == reconfig_info.link_info[i].link_id)
+				mlo_process_link_remove(co_mld_vdev,
+							&reconfig_info.link_info[i]);
+		}
+	}
+
+err_release_refs:
+
+	for (i = 0; i < vdev_count; i++)
+		mlo_release_vdev_ref(wlan_vdev_list[i]);
 }
 #endif

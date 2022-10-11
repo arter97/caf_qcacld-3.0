@@ -151,7 +151,7 @@ osif_cm_indicate_disconnect(struct wlan_objmgr_vdev *vdev,
 	struct vdev_osif_priv *osif_priv = NULL;
 	struct wlan_objmgr_vdev *assoc_vdev = NULL;
 
-	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev) || (link_id != -1)) {
 		osif_cm_indicate_disconnect_result(
 				netdev, reason, ie, ie_len,
 				locally_generated, link_id, gfp);
@@ -273,6 +273,10 @@ QDF_STATUS osif_disconnect_handler(struct wlan_objmgr_vdev *vdev,
 		osif_cm_disconnect_comp_ind(vdev, rsp, OSIF_NOT_HANDLED);
 		return status;
 	}
+
+	/* If disconnect due to ML Reconfig, fill link id */
+	if (rsp->req.req.reason_code == REASON_HOST_TRIGGERED_LINK_DELETE)
+		link_id = wlan_vdev_get_link_id(vdev);
 
 	osif_cm_disconnect_comp_ind(vdev, rsp, OSIF_PRE_USERSPACE_UPDATE);
 	osif_cm_indicate_disconnect(vdev, osif_priv->wdev->netdev,
