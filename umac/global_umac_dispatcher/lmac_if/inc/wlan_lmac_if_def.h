@@ -1753,6 +1753,14 @@ struct wlan_lmac_if_reg_rx_ops {
 	(*reg_get_afc_dev_type)(struct wlan_objmgr_psoc *psoc,
 				enum reg_afc_dev_deploy_type
 				*reg_afc_dev_type);
+	QDF_STATUS
+	(*reg_set_eirp_preferred_support)(
+				struct wlan_objmgr_psoc *psoc,
+				bool reg_is_eirp_support_preferred);
+	QDF_STATUS
+	(*reg_get_eirp_preferred_support)(
+				struct wlan_objmgr_psoc *psoc,
+				bool *reg_is_eirp_support_preferred);
 #endif
 };
 
