@@ -2327,7 +2327,8 @@ QDF_STATUS cm_notify_connect_complete(struct cnx_mgr *cm_ctx,
 					  resp->connect_status);
 	cm_inform_dlm_connect_complete(cm_ctx->vdev, resp);
 
-	if (QDF_IS_STATUS_ERROR(resp->connect_status))
+	if (QDF_IS_STATUS_ERROR(resp->connect_status) &&
+	    sm_state == WLAN_CM_S_INIT)
 		cm_clear_vdev_mlo_cap(cm_ctx->vdev);
 
 	return QDF_STATUS_SUCCESS;
