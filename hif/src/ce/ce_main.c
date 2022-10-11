@@ -941,7 +941,7 @@ static struct service_to_pipe target_service_to_ce_map_qcn9224[] = {
 };
 #endif
 
-#if (defined(QCA_WIFI_QCA5018))
+#if defined(QCA_WIFI_QCA5018) || defined(QCA_WIFI_QCN9160)
 static struct service_to_pipe target_service_to_ce_map_qca5018[] = {
 	{ WMI_DATA_VO_SVC, PIPEDIR_OUT, 3, },
 	{ WMI_DATA_VO_SVC, PIPEDIR_IN, 2, },
@@ -1439,6 +1439,7 @@ static void hif_select_service_to_pipe_map(struct hif_softc *scn,
 			break;
 		case TARGET_TYPE_QCA5018:
 		case TARGET_TYPE_QCN6122:
+		case TARGET_TYPE_QCN9160:
 			*tgt_svc_map_to_use =
 				target_service_to_ce_map_qca5018;
 			*sz_tgt_svc_map_to_use =
@@ -1707,6 +1708,7 @@ bool ce_srng_based(struct hif_softc *scn)
 	case TARGET_TYPE_QCA6018:
 	case TARGET_TYPE_QCN9000:
 	case TARGET_TYPE_QCN6122:
+	case TARGET_TYPE_QCN9160:
 	case TARGET_TYPE_QCA5018:
 	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_MANGO:
@@ -2361,7 +2363,6 @@ struct CE_handle *ce_init(struct hif_softc *scn,
 					       src_ring, attr);
 			if (status < 0)
 				goto error_target_access;
-
 			ce_ring_test_initial_indexes(CE_id, src_ring,
 						     "src_ring");
 		}
@@ -4102,6 +4103,14 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 		hif_state->target_ce_config_sz =
 					sizeof(target_ce_config_wlan_qcn6122);
 		scn->ce_count = QCN_6122_CE_COUNT;
+		scn->disable_wake_irq = 1;
+		break;
+	case TARGET_TYPE_QCN9160:
+		hif_state->host_ce_config = host_ce_config_wlan_qcn9160;
+		hif_state->target_ce_config = target_ce_config_wlan_qcn9160;
+		hif_state->target_ce_config_sz =
+					sizeof(target_ce_config_wlan_qcn9160);
+		scn->ce_count = QCN_9160_CE_COUNT;
 		scn->disable_wake_irq = 1;
 		break;
 	case TARGET_TYPE_QCA5018:
