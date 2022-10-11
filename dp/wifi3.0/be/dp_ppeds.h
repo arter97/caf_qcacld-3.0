@@ -172,4 +172,30 @@ QDF_STATUS dp_ppeds_vdev_enable_pri2tid_be(struct cdp_soc_t *soc_hdl,
  * Return: IRQ handle status
  */
 irqreturn_t dp_ppeds_handle_tx_comp(int irq, void *ctxr);
+
+/*
+ * dp_ppe_ds_ppe2tcl_irq_handler: Handle ppe2tcl ring interrupt
+ * @irq: IRQ number
+ * @ctxr: IRQ handler context
+ *
+ * Return: IRQ handle status
+ */
+irqreturn_t dp_ppe_ds_ppe2tcl_irq_handler(int irq, void *ctxr);
+
+/*
+ * dp_ppe_ds_reo2ppe_irq_handler: Handle reo2ppe ring interrupt
+ * @irq: IRQ number
+ * @ctxr: IRQ handler context
+ *
+ * Return: IRQ handle status
+ */
+irqreturn_t dp_ppe_ds_reo2ppe_irq_handler(int irq, void *ctxr);
+
+/*
+ * dp_get_ppe_ds_ctxt: Get context from ppe ds driver
+ * @soc: CDP SoC Tx/Rx handle
+ *
+ * Return: ppeds handle
+ */
+void *dp_get_ppe_ds_ctxt(struct dp_soc *soc);
 #endif /* _DP_PPEDS_H_ */
