@@ -5976,21 +5976,23 @@ typedef enum {
 
 /**
  * enum WMI_HOST_VENDOR1_REQ1_VERSION - Vendor 1 requirement 1 version
- * @WMI_HOST_VENDOR1_REQ2_VERSION_3_00: Major version 3, mnor version 00
- * @WMI_HOST_VENDOR1_REQ2_VERSION_3_01: Major version 3, mnor version 01
- * @WMI_HOST_VENDOR1_REQ2_VERSION_3_20: Major version 3, mnor version 20
+ * @WMI_HOST_VENDOR1_REQ2_VERSION_3_00: Major version 3, minor version 00
+ * @WMI_HOST_VENDOR1_REQ2_VERSION_3_01: Major version 3, minor version 01
+ * @WMI_HOST_VENDOR1_REQ2_VERSION_3_20: Major version 3, minor version 20
+ * @WMI_HOST_VENDOR1_REQ1_VERSION_3_30: Major version 3, minor version 30
  */
 typedef enum {
 	WMI_HOST_VENDOR1_REQ1_VERSION_3_00 = 0,
 	WMI_HOST_VENDOR1_REQ1_VERSION_3_01 = 1,
 	WMI_HOST_VENDOR1_REQ1_VERSION_3_20 = 2,
+	WMI_HOST_VENDOR1_REQ1_VERSION_3_30 = 3,
 } WMI_HOST_VENDOR1_REQ1_VERSION;
 
 /**
  * enum WMI_HOST_VENDOR1_REQ2_VERSION - Vendor 1 requirement 2 version
- * @WMI_HOST_VENDOR1_REQ2_VERSION_3_00: Major version 3, mnor version 00
- * @WMI_HOST_VENDOR1_REQ2_VERSION_3_01: Major version 3, mnor version 01
- * @WMI_HOST_VENDOR1_REQ2_VERSION_3_20: Major version 3, mnor version 20
+ * @WMI_HOST_VENDOR1_REQ2_VERSION_3_00: Major version 3, minor version 00
+ * @WMI_HOST_VENDOR1_REQ2_VERSION_3_01: Major version 3, minor version 01
+ * @WMI_HOST_VENDOR1_REQ2_VERSION_3_20: Major version 3, minor version 20
  */
 typedef enum {
 	WMI_HOST_VENDOR1_REQ2_VERSION_3_00 = 0,
