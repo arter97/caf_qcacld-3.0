@@ -5807,6 +5807,7 @@ typedef enum {
 	wmi_service_ndi_txbf_support,
 	wmi_service_reg_cc_ext_event_support,
 	wmi_service_bang_radar_320_support,
+	wmi_service_eirp_preferred_support,
 #if defined(CONFIG_BAND_6GHZ)
 	wmi_service_lower_6g_edge_ch_supp,
 	wmi_service_disable_upper_6g_edge_ch_supp,
