@@ -610,6 +610,11 @@ bool dp_monitor_reap_timer_stop(struct dp_soc *soc,
 	return false;
 }
 
+static inline void
+dp_monitor_reap_timer_suspend(struct dp_soc *soc)
+{
+}
+
 static inline
 void dp_monitor_vdev_timer_init(struct dp_soc *soc)
 {
