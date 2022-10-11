@@ -314,6 +314,18 @@ cdp_get_drop_stats(ol_txrx_soc_handle soc, void *arg,
 
 #else
 static inline QDF_STATUS
+cdp_sawf_mpdu_stats_req(ol_txrx_soc_handle soc, uint8_t enable)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
+cdp_sawf_mpdu_details_stats_req(ol_txrx_soc_handle soc, uint8_t enable)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
 cdp_get_peer_sawf_delay_stats(ol_txrx_soc_handle soc, uint32_t svc_id,
 			      uint8_t *mac, void *data)
 {

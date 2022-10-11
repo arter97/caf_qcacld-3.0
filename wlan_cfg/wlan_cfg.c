@@ -2629,6 +2629,58 @@ wlan_cfg_soc_update_tgt_params(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 						  CFG_DP_REO_RINGS_MAP);
 }
 
+#ifdef CONFIG_SAWF_STATS
+/**
+ * wlan_soc_sawf_stats_cfg_attach() - Update sawf stats config in dp soc
+ *  cfg context
+ * @psoc - Object manager psoc
+ * @wlan_cfg_ctx - dp soc cfg ctx
+ *
+ * Return: None
+ */
+static void
+wlan_soc_sawf_stats_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
+			       struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
+{
+	wlan_cfg_ctx->sawf_stats = cfg_get(psoc, CFG_DP_SAWF_STATS);
+}
+
+uint8_t wlan_cfg_get_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->sawf_stats;
+}
+
+void wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg,
+				    uint8_t val)
+{
+	cfg->sawf_stats = val;
+}
+#else
+/**
+ * wlan_soc_sawf_stats_cfg_attach() - Update sawf stats config in dp soc
+ *  cfg context
+ * @psoc - Object manager psoc
+ * @wlan_cfg_ctx - dp soc cfg ctx
+ *
+ * Return: None
+ */
+static void
+wlan_soc_sawf_stats_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
+			       struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
+{
+}
+
+uint8_t wlan_cfg_get_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+
+void wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg,
+				    uint8_t val)
+{
+}
+#endif /* CONFIG_SAWF_STATS */
+
 /**
  * wlan_cfg_soc_attach() - Allocate and prepare SoC configuration
  * @psoc - Object manager psoc
@@ -2840,6 +2892,7 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 
 	wlan_cfg_ctx->napi_scale_factor = cfg_get(psoc,
 						  CFG_DP_NAPI_SCALE_FACTOR);
+	wlan_soc_sawf_stats_cfg_attach(psoc, wlan_cfg_ctx);
 	return wlan_cfg_ctx;
 }
 

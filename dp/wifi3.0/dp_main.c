@@ -11004,6 +11004,10 @@ dp_set_psoc_param(struct cdp_soc_t *cdp_soc,
 	case CDP_UMAC_RST_SKEL_ENABLE:
 		dp_umac_rst_skel_enable_update(soc, val.cdp_umac_rst_skel);
 		break;
+	case CDP_SAWF_STATS:
+		wlan_cfg_set_sawf_stats_config(wlan_cfg_ctx,
+					       val.cdp_sawf_stats);
+		break;
 	default:
 		break;
 	}
@@ -14047,7 +14051,7 @@ static struct cdp_sawf_ops dp_ops_sawf = {
 	.sawf_def_queues_unmap_req = dp_sawf_def_queues_unmap_req,
 	.sawf_def_queues_get_map_report =
 		dp_sawf_def_queues_get_map_report,
-#ifdef CONFIG_SAWF
+#ifdef CONFIG_SAWF_STATS
 	.txrx_get_peer_sawf_delay_stats = dp_sawf_get_peer_delay_stats,
 	.txrx_get_peer_sawf_tx_stats = dp_sawf_get_peer_tx_stats,
 	.sawf_mpdu_stats_req = dp_sawf_mpdu_stats_req,

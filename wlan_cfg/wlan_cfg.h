@@ -439,6 +439,9 @@ struct wlan_cfg_dp_soc_ctxt {
 #ifdef CONFIG_SAWF
 	bool sawf_enabled;
 #endif
+#ifdef CONFIG_SAWF_STATS
+	uint8_t sawf_stats;
+#endif
 	uint8_t mpdu_retry_threshold_1;
 	uint8_t mpdu_retry_threshold_2;
 	uint8_t napi_scale_factor;
@@ -2121,6 +2124,25 @@ wlan_cfg_set_sawf_config(struct wlan_cfg_dp_soc_ctxt *cfg, bool value);
  */
 bool
 wlan_cfg_get_sawf_config(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_set_sawf_stats_config() - Set SAWF stats config
+ * @cfg: config context
+ * @value: value to be set
+ *
+ * Return: void
+ */
+void
+wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg, uint8_t value);
+
+/**
+ * wlan_cfg_get_sawf_stats_config() - Get SAWF stats config
+ * @cfg: config context
+ *
+ * Return: value for sawf_stats_config
+ */
+uint8_t
+wlan_cfg_get_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 /**

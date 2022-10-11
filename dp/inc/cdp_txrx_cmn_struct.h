@@ -1288,6 +1288,8 @@ enum cdp_pdev_param_type {
  * @cdp_ipa_enabled : set ipa mode
  * @cdp_psoc_param_vdev_stats_hw_offload: Configure HW vdev stats offload
  * @cdp_pdev_param_undecoded_metadata_enable: Undecoded metadata capture enable
+ * @cdp_sawf_enabled: SAWF enable/dsiable
+ * @cdp_sawf_stats: SAWF stats config
  * @cdp_vdev_param_traffic_end_ind: Traffic end indication enable/disable
  * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
  */
@@ -1375,6 +1377,7 @@ typedef union cdp_config_param_t {
 	bool cdp_psoc_param_vdev_stats_hw_offload;
 	bool cdp_pdev_param_undecoded_metadata_enable;
 	bool cdp_sawf_enabled;
+	uint8_t cdp_sawf_stats;
 	bool cdp_drop_3addr_mcast;
 	bool cdp_vdev_param_traffic_end_ind;
 	bool cdp_umac_rst_skel;
@@ -1516,6 +1519,7 @@ enum cdp_vdev_param_type {
  * @CDP_CFG_VDEV_STATS_HW_OFFLOAD: HW Vdev stats config
  * @CDP_UMAC_RST_SKEL_ENABLE: Enable Umac reset skeleton code for debug
  * @CDP_CDP_PPEDS_ENABLE: PPEDS is enabled or not
+ * @CDP_SAWF_STATS : set SAWF stats config
  */
 enum cdp_psoc_param_type {
 	CDP_ENABLE_RATE_STATS,
@@ -1527,6 +1531,7 @@ enum cdp_psoc_param_type {
 	CDP_SAWF_ENABLE,
 	CDP_UMAC_RST_SKEL_ENABLE,
 	CDP_PPEDS_ENABLE,
+	CDP_SAWF_STATS,
 };
 
 #define TXRX_FW_STATS_TXSTATS                     1

@@ -472,6 +472,11 @@
 #define WLAN_CFG_DP_NAPI_SCALE_FACTOR_MIN 0
 #define WLAN_CFG_DP_NAPI_SCALE_FACTOR_MAX 4
 
+#ifdef CONFIG_SAWF_STATS
+#define WLAN_CFG_SAWF_STATS 0x0
+#define WLAN_CFG_SAWF_STATS_MIN 0x0
+#define WLAN_CFG_SAWF_STATS_MAX 0x7
+#endif
 /*
  * <ini>
  * "dp_tx_capt_max_mem_mb"- maximum memory used by Tx capture
@@ -691,6 +696,19 @@
 		WLAN_CFG_TIME_CONTROL_BP_MAX,\
 		WLAN_CFG_TIME_CONTROL_BP,\
 		CFG_VALUE_OR_DEFAULT, "DP time control back pressure")
+
+#ifdef CONFIG_SAWF_STATS
+#define CFG_DP_SAWF_STATS \
+		CFG_INI_UINT("dp_sawf_stats", \
+		WLAN_CFG_SAWF_STATS_MIN,\
+		WLAN_CFG_SAWF_STATS_MAX,\
+		WLAN_CFG_SAWF_STATS,\
+		CFG_VALUE_OR_DEFAULT, "DP sawf stats config")
+#define CFG_DP_SAWF_STATS_CONFIG CFG(CFG_DP_SAWF_STATS)
+#else
+#define CFG_DP_SAWF_STATS_CONFIG
+#endif
+
 /*
  * <ini>
  * dp_rx_pending_hl_threshold - High threshold of frame number to start
@@ -1830,5 +1848,6 @@
 		CFG_DP_VDEV_STATS_HW_OFFLOAD \
 		CFG(CFG_DP_TX_CAPT_MAX_MEM_MB) \
 		CFG(CFG_DP_NAPI_SCALE_FACTOR) \
-		CFG(CFG_DP_HOST_AST_DB_ENABLE)
+		CFG(CFG_DP_HOST_AST_DB_ENABLE) \
+		CFG_DP_SAWF_STATS_CONFIG
 #endif /* _CFG_DP_H_ */
