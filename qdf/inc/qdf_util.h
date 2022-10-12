@@ -501,6 +501,11 @@ static inline uint8_t *qdf_get_u32(uint8_t *ptr, uint32_t *value)
 }
 
 /**
+ * qdf_abs - Get absolute value
+ */
+#define qdf_abs(x)                           __qdf_abs(x)
+
+/**
  * qdf_ntohs - Convert a 16-bit value from network byte order to host byte order
  */
 #define qdf_ntohs(x)                         __qdf_ntohs(x)
