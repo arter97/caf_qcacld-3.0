@@ -2169,7 +2169,7 @@ static int wma_unified_link_radio_stats_event_handler(void *handle,
 	}
 	if (wma_handle->link_stats_results &&
 	    !wma_handle->link_stats_results->num_radio)
-		__wma_unified_radio_tx_mem_free(wma_handle);
+		wma_unified_radio_tx_mem_free(wma_handle);
 
 	if (!wma_handle->link_stats_results) {
 		wma_handle->link_stats_results = qdf_mem_malloc(
