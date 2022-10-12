@@ -284,11 +284,24 @@ uint32_t DEBUG_CE_DEST_RING_READ_IDX_GET(struct hif_softc *scn,
 #define BITS32_TO_35(val) ((uint32_t)(((uint64_t)(val)\
 				     & (uint64_t)(0xF00000000))>>32))
 
-#define VADDR_FOR_CE(scn, CE_ctrl_addr)\
-	((scn->vaddr_rri_on_ddr) + COPY_ENGINE_ID(CE_ctrl_addr))
+#ifdef WLAN_40BIT_ADDRESSING_SUPPORT
+#define RRI_ON_DDR_PADDR_HIGH(val) (uint32_t)(((uint64_t)(val) >> 32) & 0xFF)
+#else
+#define RRI_ON_DDR_PADDR_HIGH(val) BITS32_TO_35(val)
+#endif
+#define RRI_ON_DDR_PADDR_LOW(val) BITS0_TO_31(val)
 
+#ifdef WLAN_64BIT_DATA_SUPPORT
+#define VADDR_FOR_CE(scn, CE_ctrl_addr)\
+	(((uint64_t *)((scn)->vaddr_rri_on_ddr)) + COPY_ENGINE_ID(CE_ctrl_addr))
+#define SRRI_FROM_DDR_ADDR(addr) ((*(addr)) & 0xFFFF)
+#define DRRI_FROM_DDR_ADDR(addr) (((*(addr)) >> 32) & 0xFFFF)
+#else
+#define VADDR_FOR_CE(scn, CE_ctrl_addr)\
+	(((uint32_t *)((scn)->vaddr_rri_on_ddr)) + COPY_ENGINE_ID(CE_ctrl_addr))
 #define SRRI_FROM_DDR_ADDR(addr) ((*(addr)) & 0xFFFF)
 #define DRRI_FROM_DDR_ADDR(addr) (((*(addr))>>16) & 0xFFFF)
+#endif
 
 #define CE_SRC_RING_READ_IDX_GET_FROM_REGISTER(scn, CE_ctrl_addr) \
 	A_TARGET_READ(scn, (CE_ctrl_addr) + CURRENT_SRRI_ADDRESS)

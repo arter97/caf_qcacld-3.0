@@ -159,6 +159,12 @@
 
 #define CE_INTERRUPT_IDX(x) x
 
+#ifdef WLAN_64BIT_DATA_SUPPORT
+#define RRI_ON_DDR_MEM_SIZE CE_COUNT * sizeof(uint64_t)
+#else
+#define RRI_ON_DDR_MEM_SIZE CE_COUNT * sizeof(uint32_t)
+#endif
+
 struct ce_int_assignment {
 	uint8_t msi_idx[NUM_CE_AVAILABLE];
 };
@@ -290,7 +296,7 @@ struct hif_softc {
 	atomic_t active_tasklet_cnt;
 	atomic_t active_grp_tasklet_cnt;
 	atomic_t link_suspended;
-	uint32_t *vaddr_rri_on_ddr;
+	void *vaddr_rri_on_ddr;
 	qdf_dma_addr_t paddr_rri_on_ddr;
 #ifdef CONFIG_BYPASS_QMI
 	uint32_t *vaddr_qmi_bypass;

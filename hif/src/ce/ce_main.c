@@ -3912,8 +3912,8 @@ static inline QDF_STATUS hif_alloc_rri_on_ddr(struct hif_softc *scn)
 	qdf_dma_addr_t paddr_rri_on_ddr = 0;
 
 	scn->vaddr_rri_on_ddr =
-		(uint32_t *)qdf_mem_alloc_consistent(scn->qdf_dev,
-		scn->qdf_dev->dev, (CE_COUNT * sizeof(uint32_t)),
+		(void *)qdf_mem_alloc_consistent(scn->qdf_dev,
+		scn->qdf_dev->dev, RRI_ON_DDR_MEM_SIZE,
 		&paddr_rri_on_ddr);
 
 	if (!scn->vaddr_rri_on_ddr) {
@@ -3923,7 +3923,7 @@ static inline QDF_STATUS hif_alloc_rri_on_ddr(struct hif_softc *scn)
 
 	scn->paddr_rri_on_ddr = paddr_rri_on_ddr;
 
-	qdf_mem_zero(scn->vaddr_rri_on_ddr, CE_COUNT * sizeof(uint32_t));
+	qdf_mem_zero(scn->vaddr_rri_on_ddr, RRI_ON_DDR_MEM_SIZE);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3949,8 +3949,8 @@ static inline void hif_config_rri_on_ddr(struct hif_softc *scn)
 	if (hif_alloc_rri_on_ddr(scn) != QDF_STATUS_SUCCESS)
 		return;
 
-	low_paddr  = BITS0_TO_31(scn->paddr_rri_on_ddr);
-	high_paddr = BITS32_TO_35(scn->paddr_rri_on_ddr);
+	low_paddr  = RRI_ON_DDR_PADDR_LOW(scn->paddr_rri_on_ddr);
+	high_paddr = RRI_ON_DDR_PADDR_HIGH(scn->paddr_rri_on_ddr);
 
 	hif_debug("using srri and drri from DDR");
 
