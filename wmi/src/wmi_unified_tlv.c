@@ -8040,6 +8040,40 @@ enum phy_ch_width wmi_map_ch_width(A_UINT32 wmi_width)
 	}
 }
 
+/*
+ * convert_host_to_target_ch_width()- map host channel width(enum phy_ch_width)
+ * to wmi channel width
+ * @chan_width: Host channel width
+ *
+ * Return: wmi channel width
+ */
+static
+wmi_channel_width convert_host_to_target_ch_width(uint32_t chan_width)
+{
+	switch (chan_width) {
+	case CH_WIDTH_20MHZ:
+		return WMI_CHAN_WIDTH_20;
+	case CH_WIDTH_40MHZ:
+		return WMI_CHAN_WIDTH_40;
+	case CH_WIDTH_80MHZ:
+		return WMI_CHAN_WIDTH_80;
+	case CH_WIDTH_160MHZ:
+		return WMI_CHAN_WIDTH_160;
+	case CH_WIDTH_80P80MHZ:
+		return WMI_CHAN_WIDTH_80P80;
+	case CH_WIDTH_5MHZ:
+		return WMI_CHAN_WIDTH_5;
+	case CH_WIDTH_10MHZ:
+		return WMI_CHAN_WIDTH_10;
+#ifdef WLAN_FEATURE_11BE
+	case CH_WIDTH_320MHZ:
+		return WMI_CHAN_WIDTH_320;
+#endif
+	default:
+		return WMI_CHAN_WIDTH_MAX;
+	}
+}
+
 /**
  * send_vdev_spectral_configure_cmd_tlv() - send VDEV spectral configure
  * command to fw
@@ -8089,7 +8123,8 @@ static QDF_STATUS send_vdev_spectral_configure_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->spectral_scan_mode = param->mode;
 	cmd->spectral_scan_center_freq1 = param->center_freq1;
 	cmd->spectral_scan_center_freq2 = param->center_freq2;
-	cmd->spectral_scan_chan_width = param->chan_width;
+	cmd->spectral_scan_chan_width =
+			convert_host_to_target_ch_width(param->chan_width);
 	cmd->recapture_sample_on_gain_change = param->fft_recap;
 	/* Not used, fill with zeros */
 	cmd->spectral_scan_chan_freq = 0;
