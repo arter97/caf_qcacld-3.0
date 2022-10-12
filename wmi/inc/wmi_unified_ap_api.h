@@ -492,6 +492,19 @@ QDF_STATUS wmi_unified_send_multiple_vdev_restart_req_cmd(
 		struct multiple_vdev_restart_params *param);
 
 /**
+  * wmi_unified_send_multiple_vdev_set_param_cmd() - send multiple vdev set param
+  * @wmi_handle: wmi handle
+  * @param: multiple vdev set parameter
+  *
+  * Send WMI_PDEV_MULTIPLE_VDEV_SET_PARAM_CMDID parameters to fw.
+  *
+  * Return: QDF_STATUS_SUCCESS on success, QDF_STATUS_E_** on error
+  */
+QDF_STATUS wmi_unified_send_multiple_vdev_set_param_cmd(
+		struct wmi_unified *wmi_handle,
+		struct multiple_vdev_set_param *param);
+
+/**
  * wmi_extract_peer_create_response_event() -
  * extract vdev id and peer mac address and status from peer create
  * response event

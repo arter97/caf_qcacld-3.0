@@ -1262,6 +1262,72 @@ end:
 	return qdf_status;
 }
 
+static QDF_STATUS send_multiple_vdev_set_param_cmd_tlv(
+		wmi_unified_t wmi_handle,
+		struct multiple_vdev_set_param *param)
+{
+	wmi_buf_t buf;
+	QDF_STATUS qdf_status;
+	wmi_pdev_multiple_vdev_set_param_cmd_fixed_param *cmd;
+	int i;
+	uint8_t *buf_ptr;
+	uint32_t *vdev_ids;
+	uint16_t len = sizeof(*cmd);
+
+	if (!param->num_vdevs) {
+		wmi_err("vdev's not found for multi vdev set cmd");
+		qdf_status = QDF_STATUS_E_FAULT;
+		goto end;
+	}
+
+	/* Add length of num_vdevs + tlv_hdr_size for vdev_id */
+	len += sizeof(uint32_t) * param->num_vdevs + WMI_TLV_HDR_SIZE;
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf) {
+		wmi_err("Failed to allocate memory");
+		qdf_status = QDF_STATUS_E_NOMEM;
+		goto end;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_pdev_multiple_vdev_set_param_cmd_fixed_param *)
+		buf_ptr;
+
+	WMITLV_SET_HDR(&cmd->tlv_header,
+	WMITLV_TAG_STRUC_wmi_pdev_multiple_vdev_set_param_cmd_fixed_param,
+	WMITLV_GET_STRUCT_TLVLEN
+		(wmi_pdev_multiple_vdev_set_param_cmd_fixed_param));
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+								wmi_handle,
+								param->pdev_id);
+	cmd->param_id = wmi_handle->ops->convert_host_vdev_param_tlv(
+			param->param_id);
+	cmd->param_value = param->param_value;
+
+	buf_ptr += sizeof(*cmd);
+
+	WMITLV_SET_HDR(buf_ptr,
+			WMITLV_TAG_ARRAY_UINT32,
+			sizeof(uint32_t) * param->num_vdevs);
+	vdev_ids = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
+	for (i = 0; i < param->num_vdevs; i++) {
+		vdev_ids[i] = param->vdev_ids[i];
+	}
+
+	wmi_mtrace(WMI_PDEV_MULTIPLE_VDEV_SET_PARAM_CMDID, NO_SESSION, 0);
+	qdf_status = wmi_unified_cmd_send(wmi_handle, buf, len,
+				WMI_PDEV_MULTIPLE_VDEV_SET_PARAM_CMDID);
+
+	if (QDF_IS_STATUS_ERROR(qdf_status)) {
+		wmi_err("Failed to send");
+		wmi_buf_free(buf);
+	}
+end:
+	return qdf_status;
+}
+
+
 /**
  * extract_dcs_interference_type_tlv() - extract dcs interference type
  * from event
@@ -2996,6 +3062,8 @@ void wmi_ap_attach_tlv(wmi_unified_t wmi_handle)
 	ops->extract_peer_sta_kickout_ev = extract_peer_sta_kickout_ev_tlv;
 	ops->send_multiple_vdev_restart_req_cmd =
 				send_multiple_vdev_restart_req_cmd_tlv;
+	ops->send_multiple_vdev_set_param_cmd =
+				send_multiple_vdev_set_param_cmd_tlv;
 	ops->extract_dcs_interference_type = extract_dcs_interference_type_tlv;
 	ops->extract_dcs_awgn_info = extract_dcs_awgn_info_tlv;
 	ops->extract_dcs_cw_int = extract_dcs_cw_int_tlv;
