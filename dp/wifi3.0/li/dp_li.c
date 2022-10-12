@@ -632,6 +632,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_txrx_ppeds_rings_status = NULL;
 	arch_ops->txrx_soc_ppeds_start = NULL;
 	arch_ops->txrx_soc_ppeds_stop = NULL;
+	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_li;
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH

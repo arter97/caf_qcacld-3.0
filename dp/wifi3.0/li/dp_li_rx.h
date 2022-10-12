@@ -79,6 +79,27 @@ QDF_STATUS dp_wbm_get_rx_desc_from_hal_desc_li(
 					struct dp_soc *soc,
 					void *ring_desc,
 					struct dp_rx_desc **r_rx_desc);
+/**
+ * dp_rx_get_reo_qdesc_addr_li(): API to get qdesc address of reo
+ * entrance ring desc
+ *
+ * @hal_soc: Handle to HAL Soc structure
+ * @dst_ring_desc: reo dest ring descriptor (used for Lithium DP)
+ * @buf: pointer to the start of RX PKT TLV headers
+ * @txrx_peer: pointer to txrx_peer
+ * @tid: tid value
+ *
+ * Return: qdesc adrress in reo destination ring buffer
+ */
+static inline
+uint64_t dp_rx_get_reo_qdesc_addr_li(hal_soc_handle_t hal_soc,
+				     uint8_t *dst_ring_desc,
+				     uint8_t *buf,
+				     struct dp_txrx_peer *txrx_peer,
+				     unsigned int tid)
+{
+	return hal_rx_get_qdesc_addr(hal_soc, dst_ring_desc, buf);
+}
 
 /**
  * dp_rx_desc_cookie_2_va_li() - Convert RX Desc cookie ID to VA

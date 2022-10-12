@@ -2157,6 +2157,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 #endif
 
 	dp_init_near_full_arch_ops_be(arch_ops);
+	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_be;
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_be;
 	arch_ops->print_mlo_ast_stats = dp_print_mlo_ast_stats_be;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_be;

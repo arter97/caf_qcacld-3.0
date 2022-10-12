@@ -1398,9 +1398,11 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 	ent_qdesc_addr = hal_get_reo_ent_desc_qdesc_addr(soc->hal_soc,
 						(uint8_t *)ent_ring_desc);
 
-	dst_qdesc_addr = hal_rx_get_qdesc_addr(soc->hal_soc,
-					       (uint8_t *)dst_ring_desc,
-					       qdf_nbuf_data(head));
+	dst_qdesc_addr = soc->arch_ops.get_reo_qdesc_addr(
+						soc->hal_soc,
+						(uint8_t *)dst_ring_desc,
+						qdf_nbuf_data(head),
+						txrx_peer, tid);
 
 	qdf_mem_copy(ent_qdesc_addr, &dst_qdesc_addr, 5);
 

@@ -1962,6 +1962,11 @@ struct dp_arch_ops {
 						   enum dp_mod_id mod_id,
 						   uint8_t vdev_id);
 #endif
+	uint64_t (*get_reo_qdesc_addr)(hal_soc_handle_t hal_soc_hdl,
+				       uint8_t *dst_ring_desc,
+				       uint8_t *buf,
+				       struct dp_txrx_peer *peer,
+				       unsigned int tid);
 	void (*get_rx_hash_key)(struct dp_soc *soc,
 				struct cdp_lro_hash_config *lro_hash);
 	void (*txrx_print_peer_stats)(struct cdp_peer_stats *peer_stats,

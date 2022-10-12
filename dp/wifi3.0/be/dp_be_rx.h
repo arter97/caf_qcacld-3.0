@@ -488,4 +488,52 @@ dp_rx_prefetch_hw_sw_nbuf_32_byte_desc(struct dp_soc *soc,
 {
 }
 #endif
+#ifdef CONFIG_WORD_BASED_TLV
+/**
+ * dp_rx_get_reo_qdesc_addr_be(): API to get qdesc address of reo
+ * entrance ring desc
+ *
+ * @hal_soc: Handle to HAL Soc structure
+ * @dst_ring_desc: reo dest ring descriptor (used for Lithium DP)
+ * @buf: pointer to the start of RX PKT TLV headers
+ * @txrx_peer: pointer to txrx_peer
+ * @tid: tid value
+ *
+ * Return: qdesc adrress in reo destination ring buffer
+ */
+static inline
+uint64_t dp_rx_get_reo_qdesc_addr_be(hal_soc_handle_t hal_soc,
+				     uint8_t *dst_ring_desc,
+				     uint8_t *buf,
+				     struct dp_txrx_peer *txrx_peer,
+				     unsigned int tid)
+{
+	struct dp_peer *peer = NULL;
+	uint64_t qdesc_addr = 0;
+
+	if (hal_reo_shared_qaddr_is_enable(hal_soc)) {
+		qdesc_addr = (uint64_t)txrx_peer->peer_id;
+	} else {
+		peer = dp_peer_get_ref_by_id(txrx_peer->vdev->pdev->soc,
+					     txrx_peer->peer_id,
+					     DP_MOD_ID_CONFIG);
+		if (!peer)
+			return 0;
+
+		qdesc_addr = (uint64_t)peer->rx_tid[tid].hw_qdesc_paddr;
+		dp_peer_unref_delete(peer, DP_MOD_ID_CONFIG);
+	}
+	return qdesc_addr;
+}
+#else
+static inline
+uint64_t dp_rx_get_reo_qdesc_addr_be(hal_soc_handle_t hal_soc,
+				     uint8_t *dst_ring_desc,
+				     uint8_t *buf,
+				     struct dp_txrx_peer *txrx_peer,
+				     unsigned int tid)
+{
+	return hal_rx_get_qdesc_addr(hal_soc, dst_ring_desc, buf);
+}
+#endif
 #endif
