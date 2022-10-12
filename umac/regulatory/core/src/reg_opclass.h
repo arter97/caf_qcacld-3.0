@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -117,6 +117,7 @@ uint16_t reg_dmn_get_curr_opclasses(uint8_t *num_classes, uint8_t *class);
  * @n_opclasses: Pointer to number of opclasses.
  * @max_supp_op_class: Maximum number of operating classes supported.
  * @global_tbl_lookup: Whether to lookup global op class table.
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Return: QDF_STATUS_SUCCESS if success, else return QDF_STATUS_FAILURE.
  */
@@ -124,7 +125,8 @@ QDF_STATUS reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 				   struct regdmn_ap_cap_opclass_t *reg_ap_cap,
 				   uint8_t *n_opclasses,
 				   uint8_t max_supp_op_class,
-				   bool global_tbl_lookup);
+				   bool global_tbl_lookup,
+				   enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
  * reg_get_opclass_for_cur_hwmode() - Get details about the opclasses for
@@ -136,6 +138,7 @@ QDF_STATUS reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
  * @global_tbl_lookup: Whether to lookup global op class table.
  * @max_chwidth: Max channel width supported by cur hwmode
  * @is_80p80_supp: Bool to indicate if 80p80 is supported
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Return: QDF_STATUS_SUCCESS if success, else return QDF_STATUS_FAILURE.
  */
@@ -146,7 +149,8 @@ reg_get_opclass_for_cur_hwmode(struct wlan_objmgr_pdev *pdev,
 			       uint8_t max_supp_op_class,
 			       bool global_tbl_lookup,
 			       enum phy_ch_width max_chwidth,
-			       bool is_80p80_supp);
+			       bool is_80p80_supp,
+			       enum supported_6g_pwr_types in_6g_pwr_mode);
 /**
  * reg_is_5ghz_op_class() - Check if the input opclass is a 5GHz opclass.
  * @country: Country code.
@@ -359,7 +363,8 @@ QDF_STATUS reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 				   struct regdmn_ap_cap_opclass_t *reg_ap_cap,
 				   uint8_t *n_opclasses,
 				   uint8_t max_supp_op_class,
-				   bool global_tbl_lookup)
+				   bool global_tbl_lookup,
+				   enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	return QDF_STATUS_E_FAILURE;
 }
@@ -383,7 +388,8 @@ reg_get_opclass_for_cur_hwmode(struct wlan_objmgr_pdev *pdev,
 			       uint8_t max_supp_op_class,
 			       bool global_tbl_lookup,
 			       enum phy_ch_width max_ch_width,
-			       bool is_80p80_supp)
+			       bool is_80p80_supp,
+			       enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	return QDF_STATUS_E_FAILURE;
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1556,25 +1556,24 @@ static inline qdf_freq_t reg_get_nearest_primary_freq(uint16_t bw,
  * @pri_freq: Primary frequency of the input channel
  * @cfi_freq: cfi frequency of the input channel
  * @ch_width: Input channel width
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Return: True if the channel is supported, else false
  */
 static bool reg_is_chan_supported(struct wlan_objmgr_pdev *pdev,
 				  qdf_freq_t pri_freq,
 				  qdf_freq_t cfi_freq,
-				  enum phy_ch_width ch_width)
+				  enum phy_ch_width ch_width,
+				  enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	struct reg_channel_list chan_list;
 	qdf_freq_t center_320;
 	struct ch_params ch_params = {0};
 
 	center_320 = (ch_width == CH_WIDTH_320MHZ) ? cfi_freq : 0;
-	reg_fill_channel_list(pdev,
-			      pri_freq,
-			      0,
-			      ch_width,
-			      center_320,
-			      &chan_list, true);
+	reg_fill_channel_list_for_pwrmode(pdev, pri_freq, 0,
+					  ch_width, center_320, &chan_list,
+					  in_6g_pwr_mode, true);
 	ch_params = chan_list.chan_param[0];
 
 	if (ch_params.ch_width == ch_width)
@@ -1586,7 +1585,8 @@ static bool reg_is_chan_supported(struct wlan_objmgr_pdev *pdev,
 static bool reg_is_chan_supported(struct wlan_objmgr_pdev *pdev,
 				  qdf_freq_t pri_freq,
 				  qdf_freq_t cfi_freq,
-				  enum phy_ch_width ch_width)
+				  enum phy_ch_width ch_width,
+				  enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	struct ch_params ch_params = {0};
 
@@ -1604,13 +1604,16 @@ static bool reg_is_chan_supported(struct wlan_objmgr_pdev *pdev,
  * @pdev: Pointer to pdev
  * @cfi_freq: cfi frequency
  * @bw: bandwidth
+ * @op_class: op_class
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Return: True if the cfi is supported, else false
  */
 static bool reg_is_cfi_supported(struct wlan_objmgr_pdev *pdev,
 				 qdf_freq_t cfi_freq,
 				 uint16_t bw,
-				 uint8_t op_class)
+				 uint8_t op_class,
+				 enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	enum phy_ch_width ch_width;
 	qdf_freq_t pri_freq;
@@ -1621,7 +1624,8 @@ static bool reg_is_cfi_supported(struct wlan_objmgr_pdev *pdev,
 	is_cfi_supported = reg_is_chan_supported(pdev,
 						 pri_freq,
 						 cfi_freq,
-						 ch_width);
+						 ch_width,
+						 in_6g_pwr_mode);
 
 	return is_cfi_supported;
 }
@@ -1634,6 +1638,7 @@ static bool reg_is_cfi_supported(struct wlan_objmgr_pdev *pdev,
  * @op_class_tbl: Pointer to op_class_tbl
  * @in_opclass_conf: input opclass configuration
  * Supported or not-supported by current HW mode
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Populate channels from opclass map to regdmn_ap_cap_opclass_t as supported
  * and non-supported channels for 6Ghz.
@@ -1644,7 +1649,8 @@ static void reg_get_cfis_from_opclassmap_for_6g(
 			struct wlan_objmgr_pdev *pdev,
 			struct regdmn_ap_cap_opclass_t *cap,
 			const struct reg_dmn_op_class_map_t *op_class_tbl,
-			enum opclass_config in_opclass_conf)
+			enum opclass_config in_opclass_conf,
+			enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	uint8_t n_sup_chans = 0, n_unsup_chans = 0, j;
 	const struct c_freq_lst *p_cfi_lst = op_class_tbl->p_cfi_lst_obj;
@@ -1660,7 +1666,8 @@ static void reg_get_cfis_from_opclassmap_for_6g(
 		is_cfi_supported = reg_is_cfi_supported(pdev,
 							cfi_freq,
 							bw,
-							op_class_tbl->op_class);
+							op_class_tbl->op_class,
+							in_6g_pwr_mode);
 		if (is_cfi_supported &&
 		    (in_opclass_conf == OPCLASSES_SUPPORTED_BY_CUR_HWMODE ||
 		     in_opclass_conf == OPCLASSES_SUPPORTED_BY_DOMAIN)) {
@@ -1687,6 +1694,7 @@ static uint16_t reg_find_nearest_ieee_bw(uint16_t spacing)
  * @op_class_tbl: Pointer to op_class_tbl
  * @in_opclass_conf: input opclass configuration
  * Supported or not-supported by current HW mode
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Populate channels from opclass map to regdmn_ap_cap_opclass_t as supported
  * and non-supported channels for non-6Ghz.
@@ -1697,7 +1705,8 @@ static void reg_get_cfis_from_opclassmap_for_non6g(
 			struct wlan_objmgr_pdev *pdev,
 			struct regdmn_ap_cap_opclass_t *cap,
 			const struct reg_dmn_op_class_map_t *op_class_tbl,
-			enum opclass_config in_opclass_conf)
+			enum opclass_config in_opclass_conf,
+			enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	qdf_freq_t start_freq = op_class_tbl->start_freq;
 	uint8_t chan_idx = 0, n_sup_chans = 0, n_unsup_chans = 0;
@@ -1720,7 +1729,8 @@ static void reg_get_cfis_from_opclassmap_for_non6g(
 		is_supported = reg_is_chan_supported(pdev,
 						     pri_freq,
 						     0,
-						     ch_width);
+						     ch_width,
+						     in_6g_pwr_mode);
 
 		if (is_supported &&
 		    (in_opclass_conf == OPCLASSES_SUPPORTED_BY_CUR_HWMODE ||
@@ -1743,6 +1753,7 @@ static void reg_get_cfis_from_opclassmap_for_non6g(
  * @is_opclass_operable: Set true if opclass is operable, else set false
  * @in_opclass_conf: input opclass configuration
  * Supported or not-supported by current HW mode
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Populate channels from opclass map to reg_ap_cap as supported and
  * non-supported channels.
@@ -1756,7 +1767,8 @@ reg_get_channels_from_opclassmap(
 		uint8_t index,
 		const struct reg_dmn_op_class_map_t *op_class_tbl,
 		bool *is_opclass_operable,
-		enum opclass_config in_opclass_conf)
+		enum opclass_config in_opclass_conf,
+		enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	struct regdmn_ap_cap_opclass_t *cap = &reg_ap_cap[index];
 
@@ -1764,12 +1776,14 @@ reg_get_channels_from_opclassmap(
 		reg_get_cfis_from_opclassmap_for_6g(pdev,
 						    cap,
 						    op_class_tbl,
-						    in_opclass_conf);
+						    in_opclass_conf,
+						    in_6g_pwr_mode);
 	} else {
 		reg_get_cfis_from_opclassmap_for_non6g(pdev,
 						       cap,
 						       op_class_tbl,
-						       in_opclass_conf);
+						       in_opclass_conf,
+						       in_6g_pwr_mode);
 	}
 
 	if (cap->num_supported_chan >= 1)
@@ -1780,7 +1794,8 @@ QDF_STATUS reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 				   struct regdmn_ap_cap_opclass_t *reg_ap_cap,
 				   uint8_t *n_opclasses,
 				   uint8_t max_supp_op_class,
-				   bool global_tbl_lookup)
+				   bool global_tbl_lookup,
+				   enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	uint8_t max_reg_power = 0;
 	const struct reg_dmn_op_class_map_t *op_class_tbl;
@@ -1808,7 +1823,8 @@ QDF_STATUS reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 						 index,
 						 op_class_tbl,
 						 &is_opclass_operable,
-						 opclass_conf);
+						 opclass_conf,
+						 in_6g_pwr_mode);
 		if (is_opclass_operable) {
 			reg_ap_cap[index].op_class = op_class_tbl->op_class;
 			reg_ap_cap[index].ch_width =
@@ -1950,7 +1966,8 @@ reg_get_opclass_for_cur_hwmode(struct wlan_objmgr_pdev *pdev,
 			       uint8_t max_supp_op_class,
 			       bool global_tbl_lookup,
 			       enum phy_ch_width max_chwidth,
-			       bool is_80p80_supp)
+			       bool is_80p80_supp,
+			       enum supported_6g_pwr_types in_6g_pwr_mode)
 {
 	uint8_t max_reg_power = 0;
 	const struct reg_dmn_op_class_map_t *op_class_tbl;
@@ -1993,7 +2010,8 @@ reg_get_opclass_for_cur_hwmode(struct wlan_objmgr_pdev *pdev,
 						 index,
 						 op_class_tbl,
 						 &is_opclass_operable,
-						 opclass_in_config);
+						 opclass_in_config,
+						 in_6g_pwr_mode);
 
 		if (is_opclass_operable && opclass_in_config ==
 		    OPCLASSES_SUPPORTED_BY_CUR_HWMODE) {

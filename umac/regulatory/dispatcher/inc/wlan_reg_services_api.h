@@ -1060,6 +1060,7 @@ uint16_t wlan_reg_dmn_get_curr_opclasses(uint8_t *num_classes,
  * @n_opclasses: Pointer to number of opclasses.
  * @max_supp_op_class: Maximum number of operating classes supported.
  * @global_tbl_lookup: Whether to lookup global op class tbl.
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Return: QDF_STATUS_SUCCESS if success, else return QDF_STATUS_FAILURE.
  */
@@ -1068,7 +1069,8 @@ wlan_reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
 			     struct regdmn_ap_cap_opclass_t *reg_ap_cap,
 			     uint8_t *n_opclasses,
 			     uint8_t max_supp_op_class,
-			     bool global_tbl_lookup);
+			     bool global_tbl_lookup,
+			     enum supported_6g_pwr_types in_6g_pwr_mode);
 
 /**
  * wlan_reg_get_opclass_for_cur_hwmode() - Get details about the
@@ -1080,6 +1082,7 @@ wlan_reg_get_opclass_details(struct wlan_objmgr_pdev *pdev,
  * @global_tbl_lookup: Whether to lookup global op class tbl.
  * @max_chwidth: Maximum channel width supported by cur hwmode
  * @is_80p80_supp: Bool to indicate if 80p80 is supported.
+ * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
  *
  * Return: QDF_STATUS_SUCCESS if success, else return QDF_STATUS_FAILURE.
  */
@@ -1090,7 +1093,8 @@ wlan_reg_get_opclass_for_cur_hwmode(struct wlan_objmgr_pdev *pdev,
 				    uint8_t max_supp_op_class,
 				    bool global_tbl_lookup,
 				    enum phy_ch_width max_chwidth,
-				    bool is_80p80_supp);
+				    bool is_80p80_supp,
+				    enum supported_6g_pwr_types in_6g_pwr_mode);
 /**
  * wlan_reg_get_cc_and_src () - get country code and src
  * @psoc: psoc ptr
