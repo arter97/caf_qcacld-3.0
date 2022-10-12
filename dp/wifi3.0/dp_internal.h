@@ -920,12 +920,14 @@ dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
 {
 }
 
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
 static inline
 void dp_monitor_peer_telemetry_stats(struct dp_peer *peer,
 				     struct cdp_peer_telemetry_stats *stats)
 {
 }
-#endif
+#endif /* WLAN_TELEMETRY_STATS_SUPPORT */
+#endif /* !WIFI_MONITOR_SUPPORT */
 
 /**
  * cdp_soc_t_to_dp_soc() - typecast cdp_soc_t to
