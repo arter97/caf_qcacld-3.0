@@ -718,6 +718,7 @@ QDF_STATUS __dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 	struct dp_pdev *dp_pdev = dp_get_pdev_for_lmac_id(dp_soc, mac_id);
 	uint32_t num_entries_avail;
 	uint32_t count;
+	uint32_t extra_buffers;
 	int sync_hw_ptr = 1;
 	struct dp_rx_nbuf_frag_info nbuf_frag_info = {0};
 	void *rxdma_ring_entry;
@@ -764,11 +765,20 @@ QDF_STATUS __dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 	} else if ((*desc_list) &&
 		   dp_rxdma_srng->num_entries - num_entries_avail <
 		   CRITICAL_BUFFER_THRESHOLD) {
+		/* set extra buffers to CRITICAL_BUFFER_THRESHOLD only if
+		 * total buff requested after adding extra buffers is less
+		 * than or equal to num entries available, else set it to max
+		 * possible additional buffers available at that moment
+		 */
+		extra_buffers =
+			((num_req_buffers + CRITICAL_BUFFER_THRESHOLD) > num_entries_avail) ?
+			(num_entries_avail - num_req_buffers) :
+			CRITICAL_BUFFER_THRESHOLD;
 		/* Append some free descriptors to tail */
 		num_alloc_desc =
 			dp_rx_get_free_desc_list(dp_soc, mac_id,
 						 rx_desc_pool,
-						 CRITICAL_BUFFER_THRESHOLD,
+						 extra_buffers,
 						 &desc_list_append,
 						 &tail_append);
 
