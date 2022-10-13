@@ -2548,7 +2548,8 @@ static QDF_STATUS reg_get_max_psd(qdf_freq_t freq,
 				  enum reg_6g_client_type reg_client,
 				  uint8_t *tx_power)
 {
-	if (reg_ap == REG_INDOOR_AP) {
+	if (reg_ap == REG_INDOOR_AP ||
+	    reg_ap == REG_VERY_LOW_POWER_AP) {
 		switch (reg_client) {
 		case REG_DEFAULT_CLIENT:
 			*tx_power = REG_PSD_MAX_TXPOWER_FOR_DEFAULT_CLIENT;
@@ -2584,7 +2585,8 @@ static QDF_STATUS reg_get_max_eirp(struct wlan_objmgr_pdev *pdev,
 				   enum reg_6g_client_type reg_client,
 				   uint8_t *tx_power)
 {
-	if (reg_ap == REG_INDOOR_AP) {
+	if (reg_ap == REG_INDOOR_AP ||
+	    reg_ap == REG_VERY_LOW_POWER_AP) {
 		switch (reg_client) {
 		case REG_DEFAULT_CLIENT:
 			*tx_power = reg_get_channel_reg_power_for_freq(pdev,
