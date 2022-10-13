@@ -532,8 +532,12 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppeds_wlan_handle_t *ppeds_handle,
 		/*
 		 * Map(Get Phys address)
 		 */
+		if (!nbuf->recycled_for_ds) {
 		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
 				(void *)(nbuf->data + buff_size - headroom));
+			nbuf->recycled_for_ds = 1;
+			DP_STATS_INC(soc, tx.count, 1);
+		}
 		paddr = (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
 
 		tx_desc = dp_ppeds_tx_desc_alloc(be_soc);
