@@ -3979,7 +3979,8 @@ target_if_calculate_center_freq(struct target_if_spectral *spectral,
 
 		state = wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode
 			(spectral->pdev_obj, chan_freq, agile_ch_width,
-			 &bonded_chan_ptr, REG_CURRENT_PWR_MODE);
+			 &bonded_chan_ptr, REG_CURRENT_PWR_MODE,
+			 NO_SCHANS_PUNC);
 		if (state == CHANNEL_STATE_DISABLE ||
 		    state == CHANNEL_STATE_INVALID) {
 			spectral_err("Channel state is disable or invalid");
@@ -4062,7 +4063,8 @@ target_if_validate_center_freq(struct target_if_spectral *spectral,
 				(pdev, center_freq + FREQ_OFFSET_10MHZ,
 				 agile_ch_width,
 				 &bonded_chan_ptr,
-				 REG_CURRENT_PWR_MODE);
+				 REG_CURRENT_PWR_MODE,
+				 NO_SCHANS_PUNC);
 			if (st == CHANNEL_STATE_DISABLE ||
 			    st == CHANNEL_STATE_INVALID) {
 				spectral_err("Channel state disable/invalid");
@@ -4170,7 +4172,7 @@ target_if_is_agile_span_overlap_with_operating_span
 
 		state = wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode
 			(pdev, chan_freq, op_ch_width, &bonded_chan_ptr,
-			 REG_CURRENT_PWR_MODE);
+			 REG_CURRENT_PWR_MODE, NO_SCHANS_PUNC);
 		if (state == CHANNEL_STATE_DISABLE ||
 		    state == CHANNEL_STATE_INVALID) {
 			spectral_err("Channel state is disable or invalid");

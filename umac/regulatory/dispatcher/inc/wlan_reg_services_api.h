@@ -886,6 +886,7 @@ wlan_reg_get_bonded_channel_state_for_freq(struct wlan_objmgr_pdev *pdev,
  * @bw: channel band width
  * @sec_freq: secondary frequency
  * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
+ * @input_puncture_bitmap: input puncture bitmap
  *
  * Return: channel state
  */
@@ -895,7 +896,8 @@ wlan_reg_get_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 					      enum phy_ch_width bw,
 					      qdf_freq_t sec_freq,
 					      enum supported_6g_pwr_types
-					      in_6g_pwr_mode);
+					      in_6g_pwr_mode,
+					      uint16_t input_puncture_bitmap);
 #endif
 
 /**
@@ -1957,6 +1959,7 @@ wlan_reg_get_5g_bonded_channel_and_state_for_freq(struct wlan_objmgr_pdev *pdev,
  * @bw Channel Width.
  * @bonded_chan_ptr_ptr: Pointer to bonded_channel_freq.
  * @in_6g_pwr_type: 6g power type which decides 6G channel list lookup.
+ * @input_puncture_bitmap: Input puncture bitmap
  *
  * Return: Channel State
  */
@@ -1969,7 +1972,8 @@ wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode(
 						  struct bonded_channel_freq
 						  **bonded_chan_ptr_ptr,
 						  enum supported_6g_pwr_types
-						  in_6g_pwr_mode);
+						  in_6g_pwr_mode,
+						  uint16_t input_puncture_bitmap);
 #endif
 #endif /*CONFIG_CHAN_FREQ_API */
 
@@ -2564,6 +2568,7 @@ enum phy_ch_width wlan_reg_find_chwidth_from_bw(uint16_t bw);
  * @bonded_chan_ptr_ptr: Pointer to bonded channel pointer
  * @treat_nol_chan_as_disabled: Bool to treat nol chan as enabled/disabled
  * @in_pwr_type: Input 6g power type
+ * @input_puncture_bitmap: Input puncture bitmap
  *
  * Return: Channel state
  */
@@ -2576,7 +2581,8 @@ wlan_reg_get_chan_state_for_320(struct wlan_objmgr_pdev *pdev,
 				const struct bonded_channel_freq
 				**bonded_chan_ptr_ptr,
 				enum supported_6g_pwr_types in_6g_pwr_type,
-				bool treat_nol_chan_as_disabled);
+				bool treat_nol_chan_as_disabled,
+				uint16_t input_puncture_bitmap);
 #else
 static inline enum channel_state
 wlan_reg_get_chan_state_for_320(struct wlan_objmgr_pdev *pdev,
@@ -2586,7 +2592,8 @@ wlan_reg_get_chan_state_for_320(struct wlan_objmgr_pdev *pdev,
 				const struct bonded_channel_freq
 				**bonded_chan_ptr_ptr,
 				enum supported_6g_pwr_types in_6g_pwr_type,
-				bool treat_nol_chan_as_disabled)
+				bool treat_nol_chan_as_disabled,
+				uint16_t input_puncture_bitmap)
 {
 	return CHANNEL_STATE_INVALID;
 }

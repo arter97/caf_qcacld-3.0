@@ -1206,10 +1206,12 @@ wlan_reg_get_5g_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 
 	if (reg_is_ch_width_320(bw)) {
 		const struct bonded_channel_freq *bonded_ch_ptr_ptr = NULL;
+		uint16_t in_punc_bitmap = reg_fetch_punc_bitmap(ch_params);
 
 		return reg_get_5g_bonded_channel_for_pwrmode(pdev, freq, bw,
 							     &bonded_ch_ptr_ptr,
-							     in_6g_pwr_type);
+							     in_6g_pwr_type,
+							     in_punc_bitmap);
 	}
 
 	return reg_get_5g_bonded_channel_state_for_pwrmode(pdev, freq,
@@ -1489,14 +1491,16 @@ wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode(
 						  struct bonded_channel_freq
 						  **bonded_chan_ptr_ptr,
 						  enum supported_6g_pwr_types
-						  in_6g_pwr_mode)
+						  in_6g_pwr_mode,
+						  uint16_t input_puncture_bitmap)
 {
 	/*
 	 * Get channel frequencies and state from regulatory
 	 */
 	return reg_get_5g_bonded_channel_for_pwrmode(pdev, freq, bw,
 						     bonded_chan_ptr_ptr,
-						     in_6g_pwr_mode);
+						     in_6g_pwr_mode,
+						     input_puncture_bitmap);
 }
 
 qdf_export_symbol(wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode);
@@ -1558,7 +1562,8 @@ wlan_reg_get_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 					      enum phy_ch_width bw,
 					      qdf_freq_t sec_freq,
 					      enum supported_6g_pwr_types
-					      in_6g_pwr_mode)
+					      in_6g_pwr_mode,
+					      uint16_t input_punc_bitmap)
 {
 	if (WLAN_REG_IS_24GHZ_CH_FREQ(freq)) {
 		return reg_get_2g_bonded_channel_state_for_freq(pdev, freq,
@@ -1904,12 +1909,14 @@ wlan_reg_get_chan_state_for_320(struct wlan_objmgr_pdev *pdev,
 				const struct bonded_channel_freq
 				**bonded_chan_ptr_ptr,
 				enum supported_6g_pwr_types in_6g_pwr_type,
-				bool treat_nol_chan_as_disabled)
+				bool treat_nol_chan_as_disabled,
+				uint16_t input_puncture_bitmap)
 {
 	return reg_get_chan_state_for_320(pdev, freq, center_320,
 					  ch_width, bonded_chan_ptr_ptr,
 					  in_6g_pwr_type,
-					  treat_nol_chan_as_disabled);
+					  treat_nol_chan_as_disabled,
+					  input_puncture_bitmap);
 }
 #endif
 
