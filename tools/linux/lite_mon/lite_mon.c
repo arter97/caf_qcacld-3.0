@@ -84,7 +84,7 @@ static void lite_mon_fill_fil_value(struct lite_mon_filter_config *filter_config
 	int type = LITE_MON_GET_FILTER_TYPE(input_filter);
 	uint16_t filter = LITE_MON_GET_FILTER_VALUE(input_filter);
 
-	lite_mon_printf(LITE_MON_TRACE_DEBUG, "Filter type %d filter %02X",
+	lite_mon_printf(LITE_MON_TRACE_DEBUG, "Filter type %d filter 0x%02X",
 			type, filter);
 	switch (type) {
 	case LITE_MON_TYPE_MGMT:
@@ -99,7 +99,7 @@ static void lite_mon_fill_fil_value(struct lite_mon_filter_config *filter_config
 	case LITE_MON_TYPE_ALL:
 		if (filter != LITE_MON_FILTER_ALL) {
 			lite_mon_printf(LITE_MON_TRACE_ERROR,
-					"Wrong filter type %d filter %02X",
+					"Wrong filter type %d filter 0x%02X",
 					type, filter);
 			exit(0);
 		}
@@ -109,7 +109,7 @@ static void lite_mon_fill_fil_value(struct lite_mon_filter_config *filter_config
 		break;
 	default:
 		lite_mon_printf(LITE_MON_TRACE_ERROR,
-				"Wrong filter type %d filter %02X",
+				"Wrong filter type %d filter 0x%02X",
 				type, filter);
 		exit(0);
 	}
@@ -132,7 +132,7 @@ static void lite_mon_set_cmdtype(struct lite_mon_config *mon_config,
 			count++;
 	}
 
-	lite_mon_printf(LITE_MON_TRACE_DEBUG, "cmd_bitmask %02X count %d",
+	lite_mon_printf(LITE_MON_TRACE_DEBUG, "cmd_bitmask 0x%02X count %d",
 			cmd_bitmask, count);
 	if (count == 1) {
 		if (cmd_bitmask & LITE_MON_SET_FILTER_MASK) {
@@ -181,47 +181,49 @@ static void lite_mon_set_default_len(struct lite_mon_config *mon_config)
 	}
 
 	if (mgmt_filter_set &&
-	    !mon_config->data.filter_config.len[LITE_MON_TYPE_MGMT])
+	    !mon_config->data.filter_config.len[LITE_MON_TYPE_MGMT]) {
+		lite_mon_printf(LITE_MON_TRACE_DEBUG,
+				"Set default len for mgmt");
 		mon_config->data.filter_config.len[LITE_MON_TYPE_MGMT] =
 							LITE_MON_LEN_ALL;
+	}
 
 	if (ctrl_filter_set &&
-	    !mon_config->data.filter_config.len[LITE_MON_TYPE_CTRL])
+	    !mon_config->data.filter_config.len[LITE_MON_TYPE_CTRL]) {
+		lite_mon_printf(LITE_MON_TRACE_DEBUG,
+				"Set default len for ctrl");
 		mon_config->data.filter_config.len[LITE_MON_TYPE_CTRL] =
 							LITE_MON_LEN_ALL;
+	}
 
 	if (data_filter_set &&
-	    !mon_config->data.filter_config.len[LITE_MON_TYPE_DATA])
+	    !mon_config->data.filter_config.len[LITE_MON_TYPE_DATA]) {
+		lite_mon_printf(LITE_MON_TRACE_DEBUG,
+				"Set default len for data");
 		mon_config->data.filter_config.len[LITE_MON_TYPE_DATA] =
 							LITE_MON_LEN_ALL;
+	}
 }
 
 /*
  * lite_mon_set_default_filter: set default filter in mon_config structre
  * @mon_config: mon_config structre filled by user
+ * @filter_input: value to detect if filter input was given by user
  * return void
  */
-static void lite_mon_set_default_filter(struct lite_mon_config *mon_config)
+static void lite_mon_set_default_filter(struct lite_mon_config *mon_config,
+					int filter_input)
 {
-	int i;
-	bool mgmt_filter_set = false;
-	bool ctrl_filter_set = false;
-	bool data_filter_set = false;
 	struct lite_mon_filter_config *filter_config =
 					&mon_config->data.filter_config;
 
-	for (i = 0; i < LITE_MON_MODE_MAX; i++)	{
-		if (mon_config->data.filter_config.mgmt_filter[i])
-			mgmt_filter_set = true;
-		if (mon_config->data.filter_config.ctrl_filter[i])
-			ctrl_filter_set = true;
-		if (mon_config->data.filter_config.data_filter[i])
-			data_filter_set = true;
-	}
-
-	if (mgmt_filter_set || ctrl_filter_set || data_filter_set)
+	/* Return if user has explicitely provided filter value */
+	if (filter_input) {
+		lite_mon_printf(LITE_MON_TRACE_DEBUG,
+				"Dont set default filter since user input has been received.");
 		return;
-
+	}
+	lite_mon_printf(LITE_MON_TRACE_DEBUG, "Set default filters");
 	switch (mon_config->direction) {
 	case LITE_MON_DIRECTION_RX:
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
@@ -259,11 +261,13 @@ static void lite_mon_set_default_filter(struct lite_mon_config *mon_config)
 /*
  * lite_mon_set_defaults: set default value of mon_config structre
  * @mon_config: mon_config structre to be filled
+ * @filter_input: value to detect if filter input was given by user
  * return void
  */
-static void lite_mon_set_defaults(struct lite_mon_config *mon_config)
+static void lite_mon_set_defaults(struct lite_mon_config *mon_config,
+				  int filter_input)
 {
-	lite_mon_set_default_filter(mon_config);
+	lite_mon_set_default_filter(mon_config, filter_input);
 	lite_mon_set_default_len(mon_config);
 }
 
@@ -272,6 +276,7 @@ static void lite_mon_set_defaults(struct lite_mon_config *mon_config)
  * lite_mon_sanitize_filter: sanitize the filter given by user
  * @filter: filter config given by user
  * @direction: direction value given by user
+ * @filter_invalid: invalid filter bitmap
  * return void
  */
 static void lite_mon_sanitize_filter(uint16_t *filter, uint8_t direction,
@@ -279,21 +284,21 @@ static void lite_mon_sanitize_filter(uint16_t *filter, uint8_t direction,
 {
 	int i;
 
-	lite_mon_printf(LITE_MON_TRACE_DEBUG, "filter FP %02X MD %02X MO %02X FPMO %02X",
+	lite_mon_printf(LITE_MON_TRACE_DEBUG, "filter FP 0x%02X MD 0x%02X MO 0x%02X FPMO 0x%02X",
 			filter[0], filter[1], filter[2], filter[3]);
 	for (i = 0; i < LITE_MON_MODE_MAX; i++) {
 		if (filter[i] == LITE_MON_FILTER_ALL)
 			continue;
 		if (filter[i] & filter_invalid) {
 			lite_mon_printf(LITE_MON_TRACE_ERROR,
-					"filter invalid i %d filter %02X",
+					"filter invalid i %d filter 0x%02X",
 					i, filter[i]);
 			exit(0);
 		}
 		if (direction == LITE_MON_DIRECTION_TX &&
 		    i != LITE_MON_MODE_FILTER_FP && filter[i]) {
 			lite_mon_printf(LITE_MON_TRACE_ERROR,
-					"Only FP filter is valid for Tx i %d filter %02X",
+					"Only FP filter is valid for Tx i %d filter 0x%02X",
 					i, filter[i]);
 			exit(0);
 		}
@@ -310,7 +315,7 @@ static void lite_mon_sanitize_len(uint16_t *len)
 	int i;
 
 	lite_mon_printf(LITE_MON_TRACE_DEBUG,
-			"mgmt_len %02X ctrl_len %02X data_len %02X",
+			"mgmt_len 0x%02X ctrl_len 0x%02X data_len 0x%02X",
 			len[0], len[1], len[2]);
 	for (i = 0; i < LITE_MON_TYPE_MAX; i++) {
 		switch (len[i]) {
@@ -335,10 +340,10 @@ static void lite_mon_sanitize_len(uint16_t *len)
  */
 static void lite_mon_sanitize_metadata(uint16_t metadata)
 {
-	lite_mon_printf(LITE_MON_TRACE_DEBUG, "metadata %02X", metadata);
+	lite_mon_printf(LITE_MON_TRACE_DEBUG, "metadata 0x%02X", metadata);
 	if (metadata & LITE_MON_METADATA_INVALID) {
 		lite_mon_printf(LITE_MON_TRACE_ERROR,
-				"Invalid metadata option %02X",
+				"Invalid metadata option 0x%02X",
 				metadata);
 		exit(0);
 	}
@@ -520,34 +525,34 @@ static void lite_mon_display_filter(struct lite_mon_config *mon_config)
 
 	lite_mon_printf(LITE_MON_TRACE_INFO, "Direction: %s",
 			lite_mon_get_direction(mon_config->direction));
-	lite_mon_printf(LITE_MON_TRACE_INFO, "Debug: %02X",
+	lite_mon_printf(LITE_MON_TRACE_INFO, "Debug: %d",
 			mon_config->debug);
 	lite_mon_printf(LITE_MON_TRACE_INFO, "Level: %s",
 			lite_mon_get_level(filter_config->level));
-	lite_mon_printf(LITE_MON_TRACE_INFO, "Metadata Requested: %02X",
+	lite_mon_printf(LITE_MON_TRACE_INFO, "Metadata Requested: 0x%02X",
 			filter_config->metadata);
 	lite_mon_printf(LITE_MON_TRACE_INFO, "Interface Name: %s",
 			filter_config->interface_name);
-	lite_mon_printf(LITE_MON_TRACE_INFO, "MGMT Length: %02X ",
+	lite_mon_printf(LITE_MON_TRACE_INFO, "MGMT Length: 0x%02X ",
 			filter_config->len[LITE_MON_TYPE_MGMT]);
-	lite_mon_printf(LITE_MON_TRACE_INFO, "CTRL Length: %02X ",
+	lite_mon_printf(LITE_MON_TRACE_INFO, "CTRL Length: 0x%02X ",
 			filter_config->len[LITE_MON_TYPE_CTRL]);
-	lite_mon_printf(LITE_MON_TRACE_INFO, "DATA Length: %02X ",
+	lite_mon_printf(LITE_MON_TRACE_INFO, "DATA Length: 0x%02X ",
 			filter_config->len[LITE_MON_TYPE_DATA]);
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"MGMT filter: FP %02X MD %02X MO %02X FPMO %02X",
+			"MGMT filter: FP 0x%02X MD 0x%02X MO 0x%02X FPMO 0x%02X",
 			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_FP],
 			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_MD],
 			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_MO],
 			filter_config->mgmt_filter[LITE_MON_MODE_FILTER_FPMO]);
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"CTRL filter: FP %02X MD %02X MO %02X FPMO %02X",
+			"CTRL filter: FP 0x%02X MD 0x%02X MO 0x%02X FPMO 0x%02X",
 			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_FP],
 			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_MD],
 			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_MO],
 			filter_config->ctrl_filter[LITE_MON_MODE_FILTER_FPMO]);
 	lite_mon_printf(LITE_MON_TRACE_INFO,
-			"DATA filter: FP %02X MD %02X MO %02X FPMO %02X",
+			"DATA filter: FP 0x%02X MD 0x%02X MO 0x%02X FPMO 0x%02X",
 			filter_config->data_filter[LITE_MON_MODE_FILTER_FP],
 			filter_config->data_filter[LITE_MON_MODE_FILTER_MD],
 			filter_config->data_filter[LITE_MON_MODE_FILTER_MO],
@@ -565,7 +570,7 @@ static void lite_mon_display_peer(struct lite_mon_config *mon_config)
 
 	lite_mon_printf(LITE_MON_TRACE_INFO, "Direction: %s",
 			lite_mon_get_direction(mon_config->direction));
-	lite_mon_printf(LITE_MON_TRACE_INFO, "Debug: %02X",
+	lite_mon_printf(LITE_MON_TRACE_INFO, "Debug: %d",
 			mon_config->debug);
 	lite_mon_printf(LITE_MON_TRACE_INFO, "Number of peers in list: %d",
 			mon_config->data.peer_config.count);
@@ -648,25 +653,25 @@ static void lite_mon_dump_structure_content(struct lite_mon_config *mon_config)
 				filter_config->metadata,
 				filter_config->interface_name);
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
-				"mgmt filter fp %02X md %02X mo %02X fpmo %02X",
+				"mgmt filter fp 0x%02X md 0x%02X mo 0x%02X fpmo 0x%02X",
 				filter_config->mgmt_filter[0],
 				filter_config->mgmt_filter[1],
 				filter_config->mgmt_filter[2],
 				filter_config->mgmt_filter[3]);
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
-				"ctrl filter fp %02X md %02X mo %02X fpmo %02X",
+				"ctrl filter fp 0x%02X md 0x%02X mo 0x%02X fpmo 0x%02X",
 				filter_config->ctrl_filter[0],
 				filter_config->ctrl_filter[1],
 				filter_config->ctrl_filter[2],
 				filter_config->ctrl_filter[3]);
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
-				"data filter fp %02X md %02X mo %02X fpmo %02X",
+				"data filter fp 0x%02X md 0x%02X mo %0x02X fpmo 0x%02X",
 				filter_config->data_filter[0],
 				filter_config->data_filter[1],
 				filter_config->data_filter[2],
 				filter_config->data_filter[3]);
 		lite_mon_printf(LITE_MON_TRACE_DEBUG,
-				"len mgmt %02X ctrl %02X data %02X",
+				"len mgmt 0x%02X ctrl 0x%02X data 0x%02X",
 				filter_config->len[0],
 				filter_config->len[1],
 				filter_config->len[2]);
@@ -742,6 +747,7 @@ int main(int argc, char *argv[])
 	struct lite_mon_config mon_config = {0};
 	struct socket_context sock_ctx = {0};
 	const char *ifname = argv[1];
+	int filter_input = 0;
 
 	/* Set default debug level to INFO */
 	debug_level = LITE_MON_TRACE_INFO;
@@ -794,6 +800,7 @@ int main(int argc, char *argv[])
 			cmd_bitmask |= LITE_MON_SANITY_NOT_NEEDED;
 			break;
 		case 'p': /* filter_fp */
+			filter_input = 1;
 			cmd_bitmask |= LITE_MON_SET_FILTER_MASK;
 			filter = strtoul(optarg, NULL, 0);
 			lite_mon_fill_fil_value(&mon_config.data.filter_config,
@@ -801,6 +808,7 @@ int main(int argc, char *argv[])
 						LITE_MON_MODE_FILTER_FP);
 			break;
 		case 'm': /* filter_md */
+			filter_input = 1;
 			cmd_bitmask |= LITE_MON_SET_FILTER_MASK;
 			filter = strtoul(optarg, NULL, 0);
 			lite_mon_fill_fil_value(&mon_config.data.filter_config,
@@ -808,6 +816,7 @@ int main(int argc, char *argv[])
 						LITE_MON_MODE_FILTER_MD);
 			break;
 		case 'o': /* filter_mo */
+			filter_input = 1;
 			cmd_bitmask |= LITE_MON_SET_FILTER_MASK;
 			filter = strtoul(optarg, NULL, 0);
 			lite_mon_fill_fil_value(&mon_config.data.filter_config,
@@ -815,6 +824,7 @@ int main(int argc, char *argv[])
 						LITE_MON_MODE_FILTER_MO);
 			break;
 		case 'f': /* filter_fpmo */
+			filter_input = 1;
 			cmd_bitmask |= LITE_MON_SET_FILTER_MASK;
 			filter = strtoul(optarg, NULL, 0);
 			lite_mon_fill_fil_value(&mon_config.data.filter_config,
@@ -888,7 +898,7 @@ int main(int argc, char *argv[])
 		}
 	}
 	lite_mon_set_cmdtype(&mon_config, cmd_bitmask);
-	lite_mon_set_defaults(&mon_config);
+	lite_mon_set_defaults(&mon_config, filter_input);
 	if (!(cmd_bitmask & LITE_MON_SANITY_NOT_NEEDED)) {
 		switch (mon_config.cmdtype) {
 		case LITE_MON_SET_FILTER:
