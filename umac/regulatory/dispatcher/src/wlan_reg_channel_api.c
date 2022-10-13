@@ -315,3 +315,8 @@ wlan_reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
 	return reg_get_power_from_afc_list(pdev, freq, reg_eirp, reg_psd);
 }
 #endif
+
+bool wlan_reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev)
+{
+	return reg_is_6g_domain_jp(pdev);
+}

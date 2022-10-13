@@ -1511,3 +1511,20 @@ reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+bool reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	if (!pdev) {
+		reg_err_rl("invalid pdev");
+		return false;
+	}
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err_rl("reg pdev priv obj is NULL");
+		return false;
+	}
+	return pdev_priv_obj->reg_6g_superid == MKK1_6G_0B;
+}
