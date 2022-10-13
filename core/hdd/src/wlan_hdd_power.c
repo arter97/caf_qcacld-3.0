@@ -1417,9 +1417,15 @@ void hdd_svc_fw_shutdown_ind(struct device *dev)
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
-	hdd_ctx ? wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
+	if (!hdd_ctx) {
+		hdd_err("HDD context is Null");
+		return;
+	}
+
+	hdd_ctx->ssr_src = WLAN_HDD_SSR_SRC_FW_CRASH;
+	wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
 					      WLAN_SVC_FW_SHUTDOWN_IND,
-					      NULL, 0) : 0;
+					      NULL, 0);
 }
 
 /**
@@ -1460,6 +1466,15 @@ QDF_STATUS hdd_wlan_shutdown(void)
 	if (!hdd_ctx) {
 		hdd_err("HDD context is Null");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	/* When ssr is caused by FW crash, the ind should already be sent */
+	if (hdd_ctx->ssr_src != WLAN_HDD_SSR_SRC_FW_CRASH) {
+		/* send ssr start ind to user space */
+		wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
+						      WLAN_SVC_FW_SHUTDOWN_IND,
+						      NULL, 0);
+		hdd_ctx->ssr_src = WLAN_HDD_SSR_SRC_DEFAULT;
 	}
 
 	hdd_set_connection_in_progress(false);
@@ -1660,6 +1675,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 	wlan_hdd_send_svc_nlink_msg(hdd_ctx->radio_index,
 				WLAN_SVC_FW_CRASHED_IND, NULL, 0);
 
+	hdd_ctx->ssr_src = WLAN_HDD_SSR_SRC_DEFAULT;
 	/* Restart all adapters */
 	hdd_start_all_adapters(hdd_ctx);
 
