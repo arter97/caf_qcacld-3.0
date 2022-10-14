@@ -1788,6 +1788,23 @@ qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf)
 	return parent;
 }
 
+#ifdef DP_RX_SG_FRAME_SUPPORT
+/**
+ * dp_rx_is_sg_supported() - SG packets processing supported or not.
+ *
+ * Return: returns true when processing is supported else false.
+ */
+bool dp_rx_is_sg_supported(void)
+{
+	return true;
+}
+#else
+bool dp_rx_is_sg_supported(void)
+{
+	return false;
+}
+#endif
+
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
 #ifdef QCA_PEER_EXT_STATS
