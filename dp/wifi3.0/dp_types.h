@@ -1961,6 +1961,8 @@ struct dp_arch_ops {
 				     uint16_t peer_id);
 	void (*dp_partner_chips_unmap)(struct dp_soc *soc,
 				       uint16_t peer_id);
+
+	void (*dp_txrx_ppeds_rings_status)(struct dp_soc *soc);
 };
 
 /**
