@@ -351,11 +351,11 @@ static inline void
 log_to_console(QDF_TRACE_LEVEL level, const char *timestamp, const char *msg)
 {
 	if (qdf_detected_excessive_logging()) {
-		qdf_rl_print_supressed_inc();
+		qdf_rl_print_suppressed_inc();
 		return;
 	}
 
-	qdf_rl_print_supressed_log();
+	qdf_rl_print_suppressed_log();
 	pr_err("%s %s\n", timestamp, msg);
 }
 #else
