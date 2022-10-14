@@ -17,6 +17,11 @@
 #ifndef _DP_PPEDS_H_
 #define _DP_PPEDS_H_
 
+struct dp_ppe_ds_idxs {
+	uint32_t ppe2tcl_start_idx;
+	uint32_t reo2ppe_start_idx;
+};
+
 /**
  * dp_ppeds_init_ppe_vp_tbl_be - Attach ppeds soc instance
  * @be_soc: BE SoC
@@ -65,7 +70,7 @@ QDF_STATUS dp_ppeds_deinit_soc_be(struct dp_soc *soc);
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc);
+QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc, struct dp_ppe_ds_idxs *idx);
 
 /**
  * dp_ppeds_start_soc_be - Starts ppeds txrx

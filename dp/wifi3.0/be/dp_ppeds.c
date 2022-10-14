@@ -1181,12 +1181,14 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 /**
  * dp_ppeds_register_soc_be() - Register the PPE-DS instance
  * @be_soc: BE SoC
+ * @idx: ppeds indices
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc)
+QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc,
+				    struct dp_ppe_ds_idxs *idx)
 {
-	struct ppeds_wlan_reg_info reg_info;
+	struct ppeds_wlan_reg_info reg_info = {0};
 	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
 
 	if (!be_soc->ppeds_handle) {
@@ -1203,12 +1205,11 @@ QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc)
 		return QDF_STATUS_SUCCESS;
 	}
 
-	/*
-	 * Implicit tx to tx complete mapping for PPE2TCL ring
-	 */
-	hal_tx_config_rbm_mapping_be(soc->hal_soc,
-				     be_soc->ppe2tcl_ring.hal_srng,
-				     WBM2_SW_PPE_REL_MAP_ID);
+	idx->ppe2tcl_start_idx = reg_info.ppe2tcl_start_idx;
+	idx->reo2ppe_start_idx = reg_info.reo2ppe_start_idx;
+
+	dp_info("ppe2tcl_start_idx %d reo2ppe_start_idx %d\n",
+		idx->ppe2tcl_start_idx, idx->reo2ppe_start_idx);
 
 	return QDF_STATUS_SUCCESS;
 }
