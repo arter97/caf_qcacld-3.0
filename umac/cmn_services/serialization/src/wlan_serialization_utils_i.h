@@ -150,17 +150,13 @@ enum serialization_vdev_queue_type {
  * enum wlan_serialization_match_type - Comparison options for a command
  * @WLAN_SER_MATCH_VDEV: Compare vdev
  * @WLAN_SER_MATCH_PDEV: Compare pdev
- * @WLAN_SER_MATCH_CMD_TYPE: Compare command type
  * @WLAN_SER_MATCH_CMD_TYPE_VDEV: Compare command type and vdev
- * @WLAN_SER_MATCH_CMD_ID: Compare command id
  * @WLAN_SER_MATCH_CMD_ID_VDEV: Compare command id and vdev
  */
 enum wlan_serialization_match_type {
 	WLAN_SER_MATCH_VDEV,
 	WLAN_SER_MATCH_PDEV,
-	WLAN_SER_MATCH_CMD_TYPE,
 	WLAN_SER_MATCH_CMD_TYPE_VDEV,
-	WLAN_SER_MATCH_CMD_ID,
 	WLAN_SER_MATCH_CMD_ID_VDEV,
 	WLAN_SER_MATCH_MAX,
 };
