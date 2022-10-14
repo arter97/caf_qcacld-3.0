@@ -202,7 +202,7 @@ struct channel_info {
  * @rsnxe: Pointer to rsnxe IE
  * @ehtcap: pointer to ehtcap ie
  * @ehtop: pointer to eht op ie
- * @multi_link: pointer to multi link IE
+ * @multi_link_bv: pointer to multi link basic variant IE
  * @bwnss_map: pointer to NSS map IE
  * @secchanoff: pointer to secondary chan IE
  * @mdie: pointer to md IE
@@ -269,7 +269,7 @@ struct ie_list {
 	uint8_t *ehtop;
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
-	uint8_t *multi_link;
+	uint8_t *multi_link_bv;
 #endif
 	uint8_t *qcn;
 

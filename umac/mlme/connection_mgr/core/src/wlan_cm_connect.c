@@ -471,7 +471,7 @@ static void cm_update_vdev_mlme_macaddr(struct cnx_mgr *cm_ctx,
 	if (!eht_capab)
 		return;
 
-	if (req->cur_candidate->entry->ie_list.multi_link) {
+	if (req->cur_candidate->entry->ie_list.multi_link_bv) {
 		wlan_vdev_obj_lock(cm_ctx->vdev);
 		/* Use link address for ML connection */
 		wlan_vdev_mlme_set_macaddr(cm_ctx->vdev,
@@ -544,7 +544,7 @@ static void
 cm_candidate_mlo_update(struct scan_cache_entry *scan_entry,
 			struct validate_bss_data *validate_bss_info)
 {
-	validate_bss_info->is_mlo = !!scan_entry->ie_list.multi_link;
+	validate_bss_info->is_mlo = !!scan_entry->ie_list.multi_link_bv;
 	validate_bss_info->scan_entry = scan_entry;
 }
 #else

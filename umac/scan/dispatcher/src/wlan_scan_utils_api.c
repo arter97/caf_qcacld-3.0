@@ -1155,7 +1155,7 @@ static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
 				  struct extn_ie_header *extn_ie)
 {
 	if (extn_ie->ie_extn_id == WLAN_EXTN_ELEMID_MULTI_LINK)
-		scan_params->ie_list.multi_link = (uint8_t *)extn_ie;
+		scan_params->ie_list.multi_link_bv = (uint8_t *)extn_ie;
 }
 #else
 static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
@@ -2111,9 +2111,9 @@ static uint8_t util_get_link_info_offset(uint8_t *ml_ie)
 	return 0;
 }
 
-static void util_get_partner_link_info(struct scan_cache_entry *scan_entry)
+static void util_get_ml_bv_partner_link_info(struct scan_cache_entry *scan_entry)
 {
-	uint8_t *ml_ie = scan_entry->ie_list.multi_link;
+	uint8_t *ml_ie = scan_entry->ie_list.multi_link_bv;
 	uint8_t offset = util_get_link_info_offset(ml_ie);
 	uint16_t sta_ctrl;
 	uint8_t *stactrl_offset = NULL, *ielist_offset;
@@ -2228,13 +2228,12 @@ static void util_get_partner_link_info(struct scan_cache_entry *scan_entry)
 
 static void util_scan_update_ml_info(struct scan_cache_entry *scan_entry)
 {
-	uint8_t *ml_ie = scan_entry->ie_list.multi_link;
+	uint8_t *ml_ie = scan_entry->ie_list.multi_link_bv;
 	uint16_t multi_link_ctrl;
 	uint8_t offset;
 
-	if (!scan_entry->ie_list.multi_link) {
+	if (!scan_entry->ie_list.multi_link_bv)
 		return;
-	}
 
 	multi_link_ctrl = *(uint16_t *)(ml_ie + ML_CONTROL_OFFSET);
 
@@ -2260,7 +2259,7 @@ static void util_scan_update_ml_info(struct scan_cache_entry *scan_entry)
 	if (multi_link_ctrl & CMN_INFO_LINK_ID_PRESENT_BIT)
 		scan_entry->ml_info.self_link_id = ml_ie[offset] & 0x0F;
 
-	util_get_partner_link_info(scan_entry);
+	util_get_ml_bv_partner_link_info(scan_entry);
 }
 #else
 static void util_scan_update_ml_info(struct scan_cache_entry *scan_entry)

@@ -740,7 +740,8 @@ util_scan_copy_beacon_data(struct scan_cache_entry *new_entry,
 	ie_lst->ehtop = conv_ptr(ie_lst->ehtop, old_ptr, new_ptr);
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
-	ie_lst->multi_link = conv_ptr(ie_lst->multi_link, old_ptr, new_ptr);
+	ie_lst->multi_link_bv =
+			conv_ptr(ie_lst->multi_link_bv, old_ptr, new_ptr);
 #endif
 	ie_lst->qcn = conv_ptr(ie_lst->qcn, old_ptr, new_ptr);
 

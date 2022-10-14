@@ -1700,7 +1700,7 @@ static enum MLO_TYPE  cm_bss_mlo_type(struct wlan_objmgr_psoc *psoc,
 	bool multi_link = false;
 
 	mlo_link_num = cm_get_sta_mlo_conn_max_num(psoc);
-	if (!entry->ie_list.multi_link)
+	if (!entry->ie_list.multi_link_bv)
 		return SLO;
 	else if (!entry->ml_info.num_links)
 		return SLO;

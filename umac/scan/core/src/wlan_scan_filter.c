@@ -699,7 +699,7 @@ static bool util_mlo_filter_match(struct wlan_objmgr_pdev *pdev,
 	struct partner_link_info *partner_link;
 	bool is_disabled;
 
-	if (!db_entry->ie_list.multi_link)
+	if (!db_entry->ie_list.multi_link_bv)
 		return true;
 	if (!filter->band_bitmap)
 		return true;
