@@ -566,6 +566,8 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, struct dp_intr *int_ctx,
 				dp_rx_mon_update_scan_spcl_vap_stats(pdev,
 								     ppdu_info);
 
+			dp_rx_mon_update_user_ctrl_frame_stats(pdev, ppdu_info);
+
 			/*
 			* if chan_num is not fetched correctly from ppdu RX TLV,
 			 * get it from pdev saved.

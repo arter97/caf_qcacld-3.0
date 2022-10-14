@@ -1876,6 +1876,9 @@ struct cdp_delayed_tx_completion_ppdu_user {
  * @mpdu_bytes: accumulated bytes per mpdu for mem limit feature
  * @punc_mode: puncutured mode to indicate punctured bw
  * @punc_pattern_bitmap: bitmap indicating punctured pattern
+ * @mprot_type: medium protection type
+ * @rts_success: rts success
+ * @rts failure: rts failure
  */
 struct cdp_tx_completion_ppdu_user {
 	uint32_t completion_status:8,
@@ -1981,6 +1984,9 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t mpdu_bytes;
 	uint8_t punc_mode;
 	uint16_t punc_pattern_bitmap;
+	uint8_t mprot_type:3,
+		rts_success:1,
+		rts_failure:1;
 };
 
 /**

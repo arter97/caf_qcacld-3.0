@@ -1644,6 +1644,8 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 		else if (dp_cfr_rcc_mode_status(pdev) && ppdu_info)
 			dp_rx_handle_cfr(soc, pdev, ppdu_info);
 
+		dp_rx_mon_update_user_ctrl_frame_stats(pdev, ppdu_info);
+
 		status = dp_rx_mon_add_ppdu_info_to_wq(pdev, ppdu_info);
 		if (status != QDF_STATUS_SUCCESS) {
 			if (ppdu_info)

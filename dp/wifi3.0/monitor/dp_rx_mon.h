@@ -366,6 +366,25 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 }
 #endif /* QCA_ENHANCED_STATS_SUPPORT */
 
+#ifdef WLAN_SUPPORT_CTRL_FRAME_STATS
+/**
+ * dp_rx_mon_update_user_ctrl_frame_stats() - Function to update Rx control
+ * frame stats per user.
+ * @pdev: DP Pdev Pointer
+ * @ppdu_info: HAL Rx PPDU info Pointer
+ *
+ * Return: None
+ */
+void dp_rx_mon_update_user_ctrl_frame_stats(struct dp_pdev *pdev,
+					    struct hal_rx_ppdu_info *ppdu_info);
+#else
+static inline void
+dp_rx_mon_update_user_ctrl_frame_stats(struct dp_pdev *pdev,
+				       struct hal_rx_ppdu_info *ppdu_info)
+{
+}
+#endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
+
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
 /**
  * dp_rx_handle_ppdu_undecoded_metadata() - Allocate and deliver ppdu info

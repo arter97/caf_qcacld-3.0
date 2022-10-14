@@ -3825,6 +3825,10 @@ struct dp_peer_per_pkt_tx_stats {
  * @su_be_ppdu_cnt: SU Tx packet count for 11BE
  * @mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX]: MU Tx packet count for 11BE
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured bw
+ * @rts_success: RTS success count
+ * @rts_failure: RTS failure count
+ * @bar_cnt: Block ACK Request frame count
+ * @ndpa_cnt: NDP announcement frame count
  */
 struct dp_peer_extd_tx_stats {
 	uint32_t stbc;
@@ -3877,6 +3881,10 @@ struct dp_peer_extd_tx_stats {
 	struct cdp_pkt_type mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX];
 	uint32_t punc_bw[MAX_PUNCTURED_MODE];
 #endif
+	uint32_t rts_success;
+	uint32_t rts_failure;
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 /**
@@ -3992,6 +4000,8 @@ struct dp_peer_per_pkt_rx_stats {
  * @su_be_ppdu_cnt: SU Rx packet count for BE
  * @mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX]: MU rx packet count for BE
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured bw
+ * @bar_cnt: Block ACK Request frame count
+ * @ndpa_cnt: NDP announcement frame count
  */
 struct dp_peer_extd_rx_stats {
 	struct cdp_pkt_type pkt_type[DOT11_MAX];
@@ -4037,6 +4047,8 @@ struct dp_peer_extd_rx_stats {
 	struct cdp_pkt_type mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX];
 	uint32_t punc_bw[MAX_PUNCTURED_MODE];
 #endif
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 /**

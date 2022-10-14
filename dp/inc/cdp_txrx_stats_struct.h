@@ -1426,6 +1426,10 @@ struct protocol_trace_count {
  * @release_src_not_tqm: Counter to keep track of release source is not TQM
  *			 in TX completion status processing
  * @per: Packet error ratio
+ * @rts_success: RTS success count
+ * @rts_failure: RTS failure count
+ * @bar_cnt: Block ACK Request frame count
+ * @ndpa_cnt: NDP announcement frame count
  */
 struct cdp_tx_stats {
 	struct cdp_pkt_info comp_pkt;
@@ -1545,6 +1549,10 @@ struct cdp_tx_stats {
 #endif
 	uint32_t release_src_not_tqm;
 	uint32_t per;
+	uint32_t rts_success;
+	uint32_t rts_failure;
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 /* struct cdp_rx_stats - rx Level Stats
@@ -1634,6 +1642,8 @@ struct cdp_tx_stats {
  * @su_be_ppdu_cnt: SU Rx packet count for BE
  * @mu_be_ppdu_cnt: MU rx packet count for BE
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured BW
+ * @bar_cnt: Block ACK Request frame count
+ * @ndpa_cnt: NDP announcement frame count
  */
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
@@ -1723,6 +1733,8 @@ struct cdp_rx_stats {
 	uint32_t punc_bw[MAX_PUNCTURED_MODE];
 #endif
 	uint32_t mcast_3addr_drop;
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 /* struct cdp_tx_ingress_stats - Tx ingress Stats

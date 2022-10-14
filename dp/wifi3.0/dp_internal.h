@@ -1924,6 +1924,10 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		_tgtobj->tx.retries_mpdu += _srcobj->tx.retries_mpdu; \
 		_tgtobj->tx.mpdu_success_with_retries += \
 					_srcobj->tx.mpdu_success_with_retries; \
+		_tgtobj->tx.rts_success = _srcobj->tx.rts_success; \
+		_tgtobj->tx.rts_failure = _srcobj->tx.rts_failure; \
+		_tgtobj->tx.bar_cnt = _srcobj->tx.bar_cnt; \
+		_tgtobj->tx.ndpa_cnt = _srcobj->tx.ndpa_cnt; \
 		for (pream_type = 0; pream_type < DOT11_MAX; pream_type++) { \
 			for (i = 0; i < MAX_MCS; i++) \
 				_tgtobj->tx.pkt_type[pream_type].mcs_count[i] += \
@@ -1985,6 +1989,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		_tgtobj->rx.gi_info = _srcobj->rx.gi_info; \
 		_tgtobj->rx.preamble_info = _srcobj->rx.preamble_info; \
 		_tgtobj->rx.mpdu_retry_cnt += _srcobj->rx.mpdu_retry_cnt; \
+		_tgtobj->rx.bar_cnt = _srcobj->rx.bar_cnt; \
+		_tgtobj->rx.ndpa_cnt = _srcobj->rx.ndpa_cnt; \
 		for (pream_type = 0; pream_type < DOT11_MAX; pream_type++) { \
 			for (i = 0; i < MAX_MCS; i++) { \
 				_tgtobj->rx.pkt_type[pream_type].mcs_count[i] += \

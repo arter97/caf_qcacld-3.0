@@ -3471,6 +3471,11 @@ static void dp_process_ppdu_stats_user_cmpltn_common_tlv(
 		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_RTS_SUCCESS_GET(*tag_buf);
 	ppdu_desc->rts_failure =
 		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_RTS_FAILURE_GET(*tag_buf);
+
+	ppdu_user_desc->mprot_type = ppdu_desc->mprot_type;
+	ppdu_user_desc->rts_success = ppdu_desc->rts_success;
+	ppdu_user_desc->rts_failure = ppdu_desc->rts_failure;
+
 	ppdu_user_desc->pream_punct =
 		HTT_PPDU_STATS_USER_CMPLTN_COMMON_TLV_PREAM_PUNC_TX_GET(*tag_buf);
 
@@ -4112,6 +4117,7 @@ void dp_ppdu_desc_user_airtime_consumption_update(
 			struct cdp_tx_completion_ppdu_user *user)
 { }
 #endif
+
 #if defined(WLAN_ATF_ENABLE) || defined(WLAN_TELEMETRY_STATS_SUPPORT)
 static void
 dp_ppdu_desc_user_phy_tx_time_update(struct dp_pdev *pdev,
@@ -4163,6 +4169,46 @@ dp_ppdu_desc_user_phy_tx_time_update(struct dp_pdev *pdev,
 {
 }
 #endif
+
+#ifdef WLAN_SUPPORT_CTRL_FRAME_STATS
+static void
+dp_tx_ctrl_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
+			struct cdp_tx_completion_ppdu_user *user)
+{
+	struct dp_mon_peer *mon_peer = NULL;
+	uint16_t fc = 0;
+
+	if (!pdev || !peer || !user)
+		return;
+
+	mon_peer = peer->monitor_peer;
+	if (qdf_unlikely(!mon_peer))
+		return;
+
+	if (user->mprot_type) {
+		DP_STATS_INCC(mon_peer,
+			      tx.rts_success, 1, user->rts_success);
+		DP_STATS_INCC(mon_peer,
+			      tx.rts_failure, 1, user->rts_failure);
+	}
+	fc = user->frame_ctrl;
+	if ((qdf_cpu_to_le16(fc) & QDF_IEEE80211_FC0_TYPE_MASK) ==
+	    QDF_IEEE80211_FC0_TYPE_CTL) {
+		if ((qdf_cpu_to_le16(fc) & QDF_IEEE80211_FC0_SUBTYPE_MASK) ==
+		    QDF_IEEE80211_FC0_SUBTYPE_VHT_NDP_AN)
+			DP_STATS_INC(mon_peer, tx.ndpa_cnt, 1);
+		if ((qdf_cpu_to_le16(fc) & QDF_IEEE80211_FC0_SUBTYPE_MASK) ==
+		    QDF_IEEE80211_FC0_SUBTYPE_BAR)
+			DP_STATS_INC(mon_peer, tx.bar_cnt, 1);
+	}
+}
+#else
+static void
+dp_tx_ctrl_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
+			struct cdp_tx_completion_ppdu_user *user)
+{
+}
+#endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
 
 /**
  * dp_ppdu_desc_user_stats_update(): Function to update TX user stats
@@ -4226,6 +4272,9 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 
 		dp_ppdu_desc_user_phy_tx_time_update(pdev, peer, ppdu_desc,
 						     &ppdu_desc->user[i]);
+
+		dp_tx_ctrl_stats_update(pdev, peer, &ppdu_desc->user[i]);
+
 		/*
 		 * different frame like DATA, BAR or CTRL has different
 		 * tlv bitmap expected. Apart from ACK_BA_STATUS TLV, we

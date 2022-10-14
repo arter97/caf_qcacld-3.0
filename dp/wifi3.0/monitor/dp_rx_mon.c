@@ -2036,3 +2036,42 @@ dp_mon_rx_stats_update_rssi_dbm_params(struct dp_mon_pdev *mon_pdev,
 	ppdu_info->rx_status.rssi_dbm_conv_support =
 				mon_pdev->rssi_dbm_conv_support;
 }
+
+#ifdef WLAN_SUPPORT_CTRL_FRAME_STATS
+void dp_rx_mon_update_user_ctrl_frame_stats(struct dp_pdev *pdev,
+					    struct hal_rx_ppdu_info *ppdu_info)
+{
+	struct dp_peer *peer;
+	struct dp_mon_peer *mon_peer;
+	struct dp_soc *soc = pdev->soc;
+	uint16_t fc, sw_peer_id;
+	uint8_t i;
+
+	if (qdf_unlikely(!ppdu_info))
+		return;
+
+	fc = ppdu_info->nac_info.frame_control;
+	if (qdf_likely((qdf_cpu_to_le16(fc) & QDF_IEEE80211_FC0_TYPE_MASK) !=
+	    QDF_IEEE80211_FC0_TYPE_CTL))
+		return;
+
+	for (i = 0; i < ppdu_info->com_info.num_users; i++) {
+		sw_peer_id = ppdu_info->rx_user_status[i].sw_peer_id;
+		peer = dp_peer_get_ref_by_id(soc, sw_peer_id,
+					     DP_MOD_ID_RX_PPDU_STATS);
+		if (qdf_unlikely(!peer))
+			continue;
+		mon_peer = peer->monitor_peer;
+		if (qdf_unlikely(!mon_peer)) {
+			dp_peer_unref_delete(peer, DP_MOD_ID_RX_PPDU_STATS);
+			continue;
+		}
+		DP_STATS_INCC(mon_peer, rx.ndpa_cnt, 1,
+			      ppdu_info->ctrl_frm_info[i].ndpa);
+		DP_STATS_INCC(mon_peer, rx.bar_cnt, 1,
+			      ppdu_info->ctrl_frm_info[i].bar);
+
+		dp_peer_unref_delete(peer, DP_MOD_ID_RX_PPDU_STATS);
+	}
+}
+#endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
