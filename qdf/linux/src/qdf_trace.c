@@ -3650,7 +3650,7 @@ static qdf_time_t __log_window_end;
 static qdf_atomic_t __log_window_count;
 uint32_t qdf_rl_print_count = WLAN_MAX_LOGS_PER_SEC;
 uint32_t qdf_rl_print_time = 1;
-uint32_t qdf_rl_print_supressed;
+uint32_t qdf_rl_print_suppressed;
 
 /**
  * qdf_detected_excessive_logging() - Excessive logging detected
@@ -3699,32 +3699,32 @@ void qdf_rl_print_time_set(uint32_t rl_print_time)
 
 qdf_export_symbol(qdf_rl_print_time_set);
 
-void qdf_rl_print_supressed_log(void)
+void qdf_rl_print_suppressed_log(void)
 {
-	if (qdf_rl_print_supressed) {
+	if (qdf_rl_print_suppressed) {
 		pr_err("QDF Ratelimiting: %d prints suppressed",
-		       qdf_rl_print_supressed);
-		qdf_rl_print_supressed = 0;
+		       qdf_rl_print_suppressed);
+		qdf_rl_print_suppressed = 0;
 	}
 }
 
-void qdf_rl_print_supressed_inc(void)
+void qdf_rl_print_suppressed_inc(void)
 {
-	qdf_rl_print_supressed++;
+	qdf_rl_print_suppressed++;
 }
 #else
-#define qdf_rl_print_supressed_log()
-#define qdf_rl_print_supressed_inc()
+#define qdf_rl_print_suppressed_log()
+#define qdf_rl_print_suppressed_inc()
 #endif /* WLAN_MAX_LOGS_PER_SEC */
 
 #ifdef QDF_TRACE_PRINT_ENABLE
 static inline void print_to_console(char *str_buffer)
 {
 	if (qdf_in_interrupt() && qdf_detected_excessive_logging()) {
-		qdf_rl_print_supressed_inc();
+		qdf_rl_print_suppressed_inc();
 		return;
 	}
-	qdf_rl_print_supressed_log();
+	qdf_rl_print_suppressed_log();
 	pr_err("%s\n", str_buffer);
 }
 #else
