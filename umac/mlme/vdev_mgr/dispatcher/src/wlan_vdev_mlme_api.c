@@ -27,8 +27,6 @@
 #include <include/wlan_mlme_cmn.h>
 #include <qdf_module.h>
 #include "wlan_objmgr_vdev_obj.h"
-#include "wlan_policy_mgr_api.h"
-#include "wlan_policy_mgr_i.h"
 
 struct vdev_mlme_obj *wlan_vdev_mlme_get_cmpt_obj(struct wlan_objmgr_vdev *vdev)
 {
