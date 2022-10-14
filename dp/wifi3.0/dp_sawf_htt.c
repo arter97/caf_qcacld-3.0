@@ -428,6 +428,7 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef CONFIG_SAWF_STATS
 QDF_STATUS
 dp_sawf_htt_h2t_mpdu_stats_req(struct htt_soc *soc,
 			       uint8_t stats_type, uint8_t enable,
@@ -627,3 +628,31 @@ dp_sawf_htt_mpdu_stats_handler(struct htt_soc *soc,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+QDF_STATUS
+dp_sawf_htt_h2t_mpdu_stats_req(struct htt_soc *soc,
+			       uint8_t stats_type, uint8_t enable,
+			       uint32_t config_param0,
+			       uint32_t config_param1,
+			       uint32_t config_param2,
+			       uint32_t config_param3)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static void dp_sawf_htt_gen_mpdus_tlv(struct dp_soc *soc, uint8_t *tlv_buf)
+{
+}
+
+static void dp_sawf_htt_gen_mpdus_details_tlv(struct dp_soc *soc,
+					      uint8_t *tlv_buf)
+{
+}
+
+QDF_STATUS
+dp_sawf_htt_mpdu_stats_handler(struct htt_soc *soc,
+			       qdf_nbuf_t htt_t2h_msg)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
