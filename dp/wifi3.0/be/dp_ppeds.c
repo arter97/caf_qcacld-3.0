@@ -383,6 +383,24 @@ static QDF_STATUS dp_ppeds_tx_desc_pool_init(struct dp_soc *soc)
 }
 
 /**
+ * dp_ppeds_tx_desc_clean_up() -  Clean up the ppeds tx dexcriptors
+ * @ctxt: context passed
+ * @elem: element to be cleaned up
+ * @elem_list: element list
+ *
+ */
+void dp_ppeds_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
+{
+	struct dp_soc *soc = (struct dp_soc *)ctxt;
+	struct dp_tx_desc_s *tx_desc = (struct dp_tx_desc_s *)elem;
+
+	if (tx_desc->nbuf) {
+		qdf_nbuf_free(tx_desc->nbuf);
+		dp_ppeds_tx_desc_free(soc, tx_desc);
+	}
+}
+
+/**
  * dp_ppeds_tx_desc_pool_cleanup() - PPE DS tx desc pool cleanup
  * @soc: SoC
  * @tx_desc_pool: TX desc pool
@@ -398,6 +416,13 @@ dp_ppeds_tx_desc_pool_cleanup(struct dp_soc_be *be_soc,
 	struct dp_spt_page_desc *page_desc;
 	int i = 0;
 	struct dp_hw_cookie_conversion_t *cc_ctx;
+	struct dp_ppe_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
+
+	if (pool)
+		qdf_tx_desc_pool_free_bufs(&be_soc->soc, &pool->desc_pages,
+					   pool->elem_size, pool->elem_count,
+					   true, &dp_ppeds_tx_desc_clean_up,
+					   NULL);
 
 	cc_ctx  = &be_soc->ppeds_tx_cc_ctx;
 
