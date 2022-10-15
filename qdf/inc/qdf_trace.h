@@ -708,10 +708,6 @@ static inline void qdf_rl_print_suppressed_log(void) {}
 static inline void qdf_rl_print_suppressed_inc(void) {}
 #endif /* WLAN_MAX_LOGS_PER_SEC */
 
-/* legacy misspelled names */
-#define qdf_rl_print_supressed_log qdf_rl_print_suppressed_log
-#define qdf_rl_print_supressed_inc qdf_rl_print_suppressed_inc
-
 #ifdef ENABLE_MTRACE_LOG
 /**
  * qdf_mtrace_log() - Logs a message tracepoint to DIAG
