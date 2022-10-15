@@ -388,6 +388,15 @@ wlan_reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				     uint16_t *reg_psd);
 
 /**
+ * reg_is_6g_domain_jp() - Check if current 6GHz regdomain is a JP domain
+ * or not.
+ * @pdev: Pointer to pdev.
+ *
+ * Return: true if 6GHz regdomain is a JP domain else false.
+ */
+bool wlan_reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev);
+
+/**
  * wlan_reg_get_reg_chan_list_based_on_freq() - Chan list returned  based on
  * freq
  * @pdev: Pointer to pdev.
