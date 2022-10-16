@@ -1098,6 +1098,10 @@
 		WLAN_CFG_RXDMA_REFILL_RING_SIZE, \
 		CFG_VALUE_OR_DEFAULT, "DP RXDMA refilll ring")
 
+#define CFG_DP_RXDMA_REFILL_LT_DISABLE \
+	CFG_INI_BOOL("dp_disable_rx_buf_low_threshold", false, \
+		     "Disable Low threshold interrupts for Rx Refill ring")
+
 #define CFG_DP_TX_DESC_LIMIT_0 \
 		CFG_INI_UINT("dp_tx_desc_limit_0", \
 		WLAN_CFG_TX_DESC_LIMIT_0_MIN, \
@@ -1790,6 +1794,7 @@
 		CFG(CFG_DP_REO_STATUS_RING) \
 		CFG(CFG_DP_RXDMA_BUF_RING) \
 		CFG(CFG_DP_RXDMA_REFILL_RING) \
+		CFG(CFG_DP_RXDMA_REFILL_LT_DISABLE) \
 		CFG(CFG_DP_TX_DESC_LIMIT_0) \
 		CFG(CFG_DP_TX_DESC_LIMIT_1) \
 		CFG(CFG_DP_TX_DESC_LIMIT_2) \

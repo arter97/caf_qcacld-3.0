@@ -207,6 +207,7 @@ struct wlan_srng_cfg {
  * @reo_cmd_ring: reo cmd ring size
  * @reo_status_ring: reo status ting size
  * @rxdma_refill_ring: rxdma refill ring size
+ * @rxdma_refill_lt_disable: rxdma refill low threshold disable
  * @rxdma_err_dst_ring: rxdma error destination ring size
  * @raw_mode_war: enable/disable raw mode war
  * @enable_data_stall_detection: enable/disable specific data stall detection
@@ -351,6 +352,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	int reo_cmd_ring;
 	int reo_status_ring;
 	int rxdma_refill_ring;
+	bool rxdma_refill_lt_disable;
 	int rxdma_err_dst_ring;
 	uint32_t per_pkt_trace;
 	bool raw_mode_war;
@@ -1508,6 +1510,15 @@ wlan_cfg_get_dp_soc_tx_sw_internode_queue(struct wlan_cfg_dp_soc_ctxt *cfg);
  */
 int
 wlan_cfg_get_dp_soc_rxdma_refill_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_soc_rxdma_refill_lt_disable - Get RxDMA refill LT status
+ * @wlan_cfg_soc_ctx
+ *
+ * Return: true if Low threshold disable else false
+ */
+bool
+wlan_cfg_get_dp_soc_rxdma_refill_lt_disable(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /*
  * wlan_cfg_get_dp_soc_rxdma_err_dst_ring_size - Get rxdma dst ring size
