@@ -1094,7 +1094,7 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 		mac_hw_ss = &snapshot_params
 				[MGMT_RX_REO_SHARED_SNAPSHOT_MAC_HW];
 		fw_forwarded_ss = &snapshot_params
-				[MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWADED];
+				[MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWARDED];
 		fw_consumed_ss = &snapshot_params
 				[MGMT_RX_REO_SHARED_SNAPSHOT_FW_CONSUMED];
 
@@ -1110,7 +1110,7 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 
 		desc->shared_snapshots[link][MGMT_RX_REO_SHARED_SNAPSHOT_MAC_HW] =
 								*mac_hw_ss;
-		desc->shared_snapshots[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWADED] =
+		desc->shared_snapshots[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWARDED] =
 								*fw_forwarded_ss;
 		desc->shared_snapshots[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_CONSUMED] =
 								*fw_consumed_ss;
@@ -1809,7 +1809,7 @@ mgmt_rx_reo_debug_print_egress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 		for (link = 0; link < MAX_MLO_LINKS; link++) {
 			char mac_hw[MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
 			char fw_consumed[MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
-			char fw_forwaded[MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
+			char fw_forwarded[MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
 			char host[MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
 			struct mgmt_rx_reo_snapshot_params *mac_hw_ss;
 			struct mgmt_rx_reo_snapshot_params *fw_consumed_ss;
@@ -1821,7 +1821,7 @@ mgmt_rx_reo_debug_print_egress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 			fw_consumed_ss = &info->shared_snapshots
 				[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_CONSUMED];
 			fw_forwarded_ss = &info->shared_snapshots
-				[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWADED];
+				[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWARDED];
 			host_ss = &info->host_snapshot[link];
 
 			snprintf(mac_hw, sizeof(mac_hw), "(%1u, %5u, %10u)",
@@ -1832,7 +1832,7 @@ mgmt_rx_reo_debug_print_egress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 				 fw_consumed_ss->valid,
 				 fw_consumed_ss->mgmt_pkt_ctr,
 				 fw_consumed_ss->global_timestamp);
-			snprintf(fw_forwaded, sizeof(fw_forwaded),
+			snprintf(fw_forwarded, sizeof(fw_forwarded),
 				 "(%1u, %5u, %10u)",
 				 fw_forwarded_ss->valid,
 				 fw_forwarded_ss->mgmt_pkt_ctr,
@@ -1843,7 +1843,7 @@ mgmt_rx_reo_debug_print_egress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 				 host_ss->global_timestamp);
 			snprintf(snapshots[link], sizeof(snapshots[link]),
 				 "%22s, %22s, %22s, %22s", mac_hw, fw_consumed,
-				 fw_forwaded, host);
+				 fw_forwarded, host);
 		}
 
 		mgmt_rx_reo_alert_no_fl("|%3u|%5d|%4u|%5u|%10u|%11llu|%11llu|%11llu|%11llu|%5llu|%7llu|%5s|%4x|%69s|%69s|%94s|%94s|%94s|%94s|%94s|%94s|",
@@ -3186,7 +3186,7 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 		for (link = 0; link < MAX_MLO_LINKS; link++) {
 			char mac_hw[MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
 			char fw_consumed[MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
-			char fw_forwaded[MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
+			char fw_forwarded[MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
 			char host[MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE + 1] = {'\0'};
 			struct mgmt_rx_reo_snapshot_params *mac_hw_ss;
 			struct mgmt_rx_reo_snapshot_params *fw_consumed_ss;
@@ -3198,7 +3198,7 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 			fw_consumed_ss = &info->shared_snapshots
 				[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_CONSUMED];
 			fw_forwarded_ss = &info->shared_snapshots
-				[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWADED];
+				[link][MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWARDED];
 			host_ss = &info->host_snapshot[link];
 
 			snprintf(mac_hw, sizeof(mac_hw), "(%1u, %5u, %10u)",
@@ -3209,7 +3209,7 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 				 fw_consumed_ss->valid,
 				 fw_consumed_ss->mgmt_pkt_ctr,
 				 fw_consumed_ss->global_timestamp);
-			snprintf(fw_forwaded, sizeof(fw_forwaded),
+			snprintf(fw_forwarded, sizeof(fw_forwarded),
 				 "(%1u, %5u, %10u)",
 				 fw_forwarded_ss->valid,
 				 fw_forwarded_ss->mgmt_pkt_ctr,
@@ -3220,7 +3220,7 @@ mgmt_rx_reo_debug_print_ingress_frame_info(struct mgmt_rx_reo_context *reo_ctx,
 				 host_ss->global_timestamp);
 			snprintf(snapshots[link], sizeof(snapshots[link]),
 				 "%22s, %22s, %22s, %22s", mac_hw, fw_consumed,
-				 fw_forwaded, host);
+				 fw_forwarded, host);
 		}
 
 		mgmt_rx_reo_alert_no_fl("|%5u|%5d|%6u|%6x|%9x|%4u|%5u|%10u|%10u|%10u|%5u|%10lld|%11llu|%13s|%11llu|%4d|%3d|%69s|%70s|%70s|%70s|%70s|%70s|%70s|",
@@ -4161,7 +4161,7 @@ mgmt_rx_reo_sim_frame_handler_fw(void *arg)
 
 	snapshot_id = is_consumed_by_fw ?
 		      MGMT_RX_REO_SHARED_SNAPSHOT_FW_CONSUMED :
-		      MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWADED;
+		      MGMT_RX_REO_SHARED_SNAPSHOT_FW_FORWARDED;
 
 	snapshot_value = mgmt_rx_reo_sim_get_snapshot_value(
 					frame_hw->params.global_timestamp,
