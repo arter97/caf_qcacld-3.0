@@ -652,7 +652,7 @@ int hif_napi_event(struct hif_opaque_softc *hif_ctx, enum qca_napi_event event,
 	} /* switch denylist_pending */
 
 	/* we want to perform the comparison in lock:
-	 * there is a possiblity of hif_napi_event get called
+	 * there is a possibility of hif_napi_event get called
 	 * from two different contexts (driver unload and cpu hotplug
 	 * notification) and napid->state get changed
 	 * in driver unload context and can lead to race condition
