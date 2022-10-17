@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -100,8 +101,7 @@ lim_process_disassoc_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 	}
 
 	if (LIM_IS_STA_ROLE(pe_session) &&
-		((eLIM_SME_WT_DISASSOC_STATE == pe_session->limSmeState) ||
-		(eLIM_SME_WT_DEAUTH_STATE == pe_session->limSmeState))) {
+	    !lim_is_sb_disconnect_allowed(pe_session)) {
 		if (!(mac->lim.disassocMsgCnt & 0xF)) {
 			pe_debug("received Disassoc frame in %s"
 				"already processing previously received Disassoc frame, dropping this %d",
@@ -310,7 +310,7 @@ lim_process_disassoc_frame(struct mac_context *mac, uint8_t *pRxPacketInfo,
 
 		ap_info.retry_delay = 0;
 		ap_info.expected_rssi = frame_rssi +
-			wlan_blm_get_rssi_blacklist_threshold(mac->pdev);
+			wlan_dlm_get_rssi_denylist_threshold(mac->pdev);
 		qdf_mem_copy(ap_info.bssid.bytes, pHdr->sa, QDF_MAC_ADDR_SIZE);
 		ap_info.reject_reason = REASON_ASSOC_REJECT_POOR_RSSI;
 		ap_info.source = ADDED_BY_DRIVER;

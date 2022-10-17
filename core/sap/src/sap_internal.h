@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -138,9 +139,12 @@ struct sap_context {
 
 	/* Include the associations MAC addresses */
 	uint8_t self_mac_addr[CDS_MAC_ADDRESS_LEN];
-
+#ifndef SAP_CP_CLEANUP
 	/* Include the SME(CSR) context here */
 	struct csr_roam_profile csr_roamProfile;
+#else
+	struct start_bss_config sap_bss_cfg;
+#endif
 	uint32_t csr_roamId;
 
 	/* SAP event Callback to hdd */
@@ -231,6 +235,8 @@ struct sap_context {
 	uint8_t sap_sta_id;
 	bool dfs_cac_offload;
 	bool is_chan_change_inprogress;
+	/* Disabled mcs13 by sap or not */
+	bool disabled_mcs13;
 	qdf_list_t owe_pending_assoc_ind_list;
 	uint32_t freq_before_ch_switch;
 #ifdef WLAN_FEATURE_P2P_P2P_STA
@@ -241,6 +247,9 @@ struct sap_context {
 	bool is_forcescc_restart_required;
 #endif
 	qdf_freq_t candidate_freq;
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+	uint32_t restriction_mask;
+#endif
 };
 
 /*----------------------------------------------------------------------------
@@ -319,12 +328,14 @@ sap_signal_hdd_event(struct sap_context *sap_ctx,
 
 QDF_STATUS sap_fsm(struct sap_context *sap_ctx, struct sap_sm_event *sap_event);
 
+#ifndef SAP_CP_CLEANUP
 eSapStatus
 sapconvert_to_csr_profile(struct sap_config *config,
 			  eCsrRoamBssType bssType,
 			  struct csr_roam_profile *profile);
 
 void sap_free_roam_profile(struct csr_roam_profile *profile);
+#endif
 
 QDF_STATUS
 sap_is_peer_mac_allowed(struct sap_context *sap_ctx, uint8_t *peerMac);
@@ -497,4 +508,10 @@ bool
 sap_chan_bond_dfs_sub_chan(struct sap_context *sap_context,
 			   qdf_freq_t channel_freq,
 			   ePhyChanBondState bond_state);
+
+#ifdef SAP_CP_CLEANUP
+void
+sap_build_start_bss_config(struct start_bss_config *sap_bss_cfg,
+			   struct sap_config *config);
+#endif
 #endif

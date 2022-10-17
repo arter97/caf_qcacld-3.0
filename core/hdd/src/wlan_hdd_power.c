@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -574,11 +574,23 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	ns_req->trigger = trigger;
 	ns_req->count = 0;
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		goto free_req;
+	}
+
 	/* check if offload cache and send is required or not */
 	status = ucfg_pmo_ns_offload_check(psoc, trigger, adapter->vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("NS offload is not required");
-		goto free_req;
+		goto put_vdev;
+	}
+
+	if (ucfg_pmo_get_arp_ns_offload_dynamic_disable(vdev)) {
+		hdd_debug("Dynamic arp ns offload disabled");
+		ucfg_pmo_flush_ns_offload_req(vdev);
+		goto skip_cache_ns;
 	}
 
 	/* Unicast Addresses */
@@ -588,7 +600,7 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	if (errno) {
 		hdd_disable_ns_offload(adapter, trigger);
 		hdd_debug("Max supported addresses: disabling NS offload");
-		goto free_req;
+		goto put_vdev;
 	}
 
 	/* Anycast Addresses */
@@ -598,21 +610,17 @@ void hdd_enable_ns_offload(struct hdd_adapter *adapter,
 	if (errno) {
 		hdd_disable_ns_offload(adapter, trigger);
 		hdd_debug("Max supported addresses: disabling NS offload");
-		goto free_req;
+		goto put_vdev;
 	}
 
 	/* cache ns request */
 	status = ucfg_pmo_cache_ns_offload_req(ns_req);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_debug("Failed to cache ns request; status:%d", status);
-		goto free_req;
+		goto put_vdev;
 	}
 
-	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_POWER_ID);
-	if (!vdev) {
-		hdd_err("vdev is NULL");
-		goto free_req;
-	}
+skip_cache_ns:
 	/* enable ns request */
 	status = ucfg_pmo_enable_ns_offload_in_fwr(vdev, trigger);
 	if (QDF_IS_STATUS_ERROR(status)) {
@@ -1316,6 +1324,12 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 		goto put_vdev;
 	}
 
+	if (ucfg_pmo_get_arp_ns_offload_dynamic_disable(vdev)) {
+		hdd_debug("Dynamic arp ns offload disabled");
+		ucfg_pmo_flush_arp_offload_req(vdev);
+		goto skip_cache_arp;
+	}
+
 	ifa = hdd_get_ipv4_local_interface(adapter);
 	if (!ifa || !ifa->ifa_local) {
 		hdd_info("IP Address is not assigned");
@@ -1331,6 +1345,7 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 		goto put_vdev;
 	}
 
+skip_cache_arp:
 	status = ucfg_pmo_enable_arp_offload_in_fwr(vdev, trigger);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		hdd_err("failed arp offload config in fw; status:%d", status);
@@ -1636,8 +1651,6 @@ hdd_suspend_wlan(void)
 	QDF_STATUS status;
 	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
 	uint32_t conn_state_mask = 0;
-	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
-	cdp_config_param_type val = {0};
 
 	hdd_info("WLAN being suspended by OS");
 
@@ -1669,12 +1682,6 @@ hdd_suspend_wlan(void)
 		if (adapter->device_mode == QDF_STA_MODE)
 			status = hdd_enable_default_pkt_filters(adapter);
 
-		if (adapter->session.ap.disable_intrabss_fwd &&
-		    (adapter->device_mode == QDF_SAP_MODE ||
-		     adapter->device_mode == QDF_P2P_GO_MODE))
-			cdp_txrx_set_vdev_param(soc, adapter->vdev_id,
-						CDP_ENABLE_AP_BRIDGE, val);
-
 		/* Configure supported OffLoads */
 		hdd_enable_host_offloads(adapter, pmo_apps_suspend);
 		hdd_update_conn_state_mask(adapter, &conn_state_mask);
@@ -1705,8 +1712,6 @@ static int hdd_resume_wlan(void)
 	struct hdd_context *hdd_ctx;
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	QDF_STATUS status;
-	ol_txrx_soc_handle soc = cds_get_context(QDF_MODULE_ID_SOC);
-	cdp_config_param_type val = {0};
 
 	hdd_info("WLAN being resumed by OS");
 
@@ -1744,14 +1749,6 @@ static int hdd_resume_wlan(void)
 
 		if (adapter->device_mode == QDF_STA_MODE)
 			status = hdd_disable_default_pkt_filters(adapter);
-
-		if (adapter->session.ap.disable_intrabss_fwd &&
-		    (adapter->device_mode == QDF_SAP_MODE ||
-		     adapter->device_mode == QDF_P2P_GO_MODE)) {
-			val.cdp_vdev_param_ap_brdg_en = true;
-			cdp_txrx_set_vdev_param(soc, adapter->vdev_id,
-						CDP_ENABLE_AP_BRIDGE, val);
-		}
 
 		hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_RESUME_WLAN);
 	}
@@ -1820,7 +1817,6 @@ QDF_STATUS hdd_wlan_shutdown(void)
 		return QDF_STATUS_E_FAILURE;
 
 	hdd_set_connection_in_progress(false);
-	policy_mgr_clear_concurrent_session_count(hdd_ctx->psoc);
 
 	hdd_debug("Invoking packetdump deregistration API");
 	wlan_deregister_txrx_packetdump(OL_TXRX_PDEV_ID);
@@ -2265,6 +2261,18 @@ hdd_sched_scan_results(struct wiphy *wiphy, uint64_t reqid)
 }
 #endif
 
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+bool wlan_hdd_is_full_power_down_enable(struct hdd_context *hdd_ctx)
+{
+	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_FULL_POWER_DOWN) {
+		hdd_info_rl("Wlan full power down is enabled while suspend");
+		return true;
+	}
+
+	return false;
+}
+#endif
+
 /**
  * __wlan_hdd_cfg80211_resume_wlan() - cfg80211 resume callback
  * @wiphy: Pointer to wiphy
@@ -2301,6 +2309,12 @@ static int __wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 	if (ucfg_pmo_get_suspend_mode(hdd_ctx->psoc) == PMO_SUSPEND_NONE) {
 		hdd_info_rl("Suspend is not supported");
 		return -EINVAL;
+	}
+
+	if (wlan_hdd_is_full_power_down_enable(hdd_ctx)) {
+		hdd_debug("Driver has been re-initialized; Skipping resume");
+		exit_code = 0;
+		goto exit_with_code;
 	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
@@ -2452,10 +2466,10 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	struct hdd_adapter *adapter, *next_adapter = NULL;
 	mac_handle_t mac_handle;
 	struct wlan_objmgr_vdev *vdev;
-	enum pmo_suspend_mode mode;
 	int rc;
 	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_CFG80211_SUSPEND_WLAN;
 	struct hdd_hostapd_state *hapd_state;
+	enum pmo_suspend_mode suspend_mode;
 	struct csr_del_sta_params params = {
 		.peerMacAddr = QDF_MAC_ADDR_BCAST_INIT,
 		.reason_code = REASON_DEAUTH_NETWORK_LEAVING,
@@ -2472,21 +2486,32 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	}
 
 	rc = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != rc)
-		return rc;
+	if (0 != rc) {
+		if (pld_is_low_power_mode(hdd_ctx->parent_dev))
+			hdd_debug("low power mode (Deep Sleep/Hibernate)");
+		else
+			return rc;
+	}
+
+	suspend_mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
+	if (suspend_mode == PMO_SUSPEND_NONE) {
+		hdd_info_rl("Suspend is not supported");
+		return -EINVAL;
+	}
+
+	if (suspend_mode == PMO_SUSPEND_SHUTDOWN) {
+		hdd_info_rl("Shutdown WLAN in Suspend");
+		hdd_ctx->shutdown_in_suspend = true;
+		hdd_shutdown_wlan_in_suspend(hdd_ctx);
+		/* shutdown must be excute in active, so return -EAGAIN
+		 * to PM to exit and try again
+		 */
+		return -EAGAIN;
+	}
 
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
 		hdd_debug("Driver Modules not Enabled ");
 		return 0;
-	}
-
-	mode = ucfg_pmo_get_suspend_mode(hdd_ctx->psoc);
-	if (mode == PMO_SUSPEND_NONE) {
-		hdd_info_rl("Suspend is not supported");
-		return -EINVAL;
-	} else if (mode == PMO_SUSPEND_SHUTDOWN) {
-		hdd_info_rl("shutdown suspend should complete in prepare");
-		return -EINVAL;
 	}
 
 	mac_handle = hdd_ctx->mac_handle;
@@ -2602,7 +2627,7 @@ static int __wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	if (ucfg_ipa_suspend(hdd_ctx->pdev)) {
 		hdd_err("IPA not ready to suspend!");
 		wlan_hdd_inc_suspend_stats(hdd_ctx, SUSPEND_FAIL_IPA);
-		return -EAGAIN;
+		goto resume_all_components;
 	}
 
 	/* Suspend control path scheduler */
@@ -2691,6 +2716,9 @@ resume_ol_rx:
 	hdd_ctx->is_scheduler_suspended = false;
 resume_tx:
 	hdd_resume_wlan();
+resume_all_components:
+	ucfg_pmo_resume_all_components(hdd_ctx->psoc, QDF_SYSTEM_SUSPEND);
+
 	return -ETIME;
 
 }
@@ -2709,13 +2737,18 @@ static int _wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 
 	/* If Wifi is off, return success for system suspend */
 	if (hdd_ctx->driver_status != DRIVER_MODULES_ENABLED) {
-		hdd_debug("Driver Modules not Enabled ");
+		hdd_info("Driver Modules not Enabled");
+		hdd_ctx->shutdown_in_suspend = false;
 		return 0;
 	}
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
-	if (errno)
-		return errno;
+	if (0 != errno) {
+		if (pld_is_low_power_mode(hdd_ctx->parent_dev))
+			hdd_debug("low power mode (Deep Sleep/Hibernate)");
+		else
+			return errno;
+	}
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	if (!hif_ctx)
@@ -2742,15 +2775,20 @@ int wlan_hdd_cfg80211_suspend_wlan(struct wiphy *wiphy,
 	struct hdd_context *hdd_ctx = wiphy_priv(wiphy);
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
-	if (0 != errno)
-		return errno;
+	if (0 != errno) {
+		if (pld_is_low_power_mode(hdd_ctx->parent_dev))
+			hdd_debug("low power mode (Deep Sleep/Hibernate)");
+		else
+			return errno;
+	}
 
 	/*
 	 * Flush the idle shutdown before ops start.This is done here to avoid
 	 * the deadlock as idle shutdown waits for the dsc ops
 	 * to complete.
 	 */
-	hdd_psoc_idle_timer_stop(hdd_ctx);
+	if (!hdd_ctx->shutdown_in_suspend)
+		hdd_psoc_idle_timer_stop(hdd_ctx);
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(wiphy), &psoc_sync);
 	if (errno)
@@ -2966,7 +3004,7 @@ static int __wlan_hdd_cfg80211_set_txpower(struct wiphy *wiphy,
 
 	status = ucfg_mlme_set_current_tx_power_level(hdd_ctx->psoc, dbm);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("sme_cfg_set_int failed for tx power %hu, %d",
+		hdd_err("sme_cfg_set_int failed for tx power %d, %d",
 			dbm, status);
 		return -EIO;
 	}

@@ -269,36 +269,7 @@ int wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	return errno;
 }
 
-/**
- * wlan_hdd_validate_and_override_offchan() - To validate and override offchan
- * @adapter: hdd adapter of vdev
- * @chan: channel info of mgmt to be sent
- * @offchan: off channel flag to check and override
- *
- * This function is to validate the channel info against adapter current state
- * and home channel, if off channel not needed, override offchan flag.
- *
- * Return: None
- */
-static void
-wlan_hdd_validate_and_override_offchan(struct hdd_adapter *adapter,
-				       struct ieee80211_channel *chan,
-				       bool *offchan)
-{
-	qdf_freq_t home_ch_freq;
-
-	if (!offchan || !chan || !(*offchan))
-		return;
-
-	home_ch_freq = hdd_get_adapter_home_channel(adapter);
-
-	if (chan->center_freq == home_ch_freq) {
-		hdd_debug("override offchan to 0 at home channel %d",
-			  home_ch_freq);
-		*offchan = false;
-	}
-}
-
+#define WLAN_AUTH_FRAME_MIN_LEN 2
 static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			      struct ieee80211_channel *chan, bool offchan,
 			      unsigned int wait,
@@ -310,8 +281,8 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_vdev *vdev;
-	uint8_t type;
-	uint8_t sub_type;
+	uint8_t type, sub_type;
+	uint16_t auth_algo;
 	QDF_STATUS qdf_status;
 	int ret;
 
@@ -343,6 +314,16 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
 	    (type == SIR_MAC_MGMT_FRAME &&
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
+		/* Request ROC for PASN authentication frame */
+		if (len > (sizeof(struct wlan_frame_hdr) +
+			   WLAN_AUTH_FRAME_MIN_LEN)) {
+			auth_algo =
+				*(uint16_t *)(buf +
+					      sizeof(struct wlan_frame_hdr));
+			if (auth_algo == eSIR_AUTH_TYPE_PASN)
+				goto off_chan_tx;
+		}
+
 		qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_SME,
 			   TRACE_CODE_HDD_SEND_MGMT_TX, adapter->vdev_id, 0);
 
@@ -355,13 +336,12 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			return -EINVAL;
 	}
 
+off_chan_tx:
 	hdd_debug("device_mode:%d type:%d sub_type:%d chan:%d",
 		  adapter->device_mode, type, sub_type,
 		  chan ? chan->center_freq : 0);
 	hdd_debug("wait:%d offchan:%d do_not_wait_ack:%d",
 		  wait, offchan, dont_wait_for_ack);
-
-	wlan_hdd_validate_and_override_offchan(adapter, chan, &offchan);
 
 	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_P2P_ID);
 	if (!vdev) {
@@ -528,7 +508,7 @@ int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command)
 		noa.single_noa_duration = duration;
 		noa.ps_selection = P2P_POWER_SAVE_TYPE_SINGLE_NOA;
 	} else {
-		if (duration >= interval) {
+		if (count && (duration >= interval)) {
 			hdd_err("Duration should be less than interval");
 			return -EINVAL;
 		}

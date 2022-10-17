@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -497,8 +498,8 @@ static void lim_process_hw_mode_trans_ind(struct mac_context *mac, void *body)
 
 	param->num_freq_map = ind->num_freq_map;
 	for (i = 0; i < param->num_freq_map; i++) {
-		param->mac_freq_map[i].pdev_id =
-			ind->mac_freq_map[i].pdev_id;
+		param->mac_freq_map[i].mac_id =
+			ind->mac_freq_map[i].mac_id;
 		param->mac_freq_map[i].start_freq =
 			ind->mac_freq_map[i].start_freq;
 		param->mac_freq_map[i].end_freq =
@@ -1187,7 +1188,7 @@ lim_check_mgmt_registered_frames(struct mac_context *mac_ctx, uint8_t *buff_desc
 			(uint8_t *) hdr,
 			WMA_GET_RX_PAYLOAD_LEN(buff_desc) +
 			sizeof(tSirMacMgmtHdr), mgmt_frame->sessionId,
-			WMA_GET_RX_FREQ(buff_desc), session_entry,
+			WMA_GET_RX_FREQ(buff_desc),
 			WMA_GET_RX_RSSI_NORMALIZED(buff_desc),
 			RXMGMT_FLAG_NONE);
 
@@ -1758,7 +1759,6 @@ static void lim_process_messages(struct mac_context *mac_ctx,
 	case eWNI_SME_REGISTER_MGMT_FRAME_CB:
 	case eWNI_SME_EXT_CHANGE_CHANNEL:
 		/* fall through */
-	case eWNI_SME_ROAM_SEND_SET_PCL_REQ:
 	case eWNI_SME_SET_ADDBA_ACCEPT:
 	case eWNI_SME_UPDATE_EDCA_PROFILE:
 	case WNI_SME_UPDATE_MU_EDCA_PARAMS:

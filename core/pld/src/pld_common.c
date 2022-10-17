@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,6 +36,19 @@
 #include <net/cnss2.h>
 #endif
 #endif
+
+#ifdef CONFIG_CNSS_OUT_OF_TREE
+#ifdef CONFIG_PLD_SNOC_ICNSS
+#ifdef CONFIG_PLD_SNOC_ICNSS2
+#include "icnss2.h"
+#else
+#include "icnss.h"
+#endif
+#endif
+#ifdef CONFIG_PLD_IPCI_ICNSS
+#include "icnss2.h"
+#endif
+#else
 #ifdef CONFIG_PLD_SNOC_ICNSS
 #ifdef CONFIG_PLD_SNOC_ICNSS2
 #include <soc/qcom/icnss2.h>
@@ -44,6 +58,7 @@
 #endif
 #ifdef CONFIG_PLD_IPCI_ICNSS
 #include <soc/qcom/icnss2.h>
+#endif
 #endif
 
 #include "pld_pcie.h"
@@ -129,6 +144,39 @@ int pld_set_mode(u8 mode)
 	pld_ctx->mode = mode;
 	return 0;
 }
+
+#ifdef FEATURE_WLAN_FULL_POWER_DOWN_SUPPORT
+int pld_set_suspend_mode(enum pld_suspend_mode mode)
+{
+	struct pld_context *pld_context;
+	int ret;
+
+	pld_context = pld_get_global_context();
+	if (!pld_context)
+		return -ENOMEM;
+
+	pld_context->suspend_mode = mode;
+
+	ret = pld_pcie_set_suspend_mode(mode);
+
+	return ret;
+}
+
+bool pld_is_full_power_down_enable(void)
+{
+	struct pld_context *pld_context;
+
+	pld_context = pld_get_global_context();
+	if (!pld_context)
+		goto out;
+
+	if (pld_context->suspend_mode == PLD_FULL_POWER_DOWN)
+		return true;
+
+out:
+	return false;
+}
+#endif
 
 /**
  * pld_get_global_context() - Get global context of PLD
@@ -296,14 +344,14 @@ int pld_register_driver(struct pld_driver_ops *ops)
 
 	ret = pld_pcie_register_driver();
 	if (ret) {
-		pr_err("Fail to register pcie driver\n");
+		pld_err_rl("Fail to register pcie driver\n");
 		goto fail_pcie;
 	}
 	pld_context->pld_driver_state |= PLD_PCIE_REGISTERED;
 
 	ret = pld_snoc_register_driver();
 	if (ret) {
-		pr_err("Fail to register snoc driver\n");
+		pld_err_rl("Fail to register snoc driver\n");
 		goto fail_snoc;
 	}
 	pld_context->pld_driver_state |= PLD_SNOC_REGISTERED;
@@ -338,7 +386,7 @@ int pld_register_driver(struct pld_driver_ops *ops)
 
 	ret = pld_ipci_register_driver();
 	if (ret) {
-		pr_err("Fail to register ipci driver\n");
+		pld_err_rl("Fail to register ipci driver\n");
 		goto fail_ipci;
 	}
 	pld_context->pld_driver_state |= PLD_IPCI_REGISTERED;
@@ -1806,6 +1854,35 @@ void pld_unlock_reg_window(struct device *dev, unsigned long *flags)
 }
 
 /**
+ * pld_get_pci_slot() - Get PCI slot of attached device
+ * @dev: device
+ *
+ * Return: pci slot
+ */
+int pld_get_pci_slot(struct device *dev)
+{
+	int ret = 0;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_get_pci_slot(dev);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+		break;
+	default:
+		pr_err("Invalid device type\n");
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+/**
  * pld_power_on() - Power on WLAN hardware
  * @dev: device
  *
@@ -2169,6 +2246,58 @@ int pld_get_user_msi_assignment(struct device *dev, char *user_name,
 						       num_vectors,
 						       user_base_data,
 						       base_vector);
+		break;
+	default:
+		pr_err("Invalid device type %d\n", type);
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+/**
+ * pld_srng_devm_request_irq() - Register IRQ for SRNG
+ * @dev: device
+ * @irq: IRQ number
+ * @handler: IRQ callback function
+ * @flags: IRQ flags
+ * @name: IRQ name
+ * @ctx: IRQ context
+ *
+ * Return: 0 for success
+ *         Non zero failure code for errors
+ */
+int pld_srng_devm_request_irq(struct device *dev, int irq,
+			      irq_handler_t handler,
+			      unsigned long irqflags,
+			      const char *devname,
+			      void *dev_data)
+{
+	int ret = 0;
+	enum pld_bus_type type = pld_get_bus_type(dev);
+
+	switch (type) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = devm_request_irq(dev, irq, handler, irqflags,
+				       devname, dev_data);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+		ret = pld_pcie_fw_sim_request_irq(dev, irq, handler,
+						  irqflags, devname,
+						  dev_data);
+		break;
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_SDIO:
+	case PLD_BUS_TYPE_USB:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+		pr_err("Not supported on type %d\n", type);
+		ret = -ENODEV;
+		break;
+	case PLD_BUS_TYPE_IPCI:
+		ret = devm_request_irq(dev, irq, handler, irqflags,
+				       devname, dev_data);
 		break;
 	default:
 		pr_err("Invalid device type %d\n", type);
@@ -2732,6 +2861,38 @@ int pld_is_fw_down(struct device *dev)
 	return ret;
 }
 
+#ifdef CONFIG_ENABLE_LOW_POWER_MODE
+/**
+ * pld_is_low_power_mode() - Check WLAN fw is in low power
+ * @dev: device
+ *
+ * This API will be called to check if WLAN FW is in low power or not.
+ * Low power means either Deep Sleep or Hibernate state.
+ *
+ *  Return: 0 FW is not in low power mode
+ *          Otherwise FW is low power mode
+ *          Always return 0 for unsupported bus type
+ */
+int pld_is_low_power_mode(struct device *dev)
+{
+	int ret = 0;
+	enum pld_bus_type type = pld_get_bus_type(dev);
+
+	switch (type) {
+	case PLD_BUS_TYPE_SNOC:
+		ret = pld_snoc_is_low_power_mode(dev);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_IPCI:
+	default:
+		break;
+	}
+	return ret;
+}
+#endif
+
 /**
  * pld_force_assert_target() - Send a force assert request to FW.
  * @dev: device pointer
@@ -3124,6 +3285,34 @@ void pld_thermal_unregister(struct device *dev, int mon_id)
 	}
 }
 
+const char *pld_bus_width_type_to_str(enum pld_bus_width_type level)
+{
+	switch (level) {
+	/* initialize the wlan sub system */
+	case PLD_BUS_WIDTH_NONE:
+		return "NONE";
+	case PLD_BUS_WIDTH_IDLE:
+		return "IDLE";
+	case PLD_BUS_WIDTH_LOW:
+		return "LOW";
+	case PLD_BUS_WIDTH_MEDIUM:
+		return "MEDIUM";
+	case PLD_BUS_WIDTH_HIGH:
+		return "HIGH";
+	case PLD_BUS_WIDTH_VERY_HIGH:
+		return "VERY_HIGH";
+	case PLD_BUS_WIDTH_ULTRA_HIGH:
+		return "ULTRA_HIGH";
+	case PLD_BUS_WIDTH_LOW_LATENCY:
+		return "LOW_LAT";
+	default:
+		if (level > PLD_BUS_WIDTH_ULTRA_HIGH)
+			return "ULTRA_HIGH+";
+		else
+			return "INVAL";
+	}
+}
+
 int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 			  int mon_id)
 {
@@ -3154,6 +3343,38 @@ int pld_get_thermal_state(struct device *dev, unsigned long *thermal_state,
 
 	return errno;
 }
+
+#ifdef CNSS_UTILS_VENDOR_UNSAFE_CHAN_API_SUPPORT
+int pld_get_wlan_unsafe_channel_sap(
+	struct device *dev, struct pld_ch_avoid_ind_type *ch_avoid_ranges)
+{
+	struct cnss_ch_avoid_ind_type cnss_ch_avoid;
+	int ret;
+	int i;
+
+	if (!ch_avoid_ranges)
+		return -EINVAL;
+	cnss_ch_avoid.ch_avoid_range_cnt = 0;
+	ret = cnss_utils_get_wlan_unsafe_channel_sap(dev, &cnss_ch_avoid);
+	if (ret)
+		return ret;
+
+	for (i = 0;
+	     i < PLD_CH_AVOID_MAX_RANGE &&
+	     i < cnss_ch_avoid.ch_avoid_range_cnt; i++) {
+		ch_avoid_ranges->avoid_freq_range[i].start_freq =
+			cnss_ch_avoid.avoid_freq_range[i].start_freq;
+		ch_avoid_ranges->avoid_freq_range[i].end_freq =
+			cnss_ch_avoid.avoid_freq_range[i].end_freq;
+	}
+	ch_avoid_ranges->ch_avoid_range_cnt = i;
+	if (i < cnss_ch_avoid.ch_avoid_range_cnt)
+		pr_err("unexpected cnss ch_avoid_range_cnt %d",
+		       cnss_ch_avoid.ch_avoid_range_cnt);
+
+	return 0;
+}
+#endif
 
 #ifdef FEATURE_WLAN_TIME_SYNC_FTM
 /**

@@ -44,6 +44,7 @@
 #include "lim_process_fils.h"
 #include "wlan_mlme_api.h"
 #include "wlan_connectivity_logging.h"
+#include "lim_types.h"
 
 /**
  * is_auth_valid
@@ -414,6 +415,8 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 	uint8_t *body_ptr;
 	enum rxmgmt_flags rx_flags = RXMGMT_FLAG_NONE;
 	struct sae_auth_retry *sae_retry;
+	uint16_t sae_auth_seq = 0, sae_status_code = 0;
+	uint16_t auth_algo;
 
 	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
 	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
@@ -459,11 +462,29 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 			lim_sae_auth_cleanup_retry(mac_ctx,
 						   pe_session->vdev_id);
 	}
+
+	if (LIM_IS_STA_ROLE(pe_session)) {
+		auth_algo = *(uint16_t *)body_ptr;
+		if (frame_len >= (SAE_AUTH_STATUS_CODE_OFFSET + 2)) {
+			sae_auth_seq =
+				*(uint16_t *)(body_ptr +
+					      SAE_AUTH_SEQ_NUM_OFFSET);
+			sae_status_code =
+				*(uint16_t *)(body_ptr +
+					      SAE_AUTH_STATUS_CODE_OFFSET);
+		}
+		wlan_connectivity_mgmt_event(
+			(struct wlan_frame_hdr *)mac_hdr, pe_session->vdev_id,
+			sae_status_code, 0,
+			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info), auth_algo,
+			sae_auth_seq, sae_auth_seq, WLAN_AUTH_RESP);
+	}
+
 	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
 				    (uint8_t *)mac_hdr,
 				    frame_len + sizeof(tSirMacMgmtHdr),
-				    pe_session->smeSessionId,
-				    WMA_GET_RX_FREQ(rx_pkt_info), pe_session,
+				    pe_session->vdev_id,
+				    WMA_GET_RX_FREQ(rx_pkt_info),
 				    WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
 				    rx_flags);
 }
@@ -471,6 +492,48 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 static inline void  lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 		uint8_t *rx_pkt_info, struct pe_session *pe_session)
 {}
+#endif
+
+#ifdef WLAN_FEATURE_RTT_11AZ_SUPPORT
+/**
+ * lim_process_pasn_auth_frame()- Process PASN authentication frame
+ * @mac_ctx: MAC context
+ * @vdev_id: Vdev identifier
+ * @rx_pkt_info: Rx packet
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
+			    uint8_t vdev_id,
+			    uint8_t *rx_pkt_info)
+{
+	tpSirMacMgmtHdr mac_hdr;
+	uint32_t frame_len;
+	uint8_t *body_ptr;
+	enum rxmgmt_flags rx_flags = RXMGMT_FLAG_NONE;
+
+	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+
+	lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
+				    (uint8_t *)mac_hdr,
+				    frame_len + sizeof(tSirMacMgmtHdr),
+				    vdev_id, WMA_GET_RX_FREQ(rx_pkt_info),
+				    WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+				    rx_flags);
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS
+lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
+			    uint8_t vdev_id,
+			    uint8_t *rx_pkt_info)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
@@ -1570,6 +1633,10 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			lim_process_sae_auth_frame(mac_ctx, rx_pkt_info,
 						   pe_session);
 		goto free;
+	} else if (auth_alg == eSIR_AUTH_TYPE_PASN) {
+		lim_process_pasn_auth_frame(mac_ctx, pe_session->vdev_id,
+					    rx_pkt_info);
+		goto free;
 	} else if ((sir_convert_auth_frame2_struct(mac_ctx, body_ptr,
 				frame_len, rx_auth_frame) != QDF_STATUS_SUCCESS)
 				|| (!is_auth_valid(mac_ctx, rx_auth_frame,
@@ -1648,10 +1715,6 @@ free:
 		qdf_mem_free(plainbody);
 }
 
-#define SAE_AUTH_SEQ_NUM_OFFSET       2
-#define SAE_AUTH_STATUS_CODE_OFFSET   4
-#define SAE_MESSAGE_TYPE_OFFSET       6
-
 /**
  * lim_process_sae_preauth_frame() - Send the WPA3 preauth SAE frame received
  * to the user space.
@@ -1668,7 +1731,7 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 {
 	tpSirMacMgmtHdr dot11_hdr;
 	uint16_t auth_alg, frm_len;
-	uint16_t sae_auth_seq = 0, sae_status_code = 0, sae_type = 0;
+	uint16_t sae_auth_seq = 0, sae_status_code = 0;
 	uint8_t *frm_body, pdev_id, vdev_id = 0;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -1685,12 +1748,11 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 	if (auth_alg != eSIR_AUTH_TYPE_SAE)
 		return false;
 
-	if (frm_len > (SAE_MESSAGE_TYPE_OFFSET + 2)) {
+	if (frm_len >= (SAE_AUTH_STATUS_CODE_OFFSET + 2)) {
 		sae_auth_seq =
 			*(uint16_t *)(frm_body + SAE_AUTH_SEQ_NUM_OFFSET);
 		sae_status_code =
 			*(uint16_t *)(frm_body + SAE_AUTH_STATUS_CODE_OFFSET);
-		sae_type = *(uint16_t *)(frm_body + SAE_MESSAGE_TYPE_OFFSET);
 	}
 
 	pe_debug("LFR3: SAE auth frame: seq_ctrl:0x%X auth_transaction_num:%d",
@@ -1710,19 +1772,20 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 	wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)dot11_hdr,
 				     vdev_id, sae_status_code,
 				     0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt),
-				     auth_alg, sae_type,
+				     auth_alg, sae_auth_seq,
 				     sae_auth_seq, WLAN_AUTH_RESP);
 
 	lim_send_sme_mgmt_frame_ind(mac, dot11_hdr->fc.subType,
 				    (uint8_t *)dot11_hdr,
 				    frm_len + sizeof(tSirMacMgmtHdr),
 				    SME_SESSION_ID_ANY,
-				    WMA_GET_RX_FREQ(rx_pkt), NULL,
+				    WMA_GET_RX_FREQ(rx_pkt),
 				    WMA_GET_RX_RSSI_NORMALIZED(rx_pkt),
 				    RXMGMT_FLAG_NONE);
 	return true;
 }
 
+#define WLAN_MIN_AUTH_FRM_ALGO_FIELD_LEN 2
 /**
  *
  * Pass the received Auth frame. This is possibly the pre-auth from the
@@ -1734,31 +1797,40 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 					     uint8_t *pBd, void *body)
 {
-	tpSirMacMgmtHdr pHdr;
+	tpSirMacMgmtHdr mac_hdr;
 	struct pe_session *pe_session = NULL;
 	uint8_t *pBody;
-	uint16_t frameLen;
+	uint16_t frameLen, curr_seq_num, auth_alg = 0;
 	tSirMacAuthFrameBody *rx_auth_frame;
 	QDF_STATUS ret_status = QDF_STATUS_E_FAILURE;
 	int i;
 	bool sae_auth_frame;
 
-	pHdr = WMA_GET_RX_MAC_HEADER(pBd);
+	mac_hdr = WMA_GET_RX_MAC_HEADER(pBd);
 	pBody = WMA_GET_RX_MPDU_DATA(pBd);
 	frameLen = WMA_GET_RX_PAYLOAD_LEN(pBd);
-
-	pe_debug("Auth Frame Received: BSSID " QDF_MAC_ADDR_FMT " (RSSI %d)",
-		 QDF_MAC_ADDR_REF(pHdr->bssId),
-		 (uint) abs((int8_t) WMA_GET_RX_RSSI_NORMALIZED(pBd)));
+	curr_seq_num = mac_hdr->seqControl.seqNumHi << 4 |
+		       mac_hdr->seqControl.seqNumLo;
 
 	if (frameLen == 0) {
 		pe_err("Frame len = 0");
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (frameLen > WLAN_MIN_AUTH_FRM_ALGO_FIELD_LEN)
+		auth_alg = *(uint16_t *)pBody;
+
+	pe_debug("Auth RX: BSSID " QDF_MAC_ADDR_FMT " RSSI:%d auth_alg:%d seq:%d",
+		 QDF_MAC_ADDR_REF(mac_hdr->bssId),
+		 (uint)abs((int8_t)WMA_GET_RX_RSSI_NORMALIZED(pBd)),
+		 auth_alg, curr_seq_num);
+
 	sae_auth_frame = lim_process_sae_preauth_frame(mac, pBd);
 	if (sae_auth_frame)
 		return QDF_STATUS_SUCCESS;
+
+	if (auth_alg == eSIR_AUTH_TYPE_PASN)
+		return lim_process_pasn_auth_frame(mac, 0, pBd);
 
 	/* Auth frame has come on a new BSS, however, we need to find the session
 	 * from where the auth-req was sent to the new AP
@@ -1786,19 +1858,10 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	lim_print_mac_addr(mac, pHdr->bssId, LOGD);
-	lim_print_mac_addr(mac,
-			   pe_session->ftPEContext.pFTPreAuthReq->preAuthbssId,
-			   LOGD);
-	pe_debug("seqControl: 0x%X",
-		((pHdr->seqControl.seqNumHi << 8) |
-		 (pHdr->seqControl.seqNumLo << 4) |
-		 (pHdr->seqControl.fragNum)));
-
 	/* Check that its the same bssId we have for preAuth */
 	if (qdf_mem_cmp
 		    (pe_session->ftPEContext.pFTPreAuthReq->preAuthbssId,
-		    pHdr->bssId, sizeof(tSirMacAddr))) {
+		     mac_hdr->bssId, sizeof(tSirMacAddr))) {
 		pe_err("Error: Same bssid as preauth BSSID");
 		/* In this case SME if indeed has triggered a */
 		/* pre auth it will time out. */
@@ -1857,12 +1920,12 @@ QDF_STATUS lim_process_auth_frame_no_session(struct mac_context *mac,
 		qdf_mem_free(rx_auth_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
-	pe_info("Pre-Auth RX: type: %d seqnum: %d status: %d %d from " QDF_MAC_ADDR_FMT,
+	pe_info("Pre-Auth RX: type: %d trans_seqnum: %d status: %d %d from " QDF_MAC_ADDR_FMT,
 		(uint32_t)rx_auth_frame->authAlgoNumber,
 		(uint32_t)rx_auth_frame->authTransactionSeqNumber,
 		(uint32_t)rx_auth_frame->authStatusCode,
 		(uint32_t)mac->lim.gLimNumPreAuthContexts,
-		QDF_MAC_ADDR_REF(pHdr->sa));
+		QDF_MAC_ADDR_REF(mac_hdr->sa));
 
 	switch (rx_auth_frame->authTransactionSeqNumber) {
 	case SIR_MAC_AUTH_FRAME_2:

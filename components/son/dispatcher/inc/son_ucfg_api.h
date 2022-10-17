@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +24,7 @@
 #include <qdf_trace.h>
 #include <wlan_objmgr_pdev_obj.h>
 #include <wlan_mlme_ucfg_api.h>
+#include <son_api.h>
 
 /**
  * ucfg_son_get_operation_chan_freq_vdev_id() - get operating chan freq of
@@ -76,4 +78,142 @@ uint32_t ucfg_son_get_sta_count(struct wlan_objmgr_vdev *vdev);
 uint32_t ucfg_son_get_chan_flag(struct wlan_objmgr_pdev *pdev,
 				qdf_freq_t freq, bool flag_160,
 				struct ch_params *chan_params);
+
+/**
+ * ucfg_son_get_he_supported() - get he supported
+ * @psoc: pointer to psoc
+ * @he_supported: he supported or not
+ *
+ * Return: void
+ */
+#ifdef WLAN_FEATURE_11AX
+void ucfg_son_get_he_supported(struct wlan_objmgr_psoc *psoc,
+			       bool *he_supported);
+#else
+static inline void ucfg_son_get_he_supported(struct wlan_objmgr_psoc *psoc,
+					     bool *he_supported)
+{
+	*he_supported = false;
+}
+#endif /*WLAN_FEATURE_11AX*/
+
+/**
+ * ucfg_son_set_peer_kickout_allow() - set the peer is allowed to kickout
+ * @vdev: pointer to vdev
+ * @peer: pointer to peer
+ * @kickout_allow: kickout_allow to set
+ *
+ * Return: QDF_STATUS_SUCCESS on Success else failure.
+ */
+QDF_STATUS ucfg_son_set_peer_kickout_allow(struct wlan_objmgr_vdev *vdev,
+					   struct wlan_objmgr_peer *peer,
+					   bool kickout_allow);
+
+/**
+ * ucfg_son_register_deliver_opmode_cb() - register deliver opmode cb
+ * psoc: pointer to psoc
+ * cb: deliver opmode callback
+ *
+ * Return: QDF_STATUS_SUCCESS on Success else failure.
+ */
+QDF_STATUS ucfg_son_register_deliver_opmode_cb(struct wlan_objmgr_psoc *psoc,
+					       mlme_deliver_cb cb);
+
+/**
+ * ucfg_son_register_deliver_smps_cb() - register deliver smps cb
+ * psoc: pointer to psoc
+ * cb: deliver smps callback
+ *
+ * Return: QDF_STATUS_SUCCESS on Success else failure.
+ */
+
+QDF_STATUS ucfg_son_register_deliver_smps_cb(struct wlan_objmgr_psoc *psoc,
+					     mlme_deliver_cb cb);
+
+/**
+ * ucfg_son_cbs_init() - son cbs init
+ *
+ * Return: 0 if succeed
+ */
+int ucfg_son_cbs_init(void);
+
+/* ucfg_son_cbs_deinit - son cbs deinit
+ *
+ * Return: 0 if succeed
+ */
+int ucfg_son_cbs_deinit(void);
+
+/* ucfg_son_set_cbs() - son cbs set
+ * @vdev: pointer to vdev
+ * @enable: enable or disable son cbs
+ *
+ * Return: 0 if succeed
+ */
+int ucfg_son_set_cbs(struct wlan_objmgr_vdev *vdev,
+		     bool enable);
+
+/* ucfg_son_set_cbs_wait_time() - cbs wait time configure
+ * @vdev: pointer to vdev
+ * @val: wait time value
+ *
+ * Return: 0 if succeed
+ */
+int ucfg_son_set_cbs_wait_time(struct wlan_objmgr_vdev *vdev,
+			       uint32_t val);
+
+/* ucfg_son_set_cbs_dwell_split_time() - cbs dwell spilt time configure
+ * @vdev: pointer to vdev
+ * @val: dwell spilt time value
+ *
+ * Return: 0 if succeed
+ */
+int ucfg_son_set_cbs_dwell_split_time(struct wlan_objmgr_vdev *vdev,
+				      uint32_t val);
+
+/**
+ * ucfg_son_get_max_tx_power() - Gets the max transmit power for peer
+ * @assoc_req_ies: assoc req ies
+ *
+ * Return: Returns the max tx power
+ */
+uint8_t ucfg_son_get_tx_power(struct element_info assoc_req_ies);
+
+/**
+ * ucfg_get_max_mcs() - calculate the max mcs supported by the node
+ * @mode: current phy mode
+ * @supp_idx: max supported idx
+ * @ext_idx: max extended idx
+ * @ht_mcs_idx: max mcs index for HT
+ * @vht_mcs_map: mcs map for VHT
+ *
+ * Return: max_mcs for the node
+ */
+uint8_t ucfg_son_get_max_mcs(uint8_t mode, uint8_t supp_idx, uint8_t ext_idx,
+			     uint8_t ht_mcs_idx, uint8_t vht_mcs_map);
+
+/**
+ * ucfg_son_get_peer_rrm_info() - Get RRM info for peer
+ * @assoc_req_ies: assoc req ies
+ * @rrmcaps: rrm capabiities
+ * @is_beacon_meas_supported: if beacon meas is supported
+ *
+ * Return: Returns QDF_STATUS_SUCCESS if succeed
+ */
+QDF_STATUS ucfg_son_get_peer_rrm_info(struct element_info assoc_req_ies,
+				      uint8_t *rrmcaps,
+				      bool *is_beacon_meas_supported);
+
+#ifdef WLAN_FEATURE_SON
+/* ucfg_son_disable_cbs() - son cbs disable
+ * @vdev: vdev pointer
+ *
+ * Return: 0 if succeed
+ */
+int ucfg_son_disable_cbs(struct wlan_objmgr_vdev *vdev);
+#else
+static inline int ucfg_son_disable_cbs(struct wlan_objmgr_vdev *vdev)
+{
+	return -EINVAL;
+}
+#endif
 #endif

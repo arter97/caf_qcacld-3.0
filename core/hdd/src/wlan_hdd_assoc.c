@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -90,6 +91,7 @@
 
 #include "wlan_hdd_twt.h"
 #include "wlan_cm_roam_ucfg_api.h"
+#include "wlan_hdd_son.h"
 
 /* These are needed to recognize WPA and RSN suite types */
 #define HDD_WPA_OUI_SIZE 4
@@ -160,14 +162,6 @@ uint8_t ccp_rsn_oui_90[HDD_RSN_OUI_SIZE] = {0x00, 0x0F, 0xAC, 0x09};
 #endif
 static const
 u8 ccp_rsn_oui_13[HDD_RSN_OUI_SIZE] = {0x50, 0x6F, 0x9A, 0x01};
-
-#ifdef FEATURE_WLAN_WAPI
-#define HDD_WAPI_OUI_SIZE 4
-/* WPI-SMS4 */
-uint8_t ccp_wapi_oui01[HDD_WAPI_OUI_SIZE] = { 0x00, 0x14, 0x72, 0x01 };
-/* WAI-PSK */
-uint8_t ccp_wapi_oui02[HDD_WAPI_OUI_SIZE] = { 0x00, 0x14, 0x72, 0x02 };
-#endif  /* FEATURE_WLAN_WAPI */
 
 /* Offset where the EID-Len-IE, start. */
 #define ASSOC_RSP_IES_OFFSET 6  /* Capability(2) + AID(2) + Status Code(2) */
@@ -1166,6 +1160,8 @@ QDF_STATUS hdd_change_peer_state(struct hdd_adapter *adapter,
 		    (wlan_mlme_get_wds_mode(hdd_ctx->psoc) ==
 		    WLAN_WDS_MODE_REPEATER))
 			hdd_config_wds_repeater_mode(adapter, peer_mac);
+
+		hdd_son_deliver_peer_authorize_event(adapter, peer_mac);
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -1283,6 +1279,7 @@ QDF_STATUS hdd_roam_register_sta(struct hdd_adapter *adapter,
 
 	txrx_ops.tx.tx_comp = hdd_sta_notify_tx_comp_cb;
 	txrx_ops.tx.tx = NULL;
+	txrx_ops.get_tsf_time = hdd_get_tsf_time;
 	cdp_vdev_register(soc, adapter->vdev_id, (ol_osif_vdev_handle)adapter,
 			  &txrx_ops);
 	if (!txrx_ops.tx.tx) {
@@ -1572,10 +1569,27 @@ QDF_STATUS hdd_roam_register_tdlssta(struct hdd_adapter *adapter,
 		txrx_ops.rx.rx_stack = NULL;
 		txrx_ops.rx.rx_flush = NULL;
 	}
+	if (adapter->hdd_ctx->config->fisa_enable &&
+	    adapter->device_mode != QDF_MONITOR_MODE) {
+		hdd_debug("FISA feature enabled");
+		hdd_rx_register_fisa_ops(&txrx_ops);
+	}
+
+	txrx_ops.rx.stats_rx = hdd_tx_rx_collect_connectivity_stats_info;
+
+	txrx_ops.tx.tx_comp = hdd_sta_notify_tx_comp_cb;
+	txrx_ops.tx.tx = NULL;
+
 	cdp_vdev_register(soc, adapter->vdev_id, (ol_osif_vdev_handle)adapter,
 			  &txrx_ops);
+
+	if (!txrx_ops.tx.tx) {
+		hdd_err("vdev register fail");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	adapter->tx_fn = txrx_ops.tx.tx;
-	txrx_ops.rx.stats_rx = hdd_tx_rx_collect_connectivity_stats_info;
+
 
 	/* Register the Station with TL...  */
 	qdf_status = cdp_peer_register(soc, OL_TXRX_PDEV_ID, &txrx_desc);
@@ -2379,36 +2393,6 @@ hdd_translate_wpa_to_csr_encryption_type(uint8_t cipher_suite[4])
 
 	return cipher_type;
 }
-
-#ifdef FEATURE_WLAN_WAPI
-enum csr_akm_type hdd_translate_wapi_to_csr_auth_type(uint8_t auth_suite[4])
-{
-	enum csr_akm_type auth_type;
-
-	if (memcmp(auth_suite, ccp_wapi_oui01, 4) == 0)
-		auth_type = eCSR_AUTH_TYPE_WAPI_WAI_CERTIFICATE;
-	else if (memcmp(auth_suite, ccp_wapi_oui02, 4) == 0)
-		auth_type = eCSR_AUTH_TYPE_WAPI_WAI_PSK;
-	else
-		auth_type = eCSR_AUTH_TYPE_UNKNOWN;
-
-	return auth_type;
-}
-
-eCsrEncryptionType
-hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4])
-{
-	eCsrEncryptionType cipher_type;
-
-	if (memcmp(cipher_suite, ccp_wapi_oui01, 4) == 0 ||
-		   memcmp(cipher_suite, ccp_wapi_oui02, 4) == 0)
-		cipher_type = eCSR_ENCRYPT_TYPE_WPI;
-	else
-		cipher_type = eCSR_ENCRYPT_TYPE_FAILED;
-
-	return cipher_type;
-}
-#endif /* FEATURE_WLAN_WAPI */
 
 #ifdef WLAN_FEATURE_FILS_SK
 bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,

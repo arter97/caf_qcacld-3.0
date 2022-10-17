@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -761,9 +762,10 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 		wlan_reg_read_current_country(mac_ctx->psoc,
 					      programmed_country);
 		status = wlan_reg_get_6g_power_type_for_ctry(
-					bcn->countryInfoParam.countryString,
-					programmed_country, &pwr_type_6g,
-					&ctry_code_match);
+				mac_ctx->psoc,
+				bcn->countryInfoParam.countryString,
+				programmed_country, &pwr_type_6g,
+				&ctry_code_match, REG_MAX_AP_TYPE);
 		if (QDF_IS_STATUS_ERROR(status))
 			return;
 	}
@@ -1097,6 +1099,7 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	sch_send_beacon_report(mac_ctx, &bcn, session);
 	__sch_beacon_process_for_session(mac_ctx, &bcn, rx_pkt_info, session);
+	lim_process_beacon_mlo(mac_ctx, session, &bcn);
 }
 
 /**
@@ -1113,7 +1116,6 @@ QDF_STATUS
 sch_beacon_edca_process(struct mac_context *mac, tSirMacEdcaParamSetIE *edca,
 			struct pe_session *session)
 {
-	uint8_t i;
 	bool follow_ap_edca;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	host_log_qos_edca_pkt_type *log_ptr = NULL;
@@ -1194,16 +1196,29 @@ sch_beacon_edca_process(struct mac_context *mac, tSirMacEdcaParamSetIE *edca,
 	}
 	WLAN_HOST_DIAG_LOG_REPORT(log_ptr);
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
-	pe_debug("Edca param enabled %d. Updating Local Params to: ",
-		 mac->mlme_cfg->edca_params.enable_edca_params);
-	for (i = 0; i < QCA_WLAN_AC_ALL; i++) {
-		pe_nofl_debug("AC[%d]:  AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d",
-			      i, session->gLimEdcaParams[i].aci.aifsn,
-			      session->gLimEdcaParams[i].aci.acm,
-			      session->gLimEdcaParams[i].cw.min,
-			      session->gLimEdcaParams[i].cw.max,
-			      session->gLimEdcaParams[i].txoplimit);
-	}
+	pe_debug("Edca param enabled %d. Updating Local Params to: AC_BE: AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d  AC_BK: AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d  AC_VI: AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d  AC_VO: AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d",
+		 mac->mlme_cfg->edca_params.enable_edca_params,
+		 session->gLimEdcaParams[0].aci.aifsn,
+		 session->gLimEdcaParams[0].aci.acm,
+		 session->gLimEdcaParams[0].cw.min,
+		 session->gLimEdcaParams[0].cw.max,
+		 session->gLimEdcaParams[0].txoplimit,
+		 session->gLimEdcaParams[1].aci.aifsn,
+		 session->gLimEdcaParams[1].aci.acm,
+		 session->gLimEdcaParams[1].cw.min,
+		 session->gLimEdcaParams[1].cw.max,
+		 session->gLimEdcaParams[1].txoplimit,
+		 session->gLimEdcaParams[2].aci.aifsn,
+		 session->gLimEdcaParams[2].aci.acm,
+		 session->gLimEdcaParams[2].cw.min,
+		 session->gLimEdcaParams[2].cw.max,
+		 session->gLimEdcaParams[2].txoplimit,
+		 session->gLimEdcaParams[3].aci.aifsn,
+		 session->gLimEdcaParams[3].aci.acm,
+		 session->gLimEdcaParams[3].cw.min,
+		 session->gLimEdcaParams[3].cw.max,
+		 session->gLimEdcaParams[3].txoplimit);
+
 	return QDF_STATUS_SUCCESS;
 }
 

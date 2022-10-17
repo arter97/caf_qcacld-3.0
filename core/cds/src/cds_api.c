@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -83,6 +84,7 @@
 #include <qdf_notifier.h>
 #include <qwlan_version.h>
 #include <qdf_trace.h>
+#include <qdf_nbuf.h>
 
 /* Preprocessor Definitions and Constants */
 
@@ -120,7 +122,7 @@ static struct ol_if_ops  dp_ol_if_ops = {
 	.peer_set_default_routing = target_if_peer_set_default_routing,
 	.peer_rx_reorder_queue_setup = target_if_peer_rx_reorder_queue_setup,
 	.peer_rx_reorder_queue_remove = target_if_peer_rx_reorder_queue_remove,
-	.is_hw_dbs_2x2_capable = policy_mgr_is_dp_hw_dbs_2x2_capable,
+	.is_hw_dbs_capable = policy_mgr_is_hw_dbs_capable,
 	.lro_hash_config = target_if_lro_hash_config,
 	.rx_invalid_peer = wma_rx_invalid_peer_ind,
 	.is_roam_inprogress = wma_is_roam_in_progress,
@@ -441,6 +443,7 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 	struct txrx_pdev_cfg_param_t cdp_cfg = {0};
 	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 	struct hdd_context *hdd_ctx = gp_cds_context->hdd_context;
+	uint32_t gro_bit_set;
 
 	cdp_cfg.is_full_reorder_offload = DP_REORDER_OFFLOAD_SUPPORT;
 	cdp_cfg.is_uc_offload_enabled = ucfg_ipa_uc_is_enabled();
@@ -467,7 +470,9 @@ static void cds_cdp_cfg_attach(struct wlan_objmgr_psoc *psoc)
 	cdp_cfg.sg_enable = cfg_get(psoc, CFG_DP_SG);
 	cdp_cfg.enable_data_stall_detection =
 		cfg_get(psoc, CFG_DP_ENABLE_DATA_STALL_DETECTION);
-	cdp_cfg.gro_enable = cfg_get(psoc, CFG_DP_GRO);
+	gro_bit_set = cfg_get(psoc, CFG_DP_GRO);
+	if (gro_bit_set & DP_GRO_ENABLE_BIT_SET)
+		cdp_cfg.gro_enable = true;
 	cdp_cfg.enable_flow_steering =
 		cfg_get(psoc, CFG_DP_FLOW_STEERING_ENABLED);
 	cdp_cfg.disable_intra_bss_fwd =
@@ -809,7 +814,7 @@ QDF_STATUS cds_open(struct wlan_objmgr_psoc *psoc)
 				goto err_soc_detach;
 			}
 		hdd_ctx->is_wifi3_0_target = true;
-	} else if (hdd_ctx->target_type == TARGET_TYPE_WCN7850) {
+	} else if (hdd_ctx->target_type == TARGET_TYPE_KIWI) {
 		gp_cds_context->dp_soc =
 			cdp_soc_attach(BERYLLIUM_DP,
 				       gp_cds_context->hif_context,
@@ -931,6 +936,7 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	QDF_STATUS qdf_status;
 	struct dp_txrx_config dp_config;
 	struct hdd_context *hdd_ctx;
+	struct cdp_pdev_attach_params pdev_params = { 0 };
 
 
 	hdd_ctx = gp_cds_context->hdd_context;
@@ -939,9 +945,11 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	pdev_params.htc_handle = gp_cds_context->htc_ctx;
+	pdev_params.qdf_osdev = gp_cds_context->qdf_ctx;
+	pdev_params.pdev_id = 0;
 	qdf_status = cdp_pdev_attach(cds_get_context(QDF_MODULE_ID_SOC),
-				     gp_cds_context->htc_ctx,
-				     gp_cds_context->qdf_ctx, 0);
+				     &pdev_params);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
 		/* Critical Error ...  Cannot proceed further */
 		cds_alert("Failed to open TXRX");
@@ -953,7 +961,7 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	    hdd_ctx->target_type == TARGET_TYPE_QCA6390 ||
 	    hdd_ctx->target_type == TARGET_TYPE_QCA6490 ||
 	    hdd_ctx->target_type == TARGET_TYPE_QCA6750 ||
-	    hdd_ctx->target_type == TARGET_TYPE_WCN7850) {
+	    hdd_ctx->target_type == TARGET_TYPE_KIWI) {
 		qdf_status = cdp_pdev_init(cds_get_context(QDF_MODULE_ID_SOC),
 					   gp_cds_context->htc_ctx,
 					   gp_cds_context->qdf_ctx, 0);
@@ -985,7 +993,15 @@ QDF_STATUS cds_dp_open(struct wlan_objmgr_psoc *psoc)
 	ucfg_pmo_psoc_set_txrx_pdev_id(psoc, OL_TXRX_PDEV_ID);
 	ucfg_ocb_set_txrx_pdev_id(psoc, OL_TXRX_PDEV_ID);
 
+	cdp_set_rtpm_tput_policy_requirement(cds_get_context(QDF_MODULE_ID_SOC),
+					     false);
+
 	cds_debug("CDS successfully Opened");
+
+	if (cdp_cfg_get(gp_cds_context->dp_soc, cfg_dp_force_gro_enable))
+		hdd_ctx->dp_agg_param.force_gro_enable = true;
+	else
+		hdd_ctx->dp_agg_param.force_gro_enable = false;
 
 	return 0;
 
@@ -1436,6 +1452,8 @@ QDF_STATUS cds_close(struct wlan_objmgr_psoc *psoc)
 QDF_STATUS cds_dp_close(struct wlan_objmgr_psoc *psoc)
 {
 	cdp_txrx_intr_detach(gp_cds_context->dp_soc);
+
+	qdf_nbuf_stop_replenish_timer();
 
 	dp_txrx_deinit(cds_get_context(QDF_MODULE_ID_SOC));
 
@@ -2854,6 +2872,9 @@ cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
 
 	if (cds_get_cdp_vdev_stats(vdev_id, vdev_stats)) {
 		stats->tx_retries = vdev_stats->tx.retries;
+		stats->tx_retries_mpdu = vdev_stats->tx.retries_mpdu;
+		stats->tx_mpdu_success_with_retries =
+			vdev_stats->tx.mpdu_success_with_retries;
 		ret = true;
 	}
 
@@ -2863,6 +2884,7 @@ cds_dp_get_vdev_stats(uint8_t vdev_id, struct cds_vdev_dp_stats *stats)
 #endif
 
 #ifdef ENABLE_SMMU_S1_TRANSLATION
+#ifdef IPA_OFFLOAD
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
 QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
 {
@@ -2956,6 +2978,93 @@ exit_with_success:
 
 	return QDF_STATUS_SUCCESS;
 }
+#endif
+#else
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
+{
+	struct iommu_domain *domain;
+	bool wlan_smmu_enabled;
+
+	domain = pld_smmu_get_domain(osdev->dev);
+	if (domain) {
+		int attr = 0;
+		int errno = iommu_domain_get_attr(domain,
+						  DOMAIN_ATTR_S1_BYPASS, &attr);
+
+		wlan_smmu_enabled = !errno && !attr;
+	} else {
+		cds_info("No SMMU mapping present");
+		wlan_smmu_enabled = false;
+	}
+
+	if (!wlan_smmu_enabled) {
+		osdev->smmu_s1_enabled = false;
+		goto exit_with_success;
+	}
+
+	if (!ipa_present) {
+		osdev->smmu_s1_enabled = true;
+		goto exit_with_success;
+	}
+
+	osdev->smmu_s1_enabled = wlan_smmu_enabled;
+	if (!wlan_smmu_enabled) {
+		cds_err("SMMU disabled; WLAN: disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+exit_with_success:
+	osdev->domain = domain;
+
+	cds_info("SMMU S1 %s", osdev->smmu_s1_enabled ? "enabled" : "disabled");
+
+	return QDF_STATUS_SUCCESS;
+}
+
+#else
+QDF_STATUS cds_smmu_mem_map_setup(qdf_device_t osdev, bool ipa_present)
+{
+	struct dma_iommu_mapping *mapping;
+	bool wlan_smmu_enabled;
+
+	mapping = pld_smmu_get_mapping(osdev->dev);
+	if (mapping) {
+		int attr = 0;
+		int errno = iommu_domain_get_attr(mapping->domain,
+						  DOMAIN_ATTR_S1_BYPASS, &attr);
+
+		wlan_smmu_enabled = !errno && !attr;
+	} else {
+		cds_info("No SMMU mapping present");
+		wlan_smmu_enabled = false;
+	}
+
+	if (!wlan_smmu_enabled) {
+		osdev->smmu_s1_enabled = false;
+		goto exit_with_success;
+	}
+
+	if (!ipa_present) {
+		osdev->smmu_s1_enabled = true;
+		goto exit_with_success;
+	}
+
+	osdev->smmu_s1_enabled = wlan_smmu_enabled;
+	if (!wlan_smmu_enabled) {
+		cds_err("SMMU disabled; WLAN:disabled");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+exit_with_success:
+	osdev->iommu_mapping = mapping;
+
+	cds_info("SMMU S1 %s", osdev->smmu_s1_enabled ? "enabled" : "disabled");
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #endif
 
 #ifdef IPA_OFFLOAD

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -327,21 +328,6 @@ QDF_STATUS wmi_unified_get_roam_scan_ch_list(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-#if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
-QDF_STATUS
-wmi_extract_roam_event(wmi_unified_t wmi_handle, uint8_t *event,
-		       uint32_t data_len,
-		       struct roam_offload_roam_event *roam_event)
-{
-	if (wmi_handle->ops->extract_roam_event)
-		return wmi_handle->ops->extract_roam_event(wmi_handle, event,
-							   data_len,
-							   roam_event);
-
-	return QDF_STATUS_E_FAILURE;
-}
-#endif /* WLAN_FEATURE_HOST_ROAM || WLAN_FEATURE_ROAM_OFFLOAD */
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 QDF_STATUS wmi_unified_set_roam_triggers(wmi_unified_t wmi_handle,
 					 struct wlan_roam_triggers *triggers)
@@ -376,6 +362,19 @@ wmi_extract_roam_sync_frame_event(wmi_unified_t wmi_handle, void *event,
 								      event,
 								      len,
 								      frame_ptr);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_roam_event(wmi_unified_t wmi_handle, uint8_t *event,
+		       uint32_t data_len,
+		       struct roam_offload_roam_event *roam_event)
+{
+	if (wmi_handle->ops->extract_roam_event)
+		return wmi_handle->ops->extract_roam_event(wmi_handle, event,
+							   data_len,
+							   roam_event);
 
 	return QDF_STATUS_E_FAILURE;
 }
@@ -487,6 +486,19 @@ wmi_extract_roam_pmkid_request(wmi_unified_t wmi_handle,
 								   data_len,
 								   list);
 
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_roam_candidate_frame_event(wmi_unified_t wmi_handle, uint8_t *event,
+				       uint32_t len,
+				       struct roam_scan_candidate_frame *data)
+{
+	if (wmi_handle->ops->extract_roam_candidate_frame)
+		return wmi_handle->ops->extract_roam_candidate_frame(
+								  wmi_handle,
+								  event,
+								  len, data);
 	return QDF_STATUS_E_FAILURE;
 }
 #endif

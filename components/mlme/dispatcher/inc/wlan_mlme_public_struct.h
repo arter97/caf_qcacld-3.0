@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1274,6 +1275,21 @@ struct dual_sta_policy {
 	uint8_t primary_vdev_id;
 };
 
+/**
+ * enum mlme_cfg_frame_type  - frame type to configure mgmt hw tx retry count
+ * @CFG_GO_NEGOTIATION_REQ_FRAME_TYPE: p2p go negotiation request fame
+ * @CFG_P2P_INVITATION_REQ_FRAME_TYPE: p2p invitation request frame
+ * @CFG_PROVISION_DISCOVERY_REQ_FRAME_TYPE: p2p provision discovery request
+ */
+enum mlme_cfg_frame_type {
+	CFG_GO_NEGOTIATION_REQ_FRAME_TYPE = 0,
+	CFG_P2P_INVITATION_REQ_FRAME_TYPE = 1,
+	CFG_PROVISION_DISCOVERY_REQ_FRAME_TYPE = 2,
+	CFG_FRAME_TYPE_MAX,
+};
+
+#define MAX_MGMT_HW_TX_RETRY_COUNT 127
+
 /* struct wlan_mlme_generic - Generic CFG config items
  *
  * @band_capability: HW Band Capability - Both or 2.4G only or 5G only
@@ -1300,7 +1316,6 @@ struct dual_sta_policy {
  * @enabled_11h: enable 11h flag
  * @enabled_11d: enable 11d flag
  * @enable_beacon_reception_stats: enable beacon reception stats
- * @enable_remove_time_stamp_sync_cmd: Enable remove time stamp sync cmd
  * @data_stall_recovery_fw_support: whether FW supports Data stall recovery.
  * @enable_change_channel_bandwidth: enable/disable change channel bw in mission
  * mode
@@ -1323,6 +1338,8 @@ struct dual_sta_policy {
  * @ocv_support: FW supports OCV or not
  * @wds_mode: wds mode supported
  * @dual_sta_policy_cfg: Dual STA policies configuration
+ * @tx_retry_multiplier: TX xretry extension parameter
+ * @mgmt_hw_tx_retry_count: MGMT HW tx retry count for frames
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1350,7 +1367,6 @@ struct wlan_mlme_generic {
 	bool enabled_11d;
 	bool enable_deauth_to_disassoc_map;
 	bool enable_beacon_reception_stats;
-	bool enable_remove_time_stamp_sync_cmd;
 	bool data_stall_recovery_fw_support;
 	uint32_t disable_4way_hs_offload;
 	bool as_enabled;
@@ -1369,6 +1385,8 @@ struct wlan_mlme_generic {
 	bool ocv_support;
 	enum wlan_wds_mode wds_mode;
 	struct dual_sta_policy dual_sta_policy;
+	uint32_t tx_retry_multiplier;
+	uint8_t mgmt_hw_tx_retry_count[CFG_FRAME_TYPE_MAX];
 };
 
 /*
@@ -1562,6 +1580,19 @@ enum station_keepalive_method {
 };
 
 /**
+ * enum station_prefer_bw - Station preferred bandwidth to connect AP
+ * @STA_PREFER_BW_DEFAULT: Station connects AP with its max bw capability.
+ * @STA_PREFER_BW_VHT80MHZ: Station connects in VHT 80MHz 2x2 when AP is in
+				160MHz 2x2
+ * @STA_PREFER_BW_80MHZ: Station connects in 80MHz when AP is in 160MHz
+ */
+enum station_prefer_bw {
+	STA_PREFER_BW_DEFAULT,
+	STA_PREFER_BW_VHT80MHZ,
+	STA_PREFER_BW_80MHZ
+};
+
+/**
  * struct wlan_mlme_sta_cfg - MLME STA configuration items
  * @sta_keep_alive_period:          Sends NULL frame to AP period
  * @bss_max_idle_period:            BSS max idle period
@@ -1573,8 +1604,8 @@ enum station_keepalive_method {
  * @fils_max_chan_guard_time:       Set maximum channel guard time
  * @current_rssi:                   Current rssi
  * @deauth_retry_cnt:               Deauth retry count
- * @ignore_peer_erp_info:           Ignore peer infrormation
  * @sta_prefer_80mhz_over_160mhz:   Set Sta preference to connect in 80HZ/160HZ
+ * @ignore_peer_erp_info:           Ignore peer infrormation
  * @enable_5g_ebt:                  Set default 5G early beacon termination
  * @deauth_before_connection:       Send deauth before connection or not
  * @enable_go_cts2self_for_sta:     Stop NOA and start using cts2self
@@ -1596,8 +1627,8 @@ struct wlan_mlme_sta_cfg {
 	uint8_t fils_max_chan_guard_time;
 	uint8_t current_rssi;
 	uint8_t deauth_retry_cnt;
+	uint8_t sta_prefer_80mhz_over_160mhz;
 	bool ignore_peer_erp_info;
-	bool sta_prefer_80mhz_over_160mhz;
 	bool enable_5g_ebt;
 	bool deauth_before_connection;
 	bool enable_go_cts2self_for_sta;
@@ -1688,6 +1719,7 @@ struct fw_scan_channels {
  * @mawc_roam_enabled:              Enable/Disable MAWC during roaming
  * @enable_fast_roam_in_concurrency:Enable LFR roaming on STA during concurrency
  * @vendor_btm_param:               Vendor WTC roam trigger parameters
+ * @roam_rt_stats:                  Roam event stats vendor command parameters
  * @lfr3_roaming_offload:           Enable/disable roam offload feature
  * @lfr3_dual_sta_roaming_enabled:  Enable/Disable dual sta roaming offload
  * feature
@@ -1807,6 +1839,7 @@ struct wlan_mlme_lfr_cfg {
 	bool enable_fast_roam_in_concurrency;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	struct wlan_cm_roam_vendor_btm_params vendor_btm_param;
+	struct wlan_cm_roam_rt_stats roam_rt_stats;
 	bool lfr3_roaming_offload;
 	bool lfr3_dual_sta_roaming_enabled;
 	bool enable_self_bss_roam;
@@ -2429,6 +2462,10 @@ enum mlme_reg_srd_master_modes {
  * list command to FW till the current scan is complete.
  * @retain_nol_across_regdmn_update: Retain the NOL list across the regdomain.
  * @enable_nan_on_indoor_channels: Enable nan on Indoor channels
+ * @coex_unsafe_chan_nb_user_prefer: Honor coex unsafe freq event from firmware
+ * or not
+ * @coex_unsafe_chan_reg_disable: To disable reg channels for received coex
+ * unsafe channels list
  */
 struct wlan_mlme_reg {
 	uint32_t self_gen_frm_pwr;
@@ -2449,6 +2486,10 @@ struct wlan_mlme_reg {
 	bool enable_pending_chan_list_req;
 	bool retain_nol_across_regdmn_update;
 	bool enable_nan_on_indoor_channels;
+#ifdef FEATURE_WLAN_CH_AVOID_EXT
+	bool coex_unsafe_chan_nb_user_prefer;
+	bool coex_unsafe_chan_reg_disable;
+#endif
 };
 
 #define IOT_AGGR_INFO_MAX_NUM 32

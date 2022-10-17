@@ -222,6 +222,7 @@ typedef QDF_STATUS(*pmo_psoc_resume_handler)
  * @pmo_ns_offload_dynamic_update: enable/disable ns offload on the fly
  * @pmo_peer_disconnect: trigger is peer disconnect
  * @pmo_mcbc_setting_dynamic_update: mcbc value update on the fly
+ * @pmo_arp_ns_offload_dynamic_update: enable/disable arp/ns offload on the fly
  *
  * @pmo_offload_trigger_max: Max trigger value
  */
@@ -236,6 +237,7 @@ enum pmo_offload_trigger {
 	pmo_ns_offload_dynamic_update,
 	pmo_peer_disconnect,
 	pmo_mcbc_setting_dynamic_update,
+	pmo_arp_ns_offload_dynamic_update,
 
 	pmo_offload_trigger_max,
 };
@@ -445,7 +447,6 @@ struct pmo_psoc_cfg {
 	bool is_mod_dtim_on_sys_suspend_enabled;
 	bool is_bus_suspend_enabled_in_sap_mode;
 	bool is_bus_suspend_enabled_in_go_mode;
-	bool is_dynamic_pcie_gen_speed_change_enabled;
 #ifdef WLAN_ENABLE_GPIO_WAKEUP
 	bool enable_gpio_wakeup;
 	uint32_t gpio_wakeup_pin;

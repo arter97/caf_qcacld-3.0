@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -77,6 +78,7 @@ const struct nla_policy cfr_config_policy[
 						.type = NLA_U32},
 };
 
+#ifdef WLAN_ENH_CFR_ENABLE
 static void
 wlan_hdd_transport_mode_cfg(struct wlan_objmgr_pdev *pdev,
 			    uint8_t vdev_id, uint32_t pid,
@@ -102,8 +104,6 @@ wlan_hdd_transport_mode_cfg(struct wlan_objmgr_pdev *pdev,
 	else
 		pa->nl_cb.cfr_nl_cb = NULL;
 }
-
-#ifdef WLAN_ENH_CFR_ENABLE
 
 #define DEFAULT_CFR_NSS 0xff
 #define DEFAULT_CFR_BW  0xf
@@ -456,11 +456,10 @@ wlan_cfg80211_peer_cfr_capture_cfg_adrastea(struct hdd_adapter *adapter,
 			QCA_WLAN_VENDOR_ATTR_PEER_CFR_ENABLE]);
 	}
 
-	vdev = adapter->vdev;
-	status = hdd_objmgr_get_vdev_by_user(vdev, WLAN_CFR_ID);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("failed to get vdev");
-		return status;
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_CFR_ID);
+	if (!vdev) {
+		hdd_err("vdev is NULL");
+		return -EINVAL;
 	}
 
 	pdev = wlan_vdev_get_pdev(vdev);

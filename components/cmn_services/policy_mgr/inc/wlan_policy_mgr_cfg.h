@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -362,6 +361,32 @@ CFG_INI_UINT("gDualMacFeatureDisable", 0, 6, 6, CFG_VALUE_OR_DEFAULT, \
 	     "This INI is used to enable/disable Dual MAC feature")
 
 /*
+ *
+ * <ini>
+ * enable_sbs - Enable/Disable SBS.
+ * @Min: 0
+ * @Max: 1
+ * @Default: 1
+ *
+ * This ini is used to enable/disable SBS feature.
+ * 0 - disable SBS
+ * 1 - enable SBS
+ *
+ *
+ * Related: None.
+ *
+ * Supported Feature: SBS
+ *
+ * Usage: External
+ *
+ * </ini>
+ */
+#define CFG_ENABLE_SBS CFG_INI_BOOL(\
+					"enable_sbs", \
+					true, \
+					"Enable/Disable SBS")
+
+/*
  * <ini>
  * g_sta_sap_scc_on_dfs_chan - Allow STA+SAP SCC on DFS channel with master
  * mode support disabled.
@@ -577,27 +602,6 @@ CFG_INI_UINT("g_enable_go_force_scc", 0, 2, 0, CFG_VALUE_OR_DEFAULT, \
 CFG_INI_UINT("g_pcl_band_priority", 0, 1, 0, CFG_VALUE_OR_DEFAULT, \
 	     "Set 5G and 6G Channel order")
 
-/*
- * <ini>
- * g_multi_sap_allowed_on_same_band - Allow multi sap started on same band
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to allow multi sap started on same band or not.
- * 0 - Disallow multi sap started on same band
- * 1 - Allow multi sap started on same band
- *
- * Supported Feature: SAP
- *
- * Usage: External
- *
- * </ini>
- */
-#define CFG_MULTI_SAP_ALLOWED_ON_SAME_BAND \
-CFG_INI_BOOL("g_multi_sap_allowed_on_same_band", 1, \
-	     "Allow multi SAP started on same band")
-
 #define CFG_POLICY_MGR_ALL \
 		CFG(CFG_MCC_TO_SCC_SWITCH) \
 		CFG(CFG_CONC_SYS_PREF) \
@@ -610,6 +614,7 @@ CFG_INI_BOOL("g_multi_sap_allowed_on_same_band", 1, \
 		CFG(CFG_ENABLE_MCC_ADAPTIVE_SCH_ENABLED_NAME)\
 		CFG(CFG_ENABLE_STA_CONNECTION_IN_5GHZ)\
 		CFG(CFG_DUAL_MAC_FEATURE_DISABLE)\
+		CFG(CFG_ENABLE_SBS)\
 		CFG(CFG_STA_SAP_SCC_ON_DFS_CHAN)\
 		CFG(CFG_FORCE_1X1_FEATURE)\
 		CFG(CFG_ENABLE_SAP_MANDATORY_CHAN_LIST)\
@@ -618,6 +623,5 @@ CFG_INI_BOOL("g_multi_sap_allowed_on_same_band", 1, \
 		CFG(CFG_MARK_INDOOR_AS_DISABLE_FEATURE)\
 		CFG(CFG_ALLOW_MCC_GO_DIFF_BI) \
 		CFG(CFG_P2P_GO_ENABLE_FORCE_SCC) \
-		CFG(CFG_PCL_BAND_PRIORITY) \
-		CFG(CFG_MULTI_SAP_ALLOWED_ON_SAME_BAND)
+		CFG(CFG_PCL_BAND_PRIORITY)
 #endif

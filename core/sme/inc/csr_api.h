@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -444,12 +445,8 @@ struct csr_roam_profile {
 	uint32_t nRSNReqIELength; /* The byte count in the pRSNReqIE */
 	uint8_t *pRSNReqIE;       /* If not null,it's IE byte stream for RSN */
 	uint8_t privacy;
-	bool fwdWPSPBCProbeReq;
 	tAniAuthType csr80211AuthType;
 	uint32_t dtimPeriod;
-	bool ApUapsdEnable;
-	bool protEnabled;
-	bool obssProtEnabled;
 	bool chan_switch_hostapd_rate_enabled;
 	uint16_t cfg_protection;
 	uint8_t wps_state;
@@ -582,6 +579,8 @@ struct csr_roam_info {
 	uint8_t tx_mcs_map;
 	/* Extended capabilities of STA */
 	uint8_t ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 	int rssi;
 	int tx_rate;
 	int rx_rate;
@@ -625,6 +624,8 @@ typedef struct sSirSmeAssocIndToUpperLayerCnf {
 	uint8_t tx_mcs_map;
 	/* Extended capabilities of STA */
 	uint8_t              ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 
 	uint32_t ies_len;
 	uint8_t *ies;
@@ -739,6 +740,32 @@ struct csr_del_sta_params {
 	uint16_t reason_code;
 	uint8_t subtype;
 };
+
+#ifdef SAP_CP_CLEANUP
+/* Struct bss_dot11_config - Dot11 parameters for
+ * SAP operation
+ * @vdev_id: vdev id
+ * @privacy: privacy config
+ * @phy_mode: phy mode
+ * @bss_op_ch_freq: operational frequency
+ * @dot11_mode: dot11 mode
+ * @nw_type: network type
+ * @p_band: operating band
+ * @opr_rates: operational rates
+ * @ext_rates: extended rates
+ */
+struct bss_dot11_config {
+	uint8_t vdev_id;
+	uint8_t privacy;
+	eCsrPhyMode phy_mode;
+	uint32_t bss_op_ch_freq;
+	uint8_t dot11_mode;
+	tSirNwType nw_type;
+	enum reg_wifi_band p_band;
+	tSirMacRateSet opr_rates;
+	tSirMacRateSet ext_rates;
+};
+#endif
 
 typedef QDF_STATUS (*csr_roam_complete_cb)(struct wlan_objmgr_psoc *psoc,
 					   uint8_t session_id,
@@ -930,10 +957,43 @@ QDF_STATUS csr_mlme_vdev_disconnect_all_p2p_client_event(uint8_t vdev_id);
 QDF_STATUS csr_mlme_vdev_stop_bss(uint8_t vdev_id);
 
 /*
+ * csr_mlme_handle_sap_mlo_sta_concurrency() - Handle SAP MLO STA concurrency
+ *                                             such as:
+ *       1) If MLO STA is present with both links in 5/6 Ghz then SAP comes up
+ *          on 2.4 Ghz, then Disable one of the links
+ *       2) If MLO STA is present with both links in 5/6 Ghz and SAP, which was
+ *          present on 2.4 ghz, stops then renable both the as one of the links
+ *          were disabled because of sap on 2.4 ghz.
+ *
+ * @vdev: vdev mlme object
+ * @is_ap_up: bool to represent sap state
+ *
+ * Return: Void
+ */
+#ifdef WLAN_FEATURE_11BE_MLO
+void csr_handle_sap_mlo_sta_concurrency(struct wlan_objmgr_vdev *vdev,
+					bool is_ap_up);
+#endif
+
+/*
  * csr_mlme_get_concurrent_operation_freq() - Callback for MLME module to
  *	get the concurrent operation frequency
  *
  * Return: concurrent frequency
  */
 qdf_freq_t csr_mlme_get_concurrent_operation_freq(void);
+
+#ifdef SAP_CP_CLEANUP
+/*
+ * csr_roam_get_phy_mode_band_for_bss() - CSR API to get phy mode and
+ * band for particular dot11 config
+ * @mac : mac context
+ * @dot11_cfg : pointer to the dot11 config
+ *
+ * Return : Void
+ */
+enum csr_cfgdot11mode
+csr_roam_get_phy_mode_band_for_bss(struct mac_context *mac,
+				   struct bss_dot11_config *dot11_cfg);
+#endif
 #endif

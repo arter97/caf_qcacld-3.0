@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -52,6 +53,9 @@
 #include <wlan_scan_ucfg_api.h>
 #include <wlan_scan_utils_api.h>
 
+/* IF MGR API header file */
+#include "wlan_if_mgr_ucfg_api.h"
+
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
  * -------------------------------------------------------------------------*/
@@ -81,7 +85,7 @@
  * Function Declarations and Documentation
  * -------------------------------------------------------------------------*/
 
-#ifdef WLAN_FEATURE_11BE
+#if defined(WLAN_FEATURE_11BE)
 static inline bool sap_acs_cfg_is_chwidth_320mhz(uint16_t width)
 {
 	return width == CH_WIDTH_320MHZ;
@@ -92,6 +96,19 @@ static inline bool sap_acs_cfg_is_chwidth_320mhz(uint16_t width)
 	return false;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+static void sap_acs_set_puncture_bitmap(struct sap_context *sap_ctx,
+					struct ch_params *ch_params)
+{
+	sap_ctx->acs_cfg->acs_puncture_bitmap = ch_params->reg_punc_bitmap;
+}
+#else
+static void sap_acs_set_puncture_bitmap(struct sap_context *sap_ctx,
+					struct ch_params *ch_params)
+{
+}
+#endif /* WLAN_FEATURE_11BE */
 
 /**
  * sap_config_acs_result : Generate ACS result params based on ch constraints
@@ -113,6 +130,7 @@ void sap_config_acs_result(mac_handle_t mac_handle,
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
 
 	ch_params.ch_width = sap_ctx->acs_cfg->ch_width;
+	sap_acs_set_puncture_support(sap_ctx, &ch_params);
 	wlan_reg_set_channel_params_for_freq(
 			mac_ctx->pdev, sap_ctx->acs_cfg->pri_ch_freq,
 			sec_ch_freq, &ch_params);
@@ -140,6 +158,8 @@ void sap_config_acs_result(mac_handle_t mac_handle,
 				sap_ctx->acs_cfg->pri_ch_freq + 20;
 	else
 		sap_ctx->acs_cfg->ht_sec_ch_freq = 0;
+
+	sap_acs_set_puncture_bitmap(sap_ctx, &ch_params);
 }
 
 /**
@@ -569,10 +589,10 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	 * Fetch the number of SAP interfaces. If the number of sap Interface
 	 * more than one then we will make is_sap_ready_for_chnl_chng to true
 	 * for that sapctx. If there is only one SAP interface then process
-	 * immediately. If Dual BAND SAP is enabled then also process
-	 * immediately, as in this case the both SAP will be in different band
-	 * and channel change on one SAP doesn't mean channel change on
-	 * other interface.
+	 * immediately. If Dual BAND SAP OR SBS in different mac, is enabled
+	 * then also process immediately, as in this case the both SAP will be
+	 * in different band and channel change on one SAP doesn't mean channel
+	 * change on other interface.
 	 *
 	 * For example,
 	 * Let's say SAP(2G) + SAP(5G-DFS) is initial connection which triggered
@@ -590,6 +610,7 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	sap_scc_dfs = sap_is_conc_sap_doing_scc_dfs(mac_handle, sap_ctx);
 	if (sap_get_total_number_sap_intf(mac_handle) <= 1 ||
 	    policy_mgr_is_current_hwmode_dbs(mac_ctx->psoc) ||
+	    policy_mgr_is_current_hwmode_sbs(mac_ctx->psoc) ||
 	    sap_ctx->csa_reason == CSA_REASON_DCS ||
 	    !sap_scc_dfs) {
 		/*
@@ -865,10 +886,11 @@ sap_check_and_process_forcescc_for_go_plus_go(
 		sap_ctx = mac_ctx->sap.sapCtxList[i].sap_context;
 		if (sap_ctx &&
 		    QDF_P2P_GO_MODE == mac_ctx->sap.sapCtxList[i].sapPersona &&
-		    sap_ctx->is_forcescc_restart_required) {
-			sap_debug("sessionId %d chan_freq %d chan_width %d",
-				  sap_ctx->sessionId, cur_sap_ctx->chan_freq,
-				  cur_sap_ctx->ch_params.ch_width);
+		    sap_ctx->is_forcescc_restart_required &&
+		    cur_sap_ctx->sessionId != sap_ctx->sessionId) {
+			sap_debug("update chan_freq %d of sessionId %d with chan_freq %d",
+				  sap_ctx->chan_freq, sap_ctx->sessionId,
+				  cur_sap_ctx->chan_freq);
 			policy_mgr_process_forcescc_for_go(
 				mac_ctx->psoc, sap_ctx->sessionId,
 				cur_sap_ctx->chan_freq,
@@ -935,6 +957,38 @@ static inline void
 sap_check_and_process_go_force_ssc(struct sap_context *cur_sap_ctx)
 {}
 #endif
+
+/**
+ * sap_is_csa_restart_state() - check if sap is in csa restart state
+ * @psoc: PSOC object
+ * @sap_ctx: sap context to check
+ *
+ * Return: true if sap is in csa restart state
+ */
+static bool sap_is_csa_restart_state(struct wlan_objmgr_psoc *psoc,
+				     struct sap_context *sap_ctx)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	if (!psoc || !sap_ctx) {
+		sap_err("Invalid params");
+		return false;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+						    sap_ctx->sessionId,
+						    WLAN_DFS_ID);
+	if (!vdev) {
+		sap_err("vdev is NULL for vdev_id: %u", sap_ctx->sessionId);
+		return false;
+	}
+
+	status = wlan_vdev_mlme_is_csa_restart(vdev);
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_DFS_ID);
+
+	return QDF_IS_STATUS_SUCCESS(status);
+}
 
 QDF_STATUS wlansap_roam_callback(void *ctx,
 				 struct csr_roam_info *csr_roam_info,
@@ -1027,6 +1081,12 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			goto EXIT;
 		}
 
+		if (sap_ctx->fsm_state == SAP_STARTED &&
+		    sap_is_csa_restart_state(mac_ctx->psoc, sap_ctx)) {
+			sap_debug("Ignore Radar event in csa restart state");
+			goto EXIT;
+		}
+
 		if (!sap_chan_bond_dfs_sub_chan(
 				sap_ctx, sap_ctx->chan_freq,
 				PHY_CHANNEL_BONDING_STATE_MAX)) {
@@ -1106,6 +1166,9 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 		break;
 	case eCSR_ROAM_SET_CHANNEL_RSP:
 		sap_debug("Received set channel response");
+		ucfg_if_mgr_deliver_event(sap_ctx->vdev,
+					  WLAN_IF_MGR_EV_CSA_COMPLETE,
+					  NULL);
 		break;
 	case eCSR_ROAM_CAC_COMPLETE_IND:
 		sap_debug("Received cac complete indication");

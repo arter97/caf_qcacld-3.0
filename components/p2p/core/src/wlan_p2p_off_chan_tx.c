@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -34,6 +35,7 @@
 #include "wlan_p2p_off_chan_tx.h"
 #include "wlan_osif_request_manager.h"
 #include <wlan_mlme_main.h>
+#include "wlan_mlme_api.h"
 
 /**
  * p2p_psoc_get_tx_ops() - get p2p tx ops
@@ -752,6 +754,10 @@ static char *p2p_get_frame_type_str(struct p2p_frame_info *frame_info)
 		return "GAS come back response";
 	case P2P_PUBLIC_ACTION_WNM_BTM_REQ:
 		return "BTM request";
+	case P2P_PUBLIC_ACTION_RRM_BEACON_REQ:
+		return "BEACON request";
+	case P2P_PUBLIC_ACTION_RRM_NEIGHBOR_RSP:
+		return "NEIGHBOR response";
 	default:
 		return "Other frame";
 	}
@@ -814,22 +820,41 @@ static QDF_STATUS p2p_get_frame_info(uint8_t *data_buf, uint32_t length,
 
 	buf += P2P_ACTION_OFFSET;
 	if (length > P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET) {
-		if (buf[0] == P2P_PUBLIC_ACTION_FRAME &&
-		    buf[1] == P2P_PUBLIC_ACTION_VENDOR_SPECIFIC &&
-		    !qdf_mem_cmp(&buf[2], P2P_OUI, P2P_OUI_SIZE)) {
-			buf = data_buf +
-				P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET;
-			action_type = buf[0];
-			if (action_type > P2P_PUBLIC_ACTION_PROV_DIS_RSP)
-				frame_info->public_action_type =
-					P2P_PUBLIC_ACTION_NOT_SUPPORT;
-			else
-				frame_info->public_action_type = action_type;
-		} else if (buf[0] == WNM_ACTION_FRAME &&
-			   buf[1] == WNM_BSS_TM_REQUEST) {
+		switch (buf[0]) {
+		case P2P_PUBLIC_ACTION_FRAME:
+			if (buf[1] == P2P_PUBLIC_ACTION_VENDOR_SPECIFIC &&
+			    !qdf_mem_cmp(&buf[2], P2P_OUI, P2P_OUI_SIZE)) {
+				buf = data_buf +
+					P2P_PUBLIC_ACTION_FRAME_TYPE_OFFSET;
+				action_type = buf[0];
+				if (action_type > P2P_PUBLIC_ACTION_PROV_DIS_RSP)
+					frame_info->public_action_type =
+						P2P_PUBLIC_ACTION_NOT_SUPPORT;
+				else
+					frame_info->public_action_type =
+						action_type;
+			}
+			break;
+		case WNM_ACTION_FRAME:
+			if (buf[1] == WNM_BSS_TM_REQUEST) {
 				action_type = buf[0];
 				frame_info->public_action_type =
 					P2P_PUBLIC_ACTION_WNM_BTM_REQ;
+			}
+			break;
+		case RRM_ACTION_FRAME:
+			if (buf[1] == RRM_RADIO_MEASURE_REQ) {
+				action_type = buf[0];
+				frame_info->public_action_type =
+					P2P_PUBLIC_ACTION_RRM_BEACON_REQ;
+			} else if (buf[1] == RRM_NEIGHBOR_RPT) {
+				action_type = buf[0];
+				frame_info->public_action_type =
+					P2P_PUBLIC_ACTION_RRM_NEIGHBOR_RSP;
+			}
+			break;
+		default:
+			break;
 		}
 	} else if (length > P2P_ACTION_FRAME_TYPE_OFFSET &&
 		   buf[0] == P2P_ACTION_VENDOR_SPECIFIC_CATEGORY &&
@@ -883,15 +908,20 @@ static QDF_STATUS p2p_tx_update_connection_status(
 			  QDF_MAC_ADDR_REF(mac_to));
 
 	if ((tx_frame_info->public_action_type ==
-	     P2P_PUBLIC_ACTION_PROV_DIS_REQ) &&
-	    (p2p_soc_obj->connection_status == P2P_NOT_ACTIVE)) {
-		p2p_soc_obj->connection_status = P2P_GO_NEG_PROCESS;
+	     P2P_PUBLIC_ACTION_PROV_DIS_REQ) ||
+	    (tx_frame_info->public_action_type ==
+	     P2P_PUBLIC_ACTION_INVIT_REQ) ||
+	    (tx_frame_info->public_action_type ==
+	     P2P_PUBLIC_ACTION_NEG_REQ) ||
+	     (tx_frame_info->public_action_type ==
+	     P2P_PUBLIC_ACTION_NEG_RSP)) {
+		p2p_status_update(p2p_soc_obj, P2P_GO_NEG_PROCESS);
 		p2p_debug("[P2P State]Inactive state to GO negotiation progress state");
 	} else if ((tx_frame_info->public_action_type ==
-		    P2P_PUBLIC_ACTION_NEG_CNF) &&
-		   (p2p_soc_obj->connection_status ==
-		    P2P_GO_NEG_PROCESS)) {
-		p2p_soc_obj->connection_status = P2P_GO_NEG_COMPLETED;
+		    P2P_PUBLIC_ACTION_NEG_CNF) ||
+		   (tx_frame_info->public_action_type ==
+		    P2P_PUBLIC_ACTION_INVIT_RSP)) {
+		p2p_status_update(p2p_soc_obj, P2P_GO_NEG_COMPLETED);
 		p2p_debug("[P2P State]GO nego progress to GO nego completed state");
 	}
 
@@ -927,20 +957,25 @@ static QDF_STATUS p2p_rx_update_connection_status(
 			  QDF_MAC_ADDR_REF(mac_from));
 
 	if ((rx_frame_info->public_action_type ==
-	     P2P_PUBLIC_ACTION_PROV_DIS_REQ) &&
-	    (p2p_soc_obj->connection_status == P2P_NOT_ACTIVE)) {
-		p2p_soc_obj->connection_status = P2P_GO_NEG_PROCESS;
+			P2P_PUBLIC_ACTION_PROV_DIS_REQ) ||
+	    (rx_frame_info->public_action_type ==
+			P2P_PUBLIC_ACTION_NEG_REQ) ||
+	    (rx_frame_info->public_action_type ==
+			P2P_PUBLIC_ACTION_NEG_RSP)) {
+		p2p_status_update(p2p_soc_obj, P2P_GO_NEG_PROCESS);
 		p2p_info("[P2P State]Inactive state to GO negotiation progress state");
-	} else if ((rx_frame_info->public_action_type ==
-		    P2P_PUBLIC_ACTION_NEG_CNF) &&
+	} else if (((rx_frame_info->public_action_type ==
+		     P2P_PUBLIC_ACTION_NEG_CNF) ||
+		   (rx_frame_info->public_action_type ==
+		     P2P_PUBLIC_ACTION_INVIT_RSP)) &&
 		   (p2p_soc_obj->connection_status ==
 		    P2P_GO_NEG_PROCESS)) {
-		p2p_soc_obj->connection_status = P2P_GO_NEG_COMPLETED;
+		p2p_status_update(p2p_soc_obj, P2P_GO_NEG_COMPLETED);
 		p2p_info("[P2P State]GO negotiation progress to GO negotiation completed state");
 	} else if ((rx_frame_info->public_action_type ==
 		    P2P_PUBLIC_ACTION_INVIT_REQ) &&
 		   (p2p_soc_obj->connection_status == P2P_NOT_ACTIVE)) {
-		p2p_soc_obj->connection_status = P2P_GO_NEG_COMPLETED;
+		p2p_status_update(p2p_soc_obj, P2P_GO_NEG_COMPLETED);
 		p2p_info("[P2P State]Inactive state to GO negotiation completed state Autonomous GO formation");
 	}
 
@@ -1049,6 +1084,71 @@ static QDF_STATUS p2p_send_tx_conf(struct tx_action_context *tx_ctx,
 }
 
 /**
+ * p2p_get_hw_retry_count() - Get hw tx retry count from config store
+ * @psoc:          psoc object
+ * @tx_ctx:        tx context
+ *
+ * This function return the hw tx retry count for p2p action frame.
+ * 0 value means target will use fw default mgmt tx retry count 15.
+ *
+ * Return: frame hw tx retry count
+ */
+static uint8_t p2p_get_hw_retry_count(struct wlan_objmgr_psoc *psoc,
+				      struct tx_action_context *tx_ctx)
+{
+	if (tx_ctx->frame_info.type != P2P_FRAME_MGMT)
+		return 0;
+
+	if (tx_ctx->frame_info.sub_type != P2P_MGMT_ACTION)
+		return 0;
+
+	switch (tx_ctx->frame_info.public_action_type) {
+	case P2P_PUBLIC_ACTION_NEG_REQ:
+		return wlan_mlme_get_mgmt_hw_tx_retry_count(
+					psoc,
+					CFG_GO_NEGOTIATION_REQ_FRAME_TYPE);
+	case P2P_PUBLIC_ACTION_INVIT_REQ:
+		return wlan_mlme_get_mgmt_hw_tx_retry_count(
+					psoc,
+					CFG_P2P_INVITATION_REQ_FRAME_TYPE);
+	case P2P_PUBLIC_ACTION_PROV_DIS_REQ:
+		return wlan_mlme_get_mgmt_hw_tx_retry_count(
+					psoc,
+					CFG_PROVISION_DISCOVERY_REQ_FRAME_TYPE);
+	default:
+		return 0;
+	}
+}
+
+#define GET_HW_RETRY_LIMIT(count) QDF_GET_BITS(count, 0, 4)
+#define GET_HW_RETRY_LIMIT_EXT(count) QDF_GET_BITS(count, 4, 3)
+
+/**
+ * p2p_mgmt_set_hw_retry_count() - Set mgmt hw tx retry count
+ * @psoc:          psoc object
+ * @tx_ctx:        tx context
+ * @mgmt_param:    mgmt frame tx parameter
+ *
+ * This function will set mgmt frame hw tx retry count to tx parameter
+ *
+ * Return: void
+ */
+static void
+p2p_mgmt_set_hw_retry_count(struct wlan_objmgr_psoc *psoc,
+			    struct tx_action_context *tx_ctx,
+			    struct wmi_mgmt_params *mgmt_param)
+{
+	uint8_t retry_count = p2p_get_hw_retry_count(psoc, tx_ctx);
+
+	mgmt_param->tx_param.retry_limit = GET_HW_RETRY_LIMIT(retry_count);
+	mgmt_param->tx_param.retry_limit_ext =
+					GET_HW_RETRY_LIMIT_EXT(retry_count);
+	if (mgmt_param->tx_param.retry_limit ||
+	    mgmt_param->tx_param.retry_limit_ext)
+		mgmt_param->tx_params_valid = true;
+}
+
+/**
  * p2p_mgmt_tx() - call mgmt tx api
  * @tx_ctx:        tx context
  * @buf_len:       buffer length
@@ -1099,6 +1199,7 @@ static QDF_STATUS p2p_mgmt_tx(struct tx_action_context *tx_ctx,
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_P2P_ID);
 		return QDF_STATUS_E_INVAL;
 	}
+	p2p_mgmt_set_hw_retry_count(psoc, tx_ctx, &mgmt_param);
 
 	wh = (struct wlan_frame_hdr *)frame;
 	mac_addr = wh->i_addr1;
@@ -1132,8 +1233,12 @@ static QDF_STATUS p2p_mgmt_tx(struct tx_action_context *tx_ctx,
 		tx_ota_comp_cb = tgt_p2p_mgmt_ota_comp_cb;
 	}
 
-	p2p_debug("length:%d, chanfreq:%d", mgmt_param.frm_len,
-		  mgmt_param.chanfreq);
+	p2p_debug("length:%d, chanfreq:%d retry count:%d(%d, %d)",
+		  mgmt_param.frm_len, mgmt_param.chanfreq,
+		  (mgmt_param.tx_param.retry_limit_ext << 4) |
+		  mgmt_param.tx_param.retry_limit,
+		  mgmt_param.tx_param.retry_limit,
+		  mgmt_param.tx_param.retry_limit_ext);
 
 	tx_ctx->nbuf = packet;
 

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -93,11 +94,11 @@ typedef uint8_t tSirVersionString[SIR_VERSION_STRING_LEN];
 /* Add extra PMO_RESUME_TIMEOUT for runtime PM resume timeout */
 #define SIR_PEER_CREATE_RESPONSE_TIMEOUT (4000 + PMO_RESUME_TIMEOUT)
 #define SIR_DELETE_STA_TIMEOUT           (4000 + PMO_RESUME_TIMEOUT)
-#define SIR_VDEV_PLCY_MGR_TIMEOUT        (12000 + PMO_RESUME_TIMEOUT)
+#define SIR_VDEV_PLCY_MGR_TIMEOUT        (4000 + PMO_RESUME_TIMEOUT)
 #else
 #define SIR_PEER_CREATE_RESPONSE_TIMEOUT (4000)
 #define SIR_DELETE_STA_TIMEOUT           (4000) /* 4 seconds */
-#define SIR_VDEV_PLCY_MGR_TIMEOUT        (12000)
+#define SIR_VDEV_PLCY_MGR_TIMEOUT        (4000)
 #endif
 
 #define MAX_POWER_DBG_ARGS_SUPPORTED 8
@@ -534,6 +535,7 @@ struct roam_pmkid_req_event;
 /**
  * typedef pe_roam_synch_fn_t - PE roam synch callback routine pointer
  * @mac_ctx: Global MAC context
+ * @vdev_id: vdev id
  * @roam_sync_ind_ptr: Structure with roam synch parameters
  * @ie_len: ie length
  * @reason: Reason for calling the callback
@@ -546,6 +548,7 @@ struct roam_pmkid_req_event;
  */
 typedef QDF_STATUS
 (*pe_roam_synch_fn_t)(struct mac_context *mac_ctx,
+		      uint8_t vdev_id,
 		      struct roam_offload_synch_ind *roam_sync_ind_ptr,
 		      uint16_t ie_len,
 		      enum sir_roam_op_code reason);
@@ -685,6 +688,7 @@ struct add_ie_params {
 	uint8_t *probeRespBCNData_buff;
 };
 
+#ifndef SAP_CP_CLEANUP
 /* / Definition for kick starting BSS */
 /* / ---> MAC */
 /**
@@ -706,53 +710,30 @@ struct start_bss_req {
 	uint16_t messageType;   /* eWNI_SME_START_BSS_REQ */
 	uint16_t length;
 	uint8_t vdev_id;
-	struct qdf_mac_addr bssid;
-	struct qdf_mac_addr self_macaddr;
 	uint16_t beaconInterval;
 	uint8_t dot11mode;
-#ifdef FEATURE_WLAN_MCC_TO_SCC_SWITCH
-	uint8_t cc_switch_mode;
-#endif
-	enum bss_type bssType;
 	tSirMacSSid ssId;
 	uint32_t oper_ch_freq;
-	ePhyChanBondState cbMode;
 	uint8_t vht_channel_width;
 	uint8_t center_freq_seg0;
 	uint8_t center_freq_seg1;
 	uint8_t sec_ch_offset;
-
 	uint8_t privacy;
-	uint8_t apUapsdEnable;
 	uint8_t ssidHidden;
-	bool fwdWPSPBCProbeReq;
-	bool protEnabled;
-	bool obssProtEnabled;
-	uint16_t ht_capab;
 	tAniAuthType authType;
 	uint32_t dtimPeriod;
 	uint8_t wps_state;
-	enum QDF_OPMODE bssPersona;
-
-	uint8_t txLdpcIniFeatureEnabled;
-
 	tSirRSNie rsnIE;        /* RSN IE to be sent in */
-	/* Beacon and Probe */
-	/* Response frames */
 	tSirNwType nwType;      /* Indicates 11a/b/g */
 	tSirMacRateSet operationalRateSet;      /* Has 11a or 11b rates */
 	tSirMacRateSet extendedRateSet; /* Has 11g rates */
 	struct add_ie_params add_ie_params;
-
-	bool obssEnabled;
-	uint8_t sap_dot11mc;
 	uint16_t beacon_tx_rate;
-	bool vendor_vht_sap;
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
 
 };
-
+#endif
 #define GET_IE_LEN_IN_BSS(lenInBss) (lenInBss + sizeof(lenInBss) - \
 			    ((uintptr_t)OFFSET_OF(struct bss_description,\
 						  ieFields)))
@@ -827,11 +808,12 @@ struct start_bss_rsp {
 	uint16_t messageType;   /* eWNI_SME_START_BSS_RSP */
 	uint16_t length;
 	uint8_t sessionId;
+/* To be removed after SAP CSR cleanup changes */
+#ifdef SAP_CP_CLEANUP
+	uint32_t cmd_id;
+#endif
 	tSirResultCodes status_code;
-	enum bss_type bssType;    /* Add new type for WDS mode */
-	uint16_t beaconInterval;        /* Beacon Interval for both type */
 	uint32_t staId;         /* Station ID for Self */
-	struct bss_description bssDescription;      /* Peer BSS description */
 };
 
 struct report_channel_list {
@@ -1068,6 +1050,8 @@ struct assoc_ind {
 	uint8_t tx_mcs_map;
 	/* Extended CSA capability of station */
 	uint8_t ecsa_capable;
+	uint32_t ext_cap;
+	uint8_t supported_band;
 	tDot11fIEHTCaps HTCaps;
 	tDot11fIEVHTCaps VHTCaps;
 	bool he_caps_present;
@@ -1278,6 +1262,7 @@ struct missed_beacon_ind {
 	uint16_t messageType;   /* eWNI_SME_MISSED_BEACON_IND */
 	uint16_t length;
 	uint8_t bss_idx;
+	int32_t rssi;
 };
 
 /* / Definition for Set Context request */
@@ -2267,6 +2252,7 @@ typedef struct sSirSmeDfsChannelList {
 	uint8_t channels[SIR_DFS_MAX_20M_SUB_CH];
 } tSirSmeDfsChannelList, *tpSirSmeDfsChannelList;
 
+#ifndef SAP_CP_CLEANUP
 typedef struct sSirChanChangeRequest {
 	uint16_t messageType;
 	uint16_t messageLen;
@@ -2283,6 +2269,7 @@ typedef struct sSirChanChangeRequest {
 	uint32_t cac_duration_ms;
 	uint32_t dfs_regdomain;
 } tSirChanChangeRequest, *tpSirChanChangeRequest;
+#endif
 
 typedef struct sSirChanChangeResponse {
 	uint8_t sessionId;
@@ -2365,6 +2352,7 @@ typedef struct sSirDfsCsaIeRequest {
 	uint8_t  ch_switch_beacon_cnt;
 	uint8_t  ch_switch_mode;
 	uint8_t  dfs_ch_switch_disable;
+	uint32_t new_chan_cac_ms;
 } tSirDfsCsaIeRequest, *tpSirDfsCsaIeRequest;
 
 /* Indication from lower layer indicating the completion of first beacon send
@@ -3861,6 +3849,7 @@ struct sir_nss_update_request {
  * @REASON_COLOR_CHANGE: Color change
  * @REASON_CHANNEL_SWITCH: channel switch
  * @REASON_MLO_IE_UPDATE: mlo ie update
+ * @REASON_RNR_UPDATE: SAP is changed, notify co-located SAP
  */
 enum sir_bcn_update_reason {
 	REASON_DEFAULT = 0,
@@ -3870,6 +3859,7 @@ enum sir_bcn_update_reason {
 	REASON_COLOR_CHANGE = 4,
 	REASON_CHANNEL_SWITCH = 5,
 	REASON_MLO_IE_UPDATE = 6,
+	REASON_RNR_UPDATE = 7,
 };
 
 /**
@@ -3979,29 +3969,6 @@ struct adaptive_dwelltime_params {
 	uint8_t   lpf_weight;
 	uint8_t   passive_mon_intval;
 	uint8_t   wifi_act_threshold;
-};
-
-/**
- * struct csa_offload_params - CSA offload request parameters
- * @channel: channel
- * @switch_mode: switch mode
- * @sec_chan_offset: second channel offset
- * @new_ch_width: new channel width
- * @new_ch_freq_seg1: channel center freq 1
- * @new_ch_freq_seg2: channel center freq 2
- * @ies_present_flag: IE present flag
- */
-struct csa_offload_params {
-	uint8_t channel;
-	uint32_t csa_chan_freq;
-	uint8_t switch_mode;
-	uint8_t sec_chan_offset;
-	uint8_t new_ch_width;
-	uint8_t new_op_class;
-	uint8_t new_ch_freq_seg1;
-	uint8_t new_ch_freq_seg2;
-	uint32_t ies_present_flag;
-	tSirMacAddr bssId;
 };
 
 /**
@@ -4955,14 +4922,14 @@ struct he_capability {
 
 #ifdef WLAN_FEATURE_11BE
 #define EHT_MAX_PHY_CAP_SIZE 3
-#define EHT_CAP_OUI_TYPE "\xfd"
-#define EHT_CAP_OUI_SIZE 1
-
-#define EHT_OP_OUI_TYPE "\xfe"
+#define EHT_OP_OUI_TYPE "\x6a"
 #define EHT_OP_OUI_SIZE 1
 
-#define MLO_IE_OUI_TYPE "\x5e"
+#define MLO_IE_OUI_TYPE "\x6b"
 #define MLO_IE_OUI_SIZE 1
+
+#define EHT_CAP_OUI_TYPE "\x6c"
+#define EHT_CAP_OUI_SIZE 1
 
 /**
  * struct eht_capability - to store 11be EHT capabilities
@@ -5118,8 +5085,8 @@ struct sir_peer_set_rx_blocksize {
  * @retry_delay: Retry delay received during last rejection in ms
  * @ expected_rssi: RSSI at which STA can initate
  * @time_during_rejection: Timestamp during last rejection in millisec
- * @reject_reason: reason to add the BSSID to BLM
- * @source: Source of adding the BSSID to BLM
+ * @reject_reason: reason to add the BSSID to DLM
+ * @source: Source of adding the BSSID to DLM
  * @original_timeout: original timeout sent by the AP
  * @received_time: Timestamp when the AP was added to the Blacklist
  */
@@ -5129,8 +5096,8 @@ struct sir_rssi_disallow_lst {
 	uint32_t retry_delay;
 	int8_t expected_rssi;
 	qdf_time_t time_during_rejection;
-	enum blm_reject_ap_reason reject_reason;
-	enum blm_reject_ap_source source;
+	enum dlm_reject_ap_reason reject_reason;
+	enum dlm_reject_ap_source source;
 	uint32_t original_timeout;
 	qdf_time_t received_time;
 };
@@ -5274,4 +5241,91 @@ struct sir_update_session_txq_edca_param {
 	uint8_t vdev_id;
 	tSirMacEdcaParamRecord txq_edca_params;
 };
+
+#ifdef SAP_CP_CLEANUP
+/* struct channel_change_req - Change channel
+ * request for SAP
+ * @vdev_id: vdev id
+ * @target_chan_freq: New channel frequency
+ * @sec_ch_offset: second channel offset
+ * @center_freq_seg0: channel center freq 0
+ * @center_freq_seg1: channel center freq 1
+ * @dot11mode: dot11 mode
+ * @nw_type: nw type
+ * @cac_duration_ms:  cac duration in ms
+ * @dfs_regdomain: dfs regdomain
+ * @opr_rates: operational rates
+ * @ext_rates: extended rates
+ */
+struct channel_change_req {
+	uint8_t vdev_id;
+	uint32_t target_chan_freq;
+	uint8_t sec_ch_offset;
+	enum phy_ch_width ch_width;
+	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg1;
+	uint32_t dot11mode;
+	tSirNwType nw_type;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
+	tSirMacRateSet opr_rates;
+	tSirMacRateSet ext_rates;
+};
+
+/* struct start_bss_config - Start BSS
+ * request configurations
+ * @vdev_id: vdev id
+ * @cmd_id: serialization command id
+ * @ssid: ssid
+ * @dtim_period: dtim period
+ * @hidden_ssid: hidden ssid parameter
+ * @privacy: ssid privacy
+ * @auth_type: authentication type
+ * @rsnie: RSN IE of the AP
+ * @add_ie_params: additional IEs
+ * @oper_ch_freq: operating frequency
+ * @channel_width: channel width
+ * @center_freq_seg0: channel center freq 0
+ * @center_freq_seg1: channel center freq 1
+ * @sec_ch_offset: secondary channel offset
+ * @wps_state: wps config
+ * @dot11mode: dot11 mode
+ * @nw_type: nw type
+ * @opr_rates: operational rates
+ * @ext_rates: extended rates
+ * @beacon_tx_rate: Tx rate for beacon
+ * @cac_duration_ms: cac duration in ms
+ * @dfs_regdomain: dfs regdomain
+ */
+struct start_bss_config {
+	uint8_t vdev_id;
+	uint32_t cmd_id;
+	tSirMacSSid ssid;
+	uint16_t bcn_int;
+	uint32_t dtim_period;
+	uint8_t hidden_ssid;
+
+	uint8_t privacy;
+	tAniAuthType auth_type;
+	tSirRSNie rsn_ie;
+	struct add_ie_params add_ie_params;
+
+	uint32_t oper_ch_freq;
+	uint8_t channel_width;
+	uint8_t center_freq_seg0;
+	uint8_t center_freq_seg1;
+	uint8_t sec_ch_offset;
+
+	uint8_t wps_state;
+	uint8_t dot11mode;
+	tSirNwType nw_type;
+
+	tSirMacRateSet opr_rates;
+	tSirMacRateSet ext_rates;
+	uint16_t beacon_tx_rate;
+	uint32_t cac_duration_ms;
+	uint32_t dfs_regdomain;
+};
+#endif
+
 #endif /* __SIR_API_H */

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -32,6 +33,7 @@
 #include <wlan_cp_stats_utils_api.h>
 #include "../../core/src/wlan_cp_stats_defs.h"
 #include "../../core/src/wlan_cp_stats_obj_mgr_handler.h"
+#include "son_api.h"
 
 static bool tgt_mc_cp_stats_is_last_event(struct stats_event *ev,
 					  enum stats_req_type stats_type)
@@ -165,6 +167,10 @@ static void tgt_mc_cp_stats_extract_tx_power(struct wlan_objmgr_psoc *psoc,
 
 	wlan_cp_stats_pdev_obj_lock(pdev_cp_stats_priv);
 	pdev_mc_stats = pdev_cp_stats_priv->pdev_stats;
+	if (!is_station_stats &&
+	    pdev_mc_stats->max_pwr != ev->pdev_stats[pdev_id].max_pwr)
+		wlan_son_deliver_tx_power(vdev,
+					  ev->pdev_stats[pdev_id].max_pwr);
 	max_pwr = pdev_mc_stats->max_pwr = ev->pdev_stats[pdev_id].max_pwr;
 	wlan_cp_stats_pdev_obj_unlock(pdev_cp_stats_priv);
 	if (is_station_stats)
@@ -706,10 +712,8 @@ tgt_mc_cp_stats_extract_congestion_stats(struct wlan_objmgr_psoc *psoc,
 	uint8_t i, index;
 	struct request_info last_req = {0};
 	struct medium_assess_data data[WLAN_UMAC_MAX_RP_PID] = { {0} };
-	bool is_last_event = tgt_mc_cp_stats_is_last_event(ev,
-					TYPE_CONGESTION_STATS);
 
-	if (!(ev->num_pdev_stats || ev->num_pdev_extd_stats)) {
+	if (!ev->num_pdev_stats) {
 		cp_stats_err("no congestion sta for pdev");
 		return;
 	}
@@ -729,26 +733,14 @@ tgt_mc_cp_stats_extract_congestion_stats(struct wlan_objmgr_psoc *psoc,
 			cp_stats_err("part1 pdev id error");
 			continue;
 		}
-		data[index].part1_valid = true;
+		data[index].part1_valid = 1;
 		data[index].cycle_count = ev->pdev_stats[i].cycle_count;
 		data[index].rx_clear_count = ev->pdev_stats[i].rx_clear_count;
 		data[index].tx_frame_count = ev->pdev_stats[i].tx_frame_count;
 	}
 
-	for (i = 0; (i < ev->num_pdev_extd_stats) && (i < WLAN_UMAC_MAX_RP_PID);
-	     i++){
-		index = ev->pdev_extd_stats[i].pdev_id;
-		if (index >= WLAN_UMAC_MAX_RP_PID) {
-			cp_stats_err("part2 pdev id error");
-			continue;
-		}
-		data[index].part2_valid = true;
-		data[index].my_rx_count = ev->pdev_extd_stats[i].my_rx_count;
-	}
-
 	if (last_req.u.congestion_notif_cb)
-		last_req.u.congestion_notif_cb(last_req.vdev_id, data,
-						is_last_event);
+		last_req.u.congestion_notif_cb(last_req.vdev_id, data);
 
 }
 #else
