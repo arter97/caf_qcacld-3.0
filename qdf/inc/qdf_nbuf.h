@@ -1045,7 +1045,7 @@ enum cb_ftype {
 typedef __qdf_nbuf_t qdf_nbuf_t;
 
 /**
- * @qdf_nbuf_shared_info_t- Platform indepedent shared info
+ * @qdf_nbuf_shared_info_t- Platform independent shared info
  */
 typedef __qdf_nbuf_shared_info_t qdf_nbuf_shared_info_t;
 
