@@ -2103,6 +2103,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_wbm_get_rx_desc_from_hal_desc =
 				dp_wbm_get_rx_desc_from_hal_desc_be;
 	arch_ops->dp_tx_compute_hw_delay = dp_tx_compute_tx_delay_be;
+	arch_ops->dp_rx_chain_msdus = dp_rx_chain_msdus_be;
 #endif
 	arch_ops->txrx_get_context_size = dp_get_context_size_be;
 #ifdef WIFI_MONITOR_SUPPORT
@@ -2130,7 +2131,6 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_be;
 	arch_ops->dp_rx_peer_metadata_peer_id_get =
 					dp_rx_peer_metadata_peer_id_get_be;
-	arch_ops->dp_rx_chain_msdus = dp_rx_chain_msdus_be;
 	arch_ops->soc_cfg_attach = dp_soc_cfg_attach_be;
 	arch_ops->tx_implicit_rbm_set = dp_tx_implicit_rbm_set_be;
 	arch_ops->txrx_set_vdev_param = dp_txrx_set_vdev_param_be;
