@@ -1894,6 +1894,11 @@ void qdf_fill_wlan_connectivity_log(enum qdf_proto_type type,
 		} else if (pkt_type == EAPOL_PACKET_TYPE_KEY) {
 			wlan_diag_event.subtype =
 					qdf_eapol_get_key_type(data, subtype);
+		} else if (pkt_type == EAPOL_PACKET_TYPE_START) {
+			wlan_diag_event.subtype =
+					WLAN_CONN_DIAG_EAP_START_EVENT;
+			wlan_diag_event.eap_len =
+			    qdf_ntohs(*(uint16_t *)(data + EAPOL_PKT_LEN_OFFSET));
 		} else {
 			return;
 		}
