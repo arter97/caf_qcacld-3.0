@@ -5078,7 +5078,7 @@ fail2:
 		mon_ops->mon_pdev_free(pdev);
 fail1:
 	pdev->monitor_pdev = NULL;
-	qdf_mem_free(mon_pdev);
+	dp_context_free_mem(soc, DP_MON_PDEV_TYPE, mon_pdev);
 fail0:
 	return QDF_STATUS_E_NOMEM;
 }
@@ -5114,7 +5114,7 @@ QDF_STATUS dp_mon_pdev_detach(struct dp_pdev *pdev)
 	if (mon_ops->mon_pdev_free)
 		mon_ops->mon_pdev_free(pdev);
 
-	qdf_mem_free(mon_pdev);
+	dp_context_free_mem(pdev->soc, DP_MON_PDEV_TYPE, mon_pdev);
 	pdev->monitor_pdev = NULL;
 	return QDF_STATUS_SUCCESS;
 }

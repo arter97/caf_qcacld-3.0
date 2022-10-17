@@ -2011,7 +2011,7 @@ void *dp_context_alloc_mem(struct dp_soc *soc, enum dp_ctxt_type ctxt_type,
 		goto end;
 
 dynamic_alloc:
-	dp_info("Pre-alloc type %d, size %zu failed, need dynamic-alloc",
+	dp_info("switch to dynamic-alloc for type %d, size %zu",
 		ctxt_type, ctxt_size);
 	ctxt_mem = qdf_mem_malloc(ctxt_size);
 end:

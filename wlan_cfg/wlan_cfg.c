@@ -4013,6 +4013,12 @@ wlan_cfg_get_prealloc_cfg(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 	cfg->num_tx_ext_desc = cfg_get(ctrl_psoc, CFG_DP_TX_EXT_DESC);
 	cfg->num_rxdma_buf_ring_entries = cfg_get(ctrl_psoc,
 						  CFG_DP_RXDMA_BUF_RING);
+	cfg->num_rxdma_refill_ring_entries = cfg_get(ctrl_psoc,
+						     CFG_DP_RXDMA_REFILL_RING);
+	cfg->num_reo_status_ring_entries = cfg_get(ctrl_psoc,
+						   CFG_DP_REO_STATUS_RING);
+	cfg->num_mon_status_ring_entries = cfg_get(ctrl_psoc,
+						   CFG_DP_RXDMA_MONITOR_STATUS_RING);
 }
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
