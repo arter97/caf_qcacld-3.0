@@ -259,8 +259,22 @@ dp_get_mcs_array_index_by_pkt_type_mcs(uint32_t pkt_type, uint32_t mcs)
 }
 #endif
 
+#ifdef WIFI_MONITOR_SUPPORT
 QDF_STATUS dp_mon_soc_attach(struct dp_soc *soc);
 QDF_STATUS dp_mon_soc_detach(struct dp_soc *soc);
+#else
+static inline
+QDF_STATUS dp_mon_soc_attach(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS dp_mon_soc_detach(struct dp_soc *soc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 /*
  * dp_rx_err_match_dhost() - function to check whether dest-mac is correct
