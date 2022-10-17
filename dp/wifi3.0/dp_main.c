@@ -8070,7 +8070,7 @@ QDF_STATUS dp_peer_mlo_setup(
 			dp_info("Primary link is not the first link. vdev: %pK,"
 				"vdev_ref_cnt %d", mld_peer->vdev,
 				 mld_peer->vdev->ref_cnt);
-			/* relase the ref to original dp_vdev */
+			/* release the ref to original dp_vdev */
 			dp_vdev_unref_delete(soc, mld_peer->vdev,
 					     DP_MOD_ID_CHILD);
 			/*
