@@ -2278,7 +2278,7 @@ struct cdp_pdev_obss_pd_stats_tlv {
 	 * opportunities created. Incoming OBSS frame RSSI is compared with per
 	 * PPDU non-SRG RSSI threshold configured in each PPDU. If incoming OBSS
 	 * RSSI < non-SRG RSSI threshold configured in each PPDU, then non-SRG
-	 * tranmission happens.
+	 * transmission happens.
 	 */
 	uint32_t num_non_srg_ppdu_tried;
 	/**
@@ -2300,7 +2300,7 @@ struct cdp_pdev_obss_pd_stats_tlv {
 	 * Incoming OBSS frame RSSI is compared with per PPDU SRG RSSI
 	 * threshold configured in each PPDU.
 	 * If incoming OBSS RSSI < SRG RSSI threshold configured in each PPDU,
-	 * then SRG tranmission happens.
+	 * then SRG transmission happens.
 	 */
 	uint32_t num_srg_ppdu_tried;
 	/**
