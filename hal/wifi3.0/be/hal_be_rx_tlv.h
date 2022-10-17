@@ -899,7 +899,7 @@ static inline bool hal_rx_mpdu_info_ampdu_flag_get_be(uint8_t *buf)
  *
  * @dst_ring_desc: reo dest ring descriptor (used for Lithium DP)
  * @buf: pointer to the start of RX PKT TLV headers
- * Return: qdesc adrress in reo destination ring buffer
+ * Return: qdesc address in reo destination ring buffer
  */
 static inline uint64_t hal_rx_get_qdesc_addr_be(uint8_t *dst_ring_desc,
 						uint8_t *buf)
