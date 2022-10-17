@@ -355,60 +355,12 @@ void hal_tx_set_ppe_vp_entry_9224(hal_soc_handle_t hal_soc_hdl,
 				  int ppe_vp_idx)
 {
 	struct hal_soc *soc = (struct hal_soc *)hal_soc_hdl;
-	uint32_t reg_addr, reg_val = 0;
+	uint32_t reg_addr;
 
 	reg_addr = HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_ADDR(MAC_TCL_REG_REG_BASE,
 							  ppe_vp_idx);
 
-	/*
-	 * Drop precedence is enabled by default.
-	 */
-	reg_val = HAL_REG_READ(soc, reg_addr);
-
-	reg_val &= ~HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_VP_NUM_BMSK;
-	reg_val |= (cfg->vp_num &
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_VP_NUM_BMSK) <<
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_VP_NUM_SHFT;
-
-	reg_val &= ~HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_PMAC_ID_BMSK;
-	reg_val |= (cfg->pmac_id &
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_PMAC_ID_BMSK) <<
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_PMAC_ID_SHFT;
-
-	reg_val &= ~HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_BANK_ID_BMSK;
-	reg_val |= (cfg->bank_id &
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_BANK_ID_BMSK) <<
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_BANK_ID_SHFT;
-
-	reg_val &= ~HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_VDEV_ID_BMSK;
-	reg_val |= (cfg->vdev_id &
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_VDEV_ID_BMSK) <<
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_VDEV_ID_SHFT;
-
-	reg_val &= ~HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_SEARCH_INDEX_REG_NUM_BMSK;
-	reg_val |=
-	    (cfg->search_idx_reg_num &
-	     HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_SEARCH_INDEX_REG_NUM_BMSK) <<
-	     HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_SEARCH_INDEX_REG_NUM_SHFT;
-
-	reg_val &=
-		~HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_USE_PPE_INT_PRI_FOR_TID_BMSK;
-	reg_val |=
-	(cfg->use_ppe_int_pri &
-	HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_USE_PPE_INT_PRI_FOR_TID_BMSK) <<
-	HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_USE_PPE_INT_PRI_FOR_TID_SHFT;
-
-	reg_val &= ~HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_TO_FW_BMSK;
-	reg_val |= (cfg->to_fw &
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_TO_FW_BMSK) <<
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_TO_FW_SHFT;
-
-	reg_val &= ~HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_DROP_PREC_ENABLE_BMSK;
-	reg_val |= (cfg->drop_prec_enable &
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_DROP_PREC_ENABLE_BMSK) <<
-		    HWIO_TCL_R0_PPE_VP_CONFIG_TABLE_n_DROP_PREC_ENABLE_SHFT;
-
-	HAL_REG_WRITE(soc, reg_addr, reg_val);
+	HAL_REG_WRITE(soc, reg_addr, cfg->val);
 }
 
 /**
