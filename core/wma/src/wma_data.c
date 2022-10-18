@@ -83,6 +83,7 @@
 #include <wlan_cm_api.h>
 #include "wlan_pkt_capture_ucfg_api.h"
 #include "wma_eht.h"
+#include "wlan_mlo_mgr_sta.h"
 
 struct wma_search_rate {
 	int32_t rate;
@@ -1607,7 +1608,7 @@ int wma_mcc_vdev_tx_pause_evt_handler(void *handle, uint8_t *event,
  * @config:	Bad peer configuration from SIR module
  *
  * It is a wrapper function to sent WMI_PEER_SET_RATE_REPORT_CONDITION_CMDID
- * to the firmare\target.If the command sent to firmware failed, free the
+ * to the firmware\target. If the command sent to firmware failed, free the
  * buffer that allocated.
  *
  * Return: QDF_STATUS based on values sent to firmware
@@ -2286,7 +2287,9 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	struct ieee80211_frame *wh;
 	struct wlan_objmgr_peer *peer = NULL;
 	struct wlan_objmgr_psoc *psoc;
+	struct wlan_objmgr_vdev *vdev = NULL;
 	void *mac_addr;
+	uint8_t *mld_addr = NULL;
 	bool is_5g = false;
 	uint8_t pdev_id;
 
@@ -2673,6 +2676,13 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	mgmt_param.use_6mbps = use_6mbps;
 	mgmt_param.tx_type = tx_frm_index;
 	mgmt_param.peer_rssi = peer_rssi;
+	if (iface && wlan_vdev_mlme_get_opmode(iface->vdev) == QDF_STA_MODE &&
+	    wlan_vdev_mlme_is_mlo_vdev(iface->vdev) &&
+	    frmType == TXRX_FRM_802_11_MGMT &&
+	    pFc->subType != SIR_MAC_MGMT_PROBE_REQ &&
+	    pFc->subType != SIR_MAC_MGMT_AUTH &&
+	    pFc->subType != SIR_MAC_MGMT_ASSOC_REQ)
+		mgmt_param.mlo_link_agnostic = true;
 
 	if (tx_flag & HAL_USE_INCORRECT_KEY_PMF)
 		mgmt_param.tx_flags |= MGMT_TX_USE_INCORRECT_KEY;
@@ -2709,6 +2719,33 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		mac_addr = wh->i_addr2;
 		peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
 					WLAN_MGMT_NB_ID);
+		if (!peer) {
+			vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc,
+								    vdev_id,
+								    WLAN_MGMT_NB_ID);
+			if (!vdev) {
+				wma_err("vdev is null");
+				cds_packet_free((void *)tx_frame);
+				goto error;
+			}
+			mld_addr = wlan_vdev_mlme_get_mldaddr(vdev);
+			wlan_objmgr_vdev_release_ref(vdev, WLAN_MGMT_NB_ID);
+			if (!mld_addr) {
+				wma_err("mld addr is null");
+				cds_packet_free((void *)tx_frame);
+				goto error;
+			}
+			wma_debug("mld mac addr " QDF_MAC_ADDR_FMT,
+				  QDF_MAC_ADDR_REF(mld_addr));
+			peer = wlan_objmgr_get_peer(psoc, pdev_id,
+						    mld_addr,
+						    WLAN_MGMT_NB_ID);
+			if (!peer) {
+				wma_err("peer is null");
+				cds_packet_free((void *)tx_frame);
+				goto error;
+			}
+		}
 	}
 
 	if (ucfg_pkt_capture_get_pktcap_mode(psoc) &

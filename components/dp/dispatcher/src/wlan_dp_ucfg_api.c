@@ -37,6 +37,7 @@
 #include "wlan_pkt_capture_ucfg_api.h"
 #include <cdp_txrx_ctrl.h>
 #include <qdf_net_stats.h>
+#include "wlan_dp_prealloc.h"
 
 void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
 			    struct qdf_mac_addr *cur_mac,
@@ -324,6 +325,7 @@ ucfg_dp_suspend_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 {
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf, *dp_intf_next = NULL;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	dp_ctx = dp_psoc_get_priv(psoc);
 	if (!dp_ctx) {
@@ -332,6 +334,7 @@ ucfg_dp_suspend_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 	}
 
 	dp_ctx->is_suspend = true;
+	cdp_set_tx_pause(soc, true);
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
 		dp_intf->sap_tx_block_mask |= WLAN_DP_SUSPEND;
 	}
@@ -352,6 +355,7 @@ ucfg_dp_resume_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 {
 	struct wlan_dp_psoc_context *dp_ctx;
 	struct wlan_dp_intf *dp_intf, *dp_intf_next = NULL;
+	void *soc = cds_get_context(QDF_MODULE_ID_SOC);
 
 	dp_ctx = dp_psoc_get_priv(psoc);
 	if (!dp_ctx) {
@@ -360,6 +364,7 @@ ucfg_dp_resume_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 	}
 
 	dp_ctx->is_suspend = false;
+	cdp_set_tx_pause(soc, false);
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
 		dp_intf->sap_tx_block_mask &= ~WLAN_DP_SUSPEND;
 	}
@@ -1791,6 +1796,11 @@ void ucfg_dp_set_nud_stats_cb(struct wlan_objmgr_psoc *psoc, void *cookie)
 {
 	struct wlan_dp_psoc_sb_ops *sb_ops = dp_intf_get_tx_ops(psoc);
 
+	if (!sb_ops) {
+		dp_err("Unable to get ops");
+		return;
+	}
+
 	sb_ops->dp_arp_stats_register_event_handler(psoc);
 	sb_ops->arp_request_ctx = cookie;
 }
@@ -1798,6 +1808,11 @@ void ucfg_dp_set_nud_stats_cb(struct wlan_objmgr_psoc *psoc, void *cookie)
 void ucfg_dp_clear_nud_stats_cb(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_dp_psoc_sb_ops *sb_ops = dp_intf_get_tx_ops(psoc);
+
+	if (!sb_ops) {
+		dp_err("Unable to get ops");
+		return;
+	}
 
 	sb_ops->dp_arp_stats_unregister_event_handler(psoc);
 }
@@ -1833,6 +1848,11 @@ ucfg_dp_req_get_arp_stats(struct wlan_objmgr_psoc *psoc,
 {
 	struct wlan_dp_psoc_sb_ops *sb_ops = dp_intf_get_tx_ops(psoc);
 
+	if (!sb_ops) {
+		dp_err("Unable to get ops");
+		return QDF_STATUS_E_INVAL;
+	}
+
 	return sb_ops->dp_get_arp_req_stats(psoc, params);
 }
 
@@ -1841,6 +1861,11 @@ ucfg_dp_req_set_arp_stats(struct wlan_objmgr_psoc *psoc,
 			  struct dp_set_arp_stats_params *params)
 {
 	struct wlan_dp_psoc_sb_ops *sb_ops = dp_intf_get_tx_ops(psoc);
+
+	if (!sb_ops) {
+		dp_err("Unable to get ops");
+		return QDF_STATUS_E_INVAL;
+	}
 
 	return sb_ops->dp_set_arp_req_stats(psoc, params);
 }
@@ -2260,5 +2285,42 @@ void ucfg_dp_traffic_end_indication_update_dscp(struct wlan_objmgr_psoc *psoc,
 end:
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_DP_ID);
 	}
+}
+#endif
+
+QDF_STATUS ucfg_dp_prealloc_init(struct cdp_ctrl_objmgr_psoc *ctrl_psoc)
+{
+	return dp_prealloc_init(ctrl_psoc);
+}
+
+void ucfg_dp_prealloc_deinit(void)
+{
+	dp_prealloc_deinit();
+}
+
+#ifdef DP_MEM_PRE_ALLOC
+void *ucfg_dp_prealloc_get_consistent_mem_unaligned(qdf_size_t size,
+						    qdf_dma_addr_t *base_addr,
+						    uint32_t ring_type)
+{
+	return dp_prealloc_get_consistent_mem_unaligned(size, base_addr,
+							ring_type);
+}
+
+void ucfg_dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned)
+{
+	dp_prealloc_put_consistent_mem_unaligned(va_unaligned);
+}
+#endif
+
+#if defined(WLAN_SUPPORT_RX_FISA)
+void ucfg_dp_rx_skip_fisa(uint32_t value)
+{
+	void *dp_soc;
+
+	dp_soc = cds_get_context(QDF_MODULE_ID_SOC);
+
+	if (dp_soc)
+		dp_rx_skip_fisa(dp_soc, value);
 }
 #endif

@@ -487,6 +487,7 @@ static void lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 					      SAE_AUTH_STATUS_CODE_OFFSET);
 		}
 		wlan_connectivity_mgmt_event(
+			mac_ctx->psoc,
 			(struct wlan_frame_hdr *)mac_hdr, pe_session->vdev_id,
 			sae_status_code, 0,
 			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info), auth_algo,
@@ -507,7 +508,6 @@ static inline void  lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 {}
 #endif
 
-#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
 static uint8_t
 lim_get_pasn_peer_vdev_id(struct mac_context *mac, uint8_t *bssid)
 {
@@ -560,21 +560,6 @@ lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
 
 	return QDF_STATUS_SUCCESS;
 }
-#else
-static inline QDF_STATUS
-lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
-			    uint8_t vdev_id,
-			    uint8_t *rx_pkt_info)
-{
-	return QDF_STATUS_SUCCESS;
-}
-
-static inline uint8_t
-lim_get_pasn_peer_vdev_id(struct mac_context *mac, uint8_t *bssid)
-{
-	return WLAN_UMAC_VDEV_ID_MAX;
-}
-#endif
 
 static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		tpSirMacMgmtHdr mac_hdr,
@@ -1731,7 +1716,8 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 			SIR_MAC_AUTH_FRAME_4;
 	}
 
-	wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)mac_hdr,
+	wlan_connectivity_mgmt_event(mac_ctx->psoc,
+				     (struct wlan_frame_hdr *)mac_hdr,
 				     pe_session->vdev_id,
 				     rx_auth_frm_body->authStatusCode,
 				     0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
@@ -1827,7 +1813,8 @@ bool lim_process_sae_preauth_frame(struct mac_context *mac, uint8_t *rx_pkt)
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 	}
 
-	wlan_connectivity_mgmt_event((struct wlan_frame_hdr *)dot11_hdr,
+	wlan_connectivity_mgmt_event(mac->psoc,
+				     (struct wlan_frame_hdr *)dot11_hdr,
 				     vdev_id, sae_status_code,
 				     0, WMA_GET_RX_RSSI_NORMALIZED(rx_pkt),
 				     auth_alg, sae_auth_seq,

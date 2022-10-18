@@ -1615,19 +1615,9 @@ typedef struct sSirWPSBeaconIE {
 	uint8_t RFBand;         /* RF bands available on the AP */
 } tSirWPSBeaconIE;
 
-#define SIR_WPS_ASSOCRSP_VER_PRESENT    0x00000001
-#define SIR_WPS_ASSOCRSP_RESPONSETYPE_PRESENT    0x00000002
-
-typedef struct sSirWPSAssocRspIE {
-	uint32_t FieldPresent;
-	uint32_t Version;
-	uint8_t ResposeType;
-} tSirWPSAssocRspIE;
-
 typedef struct sSirAPWPSIEs {
 	tSirWPSProbeRspIE SirWPSProbeRspIE;     /*WPS Set Probe Respose IE */
 	tSirWPSBeaconIE SirWPSBeaconIE; /*WPS Set Beacon IE */
-	tSirWPSAssocRspIE SirWPSAssocRspIE;     /*WPS Set Assoc Response IE */
 } tSirAPWPSIEs, *tpSiriAPWPSIEs;
 
 struct update_config {
@@ -3892,8 +3882,10 @@ struct sir_sme_ext_cng_chan_ind {
  * @global_tsf_high: high 32bits of tsf64
  * @mac_id: MAC identifier
  * @mac_id_valid: Indicate if mac_id is valid or not
+ * @tsf_id: TSF-ID corresponding to the TSF value
+ * @tsf_id_valid: flag indicating whether TSD-ID is valid
  *
- * driver use this struct to store the tsf info
+ * Driver uses this structure to store the tsf information.
  */
 struct stsf {
 	uint32_t vdev_id;
@@ -3903,10 +3895,10 @@ struct stsf {
 	uint32_t soc_timer_high;
 	uint32_t global_tsf_low;
 	uint32_t global_tsf_high;
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
 	uint32_t mac_id;
 	uint32_t mac_id_valid;
-#endif
+	uint32_t tsf_id;
+	uint32_t tsf_id_valid;
 };
 
 #define SIR_BCN_FLT_MAX_ELEMS_IE_LIST 8
@@ -5150,6 +5142,7 @@ struct sir_sae_info {
  * @length: message length
  * @vdev_id: vdev id
  * @sae_status: SAE status, 0: Success, Non-zero: Failure.
+ * @pmkid: PMKID derived as part of SAE authentication
  * @peer_mac_addr: peer MAC address
  * @result_code: This carries the reason of the SAE auth failure.
  *               Currently, SAE authentication failure may happen due to
@@ -5162,6 +5155,7 @@ struct sir_sae_msg {
 	uint16_t message_type;
 	uint16_t length;
 	uint16_t vdev_id;
+	uint8_t pmkid[PMKID_LEN];
 	uint8_t sae_status;
 	tSirMacAddr peer_mac_addr;
 	tSirResultCodes result_code;

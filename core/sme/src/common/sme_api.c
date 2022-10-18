@@ -83,6 +83,7 @@
 #include "wlan_policy_mgr_ucfg.h"
 #include "wlan_wifi_pos_interface.h"
 #include "wlan_cp_stats_mc_ucfg_api.h"
+#include "wlan_psoc_mlme_ucfg_api.h"
 
 static QDF_STATUS init_sme_cmd_list(struct mac_context *mac);
 
@@ -248,7 +249,7 @@ end:
 	found = csr_nonscan_active_ll_remove_entry(mac, entry,
 			LL_ACCESS_LOCK);
 	if (found)
-		/* Now put this command back on the avilable command list */
+		/* Now put this command back on the available command list */
 		csr_release_command(mac, command);
 
 	return QDF_STATUS_SUCCESS;
@@ -606,6 +607,8 @@ QDF_STATUS sme_ser_cmd_callback(struct wlan_serialization_command *cmd,
 		status = sme_ser_handle_active_cmd(cmd);
 		break;
 	case WLAN_SER_CB_CANCEL_CMD:
+		if (cmd->cmd_type == WLAN_SER_CMD_SET_HW_MODE)
+			policy_mgr_reset_hw_mode_change(mac_ctx->psoc);
 		break;
 	case WLAN_SER_CB_RELEASE_MEM_CMD:
 		if (cmd->vdev)
@@ -622,6 +625,9 @@ QDF_STATUS sme_ser_cmd_callback(struct wlan_serialization_command *cmd,
 			qdf_trigger_self_recovery(mac_ctx->psoc,
 						  QDF_ACTIVE_LIST_TIMEOUT);
 		}
+
+		if (cmd->cmd_type == WLAN_SER_CMD_SET_HW_MODE)
+			policy_mgr_reset_hw_mode_change(mac_ctx->psoc);
 		break;
 	default:
 		sme_debug("unknown reason code");
@@ -802,7 +808,6 @@ QDF_STATUS sme_open(mac_handle_t mac_handle)
 	struct mac_context *mac = MAC_CONTEXT(mac_handle);
 
 	mac->sme.state = SME_STATE_STOP;
-	mac->sme.curr_device_mode = QDF_STA_MODE;
 	if (!QDF_IS_STATUS_SUCCESS(qdf_mutex_create(
 					&mac->sme.sme_global_lock))) {
 		sme_err("Init lock failed");
@@ -3083,7 +3088,7 @@ static QDF_STATUS sme_process_nss_update_resp(struct mac_context *mac, uint8_t *
 
 	found = csr_nonscan_active_ll_remove_entry(mac, entry, LL_ACCESS_LOCK);
 	if (found) {
-		/* Now put this command back on the avilable command list */
+		/* Now put this command back on the available command list */
 		csr_release_command(mac, command);
 	}
 
@@ -7283,7 +7288,7 @@ bool sme_get_is_ft_feature_enabled(mac_handle_t mac_handle)
  * sme_is_feature_supported_by_fw() - check if feature is supported by FW
  * @feature: enum value of requested feature.
  *
- * Retrun: 1 if supported; 0 otherwise
+ * Return: 1 if supported; 0 otherwise
  */
 bool sme_is_feature_supported_by_fw(enum cap_bitmap feature)
 {
@@ -7356,14 +7361,6 @@ QDF_STATUS sme_get_isolation(mac_handle_t mac_handle, void *context,
 ePhyChanBondState sme_get_cb_phy_state_from_cb_ini_value(uint32_t cb_ini_value)
 {
 	return csr_convert_cb_ini_value_to_phy_cb_state(cb_ini_value);
-}
-
-void sme_set_curr_device_mode(mac_handle_t mac_handle,
-			      enum QDF_OPMODE curr_device_mode)
-{
-	struct mac_context *mac = MAC_CONTEXT(mac_handle);
-
-	mac->sme.curr_device_mode = curr_device_mode;
 }
 
 /**
@@ -14618,6 +14615,9 @@ QDF_STATUS sme_handle_sae_msg(mac_handle_t mac_handle,
 		qdf_mem_copy(sae_msg->peer_mac_addr,
 			     peer_mac_addr.bytes,
 			     QDF_MAC_ADDR_SIZE);
+		qdf_mem_zero(sae_msg->pmkid, PMKID_LEN);
+		if (pmkid)
+			qdf_mem_copy(sae_msg->pmkid, pmkid, PMKID_LEN);
 		sme_debug("SAE: sae_status %d vdev_id %d Peer: "
 			  QDF_MAC_ADDR_FMT, sae_msg->sae_status,
 			  sae_msg->vdev_id,
@@ -14782,6 +14782,72 @@ void sme_set_bss_max_idle_period(mac_handle_t mac_handle, uint16_t cfg_val)
 }
 
 #ifdef WLAN_FEATURE_11AX
+void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
+		       enum eSirMacHTChannelWidth chwidth)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+	if (!session) {
+		sme_debug("No session for id %d", vdev_id);
+		return;
+	}
+	sme_debug("Config HE caps for BW %d", chwidth);
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 0;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 0;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_2 = 0;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_3 = 0;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_4 = 0;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_5 = 0;
+	mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_6 = 0;
+
+	switch (chwidth) {
+	case eHT_CHANNEL_WIDTH_20MHZ:
+		qdf_mem_copy(&mac_ctx->he_cap_2g,
+			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
+			     sizeof(tDot11fIEhe_cap));
+		qdf_mem_copy(&mac_ctx->he_cap_5g,
+			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
+			     sizeof(tDot11fIEhe_cap));
+		break;
+	case eHT_CHANNEL_WIDTH_40MHZ:
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
+		qdf_mem_copy(&mac_ctx->he_cap_2g,
+			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
+			     sizeof(tDot11fIEhe_cap));
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 0;
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
+		qdf_mem_copy(&mac_ctx->he_cap_5g,
+			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
+			     sizeof(tDot11fIEhe_cap));
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_0 = 1;
+		break;
+	case eHT_CHANNEL_WIDTH_80MHZ:
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
+		qdf_mem_copy(&mac_ctx->he_cap_5g,
+			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
+			     sizeof(tDot11fIEhe_cap));
+		break;
+	case eHT_CHANNEL_WIDTH_160MHZ:
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_1 = 1;
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.chan_width_2 = 1;
+		*((uint16_t *)
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_160) =
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.rx_he_mcs_map_lt_80;
+		*((uint16_t *)
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_160) =
+		mac_ctx->mlme_cfg->he_caps.dot11_he_cap.tx_he_mcs_map_lt_80;
+		qdf_mem_copy(&mac_ctx->he_cap_5g,
+			     &mac_ctx->mlme_cfg->he_caps.dot11_he_cap,
+			     sizeof(tDot11fIEhe_cap));
+		break;
+	default:
+		sme_debug("Config BW %d not handled", chwidth);
+	}
+	csr_update_session_he_cap(mac_ctx, session);
+}
+
 void sme_check_enable_ru_242_tx(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
@@ -14956,6 +15022,50 @@ void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 #endif
 
 #ifdef WLAN_FEATURE_11BE
+void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
+			   uint8_t val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, val);
+}
+
+void sme_set_mlo_max_simultaneous_links(mac_handle_t mac_handle,
+					uint8_t vdev_id, uint8_t val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+	wlan_mlme_set_sta_mlo_simultaneous_links(mac_ctx->psoc, val);
+}
+
+void sme_set_mlo_assoc_link_band(mac_handle_t mac_handle, uint8_t vdev_id,
+				 uint8_t val)
+{
+	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
+	struct csr_roam_session *session;
+
+	session = CSR_GET_SESSION(mac_ctx, vdev_id);
+
+	if (!session) {
+		sme_err("No session for id %d", vdev_id);
+		return;
+	}
+	wlan_mlme_set_sta_mlo_conn_band_bmp(mac_ctx->psoc, val);
+}
+
 void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 	struct mac_context *mac_ctx = MAC_CONTEXT(mac_handle);
@@ -15057,6 +15167,7 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id)
 	mac_ctx->eht_cap_5g.bw_20_tx_max_nss_for_mcs_8_and_9 = 0;
 	mac_ctx->usr_eht_testbed_cfg = true;
 	mac_ctx->roam.configParam.channelBondingMode24GHz = 0;
+	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 1);
 }
 
 void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
@@ -15084,6 +15195,8 @@ void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 		     sizeof(tDot11fIEeht_cap));
 	mac_ctx->usr_eht_testbed_cfg = false;
 	mac_ctx->roam.configParam.channelBondingMode24GHz = 1;
+	wlan_mlme_set_sta_mlo_conn_band_bmp(mac_ctx->psoc, 0x77);
+	wlan_mlme_set_sta_mlo_conn_max_num(mac_ctx->psoc, 2);
 }
 #endif
 
@@ -15181,6 +15294,10 @@ void sme_update_score_config(mac_handle_t mac_handle, eCsrPhyMode phy_mode,
 	uint32_t channel_bonding_mode;
 	QDF_STATUS status;
 	struct psoc_phy_config config = {0};
+	bool eht_cap;
+
+	ucfg_psoc_mlme_get_11be_capab(mac_ctx->psoc, &eht_cap);
+	config.eht_cap = eht_cap;
 
 	qdf_mem_zero(&vdev_ini_cfg, sizeof(struct wlan_mlme_nss_chains));
 	/* Populate the nss chain params from ini for this vdev type */
@@ -15189,9 +15306,6 @@ void sme_update_score_config(mac_handle_t mac_handle, eCsrPhyMode phy_mode,
 
 	config.vdev_nss_24g = vdev_ini_cfg.rx_nss[NSS_CHAINS_BAND_2GHZ];
 	config.vdev_nss_5g = vdev_ini_cfg.rx_nss[NSS_CHAINS_BAND_5GHZ];
-
-	if (sme_is_phy_mode_11be(phy_mode))
-		config.eht_cap = 1;
 
 	if (config.eht_cap ||
 	    phy_mode == eCSR_DOT11_MODE_AUTO ||
@@ -15207,9 +15321,6 @@ void sme_update_score_config(mac_handle_t mac_handle, eCsrPhyMode phy_mode,
 	if (config.vht_cap || phy_mode == eCSR_DOT11_MODE_11n ||
 	    phy_mode == eCSR_DOT11_MODE_11n_ONLY)
 		config.ht_cap = 1;
-
-	if (!IS_FEATURE_11BE_SUPPORTED_BY_FW)
-		config.eht_cap = 0;
 
 	if (!IS_FEATURE_SUPPORTED_BY_FW(DOT11AX))
 		config.he_cap = 0;
@@ -16078,14 +16189,9 @@ QDF_STATUS sme_switch_channel(mac_handle_t mac_handle,
 #ifdef WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
 
 #ifdef WLAN_FEATURE_11BE
-static inline bool sme_is_11be_capable(void)
+bool sme_is_11be_capable(void)
 {
 	return sme_is_feature_supported_by_fw(DOT11BE);
-}
-#else
-static inline bool sme_is_11be_capable(void)
-{
-	return false;
 }
 #endif
 
@@ -16210,6 +16316,7 @@ QDF_STATUS sme_update_vdev_mac_addr(struct wlan_objmgr_psoc *psoc,
 		wlan_vdev_mlme_set_mldaddr(vdev, mac_addr.bytes);
 	} else {
 		wlan_vdev_mlme_set_macaddr(vdev, mac_addr.bytes);
+		wlan_vdev_mlme_set_linkaddr(vdev, mac_addr.bytes);
 	}
 
 p2p_self_peer_create:

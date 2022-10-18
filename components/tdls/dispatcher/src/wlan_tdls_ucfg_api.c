@@ -458,6 +458,10 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 	soc_obj->tdls_dp_vdev_update = req->tdls_dp_vdev_update;
 	soc_obj->tdls_osif_init_cb = req->tdls_osif_init_cb;
 	soc_obj->tdls_osif_deinit_cb = req->tdls_osif_deinit_cb;
+	soc_obj->tdls_osif_update_cb.tdls_osif_conn_update =
+	       req->tdls_osif_update_cb.tdls_osif_conn_update;
+	soc_obj->tdls_osif_update_cb.tdls_osif_disconn_update =
+	       req->tdls_osif_update_cb.tdls_osif_disconn_update;
 	tdls_pm_call_backs.tdls_notify_increment_session =
 			tdls_notify_increment_session;
 
@@ -481,8 +485,7 @@ QDF_STATUS ucfg_tdls_update_config(struct wlan_objmgr_psoc *psoc,
 
 	soc_obj->tdls_last_mode = soc_obj->tdls_current_mode;
 	if (TDLS_IS_BUFFER_STA_ENABLED(tdls_feature_flags) ||
-	    TDLS_IS_SLEEP_STA_ENABLED(tdls_feature_flags) ||
-	    TDLS_IS_OFF_CHANNEL_ENABLED(tdls_feature_flags))
+	    TDLS_IS_SLEEP_STA_ENABLED(tdls_feature_flags))
 		soc_obj->max_num_tdls_sta =
 			WLAN_TDLS_STA_P_UAPSD_OFFCHAN_MAX_NUM;
 
@@ -1213,6 +1216,11 @@ void  wlan_tdls_notify_connect_failure(struct wlan_objmgr_psoc *psoc)
 void ucfg_tdls_notify_connect_failure(struct wlan_objmgr_psoc *psoc)
 {
 	return wlan_tdls_notify_connect_failure(psoc);
+}
+
+uint16_t ucfg_get_tdls_conn_peer_count(struct wlan_objmgr_vdev *vdev)
+{
+	return tdls_get_connected_peer_count_from_vdev(vdev);
 }
 
 struct wlan_objmgr_vdev *ucfg_get_tdls_vdev(struct wlan_objmgr_psoc *psoc,

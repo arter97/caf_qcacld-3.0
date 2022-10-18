@@ -31,6 +31,7 @@
 #include <wlan_crypto_global_api.h>
 #include <wlan_mlo_mgr_cmn.h>
 #include "wlan_mlme_ucfg_api.h"
+#include "wifi_pos_ucfg_i.h"
 
 #define NUM_OF_SOUNDING_DIMENSIONS     1 /*Nss - 1, (Nss = 2 for 2x2)*/
 
@@ -284,6 +285,7 @@ mlme_peer_object_created_notification(struct wlan_objmgr_peer *peer,
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_legacy_err("unable to attach peer_priv obj to peer obj");
 		qdf_mem_free(peer_priv);
+		return status;
 	}
 
 	qdf_wake_lock_create(&peer_priv->peer_set_key_wakelock, "peer_set_key");
@@ -593,6 +595,8 @@ static void mlme_init_generic_cfg(struct wlan_objmgr_psoc *psoc,
 	gen->monitor_mode_concurrency =
 		cfg_get(psoc, CFG_MONITOR_MODE_CONCURRENCY);
 	gen->tx_retry_multiplier = cfg_get(psoc, CFG_TX_RETRY_MULTIPLIER);
+	gen->enable_he_mcs0_for_6ghz_mgmt =
+		cfg_get(psoc, CFG_ENABLE_HE_MCS0_MGMT_6GHZ);
 	mlme_init_wds_config_cfg(psoc, gen);
 	mlme_init_mgmt_hw_tx_retry_count_cfg(psoc, gen);
 	mlme_init_relaxed_6ghz_conn_policy(psoc, gen);
@@ -1694,6 +1698,8 @@ static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_default(CFG_MLO_SUPPORT_LINK_NUM);
 	sta->mlo_support_link_band =
 		cfg_default(CFG_MLO_SUPPORT_LINK_BAND);
+	sta->mlo_max_simultaneous_links =
+		cfg_default(CFG_MLO_MAX_SIMULTANEOUS_LINKS);
 }
 #else
 static void mlme_init_sta_mlo_cfg(struct wlan_objmgr_psoc *psoc,
@@ -2335,6 +2341,26 @@ static void mlme_init_wep_cfg(struct wlan_mlme_wep_cfg *wep_params)
 	wep_params->wep_default_key_id = cfg_default(CFG_WEP_DEFAULT_KEYID);
 }
 
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+static void
+mlme_init_wifi_pos_11az_config(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_mlme_wifi_pos_cfg *wifi_pos_cfg)
+{
+	bool rsta_sec_ltf_enabled =
+			cfg_get(psoc, CFG_RESPONDER_SECURE_LTF_SUPPORT);
+	bool rsta_11az_ranging_enabled = cfg_get(psoc,
+						 CFG_RESPONDER_11AZ_SUPPORT);
+
+	wifi_pos_set_rsta_11az_ranging_cap(rsta_11az_ranging_enabled);
+	wifi_pos_set_rsta_sec_ltf_cap(rsta_sec_ltf_enabled);
+}
+#else
+static inline void
+mlme_init_wifi_pos_11az_config(struct wlan_objmgr_psoc *psoc,
+			       struct wlan_mlme_wifi_pos_cfg *wifi_pos_cfg)
+{}
+#endif
+
 static void mlme_init_wifi_pos_cfg(struct wlan_objmgr_psoc *psoc,
 				   struct wlan_mlme_wifi_pos_cfg *wifi_pos_cfg)
 {
@@ -2342,6 +2368,8 @@ static void mlme_init_wifi_pos_cfg(struct wlan_objmgr_psoc *psoc,
 		cfg_get(psoc, CFG_FINE_TIME_MEAS_CAPABILITY);
 	wifi_pos_cfg->oem_6g_support_disable =
 		cfg_get(psoc, CFG_OEM_SIXG_SUPPORT_DISABLE);
+
+	mlme_init_wifi_pos_11az_config(psoc, wifi_pos_cfg);
 }
 
 #ifdef FEATURE_WLAN_ESE
@@ -4113,3 +4141,50 @@ wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 	mlme_priv->mlme_ap.user_config_sap_ch_freq = freq;
 	return QDF_STATUS_SUCCESS;
 }
+
+#ifdef CONFIG_BAND_6GHZ
+bool
+wlan_get_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return false;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid opmode %d", opmode);
+		return false;
+	}
+
+	return mlme_priv->mlme_ap.update_required_scc_sta_power;
+}
+
+QDF_STATUS
+wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
+{
+	struct mlme_legacy_priv *mlme_priv;
+	enum QDF_OPMODE opmode;
+
+	mlme_priv = wlan_vdev_mlme_get_ext_hdl(vdev);
+	if (!mlme_priv) {
+		mlme_legacy_err("vdev legacy private object is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (opmode != QDF_SAP_MODE && opmode != QDF_P2P_GO_MODE) {
+		mlme_debug("Invalid mode %d", opmode);
+		QDF_ASSERT(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mlme_priv->mlme_ap.update_required_scc_sta_power = value;
+	mlme_debug("Set change scc power as %d", value);
+	return QDF_STATUS_SUCCESS;
+}
+#endif

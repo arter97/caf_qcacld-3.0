@@ -32,6 +32,7 @@
 #include "wlan_policy_mgr_ucfg.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
+#include "wlan_psoc_mlme_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -993,9 +994,14 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	tDot11fIEeht_cap *eht_cap = &wma_cfg->eht_cap;
 	tDot11fIEeht_cap *mlme_eht_cap;
+	bool eht_capab;
 
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
+
+	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+	if (!eht_capab)
+		return QDF_STATUS_SUCCESS;
 
 	mlme_obj->cfg.eht_caps.dot11_eht_cap.present = 1;
 	qdf_mem_copy(&mlme_obj->cfg.eht_caps.dot11_eht_cap, eht_cap,
@@ -1074,6 +1080,33 @@ enum phy_ch_width wlan_mlme_convert_eht_op_bw_to_phy_ch_width(
 #endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
+uint8_t wlan_mlme_get_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return false;
+
+	return mlme_obj->cfg.sta.mlo_max_simultaneous_links;
+}
+
+QDF_STATUS
+wlan_mlme_set_sta_mlo_simultaneous_links(struct wlan_objmgr_psoc *psoc,
+					 uint8_t value)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+	if (!mlme_obj)
+		return QDF_STATUS_E_FAILURE;
+
+	mlme_obj->cfg.sta.mlo_max_simultaneous_links = value;
+	mlme_legacy_debug("mlo_max_simultaneous_links %d", value);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 uint8_t wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
@@ -1086,7 +1119,7 @@ uint8_t wlan_mlme_get_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
-					      bool value)
+					      uint8_t value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -1095,6 +1128,7 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_max_num(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 
 	mlme_obj->cfg.sta.mlo_support_link_num = value;
+	mlme_legacy_debug("mlo_support_link_num %d", value);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1111,7 +1145,7 @@ uint8_t wlan_mlme_get_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc)
 }
 
 QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
-					       bool value)
+					       uint8_t value)
 {
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
 
@@ -1120,6 +1154,7 @@ QDF_STATUS wlan_mlme_set_sta_mlo_conn_band_bmp(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 
 	mlme_obj->cfg.sta.mlo_support_link_band = value;
+	mlme_legacy_debug("mlo_support_link_conn band %d", value);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3843,13 +3878,17 @@ mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg)
 	if (vht_cap_info->short_gi_80mhz && !cfg->vht_short_gi_80)
 		vht_cap_info->short_gi_80mhz = cfg->vht_short_gi_80;
 
-	/* Set VHT TX STBC cap */
-	if (vht_cap_info->tx_stbc && !cfg->vht_tx_stbc)
-		vht_cap_info->tx_stbc = cfg->vht_tx_stbc;
+	/* Set VHT TX/RX STBC cap */
+	if (vht_cap_info->enable2x2) {
+		if (vht_cap_info->tx_stbc && !cfg->vht_tx_stbc)
+			vht_cap_info->tx_stbc = cfg->vht_tx_stbc;
 
-	/* Set VHT RX STBC cap */
-	if (vht_cap_info->rx_stbc && !cfg->vht_rx_stbc)
-		vht_cap_info->rx_stbc = cfg->vht_rx_stbc;
+		if (vht_cap_info->rx_stbc && !cfg->vht_rx_stbc)
+			vht_cap_info->rx_stbc = cfg->vht_rx_stbc;
+	} else {
+		vht_cap_info->tx_stbc = 0;
+		vht_cap_info->rx_stbc = 0;
+	}
 
 	/* Set VHT SU Beamformer cap */
 	if (vht_cap_info->su_bformer && !cfg->vht_su_bformer)
@@ -4527,6 +4566,25 @@ wlan_mlme_get_mgmt_max_retry(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*max_retry = mlme_obj->cfg.gen.mgmt_retry_max;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_mgmt_6ghz_rate_support(struct wlan_objmgr_psoc *psoc,
+				     bool *enable_he_mcs0_for_6ghz_mgmt)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj) {
+		*enable_he_mcs0_for_6ghz_mgmt =
+			cfg_default(CFG_ENABLE_HE_MCS0_MGMT_6GHZ);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*enable_he_mcs0_for_6ghz_mgmt =
+		mlme_obj->cfg.gen.enable_he_mcs0_for_6ghz_mgmt;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -6013,36 +6071,14 @@ QDF_STATUS wlan_connect_hw_mode_change_resp(struct wlan_objmgr_pdev *pdev,
 						  status);
 }
 
-#ifdef WLAN_FEATURE_11BE
-static inline bool
-wlan_mlme_is_phymode_320_mhz(enum wlan_phymode phy_mode,
-			     enum phy_ch_width *ch_width)
-{
-	if (IS_WLAN_PHYMODE_320MHZ(phy_mode)) {
-		*ch_width = CH_WIDTH_320MHZ;
-		return true;
-	}
-
-	return false;
-}
-#else
-static inline bool
-wlan_mlme_is_phymode_320_mhz(enum wlan_phymode phy_mode,
-			     enum phy_ch_width *ch_width)
-{
-	return false;
-}
-#endif
-
 enum phy_ch_width
 wlan_mlme_get_ch_width_from_phymode(enum wlan_phymode phy_mode)
 {
-	enum phy_ch_width ch_width = CH_WIDTH_20MHZ;
+	enum phy_ch_width ch_width;
 
-	if (wlan_mlme_is_phymode_320_mhz(phy_mode, &ch_width))
-		goto done;
-
-	if (IS_WLAN_PHYMODE_160MHZ(phy_mode))
+	if (IS_WLAN_PHYMODE_320MHZ(phy_mode))
+		ch_width = CH_WIDTH_320MHZ;
+	else if (IS_WLAN_PHYMODE_160MHZ(phy_mode))
 		ch_width = CH_WIDTH_160MHZ;
 	else if (IS_WLAN_PHYMODE_80MHZ(phy_mode))
 		ch_width = CH_WIDTH_80MHZ;
@@ -6051,7 +6087,6 @@ wlan_mlme_get_ch_width_from_phymode(enum wlan_phymode phy_mode)
 	else
 		ch_width = CH_WIDTH_20MHZ;
 
-done:
 	mlme_legacy_debug("phymode: %d, ch_width: %d ", phy_mode, ch_width);
 
 	return ch_width;
@@ -6148,6 +6183,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 {
 	uint32_t roam_triggers;
 	int sap_max_num_clients;
+	bool is_enable_idle_roam = false, is_bss_load_enabled = false;
 
 	wlan_mlme_get_latency_enable(psoc,
 				     &mlme_feature_set->enable_wifi_optimizer);
@@ -6157,14 +6193,21 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 					WMI_HOST_VENDOR1_REQ1_VERSION_3_20;
 	roam_triggers = wlan_mlme_get_roaming_triggers(psoc);
 
+	wlan_mlme_get_bss_load_enabled(psoc, &is_bss_load_enabled);
 	mlme_feature_set->roaming_high_cu_roam_trigger =
-			roam_triggers & BIT(ROAM_TRIGGER_REASON_BSS_LOAD);
+			(roam_triggers & BIT(ROAM_TRIGGER_REASON_BSS_LOAD)) &&
+			is_bss_load_enabled;
+
 	mlme_feature_set->roaming_emergency_trigger =
 			roam_triggers & BIT(ROAM_TRIGGER_REASON_FORCED);
 	mlme_feature_set->roaming_btm_trihgger =
 			roam_triggers & BIT(ROAM_TRIGGER_REASON_BTM);
+
+	wlan_mlme_get_enable_idle_roam(psoc, &is_enable_idle_roam);
 	mlme_feature_set->roaming_idle_trigger =
-			roam_triggers & BIT(ROAM_TRIGGER_REASON_IDLE);
+			(roam_triggers & BIT(ROAM_TRIGGER_REASON_IDLE)) &&
+			is_enable_idle_roam;
+
 	mlme_feature_set->roaming_wtc_trigger =
 			roam_triggers & BIT(ROAM_TRIGGER_REASON_WTC_BTM);
 	mlme_feature_set->roaming_btcoex_trigger =

@@ -40,9 +40,21 @@
 #include "nan_ucfg_api.h"
 #include "wlan_mlme_main.h"
 
-static uint16_t tdls_get_connected_peer(struct tdls_soc_priv_obj *soc_obj)
+static uint16_t tdls_get_connected_peer_count(struct tdls_soc_priv_obj *soc_obj)
 {
 	return soc_obj->connected_peer_count;
+}
+
+uint16_t tdls_get_connected_peer_count_from_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	struct tdls_soc_priv_obj *soc_obj;
+
+	soc_obj = wlan_vdev_get_tdls_soc_obj(vdev);
+
+	if (!soc_obj)
+		return 0;
+
+	return tdls_get_connected_peer_count(soc_obj);
 }
 
 #ifdef WLAN_FEATURE_11AX
@@ -196,7 +208,20 @@ void tdls_decrement_peer_count(struct wlan_objmgr_vdev *vdev,
 
 	tdls_debug("Connected peer count %d", soc_obj->connected_peer_count);
 
+	/* Need to update osif params when last peer gets disconnected */
+	if (!soc_obj->connected_peer_count &&
+	    soc_obj->tdls_osif_update_cb.tdls_osif_disconn_update)
+		soc_obj->tdls_osif_update_cb.tdls_osif_disconn_update(vdev);
 	tdls_update_6g_power(vdev, soc_obj, false);
+
+	/*
+	 * Offchannel is allowed only when TDLS is connected with one peer.
+	 * If more than one peer is connected then Offchannel is disabled by
+	 * WMI_TDLS_SET_OFFCHAN_MODE_CMDID with DISABLE_CHANSWITCH.
+	 * Hence, re-enable offchannel when only one conencted peer is left.
+	 */
+	if (soc_obj->connected_peer_count == 1)
+		tdls_set_tdls_offchannelmode(vdev, ENABLE_CHANSWITCH);
 }
 
 /**
@@ -637,7 +662,7 @@ static QDF_STATUS tdls_activate_add_peer(struct tdls_add_peer_request *req)
 	}
 
 	/* first to check if we reached to maximum supported TDLS peer. */
-	curr_tdls_peers = tdls_get_connected_peer(soc_obj);
+	curr_tdls_peers = tdls_get_connected_peer_count(soc_obj);
 	if (soc_obj->max_num_tdls_sta <= curr_tdls_peers) {
 		tdls_err(QDF_MAC_ADDR_FMT
 			 " Request declined. Current %d, Max allowed %d.",
@@ -1099,7 +1124,7 @@ tdls_activate_update_peer(struct tdls_update_peer_request *req)
 		goto setlink;
 	}
 
-	curr_tdls_peers = tdls_get_connected_peer(soc_obj);
+	curr_tdls_peers = tdls_get_connected_peer_count(soc_obj);
 	if (soc_obj->max_num_tdls_sta <= curr_tdls_peers) {
 		tdls_err(QDF_MAC_ADDR_FMT
 			 " Request declined. Current: %d, Max allowed: %d.",
@@ -1781,6 +1806,19 @@ QDF_STATUS tdls_process_enable_link(struct tdls_oper_request *req)
 		goto error;
 	}
 
+	/*
+	 * Offchannel is allowed only when TDLS is connected with one peer.
+	 * If more than one peer is connected then Disable Offchannel by sending
+	 * WMI_TDLS_SET_OFFCHAN_MODE_CMDID with DISABLE_CHANSWITCH.
+	 * So, basically when the 2nd peer enable_link is there, offchannel
+	 * should be disabled and will remain disabled for all subsequent
+	 * TDLS peer conenction.
+	 * Offchannel will be re-enabled when connected peer count again
+	 * becomes 1.
+	 */
+	if (soc_obj->connected_peer_count == 1)
+		tdls_set_tdls_offchannelmode(vdev, DISABLE_CHANSWITCH);
+
 	peer->tdls_support = TDLS_CAP_SUPPORTED;
 	if (TDLS_LINK_CONNECTED != peer->link_status)
 		tdls_set_peer_link_status(peer, TDLS_LINK_CONNECTED,
@@ -1811,6 +1849,10 @@ QDF_STATUS tdls_process_enable_link(struct tdls_oper_request *req)
 
 	tdls_update_6g_power(vdev, soc_obj, true);
 	tdls_increment_peer_count(soc_obj);
+	/* Need to update osif params when first peer gets connected */
+	if (soc_obj->connected_peer_count == 1 &&
+	    soc_obj->tdls_osif_update_cb.tdls_osif_conn_update)
+		soc_obj->tdls_osif_update_cb.tdls_osif_conn_update(vdev);
 	feature = soc_obj->tdls_configs.tdls_feature_flags;
 
 	if (soc_obj->tdls_dp_vdev_update)
@@ -1878,7 +1920,7 @@ static QDF_STATUS tdls_config_force_peer(
 
 	/*
 	 * In case of liberal external mode, supplicant will provide peer mac
-	 * address but driver has to behave similar to implict mode ie
+	 * address but driver has to behave similar to implicit mode ie
 	 * establish tdls link with any peer that supports tdls and meets stats
 	 */
 	if (TDLS_IS_LIBERAL_EXTERNAL_CONTROL_ENABLED(feature)) {
@@ -2530,13 +2572,28 @@ free:
 
 int tdls_process_set_offchan_mode(struct tdls_set_offchanmode *req)
 {
-	int status;
+	int status = QDF_STATUS_E_FAILURE;
+	struct tdls_soc_priv_obj *tdls_soc_obj;
 
 	tdls_debug("TDLS offchan mode to be configured %d", req->offchan_mode);
+
+	tdls_soc_obj = wlan_vdev_get_tdls_soc_obj(req->vdev);
+	if (!tdls_soc_obj)
+		goto free;
+
+	if ((tdls_get_connected_peer_count(tdls_soc_obj) > 1) &&
+	    req->offchan_mode == ENABLE_CHANSWITCH) {
+		tdls_debug("Reject off chan enable, Connected peer count %d",
+			   tdls_get_connected_peer_count(tdls_soc_obj));
+		goto free;
+	}
+
 	status = tdls_set_tdls_offchannelmode(req->vdev, req->offchan_mode);
 
 	if (req->callback)
 		req->callback(req->vdev);
+
+free:
 	qdf_mem_free(req);
 
 	return status;

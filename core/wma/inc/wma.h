@@ -720,7 +720,7 @@ struct wma_txrx_node {
 	uint8_t rmfEnabled;
 	uint32_t uapsd_cached_val;
 	void *del_staself_req;
-	bool is_del_sta_defered;
+	bool is_del_sta_deferred;
 	qdf_atomic_t bss_status;
 	enum tx_rate_info rate_flags;
 	uint8_t nss;
@@ -826,7 +826,7 @@ struct wma_wlm_stats_data {
  *   was done
  * @last_umac_data_nbuf: cache nbuf ptr for the last umac data buf
  * @tgt_cfg_update_cb: configuration update callback
- * @reg_cap: regulatory capablities
+ * @reg_cap: regulatory capabilities
  * @scan_id: scan id
  * @interfaces: txrx nodes(per vdev)
  * @pdevconfig: pdev related configrations

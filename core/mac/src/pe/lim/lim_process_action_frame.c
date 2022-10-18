@@ -1156,8 +1156,12 @@ __lim_process_link_measurement_req(struct mac_context *mac, uint8_t *pRxPacketIn
 		pe_debug("There were warnings while unpacking a Link Measure request (0x%08x, %d bytes):",
 			nStatus, frameLen);
 	}
-	/* Call rrm function to handle the request. */
 
+	if (pe_session->sta_follows_sap_power) {
+		pe_debug("STA power has changed, reject the link measurement request");
+		return QDF_STATUS_E_FAILURE;
+	}
+	/* Call rrm function to handle the request. */
 	return rrm_process_link_measurement_request(mac, pRxPacketInfo, &frm,
 					     pe_session);
 
@@ -1903,6 +1907,25 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					action_hdr->actionID);
 				break;
 
+			}
+		} else if (LIM_IS_AP_ROLE(session)) {
+			switch (action_hdr->actionID) {
+			case RRM_NEIGHBOR_REQ:
+			case RRM_RADIO_MEASURE_RPT:
+				rssi = WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
+				mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+				lim_send_sme_mgmt_frame_ind(mac_ctx,
+						mac_hdr->fc.subType,
+						(uint8_t *)mac_hdr,
+						frame_len + sizeof(tSirMacMgmtHdr),
+						session->smeSessionId,
+						WMA_GET_RX_FREQ(rx_pkt_info),
+						rssi, RXMGMT_FLAG_NONE);
+				break;
+			default:
+				pe_warn("Action ID: %d not handled in RRM",
+					action_hdr->actionID);
+				break;
 			}
 		} else {
 			/* Else we will just ignore the RRM messages. */

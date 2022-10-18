@@ -51,11 +51,6 @@
 #include <net/tcp.h>
 
 #include "dp_txrx.h"
-#if defined(WLAN_SUPPORT_RX_FISA)
-#include "dp_fisa_rx.h"
-#else
-#include <net/ieee80211_radiotap.h>
-#endif
 #include <ol_defines.h>
 #include "cfg_ucfg_api.h"
 #include "target_type.h"
@@ -981,7 +976,7 @@ wlan_hdd_update_queue_history_state(struct net_device *dev,
 }
 
 /**
- * wlan_hdd_stop_non_priority_queue() - stop non prority queues
+ * wlan_hdd_stop_non_priority_queue() - stop non priority queues
  * @adapter: adapter handle
  *
  * Return: None
@@ -1003,7 +998,7 @@ static inline void wlan_hdd_stop_non_priority_queue(struct hdd_adapter *adapter)
 }
 
 /**
- * wlan_hdd_wake_non_priority_queue() - wake non prority queues
+ * wlan_hdd_wake_non_priority_queue() - wake non priority queues
  * @adapter: adapter handle
  *
  * Return: None

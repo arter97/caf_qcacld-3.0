@@ -283,13 +283,13 @@ dp_psoc_obj_destroy_notification(struct wlan_objmgr_psoc *psoc, void *arg);
 void dp_attach_ctx(struct wlan_dp_psoc_context *dp_ctx);
 
 /**
- * dp_dettach_ctx() - to dettach dp context
+ * dp_detach_ctx() - to detach dp context
  *
- * Helper function to dettach dp context
+ * Helper function to detach dp context
  *
  * Return: None.
  */
-void dp_dettach_ctx(void);
+void dp_detach_ctx(void);
 
 /**
  * dp_get_context() - to get dp context
@@ -316,6 +316,11 @@ dp_add_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
 	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return;
+	}
 
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:
@@ -349,6 +354,11 @@ dp_del_latency_critical_client(struct wlan_objmgr_vdev *vdev,
 			       enum qca_wlan_802_11_mode phymode)
 {
 	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return;
+	}
 
 	switch (phymode) {
 	case QCA_WLAN_802_11_MODE_11A:

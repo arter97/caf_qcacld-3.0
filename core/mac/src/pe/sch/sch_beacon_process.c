@@ -450,6 +450,10 @@ sch_bcn_update_opmode_change(struct mac_context *mac_ctx, tpDphHashNode sta_ds,
 		pe_debug("Ignore opmode change as channel switch is in progress");
 		return;
 	}
+	if (bcn->eht_op.eht_op_information_present) {
+		pe_debug("Ignore opmode change as there is EHT operation information");
+		return;
+	}
 
 	if (session->vhtCapability && bcn->OperatingMode.present) {
 		pe_debug("OMN IE is present in the beacon, update NSS/Ch width");
@@ -661,7 +665,13 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 			return;
 	}
 
-	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc)) {
+	/*
+	 * STA LPI + SAP VLP is supported. For this STA should operate in VLP
+	 * power level of the SAP.
+	 * If STA is operating in VLP power of SAP, do not update STA power.
+	 */
+	if (wlan_reg_is_ext_tpc_supported(mac_ctx->psoc) &&
+	    !session->sta_follows_sap_power) {
 		tx_ops = wlan_reg_get_tx_ops(mac_ctx->psoc);
 
 		lim_parse_tpe_ie(mac_ctx, session, bcn->transmit_power_env,
@@ -695,7 +705,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 						      session->vdev_id,
 						      &mlme_obj->reg_tpc_obj);
 			}
-	} else {
+	} else if (!session->sta_follows_sap_power) {
 		/* Obtain the Max Tx power for the current regulatory  */
 		regMax = wlan_reg_get_channel_reg_power_for_freq(
 					mac_ctx->pdev, session->curr_op_freq);
@@ -762,6 +772,7 @@ static void __sch_beacon_process_for_session(struct mac_context *mac_ctx,
 							      session);
 		session->send_p2p_conf_frame = false;
 	}
+	lim_process_beacon_eht(mac_ctx, session, bcn);
 }
 
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
@@ -990,7 +1001,6 @@ sch_beacon_process(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 
 	sch_send_beacon_report(mac_ctx, &bcn, session);
 	__sch_beacon_process_for_session(mac_ctx, &bcn, rx_pkt_info, session);
-	lim_process_beacon_mlo(mac_ctx, session, &bcn);
 }
 
 /**

@@ -444,13 +444,6 @@ QDF_STATUS sme_vdev_delete(mac_handle_t mac_handle,
 void sme_cleanup_session(mac_handle_t mac_handle, uint8_t vdev_id);
 
 /**
- * sme_set_curr_device_mode() - Sets the current operating device mode.
- * @mac_handle: The handle returned by mac_open.
- * @curr_device_mode: Current operating device mode.
- */
-void sme_set_curr_device_mode(mac_handle_t mac_handle,
-			      enum QDF_OPMODE curr_device_mode);
-/**
  * sme_update_roam_params() - Store/Update the roaming params
  * @mac_handle: Opaque handle to the global MAC context
  * @vdev_id:                  vdev ID
@@ -3625,6 +3618,8 @@ void sme_set_bss_max_idle_period(mac_handle_t mac_handle, uint16_t cfg_val);
 #ifdef WLAN_FEATURE_11AX
 void sme_set_he_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id);
 void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id);
+void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
+		       enum eSirMacHTChannelWidth chwidth);
 /**
  * sme_set_ru_242_tone_tx_cfg() - set ru 242 tone tx user cfg
  * @mac_handle: Opaque handle to the global MAC context
@@ -3652,6 +3647,10 @@ static inline void sme_reset_he_caps(mac_handle_t mac_handle, uint8_t vdev_id)
 {
 }
 
+static inline void sme_set_he_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
+				     enum eSirMacHTChannelWidth chwidth)
+{
+}
 static inline void sme_check_enable_ru_242_tx(mac_handle_t mac_handle,
 					      uint8_t vdev_id)
 {
@@ -3682,13 +3681,65 @@ void sme_set_eht_testbed_def(mac_handle_t mac_handle, uint8_t vdev_id);
  * Return: None
  */
 void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id);
+
+/**
+ * sme_set_mlo_max_links() - set mlo max links
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @val: value to be set
+ *
+ * Return: None
+ */
+void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
+			   uint8_t val);
+
+/**
+ * sme_set_mlo_max_simultaneous_links() - set mlo max simultaneous links
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @val: value to set
+ *
+ * Return: None
+ */
+void sme_set_mlo_max_simultaneous_links(mac_handle_t mac_handle,
+					uint8_t vdev_id, uint8_t val);
+
+/**
+ * sme_set_mlo_assoc_link_band() - set mlo assoc link band
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: VDEV id
+ * @val: value to be set
+ *
+ * Return: None
+ */
+void sme_set_mlo_assoc_link_band(mac_handle_t mac_handle, uint8_t vdev_id,
+				 uint8_t val);
 #else
 static inline void sme_set_eht_testbed_def(mac_handle_t mac_handle,
 					   uint8_t vdev_id)
 {
 }
 
-static inline void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
+static inline
+void sme_reset_eht_caps(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+}
+
+static inline
+void sme_set_mlo_max_links(mac_handle_t mac_handle, uint8_t vdev_id,
+			   uint8_t val)
+{
+}
+
+static inline
+void sme_set_mlo_assoc_link_band(mac_handle_t mac_handle, uint8_t vdev_id,
+				 uint8_t val)
+{
+}
+
+static inline
+void sme_set_mlo_max_simultaneous_links(mac_handle_t mac_handle,
+					uint8_t vdev_id, uint8_t val)
 {
 }
 #endif
@@ -4463,10 +4514,22 @@ enum csr_cfgdot11mode sme_phy_mode_to_dot11mode(enum wlan_phymode phy_mode);
  * Return: Max EHT channel width supported by FW (eg. 80, 160, 320)
  */
 uint32_t sme_get_eht_ch_width(void);
+
+/**
+ * sme_is_11be_capable() - Check if 11 be is supported or not
+ *
+ * Return: True if 11be is supported
+ */
+bool sme_is_11be_capable(void);
 #else /* !WLAN_FEATURE_11BE */
 static inline uint32_t sme_get_eht_ch_width(void)
 {
 	return 0;
+}
+
+static inline bool sme_is_11be_capable(void)
+{
+	return false;
 }
 #endif /* WLAN_FEATURE_11BE */
 

@@ -223,6 +223,7 @@ struct wlan_mlme_roaming_config {
  * @roam_config: Roaming configurations structure
  * @sae_single_pmk: Details for sae roaming using single pmk
  * @set_pmk_pending: RSO update status of PMK from set_key
+ * @sae_auth_ta: SAE pre-auth tx address
  */
 struct wlan_mlme_roam {
 	struct wlan_mlme_roam_state_info roam_sm;
@@ -231,6 +232,7 @@ struct wlan_mlme_roam {
 	struct wlan_mlme_sae_single_pmk sae_single_pmk;
 #endif
 	bool set_pmk_pending;
+	struct qdf_mac_addr sae_auth_ta;
 };
 
 #ifdef WLAN_FEATURE_MSCS
@@ -406,9 +408,14 @@ struct wait_for_key_timer {
  * struct mlme_ap_config - VDEV MLME legacy private SAP
  * related configurations
  * @user_config_sap_ch_freq : Frequency from userspace to start SAP
+ * @update_required_scc_sta_power: Change the 6 GHz power type of the
+ * concurrent STA
  */
 struct mlme_ap_config {
 	qdf_freq_t user_config_sap_ch_freq;
+#ifdef CONFIG_BAND_6GHZ
+	bool update_required_scc_sta_power;
+#endif
 };
 
 /**
@@ -456,6 +463,7 @@ struct mlme_ap_config {
  * @vdev_traffic_type: to set if vdev is LOW_LATENCY or HIGH_TPUT
  * @country_ie_for_all_band: take all band channel info in country ie
  * @mlme_ap: SAP related vdev private configurations
+ * @is_single_link_mlo_roam: Single link mlo roam flag
  */
 struct mlme_legacy_priv {
 	bool chan_switch_in_progress;
@@ -473,8 +481,13 @@ struct mlme_legacy_priv {
 	uint32_t vdev_stop_type;
 	struct wlan_mlme_roam mlme_roam;
 	struct wlan_cm_roam cm_roam;
-#ifdef WLAN_FEATURE_ROAM_OFFLOAD
-	struct wlan_log_record auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
+#if defined(WLAN_FEATURE_ROAM_OFFLOAD) && \
+		defined(WLAN_FEATURE_CONNECTIVITY_LOGGING)
+	struct wlan_log_record
+	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
+#elif defined(WLAN_FEATURE_ROAM_OFFLOAD) && defined(CONNECTIVITY_DIAG_EVENT)
+	struct wlan_diag_packet_info
+	    auth_log[MAX_ROAM_CANDIDATE_AP][WLAN_ROAM_MAX_CACHED_AUTH_FRAMES];
 #endif
 	bool bigtk_vdev_support;
 	struct sae_auth_retry sae_retry;
@@ -506,6 +519,9 @@ struct mlme_legacy_priv {
 	uint8_t vdev_traffic_type;
 	bool country_ie_for_all_band;
 	struct mlme_ap_config mlme_ap;
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_FEATURE_ROAM_OFFLOAD)
+	bool is_single_link_mlo_roam;
+#endif
 };
 
 /**
@@ -1173,6 +1189,42 @@ QDF_STATUS
 wlan_set_sap_user_config_freq(struct wlan_objmgr_vdev *vdev,
 			      qdf_freq_t freq);
 
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * wlan_get_tpc_update_required_for_sta() - Get the tpc update required config
+ * to identify whether the tpc power has changed for concurrent STA interface
+ *
+ * @vdev: pointer to SAP vdev
+ *
+ * Return: Change scc power config
+ */
+bool
+wlan_get_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_set_tpc_update_required_for_sta() - Set the tpc update required config
+ * for the concurrent STA interface
+ *
+ * @vdev:   pointer to SAP vdev
+ * @value:  change scc power config
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value);
+#else
+static inline bool
+wlan_get_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline QDF_STATUS
+wlan_set_tpc_update_required_for_sta(struct wlan_objmgr_vdev *vdev, bool value)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wlan_mlme_defer_pmk_set_in_roaming() - Set the set_key pending status

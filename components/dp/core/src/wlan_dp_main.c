@@ -63,7 +63,7 @@ void dp_free_ctx(void)
 
 	qdf_spinlock_destroy(&dp_ctx->intf_list_lock);
 	qdf_list_destroy(&dp_ctx->intf_list);
-	dp_dettach_ctx();
+	dp_detach_ctx();
 	qdf_mem_free(dp_ctx);
 }
 
@@ -842,6 +842,7 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("DP peer attach failed");
 		qdf_mem_free(sta_info);
+		return status;
 	}
 
 	qdf_mem_copy(sta_info->sta_mac.bytes, peer->macaddr,
@@ -1113,10 +1114,10 @@ void dp_attach_ctx(struct wlan_dp_psoc_context *dp_ctx)
 	gp_dp_ctx = dp_ctx;
 }
 
-void dp_dettach_ctx(void)
+void dp_detach_ctx(void)
 {
 	if (!gp_dp_ctx) {
-		dp_err("global dp ctx is already dettached");
+		dp_err("global dp ctx is already detached");
 		return;
 	}
 	gp_dp_ctx = NULL;

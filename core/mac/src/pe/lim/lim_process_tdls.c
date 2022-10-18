@@ -209,7 +209,7 @@ static void populate_dot11f_tdls_offchannel_params(
 {
 	uint32_t numChans = CFG_VALID_CHANNEL_LIST_LEN;
 	uint8_t validChan[CFG_VALID_CHANNEL_LIST_LEN];
-	uint8_t i;
+	uint8_t i, count_opclss = 1;
 	uint8_t valid_count = 0;
 	uint8_t chanOffset;
 	uint8_t op_class;
@@ -219,6 +219,9 @@ static void populate_dot11f_tdls_offchannel_params(
 	uint8_t nss_2g;
 	uint8_t nss_5g;
 	qdf_freq_t ch_freq;
+	bool is_vlp_country;
+	uint8_t ap_cc[REG_ALPHA2_LEN + 1];
+	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	numChans = mac->mlme_cfg->reg.valid_channel_list_num;
 
@@ -231,6 +234,11 @@ static void populate_dot11f_tdls_offchannel_params(
 			 mac->user_configured_nss);
 	nss_2g = QDF_MIN(mac->vdev_type_nss_2g.tdls,
 			 mac->user_configured_nss);
+
+	wlan_cm_get_country_code(mac->pdev, pe_session->vdev_id, ap_cc);
+	wlan_reg_read_current_country(mac->psoc, reg_cc);
+	is_vlp_country = wlan_reg_ctry_support_vlp(ap_cc) &&
+			 wlan_reg_ctry_support_vlp(reg_cc);
 
 	/* validating the channel list for DFS and 2G channels */
 	for (i = 0; i < numChans; i++) {
@@ -258,8 +266,10 @@ static void populate_dot11f_tdls_offchannel_params(
 		}
 
 		if (wlan_reg_is_6ghz_chan_freq(ch_freq) &&
-		    !wlan_reg_is_6ghz_psc_chan_freq(ch_freq)) {
-			pe_debug("skipping non-psc channel %d", ch_freq);
+		    !(is_vlp_country &&
+		      wlan_reg_is_6ghz_psc_chan_freq(ch_freq))) {
+			pe_debug("skipping is_vlp_country %d or non-psc channel %d",
+				 is_vlp_country, ch_freq);
 			continue;
 		}
 
@@ -303,17 +313,24 @@ static void populate_dot11f_tdls_offchannel_params(
 
 	wlan_reg_dmn_get_curr_opclasses(&numClasses, &classes[0]);
 
-	for (i = 0; i < numClasses; i++)
-		suppOperClasses->classes[i + 1] = classes[i];
+	for (i = 0; i < numClasses; i++) {
+		if (wlan_reg_is_6ghz_op_class(mac->pdev, classes[i]) &&
+		    !is_vlp_country)
+			continue;
 
-	pe_debug("countryCodeCurrent: %s, curr_op_freq: %d, htSecondaryChannelOffset: %d, chanOffset: %d op class: %d num_supportd_chan %d num_supportd_opclass %d",
+		suppOperClasses->classes[count_opclss] = classes[i];
+		count_opclss++;
+	}
+
+	pe_debug("countryCodeCurrent: %s, curr_op_freq: %d, htSecondaryChannelOffset: %d, chanOffset: %d op class: %d num_supportd_chan %d total opclasses %d num_supportd_opclass %d",
 		 mac->scan.countryCodeCurrent,
 		 pe_session->curr_op_freq,
 		 pe_session->htSecondaryChannelOffset,
-		 chanOffset, op_class, valid_count, numClasses);
+		 chanOffset, op_class, valid_count, numClasses,
+		 count_opclss);
 
 	/* add one for present operating class, added in the beginning */
-	suppOperClasses->num_classes = numClasses + 1;
+	suppOperClasses->num_classes = count_opclss;
 
 	return;
 }
@@ -377,7 +394,9 @@ static void populate_dot11f_tdls_ext_capability(struct mac_context *mac,
 	/*
 	 * For supporting wider bandwidth set tdls_wider_bw set as 1
 	 */
-	if (wlan_cfg80211_tdls_is_fw_wideband_capable(pe_session->vdev))
+	if (wlan_cfg80211_tdls_is_fw_wideband_capable(pe_session->vdev) &&
+	    (mac->lim.gLimTDLSOffChannelEnabled ||
+	     !wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq)))
 		p_ext_cap->tdls_wider_bw = 1;
 
 	extCapability->present = 1;
@@ -1088,6 +1107,8 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 	qdf_list_t *head;
 	qdf_list_node_t *p_node;
 	int i = 0;
+	uint16_t rx_he_mcs_map_160 = 0xfffa;
+	uint16_t tx_he_mcs_map_160 = 0xfffa;
 	QDF_STATUS status;
 
 	tdls_obj = wlan_vdev_get_tdls_vdev_obj(session->vdev);
@@ -1117,14 +1138,24 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 		return;
 	}
 
-	if (stads->ch_width == CH_WIDTH_160MHZ ||
-	    (tdls_peer_candidate->pref_off_chan_width &
-	     (1 << BW_160_OFFSET_BIT))) {
+	if (stads->ch_width == CH_WIDTH_160MHZ) {
 		lim_populate_he_mcs_per_bw(
 			mac_ctx, &rates->rx_he_mcs_map_160,
 			&rates->tx_he_mcs_map_160,
 			*((uint16_t *)peer_he_caps->rx_he_mcs_map_160),
 			*((uint16_t *)peer_he_caps->tx_he_mcs_map_160),
+			nss,
+			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+				rx_he_mcs_map_160),
+			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+					tx_he_mcs_map_160));
+	} else if (tdls_peer_candidate->pref_off_chan_width &
+	     (1 << BW_160_OFFSET_BIT)) {
+		lim_populate_he_mcs_per_bw(
+			mac_ctx, &rates->rx_he_mcs_map_160,
+			&rates->tx_he_mcs_map_160,
+			rx_he_mcs_map_160,
+			tx_he_mcs_map_160,
 			nss,
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				rx_he_mcs_map_160),
@@ -3102,8 +3133,9 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 
 	wide_band_peer = lim_is_wide_band_set(add_sta_req->extn_capability) &&
 		    wlan_cfg80211_tdls_is_fw_wideband_capable(pe_session->vdev);
+	selfDot11Mode = mac->mlme_cfg->dot11_mode.dot11_mode;
 	htCaps = &htCap;
-	if (htCaps->present) {
+	if (htCaps->present && IS_DOT11_MODE_HT(selfDot11Mode)) {
 		sta->mlmStaContext.htCapability = 1;
 		sta->htGreenfield = htCaps->greenField;
 		/*
@@ -3152,7 +3184,7 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 	}
 	lim_tdls_populate_dot11f_vht_caps(mac, add_sta_req, &vhtCap);
 	pVhtCaps = &vhtCap;
-	if (pVhtCaps->present) {
+	if (pVhtCaps->present && IS_DOT11_MODE_VHT(selfDot11Mode)) {
 		sta->mlmStaContext.vhtCapability = 1;
 
 		/*
@@ -3207,7 +3239,6 @@ static void lim_tdls_update_hash_node_info(struct mac_context *mac,
 			WNI_CFG_VHT_CHANNEL_WIDTH_20_40MHZ;
 	}
 
-	selfDot11Mode = mac->mlme_cfg->dot11_mode.dot11_mode;
 	if (IS_DOT11_MODE_HE(selfDot11Mode))
 		lim_tdls_update_node_he_caps(mac, add_sta_req, sta, pe_session,
 					     wide_band_peer);

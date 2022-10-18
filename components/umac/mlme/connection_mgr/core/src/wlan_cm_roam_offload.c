@@ -2653,8 +2653,8 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 						  power_cap_ie_data);
 	}
 
-	wlan_cm_ese_populate_addtional_ies(pdev, mlme_obj, vdev_id,
-					  rso_mode_cfg);
+	wlan_cm_ese_populate_additional_ies(pdev, mlme_obj, vdev_id,
+					    rso_mode_cfg);
 
 	/* Append QCN IE if g_support_qcn_ie INI is enabled */
 	if (mlme_obj->cfg.sta.qcn_ie_support)
@@ -2841,6 +2841,41 @@ cm_roam_scan_btm_offload(struct wlan_objmgr_psoc *psoc,
 	params->btm_candidate_min_score = btm_cfg->btm_trig_min_candidate_score;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * cm_roam_mlo_config() - set roam mlo offload parameters
+ * @psoc: psoc ctx
+ * @vdev: vdev
+ * @params:  roam mlo offload parameters
+ * @rso_cfg: rso config
+ *
+ * This function is used to set roam mlo offload related parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+		   struct wlan_objmgr_vdev *vdev,
+		   struct wlan_roam_start_config *start_req)
+{
+	struct wlan_roam_mlo_config *roam_mlo_params;
+
+	roam_mlo_params = &start_req->roam_mlo_params;
+	roam_mlo_params->vdev_id = wlan_vdev_get_id(vdev);
+	roam_mlo_params->support_link_num =
+		wlan_mlme_get_sta_mlo_conn_max_num(psoc);
+	roam_mlo_params->support_link_band =
+		wlan_mlme_get_sta_mlo_conn_band_bmp(psoc);
+}
+#else
+static void
+cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+		   struct wlan_objmgr_vdev *vdev,
+		   struct wlan_roam_start_config *start_req)
+{
+}
+#endif
+
 /**
  * cm_roam_offload_11k_params() - set roam 11k offload parameters
  * @psoc: psoc ctx
@@ -3015,6 +3050,7 @@ cm_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				   true);
 	start_req->wlan_roam_rt_stats_config =
 			wlan_cm_get_roam_rt_stats(psoc, ROAM_RT_STATS_ENABLE);
+	cm_roam_mlo_config(psoc, vdev, start_req);
 
 	status = wlan_cm_tgt_send_roam_start_req(psoc, vdev_id, start_req);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -5384,10 +5420,12 @@ static void cm_roam_start_init(struct wlan_objmgr_psoc *psoc,
 	 */
 	cm_store_sae_single_pmk_to_global_cache(psoc, pdev, vdev);
 
-	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
+	if (!MLME_IS_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id)) {
+		wlan_clear_sae_auth_logs_cache(psoc, vdev_id);
 		wlan_cm_roam_state_change(pdev, vdev_id,
 					  WLAN_ROAM_RSO_ENABLED,
 					  REASON_CTX_INIT);
+	}
 }
 
 void cm_roam_start_init_on_connect(struct wlan_objmgr_pdev *pdev,
@@ -6721,6 +6759,11 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 					 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
 	}
+
+	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
+	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
+		wlan_diag_event.reason = frame_data->status_code;
+
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
 
 	return status;
@@ -7059,12 +7102,10 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 			     &send_resp, start_timer);
 	/*
 	 * RSO stop resp is not supported or RSO STOP timer/req failed,
-	 * then send resp from here
+	 * send QDF_STATUS_E_NOSUPPORT so that we continue from the caller
 	 */
 	if (send_resp)
-		wlan_cm_rso_stop_continue_disconnect(wlan_vdev_get_psoc(vdev),
-						     wlan_vdev_get_id(vdev),
-						     false);
+		return QDF_STATUS_E_NOSUPPORT;
 
 	return QDF_STATUS_SUCCESS;
 }
