@@ -61,6 +61,12 @@
 #define DP_TX_DESC_FLAG_FLUSH		0x2000
 #define DP_TX_DESC_FLAG_TRAFFIC_END_IND	0x4000
 #define DP_TX_DESC_FLAG_FAST		0x8000
+/*
+ * Since the Tx descriptor flag is of only 16-bit and no more bit is free for
+ * any new flag, therefore for time being overloading PPEDS flag with that of
+ * FLUSH flag.
+ */
+#define DP_TX_DESC_FLAG_PPEDS		0x2000
 
 #define DP_TX_EXT_DESC_FLAG_METADATA_VALID 0x1
 
@@ -280,6 +286,14 @@ qdf_nbuf_t dp_tx_drop(struct cdp_soc_t *soc, uint8_t vdev_id, qdf_nbuf_t nbuf);
 qdf_nbuf_t dp_tx_exc_drop(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			  qdf_nbuf_t nbuf,
 			  struct cdp_tx_exception_metadata *tx_exc_metadata);
+#endif
+#ifdef WLAN_SUPPORT_PPEDS
+void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc);
+#else
+static inline
+void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
+{
+}
 #endif
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 /**

@@ -82,6 +82,7 @@
 #endif
 
 #define MAX_RXDESC_POOLS 4
+#define MAX_PPE_TXDESC_POOLS 1
 
 /* Max no. of VDEV per PSOC */
 #ifdef WLAN_PSOC_MAX_VDEVS
@@ -458,6 +459,7 @@ enum dp_ctxt_type {
 /**
  * enum dp_desc_type - source type for multiple pages allocation
  * @DP_TX_DESC_TYPE: DP SW TX descriptor
+ * @DP_TX_PPEDS_DESC_TYPE: DP PPE-DS Tx descriptor
  * @DP_TX_EXT_DESC_TYPE: DP TX msdu extension descriptor
  * @DP_TX_EXT_DESC_LINK_TYPE: DP link descriptor for msdu ext_desc
  * @DP_TX_TSO_DESC_TYPE: DP TX TSO descriptor
@@ -469,6 +471,7 @@ enum dp_ctxt_type {
  */
 enum dp_desc_type {
 	DP_TX_DESC_TYPE,
+	DP_TX_PPEDS_DESC_TYPE,
 	DP_TX_EXT_DESC_TYPE,
 	DP_TX_EXT_DESC_LINK_TYPE,
 	DP_TX_TSO_DESC_TYPE,
@@ -1107,6 +1110,9 @@ struct dp_soc_stats {
 		uint32_t tx_comp[MAX_TCL_DATA_RINGS];
 		/* Number of tx completions force freed */
 		uint32_t tx_comp_force_freed;
+		/* Counter to track skb invalidation in PPE-DS */
+		uint32_t count;
+
 	} tx;
 
 	/* SOC level RX stats */
@@ -1830,6 +1836,8 @@ struct dp_arch_ops {
 	void (*txrx_peer_map_detach)(struct dp_soc *soc);
 	QDF_STATUS (*dp_rxdma_ring_sel_cfg)(struct dp_soc *soc);
 	void (*soc_cfg_attach)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_peer_setup)(struct dp_soc *soc,
+				      struct dp_peer *peer);
 	void (*peer_get_reo_hash)(struct dp_vdev *vdev,
 				  struct cdp_peer_setup_info *setup_info,
 				  enum cdp_host_reo_dest_ring *reo_dest,
@@ -1963,6 +1971,8 @@ struct dp_arch_ops {
 				       uint16_t peer_id);
 
 	void (*dp_txrx_ppeds_rings_status)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_soc_ppeds_start)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_stop)(struct dp_soc *soc);
 };
 
 /**

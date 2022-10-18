@@ -5162,6 +5162,24 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			desc = next;
 			continue;
 		}
+
+		if (desc->flags & DP_TX_DESC_FLAG_PPEDS) {
+			if (qdf_likely(txrx_peer))
+				dp_tx_update_peer_basic_stats(txrx_peer,
+							      desc->length,
+							      desc->tx_status,
+							      false);
+			nbuf = desc->nbuf;
+			if (qdf_likely(desc->flags & DP_TX_DESC_FLAG_FAST))
+				qdf_nbuf_dev_queue_head(&h, nbuf);
+			else
+				qdf_nbuf_free(nbuf);
+
+			dp_ppeds_tx_desc_free(soc, desc);
+			desc = next;
+			continue;
+		}
+
 		if (qdf_likely(desc->flags & DP_TX_DESC_FLAG_SIMPLE)) {
 			struct dp_pdev *pdev = desc->pdev;
 
@@ -5390,6 +5408,10 @@ more_data:
 			continue;
 		}
 		tx_desc->buffer_src = buffer_src;
+
+		if (tx_desc->flags & DP_TX_DESC_FLAG_PPEDS)
+			goto add_to_pool2;
+
 		/*
 		 * If the release source is FW, process the HTT status
 		 */
@@ -5455,6 +5477,7 @@ more_data:
 add_to_pool:
 			DP_HIST_PACKET_COUNT_INC(tx_desc->pdev->pdev_id);
 
+add_to_pool2:
 			/* First ring descriptor on the cycle */
 			if (!head_desc) {
 				head_desc = tx_desc;

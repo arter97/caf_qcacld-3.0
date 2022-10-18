@@ -318,6 +318,53 @@ target_if_lro_hash_config(struct cdp_ctrl_objmgr_psoc *psoc, uint8_t pdev_id,
 	return status;
 }
 
+#ifdef WLAN_SUPPORT_PPEDS
+QDF_STATUS
+target_if_peer_set_ppe_default_routing(struct cdp_ctrl_objmgr_psoc *psoc,
+				       uint8_t *peer_macaddr,
+				       uint16_t service_code,
+				       uint8_t priority_valid,
+				       uint16_t src_info,
+				       uint8_t vdev_id, uint8_t use_ppe,
+				       uint8_t ppe_routing_enabled)
+{
+	struct wmi_unified *wmi_handle;
+	struct peer_ppe_ds_param param;
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+
+	if (!psoc) {
+		target_if_err("PSOC is NULL!");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_handle =
+	get_wmi_unified_hdl_from_psoc((struct wlan_objmgr_psoc *)psoc);
+	if (!wmi_handle) {
+		target_if_err("wmi_handle is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(&param, sizeof(param));
+
+	qdf_mem_copy(&param.peer_macaddr[0], peer_macaddr, QDF_MAC_ADDR_SIZE);
+	param.ppe_routing_enabled = ppe_routing_enabled;
+	param.service_code = service_code;
+	param.priority_valid = priority_valid;
+	param.src_info = src_info;
+	param.vdev_id = vdev_id;
+	param.use_ppe = use_ppe;
+
+	qdf_status = wmi_unified_peer_ppe_ds_param_send(wmi_handle, &param);
+	if (qdf_status != QDF_STATUS_SUCCESS) {
+		target_if_err("Unable to set PPE default routing for peer "
+				QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(peer_macaddr));
+	}
+
+	return qdf_status;
+}
+#endif	/* WLAN_SUPPORT_PPEDS */
+
 #ifdef WDS_CONV_TARGET_IF_OPS_ENABLE
 QDF_STATUS
 target_if_add_wds_entry(struct cdp_ctrl_objmgr_psoc *soc, uint8_t vdev_id,

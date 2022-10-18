@@ -413,6 +413,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	int reo2ppe_ring;
 	int ppe2tcl_ring;
 	int ppe_release_ring;
+	int ppe_num_tx_desc;
 #endif
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
 	uint32_t pkt_capture_mode;
@@ -1939,6 +1940,15 @@ wlan_cfg_get_dp_soc_ppe2tcl_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
  */
 int
 wlan_cfg_get_dp_soc_ppe_release_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_soc_ppe_num_tx_desc() - Number of ppeds tx Descriptors
+ * @wlan_cfg_ctx - Configuration Handle
+ *
+ * Return: num_tx_desc
+ */
+int
+wlan_cfg_get_dp_soc_ppe_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg);
 #else
 static inline bool
 wlan_cfg_get_dp_soc_is_ppe_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
@@ -1960,6 +1970,12 @@ wlan_cfg_get_dp_soc_ppe2tcl_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
 
 static inline int
 wlan_cfg_get_dp_soc_ppe_release_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+
+static inline int
+wlan_cfg_get_dp_soc_ppe_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return 0;
 }

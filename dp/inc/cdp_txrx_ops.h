@@ -1468,6 +1468,16 @@ struct ol_if_ops {
 				       uint8_t vdev_id,
 				       struct ol_txrx_hardtart_ctxt *ctxt);
 #endif
+#ifdef WLAN_SUPPORT_PPEDS
+	QDF_STATUS
+	(*peer_set_ppe_default_routing)(struct cdp_ctrl_objmgr_psoc *psoc,
+					uint8_t *peer_macaddr,
+					uint16_t service_code,
+					uint8_t priority_valid,
+					uint16_t src_info,
+					uint8_t vdev_id, uint8_t use_ppe,
+					uint8_t routing_enabled);
+#endif /* WLAN_SUPPORT_PPEDS */
 };
 
 #ifdef DP_PEER_EXTENDED_API
@@ -2134,6 +2144,25 @@ struct cdp_sawf_ops {
 };
 #endif
 
+#ifdef WLAN_SUPPORT_PPEDS
+struct cdp_ppe_txrx_ops {
+	QDF_STATUS
+	(*ppeds_entry_attach)(struct cdp_soc_t *soc,
+			      uint8_t vdev_id, void *vpai,
+			      int32_t *ppe_vp_num);
+	QDF_STATUS
+	(*ppeds_enable_pri2tid)(struct cdp_soc_t *soc,
+				uint8_t vdev_id, bool val);
+	void (*ppeds_entry_detach)(struct cdp_soc_t *soc,
+				   uint8_t vdev_id);
+	void (*ppeds_set_int_pri2tid)(struct cdp_soc_t *soc,
+				      uint8_t *pri2tid);
+	void (*ppeds_update_int_pri2tid)(struct cdp_soc_t *soc,
+					 uint8_t pri, uint8_t tid);
+	void (*ppeds_entry_dump)(struct cdp_soc_t *soc);
+};
+#endif /* WLAN_SUPPORT_PPEDS */
+
 struct cdp_ops {
 	struct cdp_cmn_ops          *cmn_drv_ops;
 	struct cdp_ctrl_ops         *ctrl_ops;
@@ -2183,6 +2212,9 @@ struct cdp_ops {
 #endif
 #ifdef WLAN_SUPPORT_SCS
 	struct cdp_scs_ops   *scs_ops;
+#endif
+#ifdef WLAN_SUPPORT_PPEDS
+	struct cdp_ppe_txrx_ops *ppe_ops;
 #endif
 };
 #endif
