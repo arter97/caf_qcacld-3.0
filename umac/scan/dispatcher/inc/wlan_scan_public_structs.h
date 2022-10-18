@@ -408,22 +408,6 @@ struct non_inheritance_ie {
 	bool non_inh_ie_found;
 };
 
-#ifdef WLAN_FEATURE_11BE_MLO
-/**
- * struct rnr_mld_info - Reduced Neighbor Report MLD information
- * @mld_id: MLD ID
- * @link_id: Link ID
- * @bss_param_change_cnt: BSS parameters change count
- * @all_updates_included: All Updates Included
- */
-struct rnr_mld_info {
-	uint8_t mld_id;
-	uint16_t link_id: 4,
-		 bss_param_change_cnt: 8,
-		 all_updates_included: 1,
-		 reserved: 3;
-};
-#endif
 /**
  * struct rnr_bss_info - Reduced Neighbor Report BSS information
  * @neighbor_ap_tbtt_offset: Neighbor AP TBTT offset
@@ -448,21 +432,6 @@ struct rnr_bss_info {
 	bool mld_info_valid;
 	struct rnr_mld_info mld_info;
 #endif
-};
-
-/**
- * struct tbtt_information_header - TBTT information header
- * @tbbt_info_fieldtype: TBTT information field type
- * @filter_neighbor_ap: filtered neighbor ap
- * @tbbt_info_count: TBTT information count
- * @tbtt_info_length: TBTT information length
- */
-struct tbtt_information_header {
-	uint16_t tbbt_info_fieldtype:2;
-	uint16_t filtered_neighbor_ap:1;
-	uint16_t reserved:1;
-	uint16_t tbtt_info_count:4;
-	uint16_t tbtt_info_length:8;
 };
 
 /**

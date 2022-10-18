@@ -1407,6 +1407,21 @@ struct htcap_ie {
 } qdf_packed;
 
 /**
+ * struct tbtt_information_header - TBTT information header
+ * @tbbt_info_fieldtype: TBTT information field type
+ * @filter_neighbor_ap: filtered neighbor ap
+ * @tbbt_info_count: TBTT information count
+ * @tbtt_info_length: TBTT information length
+ */
+struct tbtt_information_header {
+	uint16_t tbbt_info_fieldtype:2,
+		 filtered_neighbor_ap:1,
+		 reserved:1,
+		 tbtt_info_count:4,
+		 tbtt_info_length:8;
+} qdf_packed;
+
+/**
  * struct fils_indication_ie: FILS indication IE element
  * @id: id
  * @len: len
@@ -1878,6 +1893,21 @@ struct wlan_ie_ehtops {
 
 /* Size in octets of the BSS Parameters Change Count (sub)field */
 #define WLAN_ML_BSSPARAMCHNGCNT_SIZE                    1
+
+/**
+ * struct rnr_mld_info - Reduced Neighbor Report MLD information
+ * @mld_id: MLD ID
+ * @link_id: Link ID
+ * @bss_param_change_cnt: BSS parameters change count
+ * @all_updates_included: All Updates Included
+ */
+struct rnr_mld_info {
+	uint8_t mld_id;
+	uint16_t link_id: 4,
+		 bss_param_change_cnt: 8,
+		 all_updates_included: 1,
+		 reserved: 3;
+} qdf_packed;
 
 /**
  * struct wlan_ie_multilink - Fixed fields in Multi-Link IE
