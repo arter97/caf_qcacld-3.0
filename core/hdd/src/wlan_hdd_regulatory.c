@@ -122,7 +122,7 @@ hdd_world_regrules_67_68_6A_6C = {
 	}
 };
 
-#define OSIF_PSOC_SYNC_OP_WAIT_TIME 500
+#define COUNTRY_CHANGE_WORK_RESCHED_WAIT_TIME 30
 /**
  * hdd_get_world_regrules() - get the appropriate world regrules
  * @reg: regulatory data
@@ -1730,6 +1730,27 @@ static void __hdd_country_change_work_handle(struct hdd_context *hdd_ctx)
 }
 
 /**
+ * hdd_handle_country_change_work_error() - handle country code change error
+ * @hdd_ctx: Global HDD context
+ * @errno: country code change error number
+ *
+ * This function handles error code in country code change worker
+ *
+ * Return: none
+ */
+static void hdd_handle_country_change_work_error(struct hdd_context *hdd_ctx,
+						 int errno)
+{
+	if (errno == -EAGAIN) {
+		qdf_sleep(COUNTRY_CHANGE_WORK_RESCHED_WAIT_TIME);
+		hdd_debug("rescheduling country change work");
+		qdf_sched_work(0, &hdd_ctx->country_change_work);
+	} else {
+		hdd_err("can not handle country change %d", errno);
+	}
+}
+
+/**
  * hdd_country_change_work_handle() - handle country code change
  * @arg: Global HDD context
  *
@@ -1746,19 +1767,12 @@ static void hdd_country_change_work_handle(void *arg)
 
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
-		return;
+		return hdd_handle_country_change_work_error(hdd_ctx, errno);
 
 	errno = osif_psoc_sync_op_start(wiphy_dev(hdd_ctx->wiphy), &psoc_sync);
 
-	if (errno == -EAGAIN) {
-		qdf_sleep(OSIF_PSOC_SYNC_OP_WAIT_TIME);
-		hdd_debug("rescheduling country change work");
-		qdf_sched_work(0, &hdd_ctx->country_change_work);
-		return;
-	} else if (errno) {
-		hdd_err("can not handle country change %d", errno);
-		return;
-	}
+	if (errno)
+		return hdd_handle_country_change_work_error(hdd_ctx, errno);
 
 	__hdd_country_change_work_handle(hdd_ctx);
 
@@ -1845,6 +1859,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	struct regulatory_channel *cur_chan_list;
 	enum country_src cc_src;
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
+	int ret;
 
 	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
 	if (!cur_chan_list) {
@@ -1856,6 +1871,12 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	ucfg_reg_register_chan_change_callback(hdd_ctx->psoc,
 					       hdd_regulatory_dyn_cbk,
 					       NULL);
+
+	ret = hdd_update_country_code(hdd_ctx);
+	if (ret) {
+		hdd_err("Failed to update country code; errno:%d", ret);
+		return -EINVAL;
+	}
 
 	wiphy->regulatory_flags |= REGULATORY_WIPHY_SELF_MANAGED;
 	/* Check the kernel version for upstream commit aced43ce780dc5 that
