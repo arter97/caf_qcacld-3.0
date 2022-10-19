@@ -34,6 +34,7 @@
 #define NUM_CHAINS_FW_TO_HOST(n) ((1 << ((n) + 1)) - 1)
 
 #define CFR_INVALID_SNR 0x80
+#define CHAIN_SHIFT_INDEX_PINE_SCAN 2
 
 static u_int32_t end_magic = 0xBEAFDEAD;
 
@@ -1046,6 +1047,11 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 	 * Do not derive the chain phase when capability is not set Or
 	 * when an invalid gain table index is reported by Hardware.
 	 */
+	if (wlan_vdev_mlme_is_special_vdev(vdev)) {
+		for (i = 0; i < pcfr->max_aoa_chains; i++)
+			meta->chain_phase[i] = INVALID_PHASE_DELTA;
+	}
+
 	if (pcfr->is_aoa_for_rcc_support && !invalid_gain_table_idx) {
 		for (i = 0; i < pcfr->max_aoa_chains; i++) {
 			/**
@@ -1068,11 +1074,25 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 			 * is in the range of 0 - 1024 indicating 0 - 360
 			 * degrees
 			 */
-			if (pdelta == INVALID_PHASE_DELTA)
+			if (pdelta == INVALID_PHASE_DELTA) {
+				if (wlan_vdev_mlme_is_special_vdev(vdev) &&
+				    i == CHAIN_SHIFT_INDEX_PINE_SCAN) {
+					meta->chain_phase[i - 1] =
+							INVALID_PHASE_DELTA;
+					break;
+				}
 				meta->chain_phase[i] = INVALID_PHASE_DELTA;
-			else
+			} else {
+				if (wlan_vdev_mlme_is_special_vdev(vdev) &&
+				    i == CHAIN_SHIFT_INDEX_PINE_SCAN) {
+					meta->chain_phase[i - 1] =
+						((pcfr->ibf_cal_val[i] +
+						  pdelta) & 0x3FF);
+					break;
+				}
 				meta->chain_phase[i] = ((pcfr->ibf_cal_val[i] +
 							pdelta) & 0x3FF);
+			}
 		}
 	} else if (pcfr->is_aoa_for_rcc_support) {
 		/**
@@ -1081,6 +1101,11 @@ void target_if_cfr_rx_tlv_process(struct wlan_objmgr_pdev *pdev, void *nbuf)
 		 * set the chain_phase to 0xFFFF indicating an error.
 		 */
 		for (i = 0; i < pcfr->max_aoa_chains; i++) {
+			if (wlan_vdev_mlme_is_special_vdev(vdev) &&
+			    i == CHAIN_SHIFT_INDEX_PINE_SCAN) {
+				meta->chain_phase[i - 1] = INVALID_PHASE_DELTA;
+				break;
+			}
 			meta->chain_phase[i] = INVALID_PHASE_DELTA;
 		}
 	}
