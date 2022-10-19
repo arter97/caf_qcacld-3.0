@@ -396,6 +396,9 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *soc, uint32_t mac_id,
 	union dp_rx_desc_list_elem_t *next;
 	void *rxdma_srng;
 	qdf_nbuf_t nbuf;
+	qdf_nbuf_t nbuf_next;
+	qdf_nbuf_t nbuf_head = NULL;
+	qdf_nbuf_t nbuf_tail = NULL;
 	qdf_dma_addr_t paddr;
 
 	rxdma_srng = dp_rxdma_srng->hal_srng;
@@ -412,27 +415,39 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *soc, uint32_t mac_id,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_rx_debug("%pK: requested %d buffers for replenish",
-		    soc, num_req_buffers);
-
-	hal_srng_access_start(soc->hal_soc, rxdma_srng);
-
+	/* Allocate required number of nbufs */
 	for (count = 0; count < num_req_buffers; count++) {
-		next = (*desc_list)->next;
-		qdf_prefetch(next);
-		rxdma_ring_entry = (struct dp_buffer_addr_info *)
-			hal_srng_src_peek(soc->hal_soc, rxdma_srng);
-		if (qdf_unlikely(!rxdma_ring_entry))
-			break;
-
 		nbuf = dp_rx_nbuf_alloc(soc, rx_desc_pool);
 		if (qdf_unlikely(!nbuf)) {
 			DP_STATS_INC(dp_pdev, replenish.nbuf_alloc_fail, 1);
+			/* Update num_req_buffers to nbufs allocated count */
+			num_req_buffers = count;
 			break;
 		}
 
 		paddr = dp_rx_nbuf_sync_no_dsb(soc, nbuf,
 					       rx_desc_pool->buf_size);
+
+		QDF_NBUF_CB_PADDR(nbuf) = paddr;
+		DP_RX_LIST_APPEND(nbuf_head,
+				  nbuf_tail,
+				  nbuf);
+	}
+	qdf_dsb();
+
+	nbuf = nbuf_head;
+	hal_srng_access_start(soc->hal_soc, rxdma_srng);
+
+	for (count = 0; count < num_req_buffers; count++) {
+		next = (*desc_list)->next;
+		nbuf_next = nbuf->next;
+		qdf_prefetch(next);
+
+		rxdma_ring_entry = (struct dp_buffer_addr_info *)
+			hal_srng_src_get_next(soc->hal_soc, rxdma_srng);
+
+		if (!rxdma_ring_entry)
+			break;
 
 		(*desc_list)->rx_desc.nbuf = nbuf;
 		(*desc_list)->rx_desc.rx_buf_start = nbuf->data;
@@ -445,14 +460,13 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *soc, uint32_t mac_id,
 		(*desc_list)->rx_desc.in_err_state = 0;
 
 		hal_rxdma_buff_addr_info_set(soc->hal_soc, rxdma_ring_entry,
-					     paddr,
+					     QDF_NBUF_CB_PADDR(nbuf),
 					     (*desc_list)->rx_desc.cookie,
 					     rx_desc_pool->owner);
 
 		*desc_list = next;
-		hal_srng_src_get_next(soc->hal_soc, rxdma_srng);
+		nbuf = nbuf_next;
 	}
-	qdf_dsb();
 	hal_srng_access_end(soc->hal_soc, rxdma_srng);
 
 	/* No need to count the number of bytes received during replenish.
@@ -466,6 +480,12 @@ __dp_rx_buffers_no_map_replenish(struct dp_soc *soc, uint32_t mac_id,
 	if (*desc_list)
 		dp_rx_add_desc_list_to_free_list(soc, desc_list, tail,
 						 mac_id, rx_desc_pool);
+	while (nbuf) {
+		nbuf_next = nbuf->next;
+		dp_rx_nbuf_unmap_pool(soc, rx_desc_pool, nbuf);
+		qdf_nbuf_free(nbuf);
+		nbuf = nbuf_next;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
