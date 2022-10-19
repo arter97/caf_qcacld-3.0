@@ -1195,6 +1195,77 @@ reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 	return status;
 }
 
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * reg_get_afc_psd() - For a given frequency, get the psd from the AFC channel
+ * list
+ * @freq: Channel frequency
+ * @afc_chan_list: Pointer to afc_chan_list
+ * @afc_psd: Pointer to afc_psd
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS reg_get_afc_psd(qdf_freq_t freq,
+				  struct regulatory_channel *afc_chan_list,
+				  uint16_t *afc_psd)
+{
+	uint8_t i;
+
+	for (i = 0; i < NUM_6GHZ_CHANNELS; i++) {
+		if (freq == afc_chan_list[i].center_freq) {
+			*afc_psd = afc_chan_list[i].psd_eirp;
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS reg_get_client_psd_for_ap(struct wlan_objmgr_pdev *pdev,
+				     enum reg_6g_ap_type ap_pwr_type,
+				     enum reg_6g_client_type client_type,
+				     qdf_freq_t chan_freq,
+				     uint16_t *reg_psd)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *master_chan_list, *afc_chan_list;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+	uint16_t afc_psd = 0;
+	bool is_psd;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg obj is NULL");
+		*reg_psd = 0;
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	master_chan_list = pdev_priv_obj->
+			mas_chan_list_6g_client[ap_pwr_type][client_type];
+	afc_chan_list = pdev_priv_obj->mas_chan_list_6g_afc;
+
+	is_psd = reg_is_6g_psd_power(pdev);
+	if (is_psd)
+		status = reg_get_6g_chan_psd_eirp_power(chan_freq,
+							master_chan_list,
+							reg_psd);
+	else {
+		*reg_psd = 0;
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (ap_pwr_type != REG_STANDARD_POWER_AP)
+		return QDF_STATUS_SUCCESS;
+
+	status = reg_get_afc_psd(chan_freq, afc_chan_list, &afc_psd);
+	*reg_psd = QDF_MIN(afc_psd - SP_AP_AND_CLIENT_POWER_DIFF_IN_DBM,
+			  *reg_psd);
+
+	return status;
+}
+#endif
+
 static struct regulatory_channel
 reg_create_empty_reg_chan_obj(void)
 {
