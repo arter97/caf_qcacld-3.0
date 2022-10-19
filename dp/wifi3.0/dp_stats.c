@@ -9170,12 +9170,12 @@ dp_get_pdev_telemetry_stats(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 	/* consumption is in micro seconds, convert it to seconds and
 	 * then calculate %age per sec
 	 */
-	for (ac = 0; ac < WME_AC_MAX; ac++)
+	for (ac = 0; ac < WME_AC_MAX; ac++) {
 		stats->link_airtime[ac] =
 			((pdev->stats.telemetry_stats.link_airtime[ac] * 100) / 1000000);
-	stats->tx_mpdu_failed = pdev->stats.telemetry_stats.tx_mpdu_failed;
-	stats->tx_mpdu_total = pdev->stats.telemetry_stats.tx_mpdu_total;
-
+		stats->tx_mpdu_failed[ac] = pdev->stats.telemetry_stats.tx_mpdu_failed[ac];
+		stats->tx_mpdu_total[ac] = pdev->stats.telemetry_stats.tx_mpdu_total[ac];
+	}
 	return QDF_STATUS_SUCCESS;
 }
 

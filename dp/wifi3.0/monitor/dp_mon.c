@@ -2084,10 +2084,6 @@ void dp_peer_update_telemetry_stats(struct dp_peer *peer)
 
 	mon_peer = peer->monitor_peer;
 	if (qdf_likely(mon_peer)) {
-		DP_STATS_INC(pdev, telemetry_stats.tx_mpdu_failed,
-			     mon_peer->stats.tx.retries);
-		DP_STATS_INC(pdev, telemetry_stats.tx_mpdu_total,
-			     mon_peer->stats.tx.tx_mpdus_tried);
 		for (ac = 0; ac < WME_AC_MAX; ac++) {
 			mon_peer->stats.airtime_consumption[ac].avg_consumption_per_sec =
 					mon_peer->stats.airtime_consumption[ac].consumption;
@@ -2732,6 +2728,44 @@ static uint32_t dp_mon_get_ru_width_from_ru_size(uint16_t ru_size)
 }
 #endif
 
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+/*
+ * dp_pdev_telemetry_stats_update() - Update pdev telemetry stats
+ * @pdev: Datapath pdev handle
+ * @ppdu: PPDU Descriptor
+ *
+ * Return: None
+ */
+static void
+dp_pdev_telemetry_stats_update(
+		struct dp_pdev *pdev,
+		struct cdp_tx_completion_ppdu_user *ppdu)
+{
+	uint16_t mpdu_tried;
+	uint16_t mpdu_failed;
+	uint16_t num_mpdu;
+	uint8_t ac = 0;
+
+	num_mpdu = ppdu->mpdu_success;
+	mpdu_tried = ppdu->mpdu_tried_ucast + ppdu->mpdu_tried_mcast;
+	mpdu_failed = mpdu_tried - num_mpdu;
+
+	ac = TID_TO_WME_AC(ppdu->tid);
+
+	DP_STATS_INC(pdev, telemetry_stats.tx_mpdu_failed[ac],
+		     mpdu_failed);
+
+	DP_STATS_INC(pdev, telemetry_stats.tx_mpdu_total[ac],
+		     mpdu_tried);
+}
+#else
+static inline void
+dp_pdev_telemetry_stats_update(
+		struct dp_pdev *pdev,
+		struct cdp_tx_completion_ppdu_user *ppdu)
+{ }
+#endif
+
 /*
  * dp_tx_stats_update() - Update per-peer statistics
  * @pdev: Datapath pdev handle
@@ -2790,6 +2824,7 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 		 * mpdu failed equal mpdu tried.
 		 */
 		DP_STATS_INC(mon_peer, tx.retries, mpdu_failed);
+		dp_pdev_telemetry_stats_update(pdev, ppdu);
 		return;
 	}
 
@@ -2896,6 +2931,7 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 		mon_ops->mon_tx_stats_update(mon_peer, ppdu);
 
 	dp_tx_rate_stats_update(peer, ppdu);
+	dp_pdev_telemetry_stats_update(pdev, ppdu);
 
 	dp_peer_stats_notify(pdev, peer);
 
