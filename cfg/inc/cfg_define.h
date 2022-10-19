@@ -129,6 +129,8 @@ enum cfg_fallback_behavior {
 #define CFG_1G_5G_HIGH_SECTION "1G-5GH"
 #define CFG_1G_6G_SECTION "1G-6G"
 
+#define CFG_SCAN_RADIO_SECTION "SCAN-RADIO"
+
 #define CFG_SBS_NSS_RING_SECTION "SBS-NSS-RING"
 #define CFG_DBS_NSS_RING_SECTION "DBS-NSS-RING"
 
