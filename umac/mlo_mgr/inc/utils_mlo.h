@@ -146,10 +146,13 @@ util_gen_link_probe_rsp(uint8_t *frame, qdf_size_t frame_len,
  * returns error, or if the function indicates that the element or element
  * fragment sequence was not found by providing a starting address of NULL.
  *
- * Find the first Multi-Link element or the start of the first
- * Multi-Link element fragment sequence in a given buffer containing elements,
- * if a Multi-Link element or element fragment sequence exists in the given
- * buffer.
+ * Find the first Multi-Link element or the start of the first Multi-Link
+ * element fragment sequence in a given buffer containing elements, if a
+ * Multi-Link element or element fragment sequence exists in the given buffer.
+ * The buffer should contain only 802.11 Information elements, and thus should
+ * not contain other information like 802.11 header, 802.11 frame body
+ * components like fields that are not elements (e.g. Capability Information
+ * field, Beacon Interval field), etc.
  *
  * Return: QDF_STATUS_SUCCESS in the case of success, QDF_STATUS value giving
  * the reason for error in the case of failure
