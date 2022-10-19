@@ -521,7 +521,7 @@ target_if_vdev_mgr_del_rsp_post_flush_cb(struct scheduler_msg *msg)
 	return QDF_STATUS_SUCCESS;
 }
 
-static void
+static QDF_STATUS
 target_if_vdev_mgr_del_rsp_post_cb(struct scheduler_msg *msg)
 {
 	struct wlan_objmgr_psoc *psoc;
@@ -530,7 +530,7 @@ target_if_vdev_mgr_del_rsp_post_cb(struct scheduler_msg *msg)
 
 	if (!msg || !msg->bodyptr) {
 		mlme_err("Msg or Msg bodyptr is NULL");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	psoc = msg->bodyptr;
@@ -538,17 +538,19 @@ target_if_vdev_mgr_del_rsp_post_cb(struct scheduler_msg *msg)
 	vdev_id = msg->bodyval;
 	if (vdev_id >= WLAN_UMAC_PSOC_MAX_VDEVS) {
 		mlme_err("Invalid VDEV_ID %d", vdev_id);
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	rx_ops = target_if_vdev_mgr_get_rx_ops(psoc);
 	if (!rx_ops) {
 		mlme_err("No Rx Ops");
-		return;
+		return QDF_STATUS_E_INVAL;
 	}
 
 	/* Don't try to get vdev as it's already deleted */
 	target_if_vdev_mgr_delete_response_send(psoc, vdev_id, rx_ops);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 static void target_if_vdev_mgr_delete_rsp_post_ctx(
@@ -557,8 +559,7 @@ static void target_if_vdev_mgr_delete_rsp_post_ctx(
 {
 	struct scheduler_msg msg = {0};
 
-	msg.callback = (scheduler_msg_process_fn_t)
-			target_if_vdev_mgr_del_rsp_post_cb;
+	msg.callback = target_if_vdev_mgr_del_rsp_post_cb;
 	msg.bodyptr = psoc;
 	msg.bodyval = vdev_id;
 	msg.flush_callback =
