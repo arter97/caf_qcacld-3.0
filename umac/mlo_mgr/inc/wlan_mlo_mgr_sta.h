@@ -154,6 +154,14 @@ mlo_update_connected_links_bmap(struct wlan_mlo_dev_context *mlo_dev_ctx,
 				struct mlo_partner_info ml_parnter_info);
 
 /**
+ * mlo_clear_connected_links: clear connected links bitmap
+ * @vdev: vdev object
+ *
+ * Return: none
+ */
+void mlo_clear_connected_links_bmap(struct wlan_objmgr_vdev *vdev);
+
+/**
  * API to have operation on ml vdevs
  */
 typedef void (*mlo_vdev_op_handler)(struct wlan_objmgr_vdev *vdev,
@@ -400,30 +408,6 @@ mlo_update_connected_links(struct wlan_objmgr_vdev *vdev, uint8_t value)
 				qdf_clear_bit(i, sta_ctx->wlan_connected_links);
 		}
 	}
-}
-
-/**
- * mlo_clear_connected_links: clear connected links bitmap
- * @vdev: vdev object
- *
- * Return: none
- */
-static inline
-void mlo_clear_connected_links_bmap(struct wlan_objmgr_vdev *vdev)
-{
-	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
-	struct wlan_mlo_sta *sta_ctx = NULL;
-
-	if (!mlo_dev_ctx)
-		return;
-
-	sta_ctx = mlo_dev_ctx->sta_ctx;
-	if (!sta_ctx)
-		return;
-
-	qdf_mem_zero(sta_ctx->wlan_connected_links,
-		     sizeof(sta_ctx->wlan_connected_links));
-
 }
 
 #ifndef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
