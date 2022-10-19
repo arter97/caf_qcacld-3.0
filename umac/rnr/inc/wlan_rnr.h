@@ -18,6 +18,24 @@
 #define _WLAN_RNR_H_
 #include <qdf_atomic.h>
 #include <wlan_objmgr_pdev_obj.h>
+#include <ieee80211_var.h>
+#include <ol_if_athvar.h>
+
+extern int ol_num_global_soc;
+
+#define MAX_6GHZ_SOCS  2
+#define MAX_6GHZ_LINKS MAX_6GHZ_SOCS
+
+typedef QDF_STATUS (*wlan_rnr_handler)(void *arg1, void *arg2);
+
+struct rnr_info_pdev {
+	struct wlan_objmgr_pdev *pdev_6ghz;
+};
+
+struct rnr_info_soc {
+	struct ol_ath_soc_softc *soc;
+	struct rnr_info_pdev pdev_6ghz_ctx[WLAN_UMAC_MAX_PDEVS];
+};
 
 /**
  * struct rnr_global_info - Global context for RNR
@@ -29,8 +47,11 @@ struct rnr_global_info {
 #define EMA_AP_MAX_GROUPS 8
 	qdf_atomic_t vdev_lower_band_cnt;
 	qdf_atomic_t vdev_6ghz_band_cnt;
+	/* This needs a revisit at a later point in time
+	 * where it may hvae to be moved to to pdev level
+	 */
 	uint32_t rnr_mbss_idx_map[EMA_AP_MAX_GROUPS];
-	struct wlan_objmgr_pdev *pdev_6ghz_ctx;
+	struct rnr_info_soc soc_info[MAX_6GHZ_LINKS];
 };
 
 /**
@@ -74,7 +95,45 @@ void wlan_rnr_6ghz_vdev_inc(void);
 void wlan_rnr_6ghz_vdev_dec(void);
 
 /**
- * wlan_global_6ghz_pdev_set - Store 6Ghz pdev in
+ * wlan_rnr_register_soc - Register soc to RNR-module
+ *
+ * API to register soc to RNR-module
+ *
+ * Return: bool
+ */
+bool wlan_rnr_register_soc(struct ol_ath_soc_softc *soc);
+
+/**
+ * wlan_rnr_unregister_soc - Unregister soc from RNR-module
+ *
+ * API to unregister soc from RNR-module
+ *
+ * Return: bool
+ */
+bool wlan_rnr_unregister_soc(struct ol_ath_soc_softc *soc);
+
+/**
+ * wlan_rnr_unregister_soc - RNR-module-iterator to iterate
+ *			       per-soc per-6ghz-pdev
+ *
+ * API to run specific 'handler' per-soc per-6gh-pdev in RNR-module
+ *
+ * Return: void
+ */
+void wlan_rnr_6ghz_iterator(wlan_rnr_handler handler, void *arg1, void *arg2);
+
+/**
+ * wlan_global_6ghz_pdev_get - Retrieve 6Ghz pdev pointer from speicified soc
+ *
+ * API to get 6Ghz pdev pointer
+ *
+ * Return: struct wlan_objmgr_pdev
+ */
+struct
+wlan_objmgr_pdev *wlan_global_6ghz_pdev_get(uint8_t soc_id, uint8_t pdev_id);
+
+/**
+ * wlan_global_6ghz_pdev_set - Store 6Ghz pdev specific to a soc in
  *			       global context
  *
  * API to save 6Ghz pdev in global context for
@@ -82,10 +141,10 @@ void wlan_rnr_6ghz_vdev_dec(void);
  *
  * Return:void
  */
-void wlan_global_6ghz_pdev_set(struct wlan_objmgr_pdev *pdev);
+void wlan_global_6ghz_pdev_set(uint8_t soc_id, uint8_t pdev_id);
 
 /**
- * wlan_global_6ghz_pdev_destroy - Delete 6Ghz pdev in
+ * wlan_global_6ghz_pdev_destroy - Delete 6Ghz pdev specific to a soc from
  *				   global context
  *
  * API to delete 6Ghz pdev in global context for
@@ -93,7 +152,7 @@ void wlan_global_6ghz_pdev_set(struct wlan_objmgr_pdev *pdev);
  *
  * Return:void
  */
-void wlan_global_6ghz_pdev_destroy(void);
+void wlan_global_6ghz_pdev_destroy(uint8_t soc_id, uint8_t pdev_id);
 
 /**
  * wlan_lower_band_ap_cnt_get - Get lower band AP count
@@ -124,15 +183,6 @@ int32_t wlan_6ghz_band_ap_cnt_get(void);
  * Return: void
  */
 void wlan_rnr_init_cnt(void);
-
-/**
- * wlan_gbl_6ghz_pdev_get - Retrieve 6Ghz pdev pointer
- *
- * API to get 6Ghz pdev pointer
- *
- * Return: struct wlan_objmgr_pdev
- */
-struct wlan_objmgr_pdev *wlan_gbl_6ghz_pdev_get(void);
 
 /**
  * wlan_rnr_set_bss_idx - Set bit corresponding to bss index
