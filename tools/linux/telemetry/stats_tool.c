@@ -2673,11 +2673,17 @@ void print_debug_sta_ctrl_tx(struct debug_peer_ctrl_tx *tx)
 	STATS_32(stdout, "Tx Packets Discard as Power save aged",
 		 tx->cs_ps_discard);
 	STATS_32(stdout, "Tx Packets dropped form PS queue", tx->cs_psq_drops);
+	STATS_32(stdout, "Tx RTS Success Count", tx->rts_success);
+	STATS_32(stdout, "Tx RTS Failure Count", tx->rts_failure);
+	STATS_32(stdout, "Tx Block Ack Request(BAR) Count", tx->bar_cnt);
+	STATS_32(stdout, "Tx NDP Announcement Count", tx->ndpa_cnt);
 }
 
 void print_debug_sta_ctrl_rx(struct debug_peer_ctrl_rx *rx)
 {
 	print_basic_sta_ctrl_rx(&rx->b_rx);
+	STATS_32(stdout, "Rx Block Ack Request(BAR) Count", rx->bar_cnt);
+	STATS_32(stdout, "Rx NDP Announcement Count", rx->ndpa_cnt);
 }
 
 void print_debug_sta_ctrl_link(struct debug_peer_ctrl_link *link)

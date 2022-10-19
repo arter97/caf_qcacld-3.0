@@ -3913,11 +3913,12 @@ get_failed:
 }
 
 static QDF_STATUS get_debug_peer_ctrl_tx(struct unified_stats *stats,
-					 struct peer_ic_cp_stats *cp_stats)
+					 struct peer_ic_cp_stats *cp_stats,
+					 struct cdp_peer_stats *peer_stats)
 {
 	struct debug_peer_ctrl_tx *ctrl = NULL;
 
-	if (!stats || !cp_stats) {
+	if (!stats || !cp_stats || !peer_stats) {
 		qdf_err("Invalid Input!");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -3931,6 +3932,10 @@ static QDF_STATUS get_debug_peer_ctrl_tx(struct unified_stats *stats,
 	ctrl->cs_psq_drops = cp_stats->cs_psq_drops;
 	ctrl->cs_tx_dropblock = cp_stats->cs_tx_dropblock;
 	ctrl->cs_is_tx_nobuf = cp_stats->cs_is_tx_nobuf;
+	ctrl->rts_success = peer_stats->tx.rts_success;
+	ctrl->rts_success = peer_stats->tx.rts_failure;
+	ctrl->bar_cnt = peer_stats->tx.bar_cnt;
+	ctrl->ndpa_cnt = peer_stats->tx.ndpa_cnt;
 
 	stats->feat[INX_FEAT_TX] = ctrl;
 	stats->size[INX_FEAT_TX] = sizeof(struct debug_peer_ctrl_tx);
@@ -3939,11 +3944,12 @@ static QDF_STATUS get_debug_peer_ctrl_tx(struct unified_stats *stats,
 }
 
 static QDF_STATUS get_debug_peer_ctrl_rx(struct unified_stats *stats,
-					 struct peer_ic_cp_stats *cp_stats)
+					 struct peer_ic_cp_stats *cp_stats,
+					 struct cdp_peer_stats *peer_stats)
 {
 	struct debug_peer_ctrl_rx *ctrl = NULL;
 
-	if (!stats || !cp_stats) {
+	if (!stats || !cp_stats || !peer_stats) {
 		qdf_err("Invalid Input!");
 		return QDF_STATUS_E_INVAL;
 	}
@@ -3958,6 +3964,8 @@ static QDF_STATUS get_debug_peer_ctrl_rx(struct unified_stats *stats,
 	ctrl->cs_rx_ccmpmic = cp_stats->cs_rx_ccmpmic;
 	ctrl->cs_rx_wpimic = cp_stats->cs_rx_wpimic;
 	ctrl->cs_rx_tkipicv = cp_stats->cs_rx_tkipicv;
+	ctrl->bar_cnt = peer_stats->rx.bar_cnt;
+	ctrl->ndpa_cnt = peer_stats->rx.ndpa_cnt;
 
 	stats->feat[INX_FEAT_RX] = ctrl;
 	stats->size[INX_FEAT_RX] = sizeof(struct debug_peer_ctrl_rx);
@@ -4015,17 +4023,34 @@ static QDF_STATUS get_debug_peer_ctrl(struct wlan_objmgr_psoc *psoc,
 				      uint32_t feat)
 {
 	struct wlan_objmgr_peer *peer;
+	struct wlan_objmgr_vdev *vdev;
 	QDF_STATUS ret = QDF_STATUS_SUCCESS;
 	struct peer_ic_cp_stats *peer_cp_stats = NULL;
 	bool stats_collected = false;
+	struct cdp_peer_stats *peer_stats = NULL;
+	void *dp_soc = NULL;
+	uint8_t vdev_id = 0;
 
 	peer = wlan_objmgr_get_peer_by_mac(psoc, peer_mac, WLAN_MLME_SB_ID);
 	if (!peer) {
 		qdf_err("Peer (%s) not found!", ether_sprintf(peer_mac));
 		return QDF_STATUS_E_FAILURE;
 	}
+	vdev = wlan_peer_get_vdev(peer);
+	if (!vdev) {
+		qdf_err("Vdev is NULL!");
+		ret = QDF_STATUS_E_FAILURE;
+		goto get_failed;
+	}
+
 	peer_cp_stats = qdf_mem_malloc(sizeof(struct peer_ic_cp_stats));
 	if (!peer_cp_stats) {
+		qdf_err("Allocation Failed!");
+		ret = QDF_STATUS_E_NOMEM;
+		goto get_failed;
+	}
+	peer_stats = qdf_mem_malloc(sizeof(struct cdp_peer_stats));
+	if (!peer_stats) {
 		qdf_err("Allocation Failed!");
 		ret = QDF_STATUS_E_NOMEM;
 		goto get_failed;
@@ -4036,15 +4061,22 @@ static QDF_STATUS get_debug_peer_ctrl(struct wlan_objmgr_psoc *psoc,
 		qdf_err("Failed to get Peer Control Stats!");
 		goto get_failed;
 	}
+	vdev_id = wlan_vdev_get_id(vdev);
+	dp_soc = wlan_psoc_get_dp_handle(psoc);
+	ret = cdp_host_get_peer_stats(dp_soc, vdev_id, peer_mac, peer_stats);
+	if (ret != QDF_STATUS_SUCCESS) {
+		qdf_err("Unable to fetch stats!");
+		goto get_failed;
+	}
 	if (feat & STATS_FEAT_FLG_TX) {
-		ret = get_debug_peer_ctrl_tx(stats, peer_cp_stats);
+		ret = get_debug_peer_ctrl_tx(stats, peer_cp_stats, peer_stats);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch peer Debug TX Stats!");
 		else
 			stats_collected = true;
 	}
 	if (feat & STATS_FEAT_FLG_RX) {
-		ret = get_debug_peer_ctrl_rx(stats, peer_cp_stats);
+		ret = get_debug_peer_ctrl_rx(stats, peer_cp_stats, peer_stats);
 		if (ret != QDF_STATUS_SUCCESS)
 			qdf_err("Unable to fetch peer Debug RX Stats!");
 		else
@@ -4069,6 +4101,8 @@ get_failed:
 	wlan_objmgr_peer_release_ref(peer, WLAN_MLME_SB_ID);
 	if (peer_cp_stats)
 		qdf_mem_free(peer_cp_stats);
+	if (peer_stats)
+		qdf_mem_free(peer_stats);
 	if (stats_collected)
 		ret = QDF_STATUS_SUCCESS;
 

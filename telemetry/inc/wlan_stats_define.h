@@ -1172,6 +1172,10 @@ struct debug_peer_ctrl_tx {
 	uint32_t cs_psq_drops;
 	uint32_t cs_tx_dropblock;
 	uint32_t cs_is_tx_nobuf;
+	uint32_t rts_success;
+	uint32_t rts_failure;
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 struct debug_peer_ctrl_rx {
@@ -1181,6 +1185,8 @@ struct debug_peer_ctrl_rx {
 	uint32_t cs_rx_ccmpmic;
 	uint32_t cs_rx_wpimic;
 	uint32_t cs_rx_tkipicv;
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 struct debug_peer_ctrl_link {
