@@ -1579,7 +1579,45 @@ void hif_fastpath_resume(struct hif_opaque_softc *hif_ctx);
  * Return: state
  */
 int hif_rtpm_get_state(void);
+
+/**
+ * hif_rtpm_display_last_busy_hist() - Display runtimepm last busy history
+ * @hif_ctx: HIF context
+ *
+ * Return: None
+ */
+void hif_rtpm_display_last_busy_hist(struct hif_opaque_softc *hif_ctx);
+
+/**
+ * hif_rtpm_record_ce_last_busy_evt() - Record CE runtimepm last busy event
+ * @hif_ctx: HIF context
+ *
+ * Return: None
+ */
+void hif_rtpm_record_ce_last_busy_evt(struct hif_softc *scn,
+				      unsigned long ce_id);
 #else
+
+/**
+ * hif_rtpm_display_last_busy_hist() - Display runtimepm last busy history
+ * @hif_ctx: HIF context
+ *
+ * Return: None
+ */
+static inline
+void hif_rtpm_display_last_busy_hist(struct hif_opaque_softc *hif_ctx) { }
+
+/**
+ * hif_rtpm_record_ce_last_busy_evt() - Record CE runtimepm last busy event
+ * @hif_ctx: HIF context
+ *
+ * Return: None
+ */
+static inline
+void hif_rtpm_record_ce_last_busy_evt(struct hif_softc *scn,
+				      unsigned long ce_id)
+{ }
+
 static inline
 QDF_STATUS hif_rtpm_register(uint32_t id, void (*hif_rpm_cbk)(void))
 { return QDF_STATUS_SUCCESS; }

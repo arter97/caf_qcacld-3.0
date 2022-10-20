@@ -68,6 +68,21 @@ struct hif_rtpm_state_stats {
 	uint32_t runtime_get_err;
 };
 
+#define HIF_RTPM_BUSY_HIST_MAX  16
+#define HIF_RTPM_BUSY_HIST_MASK (HIF_RTPM_BUSY_HIST_MAX - 1)
+
+/**
+ * struct hif_rtpm_last_busy_hist - Runtime last busy hist
+ * @last_busy_cnt: count of last busy mark
+ * @last_busy_idx: last busy history index
+ * @last_busy_ts: last busy marked timestamp
+ */
+struct hif_rtpm_last_busy_hist {
+	unsigned long last_busy_cnt;
+	unsigned long last_busy_idx;
+	uint64_t last_busy_ts[HIF_RTPM_BUSY_HIST_MAX];
+};
+
 /**
  * struct hif_rtpm_client - Runtime PM client structure
  * @hif_rtpm_cbk: Callback during resume if get called at suspend and failed
@@ -120,6 +135,7 @@ struct hif_rtpm_ctx {
 	struct dentry *pm_dentry;
 	int cfg_delay;
 	int delay;
+	struct hif_rtpm_last_busy_hist *busy_hist[CE_COUNT_MAX];
 };
 
 #define HIF_RTPM_DELAY_MIN 100
