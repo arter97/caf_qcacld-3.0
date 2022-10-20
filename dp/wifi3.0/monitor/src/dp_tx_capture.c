@@ -160,7 +160,7 @@ static inline bool dp_tx_capt_mem_check(struct dp_pdev *pdev, int buf_size)
 	}
 }
 
-static uint32_t get_queue_bytes(qdf_nbuf_queue_t *q)
+static uint32_t dp_tx_capt_get_q_bytes(qdf_nbuf_queue_t *q)
 {
 	qdf_nbuf_t nbuf;
 	uint32_t num_bytes = 0;
@@ -911,7 +911,7 @@ void dp_peer_tx_cap_tid_queue_flush(struct dp_soc *soc, struct dp_peer *peer,
 		qdf_spin_lock_bh(&tx_tid->tid_lock);
 		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx) &&
 		    !qdf_nbuf_is_queue_empty(&tx_tid->defer_msdu_q)) {
-			nbytes = get_queue_bytes(&tx_tid->defer_msdu_q);
+			nbytes = dp_tx_capt_get_q_bytes(&tx_tid->defer_msdu_q);
 			qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_bytes);
 		}
 		TX_CAP_NBUF_QUEUE_FREE(&tx_tid->defer_msdu_q);
@@ -1024,7 +1024,7 @@ void dp_peer_tid_queue_cleanup(struct dp_peer *peer)
 		len = qdf_nbuf_queue_len(&tx_tid->defer_msdu_q);
 		if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx) &&
 		    !qdf_nbuf_is_queue_empty(&tx_tid->defer_msdu_q)) {
-			uint32_t nbytes = get_queue_bytes(&tx_tid->defer_msdu_q);
+			uint32_t nbytes = dp_tx_capt_get_q_bytes(&tx_tid->defer_msdu_q);
 			qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_bytes);
 		}
 		TX_CAP_NBUF_QUEUE_FREE(&tx_tid->defer_msdu_q);
@@ -1775,7 +1775,7 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 			struct dp_mon_soc *mon_soc = pdev->soc->monitor_soc;
 
 			if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
-				nbytes = get_queue_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				nbytes = dp_tx_capt_get_q_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
 				qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
 
@@ -1793,7 +1793,7 @@ void dp_tx_ppdu_stats_detach_1_0(struct dp_pdev *pdev)
 
 			if (!qdf_nbuf_is_queue_empty(retries_q)) {
 				if (wlan_cfg_get_tx_capt_max_mem(pdev->soc->wlan_cfg_ctx)) {
-					uint32_t nbytes = get_queue_bytes(retries_q);
+					uint32_t nbytes = dp_tx_capt_get_q_bytes(retries_q);
 					qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 				}
 				TX_CAP_NBUF_QUEUE_FREE(retries_q);
@@ -2412,7 +2412,7 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 
 			if (mem_limit_flag) {
 				 nbytes =
-				 get_queue_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				 dp_tx_capt_get_q_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
 				 qdf_atomic_sub(nbytes,
 					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
@@ -2427,7 +2427,7 @@ dp_enh_tx_capture_disable(struct dp_pdev *pdev)
 				&mon_pdev->tx_capture.retries_ctl_mgmt_q[i][j];
 			if (!qdf_nbuf_is_queue_empty(retries_q)) {
 				if (mem_limit_flag) {
-					nbytes = get_queue_bytes(retries_q);
+					nbytes = dp_tx_capt_get_q_bytes(retries_q);
 					qdf_atomic_sub(nbytes, &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 				}
 				TX_CAP_NBUF_QUEUE_FREE(retries_q);
@@ -4877,7 +4877,7 @@ dp_check_mgmt_ctrl_ppdu(struct dp_pdev *pdev,
 
 		if (ppdu_desc->sched_cmdid != retry_ppdu->sched_cmdid) {
 			if (mem_limit_flag) {
-				uint32_t nbytes = get_queue_bytes(retries_q);
+				uint32_t nbytes = dp_tx_capt_get_q_bytes(retries_q);
 				qdf_atomic_sub(nbytes,
 					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
@@ -4982,6 +4982,20 @@ get_mgmt_pkt_from_queue:
 				qdf_nbuf_free(nbuf_retry_ppdu);
 			}
 
+			/* flushing retry queue since completion status is
+			 * in final state. meaning that even though ppdu_id are
+			 * different there is a payload already.
+			 */
+			if (qdf_unlikely(ppdu_desc->user[0].completion_status ==
+					 HTT_PPDU_STATS_USER_STATUS_OK)) {
+				if (mem_limit_flag) {
+					uint32_t nbytes = dp_tx_capt_get_q_bytes(retries_q);
+					qdf_atomic_sub(nbytes,
+						       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
+				}
+				TX_CAP_NBUF_QUEUE_FREE(retries_q);
+			}
+
 			/* if adding the new buffer goes beyond the allowed limit,
 			 * drop the buffer
 			 */
@@ -5002,20 +5016,6 @@ get_mgmt_pkt_from_queue:
 				qdf_nbuf_queue_add(retries_q, nbuf_ppdu_desc);
 			}
 
-			/* flushing retry queue since completion status is
-			 * in final state. meaning that even though ppdu_id are
-			 * different there is a payload already.
-			 */
-			if (qdf_unlikely(ppdu_desc->user[0].completion_status ==
-					 HTT_PPDU_STATS_USER_STATUS_OK)) {
-				if (mem_limit_flag) {
-					uint32_t nbytes = get_queue_bytes(retries_q);
-					qdf_atomic_sub(nbytes,
-						       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
-				}
-				TX_CAP_NBUF_QUEUE_FREE(retries_q);
-			}
-
 			status = QDF_STATUS_SUCCESS;
 
 insert_mgmt_buf_to_queue:
@@ -5025,7 +5025,6 @@ insert_mgmt_buf_to_queue:
 						qdf_nbuf_get_truesize(mgmt_ctl_nbuf))) {
 					mon_soc->dp_soc_tx_capt.mem_limit_drops++;
 					qdf_nbuf_free(mgmt_ctl_nbuf);
-					status =  QDF_STATUS_E_FAILURE;
 					goto exit;
 				} else {
 					qdf_atomic_add(qdf_nbuf_get_truesize(mgmt_ctl_nbuf),
@@ -5079,7 +5078,7 @@ insert_mgmt_buf_to_queue:
 					qdf_nbuf_free(mgmt_ctl_nbuf);
 
 					if (mem_limit_flag) {
-						uint32_t nbytes = get_queue_bytes(retries_q);
+						uint32_t nbytes = dp_tx_capt_get_q_bytes(retries_q);
 						qdf_atomic_sub(nbytes,
 							       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 					}
@@ -5215,6 +5214,20 @@ insert_mgmt_buf_to_queue:
 			qdf_nbuf_free(nbuf_retry_ppdu);
 		}
 
+		/* flushing retry queue since completion status is
+		 * in final state. meaning that even though ppdu_id are
+		 * different there is a payload already.
+		 */
+		if (qdf_unlikely(ppdu_desc->user[0].completion_status ==
+				 HTT_PPDU_STATS_USER_STATUS_OK)) {
+			if (mem_limit_flag) {
+				uint32_t nbytes = dp_tx_capt_get_q_bytes(retries_q);
+				qdf_atomic_sub(nbytes,
+					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
+			}
+			TX_CAP_NBUF_QUEUE_FREE(retries_q);
+		}
+
 		/* if adding the new buffer goes beyond the allowed limit,
 		 * drop the buffer
 		 */
@@ -5223,31 +5236,16 @@ insert_mgmt_buf_to_queue:
 							qdf_nbuf_get_truesize(nbuf_ppdu_desc))) {
 				mon_soc->dp_soc_tx_capt.mem_limit_drops++;
 				qdf_nbuf_free(nbuf_ppdu_desc);
-				status = QDF_STATUS_SUCCESS;
-				goto exit;
 			} else {
 				qdf_atomic_add(qdf_nbuf_get_truesize(nbuf_ppdu_desc),
 							&mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
+				qdf_nbuf_queue_add(retries_q, nbuf_ppdu_desc);
 			}
-		}
-
-		/*
-		 * add the ppdu_desc into retry queue
-		 */
-		qdf_nbuf_queue_add(retries_q, nbuf_ppdu_desc);
-
-		/* flushing retry queue since completion status is
-		 * in final state. meaning that even though ppdu_id are
-		 * different there is a payload already.
-		 */
-		if (qdf_unlikely(ppdu_desc->user[0].completion_status ==
-				 HTT_PPDU_STATS_USER_STATUS_OK)) {
-			if (mem_limit_flag) {
-				uint32_t nbytes = get_queue_bytes(retries_q);
-				qdf_atomic_sub(nbytes,
-					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
-			}
-			TX_CAP_NBUF_QUEUE_FREE(retries_q);
+		} else {
+			/*
+			 * add the ppdu_desc into retry queue
+			 */
+			qdf_nbuf_queue_add(retries_q, nbuf_ppdu_desc);
 		}
 
 		status = QDF_STATUS_SUCCESS;
@@ -6201,7 +6199,7 @@ dp_pdev_tx_cap_flush(struct dp_pdev *pdev, bool is_stats_queue_empty)
 			qdf_nbuf_queue_t *retries_q;
 
 			if (mem_limit_flag) {
-				uint32_t nbytes = get_queue_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
+				uint32_t nbytes = dp_tx_capt_get_q_bytes(&mon_pdev->tx_capture.ctl_mgmt_q[i][j]);
 				qdf_atomic_sub(nbytes,
 					       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 			}
@@ -6220,7 +6218,7 @@ dp_pdev_tx_cap_flush(struct dp_pdev *pdev, bool is_stats_queue_empty)
 				&mon_pdev->tx_capture.retries_ctl_mgmt_q[i][j];
 			if (!qdf_nbuf_is_queue_empty(retries_q)) {
 				if (mem_limit_flag) {
-					uint32_t nbytes = get_queue_bytes(retries_q);
+					uint32_t nbytes = dp_tx_capt_get_q_bytes(retries_q);
 					qdf_atomic_sub(nbytes,
 						       &mon_soc->dp_soc_tx_capt.ppdu_mgmt_bytes);
 				}
