@@ -1110,6 +1110,8 @@ struct dp_soc_stats {
 		uint32_t tx_comp[MAX_TCL_DATA_RINGS];
 		/* Number of tx completions force freed */
 		uint32_t tx_comp_force_freed;
+		/* Tx completion ring near full */
+		uint32_t near_full;
 	} tx;
 
 	/* SOC level RX stats */
