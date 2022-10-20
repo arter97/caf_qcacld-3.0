@@ -80,6 +80,24 @@ bool dfs_is_offset_invalid_for_bw(int32_t freq_offset, uint16_t ch_width)
 }
 
 /**
+ * dfs_11be_homechan_detector_id() - Get Detector id for Home channel
+ */
+static
+enum detector_id dfs_11be_homechan_detector_id(void)
+{
+	return DETECTOR_ID_0;
+}
+
+/**
+ * dfs_11be_agile_detector_id() - Get Detector id for Agile 11BE channel
+ */
+static
+enum detector_id dfs_11be_agile_detector_id(void)
+{
+	return AGILE_DETECTOR_11BE;
+}
+
+/**
  * dfs_check_bangradar_sanity_for_11be() - Check the sanity of bangradar for
  * 11BE chispets
  * @dfs: Pointer to wlan_dfs structure.
@@ -93,21 +111,22 @@ dfs_check_bangradar_sanity_for_11be(struct wlan_dfs *dfs,
 	uint16_t width;
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 
-	if (brdr_prm->detector_id == DETECTOR_ID_0) {
-		chan = dfs->dfs_curchan;
+	if (brdr_prm->detector_id == dfs_11be_homechan_detector_id()) {
+	    chan = dfs->dfs_curchan;
+	    width = dfs_chan_to_ch_width(chan);
+	} else if (brdr_prm->detector_id == dfs_11be_agile_detector_id()) {
+		    width = dfs_translate_chwidth_enum2val(dfs,
+						dfs->dfs_precac_chwidth);
 	} else {
-		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
-			  "Invalid Detector ID");
+		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS, "Invalid Detector ID %d",
+			  brdr_prm->detector_id);
 		return status;
 	}
-
 	if (brdr_prm->seg_id != SEG_ID_PRIMARY) {
 		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
 			  "Invalid seg id");
 		return status;
 	}
-
-	width = dfs_chan_to_ch_width(chan);
 
 	if (dfs_is_offset_invalid_for_bw(brdr_prm->freq_offset, width)) {
 		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,
