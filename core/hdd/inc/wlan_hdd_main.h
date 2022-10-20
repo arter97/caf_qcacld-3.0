@@ -2067,6 +2067,7 @@ struct hdd_context {
 	/* Present state of driver cds modules */
 	enum driver_modules_status driver_status;
 	struct qdf_delayed_work psoc_idle_timeout_work;
+	struct notifier_block pm_notifier;
 	bool rps;
 	bool dynamic_rps;
 	bool enable_rxthread;
@@ -2139,6 +2140,7 @@ struct hdd_context {
 #ifdef WLAN_SUPPORT_TWT
 	enum twt_status twt_state;
 	qdf_event_t twt_disable_comp_evt;
+	qdf_event_t twt_enable_comp_evt;
 #endif
 #ifdef FEATURE_WLAN_APF
 	uint32_t apf_version;
