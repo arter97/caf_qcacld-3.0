@@ -623,10 +623,9 @@ void dp_tx_flow_pool_unmap_handler(struct dp_pdev *pdev, uint8_t flow_id,
 	soc->pool_stats.pool_unmap_count++;
 
 	pool = &soc->tx_desc[flow_pool_id];
-	if (!pool) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-		   "%s: flow_pool not available flow_pool_id %d",
-		   __func__, type);
+	if (pool->status == FLOW_POOL_INVALID) {
+		dp_err("flow_pool status invalid. flow_pool_id %d flow_id %d",
+		       flow_pool_id, flow_id);
 		return;
 	}
 
