@@ -2197,6 +2197,24 @@ static int dp_rx_err_exception(struct dp_soc *soc, hal_ring_desc_t ring_desc)
 }
 #endif /* HANDLE_RX_REROUTE_ERR */
 
+#ifdef WLAN_MLO_MULTI_CHIP
+static void dp_idle_link_bm_id_check(struct dp_soc *soc, uint8_t rbm)
+{
+	/*
+	 * For WIN usecase we should only get fragment packets in
+	 * this ring as for MLO case fragmentation is not supported
+	 * we should not see links from other soc.
+	 *
+	 * Adding a assert for link descriptors from local soc
+	 */
+	qdf_assert_always(rbm == soc->idle_link_bm_id);
+}
+#else
+static void dp_idle_link_bm_id_check(struct dp_soc *soc, uint8_t rbm)
+{
+}
+#endif
+
 uint32_t
 dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		  hal_ring_handle_t hal_ring_hdl, uint32_t quota)
@@ -2297,6 +2315,8 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		 */
 		qdf_assert_always((hbi.sw_cookie >> LINK_DESC_ID_SHIFT) &
 					soc->link_desc_id_start);
+
+		dp_idle_link_bm_id_check(soc, hbi.rbm);
 
 		status = dp_rx_link_cookie_check(ring_desc);
 		if (qdf_unlikely(QDF_IS_STATUS_ERROR(status))) {
