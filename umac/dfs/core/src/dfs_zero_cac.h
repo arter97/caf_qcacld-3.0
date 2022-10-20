@@ -394,7 +394,7 @@ dfs_decide_precac_preferred_chan_for_freq(struct wlan_dfs *dfs,
 uint16_t dfs_get_ieeechan_for_precac_for_freq(struct wlan_dfs *dfs,
 					      uint16_t exclude_pri_chan_freq,
 					      uint16_t exclude_sec_chan_freq,
-					      uint8_t bandwidth);
+					      uint16_t bandwidth);
 #endif
 
 /**
@@ -481,6 +481,18 @@ void dfs_set_agilecac_chan_for_freq(struct wlan_dfs *dfs,
 #endif
 
 /**
+ * dfs_compute_agile_and_curchan_width() - Compute the agile/current channel
+ * width from dfs structure.
+ * @dfs: Pointer to wlan_dfs structure.
+ * @agile_ch_width: Agile channel width.
+ * @cur_ch_width: Current home channel width.
+ */
+void
+dfs_compute_agile_and_curchan_width(struct wlan_dfs *dfs,
+				    enum phy_ch_width *agile_ch_width,
+				    enum phy_ch_width *cur_ch_width);
+
+/**
  * dfs_agile_precac_start() - Start agile precac.
  * @dfs: Pointer to wlan_dfs structure.
  */
@@ -506,12 +518,14 @@ void dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
  * @dfs: Pointer to wlan_dfs structure.
  * @fw_adfs_support_160: aDFS enabled when pdev is on 160/80P80MHz.
  * @fw_adfs_support_non_160: aDFS enabled when pdev is on 20/40/80MHz.
+ * @fw_adfs_support_320: aDFS enabled when pdev is on 320 MHz.
  *
  * Return: void.
  */
 void dfs_set_fw_adfs_support(struct wlan_dfs *dfs,
 			     bool fw_adfs_support_160,
-			     bool fw_adfs_support_non_160);
+			     bool fw_adfs_support_non_160,
+			     bool fw_adfs_support_320);
 #else
 static inline void dfs_find_pdev_for_agile_precac(struct wlan_objmgr_pdev *pdev,
 						  uint8_t *cur_agile_dfs_index)
@@ -542,6 +556,13 @@ dfs_set_agilecac_chan_for_freq(struct wlan_dfs *dfs,
 }
 #endif
 
+static inline void
+dfs_compute_agile_and_curchan_width(struct wlan_dfs *dfs,
+				    enum phy_ch_width *agile_ch_width,
+				    enum phy_ch_width *cur_ch_width)
+{
+}
+
 static inline void dfs_agile_precac_start(struct wlan_dfs *dfs)
 {
 }
@@ -556,7 +577,8 @@ dfs_start_agile_precac_timer(struct wlan_dfs *dfs,
 static inline void
 dfs_set_fw_adfs_support(struct wlan_dfs *dfs,
 			bool fw_adfs_support_160,
-			bool fw_adfs_support_non_160)
+			bool fw_adfs_support_non_160,
+			bool fw_adfs_support_320)
 {
 }
 #endif
@@ -1041,6 +1063,16 @@ QDF_STATUS dfs_agile_sm_destroy(struct dfs_soc_priv_obj *dfs_soc_obj);
  */
 bool dfs_is_agile_cac_enabled(struct wlan_dfs *dfs);
 
+/* dfs_translate_chwidth_enum2val() - Translate the given channel width enum
+ *                                    to it's value.
+ * @dfs:     Pointer to WLAN DFS structure.
+ * @chwidth: Channel width enum of the pdev's current channel.
+ *
+ * Return: The Bandwidth value for the given channel width enum.
+ */
+uint16_t
+dfs_translate_chwidth_enum2val(struct wlan_dfs *dfs,
+			       enum phy_ch_width chwidth);
 #else
 
 static inline
@@ -1065,6 +1097,12 @@ QDF_STATUS dfs_agile_sm_destroy(struct dfs_soc_priv_obj *dfs_soc_obj)
 }
 
 static inline bool dfs_is_agile_cac_enabled(struct wlan_dfs *dfs)
+{
+	return false;
+}
+
+static inline uint16_t dfs_translate_chwidth_enum2val(struct wlan_dfs *dfs,
+						      enum phy_ch_width chwidth)
 {
 	return false;
 }

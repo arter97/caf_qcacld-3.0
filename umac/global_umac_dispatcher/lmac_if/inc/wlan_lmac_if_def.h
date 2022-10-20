@@ -2263,7 +2263,8 @@ struct wlan_lmac_if_dfs_rx_ops {
 	bool (*dfs_is_hw_pulses_allowed)(struct wlan_objmgr_pdev *pdev);
 	void (*dfs_set_fw_adfs_support)(struct wlan_objmgr_pdev *pdev,
 					bool fw_adfs_support_160,
-					bool fw_adfs_support_non_160);
+					bool fw_adfs_support_non_160,
+					bool fw_adfs_support_320);
 	void (*dfs_reset_dfs_prevchan)(struct wlan_objmgr_pdev *pdev);
 	void (*dfs_init_tmp_psoc_nol)(struct wlan_objmgr_pdev *pdev,
 				      uint8_t num_radios);

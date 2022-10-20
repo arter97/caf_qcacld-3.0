@@ -410,6 +410,7 @@
  *                 Agile detector in true 160MHz supported devices).
  * @DETECTOR_ID_2: Detector ID 2 (Agile detector in 80p80MHZ supported devices).
  * @AGILE_DETECTOR_ID_TRUE_160MHZ:  Agile detector ID in true 160MHz devices.
+ * @AGILE_DETECTOR_11BE:  Agile detector ID in true 320 MHz devices.
  * @AGILE_DETECTOR_ID_80p80: Agile detector ID in 80p80MHz supported devices.
  * @INVALID_DETECTOR_ID: Invalid detector id.
  */
@@ -418,6 +419,7 @@ enum detector_id {
 	DETECTOR_ID_1,
 	DETECTOR_ID_2,
 	AGILE_DETECTOR_ID_TRUE_160MHZ = DETECTOR_ID_1,
+	AGILE_DETECTOR_11BE = DETECTOR_ID_1,
 	AGILE_DETECTOR_ID_80P80 = DETECTOR_ID_2,
 	INVALID_DETECTOR_ID,
 };
@@ -1125,6 +1127,7 @@ struct dfs_rcac_params {
  * @dfs_use_puncture:                User configured value for enabling or
  *                                   disabling DFS puncturing feature.
  * @dfs_agile_rcac_ucfg:             User configuration for Rolling CAC.
+ * @dfs_fw_adfs_support_320:         Target Agile DFS support for 320 BW.
  * @dfs_fw_adfs_support_non_160:     Target Agile DFS support for non-160 BWs.
  * @dfs_fw_adfs_support_160:         Target Agile DFS support for 160 BW.
  * @dfs_allow_hw_pulses:             Allow/Block HW pulses. When synthetic
@@ -1304,6 +1307,9 @@ struct wlan_dfs {
 	uint8_t        dfs_agile_precac_ucfg:1,
 #if defined(QCA_SUPPORT_ADFS_RCAC)
 		       dfs_agile_rcac_ucfg:1,
+#endif
+#ifdef WLAN_FEATURE_11BE
+		       dfs_fw_adfs_support_320:1,
 #endif
 		       dfs_fw_adfs_support_non_160:1,
 		       dfs_fw_adfs_support_160:1;
