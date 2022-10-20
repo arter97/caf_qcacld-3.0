@@ -668,6 +668,40 @@ static QDF_STATUS send_mlo_link_removal_cmd_tlv(
 	return ret;
 }
 
+/**
+ * extract_mlo_link_removal_evt_fixed_param_tlv() - Extract fixed parameters TLV
+ * from the MLO link removal WMI  event
+ * @wmi_handle: wmi handle
+ * @buf: pointer to event buffer
+ * @params: MLO link removal event parameters
+ *
+ * Return: QDF_STATUS of operation
+ */
+static QDF_STATUS
+extract_mlo_link_removal_evt_fixed_param_tlv(
+	struct wmi_unified *wmi_handle,
+	void *buf,
+	struct mlo_link_removal_evt_params *params)
+{
+	WMI_MLO_LINK_REMOVAL_EVENTID_param_tlvs *param_buf = buf;
+	wmi_mlo_link_removal_evt_fixed_param *ev;
+
+	if (!param_buf) {
+		wmi_err_rl("Param_buf is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!params) {
+		wmi_err_rl("params is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	ev = param_buf->fixed_param;
+	params->vdev_id = ev->vdev_id;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_FEATURE_11BE
 size_t peer_assoc_t2lm_params_size(struct peer_assoc_params *req)
 {
@@ -1383,4 +1417,6 @@ void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 	ops->extract_mgmt_rx_ml_cu_params =
 		extract_mgmt_rx_ml_cu_params_tlv;
 	ops->send_mlo_link_removal_cmd = send_mlo_link_removal_cmd_tlv;
+	ops->extract_mlo_link_removal_evt_fixed_param =
+			extract_mlo_link_removal_evt_fixed_param_tlv;
 }

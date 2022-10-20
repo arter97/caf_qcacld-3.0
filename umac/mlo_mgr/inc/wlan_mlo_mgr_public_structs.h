@@ -1019,4 +1019,12 @@ struct mlo_link_removal_cmd_params {
 	uint8_t *reconfig_ml_ie;
 	uint32_t reconfig_ml_ie_size;
 };
+
+/*
+ * struct mlo_link_removal_evt_params - MLO link removal event parameters
+ * @vdev_id: vdev ID of the link to be removed
+ */
+struct mlo_link_removal_evt_params {
+	uint8_t vdev_id;
+};
 #endif

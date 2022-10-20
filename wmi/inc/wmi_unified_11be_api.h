@@ -75,6 +75,20 @@ wmi_extract_mgmt_rx_ml_cu_params(wmi_unified_t wmi_handle, void *evt_buf,
 QDF_STATUS wmi_send_mlo_link_removal_cmd(
 		wmi_unified_t wmi,
 		const struct mlo_link_removal_cmd_params *param);
+
+/**
+ * wmi_extract_mlo_link_removal_evt_fixed_param() - Extract fixed parameters TLV
+ * from the MLO link removal WMI  event
+ * @wmi_handle: wmi handle
+ * @buf: pointer to event buffer
+ * @params: MLO link removal event parameters
+ *
+ * Return: QDF_STATUS_SUCCESS of operation
+ */
+QDF_STATUS wmi_extract_mlo_link_removal_evt_fixed_param(
+		struct wmi_unified *wmi_handle,
+		void *buf,
+		struct mlo_link_removal_evt_params *params);
 #endif /*WLAN_FEATURE_11BE_MLO*/
 
 #ifdef WLAN_FEATURE_11BE
