@@ -170,7 +170,8 @@ dp_rx_update_protocol_tag(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	pdev = vdev->pdev;
 
-	if (qdf_likely(!pdev->is_rx_protocol_tagging_enabled))
+	if (qdf_likely(!is_reo_exception &&
+		       !pdev->is_rx_protocol_tagging_enabled))
 		return;
 
 	/*
