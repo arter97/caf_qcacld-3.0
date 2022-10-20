@@ -7507,6 +7507,19 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 		       pdev->stats.tx_i.mcast_en.dropped_send_fail);
 	DP_PRINT_STATS("	Unicast sent = %u",
 		       pdev->stats.tx_i.mcast_en.ucast);
+
+	DP_PRINT_STATS("EAPOL Packets dropped:");
+	DP_PRINT_STATS("        Dropped: TX desc errors = %u",
+		       pdev->stats.eap_drop_stats.tx_desc_err);
+	DP_PRINT_STATS("        Dropped: Tx HAL ring access errors = %u",
+		       pdev->stats.eap_drop_stats.tx_hal_ring_access_err);
+	DP_PRINT_STATS("        Dropped: TX DMA map errors = %u",
+		       pdev->stats.eap_drop_stats.tx_dma_map_err);
+	DP_PRINT_STATS("        Dropped: Tx HW enqueue errors = %u",
+		       pdev->stats.eap_drop_stats.tx_hw_enqueue);
+	DP_PRINT_STATS("        Dropped: TX SW enqueue errors= %u",
+		       pdev->stats.eap_drop_stats.tx_sw_enqueue);
+
 	DP_PRINT_STATS("IGMP Mcast Enhancement:");
 	DP_PRINT_STATS("	IGMP packets received = %u",
 		       pdev->stats.tx_i.igmp_mcast_en.igmp_rcvd);

@@ -2946,6 +2946,26 @@ struct cdp_pdev_stats {
 		uint32_t data_users[OFDMA_NUM_USERS];
 	} ul_ofdma;
 
+	/**
+	 * struct eap_drop_stats: EAPOL packet drop stats information
+	 * @tx_desc_error: Total number EAPOL packets dropped due to TX
+	 *		   descriptor error
+	 * @tx_hal_ring_access_err: Total EAPOL packets dropped due to
+	 *			     HAL ring access failure
+	 * @tx_dma_map_err: EAPOL packets dropped due to error in DMA map
+	 * @tx_hw_enqueue: EAPOL packets dropped by the host due to failure
+	 *		   in HW enqueue
+	 * @tx_sw_enqueue: EAPOL packets dropped by the host due to failure
+	 *		   in SW enqueue
+	 */
+	struct {
+		uint8_t tx_desc_err;
+		uint8_t tx_hal_ring_access_err;
+		uint8_t tx_dma_map_err;
+		uint8_t tx_hw_enqueue;
+		uint8_t tx_sw_enqueue;
+	} eap_drop_stats;
+
 	struct cdp_tso_stats tso_stats;
 	struct cdp_cfr_rcc_stats rcc;
 

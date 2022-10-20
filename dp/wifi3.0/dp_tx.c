@@ -2222,6 +2222,45 @@ dp_tx_update_mcast_param(uint16_t peer_id,
 {
 }
 #endif
+
+#ifdef DP_TX_SW_DROP_STATS_INC
+static void tx_sw_drop_stats_inc(struct dp_pdev *pdev,
+				 qdf_nbuf_t nbuf,
+				 enum cdp_tx_sw_drop drop_code)
+{
+	/* EAPOL Drop stats */
+	if (qdf_nbuf_is_ipv4_eapol_pkt(nbuf)) {
+		switch (drop_code) {
+		case TX_DESC_ERR:
+			DP_STATS_INC(pdev, eap_drop_stats.tx_desc_err, 1);
+			break;
+		case TX_HAL_RING_ACCESS_ERR:
+			DP_STATS_INC(pdev,
+				     eap_drop_stats.tx_hal_ring_access_err, 1);
+			break;
+		case TX_DMA_MAP_ERR:
+			DP_STATS_INC(pdev, eap_drop_stats.tx_dma_map_err, 1);
+			break;
+		case TX_HW_ENQUEUE:
+			DP_STATS_INC(pdev, eap_drop_stats.tx_hw_enqueue, 1);
+			break;
+		case TX_SW_ENQUEUE:
+			DP_STATS_INC(pdev, eap_drop_stats.tx_sw_enqueue, 1);
+			break;
+		default:
+			dp_info_rl("Invalid eapol_drop code: %d", drop_code);
+			break;
+		}
+	}
+}
+#else
+static void tx_sw_drop_stats_inc(struct dp_pdev *pdev,
+				 qdf_nbuf_t nbuf,
+				 enum cdp_tx_sw_drop drop_code)
+{
+}
+#endif
+
 /**
  * dp_tx_send_msdu_single() - Setup descriptor and enqueue single MSDU to TCL
  * @vdev: DP vdev handle
@@ -2311,13 +2350,16 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		goto release_desc;
 	}
 
+	tx_sw_drop_stats_inc(pdev, nbuf, drop_code);
 	return NULL;
 
 release_desc:
 	dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
+	tx_sw_drop_stats_inc(pdev, nbuf, drop_code);
 
 fail_return:
 	dp_tx_get_tid(vdev, nbuf, msdu_info);
+	tx_sw_drop_stats_inc(pdev, nbuf, drop_code);
 	tid_stats = &pdev->stats.tid_stats.
 		    tid_tx_stats[tx_q->ring_id][tid];
 	tid_stats->swdrop_cnt[drop_code]++;
