@@ -600,6 +600,74 @@ extract_mlo_link_set_active_resp_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * send_mlo_link_removal_cmd_tlv() - Send WMI command for MLO link removal
+ * @wmi_handle: wmi handle
+ * @params: MLO link removal command parameters
+ *
+ * Return: QDF_STATUS_SUCCESS of operation
+ */
+static QDF_STATUS send_mlo_link_removal_cmd_tlv(
+	wmi_unified_t wmi_handle,
+	const struct mlo_link_removal_cmd_params *params)
+{
+	wmi_mlo_link_removal_cmd_fixed_param *fixed_params;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	uint32_t buf_len = 0;
+	uint32_t ie_len_aligned = 0;
+	QDF_STATUS ret;
+
+	if (!params) {
+		wmi_err("command params is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	ie_len_aligned = roundup(params->reconfig_ml_ie_size, sizeof(uint32_t));
+
+	buf_len = sizeof(wmi_mlo_link_removal_cmd_fixed_param) +
+		  WMI_TLV_HDR_SIZE + ie_len_aligned;
+
+	buf = wmi_buf_alloc(wmi_handle, buf_len);
+	if (!buf) {
+		wmi_err("wmi buf alloc failed for link removal cmd: psoc (%pK) vdev(%u)",
+			wmi_handle->soc->wmi_psoc, params->vdev_id);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+
+	/* Populate fixed params TLV */
+	fixed_params = (wmi_mlo_link_removal_cmd_fixed_param *)buf_ptr;
+	WMITLV_SET_HDR(&fixed_params->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_mlo_link_removal_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN(
+			   wmi_mlo_link_removal_cmd_fixed_param));
+	fixed_params->vdev_id = params->vdev_id;
+	fixed_params->reconfig_ml_ie_num_bytes_valid =
+		params->reconfig_ml_ie_size;
+	buf_ptr += sizeof(*fixed_params);
+
+	/* Populate the array of bytes TLV */
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, ie_len_aligned);
+	buf_ptr += WMI_TLV_HDR_SIZE;
+
+	/* Populate ML reconfiguration element in raw bytes */
+	qdf_mem_copy(buf_ptr, params->reconfig_ml_ie,
+		     params->reconfig_ml_ie_size);
+
+	wmi_mtrace(WMI_MLO_LINK_REMOVAL_CMDID, fixed_params->vdev_id, 0);
+	ret = wmi_unified_cmd_send(wmi_handle, buf, buf_len,
+				   WMI_MLO_LINK_REMOVAL_CMDID);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		wmi_err("Failed to send MLO link removal cmd: psoc (%pK) vdev(%u)",
+			wmi_handle->soc->wmi_psoc, params->vdev_id);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
+
 #ifdef WLAN_FEATURE_11BE
 size_t peer_assoc_t2lm_params_size(struct peer_assoc_params *req)
 {
@@ -1314,4 +1382,5 @@ void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 #endif /* WLAN_FEATURE_11BE */
 	ops->extract_mgmt_rx_ml_cu_params =
 		extract_mgmt_rx_ml_cu_params_tlv;
+	ops->send_mlo_link_removal_cmd = send_mlo_link_removal_cmd_tlv;
 }

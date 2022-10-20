@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -80,6 +80,17 @@ target_if_mlo_get_tx_ops(struct wlan_objmgr_psoc *psoc)
  */
 QDF_STATUS
 target_if_mlo_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops);
+
+/**
+ * target_if_mlo_send_link_removal_cmd() - Send WMI command for MLO link removal
+ * @psoc: psoc pointer
+ * @param: MLO link removal command parameters
+ *
+ * Return: QDF_STATUS of operation
+ */
+QDF_STATUS target_if_mlo_send_link_removal_cmd(
+		struct wlan_objmgr_psoc *psoc,
+		const struct mlo_link_removal_cmd_params *param);
 
 #endif /* __TARGET_IF_MLO_MGR_H__ */
 

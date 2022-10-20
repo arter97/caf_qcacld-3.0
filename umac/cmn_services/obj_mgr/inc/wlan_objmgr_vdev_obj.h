@@ -234,6 +234,9 @@
   /* for mlo reconfig link removal TBTT complete */
 #define WLAN_VDEV_OP_MLO_LINK_TBTT_COMPLETE 0x00800000
 
+/* MLO link removal is in progress on this VDEV */
+#define WLAN_VDEV_OP_MLO_LINK_REMOVAL_IN_PROGRESS 0x01000000
+
  /* CAPABILITY: IBSS available */
 #define WLAN_VDEV_C_IBSS                    0x00000001
 /* CAPABILITY: HOSTAP avail */

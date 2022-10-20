@@ -3035,6 +3035,10 @@ QDF_STATUS
 (*extract_mgmt_rx_ml_cu_params)(wmi_unified_t wmi_handle,
 				void *evt_buf,
 				struct mlo_mgmt_ml_info *cu_params);
+
+QDF_STATUS (*send_mlo_link_removal_cmd)(
+		wmi_unified_t wmi_handle,
+		const struct mlo_link_removal_cmd_params *params);
 #endif
 
 #ifdef WLAN_FEATURE_SON

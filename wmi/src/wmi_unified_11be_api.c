@@ -119,3 +119,13 @@ wmi_extract_mgmt_rx_ml_cu_params(wmi_unified_t wmi, void *evt_buf,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS wmi_send_mlo_link_removal_cmd(
+		wmi_unified_t wmi,
+		const struct mlo_link_removal_cmd_params *param)
+{
+	if (wmi->ops->send_mlo_link_removal_cmd)
+		return wmi->ops->send_mlo_link_removal_cmd(wmi, param);
+
+	return QDF_STATUS_E_FAILURE;
+}

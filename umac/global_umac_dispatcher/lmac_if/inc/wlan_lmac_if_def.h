@@ -1388,6 +1388,7 @@ struct wlan_lmac_if_son_rx_ops {
  * @unregister_events: function to de-register event handlers with FW
  * @link_set_active: function to send mlo link set active command to FW
  * @send_tid_to_link_mapping: function to send T2LM command to FW
+ * @send_link_removal_cmd: function to send MLO link removal command to FW
  */
 struct wlan_lmac_if_mlo_tx_ops {
 	QDF_STATUS (*register_events)(struct wlan_objmgr_psoc *psoc);
@@ -1399,6 +1400,9 @@ struct wlan_lmac_if_mlo_tx_ops {
 #endif
 	QDF_STATUS (*send_tid_to_link_mapping)(struct wlan_objmgr_vdev *vdev,
 					       struct wlan_t2lm_info *t2lm);
+	QDF_STATUS (*send_link_removal_cmd)(
+		struct wlan_objmgr_psoc *psoc,
+		const struct mlo_link_removal_cmd_params *param);
 };
 
 /**

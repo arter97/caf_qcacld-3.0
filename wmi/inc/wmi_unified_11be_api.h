@@ -64,6 +64,17 @@ wmi_send_mlo_link_set_active_cmd(wmi_unified_t wmi_handle,
 QDF_STATUS
 wmi_extract_mgmt_rx_ml_cu_params(wmi_unified_t wmi_handle, void *evt_buf,
 				 struct mlo_mgmt_ml_info *cu_params);
+
+/**
+ * wmi_send_mlo_link_removal_cmd() - Send WMI command for MLO link removal
+ * @wmi: wmi handle
+ * @param: MLO link removal command parameters
+ *
+ * Return: QDF_STATUS_SUCCESS of operation
+ */
+QDF_STATUS wmi_send_mlo_link_removal_cmd(
+		wmi_unified_t wmi,
+		const struct mlo_link_removal_cmd_params *param);
 #endif /*WLAN_FEATURE_11BE_MLO*/
 
 #ifdef WLAN_FEATURE_11BE

@@ -1007,4 +1007,16 @@ struct mlo_vdev_host_tid_to_link_map_resp {
 	enum wlan_t2lm_status status;
 	uint8_t mapping_switch_tsf;
 };
+
+/*
+ * struct mlo_link_removal_cmd_params - MLO link removal command parameters
+ * @vdev_id: vdev ID of the link to be removed
+ * @reconfig_ml_ie: Entire ML reconfiguration element
+ * @reconfig_ml_ie_size: size of the field @reconfig_ml_ie
+ */
+struct mlo_link_removal_cmd_params {
+	uint8_t vdev_id;
+	uint8_t *reconfig_ml_ie;
+	uint32_t reconfig_ml_ie_size;
+};
 #endif
