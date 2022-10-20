@@ -927,6 +927,49 @@ dp_print_pdev_mpdu_pkt_type(struct cdp_pdev_mon_stats *rx_mon_sts)
 }
 
 static inline void
+print_ppdu_eht_type_mode(
+	struct cdp_pdev_mon_stats *rx_mon_stats,
+	uint32_t ppdu_type_mode,
+	uint32_t dl_ul)
+{
+	DP_PRINT_STATS("type_mode=%d, dl_ul=%d, cnt=%d",
+		       ppdu_type_mode,
+		       dl_ul,
+		       rx_mon_stats->ppdu_eht_type_mode[ppdu_type_mode][dl_ul]);
+}
+
+static inline void
+print_ppdu_eth_type_mode_dl_ul(
+	struct cdp_pdev_mon_stats *rx_mon_stats,
+	uint32_t ppdu_type_mode
+)
+{
+	uint32_t dl_ul;
+
+	for (dl_ul = 0; dl_ul < CDP_MU_TYPE_MAX; dl_ul++) {
+		if (rx_mon_stats->ppdu_eht_type_mode[ppdu_type_mode][dl_ul])
+			print_ppdu_eht_type_mode(rx_mon_stats,
+						 ppdu_type_mode, dl_ul);
+	}
+}
+
+static inline void
+dp_print_pdev_eht_ppdu_cnt(struct dp_pdev *pdev)
+{
+	struct cdp_pdev_mon_stats *rx_mon_stats;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	uint32_t ppdu_type_mode;
+
+	rx_mon_stats = &mon_pdev->rx_mon_stats;
+	DP_PRINT_STATS("Monitor EHT PPDU  Count");
+	for (ppdu_type_mode = 0; ppdu_type_mode < CDP_EHT_TYPE_MODE_MAX;
+	     ppdu_type_mode++) {
+		print_ppdu_eth_type_mode_dl_ul(rx_mon_stats,
+					       ppdu_type_mode);
+	}
+}
+
+static inline void
 dp_print_pdev_mpdu_stats(struct dp_pdev *pdev)
 {
 	struct cdp_pdev_mon_stats *rx_mon_stats;
@@ -1033,6 +1076,7 @@ dp_print_pdev_rx_mon_stats(struct dp_pdev *pdev)
 	dp_mon_rx_print_advanced_stats(pdev->soc, pdev);
 
 	dp_print_pdev_mpdu_stats(pdev);
+	dp_print_pdev_eht_ppdu_cnt(pdev);
 
 }
 

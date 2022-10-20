@@ -1580,6 +1580,33 @@ dp_rx_mu_stats_update(
 }
 
 static inline void
+dp_rx_he_ppdu_stats_update(
+	struct cdp_pdev_mon_stats *stats,
+	struct hal_rx_u_sig_info *u_sig
+)
+{
+	stats->ppdu_eht_type_mode[u_sig->ppdu_type_comp_mode][u_sig->ul_dl]++;
+}
+
+static inline void
+dp_rx_he_ppdu_stats(struct dp_pdev *pdev, struct hal_rx_ppdu_info *ppdu_info)
+{
+	struct dp_mon_pdev *mon_pdev;
+	struct cdp_pdev_mon_stats *rx_mon_stats;
+
+	mon_pdev = pdev->monitor_pdev;
+	rx_mon_stats = &mon_pdev->rx_mon_stats;
+
+	if (ppdu_info->u_sig_info.ppdu_type_comp_mode < CDP_EHT_TYPE_MODE_MAX &&
+	    ppdu_info->u_sig_info.ul_dl < CDP_MU_TYPE_MAX)
+		dp_rx_he_ppdu_stats_update(
+			rx_mon_stats,
+			&ppdu_info->u_sig_info);
+		else
+			qdf_assert(0);
+}
+
+static inline void
 dp_rx_mu_stats(struct dp_pdev *pdev, struct hal_rx_ppdu_info *ppdu_info)
 {
 	struct dp_mon_pdev *mon_pdev;
@@ -1608,6 +1635,9 @@ dp_rx_mu_stats(struct dp_pdev *pdev, struct hal_rx_ppdu_info *ppdu_info)
 		dp_rx_mu_stats_update(ppdu_info, rx_mon_stats, preamble_type,
 				      reception_type, mu_dl_ul, i);
 	}
+
+	if (rx_status->eht_flags)
+		dp_rx_he_ppdu_stats(pdev, ppdu_info);
 }
 
 static inline uint32_t

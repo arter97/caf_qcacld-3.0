@@ -1389,8 +1389,8 @@ static inline bool hal_rx_is_non_ofdma(struct hal_soc *hal_soc,
 static inline bool hal_rx_is_mu_mimo_user(struct hal_soc *hal_soc,
 					  struct hal_rx_ppdu_info *ppdu_info)
 {
-	if (ppdu_info->u_sig_info.ppdu_type_comp_mode == 0 &&
-	    ppdu_info->u_sig_info.ul_dl == 2)
+	if (ppdu_info->u_sig_info.ppdu_type_comp_mode == 2 &&
+	    ppdu_info->u_sig_info.ul_dl == 0)
 		return true;
 
 	return false;
