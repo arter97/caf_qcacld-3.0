@@ -1446,6 +1446,34 @@ static struct mon_ops monitor_ops = {
 #endif /* QCA_SUPPORT_LITE_MONITOR */
 };
 
+/**
+ * dp_mon_is_soc_attached - get soc is attached or not
+ * @psoc: PSOC common object
+ *
+ * Return: true if soc is attached
+ */
+bool dp_mon_is_soc_attached(struct wlan_objmgr_psoc *psoc)
+{
+	struct target_psoc_info *tgt_hdl;
+	ol_ath_soc_softc_t *soc;
+
+	tgt_hdl = wlan_psoc_get_tgt_if_handle(psoc);
+
+	if (!tgt_hdl) {
+		dp_mon_err("target_psoc_info is null");
+		return false;
+	}
+
+	soc = (ol_ath_soc_softc_t *)target_psoc_get_feature_ptr(tgt_hdl);
+
+	if (!soc) {
+		dp_mon_err("feature ptr is null");
+		return false;
+	}
+
+	return soc->soc_attached;
+}
+
 QDF_STATUS mon_soc_ol_attach(struct wlan_objmgr_psoc *psoc)
 {
 	struct target_psoc_info *tgt_hdl;

@@ -499,6 +499,7 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 	uint16_t prev_ppdu_id;
 	struct rx_desc_pool *rx_desc_pool = NULL;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	void *first_rx_desc_tlv = NULL;
 
 	desc_info = mon_pdev->mon_desc;
 
@@ -606,6 +607,7 @@ dp_rx_mon_mpdu_reap(struct dp_soc *soc, struct dp_pdev *pdev, uint32_t mac_id,
 					&frag_len,
 					&l3_hdr_pad,
 					rx_tlv_hdr,
+					&first_rx_desc_tlv,
 					&is_frag_non_raw, rx_tlv_hdr);
 			if (!msdu_frag)
 				desc_info->msdu_count--;

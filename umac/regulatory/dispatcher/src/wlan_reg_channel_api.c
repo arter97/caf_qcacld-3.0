@@ -305,3 +305,13 @@ wlan_reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 	return reg_get_first_valid_freq(pdev, in_6g_pwr_mode, first_valid_freq,
 					bw, sec_40_offset);
 }
+
+#ifdef CONFIG_AFC_SUPPORT
+QDF_STATUS
+wlan_reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
+				 qdf_freq_t freq, uint16_t *reg_eirp,
+				 uint16_t *reg_psd)
+{
+	return reg_get_power_from_afc_list(pdev, freq, reg_eirp, reg_psd);
+}
+#endif

@@ -135,10 +135,8 @@ struct rptr_ext_cbacks {
 	void (*peer_disassoc)(struct wlan_objmgr_peer *peer);
 	void (*pdev_update_beacon)(struct wlan_objmgr_pdev *pdev);
 	bool (*target_lithium)(struct wlan_objmgr_pdev *pdev);
-#if REPEATER_SAME_SSID
 	bool (*dessired_ssid_found)(struct wlan_objmgr_vdev *vdev,
 				    u8 *ssid, u8 ssid_len);
-#endif
 #if DBDC_REPEATER_SUPPORT
 	void (*legacy_dbdc_flags_get)(struct wlan_objmgr_pdev *pdev,
 				      struct dbdc_flags *flags);
@@ -530,6 +528,16 @@ wlan_rptr_vdev_is_key_set_allowed(struct wlan_objmgr_vdev *vdev,
 QDF_STATUS
 wlan_rptr_vdev_ucfg_config(struct wlan_objmgr_vdev *vdev, int param,
 			   uint8_t value);
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_rptr_pdev_get_stavdev - check if pdev had sta vdev
+ * @pdev- pdev object manager
+ * return vdev if sta vdev is present; otherwise NULL
+ */
+struct wlan_objmgr_vdev *
+wlan_rptr_pdev_get_stavdev(struct wlan_objmgr_pdev *pdev);
+#endif
 
 /**
  * wlan_rptr_vdev_is_scan_allowed - check if scan is allowed for vdev

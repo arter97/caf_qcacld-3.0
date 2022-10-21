@@ -926,6 +926,20 @@ wlan_rptr_pdev_ucfg_config_get(struct wlan_objmgr_pdev *pdev, int param)
 }
 qdf_export_symbol(wlan_rptr_pdev_ucfg_config_get);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * wlan_rptr_pdev_get_stavdev - check if pdev had sta vdev
+ * @pdev- pdev object manager
+ * return vdev if sta vdev is present; otherwise NULL
+ */
+struct wlan_objmgr_vdev *
+wlan_rptr_pdev_get_stavdev(struct wlan_objmgr_pdev *pdev)
+{
+	return wlan_rptr_core_pdev_get_stavdev(pdev);
+}
+qdf_export_symbol(wlan_rptr_pdev_get_stavdev);
+#endif
+
 /**
  * wlan_rptr_vdev_is_scan_allowed - check if scan is allowed for vdev
  * @vdev- vdev object manager
@@ -1601,7 +1615,7 @@ wlan_rptr_process_extender_ie(struct wlan_objmgr_peer *peer,
 			apvaps_cnt = *ie++;
 			stavaps_cnt = *ie++;
 			mac_list = (u_int8_t *)ss_info->preferred_bssid_list;
-			for (i = 0; ((i < apvaps_cnt) && (i < MAX_RADIO_CNT) &&
+			for (i = 0; ((i < apvaps_cnt) && (i < RPTR_MAX_RADIO_CNT) &&
 				     (ie_len > 0)); i++) {
 				WLAN_ADDR_COPY((mac_list + (i * QDF_MAC_ADDR_SIZE)),
 					       ie);
@@ -1611,7 +1625,7 @@ wlan_rptr_process_extender_ie(struct wlan_objmgr_peer *peer,
 				ie_len -= QDF_MAC_ADDR_SIZE;
 			}
 			mac_list = (u_int8_t *)ss_info->denied_client_list;
-			for (i = 0; ((i < stavaps_cnt) && (i < MAX_RADIO_CNT) &&
+			for (i = 0; ((i < stavaps_cnt) && (i < RPTR_MAX_RADIO_CNT) &&
 				     (ie_len > 0)); i++) {
 				WLAN_ADDR_COPY((mac_list + (i * QDF_MAC_ADDR_SIZE)),
 						ie);
@@ -1741,7 +1755,7 @@ wlan_rptr_validate_stavap_connection(struct wlan_objmgr_vdev *vdev,
 			/* When stavap connected to RootAP, clear preferred and
 			 *  denied mac list
 			*/
-			for (i = 0; i < MAX_RADIO_CNT; i++) {
+			for (i = 0; i < RPTR_MAX_RADIO_CNT; i++) {
 				OS_MEMZERO(&ss_info->preferred_bssid_list[i][0],
 					   QDF_MAC_ADDR_SIZE);
 				OS_MEMZERO(&ss_info->denied_client_list[i][0],
@@ -1789,7 +1803,7 @@ wlan_rptr_validate_stavap_connection(struct wlan_objmgr_vdev *vdev,
 			}
 			/*make sure connecting to RE whose mac present in preferred bssid*/
 			flag = QDF_STATUS_E_INVAL;
-			for (i = 0; i < MAX_RADIO_CNT; i++) {
+			for (i = 0; i < RPTR_MAX_RADIO_CNT; i++) {
 				if (OS_MEMCMP(bssid, &ss_info->preferred_bssid_list[i][0],
 					      QDF_MAC_ADDR_SIZE) == 0) {
 					flag = QDF_STATUS_SUCCESS;
@@ -1906,6 +1920,7 @@ wlan_rptr_s_ssid_vdev_connection_down(struct wlan_objmgr_vdev *vdev)
 	if (g_priv->num_stavaps_up == 0) {
 		ss_info->ap_preference = ap_preference_type_init;
 		ss_info->extender_info = 0;
+		qdf_mem_zero(g_priv->preferred_mlo_bssid, QDF_MAC_ADDR_SIZE);
 		ss_info->rootap_access_downtime = qdf_get_system_timestamp();
 		for (i = 0; i < RPTR_MAX_RADIO_CNT; i++) {
 			qdf_mem_zero(&ss_info->preferred_bssid_list[i][0],
@@ -1939,10 +1954,14 @@ void wlan_rptr_s_ssid_vdev_down_process(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
 	struct wlan_objmgr_pdev *pdev;
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
 
 	pdev = wlan_vdev_get_pdev(vdev);
 
 	if (!pdev)
+		return;
+
+	if (!g_priv)
 		return;
 
 	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
@@ -1953,6 +1972,10 @@ void wlan_rptr_s_ssid_vdev_down_process(struct wlan_objmgr_vdev *vdev)
 	pdev_priv->extender_connection = ext_connection_type_init;
 	qdf_mem_zero(pdev_priv->preferred_bssid, QDF_MAC_ADDR_SIZE);
 	RPTR_PDEV_UNLOCK(&pdev_priv->rptr_pdev_lock);
+
+	RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
+	qdf_mem_zero(g_priv->preferred_mlo_bssid, QDF_MAC_ADDR_SIZE);
+	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 }
 
 qdf_export_symbol(wlan_rptr_s_ssid_vdev_down_process);

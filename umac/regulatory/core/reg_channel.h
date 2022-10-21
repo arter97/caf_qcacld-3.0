@@ -325,4 +325,28 @@ reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 			 in_6g_pwr_mode,
 			 qdf_freq_t *first_valid_freq,
 			 int bw, int sec_40_offset);
+
+#ifdef CONFIG_AFC_SUPPORT
+/**
+* reg_get_power_from_afc_list() - For a given frequency, fetch the EIRP
+* @pdev: Pointer to pdev.
+* power and PSD from the AFC channel list.
+* @freq - Channel frequency in MHz.
+* @reg_eirp: EIRP power.
+* @reg_psd - PSD.
+*
+* Return: QDF_STATUS.
+*/
+QDF_STATUS
+reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
+			    qdf_freq_t freq, uint16_t *reg_eirp,
+			    uint16_t *reg_psd);
+#else
+static inline QDF_STATUS
+reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
+			    qdf_freq_t freq, uint16_t *reg_eirp,
+			    uint16_t *reg_psd) {
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif /* __REG_CHANNEL_H_ */

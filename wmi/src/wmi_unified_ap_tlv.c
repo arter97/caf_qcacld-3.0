@@ -1395,7 +1395,7 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	chan_info->band_center_freq1 = tchan_info->cfreq1;
 	chan_info->band_center_freq2 = tchan_info->cfreq2;
 #ifdef WLAN_FEATURE_11BE
-	cmd->puncture_20mhz_bitmap = tchan_info->puncture_bitmap;
+	cmd->puncture_20mhz_bitmap = ~tchan_info->puncture_bitmap;
 #endif
 	if (tchan_info->is_chan_passive)
 		WMI_SET_CHANNEL_FLAG(chan_info,
@@ -2699,6 +2699,7 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 
 		WMI_PEER_CHAN_WIDTH_SWITCH_SET_VDEV_ID(cmd->vdev_var, param->vdev_id);
 		WMI_PEER_CHAN_WIDTH_SWITCH_SET_VALID_VDEV_ID(cmd->vdev_var);
+		WMI_PEER_CHAN_WIDTH_SWITCH_SET_VALID_PUNCTURE_BITMAP(cmd->vdev_var);
 
 		WMITLV_SET_HDR(((void *)cmd + sizeof(*cmd)),
                                WMITLV_TAG_ARRAY_STRUC,
@@ -2716,13 +2717,18 @@ send_peer_chan_width_switch_cmd_tlv(wmi_unified_t wmi_handle,
 					wmi_chan_width_peer_list));
 
 			WMI_CHAR_ARRAY_TO_MAC_ADDR(param_peer_list[ix].mac_addr,
-					   &cmd_peer_list[ix].peer_macaddr);
+						   &cmd_peer_list[ix].peer_macaddr);
 
 			cmd_peer_list[ix].chan_width =
 				convert_host_to_target_chwidth(param_peer_list[ix].chan_width);
 
-			wmi_debug("Peer[%u]: chan_width = %u", ix,
-				  cmd_peer_list[ix].chan_width);
+			cmd_peer_list[ix].puncture_20mhz_bitmap =
+					~param_peer_list[ix].puncture_bitmap;
+
+			wmi_debug("Peer[%u]: chan_width = %u"
+				   " puncture bitmap %x", ix,
+				  cmd_peer_list[ix].chan_width,
+				  cmd_peer_list[ix].puncture_20mhz_bitmap);
 		}
 
 		pending_peers -= cmd->num_peers;
@@ -3651,7 +3657,7 @@ QDF_STATUS send_sawf_create_cmd_tlv(wmi_unified_t wmi_handle,
 
 	sawf_create_set_defaults(param);
 
-	cmd->svc_class_id = param->svc_id;
+	cmd->svc_class_id = param->svc_id - 1;
 	cmd->min_thruput_kbps = param->min_thruput_rate;
 	cmd->max_thruput_kbps = param->max_thruput_rate;
 	cmd->burst_size_bytes = param->burst_size;
@@ -3697,7 +3703,7 @@ QDF_STATUS send_sawf_disable_cmd_tlv(wmi_unified_t wmi_handle,
 		       WMITLV_GET_STRUCT_TLVLEN
 		       (wmi_sawf_svc_class_disable_cmd_fixed_param));
 
-	cmd->svc_class_id = svc_id;
+	cmd->svc_class_id = svc_id - 1;
 
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 			WMI_SAWF_SVC_CLASS_DISABLE_CMDID);

@@ -113,6 +113,7 @@ struct pdev_hw_stats {
  *                             BIT[8-15]  : AC_BK
  *                             BIT[16-23] : AC_VI
  *                             BIT[24-31] : AC_VO
+ * @pdev_freetime_per_sec: The link idle time per sec when no tx/rx happens
  */
 struct pdev_80211_stats {
 	uint64_t cs_tx_beacon;
@@ -159,6 +160,9 @@ struct pdev_80211_stats {
 	struct pdev_dcs_chan_stats chan_stats;
 	uint32_t avg_chan_lat_per_ac[WIFI_AC_MAX];
 	uint32_t estimated_air_time_per_ac;
+#ifdef WLAN_TELEMETRY_STATS_SUPPORT
+	uint8_t pdev_freetime_per_sec;
+#endif
 };
 
 /**

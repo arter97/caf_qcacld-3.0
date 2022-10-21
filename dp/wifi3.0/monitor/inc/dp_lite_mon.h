@@ -95,11 +95,13 @@ struct dp_lite_mon_tx_config {
  * dp_lite_mon_rx_config - lite mon rx filter config structure
  * @rx_config: rx filters
  * @lite_mon_rx_lock: lite mon rx config lock
+ * @fp_type_subtype_filter_all: indicates if all type subtype enabled for FP
  */
 struct dp_lite_mon_rx_config {
 	struct dp_lite_mon_config rx_config;
 	/* add rx lite mon specific fields below */
 	qdf_spinlock_t lite_mon_rx_lock;
+	bool fp_type_subtype_filter_all;
 };
 
 static inline int

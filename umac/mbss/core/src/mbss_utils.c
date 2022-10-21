@@ -602,6 +602,70 @@ err:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+mbss_start_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev, void *arg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
+	struct wlan_objmgr_pdev *pdev;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+
+	mbss_ctx = mbss_get_ctx(vdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_start_standalone_ap_vdevs_cb)
+		handler = ext_ops->mbss_start_standalone_ap_vdevs_cb;
+	else
+		goto err;
+
+	handler(pdev, (void *)vdev, arg);
+	return status;
+
+err:
+	status = QDF_STATUS_E_FAILURE;
+	return status;
+}
+
+QDF_STATUS
+mbss_stop_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev, void *arg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_pdev *mbss_ctx;
+	wlan_objmgr_pdev_op_handler handler;
+	struct wlan_mbss_ext_cb *ext_ops;
+	struct wlan_objmgr_pdev *pdev;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+
+	mbss_ctx = mbss_get_ctx(vdev);
+	if (!mbss_ctx) {
+		mbss_err("MBSS ctx in null");
+		goto err;
+	}
+
+	ext_ops = wlan_mbss_get_ext_ops();
+	if (ext_ops && ext_ops->mbss_start_standalone_ap_vdevs_cb)
+		handler = ext_ops->mbss_stop_standalone_ap_vdevs_cb;
+	else
+		goto err;
+
+	handler(pdev, (void *)vdev, arg);
+	return status;
+
+err:
+	status = QDF_STATUS_E_FAILURE;
+	return status;
+}
+#endif
+
 QDF_STATUS wlan_mbss_sched_action_flush(struct scheduler_msg *msg)
 {
 	struct mbss_sched_data *data;
@@ -700,3 +764,81 @@ exit:
 	return status;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+wlan_mbss_standalone_sched_action(struct scheduler_msg *msg)
+{
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct mbss_sched_data *data;
+	struct wlan_objmgr_vdev *vdev;
+
+	data = msg->bodyptr;
+	vdev = data->vdev;
+
+	switch (data->action) {
+	case MBSS_SCHED_STANDALONE_AP_VDEVS_START:
+		status = wlan_mbss_start_standalone_ap_vdevs(vdev, NULL);
+		break;
+	case MBSS_SCHED_STANDALONE_AP_VDEVS_STOP:
+		status = wlan_mbss_stop_standalone_ap_vdevs(vdev, NULL);
+		break;
+	default:
+		mbss_err("Wrong action");
+	break;
+	}
+
+	wlan_objmgr_vdev_release_ref(data->vdev, WLAN_MBSS_ID);
+	qdf_mem_free(data);
+
+	return status;
+}
+
+QDF_STATUS
+wlan_mbss_standalone_sched_start_stop(struct wlan_objmgr_vdev *vdev,
+				      enum wlan_mbss_standalone_sched_actions
+				      action)
+{
+	struct scheduler_msg msg = {0};
+	struct mbss_sched_data *data;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (!vdev) {
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+
+	data = qdf_mem_malloc(sizeof(struct mbss_sched_data));
+	if (!data) {
+		mbss_err("Req is NULL");
+		status = QDF_STATUS_E_FAILURE;
+		goto exit;
+	}
+
+	status = wlan_objmgr_vdev_try_get_ref(vdev, WLAN_MBSS_ID);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mbss_err("Unable to get reference");
+		goto error;
+	}
+
+	data->vdev = vdev;
+	data->action = action;
+
+	msg.bodyptr = data;
+	msg.callback = wlan_mbss_standalone_sched_action;
+	msg.flush_callback = wlan_mbss_sched_action_flush;
+
+	status = scheduler_post_message(QDF_MODULE_ID_OS_IF,
+					QDF_MODULE_ID_OS_IF,
+					QDF_MODULE_ID_OS_IF, &msg);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_MBSS_ID);
+		mbss_err("Failed to post scheduler_msg");
+		goto error;
+	}
+	goto exit;
+error:
+	qdf_mem_free(data);
+exit:
+	return status;
+}
+#endif

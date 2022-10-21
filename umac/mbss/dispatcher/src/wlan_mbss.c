@@ -383,6 +383,26 @@ wlan_mbss_start_restart_ap_monitor_vdevs(struct wlan_objmgr_pdev *pdev,
 
 qdf_export_symbol(wlan_mbss_start_restart_ap_monitor_vdevs);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS
+wlan_mbss_start_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
+				    void *arg)
+{
+	return mbss_start_standalone_ap_vdevs(vdev, arg);
+}
+
+qdf_export_symbol(wlan_mbss_start_standalone_ap_vdevs);
+
+QDF_STATUS
+wlan_mbss_stop_standalone_ap_vdevs(struct wlan_objmgr_vdev *vdev,
+				   void *arg)
+{
+	return mbss_stop_standalone_ap_vdevs(vdev, arg);
+}
+
+qdf_export_symbol(wlan_mbss_stop_standalone_ap_vdevs);
+#endif
+
 #ifdef WLAN_MBSS_DEBUG
 void wlan_mbss_debug_print_history(struct wlan_objmgr_pdev *pdev)
 {

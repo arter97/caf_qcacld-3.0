@@ -196,6 +196,8 @@ static inline int dfs_start_host_based_bangradar(struct wlan_dfs *dfs)
  * Return: If the event is received return 0.
  */
 #if defined(WLAN_DFS_FULL_OFFLOAD)
+#define FREQ_SIGNBIT_OFFSET 8
+#define FREQ_SIGNBIT_MASK 0x1
 #define ADD_TO_32BYTE(_arg, _shift, _mask) (((_arg) & (_mask)) << (_shift))
 static int
 dfs_fill_emulate_bang_radar_test(struct wlan_dfs *dfs,
@@ -203,6 +205,7 @@ dfs_fill_emulate_bang_radar_test(struct wlan_dfs *dfs,
 {
 	struct dfs_emulate_bang_radar_test_cmd dfs_unit_test;
 	uint32_t packed_args = 0;
+	bool freq_offset_signbit;
 	enum detector_id agile_detector_id = dfs_get_agile_detector_id(dfs);
 
 	/* It is possible that home/operating channel is nonDFS
@@ -230,6 +233,15 @@ dfs_fill_emulate_bang_radar_test(struct wlan_dfs *dfs,
 		ADD_TO_32BYTE(bangradar_params->detector_id,
 			      DET_ID_SHIFT,
 			      DET_ID_MASK);
+
+	if (dfs->dfs_is_bangradar_320_supported) {
+		freq_offset_signbit = (
+			bangradar_params->freq_offset >> FREQ_SIGNBIT_OFFSET) &
+							 FREQ_SIGNBIT_MASK;
+		packed_args |= ADD_TO_32BYTE(freq_offset_signbit,
+					     FREQ_OFFSET_SIGNBIT_SHIFT,
+					     FREQ_OFFSET_SIGNBIT_MASK);
+	}
 
 	qdf_mem_zero(&dfs_unit_test, sizeof(dfs_unit_test));
 	dfs_unit_test.num_args = DFS_UNIT_TEST_NUM_ARGS;

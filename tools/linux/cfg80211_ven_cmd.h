@@ -828,6 +828,10 @@ enum {
 	IEEE80211_PARAM_EHT_SUP_MCS15     = 786,   /* Set 11be - EHT MCS15 Support */
 	IEEE80211_PARAM_EHT_MCS14_DUP_IN_6GHZ                   = 787, /* Set 11be - EHT MCS14 Duplicate in 6GHz */
 #endif /* WLAN_FEATURE_11BE */
+	IEEE80211_PARAM_DROP_3ADDR_MCAST  = 788,  /* Flag to enable/disable 3address multicast pkt drops */
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_EHT_CONFIG_CCFS0 = 789, /* Set 11be - EHT Config CCFS0 in 6GHz */
+#endif /* WLAN_FEATURE_11BE */
 };
 
 enum {
@@ -1402,6 +1406,14 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_BCN_MAX_COUNT = 515,
 	/* Display super channel list */
 	OL_ATH_PARAM_DISPLAY_SUPER_CHANNEL_LIST = 516,
+	OL_ATH_PARAM_DFS_PUNCTURE = 517,
+#ifdef WLAN_MGMT_RX_REO_SUPPORT
+	OL_ATH_PARAM_MGMT_RX_REO_STATUS = 518,
+#endif
+
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	OL_ATH_PARAM_UMAC_RST_SKEL = 519,
+#endif
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2483,6 +2495,12 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"pure11ax",            IEEE80211_PARAM_PURE11AX, SET_PARAM, 1},
 	{"get_pure11ax",        IEEE80211_PARAM_PURE11AX, GET_PARAM, 0},
 	{"get_scs_rules",       IEEE80211_PARAM_SCS_RULES, GET_PARAM, 0},
+	{"drop3addrmcast",      IEEE80211_PARAM_DROP_3ADDR_MCAST, SET_PARAM, 1},
+	{"get_drop3addrmcast",  IEEE80211_PARAM_DROP_3ADDR_MCAST, GET_PARAM, 0},
+#ifdef WLAN_FEATURE_11BE
+	{"eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, SET_PARAM, 1},
+	{"get_eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, GET_PARAM, 0},
+#endif /* WLAN_FEATURE_11BE */
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
@@ -3223,6 +3241,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_BW_EXPAND, SET_PARAM, 1},
 	{"g_bw_expand",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_BW_EXPAND, GET_PARAM, 0},
+	{"dfs_puncture_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_PUNCTURE, SET_PARAM, 1},
+	{"g_dfs_puncture_en",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DFS_PUNCTURE, GET_PARAM, 0},
 	{"get_bandinfo",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_BAND_INFO, GET_PARAM, 0},
 	{"bw_reduceEn",
@@ -3697,6 +3719,17 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_BCN_MAX_COUNT, GET_PARAM, 0},
 	{"display_super_chan_list",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_SUPER_CHANNEL_LIST, GET_PARAM, 0},
+#ifdef WLAN_MGMT_RX_REO_SUPPORT
+	{"g_mgmt_rx_reo_status",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MGMT_RX_REO_STATUS,
+		GET_PARAM, 0},
+#endif
+#ifdef DP_UMAC_HW_RESET_SUPPORT
+	{"umac_rst_skel",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UMAC_RST_SKEL, SET_PARAM, 1},
+	{"g_umac_rst_skel",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UMAC_RST_SKEL, GET_PARAM, 0},
+#endif
 };
 #endif
 

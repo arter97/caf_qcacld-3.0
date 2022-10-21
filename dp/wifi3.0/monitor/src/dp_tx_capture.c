@@ -399,6 +399,11 @@ dp_tx_peer_get_ref(const char *func, uint32_t line, struct dp_pdev *cur_pdev,
 	if (!peer)
 		return NULL;
 
+	if (qdf_unlikely(!(peer->monitor_peer))) {
+		DP_TX_PEER_DEL_REF(peer);
+		return NULL;
+	}
+
 	/* sanity check vdev NULL */
 	vdev = peer->vdev;
 	if (qdf_unlikely(!vdev)) {
@@ -456,6 +461,9 @@ dp_peer_print_tid_qlen(struct dp_soc *soc,
 	uint32_t tasklet_msdu_len;
 	uint32_t ppdu_len;
 	struct tid_q_len *c_tid_q_len = (struct tid_q_len *)arg;
+
+	if (qdf_unlikely(!(peer->monitor_peer)))
+		return;
 
 	for (tid = 0; tid < DP_MAX_TIDS; tid++) {
 		tx_tid = &peer->monitor_peer->tx_capture.tx_tid[tid];
@@ -713,6 +721,14 @@ dp_tx_find_usr_idx_from_peer_id(struct cdp_tx_completion_ppdu *ppdu_desc,
 	if (!found) {
 		dp_tx_capture_alert("peer_id: %d, ppdu_desc[%p][num_users: %d]\n",
 				    peer_id, ppdu_desc, ppdu_desc->num_users);
+
+		for (usr_idx = 0; usr_idx < ppdu_desc->num_users; usr_idx++) {
+			dp_tx_capture_alert("peer_id:%d pid:%d sched_cmdid: %d",
+					    ppdu_desc->user[usr_idx].peer_id,
+					    ppdu_desc->ppdu_id,
+					    ppdu_desc->sched_cmdid);
+		}
+
 		qdf_assert_always(0);
 	}
 
@@ -766,6 +782,8 @@ void dp_peer_tid_queue_init(struct dp_peer *peer)
 
 	mon_pdev = pdev->monitor_pdev;
 	mon_peer = peer->monitor_peer;
+	if (qdf_unlikely(!mon_peer))
+		return;
 
 	/* only if tx capture is turned on we will initialize the tid */
 	if (qdf_atomic_read(&mon_pdev->tx_capture.tx_cap_usr_mode) ==
@@ -858,7 +876,8 @@ void dp_peer_tx_cap_tid_queue_flush(struct dp_soc *soc, struct dp_peer *peer,
 	if (qdf_unlikely(!pdev))
 		return;
 
-	if (!dp_peer_or_pdev_tx_cap_enabled(pdev, peer, peer->mac_addr.raw))
+	if (!dp_peer_or_pdev_tx_cap_enabled(pdev, peer, peer->mac_addr.raw) ||
+	    qdf_unlikely(!mon_peer))
 		return;
 
 	if (!mon_peer->tx_capture.is_tid_initialized)
@@ -1964,6 +1983,12 @@ dp_update_msdu_to_list(struct dp_soc *soc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (!(peer->monitor_peer)) {
+		dp_tx_capture_err("%pK: peer[%d] bss[%d] monitor_peer is NULL!",
+				  soc, peer->peer_id, peer->bss_peer);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	tx_tid = &peer->monitor_peer->tx_capture.tx_tid[ts->tid];
 
 	if (!tx_tid) {
@@ -2642,16 +2667,18 @@ void dp_peer_tx_wds_addr_add(struct dp_peer *peer, uint8_t *addr4_mac_addr)
 }
 
 /*
- * dp_peer_tx_update_80211_wds_hdr() – Update 80211 frame header to include a
+ * dp_tx_update_80211_wds_hdr() – Update 80211 frame header to include a
  * 4 address frame, and set QoS related information if necessary
  * @pdev: Physical device reference
  * @peer: Datapath peer
  * @data: ppdu_descriptor
  * @nbuf: 802.11 frame
  * @ether_type: ethernet type
- * @src_addr: ether shost address
+ * @dst_addr: ether destination address
  * @usr_idx: user index
+ * @is_amsdu: amsdu flag
  *
+ * return: status
  */
 static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 					   struct dp_peer *peer,
@@ -2701,6 +2728,7 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
 		qdf_mem_copy(ptr_wh->i_addr4, ptr_wh->i_addr2,
 			     QDF_MAC_ADDR_SIZE);
 	} else {
+		ptr_wh->i_qos[0] &= ~IEEE80211_QOS_AMSDU;
 		/* Update Addr 3 (DA) with DA derived from ether packet */
 		qdf_mem_copy(ptr_wh->i_addr3, dst_addr, QDF_MAC_ADDR_SIZE);
 	}
@@ -2751,7 +2779,10 @@ static uint32_t dp_tx_update_80211_wds_hdr(struct dp_pdev *pdev,
  * @nbuf: 802.11 frame
  * @ether_type: ethernet type
  * @src_addr: ether shost address
+ * @usr_idx: user index
+ * @is_amsdu: amsdu flag
  *
+ * return: status
  */
 static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 				       struct dp_peer *peer,
@@ -2800,6 +2831,7 @@ static uint32_t dp_tx_update_80211_hdr(struct dp_pdev *pdev,
 		qdf_mem_copy(ptr_wh->i_addr3, ptr_wh->i_addr2,
 			     QDF_MAC_ADDR_SIZE);
 	} else {
+		ptr_wh->i_qos[0] &= ~IEEE80211_QOS_AMSDU;
 		/* Update Addr 3 (SA) with SA derived from ether packet */
 		qdf_mem_copy(ptr_wh->i_addr3, src_addr, QDF_MAC_ADDR_SIZE);
 	}
@@ -4357,20 +4389,33 @@ dp_tx_mon_proc_pending_ppdus(struct dp_pdev *pdev, struct dp_tx_tid *tx_tid,
 		/* Find missing mpdus from current schedule list */
 		ppdu_cnt = 0;
 		while (ppdu_cnt < ppdu_desc_cnt) {
+			uint8_t idx = 0;
+
+			cur_user = NULL;
+
 			ptr_nbuf_list = &nbuf_ppdu_list[ppdu_cnt];
 			ppdu_cnt++;
+
 			if (!dp_tx_cap_nbuf_list_get_ref(ptr_nbuf_list))
 				continue;
 
 			cur_ppdu_desc = (struct cdp_tx_completion_ppdu *)
-					qdf_nbuf_data(ptr_nbuf_list->nbuf_ppdu);
+				qdf_nbuf_data(ptr_nbuf_list->nbuf_ppdu);
+
 			if (!cur_ppdu_desc)
 				continue;
 
-			cur_usr_idx = dp_tx_find_usr_idx_from_peer_id(
-						cur_ppdu_desc, peer_id);
+			for (idx = 0; idx < cur_ppdu_desc->num_users; idx++) {
+				if (peer_id ==
+				    cur_ppdu_desc->user[idx].peer_id) {
+					cur_user = &cur_ppdu_desc->user[idx];
+					cur_usr_idx = idx;
+					break;
+				}
+			}
 
-			cur_user = &cur_ppdu_desc->user[cur_usr_idx];
+			if (qdf_unlikely(!cur_user))
+				continue;
 
 			if ((cur_user->skip == 1) ||
 			    (cur_user->mon_procd == 1))
@@ -5899,13 +5944,13 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 			peer = DP_TX_PEER_GET_REF(pdev, peer_id);
 
 			/**
-			 * peer can be NULL
+			 *  peer and monitor_peer can be NULL
 			 */
-			if (!peer ||
-			    !(peer->monitor_peer->tx_capture.is_tid_initialized)) {
+			if (!peer || !(peer->monitor_peer)) {
 				user->skip = 1;
 				goto free_nbuf_dec_ref;
 			}
+
 			mon_peer = peer->monitor_peer;
 
 			/**
@@ -5916,6 +5961,7 @@ dp_tx_cap_proc_per_ppdu_info(struct dp_pdev *pdev, qdf_nbuf_t nbuf_ppdu,
 			 * or globally for all peers
 			 */
 			if (peer->bss_peer ||
+			    !(mon_peer->tx_capture.is_tid_initialized) ||
 			    !dp_peer_or_pdev_tx_cap_enabled(pdev,
 				peer, peer->mac_addr.raw) || user->is_mcast) {
 				user->skip = 1;
@@ -6545,10 +6591,11 @@ void dp_ppdu_desc_deliver_1_0(struct dp_pdev *pdev,
 
 		qdf_spin_lock_bh(&mon_pdev->tx_capture.ppdu_stats_lock);
 
-		if (qdf_unlikely(!mon_pdev->tx_capture_enabled &&
-				 (mon_pdev->tx_capture.ppdu_stats_queue_depth +
-				  mon_pdev->tx_capture.ppdu_stats_defer_queue_depth) >
-				 DP_TX_PPDU_PROC_MAX_DEPTH)) {
+		if (qdf_unlikely((!mon_pdev->tx_capture_enabled &&
+				  (mon_pdev->tx_capture.ppdu_stats_queue_depth +
+				   mon_pdev->tx_capture.ppdu_stats_defer_queue_depth) >
+				  DP_TX_PPDU_PROC_MAX_DEPTH) ||
+				 !ppdu_desc->num_users)) {
 			qdf_nbuf_free(s_ppdu_info->nbuf);
 			qdf_mem_free(s_ppdu_info);
 			mon_pdev->tx_capture.ppdu_dropped++;

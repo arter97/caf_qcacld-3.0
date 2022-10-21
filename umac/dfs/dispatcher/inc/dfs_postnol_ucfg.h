@@ -185,3 +185,35 @@ QDF_STATUS
 ucfg_dfs_get_bw_expand(struct wlan_objmgr_pdev *pdev,
 		       bool *bw_expand);
 #endif /* QCA_DFS_BW_EXPAND */
+
+#ifdef QCA_DFS_BW_PUNCTURE
+/**
+ * ucfg_dfs_set_dfs_puncture() - Set the value of DFS puncturing feature.
+ * @pdev: Pointer to DFS pdev object.
+ * @is_dfs_punc_en: Set DFS puncturing based on this value.
+ *
+ * Wrapper function for dfs_set_dfs_puncture() which enables/disables
+ * the DFS puncturing feature.
+ * This function is called from outside of dfs component.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dfs_set_dfs_puncture(struct wlan_objmgr_pdev *pdev,
+			  bool is_dfs_punc_en);
+
+/**
+ * ucfg_dfs_get_dfs_puncture() - Get the value of DFS puncturing feature.
+ * @pdev: Pointer to DFS pdev object.
+ * @is_dfs_punc_en: Store the value of DFS puncturing feature
+ *
+ * Wrapper function for dfs_get_dfs_puncture() which displays value
+ * of the  DFS puncturing feature whether it is enabled or disabled.
+ * This function is called from outside of dfs component.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+ucfg_dfs_get_dfs_puncture(struct wlan_objmgr_pdev *pdev,
+			  bool *is_dfs_punc_en);
+#endif /* QCA_DFS_BW_PUNCTURE */

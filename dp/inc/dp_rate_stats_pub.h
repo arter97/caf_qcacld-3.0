@@ -149,7 +149,12 @@ struct wlan_tx_sojourn_stats {
 	qdf_ewma_tx_lag avg_sojourn_msdu[WLAN_DATA_TID_MAX];
 };
 
+#ifdef WLAN_FEATURE_11BE
+#define BW_USAGE_MAX_SIZE 6
+#define MAX_PUNCTURED_MODE 5
+#else
 #define BW_USAGE_MAX_SIZE 4
+#endif
 
 /**
  * enum wlan_rate_ppdu_type -
@@ -201,9 +206,25 @@ struct wlan_avg_rate_stats {
 struct wlan_peer_bw_stats {
 	uint32_t usage_total;
 	uint32_t usage_counter[BW_USAGE_MAX_SIZE];
+	uint16_t usage_avg;
+	uint16_t usage_max;
+};
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * struct wlan_peer_punc_bw_stats - punctured bw related stats
+ * @usage_total - sum of total Punctured BW (20, 40, 80, 160)
+ * @usage_avg - @usage_total / number of PPDUs (avg BW)
+ * @usage_counter - each punctured BW usage counter
+ * @usage_max - number of pkts in max Punc BW mode
+ */
+struct wlan_peer_punc_bw_stats {
+	uint32_t usage_total;
+	uint32_t usage_counter[MAX_PUNCTURED_MODE];
 	uint8_t usage_avg;
 	uint8_t usage_max;
 };
+#endif
 
 /**
  * struct wlan_rx_link_stats - Peer Rx link statistics
@@ -216,6 +237,7 @@ struct wlan_peer_bw_stats {
  * @ofdma_usage - number of packet in OFDMA
  * @mu_mimo_usage - number of pakcets in MU MIMO
  * @bw - average BW and max BW related structure
+ * @punc_bw - average punc BW and max punc BW related structure
  * @su_rssi - single user RSSI
  * @mpdu_retries - number of retried MPDUs
  * @pkt_error_rate - average packet error rate
@@ -231,6 +253,9 @@ struct wlan_rx_link_stats {
 	uint32_t ofdma_usage;
 	uint32_t mu_mimo_usage;
 	struct wlan_peer_bw_stats bw;
+#ifdef WLAN_FEATURE_11BE
+	struct wlan_peer_punc_bw_stats punc_bw;
+#endif
 	qdf_ewma_rx_rssi su_rssi;
 	uint32_t mpdu_retries;
 	uint32_t num_mpdus;
@@ -248,6 +273,7 @@ struct wlan_rx_link_stats {
  * @ofdma_usage - number of packet in OFDMA
  * @mu_mimo_usage - number of pakcets in MU MIMO
  * @bw - average BW and max BW related structure
+ * @punc_bw - average punc BW and max punc BW related structure
  * @ack_rssi - averaged ACK rssi
  * @mpdu_failed - number of failed MPDUs
  * @mpdu_success - number of success MPDUs
@@ -263,6 +289,9 @@ struct wlan_tx_link_stats {
 	uint32_t ofdma_usage;
 	uint32_t mu_mimo_usage;
 	struct wlan_peer_bw_stats bw;
+#ifdef WLAN_FEATURE_11BE
+	struct wlan_peer_punc_bw_stats punc_bw;
+#endif
 	qdf_ewma_rx_rssi ack_rssi;
 	uint32_t mpdu_failed;
 	uint32_t mpdu_success;

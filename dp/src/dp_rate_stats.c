@@ -414,6 +414,154 @@ wlan_peer_flush_tx_rate_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 	tx_stats->cur_cache_idx = 0;
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline uint32_t
+wlan_peer_get_bw_from_enum(uint32_t bw)
+{
+	uint32_t bw_value;
+
+	switch (bw) {
+	case CMN_BW_20MHZ:
+	case CMN_BW_40MHZ:
+	case CMN_BW_80MHZ:
+	case CMN_BW_160MHZ:
+		bw_value = GET_BW_FROM_BW_ENUM(bw);
+		break;
+	case CMN_BW_320MHZ:
+		bw_value = 320;
+		break;
+	default:
+		bw_value = 0;
+	}
+
+	return bw_value;
+}
+
+static inline uint32_t
+wlan_peer_get_punc_bw_from_punc_enum(uint8_t punc_bw)
+{
+	uint32_t ret = 0;
+
+	switch (punc_bw) {
+	case NO_PUNCTURE:
+	case PUNCTURED_20MHZ:
+	case PUNCTURED_40MHZ:
+		ret = 20 * punc_bw;
+		break;
+	case PUNCTURED_80MHZ:
+		ret = 80;
+		break;
+	case PUNCTURED_120MHZ:
+		ret = 120;
+		break;
+	default:
+		return ret;
+	}
+
+	return ret;
+}
+
+static inline void
+wlan_peer_flush_tx_punc_bw_stats(struct wlan_peer_tx_link_stats *tx_stats)
+{
+	uint8_t punc_bw_max_idx;
+
+	if (tx_stats->stats.num_ppdus) {
+		tx_stats->stats.punc_bw.usage_avg =
+					 tx_stats->stats.punc_bw.usage_total /
+					 tx_stats->stats.num_ppdus;
+		punc_bw_max_idx = tx_stats->stats.punc_bw.usage_max;
+		tx_stats->stats.punc_bw.usage_max =
+		(tx_stats->stats.punc_bw.usage_counter[punc_bw_max_idx] * 100) /
+		  tx_stats->stats.num_ppdus;
+	}
+}
+
+static inline void
+wlan_peer_flush_rx_punc_bw_stats(struct wlan_peer_rx_link_stats *rx_stats)
+{
+	uint8_t punc_bw_max_idx;
+
+	if (rx_stats->stats.num_ppdus) {
+		rx_stats->stats.punc_bw.usage_avg =
+			rx_stats->stats.punc_bw.usage_total /
+			rx_stats->stats.num_ppdus;
+		punc_bw_max_idx = rx_stats->stats.punc_bw.usage_max;
+		rx_stats->stats.punc_bw.usage_max =
+		(rx_stats->stats.punc_bw.usage_counter[punc_bw_max_idx] * 100) /
+		 rx_stats->stats.num_ppdus;
+	}
+}
+
+static inline void
+wlan_peer_update_tx_punc_bw_stats(struct wlan_tx_link_stats *tx_stats,
+				  struct cdp_tx_completion_ppdu_user *ppdu_user)
+{
+	tx_stats->punc_bw.usage_total +=
+		wlan_peer_get_punc_bw_from_punc_enum(ppdu_user->punc_mode);
+
+	if (ppdu_user->punc_mode < MAX_PUNCTURED_MODE) {
+		if (tx_stats->punc_bw.usage_max < ppdu_user->punc_mode)
+			tx_stats->punc_bw.usage_max = ppdu_user->punc_mode;
+		tx_stats->punc_bw.usage_counter[ppdu_user->punc_mode]++;
+	}
+
+}
+
+static inline void
+wlan_peer_update_rx_punc_bw_stats(struct wlan_rx_link_stats *rx_stats,
+				  struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{
+	rx_stats->punc_bw.usage_total +=
+		wlan_peer_get_punc_bw_from_punc_enum(cdp_rx_ppdu->punc_bw);
+
+	if (cdp_rx_ppdu->punc_bw < MAX_PUNCTURED_MODE) {
+		if (rx_stats->punc_bw.usage_max < cdp_rx_ppdu->punc_bw)
+			rx_stats->punc_bw.usage_max =
+				cdp_rx_ppdu->punc_bw;
+		rx_stats->punc_bw.usage_counter[cdp_rx_ppdu->punc_bw]++;
+	}
+
+}
+#else
+static inline uint32_t
+wlan_peer_get_bw_from_enum(uint32_t bw)
+{
+	uint32_t bw_value;
+
+	switch (bw) {
+	case CMN_BW_20MHZ:
+	case CMN_BW_40MHZ:
+	case CMN_BW_80MHZ:
+	case CMN_BW_160MHZ:
+		bw_value = GET_BW_FROM_BW_ENUM(bw);
+		break;
+	default:
+		bw_value = 0;
+	}
+
+	return bw_value;
+}
+
+static inline void
+wlan_peer_flush_tx_punc_bw_stats(struct wlan_peer_tx_link_stats *tx_stats)
+{ }
+
+static inline void
+wlan_peer_flush_rx_punc_bw_stats(struct wlan_peer_rx_link_stats *rx_stats)
+{ }
+
+static inline void
+wlan_peer_update_tx_punc_bw_stats(struct wlan_tx_link_stats *tx_stats,
+				  struct cdp_tx_completion_ppdu_user *ppdu_user)
+{ }
+
+static inline void
+wlan_peer_update_rx_punc_bw_stats(struct wlan_rx_link_stats *rx_stats,
+				  struct cdp_rx_indication_ppdu *cdp_rx_ppdu)
+{ }
+#endif
+
 static void
 wlan_peer_flush_tx_link_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			      struct wlan_peer_rate_stats_ctx *stats_ctx)
@@ -460,6 +608,7 @@ wlan_peer_flush_tx_link_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			 tx_stats->stats.num_ppdus;
 	}
 
+	wlan_peer_flush_tx_punc_bw_stats(tx_stats);
 	if (tx_stats->stats.mpdu_success)
 		tx_stats->stats.pkt_error_rate =
 			(tx_stats->stats.mpdu_failed * 100) /
@@ -517,6 +666,7 @@ wlan_peer_flush_rx_link_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 			 rx_stats->stats.num_ppdus;
 	}
 
+	wlan_peer_flush_rx_punc_bw_stats(rx_stats);
 	if (rx_stats->stats.num_mpdus)
 		rx_stats->stats.pkt_error_rate =
 					(rx_stats->stats.mpdu_retries * 100) /
@@ -666,14 +816,15 @@ wlan_peer_update_tx_link_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 				tx_stats->mu_mimo_usage++;
 		}
 
-		tx_stats->bw.usage_total += GET_BW_FROM_BW_ENUM(ppdu_user->bw);
-
+		tx_stats->bw.usage_total +=
+				wlan_peer_get_bw_from_enum(ppdu_user->bw);
 		if (ppdu_user->bw < BW_USAGE_MAX_SIZE) {
 			if (tx_stats->bw.usage_max < ppdu_user->bw)
 				tx_stats->bw.usage_max = ppdu_user->bw;
 			tx_stats->bw.usage_counter[ppdu_user->bw]++;
 		}
 
+		wlan_peer_update_tx_punc_bw_stats(tx_stats, ppdu_user);
 		if (ppdu_user->ack_rssi_valid)
 			qdf_ewma_rx_rssi_add(&tx_stats->ack_rssi,
 					     ppdu_user->usr_ack_rssi);
@@ -743,14 +894,14 @@ wlan_peer_update_rx_link_stats(struct wlan_soc_rate_stats_ctx *soc_stats_ctx,
 		}
 
 		rx_stats->bw.usage_total +=
-					GET_BW_FROM_BW_ENUM(cdp_rx_ppdu->u.bw);
-
+				wlan_peer_get_bw_from_enum(cdp_rx_ppdu->u.bw);
 		if (cdp_rx_ppdu->u.bw < BW_USAGE_MAX_SIZE) {
 			if (rx_stats->bw.usage_max < cdp_rx_ppdu->u.bw)
 				rx_stats->bw.usage_max = cdp_rx_ppdu->u.bw;
 			rx_stats->bw.usage_counter[cdp_rx_ppdu->u.bw]++;
 		}
 
+		wlan_peer_update_rx_punc_bw_stats(rx_stats, cdp_rx_ppdu);
 		STATS_CTX_LOCK_RELEASE(&soc_stats_ctx->rx_ctx_lock);
 	}
 }

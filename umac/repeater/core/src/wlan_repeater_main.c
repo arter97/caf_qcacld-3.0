@@ -166,10 +166,8 @@ wlan_rptr_core_register_ext_cb(struct rptr_ext_cbacks *ext_cbacks)
 		g_priv->ext_cbacks.pdev_update_beacon =
 				ext_cbacks->pdev_update_beacon;
 		g_priv->ext_cbacks.target_lithium = ext_cbacks->target_lithium;
-#if REPEATER_SAME_SSID
 		g_priv->ext_cbacks.dessired_ssid_found =
 				ext_cbacks->dessired_ssid_found;
-#endif
 #if DBDC_REPEATER_SUPPORT
 		g_priv->ext_cbacks.legacy_dbdc_flags_get =
 				ext_cbacks->legacy_dbdc_flags_get;
@@ -497,6 +495,9 @@ wlan_rptr_get_rootap_bssid(void *arg, wlan_scan_entry_t se)
 	struct wlan_objmgr_vdev *vdev = (struct wlan_objmgr_vdev *)arg;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct wlan_rptr_global_priv *g_priv = wlan_rptr_get_global_ctx();
+#endif
 	u8 *extender_ie;
 	u8 *bssid;
 
@@ -516,6 +517,15 @@ wlan_rptr_get_rootap_bssid(void *arg, wlan_scan_entry_t se)
 			bssid = util_scan_entry_bssid(se);
 			qdf_mem_copy(pdev_priv->preferred_bssid, bssid,
 				  QDF_MAC_ADDR_SIZE);
+#ifdef WLAN_FEATURE_11BE_MLO
+			if (!IS_NULL_ADDR(se->ml_info.mld_mac_addr.bytes)) {
+				RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
+				qdf_mem_copy(g_priv->preferred_mlo_bssid,
+					     se->ml_info.mld_mac_addr.bytes,
+					     QDF_MAC_ADDR_SIZE);
+				RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
+			}
+#endif
 		}
 	}
 	return QDF_STATUS_SUCCESS;
@@ -600,6 +610,13 @@ wlan_rptr_process_scan_entries(void *arg, wlan_scan_entry_t se)
 		}
 	}
 	OS_MEMCPY(pdev_priv->preferred_bssid, bssid, QDF_MAC_ADDR_SIZE);
+#ifdef WLAN_FEATURE_11BE_MLO
+	if (!IS_NULL_ADDR(se->ml_info.mld_mac_addr.bytes)) {
+		qdf_mem_copy(g_priv->preferred_mlo_bssid,
+			     se->ml_info.mld_mac_addr.bytes,
+			     QDF_MAC_ADDR_SIZE);
+	}
+#endif
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 	return QDF_STATUS_SUCCESS;
 }
@@ -638,11 +655,19 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 			ucfg_scan_db_iterate(pdev, wlan_rptr_get_rootap_bssid,
 					     (void *)vdev);
 			if (!IS_NULL_ADDR(pdev_priv->preferred_bssid)) {
-				RPTR_LOGI("RPTR sending event with preferred RootAP bssid:%s vdev_id:%d",
-					  ether_sprintf(pdev_priv->preferred_bssid),
-					  wlan_vdev_get_id(vdev));
-				ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
+				if (!IS_NULL_ADDR(g_priv->preferred_mlo_bssid)) {
+					RPTR_LOGI("RPTR sending event with preferred MLO RootAP bssid:%s vdev_id:%d",
+							ether_sprintf(g_priv->preferred_mlo_bssid),
+							wlan_vdev_get_id(vdev));
+					ext_cb->rptr_send_event(vdev, g_priv->preferred_mlo_bssid,
+							QDF_MAC_ADDR_SIZE, IEEE80211_EV_PREFERRED_MLO_BSSID);
+				} else {
+					RPTR_LOGI("RPTR sending event with preferred RootAP bssid:%s vdev_id:%d",
+							ether_sprintf(pdev_priv->preferred_bssid),
+							wlan_vdev_get_id(vdev));
+					ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
 							QDF_MAC_ADDR_SIZE, IEEE80211_EV_PREFERRED_BSSID);
+				}
 			} else {
 				RPTR_GLOBAL_LOCK(&g_priv->rptr_global_lock);
 				ss_info = &g_priv->ss_info;
@@ -664,11 +689,19 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 				RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 				ucfg_scan_db_iterate(pdev, wlan_rptr_process_scan_entries, (void *)vdev);
 				if (!IS_NULL_ADDR(pdev_priv->preferred_bssid)) {
-					RPTR_LOGI("RPTR sending event with preferred Repeater bssid:%s vdev_id:%d",
-						  ether_sprintf(pdev_priv->preferred_bssid),
-						  wlan_vdev_get_id(vdev));
-					ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
+					if (!IS_NULL_ADDR(g_priv->preferred_mlo_bssid)) {
+						RPTR_LOGI("RPTR sending event with preferred Repeater MLO bssid:%s vdev_id:%d",
+								ether_sprintf(g_priv->preferred_mlo_bssid),
+								wlan_vdev_get_id(vdev));
+						ext_cb->rptr_send_event(vdev, g_priv->preferred_mlo_bssid,
+								QDF_MAC_ADDR_SIZE, IEEE80211_EV_PREFERRED_MLO_BSSID);
+					} else {
+						RPTR_LOGI("RPTR sending event with preferred Repeater bssid:%s vdev_id:%d",
+								ether_sprintf(pdev_priv->preferred_bssid),
+								wlan_vdev_get_id(vdev));
+						ext_cb->rptr_send_event(vdev, pdev_priv->preferred_bssid,
 								QDF_MAC_ADDR_SIZE, IEEE80211_EV_PREFERRED_BSSID);
+					}
 				}
 			}
 		}
@@ -839,6 +872,24 @@ wlan_rptr_core_pdev_pref_uplink_get(struct wlan_objmgr_pdev *pdev,
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+struct wlan_objmgr_vdev *
+wlan_rptr_core_pdev_get_stavdev(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_vdev_priv *vdev_priv = NULL;
+
+	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
+	if (pdev_priv) {
+		vdev_priv = pdev_priv->sta_vdev;
+		if (vdev_priv)
+			return vdev_priv->vdev;
+		return NULL;
+	}
+	return NULL;
+}
+#endif
+
 void wlan_rptr_core_global_disconnect_timeout_set(u32 value)
 {
 	struct wlan_rptr_global_priv *g_priv = NULL;
@@ -950,33 +1001,47 @@ wlan_rptr_vdev_attach(
 
 	}
 
-	if ((opmode == QDF_STA_MODE) && (flags & IEEE80211_CLONE_MACADDR)) {
-		if (!(flags & IEEE80211_WRAP_NON_MAIN_STA)) {
-			/*
-			 * Main ProxySTA VAP for uplink WPS PBC and
-			 * downlink multicast receive.
-			 */
-			wlan_rptr_vdev_set_mpsta(vdev);
-			wlan_rptr_pdev_set_qwrap(pdev);
-		} else {
-			/*
-			 * Generally, non-Main ProxySTA VAP's don't need to
-			 * register umac event handlers. We can save some memory
-			 * space by doing so. This is required to be done before
-			 * ieee80211_vap_setup. However we still give the scan
-			 * capability to the first ATH_NSCAN_PSTA_VAPS non-Main
-			 * PSTA VAP's. This optimizes the association speed for
-			 * the first several PSTA VAP's (common case).
-			 */
-			if (pdev_priv) {
-				if (pdev_priv->nscanpsta >= ATH_NSCAN_PSTA_VAPS)
-					wlan_rptr_vdev_set_no_event(vdev);
-				else
-					pdev_priv->nscanpsta++;
+	if (opmode == QDF_STA_MODE) {
+		if (flags & IEEE80211_CLONE_MACADDR) {
+			if (!(flags & IEEE80211_WRAP_NON_MAIN_STA)) {
+				/*
+				 * Main ProxySTA VAP for uplink WPS PBC and
+				 * downlink multicast receive.
+				 */
+				wlan_rptr_vdev_set_mpsta(vdev);
+				wlan_rptr_pdev_set_qwrap(pdev);
+#ifdef WLAN_FEATURE_11BE_MLO
+				pdev_priv->sta_vdev = vdev_priv;
+#endif
+			} else {
+				/*
+				 * Generally, non-Main ProxySTA VAP's don't
+				 * need to register umac event handlers. We can
+				 * save some memory space by doing so. This is
+				 * required to be done before
+				 * ieee80211_vap_setup. However we still give
+				 * the scan capability to the first
+				 * ATH_NSCAN_PSTA_VAPS non-Main PSTA VAP's.
+				 * This optimizes the association speed for
+				 * the first several PSTA VAP's (common case).
+				 */
+				if (pdev_priv) {
+					if (pdev_priv->nscanpsta >=
+					    ATH_NSCAN_PSTA_VAPS)
+						wlan_rptr_vdev_set_no_event(
+									vdev);
+					else
+						pdev_priv->nscanpsta++;
+				}
 			}
+			wlan_rptr_vdev_set_psta(vdev);
+		} else {
+#ifdef WLAN_FEATURE_11BE_MLO
+			pdev_priv->sta_vdev = vdev_priv;
+#endif
 		}
-		wlan_rptr_vdev_set_psta(vdev);
 	}
+
 	if (flags & IEEE80211_CLONE_MATADDR)
 		wlan_rptr_vdev_set_mat(vdev);
 
@@ -998,6 +1063,9 @@ void wlan_rptr_vdev_detach(
 {
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+#ifdef WLAN_FEATURE_11BE_MLO
+	enum QDF_OPMODE opmode;
+#endif
 
 	pdev_priv = wlan_rptr_get_pdev_priv(pdev);
 	if (pdev_priv) {
@@ -1008,6 +1076,19 @@ void wlan_rptr_vdev_detach(
 			}
 		}
 	}
+
+#ifdef WLAN_FEATURE_11BE_MLO
+	opmode = wlan_vdev_mlme_get_opmode(vdev);
+	if (pdev_priv && opmode == QDF_STA_MODE) {
+		if (wlan_rptr_vdev_is_psta(vdev)) {
+			if (wlan_rptr_vdev_is_mpsta(vdev)) {
+				pdev_priv->sta_vdev = NULL;
+			}
+		} else {
+			pdev_priv->sta_vdev = NULL;
+		}
+	}
+#endif
 }
 #endif
 
@@ -1400,9 +1481,7 @@ QDF_STATUS wlan_repeater_init(void)
 	rptr_ext_cbacks.target_lithium = wlan_target_lithium;
 	rptr_ext_cbacks.peer_disassoc = wlan_peer_disassoc;
 	rptr_ext_cbacks.pdev_update_beacon = wlan_pdev_update_beacon;
-#if REPEATER_SAME_SSID
 	rptr_ext_cbacks.dessired_ssid_found = wlan_dessired_ssid_found;
-#endif
 #if DBDC_REPEATER_SUPPORT
 	rptr_ext_cbacks.legacy_dbdc_flags_get = wlan_legacy_dbdc_flags_get;
 	rptr_ext_cbacks.max_pri_stavap_process_up = wlan_max_pri_stavap_process_up;

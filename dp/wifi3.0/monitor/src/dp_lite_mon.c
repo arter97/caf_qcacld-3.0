@@ -399,14 +399,18 @@ static QDF_STATUS
 dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 			  struct cdp_lite_mon_filter_config *config)
 {
+	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 	struct dp_mon_pdev_be *be_mon_pdev =
 			(struct dp_mon_pdev_be *)be_pdev->pdev.monitor_pdev;
 	struct dp_lite_mon_tx_config *lite_mon_tx_config;
+	struct dp_soc *soc = (struct dp_soc *)be_pdev->pdev.soc;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	uint16_t num_of_buffers;
 
 	if (!be_mon_pdev)
 		return QDF_STATUS_E_FAILURE;
 
+	soc_cfg_ctx = soc->wlan_cfg_ctx;
 	lite_mon_tx_config = be_mon_pdev->lite_mon_tx_config;
 	if (lite_mon_tx_config->tx_config.enable == !config->disable) {
 		dp_mon_err("Tx lite mon already enabled/disabled");
@@ -458,7 +462,10 @@ dp_lite_mon_set_tx_config(struct dp_pdev_be *be_pdev,
 		if (dp_lite_mon_is_full_len_configured(config->len[WLAN_FC0_TYPE_DATA],
 						       config->len[WLAN_FC0_TYPE_MGMT],
 						       config->len[WLAN_FC0_TYPE_CTRL])) {
-			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev);
+			num_of_buffers = wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
+			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev, num_of_buffers);
+		} else {
+			dp_vdev_set_monitor_mode_buf_rings_tx_2_0(&be_pdev->pdev, DP_MON_RING_FILL_LEVEL_DEFAULT);
 		}
 
 		/* setupt tx lite mon filters */
@@ -1248,7 +1255,7 @@ dp_lite_mon_type_subtype_check(struct hal_rx_ppdu_info *ppdu_info,
 /**
  * dp_lite_mon_rx_filter_check - check if mpdu rcvd match filter setting
  * @ppdu_info: ppdu info context
- * @config: current lite mon config
+ * @config: current lite mon rx config
  * @user: user id
  * @mpdu: mpdu nbuf
  *
@@ -1256,7 +1263,7 @@ dp_lite_mon_type_subtype_check(struct hal_rx_ppdu_info *ppdu_info,
  */
 static QDF_STATUS
 dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
-			    struct dp_lite_mon_config *config,
+			    struct dp_lite_mon_rx_config *config,
 			    uint8_t user, qdf_nbuf_t mpdu)
 {
 	uint8_t filter_category;
@@ -1264,23 +1271,30 @@ dp_lite_mon_rx_filter_check(struct hal_rx_ppdu_info *ppdu_info,
 	filter_category = ppdu_info->rx_user_status[user].filter_category;
 	switch (filter_category) {
 	case DP_MPDU_FILTER_CATEGORY_FP:
-		if (config->fp_enabled &&
-		    (!config->peer_count || !config->fpmo_enabled))
-			return dp_lite_mon_type_subtype_check(ppdu_info, config,
-							      DP_MON_FRM_FILTER_MODE_FP,
-							      mpdu);
+		if (config->rx_config.fp_enabled &&
+		    (!config->rx_config.peer_count ||
+		     !config->rx_config.fpmo_enabled)) {
+			if (config->fp_type_subtype_filter_all)
+				return QDF_STATUS_SUCCESS;
+			else
+				return dp_lite_mon_type_subtype_check(ppdu_info,
+								      &config->rx_config,
+								      DP_MON_FRM_FILTER_MODE_FP,
+								      mpdu);
+		}
 		break;
 	case DP_MPDU_FILTER_CATEGORY_MD:
-		if (config->md_enabled)
+		if (config->rx_config.md_enabled)
 			return QDF_STATUS_SUCCESS;
 		break;
 	case DP_MPDU_FILTER_CATEGORY_MO:
-		if (config->mo_enabled &&
-		    (!config->peer_count || !config->md_enabled))
+		if (config->rx_config.mo_enabled &&
+		    (!config->rx_config.peer_count ||
+		     !config->rx_config.md_enabled))
 			return QDF_STATUS_SUCCESS;
 		break;
 	case DP_MPDU_FILTER_CATEGORY_FP_MO:
-		if (config->fpmo_enabled)
+		if (config->rx_config.fpmo_enabled)
 			return QDF_STATUS_SUCCESS;
 		break;
 	}
@@ -1565,7 +1579,8 @@ dp_lite_mon_rx_mpdu_process(struct dp_pdev *pdev,
 	}
 
 	if (QDF_STATUS_SUCCESS !=
-		dp_lite_mon_rx_filter_check(ppdu_info, config,
+		dp_lite_mon_rx_filter_check(ppdu_info,
+					    lite_mon_rx_config,
 					    user, mon_mpdu)) {
 		/* mpdu did not pass filter check drop and return success */
 		qdf_spin_unlock_bh(&lite_mon_rx_config->lite_mon_rx_lock);

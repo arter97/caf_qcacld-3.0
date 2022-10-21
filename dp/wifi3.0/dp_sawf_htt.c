@@ -106,7 +106,7 @@ dp_htt_h2t_sawf_def_queues_map_req(struct htt_soc *soc,
 	HTT_H2T_MSG_TYPE_SET(*msg_word,
 			     HTT_H2T_SAWF_DEF_QUEUES_MAP_REQ);
 	HTT_RX_SAWF_DEF_QUEUES_MAP_REQ_SVC_CLASS_ID_SET(*msg_word,
-							svc_class_id);
+							svc_class_id - 1);
 	HTT_RX_SAWF_DEF_QUEUES_MAP_REQ_PEER_ID_SET(*msg_word, peer_id);
 
 	pkt = htt_htc_pkt_alloc(soc);
@@ -177,7 +177,8 @@ dp_htt_h2t_sawf_def_queues_unmap_req(struct htt_soc *soc,
 
 	HTT_H2T_MSG_TYPE_SET(*msg_word,
 			     HTT_H2T_SAWF_DEF_QUEUES_UNMAP_REQ);
-	HTT_RX_SAWF_DEF_QUEUES_UNMAP_REQ_SVC_CLASS_ID_SET(*msg_word, svc_id);
+	HTT_RX_SAWF_DEF_QUEUES_UNMAP_REQ_SVC_CLASS_ID_SET(*msg_word,
+							  svc_id - 1);
 	HTT_RX_SAWF_DEF_QUEUES_UNMAP_REQ_PEER_ID_SET(*msg_word, peer_id);
 
 	pkt = htt_htc_pkt_alloc(soc);
@@ -328,6 +329,7 @@ dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
 		++msg_word;
 		tid = HTT_T2H_SAWF_DEF_QUEUES_MAP_REPORT_CONF_TID_GET(*msg_word);
 		svc_class_id = HTT_T2H_SAWF_DEF_QUEUES_MAP_REPORT_CONF_SVC_CLASS_ID_GET(*msg_word);
+		svc_class_id += 1;
 		qdf_info("peer id %u tid 0x%x svc_class_id %u",
 			 peer_id, tid, svc_class_id);
 		qdf_assert(tid < DP_SAWF_MAX_TIDS);
@@ -426,6 +428,7 @@ dp_htt_sawf_msduq_map(struct htt_soc *soc, uint32_t *msg_word,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef CONFIG_SAWF_STATS
 QDF_STATUS
 dp_sawf_htt_h2t_mpdu_stats_req(struct htt_soc *soc,
 			       uint8_t stats_type, uint8_t enable,
@@ -625,3 +628,31 @@ dp_sawf_htt_mpdu_stats_handler(struct htt_soc *soc,
 
 	return QDF_STATUS_SUCCESS;
 }
+#else
+QDF_STATUS
+dp_sawf_htt_h2t_mpdu_stats_req(struct htt_soc *soc,
+			       uint8_t stats_type, uint8_t enable,
+			       uint32_t config_param0,
+			       uint32_t config_param1,
+			       uint32_t config_param2,
+			       uint32_t config_param3)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static void dp_sawf_htt_gen_mpdus_tlv(struct dp_soc *soc, uint8_t *tlv_buf)
+{
+}
+
+static void dp_sawf_htt_gen_mpdus_details_tlv(struct dp_soc *soc,
+					      uint8_t *tlv_buf)
+{
+}
+
+QDF_STATUS
+dp_sawf_htt_mpdu_stats_handler(struct htt_soc *soc,
+			       qdf_nbuf_t htt_t2h_msg)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
