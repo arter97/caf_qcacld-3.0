@@ -327,11 +327,14 @@ send_twt_nudge_dialog_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->dialog_id = params->dialog_id;
 	cmd->suspend_duration_ms = params->suspend_duration / 1000;
 	cmd->next_twt_size = params->next_twt_size;
+	cmd->sp_start_offset = params->sp_start_offset;
 
 	wmi_debug("vdev_id: %d dialog_id: %d duration(in ms): %u next_twt_size: %d "
-		  "peer_macaddr: "QDF_MAC_ADDR_FMT, cmd->vdev_id,
-		  cmd->dialog_id, cmd->suspend_duration_ms, cmd->next_twt_size,
-		  QDF_MAC_ADDR_REF(params->peer_macaddr.bytes));
+		  "peer_macaddr: " QDF_MAC_ADDR_FMT " sp_start_offset: %d",
+		  cmd->vdev_id, cmd->dialog_id, cmd->suspend_duration_ms,
+		  cmd->next_twt_size,
+		  QDF_MAC_ADDR_REF(params->peer_macaddr.bytes),
+		  cmd->sp_start_offset);
 
 	status = wmi_unified_cmd_send(wmi_handle, buf, sizeof(*cmd),
 				      WMI_TWT_NUDGE_DIALOG_CMDID);
@@ -672,6 +675,10 @@ static QDF_STATUS extract_twt_add_dialog_comp_additional_parameters
 				param_buf->twt_params[idx].sp_tsf_us_lo;
 	additional_params->sp_tsf_us_hi =
 				param_buf->twt_params[idx].sp_tsf_us_hi;
+	additional_params->pm_responder_bit_valid =
+				TWT_FLAGS_GET_PM_RESPONDER_MODE_VALID(flags);
+	additional_params->pm_responder_bit =
+				TWT_FLAGS_GET_PM_RESPONDER_MODE(flags);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1095,6 +1102,10 @@ extract_twt_session_stats_event_data(wmi_unified_t wmi_handle,
 	session->protection = WMI_TWT_SESSION_FLAG_TWT_PROTECTION_GET(flags);
 	session->info_frame_disabled =
 			WMI_TWT_SESSION_FLAG_TWT_INFO_FRAME_DISABLED_GET(flags);
+	session->pm_responder_bit =
+			WMI_TWT_SESSION_FLAG_TWT_PM_RESPONDER_MODE_GET(flags);
+	session->pm_responder_bit_valid =
+		WMI_TWT_SESSION_FLAG_TWT_PM_RESPONDER_MODE_VALID_GET(flags);
 	session->dialog_id = twt_session->dialog_id;
 	session->wake_dura_us = twt_session->wake_dura_us;
 	session->wake_intvl_us = twt_session->wake_intvl_us;
@@ -1106,6 +1117,8 @@ extract_twt_session_stats_event_data(wmi_unified_t wmi_handle,
 		 session->bcast, session->trig,
 		 session->announ, session->dialog_id, session->wake_dura_us,
 		 session->wake_intvl_us, session->sp_offset_us);
+	wmi_debug("resp_pm_valid=%d resp_pm=%d",
+		  session->pm_responder_bit_valid, session->pm_responder_bit);
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -1048,6 +1048,7 @@ dp_rx_defrag_nwifi_to_8023(struct dp_soc *soc, struct dp_txrx_peer *txrx_peer,
 	union dp_align_mac_addr mac_addr;
 	uint8_t *rx_desc_info = qdf_mem_malloc(soc->rx_pkt_tlv_size);
 	struct dp_rx_tid_defrag *rx_tid = &txrx_peer->rx_tid[tid];
+	struct ieee80211_frame_addr4 wh = {0};
 
 	hal_rx_tlv_get_pn_num(soc->hal_soc, qdf_nbuf_data(nbuf), rx_tid->pn128);
 
@@ -1059,6 +1060,11 @@ dp_rx_defrag_nwifi_to_8023(struct dp_soc *soc, struct dp_txrx_peer *txrx_peer,
 		QDF_ASSERT(0);
 		return;
 	}
+
+	qdf_mem_zero(&wh, sizeof(struct ieee80211_frame_addr4));
+	if (hal_rx_get_mpdu_mac_ad4_valid(soc->hal_soc, qdf_nbuf_data(nbuf)))
+		qdf_mem_copy(&wh, qdf_nbuf_data(nbuf) + soc->rx_pkt_tlv_size,
+			     hdrsize);
 
 	qdf_mem_copy(rx_desc_info, qdf_nbuf_data(nbuf), soc->rx_pkt_tlv_size);
 
@@ -1115,10 +1121,8 @@ dp_rx_defrag_nwifi_to_8023(struct dp_soc *soc, struct dp_txrx_peer *txrx_peer,
 				      &mac_addr.raw[0]);
 		qdf_mem_copy(eth_hdr->dest_addr, &mac_addr.raw[0],
 			QDF_MAC_ADDR_SIZE);
-		hal_rx_mpdu_get_addr4(soc->hal_soc, rx_desc_info,
-				      &mac_addr.raw[0]);
-		qdf_mem_copy(eth_hdr->src_addr, &mac_addr.raw[0],
-			QDF_MAC_ADDR_SIZE);
+		qdf_mem_copy(eth_hdr->src_addr, &wh.i_addr4[0],
+			     QDF_MAC_ADDR_SIZE);
 		break;
 
 	default:
@@ -1336,12 +1340,11 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	dp_ipa_handle_rx_buf_smmu_mapping(soc, head,
-					  rx_desc_pool->buf_size,
-					  true);
+	dp_ipa_handle_rx_buf_smmu_mapping(soc, head, rx_desc_pool->buf_size,
+					  true, __func__, __LINE__);
 
 	/*
-	 * As part of rx frag handler bufffer was unmapped and rx desc
+	 * As part of rx frag handler buffer was unmapped and rx desc
 	 * unmapped is set to 1. So again for defrag reinject frame reset
 	 * it back to 0.
 	 */
@@ -1387,9 +1390,10 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 	qdf_mem_zero(ent_mpdu_desc_info, sizeof(uint32_t));
 
 	mpdu_wrd = (uint32_t *)dst_mpdu_desc_info;
-	seq_no = hal_rx_get_rx_sequence(soc->hal_soc, qdf_nbuf_data(head));
+	seq_no = hal_rx_get_rx_sequence(soc->hal_soc, rx_desc->rx_buf_start);
 
-	hal_mpdu_desc_info_set(soc->hal_soc, ent_mpdu_desc_info, seq_no);
+	hal_mpdu_desc_info_set(soc->hal_soc, ent_ring_desc, ent_mpdu_desc_info,
+			       seq_no);
 	/* qdesc addr */
 	ent_qdesc_addr = hal_get_reo_ent_desc_qdesc_addr(soc->hal_soc,
 						(uint8_t *)ent_ring_desc);

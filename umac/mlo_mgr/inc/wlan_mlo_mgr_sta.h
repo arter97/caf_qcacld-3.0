@@ -29,7 +29,6 @@
 
 /**
  * mlo_connect - Start the connection process
- *
  * @vdev: pointer to vdev
  * @req: connection request
  *
@@ -41,7 +40,6 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 /**
  * mlo_sta_link_connect_notify - Called by connection manager to notify the
  * STA link connect is complete
- *
  * @vdev: pointer to vdev
  * @mlo_ie: MLO information element
  *
@@ -56,7 +54,6 @@ mlo_sta_link_connect_notify(struct wlan_objmgr_vdev *vdev,
 
 /**
  * mlo_disconnect - Start the disconnection process
- *
  * @vdev: pointer to vdev
  * @source: source of the request (can be connect or disconnect request)
  * @reason_code: reason for disconnect
@@ -71,7 +68,6 @@ QDF_STATUS mlo_disconnect(struct wlan_objmgr_vdev *vdev,
 
 /**
  * mlo_sync_disconnect - Start the sync disconnection process
- *
  * @vdev: pointer to vdev
  * @source: source of the request (can be connect or disconnect request)
  * @reason_code: reason for disconnect
@@ -86,7 +82,6 @@ QDF_STATUS mlo_sync_disconnect(struct wlan_objmgr_vdev *vdev,
 
 /**
  * mlo_sta_link_disconn_notify - Notifies that STA link disconnect completion
- *
  * @vdev: pointer to vdev
  * @resp: disconnect resp
  *
@@ -97,7 +92,6 @@ void mlo_sta_link_disconn_notify(struct wlan_objmgr_vdev *vdev,
 
 /**
  * mlo_is_mld_sta - Check if MLD associated with the vdev is a station
- *
  * @vdev: pointer to vdev
  *
  * Return: true if MLD is a station, false otherwise
@@ -106,7 +100,6 @@ bool mlo_is_mld_sta(struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_mlo_is_mld_disconnected - Check whether MLD is disconnected
- *
  * @vdev: pointer to vdev
  *
  * Return: true if mld is disconnected, false otherwise
@@ -116,7 +109,6 @@ bool ucfg_mlo_is_mld_disconnected(struct wlan_objmgr_vdev *vdev);
 #ifndef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /**
  * ucfg_mlo_is_mld_connected - Check whether MLD is connected
- *
  * @vdev: pointer to vdev
  *
  * Return: true if mld is connected, false otherwise
@@ -125,7 +117,6 @@ bool ucfg_mlo_is_mld_connected(struct wlan_objmgr_vdev *vdev);
 
 /**
  * ucfg_mlo_mld_clear_mlo_cap - Clear MLO cap for all vdevs in MLD
- *
  * @vdev: pointer to vdev
  *
  * Return: None
@@ -133,9 +124,8 @@ bool ucfg_mlo_is_mld_connected(struct wlan_objmgr_vdev *vdev);
 void ucfg_mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev);
 #endif
 
-/*
+/**
  * ucfg_mlo_get_assoc_link_vdev - API to get assoc link vdev
- *
  * @mlo_dev_ctx: mlo dev ctx
  *
  * Return: MLD assoc link vdev
@@ -143,9 +133,8 @@ void ucfg_mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev);
 struct wlan_objmgr_vdev *
 ucfg_mlo_get_assoc_link_vdev(struct wlan_objmgr_vdev *vdev);
 
-/*
+/**
  * wlan_mlo_get_assoc_link_vdev - API to get assoc link vdev
- *
  * @mlo_dev_ctx: mlo dev ctx
  *
  * Return: MLD assoc link vdev
@@ -153,9 +142,8 @@ ucfg_mlo_get_assoc_link_vdev(struct wlan_objmgr_vdev *vdev);
 struct wlan_objmgr_vdev *
 wlan_mlo_get_assoc_link_vdev(struct wlan_objmgr_vdev *vdev);
 
-/*
+/**
  * mlo_update_connected_links_bmap: update connected links bitmap
- *
  * @mlo_dev_ctx: mlo dev context ptr
  * @ml_partner_info: ml parnter info ptr
  *
@@ -165,18 +153,17 @@ void
 mlo_update_connected_links_bmap(struct wlan_mlo_dev_context *mlo_dev_ctx,
 				struct mlo_partner_info ml_parnter_info);
 
-/*
+/**
  * API to have operation on ml vdevs
  */
 typedef void (*mlo_vdev_op_handler)(struct wlan_objmgr_vdev *vdev,
 				    void *arg);
 
-/*
+/**
  * mlo_iterate_connected_vdev_list: Iterate on connected ML links
- *
  * @vdev: vdev object
  * @handler: the handler will be called for each object in ML list
- * @arg: argumet to be passed to handler
+ * @arg: argument to be passed to handler
  *
  * Return: none
  */
@@ -206,9 +193,98 @@ void mlo_iterate_connected_vdev_list(struct wlan_objmgr_vdev *vdev,
 	}
 }
 
-/*
- * mlo_update_connect_req_links: update connect req links index
+/**
+ * call_handler_for_standalone_ap: Iterate on all standalone ML vdevs in
+ * ML AP context and call handler only for standalone AP
  *
+ * @vdev: vdev object
+ * @handler: the handler will be called for each object in ML list
+ * @arg: argument to be passed to handler
+ *
+ * Return: none
+ */
+static inline void
+call_handler_for_standalone_ap(struct wlan_mlo_dev_context *ap_dev_ctx,
+			       mlo_vdev_op_handler handler, void *arg)
+{
+	struct wlan_objmgr_vdev *ml_ap_vdev = NULL;
+	int i;
+
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		/* For each vdev in ML AP context, check if its PDEV has any
+		 * STA. If it doesn't, call the handler for that particular
+		 * VDEV.
+		 */
+		if (!ap_dev_ctx->wlan_vdev_list[i])
+			continue;
+		ml_ap_vdev = ap_dev_ctx->wlan_vdev_list[i];
+		handler(ml_ap_vdev, arg);
+	}
+}
+
+/*
+ * mlo_iterate_ml_standalone_vdev_list: Iterate on all standalone ML vdevs in
+ * ML link
+ *
+ * @vdev: vdev object
+ * @handler: the handler will be called for each object in ML list
+ * @arg: argument to be passed to handler
+ *
+ * Return: none
+ */
+static inline
+void mlo_iterate_ml_standalone_vdev_list(struct wlan_objmgr_vdev *vdev,
+					 mlo_vdev_op_handler handler,
+					 void *arg)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
+	struct wlan_mlo_sta *sta_ctx = NULL;
+	uint8_t i = 0;
+	struct wlan_objmgr_pdev *pdev = NULL;
+	struct wlan_objmgr_vdev *vdev_temp = NULL;
+	struct wlan_mlo_dev_context *ap_ml_ctx;
+	qdf_list_t *vdev_list;
+
+	if (!mlo_dev_ctx || !(wlan_vdev_mlme_is_mlo_vdev(vdev)) || !handler)
+		return;
+
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx)
+		return;
+
+	/* If repeater is configured as dependent WDS repeater,
+	 * bring up/bring down all the standalone AP vaps in it once all
+	 * the other AP vaps present in the AP ML context are up/down.
+	 */
+
+	for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (!mlo_dev_ctx->wlan_vdev_list[i])
+			continue;
+
+		pdev = wlan_vdev_get_pdev(mlo_dev_ctx->wlan_vdev_list[i]);
+		vdev_list = &pdev->pdev_objmgr.wlan_vdev_list;
+		vdev_temp = wlan_pdev_vdev_list_peek_head(vdev_list);
+		while (vdev_temp) {
+			// Get all VDEVs of the STA vap from its PDEV
+			if ((vdev_temp != vdev) &&
+			    wlan_vdev_mlme_get_opmode(vdev_temp) ==
+			    QDF_SAP_MODE) {
+				ap_ml_ctx = vdev_temp->mlo_dev_ctx;
+				if (!ap_ml_ctx)
+					return;
+
+				call_handler_for_standalone_ap(ap_ml_ctx,
+							       handler, arg);
+			}
+
+			vdev_temp = wlan_vdev_get_next_vdev_of_pdev(
+							vdev_list, vdev_temp);
+		}
+	}
+}
+
+/**
+ * mlo_update_connect_req_links: update connect req links index
  * @vdev: vdev object
  * @value: set/clear the bit
  *
@@ -242,9 +318,8 @@ mlo_update_connect_req_links(struct wlan_objmgr_vdev *vdev, uint8_t value)
 	}
 }
 
-/*
+/**
  * mlo_is_vdev_connect_req_link: API to check if vdev is in active connection
- *
  * @vdev: vdev object
  *
  * Return: true is vdev is participating in active connect else false
@@ -270,9 +345,8 @@ mlo_is_vdev_connect_req_link(struct wlan_objmgr_vdev *vdev)
 	return false;
 }
 
-/*
+/**
  * mlo_clear_connect_req_links: clear connect req links bitmap
- *
  * @vdev: vdev object
  *
  * Return: none
@@ -294,9 +368,8 @@ void mlo_clear_connect_req_links_bmap(struct wlan_objmgr_vdev *vdev)
 		     sizeof(sta_ctx->wlan_connect_req_links));
 }
 
-/*
+/**
  * mlo_update_connected_links: update connected links index
- *
  * @vdev: vdev object
  * @value: set/clear the bit
  *
@@ -329,9 +402,8 @@ mlo_update_connected_links(struct wlan_objmgr_vdev *vdev, uint8_t value)
 	}
 }
 
-/*
+/**
  * mlo_clear_connected_links: clear connected links bitmap
- *
  * @vdev: vdev object
  *
  * Return: none
@@ -355,9 +427,8 @@ void mlo_clear_connected_links_bmap(struct wlan_objmgr_vdev *vdev)
 }
 
 #ifndef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
-/*
+/**
  * mlo_get_ml_vdev_by_mac: get ml vdev from mac
- *
  * @vdev: vdev object
  * @macaddr: mac of vdev to be returned
  *
@@ -368,9 +439,26 @@ mlo_get_ml_vdev_by_mac(struct wlan_objmgr_vdev *vdev,
 		       struct qdf_mac_addr *macaddr);
 #endif
 
-/*
+/**
+ * mlo_set_keys_saved: set mlo keys saved bool for vdev
+ * @vdev: vdev object
+ * @mac_address: peer mac address
+ * @value: bool true or false
+ * Return: none
+ */
+void mlo_set_keys_saved(struct wlan_objmgr_vdev *vdev,
+			struct qdf_mac_addr *mac_address, bool value);
+
+/**
+ * mlo_get_keys_saved: get if mlo keys are saved for vdev
+ * @vdev: vdev object
+ * @mac_address: peer mac address
+ * Return: boolean value true or false
+ */
+bool mlo_get_keys_saved(struct wlan_objmgr_vdev *vdev, uint8_t *mac_address);
+
+/**
  * mlo_get_chan_freq_by_bssid - Get channel freq by bssid
- *
  * @pdev: pdev pointer
  * @bssid: link mac address
  *
@@ -382,7 +470,6 @@ mlo_get_chan_freq_by_bssid(struct wlan_objmgr_pdev *pdev,
 
 /**
  * mlo_get_assoc_rsp - Get Assoc response from mlo manager
- *
  * @vdev: vdev obj mgr
  * @assoc_rsp_frame: association response frame ptr
  *
@@ -395,7 +482,7 @@ void mlo_get_assoc_rsp(struct wlan_objmgr_vdev *vdev,
  * mlo_sta_save_quiet_status - save quiet status for given link of mlo station
  * @mlo_dev_ctx: mlo context
  * @link_id: link id
- * @quiet_status: True if quiet starts. False if quiet stopps.
+ * @quiet_status: True if quiet starts. False if quiet stops.
  *
  * Return: QDF_STATUS
  */
@@ -434,7 +521,6 @@ bool mlo_is_sta_inactivity_allowed_with_quiet(struct wlan_objmgr_psoc *psoc,
 
 /**
  * mlo_is_sta_csa_synced - Is mlo sta csa parameters are synced or not
- *
  * @mlo_dev_ctx: mlo context
  * @link_id: link id
  *
@@ -475,7 +561,6 @@ bool mlo_is_sta_csa_param_handled(struct wlan_objmgr_vdev *vdev,
 
 /**
  * mlo_internal_disconnect_links - Internal disconnect for connection manager
- *
  * @vdev: vdev obj mgr
  *
  * Return: none
@@ -624,6 +709,19 @@ void mlo_sta_get_vdev_list(struct wlan_objmgr_vdev *vdev,
 			   uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list)
 {
+}
+
+static inline
+void mlo_set_keys_saved(struct wlan_objmgr_vdev *vdev,
+			struct qdf_mac_addr *mac_address, bool value)
+{
+}
+
+static inline
+bool mlo_get_keys_saved(struct wlan_objmgr_vdev *vdev,
+			uint8_t *mac_address)
+{
+	return false;
 }
 #endif
 #endif

@@ -748,7 +748,7 @@ struct dp_txrx_pool_stats {
  * @cached: is the srng ring memory cached or un-cached memory
  * @irq: irq number of the srng ring
  * @num_entries: number of entries in the srng ring
- * @is_mem_prealloc: Is this srng memeory pre-allocated
+ * @is_mem_prealloc: Is this srng memory pre-allocated
  * @crit_thresh: Critical threshold for near-full processing of this srng
  * @safe_thresh: Safe threshold for near-full processing of this srng
  * @near_full: Flag to indicate srng is near-full
@@ -1217,6 +1217,8 @@ struct dp_soc_stats {
 			uint32_t reo_err_oor_to_stack;
 			/* REO OOR scattered msdu count */
 			uint32_t reo_err_oor_sg_count;
+			/* REO ERR RAW mpdu drops */
+			uint32_t reo_err_raw_mpdu_drop;
 			/* RX msdu rejected count on delivery to vdev stack_fn*/
 			uint32_t rejected;
 			/* Incorrect msdu count in MPDU desc info */
@@ -1392,9 +1394,13 @@ struct rx_refill_buff_pool {
 
 #ifdef DP_TX_HW_DESC_HISTORY
 #define DP_TX_HW_DESC_HIST_MAX 6144
+#define DP_TX_HW_DESC_HIST_PER_SLOT_MAX 2048
+#define DP_TX_HW_DESC_HIST_MAX_SLOTS 3
+#define DP_TX_HW_DESC_HIST_SLOT_SHIFT 11
 
 struct dp_tx_hw_desc_evt {
 	uint8_t tcl_desc[HAL_TX_DESC_LEN_BYTES];
+	uint8_t tcl_ring_id;
 	uint64_t posted;
 	uint32_t hp;
 	uint32_t tp;
@@ -1405,8 +1411,10 @@ struct dp_tx_hw_desc_evt {
  * @entry: history entries
  */
 struct dp_tx_hw_desc_history {
-	uint64_t index;
-	struct dp_tx_hw_desc_evt entry[DP_TX_HW_DESC_HIST_MAX];
+	qdf_atomic_t index;
+	uint16_t num_entries_per_slot;
+	uint16_t allocated;
+	struct dp_tx_hw_desc_evt *entry[DP_TX_HW_DESC_HIST_MAX_SLOTS];
 };
 #endif
 
@@ -1556,7 +1564,15 @@ enum dp_tx_event_type {
 #ifdef WLAN_FEATURE_DP_TX_DESC_HISTORY
 /* Size must be in 2 power, for bitwise index rotation */
 #define DP_TX_TCL_HISTORY_SIZE 0x4000
+#define DP_TX_TCL_HIST_PER_SLOT_MAX 2048
+#define DP_TX_TCL_HIST_MAX_SLOTS 8
+#define DP_TX_TCL_HIST_SLOT_SHIFT 11
+
+/* Size must be in 2 power, for bitwise index rotation */
 #define DP_TX_COMP_HISTORY_SIZE 0x4000
+#define DP_TX_COMP_HIST_PER_SLOT_MAX 2048
+#define DP_TX_COMP_HIST_MAX_SLOTS 8
+#define DP_TX_COMP_HIST_SLOT_SHIFT 11
 
 struct dp_tx_desc_event {
 	qdf_nbuf_t skb;
@@ -1568,12 +1584,16 @@ struct dp_tx_desc_event {
 
 struct dp_tx_tcl_history {
 	qdf_atomic_t index;
-	struct dp_tx_desc_event entry[DP_TX_TCL_HISTORY_SIZE];
+	uint16_t num_entries_per_slot;
+	uint16_t allocated;
+	struct dp_tx_desc_event *entry[DP_TX_TCL_HIST_MAX_SLOTS];
 };
 
 struct dp_tx_comp_history {
 	qdf_atomic_t index;
-	struct dp_tx_desc_event entry[DP_TX_COMP_HISTORY_SIZE];
+	uint16_t num_entries_per_slot;
+	uint16_t allocated;
+	struct dp_tx_desc_event *entry[DP_TX_COMP_HIST_MAX_SLOTS];
 };
 #endif /* WLAN_FEATURE_DP_TX_DESC_HISTORY */
 
@@ -1589,7 +1609,7 @@ struct dp_last_op_info {
 
 /**
  * struct dp_swlm_tcl_data - params for tcl register write coalescing
- *			     descision making
+ *			     decision making
  * @nbuf: TX packet
  * @tid: tid for transmitting the current packet
  * @num_ll_connections: Number of low latency connections on this vdev
@@ -1807,6 +1827,7 @@ enum dp_context_type {
  * @txrx_set_vdev_param: target specific ops while setting vdev params
  * @dp_srng_test_and_update_nf_params: Check if the srng is in near full state
  *				and set the near-full params.
+ * @ipa_get_bank_id: Get TCL bank id used by IPA
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -1887,6 +1908,11 @@ struct dp_arch_ops {
 				       qdf_nbuf_t nbuf_copy,
 				       struct cdp_tid_rx_stats *tid_stats);
 
+	void (*dp_rx_word_mask_subscribe)(
+				struct dp_soc *soc,
+				uint32_t *msg_word,
+				void *rx_filter);
+
 	struct dp_rx_desc *(*dp_rx_desc_cookie_2_va)(struct dp_soc *soc,
 						     uint32_t cookie);
 	uint32_t (*dp_service_near_full_srngs)(struct dp_soc *soc,
@@ -1904,7 +1930,9 @@ struct dp_arch_ops {
 
 	/* Misc Arch Ops */
 	qdf_size_t (*txrx_get_context_size)(enum dp_context_type);
+#ifdef WIFI_MONITOR_SUPPORT
 	qdf_size_t (*txrx_get_mon_context_size)(enum dp_context_type);
+#endif
 	int (*dp_srng_test_and_update_nf_params)(struct dp_soc *soc,
 						 struct dp_srng *dp_srng,
 						 int *max_reap_limit);
@@ -1959,6 +1987,11 @@ struct dp_arch_ops {
 				     uint16_t peer_id);
 	void (*dp_partner_chips_unmap)(struct dp_soc *soc,
 				       uint16_t peer_id);
+
+#ifdef IPA_OFFLOAD
+	int8_t (*ipa_get_bank_id)(struct dp_soc *soc);
+#endif
+	void (*dp_txrx_ppeds_rings_status)(struct dp_soc *soc);
 };
 
 /**
@@ -1966,7 +1999,7 @@ struct dp_arch_ops {
  * @pn_in_reo_dest: PN provided by hardware in the REO destination ring.
  * @dmac_cmn_src_rxbuf_ring_enabled: Flag to indicate DMAC mode common Rx
  *				     buffer source rings
- * @rssi_dbm_conv_support: Rssi dbm converstion support param.
+ * @rssi_dbm_conv_support: Rssi dbm conversion support param.
  * @umac_hw_reset_support: UMAC HW reset support
  */
 struct dp_soc_features {
@@ -2287,7 +2320,7 @@ struct dp_soc {
 	} ast_hash;
 
 #ifdef DP_TX_HW_DESC_HISTORY
-	struct dp_tx_hw_desc_history *tx_hw_desc_history;
+	struct dp_tx_hw_desc_history tx_hw_desc_history;
 #endif
 
 #ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
@@ -2302,12 +2335,12 @@ struct dp_soc {
 #endif
 
 #ifdef WLAN_FEATURE_DP_TX_DESC_HISTORY
-	struct dp_tx_tcl_history *tx_tcl_history;
-	struct dp_tx_comp_history *tx_comp_history;
+	struct dp_tx_tcl_history tx_tcl_history;
+	struct dp_tx_comp_history tx_comp_history;
 #endif
 
 	qdf_spinlock_t ast_lock;
-	/*Timer for AST entry ageout maintainance */
+	/*Timer for AST entry ageout maintenance */
 	qdf_timer_t ast_aging_timer;
 
 	/*Timer counter for WDS AST entry ageout*/
@@ -2539,6 +2572,7 @@ struct dp_soc {
 	/* A flag using to decide the switch of rx link speed  */
 	bool high_throughput;
 #endif
+	bool is_tx_pause;
 };
 
 #ifdef IPA_OFFLOAD
@@ -2596,8 +2630,17 @@ struct dp_ipa_resources {
  * be useful in debugging
  */
 #ifdef MAX_ALLOC_PAGE_SIZE
+#if PAGE_SIZE == 4096
 #define LINK_DESC_PAGE_ID_MASK  0x007FE0
 #define LINK_DESC_ID_SHIFT      5
+#define LINK_DESC_ID_START_21_BITS_COOKIE 0x8000
+#elif PAGE_SIZE == 65536
+#define LINK_DESC_PAGE_ID_MASK  0x007E00
+#define LINK_DESC_ID_SHIFT      9
+#define LINK_DESC_ID_START_21_BITS_COOKIE 0x800
+#else
+#error "Unsupported kernel PAGE_SIZE"
+#endif
 #define LINK_DESC_COOKIE(_desc_id, _page_id, _desc_id_start) \
 	((((_page_id) + (_desc_id_start)) << LINK_DESC_ID_SHIFT) | (_desc_id))
 #define LINK_DESC_COOKIE_PAGE_ID(_cookie) \
@@ -2609,8 +2652,8 @@ struct dp_ipa_resources {
 	((((_desc_id) + (_desc_id_start)) << LINK_DESC_ID_SHIFT) | (_page_id))
 #define LINK_DESC_COOKIE_PAGE_ID(_cookie) \
 	((_cookie) & LINK_DESC_PAGE_ID_MASK)
-#endif
 #define LINK_DESC_ID_START_21_BITS_COOKIE 0x8000
+#endif
 #define LINK_DESC_ID_START_20_BITS_COOKIE 0x4000
 
 /* same as ieee80211_nac_param */
@@ -2848,18 +2891,18 @@ struct dp_pdev {
 	 */
 
 	/* PDEV Id */
-	int pdev_id;
+	uint8_t pdev_id;
 
 	/* LMAC Id */
-	int lmac_id;
+	uint8_t lmac_id;
 
 	/* Target pdev  Id */
-	int target_pdev_id;
+	uint8_t target_pdev_id;
+
+	bool pdev_deinit;
 
 	/* TXRX SOC handle */
 	struct dp_soc *soc;
-
-	bool pdev_deinit;
 
 	/* pdev status down or up required to handle dynamic hw
 	 * mode switch between DBS and DBS_SBS.
@@ -2870,6 +2913,9 @@ struct dp_pdev {
 
 	/* Enhanced Stats is enabled */
 	bool enhanced_stats_en;
+
+	/* Flag to indicate fast RX */
+	bool rx_fast_flag;
 
 	/* Second ring used to replenish rx buffers */
 	struct dp_srng rx_refill_buf_ring2;
@@ -2889,7 +2935,7 @@ struct dp_pdev {
 	/**
 	 * TODO: See if we need a ring map here for LMAC rings.
 	 * 1. Monitor rings are currently planning to be processed on receiving
-	 * PPDU end interrupts and hence wont need ring based interrupts.
+	 * PPDU end interrupts and hence won't need ring based interrupts.
 	 * 2. Rx buffer rings will be replenished during REO destination
 	 * processing and doesn't require regular interrupt handling - we will
 	 * only handle low water mark interrupts which is not expected
@@ -3017,6 +3063,12 @@ struct dp_pdev {
 	/* qdf_event for fw_stats */
 	qdf_event_t fw_stats_event;
 
+	/* qdf_event for fw__obss_stats */
+	qdf_event_t fw_obss_stats_event;
+
+	/* To check if request is already sent for obss stats */
+	bool pending_fw_obss_stats_response;
+
 	/* User configured max number of tx buffers */
 	uint32_t num_tx_allowed;
 
@@ -3043,7 +3095,7 @@ struct dp_pdev {
 	 */
 	struct rx_protocol_tag_stats
 		reo_proto_tag_stats[MAX_REO_DEST_RINGS][RX_PROTOCOL_TAG_MAX];
-	/* Track msdus received from expection ring separately */
+	/* Track msdus received from exception ring separately */
 	struct rx_protocol_tag_stats
 		rx_err_proto_tag_stats[RX_PROTOCOL_TAG_MAX];
 	struct rx_protocol_tag_stats
@@ -3957,7 +4009,7 @@ struct dp_peer_extd_rx_stats {
 	uint32_t rx_ratecode;
 
 	uint32_t avg_snr;
-	uint32_t rx_snr_measured_time;
+	unsigned long rx_snr_measured_time;
 	uint8_t snr;
 	uint8_t last_snr;
 
@@ -4008,7 +4060,7 @@ struct dp_peer_stats {
 };
 
 /**
- * struct dp_txrx_peer: DP txrx_peer strcuture used in per pkt path
+ * struct dp_txrx_peer: DP txrx_peer structure used in per pkt path
  * @tx_failed: Total Tx failure
  * @cdp_pkt_info comp_pkt: Pkt Info for which completions were received
  * @to_stack: Total packets sent up the stack
@@ -4330,7 +4382,7 @@ struct dp_fisa_rx_sw_ft {
 	/* last aggregate count fetched from RX PKT TLV */
 	uint32_t last_hal_aggr_count;
 	uint32_t cur_aggr_gso_size;
-	struct udphdr *head_skb_udp_hdr;
+	qdf_net_udphdr_t *head_skb_udp_hdr;
 	uint16_t frags_cumulative_len;
 	/* CMEM parameters */
 	uint32_t cmem_offset;

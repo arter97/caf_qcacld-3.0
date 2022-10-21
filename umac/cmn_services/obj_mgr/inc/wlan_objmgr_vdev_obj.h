@@ -115,7 +115,7 @@
 #define WLAN_VDEV_FEXT_WAPI                 0x00000010
 		/* 802.11h enabled */
 #define WLAN_VDEV_FEXT_DOTH                 0x00000020
-	/* if the vap has wds independance set */
+	/* if the vap has wds independence set */
 #define WLAN_VDEV_FEXT_VAPIND               0x00000040
 	/* QBSS load IE enabled */
 #define WLAN_VDEV_FEXT_BSSLOAD              0x00000080
@@ -199,7 +199,7 @@
 /*For wakeup AP VAP when wds-sta connect to the AP only use when
 	export (UMAC_REPEATER_DELAYED_BRINGUP || DBDC_REPEATER_SUPPORT)=1*/
 #define WLAN_VDEV_OP_KEYFLAG                0x00002000
-  /* if performe the iwlist scanning */
+  /* if performed the iwlist scanning */
 #define WLAN_VDEV_OP_LIST_SCANNING          0x00004000
    /*Set when VAP down*/
 #define WLAN_VDEV_OP_IS_DOWN                0x00008000
@@ -282,7 +282,7 @@ struct wlan_vdev_create_params {
  * struct wlan_channel - channel structure
  * @ch_freq:      Channel in Mhz.
  * @ch_ieee:      IEEE channel number.
- * @ch_freq_seg1: Channel Center frequeny for VHT80/160 and HE80/160.
+ * @ch_freq_seg1: Channel Center frequency for VHT80/160 and HE80/160.
  * @ch_freq_seg2: Second channel Center frequency applicable for 80+80MHz mode.
  * @ch_maxpower:  Maximum tx power in dBm.
  * @ch_flagext:   Channel extension flags.
@@ -434,7 +434,7 @@ struct wlan_objmgr_vdev {
  * @pdev: PDEV object on which this vdev gets created
  * @params: VDEV create params from HDD
  *
- * Creates vdev object, intializes with default values
+ * Creates vdev object, initializes with default values
  * Attaches to psoc and pdev objects
  * Invokes the registered notifiers to create component object
  *
@@ -508,7 +508,7 @@ typedef void (*wlan_objmgr_vdev_op_handler)(struct wlan_objmgr_vdev *vdev,
  * @vdev: vdev object
  * @handler: the handler will be called for each object of requested type
  *            the handler should be implemented to perform required operation
- * @arg:     agruments passed by caller
+ * @arg:     arguments passed by caller
  * @dbg_id: id of the caller
  *
  * API to be used for performing the operations on all PEER objects

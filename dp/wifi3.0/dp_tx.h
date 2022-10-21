@@ -112,7 +112,7 @@ do {                                                           \
 
 /**
  * struct dp_tx_frag_info_s
- * @vaddr: hlos vritual address for buffer
+ * @vaddr: hlos virtual address for buffer
  * @paddr_lo: physical address lower 32bits
  * @paddr_hi: physical address higher bits
  * @len: length of the buffer
@@ -902,29 +902,34 @@ dp_set_rtpm_tput_policy_requirement(struct cdp_soc_t *soc_hdl,
 static inline void
 dp_tx_hw_desc_update_evt(uint8_t *hal_tx_desc_cached,
 			 hal_ring_handle_t hal_ring_hdl,
-			 struct dp_soc *soc)
+			 struct dp_soc *soc, uint8_t ring_id)
 {
+	struct dp_tx_hw_desc_history *tx_hw_desc_history =
+						&soc->tx_hw_desc_history;
 	struct dp_tx_hw_desc_evt *evt;
-	uint64_t idx = 0;
+	uint32_t idx = 0;
+	uint16_t slot = 0;
 
-	if (!soc->tx_hw_desc_history)
+	if (!tx_hw_desc_history->allocated)
 		return;
 
-	idx = ++soc->tx_hw_desc_history->index;
-	if (idx == DP_TX_HW_DESC_HIST_MAX)
-		soc->tx_hw_desc_history->index = 0;
-	idx = qdf_do_div_rem(idx, DP_TX_HW_DESC_HIST_MAX);
+	dp_get_frag_hist_next_atomic_idx(&tx_hw_desc_history->index, &idx,
+					 &slot,
+					 DP_TX_HW_DESC_HIST_SLOT_SHIFT,
+					 DP_TX_HW_DESC_HIST_PER_SLOT_MAX,
+					 DP_TX_HW_DESC_HIST_MAX);
 
-	evt = &soc->tx_hw_desc_history->entry[idx];
+	evt = &tx_hw_desc_history->entry[slot][idx];
 	qdf_mem_copy(evt->tcl_desc, hal_tx_desc_cached, HAL_TX_DESC_LEN_BYTES);
 	evt->posted = qdf_get_log_timestamp();
+	evt->tcl_ring_id = ring_id;
 	hal_get_sw_hptp(soc->hal_soc, hal_ring_hdl, &evt->tp, &evt->hp);
 }
 #else
 static inline void
 dp_tx_hw_desc_update_evt(uint8_t *hal_tx_desc_cached,
 			 hal_ring_handle_t hal_ring_hdl,
-			 struct dp_soc *soc)
+			 struct dp_soc *soc, uint8_t ring_id)
 {
 }
 #endif

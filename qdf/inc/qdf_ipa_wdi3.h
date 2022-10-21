@@ -121,6 +121,8 @@ typedef __qdf_ipa_wdi_pipe_setup_info_smmu_t qdf_ipa_wdi_pipe_setup_info_smmu_t;
 	__QDF_IPA_WDI_SETUP_INFO_SMMU_PKT_OFFSET(txrx)
 #define QDF_IPA_WDI_SETUP_INFO_SMMU_DESC_FORMAT_TEMPLATE(txrx)	\
 	__QDF_IPA_WDI_SETUP_INFO_SMMU_DESC_FORMAT_TEMPLATE(txrx)
+#define QDF_IPA_WDI_SETUP_INFO_SMMU_RX_BANK_ID(txrx, bid)	\
+	__QDF_IPA_WDI_SETUP_INFO_SMMU_RX_BANK_ID(txrx, bid)
 
 typedef __qdf_ipa_ep_cfg_t qdf_ipa_ep_cfg_t;
 
@@ -266,6 +268,8 @@ typedef __qdf_ipa_wdi_pipe_setup_info_t qdf_ipa_wdi_pipe_setup_info_t;
 	__QDF_IPA_WDI_SETUP_INFO_PKT_OFFSET(txrx)
 #define QDF_IPA_WDI_SETUP_INFO_DESC_FORMAT_TEMPLATE(txrx)	\
 	__QDF_IPA_WDI_SETUP_INFO_DESC_FORMAT_TEMPLATE(txrx)
+#define QDF_IPA_WDI_SETUP_INFO_RX_BANK_ID(txrx, bid)	\
+	__QDF_IPA_WDI_SETUP_INFO_RX_BANK_ID(txrx, bid)
 
 /**
  * qdf_ipa_wdi_conn_in_params_t - information provided by

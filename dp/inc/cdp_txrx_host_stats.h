@@ -58,7 +58,7 @@ static inline int cdp_host_stats_get(ol_txrx_soc_handle soc,
  * @preamb: Preamble
  * @mcs: Modulation and Coding scheme index
  * @htflag: Flag to identify HT or VHT
- * @gintval: Gaurd Interval value
+ * @gintval: Guard Interval value
  *
  * return: 0 for Failure, Returns rate on Success
  */
@@ -1035,4 +1035,82 @@ static inline QDF_STATUS cdp_get_peer_telemetry_stats(
 					soc, addr, stats);
 }
 #endif
+
+/**
+ * cdp_get_peer_extd_rate_link_stats(): cdp function to get peer
+ *				extended rate and link stats
+ * @soc: soc handle
+ * @addr: mac address
+ *
+ * return: status
+ */
+static inline QDF_STATUS cdp_get_peer_extd_rate_link_stats(
+					ol_txrx_soc_handle soc,
+					uint8_t *mac_addr)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->txrx_get_peer_extd_rate_link_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->txrx_get_peer_extd_rate_link_stats(
+								soc, mac_addr);
+}
+
+/*
+ * cdp_get_pdev_obss_pd_stats(): function to get pdev obss stats
+ * @soc: soc handle
+ * @pdev_id: pdev id
+ * @stats: pointer to pdev obss stats
+ *
+ * return: status
+ */
+static inline QDF_STATUS cdp_get_pdev_obss_pd_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id,
+				struct cdp_pdev_obss_pd_stats_tlv *stats)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->get_pdev_obss_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->get_pdev_obss_stats(
+					soc, pdev_id, stats);
+}
+
+/**
+ * cdp_clear_pdev_obss_pd_stats(): function to clear pdev obss stats
+ * @soc: soc handle
+ * @pdev_id: pdev id
+ *
+ * return: status
+ */
+static inline QDF_STATUS cdp_clear_pdev_obss_pd_stats(
+				ol_txrx_soc_handle soc,
+				uint8_t pdev_id)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->host_stats_ops ||
+	    !soc->ops->host_stats_ops->clear_pdev_obss_pd_stats)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->host_stats_ops->clear_pdev_obss_pd_stats(
+					soc, pdev_id);
+}
 #endif /* _CDP_TXRX_HOST_STATS_H_ */

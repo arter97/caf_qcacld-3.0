@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,7 +16,7 @@
  */
 
 /**
- * DOC: contains dcs structure definations
+ * DOC: contains dcs structure definitions
  */
 
 #ifndef _WLAN_DCS_PUBLIC_STRUCTS_H_
@@ -71,7 +72,7 @@ struct wlan_host_dcs_mib_stats {
  * struct wlan_host_dcs_im_tgt_stats - DCS IM target stats
  * @reg_tsf32: current running TSF from the TSF-1
  * @last_ack_rssi: known last frame rssi, in case of multiple stations, if
- *      and at different ranges, this would not gaurantee that
+ *      and at different ranges, this would not guarantee that
  *      this is the least rssi.
  * @tx_waste_time: sum of all the failed durations in the last
  *      one second interval.

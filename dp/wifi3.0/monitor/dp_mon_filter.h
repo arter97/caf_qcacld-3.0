@@ -402,7 +402,7 @@ void dp_mon_filter_show_filter(struct dp_mon_pdev *mon_pdev,
  * based on target
  * @soc: DP soc handle
  * @pdev: DP pdev handle
- * @srng_type: The srng type for which filter wll be set
+ * @srng_type: The srng type for which filter will be set
  * @tlv_filter: tlv filter
  */
 QDF_STATUS

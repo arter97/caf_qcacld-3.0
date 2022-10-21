@@ -82,7 +82,7 @@ static QDF_STATUS dp_mon_filter_check_co_exist(struct dp_pdev *pdev)
 
 	/*
 	 * Check if the m_copy, monitor mode and the smart_monitor_mode
-	 * can co-exist togther.
+	 * can co-exist together.
 	 */
 	if (mon_pdev->mcopy_mode &&
 	    (mon_pdev->mvdev || mon_pdev->neighbour_peers_added)) {

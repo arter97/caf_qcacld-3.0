@@ -41,6 +41,18 @@
 #include <qdf_nbuf_frag.h>
 #include "qdf_time.h"
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0))
+/* Since commit
+ *  baebdf48c3600 ("net: dev: Makes sure netif_rx() can be invoked in any context.")
+ *
+ * the function netif_rx() can be used in preemptible/thread context as
+ * well as in interrupt context.
+ *
+ * Use netif_rx().
+ */
+#define netif_rx_ni(skb) netif_rx(skb)
+#endif
+
 /*
  * Use socket buffer as the underlying implementation as skbuf .
  * Linux use sk_buff to represent both packet and data,
@@ -54,6 +66,13 @@ typedef struct sk_buff *__qdf_nbuf_t;
  * This is used for skb queue management via linux skb buff head APIs
  */
 typedef struct sk_buff_head __qdf_nbuf_queue_head_t;
+
+/**
+ * typedef __qdf_nbuf_get_shinfo for skb_shinfo linux struct
+ *
+ * This is used for skb shared info via linux skb shinfo APIs
+ */
+typedef struct skb_shared_info *__qdf_nbuf_shared_info_t;
 
 #define QDF_NBUF_CB_TX_MAX_OS_FRAGS 1
 
@@ -107,7 +126,7 @@ typedef union {
  *
  * Notes:
  *   1. Hard limited to 48 bytes. Please count your bytes
- *   2. The size of this structure has to be easily calculatable and
+ *   2. The size of this structure has to be easily calculable and
  *      consistently so: do not use any conditional compile flags
  *   3. Split into a common part followed by a tx/rx overlay
  *   4. There is only one extra frag, which represents the HTC/HTT header
@@ -136,7 +155,7 @@ typedef union {
  * @rx.dev.priv_cb_m.exc_frm: exception frame
  * @rx.dev.priv_cb_m.ipa_smmu_map: do IPA smmu map
  * @rx.dev.priv_cb_m.reo_dest_ind_or_sw_excpt: reo destination indication or
-					     sw execption bit from ring desc
+					     sw exception bit from ring desc
  * @rx.dev.priv_cb_m.lmac_id: lmac id for RX packet
  * @rx.dev.priv_cb_m.tcp_seq_num: TCP sequence number
  * @rx.dev.priv_cb_m.tcp_ack_num: TCP ACK number
@@ -1454,6 +1473,18 @@ __qdf_nbuf_append_ext_list(struct sk_buff *skb_head,
 }
 
 /**
+ * __qdf_nbuf_get_shinfo() - return the shared info of the skb
+ * @skb: Pointer to network buffer
+ *
+ * Return: skb shared info from head buf
+ */
+static inline
+struct skb_shared_info *__qdf_nbuf_get_shinfo(struct sk_buff *head_buf)
+{
+	return skb_shinfo(head_buf);
+}
+
+/**
  * __qdf_nbuf_get_ext_list() - Get the link to extended nbuf list.
  * @head_buf: Network buf holding head segment (single)
  *
@@ -1772,6 +1803,28 @@ __qdf_nbuf_queue_insert_head(__qdf_nbuf_queue_t *qhead, __qdf_nbuf_t skb)
 	skb->next = qhead->head;
 	qhead->head = skb;
 	qhead->qlen++;
+}
+
+static inline struct sk_buff *
+__qdf_nbuf_queue_remove_last(__qdf_nbuf_queue_t *qhead)
+{
+	__qdf_nbuf_t tmp_tail, node = NULL;
+
+	if (qhead->head) {
+		tmp_tail = qhead->tail;
+		node = qhead->head;
+		if (qhead->head == qhead->tail) {
+			qhead->head = NULL;
+			qhead->tail = NULL;
+			return node;
+		} else {
+			while (tmp_tail != node->next)
+			       node = node->next;
+			qhead->tail = node;
+			return node->next;
+		}
+	}
+	return node;
 }
 
 /**
@@ -2321,6 +2374,19 @@ __qdf_nbuf_get_timestamp(struct sk_buff *skb)
 }
 
 /**
+ * __qdf_nbuf_get_timestamp_us() - get the timestamp for frame
+ *
+ * @buf: sk buff
+ *
+ * Return: timestamp stored in skb in us
+ */
+static inline uint64_t
+__qdf_nbuf_get_timestamp_us(struct sk_buff *skb)
+{
+	return ktime_to_us(skb_get_ktime(skb));
+}
+
+/**
  * __qdf_nbuf_get_timedelta_ms() - get time difference in ms
  *
  * @buf: sk buff
@@ -2688,6 +2754,77 @@ static inline qdf_size_t __qdf_nbuf_get_data_len(__qdf_nbuf_t nbuf)
 }
 
 /**
+ * __qdf_nbuf_set_data_len() - Return the data_len of the nbuf
+ * @nbuf: qdf_nbuf_t
+ *
+ * Return: value of data_len
+ */
+static inline
+qdf_size_t __qdf_nbuf_set_data_len(__qdf_nbuf_t nbuf, uint32_t len)
+{
+	return nbuf->data_len = len;
+}
+
+/**
+ * __qdf_nbuf_get_only_data_len() - Return the data_len of the nbuf
+ * @nbuf: qdf_nbuf_t
+ *
+ * Return: value of data_len
+ */
+static inline qdf_size_t __qdf_nbuf_get_only_data_len(__qdf_nbuf_t nbuf)
+{
+	return nbuf->data_len;
+}
+
+/**
+ * __qdf_nbuf_set_hash() - set the hash of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: None
+ */
+static inline void __qdf_nbuf_set_hash(__qdf_nbuf_t buf, uint32_t len)
+{
+	buf->hash = len;
+}
+
+/**
+ * __qdf_nbuf_set_sw_hash() - set the sw hash of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: None
+ */
+static inline void __qdf_nbuf_set_sw_hash(__qdf_nbuf_t buf, uint32_t len)
+{
+	buf->sw_hash = len;
+}
+
+/**
+ * __qdf_nbuf_set_csum_start() - set the csum start of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: None
+ */
+static inline void __qdf_nbuf_set_csum_start(__qdf_nbuf_t buf, uint16_t len)
+{
+	buf->csum_start = len;
+}
+
+/**
+ * __qdf_nbuf_set_csum_offset() - set the csum offset of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: None
+ */
+static inline void __qdf_nbuf_set_csum_offset(__qdf_nbuf_t buf, uint16_t len)
+{
+	buf->csum_offset = len;
+}
+
+/**
  * __qdf_nbuf_get_gso_segs() - Return the number of gso segments
  * @skb: Pointer to network buffer
  *
@@ -2696,6 +2833,40 @@ static inline qdf_size_t __qdf_nbuf_get_data_len(__qdf_nbuf_t nbuf)
 static inline uint16_t __qdf_nbuf_get_gso_segs(struct sk_buff *skb)
 {
 	return skb_shinfo(skb)->gso_segs;
+}
+
+/**
+ * __qdf_nbuf_set_gso_segs() - set the number of gso segments
+ * @skb: Pointer to network buffer
+ * @val: val to be set
+ *
+ * Return: None
+ */
+static inline void __qdf_nbuf_set_gso_segs(struct sk_buff *skb, uint16_t val)
+{
+	skb_shinfo(skb)->gso_segs = val;
+}
+
+/**
+ * __qdf_nbuf_set_gso_type_udp_l4() - set the gso type to GSO UDP L4
+ * @skb: Pointer to network buffer
+ *
+ * Return: None
+ */
+static inline void __qdf_nbuf_set_gso_type_udp_l4(struct sk_buff *skb)
+{
+	skb_shinfo(skb)->gso_type = SKB_GSO_UDP_L4;
+}
+
+/**
+ * __qdf_nbuf_set_ip_summed_partial() - set the ip summed to CHECKSUM_PARTIAL
+ * @skb: Pointer to network buffer
+ *
+ * Return: None
+ */
+static inline void __qdf_nbuf_set_ip_summed_partial(struct sk_buff *skb)
+{
+	skb->ip_summed = CHECKSUM_PARTIAL;
 }
 
 /**

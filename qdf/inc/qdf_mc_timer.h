@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2019, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -72,12 +73,14 @@ typedef struct qdf_mc_timer_s {
 	qdf_mutex_t lock;
 	QDF_TIMER_TYPE type;
 	QDF_TIMER_STATE state;
+	qdf_time_t timer_start_jiffies;
+	qdf_time_t timer_end_jiffies;
 } qdf_mc_timer_t;
 
 
 void qdf_try_allowing_sleep(QDF_TIMER_TYPE type);
 
-/* Function declarations and documenation */
+/* Function declarations and documentation */
 #ifdef TIMER_MANAGER
 void qdf_mc_timer_manager_init(void);
 void qdf_mc_timer_manager_exit(void);

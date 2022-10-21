@@ -1109,7 +1109,7 @@ cdp_dump_pdev_rx_protocol_tag_stats(ol_txrx_soc_handle soc,
   * cdp_vdev_config_for_nac_rssi(): To invoke dp callback for nac rssi config
   * @soc: soc pointer
   * @vdev_id: id of vdev
-  * @nac_cmd: specfies nac_rss config action add, del, list
+  * @nac_cmd: specifies nac_rss config action add, del, list
   * @bssid: Neighbour bssid
   * @client_macaddr: Non-Associated client MAC
   * @chan_num: channel number to scan

@@ -1176,7 +1176,7 @@ struct wlan_rsn_ie_hdr {
 
 /**
  * struct wlan_wpa_ie_hdr: wpa ie header
- * @elem_id: Wpa element id, vender specific.
+ * @elem_id: Wpa element id, vendor specific.
  * @len: wpa ie length
  * @oui: 24-bit OUI followed by 8-bit OUI type
  * @version: wpa ver
@@ -1432,7 +1432,7 @@ struct wlan_vendor_ie_htcap {
 } qdf_packed;
 
 /**
- * struct wlan_ie_htinfo_cmn: ht info comman
+ * struct wlan_ie_htinfo_cmn: ht info command
  * @hi_ctrlchannel: control channel
  * @hi_extchoff: B0-1 extension channel offset
  * @hi_txchwidth: B2 recommended xmiss width set
@@ -1940,11 +1940,17 @@ struct wlan_ml_probe_req {
  * determination should be changed.
  * @WLAN_ML_VARIANT_BASIC: Basic variant
  * @WLAN_ML_VARIANT_PROBEREQ: Probe Request variant
+ * @WLAN_ML_VARIANT_RECONFIG: Reconfiguration variant
+ * @WLAN_ML_VARIANT_TDLS: TDLS variant
+ * @WLAN_ML_VARIANT_PRIORITYACCESS: Priority Access variant
  * @WLAN_ML_VARIANT_INVALIDSTART: Start of invalid value range
  */
 enum wlan_ml_variant {
 	WLAN_ML_VARIANT_BASIC = 0,
 	WLAN_ML_VARIANT_PROBEREQ = 1,
+	WLAN_ML_VARIANT_RECONFIG = 2,
+	WLAN_ML_VARIANT_TDLS = 3,
+	WLAN_ML_VARIANT_PRIORITYACCESS = 4,
 	WLAN_ML_VARIANT_INVALIDSTART,
 };
 
@@ -2402,6 +2408,99 @@ struct wlan_ml_prv_linfo_perstaprof {
 	 WLAN_ML_PRV_CINFO_MLDID_SIZE)
 
 /* End of definitions related to Probe Request variant Multi-Link element. */
+
+/* Definitions related to Reconfiguration variant Multi-Link element (per
+ * IEEE802.11be D2.1.1)
+ */
+
+/* Definitions for bits in the Presence Bitmap subfield in Reconfiguration
+ * variant Multi-Link element Control field. Any unused bits are reserved.
+ */
+/* MLD MAC Address Present */
+#define WLAN_ML_RV_CTRL_PBM_MLDMACADDR_P               ((uint16_t)BIT(0))
+
+/* Definitions related to Reconfiguration variant Multi-Link element Common Info
+ * field.
+ */
+
+/* Size in octets of Common Info Length subfield of Common Info field in
+ * Reconfiguration variant Multi-Link element.
+ */
+#define WLAN_ML_RV_CINFO_LENGTH_SIZE                               1
+
+/* End of definitions related to Reconfiguration variant Multi-Link element
+ * Common Info field.
+ */
+
+/* Definitions related to Reconfiguration variant Multi-Link element Link Info
+ * field
+ */
+
+/**
+ * struct wlan_ml_rv_linfo_perstaprof - Fixed fields of Per-STA Profile
+ * subelement in Reconfiguration variant Multi-Link element Link Info field
+ * @subelem_id: Subelement ID
+ * @subelem_len: Subelement length
+ * @stacontrol: STA Control
+ */
+struct wlan_ml_rv_linfo_perstaprof {
+	uint8_t subelem_id;
+	uint8_t subelem_len;
+	uint16_t stacontrol;
+} qdf_packed;
+
+/* The above fixed fields may be followed by:
+ * STA Info (variable size)
+ */
+
+/* Size in octets of STA Control field of Per-STA Profile subelement in
+ * Reconfiguration variant Multi-Link element Link Info field.
+ */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_SIZE                   2
+
+/* Definitions for subfields in STA Control field of Per-STA Profile subelement
+ * in Reconfiguration variant Multi-Link element Link Info field. Any unused
+ * bits are reserved.
+ */
+/* Link ID */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_IDX              0
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_LINKID_BITS             4
+/* Complete Profile */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_IDX           4
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_CMPLTPROF_BITS          1
+/* MAC Address Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_MACADDRP_IDX            5
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_MACADDRP_BITS           1
+/* Delete Timer Present */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_DELTIMERP_IDX           6
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STACTRL_DELTIMERP_BITS          1
+
+/* Definitions for subfields in STA Info field of Per-STA Profile subelement
+ * in Reconfiguration variant Multi-Link element Link Info field.
+ */
+
+/* STA Info Length */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE             1
+
+/* Size in octets of the Delete Timer subfield in STA info field of Per-STA
+ * Profile subelement in Reconfiguration variant Multi-Link element Link Info
+ * field.
+ */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_DELTIMER_SIZE           2
+
+/* Max value in octets of STA Info Length in STA Info field of Per-STA Profile
+ * subelement in Reconfiguration variant Multi-Link element Link Info field.
+ */
+#define WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_MAX \
+	(WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_LENGTH_SIZE + \
+	 QDF_MAC_ADDR_SIZE + \
+	 WLAN_ML_RV_LINFO_PERSTAPROF_STAINFO_DELTIMER_SIZE)
+
+/* End of definitions related to Reconfiguration variant Multi-Link element Link
+ * Info field.
+ */
+
+/* End of definitions related to Reconfiguration variant Multi-Link element. */
 
 /*
  * Definitions related to MLO specific aspects of Reduced Neighbor Report
@@ -3021,6 +3120,8 @@ struct wlan_eht_cap_info {
  * @scs_traffic_desc: SCS traffic description support
  * @max_mpdu_len: Maximum MPDU length
  * @max_a_mpdu_len_exponent_ext: Maximum A-MPDU Length Exponent Extension
+ * @eht_trs_support: EHT TRS SUPPORT
+ * @txop_return_support_txop_share_m2: TXOP Return Support in TXOP Share Mode 2
  * @reserved3: reserved bits
  * @reserved2: reserved bits
  * @support_320mhz_6ghz: support 320mhz in 6gz
@@ -3124,7 +3225,9 @@ struct wlan_eht_cap_info_network_endian {
 	uint16_t scs_traffic_desc:1;
 	uint16_t max_mpdu_len:2;
 	uint16_t max_a_mpdu_len_exponent_ext:1;
-	uint16_t reserved:7;
+	uint16_t eht_trs_support:1;
+	uint16_t txop_return_support_txop_share_m2:1;
+	uint16_t reserved:5;
 
 	uint32_t reserved2:1;
 	uint32_t support_320mhz_6ghz:1;
@@ -3609,7 +3712,7 @@ wlan_parse_oce_reduced_wan_metrics_ie(uint8_t *mbo_oce_ie,
  * While parsing vendor IE, is_mbo_oce_oui() API does sanity of
  * length and attribute ID for MBO_OCE_OUI and after passing the
  * sanity only mbo_oce IE is stored in scan cache.
- * It is a callers responsiblity to get the mbo_oce_ie pointer
+ * It is a callers responsibility to get the mbo_oce_ie pointer
  * using util_scan_entry_mbo_oce() API, which points to mbo_oce
  * stored in scan cache. Thus caller is responsible for ensuring
  * the length of the IE is consistent with the embedded length.

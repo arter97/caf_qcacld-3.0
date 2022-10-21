@@ -231,7 +231,7 @@ struct direct_buf_rx_psoc_obj {
 
 /**
  * struct module_ring_params - Direct buf ring params for module
- * @num_bufs: Number of buffers alloted to this module
+ * @num_bufs: Number of buffers allotted to this module
  * @buf_size: size of buffers
  */
 struct module_ring_params {

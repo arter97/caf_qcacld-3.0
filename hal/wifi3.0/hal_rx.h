@@ -132,7 +132,9 @@ struct hal_rx_mon_dest_buf_info {
 	uint8_t first_buffer:1,
 		last_buffer:1,
 		is_decap_raw:1,
-		reserved_1:5;
+		mpdu_len_err:1,
+		l2_hdr_pad:2,
+		reserved_1:2;
 };
 
 /**
@@ -224,7 +226,7 @@ struct hal_rx_mpdu_desc_info {
 	uint16_t msdu_count;
 	uint16_t mpdu_seq; /* 12 bits for length */
 	uint32_t mpdu_flags;
-	uint32_t peer_meta_data; /* sw progamed meta-data:MAC Id & peer Id */
+	uint32_t peer_meta_data; /* sw programmed meta-data:MAC Id & peer Id */
 	uint16_t bar_frame;
 	uint8_t tid:4,
 		reserved:4;
@@ -1778,7 +1780,7 @@ uint32_t hal_rx_msdu_start_reception_type_get(hal_soc_handle_t hal_soc_hdl,
 
 /**
  * hal_reo_status_get_header_generic - Process reo desc info
- * @d - Pointer to reo descriptior
+ * @d - Pointer to reo descriptor
  * @b - tlv type info
  * @h - Pointer to hal_reo_status_header where info to be stored
  * @hal- pointer to hal_soc structure
@@ -2492,6 +2494,48 @@ uint32_t hal_rx_mpdu_end_offset_get(hal_soc_handle_t hal_soc_hdl)
 	return hal_soc->ops->hal_rx_mpdu_end_offset_get();
 }
 
+#ifdef CONFIG_WORD_BASED_TLV
+/**
+ * hal_rx_mpdu_start_wmask_get(): Get the MPDU start word mask
+ *
+ * @hal_soc_hdl: HAL SOC handle
+ * return: mpdu_start_tlv word mask value
+ */
+static inline
+uint32_t hal_rx_mpdu_start_wmask_get(hal_soc_handle_t hal_soc_hdl)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (!hal_soc || !hal_soc->ops) {
+		hal_err("hal handle is NULL");
+		QDF_BUG(0);
+		return 0;
+	}
+
+	return hal_soc->ops->hal_rx_mpdu_start_wmask_get();
+}
+
+/**
+ * hal_rx_msdu_end_wmask_get(): Get the MSDU END word mask
+ *
+ * @hal_soc_hdl: HAL SOC handle
+ * return: msdu_end_tlv word mask value
+ */
+static inline
+uint32_t hal_rx_msdu_end_wmask_get(hal_soc_handle_t hal_soc_hdl)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (!hal_soc || !hal_soc->ops) {
+		hal_err("hal handle is NULL");
+		QDF_BUG(0);
+		return 0;
+	}
+
+	return hal_soc->ops->hal_rx_msdu_end_wmask_get();
+}
+#endif
+
 /**
  * hal_rx_attn_offset_get(): Get the ATTENTION offset from
  * rx_pkt_tlvs structure
@@ -2710,13 +2754,15 @@ hal_rx_tlv_get_freq(hal_soc_handle_t hal_soc_hdl, uint8_t *buf)
 }
 
 static inline void hal_mpdu_desc_info_set(hal_soc_handle_t hal_soc_hdl,
-					  void *mpdu_desc_info, uint32_t val)
+					  void *desc,
+					  void *mpdu_desc_info,
+					  uint32_t val)
 {
 	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
 
 	if (hal_soc->ops->hal_mpdu_desc_info_set)
 		return hal_soc->ops->hal_mpdu_desc_info_set(
-				hal_soc_hdl, mpdu_desc_info, val);
+				hal_soc_hdl, desc, mpdu_desc_info, val);
 }
 
 static inline void hal_msdu_desc_info_set(hal_soc_handle_t hal_soc_hdl,
@@ -2881,7 +2927,7 @@ hal_rx_reo_buf_type_get(hal_soc_handle_t hal_soc_hdl, hal_ring_desc_t rx_desc)
  * hal_rx_reo_prev_pn_get() - Get the previous pn from ring descriptor.
  * @hal_soc_hdl: HAL SoC handle
  * @ring_desc: REO ring descriptor
- * @prev_pn: Buffer to populate the previos PN
+ * @prev_pn: Buffer to populate the previous PN
  *
  * Return: None
  */
@@ -3017,5 +3063,26 @@ hal_rx_tlv_l3_type_get(hal_soc_handle_t hal_soc_hdl, uint8_t *buf)
 	return hal_soc->ops->hal_rx_tlv_l3_type_get ?
 		hal_soc->ops->hal_rx_tlv_l3_type_get(buf) :
 			HAL_RX_TLV_L3_TYPE_INVALID;
+}
+
+/**
+ * hal_get_tsf_time() - Get tsf time
+ * @hal_soc_hdl: HAL soc handle
+ * @mac_id: mac_id
+ * @tsf: pointer to update tsf value
+ * @tsf_sync_soc_time: pointer to update tsf sync time
+ *
+ * Return: None.
+ */
+static inline void
+hal_get_tsf_time(hal_soc_handle_t hal_soc_hdl, uint32_t tsf_id,
+		 uint32_t mac_id, uint64_t *tsf,
+		 uint64_t *tsf_sync_soc_time)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (hal_soc->ops->hal_get_tsf_time)
+		hal_soc->ops->hal_get_tsf_time(hal_soc_hdl, tsf_id, mac_id,
+					       tsf, tsf_sync_soc_time);
 }
 #endif /* _HAL_RX_H */

@@ -906,7 +906,7 @@ dp_tx_hw_enqueue_be(struct dp_soc *soc, struct dp_vdev *vdev,
 	status = QDF_STATUS_SUCCESS;
 
 	dp_tx_hw_desc_update_evt((uint8_t *)hal_tx_desc_cached,
-				 hal_ring_hdl, soc);
+				 hal_ring_hdl, soc, ring_id);
 
 ring_access_fail:
 	dp_tx_ring_access_end_wrapper(soc, hal_ring_hdl, coalesce);
@@ -914,6 +914,62 @@ ring_access_fail:
 			     qdf_get_log_timestamp(), tx_desc->nbuf);
 	return status;
 }
+
+#ifdef IPA_OFFLOAD
+static void
+dp_tx_get_ipa_bank_config(struct dp_soc_be *be_soc,
+			  union hal_tx_bank_config *bank_config)
+{
+	bank_config->epd = 0;
+	bank_config->encap_type = wlan_cfg_pkt_type(be_soc->soc.wlan_cfg_ctx);
+	bank_config->encrypt_type = 0;
+
+	bank_config->src_buffer_swap = 0;
+	bank_config->link_meta_swap = 0;
+
+	bank_config->index_lookup_enable = 0;
+	bank_config->mcast_pkt_ctrl = HAL_TX_MCAST_CTRL_FW_EXCEPTION;
+	bank_config->addrx_en = 1;
+	bank_config->addry_en = 1;
+
+	bank_config->mesh_enable = 0;
+	bank_config->dscp_tid_map_id = 0;
+	bank_config->vdev_id_check_en = 0;
+	bank_config->pmac_id = 0;
+}
+
+static void dp_tx_init_ipa_bank_profile(struct dp_soc_be *be_soc)
+{
+	union hal_tx_bank_config ipa_config = {0};
+	int bid;
+
+	if (!wlan_cfg_is_ipa_enabled(be_soc->soc.wlan_cfg_ctx)) {
+		be_soc->ipa_bank_id = DP_BE_INVALID_BANK_ID;
+		return;
+	}
+
+	dp_tx_get_ipa_bank_config(be_soc, &ipa_config);
+
+	/* Let IPA use last HOST owned bank */
+	bid = be_soc->num_bank_profiles - 1;
+
+	be_soc->bank_profiles[bid].is_configured = true;
+	be_soc->bank_profiles[bid].bank_config.val = ipa_config.val;
+	hal_tx_populate_bank_register(be_soc->soc.hal_soc,
+				      &be_soc->bank_profiles[bid].bank_config,
+				      bid);
+	qdf_atomic_inc(&be_soc->bank_profiles[bid].ref_count);
+
+	dp_info("IPA bank at slot %d config:0x%x", bid,
+		be_soc->bank_profiles[bid].bank_config.val);
+
+	be_soc->ipa_bank_id = bid;
+}
+#else /* !IPA_OFFLOAD */
+static inline void dp_tx_init_ipa_bank_profile(struct dp_soc_be *be_soc)
+{
+}
+#endif /* IPA_OFFLOAD */
 
 QDF_STATUS dp_tx_init_bank_profiles(struct dp_soc_be *be_soc)
 {
@@ -938,6 +994,9 @@ QDF_STATUS dp_tx_init_bank_profiles(struct dp_soc_be *be_soc)
 		qdf_atomic_init(&be_soc->bank_profiles[i].ref_count);
 	}
 	dp_info("initialized %u bank profiles", be_soc->num_bank_profiles);
+
+	dp_tx_init_ipa_bank_profile(be_soc);
+
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1009,7 +1068,7 @@ int dp_tx_get_bank_profile(struct dp_soc_be *be_soc,
 	dp_tx_get_vdev_bank_config(be_vdev, &vdev_config);
 
 	DP_TX_BANK_LOCK_ACQUIRE(&be_soc->tx_bank_lock);
-	/* go over all banks and find a matching/unconfigured/unsed bank */
+	/* go over all banks and find a matching/unconfigured/unused bank */
 	for (i = 0; i < be_soc->num_bank_profiles; i++) {
 		if (be_soc->bank_profiles[i].is_configured &&
 		    (be_soc->bank_profiles[i].bank_config.val ^
@@ -1304,6 +1363,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	hal_ring_handle_t hal_ring_hdl = NULL;
 	uint32_t *hal_tx_desc_cached;
 	void *hal_tx_desc;
+	uint8_t desc_size = DP_TX_FAST_DESC_SIZE;
 
 	if (qdf_unlikely(vdev_id >= MAX_VDEV_CNT))
 		return nbuf;
@@ -1372,6 +1432,13 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	hal_tx_desc_cached[5] = vdev->lmac_id << TCL_DATA_CMD_PMAC_ID_LSB;
 	hal_tx_desc_cached[5] |= vdev->vdev_id << TCL_DATA_CMD_VDEV_ID_LSB;
 
+	if (vdev->opmode == wlan_op_mode_sta) {
+		hal_tx_desc_cached[6] = vdev->bss_ast_idx |
+			((vdev->bss_ast_hash & 0xF) <<
+			 TCL_DATA_CMD_CACHE_SET_NUM_LSB);
+		desc_size = DP_TX_FAST_DESC_SIZE + 4;
+	}
+
 	hal_ring_hdl = dp_tx_get_hal_ring_hdl(soc, desc_pool_id);
 
 	if (qdf_unlikely(dp_tx_hal_ring_access_start(soc, hal_ring_hdl))) {
@@ -1392,7 +1459,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	tx_desc->flags |= DP_TX_DESC_FLAG_QUEUED_TX;
 
 	/* Sync cached descriptor with HW */
-	qdf_mem_copy(hal_tx_desc, hal_tx_desc_cached, DP_TX_FAST_DESC_SIZE);
+	qdf_mem_copy(hal_tx_desc, hal_tx_desc_cached, desc_size);
 	qdf_dsb();
 
 	DP_STATS_INC_PKT(vdev, tx_i.processed, 1, tx_desc->length);

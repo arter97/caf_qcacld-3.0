@@ -488,7 +488,7 @@ ucfg_scan_register_event_handler(struct wlan_objmgr_pdev *pdev,
  * @arg: component specific priv argument to @event_cb callback function
  *
  * Unregister a event cb handler. cb and arg will be used to
- * find the calback.
+ * find the callback.
  *
  * Return: void
  */

@@ -394,7 +394,7 @@ struct wlan_vdev_aid_mgr {
 /**
  * struct vdev_mlme_mgmt_ap - ap specific vdev mlme mgmt cfg
  * @hidden_ssid: flag to indicate whether it is hidden ssid
- * @cac_duration_ms: cac duration in millseconds
+ * @cac_duration_ms: cac duration in milliseconds
  * @aid_mgr: AID bitmap mgr
  * @max_chan_switch_time: Max channel switch time in milliseconds.
  * @last_bcn_ts_ms: Timestamp (in milliseconds) of the last beacon sent on the

@@ -20,7 +20,7 @@
 
  /**
  * @file wlan_req_ucfg_api.c
- * @brief contains regulatory user config interface definations
+ * @brief contains regulatory user config interface definitions
  */
 
 #include <wlan_objmgr_vdev_obj.h>

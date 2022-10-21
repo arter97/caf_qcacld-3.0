@@ -516,7 +516,7 @@ uint8_t mlo_glb_h_shmem_arena_get_no_of_chips_from_crash_info(void)
  * mlo_glb_h_shmem_arena_get_crash_reason_address() - get the address of crash
  * reason associated with chip_id
  *
- * Return: Address of crash_reason field fron global shmem arena in case of
+ * Return: Address of crash_reason field from global shmem arena in case of
  * success, else returns NULL
  */
 void *mlo_glb_h_shmem_arena_get_crash_reason_address(uint8_t chip_id)
@@ -542,7 +542,7 @@ void *mlo_glb_h_shmem_arena_get_crash_reason_address(uint8_t chip_id)
 	}
 
 	if (chip == crash_info->no_of_chips) {
-		target_if_err("No crash info corressponding to chip %u",
+		target_if_err("No crash info corresponding to chip %u",
 			      chip_id);
 		return NULL;
 	}

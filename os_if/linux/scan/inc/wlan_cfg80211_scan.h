@@ -92,7 +92,7 @@ typedef struct {
 } __attribute__ ((packed)) qcom_ie_age;
 
 /**
- * struct osif_scan_pdev - OS scan private strcutre
+ * struct osif_scan_pdev - OS scan private structure
  * scan_req_q: Scan request queue
  * scan_req_q_lock: Protect scan request queue
  * req_id: Scan request Id

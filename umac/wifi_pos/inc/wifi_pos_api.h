@@ -422,12 +422,10 @@ struct wlan_objmgr_psoc *wifi_pos_get_psoc(void);
 
 /**
  * wifi_pos_get_legacy_ops() - Get wifi pos legacy ops
- * @psoc: PSOC pointer
  *
  * Return: Pointer to legacy ops
  */
-struct wifi_pos_legacy_ops *
-wifi_pos_get_legacy_ops(struct wlan_objmgr_psoc *psoc);
+struct wifi_pos_legacy_ops *wifi_pos_get_legacy_ops(void);
 
 /**
  * wifi_pos_set_legacy_ops() - Set Wifi Pos legacy ops
@@ -651,22 +649,48 @@ wifi_pos_get_peer_private_object(struct wlan_objmgr_peer *peer);
 
 /**
  * wifi_pos_register_osif_callbacks() - Register OSIF callbacks
- * @psoc: Pointer to psoc object
  * @ops: Osif callbacks pointer
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS
-wifi_pos_register_osif_callbacks(struct wlan_objmgr_psoc *psoc,
-				 struct wifi_pos_osif_ops *ops);
+QDF_STATUS wifi_pos_register_osif_callbacks(struct wifi_pos_osif_ops *ops);
 
 /**
  * wifi_pos_get_osif_callbacks() - Get OS IF callbacks
- * @psoc: Pointer to PSOC object
  *
  * Return: struct wifi_pos_osif_ops pointer
  */
-struct wifi_pos_osif_ops *
-wifi_pos_get_osif_callbacks(struct wlan_objmgr_psoc *psoc);
+struct wifi_pos_osif_ops *wifi_pos_get_osif_callbacks(void);
 #endif /* WIFI_POS_CONVERGED */
+
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+/**
+ * wifi_pos_set_rsta_sec_ltf_cap() - Set RSTA secure LTF capability
+ * @val: Value
+ *
+ * Return: None
+ **/
+void
+wifi_pos_set_rsta_sec_ltf_cap(bool val);
+
+/**
+ * wifi_pos_get_rsta_sec_ltf_cap  - Get RSTA secure LTF capability
+ *
+ * Return: True or false
+ */
+bool wifi_pos_get_rsta_sec_ltf_cap(void);
+
+/**
+ * wifi_pos_set_rsta_11az_ranging_cap() - Enable/Disable R-STA 11az ranging
+ * @val: Value to set
+ */
+void wifi_pos_set_rsta_11az_ranging_cap(bool val);
+
+/**
+ * wifi_pos_get_rsta_11az_ranging_cap() - Get if RSTA 11az ranging is enabled
+ *
+ * Return: True if 11az ranging is enabled
+ */
+bool wifi_pos_get_rsta_11az_ranging_cap(void);
+#endif
 #endif /* _WIFI_POS_API_H_ */

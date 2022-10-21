@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1879,7 +1880,7 @@ static int diag_fw_handler(ol_scn_t scn, uint8_t *data, uint32_t datalen)
 		AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("NULL Pointer assigned\n"));
 		return A_ERROR;
 	}
-	/* when fw asser occurs,host can't use TLV format. */
+	/* when fw assert occurs,host can't use TLV format. */
 	if (wma->is_fw_assert) {
 		datap = data;
 		len = datalen;
@@ -2001,7 +2002,7 @@ int dbglog_parse_debug_logs(ol_scn_t scn, uint8_t *data, uint32_t datalen)
 		AR_DEBUG_PRINTF(ATH_DEBUG_ERR, ("NULL Pointer assigned\n"));
 		return A_ERROR;
 	}
-	/*when fw asser occurs,host can't use TLV format. */
+	/*when fw assert occurs,host can't use TLV format. */
 	if (wma->is_fw_assert) {
 		datap = data;
 		len = datalen;
@@ -4282,7 +4283,7 @@ int cnss_diag_deactivate_service(void)
 /**
  *  brief cnss_diag_msg_callback() - Call back invoked by netlink service
  *
- *  This function gets invoked by netlink service when a message is recevied
+ *  This function gets invoked by netlink service when a message is received
  *  from the cnss-diag application in user-space.
  *
  *  param -

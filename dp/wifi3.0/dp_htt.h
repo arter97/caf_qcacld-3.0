@@ -112,7 +112,7 @@ void htt_htc_pkt_pool_free(struct htt_soc *soc);
 
 /*
  * Set the base misclist size to HTT copy engine source ring size
- * to guarantee that a packet on the misclist wont be freed while it
+ * to guarantee that a packet on the misclist won't be freed while it
  * is sitting in the copy engine.
  */
 #define DP_HTT_HTC_PKT_MISCLIST_SIZE          2048
@@ -219,9 +219,16 @@ struct dp_htt_htc_pkt_union {
 	} u;
 };
 
+struct bp_handler {
+	unsigned long bp_start_tt;
+	unsigned long bp_last_tt;
+	unsigned long bp_duration;
+	unsigned long bp_counter;
+};
+
 struct dp_htt_timestamp {
-	long *umac_ttt;
-	long *lmac_ttt;
+	struct bp_handler *umac_path;
+	struct bp_handler *lmac_path;
 };
 
 struct htt_soc {
@@ -329,10 +336,10 @@ struct dp_tx_mon_downstream_tlv_config {
  * rx_frame_bitmap_ack: RX_FRAME_BITMAP_ACK TLV
  * rx_frame_1k_bitmap_ack: RX_FRAME_1K_BITMAP_ACK TLV
  * coex_tx_status: COEX_TX_STATUS TLV
- * recevied_response_info: RECEIVED_RESPONSE_INFO TLV
- * recevied_response_info_p2: RECEIVED_RESPONSE_INFO_PART2 TLV
+ * received_response_info: RECEIVED_RESPONSE_INFO TLV
+ * received_response_info_p2: RECEIVED_RESPONSE_INFO_PART2 TLV
  * ofdma_trigger_details: OFDMA_TRIGGER_DETAILS
- * recevied_trigger_info: RECEIVED_TRIGGER_INFO
+ * received_trigger_info: RECEIVED_TRIGGER_INFO
  * pdg_tx_request: PDG_TX_REQUEST
  * pdg_response: PDG_RESPONSE
  * pdg_trig_response: PDG_TRIG_RESPONSE
@@ -417,10 +424,10 @@ struct dp_tx_mon_upstream_tlv_config {
 		 rx_frame_bitmap_ack:1,
 		 rx_frame_1k_bitmap_ack:1,
 		 coex_tx_status:1,
-		 recevied_response_info:1,
-		 recevied_response_info_p2:1,
+		 received_response_info:1,
+		 received_response_info_p2:1,
 		 ofdma_trigger_details:1,
-		 recevied_trigger_info:1,
+		 received_trigger_info:1,
 		 pdg_tx_request:1,
 		 pdg_response:1,
 		 pdg_trig_response:1,
@@ -515,7 +522,7 @@ struct dp_tx_mon_wordmask_config {
  * enable/disable.
  * @dtlvs: enable/disable downstream TLVs
  * @utlvs: enable/disable upstream TLVs
- * @wmask: enable/disbale word mask subscription
+ * @wmask: enable/disable word mask subscription
  * @mgmt_filter: enable/disable mgmt packets
  * @data_filter: enable/disable data packets
  * @ctrl_filter: enable/disable ctrl packets
@@ -668,10 +675,10 @@ struct htt_rx_ring_tlv_filter {
 	u_int32_t phy_err_mask;
 	u_int32_t phy_err_mask_cont;
 #endif
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#if defined(QCA_MONITOR_2_0_SUPPORT) || defined(CONFIG_WORD_BASED_TLV)
 	uint16_t rx_mpdu_start_wmask;
 	uint16_t rx_mpdu_end_wmask;
-	uint16_t rx_msdu_end_wmask;
+	uint32_t rx_msdu_end_wmask;
 	uint16_t rx_pkt_tlv_offset;
 	uint16_t mgmt_dma_length:3,
 		 ctrl_dma_length:3,
@@ -791,7 +798,7 @@ htt_htc_misc_pkt_list_add(struct htt_soc *soc, struct dp_htt_htc_pkt *pkt);
  * @soc : HTT SOC handle
  * @pkt: pkt to be send
  * @cmd : command to be recorded in dp htt logger
- * @buf : Pointer to buffer needs to be recored for above cmd
+ * @buf : Pointer to buffer needs to be recorded for above cmd
  *
  * Return: None
  */
@@ -996,7 +1003,7 @@ dp_htt_rx_flow_fse_operation(struct dp_pdev *pdev,
 			     struct dp_htt_rx_flow_fst_operation *op_info);
 
 /**
- * htt_h2t_full_mon_cfg() - Send full monitor configuarion msg to FW
+ * htt_h2t_full_mon_cfg() - Send full monitor configuration msg to FW
  *
  * @htt_soc: HTT Soc handle
  * @pdev_id: Radio id

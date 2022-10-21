@@ -111,7 +111,7 @@ enum list_type {
  * @type:            type of the list to be parsed
  * @threshold:       configured by user by overwriting the respective debugfs
  *                   sys entry. This is to list the functions which requested
- *                   memory/dma allocations more than threshold nubmer of times.
+ *                   memory/dma allocations more than threshold number of times.
  */
 struct major_alloc_priv {
 	enum list_type type;
@@ -1491,7 +1491,7 @@ static void qdf_mem_debug_init(void)
 	if (is_initial_mem_debug_disabled)
 		return;
 
-	/* Initalizing the list with maximum size of 60000 */
+	/* Initializing the list with maximum size of 60000 */
 	for (i = 0; i < QDF_DEBUG_DOMAIN_COUNT; ++i)
 		qdf_list_create(&qdf_mem_domains[i], 60000);
 	qdf_spinlock_create(&qdf_mem_list_lock);
@@ -3067,4 +3067,75 @@ qdf_dma_addr_t qdf_mem_paddr_from_dmaaddr(qdf_device_t osdev,
 }
 
 qdf_export_symbol(qdf_mem_paddr_from_dmaaddr);
+#endif
+
+#ifdef QCA_KMEM_CACHE_SUPPORT
+qdf_kmem_cache_t
+__qdf_kmem_cache_create(const char *cache_name,
+			qdf_size_t size)
+{
+	struct kmem_cache *cache;
+
+	cache = kmem_cache_create(cache_name, size,
+				  0, 0, NULL);
+
+	if (!cache)
+		return NULL;
+
+	return cache;
+}
+qdf_export_symbol(__qdf_kmem_cache_create);
+
+void
+__qdf_kmem_cache_destroy(qdf_kmem_cache_t cache)
+{
+	kmem_cache_destroy(cache);
+}
+
+qdf_export_symbol(__qdf_kmem_cache_destroy);
+
+void*
+__qdf_kmem_cache_alloc(qdf_kmem_cache_t cache)
+{
+	int flags = GFP_KERNEL;
+
+	if (in_interrupt() || irqs_disabled() || in_atomic())
+		flags = GFP_ATOMIC;
+
+	return kmem_cache_alloc(cache, flags);
+}
+
+qdf_export_symbol(__qdf_kmem_cache_alloc);
+
+void
+__qdf_kmem_cache_free(qdf_kmem_cache_t cache, void *node)
+
+{
+	kmem_cache_free(cache, node);
+}
+
+qdf_export_symbol(__qdf_kmem_cache_free);
+#else
+qdf_kmem_cache_t
+__qdf_kmem_cache_create(const char *cache_name,
+			qdf_size_t size)
+{
+	return NULL;
+}
+
+void
+__qdf_kmem_cache_destroy(qdf_kmem_cache_t cache)
+{
+}
+
+void *
+__qdf_kmem_cache_alloc(qdf_kmem_cache_t cache)
+{
+	return NULL;
+}
+
+void
+__qdf_kmem_cache_free(qdf_kmem_cache_t cache, void *node)
+{
+}
 #endif

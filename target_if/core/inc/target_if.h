@@ -66,6 +66,12 @@
 #define targetif_nofl_debug(params...) \
 	QDF_TRACE_DEBUG_NO_FL(QDF_MODULE_ID_TARGET_IF, params)
 
+#ifdef SERIALIZE_WMI_RX_EXECUTION_CTX
+#define WMI_RX_EXECUTION_CTX WMI_RX_SERIALIZER_CTX
+#else
+#define WMI_RX_EXECUTION_CTX WMI_RX_UMAC_CTX
+#endif /* SERIALIZE_WMI_RX_EXECUTION_CTX */
+
 typedef struct wlan_objmgr_psoc *(*get_psoc_handle_callback)(
 			void *scn_handle);
 
@@ -76,6 +82,13 @@ typedef int (*wmi_legacy_service_ready_callback)(uint32_t event_id,
 						void *handle,
 						uint8_t *event_data,
 						uint32_t length);
+
+/* Enum for ext and ext2 processing status */
+enum wmi_init_status {
+	wmi_init_success,
+	wmi_init_ext_processing_failed,
+	wmi_init_ext2_processing_failed,
+};
 
 /**
  * struct target_if_ctx - target_interface context
@@ -169,6 +182,7 @@ struct target_version_info {
  * @wmi_ready: is ready event received
  * @total_mac_phy_cnt: num of mac phys
  * @num_radios: number of radios
+ * @wmi_service_status: wmi service status success or failed
  * @wlan_init_status: Target init status
  * @target_type: Target type
  * @max_descs: Max descriptors
@@ -200,6 +214,7 @@ struct tgt_info {
 	bool wmi_ready;
 	uint8_t total_mac_phy_cnt;
 	uint8_t num_radios;
+	enum wmi_init_status wmi_service_status;
 	uint32_t wlan_init_status;
 	uint32_t target_type;
 	uint32_t max_descs;
@@ -225,7 +240,9 @@ struct tgt_info {
 	struct wlan_psoc_host_scan_radio_caps *scan_radio_caps;
 	uint32_t device_mode;
 	uint32_t sbs_lower_band_end_freq;
+#ifdef HEALTH_MON_SUPPORT
 	struct wmi_health_mon_params health_mon_param;
+#endif /* HEALTH_MON_SUPPORT */
 };
 
 /**
@@ -2796,6 +2813,15 @@ QDF_STATUS target_if_mlo_teardown_req(struct wlan_objmgr_pdev **pdev,
 				      uint8_t num_pdevs, uint32_t reason);
 #endif /*WLAN_FEATURE_11BE_MLO && WLAN_MLO_MULTI_CHIP*/
 
+/**
+ * target_if_is_platform_eht_capable():
+ * API to check if the platform is EHT capable
+ * @pdev: pdev object
+ *
+ * Return: True if platform is 11BE capable; else False
+ */
+bool target_if_is_platform_eht_capable(struct wlan_objmgr_psoc *psoc,
+				       uint8_t pdev_id);
 #ifdef REO_SHARED_QREF_TABLE_EN
 static inline void target_if_set_reo_shared_qref_feature(struct wlan_objmgr_psoc *psoc,
 							 struct tgt_info *info)
@@ -2809,7 +2835,8 @@ static inline void target_if_set_reo_shared_qref_feature(struct wlan_objmgr_psoc
 		return;
 	}
 
-	if (target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCN9224)
+	if (target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCN9224 ||
+	    target_psoc_get_target_type(tgt_hdl) == TARGET_TYPE_QCA5332)
 		info->wlan_res_cfg.reo_qdesc_shared_addr_table_enabled = true;
 	else
 		info->wlan_res_cfg.reo_qdesc_shared_addr_table_enabled = false;

@@ -32,7 +32,18 @@ QDF_STATUS son_ol_send_null(struct wlan_objmgr_pdev *pdev,
 			    u_int8_t *macaddr,
 			    struct wlan_objmgr_vdev *vdev);
 
+#if defined(WMI_NON_TLV_SUPPORT) || defined(WMI_TLV_AND_NON_TLV_SUPPORT)
 QDF_STATUS son_ol_peer_ext_stats_enable(struct wlan_objmgr_pdev *pdev,
 					uint8_t *peer_addr,
 					struct wlan_objmgr_vdev *vdev,
 					uint32_t stats_count, uint32_t enable);
+#else
+static inline QDF_STATUS son_ol_peer_ext_stats_enable(
+					struct wlan_objmgr_pdev *pdev,
+					uint8_t *peer_addr,
+					struct wlan_objmgr_vdev *vdev,
+					uint32_t stats_count, uint32_t enable)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif

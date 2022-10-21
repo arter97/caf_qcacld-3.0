@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -69,7 +70,7 @@ void qdf_register_mc_timer_callback(void (*callback) (qdf_mc_timer_t *))
 
 qdf_export_symbol(qdf_register_mc_timer_callback);
 
-/* Function declarations and documenation */
+/* Function declarations and documentation */
 
 /**
  * qdf_try_allowing_sleep() - clean up timer states after it has been deactivated
@@ -674,7 +675,7 @@ QDF_STATUS qdf_mc_timer_start(qdf_mc_timer_t *timer, uint32_t expiration_time)
 		return QDF_STATUS_E_INVAL;
 	}
 
-	/* make sure the remainer of the logic isn't interrupted */
+	/* make sure the remainder of the logic isn't interrupted */
 	qdf_spin_lock_irqsave(&timer->platform_info.spinlock);
 
 	/* ensure if the timer can be started */
@@ -691,6 +692,12 @@ QDF_STATUS qdf_mc_timer_start(qdf_mc_timer_t *timer, uint32_t expiration_time)
 		  jiffies + __qdf_scaled_msecs_to_jiffies(expiration_time));
 
 	timer->state = QDF_TIMER_STATE_RUNNING;
+
+	/* Save the jiffies value in a per-timer context in qdf_mc_timer_t
+	 * It will help the debugger to know the exact time at which the host
+	 * starts the QDF timer.
+	 */
+	timer->timer_start_jiffies = jiffies;
 
 	/* get the thread ID on which the timer is being started */
 	timer->platform_info.thread_id = current->pid;

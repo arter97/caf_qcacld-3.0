@@ -72,6 +72,10 @@ dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			       qdf_nbuf_t nbuf_copy,
 			       struct cdp_tid_rx_stats *tid_stats);
 
+void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
+				  uint32_t *msg_word,
+				  void *rx_filter);
+
 uint32_t dp_rx_process_be(struct dp_intr *int_ctx,
 			  hal_ring_handle_t hal_ring_hdl, uint8_t reo_ring_num,
 			  uint32_t quota);

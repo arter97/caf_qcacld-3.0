@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -74,7 +75,13 @@
  * @QDF_STATUS_CRYPTO_DECRYPT_FAILED: decryption failed
  * @QDF_STATUS_E_RANGE: result/parameter/operation was out of range
  * @QDF_STATUS_E_GRO_DROP: return code for GRO drop
- * @QDF_STATUS_MAX: not a realy value just a place holder for max
+ * @QDF_STATUS_QMI_HANDLE_INIT_FAILED: QMI handle init failed
+ * @QDF_STATUS_QMI_ADD_LOOKUP_FAILED: QMI add lookup failed
+ * @QDF_STATUS_QMI_SVC_CONNECT_FAILED: QMI service connect failed
+ * @QDF_STATUS_QMI_TXN_INIT_FAILED: QMI transaction init failed
+ * @QDF_STATUS_QMI_SEND_REQ_FAILED: QMI send request failed
+ * @QDF_STATUS_QMI_TXN_WAIT_FAILED: QMI transaction wait failed
+ * @QDF_STATUS_MAX: not a real value just a place holder for max
  */
 typedef enum {
 	QDF_STATUS_SUCCESS,
@@ -125,6 +132,12 @@ typedef enum {
 	QDF_STATUS_E_DEFRAG_ERROR,
 	QDF_STATUS_E_RANGE,
 	QDF_STATUS_E_GRO_DROP,
+	QDF_STATUS_QMI_HANDLE_INIT_FAILED,
+	QDF_STATUS_QMI_ADD_LOOKUP_FAILED,
+	QDF_STATUS_QMI_SVC_CONNECT_FAILED,
+	QDF_STATUS_QMI_TXN_INIT_FAILED,
+	QDF_STATUS_QMI_SEND_REQ_FAILED,
+	QDF_STATUS_QMI_TXN_WAIT_FAILED,
 	QDF_STATUS_MAX
 } QDF_STATUS;
 

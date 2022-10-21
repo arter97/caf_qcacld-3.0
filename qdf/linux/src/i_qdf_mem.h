@@ -86,7 +86,7 @@ typedef struct mempool_elem {
  * @mem_size: Total size of the pool in bytes
  * @free_list: free pool list
  * @lock: spinlock object
- * @max_elem: Maximum number of elements in tha pool
+ * @max_elem: Maximum number of elements in the pool
  * @free_cnt: Number of free elements available
  */
 typedef struct __qdf_mempool_ctxt {
@@ -102,6 +102,7 @@ typedef struct __qdf_mempool_ctxt {
 	u_int32_t free_cnt;
 } __qdf_mempool_ctxt_t;
 
+typedef struct kmem_cache *qdf_kmem_cache_t;
 #endif /* __KERNEL__ */
 
 #define __page_size ((size_t)PAGE_SIZE)
@@ -149,7 +150,7 @@ enum dma_data_direction __qdf_dma_dir_to_os(qdf_dma_dir_t qdf_dir)
  * @buf: pointer to memory to be dma mapped
  * @dir: DMA map direction
  * @nbytes: number of bytes to be mapped.
- * @phy_addr: ponter to recive physical address.
+ * @phy_addr: pointer to receive physical address.
  *
  * Return: success/failure
  */
@@ -210,6 +211,11 @@ int __qdf_mempool_init(qdf_device_t osdev, __qdf_mempool_t *pool, int pool_cnt,
 void __qdf_mempool_destroy(qdf_device_t osdev, __qdf_mempool_t pool);
 void *__qdf_mempool_alloc(qdf_device_t osdev, __qdf_mempool_t pool);
 void __qdf_mempool_free(qdf_device_t osdev, __qdf_mempool_t pool, void *buf);
+qdf_kmem_cache_t __qdf_kmem_cache_create(const char *cache_name,
+					 qdf_size_t size);
+void __qdf_kmem_cache_destroy(qdf_kmem_cache_t cache);
+void* __qdf_kmem_cache_alloc(qdf_kmem_cache_t cache);
+void __qdf_kmem_cache_free(qdf_kmem_cache_t cache, void *node);
 #define QDF_RET_IP ((void *)_RET_IP_)
 
 #define __qdf_mempool_elem_size(_pool) ((_pool)->elem_size)
@@ -435,7 +441,7 @@ __qdf_mem_paddr_from_dmaaddr(qdf_device_t osdev,
 
 /**
  * __qdf_os_mem_dma_get_sgtable() - Returns DMA memory scatter gather table
- * @dev: device instace
+ * @dev: device instance
  * @sgt: scatter gather table pointer
  * @cpu_addr: HLOS virtual address
  * @dma_addr: dma/iova
@@ -605,6 +611,7 @@ __qdf_mem_set_dma_pa(qdf_device_t osdev,
 {
 	mem_info->pa = dma_pa;
 }
+
 
 /**
  * __qdf_mem_alloc_consistent() - allocates consistent qdf memory

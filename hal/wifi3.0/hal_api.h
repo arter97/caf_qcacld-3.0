@@ -318,7 +318,7 @@ static inline void hal_write32_mb(struct hal_soc *hal_soc, uint32_t offset,
 }
 
 /**
- * hal_write32_mb_confirm() - write register and check wirting result
+ * hal_write32_mb_confirm() - write register and check writing result
  *
  */
 static inline void hal_write32_mb_confirm(struct hal_soc *hal_soc,
@@ -931,11 +931,11 @@ enum hal_srng_dir hal_srng_get_dir(void *hal_soc, int ring_type);
 
 /* HAL memory information */
 struct hal_mem_info {
-	/* dev base virutal addr */
+	/* dev base virtual addr */
 	void *dev_base_addr;
 	/* dev base physical addr */
 	void *dev_base_paddr;
-	/* dev base ce virutal addr - applicable only for qca5018  */
+	/* dev base ce virtual addr - applicable only for qca5018  */
 	/* In qca5018 CE register are outside wcss block */
 	/* using a separate address space to access CE registers */
 	void *dev_base_addr_ce;
@@ -3194,7 +3194,7 @@ void *hal_srng_dst_prefetch(hal_soc_handle_t hal_soc_hdl,
 	uint32_t cnt;
 	/*
 	 * prefetching 4 HW descriptors will ensure atleast by the time
-	 * 5th HW descriptor is being processed it is guranteed that the
+	 * 5th HW descriptor is being processed it is guaranteed that the
 	 * 5th HW descriptor, its SW Desc, its nbuf and its nbuf's data
 	 * are in cache line. basically ensuring all the 4 (HW, SW, nbuf
 	 * & nbuf->data) are prefetched.
@@ -3303,5 +3303,65 @@ void *hal_srng_dst_get_next_32_byte_desc(hal_soc_handle_t hal_soc_hdl,
 		last_prefetched_hw_desc = (uint8_t *)&srng->ring_base_vaddr[0];
 
 	return (void *)last_prefetched_hw_desc;
+}
+
+/**
+ * hal_srng_src_set_hp() - set head idx.
+ * @hal_soc_hdl: HAL SOC handle
+ * @idx: head idx
+ *
+ * return: none
+ */
+static inline
+void hal_srng_src_set_hp(hal_ring_handle_t hal_ring_hdl, uint16_t idx)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+
+	srng->u.src_ring.hp = idx * srng->entry_size;
+}
+
+/**
+ * hal_srng_dst_set_tp() - set tail idx.
+ * @hal_soc_hdl: HAL SOC handle
+ * @idx: tail idx
+ *
+ * return: none
+ */
+static inline
+void hal_srng_dst_set_tp(hal_ring_handle_t hal_ring_hdl, uint16_t idx)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+
+	srng->u.dst_ring.tp = idx * srng->entry_size;
+}
+
+/**
+ * hal_srng_src_get_tpidx() - get tail idx
+ * @hal_soc_hdl: HAL SOC handle
+ *
+ * return: tail idx
+ */
+static inline
+uint16_t hal_srng_src_get_tpidx(hal_ring_handle_t hal_ring_hdl)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+	uint32_t tp = *(volatile uint32_t *)(srng->u.src_ring.tp_addr);
+
+	return tp / srng->entry_size;
+}
+
+/**
+ * hal_srng_dst_get_hpidx() - get head idx
+ * @hal_soc_hdl: HAL SOC handle
+ *
+ * return: head idx
+ */
+static inline
+uint16_t hal_srng_dst_get_hpidx(hal_ring_handle_t hal_ring_hdl)
+{
+	struct hal_srng *srng = (struct hal_srng *)hal_ring_hdl;
+	uint32_t hp = *(volatile uint32_t *)(srng->u.dst_ring.hp_addr);
+
+	return hp / srng->entry_size;
 }
 #endif /* _HAL_APIH_ */

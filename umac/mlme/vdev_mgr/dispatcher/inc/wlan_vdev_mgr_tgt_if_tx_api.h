@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -346,4 +346,18 @@ QDF_STATUS tgt_vdev_mgr_cdp_vdev_attach(struct vdev_mlme_obj *mlme_obj);
  */
 QDF_STATUS tgt_vdev_mgr_cdp_vdev_detach(struct vdev_mlme_obj *mlme_obj);
 #endif
+
+/**
+ * tgt_vdev_peer_set_param_send() - API to send peer param
+ * @vdev: Pointer to object manager VDEV
+ * @peer_mac_addr: pointer to peer mac address
+ * @param_id: peer param id
+ * @param_value: peer param value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS tgt_vdev_peer_set_param_send(struct wlan_objmgr_vdev *vdev,
+					uint8_t *peer_mac_addr,
+					uint32_t param_id,
+					uint32_t param_value);
 #endif /* __WLAN_VDEV_MGR_TX_OPS_API_H__ */

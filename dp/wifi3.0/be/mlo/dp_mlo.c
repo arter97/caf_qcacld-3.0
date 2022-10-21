@@ -286,7 +286,7 @@ QDF_STATUS dp_update_mlo_ptnr_list(struct cdp_soc_t *soc_hdl,
 							dp_err("Unable to add vdev to self vdev's list");
 							dp_vdev_unref_delete(self_soc,
 								vdev, DP_MOD_ID_RX);
-							/* TODO - relase soc ref here */
+							/* TODO - release soc ref here */
 							/* dp_soc_unref_delete(soc);*/
 							ret = QDF_STATUS_E_FAILURE;
 							goto exit;

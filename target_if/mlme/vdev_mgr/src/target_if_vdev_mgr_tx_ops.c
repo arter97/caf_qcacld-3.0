@@ -1268,6 +1268,106 @@ static void target_if_vdev_register_set_mac_address(
 }
 #endif
 
+/**
+ * target_if_phy_ch_width_to_wmi_chan_width() - convert channel width from
+ *                                              phy_ch_width to
+ *                                              wmi_host_channel_width
+ * @ch_width: enum phy_ch_width
+ *
+ * return: wmi_host_channel_width
+ */
+static wmi_host_channel_width
+target_if_phy_ch_width_to_wmi_chan_width(enum phy_ch_width ch_width)
+{
+	switch (ch_width) {
+	case CH_WIDTH_20MHZ:
+		return WMI_HOST_CHAN_WIDTH_20;
+	case CH_WIDTH_40MHZ:
+		return WMI_HOST_CHAN_WIDTH_40;
+	case CH_WIDTH_80MHZ:
+		return WMI_HOST_CHAN_WIDTH_80;
+	case CH_WIDTH_160MHZ:
+		return WMI_HOST_CHAN_WIDTH_160;
+	case CH_WIDTH_80P80MHZ:
+		return WMI_HOST_CHAN_WIDTH_80P80;
+	case CH_WIDTH_5MHZ:
+		return WMI_HOST_CHAN_WIDTH_5;
+	case CH_WIDTH_10MHZ:
+		return WMI_HOST_CHAN_WIDTH_10;
+	case CH_WIDTH_320MHZ:
+		return WMI_HOST_CHAN_WIDTH_320;
+	default:
+		return WMI_HOST_CHAN_WIDTH_20;
+	}
+}
+
+/**
+ * target_if_vdev_peer_mlme_param_2_wmi() - convert peer parameter from mlme to
+ *                                          wmi
+ * @mlme_id: peer parameter id in mlme layer
+ * @param_value: peer parameter value in mlme layer
+ * @param: pointer to peer_set_params
+ *
+ * Return: peer parameter id in wmi layer
+ */
+static void
+target_if_vdev_peer_mlme_param_2_wmi(enum wlan_mlme_peer_param_id mlme_id,
+				     uint32_t param_value,
+				     struct peer_set_params *param)
+{
+	enum phy_ch_width bw;
+
+	switch (mlme_id) {
+	case WLAN_MLME_PEER_BW_PUNCTURE:
+		param->param_id = WMI_HOST_PEER_CHWIDTH_PUNCTURE_20MHZ_BITMAP;
+		param->param_value = param_value;
+		bw = QDF_GET_BITS(param_value, 0, 8);
+		QDF_SET_BITS(param->param_value, 0, 8,
+			     target_if_phy_ch_width_to_wmi_chan_width(bw));
+		break;
+	default:
+		param->param_id = mlme_id;
+		param->param_value = param_value;
+		break;
+	}
+}
+
+/**
+ * target_if_vdev_peer_set_param_send() - send peer param
+ * @vdev: Pointer to vdev object.
+ * @peer_mac_addr: peer mac address
+ * @param_id: peer param id
+ * @param_value: peer param value
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS target_if_vdev_peer_set_param_send(
+						struct wlan_objmgr_vdev *vdev,
+						uint8_t *peer_mac_addr,
+						uint32_t param_id,
+						uint32_t param_value)
+{
+	struct peer_set_params param;
+	wmi_unified_t wmi_handle;
+
+	if (!peer_mac_addr || !vdev) {
+		mlme_err("invalid input");
+		return QDF_STATUS_E_INVAL;
+	}
+	wmi_handle = target_if_vdev_mgr_wmi_handle_get(vdev);
+	if (!wmi_handle) {
+		mlme_err("Failed to get WMI handle!");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	qdf_mem_zero(&param, sizeof(param));
+
+	target_if_vdev_peer_mlme_param_2_wmi(param_id, param_value, &param);
+	param.vdev_id = wlan_vdev_get_id(vdev);
+
+	return wmi_set_peer_param_send(wmi_handle, peer_mac_addr, &param);
+}
+
 QDF_STATUS
 target_if_vdev_mgr_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -1337,5 +1437,7 @@ target_if_vdev_mgr_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	mlme_tx_ops->vdev_mgr_rsp_timer_stop =
 			target_if_vdev_mgr_rsp_timer_stop;
 	target_if_vdev_register_set_mac_address(mlme_tx_ops);
+	mlme_tx_ops->vdev_peer_set_param_send =
+			target_if_vdev_peer_set_param_send;
 	return QDF_STATUS_SUCCESS;
 }

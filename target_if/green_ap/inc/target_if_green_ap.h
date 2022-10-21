@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -92,7 +93,7 @@ uint64_t target_if_green_ap_get_current_channel_flags(
  * target_if_green_ap_reset_dev() - Reset dev
  * @pdev: pdev pointer
  *
- * @Return:  QDF_STATUS_SUCCESS if device resetted
+ * @Return:  QDF_STATUS_SUCCESS if device reset
  */
 QDF_STATUS target_if_green_ap_reset_dev(struct wlan_objmgr_pdev *pdev);
 

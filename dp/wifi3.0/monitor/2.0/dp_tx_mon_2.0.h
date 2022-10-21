@@ -93,7 +93,7 @@ dp_tx_mon_buf_desc_pool_alloc(struct dp_soc *soc);
  *
  * @mon_pdev - DP_MON_PDEV handle
  * @ppdu_id - ppdu_id
- * @end_reason - monitor destiantion descriptor end reason
+ * @end_reason - monitor destination descriptor end reason
  *
  * Return: void
  */

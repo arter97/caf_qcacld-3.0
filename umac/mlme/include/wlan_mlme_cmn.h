@@ -103,6 +103,9 @@ struct mlme_cm_ops {
 						struct wlan_objmgr_vdev *vdev,
 						struct qdf_mac_addr *bssid,
 						int index, bool preauth);
+	QDF_STATUS (*mlme_cm_send_keys_cb)(struct wlan_objmgr_vdev *vdev,
+					   uint8_t key_index, bool pairwise,
+					   enum wlan_crypto_cipher_type cipher_type);
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	QDF_STATUS (*mlme_cm_roam_start_cb)(struct wlan_objmgr_vdev *vdev);
@@ -482,7 +485,7 @@ QDF_STATUS mlme_vdev_enqueue_exp_ser_cmd(struct vdev_mlme_obj *vdev_mlme,
 					 uint8_t cmd_type);
 
 /**
- * mlme_vdev_ops_start_fw_send - Send WMI START/RESTART commmand to FW
+ * mlme_vdev_ops_start_fw_send - Send WMI START/RESTART command to FW
  * @vdev:  VDEV object
  *
  * API to send WMI start/restart command to FW
@@ -495,7 +498,7 @@ QDF_STATUS mlme_vdev_ops_start_fw_send(struct wlan_objmgr_vdev *vdev,
 
 /**
  * mlme_vdev_ops_multivdev_restart_fw_cmd_send - Send WMI Multivdev restart
- *                                              commmand to FW
+ *                                              command to FW
  * @pdev:  PDEV object
  *
  * API to send WMI multivdev restart command to FW
@@ -507,7 +510,7 @@ QDF_STATUS mlme_vdev_ops_multivdev_restart_fw_cmd_send(
 						struct wlan_objmgr_pdev *pdev);
 
 /**
- * mlme_vdev_ops_stop_fw_send - Send WMI STOP commmand to FW
+ * mlme_vdev_ops_stop_fw_send - Send WMI STOP command to FW
  * @vdev:  VDEV object
  *
  * API to send WMI stop command to FW
@@ -518,7 +521,7 @@ QDF_STATUS mlme_vdev_ops_multivdev_restart_fw_cmd_send(
 QDF_STATUS mlme_vdev_ops_stop_fw_send(struct wlan_objmgr_vdev *vdev);
 
 /**
- * mlme_vdev_ops_down_fw_send - Send WMI Down commmand to FW
+ * mlme_vdev_ops_down_fw_send - Send WMI Down command to FW
  * @vdev:  VDEV object
  *
  * API to send WMI down command to FW
@@ -846,9 +849,29 @@ QDF_STATUS mlme_cm_osif_roam_sync_ind(struct wlan_objmgr_vdev *vdev);
 QDF_STATUS mlme_cm_osif_pmksa_candidate_notify(struct wlan_objmgr_vdev *vdev,
 					       struct qdf_mac_addr *bssid,
 					       int index, bool preauth);
+/**
+ * mlme_cm_osif_send_keys() - send vdev keys
+ * @vdev: vdev pointer
+ * @key_index: key index value
+ * @pairwise: pairwise bool value
+ * @ciipher_type: cipher enum value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlme_cm_osif_send_keys(struct wlan_objmgr_vdev *vdev,
+				  uint8_t key_index, bool pairwise,
+				  enum wlan_crypto_cipher_type cipher_type);
 #else
 static inline
 QDF_STATUS mlme_cm_osif_roam_sync_ind(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS mlme_cm_osif_send_keys(struct wlan_objmgr_vdev *vdev,
+				  uint8_t key_index, bool pairwise,
+				  enum wlan_crypto_cipher_type cipher_type)
 {
 	return QDF_STATUS_SUCCESS;
 }

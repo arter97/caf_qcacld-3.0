@@ -23,8 +23,11 @@
 #include "dp_be.h"
 #include "dp_be_tx.h"
 #include "dp_be_rx.h"
+#ifdef WIFI_MONITOR_SUPPORT
 #if !defined(DISABLE_MON_CONFIG) && defined(QCA_MONITOR_2_0_SUPPORT)
 #include "dp_mon_2.0.h"
+#endif
+#include "dp_mon.h"
 #endif
 #include <hal_be_api.h>
 
@@ -58,6 +61,16 @@ static struct wlan_cfg_tcl_wbm_ring_num_map g_tcl_wbm_map_array[MAX_TCL_DATA_RIN
 };
 #endif
 
+#ifdef WLAN_SUPPORT_PPEDS
+static void dp_ppeds_rings_status(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	dp_print_ring_stat_from_hal(soc, &be_soc->reo2ppe_ring, REO2PPE);
+	dp_print_ring_stat_from_hal(soc, &be_soc->ppe2tcl_ring, PPE2TCL);
+}
+#endif
+
 static void dp_soc_cfg_attach_be(struct dp_soc *soc)
 {
 	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx = soc->wlan_cfg_ctx;
@@ -88,32 +101,6 @@ qdf_size_t dp_get_context_size_be(enum dp_context_type context_type)
 		return 0;
 	}
 }
-
-#if !defined(DISABLE_MON_CONFIG) && defined(QCA_MONITOR_2_0_SUPPORT)
-qdf_size_t dp_mon_get_context_size_be(enum dp_context_type context_type)
-{
-	switch (context_type) {
-	case DP_CONTEXT_TYPE_MON_SOC:
-		return sizeof(struct dp_mon_soc_be);
-	case DP_CONTEXT_TYPE_MON_PDEV:
-		return sizeof(struct dp_mon_pdev_be);
-	default:
-		return 0;
-	}
-}
-#else
-qdf_size_t dp_mon_get_context_size_be(enum dp_context_type context_type)
-{
-	switch (context_type) {
-	case DP_CONTEXT_TYPE_MON_SOC:
-		return sizeof(struct dp_mon_soc);
-	case DP_CONTEXT_TYPE_MON_PDEV:
-		return sizeof(struct dp_mon_pdev);
-	default:
-		return 0;
-	}
-}
-#endif
 
 #ifdef DP_FEATURE_HW_COOKIE_CONVERSION
 #if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
@@ -185,7 +172,7 @@ static QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
  * dp_cc_reg_cfg_init() - initialize and configure HW cookie
 			  conversion register
  * @soc: SOC handle
- * @is_4k_align: page address 4k alignd
+ * @is_4k_align: page address 4k aligned
  *
  * Return: None
  */
@@ -766,6 +753,31 @@ qdf_size_t dp_get_soc_context_size_be(void)
 	return sizeof(struct dp_soc_be);
 }
 
+#ifdef CONFIG_WORD_BASED_TLV
+/**
+ * dp_rxdma_ring_wmask_cfg_be() - Setup RXDMA ring word mask config
+ * @soc: Common DP soc handle
+ * @htt_tlv_filter: Rx SRNG TLV and filter setting
+ *
+ * Return: none
+ */
+static inline void
+dp_rxdma_ring_wmask_cfg_be(struct dp_soc *soc,
+			   struct htt_rx_ring_tlv_filter *htt_tlv_filter)
+{
+	htt_tlv_filter->rx_msdu_end_wmask =
+				 hal_rx_msdu_end_wmask_get(soc->hal_soc);
+	htt_tlv_filter->rx_mpdu_start_wmask =
+				 hal_rx_mpdu_start_wmask_get(soc->hal_soc);
+}
+#else
+static inline void
+dp_rxdma_ring_wmask_cfg_be(struct dp_soc *soc,
+			   struct htt_rx_ring_tlv_filter *htt_tlv_filter)
+{
+}
+#endif
+
 #ifdef NO_RX_PKT_HDR_TLV
 /**
  * dp_rxdma_ring_sel_cfg_be() - Setup RXDMA ring config
@@ -821,13 +833,24 @@ dp_rxdma_ring_sel_cfg_be(struct dp_soc *soc)
 	htt_tlv_filter.rx_msdu_start_offset = 0;
 	htt_tlv_filter.rx_attn_offset = 0;
 
-	htt_tlv_filter.rx_packet_offset = soc->rx_pkt_tlv_size;
+	/*
+	 * For monitor mode, the packet hdr tlv is enabled later during
+	 * filter update
+	 */
+	if (soc->cdp_soc.ol_ops->get_con_mode &&
+	    soc->cdp_soc.ol_ops->get_con_mode() == QDF_GLOBAL_MONITOR_MODE)
+		htt_tlv_filter.rx_packet_offset = soc->rx_mon_pkt_tlv_size;
+	else
+		htt_tlv_filter.rx_packet_offset = soc->rx_pkt_tlv_size;
+
 	/*Not subscribing rx_pkt_header*/
 	htt_tlv_filter.rx_header_offset = 0;
 	htt_tlv_filter.rx_mpdu_start_offset =
 				hal_rx_mpdu_start_offset_get(soc->hal_soc);
 	htt_tlv_filter.rx_msdu_end_offset =
 				hal_rx_msdu_end_offset_get(soc->hal_soc);
+
+	dp_rxdma_ring_wmask_cfg_be(soc, &htt_tlv_filter);
 
 	for (i = 0; i < MAX_PDEV_CNT; i++) {
 		struct dp_pdev *pdev = soc->pdev_list[i];
@@ -914,7 +937,16 @@ dp_rxdma_ring_sel_cfg_be(struct dp_soc *soc)
 	htt_tlv_filter.rx_msdu_start_offset = 0;
 	htt_tlv_filter.rx_attn_offset = 0;
 
-	htt_tlv_filter.rx_packet_offset = soc->rx_pkt_tlv_size;
+	/*
+	 * For monitor mode, the packet hdr tlv is enabled later during
+	 * filter update
+	 */
+	if (soc->cdp_soc.ol_ops->get_con_mode &&
+	    soc->cdp_soc.ol_ops->get_con_mode() == QDF_GLOBAL_MONITOR_MODE)
+		htt_tlv_filter.rx_packet_offset = soc->rx_mon_pkt_tlv_size;
+	else
+		htt_tlv_filter.rx_packet_offset = soc->rx_pkt_tlv_size;
+
 	htt_tlv_filter.rx_header_offset =
 				hal_rx_pkt_tlv_offset_get(soc->hal_soc);
 	htt_tlv_filter.rx_mpdu_start_offset =
@@ -1952,6 +1984,24 @@ static bool dp_reo_remap_config_be(struct dp_soc *soc,
 }
 #endif
 
+#ifdef IPA_OFFLOAD
+static int8_t dp_ipa_get_bank_id_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	return be_soc->ipa_bank_id;
+}
+
+static inline void dp_initialize_arch_ops_be_ipa(struct dp_arch_ops *arch_ops)
+{
+	arch_ops->ipa_get_bank_id = dp_ipa_get_bank_id_be;
+}
+#else /* !IPA_OFFLOAD */
+static inline void dp_initialize_arch_ops_be_ipa(struct dp_arch_ops *arch_ops)
+{
+}
+#endif /* IPA_OFFLOAD */
+
 void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 {
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -1971,10 +2021,13 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_tx_compute_hw_delay = dp_tx_compute_tx_delay_be;
 #endif
 	arch_ops->txrx_get_context_size = dp_get_context_size_be;
+#ifdef WIFI_MONITOR_SUPPORT
 	arch_ops->txrx_get_mon_context_size = dp_mon_get_context_size_be;
+#endif
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_be;
 	arch_ops->dp_rx_intrabss_handle_nawds = dp_rx_intrabss_handle_nawds_be;
+	arch_ops->dp_rx_word_mask_subscribe = dp_rx_word_mask_subscribe_be;
 
 	arch_ops->txrx_soc_attach = dp_soc_attach_be;
 	arch_ops->txrx_soc_detach = dp_soc_detach_be;
@@ -2007,9 +2060,17 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 					dp_reconfig_tx_vdev_mcast_ctrl_be;
 	arch_ops->dp_cc_reg_cfg_init = dp_cc_reg_cfg_init;
 #endif
+
+#ifdef WLAN_SUPPORT_PPEDS
+	arch_ops->dp_txrx_ppeds_rings_status = dp_ppeds_rings_status;
+#else
+	arch_ops->dp_txrx_ppeds_rings_status = NULL;
+#endif
+
 	dp_init_near_full_arch_ops_be(arch_ops);
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_be;
 	arch_ops->print_mlo_ast_stats = dp_print_mlo_ast_stats_be;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_be;
 	arch_ops->reo_remap_config = dp_reo_remap_config_be;
+	dp_initialize_arch_ops_be_ipa(arch_ops);
 }

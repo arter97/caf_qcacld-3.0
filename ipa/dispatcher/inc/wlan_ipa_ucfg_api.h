@@ -341,7 +341,7 @@ QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 			     qdf_netdev_t net_dev, uint8_t device_mode,
 			     uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
-			     uint8_t *mac_addr, bool is_2g_iface);
+			     const uint8_t *mac_addr, bool is_2g_iface);
 
 /**
  * ucfg_ipa_uc_smmu_map() - Map / Unmap DMA buffer to IPA UC
@@ -462,7 +462,7 @@ void ucfg_ipa_flush_pending_vdev_events(struct wlan_objmgr_pdev *pdev,
  * ucfg_ipa_is_wds_enabled() - get IPA AP WDS status
  *
  * IPA driver requires WDS status for adding filter rules
- * to support easymesh feature, IPA expectes wds status
+ * to support easymesh feature, IPA expects wds status
  * with WLAN_IPA_AP_CONNECT event.
  *
  * Return: true - WDS is enabled
@@ -653,7 +653,7 @@ QDF_STATUS ucfg_ipa_wlan_evt(struct wlan_objmgr_pdev *pdev,
 			     qdf_netdev_t net_dev, uint8_t device_mode,
 			     uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
-			     uint8_t *mac_addr, bool is_2g_iface)
+			     const uint8_t *mac_addr, bool is_2g_iface)
 {
 	return QDF_STATUS_SUCCESS;
 }

@@ -355,7 +355,7 @@ target_if_dump_summary_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 	 */
 
 	/*
-	 * For easy comparision between MDK team and OS team, the MDK script
+	 * For easy comparison between MDK team and OS team, the MDK script
 	 * variable names have been used
 	 */
 
@@ -499,7 +499,7 @@ target_if_process_sfft_report_gen2(
 	 * Proper code will later use the right sizes.
 	 */
 	/*
-	 * For easy comparision between MDK team and OS team, the MDK script
+	 * For easy comparison between MDK team and OS team, the MDK script
 	 * variable names have been used
 	 */
 	uint32_t relpwr_db;
@@ -714,7 +714,7 @@ target_if_dump_sfft_report_gen2(struct spectral_phyerr_tlv_gen2 *ptlv,
 	 * Proper code will later use the right sizes.
 	 */
 	/*
-	 * For easy comparision between MDK team and OS team, the MDK script
+	 * For easy comparison between MDK team and OS team, the MDK script
 	 * variable names have been used
 	 */
 	uint32_t relpwr_db;
@@ -2363,7 +2363,7 @@ target_if_process_sfft_report_gen3(
 	 * Proper code will later use the right sizes.
 	 */
 	/*
-	 * For easy comparision between MDK team and OS team, the MDK script
+	 * For easy comparison between MDK team and OS team, the MDK script
 	 * variable names have been used
 	 */
 
@@ -3158,7 +3158,7 @@ target_if_process_sfft_report_gen3(
 	}
 
 	/*
-	 * For easy comparision between MDK team and OS team, the MDK script
+	 * For easy comparison between MDK team and OS team, the MDK script
 	 * variable names have been used
 	 */
 
@@ -3368,7 +3368,7 @@ target_if_spectral_populate_samp_params_gen3(
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	/* RSSI is in 1/2 dBm steps, Covert it to dBm scale */
+	/* RSSI is in 1/2 dBm steps, Convert it to dBm scale */
 	params->rssi = (sscan_fields->inband_pwr_db) >> 1;
 
 	params->hw_detector_id = p_sfft->fft_detector_id;
@@ -3496,22 +3496,6 @@ target_if_consume_spectral_report_gen3(
 		goto fail_no_print;
 	}
 
-	ret = target_if_spectral_is_finite_scan(spectral, spectral_mode,
-						&finite_scan);
-	if (QDF_IS_STATUS_ERROR(ret)) {
-		spectral_err_rl("Failed to check scan is finite");
-		goto fail;
-	}
-
-	if (finite_scan) {
-		ret = target_if_spectral_finite_scan_update(spectral,
-							    spectral_mode);
-		if (QDF_IS_STATUS_ERROR(ret)) {
-			spectral_err_rl("Failed to update scan count");
-			goto fail;
-		}
-	}
-
 	/* Validate and Process the search FFT report */
 	ret = target_if_process_sfft_report_gen3(
 					data, p_sfft,
@@ -3589,8 +3573,24 @@ target_if_consume_spectral_report_gen3(
 		goto fail;
 	}
 
+	ret = target_if_spectral_is_finite_scan(spectral, spectral_mode,
+						&finite_scan);
+	if (QDF_IS_STATUS_ERROR(ret)) {
+		spectral_err_rl("Failed to check scan is finite");
+		goto fail;
+	}
+
+	if (finite_scan) {
+		ret = target_if_spectral_finite_scan_update(spectral,
+							    spectral_mode);
+		if (QDF_IS_STATUS_ERROR(ret)) {
+			spectral_err_rl("Failed to update scan count");
+			goto fail;
+		}
+	}
+
 	return 0;
- fail:
+fail:
 	spectral_err_rl("Error while processing Spectral report");
 fail_no_print:
 	if (spectral_mode != SPECTRAL_SCAN_MODE_INVALID)
@@ -3715,7 +3715,7 @@ target_if_consume_spectral_report_gen3(
 	params.vhtop_ch_freq_seg2 = report->cfreq2;
 
 	if (is_primaryseg_expected(spectral, spectral_mode)) {
-		/* RSSI is in 1/2 dBm steps, Covert it to dBm scale */
+		/* RSSI is in 1/2 dBm steps, Convert it to dBm scale */
 		rssi = (sscan_report_fields.inband_pwr_db) >> 1;
 		params.agc_total_gain =
 			sscan_report_fields.sscan_agc_total_gain;
@@ -3893,7 +3893,7 @@ target_if_consume_spectral_report_gen3(
 		target_if_spectral_verify_ts(spectral, report->data,
 					     params.tstamp);
 	} else if (is_secondaryseg_expected(spectral, spectral_mode)) {
-		/* RSSI is in 1/2 dBm steps, Covert it to dBm scale */
+		/* RSSI is in 1/2 dBm steps, Convert it to dBm scale */
 		rssi = (sscan_report_fields.inband_pwr_db) >> 1;
 		params.agc_total_gain_sec80 =
 			sscan_report_fields.sscan_agc_total_gain;
@@ -4043,7 +4043,7 @@ int target_if_spectral_process_report_gen3(
 	int ret = 0;
 	struct direct_buf_rx_data *payload = buf;
 	struct target_if_spectral *spectral;
-	struct spectral_report report;
+	struct spectral_report report = {0};
 	int samp_msg_index;
 	struct spectral_data_stats *spectral_dp_stats;
 

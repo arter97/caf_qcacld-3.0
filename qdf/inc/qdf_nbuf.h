@@ -103,11 +103,6 @@
 #define EAPOL_KEY_LEN_OFFSET			21
 #define EAPOL_PACKET_TYPE_EAP			0
 #define EAPOL_PACKET_TYPE_KEY			3
-#define EAPOL_MASK				0x8013
-#define EAPOL_M1_BIT_MASK			0x8000
-#define EAPOL_M2_BIT_MASK			0x0001
-#define EAPOL_M3_BIT_MASK			0x8013
-#define EAPOL_M4_BIT_MASK			0x0003
 #define EAPOL_KEY_TYPE_MASK			0x0800
 #define EAPOL_KEY_ENCRYPTED_MASK		0x0010
 
@@ -251,7 +246,6 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * htt_rx_desc used later to update radiotap information.
  * @tsft: Time Synchronization Function timer
  * @ppdu_timestamp: Timestamp in the PPDU_START TLV
- * @preamble_type: Preamble type in radio header
  * @chan_freq: Capture channel frequency
  * @chan_num: Capture channel number
  * @chan_flags: Bitmap of Channel flags, IEEE80211_CHAN_TURBO,
@@ -264,8 +258,35 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @he_mu_other_flags: HE-MU-OTHER (11ax) flags, only present in HE frames
  * @usig_flags: USIG flags, only present in 802.11BE and subsequent protocol
  * @eht_flags: EHT (11be) flags, only present in EHT frames
- * @he_sig_A1_known: HE (11ax) sig A1 known field
- * @he_sig_A2_known: HE (11ax) sig A2 known field
+ * @nr_ant: Number of Antennas used for streaming
+ * @mcs: MCS index of Rx frame
+ * @nss: Number of spatial streams
+ * @bw: bandwidth of rx frame
+ * @is_stbc: Is STBC enabled
+ * @sgi: Rx frame short guard interval
+ * @he_re: HE range extension
+ * @ldpc: ldpc enabled
+ * @beamformed: Is frame beamformed.
+ * @dcm: dcm
+ * @preamble_type: Preamble type in radio header
+ * @tid: QoS traffic tid number
+ * @rs_fcs_err: FCS error flag
+ * @cck_flag: Flag to indicate CCK modulation
+ * @ofdm_flag: Flag to indicate OFDM modulation
+ * @ulofdma_flag: Flag to indicate UL OFDMA PPDU
+ * @monitor_direct_used: monitor direct mode
+ * @data_sequence_control_info_valid: field to indicate validity of seq control
+ * @rxpcu_filter_pass: Flag which indicates whether RX packets are received in
+ *						BSS mode(not in promisc mode)
+ * @add_rtap_ext: add radio tap extension
+ * @frame_control_info_valid: field indicates if fc value is valid
+ * @add_rtap_ext2: add radiotap extension2
+ * @reception_type: PPDU reception type
+ * @ltf_size: ltf size
+ * @tx_status: packet tx status
+ * @rx_antenna: rx antenna
+ * @vht_flag_values6: VHT flag value6
+ * @he_mu_other_flags: HE MU other flag
  * @he_sig_b_common: HE (11ax) sig B common field
  * @he_sig_b_common_known: HE (11ax) sig B common known field
  * @l_sig_a_info: L_SIG_A value coming in Rx descriptor
@@ -274,29 +295,22 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @rate: Rate in terms 500Kbps
  * @rtap_flags: Bit map of available fields in the radiotap
  * @ant_signal_db: Rx packet RSSI
- * @nr_ant: Number of Antennas used for streaming
- * @mcs: MCS index of Rx frame
  * @ht_mcs: MCS index for HT RX frames
- * @nss: Number of spatial streams
- * @bw: bandwidth of rx frame
- * @is_stbc: Is STBC enabled
- * @sgi: Rx frame short guard interval
- * @he_re: HE range extension
- * @ldpc: ldpc enabled
- * @beamformed: Is frame beamformed.
+ * @tcp_msdu_count: TCP MSDU Count
+ * @udp_msdu_count: UDP MSDU Count
+ * @other_msdu_count: Other MSDU Count
+ * @vht_flag_values1: VHT flag value 1
+ * @vht_flag_values2: VHT flag value 2
+ * @vht_flag_values3: VHT flag value 3
+ * @vht_flag_values4: VHT flag value 4
+ * @vht_flag_values5: VHT flag value 5
  * @he_sig_b_common_RU[4]: HE (11ax) common RU assignment index
  * @rssi_comb: Combined RSSI
  * @rssi[MAX_CHAIN]: 8 bits RSSI per 20Mhz per chain
  * @duration: 802.11 Duration
- * @frame_control_info_valid: field indicates if fc value is valid
  * @frame_control: frame control field
  * @ast_index: AST table hash index
- * @tid: QoS traffic tid number
- * @rs_fcs_err: FCS error flag
  * @rs_flags: Flags to indicate AMPDU or AMSDU aggregation
- * @cck_flag: Flag to indicate CCK modulation
- * @ofdm_flag: Flag to indicate OFDM modulation
- * @ulofdma_flag: Flag to indicate UL OFDMA PPDU
  * @he_per_user_1: HE per user info1
  * @he_per_user_2: HE per user info2
  * @he_per_user_position: HE per user position info
@@ -317,21 +331,13 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * function.
  * @device_id: Device ID coming from sub-system (PCI, AHB etc..)
  * @chan_noise_floor: Channel Noise Floor for the pdev
- * @data_sequence_control_info_valid: field to indicate validity of seq control
  * @first_data_seq_ctrl: Sequence ctrl field of first data frame
- * @rxpcu_filter_pass: Flag which indicates whether RX packets are received in
- *						BSS mode(not in promisc mode)
  * @rssi_chain: Rssi chain per nss per bw
- * @tx_status: packet tx status
  * @tx_retry_cnt: tx retry count
- * @add_rtap_ext: add radio tap extension
  * @start_seq: starting sequence number
  * @ba_bitmap: 256 bit block ack bitmap
- * @add_rtap_ext2: add radiotap extension2
  * @mpdu_retry_cnt: Rx mpdu retry count
  * @punctured_pattern: punctured pattern (0 means the band is punctured)
- * @rx_user_status: pointer to mon_rx_user_status, when set update
- * radiotap header will use userinfo from this structure.
  * @usig_common: U-SIG property of received frame
  * @usig_value: U-SIG property of received frame
  * @usig_mask: U-SIG property of received frame
@@ -353,31 +359,55 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @aggregation: Indicate A-MPDU format
  * @ht_stbc: Indicate stbc
  * @ht_crc: ht crc
- * @dcm: dcm
  * @xlna_bypass_offset: Low noise amplifier bypass offset
  * @xlna_bypass_threshold: Low noise amplifier bypass threshold
  * @rssi_temp_offset: Temperature based rssi offset
  * @min_nf_dbm: min noise floor in active chains per channel
  * @xbar_config: 4 bytes, used for BB to RF Chain mapping
- * @rssi_dbm_conv_support: Rssi dbm converstion support param
+ * @rssi_dbm_conv_support: Rssi dbm conversion support param
+ * @rx_user_status: pointer to mon_rx_user_status, when set update
+ * radiotap header will use userinfo from this structure.
  */
 struct mon_rx_status {
 	uint64_t tsft;
 	uint32_t ppdu_timestamp;
-	uint32_t preamble_type;
 	qdf_freq_t chan_freq;
 	uint16_t chan_num;
 	uint16_t chan_flags;
-	uint16_t ht_flags;
-	uint16_t vht_flags;
+	uint32_t ht_flags : 1,
+		 vht_flags : 1,
+		 he_flags : 1,
+		 he_mu_flags : 1,
+		 usig_flags : 1,
+		 eht_flags : 1,
+		 nr_ant : 3,
+		 mcs : 4,
+		 nss : 3,
+		 bw : 4,
+		 is_stbc : 1,
+		 sgi : 2,
+		 he_re : 1,
+		 ldpc : 1,
+		 beamformed : 1,
+		 dcm : 1,
+		 preamble_type : 4;
+	uint32_t tid : 5,
+		 rs_fcs_err : 1,
+		 cck_flag : 1,
+		 ofdm_flag : 1,
+		 ulofdma_flag : 1,
+		 monitor_direct_used : 1,
+		 data_sequence_control_info_valid : 1,
+		 rxpcu_filter_pass : 1,
+		 add_rtap_ext : 1,
+		 frame_control_info_valid : 1,
+		 add_rtap_ext2 : 1,
+		 reception_type : 4,
+		 ltf_size : 2,
+		 tx_status : 4;
+	uint32_t rx_antenna : 24;
 	uint16_t vht_flag_values6;
-	uint16_t he_flags;
-	uint16_t he_mu_flags;
 	uint16_t he_mu_other_flags;
-	uint16_t usig_flags;
-	uint16_t eht_flags;
-	uint16_t he_sig_A1_known;
-	uint16_t he_sig_A2_known;
 	uint16_t he_sig_b_common;
 	uint16_t he_sig_b_common_known;
 	uint32_t l_sig_a_info;
@@ -386,38 +416,22 @@ struct mon_rx_status {
 	uint8_t  rate;
 	uint8_t  rtap_flags;
 	uint8_t  ant_signal_db;
-	uint8_t  nr_ant;
-	uint8_t  mcs;
 	uint8_t  ht_mcs;
-	uint8_t  nss;
 	uint16_t  tcp_msdu_count;
 	uint16_t  udp_msdu_count;
 	uint16_t  other_msdu_count;
-	uint8_t  bw;
 	uint8_t  vht_flag_values1;
 	uint8_t  vht_flag_values2;
 	uint8_t  vht_flag_values3[4];
 	uint8_t  vht_flag_values4;
 	uint8_t  vht_flag_values5;
-	uint8_t  is_stbc;
-	uint8_t  sgi;
-	uint8_t  he_re;
-	uint8_t  ldpc;
-	uint8_t  beamformed;
 	uint8_t  he_sig_b_common_RU[4];
 	int8_t   rssi_comb;
-	uint64_t rssi[MAX_CHAIN];
-	uint8_t  reception_type;
+	int8_t rssi[MAX_CHAIN];
 	uint16_t duration;
-	uint8_t frame_control_info_valid;
 	uint16_t frame_control;
-	uint32_t ast_index;
-	uint32_t tid;
-	uint8_t  rs_fcs_err;
+	uint16_t ast_index;
 	uint8_t      rs_flags;
-	uint8_t cck_flag;
-	uint8_t ofdm_flag;
-	uint8_t ulofdma_flag;
 	/* New HE radiotap fields */
 	uint16_t he_per_user_1;
 	uint16_t he_per_user_2;
@@ -425,7 +439,7 @@ struct mon_rx_status {
 	uint8_t he_per_user_known;
 	uint16_t he_flags1;
 	uint16_t he_flags2;
-	uint8_t he_RU[4];
+	uint8_t he_RU[8];
 	uint16_t he_data1;
 	uint16_t he_data2;
 	uint16_t he_data3;
@@ -433,28 +447,19 @@ struct mon_rx_status {
 	uint16_t he_data5;
 	uint16_t he_data6;
 	uint32_t ppdu_len;
-	uint32_t prev_ppdu_id;
-	uint32_t ppdu_id;
-	uint32_t device_id;
+	uint16_t prev_ppdu_id;
+	uint16_t ppdu_id;
+	uint16_t device_id;
 	int16_t chan_noise_floor;
-	uint8_t monitor_direct_used;
-	uint8_t data_sequence_control_info_valid;
 	uint16_t first_data_seq_ctrl;
-	uint8_t ltf_size;
-	uint8_t rxpcu_filter_pass;
 	int8_t rssi_chain[8][8];
-	uint32_t rx_antenna;
-	uint8_t  tx_status;
 	uint8_t  tx_retry_cnt;
-	bool add_rtap_ext;
 	uint16_t start_seq;
 	uint32_t ba_bitmap[8];
-	bool add_rtap_ext2;
-	uint32_t mpdu_retry_cnt;
+	uint16_t mpdu_retry_cnt;
 #ifdef WLAN_FEATURE_11BE
 	uint16_t punctured_pattern;
 #endif
-	struct mon_rx_user_status *rx_user_status;
 	uint32_t usig_common;
 	uint32_t usig_value;
 	uint32_t usig_mask;
@@ -468,17 +473,16 @@ struct mon_rx_status {
 		 vht_no_txop_ps:1,
 		 he_crc:4;
 	uint32_t l_sig_length:12,
-		l_sig_a_parity:1,
-		l_sig_a_pkt_type:4,
-		l_sig_a_implicit_sounding:1;
+		 l_sig_a_parity:1,
+		 l_sig_a_pkt_type:4,
+		 l_sig_a_implicit_sounding:1;
 	uint32_t ht_length:16,
-		smoothing:1,
-		not_sounding:1,
-		aggregation:1,
-		ht_stbc:2,
-		ht_crc:8;
+		 smoothing:1,
+		 not_sounding:1,
+		 aggregation:1,
+		 ht_stbc:2,
+		 ht_crc:8;
 #endif
-	uint8_t  dcm;
 #ifdef QCA_RSSI_DB2DBM
 	int32_t xlna_bypass_offset;
 	int32_t xlna_bypass_threshold;
@@ -487,6 +491,7 @@ struct mon_rx_status {
 	uint32_t xbar_config;
 	bool rssi_dbm_conv_support;
 #endif
+	struct mon_rx_user_status *rx_user_status;
 };
 
 /**
@@ -502,20 +507,22 @@ struct mon_rx_status {
  * @mu_ul_user_v0_word0: MU UL user info word 0
  * @mu_ul_user_v0_word1: MU UL user info word 1
  * @ast_index: AST table hash index
+ * @sw_peer_id: software peer id
  * @tid: QoS traffic tid number
+ * @preamble_type: Preamble type in radio header
+ * @ht_flags: HT flags, only present for HT frames.
+ * @vht_flags: VHT flags, only present for VHT frames.
+ * @he_flags: HE (11ax) flags, only present in HE frames
+ * @frame_control_info_valid: field indicates if fc value is valid
+ * @frame_control: frame control field
+ * @data_sequence_control_info_valid: field to indicate validity of seq control
+ * @filter_category: mpdu filter category
  * @tcp_msdu_count: tcp protocol msdu count
  * @udp_msdu_count: udp protocol msdu count
  * @other_msdu_count: other protocol msdu count
- * @frame_control: frame control field
- * @frame_control_info_valid: field indicates if fc value is valid
- * @data_sequence_control_info_valid: field to indicate validity of seq control
  * @first_data_seq_ctrl: Sequence ctrl field of first data frame
- * @preamble_type: Preamble type in radio header
  * @duration: 802.11 Duration
- * @ht_flags: HT flags, only present for HT frames.
- * @vht_flags: VHT flags, only present for VHT frames.
  * @vht_flag_values1-5: Contains corresponding data for flags field
- * @he_flags: HE (11ax) flags, only present in HE frames
  * @he_flags1: HE flags
  * @he_flags2: HE flags
  * @he_RU[4]: HE RU assignment index
@@ -536,13 +543,11 @@ struct mon_rx_status {
  * @mpdu_fcs_ok_bitmap: mpdu with fcs ok bitmap
  * @mpdu_ok_byte_count: mpdu byte count with fcs ok
  * @mpdu_err_byte_count: mpdu byte count with fcs err
- * @sw_peer_id: software peer id
  * @retry_mpdu: mpdu retry count
  * @start_seq: starting sequence number
  * @ba_control: Block ack control
  * @ba_bitmap: 256 bit block ack bitmap
- * @tid: QoS traffic tid number
- * @filter_category: mpdu filter category
+ * @aid: Association ID
  * @mpdu_q: user mpdu_queue used for monitor
  */
 struct mon_rx_user_status {
@@ -555,54 +560,53 @@ struct mon_rx_user_status {
 		 is_ampdu:1;
 	uint32_t mu_ul_user_v0_word0;
 	uint32_t mu_ul_user_v0_word1;
-	uint32_t ast_index;
-	uint32_t tid;
+	uint32_t ast_index : 16,
+		 sw_peer_id : 16;
+	uint32_t tid : 4,
+		 preamble_type : 4,
+		 ht_flags : 1,
+		 vht_flags : 1,
+		 he_flags : 1,
+		 frame_control_info_valid : 1,
+		 frame_control : 16,
+		 data_sequence_control_info_valid : 1,
+		 ba_bitmap_sz : 2,
+		 filter_category : 2;
 	uint16_t tcp_msdu_count;
 	uint16_t udp_msdu_count;
 	uint16_t other_msdu_count;
-	uint16_t frame_control;
-	uint8_t frame_control_info_valid;
-	uint8_t data_sequence_control_info_valid;
 	uint16_t first_data_seq_ctrl;
-	uint32_t preamble_type;
 	uint16_t duration;
-	uint16_t ht_flags;
-	uint16_t vht_flags;
-	uint8_t  vht_flag_values1;
 	uint8_t  vht_flag_values2;
 	uint8_t  vht_flag_values3[4];
 	uint8_t  vht_flag_values4;
 	uint8_t  vht_flag_values5;
 	uint16_t vht_flag_values6;
-	uint16_t he_flags;
 	uint16_t he_flags1;
 	uint16_t he_flags2;
-	uint8_t he_RU[4];
+	uint8_t he_RU[8];
 	uint16_t he_data1;
 	uint16_t he_data2;
 	uint16_t he_data3;
 	uint16_t he_data4;
 	uint16_t he_data5;
 	uint16_t he_data6;
-	uint16_t he_per_user_1;
-	uint16_t he_per_user_2;
+	uint8_t he_per_user_1;
+	uint8_t he_per_user_2;
 	uint8_t he_per_user_position;
 	uint8_t he_per_user_known;
 	uint8_t rtap_flags;
 	uint8_t rs_flags;
-	uint32_t mpdu_cnt_fcs_ok;
-	uint32_t mpdu_cnt_fcs_err;
+	uint16_t mpdu_cnt_fcs_ok;
+	uint8_t mpdu_cnt_fcs_err;
 	uint32_t mpdu_fcs_ok_bitmap[QDF_MON_STATUS_MPDU_FCS_BMAP_NWORDS];
 	uint32_t mpdu_ok_byte_count;
 	uint32_t mpdu_err_byte_count;
-	uint16_t sw_peer_id;
-	uint32_t retry_mpdu;
+	uint16_t retry_mpdu;
 	uint16_t start_seq;
 	uint16_t ba_control;
-	uint32_t ba_bitmap[32];
-	uint32_t ba_bitmap_sz;
+	uint32_t ba_bitmap[8];
 	uint16_t aid;
-	uint8_t filter_category;
 	qdf_nbuf_queue_t mpdu_q;
 };
 
@@ -1029,6 +1033,7 @@ enum qdf_reception_type {
  * @CB_FTYPE_MESH_RX_INFO - Mesh Rx information
  * @CB_FTYPE_MESH_TX_INFO - Mesh Tx information
  * @CB_FTYPE_DMS - Directed Multicast Service
+ * @CB_FTYPE_SAWF - SAWF information
  */
 enum cb_ftype {
 	CB_FTYPE_INVALID = 0,
@@ -1041,12 +1046,18 @@ enum cb_ftype {
 	CB_FTYPE_MESH_RX_INFO = 7,
 	CB_FTYPE_MESH_TX_INFO = 8,
 	CB_FTYPE_DMS = 9,
+	CB_FTYPE_SAWF = 10,
 };
 
 /**
- * @qdf_nbuf_t - Platform indepedent packet abstraction
+ * @qdf_nbuf_t - Platform independent packet abstraction
  */
 typedef __qdf_nbuf_t qdf_nbuf_t;
+
+/**
+ * @qdf_nbuf_shared_info_t- Platform indepedent shared info
+ */
+typedef __qdf_nbuf_shared_info_t qdf_nbuf_shared_info_t;
 
 /**
  * struct qdf_nbuf_track_t - Network buffer track structure
@@ -1062,6 +1073,15 @@ typedef __qdf_nbuf_t qdf_nbuf_t;
  * @unmap_line_num: mapping function line number
  * @is_nbuf_mapped: indicate mapped/unmapped nbuf
  * @time: mapping function timestamp
+ * @smmu_map_line_num: smmu mapping line number
+ * @smmu_unmap_line_num: smmu unmapping line number
+ * @smmu_map_func_name: smmu mapping function name
+ * @smmu_unmap_func_name: smmu unmapping function name
+ * @is_nbuf_smmu_mapped: nbuf is smmu mapped
+ * @smmu_map_iova_addr: nbuf smmu map virtual address
+ * @smmu_map_pa_addr: nbuf smmu map physical address
+ * @smmu_unmap_iova_addr: nbuf smmu unmap virtual address
+ * @smmu_unmap_pa_addr: nbuf smmu unmap physical address
  */
 struct qdf_nbuf_track_t {
 	struct qdf_nbuf_track_t *p_next;
@@ -1075,12 +1095,23 @@ struct qdf_nbuf_track_t {
 	uint32_t unmap_line_num;
 	bool is_nbuf_mapped;
 	qdf_time_t time;
+#ifdef NBUF_SMMU_MAP_UNMAP_DEBUG
+	uint32_t smmu_map_line_num;
+	uint32_t smmu_unmap_line_num;
+	char smmu_map_func_name[QDF_MEM_FUNC_NAME_SIZE];
+	char smmu_unmap_func_name[QDF_MEM_FUNC_NAME_SIZE];
+	bool is_nbuf_smmu_mapped;
+	unsigned long smmu_map_iova_addr;
+	unsigned long smmu_map_pa_addr;
+	unsigned long smmu_unmap_iova_addr;
+	unsigned long smmu_unmap_pa_addr;
+#endif
 };
 
 typedef struct qdf_nbuf_track_t QDF_NBUF_TRACK;
 
 /**
- * typedef qdf_nbuf_queue_head_t - Platform indepedent nbuf queue head
+ * typedef qdf_nbuf_queue_head_t - Platform independent nbuf queue head
  */
 typedef __qdf_nbuf_queue_head_t qdf_nbuf_queue_head_t;
 
@@ -1121,7 +1152,7 @@ qdf_nbuf_set_send_complete_flag(qdf_nbuf_t buf, bool flag)
 
 #ifdef NBUF_MAP_UNMAP_DEBUG
 /**
- * qdf_nbuf_map_check_for_leaks() - check for nbut map leaks
+ * qdf_nbuf_map_check_for_leaks() - check for nbuf map leaks
  *
  * Check for net buffers that have been mapped, but never unmapped.
  *
@@ -1951,6 +1982,8 @@ enum qdf_nbuf_event_type {
 	QDF_NBUF_MAP,
 	QDF_NBUF_UNMAP,
 	QDF_NBUF_ALLOC_COPY_EXPAND,
+	QDF_NBUF_SMMU_MAP,
+	QDF_NBUF_SMMU_UNMAP,
 };
 
 void qdf_net_buf_debug_init(void);
@@ -1983,6 +2016,87 @@ void qdf_net_buf_debug_update_map_node(qdf_nbuf_t net_buf,
 				       uint32_t line_num);
 
 /**
+ * qdf_nbuf_smmu_map_debug() - map smmu buffer
+ * @nbuf: network buffer
+ * @hdl: ipa handle
+ * @num_buffers: number of buffers
+ * @info: memory info
+ * @func: function name
+ * @line: line number
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS qdf_nbuf_smmu_map_debug(qdf_nbuf_t nbuf,
+				   uint8_t hdl,
+				   uint8_t num_buffers,
+				   qdf_mem_info_t *info,
+				   const char *func,
+				   uint32_t line);
+
+/**
+ * qdf_nbuf_smmu_unmap_debug() - unmap smmu buffer
+ * @nbuf: network buffer
+ * @hdl: ipa handle
+ * @num_buffers: number of buffers
+ * @info: memory info
+ * @func: function name
+ * @line: line number
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS qdf_nbuf_smmu_unmap_debug(qdf_nbuf_t nbuf,
+				     uint8_t hdl,
+				     uint8_t num_buffers,
+				     qdf_mem_info_t *info,
+				     const char *func,
+				     uint32_t line);
+
+#ifdef NBUF_SMMU_MAP_UNMAP_DEBUG
+/**
+ * qdf_nbuf_map_check_for_smmu_leaks() - check for nbuf smmu map leaks
+ *
+ * Check for net buffers that have been smmu mapped, but never smmu unmapped.
+ *
+ * Returns: None
+ */
+void qdf_nbuf_map_check_for_smmu_leaks(void);
+
+/**
+ * qdf_net_buf_debug_update_smmu_map_node() - update nbuf in debug
+ * hash table with the mapping function info
+ * @nbuf: network buffer
+ * @iova: Virtual address of buffer
+ * @pa: Physical address of buffer
+ * @func: function name that requests for mapping the nbuf
+ * @line: function line number
+ *
+ * Return: none
+ */
+void qdf_net_buf_debug_update_smmu_map_node(qdf_nbuf_t nbuf,
+					    unsigned long iova,
+					    unsigned long pa,
+					    const char *func,
+					    uint32_t line);
+
+/**
+ * qdf_net_buf_debug_update_smmu_unmap_node() - update nbuf in debug
+ * hash table with the unmapping function info
+ * @nbuf: network buffer
+ * @iova: Virtual address of buffer
+ * @pa: Physical address of buffer
+ * @func: function name that requests for unmapping the nbuf
+ * @line: function line number
+ *
+ * Return: none
+ */
+void qdf_net_buf_debug_update_smmu_unmap_node(qdf_nbuf_t nbuf,
+					      unsigned long iova,
+					      unsigned long pa,
+					      const char *func,
+					      uint32_t line);
+#endif
+
+/**
  * qdf_net_buf_debug_update_unmap_node() - update nbuf in debug
  * hash table with the unmap function info
  * @nbuf:   network buffer
@@ -2012,7 +2126,7 @@ void qdf_net_buf_debug_acquire_skb(qdf_nbuf_t net_buf,
 				   uint32_t line_num);
 void qdf_net_buf_debug_release_skb(qdf_nbuf_t net_buf);
 
-/* nbuf allocation rouines */
+/* nbuf allocation routines */
 
 #define qdf_nbuf_alloc_simple(d, s, r, a, p) \
 	__qdf_nbuf_alloc_simple(d, s, __func__, __LINE__)
@@ -2153,7 +2267,7 @@ qdf_net_buf_debug_update_unmap_node(qdf_nbuf_t net_buf,
 				    uint32_t line_num)
 {
 }
-/* Nbuf allocation rouines */
+/* Nbuf allocation routines */
 
 #define qdf_nbuf_alloc_simple(osdev, size, reserve, align, prio) \
 	qdf_nbuf_alloc_fl(osdev, size, reserve, align, prio, \
@@ -2695,6 +2809,17 @@ qdf_nbuf_queue_insert_head(qdf_nbuf_queue_t *head, qdf_nbuf_t buf)
 }
 
 /**
+ * qdf_nbuf_queue_remove_last() - remove last nbuf from queue
+ * @head: Network buf queue head
+ *
+ * Return: none
+ */
+static inline qdf_nbuf_t qdf_nbuf_queue_remove_last(qdf_nbuf_queue_t *head)
+{
+	return __qdf_nbuf_queue_remove_last(head);
+}
+
+/**
  * qdf_nbuf_queue_remove() - retrieve a buf from the head of the buf queue
  * @head: Network buf queue head
  *
@@ -2732,7 +2857,7 @@ static inline qdf_nbuf_t qdf_nbuf_queue_next(qdf_nbuf_t buf)
  * @nbq: Network buf queue handle
  *
  * Return: true  if queue is empty
- *	   false if queue is not emty
+ *	   false if queue is not empty
  */
 static inline bool qdf_nbuf_is_queue_empty(qdf_nbuf_queue_t *nbq)
 {
@@ -2878,6 +3003,17 @@ qdf_nbuf_append_ext_list(qdf_nbuf_t head_buf, qdf_nbuf_t ext_list,
 static inline qdf_nbuf_t qdf_nbuf_get_ext_list(qdf_nbuf_t head_buf)
 {
 	return (qdf_nbuf_t)__qdf_nbuf_get_ext_list(head_buf);
+}
+
+/**
+ * qdf_nbuf_get_shinfo() - gets the shared info of head buf
+ * @head_buf: Network buffer
+ *
+ * Return: shared info of head buf
+ */
+static inline qdf_nbuf_shared_info_t qdf_nbuf_get_shinfo(qdf_nbuf_t head_buf)
+{
+	return (qdf_nbuf_shared_info_t)__qdf_nbuf_get_shinfo(head_buf);
 }
 
 /**
@@ -4128,6 +4264,41 @@ static inline uint16_t qdf_nbuf_get_gso_segs(qdf_nbuf_t nbuf)
 }
 
 /**
+ * qdf_nbuf_set_gso_segs() - set the number of gso segments in
+ * nbuf
+ * @nbuf: Network buffer
+ * @val: val to be set
+ *
+ * Return: None
+ */
+static inline void qdf_nbuf_set_gso_segs(qdf_nbuf_t nbuf, uint16_t val)
+{
+	__qdf_nbuf_set_gso_segs(nbuf, val);
+}
+
+/**
+ * qdf_nbuf_set_gso_type_udp_l4() - set the gso type to GSO UDP L4
+ * @nbuf: Network buffer
+ *
+ * Return: None
+ */
+static inline void qdf_nbuf_set_gso_type_udp_l4(qdf_nbuf_t nbuf)
+{
+	__qdf_nbuf_set_gso_type_udp_l4(nbuf);
+}
+
+/**
+ * qdf_nbuf_set_ip_summed_partial() - set the ip summed to CHECKSUM_PARTIAL
+ * @nbuf: Network buffer
+ *
+ * Return: None
+ */
+static inline void qdf_nbuf_set_ip_summed_partial(qdf_nbuf_t nbuf)
+{
+	__qdf_nbuf_set_ip_summed_partial(nbuf);
+}
+
+/**
  * qdf_nbuf_get_gso_size() - Return the number of gso size in
  * nbuf
  * @nbuf: Network buffer
@@ -4457,7 +4628,7 @@ static inline void qdf_nbuf_count_dec(qdf_nbuf_t buf)
 }
 
 /**
- * qdf_nbuf_mod_init() - Intialization routine for qdf_nbuf
+ * qdf_nbuf_mod_init() - Initialization routine for qdf_nbuf
  *
  * Return void
  */
@@ -4563,6 +4734,77 @@ static inline uint32_t qdf_nbuf_get_mark(qdf_nbuf_t nbuf)
 static inline qdf_size_t qdf_nbuf_get_data_len(qdf_nbuf_t nbuf)
 {
 	return __qdf_nbuf_get_data_len(nbuf);
+}
+
+/**
+ * qdf_nbuf_set_data_len() - Return the data_len of the nbuf
+ * @nbuf: qdf_nbuf_t
+ * @len: data_len to be set
+ *
+ * Return: set data_len value
+ */
+static inline qdf_size_t qdf_nbuf_set_data_len(qdf_nbuf_t nbuf, uint32_t len)
+{
+	return __qdf_nbuf_set_data_len(nbuf, len);
+}
+
+/**
+ * qdf_nbuf_get_only_data_len() - Return the data_len of the nbuf
+ * @nbuf: qdf_nbuf_t
+ *
+ * Return: data_len value
+ */
+static inline qdf_size_t qdf_nbuf_get_only_data_len(qdf_nbuf_t nbuf)
+{
+	return __qdf_nbuf_get_only_data_len(nbuf);
+}
+
+/**
+ * qdf_nbuf_set_hash() - set the hash of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_set_hash(qdf_nbuf_t buf, uint32_t len)
+{
+	__qdf_nbuf_set_hash(buf, len);
+}
+
+/**
+ * qdf_nbuf_set_sw_hash() - set the sw hash of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_set_sw_hash(qdf_nbuf_t buf, uint32_t len)
+{
+	__qdf_nbuf_set_sw_hash(buf, len);
+}
+
+/**
+ * qdf_nbuf_set_csum_start() - set the csum start of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_set_csum_start(qdf_nbuf_t buf, uint16_t len)
+{
+	__qdf_nbuf_set_csum_start(buf, len);
+}
+
+/**
+ * qdf_nbuf_set_csum_offset() - set the csum offset of the buf
+ * @buf: Network buf instance
+ * @len: len to be set
+ *
+ * Return: none
+ */
+static inline void qdf_nbuf_set_csum_offset(qdf_nbuf_t buf, uint16_t len)
+{
+	__qdf_nbuf_set_csum_offset(buf, len);
 }
 
 /**
@@ -4910,6 +5152,14 @@ void qdf_nbuf_set_timestamp(qdf_nbuf_t buf);
 uint64_t qdf_nbuf_get_timestamp(qdf_nbuf_t buf);
 
 /**
+ * qdf_nbuf_get_timestamp_us() - get the timestamp for frame
+ * @buf: pointer to network buffer
+ *
+ * Return: timestamp stored in nbuf in us
+ */
+uint64_t qdf_nbuf_get_timestamp_us(qdf_nbuf_t buf);
+
+/**
  * qdf_nbuf_get_timedelta_ms() - get time difference in ms
  * @buf: pointer to network buffer
  *
@@ -4946,6 +5196,12 @@ qdf_nbuf_get_timestamp(struct sk_buff *skb)
 }
 
 static inline uint64_t
+qdf_nbuf_get_timestamp_us(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_get_timestamp_us(buf);
+}
+
+static inline uint64_t
 qdf_nbuf_get_timedelta_ms(struct sk_buff *skb)
 {
 	return __qdf_nbuf_get_timedelta_ms(skb);
@@ -4965,8 +5221,8 @@ static inline qdf_ktime_t qdf_nbuf_net_timedelta(qdf_ktime_t t)
 
 #ifdef NBUF_MEMORY_DEBUG
 /**
- * qdf_set_smmu_fault_state() - Set smmu fault sate
- * @smmu_fault_state: state of the wlan smmy
+ * qdf_set_smmu_fault_state() - Set smmu fault state
+ * @smmu_fault_state: state of the wlan smmu
  *
  * Return: void
  */

@@ -765,7 +765,6 @@ struct dfs_state {
  * @nol_start_us:     NOL start time in us.
  * @nol_timeout_ms:   NOL timeout value in msec.
  * @nol_timer:        Per element NOL timer.
- * @nol_timer_completion_work: workqueue to process the nol timeout
  * @nol_next:         Next element pointer.
  */
 struct dfs_nolelem {
@@ -776,7 +775,6 @@ struct dfs_nolelem {
 	uint64_t       nol_start_us;
 	uint32_t       nol_timeout_ms;
 	qdf_hrtimer_data_t    nol_timer;
-	qdf_work_t     nol_timer_completion_work;
 	struct dfs_nolelem *nol_next;
 };
 
@@ -1065,6 +1063,7 @@ struct dfs_rcac_params {
  * @dfs_cac_started_chan:            CAC started channel.
  * @dfs_pdev_obj:                    DFS pdev object.
  * @dfs_is_offload_enabled:          Set if DFS offload enabled.
+ * @dfs_is_bangradar_320_supported:  Set if DFS 320MHZ enabled.
  * @dfs_is_radar_found_chan_freq_eq_center_freq:
  *                                   Set if chan_freq parameter of the radar
  *                                   found wmi event indicates channel center.
@@ -1123,6 +1122,8 @@ struct dfs_rcac_params {
  *                                   bandwidth expansion feature.
  * @dfs_use_bw_expand:               User configured value for enabling or
  *                                   disabling BW Expansion feature.
+ * @dfs_use_puncture:                User configured value for enabling or
+ *                                   disabling DFS puncturing feature.
  * @dfs_agile_rcac_ucfg:             User configuration for Rolling CAC.
  * @dfs_fw_adfs_support_non_160:     Target Agile DFS support for non-160 BWs.
  * @dfs_fw_adfs_support_160:         Target Agile DFS support for 160 BW.
@@ -1247,7 +1248,6 @@ struct wlan_dfs {
 	qdf_work_t     dfs_nol_elem_free_work;
 
 	qdf_hrtimer_data_t    dfs_cac_timer;
-	qdf_work_t     dfs_cac_completion_work;
 	qdf_timer_t    dfs_cac_valid_timer;
 	int            dfs_cac_timeout_override;
 	uint8_t        dfs_enable:1,
@@ -1275,6 +1275,7 @@ struct wlan_dfs {
 	uint16_t       dfs_agile_precac_freq_mhz;
 #endif
 	bool           dfs_is_offload_enabled;
+	bool           dfs_is_bangradar_320_supported;
 	bool           dfs_is_radar_found_chan_freq_eq_center_freq;
 	int            dfs_use_nol;
 	qdf_spinlock_t dfs_nol_lock;
@@ -1299,6 +1300,7 @@ struct wlan_dfs {
 	enum wlan_phymode dfs_bw_expand_des_mode;
 	bool           dfs_use_bw_expand;
 #endif
+	bool           dfs_use_puncture;
 	uint8_t        dfs_agile_precac_ucfg:1,
 #if defined(QCA_SUPPORT_ADFS_RCAC)
 		       dfs_agile_rcac_ucfg:1,
@@ -1341,7 +1343,7 @@ struct wlan_dfs_priv {
  * @pdev: pointer to PDEV object information
  * @dfs_is_phyerr_filter_offload: For some chip like Rome indicates too many
  *                                phyerr packets in a short time, which causes
- *                                OS hang. If this feild is configured as true,
+ *                                OS hang. If this field is configured as true,
  *                                FW will do the pre-check, filter out some
  *                                kinds of invalid phyerrors and indicate
  *                                radar detection related information to host.
@@ -1350,7 +1352,6 @@ struct wlan_dfs_priv {
  * @cur_dfs_index: index of the current dfs object using the Agile Engine.
  *                 It is used to index struct wlan_dfs_priv dfs_priv[] array.
  * @dfs_precac_timer: agile precac timer
- * @dfs_precac_completion_work: workqueue to process the precac timeout.
  * @dfs_precac_timer_running: precac timer running flag
  * @ocac_status: Off channel CAC complete status
  * @dfs_nol_ctx: dfs NOL data for all radios.
@@ -1369,14 +1370,13 @@ struct dfs_soc_priv_obj {
 	uint8_t num_dfs_privs;
 	uint8_t cur_agile_dfs_index;
 	qdf_hrtimer_data_t    dfs_precac_timer;
-	qdf_work_t     dfs_precac_completion_work;
 	uint8_t dfs_precac_timer_running;
 	bool precac_state_started;
 	bool ocac_status;
 #endif
 	struct dfsreq_nolinfo *dfs_psoc_nolinfo;
 #ifdef QCA_SUPPORT_ADFS_RCAC
-	qdf_timer_t dfs_rcac_timer;
+	qdf_hrtimer_data_t dfs_rcac_timer;
 #endif
 #ifdef QCA_SUPPORT_AGILE_DFS
 	struct wlan_sm *dfs_agile_sm_hdl;
@@ -1714,7 +1714,7 @@ int dfs_bin5_addpulse(struct wlan_dfs *dfs,
  * dfs_bin5_check() - BIN5 check.
  * @dfs: Pointer to wlan_dfs structure.
  *
- * If the dfs structure is NULL (which should be illegal if everyting is working
+ * If the dfs structure is NULL (which should be illegal if everything is working
  * properly, then signify that a bin5 radar was found.
  */
 int dfs_bin5_check(struct wlan_dfs *dfs);
@@ -2959,7 +2959,7 @@ void dfs_start_mode_switch_defer_timer(struct wlan_dfs *dfs);
 
 /**
  * dfs_complete_deferred_tasks() - Process mode switch completion event and
- * handle deffered tasks.
+ * handle deferred tasks.
  * @dfs: Pointer to wlan_dfs object.
  *
  * Return: void.
@@ -2972,23 +2972,7 @@ void dfs_complete_deferred_tasks(struct wlan_dfs *dfs);
  *
  * Return: void.
  */
-void dfs_process_cac_completion(void *context);
-
-/**
- * dfs_process_precac_completion() - Process DFS preCAC completion event.
- * @dfs_soc_obj: Pointer to dfs_soc_obj object.
- *
- * Return: void.
- */
-void dfs_process_precac_completion(void *context);
-
-/**
- * dfs_process_noltimeout_completion() - Process NOL timeout completion event.
- * @dfs_nolelem: Pointer to dfs_nolelem object.
- *
- * Return: void.
- */
-void dfs_process_noltimeout_completion(void *context);
+void dfs_process_cac_completion(struct wlan_dfs *dfs);
 
 #ifdef WLAN_DFS_TRUE_160MHZ_SUPPORT
 /**

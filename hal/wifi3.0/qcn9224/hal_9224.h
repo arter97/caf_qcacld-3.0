@@ -1119,7 +1119,7 @@ static void hal_rx_dump_msdu_end_tlv_9224(void *msduend,
 
 /**
  * hal_reo_status_get_header_9224 - Process reo desc info
- * @d - Pointer to reo descriptior
+ * @d - Pointer to reo descriptor
  * @b - tlv type info
  * @h1 - Pointer to hal_reo_status_header where info to be stored
  *
@@ -1422,7 +1422,7 @@ void hal_compute_reo_remap_ix0_9224(struct hal_soc *soc)
 			      (REO_REG_REG_BASE));
 
 	remap0 &= ~(HAL_REO_REMAP_IX0(0xF, 6));
-	remap0 |= HAL_REO_REMAP_IX0(REO2PPE_DST_IND, 6);
+	remap0 |= HAL_REO_REMAP_IX0(REO2PPE_DST_RING, 6);
 
 	HAL_REG_WRITE(soc, HWIO_REO_R0_DESTINATION_RING_CTRL_IX_0_ADDR
 		      (REO_REG_REG_BASE), remap0);
@@ -1655,7 +1655,7 @@ static void hal_cmem_write_9224(hal_soc_handle_t hal_soc_hdl,
 {
 	struct hal_soc *hal = (struct hal_soc *)hal_soc_hdl;
 
-	pld_reg_write(hal->qdf_dev->dev, offset, value);
+	pld_reg_write(hal->qdf_dev->dev, offset, value, NULL);
 }
 
 /**
@@ -2093,6 +2093,12 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 		hal_tx_populate_bank_register_be;
 	hal_soc->ops->hal_tx_vdev_mcast_ctrl_set =
 		hal_tx_vdev_mcast_ctrl_set_be;
+#ifdef CONFIG_WORD_BASED_TLV
+	hal_soc->ops->hal_rx_mpdu_start_wmask_get =
+					hal_rx_mpdu_start_wmask_get_be;
+	hal_soc->ops->hal_rx_msdu_end_wmask_get =
+					hal_rx_msdu_end_wmask_get_be;
+#endif
 };
 
 /**

@@ -839,6 +839,10 @@ QDF_STATUS (*send_disconnect_roam_params)(wmi_unified_t wmi_handle,
 
 QDF_STATUS (*send_idle_roam_params)(wmi_unified_t wmi_handle,
 				    struct wlan_roam_idle_params *req);
+#ifdef WLAN_FEATURE_11BE_MLO
+QDF_STATUS (*send_roam_mlo_config)(wmi_unified_t wmi_handle,
+				   struct wlan_roam_mlo_config *req);
+#endif
 
 QDF_STATUS (*send_roam_preauth_status)(wmi_unified_t wmi_handle,
 				struct wmi_roam_auth_status_params *params);
@@ -1973,13 +1977,14 @@ QDF_STATUS (*extract_p2p_lo_stop_ev_param)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_p2p_noa_ev_param)(wmi_unified_t wmi_handle,
 	void *evt_buf, struct p2p_noa_info *param);
 
-QDF_STATUS (*set_mac_addr_rx_filter)(wmi_unified_t wmi_handle,
-				     struct p2p_set_mac_filter *param);
 QDF_STATUS
 (*extract_mac_addr_rx_filter_evt_param)(wmi_unified_t wmi_handle,
 					void *evt_buf,
 					struct p2p_set_mac_filter_evt *param);
 #endif
+
+QDF_STATUS (*set_mac_addr_rx_filter)(wmi_unified_t wmi_handle,
+				     struct set_rx_mac_filter *param);
 
 #ifdef WLAN_FEATURE_INTEROP_ISSUES_AP
 QDF_STATUS
@@ -2103,6 +2108,16 @@ QDF_STATUS (*extract_peer_stats_count)(wmi_unified_t wmi_handle, void *evt_buf,
 
 QDF_STATUS (*extract_peer_stats_info)(wmi_unified_t wmi_handle, void *evt_buf,
 		uint32_t index, wmi_host_peer_stats_info *peer_stats_info);
+
+QDF_STATUS
+(*extract_peer_tx_pkt_per_mcs)(wmi_unified_t wmi_handle, void *evt_buf,
+			       uint32_t index,
+			       wmi_host_peer_stats_info *peer_stats_info);
+QDF_STATUS
+(*extract_peer_rx_pkt_per_mcs)(wmi_unified_t wmi_handle, void *evt_buf,
+			       uint32_t index,
+			       wmi_host_peer_stats_info *peer_stats_info);
+
 #endif /* QCA_SUPPORT_MC_CP_STATS */
 
 QDF_STATUS
@@ -3123,10 +3138,12 @@ QDF_STATUS
 QDF_STATUS (*extract_coap_buf_info)(wmi_unified_t wmi_handle, void *evt_buf,
 				    struct coap_buf_info *info);
 #endif
+#ifdef HEALTH_MON_SUPPORT
 QDF_STATUS
 (*extract_health_mon_init_done_info_event)(wmi_unified_t wmi_handle,
 					   void *evt_buf,
 					   struct wmi_health_mon_params *param);
+#endif /* HEALTH_MON_SUPPORT */
 };
 
 /* Forward declartion for psoc*/

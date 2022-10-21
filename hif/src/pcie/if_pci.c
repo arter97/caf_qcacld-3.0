@@ -314,7 +314,7 @@ irqreturn_t hif_pci_legacy_ce_interrupt_handler(int irq, void *arg)
 		}
 
 		/* Clear Legacy PCI line interrupts
-		 * IMPORTANT: INTR_CLR regiser has to be set
+		 * IMPORTANT: INTR_CLR register has to be set
 		 * after INTR_ENABLE is set to 0,
 		 * otherwise interrupt can not be really cleared
 		 */
@@ -442,7 +442,7 @@ int hif_get_irq_num(struct hif_opaque_softc *scn, int *irq, uint32_t size)
 
 
 /**
- * hif_pci_cancel_deferred_target_sleep() - cancels the defered target sleep
+ * hif_pci_cancel_deferred_target_sleep() - cancels the deferred target sleep
  * @scn: hif_softc
  *
  * Return: void
@@ -582,7 +582,7 @@ static void hif_pci_device_reset(struct hif_pci_softc *sc)
 /* CPU warm reset function
  * Steps:
  * 1. Disable all pending interrupts - so no pending interrupts on WARM reset
- * 2. Clear the FW_INDICATOR_ADDRESS -so Traget CPU initializes FW
+ * 2. Clear the FW_INDICATOR_ADDRESS -so Target CPU initializes FW
  *    correctly on WARM reset
  * 3. Clear TARGET CPU LF timer interrupt
  * 4. Reset all CEs to clear any pending CE tarnsactions
@@ -755,14 +755,14 @@ int hif_check_soc_status(struct hif_opaque_softc *hif_ctx)
 			   RTC_STATE_ADDRESS);
 	hif_debug("RTC_STATE_ADDRESS is %08x", val);
 
-	/* Try to wake up taget if it sleeps */
+	/* Try to wake up target if it sleeps */
 	hif_write32_mb(sc, sc->mem + PCIE_LOCAL_BASE_ADDRESS +
 		PCIE_SOC_WAKE_ADDRESS, PCIE_SOC_WAKE_V_MASK);
 	hif_debug("PCIE_SOC_WAKE_ADDRESS is %08x",
 		hif_read32_mb(sc, sc->mem + PCIE_LOCAL_BASE_ADDRESS +
 		PCIE_SOC_WAKE_ADDRESS));
 
-	/* Check if taget can be woken up */
+	/* Check if target can be woken up */
 	while (!hif_targ_is_awake(scn, sc->mem)) {
 		if (timeout_count >= PCIE_WAKE_TIMEOUT) {
 			hif_err("wake up timeout, %08x, %08x",
@@ -795,7 +795,7 @@ int hif_check_soc_status(struct hif_opaque_softc *hif_ctx)
  * __hif_pci_dump_registers(): dump other PCI debug registers
  * @scn: struct hif_softc
  *
- * This function dumps pci debug registers.  The parrent function
+ * This function dumps pci debug registers.  The parent function
  * dumps the copy engine registers before calling this function.
  *
  * Return: void
@@ -1189,7 +1189,7 @@ static void hif_wake_target_cpu(struct hif_softc *scn)
  * @scn: hif_softc
  *
  * Clear the force wake register.  This is done by
- * hif_sleep_entry and cancel defered timer sleep.
+ * hif_sleep_entry and cancel deferred timer sleep.
  */
 static void soc_wake_reset(struct hif_softc *scn)
 {
@@ -1798,6 +1798,30 @@ void hif_pci_close(struct hif_softc *hif_sc)
 
 #define BAR_NUM 0
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0))
+static inline int hif_pci_set_dma_mask(struct pci_dev *pci_dev, u64 mask)
+{
+	return dma_set_mask(&pci_dev->dev, mask);
+}
+
+static inline int hif_pci_set_coherent_dma_mask(struct pci_dev *pci_dev,
+						u64 mask)
+{
+	return dma_set_coherent_mask(&pci_dev->dev, mask);
+}
+#else /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) */
+static inline int hif_pci_set_dma_mask(struct pci_dev *pci_dev, u64 mask)
+{
+	return pci_set_dma_mask(pci_dev, mask);
+}
+
+static inline int hif_pci_set_coherent_dma_mask(struct pci_dev *pci_dev,
+						u64 mask)
+{
+	return pci_set_consistent_dma_mask(pci_dev, mask);
+}
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)) */
+
 static int hif_enable_pci_nopld(struct hif_pci_softc *sc,
 				struct pci_dev *pdev,
 				const struct pci_device_id *id)
@@ -1812,7 +1836,7 @@ static int hif_enable_pci_nopld(struct hif_pci_softc *sc,
 		hif_err(
 		   "dev id mismatch, config id = 0x%x, probing id = 0x%x",
 		   device_id, id->device);
-		/* pci link is down, so returing with error code */
+		/* pci link is down, so returning with error code */
 		return -EIO;
 	}
 
@@ -1842,25 +1866,25 @@ static int hif_enable_pci_nopld(struct hif_pci_softc *sc,
 	/* if CONFIG_ARM_LPAE is enabled, we have to set 64 bits mask
 	 * for 32 bits device also.
 	 */
-	ret =  pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
+	ret =  hif_pci_set_dma_mask(pdev, DMA_BIT_MASK(64));
 	if (ret) {
 		hif_err("Cannot enable 64-bit pci DMA");
 		goto err_dma;
 	}
-	ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
+	ret = hif_pci_set_coherent_dma_mask(pdev, DMA_BIT_MASK(64));
 	if (ret) {
 		hif_err("Cannot enable 64-bit DMA");
 		goto err_dma;
 	}
 #else
-	ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+	ret = hif_pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
 	if (ret) {
 		hif_err("Cannot enable 32-bit pci DMA");
 		goto err_dma;
 	}
-	ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32));
+	ret = hif_pci_set_coherent_dma_mask(pdev, DMA_BIT_MASK(32));
 	if (ret) {
-		hif_err("Cannot enable 32-bit consistent DMA!");
+		hif_err("Cannot enable 32-bit coherent DMA!");
 		goto err_dma;
 	}
 #endif
@@ -2474,7 +2498,7 @@ int hif_pci_bus_resume(struct hif_softc *scn)
  * @scn: hif context
  *
  * Ensure that if we received the wakeup message before the irq
- * was disabled that the message is pocessed before suspending.
+ * was disabled that the message is processed before suspending.
  *
  * Return: -EBUSY if we fail to flush the tasklets.
  */
@@ -2491,7 +2515,7 @@ int hif_pci_bus_suspend_noirq(struct hif_softc *scn)
  * @scn: hif context
  *
  * Ensure that if we received the wakeup message before the irq
- * was disabled that the message is pocessed before suspending.
+ * was disabled that the message is processed before suspending.
  *
  * Return: -EBUSY if we fail to flush the tasklets.
  */
@@ -3572,7 +3596,7 @@ static void hif_trigger_timer_irq(struct hif_softc *scn)
  * hif_target_sync() : ensure the target is ready
  * @scn: hif control structure
  *
- * Informs fw that we plan to use legacy interupts so that
+ * Informs fw that we plan to use legacy interrupts so that
  * it can begin booting. Ensures that the fw finishes booting
  * before continuing. Should be called before trying to write
  * to the targets other registers for the first time.
@@ -3992,6 +4016,7 @@ int hif_force_wake_request(struct hif_opaque_softc *hif_handle)
 	uint32_t timeout, value;
 	struct hif_softc *scn = (struct hif_softc *)hif_handle;
 	struct hif_pci_softc *pci_scn = HIF_GET_PCI_SOFTC(scn);
+	int ret, status = 0;
 
 	/* Prevent runtime PM or trigger resume firstly */
 	if (hif_rtpm_get(HIF_RTPM_GET_SYNC, HIF_RTPM_ID_FORCE_WAKE)) {
@@ -4008,7 +4033,8 @@ int hif_force_wake_request(struct hif_opaque_softc *hif_handle)
 	if (pld_force_wake_request_sync(scn->qdf_dev->dev, timeout)) {
 		hif_err("force wake request send failed");
 		HIF_STATS_INC(pci_scn, mhi_force_wake_failure, 1);
-		return -EINVAL;
+		status = -EINVAL;
+		goto release_rtpm_ref;
 	}
 
 	/* If device's M1 state-change event races here, it can be ignored,
@@ -4040,11 +4066,22 @@ int hif_force_wake_request(struct hif_opaque_softc *hif_handle)
 		hif_err("force wake handshake failed, reg value = 0x%x",
 			value);
 		HIF_STATS_INC(pci_scn, soc_force_wake_failure, 1);
-		return -ETIMEDOUT;
+		status = -ETIMEDOUT;
+		goto release_rtpm_ref;
 	}
 
 	HIF_STATS_INC(pci_scn, soc_force_wake_success, 1);
 	return 0;
+
+release_rtpm_ref:
+	/* Release runtime PM force wake */
+	ret = hif_rtpm_put(HIF_RTPM_PUT_ASYNC, HIF_RTPM_ID_FORCE_WAKE);
+	if (ret) {
+		hif_err("runtime pm put failure: %d", ret);
+		return ret;
+	}
+
+	return status;
 }
 
 int hif_force_wake_release(struct hif_opaque_softc *hif_handle)

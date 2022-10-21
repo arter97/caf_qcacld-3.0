@@ -352,7 +352,7 @@ struct wlan_lmac_if_mgmt_rx_reo_rx_ops {
  * @mgmt_tx_send: function pointer to transmit mgmt tx frame
  * @beacon_send:  function pointer to transmit beacon frame
  * @fd_action_frame_send: function pointer to transmit FD action frame
- * @tx_drain_nbuf_op: function pointer for any umac nbuf realted ops for
+ * @tx_drain_nbuf_op: function pointer for any umac nbuf related ops for
  *                    pending mgmt frames cleanup
  * @reg_ev_handler: function pointer to register event handlers
  * @unreg_ev_handler: function pointer to unregister event handlers
@@ -408,6 +408,8 @@ struct wlan_lmac_if_scan_tx_ops {
 	QDF_STATUS (*scan_unreg_ev_handler)(struct wlan_objmgr_psoc *psoc,
 			void *arg);
 	QDF_STATUS (*set_chan_list)(struct wlan_objmgr_pdev *pdev, void *arg);
+	bool (*is_platform_eht_capable)(struct wlan_objmgr_psoc *psoc,
+					uint8_t pdev_id);
 };
 
 /**
@@ -461,6 +463,7 @@ enum wlan_mlme_cfg_id;
  * @psoc_wake_lock_deinit: De-Initialize psoc wake lock for vdev response timer
  * @get_hw_link_id: Get hw_link_id for pdev
  * @vdev_send_set_mac_addr: API to send set MAC address request to FW
+ * @vdev_peer_set_param_send: API to send peer param to FW
  */
 struct wlan_lmac_if_mlme_tx_ops {
 	uint32_t (*get_wifi_iface_id) (struct wlan_objmgr_pdev *pdev);
@@ -559,6 +562,10 @@ QDF_STATUS (*vdev_send_set_mac_addr)(struct qdf_mac_addr mac_addr,
 				     struct qdf_mac_addr mld_addr,
 				     struct wlan_objmgr_vdev *vdev);
 #endif
+	QDF_STATUS (*vdev_peer_set_param_send)(struct wlan_objmgr_vdev *vdev,
+					       uint8_t *peer_mac_addr,
+					       uint32_t param_id,
+					       uint32_t param_value);
 };
 
 /**
@@ -580,7 +587,6 @@ struct wlan_lmac_if_scan_rx_ops {
 /* forward declarations for p2p tx ops */
 struct p2p_ps_config;
 struct p2p_lo_start;
-struct p2p_set_mac_filter;
 
 /**
  * struct wlan_lmac_if_p2p_tx_ops - structure of tx function pointers
@@ -621,7 +627,7 @@ struct wlan_lmac_if_p2p_tx_ops {
 			struct wlan_objmgr_psoc *psoc, bool reg);
 	QDF_STATUS (*set_mac_addr_rx_filter_cmd)(
 			struct wlan_objmgr_psoc *psoc,
-			struct p2p_set_mac_filter *param);
+			struct set_rx_mac_filter *param);
 #ifdef WLAN_FEATURE_MCC_QUOTA
 	QDF_STATUS (*reg_mcc_quota_ev_handler)(struct wlan_objmgr_psoc *psoc,
 					       bool reg);
@@ -902,9 +908,6 @@ struct wlan_lmac_if_iot_sim_tx_ops {
  *                                    request buffer.
  * @send_rtt_pasn_auth_status: Send PASN peers authentication status
  * @send_rtt_pasn_deauth: Send PASN peer deauth command
- * @wifi_pos_delete_all_vdev_ranging_peers_cb: Delete all ranging peers for
- * given vdev. This is called before vdev delete to cleanup all the ranging
- * peers of that vdev.
  */
 struct wlan_lmac_if_wifi_pos_tx_ops {
 	QDF_STATUS (*wifi_pos_register_events)(struct wlan_objmgr_psoc *psoc);
@@ -927,14 +930,12 @@ struct wlan_lmac_if_wifi_pos_tx_ops {
 			 struct wlan_pasn_auth_status *data);
 	QDF_STATUS (*send_rtt_pasn_deauth)(struct wlan_objmgr_psoc *psoc,
 					   struct qdf_mac_addr *peer_mac);
-	QDF_STATUS (*wifi_pos_vdev_delete_all_ranging_peers_cb)
-					(struct wlan_objmgr_vdev *vdev);
 };
 #endif
 
 #ifdef DIRECT_BUF_RX_ENABLE
 /**
- * struct wlan_lmac_if_direct_buf_rx_tx_ops - structire of direct buf rx txops
+ * struct wlan_lmac_if_direct_buf_rx_tx_ops - structure of direct buf rx txops
  * @direct_buf_rx_module_register: Registration API callback for modules
  *                                 to register with direct buf rx framework
  * @direct_buf_rx_module_unregister: Unregistration API to clean up module
@@ -1130,6 +1131,7 @@ struct wlan_lmac_if_reg_tx_ops {
  * @dfs_ocac_abort_cmd:                 Send Off-Channel CAC abort command.
  * @dfs_is_pdev_5ghz:                   Check if the given pdev is 5GHz.
  * @dfs_set_phyerr_filter_offload:      Config phyerr filter offload.
+ * @dfs_is_tgt_bangradar_320_supp:      To check host DFS 320MHZ support or not
  * @dfs_is_tgt_radar_found_chan_freq_eq_center_freq:
  *                                      Check if chan_freq parameter of the
  *                                      radar found wmi event points to channel
@@ -1181,6 +1183,7 @@ struct wlan_lmac_if_dfs_tx_ops {
 			struct wlan_objmgr_pdev *pdev,
 			bool dfs_phyerr_filter_offload);
 	bool (*dfs_is_tgt_offload)(struct wlan_objmgr_psoc *psoc);
+	bool (*dfs_is_tgt_bangradar_320_supp)(struct wlan_objmgr_psoc *psoc);
 	bool (*dfs_is_tgt_radar_found_chan_freq_eq_center_freq)
 		 (struct wlan_objmgr_psoc *psoc);
 	QDF_STATUS (*dfs_send_offload_enable_cmd)(
@@ -1666,6 +1669,10 @@ struct wlan_lmac_if_mgmt_txrx_rx_ops {
 #endif
 };
 
+/**
+ * struct wlan_lmac_if_reg_rx_ops - structure of rx function pointers
+ * @reg_display_super_chan_list: function pointer to print super channel list
+ */
 struct wlan_lmac_if_reg_rx_ops {
 	QDF_STATUS (*master_list_handler)(struct cur_regulatory_info
 					  *reg_info);
@@ -1726,6 +1733,8 @@ struct wlan_lmac_if_reg_rx_ops {
 	QDF_STATUS
 	(*reg_set_disable_upper_6g_edge_ch_supp)(struct wlan_objmgr_psoc *psoc,
 						 bool val);
+	QDF_STATUS
+	(*reg_display_super_chan_list)(struct wlan_objmgr_pdev *pdev);
 #endif
 
 #ifdef CONFIG_AFC_SUPPORT
@@ -2000,6 +2009,9 @@ struct wlan_lmac_if_iot_sim_rx_ops {
  * pointer.
  * @wifi_pos_vdev_delete_all_ranging_peers_rsp_cb: Callback to handle vdev
  * delete all ranging peers response
+ * @wifi_pos_vdev_delete_all_ranging_peers_cb: Delete all ranging peers for
+ * given vdev. This is called before vdev delete to cleanup all the ranging
+ * peers of that vdev.
  */
 struct wlan_lmac_if_wifi_pos_rx_ops {
 	int (*oem_rsp_event_rx)(struct wlan_objmgr_psoc *psoc,
@@ -2019,6 +2031,8 @@ struct wlan_lmac_if_wifi_pos_rx_ops {
 			 uint8_t vdev_id, uint8_t num_peers);
 	QDF_STATUS (*wifi_pos_vdev_delete_all_ranging_peers_rsp_cb)
 			(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+	QDF_STATUS (*wifi_pos_vdev_delete_all_ranging_peers_cb)
+					(struct wlan_objmgr_vdev *vdev);
 };
 #endif
 
@@ -2088,6 +2102,9 @@ struct wlan_lmac_if_wifi_pos_rx_ops {
  *                                    switch to, post NOL.
  * @dfs_set_bw_expand:                API to set BW Expansion feature.
  * @dfs_get_bw_expand:                API to get the status of BW Expansion
+ *                                    feature.
+ * @dfs_set_dfs_puncture:             API to set DFS puncturing feature.
+ * @dfs_get_dfs_puncture:             API to get the status of DFS puncturing
  *                                    feature.
  */
 struct wlan_lmac_if_dfs_rx_ops {
@@ -2208,6 +2225,14 @@ struct wlan_lmac_if_dfs_rx_ops {
 	QDF_STATUS (*dfs_get_bw_expand)(
 			struct wlan_objmgr_pdev *pdev,
 			bool *value);
+#ifdef QCA_DFS_BW_PUNCTURE
+	QDF_STATUS (*dfs_set_dfs_puncture)(
+			struct wlan_objmgr_pdev *pdev,
+			bool value);
+	QDF_STATUS (*dfs_get_dfs_puncture)(
+			struct wlan_objmgr_pdev *pdev,
+			bool *value);
+#endif
 	QDF_STATUS (*dfs_set_bw_reduction)(struct wlan_objmgr_pdev *pdev,
 			bool value);
 	QDF_STATUS (*dfs_is_bw_reduction_needed)(struct wlan_objmgr_pdev *pdev,

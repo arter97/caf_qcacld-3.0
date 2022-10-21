@@ -128,7 +128,7 @@ enum wlan_mlme_host_start_event_param {
 };
 
 /**
- * enum wlan_mlme_custom_aggr_type: custon aggregate type
+ * enum wlan_mlme_custom_aggr_type: custom aggregate type
  * @WLAN_MLME_CUSTOM_AGGR_TYPE_AMPDU: A-MPDU aggregation
  * @WLAN_MLME_CUSTOM_AGGR_TYPE_AMSDU: A-MSDU aggregation
  * @WLAN_MLME_CUSTOM_AGGR_TYPE_MAX: Max type
@@ -213,7 +213,7 @@ struct tbttoffset_params {
  * @vdev_id: Vdev id
  * @hw_link_id: Unique hw link id across SoCs
  * @beacon_interval: Beacon interval
- * @csa_switch_count_offset: CSA swith count offset in beacon frame
+ * @csa_switch_count_offset: CSA switch count offset in beacon frame
  * @ext_csa_switch_count_offset: ECSA switch count offset in beacon frame
  * @per_sta_profile_offset: Pointer to per-STA profile info
  * @quiet_ie_offset: Quiet IE offset
@@ -268,7 +268,7 @@ struct mlo_bcn_tmpl_ml_info {
  * @mbssid_ie_offset: mbssid ie offset
  * @tmpl_len: beacon template length
  * @tmpl_len_aligned: beacon template alignment
- * @csa_switch_count_offset: CSA swith count offset in beacon frame
+ * @csa_switch_count_offset: CSA switch count offset in beacon frame
  * @ext_csa_switch_count_offset: ECSA switch count offset in beacon frame
  * @esp_ie_offset: ESP IE offset in beacon frame
  * @mu_edca_ie_offset: Mu EDCA IE offset in beacon frame
@@ -700,6 +700,20 @@ struct set_multiple_pdev_vdev_param {
 	uint8_t dev_id;
 	uint8_t n_params;
 	struct dev_set_param *params;
+};
+
+/**
+ * struct set_rx_mac_filter - Set rx mac filter command parameters
+ * @vdev_id: Vdev id
+ * @mac: mac addr
+ * @freq: frequency
+ * @set: set or clear
+ */
+struct set_rx_mac_filter {
+	uint32_t vdev_id;
+	uint8_t mac[QDF_MAC_ADDR_SIZE];
+	uint32_t freq;
+	bool set;
 };
 
 static inline

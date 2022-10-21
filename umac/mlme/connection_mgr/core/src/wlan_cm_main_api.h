@@ -469,15 +469,24 @@ void cm_send_disconnect_resp(struct cnx_mgr *cm_ctx, wlan_cm_id cm_id);
 /**
  * cm_disconnect_continue_after_rso_stop() - Continue disconnect after RSO stop
  * @vdev: Objmgr vdev
- * @is_ho_fail: True if ho_fail happened
  * @req: pointer to cm vdev disconnect req
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 cm_disconnect_continue_after_rso_stop(struct wlan_objmgr_vdev *vdev,
-				      bool is_ho_fail,
 				      struct wlan_cm_vdev_discon_req *req);
+
+/**
+ * cm_handle_rso_stop_rsp() - Handle RSO stop response
+ * @vdev: Objmgr vdev
+ * @req: pointer to cm vdev disconnect req
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_handle_rso_stop_rsp(struct wlan_objmgr_vdev *vdev,
+		       struct wlan_cm_vdev_discon_req *req);
 
 /*************** UTIL APIs ****************/
 
@@ -897,7 +906,7 @@ bool cm_is_vdev_connected(struct wlan_objmgr_vdev *vdev);
 bool cm_is_vdev_active(struct wlan_objmgr_vdev *vdev);
 
 /**
- * cm_is_vdev_disconnecting() - check if vdev is in disconneting state
+ * cm_is_vdev_disconnecting() - check if vdev is in disconnecting state
  * @vdev: vdev pointer
  *
  * Return: bool
@@ -974,7 +983,7 @@ cm_get_active_req_type(struct wlan_objmgr_vdev *vdev);
  * @vdev: vdev pointer
  * @req: pointer to the copy of the active connect request
  * *
- * Context: Should be called only in the conext of the
+ * Context: Should be called only in the context of the
  * cm request activation
  *
  * Return: true and connect req if any request is active
@@ -987,7 +996,7 @@ bool cm_get_active_connect_req(struct wlan_objmgr_vdev *vdev,
  * @vdev: vdev pointer
  * @req: pointer to the copy of the active disconnect request
  * *
- * Context: Should be called only in the conext of the
+ * Context: Should be called only in the context of the
  * cm request activation
  *
  * Return: true and disconnect req if any request is active
@@ -1184,4 +1193,12 @@ void cm_set_candidate_custom_sort_cb(
 				 qdf_list_t *list));
 
 #endif
+
+/**
+ * cm_is_connect_req_reassoc() - Is connect req for reassoc
+ * @req: connect req
+ *
+ * Return: void
+ */
+bool cm_is_connect_req_reassoc(struct wlan_cm_connect_req *req);
 #endif /* __WLAN_CM_MAIN_API_H__ */

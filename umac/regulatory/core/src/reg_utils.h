@@ -47,7 +47,7 @@ bool reg_is_world_ctry_code(uint16_t ctry_code);
 #if defined(CONFIG_REG_CLIENT) && defined(CONFIG_CHAN_FREQ_API)
 /**
  * reg_chan_has_dfs_attribute_for_freq() - check channel frequency has dfs
- * attribue or not
+ * attribute or not
  * @freq: channel frequency.
  *
  * This API gets initial dfs attribute flag of the channel frequency from
@@ -271,7 +271,7 @@ reg_get_6g_power_type_for_ctry(struct wlan_objmgr_psoc *psoc,
 #endif
 
 /**
- * reg_set_config_vars () - set configration variables
+ * reg_set_config_vars () - set configuration variables
  * @psoc: psoc ptr
  * @config_vars: configuration struct
  *

@@ -52,11 +52,10 @@ wifi_pos_get_rx_ops(struct wlan_objmgr_psoc *psoc)
 	return &rx_ops->wifi_pos_rx_ops;
 }
 
-struct wifi_pos_legacy_ops *
-wifi_pos_get_legacy_ops(struct wlan_objmgr_psoc *psoc)
+struct wifi_pos_legacy_ops *wifi_pos_get_legacy_ops(void)
 {
 	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-			wifi_pos_get_psoc_priv_obj(psoc);
+			wifi_pos_get_psoc_priv_obj(wifi_pos_get_psoc());
 
 	if (!wifi_pos_obj)
 		return NULL;
@@ -69,7 +68,7 @@ wifi_pos_set_legacy_ops(struct wlan_objmgr_psoc *psoc,
 			struct wifi_pos_legacy_ops *legacy_ops)
 {
 	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-			wifi_pos_get_psoc_priv_obj(psoc);
+			wifi_pos_get_psoc_priv_obj(wifi_pos_get_psoc());
 
 	if (!wifi_pos_obj)
 		return QDF_STATUS_E_FAILURE;
@@ -673,12 +672,10 @@ QDF_STATUS wifi_pos_register_send_action(
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS
-wifi_pos_register_osif_callbacks(struct wlan_objmgr_psoc *psoc,
-				 struct wifi_pos_osif_ops *ops)
+QDF_STATUS wifi_pos_register_osif_callbacks(struct wifi_pos_osif_ops *ops)
 {
 	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-			wifi_pos_get_psoc_priv_obj(psoc);
+			wifi_pos_get_psoc_priv_obj(wifi_pos_get_psoc());
 
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos priv obj is null");
@@ -690,11 +687,10 @@ wifi_pos_register_osif_callbacks(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-struct wifi_pos_osif_ops *
-wifi_pos_get_osif_callbacks(struct wlan_objmgr_psoc *psoc)
+struct wifi_pos_osif_ops *wifi_pos_get_osif_callbacks(void)
 {
 	struct wifi_pos_psoc_priv_obj *wifi_pos_obj =
-			wifi_pos_get_psoc_priv_obj(psoc);
+			wifi_pos_get_psoc_priv_obj(wifi_pos_get_psoc());
 
 	if (!wifi_pos_obj) {
 		wifi_pos_err("wifi_pos priv obj is null");
@@ -703,3 +699,71 @@ wifi_pos_get_osif_callbacks(struct wlan_objmgr_psoc *psoc)
 
 	return wifi_pos_obj->osif_cb;
 }
+
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+void wifi_pos_set_rsta_sec_ltf_cap(bool val)
+{
+	struct wifi_pos_psoc_priv_obj *wifi_pos_psoc =
+			wifi_pos_get_psoc_priv_obj(wifi_pos_get_psoc());
+
+	if (!wifi_pos_psoc) {
+		wifi_pos_alert("unable to get wifi_pos psoc obj");
+		return;
+	}
+
+	qdf_spin_lock_bh(&wifi_pos_psoc->wifi_pos_lock);
+	wifi_pos_psoc->enable_rsta_secure_ltf_support = val;
+	qdf_spin_unlock_bh(&wifi_pos_psoc->wifi_pos_lock);
+}
+
+bool wifi_pos_get_rsta_sec_ltf_cap(void)
+{
+	bool value;
+	struct wifi_pos_psoc_priv_obj *wifi_pos_psoc =
+			wifi_pos_get_psoc_priv_obj(wifi_pos_get_psoc());
+
+	if (!wifi_pos_psoc) {
+		wifi_pos_alert("unable to get wifi_pos psoc obj");
+		return false;
+	}
+
+	qdf_spin_lock_bh(&wifi_pos_psoc->wifi_pos_lock);
+	value = wifi_pos_psoc->enable_rsta_secure_ltf_support;
+	qdf_spin_unlock_bh(&wifi_pos_psoc->wifi_pos_lock);
+
+	return value;
+}
+
+void wifi_pos_set_rsta_11az_ranging_cap(bool val)
+{
+	struct wifi_pos_psoc_priv_obj *wifi_pos_psoc =
+			wifi_pos_get_psoc_priv_obj(wifi_pos_get_psoc());
+
+	if (!wifi_pos_psoc) {
+		wifi_pos_alert("unable to get wifi_pos psoc obj");
+		return;
+	}
+
+	qdf_spin_lock_bh(&wifi_pos_psoc->wifi_pos_lock);
+	wifi_pos_psoc->enable_rsta_11az_ranging = val;
+	qdf_spin_unlock_bh(&wifi_pos_psoc->wifi_pos_lock);
+}
+
+bool wifi_pos_get_rsta_11az_ranging_cap(void)
+{
+	bool value;
+	struct wifi_pos_psoc_priv_obj *wifi_pos_psoc =
+			wifi_pos_get_psoc_priv_obj(wifi_pos_get_psoc());
+
+	if (!wifi_pos_psoc) {
+		wifi_pos_alert("unable to get wifi_pos psoc obj");
+		return false;
+	}
+
+	qdf_spin_lock_bh(&wifi_pos_psoc->wifi_pos_lock);
+	value = wifi_pos_psoc->enable_rsta_11az_ranging;
+	qdf_spin_unlock_bh(&wifi_pos_psoc->wifi_pos_lock);
+
+	return value;
+}
+#endif

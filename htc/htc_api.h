@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2013-2014, 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -298,7 +299,7 @@ struct htc_endpoint_credit_dist {
 #define IS_EP_ACTIVE(epDist)  ((epDist)->DistFlags & HTC_EP_ACTIVE)
 #define SET_EP_ACTIVE(epDist) (epDist)->DistFlags |= HTC_EP_ACTIVE
 
-/* credit distibution code that is passed into the distrbution function,
+/* credit distribution code that is passed into the distrbution function,
  * there are mandatory and optional codes that must be handled
  */
 enum htc_credit_dist_reason {
@@ -366,7 +367,7 @@ struct htc_endpoint_stats {
 	uint32_t TxCreditsFromOther;
 	/* count of credits received via another endpoint */
 	uint32_t TxCreditsFromEp0;
-	/* count of consummed credits */
+	/* count of consumed credits */
 	uint32_t TxCreditsConsummed;
 	/* count of credits returned */
 	uint32_t TxCreditsReturned;
@@ -882,7 +883,7 @@ void htc_vote_link_up(HTC_HANDLE htc_handle, enum htc_link_vote_user_id id)
 /**
   * htc_set_async_ep() - set async HTC end point
   *           user should call this function after htc_connect_service before
-  *           queing any packets to end point
+  *           queueing any packets to end point
   * @HTCHandle: htc handle
   * @HTC_ENDPOINT_ID: end point id
   * @value: true or false
@@ -896,7 +897,7 @@ void htc_set_async_ep(HTC_HANDLE HTCHandle,
 /**
  * htc_set_wmi_endpoint_count: Set number of WMI endpoint
  * @htc_handle: HTC handle
- * @wmi_ep_count: WMI enpoint count
+ * @wmi_ep_count: WMI endpoint count
  *
  * return: None
  */
@@ -906,7 +907,7 @@ void htc_set_wmi_endpoint_count(HTC_HANDLE htc_handle, uint8_t wmi_ep_count);
  * htc_get_wmi_endpoint_count: Get number of WMI endpoint
  * @htc_handle: HTC handle
  *
- * return: WMI enpoint count
+ * return: WMI endpoint count
  */
 uint8_t  htc_get_wmi_endpoint_count(HTC_HANDLE htc_handle);
 

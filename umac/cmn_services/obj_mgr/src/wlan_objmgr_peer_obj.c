@@ -592,7 +592,7 @@ QDF_STATUS wlan_objmgr_peer_component_obj_attach(
 		return QDF_STATUS_SUCCESS;
 
 	/* If PEER object status is partially created means, this API is
-	invoked with differnt context. this block should be executed for async
+	invoked with different context. this block should be executed for async
 	components only */
 	/* Derive status */
 	obj_status = wlan_objmgr_peer_object_status(peer);
@@ -606,7 +606,7 @@ QDF_STATUS wlan_objmgr_peer_component_obj_attach(
 	/* Notify components about the CREATION success/failure */
 	if ((obj_status == QDF_STATUS_SUCCESS) ||
 	    (obj_status == QDF_STATUS_E_FAILURE)) {
-		/* nofity object status */
+		/* notify object status */
 		for (i = 0; i < WLAN_UMAC_MAX_COMPONENTS; i++) {
 			s_hler = g_umac_glb_obj->peer_status_handler[i];
 			arg = g_umac_glb_obj->peer_status_handler_arg[i];
@@ -643,7 +643,7 @@ QDF_STATUS wlan_objmgr_peer_component_obj_detach(
 	wlan_peer_obj_unlock(peer);
 
 	/* If PEER object status is partially destroyed means, this API is
-	invoked with differnt context, this block should be executed for async
+	invoked with different context, this block should be executed for async
 	components only */
 	if ((peer->obj_state == WLAN_OBJ_STATE_PARTIALLY_DELETED) ||
 	    (peer->obj_state == WLAN_OBJ_STATE_COMP_DEL_PROGRESS)) {

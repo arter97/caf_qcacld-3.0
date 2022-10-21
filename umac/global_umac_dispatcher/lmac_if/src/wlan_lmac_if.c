@@ -91,6 +91,9 @@
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 #include "target_if_coex.h"
 #endif
+#if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
+#include <wifi_pos_pasn_api.h>
+#endif
 
 #include "target_if.h"
 
@@ -321,7 +324,17 @@ wlan_lmac_if_crypto_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 static void
 wlan_lmac_if_wifi_pos_rx_ops(struct wlan_lmac_if_rx_ops *rx_ops)
 {
-	target_if_wifi_pos_register_rx_ops(rx_ops);
+	struct wlan_lmac_if_wifi_pos_rx_ops *wifi_pos_rx_ops =
+		&rx_ops->wifi_pos_rx_ops;
+
+	wifi_pos_rx_ops->wifi_pos_ranging_peer_create_cb =
+			wifi_pos_handle_ranging_peer_create;
+	wifi_pos_rx_ops->wifi_pos_ranging_peer_create_rsp_cb =
+			wifi_pos_handle_ranging_peer_create_rsp;
+	wifi_pos_rx_ops->wifi_pos_ranging_peer_delete_cb =
+			wifi_pos_handle_ranging_peer_delete;
+	wifi_pos_rx_ops->wifi_pos_vdev_delete_all_ranging_peers_rsp_cb =
+			wifi_pos_vdev_delete_all_ranging_peers_rsp;
 }
 #else
 static inline void
@@ -351,6 +364,13 @@ static void wlan_lmac_if_register_master_list_ext_handler(
 		tgt_reg_process_master_chan_list_ext;
 }
 
+static void wlan_lmac_if_register_super_chan_display(
+					struct wlan_lmac_if_rx_ops *rx_ops)
+{
+	rx_ops->reg_rx_ops.reg_display_super_chan_list =
+		wlan_reg_display_super_chan_list;
+}
+
 #ifdef CONFIG_AFC_SUPPORT
 static void wlan_lmac_if_register_afc_handlers(
 					struct wlan_lmac_if_rx_ops *rx_ops)
@@ -373,6 +393,11 @@ static inline void wlan_lmac_if_register_master_list_ext_handler(
 }
 
 static inline void wlan_lmac_if_register_afc_handlers(
+					struct wlan_lmac_if_rx_ops *rx_ops)
+{
+}
+
+static inline void wlan_lmac_if_register_super_chan_display(
 					struct wlan_lmac_if_rx_ops *rx_ops)
 {
 }
@@ -489,6 +514,8 @@ static void wlan_lmac_if_umac_reg_rx_ops_register(
 	wlan_lmac_if_register_6g_edge_chan_supp(rx_ops);
 
 	wlan_lmac_if_register_afc_handlers(rx_ops);
+
+	wlan_lmac_if_register_super_chan_display(rx_ops);
 }
 
 #ifdef CONVERGED_P2P_ENABLE
@@ -677,6 +704,26 @@ register_dfs_bw_expand_rx_ops(struct wlan_lmac_if_dfs_rx_ops *rx_ops)
 }
 #endif
 
+#ifdef QCA_DFS_BW_PUNCTURE
+/* register_dfs_puncture_rx_ops() - Register DFS Rx-Ops for DFS puncture.
+ * @rx_ops: Pointer to wlan_lmac_if_dfs_rx_ops.
+ */
+static void
+register_dfs_puncture_rx_ops(struct wlan_lmac_if_dfs_rx_ops *rx_ops)
+{
+	if (!rx_ops)
+		return;
+
+	rx_ops->dfs_set_dfs_puncture = ucfg_dfs_set_dfs_puncture;
+	rx_ops->dfs_get_dfs_puncture = ucfg_dfs_get_dfs_puncture;
+}
+#else
+static inline void
+register_dfs_puncture_rx_ops(struct wlan_lmac_if_dfs_rx_ops *rx_ops)
+{
+}
+#endif
+
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
 static QDF_STATUS
 wlan_lmac_if_mgmt_rx_reo_rx_ops_register(
@@ -831,6 +878,7 @@ wlan_lmac_if_umac_dfs_rx_ops_register(struct wlan_lmac_if_rx_ops *rx_ops)
 	register_agile_dfs_rx_ops(dfs_rx_ops);
 	register_dfs_chan_postnol_rx_ops(dfs_rx_ops);
 	register_dfs_bw_expand_rx_ops(dfs_rx_ops);
+	register_dfs_puncture_rx_ops(dfs_rx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }

@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2017-2018, 2020-2021 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -31,7 +32,7 @@
 
 /**
  * struct scan_event_listners - listeners interested in a particular scan event
- * @count: number of listners
+ * @count: number of listeners
  * @cb: callback handler
  */
 struct scan_event_listeners {

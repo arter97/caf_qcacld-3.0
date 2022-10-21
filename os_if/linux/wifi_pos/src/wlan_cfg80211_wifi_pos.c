@@ -25,6 +25,7 @@
 #include "wlan_objmgr_psoc_obj.h"
 #include "wlan_cfg80211_wifi_pos.h"
 #include "wlan_cmn_ieee80211.h"
+#include "wifi_pos_ucfg_i.h"
 
 #if defined(WIFI_POS_CONVERGED) && defined(WLAN_FEATURE_RTT_11AZ_SUPPORT)
 
@@ -38,6 +39,12 @@ void
 wlan_wifi_pos_cfg80211_set_wiphy_ext_feature(struct wiphy *wiphy,
 					     struct wlan_objmgr_psoc *psoc)
 {
+	bool enable_rsta_11az_ranging;
+
+	enable_rsta_11az_ranging = ucfg_wifi_pos_get_rsta_11az_ranging_cap();
+	if (!enable_rsta_11az_ranging)
+		return;
+
 	if (wlan_psoc_nif_fw_ext_cap_get(psoc, WLAN_RTT_11AZ_NTB_SUPPORT)) {
 		wlan_extended_caps_iface[WLAN_EXT_RANGING_CAP_IDX] |=
 					WLAN_EXT_CAPA11_NTB_RANGING_RESPONDER;
@@ -81,14 +88,27 @@ wlan_wifi_pos_set_feature_flags(uint8_t *feature_flags,
 void wlan_wifi_pos_cfg80211_set_features(struct wlan_objmgr_psoc *psoc,
 					 uint8_t *feature_flags)
 {
+	bool rsta_secure_ltf_support, enable_rsta_11az_ranging;
+
+	enable_rsta_11az_ranging = ucfg_wifi_pos_get_rsta_11az_ranging_cap();
+	rsta_secure_ltf_support = enable_rsta_11az_ranging &&
+				wifi_pos_get_rsta_sec_ltf_cap();
 	if (wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					  WLAN_RTT_11AZ_MAC_PHY_SEC_SUPPORT))
+					  WLAN_RTT_11AZ_MAC_PHY_SEC_SUPPORT)) {
 		wlan_wifi_pos_set_feature_flags(feature_flags,
 						QCA_WLAN_VENDOR_FEATURE_SECURE_LTF_STA);
+		if (rsta_secure_ltf_support)
+			wlan_wifi_pos_set_feature_flags(feature_flags,
+							QCA_WLAN_VENDOR_FEATURE_SECURE_LTF_AP);
+	}
 
 	if (wlan_psoc_nif_fw_ext2_cap_get(psoc,
-					  WLAN_RTT_11AZ_MAC_SEC_SUPPORT))
+					  WLAN_RTT_11AZ_MAC_SEC_SUPPORT)) {
 		wlan_wifi_pos_set_feature_flags(feature_flags,
 			QCA_WLAN_VENDOR_FEATURE_PROT_RANGE_NEGO_AND_MEASURE_STA);
+		if (rsta_secure_ltf_support)
+			wlan_wifi_pos_set_feature_flags(feature_flags,
+							QCA_WLAN_VENDOR_FEATURE_PROT_RANGE_NEGO_AND_MEASURE_AP);
+	}
 }
 #endif

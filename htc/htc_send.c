@@ -282,7 +282,7 @@ void free_htc_bundle_packet(HTC_TARGET *target, HTC_PACKET *pPacket)
 				__func__));
 		return;
 	}
-	/* HIF adds data to the headroom section of the nbuf, restore thei
+	/* HIF adds data to the headroom section of the nbuf, restore their
 	 * original size. If this is not done, headroom keeps shrinking with
 	 * every HIF send and eventually HIF ends up doing another malloc big
 	 * enough to store the data + its header
@@ -989,7 +989,7 @@ static QDF_STATUS htc_issue_packets(HTC_TARGET *target,
 #ifdef FEATURE_RUNTIME_PM
 /**
  * extract_htc_pm_packets(): move pm packets from endpoint into queue
- * @endpoint: which enpoint to extract packets from
+ * @endpoint: which endpoint to extract packets from
  * @queue: a queue to store extracted packets in.
  *
  * remove pm packets from the endpoint's tx queue.
@@ -1015,8 +1015,8 @@ static void extract_htc_pm_packets(HTC_ENDPOINT *endpoint,
 
 /**
  * queue_htc_pm_packets(): queue pm packets with priority
- * @endpoint: enpoint to queue packets to
- * @queue: queue of pm packets to enque
+ * @endpoint: endpoint to queue packets to
+ * @queue: queue of pm packets to enqueue
  *
  * suspend resume packets get special treatment & priority.
  * need to queue them at the front of the queue.
@@ -1073,7 +1073,7 @@ htc_send_pkts_get_rtpm_id(HTC_SERVICE_ID service_id)
 /**
  * extract_htc_system_resume_pkts(): Move system pm resume packets from endpoint
  *  into queue
- * @endpoint: which enpoint to extract packets from
+ * @endpoint: which endpoint to extract packets from
  * @queue: a queue to store extracted packets in.
  *
  * Remove pm packets from the endpoint's tx queue and enqueue
@@ -2550,7 +2550,7 @@ void htc_tx_resource_avail_handler(void *context, uint8_t pipeID)
  * htc_kick_queues(): resumes tx transactions of suspended endpoints
  * @context: pointer to the htc target context
  *
- * Iterates through the enpoints and provides a context to empty queues
+ * Iterates through the endpoints and provides a context to empty queues
  * int the hif layer when they are stalled due to runtime suspend.
  *
  * Return: none

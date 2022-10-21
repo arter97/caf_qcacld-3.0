@@ -181,13 +181,13 @@ struct wlan_ml_vdev_aid_mgr {
 /*
  * struct wlan_mlo_key_mgmt - MLO key management
  * @link_mac_address: list of vdevs selected for connection with the MLAP
- * @ptk: Pairwise transition keys
- * @gtk: Group transition key
+ * @vdev_id: vdev id value
+ * @keys_saved: keys saved bool
  */
 struct wlan_mlo_key_mgmt {
 	struct qdf_mac_addr link_mac_address;
-	uint32_t ptk;
-	uint32_t gtk;
+	uint8_t vdev_id;
+	bool keys_saved;
 };
 
 /**
@@ -569,6 +569,18 @@ struct wlan_mlo_eml_cap {
 };
 
 /**
+ * struct wlan_mlo_msd_cap - MSD capabilities of MLD
+ * @medium_sync_duration: Medium Sync Duration
+ * @medium_sync_ofdm_ed_thresh: MSD threshold value
+ * @medium_sync_max_txop_num: Max number of TXOP
+ */
+struct wlan_mlo_msd_cap {
+	uint16_t medium_sync_duration:8,
+		 medium_sync_ofdm_ed_thresh:4,
+		 medium_sync_max_txop_num:4;
+};
+
+/**
  * struct wlan_mlo_mld_cap - MLD capabilities of MLD
  * @max_simult_link: Maximum number of simultaneous links
  * @srs_support: SRS support
@@ -597,7 +609,7 @@ struct wlan_mlo_mld_cap {
  * @mlo_peer_id: unique ID for the peer
  * @peer_mld_addr: MAC address of MLD link
  * @mlo_ie: MLO IE struct
- * @mlo_peer_lock: lock to access peer strucutre
+ * @mlo_peer_lock: lock to access peer structure
  * @assoc_id: Assoc ID derived by MLO manager
  * @ref_cnt: Reference counter to avoid use after free
  * @ml_dev: MLO dev context
@@ -607,6 +619,9 @@ struct wlan_mlo_mld_cap {
  * @nawds_config: eack link peer's NAWDS configuration
  * @pending_auth: Holds pending auth request
  * @t2lm_policy: TID-to-link mapping information
+ * @msd_cap_present: Medium Sync Capability present bit
+ * @mlpeer_emlcap: EML capability information for ML peer
+ * @mlpeer_msdcap: Medium Sync Delay capability information for ML peer
  */
 struct wlan_mlo_peer_context {
 	qdf_list_node_t peer_node;
@@ -637,7 +652,9 @@ struct wlan_mlo_peer_context {
 #ifdef WLAN_FEATURE_11BE
 	struct wlan_mlo_peer_t2lm_policy t2lm_policy;
 #endif
+	bool msd_cap_present;
 	struct wlan_mlo_eml_cap mlpeer_emlcap;
+	struct wlan_mlo_msd_cap mlpeer_msdcap;
 };
 
 /*
@@ -712,7 +729,7 @@ struct mlo_tgt_partner_info {
  * @mlo_mlme_ext_peer_assoc_fail: Callback to notify peer assoc failure
  * @mlo_mlme_ext_peer_delete: Callback to initiate link peer delete
  * @mlo_mlme_ext_assoc_resp: Callback to initiate assoc resp
- * @mlo_mlme_get_link_assoc_req: Calback to get link assoc req buffer
+ * @mlo_mlme_get_link_assoc_req: Callback to get link assoc req buffer
  * @mlo_mlme_ext_deauth: Callback to initiate deauth
  * @mlo_mlme_ext_clone_security_param: Callback to clone mlo security params
  * @mlo_mlme_ext_peer_process_auth: Callback to process pending auth

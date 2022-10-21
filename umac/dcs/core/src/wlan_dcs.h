@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -134,7 +135,7 @@ struct pdev_dcs_timer_args {
 };
 
 /**
- * struct psoc_dcs_cbk - define dcs callback in psoc oject
+ * struct psoc_dcs_cbk - define dcs callback in psoc object
  * @cbk: callback
  * @arg: arguments
  */

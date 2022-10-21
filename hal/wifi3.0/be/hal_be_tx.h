@@ -84,7 +84,7 @@ enum hal_tx_notify_frame_type {
  * @encrypt_type: encrypt type
  * @src_buffer_swap: big-endia switch for packet buffer
  * @link_meta_swap: big-endian switch for link metadata
- * @index_lookup_enable: Enabel index lookup
+ * @index_lookup_enable: Enable index lookup
  * @addrx_en: Address-X search
  * @addry_en: Address-Y search
  * @mesh_enable:mesh enable flag
@@ -140,12 +140,12 @@ union hal_tx_cmn_config_ppe {
  * hal_tx_ppe_vp_config - SW config PPE VP table
  * @vp_num - Virtual port number
  * @pmac_id - Lmac ID
- * @bank_id: Bank ID correspondig to this I/F.
+ * @bank_id: Bank ID corresponding to this I/F.
  * @vdev_id: VDEV ID of the I/F.
  * @search_idx_reg_num: Register number of this SI.
  * @use_ppe_int_pri: Use the PPE INT_PRI to TID table
  * @to_fw: Use FW
- * @drop_prec_enable: Enable precendance drop.
+ * @drop_prec_enable: Enable precedence drop.
  */
 union hal_tx_ppe_vp_config {
 	struct {

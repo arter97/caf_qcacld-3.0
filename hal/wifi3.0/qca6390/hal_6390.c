@@ -991,7 +991,7 @@ uint16_t hal_rx_get_rx_sequence_6390(uint8_t *buf)
  *
  *@rx_tlv_hdr: start address of rx_pkt_tlvs
  *
- * Return: true if RX_MPDU_START is valied, else false.
+ * Return: true if RX_MPDU_START is valid, else false.
  */
 static uint8_t hal_rx_mpdu_start_tlv_tag_valid_6390(void *rx_tlv_hdr)
 {
@@ -1234,6 +1234,8 @@ static void hal_hw_txrx_ops_attach_qca6390(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_mpdu_get_fr_ds = hal_rx_mpdu_get_fr_ds_6390;
 	hal_soc->ops->hal_rx_get_mpdu_frame_control_valid =
 		hal_rx_get_mpdu_frame_control_valid_6390;
+	hal_soc->ops->hal_rx_get_frame_ctrl_field =
+		hal_rx_get_frame_ctrl_field_li;
 	hal_soc->ops->hal_rx_mpdu_get_addr1 = hal_rx_mpdu_get_addr1_6390;
 	hal_soc->ops->hal_rx_mpdu_get_addr2 = hal_rx_mpdu_get_addr2_6390;
 	hal_soc->ops->hal_rx_mpdu_get_addr3 = hal_rx_mpdu_get_addr3_6390;

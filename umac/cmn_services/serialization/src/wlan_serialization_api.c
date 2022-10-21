@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -306,9 +307,10 @@ wlan_serialization_cancel_request(
 	cmd.source = req->requestor;
 	cmd.vdev = req->vdev;
 
-	ser_debug("Type %d id %d source %d req type %d queue type %d",
-		  cmd.cmd_type, cmd.cmd_id, cmd.source, req->req_type,
-		  req->queue_type);
+	ser_debug("Type %d id %d vdev %d source %d req type %d queue type %d",
+		  cmd.cmd_type, cmd.cmd_id,
+		  cmd.vdev ? wlan_vdev_get_id(cmd.vdev) : WLAN_INVALID_VDEV_ID,
+		  cmd.source, req->req_type, req->queue_type);
 	pdev = wlan_serialization_get_pdev_from_cmd(&cmd);
 	if (!pdev) {
 		ser_err("pdev is invalid");

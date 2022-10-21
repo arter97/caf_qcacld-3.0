@@ -681,7 +681,7 @@ QDF_STATUS ipa_send_mcc_scc_msg(struct wlan_objmgr_pdev *pdev,
 QDF_STATUS ipa_wlan_evt(struct wlan_objmgr_pdev *pdev, qdf_netdev_t net_dev,
 			uint8_t device_mode, uint8_t session_id,
 			enum wlan_ipa_wlan_event ipa_event_type,
-			uint8_t *mac_addr, bool is_2g_iface)
+			const uint8_t *mac_addr, bool is_2g_iface)
 {
 	struct wlan_ipa_priv *ipa_obj;
 

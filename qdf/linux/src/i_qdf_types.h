@@ -42,6 +42,11 @@
 
 #ifdef __KERNEL__
 #include <generated/autoconf.h>
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#include <linux/stdarg.h>
+#else
+#include <stdarg.h>
+#endif
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/types.h>

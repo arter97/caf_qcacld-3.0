@@ -24,6 +24,7 @@
 #include <wlan_cm_api.h>
 #include "connection_mgr/core/src/wlan_cm_main_api.h"
 #include "connection_mgr/core/src/wlan_cm_roam.h"
+#include <wlan_vdev_mgr_utils_api.h>
 
 QDF_STATUS wlan_cm_start_connect(struct wlan_objmgr_vdev *vdev,
 				 struct wlan_cm_connect_req *req)
@@ -374,9 +375,112 @@ struct reduced_neighbor_report *wlan_cm_get_rnr(struct wlan_objmgr_vdev *vdev,
 
 QDF_STATUS
 wlan_cm_disc_cont_after_rso_stop(struct wlan_objmgr_vdev *vdev,
-				 bool is_ho_fail,
 				 struct wlan_cm_vdev_discon_req *req)
 {
-	return cm_disconnect_continue_after_rso_stop(vdev, is_ho_fail,
-						     req);
+	return cm_handle_rso_stop_rsp(vdev, req);
 }
+
+#ifdef WLAN_FEATURE_11BE
+QDF_STATUS wlan_cm_sta_update_bw_puncture(struct wlan_objmgr_vdev *vdev,
+					  uint8_t *peer_mac,
+					  uint16_t ori_punc,
+					  enum phy_ch_width ori_bw,
+					  uint8_t ccfs0, uint8_t ccfs1,
+					  enum phy_ch_width new_bw)
+{
+	struct wlan_channel *des_chan;
+	uint16_t curr_punc = 0;
+	uint16_t new_punc = 0;
+	enum phy_ch_width curr_bw;
+	uint16_t primary_puncture_bitmap = 0;
+	struct wlan_objmgr_pdev *pdev;
+	struct reg_channel_list chan_list;
+	qdf_freq_t sec_ch_2g_freq = 0;
+	qdf_freq_t center_freq_320 = 0;
+	qdf_freq_t center_freq_40 = 0;
+	uint8_t band_mask;
+	uint32_t bw_puncture = 0;
+
+	if (!vdev || !peer_mac) {
+		mlme_err("invalid input parameters");
+		return QDF_STATUS_E_INVAL;
+	}
+	pdev = wlan_vdev_get_pdev(vdev);
+	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
+	if (!des_chan || !pdev) {
+		mlme_err("invalid des chan");
+		return QDF_STATUS_E_INVAL;
+	}
+	if (ori_bw == CH_WIDTH_320MHZ) {
+		if (WLAN_REG_IS_6GHZ_CHAN_FREQ(des_chan->ch_freq))
+			band_mask = BIT(REG_BAND_6G);
+		else
+			band_mask = BIT(REG_BAND_5G);
+		center_freq_320 = wlan_reg_chan_band_to_freq(pdev, ccfs1,
+							     band_mask);
+	} else if (ori_bw == CH_WIDTH_40MHZ) {
+		if (WLAN_REG_IS_24GHZ_CH_FREQ(des_chan->ch_freq)) {
+			band_mask = BIT(REG_BAND_2G);
+			center_freq_40 = wlan_reg_chan_band_to_freq(pdev,
+								    ccfs0,
+								    band_mask);
+			if (center_freq_40 ==  des_chan->ch_freq + BW_10_MHZ)
+				sec_ch_2g_freq = des_chan->ch_freq + BW_20_MHZ;
+			if (center_freq_40 ==  des_chan->ch_freq - BW_10_MHZ)
+				sec_ch_2g_freq = des_chan->ch_freq - BW_20_MHZ;
+		}
+	}
+	qdf_mem_zero(&chan_list, sizeof(chan_list));
+	curr_punc = des_chan->puncture_bitmap;
+	curr_bw = des_chan->ch_width;
+	wlan_reg_extract_puncture_by_bw(ori_bw, ori_punc,
+					des_chan->ch_freq,
+					center_freq_320,
+					CH_WIDTH_20MHZ,
+					&primary_puncture_bitmap);
+	if (primary_puncture_bitmap) {
+		mlme_err("sta vdev %d freq %d RX bw %d puncture 0x%x primary chan is punctured",
+			 wlan_vdev_get_id(vdev), des_chan->ch_freq,
+			 ori_bw, ori_punc);
+		return QDF_STATUS_E_FAULT;
+	}
+	if (new_bw == ori_bw)
+		new_punc = ori_punc;
+	else
+		wlan_reg_extract_puncture_by_bw(ori_bw, ori_punc,
+						des_chan->ch_freq,
+						center_freq_320,
+						new_bw,
+						&new_punc);
+	if (curr_bw == new_bw) {
+		if (curr_punc != new_punc)
+			des_chan->puncture_bitmap = new_punc;
+		else
+			return QDF_STATUS_SUCCESS;
+	} else {
+		if (new_bw != CH_WIDTH_320MHZ)
+			center_freq_320 = 0;
+		wlan_reg_fill_channel_list(pdev, des_chan->ch_freq,
+					   sec_ch_2g_freq, new_bw,
+					   center_freq_320, &chan_list,
+					   true);
+		des_chan->ch_freq_seg1 =
+				chan_list.chan_param[0].center_freq_seg0;
+		des_chan->ch_freq_seg2 =
+				chan_list.chan_param[0].center_freq_seg1;
+		des_chan->ch_cfreq1 = chan_list.chan_param[0].mhz_freq_seg0;
+		des_chan->ch_cfreq2 = chan_list.chan_param[1].mhz_freq_seg1;
+		des_chan->puncture_bitmap = new_punc;
+		des_chan->ch_width = new_bw;
+	}
+	mlme_debug("sta vdev %d freq %d bw %d puncture 0x%x ch_cfreq1 %d ch_cfreq2 %d",
+		   wlan_vdev_get_id(vdev), des_chan->ch_freq,
+		   des_chan->ch_width, des_chan->puncture_bitmap,
+		   des_chan->ch_cfreq1, des_chan->ch_cfreq2);
+	QDF_SET_BITS(bw_puncture, 0, 8, des_chan->ch_width);
+	QDF_SET_BITS(bw_puncture, 8, 16, des_chan->puncture_bitmap);
+	return wlan_util_vdev_peer_set_param_send(vdev, peer_mac,
+						  WLAN_MLME_PEER_BW_PUNCTURE,
+						  bw_puncture);
+}
+#endif /* WLAN_FEATURE_11BE */

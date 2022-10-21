@@ -183,4 +183,18 @@ QDF_STATUS wlan_util_vdev_mgr_quiet_offload(
 				struct wlan_objmgr_psoc *psoc,
 				struct vdev_sta_quiet_event *quiet_event);
 #endif /* WLAN_FEATURE_11BE_MLO */
+
+/**
+ * wlan_util_vdev_peer_set_param_send() - send peer param
+ * @vdev: Pointer to vdev object.
+ * @peer_mac_addr: peer mac address
+ * @param_id: peer param id
+ * @param_value: peer param value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_util_vdev_peer_set_param_send(struct wlan_objmgr_vdev *vdev,
+					      uint8_t *peer_mac_addr,
+					      uint32_t param_id,
+					      uint32_t param_value);
 #endif /* __WLAN_VDEV_MGR_UTILS_API_H__ */

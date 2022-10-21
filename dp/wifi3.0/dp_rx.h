@@ -224,7 +224,7 @@ void dp_rx_set_hdr_pad(qdf_nbuf_t nbuf, uint32_t l3_padding)
  * dp_rx_is_special_frame() - check is RX frame special needed
  *
  * @nbuf: RX skb pointer
- * @frame_mask: the mask for speical frame needed
+ * @frame_mask: the mask for special frame needed
  *
  * Check is RX frame wanted matched with mask
  *
@@ -253,7 +253,7 @@ bool dp_rx_is_special_frame(qdf_nbuf_t nbuf, uint32_t frame_mask)
  * @soc: Datapath soc handler
  * @peer: pointer to DP peer
  * @nbuf: pointer to the skb of RX frame
- * @frame_mask: the mask for speical frame needed
+ * @frame_mask: the mask for special frame needed
  * @rx_tlv_hdr: start of rx tlv header
  *
  * note: Msdu_len must have been stored in QDF_NBUF_CB_RX_PKT_LEN(nbuf) and
@@ -1647,7 +1647,7 @@ dp_rx_link_desc_return_by_addr(struct dp_soc *soc,
 
 /**
  * dp_rxdma_err_process() - RxDMA error processing functionality
- * @soc: core txrx main contex
+ * @soc: core txrx main context
  * @mac_id: mac id which is one of 3 mac_ids
  * @hal_ring: opaque pointer to the HAL Rx Ring, which will be serviced
  * @quota: No. of units (packets) that can be serviced in one shot.
@@ -2149,6 +2149,7 @@ void dp_rx_update_stats(struct dp_soc *soc, qdf_nbuf_t nbuf)
  *
  * Return: void
  */
+#if defined(MAX_PDEV_CNT) && (MAX_PDEV_CNT == 1)
 static inline
 void dp_rx_cksum_offload(struct dp_pdev *pdev,
 			 qdf_nbuf_t nbuf,
@@ -2171,7 +2172,14 @@ void dp_rx_cksum_offload(struct dp_pdev *pdev,
 		DP_STATS_INCC(pdev, err.tcp_udp_csum_err, 1, tcp_udp_csum_er);
 	}
 }
-
+#else
+static inline
+void dp_rx_cksum_offload(struct dp_pdev *pdev,
+			 qdf_nbuf_t nbuf,
+			 uint8_t *rx_tlv_hdr)
+{
+}
+#endif
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
 #ifdef WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
@@ -2536,7 +2544,7 @@ void dp_rx_nbuf_unmap(struct dp_soc *soc,
 	dp_ipa_reo_ctx_buf_mapping_lock(soc, reo_ring_num);
 	dp_ipa_handle_rx_buf_smmu_mapping(soc, rx_desc->nbuf,
 					  rx_desc_pool->buf_size,
-					  false);
+					  false, __func__, __LINE__);
 
 	qdf_nbuf_unmap_nbytes_single(soc->osdev, rx_desc->nbuf,
 				     QDF_DMA_FROM_DEVICE,
@@ -2551,7 +2559,7 @@ void dp_rx_nbuf_unmap_pool(struct dp_soc *soc,
 			   qdf_nbuf_t nbuf)
 {
 	dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf, rx_desc_pool->buf_size,
-					  false);
+					  false, __func__, __LINE__);
 	qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE,
 				     rx_desc_pool->buf_size);
 }

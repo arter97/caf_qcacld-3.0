@@ -157,7 +157,7 @@ void wlan_cm_set_max_connect_timeout(struct wlan_objmgr_vdev *vdev,
 				     uint32_t max_connect_timeout);
 
 /**
- * wlan_cm_is_vdev_connecting() - check if vdev is in conneting state
+ * wlan_cm_is_vdev_connecting() - check if vdev is in connecting state
  * @vdev: vdev pointer
  *
  * Return: bool
@@ -165,7 +165,7 @@ void wlan_cm_set_max_connect_timeout(struct wlan_objmgr_vdev *vdev,
 bool wlan_cm_is_vdev_connecting(struct wlan_objmgr_vdev *vdev);
 
 /**
- * wlan_cm_is_vdev_connected() - check if vdev is in conneted state
+ * wlan_cm_is_vdev_connected() - check if vdev is in connected state
  * @vdev: vdev pointer
  *
  * Return: bool
@@ -173,7 +173,7 @@ bool wlan_cm_is_vdev_connecting(struct wlan_objmgr_vdev *vdev);
 bool wlan_cm_is_vdev_connected(struct wlan_objmgr_vdev *vdev);
 
 /**
- * wlan_cm_is_vdev_active() - check if vdev is in active state ie conneted or
+ * wlan_cm_is_vdev_active() - check if vdev is in active state ie connected or
  * roaming state
  * @vdev: vdev pointer
  *
@@ -182,7 +182,7 @@ bool wlan_cm_is_vdev_connected(struct wlan_objmgr_vdev *vdev);
 bool wlan_cm_is_vdev_active(struct wlan_objmgr_vdev *vdev);
 
 /**
- * wlan_cm_is_vdev_disconnecting() - check if vdev is in disconneting state
+ * wlan_cm_is_vdev_disconnecting() - check if vdev is in disconnecting state
  * @vdev: vdev pointer
  *
  * Return: bool
@@ -273,7 +273,7 @@ bool wlan_cm_is_vdev_roam_reassoc_state(struct wlan_objmgr_vdev *vdev)
  * @vdev: vdev pointer
  * @req: pointer to the copy of the active connect request
  * *
- * Context: Should be called only in the conext of the
+ * Context: Should be called only in the context of the
  * cm request activation
  *
  * Return: true and connect req if any request is active
@@ -287,7 +287,7 @@ bool wlan_cm_get_active_connect_req(struct wlan_objmgr_vdev *vdev,
  * @vdev: vdev pointer
  * @req: pointer to the copy of the active reassoc request
  * *
- * Context: Should be called only in the conext of the
+ * Context: Should be called only in the context of the
  * cm request activation
  *
  * Return: true and reassoc req if any request is active
@@ -308,7 +308,7 @@ bool wlan_cm_get_active_reassoc_req(struct wlan_objmgr_vdev *vdev,
  * @vdev: vdev pointer
  * @req: pointer to the copy of the active disconnect request
  * *
- * Context: Should be called only in the conext of the
+ * Context: Should be called only in the context of the
  * cm request activation
  *
  * Return: true and disconnect req if any request is active
@@ -464,15 +464,34 @@ struct reduced_neighbor_report *wlan_cm_get_rnr(struct wlan_objmgr_vdev *vdev,
 /**
  * wlan_cm_disc_cont_after_rso_stop() - Continue disconnect after RSO stop
  * @vdev: Objmgr vdev
- * @is_ho_fail: True if ho_fail happened
  * @req: pointer to cm vdev disconnect req
-
+ *
+ * Continue disconnect after RSO stop response is receive from south bound.
  * This is a wrapper to call core API cm_disconnect_continue_after_rso_stop
+ * by acquiring cm_lock through cm_sm_deliver_event.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 wlan_cm_disc_cont_after_rso_stop(struct wlan_objmgr_vdev *vdev,
-				 bool is_ho_fail,
 				 struct wlan_cm_vdev_discon_req *req);
+
+#ifdef WLAN_FEATURE_11BE
+/**
+ * wlan_cm_sta_update_puncture() - update puncture and channel width for sta
+ * @vdev: vdev
+ * @peer_mac: peer mac address
+ * @ori_punc: original puncture bitmap from EHT operation IE
+ * @ori_bw: bandwidth information according to EHT operation IE
+ * @ccfs0: EHT Channel Centre Frequency Segment0 information
+ * @ccfs1: EHT Channel Centre Frequency Segment1 information
+ * @new_bw: bandwidth to be set
+ */
+QDF_STATUS wlan_cm_sta_update_bw_puncture(struct wlan_objmgr_vdev *vdev,
+					  uint8_t *peer_mac,
+					  uint16_t ori_punc,
+					  enum phy_ch_width ori_bw,
+					  uint8_t ccfs0, uint8_t ccfs1,
+					  enum phy_ch_width new_bw);
+#endif /* WLAN_FEATURE_11BE */
 #endif /* __WLAN_CM_UCFG_API_H */

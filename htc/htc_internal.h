@@ -252,7 +252,7 @@ typedef struct _HTC_TARGET {
 
 	/*
 	 * Number of WMI endpoints used.
-	 * Default value is 1. But it should be overidden after htc_create to
+	 * Default value is 1. But it should be overridden after htc_create to
 	 * reflect the actual count.
 	 */
 	uint8_t wmi_ep_count;

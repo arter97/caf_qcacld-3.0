@@ -483,7 +483,7 @@ dp_rx_pn_error_handle(struct dp_soc *soc, hal_ring_desc_t ring_desc,
  * @soc: Datapath soc handler
  * @peer: pointer to DP peer
  * @nbuf: pointer to the skb of RX frame
- * @frame_mask: the mask for speical frame needed
+ * @frame_mask: the mask for special frame needed
  * @rx_tlv_hdr: start of rx tlv header
  *
  * note: Msdu_len must have been stored in QDF_NBUF_CB_RX_PKT_LEN(nbuf) and
@@ -1015,6 +1015,16 @@ dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
 	}
 	return false;
 }
+#else
+static inline bool
+dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
+					      uint8_t pool_id,
+					      uint8_t *rx_tlv_hdr,
+					      qdf_nbuf_t nbuf)
+{
+	return false;
+}
+#endif
 
 /**
  * dp_rx_check_pkt_len() - Check for pktlen validity
@@ -1035,24 +1045,6 @@ bool dp_rx_check_pkt_len(struct dp_soc *soc, uint32_t pkt_len)
 		return false;
 	}
 }
-
-#else
-static inline bool
-dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
-					      uint8_t pool_id,
-					      uint8_t *rx_tlv_hdr,
-					      qdf_nbuf_t nbuf)
-{
-	return false;
-}
-
-static inline
-bool dp_rx_check_pkt_len(struct dp_soc *soc, uint32_t pkt_len)
-{
-	return false;
-}
-
-#endif
 
 /*
  * dp_rx_deliver_to_osif_stack() - function to deliver rx pkts to stack
@@ -1362,13 +1354,17 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 
 	if (hal_rx_is_unicast(soc->hal_soc, rx_tlv_hdr)) {
 		struct dp_peer *peer;
+		struct dp_rx_tid *rx_tid;
 		tid = hal_rx_tid_get(soc->hal_soc, rx_tlv_hdr);
 		peer = dp_peer_get_ref_by_id(soc, txrx_peer->peer_id,
 					     DP_MOD_ID_RX_ERR);
 		if (peer) {
+			rx_tid = &peer->rx_tid[tid];
+			qdf_spin_lock_bh(&rx_tid->tid_lock);
 			if (!peer->rx_tid[tid].hw_qdesc_vaddr_unaligned)
 				dp_rx_tid_setup_wifi3(peer, tid, 1,
 						      IEEE80211_SEQ_MAX);
+			qdf_spin_unlock_bh(&rx_tid->tid_lock);
 			/* IEEE80211_SEQ_MAX indicates invalid start_seq */
 			dp_peer_unref_delete(peer, DP_MOD_ID_RX_ERR);
 		}
@@ -1455,7 +1451,7 @@ drop_nbuf:
  * @ring_desc: opaque pointer to the REO error ring descriptor
  * @mpdu_desc_info: pointer to mpdu level description info
  * @link_desc_va: pointer to msdu_link_desc virtual address
- * @err_code: reo erro code fetched from ring entry
+ * @err_code: reo error code fetched from ring entry
  *
  * Function to handle msdus fetched from msdu link desc, currently
  * support REO error NULL queue, 2K jump, OOR.
@@ -1565,16 +1561,22 @@ more_msdu_link_desc:
 			goto process_next_msdu;
 		}
 
-		rx_tlv_hdr_first = qdf_nbuf_data(head_nbuf);
-		rx_tlv_hdr_last = qdf_nbuf_data(tail_nbuf);
-
-		if (qdf_unlikely(head_nbuf != tail_nbuf)) {
-			nbuf = dp_rx_sg_create(soc, head_nbuf);
-			qdf_nbuf_set_is_frag(nbuf, 1);
-			DP_STATS_INC(soc, rx.err.reo_err_oor_sg_count, 1);
-		}
-
 		if (is_pn_check_needed) {
+			if (msdu_list.msdu_info[i].msdu_flags &
+			    HAL_MSDU_F_FIRST_MSDU_IN_MPDU) {
+				hal_rx_tlv_populate_mpdu_desc_info(
+							soc->hal_soc,
+							qdf_nbuf_data(nbuf),
+							mpdu_desc_info);
+			} else {
+				/*
+				 * DO NOTHING -
+				 * Continue using the same mpdu_desc_info
+				 * details populated from the first msdu in
+				 * the mpdu.
+				 */
+			}
+
 			status = dp_rx_err_nbuf_pn_check(soc, ring_desc, nbuf);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				DP_STATS_INC(soc, rx.err.pn_in_dest_check_fail,
@@ -1583,9 +1585,6 @@ more_msdu_link_desc:
 				goto process_next_msdu;
 			}
 
-			hal_rx_tlv_populate_mpdu_desc_info(soc->hal_soc,
-							   qdf_nbuf_data(nbuf),
-							   mpdu_desc_info);
 			peer_id = dp_rx_peer_metadata_peer_id_get(soc,
 					mpdu_desc_info->peer_meta_data);
 
@@ -1594,6 +1593,23 @@ more_msdu_link_desc:
 							mpdu_desc_info, tid,
 							HAL_REO_ERROR_DETECTED,
 							err_code);
+		}
+
+		if (qdf_unlikely(mpdu_desc_info->mpdu_flags &
+				 HAL_MPDU_F_RAW_AMPDU)) {
+			dp_err_rl("RAW ampdu in REO error not expected");
+			DP_STATS_INC(soc, rx.err.reo_err_raw_mpdu_drop, 1);
+			qdf_nbuf_list_free(head_nbuf);
+			goto process_next_msdu;
+		}
+
+		rx_tlv_hdr_first = qdf_nbuf_data(head_nbuf);
+		rx_tlv_hdr_last = qdf_nbuf_data(tail_nbuf);
+
+		if (qdf_unlikely(head_nbuf != tail_nbuf)) {
+			nbuf = dp_rx_sg_create(soc, head_nbuf);
+			qdf_nbuf_set_is_frag(nbuf, 1);
+			DP_STATS_INC(soc, rx.err.reo_err_oor_sg_count, 1);
 		}
 
 		switch (err_code) {
@@ -2599,7 +2615,7 @@ done:
 /**
  * dp_handle_rxdma_decrypt_err() - Check if decrypt err frames can be handled
  *
- * Return: true if rxdma decrypt err frames are handled and false otheriwse
+ * Return: true if rxdma decrypt err frames are handled and false otherwise
  */
 static inline bool dp_handle_rxdma_decrypt_err(void)
 {
@@ -3161,7 +3177,8 @@ done:
 					err_code = wbm_err_info.rxdma_err_code;
 					tlv_hdr = rx_tlv_hdr;
 					dp_rx_process_rxdma_err(soc, nbuf,
-								tlv_hdr, NULL,
+								tlv_hdr,
+								txrx_peer,
 								err_code,
 								pool_id);
 					break;

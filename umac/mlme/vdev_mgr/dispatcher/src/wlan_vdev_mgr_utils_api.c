@@ -892,3 +892,14 @@ QDF_STATUS wlan_util_vdev_mgr_quiet_offload(
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_11BE_MLO */
+
+QDF_STATUS wlan_util_vdev_peer_set_param_send(struct wlan_objmgr_vdev *vdev,
+					      uint8_t *peer_mac_addr,
+					      uint32_t param_id,
+					      uint32_t param_value)
+{
+	return tgt_vdev_peer_set_param_send(vdev, peer_mac_addr,
+					    param_id, param_value);
+}
+
+qdf_export_symbol(wlan_util_vdev_peer_set_param_send);

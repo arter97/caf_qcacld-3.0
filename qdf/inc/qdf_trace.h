@@ -28,7 +28,6 @@
 
 /* Include Files */
 #include  <qdf_types.h>         /* For QDF_MODULE_ID... */
-#include  <stdarg.h>            /* For va_list... */
 #include  <qdf_status.h>
 #include  <qdf_nbuf.h>
 #include  <i_qdf_types.h>

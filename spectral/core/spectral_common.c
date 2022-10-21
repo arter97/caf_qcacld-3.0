@@ -438,7 +438,9 @@ spectral_control_cmn(struct wlan_objmgr_pdev *pdev,
 			struct spectral_caps *caps;
 
 			caps  = &sscan_req->caps_req.sscan_caps;
-			sc->sptrlc_get_spectral_capinfo(pdev, caps);
+			ret = sc->sptrlc_get_spectral_capinfo(pdev, caps);
+			if (QDF_IS_STATUS_ERROR(ret))
+				goto bad;
 		}
 		break;
 
@@ -447,7 +449,9 @@ spectral_control_cmn(struct wlan_objmgr_pdev *pdev,
 			struct spectral_diag_stats *diag;
 
 			diag  = &sscan_req->diag_req.sscan_diag;
-			sc->sptrlc_get_spectral_diagstats(pdev, diag);
+			ret = sc->sptrlc_get_spectral_diagstats(pdev, diag);
+			if (QDF_IS_STATUS_ERROR(ret))
+				goto bad;
 		}
 		break;
 
@@ -526,7 +530,7 @@ wlan_spectral_psoc_obj_create_handler(struct wlan_objmgr_psoc *psoc, void *arg)
 
 	status = wlan_spectral_init_psoc_feature_cap(psoc);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		spectral_err("Failed to intitialize spectral pdev feature caps");
+		spectral_err("Failed to initialize spectral pdev feature caps");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -595,7 +599,7 @@ wlan_spectral_pdev_obj_create_handler(struct wlan_objmgr_pdev *pdev, void *arg)
 
 	status = wlan_spectral_init_pdev_feature_caps(pdev);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		spectral_err("Failed to intitialize spectral pdev feature caps");
+		spectral_err("Failed to initialize spectral pdev feature caps");
 		return QDF_STATUS_E_FAILURE;
 	}
 

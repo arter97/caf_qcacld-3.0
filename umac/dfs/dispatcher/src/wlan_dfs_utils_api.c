@@ -1547,7 +1547,7 @@ QDF_STATUS utils_dfs_get_chan_dfs_state(struct wlan_objmgr_pdev *pdev,
 qdf_export_symbol(utils_dfs_get_chan_dfs_state);
 
 /**
- * convert_event_to_state() - Coverts the dfs events WLAN_DFS_EVENTS to dfs
+ * convert_event_to_state() - Converts the dfs events WLAN_DFS_EVENTS to dfs
  * states channel_dfs_state.
  * @event: Input DFS event.
  * @state: Output DFS state.

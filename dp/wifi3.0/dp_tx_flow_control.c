@@ -37,8 +37,8 @@
 /**
  * dp_tx_initialize_threshold() - Threshold of flow Pool initialization
  * @pool: flow_pool
- * @stop_threshold: stop threshold of certian AC
- * @start_threshold: start threshold of certian AC
+ * @stop_threshold: stop threshold of certain AC
+ * @start_threshold: start threshold of certain AC
  * @flow_pool_size: flow pool size
  *
  * Return: none
@@ -55,19 +55,19 @@ dp_tx_initialize_threshold(struct dp_tx_desc_pool_s *pool,
 	pool->stop_th[DP_TH_BE_BK] = (stop_threshold
 					* flow_pool_size) / 100;
 
-	/* Update VI threshold based on BE_BK threashold */
+	/* Update VI threshold based on BE_BK threshold */
 	pool->start_th[DP_TH_VI] = (pool->start_th[DP_TH_BE_BK]
 					* FL_TH_VI_PERCENTAGE) / 100;
 	pool->stop_th[DP_TH_VI] = (pool->stop_th[DP_TH_BE_BK]
 					* FL_TH_VI_PERCENTAGE) / 100;
 
-	/* Update VO threshold based on BE_BK threashold */
+	/* Update VO threshold based on BE_BK threshold */
 	pool->start_th[DP_TH_VO] = (pool->start_th[DP_TH_BE_BK]
 					* FL_TH_VO_PERCENTAGE) / 100;
 	pool->stop_th[DP_TH_VO] = (pool->stop_th[DP_TH_BE_BK]
 					* FL_TH_VO_PERCENTAGE) / 100;
 
-	/* Update High Priority threshold based on BE_BK threashold */
+	/* Update High Priority threshold based on BE_BK threshold */
 	pool->start_th[DP_TH_HI] = (pool->start_th[DP_TH_BE_BK]
 					* FL_TH_HI_PERCENTAGE) / 100;
 	pool->stop_th[DP_TH_HI] = (pool->stop_th[DP_TH_BE_BK]
@@ -110,7 +110,7 @@ dp_tx_flow_pool_dump_threshold(struct dp_tx_desc_pool_s *pool)
 			  "Level %d :: Start threshold %d :: Stop threshold %d",
 			  i, pool->start_th[i], pool->stop_th[i]);
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "Level %d :: Maximun pause time %lu ms",
+			  "Level %d :: Maximum pause time %lu ms",
 			  i, pool->max_pause_time[i]);
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
 			  "Level %d :: Latest pause timestamp %lu",
@@ -119,7 +119,7 @@ dp_tx_flow_pool_dump_threshold(struct dp_tx_desc_pool_s *pool)
 }
 
 /**
- * dp_tx_flow_ctrl_reset_subqueues() - Reset subqueues to orginal state
+ * dp_tx_flow_ctrl_reset_subqueues() - Reset subqueues to original state
  * @soc: dp soc
  * @pool: flow pool
  * @pool_status: flow pool status
@@ -376,6 +376,43 @@ struct dp_tx_desc_pool_s *dp_tx_create_flow_pool(struct dp_soc *soc,
 }
 
 /**
+ * dp_is_tx_flow_pool_delete_allowed() - Can flow pool be deleted
+ * @soc: Handle to struct dp_soc
+ * @vdev_id: vdev_id corresponding to flow pool
+ *
+ * Check if it is OK to go ahead delete the flow pool. One of the case is
+ * MLO where it is not OK to delete the flow pool when link switch happens.
+ *
+ * Return: 0 for success or error
+ */
+static bool dp_is_tx_flow_pool_delete_allowed(struct dp_soc *soc,
+					      uint8_t vdev_id)
+{
+	struct dp_vdev *vdev = NULL;
+	bool is_allow = true;
+
+	vdev = dp_vdev_get_ref_by_id(soc, vdev_id, DP_MOD_ID_MISC);
+
+	/* only check for sta mode */
+	if (!vdev || vdev->opmode != wlan_op_mode_sta)
+		goto comp_ret;
+
+	/*
+	 * Only if current vdev is belong to MLO connection and connected,
+	 * then it's not allowed to delete current pool, for legacy
+	 * connection, allowed always.
+	 */
+	is_allow = policy_mgr_is_mlo_sta_disconnected(
+			(struct wlan_objmgr_psoc *)soc->ctrl_psoc,
+			vdev_id);
+comp_ret:
+	if (vdev)
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_MISC);
+
+	return is_allow;
+}
+
+/**
  * dp_tx_delete_flow_pool() - delete flow pool
  * @soc: Handle to struct dp_soc
  * @pool: flow pool pointer
@@ -400,13 +437,20 @@ int dp_tx_delete_flow_pool(struct dp_soc *soc, struct dp_tx_desc_pool_s *pool,
 		return ENOMEM;
 	}
 
-	dp_info("pool create_cnt=%d, avail_desc=%d, size=%d, status=%d",
-		pool->pool_create_cnt, pool->avail_desc,
+	dp_info("pool_id %d create_cnt=%d, avail_desc=%d, size=%d, status=%d",
+		pool->flow_pool_id, pool->pool_create_cnt, pool->avail_desc,
 		pool->pool_size, pool->status);
+
+	if (!dp_is_tx_flow_pool_delete_allowed(soc, pool->flow_pool_id)) {
+		dp_info("skip pool id %d delete as it's not allowed",
+			pool->flow_pool_id);
+		return -EAGAIN;
+	}
+
 	qdf_spin_lock_bh(&pool->flow_pool_lock);
 	if (!pool->pool_create_cnt) {
 		qdf_spin_unlock_bh(&pool->flow_pool_lock);
-		dp_err("flow pool either not created or alread deleted");
+		dp_err("flow pool either not created or already deleted");
 		return -ENOENT;
 	}
 	pool->pool_create_cnt--;
@@ -568,9 +612,8 @@ void dp_tx_flow_pool_unmap_handler(struct dp_pdev *pdev, uint8_t flow_id,
 	struct dp_tx_desc_pool_s *pool;
 	enum htt_flow_type type = flow_type;
 
-	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
-		  "%s: flow_id %d flow_type %d flow_pool_id %d",
-		  __func__, flow_id, flow_type, flow_pool_id);
+	dp_info("flow_id %d flow_type %d flow_pool_id %d", flow_id, flow_type,
+		flow_pool_id);
 
 	if (qdf_unlikely(!pdev)) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,

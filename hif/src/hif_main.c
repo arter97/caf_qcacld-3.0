@@ -143,7 +143,7 @@ void hif_vote_link_down(struct hif_opaque_softc *hif_ctx)
  * hif_vote_link_up(): vote to prevent bus from suspending
  *
  * Makes hif guarantee that fw can message the host normally
- * durring suspend.
+ * during suspend.
  *
  * SYNCHRONIZE WITH hif_vote_link_up by only calling in MC thread
  * and initialization deinitialization sequencences.
@@ -171,7 +171,7 @@ void hif_vote_link_up(struct hif_opaque_softc *hif_ctx)
  * we don't need extra locking to ensure votes dont change while
  * we are in the process of suspending or resuming.
  *
- * Return: false if hif will guarantee link up durring suspend.
+ * Return: false if hif will guarantee link up during suspend.
  */
 bool hif_can_suspend_link(struct hif_opaque_softc *hif_ctx)
 {
@@ -360,14 +360,39 @@ static const struct qwlan_hw qwlan_hw_list[] = {
 		.name = "QCA9379_REV1_1",
 	},
 	{
-		.id = KIWI_V1,
-		.subid = 0xE,
-		.name = "KIWI_V1",
-	},
-	{
 		.id = MANGO_V1,
 		.subid = 0xF,
 		.name = "MANGO_V1",
+	},
+	{
+		.id = KIWI_V1,
+		.subid = 0,
+		.name = "KIWI_V1",
+	},
+	{
+		.id = KIWI_V2,
+		.subid = 0,
+		.name = "KIWI_V2",
+	},
+	{
+		.id = WCN6750_V1,
+		.subid = 0,
+		.name = "WCN6750_V1",
+	},
+	{
+		.id = QCA6490_v2_1,
+		.subid = 0,
+		.name = "QCA6490",
+	},
+	{
+		.id = QCA6490_v2,
+		.subid = 0,
+		.name = "QCA6490",
+	},
+	{
+		.id = WCN3990_v2_2,
+		.subid = 0,
+		.name = "WCN3990_v2_2",
 	}
 };
 
@@ -380,6 +405,10 @@ static const struct qwlan_hw qwlan_hw_list[] = {
 static const char *hif_get_hw_name(struct hif_target_info *info)
 {
 	int i;
+
+	hif_debug("target version = %d, target revision = %d",
+		  info->target_version,
+		  info->target_revision);
 
 	if (info->hw_name)
 		return info->hw_name;
@@ -464,6 +493,21 @@ uint32_t hif_get_soc_version(struct hif_opaque_softc *hif_handle)
 }
 
 qdf_export_symbol(hif_get_soc_version);
+
+/**
+ * hif_get_dev_ba_cmem(): API to get device ce base address.
+ * @scn: scn
+ *
+ * Return: dev mem base address for CMEM
+ */
+void *hif_get_dev_ba_cmem(struct hif_opaque_softc *hif_handle)
+{
+	struct hif_softc *scn = (struct hif_softc *)hif_handle;
+
+	return scn->mem_cmem;
+}
+
+qdf_export_symbol(hif_get_dev_ba_cmem);
 
 #ifdef FEATURE_RUNTIME_PM
 void hif_runtime_prevent_linkdown(struct hif_softc *scn, bool is_get)
@@ -813,12 +857,12 @@ static void hif_latency_detect_timeout_handler(void *arg)
 				    BIT(HIF_DETECT_TASKLET) |
 				    BIT(HIF_DETECT_CREDIT));
 
-	/* it need to make sure timer start on a differnt cpu,
+	/* it need to make sure timer start on a different cpu,
 	 * so it can detect the tasklet schedule stall, but there
 	 * is still chance that, after timer has been started, then
 	 * irq/tasklet happens on the same cpu, then tasklet will
 	 * execute before softirq timer, if this tasklet stall, the
-	 * timer can't detect it, we can accept this as a limition,
+	 * timer can't detect it, we can accept this as a limitation,
 	 * if tasklet stall, anyway other place will detect it, just
 	 * a little later.
 	 */
@@ -2041,7 +2085,7 @@ void hif_mem_free_consistent_unaligned(struct hif_softc *scn,
  * @osc: HIF Context
  * @msdu : list of msdus to be sent
  * @transfer_id : transfer id
- * @len : donwloaded length
+ * @len : downloaded length
  *
  * Return: list of msds not sent
  */

@@ -534,12 +534,39 @@ void ce_tasklet_kill(struct hif_softc *scn)
 	qdf_atomic_set(&scn->active_tasklet_cnt, 0);
 }
 
+/**
+ * ce_tasklet_entry_dump() - dump tasklet entries info
+ * @hif_ce_state: ce state
+ *
+ * This function will dump all tasklet entries info
+ *
+ * Return: None
+ */
+static void ce_tasklet_entry_dump(struct HIF_CE_state *hif_ce_state)
+{
+	struct ce_tasklet_entry *tasklet_entry;
+	int i;
+
+	if (hif_ce_state) {
+		for (i = 0; i < CE_COUNT_MAX; i++) {
+			tasklet_entry = &hif_ce_state->tasklets[i];
+
+			hif_info("%02d: ce_id=%d, inited=%d, hi_tasklet_ce=%d hif_ce_state=%pK",
+				 i,
+				 tasklet_entry->ce_id,
+				 tasklet_entry->inited,
+				 tasklet_entry->hi_tasklet_ce,
+				 tasklet_entry->hif_ce_state);
+		}
+	}
+}
+
 #define HIF_CE_DRAIN_WAIT_CNT          20
 /**
  * hif_drain_tasklets(): wait until no tasklet is pending
  * @scn: hif context
  *
- * Let running tasklets clear pending trafic.
+ * Let running tasklets clear pending traffic.
  *
  * Return: 0 if no bottom half is in progress when it returns.
  *   -EFAULT if it times out.
@@ -727,6 +754,7 @@ static inline bool hif_tasklet_schedule(struct hif_opaque_softc *hif_ctx,
 	return true;
 }
 
+#ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7
 /**
  * ce_poll_reap_by_id() - reap the available frames from CE by polling per ce_id
  * @scn: hif context
@@ -784,6 +812,54 @@ int hif_drain_fw_diag_ce(struct hif_softc *scn)
 
 	return ce_poll_reap_by_id(scn, ce_id);
 }
+#endif
+
+#ifdef CE_TASKLET_SCHEDULE_ON_FULL
+static inline int ce_check_tasklet_status(int ce_id,
+					  struct ce_tasklet_entry *entry)
+{
+	struct HIF_CE_state *hif_ce_state = entry->hif_ce_state;
+	struct hif_softc *scn = HIF_GET_SOFTC(hif_ce_state);
+	struct hif_opaque_softc *hif_hdl = GET_HIF_OPAQUE_HDL(scn);
+
+	if (hif_napi_enabled(hif_hdl, ce_id)) {
+		struct qca_napi_info *napi;
+
+		napi = scn->napi_data.napis[ce_id];
+		if (test_bit(NAPI_STATE_SCHED, &napi->napi.state))
+			return -EBUSY;
+	} else {
+		if (test_bit(TASKLET_STATE_SCHED,
+			     &hif_ce_state->tasklets[ce_id].intr_tq.state))
+			return -EBUSY;
+	}
+	return 0;
+}
+
+static inline void ce_interrupt_lock(struct CE_state *ce_state)
+{
+	qdf_spin_lock_irqsave(&ce_state->ce_interrupt_lock);
+}
+
+static inline void ce_interrupt_unlock(struct CE_state *ce_state)
+{
+	qdf_spin_unlock_irqrestore(&ce_state->ce_interrupt_lock);
+}
+#else
+static inline int ce_check_tasklet_status(int ce_id,
+					  struct ce_tasklet_entry *entry)
+{
+	return 0;
+}
+
+static inline void ce_interrupt_lock(struct CE_state *ce_state)
+{
+}
+
+static inline void ce_interrupt_unlock(struct CE_state *ce_state)
+{
+}
+#endif
 
 /**
  * ce_dispatch_interrupt() - dispatch an interrupt to a processing context
@@ -798,10 +874,19 @@ irqreturn_t ce_dispatch_interrupt(int ce_id,
 	struct HIF_CE_state *hif_ce_state = tasklet_entry->hif_ce_state;
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ce_state);
 	struct hif_opaque_softc *hif_hdl = GET_HIF_OPAQUE_HDL(scn);
+	struct CE_state *ce_state = scn->ce_id_to_state[ce_id];
 
 	if (tasklet_entry->ce_id != ce_id) {
-		hif_err("ce_id (expect %d, received %d) does not match",
-			tasklet_entry->ce_id, ce_id);
+		bool rl;
+
+		rl = hif_err_rl("ce_id (expect %d, received %d) does not match, inited=%d, ce_count=%u",
+				tasklet_entry->ce_id, ce_id,
+				tasklet_entry->inited,
+				scn->ce_count);
+
+		if (!rl)
+			ce_tasklet_entry_dump(hif_ce_state);
+
 		return IRQ_NONE;
 	}
 	if (unlikely(ce_id >= CE_COUNT_MAX)) {
@@ -810,10 +895,18 @@ irqreturn_t ce_dispatch_interrupt(int ce_id,
 		return IRQ_NONE;
 	}
 
+	ce_interrupt_lock(ce_state);
+	if (ce_check_tasklet_status(ce_id, tasklet_entry)) {
+		ce_interrupt_unlock(ce_state);
+		return IRQ_NONE;
+	}
+
 	hif_irq_disable(scn, ce_id);
 
-	if (!TARGET_REGISTER_ACCESS_ALLOWED(scn))
+	if (!TARGET_REGISTER_ACCESS_ALLOWED(scn)) {
+		ce_interrupt_unlock(ce_state);
 		return IRQ_HANDLED;
+	}
 
 	hif_record_ce_desc_event(scn, ce_id, HIF_IRQ_EVENT,
 				NULL, NULL, 0, 0);
@@ -822,6 +915,7 @@ irqreturn_t ce_dispatch_interrupt(int ce_id,
 	if (unlikely(hif_interrupt_is_ut_resume(scn, ce_id))) {
 		hif_ut_fw_resume(scn);
 		hif_irq_enable(scn, ce_id);
+		ce_interrupt_unlock(ce_state);
 		return IRQ_HANDLED;
 	}
 
@@ -831,6 +925,8 @@ irqreturn_t ce_dispatch_interrupt(int ce_id,
 		hif_napi_schedule(hif_hdl, ce_id);
 	else
 		hif_tasklet_schedule(hif_hdl, tasklet_entry);
+
+	ce_interrupt_unlock(ce_state);
 
 	return IRQ_HANDLED;
 }
@@ -863,7 +959,7 @@ const char *ce_name[CE_COUNT_MAX] = {
 /**
  * ce_unregister_irq() - ce_unregister_irq
  * @hif_ce_state: hif_ce_state copy engine device handle
- * @mask: which coppy engines to unregister for.
+ * @mask: which copy engines to unregister for.
  *
  * Unregisters copy engine irqs matching mask.  If a 1 is set at bit x,
  * unregister for copy engine x.
@@ -911,7 +1007,7 @@ QDF_STATUS ce_unregister_irq(struct HIF_CE_state *hif_ce_state, uint32_t mask)
 /**
  * ce_register_irq() - ce_register_irq
  * @hif_ce_state: hif_ce_state
- * @mask: which coppy engines to unregister for.
+ * @mask: which copy engines to unregister for.
  *
  * Registers copy engine irqs matching mask.  If a 1 is set at bit x,
  * Register for copy engine x.

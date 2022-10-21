@@ -233,7 +233,7 @@ static uint8_t hal_rx_get_tlv_5018(void *rx_tlv)
  *
  *@rx_tlv_hdr: start address of rx_pkt_tlvs
  *
- * Return: true if RX_MPDU_START is valied, else false.
+ * Return: true if RX_MPDU_START is valid, else false.
  */
 uint8_t hal_rx_mpdu_start_tlv_tag_valid_5018(void *rx_tlv_hdr)
 {
@@ -913,6 +913,24 @@ static uint8_t hal_rx_get_mpdu_frame_control_valid_5018(uint8_t *buf)
 	struct rx_mpdu_info *rx_mpdu_info = hal_rx_get_mpdu_info(pkt_tlvs);
 
 	return HAL_RX_MPDU_GET_FRAME_CONTROL_VALID(rx_mpdu_info);
+}
+
+/**
+ * hal_rx_get_mpdu_frame_control_field_5018(): Function to
+ * retrieve frame control field
+ *
+ * @nbuf: Network buffer
+ * Returns: value of frame control field
+ */
+static uint16_t hal_rx_get_mpdu_frame_control_field_5018(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = hal_rx_get_pkt_tlvs(buf);
+	struct rx_mpdu_info *rx_mpdu_info = hal_rx_get_mpdu_info(pkt_tlvs);
+	uint16_t frame_ctrl = 0;
+
+	frame_ctrl = HAL_RX_MPDU_GET_FRAME_CONTROL_FIELD(rx_mpdu_info);
+
+	return frame_ctrl;
 }
 
 /*
@@ -1786,6 +1804,8 @@ static void hal_hw_txrx_ops_attach_qca5018(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_mpdu_get_fr_ds = hal_rx_mpdu_get_fr_ds_5018;
 	hal_soc->ops->hal_rx_get_mpdu_frame_control_valid =
 		hal_rx_get_mpdu_frame_control_valid_5018;
+	hal_soc->ops->hal_rx_get_frame_ctrl_field =
+		hal_rx_get_mpdu_frame_control_field_5018;
 	hal_soc->ops->hal_rx_mpdu_get_addr1 = hal_rx_mpdu_get_addr1_5018;
 	hal_soc->ops->hal_rx_mpdu_get_addr2 = hal_rx_mpdu_get_addr2_5018;
 	hal_soc->ops->hal_rx_mpdu_get_addr3 = hal_rx_mpdu_get_addr3_5018;

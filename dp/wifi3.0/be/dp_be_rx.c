@@ -379,8 +379,18 @@ more_data:
 		/* Get MSDU DESC info */
 		hal_rx_msdu_desc_info_get_be(ring_desc, &msdu_desc_info);
 
+		/* Set the end bit to identify the last buffer in MPDU */
+		if (msdu_desc_info.msdu_flags & HAL_MSDU_F_LAST_MSDU_IN_MPDU)
+			qdf_nbuf_set_rx_chfrag_end(rx_desc->nbuf, 1);
+
 		if (qdf_unlikely(msdu_desc_info.msdu_flags &
 				 HAL_MSDU_F_MSDU_CONTINUATION)) {
+			/* In dp_rx_sg_create() until the last buffer,
+			 * end bit should not be set. As continuation bit set,
+			 * this is not a last buffer.
+			 */
+			qdf_nbuf_set_rx_chfrag_end(rx_desc->nbuf, 0);
+
 			/* previous msdu has end bit set, so current one is
 			 * the new MPDU
 			 */
@@ -426,7 +436,7 @@ more_data:
 			qdf_nbuf_set_raw_frame(rx_desc->nbuf, 1);
 
 		if (!is_prev_msdu_last &&
-		    msdu_desc_info.msdu_flags & HAL_MSDU_F_LAST_MSDU_IN_MPDU)
+		    !(msdu_desc_info.msdu_flags & HAL_MSDU_F_MSDU_CONTINUATION))
 			is_prev_msdu_last = true;
 
 		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
@@ -455,9 +465,6 @@ more_data:
 
 		if (msdu_desc_info.msdu_flags & HAL_MSDU_F_MSDU_CONTINUATION)
 			qdf_nbuf_set_rx_chfrag_cont(rx_desc->nbuf, 1);
-
-		if (msdu_desc_info.msdu_flags & HAL_MSDU_F_LAST_MSDU_IN_MPDU)
-			qdf_nbuf_set_rx_chfrag_end(rx_desc->nbuf, 1);
 
 		if (msdu_desc_info.msdu_flags & HAL_MSDU_F_DA_IS_MCBC)
 			qdf_nbuf_set_da_mcbc(rx_desc->nbuf, 1);
@@ -583,6 +590,12 @@ done:
 
 		/* Get TID from struct cb->tid_val, save to tid */
 		tid = qdf_nbuf_get_tid_val(nbuf);
+		if (qdf_unlikely(tid >= CDP_MAX_DATA_TIDS)) {
+			DP_STATS_INC(soc, rx.err.rx_invalid_tid_err, 1);
+			dp_rx_nbuf_free(nbuf);
+			nbuf = next;
+			continue;
+		}
 
 		if (qdf_unlikely(!txrx_peer)) {
 			txrx_peer = dp_rx_get_txrx_peer_and_vdev(soc, nbuf,
@@ -735,21 +748,6 @@ done:
 
 		dp_rx_send_pktlog(soc, rx_pdev, nbuf, QDF_TX_RX_STATUS_OK);
 
-		/*
-		 * process frame for mulitpass phrase processing
-		 */
-		if (qdf_unlikely(vdev->multipass_en)) {
-			if (dp_rx_multipass_process(txrx_peer, nbuf,
-						    tid) == false) {
-				DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-							  rx.multipass_rx_pkt_drop,
-							  1);
-				dp_rx_nbuf_free(nbuf);
-				nbuf = next;
-				continue;
-			}
-		}
-
 		if (!dp_wds_rx_policy_check(rx_tlv_hdr, vdev, txrx_peer)) {
 			dp_rx_err("%pK: Policy Check Drop pkt", soc);
 			DP_PEER_PER_PKT_STATS_INC(txrx_peer,
@@ -758,18 +756,6 @@ done:
 			/* Drop & free packet */
 			dp_rx_nbuf_free(nbuf);
 			/* Statistics */
-			nbuf = next;
-			continue;
-		}
-
-		if (qdf_unlikely(txrx_peer && (txrx_peer->nawds_enabled) &&
-				 (qdf_nbuf_is_da_mcbc(nbuf)) &&
-				 (hal_rx_get_mpdu_mac_ad4_valid_be(rx_tlv_hdr)
-				  == false))) {
-			tid_stats->fail_cnt[NAWDS_MCAST_DROP]++;
-			DP_PEER_PER_PKT_STATS_INC(txrx_peer,
-						  rx.nawds_mcast_drop, 1);
-			dp_rx_nbuf_free(nbuf);
 			nbuf = next;
 			continue;
 		}
@@ -793,44 +779,81 @@ done:
 			}
 		}
 
-		if (soc->process_rx_status)
-			dp_rx_cksum_offload(vdev->pdev, nbuf, rx_tlv_hdr);
+		dp_rx_cksum_offload(vdev->pdev, nbuf, rx_tlv_hdr);
 
-		/* Update the protocol tag in SKB based on CCE metadata */
-		dp_rx_update_protocol_tag(soc, vdev, nbuf, rx_tlv_hdr,
-					  reo_ring_num, false, true);
-
-		/* Update the flow tag in SKB based on FSE metadata */
-		dp_rx_update_flow_tag(soc, vdev, nbuf, rx_tlv_hdr, true);
-
-		dp_rx_msdu_stats_update(soc, nbuf, rx_tlv_hdr, txrx_peer,
-					reo_ring_num, tid_stats);
-
-		if (qdf_unlikely(vdev->mesh_vdev)) {
-			if (dp_rx_filter_mesh_packets(vdev, nbuf, rx_tlv_hdr)
-					== QDF_STATUS_SUCCESS) {
-				dp_rx_info("%pK: mesh pkt filtered", soc);
-				tid_stats->fail_cnt[MESH_FILTER_DROP]++;
-				DP_STATS_INC(vdev->pdev, dropped.mesh_filter,
-					     1);
-
+		if (qdf_unlikely(!rx_pdev->rx_fast_flag)) {
+			/*
+			 * process frame for mulitpass phrase processing
+			 */
+			if (qdf_unlikely(vdev->multipass_en)) {
+				if (dp_rx_multipass_process(txrx_peer, nbuf,
+							    tid) == false) {
+					DP_PEER_PER_PKT_STATS_INC
+						(txrx_peer,
+						 rx.multipass_rx_pkt_drop, 1);
+					dp_rx_nbuf_free(nbuf);
+					nbuf = next;
+					continue;
+				}
+			}
+			if (qdf_unlikely(txrx_peer &&
+					 (txrx_peer->nawds_enabled) &&
+					 (qdf_nbuf_is_da_mcbc(nbuf)) &&
+					 (hal_rx_get_mpdu_mac_ad4_valid_be
+						(rx_tlv_hdr) == false))) {
+				tid_stats->fail_cnt[NAWDS_MCAST_DROP]++;
+				DP_PEER_PER_PKT_STATS_INC(txrx_peer,
+							  rx.nawds_mcast_drop,
+							  1);
 				dp_rx_nbuf_free(nbuf);
 				nbuf = next;
 				continue;
 			}
-			dp_rx_fill_mesh_stats(vdev, nbuf, rx_tlv_hdr,
-					      txrx_peer);
+
+			/* Update the protocol tag in SKB based on CCE metadata
+			 */
+			dp_rx_update_protocol_tag(soc, vdev, nbuf, rx_tlv_hdr,
+						  reo_ring_num, false, true);
+
+			/* Update the flow tag in SKB based on FSE metadata */
+			dp_rx_update_flow_tag(soc, vdev, nbuf, rx_tlv_hdr,
+					      true);
+
+			if (qdf_likely(vdev->rx_decap_type ==
+				       htt_cmn_pkt_type_ethernet) &&
+			    qdf_likely(!vdev->mesh_vdev)) {
+				dp_rx_wds_learn(soc, vdev,
+						rx_tlv_hdr,
+						txrx_peer,
+						nbuf,
+						msdu_metadata);
+			}
+
+			if (qdf_unlikely(vdev->mesh_vdev)) {
+				if (dp_rx_filter_mesh_packets(vdev, nbuf,
+							      rx_tlv_hdr)
+						== QDF_STATUS_SUCCESS) {
+					dp_rx_info("%pK: mesh pkt filtered",
+						   soc);
+					tid_stats->fail_cnt[MESH_FILTER_DROP]++;
+					DP_STATS_INC(vdev->pdev,
+						     dropped.mesh_filter, 1);
+
+					dp_rx_nbuf_free(nbuf);
+					nbuf = next;
+					continue;
+				}
+				dp_rx_fill_mesh_stats(vdev, nbuf, rx_tlv_hdr,
+						      txrx_peer);
+			}
 		}
+
+		dp_rx_msdu_stats_update(soc, nbuf, rx_tlv_hdr, txrx_peer,
+					reo_ring_num, tid_stats);
 
 		if (qdf_likely(vdev->rx_decap_type ==
 			       htt_cmn_pkt_type_ethernet) &&
 		    qdf_likely(!vdev->mesh_vdev)) {
-			dp_rx_wds_learn(soc, vdev,
-					rx_tlv_hdr,
-					txrx_peer,
-					nbuf,
-					msdu_metadata);
-
 			/* Intrabss-fwd */
 			if (dp_rx_check_ap_bridge(vdev))
 				if (dp_rx_intrabss_fwd_be(soc, txrx_peer,
@@ -1322,7 +1345,7 @@ dp_rx_intrabss_fwd_mlo_allow(struct dp_txrx_peer *ta_peer,
 /**
  * dp_rx_intrabss_ucast_check_be() - Check if intrabss is allowed
 				     for unicast frame
- * @soc: SOC hanlde
+ * @soc: SOC handle
  * @nbuf: RX packet buffer
  * @ta_peer: transmitter DP peer handle
  * @msdu_metadata: MSDU meta data info
@@ -1508,6 +1531,52 @@ rel_da_peer:
 #endif /* WLAN_MLO_MULTI_CHIP */
 #endif /* INTRA_BSS_FWD_OFFLOAD */
 
+#if defined(QCA_MONITOR_2_0_SUPPORT) || defined(CONFIG_WORD_BASED_TLV)
+void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
+				  uint32_t *msg_word,
+				  void *rx_filter)
+{
+	struct htt_rx_ring_tlv_filter *tlv_filter =
+				(struct htt_rx_ring_tlv_filter *)rx_filter;
+
+	if (!msg_word || !tlv_filter)
+		return;
+
+	/* if word mask is zero, FW will set the default values */
+	if (!(tlv_filter->rx_mpdu_start_wmask > 0 &&
+	      tlv_filter->rx_msdu_end_wmask > 0)) {
+		msg_word += 4;
+		*msg_word = 0;
+		goto config_mon;
+	}
+
+	HTT_RX_RING_SELECTION_CFG_WORD_MASK_COMPACTION_ENABLE_SET(*msg_word, 1);
+
+	/* word 14 */
+	msg_word += 3;
+	*msg_word = 0;
+
+	HTT_RX_RING_SELECTION_CFG_RX_MPDU_START_WORD_MASK_SET(
+				*msg_word,
+				tlv_filter->rx_mpdu_start_wmask);
+
+	/* word 15 */
+	msg_word++;
+	*msg_word = 0;
+	HTT_RX_RING_SELECTION_CFG_RX_MSDU_END_WORD_MASK_SET(
+				*msg_word,
+				tlv_filter->rx_msdu_end_wmask);
+config_mon:
+	msg_word--;
+	dp_mon_rx_wmask_subscribe(soc, msg_word, tlv_filter);
+}
+#else
+void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
+				  uint32_t *msg_word,
+				  void *rx_filter)
+{
+}
+#endif
 /*
  * dp_rx_intrabss_handle_nawds_be() - Forward mcbc intrabss pkts in nawds case
  * @soc: core txrx main context

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1143,7 +1143,7 @@ static uint8_t freeze_reason_to_capture_type(void *freeze_tlv)
 {
 	/*
 	 * Capture_reason field position is common between freeze_tlv v1
-	 * and v2, hence typcasting to any one is fine
+	 * and v2, hence typecasting to any one is fine
 	 */
 	struct macrx_freeze_capture_channel *freeze =
 		(struct macrx_freeze_capture_channel *)freeze_tlv;
@@ -1835,7 +1835,7 @@ target_if_register_phase_delta_for_rcc_event_handler(struct wlan_objmgr_psoc
 
 	/*
 	 * Event registration is called per pdev
-	 * Ignore erorr if event is alreday registred.
+	 * Ignore error if event is already registered.
 	 */
 	if (ret == QDF_STATUS_E_FAILURE)
 		ret = QDF_STATUS_SUCCESS;
@@ -1896,7 +1896,7 @@ target_if_register_tx_completion_enh_event_handler(struct wlan_objmgr_psoc
 						 WMI_RX_UMAC_CTX);
 	/*
 	 * Event registration is called per pdev
-	 * Ignore erorr if event is alreday registred.
+	 * Ignore error if event is already registered.
 	 */
 	if (ret == QDF_STATUS_E_FAILURE)
 		ret = QDF_STATUS_SUCCESS;

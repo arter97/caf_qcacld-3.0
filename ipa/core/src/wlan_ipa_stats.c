@@ -177,7 +177,7 @@ void wlan_ipa_uc_rt_debug_init(struct wlan_ipa_priv *ipa_ctx)
 	ipa_ctx->ipa_rx_internal_drop_count = 0;
 	ipa_ctx->ipa_rx_destructor_count = 0;
 
-	/* Reatime debug enable on feature enable */
+	/* Realtime debug enable on feature enable */
 	if (!wlan_ipa_is_rt_debugging_enabled(ipa_ctx->config)) {
 		ipa_debug("IPA RT debug is not enabled");
 		return;

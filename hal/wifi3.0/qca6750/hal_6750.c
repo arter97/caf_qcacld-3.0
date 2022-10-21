@@ -1474,7 +1474,7 @@ bool hal_rx_get_fisa_timeout_6750(uint8_t *buf)
  *
  *@rx_tlv_hdr: start address of rx_pkt_tlvs
  *
- * Return: true if RX_MPDU_START is valied, else false.
+ * Return: true if RX_MPDU_START is valid, else false.
  */
 static uint8_t hal_rx_mpdu_start_tlv_tag_valid_6750(void *rx_tlv_hdr)
 {
@@ -1771,10 +1771,10 @@ static uint32_t hal_rx_flow_get_cmem_fse_ts_6750(struct hal_soc *hal_soc,
  * hal_rx_flow_get_cmem_fse_6750() - Get FSE from CMEM
  * @hal_soc: hal_soc reference
  * @fse_offset: CMEM FSE offset
- * @fse: referece where FSE will be copied
+ * @fse: reference where FSE will be copied
  * @len: length of FSE
  *
- * Return: If read is succesfull or not
+ * Return: If read is successful or not
  */
 static void
 hal_rx_flow_get_cmem_fse_6750(struct hal_soc *hal_soc, uint32_t fse_offset,
@@ -1989,6 +1989,8 @@ static void hal_hw_txrx_ops_attach_qca6750(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_mpdu_get_fr_ds = hal_rx_mpdu_get_fr_ds_6750;
 	hal_soc->ops->hal_rx_get_mpdu_frame_control_valid =
 		hal_rx_get_mpdu_frame_control_valid_6750;
+	hal_soc->ops->hal_rx_get_frame_ctrl_field =
+		hal_rx_get_frame_ctrl_field_li;
 	hal_soc->ops->hal_rx_mpdu_get_addr1 = hal_rx_mpdu_get_addr1_6750;
 	hal_soc->ops->hal_rx_mpdu_get_addr2 = hal_rx_mpdu_get_addr2_6750;
 	hal_soc->ops->hal_rx_mpdu_get_addr3 = hal_rx_mpdu_get_addr3_6750;

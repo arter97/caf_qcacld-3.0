@@ -24,6 +24,7 @@
 #include "hal_tx.h"	//HAL_SET_FLD
 #include "hal_be_rx.h"	//HAL_RX_BUF_RBM_GET
 #include "rx_reo_queue_1k.h"
+#include "hal_be_rx_tlv.h"
 
 /*
  * The 4 bits REO destination ring value is defined as: 0: TCL
@@ -623,6 +624,8 @@ hal_msdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
 {
 	struct rx_msdu_desc_info *msdu_desc_info =
 		(struct rx_msdu_desc_info *)msdu_desc;
+	struct rx_msdu_ext_desc_info *msdu_ext_desc_info =
+		(struct rx_msdu_ext_desc_info *)(msdu_desc_info + 1);
 
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
 				  FIRST_MSDU_IN_MPDU_FLAG, 1);
@@ -636,14 +639,22 @@ hal_msdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
 				  SA_IS_VALID, 1);
 	HAL_RX_MSDU_DESC_INFO_SET(msdu_desc_info,
 				  DA_IS_VALID, 1);
+	HAL_RX_MSDU_REO_DST_IND_SET(msdu_ext_desc_info,
+				    REO_DESTINATION_INDICATION, dst_ind);
 }
 
 static inline void
 hal_mpdu_desc_info_set_be(hal_soc_handle_t hal_soc_hdl,
-			  void *mpdu_desc, uint32_t seq_no)
+			  void *ent_desc,
+			  void *mpdu_desc,
+			  uint32_t seq_no)
 {
 	struct rx_mpdu_desc_info *mpdu_desc_info =
 			(struct rx_mpdu_desc_info *)mpdu_desc;
+	uint8_t *desc = (uint8_t *)ent_desc;
+
+	HAL_RX_FLD_SET(desc, REO_ENTRANCE_RING,
+		       MPDU_SEQUENCE_NUMBER, seq_no);
 
 	HAL_RX_MPDU_DESC_INFO_SET(mpdu_desc_info,
 				  MSDU_COUNT, 0x1);
@@ -675,7 +686,7 @@ uint32_t hal_rx_msdu_reo_dst_ind_get_be(hal_soc_handle_t hal_soc_hdl,
 
 	msdu_details = hal_rx_link_desc_msdu0_ptr(msdu_link, hal_soc);
 
-	/* The first msdu in the link should exsist */
+	/* The first msdu in the link should exist */
 	msdu_desc_info = hal_rx_msdu_ext_desc_info_get_ptr(&msdu_details[0],
 							   hal_soc);
 	dst_ind = HAL_RX_MSDU_REO_DST_IND_GET(msdu_desc_info);
@@ -958,4 +969,10 @@ void hal_hw_txrx_default_ops_attach_be(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_register_reo_send_cmd = hal_register_reo_send_cmd_be;
 	hal_soc->ops->hal_reset_rx_reo_tid_q = hal_reset_rx_reo_tid_q_be;
 #endif
+	hal_soc->ops->hal_rx_tlv_get_pn_num = hal_rx_tlv_get_pn_num_be;
+	hal_soc->ops->hal_rx_get_qdesc_addr = hal_rx_get_qdesc_addr_be;
+	hal_soc->ops->hal_set_reo_ent_desc_reo_dest_ind =
+					hal_set_reo_ent_desc_reo_dest_ind_be;
+	hal_soc->ops->hal_get_reo_ent_desc_qdesc_addr =
+					hal_get_reo_ent_desc_qdesc_addr_be;
 }

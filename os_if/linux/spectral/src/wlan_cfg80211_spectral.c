@@ -1019,6 +1019,8 @@ int wlan_cfg80211_spectral_scan_get_diag_stats(struct wiphy *wiphy,
 
 	sscan_req.req_id = SPECTRAL_GET_DIAG_STATS;
 	status = ucfg_spectral_control(pdev, &sscan_req);
+	if (QDF_IS_STATUS_ERROR(status))
+		return -EINVAL;
 	spetcral_diag = &sscan_req.diag_req.sscan_diag;
 
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy,

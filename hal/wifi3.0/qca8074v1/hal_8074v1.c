@@ -414,6 +414,25 @@ static uint8_t hal_rx_get_mpdu_frame_control_valid_8074v1(uint8_t *buf)
 	return HAL_RX_MPDU_GET_FRAME_CONTROL_VALID(rx_mpdu_info);
 }
 
+/**
+ * hal_rx_get_mpdu_frame_control_field_8074v1(): Function to
+ * retrieve frame control field
+ *
+ * @nbuf: Network buffer
+ * Returns: value of frame control field
+ *
+ */
+static uint16_t hal_rx_get_mpdu_frame_control_field_8074v1(uint8_t *buf)
+{
+	struct rx_pkt_tlvs *pkt_tlvs = hal_rx_get_pkt_tlvs(buf);
+	struct rx_mpdu_info *rx_mpdu_info = hal_rx_get_mpdu_info(pkt_tlvs);
+	uint16_t frame_ctrl = 0;
+
+	frame_ctrl = HAL_RX_MPDU_GET_FRAME_CONTROL_FIELD(rx_mpdu_info);
+
+	return frame_ctrl;
+}
+
 /*
  * hal_rx_mpdu_get_addr1_8074v1(): API to check get address1 of the mpdu
  *
@@ -1019,7 +1038,7 @@ uint16_t hal_rx_get_rx_sequence_8074v1(uint8_t *buf)
  *
  * @rx_tlv_hdr: start address of rx_pkt_tlvs
  *
- * Return: true if RX_MPDU_START is valied, else false.
+ * Return: true if RX_MPDU_START is valid, else false.
  */
 uint8_t hal_rx_mpdu_start_tlv_tag_valid_8074v1(void *rx_tlv_hdr)
 {
@@ -1331,6 +1350,8 @@ static void hal_hw_txrx_ops_attach_qca8074(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_rx_mpdu_get_fr_ds = hal_rx_mpdu_get_fr_ds_8074v1;
 	hal_soc->ops->hal_rx_get_mpdu_frame_control_valid =
 		hal_rx_get_mpdu_frame_control_valid_8074v1;
+	hal_soc->ops->hal_rx_get_frame_ctrl_field =
+		hal_rx_get_mpdu_frame_control_field_8074v1;
 	hal_soc->ops->hal_rx_mpdu_get_addr1 = hal_rx_mpdu_get_addr1_8074v1;
 	hal_soc->ops->hal_rx_mpdu_get_addr2 = hal_rx_mpdu_get_addr2_8074v1;
 	hal_soc->ops->hal_rx_mpdu_get_addr3 = hal_rx_mpdu_get_addr3_8074v1;

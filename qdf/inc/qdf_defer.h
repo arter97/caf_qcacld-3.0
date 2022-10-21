@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -165,7 +166,7 @@ QDF_STATUS qdf_create_work(qdf_handle_t hdl, qdf_work_t  *work,
  * @hdl: OS handle
  * @work: pointer to work
  *
- * Retrun: none
+ * Return: none
  */
 void qdf_sched_work(qdf_handle_t hdl, qdf_work_t *work);
 
@@ -339,7 +340,7 @@ static inline void qdf_destroy_workqueue(qdf_handle_t hdl,
  * qdf_sched_work - Schedule a deferred task on non-interrupt context
  * @hdl: OS handle
  * @work: pointer to work
- * Retrun: none
+ * Return: none
  */
 static inline void qdf_sched_work(qdf_handle_t hdl, qdf_work_t *work)
 {

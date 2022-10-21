@@ -770,7 +770,7 @@ static inline void wlan_ipa_mcc_work_handler(void *data)
 QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			     uint8_t session_id,
 			     enum wlan_ipa_wlan_event ipa_event_type,
-			     uint8_t *mac_addr, bool is_2g_iface,
+			     const uint8_t *mac_addr, bool is_2g_iface,
 			     struct wlan_ipa_priv *ipa_obj);
 
 /**
@@ -787,10 +787,10 @@ QDF_STATUS wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 int wlan_ipa_uc_smmu_map(bool map, uint32_t num_buf, qdf_mem_info_t *buf_arr);
 
 /**
- * wlan_ipa_is_fw_wdi_activated() - Is FW WDI actived?
- * @ipa_ctx: IPA contex
+ * wlan_ipa_is_fw_wdi_activated() - Is FW WDI activated?
+ * @ipa_ctx: IPA context
  *
- * Return: true if FW WDI actived, false otherwise
+ * Return: true if FW WDI activated, false otherwise
  */
 bool wlan_ipa_is_fw_wdi_activated(struct wlan_ipa_priv *ipa_ctx);
 

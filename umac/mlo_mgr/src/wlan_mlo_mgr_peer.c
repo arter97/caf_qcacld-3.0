@@ -788,6 +788,7 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 	QDF_STATUS status;
 	uint16_t i;
 	struct wlan_objmgr_peer *assoc_peer;
+	bool is_ml_peer_attached = false;
 
 	/* get ML VDEV from VDEV */
 	ml_dev = vdev->mlo_dev_ctx;
@@ -850,11 +851,27 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 			}
 		}
 	}
-
-	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE)
+	/* When roam to MLO AP, partner link vdev1 is updated first,
+	 * ml peer need be created and attached for partner link peer.
+	 *
+	 * When roam target AP and current AP have same MLD address, don't
+	 * delete old ML peer and re-create new one, just update different
+	 * info.
+	 */
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
 		ml_peer = wlan_mlo_get_mlpeer(ml_dev,
 				 (struct qdf_mac_addr *)&link_peer->mldaddr[0]);
-
+		if (ml_peer) {
+			mlo_debug("ML Peer " QDF_MAC_ADDR_FMT
+				" existed, state %d",
+				QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
+				ml_peer->mlpeer_state);
+			ml_peer->mlpeer_state = ML_PEER_CREATED;
+			ml_peer->max_links = ml_info->num_partner_links;
+			wlan_mlo_peer_set_t2lm_enable_val(ml_peer, ml_info);
+			is_ml_peer_attached = true;
+		}
+	}
 	if (!ml_peer) {
 		/* Allocate MLO peer */
 		ml_peer = qdf_mem_malloc(sizeof(*ml_peer));
@@ -931,7 +948,7 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 
 	if ((wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) ||
 		((wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) &&
-			!wlan_vdev_mlme_is_mlo_link_vdev(vdev))) {
+			!is_ml_peer_attached)) {
 		/* Attach MLO peer to ML Peer table */
 		status = mlo_dev_mlpeer_attach(ml_dev, ml_peer);
 		if (status != QDF_STATUS_SUCCESS) {
@@ -946,6 +963,8 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 			return status;
 		}
 	}
+
+	wlan_mlo_peer_get_ref(ml_peer);
 
 	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE) {
 		/* Notify other vdevs about link peer creation */
@@ -962,6 +981,15 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 	mlo_dev_release_link_vdevs(link_vdevs);
+
+	if (ml_peer->mlpeer_state == ML_PEER_DISCONN_INITIATED) {
+		mlo_info("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT " allocation failed",
+			 ml_dev->mld_id,
+			 QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
+		wlan_mlo_peer_release_ref(ml_peer);
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	mlo_info("MLD ID %d ML Peer " QDF_MAC_ADDR_FMT " allocated %pK",
 		 ml_dev->mld_id,
 		 QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes),
@@ -980,6 +1008,8 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 				mlo_mlme_peer_assoc_resp(assoc_peer);
 		}
 	}
+
+	wlan_mlo_peer_release_ref(ml_peer);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1086,10 +1116,8 @@ void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 
 		if (!link_peer)
 			continue;
-
 		if (link_peer == peer)
 			continue;
-
 		link_vdev = wlan_peer_get_vdev(link_peer);
 		if (!link_vdev)
 			continue;
@@ -1106,6 +1134,54 @@ void wlan_mlo_peer_get_links_info(struct wlan_objmgr_peer *peer,
 }
 
 qdf_export_symbol(wlan_mlo_peer_get_links_info);
+
+uint8_t wlan_mlo_peer_get_primary_peer_link_id(struct wlan_objmgr_peer *peer)
+{
+	struct wlan_mlo_peer_context *ml_peer;
+	struct wlan_mlo_link_peer_entry *peer_entry;
+	struct wlan_objmgr_peer *link_peer;
+	struct wlan_objmgr_vdev *link_vdev;
+	uint8_t i, vdev_link_id;
+
+	ml_peer = peer->mlo_peer_ctx;
+
+	if (!ml_peer) {
+		mlo_err("ml_peer is null");
+		return WLAN_LINK_ID_INVALID;
+	}
+	mlo_peer_lock_acquire(ml_peer);
+
+	if ((ml_peer->mlpeer_state != ML_PEER_CREATED) &&
+	    (ml_peer->mlpeer_state != ML_PEER_ASSOC_DONE)) {
+		mlo_peer_lock_release(ml_peer);
+		mlo_err("ml_peer is not created and association is not done");
+		return WLAN_LINK_ID_INVALID;
+	}
+
+	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
+		peer_entry = &ml_peer->peer_list[i];
+		link_peer = peer_entry->link_peer;
+		if (!link_peer)
+			continue;
+
+		if (peer_entry->is_primary) {
+			link_vdev = wlan_peer_get_vdev(link_peer);
+			if (!link_vdev) {
+				mlo_peer_lock_release(ml_peer);
+				mlo_err("link vdev not found");
+				return WLAN_LINK_ID_INVALID;
+			}
+			vdev_link_id = wlan_vdev_get_link_id(link_vdev);
+			mlo_peer_lock_release(ml_peer);
+			return vdev_link_id;
+		}
+	}
+	mlo_peer_lock_release(ml_peer);
+	mlo_err("None of the peer is designated as primary");
+	return WLAN_LINK_ID_INVALID;
+}
+
+qdf_export_symbol(wlan_mlo_peer_get_primary_peer_link_id);
 
 void wlan_mlo_peer_get_partner_links_info(struct wlan_objmgr_peer *peer,
 					  struct mlo_partner_info *ml_links)

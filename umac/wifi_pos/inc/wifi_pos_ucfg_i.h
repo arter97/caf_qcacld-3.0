@@ -61,7 +61,7 @@ static inline QDF_STATUS
 ucfg_wifi_pos_register_osif_callbacks(struct wlan_objmgr_psoc *psoc,
 				      struct wifi_pos_osif_ops *osif_ops)
 {
-	return wifi_pos_register_osif_callbacks(psoc, osif_ops);
+	return wifi_pos_register_osif_callbacks(osif_ops);
 }
 
 /**
@@ -74,7 +74,7 @@ ucfg_wifi_pos_register_osif_callbacks(struct wlan_objmgr_psoc *psoc,
 static inline QDF_STATUS
 ucfg_wifi_pos_deregister_osif_callbacks(struct wlan_objmgr_psoc *psoc)
 {
-	return wifi_pos_register_osif_callbacks(psoc, NULL);
+	return wifi_pos_register_osif_callbacks(NULL);
 }
 #else
 static inline QDF_STATUS
@@ -89,6 +89,12 @@ static inline bool
 ucfg_wifi_pos_is_ltf_keyseed_required_for_peer(struct wlan_objmgr_peer *peer)
 {
 	return wifi_pos_is_ltf_keyseed_required_for_peer(peer);
+}
+
+static inline
+bool ucfg_wifi_pos_get_rsta_11az_ranging_cap(void)
+{
+	return wifi_pos_get_rsta_11az_ranging_cap();
 }
 #endif
 #endif /* _WIFI_POS_UCFG_H_ */

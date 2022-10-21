@@ -798,9 +798,9 @@ scm_copy_info_from_dup_entry(struct wlan_objmgr_pdev *pdev,
 			scan_entry->rssi_timestamp;
 	} else {
 		/* If elapsed time since last rssi and snr update for this
-		 * entry is smaller than a thresold, calculate a
+		 * entry is smaller than a threshold, calculate a
 		 * running average of the RSSI and SNR values.
-		 * Otherwise new frames RSSI and SNR are more representive
+		 * Otherwise new frames RSSI and SNR are more representative
 		 * of the signal strength.
 		 */
 		time_gap =
@@ -1017,6 +1017,27 @@ static bool scm_is_bss_allowed_for_country(struct wlan_objmgr_psoc *psoc,
 }
 #endif
 
+/**
+ * scm_is_p2p_wildcard_ssid() - check p2p wildcard ssid or not
+ * @scan_entry: scan entry
+ *
+ * Return: true if SSID is wildcard "DIRECT-" ssid
+ */
+static bool scm_is_p2p_wildcard_ssid(struct scan_cache_entry *scan_entry)
+{
+	static const char wildcard_ssid[] = "DIRECT-";
+	uint8_t len = sizeof(wildcard_ssid) - 1;
+
+	if (!scan_entry->is_p2p)
+		return false;
+	if (!qdf_mem_cmp(scan_entry->ssid.ssid,
+			 wildcard_ssid, len) &&
+	    (scan_entry->ssid.length == len))
+		return true;
+
+	return false;
+}
+
 QDF_STATUS __scm_handle_bcn_probe(struct scan_bcn_probe_event *bcn)
 {
 	struct wlan_objmgr_psoc *psoc;
@@ -1131,7 +1152,8 @@ QDF_STATUS __scm_handle_bcn_probe(struct scan_bcn_probe_event *bcn)
 			status = wlan_crypto_rsnie_check(
 					&sec_params,
 					util_scan_entry_rsn(scan_entry));
-			if (QDF_IS_STATUS_ERROR(status)) {
+			if (QDF_IS_STATUS_ERROR(status) &&
+			    !scm_is_p2p_wildcard_ssid(scan_entry)) {
 				scm_nofl_debug("Drop frame from invalid RSN IE AP"
 					       QDF_MAC_ADDR_FMT
 					       ": RSN IE parse failed, status %d",
@@ -1951,6 +1973,10 @@ QDF_STATUS scm_scan_update_mlme_by_bssinfo(struct wlan_objmgr_pdev *pdev,
 			qdf_spin_lock_bh(&scan_db->scan_db_lock);
 			qdf_mem_copy(&entry->mlme_info, mlme,
 					sizeof(struct mlme_info));
+			scm_debug("BSSID: "QDF_MAC_ADDR_FMT" set assoc_state to %d with age %lu ms",
+				  QDF_MAC_ADDR_REF(entry->bssid.bytes),
+				  mlme->assoc_state,
+				  util_scan_entry_age(entry));
 			scm_scan_entry_put_ref(scan_db,
 					cur_node, false);
 			qdf_spin_unlock_bh(&scan_db->scan_db_lock);

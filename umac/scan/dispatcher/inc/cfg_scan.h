@@ -364,7 +364,7 @@ enum scan_mode_6ghz {
 /*
  * <ini>
  * hostscan_adaptive_dwell_mode - Enable adaptive dwell mode
- * during host scan with conneciton
+ * during host scan with connection
  * @Min: 0
  * @Max: 4
  * @Default: 1
@@ -396,7 +396,7 @@ enum scan_mode_6ghz {
 /*
  * <ini>
  * hostscan_adaptive_dwell_mode_no_conn - Enable adaptive dwell mode
- * during host scan without conneciton
+ * during host scan without connection
  * @Min: 0
  * @Max: 4
  * @Default: 4
@@ -713,7 +713,7 @@ enum scan_mode_6ghz {
  * This ini is used to set the periodic timer upon which
  * a full scan needs to be triggered when PNO channel
  * prediction feature is enabled. This parameter is intended
- * to tweak the internal algortihm for experiments.
+ * to tweak the internal algorithm for experiments.
  *
  * Related: None
  *
@@ -772,7 +772,7 @@ enum scan_mode_6ghz {
  * @Max: 255
  * @Default: 0
  *
- * For Network Listen Offload and Perfered Network Offload, multiply the fast
+ * For Network Listen Offload and Preferred Network Offload, multiply the fast
  * scan period by this value after max cycles have occurred. Setting this to 0
  * disables the feature.
  *
@@ -988,7 +988,7 @@ enum scan_mode_6ghz {
 
 /*
  * <ini>
- * min_rest_time_conc - Mininum time spent on home channel before moving to a
+ * min_rest_time_conc - Minimum time spent on home channel before moving to a
  * new channel to scan.
  * @Min: 0
  * @Max: 50

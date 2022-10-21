@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -562,9 +563,11 @@ wlan_ser_cancel_non_scan_cmd(
 			qdf_container_of(nnode,
 					 struct wlan_serialization_command_list,
 					 pdev_node);
-		if (cmd && !wlan_serialization_match_cmd_id_type(
-							nnode, cmd,
-							WLAN_SER_PDEV_NODE)) {
+		if (cmd &&
+		    !(wlan_serialization_match_cmd_id_type(nnode, cmd,
+							  WLAN_SER_PDEV_NODE) &&
+		      wlan_serialization_match_cmd_vdev(nnode, cmd->vdev,
+							WLAN_SER_PDEV_NODE))) {
 			pnode = nnode;
 			continue;
 		}
@@ -700,8 +703,8 @@ wlan_ser_cancel_non_scan_cmd(
 		 */
 		if (cmd_bkup.cmd_cb) {
 			/* caller should now do necessary clean up */
-			ser_debug("Cancel command: type %d id %d and Release memory",
-				  cmd_bkup.cmd_type, cmd_bkup.cmd_id);
+			ser_debug("Cancel command: type %d id %d vdev %d and Release memory",
+				  cmd_bkup.cmd_type, cmd_bkup.cmd_id, vdev_id);
 			cmd_bkup.cmd_cb(&cmd_bkup, WLAN_SER_CB_CANCEL_CMD);
 			/* caller should release the memory */
 			cmd_bkup.cmd_cb(&cmd_bkup, WLAN_SER_CB_RELEASE_MEM_CMD);
@@ -735,4 +738,28 @@ wlan_ser_cancel_non_scan_cmd(
 	wlan_serialization_release_lock(&pdev_q->pdev_queue_lock);
 
 	return status;
+}
+
+bool
+wlan_serialization_is_blocking_non_scan_cmd_waiting(
+				struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_serialization_pdev_queue *pdev_queue;
+	struct wlan_ser_pdev_obj *ser_pdev_obj;
+	bool blocking_cmd_active = 0;
+	uint8_t blocking_cmd_waiting = 0;
+
+	ser_pdev_obj = wlan_serialization_get_pdev_obj(pdev);
+
+	pdev_queue = wlan_serialization_get_pdev_queue_obj(
+					ser_pdev_obj,
+					WLAN_SER_CMD_NONSCAN);
+
+	blocking_cmd_active = pdev_queue->blocking_cmd_active;
+	blocking_cmd_waiting = pdev_queue->blocking_cmd_waiting;
+
+	if (blocking_cmd_active || blocking_cmd_waiting)
+		return true;
+
+	return false;
 }
