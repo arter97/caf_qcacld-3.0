@@ -368,7 +368,7 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @ht_crc: ht crc
  * @rx_user_status: pointer to mon_rx_user_status, when set update
  * @rssi_offset: This offset value will use for RSSI db to dbm conversion
- * @rssi_dbm_conv_support: Rssi dbm converstion support param
+ * @rssi_dbm_conv_support: Rssi dbm conversion support param
  * radiotap header will use userinfo from this structure.
  */
 struct mon_rx_status {
