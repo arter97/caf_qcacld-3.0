@@ -1225,24 +1225,22 @@ static int dp_srng_find_ring_in_mask(int ring_num, uint8_t *grp_mask)
 
 /**
  * dp_is_msi_group_number_invalid() - check msi_group_number valid or not
+ * @soc: dp_soc
  * @msi_group_number: MSI group number.
  * @msi_data_count: MSI data count.
  *
  * Return: true if msi_group_number is invalid.
  */
-#ifdef WLAN_ONE_MSI_VECTOR
-static bool dp_is_msi_group_number_invalid(int msi_group_number,
+static bool dp_is_msi_group_number_invalid(struct dp_soc *soc,
+					   int msi_group_number,
 					   int msi_data_count)
 {
-	return false;
-}
-#else
-static bool dp_is_msi_group_number_invalid(int msi_group_number,
-					   int msi_data_count)
-{
+	if (soc && soc->osdev && soc->osdev->dev &&
+	    pld_is_one_msi(soc->osdev->dev))
+		return false;
+
 	return msi_group_number > msi_data_count;
 }
-#endif
 
 #ifdef WLAN_FEATURE_NEAR_FULL_IRQ
 /**
@@ -1370,7 +1368,8 @@ dp_srng_msi2_setup(struct dp_soc *soc,
 		return;
 	}
 
-	if (dp_is_msi_group_number_invalid(nf_msi_grp_num, msi_data_count)) {
+	if (dp_is_msi_group_number_invalid(soc, nf_msi_grp_num,
+					   msi_data_count)) {
 		dp_init_warn("%pK: 2 msi_groups will share an msi for near full IRQ; msi_group_num %d",
 			     soc, nf_msi_grp_num);
 		QDF_ASSERT(0);
@@ -1681,7 +1680,8 @@ static void dp_srng_msi_setup(struct dp_soc *soc, struct hal_srng_params
 		goto configure_msi2;
 	}
 
-	if (dp_is_msi_group_number_invalid(reg_msi_grp_num, msi_data_count)) {
+	if (dp_is_msi_group_number_invalid(soc, reg_msi_grp_num,
+					   msi_data_count)) {
 		dp_init_warn("%pK: 2 msi_groups will share an msi; msi_group_num %d",
 			     soc, reg_msi_grp_num);
 		QDF_ASSERT(0);
