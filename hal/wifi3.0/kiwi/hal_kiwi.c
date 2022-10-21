@@ -2039,6 +2039,17 @@ hal_get_tsf_time_kiwi(hal_soc_handle_t hal_soc_hdl, uint32_t tsf_id,
 }
 #endif
 
+static QDF_STATUS hal_rx_reo_ent_get_src_link_id_kiwi(hal_rxdma_desc_t rx_desc,
+						      uint8_t *src_link_id)
+{
+	struct reo_entrance_ring *reo_ent_desc =
+					(struct reo_entrance_ring *)rx_desc;
+
+	*src_link_id = reo_ent_desc->src_link_id;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void hal_hw_txrx_ops_attach_kiwi(struct hal_soc *hal_soc)
 {
 	/* init and setup */
@@ -2290,6 +2301,8 @@ static void hal_hw_txrx_ops_attach_kiwi(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_tx_vdev_mcast_ctrl_set =
 		hal_tx_vdev_mcast_ctrl_set_be;
 	hal_soc->ops->hal_get_tsf_time = hal_get_tsf_time_kiwi;
+	hal_soc->ops->hal_rx_reo_ent_get_src_link_id =
+					hal_rx_reo_ent_get_src_link_id_kiwi;
 };
 
 struct hal_hw_srng_config hw_srng_table_kiwi[] = {

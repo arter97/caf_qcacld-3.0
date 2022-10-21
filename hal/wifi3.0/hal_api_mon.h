@@ -342,6 +342,26 @@ enum {
 	DP_PPDU_STATUS_DONE,
 };
 
+static inline QDF_STATUS
+hal_rx_reo_ent_get_src_link_id(hal_soc_handle_t hal_soc_hdl,
+			       hal_rxdma_desc_t rx_desc,
+			       uint8_t *src_link_id)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (!hal_soc || !hal_soc->ops) {
+		hal_err("hal handle is NULL");
+		QDF_BUG(0);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (hal_soc->ops->hal_rx_reo_ent_get_src_link_id)
+		return hal_soc->ops->hal_rx_reo_ent_get_src_link_id(rx_desc,
+								    src_link_id);
+
+	return QDF_STATUS_E_INVAL;
+}
+
 /**
  * hal_rx_reo_ent_buf_paddr_get: Gets the physical address and
  *			cookie from the REO entrance ring element
