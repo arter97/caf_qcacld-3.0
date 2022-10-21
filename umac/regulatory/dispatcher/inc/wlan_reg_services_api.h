@@ -836,6 +836,23 @@ wlan_reg_get_afc_dev_deploy_type(struct wlan_objmgr_pdev *pdev,
 bool
 wlan_reg_is_sta_connect_allowed(struct wlan_objmgr_pdev *pdev,
 				enum reg_6g_ap_type root_ap_pwr_mode);
+
+/**
+ * wlan_reg_is_6ghz_freq_txable() - Check if the given frequency is tx-able.
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in MHz
+ * @in_6ghz_pwr_type: Input AP power type
+ *
+ * An SP channel is tx-able if the channel is present in the AFC response.
+ * In case of non-OUTDOOR mode a channel is always tx-able (Assuming it is
+ * enabled by regulatory).
+ *
+ * Return: True if the frequency is tx-able, else false.
+ */
+bool
+wlan_reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
+			     qdf_freq_t freq,
+			     enum supported_6g_pwr_types in_6ghz_pwr_mode);
 #else
 static inline bool
 wlan_reg_is_afc_power_event_received(struct wlan_objmgr_pdev *pdev)
@@ -861,6 +878,14 @@ wlan_reg_is_sta_connect_allowed(struct wlan_objmgr_pdev *pdev,
 				enum reg_6g_ap_type root_ap_pwr_mode)
 {
 	return true;
+}
+
+static inline bool
+wlan_reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
+			     qdf_freq_t freq,
+			     enum supported_6g_pwr_types in_6ghz_pwr_mode)
+{
+	return false;
 }
 #endif
 
@@ -2605,6 +2630,7 @@ wlan_reg_get_chan_state_for_320(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
+#ifdef CONFIG_BAND_6GHZ
 /**
  * wlan_is_sup_chan_entry_afc_done() - Checks if the super chan entry of given
  * channel idx and power mode has REGULATORY_CHAN_AFC_NOT_DONE flag cleared.
@@ -2616,7 +2642,6 @@ wlan_reg_get_chan_state_for_320(struct wlan_objmgr_pdev *pdev,
  * Return: True if REGULATORY_CHAN_AFC_NOT_DONE flag is clear for the super
  * chan entry.
  */
-#ifdef CONFIG_BAND_6GHZ
 bool
 wlan_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
 				enum channel_enum chan_idx,

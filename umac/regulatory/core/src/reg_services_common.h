@@ -2678,11 +2678,36 @@ QDF_STATUS reg_get_regd_rules(struct wlan_objmgr_pdev *pdev,
 bool reg_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
 				    enum channel_enum chan_idx,
 				    enum supported_6g_pwr_types in_6g_pwr_mode);
+
+/**
+ * reg_is_6ghz_freq_txable() - Check if the given 6 GHz frequency is tx-able.
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in MHz
+ * @in_6ghz_pwr_type: Input AP power type
+ *
+ * An SP channel is tx-able if the channel is present in the AFC response.
+ * In case of non-OUTDOOR mode, a channel is always tx-able (Assuming it is
+ * enabled by regulatory).
+ *
+ * Return: True if the frequency is tx-able, else false.
+ */
+bool
+reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
+			qdf_freq_t freq,
+			enum supported_6g_pwr_types in_6ghz_pwr_mode);
 #else
 static inline bool
 reg_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
 			       enum channel_enum chan_idx,
 			       enum supported_6g_pwr_types in_6g_pwr_mode)
+{
+	return false;
+}
+
+static inline bool
+reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
+			qdf_freq_t freq,
+			enum supported_6g_pwr_types in_6ghz_pwr_mode)
 {
 	return false;
 }

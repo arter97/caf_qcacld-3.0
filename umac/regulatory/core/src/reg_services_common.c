@@ -9505,6 +9505,24 @@ reg_is_sup_chan_entry_afc_done(struct wlan_objmgr_pdev *pdev,
 	return !(super_chan_ent->chan_flags_arr[in_6g_pwr_mode] &
 		 REGULATORY_CHAN_AFC_NOT_DONE);
 }
+
+bool
+reg_is_6ghz_freq_txable(struct wlan_objmgr_pdev *pdev,
+			qdf_freq_t freq,
+			enum supported_6g_pwr_types in_6ghz_pwr_mode)
+{
+	bool is_freq_enabled;
+	enum reg_afc_dev_deploy_type reg_afc_deploy_type;
+
+	is_freq_enabled = reg_is_freq_enabled(pdev, freq, in_6ghz_pwr_mode);
+	if (!is_freq_enabled)
+		return false;
+
+	reg_get_afc_dev_deploy_type(pdev, &reg_afc_deploy_type);
+
+	return (reg_afc_deploy_type != AFC_DEPLOYMENT_OUTDOOR) ||
+		reg_is_afc_done(pdev, freq);
+}
 #endif
 
 #ifdef CONFIG_BAND_6GHZ
