@@ -646,6 +646,9 @@ dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
 	if (!be_soc->mlo_enabled || !mlo_ctxt)
 		return soc;
 
+	if (be_soc->mlo_chip_id == chip_id)
+		return soc;
+
 	replenish_soc = dp_mlo_get_soc_ref_by_chip_id(mlo_ctxt, chip_id);
 	if (qdf_unlikely(!replenish_soc)) {
 		dp_alert("replenish SOC is NULL");
