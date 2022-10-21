@@ -631,6 +631,9 @@ qdf_nbuf_t mlo_peer_get_link_peer_assoc_resp_buf(
 			continue;
 
 		if (peer_entry->link_ix == link_ix) {
+			if (!peer_entry->assoc_rsp_buf)
+				break;
+
 			frm_buf = qdf_nbuf_clone(peer_entry->assoc_rsp_buf);
 			break;
 		}
