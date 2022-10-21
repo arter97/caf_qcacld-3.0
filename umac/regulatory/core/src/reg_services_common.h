@@ -2327,6 +2327,20 @@ enum phy_ch_width reg_find_chwidth_from_bw(uint16_t bw);
 qdf_freq_t reg_get_thresh_priority_freq(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * reg_get_eirp_pwr() - Get eirp power based on the AP power mode. For SP
+ * power mode if the AFC response is received, the power is from the AFC
+ * channel list
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in mhz
+ * @bw: Bandwidth in mhz
+ * @ap_pwr_type: AP power type
+ *
+ * Return: EIRP power
+ */
+uint8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			 uint16_t bw, enum reg_6g_ap_type ap_pwr_type);
+
+/**
  * reg_get_best_pwr_mode() - Get the AP's primary channel center frequency and
  * AP's operating bandwidth to return the best power mode, which is calculated
  * based on the maximum EIRP power among the 3 AP types, i.e, LPI, SP and VLP

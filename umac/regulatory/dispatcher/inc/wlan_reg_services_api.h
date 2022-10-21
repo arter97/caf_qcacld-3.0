@@ -2346,6 +2346,20 @@ QDF_STATUS wlan_reg_psd_2_eirp(struct wlan_objmgr_pdev *pdev,
 enum reg_6g_ap_type
 wlan_reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 			   uint16_t bw);
+
+/**
+ * wlan_reg_get_eirp_pwr() - Get eirp power based on the AP power mode. For SP
+ * power mode if the AFC response is received, the power is from the AFC
+ * channel list
+ * @pdev: Pointer to pdev
+ * @freq: Frequency in mhz
+ * @bw: Bandwidth in mhz
+ * @ap_pwr_type: AP power type
+ *
+ * Return: EIRP power
+ */
+uint8_t wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+			      uint16_t bw, enum reg_6g_ap_type ap_pwr_type);
 #else
 static inline
 qdf_freq_t wlan_reg_get_thresh_priority_freq(struct wlan_objmgr_pdev *pdev)

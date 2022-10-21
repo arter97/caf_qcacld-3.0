@@ -9048,16 +9048,7 @@ reg_get_best_pwr_mode_from_eirp_list(uint8_t *eirp_list, uint8_t size)
 	return best_pwr_mode;
 }
 
-/**
- * reg_get_eirp_pwr() - Get eirp power based on the AP power mode
- * @pdev: Pointer to pdev
- * @freq: Frequency in mhz
- * @bw: Bandwidth in mhz
- * @ap_pwr_type: AP power type
- *
- * Return: EIRP power
- */
-static uint8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+uint8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 				uint16_t bw, enum reg_6g_ap_type ap_pwr_type)
 {
 	if (ap_pwr_type == REG_STANDARD_POWER_AP)
