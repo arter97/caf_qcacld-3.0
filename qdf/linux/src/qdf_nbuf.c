@@ -1874,7 +1874,7 @@ bool __qdf_nbuf_is_ipv4_wapi_pkt(struct sk_buff *skb)
 qdf_export_symbol(__qdf_nbuf_is_ipv4_wapi_pkt);
 
 /**
- * qdf_nbuf_is_ipv6_vlan_pkt() - check wheather packet is vlan IPV6
+ * qdf_nbuf_is_ipv6_vlan_pkt() - check whether packet is vlan IPV6
  * @data: Pointer to network data buffer
  *
  * This api is for vlan header included ipv6 packet.
@@ -1899,7 +1899,7 @@ static bool qdf_nbuf_is_ipv6_vlan_pkt(uint8_t *data)
 }
 
 /**
- * qdf_nbuf_is_ipv4_vlan_pkt() - check wheather packet is vlan IPV4
+ * qdf_nbuf_is_ipv4_vlan_pkt() - check whether packet is vlan IPV4
  * @data: Pointer to network data buffer
  *
  * This api is for vlan header included ipv4 packet.
