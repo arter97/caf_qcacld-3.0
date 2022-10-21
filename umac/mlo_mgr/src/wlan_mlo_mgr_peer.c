@@ -339,13 +339,6 @@ wlan_mlo_peer_deauth_init(struct wlan_mlo_peer_context *ml_peer)
 			continue;
 
 		link_peer = peer_entry->link_peer;
-		/* Skip Deauth if PMF is enabled for the station */
-		if ((i == 0) &&
-		    (wlan_crypto_is_pmf_enabled(wlan_peer_get_vdev(link_peer),
-					       link_peer))) {
-			mlo_peer_lock_release(ml_peer);
-			return;
-		}
 
 		if (wlan_objmgr_peer_try_get_ref(link_peer, WLAN_MLO_MGR_ID) !=
 						QDF_STATUS_SUCCESS)
