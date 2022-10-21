@@ -1288,7 +1288,7 @@ enum cdp_pdev_param_type {
  * @cdp_ipa_enabled : set ipa mode
  * @cdp_psoc_param_vdev_stats_hw_offload: Configure HW vdev stats offload
  * @cdp_pdev_param_undecoded_metadata_enable: Undecoded metadata capture enable
- * @cdp_sawf_enabled: SAWF enable/dsiable
+ * @cdp_sawf_enabled: SAWF enable/disable
  * @cdp_sawf_stats: SAWF stats config
  * @cdp_vdev_param_traffic_end_ind: Traffic end indication enable/disable
  * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
