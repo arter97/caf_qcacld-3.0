@@ -97,7 +97,7 @@ int htt_command_record(struct htt_logger *h, uint8_t msg_type,
 
 	cmd_log_buf = &h->log_info.htt_command_log_buf_info;
 	if ((0 == h->log_info.htt_logging_enable) ||
-	    ((1 << msg_type) & h->log_info.htt_cmd_disable_list))
+	    ((1ULL << msg_type) & h->log_info.htt_cmd_disable_list))
 		return 0;
 
 	qdf_spin_lock(&cmd_log_buf->record_lock);
@@ -150,7 +150,7 @@ int htt_event_record(struct htt_logger *h, uint8_t msg_type, uint8_t *msg_data)
 
 	event_log_buf = &h->log_info.htt_event_log_buf_info;
 	if ((0 == h->log_info.htt_logging_enable) ||
-	    ((1 << msg_type) & h->log_info.htt_event_disable_list))
+	    ((1ULL << msg_type) & h->log_info.htt_event_disable_list))
 		return 0;
 
 	qdf_spin_lock(&event_log_buf->record_lock);
@@ -955,6 +955,8 @@ void htt_interface_logging_init(struct htt_logger **phtt_logger_handle,
 	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP_V2);
 	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_UNMAP_V2);
 	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_PEER_MAP_V3);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_MLO_RX_PEER_MAP);
+	enable_event(htt_logger_handle, HTT_T2H_MSG_TYPE_MLO_RX_PEER_UNMAP);
 
 	/* Disable success status*/
 	disable_wbm_success_status(htt_logger_handle);
