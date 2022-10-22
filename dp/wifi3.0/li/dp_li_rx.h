@@ -89,7 +89,7 @@ QDF_STATUS dp_wbm_get_rx_desc_from_hal_desc_li(
  * @txrx_peer: pointer to txrx_peer
  * @tid: tid value
  *
- * Return: qdesc adrress in reo destination ring buffer
+ * Return: qdesc address in reo destination ring buffer
  */
 static inline
 uint64_t dp_rx_get_reo_qdesc_addr_li(hal_soc_handle_t hal_soc,
