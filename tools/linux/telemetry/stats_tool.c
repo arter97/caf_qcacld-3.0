@@ -1089,6 +1089,60 @@ void print_sta_rdk_tx_rate_stats(struct advance_peer_data_rdk *rdk)
 	print_sta_rdk_tx_sojourn_stats(rdk);
 }
 
+#ifdef WLAN_FEATURE_11BE
+void print_sta_11be_tx_link_stats(struct stats_if_rdk_tx_link_stats *tx_link)
+{
+	STATS_PRINT("\tpunc_bw_usage_packets: NO_PUNCTURE: %u",
+		    tx_link->punc_bw.usage_counter[0]);
+	STATS_PRINT(" PUNCTURED_20MHZ: %u PUNCTURED_40MHZ: %u",
+		    tx_link->punc_bw.usage_counter[1],
+		    tx_link->punc_bw.usage_counter[2]);
+	STATS_PRINT(" PUNCTURED_80MHZ: %u PUNCTURED_120MHZ: %u\n",
+		    tx_link->punc_bw.usage_counter[3],
+		    tx_link->punc_bw.usage_counter[4]);
+	STATS_32(stdout, "punc_bw_usage_avg (MHz)",
+		 tx_link->punc_bw.usage_avg);
+	STATS_PRINT("\tpunc_bw_usage_max                   = %u%%\n",
+		    tx_link->punc_bw.usage_max);
+	STATS_PRINT("\tbw_usage_packets: 20MHz: %u 40MHz: %u",
+		    tx_link->bw.usage_counter[0],
+			tx_link->bw.usage_counter[1]);
+	STATS_PRINT(" 80MHz: %u 160MHz: %u",
+		    tx_link->bw.usage_counter[2],
+			tx_link->bw.usage_counter[3]);
+	STATS_PRINT(" 320MHz: %u\n", tx_link->bw.usage_counter[5]);
+}
+
+void print_sta_11be_rx_link_stats(struct stats_if_rdk_rx_link_stats *rx_link)
+{
+	STATS_PRINT("\tpunc_bw_usage_packets: NO_PUNCTURE: %u",
+		    rx_link->punc_bw.usage_counter[0]);
+	STATS_PRINT(" PUNCTURED_20MHZ: %u PUNCTURED_40MHZ: %u",
+		    rx_link->punc_bw.usage_counter[1],
+		    rx_link->punc_bw.usage_counter[2]);
+	STATS_PRINT(" PUNCTURED_80MHZ: %u PUNCTURED_120MHZ: %u\n",
+		    rx_link->punc_bw.usage_counter[3],
+		    rx_link->punc_bw.usage_counter[4]);
+	STATS_32(stdout, "punc_bw_usage_avg (MHz)",
+		 rx_link->punc_bw.usage_avg);
+	STATS_PRINT("\tpunc_bw_usage_max               = %u%%\n",
+		    rx_link->punc_bw.usage_max);
+	STATS_PRINT("\tbw_usage_packets: 20MHz: %u 40MHz: %u",
+		    rx_link->bw.usage_counter[0],
+		    rx_link->bw.usage_counter[1]);
+	STATS_PRINT(" 80MHz: %u 160MHz: %u",
+		    rx_link->bw.usage_counter[2],
+		    rx_link->bw.usage_counter[3]);
+	STATS_PRINT(" 320MHz: %u\n", rx_link->bw.usage_counter[5]);
+}
+#else
+void print_sta_11be_tx_link_stats(struct stats_if_rdk_tx_link_stats *tx_link)
+{ }
+
+void print_sta_11be_rx_link_stats(struct stats_if_rdk_rx_link_stats *rx_link)
+{ }
+#endif
+
 void print_sta_rdk_tx_link_stats(struct advance_peer_data_rdk *rdk)
 {
 	struct stats_if_rdk_tx_link_stats *tx_link = &rdk->tx_link;
@@ -1105,10 +1159,16 @@ void print_sta_rdk_tx_link_stats(struct advance_peer_data_rdk *rdk)
 	STATS_32(stdout, "ofdma_usage", tx_link->ofdma_usage);
 	STATS_32(stdout, "mu_mimo_usage", tx_link->mu_mimo_usage);
 	STATS_32(stdout, "bw_usage_avg (MHz)", tx_link->bw.usage_avg);
-	STATS_PRINT("\tbw_usage_packets: 20MHz: %u 40MHz: %u",
-		    tx_link->bw.usage_counter[0], tx_link->bw.usage_counter[1]);
-	STATS_PRINT(" 80MHz: %u 160MHz: %u\n", tx_link->bw.usage_counter[2],
-		    tx_link->bw.usage_counter[3]);
+	if (!tx_link->is_lithium) {
+	    print_sta_11be_tx_link_stats(tx_link);
+	} else {
+	    STATS_PRINT("\tbw_usage_packets: 20MHz: %u 40MHz: %u",
+			tx_link->bw.usage_counter[0],
+			tx_link->bw.usage_counter[1]);
+	    STATS_PRINT(" 80MHz: %u 160MHz: %u\n",
+			tx_link->bw.usage_counter[2],
+			tx_link->bw.usage_counter[3]);
+	}
 	STATS_PRINT("\tbw_usage_max                   = %u%%\n",
 		    tx_link->bw.usage_max);
 	STATS_PRINT("\tack_rssi                       = %lu\n",
@@ -1134,10 +1194,15 @@ void print_sta_rdk_rx_link_stats(struct advance_peer_data_rdk *rdk)
 	STATS_32(stdout, "ofdma_usage", rx_link->ofdma_usage);
 	STATS_32(stdout, "mu_mimo_usage", rx_link->mu_mimo_usage);
 	STATS_32(stdout, "bw_usage_avg (MHz)", rx_link->bw.usage_avg);
-	STATS_PRINT("\tbw_usage_packets: 20MHz: %u 40MHz: %u",
-		    rx_link->bw.usage_counter[0], rx_link->bw.usage_counter[1]);
-	STATS_PRINT(" 80MHz: %u 160MHz: %u\n", rx_link->bw.usage_counter[2],
-		    rx_link->bw.usage_counter[3]);
+	if (!rx_link->is_lithium) {
+	    print_sta_11be_rx_link_stats(rx_link);
+	} else {
+	    STATS_PRINT("\tbw_usage_packets: 20MHz: %u 40MHz: %u",
+			rx_link->bw.usage_counter[0],
+			rx_link->bw.usage_counter[1]);
+	    STATS_PRINT(" 80MHz: %u 160MHz: %u\n", rx_link->bw.usage_counter[2],
+			rx_link->bw.usage_counter[3]);
+	}
 	STATS_PRINT("\tbw_usage_max                   = %u%%\n",
 		    rx_link->bw.usage_max);
 	STATS_PRINT("\tsu_rssi                        = %lu\n",
