@@ -629,6 +629,7 @@ struct htt_tx_ring_tlv_filter {
  * @fpmo_data_filter: FPMO mode data filter
  * @fpmo_mgmt_filter: FPMO mode mgmt filter
  * @fpmo_ctrl_filter: FPMO mode ctrl filter
+ * @enable_mon_mac_filter: enable/disable mac based filter on scan radio
  *
  * NOTE: Do not change the layout of this structure
  */
@@ -693,6 +694,7 @@ struct htt_rx_ring_tlv_filter {
 	u_int16_t fpmo_mgmt_filter;
 	u_int16_t fpmo_ctrl_filter;
 #endif
+	bool enable_mon_mac_filter;
 };
 
 /**

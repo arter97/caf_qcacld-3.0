@@ -661,6 +661,67 @@ void dp_mon_filter_reset_mon_mode_1_0(struct dp_pdev *pdev)
 	mon_pdev->filter[mode][srng_type] = filter;
 }
 
+static void dp_mon_set_reset_mon_filter(struct dp_mon_filter *filter, bool val)
+{
+	if (val) {
+		dp_mon_filter_debug("Set monitor filter settings");
+		filter->tlv_filter.enable_mon_mac_filter = 1;
+		filter->tlv_filter.enable_md = 1;
+		filter->tlv_filter.md_mgmt_filter = FILTER_MGMT_ALL;
+		filter->tlv_filter.md_ctrl_filter = FILTER_CTRL_ALL;
+		filter->tlv_filter.md_data_filter = 0;
+	} else {
+		dp_mon_filter_debug("Reset monitor filter settings");
+		filter->tlv_filter.enable_mon_mac_filter = 0;
+		filter->tlv_filter.enable_md = 0;
+		filter->tlv_filter.md_mgmt_filter = 0;
+		filter->tlv_filter.md_ctrl_filter = 0;
+		filter->tlv_filter.md_data_filter = 0;
+	}
+}
+
+/**
+ * dp_mon_set_reset_mon_mac_filter_1_0() - Set/Reset monitor buffer and status
+ * filter
+ * @pdev: DP pdev handle
+ * @val: Set or reset the filter
+ *
+ * Return: void
+ */
+void dp_mon_set_reset_mon_mac_filter_1_0(struct dp_pdev *pdev, bool val)
+{
+	struct dp_mon_filter filter = {0};
+	enum dp_mon_filter_mode mode = DP_MON_FILTER_MONITOR_MODE;
+	enum dp_mon_filter_srng_type srng_type =
+				DP_MON_FILTER_SRNG_TYPE_RXDMA_MONITOR_STATUS;
+	struct dp_mon_pdev *mon_pdev;
+
+	if (!pdev) {
+		dp_mon_filter_err("pdev Context is null");
+		return;
+	}
+
+	mon_pdev = pdev->monitor_pdev;
+
+	/* Set monitor buffer filter */
+	dp_mon_filter_debug("Updating monitor buffer filter");
+	filter.valid = true;
+	dp_mon_set_reset_mon_filter(&filter, val);
+	dp_mon_filter_set_reset_mon_dest(pdev, &filter);
+
+	/* Set status cmn filter */
+	dp_mon_filter_debug("Updating monitor status cmn filter");
+	qdf_mem_zero(&(filter), sizeof(struct dp_mon_filter));
+	filter.valid = true;
+	dp_mon_filter_set_status_cmn(mon_pdev, &filter);
+	dp_mon_set_reset_mon_filter(&filter, val);
+	dp_mon_filter_show_filter(mon_pdev, mode, &filter);
+
+	/* Store the above filter */
+	srng_type = DP_MON_FILTER_SRNG_TYPE_RXDMA_MONITOR_STATUS;
+	mon_pdev->filter[mode][srng_type] = filter;
+}
+
 #ifdef WDI_EVENT_ENABLE
 void dp_mon_filter_setup_rx_pkt_log_full_1_0(struct dp_pdev *pdev)
 {

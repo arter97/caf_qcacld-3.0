@@ -434,6 +434,15 @@ void dp_mon_filter_reset_smart_monitor(struct dp_pdev *pdev)
 }
 #endif /* ATH_SUPPORT_NAC_RSSI || ATH_SUPPORT_NAC */
 
+void dp_mon_filter_set_reset_mon_mac_filter(struct dp_pdev *pdev, bool val)
+{
+	struct dp_mon_ops *mon_ops = NULL;
+
+	mon_ops = dp_mon_ops_get(pdev->soc);
+	if (mon_ops && mon_ops->mon_filter_set_reset_mon_mac_filter)
+		mon_ops->mon_filter_set_reset_mon_mac_filter(pdev, val);
+}
+
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 void dp_mon_filter_setup_rx_enh_capture(struct dp_pdev *pdev)
 {

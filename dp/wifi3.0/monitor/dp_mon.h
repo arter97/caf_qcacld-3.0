@@ -738,6 +738,8 @@ struct dp_mon_ops {
 	void (*mon_filter_setup_smart_monitor)(struct dp_pdev *pdev);
 	void (*mon_filter_reset_smart_monitor)(struct dp_pdev *pdev);
 #endif
+	void (*mon_filter_set_reset_mon_mac_filter)(struct dp_pdev *pdev,
+						    bool val);
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 	void (*mon_filter_setup_rx_enh_capture)(struct dp_pdev *pdev);
 	void (*mon_filter_reset_rx_enh_capture)(struct dp_pdev *pdev);

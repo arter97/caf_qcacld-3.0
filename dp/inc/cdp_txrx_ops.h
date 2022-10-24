@@ -932,6 +932,9 @@ struct cdp_ctrl_ops {
 						     uint32_t *mask,
 						     uint32_t *mask_cont);
 #endif
+	QDF_STATUS (*txrx_update_mon_mac_filter)(struct cdp_soc_t *soc,
+						 uint8_t vdev_id,
+						 uint32_t cmd);
 };
 
 struct cdp_me_ops {

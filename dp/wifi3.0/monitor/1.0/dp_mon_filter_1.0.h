@@ -109,6 +109,13 @@ static inline void dp_mon_filter_reset_smart_monitor_1_0(struct dp_pdev *pdev)
 }
 #endif
 
+/**
+ * dp_mon_set_reset_mon_mac_filter_1_0() - Set/Reset the monitor mode filter
+ * @pdev: DP pdev handle
+ * @val: Indicate set/reset filter
+ */
+void dp_mon_set_reset_mon_mac_filter_1_0(struct dp_pdev *pdev, bool val);
+
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 /**
  * dp_mon_filter_setup_rx_enh_capture() - Setup the Rx capture mode filters

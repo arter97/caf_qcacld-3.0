@@ -1170,6 +1170,8 @@ dp_mon_register_feature_ops_1_0(struct dp_soc *soc)
 	mon_ops->mon_filter_reset_smart_monitor =
 				dp_mon_filter_reset_smart_monitor_1_0;
 #endif
+	mon_ops->mon_filter_set_reset_mon_mac_filter =
+				dp_mon_set_reset_mon_mac_filter_1_0;
 #ifdef WLAN_RX_PKT_CAPTURE_ENH
 	mon_ops->mon_filter_setup_rx_enh_capture =
 				dp_mon_filter_setup_rx_enh_capture_1_0;
