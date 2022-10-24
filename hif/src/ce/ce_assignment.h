@@ -1573,7 +1573,11 @@ static struct CE_pipe_config target_ce_config_wlan_qca6750[] = {
 #define KIWI_CE_COUNT 9
 static struct CE_attr host_ce_config_wlan_kiwi[] = {
 	/* host->target HTC control and raw streams */
+#ifdef FEATURE_XPAN
+	{ /* CE0 */ CE_ATTR_FLAGS, 0, 8, 2048, 0, NULL,},
+#else
 	{ /* CE0 */ CE_ATTR_FLAGS, 0, 16, 2048, 0, NULL,},
+#endif
 	/* target->host HTT + HTC control */
 	{ /* CE1 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
 	/* target->host WMI */
@@ -1610,7 +1614,11 @@ static struct CE_attr host_ce_config_wlan_kiwi[] = {
 
 static struct CE_pipe_config target_ce_config_wlan_kiwi[] = {
 	/* host->target HTC control and raw streams */
+#ifdef FEATURE_XPAN
+	{ /* CE0 */ 0, PIPEDIR_OUT, 8, 2048, CE_ATTR_FLAGS, 0,},
+#else
 	{ /* CE0 */ 0, PIPEDIR_OUT, 32, 2048, CE_ATTR_FLAGS, 0,},
+#endif
 	/* target->host HTT */
 	{ /* CE1 */ 1, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
 	/* target->host WMI  + HTC control */
