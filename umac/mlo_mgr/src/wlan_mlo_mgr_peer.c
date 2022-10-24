@@ -504,6 +504,8 @@ static void mlo_peer_free(struct wlan_mlo_peer_context *ml_peer)
 		return;
 	}
 
+	mlo_debug("ML Peer " QDF_MAC_ADDR_FMT " is freed",
+		  QDF_MAC_ADDR_REF(ml_peer->peer_mld_addr.bytes));
 	mlo_peer_lock_destroy(ml_peer);
 	mlo_ap_ml_peerid_free(ml_peer->mlo_peer_id);
 	mlo_peer_free_aid(ml_dev, ml_peer);
@@ -929,6 +931,13 @@ QDF_STATUS wlan_mlo_peer_create(struct wlan_objmgr_vdev *vdev,
 			ml_dev->mld_id,
 			QDF_MAC_ADDR_REF
 			(ml_peer->peer_mld_addr.bytes));
+		/* If there is another link peer attached for this ML peer,
+		 * ml peer can't be detached and freed.
+		 */
+		if (is_ml_peer_attached && ml_peer->link_peer_cnt)
+			return status;
+		if (is_ml_peer_attached)
+			mlo_dev_mlpeer_detach(ml_dev, ml_peer);
 		mlo_peer_free(ml_peer);
 		mlo_dev_release_link_vdevs(link_vdevs);
 		return status;
