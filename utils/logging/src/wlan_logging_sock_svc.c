@@ -215,8 +215,12 @@ struct wlan_logging {
 	bool is_flush_timer_initialized;
 	uint32_t flush_timer_period;
 	qdf_spinlock_t flush_timer_lock;
-
 	qdf_event_t flush_log_completion;
+	uint64_t wakup_ts;
+	uint64_t start_ts;
+	uint64_t reinitcompletion_ts;
+	uint64_t set_exit_ts;
+	uint64_t exit_ts;
 };
 
 /* This global variable is intentionally not marked static because it
@@ -843,6 +847,8 @@ static int wlan_logging_thread(void *Arg)
 	int ret = 0;
 	unsigned long flags;
 
+	gwlan_logging.start_ts = qdf_get_log_timestamp();
+
 	while (!gwlan_logging.exit) {
 		setup_flush_timer();
 		ret_wait_status =
@@ -932,6 +938,7 @@ static int wlan_logging_thread(void *Arg)
 			  &gwlan_logging.eventFlag);
 	}
 
+	gwlan_logging.exit_ts = qdf_get_log_timestamp();
 	kthread_complete_and_exit(&gwlan_logging.shutdown_comp, 0);
 
 	return 0;
@@ -1213,6 +1220,8 @@ int wlan_logging_sock_init_svc(void)
 		goto err3;
 	}
 	wake_up_process(gwlan_logging.thread);
+	gwlan_logging.wakup_ts = qdf_get_log_timestamp();
+
 	gwlan_logging.is_active = true;
 	gwlan_logging.is_flush_complete = false;
 
@@ -1255,8 +1264,13 @@ int wlan_logging_sock_deinit_svc(void)
 
 	qdf_event_destroy(&gwlan_logging.flush_log_completion);
 
+	gwlan_logging.reinitcompletion_ts = qdf_get_log_timestamp();
 	INIT_COMPLETION(gwlan_logging.shutdown_comp);
+	qdf_wmb();
 	gwlan_logging.exit = true;
+	qdf_wmb();
+	gwlan_logging.set_exit_ts = qdf_get_log_timestamp();
+
 	gwlan_logging.is_active = false;
 #if defined(FEATURE_FW_LOG_PARSING) || defined(FEATURE_WLAN_DIAG_SUPPORT)
 	cds_set_multicast_logging(0);
