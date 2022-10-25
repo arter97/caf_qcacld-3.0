@@ -2132,6 +2132,8 @@ struct dp_soc {
 	uint16_t rx_mon_pkt_tlv_size;
 	/* rx pkt tlv size */
 	uint16_t rx_pkt_tlv_size;
+	/* rx pkt tlv size in current operation mode */
+	uint16_t curr_rx_pkt_tlv_size;
 
 	struct dp_arch_ops arch_ops;
 

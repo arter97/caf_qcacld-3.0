@@ -389,7 +389,7 @@ dp_rx_mon_mpdu_pop(struct dp_soc *soc, uint32_t mac_id,
 					     total_frag_len, frag_len,
 				      msdu_list.msdu_info[i].msdu_flags);
 
-			rx_pkt_offset = soc->rx_mon_pkt_tlv_size;
+			rx_pkt_offset = dp_rx_mon_get_rx_pkt_tlv_size(soc);
 
 			rx_buf_size = rx_pkt_offset + l2_hdr_offset
 					+ frag_len;
@@ -1436,7 +1436,7 @@ void dp_rx_msdus_set_payload(struct dp_soc *soc, qdf_nbuf_t msdu,
 	uint32_t rx_pkt_offset;
 
 	data = qdf_nbuf_data(msdu);
-	rx_pkt_offset = soc->rx_mon_pkt_tlv_size;
+	rx_pkt_offset = dp_rx_mon_get_rx_pkt_tlv_size(soc);
 	qdf_nbuf_pull_head(msdu, rx_pkt_offset + l2_hdr_offset);
 }
 
