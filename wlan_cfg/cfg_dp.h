@@ -375,7 +375,7 @@
 #define WLAN_CFG_RXDMA_MONITOR_RX_DROP_THRESH_SIZE_MIN 0
 #define WLAN_CFG_RXDMA_MONITOR_RX_DROP_THRESH_SIZE_MAX 256
 
-/**
+/*
  * Allocate as many RX descriptors as buffers in the SW2RXDMA
  * ring. This value may need to be tuned later.
  */
@@ -387,7 +387,7 @@
 #define WLAN_CFG_RX_SW_DESC_NUM_SIZE_MIN 1024
 #define WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX 16384
 
-/**
+/*
  * For low memory AP cases using 1 will reduce the rx descriptors memory req
  */
 #elif defined(QCA_LOWMEM_CONFIG) || defined(QCA_512M_CONFIG)
@@ -398,7 +398,7 @@
 #define WLAN_CFG_RX_SW_DESC_NUM_SIZE_MIN 1024
 #define WLAN_CFG_RX_SW_DESC_NUM_SIZE_MAX 16384
 
-/**
+/*
  * AP use cases need to allocate more RX Descriptors than the number of
  * entries available in the SW2RXDMA buffer replenish ring. This is to account
  * for frames sitting in REO queues, HW-HW DMA rings etc. Hence using a
@@ -446,9 +446,9 @@
 #define WLAN_CFG_REO2PPE_RING_SIZE_MIN 64
 #define WLAN_CFG_REO2PPE_RING_SIZE_MAX 16384
 
-#define WLAN_CFG_PPE2TCL_RING_SIZE 1024
+#define WLAN_CFG_PPE2TCL_RING_SIZE 2048
 #define WLAN_CFG_PPE2TCL_RING_SIZE_MIN 64
-#define WLAN_CFG_PPE2TCL_RING_SIZE_MAX 1024
+#define WLAN_CFG_PPE2TCL_RING_SIZE_MAX 32768
 
 #define WLAN_CFG_PPE_RELEASE_RING_SIZE 1024
 #define WLAN_CFG_PPE_RELEASE_RING_SIZE_MIN 64
