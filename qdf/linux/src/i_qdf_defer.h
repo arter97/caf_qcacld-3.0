@@ -34,7 +34,7 @@
 typedef struct workqueue_struct __qdf_workqueue_t;
 
 /**
- * __qdf_work_t - wrapper around the real task func
+ * typedef struct __qdf_work_t - wrapper around the real task func
  * @work: Instance of work
  * @fn: function pointer to the handler
  * @arg: pointer to argument
@@ -46,7 +46,7 @@ typedef struct {
 } __qdf_work_t;
 
 /**
- * __qdf_bh_t - wrapper around the real task func
+ * typedef struct __qdf_bh_t - wrapper around the real task func
  * @bh: Instance of the bottom half
  * @fn: function pointer to the handler
  * @arg: pointer to argument
@@ -261,4 +261,25 @@ static inline void __qdf_disable_bh(__qdf_bh_t *bh)
 	tasklet_kill(&bh->bh);
 }
 
+/**
+ * __qdf_local_bh_disable - disables softirq and tasklet processing
+ * on the local processor
+ *
+ * Return: none
+ */
+static inline void __qdf_local_bh_disable(void)
+{
+	local_bh_disable();
+}
+
+/**
+ * __qdf_local_bh_enable - Enables softirq and tasklet processing
+ * on the local processor
+ *
+ * Return: none
+ */
+static inline void __qdf_local_bh_enable(void)
+{
+	local_bh_enable();
+}
 #endif /*_I_QDF_DEFER_H*/

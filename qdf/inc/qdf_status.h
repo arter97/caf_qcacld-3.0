@@ -81,6 +81,7 @@
  * @QDF_STATUS_QMI_TXN_INIT_FAILED: QMI transaction init failed
  * @QDF_STATUS_QMI_SEND_REQ_FAILED: QMI send request failed
  * @QDF_STATUS_QMI_TXN_WAIT_FAILED: QMI transaction wait failed
+ * @QDF_STATUS_E_RESTART: return error code for wait_event_interruptible
  * @QDF_STATUS_MAX: not a real value just a place holder for max
  */
 typedef enum {
@@ -138,6 +139,7 @@ typedef enum {
 	QDF_STATUS_QMI_TXN_INIT_FAILED,
 	QDF_STATUS_QMI_SEND_REQ_FAILED,
 	QDF_STATUS_QMI_TXN_WAIT_FAILED,
+	QDF_STATUS_E_RESTART,
 	QDF_STATUS_MAX
 } QDF_STATUS;
 

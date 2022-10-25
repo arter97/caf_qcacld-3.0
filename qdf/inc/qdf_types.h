@@ -43,7 +43,7 @@
 /**
  * struct qdf_sglist - scatter-gather list
  * @nsegs: total number of segments
- * struct __sg_segs - scatter-gather segment list
+ * @struct sg_segs - scatter-gather segment list
  * @vaddr: Virtual address of the segment
  * @len: Length of the segment
  */
@@ -101,7 +101,6 @@ typedef void *qdf_drv_handle_t;
 typedef void *qdf_os_handle_t;
 typedef void *qdf_pm_t;
 
-
 /**
  * typedef qdf_handle_t - handles opaque to each other
  */
@@ -116,6 +115,7 @@ typedef uint16_t qdf_freq_t;
 #else
 typedef uint32_t qdf_freq_t;
 #endif
+
 /**
  * typedef qdf_device_t - Platform/bus generic handle.
  * Used for bus specific functions.
@@ -136,9 +136,9 @@ typedef __qdf_be64_t qdf_be64_t;
 typedef __qdf_size_t qdf_size_t;
 
 /**
- * typedef __qdf_off_t - offset for API's that need them.
+ * typedef qdf_off_t - offset for API's that need them.
  */
-typedef __qdf_off_t      qdf_off_t;
+typedef __qdf_off_t   qdf_off_t;
 
 /**
  * typedef qdf_dma_map_t - DMA mapping object.
@@ -151,9 +151,9 @@ typedef __qdf_dma_map_t qdf_dma_map_t;
 typedef __qdf_dma_addr_t qdf_dma_addr_t;
 
 /**
- * typedef __qdf_dma_size_t - DMA size.
+ * typedef qdf_dma_size_t - DMA size.
  */
-typedef __qdf_dma_size_t     qdf_dma_size_t;
+typedef __qdf_dma_size_t qdf_dma_size_t;
 
 /**
  * tyepdef qdf_dma_context_t - DMA context.
@@ -168,25 +168,30 @@ typedef __sgtable_t sgtable_t;
  */
 typedef __qdf_cpu_mask qdf_cpu_mask;
 
-/**
+/*
  * pointer to net device
  */
 typedef __qdf_netdev_t qdf_netdev_t;
 
-/**
+/*
  * pointer to napi struct
  */
 typedef __qdf_napi_struct qdf_napi_struct;
 
-/**
+/*
  * pointer to net dev stats
  */
 typedef __qdf_net_dev_stats qdf_net_dev_stats;
 
+/*
+ * pointer to dummy net device
+ */
+typedef __qdf_dummy_netdev_t qdf_dummy_netdev_t;
+
 /**
  * struct qdf_dma_map_info - Information inside a DMA map.
  * @nsegs: total number mapped segments
- * struct __dma_segs - Information of physical address.
+ * @struct dma_segs - list of segments
  * @paddr: physical(dam'able) address of the segment
  * @len: length of the segment
  */
@@ -203,7 +208,7 @@ typedef struct qdf_dma_map_info {
  * @mem_info: memory info struct
  * @vaddr: virtual address
  * @sgtable: scatter-gather table
- * @memctx: dma address
+ * @qdf_dma_mem_context: dma address
  */
 typedef struct qdf_shared_mem {
 	qdf_mem_info_t mem_info;
@@ -230,7 +235,7 @@ typedef enum {
 } QDF_TIMER_TYPE;
 
 /**
- * tyepdef qdf_resource_type_t - hw resources
+ * tyepdef enum qdf_resource_type_t - hw resources
  * @QDF_RESOURCE_TYPE_MEM: memory resource
  * @QDF_RESOURCE_TYPE_IO: io resource
  * Define the hw resources the OS has allocated for the device
@@ -242,7 +247,7 @@ typedef enum {
 } qdf_resource_type_t;
 
 /**
- * tyepdef qdf_resource_t - representation of a h/w resource.
+ * tyepdef struct qdf_resource_t - representation of a h/w resource.
  * @start: start
  * @end: end
  * @type: resource type
@@ -713,7 +718,7 @@ const char *qdf_opmode_str(const enum QDF_OPMODE opmode);
  * @QDF_GLOBAL_MONITOR_MODE: Monitor Mode
  * @QDF_GLOBAL_FTM_MODE: FTM mode
  * @QDF_GLOBAL_IBSS_MODE: IBSS mode
- * @QDF_GLOBAL_COLDBOOT_CALIB_MODEL: Cold Boot Calibration Mode
+ * @QDF_GLOBAL_COLDBOOT_CALIB_MODE: Cold Boot Calibration Mode
  * @QDF_GLOBAL_EPPING_MODE: EPPING mode
  * @QDF_GLOBAL_QVIT_MODE: QVIT global mode
  * @QDF_GLOBAL_FTM_COLDBOOT_CALIB_MODE: Cold Boot Calibration in FTM Mode
@@ -975,41 +980,43 @@ struct qdf_mac_addr {
 
 /**
  * enum qdf_proto_subtype - subtype of packet
- * @QDF_PROTO_EAPOL_M1 - EAPOL 1/4
- * @QDF_PROTO_EAPOL_M2 - EAPOL 2/4
- * @QDF_PROTO_EAPOL_M3 - EAPOL 3/4
- * @QDF_PROTO_EAPOL_M4 - EAPOL 4/4
- * @QDF_PROTO_DHCP_DISCOVER - discover
- * @QDF_PROTO_DHCP_REQUEST - request
- * @QDF_PROTO_DHCP_OFFER - offer
- * @QDF_PROTO_DHCP_ACK - ACK
- * @QDF_PROTO_DHCP_NACK - NACK
- * @QDF_PROTO_DHCP_RELEASE - release
- * @QDF_PROTO_DHCP_INFORM - inform
- * @QDF_PROTO_DHCP_DECLINE - decline
- * @QDF_PROTO_ARP_REQ - arp request
- * @QDF_PROTO_ARP_RES - arp response
- * @QDF_PROTO_ICMP_REQ - icmp request
- * @QDF_PROTO_ICMP_RES - icmp response
- * @QDF_PROTO_ICMPV6_REQ - icmpv6 request
- * @QDF_PROTO_ICMPV6_RES - icmpv6 response
- * @QDF_PROTO_ICMPV6_RS - icmpv6 rs packet
- * @QDF_PROTO_ICMPV6_RA - icmpv6 ra packet
- * @QDF_PROTO_ICMPV6_NS - icmpv6 ns packet
- * @QDF_PROTO_ICMPV6_NA - icmpv6 na packet
- * @QDF_PROTO_IPV4_UDP - ipv4 udp
- * @QDF_PROTO_IPV4_TCP - ipv4 tcp
- * @QDF_PROTO_IPV6_UDP - ipv6 udp
- * @QDF_PROTO_IPV6_TCP - ipv6 tcp
- * @QDF_PROTO_MGMT_ASSOC -assoc
- * @QDF_PROTO_MGMT_DISASSOC - disassoc
- * @QDF_PROTO_MGMT_AUTH - auth
- * @QDF_PROTO_MGMT_DEAUTH - deauth
- * @QDF_ROAM_SYNCH - roam synch indication from fw
- * @QDF_ROAM_COMPLETE - roam complete cmd to fw
- * @QDF_ROAM_EVENTID - roam eventid from fw
- * @QDF_PROTO_DNS_QUERY - dns query
- * @QDF_PROTO_DNS_RES -dns response
+ * @QDF_PROTO_INVALID: invalid
+ * @QDF_PROTO_EAPOL_M1: EAPOL 1/4
+ * @QDF_PROTO_EAPOL_M2: EAPOL 2/4
+ * @QDF_PROTO_EAPOL_M3: EAPOL 3/4
+ * @QDF_PROTO_EAPOL_M4: EAPOL 4/4
+ * @QDF_PROTO_DHCP_DISCOVER: discover
+ * @QDF_PROTO_DHCP_REQUEST: request
+ * @QDF_PROTO_DHCP_OFFER: offer
+ * @QDF_PROTO_DHCP_ACK: ACK
+ * @QDF_PROTO_DHCP_NACK: NACK
+ * @QDF_PROTO_DHCP_RELEASE: release
+ * @QDF_PROTO_DHCP_INFORM: inform
+ * @QDF_PROTO_DHCP_DECLINE: decline
+ * @QDF_PROTO_ARP_REQ: arp request
+ * @QDF_PROTO_ARP_RES: arp response
+ * @QDF_PROTO_ICMP_REQ: icmp request
+ * @QDF_PROTO_ICMP_RES: icmp response
+ * @QDF_PROTO_ICMPV6_REQ: icmpv6 request
+ * @QDF_PROTO_ICMPV6_RES: icmpv6 response
+ * @QDF_PROTO_ICMPV6_RS: icmpv6 rs packet
+ * @QDF_PROTO_ICMPV6_RA: icmpv6 ra packet
+ * @QDF_PROTO_ICMPV6_NS: icmpv6 ns packet
+ * @QDF_PROTO_ICMPV6_NA: icmpv6 na packet
+ * @QDF_PROTO_IPV4_UDP: ipv4 udp
+ * @QDF_PROTO_IPV4_TCP: ipv4 tcp
+ * @QDF_PROTO_IPV6_UDP: ipv6 udp
+ * @QDF_PROTO_IPV6_TCP: ipv6 tcp
+ * @QDF_PROTO_MGMT_ASSOC: assoc
+ * @QDF_PROTO_MGMT_DISASSOC: disassoc
+ * @QDF_PROTO_MGMT_AUTH: auth
+ * @QDF_PROTO_MGMT_DEAUTH: deauth
+ * @QDF_ROAM_SYNCH: roam synch indication from fw
+ * @QDF_ROAM_COMPLETE: roam complete cmd to fw
+ * @QDF_ROAM_EVENTID: roam eventid from fw
+ * @QDF_PROTO_DNS_QUERY: dns query
+ * @QDF_PROTO_DNS_RES: dns response
+ * @QDF_PROTO_SUBTYPE_MAX: subtype max
  */
 enum qdf_proto_subtype {
 	QDF_PROTO_INVALID,
@@ -1217,8 +1224,7 @@ QDF_STATUS qdf_uint8_array_parse(const char *in_str, uint8_t *out_array,
 
 /**
  * struct qdf_tso_frag_t - fragments of a single TCP segment
- * @paddr_low_32: Lower 32 bits of the buffer pointer
- * @paddr_upper_16: upper 16 bits of the buffer pointer
+ * @paddr: physical address
  * @length: length of the buffer
  * @vaddr: virtual address
  *
@@ -1237,6 +1243,30 @@ struct qdf_tso_frag_t {
 /**
  * struct qdf_tso_flags_t - TSO specific flags
  * @tso_enable: Enable transmit segmentation offload
+ * @reserved_0a: rsvd
+ * @fin: input bit
+ * @syn: syn
+ * @rst: reset
+ * @psh: push
+ * @ack: aknowledge
+ * @urg: urg
+ * @ece: ece
+ * @cwr: cwr
+ * @ns: ns
+ * @reserved_0b: rsvd
+ * @ipv4_checksum_en: Enable/Disable ipv4 checksum
+ * @udp_ipv4_checksum_en: Enable/Disable udp ipv4 checksum
+ * @udp_ipv6_checksum_en: Enable/Disable udp ipv6 checksum
+ * @tcp_ipv4_checksum_en: Enable/Disable tcp ipv4 checksum
+ * @tcp_ipv6_checksum_en: Enable/Disable tcp ipv6 checksum
+ * @partial_checksum_en: Enable/Disable partial checksum
+ * @reserved_3a: rsvd
+ * @checksum_offset: checksum offset
+ * @reserved_4a: rsvd
+ * @payload_start_offset: payload start offset
+ * @reserved_4b: rsvd
+ * @payload_end_offset: payload end offset
+ * @reserved_5: rsvd
  * @tcp_flags_mask: Tcp_flag is inserted into the header based
  * on the mask
  * @l2_len: L2 length for the msdu
@@ -1303,10 +1333,25 @@ struct qdf_tso_seg_t {
 };
 
 /**
- * TSO seg elem action caller locations: goes into dbg.history below.
+ * enum tsoseg_dbg_caller_e: TSO seg elem action caller locations
+ * goes into dbg.history below.
  * Needed to be defined outside of the feature so that
  * callers can be coded without ifdefs (even if they get
  * resolved to nothing)
+ * @TSOSEG_LOC_UNDEFINED: undefined
+ * @TSOSEG_LOC_INIT1: init1
+ * @TSOSEG_LOC_INIT2: inti2
+ * @TSOSEG_LOC_FREE: free
+ * @TSOSEG_LOC_ALLOC: alloc
+ * @TSOSEG_LOC_DEINIT: deinit
+ * @TSOSEG_LOC_GETINFO: get info
+ * @TSOSEG_LOC_FILLHTTSEG: fill HTT segment
+ * @TSOSEG_LOC_FILLCMNSEG: fill CMN segment
+ * TSOSEG_LOC_PREPARETSO: prepare TSO
+ * @TSOSEG_LOC_TXPREPLLFAST: tx prep LL fast
+ * @TSOSEG_LOC_UNMAPTSO: unmap TSO
+ * @TSOSEG_LOC_UNMAPLAST: unmap last
+ * @TSOSEG_LOC_FORCE_FREE: force free
  */
 enum tsoseg_dbg_caller_e {
 	TSOSEG_LOC_UNDEFINED,
@@ -1324,9 +1369,9 @@ enum tsoseg_dbg_caller_e {
 	TSOSEG_LOC_UNMAPLAST,
 	TSOSEG_LOC_FORCE_FREE,
 };
-#ifdef TSOSEG_DEBUG
 
-/**
+#ifdef TSOSEG_DEBUG
+/*
  * WARNING: Don't change the history size without changing the wrap
  *  code in qdf_tso_seg_dbg_record function
  */
@@ -1343,7 +1388,7 @@ struct qdf_tso_seg_dbg_t {
 #endif /* TSOSEG_DEBUG */
 
 /**
- * qdf_tso_seg_elem_t - tso segment element
+ * struct qdf_tso_seg_elem_t - tso segment element
  * @next: pointer to the next segment
  * @seg: instance of segment
  */
@@ -1371,7 +1416,7 @@ struct qdf_tso_num_seg_t {
 };
 
 /**
- * qdf_tso_num_seg_elem_t - num of tso segment element for jumbo skb
+ * struct qdf_tso_num_seg_elem_t - num of tso segment element for jumbo skb
  * @next: pointer to the next segment
  * @num_seg: instance of num of seg
  */
@@ -1402,7 +1447,7 @@ struct qdf_tso_info_t {
 	uint32_t msdu_stats_idx;
 };
 
-/**
+/*
  * Used to set classify bit in CE desc.
  */
 #define QDF_CE_TX_CLASSIFY_BIT_S   5
@@ -1466,6 +1511,7 @@ enum qdf_suspend_type {
  * @QDF_VDEV_SM_OUT_OF_SYNC: Vdev SM is out of sync and connect req received
  * when already connected
  * @QDF_STATS_REQ_TIMEDOUT: Stats request timedout
+ * @QDF_TX_DESC_LEAK: tx desc leak
  */
 enum qdf_hang_reason {
 	QDF_REASON_UNSPECIFIED,
@@ -1559,7 +1605,7 @@ enum qdf_context_mode {
  * enum qdf_dp_tx_rx_status - TX/RX packet status
  * @QDF_TX_RX_STATUS_INVALID: default invalid status
  * @QDF_TX_RX_STATUS_OK: successfully sent + acked
- * @QDF_TX_RX_STATUS_DISCARD: queued but not sent over air
+ * @QDF_TX_RX_STATUS_FW_DISCARD: queued but not sent over air
  * @QDF_TX_RX_STATUS_NO_ACK: packet sent but no ack received
  * @QDF_TX_RX_STATUS_DROP: packet dropped due to congestion
  * @QDF_TX_RX_STATUS_DOWNLOAD_SUCC: packet delivered to target
@@ -1613,12 +1659,7 @@ enum qdf_dp_a_status {
  * @QDF_DOMAIN_ATTR_FSL_PAMUV1: Domain attribute fsl pamu v1
  * @QDF_DOMAIN_ATTR_NESTING: Domain attribute Nesting
  * @QDF_DOMAIN_ATTR_DMA_USE_FLUSH_QUEUE: Domain attribute dma use flush queue
- * @QDF_DOMAIN_ATTR_PT_BASE_ADDR: Domain attribute pt base address
  * @QDF_DOMAIN_ATTR_CONTEXT_BANK: Domain attribute context bank
- * @QDF_DOMAIN_ATTR_DYNAMIC: Domain attribute dynamic
- * @QDF_DOMAIN_ATTR_TTBR0: Domain attribute TTBR0
- * @QDF_DOMAIN_ATTR_CONTEXTIDR: Domain attribute contextidr
- * @QDF_DOMAIN_ATTR_PROCID: Domain attribute procid
  * @QDF_DOMAIN_ATTR_NON_FATAL_FAULTS: Domain attribute non fatal faults
  * @QDF_DOMAIN_ATTR_S1_BYPASS: Domain attribute S1 bypass
  * @QDF_DOMAIN_ATTR_ATOMIC: Domain attribute atomic
