@@ -9206,20 +9206,110 @@ static uint8_t reg_find_eirp_in_afc_chan_obj(struct wlan_objmgr_pdev *pdev,
 }
 
 /**
+ * reg_is_chan_punc() - Validates the input puncture pattern.
+ * @in_punc_pattern: Input puncture pattern
+ *
+ * If the in_punc_pattern has none of the subchans punctured, channel
+ * is not considered as punctured.
+ *
+ * Return: true if channel is punctured, false otherwise.
+ */
+static bool
+reg_is_chan_punc(uint16_t in_punc_pattern)
+{
+	if (in_punc_pattern == NO_SCHANS_PUNC)
+		return false;
+
+	return true;
+}
+
+/**
+ * reg_find_non_punctured_bw() - Given the input puncture pattern and the
+ * total BW of the channel, find the non-punctured bandwidth.
+ * @bw: Total bandwidth of the channel
+ * @in_punc_pattern: Input puncture pattern
+ *
+ * Return: non-punctured bw in MHz
+ */
+static uint16_t
+reg_find_non_punctured_bw(uint16_t bw,  uint16_t in_punc_pattern)
+{
+	uint8_t num_punc_bw = 0;
+
+	while (in_punc_pattern) {
+		if (in_punc_pattern & 1)
+			++num_punc_bw;
+		in_punc_pattern >>= 1;
+	}
+
+	if (bw <= num_punc_bw * 20)
+		return 0;
+
+	return (bw - num_punc_bw * 20);
+}
+
+/**
+ * reg_get_sp_eirp_for_punc_chans() - Find the standard EIRP power for
+ * punctured channels.
+ * @pdev: Pointer to struct wlan_objmgr_pdev
+ * @freq: Frequency in MHz
+ * @cen320: Center of 320 MHz channel in Mhz
+ * @bw: Bandwidth in MHz
+ * @in_punc_pattern: Input puncture pattern
+ * @reg_sp_eirp_pwr: Regulatory defined SP power for the input frequency
+ *
+ * Return: Regulatory and AFC intersected SP power of punctured channel
+ */
+static uint8_t
+reg_get_sp_eirp_for_punc_chans(struct wlan_objmgr_pdev *pdev,
+			       qdf_freq_t freq,
+			       qdf_freq_t cen320,
+			       uint16_t bw,
+			       uint16_t in_punc_pattern,
+			       uint16_t reg_sp_eirp_pwr)
+{
+	int16_t min_psd = 0;
+	uint16_t afc_eirp_pwr = 0;
+	uint16_t non_punc_bw;
+
+	/* min_psd will be calculated here */
+
+	non_punc_bw = reg_find_non_punctured_bw(bw, in_punc_pattern);
+
+	if (reg_psd_2_eirp(pdev, min_psd, non_punc_bw, &afc_eirp_pwr) !=
+	    QDF_STATUS_SUCCESS) {
+		reg_debug("Could not derive EIRP power for width %u, min_psd: %d\n", non_punc_bw, min_psd);
+		return 0;
+	}
+
+	reg_debug("freq = %u, bw: %u, cen320: %u, punc_pattern: 0x%x "
+		  "reg_sp_eirp: %d, min_psd: %d, non_punc_bw: %u, afc_eirp_pwr: %d\n",
+		  freq, bw, cen320, in_punc_pattern, reg_sp_eirp_pwr, min_psd,
+		  non_punc_bw, afc_eirp_pwr);
+
+	if (afc_eirp_pwr)
+		return QDF_MIN(afc_eirp_pwr, reg_sp_eirp_pwr);
+
+	return 0;
+}
+
+/**
  * reg_get_sp_eirp() - For the given power mode, using the bandwidth, find the
  * corresponding EIRP values from the afc power info array. The minimum of found
  * EIRP and regulatory max EIRP is returned
  * @pdev: Pointer to pdev
  * @freq: Frequency in MHz
  * @cen320: 320 MHz band center frequency
- * @bw: Bandwidth in mhz
+ * @bw: Bandwidth in MHz
+ * @in_punc_pattern: Input puncture pattern
  *
  * Return: EIRP
  */
 static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 			       qdf_freq_t freq,
 			       qdf_freq_t cen320,
-			       uint16_t bw)
+			       uint16_t bw,
+			       uint16_t in_punc_pattern)
 {
 	uint8_t i, op_class = 0, chan_num = 0, afc_eirp_pwr = 0;
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
@@ -9237,6 +9327,21 @@ static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 	if (!reg_is_afc_power_event_received(pdev))
 		return 0;
 
+	sp_ap_master_chan_list =
+		pdev_priv_obj->mas_chan_list_6g_ap[REG_STANDARD_POWER_AP];
+	reg_find_txpower_from_6g_list(freq, sp_ap_master_chan_list,
+				      &reg_sp_eirp_pwr);
+
+	if (!reg_sp_eirp_pwr)
+		return 0;
+
+	if (reg_is_chan_punc(in_punc_pattern)) {
+		reg_info("Computing SP EIRP with puncturing info");
+		return reg_get_sp_eirp_for_punc_chans(pdev, freq, cen320, bw,
+						      in_punc_pattern,
+						      reg_sp_eirp_pwr);
+	}
+
 	power_info = pdev_priv_obj->power_info;
 	if (!power_info) {
 		reg_err("power_info is NULL");
@@ -9250,13 +9355,6 @@ static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 					BIT(BEHAV_NONE),
 					&op_class,
 					&chan_num);
-	sp_ap_master_chan_list =
-		pdev_priv_obj->mas_chan_list_6g_ap[REG_STANDARD_POWER_AP];
-	reg_find_txpower_from_6g_list(freq, sp_ap_master_chan_list,
-				      &reg_sp_eirp_pwr);
-
-	if (!reg_sp_eirp_pwr)
-		return 0;
 
 	for (i = 0; i < power_info->num_chan_objs; i++) {
 		struct afc_chan_obj *chan_obj = &power_info->afc_chan_info[i];
@@ -9279,7 +9377,8 @@ static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 			       qdf_freq_t freq,
 			       qdf_freq_t cen320,
-			       uint16_t bw)
+			       uint16_t bw,
+			       uint16_t in_punc_pattern)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
 	struct regulatory_channel *sp_ap_master_chan_list;
@@ -9327,10 +9426,11 @@ reg_get_best_pwr_mode_from_eirp_list(uint8_t *eirp_list, uint8_t size)
 
 uint8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 			 qdf_freq_t cen320,
-			 uint16_t bw, enum reg_6g_ap_type ap_pwr_type)
+			 uint16_t bw, enum reg_6g_ap_type ap_pwr_type,
+			 uint16_t in_punc_pattern)
 {
 	if (ap_pwr_type == REG_STANDARD_POWER_AP)
-		return reg_get_sp_eirp(pdev, freq, cen320, bw);
+		return reg_get_sp_eirp(pdev, freq, cen320, bw, in_punc_pattern);
 
 	return reg_get_eirp_for_non_sp(pdev, freq, bw, ap_pwr_type);
 }
@@ -9338,7 +9438,8 @@ uint8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 enum reg_6g_ap_type reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev,
 					  qdf_freq_t freq,
 					  qdf_freq_t cen320,
-					  uint16_t bw)
+					  uint16_t bw,
+					  uint16_t in_punc_pattern)
 {
 	uint8_t eirp_list[REG_MAX_SUPP_AP_TYPE + 1];
 	enum reg_6g_ap_type ap_pwr_type;
@@ -9347,7 +9448,7 @@ enum reg_6g_ap_type reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev,
 	     ap_pwr_type++)
 		eirp_list[ap_pwr_type] =
 				reg_get_eirp_pwr(pdev, freq, cen320, bw,
-						 ap_pwr_type);
+						 ap_pwr_type, in_punc_pattern);
 
 	return reg_get_best_pwr_mode_from_eirp_list(eirp_list,
 						    REG_MAX_SUPP_AP_TYPE + 1);

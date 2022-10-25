@@ -1877,18 +1877,20 @@ QDF_STATUS wlan_reg_eirp_2_psd(struct wlan_objmgr_pdev *pdev, uint16_t ch_bw,
 enum reg_6g_ap_type
 wlan_reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 			   qdf_freq_t cen320,
-			   uint16_t bw)
+			   uint16_t bw, uint16_t in_punc_pattern)
 {
-	return reg_get_best_pwr_mode(pdev, freq, cen320, bw);
+	return reg_get_best_pwr_mode(pdev, freq, cen320, bw, in_punc_pattern);
 }
 
 qdf_export_symbol(wlan_reg_get_best_pwr_mode);
 
 uint8_t wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 			      qdf_freq_t cen320, uint16_t bw,
-			      enum reg_6g_ap_type ap_pwr_type)
+			      enum reg_6g_ap_type ap_pwr_type,
+			      uint16_t in_punc_pattern)
 {
-	return reg_get_eirp_pwr(pdev, freq, cen320, bw, ap_pwr_type);
+	return reg_get_eirp_pwr(pdev, freq, cen320, bw, ap_pwr_type,
+				in_punc_pattern);
 }
 
 qdf_export_symbol(wlan_reg_get_eirp_pwr);

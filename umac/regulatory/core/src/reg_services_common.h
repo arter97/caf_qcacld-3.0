@@ -159,6 +159,7 @@ extern const struct chan_map channel_map_china[];
 extern const struct chan_map channel_map_global[];
 
 #ifdef WLAN_FEATURE_11BE
+/* binary 1:- Punctured 0:- Not-Punctured */
 #define ALL_SCHANS_PUNC 0xFFFF /* all subchannels punctured */
 #endif
 
@@ -2445,13 +2446,15 @@ qdf_freq_t reg_get_thresh_priority_freq(struct wlan_objmgr_pdev *pdev);
  * @cen320: Band center of 320 MHz. (For other BW, this param is ignored during
  * processing)
  * @bw: AP's operating bandwidth in mhz
+ * @in_punc_pattern: input puncture bitmap
  *
  * Return: Best power mode
  */
 enum reg_6g_ap_type reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev,
 					  qdf_freq_t freq,
 					  qdf_freq_t cen320,
-					  uint16_t bw);
+					  uint16_t bw,
+					  uint16_t in_punc_pattern);
 
 /**
  * reg_get_eirp_pwr() - Get eirp power based on the AP power mode
@@ -2460,12 +2463,14 @@ enum reg_6g_ap_type reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev,
  * @cen320: 320 MHz Band center frequency
  * @bw: Bandwidth in MHz
  * @ap_pwr_type: AP power type
+ * @in_punc_pattern: Input puncture pattern
  *
  * Return: EIRP power
  */
 uint8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 			 qdf_freq_t cen320,
-			 uint16_t bw, enum reg_6g_ap_type ap_pwr_type);
+			 uint16_t bw, enum reg_6g_ap_type ap_pwr_type,
+			 uint16_t in_punc_pattern);
 #endif /* CONFIG_BAND_6GHZ */
 
 /**
