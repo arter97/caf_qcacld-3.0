@@ -492,18 +492,12 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 	return wlan_cm_start_connect(vdev, req);
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
-static inline void
-mlo_update_connect_req_chan_info(struct wlan_cm_connect_req *req)
-{ }
-#else
 static inline void
 mlo_update_connect_req_chan_info(struct wlan_cm_connect_req *req)
 {
 	req->chan_freq = 0;
 	req->chan_freq_hint = 0;
 }
-#endif
 
 /**
  * mlo_prepare_and_send_connect- Prepare and send the connect req
