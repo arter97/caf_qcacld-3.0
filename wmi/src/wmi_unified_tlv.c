@@ -2844,7 +2844,7 @@ static QDF_STATUS send_vdev_set_param_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->vdev_id = param->vdev_id;
 	cmd->param_id = vdev_param;
 	cmd->param_value = param->param_value;
-	wmi_debug("Setting vdev %d param = %x, value = %u",
+	wmi_debug("Setting vdev %d param = 0x%x, value = %u",
 		 cmd->vdev_id, cmd->param_id, cmd->param_value);
 	wmi_mtrace(WMI_VDEV_SET_PARAM_CMDID, cmd->vdev_id, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len, WMI_VDEV_SET_PARAM_CMDID);
