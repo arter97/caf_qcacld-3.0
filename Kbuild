@@ -3499,6 +3499,9 @@ ifdef CONFIG_MAX_CLIENTS_ALLOWED
 ccflags-y += -DWLAN_MAX_CLIENTS_ALLOWED=$(CONFIG_MAX_CLIENTS_ALLOWED)
 endif
 
+#Flag to enable customer ramdump
+ccflags-y += -DTARGET_DUMP_FOR_NON_QC_PLATFORM
+
 KBUILD_CPPFLAGS += $(cppflags-y)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
