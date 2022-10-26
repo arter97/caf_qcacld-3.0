@@ -2692,6 +2692,9 @@ cppflags-y += -DCFG80211_EXTERNAL_DH_UPDATE_SUPPORT
 
 ccflags-$(CONFIG_HASTINGS_BT_WAR) += -DHASTINGS_BT_WAR
 
+#Flag to enable customer ramdump
+ccflags-y += -DTARGET_DUMP_FOR_NON_QC_PLATFORM
+
 KBUILD_CPPFLAGS += $(cppflags-y)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
