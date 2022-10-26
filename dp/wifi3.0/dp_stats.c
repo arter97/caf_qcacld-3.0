@@ -7862,6 +7862,8 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 
 	DP_PRINT_STATS("No of AST Entries = %d", soc->num_ast_entries);
 	DP_PRINT_STATS("SOC Rx Stats:\n");
+	DP_PRINT_STATS("Fast recycled packets: %llu",
+		       soc->stats.rx.fast_recycled);
 	DP_PRINT_STATS("Fragmented packets: %u",
 		       soc->stats.rx.rx_frags);
 	DP_PRINT_STATS("Reo reinjected packets: %u",

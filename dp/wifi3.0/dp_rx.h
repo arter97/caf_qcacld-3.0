@@ -2403,6 +2403,7 @@ void dp_rx_buffers_lt_replenish_simple(struct dp_soc *soc, uint32_t mac_id,
 					    rx_desc_pool);
 }
 
+#ifndef QCA_DP_NBUF_FAST_RECYCLE_CHECK
 static inline
 qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 				      qdf_nbuf_t nbuf,
@@ -2413,6 +2414,23 @@ qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 
 	return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
 }
+#else
+static inline
+qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
+				      qdf_nbuf_t nbuf,
+				      uint32_t buf_size)
+{
+	if (unlikely(!nbuf->fast_recycled)) {
+		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
+					      (void *)(nbuf->data + buf_size));
+	} else {
+		DP_STATS_INC(dp_soc, rx.fast_recycled, 1);
+	}
+
+	nbuf->fast_recycled = 0;
+	return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
+}
+#endif
 
 static inline
 qdf_dma_addr_t dp_rx_nbuf_sync(struct dp_soc *dp_soc,

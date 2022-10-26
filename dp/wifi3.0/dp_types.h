@@ -1150,6 +1150,7 @@ struct dp_soc_stats {
 		uint32_t rxdma2rel_route_drop;
 		/* Number of frames routed from reo*/
 		uint32_t reo2rel_route_drop;
+		uint64_t fast_recycled;
 
 		struct {
 			/* Invalid RBM error count */
