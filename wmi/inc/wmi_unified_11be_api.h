@@ -44,7 +44,7 @@ wmi_extract_mlo_link_set_active_resp(wmi_unified_t wmi,
 
 /**
  * wmi_send_mlo_link_set_active_cmd() - send mlo link set active command
- * @wmi: WMI handle for this pdev
+ * @wmi_handle: WMI handle for this pdev
  * @param: Pointer to mlo link set active param
  *
  * Return: QDF_STATUS code
@@ -89,6 +89,20 @@ QDF_STATUS wmi_extract_mlo_link_removal_evt_fixed_param(
 		struct wmi_unified *wmi_handle,
 		void *buf,
 		struct mlo_link_removal_evt_params *params);
+
+/**
+ * wmi_extract_mlo_link_removal_tbtt_update() - Extract TBTT update TLV
+ * from the MLO link removal WMI  event
+ * @wmi_handle: wmi handle
+ * @buf: pointer to event buffer
+ * @tbtt_info: TBTT information
+ *
+ * Return: QDF_STATUS of operation
+ */
+QDF_STATUS wmi_extract_mlo_link_removal_tbtt_update(
+		struct wmi_unified *wmi_handle,
+		void *buf,
+		struct mlo_link_removal_tbtt_info *tbtt_info);
 #endif /*WLAN_FEATURE_11BE_MLO*/
 
 #ifdef WLAN_FEATURE_11BE

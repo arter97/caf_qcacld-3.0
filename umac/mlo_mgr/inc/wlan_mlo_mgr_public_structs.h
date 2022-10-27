@@ -1008,7 +1008,7 @@ struct mlo_vdev_host_tid_to_link_map_resp {
 	uint8_t mapping_switch_tsf;
 };
 
-/*
+/**
  * struct mlo_link_removal_cmd_params - MLO link removal command parameters
  * @vdev_id: vdev ID of the link to be removed
  * @reconfig_ml_ie: Entire ML reconfiguration element
@@ -1020,11 +1020,26 @@ struct mlo_link_removal_cmd_params {
 	uint32_t reconfig_ml_ie_size;
 };
 
-/*
+/**
+ * struct mlo_link_removal_tbtt_info - MLO link removal TBTT info. This
+ * information will be in correspondence with an outgoing beacon instance.
+ * @tbtt_count: Delete timer TBTT count in the reported beacon
+ * @qtimer_reading: Q-timer reading when the reported beacon is sent out
+ * @tsf: TSF of the reported beacon
+ */
+struct mlo_link_removal_tbtt_info {
+	uint32_t tbtt_count;
+	uint64_t qtimer_reading;
+	uint64_t tsf;
+};
+
+/**
  * struct mlo_link_removal_evt_params - MLO link removal event parameters
- * @vdev_id: vdev ID of the link to be removed
+ * @vdev_id: vdev ID of the link undergoing removal
+ * @tbtt_info: TBTT information of the link undergoing removal
  */
 struct mlo_link_removal_evt_params {
 	uint8_t vdev_id;
+	struct mlo_link_removal_tbtt_info tbtt_info;
 };
 #endif

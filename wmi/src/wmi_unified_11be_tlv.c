@@ -702,6 +702,44 @@ extract_mlo_link_removal_evt_fixed_param_tlv(
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * extract_mlo_link_removal_tbtt_update_tlv() - Extract TBTT update TLV
+ * from the MLO link removal WMI  event
+ * @wmi_handle: wmi handle
+ * @buf: pointer to event buffer
+ * @tbtt_info: TBTT information to be populated
+ *
+ * Return: QDF_STATUS of operation
+ */
+static QDF_STATUS
+extract_mlo_link_removal_tbtt_update_tlv(
+	struct wmi_unified *wmi_handle,
+	void *buf,
+	struct mlo_link_removal_tbtt_info *tbtt_info)
+{
+	WMI_MLO_LINK_REMOVAL_EVENTID_param_tlvs *param_buf = buf;
+	wmi_mlo_link_removal_tbtt_update *tlv;
+
+	if (!param_buf) {
+		wmi_err_rl("Param_buf is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!tbtt_info) {
+		wmi_err_rl("Writable argument is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	tlv = param_buf->tbtt_update;
+
+	tbtt_info->tbtt_count = tlv->tbtt_count;
+	tbtt_info->tsf = ((uint64_t)tlv->tsf_high << 32) | tlv->tsf_low;
+	tbtt_info->qtimer_reading =
+		((uint64_t)tlv->qtimer_ts_high << 32) | tlv->qtimer_ts_low;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_FEATURE_11BE
 size_t peer_assoc_t2lm_params_size(struct peer_assoc_params *req)
 {
@@ -1419,4 +1457,6 @@ void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_mlo_link_removal_cmd = send_mlo_link_removal_cmd_tlv;
 	ops->extract_mlo_link_removal_evt_fixed_param =
 			extract_mlo_link_removal_evt_fixed_param_tlv;
+	ops->extract_mlo_link_removal_tbtt_update =
+			extract_mlo_link_removal_tbtt_update_tlv;
 }

@@ -141,3 +141,15 @@ QDF_STATUS wmi_extract_mlo_link_removal_evt_fixed_param(
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS wmi_extract_mlo_link_removal_tbtt_update(
+		struct wmi_unified *wmi,
+		void *buf,
+		struct mlo_link_removal_tbtt_info *tbtt_info)
+{
+	if (wmi->ops->extract_mlo_link_removal_tbtt_update)
+		return wmi->ops->extract_mlo_link_removal_tbtt_update(
+							wmi, buf, tbtt_info);
+
+	return QDF_STATUS_E_FAILURE;
+}

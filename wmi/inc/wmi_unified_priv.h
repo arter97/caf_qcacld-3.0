@@ -3044,6 +3044,11 @@ QDF_STATUS (*extract_mlo_link_removal_evt_fixed_param)(
 		struct wmi_unified *wmi_handle,
 		void *buf,
 		struct mlo_link_removal_evt_params *params);
+
+QDF_STATUS (*extract_mlo_link_removal_tbtt_update)(
+		struct wmi_unified *wmi_handle,
+		void *buf,
+		struct mlo_link_removal_tbtt_info *tbtt_info);
 #endif
 
 #ifdef WLAN_FEATURE_SON
