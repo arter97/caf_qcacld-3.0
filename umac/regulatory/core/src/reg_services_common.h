@@ -350,6 +350,79 @@ QDF_STATUS reg_modify_chan_144(struct wlan_objmgr_pdev *pdev, bool en_chan_144);
  */
 bool reg_get_en_chan_144(struct wlan_objmgr_pdev *pdev);
 
+#if defined(CONFIG_BAND_6GHZ) && defined(CONFIG_AFC_SUPPORT)
+/**
+ * reg_get_enable_6ghz_sp_mode_support() - Get enable 6 GHz SP mode support
+ * @psoc: pointer to psoc object
+ *
+ * Return: enable 6 GHz SP mode support flag
+ */
+bool reg_get_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_enable_6ghz_sp_mode_support() - Set enable 6 GHz SP mode support
+ * @psoc: pointer to psoc object
+ * @value: value to be set
+ *
+ * Return: None
+ */
+void reg_set_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc,
+					 bool value);
+
+/**
+ * reg_get_afc_disable_timer_check() - Get AFC timer check flag
+ * @psoc: pointer to psoc object
+ *
+ * Return: AFC timer check flag
+ */
+bool reg_get_afc_disable_timer_check(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_afc_disable_timer_check() - Set AFC disable timer check
+ * @psoc: pointer to psoc object
+ * @value: value to be set
+ *
+ * Return: None
+ */
+void reg_set_afc_disable_timer_check(struct wlan_objmgr_psoc *psoc,
+				     bool value);
+
+/**
+ * reg_get_afc_disable_request_id_check() - Get AFC request id check flag
+ * @psoc: pointer to psoc object
+ *
+ * Return: AFC request id check flag
+ */
+bool reg_get_afc_disable_request_id_check(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_afc_disable_request_id_check() - Set AFC disable request id flag
+ * @psoc: pointer to psoc object
+ * @value: value to be set
+ *
+ * Return: None
+ */
+void reg_set_afc_disable_request_id_check(struct wlan_objmgr_psoc *psoc,
+					  bool value);
+
+/**
+ * reg_get_afc_noaction() - Get AFC no action flag
+ * @psoc: pointer to psoc object
+ *
+ * Return: AFC no action flag
+ */
+bool reg_get_afc_noaction(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * reg_set_afc_noaction() - Set AFC no action flag
+ * @psoc: pointer to psoc object
+ * @value: value to be set
+ *
+ * Return: None
+ */
+void reg_set_afc_noaction(struct wlan_objmgr_psoc *psoc, bool value);
+#endif
+
 /**
  * reg_get_hal_reg_cap() - Get HAL REG capabilities
  * @psoc: psoc for country information

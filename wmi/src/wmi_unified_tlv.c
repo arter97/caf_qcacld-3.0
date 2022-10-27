@@ -21018,6 +21018,10 @@ static void populate_tlv_service(uint32_t *wmi_service)
 			WMI_SERVICE_ENABLE_LOWER_6G_EDGE_CH_SUPP;
 	wmi_service[wmi_service_disable_upper_6g_edge_ch_supp] =
 			WMI_SERVICE_DISABLE_UPPER_6G_EDGE_CH_SUPP;
+#ifdef CONFIG_AFC_SUPPORT
+	wmi_service[wmi_service_afc_support] =
+			WMI_SERVICE_AFC_SUPPORT;
+#endif
 #endif
 	wmi_service[wmi_service_dcs_awgn_int_support] =
 			WMI_SERVICE_DCS_AWGN_INT_SUPPORT;

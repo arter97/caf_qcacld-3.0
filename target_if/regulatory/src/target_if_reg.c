@@ -958,6 +958,32 @@ QDF_STATUS target_if_regulatory_set_ext_tpc(struct wlan_objmgr_psoc *psoc)
 	return QDF_STATUS_SUCCESS;
 }
 
+#if defined(CONFIG_BAND_6GHZ) && defined(CONFIG_AFC_SUPPORT)
+void tgt_if_set_reg_afc_configure(struct target_psoc_info *tgt_hdl,
+				  struct wlan_objmgr_psoc *psoc)
+{
+	struct tgt_info *info;
+	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!wmi_handle || !tgt_hdl)
+		return;
+
+	if (!wmi_service_enabled(wmi_handle, wmi_service_afc_support)) {
+		target_if_err("service afc support not enable");
+		return;
+	}
+
+	info = (&tgt_hdl->info);
+
+	info->wlan_res_cfg.is_6ghz_sp_pwrmode_supp_enabled =
+		ucfg_reg_get_enable_6ghz_sp_mode_support(psoc);
+	info->wlan_res_cfg.afc_timer_check_disable =
+		ucfg_reg_get_afc_disable_timer_check(psoc);
+	info->wlan_res_cfg.afc_req_id_check_disable =
+		ucfg_reg_get_afc_disable_request_id_check(psoc);
+}
+#endif
+
 #if defined(CONFIG_BAND_6GHZ)
 /**
  * tgt_if_regulatory_is_lower_6g_edge_ch_supp() - Check if lower 6ghz

@@ -5835,6 +5835,9 @@ typedef enum {
 #if defined(CONFIG_BAND_6GHZ)
 	wmi_service_lower_6g_edge_ch_supp,
 	wmi_service_disable_upper_6g_edge_ch_supp,
+#ifdef CONFIG_AFC_SUPPORT
+	wmi_service_afc_support,
+#endif
 #endif
 	wmi_service_dcs_awgn_int_support,
 #ifdef WLAN_FEATURE_IGMP_OFFLOAD

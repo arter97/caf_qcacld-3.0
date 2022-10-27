@@ -2238,6 +2238,123 @@ QDF_STATUS reg_update_hal_reg_cap(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#if defined(CONFIG_BAND_6GHZ) && defined(CONFIG_AFC_SUPPORT)
+bool reg_get_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("psoc reg component is NULL");
+		return false;
+	}
+
+	return psoc_priv_obj->enable_6ghz_sp_pwrmode_supp;
+}
+
+void reg_set_enable_6ghz_sp_mode_support(struct wlan_objmgr_psoc *psoc,
+					 bool value)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("psoc reg component is NULL");
+		return;
+	}
+
+	psoc_priv_obj->enable_6ghz_sp_pwrmode_supp = value;
+}
+
+bool reg_get_afc_disable_timer_check(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("psoc reg component is NULL");
+		return false;
+	}
+
+	return psoc_priv_obj->afc_disable_timer_check;
+}
+
+void reg_set_afc_disable_timer_check(struct wlan_objmgr_psoc *psoc,
+				     bool value)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("psoc reg component is NULL");
+		return;
+	}
+
+	psoc_priv_obj->afc_disable_timer_check = value;
+}
+
+bool reg_get_afc_disable_request_id_check(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("psoc reg component is NULL");
+		return false;
+	}
+
+	return psoc_priv_obj->afc_disable_request_id_check;
+}
+
+void reg_set_afc_disable_request_id_check(struct wlan_objmgr_psoc *psoc,
+					  bool value)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("psoc reg component is NULL");
+		return;
+	}
+
+	psoc_priv_obj->afc_disable_request_id_check = value;
+}
+
+bool reg_get_afc_noaction(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("psoc reg component is NULL");
+		return false;
+	}
+
+	return psoc_priv_obj->is_afc_reg_noaction;
+}
+
+void reg_set_afc_noaction(struct wlan_objmgr_psoc *psoc, bool value)
+{
+	struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj;
+
+	psoc_priv_obj = reg_get_psoc_obj(psoc);
+
+	if (!IS_VALID_PSOC_REG_OBJ(psoc_priv_obj)) {
+		reg_err("psoc reg component is NULL");
+		return;
+	}
+
+	psoc_priv_obj->is_afc_reg_noaction = value;
+}
+#endif
+
 bool reg_chan_in_range(struct regulatory_channel *chan_list,
 		       qdf_freq_t low_freq_2g, qdf_freq_t high_freq_2g,
 		       qdf_freq_t low_freq_5g, qdf_freq_t high_freq_5g,
