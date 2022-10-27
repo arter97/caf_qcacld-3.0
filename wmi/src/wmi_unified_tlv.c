@@ -15460,22 +15460,82 @@ static struct cur_reg_rule
 static enum cc_setting_code wmi_reg_status_to_reg_status(
 				WMI_REG_SET_CC_STATUS_CODE wmi_status_code)
 {
-	if (wmi_status_code == WMI_REG_SET_CC_STATUS_PASS)
+	if (wmi_status_code == WMI_REG_SET_CC_STATUS_PASS) {
+		wmi_nofl_debug("REG_SET_CC_STATUS_PASS");
 		return REG_SET_CC_STATUS_PASS;
-	else if (wmi_status_code == WMI_REG_CURRENT_ALPHA2_NOT_FOUND)
+	} else if (wmi_status_code == WMI_REG_CURRENT_ALPHA2_NOT_FOUND) {
+		wmi_nofl_debug("WMI_REG_CURRENT_ALPHA2_NOT_FOUND");
 		return REG_CURRENT_ALPHA2_NOT_FOUND;
-	else if (wmi_status_code == WMI_REG_INIT_ALPHA2_NOT_FOUND)
+	} else if (wmi_status_code == WMI_REG_INIT_ALPHA2_NOT_FOUND) {
+		wmi_nofl_debug("WMI_REG_INIT_ALPHA2_NOT_FOUND");
 		return REG_INIT_ALPHA2_NOT_FOUND;
-	else if (wmi_status_code == WMI_REG_SET_CC_CHANGE_NOT_ALLOWED)
+	} else if (wmi_status_code == WMI_REG_SET_CC_CHANGE_NOT_ALLOWED) {
+		wmi_nofl_debug("WMI_REG_SET_CC_CHANGE_NOT_ALLOWED");
 		return REG_SET_CC_CHANGE_NOT_ALLOWED;
-	else if (wmi_status_code == WMI_REG_SET_CC_STATUS_NO_MEMORY)
+	} else if (wmi_status_code == WMI_REG_SET_CC_STATUS_NO_MEMORY) {
+		wmi_nofl_debug("WMI_REG_SET_CC_STATUS_NO_MEMORY");
 		return REG_SET_CC_STATUS_NO_MEMORY;
-	else if (wmi_status_code == WMI_REG_SET_CC_STATUS_FAIL)
+	} else if (wmi_status_code == WMI_REG_SET_CC_STATUS_FAIL) {
+		wmi_nofl_debug("WMI_REG_SET_CC_STATUS_FAIL");
 		return REG_SET_CC_STATUS_FAIL;
+	}
 
 	wmi_debug("Unknown reg status code from WMI");
 	return REG_SET_CC_STATUS_FAIL;
 }
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * reg_print_ap_power_type_6ghz - Prints the AP Power type
+ * @ap_type: 6ghz-AP Power type
+ *
+ * Return: void
+ */
+static void reg_print_ap_power_type_6ghz(enum reg_6g_ap_type ap_type)
+{
+	switch (ap_type) {
+	case REG_INDOOR_AP:
+		wmi_nofl_debug("AP Power type %s", "LOW POWER INDOOR");
+		break;
+	case REG_STANDARD_POWER_AP:
+		wmi_nofl_debug("AP Power type %s", "STANDARD POWER");
+		break;
+	case REG_VERY_LOW_POWER_AP:
+		wmi_nofl_debug("AP Power type %s", "VERY LOW POWER INDOOR");
+		break;
+	default:
+		wmi_nofl_debug("Invalid AP Power type %u", ap_type);
+	}
+}
+
+/**
+ * reg_print_6ghz_client_type - Prints the client type
+ * @client_type: 6ghz-client type
+ *
+ * Return: void
+ */
+static void reg_print_6ghz_client_type(enum reg_6g_client_type client_type)
+{
+	switch (client_type) {
+	case REG_DEFAULT_CLIENT:
+		wmi_nofl_debug("Client type %s", "DEFAULT CLIENT");
+		break;
+	case REG_SUBORDINATE_CLIENT:
+		wmi_nofl_debug("Client type %s", "SUBORDINATE CLIENT");
+		break;
+	default:
+		wmi_nofl_debug("Invalid Client type %u", client_type);
+	}
+}
+#else
+static inline void reg_print_ap_power_type_6ghz(enum reg_6g_ap_type ap_type)
+{
+}
+
+static inline void reg_print_6ghz_client_type(enum reg_6g_client_type client_type)
+{
+}
+#endif /* CONFIG_BAND_6GHZ */
 
 #ifdef CONFIG_BAND_6GHZ
 
@@ -15771,9 +15831,9 @@ static QDF_STATUS extract_reg_chan_list_ext_update_event_tlv(
 	wmi_nofl_debug("num_phys = %u and phy_id = %u",
 		  reg_info->num_phy, reg_info->phy_id);
 
-	wmi_nofl_debug("cc %s dfs %d BW: min_2g %d max_2g %d min_5g %d max_5g %d",
-		  reg_info->alpha2, reg_info->dfs_region, reg_info->min_bw_2g,
-		  reg_info->max_bw_2g, reg_info->min_bw_5g,
+	wmi_nofl_debug("cc %s dfs_region %d reg_dmn_pair %x BW: min_2g %d max_2g %d min_5g %d max_5g %d",
+		  reg_info->alpha2, reg_info->dfs_region, reg_info->reg_dmn_pair,
+		  reg_info->min_bw_2g, reg_info->max_bw_2g, reg_info->min_bw_5g,
 		  reg_info->max_bw_5g);
 
 	wmi_nofl_debug("min_bw_6g_ap_sp %d max_bw_6g_ap_sp %d min_bw_6g_ap_lpi %d max_bw_6g_ap_lpi %d min_bw_6g_ap_vlp %d max_bw_6g_ap_vlp %d",
@@ -15827,60 +15887,89 @@ static QDF_STATUS extract_reg_chan_list_ext_update_event_tlv(
 		create_ext_reg_rules_from_wmi(num_2g_reg_rules,
 					      ext_wmi_reg_rule);
 	ext_wmi_reg_rule += num_2g_reg_rules;
+	if (!num_2g_reg_rules)
+		wmi_nofl_debug("No 2ghz reg rule");
 	for (i = 0; i < num_2g_reg_rules; i++) {
 		if (!reg_info->reg_rules_2g_ptr)
 			break;
-		wmi_nofl_debug("2g rule %d start freq %d end freq %d flags %d",
-			  i, reg_info->reg_rules_2g_ptr[i].start_freq,
-			  reg_info->reg_rules_2g_ptr[i].end_freq,
-			  reg_info->reg_rules_2g_ptr[i].flags);
+		wmi_nofl_debug("2 GHz rule %u start freq %u end freq %u max_bw %u reg_power %u ant_gain %u flags %u psd_flag %u psd_eirp %u",
+			       i, reg_info->reg_rules_2g_ptr[i].start_freq,
+			       reg_info->reg_rules_2g_ptr[i].end_freq,
+			       reg_info->reg_rules_2g_ptr[i].max_bw,
+			       reg_info->reg_rules_2g_ptr[i].reg_power,
+			       reg_info->reg_rules_2g_ptr[i].ant_gain,
+			       reg_info->reg_rules_2g_ptr[i].flags,
+			       reg_info->reg_rules_2g_ptr[i].psd_flag,
+			       reg_info->reg_rules_2g_ptr[i].psd_eirp);
 	}
 	reg_info->reg_rules_5g_ptr =
 		create_ext_reg_rules_from_wmi(num_5g_reg_rules,
 					      ext_wmi_reg_rule);
 	ext_wmi_reg_rule += num_5g_reg_rules;
+	if (!num_5g_reg_rules)
+		wmi_nofl_debug("No 5ghz reg rule");
 	for (i = 0; i < num_5g_reg_rules; i++) {
 		if (!reg_info->reg_rules_5g_ptr)
 			break;
-		wmi_nofl_debug("5g rule %d start freq %d end freq %d flags %d",
-			  i, reg_info->reg_rules_5g_ptr[i].start_freq,
-			  reg_info->reg_rules_5g_ptr[i].end_freq,
-			  reg_info->reg_rules_5g_ptr[i].flags);
+		wmi_nofl_debug("5 GHz rule %u start freq %u end freq %u max_bw %u reg_power %u ant_gain %u flags %u psd_flag %u psd_eirp %u",
+			       i, reg_info->reg_rules_5g_ptr[i].start_freq,
+			       reg_info->reg_rules_5g_ptr[i].end_freq,
+			       reg_info->reg_rules_5g_ptr[i].max_bw,
+			       reg_info->reg_rules_5g_ptr[i].reg_power,
+			       reg_info->reg_rules_5g_ptr[i].ant_gain,
+			       reg_info->reg_rules_5g_ptr[i].flags,
+			       reg_info->reg_rules_5g_ptr[i].psd_flag,
+			       reg_info->reg_rules_5g_ptr[i].psd_eirp);
 	}
 
 	for (i = 0; i < REG_CURRENT_MAX_AP_TYPE; i++) {
+		reg_print_ap_power_type_6ghz(i);
 		reg_info->reg_rules_6g_ap_ptr[i] =
 			create_ext_reg_rules_from_wmi(num_6g_reg_rules_ap[i],
 						      ext_wmi_reg_rule);
 
 		ext_wmi_reg_rule += num_6g_reg_rules_ap[i];
+		if (!num_6g_reg_rules_ap[i])
+			wmi_nofl_debug("No 6ghz reg rule");
 		for (j = 0; j < num_6g_reg_rules_ap[i]; j++) {
 			if (!reg_info->reg_rules_6g_ap_ptr[i])
 				break;
-			wmi_nofl_debug("6g pwr type %d AP rule %d start freq %d end freq %d flags %d",
-				  i, j,
-				  reg_info->reg_rules_6g_ap_ptr[i][j].start_freq,
-				  reg_info->reg_rules_6g_ap_ptr[i][j].end_freq,
-				  reg_info->reg_rules_6g_ap_ptr[i][j].flags);
+			wmi_nofl_debug("AP 6GHz rule %u start freq %u end freq %u max_bw %u reg_power %u ant_gain %u flags %u psd_flag %u psd_eirp %u",
+				       j, reg_info->reg_rules_6g_ap_ptr[i][j].start_freq,
+				       reg_info->reg_rules_6g_ap_ptr[i][j].end_freq,
+				       reg_info->reg_rules_6g_ap_ptr[i][j].max_bw,
+				       reg_info->reg_rules_6g_ap_ptr[i][j].reg_power,
+				       reg_info->reg_rules_6g_ap_ptr[i][j].ant_gain,
+				       reg_info->reg_rules_6g_ap_ptr[i][j].flags,
+				       reg_info->reg_rules_6g_ap_ptr[i][j].psd_flag,
+				       reg_info->reg_rules_6g_ap_ptr[i][j].psd_eirp);
 		}
 	}
 
 	for (j = 0; j < REG_CURRENT_MAX_AP_TYPE; j++) {
+		reg_print_ap_power_type_6ghz(j);
 		for (i = 0; i < REG_MAX_CLIENT_TYPE; i++) {
+			reg_print_6ghz_client_type(i);
 			reg_info->reg_rules_6g_client_ptr[j][i] =
 				create_ext_reg_rules_from_wmi(
 					num_6g_reg_rules_client[j][i],
 					ext_wmi_reg_rule);
 
 			ext_wmi_reg_rule += num_6g_reg_rules_client[j][i];
+			if (!num_6g_reg_rules_client[j][i])
+				wmi_nofl_debug("No 6ghz reg rule for [%d][%d]", j, i);
 			for (k = 0; k < num_6g_reg_rules_client[j][i]; k++) {
 				if (!reg_info->reg_rules_6g_client_ptr[j][i])
 					break;
-				wmi_nofl_debug("6g pwr type %d cli type %d CLI rule %d start freq %d end freq %d flags %d",
-					  j, i, k,
-					  reg_info->reg_rules_6g_client_ptr[j][i][k].start_freq,
-					  reg_info->reg_rules_6g_client_ptr[j][i][k].end_freq,
-					  reg_info->reg_rules_6g_client_ptr[j][i][k].flags);
+				wmi_nofl_debug("CLI 6GHz rule %u start freq %u end freq %u max_bw %u reg_power %u ant_gain %u flags %u psd_flag %u psd_eirp %u",
+					       k, reg_info->reg_rules_6g_client_ptr[j][i][k].start_freq,
+					       reg_info->reg_rules_6g_client_ptr[j][i][k].end_freq,
+					       reg_info->reg_rules_6g_client_ptr[j][i][k].max_bw,
+					       reg_info->reg_rules_6g_client_ptr[j][i][k].reg_power,
+					       reg_info->reg_rules_6g_client_ptr[j][i][k].ant_gain,
+					       reg_info->reg_rules_6g_client_ptr[j][i][k].flags,
+					       reg_info->reg_rules_6g_client_ptr[j][i][k].psd_flag,
+					       reg_info->reg_rules_6g_client_ptr[j][i][k].psd_eirp);
 			}
 		}
 	}
@@ -16227,6 +16316,7 @@ static QDF_STATUS extract_reg_chan_list_update_event_tlv(
 	wmi_unified_t wmi_handle, uint8_t *evt_buf,
 	struct cur_regulatory_info *reg_info, uint32_t len)
 {
+	uint32_t i;
 	WMI_REG_CHAN_LIST_CC_EVENTID_param_tlvs *param_buf;
 	wmi_reg_chan_list_cc_event_fixed_param *chan_list_event_hdr;
 	wmi_regulatory_rule_struct *wmi_reg_rule;
@@ -16286,8 +16376,8 @@ static QDF_STATUS extract_reg_chan_list_update_event_tlv(
 	wmi_debug("num_phys = %u and phy_id = %u",
 		 reg_info->num_phy, reg_info->phy_id);
 
-	wmi_debug("cc %s dfs %d BW: min_2g %d max_2g %d min_5g %d max_5g %d",
-		 reg_info->alpha2, reg_info->dfs_region,
+	wmi_debug("cc %s dfs_region %d reg_dmn_pair %x BW: min_2g %d max_2g %d min_5g %d max_5g %d",
+		 reg_info->alpha2, reg_info->dfs_region, reg_info->reg_dmn_pair,
 		 reg_info->min_bw_2g, reg_info->max_bw_2g,
 		 reg_info->min_bw_5g, reg_info->max_bw_5g);
 
@@ -16300,9 +16390,35 @@ static QDF_STATUS extract_reg_chan_list_update_event_tlv(
 	reg_info->reg_rules_2g_ptr = create_reg_rules_from_wmi(num_2g_reg_rules,
 			wmi_reg_rule);
 	wmi_reg_rule += num_2g_reg_rules;
+	if (!num_2g_reg_rules)
+		wmi_nofl_debug("No 2ghz reg rule");
+	for (i = 0; i < num_2g_reg_rules; i++) {
+		if (!reg_info->reg_rules_2g_ptr)
+			break;
+		wmi_nofl_debug("2 GHz rule %u start freq %u end freq %u max_bw %u reg_power %u ant_gain %u flags %u",
+			       i, reg_info->reg_rules_2g_ptr[i].start_freq,
+			       reg_info->reg_rules_2g_ptr[i].end_freq,
+			       reg_info->reg_rules_2g_ptr[i].max_bw,
+			       reg_info->reg_rules_2g_ptr[i].reg_power,
+			       reg_info->reg_rules_2g_ptr[i].ant_gain,
+			       reg_info->reg_rules_2g_ptr[i].flags);
+	}
 
 	reg_info->reg_rules_5g_ptr = create_reg_rules_from_wmi(num_5g_reg_rules,
 			wmi_reg_rule);
+	if (!num_5g_reg_rules)
+		wmi_nofl_debug("No 5ghz reg rule");
+	for (i = 0; i < num_5g_reg_rules; i++) {
+		if (!reg_info->reg_rules_5g_ptr)
+			break;
+		wmi_nofl_debug("5 GHz rule %u start freq %u end freq %u max_bw %u reg_power %u ant_gain %u flags %u",
+			       i, reg_info->reg_rules_5g_ptr[i].start_freq,
+			       reg_info->reg_rules_5g_ptr[i].end_freq,
+			       reg_info->reg_rules_5g_ptr[i].max_bw,
+			       reg_info->reg_rules_5g_ptr[i].reg_power,
+			       reg_info->reg_rules_5g_ptr[i].ant_gain,
+			       reg_info->reg_rules_5g_ptr[i].flags);
+	}
 
 	wmi_debug("processed regulatory channel list");
 
@@ -19318,10 +19434,10 @@ static QDF_STATUS send_set_tpc_power_cmd_tlv(wmi_unified_t wmi_handle,
 	tpc_power_info_param->psd_power = param->is_psd_power;
 	tpc_power_info_param->eirp_power = param->eirp_power;
 	tpc_power_info_param->power_type_6ghz = param->power_type_6g;
-	wmi_debug("eirp_power = %d is_psd_power = %d power_type_6ghz = %d",
+	wmi_debug("eirp_power = %d is_psd_power = %d",
 		  tpc_power_info_param->eirp_power,
-		  tpc_power_info_param->psd_power,
-		  tpc_power_info_param->power_type_6ghz);
+		  tpc_power_info_param->psd_power);
+	reg_print_ap_power_type_6ghz(tpc_power_info_param->power_type_6ghz);
 
 	buf_ptr += sizeof(wmi_vdev_set_tpc_power_fixed_param);
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
