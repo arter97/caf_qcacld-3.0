@@ -1949,6 +1949,16 @@ static void dp_bank_reconfig_be(struct dp_soc *soc, struct dp_vdev *vdev)
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
 	defined(WLAN_MCAST_MLO)
+static void dp_mlo_mcast_reset_pri_mcast(struct dp_vdev_be *be_vdev,
+					 struct dp_vdev *ptnr_vdev,
+					 void *arg)
+{
+	struct dp_vdev_be *be_ptnr_vdev =
+				dp_get_be_vdev_from_dp_vdev(ptnr_vdev);
+
+	be_ptnr_vdev->mcast_primary = false;
+}
+
 static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 					struct dp_vdev_be *be_vdev,
 					cdp_config_param_type val)
@@ -1968,16 +1978,52 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 		dp_mcast_mlo_iter_ptnr_soc(be_soc,
 					   dp_tx_mcast_mlo_reinject_routing_set,
 					   (void *)&be_vdev->mcast_primary);
+		dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+					    dp_mlo_mcast_reset_pri_mcast,
+					    (void *)&be_vdev->mcast_primary,
+					    DP_MOD_ID_TX_MCAST);
 	} else {
 		hal_tx_vdev_mcast_ctrl_set(hal_soc, vdev_id,
 					   HAL_TX_MCAST_CTRL_DROP);
 	}
+}
+
+/**
+ * dp_txrx_get_vdev_mcast_param_be() - Target specific ops for getting vdev
+ *                                      params related to multicast
+ * @soc: DP soc handle
+ * @vdev: pointer to vdev structure
+ * @val: buffer address
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS dp_txrx_get_vdev_mcast_param_be(struct dp_soc *soc,
+					   struct dp_vdev *vdev,
+					   cdp_config_param_type *val)
+{
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+
+	if (be_vdev->mcast_primary)
+		val->cdp_vdev_param_mcast_vdev = true;
+	else
+		val->cdp_vdev_param_mcast_vdev = false;
+
+	return QDF_STATUS_SUCCESS;
 }
 #else
 static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 					struct dp_vdev_be *be_vdev,
 					cdp_config_param_type val)
 {
+}
+
+static
+QDF_STATUS dp_txrx_get_vdev_mcast_param_be(struct dp_soc *soc,
+					   struct dp_vdev *vdev,
+					   cdp_config_param_type *val)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
@@ -1998,6 +2044,16 @@ static void dp_tx_implicit_rbm_set_be(struct dp_soc *soc,
 }
 #endif
 
+/**
+ * dp_txrx_set_vdev_param_be() - Target specific ops while setting vdev params
+ * @soc: DP soc handle
+ * @vdev: pointer to vdev structure
+ * @param: parameter type to get value
+ * @val: value
+ *
+ * Return: QDF_STATUS
+ */
+static
 QDF_STATUS dp_txrx_set_vdev_param_be(struct dp_soc *soc,
 				     struct dp_vdev *vdev,
 				     enum cdp_vdev_param_type param,
@@ -2344,5 +2400,6 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->print_mlo_ast_stats = dp_print_mlo_ast_stats_be;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_be;
 	arch_ops->reo_remap_config = dp_reo_remap_config_be;
+	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_be;
 	dp_initialize_arch_ops_be_ipa(arch_ops);
 }

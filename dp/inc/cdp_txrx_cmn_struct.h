@@ -1431,18 +1431,20 @@ enum cdp_pdev_bpr_param {
 	CDP_BPR_ENABLE,
 };
 
-/*
- * cdp_vdev_param_type: different types of parameters
- *			to set values in vdev
+/**
+ * enum cdp_vdev_param_type - different types of parameters
+ *			      to set values in vdev
  * @CDP_ENABLE_NAWDS: set nawds enable/disable
  * @CDP_ENABLE_MCAST_EN: enable/disable multicast enhancement
  * @CDP_ENABLE_WDS: wds sta
  * @CDP_ENABLE_MEC: MEC enable flags
  * @CDP_ENABLE_PROXYSTA: proxy sta
  * @CDP_UPDATE_TDLS_FLAGS: tdls link flags
+ * @CDP_CFG_WDS_AGING_TIMER: modify/stop wds aging timer
  * @CDP_ENABLE_AP_BRIDGE: set ap_bridging enable/disable
- * @CDP_ENABLE_CIPHER : set cipher type based on security
+ * @CDP_ENABLE_CIPHER: set cipher type based on security
  * @CDP_ENABLE_QWRAP_ISOLATION: qwrap isolation mode
+ * @CDP_UPDATE_MULTIPASS: enable/disable multipass
  * @CDP_TX_ENCAP_TYPE: tx encap type
  * @CDP_RX_DECAP_TYPE: rx decap type
  * @CDP_MESH_RX_FILTER: set mesh rx filter
@@ -1456,9 +1458,12 @@ enum cdp_pdev_bpr_param {
  * @CDP_CFG_WDS_EXT: enable/disable wds ext feature
  * @CDP_ENABLE_PEER_AUTHORIZE: enable peer authorize flag
  * @CDP_ENABLE_PEER_TID_LATENCY: set peer tid latency enable flag
- * @CDP_SET_VAP_MESH_TID : Set latency tid in vap
+ * @CDP_SET_VAP_MESH_TID: Set latency tid in vap
+ * @CDP_SKIP_BAR_UPDATE_AP: enable/disable bar
  * @CDP_UPDATE_DSCP_TO_TID_MAP: Set DSCP to TID map id
- * @CDP_SET_MCAST_VDEV : Set primary mcast vdev
+ * @CDP_SET_MCAST_VDEV: Set primary mcast vdev
+ * @CDP_SET_MCAST_VDEV_HW_UPDATE: Not in use
+ * @CDP_DROP_3ADDR_MCAST: enable/disable drop 3addr multicast flag
  * @CDP_ENABLE_WRAP: qwrap ap
  * @CDP_ENABLE_TRAFFIC_END_INDICATION: enable/disable traffic end indication
  */
