@@ -757,7 +757,7 @@ static void wifi_pos_get_vdev_list(struct wlan_objmgr_psoc *psoc,
 
 static uint32_t wifi_pos_get_vdev_count(struct wlan_objmgr_psoc *psoc)
 {
-	return psoc->soc_objmgr.wlan_vdev_count;
+	return psoc->soc_objmgr.max_vdev_count;
 }
 
 #else
@@ -790,7 +790,7 @@ static uint32_t wifi_pos_get_vdev_count(struct wlan_objmgr_psoc *tpsoc)
 	for (index = 0; index < WLAN_OBJMGR_MAX_DEVICES; index++) {
 		if (g_umac_glb_obj->psoc[index]) {
 			psoc = g_umac_glb_obj->psoc[index];
-			vdev_count += psoc->soc_objmgr.wlan_vdev_count;
+			vdev_count += psoc->soc_objmgr.max_vdev_count;
 		}
 	}
 
