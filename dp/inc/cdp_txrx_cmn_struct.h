@@ -576,6 +576,7 @@ enum cdp_sec_type {
     cdp_sec_type_aes_ccmp_256,
     cdp_sec_type_aes_gcmp,
     cdp_sec_type_aes_gcmp_256,
+    cdp_sec_type_wapi_gcm_sm4,
 
     /* keep this last! */
     cdp_num_sec_types

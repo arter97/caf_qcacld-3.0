@@ -1782,6 +1782,7 @@ struct cdp_tx_ingress_stats {
 		struct cdp_pkt_info raw_pkt;
 		uint32_t dma_map_error;
 		uint32_t invalid_raw_pkt_datatype;
+		uint32_t invalid_len;
 		uint32_t num_frags_overflow_err;
 	} raw;
 
