@@ -1843,7 +1843,8 @@ process_rx:
 		dp_rx_update_flow_tag(soc, vdev, nbuf, rx_tlv_hdr, true);
 		DP_PEER_STATS_FLAT_INC(txrx_peer, to_stack.num, 1);
 		qdf_nbuf_set_exc_frame(nbuf, 1);
-		dp_rx_deliver_to_stack(soc, vdev, txrx_peer, nbuf, NULL);
+		dp_rx_deliver_to_osif_stack(soc, vdev, txrx_peer, nbuf, NULL,
+					    qdf_nbuf_is_ipv4_eapol_pkt(nbuf));
 	}
 
 	return;
