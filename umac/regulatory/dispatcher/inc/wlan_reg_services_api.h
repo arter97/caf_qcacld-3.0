@@ -2532,13 +2532,18 @@ wlan_reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
  * @bw: Bandwidth in MHz
  * @ap_pwr_type: AP power type
  * @in_punc_pattern: Input puncture pattern
+ * @is_client_list_lookup_needed: Boolean to indicate if client list lookup is
+ * needed
+ * @client_type: Client power type
  *
  * Return: EIRP power
  */
 uint8_t wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 			      qdf_freq_t cen320, uint16_t bw,
 			      enum reg_6g_ap_type ap_pwr_type,
-			      uint16_t in_punc_pattern);
+			      uint16_t in_punc_pattern,
+			      bool is_client_list_lookup_needed,
+			      enum reg_6g_client_type client_type);
 #else
 static inline
 qdf_freq_t wlan_reg_get_thresh_priority_freq(struct wlan_objmgr_pdev *pdev)
@@ -2571,11 +2576,14 @@ static inline QDF_STATUS wlan_reg_eirp_2_psd(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_E_FAILURE;
 }
 
-static inline uint8_t wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev,
-					    qdf_freq_t freq,
-					    qdf_freq_t cen320, uint16_t bw,
-					    enum reg_6g_ap_type ap_pwr_type,
-					    uint16_t in_punc_pattern)
+static inline uint8_t
+wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev,
+		      qdf_freq_t freq,
+		      qdf_freq_t cen320, uint16_t bw,
+		      enum reg_6g_ap_type ap_pwr_type,
+		      uint16_t in_punc_pattern,
+		      bool is_client_list_lookup_needed,
+		      enum reg_6g_client_type client_type)
 {
 	return 0;
 }

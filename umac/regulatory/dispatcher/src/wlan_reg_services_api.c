@@ -1897,10 +1897,13 @@ qdf_export_symbol(wlan_reg_get_best_pwr_mode);
 uint8_t wlan_reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 			      qdf_freq_t cen320, uint16_t bw,
 			      enum reg_6g_ap_type ap_pwr_type,
-			      uint16_t in_punc_pattern)
+			      uint16_t in_punc_pattern,
+			      bool is_client_list_lookup_needed,
+			      enum reg_6g_client_type client_type)
 {
 	return reg_get_eirp_pwr(pdev, freq, cen320, bw, ap_pwr_type,
-				in_punc_pattern);
+				in_punc_pattern, is_client_list_lookup_needed,
+				client_type);
 }
 
 qdf_export_symbol(wlan_reg_get_eirp_pwr);

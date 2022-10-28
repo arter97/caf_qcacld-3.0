@@ -2464,13 +2464,18 @@ enum reg_6g_ap_type reg_get_best_pwr_mode(struct wlan_objmgr_pdev *pdev,
  * @bw: Bandwidth in MHz
  * @ap_pwr_type: AP power type
  * @in_punc_pattern: Input puncture pattern
+ * @is_client_list_lookup_needed: Boolean to indicate if client list lookup is
+ * needed
+ * @client_type: Client power type
  *
  * Return: EIRP power
  */
 uint8_t reg_get_eirp_pwr(struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
 			 qdf_freq_t cen320,
 			 uint16_t bw, enum reg_6g_ap_type ap_pwr_type,
-			 uint16_t in_punc_pattern);
+			 uint16_t in_punc_pattern,
+			 bool is_client_list_lookup_needed,
+			 enum reg_6g_client_type client_type);
 #endif /* CONFIG_BAND_6GHZ */
 
 /**
