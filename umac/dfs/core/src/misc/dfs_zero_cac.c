@@ -1994,7 +1994,8 @@ dfs_map_to_agile_width(struct wlan_dfs *dfs, enum phy_ch_width chwidth)
 	case CH_WIDTH_80P80MHZ:
 	case CH_WIDTH_160MHZ:
 		if (dfs_is_true_160mhz_supported(dfs) ||
-		    dfs_is_restricted_80p80mhz_supported(dfs))
+		    dfs_is_restricted_80p80mhz_supported(dfs) ||
+		    dfs_is_11be_supported(dfs))
 			return CH_WIDTH_160MHZ;
 		return CH_WIDTH_80MHZ;
 	case CH_WIDTH_320MHZ:
