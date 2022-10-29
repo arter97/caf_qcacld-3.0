@@ -2232,6 +2232,10 @@ static void util_scan_update_ml_info(struct scan_cache_entry *scan_entry)
 	uint16_t multi_link_ctrl;
 	uint8_t offset;
 
+	if (!scan_entry->ie_list.ehtcap && scan_entry->ie_list.multi_link_bv) {
+		scan_entry->ie_list.multi_link_bv = NULL;
+		return;
+	}
 	if (!scan_entry->ie_list.multi_link_bv)
 		return;
 
