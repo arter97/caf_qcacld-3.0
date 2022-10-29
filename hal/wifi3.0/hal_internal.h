@@ -1199,6 +1199,10 @@ struct hal_hw_txrx_ops {
 	void (*hal_tx_vdev_mcast_ctrl_set)(hal_soc_handle_t hal_soc_hdl,
 					   uint8_t vdev_id,
 					   uint8_t mcast_ctrl_val);
+	void (*hal_get_tsf2_scratch_reg)(hal_soc_handle_t hal_soc_hdl,
+					 uint8_t mac_id, uint64_t *value);
+	void (*hal_get_tqm_scratch_reg)(hal_soc_handle_t hal_soc_hdl,
+					uint64_t *value);
 };
 
 /**

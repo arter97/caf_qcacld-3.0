@@ -663,6 +663,125 @@ typedef struct rx_msdu_end_compact_qca9224 hal_rx_msdu_end_t;
 #include "hal_be_rx_tlv.h"
 #include <hal_be_generic_api.h>
 
+#define PMM_REG_BASE_QCN9224 0xB500F8
+
+/* Enum to indicate which scratch registers hold which value */
+enum hal_scratch_reg_enum {
+	PMM_QTIMER_GLOBAL_OFFSET_LO_US,
+	PMM_QTIMER_GLOBAL_OFFSET_HI_US,
+	PMM_MAC0_TSF1_OFFSET_LO_US,
+	PMM_MAC0_TSF1_OFFSET_HI_US,
+	PMM_MAC0_TSF2_OFFSET_LO_US,
+	PMM_MAC0_TSF2_OFFSET_HI_US,
+	PMM_MAC1_TSF1_OFFSET_LO_US,
+	PMM_MAC1_TSF1_OFFSET_HI_US,
+	PMM_MAC1_TSF2_OFFSET_LO_US,
+	PMM_MAC1_TSF2_OFFSET_HI_US,
+	PMM_MLO_OFFSET_LO_US,
+	PMM_MLO_OFFSET_HI_US,
+	PMM_TQM_CLOCK_OFFSET_LO_US,
+	PMM_TQM_CLOCK_OFFSET_HI_US,
+	PMM_Q6_CRASH_REASON,
+	PMM_PMM_REG_MAX
+};
+
+/**
+ * hal_read_pmm_scratch_reg(): API to read PMM Scratch register
+ *
+ * @soc: HAL soc
+ * @base_addr: Base PMM register
+ * @reg_enum: Enum of the scratch register
+ *
+ * Return: uint32_t
+ */
+static inline
+uint32_t hal_read_pmm_scratch_reg(struct hal_soc *soc,
+				  uint32_t base_addr,
+				  enum hal_scratch_reg_enum reg_enum)
+{
+	uint32_t val = 0;
+
+	pld_reg_read(soc->qdf_dev->dev, base_addr + (reg_enum * 4), &val);
+	return val;
+}
+
+/**
+ * hal_get_tsf2_enum(): API to get the enum corresponding to the mac id
+ *
+ * @mac_id: mac id
+ * @enum_lo: Pointer to update low scratch register
+ * @enum_hi: Pointer to update hi scratch register
+ *
+ * Return: void
+ */
+static inline
+void hal_get_tsf2_enum(uint8_t mac_id,
+		       enum hal_scratch_reg_enum *enum_lo,
+		       enum hal_scratch_reg_enum *enum_hi)
+{
+	if (mac_id == 1) {
+		*enum_lo = PMM_MAC1_TSF2_OFFSET_LO_US;
+		*enum_hi = PMM_MAC1_TSF2_OFFSET_HI_US;
+	} else {
+		*enum_lo = PMM_MAC0_TSF2_OFFSET_LO_US;
+		*enum_hi = PMM_MAC0_TSF2_OFFSET_HI_US;
+	}
+}
+
+/**
+ * hal_get_tsf2_scratch_reg_qcn9224(): API to read tsf2 scratch register
+ *
+ * @hal_soc_hdl: HAL soc context
+ * @mac_id: mac id
+ * @value: Pointer to update tsf2 value
+ *
+ * Return: void
+ */
+static void hal_get_tsf2_scratch_reg_qcn9224(hal_soc_handle_t hal_soc_hdl,
+					     uint8_t mac_id, uint64_t *value)
+{
+	struct hal_soc *soc = (struct hal_soc *)hal_soc_hdl;
+	uint32_t offset_lo, offset_hi;
+	enum hal_scratch_reg_enum enum_lo, enum_hi;
+
+	hal_get_tsf2_enum(mac_id, &enum_lo, &enum_hi);
+
+	offset_lo = hal_read_pmm_scratch_reg(soc,
+					     PMM_REG_BASE_QCN9224,
+					     enum_lo);
+
+	offset_hi = hal_read_pmm_scratch_reg(soc,
+					     PMM_REG_BASE_QCN9224,
+					     enum_hi);
+
+	*value = ((uint64_t)(offset_hi) << 32 | offset_lo);
+}
+
+/**
+ * hal_get_tqm_scratch_reg_qcn9224(): API to read tqm scratch register
+ *
+ * @hal_soc_hdl: HAL soc context
+ * @value: Pointer to update tqm value
+ *
+ * Return: void
+ */
+static void hal_get_tqm_scratch_reg_qcn9224(hal_soc_handle_t hal_soc_hdl,
+					    uint64_t *value)
+{
+	struct hal_soc *soc = (struct hal_soc *)hal_soc_hdl;
+	uint32_t offset_lo, offset_hi;
+
+	offset_lo = hal_read_pmm_scratch_reg(soc,
+					     PMM_REG_BASE_QCN9224,
+					     PMM_TQM_CLOCK_OFFSET_LO_US);
+
+	offset_hi = hal_read_pmm_scratch_reg(soc,
+					     PMM_REG_BASE_QCN9224,
+					     PMM_TQM_CLOCK_OFFSET_HI_US);
+
+	*value = ((uint64_t)(offset_hi) << 32 | offset_lo);
+}
+
 #define LINK_DESC_SIZE (NUM_OF_DWORDS_RX_MSDU_LINK << 2)
 #define HAL_PPE_VP_ENTRIES_MAX 32
 /**
@@ -2093,6 +2212,10 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 		hal_tx_populate_bank_register_be;
 	hal_soc->ops->hal_tx_vdev_mcast_ctrl_set =
 		hal_tx_vdev_mcast_ctrl_set_be;
+	hal_soc->ops->hal_get_tsf2_scratch_reg =
+					hal_get_tsf2_scratch_reg_qcn9224;
+	hal_soc->ops->hal_get_tqm_scratch_reg =
+					hal_get_tqm_scratch_reg_qcn9224;
 };
 
 /**

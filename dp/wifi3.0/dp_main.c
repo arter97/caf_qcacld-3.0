@@ -13339,6 +13339,34 @@ dp_recovery_vdev_flush_peers(struct cdp_soc_t *cdp_soc,
 }
 #endif
 
+/**
+ * dp_get_tsf2_scratch_reg() - get tsf2 offset from the scratch register
+ * @soc: Datapath soc handle
+ * @mac_id: mac_id
+ * @value: pointer to update tsf2 offset value
+ *
+ * Return: None.
+ */
+static inline void
+dp_get_tsf2_scratch_reg(struct cdp_soc_t *soc_hdl, uint8_t mac_id,
+			uint64_t *value)
+{
+	hal_get_tsf2_offset(((struct dp_soc *)soc_hdl)->hal_soc, mac_id, value);
+}
+
+/**
+ * dp_get_tqm_scratch_reg() - get tqm offset from the scratch register
+ * @soc: Datapath soc handle
+ * @value: pointer to update tqm offset value
+ *
+ * Return: None.
+ */
+static inline void
+dp_get_tqm_scratch_reg(struct cdp_soc_t *soc_hdl, uint64_t *value)
+{
+	hal_get_tqm_offset(((struct dp_soc *)soc_hdl)->hal_soc, value);
+}
+
 static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_soc_attach_target = dp_soc_attach_target_wifi3,
 	.txrx_vdev_attach = dp_vdev_attach_wifi3,
@@ -13459,6 +13487,8 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 	.txrx_recovery_vdev_flush_peers = dp_recovery_vdev_flush_peers,
 #endif
 	.txrx_umac_reset_deinit = dp_soc_umac_reset_deinit,
+	.txrx_get_tsf2_offset = dp_get_tsf2_scratch_reg,
+	.txrx_get_tqm_offset = dp_get_tqm_scratch_reg,
 };
 
 static struct cdp_ctrl_ops dp_ops_ctrl = {
