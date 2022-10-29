@@ -13771,6 +13771,34 @@ dp_get_tsf_time(struct cdp_soc_t *soc_hdl, uint32_t tsf_id, uint32_t mac_id,
 #endif
 
 /**
+ * dp_get_tsf2_scratch_reg() - get tsf2 offset from the scratch register
+ * @soc: Datapath soc handle
+ * @mac_id: mac_id
+ * @value: pointer to update tsf2 offset value
+ *
+ * Return: None.
+ */
+static inline void
+dp_get_tsf2_scratch_reg(struct cdp_soc_t *soc_hdl, uint8_t mac_id,
+			uint64_t *value)
+{
+	hal_get_tsf2_offset(((struct dp_soc *)soc_hdl)->hal_soc, mac_id, value);
+}
+
+/**
+ * dp_get_tqm_scratch_reg() - get tqm offset from the scratch register
+ * @soc: Datapath soc handle
+ * @value: pointer to update tqm offset value
+ *
+ * Return: None.
+ */
+static inline void
+dp_get_tqm_scratch_reg(struct cdp_soc_t *soc_hdl, uint64_t *value)
+{
+	hal_get_tqm_offset(((struct dp_soc *)soc_hdl)->hal_soc, value);
+}
+
+/**
  * dp_set_tx_pause() - Pause or resume tx path
  * @soc_hdl: Datapath soc handle
  * @flag: set or clear is_tx_pause
@@ -13907,6 +13935,8 @@ static struct cdp_cmn_ops dp_ops_cmn = {
 #endif
 	.txrx_umac_reset_deinit = dp_soc_umac_reset_deinit,
 	.txrx_get_tsf_time = dp_get_tsf_time,
+	.txrx_get_tsf2_offset = dp_get_tsf2_scratch_reg,
+	.txrx_get_tqm_offset = dp_get_tqm_scratch_reg,
 };
 
 static struct cdp_ctrl_ops dp_ops_ctrl = {

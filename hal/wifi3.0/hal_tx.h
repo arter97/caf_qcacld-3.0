@@ -899,4 +899,42 @@ uint8_t hal_get_wbm_internal_error(hal_soc_handle_t hal_soc_hdl, void *hal_desc)
 
 	return hal_soc->ops->hal_get_wbm_internal_error(hal_desc);
 }
+
+/**
+ * hal_get_tsf2_offset() - get tsf2 offset
+ *
+ * @hal_soc_hdl: HAL SoC context
+ * @mac_id: mac id
+ * @value: pointer to update tsf2 offset value
+ *
+ * Return: void
+ */
+static inline void
+hal_get_tsf2_offset(hal_soc_handle_t hal_soc_hdl, uint8_t mac_id,
+		    uint64_t *value)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (hal_soc->ops->hal_get_tsf2_scratch_reg)
+		hal_soc->ops->hal_get_tsf2_scratch_reg(hal_soc_hdl, mac_id,
+						       value);
+}
+
+/**
+ * hal_get_tqm_offset() - get tqm offset
+ *
+ * @hal_soc_hdl: HAL SoC context
+ * @value: pointer to update tqm offset value
+ *
+ * Return: void
+ */
+
+static inline void
+hal_get_tqm_offset(hal_soc_handle_t hal_soc_hdl, uint64_t *value)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	if (hal_soc->ops->hal_get_tqm_scratch_reg)
+		hal_soc->ops->hal_get_tqm_scratch_reg(hal_soc_hdl, value);
+}
 #endif /* HAL_TX_H */

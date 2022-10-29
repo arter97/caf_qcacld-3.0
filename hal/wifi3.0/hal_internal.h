@@ -1208,6 +1208,10 @@ struct hal_hw_txrx_ops {
 	void (*hal_get_tsf_time)(hal_soc_handle_t hal_soc_hdl, uint32_t tsf_id,
 				 uint32_t mac_id, uint64_t *tsf,
 				 uint64_t *tsf_sync_soc_time);
+	void (*hal_get_tsf2_scratch_reg)(hal_soc_handle_t hal_soc_hdl,
+					 uint8_t mac_id, uint64_t *value);
+	void (*hal_get_tqm_scratch_reg)(hal_soc_handle_t hal_soc_hdl,
+					uint64_t *value);
 };
 
 /**

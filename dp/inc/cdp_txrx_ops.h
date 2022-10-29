@@ -689,6 +689,9 @@ struct cdp_cmn_ops {
 				  uint32_t mac_id, uint64_t *tsf,
 				  uint64_t *tsf_sync_soc_time);
 
+	void (*txrx_get_tsf2_offset)(struct cdp_soc_t *soc_hdl, uint8_t mac_id,
+				     uint64_t *value);
+	void (*txrx_get_tqm_offset)(struct cdp_soc_t *soc_hdl, uint64_t *value);
 };
 
 struct cdp_ctrl_ops {
