@@ -331,17 +331,17 @@ dp_rx_mon_free_ppdu_info(struct dp_pdev *pdev,
 	struct dp_mon_pdev *mon_pdev;
 
 	mon_pdev = (struct dp_mon_pdev *)pdev->monitor_pdev;
-	for (user = 0; user < ppdu_info->com_info.num_users; user++) {
-		uint16_t mpdu_count  = ppdu_info->mpdu_count[user];
+	for (user = 0; user < HAL_MAX_UL_MU_USERS; user++) {
 		uint16_t mpdu_idx;
 		qdf_nbuf_t mpdu;
 
-		for (mpdu_idx = 0; mpdu_idx < mpdu_count; mpdu_idx++) {
+		for (mpdu_idx = 0; mpdu_idx < HAL_RX_MAX_MPDU; mpdu_idx++) {
 			mpdu = (qdf_nbuf_t)ppdu_info->mpdu_q[user][mpdu_idx];
 
 			if (!mpdu)
 				continue;
 			dp_mon_free_parent_nbuf(mon_pdev, mpdu);
+			ppdu_info->mpdu_q[user][mpdu_idx] = NULL;
 		}
 	}
 }
@@ -350,7 +350,6 @@ void dp_rx_mon_drain_wq(struct dp_pdev *pdev)
 {
 	struct dp_mon_pdev *mon_pdev;
 	struct hal_rx_ppdu_info *ppdu_info = NULL;
-	struct hal_rx_ppdu_info *temp_ppdu_info = NULL;
 	struct dp_mon_pdev_be *mon_pdev_be;
 
 	if (qdf_unlikely(!pdev)) {
@@ -365,19 +364,11 @@ void dp_rx_mon_drain_wq(struct dp_pdev *pdev)
 	}
 
 	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	ppdu_info = &mon_pdev->ppdu_info;
 
-	qdf_spin_lock_bh(&mon_pdev_be->rx_mon_wq_lock);
-	TAILQ_FOREACH_SAFE(ppdu_info,
-			   &mon_pdev_be->rx_mon_queue,
-			   ppdu_list_elem,
-			   temp_ppdu_info) {
-		mon_pdev_be->rx_mon_queue_depth--;
-		TAILQ_REMOVE(&mon_pdev_be->rx_mon_queue,
-			     ppdu_info, ppdu_list_elem);
-
-		dp_rx_mon_free_ppdu_info(pdev, ppdu_info);
-	}
-	qdf_spin_unlock_bh(&mon_pdev_be->rx_mon_wq_lock);
+	qdf_spin_lock_bh(&mon_pdev->mon_lock);
+	dp_rx_mon_free_ppdu_info(pdev, ppdu_info);
+	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
 }
 
 /**
@@ -443,7 +434,7 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 
 			if (!mpdu)
 				continue;
-
+			ppdu_info->mpdu_q[user][mpdu_idx] = NULL;
 			mpdu_meta = (struct hal_rx_mon_mpdu_info *)qdf_nbuf_data(mpdu);
 
 			if (dp_lite_mon_is_rx_enabled(mon_pdev)) {
@@ -493,6 +484,8 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 			}
 		}
 	}
+	/* Free remaining mpdu from mpdu queueu */
+	dp_rx_mon_free_ppdu_info(pdev, ppdu_info);
 }
 
 /**
@@ -1349,6 +1342,7 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		return NULL;
 	}
 
+	qdf_mem_zero(ppdu_info, sizeof(struct hal_rx_ppdu_info));
 	status_buf_count = mon_pdev_be->desc_count;
 	for (idx = 0; idx < status_buf_count; idx++) {
 		mon_desc = mon_pdev_be->status[idx];

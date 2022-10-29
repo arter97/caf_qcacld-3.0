@@ -1021,6 +1021,7 @@ void dp_pdev_mon_rings_deinit_2_0(struct dp_pdev *pdev)
 {
 	int mac_id = 0;
 	struct dp_soc *soc = pdev->soc;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
@@ -1033,6 +1034,7 @@ void dp_pdev_mon_rings_deinit_2_0(struct dp_pdev *pdev)
 		dp_srng_deinit(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id],
 			       TX_MONITOR_DST, pdev->pdev_id);
 	}
+	qdf_spinlock_destroy(&mon_pdev->mon_lock);
 }
 
 static
@@ -1040,6 +1042,7 @@ QDF_STATUS dp_pdev_mon_rings_init_2_0(struct dp_pdev *pdev)
 {
 	struct dp_soc *soc = pdev->soc;
 	int mac_id = 0;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 
@@ -1059,6 +1062,8 @@ QDF_STATUS dp_pdev_mon_rings_init_2_0(struct dp_pdev *pdev)
 			goto fail;
 		}
 	}
+
+	qdf_spinlock_create(&mon_pdev->mon_lock);
 	return QDF_STATUS_SUCCESS;
 
 fail:
