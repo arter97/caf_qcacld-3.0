@@ -543,8 +543,8 @@ util_scan_get_phymode_5g(struct wlan_objmgr_pdev *pdev,
 			phymode = WLAN_PHYMODE_11AC_VHT80_80;
 			break;
 		default:
-			scm_err("bad channel: %d",
-					vhtop->vht_op_chwidth);
+			scm_debug("bad channel: %d",
+				  vhtop->vht_op_chwidth);
 			phymode = WLAN_PHYMODE_11AC_VHT20;
 			break;
 		}
