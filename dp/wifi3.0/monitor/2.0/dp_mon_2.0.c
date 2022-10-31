@@ -286,7 +286,6 @@ dp_mon_buffers_replenish(struct dp_soc *dp_soc,
 			 uint32_t *replenish_cnt_ref)
 {
 	uint32_t num_alloc_desc;
-	uint16_t num_desc_to_free = 0;
 	uint32_t num_entries_avail;
 	uint32_t count = 0;
 	int sync_hw_ptr = 1;
@@ -312,12 +311,10 @@ dp_mon_buffers_replenish(struct dp_soc *dp_soc,
 						   mon_srng, sync_hw_ptr);
 
 	if (!num_entries_avail) {
-		num_desc_to_free = num_req_buffers;
 		hal_srng_access_end(dp_soc->hal_soc, mon_srng);
 		goto free_desc;
 	}
 	if (num_entries_avail < num_req_buffers) {
-		num_desc_to_free = num_req_buffers - num_entries_avail;
 		num_req_buffers = num_entries_avail;
 	}
 
