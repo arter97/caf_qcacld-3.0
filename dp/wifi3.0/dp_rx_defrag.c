@@ -1257,7 +1257,6 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 	uint64_t dst_qdesc_addr;
 	qdf_dma_addr_t paddr;
 	uint32_t nbuf_len, seq_no, dst_ind;
-	uint32_t *mpdu_wrd;
 	uint32_t ret, cookie;
 	hal_ring_desc_t dst_ring_desc =
 		txrx_peer->rx_tid[tid].dst_ring_desc;
@@ -1394,7 +1393,6 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 				sizeof(struct rx_mpdu_desc_info));
 	qdf_mem_zero(ent_mpdu_desc_info, sizeof(uint32_t));
 
-	mpdu_wrd = (uint32_t *)dst_mpdu_desc_info;
 	seq_no = hal_rx_get_rx_sequence(soc->hal_soc, rx_desc->rx_buf_start);
 
 	hal_mpdu_desc_info_set(soc->hal_soc, ent_ring_desc, ent_mpdu_desc_info,
@@ -1469,7 +1467,7 @@ static QDF_STATUS dp_rx_defrag(struct dp_txrx_peer *txrx_peer, unsigned int tid,
 			       qdf_nbuf_t frag_list_head,
 			       qdf_nbuf_t frag_list_tail)
 {
-	qdf_nbuf_t tmp_next, prev;
+	qdf_nbuf_t tmp_next;
 	qdf_nbuf_t cur = frag_list_head, msdu;
 	uint32_t index, tkip_demic = 0;
 	uint16_t hdr_space;
@@ -1490,7 +1488,6 @@ static QDF_STATUS dp_rx_defrag(struct dp_txrx_peer *txrx_peer, unsigned int tid,
 		tmp_next = qdf_nbuf_next(cur);
 		qdf_nbuf_set_next(cur, NULL);
 		qdf_nbuf_trim_tail(cur, DEFRAG_IEEE80211_FCS_LEN);
-		prev = cur;
 		qdf_nbuf_set_next(cur, tmp_next);
 		cur = tmp_next;
 	}
