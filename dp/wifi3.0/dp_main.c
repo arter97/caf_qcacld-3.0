@@ -3916,13 +3916,13 @@ static QDF_STATUS dp_hw_link_desc_ring_alloc(struct dp_soc *soc)
 				  "wbm_idle_link_ring");
 	} else {
 		uint32_t num_scatter_bufs;
-		uint32_t num_entries_per_buf;
 		uint32_t buf_size = 0;
 
 		soc->wbm_idle_scatter_buf_size =
 			hal_idle_list_scatter_buf_size(soc->hal_soc);
-		num_entries_per_buf = hal_idle_scatter_buf_num_entries(
-			soc->hal_soc, soc->wbm_idle_scatter_buf_size);
+		hal_idle_scatter_buf_num_entries(
+					soc->hal_soc,
+					soc->wbm_idle_scatter_buf_size);
 		num_scatter_bufs = hal_idle_list_num_scatter_bufs(
 					soc->hal_soc, total_mem_size,
 					soc->wbm_idle_scatter_buf_size);
@@ -9565,12 +9565,10 @@ void dp_rx_bar_stats_cb(struct dp_soc *soc, void *cb_ctxt,
 void dp_aggregate_vdev_stats(struct dp_vdev *vdev,
 			     struct cdp_vdev_stats *vdev_stats)
 {
-	struct dp_soc *soc = NULL;
 
 	if (!vdev || !vdev->pdev)
 		return;
 
-	soc = vdev->pdev->soc;
 
 	dp_update_vdev_ingress_stats(vdev);
 
@@ -15491,7 +15489,6 @@ static struct dp_soc *
 dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 	      struct cdp_soc_attach_params *params)
 {
-	int int_ctx;
 	struct dp_soc *soc =  NULL;
 	uint16_t arch_id;
 	struct hif_opaque_softc *hif_handle = params->hif_handle;
@@ -15520,7 +15517,6 @@ dp_soc_attach(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 			  &soc->cmem_base,
 			  &soc->cmem_total_size);
 	soc->cmem_avail_size = soc->cmem_total_size;
-	int_ctx = 0;
 	soc->device_id = device_id;
 	soc->cdp_soc.ops =
 		(struct cdp_ops *)qdf_mem_malloc(sizeof(struct cdp_ops));
@@ -16884,7 +16880,7 @@ static QDF_STATUS dp_soc_srng_alloc(struct dp_soc *soc)
 	uint32_t i;
 	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 	uint32_t cached = WLAN_CFG_DST_RING_CACHED_DESC;
-	uint32_t tx_comp_ring_size, tx_ring_size, reo_dst_ring_size;
+	uint32_t reo_dst_ring_size;
 
 	soc_cfg_ctx = soc->wlan_cfg_ctx;
 
@@ -16945,8 +16941,6 @@ static QDF_STATUS dp_soc_srng_alloc(struct dp_soc *soc)
 		goto fail1;
 	}
 
-	tx_comp_ring_size = wlan_cfg_tx_comp_ring_size(soc_cfg_ctx);
-	tx_ring_size = wlan_cfg_tx_ring_size(soc_cfg_ctx);
 	reo_dst_ring_size = wlan_cfg_get_reo_dst_ring_size(soc_cfg_ctx);
 
 	/* Disable cached desc if NSS offload is enabled */
