@@ -70,6 +70,7 @@
 #include "cfg_ucfg_api.h"
 #include "wlan_twt_cfg_ext_api.h"
 #include <spatial_reuse_api.h>
+#include "wlan_psoc_mlme_api.h"
 
 /* SME REQ processing function templates */
 static bool __lim_process_sme_sys_ready_ind(struct mac_context *, uint32_t *);
@@ -361,18 +362,18 @@ static bool __lim_is_sme_assoc_cnf_valid(struct assoc_cnf *assoc_cnf)
 }
 
 /**
- * __lim_is_defered_msg_for_radar() - Defers the message if radar is detected
+ * __lim_is_deferred_msg_for_radar() - Defers the message if radar is detected
  * @mac_ctx: Pointer to Global MAC structure
  * @message: Pointer to message posted from SME to LIM.
  *
  * Has role only if 11h is enabled. Not used on STA side.
  * Defers the message if radar is detected.
  *
- * Return: true, if defered otherwise return false.
+ * Return: true, if deferred otherwise return false.
  */
 static bool
-__lim_is_defered_msg_for_radar(struct mac_context *mac_ctx,
-			       struct scheduler_msg *message)
+__lim_is_deferred_msg_for_radar(struct mac_context *mac_ctx,
+				struct scheduler_msg *message)
 {
 	/*
 	 * fRadarDetCurOperChan will be set only if we
@@ -1251,19 +1252,19 @@ free:
  * @pMsg: Message pointer
  *
  * Wrapper for the function __lim_handle_sme_start_bss_request
- * This message will be defered until softmac come out of
+ * This message will be deferred until softmac come out of
  * scan mode or if we have detected radar on the current
  * operating channel.
  *
  * return true - If we consumed the buffer
- *        false - If have defered the message.
+ *        false - If have deferred the message.
  */
 static bool __lim_process_sme_start_bss_req(struct mac_context *mac,
 					    struct scheduler_msg *pMsg)
 {
-	if (__lim_is_defered_msg_for_radar(mac, pMsg)) {
+	if (__lim_is_deferred_msg_for_radar(mac, pMsg)) {
 		/**
-		 * If message defered, buffer is not consumed yet.
+		 * If message deferred, buffer is not consumed yet.
 		 * So return false
 		 */
 		return false;
@@ -3999,7 +4000,7 @@ static void lim_fill_ml_info(struct cm_vdev_join_req *req,
 		qdf_copy_macaddr(
 			&partner_info->partner_link_info[idx].link_addr,
 			&req->partner_info.partner_link_info[idx].link_addr);
-		pe_debug("MLO: link_id:%d" QDF_MAC_ADDR_FMT,
+		pe_debug("MLO: link_id:%d " QDF_MAC_ADDR_FMT,
 			 partner_info->partner_link_info[idx].link_id,
 			 QDF_MAC_ADDR_REF(partner_info->partner_link_info[idx].
 					  link_addr.bytes));
@@ -4059,6 +4060,7 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 	int32_t akm;
 	struct mlme_legacy_priv *mlme_priv;
 	uint32_t assoc_ie_len;
+	bool eht_capab;
 
 	ie_len = util_scan_entry_ie_len(req->entry);
 	bss_len = (uint16_t)(offsetof(struct bss_description,
@@ -4189,7 +4191,9 @@ lim_fill_session_params(struct mac_context *mac_ctx,
 		}
 	}
 
-	lim_fill_ml_info(req, pe_join_req);
+	wlan_psoc_mlme_get_11be_capab(mac_ctx->psoc, &eht_capab);
+	if (eht_capab)
+		lim_fill_ml_info(req, pe_join_req);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -4529,7 +4533,7 @@ static void wma_get_mld_info_sta(struct cm_peer_create_req *req,
 				 uint8_t **peer_mld_addr,
 				 bool *is_assoc_peer)
 {
-	if (req) {
+	if (!qdf_is_macaddr_zero(&req->mld_mac)) {
 		*peer_mld_addr = req->mld_mac.bytes;
 		*is_assoc_peer = req->is_assoc_peer;
 	} else {
@@ -6471,12 +6475,12 @@ __lim_handle_sme_stop_bss_request(struct mac_context *mac, uint32_t *msg_buf)
  * @pMsg: Message from SME
  *
  * Wrapper for the function __lim_handle_sme_stop_bss_request
- * This message will be defered until softmac come out of
+ * This message will be deferred until softmac come out of
  * scan mode. Message should be handled even if we have
  * detected radar in the current operating channel.
  *
  * Return: true - If we consumed the buffer
- *         false - If have defered the message.
+ *         false - If have deferred the message.
  */
 
 static bool __lim_process_sme_stop_bss_req(struct mac_context *mac,

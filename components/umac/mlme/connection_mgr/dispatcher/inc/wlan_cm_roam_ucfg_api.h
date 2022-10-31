@@ -43,15 +43,13 @@ ucfg_user_space_enable_disable_rso(struct wlan_objmgr_pdev *pdev,
 				   const bool is_fast_roam_enabled);
 
 /**
- * ucfg_is_roaming_enabled() - Check if roaming enabled
- * to firmware.
- * @psoc: psoc context
+ * ucfg_is_rso_enabled() - Check if rso is enabled
+ * @pdev: Pointer to pdev
  * @vdev_id: vdev id
  *
- * Return: True if Roam state machine is in
- *	   WLAN_ROAM_RSO_ENABLED/WLAN_ROAMING_IN_PROG/WLAN_ROAM_SYNCH_IN_PROG
+ * Return: Wrapper for wlan_is_rso_enabled.
  */
-bool ucfg_is_roaming_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
+bool ucfg_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
 
 /*
  * ucfg_cm_abort_roam_scan() -abort current roam scan cycle by roam scan
@@ -401,4 +399,18 @@ ucfg_cm_roam_is_vendor_handoff_control_enable(struct wlan_objmgr_psoc *psoc)
 }
 #endif
 
+/**
+ * ucfg_cm_get_sae_auth_ta() - Get SAE auth tx address
+ * @vdev_id: Vdev id
+ * @sae_auth_ta: SAE auth tx address
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+ucfg_cm_get_sae_auth_ta(struct wlan_objmgr_pdev *pdev,
+			uint8_t vdev_id,
+			struct qdf_mac_addr *sae_auth_ta)
+{
+	return wlan_cm_get_sae_auth_ta(pdev, vdev_id, sae_auth_ta);
+}
 #endif /* _WLAN_CM_ROAM_UCFG_API_H_ */

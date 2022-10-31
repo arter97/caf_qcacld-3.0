@@ -240,6 +240,10 @@ char *sta_info_string_from_dbgid(wlan_sta_info_dbgid id);
  * @pending_eap_frm_type: EAP frame type in tx queue without tx completion
  * @is_attached: Flag to check if the stainfo is attached/detached
  * @peer_rssi_per_chain: Average value of RSSI (dbm) per chain
+ * @num_tx_rate_counts: Num tx rate count for current peer
+ * @num_rx_rate_counts: Num rx rate count for current peer
+ * @tx_pkt_per_mcs: Number of tx rate counts for each MCS
+ * @rx_pkt_per_mcs: Number of rx rate counts for each MCS
  */
 struct hdd_station_info {
 	qdf_list_node_t sta_node;
@@ -305,6 +309,10 @@ struct hdd_station_info {
 	unsigned long pending_eap_frm_type;
 	bool is_attached;
 	int32_t peer_rssi_per_chain[WMI_MAX_CHAINS];
+	uint32_t num_tx_rate_count;
+	uint32_t num_rx_rate_count;
+	uint32_t *tx_pkt_per_mcs;
+	uint32_t *rx_pkt_per_mcs;
 };
 
 /**
@@ -352,7 +360,7 @@ void hdd_take_sta_info_ref(struct hdd_sta_info_obj *sta_info_container,
 
 /**
  * hdd_get_front_sta_info_no_lock() - Get the first sta_info from the sta list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  *
  * @sta_info_container: The station info container obj that stores and maintains
@@ -367,7 +375,7 @@ hdd_get_front_sta_info_no_lock(struct hdd_sta_info_obj *sta_info_container,
 
 /**
  * hdd_get_next_sta_info_no_lock() - Get the next sta_info from the sta list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  *
  * @sta_info_container: The station info container obj that stores and maintains
@@ -497,7 +505,7 @@ hdd_get_next_sta_info_no_lock(struct hdd_sta_info_obj *sta_info_container,
  * @sta_info_container: The station info container obj that stores and maintains
  *                      the sta_info obj.
  * @sta_info: The station info structure that acts as the iterator object.
- * @next_sta_info: A temporary node for maintaing del safe.
+ * @next_sta_info: A temporary node for maintaining del safe.
  * @sta_info_dbgid: Debug ID of the caller API
  *
  * The sta_info will contain the structure that is fetched for that particular

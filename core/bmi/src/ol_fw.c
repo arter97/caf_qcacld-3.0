@@ -140,7 +140,7 @@ end:
  *
  * The API return board filename based on the board_id and chip_id.
  * eg: input = "bdwlan30.bin", board_id = 0x01, board_file = "bdwlan30.b01"
- * Return: The buffer with the formated board filename.
+ * Return: The buffer with the formatted board filename.
  */
 static char *ol_board_id_to_filename(const char *old_name,
 				     uint16_t board_id)
@@ -518,15 +518,15 @@ static int
 ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 		     uint32_t address, bool compressed)
 {
+#define MAX_WAKELOCK_FOR_FW_DOWNLOAD 1000	//1s
 	int ret;
-	qdf_device_t qdf_dev = ol_ctx->qdf_dev;
 
-	/* Wait until suspend and resume are completed before loading FW */
-	pld_lock_pm_sem(qdf_dev->dev);
+	qdf_wake_lock_timeout_acquire(&ol_ctx->fw_dl_wakelock,
+				      MAX_WAKELOCK_FOR_FW_DOWNLOAD);
 
 	ret = __ol_transfer_bin_file(ol_ctx, file, address, compressed);
 
-	pld_release_pm_sem(qdf_dev->dev);
+	qdf_wake_lock_release(&ol_ctx->fw_dl_wakelock, 0);
 
 	return ret;
 }

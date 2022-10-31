@@ -144,7 +144,7 @@ static int wlan_set_def_pre_cac_chan(struct hdd_context *hdd_ctx,
 	ieee_chan = ieee80211_get_channel(hdd_ctx->wiphy,
 					  pre_cac_ch_freq);
 	if (!ieee_chan) {
-		hdd_err("channel converion failed %d", pre_cac_ch_freq);
+		hdd_err("channel conversion failed %d", pre_cac_ch_freq);
 		return -EINVAL;
 	}
 	ch_params.ch_width = *ch_width;
@@ -351,7 +351,7 @@ static int __wlan_hdd_request_pre_cac(struct hdd_context *hdd_ctx,
 	pre_cac_adapter->session.ap.sap_config.authType =
 			ap_adapter->session.ap.sap_config.authType;
 
-	/* The orginal premise is that on moving from 2.4GHz to 5GHz, the SAP
+	/* The original premise is that on moving from 2.4GHz to 5GHz, the SAP
 	 * will continue to operate on the same bandwidth as that of the 2.4GHz
 	 * operations. Only bandwidths 20MHz/40MHz are possible on 2.4GHz band.
 	 * Now some customer request to start AP on higher BW such as 80Mhz.
@@ -538,16 +538,15 @@ wlan_hdd_pre_cac_conditional_freq_switch_ind(struct wlan_objmgr_vdev *vdev,
 }
 
 static void
-wlan_hdd_pre_cac_complete(struct wlan_objmgr_vdev *vdev,
+wlan_hdd_pre_cac_complete(struct wlan_objmgr_psoc *psoc,
+			  uint8_t vdev_id,
 			  QDF_STATUS status)
 {
-	struct wlan_objmgr_psoc *psoc = wlan_vdev_get_psoc(vdev);
-	uint8_t vdev_id = vdev->vdev_objmgr.vdev_id;
 	struct hdd_adapter *adapter;
 
 	adapter = wlan_hdd_get_adapter_from_vdev(psoc, vdev_id);
 	if (!adapter) {
-		hdd_err("Invalid adapter");
+		hdd_err("Invalid adapter vdev %d", vdev_id);
 		return;
 	}
 

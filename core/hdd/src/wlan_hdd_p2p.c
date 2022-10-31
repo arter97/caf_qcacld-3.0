@@ -57,6 +57,7 @@
 #include "wlan_hdd_pre_cac.h"
 #include "wlan_pre_cac_ucfg_api.h"
 #include "wlan_dp_ucfg_api.h"
+#include "wlan_psoc_mlme_ucfg_api.h"
 
 /* Ms to Time Unit Micro Sec */
 #define MS_TO_TU_MUS(x)   ((x) * 1024)
@@ -476,7 +477,7 @@ int hdd_set_p2p_noa(struct net_device *dev, uint8_t *command)
 
 	param = strnchr(command, strlen(command), ' ');
 	if (!param) {
-		hdd_err("strnchr failed to find delimeter");
+		hdd_err("strnchr failed to find delimiter");
 		return -EINVAL;
 	}
 	param++;
@@ -667,7 +668,7 @@ int hdd_set_p2p_ps(struct net_device *dev, void *msgData)
  * @name: User-visible name of the interface
  * @name_assign_type: the name of assign type of the netdev
  * @nl80211_iftype: (virtual) interface types
- * @flags: moniter configuraiton flags (not used)
+ * @flags: monitor configuration flags (not used)
  * @vif_params: virtual interface parameters (not used)
  *
  * Return: the pointer of wireless dev, otherwise ERR_PTR.
@@ -810,7 +811,7 @@ struct wireless_dev *__wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 
 	adapter->delete_in_progress = false;
 
-	/* ensure physcial soc is up */
+	/* ensure physical soc is up */
 	ret = hdd_trigger_psoc_idle_restart(hdd_ctx);
 	if (ret) {
 		hdd_err("Failed to start the wlan_modules");
@@ -1062,6 +1063,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	enum nl80211_rxmgmt_flags nl80211_flag = 0;
 	bool is_pasn_auth_frame = false;
 	struct hdd_adapter *assoc_adapter;
+	bool eht_capab;
 
 	hdd_debug("Frame Type = %d Frame Length = %d freq = %d",
 		  frame_type, frm_len, rx_freq);
@@ -1106,7 +1108,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 								  dest_addr);
 		if (!adapter) {
 			/*
-			 * Under assumtion that we don't receive any action
+			 * Under assumption that we don't receive any action
 			 * frame with BCST as destination,
 			 * we are dropping action frame
 			 */
@@ -1122,7 +1124,7 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 			if (!adapter || !qdf_is_macaddr_broadcast(
 			    (struct qdf_mac_addr *)dest_addr)) {
 				/*
-				 * Under assumtion that we don't
+				 * Under assumption that we don't
 				 * receive any action frame with BCST
 				 * as destination, we are dropping
 				 * action frame
@@ -1151,8 +1153,8 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 					      adapter->vdev_id);
 
 	assoc_adapter = adapter;
-
-	if (hdd_adapter_is_link_adapter(adapter)) {
+	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
+	if (hdd_adapter_is_link_adapter(adapter) && eht_capab) {
 		hdd_debug("adapter is not ml adapter move to ml adapter");
 		assoc_adapter = hdd_adapter_get_mlo_adapter_from_link(adapter);
 		if (!assoc_adapter) {

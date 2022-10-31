@@ -32,6 +32,7 @@
 #include <target_if_vdev_mgr_tx_ops.h>
 #include "target_if_cm_roam_event.h"
 #include <target_if_psoc_wake_lock.h>
+#include "wlan_psoc_mlme_api.h"
 
 static struct wmi_unified
 *target_if_cm_roam_get_wmi_handle_from_vdev(struct wlan_objmgr_vdev *vdev)
@@ -1104,6 +1105,55 @@ target_if_cm_roam_send_time_sync_cmd(wmi_unified_t wmi_handle)
 	return wmi_send_time_stamp_sync_cmd_tlv(wmi_handle);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * target_if_cm_roam_send_start() - Send roam mlo related commands
+ * to wmi
+ * @vdev: vdev object
+ * @req: roam mlo config parameters
+ *
+ * This function is used to send roam mlo related commands to wmi
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+target_if_cm_roam_send_mlo_config(struct wlan_objmgr_vdev *vdev,
+				  struct wlan_roam_mlo_config *req)
+{
+	QDF_STATUS status;
+	wmi_unified_t wmi_handle;
+
+	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	status = wmi_unified_roam_mlo_config_cmd(wmi_handle, req);
+
+	if (status != QDF_STATUS_SUCCESS)
+		target_if_err("failed to send WMI_ROAM_MLO_CONFIG_CMDID command");
+
+	return status;
+}
+
+static void
+target_if_cm_roam_register_mlo_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
+{
+	tx_ops->send_roam_mlo_config = target_if_cm_roam_send_mlo_config;
+}
+#else
+static QDF_STATUS
+target_if_cm_roam_send_mlo_config(struct wlan_objmgr_vdev *vdev,
+				  struct wlan_roam_mlo_config *req)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static void
+target_if_cm_roam_register_mlo_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
+{
+}
+#endif
+
 /**
  * target_if_cm_roam_send_start() - Send roam start related commands
  * to wmi
@@ -1123,6 +1173,7 @@ target_if_cm_roam_send_start(struct wlan_objmgr_vdev *vdev,
 	struct wlan_objmgr_psoc *psoc;
 	uint8_t vdev_id;
 	bool bss_load_enabled;
+	bool eht_capab = false;
 
 	wmi_handle = target_if_cm_roam_get_wmi_handle_from_vdev(vdev);
 	if (!wmi_handle)
@@ -1250,6 +1301,9 @@ target_if_cm_roam_send_start(struct wlan_objmgr_vdev *vdev,
 
 	target_if_cm_roam_idle_params(wmi_handle, ROAM_SCAN_OFFLOAD_START,
 				      &req->idle_params);
+	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+	if (eht_capab)
+		target_if_cm_roam_send_mlo_config(vdev, &req->roam_mlo_params);
 
 	vdev_id = wlan_vdev_get_id(vdev);
 	if (req->wlan_roam_rt_stats_config)
@@ -1730,10 +1784,10 @@ end:
 }
 
 /**
- * target_if_cm_roam_register_rso_req_ops() - Register rso req tx ops fucntions
+ * target_if_cm_roam_register_rso_req_ops() - Register rso req tx ops functions
  * @tx_ops: tx ops
  *
- * This function is used to register rso req tx ops fucntions
+ * This function is used to register rso req tx ops functions
  *
  * Return: none
  */
@@ -1749,6 +1803,7 @@ target_if_cm_roam_register_rso_req_ops(struct wlan_cm_roam_tx_ops *tx_ops)
 	tx_ops->send_roam_triggers = target_if_cm_roam_triggers;
 	tx_ops->send_roam_disable_config =
 					target_if_cm_roam_send_disable_config;
+	target_if_cm_roam_register_mlo_req_ops(tx_ops);
 }
 
 QDF_STATUS target_if_cm_roam_register_tx_ops(struct wlan_cm_roam_tx_ops *tx_ops)

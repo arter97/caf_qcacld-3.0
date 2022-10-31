@@ -32,6 +32,7 @@
 #include "wlan_policy_mgr_ucfg.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
+#include "wlan_psoc_mlme_api.h"
 
 /* quota in milliseconds */
 #define MCC_DUTY_CYCLE 70
@@ -993,9 +994,14 @@ QDF_STATUS mlme_update_tgt_eht_caps_in_cfg(struct wlan_objmgr_psoc *psoc,
 	struct wlan_mlme_psoc_ext_obj *mlme_obj = mlme_get_psoc_ext_obj(psoc);
 	tDot11fIEeht_cap *eht_cap = &wma_cfg->eht_cap;
 	tDot11fIEeht_cap *mlme_eht_cap;
+	bool eht_capab;
 
 	if (!mlme_obj)
 		return QDF_STATUS_E_FAILURE;
+
+	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
+	if (!eht_capab)
+		return QDF_STATUS_SUCCESS;
 
 	mlme_obj->cfg.eht_caps.dot11_eht_cap.present = 1;
 	qdf_mem_copy(&mlme_obj->cfg.eht_caps.dot11_eht_cap, eht_cap,
@@ -3872,13 +3878,17 @@ mlme_update_vht_cap(struct wlan_objmgr_psoc *psoc, struct wma_tgt_vht_cap *cfg)
 	if (vht_cap_info->short_gi_80mhz && !cfg->vht_short_gi_80)
 		vht_cap_info->short_gi_80mhz = cfg->vht_short_gi_80;
 
-	/* Set VHT TX STBC cap */
-	if (vht_cap_info->tx_stbc && !cfg->vht_tx_stbc)
-		vht_cap_info->tx_stbc = cfg->vht_tx_stbc;
+	/* Set VHT TX/RX STBC cap */
+	if (vht_cap_info->enable2x2) {
+		if (vht_cap_info->tx_stbc && !cfg->vht_tx_stbc)
+			vht_cap_info->tx_stbc = cfg->vht_tx_stbc;
 
-	/* Set VHT RX STBC cap */
-	if (vht_cap_info->rx_stbc && !cfg->vht_rx_stbc)
-		vht_cap_info->rx_stbc = cfg->vht_rx_stbc;
+		if (vht_cap_info->rx_stbc && !cfg->vht_rx_stbc)
+			vht_cap_info->rx_stbc = cfg->vht_rx_stbc;
+	} else {
+		vht_cap_info->tx_stbc = 0;
+		vht_cap_info->rx_stbc = 0;
+	}
 
 	/* Set VHT SU Beamformer cap */
 	if (vht_cap_info->su_bformer && !cfg->vht_su_bformer)
@@ -4277,7 +4287,7 @@ char *mlme_get_roam_trigger_str(uint32_t roam_scan_trigger)
 	case WMI_ROAM_TRIGGER_REASON_BTM:
 		return "BTM TRIGGER";
 	case WMI_ROAM_TRIGGER_REASON_UNIT_TEST:
-		return "TEST COMMMAND";
+		return "TEST COMMAND";
 	case WMI_ROAM_TRIGGER_REASON_BSS_LOAD:
 		return "HIGH BSS LOAD";
 	case WMI_ROAM_TRIGGER_REASON_DEAUTH:
@@ -4556,6 +4566,25 @@ wlan_mlme_get_mgmt_max_retry(struct wlan_objmgr_psoc *psoc,
 	}
 
 	*max_retry = mlme_obj->cfg.gen.mgmt_retry_max;
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+wlan_mlme_get_mgmt_6ghz_rate_support(struct wlan_objmgr_psoc *psoc,
+				     bool *enable_he_mcs0_for_6ghz_mgmt)
+{
+	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+
+	mlme_obj = mlme_get_psoc_ext_obj(psoc);
+
+	if (!mlme_obj) {
+		*enable_he_mcs0_for_6ghz_mgmt =
+			cfg_default(CFG_ENABLE_HE_MCS0_MGMT_6GHZ);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	*enable_he_mcs0_for_6ghz_mgmt =
+		mlme_obj->cfg.gen.enable_he_mcs0_for_6ghz_mgmt;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -5226,12 +5255,14 @@ wlan_mlme_check_chan_param_has_dfs(struct wlan_objmgr_pdev *pdev,
 				CHANNEL_STATE_DFS)
 			is_dfs = true;
 	} else if (ch_params->ch_width == CH_WIDTH_80P80MHZ) {
-		if (wlan_reg_get_channel_state_for_freq(
+		if (wlan_reg_get_channel_state_for_pwrmode(
 			pdev,
-			chan_freq) == CHANNEL_STATE_DFS ||
-		    wlan_reg_get_channel_state_for_freq(
+			chan_freq,
+			REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS ||
+		    wlan_reg_get_channel_state_for_pwrmode(
 			pdev,
-			ch_params->mhz_freq_seg1) == CHANNEL_STATE_DFS)
+			ch_params->mhz_freq_seg1,
+			REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS)
 			is_dfs = true;
 	} else if (wlan_reg_is_dfs_for_freq(pdev, chan_freq)) {
 		/*Indoor channels are also marked DFS, therefore
@@ -6154,6 +6185,7 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 {
 	uint32_t roam_triggers;
 	int sap_max_num_clients;
+	bool is_enable_idle_roam = false, is_bss_load_enabled = false;
 
 	wlan_mlme_get_latency_enable(psoc,
 				     &mlme_feature_set->enable_wifi_optimizer);
@@ -6163,14 +6195,21 @@ void wlan_mlme_get_feature_info(struct wlan_objmgr_psoc *psoc,
 					WMI_HOST_VENDOR1_REQ1_VERSION_3_20;
 	roam_triggers = wlan_mlme_get_roaming_triggers(psoc);
 
+	wlan_mlme_get_bss_load_enabled(psoc, &is_bss_load_enabled);
 	mlme_feature_set->roaming_high_cu_roam_trigger =
-			roam_triggers & BIT(ROAM_TRIGGER_REASON_BSS_LOAD);
+			(roam_triggers & BIT(ROAM_TRIGGER_REASON_BSS_LOAD)) &&
+			is_bss_load_enabled;
+
 	mlme_feature_set->roaming_emergency_trigger =
 			roam_triggers & BIT(ROAM_TRIGGER_REASON_FORCED);
 	mlme_feature_set->roaming_btm_trihgger =
 			roam_triggers & BIT(ROAM_TRIGGER_REASON_BTM);
+
+	wlan_mlme_get_enable_idle_roam(psoc, &is_enable_idle_roam);
 	mlme_feature_set->roaming_idle_trigger =
-			roam_triggers & BIT(ROAM_TRIGGER_REASON_IDLE);
+			(roam_triggers & BIT(ROAM_TRIGGER_REASON_IDLE)) &&
+			is_enable_idle_roam;
+
 	mlme_feature_set->roaming_wtc_trigger =
 			roam_triggers & BIT(ROAM_TRIGGER_REASON_WTC_BTM);
 	mlme_feature_set->roaming_btcoex_trigger =

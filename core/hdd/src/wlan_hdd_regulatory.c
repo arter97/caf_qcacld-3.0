@@ -1598,8 +1598,10 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 		width_changed = false;
 		oper_freq = hdd_get_adapter_home_channel(adapter);
 		if (oper_freq)
-			freq_changed = wlan_reg_is_disable_for_freq(pdev,
-								    oper_freq);
+			freq_changed = wlan_reg_is_disable_for_pwrmode(
+							pdev,
+							oper_freq,
+							REG_CURRENT_PWR_MODE);
 		else
 			freq_changed = false;
 
@@ -1923,7 +1925,6 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {
 	bool offload_enabled;
 	struct regulatory_channel *cur_chan_list;
-	enum country_src cc_src;
 	uint8_t alpha2[REG_ALPHA2_LEN + 1];
 	int ret;
 
@@ -1956,21 +1957,17 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	wiphy->reg_notifier = hdd_reg_notifier;
 	offload_enabled = ucfg_reg_is_regdb_offloaded(hdd_ctx->psoc);
 	hdd_debug("regulatory offload_enabled %d", offload_enabled);
-	if (offload_enabled) {
+	if (offload_enabled)
 		hdd_ctx->reg_offload = true;
-		ucfg_reg_get_current_chan_list(hdd_ctx->pdev,
-					       cur_chan_list);
-		hdd_regulatory_chanlist_dump(cur_chan_list);
-		fill_wiphy_band_channels(wiphy, cur_chan_list,
-					 NL80211_BAND_2GHZ);
-		fill_wiphy_band_channels(wiphy, cur_chan_list,
-					 NL80211_BAND_5GHZ);
-		fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
-		cc_src = ucfg_reg_get_cc_and_src(hdd_ctx->psoc, alpha2);
-		qdf_mem_copy(hdd_ctx->reg.alpha2, alpha2, REG_ALPHA2_LEN + 1);
-	} else {
+	else
 		hdd_ctx->reg_offload = false;
-	}
+
+	ucfg_reg_get_current_chan_list(hdd_ctx->pdev, cur_chan_list);
+	hdd_regulatory_chanlist_dump(cur_chan_list);
+	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_2GHZ);
+	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_5GHZ);
+	fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
+	qdf_mem_copy(hdd_ctx->reg.alpha2, alpha2, REG_ALPHA2_LEN + 1);
 
 	qdf_mem_free(cur_chan_list);
 	return 0;

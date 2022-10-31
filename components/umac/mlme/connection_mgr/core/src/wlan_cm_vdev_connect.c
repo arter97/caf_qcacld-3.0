@@ -39,6 +39,7 @@
 #include "wlan_reg_ucfg_api.h"
 #include "wlan_mlme_api.h"
 #include "wlan_reg_services_api.h"
+#include "wlan_psoc_mlme_api.h"
 
 #ifdef WLAN_FEATURE_FILS_SK
 void cm_update_hlp_info(struct wlan_objmgr_vdev *vdev,
@@ -696,6 +697,31 @@ cm_connect_success_diag(struct wlan_mlme_psoc_ext_obj *mlme_obj,
 	WLAN_HOST_DIAG_EVENT_REPORT(&connect_status, EVENT_WLAN_STATUS_V2);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void cm_print_mlo_info(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_peer *peer;
+	struct qdf_mac_addr *mld_addr;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return;
+
+	mld_addr = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(vdev);
+	peer = wlan_vdev_get_bsspeer(vdev);
+	if (!peer)
+		return;
+
+	mlme_nofl_debug("self_mld_addr:" QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(mld_addr->bytes));
+	mlme_nofl_debug("peer_mld_mac:" QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer->mldaddr));
+}
+#else
+static void cm_print_mlo_info(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif
+
 void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 		     struct qdf_mac_addr *bssid, struct wlan_ssid *ssid,
 		     qdf_freq_t freq)
@@ -799,6 +825,7 @@ void cm_connect_info(struct wlan_objmgr_vdev *vdev, bool connect_success,
 	mlme_nofl_debug("Qos enable: %d | Associated: %s",
 			conn_stats.qos_capability,
 			(conn_stats.result_code ? "yes" : "no"));
+	cm_print_mlo_info(vdev);
 	mlme_nofl_debug("+---------CONNECTION INFO END------------+");
 
 	WLAN_HOST_DIAG_EVENT_REPORT(&conn_stats, EVENT_WLAN_CONN_STATS_V2);
@@ -1101,9 +1128,11 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 	 * entry should be cleared to not affect next connect request.
 	 */
 	for (i = 0; i < scan_entry->ml_info.num_links; i++) {
-		mlme_debug("freq: %d, link id: %d",
-			   partner_info->partner_link_info[i].chan_freq,
-			   scan_entry->ml_info.link_info[i].link_id);
+		mlme_debug("freq: %d, link id: %d "QDF_MAC_ADDR_FMT,
+			   scan_entry->ml_info.link_info[i].freq,
+			   scan_entry->ml_info.link_info[i].link_id,
+			   QDF_MAC_ADDR_REF(
+			   scan_entry->ml_info.link_info[i].link_addr.bytes));
 		if (j >= mlo_support_link_num - 1)
 			break;
 		if (scan_entry->ml_info.link_info[i].is_valid_link) {
@@ -1111,6 +1140,8 @@ cm_get_ml_partner_info(struct scan_cache_entry *scan_entry,
 				scan_entry->ml_info.link_info[i].link_addr;
 			partner_info->partner_link_info[j].link_id =
 				scan_entry->ml_info.link_info[i].link_id;
+			partner_info->partner_link_info[j].chan_freq =
+				scan_entry->ml_info.link_info[i].freq;
 			j++;
 		} else {
 			scan_entry->ml_info.link_info[i].is_valid_link = false;
@@ -1362,6 +1393,7 @@ cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
 	struct scheduler_msg msg;
 	QDF_STATUS status;
 	struct cm_peer_create_req *req;
+	bool eht_capab;
 
 	if (!vdev || !peer_mac)
 		return QDF_STATUS_E_FAILURE;
@@ -1372,9 +1404,12 @@ cm_send_bss_peer_create_req(struct wlan_objmgr_vdev *vdev,
 	if (!req)
 		return QDF_STATUS_E_NOMEM;
 
+	wlan_psoc_mlme_get_11be_capab(wlan_vdev_get_psoc(vdev), &eht_capab);
+	if (eht_capab)
+		cm_set_peer_mld_info(req, mld_mac, is_assoc_peer);
+
 	req->vdev_id = wlan_vdev_get_id(vdev);
 	qdf_copy_macaddr(&req->peer_mac, peer_mac);
-	cm_set_peer_mld_info(req, mld_mac, is_assoc_peer);
 	msg.bodyptr = req;
 	msg.type = CM_BSS_PEER_CREATE_REQ;
 

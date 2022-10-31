@@ -824,8 +824,9 @@ static void csr_add_len_of_social_channels(struct mac_context *mac,
 			*num_chan);
 	if (CSR_IS_5G_BAND_ONLY(mac)) {
 		for (i = 0; i < MAX_SOCIAL_CHANNELS; i++) {
-			if (wlan_reg_get_channel_state_for_freq(
-				mac->pdev, social_channel_freq[i]) ==
+			if (wlan_reg_get_channel_state_for_pwrmode(
+				mac->pdev, social_channel_freq[i],
+				REG_CURRENT_PWR_MODE) ==
 					CHANNEL_STATE_ENABLE)
 				no_chan++;
 		}
@@ -845,8 +846,9 @@ static void csr_add_social_channels(struct mac_context *mac,
 			*num_chan);
 	if (CSR_IS_5G_BAND_ONLY(mac)) {
 		for (i = 0; i < MAX_SOCIAL_CHANNELS; i++) {
-			if (wlan_reg_get_channel_state_for_freq(
-					mac->pdev, social_channel_freq[i]) !=
+			if (wlan_reg_get_channel_state_for_pwrmode(
+					mac->pdev, social_channel_freq[i],
+					REG_CURRENT_PWR_MODE) !=
 					CHANNEL_STATE_ENABLE)
 				continue;
 			chan_list->chanParam[no_chan].freq =
@@ -992,8 +994,9 @@ QDF_STATUS csr_update_channel_list(struct mac_context *mac)
 			continue;
 
 		channel_state =
-			wlan_reg_get_channel_state_for_freq(
-				mac->pdev, channel_freq);
+			wlan_reg_get_channel_state_for_pwrmode(
+				mac->pdev, channel_freq,
+				REG_CURRENT_PWR_MODE);
 		if ((CHANNEL_STATE_ENABLE == channel_state) ||
 		    mac->scan.fEnableDFSChnlScan) {
 			if ((roam_policy->dfs_mode ==
@@ -1162,7 +1165,7 @@ QDF_STATUS csr_stop(struct mac_context *mac)
 	wlan_scan_psoc_set_disable(mac->psoc, REASON_SYSTEM_DOWN);
 
 	/*
-	 * purge all serialization commnad if there are any pending to make
+	 * purge all serialization command if there are any pending to make
 	 * sure memory and vdev ref are freed.
 	 */
 	csr_purge_pdev_all_ser_cmd_list(mac);
@@ -1355,7 +1358,7 @@ static QDF_STATUS csr_roam_close(struct mac_context *mac)
 	struct csr_roam_session *session;
 
 	/*
-	 * purge all serialization commnad if there are any pending to make
+	 * purge all serialization command if there are any pending to make
 	 * sure memory and vdev ref are freed.
 	 */
 	csr_purge_pdev_all_ser_cmd_list(mac);
@@ -3110,7 +3113,7 @@ csr_roam_send_disconnect_done_indication(struct mac_context *mac_ctx,
  * @msg_buf:    message buffer
  *
  * We need to be careful on whether to cast msg_buf (pSmeRsp) to other type of
- * strucutres. It depends on how the message is constructed. If the message is
+ * structures. It depends on how the message is constructed. If the message is
  * sent by lim_send_sme_rsp, the msg_buf is only a generic response and can only
  * be used as pointer to tSirSmeRsp. For the messages where sender allocates
  * memory for specific structures, then it can be cast accordingly.
@@ -3864,7 +3867,7 @@ csr_roam_chk_lnk_assoc_ind_upper_layer(
 	 *in the lim_assoc_rsp_tx_complete -> lim_fill_sme_assoc_ind_params
 	 *and then assoc_ind will pass here, so after using it
 	 *in the csr_send_assoc_ind_to_upper_layer_cnf_msg and
-	 *then free the memroy here.
+	 *then free the memory here.
 	 */
 free_mem:
 	if (assoc_ind->assocReqLength != 0 && assoc_ind->assocReqPtr)
@@ -3919,6 +3922,7 @@ csr_roam_chk_lnk_assoc_ind(struct mac_context *mac_ctx, tSirSmeRsp *msg_ptr)
 #endif
 	roam_info->addIELen = (uint8_t)pAssocInd->addIE.length;
 	roam_info->paddIE = pAssocInd->addIE.addIEdata;
+	roam_info->fReassocReq = pAssocInd->reassocReq;
 	qdf_mem_copy(roam_info->peerMac.bytes,
 		     pAssocInd->peerMacAddr,
 		     sizeof(tSirMacAddr));
@@ -4850,6 +4854,24 @@ csr_convert_mode_to_nw_type(enum csr_cfgdot11mode dot11_mode,
 }
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
+#ifdef WLAN_FEATURE_11BE_MLO
+static bool csr_pmk_match_mlo_address(struct wlan_objmgr_vdev *vdev,
+				      struct wlan_crypto_pmksa *pmksa)
+{
+	struct qdf_mac_addr bss_peer_mld_mac = {0};
+
+	wlan_vdev_get_bss_peer_mld_mac(vdev, &bss_peer_mld_mac);
+
+	return qdf_is_macaddr_equal(&bss_peer_mld_mac, &pmksa->bssid);
+}
+#else
+static inline bool csr_pmk_match_mlo_address(struct wlan_objmgr_vdev *vdev,
+					     struct wlan_crypto_pmksa *pmksa)
+{
+	return false;
+}
+#endif
+
 void csr_get_pmk_info(struct mac_context *mac_ctx, uint8_t session_id,
 		      struct wlan_crypto_pmksa *pmk_cache)
 {
@@ -4889,7 +4911,8 @@ QDF_STATUS csr_roam_set_psk_pmk(struct mac_context *mac,
 	 */
 	if (wlan_vdev_mlme_get_state(vdev) == WLAN_VDEV_S_UP &&
 	    !pmksa->ssid_len &&
-	    !qdf_is_macaddr_equal(&connected_bssid, &pmksa->bssid)) {
+	    !qdf_is_macaddr_equal(&connected_bssid, &pmksa->bssid) &&
+	    !csr_pmk_match_mlo_address(vdev, pmksa)) {
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_SME_ID);
 		sme_debug("Set pmksa received for non-connected bss");
 		return QDF_STATUS_E_INVAL;
@@ -6485,7 +6508,7 @@ QDF_STATUS csr_invoke_neighbor_report_request(
 }
 
 #ifdef FEATURE_WLAN_ESE
-void wlan_cm_ese_populate_addtional_ies(struct wlan_objmgr_pdev *pdev,
+void wlan_cm_ese_populate_additional_ies(struct wlan_objmgr_pdev *pdev,
 			struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			uint8_t vdev_id,
 			struct wlan_roam_scan_offload_params *rso_mode_cfg)

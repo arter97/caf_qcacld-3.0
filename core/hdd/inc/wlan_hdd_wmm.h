@@ -105,12 +105,12 @@ enum hdd_wmm_linuxac {
  * struct hdd_wmm_qos_context - HDD WMM QoS Context
  *
  * This structure holds the context for a single flow which has either
- * been confgured explicitly from userspace or implicitly via the
+ * been configured explicitly from userspace or implicitly via the
  * Implicit QoS feature.
  *
  * @node: list node which can be used to put the context into a list
  *	of contexts
- * @handle: identifer which uniquely identifies this context to userspace
+ * @handle: identifier which uniquely identifies this context to userspace
  * @flow_id: identifier which uniquely identifies this flow to SME
  * @adapter: adapter upon which this flow was configured
  * @ac_type: access category for this flow
@@ -141,7 +141,7 @@ struct hdd_wmm_qos_context {
  * @has_access_failed - has implicit QoS negotiation already failed?
  * @was_access_granted - has implicit QoS negotiation already succeeded?
  * @is_access_allowed - is access to this AC allowed, either because we
- *	are not doing WMM, we are not doing implicit QoS, implict QoS has
+ *	are not doing WMM, we are not doing implicit QoS, implicit QoS has
  *	completed, or explicit QoS has completed?
  * @is_tspec_valid - is the tspec valid?
  * @is_uapsd_info_valid - are the UAPSD-related fields valid?

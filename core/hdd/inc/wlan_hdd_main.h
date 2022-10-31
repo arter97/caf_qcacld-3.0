@@ -1155,6 +1155,14 @@ struct hdd_adapter {
 	uint64_t cur_target_global_tsf_time;
 	uint64_t last_target_global_tsf_time;
 	qdf_mc_timer_t host_capture_req_timer;
+#ifdef QCA_GET_TSF_VIA_REG
+	/* TSF id as obtained from FW report */
+	int tsf_id;
+	/* mac_id as obtained from FW report */
+	int tsf_mac_id;
+	/* flag indicating whether tsf details are valid */
+	qdf_atomic_t tsf_details_valid;
+#endif
 #ifdef WLAN_FEATURE_TSF_PLUS
 	/* spin lock for read/write timestamps */
 	qdf_spinlock_t host_target_sync_lock;
@@ -1308,6 +1316,9 @@ struct hdd_adapter {
 	int64_t delta_qtime;
 #ifdef DP_TRAFFIC_END_INDICATION
 	bool traffic_end_ind_en;
+#endif
+#ifdef WLAN_FEATURE_DBAM_CONFIG
+	bool is_dbam_configured;
 #endif
 };
 
@@ -1549,7 +1560,7 @@ struct hdd_cache_channels {
 
 /**
  * struct hdd_dynamic_mac - hdd structure to handle dynamic mac address changes
- * @dynamic_mac: Dynamicaly configured mac, this contains the mac on which
+ * @dynamic_mac: Dynamically configured mac, this contains the mac on which
  * current interface is up
  * @is_provisioned_mac: is this mac from provisioned list
  * @bit_position: holds the bit mask position from where this mac is assigned,
@@ -1650,7 +1661,7 @@ static inline bool hdd_get_wlan_driver_status(void)
 #endif
 
 /**
- * enum wlan_state_ctrl_str_id - state contrl param string id
+ * enum wlan_state_ctrl_str_id - state control param string id
  * @WLAN_OFF_STR: Turn OFF WiFi
  * @WLAN_ON_STR: Turn ON WiFi
  * @WLAN_ENABLE_STR: Enable WiFi
@@ -1666,6 +1677,8 @@ enum wlan_state_ctrl_str_id {
 	WLAN_WAIT_FOR_READY_STR,
 	WLAN_FORCE_DISABLE_STR
 };
+
+#define MAX_TGT_HW_NAME_LEN 32
 
 /**
  * struct hdd_context - hdd shared driver and psoc/device context
@@ -1697,6 +1710,7 @@ enum wlan_state_ctrl_str_id {
  * @dump_in_progress: Stores value of dump in progress
  * @hdd_dual_sta_policy: Concurrent STA policy configuration
  * @is_wlan_disabled: if wlan is disabled by userspace
+ * @pm_notifier: PM notifier of hdd modules
  */
 struct hdd_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -1785,7 +1799,7 @@ struct hdd_context {
 	/* defining the chip/rom revision */
 	uint32_t target_hw_revision;
 	/* chip/rom name */
-	char *target_hw_name;
+	char target_hw_name[MAX_TGT_HW_NAME_LEN];
 	struct regulatory reg;
 #ifdef FEATURE_WLAN_CH_AVOID
 	uint16_t unsafe_channel_count;
@@ -1876,6 +1890,7 @@ struct hdd_context {
 	/* Present state of driver cds modules */
 	enum driver_modules_status driver_status;
 	struct qdf_delayed_work psoc_idle_timeout_work;
+	struct notifier_block pm_notifier;
 	struct acs_dfs_policy acs_policy;
 	uint16_t wmi_max_len;
 	struct suspend_resume_stats suspend_resume_stats;
@@ -2027,6 +2042,9 @@ struct hdd_context {
 	uint8_t oem_data_len;
 	uint8_t *file_name;
 	qdf_mutex_t wifi_kobj_lock;
+#ifdef WLAN_FEATURE_DBAM_CONFIG
+	enum coex_dbam_config_mode dbam_mode;
+#endif
 };
 
 /**
@@ -2203,7 +2221,7 @@ QDF_STATUS hdd_get_next_adapter(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_get_front_adapter_no_lock() - Get the first adapter from the adapter list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  * @hdd_ctx: pointer to the HDD context
  * @out_adapter: double pointer to pass the next adapter
@@ -2215,7 +2233,7 @@ QDF_STATUS hdd_get_front_adapter_no_lock(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_get_next_adapter_no_lock() - Get the next adapter from the adapter list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  * @hdd_ctx: pointer to the HDD context
  * @current_adapter: pointer to the current adapter
@@ -2495,7 +2513,7 @@ struct hdd_adapter *hdd_get_adapter_by_macaddr(struct hdd_context *hdd_ctx,
  * @adapter: hdd adapter of vdev
  *
  * This function returns operation channel of station/p2p-cli if
- * connected, returns opration channel of sap/p2p-go if started.
+ * connected, returns operation channel of sap/p2p-go if started.
  *
  * Return: home channel if connected/started or invalid channel 0
  */
@@ -2549,7 +2567,18 @@ bool hdd_is_vdev_in_conn_state(struct hdd_adapter *adapter);
  */
 int hdd_vdev_create(struct hdd_adapter *adapter);
 int hdd_vdev_destroy(struct hdd_adapter *adapter);
-int hdd_vdev_ready(struct hdd_adapter *adapter);
+
+/**
+ * hdd_vdev_ready() - Configure FW post VDEV create
+ * @vdev: VDEV object.
+ *
+ * The function is used send configuration to the FW
+ * post VDEV creation.
+ * The caller to ensure to hold the VDEV reference
+ *
+ * Return: 0 on success, negative value on failure.
+ */
+int hdd_vdev_ready(struct wlan_objmgr_vdev *vdev);
 
 QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter);
 struct hdd_adapter *hdd_get_adapter(struct hdd_context *hdd_ctx,
@@ -2828,7 +2857,7 @@ int wlan_hdd_scan_abort(struct hdd_adapter *adapter);
  * @vdev_id: vdev id
  * @cnt: number of active ndp sessions
  *
- * This HDD callback registerd with policy manager to indicates number of active
+ * This HDD callback registered with policy manager to indicates number of active
  * ndp sessions to hdd.
  *
  * Return:  none
@@ -3501,7 +3530,7 @@ wlan_hdd_deinit_multi_client_info_table(struct hdd_adapter *adapter)
 int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit);
 
 /**
- * hdd_wlan_stop_modules - Single driver state machine for stoping modules
+ * hdd_wlan_stop_modules - Single driver state machine for stopping modules
  * @hdd_ctx: HDD context
  * @ftm_mode: ftm mode
  *

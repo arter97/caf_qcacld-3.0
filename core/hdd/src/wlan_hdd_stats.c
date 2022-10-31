@@ -94,6 +94,8 @@
 #define HDD_LINK_STATS_MAX		5
 #define HDD_MAX_ALLOWED_LL_STATS_FAILURE	5
 
+#define INVALID_PREAMBLE 0xFF
+
 /* 11B, 11G Rate table include Basic rate and Extended rate
  * The IDX field is the rate index
  * The HI field is the rate when RSSI is strong or being ignored
@@ -473,6 +475,8 @@ struct hdd_ll_stats {
  * @request_bitmap: userspace-assigned link layer stats request bitmap
  * @ll_stats_lock: Lock to serially access request_bitmap
  * @vdev_id: id of vdev handle
+ * @is_mlo_req: is the request for mlo link layer stats
+ * @mlo_vdev_id_bitmap: bitmap of all ml vdevs
  */
 struct hdd_ll_stats_priv {
 	qdf_list_t ll_stats_q;
@@ -480,6 +484,8 @@ struct hdd_ll_stats_priv {
 	uint32_t request_bitmap;
 	qdf_spinlock_t ll_stats_lock;
 	uint8_t vdev_id;
+	bool is_mlo_req;
+	uint32_t mlo_vdev_id_bitmap;
 };
 
 /*
@@ -1548,6 +1554,12 @@ static void hdd_process_ll_stats(tSirLLStatsResults *results,
 		if (!results->num_peers)
 			priv->request_bitmap &= ~(WMI_LINK_STATS_ALL_PEER);
 		priv->request_bitmap &= ~stats->result_param_id;
+
+		/* Firmware sends interface stats based on vdev_id_bitmap
+		 * So, clear the mlo_vdev_id_bitmap in the host accordingly
+		 */
+		if (priv->is_mlo_req)
+			priv->mlo_vdev_id_bitmap &= ~(1 << results->ifaceId);
 	} else if (results->paramId & WMI_LINK_STATS_ALL_PEER) {
 		struct wifi_peer_stat *peer_stat = (struct wifi_peer_stat *)
 						   results->results;
@@ -1590,6 +1602,8 @@ static void hdd_process_ll_stats(tSirLLStatsResults *results,
 		qdf_list_insert_back(&priv->ll_stats_q, &stats->ll_stats_node);
 
 	if (!priv->request_bitmap) {
+		if (priv->is_mlo_req && priv->mlo_vdev_id_bitmap)
+			goto out;
 exit:
 		qdf_spin_unlock(&priv->ll_stats_lock);
 
@@ -1601,7 +1615,7 @@ exit:
 		osif_request_complete(request);
 		return;
 	}
-
+out:
 	qdf_spin_unlock(&priv->ll_stats_lock);
 }
 
@@ -1632,6 +1646,12 @@ static void hdd_debugfs_process_ll_stats(struct hdd_adapter *adapter,
 			priv->request_bitmap &= ~(WMI_LINK_STATS_ALL_PEER);
 
 		priv->request_bitmap &= ~(WMI_LINK_STATS_IFACE);
+
+		/* Firmware sends interface stats based on vdev_id_bitmap
+		 * So, clear the mlo_vdev_id_bitmap in the host accordingly
+		 */
+		if (priv->is_mlo_req)
+			priv->mlo_vdev_id_bitmap &= ~(1 << results->ifaceId);
 	} else if (results->paramId & WMI_LINK_STATS_ALL_PEER) {
 		hdd_debugfs_process_peer_stats(adapter, results->results);
 		if (!results->moreResultToFollow)
@@ -1641,6 +1661,8 @@ static void hdd_debugfs_process_ll_stats(struct hdd_adapter *adapter,
 	}
 
 	if (!priv->request_bitmap) {
+		if (priv->is_mlo_req && priv->mlo_vdev_id_bitmap)
+			return;
 		/* Thread which invokes this function has allocated memory in
 		 * WMA for radio stats, that memory should be freed from the
 		 * same thread to avoid any race conditions between two threads
@@ -1664,22 +1686,11 @@ wlan_hdd_update_ll_stats_request_bitmap(struct hdd_context *hdd_ctx,
 		return;
 	}
 
-	/* The radio stats event is expected at the last, for MLO ll_stats */
-	if (priv->request_bitmap != WMI_LINK_STATS_RADIO &&
-	    results->paramId == WMI_LINK_STATS_RADIO) {
-		hdd_err("req_id %d resp_id %u req_bitmap 0x%x resp_bitmap 0x%x",
-			priv->request_id, results->rspId,
-			priv->request_bitmap, results->paramId);
-		QDF_DEBUG_PANIC("Out of order event received for MLO_LL_STATS");
-	}
-
 	is_mlo_link = wlan_vdev_mlme_get_is_mlo_link(hdd_ctx->psoc,
 						     results->ifaceId);
 	/* In case of MLO Connection, set the request_bitmap */
 	if (is_mlo_link && results->paramId == WMI_LINK_STATS_IFACE) {
-		/* The radio stats are received at the last, hence set
-		 * the request_bitmap for MLO link vdev iface stats.
-		 */
+		/* Set the request_bitmap for MLO link vdev iface stats */
 		if (!(priv->request_bitmap & results->paramId))
 			priv->request_bitmap |= results->paramId;
 
@@ -2272,6 +2283,11 @@ static int wlan_hdd_send_ll_stats_req(struct hdd_adapter *adapter,
 	priv->request_id = req->reqId;
 	priv->request_bitmap = req->paramIdMask;
 	priv->vdev_id = adapter->vdev_id;
+	priv->is_mlo_req = wlan_vdev_mlme_get_is_mlo_vdev(hdd_ctx->psoc,
+							  adapter->vdev_id);
+	if (priv->is_mlo_req)
+		priv->mlo_vdev_id_bitmap = req->mlo_vdev_id_bitmap;
+
 	qdf_spinlock_create(&priv->ll_stats_lock);
 	qdf_list_create(&priv->ll_stats_q, HDD_LINK_STATS_MAX);
 
@@ -6020,11 +6036,6 @@ wlan_hdd_refill_actual_rate(struct rate_info *os_rate,
 	os_rate->nss = nss;
 	if (preamble == DOT11_A || preamble == DOT11_B) {
 		os_rate->legacy = rate;
-		/*
-		 * Clear os rate flags set by hdd_report_actual_rate(),
-		 * otherwise, kernel will not display legacy rate
-		 */
-		os_rate->flags = 0;
 		hdd_debug("Reporting legacy rate %d", os_rate->legacy);
 		return;
 	}
@@ -6251,24 +6262,41 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 						   rx_nss_max);
 
 		if (!tx_rate_calc || !rx_rate_calc) {
-			hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_STATS_ID);
-			/* Keep GUI happy */
-			return 0;
+			hdd_report_actual_rate(tx_rate_flags, my_tx_rate,
+					       &sinfo->txrate, tx_mcs_index,
+					       tx_nss, tx_dcm, tx_gi);
+
+			hdd_report_actual_rate(rx_rate_flags, my_rx_rate,
+					       &sinfo->rxrate, rx_mcs_index,
+					       rx_nss, rx_dcm, rx_gi);
 		}
 	} else {
+		uint8_t rx_nss_max, rx_preamble;
 
 		/* Fill TX stats */
 		hdd_report_actual_rate(tx_rate_flags, my_tx_rate,
 				       &sinfo->txrate, tx_mcs_index,
 				       tx_nss, tx_dcm, tx_gi);
 
-
 		/* Fill RX stats */
-		hdd_report_actual_rate(rx_rate_flags, my_rx_rate,
-				       &sinfo->rxrate, rx_mcs_index,
-				       rx_nss, rx_dcm, rx_gi);
+		rx_nss_max = wlan_vdev_mlme_get_nss(vdev);
+		rx_preamble = adapter->hdd_stats.class_a_stat.rx_preamble;
 
-		wlan_hdd_refill_actual_rate(&sinfo->rxrate, adapter);
+		/*
+		 * If rx_preamble has been marked invalid, it means that DP
+		 * has not received a data frame since assoc or roaming so
+		 * that the rates info has not been updated, report max rate.
+		 */
+		if (qdf_unlikely(rx_preamble == INVALID_PREAMBLE))
+			hdd_report_max_rate(adapter, mac_handle,
+					    &sinfo->rxrate,
+					    sinfo->signal,
+					    rx_rate_flags,
+					    rx_mcs_index,
+					    my_rx_rate,
+					    rx_nss_max);
+		else
+			wlan_hdd_refill_actual_rate(&sinfo->rxrate, adapter);
 	}
 
 	wlan_hdd_fill_summary_stats(&adapter->hdd_stats.summary_stat,
@@ -7410,7 +7438,26 @@ void wlan_hdd_get_peer_rx_rate_stats(struct hdd_adapter *adapter)
 					 peer_stats);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(peer_stats);
+		adapter->hdd_stats.class_a_stat.rx_preamble = INVALID_PREAMBLE;
 		osif_err("cdp_host_get_peer_stats failed. error: %d", status);
+		return;
+	}
+
+	if (qdf_unlikely(peer_stats->rx.last_rx_rate == 0)) {
+		hdd_debug("No rates, mcs=%d, nss=%d, gi=%d, preamble=%d, bw=%d",
+			  peer_stats->rx.mcs_info,
+			  peer_stats->rx.nss_info,
+			  peer_stats->rx.gi_info,
+			  peer_stats->rx.preamble_info,
+			  peer_stats->rx.bw_info);
+
+		/*
+		 * Assign preamble an invalid value used to determine
+		 * whether driver fills in actual rates or max rates
+		 */
+		adapter->hdd_stats.class_a_stat.rx_preamble = INVALID_PREAMBLE;
+
+		qdf_mem_free(peer_stats);
 		return;
 	}
 

@@ -127,12 +127,12 @@ typedef enum {
 	eSAP_STA_ASSOC_IND,           /* Indicate assoc req to upper layers */
 	/*
 	 * Event sent when we have successfully associated a station and
-	 * upper layer neeeds to allocate a context
+	 * upper layer needs to allocate a context
 	 */
 	eSAP_STA_ASSOC_EVENT,
 	/*
 	 * Event sent when we have successfully reassociated a station and
-	 * upper layer neeeds to allocate a context
+	 * upper layer needs to allocate a context
 	 */
 	eSAP_STA_REASSOC_EVENT,
 	/*
@@ -180,10 +180,10 @@ typedef enum {
 } eSapAuthType;
 
 typedef enum {
-	/* Disassociation was internally initated from CORE stack */
+	/* Disassociation was internally initiated from CORE stack */
 	eSAP_MAC_INITATED_DISASSOC = 0x10000,
 	/*
-	 * Disassociation was internally initated from host by
+	 * Disassociation was internally initiated from host by
 	 * invoking wlansap_disassoc_sta call
 	 */
 	eSAP_USR_INITATED_DISASSOC
@@ -425,6 +425,24 @@ typedef struct sap_SSIDInfo {
 	uint8_t ssidHidden;
 } qdf_packed tSap_SSIDInfo_t;
 
+/**
+ * struct master_acs - acs attributes received from userspace
+ * @hw_mode: hw mode
+ * @ht: ht flag
+ * @ht40: ht40 flag
+ * @vht: vht flag
+ * @eht: eht flag
+ * @ch_width: channel bandwidth
+ */
+struct master_acs {
+	uint8_t    hw_mode;
+	uint8_t    ht;
+	uint8_t    ht40;
+	uint8_t    vht;
+	uint8_t    eht;
+	uint16_t   ch_width;
+};
+
 struct sap_acs_cfg {
 	/* ACS Algo Input */
 	uint8_t    acs_mode;
@@ -459,7 +477,9 @@ struct sap_acs_cfg {
 	bool       is_eht_enabled;
 	uint16_t   acs_puncture_bitmap;
 #endif
+	bool       skip_acs_scan;
 	uint32_t   last_scan_ageout_time;
+	struct master_acs master_acs_cfg;
 };
 
 /*
@@ -758,7 +778,7 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
  *
  * When SAP session is about to close, this API needs to be called
  * to de-initialize all the members of sap context structure, so that
- * nobody can accidently start using the sap context.
+ * nobody can accidentally start using the sap context.
  *
  * Return: The result code associated with performing the operation
  *         QDF_STATUS_E_FAULT: BSS could not be stopped
@@ -911,7 +931,7 @@ QDF_STATUS wlansap_deauth_sta(struct sap_context *sap_ctx,
 /**
  * wlansap_set_channel_change_with_csa() - Set channel change with CSA
  * @sap_ctx: Pointer to SAP context
- * @target_chan_freq: Target channel frequncy
+ * @target_chan_freq: Target channel frequency
  * @target_bw: Target bandwidth
  * @strict: if true switch to the requested channel always, fail
  *        otherwise

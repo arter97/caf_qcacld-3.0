@@ -675,7 +675,6 @@ static int dp_rx_thread_loop(void *arg)
 	dp_info("exiting (%s) id %d pid %d", qdf_get_current_comm(),
 		rx_thread->id, qdf_get_current_pid());
 	qdf_event_set(&rx_thread->shutdown_event);
-	qdf_exit_thread(QDF_STATUS_SUCCESS);
 
 	return 0;
 }
@@ -753,7 +752,6 @@ static int dp_rx_refill_thread_loop(void *arg)
 	dp_info("exiting (%s) pid %d", qdf_get_current_comm(),
 		qdf_get_current_pid());
 	qdf_event_set(&rx_thread->shutdown_event);
-	qdf_exit_thread(QDF_STATUS_SUCCESS);
 
 	return 0;
 }
@@ -1187,7 +1185,7 @@ QDF_STATUS dp_rx_tm_flush_by_vdev_id(struct dp_rx_tm_handle *rx_tm_hdl,
 							   wait_timeout);
 
 		/* if one thread timeout happened, shrink timeout value
-		 * to 1/4 of origional value
+		 * to 1/4 of original value
 		 */
 		if (qdf_status == QDF_STATUS_E_TIMEOUT)
 			wait_timeout = DP_RX_THREAD_WAIT_TIMEOUT / 4;
@@ -1291,7 +1289,8 @@ static QDF_STATUS dp_rx_tm_shutdown(struct dp_rx_tm_handle *rx_tm_hdl)
 	int i;
 
 	for (i = 0; i < rx_tm_hdl->num_dp_rx_threads; i++) {
-		if (!rx_tm_hdl->rx_thread[i])
+		if (!rx_tm_hdl->rx_thread[i] ||
+		    rx_tm_hdl->state == DP_RX_THREADS_INVALID)
 			continue;
 		qdf_set_bit(RX_SHUTDOWN_EVENT,
 			    &rx_tm_hdl->rx_thread[i]->event_flag);
@@ -1302,7 +1301,8 @@ static QDF_STATUS dp_rx_tm_shutdown(struct dp_rx_tm_handle *rx_tm_hdl)
 
 
 	for (i = 0; i < rx_tm_hdl->num_dp_rx_threads; i++) {
-		if (!rx_tm_hdl->rx_thread[i])
+		if (!rx_tm_hdl->rx_thread[i] ||
+		    rx_tm_hdl->state == DP_RX_THREADS_INVALID)
 			continue;
 		dp_debug("waiting for shutdown of thread %d", i);
 		qdf_wait_single_event(&rx_tm_hdl->rx_thread[i]->shutdown_event,

@@ -363,7 +363,7 @@ void wlan_cm_set_ese_assoc(struct wlan_objmgr_pdev *pdev,
  */
 bool wlan_cm_get_ese_assoc(struct wlan_objmgr_pdev *pdev,
 			   uint8_t vdev_id);
-void wlan_cm_ese_populate_addtional_ies(struct wlan_objmgr_pdev *pdev,
+void wlan_cm_ese_populate_additional_ies(struct wlan_objmgr_pdev *pdev,
 			struct wlan_mlme_psoc_ext_obj *mlme_obj,
 			uint8_t vdev_id,
 			struct wlan_roam_scan_offload_params *rso_mode_cfg);
@@ -376,7 +376,7 @@ bool wlan_cm_get_ese_assoc(struct wlan_objmgr_pdev *pdev,
 {
 	return false;
 }
-static inline void wlan_cm_ese_populate_addtional_ies(
+static inline void wlan_cm_ese_populate_additional_ies(
 		struct wlan_objmgr_pdev *pdev,
 		struct wlan_mlme_psoc_ext_obj *mlme_obj,
 		uint8_t vdev_id,
@@ -1614,15 +1614,15 @@ cm_roam_pe_sync_callback(struct roam_offload_synch_ind *sync_ind,
  * cm_update_phymode_on_roam() - Update new phymode after
  * ROAM SYNCH event is received from firmware
  * @vdev_id: roamed vdev id
- * @bssid: bssid
- * @chan: wmi channel
+ * @sync_ind: Structure with roam synch parameters
  *
  * This api will update the phy mode after roam sync is received.
  *
  * Return: none
  */
-void cm_update_phymode_on_roam(uint8_t vdev_id, uint8_t *bssid,
-			       wmi_channel *chan);
+void
+cm_update_phymode_on_roam(uint8_t vdev_id,
+			  struct roam_offload_synch_ind *sync_ind);
 
 /**
  * wlan_cm_fw_to_host_phymode() - Convert fw phymode to host
@@ -1671,5 +1671,55 @@ bool wlan_cm_same_band_sta_allowed(struct wlan_objmgr_psoc *psoc);
  */
 QDF_STATUS cm_cleanup_mlo_link(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * wlan_is_roaming_enabled() - Check if Roaming is enabled
+ *
+ * @pdev: pointer to pdev object
+ * @vdev_id : Vdev id
+ *
+ * Check if the ROAM enable vdev param (WMI_VDEV_PARAM_ROAM_FW_OFFLOAD)
+ * is sent to firmware or not.
+ *
+ * Return: True if RSO state is not DEINIT, which indicates that vdev param
+ * WMI_VDEV_PARAM_ROAM_FW_OFFLOAD is sent to firmware.
+ */
 bool wlan_is_roaming_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
+
+/**
+ * wlan_is_rso_enabled() - Check if RSO state is enabled
+ *
+ * @pdev: pointer to pdev object
+ * @vdev_id : Vdev id
+ *
+ * Check if the ROAM SCAN OFFLOAD enable is sent to firmware. Host driver tracks
+ * this through RSO state machine and the states can be WLAN_ROAM_RSO_ENABLED/
+ * WLAN_ROAMING_IN_PROG/WLAN_ROAM_SYNCH_IN_PROG/WLAN_MLO_ROAM_SYNCH_IN_PROG.
+ *
+ * Return: True if RSO state is any of the above mentioned states.
+ */
+bool wlan_is_rso_enabled(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id);
+
+/**
+ * wlan_cm_set_sae_auth_ta() - Set SAE auth tx address
+ * @vdev_id : Vdev id
+ * @sae_auth_ta: SAE auth tx address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_set_sae_auth_ta(struct wlan_objmgr_pdev *pdev,
+			uint8_t vdev_id,
+			struct qdf_mac_addr sae_auth_ta);
+
+/**
+ * wlan_cm_get_sae_auth_ta() - Get SAE auth tx address
+ * @vdev_id: Vdev id
+ * @sae_auth_ta: SAE auth tx address
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_cm_get_sae_auth_ta(struct wlan_objmgr_pdev *pdev,
+			uint8_t vdev_id,
+			struct qdf_mac_addr *sae_auth_ta);
 #endif  /* WLAN_CM_ROAM_API_H__ */

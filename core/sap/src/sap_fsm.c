@@ -61,6 +61,7 @@
 #include "wlan_mlme_vdev_mgr_interface.h"
 #include "wlan_vdev_mgr_utils_api.h"
 #include "wlan_pre_cac_api.h"
+#include <wlan_cmn_ieee80211.h>
 
 /*----------------------------------------------------------------------------
  * Preprocessor Definitions and Constants
@@ -238,7 +239,7 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 		flag |= DFS_RANDOM_CH_FLAG_NO_LOWER_5G_CH;
 
 	/*
-	 * Dont choose 6ghz channel currently as legacy clients wont be able to
+	 * Dont choose 6ghz channel currently as legacy clients won't be able to
 	 * scan them. In future create an ini if any customer wants 6ghz freq
 	 * to be prioritize over 5ghz/2.4ghz.
 	 * Currently for SAP there is a high chance of 6ghz being selected as
@@ -502,13 +503,15 @@ is_wlansap_cac_required_for_chan(struct mac_context *mac_ctx,
 		    ch_params->ch_width, 0) == CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else if (ch_params->ch_width == CH_WIDTH_80P80MHZ) {
-		if (wlan_reg_get_channel_state_for_freq(
+		if (wlan_reg_get_channel_state_for_pwrmode(
 						mac_ctx->pdev,
-						chan_freq) ==
+						chan_freq,
+						REG_CURRENT_PWR_MODE) ==
 		    CHANNEL_STATE_DFS ||
-		    wlan_reg_get_channel_state_for_freq(
+		    wlan_reg_get_channel_state_for_pwrmode(
 					mac_ctx->pdev,
-					ch_params->mhz_freq_seg1) ==
+					ch_params->mhz_freq_seg1,
+					REG_CURRENT_PWR_MODE) ==
 				CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else {
@@ -847,8 +850,9 @@ uint32_t sap_select_default_oper_chan(struct mac_context *mac_ctx,
 
 	for (i = 0; i < acs_cfg->ch_list_count; i++) {
 		enum channel_state state =
-			wlan_reg_get_channel_state_for_freq(
-					mac_ctx->pdev, acs_cfg->freq_list[i]);
+			wlan_reg_get_channel_state_for_pwrmode(
+					mac_ctx->pdev, acs_cfg->freq_list[i],
+					REG_CURRENT_PWR_MODE);
 		if (!freq0 && state == CHANNEL_STATE_ENABLE &&
 		    WLAN_REG_IS_5GHZ_CH_FREQ(acs_cfg->freq_list[i])) {
 			freq0 = acs_cfg->freq_list[i];
@@ -1249,7 +1253,7 @@ static void sap_acs_scan_freq_list_optimize(struct sap_context *sap_ctx,
 		if (qdf_system_time_before(
 		    qdf_get_time_of_the_day_ms(),
 		    ts_last_scan + sap_ctx->acs_cfg->last_scan_ageout_time)) {
-			sap_info("ACS chan %d skipped from scan as last scan ts %d\n",
+			sap_info("ACS chan %d skipped from scan as last scan ts %lu\n",
 				 list->chan[loop_count].freq,
 				 qdf_get_time_of_the_day_ms() - ts_last_scan);
 
@@ -1397,6 +1401,7 @@ QDF_STATUS sap_channel_sel(struct sap_context *sap_context)
 
 		if (!req->scan_req.chan_list.num_chan) {
 			sap_info("## SKIPPED ACS SCAN");
+			sap_context->acs_cfg->skip_acs_scan = true;
 			wlansap_pre_start_bss_acs_scan_callback(
 				mac_handle, sap_context, sap_context->sessionId,
 				0, eCSR_SCAN_SUCCESS);
@@ -1785,6 +1790,7 @@ static void sap_handle_acs_scan_event(struct sap_context *sap_context,
  * Function to fill OWE IE in assoc indication
  * @assoc_ind: SAP STA association indication
  * @sme_assoc_ind: SME association indication
+ * @reassoc: True if it is reassoc frame
  *
  * This function is to get OWE IEs (RSN IE, DH IE etc) from assoc request
  * and fill them in association indication.
@@ -1792,19 +1798,37 @@ static void sap_handle_acs_scan_event(struct sap_context *sap_context,
  * Return: true for success and false for failure
  */
 static bool sap_fill_owe_ie_in_assoc_ind(tSap_StationAssocIndication *assoc_ind,
-					 struct assoc_ind *sme_assoc_ind)
+					 struct assoc_ind *sme_assoc_ind,
+					 bool reassoc)
 {
 	uint32_t owe_ie_len, rsn_ie_len, dh_ie_len;
 	const uint8_t *rsn_ie, *dh_ie;
+	uint8_t *assoc_req_ie;
+	uint16_t assoc_req_ie_len;
 
-	if (assoc_ind->assocReqLength < ASSOC_REQ_IE_OFFSET) {
-		sap_err("Invalid assoc req");
-		return false;
+	if (reassoc) {
+		if (assoc_ind->assocReqLength < WLAN_REASSOC_REQ_IES_OFFSET) {
+			sap_err("Invalid reassoc req");
+			return false;
+		}
+
+		assoc_req_ie = assoc_ind->assocReqPtr +
+			       WLAN_REASSOC_REQ_IES_OFFSET;
+		assoc_req_ie_len = assoc_ind->assocReqLength -
+				   WLAN_REASSOC_REQ_IES_OFFSET;
+	} else {
+		if (assoc_ind->assocReqLength < WLAN_ASSOC_REQ_IES_OFFSET) {
+			sap_err("Invalid assoc req");
+			return false;
+		}
+
+		assoc_req_ie = assoc_ind->assocReqPtr +
+			       WLAN_ASSOC_REQ_IES_OFFSET;
+		assoc_req_ie_len = assoc_ind->assocReqLength -
+				   WLAN_ASSOC_REQ_IES_OFFSET;
 	}
-
 	rsn_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_RSN,
-			       assoc_ind->assocReqPtr + ASSOC_REQ_IE_OFFSET,
-			       assoc_ind->assocReqLength - ASSOC_REQ_IE_OFFSET);
+					  assoc_req_ie, assoc_req_ie_len);
 	if (!rsn_ie) {
 		sap_err("RSN IE is not present");
 		return false;
@@ -1817,8 +1841,7 @@ static bool sap_fill_owe_ie_in_assoc_ind(tSap_StationAssocIndication *assoc_ind,
 	}
 
 	dh_ie = wlan_get_ext_ie_ptr_from_ext_id(DH_OUI_TYPE, DH_OUI_TYPE_SIZE,
-		   assoc_ind->assocReqPtr + ASSOC_REQ_IE_OFFSET,
-		   (uint16_t)(assoc_ind->assocReqLength - ASSOC_REQ_IE_OFFSET));
+						assoc_req_ie, assoc_req_ie_len);
 	if (!dh_ie) {
 		sap_err("DH IE is not present");
 		return false;
@@ -1986,7 +2009,7 @@ bool find_ch_freq_in_radar_hist(struct dfs_radar_history *radar_result,
  * sap_append_cac_history() - Add CAC history to list
  * @radar_result: radar history buffer
  * @idx: current radar history element number
- * @max_elems: max elements nummber of radar history buffer.
+ * @max_elems: max elements number of radar history buffer.
  *
  * This function is to add the CAC history to radar history list.
  *
@@ -2035,8 +2058,9 @@ void sap_append_cac_history(struct mac_context *mac_ctx,
 
 		chan_cfreq = bonded_chan_ptr->start_freq;
 		while (chan_cfreq <= bonded_chan_ptr->end_freq) {
-			state = wlan_reg_get_channel_state_for_freq(
-					mac_ctx->pdev, chan_cfreq);
+			state = wlan_reg_get_channel_state_for_pwrmode(
+					mac_ctx->pdev, chan_cfreq,
+					REG_CURRENT_PWR_MODE);
 			if (state == CHANNEL_STATE_INVALID) {
 				sap_debug("invalid ch freq %d",
 					  chan_cfreq);
@@ -2269,7 +2293,8 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 		assoc_ind->ecsa_capable = csr_roaminfo->ecsa_capable;
 		if (csr_roaminfo->owe_pending_assoc_ind) {
 			if (!sap_fill_owe_ie_in_assoc_ind(assoc_ind,
-					 csr_roaminfo->owe_pending_assoc_ind)) {
+					 csr_roaminfo->owe_pending_assoc_ind,
+					 csr_roaminfo->fReassocReq)) {
 				sap_err("Failed to fill OWE IE");
 				qdf_mem_free(csr_roaminfo->
 					     owe_pending_assoc_ind);
@@ -2873,7 +2898,7 @@ QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 	 * All APs are done with CAC timer, all APs should start beaconing.
 	 * Lets assume AP1 and AP2 started beaconing on DFS channel, Now lets
 	 * say AP1 goes down and comes back on same DFS channel. In this case
-	 * AP1 shouldn't start CAC timer and start beacon immediately beacause
+	 * AP1 shouldn't start CAC timer and start beacon immediately because
 	 * AP2 is already beaconing on this channel. This case will be handled
 	 * by checking against eSAP_DFS_SKIP_CAC while starting the timer.
 	 */
@@ -3379,7 +3404,7 @@ static QDF_STATUS sap_fsm_handle_start_failure(struct sap_context *sap_ctx,
 		/*
 		 * Stop the CAC timer only in following conditions
 		 * single AP: if there is a single AP then stop timer
-		 * mulitple APs: incase of multiple APs, make sure that
+		 * multiple APs: incase of multiple APs, make sure that
 		 * all APs are down.
 		 */
 		if (!sap_find_valid_concurrent_session(mac_handle)) {
@@ -3545,13 +3570,15 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 					mac_ctx->pdev, sap_chan_freq,
 					CH_WIDTH_160MHZ) == CHANNEL_STATE_DFS;
 		} else if (sap_ctx->ch_params.ch_width == CH_WIDTH_80P80MHZ) {
-			if (wlan_reg_get_channel_state_for_freq(
+			if (wlan_reg_get_channel_state_for_pwrmode(
 							mac_ctx->pdev,
-							sap_chan_freq) ==
+							sap_chan_freq,
+							REG_CURRENT_PWR_MODE) ==
 			    CHANNEL_STATE_DFS ||
-			    wlan_reg_get_channel_state_for_freq(
+			    wlan_reg_get_channel_state_for_pwrmode(
 							mac_ctx->pdev,
-							ch_cfreq1) ==
+							ch_cfreq1,
+							REG_CURRENT_PWR_MODE) ==
 					CHANNEL_STATE_DFS)
 				is_dfs = true;
 		} else {
@@ -3728,9 +3755,10 @@ static QDF_STATUS sap_fsm_state_started(struct sap_context *sap_ctx,
 					sap_debug("vdev %d freq %d (state %d) is not DFS or disabled so continue",
 						  temp_sap_ctx->sessionId,
 						  temp_sap_ctx->chan_freq,
-						  wlan_reg_get_channel_state_for_freq(
+						  wlan_reg_get_channel_state_for_pwrmode(
 						  mac_ctx->pdev,
-						  temp_sap_ctx->chan_freq));
+						  temp_sap_ctx->chan_freq,
+						  REG_CURRENT_PWR_MODE));
 					continue;
 				}
 				sap_debug("vdev %d switch freq %d -> %d",
@@ -3978,7 +4006,7 @@ void sap_remove_mac_from_acl(struct qdf_mac_addr *macList,
 		qdf_mem_copy((macList + i)->bytes, (macList + i + 1)->bytes,
 			     QDF_MAC_ADDR_SIZE);
 	}
-	/* The last space should be made empty since all mac addesses moved one step up */
+	/* The last space should be made empty since all mac addresses moved one step up */
 	qdf_mem_zero((macList + (*size) - 1)->bytes, QDF_MAC_ADDR_SIZE);
 	/* reduce the list size by 1 */
 	(*size)--;
@@ -4052,7 +4080,7 @@ void sap_dump_acs_channel(struct sap_acs_cfg *acs_cfg)
 	uint8_t *chan_buff = NULL;
 
 	/*
-	 * Buffer of (num channl * 5) + 1  to consider the 4 char freq
+	 * Buffer of (num channel * 5) + 1  to consider the 4 char freq
 	 * and 1 space after it for each channel and 1 to end the string
 	 * with NULL.
 	 */
@@ -4640,7 +4668,7 @@ bool is_concurrent_sap_ready_for_channel_change(mac_handle_t mac_handle,
  * check if other beaconing entity's channel is same DFS channel. If they are
  * same then concurrent sap is doing SCC DFS.
  *
- * Return: true if two or more beaconing entitity doing SCC DFS else false
+ * Return: true if two or more beaconing entities doing SCC DFS else false
  */
 bool sap_is_conc_sap_doing_scc_dfs(mac_handle_t mac_handle,
 				   struct sap_context *given_sapctx)

@@ -713,7 +713,7 @@ static void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
  * __hdd_ipv6_notifier_work_queue() - IPv6 notification work function
  * @adapter: adapter whose IP address changed
  *
- * This function performs the work initially trigged by a callback
+ * This function performs the work initially triggered by a callback
  * from the IPv6 netdev notifier.  Since this means there has been a
  * change in IPv6 state for the interface, the NS offload is
  * reconfigured.
@@ -1056,7 +1056,7 @@ int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
  * __hdd_ipv4_notifier_work_queue() - IPv4 notification work function
  * @adapter: adapter whose IP address changed
  *
- * This function performs the work initially trigged by a callback
+ * This function performs the work initially triggered by a callback
  * from the IPv4 netdev notifier.  Since this means there has been a
  * change in IPv4 state for the interface, the ARP offload is
  * reconfigured. Also, Updates the HLP IE info with IP address info
@@ -1267,7 +1267,7 @@ bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 #endif
 
 /**
- * hdd_get_ipv4_local_interface() - get ipv4 local interafce from iface list
+ * hdd_get_ipv4_local_interface() - get ipv4 local interface from iface list
  * @adapter: Adapter context for which ARP offload is to be configured
  *
  * Return:
@@ -1305,6 +1305,8 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 	struct pmo_arp_req *arp_req;
 	struct in_ifaddr *ifa;
 	struct wlan_objmgr_vdev *vdev;
+
+	hdd_enter();
 
 	arp_req = qdf_mem_malloc(sizeof(*arp_req));
 	if (!arp_req)
@@ -1523,6 +1525,8 @@ void hdd_disable_arp_offload(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_vdev *vdev;
+
+	hdd_enter();
 
 	status = ucfg_pmo_check_arp_offload(hdd_ctx->psoc, trigger,
 					    adapter->vdev_id);
@@ -1902,6 +1906,34 @@ static inline void hdd_wlan_ssr_reinit_event(void)
 }
 #endif
 
+#ifdef WLAN_FEATURE_DBAM_CONFIG
+/**
+ * hdd_retore_dbam_config - restore and send dbam config to fw
+ *
+ * This function is used to send  store dbam config to fw
+ * in case of wlan re-init
+ *
+ * Return: void
+ */
+static void hdd_restore_dbam_config(struct hdd_context *hdd_ctx)
+{
+	struct hdd_adapter *adapter, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_GET_ADAPTER;
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (hdd_is_interface_up(adapter) &&
+		    adapter->is_dbam_configured)
+			hdd_send_dbam_config(adapter, hdd_ctx->dbam_mode);
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+}
+#else
+static inline void hdd_restore_dbam_config(struct hdd_context *hdd_ctx)
+{
+}
+#endif
+
 /**
  * hdd_restore_dual_sta_config() - Restore dual sta configuration
  * @hdd_ctx: pointer to struct hdd_context
@@ -2082,6 +2114,7 @@ QDF_STATUS hdd_wlan_re_init(void)
 
 	hdd_send_default_scan_ies(hdd_ctx);
 	hdd_restore_dual_sta_config(hdd_ctx);
+	hdd_restore_dbam_config(hdd_ctx);
 	hdd_info("WLAN host driver reinitiation completed!");
 
 	ucfg_mlme_get_sap_internal_restart(hdd_ctx->psoc, &value);

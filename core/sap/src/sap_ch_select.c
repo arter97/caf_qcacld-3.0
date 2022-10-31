@@ -51,6 +51,7 @@
 #include "wlan_reg_services_api.h"
 #include <wlan_scan_utils_api.h>
 #include <wlan_cp_stats_mc_ucfg_api.h>
+#include <wlan_policy_mgr_api.h>
 
 /*--------------------------------------------------------------------------
    Function definitions
@@ -362,8 +363,8 @@ sap_process_avoid_ie(mac_handle_t mac_handle, struct sap_context *sap_ctx,
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
 /**
- * sap_select_preferred_channel_from_channel_list() - to calc best cahnnel
- * @best_ch_freq: best chan freq already calculated among all the chanels
+ * sap_select_preferred_channel_from_channel_list() - to calc best channel
+ * @best_ch_freq: best chan freq already calculated among all the channels
  * @sap_ctx: sap context
  * @spectinfo_param: Pointer to tSapChSelSpectInfo structure
  *
@@ -417,6 +418,8 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	bool include_dfs_ch = true;
 	uint8_t sta_sap_scc_on_dfs_chnl_config_value;
 	bool ch_support_puncture;
+	bool is_sta_sap_scc;
+	bool sta_sap_scc_on_indoor_channel;
 
 	pSpectInfoParams->numSpectChans =
 		mac->scan.base_channels.numChannels;
@@ -441,6 +444,9 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 	if (!mac->mlme_cfg->dfs_cfg.dfs_master_capable ||
 	    ACS_DFS_MODE_DISABLE == sap_ctx->dfs_mode)
 		include_dfs_ch = false;
+
+	sta_sap_scc_on_indoor_channel =
+		policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(mac->psoc);
 
 	/* Fill the channel number in the spectrum in the operating freq band */
 	for (channelnum = 0;
@@ -468,7 +474,10 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 		}
 
 		if (!include_dfs_ch ||
-		    sta_sap_scc_on_dfs_chnl_config_value == 1) {
+		    (sta_sap_scc_on_dfs_chnl_config_value ==
+				PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED &&
+		     !policy_mgr_is_sta_sap_scc(mac->psoc,
+						pSpectCh->chan_freq))) {
 			if (wlan_reg_is_dfs_for_freq(mac->pdev,
 						     pSpectCh->chan_freq)) {
 				sap_debug("DFS Ch %d not considered for ACS. include_dfs_ch %u, sta_sap_scc_on_dfs_chnl_config_value %d",
@@ -498,6 +507,18 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
 		if (wlan_reg_is_dsrc_freq(pSpectCh->chan_freq))
 			continue;
 
+		/* Skip indoor channels for non-scc indoor scenario*/
+		is_sta_sap_scc = policy_mgr_is_sta_sap_scc(mac->psoc,
+							   *pChans);
+		if (!(is_sta_sap_scc && sta_sap_scc_on_indoor_channel) &&
+		    !policy_mgr_sap_allowed_on_indoor_freq(mac->psoc,
+							   mac->pdev,
+							   *pChans)) {
+			sap_debug("Do not allow SAP on indoor frequency %u",
+				  *pChans);
+			continue;
+		}
+
 		/*
 		 * Skip the channels which are not in ACS config from user
 		 * space
@@ -519,7 +540,7 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
  * sapweight_rssi_count() - calculates the channel weight due to rssi
     and data count(here number of BSS observed)
  * @sap_ctx     : Softap context
- * @rssi        : Max signal strength receieved from a BSS for the channel
+ * @rssi        : Max signal strength received from a BSS for the channel
  * @count       : Number of BSS observed in the channel
  *
  * Return: uint32_t Calculated channel weight based on above two
@@ -593,6 +614,7 @@ static struct channel_status *sap_get_channel_status
 	return ucfg_mc_cp_stats_get_channel_status(p_mac->pdev, chan_freq);
 }
 
+#ifndef WLAN_FEATURE_SAP_ACS_OPTIMIZE
 /**
  * sap_clear_channel_status() - clear chan info
  * @p_mac: Pointer to Global MAC structure
@@ -606,6 +628,12 @@ static void sap_clear_channel_status(struct mac_context *p_mac)
 
 	ucfg_mc_cp_stats_clear_channel_status(p_mac->pdev);
 }
+#else
+static void sap_clear_channel_status(struct mac_context *p_mac)
+{
+}
+#endif
+
 /**
  * sap_weight_channel_noise_floor() - compute noise floor weight
  * @sap_ctx:  sap context
@@ -1216,7 +1244,7 @@ static bool ch_in_pcl(struct sap_context *sap_ctx, uint32_t ch_freq)
 /**
  * sap_upd_chan_spec_params() - sap_upd_chan_spec_params
  *  updates channel parameters obtained from Beacon
- * @scan_entry: Beacon strucutre populated by scan
+ * @scan_entry: Beacon structure populated by scan
  * @ch_width: Channel width
  * @sec_ch_offset: Secondary Channel Offset
  * @center_freq0: Central frequency 0 for the given channel
@@ -1393,7 +1421,7 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		 * and not meant to be included in the ACS scan results.
 		 * So just assign RSSI as -100, bsscount as 0, and weight as max
 		 * to them, so that they always stay low in sorting of best
-		 * channles which were included in ACS scan list
+		 * channels which were included in ACS scan list
 		 */
 		found = false;
 		for (i = 0; i < sap_ctx->num_of_channel; i++) {
@@ -2604,7 +2632,7 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	}
 
 	/*
-	 * in case the best channel seleted is not in PCL and there is another
+	 * in case the best channel selected is not in PCL and there is another
 	 * channel which has same weightage and is in PCL, choose the one in
 	 * PCL
 	 */

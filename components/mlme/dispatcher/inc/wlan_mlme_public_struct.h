@@ -18,7 +18,7 @@
  */
 
 /*
- * DOC: contains mlme structure definations
+ * DOC: contains mlme structure definitions
  */
 
 #ifndef _WLAN_MLME_STRUCT_H_
@@ -822,7 +822,7 @@ struct wlan_mlme_mbo {
  * @is_imps_enabled: flag to enable/disable IMPS
  * @is_bmps_enabled: flag to enable/disable BMPS
  * @auto_bmps_timer: auto BMPS timer value
- * @bmps_min_listen_interval: BMPS listen inteval minimum value
+ * @bmps_min_listen_interval: BMPS listen interval minimum value
  * @bmps_max_listen_interval: BMPS listen interval maximum value
  * @dtim_selection_diversity: dtim selection diversity value to be sent to fw
  */
@@ -1216,7 +1216,7 @@ struct wlan_mlme_sap_protection {
  * @rx_chain_mask_2g:   Tx chain mask for 2g
  * @tx_chain_mask_5g:   Tx chain mask for 5g
  * @rx_chain_mask_5g:   Rx chain mask for 5g
- * @enable_bt_chain_separation: Enable/Disable BT/WLAN Host chain seperation
+ * @enable_bt_chain_separation: Enable/Disable BT/WLAN Host chain separation
  */
 struct wlan_mlme_chainmask {
 	uint8_t txchainmask1x1;
@@ -1339,6 +1339,7 @@ struct wlan_user_mcc_quota {
  * @disable_4way_hs_offload: enable/disable 4 way handshake offload to firmware
  * @as_enabled: antenna sharing enabled or not (FW capability)
  * @mgmt_retry_max: maximum retries for management frame
+ * @enable_he_mcs0_for_6ghz_mgmt: HE MCS0 rate for mgmt frames in 6GHz band
  * @bmiss_skip_full_scan: Decide if full scan can be skipped in firmware if no
  * candidate is found in partial scan based on channel map
  * @enable_ring_buffer: Decide to enable/disable ring buffer for bug report
@@ -1392,6 +1393,7 @@ struct wlan_mlme_generic {
 	uint32_t disable_4way_hs_offload;
 	bool as_enabled;
 	uint8_t mgmt_retry_max;
+	bool enable_he_mcs0_for_6ghz_mgmt;
 	bool bmiss_skip_full_scan;
 	bool enable_ring_buffer;
 	bool enable_peer_unmap_conf_support;
@@ -1656,7 +1658,7 @@ enum station_prefer_bw {
  * @current_rssi:                   Current rssi
  * @deauth_retry_cnt:               Deauth retry count
  * @sta_prefer_80mhz_over_160mhz:   Set Sta preference to connect in 80HZ/160HZ
- * @ignore_peer_erp_info:           Ignore peer infrormation
+ * @ignore_peer_erp_info:           Ignore peer information
  * @enable_5g_ebt:                  Set default 5G early beacon termination
  * @deauth_before_connection:       Send deauth before connection or not
  * @enable_go_cts2self_for_sta:     Stop NOA and start using cts2self
@@ -2217,7 +2219,7 @@ struct  wlan_mlme_weight_config {
  * @bad_rssi_pcnt: Bad RSSI Percentage
  * @good_rssi_bucket_size: Good RSSI Bucket Size
  * @bad_rssi_bucket_size: Bad RSSI Bucket Size
- * @rssi_pref_5g_rssi_thresh: Preffered 5G RSSI threshold
+ * @rssi_pref_5g_rssi_thresh: Preferred 5G RSSI threshold
  */
 struct wlan_mlme_rssi_cfg_score  {
 	uint32_t best_rssi_threshold;

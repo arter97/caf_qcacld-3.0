@@ -62,7 +62,7 @@ QDF_STATUS cm_fw_roam_sync_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 	}
 
 	if (cm_is_vdev_connecting(vdev) || cm_is_vdev_disconnecting(vdev)) {
-		mlme_err("vdev %d Roam sync not handled in conneting/disconneting state",
+		mlme_err("vdev %d Roam sync not handled in connecting/disconnecting state",
 			 vdev_id);
 		wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_SB_ID);
 		return cm_roam_stop_req(psoc, vdev_id,
@@ -430,9 +430,11 @@ cm_fill_bssid_freq_info(uint8_t vdev_id,
 			return QDF_STATUS_SUCCESS;
 		}
 	}
-	mlme_err("Failed to get vdev %u mlo link info");
 
-	return QDF_STATUS_E_FAILURE;
+	qdf_copy_macaddr(&rsp->connect_rsp.bssid, &roam_synch_data->bssid);
+	rsp->connect_rsp.freq = roam_synch_data->chan_freq;
+
+	return QDF_STATUS_SUCCESS;
 }
 #else
 static QDF_STATUS
@@ -878,14 +880,13 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 
 	cm_process_roam_keys(vdev, rsp, cm_id);
 	/*
-	 * Re-enable the disabled link on roaming as desision
+	 * Re-enable the disabled link on roaming as decision
 	 * will be taken again to disable the link on roam sync completion.
 	 */
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
 		policy_mgr_move_vdev_from_disabled_to_connection_tbl(psoc,
 								     vdev_id);
 	mlo_roam_copy_partner_info(connect_rsp, roam_synch_data);
-	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 
 	/**
 	 * Don't send roam_sync complete for MLO link vdevs.
@@ -924,6 +925,7 @@ cm_fw_roam_sync_propagation(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 			 CM_PREFIX_REF(vdev_id, cm_id));
 		goto error;
 	}
+	mlme_cm_osif_connect_complete(vdev, connect_rsp);
 	mlme_cm_osif_roam_complete(vdev);
 	mlme_debug(CM_PREFIX_FMT, CM_PREFIX_REF(vdev_id, cm_id));
 	if (!wlan_vdev_mlme_is_mlo_link_vdev(vdev))
@@ -1003,15 +1005,14 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	 * roam sync to make sure the new AP is not on disable freq
 	 * or disconnect the AP.
 	 */
-	if (wlan_reg_is_disable_for_freq(pdev, roam_synch_data->chan_freq)) {
+	if (wlan_reg_is_disable_for_pwrmode(pdev, roam_synch_data->chan_freq,
+					    REG_CURRENT_PWR_MODE)) {
 		mlo_disconnect(cm_ctx->vdev, CM_ROAM_DISCONNECT,
 			       REASON_OPER_CHANNEL_BAND_CHANGE, NULL);
 		status = QDF_STATUS_E_FAILURE;
 		goto end;
 	}
 
-	/* Check if FW as indicated this link as disabled */
-	cm_get_and_disable_link_from_roam_ind(psoc, vdev_id, roam_synch_data);
 	/*
 	 * Following operations need to be done once roam sync
 	 * completion is sent to FW, hence called here:
@@ -1020,7 +1021,13 @@ QDF_STATUS cm_fw_roam_complete(struct cnx_mgr *cm_ctx, void *data)
 	 * 2) Force SCC switch if needed
 	 */
 	/* first update connection info from wma interface */
-	policy_mgr_update_connection_info(psoc, vdev_id);
+	status = policy_mgr_update_connection_info(psoc, vdev_id);
+	if (status == QDF_STATUS_NOT_INITIALIZED)
+		policy_mgr_incr_active_session(psoc, QDF_STA_MODE, vdev_id);
+
+	/* Check if FW as indicated this link as disabled */
+	cm_get_and_disable_link_from_roam_ind(psoc, vdev_id, roam_synch_data);
+
 	/* then update remaining parameters from roam sync ctx */
 	if (roam_synch_data->hw_mode_trans_present)
 		policy_mgr_hw_mode_transition_cb(

@@ -79,7 +79,10 @@
  */
 uint32_t lim_cmp_ssid(tSirMacSSid *rx_ssid, struct pe_session *session_entry)
 {
-	return qdf_mem_cmp(rx_ssid, &session_entry->ssId,
+	if (session_entry->ssId.length != rx_ssid->length)
+		return 1;
+
+	return qdf_mem_cmp(rx_ssid->ssId, &session_entry->ssId.ssId,
 				session_entry->ssId.length);
 }
 
@@ -1592,6 +1595,13 @@ static bool lim_check_valid_mcs_for_nss(struct pe_session *session,
 		mcs_count--;
 	} while (mcs_count);
 
+	if ((session->ch_width == CH_WIDTH_160MHZ ||
+	     lim_is_session_chwidth_320mhz(session)) &&
+	     !he_caps->chan_width_2) {
+		pe_err("session BW 160/320 MHz but peer BW less than 160 MHz");
+		return false;
+	}
+
 	return true;
 
 }
@@ -1866,7 +1876,7 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 					  tDot11fIEeht_cap *eht_caps)
 {
 	tSirMacRateSet temp_rate_set;
-	tSirMacRateSet temp_rate_set2;
+	tSirMacRateSet temp_rate_set2 = {0};
 	uint32_t i, j, val, min, is_arate;
 	uint32_t phy_mode;
 	uint8_t mcs_set[SIZE_OF_SUPPORTED_MCS_SET];
@@ -1890,8 +1900,6 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 			     session_entry->extRateSet.numRates);
 		temp_rate_set2.numRates =
 			(uint8_t) session_entry->extRateSet.numRates;
-	} else {
-		temp_rate_set2.numRates = 0;
 	}
 
 	lim_remove_membership_selectors(&temp_rate_set);
@@ -3703,7 +3711,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	listen_interval = mac->mlme_cfg->sap_cfg.listen_interval;
 	pAddBssParams->staContext.listenInterval = listen_interval;
 
-	/* Fill Assoc id from the dph table */
+	/* Get STA hash entry from the dph table */
 	sta = dph_lookup_hash_entry(mac, pAddBssParams->staContext.bssId,
 				&pAddBssParams->staContext.assocId,
 				&pe_session->dph.dphHashTable);
@@ -3715,6 +3723,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 			qdf_mem_free(pAddBssParams);
 			return QDF_STATUS_E_FAILURE;
 	}
+
+	/* Update Assoc id from pe_session for STA */
+	pAddBssParams->staContext.assocId = pe_session->limAID;
 
 	pAddBssParams->staContext.uAPSD =
 		pe_session->gUapsdPerAcBitmask;

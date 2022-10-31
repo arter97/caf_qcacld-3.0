@@ -1578,7 +1578,7 @@ QDF_STATUS policy_mgr_update_sbs_freq(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_update_sbs_lowr_band_end_frq(pm_ctx, info);
 	/* no need to update if sbs_lower_band_end_freq is not set */
 	if (!pm_ctx->hw_mode.sbs_lower_band_end_freq)
-		return QDF_STATUS_E_NOSUPPORT;
+		return QDF_STATUS_SUCCESS;
 
 	policy_mgr_update_hw_mode_list(psoc, tgt_hdl);
 
@@ -3588,7 +3588,7 @@ policy_mgr_ml_link_vdev_need_to_be_disabled(struct wlan_objmgr_psoc *psoc,
 
 	conc_ext_flags.value = policy_mgr_get_conc_ext_flags(vdev, false);
 	/*
-	 * For non-assoc link vdev set link as disabled if concurency is
+	 * For non-assoc link vdev set link as disabled if concurrency is
 	 * not allowed
 	 */
 	return !policy_mgr_is_concurrency_allowed(psoc, PM_STA_MODE,
@@ -3751,6 +3751,26 @@ policy_mgr_delete_from_disabled_links(struct policy_mgr_psoc_priv_obj *pm_ctx,
 }
 #endif
 
+bool policy_mgr_is_mlo_sta_disconnected(struct wlan_objmgr_psoc *psoc,
+					 uint8_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool disconnected;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev)
+		return true;
+	/* mlo mgr has no corresponding protocol api used in non-osif/hdd
+	 * component. Todo: clean up to use internal API
+	 */
+	disconnected = ucfg_mlo_is_mld_disconnected(vdev);
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+
+	return disconnected;
+}
+
 void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 				enum QDF_OPMODE mode,
 				uint8_t session_id)
@@ -3767,7 +3787,7 @@ void policy_mgr_incr_active_session(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/*
-	 * Need to aquire mutex as entire functionality in this function
+	 * Need to acquire mutex as entire functionality in this function
 	 * is in critical section
 	 */
 	qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
@@ -4705,9 +4725,12 @@ policy_mgr_mlo_sta_set_link(struct wlan_objmgr_psoc *psoc,
 	policy_mgr_fill_ml_active_link_vdev_bitmap(req, mlo_vdev_lst,
 						   num_mlo_vdev);
 
-	/* fill num of links for MLO_LINK_FORCE_MODE_ACTIVE_NUM */
-	if (mode == MLO_LINK_FORCE_MODE_ACTIVE_NUM) {
-		req->param.force_mode = MLO_LINK_FORCE_MODE_ACTIVE_NUM;
+	/*
+	 * Fill number of links for MLO_LINK_FORCE_MODE_ACTIVE_NUM or
+	 * MLO_LINK_FORCE_MODE_INACTIVE_NUM mode.
+	 */
+	if (mode == MLO_LINK_FORCE_MODE_ACTIVE_NUM ||
+	    mode == MLO_LINK_FORCE_MODE_INACTIVE_NUM) {
 		req->param.num_link_entry = 1;
 		req->param.link_num[0].num_of_link = num_mlo_vdev - 1;
 	}
@@ -4982,6 +5005,54 @@ bool policy_mgr_is_mlo_in_mode_sbs(struct wlan_objmgr_psoc *psoc,
 	return is_sbs_link;
 }
 
+bool policy_mgr_is_mlo_in_mode_dbs(struct wlan_objmgr_psoc *psoc,
+				   enum policy_mgr_con_mode mode,
+				   uint8_t *mlo_vdev_lst, uint8_t *num_mlo)
+{
+	uint32_t mode_num = 0;
+	uint8_t i, mlo_idx = 0;
+	struct wlan_objmgr_vdev *temp_vdev;
+	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS] = {0};
+	bool has_2g_link = false;
+	bool has_5g_link = false;
+	qdf_freq_t mlo_freq;
+
+	mode_num = policy_mgr_get_mode_specific_conn_info(psoc, NULL,
+							  vdev_id_list, mode);
+	if (!mode_num || mode_num < 2)
+		return false;
+
+	for (i = 0; i < mode_num; i++) {
+		temp_vdev = wlan_objmgr_get_vdev_by_id_from_psoc(
+							psoc,
+							vdev_id_list[i],
+							WLAN_POLICY_MGR_ID);
+		if (!temp_vdev) {
+			policy_mgr_err("invalid vdev for id %d",
+				       vdev_id_list[i]);
+			return false;
+		}
+
+		if (wlan_vdev_mlme_is_mlo_vdev(temp_vdev)) {
+			if (mlo_vdev_lst)
+				mlo_vdev_lst[mlo_idx] = vdev_id_list[i];
+			mlo_freq =
+				wlan_get_operation_chan_freq(temp_vdev);
+			if (wlan_reg_is_24ghz_ch_freq(mlo_freq))
+				has_2g_link = true;
+			else
+				has_5g_link = true;
+			mlo_idx++;
+		}
+		wlan_objmgr_vdev_release_ref(temp_vdev, WLAN_POLICY_MGR_ID);
+	}
+
+	if (num_mlo)
+		*num_mlo = mlo_idx;
+
+	return has_2g_link && has_5g_link;
+}
+
 bool policy_mgr_is_curr_hwmode_emlsr(struct wlan_objmgr_psoc *psoc)
 {
 	struct policy_mgr_hw_mode_params hw_mode;
@@ -5243,7 +5314,7 @@ policy_mgr_get_concurrent_num_links(struct wlan_objmgr_vdev *vdev,
 }
 
 static void
-policy_mgr_ml_sta_concurency_on_connect(struct wlan_objmgr_psoc *psoc,
+policy_mgr_ml_sta_concurrency_on_connect(struct wlan_objmgr_psoc *psoc,
 				    struct wlan_objmgr_vdev *vdev,
 				    uint8_t num_ml, uint8_t *ml_idx,
 				    uint8_t num_non_ml, uint8_t *non_ml_idx,
@@ -5410,10 +5481,10 @@ policy_mgr_handle_ml_sta_link_concurrency(struct wlan_objmgr_psoc *psoc,
 	 * secondary STA switch happens to a new channel due to CSA
 	 */
 
-	policy_mgr_ml_sta_concurency_on_connect(psoc, vdev, num_ml,
-						ml_idx, num_non_ml,
-						non_ml_idx, freq_list,
-						vdev_id_list);
+	policy_mgr_ml_sta_concurrency_on_connect(psoc, vdev, num_ml,
+						 ml_idx, num_non_ml,
+						 non_ml_idx, freq_list,
+						 vdev_id_list);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -5478,7 +5549,7 @@ policy_mgr_get_affected_links_for_go_sap_cli(struct wlan_objmgr_psoc *psoc,
 			/* Continue if SCC */
 			if (ml_freq_lst[i] == p2p_sap_freq_lst[k])
 				continue;
-			/* Continue if high tput ot low latency is not set */
+			/* Continue if high tput or low latency is not set */
 			if (!policy_mgr_is_vdev_high_tput_or_low_latency(psoc,
 			    p2p_sap_vdev_lst[k]))
 				continue;
@@ -5875,7 +5946,7 @@ policy_mgr_handle_ml_sta_link_enable_on_sta_down(struct wlan_objmgr_psoc *psoc,
 						  num_ml_sta, ml_freq_lst,
 						  ml_sta_vdev_lst)) {
 		if (num_disabled_ml_sta)
-			policy_mgr_debug("Not reenabled due to disallowed concurrency");
+			policy_mgr_debug("Not re-enabled due to disallowed concurrency");
 		goto done;
 	}
 
@@ -7015,7 +7086,7 @@ bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc)
 	}
 
 	/*
-	 * 1) if agile & DFS scans are supportet
+	 * 1) if agile & DFS scans are supported
 	 * 2) if hardware is DBS capable
 	 * 3) if current hw mode is non-dbs
 	 * if all above 3 conditions are true then don't skip any
@@ -7727,8 +7798,8 @@ bool policy_mgr_is_sap_allowed_on_dfs_freq(struct wlan_objmgr_pdev *pdev,
 	/* if sta_sap_scc_on_dfs_chan ini is set, DFS master capability is
 	 * assumed disabled in the driver.
 	 */
-	if ((wlan_reg_get_channel_state_for_freq(pdev, ch_freq) ==
-	    CHANNEL_STATE_DFS) &&
+	if ((wlan_reg_get_channel_state_for_pwrmode(
+		pdev, ch_freq, REG_CURRENT_PWR_MODE) == CHANNEL_STATE_DFS) &&
 	    !sta_cnt && !gc_cnt && sta_sap_scc_on_dfs_chan &&
 	    !policy_mgr_get_dfs_master_dynamic_enabled(psoc, vdev_id)) {
 		policy_mgr_err("SAP not allowed on DFS channel if no dfs master capability!!");
@@ -8190,7 +8261,8 @@ bool policy_mgr_is_valid_for_channel_switch(struct wlan_objmgr_psoc *psoc,
 	sap_count = policy_mgr_mode_specific_connection_count(psoc,
 							      PM_SAP_MODE,
 							      NULL);
-	state = wlan_reg_get_channel_state_for_freq(pm_ctx->pdev, ch_freq);
+	state = wlan_reg_get_channel_state_for_pwrmode(pm_ctx->pdev, ch_freq,
+						       REG_CURRENT_PWR_MODE);
 
 	policy_mgr_debug("sta_sap_scc_on_dfs_chan %u, sap_count %u, ch freq %u, state %u",
 			 sta_sap_scc_on_dfs_chan, sap_count, ch_freq, state);
@@ -8467,7 +8539,7 @@ bool policy_mgr_is_restart_sap_required(struct wlan_objmgr_psoc *psoc,
 		 * STA moves back to 5 GHZ non indoor/non DFS channel
 		 *
 		 * Now SAP has to move to STA 5 GHz channel if SAP
-		 * was started on 5 GHz channel initialy.
+		 * was started on 5 GHz channel initially.
 		 */
 		user_config_freq =
 			policy_mgr_get_user_config_sap_freq(psoc, vdev_id);

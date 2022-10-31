@@ -119,8 +119,8 @@ void *hdd_get_consistent_mem_unaligned(size_t size,
 				       qdf_dma_addr_t *paddr,
 				       uint32_t ring_type)
 {
-	return dp_prealloc_get_consistent_mem_unaligned(size, paddr,
-							ring_type);
+	return ucfg_dp_prealloc_get_consistent_mem_unaligned(size, paddr,
+							     ring_type);
 }
 
 /**
@@ -132,7 +132,7 @@ void *hdd_get_consistent_mem_unaligned(size_t size,
 static
 void hdd_put_consistent_mem_unaligned(void *vaddr)
 {
-	dp_prealloc_put_consistent_mem_unaligned(vaddr);
+	ucfg_dp_prealloc_put_consistent_mem_unaligned(vaddr);
 }
 
 #else
@@ -649,7 +649,8 @@ static int __hdd_soc_probe(struct device *dev,
 		goto assert_fail_count;
 	}
 
-	status = dp_prealloc_init((struct cdp_ctrl_objmgr_psoc *)hdd_ctx->psoc);
+	status = ucfg_dp_prealloc_init((struct cdp_ctrl_objmgr_psoc *)
+					hdd_ctx->psoc);
 
 	if (status != QDF_STATUS_SUCCESS) {
 		errno = qdf_status_to_os_return(status);
@@ -680,7 +681,7 @@ wlan_exit:
 	hdd_wlan_exit(hdd_ctx);
 
 hdd_context_destroy:
-	dp_prealloc_deinit();
+	ucfg_dp_prealloc_deinit();
 
 dp_prealloc_fail:
 	hdd_context_destroy(hdd_ctx);
@@ -872,7 +873,7 @@ static void __hdd_soc_remove(struct device *dev)
 	cds_set_driver_in_bad_state(false);
 	cds_set_unload_in_progress(false);
 
-	dp_prealloc_deinit();
+	ucfg_dp_prealloc_deinit();
 
 	pr_info("%s: Driver De-initialized\n", WLAN_MODULE_NAME);
 }
@@ -960,7 +961,7 @@ static void hdd_psoc_shutdown_notify(struct hdd_context *hdd_ctx)
  * hdd_soc_recovery_cleanup() - Perform SSR related cleanup activities.
  *
  * This function will perform cleanup activities related to when driver
- * undergoes SSR. Activities inclues stopping idle timer and invoking shutdown
+ * undergoes SSR. Activities include stopping idle timer and invoking shutdown
  * notifier.
  *
  * Return: None
@@ -1013,7 +1014,7 @@ static void __hdd_soc_recovery_shutdown(void)
 		qdf_atomic_set(&is_recovery_cleanup_done, 0);
 
 	if (!hdd_wait_for_debugfs_threads_completion())
-		hdd_err("Debufs threads are still pending, attempting SSR anyway");
+		hdd_err("Debugfs threads are still pending, attempting SSR anyway");
 
 	hif_ctx = cds_get_context(QDF_MODULE_ID_HIF);
 	if (!hif_ctx)
@@ -1088,7 +1089,7 @@ static void wlan_hdd_crash_shutdown(void)
 	 * send crash_inject to FW directly, because we are now
 	 * in an atomic context, and preempt has been disabled,
 	 * MCThread won't be scheduled at the moment, at the same
-	 * time, TargetFailure event wont't be received after inject
+	 * time, TargetFailure event won't be received after inject
 	 * crash due to the same reason.
 	 */
 	ret = wma_crash_inject(wma_handle, RECOVERY_SIM_ASSERT, 0);
@@ -1188,18 +1189,18 @@ hdd_to_pmo_wow_enable_params(struct wow_enable_params *in_params,
 }
 
 /**
- * __wlan_hdd_bus_suspend() - handles platform supsend
+ * __wlan_hdd_bus_suspend() - handles platform suspend
  * @wow_params: collection of wow enable override parameters
  * @type: WoW suspend type
  *
- * Does precondtion validation. Ensures that a subsystem restart isn't in
+ * Does precondition validation. Ensures that a subsystem restart isn't in
  * progress. Ensures that no load or unload is in progress. Does:
  *	data path suspend
  *	component (pmo) suspend
  *	hif (bus) suspend
  *
  * Return: 0 for success, -EFAULT for null pointers,
- *     -EBUSY or -EAGAIN if another opperation is in progress and
+ *     -EBUSY or -EAGAIN if another operation is in progress and
  *     wlan will not be ready to suspend in time.
  */
 static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
@@ -1297,7 +1298,7 @@ static int __wlan_hdd_bus_suspend(struct wow_enable_params wow_params,
 
 	if (hif_try_prevent_ep_vote_access(hif_ctx)) {
 		hdd_debug("Prevent suspend, ep work pending");
-		err = QDF_STATUS_E_BUSY;
+		err = -EBUSY;
 		goto resume_txrx;
 	}
 
@@ -1427,12 +1428,12 @@ done:
  *
  * @type: WoW suspend type
  *
- * Does precondtion validation. Ensures that a subsystem restart isn't in
+ * Does precondition validation. Ensures that a subsystem restart isn't in
  * progress.  Ensures that no load or unload is in progress.  Ensures that
  * it has valid pointers for the required contexts.
- * Calls into hif to resume the bus opperation.
+ * Calls into hif to resume the bus operation.
  * Calls into wma to handshake with firmware and notify it that the bus is up.
- * Calls into ol_txrx for symetry.
+ * Calls into ol_txrx for symmetry.
  * Failures are treated as catastrophic.
  *
  * return: error code or 0 for success
@@ -1815,7 +1816,7 @@ static void hdd_soc_idle_shutdown_unlock(void)
 
 /**
  * wlan_hdd_pld_idle_shutdown() - wifi module idle shutdown after interface
- *                                inactivity timeout has trigerred idle shutdown
+ *                                inactivity timeout has triggered idle shutdown
  * @dev: device to remove
  * @pld_bus_type: PLD bus type
  *

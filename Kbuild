@@ -1510,6 +1510,7 @@ UMAC_MLME_INC := -I$(WLAN_COMMON_INC)/umac/mlme \
 		-I$(WLAN_COMMON_INC)/umac/mlme/psoc_mgr/dispatcher/inc \
 		-I$(WLAN_COMMON_INC)/umac/mlme/connection_mgr/dispatcher/inc \
 		-I$(WLAN_COMMON_INC)/umac/mlme/connection_mgr/utf/inc \
+		-I$(WLAN_COMMON_INC)/umac/mlme/include \
 		-I$(WLAN_COMMON_INC)/umac/mlme/mlme_utils/
 
 UMAC_MLME_OBJS := $(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_vdev_mlme_main.o \
@@ -1525,6 +1526,7 @@ UMAC_MLME_OBJS := $(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_
 		$(WLAN_COMMON_ROOT)/umac/mlme/pdev_mgr/dispatcher/src/wlan_pdev_mlme_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/mlme_objmgr/dispatcher/src/wlan_psoc_mlme_main.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/psoc_mgr/dispatcher/src/wlan_psoc_mlme_api.o \
+		$(WLAN_COMMON_ROOT)/umac/mlme/psoc_mgr/dispatcher/src/wlan_psoc_mlme_ucfg_api.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/connection_mgr/core/src/wlan_cm_bss_scoring.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/connection_mgr/core/src/wlan_cm_main.o \
 		$(WLAN_COMMON_ROOT)/umac/mlme/connection_mgr/core/src/wlan_cm_sm.o \
@@ -2029,6 +2031,8 @@ WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_wds_api.o
 WMI_OBJS += $(WMI_OBJ_DIR)/wmi_unified_wds_tlv.o
 endif
 
+cppflags-y += -DSERIALIZE_WMI_RX_EXECUTION_CTX
+
 $(call add-wlan-objs,wmi,$(WMI_OBJS))
 
 ########### FWLOG ###########
@@ -2114,11 +2118,6 @@ TXRX3.0_OBJS := $(TXRX3.0_DIR)/dp_txrx.o
 
 ifeq ($(CONFIG_WLAN_FEATURE_DP_RX_THREADS), y)
 TXRX3.0_OBJS += $(TXRX3.0_DIR)/dp_rx_thread.o
-endif
-
-ifeq ($(CONFIG_RX_FISA), y)
-TXRX3.0_OBJS += $(TXRX3.0_DIR)/dp_fisa_rx.o
-TXRX3.0_OBJS += $(TXRX3.0_DIR)/dp_rx_fst.o
 endif
 
 endif #LITHIUM
@@ -2556,6 +2555,15 @@ ifeq ($(CONFIG_DP_SWLM), y)
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_swlm.o
 endif
 
+ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM)))
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_prealloc.o
+endif
+
+ifeq ($(CONFIG_RX_FISA), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_fisa_rx.o
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_rx_fst.o
+endif
+
 $(call add-wlan-objs,dp_comp,$(WLAN_DP_COMP_OBJS))
 
 #######################################################
@@ -2621,6 +2629,7 @@ endif
 $(call add-wlan-objs,coex,$(COEX_OBJS))
 
 ###### COAP ########
+ifeq ($(CONFIG_WLAN_FEATURE_COAP), y)
 COAP_HDD_SRC := core/hdd/src
 COAP_OS_IF_SRC := os_if/coap/src
 COAP_TGT_SRC := components/target_if/coap/src
@@ -2634,7 +2643,6 @@ COAP_DISPATCHER_INC := -I$(WLAN_ROOT)/components/coap/dispatcher/inc
 COAP_CORE_INC := -I$(WLAN_ROOT)/components/coap/core/inc
 COAP_WMI_INC := -I$(WLAN_ROOT)/components/wmi/inc
 
-ifeq ($(CONFIG_WLAN_FEATURE_COAP), y)
 COAP_OBJS := \
 	$(COAP_HDD_SRC)/wlan_hdd_coap.o \
 	$(COAP_OS_IF_SRC)/wlan_cfg80211_coap.o \
@@ -2643,9 +2651,8 @@ COAP_OBJS := \
 	$(COAP_DISPATCHER_SRC)/wlan_coap_tgt_api.o \
 	$(COAP_DISPATCHER_SRC)/wlan_coap_ucfg_api.o \
 	$(COAP_WMI_SRC)/wmi_unified_coap_tlv.o
-endif
-
 $(call add-wlan-objs,coap,$(COAP_OBJS))
+endif
 
 ############## HTC ##########
 HTC_DIR := htc
@@ -3301,6 +3308,7 @@ cppflags-$(CONFIG_PLD_PCIE_INIT_FLAG) += -DCONFIG_PLD_PCIE_INIT
 cppflags-$(CONFIG_WLAN_FEATURE_DP_RX_THREADS) += -DFEATURE_WLAN_DP_RX_THREADS
 cppflags-$(CONFIG_WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT) += -DWLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
 cppflags-$(CONFIG_FEATURE_HAL_DELAYED_REG_WRITE) += -DFEATURE_HAL_DELAYED_REG_WRITE
+cppflags-$(CONFIG_FEATURE_HAL_RECORD_SUSPEND_WRITE) += -DFEATURE_HAL_RECORD_SUSPEND_WRITE
 cppflags-$(CONFIG_QCA_OL_DP_SRNG_LOCK_LESS_ACCESS) += -DQCA_OL_DP_SRNG_LOCK_LESS_ACCESS
 cppflags-$(CONFIG_SHADOW_WRITE_DELAY) += -DSHADOW_WRITE_DELAY
 
@@ -3317,6 +3325,7 @@ cppflags-y += -DFEATURE_MONITOR_MODE_SUPPORT
 cppflags-$(CONFIG_DP_CON_MON_MSI_ENABLED) += -DDP_CON_MON_MSI_ENABLED
 cppflags-$(CONFIG_WLAN_RX_MON_PARSE_CMN_USER_INFO) += -DWLAN_RX_MON_PARSE_CMN_USER_INFO
 cppflags-$(CONFIG_DP_CON_MON_MSI_SKIP_SET) += -DDP_CON_MON_MSI_SKIP_SET
+cppflags-$(CONFIG_QCA_WIFI_MONITOR_MODE_NO_MSDU_START_TLV_SUPPORT) += -DQCA_WIFI_MONITOR_MODE_NO_MSDU_START_TLV_SUPPORT
 else
 cppflags-y += -DDISABLE_MON_CONFIG
 endif
@@ -3613,6 +3622,9 @@ cppflags-$(CONFIG_HL_DP_SUPPORT) += -DQCA_COMPUTE_TX_DELAY_PER_TID
 cppflags-$(CONFIG_LL_DP_SUPPORT) += -DCONFIG_LL_DP_SUPPORT
 cppflags-$(CONFIG_LL_DP_SUPPORT) += -DWLAN_FULL_REORDER_OFFLOAD
 cppflags-$(CONFIG_WLAN_FEATURE_BIG_DATA_STATS) += -DWLAN_FEATURE_BIG_DATA_STATS
+ifeq ($(CONFIG_WLAN_FEATURE_11AX), y)
+cppflags-$(CONFIG_WLAN_FEATURE_SR) += -DWLAN_FEATURE_SR
+endif
 cppflags-$(CONFIG_WLAN_FEATURE_IGMP_OFFLOAD) += -DWLAN_FEATURE_IGMP_OFFLOAD
 cppflags-$(CONFIG_WLAN_FEATURE_GET_USABLE_CHAN_LIST) += -DWLAN_FEATURE_GET_USABLE_CHAN_LIST
 
@@ -3980,6 +3992,8 @@ cppflags-$(CONFIG_DP_FEATURE_HW_COOKIE_CONVERSION) += -DDP_FEATURE_HW_COOKIE_CON
 cppflags-$(CONFIG_DP_HW_COOKIE_CONVERT_EXCEPTION) += -DDP_HW_COOKIE_CONVERT_EXCEPTION
 cppflags-$(CONFIG_TX_ADDR_INDEX_SEARCH) += -DTX_ADDR_INDEX_SEARCH
 cppflags-$(CONFIG_QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES) += -DQCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES
+cppflags-$(CONFIG_QCA_GET_TSF_VIA_REG) += -DQCA_GET_TSF_VIA_REG
+
 cppflags-$(CONFIG_RX_HASH_DEBUG) += -DRX_HASH_DEBUG
 cppflags-$(CONFIG_DP_PKT_STATS_PER_LMAC) += -DDP_PKT_STATS_PER_LMAC
 cppflags-$(CONFIG_NO_RX_PKT_HDR_TLV) += -DNO_RX_PKT_HDR_TLV
@@ -4042,6 +4056,7 @@ cppflags-$(CONFIG_DP_RX_SPECIAL_FRAME_NEED) += -DDP_RX_SPECIAL_FRAME_NEED
 cppflags-$(CONFIG_FEATURE_STATS_EXT_V2) += -DFEATURE_STATS_EXT_V2
 cppflags-$(CONFIG_WLAN_FEATURE_CAL_FAILURE_TRIGGER) += -DWLAN_FEATURE_CAL_FAILURE_TRIGGER
 cppflags-$(CONFIG_WLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE) += -DWLAN_FEATURE_DYNAMIC_MAC_ADDR_UPDATE
+cppflags-$(CONFIG_WLAN_FEATURE_SAP_ACS_OPTIMIZE) += -DWLAN_FEATURE_SAP_ACS_OPTIMIZE
 
 cppflags-$(CONFIG_VERBOSE_DEBUG) += -DENABLE_VERBOSE_DEBUG
 cppflags-$(CONFIG_RX_DESC_DEBUG_CHECK) += -DRX_DESC_DEBUG_CHECK
@@ -4563,6 +4578,8 @@ endif
 
 cppflags-$(CONFIG_WLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET) += -DWLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET
 
+ccflags-$(CONFIG_SHUTDOWN_WLAN_IN_SYSTEM_SUSPEND) += -DSHUTDOWN_WLAN_IN_SYSTEM_SUSPEND
+
 ifeq ($(CONFIG_WLAN_FEATURE_MCC_QUOTA), y)
 cppflags-y += -DWLAN_FEATURE_MCC_QUOTA
 ifdef CONFIG_WLAN_MCC_MIN_CHANNEL_QUOTA
@@ -4619,7 +4636,7 @@ endif
 #
 # If DYNAMIC_SINGLE_CHIP & MULTI_IF_NAME defined, which means there are
 # multiple possible drivers, we also can load multiple drivers together.
-# And we can use DYNAMIC_SINGLE_CHIP to distingush the ko name, and use
+# And we can use DYNAMIC_SINGLE_CHIP to distinguish the ko name, and use
 # MULTI_IF_NAME to make cnss2 platform driver to figure out which wlanhost
 # driver attached. Moreover, as the first priority, host driver will only
 # append DYNAMIC_SINGLE_CHIP to the path of firmware/mac/ini file.
@@ -4653,9 +4670,9 @@ endif
 
 ccflags-y += -DSCHEDULER_CORE_MAX_MESSAGES=1000
 
-ccflags-y += -DLOG_DEL_OBJ_TIMEOUT_VALUE_MSEC=10000
+ccflags-y += -DLOG_DEL_OBJ_TIMEOUT_VALUE_MSEC=4000
 
-ccflags-y += -DLOG_DEL_OBJ_DESTROY_DURATION_SEC=10
+ccflags-y += -DLOG_DEL_OBJ_DESTROY_DURATION_SEC=4
 
 ccflags-y += -DWLAN_OBJMGR_RATELIMIT_THRESH=0
 

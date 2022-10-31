@@ -363,7 +363,7 @@ QDF_STATUS policy_mgr_update_connection_info(struct wlan_objmgr_psoc *psoc,
 		/* err msg */
 		policy_mgr_err("can't find vdev_id %d in pm_conc_connection_list",
 			vdev_id);
-		return status;
+		return QDF_STATUS_NOT_INITIALIZED;
 	}
 	if (pm_ctx->wma_cbacks.wma_get_connection_info) {
 		status = pm_ctx->wma_cbacks.wma_get_connection_info(
@@ -1332,7 +1332,7 @@ QDF_STATUS policy_mgr_next_actions(
 	case PM_DOWNGRADE:
 		/*
 		 * check if we have a beaconing entity that advertised 2x2
-		 * intially. If yes, update the beacon template & notify FW.
+		 * initially. If yes, update the beacon template & notify FW.
 		 */
 		status = policy_mgr_nss_update(psoc, POLICY_MGR_RX_NSS_1,
 					PM_NOP, POLICY_MGR_ANY, reason,
@@ -1341,7 +1341,7 @@ QDF_STATUS policy_mgr_next_actions(
 	case PM_UPGRADE:
 		/*
 		 * check if we have a beaconing entity that advertised 2x2
-		 * intially. If yes, update the beacon template & notify FW.
+		 * initially. If yes, update the beacon template & notify FW.
 		 */
 		status = policy_mgr_nss_update(psoc, POLICY_MGR_RX_NSS_2,
 					PM_NOP, POLICY_MGR_ANY, reason,
@@ -1449,6 +1449,11 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 				 uint32_t request_id)
 {
 	QDF_STATUS status;
+	uint8_t num_cxn_del = 0;
+	struct policy_mgr_conc_connection_info info = {0};
+
+	policy_mgr_store_and_del_conn_info_by_vdev_id(psoc, session_id,
+						      &info, &num_cxn_del);
 
 	if (!policy_mgr_check_for_session_conc(psoc, session_id, ch_freq)) {
 		policy_mgr_err("Conc not allowed for the session %d",
@@ -1463,10 +1468,12 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
 	status = policy_mgr_current_connections_update(psoc, session_id,
 						       ch_freq, reason,
 						       request_id);
-	if (QDF_STATUS_E_FAILURE == status) {
+	if (QDF_STATUS_E_FAILURE == status)
 		policy_mgr_err("connections update failed");
-		return status;
-	}
+
+	if (num_cxn_del > 0)
+		policy_mgr_restore_deleted_conn_info(psoc, &info,
+						     num_cxn_del);
 
 	return status;
 }
@@ -2593,7 +2600,8 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		find_alternate = true;
 		policymgr_nofl_debug("sap not capable of DFS SCC on con ch_freq %d",
 				     ch_freq);
-	} else if (wlan_reg_is_disable_for_freq(pm_ctx->pdev, ch_freq)) {
+	} else if (wlan_reg_is_disable_for_pwrmode(pm_ctx->pdev, ch_freq,
+						   REG_CURRENT_PWR_MODE)) {
 		find_alternate = true;
 		policymgr_nofl_debug("sap not capable on disabled con ch_freq %d",
 				     ch_freq);

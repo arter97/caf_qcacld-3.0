@@ -63,7 +63,7 @@ void dp_free_ctx(void)
 
 	qdf_spinlock_destroy(&dp_ctx->intf_list_lock);
 	qdf_list_destroy(&dp_ctx->intf_list);
-	dp_dettach_ctx();
+	dp_detach_ctx();
 	qdf_mem_free(dp_ctx);
 }
 
@@ -450,7 +450,7 @@ static void dp_ini_tcp_settings(struct wlan_dp_psoc_cfg *config,
 #ifdef CONFIG_DP_TRACE
 /**
  * dp_trace_cfg_update() - initialize DP Trace config
- * @config : Configuration paramerts
+ * @config : Configuration parameters
  * @psoc: psoc handle
  */
 static void
@@ -476,7 +476,7 @@ dp_trace_cfg_update(struct wlan_dp_psoc_cfg *config,
 #ifdef WLAN_NUD_TRACKING
 /**
  * dp_nud_tracking_cfg_update() - initialize NUD Tracking config
- * @config : Configuration paramerts
+ * @config : Configuration parameters
  * @psoc: psoc handle
  */
 static void
@@ -496,7 +496,7 @@ dp_nud_tracking_cfg_update(struct wlan_dp_psoc_cfg *config,
 #ifdef QCA_SUPPORT_TXRX_DRIVER_TCP_DEL_ACK
 /**
  * dp_ini_tcp_del_ack_settings() - initialize TCP delack config
- * @config : Configuration paramerts
+ * @config : Configuration parameters
  * @psoc: psoc handle
  */
 static void dp_ini_tcp_del_ack_settings(struct wlan_dp_psoc_cfg *config,
@@ -523,7 +523,7 @@ static void dp_ini_tcp_del_ack_settings(struct wlan_dp_psoc_cfg *config,
 #ifdef WLAN_SUPPORT_TXRX_HL_BUNDLE
 /**
  * dp_hl_bundle_cfg_update() - initialize TxRx HL bundle config
- * @config : Configuration paramerts
+ * @config : Configuration parameters
  * @psoc: psoc handle
  */
 static void dp_hl_bundle_cfg_update(struct wlan_dp_psoc_cfg *config,
@@ -751,7 +751,7 @@ dp_rx_mic_error_ind(struct cdp_ctrl_objmgr_psoc *psoc, uint8_t pdev_id,
 	}
 	/*
 	 * Store mic error info pointer in dp_intf
-	 * for freeing up the alocated memory in case
+	 * for freeing up the allocated memory in case
 	 * the work scheduled below is flushed or deinitialized.
 	 */
 	dp_intf->mic_work.status = DP_MIC_SCHEDULED;
@@ -842,6 +842,7 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 	if (QDF_IS_STATUS_ERROR(status)) {
 		dp_err("DP peer attach failed");
 		qdf_mem_free(sta_info);
+		return status;
 	}
 
 	qdf_mem_copy(sta_info->sta_mac.bytes, peer->macaddr,
@@ -850,8 +851,8 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 	sta_info->dhcp_phase = DHCP_PHASE_ACK;
 	sta_info->dhcp_nego_status = DHCP_NEGO_STOP;
 
-	dp_info("sta info crated mac:" QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(&sta_info->sta_mac));
+	dp_info("sta info created mac:" QDF_MAC_ADDR_FMT,
+		QDF_MAC_ADDR_REF(&sta_info->sta_mac));
 
 	return status;
 }
@@ -1113,10 +1114,10 @@ void dp_attach_ctx(struct wlan_dp_psoc_context *dp_ctx)
 	gp_dp_ctx = dp_ctx;
 }
 
-void dp_dettach_ctx(void)
+void dp_detach_ctx(void)
 {
 	if (!gp_dp_ctx) {
-		dp_err("global dp ctx is already dettached");
+		dp_err("global dp ctx is already detached");
 		return;
 	}
 	gp_dp_ctx = NULL;

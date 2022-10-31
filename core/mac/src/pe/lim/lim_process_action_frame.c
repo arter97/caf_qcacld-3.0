@@ -190,8 +190,9 @@ lim_process_ext_channel_switch_action_frame(struct mac_context *mac_ctx,
 	 * and no concurrent session is running.
 	 */
 	if (!(session_entry->curr_op_freq != target_freq &&
-	      ((wlan_reg_get_channel_state_for_freq(mac_ctx->pdev, target_freq) ==
-		  CHANNEL_STATE_ENABLE) ||
+	      ((wlan_reg_get_channel_state_for_pwrmode(mac_ctx->pdev,
+						       target_freq,
+						       REG_CURRENT_PWR_MODE) == CHANNEL_STATE_ENABLE) ||
 	       (wlan_reg_is_dfs_for_freq(mac_ctx->pdev, target_freq) &&
 		!policy_mgr_concurrent_open_sessions_running(
 			mac_ctx->psoc))))) {
@@ -1907,6 +1908,25 @@ void lim_process_action_frame(struct mac_context *mac_ctx,
 					action_hdr->actionID);
 				break;
 
+			}
+		} else if (LIM_IS_AP_ROLE(session)) {
+			switch (action_hdr->actionID) {
+			case RRM_NEIGHBOR_REQ:
+			case RRM_RADIO_MEASURE_RPT:
+				rssi = WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info);
+				mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+				lim_send_sme_mgmt_frame_ind(mac_ctx,
+						mac_hdr->fc.subType,
+						(uint8_t *)mac_hdr,
+						frame_len + sizeof(tSirMacMgmtHdr),
+						session->smeSessionId,
+						WMA_GET_RX_FREQ(rx_pkt_info),
+						rssi, RXMGMT_FLAG_NONE);
+				break;
+			default:
+				pe_warn("Action ID: %d not handled in RRM",
+					action_hdr->actionID);
+				break;
 			}
 		} else {
 			/* Else we will just ignore the RRM messages. */

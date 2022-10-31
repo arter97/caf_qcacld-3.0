@@ -20,7 +20,7 @@
  * DOC: Declare various struct, macros which are common for
  * various pmo related features.
  *
- * Note: This file shall not contain public API's prototype/declartions.
+ * Note: This file shall not contain public API's prototype/declarations.
  *
  */
 
@@ -175,7 +175,7 @@ enum powersave_mode {
  * @PMO_SUSPEND_NONE: Does not support suspend
  * @PMO_SUSPEND_LEGENCY: Legency PDEV suspend mode
  * @PMO_SUSPEND_WOW: WoW suspend mode
- * @PMO_SUSPEND_SHUTDOWN: shutdown while suspend mode
+ * @PMO_SUSPEND_SHUTDOWN: Shutdown suspend mode. Shutdown while suspend
  */
 enum pmo_suspend_mode {
 	PMO_SUSPEND_NONE = 0,

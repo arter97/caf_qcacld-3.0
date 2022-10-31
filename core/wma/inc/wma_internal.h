@@ -26,7 +26,7 @@
 
 /* ################### defines ################### */
 /*
- * TODO: Following constant should be shared by firwmare in
+ * TODO: Following constant should be shared by firmware in
  * wmi_unified.h. This will be done once wmi_unified.h is updated.
  */
 #define WMI_PEER_STATE_AUTHORIZED 0x2
@@ -219,19 +219,6 @@ wma_roam_pmkid_request_event_handler(void *handle,
 	return 0;
 }
 #endif /* WLAN_FEATURE_FIPS */
-
-/**
- * wma_roam_auth_offload_event_handler() - Handle LFR-3.0 Roam authentication
- * offload event.
- * @handle: wma_handle
- * @event:  rso auth offload event data pointer
- * @len: length of the data
- *
- * Handles roam authentication offload event from firmware which is triggered
- * after roam candidate selection.
- */
-int wma_roam_auth_offload_event_handler(WMA_HANDLE handle, uint8_t *event,
-					uint32_t len);
 
 /**
  * wma_roam_stats_event_handler() - Handle the WMI_ROAM_STATS_EVENTID
@@ -1221,7 +1208,7 @@ void wma_del_ts_req(tp_wma_handle wma, struct del_ts_params *msg);
  * @pAggrQosRspMsg - combined struct for all ADD_TS requests.
  *
  * A function to handle WMA_AGGR_QOS_REQ. This will send out
- * ADD_TS requestes to firmware in loop for all the ACs with
+ * ADD_TS requests to firmware in loop for all the ACs with
  * active flow.
  *
  * Return: none

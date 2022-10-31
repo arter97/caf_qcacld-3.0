@@ -725,7 +725,7 @@ QDF_STATUS p2p_psoc_object_open(struct wlan_objmgr_psoc *soc)
 	p2p_soc_obj = wlan_objmgr_psoc_get_comp_private_obj(soc,
 			WLAN_UMAC_COMP_P2P);
 	if (!p2p_soc_obj) {
-		p2p_err("p2p soc priviate object is NULL");
+		p2p_err("p2p soc private object is NULL");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -889,7 +889,7 @@ QDF_STATUS p2p_psoc_stop(struct wlan_objmgr_psoc *soc)
 
 	/* clean up queue of p2p psoc private object */
 	p2p_cleanup_tx_sync(p2p_soc_obj, NULL);
-	p2p_cleanup_roc_sync(p2p_soc_obj, NULL);
+	p2p_cleanup_roc(p2p_soc_obj, NULL, true);
 
 	/* unrgister scan request id*/
 	wlan_scan_unregister_requester(soc, p2p_soc_obj->scan_req_id);

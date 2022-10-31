@@ -2653,8 +2653,8 @@ static void cm_update_driver_assoc_ies(struct wlan_objmgr_psoc *psoc,
 						  power_cap_ie_data);
 	}
 
-	wlan_cm_ese_populate_addtional_ies(pdev, mlme_obj, vdev_id,
-					  rso_mode_cfg);
+	wlan_cm_ese_populate_additional_ies(pdev, mlme_obj, vdev_id,
+					    rso_mode_cfg);
 
 	/* Append QCN IE if g_support_qcn_ie INI is enabled */
 	if (mlme_obj->cfg.sta.qcn_ie_support)
@@ -2841,6 +2841,41 @@ cm_roam_scan_btm_offload(struct wlan_objmgr_psoc *psoc,
 	params->btm_candidate_min_score = btm_cfg->btm_trig_min_candidate_score;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * cm_roam_mlo_config() - set roam mlo offload parameters
+ * @psoc: psoc ctx
+ * @vdev: vdev
+ * @params:  roam mlo offload parameters
+ * @rso_cfg: rso config
+ *
+ * This function is used to set roam mlo offload related parameters
+ *
+ * Return: None
+ */
+static void
+cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+		   struct wlan_objmgr_vdev *vdev,
+		   struct wlan_roam_start_config *start_req)
+{
+	struct wlan_roam_mlo_config *roam_mlo_params;
+
+	roam_mlo_params = &start_req->roam_mlo_params;
+	roam_mlo_params->vdev_id = wlan_vdev_get_id(vdev);
+	roam_mlo_params->support_link_num =
+		wlan_mlme_get_sta_mlo_conn_max_num(psoc);
+	roam_mlo_params->support_link_band =
+		wlan_mlme_get_sta_mlo_conn_band_bmp(psoc);
+}
+#else
+static void
+cm_roam_mlo_config(struct wlan_objmgr_psoc *psoc,
+		   struct wlan_objmgr_vdev *vdev,
+		   struct wlan_roam_start_config *start_req)
+{
+}
+#endif
+
 /**
  * cm_roam_offload_11k_params() - set roam 11k offload parameters
  * @psoc: psoc ctx
@@ -3015,6 +3050,7 @@ cm_roam_start_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
 				   true);
 	start_req->wlan_roam_rt_stats_config =
 			wlan_cm_get_roam_rt_stats(psoc, ROAM_RT_STATS_ENABLE);
+	cm_roam_mlo_config(psoc, vdev, start_req);
 
 	status = wlan_cm_tgt_send_roam_start_req(psoc, vdev_id, start_req);
 	if (QDF_IS_STATUS_ERROR(status))
@@ -3327,7 +3363,7 @@ cm_roam_fill_per_roam_request(struct wlan_objmgr_psoc *psoc,
 	req->per_config.min_candidate_rssi =
 		mlme_obj->cfg.lfr.per_roam_min_candidate_rssi;
 
-	mlme_debug("PER based roaming configuaration enable: %d vdev: %d high_rate_thresh: %d low_rate_thresh: %d rate_thresh_percnt: %d per_rest_time: %d monitor_time: %d min cand rssi: %d",
+	mlme_debug("PER based roaming configuration enable: %d vdev: %d high_rate_thresh: %d low_rate_thresh: %d rate_thresh_percnt: %d per_rest_time: %d monitor_time: %d min cand rssi: %d",
 		   req->per_config.enable, req->vdev_id,
 		   req->per_config.tx_high_rate_thresh,
 		   req->per_config.tx_low_rate_thresh,
@@ -3701,15 +3737,6 @@ cm_roam_switch_to_rso_stop(struct wlan_objmgr_pdev *pdev,
 	switch (cur_state) {
 	case WLAN_ROAM_RSO_ENABLED:
 	case WLAN_ROAMING_IN_PROG:
-		/*
-		 * Set the roam state to RSO_STOPPED for RSO_ENABLED
-		 * and ROAMING_IN_PROGRESS. cm_roam_stop_req() has a check
-		 * for ROAM_SYNC_IN_PROGRESS and return.
-		 * This is moved here i.e. before calling cm_roam_stop_req()
-		 * as the state may get modified from another thread while
-		 * cm_roam_stop_req is sending commands to firmware.
-		 */
-		mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_STOPPED);
 	case WLAN_ROAM_SYNCH_IN_PROG:
 		status = cm_roam_stop_req(psoc, vdev_id, reason,
 					  send_resp, start_timer);
@@ -3730,11 +3757,6 @@ cm_roam_switch_to_rso_stop(struct wlan_objmgr_pdev *pdev,
 
 		return QDF_STATUS_SUCCESS;
 	}
-	/*
-	 * This shall make sure the state is set to STOPPED in
-	 * ROAM_SYNC_IN_PROGRESS state also.
-	 * No harm in setting the state again to STOPPED in other cases.
-	 */
 	mlme_set_roam_state(psoc, vdev_id, WLAN_ROAM_RSO_STOPPED);
 
 	return QDF_STATUS_SUCCESS;
@@ -4106,7 +4128,7 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 	}
 
 	if (control_bitmap) {
-		mlme_debug("ROAM: RSO Disabled internaly: vdev[%d] bitmap[0x%x]",
+		mlme_debug("ROAM: RSO Disabled internally: vdev[%d] bitmap[0x%x]",
 			   vdev_id, control_bitmap);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -5090,6 +5112,7 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 	struct cm_roam_values_copy src_config = {};
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	uint32_t roam_trigger_bitmap;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
@@ -5100,6 +5123,20 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 		return;
 
 	if (mlme_obj->cfg.lfr.roam_scan_offload_enabled) {
+		/*
+		 * When vendor handoff is enabled and disconnection is received,
+		 * then restore the roam trigger bitmap from the ini
+		 * configuration
+		 */
+		wlan_cm_roam_cfg_get_value(psoc, vdev_id, ROAM_CONFIG_ENABLE,
+					   &src_config);
+		if (src_config.bool_value) {
+			roam_trigger_bitmap =
+					wlan_mlme_get_roaming_triggers(psoc);
+			mlme_set_roam_trigger_bitmap(psoc, vdev_id,
+						     roam_trigger_bitmap);
+		}
+
 		src_config.bool_value = 0;
 		wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_CONFIG_ENABLE,
 					   &src_config);
@@ -5478,7 +5515,7 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 	roam_control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
 	if (roam_offload_enabled && (roam_control_bitmap ||
 	    !MLME_IS_ROAM_INITIALIZED(psoc, vdev_id))) {
-		mlme_debug("ROAM: RSO Disabled internaly: vdev[%d] bitmap[0x%x]",
+		mlme_debug("ROAM: RSO Disabled internally: vdev[%d] bitmap[0x%x]",
 			   vdev_id, roam_control_bitmap);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -5891,7 +5928,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 * 2. Atleast one candidate AP found during scan
 	 *
 	 * Print NO_ROAM only if:
-	 * 1. No candidate AP found(eventhough other APs are found in scan)
+	 * 1. No candidate AP found(even though other APs are found in scan)
 	 */
 	wlan_diag_event.is_roam_successful = (res->status == 0) ||
 		(ap_found_in_roam_scan &&
@@ -6179,7 +6216,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 * 2. Atleast one candidate AP found during scan
 	 *
 	 * Print NO_ROAM only if:
-	 * 1. No candidate AP found(eventhough other APs are found in scan)
+	 * 1. No candidate AP found(even though other APs are found in scan)
 	 */
 	log_record->roam_result.is_roam_successful =
 		(res->status == 0) ||
@@ -6737,6 +6774,11 @@ cm_roam_mgmt_frame_event(struct roam_frame_info *frame_data,
 					 !frame_data->is_rsp);
 		diag_event = EVENT_WLAN_MGMT;
 	}
+
+	if (wlan_diag_event.subtype > WLAN_CONN_DIAG_REASSOC_RESP_EVENT &&
+	    wlan_diag_event.subtype < WLAN_CONN_DIAG_BMISS_EVENT)
+		wlan_diag_event.reason = frame_data->status_code;
+
 	WLAN_HOST_DIAG_EVENT_REPORT(&wlan_diag_event, diag_event);
 
 	return status;
@@ -7075,12 +7117,10 @@ cm_send_rso_stop(struct wlan_objmgr_vdev *vdev)
 			     &send_resp, start_timer);
 	/*
 	 * RSO stop resp is not supported or RSO STOP timer/req failed,
-	 * then send resp from here
+	 * send QDF_STATUS_E_NOSUPPORT so that we continue from the caller
 	 */
 	if (send_resp)
-		wlan_cm_rso_stop_continue_disconnect(wlan_vdev_get_psoc(vdev),
-						     wlan_vdev_get_id(vdev),
-						     false);
+		return QDF_STATUS_E_NOSUPPORT;
 
 	return QDF_STATUS_SUCCESS;
 }

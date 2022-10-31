@@ -236,11 +236,13 @@ void lim_process_mlm_start_cnf(struct mac_context *mac, uint32_t *msg_buf)
 					CHANNEL_STATE_DFS)
 				send_bcon_ind = true;
 		} else if (pe_session->ch_width == CH_WIDTH_80P80MHZ) {
-			if ((wlan_reg_get_channel_state_for_freq(
-					mac->pdev, chan_freq) !=
+			if ((wlan_reg_get_channel_state_for_pwrmode(
+					mac->pdev, chan_freq,
+					REG_CURRENT_PWR_MODE) !=
 					CHANNEL_STATE_DFS) &&
-			    (wlan_reg_get_channel_state_for_freq(
-					mac->pdev, ch_cfreq1) !=
+			    (wlan_reg_get_channel_state_for_pwrmode(
+					mac->pdev, ch_cfreq1,
+					REG_CURRENT_PWR_MODE) !=
 					CHANNEL_STATE_DFS))
 				send_bcon_ind = true;
 		} else {
@@ -2814,7 +2816,7 @@ lim_process_switch_channel_join_mlo(struct pe_session *session_entry,
 			pe_debug("MLO: process assoc rsp for link vdev");
 			lim_process_assoc_rsp_frame(mac_ctx,
 						    link_assoc_rsp.ptr,
-						    link_assoc_rsp.len,
+						    (link_assoc_rsp.len - SIR_MAC_HDR_LEN_3A),
 						    LIM_ASSOC,
 						    session_entry);
 			qdf_mem_free(link_assoc_rsp.ptr);

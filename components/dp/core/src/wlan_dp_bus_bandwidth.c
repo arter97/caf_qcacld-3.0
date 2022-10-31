@@ -45,7 +45,7 @@
 #ifdef FEATURE_BUS_BANDWIDTH_MGR
 /**
  * bus_bw_table_default - default table which provides bus bandwidth level
- *  corresonding to a given connection mode and throughput level.
+ *  corresponding to a given connection mode and throughput level.
  */
 static bus_bw_table_type bus_bw_table_default = {
 	[QCA_WLAN_802_11_MODE_11B] = {BUS_BW_LEVEL_NONE, BUS_BW_LEVEL_1,
@@ -80,7 +80,7 @@ static bus_bw_table_type bus_bw_table_default = {
 
 /**
  * bus_bw_table_low_latency - table which provides bus bandwidth level
- *  corresonding to a given connection mode and throughput level in low
+ *  corresponding to a given connection mode and throughput level in low
  *  latency setting.
  */
 static bus_bw_table_type bus_bw_table_low_latency = {
@@ -224,6 +224,12 @@ bbm_get_bus_bw_level_vote(struct wlan_dp_intf *dp_intf,
 	return vote_lvl;
 }
 
+static inline bool bbm_validate_intf_id(uint8_t intf_id)
+{
+	return !!(intf_id == WLAN_UMAC_VDEV_ID_MAX ||
+				intf_id >= WLAN_MAX_VDEVS);
+}
+
 /**
  * bbm_apply_tput_policy() - Apply tput BBM policy by considering
  *  throughput level and connection modes across adapters
@@ -262,6 +268,8 @@ bbm_apply_tput_policy(struct wlan_dp_psoc_context *dp_ctx,
 
 	dp_for_each_intf_held_safe(dp_ctx, dp_intf, dp_intf_next) {
 		if (!dp_intf)
+			continue;
+		if (bbm_validate_intf_id(dp_intf->intf_id))
 			continue;
 		tmp_vote = bbm_get_bus_bw_level_vote(dp_intf, tput_level);
 		if (tmp_vote > next_vote)

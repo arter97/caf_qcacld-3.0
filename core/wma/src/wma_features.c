@@ -315,22 +315,29 @@ end:
 
 #ifdef WLAN_FEATURE_TSF
 
-#ifdef WLAN_FEATURE_TSF_UPLINK_DELAY
-static void wma_vdev_tsf_set_mac_id(struct stsf *ptsf, uint32_t mac_id,
-				    uint32_t mac_id_valid)
+#if defined(WLAN_FEATURE_TSF_UPLINK_DELAY) || defined(QCA_GET_TSF_VIA_REG)
+static inline void
+wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
+			       uint32_t mac_id_valid, uint32_t tsf_id,
+			       uint32_t tsf_id_valid)
 {
 	ptsf->mac_id = mac_id;
 	ptsf->mac_id_valid = mac_id_valid;
+	ptsf->tsf_id = tsf_id;
+	ptsf->tsf_id_valid = tsf_id_valid;
 
-	wma_nofl_debug("mac_id %d mac_id_valid %d", ptsf->mac_id,
-		       ptsf->mac_id_valid);
+	wma_nofl_debug("mac_id %d mac_id_valid %d tsf_id %d tsf_id_valid %d",
+		       ptsf->mac_id, ptsf->mac_id_valid, ptsf->tsf_id,
+		       ptsf->tsf_id_valid);
 }
-#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY */
-static inline void wma_vdev_tsf_set_mac_id(struct stsf *ptsf, uint32_t mac_id,
-					   uint32_t mac_id_valid)
+#else /* !WLAN_FEATURE_TSF_UPLINK_DELAY || !QCA_GET_TSF_VIA_REG*/
+static inline void
+wma_vdev_tsf_set_mac_id_tsf_id(struct stsf *ptsf, uint32_t mac_id,
+			       uint32_t mac_id_valid, uint32_t tsf_id,
+			       uint32_t tsf_id_valid)
 {
 }
-#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY */
+#endif /* WLAN_FEATURE_TSF_UPLINK_DELAY || QCA_GET_TSF_VIA_REG*/
 
 /**
  * wma_vdev_tsf_handler() - handle tsf event indicated by FW
@@ -372,9 +379,10 @@ int wma_vdev_tsf_handler(void *handle, uint8_t *data, uint32_t data_len)
 		       ptsf->global_tsf_low, ptsf->global_tsf_high,
 			   ptsf->soc_timer_low, ptsf->soc_timer_high);
 
-	wma_vdev_tsf_set_mac_id(ptsf, tsf_event->mac_id,
-				tsf_event->mac_id_valid);
-
+	wma_vdev_tsf_set_mac_id_tsf_id(ptsf, tsf_event->mac_id,
+				       tsf_event->mac_id_valid,
+				       tsf_event->tsf_id,
+				       tsf_event->tsf_id_valid);
 	tsf_msg.type = eWNI_SME_TSF_EVENT;
 	tsf_msg.bodyptr = ptsf;
 	tsf_msg.bodyval = 0;
@@ -2517,8 +2525,8 @@ static void wma_wow_dump_mgmt_buffer(uint8_t *wow_packet_buffer,
 }
 
 /**
- * wma_acquire_wakelock() - conditionally aquires a wakelock base on wake reason
- * @wma: the wma handle with the wakelocks to aquire
+ * wma_acquire_wakelock() - conditionally acquires a wakelock base on wake reason
+ * @wma: the wma handle with the wakelocks to acquire
  * @wake_reason: wow wakeup reason
  *
  * Return: None
@@ -4211,7 +4219,7 @@ wma_send_apf_write_work_memory_cmd(WMA_HANDLE handle,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	wma_debug("Sent APF wite mem on vdevid: %d", write_params->vdev_id);
+	wma_debug("Sent APF write mem on vdevid: %d", write_params->vdev_id);
 	return status;
 }
 

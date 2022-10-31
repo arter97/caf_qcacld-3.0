@@ -1415,7 +1415,7 @@ static void wlan_hdd_ready_to_extwow(void *cookie, bool is_success)
 
 	request = osif_request_get(cookie);
 	if (!request) {
-		hdd_err("Obselete request");
+		hdd_err("obsolete request");
 		return;
 	}
 	priv = osif_request_priv(request);
@@ -3240,6 +3240,59 @@ struct roam_ch_priv {
 	struct roam_scan_ch_resp roam_ch;
 };
 
+/**
+ * hdd_dump_roam_scan_ch_list() - Function to dump roam scan chan list content
+ * @chan_list: pointer to channel list received from FW via an event
+ * WMI_ROAM_SCAN_CHANNEL_LIST_EVENTID
+ * @num_channels: Number of channels
+ *
+ * Return: none
+ */
+static void
+hdd_dump_roam_scan_ch_list(uint32_t *chan_list, uint16_t num_channels)
+{
+	uint8_t i, j;
+	uint8_t ch_cache_str[128] = {0};
+
+	/* print channel list after sorting in ascending order */
+	for (i = 0, j = 0; i < num_channels; i++) {
+		if (j < sizeof(ch_cache_str))
+			j += snprintf(ch_cache_str + j,
+				      sizeof(ch_cache_str) - j, " %d",
+				      chan_list[i]);
+		else
+			break;
+	}
+
+	hdd_debug("No of freq:%d, freq list : %s", num_channels, ch_cache_str);
+}
+
+/**
+ * hdd_sort_roam_scan_ch_list() - Function to sort roam scan channel list in
+ * ascending order before sending it to supplicant
+ * @chan_list: pointer to channel list received from FW via an event
+ * WMI_ROAM_SCAN_CHANNEL_LIST_EVENTID
+ * @num_channels: Number of channels
+ *
+ * Return: none
+ */
+static void
+hdd_sort_roam_scan_ch_list(uint32_t *chan_list, uint16_t num_channels)
+{
+	uint8_t i, j, swap = 0;
+
+	for (i = 0; i < (num_channels - 1) &&
+	     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++) {
+		for (j = 0; j < (num_channels - i - 1); j++) {
+			if (chan_list[j] > chan_list[j + 1]) {
+				swap = chan_list[j];
+				chan_list[j] = chan_list[j + 1];
+				chan_list[j + 1] = swap;
+			}
+		}
+	}
+}
+
 void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 			     struct roam_scan_ch_resp *roam_ch,
 			     void *context)
@@ -3254,7 +3307,7 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 		  roam_ch->vdev_id, roam_ch->command_resp);
 	/**
 	 * If command response is set in the response message, then it is
-	 * getroamscanchannels command response else this event is asyncronous
+	 * getroamscanchannels command response else this event is asynchronous
 	 * event raised by firmware.
 	 */
 	if (!roam_ch->command_resp) {
@@ -3268,6 +3321,10 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 			return;
 
 		freq = (uint32_t *)event;
+		hdd_sort_roam_scan_ch_list(roam_ch->chan_list,
+					   roam_ch->num_channels);
+		hdd_dump_roam_scan_ch_list(roam_ch->chan_list,
+					   roam_ch->num_channels);
 		for (i = 0; i < roam_ch->num_channels &&
 		     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++) {
 			freq[i] = roam_ch->chan_list[i];
@@ -3285,6 +3342,9 @@ void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
 		return;
 	}
 	priv = osif_request_priv(request);
+
+	hdd_sort_roam_scan_ch_list(roam_ch->chan_list, roam_ch->num_channels);
+	hdd_dump_roam_scan_ch_list(roam_ch->chan_list, roam_ch->num_channels);
 
 	priv->roam_ch.num_channels = roam_ch->num_channels;
 	for (i = 0; i < priv->roam_ch.num_channels &&
@@ -5236,8 +5296,10 @@ static int drv_cmd_tdls_off_channel(struct hdd_adapter *adapter,
 		return -EINVAL;
 
 	ch_freq = wlan_reg_legacy_chan_to_freq(hdd_ctx->pdev, channel);
-	reg_state = wlan_reg_get_channel_state_for_freq(hdd_ctx->pdev,
-							ch_freq);
+	reg_state = wlan_reg_get_channel_state_for_pwrmode(
+							hdd_ctx->pdev,
+							ch_freq,
+							REG_CURRENT_PWR_MODE);
 
 	if (reg_state == CHANNEL_STATE_DFS ||
 		reg_state == CHANNEL_STATE_DISABLE ||
@@ -5584,7 +5646,7 @@ static int hdd_parse_setantennamode_command(const uint8_t *value)
 /**
  * hdd_is_supported_chain_mask_2x2() - Verify if supported chain
  * mask is 2x2 mode
- * @hdd_ctx: Pointer to hdd contex
+ * @hdd_ctx: Pointer to hdd context
  *
  * Return: true if supported chain mask 2x2 else false
  */
@@ -5609,7 +5671,7 @@ static bool hdd_is_supported_chain_mask_2x2(struct hdd_context *hdd_ctx)
 /**
  * hdd_is_supported_chain_mask_1x1() - Verify if the supported
  * chain mask is 1x1
- * @hdd_ctx: Pointer to hdd contex
+ * @hdd_ctx: Pointer to hdd context
  *
  * Return: true if supported chain mask 1x1 else false
  */
@@ -5693,7 +5755,7 @@ wlan_hdd_soc_set_antenna_mode_cb(enum set_antenna_mode_status status,
 
 	request = osif_request_get(context);
 	if (!request) {
-		hdd_err("obselete request");
+		hdd_err("obsolete request");
 		return;
 	}
 
@@ -6261,8 +6323,8 @@ static void disconnect_sta_and_restart_sap(struct hdd_context *hdd_ctx,
  * SET_DISABLE_CHANNEL_LIST <num of channels>
  * <channels separated by spaces>.
  * If the command comes multiple times than this function will compare
- * the channels received in the command with the channles cached in the
- * first command, if the channel list matches with the cached channles,
+ * the channels received in the command with the channels cached in the
+ * first command, if the channel list matches with the cached channels,
  * it returns success otherwise returns failure.
  *
  * Return: 0 on success, Error code on failure
@@ -6402,7 +6464,7 @@ static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 	 * If command is received first time, cache the channels to
 	 * be disabled else compare the channels received in the
 	 * command with the cached channels, if channel list matches
-	 * return success otherewise return failure.
+	 * return success otherwise return failure.
 	 */
 	if (!is_command_repeated) {
 		for (j = 0; j < num_channels; j++)

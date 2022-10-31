@@ -291,7 +291,7 @@ wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
 	 * would contain the channels in acs cfg. Now since the scan takes time
 	 * there could be channels present in acs cfg that could become unsafe
 	 * in the mean time, so it is better to filter out those channels from
-	 * the acs channel list before chosing one of them as a default channel
+	 * the acs channel list before choosing one of them as a default channel
 	 */
 	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
 		freq = sap_ctx->acs_cfg->freq_list[i];
@@ -467,13 +467,15 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 		    sap_ctx->ch_params.ch_width, 0) == CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else if (sap_ctx->ch_params.ch_width == CH_WIDTH_80P80MHZ) {
-		if (wlan_reg_get_channel_state_for_freq(
+		if (wlan_reg_get_channel_state_for_pwrmode(
 						mac_ctx->pdev,
-						target_chan_freq) ==
+						target_chan_freq,
+						REG_CURRENT_PWR_MODE) ==
 		    CHANNEL_STATE_DFS ||
-		    wlan_reg_get_channel_state_for_freq(
+		    wlan_reg_get_channel_state_for_pwrmode(
 					mac_ctx->pdev,
-					sap_ctx->ch_params.mhz_freq_seg1) ==
+					sap_ctx->ch_params.mhz_freq_seg1,
+					REG_CURRENT_PWR_MODE) ==
 				CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else {
@@ -673,7 +675,8 @@ wlansap_roam_process_dfs_chansw_update(mac_handle_t mac_handle,
 	for (intf = 0; intf < SAP_MAX_NUM_SESSION; intf++) {
 		struct sap_context *sap_context;
 
-		if (!((QDF_SAP_MODE == mac_ctx->sap.sapCtxList[intf].sapPersona)
+		if (!((QDF_SAP_MODE == mac_ctx->sap.sapCtxList[intf].sapPersona ||
+		       QDF_P2P_GO_MODE == mac_ctx->sap.sapCtxList[intf].sapPersona)
 		    && (mac_ctx->sap.sapCtxList[intf].sap_context)))
 			continue;
 		sap_context = mac_ctx->sap.sapCtxList[intf].sap_context;
