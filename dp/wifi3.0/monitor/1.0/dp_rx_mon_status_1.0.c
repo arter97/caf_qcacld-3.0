@@ -427,7 +427,6 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, struct dp_intr *int_ctx,
 	uint8_t *rx_tlv;
 	uint8_t *rx_tlv_start;
 	uint32_t tlv_status = HAL_TLV_STATUS_BUF_DONE;
-	QDF_STATUS enh_log_status = QDF_STATUS_SUCCESS;
 	struct cdp_pdev_mon_stats *rx_mon_stats;
 	int smart_mesh_status;
 	enum WDI_EVENT pktlog_mode = WDI_NO_VAL;
@@ -533,7 +532,6 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, struct dp_intr *int_ctx,
 				qdf_nbuf_free(status_nbuf);
 
 			if (tlv_status == HAL_TLV_STATUS_PPDU_DONE)
-				enh_log_status =
 				dp_rx_handle_enh_capture(soc,
 							 pdev, ppdu_info);
 		} else {
@@ -850,11 +848,9 @@ dp_rx_pdev_mon_status_buffers_alloc(struct dp_pdev *pdev, uint32_t mac_id)
 	struct dp_srng *mon_status_ring;
 	uint32_t num_entries;
 	struct rx_desc_pool *rx_desc_pool;
-	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 	union dp_rx_desc_list_elem_t *desc_list = NULL;
 	union dp_rx_desc_list_elem_t *tail = NULL;
 
-	soc_cfg_ctx = soc->wlan_cfg_ctx;
 	mon_status_ring = &soc->rxdma_mon_status_ring[mac_id];
 
 	num_entries = mon_status_ring->num_entries;
@@ -878,9 +874,7 @@ dp_rx_pdev_mon_status_desc_pool_alloc(struct dp_pdev *pdev, uint32_t mac_id)
 	struct dp_srng *mon_status_ring;
 	uint32_t num_entries;
 	struct rx_desc_pool *rx_desc_pool;
-	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 
-	soc_cfg_ctx = soc->wlan_cfg_ctx;
 	mon_status_ring = &soc->rxdma_mon_status_ring[mac_id];
 
 	num_entries = mon_status_ring->num_entries;
@@ -902,10 +896,8 @@ dp_rx_pdev_mon_status_desc_pool_init(struct dp_pdev *pdev, uint32_t mac_id)
 	struct dp_srng *mon_status_ring;
 	uint32_t num_entries;
 	struct rx_desc_pool *rx_desc_pool;
-	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
-	soc_cfg_ctx = soc->wlan_cfg_ctx;
 	mon_status_ring = &soc->rxdma_mon_status_ring[mac_id];
 
 	num_entries = mon_status_ring->num_entries;
