@@ -356,7 +356,6 @@ void dp_tx_mon_buf_desc_pool_free(struct dp_soc *soc)
 QDF_STATUS
 dp_tx_mon_buf_desc_pool_alloc(struct dp_soc *soc)
 {
-	struct dp_srng *mon_buf_ring;
 	struct dp_mon_desc_pool *tx_mon_desc_pool;
 	int entries;
 	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
@@ -368,7 +367,6 @@ dp_tx_mon_buf_desc_pool_alloc(struct dp_soc *soc)
 
 	entries = wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
 
-	mon_buf_ring = &mon_soc_be->tx_mon_buf_ring;
 
 	tx_mon_desc_pool = &mon_soc_be->tx_desc_mon;
 
