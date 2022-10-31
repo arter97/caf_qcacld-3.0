@@ -253,6 +253,8 @@ extern enum policy_mgr_conc_next_action
  * @pcl_band_priority: PCL channel order between 5G and 6G.
  * @multi_sap_allowed_on_same_band: Enable/Disable multi sap started
  *                                  on same band
+ * @use_sap_original_bw: Enable/Disable sap original BW as default
+ *                       BW when do restart
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -276,6 +278,7 @@ struct policy_mgr_cfg {
 	uint8_t go_force_scc;
 	enum policy_mgr_pcl_band_priority pcl_band_priority;
 	bool multi_sap_allowed_on_same_band;
+	bool use_sap_original_bw;
 };
 
 /**

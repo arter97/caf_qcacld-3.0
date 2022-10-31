@@ -299,6 +299,7 @@ wlan_hdd_validate_and_override_offchan(struct hdd_adapter *adapter,
 	}
 }
 
+#define WLAN_AUTH_FRAME_MIN_LEN 2
 static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			      struct ieee80211_channel *chan, bool offchan,
 			      unsigned int wait,
@@ -310,8 +311,8 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_vdev *vdev;
-	uint8_t type;
-	uint8_t sub_type;
+	uint8_t type, sub_type;
+	uint16_t auth_algo;
 	QDF_STATUS qdf_status;
 	int ret;
 
@@ -343,6 +344,16 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
 	    (type == SIR_MAC_MGMT_FRAME &&
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
+		/* Request ROC for PASN authentication frame */
+		if (len > (sizeof(struct wlan_frame_hdr) +
+			   WLAN_AUTH_FRAME_MIN_LEN)) {
+			auth_algo =
+				*(uint16_t *)(buf +
+					      sizeof(struct wlan_frame_hdr));
+			if (auth_algo == eSIR_AUTH_TYPE_PASN)
+				goto off_chan_tx;
+		}
+
 		qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_SME,
 			   TRACE_CODE_HDD_SEND_MGMT_TX, adapter->vdev_id, 0);
 
@@ -355,6 +366,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			return -EINVAL;
 	}
 
+off_chan_tx:
 	hdd_debug("device_mode:%d type:%d sub_type:%d chan:%d",
 		  adapter->device_mode, type, sub_type,
 		  chan ? chan->center_freq : 0);
