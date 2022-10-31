@@ -696,7 +696,7 @@ _dp_rx_bar_frame_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	if (!peer)
 		return;
 
-	dp_info("BAR frame: "
+	dp_info_rl("BAR frame: "
 		" peer_id = %d"
 		" tid = %u"
 		" SSN = %d"
