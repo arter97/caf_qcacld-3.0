@@ -438,15 +438,18 @@ void mlo_get_ml_vdev_list(struct wlan_objmgr_vdev *vdev,
 /**
  * mlo_link_set_active() - send MLO link set active command
  * @psoc: PSOC object
- * @param: MLO link set active params
+ * @req: MLO link set active request
  *
  * Return: QDF_STATUS
  */
 static QDF_STATUS
 mlo_link_set_active(struct wlan_objmgr_psoc *psoc,
-		    struct mlo_link_set_active_param *param)
+		    struct mlo_link_set_active_req *req)
 {
 	struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops;
+	struct mlo_link_set_active_param *param = &req->param;
+	QDF_STATUS status;
+	struct mlo_link_set_active_resp rsp_evt;
 
 	if (!psoc) {
 		mlo_err("psoc is null");
@@ -462,6 +465,19 @@ mlo_link_set_active(struct wlan_objmgr_psoc *psoc,
 	if (!mlo_tx_ops->link_set_active) {
 		mlo_err("link_set_active function is null!");
 		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (req->ctx.validate_set_mlo_link_cb) {
+		status = req->ctx.validate_set_mlo_link_cb(psoc, param);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			qdf_mem_zero(&rsp_evt, sizeof(rsp_evt));
+			rsp_evt.status = status;
+			if (req->ctx.set_mlo_link_cb)
+				req->ctx.set_mlo_link_cb(req->ctx.vdev,
+							 req->ctx.cb_arg,
+							 &rsp_evt);
+			return status;
+		}
 	}
 
 	return mlo_tx_ops->link_set_active(psoc, param);
@@ -564,7 +580,7 @@ mlo_ser_set_link_cb(struct wlan_serialization_command *cmd,
 	vdev = cmd->vdev;
 	switch (reason) {
 	case WLAN_SER_CB_ACTIVATE_CMD:
-		status = mlo_link_set_active(psoc, &req->param);
+		status = mlo_link_set_active(psoc, req);
 		break;
 	case WLAN_SER_CB_CANCEL_CMD:
 	case WLAN_SER_CB_ACTIVE_CMD_TIMEOUT:

@@ -862,13 +862,17 @@ struct mlo_link_set_active_param {
 /*
  * struct mlo_link_set_active_ctx - Context for MLO link set active request
  * @vdev: pointer to vdev on which the request issued
- * @cb: callback function for MLO link set active request
+ * @set_mlo_link_cb: callback function for MLO link set active request
+ * @validate_set_mlo_link_cb: callback to validate set link request
  * @cb_arg: callback context
  */
 struct mlo_link_set_active_ctx {
 	struct wlan_objmgr_vdev *vdev;
 	void (*set_mlo_link_cb)(struct wlan_objmgr_vdev *vdev, void *arg,
 				struct mlo_link_set_active_resp *evt);
+	QDF_STATUS (*validate_set_mlo_link_cb)(
+			struct wlan_objmgr_psoc *psoc,
+			struct mlo_link_set_active_param *param);
 	void *cb_arg;
 };
 
