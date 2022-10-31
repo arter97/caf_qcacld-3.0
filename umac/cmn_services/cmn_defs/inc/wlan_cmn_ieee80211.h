@@ -3950,7 +3950,7 @@ struct csa_offload_params {
 	uint32_t csa_chan_freq;
 	uint8_t switch_mode;
 	uint8_t sec_chan_offset;
-	uint8_t new_ch_width;
+	enum phy_ch_width new_ch_width;
 	uint8_t new_op_class;
 	uint8_t new_ch_freq_seg1;
 	uint8_t new_ch_freq_seg2;
