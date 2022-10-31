@@ -980,7 +980,7 @@ int htt_h2t_tx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 	qdf_nbuf_t htt_msg;
 	uint32_t *msg_word;
 	struct hal_srng_params srng_params;
-	uint32_t htt_ring_type, htt_ring_id;
+	uint32_t htt_ring_id;
 	uint8_t *htt_logger_bufp;
 	int target_pdev_id;
 	QDF_STATUS status;
@@ -998,11 +998,9 @@ int htt_h2t_tx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 	switch (hal_ring_type) {
 	case TX_MONITOR_BUF:
 		htt_ring_id = HTT_TX_MON_HOST2MON_BUF_RING;
-		htt_ring_type = HTT_SW_TO_HW_RING;
 		break;
 	case TX_MONITOR_DST:
 		htt_ring_id = HTT_TX_MON_MON2HOST_DEST_RING;
-		htt_ring_type = HTT_HW_TO_SW_RING;
 		break;
 	default:
 		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
