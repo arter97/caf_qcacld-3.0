@@ -5207,7 +5207,6 @@ void dp_pdev_print_delay_stats(struct dp_pdev *pdev)
 	struct dp_soc *soc = pdev->soc;
 	struct cdp_tid_tx_stats total_tx;
 	struct cdp_tid_rx_stats total_rx;
-	struct cdp_tid_stats *tid_stats;
 
 	uint8_t tid, index;
 	uint64_t count = 0;
@@ -5217,7 +5216,6 @@ void dp_pdev_print_delay_stats(struct dp_pdev *pdev)
 
 	tid = 0;
 	index = 0;
-	tid_stats = &pdev->stats.tid_stats;
 
 	DP_PRINT_STATS("Per TID Delay Non-Zero Stats:\n");
 	for (tid = 0; tid < CDP_MAX_DATA_TIDS; tid++) {
@@ -5299,14 +5297,12 @@ void dp_pdev_print_rx_error_stats(struct dp_pdev *pdev)
 	struct dp_soc *soc = pdev->soc;
 	struct cdp_tid_rx_stats total_rx;
 	struct cdp_tid_tx_stats total_tx;
-	struct cdp_tid_stats *tid_stats;
 
 	uint8_t tid, index;
 
 	if (!soc)
 		return;
 
-	tid_stats = &pdev->stats.tid_stats;
 
 	DP_PRINT_STATS("Per TID RX Error Stats:\n");
 	for (tid = 0; tid < CDP_MAX_VOW_TID; tid++) {
@@ -5835,10 +5831,8 @@ dp_print_ring_stat_from_hal(struct dp_soc *soc,  struct dp_srng *srng,
 	int32_t hw_tailp = -1;
 	uint32_t ring_usage;
 	const char *ring_name;
-	struct hal_soc *hal_soc;
 
 	if (soc && srng && srng->hal_srng) {
-		hal_soc = (struct hal_soc *)soc->hal_soc;
 		ring_name = dp_srng_get_str_from_hal_ring_type(ring_type);
 		hal_get_sw_hptp(soc->hal_soc, srng->hal_srng, &tailp, &headp);
 		ring_usage = hal_get_ring_usage(srng->hal_srng,
