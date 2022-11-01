@@ -2905,4 +2905,47 @@ cdp_enable_mon_reap_timer(ol_txrx_soc_handle soc,
 	return soc->ops->mon_ops->txrx_enable_mon_reap_timer(soc, source,
 							     enable);
 }
+
+/**
+ * cdp_get_tsf2_offset() - get tsf2 offset
+ * @soc: Datapath soc handle
+ * @mac_id: mac_id
+ * @value: pointer to update tsf2 value
+ *
+ * Return: None.
+ */
+static inline void
+cdp_get_tsf2_offset(ol_txrx_soc_handle soc, uint8_t mac_id, uint64_t *value)
+{
+	if (!soc) {
+		dp_cdp_debug("Invalid Instance");
+		return;
+	}
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->txrx_get_tsf2_offset)
+		return;
+
+	soc->ops->cmn_drv_ops->txrx_get_tsf2_offset(soc, mac_id, value);
+}
+
+/**
+ * cdp_get_tqm_offset() - get tqm offset
+ * @soc: Datapath soc handle
+ * @value: pointer to update tqm value
+ *
+ * Return: None.
+ */
+static inline void
+cdp_get_tqm_offset(ol_txrx_soc_handle soc, uint64_t *value)
+{
+	if (!soc) {
+		dp_cdp_debug("Invalid Instance");
+		return;
+	}
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->txrx_get_tqm_offset)
+		return;
+
+	soc->ops->cmn_drv_ops->txrx_get_tqm_offset(soc, value);
+}
 #endif /* _CDP_TXRX_CMN_H_ */

@@ -683,6 +683,9 @@ struct cdp_cmn_ops {
 					       bool mlo_peers_only);
 #endif
 	QDF_STATUS (*txrx_umac_reset_deinit)(ol_txrx_soc_handle soc);
+	void (*txrx_get_tsf2_offset)(struct cdp_soc_t *soc_hdl, uint8_t mac_id,
+				     uint64_t *value);
+	void (*txrx_get_tqm_offset)(struct cdp_soc_t *soc_hdl, uint64_t *value);
 };
 
 struct cdp_ctrl_ops {
