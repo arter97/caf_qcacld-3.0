@@ -127,7 +127,7 @@ static const uint32_t peer_param_tlv[] = {
 					WMI_PEER_CHWIDTH_PUNCTURE_20MHZ_BITMAP,
 };
 
-/**
+/*
  * Populate pdev_param_value whose index is host param and value is target
  * param
  */
@@ -436,7 +436,7 @@ static const uint32_t pdev_param_tlv[] = {
 	[wmi_pdev_param_txpower_reason_sar] = WMI_PDEV_PARAM_TXPOWER_REASON_SAR,
 };
 
-/**
+/*
  * Populate vdev_param_value_tlv array whose index is host param
  * and value is target param
  */
@@ -728,7 +728,7 @@ static const uint32_t vdev_param_tlv[] = {
 #define WMI_PKTLOG_EVENT_CBF 0x100
 #endif
 
-/**
+/*
  * Populate the pktlog event tlv array, where
  * the values are the FW WMI events, which host
  * uses to communicate with FW for pktlog
@@ -756,7 +756,7 @@ static const uint32_t pktlog_event_tlv[] =  {
  * convert_host_pdev_id_to_target_pdev_id() - Convert pdev_id from
  *	   host to target defines.
  * @wmi_handle: pointer to wmi_handle
- * @param pdev_id: host pdev_id to be converted.
+ * @pdev_id: host pdev_id to be converted.
  * Return: target pdev_id after conversion.
  */
 static uint32_t convert_host_pdev_id_to_target_pdev_id(wmi_unified_t wmi_handle,
@@ -788,7 +788,7 @@ static uint32_t convert_host_pdev_id_to_target_pdev_id(wmi_unified_t wmi_handle,
  * convert_target_pdev_id_to_host_pdev_id() - Convert pdev_id from
  *	   target to host defines.
  * @wmi_handle: pointer to wmi_handle
- * @param pdev_id: target pdev_id to be converted.
+ * @pdev_id: target pdev_id to be converted.
  * Return: host pdev_id after conversion.
  */
 static uint32_t convert_target_pdev_id_to_host_pdev_id(wmi_unified_t wmi_handle,
@@ -821,7 +821,7 @@ static uint32_t convert_target_pdev_id_to_host_pdev_id(wmi_unified_t wmi_handle,
  * convert_host_phy_id_to_target_phy_id() - Convert phy_id from
  *	   host to target defines.
  * @wmi_handle: pointer to wmi_handle
- * @param phy_id: host pdev_id to be converted.
+ * @phy_id: host pdev_id to be converted.
  * Return: target phy_id after conversion.
  */
 static uint32_t convert_host_phy_id_to_target_phy_id(wmi_unified_t wmi_handle,
@@ -839,7 +839,7 @@ static uint32_t convert_host_phy_id_to_target_phy_id(wmi_unified_t wmi_handle,
  * convert_target_phy_id_to_host_phy_id() - Convert phy_id from
  *	   target to host defines.
  * @wmi_handle: pointer to wmi_handle
- * @param phy_id: target phy_id to be converted.
+ * @phy_id: target phy_id to be converted.
  * Return: host phy_id after conversion.
  */
 static uint32_t convert_target_phy_id_to_host_phy_id(wmi_unified_t wmi_handle,
@@ -855,8 +855,11 @@ static uint32_t convert_target_phy_id_to_host_phy_id(wmi_unified_t wmi_handle,
 
 /**
  * wmi_tlv_pdev_id_conversion_enable() - Enable pdev_id conversion
+ * @wmi_handle: WMI handle
+ * @pdev_id_map: pointer to mapping table
+ * @size: number of entries in @pdev_id_map
  *
- * Return None.
+ * Return: None.
  */
 static void wmi_tlv_pdev_id_conversion_enable(wmi_unified_t wmi_handle,
 					      uint32_t *pdev_id_map,
@@ -1085,7 +1088,7 @@ static QDF_STATUS send_vdev_delete_cmd_tlv(wmi_unified_t wmi_handle,
  * send_vdev_nss_chain_params_cmd_tlv() - send VDEV nss chain params to fw
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
- * @nss_chains_user_cfg: user configured nss chain params
+ * @user_cfg: user configured nss chain params
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -1395,7 +1398,7 @@ static QDF_STATUS send_vdev_start_cmd_tlv(wmi_unified_t wmi_handle,
  * @peer_addr: peer mac address
  * @param: pointer to hold peer flush tid parameter
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_peer_flush_tids_cmd_tlv(wmi_unified_t wmi,
 					 uint8_t peer_addr[QDF_MAC_ADDR_SIZE],
@@ -1453,9 +1456,9 @@ map_to_wmi_flush_policy(enum peer_txq_flush_policy policy)
 /**
  * send_peer_txq_flush_config_cmd_tlv() - Send peer TID queue flush config
  * @wmi: wmi handle
- * @para: Peer txq flush configuration
+ * @param: Peer txq flush configuration
  *
- * Return: QDF status
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_peer_txq_flush_config_cmd_tlv(wmi_unified_t wmi,
@@ -1686,7 +1689,7 @@ static wmi_channel_width wmi_host_chan_bw_to_target_chan_bw(
  * @param_id: target param id
  * @param_value: host param value
  *
- * @Return: target param value
+ * Return: target param value
  */
 static uint32_t convert_host_peer_param_value_to_target_value_tlv(
 				uint32_t param_id, uint32_t param_value)
@@ -1778,7 +1781,7 @@ static QDF_STATUS peer_ppe_ds_param_send_tlv(wmi_unified_t wmi,
  * send_peer_param_cmd_tlv() - set peer parameter in fw
  * @wmi: wmi handle
  * @peer_addr: peer mac address
- * @param    : pointer to hold peer set parameter
+ * @param: pointer to hold peer set parameter
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -1835,7 +1838,7 @@ static QDF_STATUS send_peer_param_cmd_tlv(wmi_unified_t wmi,
  * send_vdev_up_cmd_tlv() - send vdev up command in fw
  * @wmi: wmi handle
  * @bssid: bssid
- * @vdev_up_params: pointer to hold vdev up parameter
+ * @params: pointer to hold vdev up parameter
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -1894,9 +1897,7 @@ static uint32_t convert_peer_type_host_to_target(uint32_t peer_type)
 /**
  * send_peer_create_cmd_tlv() - send peer create command to fw
  * @wmi: wmi handle
- * @peer_addr: peer mac address
- * @peer_type: peer type
- * @vdev_id: vdev id
+ * @param: peer create parameters
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -1942,9 +1943,9 @@ static QDF_STATUS send_peer_create_cmd_tlv(wmi_unified_t wmi,
  * send_peer_rx_reorder_queue_setup_cmd_tlv() - send rx reorder setup
  * 	command to fw
  * @wmi: wmi handle
- * @rx_reorder_queue_setup_params: Rx reorder queue setup parameters
+ * @param: Rx reorder queue setup parameters
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static
 QDF_STATUS send_peer_rx_reorder_queue_setup_cmd_tlv(wmi_unified_t wmi,
@@ -1991,9 +1992,9 @@ QDF_STATUS send_peer_rx_reorder_queue_setup_cmd_tlv(wmi_unified_t wmi,
  * send_peer_rx_reorder_queue_remove_cmd_tlv() - send rx reorder remove
  * 	command to fw
  * @wmi: wmi handle
- * @rx_reorder_queue_remove_params: Rx reorder queue remove parameters
+ * @param: Rx reorder queue remove parameters
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static
 QDF_STATUS send_peer_rx_reorder_queue_remove_cmd_tlv(wmi_unified_t wmi,
@@ -2198,7 +2199,7 @@ static inline uint32_t convert_host_vdev_param_tlv(uint32_t host_param)
  * @param: pointer to pdev parameter
  * @mac_id: radio context
  *
- * Return: 0 on success, errno on failure
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_pdev_param_cmd_tlv(wmi_unified_t wmi_handle,
@@ -2253,7 +2254,7 @@ send_pdev_param_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @params: pointer to hold set_multiple_pdev_vdev_param info
  *
- * Return: 0 on success, errno on failure
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_multi_param_cmd_using_pdev_set_param_tlv(wmi_unified_t wmi_handle,
@@ -2413,7 +2414,7 @@ send_multi_pdev_vdev_set_param_cmd_tlv(
  * @wmi_handle: wmi handle
  * @params: pointer to set_multiple_pdev_vdev_param structure
  *
- * Return: 0 on success, errno on failure
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_multiple_pdev_param_cmd_tlv(wmi_unified_t wmi_handle,
@@ -2432,7 +2433,7 @@ send_multiple_pdev_param_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @params: pointer to set_multiple_pdev_vdev_param structure
  *
- * Return: 0 on success, errno on failure
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_multiple_pdev_param_cmd_tlv(wmi_unified_t wmi_handle,
@@ -2445,7 +2446,6 @@ send_multiple_pdev_param_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_pdev_set_hw_mode_cmd_tlv() - Send WMI_PDEV_SET_HW_MODE_CMDID to FW
  * @wmi_handle: wmi handle
- * @msg: Structure containing the following parameters
  * @hw_mode_index: The HW_Mode field is a enumerated type that is selected
  * from the HW_Mode table, which is returned in the WMI_SERVICE_READY_EVENTID.
  *
@@ -2493,11 +2493,11 @@ static QDF_STATUS send_pdev_set_hw_mode_cmd_tlv(wmi_unified_t wmi_handle,
 
 /**
  * send_suspend_cmd_tlv() - WMI suspend function
- * @param wmi_handle      : handle to WMI.
- * @param param    : pointer to hold suspend parameter
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold suspend parameter
  * @mac_id: radio context
  *
- * Return 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_suspend_cmd_tlv(wmi_unified_t wmi_handle,
 				struct suspend_params *param,
@@ -2544,10 +2544,10 @@ static QDF_STATUS send_suspend_cmd_tlv(wmi_unified_t wmi_handle,
 
 /**
  * send_resume_cmd_tlv() - WMI resume function
- * @param wmi_handle      : handle to WMI.
+ * @wmi_handle: handle to WMI.
  * @mac_id: radio context
  *
- * Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_resume_cmd_tlv(wmi_unified_t wmi_handle,
 				uint8_t mac_id)
@@ -2579,12 +2579,12 @@ static QDF_STATUS send_resume_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_wow_enable_cmd_tlv() - WMI wow enable function
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to hold wow enable parameter
- *  @mac_id: radio context
+ * send_wow_enable_cmd_tlv() - WMI wow enable function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold wow enable parameter
+ * @mac_id: radio context
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_wow_enable_cmd_tlv(wmi_unified_t wmi_handle,
 				struct wow_cmd_params *param,
@@ -2671,7 +2671,6 @@ static QDF_STATUS send_set_ap_ps_param_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_set_sta_ps_param_cmd_tlv() - set sta powersave parameters
  * @wmi_handle: wmi handle
- * @peer_addr: peer mac address
  * @param: pointer to sta_ps parameter structure
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
@@ -2747,15 +2746,15 @@ static QDF_STATUS send_crash_inject_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_dbglog_cmd_tlv() - set debug log level
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to hold dbglog level parameter
+ * send_dbglog_cmd_tlv() - set debug log level
+ * @wmi_handle: handle to WMI.
+ * @dbglog_param: pointer to hold dbglog level parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS on success, otherwise QDF_STATUS_E_*
  */
- static QDF_STATUS
+static QDF_STATUS
 send_dbglog_cmd_tlv(wmi_unified_t wmi_handle,
-				struct dbglog_params *dbglog_param)
+		    struct dbglog_params *dbglog_param)
 {
 	wmi_buf_t buf;
 	wmi_debug_log_config_cmd_fixed_param *configmsg;
@@ -2810,12 +2809,11 @@ send_dbglog_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_vdev_set_param_cmd_tlv() - WMI vdev set parameter function
- *  @param wmi_handle      : handle to WMI.
- *  @param macaddr	: MAC address
- *  @param param    : pointer to hold vdev set parameter
+ * send_vdev_set_param_cmd_tlv() - WMI vdev set parameter function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold vdev set parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_vdev_set_param_cmd_tlv(wmi_unified_t wmi_handle,
 				struct vdev_set_params *param)
@@ -2857,13 +2855,11 @@ static QDF_STATUS send_vdev_set_param_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_multi_param_cmd_using_vdev_param_tlv() - vdev set parameter function
- *  @wmi_handle : handle to WMI.
- *  @dev_id: device id of pdev/vdev
- *  @params: pointer to point array of structure dev_set_param with @n_params
- *  @n_params: total number of set params that are combined with @params
+ * send_multi_param_cmd_using_vdev_param_tlv() - vdev set parameter function
+ * @wmi_handle : handle to WMI.
+ * @params: pointer to parameters to set
  *
- *  Return:  returns QDF_STATUS.
+ * Return: QDF_STATUS_SUCCESS on success, otherwise QDF_STATUS_E_*
  */
 static QDF_STATUS
 send_multi_param_cmd_using_vdev_param_tlv(wmi_unified_t wmi_handle,
@@ -2886,11 +2882,11 @@ send_multi_param_cmd_using_vdev_param_tlv(wmi_unified_t wmi_handle,
 
 #ifdef WLAN_PDEV_VDEV_SEND_MULTI_PARAM
 /**
- *  send_multiple_vdev_param_cmd_tlv() - WMI vdev set parameter function
- *  @wmi_handle : handle to WMI.
- *  @params: pointer to hold set_multiple_pdev_vdev_param info
+ * send_multiple_vdev_param_cmd_tlv() - WMI vdev set parameter function
+ * @wmi_handle : handle to WMI.
+ * @params: pointer to hold set_multiple_pdev_vdev_param info
  *
- *  Return: 0  on success and errorcode on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_multiple_vdev_param_cmd_tlv(wmi_unified_t wmi_handle,
@@ -2906,11 +2902,11 @@ send_multiple_vdev_param_cmd_tlv(wmi_unified_t wmi_handle,
 #else /* WLAN_PDEV_VDEV_SEND_MULTI_PARAM */
 
 /**
- *  send_multiple_vdev_param_cmd_tlv() - WMI vdev set parameter function
- *  @wmi_handle : handle to WMI.
- *  @params: pointer to hold set_multiple_pdev_vdev_param info
+ * send_multiple_vdev_param_cmd_tlv() - WMI vdev set parameter function
+ * @wmi_handle : handle to WMI.
+ * @params: pointer to hold set_multiple_pdev_vdev_param info
  *
- *  Return: 0  on success and errorcode on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_multiple_vdev_param_cmd_tlv(wmi_unified_t wmi_handle,
@@ -2921,11 +2917,11 @@ send_multiple_vdev_param_cmd_tlv(wmi_unified_t wmi_handle,
 #endif /*end of WLAN_PDEV_VDEV_SEND_MULTI_PARAM */
 
 /**
- *  send_vdev_set_mu_snif_cmd_tlv() - WMI vdev set mu snif function
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to hold mu sniffer parameter
+ * send_vdev_set_mu_snif_cmd_tlv() - WMI vdev set mu snif function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold mu sniffer parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static
 QDF_STATUS send_vdev_set_mu_snif_cmd_tlv(wmi_unified_t wmi_handle,
@@ -2986,13 +2982,13 @@ QDF_STATUS send_vdev_set_mu_snif_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_peer_based_pktlog_cmd() - Send WMI command to enable packet-log
- *  @wmi_handle: handle to WMI.
- *  @macaddr: Peer mac address to be filter
- *  @mac_id: mac id to have radio context
- *  @enb_dsb: Enable MAC based filtering or Disable
+ * send_peer_based_pktlog_cmd() - Send WMI command to enable packet-log
+ * @wmi_handle: handle to WMI.
+ * @macaddr: Peer mac address to be filter
+ * @mac_id: mac id to have radio context
+ * @enb_dsb: Enable MAC based filtering or Disable
  *
- *  Return: QDF_STATUS
+ * Return: QDF_STATUS
  */
 static QDF_STATUS send_peer_based_pktlog_cmd(wmi_unified_t wmi_handle,
 					     uint8_t *macaddr,
@@ -3047,12 +3043,12 @@ static QDF_STATUS send_peer_based_pktlog_cmd(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_packet_log_enable_cmd_tlv() - Send WMI command to enable packet-log
- *  @param wmi_handle      : handle to WMI.
- *  @param PKTLOG_EVENT	: packet log event
- *  @mac_id: mac id to have radio context
+ * send_packet_log_enable_cmd_tlv() - Send WMI command to enable packet-log
+ * @wmi_handle: handle to WMI.
+ * @PKTLOG_EVENT: packet log event
+ * @mac_id: mac id to have radio context
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_packet_log_enable_cmd_tlv(wmi_unified_t wmi_handle,
 			WMI_HOST_PKTLOG_EVENT PKTLOG_EVENT, uint8_t mac_id)
@@ -3090,11 +3086,11 @@ static QDF_STATUS send_packet_log_enable_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_packet_log_disable_cmd_tlv() - Send WMI command to disable packet-log
- *  @param wmi_handle      : handle to WMI.
- *  @mac_id: mac id to have radio context
+ * send_packet_log_disable_cmd_tlv() - Send WMI command to disable packet-log
+ * @wmi_handle: handle to WMI.
+ * @mac_id: mac id to have radio context
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_packet_log_disable_cmd_tlv(wmi_unified_t wmi_handle,
 			uint8_t mac_id)
@@ -3127,11 +3123,11 @@ static QDF_STATUS send_packet_log_disable_cmd_tlv(wmi_unified_t wmi_handle,
 
 #define WMI_FW_TIME_STAMP_LOW_MASK 0xffffffff
 /**
- *  send_time_stamp_sync_cmd_tlv() - Send WMI command to
- *  sync time between between host and firmware
- *  @param wmi_handle      : handle to WMI.
+ * send_time_stamp_sync_cmd_tlv() - Send WMI command to
+ * sync time between between host and firmware
+ * @wmi_handle: handle to WMI.
  *
- *  Return: None
+ * Return: None
  */
 static void send_time_stamp_sync_cmd_tlv(wmi_unified_t wmi_handle)
 {
@@ -3179,11 +3175,11 @@ static void send_time_stamp_sync_cmd_tlv(wmi_unified_t wmi_handle)
 }
 
 /**
- *  send_fd_tmpl_cmd_tlv() - WMI FILS Discovery send function
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to hold FILS Discovery send cmd parameter
+ * send_fd_tmpl_cmd_tlv() - WMI FILS Discovery send function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold FILS Discovery send cmd parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_fd_tmpl_cmd_tlv(wmi_unified_t wmi_handle,
 				struct fils_discovery_tmpl_params *param)
@@ -3227,11 +3223,11 @@ static QDF_STATUS send_fd_tmpl_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_beacon_send_tmpl_cmd_tlv() - WMI beacon send function
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to hold beacon send cmd parameter
+ * send_beacon_tmpl_send_cmd_tlv() - WMI beacon send function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold beacon send cmd parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_beacon_tmpl_send_cmd_tlv(wmi_unified_t wmi_handle,
 				struct beacon_tmpl_params *param)
@@ -3535,11 +3531,11 @@ static void wmi_populate_service_11be(uint32_t *wmi_service)
 #endif
 
 /**
- *  send_peer_assoc_cmd_tlv() - WMI peer assoc function
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to peer assoc parameter
+ * send_peer_assoc_cmd_tlv() - WMI peer assoc function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to peer assoc parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_peer_assoc_cmd_tlv(wmi_unified_t wmi_handle,
 				struct peer_assoc_params *param)
@@ -3879,11 +3875,11 @@ void wmi_fill_ie_allowlist_attrs(uint32_t *ie_bitmap,
 }
 
 /**
- *  send_scan_start_cmd_tlv() - WMI scan start function
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to hold scan start cmd parameter
+ * send_scan_start_cmd_tlv() - WMI scan start function
+ * @wmi_handle: handle to WMI.
+ * @params: pointer to hold scan start cmd parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_scan_start_cmd_tlv(wmi_unified_t wmi_handle,
 				struct scan_req_params *params)
@@ -4119,11 +4115,11 @@ error:
 }
 
 /**
- *  send_scan_stop_cmd_tlv() - WMI scan start function
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to hold scan cancel cmd parameter
+ * send_scan_stop_cmd_tlv() - WMI scan start function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold scan cancel cmd parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_scan_stop_cmd_tlv(wmi_unified_t wmi_handle,
 				struct scan_cancel_param *param)
@@ -4415,11 +4411,11 @@ static inline QDF_STATUS populate_tx_send_params(uint8_t *bufp,
 
 #ifdef CONFIG_HL_SUPPORT
 /**
- *  send_mgmt_cmd_tlv() - WMI scan start function
- *  @wmi_handle      : handle to WMI.
- *  @param    : pointer to hold mgmt cmd parameter
+ * send_mgmt_cmd_tlv() - WMI scan start function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold mgmt cmd parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_mgmt_cmd_tlv(wmi_unified_t wmi_handle,
 				struct wmi_mgmt_params *param)
@@ -4495,11 +4491,11 @@ free_buf:
 }
 #else
 /**
- *  send_mgmt_cmd_tlv() - WMI scan start function
- *  @wmi_handle      : handle to WMI.
- *  @param    : pointer to hold mgmt cmd parameter
+ * send_mgmt_cmd_tlv() - WMI scan start function
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to hold mgmt cmd parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_mgmt_cmd_tlv(wmi_unified_t wmi_handle,
 				struct wmi_mgmt_params *param)
@@ -4617,11 +4613,11 @@ free_buf:
 #endif /* CONFIG_HL_SUPPORT */
 
 /**
- *  send_offchan_data_tx_send_cmd_tlv() - Send off-chan tx data
- *  @wmi_handle      : handle to WMI.
- *  @param    : pointer to offchan data tx cmd parameter
+ * send_offchan_data_tx_cmd_tlv() - Send off-chan tx data
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to offchan data tx cmd parameter
  *
- *  Return: QDF_STATUS_SUCCESS  on success and error on failure.
+ * Return: QDF_STATUS_SUCCESS  on success and error on failure.
  */
 static QDF_STATUS send_offchan_data_tx_cmd_tlv(wmi_unified_t wmi_handle,
 				struct wmi_offchan_data_tx_params *param)
@@ -4780,7 +4776,7 @@ static QDF_STATUS send_set_sta_ps_mode_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_idle_roam_monitor_cmd_tlv() - send idle monitor command to fw
  * @wmi_handle: wmi handle
- * @vdev_id: vdev id
+ * @val: non-zero to turn monitor on
  *
  * Return: QDF_STATUS_SUCCESS for success or error code.
  */
@@ -4966,10 +4962,7 @@ static QDF_STATUS send_get_temperature_cmd_tlv(wmi_unified_t wmi_handle)
 /**
  * send_set_sta_uapsd_auto_trig_cmd_tlv() - set uapsd auto trigger command
  * @wmi_handle: wmi handle
- * @vdevid: vdev id
- * @peer_addr: peer mac address
- * @auto_triggerparam: auto trigger parameters
- * @num_ac: number of access category
+ * @param: UAPSD trigger parameters
  *
  * This function sets the trigger
  * uapsd params such as service interval, delay interval
@@ -5271,6 +5264,7 @@ static QDF_STATUS send_peer_rate_report_cmd_tlv(wmi_unified_t wmi_handle,
  * send_process_update_edca_param_cmd_tlv() - update EDCA params
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id.
+ * @mu_edca_param: true if these are MU EDCA params
  * @wmm_vparams: edca parameters
  *
  * This function updates EDCA parameters to the target
@@ -5929,7 +5923,7 @@ static QDF_STATUS send_halphy_stats_cmd_tlv(wmi_unified_t wmi_handle,
  * Return: status of operation
  */
 static QDF_STATUS
-extract_cp_stats_more_pending_tlv(wmi_unified_t wmi, void *evt_buf,
+extract_cp_stats_more_pending_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 				  uint32_t *more_flag)
 {
 	WMI_CTRL_PATH_STATS_EVENTID_param_tlvs *param_buf;
@@ -5956,7 +5950,7 @@ extract_cp_stats_more_pending_tlv(wmi_unified_t wmi, void *evt_buf,
  * Return: status of operation
  */
 static QDF_STATUS
-extract_halphy_stats_end_of_event_tlv(wmi_unified_t wmi, void *evt_buf,
+extract_halphy_stats_end_of_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 				      uint32_t *end_of_event_flag)
 {
 	WMI_HALPHY_CTRL_PATH_STATS_EVENTID_param_tlvs *param_buf;
@@ -5975,8 +5969,8 @@ extract_halphy_stats_end_of_event_tlv(wmi_unified_t wmi, void *evt_buf,
 }
 
 /**
- * extract_halphy_stats_event_count - api to extract event count flag from
- * event data
+ * extract_halphy_stats_event_count_tlv() - api to extract event count flag
+ *                                          from event data
  * @wmi_handle: wmi handle
  * @evt_buf:    event buffer
  * @event_count_flag:  buffer to populate event_count flag
@@ -5984,7 +5978,7 @@ extract_halphy_stats_end_of_event_tlv(wmi_unified_t wmi, void *evt_buf,
  * Return: status of operation
  */
 static QDF_STATUS
-extract_halphy_stats_event_count_tlv(wmi_unified_t wmi, void *evt_buf,
+extract_halphy_stats_event_count_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 				     uint32_t *event_count_flag)
 {
 	WMI_HALPHY_CTRL_PATH_STATS_EVENTID_param_tlvs *param_buf;
@@ -6317,8 +6311,8 @@ static QDF_STATUS send_pno_start_cmd_tlv(wmi_unified_t wmi_handle,
 
 /**
  * is_service_enabled_tlv() - Check if service enabled
- * @param wmi_handle: wmi handle
- * @param service_id: service identifier
+ * @wmi_handle: wmi handle
+ * @service_id: service identifier
  *
  * Return: 1 enabled, 0 disabled
  */
@@ -6740,9 +6734,8 @@ static QDF_STATUS send_congestion_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_snr_request_cmd_tlv() - send request to fw to get RSSI stats
  * @wmi_handle: wmi handle
- * @rssi_req: get RSSI request
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_snr_request_cmd_tlv(wmi_unified_t wmi_handle)
 {
@@ -6886,7 +6879,7 @@ static QDF_STATUS send_egap_conf_params_cmd_tlv(wmi_unified_t wmi_handle,
 #endif
 
 /**
- * wmi_unified_csa_offload_enable() - sen CSA offload enable command
+ * send_csa_offload_enable_cmd_tlv() - send CSA offload enable command
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
  *
@@ -6926,8 +6919,7 @@ static QDF_STATUS send_csa_offload_enable_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_oem_dma_cfg_cmd_tlv() - configure OEM DMA rings
  * @wmi_handle: wmi handle
- * @data_len: len of dma cfg req
- * @data: dma cfg req
+ * @cfg: dma cfg req
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
@@ -7012,7 +7004,7 @@ static QDF_STATUS send_start_11d_scan_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_stop_11d_scan_cmd_tlv() - stop 11d scan request
  * @wmi_handle: wmi handle
- * @start_11d_scan: 11d scan stop request parameters
+ * @stop_11d_scan: 11d scan stop request parameters
  *
  * This function request FW to stop 11d scan.
  *
@@ -7485,7 +7477,7 @@ send_process_dhcpserver_offload_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to pdev regdomain params
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_pdev_set_regdomain_cmd_tlv(wmi_unified_t wmi_handle,
@@ -7606,7 +7598,7 @@ static inline void copy_custom_aggr_bitmap(
  * @wmi_handle: wmi handle
  * @param: pointer to hold custom aggr size params
  *
- *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_vdev_set_custom_aggr_size_cmd_tlv(
 			wmi_unified_t wmi_handle,
@@ -7651,11 +7643,11 @@ static QDF_STATUS send_vdev_set_custom_aggr_size_cmd_tlv(
 }
 
 /**
- *  send_vdev_set_qdepth_thresh_cmd_tlv() - WMI set qdepth threshold
- *  @param wmi_handle  : handle to WMI.
- *  @param param       : pointer to tx antenna param
+ * send_vdev_set_qdepth_thresh_cmd_tlv() - WMI set qdepth threshold
+ * @wmi_handle: handle to WMI.
+ * @param: pointer to tx antenna param
  *
- *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 
 static QDF_STATUS send_vdev_set_qdepth_thresh_cmd_tlv(wmi_unified_t wmi_handle,
@@ -7746,7 +7738,7 @@ static QDF_STATUS send_vdev_set_qdepth_thresh_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to hold vap dscp tid map param
  *
- *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_set_vap_dscp_tid_map_cmd_tlv(wmi_unified_t wmi_handle,
@@ -7784,7 +7776,7 @@ send_set_vap_dscp_tid_map_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to hold fwtest param
  *
- *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_vdev_set_fwtest_param_cmd_tlv(wmi_unified_t wmi_handle,
 				struct set_fwtest_params *param)
@@ -7817,10 +7809,10 @@ static QDF_STATUS send_vdev_set_fwtest_param_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- *  send_phyerr_disable_cmd_tlv() - WMI phyerr disable function
+ * send_phyerr_disable_cmd_tlv() - WMI phyerr disable function
+ * @wmi_handle: handle to WMI.
  *
- *  @param wmi_handle     : handle to WMI.
- *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_phyerr_disable_cmd_tlv(wmi_unified_t wmi_handle)
 {
@@ -7858,10 +7850,10 @@ static QDF_STATUS send_phyerr_disable_cmd_tlv(wmi_unified_t wmi_handle)
 }
 
 /**
- *  send_phyerr_enable_cmd_tlv() - WMI phyerr disable function
+ * send_phyerr_enable_cmd_tlv() - WMI phyerr disable function
+ * @wmi_handle: handle to WMI.
  *
- *  @param wmi_handle     : handle to WMI.
- *  @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_phyerr_enable_cmd_tlv(wmi_unified_t wmi_handle)
 {
@@ -7902,7 +7894,7 @@ static QDF_STATUS send_phyerr_enable_cmd_tlv(wmi_unified_t wmi_handle)
  * @wmi_handle: wmi handle
  * @param: pointer to hold periodic chan stats param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_periodic_chan_stats_config_cmd_tlv(wmi_unified_t wmi_handle,
@@ -7950,7 +7942,7 @@ send_periodic_chan_stats_config_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to hold simulation test parameter
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_simulation_test_cmd_tlv(wmi_unified_t wmi_handle,
 					       struct simulation_test_params
@@ -8080,7 +8072,7 @@ wmi_channel_width convert_host_to_target_ch_width(uint32_t chan_width)
  * @wmi_handle: wmi handle
  * @param: pointer to hold spectral config parameter
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_vdev_spectral_configure_cmd_tlv(wmi_unified_t wmi_handle,
 				struct vdev_spectral_configure_params *param)
@@ -8175,7 +8167,7 @@ static QDF_STATUS send_vdev_spectral_configure_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to hold spectral enable parameter
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_vdev_spectral_enable_cmd_tlv(wmi_unified_t wmi_handle,
 				struct vdev_spectral_enable_params *param)
@@ -8426,7 +8418,7 @@ extract_pdev_spectral_session_detector_info_tlv(
  * capabilities WMI event
  * @wmi_handle: handle to WMI.
  * @event: Event buffer
- * @param: Spectral capabilities event parameters data structure to be filled
+ * @params: Spectral capabilities event parameters data structure to be filled
  * by this API
  *
  * Return: QDF_STATUS of operation
@@ -8572,10 +8564,10 @@ wmi_fill_client_id_priority(wmi_therm_throt_config_request_fixed_param *tt_conf,
 
 /**
  * send_thermal_mitigation_param_cmd_tlv() - configure thermal mitigation params
- * @param wmi_handle : handle to WMI.
- * @param param : pointer to hold thermal mitigation param
+ * @wmi_handle : handle to WMI.
+ * @param : pointer to hold thermal mitigation param
  *
- * @return QDF_STATUS_SUCCESS  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_thermal_mitigation_param_cmd_tlv(
 		wmi_unified_t wmi_handle,
@@ -8646,7 +8638,7 @@ static QDF_STATUS send_thermal_mitigation_param_cmd_tlv(
  * @wmi_handle: wmi handle
  * @param: pointer to coex config param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_coex_config_cmd_tlv(wmi_unified_t wmi_handle,
@@ -8710,7 +8702,7 @@ map_to_wmi_coex_dbam_mode_type(enum coex_dbam_config_mode mode)
  * @wmi_handle: wmi handle
  * @param: pointer to coex dbam config param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_dbam_config_cmd_tlv(wmi_unified_t wmi_handle,
@@ -8770,7 +8762,7 @@ wmi_convert_dbam_comp_status(wmi_coex_dbam_comp_status status)
 }
 
 /**
- * extract_dbam_comp_status_event_tlv() - extract dbam complete status event
+ * extract_dbam_config_resp_event_tlv() - extract dbam complete status event
  * @wmi_handle: WMI handle
  * @evt_buf: event buffer
  * @resp: pointer to coex dbam config response
@@ -9641,13 +9633,11 @@ static QDF_STATUS save_fw_version_cmd_tlv(wmi_unified_t wmi_handle, void *evt_bu
 }
 
 /**
- * wmi_unified_save_fw_version_cmd() - save fw version
+ * check_and_update_fw_version_cmd_tlv() - save fw version
  * @wmi_handle:      pointer to wmi handle
- * @res_cfg:	 resource config
- * @num_mem_chunks:  no of mem chunk
- * @mem_chunk:       pointer to mem chunk structure
+ * @evt_buf:         pointer to the event buffer
  *
- * This function sends IE information to firmware
+ * This function extracts and saves the firmware WMI ABI version
  *
  * Return: QDF_STATUS_SUCCESS for success otherwise failure
  *
@@ -9696,15 +9686,15 @@ static QDF_STATUS check_and_update_fw_version_cmd_tlv(wmi_unified_t wmi_handle,
 
 /**
  * send_log_supported_evt_cmd_tlv() - Enable/Disable FW diag/log events
- * @handle: wmi handle
- * @event:  Event received from FW
- * @len:    Length of the event
+ * @wmi_handle: wmi handle
+ * @event: Event received from FW
+ * @len: Length of the event
  *
  * Enables the low frequency events and disables the high frequency
  * events. Bit 17 indicates if the event if low/high frequency.
  * 1 - high frequency, 0 - low frequency
  *
- * Return: 0 on successfully enabling/disabling the events
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_log_supported_evt_cmd_tlv(wmi_unified_t wmi_handle,
 		uint8_t *event,
@@ -9964,7 +9954,8 @@ static QDF_STATUS send_flush_logs_to_fw_cmd_tlv(wmi_unified_t wmi_handle)
 #ifdef WLAN_FEATURE_FIPS_BER_CCMGCM
 /**
  * fips_extend_align_data_be() - LE to BE conversion of FIPS extend ev data
- * @param - fips extend param related parameters
+ * @wmi_handle: wmi handle
+ * @param: fips extend param related parameters
  *
  * Return: QDF_STATUS - success or error status
 */
@@ -10101,6 +10092,13 @@ fips_align_fail_data:
 }
 #endif
 
+/**
+ * fips_align_data_be() - LE to BE conversion of FIPS ev data
+ * @wmi_handle: wmi handle
+ * @param: fips param related parameters
+ *
+ * Return: QDF_STATUS - success or error status
+ */
 static QDF_STATUS fips_align_data_be(wmi_unified_t wmi_handle,
 			struct fips_params *param)
 {
@@ -10189,11 +10187,6 @@ static QDF_STATUS fips_align_data_be(wmi_unified_t wmi_handle,
 }
 #else
 #ifdef WLAN_FEATURE_FIPS_BER_CCMGCM
-/**
- * fips_extend_align_data_be() - DUMMY for LE platform
- *
- * Return: QDF_STATUS - success
- */
 static QDF_STATUS fips_extend_align_data_be(wmi_unified_t wmi_handle,
 					    struct fips_extend_params *param)
 {
@@ -10201,11 +10194,6 @@ static QDF_STATUS fips_extend_align_data_be(wmi_unified_t wmi_handle,
 }
 #endif
 
-/**
-* fips_align_data_be() - DUMMY for LE platform
-*
-* Return: QDF_STATUS - success
-*/
 static QDF_STATUS fips_align_data_be(wmi_unified_t wmi_handle,
 				     struct fips_params *param)
 {
@@ -10215,9 +10203,9 @@ static QDF_STATUS fips_align_data_be(wmi_unified_t wmi_handle,
 
 #ifdef WLAN_FEATURE_DISA
 /**
- * send_encrypt_decrypt_send_cmd() - send encrypt/decrypt cmd to fw
+ * send_encrypt_decrypt_send_cmd_tlv() - send encrypt/decrypt cmd to fw
  * @wmi_handle: wmi handle
- * @params: encrypt/decrypt params
+ * @encrypt_decrypt_params: encrypt/decrypt params
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -10301,7 +10289,7 @@ send_encrypt_decrypt_send_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to hold pdev fips param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_pdev_fips_cmd_tlv(wmi_unified_t wmi_handle,
@@ -10400,7 +10388,7 @@ send_pdev_fips_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to hold pdev fips param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_pdev_fips_extend_cmd_tlv(wmi_unified_t wmi_handle,
@@ -10522,7 +10510,7 @@ send_pdev_fips_extend_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to hold pdev fips param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_pdev_fips_mode_set_cmd_tlv(wmi_unified_t wmi_handle,
@@ -10567,7 +10555,7 @@ send_pdev_fips_mode_set_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to wlan profile param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_wlan_profile_enable_cmd_tlv(wmi_unified_t wmi_handle,
@@ -10612,7 +10600,7 @@ send_wlan_profile_enable_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to wlan profile param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_wlan_profile_trigger_cmd_tlv(wmi_unified_t wmi_handle,
@@ -10656,7 +10644,7 @@ send_wlan_profile_trigger_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to wlan profile param
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_wlan_profile_hist_intvl_cmd_tlv(wmi_unified_t wmi_handle,
@@ -11234,7 +11222,7 @@ QDF_STATUS send_adfs_ocac_abort_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * init_cmd_send_tlv() - send initialization cmd to fw
  * @wmi_handle: wmi handle
- * @param param: pointer to wmi init param
+ * @param: pointer to wmi init param
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -11431,7 +11419,7 @@ send_delba_send_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @param: pointer to addba clearresp params
  * @macaddr: peer mac address
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_addba_clearresponse_cmd_tlv(wmi_unified_t wmi_handle,
@@ -11964,8 +11952,8 @@ static QDF_STATUS extract_cca_stats_tlv(wmi_unified_t wmi_handle,
  * extract_ctl_failsafe_check_ev_param_tlv() - extract ctl data from
  * event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold peer ctl data
+ * @evt_buf: pointer to event buffer
+ * @param: Pointer to hold peer ctl data
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -11992,8 +11980,8 @@ static QDF_STATUS extract_ctl_failsafe_check_ev_param_tlv(
 /**
  * save_service_bitmap_tlv() - save service bitmap
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param bitmap_buf: bitmap buffer, for converged legacy support
+ * @evt_buf: pointer to event buffer
+ * @bitmap_buf: bitmap buffer, for converged legacy support
  *
  * Return: QDF_STATUS
  */
@@ -12031,8 +12019,8 @@ QDF_STATUS save_service_bitmap_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 /**
  * save_ext_service_bitmap_tlv() - save extendend service bitmap
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param bitmap_buf: bitmap buffer, for converged legacy support
+ * @evt_buf: pointer to event buffer
+ * @bitmap_buf: bitmap buffer, for converged legacy support
  *
  * Return: QDF_STATUS
  */
@@ -12124,8 +12112,8 @@ static inline void copy_ht_cap_info(uint32_t ev_target_cap,
 /**
  * extract_service_ready_tlv() - extract service ready event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to received event buffer
- * @param cap: pointer to hold target capability information extracted from even
+ * @evt_buf: pointer to received event buffer
+ * @cap: pointer to hold target capability information extracted from even
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -12407,8 +12395,8 @@ static inline uint64_t convert_wireless_modes_ext_tlv(
 /**
  * extract_hal_reg_cap_tlv() - extract HAL registered capabilities
  * @wmi_handle: wmi handle
- * @param evt_buf: Pointer to event buffer
- * @param cap: pointer to hold HAL reg capabilities
+ * @evt_buf: Pointer to event buffer
+ * @cap: pointer to hold HAL reg capabilities
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -12435,8 +12423,9 @@ static QDF_STATUS extract_hal_reg_cap_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_hal_reg_cap_ext2_tlv() - extract HAL registered capability ext
  * @wmi_handle: wmi handle
- * @param evt_buf: Pointer to event buffer
- * @param cap: pointer to hold HAL reg capabilities
+ * @evt_buf: Pointer to event buffer
+ * @phy_idx: Specific phy to extract
+ * @param: pointer to hold HAL reg capabilities
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -12584,7 +12573,7 @@ static QDF_STATUS extract_host_mem_req_tlv(wmi_unified_t wmi_handle,
  * save_fw_version_in_service_ready_tlv() - Save fw version in service
  * ready function
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
+ * @evt_buf: pointer to event buffer
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -12614,7 +12603,7 @@ save_fw_version_in_service_ready_tlv(wmi_unified_t wmi_handle, void *evt_buf)
 /**
  * ready_extract_init_status_tlv() - Extract init status from ready event
  * @wmi_handle: wmi handle
- * @param evt_buf: Pointer to event buffer
+ * @evt_buf: Pointer to event buffer
  *
  * Return: ready status
  */
@@ -12635,13 +12624,13 @@ static uint32_t ready_extract_init_status_tlv(wmi_unified_t wmi_handle,
 /**
  * ready_extract_mac_addr_tlv() - extract mac address from ready event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param macaddr: Pointer to hold MAC address
+ * @evt_buf: pointer to event buffer
+ * @macaddr: Pointer to hold MAC address
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
-static QDF_STATUS ready_extract_mac_addr_tlv(wmi_unified_t wmi_hamdle,
-	void *evt_buf, uint8_t *macaddr)
+static QDF_STATUS ready_extract_mac_addr_tlv(wmi_unified_t wmi_handle,
+					     void *evt_buf, uint8_t *macaddr)
 {
 	WMI_READY_EVENTID_param_tlvs *param_buf = NULL;
 	wmi_ready_event_fixed_param *ev = NULL;
@@ -12658,13 +12647,14 @@ static QDF_STATUS ready_extract_mac_addr_tlv(wmi_unified_t wmi_hamdle,
 /**
  * ready_extract_mac_addr_list_tlv() - extract MAC address list from ready event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param macaddr: Pointer to hold number of MAC addresses
+ * @evt_buf: pointer to event buffer
+ * @num_mac: Pointer to hold number of MAC addresses
  *
  * Return: Pointer to addr list
  */
-static wmi_host_mac_addr *ready_extract_mac_addr_list_tlv(wmi_unified_t wmi_hamdle,
-	void *evt_buf, uint8_t *num_mac)
+static wmi_host_mac_addr *
+ready_extract_mac_addr_list_tlv(wmi_unified_t wmi_handle,
+				void *evt_buf, uint8_t *num_mac)
 {
 	WMI_READY_EVENTID_param_tlvs *param_buf = NULL;
 	wmi_ready_event_fixed_param *ev = NULL;
@@ -12678,7 +12668,7 @@ static wmi_host_mac_addr *ready_extract_mac_addr_list_tlv(wmi_unified_t wmi_hamd
 }
 
 /**
- * extract_ready_params_tlv() - Extract data from ready event apart from
+ * extract_ready_event_params_tlv() - Extract data from ready event apart from
  *		     status, macaddr and version.
  * @wmi_handle: Pointer to WMI handle.
  * @evt_buf: Pointer to Ready event buffer.
@@ -12714,9 +12704,10 @@ static QDF_STATUS extract_ready_event_params_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_dbglog_data_len_tlv() - extract debuglog data length
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
+ * @evt_buf: pointer to event buffer
+ * @len: length of the log
  *
- * Return: length
+ * Return: pointer to the debug log
  */
 static uint8_t *extract_dbglog_data_len_tlv(wmi_unified_t wmi_handle,
 	void *evt_buf, uint32_t *len)
@@ -12741,9 +12732,9 @@ static uint8_t *extract_dbglog_data_len_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_mgmt_rx_params_tlv() - extract management rx params from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param hdr: Pointer to hold header
- * @param bufp: Pointer to hold pointer to rx param buffer
+ * @evt_buf: pointer to event buffer
+ * @hdr: Pointer to hold header
+ * @bufp: Pointer to hold pointer to rx param buffer
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -12891,7 +12882,7 @@ extract_mgmt_rx_fw_consumed_tlv(wmi_unified_t wmi_handle,
  * MGMT_RX_EVENT_ID
  * @wmi_handle: wmi handle
  * @evt_buf: pointer to event buffer
- * @params: Pointer to MGMT Rx REO parameters
+ * @reo_params: Pointer to MGMT Rx REO parameters
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13044,7 +13035,8 @@ static QDF_STATUS extract_frame_pn_params_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
- * extract_is_conn_ap_param_tlv() - extract is_conn_ap_frame param from event
+ * extract_is_conn_ap_frm_param_tlv() - extract is_conn_ap_frame param from
+ *                                      event
  * @wmi_handle: wmi handle
  * @evt_buf: pointer to event buffer
  * @is_conn_ap: Pointer for is_conn_ap frame
@@ -13083,8 +13075,8 @@ static QDF_STATUS extract_is_conn_ap_frm_param_tlv(
 /**
  * extract_vdev_roam_param_tlv() - extract vdev roam param from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold roam param
+ * @evt_buf: pointer to event buffer
+ * @param: Pointer to hold roam param
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13113,8 +13105,8 @@ static QDF_STATUS extract_vdev_roam_param_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_vdev_scan_ev_param_tlv() - extract vdev scan param from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold vdev scan param
+ * @evt_buf: pointer to event buffer
+ * @param: Pointer to hold vdev scan param
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13256,9 +13248,9 @@ static QDF_STATUS extract_nlo_complete_ev_param_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_unit_test_tlv() - extract unit test data
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param unit_test: pointer to hold unit test data
- * @param maxspace: Amount of space in evt_buf
+ * @evt_buf: pointer to event buffer
+ * @unit_test: pointer to hold unit test data
+ * @maxspace: Amount of space in evt_buf
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13298,9 +13290,9 @@ static QDF_STATUS extract_unit_test_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_pdev_ext_stats_tlv() - extract extended pdev stats from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into extended pdev stats
- * @param pdev_ext_stats: Pointer to hold extended pdev stats
+ * @evt_buf: pointer to event buffer
+ * @index: Index into extended pdev stats
+ * @pdev_ext_stats: Pointer to hold extended pdev stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13333,9 +13325,9 @@ static QDF_STATUS extract_pdev_ext_stats_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_bcn_stats_tlv() - extract bcn stats from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into vdev stats
- * @param bcn_stats: Pointer to hold bcn stats
+ * @evt_buf: pointer to event buffer
+ * @index: Index into vdev stats
+ * @bcn_stats: Pointer to hold bcn stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13371,9 +13363,9 @@ static QDF_STATUS extract_bcn_stats_tlv(wmi_unified_t wmi_handle,
  * extract_vdev_prb_fils_stats_tlv() - extract vdev probe and fils
  * stats from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into vdev stats
- * @param vdev_prb_fd_stats: Pointer to hold vdev probe and fils stats
+ * @evt_buf: pointer to event buffer
+ * @index: Index into vdev stats
+ * @vdev_stats: Pointer to hold vdev probe and fils stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13409,14 +13401,14 @@ extract_vdev_prb_fils_stats_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_bcnflt_stats_tlv() - extract bcn fault stats from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into bcn fault stats
- * @param bcnflt_stats: Pointer to hold bcn fault stats
+ * @evt_buf: pointer to event buffer
+ * @index: Index into bcn fault stats
+ * @bcnflt_stats: Pointer to hold bcn fault stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS extract_bcnflt_stats_tlv(wmi_unified_t wmi_handle,
-	void *evt_buf, uint32_t index, wmi_host_bcnflt_stats *peer_stats)
+	void *evt_buf, uint32_t index, wmi_host_bcnflt_stats *bcnflt_stats)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -13424,9 +13416,9 @@ static QDF_STATUS extract_bcnflt_stats_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_chan_stats_tlv() - extract chan stats from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param index: Index into chan stats
- * @param vdev_extd_stats: Pointer to hold chan stats
+ * @evt_buf: pointer to event buffer
+ * @index: Index into chan stats
+ * @chan_stats: Pointer to hold chan stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13463,9 +13455,8 @@ static QDF_STATUS extract_chan_stats_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_profile_ctx_tlv() - extract profile context from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @idx: profile stats index to extract
- * @param profile_ctx: Pointer to hold profile context
+ * @evt_buf: pointer to event buffer
+ * @profile_ctx: Pointer to hold profile context
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13498,8 +13489,9 @@ static QDF_STATUS extract_profile_ctx_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_profile_data_tlv() - extract profile data from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param profile_data: Pointer to hold profile data
+ * @evt_buf: pointer to event buffer
+ * @idx: profile stats index to extract
+ * @profile_data: Pointer to hold profile data
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13530,10 +13522,10 @@ static QDF_STATUS extract_profile_data_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_pdev_utf_event_tlv() - extract UTF data info from event
  * @wmi_handle: WMI handle
- * @param evt_buf: Pointer to event buffer
- * @param param: Pointer to hold data
+ * @evt_buf: Pointer to event buffer
+ * @event: Pointer to hold data
  *
- * Return : QDF_STATUS_SUCCESS for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS extract_pdev_utf_event_tlv(wmi_unified_t wmi_handle,
 			     uint8_t *evt_buf,
@@ -13642,8 +13634,8 @@ extract_11be_chainmask(struct wlan_psoc_host_chainmask_capabilities *cap,
 /**
  * extract_chainmask_tables_tlv() - extract chain mask tables from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold evt buf
+ * @event: pointer to event buffer
+ * @chainmask_table: Pointer to hold extracted chainmask tables
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13760,8 +13752,8 @@ static QDF_STATUS extract_chainmask_tables_tlv(wmi_unified_t wmi_handle,
  * extract_service_ready_ext_tlv() - extract basic extended service ready params
  * from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold evt buf
+ * @event: pointer to event buffer
+ * @param: Pointer to hold evt buf
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -13891,7 +13883,7 @@ extract_svc_rdy_ext2_afc_tlv(wmi_service_ready_ext2_event_fixed_param *ev,
 #endif
 
 /**
- * extract_ul_mumimo_support) - extract UL-MUMIMO capability from target cap
+ * extract_ul_mumimo_support() - extract UL-MUMIMO capability from target cap
  * @param: Pointer to hold the params
  *
  * Return: Void
@@ -14042,9 +14034,9 @@ static QDF_STATUS extract_sar_cap_service_ready_ext_tlv(
  * extract_hw_mode_cap_service_ready_ext_tlv() -
  *       extract HW mode cap from service ready event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold evt buf
- * @param hw_mode_idx: hw mode idx should be less than num_mode
+ * @event: pointer to event buffer
+ * @hw_mode_idx: hw mode idx should be less than num_mode
+ * @param: Pointer to hold evt buf
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -14083,9 +14075,9 @@ static QDF_STATUS extract_hw_mode_cap_service_ready_ext_tlv(
 }
 
 /**
- * extract_mac_phy_cap_service_ready_11be_support - api to extract 11be support
- * @param param: host mac phy capabilities
- * @param mac_phy_caps: mac phy capabilities
+ * extract_service_ready_11be_support() - api to extract 11be support
+ * @param: host mac phy capabilities
+ * @mac_phy_caps: mac phy capabilities
  *
  * Return: void
  */
@@ -14124,10 +14116,10 @@ static void extract_hw_link_id(struct wlan_psoc_host_mac_phy_caps *param,
  * extract_mac_phy_cap_service_ready_ext_tlv() -
  *       extract MAC phy cap from service ready event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold evt buf
- * @param hw_mode_idx: hw mode idx should be less than num_mode
- * @param phy_id: phy id within hw_mode
+ * @event: pointer to event buffer
+ * @hw_mode_id: hw mode idx should be less than num_mode
+ * @phy_id: phy id within hw_mode
+ * @param: Pointer to hold evt buf
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -14305,8 +14297,8 @@ static void extract_mac_phy_mldcap(struct wlan_psoc_host_mac_phy_caps_ext2 *para
 
 /**
  * extract_mac_phy_cap_ehtcaps- api to extract eht mac phy caps
- * @param param: host ext2 mac phy capabilities
- * @param mac_phy_caps: ext mac phy capabilities
+ * @param: host ext2 mac phy capabilities
+ * @mac_phy_caps: ext mac phy capabilities
  *
  * Return: void
  */
@@ -14444,9 +14436,9 @@ static QDF_STATUS extract_mac_phy_cap_service_ready_ext2_tlv(
  * extract_reg_cap_service_ready_ext_tlv() -
  *       extract REG cap from service ready event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold evt buf
- * @param phy_idx: phy idx should be less than num_mode
+ * @event: pointer to event buffer
+ * @phy_idx: phy idx should be less than num_mode
+ * @param: Pointer to hold evt buf
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -14694,15 +14686,16 @@ populate_thermal_stats(WMI_THERM_THROT_STATS_EVENTID_param_tlvs *param_buf,
 /**
  * extract_thermal_stats_tlv() - extract thermal stats from event
  * @wmi_handle: wmi handle
- * @param evt_buf: Pointer to event buffer
- * @param temp: Pointer to hold extracted temperature
- * @param level: Pointer to hold extracted level in host enum
- * @param therm_throt_levels: Pointer to hold extracted thermal throttle temp
- *        range
- * @param tt_temp_range_stats_event: Pointer to hold extracted thermal stats for
+ * @evt_buf: Pointer to event buffer
+ * @temp: Pointer to hold extracted temperature
+ * @level: Pointer to hold extracted level in host enum
+ * @therm_throt_levels: Pointer to hold extracted thermal throttle temp
+ *  range
+ * @tt_temp_range_stats_event: Pointer to hold extracted thermal stats for
  *                                   every level
+ * @pdev_id: Pointer to hold extracted pdev id
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 extract_thermal_stats_tlv(wmi_unified_t wmi_handle,
@@ -14739,12 +14732,12 @@ extract_thermal_stats_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_thermal_level_stats_tlv() - extract thermal level stats from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param idx: Index to level stats
- * @param levelcount: Pointer to hold levelcount
- * @param dccount: Pointer to hold dccount
+ * @evt_buf: pointer to event buffer
+ * @idx: Index to level stats
+ * @levelcount: Pointer to hold levelcount
+ * @dccount: Pointer to hold dccount
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 extract_thermal_level_stats_tlv(wmi_unified_t wmi_handle,
@@ -14769,14 +14762,15 @@ extract_thermal_level_stats_tlv(wmi_unified_t wmi_handle,
 
 	return QDF_STATUS_E_FAILURE;
 }
-#ifdef BIG_ENDIAN_HOST
+
 /**
  * fips_conv_data_be() - LE to BE conversion of FIPS ev data
- * @param data_len - data length
- * @param data - pointer to data
+ * @data_len: data length
+ * @data: pointer to data
  *
  * Return: QDF_STATUS - success or error status
  */
+#ifdef BIG_ENDIAN_HOST
 static QDF_STATUS fips_conv_data_be(uint32_t data_len, uint8_t *data)
 {
 	uint8_t *data_aligned = NULL;
@@ -14821,11 +14815,6 @@ static QDF_STATUS fips_conv_data_be(uint32_t data_len, uint8_t *data)
 	return QDF_STATUS_SUCCESS;
 }
 #else
-/**
- * fips_conv_data_be() - DUMMY for LE platform
- *
- * Return: QDF_STATUS - success
- */
 static QDF_STATUS fips_conv_data_be(uint32_t data_len, uint8_t *data)
 {
 	return QDF_STATUS_SUCCESS;
@@ -14833,12 +14822,12 @@ static QDF_STATUS fips_conv_data_be(uint32_t data_len, uint8_t *data)
 #endif
 
 /**
-* send_pdev_get_pn_cmd_tlv() - send get PN request params to fw
-* @wmi_handle - wmi handle
-* @params - PN request params for peer
-*
-* Return: QDF_STATUS - success or error status
-*/
+ * send_pdev_get_pn_cmd_tlv() - send get PN request params to fw
+ * @wmi_handle: wmi handle
+ * @params: PN request params for peer
+ *
+ * Return: QDF_STATUS - success or error status
+ */
 static QDF_STATUS
 send_pdev_get_pn_cmd_tlv(wmi_unified_t wmi_handle,
 			 struct peer_request_pn_param *params)
@@ -14874,12 +14863,13 @@ send_pdev_get_pn_cmd_tlv(wmi_unified_t wmi_handle,
 }
 
 /**
-* extract_get_pn_data_tlv() - extract pn resp
-* @wmi_handle - wmi handle
-* @params - PN response params for peer
-*
-* Return: QDF_STATUS - success or error status
-*/
+ * extract_get_pn_data_tlv() - extract pn resp
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @param: PN response params for peer
+ *
+ * Return: QDF_STATUS - success or error status
+ */
 static QDF_STATUS
 extract_get_pn_data_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 			struct wmi_host_get_pn_event *param)
@@ -14949,6 +14939,7 @@ send_pdev_get_rxpn_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_get_rxpn_data_tlv() - extract Rx PN resp
  * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
  * @params: Rx PN response params for peer
  *
  * Return: QDF_STATUS - success or error status
@@ -14974,10 +14965,10 @@ extract_get_rxpn_data_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 /**
  * extract_fips_event_data_tlv() - extract fips event data
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: pointer FIPS event params
+ * @evt_buf: pointer to event buffer
+ * @param: pointer FIPS event params
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS extract_fips_event_data_tlv(wmi_unified_t wmi_handle,
 		void *evt_buf, struct wmi_host_fips_event_param *param)
@@ -15009,10 +15000,10 @@ static QDF_STATUS extract_fips_event_data_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_fips_extend_event_data_tlv() - extract fips event data
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: pointer FIPS event params
+ * @evt_buf: pointer to event buffer
+ * @param: pointer FIPS event params
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 extract_fips_extend_event_data_tlv(wmi_unified_t wmi_handle,
@@ -15136,7 +15127,7 @@ static uint16_t wmi_tag_fw_hang_cmd(wmi_unified_t wmi_handle)
  * @buf:	WMI buffer
  * @cmd_id:	WMI command Id
  *
- * Return htc_tx_tag
+ * Return: htc_tx_tag
  */
 static uint16_t wmi_set_htc_tx_tag_tlv(wmi_unified_t wmi_handle,
 				wmi_buf_t buf,
@@ -15285,7 +15276,7 @@ static enum cc_setting_code wmi_reg_status_to_reg_status(
  * @num_fcc_rules: Number of FCC rules
  * @wmi_fcc_rule:  WMI FCC rules TLV
  *
- * Return fcc_rule_ptr
+ * Return: fcc_rule_ptr
  */
 static struct cur_fcc_rule
 *extract_ext_fcc_rules_from_wmi(uint32_t num_fcc_rules,
@@ -15316,17 +15307,17 @@ static struct cur_fcc_rule
 
 /**
  * extract_reg_fcc_rules_tlv - Extract reg fcc rules TLV
- * @param_buf - Pointer to WMI params TLV
- * @ext_chan_list_event_hdr - Pointer to REG CHAN LIST CC EXT EVENT Fixed
- *			      Params TLV
- * @ext_wmi_reg_rule - Pointer to REG CHAN LIST CC EXT EVENT Reg Rules TLV
- * @ext_wmi_chan_priority - Pointer to REG CHAN LIST CC EXT EVENT Chan
- *			    Priority TLV
- * @evt_buf - Pointer to REG CHAN LIST CC EXT EVENT event buffer
- * @reg_info - Pointer to Regulatory Info
- * @len - Length of REG CHAN LIST CC EXT EVENT buffer
+ * @param_buf: Pointer to WMI params TLV
+ * @ext_chan_list_event_hdr: Pointer to REG CHAN LIST CC EXT EVENT Fixed
+ *			     Params TLV
+ * @ext_wmi_reg_rule: Pointer to REG CHAN LIST CC EXT EVENT Reg Rules TLV
+ * @ext_wmi_chan_priority: Pointer to REG CHAN LIST CC EXT EVENT Chan
+ *			   Priority TLV
+ * @evt_buf: Pointer to REG CHAN LIST CC EXT EVENT event buffer
+ * @reg_info: Pointer to Regulatory Info
+ * @len: Length of REG CHAN LIST CC EXT EVENT buffer
  *
- * Return - QDF_STATUS
+ * Return: QDF_STATUS
  */
 static QDF_STATUS extract_reg_fcc_rules_tlv(
 	WMI_REG_CHAN_LIST_CC_EXT_EVENTID_param_tlvs *param_buf,
@@ -16195,7 +16186,7 @@ static QDF_STATUS extract_reg_ch_avoid_event_tlv(
  * @vdev_id: vdev id
  * @len: length of buffer
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS extract_dfs_cac_complete_event_tlv(wmi_unified_t wmi_handle,
 		uint8_t *evt_buf,
@@ -16222,10 +16213,9 @@ static QDF_STATUS extract_dfs_cac_complete_event_tlv(wmi_unified_t wmi_handle,
  * extract_dfs_ocac_complete_event_tlv() - extract cac complete event
  * @wmi_handle: wma handle
  * @evt_buf: event buffer
- * @vdev_id: vdev id
- * @len: length of buffer
+ * @param: extracted event
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 extract_dfs_ocac_complete_event_tlv(wmi_unified_t wmi_handle,
@@ -16271,7 +16261,7 @@ extract_dfs_ocac_complete_event_tlv(wmi_unified_t wmi_handle,
  * @radar_found: radar found event info
  * @len: length of buffer
  *
- * Return: 0 for success or error code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS extract_dfs_radar_detection_event_tlv(
 		wmi_unified_t wmi_handle,
@@ -16509,7 +16499,8 @@ extract_rcpi_response_event_tlv(wmi_unified_t wmi_handle,
  * convert_host_pdev_id_to_target_pdev_id_legacy() - Convert pdev_id from
  *	   host to target defines. For legacy there is not conversion
  *	   required. Just return pdev_id as it is.
- * @param pdev_id: host pdev_id to be converted.
+ * @wmi_handle: handle to WMI.
+ * @pdev_id: host pdev_id to be converted.
  * Return: target pdev_id after conversion.
  */
 static uint32_t convert_host_pdev_id_to_target_pdev_id_legacy(
@@ -16527,7 +16518,8 @@ static uint32_t convert_host_pdev_id_to_target_pdev_id_legacy(
  * convert_target_pdev_id_to_host_pdev_id_legacy() - Convert pdev_id from
  *	   target to host defines. For legacy there is not conversion
  *	   required. Just return pdev_id as it is.
- * @param pdev_id: target pdev_id to be converted.
+ * @wmi_handle: handle to WMI.
+ * @pdev_id: target pdev_id to be converted.
  * Return: host pdev_id after conversion.
  */
 static uint32_t convert_target_pdev_id_to_host_pdev_id_legacy(
@@ -16542,7 +16534,9 @@ static uint32_t convert_target_pdev_id_to_host_pdev_id_legacy(
  * convert_host_phy_id_to_target_phy_id_legacy() - Convert phy_id from
  *	   host to target defines. For legacy there is not conversion
  *	   required. Just return phy_id as it is.
- * @param pdev_id: host phy_id to be converted.
+ * @wmi_handle: handle to WMI.
+ * @phy_id: host phy_id to be converted.
+ *
  * Return: target phy_id after conversion.
  */
 static uint32_t convert_host_phy_id_to_target_phy_id_legacy(
@@ -16557,7 +16551,9 @@ static uint32_t convert_host_phy_id_to_target_phy_id_legacy(
  * convert_target_phy_id_to_host_phy_id_legacy() - Convert phy_id from
  *	   target to host defines. For legacy there is not conversion
  *	   required. Just return phy_id as it is.
- * @param pdev_id: target phy_id to be converted.
+ * @wmi_handle: handle to WMI.
+ * @phy_id: target phy_id to be converted.
+ *
  * Return: host phy_id after conversion.
  */
 static uint32_t convert_target_phy_id_to_host_phy_id_legacy(
@@ -16569,11 +16565,11 @@ static uint32_t convert_target_phy_id_to_host_phy_id_legacy(
 }
 
 /**
- *  send_set_country_cmd_tlv() - WMI scan channel list function
- *  @param wmi_handle      : handle to WMI.
- *  @param param    : pointer to hold scan channel list parameter
+ * send_set_country_cmd_tlv() - WMI scan channel list function
+ * @wmi_handle: handle to WMI.
+ * @params: pointer to hold scan channel list parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS send_set_country_cmd_tlv(wmi_unified_t wmi_handle,
 				struct set_country *params)
@@ -17914,10 +17910,10 @@ send_vdev_set_ltf_key_seed_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * extract_hw_mode_resp_event_status_tlv() - Extract HW mode change status
  * @wmi_handle: wmi handle
- * @event_buf: pointer to event buffer
+ * @evt_buf: pointer to event buffer
  * @cmd_status: status of HW mode change command
  *
- * Return QDF_STATUS_SUCCESS on success or proper error code.
+ * Return: QDF_STATUS_SUCCESS on success or proper error code.
  */
 static QDF_STATUS
 extract_hw_mode_resp_event_status_tlv(wmi_unified_t wmi_handle, void *evt_buf,
@@ -18116,6 +18112,8 @@ static uint32_t wmi_convert_fw_to_cm_trig_reason(uint32_t fw_trig_reason)
  * @wmi_handle: wmi_handle
  * @evt_buf: Event buffer
  * @dst_info: Destination buffer
+ * @btm_idx: BTM index
+ * @num_cand: Number of candidates
  *
  * Return: QDF_STATUS
  */
@@ -18185,6 +18183,7 @@ wmi_convert_roam_sub_reason(WMI_ROAM_TRIGGER_SUB_REASON_ID subreason)
  * @evt_buf:    Pointer to the event buffer
  * @trig:       Pointer to destination structure to fill data
  * @idx:        TLV id
+ * @btm_idx:    BTM index
  */
 static QDF_STATUS
 extract_roam_trigger_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
@@ -18497,7 +18496,7 @@ wlan_roam_fail_reason_code(uint16_t wmi_roam_fail_reason)
 }
 
 /**
- * extract_roam_scan_stats_tlv() - Extract the Roam trigger stats
+ * extract_roam_result_stats_tlv() - Extract the Roam trigger stats
  * from the WMI_ROAM_STATS_EVENTID
  * @wmi_handle: wmi handle
  * @evt_buf:    Pointer to the event buffer
@@ -18593,11 +18592,11 @@ extract_roam_11kv_stats_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 }
 
 /**
- *  send_roam_set_param_cmd_tlv() - WMI roam set parameter function
- *  @wmi_handle      : handle to WMI.
- *  @roam_param    : pointer to hold roam set parameter
+ * send_roam_set_param_cmd_tlv() - WMI roam set parameter function
+ * @wmi_handle: handle to WMI.
+ * @roam_param: pointer to hold roam set parameter
  *
- *  Return: 0  on success and -ve on failure.
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 static QDF_STATUS
 send_roam_set_param_cmd_tlv(wmi_unified_t wmi_handle,
@@ -18915,8 +18914,8 @@ send_vdev_tsf_tstamp_action_cmd_tlv(wmi_unified_t wmi, uint8_t vdev_id)
 /**
  * extract_vdev_tsf_report_event_tlv() - extract vdev tsf report from event
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @wmi_host_tsf_event param: Pointer to struct to hold event info
+ * @evt_buf: pointer to event buffer
+ * @param: Pointer to struct to hold event info
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */
@@ -18957,8 +18956,8 @@ extract_vdev_tsf_report_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
  * extract_pdev_csa_switch_count_status_tlv() - extract pdev csa switch count
  *					      status tlv
  * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: Pointer to hold csa switch count status event param
+ * @evt_buf: pointer to event buffer
+ * @param: Pointer to hold csa switch count status event param
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -19042,6 +19041,7 @@ QDF_STATUS send_afc_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_set_tpc_power_cmd_tlv() - Sends the set TPC power level to FW
  * @wmi_handle: wmi handle
+ * @vdev_id: vdev id
  * @param: Pointer to hold TX power info
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
@@ -19408,10 +19408,7 @@ static QDF_STATUS extract_update_mac_address_event_tlv(
  * extract_quiet_offload_event_tlv() - extract quiet offload event
  * @wmi_handle: WMI handle
  * @evt_buf: event buffer
- * @mld_mac: mld mac address
- * @link_mac: link mac address
- * @link_id: link id
- * @quiet_status: quiet is started or stopped
+ * @quiet_event: quiet event extracted from the buffer
  *
  * Return: QDF_STATUS
  */
@@ -19530,7 +19527,7 @@ extract_pktlog_decode_info_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
  * fw
  * @wmi_handle: wmi handle
  * @evt_buf: pointer to event buffer
- * @params: health monitor params
+ * @param: health monitor params
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -19560,7 +19557,7 @@ extract_health_mon_init_done_info_event_tlv(wmi_unified_t wmi_handle,
  * extract_pdev_telemetry_stats_tlv - extract pdev telemetry stats
  * @wmi_handle: wmi handle
  * @evt_buf: pointer to event buffer
- * @pdev stats: Pointer to hold pdev telemetry stats
+ * @pdev_stats: Pointer to hold pdev telemetry stats
  *
  * Return: QDF_STATUS_SUCCESS for success or error code
  */
@@ -20134,9 +20131,9 @@ static inline void populate_tlv_events_id_mlo(uint32_t *event_ids)
 #endif /* WLAN_FEATURE_11BE_MLO */
 
 /**
- * populate_tlv_event_id() - populates wmi event ids
+ * populate_tlv_events_id() - populates wmi event ids
+ * @event_ids: Pointer to hold event ids
  *
- * @param event_ids: Pointer to hold event ids
  * Return: None
  */
 static void populate_tlv_events_id(uint32_t *event_ids)
@@ -20641,8 +20638,8 @@ static inline void populate_tlv_service_mlo(uint32_t *wmi_service)
 
 /**
  * populate_tlv_service() - populates wmi services
+ * @wmi_service: Pointer to hold wmi_service
  *
- * @param wmi_service: Pointer to hold wmi_service
  * Return: None
  */
 static void populate_tlv_service(uint32_t *wmi_service)
@@ -21154,7 +21151,7 @@ static inline void wmi_ocb_ut_attach(struct wmi_unified *wmi_handle)
 
 /**
  * wmi_tlv_attach() - Attach TLV APIs
- *
+ * @wmi_handle: wmi handle
  * Return: None
  */
 void wmi_tlv_attach(wmi_unified_t wmi_handle)
