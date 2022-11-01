@@ -22,7 +22,8 @@
 #include "qdf_module.h"
 #include "hif_main.h"
 
-#if defined(HIF_PCI) || defined(HIF_SNOC) || defined(HIF_AHB)
+#if defined(HIF_PCI) || defined(HIF_SNOC) || defined(HIF_AHB) || \
+	defined(HIF_IPCI)
 #include "ce_api.h"
 #include "ce_internal.h"
 #endif

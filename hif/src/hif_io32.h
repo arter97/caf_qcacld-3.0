@@ -301,7 +301,12 @@ static inline uint32_t hif_read32_mb_reg_window(void *scn, void __iomem *addr)
 }
 #endif
 
-#ifdef CONFIG_IO_MEM_ACCESS_DEBUG
+#if defined(HIF_HAL_REG_ACCESS_SUPPORT)
+#define A_TARGET_READ(scn, offset) \
+	hif_reg_window_read(scn, offset)
+#define A_TARGET_WRITE(scn, offset, value) \
+	hif_reg_window_write(scn, offset, value)
+#elif defined(CONFIG_IO_MEM_ACCESS_DEBUG)
 uint32_t hif_target_read_checked(struct hif_softc *scn,
 					uint32_t offset);
 void hif_target_write_checked(struct hif_softc *scn, uint32_t offset,
