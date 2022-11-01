@@ -132,6 +132,10 @@
 #define CE_MSI_ADDRESS_HIGH       (scn->target_ce_def->d_CE_MSI_ADDRESS_HIGH)
 #define CE_MSI_DATA               (scn->target_ce_def->d_CE_MSI_DATA)
 #define CE_MSI_ENABLE_BIT         (scn->target_ce_def->d_CE_MSI_ENABLE_BIT)
+#define CE_SRC_BATCH_TIMER_INT_SETUP \
+	(scn->target_ce_def->d_CE_SRC_BATCH_TIMER_INT_SETUP)
+#define CE_DST_BATCH_TIMER_INT_SETUP \
+	(scn->target_ce_def->d_CE_DST_BATCH_TIMER_INT_SETUP)
 #define MISC_IE_ADDRESS           (scn->target_ce_def->d_MISC_IE_ADDRESS)
 #define MISC_IS_AXI_ERR_MASK      (scn->target_ce_def->d_MISC_IS_AXI_ERR_MASK)
 #define MISC_IS_DST_ADDR_ERR_MASK \
@@ -369,8 +373,64 @@ unsigned int hif_get_dst_ring_read_index(struct hif_softc *scn,
 #define CE_MSI_ADDR_HIGH_SET(scn, CE_ctrl_addr, addr) \
 	A_TARGET_WRITE(scn, (CE_ctrl_addr) + CE_MSI_ADDRESS_HIGH, (addr))
 
+#define CE_MSI_ADDR_HIGH_GET(scn, CE_ctrl_addr) \
+	A_TARGET_READ(scn, (CE_ctrl_addr) + CE_MSI_ADDRESS_HIGH)
+
 #define CE_MSI_DATA_SET(scn, CE_ctrl_addr, data) \
 	A_TARGET_WRITE(scn, (CE_ctrl_addr) + CE_MSI_DATA, (data))
+
+#define CE_MSI_EN_SET(scn, CE_ctrl_addr) \
+	A_TARGET_WRITE(scn, (CE_ctrl_addr) + CE_CTRL1_ADDRESS, \
+	(A_TARGET_READ(scn, (CE_ctrl_addr) + CE_CTRL1_ADDRESS) \
+	| CE_MSI_ENABLE_BIT))
+
+#define CE_SRC_BATCH_TIMER_THRESHOLD 0
+#define CE_SRC_BATCH_COUNTER_THRESHOLD 1
+#define CE_DST_BATCH_TIMER_THRESHOLD 512
+#define CE_DST_BATCH_COUNTER_THRESHOLD 0
+
+#define CE_SRC_BATCH_TIMER_THRESH_MASK \
+	(scn->target_ce_def->d_CE_SRC_BATCH_TIMER_THRESH_MASK)
+#define CE_SRC_BATCH_TIMER_THRESH_LSB \
+	(scn->target_ce_def->d_CE_SRC_BATCH_TIMER_THRESH_LSB)
+#define CE_SRC_BATCH_COUNTER_THRESH_MASK \
+	(scn->target_ce_def->d_CE_SRC_BATCH_COUNTER_THRESH_MASK)
+#define CE_SRC_BATCH_COUNTER_THRESH_LSB \
+	(scn->target_ce_def->d_CE_SRC_BATCH_COUNTER_THRESH_LSB)
+#define CE_DST_BATCH_TIMER_THRESH_MASK \
+	(scn->target_ce_def->d_CE_DST_BATCH_TIMER_THRESH_MASK)
+#define CE_DST_BATCH_TIMER_THRESH_LSB \
+	(scn->target_ce_def->d_CE_DST_BATCH_TIMER_THRESH_LSB)
+#define CE_DST_BATCH_COUNTER_THRESH_MASK \
+	(scn->target_ce_def->d_CE_DST_BATCH_COUNTER_THRESH_MASK)
+#define CE_DST_BATCH_COUNTER_THRESH_LSB \
+	(scn->target_ce_def->d_CE_DST_BATCH_COUNTER_THRESH_LSB)
+
+#define CE_CHANNEL_SRC_BATCH_TIMER_INT_SETUP_GET(scn, CE_ctrl_addr) \
+	A_TARGET_READ(scn, (CE_ctrl_addr) + CE_SRC_BATCH_TIMER_INT_SETUP)
+#define CE_CHANNEL_DST_BATCH_TIMER_INT_SETUP_GET(scn, CE_ctrl_addr) \
+	A_TARGET_READ(scn, (CE_ctrl_addr) + CE_DST_BATCH_TIMER_INT_SETUP)
+
+#define CE_CHANNEL_SRC_BATCH_TIMER_INT_SETUP(scn, CE_ctrl_addr, data) \
+	A_TARGET_WRITE(scn, (CE_ctrl_addr) + CE_SRC_BATCH_TIMER_INT_SETUP, data)
+#define CE_CHANNEL_DST_BATCH_TIMER_INT_SETUP(scn, CE_ctrl_addr, data) \
+	A_TARGET_WRITE(scn, (CE_ctrl_addr) + CE_DST_BATCH_TIMER_INT_SETUP, data)
+
+#define HOST_IE_SRC_TIMER_BATCH_MASK \
+	(scn->target_ce_def->d_HOST_IE_SRC_TIMER_BATCH_MASK)
+#define HOST_IE_DST_TIMER_BATCH_MASK \
+	(scn->target_ce_def->d_HOST_IE_DST_TIMER_BATCH_MASK)
+
+#define CE_CHANNEL_SRC_TIMER_BATCH_INT_EN(scn, CE_ctrl_addr) \
+	A_TARGET_WRITE(scn, (CE_ctrl_addr) + HOST_IE_ADDRESS, \
+		       A_TARGET_READ(scn, \
+		       (CE_ctrl_addr) + HOST_IE_ADDRESS) | \
+		       HOST_IE_SRC_TIMER_BATCH_MASK)
+#define CE_CHANNEL_DST_TIMER_BATCH_INT_EN(scn, CE_ctrl_addr) \
+	A_TARGET_WRITE(scn, (CE_ctrl_addr) + HOST_IE_ADDRESS, \
+		       A_TARGET_READ(scn, \
+		       (CE_ctrl_addr) + HOST_IE_ADDRESS) | \
+		       HOST_IE_DST_TIMER_BATCH_MASK)
 
 #define CE_CTRL_REGISTER1_SET(scn, CE_ctrl_addr, val) \
 	A_TARGET_WRITE(scn, (CE_ctrl_addr) + CE_CTRL1_ADDRESS, val)
