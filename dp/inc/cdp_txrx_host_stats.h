@@ -1067,13 +1067,15 @@ static inline QDF_STATUS cdp_get_peer_extd_rate_link_stats(
  * @soc: soc handle
  * @pdev_id: pdev id
  * @stats: pointer to pdev obss stats
+ * @req: Pointer to CDP TxRx stats
  *
  * return: status
  */
 static inline QDF_STATUS cdp_get_pdev_obss_pd_stats(
 				ol_txrx_soc_handle soc,
 				uint8_t pdev_id,
-				struct cdp_pdev_obss_pd_stats_tlv *stats)
+				struct cdp_pdev_obss_pd_stats_tlv *stats,
+				struct cdp_txrx_stats_req *req)
 {
 	if (!soc || !soc->ops) {
 		dp_cdp_debug("Invalid Instance");
@@ -1086,7 +1088,7 @@ static inline QDF_STATUS cdp_get_pdev_obss_pd_stats(
 		return QDF_STATUS_E_FAILURE;
 
 	return soc->ops->host_stats_ops->get_pdev_obss_stats(
-					soc, pdev_id, stats);
+				     soc, pdev_id, stats, req);
 }
 
 /**

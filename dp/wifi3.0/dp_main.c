@@ -11508,14 +11508,15 @@ dp_txrx_stats_publish(struct cdp_soc_t *soc, uint8_t pdev_id,
  * @soc: DP soc handle
  * @pdev_id: id of DP_PDEV handle
  * @buf: to hold pdev obss stats
+ * @req: Pointer to CDP TxRx stats
  *
  * Return: status
  */
 static QDF_STATUS
 dp_get_obss_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
-		  struct cdp_pdev_obss_pd_stats_tlv *buf)
+		  struct cdp_pdev_obss_pd_stats_tlv *buf,
+		  struct cdp_txrx_stats_req *req)
 {
-	struct cdp_txrx_stats_req req = {0};
 	QDF_STATUS status;
 	struct dp_pdev *pdev =
 		dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
@@ -11528,12 +11529,13 @@ dp_get_obss_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
 		return QDF_STATUS_E_AGAIN;
 
 	pdev->pending_fw_obss_stats_response = true;
-	req.stats = (enum cdp_stats)HTT_DBG_EXT_STATS_PDEV_OBSS_PD_STATS;
-	req.cookie_val = DBG_STATS_COOKIE_HTT_OBSS;
+	req->stats = (enum cdp_stats)HTT_DBG_EXT_STATS_PDEV_OBSS_PD_STATS;
+	req->cookie_val = DBG_STATS_COOKIE_HTT_OBSS;
 	qdf_event_reset(&pdev->fw_obss_stats_event);
-	status = dp_h2t_ext_stats_msg_send(pdev, req.stats, req.param0,
-					   req.param1, req.param2, req.param3,
-					   0, req.cookie_val, 0);
+	status = dp_h2t_ext_stats_msg_send(pdev, req->stats, req->param0,
+					   req->param1, req->param2,
+					   req->param3, 0, req->cookie_val,
+					   req->mac_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pdev->pending_fw_obss_stats_response = false;
 		return status;

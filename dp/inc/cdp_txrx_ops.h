@@ -1221,7 +1221,8 @@ struct cdp_host_stats_ops {
 				(struct cdp_soc_t *soc, uint8_t *mac_addr);
 	QDF_STATUS
 		(*get_pdev_obss_stats)(struct cdp_soc_t *soc, uint8_t pdev_id,
-				       struct cdp_pdev_obss_pd_stats_tlv *buf);
+				       struct cdp_pdev_obss_pd_stats_tlv *buf,
+				       struct cdp_txrx_stats_req *req);
 	QDF_STATUS (*clear_pdev_obss_pd_stats)(struct cdp_soc_t *soc,
 					       uint8_t pdev_id);
 };
