@@ -1682,6 +1682,73 @@ dp_rx_defrag_save_info_from_ring_desc(struct dp_soc *soc,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef DP_RX_DEFRAG_ADDR1_CHECK_WAR
+#ifdef WLAN_FEATURE_11BE_MLO
+/*
+ * dp_rx_defrag_vdev_mac_addr_cmp() - function to check whether mac address
+ *				matches VDEV mac
+ * @vdev: dp_vdev object of the VDEV on which this data packet is received
+ * @mac_addr: Address to compare
+ *
+ * Return: 1 if the mac matching,
+ *         0 if this frame is not correctly destined to this VDEV/MLD
+ */
+static int dp_rx_defrag_vdev_mac_addr_cmp(struct dp_vdev *vdev,
+					  uint8_t *mac_addr)
+{
+	return ((qdf_mem_cmp(mac_addr, &vdev->mac_addr.raw[0],
+			     QDF_MAC_ADDR_SIZE) == 0) ||
+		(qdf_mem_cmp(mac_addr, &vdev->mld_mac_addr.raw[0],
+			     QDF_MAC_ADDR_SIZE) == 0));
+}
+
+#else
+static int dp_rx_defrag_vdev_mac_addr_cmp(struct dp_vdev *vdev,
+					  uint8_t *mac_addr)
+{
+	return (qdf_mem_cmp(mac_addr, &vdev->mac_addr.raw[0],
+			    QDF_MAC_ADDR_SIZE) == 0);
+}
+#endif
+
+static bool dp_rx_defrag_addr1_check(struct dp_soc *soc,
+				     struct dp_vdev *vdev,
+				     uint8_t *rx_tlv_hdr)
+{
+	union dp_align_mac_addr mac_addr;
+
+	/* If address1 is not valid discard the fragment */
+	if (hal_rx_mpdu_get_addr1(soc->hal_soc, rx_tlv_hdr,
+				  &mac_addr.raw[0]) != QDF_STATUS_SUCCESS) {
+		DP_STATS_INC(soc, rx.err.defrag_ad1_invalid, 1);
+		return false;
+	}
+
+	/* WAR suggested by HW team to avoid crashing incase of packet
+	 * corruption issue
+	 *
+	 * recipe is to compare VDEV mac or MLD mac address with ADDR1
+	 * in case of mismatch consider it as corrupted packet and do
+	 * not process further
+	 */
+	if (!dp_rx_defrag_vdev_mac_addr_cmp(vdev,
+					    &mac_addr.raw[0])) {
+		DP_STATS_INC(soc, rx.err.defrag_ad1_invalid, 1);
+		return false;
+	}
+
+	return true;
+}
+#else
+static inline bool dp_rx_defrag_addr1_check(struct dp_soc *soc,
+					    struct dp_vdev *vdev,
+					    uint8_t *rx_tlv_hdr)
+{
+
+	return true;
+}
+#endif
+
 /*
  * dp_rx_defrag_store_fragment(): Store incoming fragments
  * @soc: Pointer to the SOC data structure
@@ -1756,6 +1823,12 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	if (tid >= DP_MAX_TIDS) {
 		dp_info("TID out of bounds: %d", tid);
 		qdf_assert_always(0);
+		goto discard_frag;
+	}
+
+	if (!dp_rx_defrag_addr1_check(soc, txrx_peer->vdev,
+				      rx_desc->rx_buf_start)) {
+		dp_info("Invalid address 1");
 		goto discard_frag;
 	}
 

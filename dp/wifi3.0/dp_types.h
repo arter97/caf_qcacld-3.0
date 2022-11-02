@@ -1251,6 +1251,8 @@ struct dp_soc_stats {
 			uint32_t rx_flush_count;
 			/* Rx invalid tid count */
 			uint32_t rx_invalid_tid_err;
+			/* Invalid address1 in defrag path*/
+			uint32_t defrag_ad1_invalid;
 		} err;
 
 		/* packet count per core - per ring */
