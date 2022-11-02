@@ -2060,7 +2060,8 @@ struct cdp_cfr_ops {
 	void (*txrx_cfr_filter)(struct cdp_soc_t *soc_hdl,
 				uint8_t pdev_id,
 				bool enable,
-				struct cdp_monitor_filter *filter_val);
+				struct cdp_monitor_filter *filter_val,
+				bool cfr_enable_monitor_mode);
 	bool (*txrx_get_cfr_rcc)(struct cdp_soc_t *soc_hdl,
 				 uint8_t pdev_id);
 	void (*txrx_set_cfr_rcc)(struct cdp_soc_t *soc_hdl,

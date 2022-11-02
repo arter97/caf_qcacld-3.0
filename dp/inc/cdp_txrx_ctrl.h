@@ -922,12 +922,14 @@ cdp_get_pldev(ol_txrx_soc_handle soc, uint8_t pdev_id)
  * @pdev_id: ID of the physical device object
  * @enable: Enable or disable CFR
  * @filter_val: Flag to select filter for monitor mode
+ * @cfr_enable_monitor_mode: Flag to be enabled when scan radio is brought up
+ * in special vap mode
  */
 static inline void
 cdp_cfr_filter(ol_txrx_soc_handle soc,
 	       uint8_t pdev_id,
-	       bool enable,
-	       struct cdp_monitor_filter *filter_val)
+	       bool enable, struct cdp_monitor_filter *filter_val,
+	       bool cfr_enable_monitor_mode)
 {
 	if (!soc || !soc->ops) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
@@ -939,7 +941,8 @@ cdp_cfr_filter(ol_txrx_soc_handle soc,
 	if (!soc->ops->cfr_ops || !soc->ops->cfr_ops->txrx_cfr_filter)
 		return;
 
-	soc->ops->cfr_ops->txrx_cfr_filter(soc, pdev_id, enable, filter_val);
+	soc->ops->cfr_ops->txrx_cfr_filter(soc, pdev_id, enable, filter_val,
+					   cfr_enable_monitor_mode);
 }
 
 /**
