@@ -618,6 +618,7 @@ struct dp_mon_ops {
 				   struct dp_intr *int_ctx,
 				   uint32_t mac_id,
 				   uint32_t quota);
+	void (*print_txmon_ring_stat)(struct dp_pdev *pdev);
 #endif
 	void (*mon_peer_tx_init)(struct dp_pdev *pdev, struct dp_peer *peer);
 	void (*mon_peer_tx_cleanup)(struct dp_vdev *vdev,
@@ -2432,6 +2433,28 @@ uint32_t dp_rx_mon_buf_refill(struct dp_intr *int_ctx)
 
 	return monitor_ops->rx_mon_refill_buf_ring(int_ctx);
 }
+
+static inline
+void dp_print_txmon_ring_stat_from_hal(struct dp_pdev *pdev)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_ops *monitor_ops;
+
+	if (!mon_soc) {
+		dp_mon_debug("monitor soc is NULL");
+		return;
+	}
+
+	monitor_ops = mon_soc->mon_ops;
+	if (!monitor_ops || !monitor_ops->print_txmon_ring_stat) {
+		dp_mon_debug("callback not registered");
+		return;
+	}
+
+	monitor_ops->print_txmon_ring_stat(pdev);
+}
+
 #else
 static inline
 uint32_t dp_monitor_process(struct dp_soc *soc, struct dp_intr *int_ctx,
@@ -2457,6 +2480,11 @@ static inline
 uint32_t dp_rx_mon_buf_refill(struct dp_intr *int_ctx)
 {
 	return 0;
+}
+
+static inline
+void dp_print_txmon_ring_stat_from_hal(struct dp_pdev *pdev)
+{
 }
 #endif
 

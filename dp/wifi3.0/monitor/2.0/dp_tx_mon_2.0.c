@@ -300,6 +300,22 @@ dp_tx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 }
 
 void
+dp_tx_mon_print_ring_stat_2_0(struct dp_pdev *pdev)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_soc_be *mon_soc_be =
+		dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
+	int lmac_id;
+
+	lmac_id = dp_get_lmac_id_for_pdev_id(soc, 0, pdev->pdev_id);
+	dp_print_ring_stat_from_hal(soc, &mon_soc_be->tx_mon_buf_ring,
+				    TX_MONITOR_BUF);
+	dp_print_ring_stat_from_hal(soc, &mon_soc_be->tx_mon_dst_ring[lmac_id],
+				    TX_MONITOR_DST);
+}
+
+void
 dp_tx_mon_buf_desc_pool_deinit(struct dp_soc *soc)
 {
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;

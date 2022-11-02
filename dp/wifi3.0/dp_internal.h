@@ -907,6 +907,12 @@ dp_tx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 	return 0;
 }
 
+static inline uint32_t
+dp_print_txmon_ring_stat_from_hal(struct dp_pdev *pdev)
+{
+	return 0;
+}
+
 static inline
 uint32_t dp_rx_mon_buf_refill(struct dp_intr *int_ctx)
 {

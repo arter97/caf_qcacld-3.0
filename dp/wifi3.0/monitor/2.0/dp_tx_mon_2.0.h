@@ -148,6 +148,14 @@ uint32_t
 dp_tx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 		      uint32_t mac_id, uint32_t quota);
 
+/*
+ * dp_tx_mon_print_ring_stat_2_0() - Print monitor ring stats
+ * @pdev: dp pdev handle
+ *
+ */
+void
+dp_tx_mon_print_ring_stat_2_0(struct dp_pdev *pdev);
+
 /* The maximum buffer length allocated for radiotap for monitor status buffer */
 #define MAX_MONITOR_HEADER (512)
 #define MAX_DUMMY_FRM_BODY (128)

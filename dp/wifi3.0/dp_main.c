@@ -9633,6 +9633,10 @@ char *dp_srng_get_str_from_hal_ring_type(enum hal_ring_type ring_type)
 		return "PPE2TCL";
 	case REO2PPE:
 		return "REO2PPE";
+	case TX_MONITOR_DST:
+		return "tx_monitor_destination";
+	case TX_MONITOR_BUF:
+		return "tx_monitor_buf";
 	default:
 		dp_err("Invalid ring type");
 		break;

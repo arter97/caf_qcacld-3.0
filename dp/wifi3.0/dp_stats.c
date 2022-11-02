@@ -17,6 +17,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 #include "qdf_types.h"
+#include "qdf_module.h"
 #include "dp_peer.h"
 #include "dp_types.h"
 #include "dp_internal.h"
@@ -5854,6 +5855,8 @@ dp_print_ring_stat_from_hal(struct dp_soc *soc,  struct dp_srng *srng,
 	}
 }
 
+qdf_export_symbol(dp_print_ring_stat_from_hal);
+
 #ifdef FEATURE_TSO_STATS
 /**
  * dp_print_tso_seg_stats - tso segment stats
@@ -6031,6 +6034,8 @@ dp_print_ring_stats(struct dp_pdev *pdev)
 					    [lmac_id],
 					    RXDMA_DST);
 	}
+
+	dp_print_txmon_ring_stat_from_hal(pdev);
 
 #ifdef WLAN_SUPPORT_PPEDS
 	if (pdev->soc->arch_ops.dp_txrx_ppeds_rings_status)
