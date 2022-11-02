@@ -5470,7 +5470,8 @@ dp_tx_mcast_reinject_handler(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 	struct dp_vdev *vdev = NULL;
 
 	if (desc->tx_status == HAL_TX_TQM_RR_MULTICAST_DROP) {
-		if (!soc->arch_ops.dp_tx_mcast_handler)
+		if (!soc->arch_ops.dp_tx_mcast_handler ||
+		    !soc->arch_ops.dp_tx_is_mcast_primary)
 			return false;
 
 		vdev = dp_vdev_get_ref_by_id(soc, desc->vdev_id,
@@ -5479,6 +5480,11 @@ dp_tx_mcast_reinject_handler(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 		if (qdf_unlikely(!vdev)) {
 			dp_tx_comp_info_rl("Unable to get vdev ref  %d",
 					   desc->id);
+			return false;
+		}
+
+		if (!(soc->arch_ops.dp_tx_is_mcast_primary(soc, vdev))) {
+			dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_REINJECT);
 			return false;
 		}
 		DP_STATS_INC_PKT(vdev, tx_i.reinject_pkts, 1,

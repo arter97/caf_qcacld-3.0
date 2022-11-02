@@ -1462,6 +1462,7 @@ enum cdp_pdev_bpr_param {
  * @CDP_SKIP_BAR_UPDATE_AP: enable/disable bar
  * @CDP_UPDATE_DSCP_TO_TID_MAP: Set DSCP to TID map id
  * @CDP_SET_MCAST_VDEV: Set primary mcast vdev
+ * @CDP_RESET_MLO_MCAST_VDEV: Reset mlo mcast vdev settings
  * @CDP_SET_MCAST_VDEV_HW_UPDATE: Not in use
  * @CDP_DROP_3ADDR_MCAST: enable/disable drop 3addr multicast flag
  * @CDP_ENABLE_WRAP: qwrap ap
@@ -1505,6 +1506,7 @@ enum cdp_vdev_param_type {
 #endif
 	CDP_UPDATE_DSCP_TO_TID_MAP,
 	CDP_SET_MCAST_VDEV,
+	CDP_RESET_MLO_MCAST_VDEV,
 	CDP_SET_MCAST_VDEV_HW_UPDATE,
 	CDP_DROP_3ADDR_MCAST,
 	CDP_ENABLE_WRAP,

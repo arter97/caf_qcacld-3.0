@@ -1971,6 +1971,8 @@ struct dp_arch_ops {
 				    qdf_nbuf_t nbuf);
 	bool (*dp_rx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
 				    struct dp_txrx_peer *peer, qdf_nbuf_t nbuf);
+	bool (*dp_tx_is_mcast_primary)(struct dp_soc *soc,
+				       struct dp_vdev *vdev);
 #endif
 	struct dp_soc * (*dp_soc_get_by_idle_bm_id)(struct dp_soc *soc,
 						    uint8_t bm_id);

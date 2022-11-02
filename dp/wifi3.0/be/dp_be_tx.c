@@ -685,21 +685,6 @@ dp_tx_mlo_mcast_multipass_handler(struct dp_soc *soc, struct dp_vdev *vdev,
 }
 #endif
 
-void dp_tx_mcast_mlo_reinject_routing_set(struct dp_soc *soc, void *arg)
-{
-	hal_soc_handle_t hal_soc = soc->hal_soc;
-	uint8_t *cmd = (uint8_t *)arg;
-
-	if (*cmd)
-		hal_tx_mcast_mlo_reinject_routing_set(
-					hal_soc,
-					HAL_TX_MCAST_MLO_REINJECT_TQM_NOTIFY);
-	else
-		hal_tx_mcast_mlo_reinject_routing_set(
-					hal_soc,
-					HAL_TX_MCAST_MLO_REINJECT_FW_NOTIFY);
-}
-
 void
 dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 			 struct dp_vdev *ptnr_vdev,
@@ -770,6 +755,17 @@ void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
 	else
 		be_vdev->seq_num++;
 }
+
+bool dp_tx_mlo_is_mcast_primary_be(struct dp_soc *soc,
+				   struct dp_vdev *vdev)
+{
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+
+	if (be_vdev->mcast_primary)
+		return true;
+
+	return false;
+}
 #else
 static inline void
 dp_tx_vdev_id_set_hal_tx_desc(uint32_t *hal_tx_desc_cached,
@@ -785,6 +781,12 @@ void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
 				struct dp_vdev *vdev,
 				qdf_nbuf_t nbuf)
 {
+}
+
+bool dp_tx_mlo_is_mcast_primary_be(struct dp_soc *soc,
+				   struct dp_vdev *vdev)
+{
+	return false;
 }
 #endif
 

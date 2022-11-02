@@ -240,6 +240,17 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota);
 void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
 				struct dp_vdev *vdev,
 				qdf_nbuf_t nbuf);
+
+/**
+ * dp_tx_mlo_is_mcast_primary_be() - Function to check for primary mcast vdev
+ * @soc: Handle to DP Soc structure
+ * @vdev: DP vdev handle
+ *
+ * Return: True if vdev is mcast primary
+ *         False for all othercase
+ */
+bool dp_tx_mlo_is_mcast_primary_be(struct dp_soc *soc,
+				   struct dp_vdev *vdev);
 #ifdef WLAN_MCAST_MLO
 #ifdef WLAN_MLO_MULTI_CHIP
 /**
@@ -253,15 +264,6 @@ void dp_tx_mlo_mcast_handler_be(struct dp_soc *soc,
 void dp_tx_mlo_mcast_pkt_send(struct dp_vdev_be *be_vdev,
 			      struct dp_vdev *ptnr_vdev,
 			      void *arg);
-
-/**
- * dp_tx_mcast_mlo_reinject_routing_set() - mlo mcast reinject routing handler
- * @be_vdev: Handle to DP be_vdev structure
- * @cmd: cmd to set TQM/FW based reinjection
- *
- * Return: None
- */
-void dp_tx_mcast_mlo_reinject_routing_set(struct dp_soc *soc, void *arg);
 #endif
 #endif
 #endif

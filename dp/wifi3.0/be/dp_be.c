@@ -674,17 +674,15 @@ dp_mlo_mcast_init(struct dp_soc *soc, struct dp_vdev *vdev)
 
 	be_vdev->mcast_primary = false;
 	be_vdev->seq_num = 0;
-	dp_tx_mcast_mlo_reinject_routing_set(soc,
-					     (void *)&be_vdev->mcast_primary);
+
+	hal_tx_mcast_mlo_reinject_routing_set(
+				soc->hal_soc,
+				HAL_TX_MCAST_MLO_REINJECT_TQM_NOTIFY);
+
 	if (vdev->opmode == wlan_op_mode_ap) {
-		if (vdev->mlo_vdev)
-			hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
-						   vdev->vdev_id,
-						   HAL_TX_MCAST_CTRL_DROP);
-		else
-			hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
-						   vdev->vdev_id,
-						   HAL_TX_MCAST_CTRL_FW_EXCEPTION);
+		hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
+					   vdev->vdev_id,
+					   HAL_TX_MCAST_CTRL_FW_EXCEPTION);
 	}
 }
 
@@ -2000,22 +1998,16 @@ static void dp_reconfig_tx_vdev_mcast_ctrl_be(struct dp_soc *soc,
 			hal_tx_vdev_mcast_ctrl_set(hal_soc, vdev_id,
 						HAL_TX_MCAST_CTRL_MEC_NOTIFY);
 	} else if (vdev->opmode == wlan_op_mode_ap) {
+		hal_tx_mcast_mlo_reinject_routing_set(
+					hal_soc,
+					HAL_TX_MCAST_MLO_REINJECT_TQM_NOTIFY);
 		if (vdev->mlo_vdev) {
-			if (be_vdev->mcast_primary) {
-				hal_tx_vdev_mcast_ctrl_set(hal_soc, vdev_id,
-					   HAL_TX_MCAST_CTRL_NO_SPECIAL);
-				hal_tx_vdev_mcast_ctrl_set(hal_soc,
-						vdev_id + 128,
-						HAL_TX_MCAST_CTRL_FW_EXCEPTION);
-				dp_mcast_mlo_iter_ptnr_soc(be_soc,
-					dp_tx_mcast_mlo_reinject_routing_set,
-					(void *)&be_vdev->mcast_primary);
-			} else {
-				hal_tx_vdev_mcast_ctrl_set(hal_soc, vdev_id,
-							HAL_TX_MCAST_CTRL_DROP);
-			}
+			hal_tx_vdev_mcast_ctrl_set(
+						hal_soc,
+						vdev_id,
+						HAL_TX_MCAST_CTRL_NO_SPECIAL);
 		} else {
-			hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
+			hal_tx_vdev_mcast_ctrl_set(hal_soc,
 						   vdev_id,
 						   HAL_TX_MCAST_CTRL_FW_EXCEPTION);
 		}
@@ -2052,32 +2044,38 @@ static void dp_mlo_mcast_reset_pri_mcast(struct dp_vdev_be *be_vdev,
 }
 
 static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
-					struct dp_vdev_be *be_vdev,
+					struct dp_vdev *vdev,
 					cdp_config_param_type val)
 {
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(
 						be_vdev->vdev.pdev->soc);
-	hal_soc_handle_t hal_soc = be_vdev->vdev.pdev->soc->hal_soc;
-	uint8_t vdev_id = be_vdev->vdev.vdev_id;
 
 	be_vdev->mcast_primary = val.cdp_vdev_param_mcast_vdev;
+	vdev->mlo_vdev = true;
+	hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
+				   vdev->vdev_id,
+				   HAL_TX_MCAST_CTRL_NO_SPECIAL);
 
 	if (be_vdev->mcast_primary) {
-		hal_tx_vdev_mcast_ctrl_set(hal_soc, vdev_id,
-					   HAL_TX_MCAST_CTRL_NO_SPECIAL);
-		hal_tx_vdev_mcast_ctrl_set(hal_soc, vdev_id + 128,
-					   HAL_TX_MCAST_CTRL_FW_EXCEPTION);
-		dp_mcast_mlo_iter_ptnr_soc(be_soc,
-					   dp_tx_mcast_mlo_reinject_routing_set,
-					   (void *)&be_vdev->mcast_primary);
 		dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 					    dp_mlo_mcast_reset_pri_mcast,
 					    (void *)&be_vdev->mcast_primary,
 					    DP_MOD_ID_TX_MCAST);
-	} else {
-		hal_tx_vdev_mcast_ctrl_set(hal_soc, vdev_id,
-					   HAL_TX_MCAST_CTRL_DROP);
 	}
+}
+
+static void dp_txrx_reset_mlo_mcast_primary_vdev_param_be(
+					struct dp_vdev *vdev,
+					cdp_config_param_type val)
+{
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+
+	be_vdev->mcast_primary = false;
+	vdev->mlo_vdev = false;
+	hal_tx_vdev_mcast_ctrl_set(vdev->pdev->soc->hal_soc,
+				   vdev->vdev_id,
+				   HAL_TX_MCAST_CTRL_FW_EXCEPTION);
 }
 
 /**
@@ -2105,7 +2103,13 @@ QDF_STATUS dp_txrx_get_vdev_mcast_param_be(struct dp_soc *soc,
 }
 #else
 static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
-					struct dp_vdev_be *be_vdev,
+					struct dp_vdev *vdev,
+					cdp_config_param_type val)
+{
+}
+
+static void dp_txrx_reset_mlo_mcast_primary_vdev_param_be(
+					struct dp_vdev *vdev,
 					cdp_config_param_type val)
 {
 }
@@ -2165,7 +2169,10 @@ QDF_STATUS dp_txrx_set_vdev_param_be(struct dp_soc *soc,
 			dp_tx_update_bank_profile(be_soc, be_vdev);
 		break;
 	case CDP_SET_MCAST_VDEV:
-		dp_txrx_set_mlo_mcast_primary_vdev_param_be(be_vdev, val);
+		dp_txrx_set_mlo_mcast_primary_vdev_param_be(vdev, val);
+		break;
+	case CDP_RESET_MLO_MCAST_VDEV:
+		dp_txrx_reset_mlo_mcast_primary_vdev_param_be(vdev, val);
 		break;
 	default:
 		dp_warn("invalid param %d", param);
@@ -2273,6 +2280,7 @@ dp_initialize_arch_ops_be_mcast_mlo(struct dp_arch_ops *arch_ops)
 {
 	arch_ops->dp_tx_mcast_handler = dp_tx_mlo_mcast_handler_be;
 	arch_ops->dp_rx_mcast_handler = dp_rx_mlo_igmp_handler;
+	arch_ops->dp_tx_is_mcast_primary = dp_tx_mlo_is_mcast_primary_be;
 }
 #else /* WLAN_MCAST_MLO */
 static inline void
