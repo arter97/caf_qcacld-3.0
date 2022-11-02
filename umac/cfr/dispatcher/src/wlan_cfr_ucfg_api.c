@@ -1176,7 +1176,8 @@ QDF_STATUS ucfg_cfr_rcc_dump_lut(struct wlan_objmgr_vdev *vdev)
 }
 
 static void cfr_set_filter(struct wlan_objmgr_pdev *pdev, bool enable,
-			   struct cdp_monitor_filter *filter_val)
+			   struct cdp_monitor_filter *filter_val,
+			   bool cfr_enable_monitor_mode)
 {
 	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
 
@@ -1184,8 +1185,8 @@ static void cfr_set_filter(struct wlan_objmgr_pdev *pdev, bool enable,
 
 	cdp_cfr_filter(wlan_psoc_get_dp_handle(psoc),
 		       wlan_objmgr_pdev_get_pdev_id(pdev),
-		       enable,
-		       filter_val);
+		       enable, filter_val,
+		       cfr_enable_monitor_mode);
 }
 
 #ifdef WLAN_ENH_CFR_ENABLE
@@ -1210,6 +1211,7 @@ QDF_STATUS ucfg_cfr_committed_rcc_config(struct wlan_objmgr_vdev *vdev)
 	struct wlan_objmgr_psoc *psoc = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct cdp_monitor_filter filter_val = {0};
+	bool cfr_enable_monitor_mode = false;
 
 	status = dev_sanity_check(vdev, &pdev, &pcfr);
 	if (status != QDF_STATUS_SUCCESS)
@@ -1224,6 +1226,9 @@ QDF_STATUS ucfg_cfr_committed_rcc_config(struct wlan_objmgr_vdev *vdev)
 	}
 
 	pcfr->rcc_param.vdev_id = wlan_vdev_get_id(vdev);
+
+	if (wlan_vdev_mlme_is_special_vdev(vdev))
+		cfr_enable_monitor_mode = true;
 
 	/*
 	 * If capture mode is valid, then Host:
@@ -1298,12 +1303,12 @@ QDF_STATUS ucfg_cfr_committed_rcc_config(struct wlan_objmgr_vdev *vdev)
 		if (!cdp_get_cfr_rcc(wlan_psoc_get_dp_handle(psoc),
 				    wlan_objmgr_pdev_get_pdev_id(pdev)))
 			tgt_cfr_start_lut_age_timer(pdev);
-		cfr_set_filter(pdev, 1, &filter_val);
+		cfr_set_filter(pdev, 1, &filter_val, cfr_enable_monitor_mode);
 	} else {
 		if (cdp_get_cfr_rcc(wlan_psoc_get_dp_handle(psoc),
 				    wlan_objmgr_pdev_get_pdev_id(pdev)))
 			tgt_cfr_stop_lut_age_timer(pdev);
-		cfr_set_filter(pdev, 0, &filter_val);
+		cfr_set_filter(pdev, 0, &filter_val, cfr_enable_monitor_mode);
 	}
 
 	/* Trigger wmi to start the TLV processing. */
