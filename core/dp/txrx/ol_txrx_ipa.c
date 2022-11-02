@@ -869,6 +869,8 @@ QDF_STATUS ol_txrx_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 		  "%s: Add Partial hdr: %s, "QDF_MAC_ADDR_FMT,
 		  __func__, ifname, QDF_MAC_ADDR_REF(mac_addr));
 
+	qdf_mem_zero(&in, sizeof(qdf_ipa_wdi_reg_intf_in_params_t));
+
 	qdf_mem_zero(&hdr_info, sizeof(qdf_ipa_wdi_hdr_info_t));
 	memcpy(&uc_tx_hdr, &ipa_uc_tx_hdr, OL_TXRX_IPA_UC_WLAN_TX_HDR_LEN);
 	qdf_ether_addr_copy(uc_tx_hdr.eth.h_source, mac_addr);
@@ -892,6 +894,7 @@ QDF_STATUS ol_txrx_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 	QDF_IPA_WDI_REG_INTF_IN_PARAMS_META_DATA(&in) =
 		htonl(session_id << 16);
 	QDF_IPA_WDI_REG_INTF_IN_PARAMS_META_DATA_MASK(&in) = htonl(0x00FF0000);
+	QDF_IPA_WDI_REG_INTF_IN_PARAMS_HANDLE(&in) = hdl;
 
 	/* IPV6 header */
 	if (is_ipv6_enabled) {
