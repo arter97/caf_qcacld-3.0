@@ -478,6 +478,31 @@ wlan_cm_disc_cont_after_rso_stop(struct wlan_objmgr_vdev *vdev,
 
 #ifdef WLAN_FEATURE_11BE
 /**
+ * wlan_cm_sta_set_chan_param() - set channel parameters for 802.11be sta
+ *
+ * @vdev: vdev
+ * @ch_freq: operating channel frequency
+ * @ori_bw: bandwidth information according to EHT operation IE
+ * @ori_punc: original puncture bitmap from EHT operation IE
+ * @ccfs0: EHT channel center frequency segment0 information
+ * @ccfs1: EHT channel center frequency segment1 information
+ * @chan_param: chan_param to be set
+ *
+ * ori_bw, ori_punc, ccfs0, ccfs1 are information from AP EHT operation IE
+ * chan_param->ch_width is the intersected channel width based on STA's
+ * capability. Complete chan_param including puncture will be set if
+ * it returns success.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_cm_sta_set_chan_param(struct wlan_objmgr_vdev *vdev,
+				      qdf_freq_t ch_freq,
+				      enum phy_ch_width ori_bw,
+				      uint16_t ori_punc,
+				      uint8_t ccfs0, uint8_t ccfs1,
+				      struct ch_params *chan_param);
+
+/**
  * wlan_cm_sta_update_puncture() - update puncture and channel width for sta
  * @vdev: vdev
  * @peer_mac: peer mac address

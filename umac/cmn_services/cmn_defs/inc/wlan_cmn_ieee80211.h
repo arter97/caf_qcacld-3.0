@@ -3940,6 +3940,7 @@ enum mlme_csa_event_ies_present_flag {
  * @switch_mode: switch mode
  * @sec_chan_offset: secondary channel offset
  * @new_ch_width: new channel width
+ * @new_punct_bitmap: new puncture bitmap based on new channel width
  * @new_ch_freq_seg1: channel center freq 1
  * @new_ch_freq_seg2: channel center freq 2
  * @ies_present_flag: BIT MAP of MLME_CSA_EVENT_IES_PRESENT_FLAG
@@ -3951,6 +3952,9 @@ struct csa_offload_params {
 	uint8_t switch_mode;
 	uint8_t sec_chan_offset;
 	enum phy_ch_width new_ch_width;
+#ifdef WLAN_FEATURE_11BE
+	uint16_t new_punct_bitmap;
+#endif
 	uint8_t new_op_class;
 	uint8_t new_ch_freq_seg1;
 	uint8_t new_ch_freq_seg2;
