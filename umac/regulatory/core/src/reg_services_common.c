@@ -9345,8 +9345,29 @@ reg_get_sp_eirp_for_punc_chans(struct wlan_objmgr_pdev *pdev,
 	int16_t min_psd = 0;
 	uint16_t afc_eirp_pwr = 0;
 	uint16_t non_punc_bw;
+	struct wlan_lmac_if_reg_tx_ops *reg_tx_ops;
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+
+	if (!psoc)
+		return 0;
+
+	reg_tx_ops = reg_get_psoc_tx_ops(psoc);
+
+	if (!reg_tx_ops->reg_get_min_psd)
+		return 0;
 
 	/* min_psd will be calculated here */
+	status = reg_tx_ops->reg_get_min_psd(pdev, freq, cen320,
+					     in_punc_pattern, bw,
+					     &min_psd);
+	if (status != QDF_STATUS_SUCCESS) {
+		reg_debug("Could not derive min_psd power for width %u, freq; %d, cen320: %d, in_punc: 0x%x\n",
+			  bw, freq, cen320, in_punc_pattern);
+		return 0;
+	}
 
 	non_punc_bw = reg_find_non_punctured_bw(bw, in_punc_pattern);
 

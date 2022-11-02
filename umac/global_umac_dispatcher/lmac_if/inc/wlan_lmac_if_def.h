@@ -1104,6 +1104,12 @@ struct wlan_lmac_if_reg_tx_ops {
 	QDF_STATUS (*unregister_afc_event_handler)
 				(struct wlan_objmgr_psoc *psoc, void *arg);
 	QDF_STATUS (*trigger_acs_for_afc)(struct wlan_objmgr_pdev *pdev);
+
+	QDF_STATUS (*reg_get_min_psd) (struct wlan_objmgr_pdev *pdev,
+				       qdf_freq_t primary_freq,
+				       qdf_freq_t cen320,
+				       uint16_t punc_pattern, uint16_t bw,
+				       int16_t *min_psd);
 #endif
 	bool (*is_chip_11be)(struct wlan_objmgr_psoc *psoc,
 			     uint16_t phy_id);
