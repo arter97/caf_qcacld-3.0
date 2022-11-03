@@ -2803,8 +2803,10 @@ wlan_hdd_cfg80211_do_acs_policy[QCA_WLAN_VENDOR_ATTR_ACS_MAX + 1] = {
 	[QCA_WLAN_VENDOR_ATTR_ACS_HT40_ENABLED] = { .type = NLA_FLAG },
 	[QCA_WLAN_VENDOR_ATTR_ACS_VHT_ENABLED] = { .type = NLA_FLAG },
 	[QCA_WLAN_VENDOR_ATTR_ACS_CHWIDTH] = { .type = NLA_U16 },
-	[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST] = { .type = NLA_UNSPEC },
-	[QCA_WLAN_VENDOR_ATTR_ACS_FREQ_LIST] = { .type = NLA_UNSPEC },
+	[QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST] = { .type = NLA_BINARY,
+				.len = sizeof(NLA_U8) * NUM_CHANNELS },
+	[QCA_WLAN_VENDOR_ATTR_ACS_FREQ_LIST] = { .type = NLA_BINARY,
+				.len = sizeof(NLA_U32) * NUM_CHANNELS },
 };
 
 int hdd_start_vendor_acs(struct hdd_adapter *adapter)
@@ -4189,8 +4191,8 @@ const struct nla_policy wlan_hdd_set_roam_param_policy[
 	[PARAM_NUM_BSSID] = {.type = NLA_U32},
 	[PARAM_RSSI_MODIFIER] = {.type = NLA_U32},
 	[PARAMS_NUM_BSSID] = {.type = NLA_U32},
-	[PARAM_ROAM_BSSID] = {.type = NLA_UNSPEC, .len = QDF_MAC_ADDR_SIZE},
-	[PARAM_SET_BSSID] = {.type = NLA_UNSPEC, .len = QDF_MAC_ADDR_SIZE},
+	[PARAM_ROAM_BSSID] = VENDOR_NLA_POLICY_MAC_ADDR,
+	[PARAM_SET_BSSID] = VENDOR_NLA_POLICY_MAC_ADDR,
 	[PARAM_SET_BSSID_HINT] = {.type = NLA_FLAG},
 	[PARAM_ROAM_CONTROL_CONFIG] = {.type = NLA_NESTED},
 };
@@ -6765,9 +6767,8 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 		.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_REORDER_TIMEOUT_BACKGROUND] = {
 		.type = NLA_U32},
-	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_BLOCKSIZE_PEER_MAC] = {
-		.type = NLA_UNSPEC,
-		.len = QDF_MAC_ADDR_SIZE},
+	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_BLOCKSIZE_PEER_MAC] =
+		VENDOR_NLA_POLICY_MAC_ADDR,
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_RX_BLOCKSIZE_WINLIMIT] = {
 		.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_BEACON_MISS_THRESHOLD_24] = {
@@ -6812,9 +6813,7 @@ const struct nla_policy wlan_hdd_wifi_config_policy[
 	[RX_REORDER_TIMEOUT_VIDEO] = {.type = NLA_U32},
 	[RX_REORDER_TIMEOUT_BESTEFFORT] = {.type = NLA_U32},
 	[RX_REORDER_TIMEOUT_BACKGROUND] = {.type = NLA_U32},
-	[RX_BLOCKSIZE_PEER_MAC] = {
-		.type = NLA_UNSPEC,
-		.len = QDF_MAC_ADDR_SIZE},
+	[RX_BLOCKSIZE_PEER_MAC] = VENDOR_NLA_POLICY_MAC_ADDR,
 	[RX_BLOCKSIZE_WINLIMIT] = {.type = NLA_U32},
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_LISTEN_INTERVAL] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_CONFIG_LRO] = {.type = NLA_U8 },
@@ -22779,7 +22778,8 @@ wlan_hdd_cfg80211_update_ft_ies(struct wiphy *wiphy,
 }
 #endif
 
-#ifdef CFG80211_EXTERNAL_DH_UPDATE_SUPPORT
+#if defined(CFG80211_EXTERNAL_DH_UPDATE_SUPPORT) || \
+(LINUX_VERSION_CODE > KERNEL_VERSION(5, 2, 0))
 /**
  * __wlan_hdd_cfg80211_update_owe_info() - update OWE info
  * @wiphy: Pointer to wiphy
@@ -24453,7 +24453,8 @@ void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw)
 }
 #endif
 
-#ifdef CFG80211_EXTERNAL_DH_UPDATE_SUPPORT
+#if defined(CFG80211_EXTERNAL_DH_UPDATE_SUPPORT) || \
+(LINUX_VERSION_CODE > KERNEL_VERSION(5, 2, 0))
 void hdd_send_update_owe_info_event(struct hdd_adapter *adapter,
 				    uint8_t sta_addr[],
 				    uint8_t *owe_ie,
@@ -24568,7 +24569,8 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 #if defined(KERNEL_SUPPORT_11R_CFG80211)
 	.update_ft_ies = wlan_hdd_cfg80211_update_ft_ies,
 #endif
-#ifdef CFG80211_EXTERNAL_DH_UPDATE_SUPPORT
+#if defined(CFG80211_EXTERNAL_DH_UPDATE_SUPPORT) || \
+(LINUX_VERSION_CODE > KERNEL_VERSION(5, 2, 0))
 	.update_owe_info = wlan_hdd_cfg80211_update_owe_info,
 #endif
 #ifdef FEATURE_WLAN_TDLS
