@@ -4425,6 +4425,7 @@ BUILD_TAG = "cld:$(CLD_IDS); cmn:$(CMN_IDS); dev:$(DEVNAME)"
 ccflags-y += -DBUILD_TAG=\"$(BUILD_TAG)\"
 endif
 
+ccflags-y += -Werror=frame-larger-than=4096
 # Module information used by KBuild framework
 obj-$(CONFIG_QCA_CLD_WLAN) += $(MODNAME).o
 ifeq ($(CONFIG_WLAN_RESIDENT_DRIVER), y)

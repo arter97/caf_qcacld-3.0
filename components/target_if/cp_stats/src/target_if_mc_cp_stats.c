@@ -910,7 +910,7 @@ static int target_if_mc_cp_stats_stats_event_handler(ol_scn_t scn,
 
 	ev = qdf_mem_malloc(sizeof(*ev));
 	if (!ev) {
-		cp_stats_err("");
+		cp_stats_err("malloc error");
 		return -EINVAL;
 	}
 

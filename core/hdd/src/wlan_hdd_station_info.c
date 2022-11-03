@@ -495,9 +495,15 @@ static void hdd_get_max_tx_bitrate(struct hdd_context *hdd_ctx,
 				sinfo.signal, tx_rate_flags, tx_mcs_index,
 				my_tx_rate, tx_nss)) {
 		hdd_sta_ctx->cache_conn_info.max_tx_bitrate = sinfo.txrate;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 		hdd_debug("Reporting max tx rate flags %d mcs %d nss %d bw %d",
 			  sinfo.txrate.flags, sinfo.txrate.mcs,
 			  sinfo.txrate.nss, sinfo.txrate.bw);
+#else
+		hdd_debug("Reporting max tx rate flags %d mcs %d nss %d",
+			  sinfo.txrate.flags, sinfo.txrate.mcs,
+			  sinfo.txrate.nss);
+#endif
 	}
 }
 
