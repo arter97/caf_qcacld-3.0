@@ -313,11 +313,7 @@ dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 	tx_exc_param.sec_type = vdev->sec_type;
 	tx_exc_param.tx_encap_type = vdev->tx_encap_type;
 	tx_exc_param.peer_id = HTT_INVALID_PEER;
-	/*
-	 * We are taking one extra reference to make sure
-	 * buffer won't freed before sending all the frames.
-	 */
-	qdf_nbuf_ref(nbuf);
+
 	dms_me.soc_hdl = soc_hdl;
 	dms_me.vdev = vdev;
 	dms_me.nbuf = nbuf;
@@ -332,10 +328,9 @@ dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_MCAST2UCAST);
 
 	/* only bss peer is present, free the buffer*/
-	if (!dms_me.num_pkt_sent) {
-		qdf_nbuf_free(nbuf);
+	if (!dms_me.num_pkt_sent)
 		return 1;
-	}
+
 	return dms_me.num_pkt_sent;
 }
 
