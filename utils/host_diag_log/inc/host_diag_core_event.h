@@ -950,6 +950,7 @@ enum wifi_connectivity_events {
  * @WIFI_POWER_EVENT_WAKELOCK_SAP_D3_WOW: Wakelock for SAP D3 WOW max clients
  * @WIFI_POWER_EVENT_WAKELOCK_GO_D3_WOW: Wakelock for GO D3 WOW max clients
  * @WIFI_POWER_EVENT_WAKELOCK_RTPM_TPUT_POLICY: Wakelock for RTPM Tput policy
+ * @WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE: Dynamic mac addr update
  *
  * Indicates the reason for which the wakelock was taken/released
  */
@@ -984,6 +985,7 @@ enum wake_lock_reason {
 	WIFI_POWER_EVENT_WAKELOCK_SAP_D3_WOW,
 	WIFI_POWER_EVENT_WAKELOCK_GO_D3_WOW,
 	WIFI_POWER_EVENT_WAKELOCK_RTPM_TPUT_POLICY,
+	WIFI_POWER_EVENT_WAKELOCK_DYN_MAC_ADDR_UPDATE,
 };
 
 /* The length of interface name should >= IFNAMSIZ */
