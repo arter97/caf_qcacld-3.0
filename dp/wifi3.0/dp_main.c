@@ -9017,7 +9017,7 @@ static int dp_get_opmode(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 	int opmode;
 
 	if (!vdev) {
-		dp_err("vdev for id %d is NULL", vdev_id);
+		dp_err_rl("vdev for id %d is NULL", vdev_id);
 		return -EINVAL;
 	}
 	opmode = vdev->opmode;

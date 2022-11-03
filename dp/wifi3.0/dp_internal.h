@@ -4125,8 +4125,7 @@ void dp_tx_send_pktlog(struct dp_soc *soc, struct dp_pdev *pdev,
 	if (qdf_unlikely(packetdump_cb) &&
 	    dp_tx_frm_std == tx_desc->frm_type) {
 		packetdump_cb((ol_txrx_soc_handle)soc, pdev->pdev_id,
-			      QDF_NBUF_CB_TX_VDEV_CTX(nbuf),
-			      nbuf, status, QDF_TX_DATA_PKT);
+			      tx_desc->vdev_id, nbuf, status, QDF_TX_DATA_PKT);
 	}
 }
 
