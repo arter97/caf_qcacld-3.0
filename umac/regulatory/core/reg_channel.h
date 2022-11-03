@@ -29,6 +29,7 @@
 #include <wlan_reg_channel_api.h>
 
 #define NEXT_20_CH_OFFSET 20
+#define SP_AP_AND_CLIENT_POWER_DIFF_IN_DBM 6
 
 #ifdef CONFIG_HOST_FIND_CHAN
 
@@ -295,6 +296,24 @@ reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				qdf_freq_t chan_freq,
 				bool *is_psd, uint16_t *reg_eirp,
 				uint16_t *reg_psd);
+
+#ifdef CONFIG_AFC_SUPPORT
+/**
+ * reg_get_client_psd_for_ap() - Get the client PSD for AP
+ * @pdev: Pointer to pdev.
+ * @ap_pwr_type: AP power type
+ * @client_type: Client type
+ * @chan_freq: Channel frequency
+ * @reg_psd: Pointer to PSD
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS reg_get_client_psd_for_ap(struct wlan_objmgr_pdev *pdev,
+				     enum reg_6g_ap_type ap_pwr_type,
+				     enum reg_6g_client_type client_type,
+				     qdf_freq_t chan_freq,
+				     uint16_t *reg_psd);
+#endif
 
 /**
  * reg_is_6g_domain_jp() - Check if current 6 GHz regdomain is a JP domain
