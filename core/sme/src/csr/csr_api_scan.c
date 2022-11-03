@@ -508,6 +508,7 @@ static void csr_purge_channel_power(struct mac_context *mac,
 	 * Remove the channel sets from the learned list and put them
 	 * in the free list
 	 */
+	csr_ll_lock(pChannelList);
 	while ((pEntry = csr_ll_remove_head(pChannelList,
 					    LL_ACCESS_NOLOCK)) != NULL) {
 		pChannelSet = GET_BASE_ADDR(pEntry,
@@ -515,6 +516,7 @@ static void csr_purge_channel_power(struct mac_context *mac,
 		if (pChannelSet)
 			qdf_mem_free(pChannelSet);
 	}
+	csr_ll_unlock(pChannelList);
 }
 
 /*
