@@ -2606,7 +2606,9 @@ struct hal_hw_srng_config hw_srng_table_kiwi[] = {
 	},
 	{ /* RXDMA_BUF */
 		.start_ring_id = HAL_SRNG_WMAC1_SW2RXDMA0_BUF0,
-#ifdef IPA_OFFLOAD
+#if defined(IPA_OFFLOAD) && defined(FEATURE_DIRECT_LINK)
+		.max_rings = 4,
+#elif defined(IPA_OFFLOAD) || defined(FEATURE_DIRECT_LINK)
 		.max_rings = 3,
 #else
 		.max_rings = 2,

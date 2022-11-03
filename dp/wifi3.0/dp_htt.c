@@ -573,6 +573,13 @@ int htt_srng_setup(struct htt_soc *soc, int mac_id,
 			(lmac_id * HAL_MAX_RINGS_PER_LMAC))) {
 			htt_ring_id = HTT_RXDMA_HOST_BUF_RING;
 			htt_ring_type = HTT_SW_TO_HW_RING;
+#ifdef FEATURE_DIRECT_LINK
+		} else if (srng_params.ring_id ==
+			   (HAL_SRNG_WMAC1_RX_DIRECT_LINK_SW_REFILL_RING +
+			    (lmac_id * HAL_MAX_RINGS_PER_LMAC))) {
+			htt_ring_id = HTT_LPASS_TO_FW_RXBUF_RING;
+			htt_ring_type = HTT_SW_TO_SW_RING;
+#endif
 		} else {
 			QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
 				   "%s: Ring %d currently not supported",

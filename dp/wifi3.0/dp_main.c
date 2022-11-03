@@ -17157,3 +17157,54 @@ static QDF_STATUS dp_pdev_init_wifi3(struct cdp_soc_t *txrx_soc,
 	return dp_pdev_init(txrx_soc, htc_handle, qdf_osdev, pdev_id);
 }
 
+#ifdef FEATURE_DIRECT_LINK
+struct dp_srng *dp_setup_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
+						 uint8_t pdev_id)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_pdev *pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+
+	if (!pdev) {
+		dp_err("DP pdev is NULL");
+		return NULL;
+	}
+
+	if (dp_srng_alloc(soc, &pdev->rx_refill_buf_ring4,
+			  RXDMA_BUF, DIRECT_LINK_REFILL_RING_ENTRIES, false)) {
+		dp_err("SRNG alloc failed for rx_refill_buf_ring4");
+		return NULL;
+	}
+
+	if (dp_srng_init(soc, &pdev->rx_refill_buf_ring4,
+			 RXDMA_BUF, DIRECT_LINK_REFILL_RING_IDX, 0)) {
+		dp_err("SRNG init failed for rx_refill_buf_ring4");
+		dp_srng_free(soc, &pdev->rx_refill_buf_ring4);
+		return NULL;
+	}
+
+	if (htt_srng_setup(soc->htt_handle, pdev_id,
+			   pdev->rx_refill_buf_ring4.hal_srng, RXDMA_BUF)) {
+		dp_srng_deinit(soc, &pdev->rx_refill_buf_ring4, RXDMA_BUF,
+			       DIRECT_LINK_REFILL_RING_IDX);
+		dp_srng_free(soc, &pdev->rx_refill_buf_ring4);
+		return NULL;
+	}
+
+	return &pdev->rx_refill_buf_ring4;
+}
+
+void dp_destroy_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
+					uint8_t pdev_id)
+{
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_pdev *pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+
+	if (!pdev) {
+		dp_err("DP pdev is NULL");
+		return;
+	}
+
+	dp_srng_deinit(soc, &pdev->rx_refill_buf_ring4, RXDMA_BUF, 0);
+	dp_srng_free(soc, &pdev->rx_refill_buf_ring4);
+}
+#endif

@@ -46,6 +46,19 @@
 
 #define INVALID_WBM_RING_NUM 0xF
 
+#ifdef FEATURE_DIRECT_LINK
+#define DIRECT_LINK_REFILL_RING_ENTRIES 64
+#ifdef IPA_OFFLOAD
+#ifdef IPA_WDI3_VLAN_SUPPORT
+#define DIRECT_LINK_REFILL_RING_IDX     4
+#else
+#define DIRECT_LINK_REFILL_RING_IDX     3
+#endif
+#else
+#define DIRECT_LINK_REFILL_RING_IDX     2
+#endif
+#endif
+
 /* struct htt_dbgfs_cfg - structure to maintain required htt data
  * @msg_word: htt msg sent to upper layer
  * @m: qdf debugfs file pointer
@@ -4256,4 +4269,40 @@ void dp_rx_err_send_pktlog(struct dp_soc *soc, struct dp_pdev *pdev,
  * return: None
  */
 void dp_pdev_update_fast_rx_flag(struct dp_soc *soc, struct dp_pdev *pdev);
+
+#ifdef FEATURE_DIRECT_LINK
+/*
+ * dp_setup_direct_link_refill_ring(): Setup direct link refill ring for pdev
+ * @soc_hdl: DP SOC handle
+ * @pdev_id: pdev id
+ *
+ * Return: Handle to SRNG
+ */
+struct dp_srng *dp_setup_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
+						 uint8_t pdev_id);
+
+/*
+ * dp_destroy_direct_link_refill_ring(): Destroy direct link refill ring for
+ *  pdev
+ * @soc_hdl: DP SOC handle
+ * @pdev_id: pdev id
+ *
+ * Return: None
+ */
+void dp_destroy_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
+					uint8_t pdev_id);
+#else
+static inline
+struct dp_srng *dp_setup_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
+						 uint8_t pdev_id)
+{
+	return NULL;
+}
+
+static inline
+void dp_destroy_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
+					uint8_t pdev_id)
+{
+}
+#endif
 #endif /* #ifndef _DP_INTERNAL_H_ */

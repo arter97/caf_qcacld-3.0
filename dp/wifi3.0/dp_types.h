@@ -2948,6 +2948,11 @@ struct dp_pdev {
 	struct dp_srng rx_refill_buf_ring3;
 #endif
 
+#ifdef FEATURE_DIRECT_LINK
+	/* Fourth ring used to replenish rx buffers */
+	struct dp_srng rx_refill_buf_ring4;
+#endif
+
 	/* Empty ring used by firmware to post rx buffers to the MAC */
 	struct dp_srng rx_mac_buf_ring[MAX_RX_MAC_RINGS];
 
