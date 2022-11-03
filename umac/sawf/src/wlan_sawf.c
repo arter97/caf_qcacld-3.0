@@ -341,6 +341,7 @@ static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 	struct wlan_objmgr_pdev *pdev;
 	struct vdev_osif_priv *osif_vdev;
 	struct sk_buff *vendor_event;
+	uint8_t ac = 0;
 
 	vdev = wlan_peer_get_vdev(peer);
 	if (!vdev) {
@@ -402,6 +403,13 @@ static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 		goto error_cleanup;
 	}
 
+	ac = TID_TO_WME_AC(itr->tid);
+	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_AC,
+		       ac)) {
+		qdf_err("nla put fail");
+		goto error_cleanup;
+	}
+
 	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
 
 	return;
@@ -430,7 +438,9 @@ static void wlan_sawf_get_psoc_peer(struct wlan_objmgr_psoc *psoc,
 
 void wlan_sawf_notify_breach(uint8_t *mac_addr,
 			     uint8_t svc_id,
-			     uint8_t param, bool set_clear)
+			     uint8_t param,
+			     bool set_clear,
+			     uint8_t tid)
 {
 	struct psoc_peer_iter itr = {0};
 
@@ -438,6 +448,7 @@ void wlan_sawf_notify_breach(uint8_t *mac_addr,
 	itr.set_clear = set_clear;
 	itr.svc_id = svc_id;
 	itr.param = param;
+	itr.tid = tid;
 
 	wlan_objmgr_iterate_psoc_list(wlan_sawf_get_psoc_peer,
 				      &itr, WLAN_SAWF_ID);
