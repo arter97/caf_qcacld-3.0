@@ -545,7 +545,7 @@ endif
 endif
 
 #Flag to enable SMMU S1 support
-ifeq (y, $(filter y, $(CONFIG_ARCH_SDXPRAIRIE) $(CONFIG_ARCH_SA515)))
+ifeq (y, $(filter y, $(CONFIG_ARCH_SDXPRAIRIE) $(CONFIG_ARCH_SA515) $(CONFIG_ARCH_SA515M)))
 ifeq ($(CONFIG_IPA_OFFLOAD), y)
 CONFIG_ENABLE_SMMU_S1_TRANSLATION := y
 endif
