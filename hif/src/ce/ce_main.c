@@ -1133,7 +1133,7 @@ static struct service_to_pipe target_service_to_ce_map_kiwi[] = {
 	{ WMI_DATA_VI_SVC, PIPEDIR_IN, 2, },
 	{ WMI_CONTROL_SVC, PIPEDIR_OUT, 3, },
 	{ WMI_CONTROL_SVC, PIPEDIR_IN, 2, },
-#ifdef FEATURE_XPAN
+#ifdef FEATURE_DIRECT_LINK
 	{ HTC_CTRL_RSVD_SVC, PIPEDIR_OUT, 4, },
 #else
 	{ HTC_CTRL_RSVD_SVC, PIPEDIR_OUT, 0, },
@@ -1144,7 +1144,7 @@ static struct service_to_pipe target_service_to_ce_map_kiwi[] = {
 #ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7
 	{ WMI_CONTROL_DIAG_SVC, PIPEDIR_IN, 7, },
 #endif
-#ifdef FEATURE_XPAN
+#ifdef FEATURE_DIRECT_LINK
 	{ LPASS_DATA_MSG_SVC, PIPEDIR_OUT, 0, },
 	{ LPASS_DATA_MSG_SVC, PIPEDIR_IN, 5, },
 #endif
@@ -5304,4 +5304,23 @@ void hif_log_ce_info(struct hif_softc *scn, uint8_t *data,
 	qdf_mem_copy(data + *offset, &info, size);
 	*offset = *offset + size;
 }
+
+#ifdef FEATURE_DIRECT_LINK
+QDF_STATUS
+hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
+			   uint64_t addr, uint32_t data)
+{
+	struct hif_softc *hif_ctx = HIF_GET_SOFTC(scn);
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+
+	if (hif_state->ce_services->ce_set_irq_config_by_ceid)
+		return hif_state->ce_services->ce_set_irq_config_by_ceid(
+									hif_ctx,
+									ce_id,
+									addr,
+									data);
+
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif

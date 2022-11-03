@@ -571,4 +571,95 @@ static inline void hal_srng_hw_reg_offset_init_generic(struct hal_soc *hal_soc)
 #endif
 }
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * hal_srng_set_msi_config() - Set the MSI config and enable the SRNG
+ * @hal_ring_hdl: srng handle
+ * @params: ring parameters
+ *
+ * Return: QDF status
+ */
+static inline
+QDF_STATUS hal_srng_set_msi_config(hal_ring_handle_t ring_hdl,
+				   void *params)
+{
+	struct hal_srng *srng = (struct hal_srng *)ring_hdl;
+	struct hal_srng_params *ring_params = (struct hal_srng_params *)params;
+	uint32_t reg_val;
+
+	srng->intr_timer_thres_us = ring_params->intr_timer_thres_us;
+	srng->intr_batch_cntr_thres_entries =
+				ring_params->intr_batch_cntr_thres_entries;
+	srng->msi_addr = ring_params->msi_addr;
+	srng->msi_data = ring_params->msi_data;
+
+	if (srng->ring_dir == HAL_SRNG_SRC_RING) {
+		reg_val = 0;
+
+		SRNG_SRC_REG_WRITE(srng, MSI1_BASE_LSB,
+				   srng->msi_addr & 0xffffffff);
+		reg_val = SRNG_SM(SRNG_SRC_FLD(MSI1_BASE_MSB, ADDR),
+				  (uint64_t)(srng->msi_addr) >> 32) |
+				  SRNG_SM(SRNG_SRC_FLD(MSI1_BASE_MSB,
+						       MSI1_ENABLE), 1);
+		SRNG_SRC_REG_WRITE(srng, MSI1_BASE_MSB, reg_val);
+		SRNG_SRC_REG_WRITE(srng, MSI1_DATA,
+				   qdf_cpu_to_le32(srng->msi_data));
+
+		reg_val = 0;
+
+		if (srng->intr_timer_thres_us) {
+			reg_val |= SRNG_SM(SRNG_SRC_FLD(CONSUMER_INT_SETUP_IX0,
+				INTERRUPT_TIMER_THRESHOLD),
+				srng->intr_timer_thres_us);
+		}
+
+		if (srng->intr_batch_cntr_thres_entries) {
+			reg_val |= SRNG_SM(SRNG_SRC_FLD(CONSUMER_INT_SETUP_IX0,
+				BATCH_COUNTER_THRESHOLD),
+				srng->intr_batch_cntr_thres_entries *
+				srng->entry_size);
+		}
+		SRNG_SRC_REG_WRITE(srng, CONSUMER_INT_SETUP_IX0, reg_val);
+	} else {
+		reg_val = 0;
+
+		SRNG_DST_REG_WRITE(srng, MSI1_BASE_LSB,
+				   srng->msi_addr & 0xffffffff);
+		reg_val = SRNG_SM(SRNG_DST_FLD(MSI1_BASE_MSB, ADDR),
+				  (uint64_t)(srng->msi_addr) >> 32) |
+				  SRNG_SM(SRNG_DST_FLD(MSI1_BASE_MSB,
+						       MSI1_ENABLE), 1);
+		SRNG_DST_REG_WRITE(srng, MSI1_BASE_MSB, reg_val);
+		SRNG_DST_REG_WRITE(srng, MSI1_DATA,
+				   qdf_cpu_to_le32(srng->msi_data));
+
+		reg_val = 0;
+
+		if (srng->intr_timer_thres_us) {
+			reg_val |= SRNG_SM(SRNG_DST_FLD(PRODUCER_INT_SETUP,
+				INTERRUPT_TIMER_THRESHOLD),
+				srng->intr_timer_thres_us >> 3);
+		}
+
+		if (srng->intr_batch_cntr_thres_entries) {
+			reg_val |= SRNG_SM(SRNG_DST_FLD(PRODUCER_INT_SETUP,
+				BATCH_COUNTER_THRESHOLD),
+				srng->intr_batch_cntr_thres_entries *
+				srng->entry_size);
+		}
+
+		SRNG_DST_REG_WRITE(srng, PRODUCER_INT_SETUP, reg_val);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline
+QDF_STATUS hal_srng_set_msi_config(hal_ring_handle_t ring_hdl,
+				   void *params)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif /* HAL_GENERIC_API_H_ */

@@ -1097,6 +1097,64 @@ int ce_get_index_info_srng(struct hif_softc *scn, void *ce_state,
 }
 #endif
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * ce_set_srng_msi_irq_config_by_ceid(): Set srng MSI irq configuration for CE
+ *  given by id
+ * @scn: HIF Context
+ * @ce_state: CE opaque handle
+ * @info: CE info
+ *
+ * Return: 0 for success and non zero for failure
+ */
+static QDF_STATUS
+ce_set_srng_msi_irq_config_by_ceid(struct hif_softc *scn, uint8_t ce_id,
+				   uint64_t addr, uint32_t data)
+{
+	struct CE_state *ce_state;
+	hal_ring_handle_t ring_hdl;
+	struct hal_srng_params ring_params = {0};
+
+	ce_state = scn->ce_id_to_state[ce_id];
+	if (!ce_state)
+		return QDF_STATUS_E_NOSUPPORT;
+
+	ring_params.msi_addr = addr;
+	ring_params.msi_data = data;
+
+	if (ce_state->src_ring) {
+		ring_hdl = ce_state->src_ring->srng_ctx;
+
+		ring_params.intr_timer_thres_us = 0;
+		ring_params.intr_batch_cntr_thres_entries = 1;
+		ring_params.prefetch_timer = HAL_SRNG_PREFETCH_TIMER;
+	} else if (ce_state->dest_ring) {
+		ring_hdl = ce_state->status_ring->srng_ctx;
+
+		ce_status_ring_config_int_threshold(scn, &ring_params);
+
+		hal_srng_set_msi_irq_config(scn->hal_soc, ring_hdl,
+					    &ring_params);
+
+		if (ce_is_status_ring_timer_thresh_war_needed()) {
+			ce_srng_initialize_dest_timer_interrupt_war(
+					ce_state->dest_ring, &ring_params);
+		} else {
+			ce_srng_initialize_dest_ring_thresh(ce_state->dest_ring,
+							    &ring_params);
+		}
+		ring_params.prefetch_timer = HAL_SRNG_PREFETCH_TIMER;
+		ring_hdl = ce_state->dest_ring->srng_ctx;
+	} else {
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	hal_srng_set_msi_irq_config(scn->hal_soc, ring_hdl, &ring_params);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static struct ce_ops ce_service_srng = {
 	.ce_get_desc_size = ce_get_desc_size_srng,
 	.ce_ring_setup = ce_ring_setup_srng,
@@ -1121,6 +1179,9 @@ static struct ce_ops ce_service_srng = {
 #ifdef HIF_CE_LOG_INFO
 	.ce_get_index_info =
 		ce_get_index_info_srng,
+#endif
+#ifdef FEATURE_DIRECT_LINK
+	.ce_set_irq_config_by_ceid = ce_set_srng_msi_irq_config_by_ceid,
 #endif
 };
 

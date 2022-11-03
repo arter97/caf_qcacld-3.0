@@ -2437,4 +2437,25 @@ QDF_STATUS hif_unregister_umac_reset_handler(struct hif_opaque_softc *hif_scn)
 
 #endif /* DP_UMAC_HW_RESET_SUPPORT */
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * hif_set_irq_config_by_ceid() - Set irq configuration for CE given by id
+ * @scn: hif opaque handle
+ * @ce_id: CE id
+ * @addr: irq trigger address
+ * @data: irq trigger data
+ *
+ * Return: QDF status
+ */
+QDF_STATUS
+hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
+			   uint64_t addr, uint32_t data);
+#else
+static inline QDF_STATUS
+hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
+			   uint64_t addr, uint32_t data)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* _HIF_H_ */

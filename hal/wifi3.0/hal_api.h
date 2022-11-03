@@ -3387,4 +3387,33 @@ uint16_t hal_srng_dst_get_hpidx(hal_ring_handle_t hal_ring_hdl)
 
 	return hp / srng->entry_size;
 }
+
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * hal_srng_set_msi_irq_config() - Set the MSI irq configuration for srng
+ * @hal_soc_hdl: hal soc handle
+ * @hal_ring_hdl: srng handle
+ * @addr: MSI address
+ * @data: MSI data
+ *
+ * Return: QDF status
+ */
+static inline QDF_STATUS
+hal_srng_set_msi_irq_config(hal_soc_handle_t hal_soc_hdl,
+			    hal_ring_handle_t hal_ring_hdl,
+			    struct hal_srng_params *ring_params)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	return hal_soc->ops->hal_srng_set_msi_config(hal_ring_hdl, ring_params);
+}
+#else
+static inline QDF_STATUS
+hal_srng_set_msi_irq_config(hal_soc_handle_t hal_soc_hdl,
+			    hal_ring_handle_t hal_ring_hdl,
+			    struct hal_srng_params *ring_params)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+#endif
 #endif /* _HAL_APIH_ */

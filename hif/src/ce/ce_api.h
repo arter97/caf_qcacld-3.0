@@ -597,6 +597,11 @@ struct ce_ops {
 			    struct pld_shadow_reg_v3_cfg **shadow_config,
 			    int *num_shadow_registers_configured);
 #endif
+#ifdef FEATURE_DIRECT_LINK
+	QDF_STATUS (*ce_set_irq_config_by_ceid)(struct hif_softc *scn,
+						uint8_t ce_id, uint64_t addr,
+						uint32_t data);
+#endif
 };
 
 int hif_ce_bus_early_suspend(struct hif_softc *scn);

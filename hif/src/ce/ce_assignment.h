@@ -1573,8 +1573,9 @@ static struct CE_pipe_config target_ce_config_wlan_qca6750[] = {
 #define KIWI_CE_COUNT 9
 static struct CE_attr host_ce_config_wlan_kiwi[] = {
 	/* host->target HTC control and raw streams */
-#ifdef FEATURE_XPAN
-	{ /* CE0 */ CE_ATTR_FLAGS, 0, 8, 2048, 0, NULL,},
+#ifdef FEATURE_DIRECT_LINK
+	{ /* CE0 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 8, 2048, 0,
+	 NULL,},
 #else
 	{ /* CE0 */ CE_ATTR_FLAGS, 0, 16, 2048, 0, NULL,},
 #endif
@@ -1591,8 +1592,9 @@ static struct CE_attr host_ce_config_wlan_kiwi[] = {
 	/* target -> host PKTLOG */
 	{ /* CE5 */ CE_ATTR_FLAGS, 0, 0, 2048, 512, NULL,},
 #else
-#ifdef FEATURE_XPAN
-	{ /* CE5 */ CE_ATTR_FLAGS, 0, 0, 256, 32, NULL,},
+#ifdef FEATURE_DIRECT_LINK
+	{ /* CE5 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 0, 256, 32,
+	 NULL,},
 #else
 	{ /* CE5 */ CE_ATTR_FLAGS, 0, 0, 2048, 0, NULL,},
 #endif
@@ -1632,7 +1634,7 @@ static struct CE_pipe_config target_ce_config_wlan_kiwi[] = {
 	/* Target -> host PKTLOG */
 	{ /* CE5 */ 5, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
 #else
-#ifdef FEATURE_XPAN
+#ifdef FEATURE_DIRECT_LINK
 	{ /* CE5 */ 5, PIPEDIR_IN,  16, 256, CE_ATTR_FLAGS, 0,},
 #else
 	{ /* CE5 */ 5, PIPEDIR_IN,  0, 2048, CE_ATTR_FLAGS, 0,},
