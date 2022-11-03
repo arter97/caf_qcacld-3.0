@@ -1783,8 +1783,8 @@ static uint8_t *wmi_id_to_name(uint32_t wmi_command)
 
 static inline void wmi_log_cmd_id(uint32_t cmd_id, uint32_t tag)
 {
-	wmi_debug("Send WMI command:%s command_id:%d htc_tag:%d",
-		 wmi_id_to_name(cmd_id), cmd_id, tag);
+	wmi_nofl_debug("Send cmd %s(0x%x) tag:%d",
+		       wmi_id_to_name(cmd_id), cmd_id, tag);
 }
 
 /**
