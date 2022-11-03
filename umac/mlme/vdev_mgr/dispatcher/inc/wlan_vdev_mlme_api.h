@@ -318,10 +318,10 @@ wlan_vdev_mlme_get_is_mlo_vdev(struct wlan_objmgr_psoc *psoc,
 #ifdef WLAN_FEATURE_SR
 /**
  * wlan_mlme_update_sr_data() - Updates SR values
- *
  * @vdev: Object manager VDEV object
  * @val: SR value
- * @pd_threshold: pd threshold sent by userspace
+ * @srg_pd_threshold: SRG PD threshold sent by userspace
+ * @non_srg_pd_threshold: NON SRG PD threshold sent by userspace
  * @is_sr_enable: SR enable/disable from userspace
  *
  * API to Update SR value based on AP advertisement and provided by userspace
@@ -330,11 +330,13 @@ wlan_vdev_mlme_get_is_mlo_vdev(struct wlan_objmgr_psoc *psoc,
  */
 void
 wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
-			 int32_t pd_threshold, bool is_sr_enable);
+			 int32_t srg_pd_threshold, int32_t non_srg_pd_threshold,
+			 bool is_sr_enable);
 #else
 static inline void
 wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
-			 int32_t pd_threshold, bool is_sr_enable)
+			 int32_t srg_pd_threshold, int32_t non_srg_pd_threshold,
+			 bool is_sr_enable)
 {}
 #endif
 #endif

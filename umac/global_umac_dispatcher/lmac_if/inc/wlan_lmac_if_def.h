@@ -1490,7 +1490,8 @@ struct wlan_lmac_if_spatial_reuse_tx_ops {
 	QDF_STATUS(*target_if_set_sr_enable_disable)(
 				struct wlan_objmgr_vdev *vdev,
 				struct wlan_objmgr_pdev *pdev,
-				bool is_sr_enable, int32_t pd_threshold);
+				bool is_sr_enable, int32_t srg_pd_threshold,
+				int32_t non_srg_pd_threshold);
 };
 #endif
 

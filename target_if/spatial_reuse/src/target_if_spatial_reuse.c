@@ -174,18 +174,19 @@ spatial_reuse_send_pd_threshold(struct wlan_objmgr_pdev *pdev,
 
 /**
  * spatial_reuse_set_sr_enable_disable: To send wmi command to enable/disable SR
- *
  * @vdev: object manager vdev
  * @pdev: object manager pdev
  * @is_sr_enable: sr enable/disable
- * @pd_threshold: pd threshold
+ * @srg_pd_threshold: SRG pd threshold
+ * @non_srg_pd_threshold: NON-SRG pd threshold
  *
  * Return: Success/Failure
  */
 static QDF_STATUS
 spatial_reuse_set_sr_enable_disable(struct wlan_objmgr_vdev *vdev,
 				    struct wlan_objmgr_pdev *pdev,
-				    bool is_sr_enable, int32_t pd_threshold)
+				    bool is_sr_enable, int32_t srg_pd_threshold,
+				    int32_t non_srg_pd_threshold)
 {
 	uint32_t val = 0;
 	uint8_t sr_ctrl;
@@ -201,7 +202,8 @@ spatial_reuse_set_sr_enable_disable(struct wlan_objmgr_vdev *vdev,
 	    (sr_ctrl & NON_SRG_OFFSET_PRESENT)) ||
 	    (sr_ctrl & SRG_INFO_PRESENT)) {
 		if (is_sr_enable) {
-			wlan_mlme_update_sr_data(vdev, &val, pd_threshold,
+			wlan_mlme_update_sr_data(vdev, &val, srg_pd_threshold,
+						 non_srg_pd_threshold,
 						 is_sr_enable);
 			wlan_vdev_obj_lock(vdev);
 			wlan_vdev_mlme_set_he_spr_enabled(vdev, true);

@@ -400,47 +400,50 @@ wlan_vdev_mlme_get_is_mlo_vdev(struct wlan_objmgr_psoc *psoc,
 #ifdef WLAN_FEATURE_SR
 void
 wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
-			 int32_t pd_threshold, bool is_sr_enable)
+			 int32_t srg_pd_threshold, int32_t non_srg_pd_threshold,
+			 bool is_sr_enable)
 {
-	uint8_t non_srg_pd_threshold = 0, srg_pd_threshold = 0;
-	uint8_t srg_min_pd_threshold_offset, srg_max_pd_threshold_offset;
+	uint8_t ap_non_srg_pd_threshold = 0;
+	uint8_t ap_srg_min_pd_threshold_offset, ap_srg_max_pd_threshold_offset;
 	uint8_t sr_ctrl;
 
 	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
 	if (!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
 	    (sr_ctrl & NON_SRG_OFFSET_PRESENT)) {
-		non_srg_pd_threshold =
+		ap_non_srg_pd_threshold =
 		wlan_vdev_mlme_get_pd_offset(vdev) + NON_SR_PD_THRESHOLD_MIN;
 		/**
 		 * Update non_srg_pd_threshold with provide
-		 * pd_threshold, if pd threshold is with in the
-		 * range else keep the same as advertised by AP.
+		 * non_srg_pd_threshold for non-srg, if pd threshold is
+		 * with in the range else keep the same as
+		 * advertised by AP.
 		 */
-		if (pd_threshold && non_srg_pd_threshold > pd_threshold)
-			non_srg_pd_threshold = pd_threshold;
+		if (non_srg_pd_threshold &&
+		    non_srg_pd_threshold > ap_non_srg_pd_threshold)
+			non_srg_pd_threshold = ap_non_srg_pd_threshold;
 
 		/* 31st BIT - Enable/Disable Non-SRG based spatial reuse. */
 		*val |= is_sr_enable << NON_SRG_SPR_ENABLE_POS;
 	}
 
 	if (sr_ctrl & SRG_INFO_PRESENT) {
-		wlan_vdev_mlme_get_srg_pd_offset(vdev,
-						 &srg_max_pd_threshold_offset,
-						 &srg_min_pd_threshold_offset);
+		wlan_vdev_mlme_get_srg_pd_offset(
+					vdev, &ap_srg_max_pd_threshold_offset,
+					&ap_srg_min_pd_threshold_offset);
 		/**
-		 * Update rg_pd_threshold with provide
-		 * pd_threshold, if pd threshold is with in the
+		 * Update srg_pd_threshold with provide
+		 * srg_pd_threshold, if pd threshold is with in the
 		 * SRG range else keep the max of advertised by AP.
 		 */
-		if (pd_threshold &&
-		    pd_threshold < (srg_max_pd_threshold_offset +
+		if (srg_pd_threshold &&
+		    srg_pd_threshold < (ap_srg_max_pd_threshold_offset +
 				    NON_SR_PD_THRESHOLD_MIN) &&
-		    pd_threshold > (srg_min_pd_threshold_offset +
+		    srg_pd_threshold > (ap_srg_min_pd_threshold_offset +
 				    NON_SR_PD_THRESHOLD_MIN))
-			srg_pd_threshold = pd_threshold +
+			srg_pd_threshold = srg_pd_threshold +
 				NON_SR_PD_THRESHOLD_MIN;
 		else
-			srg_pd_threshold = srg_max_pd_threshold_offset +
+			srg_pd_threshold = ap_srg_max_pd_threshold_offset +
 				NON_SR_PD_THRESHOLD_MIN;
 
 		/* 30th BIT - Enable/Disable SRG based spatial reuse. */
