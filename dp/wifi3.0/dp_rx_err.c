@@ -1352,6 +1352,36 @@ drop_nbuf:
 	return QDF_STATUS_E_FAILURE;
 }
 
+#ifdef DP_WAR_INVALID_FIRST_MSDU_FLAG
+static inline void
+dp_rx_err_populate_mpdu_desc_info(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				  struct hal_rx_mpdu_desc_info *mpdu_desc_info,
+				  bool first_msdu_in_mpdu_processed)
+{
+	if (first_msdu_in_mpdu_processed) {
+		/*
+		 * This is the 2nd indication of first_msdu in the same mpdu.
+		 * Skip re-parsing the mdpu_desc_info and use the cached one,
+		 * since this msdu is most probably from the current mpdu
+		 * which is being processed
+		 */
+	} else {
+		hal_rx_tlv_populate_mpdu_desc_info(soc->hal_soc,
+						   qdf_nbuf_data(nbuf),
+						   mpdu_desc_info);
+	}
+}
+#else
+static inline void
+dp_rx_err_populate_mpdu_desc_info(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				  struct hal_rx_mpdu_desc_info *mpdu_desc_info,
+				  bool first_msdu_in_mpdu_processed)
+{
+	hal_rx_tlv_populate_mpdu_desc_info(soc->hal_soc, qdf_nbuf_data(nbuf),
+					   mpdu_desc_info);
+}
+#endif
+
 /**
  * dp_rx_reo_err_entry_process() - Handles for REO error entry processing
  *
@@ -1399,6 +1429,8 @@ dp_rx_reo_err_entry_process(struct dp_soc *soc,
 	struct dp_txrx_peer *txrx_peer = NULL;
 	dp_txrx_ref_handle txrx_ref_handle = NULL;
 	hal_ring_handle_t hal_ring_hdl = soc->reo_exception_ring.hal_srng;
+	bool first_msdu_in_mpdu_processed = false;
+	bool msdu_dropped = false;
 
 	peer_id = dp_rx_peer_metadata_peer_id_get(soc,
 					mpdu_desc_info->peer_meta_data);
@@ -1431,6 +1463,7 @@ more_msdu_link_desc:
 						   ring_desc, rx_desc);
 			/* ignore duplicate RX desc and continue to process */
 			/* Pop out the descriptor */
+			msdu_dropped = true;
 			continue;
 		}
 
@@ -1439,6 +1472,7 @@ more_msdu_link_desc:
 		if (!ret) {
 			DP_STATS_INC(soc, rx.err.nbuf_sanity_fail, 1);
 			rx_desc->in_err_state = 1;
+			msdu_dropped = true;
 			continue;
 		}
 
@@ -1466,17 +1500,36 @@ more_msdu_link_desc:
 		if (dp_rx_buffer_pool_refill(soc, head_nbuf,
 					     rx_desc_pool_id)) {
 			/* MSDU queued back to the pool */
+			msdu_dropped = true;
 			goto process_next_msdu;
 		}
 
 		if (is_pn_check_needed) {
 			if (msdu_list.msdu_info[i].msdu_flags &
 			    HAL_MSDU_F_FIRST_MSDU_IN_MPDU) {
-				hal_rx_tlv_populate_mpdu_desc_info(
-							soc->hal_soc,
-							qdf_nbuf_data(nbuf),
-							mpdu_desc_info);
+				dp_rx_err_populate_mpdu_desc_info(soc, nbuf,
+						mpdu_desc_info,
+						first_msdu_in_mpdu_processed);
+				first_msdu_in_mpdu_processed = true;
 			} else {
+				if (!first_msdu_in_mpdu_processed) {
+					/*
+					 * If no msdu in this mpdu was dropped
+					 * due to failed sanity checks, then
+					 * its not expected to hit this
+					 * condition. Hence we assert here.
+					 */
+					if (!msdu_dropped)
+						qdf_assert_always(0);
+
+					/*
+					 * We do not have valid mpdu_desc_info
+					 * to process this nbuf, hence drop it.
+					 */
+					dp_rx_nbuf_free(nbuf);
+					/* TODO - Increment stats */
+					goto process_next_msdu;
+				}
 				/*
 				 * DO NOTHING -
 				 * Continue using the same mpdu_desc_info
