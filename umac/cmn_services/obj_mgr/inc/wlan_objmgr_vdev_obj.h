@@ -1565,6 +1565,17 @@ static inline uint16_t wlan_vdev_get_peer_count(struct wlan_objmgr_vdev *vdev)
 	return vdev->vdev_objmgr.wlan_peer_count;
 }
 
+/**
+ * wlan_vdev_mlme_is_ap() - Check whether @vdev is an AP or not
+ * @vdev: VDEV object
+ *
+ * Return: True if @vdev is ap, otherwise false.
+ */
+static inline bool wlan_vdev_mlme_is_ap(struct wlan_objmgr_vdev *vdev)
+{
+	return (wlan_vdev_mlme_get_opmode(vdev) == QDF_SAP_MODE);
+}
+
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * wlan_vdev_mlme_is_mlo_vdev() - Determine whether the given vdev is an MLO
