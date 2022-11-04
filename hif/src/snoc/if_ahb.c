@@ -44,7 +44,7 @@
 #endif
 
 #define HIF_IC_CE0_IRQ_OFFSET 4
-#define HIF_IC_MAX_IRQ 53
+#define HIF_IC_MAX_IRQ 58
 
 static uint16_t ic_irqnum[HIF_IC_MAX_IRQ];
 /* integrated chip irq names */
@@ -102,6 +102,11 @@ const char *ic_irqname[HIF_IC_MAX_IRQ] = {
 "wbm2host-tx-completions-ring2",
 "wbm2host-tx-completions-ring1",
 "tcl2host-status-ring",
+"txmon2host-monitor-destination-mac3",
+"txmon2host-monitor-destination-mac2",
+"txmon2host-monitor-destination-mac1",
+"host2tx-monitor-ring1",
+"umac_reset"
 };
 
 /** hif_ahb_get_irq_name() - get irqname
