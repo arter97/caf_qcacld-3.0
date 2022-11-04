@@ -1988,14 +1988,15 @@ dp_initialize_arch_ops_be_mcast_mlo(struct dp_arch_ops *arch_ops)
 
 #ifdef WLAN_MLO_MULTI_CHIP
 static inline void
-dp_initialize_arch_ops_be_mlo_ptnr_chip(struct dp_arch_ops *arch_ops)
+dp_initialize_arch_ops_be_mlo_multi_chip(struct dp_arch_ops *arch_ops)
 {
 	arch_ops->dp_partner_chips_map = dp_mlo_partner_chips_map;
 	arch_ops->dp_partner_chips_unmap = dp_mlo_partner_chips_unmap;
+	arch_ops->dp_soc_get_by_idle_bm_id = dp_soc_get_by_idle_bm_id;
 }
 #else
 static inline void
-dp_initialize_arch_ops_be_mlo_ptnr_chip(struct dp_arch_ops *arch_ops)
+dp_initialize_arch_ops_be_mlo_multi_chip(struct dp_arch_ops *arch_ops)
 {
 }
 #endif
@@ -2004,7 +2005,7 @@ static inline void
 dp_initialize_arch_ops_be_mlo(struct dp_arch_ops *arch_ops)
 {
 	dp_initialize_arch_ops_be_mcast_mlo(arch_ops);
-	dp_initialize_arch_ops_be_mlo_ptnr_chip(arch_ops);
+	dp_initialize_arch_ops_be_mlo_multi_chip(arch_ops);
 	arch_ops->mlo_peer_find_hash_detach =
 	dp_mlo_peer_find_hash_detach_wrapper;
 	arch_ops->mlo_peer_find_hash_attach =
@@ -2151,6 +2152,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->tx_implicit_rbm_set = dp_tx_implicit_rbm_set_be;
 	arch_ops->txrx_set_vdev_param = dp_txrx_set_vdev_param_be;
 	dp_initialize_arch_ops_be_mlo(arch_ops);
+	arch_ops->dp_rx_replenish_soc_get = dp_rx_replensih_soc_get;
 	arch_ops->dp_peer_rx_reorder_queue_setup =
 					dp_peer_rx_reorder_queue_setup_be;
 	arch_ops->txrx_print_peer_stats = dp_print_peer_txrx_stats_be;
