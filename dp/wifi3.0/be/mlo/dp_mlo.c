@@ -658,6 +658,30 @@ dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
 	return replenish_soc;
 }
 
+struct dp_soc *
+dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctxt = be_soc->ml_ctxt;
+	struct dp_soc *partner_soc = NULL;
+	uint8_t chip_id;
+
+	if (!be_soc->mlo_enabled || !mlo_ctxt)
+		return soc;
+
+	for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
+		partner_soc = dp_mlo_get_soc_ref_by_chip_id(mlo_ctxt, chip_id);
+
+		if (!partner_soc)
+			continue;
+
+		if (partner_soc->idle_link_bm_id == idle_bm_id)
+			return partner_soc;
+	}
+
+	return NULL;
+}
+
 #ifdef WLAN_MCAST_MLO
 void dp_mcast_mlo_iter_ptnr_soc(struct dp_soc_be *be_soc,
 				dp_ptnr_soc_iter_func func,

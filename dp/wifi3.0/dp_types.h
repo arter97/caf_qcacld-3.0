@@ -1953,12 +1953,16 @@ struct dp_arch_ops {
 	bool (*dp_rx_mcast_handler)(struct dp_soc *soc, struct dp_vdev *vdev,
 				    struct dp_txrx_peer *peer, qdf_nbuf_t nbuf);
 #endif
+	struct dp_soc * (*dp_soc_get_by_idle_bm_id)(struct dp_soc *soc,
+						    uint8_t bm_id);
+
 	void (*mlo_peer_find_hash_detach)(struct dp_soc *soc);
 	QDF_STATUS (*mlo_peer_find_hash_attach)(struct dp_soc *soc);
 	void (*mlo_peer_find_hash_add)(struct dp_soc *soc,
 				       struct dp_peer *peer);
 	void (*mlo_peer_find_hash_remove)(struct dp_soc *soc,
 					  struct dp_peer *peer);
+
 	struct dp_peer *(*mlo_peer_find_hash_find)(struct dp_soc *soc,
 						   uint8_t *peer_mac_addr,
 						   int mac_addr_is_aligned,
@@ -1983,6 +1987,9 @@ struct dp_arch_ops {
 						   uint8_t *dest_mac_addr,
 						   uint8_t vdev_id);
 	void (*dp_bank_reconfig)(struct dp_soc *soc, struct dp_vdev *vdev);
+
+	struct dp_soc * (*dp_rx_replenish_soc_get)(struct dp_soc *soc,
+						   uint8_t chip_id);
 
 	void (*dp_reconfig_tx_vdev_mcast_ctrl)(struct dp_soc *soc,
 					       struct dp_vdev *vdev);

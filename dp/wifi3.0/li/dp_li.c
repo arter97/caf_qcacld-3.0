@@ -572,6 +572,12 @@ static bool dp_reo_remap_config_li(struct dp_soc *soc,
 	return dp_reo_remap_config(soc, remap0, remap1, remap2);
 }
 
+static struct dp_soc *dp_rx_replensih_soc_get_li(struct dp_soc *soc,
+						 uint8_t chip_id)
+{
+	return soc;
+}
+
 void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 {
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
@@ -629,6 +635,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_find_peer_by_destmac = dp_find_peer_by_destmac_li;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_li;
 	arch_ops->reo_remap_config = dp_reo_remap_config_li;
+	arch_ops->dp_rx_replenish_soc_get = dp_rx_replensih_soc_get_li;
 	arch_ops->dp_txrx_ppeds_rings_status = NULL;
 	arch_ops->txrx_soc_ppeds_start = NULL;
 	arch_ops->txrx_soc_ppeds_stop = NULL;
