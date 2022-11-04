@@ -483,6 +483,45 @@ static struct dp_peer *dp_sawf_get_peer_from_wds_ext_dev(
 }
 #endif
 
+QDF_STATUS
+dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
+		       uint8_t tid, uint32_t service_interval,
+		       uint32_t burst_size, uint8_t add_or_sub)
+{
+	struct dp_soc *dpsoc = cdp_soc_t_to_dp_soc(soc_hdl);
+	struct dp_vdev *vdev;
+	struct dp_peer *peer;
+	struct dp_ast_entry *ast_entry;
+	uint16_t peer_id;
+	QDF_STATUS status;
+
+	qdf_spin_lock_bh(&dpsoc->ast_lock);
+	ast_entry = dp_peer_ast_hash_find_soc(dpsoc, mac_addr);
+	if (!ast_entry) {
+		qdf_spin_unlock_bh(&dpsoc->ast_lock);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	peer_id = ast_entry->peer_id;
+	qdf_spin_unlock_bh(&dpsoc->ast_lock);
+
+	peer = dp_peer_get_ref_by_id(dpsoc, peer_id, DP_MOD_ID_SAWF);
+
+	if (!peer)
+		return QDF_STATUS_E_FAILURE;
+
+	vdev = peer->vdev;
+
+	status = soc_hdl->ol_ops->peer_update_sawf_ul_params(dpsoc->ctrl_psoc,
+			vdev->vdev_id, mac_addr,
+			tid, TID_TO_WME_AC(tid),
+			service_interval, burst_size, add_or_sub);
+
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return status;
+}
+
 uint16_t dp_sawf_get_msduq(struct net_device *netdev, uint8_t *dest_mac,
 			   uint32_t service_id)
 {
