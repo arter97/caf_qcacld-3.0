@@ -3239,6 +3239,12 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 					soc->wlan_cfg_ctx, intr_ctx_num);
 	int host2rxdma_mon_ring_mask = wlan_cfg_get_host2rxdma_mon_ring_mask(
 					soc->wlan_cfg_ctx, intr_ctx_num);
+	int host2txmon_ring_mask = wlan_cfg_get_host2txmon_ring_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
+	int txmon2host_mon_ring_mask = wlan_cfg_get_tx_mon_ring_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
+	int umac_reset_mask = wlan_cfg_get_umac_reset_intr_mask(
+					soc->wlan_cfg_ctx, intr_ctx_num);
 
 	soc->intr_mode = DP_INTR_INTEGRATED;
 
@@ -3286,6 +3292,17 @@ static void dp_soc_interrupt_map_calculate_integrated(struct dp_soc *soc,
 
 		if (reo_status_ring_mask & (1 << j))
 			irq_id_map[num_irq++] = reo2host_status;
+
+		if (host2txmon_ring_mask & (1 << j))
+			irq_id_map[num_irq++] = host2tx_monitor_ring1;
+
+		if (txmon2host_mon_ring_mask & (1 << j)) {
+			irq_id_map[num_irq++] =
+				(txmon2host_monitor_destination_mac1 - j);
+		}
+
+		if (umac_reset_mask & (1 << j))
+			irq_id_map[num_irq++] = (umac_reset - j);
 
 	}
 	*num_irq_r = num_irq;
