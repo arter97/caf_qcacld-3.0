@@ -5936,11 +5936,11 @@ reg_set_channel_params_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 				chan_list.chan_param[i].input_punc_bitmap =
 					ch_params->input_punc_bitmap;
 			}
-			/* For now sending center freq as 0 */
 			reg_fill_channel_list_for_pwrmode(pdev, freq,
 							  sec_ch_2g_freq,
 							  ch_params->ch_width,
-							  0, &chan_list,
+							  ch_params->mhz_freq_seg1,
+							  &chan_list,
 							  in_6g_pwr_mode,
 							  is_treat_nol_dis);
 			reg_copy_ch_params(ch_params, chan_list);
