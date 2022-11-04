@@ -313,6 +313,7 @@ dp_tx_me_dms_pkt_handler(struct cdp_soc_t *soc_hdl,
 	tx_exc_param.sec_type = vdev->sec_type;
 	tx_exc_param.tx_encap_type = vdev->tx_encap_type;
 	tx_exc_param.peer_id = HTT_INVALID_PEER;
+	tx_exc_param.tid = HTT_TX_EXT_TID_INVALID;
 
 	dms_me.soc_hdl = soc_hdl;
 	dms_me.vdev = vdev;
