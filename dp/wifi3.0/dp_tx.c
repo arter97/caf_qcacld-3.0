@@ -120,6 +120,22 @@ uint8_t sec_type_map[MAX_CDP_SEC_TYPE] = {HAL_TX_ENCRYPT_TYPE_NO_CIPHER,
 					  HAL_TX_ENCRYPT_TYPE_WAPI_GCM_SM4};
 qdf_export_symbol(sec_type_map);
 
+/*mapping between hal encrypt type and cdp_sec_type*/
+uint8_t sec_type_size_map[MAX_CDP_SEC_TYPE] = {
+				HAL_TX_ENCRYPT_TYPE_NO_CIPHER_SIZE,
+				HAL_TX_ENCRYPT_TYPE_WEP_128_SIZE,
+				HAL_TX_ENCRYPT_TYPE_WEP_104_SIZE,
+				HAL_TX_ENCRYPT_TYPE_WEP_40_SIZE,
+				HAL_TX_ENCRYPT_TYPE_TKIP_WITH_MIC_SIZE,
+				HAL_TX_ENCRYPT_TYPE_TKIP_NO_MIC_SIZE,
+				HAL_TX_ENCRYPT_TYPE_AES_CCMP_128_SIZE,
+				HAL_TX_ENCRYPT_TYPE_WAPI_SIZE,
+				HAL_TX_ENCRYPT_TYPE_AES_CCMP_256_SIZE,
+				HAL_TX_ENCRYPT_TYPE_AES_GCMP_128_SIZE,
+				HAL_TX_ENCRYPT_TYPE_AES_GCMP_256_SIZE,
+				HAL_TX_ENCRYPT_TYPE_WAPI_GCM_SM4_SIZE};
+qdf_export_symbol(sec_type_size_map);
+
 #ifdef WLAN_FEATURE_DP_TX_DESC_HISTORY
 static inline enum dp_tx_event_type dp_tx_get_event_type(uint32_t flags)
 {
@@ -1334,6 +1350,8 @@ static qdf_nbuf_t dp_tx_prepare_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 	qdf_dma_addr_t paddr;
 	int32_t i;
 	int32_t mapped_buf_num = 0;
+	uint8_t encrypt_size = 0;
+	uint8_t raw_hdr_len = 0;
 
 	struct dp_tx_sg_info_s *sg_info = &msdu_info->u.sg_info;
 	qdf_dot3_qosframe_t *qos_wh = (qdf_dot3_qosframe_t *) nbuf->data;
@@ -1346,6 +1364,28 @@ static qdf_nbuf_t dp_tx_prepare_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		dp_tx_debug("Pkt. recd is of not data type");
 		goto error;
 	}
+
+	encrypt_size = sec_type_size_map[vdev->sec_type];
+
+	raw_hdr_len = sizeof(qdf_dot3_frame_t);
+	if (qos_wh->i_fc[1] &
+	    (QDF_IEEE80211_FC1_TODS & QDF_IEEE80211_FC1_FROMDS))
+		raw_hdr_len += QDF_NET_MAC_ADDR_MAX_LEN;
+
+	if (DP_FRAME_QOS_HAS_SEQ(qos_wh)) {
+		raw_hdr_len += sizeof(uint16_t);
+		if (qos_wh->i_fc[1] & QDF_IEEE80211_FC1_ORDER)
+			raw_hdr_len += sizeof(qdf_dot3_htc_hdr_t);
+
+	}
+
+	raw_hdr_len += encrypt_size;
+	if (nbuf->len < raw_hdr_len) {
+		DP_STATS_INC(vdev, tx_i.raw.invalid_len, 1);
+		dp_tx_debug("Pkt. pkt len is less then 802.11 header len");
+		goto error;
+	}
+
 	/* SWAR for HW: Enable WEP bit in the AMSDU frames for RAW mode */
 	if (vdev->raw_mode_war &&
 	    (qos_wh->i_fc[0] & QDF_IEEE80211_FC0_SUBTYPE_QOS) &&

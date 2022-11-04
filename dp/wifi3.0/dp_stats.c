@@ -7521,6 +7521,8 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 		       pdev->stats.tx_i.raw.dma_map_error);
 	DP_PRINT_STATS("        RAW pkt type[!data] error = %u",
 		       pdev->stats.tx_i.raw.invalid_raw_pkt_datatype);
+	DP_PRINT_STATS("        RAW pkt len error = %u",
+		       pdev->stats.tx_i.raw.invalid_len);
 	DP_PRINT_STATS("        Frags count overflow  error = %u",
 		       pdev->stats.tx_i.raw.num_frags_overflow_err);
 	DP_PRINT_STATS("Reinjected:");

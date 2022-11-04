@@ -69,6 +69,7 @@ typedef __in6_addr_t in6_addr_t;
 #define QDF_IEEE80211_FC1_TODS          0x01
 #define QDF_IEEE80211_FC1_FROMDS        0x02
 #define QDF_IEEE80211_FC1_PM            0x10
+#define QDF_IEEE80211_FC1_ORDER         0x80
 
 #define QDF_IEEE80211_FC0_TYPE_MASK     0x0c
 #define QDF_IEEE80211_FC0_SUBTYPE_MASK  0xf0
@@ -543,6 +544,10 @@ static inline char *qdf_netdev_get_devname(qdf_netdev_t dev)
 }
 
 typedef struct {
+	uint8_t i_htc[4];
+} qdf_dot3_htc_hdr_t;
+
+typedef struct {
 	uint8_t i_fc[2];
 	uint8_t i_dur[2];
 	uint8_t i_addr1[QDF_NET_MAC_ADDR_MAX_LEN];
@@ -551,6 +556,15 @@ typedef struct {
 	uint8_t i_seq[2];
 	uint8_t i_qos[2];
 } qdf_dot3_qosframe_t;
+
+typedef struct {
+	uint8_t i_fc[2];
+	uint8_t i_dur[2];
+	uint8_t i_addr1[QDF_NET_MAC_ADDR_MAX_LEN];
+	uint8_t i_addr2[QDF_NET_MAC_ADDR_MAX_LEN];
+	uint8_t i_addr3[QDF_NET_MAC_ADDR_MAX_LEN];
+	uint8_t i_seq[2];
+} qdf_dot3_frame_t;
 
 typedef struct {
 	uint8_t ether_dhost[QDF_NET_MAC_ADDR_MAX_LEN];

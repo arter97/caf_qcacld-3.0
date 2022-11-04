@@ -296,8 +296,16 @@ enum dp_mod_id {
 #define DP_FRAME_IS_LLC(typeorlen) ((typeorlen) >= 0x600)
 #define DP_FRAME_FC0_TYPE_MASK 0x0c
 #define DP_FRAME_FC0_TYPE_DATA 0x08
+#define DP_FRAME_FC0_SUBTYPE_QOS 0x80
+
 #define DP_FRAME_IS_DATA(_frame) \
 	(((_frame)->i_fc[0] & DP_FRAME_FC0_TYPE_MASK) == DP_FRAME_FC0_TYPE_DATA)
+
+#define DP_FRAME_QOS_HAS_SEQ(_frame) \
+	(((_frame)->i_fc[0] & \
+	(DP_FRAME_FC0_TYPE_MASK | DP_FRAME_FC0_SUBTYPE_QOS)) == \
+	(DP_FRAME_FC0_TYPE_DATA | DP_FRAME_FC0_SUBTYPE_QOS))
+
 
 /**
  * macros to convert hw mac id to sw mac id:
