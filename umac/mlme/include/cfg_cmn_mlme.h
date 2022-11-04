@@ -70,8 +70,41 @@
 	CFG_VALUE_OR_DEFAULT, \
 	"11be is supported by target")
 
+#ifdef WLAN_FEATURE_11BE
+/*
+ * <ini>
+ * non_mlo_11be_ap_operation_enable - Flag to enable non MLO 802.11be AP
+ * operation
+ * @Min: false
+ * @Max: true
+ * @Default: false
+ *
+ * The 802.11be standard does not allow non-MLO 11be AP operation. For
+ * development purposes, add an INI flag to enable/disable non-MLO 802.11be AP
+ * operation. This INI will be disabled by default.
+ *
+ * Related: None
+ *
+ * Supported Feature: 802.11be protocol
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_MLME_NON_MLO_11BE_AP_OPERATION_ENABLE \
+	CFG_INI_BOOL("non_mlo_11be_ap_operation_enable", \
+		     false, \
+		     "Enable non MLO 11be AP operation")
+
+#define CFG_MLME_11BE_ALL \
+	CFG(CFG_MLME_NON_MLO_11BE_AP_OPERATION_ENABLE)
+#else
+#define CFG_MLME_11BE_ALL
+#endif /* WLAN_FEATURE_11BE */
+
 #define CFG_CMN_MLME_ALL \
 	CFG(CFG_MLME_MAX_CHAN_SWITCH_IE_ENABLE) \
-	CFG(CFG_MLME_11BE_TARGET_CAPAB)
+	CFG(CFG_MLME_11BE_TARGET_CAPAB) \
+	CFG_MLME_11BE_ALL
 
 #endif /* __CFG_CMN_MLME_H */
