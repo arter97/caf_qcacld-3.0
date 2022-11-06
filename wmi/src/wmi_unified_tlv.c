@@ -2237,13 +2237,12 @@ send_pdev_param_cmd_tlv(wmi_unified_t wmi_handle,
 								mac_id);
 	cmd->param_id = pdev_param;
 	cmd->param_value = param->param_value;
-	wmi_debug("Setting pdev %d param = %x, value = %u", cmd->pdev_id,
-		  cmd->param_id, cmd->param_value);
+	wmi_nofl_debug("Set pdev %d param 0x%x to %u", cmd->pdev_id,
+		       cmd->param_id, cmd->param_value);
 	wmi_mtrace(WMI_PDEV_SET_PARAM_CMDID, NO_SESSION, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 				   WMI_PDEV_SET_PARAM_CMDID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
-		wmi_err("Failed to send set param command ret = %d", ret);
 		wmi_buf_free(buf);
 	}
 	return ret;
@@ -2322,24 +2321,6 @@ convert_host_pdev_vdev_param_id_to_target(struct set_multiple_pdev_vdev_param *p
 }
 
 /**
- * send_dev_multi_setparam_cmd_tlv()-to print the paramid and param value
- * @setparam: buffer pointer where host is filling paramsid and value
- * @params: pointer to hold set_multiple_pdev_vdev_param info
- *
- */
-static void send_dev_multi_setparam_cmd_tlv(wmi_set_param_info *setparam,
-					    struct set_multiple_pdev_vdev_param *params)
-{
-	if (params->param_type == MLME_VDEV_SETPARAM) {
-		wmi_debug("Setting vdev %d param = %x value = %u", params->dev_id,
-			  setparam->param_id, setparam->param_value);
-	} else {
-		wmi_debug("Setting pdev %d param = %x value = %u",
-			  params->dev_id, setparam->param_id, setparam->param_value);
-	}
-}
-
-/**
  * send_multi_pdev_vdev_set_param_cmd_tlv()-set pdev/vdev params
  * @wmi_handle: wmi handle
  * @params: pointer to hold set_multiple_pdev_vdev_param info
@@ -2359,6 +2340,7 @@ send_multi_pdev_vdev_set_param_cmd_tlv(
 	uint8_t num = params->n_params;
 	uint16_t len;
 	uint8_t index = 0;
+	const char *dev_string[] = {"pdev", "vdev"};
 
 	if (convert_host_pdev_vdev_param_id_to_target(params))
 		return QDF_STATUS_E_INVAL;
@@ -2395,7 +2377,9 @@ send_multi_pdev_vdev_set_param_cmd_tlv(
 			       WMITLV_GET_STRUCT_TLVLEN(*setparam));
 		setparam->param_id = params->params[index].param_id;
 		setparam->param_value = params->params[index].param_value;
-		send_dev_multi_setparam_cmd_tlv(setparam, params);
+		wmi_nofl_debug("Set %s %d param 0x%x to %u",
+			       dev_string[cmd->is_vdev], params->dev_id,
+			       setparam->param_id, setparam->param_value);
 		buf_ptr += sizeof(*setparam);
 	}
 	wmi_mtrace(WMI_SET_MULTIPLE_PDEV_VDEV_PARAM_CMDID,
@@ -2403,7 +2387,6 @@ send_multi_pdev_vdev_set_param_cmd_tlv(
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len,
 				   WMI_SET_MULTIPLE_PDEV_VDEV_PARAM_CMDID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
-		wmi_err("failed to send WMI_SET_MULTIPLE_PDEV_VDEV_PARAM_CMDID");
 		wmi_buf_free(buf);
 	}
 	return ret;
@@ -2842,12 +2825,11 @@ static QDF_STATUS send_vdev_set_param_cmd_tlv(wmi_unified_t wmi_handle,
 	cmd->vdev_id = param->vdev_id;
 	cmd->param_id = vdev_param;
 	cmd->param_value = param->param_value;
-	wmi_debug("Setting vdev %d param = 0x%x, value = %u",
-		 cmd->vdev_id, cmd->param_id, cmd->param_value);
+	wmi_nofl_debug("Set vdev %d param 0x%x to %u",
+		       cmd->vdev_id, cmd->param_id, cmd->param_value);
 	wmi_mtrace(WMI_VDEV_SET_PARAM_CMDID, cmd->vdev_id, 0);
 	ret = wmi_unified_cmd_send(wmi_handle, buf, len, WMI_VDEV_SET_PARAM_CMDID);
 	if (QDF_IS_STATUS_ERROR(ret)) {
-		wmi_err("Failed to send set param command ret = %d", ret);
 		wmi_buf_free(buf);
 	}
 
