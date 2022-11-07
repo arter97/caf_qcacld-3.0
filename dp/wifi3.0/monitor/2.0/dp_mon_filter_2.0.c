@@ -3192,13 +3192,16 @@ dp_mon_filter_setup_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
  * @pdev_id: id of data path pdev handle
  * @enable: Enable/Disable CFR
  * @filter_val: Flag to select Filter for monitor mode
+ * @cfr_enable_monitor_mode: Flag to be enabled when scan radio is brought up
+ * in special vap mode
  *
  * Return: void
  */
 static void dp_cfr_filter_2_0(struct cdp_soc_t *soc_hdl,
 			      uint8_t pdev_id,
 			      bool enable,
-			      struct cdp_monitor_filter *filter_val)
+			      struct cdp_monitor_filter *filter_val,
+			      bool cfr_enable_monitor_mode)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_pdev *pdev = NULL;
