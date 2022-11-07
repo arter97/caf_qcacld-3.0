@@ -331,6 +331,7 @@ struct target_ops {
 	int (*csa_switch_count_status)(
 		struct wlan_objmgr_psoc *psoc,
 		struct pdev_csa_switch_count_status csa_status);
+	void (*ema_init)(struct wlan_objmgr_pdev *pdev);
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 	bool (*mlo_capable)(struct wlan_objmgr_psoc *psoc);
 	void (*mlo_setup_done_event)(struct wlan_objmgr_psoc *psoc);
