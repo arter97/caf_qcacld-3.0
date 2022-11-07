@@ -216,4 +216,20 @@ static inline void dp_mon_filter_reset_rx_pktlog_cbf_1_0(struct dp_pdev *pdev)
 
 QDF_STATUS dp_mon_filter_update_1_0(struct dp_pdev *pdev);
 
+#ifdef QCA_MAC_FILTER_FW_SUPPORT
+/**
+ * dp_mon_mac_filter_set() - Setup rx monitor mac filter feature
+ * @msg_word: msg word
+ * @htt_tlv_filter: rx ring filter configuration
+ */
+void dp_mon_mac_filter_set(uint32_t *msg_word,
+			   struct htt_rx_ring_tlv_filter *tlv_filter);
+#else
+static inline
+void dp_mon_mac_filter_set(uint32_t *msg_word,
+			   struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+}
+#endif
+
 #endif /* _DP_MON_FILTER_1_0_H_ */

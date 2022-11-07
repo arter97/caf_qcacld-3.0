@@ -104,6 +104,8 @@ void dp_mon_filter_show_filter(struct dp_mon_pdev *mon_pdev,
 	DP_MON_FILTER_PRINT("phy_err_mask_cont: 0x%x",
 			    tlv_filter->phy_err_mask_cont);
 #endif
+	DP_MON_FILTER_PRINT("mon_mac_filter: %d",
+			    tlv_filter->enable_mon_mac_filter);
 }
 
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
@@ -260,6 +262,8 @@ void dp_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
 		DP_MON_FILTER_SET(tlv_filter, FILTER_MD_CTRL, dst_filter);
 
 		dp_mon_set_fp_phy_err_filter(tlv_filter, mon_filter);
+		tlv_filter->enable_mon_mac_filter =
+				mon_filter->tlv_filter.enable_mon_mac_filter;
 	}
 
 	dp_mon_filter_show_filter(mon_pdev, 0, filter);

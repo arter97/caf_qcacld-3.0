@@ -827,6 +827,8 @@ struct dp_mon_ops {
 		(struct dp_soc *soc, struct dp_pdev *pdev);
 	QDF_STATUS (*mon_rx_ppdu_info_cache_create)(struct dp_pdev *pdev);
 	void (*mon_rx_ppdu_info_cache_destroy)(struct dp_pdev *pdev);
+	void (*mon_mac_filter_set)(uint32_t *msg_word,
+				   struct htt_rx_ring_tlv_filter *tlv_filter);
 };
 
 /**
@@ -3879,6 +3881,27 @@ dp_rx_mon_enable(struct dp_soc *soc, uint32_t *msg_word,
 	}
 
 	monitor_ops->rx_mon_enable(msg_word, tlv_filter);
+}
+
+static inline void
+dp_mon_rx_mac_filter_set(struct dp_soc *soc, uint32_t *msg_word,
+			 struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_ops *monitor_ops;
+
+	if (!mon_soc) {
+		dp_mon_debug("mon soc is NULL");
+		return;
+	}
+
+	monitor_ops = mon_soc->mon_ops;
+	if (!monitor_ops || !monitor_ops->mon_mac_filter_set) {
+		dp_mon_debug("callback not registered");
+		return;
+	}
+
+	monitor_ops->mon_mac_filter_set(msg_word, tlv_filter);
 }
 
 #ifdef QCA_ENHANCED_STATS_SUPPORT

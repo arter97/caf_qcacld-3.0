@@ -1438,6 +1438,7 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 	mon_ops->rx_enable_fpmo = dp_rx_mon_enable_fpmo;
 	mon_ops->mon_rx_print_advanced_stats =
 		dp_mon_rx_print_advanced_stats_2_0;
+	mon_ops->mon_mac_filter_set = NULL;
 }
 
 struct dp_mon_ops monitor_ops_2_0 = {

@@ -1059,6 +1059,20 @@ QDF_STATUS dp_mon_filter_update_1_0(struct dp_pdev *pdev)
 	return status;
 }
 
+#ifdef QCA_MAC_FILTER_FW_SUPPORT
+void dp_mon_mac_filter_set(uint32_t *msg_word,
+			   struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+	if (!msg_word || !tlv_filter)
+		return;
+
+	if (tlv_filter->enable_mon_mac_filter > 0)
+		HTT_RX_RING_SELECTION_CFG_RXPCU_FILTER_SET(*msg_word, 1);
+	else
+		HTT_RX_RING_SELECTION_CFG_RXPCU_FILTER_SET(*msg_word, 0);
+}
+#endif
+
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 /*
  * dp_cfr_filter_1_0() -  Configure HOST RX monitor status ring for CFR

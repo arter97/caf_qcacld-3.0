@@ -5976,8 +5976,6 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 		if (target_type == TARGET_TYPE_QCN9000)
 			ops->ctrl_ops->txrx_update_mon_mac_filter =
 					dp_update_mon_mac_filter;
-		else
-			ops->ctrl_ops->txrx_update_mon_mac_filter = NULL;
 		break;
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA5332:
@@ -5997,7 +5995,6 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 		dp_cfr_filter_register_2_0(ops);
 #endif
 #endif /* QCA_MONITOR_2_0_SUPPORT */
-		ops->ctrl_ops->txrx_update_mon_mac_filter = NULL;
 		break;
 	default:
 		dp_mon_err("%s: Unknown tgt type %d", __func__, target_type);
