@@ -1029,7 +1029,7 @@ static inline void reg_propagate_6g_mas_channel_list(
 		struct mas_chan_params *mas_chan_params)
 {
 }
-#endif
+#endif /* CONFIG_BAND_6GHZ */
 
 void reg_init_pdev_mas_chan_list(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
@@ -2962,11 +2962,12 @@ void reg_propagate_mas_chan_list_to_pdev(struct wlan_objmgr_psoc *psoc,
 		phy_id = pdev_id;
 
 	reg_set_pdev_fcc_rules(psoc_priv_obj, pdev_priv_obj);
-	psoc_reg_rules = &psoc_priv_obj->mas_chan_params[phy_id].reg_rules;
-	reg_save_reg_rules_to_pdev(psoc_reg_rules, pdev_priv_obj);
 	reg_init_pdev_mas_chan_list(
 			pdev_priv_obj,
 			&psoc_priv_obj->mas_chan_params[phy_id]);
+	psoc_reg_rules = &psoc_priv_obj->mas_chan_params[phy_id].reg_rules;
+	reg_save_reg_rules_to_pdev(psoc_reg_rules, pdev_priv_obj);
+	reg_set_ap_pwr_type(pdev_priv_obj);
 	reg_init_pdev_super_chan_list(pdev_priv_obj);
 	reg_modify_chan_list_for_japan(pdev);
 	pdev_priv_obj->chan_list_recvd =
