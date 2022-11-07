@@ -1398,9 +1398,11 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 	ent_qdesc_addr = hal_get_reo_ent_desc_qdesc_addr(soc->hal_soc,
 						(uint8_t *)ent_ring_desc);
 
-	dst_qdesc_addr = hal_rx_get_qdesc_addr(soc->hal_soc,
-					       (uint8_t *)dst_ring_desc,
-					       qdf_nbuf_data(head));
+	dst_qdesc_addr = soc->arch_ops.get_reo_qdesc_addr(
+						soc->hal_soc,
+						(uint8_t *)dst_ring_desc,
+						qdf_nbuf_data(head),
+						txrx_peer, tid);
 
 	qdf_mem_copy(ent_qdesc_addr, &dst_qdesc_addr, 5);
 
@@ -1645,6 +1647,7 @@ void dp_rx_defrag_cleanup(struct dp_txrx_peer *txrx_peer, unsigned int tid)
 
 /*
  * dp_rx_defrag_save_info_from_ring_desc(): Save info from REO ring descriptor
+ * @soc: Pointer to the SOC data structure
  * @ring_desc: Pointer to the dst ring descriptor
  * @txrx_peer: Pointer to the peer
  * @tid: Transmit Identifier
@@ -1652,13 +1655,16 @@ void dp_rx_defrag_cleanup(struct dp_txrx_peer *txrx_peer, unsigned int tid)
  * Returns: None
  */
 static QDF_STATUS
-dp_rx_defrag_save_info_from_ring_desc(hal_ring_desc_t ring_desc,
+dp_rx_defrag_save_info_from_ring_desc(struct dp_soc *soc,
+				      hal_ring_desc_t ring_desc,
 				      struct dp_rx_desc *rx_desc,
 				      struct dp_txrx_peer *txrx_peer,
 				      unsigned int tid)
 {
-	void *dst_ring_desc = qdf_mem_malloc(
-			sizeof(struct reo_destination_ring));
+	void *dst_ring_desc;
+
+	dst_ring_desc = qdf_mem_malloc(hal_srng_get_entrysize(soc->hal_soc,
+							      REO_DST));
 
 	if (!dst_ring_desc) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
@@ -1668,7 +1674,7 @@ dp_rx_defrag_save_info_from_ring_desc(hal_ring_desc_t ring_desc,
 	}
 
 	qdf_mem_copy(dst_ring_desc, ring_desc,
-		       sizeof(struct reo_destination_ring));
+		     hal_srng_get_entrysize(soc->hal_soc, REO_DST));
 
 	txrx_peer->rx_tid[tid].dst_ring_desc = dst_ring_desc;
 	txrx_peer->rx_tid[tid].head_frag_desc = rx_desc;
@@ -1877,8 +1883,9 @@ dp_rx_defrag_store_fragment(struct dp_soc *soc,
 	if ((fragno == 0) && (status == QDF_STATUS_SUCCESS) &&
 			(rx_reorder_array_elem->head == frag)) {
 
-		status = dp_rx_defrag_save_info_from_ring_desc(ring_desc,
-					rx_desc, txrx_peer, tid);
+		status = dp_rx_defrag_save_info_from_ring_desc(soc, ring_desc,
+							       rx_desc,
+							       txrx_peer, tid);
 
 		if (status != QDF_STATUS_SUCCESS) {
 			QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,

@@ -1733,6 +1733,7 @@ int hif_pci_bus_configure(struct hif_softc *hif_sc)
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA5332) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA5018) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCN6122) ||
+	     (hif_sc->target_info.target_type == TARGET_TYPE_QCN9160) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA6018)) &&
 	    (hif_sc->bus_type == QDF_BUS_TYPE_AHB)) {
 		hif_sc->per_ce_irq = true;
@@ -1757,6 +1758,7 @@ int hif_pci_bus_configure(struct hif_softc *hif_sc)
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA5332) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA5018) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCN6122) ||
+	     (hif_sc->target_info.target_type == TARGET_TYPE_QCN9160) ||
 	     (hif_sc->target_info.target_type == TARGET_TYPE_QCA6018)) &&
 	    (hif_sc->bus_type == QDF_BUS_TYPE_PCI))
 		hif_debug("Skip irq config for PCI based 8074 target");
@@ -3550,6 +3552,7 @@ int hif_configure_irq(struct hif_softc *scn)
 	case TARGET_TYPE_QCA5018:
 	case TARGET_TYPE_QCA5332:
 	case TARGET_TYPE_QCA9574:
+	case TARGET_TYPE_QCN9160:
 		ret = hif_ahb_configure_irq(sc);
 		break;
 	case TARGET_TYPE_QCN9224:
@@ -4030,8 +4033,10 @@ int hif_force_wake_request(struct hif_opaque_softc *hif_handle)
 	else
 		timeout = 0;
 
-	if (pld_force_wake_request_sync(scn->qdf_dev->dev, timeout)) {
-		hif_err("force wake request send failed");
+	ret = pld_force_wake_request_sync(scn->qdf_dev->dev, timeout);
+	if (ret) {
+		hif_err("force wake request(timeout %u) send failed: %d",
+			timeout, ret);
 		HIF_STATS_INC(pci_scn, mhi_force_wake_failure, 1);
 		status = -EINVAL;
 		goto release_rtpm_ref;
@@ -4124,6 +4129,7 @@ int hif_force_wake_request(struct hif_opaque_softc *hif_handle)
 	struct hif_softc *scn = (struct hif_softc *)hif_handle;
 	struct hif_pci_softc *pci_scn = HIF_GET_PCI_SOFTC(scn);
 	uint32_t timeout;
+	int ret;
 
 	HIF_STATS_INC(pci_scn, mhi_force_wake_request_vote, 1);
 
@@ -4132,8 +4138,10 @@ int hif_force_wake_request(struct hif_opaque_softc *hif_handle)
 	else
 		timeout = 0;
 
-	if (pld_force_wake_request_sync(scn->qdf_dev->dev, timeout)) {
-		hif_err("force wake request send failed");
+	ret = pld_force_wake_request_sync(scn->qdf_dev->dev, timeout);
+	if (ret) {
+		hif_err("force wake request(timeout %u) send failed: %d",
+			timeout, ret);
 		HIF_STATS_INC(pci_scn, mhi_force_wake_failure, 1);
 		return -EINVAL;
 	}

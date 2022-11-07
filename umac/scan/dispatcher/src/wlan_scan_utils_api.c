@@ -739,8 +739,8 @@ util_scan_get_phymode_5g(struct wlan_objmgr_pdev *pdev,
 			phymode = WLAN_PHYMODE_11AC_VHT80_80;
 			break;
 		default:
-			scm_err("bad channel: %d",
-					vhtop->vht_op_chwidth);
+			scm_debug("bad channel: %d",
+				  vhtop->vht_op_chwidth);
 			phymode = WLAN_PHYMODE_11AC_VHT20;
 			break;
 		}
@@ -2849,8 +2849,9 @@ static uint32_t util_gen_new_ie(uint8_t *ie, uint32_t ielen,
 	/* new ssid */
 	tmp_new = util_scan_find_ie(WLAN_ELEMID_SSID, sub_copy, subie_len);
 	if (tmp_new) {
-		scm_debug(" SSID %.*s", tmp_new[1],
-			  &tmp_new[PAYLOAD_START_POS]);
+		scm_debug(" SSID " QDF_SSID_FMT,
+			  QDF_SSID_REF(tmp_new[1],
+				       &tmp_new[PAYLOAD_START_POS]));
 		if ((pos + tmp_new[1] + MIN_IE_LEN) <=
 		    (new_ie + ielen)) {
 			qdf_mem_copy(pos, tmp_new,

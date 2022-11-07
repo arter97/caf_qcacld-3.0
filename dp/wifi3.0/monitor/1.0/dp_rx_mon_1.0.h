@@ -163,6 +163,18 @@ dp_rx_mon_link_desc_return(struct dp_pdev *dp_pdev,
 }
 #endif
 
+#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
+static inline uint16_t dp_rx_mon_get_rx_pkt_tlv_size(struct dp_soc *soc)
+{
+	return soc->curr_rx_pkt_tlv_size;
+}
+#else
+static inline uint16_t dp_rx_mon_get_rx_pkt_tlv_size(struct dp_soc *soc)
+{
+	return soc->rx_mon_pkt_tlv_size;
+}
+#endif
+
 /**
  * dp_mon_adjust_frag_len() - MPDU and MSDU may spread across
  *				multiple nbufs. This function
@@ -712,7 +724,7 @@ dp_rx_mon_parse_desc_buffer(struct dp_soc *dp_soc,
 			    bool *is_frag_non_raw_p, void *data)
 {
 	struct hal_rx_mon_dest_buf_info frame_info;
-	uint32_t rx_pkt_tlv_len = dp_soc->rx_mon_pkt_tlv_size;
+	uint32_t rx_pkt_tlv_len = dp_rx_mon_get_rx_pkt_tlv_size(dp_soc);
 
 	/*
 	 * HW structures call this L3 header padding

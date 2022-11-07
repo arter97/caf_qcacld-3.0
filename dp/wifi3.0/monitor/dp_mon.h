@@ -931,6 +931,21 @@ struct dp_mon_peer {
 	struct cdp_peer_rate_stats_ctx *peerstats_ctx;
 };
 
+struct dp_rx_mon_rssi_offset {
+	/* Temperature based rssi offset */
+	int32_t rssi_temp_offset;
+	/* Low noise amplifier bypass offset */
+	int32_t xlna_bypass_offset;
+	/* Low noise amplifier bypass threshold */
+	int32_t xlna_bypass_threshold;
+	/* 3 Bytes of xbar_config are used for RF to BB mapping */
+	uint32_t xbar_config;
+	/* min noise floor in active chains per channel */
+	int8_t min_nf_dbm;
+	/* this value is sum of temp_oofset + min_nf*/
+	int32_t rssi_offset;
+};
+
 struct  dp_mon_pdev {
 	/* monitor */
 	bool monitor_configured;
@@ -1119,6 +1134,9 @@ struct  dp_mon_pdev {
 
 	/* Invalid monitor peer to account for stats in mcopy mode */
 	struct dp_mon_peer *invalid_mon_peer;
+
+	bool rssi_dbm_conv_support;
+	struct dp_rx_mon_rssi_offset rssi_offsets;
 };
 
 struct  dp_mon_vdev {

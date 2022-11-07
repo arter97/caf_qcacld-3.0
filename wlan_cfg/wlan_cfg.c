@@ -2502,6 +2502,7 @@ wlan_soc_ppe_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 	wlan_cfg_ctx->ppe2tcl_ring = cfg_get(psoc, CFG_DP_PPE2TCL_RING);
 	wlan_cfg_ctx->ppe_release_ring = cfg_get(psoc,
 						 CFG_DP_PPE_RELEASE_RING);
+	wlan_cfg_ctx->ppe_num_tx_desc = cfg_get(psoc, CFG_DP_PPEDS_TX_DESC);
 }
 #else
 static inline void
@@ -2628,6 +2629,58 @@ wlan_cfg_soc_update_tgt_params(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 						  CFG_DP_REO_RINGS_MAP);
 }
 
+#ifdef CONFIG_SAWF_STATS
+/**
+ * wlan_soc_sawf_stats_cfg_attach() - Update sawf stats config in dp soc
+ *  cfg context
+ * @psoc - Object manager psoc
+ * @wlan_cfg_ctx - dp soc cfg ctx
+ *
+ * Return: None
+ */
+static void
+wlan_soc_sawf_stats_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
+			       struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
+{
+	wlan_cfg_ctx->sawf_stats = cfg_get(psoc, CFG_DP_SAWF_STATS);
+}
+
+uint8_t wlan_cfg_get_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->sawf_stats;
+}
+
+void wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg,
+				    uint8_t val)
+{
+	cfg->sawf_stats = val;
+}
+#else
+/**
+ * wlan_soc_sawf_stats_cfg_attach() - Update sawf stats config in dp soc
+ *  cfg context
+ * @psoc - Object manager psoc
+ * @wlan_cfg_ctx - dp soc cfg ctx
+ *
+ * Return: None
+ */
+static void
+wlan_soc_sawf_stats_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
+			       struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
+{
+}
+
+uint8_t wlan_cfg_get_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+
+void wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg,
+				    uint8_t val)
+{
+}
+#endif /* CONFIG_SAWF_STATS */
+
 /**
  * wlan_cfg_soc_attach() - Allocate and prepare SoC configuration
  * @psoc - Object manager psoc
@@ -2750,6 +2803,9 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 						CFG_DP_REO_STATUS_RING);
 	wlan_cfg_ctx->rxdma_refill_ring = cfg_get(psoc,
 						  CFG_DP_RXDMA_REFILL_RING);
+	wlan_cfg_ctx->rxdma_refill_lt_disable =
+					cfg_get(psoc,
+						CFG_DP_RXDMA_REFILL_LT_DISABLE);
 	wlan_cfg_ctx->tx_desc_limit_0 = cfg_get(psoc,
 						CFG_DP_TX_DESC_LIMIT_0);
 	wlan_cfg_ctx->tx_desc_limit_1 = cfg_get(psoc,
@@ -2791,6 +2847,8 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 				cfg_get(psoc, CFG_DP_RX_FISA_LRU_DEL_ENABLE);
 	wlan_cfg_ctx->reo_rings_mapping = cfg_get(psoc, CFG_DP_REO_RINGS_MAP);
 	wlan_cfg_ctx->pext_stats_enabled = cfg_get(psoc, CFG_DP_PEER_EXT_STATS);
+	wlan_cfg_ctx->jitter_stats_enabled =
+			cfg_get(psoc, CFG_DP_PEER_JITTER_STATS);
 	wlan_cfg_ctx->is_rx_buff_pool_enabled =
 			cfg_get(psoc, CFG_DP_RX_BUFF_POOL_ENABLE);
 	wlan_cfg_ctx->is_rx_refill_buff_pool_enabled =
@@ -2839,6 +2897,9 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 
 	wlan_cfg_ctx->napi_scale_factor = cfg_get(psoc,
 						  CFG_DP_NAPI_SCALE_FACTOR);
+	wlan_soc_sawf_stats_cfg_attach(psoc, wlan_cfg_ctx);
+	wlan_cfg_ctx->is_handle_invalid_decap_type_disabled =
+			cfg_get(psoc, CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE);
 	return wlan_cfg_ctx;
 }
 
@@ -3544,6 +3605,12 @@ wlan_cfg_get_dp_soc_rxdma_refill_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
 	return cfg->rxdma_refill_ring;
 }
 
+bool
+wlan_cfg_get_dp_soc_rxdma_refill_lt_disable(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->rxdma_refill_lt_disable;
+}
+
 int
 wlan_cfg_get_dp_soc_tx_desc_limit_0(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
@@ -3773,6 +3840,13 @@ wlan_cfg_set_peer_ext_stats(struct wlan_cfg_dp_soc_ctxt *cfg,
 	cfg->pext_stats_enabled = val;
 }
 
+void
+wlan_cfg_set_peer_jitter_stats(struct wlan_cfg_dp_soc_ctxt *cfg,
+			       bool val)
+{
+	cfg->jitter_stats_enabled = val;
+}
+
 bool
 wlan_cfg_is_peer_ext_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
@@ -3782,6 +3856,11 @@ wlan_cfg_is_peer_ext_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
 bool wlan_cfg_is_fst_in_cmem_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->fst_in_cmem;
+}
+
+bool wlan_cfg_is_peer_jitter_stats_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->jitter_stats_enabled;
 }
 
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
@@ -3920,6 +3999,12 @@ wlan_cfg_get_dp_soc_ppe_release_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->ppe_release_ring;
 }
+
+int
+wlan_cfg_get_dp_soc_ppe_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->ppe_num_tx_desc;
+}
 #endif
 
 void
@@ -3944,6 +4029,12 @@ wlan_cfg_get_prealloc_cfg(struct cdp_ctrl_objmgr_psoc *ctrl_psoc,
 	cfg->num_tx_ext_desc = cfg_get(ctrl_psoc, CFG_DP_TX_EXT_DESC);
 	cfg->num_rxdma_buf_ring_entries = cfg_get(ctrl_psoc,
 						  CFG_DP_RXDMA_BUF_RING);
+	cfg->num_rxdma_refill_ring_entries = cfg_get(ctrl_psoc,
+						     CFG_DP_RXDMA_REFILL_RING);
+	cfg->num_reo_status_ring_entries = cfg_get(ctrl_psoc,
+						   CFG_DP_REO_STATUS_RING);
+	cfg->num_mon_status_ring_entries = cfg_get(ctrl_psoc,
+						   CFG_DP_RXDMA_MONITOR_STATUS_RING);
 }
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2

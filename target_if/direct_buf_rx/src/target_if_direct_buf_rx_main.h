@@ -218,6 +218,7 @@ struct direct_buf_rx_pdev_obj {
  * @mem_list: list for holding the large memories during the entire
  *  PSOC lifetime
  * @mem_list_lock: spin lock for the memory list
+ * handler_ctx: Direct DMA event handler context
  */
 struct direct_buf_rx_psoc_obj {
 	void *hal_soc;
@@ -227,6 +228,7 @@ struct direct_buf_rx_psoc_obj {
 	qdf_list_t mem_list[WLAN_UMAC_MAX_PDEVS];
 	qdf_spinlock_t mem_list_lock;
 #endif
+	enum wmi_rx_exec_ctx handler_ctx;
 };
 
 /**

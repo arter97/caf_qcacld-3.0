@@ -729,12 +729,15 @@ done:
 							      rx.raw, 1,
 							      msdu_len);
 			} else {
-				dp_rx_nbuf_free(nbuf);
 				DP_STATS_INC(soc, rx.err.scatter_msdu, 1);
-				dp_info_rl("scatter msdu len %d, dropped",
-					   msdu_len);
-				nbuf = next;
-				continue;
+
+				if (!dp_rx_is_sg_supported()) {
+					dp_rx_nbuf_free(nbuf);
+					dp_info_rl("sg msdu len %d, dropped",
+						   msdu_len);
+					nbuf = next;
+					continue;
+				}
 			}
 		} else {
 			msdu_len = QDF_NBUF_CB_RX_PKT_LEN(nbuf);
@@ -1215,6 +1218,14 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 	      qdf_nbuf_is_ipv6_igmp_pkt(nbuf)))
 		return false;
 
+	if (qdf_unlikely(vdev->multipass_en)) {
+		if (dp_rx_multipass_process(peer, nbuf, tid) == false) {
+			DP_PEER_PER_PKT_STATS_INC(peer,
+						  rx.multipass_rx_pkt_drop, 1);
+			return false;
+		}
+	}
+
 	if (!peer->bss_peer) {
 		if (dp_rx_intrabss_mcbc_fwd(soc, peer, NULL, nbuf, tid_stats))
 			dp_rx_err("forwarding failed");
@@ -1669,3 +1680,72 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 	return ret;
 }
 #endif
+
+bool dp_rx_chain_msdus_be(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			  uint8_t *rx_tlv_hdr, uint8_t mac_id)
+{
+	bool mpdu_done = false;
+	qdf_nbuf_t curr_nbuf = NULL;
+	qdf_nbuf_t tmp_nbuf = NULL;
+
+	struct dp_pdev *dp_pdev = dp_get_pdev_for_lmac_id(soc, mac_id);
+
+	if (!dp_pdev) {
+		dp_rx_debug("%pK: pdev is null for mac_id = %d", soc, mac_id);
+		return mpdu_done;
+	}
+	/* if invalid peer SG list has max values free the buffers in list
+	 * and treat current buffer as start of list
+	 *
+	 * current logic to detect the last buffer from attn_tlv is not reliable
+	 * in OFDMA UL scenario hence add max buffers check to avoid list pile
+	 * up
+	 */
+	if (!dp_pdev->first_nbuf ||
+	    (dp_pdev->invalid_peer_head_msdu &&
+	    QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST
+	    (dp_pdev->invalid_peer_head_msdu) >= DP_MAX_INVALID_BUFFERS)) {
+		qdf_nbuf_set_rx_chfrag_start(nbuf, 1);
+		dp_pdev->first_nbuf = true;
+
+		/* If the new nbuf received is the first msdu of the
+		 * amsdu and there are msdus in the invalid peer msdu
+		 * list, then let us free all the msdus of the invalid
+		 * peer msdu list.
+		 * This scenario can happen when we start receiving
+		 * new a-msdu even before the previous a-msdu is completely
+		 * received.
+		 */
+		curr_nbuf = dp_pdev->invalid_peer_head_msdu;
+		while (curr_nbuf) {
+			tmp_nbuf = curr_nbuf->next;
+			dp_rx_nbuf_free(curr_nbuf);
+			curr_nbuf = tmp_nbuf;
+		}
+
+		dp_pdev->invalid_peer_head_msdu = NULL;
+		dp_pdev->invalid_peer_tail_msdu = NULL;
+
+		dp_monitor_get_mpdu_status(dp_pdev, soc, rx_tlv_hdr);
+	}
+
+	if (qdf_nbuf_is_rx_chfrag_end(nbuf) &&
+	    hal_rx_attn_msdu_done_get(soc->hal_soc, rx_tlv_hdr)) {
+		qdf_assert_always(dp_pdev->first_nbuf);
+		dp_pdev->first_nbuf = false;
+		mpdu_done = true;
+	}
+
+	/*
+	 * For MCL, invalid_peer_head_msdu and invalid_peer_tail_msdu
+	 * should be NULL here, add the checking for debugging purpose
+	 * in case some corner case.
+	 */
+	DP_PDEV_INVALID_PEER_MSDU_CHECK(dp_pdev->invalid_peer_head_msdu,
+					dp_pdev->invalid_peer_tail_msdu);
+	DP_RX_LIST_APPEND(dp_pdev->invalid_peer_head_msdu,
+			  dp_pdev->invalid_peer_tail_msdu,
+			  nbuf);
+
+	return mpdu_done;
+}

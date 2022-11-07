@@ -472,6 +472,11 @@
 #define WLAN_CFG_DP_NAPI_SCALE_FACTOR_MIN 0
 #define WLAN_CFG_DP_NAPI_SCALE_FACTOR_MAX 4
 
+#ifdef CONFIG_SAWF_STATS
+#define WLAN_CFG_SAWF_STATS 0x0
+#define WLAN_CFG_SAWF_STATS_MIN 0x0
+#define WLAN_CFG_SAWF_STATS_MAX 0x7
+#endif
 /*
  * <ini>
  * "dp_tx_capt_max_mem_mb"- maximum memory used by Tx capture
@@ -691,6 +696,19 @@
 		WLAN_CFG_TIME_CONTROL_BP_MAX,\
 		WLAN_CFG_TIME_CONTROL_BP,\
 		CFG_VALUE_OR_DEFAULT, "DP time control back pressure")
+
+#ifdef CONFIG_SAWF_STATS
+#define CFG_DP_SAWF_STATS \
+		CFG_INI_UINT("dp_sawf_stats", \
+		WLAN_CFG_SAWF_STATS_MIN,\
+		WLAN_CFG_SAWF_STATS_MAX,\
+		WLAN_CFG_SAWF_STATS,\
+		CFG_VALUE_OR_DEFAULT, "DP sawf stats config")
+#define CFG_DP_SAWF_STATS_CONFIG CFG(CFG_DP_SAWF_STATS)
+#else
+#define CFG_DP_SAWF_STATS_CONFIG
+#endif
+
 /*
  * <ini>
  * dp_rx_pending_hl_threshold - High threshold of frame number to start
@@ -1080,6 +1098,10 @@
 		WLAN_CFG_RXDMA_REFILL_RING_SIZE, \
 		CFG_VALUE_OR_DEFAULT, "DP RXDMA refilll ring")
 
+#define CFG_DP_RXDMA_REFILL_LT_DISABLE \
+	CFG_INI_BOOL("dp_disable_rx_buf_low_threshold", false, \
+		     "Disable Low threshold interrupts for Rx Refill ring")
+
 #define CFG_DP_TX_DESC_LIMIT_0 \
 		CFG_INI_UINT("dp_tx_desc_limit_0", \
 		WLAN_CFG_TX_DESC_LIMIT_0_MIN, \
@@ -1241,6 +1263,10 @@
 	CFG_INI_BOOL("dp_tx_allow_per_pkt_vdev_id_check", false, \
 		     "Enable/Disable tx Per Pkt vdev id check")
 
+#define CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE \
+	CFG_INI_BOOL("dp_handle_invalid_decap_type_disable", false, \
+		     "Enable/Disable DP TLV out of order WAR")
+
 /*
  * <ini>
  * dp_rx_fisa_enable - Control Rx datapath FISA
@@ -1332,6 +1358,10 @@
 #define CFG_DP_PEER_EXT_STATS \
 		CFG_INI_BOOL("peer_ext_stats", \
 		false, "Peer extended stats")
+
+#define CFG_DP_PEER_JITTER_STATS \
+		CFG_INI_BOOL("peer_jitter_stats", \
+		false, "Peer Jitter stats")
 
 #define CFG_DP_NAPI_SCALE_FACTOR \
 		CFG_INI_UINT("dp_napi_scale_factor", \
@@ -1578,6 +1608,17 @@
 #endif
 
 #ifdef WLAN_SUPPORT_PPEDS
+#define WLAN_CFG_NUM_PPEDS_TX_DESC_MIN 16
+#define WLAN_CFG_NUM_PPEDS_TX_DESC_MAX 0x8000
+#define WLAN_CFG_NUM_PPEDS_TX_DESC 0x8000
+
+#define CFG_DP_PPEDS_TX_DESC \
+		CFG_INI_UINT("dp_ppeds_tx_desc", \
+		WLAN_CFG_NUM_PPEDS_TX_DESC_MIN, \
+		WLAN_CFG_NUM_PPEDS_TX_DESC_MAX, \
+		WLAN_CFG_NUM_PPEDS_TX_DESC, \
+		CFG_VALUE_OR_DEFAULT, "DP PPEDS Tx Descriptors")
+
 #define CFG_DP_PPE_ENABLE \
 	CFG_INI_BOOL("ppe_enable", false, \
 	"DP ppe enable flag")
@@ -1604,12 +1645,14 @@
 		CFG_VALUE_OR_DEFAULT, "DP PPE Release Ring")
 
 #define CFG_DP_PPE_CONFIG \
+		CFG(CFG_DP_PPEDS_TX_DESC) \
 		CFG(CFG_DP_PPE_ENABLE) \
 		CFG(CFG_DP_REO2PPE_RING) \
 		CFG(CFG_DP_PPE2TCL_RING) \
 		CFG(CFG_DP_PPE_RELEASE_RING)
 #else
 #define CFG_DP_PPE_CONFIG
+#define WLAN_CFG_NUM_PPEDS_TX_DESC_MAX 0
 #endif
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
@@ -1759,6 +1802,7 @@
 		CFG(CFG_DP_REO_STATUS_RING) \
 		CFG(CFG_DP_RXDMA_BUF_RING) \
 		CFG(CFG_DP_RXDMA_REFILL_RING) \
+		CFG(CFG_DP_RXDMA_REFILL_LT_DISABLE) \
 		CFG(CFG_DP_TX_DESC_LIMIT_0) \
 		CFG(CFG_DP_TX_DESC_LIMIT_1) \
 		CFG(CFG_DP_TX_DESC_LIMIT_2) \
@@ -1790,6 +1834,7 @@
 		CFG(CFG_DP_FULL_MON_MODE) \
 		CFG(CFG_DP_REO_RINGS_MAP) \
 		CFG(CFG_DP_PEER_EXT_STATS) \
+		CFG(CFG_DP_PEER_JITTER_STATS) \
 		CFG(CFG_DP_RX_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_REFILL_BUFF_POOL_ENABLE) \
 		CFG(CFG_DP_RX_PENDING_HL_THRESHOLD) \
@@ -1817,5 +1862,7 @@
 		CFG_DP_VDEV_STATS_HW_OFFLOAD \
 		CFG(CFG_DP_TX_CAPT_MAX_MEM_MB) \
 		CFG(CFG_DP_NAPI_SCALE_FACTOR) \
-		CFG(CFG_DP_HOST_AST_DB_ENABLE)
+		CFG(CFG_DP_HOST_AST_DB_ENABLE) \
+		CFG_DP_SAWF_STATS_CONFIG \
+		CFG(CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE)
 #endif /* _CFG_DP_H_ */

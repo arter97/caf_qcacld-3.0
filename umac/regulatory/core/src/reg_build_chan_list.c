@@ -995,10 +995,27 @@ static void reg_propagate_6g_mas_channel_list(
 #ifdef CONFIG_AFC_SUPPORT
 void reg_set_ap_pwr_type(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {
-	if (pdev_priv_obj->reg_afc_dev_deployment_type == AFC_DEPLOYMENT_OUTDOOR)
-		pdev_priv_obj->reg_cur_6g_ap_pwr_type = REG_STANDARD_POWER_AP;
-	else
-		pdev_priv_obj->reg_cur_6g_ap_pwr_type = REG_INDOOR_AP;
+	uint8_t  *num_rules = pdev_priv_obj->reg_rules.num_of_6g_ap_reg_rules;
+
+	if (pdev_priv_obj->reg_afc_dev_deployment_type ==
+	    AFC_DEPLOYMENT_OUTDOOR) {
+		if (num_rules[REG_VERY_LOW_POWER_AP])
+			pdev_priv_obj->reg_cur_6g_ap_pwr_type =
+				REG_VERY_LOW_POWER_AP;
+		else
+			pdev_priv_obj->reg_cur_6g_ap_pwr_type =
+				REG_STANDARD_POWER_AP;
+	} else {
+		if (num_rules[REG_INDOOR_AP])
+			pdev_priv_obj->reg_cur_6g_ap_pwr_type =
+				REG_INDOOR_AP;
+		else if (num_rules[REG_VERY_LOW_POWER_AP])
+			pdev_priv_obj->reg_cur_6g_ap_pwr_type =
+				REG_VERY_LOW_POWER_AP;
+		else
+			pdev_priv_obj->reg_cur_6g_ap_pwr_type =
+				REG_INDOOR_AP;
+	}
 }
 #else
 void reg_set_ap_pwr_type(struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
@@ -2901,7 +2918,7 @@ static void reg_set_pdev_fcc_rules(
 		     sizeof(struct cur_fcc_rule) * MAX_NUM_FCC_RULES);
 }
 #else
-static void reg_set_pdev_fcc_rules(
+static inline void reg_set_pdev_fcc_rules(
 		struct wlan_regulatory_psoc_priv_obj *psoc_priv_obj,
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj)
 {
@@ -2945,12 +2962,12 @@ void reg_propagate_mas_chan_list_to_pdev(struct wlan_objmgr_psoc *psoc,
 		phy_id = pdev_id;
 
 	reg_set_pdev_fcc_rules(psoc_priv_obj, pdev_priv_obj);
+	psoc_reg_rules = &psoc_priv_obj->mas_chan_params[phy_id].reg_rules;
+	reg_save_reg_rules_to_pdev(psoc_reg_rules, pdev_priv_obj);
 	reg_init_pdev_mas_chan_list(
 			pdev_priv_obj,
 			&psoc_priv_obj->mas_chan_params[phy_id]);
 	reg_init_pdev_super_chan_list(pdev_priv_obj);
-	psoc_reg_rules = &psoc_priv_obj->mas_chan_params[phy_id].reg_rules;
-	reg_save_reg_rules_to_pdev(psoc_reg_rules, pdev_priv_obj);
 	reg_modify_chan_list_for_japan(pdev);
 	pdev_priv_obj->chan_list_recvd =
 		psoc_priv_obj->chan_list_recvd[phy_id];
@@ -3935,10 +3952,10 @@ static void reg_disable_afc_mas_chan_list_channels(
 			if (pdev_priv_obj->reg_afc_dev_deployment_type ==
 			    AFC_DEPLOYMENT_OUTDOOR) {
 				afc_mas_chan_list[chan_idx].chan_flags |=
-						REGULATORY_CHAN_AFC_NOT_DONE;
+					REGULATORY_CHAN_AFC_NOT_DONE;
 			} else {
 				afc_mas_chan_list[chan_idx].state =
-						CHANNEL_STATE_DISABLE;
+					CHANNEL_STATE_DISABLE;
 				afc_mas_chan_list[chan_idx].chan_flags |=
 					REGULATORY_CHAN_DISABLED;
 				afc_mas_chan_list[chan_idx].psd_eirp = 0;

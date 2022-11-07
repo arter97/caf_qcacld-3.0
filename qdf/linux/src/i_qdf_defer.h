@@ -73,7 +73,7 @@ void __qdf_defer_func(struct work_struct *work);
  * __qdf_bh_func() - bottom half handler
  * @arg: Pointer to bottom half abstraction
  *
- * This function services all Linux-specific bottom halfs
+ * This function services all Linux-specific bottom halves
  * and dispatches them to the correct handler using the
  * abstracted functional interface.
  *

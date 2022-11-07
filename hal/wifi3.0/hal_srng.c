@@ -50,7 +50,7 @@ void hal_qcn9000_attach(struct hal_soc *hal);
 void hal_qcn9224v1_attach(struct hal_soc *hal);
 void hal_qcn9224v2_attach(struct hal_soc *hal);
 #endif
-#ifdef QCA_WIFI_QCN6122
+#if defined(QCA_WIFI_QCN6122) || defined(QCA_WIFI_QCN9160)
 void hal_qcn6122_attach(struct hal_soc *hal);
 #endif
 #ifdef QCA_WIFI_QCA6750
@@ -476,6 +476,18 @@ static void hal_target_based_configure(struct hal_soc *hal)
 		hal->use_register_windowing = true;
 		/*
 		 * Static window map  is enabled for qcn9000 to use 2mb bar
+		 * size and use multiple windows to write into registers.
+		 */
+		hal->static_window_map = true;
+		hal_qcn6122_attach(hal);
+		break;
+#endif
+
+#if defined(QCA_WIFI_QCN9160)
+	case TARGET_TYPE_QCN9160:
+		hal->use_register_windowing = true;
+		/*
+		 * Static window map  is enabled for qcn9160 to use 2mb bar
 		 * size and use multiple windows to write into registers.
 		 */
 		hal->static_window_map = true;

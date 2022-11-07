@@ -349,12 +349,16 @@ struct dp_tx_desc_pool_s *dp_tx_create_flow_pool(struct dp_soc *soc,
 
 	if (dp_tx_desc_pool_alloc(soc, flow_pool_id, flow_pool_size)) {
 		qdf_spin_unlock_bh(&pool->flow_pool_lock);
+		dp_err("dp_tx_desc_pool_alloc failed flow_pool_id: %d",
+			flow_pool_id);
 		return NULL;
 	}
 
 	if (dp_tx_desc_pool_init(soc, flow_pool_id, flow_pool_size)) {
 		dp_tx_desc_pool_free(soc, flow_pool_id);
 		qdf_spin_unlock_bh(&pool->flow_pool_lock);
+		dp_err("dp_tx_desc_pool_init failed flow_pool_id: %d",
+			flow_pool_id);
 		return NULL;
 	}
 
@@ -616,17 +620,17 @@ void dp_tx_flow_pool_unmap_handler(struct dp_pdev *pdev, uint8_t flow_id,
 		flow_pool_id);
 
 	if (qdf_unlikely(!pdev)) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: pdev is NULL", __func__);
+		dp_err("pdev is NULL");
 		return;
 	}
 	soc->pool_stats.pool_unmap_count++;
 
 	pool = &soc->tx_desc[flow_pool_id];
-	if (!pool) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-		   "%s: flow_pool not available flow_pool_id %d",
-		   __func__, type);
+	dp_info("pool status: %d", pool->status);
+
+	if (pool->status == FLOW_POOL_INACTIVE) {
+		dp_err("flow pool id: %d is inactive, ignore unmap",
+			flow_pool_id);
 		return;
 	}
 

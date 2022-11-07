@@ -2879,7 +2879,7 @@ end:
 static inline void wmi_workqueue_watchdog_warn(uint32_t msg_type_id)
 {
 	QDF_TRACE(QDF_MODULE_ID_QDF, QDF_TRACE_LEVEL_ERROR,
-		  "%s: WLAN_BUG_RCA: Message type %x has exceeded its alloted time of %ds",
+		  "%s: WLAN_BUG_RCA: Message type %x has exceeded its allotted time of %ds",
 		  __func__, msg_type_id, WMI_WQ_WD_TIMEOUT / 1000);
 }
 
@@ -3273,7 +3273,7 @@ void *wmi_unified_attach(void *scn_handle,
 	wmi_interface_logging_init(wmi_handle, WMI_HOST_PDEV_ID_0);
 
 	wmi_interface_sequence_init(wmi_handle);
-	/* Assign target cookie capablity */
+	/* Assign target cookie capability */
 	wmi_handle->use_cookie = param->use_cookie;
 	wmi_handle->osdev = param->osdev;
 	wmi_handle->wmi_stopinprogress = 0;

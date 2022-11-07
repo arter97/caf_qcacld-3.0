@@ -62,16 +62,16 @@ struct wlan_host_mlo_glb_rx_reo_per_link_info {
  * @num_links: Number of valid links
  * @valid_link_bmap: Valid link bitmap
  * @link_info: pointer to an array of Rx REO per-link information
- * @hw_forwaded_snapshot_ver: HW forwaded snapshot version
- * @fw_forwaded_snapshot_ver: FW forwaded snapshot version
+ * @hw_forwarded_snapshot_ver: HW forwarded snapshot version
+ * @fw_forwarded_snapshot_ver: FW forwarded snapshot version
  * @fw_consumed_snapshot_ver: FW consumed snapshot version
  */
 struct wlan_host_mlo_glb_rx_reo_snapshot_info {
 	uint8_t num_links;
 	uint16_t valid_link_bmap;
 	struct wlan_host_mlo_glb_rx_reo_per_link_info *link_info;
-	uint8_t hw_forwaded_snapshot_ver;
-	uint8_t fw_forwaded_snapshot_ver;
+	uint8_t hw_forwarded_snapshot_ver;
+	uint8_t fw_forwarded_snapshot_ver;
 	uint8_t fw_consumed_snapshot_ver;
 };
 

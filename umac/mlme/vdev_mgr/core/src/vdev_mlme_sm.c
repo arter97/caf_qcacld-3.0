@@ -1704,8 +1704,8 @@ static bool mlme_vdev_subst_mlo_sync_wait_event(void *ctx, uint16_t event,
 		break;
 
 	case WLAN_VDEV_SM_EV_DOWN:
-		mlme_vdev_sm_transition_to(vdev_mlme, WLAN_VDEV_S_STOP);
-		mlme_vdev_sm_deliver_event(vdev_mlme, WLAN_VDEV_SM_EV_STOP_REQ,
+		mlme_vdev_sm_transition_to(vdev_mlme, WLAN_VDEV_S_SUSPEND);
+		mlme_vdev_sm_deliver_event(vdev_mlme, event,
 					   event_data_len, event_data);
 		status = true;
 		break;

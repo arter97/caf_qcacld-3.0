@@ -269,9 +269,7 @@ void mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev)
 		if (!mlo_dev_ctx->wlan_vdev_list[i])
 			continue;
 		wlan_vdev_mlme_clear_mlo_vdev(mlo_dev_ctx->wlan_vdev_list[i]);
-		wlan_vdev_mlme_feat_ext2_cap_clear(
-				mlo_dev_ctx->wlan_vdev_list[i],
-				WLAN_VDEV_FEXT2_MLO_STA_LINK);
+		wlan_vdev_mlme_clear_mlo_link_vdev(mlo_dev_ctx->wlan_vdev_list[i]);
 	}
 }
 
@@ -494,18 +492,12 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 	return wlan_cm_start_connect(vdev, req);
 }
 
-#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
-static inline void
-mlo_update_connect_req_chan_info(struct wlan_cm_connect_req *req)
-{ }
-#else
 static inline void
 mlo_update_connect_req_chan_info(struct wlan_cm_connect_req *req)
 {
 	req->chan_freq = 0;
 	req->chan_freq_hint = 0;
 }
-#endif
 
 /**
  * mlo_prepare_and_send_connect- Prepare and send the connect req
@@ -612,8 +604,7 @@ mlo_send_link_connect(struct wlan_objmgr_vdev *vdev,
 		    (mlo_dev_ctx->wlan_vdev_list[i] == vdev))
 			continue;
 		wlan_vdev_mlme_set_mlo_vdev(mlo_dev_ctx->wlan_vdev_list[i]);
-		wlan_vdev_mlme_feat_ext2_cap_set(mlo_dev_ctx->wlan_vdev_list[i],
-						 WLAN_VDEV_FEXT2_MLO_STA_LINK);
+		wlan_vdev_mlme_set_mlo_link_vdev(mlo_dev_ctx->wlan_vdev_list[i]);
 		wlan_vdev_set_link_id(
 		      mlo_dev_ctx->wlan_vdev_list[i],
 		      ml_parnter_info->partner_link_info[partner_idx].link_id);
@@ -704,6 +695,26 @@ mlo_update_connected_links_bmap(struct wlan_mlo_dev_context *mlo_dev_ctx,
 					mlo_dev_ctx->wlan_vdev_list[i], 1);
 		}
 	}
+}
+
+void mlo_clear_connected_links_bmap(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx = NULL;
+	struct wlan_mlo_sta *sta_ctx = NULL;
+
+	if (!vdev)
+		return;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		return;
+
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx)
+		return;
+
+	qdf_mem_zero(sta_ctx->wlan_connected_links,
+		     sizeof(sta_ctx->wlan_connected_links));
 }
 
 static QDF_STATUS ml_activate_disconnect_req_sched_cb(struct scheduler_msg *msg)
@@ -1203,8 +1214,7 @@ void mlo_sta_link_handle_pending_connect(struct wlan_objmgr_vdev *vdev)
 	if (sta_ctx->connect_req->ml_parnter_info.num_partner_links) {
 		partner_info = sta_ctx->connect_req->ml_parnter_info;
 		wlan_vdev_mlme_set_mlo_vdev(vdev);
-		wlan_vdev_mlme_feat_ext2_cap_clear(
-				vdev, WLAN_VDEV_FEXT2_MLO_STA_LINK);
+		wlan_vdev_mlme_clear_mlo_link_vdev(vdev);
 		mlo_clear_connect_req_links_bmap(vdev);
 		mlo_update_connect_req_links(vdev, 1);
 		for (i = 0; i < partner_info.num_partner_links; i++) {
@@ -1215,9 +1225,7 @@ void mlo_sta_link_handle_pending_connect(struct wlan_objmgr_vdev *vdev)
 			if (tmp_vdev) {
 				mlo_update_connect_req_links(tmp_vdev, 1);
 				wlan_vdev_mlme_set_mlo_vdev(tmp_vdev);
-				wlan_vdev_mlme_feat_ext2_cap_set(
-						tmp_vdev,
-						WLAN_VDEV_FEXT2_MLO_STA_LINK);
+				wlan_vdev_mlme_set_mlo_link_vdev(tmp_vdev);
 				wlan_vdev_set_link_id(
 					tmp_vdev,
 					partner_link_info.link_id);

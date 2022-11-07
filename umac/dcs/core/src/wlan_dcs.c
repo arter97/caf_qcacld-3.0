@@ -1045,7 +1045,8 @@ wlan_dcs_get_available_chan_for_bw(struct wlan_objmgr_pdev *pdev,
 
 		state = wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode(
 				pdev, freq, bw, &bonded_chan_ptr,
-				REG_CURRENT_PWR_MODE);
+				REG_CURRENT_PWR_MODE,
+				NO_SCHANS_PUNC);
 		if (state != CHANNEL_STATE_ENABLE)
 			continue;
 

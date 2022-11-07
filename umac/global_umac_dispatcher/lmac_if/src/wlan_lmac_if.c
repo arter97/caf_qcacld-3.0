@@ -378,6 +378,10 @@ static void wlan_lmac_if_register_afc_handlers(
 	rx_ops->reg_rx_ops.afc_event_handler = tgt_reg_process_afc_event;
 	rx_ops->reg_rx_ops.reg_set_afc_dev_type = tgt_reg_set_afc_dev_type;
 	rx_ops->reg_rx_ops.reg_get_afc_dev_type = tgt_reg_get_afc_dev_type;
+	rx_ops->reg_rx_ops.reg_set_eirp_preferred_support =
+				tgt_reg_set_eirp_preferred_support;
+	rx_ops->reg_rx_ops.reg_get_eirp_preferred_support =
+				tgt_reg_get_eirp_preferred_support;
 }
 #else
 static inline void wlan_lmac_if_register_afc_handlers(

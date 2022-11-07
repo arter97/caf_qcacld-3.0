@@ -1603,6 +1603,22 @@ void wlan_vdev_mlme_set_mlo_vdev(struct wlan_objmgr_vdev *vdev);
  */
 void wlan_vdev_mlme_clear_mlo_vdev(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * wlan_vdev_mlme_set_mlo_link_vdev() - Set vdev as an MLO link vdev
+ * @vdev: VDEV object
+ *
+ * Return: void
+ */
+void wlan_vdev_mlme_set_mlo_link_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_vdev_mlme_clear_mlo_link_vdev() - Mark that the vdev is no longer an
+ * MLO link vdev
+ * @vdev: VDEV object
+ *
+ * Return: void
+ */
+void wlan_vdev_mlme_clear_mlo_link_vdev(struct wlan_objmgr_vdev *vdev);
 #ifdef WLAN_MCAST_MLO
 /**
  * wlan_vdev_mlme_is_mlo_mcast_vdev() - whether it is mlo mcast vdev or not
@@ -1693,6 +1709,16 @@ void wlan_vdev_mlme_set_mlo_vdev(struct wlan_objmgr_vdev *vdev)
 
 static inline
 void wlan_vdev_mlme_clear_mlo_vdev(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void wlan_vdev_mlme_set_mlo_link_vdev(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline
+void wlan_vdev_mlme_clear_mlo_link_vdev(struct wlan_objmgr_vdev *vdev)
 {
 }
 

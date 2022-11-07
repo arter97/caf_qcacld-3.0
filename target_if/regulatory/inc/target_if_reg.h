@@ -155,10 +155,25 @@ target_if_reg_set_afc_dev_type(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 target_if_reg_get_afc_dev_type(struct wlan_objmgr_psoc *psoc,
 			       enum reg_afc_dev_deploy_type *reg_afc_dev_type);
+
+/**
+ * target_if_set_regulatory_eirp_preferred_support() - Set EIRP as the preferred
+ * support
+ * @psoc: psoc pointer
+ * Return: Success or Failure
+ */
+QDF_STATUS
+target_if_set_regulatory_eirp_preferred_support(struct wlan_objmgr_psoc *psoc);
 #else
 static inline QDF_STATUS
 target_if_reg_set_afc_dev_type(struct wlan_objmgr_psoc *psoc,
 			       struct target_psoc_info *tgt_hdl)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline QDF_STATUS
+target_if_set_regulatory_eirp_preferred_support(struct wlan_objmgr_psoc *psoc)
 {
 	return QDF_STATUS_E_FAILURE;
 }

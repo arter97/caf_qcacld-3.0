@@ -50,8 +50,6 @@
 
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 
-/* Max buffer in invalid peer SG list*/
-#define DP_MAX_INVALID_BUFFERS 10
 
 /* Max regular Rx packet routing error */
 #define DP_MAX_REG_RX_ROUTING_ERRS_THRESHOLD 20
@@ -723,104 +721,6 @@ _dp_rx_bar_frame_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 	dp_peer_unref_delete(peer, DP_MOD_ID_RX_ERR);
 }
 
-#ifdef DP_INVALID_PEER_ASSERT
-#define DP_PDEV_INVALID_PEER_MSDU_CHECK(head, tail) \
-		do {                                \
-			qdf_assert_always(!(head)); \
-			qdf_assert_always(!(tail)); \
-		} while (0)
-#else
-#define DP_PDEV_INVALID_PEER_MSDU_CHECK(head, tail) /* no op */
-#endif
-
-/**
- * dp_rx_chain_msdus() - Function to chain all msdus of a mpdu
- *                       to pdev invalid peer list
- *
- * @soc: core DP main context
- * @nbuf: Buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- * @mac_id: mac id
- *
- *  Return: bool: true for last msdu of mpdu
- */
-static bool
-dp_rx_chain_msdus(struct dp_soc *soc, qdf_nbuf_t nbuf,
-		  uint8_t *rx_tlv_hdr, uint8_t mac_id)
-{
-	bool mpdu_done = false;
-	qdf_nbuf_t curr_nbuf = NULL;
-	qdf_nbuf_t tmp_nbuf = NULL;
-
-	/* TODO: Currently only single radio is supported, hence
-	 * pdev hard coded to '0' index
-	 */
-	struct dp_pdev *dp_pdev = dp_get_pdev_for_lmac_id(soc, mac_id);
-
-	if (!dp_pdev) {
-		dp_rx_err_debug("%pK: pdev is null for mac_id = %d", soc, mac_id);
-		return mpdu_done;
-	}
-	/* if invalid peer SG list has max values free the buffers in list
-	 * and treat current buffer as start of list
-	 *
-	 * current logic to detect the last buffer from attn_tlv is not reliable
-	 * in OFDMA UL scenario hence add max buffers check to avoid list pile
-	 * up
-	 */
-	if (!dp_pdev->first_nbuf ||
-	    (dp_pdev->invalid_peer_head_msdu &&
-	    QDF_NBUF_CB_RX_NUM_ELEMENTS_IN_LIST
-	    (dp_pdev->invalid_peer_head_msdu) >= DP_MAX_INVALID_BUFFERS)) {
-		qdf_nbuf_set_rx_chfrag_start(nbuf, 1);
-		dp_pdev->ppdu_id = hal_rx_get_ppdu_id(soc->hal_soc,
-						      rx_tlv_hdr);
-		dp_pdev->first_nbuf = true;
-
-		/* If the new nbuf received is the first msdu of the
-		 * amsdu and there are msdus in the invalid peer msdu
-		 * list, then let us free all the msdus of the invalid
-		 * peer msdu list.
-		 * This scenario can happen when we start receiving
-		 * new a-msdu even before the previous a-msdu is completely
-		 * received.
-		 */
-		curr_nbuf = dp_pdev->invalid_peer_head_msdu;
-		while (curr_nbuf) {
-			tmp_nbuf = curr_nbuf->next;
-			dp_rx_nbuf_free(curr_nbuf);
-			curr_nbuf = tmp_nbuf;
-		}
-
-		dp_pdev->invalid_peer_head_msdu = NULL;
-		dp_pdev->invalid_peer_tail_msdu = NULL;
-
-		dp_monitor_get_mpdu_status(dp_pdev, soc, rx_tlv_hdr);
-	}
-
-	if (dp_pdev->ppdu_id == hal_rx_attn_phy_ppdu_id_get(soc->hal_soc,
-							    rx_tlv_hdr) &&
-	    hal_rx_attn_msdu_done_get(soc->hal_soc, rx_tlv_hdr)) {
-		qdf_nbuf_set_rx_chfrag_end(nbuf, 1);
-		qdf_assert_always(dp_pdev->first_nbuf == true);
-		dp_pdev->first_nbuf = false;
-		mpdu_done = true;
-	}
-
-	/*
-	 * For MCL, invalid_peer_head_msdu and invalid_peer_tail_msdu
-	 * should be NULL here, add the checking for debugging purpose
-	 * in case some corner case.
-	 */
-	DP_PDEV_INVALID_PEER_MSDU_CHECK(dp_pdev->invalid_peer_head_msdu,
-					dp_pdev->invalid_peer_tail_msdu);
-	DP_RX_LIST_APPEND(dp_pdev->invalid_peer_head_msdu,
-				dp_pdev->invalid_peer_tail_msdu,
-				nbuf);
-
-	return mpdu_done;
-}
-
 /**
  * dp_rx_bar_frame_handle() - Function to handle err BAR frames
  * @soc: core DP main context
@@ -860,6 +760,12 @@ dp_rx_bar_frame_handle(struct dp_soc *soc,
 	tid = hal_rx_mpdu_start_tid_get(soc->hal_soc,
 					rx_tlv_hdr);
 	pdev = dp_get_pdev_for_lmac_id(soc, rx_desc->pool_id);
+
+	if (!pdev) {
+		dp_rx_err_debug("%pK: pdev is null for pool_id = %d",
+				soc, rx_desc->pool_id);
+		return;
+	}
 
 	_dp_rx_bar_frame_handle(soc, nbuf, mpdu_desc_info, tid, err_status,
 				err_code);
@@ -1262,7 +1168,9 @@ dp_rx_null_q_desc_handle(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			dp_rx_process_invalid_peer_wrapper(soc,
 					nbuf, mpdu_done, pool_id);
 		} else {
-			mpdu_done = dp_rx_chain_msdus(soc, nbuf, rx_tlv_hdr, pool_id);
+			mpdu_done = soc->arch_ops.dp_rx_chain_msdus(soc, nbuf,
+								    rx_tlv_hdr,
+								    pool_id);
 			/* Trigger invalid peer handler wrapper */
 			dp_rx_process_invalid_peer_wrapper(soc,
 					pdev->invalid_peer_head_msdu,
@@ -2295,6 +2203,24 @@ static int dp_rx_err_exception(struct dp_soc *soc, hal_ring_desc_t ring_desc)
 }
 #endif /* HANDLE_RX_REROUTE_ERR */
 
+#ifdef WLAN_MLO_MULTI_CHIP
+static void dp_idle_link_bm_id_check(struct dp_soc *soc, uint8_t rbm)
+{
+	/*
+	 * For WIN usecase we should only get fragment packets in
+	 * this ring as for MLO case fragmentation is not supported
+	 * we should not see links from other soc.
+	 *
+	 * Adding a assert for link descriptors from local soc
+	 */
+	qdf_assert_always(rbm == soc->idle_link_bm_id);
+}
+#else
+static void dp_idle_link_bm_id_check(struct dp_soc *soc, uint8_t rbm)
+{
+}
+#endif
+
 uint32_t
 dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		  hal_ring_handle_t hal_ring_hdl, uint32_t quota)
@@ -2395,6 +2321,8 @@ dp_rx_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		 */
 		qdf_assert_always((hbi.sw_cookie >> LINK_DESC_ID_SHIFT) &
 					soc->link_desc_id_start);
+
+		dp_idle_link_bm_id_check(soc, hbi.rbm);
 
 		status = dp_rx_link_cookie_check(ring_desc);
 		if (qdf_unlikely(QDF_IS_STATUS_ERROR(status))) {

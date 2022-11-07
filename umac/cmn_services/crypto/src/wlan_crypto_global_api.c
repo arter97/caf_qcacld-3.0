@@ -2226,7 +2226,7 @@ uint8_t *wlan_crypto_add_mmie(struct wlan_objmgr_vdev *vdev,
 				uint32_t len) {
 	struct wlan_crypto_key *key;
 	struct wlan_crypto_mmie *mmie;
-	uint8_t *pn, *aad, *buf, *efrm, nounce[12];
+	uint8_t *pn, *aad, *buf, *efrm, nonce[12];
 	struct wlan_frame_hdr *hdr;
 	uint32_t i, hdrlen, mic_len, aad_len;
 	uint8_t mic[16];
@@ -2330,10 +2330,10 @@ uint8_t *wlan_crypto_add_mmie(struct wlan_objmgr_vdev *vdev,
 			|| (crypto_priv->igtk_key_type
 					== WLAN_CRYPTO_CIPHER_AES_GMAC_256)) {
 
-		qdf_mem_copy(nounce, hdr->i_addr2, QDF_MAC_ADDR_SIZE);
-		wlan_crypto_gmac_pn_swap(nounce + 6, pn);
-		ret = wlan_crypto_aes_gmac(key->keyval, key->keylen, nounce,
-					sizeof(nounce), buf,
+		qdf_mem_copy(nonce, hdr->i_addr2, QDF_MAC_ADDR_SIZE);
+		wlan_crypto_gmac_pn_swap(nonce + 6, pn);
+		ret = wlan_crypto_aes_gmac(key->keyval, key->keylen, nonce,
+					sizeof(nonce), buf,
 					len + aad_len - hdrlen, mmie->mic);
 	}
 	qdf_mem_free(buf);
@@ -2360,7 +2360,7 @@ bool wlan_crypto_is_mmie_valid(struct wlan_objmgr_vdev *vdev,
 					uint8_t *frm,
 					uint8_t *efrm){
 	struct wlan_crypto_mmie   *mmie = NULL;
-	uint8_t *ipn, *aad, *buf, *mic, nounce[12];
+	uint8_t *ipn, *aad, *buf, *mic, nonce[12];
 	struct wlan_crypto_key *key;
 	struct wlan_frame_hdr *hdr;
 	uint16_t mic_len, hdrlen, len;
@@ -2470,10 +2470,10 @@ bool wlan_crypto_is_mmie_valid(struct wlan_objmgr_vdev *vdev,
 	} else if ((crypto_priv->igtk_key_type == WLAN_CRYPTO_CIPHER_AES_GMAC)
 			|| (crypto_priv->igtk_key_type
 					== WLAN_CRYPTO_CIPHER_AES_GMAC_256)) {
-		qdf_mem_copy(nounce, hdr->i_addr2, QDF_MAC_ADDR_SIZE);
-		wlan_crypto_gmac_pn_swap(nounce + 6, ipn);
-		ret = wlan_crypto_aes_gmac(key->keyval, key->keylen, nounce,
-					sizeof(nounce), buf,
+		qdf_mem_copy(nonce, hdr->i_addr2, QDF_MAC_ADDR_SIZE);
+		wlan_crypto_gmac_pn_swap(nonce + 6, ipn);
+		ret = wlan_crypto_aes_gmac(key->keyval, key->keylen, nonce,
+					sizeof(nonce), buf,
 					len + aad_len - hdrlen, mic);
 	}
 

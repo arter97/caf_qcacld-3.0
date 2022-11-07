@@ -66,14 +66,17 @@
 #define QDF_NBUF_SRC_MAC_OFFSET			6
 #define QDF_NBUF_TRAC_IPV4_TOS_OFFSET		15
 #define QDF_NBUF_TRAC_IPV4_PROTO_TYPE_OFFSET  23
+#define QDF_NBUF_TRAC_VLAN_IPV4_PROTO_TYPE_OFFSET  27
 #define QDF_NBUF_TRAC_IPV4_DEST_ADDR_OFFSET   30
 #define QDF_NBUF_TRAC_IPV4_SRC_ADDR_OFFSET    26
 #define QDF_NBUF_TRAC_IPV6_PROTO_TYPE_OFFSET  20
+#define QDF_NBUF_TRAC_VLAN_IPV6_PROTO_TYPE_OFFSET  24
 #define QDF_NBUF_TRAC_IPV4_ADDR_MCAST_MASK    0xE0000000
 #define QDF_NBUF_TRAC_IPV4_ADDR_BCAST_MASK    0xF0000000
 #define QDF_NBUF_TRAC_IPV6_DEST_ADDR_OFFSET   38
 #define QDF_NBUF_TRAC_IPV6_DEST_ADDR          0xFF00
 #define QDF_NBUF_TRAC_IPV6_OFFSET		14
+#define QDF_NBUF_TRAC_VLAN_IPV6_OFFSET		18
 #define QDF_NBUF_TRAC_IPV6_HEADER_SIZE   40
 #define QDF_NBUF_TRAC_ICMP_TYPE         1
 #define QDF_NBUF_TRAC_IGMP_TYPE         2
@@ -101,8 +104,12 @@
 #define EAPOL_KEY_INFO_OFFSET			19
 #define EAPOL_PKT_LEN_OFFSET			16
 #define EAPOL_KEY_LEN_OFFSET			21
-#define EAPOL_PACKET_TYPE_EAP			0
-#define EAPOL_PACKET_TYPE_KEY			3
+
+#define EAPOL_PACKET_TYPE_EAP                   0
+#define EAPOL_PACKET_TYPE_START                 1
+#define EAPOL_PACKET_TYPE_LOGOFF                2
+#define EAPOL_PACKET_TYPE_KEY                   3
+
 #define EAPOL_KEY_TYPE_MASK			0x0800
 #define EAPOL_KEY_ENCRYPTED_MASK		0x0010
 
@@ -359,13 +366,9 @@ typedef __qdf_nbuf_queue_t qdf_nbuf_queue_t;
  * @aggregation: Indicate A-MPDU format
  * @ht_stbc: Indicate stbc
  * @ht_crc: ht crc
- * @xlna_bypass_offset: Low noise amplifier bypass offset
- * @xlna_bypass_threshold: Low noise amplifier bypass threshold
- * @rssi_temp_offset: Temperature based rssi offset
- * @min_nf_dbm: min noise floor in active chains per channel
- * @xbar_config: 4 bytes, used for BB to RF Chain mapping
- * @rssi_dbm_conv_support: Rssi dbm conversion support param
  * @rx_user_status: pointer to mon_rx_user_status, when set update
+ * @rssi_offset: This offset value will use for RSSI db to dbm conversion
+ * @rssi_dbm_conv_support: Rssi dbm conversion support param
  * radiotap header will use userinfo from this structure.
  */
 struct mon_rx_status {
@@ -483,15 +486,9 @@ struct mon_rx_status {
 		 ht_stbc:2,
 		 ht_crc:8;
 #endif
-#ifdef QCA_RSSI_DB2DBM
-	int32_t xlna_bypass_offset;
-	int32_t xlna_bypass_threshold;
-	int32_t rssi_temp_offset;
-	int8_t min_nf_dbm;
-	uint32_t xbar_config;
-	bool rssi_dbm_conv_support;
-#endif
 	struct mon_rx_user_status *rx_user_status;
+	int32_t rssi_offset;
+	bool rssi_dbm_conv_support;
 };
 
 /**
@@ -1055,7 +1052,7 @@ enum cb_ftype {
 typedef __qdf_nbuf_t qdf_nbuf_t;
 
 /**
- * @qdf_nbuf_shared_info_t- Platform indepedent shared info
+ * @qdf_nbuf_shared_info_t- Platform independent shared info
  */
 typedef __qdf_nbuf_shared_info_t qdf_nbuf_shared_info_t;
 

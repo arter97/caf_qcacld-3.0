@@ -291,10 +291,10 @@ struct wmi_command_header {
 
 /**
  * struct wmi_log_buf_t - WMI log buffer information type
- * @buf - Refernce to WMI log buffer
+ * @buf - Reference to WMI log buffer
  * @ length - length of buffer
  * @ buf_tail_idx - Tail index of buffer
- * @ p_buf_tail_idx - refernce to buffer tail index. It is added to accommodate
+ * @ p_buf_tail_idx - reference to buffer tail index. It is added to accommodate
  * unified design since MCL uses global variable for buffer tail index
  * @ size - the size of the buffer in number of entries
  */
@@ -321,9 +321,9 @@ struct wmi_log_buf_t {
  * @wmi_diag_event_log_buf_info - Buffer info for WMI diag event log
  * @wmi_record_lock - Lock WMI recording
  * @wmi_logging_enable - Enable/Disable state for WMI logging
- * @wmi_id_to_name - Function refernce to API to convert Command id to
+ * @wmi_id_to_name - Function reference to API to convert Command id to
  * string name
- * @wmi_log_debugfs_dir - refernce to debugfs directory
+ * @wmi_log_debugfs_dir - reference to debugfs directory
  * @filtered_wmi_cmds - Buffer to save inputs from user on
  * which WMI commands to record
  * @filtered_wmi_cmds_idx - target cmd index
@@ -2857,6 +2857,11 @@ QDF_STATUS (*extract_smart_monitor_event)(
 QDF_STATUS (*multisoc_tbtt_sync_cmd)(wmi_unified_t wmi_handle,
 				     struct rnr_tbtt_multisoc_sync_param *param);
 
+#ifdef WLAN_FEATURE_SR
+QDF_STATUS (*vdev_param_sr_prohibit_send)(wmi_unified_t wmi_handle,
+					  struct sr_prohibit_param *param);
+#endif
+
 #ifdef FEATURE_WLAN_TIME_SYNC_FTM
 QDF_STATUS (*send_wlan_time_sync_ftm_trigger_cmd)(wmi_unified_t wmi_handle,
 						  uint32_t vdev_id,
@@ -3146,7 +3151,7 @@ QDF_STATUS
 #endif /* HEALTH_MON_SUPPORT */
 };
 
-/* Forward declartion for psoc*/
+/* Forward declaration for psoc*/
 struct wlan_objmgr_psoc;
 
 /**

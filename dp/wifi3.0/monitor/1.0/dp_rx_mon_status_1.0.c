@@ -498,6 +498,7 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, struct dp_intr *int_ctx,
 				 (tlv_status == HAL_TLV_STATUS_MPDU_START) ||
 				 (tlv_status == HAL_TLV_STATUS_MSDU_END));
 		}
+		dp_mon_rx_stats_update_rssi_dbm_params(mon_pdev, ppdu_info);
 		if (qdf_unlikely(mon_pdev->dp_peer_based_pktlog)) {
 			dp_rx_process_peer_based_pktlog(soc, ppdu_info,
 							status_nbuf,
@@ -564,6 +565,8 @@ dp_rx_mon_status_process_tlv(struct dp_soc *soc, struct dp_intr *int_ctx,
 			if (qdf_unlikely(mon_pdev->scan_spcl_vap_configured))
 				dp_rx_mon_update_scan_spcl_vap_stats(pdev,
 								     ppdu_info);
+
+			dp_rx_mon_update_user_ctrl_frame_stats(pdev, ppdu_info);
 
 			/*
 			* if chan_num is not fetched correctly from ppdu RX TLV,

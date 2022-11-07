@@ -883,4 +883,15 @@ struct rtt_channel_info {
 	uint16_t num_bssids;
 	struct rtt_bssid_info bssid_info[RTT_MAX_BSSIDS_TO_SCAN];
 };
+
+/**
+ * struct sr_prohibit_param - SR prohibit command parameter
+ *
+ * @vdev_id: vdev id
+ * @sr_he_siga_val15_allowed: HE_SIG_A_VAL15_ALLOWED is enabled/disabled
+ */
+struct sr_prohibit_param {
+	uint8_t vdev_id;
+	bool sr_he_siga_val15_allowed;
+};
 #endif /* __WLAN_VDEV_MGR_TX_OPS_DEFS_H__ */

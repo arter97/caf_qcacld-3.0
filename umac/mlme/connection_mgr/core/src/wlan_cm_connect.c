@@ -545,6 +545,7 @@ cm_candidate_mlo_update(struct scan_cache_entry *scan_entry,
 			struct validate_bss_data *validate_bss_info)
 {
 	validate_bss_info->is_mlo = !!scan_entry->ie_list.multi_link;
+	validate_bss_info->scan_entry = scan_entry;
 }
 #else
 static inline
@@ -2084,10 +2085,10 @@ cm_resume_connect_after_peer_create(struct cnx_mgr *cm_ctx, wlan_cm_id *cm_id)
 	}
 
 	wlan_reg_get_cc_and_src(psoc, country_code);
-	mlme_nofl_info(CM_PREFIX_FMT "Connecting to %.*s " QDF_MAC_ADDR_FMT " rssi: %d freq: %d akm 0x%x cipher: uc 0x%x mc 0x%x, wps %d osen %d force RSN %d CC: %c%c",
+	mlme_nofl_info(CM_PREFIX_FMT "Connecting to " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT " rssi: %d freq: %d akm 0x%x cipher: uc 0x%x mc 0x%x, wps %d osen %d force RSN %d CC: %c%c",
 		       CM_PREFIX_REF(req.vdev_id, req.cm_id),
-		       cm_req->connect_req.req.ssid.length,
-		       cm_req->connect_req.req.ssid.ssid,
+		       QDF_SSID_REF(cm_req->connect_req.req.ssid.length,
+				    cm_req->connect_req.req.ssid.ssid),
 		       QDF_MAC_ADDR_REF(req.bss->entry->bssid.bytes),
 		       req.bss->entry->rssi_raw,
 		       req.bss->entry->channel.chan_freq,
@@ -2327,7 +2328,8 @@ QDF_STATUS cm_notify_connect_complete(struct cnx_mgr *cm_ctx,
 					  resp->connect_status);
 	cm_inform_dlm_connect_complete(cm_ctx->vdev, resp);
 
-	if (QDF_IS_STATUS_ERROR(resp->connect_status))
+	if (QDF_IS_STATUS_ERROR(resp->connect_status) &&
+	    sm_state == WLAN_CM_S_INIT)
 		cm_clear_vdev_mlo_cap(cm_ctx->vdev);
 
 	return QDF_STATUS_SUCCESS;

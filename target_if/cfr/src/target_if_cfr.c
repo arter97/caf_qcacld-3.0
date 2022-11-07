@@ -266,6 +266,8 @@ void target_if_cfr_fill_header(struct csi_cfr_header *hdr,
 			hdr->cmn.chip_type = CFR_CAPTURE_RADIO_MAPLE;
 		else if (target_type == TARGET_TYPE_QCN6122)
 			hdr->cmn.chip_type = CFR_CAPTURE_RADIO_SPRUCE;
+		else if (target_type == TARGET_TYPE_QCN9160)
+			hdr->cmn.chip_type = CFR_CAPTURE_RADIO_YORK;
 		else if (target_type == TARGET_TYPE_QCN9224)
 			hdr->cmn.chip_type = CFR_CAPTURE_RADIO_WAIKIKI;
 		else if (target_type == TARGET_TYPE_QCA5332)
@@ -461,7 +463,8 @@ target_if_cfr_init_pdev(struct wlan_objmgr_psoc *psoc,
 		   (target_type == TARGET_TYPE_QCN6122) ||
 		   (target_type == TARGET_TYPE_QCA5018) ||
 		   (target_type == TARGET_TYPE_QCA5332) ||
-		   (target_type == TARGET_TYPE_QCN9224)) {
+		   (target_type == TARGET_TYPE_QCN9224) ||
+		   (target_type == TARGET_TYPE_QCN9160)) {
 		pa->is_cfr_capable = cfr_sc->is_cfr_capable;
 		return cfr_enh_init_pdev(psoc, pdev);
 	} else
@@ -489,7 +492,8 @@ target_if_cfr_deinit_pdev(struct wlan_objmgr_psoc *psoc,
 		   (target_type == TARGET_TYPE_QCN6122) ||
 		   (target_type == TARGET_TYPE_QCA5018) ||
 		   (target_type == TARGET_TYPE_QCA5332) ||
-		   (target_type == TARGET_TYPE_QCN9224)) {
+		   (target_type == TARGET_TYPE_QCN9224) ||
+		   (target_type == TARGET_TYPE_QCN9160)) {
 		return cfr_enh_deinit_pdev(psoc, pdev);
 	} else
 		return QDF_STATUS_E_NOSUPPORT;

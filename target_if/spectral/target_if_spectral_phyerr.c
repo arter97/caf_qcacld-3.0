@@ -896,7 +896,8 @@ target_if_spectral_unify_cfreq_format(struct target_if_spectral *spectral,
 			state =
 			    wlan_reg_get_5g_bonded_channel_and_state_for_pwrmode
 				(spectral->pdev_obj, pri20_freq, CH_WIDTH_80MHZ,
-				 &bonded_chan_ptr, REG_CURRENT_PWR_MODE);
+				 &bonded_chan_ptr, REG_CURRENT_PWR_MODE,
+				 NO_SCHANS_PUNC);
 
 			if (state == CHANNEL_STATE_DISABLE ||
 			    state == CHANNEL_STATE_INVALID) {

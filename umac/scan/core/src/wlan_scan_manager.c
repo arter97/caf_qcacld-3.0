@@ -1200,6 +1200,8 @@ scm_scan_req_update_params(struct wlan_objmgr_vdev *vdev,
 		ucfg_scan_init_chanlist_params(req, 0, NULL, NULL);
 
 	scm_update_channel_list(req, scan_obj);
+
+	wlan_scan_update_low_latency_profile_chnlist(vdev, req);
 }
 
 static inline void scm_print_scan_req_info(struct scan_req_params *req)
@@ -1221,8 +1223,9 @@ static inline void scm_print_scan_req_info(struct scan_req_params *req)
 		       req->scan_priority);
 
 	for (idx = 0; idx < req->num_ssids; idx++)
-		scm_nofl_debug("SSID[%d]: %.*s", idx, req->ssid[idx].length,
-			       req->ssid[idx].ssid);
+		scm_nofl_debug("SSID[%d]: " QDF_SSID_FMT, idx,
+			       QDF_SSID_REF(req->ssid[idx].length,
+					    req->ssid[idx].ssid));
 
 	chan_lst  = &req->chan_list;
 

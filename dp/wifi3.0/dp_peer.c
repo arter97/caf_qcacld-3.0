@@ -5224,15 +5224,25 @@ QDF_STATUS dp_peer_jitter_stats_ctx_alloc(struct dp_pdev *pdev,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	/*
-	 * Allocate memory for jitter stats only when
-	 * operating in offload enabled mode.
-	 */
-	if (!wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx))
+	if (!wlan_cfg_is_peer_jitter_stats_enabled(pdev->soc->wlan_cfg_ctx))
 		return QDF_STATUS_SUCCESS;
 
-	txrx_peer->jitter_stats =
-		qdf_mem_malloc(sizeof(struct cdp_peer_tid_stats) * DP_MAX_TIDS);
+	if (wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx)) {
+		/*
+		 * Allocate memory on per tid basis when nss is enabled
+		 */
+		txrx_peer->jitter_stats =
+			qdf_mem_malloc(sizeof(struct cdp_peer_tid_stats)
+					* DP_MAX_TIDS);
+	} else {
+		/*
+		 * Allocate memory on per tid per ring basis
+		 */
+		txrx_peer->jitter_stats =
+			qdf_mem_malloc(sizeof(struct cdp_peer_tid_stats)
+					* DP_MAX_TIDS * CDP_MAX_TXRX_CTX);
+	}
+
 	if (!txrx_peer->jitter_stats) {
 		dp_warn("Jitter stats obj alloc failed!!");
 		return QDF_STATUS_E_NOMEM;
@@ -5257,8 +5267,7 @@ void dp_peer_jitter_stats_ctx_dealloc(struct dp_pdev *pdev,
 		return;
 	}
 
-	/* Check for offload mode */
-	if (!wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx))
+	if (!wlan_cfg_is_peer_jitter_stats_enabled(pdev->soc->wlan_cfg_ctx))
 		return;
 
 	if (txrx_peer->jitter_stats) {
@@ -5276,9 +5285,33 @@ void dp_peer_jitter_stats_ctx_dealloc(struct dp_pdev *pdev,
  */
 void dp_peer_jitter_stats_ctx_clr(struct dp_txrx_peer *txrx_peer)
 {
-	if (txrx_peer->jitter_stats)
-		qdf_mem_zero(txrx_peer->jitter_stats,
-			     sizeof(struct cdp_peer_tid_stats) * DP_MAX_TIDS);
+	struct cdp_peer_tid_stats *jitter_stats = NULL;
+
+	if (!txrx_peer) {
+		dp_warn("Null peer");
+		return;
+	}
+
+	if (!wlan_cfg_is_peer_jitter_stats_enabled(txrx_peer->
+						   vdev->
+						   pdev->soc->wlan_cfg_ctx))
+		return;
+
+	jitter_stats = txrx_peer->jitter_stats;
+	if (!jitter_stats)
+		return;
+
+	if (wlan_cfg_get_dp_pdev_nss_enabled(txrx_peer->
+					     vdev->pdev->wlan_cfg_ctx))
+		qdf_mem_zero(jitter_stats,
+			     sizeof(struct cdp_peer_tid_stats) *
+			     DP_MAX_TIDS);
+
+	else
+		qdf_mem_zero(jitter_stats,
+			     sizeof(struct cdp_peer_tid_stats) *
+			     DP_MAX_TIDS * CDP_MAX_TXRX_CTX);
+
 }
 #endif
 

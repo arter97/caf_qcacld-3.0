@@ -3802,7 +3802,7 @@ wmi_unified_extract_halphy_stats_event_count(wmi_unified_t wmi_handle,
  * @vdev_id: vdev id
  *
  * TSF_TSTAMP_READ_VALUE is the only operation supported
- * Return: QDF_STATUS_SUCCESS for success or erro code
+ * Return: QDF_STATUS_SUCCESS for success or error code
  */
 QDF_STATUS wmi_unified_send_vdev_tsf_tstamp_action_cmd(wmi_unified_t wmi_hdl,
 						       uint8_t vdev_id)

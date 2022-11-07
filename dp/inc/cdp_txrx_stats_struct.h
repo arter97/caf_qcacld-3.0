@@ -1426,6 +1426,10 @@ struct protocol_trace_count {
  * @release_src_not_tqm: Counter to keep track of release source is not TQM
  *			 in TX completion status processing
  * @per: Packet error ratio
+ * @rts_success: RTS success count
+ * @rts_failure: RTS failure count
+ * @bar_cnt: Block ACK Request frame count
+ * @ndpa_cnt: NDP announcement frame count
  */
 struct cdp_tx_stats {
 	struct cdp_pkt_info comp_pkt;
@@ -1545,6 +1549,10 @@ struct cdp_tx_stats {
 #endif
 	uint32_t release_src_not_tqm;
 	uint32_t per;
+	uint32_t rts_success;
+	uint32_t rts_failure;
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 /* struct cdp_rx_stats - rx Level Stats
@@ -1634,6 +1642,8 @@ struct cdp_tx_stats {
  * @su_be_ppdu_cnt: SU Rx packet count for BE
  * @mu_be_ppdu_cnt: MU rx packet count for BE
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured BW
+ * @bar_cnt: Block ACK Request frame count
+ * @ndpa_cnt: NDP announcement frame count
  */
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
@@ -1723,6 +1733,8 @@ struct cdp_rx_stats {
 	uint32_t punc_bw[MAX_PUNCTURED_MODE];
 #endif
 	uint32_t mcast_3addr_drop;
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 /* struct cdp_tx_ingress_stats - Tx ingress Stats
@@ -1929,6 +1941,7 @@ struct cdp_peer_stats {
 };
 
 /* struct cdp_peer_tid_stats - Per peer and per TID stats
+ * @tx_prev_delay: tx previous delay
  * @tx_avg_jitter: tx average jitter
  * @tx_avg_delay: tx average delay
  * @tx_avg_err: tx average error
@@ -1937,6 +1950,7 @@ struct cdp_peer_stats {
  */
 struct cdp_peer_tid_stats {
 #ifdef WLAN_PEER_JITTER
+	uint32_t tx_prev_delay;
 	uint32_t tx_avg_jitter;
 	uint32_t tx_avg_delay;
 	uint64_t tx_avg_err;
@@ -2278,7 +2292,7 @@ struct cdp_pdev_obss_pd_stats_tlv {
 	 * opportunities created. Incoming OBSS frame RSSI is compared with per
 	 * PPDU non-SRG RSSI threshold configured in each PPDU. If incoming OBSS
 	 * RSSI < non-SRG RSSI threshold configured in each PPDU, then non-SRG
-	 * tranmission happens.
+	 * transmission happens.
 	 */
 	uint32_t num_non_srg_ppdu_tried;
 	/**
@@ -2300,7 +2314,7 @@ struct cdp_pdev_obss_pd_stats_tlv {
 	 * Incoming OBSS frame RSSI is compared with per PPDU SRG RSSI
 	 * threshold configured in each PPDU.
 	 * If incoming OBSS RSSI < SRG RSSI threshold configured in each PPDU,
-	 * then SRG tranmission happens.
+	 * then SRG transmission happens.
 	 */
 	uint32_t num_srg_ppdu_tried;
 	/**
@@ -2800,8 +2814,8 @@ struct cdp_soc_stats {
  * @link_airtime: pdev airtime usage per ac per sec
  */
 struct cdp_pdev_telemetry_stats {
-	uint32_t tx_mpdu_failed;
-	uint32_t tx_mpdu_total;
+	uint32_t tx_mpdu_failed[WME_AC_MAX];
+	uint32_t tx_mpdu_total[WME_AC_MAX];
 	uint32_t link_airtime[WME_AC_MAX];
 };
 

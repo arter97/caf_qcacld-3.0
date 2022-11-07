@@ -929,11 +929,12 @@ static QDF_STATUS scm_add_update_entry(struct wlan_objmgr_psoc *psoc,
 					  &dup_node);
 
 	security_type = scan_params->security_type;
-	scm_nofl_debug("Received %s: "QDF_MAC_ADDR_FMT" \"%.*s\" freq %d rssi %d tsf_delta %u seq %d snr %d phy %d hidden %d mismatch %d %s%s%s%s pdev %d boot_time %llu ns",
+	scm_nofl_debug("Received %s: " QDF_MAC_ADDR_FMT " \"" QDF_SSID_FMT "\" freq %d rssi %d tsf_delta %u seq %d snr %d phy %d hidden %d mismatch %d %s%s%s%s pdev %d boot_time %llu ns",
 		       (scan_params->frm_subtype == MGMT_SUBTYPE_PROBE_RESP) ?
 		       "prb rsp" : "bcn",
 		       QDF_MAC_ADDR_REF(scan_params->bssid.bytes),
-		       scan_params->ssid.length, scan_params->ssid.ssid,
+		       QDF_SSID_REF(scan_params->ssid.length,
+				    scan_params->ssid.ssid),
 		       scan_params->channel.chan_freq, scan_params->rssi_raw,
 		       scan_params->tsf_delta, scan_params->seq_num,
 		       scan_params->snr, scan_params->phy_mode,

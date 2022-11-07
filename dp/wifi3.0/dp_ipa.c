@@ -3438,7 +3438,7 @@ static inline bool dp_ipa_peer_check(struct dp_soc *soc,
 	}
 
 	peer = dp_peer_get_ref_by_id(soc, ast_entry->peer_id,
-				     DP_MOD_ID_AST);
+				     DP_MOD_ID_IPA);
 
 	if (!peer) {
 		qdf_spin_unlock_bh(&soc->ast_lock);

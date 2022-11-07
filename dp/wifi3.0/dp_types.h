@@ -82,6 +82,7 @@
 #endif
 
 #define MAX_RXDESC_POOLS 4
+#define MAX_PPE_TXDESC_POOLS 1
 
 /* Max no. of VDEV per PSOC */
 #ifdef WLAN_PSOC_MAX_VDEVS
@@ -458,6 +459,7 @@ enum dp_ctxt_type {
 /**
  * enum dp_desc_type - source type for multiple pages allocation
  * @DP_TX_DESC_TYPE: DP SW TX descriptor
+ * @DP_TX_PPEDS_DESC_TYPE: DP PPE-DS Tx descriptor
  * @DP_TX_EXT_DESC_TYPE: DP TX msdu extension descriptor
  * @DP_TX_EXT_DESC_LINK_TYPE: DP link descriptor for msdu ext_desc
  * @DP_TX_TSO_DESC_TYPE: DP TX TSO descriptor
@@ -469,6 +471,7 @@ enum dp_ctxt_type {
  */
 enum dp_desc_type {
 	DP_TX_DESC_TYPE,
+	DP_TX_PPEDS_DESC_TYPE,
 	DP_TX_EXT_DESC_TYPE,
 	DP_TX_EXT_DESC_LINK_TYPE,
 	DP_TX_TSO_DESC_TYPE,
@@ -1144,6 +1147,7 @@ struct dp_soc_stats {
 		uint32_t rxdma2rel_route_drop;
 		/* Number of frames routed from reo*/
 		uint32_t reo2rel_route_drop;
+		uint64_t fast_recycled;
 
 		struct {
 			/* Invalid RBM error count */
@@ -1922,6 +1926,8 @@ struct dp_arch_ops {
 				    uint8_t bm_id);
 	uint16_t (*dp_rx_peer_metadata_peer_id_get)(struct dp_soc *soc,
 						    uint32_t peer_metadata);
+	bool (*dp_rx_chain_msdus)(struct dp_soc *soc, qdf_nbuf_t nbuf,
+				  uint8_t *rx_tlv_hdr, uint8_t mac_id);
 	/* Control Arch Ops */
 	QDF_STATUS (*txrx_set_vdev_param)(struct dp_soc *soc,
 					  struct dp_vdev *vdev,
@@ -1957,6 +1963,11 @@ struct dp_arch_ops {
 						   enum dp_mod_id mod_id,
 						   uint8_t vdev_id);
 #endif
+	uint64_t (*get_reo_qdesc_addr)(hal_soc_handle_t hal_soc_hdl,
+				       uint8_t *dst_ring_desc,
+				       uint8_t *buf,
+				       struct dp_txrx_peer *peer,
+				       unsigned int tid);
 	void (*get_rx_hash_key)(struct dp_soc *soc,
 				struct cdp_lro_hash_config *lro_hash);
 	void (*txrx_print_peer_stats)(struct cdp_peer_stats *peer_stats,
@@ -1992,6 +2003,8 @@ struct dp_arch_ops {
 	int8_t (*ipa_get_bank_id)(struct dp_soc *soc);
 #endif
 	void (*dp_txrx_ppeds_rings_status)(struct dp_soc *soc);
+	QDF_STATUS (*txrx_soc_ppeds_start)(struct dp_soc *soc);
+	void (*txrx_soc_ppeds_stop)(struct dp_soc *soc);
 };
 
 /**
@@ -2119,6 +2132,8 @@ struct dp_soc {
 	uint16_t rx_mon_pkt_tlv_size;
 	/* rx pkt tlv size */
 	uint16_t rx_pkt_tlv_size;
+	/* rx pkt tlv size in current operation mode */
+	uint16_t curr_rx_pkt_tlv_size;
 
 	struct dp_arch_ops arch_ops;
 
@@ -3813,6 +3828,10 @@ struct dp_peer_per_pkt_tx_stats {
  * @su_be_ppdu_cnt: SU Tx packet count for 11BE
  * @mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX]: MU Tx packet count for 11BE
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured bw
+ * @rts_success: RTS success count
+ * @rts_failure: RTS failure count
+ * @bar_cnt: Block ACK Request frame count
+ * @ndpa_cnt: NDP announcement frame count
  */
 struct dp_peer_extd_tx_stats {
 	uint32_t stbc;
@@ -3865,6 +3884,10 @@ struct dp_peer_extd_tx_stats {
 	struct cdp_pkt_type mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX];
 	uint32_t punc_bw[MAX_PUNCTURED_MODE];
 #endif
+	uint32_t rts_success;
+	uint32_t rts_failure;
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 /**
@@ -3980,6 +4003,8 @@ struct dp_peer_per_pkt_rx_stats {
  * @su_be_ppdu_cnt: SU Rx packet count for BE
  * @mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX]: MU rx packet count for BE
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured bw
+ * @bar_cnt: Block ACK Request frame count
+ * @ndpa_cnt: NDP announcement frame count
  */
 struct dp_peer_extd_rx_stats {
 	struct cdp_pkt_type pkt_type[DOT11_MAX];
@@ -4025,6 +4050,8 @@ struct dp_peer_extd_rx_stats {
 	struct cdp_pkt_type mu_be_ppdu_cnt[TXRX_TYPE_MU_MAX];
 	uint32_t punc_bw[MAX_PUNCTURED_MODE];
 #endif
+	uint32_t bar_cnt;
+	uint32_t ndpa_cnt;
 };
 
 /**

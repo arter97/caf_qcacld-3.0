@@ -366,6 +366,25 @@ dp_rx_handle_ppdu_stats(struct dp_soc *soc, struct dp_pdev *pdev,
 }
 #endif /* QCA_ENHANCED_STATS_SUPPORT */
 
+#ifdef WLAN_SUPPORT_CTRL_FRAME_STATS
+/**
+ * dp_rx_mon_update_user_ctrl_frame_stats() - Function to update Rx control
+ * frame stats per user.
+ * @pdev: DP Pdev Pointer
+ * @ppdu_info: HAL Rx PPDU info Pointer
+ *
+ * Return: None
+ */
+void dp_rx_mon_update_user_ctrl_frame_stats(struct dp_pdev *pdev,
+					    struct hal_rx_ppdu_info *ppdu_info);
+#else
+static inline void
+dp_rx_mon_update_user_ctrl_frame_stats(struct dp_pdev *pdev,
+				       struct hal_rx_ppdu_info *ppdu_info)
+{
+}
+#endif /* WLAN_SUPPORT_CTRL_FRAME_STATS */
+
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
 /**
  * dp_rx_handle_ppdu_undecoded_metadata() - Allocate and deliver ppdu info
@@ -772,4 +791,16 @@ dp_rx_process_peer_based_pktlog(struct dp_soc *soc,
 
 uint32_t dp_mon_rx_add_tlv(uint8_t id, uint16_t len, void *value,
 			   qdf_nbuf_t mpdu_nbuf);
+
+/**
+ * dp_mon_rx_stats_update_rssi_dbm_params() - update rssi calibration
+ *                                      parameters in rx stats
+ * @mon_pdev: monitor pdev
+ * @ppdu_info: Structure for rx ppdu info
+ *
+ * Return: none
+ */
+void
+dp_mon_rx_stats_update_rssi_dbm_params(struct dp_mon_pdev *mon_pdev,
+				       struct hal_rx_ppdu_info *ppdu_info);
 #endif /* _DP_RX_MON_H_ */

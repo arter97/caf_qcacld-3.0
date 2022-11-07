@@ -684,18 +684,18 @@ void qdf_rl_print_count_set(uint32_t rl_print_count);
 void qdf_rl_print_time_set(uint32_t rl_print_time);
 
 /**
- * qdf_rl_print_supressed_log() - print the supressed logs count
+ * qdf_rl_print_suppressed_log() - print the suppressed logs count
  *
  * Return: none
  */
-void qdf_rl_print_supressed_log(void);
+void qdf_rl_print_suppressed_log(void);
 
 /**
- * qdf_rl_print_supressed_inc() - increment the supressed logs count
+ * qdf_rl_print_suppressed_inc() - increment the suppressed logs count
  *
  * Return: none
  */
-void qdf_rl_print_supressed_inc(void);
+void qdf_rl_print_suppressed_inc(void);
 
 #else /* WLAN_MAX_LOGS_PER_SEC */
 static inline bool qdf_detected_excessive_logging(void)
@@ -704,8 +704,8 @@ static inline bool qdf_detected_excessive_logging(void)
 }
 static inline void qdf_rl_print_count_set(uint32_t rl_print_count) {}
 static inline void qdf_rl_print_time_set(uint32_t rl_print_time) {}
-static inline void qdf_rl_print_supressed_log(void) {}
-static inline void qdf_rl_print_supressed_inc(void) {}
+static inline void qdf_rl_print_suppressed_log(void) {}
+static inline void qdf_rl_print_suppressed_inc(void) {}
 #endif /* WLAN_MAX_LOGS_PER_SEC */
 
 #ifdef ENABLE_MTRACE_LOG

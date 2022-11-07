@@ -952,6 +952,14 @@ QDF_STATUS qdf_uint64_parse(const char *int_str, uint64_t *out_int);
 #define QDF_MAC_ADDR_REF(a) (a)
 #endif /* WLAN_TRACE_HIDE_MAC_ADDRESS */
 
+#define QDF_SSID_FMT "%.*s"
+
+#if defined(WLAN_TRACE_HIDE_SSID)
+#define QDF_SSID_REF(_l, _s) 1, "*"
+#else
+#define QDF_SSID_REF(_l, _s) (_l), (_s)
+#endif /* WLAN_TRACE_HIDE_SSID */
+
 #define QDF_MAC_ADDR_BCAST_INIT { { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff } }
 #define QDF_MAC_ADDR_ZERO_INIT { { 0, 0, 0, 0, 0, 0 } }
 
@@ -1137,6 +1145,22 @@ struct qdf_ipv6_addr {
  * Return: QDF_STATUS
  */
 QDF_STATUS qdf_ipv6_parse(const char *ipv6_str, struct qdf_ipv6_addr *out_addr);
+
+/**
+ * qdf_int32_array_parse() - parse the given string as int32 array
+ * @in_str: the input string to parse
+ * @out_array: the output uint32 array, populated on success
+ * @array_size: size of the array
+ * @out_size: size of the populated array
+ *
+ * This API is called to convert string (each value separated by
+ * a comma) into an uint32 array
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS qdf_int32_array_parse(const char *in_str, int32_t *out_array,
+				 qdf_size_t array_size, qdf_size_t *out_size);
 
 /**
  * qdf_uint32_array_parse() - parse the given string as uint32 array

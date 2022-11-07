@@ -589,6 +589,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_rx_desc_pool_init = dp_rx_desc_pool_init_li;
 	arch_ops->dp_rx_desc_pool_deinit = dp_rx_desc_pool_deinit_li;
 	arch_ops->dp_tx_compute_hw_delay = dp_tx_compute_tx_delay_li;
+	arch_ops->dp_rx_chain_msdus = dp_rx_chain_msdus_li;
 #else
 	arch_ops->dp_rx_desc_pool_init = dp_rx_desc_pool_init_generic;
 	arch_ops->dp_rx_desc_pool_deinit = dp_rx_desc_pool_deinit_generic;
@@ -629,6 +630,9 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_li;
 	arch_ops->reo_remap_config = dp_reo_remap_config_li;
 	arch_ops->dp_txrx_ppeds_rings_status = NULL;
+	arch_ops->txrx_soc_ppeds_start = NULL;
+	arch_ops->txrx_soc_ppeds_stop = NULL;
+	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_li;
 }
 
 #ifdef QCA_DP_TX_HW_SW_NBUF_DESC_PREFETCH

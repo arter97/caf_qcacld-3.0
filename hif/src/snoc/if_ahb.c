@@ -475,11 +475,16 @@ QDF_STATUS hif_ahb_enable_bus(struct hif_softc *ol_sc,
 	}
 
 	if (target_type == TARGET_TYPE_QCN6122 ||
-	    target_type == TARGET_TYPE_QCA5332) {
+	    target_type == TARGET_TYPE_QCN9160) {
 		hif_ahb_get_soc_info_pld(sc, dev);
 	}
 
-	if (target_type == TARGET_TYPE_QCN6122) {
+	/* 11BE SoC chipsets Need to call this function to get cmem addr */
+	if (target_type == TARGET_TYPE_QCA5332)
+		hif_ahb_get_soc_info_pld(sc, dev);
+
+	if (target_type == TARGET_TYPE_QCN6122 ||
+	    target_type == TARGET_TYPE_QCN9160) {
 		hif_update_irq_ops_with_pci(ol_sc);
 	} else {
 		status = pfrm_platform_get_resource(&pdev->dev,
@@ -792,7 +797,8 @@ void hif_display_ahb_irq_regs(struct hif_softc *scn)
 	void *mem = scn->mem_ce ? scn->mem_ce : scn->mem;
 	struct hif_target_info *tgt_info = &scn->target_info;
 
-	if (tgt_info->target_type == TARGET_TYPE_QCN6122) {
+	if (tgt_info->target_type == TARGET_TYPE_QCN6122 ||
+	    tgt_info->target_type == TARGET_TYPE_QCN9160) {
 		return;
 	}
 	if (scn->per_ce_irq) {

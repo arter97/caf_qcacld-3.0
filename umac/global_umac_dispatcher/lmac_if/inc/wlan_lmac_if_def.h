@@ -1225,6 +1225,7 @@ struct wlan_lmac_if_target_tx_ops {
 	bool (*tgt_is_tgt_type_adrastea)(uint32_t);
 	bool (*tgt_is_tgt_type_qcn9000)(uint32_t);
 	bool (*tgt_is_tgt_type_qcn6122)(uint32_t);
+	bool (*tgt_is_tgt_type_qcn9160)(uint32_t);
 	bool (*tgt_is_tgt_type_qcn7605)(uint32_t);
 	uint32_t (*tgt_get_tgt_type)(struct wlan_objmgr_psoc *psoc);
 	uint32_t (*tgt_get_tgt_version)(struct wlan_objmgr_psoc *psoc);
@@ -1474,11 +1475,17 @@ struct wlan_lmac_if_twt_rx_ops {
 };
 #endif
 
-#if defined WLAN_FEATURE_11AX
+#if defined WLAN_FEATURE_SR
 struct wlan_lmac_if_spatial_reuse_tx_ops {
 	QDF_STATUS (*send_cfg)(struct wlan_objmgr_vdev *vdev, uint8_t sr_ctrl,
 			       uint8_t non_srg_max_pd_offset);
-	};
+	QDF_STATUS (*send_sr_prohibit_cfg)(struct wlan_objmgr_vdev *vdev,
+					   bool he_siga_val15_allowed);
+	QDF_STATUS(*target_if_set_sr_enable_disable)(
+				struct wlan_objmgr_vdev *vdev,
+				struct wlan_objmgr_pdev *pdev,
+				bool is_sr_enable, int32_t pd_threshold);
+};
 #endif
 
 #ifdef WLAN_FEATURE_COAP
@@ -1619,7 +1626,7 @@ struct wlan_lmac_if_tx_ops {
 	struct wlan_lmac_if_twt_tx_ops twt_tx_ops;
 #endif
 
-#if defined WLAN_FEATURE_11AX
+#if defined WLAN_FEATURE_SR
 	struct wlan_lmac_if_spatial_reuse_tx_ops spatial_reuse_tx_ops;
 #endif
 
@@ -1746,6 +1753,14 @@ struct wlan_lmac_if_reg_rx_ops {
 	(*reg_get_afc_dev_type)(struct wlan_objmgr_psoc *psoc,
 				enum reg_afc_dev_deploy_type
 				*reg_afc_dev_type);
+	QDF_STATUS
+	(*reg_set_eirp_preferred_support)(
+				struct wlan_objmgr_psoc *psoc,
+				bool reg_is_eirp_support_preferred);
+	QDF_STATUS
+	(*reg_get_eirp_preferred_support)(
+				struct wlan_objmgr_psoc *psoc,
+				bool *reg_is_eirp_support_preferred);
 #endif
 };
 

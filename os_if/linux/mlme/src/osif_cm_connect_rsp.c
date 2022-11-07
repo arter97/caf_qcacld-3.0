@@ -1077,11 +1077,11 @@ QDF_STATUS osif_connect_handler(struct wlan_objmgr_vdev *vdev,
 	struct vdev_osif_priv *osif_priv  = wlan_vdev_get_ospriv(vdev);
 	QDF_STATUS status;
 
-	osif_nofl_info("%s(vdevid-%d): " QDF_MAC_ADDR_FMT " Connect with " QDF_MAC_ADDR_FMT " SSID \"%.*s\" is %s cm_id 0x%x cm_reason %d status_code %d is_reassoc %d send discon %d",
+	osif_nofl_info("%s(vdevid-%d): " QDF_MAC_ADDR_FMT " Connect with " QDF_MAC_ADDR_FMT " SSID \"" QDF_SSID_FMT "\" is %s cm_id 0x%x cm_reason %d status_code %d is_reassoc %d send discon %d",
 		       osif_priv->wdev->netdev->name, rsp->vdev_id,
 		       QDF_MAC_ADDR_REF(wlan_vdev_mlme_get_macaddr(vdev)),
 		       QDF_MAC_ADDR_REF(rsp->bssid.bytes),
-		       rsp->ssid.length, rsp->ssid.ssid,
+		       QDF_SSID_REF(rsp->ssid.length, rsp->ssid.ssid),
 		       rsp->connect_status ? "FAILURE" : "SUCCESS", rsp->cm_id,
 		       rsp->reason, rsp->status_code, rsp->is_reassoc,
 		       rsp->send_disconnect);
@@ -1135,12 +1135,12 @@ QDF_STATUS osif_failed_candidate_handler(struct wlan_objmgr_vdev *vdev,
 {
 	struct vdev_osif_priv *osif_priv  = wlan_vdev_get_ospriv(vdev);
 
-	osif_nofl_info("%s(vdevid-%d): " QDF_MAC_ADDR_FMT " Connect with " QDF_MAC_ADDR_FMT " SSID \"%.*s\" FAILED cm_id 0x%x cm_reason %d reason_code %d",
+	osif_nofl_info("%s(vdevid-%d): " QDF_MAC_ADDR_FMT " Connect with " QDF_MAC_ADDR_FMT " SSID \"" QDF_SSID_FMT "\" FAILED cm_id 0x%x cm_reason %d reason_code %d",
 		       osif_priv->wdev->netdev->name, rsp->vdev_id,
 		       QDF_MAC_ADDR_REF(wlan_vdev_mlme_get_macaddr(vdev)),
 		       QDF_MAC_ADDR_REF(rsp->bssid.bytes),
-		       rsp->ssid.length, rsp->ssid.ssid, rsp->cm_id,
-		       rsp->reason, rsp->status_code);
+		       QDF_SSID_REF(rsp->ssid.length, rsp->ssid.ssid),
+		       rsp->cm_id, rsp->reason, rsp->status_code);
 
 	/**
 	 * Do not unlink the BSS if it is an ML candidate. In case of ML,

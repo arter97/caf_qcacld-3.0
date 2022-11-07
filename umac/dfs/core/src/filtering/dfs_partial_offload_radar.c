@@ -825,6 +825,14 @@ void dfs_extract_radar_found_params(struct wlan_dfs *dfs,
 	dfs->dfs_average_pri = 0;
 }
 
+void
+dfs_disable_radar_and_flush_pulses(struct wlan_dfs *dfs)
+{
+	dfs_radar_disable(dfs);
+	dfs_second_segment_radar_disable(dfs);
+	dfs_flush_additional_pulses(dfs);
+}
+
 void dfs_radarfound_action_fcc(struct wlan_dfs *dfs, uint8_t seg_id)
 {
 	struct dfs_radar_found_params params;
@@ -839,6 +847,7 @@ void dfs_radarfound_action_fcc(struct wlan_dfs *dfs, uint8_t seg_id)
 		      dfs->dfs_status_timeout_override);
 	dfs->dfs_seg_id = seg_id;
 	dfs_send_avg_params_to_fw(dfs, &params);
+	dfs_disable_radar_and_flush_pulses(dfs);
 }
 
 void dfs_host_wait_timer_reset(struct wlan_dfs *dfs)
@@ -854,6 +863,10 @@ void dfs_host_wait_timer_reset(struct wlan_dfs *dfs)
 static void dfs_action_on_spoof_success(struct wlan_dfs *dfs)
 {
 	dfs->dfs_spoof_test_done = 1;
+
+	/* On spoof success, enable the radar detection flags */
+	dfs_radar_enable(dfs, 0, 0);
+
 	if (dfs->dfs_radar_found_chan.dfs_ch_freq ==
 			dfs->dfs_curchan->dfs_ch_freq) {
 		dfs_debug(dfs, WLAN_DEBUG_DFS_ALWAYS,

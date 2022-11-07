@@ -44,6 +44,18 @@
 #define DP_DEFRAG_RBM(sw0_bm_id)	HAL_RX_BUF_RBM_SW3_BM(sw0_bm_id)
 #endif
 
+/* Max buffer in invalid peer SG list*/
+#define DP_MAX_INVALID_BUFFERS 10
+#ifdef DP_INVALID_PEER_ASSERT
+#define DP_PDEV_INVALID_PEER_MSDU_CHECK(head, tail) \
+		do {                                \
+			qdf_assert_always(!(head)); \
+			qdf_assert_always(!(tail)); \
+		} while (0)
+#else
+#define DP_PDEV_INVALID_PEER_MSDU_CHECK(head, tail) /* no op */
+#endif
+
 #define RX_BUFFER_RESERVATION   0
 #ifdef BE_PKTLOG_SUPPORT
 #define BUFFER_RESIDUE 1
@@ -886,6 +898,12 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
  */
 qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf);
 
+/**
+ * dp_rx_is_sg_supported() - SG packets processing supported or not.
+ *
+ * Return: returns true when processing is supported else false.
+ */
+bool dp_rx_is_sg_supported(void);
 
 /*
  * dp_rx_desc_nbuf_and_pool_free() - free the sw rx desc pool called during
@@ -2397,6 +2415,7 @@ void dp_rx_buffers_lt_replenish_simple(struct dp_soc *soc, uint32_t mac_id,
 					    rx_desc_pool);
 }
 
+#ifndef QCA_DP_NBUF_FAST_RECYCLE_CHECK
 static inline
 qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 				      qdf_nbuf_t nbuf,
@@ -2407,6 +2426,23 @@ qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 
 	return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
 }
+#else
+static inline
+qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
+				      qdf_nbuf_t nbuf,
+				      uint32_t buf_size)
+{
+	if (unlikely(!nbuf->fast_recycled)) {
+		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
+					      (void *)(nbuf->data + buf_size));
+	} else {
+		DP_STATS_INC(dp_soc, rx.fast_recycled, 1);
+	}
+
+	nbuf->fast_recycled = 0;
+	return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
+}
+#endif
 
 static inline
 qdf_dma_addr_t dp_rx_nbuf_sync(struct dp_soc *dp_soc,
