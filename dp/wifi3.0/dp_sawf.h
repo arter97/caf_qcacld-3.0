@@ -84,6 +84,18 @@
 #define DP_SAWF_DELAY_BOUND_MS_MULTIPLER 1000
 
 /**
+ * sawf_stats_level - sawf stats level
+ * @SAWF_STATS_BASIC : sawf basic stats
+ * @SAWF_STATS_ADVNCD : sawf advanced stats
+ * @SAWF_STATS_LATENCY : sawf latency stats
+ */
+enum sawf_stats_level {
+	SAWF_STATS_BASIC = 0,
+	SAWF_STATS_ADVNCD = 1,
+	SAWF_STATS_LATENCY = 2
+};
+
+/**
  * sawf_stats - sawf stats
  * @delay: delay stats per host msdu queue
  * @tx_stats: Tx stats per host msdu queue
@@ -404,6 +416,7 @@ uint32_t dp_sawf_get_search_index(struct dp_soc *soc, qdf_nbuf_t nbuf,
 uint32_t dp_sawf_queue_id_get(qdf_nbuf_t nbuf);
 void dp_sawf_tcl_cmd(uint16_t *htt_tcl_metadata, qdf_nbuf_t nbuf);
 bool dp_sawf_tag_valid_get(qdf_nbuf_t nbuf);
+uint8_t dp_sawf_tid_get(uint16_t queue_id);
 
 /*
  * dp_sawf_mpdu_stats_req() - Send MPDU basic stats request to target

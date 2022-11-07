@@ -159,7 +159,12 @@ struct basic_psoc_data {
 #if WLAN_ADVANCE_TELEMETRY
 #define STATS_IF_MAX_CHAIN 8
 #define STATS_IF_DATA_TID_MAX 8
+#ifdef WLAN_FEATURE_11BE
+#define STATS_IF_BW_USAGE_MAX_SIZE 6
+#define STATS_IF_PUNC_BW_USAGE_MAX_SIZE 5
+#else
 #define STATS_IF_BW_USAGE_MAX_SIZE 4
+#endif
 #define STATS_IF_CACHE_SIZE 10
 #define STATS_IF_INVALID_CACHE_IDX (-1)
 #define STATS_IF_INVALID_CACHE_TYPE (~1)
@@ -214,11 +219,21 @@ struct stats_if_rdk_tx_sojourn_stats {
 struct stats_if_peer_bw_stats {
 	uint32_t usage_total;
 	uint32_t usage_counter[STATS_IF_BW_USAGE_MAX_SIZE];
+	uint16_t usage_avg;
+	uint16_t usage_max;
+};
+
+#ifdef WLAN_FEATURE_11BE
+struct stats_if_peer_punc_bw_stats {
+	uint32_t usage_total;
+	uint32_t usage_counter[STATS_IF_PUNC_BW_USAGE_MAX_SIZE];
 	uint8_t usage_avg;
 	uint8_t usage_max;
 };
+#endif
 
 struct stats_if_rdk_tx_link_stats {
+	bool is_lithium;
 	uint64_t bytes;
 	uint32_t num_ppdus;
 	uint32_t phy_rate_lpf_avg_su;
@@ -228,6 +243,9 @@ struct stats_if_rdk_tx_link_stats {
 	uint32_t ofdma_usage;
 	uint32_t mu_mimo_usage;
 	struct stats_if_peer_bw_stats bw;
+#ifdef WLAN_FEATURE_11BE
+	struct stats_if_peer_punc_bw_stats punc_bw;
+#endif
 	unsigned long ack_rssi;
 	uint32_t mpdu_failed;
 	uint32_t mpdu_success;
@@ -235,6 +253,7 @@ struct stats_if_rdk_tx_link_stats {
 };
 
 struct stats_if_rdk_rx_link_stats {
+	bool is_lithium;
 	uint64_t bytes;
 	uint32_t num_ppdus;
 	uint32_t phy_rate_lpf_avg_su;
@@ -244,6 +263,9 @@ struct stats_if_rdk_rx_link_stats {
 	uint32_t ofdma_usage;
 	uint32_t mu_mimo_usage;
 	struct stats_if_peer_bw_stats bw;
+#ifdef WLAN_FEATURE_11BE
+	struct stats_if_peer_punc_bw_stats punc_bw;
+#endif
 	unsigned long su_rssi;
 	uint32_t mpdu_retries;
 	uint32_t num_mpdus;

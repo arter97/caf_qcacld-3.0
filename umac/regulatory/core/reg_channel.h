@@ -25,6 +25,7 @@
 #ifndef __REG_CHANNEL_H_
 #define __REG_CHANNEL_H_
 
+#include <reg_db.h>
 #include <wlan_reg_channel_api.h>
 
 #define NEXT_20_CH_OFFSET 20
@@ -39,6 +40,7 @@
  * @primary_freq: Input primary frequency.
  * @in_6g_pwr_mode: Input 6g power mode based on which the 6g channel list
  * is determined.
+ * @input_puncture_bitmap: Input puncture bitmap
  *
  * Return: true if phymode is allowed, else false.
  */
@@ -47,7 +49,8 @@ bool reg_is_phymode_chwidth_allowed(
 		enum reg_phymode phy_in,
 		enum phy_ch_width ch_width,
 		qdf_freq_t primary_freq,
-		enum supported_6g_pwr_types in_6g_pwr_mode);
+		enum supported_6g_pwr_types in_6g_pwr_mode,
+		uint16_t input_puncture_bitmap);
 
 /**
  * reg_set_chan_blocked() - Set is_chan_hop_blocked to true for a frequency
@@ -139,7 +142,8 @@ static inline bool reg_is_phymode_chwidth_allowed(
 		struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj,
 		enum reg_phymode phy_in,
 		enum phy_ch_width ch_width,
-		qdf_freq_t primary_freq)
+		qdf_freq_t primary_freq,
+		uint16_t input_puncture_bitmap)
 {
 	return false;
 }
@@ -291,6 +295,15 @@ reg_get_client_power_for_rep_ap(struct wlan_objmgr_pdev *pdev,
 				qdf_freq_t chan_freq,
 				bool *is_psd, uint16_t *reg_eirp,
 				uint16_t *reg_psd);
+
+/**
+ * reg_is_6g_domain_jp() - Check if current 6 GHz regdomain is a JP domain
+ * or not.
+ * @pdev: Pointer to pdev.
+ *
+ * Return: True if 6 GHz regdomain is a JP domain, else false.
+ */
+bool reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev);
 
 /**
  * reg_get_reg_chan_list_based_on_freq() - Chan list returned  based on freq

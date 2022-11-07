@@ -817,7 +817,9 @@ enum {
 	IEEE80211_PARAM_VDEV_TSF          = 778,
 	IEEE80211_PARAM_STEALTHDOWN       = 779,  /* Flag to indicate vap down without sending deauth or disassoc */
 	IEEE80211_PARAM_MODE_EXT          = 780,    /* phy mode (11a, 11b, etc.) */
-	IEEE80211_PARAM_ML_PROBE_REQ      = 781,  /* Param to set ML probe request configuration */
+#ifdef WLAN_FEATURE_11BE
+	IEEE80211_PARAM_EHT_ML_PROBE_REQ      = 781,  /* Param to set ML probe request configuration */
+#endif
 	IEEE80211_PARAM_PURE11AX          = 782,  /* pure 11ax (no 11bg, 11a, 11n or 11ac clients */
 	IEEE80211_PARAM_SCS_RULES         = 783,  /* Get SCS rules */
 #ifdef WLAN_FEATURE_11BE
@@ -1414,6 +1416,7 @@ enum _ol_ath_param_t {
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 	OL_ATH_PARAM_UMAC_RST_SKEL = 519,
 #endif
+	OL_ATH_PARAM_MON_MAC_FILTER = 520,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -2491,6 +2494,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"get_eht_mcs15_supp",   IEEE80211_PARAM_EHT_SUP_MCS15, GET_PARAM, 0},
 	{"eht_mcs14_dup_6ghz",   IEEE80211_PARAM_EHT_MCS14_DUP_IN_6GHZ, SET_PARAM, 1},
 	{"get_eht_mcs14_dup_6ghz", IEEE80211_PARAM_EHT_MCS14_DUP_IN_6GHZ, GET_PARAM, 0},
+	{"set_eht_ml_probe_req", IEEE80211_PARAM_EHT_ML_PROBE_REQ, SET_PARAM, 1},
 #endif /* WLAN_FEATURE_11BE */
 	{"pure11ax",            IEEE80211_PARAM_PURE11AX, SET_PARAM, 1},
 	{"get_pure11ax",        IEEE80211_PARAM_PURE11AX, GET_PARAM, 0},
@@ -3730,6 +3734,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"g_umac_rst_skel",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UMAC_RST_SKEL, GET_PARAM, 0},
 #endif
+	{"mon_mac_filter",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, SET_PARAM, 1},
+	{"get_mon_mac_filter",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, GET_PARAM, 0},
 };
 #endif
 

@@ -33,6 +33,9 @@
 #include <wlan_objmgr_global_obj.h>
 #include <wlan_osif_priv.h>
 #include <cfg80211_external.h>
+#ifdef WLAN_FEATURE_11BE_MLO
+#include <wlan_mlo_mgr_peer.h>
+#endif
 
 static struct sawf_ctx *g_wlan_sawf_ctx;
 
@@ -309,6 +312,28 @@ int wlan_sawf_get_drop_stats(void *soc, void *arg, uint64_t *pass,
 }
 qdf_export_symbol(wlan_sawf_get_drop_stats);
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline QDF_STATUS wlan_sawf_fill_mld_mac(struct wlan_objmgr_peer *peer,
+						struct sk_buff *vendor_event)
+{
+	if (wlan_peer_is_mlo(peer)) {
+		if (nla_put(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_PEER_MLD_MAC,
+			    QDF_MAC_ADDR_SIZE,
+			    (void *)(wlan_peer_mlme_get_mldaddr(peer)))) {
+			qdf_err("nla put fail");
+			return QDF_STATUS_E_FAILURE;
+		}
+	}
+	return QDF_STATUS_SUCCESS;
+}
+#else
+static inline QDF_STATUS wlan_sawf_fill_mld_mac(struct wlan_objmgr_peer *peer,
+						struct sk_buff *vendor_event)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 				     struct psoc_peer_iter *itr)
 {
@@ -354,6 +379,11 @@ static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 		goto error_cleanup;
 	}
 
+	if (wlan_sawf_fill_mld_mac(peer, vendor_event)) {
+			qdf_err("nla put fail");
+		goto error_cleanup;
+	}
+
 	if (nla_put_u8(vendor_event, QCA_WLAN_VENDOR_ATTR_SLA_SVC_ID,
 		       itr->svc_id)) {
 		qdf_err("nla put fail");
@@ -373,6 +403,9 @@ static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 	}
 
 	wlan_cfg80211_vendor_event(vendor_event, GFP_ATOMIC);
+
+	return;
+
 error_cleanup:
 	wlan_cfg80211_vendor_free_skb(vendor_event);
 }

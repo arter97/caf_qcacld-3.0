@@ -28,6 +28,7 @@
 #include <cfg80211_nlwrapper_api.h>
 #include <qca_vendor.h>
 
+#define SAWF_SPM_RULE_CLASSIFIER_TYPE        1
 #define SCS_SPM_RULE_CLASSIFIER_TYPE         2
 #define SCS_ATTR_FLOW_LABEL_LENGTH           3
 
@@ -398,7 +399,18 @@ parse_tclas10:
 	rule->flags |= SP_RULE_FLAG_MATCH_PRECEDENCE;
 
 done:
-	rule->classifier_type = SCS_SPM_RULE_CLASSIFIER_TYPE;
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_SERVICE_CLASS_ID];
+	if (tb) {
+		val16 = nla_get_u16(tb);
+		rule->service_class_id = (uint8_t)val16;
+		rule->flags |= SP_RULE_FLAG_MATCH_SERVICE_CLASS_ID;
+		rule->classifier_type = SAWF_SPM_RULE_CLASSIFIER_TYPE;
+		PRINT_IF_VERB("Service Class ID: %u", rule->service_class_id);
+	} else {
+		rule->classifier_type = SCS_SPM_RULE_CLASSIFIER_TYPE;
+	}
+
+	PRINT_IF_VERB("Rule Type: %u", rule->classifier_type);
 	rule->flags |= SP_RULE_FLAG_MATCH_CLASSIFIER_TYPE;
 
 	return 0;
