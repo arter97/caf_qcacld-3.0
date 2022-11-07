@@ -30,6 +30,9 @@
 #include <wlan_cmn_ieee80211.h>
 #include <wlan_mgmt_txrx_utils_api.h>
 #include <reg_services_public_struct.h>
+#ifdef WLAN_FEATURE_11BE_MLO
+#include "wlan_mlo_mgr_public_structs.h"
+#endif
 
 typedef uint16_t wlan_scan_requester;
 typedef uint32_t wlan_scan_id;
@@ -202,6 +205,7 @@ struct channel_info {
  * @rsnxe: Pointer to rsnxe IE
  * @ehtcap: pointer to ehtcap ie
  * @ehtop: pointer to eht op ie
+ * @t2lm: array of pointers to t2lm op ie
  * @multi_link_bv: pointer to multi link basic variant IE
  * @bwnss_map: pointer to NSS map IE
  * @secchanoff: pointer to secondary chan IE
@@ -270,6 +274,7 @@ struct ie_list {
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t *multi_link_bv;
+	uint8_t *t2lm[WLAN_MAX_T2LM_IE];
 #endif
 	uint8_t *qcn;
 

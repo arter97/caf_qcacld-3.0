@@ -31,6 +31,8 @@
 #include "wlan_dlm_api.h"
 #include "wlan_cm_roam_api.h"
 #include "wlan_tdls_api.h"
+#include "wlan_mlo_t2lm.h"
+#include "wlan_t2lm_api.h"
 #endif
 #include <wlan_utility.h>
 #include <wlan_mlo_mgr_sta.h>
@@ -627,17 +629,38 @@ static void cm_create_bss_peer(struct cnx_mgr *cm_ctx,
 	}
 }
 
+#if defined(CONN_MGR_ADV_FEATURE) && defined(WLAN_FEATURE_11BE_MLO)
+static QDF_STATUS
+cm_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
+			   struct scan_cache_entry *scan_entry)
+{
+	return wlan_t2lm_validate_candidate(cm_ctx, scan_entry);
+}
+#else
+static inline QDF_STATUS
+cm_t2lm_validate_candidate(struct cnx_mgr *cm_ctx,
+			   struct scan_cache_entry *scan_entry)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 static
 QDF_STATUS cm_if_mgr_validate_candidate(struct cnx_mgr *cm_ctx,
 					struct scan_cache_entry *scan_entry)
 {
 	struct if_mgr_event_data event_data = {0};
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	event_data.validate_bss_info.chan_freq = scan_entry->channel.chan_freq;
 	event_data.validate_bss_info.beacon_interval = scan_entry->bcn_int;
 	qdf_copy_macaddr(&event_data.validate_bss_info.peer_addr,
 			 &scan_entry->bssid);
 	cm_candidate_mlo_update(scan_entry, &event_data.validate_bss_info);
+
+	status = cm_t2lm_validate_candidate(cm_ctx, scan_entry);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
 
 	return if_mgr_deliver_event(cm_ctx->vdev,
 				    WLAN_IF_MGR_EV_VALIDATE_CANDIDATE,

@@ -32,6 +32,7 @@
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_utility.h>
+#include "wlan_mlo_mgr_public_structs.h"
 #endif
 #include "wlan_psoc_mlme_api.h"
 #include "reg_services_public_struct.h"
@@ -1149,6 +1150,24 @@ util_scan_parse_rnr_ie(struct scan_cache_entry *scan_entry,
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static void
+util_scan_parse_t2lm_ie(struct scan_cache_entry *scan_params,
+			struct extn_ie_header *extn_ie)
+{
+	uint8_t t2lm_idx = 0;
+
+	if (extn_ie->ie_extn_id == WLAN_EXTN_ELEMID_T2LM)
+		for (t2lm_idx = 0; t2lm_idx < WLAN_MAX_T2LM_IE; t2lm_idx++) {
+			if (!scan_params->ie_list.t2lm[t2lm_idx]) {
+				scan_params->ie_list.t2lm[t2lm_idx] =
+					(uint8_t *)extn_ie;
+				return;
+		}
+	}
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 #ifdef WLAN_FEATURE_11BE_MLO
 static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
@@ -1178,6 +1197,7 @@ static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
 	}
 
 	util_scan_parse_ml_ie(scan_params, extn_ie);
+	util_scan_parse_t2lm_ie(scan_params, extn_ie);
 }
 #else
 static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
