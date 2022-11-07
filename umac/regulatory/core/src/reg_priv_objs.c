@@ -319,8 +319,9 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 	uint32_t range_2g_low, range_2g_high;
 	uint32_t range_5g_low, range_5g_high;
 	QDF_STATUS status;
-	struct reg_rule_info *psoc_reg_rules;
 	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	enum direction dir;
+	wlan_objmgr_ref_dbgid dbg_id;
 
 	pdev_priv_obj = qdf_mem_common_alloc(sizeof(*pdev_priv_obj));
 	if (!pdev_priv_obj)
@@ -394,16 +395,8 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 	pdev_priv_obj->range_5g_high = range_5g_high;
 	pdev_priv_obj->wireless_modes = reg_cap_ptr->wireless_modes;
 	reg_init_6g_vars(pdev_priv_obj);
-
-	reg_init_pdev_mas_chan_list(pdev_priv_obj,
-				    &psoc_priv_obj->mas_chan_params[phy_id]);
-
-	psoc_reg_rules = &psoc_priv_obj->mas_chan_params[phy_id].reg_rules;
-	reg_save_reg_rules_to_pdev(psoc_reg_rules, pdev_priv_obj);
 	pdev_priv_obj->chan_list_recvd =
 		psoc_priv_obj->chan_list_recvd[phy_id];
-
-	reg_init_indoor_channel_list(pdev);
 
 	status = wlan_objmgr_pdev_component_obj_attach(
 			pdev, WLAN_UMAC_COMP_REGULATORY, pdev_priv_obj,
@@ -414,7 +407,17 @@ QDF_STATUS wlan_regulatory_pdev_obj_created_notification(
 		return status;
 	}
 
-	reg_compute_pdev_current_chan_list(pdev_priv_obj);
+	if (psoc_priv_obj->offload_enabled) {
+		dbg_id = WLAN_REGULATORY_NB_ID;
+		dir = NORTHBOUND;
+	} else {
+		dbg_id = WLAN_REGULATORY_SB_ID;
+		dir = SOUTHBOUND;
+	}
+
+	wlan_objmgr_pdev_get_ref(pdev, dbg_id);
+	reg_propagate_mas_chan_list_to_pdev(parent_psoc, pdev, &dir);
+	wlan_objmgr_pdev_release_ref(pdev, dbg_id);
 
 	reg_init_afc_vars(psoc_priv_obj, pdev_priv_obj);
 
