@@ -404,14 +404,16 @@ wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
 			 bool is_sr_enable)
 {
 	uint8_t ap_non_srg_pd_threshold = 0;
-	uint8_t ap_srg_min_pd_threshold_offset, ap_srg_max_pd_threshold_offset;
+	uint8_t ap_srg_min_pd_threshold_offset = 0;
+	uint8_t ap_srg_max_pd_threshold_offset = 0;
 	uint8_t sr_ctrl;
 
 	sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(vdev);
 	if (!(sr_ctrl & NON_SRG_PD_SR_DISALLOWED) &&
 	    (sr_ctrl & NON_SRG_OFFSET_PRESENT)) {
 		ap_non_srg_pd_threshold =
-		wlan_vdev_mlme_get_pd_offset(vdev) + NON_SR_PD_THRESHOLD_MIN;
+			wlan_vdev_mlme_get_non_srg_pd_offset(vdev) +
+			SR_PD_THRESHOLD_MIN;
 		/**
 		 * Update non_srg_pd_threshold with provide
 		 * non_srg_pd_threshold for non-srg, if pd threshold is
@@ -437,19 +439,18 @@ wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
 		 */
 		if (srg_pd_threshold &&
 		    srg_pd_threshold < (ap_srg_max_pd_threshold_offset +
-				    NON_SR_PD_THRESHOLD_MIN) &&
+					SR_PD_THRESHOLD_MIN) &&
 		    srg_pd_threshold > (ap_srg_min_pd_threshold_offset +
-				    NON_SR_PD_THRESHOLD_MIN))
+					SR_PD_THRESHOLD_MIN))
 			srg_pd_threshold = srg_pd_threshold +
-				NON_SR_PD_THRESHOLD_MIN;
+					   SR_PD_THRESHOLD_MIN;
 		else
 			srg_pd_threshold = ap_srg_max_pd_threshold_offset +
-				NON_SR_PD_THRESHOLD_MIN;
+						SR_PD_THRESHOLD_MIN;
 
 		/* 30th BIT - Enable/Disable SRG based spatial reuse. */
 		*val |= is_sr_enable << SRG_SPR_ENABLE_POS;
 	}
-
 	/* bit    | purpose
 	 * -----------------
 	 * 0  - 7 | Param Value for non-SRG based Spatial Reuse
@@ -461,5 +462,8 @@ wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
 	*val |=
 		(uint8_t)(srg_pd_threshold << SRG_THRESHOLD_MAX_PD_POS);
 	*val |= SR_PARAM_VAL_DBM_UNIT << SR_PARAM_VAL_DBM_POS;
+	wlan_vdev_mlme_set_current_non_srg_pd_threshold(vdev,
+							non_srg_pd_threshold);
+	wlan_vdev_mlme_set_current_srg_pd_threshold(vdev, srg_pd_threshold);
 }
 #endif
