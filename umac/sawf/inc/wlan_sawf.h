@@ -140,6 +140,7 @@ struct psoc_peer_iter {
 	bool set_clear;
 	uint8_t svc_id;
 	uint8_t param;
+	uint8_t tid;
 };
 
 /* wlan_sawf_init() - Initialize SAWF subsytem
