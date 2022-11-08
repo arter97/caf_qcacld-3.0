@@ -764,8 +764,8 @@ static inline void dfs_reinit_precac_lists(struct wlan_dfs *src_dfs,
 #endif
 
 /**
- * dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq() - Is precac done on
- * a VHT20/40/80/160/165 channel.
+ * dfs_is_precac_done_on_non_80p80_chan_for_freq() - Is precac done on
+ * a 20/40/80/160/165/320 MHz channel.
  *@dfs: Pointer to wlan_dfs structure.
  *@chan: Channel frequency
  *
@@ -775,14 +775,12 @@ static inline void dfs_reinit_precac_lists(struct wlan_dfs *src_dfs,
  */
 #ifdef CONFIG_CHAN_FREQ_API
 bool
-dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(struct wlan_dfs *dfs,
-						       uint16_t chan_freq);
+dfs_is_precac_done_on_non_80p80_chan_for_freq(struct wlan_dfs *dfs,
+					      uint16_t chan_freq);
 #endif
 
 /**
- * dfs_is_precac_done_on_ht8080_chan() - Is precac done on VHT80+80 channel
- *                                       channel other than the restricted
- *                                       80+80 channel.
+ * dfs_is_precac_done_on_80p80_chan() - Is precac done on 80+80 MHz channel.
  * @dfs: Pointer to wlan_dfs structure.
  * @chan: Pointer to dfs_channel for which preCAC done is checked.
  *
@@ -790,8 +788,8 @@ dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(struct wlan_dfs *dfs,
  * * True:  If CAC is done on channel.
  * * False: If CAC is not done on channel.
  */
-bool dfs_is_precac_done_on_ht8080_chan(struct wlan_dfs *dfs,
-				       struct dfs_channel *chan);
+bool dfs_is_precac_done_on_80p80_chan(struct wlan_dfs *dfs,
+				      struct dfs_channel *chan);
 
 #if !defined(MOBILE_DFS_SUPPORT) && (defined(ATH_SUPPORT_ZERO_CAC_DFS) || \
 				     defined(QCA_SUPPORT_AGILE_DFS))
