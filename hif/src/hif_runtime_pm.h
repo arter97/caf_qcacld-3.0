@@ -118,7 +118,12 @@ struct hif_rtpm_ctx {
 	qdf_atomic_t monitor_wake_intr;
 	struct hif_rtpm_state_stats stats;
 	struct dentry *pm_dentry;
+	int cfg_delay;
+	int delay;
 };
+
+#define HIF_RTPM_DELAY_MIN 100
+#define HIF_RTPM_DELAY_MAX 10000
 
 /**
  * __hif_rtpm_enabled() - Check if runtime pm is enabled from kernel
@@ -202,6 +207,19 @@ static inline void __hif_rtpm_put_noidle(struct device *dev)
 static inline int __hif_rtpm_put_sync_suspend(struct device *dev)
 {
 	return pm_runtime_put_sync_suspend(dev);
+}
+
+/**
+ * __hif_rtpm_set_autosuspend_delay() - Set delay to trigger RTPM suspend
+ * @dev: device structure
+ * @delay: delay in ms to be set
+ *
+ * Return: None
+ */
+static inline
+void __hif_rtpm_set_autosuspend_delay(struct device *dev, int delay)
+{
+	pm_runtime_set_autosuspend_delay(dev, delay);
 }
 
 /**

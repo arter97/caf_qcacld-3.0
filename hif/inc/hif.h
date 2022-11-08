@@ -1297,6 +1297,28 @@ QDF_STATUS hif_rtpm_register(uint32_t id, void (*hif_rpm_cbk)(void));
 QDF_STATUS hif_rtpm_deregister(uint32_t id);
 
 /**
+ * hif_rtpm_set_autosuspend_delay() - Set delay to trigger RTPM suspend
+ * @delay: delay in ms to be set
+ *
+ * Return: Success if delay is set successfully
+ */
+QDF_STATUS hif_rtpm_set_autosuspend_delay(int delay);
+
+/**
+ * hif_rtpm_restore_autosuspend_delay() - Restore delay value to default value
+ *
+ * Return: Success if reset done. E_ALREADY if delay same as config value
+ */
+QDF_STATUS hif_rtpm_restore_autosuspend_delay(void);
+
+/**
+ * hif_rtpm_get_autosuspend_delay() -Get delay to trigger RTPM suspend
+ *
+ * Return: Delay in ms
+ */
+int hif_rtpm_get_autosuspend_delay(void);
+
+/**
  * hif_runtime_lock_init() - API to initialize Runtime PM context
  * @lock: QDF lock context
  * @name: Context name
@@ -1565,6 +1587,16 @@ QDF_STATUS hif_rtpm_register(uint32_t id, void (*hif_rpm_cbk)(void))
 static inline
 QDF_STATUS hif_rtpm_deregister(uint32_t id)
 { return QDF_STATUS_SUCCESS; }
+
+static inline
+QDF_STATUS hif_rtpm_set_autosuspend_delay(int delay)
+{ return QDF_STATUS_SUCCESS; }
+
+static inline QDF_STATUS hif_rtpm_restore_autosuspend_delay(void)
+{ return QDF_STATUS_SUCCESS; }
+
+static inline int hif_rtpm_get_autosuspend_delay(void)
+{ return 0; }
 
 static inline
 int hif_runtime_lock_init(qdf_runtime_lock_t *lock, const char *name)

@@ -374,6 +374,8 @@ void hif_rtpm_start(struct hif_softc *scn)
 
 	qdf_atomic_set(&gp_hif_rtpm_ctx->pm_state, HIF_RTPM_STATE_ON);
 	hif_rtpm_init(gp_hif_rtpm_ctx->dev, scn->hif_config.runtime_pm_delay);
+	gp_hif_rtpm_ctx->cfg_delay = scn->hif_config.runtime_pm_delay;
+	gp_hif_rtpm_ctx->delay = gp_hif_rtpm_ctx->cfg_delay;
 	hif_rtpm_debugfs_create();
 }
 
@@ -457,6 +459,41 @@ QDF_STATUS hif_rtpm_deregister(uint32_t id)
 	gp_hif_rtpm_ctx->clients[id] = NULL;
 
 	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS hif_rtpm_set_autosuspend_delay(int delay)
+{
+	if (delay < HIF_RTPM_DELAY_MIN || delay > HIF_RTPM_DELAY_MAX) {
+		hif_err("Invalid delay value %d ms", delay);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	__hif_rtpm_set_autosuspend_delay(gp_hif_rtpm_ctx->dev, delay);
+	gp_hif_rtpm_ctx->delay = delay;
+	hif_info_high("RTPM delay set: %d ms", delay);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS hif_rtpm_restore_autosuspend_delay(void)
+{
+	if (gp_hif_rtpm_ctx->delay == gp_hif_rtpm_ctx->cfg_delay) {
+		hif_info_rl("RTPM delay already default: %d",
+			    gp_hif_rtpm_ctx->delay);
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	__hif_rtpm_set_autosuspend_delay(gp_hif_rtpm_ctx->dev,
+					 gp_hif_rtpm_ctx->cfg_delay);
+	gp_hif_rtpm_ctx->delay = gp_hif_rtpm_ctx->cfg_delay;
+	hif_info_rl("RTPM delay set: %d ms", gp_hif_rtpm_ctx->delay);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+int hif_rtpm_get_autosuspend_delay(void)
+{
+	return gp_hif_rtpm_ctx->delay;
 }
 
 int hif_runtime_lock_init(qdf_runtime_lock_t *lock, const char *name)
@@ -657,7 +694,6 @@ QDF_STATUS hif_rtpm_put(uint8_t type, uint32_t id)
 	gp_hif_rtpm_ctx->stats.last_busy_ts = client->put_ts;
 
 	return QDF_STATUS_SUCCESS;
-
 }
 
 /**
@@ -738,7 +774,6 @@ static int __hif_pm_runtime_allow_suspend(struct hif_pm_runtime_lock *lock)
 	gp_hif_rtpm_ctx->stats.allow_suspend++;
 	return ret;
 }
-
 
 int hif_pm_runtime_prevent_suspend(struct hif_pm_runtime_lock *lock)
 {
