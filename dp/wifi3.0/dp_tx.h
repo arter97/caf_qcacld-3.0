@@ -1162,33 +1162,77 @@ dp_update_tx_desc_stats(struct dp_pdev *pdev)
 #endif /* CONFIG_WLAN_SYSFS_MEM_STATS */
 
 #ifdef QCA_TX_LIMIT_CHECK
+static inline bool is_spl_packet(qdf_nbuf_t nbuf)
+{
+	if (qdf_nbuf_is_ipv4_eapol_pkt(nbuf))
+		return true;
+	return false;
+}
+
 /**
- * dp_tx_limit_check - Check if allocated tx descriptors reached
- * soc max limit and pdev max limit
+ * is_dp_spl_tx_limit_reached - Check if the packet is a special packet to allow
+ * allocation if allocated tx descriptors are within the soc max limit
+ * and pdev max limit.
  * @vdev: DP vdev handle
  *
  * Return: true if allocated tx descriptors reached max configured value, else
  * false
  */
 static inline bool
-dp_tx_limit_check(struct dp_vdev *vdev)
+is_dp_spl_tx_limit_reached(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
+{
+	struct dp_pdev *pdev = vdev->pdev;
+	struct dp_soc *soc = pdev->soc;
+
+	if (is_spl_packet(nbuf)) {
+		if (qdf_atomic_read(&soc->num_tx_outstanding) >=
+				soc->num_tx_allowed)
+			return true;
+
+		if (qdf_atomic_read(&pdev->num_tx_outstanding) >=
+			pdev->num_tx_allowed)
+			return true;
+
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * dp_tx_limit_check - Check if allocated tx descriptors reached
+ * soc max reg limit and pdev max reg limit for regular packets. Also check if
+ * the limit is reached for special packets.
+ * @vdev: DP vdev handle
+ *
+ * Return: true if allocated tx descriptors reached max limit for regular
+ * packets and in case of special packets, if the limit is reached max
+ * configured vale for the soc/pdev, else false
+ */
+static inline bool
+dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 
 	if (qdf_atomic_read(&soc->num_tx_outstanding) >=
-			soc->num_tx_allowed) {
-		dp_tx_info("queued packets are more than max tx, drop the frame");
-		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
-		return true;
+			soc->num_reg_tx_allowed) {
+		if (is_dp_spl_tx_limit_reached(vdev, nbuf)) {
+			dp_tx_info("queued packets are more than max tx, drop the frame");
+			DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
+			return true;
+		}
 	}
 
 	if (qdf_atomic_read(&pdev->num_tx_outstanding) >=
-			pdev->num_tx_allowed) {
-		dp_tx_info("queued packets are more than max tx, drop the frame");
-		DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
-		DP_STATS_INC(vdev, tx_i.dropped.desc_na_exc_outstand.num, 1);
-		return true;
+			pdev->num_reg_tx_allowed) {
+		if (is_dp_spl_tx_limit_reached(vdev, nbuf)) {
+			dp_tx_info("queued packets are more than max tx, drop the frame");
+			DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
+			DP_STATS_INC(vdev,
+				     tx_i.dropped.desc_na_exc_outstand.num, 1);
+			return true;
+		}
 	}
 	return false;
 }
@@ -1251,7 +1295,7 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 
 #else //QCA_TX_LIMIT_CHECK
 static inline bool
-dp_tx_limit_check(struct dp_vdev *vdev)
+dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	return false;
 }

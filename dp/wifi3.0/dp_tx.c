@@ -1155,7 +1155,7 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 
-	if (dp_tx_limit_check(vdev))
+	if (dp_tx_limit_check(vdev, nbuf))
 		return NULL;
 
 	/* Allocate software Tx descriptor */
@@ -1300,7 +1300,7 @@ static struct dp_tx_desc_s *dp_tx_prepare_desc(struct dp_vdev *vdev,
 	struct dp_pdev *pdev = vdev->pdev;
 	struct dp_soc *soc = pdev->soc;
 
-	if (dp_tx_limit_check(vdev))
+	if (dp_tx_limit_check(vdev, nbuf))
 		return NULL;
 
 	/* Allocate software Tx descriptor */

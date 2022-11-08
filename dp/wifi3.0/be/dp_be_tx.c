@@ -1582,7 +1582,7 @@ qdf_nbuf_t dp_tx_fast_send_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	DP_STATS_INC(vdev, tx_i.rcvd_per_core[desc_pool_id], 1);
 
 	pdev = vdev->pdev;
-	if (dp_tx_limit_check(vdev))
+	if (dp_tx_limit_check(vdev, nbuf))
 		return nbuf;
 
 	tx_desc = dp_tx_desc_alloc(soc, desc_pool_id);

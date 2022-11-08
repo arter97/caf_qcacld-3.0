@@ -15562,7 +15562,7 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	qdf_atomic_init(&soc->num_tx_exception);
 	soc->num_tx_allowed =
 		wlan_cfg_get_dp_soc_tx_device_limit(soc->wlan_cfg_ctx);
-
+	soc->num_reg_tx_allowed = soc->num_tx_allowed - MAX_TX_SPL_DESC;
 	if (soc->cdp_soc.ol_ops->get_dp_cfg_param) {
 		int ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
 				CDP_CFG_MAX_PEER_ID);
@@ -17170,6 +17170,7 @@ static QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 	qdf_event_create(&pdev->fw_obss_stats_event);
 
 	pdev->num_tx_allowed = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
+	pdev->num_reg_tx_allowed = pdev->num_tx_allowed - MAX_TX_SPL_DESC;
 
 	if (dp_rxdma_ring_setup(soc, pdev)) {
 		dp_init_err("%pK: RXDMA ring config failed", soc);

@@ -81,6 +81,9 @@
 #define MAX_TXDESC_POOLS 4
 #endif
 
+/* Max no of descriptors to handle special frames like EAPOL */
+#define MAX_TX_SPL_DESC 1024
+
 #define MAX_RXDESC_POOLS 4
 #define MAX_PPE_TXDESC_POOLS 1
 
@@ -2473,6 +2476,8 @@ struct dp_soc {
 	qdf_atomic_t num_tx_exception;
 	/* Num Tx allowed */
 	uint32_t num_tx_allowed;
+	/* Num Regular Tx allowed */
+	uint32_t num_reg_tx_allowed;
 	/* Preferred HW mode */
 	uint8_t preferred_hw_mode;
 
@@ -3138,6 +3143,12 @@ struct dp_pdev {
 
 	/* User configured max number of tx buffers */
 	uint32_t num_tx_allowed;
+
+	/*
+	 * User configured max num of tx buffers excluding the
+	 * number of buffers reserved for handling special frames
+	 */
+	uint32_t num_reg_tx_allowed;
 
 	/* unique cookie required for peer session */
 	uint32_t next_peer_cookie;
