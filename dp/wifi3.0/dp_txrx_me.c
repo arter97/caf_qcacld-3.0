@@ -27,6 +27,7 @@
 #include "dp_tx_desc.h"
 #include "dp_internal.h"
 #include "dp_txrx_me.h"
+#include <dp_peer.h>
 #define MAX_ME_BUF_CHUNK 1424
 #define ME_US_TO_SEC(_x) ((_x) / (1000 * 1000))
 #define ME_CLEAN_WAIT_TIMEOUT (200000) /*200ms*/
@@ -261,6 +262,33 @@ static void dp_tx_me_mem_free(struct dp_pdev *pdev,
 	}
 }
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * dp_tx_me_check_wds_peer_by_mac() - Check WDS peer using mac address
+ * @soc: Datapath soc handle
+ * @vdev: DP vdev
+ * @mac_addr: Peer mac address
+ *
+ * Return: True if wds ext peer; false otherwise
+ */
+static inline
+bool dp_tx_me_check_wds_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev,
+				    uint8_t *mac_addr)
+{
+	if (!vdev->wds_ext_enabled)
+		return false;
+	return !dp_find_peer_exist(&soc->cdp_soc, vdev->pdev->pdev_id,
+				   mac_addr);
+}
+#else
+static inline
+bool dp_tx_me_check_wds_peer_by_mac(struct dp_soc *soc, struct dp_vdev *vdev,
+				    uint8_t *mac_addr)
+{
+	return false;
+}
+#endif
+
 /**
  * dp_tx_me_send_dms_pkt: function to send dms packet
  * @soc: Datapath soc handle
@@ -276,6 +304,9 @@ dp_tx_me_send_dms_pkt(struct dp_soc *soc, struct dp_peer *peer, void *arg)
 	dp_vdev_dms_me_t *dms_me = (dp_vdev_dms_me_t *)arg;
 
 	if (peer->bss_peer || !dp_peer_is_primary_link_peer(peer))
+		return;
+
+	if (dp_peer_check_wds_ext_peer(peer))
 		return;
 
 	dms_me->tx_exc_metadata->peer_id = peer->peer_id;
@@ -428,6 +459,9 @@ dp_tx_me_send_convert_ucast(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 		/* frame to self mac. skip */
 		if (!qdf_mem_cmp(dstmac, srcmac, QDF_MAC_ADDR_SIZE))
+			continue;
+
+		if (dp_tx_me_check_wds_peer_by_mac(soc, vdev, dstmac))
 			continue;
 
 		/*
