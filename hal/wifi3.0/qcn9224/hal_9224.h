@@ -138,26 +138,6 @@
 
 #define PMM_REG_BASE_QCN9224 0xB500F8
 
-/* Enum to indicate which scratch registers hold which value */
-enum hal_scratch_reg_enum {
-	PMM_QTIMER_GLOBAL_OFFSET_LO_US,
-	PMM_QTIMER_GLOBAL_OFFSET_HI_US,
-	PMM_MAC0_TSF1_OFFSET_LO_US,
-	PMM_MAC0_TSF1_OFFSET_HI_US,
-	PMM_MAC0_TSF2_OFFSET_LO_US,
-	PMM_MAC0_TSF2_OFFSET_HI_US,
-	PMM_MAC1_TSF1_OFFSET_LO_US,
-	PMM_MAC1_TSF1_OFFSET_HI_US,
-	PMM_MAC1_TSF2_OFFSET_LO_US,
-	PMM_MAC1_TSF2_OFFSET_HI_US,
-	PMM_MLO_OFFSET_LO_US,
-	PMM_MLO_OFFSET_HI_US,
-	PMM_TQM_CLOCK_OFFSET_LO_US,
-	PMM_TQM_CLOCK_OFFSET_HI_US,
-	PMM_Q6_CRASH_REASON,
-	PMM_PMM_REG_MAX
-};
-
 /**
  * hal_read_pmm_scratch_reg(): API to read PMM Scratch register
  *
@@ -179,29 +159,6 @@ uint32_t hal_read_pmm_scratch_reg(struct hal_soc *soc,
 }
 
 /**
- * hal_get_tsf2_enum(): API to get the enum corresponding to the mac id
- *
- * @mac_id: mac id
- * @enum_lo: Pointer to update low scratch register
- * @enum_hi: Pointer to update hi scratch register
- *
- * Return: void
- */
-static inline
-void hal_get_tsf2_enum(uint8_t mac_id,
-		       enum hal_scratch_reg_enum *enum_lo,
-		       enum hal_scratch_reg_enum *enum_hi)
-{
-	if (mac_id == 1) {
-		*enum_lo = PMM_MAC1_TSF2_OFFSET_LO_US;
-		*enum_hi = PMM_MAC1_TSF2_OFFSET_HI_US;
-	} else {
-		*enum_lo = PMM_MAC0_TSF2_OFFSET_LO_US;
-		*enum_hi = PMM_MAC0_TSF2_OFFSET_HI_US;
-	}
-}
-
-/**
  * hal_get_tsf2_scratch_reg_qcn9224(): API to read tsf2 scratch register
  *
  * @hal_soc_hdl: HAL soc context
@@ -217,7 +174,7 @@ static void hal_get_tsf2_scratch_reg_qcn9224(hal_soc_handle_t hal_soc_hdl,
 	uint32_t offset_lo, offset_hi;
 	enum hal_scratch_reg_enum enum_lo, enum_hi;
 
-	hal_get_tsf2_enum(mac_id, &enum_lo, &enum_hi);
+	hal_get_tsf_enum(DEFAULT_TSF_ID, mac_id, &enum_lo, &enum_hi);
 
 	offset_lo = hal_read_pmm_scratch_reg(soc,
 					     PMM_REG_BASE_QCN9224,

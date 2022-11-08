@@ -110,6 +110,80 @@
 #include "hal_be_rx_tlv.h"
 #include <hal_be_generic_api.h>
 
+#define PMM_SCRATCH_BASE_QCA5332 0xCB500FC
+#define PMM_SCRATCH_SIZE 0x100
+
+/**
+ * hal_read_pmm_scratch_reg_5332(): API to read PMM Scratch register
+ *
+ * @soc: HAL soc
+ * @reg_enum: Enum of the scratch register
+ *
+ * Return: uint32_t
+ */
+static inline
+uint32_t hal_read_pmm_scratch_reg_5332(struct hal_soc *soc,
+				       enum hal_scratch_reg_enum reg_enum)
+{
+	uint32_t val = 0;
+	void __iomem *bar;
+
+	bar = ioremap_nocache(PMM_SCRATCH_BASE_QCA5332, PMM_SCRATCH_SIZE);
+	pld_reg_read(soc->qdf_dev->dev, (reg_enum * 4), &val, bar);
+	iounmap(bar);
+	return val;
+}
+
+/**
+ * hal_get_tsf2_scratch_reg_qca5332(): API to read tsf2 scratch register
+ *
+ * @hal_soc_hdl: HAL soc context
+ * @mac_id: mac id
+ * @value: Pointer to update tsf2 value
+ *
+ * Return: void
+ */
+static void hal_get_tsf2_scratch_reg_qca5332(hal_soc_handle_t hal_soc_hdl,
+					     uint8_t mac_id, uint64_t *value)
+{
+	struct hal_soc *soc = (struct hal_soc *)hal_soc_hdl;
+	uint32_t offset_lo, offset_hi;
+	enum hal_scratch_reg_enum enum_lo, enum_hi;
+
+	hal_get_tsf_enum(DEFAULT_TSF_ID, mac_id, &enum_lo, &enum_hi);
+
+	offset_lo = hal_read_pmm_scratch_reg_5332(soc,
+						  enum_lo);
+
+	offset_hi = hal_read_pmm_scratch_reg_5332(soc,
+						  enum_hi);
+
+	*value = ((uint64_t)(offset_hi) << 32 | offset_lo);
+}
+
+/**
+ * hal_get_tqm_scratch_reg_qca5332(): API to read tqm scratch register
+ *
+ * @hal_soc_hdl: HAL soc context
+ * @value: Pointer to update tqm value
+ *
+ * Return: void
+ */
+static void hal_get_tqm_scratch_reg_qca5332(hal_soc_handle_t hal_soc_hdl,
+					    uint64_t *value)
+{
+	struct hal_soc *soc = (struct hal_soc *)hal_soc_hdl;
+	uint32_t offset_lo, offset_hi;
+
+	offset_lo = hal_read_pmm_scratch_reg_5332(soc,
+						  PMM_TQM_CLOCK_OFFSET_LO_US);
+
+	offset_hi = hal_read_pmm_scratch_reg_5332(soc,
+						  PMM_TQM_CLOCK_OFFSET_HI_US);
+
+	*value = ((uint64_t)(offset_hi) << 32 | offset_lo);
+}
+
 #define LINK_DESC_SIZE (NUM_OF_DWORDS_RX_MSDU_LINK << 2)
 #define HAL_PPE_VP_ENTRIES_MAX 32
 /**
@@ -1519,6 +1593,10 @@ static void hal_hw_txrx_ops_attach_qca5332(struct hal_soc *hal_soc)
 		hal_tx_populate_bank_register_be;
 	hal_soc->ops->hal_tx_vdev_mcast_ctrl_set =
 		hal_tx_vdev_mcast_ctrl_set_be;
+	hal_soc->ops->hal_get_tsf2_scratch_reg =
+					hal_get_tsf2_scratch_reg_qca5332;
+	hal_soc->ops->hal_get_tqm_scratch_reg =
+					hal_get_tqm_scratch_reg_qca5332;
 };
 
 struct hal_hw_srng_config hw_srng_table_5332[] = {

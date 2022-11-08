@@ -579,7 +579,7 @@ static void hal_get_tsf2_scratch_reg_qcn9224_v2(hal_soc_handle_t hal_soc_hdl,
 	uint32_t offset_lo, offset_hi;
 	enum hal_scratch_reg_enum enum_lo, enum_hi;
 
-	hal_get_tsf2_enum(mac_id, &enum_lo, &enum_hi);
+	hal_get_tsf_enum(DEFAULT_TSF_ID, mac_id, &enum_lo, &enum_hi);
 
 	offset_lo = hal_read_pmm_scratch_reg(soc,
 					     PMM_REG_BASE_QCN9224_V2,
