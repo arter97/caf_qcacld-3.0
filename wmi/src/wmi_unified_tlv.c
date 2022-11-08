@@ -13869,6 +13869,51 @@ extract_ul_mumimo_support(struct wlan_psoc_host_service_ext2_param *param)
 }
 
 /**
+ * extract_hw_bdf_status() - extract service ready ext2 BDF hw status
+ * type from event
+ * @ev: pointer to event fixed param
+ *
+ * Return: void
+ */
+
+static void
+extract_hw_bdf_status(wmi_service_ready_ext2_event_fixed_param *ev)
+{
+	uint8_t hw_bdf_s;
+
+	hw_bdf_s = ev->hw_bd_status;
+	switch (hw_bdf_s) {
+	case WMI_BDF_VERSION_CHECK_DISABLED:
+		wmi_info("BDF VER is %d, FW and BDF ver check skipped",
+			 hw_bdf_s);
+		break;
+	case WMI_BDF_VERSION_CHECK_GOOD:
+		wmi_info("BDF VER is %d, FW and BDF ver check good",
+			 hw_bdf_s);
+		break;
+	case WMI_BDF_VERSION_TEMPLATE_TOO_OLD:
+		wmi_info("BDF VER is %d, BDF ver is older than the oldest version supported by FW",
+			 hw_bdf_s);
+		break;
+	case WMI_BDF_VERSION_TEMPLATE_TOO_NEW:
+		wmi_info("BDF VER is %d, BDF ver is newer than the newest version supported by FW",
+			 hw_bdf_s);
+		break;
+	case WMI_BDF_VERSION_FW_TOO_OLD:
+		wmi_info("BDF VER is %d, FW ver is older than the major version supported by BDF",
+			 hw_bdf_s);
+		break;
+	case WMI_BDF_VERSION_FW_TOO_NEW:
+		wmi_info("BDF VER is %d, FW ver is newer than the minor version supported by BDF",
+			 hw_bdf_s);
+		break;
+	default:
+		wmi_info("unknown BDF VER %d", hw_bdf_s);
+		break;
+	}
+}
+
+/**
  * extract_service_ready_ext2_tlv() - extract service ready ext2 params from
  * event
  * @wmi_handle: wmi handle
@@ -13929,6 +13974,8 @@ extract_service_ready_ext2_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 	wmi_debug("htt peer data :%d", ev->target_cap_flags);
 
 	extract_svc_rdy_ext2_afc_tlv(ev, param);
+
+	extract_hw_bdf_status(ev);
 
 	return QDF_STATUS_SUCCESS;
 }
