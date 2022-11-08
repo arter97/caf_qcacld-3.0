@@ -3053,6 +3053,10 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 			cfg_get(psoc, CFG_DP_WOW_CHECK_RX_PENDING);
 	wlan_cfg_ctx->delay_mon_replenish = cfg_get(psoc,
 			CFG_DP_DELAY_MON_REPLENISH);
+	wlan_cfg_ctx->num_global_tx_desc = cfg_get(psoc,
+					CFG_DP_TX_DESC_GLOBAL_COUNT);
+	wlan_cfg_ctx->num_global_spcl_tx_desc = cfg_get(psoc,
+					CFG_DP_SPCL_TX_DESC_GLOBAL_COUNT);
 	wlan_cfg_ctx->rx_mon_buf_ring_size = cfg_get(psoc,
 					CFG_DP_RXDMA_MONITOR_BUF_RING);
 	wlan_cfg_ctx->tx_mon_buf_ring_size = cfg_get(psoc,
@@ -3547,6 +3551,16 @@ void wlan_cfg_set_raw_mode_war(struct wlan_cfg_dp_soc_ctxt *cfg,
 bool wlan_cfg_get_raw_mode_war(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->raw_mode_war;
+}
+
+int wlan_cfg_get_num_global_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->num_global_tx_desc;
+}
+
+int wlan_cfg_get_num_global_spcl_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->num_global_spcl_tx_desc;
 }
 
 int wlan_cfg_get_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)

@@ -900,6 +900,22 @@ struct wlan_objmgr_psoc
 
 qdf_export_symbol(wlan_objmgr_get_psoc_by_id);
 
+#ifdef QCA_SUPPORT_GLOBAL_DESC
+struct dp_global_desc_context *wlan_objmgr_get_desc_ctx(void)
+{
+	return g_umac_glb_obj->desc_ctx;
+}
+
+qdf_export_symbol(wlan_objmgr_get_desc_ctx);
+
+void wlan_objmgr_set_desc_ctx(struct dp_global_desc_context *ctx)
+{
+	g_umac_glb_obj->desc_ctx = ctx;
+}
+
+qdf_export_symbol(wlan_objmgr_set_desc_ctx);
+#endif
+
 #ifdef WLAN_FEATURE_11BE_MLO
 struct mlo_mgr_context *wlan_objmgr_get_mlo_ctx(void)
 {

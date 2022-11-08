@@ -153,6 +153,8 @@ struct wlan_srng_cfg {
  * @num_nss_reo_dest_rings:
  * @num_tx_desc_pool: Number of Tx Descriptor pools
  * @num_tx_ext_desc_pool: Number of Tx MSDU extension Descriptor pools
+ * @num_global_tx_desc: Number of Global Tx Descriptors allowed
+ * @num_global_spcl_tx_desc: Number of Global special Tx Descriptors allowed
  * @num_tx_desc: Number of Tx Descriptors per pool
  * @num_tx_spl_desc: Number of Tx Descriptors per pool to handle special frames
  * @min_tx_desc: Minimum number of Tx Descriptors per pool
@@ -344,6 +346,8 @@ struct wlan_cfg_dp_soc_ctxt {
 	int num_nss_reo_dest_rings;
 	int num_tx_desc_pool;
 	int num_tx_ext_desc_pool;
+	int num_global_tx_desc;
+	int num_global_spcl_tx_desc;
 	int num_tx_desc;
 	int num_tx_spl_desc;
 	int min_tx_desc;
@@ -1184,6 +1188,23 @@ bool wlan_cfg_get_raw_mode_war(struct wlan_cfg_dp_soc_ctxt *cfg);
  * @num_pool: Number of pool
  */
 void wlan_cfg_set_num_tx_ext_desc_pool(struct wlan_cfg_dp_soc_ctxt *cfg, int num_pool);
+
+/**
+ * wlan_cfg_get_num_global_tx_desc() - Number of global Tx Descriptors allowed
+ * @wlan_cfg_ctx: Configuration Handle
+ *
+ * Return: num_global_tx_desc
+ */
+int wlan_cfg_get_num_global_tx_desc(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
+
+/**
+ * wlan_cfg_get_num_global_spcl_tx_desc() - Number of global special Tx Descriptors
+ * allowed
+ * @wlan_cfg_ctx: Configuration Handle
+ *
+ * Return: num_global_spcl_tx_desc
+ */
+int wlan_cfg_get_num_global_spcl_tx_desc(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
 
 /**
  * wlan_cfg_get_num_tx_desc() - Number of Tx Descriptors per pool

@@ -20,6 +20,7 @@
 #include "qdf_module.h"
 #include "dp_peer.h"
 #include "dp_types.h"
+#include "dp_tx.h"
 #include "dp_internal.h"
 #include "htt_stats.h"
 #include "htt_ppdu_stats.h"
@@ -7729,6 +7730,18 @@ void dp_print_tx_ppeds_stats(struct dp_soc *soc)
 #else
 void dp_print_tx_ppeds_stats(struct dp_soc *soc)
 {
+}
+#endif
+
+#ifdef QCA_SUPPORT_GLOBAL_DESC
+void dp_print_global_desc_count(void)
+{
+	struct dp_global_desc_context *dp_global;
+
+	dp_global = wlan_objmgr_get_desc_ctx();
+
+	DP_PRINT_STATS("Global Tx Descriptors in use = %u",
+		       dp_tx_get_global_desc_in_use(dp_global));
 }
 #endif
 

@@ -2605,6 +2605,25 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev);
  */
 void dp_print_soc_tx_stats(struct dp_soc *soc);
 
+#ifdef QCA_SUPPORT_GLOBAL_DESC
+/**
+ * dp_print_global_desc_count(): Print global desc in use
+ *
+ * Return: void
+ */
+void dp_print_global_desc_count(void);
+#else
+/**
+ * dp_print_global_desc_count(): Print global desc in use
+ *
+ * Return: void
+ */
+static inline
+void dp_print_global_desc_count(void)
+{
+}
+#endif
+
 /**
  * dp_print_soc_interrupt_stats() - Print interrupt stats for the soc
  * @soc: dp_soc handle

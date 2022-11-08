@@ -30,6 +30,7 @@
 #include "cdp_txrx_ops.h"
 #include "cdp_txrx_handle.h"
 #include "cdp_txrx_cmn_struct.h"
+#include "wlan_objmgr_global_obj.h"
 
 #ifdef ENABLE_VERBOSE_DEBUG
 extern bool is_dp_verbose_debug_enabled;
@@ -159,6 +160,69 @@ enum rx_tlv_bw {
  */
 typedef void (*ipa_uc_op_cb_type)(uint8_t *op_msg,
 				  void *osif_ctxt);
+
+#ifdef QCA_SUPPORT_GLOBAL_DESC
+/* Global level structure for total descriptors in use */
+struct dp_global_desc_context {
+	qdf_atomic_t global_descriptor_in_use;
+};
+
+/**
+ * cdp_global_ctx_init() - to initialise global context for tx descriptors
+ *
+ * Return: QDF_STATUS on success
+ */
+static inline QDF_STATUS cdp_global_ctx_init(void)
+{
+	struct dp_global_desc_context *dp_global;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (wlan_objmgr_get_desc_ctx()) {
+		dp_err("Global object is already created");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	dp_global =  (struct dp_global_desc_context *)
+			qdf_mem_malloc(sizeof(*dp_global));
+
+	if (!dp_global)
+		return QDF_STATUS_E_FAILURE;
+
+	wlan_objmgr_set_desc_ctx(dp_global);
+	qdf_atomic_set(&dp_global->global_descriptor_in_use, 0);
+
+	return status;
+}
+
+/**
+ * cdp_global_ctx_deinit() - to deinitialise global context for tx descriptors
+ *
+ * Return: SUCCESS status on success
+ */
+static inline QDF_STATUS cdp_global_ctx_deinit(void)
+{
+	struct dp_global_desc_context *dp_global = wlan_objmgr_get_desc_ctx();
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!dp_global)
+		return QDF_STATUS_SUCCESS;
+
+	qdf_mem_free(dp_global);
+	wlan_objmgr_set_desc_ctx(NULL);
+
+	return status;
+}
+#else
+static inline QDF_STATUS cdp_global_ctx_init(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline QDF_STATUS cdp_global_ctx_deinit(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 
 static inline QDF_STATUS
 cdp_soc_attach_target(ol_txrx_soc_handle soc)

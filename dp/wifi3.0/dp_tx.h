@@ -1151,6 +1151,20 @@ dp_update_tx_desc_stats(struct dp_pdev *pdev)
 }
 #endif /* CONFIG_WLAN_SYSFS_MEM_STATS */
 
+#ifdef QCA_SUPPORT_GLOBAL_DESC
+/**
+ * dp_tx_get_global_desc_in_use() - read global descriptors in usage
+ * @dp_global: Datapath global context
+ *
+ * Return: global descriptors in use
+ */
+static inline int32_t
+dp_tx_get_global_desc_in_use(struct dp_global_desc_context *dp_global)
+{
+	return qdf_atomic_read(&dp_global->global_descriptor_in_use);
+}
+#endif
+
 #ifdef QCA_TX_LIMIT_CHECK
 static inline bool is_spl_packet(qdf_nbuf_t nbuf)
 {
@@ -1159,6 +1173,92 @@ static inline bool is_spl_packet(qdf_nbuf_t nbuf)
 	return false;
 }
 
+#ifdef QCA_SUPPORT_GLOBAL_DESC
+/**
+ * is_dp_spl_tx_limit_reached - Check if the packet is a special packet to allow
+ * allocation if allocated tx descriptors are within the global max limit
+ * and pdev max limit.
+ * @vdev: DP vdev handle
+ *
+ * Return: true if allocated tx descriptors reached max configured value, else
+ * false
+ */
+static inline bool
+is_dp_spl_tx_limit_reached(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
+{
+	struct dp_pdev *pdev = vdev->pdev;
+	struct dp_soc *soc = pdev->soc;
+	struct dp_global_desc_context *dp_global;
+	uint32_t global_tx_desc_allowed;
+
+	dp_global = wlan_objmgr_get_desc_ctx();
+	global_tx_desc_allowed =
+		wlan_cfg_get_num_global_tx_desc(soc->wlan_cfg_ctx);
+
+	if (is_spl_packet(nbuf)) {
+		if (dp_tx_get_global_desc_in_use(dp_global) >=
+				global_tx_desc_allowed)
+			return true;
+
+		if (qdf_atomic_read(&pdev->num_tx_outstanding) >=
+			pdev->num_tx_allowed)
+			return true;
+
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * dp_tx_limit_check - Check if allocated tx descriptors reached
+ * global max reg limit and pdev max reg limit for regular packets. Also check
+ * if the limit is reached for special packets.
+ * @vdev: DP vdev handle
+ *
+ * Return: true if allocated tx descriptors reached max limit for regular
+ * packets and in case of special packets, if the limit is reached max
+ * configured vale for the soc/pdev, else false
+ */
+static inline bool
+dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
+{
+	struct dp_pdev *pdev = vdev->pdev;
+	struct dp_soc *soc = pdev->soc;
+	struct dp_global_desc_context *dp_global;
+	uint32_t global_tx_desc_allowed;
+	uint32_t global_tx_desc_reg_allowed;
+	uint32_t global_tx_desc_spcl_allowed;
+
+	dp_global = wlan_objmgr_get_desc_ctx();
+	global_tx_desc_allowed =
+		wlan_cfg_get_num_global_tx_desc(soc->wlan_cfg_ctx);
+	global_tx_desc_spcl_allowed =
+		wlan_cfg_get_num_global_spcl_tx_desc(soc->wlan_cfg_ctx);
+	global_tx_desc_reg_allowed = global_tx_desc_allowed -
+					global_tx_desc_spcl_allowed;
+
+	if (dp_tx_get_global_desc_in_use(dp_global) >= global_tx_desc_reg_allowed) {
+		if (is_dp_spl_tx_limit_reached(vdev, nbuf)) {
+			dp_tx_info("queued packets are more than max tx, drop the frame");
+			DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
+			return true;
+		}
+	}
+
+	if (qdf_atomic_read(&pdev->num_tx_outstanding) >=
+			pdev->num_reg_tx_allowed) {
+		if (is_dp_spl_tx_limit_reached(vdev, nbuf)) {
+			dp_tx_info("queued packets are more than max tx, drop the frame");
+			DP_STATS_INC(vdev, tx_i.dropped.desc_na.num, 1);
+			DP_STATS_INC(vdev,
+				     tx_i.dropped.desc_na_exc_outstand.num, 1);
+			return true;
+		}
+	}
+	return false;
+}
+#else
 /**
  * is_dp_spl_tx_limit_reached - Check if the packet is a special packet to allow
  * allocation if allocated tx descriptors are within the soc max limit
@@ -1226,6 +1326,7 @@ dp_tx_limit_check(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 	}
 	return false;
 }
+#endif
 
 /**
  * dp_tx_exception_limit_check - Check if allocated tx exception descriptors
@@ -1251,6 +1352,44 @@ dp_tx_exception_limit_check(struct dp_vdev *vdev)
 	return false;
 }
 
+#ifdef QCA_SUPPORT_GLOBAL_DESC
+/**
+ * dp_tx_outstanding_inc - Inc outstanding tx desc values on global and pdev
+ * @vdev: DP pdev handle
+ *
+ * Return: void
+ */
+static inline void
+dp_tx_outstanding_inc(struct dp_pdev *pdev)
+{
+	struct dp_global_desc_context *dp_global;
+
+	dp_global = wlan_objmgr_get_desc_ctx();
+
+	qdf_atomic_inc(&dp_global->global_descriptor_in_use);
+	qdf_atomic_inc(&pdev->num_tx_outstanding);
+	dp_update_tx_desc_stats(pdev);
+}
+
+/**
+ * dp_tx_outstanding__dec - Dec outstanding tx desc values on global and pdev
+ * @vdev: DP pdev handle
+ *
+ * Return: void
+ */
+static inline void
+dp_tx_outstanding_dec(struct dp_pdev *pdev)
+{
+	struct dp_global_desc_context *dp_global;
+
+	dp_global = wlan_objmgr_get_desc_ctx();
+
+	qdf_atomic_dec(&dp_global->global_descriptor_in_use);
+	qdf_atomic_dec(&pdev->num_tx_outstanding);
+	dp_update_tx_desc_stats(pdev);
+}
+
+#else
 /**
  * dp_tx_outstanding_inc - Increment outstanding tx desc values on pdev and soc
  * @vdev: DP pdev handle
@@ -1282,6 +1421,7 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 	qdf_atomic_dec(&soc->num_tx_outstanding);
 	dp_update_tx_desc_stats(pdev);
 }
+#endif /* QCA_SUPPORT_GLOBAL_DESC */
 
 #else //QCA_TX_LIMIT_CHECK
 static inline bool
@@ -1310,6 +1450,7 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 	dp_update_tx_desc_stats(pdev);
 }
 #endif //QCA_TX_LIMIT_CHECK
+
 /**
  * dp_tx_get_pkt_len() - Get the packet length of a msdu
  * @tx_desc: tx descriptor
