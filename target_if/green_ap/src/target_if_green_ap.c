@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,6 +27,49 @@
 #include <target_if.h>
 #include <wmi_unified_api.h>
 
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+/**
+ * target_if_green_ap_ll_ps_cmd() - Green AP low latency power save mode
+ * cmd api
+ * @vdev: vdev object
+ * @ll_ps_params: low latency power save command parameter
+ *
+ * Return: QDF_STATUS_SUCCESS for success, otherwise appropriate failure reason
+ */
+static QDF_STATUS
+target_if_green_ap_ll_ps_cmd(struct wlan_objmgr_vdev *vdev,
+			     struct green_ap_ll_ps_cmd_param *ll_ps_params)
+{
+	struct wlan_objmgr_pdev *pdev;
+	wmi_unified_t wmi_hdl;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		green_ap_err("pdev context passed is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wmi_hdl = GET_WMI_HDL_FROM_PDEV(pdev);
+	if (!wmi_hdl) {
+		green_ap_err("null wmi_hdl");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return wmi_unified_green_ap_ll_ps_send(wmi_hdl, ll_ps_params);
+}
+
+static inline void target_if_register_ll_ps_tx_ops(
+		struct wlan_lmac_if_green_ap_tx_ops *tx_ops)
+{
+	tx_ops->ll_ps = target_if_green_ap_ll_ps_cmd;
+}
+#else
+static inline void target_if_register_ll_ps_tx_ops(
+		struct wlan_lmac_if_green_ap_tx_ops *tx_ops)
+{
+}
+#endif
+
 QDF_STATUS target_if_register_green_ap_tx_ops(
 		struct wlan_lmac_if_tx_ops *tx_ops)
 {
@@ -44,6 +88,8 @@ QDF_STATUS target_if_register_green_ap_tx_ops(
 	green_ap_tx_ops->get_current_channel = NULL;
 	green_ap_tx_ops->get_current_channel_flags = NULL;
 	green_ap_tx_ops->get_capab = NULL;
+
+	target_if_register_ll_ps_tx_ops(green_ap_tx_ops);
 
 	return QDF_STATUS_SUCCESS;
 }

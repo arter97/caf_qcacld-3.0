@@ -259,6 +259,7 @@ QDF_STATUS wmi_unified_green_ap_ps_send(wmi_unified_t wmi_handle,
 
 	return QDF_STATUS_E_FAILURE;
 }
+
 #else
 QDF_STATUS wmi_unified_green_ap_ps_send(wmi_unified_t wmi_handle,
 					uint32_t value, uint8_t pdev_id)
@@ -266,6 +267,20 @@ QDF_STATUS wmi_unified_green_ap_ps_send(wmi_unified_t wmi_handle,
 	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_SUPPORT_GREEN_AP */
+
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+QDF_STATUS wmi_unified_green_ap_ll_ps_send(
+		wmi_unified_t wmi_handle,
+		struct green_ap_ll_ps_cmd_param *ll_ps_params)
+{
+	if (wmi_handle->ops->send_green_ap_ll_ps_cmd)
+		return wmi_handle->ops->send_green_ap_ll_ps_cmd(
+				wmi_handle,
+				ll_ps_params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+#endif
 
 QDF_STATUS
 wmi_unified_pdev_utf_cmd_send(wmi_unified_t wmi_handle,

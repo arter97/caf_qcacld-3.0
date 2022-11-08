@@ -101,6 +101,16 @@ enum wlan_green_ap_ps_event {
 };
 
 /**
+ * enum wlan_green_ap_ll_ps_state - PS state
+ * @WLAN_GREEN_AP_LL_PS_DISABLE - Disable PS
+ * @WLAN_GREEN_AP_LL_PS_ENABLE - Enable PS
+ */
+enum wlan_green_ap_ll_ps_state {
+	WLAN_GREEN_AP_LL_PS_DISABLE = 0,
+	WLAN_GREEN_AP_LL_PS_ENABLE,
+};
+
+/**
  * struct wlan_pdev_green_ap_ctx - green ap context
  * @pdev: Pdev pointer
  * @ps_enable: Enable PS
@@ -135,6 +145,7 @@ struct wlan_pdev_green_ap_ctx {
 	uint32_t bcn_mult;
 	qdf_atomic_t ps_en_cmd_cnt;
 	qdf_atomic_t ps_dis_cmd_cnt;
+	struct wlan_objmgr_vdev *vdev;
 #endif
 	struct wlan_green_ap_egap_params egap_params;
 	bool dbg_enable;
@@ -144,7 +155,7 @@ struct wlan_pdev_green_ap_ctx {
  * wlan_psoc_get_green_ap_tx_ops() - Obtain green ap tx ops from green ap ctx
  * @green_ap_ctx: green ap context
  *
- * @Return: green ap tx ops pointer
+ * Return: green ap tx ops pointer
  */
 struct wlan_lmac_if_green_ap_tx_ops *
 wlan_psoc_get_green_ap_tx_ops(struct wlan_pdev_green_ap_ctx *green_ap_ctx);
@@ -162,7 +173,7 @@ bool wlan_is_egap_enabled(struct wlan_pdev_green_ap_ctx *green_ap_ctx);
  * @green_ap_ctx: green ap context
  * @event: ps event
  *
- * @Return: Success or Failure
+ * Return: Success or Failure
  */
 QDF_STATUS wlan_green_ap_state_mc(struct wlan_pdev_green_ap_ctx *green_ap_ctx,
 				  enum wlan_green_ap_ps_event event);
@@ -171,7 +182,7 @@ QDF_STATUS wlan_green_ap_state_mc(struct wlan_pdev_green_ap_ctx *green_ap_ctx,
  * wlan_green_ap_timer_fn() - Green ap timer callback
  * @pdev: pdev pointer
  *
- * @Return: None
+ * Return: None
  */
 void wlan_green_ap_timer_fn(void *pdev);
 
@@ -183,9 +194,19 @@ void wlan_green_ap_timer_fn(void *pdev);
  *
  * Callback to check if all modes on radio are configured as AP
  *
- * @Return: None
+ * Return: None
  */
 void wlan_green_ap_check_mode(struct wlan_objmgr_pdev *pdev,
 		void *object,
 		void *arg);
+
+/**
+ * wlan_green_ap_get_cookie_id() - Get Low latency Power save cookie id
+ * @green_ap_ctx: green ap context
+ * @state: Received command state (Enable/Disable)
+ *
+ * Return: New cookie id
+ */
+uint32_t wlan_green_ap_get_cookie_id(struct wlan_pdev_green_ap_ctx *green_ap_ctx,
+				     enum wlan_green_ap_ll_ps_state state);
 #endif  /* _WLAN_GREEN_AP_MAIN_I_H_ */

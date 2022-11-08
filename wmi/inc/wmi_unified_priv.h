@@ -549,6 +549,10 @@ QDF_STATUS (*send_green_ap_ps_cmd)(wmi_unified_t wmi_handle,
 QDF_STATUS (*extract_green_ap_egap_status_info)(
 		uint8_t *evt_buf,
 		struct wlan_green_ap_egap_status_info *egap_status_info_params);
+#if defined(WLAN_SUPPORT_GAP_LL_PS_MODE)
+QDF_STATUS (*send_green_ap_ll_ps_cmd)(wmi_unified_t wmi_handle,
+				      struct green_ap_ll_ps_cmd_param *ll_ps_params);
+#endif
 #endif
 
 QDF_STATUS

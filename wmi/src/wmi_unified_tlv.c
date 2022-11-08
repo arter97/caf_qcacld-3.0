@@ -2061,6 +2061,47 @@ static QDF_STATUS send_green_ap_ps_cmd_tlv(wmi_unified_t wmi_handle,
 }
 #endif
 
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+static QDF_STATUS send_green_ap_ll_ps_cmd_tlv(wmi_unified_t wmi_handle,
+					      struct green_ap_ll_ps_cmd_param *green_ap_ll_ps_params)
+{
+	uint32_t len;
+	wmi_buf_t buf;
+	wmi_xgap_enable_cmd_fixed_param *cmd;
+
+	len = sizeof(*cmd);
+
+	wmi_debug("Green AP low latency PS: bcn interval: %u state: %u cookie: %u",
+		  green_ap_ll_ps_params->bcn_interval,
+		  green_ap_ll_ps_params->state,
+		  green_ap_ll_ps_params->cookie);
+
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_xgap_enable_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(&cmd->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_xgap_enable_cmd_fixed_param,
+		       WMITLV_GET_STRUCT_TLVLEN
+				(wmi_xgap_enable_cmd_fixed_param));
+
+	cmd->beacon_interval = green_ap_ll_ps_params->bcn_interval;
+	cmd->sap_lp_flag = green_ap_ll_ps_params->state;
+	cmd->dialog_token = green_ap_ll_ps_params->cookie;
+
+	wmi_mtrace(WMI_XGAP_ENABLE_CMDID, NO_SESSION, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_XGAP_ENABLE_CMDID)) {
+		wmi_err("Green AP Low latency PS cmd Failed");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * send_pdev_utf_cmd_tlv() - send utf command to fw
  * @wmi_handle: wmi handle
@@ -19892,6 +19933,9 @@ struct wmi_ops tlv_ops =  {
 	.send_green_ap_ps_cmd = send_green_ap_ps_cmd_tlv,
 	.extract_green_ap_egap_status_info =
 			extract_green_ap_egap_status_info_tlv,
+#endif
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+	.send_green_ap_ll_ps_cmd = send_green_ap_ll_ps_cmd_tlv,
 #endif
 	.send_csa_offload_enable_cmd = send_csa_offload_enable_cmd_tlv,
 	.send_start_oem_data_cmd = send_start_oem_data_cmd_tlv,

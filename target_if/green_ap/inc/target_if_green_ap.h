@@ -55,7 +55,7 @@ QDF_STATUS target_if_green_ap_register_egap_event_handler(
  * @pdev: pdev pointer
  * @egap_params: enhanced green ap params
  *
- * @Return: QDF_STATUS_SUCCESS in case of success
+ * Return: QDF_STATUS_SUCCESS in case of success
  */
 QDF_STATUS target_if_green_ap_enable_egap(
 		struct wlan_objmgr_pdev *pdev,
@@ -67,7 +67,7 @@ QDF_STATUS target_if_green_ap_enable_egap(
  * @value: Value to send PS on/off to FW
  * @pdev_id: pdev id
  *
- * @Return: QDF_STATUS_SUCCESS in case of success
+ * Return: QDF_STATUS_SUCCESS in case of success
  */
 QDF_STATUS target_if_green_ap_set_ps_on_off(struct wlan_objmgr_pdev *pdev,
 					    bool value, uint8_t pdev_id);
@@ -76,7 +76,7 @@ QDF_STATUS target_if_green_ap_set_ps_on_off(struct wlan_objmgr_pdev *pdev,
  * target_if_green_ap_get_current_channel() - Get current channel
  * @pdev: pdev pointer
  *
- * @Return: current channel freq
+ * Return: current channel freq
  */
 uint16_t target_if_green_ap_get_current_channel(struct wlan_objmgr_pdev *pdev);
 
@@ -84,7 +84,7 @@ uint16_t target_if_green_ap_get_current_channel(struct wlan_objmgr_pdev *pdev);
  * target_if_green_ap_get_current_channel_flags() - Get current channel flags
  * @pdev: pdev pointer
  *
- * @Return: current channel flags
+ * Return: current channel flags
  */
 uint64_t target_if_green_ap_get_current_channel_flags(
 				struct wlan_objmgr_pdev *pdev);
@@ -93,7 +93,7 @@ uint64_t target_if_green_ap_get_current_channel_flags(
  * target_if_green_ap_reset_dev() - Reset dev
  * @pdev: pdev pointer
  *
- * @Return:  QDF_STATUS_SUCCESS if device reset
+ * Return:  QDF_STATUS_SUCCESS if device reset
  */
 QDF_STATUS target_if_green_ap_reset_dev(struct wlan_objmgr_pdev *pdev);
 

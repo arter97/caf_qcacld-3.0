@@ -234,21 +234,38 @@ static void wlan_green_ap_set_bcn_mult(struct wlan_objmgr_pdev *pdev)
 
 	if (!psoc) {
 		green_ap_err("psoc is NULL");
-		return QDF_STATUS_E_INVAL;
+		return;
 	}
 
 	green_ap_ctx = wlan_objmgr_pdev_get_comp_private_obj(
 			pdev, WLAN_UMAC_COMP_GREEN_AP);
 	if (!green_ap_ctx) {
 		green_ap_err("green ap context obtained is NULL");
-		return QDF_STATUS_E_FAILURE;
+		return;
 	}
 
 	green_ap_ctx->bcn_mult = cfg_get(psoc,
 					 CFG_GAP_LL_PS_LOW_BEACON_MULT);
 }
+
+/**
+ * wlan_green_ap_init_cmd_count() - Initialize command count.
+ * @green_ap_ctx: green ap ctx
+ */
+static void wlan_green_ap_init_cmd_count(struct wlan_pdev_green_ap_ctx *green_ap_ctx)
+{
+	/* Disable cookie id will from 0,2,6,..*/
+	qdf_atomic_init(&green_ap_ctx->ps_dis_cmd_cnt);
+	/* Enable cookie id will be from 1,3,5,..*/
+	qdf_atomic_set(&green_ap_ctx->ps_en_cmd_cnt, 1);
+}
 #else
 static inline void wlan_green_ap_set_bcn_mult(struct wlan_objmgr_pdev *pdev)
+{
+}
+
+static inline
+void wlan_green_ap_init_cmd_count(struct wlan_pdev_green_ap_ctx *green_ap_ctx)
 {
 }
 #endif
@@ -290,6 +307,8 @@ QDF_STATUS wlan_green_ap_pdev_open(struct wlan_objmgr_pdev *pdev)
 					CFG_EGAP_FLAGS_FEATURE);
 
 	wlan_green_ap_set_bcn_mult(pdev);
+
+	wlan_green_ap_init_cmd_count(green_ap_ctx);
 
 	qdf_spin_unlock_bh(&green_ap_ctx->lock);
 
