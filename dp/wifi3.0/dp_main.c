@@ -14549,7 +14549,7 @@ dp_txrx_post_data_stall_event(struct cdp_soc_t *soc_hdl,
 
 #ifdef WLAN_FEATURE_STATS_EXT
 /* rx hw stats event wait timeout in ms */
-#define DP_REO_STATUS_STATS_TIMEOUT 1500
+#define DP_REO_STATUS_STATS_TIMEOUT 850
 /**
  * dp_txrx_ext_stats_request - request dp txrx extended stats request
  * @soc_hdl: soc handle
@@ -14690,6 +14690,7 @@ dp_request_rx_hw_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 	last_rx_mpdu_missed = soc->ext_stats.rx_mpdu_missed;
 	soc->ext_stats.rx_mpdu_received = 0;
 
+	dp_debug("HW stats query start");
 	rx_stats_sent_cnt =
 		dp_peer_rxtid_stats(peer, dp_rx_hw_stats_cb, rx_hw_stats);
 	if (!rx_stats_sent_cnt) {
@@ -14707,10 +14708,13 @@ dp_request_rx_hw_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 
 	status = qdf_wait_single_event(&soc->rx_hw_stats_event,
 				       DP_REO_STATUS_STATS_TIMEOUT);
+	dp_debug("HW stats query end with %d", rx_stats_sent_cnt);
 
 	qdf_spin_lock_bh(&soc->rx_hw_stats_lock);
 	if (status != QDF_STATUS_SUCCESS) {
-		dp_info("rx hw stats event timeout");
+		dp_info("partial rx hw stats event collected with %d",
+			qdf_atomic_read(
+				&rx_hw_stats->pending_tid_stats_cnt));
 		if (soc->is_last_stats_ctx_init)
 			rx_hw_stats->is_query_timeout = true;
 		/**
@@ -14719,6 +14723,8 @@ dp_request_rx_hw_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 		 */
 		soc->ext_stats.rx_mpdu_received = last_rx_mpdu_received;
 		soc->ext_stats.rx_mpdu_missed = last_rx_mpdu_missed;
+		DP_STATS_INC(soc, rx.rx_hw_stats_timeout, 1);
+
 	}
 	qdf_spin_unlock_bh(&soc->rx_hw_stats_lock);
 
@@ -14727,6 +14733,7 @@ out:
 		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
 	if (vdev)
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+	DP_STATS_INC(soc, rx.rx_hw_stats_requested, 1);
 
 	return status;
 }

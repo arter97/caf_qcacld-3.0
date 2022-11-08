@@ -1151,6 +1151,10 @@ struct dp_soc_stats {
 		/* Number of frames routed from reo*/
 		uint32_t reo2rel_route_drop;
 		uint64_t fast_recycled;
+		/* Number of hw stats requested */
+		uint32_t rx_hw_stats_requested;
+		/* Number of hw stats request timeout */
+		uint32_t rx_hw_stats_timeout;
 
 		struct {
 			/* Invalid RBM error count */
