@@ -19,6 +19,7 @@
 #include <hal_be_api.h>
 #include "dp_mlo.h"
 #include <dp_be.h>
+#include <dp_be_rx.h>
 #include <dp_htt.h>
 #include <dp_internal.h>
 #include <wlan_cfg.h>
@@ -168,6 +169,96 @@ static QDF_STATUS dp_partner_soc_rx_hw_cc_init(struct dp_mlo_ctxt *mlo_ctxt,
 	return qdf_status;
 }
 
+static void dp_mlo_soc_drain_rx_buf(struct dp_soc *soc, void *arg)
+{
+	uint8_t i = 0;
+	uint8_t cpu = 0;
+	uint8_t rx_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS] = {0};
+	uint8_t rx_err_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS] = {0};
+	uint8_t rx_wbm_rel_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS] = {0};
+	uint8_t reo_status_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS] = {0};
+
+	/* Save the current interrupt mask and disable the interrupts */
+	for (i = 0; i < wlan_cfg_get_num_contexts(soc->wlan_cfg_ctx); i++) {
+		rx_ring_mask[i] = soc->intr_ctx[i].rx_ring_mask;
+		rx_err_ring_mask[i] = soc->intr_ctx[i].rx_err_ring_mask;
+		rx_wbm_rel_ring_mask[i] = soc->intr_ctx[i].rx_wbm_rel_ring_mask;
+		reo_status_ring_mask[i] = soc->intr_ctx[i].reo_status_ring_mask;
+
+		soc->intr_ctx[i].rx_ring_mask = 0;
+		soc->intr_ctx[i].rx_err_ring_mask = 0;
+		soc->intr_ctx[i].rx_wbm_rel_ring_mask = 0;
+		soc->intr_ctx[i].reo_status_ring_mask = 0;
+	}
+
+	/* make sure dp_service_srngs not running on any of the CPU */
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		while (qdf_atomic_test_bit(cpu,
+					   &soc->service_rings_running))
+			;
+	}
+
+	for (i = 0; i < wlan_cfg_get_num_contexts(soc->wlan_cfg_ctx); i++) {
+		uint8_t ring = 0;
+		uint32_t num_entries = 0;
+		hal_ring_handle_t hal_ring_hdl = NULL;
+		uint8_t rx_mask = wlan_cfg_get_rx_ring_mask(
+						soc->wlan_cfg_ctx, i);
+		uint8_t rx_err_mask = wlan_cfg_get_rx_err_ring_mask(
+						soc->wlan_cfg_ctx, i);
+		uint8_t rx_wbm_rel_mask = wlan_cfg_get_rx_wbm_rel_ring_mask(
+						soc->wlan_cfg_ctx, i);
+
+		if (rx_mask) {
+			/* iterate through each reo ring and process the buf */
+			for (ring = 0; ring < soc->num_reo_dest_rings; ring++) {
+				if (!(rx_mask & (1 << ring)))
+					continue;
+
+				hal_ring_hdl =
+					soc->reo_dest_ring[ring].hal_srng;
+				num_entries = hal_srng_get_num_entries(
+								soc->hal_soc,
+								hal_ring_hdl);
+				dp_rx_process_be(&soc->intr_ctx[i],
+						 hal_ring_hdl,
+						 ring,
+						 num_entries);
+			}
+		}
+
+		/* Process REO Exception ring */
+		if (rx_err_mask) {
+			hal_ring_hdl = soc->reo_exception_ring.hal_srng;
+			num_entries = hal_srng_get_num_entries(
+						soc->hal_soc,
+						hal_ring_hdl);
+
+			dp_rx_err_process(&soc->intr_ctx[i], soc,
+					  hal_ring_hdl, num_entries);
+		}
+
+		/* Process Rx WBM release ring */
+		if (rx_wbm_rel_mask) {
+			hal_ring_hdl = soc->rx_rel_ring.hal_srng;
+			num_entries = hal_srng_get_num_entries(
+						soc->hal_soc,
+						hal_ring_hdl);
+
+			dp_rx_wbm_err_process(&soc->intr_ctx[i], soc,
+					      hal_ring_hdl, num_entries);
+		}
+	}
+
+	/* restore the interrupt mask */
+	for (i = 0; i < wlan_cfg_get_num_contexts(soc->wlan_cfg_ctx); i++) {
+		soc->intr_ctx[i].rx_ring_mask = rx_ring_mask[i];
+		soc->intr_ctx[i].rx_err_ring_mask = rx_err_ring_mask[i];
+		soc->intr_ctx[i].rx_wbm_rel_ring_mask = rx_wbm_rel_ring_mask[i];
+		soc->intr_ctx[i].reo_status_ring_mask = reo_status_ring_mask[i];
+	}
+}
+
 static void dp_mlo_soc_setup(struct cdp_soc_t *soc_hdl,
 			     struct cdp_mlo_ctxt *cdp_ml_ctxt)
 {
@@ -192,17 +283,12 @@ static void dp_mlo_soc_teardown(struct cdp_soc_t *soc_hdl,
 	if (!cdp_ml_ctxt)
 		return;
 
-	dp_mlo_set_soc_by_chip_id(mlo_ctxt, NULL, be_soc->mlo_chip_id);
+	/* During the teardown drain the Rx buffers if any exist in the ring */
+	dp_mcast_mlo_iter_ptnr_soc(be_soc,
+				   dp_mlo_soc_drain_rx_buf,
+				   NULL);
 
-	/*
-	 * In force teardown case disable the interrupts before
-	 * going down. As target may be still active, we may still
-	 * continue to receive traffic. Disabling interrupts to
-	 * ensure we dont process interrupts while clean up on
-	 * other SOC.
-	 */
-	if (is_force_down)
-		dp_soc_interrupt_detach(soc_hdl);
+	dp_mlo_set_soc_by_chip_id(mlo_ctxt, NULL, be_soc->mlo_chip_id);
 }
 
 static QDF_STATUS dp_mlo_add_ptnr_vdev(struct dp_vdev *vdev1,
