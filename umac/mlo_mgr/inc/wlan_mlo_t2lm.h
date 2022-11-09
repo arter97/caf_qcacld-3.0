@@ -21,6 +21,8 @@
 #ifndef _WLAN_MLO_T2LM_H_
 #define _WLAN_MLO_T2LM_H_
 
+#include <wlan_cmn_ieee80211.h>
+
 #ifdef WLAN_FEATURE_11BE
 
 #define t2lm_alert(format, args...) \
@@ -62,6 +64,36 @@ QDF_STATUS wlan_mlo_parse_t2lm_ie(
  */
 uint8_t *wlan_mlo_add_t2lm_ie(uint8_t *frm, struct wlan_objmgr_peer *peer,
 			      struct wlan_t2lm_onging_negotiation_info *t2lm);
+
+/**
+ * wlan_mlo_parse_t2lm_action_frame() - API to parse T2LM action frame
+ * @peer: Pointer to peer structure
+ * @t2lm: Pointer to T2LM structure
+ * @action_frm: Pointer to action frame
+ * @category: T2LM action frame category
+ *
+ * Return: 0 - success, else failure
+ */
+int wlan_mlo_parse_t2lm_action_frame(
+		struct wlan_objmgr_peer *peer,
+		struct wlan_t2lm_onging_negotiation_info *t2lm,
+		struct wlan_action_frame *action_frm,
+		enum wlan_t2lm_category category);
+
+/**
+ * wlan_mlo_add_t2lm_action_frame() - API to add T2LM action frame
+ * @peer: Pointer to peer structure
+ * @frm: Pointer to a frame to add T2LM IE
+ * @args: T2LM action frame related info
+ * @buf: Pointer to T2LM IE values
+ * @category: T2LM action frame category
+ *
+ * Return: Pointer to the updated frame buffer
+ */
+uint8_t *wlan_mlo_add_t2lm_action_frame(
+		struct wlan_objmgr_peer *peer,
+		uint8_t *frm, struct wlan_action_frame_args *args,
+		uint8_t *buf, enum wlan_t2lm_category category);
 #else
 static inline QDF_STATUS wlan_mlo_parse_t2lm_ie(
 	struct wlan_objmgr_peer *peer,
@@ -73,6 +105,25 @@ static inline QDF_STATUS wlan_mlo_parse_t2lm_ie(
 static inline
 int8_t *wlan_mlo_add_t2lm_ie(uint8_t *frm, struct wlan_objmgr_peer *peer,
 			     struct wlan_t2lm_onging_negotiation_info *t2lm)
+{
+	return frm;
+}
+
+static inline
+int wlan_mlo_parse_t2lm_action_frame(
+		struct wlan_objmgr_peer *peer,
+		struct wlan_t2lm_onging_negotiation_info *t2lm,
+		struct wlan_action_frame *action_frm,
+		enum wlan_t2lm_category category)
+{
+	return 0;
+}
+
+static inline
+uint8_t *wlan_mlo_add_t2lm_action_frame(
+		struct wlan_objmgr_peer *peer,
+		uint8_t *frm, struct wlan_action_frame_args *args,
+		uint8_t *buf, enum wlan_t2lm_category category)
 {
 	return frm;
 }

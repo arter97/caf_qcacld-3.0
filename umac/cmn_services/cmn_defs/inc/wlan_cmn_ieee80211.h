@@ -2655,6 +2655,34 @@ struct wlan_ie_multi_link_traffic_indication {
 	uint16_t ml_traffic_ind_control;
 	uint16_t per_link_traffic_ind_list[];
 } qdf_packed;
+
+/**
+ * struct wlan_action - Generic action frame format
+ * @category: Action frame category
+ * @action: action
+ */
+struct wlan_action_frame {
+	int8_t category;
+	int8_t action;
+} __packed;
+
+/**
+ * struct wlan_action_frame_args - Generic action frame arguments
+ * @category: Action frame category
+ * @action: action
+ * @arg1: argument1
+ * @arg2: argument2
+ * @arg3: argument3
+ * @arg4: Pointer to argument4
+ */
+struct wlan_action_frame_args {
+	uint8_t category;
+	uint8_t action;
+	uint32_t arg1;
+	uint32_t arg2;
+	uint32_t arg3;
+	uint8_t *arg4;
+};
 #endif /* WLAN_FEATURE_11BE */
 
 /**

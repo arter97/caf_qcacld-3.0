@@ -493,3 +493,197 @@ uint8_t *wlan_mlo_add_t2lm_ie(uint8_t *frm, struct wlan_objmgr_peer *peer,
 
 	return frm;
 }
+
+/**
+ * wlan_mlo_parse_t2lm_request_action_frame() - API to parse T2LM request action
+ * frame.
+ * @peer: Pointer to peer structure
+ * @t2lm: Pointer to T2LM structure
+ * @action_frm: Pointer to action frame
+ * @category: T2LM action frame category
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS wlan_mlo_parse_t2lm_request_action_frame(
+		struct wlan_objmgr_peer *peer,
+		struct wlan_t2lm_onging_negotiation_info *t2lm,
+		struct wlan_action_frame *action_frm,
+		enum wlan_t2lm_category category)
+{
+	uint8_t *t2lm_action_frm;
+
+	t2lm->category = category;
+
+	/*
+	 * T2LM request action frame
+	 *
+	 *   1-byte     1-byte     1-byte   variable
+	 *-------------------------------------------
+	 * |         |           |        |         |
+	 * | Category| Protected | Dialog | T2LM IE |
+	 * |         |    EHT    | token  |         |
+	 * |         |  Action   |        |         |
+	 *-------------------------------------------
+	 */
+
+	t2lm_action_frm = (uint8_t *)action_frm + sizeof(*action_frm);
+
+	t2lm->dialog_token = *t2lm_action_frm;
+
+	return wlan_mlo_parse_t2lm_ie(peer, t2lm,
+				      t2lm_action_frm + sizeof(uint8_t));
+}
+
+/**
+ * wlan_mlo_parse_t2lm_response_action_frame() - API to parse T2LM response
+ * action frame.
+ * @peer: Pointer to peer structure
+ * @t2lm: Pointer to T2LM structure
+ * @action_frm: Pointer to action frame
+ * @category: T2LM action frame category
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS wlan_mlo_parse_t2lm_response_action_frame(
+		struct wlan_objmgr_peer *peer,
+		struct wlan_t2lm_onging_negotiation_info *t2lm,
+		struct wlan_action_frame *action_frm,
+		enum wlan_t2lm_category category)
+{
+	uint8_t *t2lm_action_frm;
+	QDF_STATUS ret_val = QDF_STATUS_SUCCESS;
+
+	t2lm->category = WLAN_T2LM_CATEGORY_RESPONSE;
+	/*
+	 * T2LM response action frame
+	 *
+	 *   1-byte     1-byte     1-byte   1-byte   variable
+	 *----------------------------------------------------
+	 * |         |           |        |        |         |
+	 * | Category| Protected | Dialog | Status | T2LM IE |
+	 * |         |    EHT    | token  |  code  |         |
+	 * |         |  Action   |        |        |         |
+	 *----------------------------------------------------
+	 */
+
+	t2lm_action_frm = (uint8_t *)action_frm + sizeof(*action_frm);
+
+	t2lm->dialog_token = *t2lm_action_frm;
+	t2lm->t2lm_resp_type = *(t2lm_action_frm + sizeof(uint8_t));
+
+	if (t2lm->t2lm_resp_type ==
+			WLAN_T2LM_RESP_TYPE_PREFERRED_TID_TO_LINK_MAPPING) {
+		t2lm_action_frm += sizeof(uint8_t) + sizeof(uint8_t);
+		ret_val = wlan_mlo_parse_t2lm_ie(peer, t2lm, t2lm_action_frm);
+	}
+
+	return ret_val;
+}
+
+int wlan_mlo_parse_t2lm_action_frame(
+		struct wlan_objmgr_peer *peer,
+		struct wlan_t2lm_onging_negotiation_info *t2lm,
+		struct wlan_action_frame *action_frm,
+		enum wlan_t2lm_category category)
+{
+	QDF_STATUS ret_val = QDF_STATUS_SUCCESS;
+
+	switch (category) {
+	case WLAN_T2LM_CATEGORY_REQUEST:
+		{
+			ret_val = wlan_mlo_parse_t2lm_request_action_frame(
+					peer, t2lm, action_frm, category);
+			return qdf_status_to_os_return(ret_val);
+		}
+	case WLAN_T2LM_CATEGORY_RESPONSE:
+		{
+			ret_val = wlan_mlo_parse_t2lm_response_action_frame(
+					peer, t2lm, action_frm, category);
+
+			return qdf_status_to_os_return(ret_val);
+		}
+	case WLAN_T2LM_CATEGORY_TEARDOWN:
+			/* Nothing to parse from T2LM teardown frame, just reset
+			 * the mapping to default mapping.
+			 *
+			 * T2LM teardown action frame
+			 *
+			 *   1-byte     1-byte
+			 *------------------------
+			 * |         |           |
+			 * | Category| Protected |
+			 * |         |    EHT    |
+			 * |         |  Action   |
+			 *------------------------
+			 */
+			break;
+	default:
+			t2lm_err("Invalid category:%d", category);
+	}
+
+	return ret_val;
+}
+
+static uint8_t *wlan_mlo_add_t2lm_request_action_frame(
+		struct wlan_objmgr_peer *peer, uint8_t *frm,
+		struct wlan_action_frame_args *args, uint8_t *buf,
+		enum wlan_t2lm_category category)
+{
+	*frm++ = args->category;
+	*frm++ = args->action;
+	/* Dialog token*/
+	*frm++ = args->arg1;
+
+	t2lm_info("T2LM request frame: category:%d action:%d dialog_token:%d",
+		  args->category, args->action, args->arg1);
+	return wlan_mlo_add_t2lm_ie(frm, peer, (void *)buf);
+}
+
+static uint8_t *wlan_mlo_add_t2lm_response_action_frame(
+		struct wlan_objmgr_peer *peer, uint8_t *frm,
+		struct wlan_action_frame_args *args, uint8_t *buf,
+		enum wlan_t2lm_category category)
+{
+	*frm++ = args->category;
+	*frm++ = args->action;
+	/* Dialog token*/
+	*frm++ = args->arg1;
+	/* Status code */
+	*frm++ = args->arg2;
+
+	t2lm_info("T2LM response frame: category:%d action:%d dialog_token:%d status_code:%d",
+		  args->category, args->action, args->arg1, args->arg2);
+
+	if (args->arg2 == WLAN_T2LM_RESP_TYPE_PREFERRED_TID_TO_LINK_MAPPING)
+		frm = wlan_mlo_add_t2lm_ie(frm, peer, (void *)buf);
+
+	return frm;
+}
+
+uint8_t *wlan_mlo_add_t2lm_action_frame(
+		struct wlan_objmgr_peer *peer, uint8_t *frm,
+		struct wlan_action_frame_args *args, uint8_t *buf,
+		enum wlan_t2lm_category category)
+{
+	if (!peer) {
+		t2lm_err("null peer");
+		return NULL;
+	}
+
+	switch (category) {
+	case WLAN_T2LM_CATEGORY_REQUEST:
+		return wlan_mlo_add_t2lm_request_action_frame(peer, frm, args,
+							      buf, category);
+	case WLAN_T2LM_CATEGORY_RESPONSE:
+		return wlan_mlo_add_t2lm_response_action_frame(peer, frm, args,
+							      buf, category);
+	case WLAN_T2LM_CATEGORY_TEARDOWN:
+		*frm++ = args->category;
+		*frm++ = args->action;
+		return frm;
+	default:
+		t2lm_err("Invalid category:%d", category);
+	}
+
+	return frm;
+}
