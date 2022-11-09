@@ -204,6 +204,38 @@ policy_mgr_get_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+policy_mgr_set_original_bw_for_sap_restart(struct wlan_objmgr_psoc *psoc,
+					   bool use_sap_original_bw)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	pm_ctx->cfg.use_sap_original_bw = use_sap_original_bw;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+policy_mgr_get_original_bw_for_sap_restart(struct wlan_objmgr_psoc *psoc,
+					   bool *use_sap_original_bw)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+	*use_sap_original_bw = pm_ctx->cfg.use_sap_original_bw;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static bool
 policy_mgr_update_dfs_master_dynamic_enabled(
 	struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
@@ -4089,29 +4121,34 @@ bool policy_mgr_is_any_dfs_beaconing_session_present(
 
 bool policy_mgr_scan_trim_5g_chnls_for_dfs_ap(struct wlan_objmgr_psoc *psoc)
 {
-	struct policy_mgr_psoc_priv_obj *pm_ctx;
 	qdf_freq_t dfs_ch_frq = 0;
+	qdf_freq_t dfs_sta_frq = 0;
 	uint8_t vdev_id;
 	enum hw_mode_bandwidth ch_width;
-
-	pm_ctx = policy_mgr_get_context(psoc);
-	if (!pm_ctx) {
-		policy_mgr_err("Invalid Context");
-		return false;
-	}
-
-	if (policy_mgr_is_sta_present_on_dfs_channel(psoc, &vdev_id,
-						     &dfs_ch_frq,
-						     &ch_width)) {
-		policymgr_nofl_err("DFS STA present vdev_id %d ch_feq %d ch_width %d",
-				   vdev_id, dfs_ch_frq, ch_width);
-		return false;
-	}
+	enum hw_mode_bandwidth ch_sta_width;
+	QDF_STATUS status;
+	uint8_t  sta_sap_scc_on_dfs_chnl;
 
 	policy_mgr_is_any_dfs_beaconing_session_present(psoc, &dfs_ch_frq,
 							&ch_width);
 	if (!dfs_ch_frq)
 		return false;
+
+	status = policy_mgr_get_sta_sap_scc_on_dfs_chnl(psoc,
+						&sta_sap_scc_on_dfs_chnl);
+	if (QDF_IS_STATUS_ERROR(status))
+		return false;
+
+	if (policy_mgr_is_sta_present_on_dfs_channel(psoc, &vdev_id,
+						     &dfs_sta_frq,
+						     &ch_sta_width) &&
+	    !policy_mgr_is_hw_dbs_capable(psoc) &&
+	    sta_sap_scc_on_dfs_chnl != PM_STA_SAP_ON_DFS_DEFAULT) {
+		policymgr_nofl_err("DFS STA present vdev_id %d ch_feq %d ch_width %d",
+				   vdev_id, dfs_sta_frq, ch_sta_width);
+		return false;
+	}
+
 	/*
 	 * 1) if agile & DFS scans are supportet
 	 * 2) if hardware is DBS capable

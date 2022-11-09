@@ -3213,6 +3213,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 	struct hdd_station_ctx *sta_ctx;
 	struct sap_context *sap_ctx;
 	uint8_t conc_rule1 = 0;
+	uint8_t  sta_sap_scc_on_dfs_chnl;
 	bool is_p2p_go_session = false;
 	struct wlan_objmgr_vdev *vdev;
 	bool strict;
@@ -3267,9 +3268,17 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 							    NULL);
 	/*
 	 * For non-dbs HW, don't allow Channel switch on DFS channel if STA is
-	 * not connected.
+	 * not connected and sta_sap_scc_on_dfs_chnl is 1.
 	 */
+	status = policy_mgr_get_sta_sap_scc_on_dfs_chnl(
+				hdd_ctx->psoc, &sta_sap_scc_on_dfs_chnl);
+	if (QDF_STATUS_SUCCESS != status) {
+		return status;
+	}
+
 	if (!sta_cnt && !policy_mgr_is_hw_dbs_capable(hdd_ctx->psoc) &&
+	    (sta_sap_scc_on_dfs_chnl ==
+	     PM_STA_SAP_ON_DFS_MASTER_MODE_DISABLED) &&
 	    (wlan_reg_is_dfs_for_freq(hdd_ctx->pdev, target_chan_freq) ||
 	    (wlan_reg_is_5ghz_ch_freq(target_chan_freq) &&
 	     target_bw == CH_WIDTH_160MHZ))) {
@@ -3447,6 +3456,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	struct sap_context *sap_context;
 	enum sap_csa_reason_code csa_reason =
 		CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
+	bool use_sap_original_bw = false;
 
 	if (!ap_adapter) {
 		hdd_err("ap_adapter is NULL");
@@ -3485,8 +3495,12 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/* Initialized ch_width to CH_WIDTH_MAX */
-	ch_params.ch_width = CH_WIDTH_MAX;
+	policy_mgr_get_original_bw_for_sap_restart(psoc, &use_sap_original_bw);
+	if (use_sap_original_bw)
+		ch_params.ch_width = sap_context->ch_width_orig;
+	else
+		ch_params.ch_width = CH_WIDTH_MAX;
+
 	intf_ch_freq = wlansap_get_chan_band_restrict(sap_context, &csa_reason);
 	if (intf_ch_freq)
 		goto sap_restart;
@@ -4664,6 +4678,8 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 				      WLAN_ELEMID_WAPI);
 	}
 #endif
+	/* extract and add rrm ie from hostapd */
+	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen, WLAN_ELEMID_RRM);
 
 	wlan_hdd_add_hostapd_conf_vsie(adapter, genie,
 				       &total_ielen);
