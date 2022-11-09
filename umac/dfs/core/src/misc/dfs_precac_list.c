@@ -319,7 +319,7 @@ dfs_get_num_cur_subchans_in_node_freq(struct wlan_dfs *dfs,
 static bool
 dfs_is_cac_needed_for_bst_node_for_freq(struct wlan_dfs *dfs,
 					struct precac_tree_node *node,
-					uint8_t req_bandwidth)
+					uint16_t req_bandwidth)
 {
 	uint8_t n_subchs_for_req_bw, n_allowed_subchs, n_excluded_subchs;
 
@@ -1053,7 +1053,7 @@ dfs_find_cac_status_for_chan_for_freq(struct dfs_precac_entry *precac_entry,
 static uint16_t
 dfs_find_ieee_ch_from_precac_tree_for_freq(struct wlan_dfs *dfs,
 					   struct precac_tree_node *root,
-					   uint8_t req_bw)
+					   uint16_t req_bw)
 {
 	struct precac_tree_node *curr_node;
 
@@ -1124,7 +1124,7 @@ dfs_find_precac_state_of_node(qdf_freq_t channel,
 uint16_t dfs_get_ieeechan_for_precac_for_freq(struct wlan_dfs *dfs,
 					      uint16_t exclude_pri_ch_freq,
 					      uint16_t exclude_sec_ch_freq,
-					      uint8_t bw)
+					      uint16_t bw)
 {
 	struct dfs_precac_entry *precac_entry;
 	struct precac_tree_node *root = NULL;

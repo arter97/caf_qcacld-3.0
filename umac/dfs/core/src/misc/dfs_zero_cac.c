@@ -394,12 +394,68 @@ bool dfs_is_precac_timer_running(struct wlan_dfs *dfs)
 	return dfs->dfs_soc_obj->dfs_precac_timer_running ? true : false;
 }
 
+#ifdef WLAN_FEATURE_11BE
+/*
+ * dfs_is_11be_supported() - Check if 11BE supported chip
+ *
+ * @dfs: Pointer to dfs structure.
+ * return: True if the 11BE supported chip.
+ */
+static
+bool dfs_is_11be_supported(struct wlan_dfs *dfs)
+{
+	struct wlan_objmgr_psoc *psoc = dfs->dfs_soc_obj->psoc;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	uint8_t phy_id;
+
+	tx_ops = wlan_reg_get_tx_ops(psoc);
+	if (tx_ops->get_phy_id_from_pdev_id)
+		tx_ops->get_phy_id_from_pdev_id(
+				psoc,
+				wlan_objmgr_pdev_get_pdev_id(dfs->dfs_pdev_obj),
+				&phy_id);
+	else
+		phy_id = wlan_objmgr_pdev_get_pdev_id(dfs->dfs_pdev_obj);
+
+	if (tx_ops->is_chip_11be(psoc, phy_id))
+		return true;
+
+	return false;
+}
+
+/*
+ * dfs_is_adfs_320mhz_supported() - Check if 320 MHz adfs supported
+ *
+ * @dfs: Pointer to dfs structure.
+ * return: True if the 320 MHz adfs supported.
+ */
+static
+bool dfs_is_adfs_320mhz_supported(struct wlan_dfs *dfs)
+{
+	return dfs->dfs_fw_adfs_support_320;
+}
+#else
+static inline
+bool dfs_is_11be_supported(struct wlan_dfs *dfs)
+{
+	return false;
+}
+
+static inline
+bool dfs_is_adfs_320mhz_supported(struct wlan_dfs *dfs)
+{
+	return false;
+}
+#endif /* WLAN_FEATURE_11BE */
+
 void dfs_zero_cac_attach(struct wlan_dfs *dfs)
 {
 	dfs->dfs_precac_timeout_override = -1;
 	PRECAC_LIST_LOCK_CREATE(dfs);
-	if (dfs_is_true_160mhz_supported(dfs))
-		dfs->dfs_agile_detector_id = AGILE_DETECTOR_ID_TRUE_160MHZ;
+	if (dfs_is_11be_supported(dfs))
+	    dfs->dfs_agile_detector_id = AGILE_DETECTOR_11BE;
+	else if (dfs_is_true_160mhz_supported(dfs))
+		 dfs->dfs_agile_detector_id = AGILE_DETECTOR_ID_TRUE_160MHZ;
 	else
 		dfs->dfs_agile_detector_id = AGILE_DETECTOR_ID_80P80;
 }
@@ -1894,14 +1950,7 @@ exit:
 #endif
 
 #ifdef QCA_SUPPORT_AGILE_DFS
-/* dfs_translate_chwidth_enum2val() - Translate the given channel width enum
- *                                    to it's value.
- * @dfs:     Pointer to WLAN DFS structure.
- * @chwidth: Channel width enum of the pdev's current channel.
- *
- * Return: The Bandwidth value for the given channel width enum.
- */
-static uint8_t
+uint16_t
 dfs_translate_chwidth_enum2val(struct wlan_dfs *dfs,
 			       enum phy_ch_width chwidth)
 {
@@ -1915,6 +1964,8 @@ dfs_translate_chwidth_enum2val(struct wlan_dfs *dfs,
 		return DFS_CHWIDTH_80_VAL;
 	case CH_WIDTH_160MHZ:
 		return DFS_CHWIDTH_160_VAL;
+	case CH_WIDTH_320MHZ:
+		return DFS_CHWIDTH_320_VAL;
 	default:
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "cannot find mode!");
 		return 0;
@@ -1946,6 +1997,11 @@ dfs_map_to_agile_width(struct wlan_dfs *dfs, enum phy_ch_width chwidth)
 		    dfs_is_restricted_80p80mhz_supported(dfs))
 			return CH_WIDTH_160MHZ;
 		return CH_WIDTH_80MHZ;
+	case CH_WIDTH_320MHZ:
+		if (dfs_is_adfs_320mhz_supported(dfs) &&
+		    dfs_is_11be_supported(dfs))
+			return CH_WIDTH_320MHZ;
+		return CH_WIDTH_INVALID;
 	default:
 		dfs_err(dfs, WLAN_DEBUG_DFS_ALWAYS, "Invalid chwidth enum!");
 		return CH_WIDTH_INVALID;
@@ -2093,7 +2149,7 @@ dfs_find_dfschan_for_freq(struct wlan_dfs *dfs,
  * @agile_ch_width: Agile channel width to be filled.
  * @cur_ch_width: Current channel width to be filled.
  */
-static void
+void
 dfs_compute_agile_and_curchan_width(struct wlan_dfs *dfs,
 				    enum phy_ch_width *agile_ch_width,
 				    enum phy_ch_width *cur_ch_width)
@@ -2470,7 +2526,7 @@ static qdf_freq_t dfs_find_precac_chan(struct wlan_dfs *dfs,
 	/* Convert precac_chwidth to DFS width and find a valid Agile
 	 * PreCAC frequency from the preCAC tree.
 	 */
-	uint8_t chwidth_val;
+	uint16_t chwidth_val;
 
 	/* Find chwidth value for the given enum */
 	chwidth_val = dfs_translate_chwidth_enum2val(dfs,
@@ -2622,6 +2678,21 @@ uint32_t dfs_get_precac_intermediate_chan(struct wlan_dfs *dfs)
 	return dfs->dfs_precac_inter_chan_freq;
 }
 #endif
+
+#ifdef WLAN_FEATURE_11BE
+static inline void
+dfs_set_fw_adfs_support_320(struct wlan_dfs *dfs, bool fw_adfs_support_320)
+{
+	dfs->dfs_fw_adfs_support_320 = fw_adfs_support_320;
+}
+#else
+static inline void
+dfs_set_fw_adfs_support_320(struct wlan_dfs *dfs, bool fw_adfs_support_320)
+{
+	return;
+}
+#endif /* WLAN_FEATURE_11BE */
+
 #ifdef QCA_SUPPORT_AGILE_DFS
 void dfs_reset_agile_config(struct dfs_soc_priv_obj *dfs_soc)
 {
@@ -2633,10 +2704,12 @@ void dfs_reset_agile_config(struct dfs_soc_priv_obj *dfs_soc)
 
 void dfs_set_fw_adfs_support(struct wlan_dfs *dfs,
 			     bool fw_adfs_support_160,
-			     bool fw_adfs_support_non_160)
+			     bool fw_adfs_support_non_160,
+			     bool fw_adfs_support_320)
 {
 	dfs->dfs_fw_adfs_support_non_160 = fw_adfs_support_non_160;
 	dfs->dfs_fw_adfs_support_160 = fw_adfs_support_160;
+	dfs_set_fw_adfs_support_320(dfs, fw_adfs_support_320);
 }
 #endif
 
