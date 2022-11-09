@@ -110,6 +110,8 @@
  * @tid: TID
  * @msdu_rate_loss: MSDU loss rate in parts per million
  * @configured: indicating if the serivice class is configured.
+ * @ul_service_interval: Uplink service interval
+ * @ul_burst_size: Uplink Burst Size
  */
 
 struct wlan_sawf_scv_class_params {
@@ -125,6 +127,8 @@ struct wlan_sawf_scv_class_params {
 	uint32_t tid;
 	uint32_t msdu_rate_loss;
 	bool configured;
+	uint32_t ul_service_interval;
+	uint32_t ul_burst_size;
 };
 
 /**
@@ -236,5 +240,17 @@ void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params);
  */
 QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_scv_class_params *params);
 
+/* wlan_sawf_get_uplink_params() - Get service class uplink parameters
+ *
+ * @svc_id: service class ID
+ * @tid: pointer to update TID
+ * @service_interval: Pointer to update uplink Service Interval
+ * @burst_size: Pointer to update uplink Burst Size
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
+			    uint32_t *service_interval, uint32_t *burst_size);
 #endif
 
