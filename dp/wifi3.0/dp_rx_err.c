@@ -2723,6 +2723,27 @@ dp_rx_is_sg_formation_required(struct hal_wbm_err_desc_info *info)
 	return false;
 }
 
+#ifdef QCA_DP_NBUF_FAST_RECYCLE_CHECK
+static inline void dp_rx_err_tlv_invalidate(struct dp_soc *soc,
+					    qdf_nbuf_t nbuf)
+{
+	/*
+	 * In case of fast recycle TX driver can avoid invalidate
+	 * of buffer in case of SFE forward. We need to invalidate
+	 * the TLV headers after writing to this location
+	 */
+	qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
+				      (void *)(nbuf->data +
+					       soc->rx_pkt_tlv_size +
+					       L3_HEADER_PAD));
+}
+#else
+static inline void dp_rx_err_tlv_invalidate(struct dp_soc *soc,
+					    qdf_nbuf_t nbuf)
+{
+}
+#endif
+
 uint32_t
 dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 		      hal_ring_handle_t hal_ring_hdl, uint32_t quota)
@@ -2897,6 +2918,7 @@ dp_rx_wbm_err_process(struct dp_intr *int_ctx, struct dp_soc *soc,
 					    (uint8_t *)&wbm_err_info,
 					    sizeof(wbm_err_info));
 
+		dp_rx_err_tlv_invalidate(soc, nbuf);
 		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
 
 		if (qdf_nbuf_is_rx_chfrag_cont(nbuf) || process_sg_buf) {

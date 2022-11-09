@@ -2427,6 +2427,7 @@ qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 	return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
 }
 #else
+#define L3_HEADER_PAD 2
 static inline
 qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 				      qdf_nbuf_t nbuf,
@@ -2436,7 +2437,19 @@ qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
 					      (void *)(nbuf->data + buf_size));
 	} else {
+		/*
+		 * In case of fast_recycled is set we can avoid invalidating
+		 * the complete buffer as it would have been invalidated
+		 * by tx driver before giving to recycler.
+		 *
+		 * But we need to still invalidate rx_pkt_tlv_size as this
+		 * area will not be invalidated in TX path
+		 */
 		DP_STATS_INC(dp_soc, rx.fast_recycled, 1);
+		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
+					      (void *)(nbuf->data +
+						       dp_soc->rx_pkt_tlv_size +
+						       L3_HEADER_PAD));
 	}
 
 	nbuf->fast_recycled = 0;
