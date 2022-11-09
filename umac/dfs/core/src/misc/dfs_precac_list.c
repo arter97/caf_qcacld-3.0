@@ -485,6 +485,21 @@ dfs_is_tree_node_marked_as_cac_for_freq(struct precac_tree_node *root,
 	return false;
 }
 
+static bool
+dfs_is_tree_node_marked_as_nol(struct precac_tree_node *root, qdf_freq_t freq)
+{
+	struct precac_tree_node *curr_node = root;
+
+	while (curr_node) {
+		if (!curr_node->n_nol_subchs)
+			return false;
+		if (curr_node->ch_freq == freq)
+			return curr_node->n_nol_subchs;
+		curr_node = dfs_descend_precac_tree_for_freq(curr_node, freq);
+	}
+	return false;
+}
+
 /* dfs_unmark_tree_node_as_nol_for_freq() - Unmark the preCAC BSTree node as
  * NOL.
  * @dfs:          Pointer to WLAN DFS structure.
@@ -2034,9 +2049,10 @@ void dfs_mark_precac_nol_for_freq(struct wlan_dfs *dfs,
 			if (IS_WITHIN_RANGE_STRICT(freq_lst[i],
 					precac_entry->center_ch_freq,
 					(precac_entry->bw/2))) {
-				dfs_mark_tree_node_as_nol_for_freq(dfs,
-								   precac_entry,
-								   freq_lst[i]);
+				if (!dfs_is_tree_node_marked_as_nol(
+					precac_entry->tree_root, freq_lst[i]))
+					dfs_mark_tree_node_as_nol_for_freq(
+						dfs, precac_entry, freq_lst[i]);
 				break;
 			}
 		}
