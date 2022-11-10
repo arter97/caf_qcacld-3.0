@@ -245,6 +245,7 @@ dp_lite_mon_disable_tx(struct dp_pdev *pdev)
 	/* reset tx lite mon config */
 	dp_lite_mon_reset_config(&lite_mon_tx_config->tx_config);
 	lite_mon_tx_config->subtype_filtering = false;
+	lite_mon_tx_config->sw_peer_filtering = false;
 	qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
 }
 
@@ -677,6 +678,8 @@ dp_lite_mon_set_tx_peer_config(struct dp_soc *soc,
 	status = dp_lite_mon_update_peers(&lite_mon_tx_config->tx_config,
 					  peer_config, peer);
 	qdf_spin_unlock_bh(&lite_mon_tx_config->lite_mon_tx_lock);
+	lite_mon_tx_config->sw_peer_filtering =
+		wlan_cfg_get_txmon_sw_peer_filtering(soc->wlan_cfg_ctx);
 
 	if (status == QDF_STATUS_SUCCESS) {
 		/* configure peer to fw */
