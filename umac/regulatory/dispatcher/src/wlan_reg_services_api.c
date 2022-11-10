@@ -1989,3 +1989,33 @@ wlan_reg_get_num_afc_freq_obj(struct wlan_objmgr_pdev *pdev,
 #endif
 
 #endif
+
+#ifdef CONFIG_REG_CLIENT
+QDF_STATUS
+wlan_reg_recompute_current_chan_list(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	reg_debug("Recomputing the current channel list");
+	reg_compute_pdev_current_chan_list(pdev_priv_obj);
+	return reg_send_scheduler_msg_nb(psoc, pdev);
+}
+
+QDF_STATUS
+wlan_reg_modify_indoor_concurrency(struct wlan_objmgr_pdev *pdev,
+				   uint8_t vdev_id, uint32_t freq,
+				   enum phy_ch_width width, bool add)
+{
+	if (add)
+		return reg_add_indoor_concurrency(pdev, vdev_id, freq, width);
+	else
+		return reg_remove_indoor_concurrency(pdev, vdev_id, freq);
+}
+#endif

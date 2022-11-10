@@ -100,6 +100,21 @@ struct ctry_change_cbk_entry {
 	reg_ctry_change_callback cbk;
 };
 
+#ifdef CONFIG_REG_CLIENT
+#define MAX_INDOOR_LIST_SIZE 3
+
+/**
+ * struct indoor_concurrency_list - Active indoor station list
+ * @vdev_id: vdev ID
+ * @freq: frequency of the interface
+ * @chan_range: Range of channels based on bandwidth
+ */
+struct indoor_concurrency_list {
+	uint8_t vdev_id;
+	uint32_t freq;
+	const struct bonded_channel_freq *chan_range;
+};
+#endif
 /**
  * struct wlan_regulatory_psoc_priv_obj - wlan regulatory psoc private object
  * @mas_chan_params: master channel parameters list
@@ -276,6 +291,7 @@ struct wlan_regulatory_psoc_priv_obj {
  * priority during channel selection by upper layer
  * @reg_afc_dev_deployment_type: AFC device deployment type from BDF
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
+ * @indoor_concurrency_list: List of current indoor station interfaces
  * @fcc_rules_ptr : Value of fcc channel frequency and tx_power list received
  * from firmware
  */
@@ -356,6 +372,7 @@ struct wlan_regulatory_pdev_priv_obj {
 	bool sta_sap_scc_on_indoor_channel;
 #ifdef CONFIG_REG_CLIENT
 	struct cur_fcc_rule fcc_rules_ptr[MAX_NUM_FCC_RULES];
+	struct indoor_concurrency_list indoor_list[MAX_INDOOR_LIST_SIZE];
 #endif
 };
 
