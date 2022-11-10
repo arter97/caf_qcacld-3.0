@@ -13587,6 +13587,8 @@ extract_11be_chainmask(struct wlan_psoc_host_chainmask_capabilities *cap,
 {
 	cap->supports_chan_width_320 =
 		WMI_SUPPORT_CHAN_WIDTH_320_GET(chainmask_caps->supported_flags);
+	cap->supports_aDFS_320 =
+		WMI_SUPPORT_ADFS_320_GET(chainmask_caps->supported_flags);
 }
 #else
 static void
