@@ -2001,6 +2001,70 @@ void dp_tx_nbuf_unmap_regular(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 					   desc->length);
 }
 
+#ifdef QCA_DP_TX_RMNET_OPTIMIZATION
+static inline bool
+is_nbuf_frm_rmnet(qdf_nbuf_t nbuf, struct dp_tx_msdu_info_s *msdu_info)
+{
+	struct net_device *ingress_dev;
+	skb_frag_t *frag;
+	uint16_t buf_len = 0;
+	uint16_t linear_data_len = 0;
+	uint8_t *payload_addr = NULL;
+
+	ingress_dev = dev_get_by_index(dev_net(nbuf->dev), nbuf->skb_iif);
+
+	if ((ingress_dev->priv_flags & IFF_PHONY_HEADROOM)) {
+		dev_put(ingress_dev);
+		frag = &(skb_shinfo(nbuf)->frags[0]);
+		buf_len = skb_frag_size(frag);
+		payload_addr = (uint8_t *)skb_frag_address(frag);
+		linear_data_len = skb_headlen(nbuf);
+
+		buf_len += linear_data_len;
+		payload_addr = payload_addr - linear_data_len;
+		memcpy(payload_addr, nbuf->data, linear_data_len);
+
+		msdu_info->frm_type = dp_tx_frm_rmnet;
+		msdu_info->buf_len = buf_len;
+		msdu_info->payload_addr = payload_addr;
+
+		return true;
+	}
+	dev_put(ingress_dev);
+	return false;
+}
+
+static inline
+qdf_dma_addr_t dp_tx_rmnet_nbuf_map(struct dp_tx_msdu_info_s *msdu_info,
+				    struct dp_tx_desc_s *tx_desc)
+{
+	qdf_dma_addr_t paddr;
+
+	paddr = (qdf_dma_addr_t)qdf_mem_virt_to_phys(msdu_info->payload_addr);
+	tx_desc->length  = msdu_info->buf_len;
+
+	qdf_nbuf_dma_clean_range((void *)msdu_info->payload_addr,
+				 (void *)(msdu_info->payload_addr +
+					  msdu_info->buf_len));
+
+	tx_desc->flags |= DP_TX_DESC_FLAG_RMNET;
+	return paddr;
+}
+#else
+static inline bool
+is_nbuf_frm_rmnet(qdf_nbuf_t nbuf, struct dp_tx_msdu_info_s *msdu_info)
+{
+	return false;
+}
+
+static inline
+qdf_dma_addr_t dp_tx_rmnet_nbuf_map(struct dp_tx_msdu_info_s *msdu_info,
+				    struct dp_tx_desc_s *tx_desc)
+{
+	return 0;
+}
+#endif
+
 #if defined(QCA_DP_TX_NBUF_NO_MAP_UNMAP) && !defined(BUILD_X86)
 static inline
 qdf_dma_addr_t dp_tx_nbuf_map(struct dp_vdev *vdev,
@@ -2020,7 +2084,8 @@ static inline
 void dp_tx_nbuf_unmap(struct dp_soc *soc,
 		      struct dp_tx_desc_s *desc)
 {
-	if (qdf_unlikely(!(desc->flags & DP_TX_DESC_FLAG_SIMPLE)))
+	if (qdf_unlikely(!(desc->flags &
+			   (DP_TX_DESC_FLAG_SIMPLE | DP_TX_DESC_FLAG_RMNET))))
 		return dp_tx_nbuf_unmap_regular(soc, desc);
 }
 #else
@@ -2322,7 +2387,11 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 	dp_tx_update_mesh_flags(soc, vdev, tx_desc);
 
-	paddr =  dp_tx_nbuf_map(vdev, tx_desc, nbuf);
+	if (qdf_unlikely(msdu_info->frm_type == dp_tx_frm_rmnet))
+		paddr = dp_tx_rmnet_nbuf_map(msdu_info, tx_desc);
+	else
+		paddr =  dp_tx_nbuf_map(vdev, tx_desc, nbuf);
+
 	if (!paddr) {
 		/* Handle failure */
 		dp_err("qdf_nbuf_map failed");
@@ -3612,6 +3681,9 @@ qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		} else {
 			struct dp_tx_seg_info_s seg_info = {0};
 
+			if (qdf_unlikely(is_nbuf_frm_rmnet(nbuf, &msdu_info)))
+				goto send_single;
+
 			nbuf = dp_tx_prepare_sg(vdev, nbuf, &seg_info,
 						&msdu_info);
 			if (!nbuf)
@@ -3670,6 +3742,7 @@ qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 				 1, qdf_nbuf_len(nbuf));
 	}
 
+send_single:
 	/*  Single linear frame */
 	/*
 	 * If nbuf is a simple linear frame, use send_single function to

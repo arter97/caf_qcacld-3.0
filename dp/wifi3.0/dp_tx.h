@@ -60,6 +60,7 @@
 #define DP_TX_DESC_FLAG_TX_COMP_ERR	0x1000
 #define DP_TX_DESC_FLAG_FLUSH		0x2000
 #define DP_TX_DESC_FLAG_TRAFFIC_END_IND	0x4000
+#define DP_TX_DESC_FLAG_RMNET		0x8000
 /*
  * Since the Tx descriptor flag is of only 16-bit and no more bit is free for
  * any new flag, therefore for time being overloading PPEDS flag with that of
@@ -223,6 +224,10 @@ struct dp_tx_msdu_info_s {
 #endif
 #ifdef WLAN_DP_FEATURE_SW_LATENCY_MGR
 	uint8_t skip_hp_update;
+#endif
+#ifdef QCA_DP_TX_RMNET_OPTIMIZATION
+	uint16_t buf_len;
+	uint8_t *payload_addr;
 #endif
 };
 
