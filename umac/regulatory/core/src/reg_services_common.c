@@ -9282,20 +9282,33 @@ static uint8_t reg_find_eirp_in_afc_chan_obj(struct wlan_objmgr_pdev *pdev,
 /**
  * reg_is_chan_punc() - Validates the input puncture pattern.
  * @in_punc_pattern: Input puncture pattern
+ * @bw: Channel bandwidth in MHz
  *
  * If the in_punc_pattern has none of the subchans punctured, channel
- * is not considered as punctured.
+ * is not considered as punctured. Also, if the input puncture bitmap
+ * is invalid, do not consider the channel as punctured.
  *
  * Return: true if channel is punctured, false otherwise.
  */
+#ifdef WLAN_FEATURE_11BE
 static bool
-reg_is_chan_punc(uint16_t in_punc_pattern)
+reg_is_chan_punc(uint16_t in_punc_pattern, uint16_t bw)
 {
-	if (in_punc_pattern == NO_SCHANS_PUNC)
+	enum phy_ch_width ch_width = reg_find_chwidth_from_bw(bw);
+
+	if (in_punc_pattern == NO_SCHANS_PUNC ||
+	    !reg_is_punc_bitmap_valid(ch_width, in_punc_pattern))
 		return false;
 
 	return true;
 }
+#else
+static inline bool
+reg_is_chan_punc(uint16_t in_punc_pattern, uint16_t bw)
+{
+	return false;
+}
+#endif
 
 /**
  * reg_find_non_punctured_bw() - Given the input puncture pattern and the
@@ -9436,7 +9449,7 @@ static uint8_t reg_get_sp_eirp(struct wlan_objmgr_pdev *pdev,
 	if (!reg_sp_eirp_pwr)
 		return 0;
 
-	if (reg_is_chan_punc(in_punc_pattern)) {
+	if (reg_is_chan_punc(in_punc_pattern, bw)) {
 		reg_info("Computing SP EIRP with puncturing info");
 		return reg_get_sp_eirp_for_punc_chans(pdev, freq, cen320, bw,
 						      in_punc_pattern,
