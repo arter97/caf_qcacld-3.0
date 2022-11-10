@@ -2946,6 +2946,8 @@ wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 	wlan_soc_sawf_stats_cfg_attach(psoc, wlan_cfg_ctx);
 	wlan_cfg_ctx->is_handle_invalid_decap_type_disabled =
 			cfg_get(psoc, CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE);
+	wlan_cfg_ctx->txmon_sw_peer_filtering =
+			cfg_get(psoc, CFG_DP_TXMON_SW_PEER_FILTERING);
 	return wlan_cfg_ctx;
 }
 
@@ -4236,3 +4238,10 @@ uint8_t wlan_cfg_get_napi_scale_factor(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return cfg->napi_scale_factor;
 }
+
+bool wlan_cfg_get_txmon_sw_peer_filtering(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return cfg->txmon_sw_peer_filtering;
+}
+
+qdf_export_symbol(wlan_cfg_get_txmon_sw_peer_filtering);

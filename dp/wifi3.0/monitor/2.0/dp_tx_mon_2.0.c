@@ -728,8 +728,10 @@ dp_lite_mon_filter_peer(struct dp_lite_mon_tx_config *config,
 {
 	struct dp_lite_mon_peer *peer;
 
-	/* Return here if peer filtering is not required */
-	if (!config->tx_config.peer_count)
+	/* Return here if sw peer filtering is not required or if peer count
+	 * is zero
+	 */
+	if (!config->sw_peer_filtering || !config->tx_config.peer_count)
 		return QDF_STATUS_SUCCESS;
 
 	TAILQ_FOREACH(peer, &config->tx_config.peer_list, peer_list_elem) {
@@ -806,7 +808,8 @@ dp_lite_mon_filter_peer_subtype(struct dp_lite_mon_tx_config *config,
 	QDF_STATUS ret;
 
 	/* Return here if subtype and peer filtering is not required */
-	if (!config->subtype_filtering && !config->tx_config.peer_count)
+	if (!config->subtype_filtering && !config->sw_peer_filtering &&
+	    !config->tx_config.peer_count)
 		return QDF_STATUS_SUCCESS;
 
 	if (dp_tx_mon_nbuf_get_num_frag(buf)) {

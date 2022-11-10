@@ -1267,6 +1267,10 @@
 	CFG_INI_BOOL("dp_handle_invalid_decap_type_disable", false, \
 		     "Enable/Disable DP TLV out of order WAR")
 
+#define CFG_DP_TXMON_SW_PEER_FILTERING \
+	CFG_INI_BOOL("tx_litemon_sw_peer_filtering", false, \
+		     "Enable SW based tx monitor peer fitlering")
+
 /*
  * <ini>
  * dp_rx_fisa_enable - Control Rx datapath FISA
@@ -1876,5 +1880,6 @@
 		CFG(CFG_DP_NAPI_SCALE_FACTOR) \
 		CFG(CFG_DP_HOST_AST_DB_ENABLE) \
 		CFG_DP_SAWF_STATS_CONFIG \
-		CFG(CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE)
+		CFG(CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE) \
+		CFG(CFG_DP_TXMON_SW_PEER_FILTERING)
 #endif /* _CFG_DP_H_ */

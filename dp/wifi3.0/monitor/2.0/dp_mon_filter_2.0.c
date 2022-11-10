@@ -3119,6 +3119,7 @@ dp_mon_filter_reset_tx_lite_mon(struct dp_mon_pdev_be *be_mon_pdev)
 	if (!config)
 		return;
 	config->subtype_filtering = false;
+	config->sw_peer_filtering = false;
 
 }
 

@@ -440,6 +440,7 @@ struct wlan_cfg_dp_soc_ctxt {
 #endif
 	uint8_t num_rxdma_dst_rings_per_pdev;
 	bool txmon_hw_support;
+	bool txmon_sw_peer_filtering;
 	uint8_t num_rxdma_status_rings_per_pdev;
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
 	uint32_t tx_capt_max_mem_allowed;
@@ -2252,6 +2253,10 @@ void wlan_cfg_set_txmon_hw_support(struct wlan_cfg_dp_soc_ctxt *cfg,
  * Return: txmon_hw_support
  */
 bool wlan_cfg_get_txmon_hw_support(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+void wlan_cfg_set_txmon_sw_peer_filtering(struct wlan_cfg_dp_soc_ctxt *cfg,
+					  bool txmon_sw_peer_filtering);
+bool wlan_cfg_get_txmon_sw_peer_filtering(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
 /*
