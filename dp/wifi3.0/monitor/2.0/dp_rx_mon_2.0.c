@@ -983,12 +983,12 @@ dp_rx_mon_flush_status_buf_queue(struct dp_pdev *pdev)
 	union dp_mon_desc_list_elem_t *desc_list = NULL;
 	union dp_mon_desc_list_elem_t *tail = NULL;
 	struct dp_mon_desc *mon_desc;
-	uint8_t idx;
+	uint16_t idx;
 	void *buf;
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	struct dp_mon_desc_pool *rx_mon_desc_pool = &mon_soc_be->rx_desc_mon;
-	uint8_t work_done = 0;
+	uint16_t work_done = 0;
 	uint16_t status_buf_count;
 
 	if (!mon_pdev_be->desc_count) {
@@ -1412,7 +1412,8 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 	union dp_mon_desc_list_elem_t *desc_list = NULL;
 	union dp_mon_desc_list_elem_t *tail = NULL;
 	struct dp_mon_desc *mon_desc;
-	uint8_t idx, user;
+	uint8_t user;
+	uint16_t idx;
 	void *buf;
 	struct hal_rx_ppdu_info *ppdu_info;
 	uint8_t *rx_tlv;
@@ -1422,7 +1423,7 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 	struct dp_mon_soc *mon_soc = soc->monitor_soc;
 	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	struct dp_mon_desc_pool *rx_mon_desc_pool = &mon_soc_be->rx_desc_mon;
-	uint8_t work_done = 0;
+	uint16_t work_done = 0;
 	uint16_t status_buf_count;
 
 	if (!mon_pdev_be->desc_count) {
