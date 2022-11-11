@@ -21157,6 +21157,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_obss_per_packet_sr_support] =
 				WMI_SERVICE_OBSS_PER_PACKET_SR_SUPPORT;
 #endif
+	wmi_service[wmi_service_wpa3_sha384_roam_support] =
+			WMI_SERVICE_WMI_SERVICE_WPA3_SHA384_ROAM_SUPPORT;
 }
 
 /**

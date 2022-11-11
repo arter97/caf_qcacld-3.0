@@ -6199,6 +6199,7 @@ typedef enum {
 #ifdef WLAN_FEATURE_SR
 	wmi_service_obss_per_packet_sr_support,
 #endif
+	wmi_service_wpa3_sha384_roam_support,
 	wmi_services_max,
 } wmi_conv_service_ids;
 #define WMI_SERVICE_UNAVAILABLE 0xFFFF
