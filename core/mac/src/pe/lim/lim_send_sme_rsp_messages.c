@@ -55,6 +55,7 @@
 #include "lim_process_fils.h"
 #include "wma.h"
 #include <../../core/src/wlan_cm_vdev_api.h>
+#include <cds_api.h>
 
 void lim_send_sme_rsp(struct mac_context *mac_ctx, uint16_t msg_type,
 		      tSirResultCodes result_code, uint8_t vdev_id)
@@ -2328,8 +2329,11 @@ lim_process_beacon_tx_success_ind(struct mac_context *mac_ctx, uint16_t msgType,
 	if (session->dfsIncludeChanSwIe &&
 	    (session->gLimChannelSwitch.switchCount ==
 	    mac_ctx->sap.SapDfsInfo.sap_ch_switch_beacon_cnt) &&
-	    !csa_tx_offload)
+	    !csa_tx_offload) {
+		pe_debug("delay 30ms to update beacon template");
+		qdf_sleep(30);
 		lim_process_ap_ecsa_timeout(session);
+	}
 
 
 	if (session->gLimOperatingMode.present)
