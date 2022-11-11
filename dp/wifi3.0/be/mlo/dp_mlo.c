@@ -182,7 +182,8 @@ static void dp_mlo_soc_setup(struct cdp_soc_t *soc_hdl,
 }
 
 static void dp_mlo_soc_teardown(struct cdp_soc_t *soc_hdl,
-				struct cdp_mlo_ctxt *cdp_ml_ctxt)
+				struct cdp_mlo_ctxt *cdp_ml_ctxt,
+				bool is_force_down)
 {
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_mlo_ctxt *mlo_ctxt = cdp_mlo_ctx_to_dp(cdp_ml_ctxt);
@@ -192,6 +193,16 @@ static void dp_mlo_soc_teardown(struct cdp_soc_t *soc_hdl,
 		return;
 
 	dp_mlo_set_soc_by_chip_id(mlo_ctxt, NULL, be_soc->mlo_chip_id);
+
+	/*
+	 * In force teardown case disable the interrupts before
+	 * going down. As target may be still active, we may still
+	 * continue to receive traffic. Disabling interrupts to
+	 * ensure we dont process interrupts while clean up on
+	 * other SOC.
+	 */
+	if (is_force_down)
+		dp_soc_interrupt_detach(soc_hdl);
 }
 
 static QDF_STATUS dp_mlo_add_ptnr_vdev(struct dp_vdev *vdev1,

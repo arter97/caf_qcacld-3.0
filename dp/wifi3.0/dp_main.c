@@ -3377,7 +3377,7 @@ dp_soc_near_full_interrupt_attach(struct dp_soc *soc, int num_irq,
  *
  * Return: none
  */
-static void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc)
+void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc)
 {
 	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
 	int i;

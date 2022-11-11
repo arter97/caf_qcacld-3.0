@@ -4112,4 +4112,12 @@ void dp_rx_err_send_pktlog(struct dp_soc *soc, struct dp_pdev *pdev,
  * return: None
  */
 void dp_pdev_update_fast_rx_flag(struct dp_soc *soc, struct dp_pdev *pdev);
+
+/*
+ * dp_soc_interrupt_detach() - Deregister any allocations done for interrupts
+ * @txrx_soc: DP SOC handle
+ *
+ * Return: none
+ */
+void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc);
 #endif /* #ifndef _DP_INTERNAL_H_ */
