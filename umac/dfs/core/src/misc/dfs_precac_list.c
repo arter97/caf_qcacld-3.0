@@ -1366,7 +1366,7 @@ bool dfs_is_precac_done(struct wlan_dfs *dfs, struct dfs_channel *chan)
 		return 0;
 	}
 
-	if (WLAN_IS_CHAN_MODE_160(chan))
+	if (WLAN_IS_CHAN_MODE_160(chan) || WLAN_IS_CHAN_MODE_320(chan))
 		cfreq = chan->dfs_ch_mhz_freq_seg2;
 	else if (WLAN_IS_CHAN_MODE_165(dfs, chan))
 		cfreq = RESTRICTED_80P80_CHAN_CENTER_FREQ;
@@ -1380,13 +1380,12 @@ bool dfs_is_precac_done(struct wlan_dfs *dfs, struct dfs_channel *chan)
 	    WLAN_IS_CHAN_MODE_40(chan) ||
 	    WLAN_IS_CHAN_MODE_80(chan) ||
 	    WLAN_IS_CHAN_MODE_160(chan) ||
-	    WLAN_IS_CHAN_MODE_165(dfs, chan)) {
+	    WLAN_IS_CHAN_MODE_165(dfs, chan) ||
+	    WLAN_IS_CHAN_MODE_320(chan)) {
 		ret_val =
-		    dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(
-				dfs,
-				cfreq);
+		    dfs_is_precac_done_on_non_80p80_chan_for_freq(dfs, cfreq);
 	} else if (WLAN_IS_CHAN_MODE_80_80(chan)) {
-		ret_val = dfs_is_precac_done_on_ht8080_chan(dfs, chan);
+		ret_val = dfs_is_precac_done_on_80p80_chan(dfs, chan);
 	}
 
 	dfs_debug(dfs, WLAN_DEBUG_DFS, "precac_done_status = %d", ret_val);
@@ -1394,14 +1393,14 @@ bool dfs_is_precac_done(struct wlan_dfs *dfs, struct dfs_channel *chan)
 }
 
 /*
- * dfs_is_precac_done_on_ht20_40_80_chan_for_freq() - Find if preCAC is done
+ * dfs_is_precac_done_on_non_80p80_chan_for_freq() - Find if preCAC is done
  * for the given frequency.
  * @dfs: Pointer to wlan_dfs.
  * @chan_freq: Channel frequency in MHZ.
  */
 bool
-dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(struct wlan_dfs *dfs,
-						       uint16_t chan_freq)
+dfs_is_precac_done_on_non_80p80_chan_for_freq(struct wlan_dfs *dfs,
+					      uint16_t chan_freq)
 {
 	struct dfs_precac_entry *precac_entry;
 	bool ret_val = 0;
@@ -1434,13 +1433,13 @@ dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(struct wlan_dfs *dfs,
 }
 
 /*
- * dfs_is_precac_done_on_ht8080_chan - Find if preCAC is done
+ * dfs_is_precac_done_on_80p80_chan- Find if preCAC is done
  * for the given frequency.
  * @dfs: Pointer to wlan_dfs.
  * @chan: Pointer to dfs_channel.
  */
-bool dfs_is_precac_done_on_ht8080_chan(struct wlan_dfs *dfs,
-				       struct dfs_channel *chan)
+bool dfs_is_precac_done_on_80p80_chan(struct wlan_dfs *dfs,
+				      struct dfs_channel *chan)
 {
 	bool ret_val = 0, primary_found = 0;
 	uint16_t cfreq1, cfreq2 = 0;
@@ -1451,18 +1450,16 @@ bool dfs_is_precac_done_on_ht8080_chan(struct wlan_dfs *dfs,
 	/* Check if primary is DFS then search */
 	if (WLAN_IS_CHAN_DFS(chan))
 		primary_found =
-			dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(
-				dfs,
-				cfreq1);
+			dfs_is_precac_done_on_non_80p80_chan_for_freq(dfs,
+								      cfreq1);
 	else
 		primary_found = 1;
 
 	/* Check if secondary DFS then search */
 	if (WLAN_IS_CHAN_DFS_CFREQ2(chan) && primary_found) {
 		ret_val =
-			dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(
-				dfs,
-				cfreq2);
+			dfs_is_precac_done_on_non_80p80_chan_for_freq(dfs,
+								      cfreq2);
 
 	} else {
 		if (primary_found)

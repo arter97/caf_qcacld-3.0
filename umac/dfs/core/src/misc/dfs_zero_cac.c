@@ -1188,8 +1188,8 @@ bool dfs_is_rcac_done_on_subchan_list(struct wlan_dfs *dfs,
 	uint8_t i;
 
 	for (i = 0; i < n_subchans; i++) {
-		if (!dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(dfs,
-									    target_freq_list[i]))
+		if (!dfs_is_precac_done_on_non_80p80_chan_for_freq(dfs,
+							target_freq_list[i]))
 			return false;
 	}
 	return true;
@@ -1994,7 +1994,8 @@ dfs_map_to_agile_width(struct wlan_dfs *dfs, enum phy_ch_width chwidth)
 	case CH_WIDTH_80P80MHZ:
 	case CH_WIDTH_160MHZ:
 		if (dfs_is_true_160mhz_supported(dfs) ||
-		    dfs_is_restricted_80p80mhz_supported(dfs))
+		    dfs_is_restricted_80p80mhz_supported(dfs) ||
+		    dfs_is_11be_supported(dfs))
 			return CH_WIDTH_160MHZ;
 		return CH_WIDTH_80MHZ;
 	case CH_WIDTH_320MHZ:
@@ -3051,7 +3052,7 @@ bool dfs_bwexpand_is_chanset_agile_eligible(struct wlan_dfs *dfs,
 						   1))
 			return false;
 
-		if (dfs_is_precac_done_on_ht20_40_80_160_165_chan_for_freq(dfs, *p_tgt_freq))
+		if (dfs_is_precac_done_on_non_80p80_chan_for_freq(dfs, *p_tgt_freq))
 			n_cac_done_chan++;
 
 		temp++;
