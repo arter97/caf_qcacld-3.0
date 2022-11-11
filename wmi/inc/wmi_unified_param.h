@@ -1779,14 +1779,38 @@ struct wmi_lro_config_cmd_t {
 	uint32_t pdev_id;
 };
 
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * struct mlo_prb_resp_tmpl_ml_info - Impacted link critical update information
+ * @hw_link_id: Unique hw link id across SoCs
+ * CU vdev map for the Critical update category-1 (Inclusion of CU IES)
+ * @cu_vdev_map_cat1_lo: bits 31:0 to represent vdev ids 0 to 31
+ * @cu_vdev_map_cat1_hi: bits 63:32 to represent vdev ids 32 to 63
+ * CU vdev map for the Critical update category-2 (modification of CU IES)
+ * @cu_vdev_map_cat2_lo: bits 31:0 to represent vdev ids 0 to 31
+ * @cu_vdev_map_cat2_hi: bits 63:32 to represent vdev ids 32 to 63
+ */
+struct mlo_prb_resp_tmpl_ml_info {
+	uint32_t hw_link_id;
+	uint32_t cu_vdev_map_cat1_lo;
+	uint32_t cu_vdev_map_cat1_hi;
+	uint32_t cu_vdev_map_cat2_lo;
+	uint32_t cu_vdev_map_cat2_hi;
+};
+#endif
+
 /**
  * struct wmi_probe_resp_params - send probe response parameters
  * @prb_rsp_template_frm: pointer to template probe response template
  * @prb_rsp_template_len: length of probe response template
+ * @cu_ml_info: Impacted link critical update information
  */
 struct wmi_probe_resp_params {
 	uint8_t *prb_rsp_template_frm;
 	uint32_t prb_rsp_template_len;
+#ifdef WLAN_FEATURE_11BE_MLO
+	struct mlo_prb_resp_tmpl_ml_info cu_ml_info;
+#endif
 };
 
 /* struct set_key_params: structure containing

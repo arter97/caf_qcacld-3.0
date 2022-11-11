@@ -5353,7 +5353,8 @@ static QDF_STATUS send_probe_rsp_tmpl_send_cmd_tlv(wmi_unified_t wmi_handle,
 
 	wmi_buf_len = sizeof(wmi_prb_tmpl_cmd_fixed_param) +
 			sizeof(wmi_bcn_prb_info) + WMI_TLV_HDR_SIZE +
-			tmpl_len_aligned;
+			tmpl_len_aligned +
+			prb_resp_tmpl_ml_info_size(probe_rsp_info);
 
 	if (wmi_buf_len > WMI_BEACON_TX_BUFFER_SIZE) {
 		wmi_err("wmi_buf_len: %d > %d. Can't send wmi cmd",
@@ -5386,6 +5387,8 @@ static QDF_STATUS send_probe_rsp_tmpl_send_cmd_tlv(wmi_unified_t wmi_handle,
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_BYTE, tmpl_len_aligned);
 	buf_ptr += WMI_TLV_HDR_SIZE;
 	qdf_mem_copy(buf_ptr, probe_rsp_info->prb_rsp_template_frm, tmpl_len);
+	buf_ptr += tmpl_len_aligned;
+	buf_ptr = prb_resp_tmpl_add_ml_info(buf_ptr, probe_rsp_info);
 
 	wmi_mtrace(WMI_PRB_TMPL_CMDID, cmd->vdev_id, 0);
 	ret = wmi_unified_cmd_send(wmi_handle,
