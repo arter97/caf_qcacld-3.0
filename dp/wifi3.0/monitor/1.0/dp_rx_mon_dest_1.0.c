@@ -97,6 +97,8 @@ dp_tx_capture_get_user_id(struct dp_pdev *dp_pdev, void *rx_desc_tlv)
  *
  * @dp_pdev: core txrx pdev context
  * @buf_addr_info: void pointer to monitor link descriptor buf addr info
+ * @mac_id: mac_id for which the link desc is released.
+ *
  * Return: QDF_STATUS
  */
 QDF_STATUS
@@ -608,7 +610,7 @@ dp_rx_mon_check_n_drop_mpdu(struct dp_pdev *pdev, uint32_t mac_id,
 	QDF_STATUS status;
 
 	if (mon_pdev->mon_chan_band == REG_BAND_UNKNOWN)
-		return QDF_STATUS_E_INVAL;
+		goto drop_mpdu;
 
 	lmac_id = pdev->ch_band_lmac_id_mapping[mon_pdev->mon_chan_band];
 
@@ -621,6 +623,7 @@ dp_rx_mon_check_n_drop_mpdu(struct dp_pdev *pdev, uint32_t mac_id,
 	if (src_link_id == lmac_id)
 		return QDF_STATUS_E_INVAL;
 
+drop_mpdu:
 	*rx_bufs_dropped = dp_rx_mon_drop_one_mpdu(pdev, mac_id,
 						   rxdma_dst_ring_desc,
 						   head, tail);
@@ -957,7 +960,9 @@ dp_mon_dest_srng_drop_for_mac(struct dp_pdev *pdev, uint32_t mac_id)
 	uint32_t rx_bufs_used = 0;
 	struct rx_desc_pool *rx_desc_pool;
 	uint32_t reap_cnt = 0;
+	uint32_t rx_bufs_dropped;
 	struct dp_mon_pdev *mon_pdev;
+	bool is_rxdma_dst_ring_common;
 
 	if (qdf_unlikely(!soc || !soc->hal_soc))
 		return reap_cnt;
@@ -978,14 +983,33 @@ dp_mon_dest_srng_drop_for_mac(struct dp_pdev *pdev, uint32_t mac_id)
 	}
 
 	rx_desc_pool = dp_rx_get_mon_desc_pool(soc, mac_id, pdev->pdev_id);
+	is_rxdma_dst_ring_common = dp_is_rxdma_dst_ring_common(pdev);
 
 	while ((rxdma_dst_ring_desc =
 		hal_srng_dst_peek(hal_soc, mon_dst_srng)) &&
 		reap_cnt < MON_DROP_REAP_LIMIT) {
-
-		rx_bufs_used += dp_rx_mon_drop_one_mpdu(pdev, mac_id,
+		if (is_rxdma_dst_ring_common) {
+			if (QDF_STATUS_SUCCESS ==
+			    dp_rx_mon_check_n_drop_mpdu(pdev, mac_id,
 							rxdma_dst_ring_desc,
-							&head, &tail);
+							&head, &tail,
+							&rx_bufs_dropped)) {
+				/* Increment stats */
+				rx_bufs_used += rx_bufs_dropped;
+			} else {
+				/*
+				 * If the mpdu was not dropped, we need to
+				 * wait for the entry to be processed, along
+				 * with the status ring entry for the other
+				 * mac. Hence we bail out here.
+				 */
+				break;
+			}
+		} else {
+			rx_bufs_used += dp_rx_mon_drop_one_mpdu(pdev, mac_id,
+								rxdma_dst_ring_desc,
+								&head, &tail);
+		}
 		reap_cnt++;
 		rxdma_dst_ring_desc = hal_srng_dst_get_next(hal_soc,
 							    mon_dst_srng);
