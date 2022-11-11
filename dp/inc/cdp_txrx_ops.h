@@ -154,7 +154,8 @@ struct cdp_mlo_ops {
 	void (*mlo_soc_setup)(struct cdp_soc_t *cdp_soc,
 			      struct cdp_mlo_ctxt *mlo_ctxt);
 	void (*mlo_soc_teardown)(struct cdp_soc_t *cdp_soc,
-				 struct cdp_mlo_ctxt *mlo_ctxt);
+				 struct cdp_mlo_ctxt *mlo_ctxt,
+				 bool is_force_down);
 	QDF_STATUS (*update_mlo_ptnr_list)(struct cdp_soc_t *soc_hdl,
 					   int8_t *vdev_ids, uint8_t num_vdevs,
 					   uint8_t vdev_id);

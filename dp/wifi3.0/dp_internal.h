@@ -4311,4 +4311,12 @@ void dp_destroy_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
 {
 }
 #endif
+
+/*
+ * dp_soc_interrupt_detach() - Deregister any allocations done for interrupts
+ * @txrx_soc: DP SOC handle
+ *
+ * Return: none
+ */
+void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc);
 #endif /* #ifndef _DP_INTERNAL_H_ */

@@ -3419,7 +3419,7 @@ static inline bool dp_skip_rx_mon_ring_mask_set(struct dp_soc *soc)
  *
  * Return: none
  */
-static void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc)
+void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc)
 {
 	struct dp_soc *soc = (struct dp_soc *)txrx_soc;
 	int i;

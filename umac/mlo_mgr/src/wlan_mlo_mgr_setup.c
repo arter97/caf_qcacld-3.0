@@ -469,7 +469,8 @@ void mlo_link_teardown_complete(struct wlan_objmgr_pdev *pdev)
 		soc = mlo_ctx->setup_info.soc_list[chip_idx];
 		if (soc)
 			cdp_soc_mlo_soc_teardown(wlan_psoc_get_dp_handle(soc),
-						 mlo_ctx->dp_handle);
+						 mlo_ctx->dp_handle,
+						 false);
 	}
 
 	qdf_event_set(&mlo_ctx->setup_info.event);
@@ -494,7 +495,8 @@ static void mlo_force_teardown(void)
 		soc = mlo_ctx->setup_info.soc_list[chip_idx];
 		if (soc)
 			cdp_soc_mlo_soc_teardown(wlan_psoc_get_dp_handle(soc),
-						 mlo_ctx->dp_handle);
+						 mlo_ctx->dp_handle,
+						 true);
 	}
 }
 

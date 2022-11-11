@@ -56,7 +56,8 @@ static inline void cdp_soc_mlo_soc_setup(ol_txrx_soc_handle soc,
 }
 
 static inline void cdp_soc_mlo_soc_teardown(ol_txrx_soc_handle soc,
-					    struct cdp_mlo_ctxt *mlo_ctx)
+					    struct cdp_mlo_ctxt *mlo_ctx,
+					    bool is_force_down)
 {
 	if (!soc || !soc->ops) {
 		QDF_BUG(0);
@@ -67,7 +68,7 @@ static inline void cdp_soc_mlo_soc_teardown(ol_txrx_soc_handle soc,
 	    !soc->ops->mlo_ops->mlo_soc_teardown)
 		return;
 
-	soc->ops->mlo_ops->mlo_soc_teardown(soc, mlo_ctx);
+	soc->ops->mlo_ops->mlo_soc_teardown(soc, mlo_ctx, is_force_down);
 }
 
 /*
