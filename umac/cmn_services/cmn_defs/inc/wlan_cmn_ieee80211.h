@@ -205,6 +205,7 @@
  * @QCN_ATTRIB_REPEATER_INFO: Repeater information
  * @QCN_ATTRIB_HE_240_MHZ_SUPP: HE 240 MHZ support
  * @QCN_ATTRIB_ECSA_SUPP: ECSA support
+ * @QCN_ATTRIB_EDCA_PIFS_PARAM: EDCA PIFS param
  * @QCN_ATTRIB_MAX: Maximum attribute
  */
 enum qcn_attribute_id {
@@ -220,7 +221,8 @@ enum qcn_attribute_id {
 	QCN_ATTRIB_REPEATER_INFO            = 0X0A,
 	QCN_ATTRIB_HE_240_MHZ_SUPP          = 0X0B,
 	QCN_ATTRIB_ECSA_SUPP                = 0X0C,
-	QCN_ATTRIB_MAX                      = 0x0D
+	QCN_ATTRIB_EDCA_PIFS_PARAM          = 0X0D,
+	QCN_ATTRIB_MAX                      = 0x0E
 };
 
 /* Extender vendor specific IE */
@@ -3418,6 +3420,40 @@ struct wlan_eht_cap_info_network_endian {
 	uint32_t bw_320_rx_max_nss_for_mcs_10_and_11:4;
 	uint32_t bw_320_tx_max_nss_for_mcs_10_and_11:4;
 	uint8_t bw_320_rx_max_nss_for_mcs_12_and_13:4;
+} qdf_packed;
+
+/**
+ * struct wlan_edca_pifs_param_ie: struct for QCN_ATTRIB_EDCA_PIFS_PARAM
+ * @edca_param_type: edca param type
+ * @acvo_aifsn: ac vo aifsn
+ * @acvo_acm: ac vo acm
+ * @acvo_aci: ac vo aci
+ * @unused: unused bit
+ * @acvo_cwmin: ac vo cwmin
+ * @acvo_cwmax: ac vo cwmax
+ * @acvo_txoplimit: ac vo txoplimit
+ * @sap_pifs_offset: sap pifs offset
+ * @leb_pifs_offset: left earbud offset
+ * @reb_pifs_offset: right earbud offset
+ */
+struct wlan_edca_pifs_param_ie {
+	uint8_t edca_param_type;
+	union {
+		struct {
+			uint8_t acvo_aifsn:4;
+			uint8_t acvo_acm:1;
+			uint8_t acvo_aci:2;
+			uint8_t unused:1;
+			uint8_t acvo_cwmin:4;
+			uint8_t acvo_cwmax:4;
+			uint16_t acvo_txoplimit;
+		} qdf_packed edca_param; /* edca_param_type = 0 */
+		struct {
+			uint8_t sap_pifs_offset;
+			uint8_t leb_pifs_offset;
+			uint8_t reb_pifs_offset;
+		} qdf_packed pifs_params; /* edca_param_type = 1 */
+	} qdf_packed edca_pifs_param;
 } qdf_packed;
 
 /**
