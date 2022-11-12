@@ -1042,4 +1042,17 @@ struct mlo_link_removal_evt_params {
 	uint8_t vdev_id;
 	struct mlo_link_removal_tbtt_info tbtt_info;
 };
+
+/*
+ * struct mgmt_rx_mlo_link_removal_info - Information, sent in MGMT Rx event, of
+ * a link undergoing removal from its MLD
+ * @vdev_id: Vdev ID of the link undergoing removal
+ * @hw_link_id: HW link ID of the link undergoing removal
+ * @tbtt_count: Delete timer TBTT count of the link undergoing removal
+ */
+struct mgmt_rx_mlo_link_removal_info {
+	uint8_t vdev_id;
+	uint8_t hw_link_id;
+	uint16_t tbtt_count;
+};
 #endif

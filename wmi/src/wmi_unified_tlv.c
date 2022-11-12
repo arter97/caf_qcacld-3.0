@@ -12757,6 +12757,9 @@ static QDF_STATUS extract_mgmt_rx_params_tlv(wmi_unified_t wmi_handle,
 
 	*bufp = param_tlvs->bufp;
 
+	extract_mgmt_rx_mlo_link_removal_tlv_count(
+		param_tlvs->num_link_removal_tbtt_count, hdr);
+
 	return QDF_STATUS_SUCCESS;
 }
 

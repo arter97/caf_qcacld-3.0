@@ -27,9 +27,10 @@
 #include <target_if.h>
 #include <wlan_lmac_if_def.h>
 
+#ifdef WLAN_FEATURE_11BE_MLO
 /**
  * target_if_mlo_get_rx_ops() - get rx ops
- * @tx_ops: pointer to target_if tx ops
+ * @psoc: pointer to soc object
  *
  * API to retrieve the MLO rx ops from the psoc context
  *
@@ -51,7 +52,7 @@ target_if_mlo_get_rx_ops(struct wlan_objmgr_psoc *psoc)
 
 /**
  * target_if_mlo_get_tx_ops() - get tx ops
- * @tx_ops: pointer to target_if tx ops
+ * @psoc: pointer to soc object
  *
  * API to retrieve the MLO tx ops from the psoc context
  *
@@ -92,5 +93,28 @@ QDF_STATUS target_if_mlo_send_link_removal_cmd(
 		struct wlan_objmgr_psoc *psoc,
 		const struct mlo_link_removal_cmd_params *param);
 
+/**
+ * target_if_extract_mlo_link_removal_info_mgmt_rx() - Extract MLO link removal
+ * information from MGMT Rx event
+ * @wmi_handle: WMI handle
+ * @evt_buf: Event buffer
+ * @rx_event: MGMT Rx event parameters
+ *
+ * Return: QDF_STATUS of operation
+ */
+QDF_STATUS
+target_if_extract_mlo_link_removal_info_mgmt_rx(
+		wmi_unified_t wmi_handle,
+		void *evt_buf,
+		struct mgmt_rx_event_params *rx_event);
+#else
+static inline QDF_STATUS
+target_if_extract_mlo_link_removal_info_mgmt_rx(
+		wmi_unified_t wmi_handle,
+		void *evt_buf,
+		struct mgmt_rx_event_params *rx_event)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 #endif /* __TARGET_IF_MLO_MGR_H__ */
-

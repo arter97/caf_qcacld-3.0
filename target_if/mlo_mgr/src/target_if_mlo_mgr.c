@@ -142,6 +142,55 @@ exit:
 	return qdf_status_to_os_return(status);
 }
 
+QDF_STATUS
+target_if_extract_mlo_link_removal_info_mgmt_rx(
+		wmi_unified_t wmi_handle,
+		void *evt_buf,
+		struct mgmt_rx_event_params *rx_event)
+{
+	QDF_STATUS status;
+	struct mgmt_rx_mlo_link_removal_info *link_removal_info;
+
+	if (!rx_event) {
+		target_if_err("Invalid rx_event");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	rx_event->link_removal_info = NULL;
+	if (!rx_event->num_link_removal_info) {
+		/**
+		 * This is not an error. Only probe request frames will contain
+		 * Link removal TLVs, that too only till the link removal TBTT
+		 * countdown completion.
+		 */
+		target_if_debug("Link removal TLVs are not present");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	link_removal_info = qdf_mem_malloc(rx_event->num_link_removal_info *
+					   sizeof(*link_removal_info));
+	if (!link_removal_info) {
+		target_if_err("Couldn't allocate memory for link_removal_info");
+		rx_event->num_link_removal_info = 0;
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	status = wmi_extract_mgmt_rx_mlo_link_removal_info(
+					wmi_handle, evt_buf,
+					link_removal_info,
+					rx_event->num_link_removal_info);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		target_if_err("Unable to extract link removal TLVs");
+		rx_event->num_link_removal_info = 0;
+		qdf_mem_free(link_removal_info);
+		return status;
+	}
+
+	rx_event->link_removal_info = link_removal_info;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 /**
  * target_if_mlo_register_event_handler() - function to register handler for
  *  mlo related wmi event from firmware.

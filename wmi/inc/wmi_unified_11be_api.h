@@ -103,6 +103,22 @@ QDF_STATUS wmi_extract_mlo_link_removal_tbtt_update(
 		struct wmi_unified *wmi_handle,
 		void *buf,
 		struct mlo_link_removal_tbtt_info *tbtt_info);
+
+/**
+ * wmi_extract_mgmt_rx_mlo_link_removal_info() - Extract MLO link removal info
+ * from MGMT Rx event
+ * @wmi: wmi handle
+ * @buf: event buffer
+ * @link_removal_info: link removal information array to be populated
+ * @num_link_removal_info: Number of elements in @link_removal_info
+ *
+ * Return: QDF_STATUS of operation
+ */
+QDF_STATUS wmi_extract_mgmt_rx_mlo_link_removal_info(
+		struct wmi_unified *wmi,
+		void *buf,
+		struct mgmt_rx_mlo_link_removal_info *link_removal_info,
+		int num_link_removal_info);
 #endif /*WLAN_FEATURE_11BE_MLO*/
 
 #ifdef WLAN_FEATURE_11BE

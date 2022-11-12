@@ -740,6 +740,61 @@ extract_mlo_link_removal_tbtt_update_tlv(
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * extract_mgmt_rx_mlo_link_removal_info_tlv() - Extract MLO link removal info
+ * from MGMT Rx event
+ * @wmi_handle: wmi handle
+ * @buf: event buffer
+ * @link_removal_info: link removal information array to be populated
+ * @num_link_removal_info: Number of elements in @link_removal_info
+ *
+ * Return: QDF_STATUS of operation
+ */
+static QDF_STATUS
+extract_mgmt_rx_mlo_link_removal_info_tlv(
+	struct wmi_unified *wmi_handle,
+	void *buf,
+	struct mgmt_rx_mlo_link_removal_info *link_removal_info,
+	int num_link_removal_info)
+{
+	WMI_MGMT_RX_EVENTID_param_tlvs *param_buf = buf;
+	wmi_mlo_link_removal_tbtt_count *tlv_arr;
+	int tlv_idx = 0;
+	struct mgmt_rx_mlo_link_removal_info *info;
+
+	if (!param_buf) {
+		wmi_err_rl("Param_buf is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!link_removal_info) {
+		wmi_err_rl("Writable argument is NULL");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (num_link_removal_info != param_buf->num_link_removal_tbtt_count) {
+		wmi_err_rl("link_removal_info array size (%d) is not equal to"
+			   "number of corresponding TLVs(%d) present in event",
+			   num_link_removal_info,
+			   param_buf->num_link_removal_tbtt_count);
+		return QDF_STATUS_E_RANGE;
+	}
+
+	tlv_arr = param_buf->link_removal_tbtt_count;
+	for (; tlv_idx < param_buf->num_link_removal_tbtt_count; tlv_idx++) {
+		info = &link_removal_info[tlv_idx];
+
+		info->hw_link_id = WMI_MLO_LINK_REMOVAL_GET_LINKID(
+					tlv_arr[tlv_idx].tbtt_info);
+		info->vdev_id = WMI_MLO_LINK_REMOVAL_GET_VDEVID(
+					tlv_arr[tlv_idx].tbtt_info);
+		info->tbtt_count = WMI_MLO_LINK_REMOVAL_GET_TBTT_COUNT(
+					tlv_arr[tlv_idx].tbtt_info);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #ifdef WLAN_FEATURE_11BE
 size_t peer_assoc_t2lm_params_size(struct peer_assoc_params *req)
 {
@@ -1459,4 +1514,6 @@ void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 			extract_mlo_link_removal_evt_fixed_param_tlv;
 	ops->extract_mlo_link_removal_tbtt_update =
 			extract_mlo_link_removal_tbtt_update_tlv;
+	ops->extract_mgmt_rx_mlo_link_removal_info =
+			extract_mgmt_rx_mlo_link_removal_info_tlv;
 }

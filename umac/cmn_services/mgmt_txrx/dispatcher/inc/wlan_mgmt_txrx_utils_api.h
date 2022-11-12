@@ -884,6 +884,8 @@ struct mlo_mgmt_ml_info {
  * @pn_params: Frame PN params
  * @ext_params: Extended params
  * @frm_con_ap: Frame is from connected ap
+ * @link_removal_info: MLO link removal information array
+ * @num_link_removal_info: Number of elements in @link_removal_info
  */
 struct mgmt_rx_event_params {
 	uint32_t    chan_freq;
@@ -908,8 +910,17 @@ struct mgmt_rx_event_params {
 	struct frm_conn_ap is_conn_ap;
 #ifdef WLAN_FEATURE_11BE_MLO
 	struct mlo_mgmt_ml_info cu_params;
+	struct mgmt_rx_mlo_link_removal_info *link_removal_info;
+	int num_link_removal_info;
 #endif
 };
+
+#ifdef WLAN_FEATURE_11BE_MLO
+#define free_mgmt_rx_mlo_link_removal_info(rx_params) \
+			qdf_mem_free((rx_params)->link_removal_info)
+#else
+#define free_mgmt_rx_mlo_link_removal_info(rx_params)
+#endif
 
 #ifdef WLAN_MGMT_RX_REO_SUPPORT
 static inline
@@ -947,6 +958,7 @@ free_mgmt_rx_event_params(struct mgmt_rx_event_params *rx_params)
 	if (rx_params) {
 		qdf_mem_free(rx_params->ext_params);
 		qdf_mem_free(rx_params->reo_params);
+		free_mgmt_rx_mlo_link_removal_info(rx_params);
 	}
 
 	qdf_mem_free(rx_params);
@@ -975,8 +987,10 @@ struct mgmt_rx_event_params *alloc_mgmt_rx_event_params(void)
 static inline void
 free_mgmt_rx_event_params(struct mgmt_rx_event_params *rx_params)
 {
-	if (rx_params)
+	if (rx_params) {
 		qdf_mem_free(rx_params->ext_params);
+		free_mgmt_rx_mlo_link_removal_info(rx_params);
+	}
 
 	qdf_mem_free(rx_params);
 }
