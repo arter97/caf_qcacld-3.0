@@ -1571,14 +1571,44 @@ static struct CE_pipe_config target_ce_config_wlan_qca6750[] = {
 };
 
 #define KIWI_CE_COUNT 9
-static struct CE_attr host_ce_config_wlan_kiwi[] = {
-	/* host->target HTC control and raw streams */
 #ifdef FEATURE_DIRECT_LINK
+static struct CE_attr host_ce_config_wlan_kiwi_direct_link[] = {
 	{ /* CE0 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 8, 2048, 0,
 	 NULL,},
+	/* target->host HTT + HTC control */
+	{ /* CE1 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
+	/* target->host WMI */
+	{ /* CE2 */ CE_ATTR_FLAGS, 0, 0,  3520, 256, NULL,},
+	/* host->target WMI */
+	{ /* CE3 */ CE_ATTR_FLAGS, 0, 32, 3520, 0, NULL,},
+	/* host->target HTT, HTC control and raw streams */
+	{ /* CE4 */ CE4_COMP_HTT_HTC, 0, 256, 256, 0, NULL,},
+#ifdef FEATURE_PKTLOG
+	/* target -> host PKTLOG */
+	{ /* CE5 */ CE_ATTR_FLAGS, 0, 0, 2048, 512, NULL,},
 #else
-	{ /* CE0 */ CE_ATTR_FLAGS, 0, 16, 2048, 0, NULL,},
+	{ /* CE5 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 0, 256, 32,
+	 NULL,},
 #endif
+	/* Target autonomous HIF_memcpy */
+	{ /* CE6 */ CE_ATTR_FLAGS, 0, 0, 0, 0, NULL,},
+#ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7
+	/* target->host WMI_DIAG */
+	{ /* CE7 */ CE_ATTR_FLAGS, 0, 0,  2048, 32, NULL,},
+#else
+	/* ce_diag, the Diagnostic Window */
+	{ /* CE7 */ (CE_ATTR_DIAG_FLAGS | CE_ATTR_DISABLE_INTR), 0,
+		0, DIAG_TRANSFER_LIMIT, 0, NULL,},
+#endif
+	/* Reserved for target */
+	{ /* CE8 */ CE_ATTR_FLAGS, 0, 0, 0, 0, NULL,},
+	/* CE 9, 10, 11 belong to CoreBsp & MHI driver */
+};
+#endif
+
+static struct CE_attr host_ce_config_wlan_kiwi[] = {
+	/* host->target HTC control and raw streams */
+	{ /* CE0 */ CE_ATTR_FLAGS, 0, 16, 2048, 0, NULL,},
 	/* target->host HTT + HTC control */
 	{ /* CE1 */ CE_ATTR_FLAGS, 0, 0,  2048, 512, NULL,},
 	/* target->host WMI */
@@ -1592,12 +1622,7 @@ static struct CE_attr host_ce_config_wlan_kiwi[] = {
 	/* target -> host PKTLOG */
 	{ /* CE5 */ CE_ATTR_FLAGS, 0, 0, 2048, 512, NULL,},
 #else
-#ifdef FEATURE_DIRECT_LINK
-	{ /* CE5 */ (CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0, 0, 256, 32,
-	 NULL,},
-#else
 	{ /* CE5 */ CE_ATTR_FLAGS, 0, 0, 2048, 0, NULL,},
-#endif
 #endif
 	/* Target autonomous HIF_memcpy */
 	{ /* CE6 */ CE_ATTR_FLAGS, 0, 0, 0, 0, NULL,},
@@ -1614,13 +1639,43 @@ static struct CE_attr host_ce_config_wlan_kiwi[] = {
 	/* CE 9, 10, 11 belong to CoreBsp & MHI driver */
 };
 
+#ifdef FEATURE_DIRECT_LINK
+static struct CE_pipe_config target_ce_config_wlan_kiwi_direct_link[] = {
+	{ /* CE0 */ 0, PIPEDIR_OUT, 8, 2048, CE_ATTR_FLAGS, 0,},
+	/* target->host HTT */
+	{ /* CE1 */ 1, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
+	/* target->host WMI  + HTC control */
+	{ /* CE2 */ 2, PIPEDIR_IN,  32, 3520, CE_ATTR_FLAGS, 0,},
+	/* host->target WMI */
+	{ /* CE3 */ 3, PIPEDIR_OUT, 32, 3520, CE_ATTR_FLAGS, 0,},
+	/* host->target HTT, HTC control and raw streams */
+	{ /* CE4 */ 4, PIPEDIR_OUT, 256, 256,
+		(CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0,},
+#ifdef FEATURE_PKTLOG
+	/* Target -> host PKTLOG */
+	{ /* CE5 */ 5, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
+#else
+	{ /* CE5 */ 5, PIPEDIR_IN,  16, 256, CE_ATTR_FLAGS, 0,},
+#endif
+	/* Reserved for target autonomous HIF_memcpy */
+	{ /* CE6 */ 6, PIPEDIR_INOUT, 32, 16384, CE_ATTR_FLAGS, 0,},
+#ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7
+	/* target->host WMI_DIAG */
+	{ /* CE7 */ 7, PIPEDIR_IN, 32, 2048, CE_ATTR_FLAGS, 0,},
+#else
+	/* CE7 used only by Host */
+	{ /* CE7 */ 7, PIPEDIR_INOUT_H2H, 0, 0,
+		(CE_ATTR_FLAGS | CE_ATTR_DISABLE_INTR), 0,},
+#endif
+	/* Reserved for target */
+	{ /* CE8 */ 8, PIPEDIR_INOUT, 32, 16384, CE_ATTR_FLAGS, 0,},
+	/* CE 9, 10, 11 belong to CoreBsp & MHI driver */
+};
+#endif
+
 static struct CE_pipe_config target_ce_config_wlan_kiwi[] = {
 	/* host->target HTC control and raw streams */
-#ifdef FEATURE_XPAN
-	{ /* CE0 */ 0, PIPEDIR_OUT, 8, 2048, CE_ATTR_FLAGS, 0,},
-#else
 	{ /* CE0 */ 0, PIPEDIR_OUT, 32, 2048, CE_ATTR_FLAGS, 0,},
-#endif
 	/* target->host HTT */
 	{ /* CE1 */ 1, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
 	/* target->host WMI  + HTC control */
@@ -1634,13 +1689,8 @@ static struct CE_pipe_config target_ce_config_wlan_kiwi[] = {
 	/* Target -> host PKTLOG */
 	{ /* CE5 */ 5, PIPEDIR_IN,  32, 2048, CE_ATTR_FLAGS, 0,},
 #else
-#ifdef FEATURE_DIRECT_LINK
-	{ /* CE5 */ 5, PIPEDIR_IN,  16, 256, CE_ATTR_FLAGS, 0,},
-#else
 	{ /* CE5 */ 5, PIPEDIR_IN,  0, 2048, CE_ATTR_FLAGS, 0,},
 #endif
-#endif
-
 	/* Reserved for target autonomous HIF_memcpy */
 	{ /* CE6 */ 6, PIPEDIR_INOUT, 32, 16384, CE_ATTR_FLAGS, 0,},
 #ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7

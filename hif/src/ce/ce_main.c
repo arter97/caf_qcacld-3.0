@@ -1122,6 +1122,32 @@ static struct service_to_pipe target_service_to_ce_map_qca6750[] = {
 #endif
 
 #if (defined(QCA_WIFI_KIWI))
+#ifdef FEATURE_DIRECT_LINK
+static struct service_to_pipe target_service_to_ce_map_kiwi_direct_link[] = {
+	{ WMI_DATA_VO_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_VO_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_BK_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_BK_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_BE_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_BE_SVC, PIPEDIR_IN, 2, },
+	{ WMI_DATA_VI_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_DATA_VI_SVC, PIPEDIR_IN, 2, },
+	{ WMI_CONTROL_SVC, PIPEDIR_OUT, 3, },
+	{ WMI_CONTROL_SVC, PIPEDIR_IN, 2, },
+	{ HTC_CTRL_RSVD_SVC, PIPEDIR_OUT, 4, },
+	{ HTC_CTRL_RSVD_SVC, PIPEDIR_IN, 2, },
+	{ HTT_DATA_MSG_SVC, PIPEDIR_OUT, 4, },
+	{ HTT_DATA_MSG_SVC, PIPEDIR_IN, 1, },
+#ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7
+	{ WMI_CONTROL_DIAG_SVC, PIPEDIR_IN, 7, },
+#endif
+	{ LPASS_DATA_MSG_SVC, PIPEDIR_OUT, 0, },
+	{ LPASS_DATA_MSG_SVC, PIPEDIR_IN, 5, },
+	/* (Additions here) */
+	{ 0, 0, 0, },
+};
+#endif
+
 static struct service_to_pipe target_service_to_ce_map_kiwi[] = {
 	{ WMI_DATA_VO_SVC, PIPEDIR_OUT, 3, },
 	{ WMI_DATA_VO_SVC, PIPEDIR_IN, 2, },
@@ -1133,20 +1159,12 @@ static struct service_to_pipe target_service_to_ce_map_kiwi[] = {
 	{ WMI_DATA_VI_SVC, PIPEDIR_IN, 2, },
 	{ WMI_CONTROL_SVC, PIPEDIR_OUT, 3, },
 	{ WMI_CONTROL_SVC, PIPEDIR_IN, 2, },
-#ifdef FEATURE_DIRECT_LINK
-	{ HTC_CTRL_RSVD_SVC, PIPEDIR_OUT, 4, },
-#else
 	{ HTC_CTRL_RSVD_SVC, PIPEDIR_OUT, 0, },
-#endif
 	{ HTC_CTRL_RSVD_SVC, PIPEDIR_IN, 2, },
 	{ HTT_DATA_MSG_SVC, PIPEDIR_OUT, 4, },
 	{ HTT_DATA_MSG_SVC, PIPEDIR_IN, 1, },
 #ifdef WLAN_FEATURE_WMI_DIAG_OVER_CE7
 	{ WMI_CONTROL_DIAG_SVC, PIPEDIR_IN, 7, },
-#endif
-#ifdef FEATURE_DIRECT_LINK
-	{ LPASS_DATA_MSG_SVC, PIPEDIR_OUT, 0, },
-	{ LPASS_DATA_MSG_SVC, PIPEDIR_IN, 5, },
 #endif
 	/* (Additions here) */
 	{ 0, 0, 0, },
@@ -1342,6 +1360,39 @@ void hif_select_ce_map_qcn9224(struct service_to_pipe **tgt_svc_map_to_use,
 }
 #endif
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * hif_select_service_to_pipe_map_kiwi() - Select service to CE map
+ *  configuration for Kiwi
+ * @scn: HIF context
+ *
+ * Return: None
+ */
+static inline void
+hif_select_service_to_pipe_map_kiwi(struct hif_softc *scn,
+				    struct service_to_pipe **tgt_svc_map_to_use,
+				    uint32_t *sz_tgt_svc_map_to_use)
+{
+	if (pld_is_direct_link_supported(scn->qdf_dev->dev)) {
+		*tgt_svc_map_to_use = target_service_to_ce_map_kiwi_direct_link;
+		*sz_tgt_svc_map_to_use =
+			sizeof(target_service_to_ce_map_kiwi_direct_link);
+	} else {
+		*tgt_svc_map_to_use = target_service_to_ce_map_kiwi;
+		*sz_tgt_svc_map_to_use = sizeof(target_service_to_ce_map_kiwi);
+	}
+}
+#else
+static inline void
+hif_select_service_to_pipe_map_kiwi(struct hif_softc *scn,
+				    struct service_to_pipe **tgt_svc_map_to_use,
+				    uint32_t *sz_tgt_svc_map_to_use)
+{
+	*tgt_svc_map_to_use = target_service_to_ce_map_kiwi;
+	*sz_tgt_svc_map_to_use = sizeof(target_service_to_ce_map_kiwi);
+}
+#endif
+
 static void hif_select_service_to_pipe_map(struct hif_softc *scn,
 				    struct service_to_pipe **tgt_svc_map_to_use,
 				    uint32_t *sz_tgt_svc_map_to_use)
@@ -1395,9 +1446,9 @@ static void hif_select_service_to_pipe_map(struct hif_softc *scn,
 			break;
 		case TARGET_TYPE_KIWI:
 		case TARGET_TYPE_MANGO:
-			*tgt_svc_map_to_use = target_service_to_ce_map_kiwi;
-			*sz_tgt_svc_map_to_use =
-				sizeof(target_service_to_ce_map_kiwi);
+			hif_select_service_to_pipe_map_kiwi(scn,
+							 tgt_svc_map_to_use,
+							 sz_tgt_svc_map_to_use);
 			break;
 		case TARGET_TYPE_QCA8074:
 			*tgt_svc_map_to_use = target_service_to_ce_map_qca8074;
@@ -3977,6 +4028,42 @@ static inline void hif_ce_service_init(void)
 }
 #endif
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * hif_ce_select_config_kiwi() - Select the host and target CE
+ *  configuration for Kiwi
+ * @hif_state: HIF CE context
+ *
+ * Return: None
+ */
+static inline
+void hif_ce_select_config_kiwi(struct HIF_CE_state *hif_state)
+{
+	struct hif_softc *hif_ctx = HIF_GET_SOFTC(hif_state);
+
+	if (pld_is_direct_link_supported(hif_ctx->qdf_dev->dev)) {
+		hif_state->host_ce_config =
+				host_ce_config_wlan_kiwi_direct_link;
+		hif_state->target_ce_config =
+				target_ce_config_wlan_kiwi_direct_link;
+		hif_state->target_ce_config_sz =
+				sizeof(target_ce_config_wlan_kiwi_direct_link);
+	} else {
+		hif_state->host_ce_config = host_ce_config_wlan_kiwi;
+		hif_state->target_ce_config = target_ce_config_wlan_kiwi;
+		hif_state->target_ce_config_sz =
+				sizeof(target_ce_config_wlan_kiwi);
+	}
+}
+#else
+static inline
+void hif_ce_select_config_kiwi(struct HIF_CE_state *hif_state)
+{
+	hif_state->host_ce_config = host_ce_config_wlan_kiwi;
+	hif_state->target_ce_config = target_ce_config_wlan_kiwi;
+	hif_state->target_ce_config_sz = sizeof(target_ce_config_wlan_kiwi);
+}
+#endif
 
 /**
  * hif_ce_prepare_config() - load the correct static tables.
@@ -4152,10 +4239,7 @@ void hif_ce_prepare_config(struct hif_softc *scn)
 		break;
 	case TARGET_TYPE_KIWI:
 	case TARGET_TYPE_MANGO:
-		hif_state->host_ce_config = host_ce_config_wlan_kiwi;
-		hif_state->target_ce_config = target_ce_config_wlan_kiwi;
-		hif_state->target_ce_config_sz =
-					sizeof(target_ce_config_wlan_kiwi);
+		hif_ce_select_config_kiwi(hif_state);
 		scn->ce_count = KIWI_CE_COUNT;
 		break;
 	case TARGET_TYPE_ADRASTEA:
