@@ -405,7 +405,8 @@ enum {
 	IEEE80211_PARAM_SET_MHDR                = 394,
 	IEEE80211_PARAM_ALLOW_DATA              = 395,
 	IEEE80211_PARAM_SET_MESHDBG             = 396,
-	IEEE80211_PARAM_RTT_ENABLE              = 397,
+	IEEE80211_PARAM_RTT_ENABLE              = 397, /* Enable/Disable RTT initiator/responder modes for a single vap
+							  with the vap restart */
 	IEEE80211_PARAM_LCI_ENABLE              = 398,
 	IEEE80211_PARAM_VAP_ENHIND              = 399, /* Independent VAP mode for Repeater and AP-STA config */
 	IEEE80211_PARAM_VAP_PAUSE_SCAN          = 400, /* Pause VAP mode for scanning */
@@ -796,6 +797,8 @@ enum {
 	IEEE80211_PARAM_WLAN_SCHED_TIMEOUT         = 735,
 	IEEE80211_PARAM_AP_MAX_AUTH_FAIL           = 736,   /* Set max continuous auth failures to be sent auth response within 15 seconds */
 	IEEE80211_PARAM_VAP_PROFILE_CONFIG         = 737,   /* Per vap resource profile size for EMA non tx vap */
+	IEEE80211_PARAM_SWITCH_RTT_ROLE            = 743, /* Switch between RTT intiator/responder modes for a single vap
+							     without the vap restart */
 };
 
 enum {
@@ -1307,6 +1310,15 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_WLAN_COUNTER_PERIOD = 500,
 	OL_ATH_PARAM_UL_OFDMA_RTD = 501,
 	OL_ATH_PARAM_PREAMBLE_POWER_REMOVAL = 502,
+
+	/* Enable/disable RTT initiator/responder modes for all the vaps with
+	 * the vap restart
+	 */
+	OL_ATH_PARAM_RTT_ENABLE = 503,
+	/* Switch between RTT intiator/responder modes for all the vaps without
+	 * the vap resatrt
+	*/
+	OL_ATH_PARAM_SWITCH_RTT_ROLE = 504,
 };
 
 #ifdef CONFIG_SUPPORT_LIBROXML
@@ -1817,6 +1829,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"allowdata",           IEEE80211_PARAM_ALLOW_DATA, SET_PARAM, 2},
 	{"meshdbg",             IEEE80211_PARAM_SET_MESHDBG, SET_PARAM, 1},
 	{"enable_rtt",          IEEE80211_PARAM_RTT_ENABLE, SET_PARAM, 1},
+	{"switch_rtt_role",     IEEE80211_PARAM_SWITCH_RTT_ROLE, SET_PARAM, 1},
 	{"enable_lci",          IEEE80211_PARAM_LCI_ENABLE, SET_PARAM, 1},
 	{"athnewind",           IEEE80211_PARAM_VAP_ENHIND, SET_PARAM, 1},
 	{"get_athnewind",       IEEE80211_PARAM_VAP_ENHIND, GET_PARAM, 0},
@@ -3367,6 +3380,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_UL_OFDMA_RTD, SET_PARAM, 1},
 	{"preamble_power_removal",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PREAMBLE_POWER_REMOVAL, SET_PARAM, 1},
+	{"enable_rtt",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_RTT_ENABLE, SET_PARAM, 1},
+	{"switch_rtt_role",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SWITCH_RTT_ROLE, SET_PARAM, 1},
 };
 #endif
 #endif
