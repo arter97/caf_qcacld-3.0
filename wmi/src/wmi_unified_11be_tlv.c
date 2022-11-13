@@ -975,6 +975,79 @@ static void wmi_11be_attach_mlo_setup_tlv(wmi_unified_t wmi_handle)
 
 #endif /*WLAN_MLO_MULTI_CHIP*/
 
+/**
+ * extract_mgmt_rx_ml_cu_params_tlv() - extract MGMT Critical Update params
+ * from MGMT_RX_EVENT_ID
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to event buffer
+ * @cu_params: Pointer to MGMT Critical update parameters
+ *
+ * Return: QDF_STATUS_SUCCESS for success or error code
+ */
+static
+QDF_STATUS extract_mgmt_rx_ml_cu_params_tlv(wmi_unified_t wmi_handle,
+					    void *evt_buf,
+					    struct mlo_mgmt_ml_info *cu_params)
+{
+	WMI_MGMT_RX_EVENTID_param_tlvs *param_tlvs;
+	wmi_mgmt_ml_info *cu_params_tlv;
+	wmi_mgmt_rx_hdr *ev_hdr;
+	uint32_t num_bpcc_bufp;
+
+	param_tlvs = evt_buf;
+	if (!param_tlvs) {
+		wmi_err(" MGMT RX param_tlvs is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ev_hdr = param_tlvs->hdr;
+	if (!ev_hdr) {
+		wmi_err("Rx event is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (!cu_params) {
+		wmi_debug("MGMT Rx CU params is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cu_params_tlv = param_tlvs->ml_info;
+	if (!cu_params_tlv) {
+		wmi_debug("mgmt_ml_info TLV is not sent by FW");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cu_params->cu_vdev_map[0] =
+		cu_params_tlv->cu_vdev_map_1 & CU_VDEV_MAP_MASK;
+	cu_params->cu_vdev_map[1] =
+		(cu_params_tlv->cu_vdev_map_1 >> 16) & CU_VDEV_MAP_MASK;
+	cu_params->cu_vdev_map[2] =
+		cu_params_tlv->cu_vdev_map_2 & CU_VDEV_MAP_MASK;
+	cu_params->cu_vdev_map[3] =
+		(cu_params_tlv->cu_vdev_map_2 >> 16) & CU_VDEV_MAP_MASK;
+	cu_params->cu_vdev_map[4] =
+		cu_params_tlv->cu_vdev_map_3 & CU_VDEV_MAP_MASK;
+	cu_params->cu_vdev_map[5] =
+		(cu_params_tlv->cu_vdev_map_3 >> 16) & CU_VDEV_MAP_MASK;
+
+	/* At present MAX_LINKS_SUPPORTED are 6.
+	 * cu_vdev_map_4 which required for links
+	 * 7 and 8 is unused.
+	 */
+	num_bpcc_bufp = param_tlvs->num_bpcc_bufp;
+	if (param_tlvs->num_bpcc_bufp > sizeof(cu_params->vdev_bpcc)) {
+		wmi_err("Invalid num_bpcc_bufp:%u", num_bpcc_bufp);
+		return QDF_STATUS_E_INVAL;
+	}
+	qdf_mem_copy(cu_params->vdev_bpcc, param_tlvs->bpcc_bufp,
+		     num_bpcc_bufp);
+
+	qdf_trace_hex_dump(QDF_MODULE_ID_WMI, QDF_TRACE_LEVEL_DEBUG,
+			   param_tlvs->bpcc_bufp, num_bpcc_bufp);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 {
 	struct wmi_ops *ops = wmi_handle->ops;
@@ -988,4 +1061,6 @@ void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_mlo_peer_tid_to_link_map =
 		send_mlo_peer_tid_to_link_map_cmd_tlv;
 #endif /* WLAN_FEATURE_11BE */
+	ops->extract_mgmt_rx_ml_cu_params =
+		extract_mgmt_rx_ml_cu_params_tlv;
 }
