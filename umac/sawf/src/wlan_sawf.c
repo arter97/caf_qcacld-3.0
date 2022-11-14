@@ -88,6 +88,8 @@ void wlan_print_service_class(struct wlan_sawf_scv_class_params *params)
 	qdf_info("Priority         :%d", params->priority);
 	qdf_info("TID              :%d", params->tid);
 	qdf_info("MSDU Loss Rate   :%d", params->msdu_rate_loss);
+	qdf_info("UL Burst Size    :%d", params->ul_burst_size);
+	qdf_info("UL Service Interval :%d", params->ul_service_interval);
 }
 
 qdf_export_symbol(wlan_print_service_class);
@@ -207,6 +209,8 @@ void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params)
 	new_param->priority = params->priority;
 	new_param->tid = params->tid;
 	new_param->msdu_rate_loss = params->msdu_rate_loss;
+	new_param->ul_burst_size = params->ul_burst_size;
+	new_param->ul_service_interval = params->ul_service_interval;
 }
 
 qdf_export_symbol(wlan_update_sawf_params);
@@ -282,6 +286,39 @@ QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_scv_class_params *params)
 }
 
 qdf_export_symbol(wlan_validate_sawf_params);
+
+QDF_STATUS
+wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
+			    uint32_t *service_interval, uint32_t *burst_size)
+{
+	struct sawf_ctx *sawf;
+	struct wlan_sawf_scv_class_params *svc_param;
+
+	if (!wlan_service_id_valid(svc_id) ||
+	    !wlan_service_id_configured(svc_id))
+		return QDF_STATUS_E_INVAL;
+
+	sawf = wlan_get_sawf_ctx();
+	if (!sawf) {
+		qdf_err("SAWF ctx is invalid");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	svc_param = &sawf->svc_classes[svc_id - 1];
+
+	if (tid)
+		*tid = svc_param->tid;
+
+	if (service_interval)
+		*service_interval = svc_param->ul_service_interval;
+
+	if (burst_size)
+		*burst_size = svc_param->ul_burst_size;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(wlan_sawf_get_uplink_params);
 
 int wlan_sawf_get_tput_stats(void *soc, void *arg, uint64_t *in_bytes,
 			     uint64_t *in_cnt, uint64_t *tx_bytes,
