@@ -1366,14 +1366,15 @@ qdf_export_symbol(hal_srng_dst_init_hp);
  * @hal_soc: HAL SOC handle
  * @srng: SRNG ring pointer
  * @idle_check: Check if ring is idle
+ * @idx: ring index
  */
 static inline void hal_srng_hw_init(struct hal_soc *hal,
-	struct hal_srng *srng, bool idle_check)
+	struct hal_srng *srng, bool idle_check, uint32_t idx)
 {
 	if (srng->ring_dir == HAL_SRNG_SRC_RING)
-		hal_srng_src_hw_init(hal, srng, idle_check);
+		hal_srng_src_hw_init(hal, srng, idle_check, idx);
 	else
-		hal_srng_dst_hw_init(hal, srng, idle_check);
+		hal_srng_dst_hw_init(hal, srng, idle_check, idx);
 }
 
 #if defined(CONFIG_SHADOW_V2) || defined(CONFIG_SHADOW_V3)
@@ -1523,7 +1524,7 @@ static inline void hal_srng_update_high_wm_thresholds(struct hal_srng *srng)
 #endif
 
 /**
- * hal_srng_setup - Initialize HW SRNG ring.
+ * hal_srng_setup_idx - Initialize HW SRNG ring.
  * @hal_soc: Opaque HAL SOC handle
  * @ring_type: one of the types from hal_ring_type
  * @ring_num: Ring number if there are multiple rings of same type (staring
@@ -1531,6 +1532,7 @@ static inline void hal_srng_update_high_wm_thresholds(struct hal_srng *srng)
  * @mac_id: valid MAC Id should be passed if ring type is one of lmac rings
  * @ring_params: SRNG ring params in hal_srng_params structure.
  * @idle_check: Check if ring is idle
+ * @idx: Ring index to be programmed as init value in HP/TP based on srng type
  *
  * Callers are expected to allocate contiguous ring memory of size
  * 'num_entries * entry_size' bytes and pass the physical and virtual base
@@ -1542,11 +1544,13 @@ static inline void hal_srng_update_high_wm_thresholds(struct hal_srng *srng)
  * Return: Opaque pointer to ring on success
  *		 NULL on failure (if given ring is not available)
  */
-void *hal_srng_setup(void *hal_soc, int ring_type, int ring_num,
-	int mac_id, struct hal_srng_params *ring_params, bool idle_check)
+void *hal_srng_setup_idx(void *hal_soc, int ring_type, int ring_num, int mac_id,
+			 struct hal_srng_params *ring_params, bool idle_check,
+			 uint32_t idx)
 {
 	int ring_id;
 	struct hal_soc *hal = (struct hal_soc *)hal_soc;
+	hal_soc_handle_t hal_hdl = (hal_soc_handle_t)hal;
 	struct hal_srng *srng;
 	struct hal_hw_srng_config *ring_config =
 		HAL_SRNG_CONFIG(hal, ring_type);
@@ -1712,7 +1716,18 @@ void *hal_srng_setup(void *hal_soc, int ring_type, int ring_num,
 	}
 
 	if (!(ring_config->lmac_ring)) {
-		hal_srng_hw_init(hal, srng, idle_check);
+		if (idx) {
+			hal->ops->hal_tx_ring_halt_set(hal_hdl);
+			do {
+				hal_info("Waiting for ring reset\n");
+			} while (!(hal->ops->hal_tx_ring_halt_poll(hal_hdl)));
+		}
+		hal_srng_hw_init(hal, srng, idle_check, idx);
+
+		if (idx) {
+			hal->ops->hal_tx_ring_halt_reset(hal_hdl);
+		}
+
 
 		if (ring_type == CE_DST) {
 			srng->u.dst_ring.max_buffer_length = ring_params->max_buffer_length;
@@ -1727,6 +1742,35 @@ void *hal_srng_setup(void *hal_soc, int ring_type, int ring_num,
 	srng->initialized = true;
 
 	return (void *)srng;
+}
+qdf_export_symbol(hal_srng_setup_idx);
+
+/**
+ * hal_srng_setup - Initialize HW SRNG ring.
+ * @hal_soc: Opaque HAL SOC handle
+ * @ring_type: one of the types from hal_ring_type
+ * @ring_num: Ring number if there are multiple rings of same type (staring
+ * from 0)
+ * @mac_id: valid MAC Id should be passed if ring type is one of lmac rings
+ * @ring_params: SRNG ring params in hal_srng_params structure.
+ * @idle_check: Check if ring is idle
+ *
+ * Callers are expected to allocate contiguous ring memory of size
+ * 'num_entries * entry_size' bytes and pass the physical and virtual base
+ * addresses through 'ring_base_paddr' and 'ring_base_vaddr' in
+ * hal_srng_params structure. Ring base address should be 8 byte aligned
+ * and size of each ring entry should be queried using the API
+ * hal_srng_get_entrysize
+ *
+ * Return: Opaque pointer to ring on success
+ *		 NULL on failure (if given ring is not available)
+ */
+void *hal_srng_setup(void *hal_soc, int ring_type, int ring_num,
+		     int mac_id, struct hal_srng_params *ring_params,
+		     bool idle_check)
+{
+	return hal_srng_setup_idx(hal_soc, ring_type, ring_num, mac_id,
+				  ring_params, idle_check, 0);
 }
 qdf_export_symbol(hal_srng_setup);
 

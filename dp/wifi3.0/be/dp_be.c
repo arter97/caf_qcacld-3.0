@@ -1420,12 +1420,20 @@ static QDF_STATUS dp_soc_ppe_srng_init(struct dp_soc *soc)
 	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
 	hal_soc_handle_t hal_soc = soc->hal_soc;
 
+	struct dp_ppe_ds_idxs idx = {0};
+
 	soc_cfg_ctx = soc->wlan_cfg_ctx;
 
 	if (!wlan_cfg_get_dp_soc_is_ppe_enabled(soc_cfg_ctx))
 		return QDF_STATUS_SUCCESS;
 
-	if (dp_srng_init(soc, &be_soc->reo2ppe_ring, REO2PPE, 0, 0)) {
+	if (dp_ppeds_register_soc_be(be_soc, &idx)) {
+		dp_err("%pK: ppeds registration failed", soc);
+		goto fail;
+	}
+
+	if (dp_srng_init_idx(soc, &be_soc->reo2ppe_ring, REO2PPE, 0, 0,
+			     idx.reo2ppe_start_idx)) {
 		dp_err("%pK: dp_srng_init failed for reo2ppe", soc);
 		goto fail;
 	}
@@ -1438,7 +1446,8 @@ static QDF_STATUS dp_soc_ppe_srng_init(struct dp_soc *soc)
 
 	hal_reo_config_reo2ppe_dest_info(hal_soc);
 
-	if (dp_srng_init(soc, &be_soc->ppe2tcl_ring, PPE2TCL, 0, 0)) {
+	if (dp_srng_init_idx(soc, &be_soc->ppe2tcl_ring, PPE2TCL, 0, 0,
+			     idx.ppe2tcl_start_idx)) {
 		dp_err("%pK: dp_srng_init failed for ppe2tcl_ring", soc);
 		goto fail;
 	}
@@ -1448,6 +1457,10 @@ static QDF_STATUS dp_soc_ppe_srng_init(struct dp_soc *soc)
 			  soc->ctrl_psoc,
 			  WLAN_MD_DP_SRNG_PPE2TCL,
 			  "ppe2tcl_ring");
+
+	hal_tx_config_rbm_mapping_be(soc->hal_soc,
+				     be_soc->ppe2tcl_ring.hal_srng,
+				     WBM2_SW_PPE_REL_MAP_ID);
 
 	if (dp_srng_init(soc, &be_soc->ppe_release_ring, PPE_RELEASE, 0, 0)) {
 		dp_err("%pK: dp_srng_init failed for ppe_release_ring", soc);
@@ -1471,11 +1484,6 @@ static QDF_STATUS dp_soc_ppe_srng_init(struct dp_soc *soc)
 			     soc->ctrl_psoc,
 			     WLAN_MD_DP_SRNG_PPE_WBM2SW_RELEASE,
 			     "ppe_wbm_release_ring");
-
-	if (dp_ppeds_register_soc_be(be_soc)) {
-		dp_err("%pK: ppeds registration failed", soc);
-		goto fail;
-	}
 
 	return QDF_STATUS_SUCCESS;
 fail:
