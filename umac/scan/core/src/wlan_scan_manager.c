@@ -1038,6 +1038,7 @@ scm_update_channel_list(struct scan_start_request *req,
 /**
  * scm_req_update_dwell_time_as_per_scan_mode() - update scan req params
  * dwell time as per scan mode.
+ * @vdev: vdev to update
  * @req: scan request
  *
  * Return: void
