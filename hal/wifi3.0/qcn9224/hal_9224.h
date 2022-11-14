@@ -1835,6 +1835,11 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_get_tsf2_scratch_reg_qcn9224;
 	hal_soc->ops->hal_get_tqm_scratch_reg =
 					hal_get_tqm_scratch_reg_qcn9224;
+	hal_soc->ops->hal_tx_ring_halt_set = hal_tx_ppe2tcl_ring_halt_set_9224;
+	hal_soc->ops->hal_tx_ring_halt_reset =
+					hal_tx_ppe2tcl_ring_halt_reset_9224;
+	hal_soc->ops->hal_tx_ring_halt_poll =
+					hal_tx_ppe2tcl_ring_halt_done_9224;
 };
 
 /**

@@ -2331,17 +2331,19 @@ static bool dp_check_umac_reset_in_progress(struct dp_soc *soc)
 #endif
 
 /*
- * dp_srng_init() - Initialize SRNG
+ * dp_srng_init_idx() - Initialize SRNG
  * @soc  : Data path soc handle
  * @srng : SRNG pointer
  * @ring_type : Ring Type
  * @ring_num: Ring number
  * @mac_id: mac_id
+ * @idx: ring index
  *
  * return: QDF_STATUS
  */
-QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng,
-			int ring_type, int ring_num, int mac_id)
+QDF_STATUS dp_srng_init_idx(struct dp_soc *soc, struct dp_srng *srng,
+			    int ring_type, int ring_num, int mac_id,
+			    uint32_t idx)
 {
 	bool idle_check;
 
@@ -2392,8 +2394,9 @@ QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng,
 
 	idle_check = dp_check_umac_reset_in_progress(soc);
 
-	srng->hal_srng = hal_srng_setup(hal_soc, ring_type, ring_num,
-					mac_id, &ring_params, idle_check);
+	srng->hal_srng = hal_srng_setup_idx(hal_soc, ring_type, ring_num,
+					    mac_id, &ring_params, idle_check,
+					    idx);
 
 	if (!srng->hal_srng) {
 		dp_srng_free(soc, srng);
@@ -2403,8 +2406,25 @@ QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng,
 	return QDF_STATUS_SUCCESS;
 }
 
-qdf_export_symbol(dp_srng_init);
+qdf_export_symbol(dp_srng_init_idx);
 
+/*
+ * dp_srng_init() - Initialize SRNG
+ * @soc  : Data path soc handle
+ * @srng : SRNG pointer
+ * @ring_type : Ring Type
+ * @ring_num: Ring number
+ * @mac_id: mac_id
+ *
+ * return: QDF_STATUS
+ */
+QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng, int ring_type,
+			int ring_num, int mac_id)
+{
+	return dp_srng_init_idx(soc, srng, ring_type, ring_num, mac_id, 0);
+}
+
+qdf_export_symbol(dp_srng_init);
 /*
  * dp_srng_alloc() - Allocate memory for SRNG
  * @soc  : Data path soc handle
