@@ -3456,6 +3456,7 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 	struct sap_context *sap_context;
 	enum sap_csa_reason_code csa_reason =
 		CSA_REASON_CONCURRENT_STA_CHANGED_CHANNEL;
+	bool use_sap_original_bw = false;
 
 	if (!ap_adapter) {
 		hdd_err("ap_adapter is NULL");
@@ -3494,8 +3495,12 @@ QDF_STATUS wlan_hdd_get_channel_for_sap_restart(
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	/* Initialized ch_width to CH_WIDTH_MAX */
-	ch_params.ch_width = CH_WIDTH_MAX;
+	policy_mgr_get_original_bw_for_sap_restart(psoc, &use_sap_original_bw);
+	if (use_sap_original_bw)
+		ch_params.ch_width = sap_context->ch_width_orig;
+	else
+		ch_params.ch_width = CH_WIDTH_MAX;
+
 	intf_ch_freq = wlansap_get_chan_band_restrict(sap_context, &csa_reason);
 	if (intf_ch_freq)
 		goto sap_restart;
@@ -4673,6 +4678,8 @@ int wlan_hdd_cfg80211_update_apies(struct hdd_adapter *adapter)
 				      WLAN_ELEMID_WAPI);
 	}
 #endif
+	/* extract and add rrm ie from hostapd */
+	wlan_hdd_add_extra_ie(adapter, genie, &total_ielen, WLAN_ELEMID_RRM);
 
 	wlan_hdd_add_hostapd_conf_vsie(adapter, genie,
 				       &total_ielen);
