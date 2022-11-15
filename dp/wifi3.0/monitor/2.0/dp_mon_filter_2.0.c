@@ -2270,7 +2270,7 @@ void dp_mon_filter_reset_pktlog_hybrid_2_0(struct dp_pdev *pdev)
  * @soc: DP soc handle
  * @pdev: DP pdev handle
  * @srng_type: The srng type for which filter will be set
- * @tlv_filter: tlv filter
+ * @filter: tlv filter
  */
 static void
 dp_rx_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
@@ -2757,7 +2757,7 @@ void dp_tx_mon_wordmask_config_set(struct htt_tx_ring_tlv_filter *dst_filter,
  * @soc: DP soc handle
  * @pdev: DP pdev handle
  * @srng_type: The srng type for which filter will be set
- * @tlv_filter: tlv filter
+ * @filter: tlv filter
  */
 static
 void dp_tx_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
@@ -3220,7 +3220,10 @@ static void dp_cfr_filter_2_0(struct cdp_soc_t *soc_hdl,
 	mon_pdev = pdev->monitor_pdev;
 
 	if (mon_pdev->mvdev) {
-		dp_mon_info("No action is needed since mon mode is enabled\n");
+		if (enable && cfr_enable_monitor_mode)
+			pdev->cfr_rcc_mode = true;
+		else
+			pdev->cfr_rcc_mode = false;
 		return;
 	}
 
