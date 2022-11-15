@@ -121,6 +121,10 @@
 #include "wlan_osif_features.h"
 #include "wlan_dp_public_struct.h"
 
+#ifdef WLAN_FEATURE_TSF_ACCURACY
+#include "qdf_hrtimer.h"
+#endif
+
 /*
  * Preprocessor definitions and constants
  */
@@ -132,6 +136,8 @@ static qdf_atomic_t dp_protect_entry_count;
 #define MAX_SSR_WAIT_ITERATIONS 100
 #define MAX_SSR_PROTECT_LOG (16)
 
+#define HDD_MAX_OEM_DATA_LEN 1024
+#define HDD_MAX_FILE_NAME_LEN 64
 #ifdef FEATURE_WLAN_APF
 /**
  * struct hdd_apf_context - hdd Context for apf
@@ -833,6 +839,7 @@ struct hdd_fw_txrx_stats {
  * @acs_in_progress: In progress acs flag for an adapter
  * @client_count: client count per dot11_mode
  * @country_ie_updated: country ie is updated or not by hdd hostapd
+ * @during_auth_offload: auth mgmt frame is offloading to hostapd
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -853,6 +860,7 @@ struct hdd_ap_ctx {
 	qdf_atomic_t acs_in_progress;
 	uint16_t client_count[QCA_WLAN_802_11_MODE_INVALID];
 	bool country_ie_updated;
+	bool during_auth_offload;
 };
 
 /**
@@ -996,10 +1004,13 @@ struct wlm_multi_client_info_table {
  * @vdev_id: Unique identifier assigned to the vdev
  * @event_flags: a bitmap of hdd_adapter_flags
  * @enable_dynamic_tsf_sync: Enable/Disable TSF sync through NL interface
+ * @host_target_sync_force: Force update host to TSF mapping
  * @dynamic_tsf_sync_interval: TSF sync interval configure through NL interface
  * @gpio_tsf_sync_work: work to sync send TSF CAP WMI command
  * @cache_sta_count: number of currently cached stations
  * @acs_complete_event: acs complete event
+ * @host_trigger_gpio_timer: A hrtimer used for TSF Accuracy Feature to
+ *                           indicate TSF cycle complete
  * @latency_level: 0 - normal, 1 - xr, 2 - low, 3 - ultralow
  * @multi_client_ll_support: to check multi client ll support in driver
  * @client_info: To store multi client id information
@@ -1167,7 +1178,11 @@ struct hdd_adapter {
 	/* spin lock for read/write timestamps */
 	qdf_spinlock_t host_target_sync_lock;
 	qdf_mc_timer_t host_target_sync_timer;
+#ifdef WLAN_FEATURE_TSF_ACCURACY
+	qdf_hrtimer_data_t host_trigger_gpio_timer;
+#endif
 	bool enable_dynamic_tsf_sync;
+	bool host_target_sync_force;
 	uint32_t dynamic_tsf_sync_interval;
 	uint64_t cur_host_time;
 	uint64_t last_host_time;
@@ -1690,6 +1705,7 @@ enum wlan_state_ctrl_str_id {
  * @bus_bw_work: work for periodically computing DDR bus bandwidth requirements
  * @g_event_flags: a bitmap of hdd_driver_flags
  * @psoc_idle_timeout_work: delayed work for psoc idle shutdown
+ * @tsf_accuracy_context: Holds TSF Accuracy feature activated vdev adapter.
  * @dynamic_nss_chains_support: Per vdev dynamic nss chains update capability
  * @sar_cmd_params: SAR command params to be configured to the FW
  * @country_change_work: work for updating vdev when country changes
@@ -1922,6 +1938,9 @@ struct hdd_context {
 	qdf_atomic_t cap_tsf_flag;
 	/* the context that is capturing tsf */
 	struct hdd_adapter *cap_tsf_context;
+#ifdef WLAN_FEATURE_TSF_ACCURACY
+	struct hdd_adapter *tsf_accuracy_context;
+#endif
 #endif
 #ifdef WLAN_FEATURE_TSF_PTP
 	struct ptp_clock_info ptp_cinfo;
@@ -2024,9 +2043,6 @@ struct hdd_context {
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
 	struct hdd_dual_sta_policy dual_sta_policy;
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-	struct hdd_mld_mac_info mld_mac_info;
-#endif
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
 #endif
@@ -2038,10 +2054,9 @@ struct hdd_context {
 #endif
 	bool is_wlan_disabled;
 
-	uint8_t *oem_data;
+	uint8_t oem_data[HDD_MAX_OEM_DATA_LEN];
 	uint8_t oem_data_len;
-	uint8_t *file_name;
-	qdf_mutex_t wifi_kobj_lock;
+	uint8_t file_name[HDD_MAX_FILE_NAME_LEN];
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	enum coex_dbam_config_mode dbam_mode;
 #endif
@@ -2221,7 +2236,7 @@ QDF_STATUS hdd_get_next_adapter(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_get_front_adapter_no_lock() - Get the first adapter from the adapter list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  * @hdd_ctx: pointer to the HDD context
  * @out_adapter: double pointer to pass the next adapter
@@ -2233,7 +2248,7 @@ QDF_STATUS hdd_get_front_adapter_no_lock(struct hdd_context *hdd_ctx,
 
 /**
  * hdd_get_next_adapter_no_lock() - Get the next adapter from the adapter list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  * @hdd_ctx: pointer to the HDD context
  * @current_adapter: pointer to the current adapter
@@ -2906,6 +2921,19 @@ static inline bool hdd_roaming_supported(struct hdd_context *hdd_ctx)
 
 	return val;
 }
+
+#ifdef WLAN_NS_OFFLOAD
+static inline void
+hdd_adapter_flush_ipv6_notifier_work(struct hdd_adapter *adapter)
+{
+	flush_work(&adapter->ipv6_notifier_work);
+}
+#else
+static inline void
+hdd_adapter_flush_ipv6_notifier_work(struct hdd_adapter *adapter)
+{
+}
+#endif
 
 #ifdef CFG80211_SCAN_RANDOM_MAC_ADDR
 static inline bool hdd_scan_random_mac_addr_supported(void)

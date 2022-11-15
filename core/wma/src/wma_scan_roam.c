@@ -94,7 +94,7 @@
 #define WMA_EXTSCAN_CYCLE_WAKE_LOCK_DURATION WAKELOCK_DURATION_RECOMMENDED
 
 /*
- * Maximum number of entires that could be present in the
+ * Maximum number of entries that could be present in the
  * WMI_EXTSCAN_HOTLIST_MATCH_EVENT buffer from the firmware
  */
 #define WMA_EXTSCAN_MAX_HOTLIST_ENTRIES 10
@@ -226,9 +226,10 @@ QDF_STATUS wma_update_channel_list(WMA_HANDLE handle,
 
 		wma_update_ch_list_11be_params(&ch_params);
 
-		wlan_reg_set_channel_params_for_freq(wma_handle->pdev,
-						     chan_p->mhz, 0,
-						     &ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(wma_handle->pdev,
+							chan_p->mhz, 0,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
 
 		chan_p->max_bw_supported =
 		     wma_map_phy_ch_bw_to_wmi_channel_width(ch_params.ch_width);
@@ -680,9 +681,10 @@ static void wma_update_phymode_on_roam(tp_wma_handle wma,
 			else
 				sec_ch_2g_freq = des_chan->ch_freq - 20;
 		}
-		wlan_reg_set_channel_params_for_freq(pdev, des_chan->ch_freq,
-						     sec_ch_2g_freq,
-						     &ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(pdev, des_chan->ch_freq,
+							sec_ch_2g_freq,
+							&ch_params,
+							REG_CURRENT_PWR_MODE);
 		if (ch_params.ch_width != des_chan->ch_width ||
 		    ch_params.mhz_freq_seg0 != chan->band_center_freq1 ||
 		    ch_params.mhz_freq_seg1 != chan->band_center_freq2)
@@ -2834,7 +2836,7 @@ QDF_STATUS wma_set_gateway_params(tp_wma_handle wma,
 
 /**
  * wma_ht40_stop_obss_scan() - ht40 obss stop scan
- * @wma: WMA handel
+ * @wma: WMA handle
  * @vdev_id: vdev identifier
  *
  * Return: Return QDF_STATUS, otherwise appropriate failure code
@@ -2869,7 +2871,7 @@ QDF_STATUS wma_ht40_stop_obss_scan(tp_wma_handle wma, int32_t vdev_id)
 
 /**
  * wma_send_ht40_obss_scanind() - ht40 obss start scan indication
- * @wma: WMA handel
+ * @wma: WMA handle
  * @req: start scan request
  *
  * Return: Return QDF_STATUS, otherwise appropriate failure code

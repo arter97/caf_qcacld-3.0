@@ -43,7 +43,7 @@ QDF_STATUS ucfg_mlme_init(void);
 /**
  * ucfg_mlme_deinit() - De initialize mlme_ctx context.
  *
- * This function De initializes mlme contex.
+ * This function De initializes mlme context.
  *
  * Return: QDF_STATUS_SUCCESS - in case of success else return error
  */
@@ -53,7 +53,7 @@ QDF_STATUS ucfg_mlme_deinit(void);
  * ucfg_mlme_psoc_open() - MLME component Open
  * @psoc: pointer to psoc object
  *
- * Open the MLME component and initialize the MLME strucutre
+ * Open the MLME component and initialize the MLME structure
  *
  * Return: QDF Status
  */
@@ -73,7 +73,7 @@ void ucfg_mlme_psoc_close(struct wlan_objmgr_psoc *psoc);
  * ucfg_mlme_pdev_open() - MLME component pdev Open
  * @pdev: pointer to pdev object
  *
- * Open the MLME component and initialize the MLME pdev strucutre
+ * Open the MLME component and initialize the MLME pdev structure
  *
  * Return: QDF Status
  */
@@ -336,6 +336,20 @@ QDF_STATUS ucfg_mlme_get_dual_sta_policy(struct wlan_objmgr_psoc *psoc,
 					 uint8_t *dual_sta_config)
 {
 	return wlan_mlme_get_dual_sta_policy(psoc, dual_sta_config);
+}
+
+/**
+ * ucfg_mlme_set_ap_policy() - Configures the AP policy value
+ * @vdev: pointer to vdev object
+ * @ap_cfg_policy: AP policy configuration value
+ *
+ * Return: QDF Status
+ */
+static inline
+QDF_STATUS ucfg_mlme_set_ap_policy(struct wlan_objmgr_vdev *vdev,
+				   enum host_concurrent_ap_policy ap_cfg_policy)
+{
+	return wlan_mlme_set_ap_policy(vdev, ap_cfg_policy);
 }
 
 /**
@@ -3543,6 +3557,44 @@ ucfg_mlme_update_tgt_eht_cap(struct wlan_objmgr_psoc *psoc,
 {
 	return mlme_update_tgt_eht_caps_in_cfg(psoc, cfg);
 }
+
+/**
+ * ucfg_mlme_get_usr_disable_sta_eht() - Get user disable sta eht flag
+ * @psoc: psoc object
+ *
+ * Return: true if user has disabled eht in connect request
+ */
+static inline
+bool ucfg_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_mlme_get_usr_disable_sta_eht(psoc);
+}
+
+/**
+ * ucfg_mlme_set_usr_disable_sta_eht() - Set user disable sta eht flag
+ * @psoc: psoc object
+ * @disable: eht disable flag
+ *
+ * Return: void
+ */
+static inline
+void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
+				       bool disable)
+{
+	wlan_mlme_set_usr_disable_sta_eht(psoc, disable);
+}
+#else
+static inline
+bool ucfg_mlme_get_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
+
+static inline
+void ucfg_mlme_set_usr_disable_sta_eht(struct wlan_objmgr_psoc *psoc,
+				       bool disable)
+{
+}
 #endif
 
 /**
@@ -4746,4 +4798,28 @@ ucfg_mlme_get_peer_ch_width(struct wlan_objmgr_psoc *psoc, uint8_t *mac)
  */
 enum wlan_phymode
 ucfg_mlme_get_vdev_phy_mode(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id);
+
+#if defined(WLAN_FEATURE_SR)
+/**
+ * ucfg_mlme_get_sr_enable_modes() - check for which mode SR is enabled
+ *
+ * @psoc: pointer to psoc object
+ * @val: SR(Spatial Reuse) enable modes
+ *
+ * Return: void
+ */
+static inline void
+ucfg_mlme_get_sr_enable_modes(struct wlan_objmgr_psoc *psoc,
+			      uint8_t *val)
+{
+	wlan_mlme_get_sr_enable_modes(psoc, val);
+}
+#else
+static inline void
+ucfg_mlme_get_sr_enable_modes(struct wlan_objmgr_psoc *psoc,
+			      uint8_t *val)
+{
+	*val = 0;
+}
+#endif
 #endif /* _WLAN_MLME_UCFG_API_H_ */

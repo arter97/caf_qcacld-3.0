@@ -416,6 +416,8 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 			sync_frame_ind->bcn_probe_rsp_len;
 		roam_synch_frame_ind->is_beacon =
 			sync_frame_ind->is_beacon;
+		if (roam_synch_frame_ind->bcn_probe_rsp)
+			qdf_mem_free(roam_synch_frame_ind->bcn_probe_rsp);
 		roam_synch_frame_ind->bcn_probe_rsp =
 			sync_frame_ind->bcn_probe_rsp;
 	}
@@ -423,6 +425,8 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 	if (sync_frame_ind->reassoc_req_len) {
 		roam_synch_frame_ind->reassoc_req_len =
 				sync_frame_ind->reassoc_req_len;
+		if (roam_synch_frame_ind->reassoc_req)
+			qdf_mem_free(roam_synch_frame_ind->reassoc_req);
 		roam_synch_frame_ind->reassoc_req =
 			sync_frame_ind->reassoc_req;
 	}
@@ -430,6 +434,8 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 	if (sync_frame_ind->reassoc_rsp_len) {
 		roam_synch_frame_ind->reassoc_rsp_len =
 				sync_frame_ind->reassoc_rsp_len;
+		if (roam_synch_frame_ind->reassoc_rsp)
+			qdf_mem_free(roam_synch_frame_ind->reassoc_rsp);
 		roam_synch_frame_ind->reassoc_rsp =
 			sync_frame_ind->reassoc_rsp;
 	}
@@ -532,7 +538,8 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 
 err:
 	if (QDF_IS_STATUS_ERROR(status)) {
-		wlan_mlo_roam_abort_on_link(psoc, sync_ind);
+		wlan_mlo_roam_abort_on_link(psoc, event,
+					    sync_ind->roamed_vdev_id);
 		cm_fw_roam_abort_req(psoc, sync_ind->roamed_vdev_id);
 		cm_roam_stop_req(psoc, sync_ind->roamed_vdev_id,
 				 REASON_ROAM_SYNCH_FAILED,
@@ -590,8 +597,8 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 							   ie_ptr, ie_len);
 	if (extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID &&
 	    extracted_ie[1] > MIN_IE_LEN) {
-		mlme_debug("SSID of the candidate is %.*s", extracted_ie[1],
-			   &extracted_ie[2]);
+		mlme_debug("SSID of the candidate is " QDF_SSID_FMT,
+			   QDF_SSID_REF(extracted_ie[1], &extracted_ie[2]));
 		wlan_cm_set_roam_offload_ssid(vdev, extracted_ie);
 	}
 

@@ -479,9 +479,9 @@ populate_dot11f_tx_power_env(struct mac_context *mac,
 
 		chan_params.ch_width = chan_width;
 		bw_val = wlan_reg_get_bw_value(chan_width);
-		wlan_reg_set_channel_params_for_freq(mac->pdev, chan_freq,
-						     chan_freq,
-						     &chan_params);
+		wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,
+							chan_freq, &chan_params,
+							REG_CURRENT_PWR_MODE);
 
 		if (chan_params.mhz_freq_seg1)
 			psd_start_freq =
@@ -1021,9 +1021,9 @@ populate_dot11f_ht_caps(struct mac_context *mac,
 		    mac->roam.configParam.channelBondingMode24GHz) {
 			pDot11f->supportedChannelWidthSet = 1;
 			ch_params.ch_width = CH_WIDTH_40MHZ;
-			wlan_reg_set_channel_params_for_freq(
+			wlan_reg_set_channel_params_for_pwrmode(
 				mac->pdev, pe_session->curr_op_freq, 0,
-				&ch_params);
+				&ch_params, REG_CURRENT_PWR_MODE);
 			if (ch_params.ch_width != CH_WIDTH_40MHZ)
 				pDot11f->supportedChannelWidthSet = 0;
 		} else if (LIM_IS_STA_ROLE(pe_session)) {
@@ -1219,8 +1219,9 @@ ePhyChanBondState wlan_get_cb_mode(struct mac_context *mac,
 
 	if (cb_mode != PHY_SINGLE_CHANNEL_CENTERED) {
 		ch_params.ch_width = CH_WIDTH_40MHZ;
-		wlan_reg_set_channel_params_for_freq(mac->pdev, ch_freq,
-						     sec_ch_freq, &ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(mac->pdev, ch_freq,
+							sec_ch_freq, &ch_params,
+							REG_CURRENT_PWR_MODE);
 		if (ch_params.ch_width == CH_WIDTH_20MHZ ||
 		    ch_params.sec_ch_offset != cb_mode) {
 			pe_err("ch freq %d :: Supported HT BW %d and cbmode %d, APs HT BW %d and cbmode %d, so switch to 20Mhz",
@@ -2089,7 +2090,7 @@ populate_dot11f_supp_rates(struct mac_context *mac,
 /**
  * populate_dot11f_rates_tdls() - populate supported rates and
  *                                extended supported rates IE.
- * @p_mac gloabl - header.
+ * @p_mac global - header.
  * @p_supp_rates - pointer to supported rates IE
  * @p_ext_supp_rates - pointer to extended supported rates IE
  * @curr_oper_channel - current operating channel
@@ -3175,7 +3176,7 @@ sir_convert_assoc_req_frame2_struct(struct mac_context *mac,
 		qdf_mem_free(ar);
 		return QDF_STATUS_E_FAILURE;
 	} else if (DOT11F_WARNED(status)) {
-		pe_debug("There were warnings while unpacking an Assoication Request (0x%08x, %d bytes):",
+		pe_debug("There were warnings while unpacking an Association Request (0x%08x, %d bytes):",
 			status, nFrame);
 	}
 	/* & "transliterate" from a 'tDot11fAssocRequest' to a 'tSirAssocReq'... */
@@ -3700,6 +3701,20 @@ sir_convert_assoc_resp_frame2_mlo_struct(struct mac_context *mac,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+#ifdef WLAN_FEATURE_SR
+static void sir_convert_assoc_resp_frame2_sr(tpSirAssocRsp pAssocRsp,
+					     tDot11fAssocResponse *ar)
+{
+	if (ar->spatial_reuse.present)
+		qdf_mem_copy(&pAssocRsp->srp_ie, &ar->spatial_reuse,
+			     sizeof(tDot11fIEspatial_reuse));
+}
+#else
+static inline void sir_convert_assoc_resp_frame2_sr(tpSirAssocRsp pAssocRsp,
+						    tDot11fAssocResponse *ar)
+{
+}
+#endif
 
 QDF_STATUS
 sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
@@ -3728,7 +3743,7 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 	/*
 	 * decrypt the cipher text using AEAD decryption, if association
 	 * response status code is successful, else the don't do AEAD decryption
-	 * since AP doesn't inlude FILS session IE when association reject is
+	 * since AP doesn't include FILS session IE when association reject is
 	 * sent
 	 */
 	if (lim_is_fils_connection(session_entry) && !status_code) {
@@ -3965,6 +3980,8 @@ sir_convert_assoc_resp_frame2_struct(struct mac_context *mac,
 	if (ar->he_op.present)
 		qdf_mem_copy(&pAssocRsp->he_op, &ar->he_op,
 			     sizeof(tDot11fIEhe_op));
+
+	sir_convert_assoc_resp_frame2_sr(pAssocRsp, ar);
 
 	if (ar->he_6ghz_band_cap.present)
 		qdf_mem_copy(&pAssocRsp->he_6ghz_band_cap,
@@ -5821,7 +5838,7 @@ sir_convert_tpc_req_frame2_struct(struct mac_context *mac,
 		pTpcReqFrame->type = DOT11F_EID_TPCREQUEST;
 		pTpcReqFrame->length = 0;
 	} else {
-		pe_warn("!!!Rcv TPC Req of inalid type!");
+		pe_warn("!!!Rcv TPC Req of invalid type!");
 		return QDF_STATUS_E_FAILURE;
 	}
 	return QDF_STATUS_SUCCESS;
@@ -5936,21 +5953,21 @@ void
 populate_dot11f_mscs_dec_element(struct mscs_req_info *mscs_req,
 				 tDot11fmscs_request_action_frame *dot11f)
 {
-	dot11f->decriptor_element.request_type =
+	dot11f->descriptor_element.request_type =
 			mscs_req->dec.request_type;
-	dot11f->decriptor_element.user_priority_control =
+	dot11f->descriptor_element.user_priority_control =
 			mscs_req->dec.user_priority_control;
-	dot11f->decriptor_element.stream_timeout =
+	dot11f->descriptor_element.stream_timeout =
 			mscs_req->dec.stream_timeout;
-	dot11f->decriptor_element.tclas_mask.classifier_type =
+	dot11f->descriptor_element.tclas_mask.classifier_type =
 			mscs_req->dec.tclas_mask.classifier_type;
-	dot11f->decriptor_element.tclas_mask.classifier_mask =
+	dot11f->descriptor_element.tclas_mask.classifier_mask =
 			mscs_req->dec.tclas_mask.classifier_mask;
 
-	dot11f->decriptor_element.present = 1;
-	dot11f->decriptor_element.tclas_mask.present = 1;
+	dot11f->descriptor_element.present = 1;
+	dot11f->descriptor_element.tclas_mask.present = 1;
 
-} /* End populate_dot11f_decriptor_element */
+} /* End populate_dot11f_descriptor_element */
 #endif
 
 void populate_dot11f_wmmtspec(struct mac_tspec_ie *pOld,
@@ -7138,8 +7155,10 @@ populate_dot11f_sr_info(struct mac_context *mac_ctx,
 	uint8_t non_srg_pd_offset;
 	uint8_t sr_ctrl = wlan_vdev_mlme_get_sr_ctrl(session->vdev);
 	bool sr_enabled = wlan_vdev_mlme_get_he_spr_enabled(session->vdev);
+	bool sr_disabled_due_conc =
+		wlan_vdev_mlme_is_sr_disable_due_conc(session->vdev);
 
-	if (!sr_enabled || !sr_ctrl ||
+	if (!sr_enabled || !sr_ctrl || sr_disabled_due_conc ||
 	    (sr_ctrl & WLAN_HE_NON_SRG_PD_SR_DISALLOWED) ||
 	    !(sr_ctrl & WLAN_HE_NON_SRG_OFFSET_PRESENT))
 		return QDF_STATUS_SUCCESS;
@@ -7151,6 +7170,8 @@ populate_dot11f_sr_info(struct mac_context *mac_ctx,
 	sr_info->srg_info_present = 0;
 	sr_info->non_srg_offset_present = 1;
 	sr_info->srg_info_present = 0;
+	if (sr_ctrl & WLAN_HE_SIGA_SR_VAL15_ALLOWED)
+		sr_info->sr_value15_allow = 1;
 	sr_info->non_srg_offset.info.non_srg_pd_max_offset = non_srg_pd_offset;
 
 	return QDF_STATUS_SUCCESS;
@@ -10832,7 +10853,7 @@ wlan_get_ielen_from_bss_description(struct bss_description *bss_desc)
 	}
 
 	/*
-	 * Length of BSS desription is without length of
+	 * Length of BSS description is without length of
 	 * length itself and length of pointer
 	 * that holds ieFields
 	 *

@@ -1387,8 +1387,8 @@ void cm_update_owe_info(struct wlan_objmgr_vdev *vdev,
 	qdf_mem_copy(owe_info->ssid.ssid, owe_transition_ie + OWE_SSID_OFFSET,
 		     owe_info->ssid.length);
 
-	mlme_debug("[OWE_TRANSITION] open bss ssid: \"%.*s\"",
-		   owe_info->ssid.length, owe_info->ssid.ssid);
+	mlme_debug("[OWE_TRANSITION] open bss ssid: \"" QDF_SSID_FMT "\"",
+		   QDF_SSID_REF(owe_info->ssid.length, owe_info->ssid.ssid));
 	return;
 
 reset:
@@ -2338,9 +2338,9 @@ cm_roam_scan_filter(struct wlan_objmgr_psoc *psoc,
 			     rso_usr_cfg->ssid_allowed_list[i].length);
 		params->ssid_allowed_list[i].length =
 				rso_usr_cfg->ssid_allowed_list[i].length;
-		mlme_debug("SSID %d: %.*s", i,
-			   params->ssid_allowed_list[i].length,
-			   params->ssid_allowed_list[i].ssid);
+		mlme_debug("SSID %d: " QDF_SSID_FMT, i,
+			   QDF_SSID_REF(params->ssid_allowed_list[i].length,
+					params->ssid_allowed_list[i].ssid));
 	}
 
 	if (params->num_bssid_preferred_list) {
@@ -3363,7 +3363,7 @@ cm_roam_fill_per_roam_request(struct wlan_objmgr_psoc *psoc,
 	req->per_config.min_candidate_rssi =
 		mlme_obj->cfg.lfr.per_roam_min_candidate_rssi;
 
-	mlme_debug("PER based roaming configuaration enable: %d vdev: %d high_rate_thresh: %d low_rate_thresh: %d rate_thresh_percnt: %d per_rest_time: %d monitor_time: %d min cand rssi: %d",
+	mlme_debug("PER based roaming configuration enable: %d vdev: %d high_rate_thresh: %d low_rate_thresh: %d rate_thresh_percnt: %d per_rest_time: %d monitor_time: %d min cand rssi: %d",
 		   req->per_config.enable, req->vdev_id,
 		   req->per_config.tx_high_rate_thresh,
 		   req->per_config.tx_low_rate_thresh,
@@ -4128,7 +4128,7 @@ cm_roam_switch_to_rso_enable(struct wlan_objmgr_pdev *pdev,
 	}
 
 	if (control_bitmap) {
-		mlme_debug("ROAM: RSO Disabled internaly: vdev[%d] bitmap[0x%x]",
+		mlme_debug("ROAM: RSO Disabled internally: vdev[%d] bitmap[0x%x]",
 			   vdev_id, control_bitmap);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -5112,6 +5112,7 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 	struct cm_roam_values_copy src_config = {};
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_mlme_psoc_ext_obj *mlme_obj;
+	uint32_t roam_trigger_bitmap;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 	if (!psoc)
@@ -5122,6 +5123,20 @@ void cm_roam_restore_default_config(struct wlan_objmgr_pdev *pdev,
 		return;
 
 	if (mlme_obj->cfg.lfr.roam_scan_offload_enabled) {
+		/*
+		 * When vendor handoff is enabled and disconnection is received,
+		 * then restore the roam trigger bitmap from the ini
+		 * configuration
+		 */
+		wlan_cm_roam_cfg_get_value(psoc, vdev_id, ROAM_CONFIG_ENABLE,
+					   &src_config);
+		if (src_config.bool_value) {
+			roam_trigger_bitmap =
+					wlan_mlme_get_roaming_triggers(psoc);
+			mlme_set_roam_trigger_bitmap(psoc, vdev_id,
+						     roam_trigger_bitmap);
+		}
+
 		src_config.bool_value = 0;
 		wlan_cm_roam_cfg_set_value(psoc, vdev_id, ROAM_CONFIG_ENABLE,
 					   &src_config);
@@ -5500,7 +5515,7 @@ QDF_STATUS cm_start_roam_invoke(struct wlan_objmgr_psoc *psoc,
 	roam_control_bitmap = mlme_get_operations_bitmap(psoc, vdev_id);
 	if (roam_offload_enabled && (roam_control_bitmap ||
 	    !MLME_IS_ROAM_INITIALIZED(psoc, vdev_id))) {
-		mlme_debug("ROAM: RSO Disabled internaly: vdev[%d] bitmap[0x%x]",
+		mlme_debug("ROAM: RSO Disabled internally: vdev[%d] bitmap[0x%x]",
 			   vdev_id, roam_control_bitmap);
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -5913,7 +5928,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 * 2. Atleast one candidate AP found during scan
 	 *
 	 * Print NO_ROAM only if:
-	 * 1. No candidate AP found(eventhough other APs are found in scan)
+	 * 1. No candidate AP found(even though other APs are found in scan)
 	 */
 	wlan_diag_event.is_roam_successful = (res->status == 0) ||
 		(ap_found_in_roam_scan &&
@@ -6201,7 +6216,7 @@ void cm_roam_result_info_event(struct wlan_objmgr_psoc *psoc,
 	 * 2. Atleast one candidate AP found during scan
 	 *
 	 * Print NO_ROAM only if:
-	 * 1. No candidate AP found(eventhough other APs are found in scan)
+	 * 1. No candidate AP found(even though other APs are found in scan)
 	 */
 	log_record->roam_result.is_roam_successful =
 		(res->status == 0) ||

@@ -681,6 +681,32 @@ out:
 
 }
 
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter,
+				  struct hdd_context *hdd_ctx,
+				  enum sme_ps_cmd command)
+{
+	struct hdd_adapter *link_adapter;
+	struct hdd_mlo_adapter_info *mlo_adapter_info;
+	int i;
+
+	mlo_adapter_info = &adapter->mlo_adapter_info;
+	for (i = 0; i < WLAN_MAX_MLD; i++) {
+		link_adapter = mlo_adapter_info->link_adapter[i];
+		if (!link_adapter)
+			continue;
+		sme_ps_enable_disable(hdd_ctx->mac_handle,
+				      link_adapter->vdev_id,
+				      command);
+	}
+}
+#else
+static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter,
+				  struct hdd_context *hdd_ctx,
+				  enum sme_ps_cmd command)
+{}
+#endif
+
 /**
  * hdd_send_ps_config_to_fw() - Check user pwr save config set/reset PS
  * @adapter: pointer to hdd adapter
@@ -694,26 +720,32 @@ static void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 	bool usr_ps_cfg;
+	enum sme_ps_cmd command;
+	bool is_mlo_vdev;
 
 	if (hdd_validate_adapter(adapter))
 		return;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-
 	usr_ps_cfg = ucfg_mlme_get_user_ps(hdd_ctx->psoc, adapter->vdev_id);
-	if (usr_ps_cfg)
+	command = usr_ps_cfg ? SME_PS_ENABLE : SME_PS_DISABLE;
+
+	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(adapter->vdev);
+
+	if (!is_mlo_vdev) {
 		sme_ps_enable_disable(hdd_ctx->mac_handle, adapter->vdev_id,
-				      SME_PS_ENABLE);
-	else
-		sme_ps_enable_disable(hdd_ctx->mac_handle, adapter->vdev_id,
-				      SME_PS_DISABLE);
+				      command);
+		return;
+	}
+
+	hdd_send_mlo_ps_to_fw(adapter, hdd_ctx, command);
 }
 
 /**
  * __hdd_ipv6_notifier_work_queue() - IPv6 notification work function
  * @adapter: adapter whose IP address changed
  *
- * This function performs the work initially trigged by a callback
+ * This function performs the work initially triggered by a callback
  * from the IPv6 netdev notifier.  Since this means there has been a
  * change in IPv6 state for the interface, the NS offload is
  * reconfigured.
@@ -1056,7 +1088,7 @@ int hdd_set_grat_arp_keepalive(struct hdd_adapter *adapter)
  * __hdd_ipv4_notifier_work_queue() - IPv4 notification work function
  * @adapter: adapter whose IP address changed
  *
- * This function performs the work initially trigged by a callback
+ * This function performs the work initially triggered by a callback
  * from the IPv4 netdev notifier.  Since this means there has been a
  * change in IPv4 state for the interface, the ARP offload is
  * reconfigured. Also, Updates the HLP IE info with IP address info
@@ -1267,7 +1299,7 @@ bool wlan_hdd_is_cpu_pm_qos_in_progress(struct hdd_context *hdd_ctx)
 #endif
 
 /**
- * hdd_get_ipv4_local_interface() - get ipv4 local interafce from iface list
+ * hdd_get_ipv4_local_interface() - get ipv4 local interface from iface list
  * @adapter: Adapter context for which ARP offload is to be configured
  *
  * Return:
@@ -1305,6 +1337,8 @@ void hdd_enable_arp_offload(struct hdd_adapter *adapter,
 	struct pmo_arp_req *arp_req;
 	struct in_ifaddr *ifa;
 	struct wlan_objmgr_vdev *vdev;
+
+	hdd_enter();
 
 	arp_req = qdf_mem_malloc(sizeof(*arp_req));
 	if (!arp_req)
@@ -1523,6 +1557,8 @@ void hdd_disable_arp_offload(struct hdd_adapter *adapter,
 	QDF_STATUS status;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_vdev *vdev;
+
+	hdd_enter();
 
 	status = ucfg_pmo_check_arp_offload(hdd_ctx->psoc, trigger,
 					    adapter->vdev_id);
@@ -1754,6 +1790,7 @@ static int hdd_resume_wlan(void)
 		if (adapter->device_mode == QDF_STA_MODE)
 			status = hdd_disable_default_pkt_filters(adapter);
 
+		hdd_restart_tsf_sync_post_wlan_resume(adapter);
 		hdd_adapter_dev_put_debug(adapter, NET_DEV_HOLD_RESUME_WLAN);
 	}
 
@@ -2396,6 +2433,15 @@ static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		return 0;
 	}
 
+	/**
+	 * Return success if recovery is in progress, otherwise, linux kernel
+	 * will shutdown all interfaces in wiphy_resume.
+	 */
+	if (cds_is_driver_recovering()) {
+		hdd_debug("Recovery in progress");
+		return 0;
+	}
+
 	errno = wlan_hdd_validate_context(hdd_ctx);
 	if (errno)
 		return errno;
@@ -2869,7 +2915,7 @@ static int wlan_hdd_set_mlo_ps(struct wlan_objmgr_psoc *psoc,
 {
 	struct hdd_adapter *link_adapter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
-	int i, status;
+	int i, status = -EINVAL;
 
 	mlo_adapter_info = &adapter->mlo_adapter_info;
 	for (i = 0; i < WLAN_MAX_MLD; i++) {
@@ -2954,6 +3000,13 @@ static int __wlan_hdd_cfg80211_set_power_mgmt(struct wiphy *wiphy,
 	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
 
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_POWER_ID);
+
+	/* Flush any scheduled inet change notifier work
+	 * This is to make sure set power save request
+	 * sent to FW are serialized to avoid race condition
+	 */
+	flush_work(&adapter->ipv4_notifier_work);
+	hdd_adapter_flush_ipv6_notifier_work(adapter);
 
 	if (is_mlo_vdev) {
 		status = wlan_hdd_set_mlo_ps(hdd_ctx->psoc, adapter,
