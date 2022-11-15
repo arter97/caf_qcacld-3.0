@@ -1693,7 +1693,11 @@ static bool mlme_vdev_subst_mlo_sync_wait_event(void *ctx, uint16_t event,
 
 	switch (event) {
 	case WLAN_VDEV_SM_EV_START_SUCCESS:
-		mlme_vdev_up_notify_mlo_mgr(vdev_mlme);
+		if (mlme_vdev_up_notify_mlo_mgr(vdev_mlme))
+			mlme_vdev_sm_deliver_event(
+					vdev_mlme,
+					WLAN_VDEV_SM_EV_MLO_SYNC_COMPLETE,
+					event_data_len, event_data);
 		status = true;
 		break;
 
