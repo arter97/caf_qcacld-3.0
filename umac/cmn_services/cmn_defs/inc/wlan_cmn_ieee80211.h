@@ -191,7 +191,22 @@
 #define QCA_OUI_WHC_TYPE  0x00
 #define QCA_OUI_WHC_REPT_TYPE 0x01
 
-/* QCN IE attribute types */
+/**
+ * enum qcn_attribute_id: QCN IE attribute ID
+ * @QCN_ATTRIB_VERSION: QCN version
+ * @QCN_ATTRIB_VHT_MCS10_11_SUPP: VHT MCS 10-11 support
+ * @QCN_ATTRIB_HE_400NS_SGI_SUPP: HE 400 NS SGI support
+ * @QCN_ATTRIB_HE_2XLTF_160_80P80_SUPP: HE 2X LTF 160 80P80 support
+ * @QCN_ATTRIB_HE_DL_OFDMA_SUPP: HE DL OFDMA support
+ * @QCN_ATTRIB_TRANSITION_REASON: Transition reason
+ * @QCN_ATTRIB_TRANSITION_REJECTION: Transition rejection
+ * @QCN_ATTRIB_HE_DL_MUMIMO_SUPP: DL MUMIMO support
+ * @QCN_ATTRIB_HE_MCS12_13_SUPP: MCS 12-13 support
+ * @QCN_ATTRIB_REPEATER_INFO: Repeater information
+ * @QCN_ATTRIB_HE_240_MHZ_SUPP: HE 240 MHZ support
+ * @QCN_ATTRIB_ECSA_SUPP: ECSA support
+ * @QCN_ATTRIB_MAX: Maximum attribute
+ */
 enum qcn_attribute_id {
 	QCN_ATTRIB_VERSION                  = 0x01,
 	QCN_ATTRIB_VHT_MCS10_11_SUPP        = 0X02,
@@ -204,7 +219,8 @@ enum qcn_attribute_id {
 	QCN_ATTRIB_HE_MCS12_13_SUPP         = 0X09,
 	QCN_ATTRIB_REPEATER_INFO            = 0X0A,
 	QCN_ATTRIB_HE_240_MHZ_SUPP          = 0X0B,
-	QCN_ATTRIB_MAX                      = 0x0C
+	QCN_ATTRIB_ECSA_SUPP                = 0X0C,
+	QCN_ATTRIB_MAX                      = 0x0D
 };
 
 /* Extender vendor specific IE */
