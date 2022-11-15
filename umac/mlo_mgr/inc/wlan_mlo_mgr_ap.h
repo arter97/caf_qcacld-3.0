@@ -85,9 +85,9 @@ void mlo_ap_get_partner_vdev_list_from_mld(
  *                                  enters WLAN_VDEV_SS_MLO_SYNC_WAIT
  * @vdev: vdev pointer
  *
- * Return: None
+ * Return: true if MLO_SYNC_COMPLETE is posted, else false
  */
-void mlo_ap_link_sync_wait_notify(struct wlan_objmgr_vdev *vdev);
+bool mlo_ap_link_sync_wait_notify(struct wlan_objmgr_vdev *vdev);
 
 /**
  * mlo_ap_link_start_rsp_notify - Notify that the link start is completed

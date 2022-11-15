@@ -644,14 +644,16 @@ static inline QDF_STATUS mlme_vdev_chan_switch_disable_notify_dfs(
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * mlme_vdev_up_notify_mlo_mgr - notify mlo link is ready to up
- * @vdev_mlme_obj:  VDEV MLME comp object
+ * @vdev_mlme:  VDEV MLME comp object
  *
- * Return: VOID.
+ * Return: true if MLO_SYNC_COMPLETE is posted, else false
  */
-static inline void mlme_vdev_up_notify_mlo_mgr(struct vdev_mlme_obj *vdev_mlme)
+static inline bool mlme_vdev_up_notify_mlo_mgr(struct vdev_mlme_obj *vdev_mlme)
 {
 	if (wlan_vdev_mlme_is_mlo_ap(vdev_mlme->vdev))
-		mlo_ap_link_sync_wait_notify(vdev_mlme->vdev);
+		return mlo_ap_link_sync_wait_notify(vdev_mlme->vdev);
+
+	return true;
 }
 
 /**
@@ -694,8 +696,9 @@ static inline void mlme_vdev_up_active_notify_mlo_mgr(
 		mlo_sta_up_active_notify(vdev_mlme->vdev);
 }
 #else
-static inline void mlme_vdev_up_notify_mlo_mgr(struct vdev_mlme_obj *vdev_mlme)
+static inline bool mlme_vdev_up_notify_mlo_mgr(struct vdev_mlme_obj *vdev_mlme)
 {
+	return true;
 }
 
 static inline void mlme_vdev_start_rsp_notify_mlo_mgr(

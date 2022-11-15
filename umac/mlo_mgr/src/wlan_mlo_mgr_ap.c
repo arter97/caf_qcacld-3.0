@@ -261,13 +261,13 @@ static bool mlo_pre_link_up(struct wlan_objmgr_vdev *vdev)
  *                           event WLAN_VDEV_SM_EV_MLO_SYNC_COMPLETE.
  *
  * This function is triggered once a link gets start response or enters
- * LAN_VDEV_SS_MLO_SYNC_WAIT state
+ * WLAN_VDEV_SS_MLO_SYNC_WAIT state
  *
  * @vdev: vdev pointer
  *
- * Return: None
+ * Return: true if MLO_SYNC_COMPLETE is posted, else false
  */
-static void mlo_handle_link_ready(struct wlan_objmgr_vdev *vdev)
+static bool mlo_handle_link_ready(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_objmgr_vdev *vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
 	uint16_t num_links = 0;
@@ -275,32 +275,35 @@ static void mlo_handle_link_ready(struct wlan_objmgr_vdev *vdev)
 
 	if (!vdev || !vdev->mlo_dev_ctx) {
 		mlo_err("Invalid input");
-		return;
+		return false;
 	}
 
 	if (!mlo_is_ap_vdev_up_allowed(vdev))
-		return;
+		return false;
 
 	mlo_ap_get_vdev_list(vdev, &num_links, vdev_list);
 	if (!num_links || (num_links > QDF_ARRAY_SIZE(vdev_list))) {
 		mlo_err("Invalid number of VDEVs under AP-MLD");
-		return;
+		return false;
 	}
 
 	for (i = 0; i < num_links; i++) {
-		if (mlo_pre_link_up(vdev_list[i]))
-			wlan_vdev_mlme_sm_deliver_evt_sync(
+		if (mlo_pre_link_up(vdev_list[i])) {
+			if (vdev_list[i] != vdev)
+				wlan_vdev_mlme_sm_deliver_evt(
 					vdev_list[i],
 					WLAN_VDEV_SM_EV_MLO_SYNC_COMPLETE,
 					0, NULL);
+		}
 		/* Release ref taken as part of mlo_ap_get_vdev_list */
 		mlo_release_vdev_ref(vdev_list[i]);
 	}
+	return true;
 }
 
-void mlo_ap_link_sync_wait_notify(struct wlan_objmgr_vdev *vdev)
+bool mlo_ap_link_sync_wait_notify(struct wlan_objmgr_vdev *vdev)
 {
-	mlo_handle_link_ready(vdev);
+	return mlo_handle_link_ready(vdev);
 }
 
 void mlo_ap_link_start_rsp_notify(struct wlan_objmgr_vdev *vdev)
