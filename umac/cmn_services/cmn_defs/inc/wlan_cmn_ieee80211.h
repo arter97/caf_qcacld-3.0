@@ -2595,6 +2595,9 @@ struct wlan_ml_rv_linfo_perstaprof {
 /* All Updates Included */
 #define WLAN_RNR_NBRAPINFO_TBTTINFO_MLDPARAMS_ALLUPDATESINC_IDX          20
 #define WLAN_RNR_NBRAPINFO_TBTTINFO_MLDPARAMS_ALLUPDATESINC_BITS         1
+/* Disabled link indication */
+#define WLAN_RNR_NBRAPINFO_TBTTINFO_MLDPARAMS_DISABLEDLINKIND_IDX        21
+#define WLAN_RNR_NBRAPINFO_TBTTINFO_MLDPARAMS_DISABLEDLINKIND_BITS       1
 
 /*
  * End of definitions related to MLO specific aspects of Reduced Neighbor Report
