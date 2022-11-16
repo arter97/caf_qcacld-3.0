@@ -2433,6 +2433,11 @@ qdf_dma_addr_t dp_rx_nbuf_sync_no_dsb(struct dp_soc *dp_soc,
 				      qdf_nbuf_t nbuf,
 				      uint32_t buf_size)
 {
+	if (nbuf->recycled_for_ds) {
+		nbuf->recycled_for_ds = 0;
+		return (qdf_dma_addr_t)qdf_mem_virt_to_phys(nbuf->data);
+	}
+
 	if (unlikely(!nbuf->fast_recycled)) {
 		qdf_nbuf_dma_inv_range_no_dsb((void *)nbuf->data,
 					      (void *)(nbuf->data + buf_size));
