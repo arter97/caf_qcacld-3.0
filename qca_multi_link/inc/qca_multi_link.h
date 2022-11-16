@@ -28,7 +28,6 @@
 #include <linux/version.h>
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
-#include <br_private.h>
 
 #include <ieee80211.h>
 #include <ieee80211_defines.h>

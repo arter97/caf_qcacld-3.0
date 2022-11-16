@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,7 +28,6 @@
 #include <linux/etherdevice.h>
 #include <linux/wireless.h>
 #include <net/cfg80211.h>
-#include <br_private.h>
 
 /**
  * qca_multi_link_entry_type - bridge entry type
