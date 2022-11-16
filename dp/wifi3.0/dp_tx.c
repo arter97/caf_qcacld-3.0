@@ -5030,6 +5030,51 @@ void dp_tx_update_connectivity_stats(struct dp_soc *soc,
 #endif
 
 #if defined(WLAN_FEATURE_TSF_UPLINK_DELAY) || defined(WLAN_CONFIG_TX_DELAY)
+/* Mask for bit29 ~ bit31 */
+#define DP_TX_TS_BIT29_31_MASK 0xE0000000
+/* Timestamp value (unit us) if bit29 is set */
+#define DP_TX_TS_BIT29_SET_VALUE BIT(29)
+/**
+ * dp_tx_adjust_enqueue_buffer_ts() - adjust the enqueue buffer_timestamp
+ * @ack_ts: OTA ack timestamp, unit us.
+ * @enqueue_ts: TCL enqueue TX data to TQM timestamp, unit us.
+ * @base_delta_ts: base timestamp delta for ack_ts and enqueue_ts
+ *
+ * this function will restore the bit29 ~ bit31 3 bits value for
+ * buffer_timestamp in wbm2sw ring entry, currently buffer_timestamp only
+ * can support 0x7FFF * 1024 us (29 bits), but if the timestamp is >
+ * 0x7FFF * 1024 us, bit29~ bit31 will be lost.
+ *
+ * Return: the adjusted buffer_timestamp value
+ */
+static inline
+uint32_t dp_tx_adjust_enqueue_buffer_ts(uint32_t ack_ts,
+					uint32_t enqueue_ts,
+					uint32_t base_delta_ts)
+{
+	uint32_t ack_buffer_ts;
+	uint32_t ack_buffer_ts_bit29_31;
+	uint32_t adjusted_enqueue_ts;
+
+	/* corresponding buffer_timestamp value when receive OTA Ack */
+	ack_buffer_ts = ack_ts - base_delta_ts;
+	ack_buffer_ts_bit29_31 = ack_buffer_ts & DP_TX_TS_BIT29_31_MASK;
+
+	/* restore the bit29 ~ bit31 value */
+	adjusted_enqueue_ts = ack_buffer_ts_bit29_31 | enqueue_ts;
+
+	/*
+	 * if actual enqueue_ts value occupied 29 bits only, this enqueue_ts
+	 * value + real UL delay overflow 29 bits, then 30th bit (bit-29)
+	 * should not be marked, otherwise extra 0x20000000 us is added to
+	 * enqueue_ts.
+	 */
+	if (qdf_unlikely(adjusted_enqueue_ts > ack_buffer_ts))
+		adjusted_enqueue_ts -= DP_TX_TS_BIT29_SET_VALUE;
+
+	return adjusted_enqueue_ts;
+}
+
 QDF_STATUS
 dp_tx_compute_hw_delay_us(struct hal_tx_completion_status *ts,
 			  uint32_t delta_tsf,
@@ -5050,6 +5095,8 @@ dp_tx_compute_hw_delay_us(struct hal_tx_completion_status *ts,
 	 * valid up to 29 bits.
 	 */
 	buffer_ts = ts->buffer_timestamp << 10;
+	buffer_ts = dp_tx_adjust_enqueue_buffer_ts(ts->tsf,
+						   buffer_ts, delta_tsf);
 
 	delay = ts->tsf - buffer_ts - delta_tsf;
 
