@@ -30,7 +30,7 @@
 #include <wmi_unified_param.h>
 #include <wlan_osif_priv.h>
 #include <net/cfg80211.h>
-#ifdef QCA_LL_TX_FLOW_CONTROL_V2
+#if defined(QCA_LL_TX_FLOW_CONTROL_V2) || !defined(QCA_IPA_LL_TX_FLOW_CONTROL)
 #include <cdp_txrx_flow_ctrl_v2.h>
 #include <cdp_txrx_peer_ops.h>
 #endif
