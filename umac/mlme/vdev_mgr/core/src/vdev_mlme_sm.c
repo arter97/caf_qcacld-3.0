@@ -1658,6 +1658,7 @@ static void mlme_vdev_subst_mlo_sync_wait_entry(void *ctx)
 		QDF_BUG(0);
 
 	mlme_vdev_set_substate(vdev, WLAN_VDEV_SS_MLO_SYNC_WAIT);
+	mlme_vdev_notify_mlo_sync_wait_entry(vdev_mlme);
 }
 
 /**

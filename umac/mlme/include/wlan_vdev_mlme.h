@@ -770,7 +770,8 @@ struct vdev_mlme_ops {
 	QDF_STATUS (*mlme_vdev_sta_disconn_start)(
 				struct vdev_mlme_obj *vdev_mlme,
 				uint16_t event_data_len, void *event_data);
-
+	QDF_STATUS (*mlme_vdev_notify_mlo_sync_wait_entry)(
+				struct vdev_mlme_obj *vdev_mlme);
 };
 
 /**
