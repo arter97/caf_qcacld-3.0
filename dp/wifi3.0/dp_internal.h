@@ -2128,17 +2128,6 @@ QDF_STATUS dp_clear_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			 struct qdf_mac_addr peer_addr);
 
 /*
- * dp_find_peer_exist - find peer if already exists
- * @soc: datapath soc handle
- * @pdev_id: physical device instance id
- * @peer_mac_addr: peer mac address
- *
- * Return: true or false
- */
-bool dp_find_peer_exist(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
-			uint8_t *peer_addr);
-
-/*
  * dp_find_peer_exist_on_vdev - find if peer exists on the given vdev
  * @soc: datapath soc handle
  * @vdev_id: vdev instance id
@@ -2257,6 +2246,17 @@ void dp_set_peer_as_tdls_peer(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 {
 }
 #endif
+
+/*
+ * dp_find_peer_exist - find peer if already exists
+ * @soc: datapath soc handle
+ * @pdev_id: physical device instance id
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: true or false
+ */
+bool dp_find_peer_exist(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			uint8_t *peer_addr);
 
 int dp_addba_resp_tx_completion_wifi3(struct cdp_soc_t *cdp_soc,
 				      uint8_t *peer_mac, uint16_t vdev_id,
