@@ -25,6 +25,86 @@
 #include "dp_types.h"
 #include "hal_rx_flow.h"
 #include "dp_htt.h"
+#include "dp_rx_tag.h"
+#if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
+#include <ppe_drv.h>
+#include <ppe_drv_sc.h>
+#endif
+
+#if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
+/**
+ * dp_rx_ppe_fse_register() - function to register fse add and delete
+ *				with PPE
+ *
+ * Return: void
+ */
+void dp_rx_ppe_fse_register(void)
+{
+	struct ppe_drv_fse_ops ppe_fse_ops;
+
+	ppe_fse_ops.create_fse_rule = dp_rx_ppe_add_flow_entry;
+	ppe_fse_ops.destroy_fse_rule = dp_rx_ppe_del_flow_entry;
+
+	ppe_drv_fse_ops_register(&ppe_fse_ops);
+}
+
+/**
+ * dp_rx_ppe_fse_unregister() - function to unregister fse add and delete
+ *				with PPE
+ *
+ * Return: void
+ */
+void dp_rx_ppe_fse_unregister(void)
+{
+	ppe_drv_fse_ops_unregister();
+}
+
+/**
+ * dp_rx_update_ppe_fse_fields() - API to update PPE related fields
+ * @hal_rx_flow: hal level flow info
+ * @cdp_rx_flow_info: flow info from PPE
+ *
+ * Return: void
+ */
+void dp_rx_update_ppe_fse_fields(struct hal_rx_flow *flow,
+				 struct cdp_rx_flow_info *rx_flow_info)
+{
+	flow->use_ppe_ds = rx_flow_info->use_ppe_ds;
+	flow->service_code = PPE_DRV_SC_SPF_BYPASS;
+}
+#else
+/**
+ * dp_rx_ppe_fse_register() - function to register fse add and delete
+ *				with PPE
+ *
+ * Return: void
+ */
+void dp_rx_ppe_fse_register(void)
+{
+}
+
+/**
+ * dp_rx_ppe_fse_unregister() - function to unregister fse add and delete
+ *				with PPE
+ *
+ * Return: void
+ */
+void dp_rx_ppe_fse_unregister(void)
+{
+}
+
+/**
+ * dp_rx_update_ppe_fse_fields() - API to update PPE related fields
+ * @hal_rx_flow: hal level flow info
+ * @cdp_rx_flow_info: flow info from PPE
+ *
+ * Return: void
+ */
+void dp_rx_update_ppe_fse_fields(struct hal_rx_flow *flow,
+				 struct cdp_rx_flow_info *rx_flow_info)
+{
+}
+#endif
 
 /**
  * In Hawkeye, a hardware bug disallows SW to only clear a single flow entry
@@ -309,6 +389,7 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 
 	flow.reo_destination_handler = HAL_RX_FSE_REO_DEST_FT;
 	flow.fse_metadata = rx_flow_info->fse_metadata;
+	dp_rx_update_ppe_fse_fields(&flow, rx_flow_info);
 	fse->hal_rx_fse = hal_rx_flow_setup_fse(soc->hal_soc, fst->hal_rx_fst,
 						fse->flow_id, &flow);
 	if (qdf_unlikely(!fse->hal_rx_fse)) {
@@ -644,6 +725,10 @@ QDF_STATUS dp_rx_fst_attach(struct dp_soc *soc, struct dp_pdev *pdev)
 		qdf_atomic_set(&fst->is_cache_update_pending, false);
 	}
 
+	qdf_atomic_init(&soc->ipv4_fse_cnt);
+	qdf_atomic_init(&soc->ipv6_fse_cnt);
+
+	dp_rx_ppe_fse_register();
 	QDF_TRACE(QDF_MODULE_ID_ANY, QDF_TRACE_LEVEL_INFO,
 		  "Rx FST attach successful, #entries:%d\n",
 		  fst->max_entries);
@@ -681,6 +766,8 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 		qdf_mem_free(dp_fst->base);
 		qdf_mem_free(dp_fst);
 	}
+
+	dp_rx_ppe_fse_unregister();
 	QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_DEBUG,
 		  "Rx FST detached for pdev %u\n", pdev->pdev_id);
 }
@@ -766,5 +853,4 @@ QDF_STATUS dp_mon_rx_update_rx_flow_tag_stats(struct dp_pdev *pdev,
 }
 #endif
 qdf_export_symbol(dp_mon_rx_update_rx_flow_tag_stats);
-
 #endif /* WLAN_SUPPORT_RX_FLOW_TAG */
