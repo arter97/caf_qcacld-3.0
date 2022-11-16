@@ -21,9 +21,6 @@
  * DOC: qdf_nbuf.c
  * QCA driver framework(QDF) network buffer management APIs
  */
-#ifdef IPA_OFFLOAD
-#include <i_qdf_ipa_wdi3.h>
-#endif
 #include <linux/hashtable.h>
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -53,6 +50,10 @@
 #include <linux/if_vlan.h>
 #include <linux/ip.h>
 #endif /* FEATURE_TSO */
+
+#ifdef IPA_OFFLOAD
+#include <i_qdf_ipa_wdi3.h>
+#endif /* IPA_OFFLOAD */
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 13, 0)
 
