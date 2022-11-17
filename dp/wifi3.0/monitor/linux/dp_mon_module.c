@@ -126,6 +126,7 @@ int monitor_mod_init(void)
 		}
 
 		soc->monitor_soc = mon_soc;
+		dp_mon_cdp_ops_register(soc);
 		dp_mon_soc_cfg_init(soc);
 		pdev_attach_success = false;
 		dp_mon_ops_register(soc);
@@ -198,7 +199,6 @@ int monitor_mod_init(void)
 		mon_soc_ol_attach(psoc);
 		dp_mon_register_feature_ops(soc);
 		dp_mon_register_intr_ops(soc);
-		dp_mon_cdp_ops_register(soc);
 	}
 
 	is_monitor_installed = 1;
