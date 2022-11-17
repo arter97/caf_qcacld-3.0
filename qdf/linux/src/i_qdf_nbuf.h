@@ -1805,12 +1805,21 @@ __qdf_nbuf_queue_insert_head(__qdf_nbuf_queue_t *qhead, __qdf_nbuf_t skb)
 	qhead->qlen++;
 }
 
+/**
+ * __qdf_nbuf_queue_remove_last() - remove a skb from the tail of the queue
+ * @qhead: Queue head
+ *
+ * This is a lockless version. Driver should take care of the locks
+ *
+ * Return: skb or NULL
+ */
 static inline struct sk_buff *
 __qdf_nbuf_queue_remove_last(__qdf_nbuf_queue_t *qhead)
 {
 	__qdf_nbuf_t tmp_tail, node = NULL;
 
 	if (qhead->head) {
+		qhead->qlen--;
 		tmp_tail = qhead->tail;
 		node = qhead->head;
 		if (qhead->head == qhead->tail) {
