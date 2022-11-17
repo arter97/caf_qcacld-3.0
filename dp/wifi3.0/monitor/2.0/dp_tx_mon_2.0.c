@@ -258,6 +258,10 @@ dp_tx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 			continue;
 		}
 
+		dp_tx_process_pktlog_be(soc, pdev,
+					status_frag,
+					end_offset);
+
 		dp_tx_mon_process_status_tlv(soc, pdev,
 					     &hal_mon_tx_desc,
 					     status_frag,

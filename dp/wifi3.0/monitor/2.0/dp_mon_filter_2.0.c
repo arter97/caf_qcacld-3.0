@@ -1601,6 +1601,7 @@ static void dp_rx_mon_filter_show_filter(struct dp_mon_filter_be *filter)
 	struct htt_rx_ring_tlv_filter *rx_tlv_filter =
 		&filter->rx_tlv_filter.tlv_filter;
 
+	DP_MON_FILTER_PRINT("Enable: %d", rx_tlv_filter->enable);
 	DP_MON_FILTER_PRINT("mpdu_start: %d", rx_tlv_filter->mpdu_start);
 	DP_MON_FILTER_PRINT("msdu_start: %d", rx_tlv_filter->msdu_start);
 	DP_MON_FILTER_PRINT("packet: %d", rx_tlv_filter->packet);
@@ -2081,6 +2082,8 @@ dp_mon_filter_set_reset_rx_pkt_log_cbf_dest_2_0(struct dp_pdev_be *pdev_be,
 	struct dp_mon_pdev *mon_pdev = pdev_be->pdev.monitor_pdev;
 	struct dp_mon_pdev_be *mon_pdev_be =
 			dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+	struct htt_rx_ring_tlv_filter *rx_tlv_filter =
+		&filter->rx_tlv_filter.tlv_filter;
 
 	srng_type = ((soc->wlan_cfg_ctx->rxdma1_enable) ?
 		     DP_MON_FILTER_SRNG_TYPE_RXDMA_MON_BUF :
@@ -2091,6 +2094,7 @@ dp_mon_filter_set_reset_rx_pkt_log_cbf_dest_2_0(struct dp_pdev_be *pdev_be,
 		dp_mon_filter_set_cbf_cmn(&pdev_be->pdev,
 					  &filter->rx_tlv_filter);
 
+		rx_tlv_filter->attention = 0;
 		dp_mon_filter_show_rx_filter_be(mode, filter);
 		mon_pdev_be->filter_be[mode][srng_type] = *filter;
 	} else /* reset the filter */
@@ -2107,7 +2111,6 @@ dp_mon_filter_set_reset_rx_pkt_log_cbf_dest_2_0(struct dp_pdev_be *pdev,
 void dp_mon_filter_setup_rx_pkt_log_cbf_2_0(struct dp_pdev *pdev)
 {
 	struct dp_mon_filter_be filter = {0};
-	struct dp_soc *soc;
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_PKT_LOG_CBF_MODE;
 	enum dp_mon_filter_srng_type srng_type =
 		DP_MON_FILTER_SRNG_TYPE_RXMON_DEST;
@@ -2117,12 +2120,6 @@ void dp_mon_filter_setup_rx_pkt_log_cbf_2_0(struct dp_pdev *pdev)
 
 	if (!pdev) {
 		dp_mon_filter_err("pdev Context is null");
-		return;
-	}
-
-	soc = pdev->soc;
-	if (!soc) {
-		dp_mon_filter_err("Soc Context is null");
 		return;
 	}
 
@@ -2155,7 +2152,6 @@ void dp_mon_filter_setup_rx_pkt_log_cbf_2_0(struct dp_pdev *pdev)
 void dp_mon_filter_reset_rx_pktlog_cbf_2_0(struct dp_pdev *pdev)
 {
 	struct dp_mon_filter_be filter = {0};
-	struct dp_soc *soc;
 	enum dp_mon_filter_mode mode = DP_MON_FILTER_PKT_LOG_CBF_MODE;
 	enum dp_mon_filter_srng_type srng_type =
 		DP_MON_FILTER_SRNG_TYPE_RXDMA_BUF;
@@ -2166,12 +2162,6 @@ void dp_mon_filter_reset_rx_pktlog_cbf_2_0(struct dp_pdev *pdev)
 	if (!pdev) {
 		QDF_TRACE(QDF_MODULE_ID_MON_FILTER, QDF_TRACE_LEVEL_ERROR,
 			  FL("pdev Context is null"));
-		return;
-	}
-
-	soc = pdev->soc;
-	if (!soc) {
-		dp_mon_filter_err("Soc Context is null");
 		return;
 	}
 
@@ -2235,6 +2225,29 @@ void dp_mon_filter_setup_pktlog_hybrid_2_0(struct dp_pdev *pdev)
 	tlv_filter->utlvs.received_response_info_p2 = 1;
 	tlv_filter->utlvs.response_end_status = 1;
 
+	tlv_filter->mgmt_filter = 0x1;
+	tlv_filter->data_filter = 0x1;
+	tlv_filter->ctrl_filter = 0x1;
+
+	tlv_filter->mgmt_mpdu_end = 1;
+	tlv_filter->mgmt_msdu_end = 1;
+	tlv_filter->mgmt_msdu_start = 1;
+	tlv_filter->mgmt_mpdu_start = 1;
+	tlv_filter->ctrl_mpdu_end = 1;
+	tlv_filter->ctrl_msdu_end = 1;
+	tlv_filter->ctrl_msdu_start = 1;
+	tlv_filter->ctrl_mpdu_start = 1;
+	tlv_filter->data_mpdu_end = 1;
+	tlv_filter->data_msdu_end = 1;
+	tlv_filter->data_msdu_start = 1;
+	tlv_filter->data_mpdu_start = 1;
+	tlv_filter->mgmt_mpdu_log = 1;
+	tlv_filter->ctrl_mpdu_log = 1;
+	tlv_filter->data_mpdu_log = 1;
+
+	tlv_filter->mgmt_dma_length = mon_pdev_be->tx_mon_filter_length;
+	tlv_filter->ctrl_dma_length = mon_pdev_be->tx_mon_filter_length;
+	tlv_filter->data_dma_length = mon_pdev_be->tx_mon_filter_length;
 	dp_mon_filter_show_tx_filter_be(mode, &filter);
 	mon_pdev_be->filter_be[mode][srng_type] = filter;
 }

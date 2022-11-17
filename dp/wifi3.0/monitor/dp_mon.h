@@ -763,6 +763,8 @@ struct dp_mon_ops {
 #endif
 	QDF_STATUS (*rx_mon_filter_update)(struct dp_pdev *pdev);
 	QDF_STATUS (*tx_mon_filter_update)(struct dp_pdev *pdev);
+	QDF_STATUS (*set_mon_mode_buf_rings_tx)(struct dp_pdev *pdev,
+						uint16_t num_buf);
 
 	QDF_STATUS (*tx_mon_filter_alloc)(struct dp_pdev *pdev);
 	void (*tx_mon_filter_dealloc)(struct dp_pdev *pdev);

@@ -1101,6 +1101,10 @@ dp_set_hybrid_pktlog_enable(struct dp_pdev *pdev,
 			    struct dp_mon_pdev *mon_pdev,
 			    struct dp_soc *soc)
 {
+	struct wlan_cfg_dp_soc_ctxt *soc_cfg_ctx;
+	struct dp_mon_ops *mon_ops = NULL;
+	uint16_t num_buffers;
+
 	if (mon_pdev->mvdev) {
 		/* Nothing needs to be done if monitor mode is
 		 * enabled
@@ -1109,10 +1113,23 @@ dp_set_hybrid_pktlog_enable(struct dp_pdev *pdev,
 		return false;
 	}
 
+	mon_ops = dp_mon_ops_get(pdev->soc);
+	if (!mon_ops) {
+		dp_mon_filter_err("Mon ops uninitialized");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	if (!mon_pdev->pktlog_hybrid_mode) {
 		mon_pdev->pktlog_hybrid_mode = true;
+		soc_cfg_ctx = soc->wlan_cfg_ctx;
+		num_buffers =
+			wlan_cfg_get_dp_soc_tx_mon_buf_ring_size(soc_cfg_ctx);
+
+		if (mon_ops && mon_ops->set_mon_mode_buf_rings_tx)
+			mon_ops->set_mon_mode_buf_rings_tx(pdev, num_buffers);
+
 		dp_mon_filter_setup_pktlog_hybrid(pdev);
-		if (dp_mon_filter_update(pdev) !=
+		if (dp_tx_mon_filter_update(pdev) !=
 		    QDF_STATUS_SUCCESS) {
 			dp_cdp_err("Set hybrid filters failed");
 			dp_mon_filter_reset_pktlog_hybrid(pdev);
@@ -1174,13 +1191,11 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 	if (enable) {
 		switch (event) {
 		case WDI_EVENT_RX_DESC:
-			if (mon_pdev->mvdev) {
-				/* Nothing needs to be done if monitor mode is
-				 * enabled
-				 */
-				mon_pdev->rx_pktlog_mode = DP_RX_PKTLOG_FULL;
+			/* Nothing needs to be done if monitor mode is
+			 * enabled
+			 */
+			if (mon_pdev->mvdev)
 				return 0;
-			}
 
 			if (mon_pdev->rx_pktlog_mode == DP_RX_PKTLOG_FULL)
 				break;
@@ -1201,13 +1216,11 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 			break;
 
 		case WDI_EVENT_LITE_RX:
-			if (mon_pdev->mvdev) {
-				/* Nothing needs to be done if monitor mode is
-				 * enabled
-				 */
-				mon_pdev->rx_pktlog_mode = DP_RX_PKTLOG_LITE;
+			/* Nothing needs to be done if monitor mode is
+			 * enabled
+			 */
+			if (mon_pdev->mvdev)
 				return 0;
-			}
 
 			if (mon_pdev->rx_pktlog_mode == DP_RX_PKTLOG_LITE)
 				break;
@@ -1243,14 +1256,11 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 			break;
 
 		case WDI_EVENT_RX_CBF:
-			if (mon_pdev->mvdev) {
-				/* Nothing needs to be done if monitor mode is
-				 * enabled
-				 */
-				dp_mon_info("Mon mode, CBF setting filters");
-				mon_pdev->rx_pktlog_cbf = true;
+			/* Nothing needs to be done if monitor mode is
+			 * enabled
+			 */
+			if (mon_pdev->mvdev)
 				return 0;
-			}
 
 			if (mon_pdev->rx_pktlog_cbf)
 				break;
@@ -1292,14 +1302,11 @@ int dp_set_pktlog_wifi3(struct dp_pdev *pdev, uint32_t event,
 		switch (event) {
 		case WDI_EVENT_RX_DESC:
 		case WDI_EVENT_LITE_RX:
-			if (mon_pdev->mvdev) {
-				/* Nothing needs to be done if monitor mode is
-				 * enabled
-				 */
-				mon_pdev->rx_pktlog_mode =
-						DP_RX_PKTLOG_DISABLED;
+			/* Nothing needs to be done if monitor mode is
+			 * enabled
+			 */
+			if (mon_pdev->mvdev)
 				return 0;
-			}
 
 			if (mon_pdev->rx_pktlog_mode == DP_RX_PKTLOG_DISABLED)
 				break;

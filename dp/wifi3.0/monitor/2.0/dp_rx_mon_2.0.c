@@ -519,6 +519,9 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 								   pdev->soc,
 								   ppdu_info);
 
+				dp_rx_mon_process_dest_pktlog(pdev->soc,
+							      pdev->pdev_id,
+							      mpdu);
 				/* Deliver MPDU to osif layer */
 				status = dp_rx_mon_deliver_mpdu(mon_pdev,
 								mpdu,

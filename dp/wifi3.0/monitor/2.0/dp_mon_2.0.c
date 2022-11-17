@@ -1497,6 +1497,7 @@ struct dp_mon_ops monitor_ops_2_0 = {
 	.mon_filter_reset_tx_mon_mode = dp_mon_filter_reset_tx_mon_mode_2_0,
 	.tx_mon_filter_update = dp_tx_mon_filter_update_2_0,
 	.rx_mon_filter_update = dp_rx_mon_filter_update_2_0,
+	.set_mon_mode_buf_rings_tx = dp_vdev_set_monitor_mode_buf_rings_tx_2_0,
 	.tx_mon_filter_alloc = dp_mon_filter_alloc_2_0,
 	.tx_mon_filter_dealloc = dp_mon_filter_dealloc_2_0,
 	.mon_rings_alloc = dp_pdev_mon_rings_alloc_2_0,
