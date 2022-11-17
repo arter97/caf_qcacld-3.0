@@ -8994,6 +8994,8 @@ static QDF_STATUS dp_peer_delete_wifi3(struct cdp_soc_t *soc_hdl,
 	dp_init_info("%pK: peer %pK (" QDF_MAC_ADDR_FMT ")",
 		     soc, peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw));
 
+	dp_peer_rx_reo_shared_qaddr_delete(soc, peer);
+
 	dp_local_peer_id_free(peer->vdev->pdev, peer);
 
 	/* Drop all rx packets before deleting peer */
