@@ -1620,7 +1620,7 @@
 		CFG_VALUE_OR_DEFAULT, "DP PPEDS Tx Descriptors")
 
 #define CFG_DP_PPE_ENABLE \
-	CFG_INI_BOOL("ppe_enable", false, \
+	CFG_INI_BOOL("ppe_ds_enable", true, \
 	"DP ppe enable flag")
 
 #define CFG_DP_REO2PPE_RING \
