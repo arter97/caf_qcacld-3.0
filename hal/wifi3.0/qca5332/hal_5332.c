@@ -1597,6 +1597,12 @@ static void hal_hw_txrx_ops_attach_qca5332(struct hal_soc *hal_soc)
 					hal_get_tsf2_scratch_reg_qca5332;
 	hal_soc->ops->hal_get_tqm_scratch_reg =
 					hal_get_tqm_scratch_reg_qca5332;
+#ifdef CONFIG_WORD_BASED_TLV
+	hal_soc->ops->hal_rx_mpdu_start_wmask_get =
+					hal_rx_mpdu_start_wmask_get_be;
+	hal_soc->ops->hal_rx_msdu_end_wmask_get =
+					hal_rx_msdu_end_wmask_get_be;
+#endif
 };
 
 struct hal_hw_srng_config hw_srng_table_5332[] = {
