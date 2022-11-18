@@ -119,7 +119,7 @@ static QDF_STATUS wlan_mlo_parse_t2lm_provisioned_links(
 			hw_link_id_mask = wlan_mlo_get_hw_link_id_mask(
 					wlan_vdev_list, vdev_count,
 					*(uint16_t *)link_mapping_of_tids);
-			t2lm->t2lm_info[dir].t2lm_provisioned_links[tid_num] =
+			t2lm->t2lm_info[dir].hw_link_map_tid[tid_num] =
 				hw_link_id_mask;
 			link_mapping_of_tids += sizeof(uint16_t);
 		}
@@ -199,7 +199,7 @@ static QDF_STATUS wlan_mlo_parse_t2lm_info(
 	for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++) {
 		if (link_mapping_presence_ind & BIT(tid_num))
 			t2lm_debug("link mapping of TID%d is %x", tid_num,
-				   t2lm->t2lm_info[dir].t2lm_provisioned_links[tid_num]);
+				   t2lm->t2lm_info[dir].hw_link_map_tid[tid_num]);
 	}
 
 	return ret;
@@ -323,7 +323,7 @@ static uint8_t wlan_get_ieee_link_id_mask(
 static QDF_STATUS wlan_mlo_add_t2lm_provisioned_links(
 		struct wlan_objmgr_peer *peer,
 		uint8_t link_mapping_presence_indicator,
-		uint8_t *link_mapping_of_tids, struct wlan_t2lm_of_tids *t2lm,
+		uint8_t *link_mapping_of_tids, struct wlan_t2lm_info *t2lm,
 		uint8_t *num_tids)
 {
 	struct wlan_objmgr_vdev *vdev;
@@ -349,8 +349,8 @@ static QDF_STATUS wlan_mlo_add_t2lm_provisioned_links(
 	for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++) {
 		ieee_link_id_mask = 0;
 
-		if (t2lm->t2lm_provisioned_links[tid_num]) {
-			hw_link_id_mask = t2lm->t2lm_provisioned_links[tid_num];
+		if (t2lm->hw_link_map_tid[tid_num]) {
+			hw_link_id_mask = t2lm->hw_link_map_tid[tid_num];
 			ieee_link_id_mask = wlan_get_ieee_link_id_mask(
 					wlan_vdev_list, vdev_count,
 					hw_link_id_mask);
@@ -379,7 +379,7 @@ static QDF_STATUS wlan_mlo_add_t2lm_provisioned_links(
  */
 static uint8_t *wlan_add_t2lm_info_ie(uint8_t *frm,
 				      struct wlan_objmgr_peer *peer,
-				      struct wlan_t2lm_of_tids *t2lm)
+				      struct wlan_t2lm_info *t2lm)
 {
 	struct wlan_ie_tid_to_link_mapping *t2lm_ie;
 	uint16_t t2lm_control = 0;
@@ -421,7 +421,7 @@ static uint8_t *wlan_add_t2lm_info_ie(uint8_t *frm,
 		frm += sizeof(*t2lm_ie) + sizeof(uint8_t);
 	} else {
 		for (tid_num = 0; tid_num < T2LM_MAX_NUM_TIDS; tid_num++)
-			if (t2lm->t2lm_provisioned_links[tid_num])
+			if (t2lm->hw_link_map_tid[tid_num])
 				link_mapping_presence_indicator |= BIT(tid_num);
 
 		QDF_SET_BITS(t2lm_control,
