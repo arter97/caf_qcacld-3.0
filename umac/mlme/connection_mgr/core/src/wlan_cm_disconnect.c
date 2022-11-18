@@ -228,6 +228,10 @@ static QDF_STATUS cm_ser_disconnect_req(struct wlan_objmgr_pdev *pdev,
 	cmd.cmd_timeout_duration = DISCONNECT_TIMEOUT;
 	cmd.vdev = cm_ctx->vdev;
 	cmd.is_blocking = cm_ser_get_blocking_cmd();
+	if (wlan_vdev_mlme_is_link_sta_vdev(cmd.vdev)) {
+		mlme_debug("Set link dev disconnect cmd as high priority");
+		cmd.is_high_priority = true;
+	}
 
 	ser_cmd_status = wlan_serialization_request(&cmd);
 	switch (ser_cmd_status) {

@@ -964,7 +964,9 @@ void mlo_sta_link_connect_notify(struct wlan_objmgr_vdev *vdev,
 		mlo_debug("Handle pending disconnect for vdev %d",
 			  wlan_vdev_get_id(vdev));
 		if (assoc_vdev != vdev)
-			mlo_handle_pending_disconnect(vdev);
+			mlo_disconnect(vdev, CM_MLME_DISCONNECT,
+				       REASON_DEAUTH_NETWORK_LEAVING,
+				       NULL);
 		return;
 	}
 
