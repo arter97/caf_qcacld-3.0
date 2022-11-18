@@ -795,6 +795,13 @@ ucfg_cfr_set_frame_type_subtype(struct wlan_objmgr_vdev *vdev,
 	if (status != QDF_STATUS_SUCCESS)
 		return status;
 
+	if (params->grp_id >= MAX_TA_RA_ENTRIES) {
+		cfr_err("err parameter grp_id, value=%u, max=%u\n",
+			params->grp_id,
+			MAX_TA_RA_ENTRIES);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	/* Populating current config based on user's input */
 	curr_cfg = &pcfr->rcc_param.curr[params->grp_id];
 	curr_cfg->mgmt_subtype_filter = params->expected_mgmt_subtype;
@@ -832,6 +839,13 @@ QDF_STATUS ucfg_cfr_set_bw_nss(struct wlan_objmgr_vdev *vdev,
 	if (status != QDF_STATUS_SUCCESS)
 		return status;
 
+	if (params->grp_id >= MAX_TA_RA_ENTRIES) {
+		cfr_err("err parameter grp_id, value=%u, max=%u\n",
+			params->grp_id,
+			MAX_TA_RA_ENTRIES);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	/* Populating current config based on user's input */
 	curr_cfg = &pcfr->rcc_param.curr[params->grp_id];
 	curr_cfg->bw = params->bw;
@@ -866,6 +880,13 @@ QDF_STATUS ucfg_cfr_set_tara_config(struct wlan_objmgr_vdev *vdev,
 	status = dev_sanity_check(vdev, &pdev, &pcfr);
 	if (status != QDF_STATUS_SUCCESS)
 		return status;
+
+	if (params->grp_id >= MAX_TA_RA_ENTRIES) {
+		cfr_err("err parameter grp_id, value=%u, max=%u\n",
+			params->grp_id,
+			MAX_TA_RA_ENTRIES);
+		return QDF_STATUS_E_INVAL;
+	}
 
 	curr_cfg = &pcfr->rcc_param.curr[params->grp_id];
 	qdf_mem_copy(curr_cfg->tx_addr, params->ta, QDF_MAC_ADDR_SIZE);
