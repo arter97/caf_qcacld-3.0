@@ -278,6 +278,106 @@ struct wlan_mlo_peer_list {
 #endif
 };
 
+#define T2LM_MAX_NUM_TIDS 8
+
+/**
+ * enum wlan_t2lm_direction - Indicates the direction for which TID-to-link
+ * mapping is available.
+ *
+ * @WLAN_T2LM_DL_DIRECTION: Downlink
+ * @WLAN_T2LM_UL_DIRECTION: Uplink
+ * @WLAN_T2LM_BIDI_DIRECTION: Both downlink and uplink
+ * @WLAN_T2LM_MAX_DIRECTION: Max direction, this is used only internally
+ * @WLAN_T2LM_INVALID_DIRECTION: Invalid, this is used only internally to check
+ *                               if the mapping present in wlan_t2lm_info
+ *                               structure is valid or not.
+ */
+enum wlan_t2lm_direction {
+	WLAN_T2LM_DL_DIRECTION,
+	WLAN_T2LM_UL_DIRECTION,
+	WLAN_T2LM_BIDI_DIRECTION,
+	WLAN_T2LM_MAX_DIRECTION,
+	WLAN_T2LM_INVALID_DIRECTION,
+};
+
+/**
+ * struct wlan_t2lm_info - TID-to-Link mapping information for the frames
+ * transmitted on the uplink, downlink and bidirectional.
+ *
+ * @direction:  0 - Downlink, 1 - uplink 2 - Both uplink and downlink
+ * @default_link_mapping: value 1 indicates the default T2LM, where all the TIDs
+ *                        are mapped to all the links.
+ *                        value 0 indicates the preferred T2LM mapping
+ * @mapping_switch_time_present: Indicates if mapping switch time field present
+ *                               in the T2LM IE
+ * @expected_duration_present: Indicates if expected duration present in the
+ *                             T2LM IE
+ * @mapping_switch_time: Mapping switch time of this T2LM IE
+ * @expected_duration: Expected duration of this T2LM IE
+ * @ieee_link_map_tid: Indicates ieee link id mapping of all the TIDS
+ * @hw_link_map_tid: Indicates hw link id mapping of all the TIDS
+ * @timer_started: flag to check if T2LM timer is started for this T2LM IE
+ */
+struct wlan_t2lm_info {
+	enum wlan_t2lm_direction direction;
+	bool default_link_mapping;
+	bool mapping_switch_time_present;
+	bool expected_duration_present;
+	uint16_t mapping_switch_time;
+	uint32_t expected_duration;
+	uint16_t ieee_link_map_tid[T2LM_MAX_NUM_TIDS];
+	uint16_t hw_link_map_tid[T2LM_MAX_NUM_TIDS];
+	bool timer_started;
+};
+
+/**
+ * struct wlan_mlo_t2lm_ie - T2LM information
+ *
+ * @disabled_link_bitmap: Bitmap of disabled links. This is used to update the
+ *                        disabled link field of RNR IE
+ * @t2lm: T2LM info structure
+ */
+struct wlan_mlo_t2lm_ie {
+	uint16_t disabled_link_bitmap;
+	struct wlan_t2lm_info t2lm;
+};
+
+/*
+ * In a beacon or probe response frame, at max two T2LM IEs can be present
+ * first one to represent the already existing mapping and the other one
+ * represents the new T2LM mapping that is yet to establish.
+ */
+#define WLAN_MAX_T2LM_IE 2
+/**
+ * struct wlan_t2lm_timer - T2LM timer information
+ *
+ * @t2lm_timer: T2LM timer
+ * @timer_interval: T2LM timer interval value
+ */
+struct wlan_t2lm_timer {
+	qdf_timer_t t2lm_timer;
+	uint32_t timer_interval;
+};
+
+/**
+ * struct wlan_t2lm_context - T2LM IE information
+ *
+ * @num_of_t2lm_ie: Number of T2LM IE
+ * @t2lm_ie: T2LM IE information
+ * @t2lm_timer: T2LM timer information
+ * @t2lm_dev_lock: t2lm dev context lock
+ */
+struct wlan_t2lm_context {
+	uint8_t num_of_t2lm_ie;
+	struct wlan_mlo_t2lm_ie t2lm_ie[WLAN_MAX_T2LM_IE];
+	struct wlan_t2lm_timer t2lm_timer;
+#ifdef WLAN_MLO_USE_SPINLOCK
+	qdf_spinlock_t t2lm_dev_lock;
+#else
+	qdf_mutex_t t2lm_dev_lock;
+#endif
+};
+
 /*
  * struct wlan_mlo_dev_context - MLO device context
  * @node: QDF list node member
@@ -293,6 +393,7 @@ struct wlan_mlo_peer_list {
  * @ref_id_dbg: Reference count debug information
  * @sta_ctx: MLO STA related information
  * @ap_ctx: AP related information
+ * @t2lm_ctx: T2LM related information
  */
 struct wlan_mlo_dev_context {
 	qdf_list_node_t node;
@@ -313,6 +414,7 @@ struct wlan_mlo_dev_context {
 	qdf_atomic_t ref_id_dbg[WLAN_REF_ID_MAX];
 	struct wlan_mlo_sta *sta_ctx;
 	struct wlan_mlo_ap *ap_ctx;
+	struct wlan_t2lm_context t2lm_ctx;
 };
 
 /*
@@ -391,27 +493,6 @@ struct mlpeer_auth_params {
 #ifdef WLAN_FEATURE_11BE
 
 /**
- * enum wlan_t2lm_direction - Indicates the direction for which TID-to-link
- * mapping is available.
- * @WLAN_T2LM_DL_DIRECTION: Downlink
- * @WLAN_T2LM_UL_DIRECTION: Uplink
- * @WLAN_T2LM_BIDI_DIRECTION: Both downlink and uplink
- * @WLAN_T2LM_MAX_DIRECTION: Max direction, this is used only internally
- * @WLAN_T2LM_INVALID_DIRECTION: Invalid, this is used only internally to check
- * if the mapping present in wlan_t2lm_of_tids structure is valid or not.
- */
-enum wlan_t2lm_direction {
-	WLAN_T2LM_DL_DIRECTION,
-	WLAN_T2LM_UL_DIRECTION,
-	WLAN_T2LM_BIDI_DIRECTION,
-	WLAN_T2LM_MAX_DIRECTION,
-	WLAN_T2LM_INVALID_DIRECTION,
-};
-
-/* Total 8 TIDs are supported, TID 0 to TID 7 */
-#define T2LM_MAX_NUM_TIDS 8
-
-/**
  * enum wlan_t2lm_category - T2LM category
  *
  * @WLAN_T2LM_CATEGORY_NONE: none
@@ -483,24 +564,6 @@ enum wlan_t2lm_enable {
 };
 
 /**
- * struct wlan_t2lm_of_tids - TID-to-Link mapping information for the frames
- * transmitted on the uplink, downlink and bidirectional.
- *
- * @is_homogeneous_mapping: The t2lm_provisioned_links is homogeneous mapping
- * @direction:  0 - Downlink, 1 - uplink 2 - Both uplink and downlink
- * @default_link_mapping: value 1 indicates the default T2LM, where all the TIDs
- *                        are mapped to all the links.
- *                        value 0 indicates the preferred T2LM mapping
- * @t2lm_provisioned_links: Indicates TID to link mapping of all the TIDS.
- */
-struct wlan_t2lm_of_tids {
-	bool is_homogeneous_mapping;
-	enum wlan_t2lm_direction direction;
-	bool default_link_mapping;
-	uint16_t t2lm_provisioned_links[T2LM_MAX_NUM_TIDS];
-};
-
-/**
  * struct wlan_prev_t2lm_negotiated_info - Previous successful T2LM negotiation
  * is saved here.
  *
@@ -509,7 +572,7 @@ struct wlan_t2lm_of_tids {
  */
 struct wlan_prev_t2lm_negotiated_info {
 	uint16_t dialog_token;
-	struct wlan_t2lm_of_tids t2lm_info[WLAN_T2LM_MAX_DIRECTION];
+	struct wlan_t2lm_info t2lm_info[WLAN_T2LM_MAX_DIRECTION];
 };
 
 /**
@@ -525,7 +588,7 @@ struct wlan_prev_t2lm_negotiated_info {
 struct wlan_t2lm_onging_negotiation_info {
 	enum wlan_t2lm_category category;
 	uint8_t dialog_token;
-	struct wlan_t2lm_of_tids t2lm_info[WLAN_T2LM_MAX_DIRECTION];
+	struct wlan_t2lm_info t2lm_info[WLAN_T2LM_MAX_DIRECTION];
 	enum wlan_t2lm_tx_status t2lm_tx_status;
 	enum wlan_t2lm_resp_frm_type t2lm_resp_type;
 };
