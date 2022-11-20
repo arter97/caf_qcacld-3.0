@@ -874,7 +874,7 @@ irqreturn_t ce_dispatch_interrupt(int ce_id,
 	struct HIF_CE_state *hif_ce_state = tasklet_entry->hif_ce_state;
 	struct hif_softc *scn = HIF_GET_SOFTC(hif_ce_state);
 	struct hif_opaque_softc *hif_hdl = GET_HIF_OPAQUE_HDL(scn);
-	struct CE_state *ce_state = scn->ce_id_to_state[ce_id];
+	struct CE_state *ce_state;
 
 	if (tasklet_entry->ce_id != ce_id) {
 		bool rl;
@@ -894,6 +894,8 @@ irqreturn_t ce_dispatch_interrupt(int ce_id,
 			tasklet_entry->ce_id, CE_COUNT_MAX);
 		return IRQ_NONE;
 	}
+
+	ce_state = scn->ce_id_to_state[ce_id];
 
 	ce_interrupt_lock(ce_state);
 	if (ce_check_tasklet_status(ce_id, tasklet_entry)) {
