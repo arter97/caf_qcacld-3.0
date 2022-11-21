@@ -2855,6 +2855,12 @@ QDF_STATUS dp_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 
 	qdf_mem_zero(&in, sizeof(qdf_ipa_wdi_reg_intf_in_params_t));
 
+	/* Need to reset the values to 0 as all the fields are not
+	 * updated in the Header, Unused fields will be set to 0.
+	 */
+	qdf_mem_zero(&uc_tx_vlan_hdr, sizeof(struct dp_ipa_uc_tx_vlan_hdr));
+	qdf_mem_zero(&uc_tx_vlan_hdr_v6, sizeof(struct dp_ipa_uc_tx_vlan_hdr));
+
 	dp_debug("Add Partial hdr: %s, "QDF_MAC_ADDR_FMT, ifname,
 		 QDF_MAC_ADDR_REF(mac_addr));
 	qdf_mem_zero(&hdr_info, sizeof(qdf_ipa_wdi_hdr_info_t));
