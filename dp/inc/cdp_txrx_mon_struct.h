@@ -413,6 +413,10 @@ enum cdp_mon_phyrx_abort_reason_code {
  * @total_ppdu_info_drop: Number of PPDUs dropped
  * @total_ppdu_info_alloc: Number of PPDU info allocated
  * @total_ppdu_info_free: Number of PPDU info freed
+ * @ppdu_drop_cnt: Total PPDU drop count
+ * @mpdu_drop_cnt: Total MPDU drop count
+ * @end_of_ppdu_drop_cnt: Total end of ppdu drop count
+ * @tlv_drop_cnt: TLV drop count
  */
 struct cdp_pdev_mon_stats {
 #ifndef REMOVE_MON_DBG_STATS
@@ -468,6 +472,10 @@ struct cdp_pdev_mon_stats {
 	uint32_t total_ppdu_info_drop;
 	uint32_t total_ppdu_info_alloc;
 	uint32_t total_ppdu_info_free;
+	uint32_t ppdu_drop_cnt;
+	uint32_t mpdu_drop_cnt;
+	uint32_t end_of_ppdu_drop_cnt;
+	uint32_t tlv_drop_cnt;
 };
 
 #ifdef QCA_SUPPORT_LITE_MONITOR

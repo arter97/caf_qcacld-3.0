@@ -22,6 +22,7 @@
 #ifdef QCA_MONITOR_2_0_SUPPORT
 #include <mon_ingress_ring.h>
 #include <mon_destination_ring.h>
+#include <mon_drop.h>
 #endif
 #include <hal_be_hw_headers.h>
 #include "hal_api_mon.h"
@@ -1876,6 +1877,18 @@ hal_rx_status_get_mon_buf_addr(uint8_t *rx_tlv,
 	ppdu_info->packet_info.truncated = addr->truncated;
 
 }
+
+static inline void
+hal_rx_update_ppdu_drop_cnt(uint8_t *rx_tlv,
+			    struct hal_rx_ppdu_info *ppdu_info)
+{
+	struct mon_drop *drop_cnt = (struct mon_drop *)rx_tlv;
+
+	ppdu_info->drop_cnt.ppdu_drop_cnt = drop_cnt->ppdu_drop_cnt;
+	ppdu_info->drop_cnt.mpdu_drop_cnt = drop_cnt->mpdu_drop_cnt;
+	ppdu_info->drop_cnt.end_of_ppdu_drop_cnt = drop_cnt->end_of_ppdu_seen;
+	ppdu_info->drop_cnt.tlv_drop_cnt = drop_cnt->tlv_drop_cnt;
+}
 #else
 static inline void
 hal_rx_status_get_mpdu_retry_cnt(struct hal_rx_ppdu_info *ppdu_info,
@@ -1886,6 +1899,12 @@ hal_rx_status_get_mpdu_retry_cnt(struct hal_rx_ppdu_info *ppdu_info,
 static inline void
 hal_rx_status_get_mon_buf_addr(uint8_t *rx_tlv,
 			       struct hal_rx_ppdu_info *ppdu_info)
+{
+}
+
+static inline void
+hal_rx_update_ppdu_drop_cnt(uint8_t *rx_tlv,
+			    struct hal_rx_ppdu_info *ppdu_info)
 {
 }
 #endif
@@ -3051,6 +3070,9 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		hal_rx_status_get_mon_buf_addr(rx_tlv, ppdu_info);
 
 		return HAL_TLV_STATUS_MON_BUF_ADDR;
+	case WIFIMON_DROP_E:
+		hal_rx_update_ppdu_drop_cnt(rx_tlv, ppdu_info);
+		return HAL_TLV_STATUS_MON_DROP;
 	case 0:
 		return HAL_TLV_STATUS_PPDU_DONE;
 	case WIFIRX_STATUS_BUFFER_DONE_E:

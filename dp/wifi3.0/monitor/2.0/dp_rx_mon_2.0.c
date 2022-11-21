@@ -60,6 +60,29 @@ void dp_rx_mon_print_tag_buf(uint8_t *buf, uint16_t room)
 
 #endif
 
+/**
+ * dp_rx_mon_update_drop_cnt() - Update drop statistics
+ *
+ * @mon_pdev: monitor pdev
+ * @hal_mon_rx_desc: HAL monitor desc
+ *
+ * Return: void
+ */
+static inline void
+dp_rx_mon_update_drop_cnt(struct dp_mon_pdev *mon_pdev,
+			  struct hal_mon_desc *hal_mon_rx_desc)
+{
+	mon_pdev->rx_mon_stats.empty_desc_ppdu++;
+	mon_pdev->rx_mon_stats.ppdu_drop_cnt +=
+		hal_mon_rx_desc->ppdu_drop_count;
+	mon_pdev->rx_mon_stats.mpdu_drop_cnt +=
+		hal_mon_rx_desc->mpdu_drop_count;
+	if (hal_mon_rx_desc->end_of_ppdu_dropped)
+		mon_pdev->rx_mon_stats.end_of_ppdu_drop_cnt++;
+	mon_pdev->rx_mon_stats.tlv_drop_cnt +=
+		hal_mon_rx_desc->tlv_drop_count;
+}
+
 static
 void dp_rx_mon_set_zero(qdf_nbuf_t nbuf)
 {
@@ -1356,6 +1379,18 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		ppdu_info->rx_hdr_rcvd[user_id] = false;
 	}
 	break;
+	case HAL_TLV_STATUS_MON_DROP:
+	{
+		mon_pdev->rx_mon_stats.ppdu_drop_cnt +=
+			ppdu_info->drop_cnt.ppdu_drop_cnt;
+		mon_pdev->rx_mon_stats.mpdu_drop_cnt +=
+			ppdu_info->drop_cnt.mpdu_drop_cnt;
+		mon_pdev->rx_mon_stats.end_of_ppdu_drop_cnt +=
+			ppdu_info->drop_cnt.end_of_ppdu_drop_cnt;
+		mon_pdev->rx_mon_stats.tlv_drop_cnt +=
+			ppdu_info->drop_cnt.tlv_drop_cnt;
+	}
+	break;
 	}
 	return num_buf_reaped;
 }
@@ -1704,7 +1739,7 @@ dp_rx_mon_srng_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 				     mon_pdev);
 			rx_mon_dst_ring_desc =
 				hal_srng_dst_get_next(hal_soc, mon_dst_srng);
-			mon_pdev->rx_mon_stats.empty_desc_ppdu++;
+			dp_rx_mon_update_drop_cnt(mon_pdev, &hal_mon_rx_desc);
 			continue;
 		}
 		mon_desc = (struct dp_mon_desc *)(uintptr_t)(hal_mon_rx_desc.buf_addr);
@@ -2048,5 +2083,13 @@ void dp_mon_rx_print_advanced_stats_2_0(struct dp_soc *soc,
 		       mon_pdev->rx_mon_stats.mpdu_decap_type_invalid);
 	DP_PRINT_STATS("total_free_elem= %d",
 		       mon_pdev_be->total_free_elem);
+	DP_PRINT_STATS("ppdu_drop_cnt= %d",
+		       mon_pdev->rx_mon_stats.ppdu_drop_cnt);
+	DP_PRINT_STATS("mpdu_drop_cnt= %d",
+		       mon_pdev->rx_mon_stats.mpdu_drop_cnt);
+	DP_PRINT_STATS("end_of_ppdu_drop_cnt= %d",
+		       mon_pdev->rx_mon_stats.end_of_ppdu_drop_cnt);
+	DP_PRINT_STATS("tlv_drop_cnt= %d",
+		       mon_pdev->rx_mon_stats.tlv_drop_cnt);
 }
 #endif
