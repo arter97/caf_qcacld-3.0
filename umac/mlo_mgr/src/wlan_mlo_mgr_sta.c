@@ -377,6 +377,8 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
 	struct wlan_mlo_sta *sta_ctx = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *assoc_vdev = NULL;
+	uint8_t i = 0;
 
 	if (mlo_dev_ctx)
 		sta_ctx = mlo_dev_ctx->sta_ctx;
@@ -397,6 +399,10 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 		if (!sta_ctx)
 			return QDF_STATUS_E_FAILURE;
 
+		assoc_vdev = mlo_get_assoc_link_vdev(mlo_dev_ctx);
+		if (!assoc_vdev)
+			return QDF_STATUS_E_FAILURE;
+
 		if (sta_ctx->connect_req) {
 			mlo_free_connect_ies(sta_ctx->connect_req);
 			qdf_mem_free(sta_ctx->connect_req);
@@ -407,12 +413,22 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 						  reason_code, bssid);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlo_debug("Connect in progress, deferring disconnect");
-			mlo_dev_lock_release(mlo_dev_ctx);
 			return status;
 		}
 
-		status = mlo_send_link_disconnect(vdev, source,
-						  reason_code, bssid);
+		for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+			if (!mlo_dev_ctx->wlan_vdev_list[i])
+				continue;
+
+			if (qdf_test_bit(i, mlo_dev_ctx->sta_ctx->wlan_connected_links) &&
+			    mlo_dev_ctx->wlan_vdev_list[i] != assoc_vdev)
+				wlan_cm_disconnect(mlo_dev_ctx->wlan_vdev_list[i],
+						   source, reason_code,
+						   NULL);
+		}
+
+		wlan_cm_disconnect(assoc_vdev,
+				   source, reason_code, NULL);
 	}
 
 	return status;
