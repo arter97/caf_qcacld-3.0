@@ -96,7 +96,9 @@
 #define UNIFIED_WBM_RELEASE_RING_6_TX_RATE_STATS_INFO_TX_RATE_STATS_LSB \
 	WBM_RELEASE_RING_TX_TX_RATE_STATS_PPDU_TRANSMISSION_TSF_LSB
 
+#ifdef QCA_MONITOR_2_0_SUPPORT
 #include "hal_be_api_mon.h"
+#endif
 
 #define CMEM_REG_BASE 0x00100000
 
@@ -1131,8 +1133,10 @@ static void hal_hw_txrx_ops_attach_qca5332(struct hal_soc *hal_soc)
 					hal_rx_link_desc_msdu0_ptr_5332;
 	hal_soc->ops->hal_reo_status_get_header =
 					hal_reo_status_get_header_5332;
+#ifdef QCA_MONITOR_2_0_SUPPORT
 	hal_soc->ops->hal_rx_status_get_tlv_info =
 					hal_rx_status_get_tlv_info_wrapper_be;
+#endif
 	hal_soc->ops->hal_rx_wbm_err_info_get =
 					hal_rx_wbm_err_info_get_generic_be;
 	hal_soc->ops->hal_tx_set_pcp_tid_map =
