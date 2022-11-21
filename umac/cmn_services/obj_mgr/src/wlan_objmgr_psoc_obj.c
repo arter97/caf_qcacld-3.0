@@ -1360,7 +1360,7 @@ static QDF_STATUS wlan_peer_bssid_match(struct wlan_objmgr_peer *peer,
 #ifdef WLAN_OBJMGR_REF_ID_TRACE
 static struct wlan_objmgr_peer
 	*wlan_obj_psoc_peerlist_get_peer_by_pdev_id_debug(
-				qdf_list_t *obj_list, uint8_t *macaddr,
+				qdf_list_t *obj_list, const uint8_t *macaddr,
 				uint8_t pdev_id, wlan_objmgr_ref_dbgid dbg_id,
 				const char *func, int line)
 {
@@ -2076,7 +2076,7 @@ QDF_STATUS wlan_objmgr_psoc_peer_detach(struct wlan_objmgr_psoc *psoc,
 #ifdef WLAN_OBJMGR_REF_ID_TRACE
 struct wlan_objmgr_peer *wlan_objmgr_get_peer_debug(
 			struct wlan_objmgr_psoc *psoc, uint8_t pdev_id,
-			uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id,
+			const uint8_t *macaddr, wlan_objmgr_ref_dbgid dbg_id,
 			const char *func, int line)
 {
 	struct wlan_objmgr_psoc_objmgr *objmgr;

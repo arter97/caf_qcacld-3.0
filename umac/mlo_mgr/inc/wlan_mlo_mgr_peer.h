@@ -54,7 +54,7 @@ void mlo_peer_create(struct wlan_objmgr_vdev *vdev,
  */
 struct wlan_mlo_peer_context *mlo_get_mlpeer(
 				struct wlan_mlo_dev_context *ml_dev,
-				struct qdf_mac_addr *ml_addr);
+				const struct qdf_mac_addr *ml_addr);
 
 /**
  * mlo_peer_attach - Attaches the peer by updating the MLO peer context with
