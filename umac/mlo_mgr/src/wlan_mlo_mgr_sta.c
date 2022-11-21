@@ -389,6 +389,8 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 	struct wlan_mlo_dev_context *mlo_dev_ctx = vdev->mlo_dev_ctx;
 	struct wlan_mlo_sta *sta_ctx = NULL;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_objmgr_vdev *assoc_vdev = NULL;
+	uint8_t i = 0;
 
 	if (mlo_dev_ctx)
 		sta_ctx = mlo_dev_ctx->sta_ctx;
@@ -401,6 +403,10 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 	if (wlan_vdev_mlme_is_mlo_vdev(vdev)) {
 		sta_ctx = mlo_dev_ctx->sta_ctx;
 		if (!sta_ctx)
+			return QDF_STATUS_E_FAILURE;
+
+		assoc_vdev = mlo_get_assoc_link_vdev(mlo_dev_ctx);
+		if (!assoc_vdev)
 			return QDF_STATUS_E_FAILURE;
 
 		if (sta_ctx->connect_req) {
@@ -417,8 +423,19 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 			return status;
 		}
 
-		status = mlo_send_link_disconnect(vdev, source,
-						  reason_code, bssid);
+		for (i =  0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+			if (!mlo_dev_ctx->wlan_vdev_list[i])
+				continue;
+
+			if (qdf_test_bit(i, mlo_dev_ctx->sta_ctx->wlan_connected_links) &&
+			    mlo_dev_ctx->wlan_vdev_list[i] != assoc_vdev)
+				wlan_cm_disconnect(mlo_dev_ctx->wlan_vdev_list[i],
+						   source, reason_code,
+						   NULL);
+		}
+
+		wlan_cm_disconnect(assoc_vdev,
+				   source, reason_code, NULL);
 	}
 
 	return status;
