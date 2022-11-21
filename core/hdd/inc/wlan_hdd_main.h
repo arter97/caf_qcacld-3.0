@@ -4240,11 +4240,11 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
  */
 void
 hdd_set_mld_address(struct hdd_adapter *adapter,
-		    struct qdf_mac_addr *mac_addr);
+		    const struct qdf_mac_addr *mac_addr);
 #else
 static inline void
 hdd_set_mld_address(struct hdd_adapter *adapter,
-		    struct qdf_mac_addr *mac_addr)
+		    const struct qdf_mac_addr *mac_addr)
 {
 }
 #endif

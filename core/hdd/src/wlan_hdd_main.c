@@ -5006,7 +5006,7 @@ void hdd_update_dynamic_mac(struct hdd_context *hdd_ctx,
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 void
 hdd_set_mld_address(struct hdd_adapter *adapter,
-		    struct qdf_mac_addr *mac_addr)
+		    const struct qdf_mac_addr *mac_addr)
 {
 	int i;
 	bool eht_capab;

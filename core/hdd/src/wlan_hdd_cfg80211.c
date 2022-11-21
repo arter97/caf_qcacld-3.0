@@ -21015,7 +21015,7 @@ QDF_STATUS wlan_hdd_send_key_vdev(struct wlan_objmgr_vdev *vdev,
 defined(CFG80211_SINGLE_NETDEV_MULTI_LINK_SUPPORT)
 struct wlan_objmgr_peer *
 wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev,
-			 uint8_t *peer_mld)
+			 const uint8_t *peer_mld)
 {
 	struct wlan_mlo_dev_context *ap_mlo_dev_ctx;
 	struct wlan_mlo_peer_list *mlo_peer_list;
@@ -21103,11 +21103,7 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 	 * both the links.
 	 */
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	/* This is to avoid const qualifier voilation
-	 * while using the mac_addr received from kernel
-	 * to fetch peer
-	 */
-	qdf_mem_copy(&peer_mac.bytes[0], mac_addr, QDF_MAC_ADDR_SIZE);
+
 	mlo_sta_get_vdev_list(vdev, &vdev_count, wlan_vdev_list);
 	for (link = 0; link < vdev_count; link++) {
 		link_vdev = wlan_vdev_list[link];
@@ -21125,7 +21121,7 @@ static int wlan_hdd_add_key_all_mlo_vdev(mac_handle_t mac_handle,
 			if (wlan_vdev_mlme_is_mlo_vdev(link_vdev))
 				peer = wlan_hdd_ml_sap_get_peer(
 						link_vdev,
-						peer_mac.bytes);
+						mac_addr);
 			break;
 		case QDF_STA_MODE:
 		default:

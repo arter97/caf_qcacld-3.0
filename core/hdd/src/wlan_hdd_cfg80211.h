@@ -1047,10 +1047,12 @@ wlan_hdd_mlo_copy_partner_addr_from_mlie(struct wlan_objmgr_vdev *vdev,
  * Return: Peer object
  */
 struct wlan_objmgr_peer *
-wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mld);
+wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev,
+			 const uint8_t *peer_mld);
 #else
 static inline struct wlan_objmgr_peer *
-wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev, uint8_t *peer_mld)
+wlan_hdd_ml_sap_get_peer(struct wlan_objmgr_vdev *vdev,
+			 const uint8_t *peer_mld)
 {
 	return NULL;
 }
