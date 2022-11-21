@@ -498,7 +498,7 @@ static void hdd_process_regulatory_data(struct hdd_context *hdd_ctx,
 {
 	int band_num;
 	int chan_num;
-	enum channel_enum chan_enum = CHAN_ENUM_1;
+	enum channel_enum chan_enum = CHAN_ENUM_2412;
 	struct ieee80211_channel *wiphy_chan, *wiphy_chan_144 = NULL;
 	struct regulatory_channel *cds_chan;
 	uint8_t band_capability, indoor_chnl_marking = 0;
@@ -525,7 +525,7 @@ static void hdd_process_regulatory_data(struct hdd_context *hdd_ctx,
 				&(wiphy->bands[band_num]->channels[chan_num]);
 			cds_chan = &(reg_channels[chan_enum]);
 			cds_chan->chan_flags = 0;
-			if (CHAN_ENUM_144 == chan_enum)
+			if (CHAN_ENUM_5720 == chan_enum)
 				wiphy_chan_144 = wiphy_chan;
 
 			chan_enum++;
@@ -601,7 +601,7 @@ static void hdd_process_regulatory_data(struct hdd_context *hdd_ctx,
 
 	if (0 == (hdd_ctx->reg.eeprom_rd_ext &
 		  (1 << WMI_REG_EXT_FCC_CH_144))) {
-		cds_chan = &(reg_channels[CHAN_ENUM_144]);
+		cds_chan = &(reg_channels[CHAN_ENUM_5720]);
 		cds_chan->state = CHANNEL_STATE_DISABLE;
 		if (wiphy_chan_144)
 			wiphy_chan_144->flags |= IEEE80211_CHAN_DISABLED;
@@ -1947,7 +1947,15 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 
 	return 0;
 }
+int hdd_update_regulatory_config(struct hdd_context *hdd_ctx)
+{
+	return 0;
+}
 
+int hdd_init_regulatory_update_event(struct hdd_context *hdd_ctx)
+{
+	return 0;
+}
 #else
 int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {

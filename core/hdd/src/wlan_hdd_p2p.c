@@ -933,6 +933,7 @@ struct wireless_dev *wlan_hdd_add_virtual_intf(struct wiphy *wiphy,
 					       u32 *flags,
 					       struct vif_params *params)
 {
+	unsigned char name_assign_type = 0;
 	return _wlan_hdd_add_virtual_intf(wiphy, name, name_assign_type,
 					  type, flags, params);
 }

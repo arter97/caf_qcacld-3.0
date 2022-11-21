@@ -208,7 +208,9 @@
 #include "wlan_hdd_bus_bandwidth.h"
 #include "wlan_hdd_medium_assess.h"
 #include "wlan_hdd_eht.h"
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 #include <linux/bitfield.h>
+#endif
 #include "wlan_hdd_mlo.h"
 #include <wlan_hdd_son.h>
 #ifdef WLAN_FEATURE_11BE_MLO
@@ -1331,9 +1333,11 @@ QDF_STATUS hdd_nl_to_qdf_iface_type(enum nl80211_iftype nl_type,
 	case NL80211_IFTYPE_MONITOR:
 		*out_qdf_type = QDF_MONITOR_MODE;
 		break;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 	case NL80211_IFTYPE_OCB:
 		*out_qdf_type = QDF_OCB_MODE;
 		break;
+#endif
 	case NL80211_IFTYPE_P2P_CLIENT:
 		*out_qdf_type = QDF_P2P_CLIENT_MODE;
 		break;

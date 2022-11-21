@@ -37,7 +37,9 @@
 #include <linux/kthread.h>
 #include <linux/cpu.h>
 #ifdef RX_PERFORMANCE
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 #include <linux/sched/types.h>
+#endif
 #endif
 
 static spinlock_t ssr_protect_lock;

@@ -23,14 +23,15 @@
 #include <qdf_net_types.h>      /* QDF_NBUF_TX_EXT_TID_INVALID */
 
 #include "queue.h"          /* TAILQ */
-#ifdef QCA_COMPUTE_TX_DELAY
-#include <enet.h>               /* ethernet_hdr_t, etc. */
-#include <ipv6_defs.h>          /* ipv6_traffic_class */
-#endif
 
 #include <ol_txrx_api.h>        /* ol_txrx_vdev_handle, etc. */
 #include <ol_htt_tx_api.h>      /* htt_tx_compl_desc_id */
 #include <ol_txrx_htt_api.h>    /* htt_tx_status */
+
+#ifdef QCA_COMPUTE_TX_DELAY
+#include <enet.h>               /* ethernet_hdr_t, etc. */
+#include <ipv6_defs.h>          /* ipv6_traffic_class */
+#endif
 
 #include <ol_ctrl_txrx_api.h>
 #include <cdp_txrx_tx_delay.h>
