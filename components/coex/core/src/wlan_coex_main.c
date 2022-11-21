@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -128,7 +129,8 @@ wlan_coex_config_updated(struct wlan_objmgr_vdev *vdev, uint8_t type)
 }
 
 QDF_STATUS
-wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc, uint8_t val)
+wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode val)
 {
 	struct coex_psoc_obj *coex_obj;
 
@@ -142,7 +144,8 @@ wlan_coex_psoc_set_btc_chain_mode(struct wlan_objmgr_psoc *psoc, uint8_t val)
 }
 
 QDF_STATUS
-wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc, uint8_t *val)
+wlan_coex_psoc_get_btc_chain_mode(struct wlan_objmgr_psoc *psoc,
+				  enum coex_btc_chain_mode *val)
 {
 	struct coex_psoc_obj *coex_obj;
 

@@ -1697,9 +1697,10 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 	bytes += sizeof(tSirMacMgmtHdr) + payload;
 
-	if (sta)
+	if (sta) {
 		bytes += sta->mlmStaContext.owe_ie_len;
-
+		bytes += sta->mlmStaContext.ft_ie_len;
+	}
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				      (void **)&packet);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -1741,6 +1742,12 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 			     + addn_ie_len,
 			     sta->mlmStaContext.owe_ie,
 			     sta->mlmStaContext.owe_ie_len);
+
+	if (sta && sta->mlmStaContext.ft_ie_len)
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload
+				 + addn_ie_len + sta->mlmStaContext.owe_ie_len,
+			     sta->mlmStaContext.ft_ie,
+			     sta->mlmStaContext.ft_ie_len);
 	pe_nofl_debug("Assoc rsp TX: vdev %d subtype %d to "QDF_MAC_ADDR_FMT" seq num %d status %d aid %d addn_ie_len %d ht %d vht %d vendor vht %d he %d eht %d",
 		      pe_session->vdev_id, subtype,
 		      QDF_MAC_ADDR_REF(mac_hdr->da),
@@ -6079,6 +6086,19 @@ void lim_send_mgmt_frame_tx(struct mac_context *mac_ctx,
 		if (auth_algo == eSIR_AUTH_TYPE_SAE)
 			lim_handle_sae_auth_retry(mac_ctx, vdev_id,
 						  mb_msg->data, msg_len);
+		if (auth_algo == eSIR_FT_AUTH) {
+			struct tLimPreAuthNode *sta_pre_auth_ctx;
+
+			sta_pre_auth_ctx = lim_search_pre_auth_list(mac_ctx,
+				((tpSirMacMgmtHdr)(mb_msg->data))->da);
+			pe_debug("FT Auth TX to " QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(((tpSirMacMgmtHdr)(mb_msg->data))->da));
+			if (sta_pre_auth_ctx) {
+				pe_debug("STA is AUTHENTICATED_STATE");
+				sta_pre_auth_ctx->mlmState =
+					eLIM_MLM_AUTHENTICATED_STATE;
+			}
+		}
 	}
 
 	lim_send_frame(mac_ctx, vdev_id, mb_msg->data, msg_len);

@@ -4094,8 +4094,9 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 			  enum nss_chains_band_info band,
 			  uint8_t rf_chains_supported)
 {
-	uint8_t nss_chain_shift, btc_chain_mode;
+	uint8_t nss_chain_shift;
 	uint8_t max_supported_nss;
+	enum coex_btc_chain_mode btc_chain_mode;
 	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
 					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
 	QDF_STATUS status;
@@ -4120,7 +4121,8 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 	}
 
 	if (band == NSS_CHAINS_BAND_2GHZ &&
-	    btc_chain_mode == QCA_BTC_CHAIN_SEPARATED)
+	    (btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_FDD ||
+	     btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_HYBRID))
 		max_supported_nss = NSS_1x1_MODE;
 
 	/* If the fw doesn't support two chains, num rf chains can max be 1 */
@@ -7593,7 +7595,7 @@ void sme_get_command_q_status(mac_handle_t mac_handle)
  * @timestamp_offset: return for the offset of the timestamp field
  * @time_value_offset: return for the time_value field in the TA IE
  *
- * Return: the length of the buffer.
+ * Return: the length of the buffer on success and error code on failure.
  */
 int sme_ocb_gen_timing_advert_frame(mac_handle_t mac_handle,
 				    tSirMacAddr self_addr, uint8_t **buf,
@@ -15641,6 +15643,20 @@ QDF_STATUS sme_update_owe_info(struct mac_context *mac,
 	status = sme_acquire_global_lock(&mac->sme);
 	if (QDF_IS_STATUS_SUCCESS(status)) {
 		status = csr_update_owe_info(mac, assoc_ind);
+		sme_release_global_lock(&mac->sme);
+	}
+
+	return status;
+}
+
+QDF_STATUS sme_update_ft_info(struct mac_context *mac,
+			      struct assoc_ind *assoc_ind)
+{
+	QDF_STATUS status;
+
+	status = sme_acquire_global_lock(&mac->sme);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		status = csr_update_ft_info(mac, assoc_ind);
 		sme_release_global_lock(&mac->sme);
 	}
 

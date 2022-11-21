@@ -269,6 +269,7 @@ int wlan_hdd_cfg80211_cancel_remain_on_channel(struct wiphy *wiphy,
 	return errno;
 }
 
+#define WLAN_AUTH_FRAME_MIN_LEN 2
 static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 			      struct ieee80211_channel *chan, bool offchan,
 			      unsigned int wait,
@@ -280,10 +281,14 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct wlan_objmgr_vdev *vdev;
-	uint8_t type;
-	uint8_t sub_type;
+	uint8_t type, sub_type;
+	uint16_t auth_algo;
 	QDF_STATUS qdf_status;
 	int ret;
+	uint32_t assoc_resp_len, ft_info_len = 0;
+	const uint8_t  *assoc_resp;
+	void *ft_info;
+	struct hdd_ap_ctx *hdd_ap_ctx;
 
 	hdd_enter();
 
@@ -301,6 +306,7 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 	type = WLAN_HDD_GET_TYPE_FRM_FC(buf[0]);
 	sub_type = WLAN_HDD_GET_SUBTYPE_FRM_FC(buf[0]);
+	hdd_debug("type %d, sub_type %d", type, sub_type);
 
 	/* When frame to be transmitted is auth mgmt, then trigger
 	 * sme_send_mgmt_tx to send auth frame without need for policy manager.
@@ -313,6 +319,22 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 	     adapter->device_mode == QDF_P2P_GO_MODE) &&
 	    (type == SIR_MAC_MGMT_FRAME &&
 	    sub_type == SIR_MAC_MGMT_AUTH)) {
+		/* Request ROC for PASN authentication frame */
+		if (len > (sizeof(struct wlan_frame_hdr) +
+			   WLAN_AUTH_FRAME_MIN_LEN)) {
+			auth_algo =
+				*(uint16_t *)(buf +
+					      sizeof(struct wlan_frame_hdr));
+			if (auth_algo == eSIR_AUTH_TYPE_PASN)
+				goto off_chan_tx;
+			if ((auth_algo == eSIR_FT_AUTH) &&
+			    (adapter->device_mode == QDF_SAP_MODE ||
+			     adapter->device_mode == QDF_P2P_GO_MODE)) {
+				hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+				hdd_ap_ctx->during_auth_offload = false;
+			}
+		}
+
 		qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_SME,
 			   TRACE_CODE_HDD_SEND_MGMT_TX, adapter->vdev_id, 0);
 
@@ -320,11 +342,44 @@ static int __wlan_hdd_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 					      adapter->vdev_id, buf, len);
 
 		if (QDF_IS_STATUS_SUCCESS(qdf_status))
-			return 0;
+			return qdf_status_to_os_return(qdf_status);
+		else
+			return -EINVAL;
+	}
+	/* Only when SAP working on Fast BSS transition mode. Driver offload
+	 * (re)assoc request to hostapd. Here driver receive (re)assoc response
+	 * frame from hostapd.
+	 */
+	if ((adapter->device_mode == QDF_SAP_MODE ||
+	     adapter->device_mode == QDF_P2P_GO_MODE) &&
+	    (type == SIR_MAC_MGMT_FRAME) &&
+	    (sub_type == SIR_MAC_MGMT_ASSOC_RSP ||
+	     sub_type == SIR_MAC_MGMT_REASSOC_RSP)) {
+		assoc_resp = &((struct ieee80211_mgmt *)buf)->u.assoc_resp.variable[0];
+		assoc_resp_len = len - DOT11F_FF_CAPABILITIES_LEN
+			   - DOT11F_FF_STATUS_LEN
+			   - DOT11F_IE_AID_MAX_LEN
+			   - sizeof(tSirMacMgmtHdr);
+		if (!wlan_get_ie_ptr_from_eid(DOT11F_EID_FTINFO,
+					      assoc_resp, assoc_resp_len))
+			goto off_chan_tx;
+		ft_info = hdd_filter_ft_info(assoc_resp, len, &ft_info_len);
+		if (!ft_info || !ft_info_len)
+			return -EINVAL;
+		hdd_debug("get ft_info_len from Assoc rsp :%d", ft_info_len);
+		hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		qdf_status = wlansap_update_ft_info(hdd_ap_ctx->sap_context,
+				((struct ieee80211_mgmt *)buf)->da,
+				ft_info, ft_info_len, 0);
+		qdf_mem_free(ft_info);
+
+		if (QDF_IS_STATUS_SUCCESS(qdf_status))
+			return qdf_status_to_os_return(qdf_status);
 		else
 			return -EINVAL;
 	}
 
+off_chan_tx:
 	hdd_debug("device_mode:%d type:%d sub_type:%d chan:%d",
 		  adapter->device_mode, type, sub_type,
 		  chan ? chan->center_freq : 0);
@@ -1041,6 +1096,8 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 	struct hdd_context *hdd_ctx;
 	uint8_t *dest_addr;
 	enum nl80211_rxmgmt_flags nl80211_flag = 0;
+	struct hdd_ap_ctx *hdd_ap_ctx;
+	uint16_t auth_algo;
 
 	hdd_debug("Frame Type = %d Frame Length = %d freq = %d",
 		  frame_type, frm_len, rx_freq);
@@ -1063,6 +1120,20 @@ __hdd_indicate_mgmt_frame_to_user(struct hdd_adapter *adapter,
 
 	type = WLAN_HDD_GET_TYPE_FRM_FC(pb_frames[0]);
 	sub_type = WLAN_HDD_GET_SUBTYPE_FRM_FC(pb_frames[0]);
+	if (type == SIR_MAC_MGMT_FRAME &&
+	    sub_type == SIR_MAC_MGMT_AUTH &&
+	    frm_len > (sizeof(struct wlan_frame_hdr) +
+		       WLAN_AUTH_FRAME_MIN_LEN)) {
+		auth_algo = *(uint16_t *)(pb_frames +
+					  sizeof(struct wlan_frame_hdr));
+		if (auth_algo == eSIR_FT_AUTH) {
+			if (adapter->device_mode == QDF_SAP_MODE ||
+			    adapter->device_mode == QDF_P2P_GO_MODE) {
+				hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+				hdd_ap_ctx->during_auth_offload = true;
+			}
+		}
+	}
 
 	/* Get adapter from Destination mac address of the frame */
 	if ((type == SIR_MAC_MGMT_FRAME) &&
