@@ -33,6 +33,7 @@
 #include <target_if_reg_11d.h>
 #include <target_if_reg_lte.h>
 #include <wlan_reg_ucfg_api.h>
+#include <wlan_utility.h>
 
 /**
  * get_chan_list_cc_event_id() - Get chan_list_cc event i
@@ -658,19 +659,29 @@ static QDF_STATUS tgt_if_regulatory_set_country_code(
 static QDF_STATUS tgt_if_regulatory_set_user_country_code(
 	struct wlan_objmgr_psoc *psoc, uint8_t pdev_id, struct cc_regdmn_s *rd)
 {
-	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	struct wlan_objmgr_pdev *pdev;
+	wmi_unified_t wmi_handle;
+	QDF_STATUS status;
 
-	if (!wmi_handle)
-		return QDF_STATUS_E_FAILURE;
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id,
+					  WLAN_REGULATORY_NB_ID);
 
-	if (wmi_unified_set_user_country_code_cmd_send(
-				wmi_handle, pdev_id, rd) != QDF_STATUS_SUCCESS
-			) {
-		target_if_err("Set user country code failed");
-		return QDF_STATUS_E_FAILURE;
+	wmi_handle = get_wmi_unified_hdl_from_pdev(pdev);
+
+	if (!wmi_handle) {
+		status = QDF_STATUS_E_FAILURE;
+		goto free_pdevref;
 	}
 
-	return QDF_STATUS_SUCCESS;
+	status = wmi_unified_set_user_country_code_cmd_send(wmi_handle,
+							    pdev_id, rd);
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("Set user country code failed,status %d",
+			      status);
+free_pdevref:
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_REGULATORY_NB_ID);
+
+	return status;
 }
 
 QDF_STATUS tgt_if_regulatory_modify_freq_range(struct wlan_objmgr_psoc *psoc)
@@ -876,12 +887,31 @@ tgt_if_regulatory_set_tpc_power(struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id,
 				struct reg_tpc_power_info *param)
 {
-	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	wmi_unified_t wmi_handle;
+	uint8_t pdev_id;
+	struct wlan_objmgr_pdev *pdev;
+	QDF_STATUS status;
 
-	if (!wmi_handle)
-		return QDF_STATUS_E_FAILURE;
+	pdev_id = wlan_get_pdev_id_from_vdev_id(psoc,
+						vdev_id, WLAN_REGULATORY_NB_ID);
 
-	return wmi_unified_send_set_tpc_power_cmd(wmi_handle, vdev_id, param);
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id,
+					  WLAN_REGULATORY_NB_ID);
+
+	wmi_handle = get_wmi_unified_hdl_from_pdev(pdev);
+
+	if (!wmi_handle) {
+		status = QDF_STATUS_E_FAILURE;
+		goto free_pdevref;
+	}
+	status = wmi_unified_send_set_tpc_power_cmd(wmi_handle, vdev_id, param);
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("send tpc power cmd failed, status: %d", status);
+
+free_pdevref:
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_REGULATORY_NB_ID);
+
+	return status;
 }
 
 #ifdef CONFIG_AFC_SUPPORT
@@ -899,12 +929,29 @@ tgt_if_regulatory_send_afc_cmd(struct wlan_objmgr_psoc *psoc,
 			       uint8_t pdev_id,
 			       struct reg_afc_resp_rx_ind_info *param)
 {
-	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	struct wlan_objmgr_pdev *pdev;
+	wmi_unified_t wmi_handle;
+	QDF_STATUS status;
 
-	if (!wmi_handle)
-		return QDF_STATUS_E_FAILURE;
+	pdev = wlan_objmgr_get_pdev_by_id(psoc, pdev_id,
+					  WLAN_REGULATORY_NB_ID);
 
-	return wmi_unified_send_afc_cmd(wmi_handle, pdev_id, param);
+	wmi_handle = get_wmi_unified_hdl_from_pdev(pdev);
+
+	if (!wmi_handle) {
+		status = QDF_STATUS_E_FAILURE;
+		goto free_pdevref;
+	}
+
+	status = wmi_unified_send_afc_cmd(wmi_handle, pdev_id, param);
+
+	if (QDF_IS_STATUS_ERROR(status))
+		target_if_err("send afc  cmd failed, status: %d", status);
+
+free_pdevref:
+	wlan_objmgr_pdev_release_ref(pdev, WLAN_REGULATORY_NB_ID);
+
+	return status;
 }
 
 static void
