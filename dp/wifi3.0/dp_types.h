@@ -2481,6 +2481,8 @@ struct dp_soc {
 	uint32_t num_tx_allowed;
 	/* Num Regular Tx allowed */
 	uint32_t num_reg_tx_allowed;
+	/* Num Tx allowed for special frames*/
+	uint32_t num_tx_spl_allowed;
 	/* Preferred HW mode */
 	uint8_t preferred_hw_mode;
 

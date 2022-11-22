@@ -15596,7 +15596,9 @@ void *dp_soc_init(struct dp_soc *soc, HTC_HANDLE htc_handle,
 	qdf_atomic_init(&soc->num_tx_exception);
 	soc->num_tx_allowed =
 		wlan_cfg_get_dp_soc_tx_device_limit(soc->wlan_cfg_ctx);
-	soc->num_reg_tx_allowed = soc->num_tx_allowed - MAX_TX_SPL_DESC;
+	soc->num_tx_spl_allowed =
+		wlan_cfg_get_dp_soc_tx_spl_device_limit(soc->wlan_cfg_ctx);
+	soc->num_reg_tx_allowed = soc->num_tx_allowed - soc->num_tx_spl_allowed;
 	if (soc->cdp_soc.ol_ops->get_dp_cfg_param) {
 		int ret = soc->cdp_soc.ol_ops->get_dp_cfg_param(soc->ctrl_psoc,
 				CDP_CFG_MAX_PEER_ID);

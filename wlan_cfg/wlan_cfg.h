@@ -250,6 +250,7 @@ struct wlan_srng_cfg {
  * @tx_desc_limit_1: tx_desc limit for 2 GHz
  * @tx_desc_limit_2: tx_desc limit for 5 GHz Low
  * @tx_device_limit: tx device limit
+ * @tx_spl_device_limit: tx device limit for special frames
  * @tx_sw_internode_queue: tx sw internode queue
  * @mon_drop_thresh:
  * @tx_comp_loop_pkt_limit: Max # of packets to be processed in 1 tx comp loop
@@ -428,6 +429,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	int tx_desc_limit_1;
 	int tx_desc_limit_2;
 	int tx_device_limit;
+	int tx_spl_device_limit;
 	int tx_sw_internode_queue;
 	int mon_drop_thresh;
 #ifdef WLAN_FEATURE_RX_SOFTIRQ_TIME_LIMIT
@@ -1600,6 +1602,16 @@ wlan_cfg_get_dp_soc_tx_desc_limit_2(struct wlan_cfg_dp_soc_ctxt *cfg);
  */
 int
 wlan_cfg_get_dp_soc_tx_device_limit(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/**
+ * wlan_cfg_get_dp_soc_tx_spl_device_limit - Get tx device limit for special
+ *					     frames
+ * @cfg: Configuration Handle
+ *
+ * Return: tx device limit for special frames
+ */
+int
+wlan_cfg_get_dp_soc_tx_spl_device_limit(struct wlan_cfg_dp_soc_ctxt *cfg);
 
 /**
  * wlan_cfg_get_dp_soc_tx_sw_internode_queue - Get tx sw internode queue
