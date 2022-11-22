@@ -3153,6 +3153,9 @@ struct dp_pdev {
 	 */
 	uint32_t num_reg_tx_allowed;
 
+	/* User configured max number of tx buffers for the special frames*/
+	uint32_t num_tx_spl_allowed;
+
 	/* unique cookie required for peer session */
 	uint32_t next_peer_cookie;
 

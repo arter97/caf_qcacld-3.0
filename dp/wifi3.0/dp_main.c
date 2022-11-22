@@ -17204,8 +17204,10 @@ static QDF_STATUS dp_pdev_init(struct cdp_soc_t *txrx_soc,
 	qdf_event_create(&pdev->fw_obss_stats_event);
 
 	pdev->num_tx_allowed = wlan_cfg_get_num_tx_desc(soc->wlan_cfg_ctx);
-	pdev->num_reg_tx_allowed = pdev->num_tx_allowed - MAX_TX_SPL_DESC;
-
+	pdev->num_tx_spl_allowed =
+		wlan_cfg_get_num_tx_spl_desc(soc->wlan_cfg_ctx);
+	pdev->num_reg_tx_allowed =
+		pdev->num_tx_allowed - pdev->num_tx_spl_allowed;
 	if (dp_rxdma_ring_setup(soc, pdev)) {
 		dp_init_err("%pK: RXDMA ring config failed", soc);
 		goto fail3;

@@ -154,6 +154,7 @@ struct wlan_srng_cfg {
  * @num_tx_desc_pool: Number of Tx Descriptor pools
  * @num_tx_ext_desc_pool: Number of Tx MSDU extension Descriptor pools
  * @num_tx_desc: Number of Tx Descriptors per pool
+ * @num_tx_spl_desc: Number of Tx Descriptors per pool to handle special frames
  * @min_tx_desc: Minimum number of Tx Descriptors per pool
  * @num_tx_ext_desc: Number of Tx MSDU extension Descriptors per pool
  * @max_peer_id: Maximum value of peer id that FW can assign for a client
@@ -341,6 +342,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	int num_tx_desc_pool;
 	int num_tx_ext_desc_pool;
 	int num_tx_desc;
+	int num_tx_spl_desc;
 	int min_tx_desc;
 	int num_tx_ext_desc;
 	int max_peer_id;
@@ -1183,6 +1185,15 @@ void wlan_cfg_set_num_tx_ext_desc_pool(struct wlan_cfg_dp_soc_ctxt *cfg, int num
  * Return: num_tx_desc
  */
 int wlan_cfg_get_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
+
+/**
+ * wlan_cfg_get_num_tx_spl_desc() - Number of Tx Descriptors for special
+ *				    frames per pool
+ * @wlan_cfg_ctx: Configuration Handle
+ *
+ * Return: num_tx_desc
+ */
+int wlan_cfg_get_num_tx_spl_desc(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx);
 
 /**
  * wlan_cfg_get_min_tx_desc() - Minimum number of Tx Descriptors per pool
