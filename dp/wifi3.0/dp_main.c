@@ -14221,10 +14221,10 @@ static bool dp_tx_comp_delay_check(struct dp_tx_desc_s *tx_desc)
 	qdf_ktime_t current_time = qdf_ktime_real_get();
 	qdf_ktime_t timestamp = tx_desc->timestamp;
 
-	if (!timestamp)
-		return false;
-
 	if (dp_tx_pkt_tracepoints_enabled()) {
+		if (!timestamp)
+			return false;
+
 		time_latency = qdf_ktime_to_ms(current_time) -
 				qdf_ktime_to_ms(timestamp);
 		if (time_latency >= DP_TX_COMP_MAX_LATENCY_MS) {
@@ -14233,12 +14233,15 @@ static bool dp_tx_comp_delay_check(struct dp_tx_desc_s *tx_desc)
 			return true;
 		}
 	} else {
+		if (!timestamp_tick)
+			return false;
+
 		current_time = qdf_system_ticks();
 		time_latency = qdf_system_ticks_to_msecs(current_time -
 							 timestamp_tick);
 		if (time_latency >= DP_TX_COMP_MAX_LATENCY_MS) {
 			dp_err_rl("enqueued: %u ms, current : %u ms",
-				  qdf_system_ticks_to_msecs(timestamp),
+				  qdf_system_ticks_to_msecs(timestamp_tick),
 				  qdf_system_ticks_to_msecs(current_time));
 			return true;
 		}
