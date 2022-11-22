@@ -418,7 +418,10 @@ QDF_STATUS mbss_ap_cancel_acs_ht40(struct wlan_objmgr_vdev *vdev,
 
 		new_src_vdev = wlan_objmgr_get_vdev_by_id_from_pdev(
 				pdev, src_vdev_id, WLAN_MBSS_ID);
+		if (!new_src_vdev)
+			goto done;
 		mbss_debug("Trigger ACS handoff for %d", src_vdev_id);
+		mbss_acs->acs_vdev_id = wlan_vdev_get_id(new_src_vdev);
 		if (mbss_ops->ext_ops.mbss_start_acs) {
 			mbss_unlock(mbss_pdev);
 			mbss_ops->ext_ops.mbss_start_acs(new_src_vdev,
