@@ -1727,6 +1727,8 @@ wlan_reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 					  reg_cur_6g_client_mobility_type);
 }
 
+qdf_export_symbol(wlan_reg_get_cur_6g_client_type);
+
 bool wlan_reg_is_6g_psd_power(struct wlan_objmgr_pdev *pdev)
 {
 	return reg_is_6g_psd_power(pdev);
