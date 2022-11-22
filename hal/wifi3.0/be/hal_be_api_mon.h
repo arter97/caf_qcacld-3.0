@@ -1700,9 +1700,11 @@ hal_rx_parse_receive_user_info(struct hal_soc *hal_soc, uint8_t *tlv,
 	case HAL_RECEPTION_TYPE_DL_MU_OFDMA_MIMO:
 		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_DL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA_MIMO;
+		break;
 	case HAL_RECEPTION_TYPE_UL_MU_OFDMA_MIMO:
 		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_UL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA_MIMO;
+		break;
 	}
 
 	ppdu_info->start_user_info_cnt++;
