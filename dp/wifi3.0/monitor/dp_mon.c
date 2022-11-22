@@ -3101,9 +3101,14 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 	DP_STATS_INC(mon_peer, tx.sgi_count[ppdu->gi], num_msdu);
 	DP_STATS_INC(mon_peer, tx.bw[ppdu->bw], num_msdu);
 	DP_STATS_INC(mon_peer, tx.nss[ppdu->nss], num_msdu);
-	if (ppdu->tid < CDP_DATA_TID_MAX)
+	if (ppdu->tid < CDP_DATA_TID_MAX) {
 		DP_STATS_INC(mon_peer, tx.wme_ac_type[TID_TO_WME_AC(ppdu->tid)],
 			     num_msdu);
+		DP_STATS_INC(mon_peer,
+			     tx.wme_ac_type_bytes[TID_TO_WME_AC(ppdu->tid)],
+			     tx_byte_count);
+	}
+
 	DP_STATS_INCC(mon_peer, tx.stbc, num_msdu, ppdu->stbc);
 	DP_STATS_INCC(mon_peer, tx.ldpc, num_msdu, ppdu->ldpc);
 	if (!(ppdu->is_mcast) && ppdu->ack_rssi_valid)

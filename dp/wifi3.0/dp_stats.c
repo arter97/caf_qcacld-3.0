@@ -8493,6 +8493,7 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		goto link_stats;
 
 	dp_update_vdev_basic_stats(txrx_peer, vdev_stats);
+	dp_peer_aggregate_tid_stats(peer);
 
 	per_pkt_stats = &txrx_peer->stats.per_pkt_stats;
 	DP_UPDATE_PER_PKT_STATS(vdev_stats, per_pkt_stats);
@@ -8587,8 +8588,12 @@ void dp_update_pdev_stats(struct dp_pdev *tgtobj,
 	for (i = 0; i < WME_AC_MAX; i++) {
 		tgtobj->stats.tx.wme_ac_type[i] +=
 			srcobj->tx.wme_ac_type[i];
+		tgtobj->stats.tx.wme_ac_type_bytes[i] +=
+			srcobj->tx.wme_ac_type_bytes[i];
 		tgtobj->stats.rx.wme_ac_type[i] +=
 			srcobj->rx.wme_ac_type[i];
+		tgtobj->stats.rx.wme_ac_type_bytes[i] +=
+			srcobj->rx.wme_ac_type_bytes[i];
 		tgtobj->stats.tx.excess_retries_per_ac[i] +=
 			srcobj->tx.excess_retries_per_ac[i];
 	}
@@ -8757,11 +8762,13 @@ void dp_update_pdev_stats(struct dp_pdev *tgtobj,
 			srcobj->rx.rx_lmac[i].bytes;
 	}
 
-	srcobj->rx.unicast.num =
-		srcobj->rx.to_stack.num -
+	if (srcobj->rx.to_stack.num >= (srcobj->rx.multicast.num))
+		srcobj->rx.unicast.num =
+			srcobj->rx.to_stack.num -
 				(srcobj->rx.multicast.num);
-	srcobj->rx.unicast.bytes =
-		srcobj->rx.to_stack.bytes -
+	if (srcobj->rx.to_stack.bytes >= srcobj->rx.multicast.bytes)
+		srcobj->rx.unicast.bytes =
+			srcobj->rx.to_stack.bytes -
 				(srcobj->rx.multicast.bytes);
 
 	tgtobj->stats.rx.unicast.num += srcobj->rx.unicast.num;

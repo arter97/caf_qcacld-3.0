@@ -3904,6 +3904,7 @@ struct dp_peer_per_pkt_tx_stats {
  * @rts_failure: RTS failure count
  * @bar_cnt: Block ACK Request frame count
  * @ndpa_cnt: NDP announcement frame count
+ * @wme_ac_type_bytes: Wireless Multimedia bytes Count
  */
 struct dp_peer_extd_tx_stats {
 	uint32_t stbc;
@@ -3960,6 +3961,7 @@ struct dp_peer_extd_tx_stats {
 	uint32_t rts_failure;
 	uint32_t bar_cnt;
 	uint32_t ndpa_cnt;
+	uint64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
 /**
@@ -3991,6 +3993,7 @@ struct dp_peer_extd_tx_stats {
  * @policy_check_drop: policy check drops
  * @to_stack_twt: Total packets sent up the stack in TWT session
  * @protocol_trace_cnt: per-peer protocol counters
+ * @rx_total: total rx count
  */
 struct dp_peer_per_pkt_rx_stats {
 	struct cdp_pkt_info rcvd_reo[CDP_MAX_RX_RINGS];
@@ -4027,6 +4030,9 @@ struct dp_peer_per_pkt_rx_stats {
 	struct protocol_trace_count protocol_trace_cnt[CDP_TRACE_MAX];
 #endif
 	uint32_t mcast_3addr_drop;
+#ifdef IPA_OFFLOAD
+	struct cdp_pkt_info rx_total;
+#endif
 };
 
 /**
@@ -4077,6 +4083,7 @@ struct dp_peer_per_pkt_rx_stats {
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured bw
  * @bar_cnt: Block ACK Request frame count
  * @ndpa_cnt: NDP announcement frame count
+ * @wme_ac_type_bytes: Wireless Multimedia type Bytes Count
  */
 struct dp_peer_extd_rx_stats {
 	struct cdp_pkt_type pkt_type[DOT11_MAX];
@@ -4124,6 +4131,7 @@ struct dp_peer_extd_rx_stats {
 #endif
 	uint32_t bar_cnt;
 	uint32_t ndpa_cnt;
+	uint64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
 /**

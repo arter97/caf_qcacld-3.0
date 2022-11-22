@@ -468,6 +468,17 @@ dp_ipa_ast_notify_cb(qdf_ipa_wdi_conn_in_params_t *pipe_in,
 }
 #endif
 
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+QDF_STATUS dp_ipa_txrx_get_peer_stats(struct cdp_soc_t *soc, uint8_t vdev_id,
+				      uint8_t *peer_mac,
+				      struct cdp_peer_stats *peer_stats);
+int dp_ipa_txrx_get_vdev_stats(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
+			       void *buf, bool is_aggregate);
+QDF_STATUS dp_ipa_txrx_get_pdev_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
+				      struct cdp_pdev_stats *pdev_stats);
+QDF_STATUS dp_ipa_update_peer_rx_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
+				       uint8_t *peer_mac, qdf_nbuf_t nbuf);
+#endif
 #else
 static inline int dp_ipa_uc_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 {

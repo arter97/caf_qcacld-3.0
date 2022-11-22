@@ -10014,7 +10014,7 @@ void dp_get_peer_tx_per(struct cdp_peer_stats *peer_stats)
  *
  * Return: none
  */
-static inline
+
 void dp_get_peer_stats(struct dp_peer *peer, struct cdp_peer_stats *peer_stats)
 {
 	dp_get_peer_calibr_stats(peer, peer_stats);
@@ -14139,6 +14139,11 @@ static struct cdp_host_stats_ops dp_ops_host_stats = {
 	.txrx_get_peer_stats_param = dp_txrx_get_peer_stats_param,
 	.txrx_reset_peer_stats = dp_txrx_reset_peer_stats,
 	.txrx_get_pdev_stats = dp_txrx_get_pdev_stats,
+#if defined(IPA_OFFLOAD) && defined(QCA_ENHANCED_STATS_SUPPORT)
+	.txrx_get_peer_stats = dp_ipa_txrx_get_peer_stats,
+	.txrx_get_vdev_stats  = dp_ipa_txrx_get_vdev_stats,
+	.txrx_get_pdev_stats = dp_ipa_txrx_get_pdev_stats,
+#endif
 	.txrx_get_ratekbps = dp_txrx_get_ratekbps,
 	.txrx_update_vdev_stats = dp_txrx_update_vdev_host_stats,
 	.txrx_get_peer_delay_stats = dp_txrx_get_peer_delay_stats,

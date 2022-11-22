@@ -1431,6 +1431,9 @@ struct protocol_trace_count {
  * @rts_failure: RTS failure count
  * @bar_cnt: Block ACK Request frame count
  * @ndpa_cnt: NDP announcement frame count
+ * @wme_ac_type_bytes: Wireless Multimedia Type Bytes Count
+ * @tx_ucast_total: Total tx unicast count
+ * @tx_ucast_success: Total tx unicast success count
  */
 struct cdp_tx_stats {
 	struct cdp_pkt_info comp_pkt;
@@ -1554,6 +1557,9 @@ struct cdp_tx_stats {
 	uint32_t rts_failure;
 	uint32_t bar_cnt;
 	uint32_t ndpa_cnt;
+	uint64_t wme_ac_type_bytes[WME_AC_MAX];
+	struct cdp_pkt_info tx_ucast_total;
+	struct cdp_pkt_info tx_ucast_success;
 };
 
 /* struct cdp_rx_stats - rx Level Stats
@@ -1645,6 +1651,8 @@ struct cdp_tx_stats {
  * @punc_bw[MAX_PUNCTURED_MODE]: MSDU count for punctured BW
  * @bar_cnt: Block ACK Request frame count
  * @ndpa_cnt: NDP announcement frame count
+ * @wme_ac_type_bytes: Wireless Multimedia type Byte Count
+ * @rx_total: Total rx count
  */
 struct cdp_rx_stats {
 	struct cdp_pkt_info to_stack;
@@ -1736,6 +1744,10 @@ struct cdp_rx_stats {
 	uint32_t mcast_3addr_drop;
 	uint32_t bar_cnt;
 	uint32_t ndpa_cnt;
+	uint64_t wme_ac_type_bytes[WME_AC_MAX];
+#ifdef IPA_OFFLOAD
+	struct cdp_pkt_info rx_total;
+#endif
 };
 
 /* struct cdp_tx_ingress_stats - Tx ingress Stats

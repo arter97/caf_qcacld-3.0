@@ -1163,6 +1163,11 @@ void DP_PRINT_STATS(const char *fmt, ...);
 	DP_PEER_PER_PKT_STATS_INCC(_handle, _field.bytes, _bytes, _cond) \
 }
 
+#define DP_PEER_PER_PKT_STATS_UPD(_handle, _field, _delta) \
+{ \
+	DP_STATS_UPD(_handle, per_pkt_stats._field, _delta); \
+}
+
 #ifndef QCA_ENHANCED_STATS_SUPPORT
 #define DP_PEER_EXTD_STATS_INC(_handle, _field, _delta) \
 { \
@@ -1629,6 +1634,23 @@ void dp_update_vdev_stats(struct dp_soc *soc,
 void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 					struct dp_peer *peer);
 
+#ifdef IPA_OFFLOAD
+#define DP_IPA_UPDATE_RX_STATS(__tgtobj, __srcobj) \
+{ \
+	DP_STATS_AGGR_PKT(__tgtobj, __srcobj, rx.rx_total); \
+}
+
+#define DP_IPA_UPDATE_PER_PKT_RX_STATS(__tgtobj, __srcobj) \
+{ \
+	(__tgtobj)->rx.rx_total.num += (__srcobj)->rx.rx_total.num; \
+	(__tgtobj)->rx.rx_total.bytes += (__srcobj)->rx.rx_total.bytes; \
+}
+#else
+#define DP_IPA_UPDATE_PER_PKT_RX_STATS(tgtobj, srcobj) \
+
+#define DP_IPA_UPDATE_RX_STATS(tgtobj, srcobj)
+#endif
+
 #define DP_UPDATE_STATS(_tgtobj, _srcobj)	\
 	do {				\
 		uint8_t i;		\
@@ -1654,6 +1676,14 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		for (i = 0; i < WME_AC_MAX; i++) { \
 			DP_STATS_AGGR(_tgtobj, _srcobj, tx.wme_ac_type[i]); \
 			DP_STATS_AGGR(_tgtobj, _srcobj, rx.wme_ac_type[i]); \
+			DP_STATS_AGGR(_tgtobj, _srcobj, \
+				      tx.wme_ac_type_bytes[i]); \
+			DP_STATS_AGGR(_tgtobj, _srcobj, \
+				      rx.wme_ac_type_bytes[i]); \
+			DP_STATS_AGGR(_tgtobj, _srcobj, \
+					tx.wme_ac_type_bytes[i]); \
+			DP_STATS_AGGR(_tgtobj, _srcobj, \
+					rx.wme_ac_type_bytes[i]); \
 			DP_STATS_AGGR(_tgtobj, _srcobj, tx.excess_retries_per_ac[i]); \
 		\
 		} \
@@ -1698,6 +1728,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		DP_STATS_AGGR(_tgtobj, _srcobj, tx.dropped.mcast_vdev_drop); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, tx.dropped.invalid_rr); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, tx.dropped.age_out); \
+		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, tx.tx_ucast_total); \
+		DP_STATS_AGGR_PKT(_tgtobj, _srcobj, tx.tx_ucast_success); \
 								\
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.err.mic_err); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.err.decrypt_err); \
@@ -1741,6 +1773,7 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.multipass_rx_pkt_drop); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.peer_unauth_rx_pkt_drop); \
 		DP_STATS_AGGR(_tgtobj, _srcobj, rx.policy_check_drop); \
+		DP_IPA_UPDATE_RX_STATS(_tgtobj, _srcobj); \
 	}  while (0)
 
 #ifdef VDEV_PEER_PROTOCOL_COUNT
@@ -1912,6 +1945,7 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 			_tgtobj->rx.rx_lmac[i].bytes += \
 					_srcobj->rx.rx_lmac[i].bytes; \
 		} \
+		DP_IPA_UPDATE_PER_PKT_RX_STATS(_tgtobj, _srcobj); \
 		DP_UPDATE_PROTOCOL_COUNT_STATS(_tgtobj, _srcobj); \
 	} while (0)
 
@@ -1961,6 +1995,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		} \
 		for (i = 0; i < WME_AC_MAX; i++) { \
 			_tgtobj->tx.wme_ac_type[i] += _srcobj->tx.wme_ac_type[i]; \
+			_tgtobj->tx.wme_ac_type_bytes[i] += \
+					_srcobj->tx.wme_ac_type_bytes[i]; \
 			_tgtobj->tx.excess_retries_per_ac[i] += \
 					_srcobj->tx.excess_retries_per_ac[i]; \
 		} \
@@ -1992,6 +2028,14 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		for (i = 0; i < MAX_MU_GROUP_ID; i++) { \
 			_tgtobj->tx.mu_group_id[i] = _srcobj->tx.mu_group_id[i]; \
 		} \
+		_tgtobj->tx.tx_ucast_total.num += \
+				_srcobj->tx.tx_ucast_total.num;\
+		_tgtobj->tx.tx_ucast_total.bytes += \
+				 _srcobj->tx.tx_ucast_total.bytes;\
+		_tgtobj->tx.tx_ucast_success.num += \
+				_srcobj->tx.tx_ucast_success.num; \
+		_tgtobj->tx.tx_ucast_success.bytes += \
+				_srcobj->tx.tx_ucast_success.bytes; \
 		\
 		_tgtobj->rx.mpdu_cnt_fcs_ok += _srcobj->rx.mpdu_cnt_fcs_ok; \
 		_tgtobj->rx.mpdu_cnt_fcs_err += _srcobj->rx.mpdu_cnt_fcs_err; \
@@ -2025,6 +2069,8 @@ void dp_update_vdev_stats_on_peer_unmap(struct dp_vdev *vdev,
 		} \
 		for (i = 0; i < WME_AC_MAX; i++) { \
 			_tgtobj->rx.wme_ac_type[i] += _srcobj->rx.wme_ac_type[i]; \
+			_tgtobj->rx.wme_ac_type_bytes[i] += \
+					_srcobj->rx.wme_ac_type_bytes[i]; \
 		} \
 		for (i = 0; i < MAX_MCS; i++) { \
 			_tgtobj->rx.su_ax_ppdu_cnt.mcs_count[i] += \
@@ -2379,6 +2425,13 @@ void dp_peer_update_tid_stats_from_reo(struct dp_soc *soc, void *cb_ctxt,
 				       union hal_reo_status *reo_status);
 int dp_peer_get_rxtid_stats_ipa(struct dp_peer *peer,
 				dp_rxtid_stats_cmd_cb dp_stats_cmd_cb);
+#ifdef QCA_ENHANCED_STATS_SUPPORT
+void dp_peer_aggregate_tid_stats(struct dp_peer *peer);
+#endif
+#else
+static inline void dp_peer_aggregate_tid_stats(struct dp_peer *peer)
+{
+}
 #endif
 QDF_STATUS
 dp_set_pn_check_wifi3(struct cdp_soc_t *soc, uint8_t vdev_id,
@@ -4334,4 +4387,8 @@ void dp_destroy_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
  * Return: none
  */
 void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc);
+
+void dp_get_peer_stats(struct dp_peer *peer,
+		       struct cdp_peer_stats *peer_stats);
+
 #endif /* #ifndef _DP_INTERNAL_H_ */
