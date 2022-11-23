@@ -633,6 +633,8 @@ process_peer:
 				dp_sawf(peer, q_id, is_used) = 1;
 				dp_sawf(peer, q_id, svc_id) = service_id;
 				dp_sawf(peer, q_id, ref_count)++;
+				if (!peer->sawf->is_sla)
+					peer->sawf->is_sla = true;
 				if (!peer->sawf->telemetry_ctx) {
 					tmetry_ctx = telemetry_sawf_peer_ctx_alloc(
 							soc, txrx_peer->sawf_stats,
@@ -709,6 +711,61 @@ process_peer:
 }
 
 qdf_export_symbol(dp_sawf_get_msduq);
+
+bool
+dp_swaf_peer_is_sla_configured(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr)
+{
+	struct dp_soc *dp_soc;
+	struct dp_peer *peer = NULL, *primary_link_peer = NULL;
+	struct dp_txrx_peer *txrx_peer;
+	struct dp_peer_sawf *sawf_ctx;
+	bool is_sla = false;
+
+	dp_soc = cdp_soc_t_to_dp_soc(soc_hdl);
+	if (!dp_soc) {
+		dp_sawf_err("Invalid soc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	peer = dp_peer_find_hash_find(dp_soc, mac_addr, 0,
+				      DP_VDEV_ALL, DP_MOD_ID_SAWF);
+	if (!peer) {
+		dp_sawf_err("Invalid peer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	txrx_peer = dp_get_txrx_peer(peer);
+	if (!txrx_peer) {
+		dp_sawf_err("txrx peer is NULL");
+		goto fail;
+	}
+
+	primary_link_peer = dp_get_primary_link_peer_by_id(dp_soc,
+							   txrx_peer->peer_id,
+							   DP_MOD_ID_SAWF);
+	if (!primary_link_peer) {
+		dp_sawf_err("No primary link peer found");
+		goto fail;
+	}
+
+	sawf_ctx = dp_peer_sawf_ctx_get(primary_link_peer);
+	if (!sawf_ctx) {
+		dp_sawf_err("stats_ctx doesn't exist");
+		goto fail;
+	}
+
+	is_sla = sawf_ctx->is_sla;
+	dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
+	dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+
+	return is_sla;
+fail:
+	if (primary_link_peer)
+		dp_peer_unref_delete(primary_link_peer, DP_MOD_ID_SAWF);
+	if (peer)
+		dp_peer_unref_delete(peer, DP_MOD_ID_SAWF);
+	return is_sla;
+}
 
 #ifdef CONFIG_SAWF_STATS
 struct sawf_telemetry_params sawf_telemetry_cfg;
