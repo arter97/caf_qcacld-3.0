@@ -865,6 +865,17 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	/*
+	 * Check if PPEDS could be enabled for Vdev
+	 */
+	if (vdev->wrap_vdev || vdev->nawds_enabled ||
+	    vdev->opmode == wlan_op_mode_monitor ||
+	    vdev->mesh_vdev || vdev->mesh_rx_filter) {
+		dp_err("Unsupported Vdev config for id:%d", vdev_id);
+		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	osif = vdev->osif_vdev;
 	dev = OSIF_TO_NETDEV(osif);
 	if (!dev) {
