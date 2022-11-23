@@ -211,6 +211,7 @@
 #include "wlan_hdd_eht.h"
 #include <linux/bitfield.h>
 #include "wlan_hdd_mlo.h"
+#include "wlan_afc_ucfg_api.h"
 
 #ifdef MODULE
 #define WLAN_MODULE_NAME  module_name(THIS_MODULE)
@@ -16431,8 +16432,14 @@ static QDF_STATUS hdd_component_init(void)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto pkt_capture_deinit;
 
+	status = ucfg_afc_init();
+	if (QDF_IS_STATUS_ERROR(status))
+		goto ftm_time_sync_deinit;
+
 	return QDF_STATUS_SUCCESS;
 
+ftm_time_sync_deinit:
+	ucfg_ftm_time_sync_deinit();
 pkt_capture_deinit:
 	ucfg_pkt_capture_deinit();
 blm_deinit:
@@ -16479,6 +16486,7 @@ mlme_global_deinit:
 static void hdd_component_deinit(void)
 {
 	/* deinitialize non-converged components */
+	ucfg_afc_deinit();
 	ucfg_ftm_time_sync_deinit();
 	ucfg_pkt_capture_deinit();
 	ucfg_blm_deinit();
