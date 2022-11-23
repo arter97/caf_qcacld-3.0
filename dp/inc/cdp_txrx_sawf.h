@@ -339,6 +339,27 @@ cdp_sawf_peer_config_ul(ol_txrx_soc_handle soc, uint8_t *mac_addr, uint8_t tid,
 						  service_interval, burst_size,
 						  add_or_sub);
 }
+
+/*
+ * cdp_swaf_peer_is_sla_configured() - Check if sla is configured for a peer
+ * @soc_hdl: SOC handle
+ * @mac_addr: peer mac address
+ *
+ * Return: true is peer is sla configured
+ */
+static inline bool
+cdp_swaf_peer_is_sla_configured(ol_txrx_soc_handle soc, uint8_t *mac_addr)
+{
+	if (!soc || !soc->ops || !soc->ops->sawf_ops ||
+	    !soc->ops->sawf_ops->swaf_peer_is_sla_configured) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return false;
+	}
+
+	return soc->ops->sawf_ops->swaf_peer_is_sla_configured(soc, mac_addr);
+}
+
 #else
 static inline QDF_STATUS
 cdp_sawf_mpdu_stats_req(ol_txrx_soc_handle soc, uint8_t enable)
@@ -364,6 +385,12 @@ cdp_get_peer_sawf_tx_stats(ol_txrx_soc_handle soc, uint32_t svc_id,
 			   uint8_t *mac, void *data)
 {
 	return QDF_STATUS_E_FAILURE;
+}
+
+static inline bool
+cdp_swaf_peer_is_sla_configured(ol_txrx_soc_handle soc, uint8_t *mac_addr)
+{
+	return false;
 }
 #endif
 #endif /* _CDP_TXRX_SAWF_H_ */

@@ -2184,6 +2184,10 @@ struct cdp_sawf_ops {
 	(*peer_config_ul)(struct cdp_soc_t *hdl, uint8_t *mac_addr, uint8_t tid,
 			  uint32_t service_interval, uint32_t burst_size,
 			  uint8_t add_or_sub);
+	bool
+	(*swaf_peer_is_sla_configured)(struct cdp_soc_t *soc,
+				       uint8_t *mac_addr);
+
 #endif
 };
 #endif
