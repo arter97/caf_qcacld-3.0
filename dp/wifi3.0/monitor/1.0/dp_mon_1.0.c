@@ -219,10 +219,8 @@ static
 void dp_mon_rings_deinit_1_0(struct dp_pdev *pdev)
 {
 	int mac_id = 0;
-	struct wlan_cfg_dp_pdev_ctxt *pdev_cfg_ctx;
 	struct dp_soc *soc = pdev->soc;
 
-	pdev_cfg_ctx = pdev->wlan_cfg_ctx;
 
 	for (mac_id = 0;
 	     mac_id  < soc->wlan_cfg_ctx->num_rxdma_status_rings_per_pdev;
@@ -241,10 +239,8 @@ static
 void dp_mon_rings_free_1_0(struct dp_pdev *pdev)
 {
 	int mac_id = 0;
-	struct wlan_cfg_dp_pdev_ctxt *pdev_cfg_ctx;
 	struct dp_soc *soc = pdev->soc;
 
-	pdev_cfg_ctx = pdev->wlan_cfg_ctx;
 
 	for (mac_id = 0;
 	     mac_id  < soc->wlan_cfg_ctx->num_rxdma_status_rings_per_pdev;
@@ -263,9 +259,6 @@ QDF_STATUS dp_mon_rings_init_1_0(struct dp_pdev *pdev)
 {
 	struct dp_soc *soc = pdev->soc;
 	int mac_id = 0;
-	struct wlan_cfg_dp_pdev_ctxt *pdev_cfg_ctx;
-
-	pdev_cfg_ctx = pdev->wlan_cfg_ctx;
 
 	for (mac_id = 0;
 	     mac_id  < soc->wlan_cfg_ctx->num_rxdma_status_rings_per_pdev;
@@ -400,7 +393,6 @@ QDF_STATUS dp_vdev_set_monitor_mode_buf_rings(struct dp_pdev *pdev)
 QDF_STATUS dp_vdev_set_monitor_mode_rings(struct dp_pdev *pdev,
 					  uint8_t delayed_replenish)
 {
-	struct wlan_cfg_dp_pdev_ctxt *pdev_cfg_ctx;
 	uint32_t mac_id;
 	uint32_t mac_for_pdev;
 	struct dp_soc *soc = pdev->soc;
@@ -409,7 +401,6 @@ QDF_STATUS dp_vdev_set_monitor_mode_rings(struct dp_pdev *pdev,
 	uint32_t num_entries;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 
-	pdev_cfg_ctx = pdev->wlan_cfg_ctx;
 
 	/* If monitor rings are already initialized, return from here */
 	if (mon_pdev->pdev_mon_init)
@@ -709,7 +700,6 @@ static void dp_mon_neighbour_peer_add_ast(struct dp_pdev *pdev,
 	struct dp_neighbour_peer *neighbour_peer = NULL;
 	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
 	struct dp_soc *soc = pdev->soc;
-	uint32_t ret = 0;
 
 	if (mon_pdev->neighbour_peers_added) {
 		qdf_mem_copy(mac_addr,
@@ -724,11 +714,11 @@ static void dp_mon_neighbour_peer_add_ast(struct dp_pdev *pdev,
 			if (!qdf_mem_cmp(&neighbour_peer->neighbour_peers_macaddr,
 					 mac_addr,
 					 QDF_MAC_ADDR_SIZE)) {
-				ret = dp_peer_add_ast(soc,
-						      ta_peer,
-						      mac_addr,
-						      CDP_TXRX_AST_TYPE_WDS,
-						      flags);
+				dp_peer_add_ast(soc,
+						ta_peer,
+						mac_addr,
+						CDP_TXRX_AST_TYPE_WDS,
+						flags);
 				QDF_TRACE(QDF_MODULE_ID_DP,
 					  QDF_TRACE_LEVEL_INFO,
 					  "sa valid and nac roamed to wds");
