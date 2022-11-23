@@ -661,7 +661,9 @@ wmitlv_check_and_pad_tlvs(void *os_handle, void *param_struc_ptr,
 			    || (WMITLV_TAG_ARRAY_BYTE ==
 				attr_struct_ptr.tag_id)
 			    || (WMITLV_TAG_ARRAY_FIXED_STRUC ==
-				attr_struct_ptr.tag_id)) {
+				attr_struct_ptr.tag_id) ||
+				(WMITLV_TAG_ARRAY_INT16 ==
+					attr_struct_ptr.tag_id)) {
 				tlv_size_diff = 0;
 				num_of_elems =
 					curr_tlv_len /
