@@ -4296,6 +4296,11 @@ struct dp_peer {
 #ifdef CONFIG_SAWF_DEF_QUEUES
 	struct dp_peer_sawf *sawf;
 #endif
+	/* AST hash index for peer in HW */
+	uint16_t ast_idx;
+
+	/* AST hash value for peer in HW */
+	uint16_t ast_hash;
 };
 
 /*

@@ -3117,6 +3117,9 @@ dp_rx_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 					   CDP_LINK_PEER_TYPE);
 
 		if (peer) {
+			/* Updating ast_hash and ast_idx in peer level */
+			peer->ast_hash = ast_hash;
+			peer->ast_idx = hw_peer_id;
 			vdev = peer->vdev;
 			/* Only check for STA Vdev and peer is not for TDLS */
 			if (wlan_op_mode_sta == vdev->opmode &&
