@@ -1736,7 +1736,7 @@ mpdu_stitch_fail:
  */
 void dp_rx_mon_fraglist_prepare(qdf_nbuf_t head_msdu, qdf_nbuf_t tail_msdu)
 {
-	qdf_nbuf_t msdu, mpdu_buf, prev_buf, head_frag_list;
+	qdf_nbuf_t msdu, mpdu_buf, head_frag_list;
 	uint32_t frag_list_sum_len;
 
 	dp_err("[%s][%d] decap format raw head %pK head->next %pK last_msdu %pK last_msdu->next %pK",
@@ -1748,7 +1748,6 @@ void dp_rx_mon_fraglist_prepare(qdf_nbuf_t head_msdu, qdf_nbuf_t tail_msdu)
 		return;
 
 	mpdu_buf = head_msdu;
-	prev_buf = mpdu_buf;
 	frag_list_sum_len = 0;
 
 	msdu = qdf_nbuf_next(head_msdu);
@@ -1759,7 +1758,6 @@ void dp_rx_mon_fraglist_prepare(qdf_nbuf_t head_msdu, qdf_nbuf_t tail_msdu)
 
 	while (msdu) {
 		frag_list_sum_len += qdf_nbuf_len(msdu);
-		prev_buf = msdu;
 		msdu = qdf_nbuf_next(msdu);
 	}
 
