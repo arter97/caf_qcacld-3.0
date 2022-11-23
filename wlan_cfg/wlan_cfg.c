@@ -860,11 +860,14 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 		/* tx_ring_near_full_irq mask */
 		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* host2txmon ring masks */
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{WLAN_CFG_HOST2TXMON_RING_MASK_0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 0, 0, 0, 0, 0, 0},
 		/* tx mon ring masks */
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{WLAN_CFG_TX_MON_RING_MASK_0, WLAN_CFG_TX_MON_RING_MASK_1, 0,
+		 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		/* umac reset mask */
-		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		 WLAN_CFG_UMAC_RESET_INTR_MASK_0},
 	},
 	/* Interrupt assignment for 1 MSI combination */
 	{

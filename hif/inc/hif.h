@@ -131,6 +131,11 @@ enum hif_ic_irq {
 	wbm2host_tx_completions_ring2,
 	wbm2host_tx_completions_ring1,
 	tcl2host_status_ring,
+	txmon2host_monitor_destination_mac3,
+	txmon2host_monitor_destination_mac2,
+	txmon2host_monitor_destination_mac1,
+	host2tx_monitor_ring1,
+	umac_reset,
 };
 
 #ifdef QCA_SUPPORT_LEGACY_INTERRUPTS
