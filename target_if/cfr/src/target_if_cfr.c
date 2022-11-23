@@ -529,6 +529,17 @@ static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
 {
 	return target_if_cfr_get_mac_id(pdev);
 }
+#elif defined(QCA_WIFI_QCA6750)
+static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
+{
+	/* Host and FW have agreement about using fixed pdev id for
+	 * CFR on HMT, FW will get correct mac id if host pass soc
+	 * pdev id when start CFR. Since mac id in FW side is
+	 * different to legacy chip if it's concurrency case or 2.4GHz
+	 * band only case or 5/6GHz band only case.
+	 */
+	return WMI_HOST_PDEV_ID_SOC;
+}
 #else
 static uint8_t target_if_cfr_get_pdev_id(struct wlan_objmgr_pdev *pdev)
 {
