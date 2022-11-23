@@ -3092,8 +3092,22 @@ QDF_STATUS
 
 #ifdef WLAN_FEATURE_11BE
 QDF_STATUS (*send_mlo_peer_tid_to_link_map)(
-		wmi_unified_t wmi_handle,
-		struct wmi_host_tid_to_link_map_params *params);
+			wmi_unified_t wmi_handle,
+			struct wmi_host_tid_to_link_map_params *params);
+
+QDF_STATUS (*send_mlo_vdev_tid_to_link_map)(
+			wmi_unified_t wmi_handle,
+			struct wmi_host_tid_to_link_map_ap_params *params);
+
+QDF_STATUS (*extract_mlo_vdev_tid_to_link_map_event)(
+				struct wmi_unified *wmi_handle,
+				uint8_t *buf,
+				struct wmi_host_tid_to_link_map_resp *params);
+
+QDF_STATUS (*extract_mlo_vdev_bcast_tid_to_link_map_event)(
+			struct wmi_unified *wmi_handle,
+			void *buf,
+			struct wmi_host_bcast_t2lm_info *bcast_info);
 #endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS

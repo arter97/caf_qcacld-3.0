@@ -765,6 +765,240 @@ static QDF_STATUS send_mlo_peer_tid_to_link_map_cmd_tlv(
 
 	return ret;
 }
+
+static void update_t2lm_ie_info_params(
+		wmi_mlo_ap_vdev_tid_to_link_map_ie_info * info,
+		struct wlan_t2lm_info *params)
+{
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_CTRL_DIR_SET(
+			info->tid_to_link_map_ctrl,
+			params->direction);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_CTRL_DEF_LINK_SET(
+			info->tid_to_link_map_ctrl,
+			params->default_link_mapping);
+
+	info->map_switch_time = params->mapping_switch_time;
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_CTRL_SWT_TIME_SET(
+			info->tid_to_link_map_ctrl,
+			params->mapping_switch_time_present);
+
+	info->expected_duration = params->expected_duration;
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_CTRL_DUR_TIME_SET(
+			info->tid_to_link_map_ctrl,
+			params->expected_duration_present);
+
+	wmi_debug("tid_to_link_map_ctrl:%x map_switch_time:%d expected_duration:%d",
+		  info->tid_to_link_map_ctrl, info->map_switch_time,
+		  info->expected_duration);
+
+	/* Do not fill link mapping values when default mapping is set to 1 */
+	if (params->default_link_mapping)
+		return;
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_CTRL_LINK_MAP_PRE_SET(
+			info->tid_to_link_map_ctrl, 0xff);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_IEEE_LINK_ID_0_SET(
+			info->ieee_tid_0_1_link_map,
+			params->ieee_link_map_tid[0]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_IEEE_LINK_ID_1_SET(
+			info->ieee_tid_0_1_link_map,
+			params->ieee_link_map_tid[1]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_IEEE_LINK_ID_2_SET(
+			info->ieee_tid_2_3_link_map,
+			params->ieee_link_map_tid[2]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_IEEE_LINK_ID_3_SET(
+			info->ieee_tid_2_3_link_map,
+			params->ieee_link_map_tid[3]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_IEEE_LINK_ID_4_SET(
+			info->ieee_tid_4_5_link_map,
+			params->ieee_link_map_tid[4]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_IEEE_LINK_ID_5_SET(
+			info->ieee_tid_4_5_link_map,
+			params->ieee_link_map_tid[5]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_IEEE_LINK_ID_6_SET(
+			info->ieee_tid_6_7_link_map,
+			params->ieee_link_map_tid[6]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_IEEE_LINK_ID_7_SET(
+			info->ieee_tid_6_7_link_map,
+			params->ieee_link_map_tid[7]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_HW_LINK_ID_0_SET(
+			info->hw_tid_0_1_link_map,
+			params->hw_link_map_tid[0]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_HW_LINK_ID_1_SET(
+			info->hw_tid_0_1_link_map,
+			params->hw_link_map_tid[1]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_HW_LINK_ID_2_SET(
+			info->hw_tid_2_3_link_map,
+			params->hw_link_map_tid[2]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_HW_LINK_ID_3_SET(
+			info->hw_tid_2_3_link_map,
+			params->hw_link_map_tid[3]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_HW_LINK_ID_4_SET(
+			info->hw_tid_4_5_link_map,
+			params->hw_link_map_tid[4]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_HW_LINK_ID_5_SET(
+			info->hw_tid_4_5_link_map,
+			params->hw_link_map_tid[5]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_HW_LINK_ID_6_SET(
+			info->hw_tid_6_7_link_map,
+			params->hw_link_map_tid[6]);
+
+	WMI_MLO_VDEV_TID_TO_LINK_MAP_HW_LINK_ID_7_SET(
+			info->hw_tid_6_7_link_map,
+			params->hw_link_map_tid[7]);
+
+	wmi_debug("tid_to_link_map_ctrl:%x", info->tid_to_link_map_ctrl);
+	wmi_debug("ieee_link_map: tid_0_1:%x tid_2_3:%x tid_4_5:%x tid_6_7:%x",
+		  info->ieee_tid_0_1_link_map, info->ieee_tid_2_3_link_map,
+		  info->ieee_tid_4_5_link_map, info->ieee_tid_6_7_link_map);
+	wmi_debug("hw_link_map: tid_0_1:%x tid_2_3:%x tid_4_5:%x tid_6_7:%x",
+		  info->hw_tid_0_1_link_map, info->hw_tid_2_3_link_map,
+		  info->hw_tid_4_5_link_map, info->hw_tid_6_7_link_map);
+}
+
+static QDF_STATUS send_mlo_vdev_tid_to_link_map_cmd_tlv(
+		wmi_unified_t wmi_handle,
+		struct wmi_host_tid_to_link_map_ap_params *params)
+{
+	wmi_mlo_ap_vdev_tid_to_link_map_cmd_fixed_param *cmd;
+	wmi_mlo_ap_vdev_tid_to_link_map_ie_info *info;
+	wmi_buf_t buf;
+	uint8_t *buf_ptr;
+	QDF_STATUS ret = QDF_STATUS_SUCCESS;
+	uint32_t buf_len = 0;
+	uint32_t num_info = 0;
+
+	buf_len = sizeof(wmi_mlo_ap_vdev_tid_to_link_map_cmd_fixed_param) +
+		WMI_TLV_HDR_SIZE + (params->num_t2lm_info *
+		 sizeof(wmi_mlo_ap_vdev_tid_to_link_map_ie_info));
+
+	buf = wmi_buf_alloc(wmi_handle, buf_len);
+	if (!buf) {
+		wmi_err("wmi buf alloc failed for vdev id %d while t2lm map cmd send: ",
+			params->vdev_id);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	buf_ptr = (uint8_t *)wmi_buf_data(buf);
+	cmd = (wmi_mlo_ap_vdev_tid_to_link_map_cmd_fixed_param *)buf_ptr;
+
+	WMITLV_SET_HDR(
+	       &cmd->tlv_header,
+	       WMITLV_TAG_STRUC_wmi_mlo_ap_vdev_tid_to_link_map_cmd_fixed_param,
+	       WMITLV_GET_STRUCT_TLVLEN(
+	       wmi_mlo_ap_vdev_tid_to_link_map_cmd_fixed_param));
+
+	cmd->pdev_id = wmi_handle->ops->convert_pdev_id_host_to_target(
+			wmi_handle, params->pdev_id);
+	cmd->vdev_id = params->vdev_id;
+	cmd->disabled_link_bitmap = params->disabled_link_bitmap;
+	wmi_debug("pdev_id:%d vdev_id:%d disabled_link_bitmap:%x num_t2lm_info:%d",
+		  cmd->pdev_id, cmd->vdev_id, cmd->disabled_link_bitmap,
+		  params->num_t2lm_info);
+
+	buf_ptr += sizeof(wmi_mlo_ap_vdev_tid_to_link_map_cmd_fixed_param);
+
+	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
+		       (params->num_t2lm_info *
+			sizeof(wmi_mlo_ap_vdev_tid_to_link_map_ie_info)));
+	buf_ptr += sizeof(uint32_t);
+
+	for (num_info = 0; num_info < params->num_t2lm_info; num_info++) {
+		info = (wmi_mlo_ap_vdev_tid_to_link_map_ie_info *)buf_ptr;
+
+		WMITLV_SET_HDR(
+		       &info->tlv_header,
+		       WMITLV_TAG_STRUC_wmi_mlo_ap_vdev_tid_to_link_map_ie_info,
+		       WMITLV_GET_STRUCT_TLVLEN(
+		       wmi_mlo_ap_vdev_tid_to_link_map_ie_info));
+		update_t2lm_ie_info_params(info, &params->info[num_info]);
+		buf_ptr += sizeof(wmi_mlo_ap_vdev_tid_to_link_map_ie_info);
+	}
+
+	wmi_mtrace(WMI_MLO_AP_VDEV_TID_TO_LINK_MAP_CMDID, cmd->vdev_id, 0);
+	ret = wmi_unified_cmd_send(wmi_handle, buf, buf_len,
+				   WMI_MLO_AP_VDEV_TID_TO_LINK_MAP_CMDID);
+	if (ret) {
+		wmi_err("Failed to send T2LM command to FW: %d vdev id %d",
+			ret, cmd->vdev_id);
+		wmi_buf_free(buf);
+	}
+
+	return ret;
+}
+
+static QDF_STATUS
+extract_mlo_vdev_tid_to_link_map_event_tlv(
+				struct wmi_unified *wmi_handle,
+				uint8_t *buf,
+				struct wmi_host_tid_to_link_map_resp *params)
+{
+	WMI_MLO_AP_VDEV_TID_TO_LINK_MAP_EVENTID_param_tlvs *param_buf;
+	wmi_mlo_ap_vdev_tid_to_link_map_evt_fixed_param *ev;
+
+	param_buf = (WMI_MLO_AP_VDEV_TID_TO_LINK_MAP_EVENTID_param_tlvs *)buf;
+	if (!param_buf) {
+		wmi_err_rl("Param_buf is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	ev = (wmi_mlo_ap_vdev_tid_to_link_map_evt_fixed_param *)
+		param_buf->fixed_param;
+
+	params->vdev_id = ev->vdev_id;
+	params->status  = ev->status_type;
+	params->mapping_switch_tsf = ev->mapping_switch_tsf;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static QDF_STATUS
+extract_mlo_vdev_bcast_tid_to_link_map_event_tlv(
+				struct wmi_unified *wmi_handle,
+				void *buf,
+				struct wmi_host_bcast_t2lm_info *bcast_info)
+{
+	WMI_MGMT_RX_EVENTID_param_tlvs *param_tlvs;
+	wmi_mlo_bcast_t2lm_info *info;
+
+	param_tlvs = (WMI_MGMT_RX_EVENTID_param_tlvs *)buf;
+	if (!param_tlvs) {
+		wmi_err(" MGMT RX param_tlvs is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	info = param_tlvs->mlo_bcast_t2lm_info;
+	if (!info) {
+		wmi_debug("mgmt_ml_info TLV is not sent by FW");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	bcast_info->vdev_id =
+		WMI_MLO_BROADCAST_TID_TO_LINK_MAP_INFO_VDEV_ID_GET(
+			info->vdev_id_expec_dur);
+
+	bcast_info->expected_duration =
+		WMI_MLO_BROADCAST_TID_TO_LINK_MAP_INFO_VDEV_ID_GET(
+				info->vdev_id_expec_dur);
+
+	return QDF_STATUS_SUCCESS;
+}
 #else
 size_t peer_assoc_t2lm_params_size(struct peer_assoc_params *req)
 {
@@ -1060,6 +1294,12 @@ void wmi_11be_attach_tlv(wmi_unified_t wmi_handle)
 #ifdef WLAN_FEATURE_11BE
 	ops->send_mlo_peer_tid_to_link_map =
 		send_mlo_peer_tid_to_link_map_cmd_tlv;
+	ops->send_mlo_vdev_tid_to_link_map =
+		send_mlo_vdev_tid_to_link_map_cmd_tlv;
+	ops->extract_mlo_vdev_tid_to_link_map_event =
+		extract_mlo_vdev_tid_to_link_map_event_tlv;
+	ops->extract_mlo_vdev_bcast_tid_to_link_map_event =
+		extract_mlo_vdev_bcast_tid_to_link_map_event_tlv;
 #endif /* WLAN_FEATURE_11BE */
 	ops->extract_mgmt_rx_ml_cu_params =
 		extract_mgmt_rx_ml_cu_params_tlv;

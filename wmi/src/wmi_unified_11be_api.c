@@ -69,6 +69,45 @@ QDF_STATUS wmi_send_mlo_peer_tid_to_link_map_cmd(
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS wmi_send_mlo_vdev_tid_to_link_map_cmd(
+		wmi_unified_t wmi,
+		struct wmi_host_tid_to_link_map_ap_params *params)
+{
+	if (wmi->ops->send_mlo_vdev_tid_to_link_map)
+		return wmi->ops->send_mlo_vdev_tid_to_link_map(wmi, params);
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_mlo_vdev_tid_to_link_map_event(
+				     wmi_unified_t wmi,
+				     void *evt_buf,
+				     struct wmi_host_tid_to_link_map_resp *resp)
+{
+	if (wmi->ops->extract_mlo_vdev_tid_to_link_map_event) {
+		return wmi->ops->extract_mlo_vdev_tid_to_link_map_event(wmi,
+									evt_buf,
+									resp);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+
+QDF_STATUS
+wmi_extract_mlo_vdev_bcast_tid_to_link_map_event(
+				     wmi_unified_t wmi,
+				     void *evt_buf,
+				     struct wmi_host_bcast_t2lm_info *bcast)
+{
+	if (wmi->ops->extract_mlo_vdev_bcast_tid_to_link_map_event) {
+		return wmi->ops->extract_mlo_vdev_bcast_tid_to_link_map_event(
+						wmi,
+						evt_buf,
+						bcast);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
 #endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS
