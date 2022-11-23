@@ -1000,14 +1000,12 @@ QDF_STATUS dp_mon_filter_update_1_0(struct dp_pdev *pdev)
 	bool mon_mode_set = false;
 	struct dp_mon_filter filter = {0};
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	struct dp_mon_pdev *mon_pdev;
 
 	if (!pdev) {
 		dp_mon_filter_err("pdev Context is null");
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	mon_pdev = pdev->monitor_pdev;
 	soc = pdev->soc;
 	if (!soc) {
 		dp_mon_filter_err("Soc Context is null");
