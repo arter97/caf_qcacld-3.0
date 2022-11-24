@@ -1384,6 +1384,10 @@ static void __wlan_ipa_w2i_cb(void *priv, qdf_ipa_dp_evt_type_t evt,
 				     QDF_NBUF_SRC_MAC_OFFSET,
 				     QDF_MAC_ADDR_SIZE);
 
+		cdp_ipa_update_peer_rx_stats(ipa_ctx->dp_soc,
+					     iface_context->session_id,
+					     &peer_mac_addr.bytes[0],
+					     skb);
 		if (qdf_nbuf_is_ipv4_eapol_pkt(skb)) {
 			is_eapol_wapi = true;
 			if (iface_context->device_mode == QDF_SAP_MODE &&

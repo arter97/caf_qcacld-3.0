@@ -767,6 +767,33 @@ cdp_ipa_ast_create(ol_txrx_soc_handle soc, qdf_ipa_ast_info_type_t *data)
 }
 #endif
 
+/**
+ * cdp_ipa_update_peer_rx_stats - update peer rx stats
+ * @soc: data path soc handle
+ * @vdev_id: vdev id
+ * @peer_mac: Peer Mac Address
+ * @nbuf: pointer to data packet
+ *
+ * Return: QDF_STATUS
+ */
+static inline QDF_STATUS
+cdp_ipa_update_peer_rx_stats(ol_txrx_soc_handle soc, uint8_t vdev_id,
+			     uint8_t *peer_mac, qdf_nbuf_t nbuf)
+{
+	if (!soc || !soc->ops || !soc->ops->ipa_ops) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
+			  "%s invalid instance", __func__);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (soc->ops->ipa_ops->ipa_update_peer_rx_stats)
+		return soc->ops->ipa_ops->ipa_update_peer_rx_stats(soc,
+								   vdev_id,
+								   peer_mac,
+								   nbuf);
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif /* IPA_OFFLOAD */
 
 #endif /* _CDP_TXRX_IPA_H_ */

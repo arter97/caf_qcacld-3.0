@@ -1961,6 +1961,10 @@ struct cdp_ipa_ops {
 					uint8_t vdev_id, qdf_nbuf_t skb);
 	void (*ipa_set_uc_tx_partition_base)(struct cdp_cfg *pdev,
 		uint32_t value);
+	QDF_STATUS (*ipa_update_peer_rx_stats)(struct cdp_soc_t *soc_hdl,
+					       uint8_t vdev_id,
+					       uint8_t *peer_mac,
+					       qdf_nbuf_t nbuf);
 #ifdef FEATURE_METERING
 	QDF_STATUS (*ipa_uc_get_share_stats)(struct cdp_soc_t *soc_hdl,
 					     uint8_t pdev_id,
