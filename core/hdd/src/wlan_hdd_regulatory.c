@@ -1598,8 +1598,10 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 		width_changed = false;
 		oper_freq = hdd_get_adapter_home_channel(adapter);
 		if (oper_freq)
-			freq_changed = wlan_reg_is_disable_for_freq(pdev,
-								    oper_freq);
+			freq_changed = wlan_reg_is_disable_for_pwrmode(
+							pdev,
+							oper_freq,
+							REG_CURRENT_PWR_MODE);
 		else
 			freq_changed = false;
 
@@ -1622,15 +1624,23 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 								    adapter,
 								    oper_freq);
 
-			if (hdd_is_vdev_in_conn_state(adapter) &&
-			    (phy_changed || freq_changed || width_changed)) {
-				hdd_debug("changed: phy %d, freq %d, width %d",
-					  phy_changed, freq_changed,
-					  width_changed);
-				wlan_hdd_cm_issue_disconnect(adapter,
+			if (hdd_is_vdev_in_conn_state(adapter)) {
+				if (phy_changed || freq_changed ||
+				    width_changed) {
+					hdd_debug("changed: phy %d, freq %d, width %d",
+						  phy_changed, freq_changed,
+						  width_changed);
+					wlan_hdd_cm_issue_disconnect(
+							adapter,
 							REASON_UNSPEC_FAILURE,
 							false);
-				sta_ctx->reg_phymode = csr_phy_mode;
+					sta_ctx->reg_phymode = csr_phy_mode;
+				} else {
+					hdd_debug("Remain on current channel but update tx power");
+					wlan_reg_update_tx_power_on_ctry_change(
+							pdev,
+							adapter->vdev_id);
+				}
 			}
 			break;
 		default:
@@ -1766,6 +1776,10 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 			else
 				policy_mgr_check_sap_restart(hdd_ctx->psoc,
 							     adapter->vdev_id);
+				hdd_debug("Update tx power due to ctry change");
+				wlan_reg_update_tx_power_on_ctry_change(
+							pdev,
+							adapter->vdev_id);
 			break;
 		default:
 			break;
@@ -1923,7 +1937,6 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {
 	bool offload_enabled;
 	struct regulatory_channel *cur_chan_list;
-	uint8_t alpha2[REG_ALPHA2_LEN + 1];
 	int ret;
 
 	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
@@ -1965,7 +1978,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_2GHZ);
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_5GHZ);
 	fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
-	qdf_mem_copy(hdd_ctx->reg.alpha2, alpha2, REG_ALPHA2_LEN + 1);
+	qdf_mem_zero(hdd_ctx->reg.alpha2, REG_ALPHA2_LEN + 1);
 
 	qdf_mem_free(cur_chan_list);
 	return 0;

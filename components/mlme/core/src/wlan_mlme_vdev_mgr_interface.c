@@ -173,12 +173,12 @@ static QDF_STATUS sta_mlme_vdev_start_send(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
- * sta_mlme_start_continue() - vdev start rsp calback
+ * sta_mlme_start_continue() - vdev start rsp callback
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
  *
- * This function is called to handle the VDEV START/RESTART calback
+ * This function is called to handle the VDEV START/RESTART callback
  *
  * Return: QDF_STATUS
  */
@@ -408,12 +408,12 @@ static QDF_STATUS ap_mlme_vdev_start_send(struct vdev_mlme_obj *vdev_mlme,
 }
 
 /**
- * ap_start_continue () - vdev start rsp calback
+ * ap_start_continue () - vdev start rsp callback
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
  *
- * This function is called to handle the VDEV START/RESTART calback
+ * This function is called to handle the VDEV START/RESTART callback
  *
  * Return: QDF_STATUS
  */
@@ -1425,6 +1425,39 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_create(struct vdev_mlme_obj *vdev_mlme)
 	return status;
 }
 
+static QDF_STATUS
+mlme_wma_vdev_detach_post_cb(struct scheduler_msg *msg)
+{
+	struct vdev_delete_response rsp = {0};
+
+	if (!msg) {
+		mlme_err("Msg is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	rsp.vdev_id = msg->bodyval;
+	wma_vdev_detach_callback(&rsp);
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void mlme_wma_vdev_detach_handler(uint8_t vdev_id)
+{
+	struct scheduler_msg msg = {0};
+
+	msg.bodyptr = NULL;
+	msg.bodyval = vdev_id;
+	msg.callback = mlme_wma_vdev_detach_post_cb;
+
+	if (scheduler_post_message(QDF_MODULE_ID_MLME,
+				   QDF_MODULE_ID_TARGET_IF,
+				   QDF_MODULE_ID_TARGET_IF, &msg) ==
+				   QDF_STATUS_SUCCESS)
+		return;
+
+	mlme_err("Failed to post wma vdev detach");
+}
+
 /**
  * vdevmgr_mlme_ext_hdl_destroy () - Destroy mlme legacy priv object
  * @vdev_mlme: vdev mlme object
@@ -1435,7 +1468,6 @@ static
 QDF_STATUS vdevmgr_mlme_ext_hdl_destroy(struct vdev_mlme_obj *vdev_mlme)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	struct vdev_delete_response rsp;
 	uint8_t vdev_id;
 
 	vdev_id = vdev_mlme->vdev->vdev_objmgr.vdev_id;
@@ -1448,8 +1480,7 @@ QDF_STATUS vdevmgr_mlme_ext_hdl_destroy(struct vdev_mlme_obj *vdev_mlme)
 	status = vdev_mgr_delete_send(vdev_mlme);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mlme_err("Failed to send vdev delete to firmware");
-			 rsp.vdev_id = vdev_id;
-		wma_vdev_detach_callback(&rsp);
+		mlme_wma_vdev_detach_handler(vdev_id);
 	}
 
 	mlme_ext_handler_destroy(vdev_mlme);
@@ -1506,12 +1537,12 @@ static QDF_STATUS mon_mlme_vdev_start_restart_send(
 }
 
 /**
- * mon_start_continue () - vdev start rsp calback
+ * mon_start_continue () - vdev start rsp callback
  * @vdev_mlme: vdev mlme object
  * @data_len: event data length
  * @data: event data
  *
- * This function is called to handle the VDEV START/RESTART calback
+ * This function is called to handle the VDEV START/RESTART callback
  *
  * Return: QDF_STATUS
  */
@@ -1811,7 +1842,7 @@ void mlme_vdev_self_peer_delete_resp(struct del_vdev_params *param)
 					QDF_MODULE_ID_SME,
 					QDF_MODULE_ID_SME, &peer_del_rsp);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
-		/* In the error cases release the final sme referene */
+		/* In the error cases release the final sme reference */
 		wlan_objmgr_vdev_release_ref(param->vdev, WLAN_LEGACY_SME_ID);
 		qdf_mem_free(param);
 	}
@@ -1875,7 +1906,7 @@ static QDF_STATUS ap_mlme_vdev_csa_complete(struct vdev_mlme_obj *vdev_mlme)
 }
 
 /**
- * struct sta_mlme_ops - VDEV MLME operation callbacks strucutre for sta
+ * struct sta_mlme_ops - VDEV MLME operation callbacks structure for sta
  * @mlme_vdev_start_send:               callback to initiate actions of VDEV
  *                                      MLME start operation
  * @mlme_vdev_restart_send:             callback to initiate actions of VDEV
@@ -1927,7 +1958,7 @@ static struct vdev_mlme_ops sta_mlme_ops = {
 };
 
 /**
- * struct ap_mlme_ops - VDEV MLME operation callbacks strucutre for beaconing
+ * struct ap_mlme_ops - VDEV MLME operation callbacks structure for beaconing
  *                      interface
  * @mlme_vdev_start_send:               callback to initiate actions of VDEV
  *                                      MLME start operation

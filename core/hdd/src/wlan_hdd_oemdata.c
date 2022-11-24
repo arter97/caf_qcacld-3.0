@@ -403,8 +403,8 @@ void hdd_update_channel_bw_info(struct hdd_context *hdd_ctx,
 	/* Passing CH_WIDTH_MAX will give the max bandwidth supported */
 	ch_params.ch_width = CH_WIDTH_MAX;
 
-	wlan_reg_set_channel_params_for_freq(
-		hdd_ctx->pdev, chan_freq, 0, &ch_params);
+	wlan_reg_set_channel_params_for_pwrmode(
+		hdd_ctx->pdev, chan_freq, 0, &ch_params, REG_CURRENT_PWR_MODE);
 	if (ch_params.center_freq_seg0)
 		hdd_chan_info->band_center_freq1 =
 			cds_chan_to_freq(ch_params.center_freq_seg0);
@@ -504,8 +504,9 @@ static int oem_process_channel_info_req_msg(int numOfChannels, char *chanList)
 
 			hddChanInfo.info = 0;
 			if (CHANNEL_STATE_DFS ==
-			    wlan_reg_get_channel_state_for_freq(
-				p_hdd_ctx->pdev, chan_freq))
+			    wlan_reg_get_channel_state_for_pwrmode(
+						p_hdd_ctx->pdev, chan_freq,
+						REG_CURRENT_PWR_MODE))
 				WMI_SET_CHANNEL_FLAG(&hddChanInfo,
 						     WMI_CHAN_FLAG_DFS);
 
@@ -1151,37 +1152,22 @@ static void hdd_copy_file_name_and_oem_data(
 		return;
 	}
 
-	if (hdd_ctx->oem_data || hdd_ctx->file_name) {
-		hdd_err("OEM data or file name already present");
+	if (oem_event_data->data_len > HDD_MAX_OEM_DATA_LEN ||
+	    oem_event_data->file_name_len > HDD_MAX_FILE_NAME_LEN) {
+		hdd_err("Invalid oem data len %zu or file name len %d",
+			oem_event_data->data_len,
+			oem_event_data->file_name_len);
 		return;
 	}
+	qdf_mem_zero(hdd_ctx->oem_data, HDD_MAX_OEM_DATA_LEN);
+	qdf_mem_zero(hdd_ctx->file_name, HDD_MAX_FILE_NAME_LEN);
 
-	hdd_ctx->oem_data = qdf_mem_malloc(oem_event_data->data_len);
-	if (hdd_ctx->oem_data) {
-		hdd_ctx->oem_data_len = oem_event_data->data_len;
-		qdf_mem_copy(hdd_ctx->oem_data, oem_event_data->data,
-			     oem_event_data->data_len);
-		hdd_ctx->file_name = qdf_mem_malloc(
-					oem_event_data->file_name_len);
-		if (hdd_ctx->file_name)
-			qdf_mem_copy(hdd_ctx->file_name,
-				     oem_event_data->file_name,
-				     oem_event_data->file_name_len);
-		else
-			qdf_mem_free(hdd_ctx->oem_data);
-	}
-}
+	qdf_mem_copy(hdd_ctx->oem_data, oem_event_data->data,
+		     oem_event_data->data_len);
+	hdd_ctx->oem_data_len = oem_event_data->data_len;
 
-/**
- * hdd_create_wifi_feature_interface() - Create wifi feature interface
- * @hdd_ctx: pointer to hdd context
- *
- * Return: none
- */
-static void hdd_create_wifi_feature_interface(struct hdd_context *hdd_ctx)
-{
-	hdd_sysfs_create_wifi_root_obj(hdd_ctx);
-	hdd_create_wifi_feature_interface_sysfs_file();
+	qdf_mem_copy(hdd_ctx->file_name, oem_event_data->file_name,
+		     oem_event_data->file_name_len);
 }
 
 void hdd_oem_event_async_cb(const struct oem_data *oem_event_data)
@@ -1200,7 +1186,7 @@ void hdd_oem_event_async_cb(const struct oem_data *oem_event_data)
 
 	if (oem_event_data->file_name) {
 		hdd_copy_file_name_and_oem_data(hdd_ctx, oem_event_data);
-		return hdd_create_wifi_feature_interface(hdd_ctx);
+		return;
 	}
 
 	adapter = hdd_get_adapter_by_vdev(hdd_ctx, oem_event_data->vdev_id);

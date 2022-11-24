@@ -851,6 +851,10 @@ QDF_STATUS pe_open(struct mac_context *mac, struct cds_config_info *cds_cfg)
 	lim_nan_register_callbacks(mac);
 	p2p_register_callbacks(mac);
 	lim_register_sap_bcn_callback(mac);
+	wlan_reg_register_ctry_change_callback(
+					mac->psoc,
+					lim_update_tx_pwr_on_ctry_change_cb);
+
 	if (mac->mlme_cfg->edca_params.enable_edca_params)
 		lim_register_policy_mgr_callback(mac->psoc);
 
@@ -893,6 +897,9 @@ QDF_STATUS pe_close(struct mac_context *mac)
 	qdf_hang_event_unregister_notifier(&pe_hang_event_notifier);
 	lim_cleanup(mac);
 	lim_unregister_sap_bcn_callback(mac);
+	wlan_reg_unregister_ctry_change_callback(
+					mac->psoc,
+					lim_update_tx_pwr_on_ctry_change_cb);
 
 	if (mac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq) {
 		qdf_mem_free(mac->lim.limDisassocDeauthCnfReq.pMlmDeauthReq);
@@ -1467,7 +1474,7 @@ lim_enc_type_matched(struct mac_context *mac_ctx,
 	 * check for security type in case
 	 * OSEN session.
 	 * For WPS registration session no need to detect
-	 * detect security mismatch as it wont match and
+	 * detect security mismatch as it won't match and
 	 * driver may end up sending probe request without
 	 * WPS IE during WPS registration process.
 	 */
@@ -1895,11 +1902,18 @@ static void pe_update_crypto_params(struct mac_context *mac_ctx,
 		pe_err("crypto params is null");
 		return;
 	}
-	pe_nofl_debug("vdev %d roam auth 0x%x akm 0x%0x rsn_caps 0x%x",
+
+	ft_session->connected_akm =
+		lim_get_connected_akm(ft_session, crypto_params->ucastcipherset,
+				      crypto_params->authmodeset,
+				      crypto_params->key_mgmt);
+	pe_nofl_debug("vdev %d roam auth 0x%x akm 0x%0x rsn_caps 0x%x ucastcipher 0x%x akm %d",
 		      ft_session->vdev_id,
 		      crypto_params->authmodeset,
 		      crypto_params->key_mgmt,
-		      crypto_params->rsn_caps);
+		      crypto_params->rsn_caps,
+		      crypto_params->ucastcipherset,
+		      ft_session->connected_akm);
 }
 
 /**
@@ -1934,7 +1948,7 @@ lim_roam_gen_mbssid_beacon(struct mac_context *mac,
 			   uint8_t **ie, uint32_t *ie_len)
 {
 	qdf_list_t *scan_list;
-	struct mgmt_rx_event_params rx_param;
+	struct mgmt_rx_event_params rx_param = {0};
 	uint8_t list_count = 0, i;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	qdf_list_node_t *next_node = NULL, *cur_node = NULL;
@@ -1952,6 +1966,10 @@ lim_roam_gen_mbssid_beacon(struct mac_context *mac,
 	rx_param.chan_freq = roam_ind->chan_freq;
 	rx_param.pdev_id = wlan_objmgr_pdev_get_pdev_id(mac->pdev);
 	rx_param.rssi = roam_ind->rssi;
+
+	/* Set all per chain rssi as invalid */
+	for (i = 0; i < WLAN_MGMT_TXRX_HOST_MAX_ANTENNA; i++)
+		rx_param.rssi_ctl[i] = WLAN_INVALID_PER_CHAIN_RSSI;
 
 	scan_list = util_scan_unpack_beacon_frame(mac->pdev, bcn_prb_ptr,
 						  roam_ind->beaconProbeRespLength,
@@ -2198,7 +2216,7 @@ lim_roam_fill_bss_descr(struct mac_context *mac,
 	}
 
 	/*
-	 * Length of BSS desription is without length of
+	 * Length of BSS description is without length of
 	 * length itself and length of pointer
 	 * that holds ieFields
 	 *
@@ -2431,9 +2449,13 @@ pe_disconnect_callback(struct mac_context *mac, uint8_t vdev_id,
 	if (!lim_is_sb_disconnect_allowed(session))
 		return QDF_STATUS_SUCCESS;
 
-	if (!(deauth_disassoc_frame ||
-	      deauth_disassoc_frame_len > SIR_MAC_MIN_IE_LEN))
+	if (!deauth_disassoc_frame ||
+	    deauth_disassoc_frame_len <
+	    (sizeof(struct wlan_frame_hdr) + sizeof(reason_code))) {
+		pe_err_rl("Discard invalid disconnect evt. frame len:%d",
+			  deauth_disassoc_frame_len);
 		goto end;
+	}
 
 	/*
 	 * Use vdev pmf status instead of peer pmf capability as
@@ -2606,7 +2628,7 @@ lim_gen_link_specific_assoc_rsp(struct mac_context *mac_ctx,
 	}
 
 	lim_process_assoc_rsp_frame(mac_ctx, link_reassoc_rsp.ptr,
-				    link_reassoc_rsp.len,
+				    link_reassoc_rsp.len - SIR_MAC_HDR_LEN_3A,
 				    LIM_REASSOC, session_entry);
 end:
 	qdf_mem_free(link_reassoc_rsp.ptr);
@@ -2745,6 +2767,10 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	qdf_mem_copy(roam_sync_ind_ptr->ssid.ssid, ft_session_ptr->ssId.ssId,
 		     roam_sync_ind_ptr->ssid.length);
 	pe_update_crypto_params(mac_ctx, ft_session_ptr, roam_sync_ind_ptr);
+
+	/* Reset the SPMK global cache */
+	wlan_mlme_set_sae_single_pmk_bss_cap(mac_ctx->psoc, vdev_id, false);
+
 	/* Next routine may update nss based on dot11Mode */
 
 	lim_ft_prepare_add_bss_req(mac_ctx, ft_session_ptr, bss_desc);
@@ -2802,7 +2828,7 @@ pe_roam_synch_callback(struct mac_context *mac_ctx,
 	}
 	else
 		lim_process_assoc_rsp_frame(mac_ctx, reassoc_resp,
-					    roam_sync_ind_ptr->reassocRespLength,
+					    roam_sync_ind_ptr->reassocRespLength - SIR_MAC_HDR_LEN_3A,
 					    LIM_REASSOC, ft_session_ptr);
 
 	lim_check_ft_initial_im_association(roam_sync_ind_ptr, ft_session_ptr);
@@ -2883,7 +2909,7 @@ static bool lim_is_beacon_miss_scenario(struct mac_context *mac,
 
    This function is called before enqueuing the frame to PE queue for further processing.
    This prevents unnecessary frames getting into PE Queue and drops them right away.
-   Frames will be droped in the following scenarios:
+   Frames will be dropped in the following scenarios:
 
    - In Scan State, drop the frames which are not marked as scan frames
    - In non-Scan state, drop the frames which are marked as scan frames.
@@ -2935,7 +2961,7 @@ tMgmtFrmDropReason lim_is_pkt_candidate_for_drop(struct mac_context *mac,
 			return eMGMT_DROP_NO_DROP;
 
 		/* Drop INFRA Beacons and Probe Responses in IBSS Mode */
-		/* This can be enhanced to even check the SSID before deciding to enque the frame. */
+		/* This can be enhanced to even check the SSID before deciding to enqueue the frame. */
 		if (capabilityInfo.ess)
 			return eMGMT_DROP_INFRA_BCN_IN_IBSS;
 
@@ -3303,8 +3329,10 @@ lim_cm_fill_link_session(struct mac_context *mac_ctx,
 		pe_session->limMlmState = eLIM_MLM_WT_REASSOC_RSP_STATE;
 	}
 end:
-	if (QDF_IS_STATUS_ERROR(status))
+	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_mem_free(pe_session->lim_join_req);
+		pe_session->lim_join_req = NULL;
+	}
 	return status;
 }
 
@@ -3575,6 +3603,24 @@ lim_validate_probe_rsp_link_info(struct pe_session *session_entry,
 		}
 	}
 
+	/* WAR: currently util_gen_link_reqrsp_cmn generates only the first
+	 * partner link and DUT only 2 mlo link is supported, so let's just
+	 * comparing the first partner info to check whether mlo is possible.
+	 */
+	if (ml_partner_info.num_partner_links == 1) {
+		if (partner_info.partner_link_info[0].link_id ==
+		    ml_partner_info.partner_link_info[0].link_id &&
+		    (qdf_is_macaddr_equal(&ml_partner_info.partner_link_info[0].link_addr,
+					  &partner_info.partner_link_info[0].link_addr)))
+			status = QDF_STATUS_SUCCESS;
+		else
+			status = QDF_STATUS_E_PROTO;
+
+		pe_debug("DUT num partner: %d, AP num partner: %d, status: %d",
+			 ml_partner_info.num_partner_links,
+			 partner_info.num_partner_links, status);
+	}
+
 	return status;
 }
 
@@ -3626,7 +3672,7 @@ lim_gen_link_specific_probe_rsp(struct mac_context *mac_ctx,
 				uint32_t probe_rsp_len,
 				int32_t rssi)
 {
-	struct element_info link_probe_rsp;
+	struct element_info link_probe_rsp = {0};
 	struct qdf_mac_addr sta_link_addr;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 	struct mlo_link_info *link_info = NULL;
@@ -3715,5 +3761,34 @@ end:
 		qdf_mem_free(link_probe_rsp.ptr);
 	link_probe_rsp.len = 0;
 	return status;
+}
+#endif
+
+#ifdef WLAN_FEATURE_SR
+void lim_update_vdev_sr_elements(struct pe_session *session_entry,
+				 tpDphHashNode sta_ds)
+{
+	uint8_t sr_ctrl;
+	uint8_t non_srg_max_pd_offset, srg_min_pd_offset, srg_max_pd_offset;
+	tDot11fIEspatial_reuse *srp_ie = &sta_ds->parsed_ies.srp_ie;
+
+	sr_ctrl = srp_ie->sr_value15_allow << 4 |
+		  srp_ie->srg_info_present << 3 |
+		  srp_ie->non_srg_offset_present << 2 |
+		  srp_ie->non_srg_pd_sr_disallow << 1 |
+		  srp_ie->psr_disallow;
+	non_srg_max_pd_offset =
+		srp_ie->non_srg_offset.info.non_srg_pd_max_offset;
+	srg_min_pd_offset = srp_ie->srg_info.info.srg_pd_min_offset;
+	srg_max_pd_offset = srp_ie->srg_info.info.srg_pd_max_offset;
+	pe_debug("Spatial Reuse Control field: %x Non-SRG Max PD Offset: %x SRG range %d - %d",
+		 sr_ctrl, non_srg_max_pd_offset, srg_min_pd_offset,
+		 srg_max_pd_offset);
+
+	wlan_vdev_mlme_set_sr_ctrl(session_entry->vdev, sr_ctrl);
+	wlan_vdev_mlme_set_pd_offset(session_entry->vdev,
+				     non_srg_max_pd_offset);
+	wlan_vdev_mlme_set_srg_pd_offset(session_entry->vdev, srg_max_pd_offset,
+					 srg_min_pd_offset);
 }
 #endif

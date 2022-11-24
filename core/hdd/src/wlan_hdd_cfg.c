@@ -318,8 +318,7 @@ QDF_STATUS hdd_update_mac_config(struct hdd_context *hdd_ctx)
 			     &hdd_ctx->derived_mac_addr[0].bytes[0],
 			     sizeof(custom_mac_addr));
 
-	hdd_update_mld_mac_addr(hdd_ctx, custom_mac_addr);
-	sme_set_custom_mac_addr(custom_mac_addr.bytes);
+	qdf_status = sme_set_custom_mac_addr(custom_mac_addr.bytes);
 
 config_exit:
 	qdf_mem_free(temp);
@@ -2127,6 +2126,7 @@ int hdd_update_channel_width(struct hdd_adapter *adapter,
 	sme_config->csr_config.channelBondingMode24GHz = bonding_mode;
 	sme_update_config(hdd_ctx->mac_handle, sme_config);
 	sme_set_he_bw_cap(hdd_ctx->mac_handle, adapter->vdev_id, chwidth);
+	sme_set_eht_bw_cap(hdd_ctx->mac_handle, adapter->vdev_id, chwidth);
 	sme_set_vdev_ies_per_band(hdd_ctx->mac_handle, adapter->vdev_id,
 				  adapter->device_mode);
 

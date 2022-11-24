@@ -1332,7 +1332,7 @@ QDF_STATUS policy_mgr_next_actions(
 	case PM_DOWNGRADE:
 		/*
 		 * check if we have a beaconing entity that advertised 2x2
-		 * intially. If yes, update the beacon template & notify FW.
+		 * initially. If yes, update the beacon template & notify FW.
 		 */
 		status = policy_mgr_nss_update(psoc, POLICY_MGR_RX_NSS_1,
 					PM_NOP, POLICY_MGR_ANY, reason,
@@ -1341,7 +1341,7 @@ QDF_STATUS policy_mgr_next_actions(
 	case PM_UPGRADE:
 		/*
 		 * check if we have a beaconing entity that advertised 2x2
-		 * intially. If yes, update the beacon template & notify FW.
+		 * initially. If yes, update the beacon template & notify FW.
 		 */
 		status = policy_mgr_nss_update(psoc, POLICY_MGR_RX_NSS_2,
 					PM_NOP, POLICY_MGR_ANY, reason,
@@ -1563,7 +1563,8 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 		(unsigned long)policy_mgr_get_freq_restriction_mask(pm_ctx);
 	for (j = 0; j < pm_ctx->unsafe_channel_count; j++) {
 		if ((ch_freq == pm_ctx->unsafe_channel_list[j]) &&
-		    (qdf_test_bit(QDF_SAP_MODE, &restriction_mask))) {
+		    (qdf_test_bit(QDF_SAP_MODE, &restriction_mask) ||
+		     !wlan_mlme_get_coex_unsafe_chan_nb_user_prefer(psoc))) {
 			is_safe = false;
 			policy_mgr_warn("Freq %d is not safe, restriction mask %lu", ch_freq, restriction_mask);
 			break;
@@ -2475,8 +2476,8 @@ static bool policy_mgr_valid_sta_channel_check(struct wlan_objmgr_psoc *psoc,
 
 	if ((wlan_reg_is_dfs_for_freq(pm_ctx->pdev, sta_ch_freq) &&
 	     !sta_sap_scc_on_dfs_chan) ||
-	    wlan_reg_is_passive_or_disable_for_freq(
-	    pm_ctx->pdev, sta_ch_freq) ||
+	    wlan_reg_is_passive_or_disable_for_pwrmode(
+	    pm_ctx->pdev, sta_ch_freq, REG_CURRENT_PWR_MODE) ||
 	    (wlan_reg_is_freq_indoor(pm_ctx->pdev, sta_ch_freq) &&
 	    !sta_sap_scc_on_indoor_channel) ||
 	    !policy_mgr_is_safe_channel(psoc, sta_ch_freq)) {
@@ -2600,13 +2601,16 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 		find_alternate = true;
 		policymgr_nofl_debug("sap not capable of DFS SCC on con ch_freq %d",
 				     ch_freq);
-	} else if (wlan_reg_is_disable_for_freq(pm_ctx->pdev, ch_freq)) {
+	} else if (wlan_reg_is_disable_for_pwrmode(pm_ctx->pdev, ch_freq,
+						   REG_CURRENT_PWR_MODE)) {
 		find_alternate = true;
 		policymgr_nofl_debug("sap not capable on disabled con ch_freq %d",
 				     ch_freq);
 	} else if (con_mode == PM_P2P_GO_MODE &&
-		   wlan_reg_is_passive_or_disable_for_freq(pm_ctx->pdev,
-							   ch_freq) &&
+		   wlan_reg_is_passive_or_disable_for_pwrmode(
+						pm_ctx->pdev,
+						ch_freq,
+						REG_CURRENT_PWR_MODE) &&
 		   !(policy_mgr_is_go_scc_strict(psoc) &&
 		     (!is_sta_sap_scc || sta_sap_scc_on_dfs_chan))) {
 		find_alternate = true;

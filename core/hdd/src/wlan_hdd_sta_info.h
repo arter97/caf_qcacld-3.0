@@ -360,7 +360,7 @@ void hdd_take_sta_info_ref(struct hdd_sta_info_obj *sta_info_container,
 
 /**
  * hdd_get_front_sta_info_no_lock() - Get the first sta_info from the sta list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  *
  * @sta_info_container: The station info container obj that stores and maintains
@@ -375,7 +375,7 @@ hdd_get_front_sta_info_no_lock(struct hdd_sta_info_obj *sta_info_container,
 
 /**
  * hdd_get_next_sta_info_no_lock() - Get the next sta_info from the sta list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  *
  * @sta_info_container: The station info container obj that stores and maintains
@@ -391,70 +391,6 @@ hdd_get_next_sta_info_no_lock(struct hdd_sta_info_obj *sta_info_container,
 
 /* Abstract wrapper to check sta_info validity */
 #define __hdd_is_station_valid(sta_info) sta_info
-
-/**
- * __hdd_take_ref_and_fetch_front_sta_info - Helper macro to lock, fetch front
- * sta_info, take ref and unlock.
- * @sta_info_container: The station info container obj that stores and maintains
- *                      the sta_info obj.
- * @sta_info: The station info structure that acts as the iterator object.
- */
-#define __hdd_take_ref_and_fetch_front_sta_info(sta_info_container, sta_info, \
-						sta_info_dbgid) \
-	qdf_spin_lock_bh(&sta_info_container.sta_obj_lock), \
-	hdd_get_front_sta_info_no_lock(&sta_info_container, &sta_info), \
-	(sta_info) ? hdd_take_sta_info_ref(&sta_info_container, \
-					   sta_info, false, sta_info_dbgid) : \
-					(false), \
-	qdf_spin_unlock_bh(&sta_info_container.sta_obj_lock)
-
-/**
- * __hdd_take_ref_and_fetch_next_sta_info - Helper macro to lock, fetch next
- * sta_info, take ref and unlock.
- * @sta_info_container: The station info container obj that stores and maintains
- *                      the sta_info obj.
- * @sta_info: The station info structure that acts as the iterator object.
- */
-#define __hdd_take_ref_and_fetch_next_sta_info(sta_info_container, sta_info, \
-					       sta_info_dbgid) \
-	qdf_spin_lock_bh(&sta_info_container.sta_obj_lock), \
-	hdd_get_next_sta_info_no_lock(&sta_info_container, sta_info, \
-				      &sta_info), \
-	(sta_info) ? hdd_take_sta_info_ref(&sta_info_container, \
-					   sta_info, false, sta_info_dbgid) : \
-					(false), \
-	qdf_spin_unlock_bh(&sta_info_container.sta_obj_lock)
-
-/**
- * hdd_for_each_sta_ref - Iterate over each station stored in the sta info
- *                        container with ref taken
- * @sta_info_container: The station info container obj that stores and maintains
- *                      the sta_info obj.
- * @sta_info: The station info structure that acts as the iterator object.
- * @sta_info_dbgid: Debug ID of the caller API
- *
- * The sta_info will contain the structure that is fetched for that particular
- * iteration.
- *
- *			     ***** NOTE *****
- * Before the end of each iteration, dev_put(adapter->dev) must be
- * called. Not calling this will keep hold of a reference, thus preventing
- * unregister of the netdevice.
- *
- * Usage example:
- *	    hdd_for_each_sta_ref(sta_info_container, sta_info, sta_info_dbgid) {
- *		    <work involving station>
- *		    <some more work>
- *		    hdd_put_sta_info_ref(sta_info_container, sta_info, true,
- *					 sta_info_dbgid)
- *	    }
- */
-#define hdd_for_each_sta_ref(sta_info_container, sta_info, sta_info_dbgid) \
-	for (__hdd_take_ref_and_fetch_front_sta_info(sta_info_container, \
-						     sta_info, sta_info_dbgid);\
-	     __hdd_is_station_valid(sta_info); \
-	     __hdd_take_ref_and_fetch_next_sta_info(sta_info_container, \
-						    sta_info, sta_info_dbgid))
 
 /**
  * __hdd_take_ref_and_fetch_front_sta_info_safe - Helper macro to lock, fetch
@@ -505,7 +441,7 @@ hdd_get_next_sta_info_no_lock(struct hdd_sta_info_obj *sta_info_container,
  * @sta_info_container: The station info container obj that stores and maintains
  *                      the sta_info obj.
  * @sta_info: The station info structure that acts as the iterator object.
- * @next_sta_info: A temporary node for maintaing del safe.
+ * @next_sta_info: A temporary node for maintaining del safe.
  * @sta_info_dbgid: Debug ID of the caller API
  *
  * The sta_info will contain the structure that is fetched for that particular

@@ -144,8 +144,15 @@
 	QCA_WLAN_VENDOR_ATTR_GET_STATION_INFO_ASSOC_REQ_IES
 
 /*
+ * it may include the beacon IEs and other miscellaneous information
+ * in function hdd_get_station_info, malloc enough memory to save
+ * the data.
+ */
+#define WLAN_STATS_INFO_LEN 2048
+
+/*
  * MSB of rx_mc_bc_cnt indicates whether FW supports rx_mc_bc_cnt
- * feature or not, if first bit is 1 it indictes that FW supports this
+ * feature or not, if first bit is 1 it indicates that FW supports this
  * feature, if it is 0 it indicates FW doesn't support this feature
  */
 #define HDD_STATION_INFO_RX_MC_BC_COUNT (1 << 31)
@@ -650,11 +657,6 @@ static int32_t hdd_add_he_oper_info(struct sk_buff *skb,
 	hdd_sta_ctx->cache_conn_info.he_oper_len = 0;
 	return ret;
 }
-
-static int32_t hdd_get_he_op_len(struct hdd_station_ctx *hdd_sta_ctx)
-{
-	return hdd_sta_ctx->cache_conn_info.he_oper_len;
-}
 #else
 static inline uint32_t hdd_add_he_oper_info(
 					struct sk_buff *skb,
@@ -662,18 +664,7 @@ static inline uint32_t hdd_add_he_oper_info(
 {
 	return 0;
 }
-
-static uint32_t hdd_get_he_op_len(struct hdd_station_ctx *hdd_sta_ctx)
-{
-	return 0;
-}
 #endif
-
-static uint32_t hdd_get_prev_connected_bss_ies_len(
-					struct hdd_station_ctx *hdd_sta_ctx)
-{
-	return hdd_sta_ctx->conn_info.prev_ap_bcn_ie.len;
-}
 
 static uint32_t hdd_add_prev_connected_bss_ies(
 					struct sk_buff *skb,
@@ -710,7 +701,6 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 {
 	struct sk_buff *skb = NULL;
 	uint8_t *tmp_hs20 = NULL;
-	uint32_t nl_buf_len, hdd_he_op_len = 0;
 	struct hdd_station_ctx *hdd_sta_ctx;
 
 	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
@@ -720,41 +710,8 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 
-	nl_buf_len = NLMSG_HDRLEN;
-	nl_buf_len += sizeof(hdd_sta_ctx->
-				cache_conn_info.last_ssid.SSID.length) +
-		      QDF_MAC_ADDR_SIZE +
-		      sizeof(hdd_sta_ctx->cache_conn_info.chan_freq) +
-		      sizeof(hdd_sta_ctx->cache_conn_info.noise) +
-		      sizeof(hdd_sta_ctx->cache_conn_info.signal) +
-		      (sizeof(uint32_t) * 2) +
-		      sizeof(hdd_sta_ctx->cache_conn_info.txrate.nss) +
-		      sizeof(hdd_sta_ctx->cache_conn_info.roam_count) +
-		      sizeof(hdd_sta_ctx->cache_conn_info.last_auth_type) +
-		      sizeof(hdd_sta_ctx->cache_conn_info.dot11mode) +
-		      sizeof(uint32_t);
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_present)
-		nl_buf_len += sizeof(hdd_sta_ctx->cache_conn_info.vht_caps);
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_present)
-		nl_buf_len += sizeof(hdd_sta_ctx->cache_conn_info.ht_caps);
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.hs20_present) {
-		tmp_hs20 = (uint8_t *)&(hdd_sta_ctx->
-						cache_conn_info.hs20vendor_ie);
-		nl_buf_len += (sizeof(hdd_sta_ctx->
-					cache_conn_info.hs20vendor_ie) - 1);
-	}
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.ht_op_present)
-		nl_buf_len += sizeof(hdd_sta_ctx->
-						cache_conn_info.ht_operation);
-	if (hdd_sta_ctx->cache_conn_info.conn_flag.vht_op_present)
-		nl_buf_len += sizeof(hdd_sta_ctx->
-						cache_conn_info.vht_operation);
-	nl_buf_len += hdd_get_prev_connected_bss_ies_len(hdd_sta_ctx);
-
-	hdd_he_op_len = hdd_get_he_op_len(hdd_sta_ctx);
-	nl_buf_len += hdd_he_op_len;
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy, nl_buf_len);
+	skb = cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
+						  WLAN_STATS_INFO_LEN);
 	if (!skb) {
 		hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
@@ -813,6 +770,8 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 		goto fail;
 	}
 	if (hdd_sta_ctx->cache_conn_info.conn_flag.hs20_present) {
+		tmp_hs20 =
+			(uint8_t *)&hdd_sta_ctx->cache_conn_info.hs20vendor_ie;
 		if (nla_put(skb, AP_INFO_HS20_INDICATION,
 			    (sizeof(hdd_sta_ctx->cache_conn_info.hs20vendor_ie)
 			     - 1),
@@ -829,20 +788,21 @@ static int hdd_get_station_info(struct hdd_context *hdd_ctx,
 
 	if (nla_put_u32(skb, DISCONNECT_REASON,
 			adapter->last_disconnect_reason)) {
-		hdd_err("Failed to put disconect reason");
+		hdd_err("Failed to put disconnect reason");
 		goto fail;
 	}
 
 	if (hdd_add_prev_connected_bss_ies(skb, hdd_sta_ctx)) {
-		hdd_err("put fail total buf_len: %u", nl_buf_len);
+		hdd_err("put fail");
 		goto fail;
 	}
 
 	hdd_nofl_debug(
-		"STA Info:: SSID:%s, BSSID:" QDF_MAC_ADDR_FMT ", freq:%d, "
+		"STA Info:: SSID:" QDF_SSID_FMT ", BSSID:" QDF_MAC_ADDR_FMT ", freq:%d, "
 		"Noise:%d, signal:%d, roam_count:%d, last_auth_type:%d, "
 		"dot11mode:%d, disconnect_reason:%d, ",
-		hdd_sta_ctx->cache_conn_info.last_ssid.SSID.ssId,
+		QDF_SSID_REF(WLAN_SSID_MAX_LEN,
+			hdd_sta_ctx->cache_conn_info.last_ssid.SSID.ssId),
 		QDF_MAC_ADDR_REF(hdd_sta_ctx->cache_conn_info.bssid.bytes),
 		hdd_sta_ctx->cache_conn_info.chan_freq,
 		(hdd_sta_ctx->cache_conn_info.noise + 100),
@@ -1037,12 +997,12 @@ static uint32_t hdd_add_link_standard_info_sap_get_len(void)
 }
 
 /**
- * hdd_add_link_standard_info_sap - add add link info attribut
+ * hdd_add_link_standard_info_sap - add add link info attribute
  * @skb: pointer to response skb buffer
  * @stainfo: station information
  * @idx: attribute type index for nla_next_start()
  *
- * This function adds link info attribut to response skb buffer
+ * This function adds link info attribute to response skb buffer
  *
  * Return : 0 on success and errno on failure
  */

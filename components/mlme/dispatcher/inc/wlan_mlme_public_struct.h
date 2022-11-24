@@ -18,7 +18,7 @@
  */
 
 /*
- * DOC: contains mlme structure definations
+ * DOC: contains mlme structure definitions
  */
 
 #ifndef _WLAN_MLME_STRUCT_H_
@@ -822,7 +822,7 @@ struct wlan_mlme_mbo {
  * @is_imps_enabled: flag to enable/disable IMPS
  * @is_bmps_enabled: flag to enable/disable BMPS
  * @auto_bmps_timer: auto BMPS timer value
- * @bmps_min_listen_interval: BMPS listen inteval minimum value
+ * @bmps_min_listen_interval: BMPS listen interval minimum value
  * @bmps_max_listen_interval: BMPS listen interval maximum value
  * @dtim_selection_diversity: dtim selection diversity value to be sent to fw
  */
@@ -1216,7 +1216,7 @@ struct wlan_mlme_sap_protection {
  * @rx_chain_mask_2g:   Tx chain mask for 2g
  * @tx_chain_mask_5g:   Tx chain mask for 5g
  * @rx_chain_mask_5g:   Rx chain mask for 5g
- * @enable_bt_chain_separation: Enable/Disable BT/WLAN Host chain seperation
+ * @enable_bt_chain_separation: Enable/Disable BT/WLAN Host chain separation
  */
 struct wlan_mlme_chainmask {
 	uint8_t txchainmask1x1;
@@ -1362,6 +1362,7 @@ struct wlan_user_mcc_quota {
  * @enable_emlsr_mode: 11BE eMLSR mode support
  * @safe_mode_enable: safe mode to bypass some strict 6 GHz checks for
  * connection, bypass strict power levels
+ * @sr_enable_modes: modes for which SR(Spatial Reuse) is enabled
  */
 struct wlan_mlme_generic {
 	uint32_t band_capability;
@@ -1420,6 +1421,9 @@ struct wlan_mlme_generic {
 	struct wlan_user_mcc_quota user_mcc_quota;
 #endif
 	bool safe_mode_enable;
+#if defined(WLAN_FEATURE_SR)
+	uint32_t sr_enable_modes;
+#endif
 };
 
 /*
@@ -1658,7 +1662,7 @@ enum station_prefer_bw {
  * @current_rssi:                   Current rssi
  * @deauth_retry_cnt:               Deauth retry count
  * @sta_prefer_80mhz_over_160mhz:   Set Sta preference to connect in 80HZ/160HZ
- * @ignore_peer_erp_info:           Ignore peer infrormation
+ * @ignore_peer_erp_info:           Ignore peer information
  * @enable_5g_ebt:                  Set default 5G early beacon termination
  * @deauth_before_connection:       Send deauth before connection or not
  * @enable_go_cts2self_for_sta:     Stop NOA and start using cts2self
@@ -1672,6 +1676,7 @@ enum station_prefer_bw {
  * @mlo_support_link_num:           max number of links that sta mlo supports
  * @mlo_support_link_band:          band bitmap that sta mlo supports
  * @mlo_max_simultaneous_links      number of simultaneous links
+ * @usr_disable_eht                 user disable the eht for STA
  */
 struct wlan_mlme_sta_cfg {
 	uint32_t sta_keep_alive_period;
@@ -1703,6 +1708,9 @@ struct wlan_mlme_sta_cfg {
 	uint8_t mlo_support_link_num;
 	uint8_t mlo_support_link_band;
 	uint8_t mlo_max_simultaneous_links;
+#endif
+#ifdef WLAN_FEATURE_11BE
+	bool usr_disable_eht;
 #endif
 };
 
@@ -2219,7 +2227,7 @@ struct  wlan_mlme_weight_config {
  * @bad_rssi_pcnt: Bad RSSI Percentage
  * @good_rssi_bucket_size: Good RSSI Bucket Size
  * @bad_rssi_bucket_size: Bad RSSI Bucket Size
- * @rssi_pref_5g_rssi_thresh: Preffered 5G RSSI threshold
+ * @rssi_pref_5g_rssi_thresh: Preferred 5G RSSI threshold
  */
 struct wlan_mlme_rssi_cfg_score  {
 	uint32_t best_rssi_threshold;
@@ -2809,4 +2817,17 @@ struct wlan_mlme_features {
 	bool enable2x2;
 };
 #endif
+
+/**
+ * host_concurrent_ap_policy - Host concurrent AP policy value
+ * @HOST_CONCURRENT_AP_POLICY_UNSPECIFIED: Unspecified concurrent policy value
+ * @HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO: Gaming audio concurrent policy value
+ * @HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING: Lossless audio
+ * concurrent streaming policy value
+ */
+enum host_concurrent_ap_policy {
+	HOST_CONCURRENT_AP_POLICY_UNSPECIFIED = 0,
+	HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO = 1,
+	HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING = 2
+};
 #endif

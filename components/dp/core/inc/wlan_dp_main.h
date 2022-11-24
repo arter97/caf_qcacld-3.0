@@ -46,7 +46,7 @@ void dp_free_ctx(void);
 
 /**
  * dp_get_front_intf_no_lock() - Get the first interface from the intf list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  * @dp_ctx: pointer to the DP context
  * @out_intf: double pointer to pass the next interface
@@ -59,7 +59,7 @@ dp_get_front_intf_no_lock(struct wlan_dp_psoc_context *dp_ctx,
 
 /**
  * dp_get_next_intf_no_lock() - Get the next intf from the intf list
- * This API doesnot use any lock in it's implementation. It is the caller's
+ * This API does not use any lock in it's implementation. It is the caller's
  * directive to ensure concurrency safety.
  * @dp_ctx: pointer to the DP context
  * @cur_intf: pointer to the current intf
@@ -657,4 +657,32 @@ void dp_clear_net_dev_stats(struct wlan_dp_intf *dp_intf)
 	qdf_mem_set(&dp_intf->stats, sizeof(dp_intf->stats), 0);
 }
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * dp_direct_link_init() - Initializes Direct Link datapath
+ * @dp_ctx: DP private context
+ *
+ * Return: QDF status
+ */
+QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx);
+
+/**
+ * dp_direct_link_deinit() - De-initializes Direct Link datapath
+ * @dp_ctx: DP private context
+ *
+ * Return: None
+ */
+void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx);
+#else
+static inline
+QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx)
+{
+}
+#endif
 #endif

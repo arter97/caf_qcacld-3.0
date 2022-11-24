@@ -1822,7 +1822,7 @@ int pld_power_on(struct device *dev)
 	switch (pld_get_bus_type(dev)) {
 	case PLD_BUS_TYPE_PCIE:
 		/* cnss platform driver handles PCIe SoC
-		 * power on/off seqeunce so let CNSS driver
+		 * power on/off sequence so let CNSS driver
 		 * handle the power on sequence for PCIe SoC
 		 */
 		break;
@@ -1858,7 +1858,7 @@ int pld_power_off(struct device *dev)
 	switch (pld_get_bus_type(dev)) {
 	case PLD_BUS_TYPE_PCIE:
 		/* cnss platform driver handles PCIe SoC
-		 * power on/off seqeunce so let CNSS driver
+		 * power on/off sequence so let CNSS driver
 		 * handle the power off sequence for PCIe SoC
 		 */
 		break;
@@ -2050,23 +2050,9 @@ void *pld_smmu_get_mapping(struct device *dev)
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 struct kobject *pld_get_wifi_kobj(struct device *dev)
 {
-	enum pld_bus_type type = pld_get_bus_type(dev);
 	struct kobject *wifi_kobj = NULL;
 
-	switch (type) {
-	case PLD_BUS_TYPE_SNOC:
-	case PLD_BUS_TYPE_PCIE_FW_SIM:
-	case PLD_BUS_TYPE_IPCI_FW_SIM:
-	case PLD_BUS_TYPE_SNOC_FW_SIM:
-	case PLD_BUS_TYPE_IPCI:
-		break;
-	case PLD_BUS_TYPE_PCIE:
-		wifi_kobj = pld_pcie_get_wifi_kobj(dev);
-		break;
-	default:
-		pr_err("Invalid device type %d\n", type);
-		break;
-	}
+	wifi_kobj = pld_pcie_get_wifi_kobj(dev);
 
 	return wifi_kobj;
 }
@@ -3405,3 +3391,19 @@ int pld_get_audio_wlan_timestamp(struct device *dev,
 	return ret;
 }
 #endif /* FEATURE_WLAN_TIME_SYNC_FTM */
+
+bool pld_is_one_msi(struct device *dev)
+{
+	bool ret = false;
+	enum pld_bus_type type = pld_get_bus_type(dev);
+
+	switch (type) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_is_one_msi(dev);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}

@@ -363,8 +363,8 @@ sap_process_avoid_ie(mac_handle_t mac_handle, struct sap_context *sap_ctx,
 #endif /* FEATURE_AP_MCC_CH_AVOIDANCE */
 
 /**
- * sap_select_preferred_channel_from_channel_list() - to calc best cahnnel
- * @best_ch_freq: best chan freq already calculated among all the chanels
+ * sap_select_preferred_channel_from_channel_list() - to calc best channel
+ * @best_ch_freq: best chan freq already calculated among all the channels
  * @sap_ctx: sap context
  * @spectinfo_param: Pointer to tSapChSelSpectInfo structure
  *
@@ -540,7 +540,7 @@ static bool sap_chan_sel_init(mac_handle_t mac_handle,
  * sapweight_rssi_count() - calculates the channel weight due to rssi
     and data count(here number of BSS observed)
  * @sap_ctx     : Softap context
- * @rssi        : Max signal strength receieved from a BSS for the channel
+ * @rssi        : Max signal strength received from a BSS for the channel
  * @count       : Number of BSS observed in the channel
  *
  * Return: uint32_t Calculated channel weight based on above two
@@ -1244,7 +1244,7 @@ static bool ch_in_pcl(struct sap_context *sap_ctx, uint32_t ch_freq)
 /**
  * sap_upd_chan_spec_params() - sap_upd_chan_spec_params
  *  updates channel parameters obtained from Beacon
- * @scan_entry: Beacon strucutre populated by scan
+ * @scan_entry: Beacon structure populated by scan
  * @ch_width: Channel width
  * @sec_ch_offset: Secondary Channel Offset
  * @center_freq0: Central frequency 0 for the given channel
@@ -1421,7 +1421,7 @@ static void sap_compute_spect_weight(tSapChSelSpectInfo *pSpectInfoParams,
 		 * and not meant to be included in the ACS scan results.
 		 * So just assign RSSI as -100, bsscount as 0, and weight as max
 		 * to them, so that they always stay low in sorting of best
-		 * channles which were included in ACS scan list
+		 * channels which were included in ACS scan list
 		 */
 		found = false;
 		for (i = 0; i < sap_ctx->num_of_channel; i++) {
@@ -1622,9 +1622,10 @@ static void sap_sort_chl_weight_80_mhz(struct mac_context *mac_ctx,
 		acs_ch_params.ch_width = CH_WIDTH_80MHZ;
 		sap_acs_set_puncture_support(sap_ctx, &acs_ch_params);
 
-		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
-						     pSpectInfo[j].chan_freq,
-						     0, &acs_ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+							pSpectInfo[j].chan_freq,
+							0, &acs_ch_params,
+							REG_CURRENT_PWR_MODE);
 
 		/* Check if the freq supports 80 Mhz */
 		if (acs_ch_params.ch_width != CH_WIDTH_80MHZ) {
@@ -1756,9 +1757,10 @@ static void sap_sort_chl_weight_160_mhz(struct mac_context *mac_ctx,
 		acs_ch_params.ch_width = CH_WIDTH_160MHZ;
 		sap_acs_set_puncture_support(sap_ctx, &acs_ch_params);
 
-		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
-						     pSpectInfo[j].chan_freq,
-						     0, &acs_ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+							pSpectInfo[j].chan_freq,
+							0, &acs_ch_params,
+							REG_CURRENT_PWR_MODE);
 
 		/* Check if the freq supports 160 Mhz */
 		if (acs_ch_params.ch_width != CH_WIDTH_160MHZ) {
@@ -1926,9 +1928,10 @@ static void sap_sort_chl_weight_320_mhz(struct mac_context *mac_ctx,
 		acs_ch_params.ch_width = CH_WIDTH_320MHZ;
 		sap_acs_set_puncture_support(sap_ctx, &acs_ch_params);
 
-		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
-						     pSpectInfo[j].chan_freq,
-						     0, &acs_ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+							pSpectInfo[j].chan_freq,
+							0, &acs_ch_params,
+							REG_CURRENT_PWR_MODE);
 
 		/* Check if the freq supports 320 Mhz */
 		if (acs_ch_params.ch_width != CH_WIDTH_320MHZ) {
@@ -2224,7 +2227,7 @@ static void sap_sort_chl_weight_ht40_24_g(struct mac_context *mac_ctx,
 			continue;
 		}
 		/*
-		 * check if there is another channel combination possiblity
+		 * check if there is another channel combination possibility
 		 * e.g., {1, 5} & {5, 9}
 		 */
 		if ((pSpectInfo[j + 4].chan_freq + 20) ==
@@ -2354,9 +2357,10 @@ static void sap_sort_chl_weight_40_mhz(struct mac_context *mac_ctx,
 
 		acs_ch_params.ch_width = CH_WIDTH_40MHZ;
 
-		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
-						     pSpectInfo[j].chan_freq,
-						     0, &acs_ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+							pSpectInfo[j].chan_freq,
+							0, &acs_ch_params,
+							REG_CURRENT_PWR_MODE);
 
 		/* Check if the freq supports 40 Mhz */
 		if (acs_ch_params.ch_width != CH_WIDTH_40MHZ) {
@@ -2632,7 +2636,7 @@ uint32_t sap_select_channel(mac_handle_t mac_handle,
 	}
 
 	/*
-	 * in case the best channel seleted is not in PCL and there is another
+	 * in case the best channel selected is not in PCL and there is another
 	 * channel which has same weightage and is in PCL, choose the one in
 	 * PCL
 	 */
@@ -2665,8 +2669,9 @@ next_bw:
 				continue;
 			ch_params.ch_width = pref_bw;
 			sap_acs_set_puncture_support(sap_ctx, &ch_params);
-			wlan_reg_set_channel_params_for_freq(
-				mac_ctx->pdev, cal_chan_freq, 0, &ch_params);
+			wlan_reg_set_channel_params_for_pwrmode(
+				mac_ctx->pdev, cal_chan_freq, 0, &ch_params,
+				REG_CURRENT_PWR_MODE);
 			if (ch_params.ch_width != pref_bw)
 				continue;
 			best_chan_freq = cal_chan_freq;

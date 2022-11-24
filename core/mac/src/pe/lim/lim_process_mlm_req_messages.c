@@ -549,8 +549,7 @@ static bool lim_is_auth_req_expected(struct mac_context *mac_ctx,
 }
 
 /**
- * lim_is_preauth_ctx_exisits() - check if preauth context exists
- *
+ * lim_is_preauth_ctx_exists() - check if preauth context exists
  * @mac_ctx:          global MAC context
  * @session:          PE session entry
  * @preauth_node_ptr: pointer to preauth node pointer
@@ -614,11 +613,10 @@ QDF_STATUS lim_trigger_auth_req_sae(struct mac_context *mac_ctx,
 		session->ssId.ssId,
 		session->ssId.length);
 
-	pe_debug("vdev_id %d ssid %.*s "QDF_MAC_ADDR_FMT,
-		sae_info->vdev_id,
-		sae_info->ssid.length,
-		sae_info->ssid.ssId,
-		QDF_MAC_ADDR_REF(sae_info->peer_mac_addr.bytes));
+	pe_debug("vdev_id %d ssid " QDF_SSID_FMT " " QDF_MAC_ADDR_FMT,
+		 sae_info->vdev_id,
+		 QDF_SSID_REF(sae_info->ssid.length, sae_info->ssid.ssId),
+		 QDF_MAC_ADDR_REF(sae_info->peer_mac_addr.bytes));
 
 	msg.type = eWNI_SME_TRIGGER_SAE;
 	msg.bodyptr = sae_info;

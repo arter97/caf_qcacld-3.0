@@ -93,7 +93,7 @@ enum mlmmsgtype {
 
 #define LIM_DECRYPT_ICV_FAIL    1
 
-/* / Definitions to distinquish between Association/Reassociaton */
+/* / Definitions to distinguish between Association/Reassociaton */
 #define LIM_ASSOC    0
 #define LIM_REASSOC  1
 
@@ -438,11 +438,27 @@ void lim_cleanup_mlm(struct mac_context *);
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    tSchBeaconStruct *bcn_ptr);
+
+/**
+ * lim_process_beacon_eht_op() - process beacon 11be eht op IE
+ * @session: pe session
+ * @eht_op: pointer to eht op IE
+ *
+ * Return none
+ */
+void lim_process_beacon_eht_op(struct pe_session *session,
+			       tDot11fIEeht_op *eht_op);
 #else
 static inline
 void lim_process_beacon_eht(struct mac_context *mac_ctx,
 			    struct pe_session *session,
 			    tSchBeaconStruct *bcn_ptr)
+{
+}
+
+static inline
+void lim_process_beacon_eht_op(struct pe_session *session,
+			       tDot11fIEeht_op *eht_op)
 {
 }
 #endif
@@ -581,7 +597,6 @@ QDF_STATUS lim_send_mlm_assoc_ind(struct mac_context *mac,
 				  tpDphHashNode sta,
 				  struct pe_session *pe_session);
 
-#define ASSOC_FRAME_LEN 0
 /**
  * lim_process_assoc_rsp_frame() - Processes assoc response
  * @mac_ctx:              Pointer to Global MAC structure
