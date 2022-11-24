@@ -2035,6 +2035,8 @@ dp_mon_rx_stats_update_rssi_dbm_params(struct dp_mon_pdev *mon_pdev,
 	ppdu_info->rx_status.rssi_offset = mon_pdev->rssi_offsets.rssi_offset;
 	ppdu_info->rx_status.rssi_dbm_conv_support =
 				mon_pdev->rssi_dbm_conv_support;
+	ppdu_info->rx_status.chan_noise_floor =
+		mon_pdev->rssi_offsets.rssi_offset;
 }
 
 #ifdef WLAN_SUPPORT_CTRL_FRAME_STATS
