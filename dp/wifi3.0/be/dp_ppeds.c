@@ -694,9 +694,9 @@ static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 		}
 		rx_bufs_reaped[rx_desc->chip_id][rx_desc->pool_id]++;
 
-		dp_rx_nbuf_unmap(soc, rx_desc, REO2PPE_DST_IND);
-		rx_desc->unmapped = 1;
 		qdf_nbuf_dev_queue_head(&h, rx_desc->nbuf);
+		rx_desc->nbuf->recycled_for_ds = 1;
+
 		dp_rx_add_to_free_desc_list(&head[rx_desc->chip_id][rx_desc->pool_id],
 				&tail[rx_desc->chip_id][rx_desc->pool_id], rx_desc);
 	}
@@ -713,10 +713,9 @@ static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 			dp_rxdma_srng = &replenish_soc->rx_refill_buf_ring[mac_id];
 			rx_desc_pool = &replenish_soc->rx_desc_buf[mac_id];
 
-			dp_rx_buffers_replenish(replenish_soc, mac_id, dp_rxdma_srng,
+			dp_rx_buffers_replenish_simple(replenish_soc, mac_id, dp_rxdma_srng,
 					rx_desc_pool, rx_bufs_reaped[chip_id][mac_id],
-					&head[chip_id][mac_id], &tail[chip_id][mac_id],
-					true);
+					&head[chip_id][mac_id], &tail[chip_id][mac_id]);
 		}
 	}
 }
