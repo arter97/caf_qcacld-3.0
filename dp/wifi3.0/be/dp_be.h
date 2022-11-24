@@ -236,7 +236,7 @@ struct dp_ppe_vp_profile {
 };
 
 /**
- * struct dp_ppe_tx_desc_pool_s - PPEDS Tx Descriptor Pool
+ * struct dp_ppeds_tx_desc_pool_s - PPEDS Tx Descriptor Pool
  * @elem_size: Size of each descriptor
  * @num_allocated: Number of used descriptors
  * @freelist: Chain of free descriptors
@@ -245,7 +245,7 @@ struct dp_ppe_vp_profile {
  * @num_free: Number of free descriptors
  * @lock- Lock for descriptor allocation/free from/to the pool
  */
-struct dp_ppe_tx_desc_pool_s {
+struct dp_ppeds_tx_desc_pool_s {
 	uint16_t elem_size;
 	uint32_t num_allocated;
 	struct dp_tx_desc_s *freelist;
@@ -286,7 +286,6 @@ struct dp_ppeds_napi {
  * @ppe_ds_int_mode_enabled: PPE DS interrupt mode enabled
  * @reo2ppe_ring: REO2PPE ring
  * @ppe2tcl_ring: PPE2TCL ring
- * @ppe_release_ring: PPE release ring
  * @ppe_vp_tbl: PPE VP table
  * @ppe_vp_tbl_lock: PPE VP table lock
  * @num_ppe_vp_entries : Number of PPE VP entries
@@ -313,11 +312,10 @@ struct dp_soc_be {
 		ppeds_stopped:1;
 	struct dp_srng reo2ppe_ring;
 	struct dp_srng ppe2tcl_ring;
-	struct dp_srng ppe_release_ring;
-	struct dp_srng ppe_wbm_release_ring;
+	struct dp_srng ppeds_wbm_release_ring;
 	struct dp_ppe_vp_tbl_entry *ppe_vp_tbl;
 	struct dp_hw_cookie_conversion_t ppeds_tx_cc_ctx;
-	struct dp_ppe_tx_desc_pool_s ppeds_tx_desc;
+	struct dp_ppeds_tx_desc_pool_s ppeds_tx_desc;
 	struct dp_ppeds_napi ppeds_napi_ctxt;
 	void *ppeds_handle;
 	qdf_mutex_t ppe_vp_tbl_lock;

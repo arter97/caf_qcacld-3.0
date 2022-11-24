@@ -30,16 +30,16 @@ static inline
 QDF_STATUS cdp_ppesds_entry_attach(struct cdp_soc_t *soc, uint8_t vdev_id,
 				   void *vpai, int32_t *ppe_vp_num)
 {
-	if (!soc || !soc->ops || !soc->ops->ppe_ops) {
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
 			  "%s invalid instance", __func__);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (soc->ops->ppe_ops->ppeds_entry_attach) {
-		return soc->ops->ppe_ops->ppeds_entry_attach(soc, vdev_id,
-				vpai, ppe_vp_num);
-	}
+	if (soc->ops->ppeds_ops->ppeds_entry_attach)
+		return soc->ops->ppeds_ops->ppeds_entry_attach(soc, vdev_id,
+							       vpai,
+							       ppe_vp_num);
 
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -54,16 +54,14 @@ QDF_STATUS cdp_ppesds_entry_attach(struct cdp_soc_t *soc, uint8_t vdev_id,
 static inline
 void cdp_ppesds_entry_detach(struct cdp_soc_t *soc, uint8_t vdev_id)
 {
-	if (!soc || !soc->ops || !soc->ops->ppe_ops) {
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
 			  "%s invalid instance", __func__);
 		return;
 	}
 
-	if (soc->ops->ppe_ops->ppeds_entry_detach) {
-		return soc->ops->ppe_ops->ppeds_entry_detach
-			(soc, vdev_id);
-	}
+	if (soc->ops->ppeds_ops->ppeds_entry_detach)
+		return soc->ops->ppeds_ops->ppeds_entry_detach(soc, vdev_id);
 }
 
 /**
@@ -77,16 +75,14 @@ static inline
 void cdp_ppesds_set_int_pri2tid(struct cdp_soc_t *soc,
 				uint8_t *pri2tid)
 {
-	if (!soc || !soc->ops || !soc->ops->ppe_ops) {
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
 			  "%s invalid instance", __func__);
 		return;
 	}
 
-	if (soc->ops->ppe_ops->ppeds_set_int_pri2tid) {
-		return soc->ops->ppe_ops->ppeds_set_int_pri2tid
-			(soc, pri2tid);
-	}
+	if (soc->ops->ppeds_ops->ppeds_set_int_pri2tid)
+		return soc->ops->ppeds_ops->ppeds_set_int_pri2tid(soc, pri2tid);
 }
 
 /**
@@ -101,15 +97,14 @@ static inline
 void cdp_ppesds_update_int_pri2tid(struct cdp_soc_t *soc,
 				   uint8_t pri, uint8_t tid)
 {
-	if (!soc || !soc->ops || !soc->ops->ppe_ops) {
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
 			  "%s invalid instance", __func__);
 	}
 
-	if (soc->ops->ppe_ops->ppeds_update_int_pri2tid) {
-		return soc->ops->ppe_ops->ppeds_update_int_pri2tid
-		       (soc, pri, tid);
-	}
+	if (soc->ops->ppeds_ops->ppeds_update_int_pri2tid)
+		return soc->ops->ppeds_ops->ppeds_update_int_pri2tid(soc, pri,
+								     tid);
 }
 
 /**
@@ -121,14 +116,14 @@ void cdp_ppesds_update_int_pri2tid(struct cdp_soc_t *soc,
 static inline
 void cdp_ppesds_entry_dump(struct cdp_soc_t *soc)
 {
-	if (!soc || !soc->ops || !soc->ops->ppe_ops) {
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
 			  "%s invalid instance", __func__);
 		return;
 	}
 
-	if (soc->ops->ppe_ops->ppeds_entry_dump)
-		soc->ops->ppe_ops->ppeds_entry_dump(soc);
+	if (soc->ops->ppeds_ops->ppeds_entry_dump)
+		soc->ops->ppeds_ops->ppeds_entry_dump(soc);
 }
 
 /**
@@ -143,16 +138,15 @@ static inline
 QDF_STATUS cdp_ppesds_enable_pri2tid(struct cdp_soc_t *soc,
 				     uint8_t vdev_id, bool val)
 {
-	if (!soc || !soc->ops || !soc->ops->ppe_ops) {
+	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
 			  "%s invalid instance", __func__);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (soc->ops->ppe_ops->ppeds_enable_pri2tid) {
-		return soc->ops->ppe_ops->ppeds_enable_pri2tid(soc,
-				vdev_id, val);
-	}
+	if (soc->ops->ppeds_ops->ppeds_enable_pri2tid)
+		return soc->ops->ppeds_ops->ppeds_enable_pri2tid(soc, vdev_id,
+								 val);
 
 	return QDF_STATUS_E_NOSUPPORT;
 }

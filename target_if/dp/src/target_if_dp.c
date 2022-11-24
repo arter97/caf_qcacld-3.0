@@ -320,13 +320,13 @@ target_if_lro_hash_config(struct cdp_ctrl_objmgr_psoc *psoc, uint8_t pdev_id,
 
 #ifdef WLAN_SUPPORT_PPEDS
 QDF_STATUS
-target_if_peer_set_ppe_default_routing(struct cdp_ctrl_objmgr_psoc *soc,
-				       uint8_t *peer_macaddr,
-				       uint16_t service_code,
-				       uint8_t priority_valid,
-				       uint16_t src_info,
-				       uint8_t vdev_id, uint8_t use_ppe,
-				       uint8_t ppe_routing_enabled)
+target_if_peer_set_ppeds_default_routing(struct cdp_ctrl_objmgr_psoc *soc,
+					 uint8_t *peer_macaddr,
+					 uint16_t service_code,
+					 uint8_t priority_valid,
+					 uint16_t src_info,
+					 uint8_t vdev_id, uint8_t use_ppe,
+					 uint8_t ppe_routing_enabled)
 {
 	struct wmi_unified *pdev_wmi_handle;
 	struct wlan_objmgr_pdev *pdev;

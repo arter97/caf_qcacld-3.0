@@ -858,7 +858,8 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 	void *last_prefetch_hw_desc = NULL;
 	struct dp_tx_desc_s *last_prefetch_sw_desc = NULL;
 	hal_soc_handle_t hal_soc = soc->hal_soc;
-	hal_ring_handle_t hal_ring_hdl = be_soc->ppe_wbm_release_ring.hal_srng;
+	hal_ring_handle_t hal_ring_hdl =
+				be_soc->ppeds_wbm_release_ring.hal_srng;
 
 	if (qdf_unlikely(dp_srng_access_start(NULL, soc, hal_ring_hdl))) {
 		dp_err("HAL RING Access Failed -- %pK", hal_ring_hdl);

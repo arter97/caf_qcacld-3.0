@@ -1507,13 +1507,13 @@ void (*peer_send_wds_disconnect)(struct cdp_ctrl_objmgr_psoc *psoc,
 #endif
 #ifdef WLAN_SUPPORT_PPEDS
 	QDF_STATUS
-	(*peer_set_ppe_default_routing)(struct cdp_ctrl_objmgr_psoc *psoc,
-					uint8_t *peer_macaddr,
-					uint16_t service_code,
-					uint8_t priority_valid,
-					uint16_t src_info,
-					uint8_t vdev_id, uint8_t use_ppe,
-					uint8_t routing_enabled);
+	(*peer_set_ppeds_default_routing)(struct cdp_ctrl_objmgr_psoc *psoc,
+					  uint8_t *peer_macaddr,
+					  uint16_t service_code,
+					  uint8_t priority_valid,
+					  uint16_t src_info,
+					  uint8_t vdev_id, uint8_t use_ppe,
+					  uint8_t routing_enabled);
 #endif /* WLAN_SUPPORT_PPEDS */
 };
 
@@ -2195,7 +2195,7 @@ struct cdp_sawf_ops {
 #endif
 
 #ifdef WLAN_SUPPORT_PPEDS
-struct cdp_ppe_txrx_ops {
+struct cdp_ppeds_txrx_ops {
 	QDF_STATUS
 	(*ppeds_entry_attach)(struct cdp_soc_t *soc,
 			      uint8_t vdev_id, void *vpai,
@@ -2264,7 +2264,7 @@ struct cdp_ops {
 	struct cdp_scs_ops   *scs_ops;
 #endif
 #ifdef WLAN_SUPPORT_PPEDS
-	struct cdp_ppe_txrx_ops *ppe_ops;
+	struct cdp_ppeds_txrx_ops *ppeds_ops;
 #endif
 };
 #endif
