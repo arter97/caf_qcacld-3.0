@@ -622,6 +622,31 @@ bool mlo_is_sta_csa_param_handled(struct wlan_objmgr_vdev *vdev,
 void mlo_internal_disconnect_links(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlo_sta_vdev_get_reconfig_timer_state() - Get ml reconfig timer state on
+ * vdev
+ * @vdev: vdev pointer
+ *
+ * Return: true if reconfig timer is active, otherwise false
+ */
+bool mlo_sta_vdev_get_reconfig_timer_state(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_sta_stop_reconfig_timer_by_vdev() - Stop ml reconfig timer
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void mlo_sta_stop_reconfig_timer_by_vdev(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_sta_stop_reconfig_timer() - Stop reconfig timer on all vdev on ml dev
+ * @vdev: vdev pointer
+ *
+ * Return: None
+ */
+void mlo_sta_stop_reconfig_timer(struct wlan_objmgr_vdev *vdev);
+
+/**
  * mlo_sta_get_vdev_list() - get mlo vdev list
  * @vdev: vdev pointer
  * @vdev_count: vdev count
@@ -802,6 +827,21 @@ static inline
 void mlo_sta_get_vdev_list(struct wlan_objmgr_vdev *vdev,
 			   uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list)
+{
+}
+
+static inline bool
+mlo_sta_vdev_get_reconfig_timer_state(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline void
+mlo_sta_stop_reconfig_timer_by_vdev(struct wlan_objmgr_vdev *vdev)
+{
+}
+
+static inline void mlo_sta_stop_reconfig_timer(struct wlan_objmgr_vdev *vdev)
 {
 }
 

@@ -2035,6 +2035,73 @@ void mlo_sta_get_vdev_list(struct wlan_objmgr_vdev *vdev, uint16_t *vdev_count,
 	mlo_dev_lock_release(dev_ctx);
 }
 
+bool mlo_sta_vdev_get_reconfig_timer_state(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	if (!vdev || !mlo_is_mld_sta(vdev))
+		return false;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlo_err("vdev mlme is null");
+		return false;
+	}
+
+	return vdev_mlme->ml_reconfig_started;
+}
+
+void mlo_sta_stop_reconfig_timer_by_vdev(struct wlan_objmgr_vdev *vdev)
+{
+	struct vdev_mlme_obj *vdev_mlme;
+
+	if (!vdev || !mlo_is_mld_sta(vdev))
+		return;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		mlo_err("vdev mlme is null");
+		return;
+	}
+
+	if (!vdev_mlme->ml_reconfig_started)
+		return;
+
+	qdf_timer_stop(&vdev_mlme->ml_reconfig_timer);
+
+	mlo_debug("vdev %d reconfig timer active to stop",
+		  wlan_vdev_get_id(vdev));
+	vdev_mlme->ml_reconfig_started = false;
+}
+
+void mlo_sta_stop_reconfig_timer(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {0};
+	uint16_t vdev_count = 0;
+	uint8_t i;
+
+	if (!vdev || !mlo_is_mld_sta(vdev))
+		return;
+
+	mlo_get_ml_vdev_list(vdev, &vdev_count, wlan_vdev_list);
+	if (!vdev_count) {
+		mlo_err("vdev num 0 in mld dev");
+		return;
+	}
+
+	for (i = 0; i < vdev_count; i++) {
+		if (!wlan_vdev_list[i]) {
+			mlo_err("vdev is null in mld");
+			goto release_ref;
+		}
+		mlo_sta_stop_reconfig_timer_by_vdev(wlan_vdev_list[i]);
+	}
+
+release_ref:
+	for (i = 0; i < vdev_count; i++)
+		mlo_release_vdev_ref(wlan_vdev_list[i]);
+}
+
 void mlo_set_keys_saved(struct wlan_objmgr_vdev *vdev,
 			struct qdf_mac_addr *mac_address, bool value)
 {
