@@ -27,6 +27,7 @@
 #include <wlan_mlo_mgr_cmn.h>
 #include <wlan_scan_api.h>
 #include <scheduler_api.h>
+#include <wlan_crypto_global_api.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline void
@@ -670,6 +671,7 @@ mlo_send_link_connect(struct wlan_objmgr_vdev *vdev,
 		      ml_parnter_info->partner_link_info[partner_idx].link_id);
 		ml_parnter_info->partner_link_info[partner_idx].vdev_id =
 			       wlan_vdev_get_id(mlo_dev_ctx->wlan_vdev_list[i]);
+		wlan_crypto_free_vdev_key(wlan_vdev_list[i]);
 		mlo_prepare_and_send_connect(
 				wlan_vdev_list[i],
 				*ml_parnter_info,
