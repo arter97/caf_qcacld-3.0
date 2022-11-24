@@ -1110,6 +1110,26 @@ dp_tx_send_msdu_single_wrapper(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 }
 #endif
 
+#if defined(QCA_SUPPORT_WDS_EXTENDED)
+static bool
+dp_tx_is_wds_ast_override_en(struct dp_soc *soc,
+			     struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	if (soc->features.wds_ext_ast_override_enable &&
+	    tx_exc_metadata && tx_exc_metadata->is_wds_extended)
+		return true;
+
+	return false;
+}
+#else
+static bool
+dp_tx_is_wds_ast_override_en(struct dp_soc *soc,
+			     struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	return false;
+}
+#endif
+
 /**
  * dp_tx_desc_prepare_single - Allocate and prepare Tx descriptor
  * @vdev: DP vdev handle
@@ -1172,6 +1192,13 @@ struct dp_tx_desc_s *dp_tx_prepare_desc_single(struct dp_vdev *vdev,
 	/* Packets marked by upper layer (OS-IF) to be sent to FW */
 	if (dp_tx_is_nbuf_marked_exception(soc, nbuf))
 		is_exception = 1;
+
+	/* for BE chipsets if wds extension was enbled will not mark FW
+	 * in desc will mark ast index based search for ast index.
+	 */
+	if (dp_tx_is_wds_ast_override_en(soc, tx_exc_metadata))
+		return tx_desc;
+
 	/*
 	 * For special modes (vdev_type == ocb or mesh), data frames should be
 	 * transmitted using varying transmit parameters (tx spec) which include

@@ -16924,6 +16924,7 @@ static void dp_soc_cfg_init(struct dp_soc *soc)
 		wlan_cfg_set_txmon_hw_support(soc->wlan_cfg_ctx, true);
 		soc->host_ast_db_enable = cfg_get(soc->ctrl_psoc,
 						  CFG_DP_HOST_AST_DB_ENABLE);
+		soc->features.wds_ext_ast_override_enable = true;
 		break;
 	case TARGET_TYPE_QCA5332:
 		soc->ast_override_support = 1;
@@ -16939,6 +16940,7 @@ static void dp_soc_cfg_init(struct dp_soc *soc)
 		wlan_cfg_set_txmon_hw_support(soc->wlan_cfg_ctx, true);
 		soc->host_ast_db_enable = cfg_get(soc->ctrl_psoc,
 						  CFG_DP_HOST_AST_DB_ENABLE);
+		soc->features.wds_ext_ast_override_enable = true;
 		break;
 	default:
 		qdf_print("%s: Unknown tgt type %d\n", __func__, target_type);

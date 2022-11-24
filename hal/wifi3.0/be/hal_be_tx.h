@@ -487,6 +487,21 @@ hal_tx_desc_set_cache_set_num(hal_soc_handle_t hal_soc_hdl, void *desc,
 		HAL_TX_SM(TCL_DATA_CMD, CACHE_SET_NUM, cache_num);
 }
 
+/**
+ * hal_tx_desc_set_lookup_override_num - set lookup override num
+ * to the descriptor to Hardware
+ * @hal_soc_hdl: hal soc handle
+ * @hal_tx_des_cached: Cached descriptor that software maintains
+ * @cache_num: set numbernumber
+ */
+static inline void
+hal_tx_desc_set_index_lookup_override(hal_soc_handle_t hal_soc_hdl,
+				      void *desc, uint8_t num)
+{
+	HAL_SET_FLD(desc, TCL_DATA_CMD, INDEX_LOOKUP_OVERRIDE) |=
+		HAL_TX_SM(TCL_DATA_CMD, INDEX_LOOKUP_OVERRIDE, num);
+}
+
 /*---------------------------------------------------------------------------
  * WBM Descriptor accessor APIs for Tx completions
  * ---------------------------------------------------------------------------

@@ -2059,6 +2059,7 @@ struct dp_soc_features {
 		dmac_cmn_src_rxbuf_ring_enabled:1;
 	bool rssi_dbm_conv_support;
 	bool umac_hw_reset_support;
+	bool wds_ext_ast_override_enable;
 };
 
 enum sysfs_printing_mode {
