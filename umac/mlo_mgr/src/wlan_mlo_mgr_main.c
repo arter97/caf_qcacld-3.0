@@ -378,6 +378,26 @@ QDF_STATUS wlan_mlo_check_valid_config(struct wlan_mlo_dev_context *ml_dev,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * mlo_t2lm_ctx_init() - API to initialize the t2lm context with the default
+ * values.
+ * @ml_dev: Pointer to ML Dev context
+ *
+ * Return: None
+ */
+static inline void mlo_t2lm_ctx_init(struct wlan_mlo_dev_context *ml_dev)
+{
+	struct wlan_t2lm_info *t2lm;
+
+	t2lm = &ml_dev->t2lm_ctx.t2lm_ie[0].t2lm;
+
+	qdf_mem_zero(&ml_dev->t2lm_ctx, sizeof(struct wlan_t2lm_context));
+
+	ml_dev->t2lm_ctx.num_of_t2lm_ie = 1;
+	t2lm->direction = WLAN_T2LM_BIDI_DIRECTION;
+	t2lm->default_link_mapping = 1;
+}
+
 static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_mlo_dev_context *ml_dev;
@@ -452,6 +472,8 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 	if (qdf_list_size(&g_mlo_ctx->ml_dev_list) < WLAN_UMAC_MLO_MAX_DEV)
 		qdf_list_insert_back(&g_mlo_ctx->ml_dev_list, &ml_dev->node);
 	ml_link_lock_release(g_mlo_ctx);
+
+	mlo_t2lm_ctx_init(ml_dev);
 
 	return status;
 }
