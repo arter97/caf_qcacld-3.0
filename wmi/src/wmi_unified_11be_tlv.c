@@ -884,6 +884,14 @@ static QDF_STATUS send_mlo_vdev_tid_to_link_map_cmd_tlv(
 	uint32_t buf_len = 0;
 	uint32_t num_info = 0;
 
+	if (params->num_t2lm_info > WLAN_MAX_T2LM_IE) {
+		wmi_err("Failed to send T2LM command to FW for vdev id %d as t2lm info %d is greater than max %d",
+			params->vdev_id,
+			params->num_t2lm_info,
+			WLAN_MAX_T2LM_IE);
+		return QDF_STATUS_E_INVAL;
+	}
+
 	buf_len = sizeof(wmi_mlo_ap_vdev_tid_to_link_map_cmd_fixed_param) +
 		WMI_TLV_HDR_SIZE + (params->num_t2lm_info *
 		 sizeof(wmi_mlo_ap_vdev_tid_to_link_map_ie_info));
@@ -994,7 +1002,7 @@ extract_mlo_vdev_bcast_tid_to_link_map_event_tlv(
 			info->vdev_id_expec_dur);
 
 	bcast_info->expected_duration =
-		WMI_MLO_BROADCAST_TID_TO_LINK_MAP_INFO_VDEV_ID_GET(
+		WMI_MLO_BROADCAST_TID_TO_LINK_MAP_INFO_EXP_DUR_GET(
 				info->vdev_id_expec_dur);
 
 	return QDF_STATUS_SUCCESS;
