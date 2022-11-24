@@ -50,19 +50,25 @@ enum mgmt_rx_reo_shared_snapshot_id {
 struct mgmt_rx_reo_shared_snapshot {
 	union {
 		uint32_t mgmt_rx_reo_snapshot_low;
-		uint32_t mgmt_pkt_ctr_ver_a:16,
-			 global_timestamp_redundant_ver_a:15,
-			 valid_ver_a:1;
-		uint32_t global_timestamp_low_ver_b:15,
-			 mgmt_pkt_ctr_ver_b:16,
-			 valid_ver_b:1;
+		struct {
+			uint32_t mgmt_pkt_ctr_ver_a:16;
+			uint32_t global_timestamp_redundant_ver_a:15;
+			uint32_t valid_ver_a:1;
+		};
+		struct {
+			uint32_t global_timestamp_low_ver_b:15;
+			uint32_t mgmt_pkt_ctr_ver_b:16;
+			uint32_t valid_ver_b:1;
+		};
 	};
 
 	union {
 		uint32_t mgmt_rx_reo_snapshot_high;
 		uint32_t global_timestamp_ver_a;
-		uint32_t mgmt_pkt_ctr_redundant_ver_b:15,
-			 global_timestamp_high_ver_b:17;
+		struct {
+			uint32_t mgmt_pkt_ctr_redundant_ver_b:15;
+			uint32_t global_timestamp_high_ver_b:17;
+		};
 	};
 };
 
