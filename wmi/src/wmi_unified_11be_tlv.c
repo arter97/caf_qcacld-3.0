@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -376,6 +376,9 @@ force_mode_host_to_fw(enum mlo_link_force_mode host_mode,
 	case MLO_LINK_FORCE_MODE_INACTIVE:
 		*fw_mode = WMI_MLO_LINK_FORCE_INACTIVE;
 		break;
+	case MLO_LINK_FORCE_MODE_ACTIVE_INACTIVE:
+		*fw_mode = WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE;
+		break;
 	case MLO_LINK_FORCE_MODE_ACTIVE_NUM:
 		*fw_mode = WMI_MLO_LINK_FORCE_ACTIVE_LINK_NUM;
 		break;
@@ -412,6 +415,9 @@ force_reason_host_to_fw(enum mlo_link_force_reason host_reason,
 	case MLO_LINK_FORCE_REASON_DISCONNECT:
 		*fw_reason =  WMI_MLO_LINK_FORCE_REASON_NEW_DISCONNECT;
 		break;
+	case MLO_LINK_FORCE_REASON_LINK_REMOVAL:
+		*fw_reason =  WMI_MLO_LINK_FORCE_REASON_LINK_REMOVAL;
+		break;
 	default:
 		wmi_err("Invalid force reason: %d", host_reason);
 		return QDF_STATUS_E_INVAL;
@@ -436,6 +442,7 @@ send_mlo_link_set_active_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_mlo_set_active_link_number_param *link_num_param;
 	uint32_t *vdev_bitmap;
 	uint32_t num_link_num_param = 0, num_vdev_bitmap = 0, tlv_len;
+	uint32_t num_inactive_vdev_bitmap = 0;
 	wmi_buf_t buf;
 	uint8_t *buf_ptr;
 	uint32_t len;
@@ -469,6 +476,10 @@ send_mlo_link_set_active_cmd_tlv(wmi_unified_t wmi_handle,
 	case WMI_MLO_LINK_NO_FORCE:
 		num_vdev_bitmap = param->num_vdev_bitmap;
 		break;
+	case WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE:
+		num_vdev_bitmap = param->num_vdev_bitmap;
+		num_inactive_vdev_bitmap = param->num_inactive_vdev_bitmap;
+		break;
 	default:
 		wmi_err("Invalid force reason: %d", force_mode);
 		return QDF_STATUS_E_INVAL;
@@ -477,6 +488,9 @@ send_mlo_link_set_active_cmd_tlv(wmi_unified_t wmi_handle,
 	len = sizeof(*cmd) +
 	      WMI_TLV_HDR_SIZE + sizeof(*link_num_param) * num_link_num_param +
 	      WMI_TLV_HDR_SIZE + sizeof(*vdev_bitmap) * num_vdev_bitmap;
+	if (force_mode == WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE)
+		len += WMI_TLV_HDR_SIZE +
+		sizeof(*vdev_bitmap) * num_inactive_vdev_bitmap;
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf)
@@ -491,9 +505,9 @@ send_mlo_link_set_active_cmd_tlv(wmi_unified_t wmi_handle,
 	WMITLV_SET_HDR(&cmd->tlv_header, tag_id, tlv_len);
 	cmd->force_mode = force_mode;
 	cmd->reason = force_reason;
-	wmi_debug("mode %d reason %d num_link_num_param %d num_vdev_bitmap %d",
+	wmi_debug("mode %d reason %d num_link_num_param %d num_vdev_bitmap %d inactive %d",
 		  cmd->force_mode, cmd->reason, num_link_num_param,
-		  num_vdev_bitmap);
+		  num_vdev_bitmap, num_inactive_vdev_bitmap);
 	buf_ptr += sizeof(*cmd);
 
 	WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_STRUC,
@@ -539,6 +553,25 @@ send_mlo_link_set_active_cmd_tlv(wmi_unified_t wmi_handle,
 		}
 
 		buf_ptr += sizeof(*vdev_bitmap) * num_vdev_bitmap;
+	}
+	if (force_mode == WMI_MLO_LINK_FORCE_ACTIVE_INACTIVE) {
+		WMITLV_SET_HDR(buf_ptr, WMITLV_TAG_ARRAY_UINT32,
+			       sizeof(*vdev_bitmap) *
+			       num_inactive_vdev_bitmap);
+		buf_ptr += WMI_TLV_HDR_SIZE;
+
+		if (num_inactive_vdev_bitmap) {
+			vdev_bitmap = (A_UINT32 *)(buf_ptr);
+			for (i = 0; i < num_inactive_vdev_bitmap; i++) {
+				vdev_bitmap[i] =
+					param->inactive_vdev_bitmap[i];
+				wmi_debug("entry[%d]: inactive_vdev_id_bitmap 0x%x ",
+					  i, vdev_bitmap[i]);
+			}
+
+			buf_ptr += sizeof(*vdev_bitmap) *
+				num_inactive_vdev_bitmap;
+		}
 	}
 
 	wmi_mtrace(WMI_MLO_LINK_SET_ACTIVE_CMDID, 0, cmd->force_mode);
