@@ -303,7 +303,7 @@ static int dp_ppeds_tx_comp_poll(struct napi_struct *napi, int budget)
 	if (budget > work_done) {
 		napi_complete(napi);
 		dp_ppeds_enable_irq(&be_soc->soc,
-				    &be_soc->ppe_wbm_release_ring);
+				    &be_soc->ppeds_wbm_release_ring);
 	}
 
 	return (work_done > budget) ? budget : work_done;
@@ -337,7 +337,7 @@ static void dp_ppeds_add_napi_ctxt(struct dp_soc_be *be_soc)
 	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
 	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
 	int napi_budget =
-		wlan_cfg_get_dp_soc_ppe_tx_comp_napi_budget(soc->wlan_cfg_ctx);
+	wlan_cfg_get_dp_soc_ppeds_tx_comp_napi_budget(soc->wlan_cfg_ctx);
 
 	qdf_net_if_create_dummy_if((struct qdf_net_if *)&napi_ctxt->ndev);
 
@@ -358,7 +358,7 @@ static QDF_STATUS
 dp_ppeds_tx_desc_pool_alloc(struct dp_soc *soc, uint16_t num_elem)
 {
 	uint32_t desc_size;
-	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	struct dp_ppeds_tx_desc_pool_s *tx_desc_pool;
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
 	desc_size =  qdf_get_pwr2(sizeof(struct dp_tx_desc_s));
@@ -385,7 +385,7 @@ dp_ppeds_tx_desc_pool_alloc(struct dp_soc *soc, uint16_t num_elem)
  */
 static void dp_ppeds_tx_desc_pool_free(struct dp_soc *soc)
 {
-	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	struct dp_ppeds_tx_desc_pool_s *tx_desc_pool;
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
 	tx_desc_pool = &be_soc->ppeds_tx_desc;
@@ -410,7 +410,7 @@ static QDF_STATUS dp_ppeds_tx_desc_pool_setup(struct dp_soc *soc,
 					      uint16_t num_elem,
 					      uint8_t pool_id)
 {
-	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	struct dp_ppeds_tx_desc_pool_s *tx_desc_pool;
 	struct dp_hw_cookie_conversion_t *cc_ctx;
 	struct dp_soc_be *be_soc;
 	struct dp_spt_page_desc *page_desc;
@@ -467,12 +467,12 @@ static QDF_STATUS dp_ppeds_tx_desc_pool_setup(struct dp_soc *soc,
  */
 static QDF_STATUS dp_ppeds_tx_desc_pool_init(struct dp_soc *soc)
 {
-	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	struct dp_ppeds_tx_desc_pool_s *tx_desc_pool;
 	uint32_t desc_size, num_elem;
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
 	desc_size = qdf_get_pwr2(sizeof(struct dp_tx_desc_s));
-	num_elem = wlan_cfg_get_dp_soc_ppe_num_tx_desc(soc->wlan_cfg_ctx);
+	num_elem = wlan_cfg_get_dp_soc_ppeds_num_tx_desc(soc->wlan_cfg_ctx);
 	tx_desc_pool = &be_soc->ppeds_tx_desc;
 
 	if (qdf_mem_multi_page_link(soc->osdev,
@@ -515,7 +515,7 @@ void dp_ppeds_tx_desc_free_nolock(struct dp_soc *soc,
 				  struct dp_tx_desc_s *tx_desc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppe_tx_desc_pool_s *pool = NULL;
+	struct dp_ppeds_tx_desc_pool_s *pool = NULL;
 
 	tx_desc->nbuf = NULL;
 	tx_desc->flags = 0;
@@ -557,12 +557,12 @@ void dp_ppeds_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
  */
 static void
 dp_ppeds_tx_desc_pool_cleanup(struct dp_soc_be *be_soc,
-			      struct dp_ppe_tx_desc_pool_s *tx_desc_pool)
+			      struct dp_ppeds_tx_desc_pool_s *tx_desc_pool)
 {
 	struct dp_spt_page_desc *page_desc;
 	int i = 0;
 	struct dp_hw_cookie_conversion_t *cc_ctx;
-	struct dp_ppe_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
+	struct dp_ppeds_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
 
 	if (pool) {
 		TX_DESC_LOCK_LOCK(&pool->lock);
@@ -594,7 +594,7 @@ dp_ppeds_tx_desc_pool_cleanup(struct dp_soc_be *be_soc,
  */
 static void dp_ppeds_tx_desc_pool_deinit(struct dp_soc_be *be_soc)
 {
-	struct dp_ppe_tx_desc_pool_s *tx_desc_pool;
+	struct dp_ppeds_tx_desc_pool_s *tx_desc_pool;
 
 	tx_desc_pool = &be_soc->ppeds_tx_desc;
 	dp_ppeds_tx_desc_pool_cleanup(be_soc, tx_desc_pool);
@@ -614,7 +614,7 @@ static inline
 struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 {
 	struct dp_tx_desc_s *tx_desc = NULL;
-	struct dp_ppe_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
+	struct dp_ppeds_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
 
 	TX_DESC_LOCK_LOCK(&pool->lock);
 
@@ -650,7 +650,7 @@ struct dp_tx_desc_s *dp_ppeds_tx_desc_alloc(struct dp_soc_be *be_soc)
 void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppe_tx_desc_pool_s *pool = NULL;
+	struct dp_ppeds_tx_desc_pool_s *pool = NULL;
 
 	tx_desc->nbuf = NULL;
 	tx_desc->flags = 0;
@@ -687,7 +687,7 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 	struct dp_tx_desc_s *tx_desc;
 	struct dp_soc *soc = *((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
-	struct dp_ppe_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
+	struct dp_ppeds_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
 	qdf_dma_addr_t paddr;
 
 	/*
@@ -1382,7 +1382,7 @@ irqreturn_t dp_ppeds_handle_tx_comp(int irq, void *ctxt)
 			dp_get_be_soc_from_dp_soc((struct dp_soc *)ctxt);
 	struct napi_struct *napi = &be_soc->ppeds_napi_ctxt.napi;
 
-	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe_wbm_release_ring);
+	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppeds_wbm_release_ring);
 
 	napi_schedule(napi);
 
@@ -1393,7 +1393,7 @@ QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
-	if (!wlan_cfg_get_dp_soc_is_ppe_enabled(soc->wlan_cfg_ctx))
+	if (!wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx))
 		return QDF_STATUS_SUCCESS;
 
 	return dp_hw_cookie_conversion_init(be_soc, &be_soc->ppeds_tx_cc_ctx);
@@ -1403,7 +1403,7 @@ QDF_STATUS dp_ppeds_deinit_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 
-	if (!wlan_cfg_get_dp_soc_is_ppe_enabled(soc->wlan_cfg_ctx))
+	if (!wlan_cfg_get_dp_soc_is_ppeds_enabled(soc->wlan_cfg_ctx))
 		return QDF_STATUS_SUCCESS;
 
 	return dp_hw_cookie_conversion_deinit(be_soc, &be_soc->ppeds_tx_cc_ctx);
@@ -1422,7 +1422,7 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 	struct dp_soc_be **besocptr;
 	uint32_t num_elem;
 
-	num_elem = wlan_cfg_get_dp_soc_ppe_num_tx_desc(soc->wlan_cfg_ctx);
+	num_elem = wlan_cfg_get_dp_soc_ppeds_num_tx_desc(soc->wlan_cfg_ctx);
 
 	qdf_status =
 		dp_hw_cookie_conversion_attach(be_soc, &be_soc->ppeds_tx_cc_ctx,
