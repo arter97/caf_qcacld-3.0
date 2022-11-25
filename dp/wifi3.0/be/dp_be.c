@@ -2168,10 +2168,21 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 				   HAL_TX_MCAST_CTRL_NO_SPECIAL);
 
 	if (be_vdev->mcast_primary) {
+		struct cdp_txrx_peer_params_update params = {0};
+
 		dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
 					    dp_mlo_mcast_reset_pri_mcast,
 					    (void *)&be_vdev->mcast_primary,
 					    DP_MOD_ID_TX_MCAST);
+
+		params.chip_id = be_soc->mlo_chip_id;
+		params.pdev_id = vdev->pdev->pdev_id;
+		params.osif_vdev = vdev->osif_vdev;
+		dp_wdi_event_handler(
+				WDI_EVENT_MCAST_PRIMARY_UPDATE,
+				vdev->pdev->soc,
+				(void *)&params, CDP_INVALID_PEER,
+				WDI_NO_VAL, params.pdev_id);
 	}
 }
 

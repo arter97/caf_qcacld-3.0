@@ -7815,12 +7815,20 @@ static QDF_STATUS dp_txrx_peer_detach(struct dp_soc *soc, struct dp_peer *peer)
 {
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_pdev *pdev;
+	struct cdp_txrx_peer_params_update params = {0};
 
 	/* dp_txrx_peer exists for mld peer and legacy peer */
 	if (peer->txrx_peer) {
 		txrx_peer = peer->txrx_peer;
 		peer->txrx_peer = NULL;
 		pdev = txrx_peer->vdev->pdev;
+
+		params.osif_vdev = (void *)peer->vdev->osif_vdev;
+		params.peer_mac = peer->mac_addr.raw;
+
+		dp_wdi_event_handler(WDI_EVENT_PEER_DELETE, soc,
+				     (void *)&params, peer->peer_id,
+				     WDI_NO_VAL, pdev->pdev_id);
 
 		dp_peer_defrag_rx_tids_deinit(txrx_peer);
 		/*
@@ -7841,6 +7849,7 @@ static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 {
 	struct dp_txrx_peer *txrx_peer;
 	struct dp_pdev *pdev;
+	struct cdp_txrx_peer_params_update params = {0};
 
 	txrx_peer = (struct dp_txrx_peer *)qdf_mem_malloc(sizeof(*txrx_peer));
 
@@ -7883,6 +7892,15 @@ static QDF_STATUS dp_txrx_peer_attach(struct dp_soc *soc, struct dp_peer *peer)
 		dp_warn("peer sawf stats alloc failed");
 
 	dp_txrx_peer_attach_add(soc, peer, txrx_peer);
+
+	params.peer_mac = peer->mac_addr.raw;
+	params.osif_vdev = (void *)peer->vdev->osif_vdev;
+	params.chip_id = dp_mlo_get_chip_id(soc);
+	params.pdev_id = peer->vdev->pdev->pdev_id;
+
+	dp_wdi_event_handler(WDI_EVENT_TXRX_PEER_CREATE, soc,
+			     (void *)&params, peer->peer_id,
+			     WDI_NO_VAL, params.pdev_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -8162,6 +8180,7 @@ QDF_STATUS dp_peer_mlo_setup(
 			struct cdp_peer_setup_info *setup_info)
 {
 	struct dp_peer *mld_peer = NULL;
+	struct cdp_txrx_peer_params_update params = {0};
 
 	/* Non-MLO connection, do nothing */
 	if (!setup_info || !setup_info->mld_peer_mac)
@@ -8183,6 +8202,21 @@ QDF_STATUS dp_peer_mlo_setup(
 				     vdev_id,
 				     setup_info->mld_peer_mac,
 				     CDP_MLD_PEER_TYPE);
+
+	if (peer->vdev->opmode == wlan_op_mode_sta &&
+	    setup_info->is_primary_link) {
+		struct cdp_txrx_peer_params_update params = {0};
+
+		params.chip_id = dp_mlo_get_chip_id(soc);
+		params.pdev_id = peer->vdev->pdev->pdev_id;
+		params.osif_vdev = peer->vdev->osif_vdev;
+
+		dp_wdi_event_handler(
+				WDI_EVENT_STA_PRIMARY_UMAC_UPDATE,
+				soc,
+				(void *)&params, peer->peer_id,
+				WDI_NO_VAL, params.pdev_id);
+	}
 
 	peer->first_link = setup_info->is_first_link;
 	peer->primary_link = setup_info->is_primary_link;
@@ -8233,6 +8267,15 @@ QDF_STATUS dp_peer_mlo_setup(
 					soc, mld_peer, prev_vdev,
 					mld_peer->vdev);
 
+			params.osif_vdev = (void *)peer->vdev->osif_vdev;
+			params.peer_mac = peer->mac_addr.raw;
+			params.chip_id = dp_mlo_get_chip_id(soc);
+			params.pdev_id = peer->vdev->pdev->pdev_id;
+
+			dp_wdi_event_handler(
+					WDI_EVENT_PEER_PRIMARY_UMAC_UPDATE,
+					soc, (void *)&params, peer->peer_id,
+					WDI_NO_VAL, params.pdev_id);
 		}
 
 		/* associate mld and link peer */
