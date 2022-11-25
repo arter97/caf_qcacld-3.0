@@ -11659,13 +11659,15 @@ dp_get_obss_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
  * dp_clear_pdev_obss_pd_stats(): Clear pdev obss stats
  * @soc: DP soc handle
  * @pdev_id: id of DP_PDEV handle
+ * @req: Pointer to CDP TxRx stats request mac_id will be
+ *	 pre-filled and should not be overwritten
  *
  * Return: status
  */
 static QDF_STATUS
-dp_clear_pdev_obss_pd_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
+dp_clear_pdev_obss_pd_stats(struct cdp_soc_t *soc, uint8_t pdev_id,
+			    struct cdp_txrx_stats_req *req)
 {
-	struct cdp_txrx_stats_req req = {0};
 	struct dp_pdev *pdev =
 		dp_get_pdev_from_soc_pdev_id_wifi3((struct dp_soc *)soc,
 						   pdev_id);
@@ -11684,13 +11686,13 @@ dp_clear_pdev_obss_pd_stats(struct cdp_soc_t *soc, uint8_t pdev_id)
 	 *   - config_param2 : stats bmask from start offset + 32
 	 *   - config_param3 : stats bmask from start offset + 64
 	 */
-	req.stats = (enum cdp_stats)HTT_DBG_EXT_STATS_RESET;
-	req.param0 = HTT_DBG_EXT_STATS_PDEV_OBSS_PD_STATS;
-	req.param1 = 0x00000001;
+	req->stats = (enum cdp_stats)HTT_DBG_EXT_STATS_RESET;
+	req->param0 = HTT_DBG_EXT_STATS_PDEV_OBSS_PD_STATS;
+	req->param1 = 0x00000001;
 
-	return dp_h2t_ext_stats_msg_send(pdev, req.stats, req.param0,
-				  req.param1, req.param2, req.param3, 0,
-				cookie_val, 0);
+	return dp_h2t_ext_stats_msg_send(pdev, req->stats, req->param0,
+				  req->param1, req->param2, req->param3, 0,
+				cookie_val, req->mac_id);
 }
 
 /**
