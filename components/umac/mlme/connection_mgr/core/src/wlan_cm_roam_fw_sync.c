@@ -1238,7 +1238,9 @@ QDF_STATUS cm_fw_roam_invoke_fail(struct wlan_objmgr_psoc *psoc,
 	 */
 	if (qdf_is_macaddr_broadcast(&bssid))
 		mlme_debug("Keep current connection");
-	else if (source == CM_ROAMING_HOST || source == CM_ROAMING_NUD_FAILURE)
+	else if (source == CM_ROAMING_HOST ||
+		 source == CM_ROAMING_NUD_FAILURE ||
+		 source == CM_ROAMING_LINK_REMOVAL)
 		status = mlo_disconnect(vdev, CM_ROAM_DISCONNECT,
 					REASON_USER_TRIGGERED_ROAM_FAILURE,
 					NULL);
