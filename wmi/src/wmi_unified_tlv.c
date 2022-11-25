@@ -12730,6 +12730,9 @@ static QDF_STATUS extract_mgmt_rx_params_tlv(wmi_unified_t wmi_handle,
 		wmi_err("RX mgmt frame decrypt error, discard it");
 		return QDF_STATUS_E_INVAL;
 	}
+	if ((ev_hdr->status) & WMI_RXERR_MIC) {
+		wmi_err("RX mgmt frame MIC mismatch for beacon protected frame");
+	}
 
 	if (ev_hdr->buf_len > param_tlvs->num_bufp) {
 		wmi_err("Rx mgmt frame length mismatch, discard it");
