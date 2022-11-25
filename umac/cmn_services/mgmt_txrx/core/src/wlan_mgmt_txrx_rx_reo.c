@@ -2513,6 +2513,9 @@ mgmt_rx_reo_update_list(struct mgmt_rx_reo_list *reo_list,
 			break;
 		}
 
+		qdf_assert_always(!frame_desc->is_stale ||
+				  cur_entry->is_parallel_rx);
+
 		list_insertion_pos++;
 
 		status = mgmt_rx_reo_update_wait_count(
@@ -2525,9 +2528,6 @@ mgmt_rx_reo_update_list(struct mgmt_rx_reo_list *reo_list,
 			cur_entry->status &=
 			      ~MGMT_RX_REO_STATUS_WAIT_FOR_FRAME_ON_OTHER_LINKS;
 	}
-
-	if (frame_desc->is_stale)
-		qdf_assert_always(!list_insertion_pos);
 
 	if (frame_desc->type == MGMT_RX_REO_FRAME_DESC_HOST_CONSUMED_FRAME &&
 	    !frame_desc->is_stale && frame_desc->reo_required) {
