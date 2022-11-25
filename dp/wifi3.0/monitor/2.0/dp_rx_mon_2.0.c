@@ -1332,14 +1332,14 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		last_buf_info->reception_type = msdu_info->reception_type;
 		last_buf_info->msdu_len = msdu_info->msdu_len;
 
+		/* If flow classification is enabled,
+		 * update protocol and flow tag to buf headroom
+		 */
 		dp_rx_mon_pf_tag_to_buf_headroom_2_0(nbuf, ppdu_info, pdev,
 						     soc);
+
 		/* reset msdu info for next msdu for same user */
 		qdf_mem_zero(msdu_info, sizeof(*msdu_info));
-
-		/* If flow classification is enabled,
-		 * update cce_metadata and fse_metadata
-		 */
 	}
 	break;
 	case HAL_TLV_STATUS_MPDU_START:
