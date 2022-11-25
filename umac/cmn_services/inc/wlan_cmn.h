@@ -715,4 +715,14 @@ struct wlan_ssid {
 #define PSOC_HOST_EHT_MCS_NSS_MAP_5G_SIZE 4
 #endif
 
+/**
+ * enum host_edca_param_type - Host edca param type
+ * @HOST_EDCA_PARAM_TYPE_AGGRESSIVE: Aggressive type
+ * @HOST_EDCA_PARAM_TYPE_PIFS: Pifs type
+ */
+enum host_edca_param_type {
+	HOST_EDCA_PARAM_TYPE_AGGRESSIVE = 0,
+	HOST_EDCA_PARAM_TYPE_PIFS = 1,
+};
+
 #endif /* _WLAN_OBJMGR_CMN_H_*/

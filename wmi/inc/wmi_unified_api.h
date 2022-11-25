@@ -5001,4 +5001,18 @@ QDF_STATUS wmi_extract_health_mon_event(
 		void *ev,
 		struct wmi_health_mon_params *param);
 #endif /* HEALTH_MON_SUPPORT */
+
+/**
+ * wmi_unified__update_edca_pifs_param() - update EDCA/PIFS params
+ * @wmi_handle: wmi handle
+ * @edca_pifs_param: pointer to edca_pifs_vparam struct
+ *
+ * This function updates EDCA/PIFS parameters to the target
+ *
+ * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
+ */
+QDF_STATUS
+wmi_unified_update_edca_pifs_param(
+			wmi_unified_t wmi_handle,
+			struct edca_pifs_vparam *edca_pifs_param);
 #endif /* _WMI_UNIFIED_API_H_ */

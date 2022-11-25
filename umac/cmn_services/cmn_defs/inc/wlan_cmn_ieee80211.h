@@ -3424,8 +3424,7 @@ struct wlan_eht_cap_info_network_endian {
 } qdf_packed;
 
 /**
- * struct wlan_edca_pifs_param_ie: struct for QCN_ATTRIB_EDCA_PIFS_PARAM
- * @edca_param_type: edca param type
+ * struct edca_param: struct for edca_param
  * @acvo_aifsn: ac vo aifsn
  * @acvo_acm: ac vo acm
  * @acvo_aci: ac vo aci
@@ -3433,27 +3432,40 @@ struct wlan_eht_cap_info_network_endian {
  * @acvo_cwmin: ac vo cwmin
  * @acvo_cwmax: ac vo cwmax
  * @acvo_txoplimit: ac vo txoplimit
+ */
+struct edca_param {
+	uint8_t acvo_aifsn:4;
+	uint8_t acvo_acm:1;
+	uint8_t acvo_aci:2;
+	uint8_t unused:1;
+	uint8_t acvo_cwmin:4;
+	uint8_t acvo_cwmax:4;
+	uint16_t acvo_txoplimit;
+};
+
+/**
+ * struct pifs_param: struct for pifs_param
  * @sap_pifs_offset: sap pifs offset
  * @leb_pifs_offset: left earbud offset
  * @reb_pifs_offset: right earbud offset
  */
+struct pifs_param {
+	uint8_t sap_pifs_offset;
+	uint8_t leb_pifs_offset;
+	uint8_t reb_pifs_offset;
+};
+
+/**
+ * struct wlan_edca_pifs_param_ie: struct for QCN_ATTRIB_EDCA_PIFS_PARAM
+ * @edca_param_type: edca param type
+ * @eparam: structure for edca_param
+ * @pparam: structure for pifs_param
+ */
 struct wlan_edca_pifs_param_ie {
 	uint8_t edca_param_type;
 	union {
-		struct {
-			uint8_t acvo_aifsn:4;
-			uint8_t acvo_acm:1;
-			uint8_t acvo_aci:2;
-			uint8_t unused:1;
-			uint8_t acvo_cwmin:4;
-			uint8_t acvo_cwmax:4;
-			uint16_t acvo_txoplimit;
-		} qdf_packed edca_param; /* edca_param_type = 0 */
-		struct {
-			uint8_t sap_pifs_offset;
-			uint8_t leb_pifs_offset;
-			uint8_t reb_pifs_offset;
-		} qdf_packed pifs_params; /* edca_param_type = 1 */
+		struct edca_param eparam; /* edca_param_type = 0 */
+		struct pifs_param pparam; /* edca_param_type = 1 */
 	} qdf_packed edca_pifs_param;
 } qdf_packed;
 

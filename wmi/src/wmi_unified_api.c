@@ -4046,3 +4046,15 @@ QDF_STATUS wmi_feature_set_cmd_send(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 #endif
+
+QDF_STATUS
+wmi_unified_update_edca_pifs_param(
+			wmi_unified_t wmi_handle,
+			struct edca_pifs_vparam *edca_pifs_param)
+{
+	if (wmi_handle->ops->send_update_edca_pifs_param_cmd)
+		return wmi_handle->ops->send_update_edca_pifs_param_cmd(
+				wmi_handle, edca_pifs_param);
+
+	return QDF_STATUS_E_FAILURE;
+}

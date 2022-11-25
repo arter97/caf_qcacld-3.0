@@ -3187,6 +3187,10 @@ QDF_STATUS
 					   void *evt_buf,
 					   struct wmi_health_mon_params *param);
 #endif /* HEALTH_MON_SUPPORT */
+
+QDF_STATUS (*send_update_edca_pifs_param_cmd)(
+			wmi_unified_t wmi_handle,
+			struct edca_pifs_vparam *edca_pifs_param);
 };
 
 /* Forward declaration for psoc*/
