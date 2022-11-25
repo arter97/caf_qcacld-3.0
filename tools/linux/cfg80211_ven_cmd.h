@@ -1418,6 +1418,8 @@ enum _ol_ath_param_t {
 #endif
 	OL_ATH_PARAM_MON_MAC_FILTER = 520,
 	OL_ATH_PARAM_PUNC_EIRP_THRES = 521,
+	/* Display the current 6G client type */
+	OL_ATH_PARAM_DISPLAY_CLIENT_TYPE = 522,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3554,6 +3556,9 @@ struct vendor_commands radio_vendor_cmds[] = {
 	{"ap_power_mode",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_SET_AP_PWR_TYPE,
 		SET_PARAM, 1},
+	{"g_client_type",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DISPLAY_CLIENT_TYPE,
+		GET_PARAM, 0},
 #ifdef CONFIG_AFC_SUPPORT
 	{"dcs_afc_random_chan_en",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_DCS_AFC_RANDOM_CHAN_EN,
