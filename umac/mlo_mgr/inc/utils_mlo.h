@@ -162,6 +162,46 @@ util_find_mlie(uint8_t *buf, qdf_size_t buflen, uint8_t **mlieseq,
 	       qdf_size_t *mlieseqlen);
 
 /**
+ * util_find_mlie_by_variant - Find the first Multi-Link element or the start of
+ * the first Multi-Link element fragment sequence in a given buffer containing
+ * elements based on variant, if a Multi-Link element or element fragment
+ * sequence exists in the given buffer.
+ *
+ * @buf: Buffer to be searched for the Multi-Link element or the start of the
+ * Multi-Link element fragment sequence
+ * @buflen: Length of the buffer
+ * @mlieseq: Based on the variant, pointer to location where the starting
+ * address of the Multi-Link element or Multi-Link element fragment sequence
+ * should be updated if found in the given buffer. The value NULL will be
+ * updated to this location if the element or element fragment sequence is not
+ * found. This should be ignored by the caller if the function returns error.
+ * @mlieseqlen: Pointer to location where the total length of the Multi-Link
+ * element or Multi-Link element fragment sequence should be updated if found
+ * in the given buffer. This should be ignored by the caller if the function
+ * returns error, or if the function indicates that the element or element
+ * fragment sequence was not found by providing a starting address of NULL.
+ * @variant: Multi-Link element variant.  The value should be interpreted by the
+ * caller as a member of enum wlan_ml_variant. (This enum is not directly used
+ * as an argument, so that non-MLO code that happens to call this function does
+ * not need to be aware of the definition of the enum, though such a call would
+ * ultimately result in an error).
+ *
+ * Based on variant, find the Multi-Link element or the start of the Multi-Link
+ * element fragment sequence in a given buffer containing elements, if a
+ * Multi-Link element or element fragment sequence exists in the given buffer.
+ * The buffer should contain only 802.11 Information elements, and thus should
+ * not contain other information like 802.11 header, 802.11 frame body
+ * components like fields that are not elements (e.g. Capability Information
+ * field, Beacon Interval field), etc.
+ *
+ * Return: QDF_STATUS_SUCCESS in the case of success, QDF_STATUS value giving
+ * the reason for error in the case of failure
+ */
+QDF_STATUS
+util_find_mlie_by_variant(uint8_t *buf, qdf_size_t buflen, uint8_t **mlieseq,
+			  qdf_size_t *mlieseqlen, int variant);
+
+/**
  * util_get_mlie_variant() - Get ML IE variant
  * @mlieseq: Starting address of the Multi-Link element or Multi-Link element
  * fragment sequence
@@ -190,8 +230,8 @@ util_get_mlie_variant(uint8_t *mlieseq, qdf_size_t mlieseqlen,
  * fragment sequence
  * @mlieseqlen: Total length of the Multi-Link element or Multi-Link element
  * fragment sequence
- * @linkid: Pointer to the location where the MLD MAC address should be updated.
- * This should be ignored by the caller if the function returns error.
+ * @mldmacaddr: Pointer to the location where the MLD MAC address should be
+ * updated. This should be ignored by the caller if the function returns error.
  *
  * Get the MLD MAC address from a given Basic variant Multi-Link element
  * or element fragment sequence.
@@ -450,6 +490,13 @@ util_find_mlie(uint8_t *buf, qdf_size_t buflen, uint8_t **mlieseq,
 	       qdf_size_t *mlieseqlen)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+util_find_mlie_by_variant(uint8_t *buf, qdf_size_t buflen, uint8_t **mlieseq,
+			  qdf_size_t *mlieseqlen)
+{
+	return QDF_STATUS_E_FAILURE;
 }
 
 static inline QDF_STATUS
