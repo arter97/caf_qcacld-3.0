@@ -4475,6 +4475,9 @@ QDF_STATUS dp_srng_alloc(struct dp_soc *soc, struct dp_srng *srng,
 void dp_srng_free(struct dp_soc *soc, struct dp_srng *srng);
 QDF_STATUS dp_srng_init(struct dp_soc *soc, struct dp_srng *srng,
 			int ring_type, int ring_num, int mac_id);
+QDF_STATUS dp_srng_init_idx(struct dp_soc *soc, struct dp_srng *srng,
+			    int ring_type, int ring_num, int mac_id,
+			    uint32_t idx);
 void dp_srng_deinit(struct dp_soc *soc, struct dp_srng *srng,
 		    int ring_type, int ring_num);
 void dp_print_peer_txrx_stats_be(struct cdp_peer_stats *peer_stats,

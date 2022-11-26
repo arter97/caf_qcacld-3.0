@@ -821,9 +821,11 @@ struct hal_rx_pkt_capture_flags {
 struct hal_hw_txrx_ops {
 	/* init and setup */
 	void (*hal_srng_dst_hw_init)(struct hal_soc *hal,
-				     struct hal_srng *srng, bool idle_check);
+				     struct hal_srng *srng, bool idle_check,
+				     uint32_t idx);
 	void (*hal_srng_src_hw_init)(struct hal_soc *hal,
-				     struct hal_srng *srng, bool idle_check);
+				     struct hal_srng *srng, bool idle_check,
+				     uint32_t idx);
 
 	void (*hal_srng_hw_disable)(struct hal_soc *hal,
 				    struct hal_srng *srng);
@@ -1203,6 +1205,9 @@ struct hal_hw_txrx_ops {
 					 uint8_t mac_id, uint64_t *value);
 	void (*hal_get_tqm_scratch_reg)(hal_soc_handle_t hal_soc_hdl,
 					uint64_t *value);
+	void (*hal_tx_ring_halt_set)(hal_soc_handle_t hal_soc_hdl);
+	void (*hal_tx_ring_halt_reset)(hal_soc_handle_t hal_soc_hdl);
+	bool (*hal_tx_ring_halt_poll)(hal_soc_handle_t hal_soc_hdl);
 };
 
 /**

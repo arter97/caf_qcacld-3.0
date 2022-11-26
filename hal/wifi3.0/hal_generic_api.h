@@ -235,10 +235,12 @@ void hal_srng_src_hw_write_cons_prefetch_timer(struct hal_srng *srng,
  * @hal_soc: HAL SOC handle
  * @srng: SRNG ring pointer
  * @idle_check: Check if ring is idle
+ * @idx: ring index
  */
 static inline
 void hal_srng_src_hw_init_generic(struct hal_soc *hal,
-				  struct hal_srng *srng, bool idle_check)
+				  struct hal_srng *srng, bool idle_check,
+				  uint32_t idx)
 {
 	uint32_t reg_val = 0;
 	uint64_t tp_addr = 0;
@@ -255,6 +257,11 @@ void hal_srng_src_hw_init_generic(struct hal_soc *hal,
 	}
 
 	hal_debug("hw_init srng %d", srng->ring_id);
+
+	reg_val = SRNG_SRC_REG_READ(srng, MISC) & ~(SRNG_ENABLE_BIT);
+	SRNG_SRC_REG_WRITE(srng, MISC, reg_val);
+
+	reg_val = 0;
 
 	if (srng->flags & HAL_SRNG_MSI_INTR) {
 		SRNG_SRC_REG_WRITE(srng, MSI1_BASE_LSB,
@@ -332,9 +339,10 @@ void hal_srng_src_hw_init_generic(struct hal_soc *hal,
 	}
 
 	/* Initilaize head and tail pointers to indicate ring is empty */
-	SRNG_SRC_REG_WRITE(srng, HP, 0);
-	SRNG_SRC_REG_WRITE(srng, TP, 0);
-	*(srng->u.src_ring.tp_addr) = 0;
+	SRNG_SRC_REG_WRITE(srng, HP, idx * srng->entry_size);
+	SRNG_SRC_REG_WRITE(srng, TP, idx * srng->entry_size);
+	*srng->u.src_ring.tp_addr = idx * srng->entry_size;
+	srng->u.src_ring.hp = idx * srng->entry_size;
 
 	reg_val |= ((srng->flags & HAL_SRNG_DATA_TLV_SWAP) ?
 			SRNG_SM(SRNG_SRC_FLD(MISC, DATA_TLV_SWAP_BIT), 1) : 0) |
@@ -422,10 +430,12 @@ static inline void hal_srng_dst_near_full_int_setup(struct hal_srng *srng)
  * @hal_soc: HAL SOC handle
  * @srng: SRNG ring pointer
  * @idle_check: Check if ring is idle
+ * @idx: Ring index
  */
 static inline
 void hal_srng_dst_hw_init_generic(struct hal_soc *hal,
-				  struct hal_srng *srng, bool idle_check)
+				  struct hal_srng *srng, bool idle_check,
+				  uint32_t idx)
 {
 	uint32_t reg_val = 0;
 	uint64_t hp_addr = 0;
@@ -439,6 +449,12 @@ void hal_srng_dst_hw_init_generic(struct hal_soc *hal,
 	}
 
 	hal_debug("hw_init srng %d", srng->ring_id);
+
+	reg_val = SRNG_DST_REG_READ(srng, MISC) & ~(SRNG_ENABLE_BIT);
+
+	SRNG_DST_REG_WRITE(srng, MISC, reg_val);
+
+	reg_val = 0;
 
 	if (srng->flags & HAL_SRNG_MSI_INTR) {
 		SRNG_DST_REG_WRITE(srng, MSI1_BASE_LSB,
@@ -501,9 +517,10 @@ void hal_srng_dst_hw_init_generic(struct hal_soc *hal,
 	SRNG_DST_REG_WRITE(srng, HP_ADDR_MSB, hp_addr >> 32);
 
 	/* Initilaize head and tail pointers to indicate ring is empty */
-	SRNG_DST_REG_WRITE(srng, HP, 0);
-	SRNG_DST_REG_WRITE(srng, TP, 0);
-	*(srng->u.dst_ring.hp_addr) = 0;
+	SRNG_DST_REG_WRITE(srng, HP, idx * srng->entry_size);
+	SRNG_DST_REG_WRITE(srng, TP, idx * srng->entry_size);
+	*srng->u.dst_ring.hp_addr = idx * srng->entry_size;
+	srng->u.dst_ring.tp = idx * srng->entry_size;
 
 	reg_val = ((srng->flags & HAL_SRNG_DATA_TLV_SWAP) ?
 			SRNG_SM(SRNG_DST_FLD(MISC, DATA_TLV_SWAP_BIT), 1) : 0) |
