@@ -184,6 +184,16 @@ void dp_tx_desc_pool_deinit_be(struct dp_soc *soc,
 			       struct dp_tx_desc_pool_s *tx_desc_pool,
 			       uint8_t pool_id);
 
+#ifdef WLAN_SUPPORT_PPEDS
+/**
+ * dp_ppeds_tx_comp_handler()- Handle tx completions for ppe2tcl ring
+ * @soc: Handle to DP Soc structure
+ * @quota: Max number of tx completions to process
+ *
+ * Return: Number of tx completions processed
+ */
+int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota);
+#endif
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
  * dp_tx_mlo_mcast_handler_be() - Tx handler for Mcast packets

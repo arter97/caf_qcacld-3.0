@@ -113,9 +113,15 @@ enum CMEM_MEM_CLIENTS {
 
 #define PEER_ROUTING_USE_PPE 1
 #define PEER_ROUTING_ENABLED 1
+#define DP_PPE_INTR_STRNG_LEN 32
+#define DP_PPE_INTR_MAX 3
+
 #else
 #define DP_TX_PPEDS_DESC_CMEM_OFFSET 0
 #define DP_TX_PPEDS_DESC_POOL_CMEM_SIZE 0
+
+#define DP_PPE_INTR_STRNG_LEN 0
+#define DP_PPE_INTR_MAX 0
 #endif
 
 /* tx descriptor are programmed at start of CMEM region*/
@@ -251,6 +257,16 @@ struct dp_ppe_tx_desc_pool_s {
 #endif
 
 /**
+ * struct dp_ppeds_napi - napi parameters for ppe ds
+ * @napi: napi structure to register with napi infra
+ * @ndev: net_dev structure
+ */
+struct dp_ppeds_napi {
+	struct napi_struct napi;
+	struct net_device ndev;
+};
+
+/**
  * struct dp_soc_be - Extended DP soc for BE targets
  * @soc: dp soc structure
  * @num_bank_profiles: num TX bank profiles
@@ -294,12 +310,15 @@ struct dp_soc_be {
 	struct dp_srng reo2ppe_ring;
 	struct dp_srng ppe2tcl_ring;
 	struct dp_srng ppe_release_ring;
+	struct dp_srng ppe_wbm_release_ring;
 	struct dp_ppe_vp_tbl_entry *ppe_vp_tbl;
 	struct dp_hw_cookie_conversion_t ppeds_tx_cc_ctx;
 	struct dp_ppe_tx_desc_pool_s ppeds_tx_desc;
+	struct dp_ppeds_napi ppeds_napi_ctxt;
 	void *ppeds_handle;
 	qdf_mutex_t ppe_vp_tbl_lock;
 	uint8_t num_ppe_vp_entries;
+	char irq_name[DP_PPE_INTR_MAX][DP_PPE_INTR_STRNG_LEN];
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_MLO_MULTI_CHIP
@@ -572,6 +591,9 @@ struct dp_peer_be *dp_get_be_peer_from_dp_peer(struct dp_peer *peer)
 {
 	return (struct dp_peer_be *)peer;
 }
+
+void dp_ppeds_disable_irq(struct dp_soc *soc, struct dp_srng *srng);
+void dp_ppeds_enable_irq(struct dp_soc *soc, struct dp_srng *srng);
 
 QDF_STATUS
 dp_hw_cookie_conversion_attach(struct dp_soc_be *be_soc,

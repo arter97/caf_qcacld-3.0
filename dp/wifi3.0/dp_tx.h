@@ -243,6 +243,9 @@ struct dp_tx_msdu_info_s {
 void dp_tx_deinit_pair_by_index(struct dp_soc *soc, int index);
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
+void
+dp_tx_comp_process_desc_list(struct dp_soc *soc,
+			     struct dp_tx_desc_s *comp_head, uint8_t ring_id);
 void dp_tx_tso_cmn_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
 void dp_tx_tso_cmn_desc_pool_free(struct dp_soc *soc, uint8_t num_pool);
 void dp_tx_tso_cmn_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
