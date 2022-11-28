@@ -742,6 +742,8 @@ util_scan_copy_beacon_data(struct scan_cache_entry *new_entry,
 #ifdef WLAN_FEATURE_11BE_MLO
 	ie_lst->multi_link_bv =
 			conv_ptr(ie_lst->multi_link_bv, old_ptr, new_ptr);
+	ie_lst->multi_link_rv =
+			conv_ptr(ie_lst->multi_link_rv, old_ptr, new_ptr);
 	for (i = 0; i < WLAN_MAX_T2LM_IE; i++)
 		ie_lst->t2lm[i] = conv_ptr(ie_lst->t2lm[i], old_ptr, new_ptr);
 #endif

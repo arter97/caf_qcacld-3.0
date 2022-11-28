@@ -205,8 +205,9 @@ struct channel_info {
  * @rsnxe: Pointer to rsnxe IE
  * @ehtcap: pointer to ehtcap ie
  * @ehtop: pointer to eht op ie
- * @t2lm: array of pointers to t2lm op ie
  * @multi_link_bv: pointer to multi link basic variant IE
+ * @multi_link_rv: pointer to multi link reconfig IE
+ * @t2lm: array of pointers to t2lm op ie
  * @bwnss_map: pointer to NSS map IE
  * @secchanoff: pointer to secondary chan IE
  * @mdie: pointer to md IE
@@ -274,6 +275,7 @@ struct ie_list {
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t *multi_link_bv;
+	uint8_t *multi_link_rv;
 	uint8_t *t2lm[WLAN_MAX_T2LM_IE];
 #endif
 	uint8_t *qcn;

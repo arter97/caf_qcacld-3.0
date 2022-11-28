@@ -33,6 +33,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_utility.h>
 #include "wlan_mlo_mgr_public_structs.h"
+#include <utils_mlo.h>
 #endif
 #include "wlan_psoc_mlme_api.h"
 #include "reg_services_public_struct.h"
@@ -1173,8 +1174,35 @@ util_scan_parse_t2lm_ie(struct scan_cache_entry *scan_params,
 static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
 				  struct extn_ie_header *extn_ie)
 {
-	if (extn_ie->ie_extn_id == WLAN_EXTN_ELEMID_MULTI_LINK)
+	uint8_t *ml_ie;
+	uint32_t ml_ie_len;
+	enum wlan_ml_variant ml_variant;
+	QDF_STATUS ret;
+
+	if (extn_ie->ie_extn_id != WLAN_EXTN_ELEMID_MULTI_LINK)
+		return;
+
+	ml_ie = (uint8_t *)extn_ie;
+	ml_ie_len = ml_ie[TAG_LEN_POS];
+
+	/* Adding the size of IE header to ML IE length */
+	ml_ie_len += sizeof(struct ie_header);
+	ret = util_get_mlie_variant(ml_ie, ml_ie_len, (int *)&ml_variant);
+	if (ret) {
+		scm_err("Unable to get ml variant");
+		return;
+	}
+
+	switch (ml_variant) {
+	case WLAN_ML_VARIANT_BASIC:
 		scan_params->ie_list.multi_link_bv = (uint8_t *)extn_ie;
+		break;
+	case WLAN_ML_VARIANT_RECONFIG:
+		scan_params->ie_list.multi_link_rv = (uint8_t *)extn_ie;
+		break;
+	default:
+		break;
+	}
 }
 #else
 static void util_scan_parse_ml_ie(struct scan_cache_entry *scan_params,
