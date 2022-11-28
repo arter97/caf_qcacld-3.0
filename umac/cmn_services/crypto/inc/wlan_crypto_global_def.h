@@ -517,7 +517,7 @@ struct wlan_lmac_if_crypto_tx_ops {
 			      struct wlan_crypto_key *key,
 			      enum wlan_crypto_key_type key_type);
 	QDF_STATUS(*getpn)(struct wlan_objmgr_vdev *vdev,
-			   uint8_t *macaddr, uint32_t key_type);
+			   uint8_t *macaddr, uint8_t keyix, uint32_t key_type);
 	QDF_STATUS (*set_ltf_keyseed)(struct wlan_objmgr_psoc *psoc,
 				      struct wlan_crypto_ltf_keyseed_data *ks);
 	QDF_STATUS (*set_vdev_param)(struct wlan_objmgr_psoc *psoc,

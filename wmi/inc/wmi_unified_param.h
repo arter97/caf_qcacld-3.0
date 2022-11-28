@@ -4067,11 +4067,13 @@ struct rtt_meas_req_test_params {
 /**
  * struct peer_request_pn_param - PN request params
  * @vdev_id: vdev id
+ * @keyix: key index
  * @peer_macaddr: Peer mac address
  * @key_type: key type
  */
 struct peer_request_pn_param {
 	uint32_t vdev_id;
+	uint8_t keyix;
 	uint8_t  peer_macaddr[QDF_MAC_ADDR_SIZE];
 	uint32_t key_type;
 };
@@ -8313,12 +8315,14 @@ enum wmi_host_fatal_condition_subtype_packet_log_config {
  * struct wmi_host_get_pn_event - PN event params
  * @vdev_id: vdev id
  * @peer_macaddr: Peer mac address
+ * @key_ix: Key index
  * @key_type: key type
  * @pn : pn value
  */
 struct wmi_host_get_pn_event {
 	uint32_t vdev_id;
 	uint8_t mac_addr[QDF_MAC_ADDR_SIZE];
+	uint8_t key_ix;
 	uint32_t key_type;
 	uint8_t pn[GET_PN_MAX_LEN];
 };

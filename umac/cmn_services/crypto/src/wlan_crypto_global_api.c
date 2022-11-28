@@ -1389,6 +1389,7 @@ QDF_STATUS wlan_crypto_getkey(struct wlan_objmgr_vdev *vdev,
 		if (get_pn_enable) {
 			if (WLAN_CRYPTO_TX_OPS_GETPN(tx_ops))
 				WLAN_CRYPTO_TX_OPS_GETPN(tx_ops)(vdev, mac_addr,
+								 req_key->keyix,
 								 req_key->type);
 			if (WLAN_CRYPTO_RX_OPS_GET_RXPN(&rx_ops->crypto_rx_ops))
 				WLAN_CRYPTO_RX_OPS_GET_RXPN(&rx_ops->crypto_rx_ops)(
