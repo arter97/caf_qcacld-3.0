@@ -1831,8 +1831,11 @@ static QDF_STATUS send_vdev_up_cmd_tlv(wmi_unified_t wmi,
 	int32_t len = sizeof(*cmd);
 
 	wmi_debug("VDEV_UP");
-	wmi_debug("vdev_id %d aid %d bssid "QDF_MAC_ADDR_FMT,
-		 params->vdev_id, params->assoc_id, QDF_MAC_ADDR_REF(bssid));
+	wmi_debug("vdev_id %d aid %d profile idx %d count %d bssid "
+		  QDF_MAC_ADDR_FMT,
+		  params->vdev_id, params->assoc_id,
+		  params->profile_idx, params->profile_num,
+		  QDF_MAC_ADDR_REF(bssid));
 	buf = wmi_buf_alloc(wmi, len);
 	if (!buf)
 		return QDF_STATUS_E_NOMEM;
