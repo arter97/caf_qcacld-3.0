@@ -228,10 +228,6 @@ static QDF_STATUS cm_ser_disconnect_req(struct wlan_objmgr_pdev *pdev,
 	cmd.cmd_timeout_duration = DISCONNECT_TIMEOUT;
 	cmd.vdev = cm_ctx->vdev;
 	cmd.is_blocking = cm_ser_get_blocking_cmd();
-	if (wlan_vdev_mlme_is_link_sta_vdev(cmd.vdev)) {
-		mlme_debug("Set link dev disconnect cmd as high priority");
-		cmd.is_high_priority = true;
-	}
 
 	ser_cmd_status = wlan_serialization_request(&cmd);
 	switch (ser_cmd_status) {
@@ -325,6 +321,10 @@ QDF_STATUS cm_disconnect_start(struct cnx_mgr *cm_ctx,
 		cm_send_disconnect_resp(cm_ctx, req->cm_id);
 		return QDF_STATUS_E_INVAL;
 	}
+
+	if (wlan_vdev_mlme_is_mlo_vdev(cm_ctx->vdev))
+		mlo_internal_disconnect_links(cm_ctx->vdev);
+
 	cm_vdev_scan_cancel(pdev, cm_ctx->vdev);
 	mlme_cm_disconnect_start_ind(cm_ctx->vdev, &req->req);
 	cm_if_mgr_inform_disconnect_start(cm_ctx->vdev);
