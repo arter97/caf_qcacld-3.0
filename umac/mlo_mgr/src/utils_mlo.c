@@ -3861,4 +3861,50 @@ util_get_prvmlie_mldid(uint8_t *mlieseq, qdf_size_t mlieseqlen,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS util_get_rvmlie_mldmacaddr(uint8_t *mlieseq, qdf_size_t mlieseqlen,
+				      struct qdf_mac_addr *mldmacaddr)
+{
+	struct wlan_ie_multilink *mlie_fixed;
+	enum wlan_ml_variant variant;
+	uint16_t mlcontrol;
+	uint16_t presencebitmap;
+
+	if (!mlieseq || !mlieseqlen || !mldmacaddr)
+		return QDF_STATUS_E_NULL_VALUE;
+
+	qdf_mem_zero(mldmacaddr, sizeof(*mldmacaddr));
+
+	if (mlieseqlen < sizeof(struct wlan_ie_multilink))
+		return QDF_STATUS_E_INVAL;
+
+	mlie_fixed = (struct wlan_ie_multilink *)mlieseq;
+
+	if (mlie_fixed->elem_id != WLAN_ELEMID_EXTN_ELEM ||
+	    mlie_fixed->elem_id_ext != WLAN_EXTN_ELEMID_MULTI_LINK)
+		return QDF_STATUS_E_INVAL;
+
+	mlcontrol = qdf_le16_to_cpu(mlie_fixed->mlcontrol);
+
+	variant = QDF_GET_BITS(mlcontrol, WLAN_ML_CTRL_TYPE_IDX,
+			       WLAN_ML_CTRL_TYPE_BITS);
+
+	if (variant != WLAN_ML_VARIANT_RECONFIG)
+		return QDF_STATUS_E_INVAL;
+
+	presencebitmap = QDF_GET_BITS(mlcontrol, WLAN_ML_CTRL_PBM_IDX,
+				      WLAN_ML_CTRL_PBM_BITS);
+
+	/* Check if MLD mac address is present */
+	if (presencebitmap & WLAN_ML_RV_CTRL_PBM_MLDMACADDR_P) {
+		if ((sizeof(struct wlan_ie_multilink) + QDF_MAC_ADDR_SIZE) >
+			mlieseqlen)
+			return QDF_STATUS_E_PROTO;
+
+		qdf_mem_copy(mldmacaddr->bytes,
+			     mlieseq + sizeof(struct wlan_ie_multilink),
+			     QDF_MAC_ADDR_SIZE);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
