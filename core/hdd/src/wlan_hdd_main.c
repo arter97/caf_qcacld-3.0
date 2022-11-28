@@ -264,11 +264,7 @@
 #define MEMORY_DEBUG_STR ""
 #endif
 
-#ifdef PANIC_ON_BUG
-#define PANIC_ON_BUG_STR " +PANIC_ON_BUG"
-#else
 #define PANIC_ON_BUG_STR ""
-#endif
 
 /* PCIe gen speed change idle shutdown timer 100 milliseconds */
 #define HDD_PCIE_GEN_SPEED_CHANGE_TIMEOUT_MS (100)
