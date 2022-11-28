@@ -602,7 +602,8 @@ struct ce_ops {
 						uint8_t ce_id, uint64_t addr,
 						uint32_t data);
 	uint16_t (*ce_get_direct_link_dest_buffers)(struct hif_softc *scn,
-						    uint64_t **dma_addr);
+						    uint64_t **dma_addr,
+						    uint32_t *buf_size);
 	QDF_STATUS (*ce_get_direct_link_ring_info)(struct hif_softc *scn,
 					   struct hif_direct_link_ce_info *info,
 					   uint8_t max_ce_info_len);

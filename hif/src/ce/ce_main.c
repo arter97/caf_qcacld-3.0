@@ -5409,7 +5409,8 @@ hif_set_irq_config_by_ceid(struct hif_opaque_softc *scn, uint8_t ce_id,
 }
 
 uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn,
-						  uint64_t **dma_addr)
+						  uint64_t **dma_addr,
+						  uint32_t *buf_size)
 {
 	struct hif_softc *hif_ctx = HIF_GET_SOFTC(scn);
 	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
@@ -5417,7 +5418,8 @@ uint16_t hif_get_direct_link_ce_dest_srng_buffers(struct hif_opaque_softc *scn,
 
 	if (ce_services->ce_get_direct_link_dest_buffers)
 		return ce_services->ce_get_direct_link_dest_buffers(hif_ctx,
-								    dma_addr);
+								    dma_addr,
+								    buf_size);
 
 	return 0;
 }
