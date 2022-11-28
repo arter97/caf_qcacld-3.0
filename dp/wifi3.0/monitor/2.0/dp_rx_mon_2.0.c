@@ -1018,10 +1018,10 @@ dp_rx_mon_flush_status_buf_queue(struct dp_pdev *pdev)
 	if (work_done) {
 		mon_pdev->rx_mon_stats.mon_rx_bufs_replenished_dest +=
 			work_done;
-		dp_mon_buffers_replenish(soc, &soc->rxdma_mon_buf_ring[0],
-					 rx_mon_desc_pool,
-					 work_done,
-					 &desc_list, &tail, NULL);
+		if (desc_list)
+			dp_mon_add_desc_list_to_free_list(soc,
+							  &desc_list, &tail,
+							  rx_mon_desc_pool);
 	}
 }
 
@@ -1051,10 +1051,9 @@ dp_rx_mon_handle_flush_n_trucated_ppdu(struct dp_soc *soc,
 	DP_STATS_INC(mon_soc, frag_free, 1);
 	dp_mon_add_to_free_desc_list(&desc_list, &tail, mon_desc);
 	work_done = 1;
-	dp_mon_buffers_replenish(soc, &soc->rxdma_mon_buf_ring[0],
-				 rx_mon_desc_pool,
-				 work_done,
-				 &desc_list, &tail, NULL);
+	if (desc_list)
+		dp_mon_add_desc_list_to_free_list(soc, &desc_list, &tail,
+						  rx_mon_desc_pool);
 }
 
 uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
@@ -1514,11 +1513,11 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 	dp_mon_rx_stats_update_rssi_dbm_params(mon_pdev, ppdu_info);
 	if (work_done) {
 		mon_pdev->rx_mon_stats.mon_rx_bufs_replenished_dest +=
-				work_done;
-		dp_mon_buffers_replenish(soc, &soc->rxdma_mon_buf_ring[0],
-					 rx_mon_desc_pool,
-					 work_done,
-					 &desc_list, &tail, NULL);
+			work_done;
+		if (desc_list)
+			dp_mon_add_desc_list_to_free_list(soc,
+							  &desc_list, &tail,
+							  rx_mon_desc_pool);
 	}
 
 	ppdu_info->rx_status.tsft = ppdu_info->rx_status.tsft +
