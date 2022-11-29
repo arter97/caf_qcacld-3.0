@@ -392,6 +392,17 @@ QDF_STATUS telemetry_sawf_get_mov_avg(void *telemetry_ctx, uint8_t tid,
 
 qdf_export_symbol(telemetry_sawf_get_mov_avg);
 
+QDF_STATUS telemetry_sawf_reset_peer_stats(uint8_t *peer_mac)
+{
+	if (g_agent_ops) {
+		if (g_agent_ops->sawf_reset_peer_stats(peer_mac))
+		return QDF_STATUS_E_FAILURE;
+	}
+	return QDF_STATUS_SUCCESS;
+}
+
+qdf_export_symbol(telemetry_sawf_reset_peer_stats);
+
 int register_telemetry_agent_ops(struct telemetry_agent_ops *agent_ops)
 {
 	g_agent_ops = agent_ops;

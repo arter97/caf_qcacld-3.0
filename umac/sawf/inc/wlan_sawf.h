@@ -252,5 +252,18 @@ QDF_STATUS wlan_validate_sawf_params(struct wlan_sawf_scv_class_params *params);
 QDF_STATUS
 wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
 			    uint32_t *service_interval, uint32_t *burst_size);
+
+/* wlan_sawf_sla_process_sla_event() - Process SLA-related nl-event
+ *
+ * @svc_id: service class ID
+ * @peer_mac: pointer to peer mac-addr
+ * @peer_mld_mac: pointer to peer mld mac-addr
+ * @flag: flag to denote set or clear
+ *
+ * Return: 0 on success
+ */
+int
+wlan_sawf_sla_process_sla_event(uint8_t svc_id, uint8_t *peer_mac,
+				uint8_t *peer_mld_mac, uint8_t flag);
 #endif
 
