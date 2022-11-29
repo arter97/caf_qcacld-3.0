@@ -248,6 +248,35 @@ reg_get_max_channel_width(struct wlan_objmgr_pdev *pdev,
 }
 #endif
 
+/**
+ * reg_is_per_channel_bw_update_needed() - Returns true if BW correction is
+ * needed, false otherwise.
+ * @pdev_priv_obj: Pointer to struct wlan_regulatory_pdev_priv_obj
+ * @reg_chan: Pointer to struct regulatory_channel
+ *
+ * In case of 6 GHz, VLP and LPI power modes operate on the full bandwidth
+ * advertised by regulatory. In case of standard power mode, the regulatory
+ * provided bandwidth will be restricted by AFC and the max_bandwidth is
+ * reduced. However, if puncture bitmap is applied on SP channels, max_bw
+ * of a channel can vary.
+ *
+ * For example: channel 149 cannot operate on EHT320 in SP power mode.
+ * However, if puncture pattern of 0xC000 is applied, max BW of 149 can be
+ * 320 MHz. Hence do not restrict the max BW with SP power mode.
+ */
+static bool
+reg_is_per_channel_bw_update_needed(struct wlan_regulatory_pdev_priv_obj
+				    *pdev_priv_obj,
+				    struct regulatory_channel *reg_chan)
+{
+	if (pdev_priv_obj->reg_cur_6g_ap_pwr_type == REG_STANDARD_POWER_AP &&
+	    REG_IS_6GHZ_FREQ(reg_chan->center_freq))
+		return false;
+
+	return true;
+}
+
+
 void reg_modify_chan_list_for_max_chwidth_for_pwrmode(
 		struct wlan_objmgr_pdev *pdev,
 		struct regulatory_channel *cur_chan_list,
@@ -271,6 +300,16 @@ void reg_modify_chan_list_for_max_chwidth_for_pwrmode(
 		if (cur_chan_list[i].chan_flags & REGULATORY_CHAN_DISABLED)
 			continue;
 
+		/*
+		 * For 5 GHz band,  bandwidth correction is needed.
+		 * Eg: For freq range: 5490- 5730,  max_bw 160 is
+		 * advertised by FW in reg rules. However, channels 132 - 144
+		 * support only 80 MHz. Hence BW correction is needed.
+		 * For 6Ghz SP channels, we are skipping the BW correction.
+		 */
+		if (!reg_is_per_channel_bw_update_needed(pdev_priv_obj,
+							 &cur_chan_list[i]))
+			continue;
 		/*
 		 * Correct the max bandwidths if they were not taken care of
 		 * while parsing the reg rules.
