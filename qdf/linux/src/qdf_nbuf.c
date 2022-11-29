@@ -860,6 +860,7 @@ void qdf_nbuf_map_check_for_smmu_leaks(void)
 	qdf_tracker_check_for_leaks(&qdf_nbuf_smmu_map_tracker);
 }
 
+#ifdef IPA_OFFLOAD
 QDF_STATUS qdf_nbuf_smmu_map_debug(qdf_nbuf_t nbuf,
 				   uint8_t hdl,
 				   uint8_t num_buffers,
@@ -906,6 +907,7 @@ QDF_STATUS qdf_nbuf_smmu_unmap_debug(qdf_nbuf_t nbuf,
 }
 
 qdf_export_symbol(qdf_nbuf_smmu_unmap_debug);
+#endif /* IPA_OFFLOAD */
 
 static void qdf_nbuf_panic_on_free_if_smmu_mapped(qdf_nbuf_t nbuf,
 						  const char *func,
@@ -934,7 +936,7 @@ static inline void qdf_net_buf_update_smmu_params(QDF_NBUF_TRACK *p_node)
 	p_node->smmu_map_iova_addr = 0;
 	p_node->smmu_map_pa_addr = 0;
 }
-#else
+#else /* !NBUF_SMMU_MAP_UNMAP_DEBUG */
 #ifdef NBUF_MEMORY_DEBUG
 static void qdf_nbuf_smmu_map_tracking_init(void)
 {
@@ -953,7 +955,7 @@ static void qdf_nbuf_panic_on_free_if_smmu_mapped(qdf_nbuf_t nbuf,
 static inline void qdf_net_buf_update_smmu_params(QDF_NBUF_TRACK *p_node)
 {
 }
-#endif
+#endif /* NBUF_MEMORY_DEBUG */
 
 #ifdef IPA_OFFLOAD
 QDF_STATUS qdf_nbuf_smmu_map_debug(qdf_nbuf_t nbuf,
@@ -979,8 +981,8 @@ QDF_STATUS qdf_nbuf_smmu_unmap_debug(qdf_nbuf_t nbuf,
 }
 
 qdf_export_symbol(qdf_nbuf_smmu_unmap_debug);
-#endif
-#endif
+#endif /* IPA_OFFLOAD */
+#endif /* NBUF_SMMU_MAP_UNMAP_DEBUG */
 
 #ifdef NBUF_MAP_UNMAP_DEBUG
 #define qdf_nbuf_map_tracker_bits 11 /* 2048 buckets */
