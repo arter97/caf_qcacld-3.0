@@ -30,6 +30,7 @@
 #include <qdf_module.h>
 #include <qdf_util.h>
 #include <qdf_mem.h>
+#include <qdf_list.h>
 
 /* macro to map qdf trace levels into the bitmask */
 #define QDF_TRACE_LEVEL_TO_MODULE_BITMASK(_level) ((1 << (_level)))
