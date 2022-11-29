@@ -414,14 +414,14 @@ wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
 		ap_non_srg_pd_threshold =
 			wlan_vdev_mlme_get_non_srg_pd_offset(vdev) +
 			SR_PD_THRESHOLD_MIN;
-		/**
+		/*
 		 * Update non_srg_pd_threshold with provide
 		 * non_srg_pd_threshold for non-srg, if pd threshold is
 		 * with in the range else keep the same as
 		 * advertised by AP.
 		 */
-		if (non_srg_pd_threshold &&
-		    non_srg_pd_threshold > ap_non_srg_pd_threshold)
+		if (!non_srg_pd_threshold ||
+		    (non_srg_pd_threshold > ap_non_srg_pd_threshold))
 			non_srg_pd_threshold = ap_non_srg_pd_threshold;
 
 		/* 31st BIT - Enable/Disable Non-SRG based spatial reuse. */
@@ -432,21 +432,18 @@ wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
 		wlan_vdev_mlme_get_srg_pd_offset(
 					vdev, &ap_srg_max_pd_threshold_offset,
 					&ap_srg_min_pd_threshold_offset);
-		/**
+		/*
 		 * Update srg_pd_threshold with provide
 		 * srg_pd_threshold, if pd threshold is with in the
 		 * SRG range else keep the max of advertised by AP.
 		 */
-		if (srg_pd_threshold &&
-		    srg_pd_threshold < (ap_srg_max_pd_threshold_offset +
-					SR_PD_THRESHOLD_MIN) &&
-		    srg_pd_threshold > (ap_srg_min_pd_threshold_offset +
-					SR_PD_THRESHOLD_MIN))
-			srg_pd_threshold = srg_pd_threshold +
-					   SR_PD_THRESHOLD_MIN;
-		else
+		if (!srg_pd_threshold ||
+		    (srg_pd_threshold > (ap_srg_max_pd_threshold_offset +
+					SR_PD_THRESHOLD_MIN) ||
+		    srg_pd_threshold < (ap_srg_min_pd_threshold_offset +
+					SR_PD_THRESHOLD_MIN)))
 			srg_pd_threshold = ap_srg_max_pd_threshold_offset +
-						SR_PD_THRESHOLD_MIN;
+					   SR_PD_THRESHOLD_MIN;
 
 		/* 30th BIT - Enable/Disable SRG based spatial reuse. */
 		*val |= is_sr_enable << SRG_SPR_ENABLE_POS;
@@ -457,10 +454,10 @@ wlan_mlme_update_sr_data(struct wlan_objmgr_vdev *vdev, int *val,
 	 * 8  - 15| Param value for SRG based Spatial Reuse
 	 * 29     | Param value is in dBm units rather than dB units
 	 */
-	*val |=
-		(uint8_t)(non_srg_pd_threshold << NON_SRG_MAX_PD_OFFSET_POS);
-	*val |=
-		(uint8_t)(srg_pd_threshold << SRG_THRESHOLD_MAX_PD_POS);
+	QDF_SET_BITS(*val, NON_SRG_MAX_PD_OFFSET_POS, SR_PADDING_BYTE,
+		     (uint8_t)non_srg_pd_threshold);
+	QDF_SET_BITS(*val, SRG_THRESHOLD_MAX_PD_POS, SR_PADDING_BYTE,
+		     (uint8_t)srg_pd_threshold);
 	*val |= SR_PARAM_VAL_DBM_UNIT << SR_PARAM_VAL_DBM_POS;
 	wlan_vdev_mlme_set_current_non_srg_pd_threshold(vdev,
 							non_srg_pd_threshold);
