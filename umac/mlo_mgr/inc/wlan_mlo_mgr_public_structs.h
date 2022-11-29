@@ -559,6 +559,30 @@ struct mlo_probereq_info {
 	bool skip_mbssid;
 };
 
+/**
+ * struct ml_rv_partner_link_info: Partner link information of an ML reconfig IE
+ * @link_id: Link id advertised by the AP
+ * @is_delete_timer_p: Delete timer is present or not
+ * @delete_timer: number of TBTTs of the AP
+ */
+struct ml_rv_partner_link_info {
+	uint8_t link_id;
+	uint8_t is_delete_timer_p;
+	uint16_t delete_timer;
+};
+
+/**
+ * struct ml_rv_info: Reconfig Multi link information of a 11be beacon
+ * @mld_mac_addr: MLD mac address
+ * @num_links: Number of links supported by ML AP
+ * @link_info: Array containing partner links information
+ */
+struct ml_rv_info {
+	struct qdf_mac_addr mld_mac_addr;
+	uint8_t num_links;
+	struct ml_rv_partner_link_info link_info[WLAN_UMAC_MLO_MAX_VDEVS];
+};
+
 /*
  * struct mlo_tgt_link_info – ML target link info
  * @vdev_id: link peer vdev id

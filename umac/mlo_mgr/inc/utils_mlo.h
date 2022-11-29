@@ -485,6 +485,30 @@ QDF_STATUS
 util_get_rvmlie_mldmacaddr(uint8_t *mlieseq, qdf_size_t mlieseqlen,
 			   struct qdf_mac_addr *mldmacaddr);
 
+/**
+ * util_get_rvmlie_persta_link_info() - Get per-STA reconfig link information
+ *
+ * @mlieseq: Starting address of the Multi-Link element or Multi-Link element
+ * fragment sequence
+ * @mlieseqlen: Total length of the Multi-Link element or Multi-Link element
+ * fragment sequence
+ * @reconfig_info: Pointer to the location where the reconfig link information
+ * should be updated. This should be ignored by the caller if the function
+ * returns error. Note that success will be returned and the number of links in
+ * this structure will be reported as 0, if no Link Info is found, or no per-STA
+ * profile is found.
+ *
+ * Get reconfig link information in the per-STA profiles present in a Reconfig
+ * variant Multi-Link element.
+ *
+ * Return: QDF_STATUS_SUCCESS in the case of success, QDF_STATUS value giving
+ * the reason for error in the case of failure.
+ */
+QDF_STATUS
+util_get_rvmlie_persta_link_info(uint8_t *mlieseq,
+				 qdf_size_t mlieseqlen,
+				 struct ml_rv_info *reconfig_info);
+
 #else
 static inline QDF_STATUS
 util_gen_link_assoc_req(uint8_t *frame, qdf_size_t frame_len, bool isreassoc,
@@ -598,6 +622,14 @@ util_get_prvmlie_mldid(uint8_t *mlieseq, qdf_size_t mlieseqlen,
 static inline QDF_STATUS
 util_get_rvmlie_mldmacaddr(uint8_t *mlieseq, qdf_size_t mlieseqlen,
 			   struct qdf_mac_addr *mldmacaddr)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+util_get_rvmlie_persta_link_info(uint8_t *mlieseq,
+				 qdf_size_t mlieseqlen,
+				 struct ml_rv_info *reconfig_info)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
