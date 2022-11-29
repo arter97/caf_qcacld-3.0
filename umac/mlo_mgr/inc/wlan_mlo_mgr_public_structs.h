@@ -817,7 +817,8 @@ struct mlo_mlme_ext_ops {
 	void (*mlo_mlme_ext_assoc_resp)(struct wlan_objmgr_peer *peer);
 	qdf_nbuf_t (*mlo_mlme_get_link_assoc_req)(struct wlan_objmgr_peer *peer,
 						  uint8_t link_ix);
-	void (*mlo_mlme_ext_deauth)(struct wlan_objmgr_peer *peer);
+	void (*mlo_mlme_ext_deauth)(struct wlan_objmgr_peer *peer,
+				    uint8_t is_disassoc);
 	QDF_STATUS (*mlo_mlme_ext_clone_security_param)(
 		    struct vdev_mlme_obj *vdev_mlme,
 		    struct wlan_cm_connect_req *req);

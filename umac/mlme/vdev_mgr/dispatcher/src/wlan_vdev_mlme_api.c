@@ -235,10 +235,11 @@ QDF_STATUS wlan_vdev_is_mlo_peer_create_allowed(struct wlan_objmgr_vdev *vdev)
 	enum wlan_vdev_state substate;
 	bool acs_in_progress;
 	QDF_STATUS ret;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	if (!vdev) {
 		mlme_err("vdev is null");
-		return QDF_STATUS_E_FAILURE;
+		return status;
 	}
 
 	state = wlan_vdev_mlme_get_state(vdev);
@@ -248,7 +249,7 @@ QDF_STATUS wlan_vdev_is_mlo_peer_create_allowed(struct wlan_objmgr_vdev *vdev)
 	ret = mlme_ext_hdl_get_acs_in_progress(vdev, &acs_in_progress);
 	if (ret != QDF_STATUS_SUCCESS) {
 		mlme_err("Unable to get ACS in progress status");
-		return QDF_STATUS_E_FAILURE;
+		return status;
 	}
 
 	if (!acs_in_progress)
@@ -256,9 +257,15 @@ QDF_STATUS wlan_vdev_is_mlo_peer_create_allowed(struct wlan_objmgr_vdev *vdev)
 		    ((state == WLAN_VDEV_S_SUSPEND) &&
 		     (substate == WLAN_VDEV_SS_SUSPEND_CSA_RESTART)) ||
 		    (state == WLAN_VDEV_S_DFS_CAC_WAIT))
-			return QDF_STATUS_SUCCESS;
+			status = QDF_STATUS_SUCCESS;
 
-	return QDF_STATUS_E_FAILURE;
+	/* with link rejection feature, this check can be removed */
+	if (wlan_vdev_mlme_op_flags_get(vdev, WLAN_VDEV_OP_MLO_STOP_LINK_DEL) ||
+	    wlan_vdev_mlme_op_flags_get(vdev,
+					WLAN_VDEV_OP_MLO_LINK_TBTT_COMPLETE))
+		status = QDF_STATUS_E_FAILURE;
+
+	return status;
 }
 
 QDF_STATUS wlan_vdev_is_restart_progress(struct wlan_objmgr_vdev *vdev)

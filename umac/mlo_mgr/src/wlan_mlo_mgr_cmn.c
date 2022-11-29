@@ -259,7 +259,7 @@ qdf_nbuf_t mlo_mlme_get_link_assoc_req(struct wlan_objmgr_peer *peer,
 	return mlo_ctx->mlme_ops->mlo_mlme_get_link_assoc_req(peer, link_ix);
 }
 
-void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer)
+void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer, uint8_t is_disassoc)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
@@ -267,7 +267,7 @@ void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer)
 	    !mlo_ctx->mlme_ops->mlo_mlme_ext_deauth)
 		return;
 
-	mlo_ctx->mlme_ops->mlo_mlme_ext_deauth(peer);
+	mlo_ctx->mlme_ops->mlo_mlme_ext_deauth(peer, is_disassoc);
 }
 
 #ifdef UMAC_MLO_AUTH_DEFER

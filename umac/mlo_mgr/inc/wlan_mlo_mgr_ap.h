@@ -60,6 +60,25 @@ void mlo_ap_get_vdev_list(struct wlan_objmgr_vdev *vdev,
 			  struct wlan_objmgr_vdev **wlan_vdev_list);
 
 /**
+ * mlo_ap_get_active_vdev_list() - get mlo vdev list
+ * @vdev: vdev pointer
+ * @vdev_count: vdev count
+ * @wlan_vdev_list: vdev list
+ *
+ * This API gets all active partner vdev's which have WLAN_VDEV_FEXT2_MLO bit
+ * set.
+ *
+ * It takes references for all vdev's with bit set in the list. Callers
+ * of this API should properly release references before destroying the
+ * list.
+ *
+ * Return: None
+ */
+void mlo_ap_get_active_vdev_list(struct wlan_objmgr_vdev *vdev,
+				 uint16_t *vdev_count,
+				 struct wlan_objmgr_vdev **wlan_vdev_list);
+
+/**
  * mlo_ap_get_partner_vdev_list_from_mld() - get partner vdev from MLD
  *                                           vdev_list without checking
  *                                           WLAN_VDEV_FEXT2_MLO bit
@@ -531,4 +550,13 @@ QDF_STATUS mlo_peer_create_get_frm_buf(
 		struct wlan_mlo_peer_context *ml_peer,
 		struct peer_create_notif_s *peer_create,
 		qdf_nbuf_t frm_buf);
+
+/**
+ * wlan_mlo_ap_get_active_links() - Get number of active link VDEVs of MLD
+ * @vdev: vdev pointer
+ *
+ * Return: active vdev count.
+ */
+uint16_t wlan_mlo_ap_get_active_links(struct wlan_objmgr_vdev *vdev);
+
 #endif

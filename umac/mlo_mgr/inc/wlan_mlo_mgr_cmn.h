@@ -243,10 +243,11 @@ qdf_nbuf_t mlo_mlme_get_link_assoc_req(struct wlan_objmgr_peer *peer,
 /**
  * mlo_mlme_peer_deauth() - Initiate deauth on link peer
  * @peer: Object manager peer
+ * @is_disassoc: disassoc frame needs to be sent
  *
  * Return: void
  */
-void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer);
+void mlo_mlme_peer_deauth(struct wlan_objmgr_peer *peer, uint8_t is_disassoc);
 
 #ifdef UMAC_MLO_AUTH_DEFER
 /**

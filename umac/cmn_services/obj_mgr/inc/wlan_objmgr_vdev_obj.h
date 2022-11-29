@@ -227,6 +227,12 @@
  * Broadcast TWT element
  */
 #define WLAN_VDEV_OP_CU_CAT2                0x00100000
+  /* for mlo reconfig link removal functionality */
+#define WLAN_VDEV_OP_MLO_STOP_LINK_DEL      0x00200000
+  /* for mlo reconfig link add functionality */
+#define WLAN_VDEV_OP_MLO_LINK_ADD           0x00400000
+  /* for mlo reconfig link removal TBTT complete */
+#define WLAN_VDEV_OP_MLO_LINK_TBTT_COMPLETE 0x00800000
 
  /* CAPABILITY: IBSS available */
 #define WLAN_VDEV_C_IBSS                    0x00000001

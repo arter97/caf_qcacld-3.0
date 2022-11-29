@@ -135,6 +135,45 @@ void mlo_ap_get_vdev_list(struct wlan_objmgr_vdev *vdev,
 	mlo_dev_lock_release(dev_ctx);
 }
 
+void mlo_ap_get_active_vdev_list(struct wlan_objmgr_vdev *vdev,
+				 uint16_t *vdev_count,
+				 struct wlan_objmgr_vdev **wlan_vdev_list)
+{
+	struct wlan_mlo_dev_context *dev_ctx;
+	int i;
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *partner_vdev = NULL;
+
+	*vdev_count = 0;
+
+	if (!vdev || !vdev->mlo_dev_ctx) {
+		mlo_err("Invalid input");
+		return;
+	}
+
+	dev_ctx = vdev->mlo_dev_ctx;
+
+	mlo_dev_lock_acquire(dev_ctx);
+	*vdev_count = 0;
+	for (i = 0; i < QDF_ARRAY_SIZE(dev_ctx->wlan_vdev_list); i++) {
+		partner_vdev = dev_ctx->wlan_vdev_list[i];
+		if (partner_vdev &&
+		    wlan_vdev_mlme_is_mlo_ap(partner_vdev)) {
+			if (wlan_vdev_chan_config_valid(partner_vdev) !=
+						 QDF_STATUS_SUCCESS)
+				continue;
+
+			status = wlan_objmgr_vdev_try_get_ref(partner_vdev,
+							      WLAN_MLO_MGR_ID);
+			if (QDF_IS_STATUS_ERROR(status))
+				break;
+			wlan_vdev_list[*vdev_count] = partner_vdev;
+			(*vdev_count) += 1;
+		}
+	}
+	mlo_dev_lock_release(dev_ctx);
+}
+
 void mlo_ap_get_partner_vdev_list_from_mld(
 		struct wlan_objmgr_vdev *vdev,
 		uint16_t *vdev_count,
@@ -199,22 +238,15 @@ static QDF_STATUS mlo_ap_vdev_is_start_resp_rcvd(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * mlo_is_ap_vdev_up_allowed() - Is mlo ap allowed to come up
- * @vdev: vdev pointer
- *
- * Return: true if given ap is allowed to up, false otherwise.
- */
-static bool mlo_is_ap_vdev_up_allowed(struct wlan_objmgr_vdev *vdev)
+uint16_t wlan_mlo_ap_get_active_links(struct wlan_objmgr_vdev *vdev)
 {
 	uint16_t vdev_count = 0;
 	struct wlan_mlo_dev_context *dev_ctx;
 	int i;
-	bool up_allowed = false;
 
 	if (!vdev || !vdev->mlo_dev_ctx || !vdev->mlo_dev_ctx->ap_ctx) {
 		mlo_err("Invalid input");
-		return up_allowed;
+		return vdev_count;
 	}
 
 	dev_ctx = vdev->mlo_dev_ctx;
@@ -226,9 +258,33 @@ static bool mlo_is_ap_vdev_up_allowed(struct wlan_objmgr_vdev *vdev)
 			vdev_count++;
 	}
 
+	mlo_dev_lock_release(dev_ctx);
+
+	return vdev_count;
+}
+
+/**
+ * mlo_is_ap_vdev_up_allowed() - Is mlo ap allowed to come up
+ * @vdev: vdev pointer
+ *
+ * Return: true if given ap is allowed to up, false otherwise.
+ */
+static bool mlo_is_ap_vdev_up_allowed(struct wlan_objmgr_vdev *vdev)
+{
+	uint16_t vdev_count = 0;
+	bool up_allowed = false;
+	struct wlan_mlo_dev_context *dev_ctx;
+
+	if (!vdev) {
+		mlo_err("Invalid input");
+		return up_allowed;
+	}
+
+	dev_ctx = vdev->mlo_dev_ctx;
+
+	vdev_count = wlan_mlo_ap_get_active_links(vdev);
 	if (vdev_count == dev_ctx->ap_ctx->num_ml_vdevs)
 		up_allowed = true;
-	mlo_dev_lock_release(dev_ctx);
 
 	return up_allowed;
 }

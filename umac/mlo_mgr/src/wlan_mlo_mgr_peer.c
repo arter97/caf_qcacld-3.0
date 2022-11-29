@@ -120,12 +120,14 @@ static void mlo_link_peer_disconnect_notify(struct wlan_mlo_dev_context *ml_dev,
 }
 
 static void mlo_link_peer_deauth_init(struct wlan_mlo_dev_context *ml_dev,
-				      struct wlan_objmgr_peer *peer)
+				      struct wlan_objmgr_peer *peer,
+				      uint8_t is_disassoc)
 {
 	struct peer_deauth_notify_s peer_deauth;
 	QDF_STATUS status;
 
 	peer_deauth.peer = peer;
+	peer_deauth.is_disassoc = is_disassoc;
 	status = mlo_msgq_post(MLO_PEER_DEAUTH, ml_dev, &peer_deauth);
 	if (status != QDF_STATUS_SUCCESS)
 		wlan_objmgr_peer_release_ref(peer, WLAN_MLO_MGR_ID);
@@ -312,13 +314,16 @@ void wlan_mlo_partner_peer_assoc_post(struct wlan_objmgr_peer *assoc_peer)
 }
 
 void
-wlan_mlo_peer_deauth_init(struct wlan_mlo_peer_context *ml_peer)
+wlan_mlo_peer_deauth_init(struct wlan_mlo_peer_context *ml_peer,
+			  struct wlan_objmgr_peer *src_peer,
+			  uint8_t is_disassoc)
 {
 	struct wlan_mlo_dev_context *ml_dev;
 	struct wlan_objmgr_peer *link_peer;
 	struct wlan_objmgr_peer *link_peers[MAX_MLO_LINK_PEERS];
 	struct wlan_mlo_link_peer_entry *peer_entry;
 	uint16_t i;
+	uint8_t deauth_sent = 0;
 
 	if (!ml_peer)
 		return;
@@ -356,10 +361,15 @@ wlan_mlo_peer_deauth_init(struct wlan_mlo_peer_context *ml_peer)
 			continue;
 
 		/* Prepare and queue message */
-		if (i == 0)
-			mlo_link_peer_deauth_init(ml_dev, link_peers[i]);
-		else
+		/* skip sending deauth on src peer */
+		if ((deauth_sent) ||
+		    (src_peer && (src_peer == link_peers[i]))) {
 			mlo_link_peer_disconnect_notify(ml_dev, link_peers[i]);
+		} else {
+			mlo_link_peer_deauth_init(ml_dev, link_peers[i],
+						  is_disassoc);
+			deauth_sent = 1;
+		}
 	}
 
 	return;
@@ -429,6 +439,10 @@ void wlan_mlo_partner_peer_disconnect_notify(struct wlan_objmgr_peer *src_peer)
 	if (!ml_peer)
 		return;
 
+	vdev = wlan_peer_get_vdev(src_peer);
+	if (!vdev)
+		return;
+
 	mlo_peer_lock_acquire(ml_peer);
 
 	if (ml_peer->mlpeer_state == ML_PEER_DISCONN_INITIATED) {
@@ -438,8 +452,7 @@ void wlan_mlo_partner_peer_disconnect_notify(struct wlan_objmgr_peer *src_peer)
 
 	ml_peer->mlpeer_state = ML_PEER_DISCONN_INITIATED;
 
-	vdev = wlan_peer_get_vdev(src_peer);
-	if (!vdev || wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
+	if (wlan_vdev_mlme_get_opmode(vdev) == QDF_STA_MODE) {
 		mlo_peer_lock_release(ml_peer);
 		return;
 	}
@@ -671,11 +684,6 @@ static QDF_STATUS mlo_peer_detach_link_peer(
 	uint16_t i;
 
 	mlo_peer_lock_acquire(ml_peer);
-
-	if (ml_peer->mlpeer_state != ML_PEER_DISCONN_INITIATED) {
-		mlo_peer_lock_release(ml_peer);
-		return status;
-	}
 
 	for (i = 0; i < MAX_MLO_LINK_PEERS; i++) {
 		peer_entry = &ml_peer->peer_list[i];
@@ -1316,5 +1324,36 @@ QDF_STATUS mlo_peer_link_auth_defer(struct wlan_mlo_peer_context *ml_peer,
 	mlo_peer_lock_release(ml_peer);
 
 	return status;
+}
+
+bool wlan_mlo_partner_peer_delete_is_allowed(struct wlan_objmgr_peer *src_peer)
+{
+	struct wlan_objmgr_vdev *vdev = NULL;
+	struct wlan_mlo_peer_context *ml_peer;
+
+	vdev = wlan_peer_get_vdev(src_peer);
+	if (!vdev)
+		return false;
+
+	ml_peer = src_peer->mlo_peer_ctx;
+	if (!wlan_peer_is_mlo(src_peer) || !ml_peer)
+		return false;
+
+	if (wlan_vdev_mlme_op_flags_get(vdev, WLAN_VDEV_OP_MLO_STOP_LINK_DEL) ||
+	    wlan_vdev_mlme_op_flags_get(vdev,
+					WLAN_VDEV_OP_MLO_LINK_TBTT_COMPLETE)) {
+		/* Single LINK MLO connection */
+		if (ml_peer->link_peer_cnt == 1)
+			return false;
+		/*
+		 * If this link is primary TQM, then delete MLO connection till
+		 * primary umac migration is implemented
+		 */
+		if (wlan_mlo_peer_get_primary_peer_link_id(src_peer) !=
+			wlan_vdev_get_link_id(vdev))
+			return false;
+	}
+
+	return true;
 }
 #endif
