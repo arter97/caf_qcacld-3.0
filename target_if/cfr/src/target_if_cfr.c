@@ -126,7 +126,6 @@ int target_if_cfr_start_capture(struct wlan_objmgr_pdev *pdev,
 	return retv;
 }
 
-#ifdef ENABLE_HOST_TO_TARGET_CONVERSION
 int target_if_cfr_periodic_peer_cfr_enable(struct wlan_objmgr_pdev *pdev,
 					   uint32_t param_value)
 {
@@ -150,31 +149,6 @@ int target_if_cfr_periodic_peer_cfr_enable(struct wlan_objmgr_pdev *pdev,
 	return wmi_unified_pdev_param_send(pdev_wmi_handle,
 					   &pparam, pdev_id);
 }
-#else
-int target_if_cfr_periodic_peer_cfr_enable(struct wlan_objmgr_pdev *pdev,
-					   uint32_t param_value)
-{
-	struct pdev_params pparam;
-	uint32_t pdev_id;
-	struct wmi_unified *pdev_wmi_handle = NULL;
-
-	pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
-	if (pdev_id < 0)
-		return -EINVAL;
-
-	pdev_wmi_handle = lmac_get_pdev_wmi_handle(pdev);
-	if (!pdev_wmi_handle) {
-		cfr_err("pdev wmi handle NULL");
-		return -EINVAL;
-	}
-	qdf_mem_set(&pparam, sizeof(pparam), 0);
-	pparam.param_id = WMI_PDEV_PARAM_PER_PEER_PERIODIC_CFR_ENABLE;
-	pparam.param_value = param_value;
-
-	return wmi_unified_pdev_param_send(pdev_wmi_handle,
-					   &pparam, pdev_id);
-}
-#endif
 
 int target_if_cfr_enable_cfr_timer(struct wlan_objmgr_pdev *pdev,
 				   uint32_t cfr_timer)

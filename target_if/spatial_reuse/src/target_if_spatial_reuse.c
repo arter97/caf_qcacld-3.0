@@ -163,7 +163,7 @@ spatial_reuse_send_pd_threshold(struct wlan_objmgr_pdev *pdev,
 	if (sr_supported) {
 		qdf_mem_zero(&vdev_param, sizeof(vdev_param));
 		vdev_param.vdev_id = vdev_id;
-		vdev_param.param_id = WMI_VDEV_PARAM_SET_CMD_OBSS_PD_THRESHOLD;
+		vdev_param.param_id = wmi_vdev_param_set_cmd_obss_pd_threshold;
 		vdev_param.param_value = val;
 		return wmi_unified_vdev_set_param_send(wmi_handle, &vdev_param);
 	} else {

@@ -320,7 +320,7 @@ target_if_lro_hash_config(struct cdp_ctrl_objmgr_psoc *psoc, uint8_t pdev_id,
 
 #ifdef WLAN_SUPPORT_PPEDS
 QDF_STATUS
-target_if_peer_set_ppe_default_routing(struct cdp_ctrl_objmgr_psoc *psoc,
+target_if_peer_set_ppe_default_routing(struct cdp_ctrl_objmgr_psoc *soc,
 				       uint8_t *peer_macaddr,
 				       uint16_t service_code,
 				       uint8_t priority_valid,
@@ -328,19 +328,36 @@ target_if_peer_set_ppe_default_routing(struct cdp_ctrl_objmgr_psoc *psoc,
 				       uint8_t vdev_id, uint8_t use_ppe,
 				       uint8_t ppe_routing_enabled)
 {
-	struct wmi_unified *wmi_handle;
+	struct wmi_unified *pdev_wmi_handle;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_vdev *vdev;
 	struct peer_ppe_ds_param param;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 
+	struct wlan_objmgr_psoc *psoc = (struct wlan_objmgr_psoc *)soc;
 	if (!psoc) {
 		target_if_err("PSOC is NULL!");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_WDS_ID);
+	if (!vdev) {
+		target_if_err("vdev with id %d is NULL", vdev_id);
+		return QDF_STATUS_E_INVAL;
+	}
 
-	wmi_handle =
-	get_wmi_unified_hdl_from_psoc((struct wlan_objmgr_psoc *)psoc);
-	if (!wmi_handle) {
-		target_if_err("wmi_handle is null");
+	pdev = wlan_vdev_get_pdev(vdev);
+
+	if (!pdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_WDS_ID);
+		target_if_err("pdev is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	pdev_wmi_handle = lmac_get_pdev_wmi_handle(pdev);
+	if (!pdev_wmi_handle) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_WDS_ID);
+		target_if_err("pdev_wmi_handle is NULL");
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -354,13 +371,15 @@ target_if_peer_set_ppe_default_routing(struct cdp_ctrl_objmgr_psoc *psoc,
 	param.vdev_id = vdev_id;
 	param.use_ppe = use_ppe;
 
-	qdf_status = wmi_unified_peer_ppe_ds_param_send(wmi_handle, &param);
+	qdf_status = wmi_unified_peer_ppe_ds_param_send(pdev_wmi_handle,
+							&param);
 	if (qdf_status != QDF_STATUS_SUCCESS) {
 		target_if_err("Unable to set PPE default routing for peer "
 				QDF_MAC_ADDR_FMT,
 				QDF_MAC_ADDR_REF(peer_macaddr));
 	}
 
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_WDS_ID);
 	return qdf_status;
 }
 #endif	/* WLAN_SUPPORT_PPEDS */

@@ -28,7 +28,8 @@
 #define DP_PEER_WDS_COUNT_INVALID UINT_MAX
 
 #define DP_BLOCKMEM_SIZE 4096
-
+#define WBM2_SW_PPE_REL_RING_ID 6
+#define WBM2_SW_PPE_REL_MAP_ID 11
 /* Alignment for consistent memory for DP rings*/
 #define DP_RING_BASE_ALIGN 32
 
@@ -903,6 +904,12 @@ uint32_t dp_tx_mon_buf_refill(struct dp_intr *int_ctx)
 static inline uint32_t
 dp_tx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 		  uint32_t mac_id, uint32_t quota)
+{
+	return 0;
+}
+
+static inline uint32_t
+dp_print_txmon_ring_stat_from_hal(struct dp_pdev *pdev)
 {
 	return 0;
 }
@@ -2122,17 +2129,6 @@ QDF_STATUS dp_clear_peer(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			 struct qdf_mac_addr peer_addr);
 
 /*
- * dp_find_peer_exist - find peer if already exists
- * @soc: datapath soc handle
- * @pdev_id: physical device instance id
- * @peer_mac_addr: peer mac address
- *
- * Return: true or false
- */
-bool dp_find_peer_exist(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
-			uint8_t *peer_addr);
-
-/*
  * dp_find_peer_exist_on_vdev - find if peer exists on the given vdev
  * @soc: datapath soc handle
  * @vdev_id: vdev instance id
@@ -2251,6 +2247,17 @@ void dp_set_peer_as_tdls_peer(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 {
 }
 #endif
+
+/*
+ * dp_find_peer_exist - find peer if already exists
+ * @soc: datapath soc handle
+ * @pdev_id: physical device instance id
+ * @peer_mac_addr: peer mac address
+ *
+ * Return: true or false
+ */
+bool dp_find_peer_exist(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
+			uint8_t *peer_addr);
 
 int dp_addba_resp_tx_completion_wifi3(struct cdp_soc_t *cdp_soc,
 				      uint8_t *peer_mac, uint16_t vdev_id,
@@ -4311,4 +4318,12 @@ void dp_destroy_direct_link_refill_ring(struct cdp_soc_t *soc_hdl,
 {
 }
 #endif
+
+/*
+ * dp_soc_interrupt_detach() - Deregister any allocations done for interrupts
+ * @txrx_soc: DP SOC handle
+ *
+ * Return: none
+ */
+void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc);
 #endif /* #ifndef _DP_INTERNAL_H_ */

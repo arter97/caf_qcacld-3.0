@@ -471,7 +471,10 @@ static void cm_update_vdev_mlme_macaddr(struct cnx_mgr *cm_ctx,
 	if (!eht_capab)
 		return;
 
-	if (req->cur_candidate->entry->ie_list.multi_link_bv) {
+	mac = (struct qdf_mac_addr *)wlan_vdev_mlme_get_mldaddr(cm_ctx->vdev);
+
+	if (req->cur_candidate->entry->ie_list.multi_link_bv &&
+	    !qdf_is_macaddr_zero(mac)) {
 		wlan_vdev_obj_lock(cm_ctx->vdev);
 		/* Use link address for ML connection */
 		wlan_vdev_mlme_set_macaddr(cm_ctx->vdev,
@@ -480,15 +483,14 @@ static void cm_update_vdev_mlme_macaddr(struct cnx_mgr *cm_ctx,
 		wlan_vdev_mlme_set_mlo_vdev(cm_ctx->vdev);
 		mlme_debug("set link address for ML connection");
 	} else {
-		wlan_vdev_obj_lock(cm_ctx->vdev);
 		/* Use net_dev address for non-ML connection */
-		mac = (struct qdf_mac_addr *)cm_ctx->vdev->vdev_mlme.mldaddr;
 		if (!qdf_is_macaddr_zero(mac)) {
+			wlan_vdev_obj_lock(cm_ctx->vdev);
 			wlan_vdev_mlme_set_macaddr(cm_ctx->vdev, mac->bytes);
+			wlan_vdev_obj_unlock(cm_ctx->vdev);
 			mlme_debug(QDF_MAC_ADDR_FMT " for non-ML connection",
 				   QDF_MAC_ADDR_REF(mac->bytes));
 		}
-		wlan_vdev_obj_unlock(cm_ctx->vdev);
 
 		wlan_vdev_mlme_clear_mlo_vdev(cm_ctx->vdev);
 		mlme_debug("clear MLO cap for non-ML connection");
@@ -835,9 +837,11 @@ static bool cm_is_retry_with_same_candidate(struct cnx_mgr *cm_ctx,
 	struct wlan_objmgr_psoc *psoc;
 	bool sae_connection;
 	QDF_STATUS status;
+	qdf_freq_t freq;
 
 	psoc = wlan_pdev_get_psoc(wlan_vdev_get_pdev(cm_ctx->vdev));
 	key_mgmt = req->cur_candidate->entry->neg_sec_info.key_mgmt;
+	freq = req->cur_candidate->entry->channel.chan_freq;
 
 	/* Try once again for the invalid PMKID case without PMKID */
 	if (resp->status_code == STATUS_INVALID_PMKID)
@@ -846,7 +850,15 @@ static bool cm_is_retry_with_same_candidate(struct cnx_mgr *cm_ctx,
 	/* Try again for the JOIN timeout if only one candidate */
 	if (resp->reason == CM_JOIN_TIMEOUT &&
 	    qdf_list_size(req->candidate_list) == 1) {
-		/* Get assoc retry count */
+		/*
+		 * If there is a interface connected which can lead to MCC,
+		 * do not retry as it can lead to beacon miss on that interface.
+		 * Coz as part of vdev start mac remain on candidate freq for 3
+		 * sec.
+		 */
+		if (policy_mgr_will_freq_lead_to_mcc(psoc, freq))
+			return false;
+
 		wlan_mlme_get_sae_assoc_retry_count(psoc, &max_retry_count);
 		goto use_same_candidate;
 	}

@@ -1187,14 +1187,10 @@ static void util_scan_parse_eht_ie(struct scan_cache_entry *scan_params,
 #endif
 
 static QDF_STATUS
-util_scan_parse_extn_ie(struct wlan_objmgr_psoc *psoc,
-			struct scan_cache_entry *scan_params,
+util_scan_parse_extn_ie(struct scan_cache_entry *scan_params,
 			struct ie_header *ie)
 {
 	struct extn_ie_header *extn_ie = (struct extn_ie_header *) ie;
-	bool eht_capab;
-
-	wlan_psoc_mlme_get_11be_capab(psoc, &eht_capab);
 
 	switch (extn_ie->ie_extn_id) {
 	case WLAN_EXTN_ELEMID_MAX_CHAN_SWITCH_TIME:
@@ -1231,8 +1227,7 @@ util_scan_parse_extn_ie(struct wlan_objmgr_psoc *psoc,
 	default:
 		break;
 	}
-	if (eht_capab)
-		util_scan_parse_eht_ie(scan_params, extn_ie);
+	util_scan_parse_eht_ie(scan_params, extn_ie);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1611,7 +1606,7 @@ util_scan_populate_bcn_ie_list(struct wlan_objmgr_pdev *pdev,
 			scan_params->ie_list.rsnxe = (uint8_t *)ie;
 			break;
 		case WLAN_ELEMID_EXTN_ELEM:
-			status = util_scan_parse_extn_ie(psoc, scan_params, ie);
+			status = util_scan_parse_extn_ie(scan_params, ie);
 			if (QDF_IS_STATUS_ERROR(status))
 				goto err_status;
 			break;
@@ -2232,6 +2227,10 @@ static void util_scan_update_ml_info(struct scan_cache_entry *scan_entry)
 	uint16_t multi_link_ctrl;
 	uint8_t offset;
 
+	if (!scan_entry->ie_list.ehtcap && scan_entry->ie_list.multi_link_bv) {
+		scan_entry->ie_list.multi_link_bv = NULL;
+		return;
+	}
 	if (!scan_entry->ie_list.multi_link_bv)
 		return;
 

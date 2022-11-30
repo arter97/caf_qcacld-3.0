@@ -1389,8 +1389,8 @@ static inline bool hal_rx_is_non_ofdma(struct hal_soc *hal_soc,
 static inline bool hal_rx_is_mu_mimo_user(struct hal_soc *hal_soc,
 					  struct hal_rx_ppdu_info *ppdu_info)
 {
-	if (ppdu_info->u_sig_info.ppdu_type_comp_mode == 0 &&
-	    ppdu_info->u_sig_info.ul_dl == 2)
+	if (ppdu_info->u_sig_info.ppdu_type_comp_mode == 2 &&
+	    ppdu_info->u_sig_info.ul_dl == 0)
 		return true;
 
 	return false;
@@ -1700,9 +1700,11 @@ hal_rx_parse_receive_user_info(struct hal_soc *hal_soc, uint8_t *tlv,
 	case HAL_RECEPTION_TYPE_DL_MU_OFDMA_MIMO:
 		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_DL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA_MIMO;
+		break;
 	case HAL_RECEPTION_TYPE_UL_MU_OFDMA_MIMO:
 		ppdu_info->rx_status.mu_dl_ul = HAL_RX_TYPE_UL;
 		ppdu_info->rx_status.reception_type = HAL_RX_TYPE_MU_OFDMA_MIMO;
+		break;
 	}
 
 	ppdu_info->start_user_info_cnt++;

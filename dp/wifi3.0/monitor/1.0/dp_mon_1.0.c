@@ -1271,6 +1271,7 @@ struct dp_mon_ops monitor_ops_1_0 = {
 	.mon_filter_reset_tx_mon_mode = NULL,
 	.rx_mon_filter_update = dp_mon_filter_update_1_0,
 	.tx_mon_filter_update = NULL,
+	.set_mon_mode_buf_rings_tx = NULL,
 	.rx_mon_desc_pool_init = dp_rx_pdev_mon_desc_pool_init,
 	.rx_mon_desc_pool_deinit = dp_rx_pdev_mon_desc_pool_deinit,
 	.rx_mon_desc_pool_alloc = dp_rx_pdev_mon_desc_pool_alloc,

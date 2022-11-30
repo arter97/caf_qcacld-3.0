@@ -138,6 +138,11 @@ struct ctry_change_cbk_entry {
  * @reg_afc_dev_type: AFC device deployment type from BDF
  * @reg_is_eirp_support_preferred: Whether target prefers EIRP format for
  * WMI Set TPC command
+ * @enable_6ghz_sp_pwrmode_supp: Whether enable target Standard Power mode
+ *	support
+ * @afc_disable_timer_check: Whether disable target AFC timer check
+ * @afc_disable_request_id_check: Whether disable target AFC request id check
+ * @is_afc_reg_noaction: Whether no action to AFC power event
  * @sta_sap_scc_on_indoor_channel: Value of sap+sta scc on indoor support
  * @fcc_rules_ptr : Value of fcc channel frequency and tx_power list received
  * from firmware
@@ -213,6 +218,10 @@ struct wlan_regulatory_psoc_priv_obj {
 #ifdef CONFIG_AFC_SUPPORT
 	enum reg_afc_dev_deploy_type reg_afc_dev_type;
 	bool reg_is_eirp_support_preferred;
+	bool enable_6ghz_sp_pwrmode_supp;
+	bool afc_disable_timer_check;
+	bool afc_disable_request_id_check;
+	bool is_afc_reg_noaction;
 #endif
 	bool sta_sap_scc_on_indoor_channel;
 #ifdef CONFIG_REG_CLIENT

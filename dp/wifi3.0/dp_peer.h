@@ -2083,4 +2083,13 @@ void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
 static inline void dp_peer_rx_reo_shared_qaddr_delete(struct dp_soc *soc,
 						      struct dp_peer *peer) {}
 #endif
+
+/**
+ * dp_peer_check_wds_ext_peer() - Check WDS ext peer
+ *
+ * @peer: DP peer
+ *
+ * Return: True for WDS ext peer, false otherwise
+ */
+bool dp_peer_check_wds_ext_peer(struct dp_peer *peer);
 #endif /* _DP_PEER_H_ */

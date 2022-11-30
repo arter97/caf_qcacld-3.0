@@ -357,6 +357,7 @@ enum dp_tx_frm_type {
 	dp_tx_frm_audio,
 	dp_tx_frm_me,
 	dp_tx_frm_raw,
+	dp_tx_frm_rmnet,
 };
 
 /**
@@ -1110,6 +1111,8 @@ struct dp_soc_stats {
 		uint32_t tx_comp[MAX_TCL_DATA_RINGS];
 		/* Number of tx completions force freed */
 		uint32_t tx_comp_force_freed;
+		/* Tx completion ring near full */
+		uint32_t near_full;
 	} tx;
 
 	/* SOC level RX stats */
@@ -2013,9 +2016,17 @@ struct dp_arch_ops {
 #ifdef IPA_OFFLOAD
 	int8_t (*ipa_get_bank_id)(struct dp_soc *soc);
 #endif
+#ifdef WLAN_SUPPORT_PPEDS
 	void (*dp_txrx_ppeds_rings_status)(struct dp_soc *soc);
+#endif
 	QDF_STATUS (*txrx_soc_ppeds_start)(struct dp_soc *soc);
 	void (*txrx_soc_ppeds_stop)(struct dp_soc *soc);
+	int (*dp_register_ppeds_interrupts)(struct dp_soc *soc,
+					    struct dp_srng *srng, int vector,
+					    int ring_type, int ring_num);
+	void (*dp_free_ppeds_interrupts)(struct dp_soc *soc,
+					 struct dp_srng *srng, int ring_type,
+					 int ring_num);
 };
 
 /**

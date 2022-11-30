@@ -1151,6 +1151,34 @@ bool wlan_reg_is_dfs_in_secondary_list_for_freq(struct wlan_objmgr_pdev *pdev,
 {
 	return reg_is_dfs_in_secondary_list_for_freq(pdev, freq);
 }
+
+QDF_STATUS
+wlan_reg_get_chan_pwr_attr_from_secondary_list_for_freq(
+				struct wlan_objmgr_pdev *pdev, qdf_freq_t freq,
+				bool *is_psd, uint16_t *tx_power,
+				uint16_t *psd_eirp, uint32_t *flags)
+{
+	return reg_get_channel_power_attr_from_secondary_list_for_freq(
+			pdev, freq, is_psd, tx_power, psd_eirp, flags);
+}
+
+QDF_STATUS
+wlan_reg_decide_6ghz_power_within_bw_for_freq(struct wlan_objmgr_pdev *pdev,
+					      qdf_freq_t freq,
+					      enum phy_ch_width bw,
+					      bool *is_psd,
+					      uint16_t *min_tx_power,
+					      int16_t *min_psd_eirp,
+					      enum reg_6g_ap_type *power_type)
+{
+	return reg_decide_6ghz_power_within_bw_for_freq(pdev,
+							freq,
+							bw,
+							is_psd,
+							min_tx_power,
+							min_psd_eirp,
+							power_type);
+}
 #endif
 
 bool wlan_reg_is_passive_for_freq(struct wlan_objmgr_pdev *pdev,

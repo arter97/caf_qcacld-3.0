@@ -318,6 +318,7 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t int_rx_ring_near_full_irq_2_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t int_tx_ring_near_full_irq_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t int_host2txmon_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
+	uint8_t int_ppeds_wbm_release_ring_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	uint8_t int_umac_reset_intr_mask[WLAN_CFG_INT_NUM_CONTEXTS];
 	int hw_macid[MAX_PDEV_CNT];
 	int hw_macid_pdev_id_map[MAX_NUM_LMAC_HW];
@@ -419,7 +420,9 @@ struct wlan_cfg_dp_soc_ctxt {
 	int reo2ppe_ring;
 	int ppe2tcl_ring;
 	int ppe_release_ring;
+	int ppe_wbm_release_ring;
 	int ppe_num_tx_desc;
+	int ppe_tx_comp_napi_budget;
 #endif
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
 	uint32_t pkt_capture_mode;
@@ -2008,6 +2011,15 @@ wlan_cfg_get_dp_soc_ppe_release_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg);
  */
 int
 wlan_cfg_get_dp_soc_ppe_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg);
+
+/*
+ * wlan_cfg_get_dp_soc_ppe_tx_comp_napi_budget() - ppeds Tx comp napi budget
+ * @ctx - Configuration Handle
+ *
+ * Return: napi budget
+ */
+int
+wlan_cfg_get_dp_soc_ppe_tx_comp_napi_budget(struct wlan_cfg_dp_soc_ctxt *cfg);
 #else
 static inline bool
 wlan_cfg_get_dp_soc_is_ppe_enabled(struct wlan_cfg_dp_soc_ctxt *cfg)
@@ -2035,6 +2047,12 @@ wlan_cfg_get_dp_soc_ppe_release_ring_size(struct wlan_cfg_dp_soc_ctxt *cfg)
 
 static inline int
 wlan_cfg_get_dp_soc_ppe_num_tx_desc(struct wlan_cfg_dp_soc_ctxt *cfg)
+{
+	return 0;
+}
+
+static inline int
+wlan_cfg_get_dp_soc_ppe_tx_comp_napi_budget(struct wlan_cfg_dp_soc_ctxt *cfg)
 {
 	return 0;
 }

@@ -1216,6 +1216,11 @@ dp_tx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 	return 0;
 }
 
+static void
+dp_tx_mon_print_ring_stat_2_0(struct dp_pdev *pdev)
+{
+}
+
 static inline
 QDF_STATUS dp_mon_soc_attach_2_0(struct dp_soc *soc)
 {
@@ -1331,6 +1336,7 @@ dp_mon_register_feature_ops_2_0(struct dp_soc *soc)
 	mon_ops->mon_neighbour_peer_add_ast = NULL;
 #ifndef DISABLE_MON_CONFIG
 	mon_ops->mon_tx_process = dp_tx_mon_process_2_0;
+	mon_ops->print_txmon_ring_stat = dp_tx_mon_print_ring_stat_2_0;
 #endif
 #ifdef WLAN_TX_PKT_CAPTURE_ENH_BE
 	mon_ops->mon_peer_tid_peer_id_update = NULL;
@@ -1491,6 +1497,7 @@ struct dp_mon_ops monitor_ops_2_0 = {
 	.mon_filter_reset_tx_mon_mode = dp_mon_filter_reset_tx_mon_mode_2_0,
 	.tx_mon_filter_update = dp_tx_mon_filter_update_2_0,
 	.rx_mon_filter_update = dp_rx_mon_filter_update_2_0,
+	.set_mon_mode_buf_rings_tx = dp_vdev_set_monitor_mode_buf_rings_tx_2_0,
 	.tx_mon_filter_alloc = dp_mon_filter_alloc_2_0,
 	.tx_mon_filter_dealloc = dp_mon_filter_dealloc_2_0,
 	.mon_rings_alloc = dp_pdev_mon_rings_alloc_2_0,

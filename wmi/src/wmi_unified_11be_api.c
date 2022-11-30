@@ -70,3 +70,14 @@ QDF_STATUS wmi_send_mlo_peer_tid_to_link_map_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 #endif /* WLAN_FEATURE_11BE */
+
+QDF_STATUS
+wmi_extract_mgmt_rx_ml_cu_params(wmi_unified_t wmi, void *evt_buf,
+				 struct mlo_mgmt_ml_info *cu_params)
+{
+	if (wmi->ops->extract_mgmt_rx_ml_cu_params)
+		return wmi->ops->extract_mgmt_rx_ml_cu_params(
+				wmi, evt_buf, cu_params);
+
+	return QDF_STATUS_E_FAILURE;
+}

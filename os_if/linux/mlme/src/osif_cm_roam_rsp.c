@@ -366,6 +366,10 @@ osif_send_roam_auth_mlo_links_event(struct sk_buff *skb,
 		return -EINVAL;
 
 	mlo_links  = nla_nest_start(skb, QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_MLO_LINKS);
+	if (!mlo_links) {
+		osif_err("nla_nest_start error");
+		return -EINVAL;
+	}
 
 	for (i = 0; i < rsp->ml_parnter_info.num_partner_links; i++) {
 		mlo_links_info = nla_nest_start(skb, i);

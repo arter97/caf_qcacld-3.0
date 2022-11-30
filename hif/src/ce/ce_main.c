@@ -3070,6 +3070,7 @@ hif_pci_ce_recv_data(struct CE_handle *copyeng, void *ce_context,
 	struct hif_msg_callbacks *msg_callbacks = &pipe_info->pipe_callbacks;
 
 	do {
+		hif_rtpm_record_ce_last_busy_evt(scn, ce_state->id);
 		hif_rtpm_mark_last_busy(HIF_RTPM_ID_CE);
 		qdf_nbuf_unmap_single(scn->qdf_dev,
 				      (qdf_nbuf_t) transfer_context,
