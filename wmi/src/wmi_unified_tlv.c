@@ -17331,6 +17331,39 @@ static QDF_STATUS extract_green_ap_egap_status_info_tlv(
 }
 #endif
 
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+static QDF_STATUS extract_green_ap_ll_ps_param_tlv(
+		uint8_t *evt_buf,
+		struct wlan_green_ap_ll_ps_event_param *ll_ps_params)
+{
+	WMI_XGAP_ENABLE_COMPLETE_EVENTID_param_tlvs *param_buf;
+	wmi_xgap_enable_complete_event_fixed_param *ll_ps_event;
+
+	param_buf = (WMI_XGAP_ENABLE_COMPLETE_EVENTID_param_tlvs *)evt_buf;
+	if (!param_buf) {
+		wmi_err("Invalid XGAP SAP info status");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ll_ps_event = (wmi_xgap_enable_complete_event_fixed_param *)
+				param_buf->fixed_param;
+	if (!ll_ps_event) {
+		wmi_err("Invalid low latency power save event buffer");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	ll_ps_params->dialog_token = ll_ps_event->dialog_token;
+	ll_ps_params->next_tsf =
+		((uint64_t)ll_ps_event->next_tsf_high32 << 32) |
+		ll_ps_event->next_tsf_low32;
+
+	wmi_debug("cookie : %llu next_tsf %llu", ll_ps_params->dialog_token,
+		  ll_ps_params->next_tsf);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /*
  * extract_comb_phyerr_tlv() - extract comb phy error from event
  * @wmi_handle: wmi handle
@@ -19936,6 +19969,7 @@ struct wmi_ops tlv_ops =  {
 #endif
 #ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
 	.send_green_ap_ll_ps_cmd = send_green_ap_ll_ps_cmd_tlv,
+	.extract_green_ap_ll_ps_param = extract_green_ap_ll_ps_param_tlv,
 #endif
 	.send_csa_offload_enable_cmd = send_csa_offload_enable_cmd_tlv,
 	.send_start_oem_data_cmd = send_start_oem_data_cmd_tlv,
@@ -20822,6 +20856,10 @@ static void populate_tlv_events_id(uint32_t *event_ids)
 	event_ids[wmi_extract_health_mon_init_done_info_eventid] =
 		WMI_HEALTH_MON_INIT_DONE_EVENTID;
 #endif /* HEALTH_MON_SUPPORT */
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+	event_ids[wmi_xgap_enable_complete_eventid] =
+		WMI_XGAP_ENABLE_COMPLETE_EVENTID;
+#endif
 }
 
 #ifdef WLAN_FEATURE_LINK_LAYER_STATS

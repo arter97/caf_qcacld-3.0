@@ -280,6 +280,18 @@ QDF_STATUS wmi_unified_green_ap_ll_ps_send(
 
 	return QDF_STATUS_E_FAILURE;
 }
+
+QDF_STATUS wmi_unified_extract_green_ap_ll_ps_param(
+	wmi_unified_t wmi_handle, uint8_t *evt_buf,
+	struct wlan_green_ap_ll_ps_event_param *green_ap_ll_ps_event_param)
+{
+	if (wmi_handle->ops->extract_green_ap_ll_ps_param)
+		return wmi_handle->ops->extract_green_ap_ll_ps_param(
+				evt_buf,
+				green_ap_ll_ps_event_param);
+
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
 
 QDF_STATUS

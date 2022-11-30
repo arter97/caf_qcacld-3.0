@@ -40,6 +40,24 @@ struct wlan_green_ap_egap_params;
 QDF_STATUS target_if_register_green_ap_tx_ops(
 		struct wlan_lmac_if_tx_ops *tx_ops);
 
+#if defined(WLAN_SUPPORT_GAP_LL_PS_MODE)
+/**
+ * target_if_green_ap_register_ll_ps_event_handler() - register green ap low
+ * latency power save mode event handler
+ * @pdev: objmgr pdev
+ *
+ * Return: QDF_STATUS in case of success
+ */
+
+QDF_STATUS target_if_green_ap_register_ll_ps_event_handler(
+						struct wlan_objmgr_pdev *pdev);
+#else
+static inline QDF_STATUS target_if_green_ap_register_ll_ps_event_handler(
+						struct wlan_objmgr_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
 /**
  * target_if_green_ap_register_egap_event_handler() - registers enhanced
  *                                  green ap event handler

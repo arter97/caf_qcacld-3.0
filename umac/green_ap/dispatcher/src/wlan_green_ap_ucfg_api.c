@@ -126,12 +126,11 @@ QDF_STATUS ucfg_green_ap_ll_ps(struct wlan_objmgr_pdev *pdev,
 
 	green_ap_ctx->vdev = vdev;
 	green_ap_ll_ps_params.state = state;
+	green_ap_ll_ps_params.bcn_interval = bcn_interval;
 
 	if (state)
-		green_ap_ll_ps_params.bcn_interval =
-			green_ap_ctx->bcn_mult * bcn_interval;
-	else
-		green_ap_ll_ps_params.bcn_interval = bcn_interval;
+		green_ap_ll_ps_params.bcn_interval *=
+			green_ap_ctx->bcn_mult;
 
 	green_ap_ll_ps_params.cookie =
 		wlan_green_ap_get_cookie_id(

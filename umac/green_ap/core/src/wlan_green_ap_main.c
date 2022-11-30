@@ -436,4 +436,24 @@ uint32_t wlan_green_ap_get_cookie_id(struct wlan_pdev_green_ap_ctx *green_ap_ctx
 
 	return id;
 }
+
+QDF_STATUS
+wlan_green_ap_send_ll_ps_event_params(struct wlan_objmgr_pdev *pdev,
+		struct wlan_green_ap_ll_ps_event_param *event_param)
+{
+	QDF_STATUS status;
+	struct wlan_pdev_green_ap_ctx *green_ap_ctx;
+
+	green_ap_ctx = wlan_objmgr_pdev_get_comp_private_obj(
+			pdev, WLAN_UMAC_COMP_GREEN_AP);
+
+	if (!green_ap_ctx) {
+		green_ap_err("green ap context obtained is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = green_ap_ctx->hdd_cback.send_event(green_ap_ctx->vdev, event_param);
+
+	return status;
+}
 #endif

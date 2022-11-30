@@ -5204,6 +5204,9 @@ typedef enum {
 #ifdef WLAN_FEATURE_11BE_MLO
 	wmi_mlo_ap_vdev_tid_to_link_map_eventid,
 #endif
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+	wmi_xgap_enable_complete_eventid,
+#endif
 	wmi_events_max,
 } wmi_conv_event_id;
 

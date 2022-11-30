@@ -1250,7 +1250,6 @@ struct wlan_lmac_if_offchan_txrx_ops {
 };
 #endif
 
-#ifdef WLAN_SUPPORT_GREEN_AP
 struct wlan_green_ap_egap_params;
 
 #ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
@@ -1267,6 +1266,19 @@ struct green_ap_ll_ps_cmd_param {
 	uint8_t state;
 	uint16_t bcn_interval;
 	uint32_t cookie;
+};
+
+/**
+ * struct wlan_green_ap_ll_ps_event_param - Green AP low latency Power Save
+ * event parameter structure
+ * @bcn_mult: Beacon multiplier
+ * @dialog_token: Dialog token
+ * @next_rsf: Next TSF
+ */
+struct wlan_green_ap_ll_ps_event_param {
+	uint16_t bcn_mult;
+	uint32_t dialog_token;
+	uint64_t next_tsf;
 };
 #endif
 
@@ -1290,13 +1302,11 @@ struct wlan_lmac_if_green_ap_tx_ops {
 	uint16_t (*get_current_channel)(struct wlan_objmgr_pdev *pdev);
 	uint64_t (*get_current_channel_flags)(struct wlan_objmgr_pdev *pdev);
 	QDF_STATUS (*get_capab)(struct  wlan_objmgr_pdev *pdev);
-#if defined(WLAN_SUPPORT_GAP_LL_PS_MODE)
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
 	QDF_STATUS (*ll_ps)(struct wlan_objmgr_vdev *vdev,
 			    struct green_ap_ll_ps_cmd_param *ll_ps_params);
 #endif
-
 };
-#endif
 
 #ifdef FEATURE_COEX
 struct coex_config_params;
@@ -2425,6 +2435,10 @@ struct wlan_lmac_if_green_ap_rx_ops {
 	QDF_STATUS (*ps_get)(struct wlan_objmgr_pdev *pdev, uint8_t *value);
 	QDF_STATUS (*ps_set)(struct wlan_objmgr_pdev *pdev, uint8_t value);
 	void (*suspend_handle)(struct wlan_objmgr_pdev *pdev);
+#if defined(WLAN_SUPPORT_GAP_LL_PS_MODE)
+	QDF_STATUS (*ll_ps_cb)(struct wlan_green_ap_ll_ps_event_param
+			       *ll_ps_event_param);
+#endif
 };
 #endif
 

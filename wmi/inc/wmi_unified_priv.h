@@ -555,6 +555,12 @@ QDF_STATUS (*send_green_ap_ll_ps_cmd)(wmi_unified_t wmi_handle,
 #endif
 #endif
 
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+QDF_STATUS (*extract_green_ap_ll_ps_param)(
+		uint8_t *evt_buf,
+		struct wlan_green_ap_ll_ps_event_param *ll_ps_params);
+#endif
+
 QDF_STATUS
 (*send_pdev_utf_cmd)(wmi_unified_t wmi_handle,
 				struct pdev_utf_params *param,

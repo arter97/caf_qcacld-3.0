@@ -4074,6 +4074,21 @@ QDF_STATUS wmi_extract_green_ap_egap_status_info(
 	struct wlan_green_ap_egap_status_info *egap_status_info_params);
 #endif
 
+#ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+/**
+ * wmi_unified_extract_green_ap_ll_ps_param() - API to extract Green AP low
+ * latency power save event parameter
+ * @wmi_handle: wmi handle
+ * @evt_buf: pointer to the event buffer
+ * @green_ap_ll_ps_event_param: Event parameter
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wmi_unified_extract_green_ap_ll_ps_param(
+	wmi_unified_t wmi_hdl, uint8_t *evt_buf,
+	struct wlan_green_ap_ll_ps_event_param *green_ap_ll_ps_event_param);
+#endif
+
 /**
  * wmi_unified_send_roam_scan_stats_cmd() - Wrapper to request roam scan stats
  * @wmi_handle: wmi handle
