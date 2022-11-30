@@ -1075,16 +1075,18 @@ bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 						      tid_stats))
 		return false;
 
-	if (dp_tx_send((struct cdp_soc_t *)soc,
-		       ta_peer->vdev->vdev_id, nbuf_copy)) {
+	/* Don't send packets if tx is paused */
+	if (!soc->is_tx_pause &&
+	    !dp_tx_send((struct cdp_soc_t *)soc,
+			ta_peer->vdev->vdev_id, nbuf_copy)) {
+		DP_PEER_PER_PKT_STATS_INC_PKT(ta_peer, rx.intra_bss.pkts, 1,
+					      len);
+		tid_stats->intrabss_cnt++;
+	} else {
 		DP_PEER_PER_PKT_STATS_INC_PKT(ta_peer, rx.intra_bss.fail, 1,
 					      len);
 		tid_stats->fail_cnt[INTRABSS_DROP]++;
 		dp_rx_nbuf_free(nbuf_copy);
-	} else {
-		DP_PEER_PER_PKT_STATS_INC_PKT(ta_peer, rx.intra_bss.pkts, 1,
-					      len);
-		tid_stats->intrabss_cnt++;
 	}
 	return false;
 }
@@ -1135,8 +1137,9 @@ bool dp_rx_intrabss_ucast_fwd(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 	qdf_mem_set(nbuf->cb, 0x0, sizeof(nbuf->cb));
 	dp_classify_critical_pkts(soc, ta_peer->vdev, nbuf);
 
-	if (!dp_tx_send((struct cdp_soc_t *)soc,
-			tx_vdev_id, nbuf)) {
+	/* Don't send packets if tx is paused */
+	if (!soc->is_tx_pause && !dp_tx_send((struct cdp_soc_t *)soc,
+					     tx_vdev_id, nbuf)) {
 		DP_PEER_PER_PKT_STATS_INC_PKT(ta_peer, rx.intra_bss.pkts, 1,
 					      len);
 	} else {
