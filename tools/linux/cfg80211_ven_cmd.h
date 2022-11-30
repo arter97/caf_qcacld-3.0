@@ -1417,6 +1417,7 @@ enum _ol_ath_param_t {
 	OL_ATH_PARAM_UMAC_RST_SKEL = 519,
 #endif
 	OL_ATH_PARAM_MON_MAC_FILTER = 520,
+	OL_ATH_PARAM_PUNC_EIRP_THRES = 521,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3738,6 +3739,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, SET_PARAM, 1},
 	{"get_mon_mac_filter",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_MON_MAC_FILTER, GET_PARAM, 0},
+	{"punc_eirp_thres",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PUNC_EIRP_THRES, SET_PARAM, 1},
+	{"g_punc_eirp_thres",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PUNC_EIRP_THRES, GET_PARAM, 0},
 };
 #endif
 

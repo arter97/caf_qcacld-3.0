@@ -26,11 +26,15 @@
 #include <be/dp_be.h>
 #include <ppe_vp_public.h>
 #include "dp_ppeds.h"
-#include <ppeds_wlan.h>
+#include <ppe_ds_wlan.h>
 #include <wlan_osif_priv.h>
 #include <dp_tx_desc.h>
 #include "dp_rx.h"
 #include "dp_rx_buffer_pool.h"
+#include "dp_be_rx.h"
+
+#define DS_NAPI_BUDGET_TO_INTERNAL_BUDGET(n, s) (((n) << (s)) - 1)
+#define DS_INTERNAL_BUDGET_TO_NAPI_BUDGET(n, s) (((n) + 1) >> (s))
 
 /**
  * dp_ppeds_deinit_ppe_vp_tbl_be - PPE VP table dealoc
@@ -223,6 +227,75 @@ static void dp_ppeds_dealloc_vp_tbl_entry_be(struct dp_soc_be *be_soc,
 	be_soc->ppe_vp_tbl[ppe_vp_num_idx].is_configured = false;
 	be_soc->num_ppe_vp_entries--;
 	qdf_mutex_release(&be_soc->ppe_vp_tbl_lock);
+}
+
+/**
+ * dp_ppeds_tx_comp_poll() - ppeds tx completion napi poll
+ * @napi: napi handle
+ * @budget: Budget
+ *
+ * Ppeds tx completion napi poll funciton
+ *
+ * Return: Work done
+ */
+static int dp_ppeds_tx_comp_poll(struct napi_struct *napi, int budget)
+{
+	int work_done;
+	int shift = 2;
+	int norm_budget = DS_NAPI_BUDGET_TO_INTERNAL_BUDGET(budget, shift);
+	struct dp_soc_be *be_soc =
+		qdf_container_of(napi, struct dp_soc_be, ppeds_napi_ctxt.napi);
+
+	work_done = dp_ppeds_tx_comp_handler(be_soc, norm_budget);
+	work_done = DS_INTERNAL_BUDGET_TO_NAPI_BUDGET(work_done, shift);
+
+	if (budget > work_done) {
+		napi_complete(napi);
+		dp_ppeds_enable_irq(&be_soc->soc,
+				    &be_soc->ppe_wbm_release_ring);
+	}
+
+	return (work_done > budget) ? budget : work_done;
+}
+
+/**
+ * dp_ppeds_del_napi_ctxt() - delete ppeds tx completion napi context
+ * @be_soc: BE SoC
+ *
+ * Delete ppeds tx completion napi context
+ *
+ * Return: None
+ */
+static void dp_ppeds_del_napi_ctxt(struct dp_soc_be *be_soc)
+{
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+
+	napi_disable(&napi_ctxt->napi);
+
+	netif_napi_del(&napi_ctxt->napi);
+}
+
+/**
+ * dp_ppeds_add_napi_ctxt() - Add ppeds tx completion napi context
+ * @be_soc: BE SoC
+ *
+ * Add ppeds tx completion napi context
+ *
+ * Return: None
+ */
+static void dp_ppeds_add_napi_ctxt(struct dp_soc_be *be_soc)
+{
+	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
+	int napi_budget =
+		wlan_cfg_get_dp_soc_ppe_tx_comp_napi_budget(soc->wlan_cfg_ctx);
+
+	qdf_net_if_create_dummy_if((struct qdf_net_if *)&napi_ctxt->ndev);
+
+	netif_napi_add(&napi_ctxt->ndev, &napi_ctxt->napi,
+		       dp_ppeds_tx_comp_poll, napi_budget);
+
+	napi_enable(&napi_ctxt->napi);
 }
 
 /**
@@ -524,8 +597,8 @@ void dp_ppeds_tx_desc_free(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
  * Return: Number of buffers allocated
  */
 static
-uint32_t dp_ppeds_get_batched_tx_desc(ppeds_wlan_handle_t *ppeds_handle,
-				      struct ppeds_wlan_txdesc_elem *arr,
+uint32_t dp_ppeds_get_batched_tx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
+				      struct ppe_ds_wlan_txdesc_elem *arr,
 				      uint32_t num_buff_req,
 				      uint32_t buff_size,
 				      uint32_t headroom)
@@ -533,7 +606,7 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppeds_wlan_handle_t *ppeds_handle,
 	uint32_t i = 0;
 	unsigned int cpu;
 	struct dp_tx_desc_s *tx_desc;
-	struct dp_soc *soc = *((struct dp_soc **)ppeds_wlan_priv(ppeds_handle));
+	struct dp_soc *soc = *((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	qdf_dma_addr_t paddr;
 
@@ -597,11 +670,11 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppeds_wlan_handle_t *ppeds_handle,
  *
  * Return: void
  */
-static void dp_ppeds_release_rx_desc(ppeds_wlan_handle_t *ppeds_handle,
-					struct ppeds_wlan_rxdesc_elem *arr, uint16_t count)
+static void dp_ppeds_release_rx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
+					struct ppe_ds_wlan_rxdesc_elem *arr, uint16_t count)
 {
 	struct dp_rx_desc *rx_desc;
-	struct dp_soc *soc = *((struct dp_soc **)ppeds_wlan_priv(ppeds_handle));
+	struct dp_soc *soc = *((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
 	union dp_rx_desc_list_elem_t *head[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = {0};
 	union dp_rx_desc_list_elem_t *tail[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = {0};
 	uint32_t rx_bufs_reaped[WLAN_MAX_MLO_CHIPS][MAX_PDEV_CNT] = {0};
@@ -610,7 +683,9 @@ static void dp_ppeds_release_rx_desc(ppeds_wlan_handle_t *ppeds_handle,
 	struct dp_soc *replenish_soc;
 	uint32_t i, mac_id;
 	uint8_t chip_id;
+	qdf_nbuf_queue_head_t h;
 
+	qdf_nbuf_queue_head_init(&h);
 	for (i = 0; i < count; i++) {
 		rx_desc = (struct dp_rx_desc *)arr[i].cookie;
 		if (rx_desc == NULL) {
@@ -621,11 +696,11 @@ static void dp_ppeds_release_rx_desc(ppeds_wlan_handle_t *ppeds_handle,
 
 		dp_rx_nbuf_unmap(soc, rx_desc, REO2PPE_DST_IND);
 		rx_desc->unmapped = 1;
-		dp_rx_buffer_pool_nbuf_free(soc, rx_desc->nbuf, rx_desc->pool_id);
-
+		qdf_nbuf_dev_queue_head(&h, rx_desc->nbuf);
 		dp_rx_add_to_free_desc_list(&head[rx_desc->chip_id][rx_desc->pool_id],
 				&tail[rx_desc->chip_id][rx_desc->pool_id], rx_desc);
 	}
+	qdf_nbuf_dev_kfree_list(&h);
 
 	for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
 		for (mac_id = 0; mac_id < MAX_PDEV_CNT; mac_id++) {
@@ -656,7 +731,7 @@ static void dp_ppeds_release_rx_desc(ppeds_wlan_handle_t *ppeds_handle,
  * Return: void
  */
 static
-void dp_ppeds_release_tx_desc_single(ppeds_wlan_handle_t *ppeds_handle,
+void dp_ppeds_release_tx_desc_single(ppe_ds_wlan_handle_t *ppeds_handle,
 				     uint32_t cookie)
 {
 	return;
@@ -671,11 +746,11 @@ void dp_ppeds_release_tx_desc_single(ppeds_wlan_handle_t *ppeds_handle,
  *
  * Return: void
  */
-static void dp_ppeds_set_tcl_prod_idx(ppeds_wlan_handle_t *ppeds_handle,
+static void dp_ppeds_set_tcl_prod_idx(ppe_ds_wlan_handle_t *ppeds_handle,
 				      uint16_t tcl_prod_idx)
 {
 	struct dp_soc_be *soc =
-			*((struct dp_soc_be **)ppeds_wlan_priv(ppeds_handle));
+			*((struct dp_soc_be **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_soc *dpsoc = (struct dp_soc *)soc;
 	struct dp_srng *ppe2tcl_ring = &soc->ppe2tcl_ring;
 
@@ -691,10 +766,10 @@ static void dp_ppeds_set_tcl_prod_idx(ppeds_wlan_handle_t *ppeds_handle,
  *
  * Return: Consumer index of the PPE2TCL ring
  */
-static uint16_t dp_ppeds_get_tcl_cons_idx(ppeds_wlan_handle_t *ppeds_handle)
+static uint16_t dp_ppeds_get_tcl_cons_idx(ppe_ds_wlan_handle_t *ppeds_handle)
 {
 	struct dp_soc_be *soc =
-			*((struct dp_soc_be **)ppeds_wlan_priv(ppeds_handle));
+			*((struct dp_soc_be **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_srng *ppe2tcl_ring = &soc->ppe2tcl_ring;
 
 	return hal_srng_src_get_tpidx(ppe2tcl_ring->hal_srng);
@@ -709,11 +784,11 @@ static uint16_t dp_ppeds_get_tcl_cons_idx(ppeds_wlan_handle_t *ppeds_handle)
  *
  * Return: void
  */
-static void dp_ppeds_set_reo_cons_idx(ppeds_wlan_handle_t *ppeds_handle,
+static void dp_ppeds_set_reo_cons_idx(ppe_ds_wlan_handle_t *ppeds_handle,
 				      uint16_t reo_cons_idx)
 {
 	struct dp_soc_be *soc =
-			*((struct dp_soc_be **)ppeds_wlan_priv(ppeds_handle));
+			*((struct dp_soc_be **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_soc *dpsoc = (struct dp_soc *)soc;
 	struct dp_srng *reo2ppe_ring = &soc->reo2ppe_ring;
 
@@ -729,10 +804,10 @@ static void dp_ppeds_set_reo_cons_idx(ppeds_wlan_handle_t *ppeds_handle,
  *
  * Return: Producer index of the REO2PPE ring
  */
-static uint16_t dp_ppeds_get_reo_prod_idx(ppeds_wlan_handle_t *ppeds_handle)
+static uint16_t dp_ppeds_get_reo_prod_idx(ppe_ds_wlan_handle_t *ppeds_handle)
 {
 	struct dp_soc_be *soc =
-			*((struct dp_soc_be **)ppeds_wlan_priv(ppeds_handle));
+			*((struct dp_soc_be **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_srng *reo2ppe_ring = &soc->reo2ppe_ring;
 
 	return hal_srng_dst_get_hpidx(reo2ppe_ring->hal_srng);
@@ -742,7 +817,7 @@ static uint16_t dp_ppeds_get_reo_prod_idx(ppeds_wlan_handle_t *ppeds_handle)
  * ppeds_ops
  *	PPE-DS WLAN operations
  */
-static struct ppeds_wlan_ops ppeds_ops = {
+static struct ppe_ds_wlan_ops ppeds_ops = {
 	.get_tx_desc_many = dp_ppeds_get_batched_tx_desc,
 	.release_tx_desc_single = dp_ppeds_release_tx_desc_single,
 	.set_tcl_prod_idx  = dp_ppeds_set_tcl_prod_idx,
@@ -799,7 +874,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	*ppe_vp_num = nss_ppe_ds_wlan_vp_alloc(be_soc->ppeds_handle, dev, vp_arg);
+	*ppe_vp_num = ppe_ds_wlan_vp_alloc(be_soc->ppeds_handle, dev, vp_arg);
 	if (*ppe_vp_num < 0) {
 		dp_err("vp alloc failed\n");
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
@@ -818,7 +893,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	if (be_vdev->ppe_vp_enabled == PPE_VP_USER_TYPE_DS) {
 		dp_err("%p: PPE DS is already enabled on this vdev_id:%d",
 		       be_soc, vdev_id);
-		nss_ppe_ds_wlan_vp_free(be_soc->ppeds_handle, *ppe_vp_num);
+		ppe_ds_wlan_vp_free(be_soc->ppeds_handle, *ppe_vp_num);
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_ALREADY;
 	} else
@@ -828,7 +903,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	if (ppe_vp_idx < 0) {
 		dp_err("%p: Failed to allocate PPE VP idx for vdev_id:%d",
 		       be_soc, vdev->vdev_id);
-		nss_ppe_ds_wlan_vp_free(be_soc->ppeds_handle, *ppe_vp_num);
+		ppe_ds_wlan_vp_free(be_soc->ppeds_handle, *ppe_vp_num);
 		be_vdev->ppe_vp_enabled = 0;
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 		return QDF_STATUS_E_RESOURCES;
@@ -890,7 +965,7 @@ void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 		return;
 	}
 
-	nss_ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_profile->ppe_vp_num_idx);
+	ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_profile->ppe_vp_num_idx);
 
 	dp_ppeds_dealloc_vp_tbl_entry_be(be_soc, vp_profile->ppe_vp_num_idx);
 
@@ -1073,7 +1148,7 @@ void dp_ppeds_stop_soc_be(struct dp_soc *soc)
 	if (!be_soc->ppeds_handle)
 		return;
 
-	nss_ppe_ds_wlan_inst_stop(be_soc->ppeds_handle);
+	ppe_ds_wlan_inst_stop(be_soc->ppeds_handle);
 	dp_ppeds_tx_desc_pool_deinit(be_soc);
 }
 
@@ -1097,7 +1172,7 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 		return QDF_STATUS_SUCCESS;
 	}
 
-	if (nss_ppe_ds_wlan_inst_start(be_soc->ppeds_handle) != 0) {
+	if (ppe_ds_wlan_inst_start(be_soc->ppeds_handle) != 0) {
 		dp_err("%p: ppeds start failed", soc);
 		dp_ppeds_tx_desc_pool_deinit(be_soc);
 		return QDF_STATUS_SUCCESS;
@@ -1109,12 +1184,14 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 /**
  * dp_ppeds_register_soc_be() - Register the PPE-DS instance
  * @be_soc: BE SoC
+ * @idx: ppeds indices
  *
  * Return: QDF_STATUS
  */
-QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc)
+QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc,
+				    struct dp_ppe_ds_idxs *idx)
 {
-	struct ppeds_wlan_reg_info reg_info;
+	struct ppe_ds_wlan_reg_info reg_info = {0};
 	struct dp_soc *soc = DP_SOC_BE_GET_SOC(be_soc);
 
 	if (!be_soc->ppeds_handle) {
@@ -1126,15 +1203,16 @@ QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc)
 	reg_info.reo2ppe_ba = be_soc->reo2ppe_ring.base_paddr_aligned;
 	reg_info.ppe2tcl_num_desc = be_soc->ppe2tcl_ring.num_entries;
 	reg_info.reo2ppe_num_desc = be_soc->reo2ppe_ring.num_entries;
-	if (nss_ppe_ds_wlan_inst_register(be_soc->ppeds_handle, &reg_info) != true) {
+	if (ppe_ds_wlan_inst_register(be_soc->ppeds_handle, &reg_info) != true) {
 		dp_err("%p: ppeds registeration failed", be_soc);
 		return QDF_STATUS_SUCCESS;
 	}
 
-	/*
-	 * Implicit tx to tx complete mapping for PPE2TCL ring
-	 */
-	hal_tx_config_rbm_mapping_be(soc->hal_soc, be_soc->ppe2tcl_ring.hal_srng, 6);
+	idx->ppe2tcl_start_idx = reg_info.ppe2tcl_start_idx;
+	idx->reo2ppe_start_idx = reg_info.reo2ppe_start_idx;
+
+	dp_info("ppe2tcl_start_idx %d reo2ppe_start_idx %d\n",
+		idx->ppe2tcl_start_idx, idx->reo2ppe_start_idx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1152,12 +1230,35 @@ void dp_ppeds_detach_soc_be(struct dp_soc_be *be_soc)
 	if (!be_soc->ppeds_handle)
 		return;
 
+	dp_ppeds_del_napi_ctxt(be_soc);
 	dp_ppeds_tx_desc_pool_free(soc);
 	dp_hw_cookie_conversion_detach(be_soc, &be_soc->ppeds_tx_cc_ctx);
-	nss_ppe_ds_wlan_inst_del(be_soc->ppeds_handle);
+	ppe_ds_wlan_inst_free(be_soc->ppeds_handle);
 	be_soc->ppeds_handle = NULL;
 
 	dp_ppeds_deinit_ppe_vp_tbl_be(be_soc);
+}
+
+/**
+ * dp_ppeds_handle_tx_comp() - PPE DS handle irq
+ * @irq: irq number
+ * @ctxt: irq context
+ *
+ * PPE DS handle irq function
+ *
+ * Return: irq status
+ */
+irqreturn_t dp_ppeds_handle_tx_comp(int irq, void *ctxt)
+{
+	struct dp_soc_be *be_soc =
+			dp_get_be_soc_from_dp_soc((struct dp_soc *)ctxt);
+	struct napi_struct *napi = &be_soc->ppeds_napi_ctxt.napi;
+
+	dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe_wbm_release_ring);
+
+	napi_schedule(napi);
+
+	return IRQ_HANDLED;
 }
 
 QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
@@ -1213,15 +1314,19 @@ QDF_STATUS dp_ppeds_attach_soc_be(struct dp_soc_be *be_soc)
 	}
 
 	be_soc->ppeds_handle =
-			nss_ppe_ds_wlan_inst_alloc(&ppeds_ops,
+			ppe_ds_wlan_inst_alloc(&ppeds_ops,
 						   sizeof(struct dp_soc_be *));
 	if (!be_soc->ppeds_handle) {
 		dp_err("%p: Failed to allocate ppeds soc instance", be_soc);
 		goto fail4;
 	}
 
-	 besocptr = (struct dp_soc_be **)ppeds_wlan_priv(be_soc->ppeds_handle);
-	 *besocptr = be_soc;
+	dp_ppeds_add_napi_ctxt(be_soc);
+
+	dp_info("Allocated PPEDS handle\n");
+
+	besocptr = (struct dp_soc_be **)ppe_ds_wlan_priv(be_soc->ppeds_handle);
+	*besocptr = be_soc;
 
 	 return QDF_STATUS_SUCCESS;
 
@@ -1232,6 +1337,7 @@ fail3:
 fail2:
 	dp_hw_cookie_conversion_detach(be_soc, &be_soc->ppeds_tx_cc_ctx);
 fail1:
+	dp_err("Could not allocate PPEDS handle\n");
 	return QDF_STATUS_E_FAILURE;
 
 }

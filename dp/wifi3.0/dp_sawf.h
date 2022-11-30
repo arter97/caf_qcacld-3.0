@@ -486,4 +486,20 @@ QDF_STATUS dp_sawf_set_sla_params(uint32_t num_pkt,
  */
 
 QDF_STATUS dp_sawf_init_telemetry_params(void);
+
+/**
+ * dp_sawf_peer_config_ul - Config uplink parameters
+ * @soc_hdl: SOC handle
+ * @mac_addr: peer MAC address
+ * @tid: TID
+ * @service_interval: Service Interval
+ * @burst_size: Burst size
+ * @add_or_sub: Add or Sub
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+dp_sawf_peer_config_ul(struct cdp_soc_t *soc_hdl, uint8_t *mac_addr,
+		       uint8_t tid, uint32_t service_interval,
+		       uint32_t burst_size, uint8_t add_or_sub);
 #endif /* DP_SAWF_H*/
