@@ -260,6 +260,60 @@ bool wlan_mlo_is_mld_ctx_exist(struct qdf_mac_addr *mldaddr)
 	return false;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+bool mlo_mgr_ml_peer_exist(uint8_t *peer_addr)
+{
+	qdf_list_t *ml_list;
+	struct wlan_mlo_dev_context *mld_cur, *mld_next;
+	struct wlan_mlo_peer_list *mlo_peer_list;
+	bool ret_status = false;
+	struct mlo_mgr_context *g_mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!g_mlo_ctx || !peer_addr ||
+	    qdf_is_macaddr_zero((struct qdf_mac_addr *)peer_addr))
+		return ret_status;
+
+	ml_link_lock_acquire(g_mlo_ctx);
+	ml_list = &g_mlo_ctx->ml_dev_list;
+	if (!qdf_list_size(ml_list))
+		goto g_ml_ref;
+
+	mld_cur = mlo_list_peek_head(ml_list);
+	while (mld_cur) {
+		mlo_dev_lock_acquire(mld_cur);
+		if (qdf_is_macaddr_equal(&mld_cur->mld_addr,
+					 (struct qdf_mac_addr *)peer_addr)) {
+			mlo_dev_lock_release(mld_cur);
+			mlo_err("MLD ID %d exists with mac " QDF_MAC_ADDR_FMT,
+				mld_cur->mld_id, QDF_MAC_ADDR_REF(peer_addr));
+			ret_status = true;
+			goto g_ml_ref;
+		}
+
+		/* Check the peer list for a MAC address match */
+		mlo_peer_list = &mld_cur->mlo_peer_list;
+		ml_peerlist_lock_acquire(mlo_peer_list);
+		if (mlo_get_mlpeer(mld_cur, (struct qdf_mac_addr *)peer_addr)) {
+			ml_peerlist_lock_release(mlo_peer_list);
+			mlo_dev_lock_release(mld_cur);
+			mlo_err("MLD ID %d ML Peer exists with mac " QDF_MAC_ADDR_FMT,
+				mld_cur->mld_id, QDF_MAC_ADDR_REF(peer_addr));
+			ret_status = true;
+			goto g_ml_ref;
+		}
+		ml_peerlist_lock_release(mlo_peer_list);
+
+		mld_next = mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mlo_dev_lock_release(mld_cur);
+		mld_cur = mld_next;
+	}
+
+g_ml_ref:
+	ml_link_lock_release(g_mlo_ctx);
+	return ret_status;
+}
+#endif
+
 static QDF_STATUS mlo_ap_ctx_deinit(struct wlan_mlo_dev_context *ml_dev)
 {
 	wlan_mlo_vdev_aid_mgr_deinit(ml_dev);
