@@ -1710,6 +1710,16 @@ enum hdd_adapter_ops_event {
 };
 
 /**
+ * enum hdd_ssr_src - the source to trigger ssr
+ * @WLAN_HDD_SSR_SRC_DEFAULT: src sent from cnss, e.g. PCIe linkdown
+ * @WLAN_HDD_SSR_SRC_FW_CRASH: FW crash triggered ssr
+ */
+enum hdd_ssr_src {
+	WLAN_HDD_SSR_SRC_DEFAULT,
+	WLAN_HDD_SSR_SRC_FW_CRASH,
+};
+
+/**
  * struct hdd_adapter_ops_record - record of adapter ops history
  * @timestamp: time of the occurrence of event
  * @event: event
@@ -2092,6 +2102,7 @@ struct hdd_context {
 #ifdef FEATURE_WPSS_THERMAL_MITIGATION
 	bool multi_client_thermal_mitigation;
 #endif
+	enum hdd_ssr_src ssr_src;
 };
 
 /**
