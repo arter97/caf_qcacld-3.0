@@ -264,6 +264,8 @@ struct wlan_regulatory_psoc_priv_obj {
  * @pdev_opened: whether pdev has been opened by application
  * @reg_cur_6g_ap_pwr_type: 6G AP type ie VLP/SP/LPI.
  * @reg_cur_6g_client_mobility_type: 6G client type ie Default/Subordinate.
+ * @reg_target_client_type: 6 GHz client type received from target. The Client
+ *	type can be Default/Subordinate.
  * @reg_rnr_tpe_usable: Indicates whether RNR IE is applicable for current reg
  * domain.
  * @reg_unspecified_ap_usable: Indicates if the AP type mentioned is not part of
@@ -345,6 +347,7 @@ struct wlan_regulatory_pdev_priv_obj {
 #if defined(CONFIG_BAND_6GHZ)
 	enum reg_6g_ap_type reg_cur_6g_ap_pwr_type;
 	enum reg_6g_client_type reg_cur_6g_client_mobility_type;
+	enum reg_6g_client_type reg_target_client_type;
 	bool reg_rnr_tpe_usable;
 	bool reg_unspecified_ap_usable;
 	qdf_freq_t reg_6g_thresh_priority_freq;

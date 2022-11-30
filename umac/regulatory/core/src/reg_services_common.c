@@ -8074,6 +8074,43 @@ reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+QDF_STATUS
+reg_set_cur_6ghz_client_type(struct wlan_objmgr_pdev *pdev,
+			     enum reg_6g_client_type in_6ghz_client_type)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg component is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (in_6ghz_client_type >= REG_MAX_CLIENT_TYPE)
+		return QDF_STATUS_E_FAILURE;
+
+	pdev_priv_obj->reg_cur_6g_client_mobility_type = in_6ghz_client_type;
+
+	return QDF_STATUS_SUCCESS;
+}
+
+QDF_STATUS
+reg_set_6ghz_client_type_from_target(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("pdev reg component is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	pdev_priv_obj->reg_cur_6g_client_mobility_type =
+					pdev_priv_obj->reg_target_client_type;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 QDF_STATUS reg_get_rnr_tpe_usable(struct wlan_objmgr_pdev *pdev,
 				  bool *reg_rnr_tpe_usable)
 {

@@ -1729,6 +1729,19 @@ wlan_reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 
 qdf_export_symbol(wlan_reg_get_cur_6g_client_type);
 
+QDF_STATUS
+wlan_reg_set_cur_6ghz_client_type(struct wlan_objmgr_pdev *pdev,
+				  enum reg_6g_client_type in_6ghz_client_type)
+{
+	return reg_set_cur_6ghz_client_type(pdev, in_6ghz_client_type);
+}
+
+QDF_STATUS
+wlan_reg_set_6ghz_client_type_from_target(struct wlan_objmgr_pdev *pdev)
+{
+	return reg_set_6ghz_client_type_from_target(pdev);
+}
+
 bool wlan_reg_is_6g_psd_power(struct wlan_objmgr_pdev *pdev)
 {
 	return reg_is_6g_psd_power(pdev);

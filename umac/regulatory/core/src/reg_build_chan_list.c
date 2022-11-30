@@ -1088,6 +1088,8 @@ static void reg_propagate_6g_mas_channel_list(
 
 	pdev_priv_obj->reg_cur_6g_client_mobility_type =
 				mas_chan_params->client_type;
+	pdev_priv_obj->reg_target_client_type =
+				mas_chan_params->client_type;
 	pdev_priv_obj->reg_rnr_tpe_usable = mas_chan_params->rnr_tpe_usable;
 	pdev_priv_obj->reg_unspecified_ap_usable =
 				mas_chan_params->unspecified_ap_usable;

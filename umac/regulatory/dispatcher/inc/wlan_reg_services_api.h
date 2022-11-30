@@ -2235,6 +2235,29 @@ QDF_STATUS
 wlan_reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 				enum reg_6g_client_type
 				*reg_cur_6g_client_mobility_type);
+
+/**
+ * wlan_reg_set_cur_6ghz_client_type() - Set the cur 6 GHz regulatory client
+ * type to the given value.
+ * @pdev: Pointer to PDEV object.
+ * @in_6ghz_client_type: Input Client type to be set ie. default/subordinate.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_reg_set_cur_6ghz_client_type(struct wlan_objmgr_pdev *pdev,
+				  enum reg_6g_client_type in_6ghz_client_type);
+
+/**
+ * wlan_reg_set_6ghz_client_type_from_target() - Set the current 6 GHz
+ * regulatory client type to the value received from target.
+ * @pdev: Pointer to PDEV object.
+ *
+ * Return: QDF_STATUS.
+ */
+QDF_STATUS
+wlan_reg_set_6ghz_client_type_from_target(struct wlan_objmgr_pdev *pdev);
+
 /**
  * wlan_reg_get_rnr_tpe_usable() - Tells if RNR IE is applicable for current
  * domain.
@@ -2408,6 +2431,19 @@ wlan_reg_get_cur_6g_client_type(struct wlan_objmgr_pdev *pdev,
 				*reg_cur_6g_client_mobility_type)
 {
 	*reg_cur_6g_client_mobility_type = REG_SUBORDINATE_CLIENT;
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_reg_set_cur_6ghz_client_type(struct wlan_objmgr_pdev *pdev,
+				  enum reg_6g_client_type in_6ghz_client_type)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_reg_set_6ghz_client_type_from_target(struct wlan_objmgr_pdev *pdev)
+{
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
