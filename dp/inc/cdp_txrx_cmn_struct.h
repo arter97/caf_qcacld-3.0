@@ -662,6 +662,7 @@ enum cdp_sec_type {
  * @is_intrabss_fwd:
  * @ppdu_cookie: 16-bit ppdu cookie that has to be replayed back in completions
  * @is_wds_extended:
+ * @is_mlo_mcast: Indicates if mlo_mcast enable or not
  *
  * This structure holds the parameters needed in the exception path of tx
  *
@@ -676,6 +677,9 @@ struct cdp_tx_exception_metadata {
 	uint16_t ppdu_cookie;
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	uint8_t is_wds_extended;
+#endif
+#ifdef WLAN_MCAST_MLO
+	uint8_t is_mlo_mcast;
 #endif
 };
 

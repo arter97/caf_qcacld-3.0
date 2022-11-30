@@ -809,6 +809,79 @@ bool dp_tx_mlo_is_mcast_primary_be(struct dp_soc *soc,
 
 	return false;
 }
+
+#if defined(CONFIG_MLO_SINGLE_DEV)
+static void
+dp_tx_mlo_mcast_enhance_be(struct dp_vdev_be *be_vdev,
+			   struct dp_vdev *ptnr_vdev,
+			   void *arg)
+{
+	struct dp_vdev *vdev = (struct dp_vdev *)be_vdev;
+	qdf_nbuf_t  nbuf = (qdf_nbuf_t)arg;
+
+	if (vdev == ptnr_vdev)
+		return;
+
+	/*
+	 * Hold the reference to avoid free of nbuf in
+	 * dp_tx_mcast_enhance() in case of successful
+	 * conversion
+	 */
+	qdf_nbuf_ref(nbuf);
+
+	if (qdf_unlikely(!dp_tx_mcast_enhance(ptnr_vdev, nbuf)))
+		return;
+
+	qdf_nbuf_free(nbuf);
+}
+
+qdf_nbuf_t
+dp_tx_mlo_mcast_send_be(struct dp_soc *soc, struct dp_vdev *vdev,
+			qdf_nbuf_t nbuf,
+			struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (!tx_exc_metadata->is_mlo_mcast)
+		return nbuf;
+
+	if (!be_vdev->mcast_primary) {
+		qdf_nbuf_free(nbuf);
+		return NULL;
+	}
+
+	/*
+	 * In the single netdev model avoid reinjection path as mcast
+	 * packet is identified in upper layers while peer search to find
+	 * primary TQM based on dest mac addr
+	 *
+	 * New bonding interface added into the bridge so MCSD will update
+	 * snooping table and wifi driver populates the entries in appropriate
+	 * child net devices.
+	 */
+	if (vdev->mcast_enhancement_en) {
+		/*
+		 * As dp_tx_mcast_enhance() can consume the nbuf incase of
+		 * successful conversion hold the reference of nbuf.
+		 *
+		 * Hold the reference to tx on partner links
+		 */
+		qdf_nbuf_ref(nbuf);
+		if (qdf_unlikely(!dp_tx_mcast_enhance(vdev, nbuf))) {
+			dp_mcast_mlo_iter_ptnr_vdev(be_soc, be_vdev,
+						    dp_tx_mlo_mcast_enhance_be,
+						    nbuf, DP_MOD_ID_TX);
+			qdf_nbuf_free(nbuf);
+			return NULL;
+		}
+		/* release reference taken above */
+		qdf_nbuf_free(nbuf);
+	}
+	dp_tx_mlo_mcast_handler_be(soc, vdev, nbuf);
+	return NULL;
+}
+#endif
 #else
 static inline void
 dp_tx_vdev_id_set_hal_tx_desc(uint32_t *hal_tx_desc_cached,

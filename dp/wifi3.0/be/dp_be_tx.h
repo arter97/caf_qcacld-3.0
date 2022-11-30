@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -253,6 +253,24 @@ bool dp_tx_mlo_is_mcast_primary_be(struct dp_soc *soc,
 				   struct dp_vdev *vdev);
 #ifdef WLAN_MCAST_MLO
 #ifdef WLAN_MLO_MULTI_CHIP
+#ifdef CONFIG_MLO_SINGLE_DEV
+/**
+ * dp_tx_mlo_mcast_send_be() - Tx send handler for mlo mcast enhance
+ * @soc: DP soc handle
+ * @vdev_id: id of DP vdev handle
+ * @nbuf: skb
+ * @tx_exc_metadata: Handle that holds exception path meta data
+ * @pkt_drop_st: if packet drop will set for 1
+ *
+ * Return: NULL for success
+ *         nbuf for failure
+ */
+
+qdf_nbuf_t dp_tx_mlo_mcast_send_be(struct dp_soc *soc, struct dp_vdev *vdev,
+				   qdf_nbuf_t nbuf,
+				   struct cdp_tx_exception_metadata
+				   *tx_exc_metadata);
+#endif
 /**
  * dp_tx_mlo_mcast_pkt_send() - handler to send MLO Mcast packets
  * @be_vdev: Handle to DP be_vdev structure

@@ -337,6 +337,16 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 		       struct dp_tx_msdu_info_s *msdu_info, uint16_t peer_id,
 		       struct cdp_tx_exception_metadata *tx_exc_metadata);
 
+/**
+ * dp_tx_mcast_enhance
+ * @vdev: DP vdev handle
+ * @nbuf: network buffer to be transmitted
+ *
+ * Return: true on success
+ *         false on failure
+ */
+bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t buf);
+
 #if QDF_LOCK_STATS
 noinline qdf_nbuf_t
 dp_tx_send_msdu_multiple(struct dp_vdev *vdev, qdf_nbuf_t nbuf,

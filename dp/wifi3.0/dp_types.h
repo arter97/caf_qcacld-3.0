@@ -2241,6 +2241,13 @@ struct dp_arch_ops {
 	void (*tx_comp_get_params_from_hal_desc)(struct dp_soc *soc,
 						 void *tx_comp_hal_desc,
 						 struct dp_tx_desc_s **desc);
+
+	qdf_nbuf_t (*dp_tx_mlo_mcast_send)(struct dp_soc *soc,
+					   struct dp_vdev *vdev,
+					   qdf_nbuf_t nbuf,
+					   struct cdp_tx_exception_metadata
+					   *tx_exc_metadata);
+
 	void (*dp_tx_process_htt_completion)(struct dp_soc *soc,
 					     struct dp_tx_desc_s *tx_desc,
 					     uint8_t *status,

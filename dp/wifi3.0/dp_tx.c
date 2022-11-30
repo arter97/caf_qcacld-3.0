@@ -3090,7 +3090,7 @@ static bool dp_check_exc_metadata(struct cdp_tx_exception_metadata *tx_exc)
  * Return: true on success,
  *         false on failure
  */
-static inline bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
+bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	qdf_ether_header_t *eh;
 
@@ -3122,7 +3122,7 @@ static inline bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 	return true;
 }
 #else
-static inline bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
+bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	return true;
 }
@@ -3394,6 +3394,19 @@ dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	 *  to minimize lock contention for these resources.
 	 */
 	dp_tx_get_queue(vdev, nbuf, &msdu_info.tx_queue);
+
+	/*
+	 * if the packet is mcast packet send through mlo_macst handler
+	 * for all prnt_vdevs
+	 */
+
+	if (soc->arch_ops.dp_tx_mlo_mcast_send) {
+		nbuf = soc->arch_ops.dp_tx_mlo_mcast_send(soc, vdev,
+							  nbuf,
+							  tx_exc_metadata);
+		if (!nbuf)
+			goto fail;
+	}
 
 	if (qdf_likely(tx_exc_metadata->is_intrabss_fwd)) {
 		if (qdf_unlikely(vdev->nawds_enabled)) {

@@ -2517,6 +2517,19 @@ static bool dp_reo_remap_config_be(struct dp_soc *soc,
 }
 #endif
 
+#ifdef CONFIG_MLO_SINGLE_DEV
+static inline
+void dp_initialize_arch_ops_be_single_dev(struct dp_arch_ops *arch_ops)
+{
+	arch_ops->dp_tx_mlo_mcast_send = dp_tx_mlo_mcast_send_be;
+}
+#else
+static inline
+void dp_initialize_arch_ops_be_single_dev(struct dp_arch_ops *arch_ops)
+{
+}
+#endif
+
 #ifdef IPA_OFFLOAD
 static int8_t dp_ipa_get_bank_id_be(struct dp_soc *soc)
 {
@@ -2621,4 +2634,5 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->reo_remap_config = dp_reo_remap_config_be;
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_be;
 	dp_initialize_arch_ops_be_ipa(arch_ops);
+	dp_initialize_arch_ops_be_single_dev(arch_ops);
 }
