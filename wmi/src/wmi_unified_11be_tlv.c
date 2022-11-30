@@ -101,6 +101,8 @@ uint8_t *vdev_start_add_mlo_params(uint8_t *buf_ptr,
 				  req->mlo_flags.mlo_enabled);
 	WMI_MLO_FLAGS_SET_ASSOC_LINK(mlo_params->mlo_flags.mlo_flags,
 				     req->mlo_flags.mlo_assoc_link);
+	WMI_MLO_FLAGS_SET_LINK_ADD(mlo_params->mlo_flags.mlo_flags,
+				   req->mlo_flags.mlo_link_add);
 	mlo_params->mlo_flags.emlsr_support = req->mlo_flags.emlsr_support;
 
 	vdev_start_add_mlo_mcast_params(&mlo_params->mlo_flags.mlo_flags,
