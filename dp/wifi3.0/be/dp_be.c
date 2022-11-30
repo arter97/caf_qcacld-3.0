@@ -121,7 +121,8 @@ qdf_size_t dp_get_context_size_be(enum dp_context_type context_type)
 #if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
 /**
  * dp_cc_wbm_sw_en_cfg() - configure HW cookie conversion enablement
-			   per wbm2sw ring
+ *			   per wbm2sw ring
+ *
  * @cc_cfg: HAL HW cookie conversion configuration structure pointer
  *
  * Return: None
@@ -185,7 +186,8 @@ static QDF_STATUS dp_fisa_fst_cmem_addr_init(struct dp_soc *soc)
 
 /**
  * dp_cc_reg_cfg_init() - initialize and configure HW cookie
-			  conversion register
+ *			  conversion register
+ *
  * @soc: SOC handle
  * @is_4k_align: page address 4k aligned
  *
@@ -238,9 +240,9 @@ static inline void dp_hw_cc_cmem_write(hal_soc_handle_t hal_soc_hdl,
 
 /**
  * dp_hw_cc_cmem_addr_init() - Check and initialize CMEM base address for
-			       HW cookie conversion
+ *			       HW cookie conversion
+ *
  * @soc: SOC handle
- * @cc_ctx: cookie conversion context pointer
  *
  * Return: 0 in case of success, else error value
  */
@@ -506,15 +508,13 @@ static QDF_STATUS dp_soc_ppe_detach_be(struct dp_soc *soc)
 	return QDF_STATUS_SUCCESS;
 }
 
-static QDF_STATUS dp_peer_setup_ppe_be(struct dp_soc *soc,
-				       struct dp_peer_be *be_peer,
-				       struct dp_vdev_be *be_vdev)
+static QDF_STATUS dp_peer_ppeds_default_route_be(struct dp_soc *soc,
+						 struct dp_peer_be *be_peer,
+						 uint8_t vdev_id,
+						 uint16_t src_info)
 {
 	uint16_t service_code;
 	uint8_t priority_valid;
-	struct dp_ppe_vp_profile *ppe_vp_profile = &be_vdev->ppe_vp_profile;
-	uint16_t src_info = ppe_vp_profile->vp_num;
-	uint8_t vdev_id = be_vdev->vdev.vdev_id;
 	uint8_t use_ppe = PEER_ROUTING_USE_PPE;
 	uint8_t peer_routing_enabled = PEER_ROUTING_ENABLED;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
@@ -543,6 +543,78 @@ static QDF_STATUS dp_peer_setup_ppe_be(struct dp_soc *soc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+static QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
+					 struct dp_peer *peer,
+					 struct dp_vdev_be *be_vdev)
+{
+	struct dp_ppe_vp_profile *ppe_vp_profile = &be_vdev->ppe_vp_profile;
+	uint16_t src_info = ppe_vp_profile->vp_num;
+	uint8_t vdev_id = be_vdev->vdev.vdev_id;
+	struct dp_peer_be *be_peer = dp_get_be_peer_from_dp_peer(peer);
+	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
+
+	if (!be_peer) {
+		qdf_err("BE peer is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (IS_DP_LEGACY_PEER(peer)) {
+		qdf_status = dp_peer_ppeds_default_route_be(soc, be_peer,
+							    vdev_id, src_info);
+	} else if (IS_MLO_DP_MLD_PEER(peer)) {
+		int i;
+		struct dp_peer *link_peer = NULL;
+		struct dp_mld_link_peers link_peers_info;
+
+		/* get link peers with reference */
+		dp_get_link_peers_ref_from_mld_peer(soc, peer, &link_peers_info,
+						    DP_MOD_ID_DS);
+
+		for (i = 0; i < link_peers_info.num_links; i++) {
+			link_peer = link_peers_info.link_peers[i];
+			be_peer = dp_get_be_peer_from_dp_peer(link_peer);
+			if (!be_peer) {
+				qdf_err("BE peer is null for peer id %d ",
+							link_peer->peer_id);
+				continue;
+			}
+
+			be_vdev = dp_get_be_vdev_from_dp_vdev(link_peer->vdev);
+			if (!be_vdev) {
+				qdf_err("BE vap is null for peer id %d ",
+							link_peer->peer_id);
+				continue;
+			}
+
+			vdev_id = be_vdev->vdev.vdev_id;
+			qdf_status = dp_peer_ppeds_default_route_be(soc,
+								    be_peer,
+								    vdev_id,
+								    src_info);
+		}
+
+		dp_release_link_peers_ref(&link_peers_info, DP_MOD_ID_DS);
+	} else {
+		struct dp_peer *mld_peer = DP_GET_MLD_PEER_FROM_PEER(peer);
+
+		if (!mld_peer)
+			return qdf_status;
+
+		be_vdev = dp_get_be_vdev_from_dp_vdev(mld_peer->vdev);
+		if (!be_vdev) {
+			qdf_err("BE vap is null");
+			return QDF_STATUS_E_NULL_VALUE;
+		}
+
+		ppe_vp_profile = &be_vdev->ppe_vp_profile;
+		src_info = ppe_vp_profile->vp_num;
+		qdf_status = dp_peer_ppeds_default_route_be(soc, be_peer,
+							    vdev_id, src_info);
+	}
+
+	return qdf_status;
+}
 #else
 static QDF_STATUS dp_ppeds_init_soc_be(struct dp_soc *soc)
 {
@@ -565,9 +637,8 @@ static inline QDF_STATUS dp_soc_ppe_detach_be(struct dp_soc *soc)
 }
 
 static inline
-QDF_STATUS dp_peer_setup_ppe_be(struct dp_soc *soc,
-				struct dp_peer_be *be_peer,
-				struct dp_vdev_be *be_vdev)
+QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc, struct dp_peer *peer,
+				  struct dp_vdev_be *be_vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -878,14 +949,8 @@ static QDF_STATUS dp_vdev_detach_be(struct dp_soc *soc, struct dp_vdev *vdev)
 #ifdef WLAN_SUPPORT_PPEDS
 static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
 {
-	struct dp_peer_be *be_peer = dp_get_be_peer_from_dp_peer(peer);
 	struct dp_vdev_be *be_vdev;
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-
-	if (!be_peer) {
-		qdf_err("BE peer is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
 
 	be_vdev = dp_get_be_vdev_from_dp_vdev(peer->vdev);
 	if (!be_vdev) {
@@ -897,7 +962,7 @@ static QDF_STATUS dp_peer_setup_be(struct dp_soc *soc, struct dp_peer *peer)
 	 * Check if PPE routing is enabled on the associated vap.
 	 */
 	if (be_vdev->ppe_vp_enabled == PPE_VP_USER_TYPE_DS)
-		qdf_status = dp_peer_setup_ppe_be(soc, be_peer, be_vdev);
+		qdf_status = dp_peer_setup_ppeds_be(soc, peer, be_vdev);
 
 	return qdf_status;
 }
