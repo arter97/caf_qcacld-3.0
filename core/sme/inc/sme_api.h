@@ -3366,7 +3366,7 @@ int sme_update_he_capabilities(mac_handle_t mac_handle, uint8_t session_id,
  * sme_update_he_twt_req_support() - Sets twt request capability
  * @mac_handle: Opaque handle to the global MAC context
  * @session_id: SME session id
- * @value: set value
+ * @cfg_val: set value
  *
  * Return: 0 on success else err code
  */

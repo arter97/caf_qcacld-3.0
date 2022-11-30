@@ -2229,7 +2229,7 @@ static bool lim_is_eht_connection_op_info_present(struct pe_session *pe_session,
 /**
  * lim_update_peer_twt_caps() - Update peer twt caps to add sta params
  * @add_sta_params: pointer to add sta params
- * @@session_entry: pe session entry
+ * @session_entry: pe session entry
  *
  * Return: None
  */
