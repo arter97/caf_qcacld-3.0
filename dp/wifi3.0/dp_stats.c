@@ -7165,6 +7165,8 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 
 		DP_PRINT_STATS("Invalid release source: %u",
 			       soc->stats.tx.invalid_release_source);
+		DP_PRINT_STATS("Invalid TX desc from completion ring: %u",
+			       soc->stats.tx.invalid_tx_comp_desc);
 		DP_PRINT_STATS("Dropped in host:");
 		DP_PRINT_STATS("Total packets dropped: %u,",
 			       pdev->stats.tx_i.dropped.dropped_pkt.num);
@@ -7714,6 +7716,8 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 		       soc->stats.tx.tcl_ring_full[3]);
 	DP_PRINT_STATS("Tx invalid completion release = %u",
 		       soc->stats.tx.invalid_release_source);
+	DP_PRINT_STATS("TX invalid Desc from completion ring = %u",
+		       soc->stats.tx.invalid_tx_comp_desc);
 	DP_PRINT_STATS("Tx comp wbm internal error = %d : [%d %d %d %d]",
 		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_ALL],
 		       soc->stats.tx.wbm_internal_error[WBM_INT_ERROR_REO_NULL_BUFFER],
@@ -8860,6 +8864,8 @@ QDF_STATUS dp_txrx_get_soc_stats(struct cdp_soc_t *soc_hdl,
 	soc_stats->tx.dropped_fw_removed = soc->stats.tx.dropped_fw_removed;
 	soc_stats->tx.invalid_release_source =
 					soc->stats.tx.invalid_release_source;
+	soc_stats->tx.invalid_tx_comp_desc =
+					soc->stats.tx.invalid_tx_comp_desc;
 	for (inx = 0; inx < CDP_MAX_WIFI_INT_ERROR_REASONS; inx++)
 		soc_stats->tx.wifi_internal_error[inx] =
 					soc->stats.tx.wbm_internal_error[inx];

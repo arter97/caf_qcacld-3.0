@@ -49,6 +49,33 @@ struct __attribute__((__packed__)) dp_tx_comp_peer_id {
 #define DP_TX_FAST_DESC_SIZE	24
 #define DP_TX_L3_L4_CSUM_ENABLE	0x1f
 
+#ifdef DP_USE_REDUCED_PEER_ID_FIELD_WIDTH
+/**
+ * dp_tx_comp_get_peer_id_be() - Get peer ID from TX Comp Desc
+ * @soc: Handle to DP Soc structure
+ * @tx_comp_hal_desc: TX comp ring descriptor
+ *
+ * Return: Peer ID
+ */
+static inline uint16_t dp_tx_comp_get_peer_id_be(struct dp_soc *soc,
+						 void *tx_comp_hal_desc)
+{
+	uint16_t peer_id = hal_tx_comp_get_peer_id(tx_comp_hal_desc);
+	struct dp_tx_comp_peer_id *tx_peer_id =
+			(struct dp_tx_comp_peer_id *)&peer_id;
+
+	return (tx_peer_id->peer_id |
+		(tx_peer_id->ml_peer_valid << soc->peer_id_shift));
+}
+#else
+static inline uint16_t dp_tx_comp_get_peer_id_be(struct dp_soc *soc,
+						 void *tx_comp_hal_desc)
+{
+	return hal_tx_comp_get_peer_id(tx_comp_hal_desc);
+
+}
+#endif
+
 /**
  * dp_tx_hw_enqueue_be() - Enqueue to TCL HW for transmit for BE target
  * @soc: DP Soc Handle

@@ -571,6 +571,20 @@ static inline uint8_t hal_tx_comp_get_cookie_convert_done(void *hal_desc)
 #endif
 
 /**
+ * hal_tx_comp_set_desc_va_63_32() - Set bit 32~63 value for 64 bit VA
+ * @hal_desc: completion ring descriptor pointer
+ * @val: value to be set
+ *
+ * Return: None
+ */
+static inline void hal_tx_comp_set_desc_va_63_32(void *hal_desc, uint32_t val)
+{
+	HAL_SET_FLD(hal_desc,
+		    WBM2SW_COMPLETION_RING_TX,
+		    BUFFER_VIRT_ADDR_63_32) = val;
+}
+
+/**
  * hal_tx_comp_get_desc_va() - Get Desc virtual address within completion Desc
  * @hal_desc: completion ring descriptor pointer
  *
@@ -578,7 +592,7 @@ static inline uint8_t hal_tx_comp_get_cookie_convert_done(void *hal_desc)
  *
  * Return: TX desc virtual address
  */
-static inline uintptr_t hal_tx_comp_get_desc_va(void *hal_desc)
+static inline uint64_t hal_tx_comp_get_desc_va(void *hal_desc)
 {
 	uint64_t va_from_desc;
 
@@ -590,7 +604,7 @@ static inline uintptr_t hal_tx_comp_get_desc_va(void *hal_desc)
 					WBM2SW_COMPLETION_RING_TX,
 					BUFFER_VIRT_ADDR_63_32)) << 32);
 
-	return (uintptr_t)va_from_desc;
+	return va_from_desc;
 }
 
 /*---------------------------------------------------------------------------

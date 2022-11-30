@@ -1097,6 +1097,8 @@ struct dp_soc_stats {
 		uint32_t dropped_fw_removed;
 		/* tx completion release_src != TQM or FW */
 		uint32_t invalid_release_source;
+		/* TX descriptor from completion ring Desc is not valid */
+		uint32_t invalid_tx_comp_desc;
 		/* tx completion wbm_internal_error */
 		uint32_t wbm_internal_error[MAX_WBM_INT_ERROR_REASONS];
 		/* tx completion non_wbm_internal_error */
@@ -1885,9 +1887,9 @@ struct dp_arch_ops {
 				    struct cdp_tx_exception_metadata *metadata,
 				    struct dp_tx_msdu_info_s *msdu_info);
 
-	 void (*tx_comp_get_params_from_hal_desc)(struct dp_soc *soc,
-						  void *tx_comp_hal_desc,
-						  struct dp_tx_desc_s **desc);
+	void (*tx_comp_get_params_from_hal_desc)(struct dp_soc *soc,
+						 void *tx_comp_hal_desc,
+						 struct dp_tx_desc_s **desc);
 	void (*dp_tx_process_htt_completion)(struct dp_soc *soc,
 					     struct dp_tx_desc_s *tx_desc,
 					     uint8_t *status,

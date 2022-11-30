@@ -5825,8 +5825,10 @@ more_data:
 		soc->arch_ops.tx_comp_get_params_from_hal_desc(soc,
 							       tx_comp_hal_desc,
 							       &tx_desc);
-		if (!tx_desc) {
+		if (qdf_unlikely(!tx_desc)) {
 			dp_err("unable to retrieve tx_desc!");
+			hal_dump_comp_desc(tx_comp_hal_desc);
+			DP_STATS_INC(soc, tx.invalid_tx_comp_desc, 1);
 			QDF_BUG(0);
 			continue;
 		}

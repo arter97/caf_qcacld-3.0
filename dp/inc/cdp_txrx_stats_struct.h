@@ -2634,6 +2634,7 @@ struct cdp_per_cpu_packets {
  * @tx.desc_in_use: Descriptors in use at soc
  * @tx.dropped_fw_removed: HW_release_reason == FW removed
  * @tx.invalid_release_source: tx completion release_src != HW or FW
+ * @tx.invalid_tx_comp_desc: TX Desc from completion ring Desc is not valid
  * @tx.wifi_internal_error: tx completion wifi_internal_error
  * @tx.non_wifi_internal_err: tx completion non_wifi_internal_error
  * @tx.tx_comp_loop_pkt_limit_hit: TX Comp loop packet limit hit
@@ -2717,6 +2718,7 @@ struct cdp_soc_stats {
 		uint32_t desc_in_use;
 		uint32_t dropped_fw_removed;
 		uint32_t invalid_release_source;
+		uint32_t invalid_tx_comp_desc;
 		uint32_t wifi_internal_error[CDP_MAX_WIFI_INT_ERROR_REASONS];
 		uint32_t non_wifi_internal_err;
 		uint32_t tx_comp_loop_pkt_limit_hit;
