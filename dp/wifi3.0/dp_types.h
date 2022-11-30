@@ -262,6 +262,7 @@ enum dp_mod_id {
 	DP_MOD_ID_REINJECT,
 	DP_MOD_ID_SCS,
 	DP_MOD_ID_UMAC_RESET,
+	DP_MOD_ID_DS,
 	DP_MOD_ID_MAX,
 };
 
