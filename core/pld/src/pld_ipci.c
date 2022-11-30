@@ -520,6 +520,23 @@ void pld_ipci_unregister_driver(void)
 	icnss_unregister_driver(&pld_ipci_ops);
 }
 
+#ifdef CONFIG_SHADOW_V3
+static inline void
+pld_ipci_populate_shadow_v3_cfg(struct icnss_wlan_enable_cfg *cfg,
+				struct pld_wlan_enable_cfg *config)
+{
+	cfg->num_shadow_reg_v3_cfg = config->num_shadow_reg_v3_cfg;
+	cfg->shadow_reg_v3_cfg = (struct icnss_shadow_reg_v3_cfg *)
+				 config->shadow_reg_v3_cfg;
+}
+#else
+static inline void
+pld_ipci_populate_shadow_v3_cfg(struct icnss_wlan_enable_cfg *cfg,
+				struct pld_wlan_enable_cfg *config)
+{
+}
+#endif
+
 int pld_ipci_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 			 enum pld_driver_mode mode, const char *host_version)
 {
@@ -548,6 +565,8 @@ int pld_ipci_wlan_enable(struct device *dev, struct pld_wlan_enable_cfg *config,
 		cfg.rri_over_ddr_cfg.base_addr_high =
 			 config->rri_over_ddr_cfg.base_addr_high;
 	}
+
+	pld_ipci_populate_shadow_v3_cfg(&cfg, config);
 
 	switch (mode) {
 	case PLD_FTM:

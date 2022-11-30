@@ -622,6 +622,23 @@ void pld_pcie_fw_sim_unregister_driver(void)
 	cnss_fw_sim_wlan_unregister_driver(&pld_pcie_fw_sim_ops);
 }
 
+#ifdef CONFIG_SHADOW_V3
+static inline void
+pld_pcie_fw_sim_populate_shadow_v3_cfg(struct cnss_wlan_enable_cfg *cfg,
+				       struct pld_wlan_enable_cfg *config)
+{
+	cfg->num_shadow_reg_v3_cfg = config->num_shadow_reg_v3_cfg;
+	cfg->shadow_reg_v3_cfg = (struct cnss_shadow_reg_v3_cfg *)
+				 config->shadow_reg_v3_cfg;
+}
+#else
+static inline void
+pld_pcie_fw_sim_populate_shadow_v3_cfg(struct cnss_wlan_enable_cfg *cfg,
+				       struct pld_wlan_enable_cfg *config)
+{
+}
+#endif
+
 /**
  * pld_pcie_fw_sim_wlan_enable() - Enable WLAN
  * @dev: device
@@ -662,6 +679,8 @@ int pld_pcie_fw_sim_wlan_enable(struct device *dev,
 		cfg.rri_over_ddr_cfg.base_addr_high =
 			 config->rri_over_ddr_cfg.base_addr_high;
 	}
+
+	pld_pcie_fw_sim_populate_shadow_v3_cfg(&cfg, config);
 
 	switch (mode) {
 	case PLD_FTM:
