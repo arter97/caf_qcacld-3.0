@@ -2410,6 +2410,11 @@ qdf_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
 }
 #endif /* NBUF_MEMORY_DEBUG */
 
+#if defined(QCA_DP_NBUF_FAST_PPEDS)
+#define qdf_nbuf_alloc_ppe_ds(d, s, r, a, p) \
+	__qdf_nbuf_alloc_ppe_ds(d, s, __func__, __LINE__)
+#endif /* QCA_DP_NBUF_FAST_PPEDS */
+
 /**
  * qdf_nbuf_dev_queue_head() - Queue a buffer at the list head
  * @nbuf_queue_head: Pointer to buffer list head
