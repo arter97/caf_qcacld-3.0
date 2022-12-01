@@ -111,6 +111,8 @@
 #include "wlan_vdev_mgr_tgt_if_tx_defs.h"
 #include "wlan_mlo_mgr_roam.h"
 #include "target_if_vdev_mgr_tx_ops.h"
+#include "wlan_fwol_ucfg_api.h"
+
 /*
  * FW only supports 8 clients in SAP/GO mode for D3 WoW feature
  * and hence host needs to hold a wake lock after 9th client connects
@@ -2979,6 +2981,7 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	struct wlan_mlme_qos *qos_aggr;
 	struct vdev_mlme_obj *vdev_mlme;
 	tp_wma_handle wma_handle;
+	uint8_t enable_sifs_burst = 0;
 
 	if (!mac)
 		return QDF_STATUS_E_FAILURE;
@@ -3066,6 +3069,34 @@ QDF_STATUS wma_post_vdev_create_setup(struct wlan_objmgr_vdev *vdev)
 	if (vdev_mlme->mgmt.generic.type == WMI_VDEV_TYPE_STA &&
 	    vdev_mlme->mgmt.generic.subtype == 0)
 		wma_set_vdev_latency_level_param(wma_handle, mac, vdev_id);
+
+	switch (vdev_mlme->mgmt.generic.type) {
+	case WMI_VDEV_TYPE_AP:
+		if (vdev_mlme->mgmt.generic.subtype !=
+		    WLAN_VDEV_MLME_SUBTYPE_P2P_DEVICE)
+			break;
+
+		fallthrough;
+	case WMI_VDEV_TYPE_STA:
+	case WMI_VDEV_TYPE_NAN:
+	case WMI_VDEV_TYPE_OCB:
+	case WMI_VDEV_TYPE_MONITOR:
+		status = ucfg_get_enable_sifs_burst(wma_handle->psoc,
+						    &enable_sifs_burst);
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("Failed to get sifs burst value, use default");
+
+		status = wma_vdev_set_param(wma_handle->wmi_handle, vdev_id,
+					    WMI_PDEV_PARAM_BURST_ENABLE,
+					    enable_sifs_burst);
+
+		if (QDF_IS_STATUS_ERROR(status))
+			wma_err("WMI_PDEV_PARAM_BURST_ENABLE set failed %d",
+				status);
+		break;
+	default:
+		break;
+	}
 
 	wma_vdev_set_data_tx_callback(vdev);
 

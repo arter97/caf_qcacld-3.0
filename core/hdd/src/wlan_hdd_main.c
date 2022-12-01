@@ -6706,9 +6706,7 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
 	QDF_STATUS status;
-	int ret_val;
 	mac_handle_t mac_handle;
-	uint8_t enable_sifs_burst = 0;
 	uint32_t roam_triggers;
 	struct wlan_objmgr_vdev *vdev;
 
@@ -6737,21 +6735,7 @@ QDF_STATUS hdd_init_station_mode(struct hdd_adapter *adapter)
 			status, status);
 		goto error_wmm_init;
 	}
-
 	set_bit(WMM_INIT_DONE, &adapter->event_flags);
-
-	status = ucfg_get_enable_sifs_burst(hdd_ctx->psoc, &enable_sifs_burst);
-	if (!QDF_IS_STATUS_SUCCESS(status))
-		hdd_err("Failed to get sifs burst value, use default");
-	ret_val = sme_cli_set_command(adapter->deflink->vdev_id,
-				      wmi_pdev_param_burst_enable,
-				      enable_sifs_burst,
-				      PDEV_CMD);
-	if (ret_val) {
-		hdd_err("wmi_pdev_param_burst_enable set failed: %d", ret_val);
-		status = QDF_STATUS_E_FAILURE;
-		goto error_wmm_init;
-	}
 
 	hdd_set_netdev_flags(adapter);
 
