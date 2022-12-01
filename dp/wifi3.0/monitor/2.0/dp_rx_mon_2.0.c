@@ -1184,6 +1184,10 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 		}
 
 		nbuf = qdf_nbuf_queue_last(&ppdu_info->mpdu_q[user_id]);
+		if (qdf_unlikely(!nbuf)) {
+			dp_mon_debug("nbuf is NULL");
+			return num_buf_reaped;
+		}
 
 		if (mpdu_info->decap_type == DP_MON_DECAP_FORMAT_INVALID) {
 			/* decap type is invalid, drop the frame */
@@ -1284,6 +1288,10 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 			break;
 		}
 		nbuf = qdf_nbuf_queue_last(&ppdu_info->mpdu_q[user_id]);
+		if (qdf_unlikely(!nbuf)) {
+			dp_mon_debug("nbuf is NULL");
+			break;
+		}
 		num_frags = qdf_nbuf_get_nr_frags(nbuf);
 		if (ppdu_info->mpdu_info[user_id].decap_type ==
 				HAL_HW_RX_DECAP_FORMAT_RAW) {
@@ -1322,6 +1330,10 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 			break;
 		}
 		nbuf = qdf_nbuf_queue_last(&ppdu_info->mpdu_q[user_id]);
+		if (qdf_unlikely(!nbuf)) {
+			dp_mon_debug("nbuf is NULL");
+			break;
+		}
 		mpdu_meta = (struct hal_rx_mon_mpdu_info *)qdf_nbuf_data(nbuf);
 		mpdu_info = &ppdu_info->mpdu_info[user_id];
 		mpdu_meta->decap_type = mpdu_info->decap_type;
@@ -1340,6 +1352,10 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 			break;
 		}
 		nbuf = qdf_nbuf_queue_last(&ppdu_info->mpdu_q[user_id]);
+		if (qdf_unlikely(!nbuf)) {
+			dp_mon_debug("nbuf is NULL");
+			break;
+		}
 		mpdu_meta = (struct hal_rx_mon_mpdu_info *)qdf_nbuf_data(nbuf);
 		mpdu_meta->mpdu_length_err = mpdu_info->mpdu_length_err;
 		mpdu_meta->fcs_err = mpdu_info->fcs_err;
