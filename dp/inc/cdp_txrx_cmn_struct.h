@@ -2775,12 +2775,18 @@ struct cdp_rx_flow_tuple_info {
  * @op_code: add/delete/enable/disable operation requested
  * @flow_tupe_info: structure containing tuple info
  * @fse_metadata: metadata to be set in RX flow
+ * @use_ppe_ds: use DS mode
+ * @priority_vld: is priority valid
+ * @service_code: service code for DS
  */
 struct cdp_rx_flow_info {
 	bool is_addr_ipv4;
 	enum cdp_flow_fst_operation op_code;
 	struct cdp_rx_flow_tuple_info flow_tuple_info;
 	uint16_t fse_metadata;
+	uint8_t use_ppe_ds;
+	uint8_t priority_vld;
+	uint16_t service_code;
 };
 
 #ifdef QCA_SUPPORT_SCAN_SPCL_VAP_STATS

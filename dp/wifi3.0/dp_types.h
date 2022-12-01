@@ -2581,6 +2581,13 @@ struct dp_soc {
 	/* A flag using to decide the switch of rx link speed  */
 	bool high_throughput;
 #endif
+
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+	/* number of IPv4 flows inserted */
+	qdf_atomic_t ipv4_fse_cnt;
+	/* number of IPv6 flows inserted */
+	qdf_atomic_t ipv6_fse_cnt;
+#endif
 };
 
 #ifdef IPA_OFFLOAD

@@ -7583,6 +7583,20 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 	dp_monitor_print_pdev_tx_capture_stats(pdev);
 }
 
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+static inline void dp_rx_basic_fst_stats(struct dp_pdev *pdev)
+{
+	DP_PRINT_STATS("\tNo of IPv4 Flow entries inserted = %d",
+		       qdf_atomic_read(&pdev->soc->ipv4_fse_cnt));
+	DP_PRINT_STATS("\tNo of IPv6 Flow entries inserted = %d",
+		       qdf_atomic_read(&pdev->soc->ipv6_fse_cnt));
+}
+#else
+static inline void dp_rx_basic_fst_stats(struct dp_pdev *pdev)
+{
+}
+#endif
+
 void
 dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 {
@@ -7667,6 +7681,8 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 		       pdev->stats.rx_buffer_pool.num_bufs_alloc_success);
 	DP_PRINT_STATS("\tAllocations from the pool during replenish = %llu",
 		       pdev->stats.rx_buffer_pool.num_pool_bufs_replenish);
+
+	dp_rx_basic_fst_stats(pdev);
 }
 
 #ifdef WLAN_SUPPORT_PPEDS
