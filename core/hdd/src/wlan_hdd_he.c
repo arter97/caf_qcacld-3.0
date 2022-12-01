@@ -187,8 +187,7 @@ __wlan_hdd_cfg80211_get_he_cap(struct wiphy *wiphy,
 
 	hdd_info("11AX: he_supported: %d", he_supported);
 
-	reply_skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
-
+	reply_skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
 	if (!reply_skb) {
 		hdd_err("Allocate reply_skb failed");
 		return -EINVAL;
@@ -219,13 +218,13 @@ __wlan_hdd_cfg80211_get_he_cap(struct wiphy *wiphy,
 		    he_cap.ppet.ppet16_ppet8_ru3_ru0))
 		goto nla_put_failure;
 end:
-	ret = cfg80211_vendor_cmd_reply(reply_skb);
+	ret = wlan_cfg80211_vendor_cmd_reply(reply_skb);
 	hdd_exit();
 	return ret;
 
 nla_put_failure:
 	hdd_err("nla put fail");
-	kfree_skb(reply_skb);
+	wlan_cfg80211_vendor_free_skb(reply_skb);
 	return -EINVAL;
 }
 
@@ -433,7 +432,7 @@ static void hdd_sr_osif_events(struct wlan_objmgr_vdev *vdev,
 							       len, idx,
 							       GFP_KERNEL);
 			if (!skb) {
-				hdd_err("cfg80211_vendor_event_alloc failed");
+				hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 				return;
 			}
 			status = hdd_sr_pack_suspend_resume_event(
@@ -441,7 +440,7 @@ static void hdd_sr_osif_events(struct wlan_objmgr_vdev *vdev,
 					srg_max_pd_offset, srg_min_pd_offset,
 					non_srg_max_pd_offset);
 			if (QDF_IS_STATUS_ERROR(status)) {
-				kfree_skb(skb);
+				wlan_cfg80211_vendor_free_skb(skb);
 				return;
 			}
 
@@ -830,7 +829,7 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
 							       nl_buf_len);
 		if (!skb) {
-			hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+			hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 			return -ENOMEM;
 		}
 		if (hdd_add_stats_info(skb, &stats)) {
@@ -886,7 +885,7 @@ static int __wlan_hdd_cfg80211_sr_operations(struct wiphy *wiphy,
 		skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(hdd_ctx->wiphy,
 							       nl_buf_len);
 		if (!skb) {
-			hdd_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+			hdd_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 			return -ENOMEM;
 		}
 		if (hdd_add_param_info(skb, srg_max_pd_offset,

@@ -1086,13 +1086,14 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	vendor_event = cfg80211_vendor_event_alloc(hdd_context->wiphy,
-			wdev,
-			data_size + NLMSG_HDRLEN,
-			index,
-			GFP_KERNEL);
+	vendor_event = wlan_cfg80211_vendor_event_alloc(hdd_context->wiphy,
+							wdev,
+							data_size +
+							NLMSG_HDRLEN,
+							index, GFP_KERNEL);
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed for %d", index);
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed for %d",
+			index);
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -1100,11 +1101,11 @@ static QDF_STATUS hdd_send_radar_event(struct hdd_context *hdd_context,
 
 	if (ret) {
 		hdd_err("NL80211_ATTR_WIPHY_FREQ put fail");
-		kfree_skb(vendor_event);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 	return QDF_STATUS_SUCCESS;
 }
 

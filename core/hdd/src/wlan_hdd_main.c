@@ -14171,6 +14171,8 @@ static void wlan_hdd_p2p_lo_event_callback(void *context,
 	struct hdd_context *hdd_ctx = context;
 	struct sk_buff *vendor_event;
 	struct hdd_adapter *adapter;
+	enum qca_nl80211_vendor_subcmds_index index =
+		QCA_NL80211_VENDOR_SUBCMD_P2P_LO_EVENT_INDEX;
 
 	hdd_enter();
 
@@ -14187,13 +14189,13 @@ static void wlan_hdd_p2p_lo_event_callback(void *context,
 	}
 
 	vendor_event =
-		cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
-			&(adapter->wdev), sizeof(uint32_t) + NLMSG_HDRLEN,
-			QCA_NL80211_VENDOR_SUBCMD_P2P_LO_EVENT_INDEX,
-			GFP_KERNEL);
-
+		wlan_cfg80211_vendor_event_alloc(hdd_ctx->wiphy,
+						 &adapter->wdev,
+						 sizeof(uint32_t) +
+						 NLMSG_HDRLEN,
+						 index, GFP_KERNEL);
 	if (!vendor_event) {
-		hdd_err("cfg80211_vendor_event_alloc failed");
+		hdd_err("wlan_cfg80211_vendor_event_alloc failed");
 		return;
 	}
 
@@ -14201,11 +14203,11 @@ static void wlan_hdd_p2p_lo_event_callback(void *context,
 			QCA_WLAN_VENDOR_ATTR_P2P_LISTEN_OFFLOAD_STOP_REASON,
 			evt->reason_code)) {
 		hdd_err("nla put failed");
-		kfree_skb(vendor_event);
+		wlan_cfg80211_vendor_free_skb(vendor_event);
 		return;
 	}
 
-	cfg80211_vendor_event(vendor_event, GFP_KERNEL);
+	wlan_cfg80211_vendor_event(vendor_event, GFP_KERNEL);
 	hdd_debug("Sent P2P_LISTEN_OFFLOAD_STOP event for vdev_id = %d",
 			evt->vdev_id);
 }

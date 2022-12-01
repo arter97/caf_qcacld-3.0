@@ -194,7 +194,7 @@ static int wlan_cfg80211_mc_cp_stats_send_wake_lock_stats(struct wiphy *wiphy,
 	skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wiphy, nl_buf_len);
 
 	if (!skb) {
-		osif_err("cfg80211_vendor_cmd_alloc_reply_skb failed");
+		osif_err("wlan_cfg80211_vendor_cmd_alloc_reply_skb failed");
 		return -ENOMEM;
 	}
 
