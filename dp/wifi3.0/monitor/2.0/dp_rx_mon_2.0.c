@@ -489,11 +489,19 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 		return;
 
 	for (user = 0; user < ppdu_info->com_info.num_users; user++) {
-		uint16_t mpdu_count  = ppdu_info->mpdu_count[user];
+		uint16_t mpdu_count;
 		uint16_t mpdu_idx;
 		struct hal_rx_mon_mpdu_info *mpdu_meta;
 		QDF_STATUS status;
 
+		if (user >= HAL_MAX_UL_MU_USERS) {
+			dp_mon_err("num user exceeds max limit");
+			return;
+		}
+
+		mpdu_count  = ppdu_info->mpdu_count[user];
+		ppdu_info->rx_status.rx_user_status =
+					&ppdu_info->rx_user_status[user];
 		for (mpdu_idx = 0; mpdu_idx < mpdu_count; mpdu_idx++) {
 			mpdu = qdf_nbuf_queue_remove(&ppdu_info->mpdu_q[user]);
 
@@ -1454,6 +1462,8 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 		dp_rx_mon_flush_status_buf_queue(pdev);
 		return NULL;
 	}
+
+	qdf_mem_zero(ppdu_info, sizeof(struct hal_rx_ppdu_info));
 	mon_pdev->rx_mon_stats.total_ppdu_info_alloc++;
 
 	for (user = 0; user < HAL_MAX_UL_MU_USERS; user++)
