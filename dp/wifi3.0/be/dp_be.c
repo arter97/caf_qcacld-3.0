@@ -525,9 +525,13 @@ static QDF_STATUS dp_peer_ppeds_default_route_be(struct dp_soc *soc,
 {
 	uint16_t service_code;
 	uint8_t priority_valid;
-	uint8_t use_ppe = PEER_ROUTING_USE_PPE;
+	uint8_t use_ppe_ds = PEER_ROUTING_USE_PPE;
 	uint8_t peer_routing_enabled = PEER_ROUTING_ENABLED;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
+	struct dp_vdev_be *be_vdev;
+
+	be_vdev = dp_get_be_vdev_from_dp_vdev(be_peer->peer.vdev);
 
 	/*
 	 * Program service code bypass to avoid L2 new mac address
@@ -536,13 +540,23 @@ static QDF_STATUS dp_peer_ppeds_default_route_be(struct dp_soc *soc,
 	service_code = PPE_DRV_SC_SPF_BYPASS;
 	priority_valid = be_peer->priority_valid;
 
+	/*
+	 * if FST is enabled and MLO is disabled then
+	 * let flow rule take the decision of routing
+	 * the pkt to DS or host
+	 */
+	if (wlan_cfg_is_rx_flow_tag_enabled(cfg) &&
+	    qdf_is_macaddr_zero((struct qdf_mac_addr *)
+				 be_vdev->vdev.mld_mac_addr.raw))
+		use_ppe_ds = 0;
+
 	if (soc->cdp_soc.ol_ops->peer_set_ppeds_default_routing) {
 		status =
 		soc->cdp_soc.ol_ops->peer_set_ppeds_default_routing
 				(soc->ctrl_psoc,
 				be_peer->peer.mac_addr.raw,
 				service_code, priority_valid,
-				src_info, vdev_id, use_ppe,
+				src_info, vdev_id, use_ppe_ds,
 				peer_routing_enabled);
 		if (status != QDF_STATUS_SUCCESS) {
 			qdf_err("vdev_id: %d, PPE peer routing mac:"
