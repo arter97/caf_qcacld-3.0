@@ -1564,38 +1564,6 @@ reg_get_first_valid_freq(struct wlan_objmgr_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef CONFIG_AFC_SUPPORT
-QDF_STATUS
-reg_get_power_from_afc_list(struct wlan_objmgr_pdev *pdev,
-			    qdf_freq_t freq, uint16_t *reg_eirp,
-			    uint16_t *reg_psd)
-{
-	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
-	struct regulatory_channel *afc_chan_list;
-	enum channel_enum chan_enum;
-
-	*reg_eirp = 0;
-	*reg_psd = 0;
-
-	pdev_priv_obj = reg_get_pdev_obj(pdev);
-	if (!pdev_priv_obj) {
-	    reg_err("pdev priv obj is NULL");
-	    return QDF_STATUS_E_INVAL;
-	}
-
-	afc_chan_list = pdev_priv_obj->afc_chan_list;
-
-	for (chan_enum = 0; chan_enum < NUM_6GHZ_CHANNELS; chan_enum++) {
-	    if (afc_chan_list[chan_enum].center_freq == freq) {
-		*reg_eirp = afc_chan_list[chan_enum].tx_power;
-		*reg_psd = afc_chan_list[chan_enum].psd_eirp;
-		return QDF_STATUS_SUCCESS;
-	    }
-	}
-	return QDF_STATUS_SUCCESS;
-}
-#endif
-
 bool reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev)
 {
 	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
