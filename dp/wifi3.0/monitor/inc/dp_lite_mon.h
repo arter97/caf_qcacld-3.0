@@ -83,12 +83,14 @@ struct dp_lite_mon_config {
  * @tx_config: tx filters
  * @lite_mon_tx_lock: lite mon tx config lock
  * @subtype_filtering: Flag to indicate if subtype filtering is needed
+ * @sw_peer_filtering: Flag to indicate if sw peer filtering is needed
  */
 struct dp_lite_mon_tx_config {
 	struct dp_lite_mon_config tx_config;
 	/* add tx lite mon specific fields below */
 	qdf_spinlock_t lite_mon_tx_lock;
 	bool subtype_filtering;
+	bool sw_peer_filtering;
 };
 
 /**
