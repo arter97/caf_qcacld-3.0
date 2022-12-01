@@ -567,3 +567,114 @@ uint8_t *wlan_mlo_add_t2lm_action_frame(
 
 	return frm;
 }
+
+/**
+ * wlan_mlo_t2lm_handle_mapping_switch_time_expiry() - API to handle the mapping
+ * switch timer expiry.
+ * @t2lm_ctx: Pointer to T2LM context
+ * @vdev: Pointer to vdev structure
+ *
+ * Return: None
+ */
+static void wlan_mlo_t2lm_handle_mapping_switch_time_expiry(
+		struct wlan_t2lm_context *t2lm_ctx,
+		struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	int i = 0;
+
+	for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {
+		if (!t2lm_ctx->t2lm_ie[i].t2lm.mapping_switch_time_present)
+			continue;
+
+		/* Mapping switch time will always present at index 1. Hence,
+		 * skip the index 0.
+		 */
+		if (i != 1)
+			continue;
+
+		qdf_mem_copy(&t2lm_ctx->t2lm_ie[0], &t2lm_ctx->t2lm_ie[1],
+			     sizeof(struct wlan_mlo_t2lm_ie));
+		t2lm_ctx->t2lm_ie[0].t2lm.mapping_switch_time_present = false;
+		t2lm_ctx->t2lm_ie[0].t2lm.mapping_switch_time = 0;
+		t2lm_debug("vdev_id:%d mark the advertised T2LM as established",
+			   vdev_id);
+	}
+}
+
+/**
+ * wlan_mlo_t2lm_handle_expected_duration_expiry() - API to handle the expected
+ * duration timer expiry.
+ * @t2lm_ctx: Pointer to T2LM context
+ * @vdev: Pointer to vdev structure
+ *
+ * Return: none
+ */
+static void wlan_mlo_t2lm_handle_expected_duration_expiry(
+		struct wlan_t2lm_context *t2lm_ctx,
+		struct wlan_objmgr_vdev *vdev)
+{
+	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+	int i = 0;
+
+	for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {
+		if (!t2lm_ctx->t2lm_ie[i].t2lm.expected_duration_present)
+			continue;
+
+		qdf_mem_zero(&t2lm_ctx->t2lm_ie[i],
+			     sizeof(struct wlan_mlo_t2lm_ie));
+		t2lm_ctx->t2lm_ie[i].t2lm.direction = WLAN_T2LM_BIDI_DIRECTION;
+		t2lm_ctx->t2lm_ie[i].t2lm.default_link_mapping = 1;
+		t2lm_debug("vdev_id:%d Expected duration is expired",
+			   vdev_id);
+	}
+}
+
+QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
+		struct wlan_objmgr_psoc *psoc,
+		struct mlo_vdev_host_tid_to_link_map_resp *event)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_t2lm_context *t2lm_ctx;
+	int i = 0;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, event->vdev_id,
+						    WLAN_MLO_MGR_ID);
+	if (!vdev) {
+		t2lm_err("null vdev");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!vdev->mlo_dev_ctx) {
+		t2lm_err("null mlo_dev_ctx");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+
+	switch (event->status) {
+	case WLAN_MAP_SWITCH_TIMER_TSF:
+		for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {
+			if (!t2lm_ctx->t2lm_ie[i].t2lm.mapping_switch_time_present)
+				continue;
+
+			t2lm_ctx->t2lm_ie[i].t2lm.mapping_switch_time =
+				event->mapping_switch_tsf;
+			t2lm_debug("vdev_id:%d updated mapping switch time:%d",
+				   event->vdev_id, event->mapping_switch_tsf);
+		}
+		break;
+	case WLAN_MAP_SWITCH_TIMER_EXPIRED:
+		wlan_mlo_t2lm_handle_mapping_switch_time_expiry(t2lm_ctx, vdev);
+		break;
+	case WLAN_EXPECTED_DUR_EXPIRED:
+		wlan_mlo_t2lm_handle_expected_duration_expiry(t2lm_ctx, vdev);
+		break;
+	default:
+		t2lm_err("Invalid status");
+	}
+
+	mlo_release_vdev_ref(vdev);
+
+	return QDF_STATUS_SUCCESS;
+}

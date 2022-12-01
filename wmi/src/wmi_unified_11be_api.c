@@ -82,9 +82,8 @@ QDF_STATUS wmi_send_mlo_vdev_tid_to_link_map_cmd(
 
 QDF_STATUS
 wmi_extract_mlo_vdev_tid_to_link_map_event(
-				     wmi_unified_t wmi,
-				     void *evt_buf,
-				     struct wmi_host_tid_to_link_map_resp *resp)
+		wmi_unified_t wmi, void *evt_buf,
+		struct mlo_vdev_host_tid_to_link_map_resp *resp)
 {
 	if (wmi->ops->extract_mlo_vdev_tid_to_link_map_event) {
 		return wmi->ops->extract_mlo_vdev_tid_to_link_map_event(wmi,

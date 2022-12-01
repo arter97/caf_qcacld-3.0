@@ -953,9 +953,9 @@ static QDF_STATUS send_mlo_vdev_tid_to_link_map_cmd_tlv(
 
 static QDF_STATUS
 extract_mlo_vdev_tid_to_link_map_event_tlv(
-				struct wmi_unified *wmi_handle,
-				uint8_t *buf,
-				struct wmi_host_tid_to_link_map_resp *params)
+		struct wmi_unified *wmi_handle,
+		uint8_t *buf,
+		struct mlo_vdev_host_tid_to_link_map_resp *params)
 {
 	WMI_MLO_AP_VDEV_TID_TO_LINK_MAP_EVENTID_param_tlvs *param_buf;
 	wmi_mlo_ap_vdev_tid_to_link_map_evt_fixed_param *ev;

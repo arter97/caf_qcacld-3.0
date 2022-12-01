@@ -1091,21 +1091,6 @@ typedef struct {
 
 #ifdef WLAN_FEATURE_11BE
 /**
- * enum wlan_t2lm_status - Target status codes in event of t2lm
- * @WLAN_MAP_SWITCH_TIMER_TSF: Mapping switch time value in TSF to be included
- * in probe response frames
- * @WLAN_MAP_SWITCH_TIMER_EXPIRED: Indication that the new proposed T2LM has
- * been applied, Update the required data structures and other modules.
- * @WLAN_EXPECTED_DUR_EXPIRED: Indication that the proposed T2LM ineffective
- * after this duration and all TIDs fall back to default mode.
- */
-enum wlan_t2lm_status {
-	WLAN_MAP_SWITCH_TIMER_TSF,
-	WLAN_MAP_SWITCH_TIMER_EXPIRED,
-	WLAN_EXPECTED_DUR_EXPIRED,
-};
-
-/**
  * struct wlan_host_t2lm_of_tids - TID-to-link mapping info
  * @direction:  0 - Downlink, 1 - uplink 2 - Both uplink and downlink
  * @default_link_mapping: value 1 indicates the default T2LM, where all the TIDs
@@ -1149,18 +1134,6 @@ struct wmi_host_tid_to_link_map_ap_params {
 	uint16_t hw_link_id;
 	uint16_t disabled_link_bitmap;
 	struct wlan_t2lm_info info[WLAN_MAX_T2LM_IE];
-};
-
-/**
- * struct wmi_host_tid_to_link_map_resp - TID-to-link mapping response
- * @vdev_id: Vdev id
- * @wlan_t2lm_status: Target status for t2lm ie info
- * @mapping_switch_tsf: Mapping switch time in tsf for probe response frames
- */
-struct wmi_host_tid_to_link_map_resp {
-	uint8_t vdev_id;
-	enum wlan_t2lm_status status;
-	uint8_t mapping_switch_tsf;
 };
 
 /**
@@ -5202,6 +5175,9 @@ typedef enum {
 #ifdef HEALTH_MON_SUPPORT
 	wmi_extract_health_mon_init_done_info_eventid,
 #endif /* HEALTH_MON_SUPPORT */
+#ifdef WLAN_FEATURE_11BE_MLO
+	wmi_mlo_ap_vdev_tid_to_link_map_eventid,
+#endif
 	wmi_events_max,
 } wmi_conv_event_id;
 

@@ -3100,9 +3100,9 @@ QDF_STATUS (*send_mlo_vdev_tid_to_link_map)(
 			struct wmi_host_tid_to_link_map_ap_params *params);
 
 QDF_STATUS (*extract_mlo_vdev_tid_to_link_map_event)(
-				struct wmi_unified *wmi_handle,
-				uint8_t *buf,
-				struct wmi_host_tid_to_link_map_resp *params);
+		struct wmi_unified *wmi_handle,
+		uint8_t *buf,
+		struct mlo_vdev_host_tid_to_link_map_resp *params);
 
 QDF_STATUS (*extract_mlo_vdev_bcast_tid_to_link_map_event)(
 			struct wmi_unified *wmi_handle,

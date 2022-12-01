@@ -969,4 +969,31 @@ enum mlo_chip_recovery_type {
 	/* Add new types above */
 	MLO_RECOVERY_MODE_MAX = 0xf
 };
+
+/**
+ * enum wlan_t2lm_status - Target status codes in event of t2lm
+ * @WLAN_MAP_SWITCH_TIMER_TSF: Mapping switch time value in TSF to be included
+ * in probe response frames
+ * @WLAN_MAP_SWITCH_TIMER_EXPIRED: Indication that the new proposed T2LM has
+ * been applied, Update the required data structures and other modules.
+ * @WLAN_EXPECTED_DUR_EXPIRED: Indication that the proposed T2LM ineffective
+ * after this duration and all TIDs fall back to default mode.
+ */
+enum wlan_t2lm_status {
+	WLAN_MAP_SWITCH_TIMER_TSF,
+	WLAN_MAP_SWITCH_TIMER_EXPIRED,
+	WLAN_EXPECTED_DUR_EXPIRED,
+};
+
+/**
+ * struct mlo_vdev_host_tid_to_link_map_resp - TID-to-link mapping response
+ * @vdev_id: Vdev id
+ * @wlan_t2lm_status: Target status for t2lm ie info
+ * @mapping_switch_tsf: Mapping switch time in tsf for probe response frames
+ */
+struct mlo_vdev_host_tid_to_link_map_resp {
+	uint8_t vdev_id;
+	enum wlan_t2lm_status status;
+	uint8_t mapping_switch_tsf;
+};
 #endif

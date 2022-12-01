@@ -90,7 +90,7 @@ QDF_STATUS wmi_send_mlo_vdev_tid_to_link_map_cmd(
  * wmi_extract_mlo_vdev_tid_to_link_map_event() - extract mlo t2lm info for vdev
  * @wmi: wmi handle
  * @evt_buf: pointer to event buffer
- * @evt: Pointer to host structure to get the t2lm info
+ * @resp: Pointer to host structure to get the t2lm info
  *
  * This function gets called to extract mlo t2lm info for particular pdev
  *
@@ -98,9 +98,8 @@ QDF_STATUS wmi_send_mlo_vdev_tid_to_link_map_cmd(
  */
 QDF_STATUS
 wmi_extract_mlo_vdev_tid_to_link_map_event(
-				wmi_unified_t wmi,
-				void *evt_buf,
-				struct wmi_host_tid_to_link_map_resp *params);
+		wmi_unified_t wmi, void *evt_buf,
+		struct mlo_vdev_host_tid_to_link_map_resp *resp);
 
 /**
  * wmi_extract_mlo_vdev_bcast_tid_to_link_map_event() - extract bcast mlo t2lm

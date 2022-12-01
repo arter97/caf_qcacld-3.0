@@ -1401,11 +1401,15 @@ struct wlan_lmac_if_mlo_tx_ops {
 /**
  * struct wlan_lmac_if_mlo_rx_ops - defines southbound rx callbacks for mlo
  * @process_link_set_active_resp: function pointer to rx FW events
+ * @process_mlo_vdev_tid_to_link_map_event:  function pointer to rx T2LM event
  */
 struct wlan_lmac_if_mlo_rx_ops {
 	QDF_STATUS
 	(*process_link_set_active_resp)(struct wlan_objmgr_psoc *psoc,
 		struct mlo_link_set_active_resp *event);
+	QDF_STATUS (*process_mlo_vdev_tid_to_link_map_event)(
+			struct wlan_objmgr_psoc *psoc,
+			struct mlo_vdev_host_tid_to_link_map_resp *event);
 };
 #endif
 

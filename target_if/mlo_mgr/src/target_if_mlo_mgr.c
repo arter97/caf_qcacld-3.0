@@ -177,6 +177,67 @@ target_if_mlo_link_set_active(struct wlan_objmgr_psoc *psoc,
 	return ret;
 }
 
+static int target_if_mlo_vdev_tid_to_link_map_event_handler(
+		ol_scn_t scn, uint8_t *event_buff, uint32_t len)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct mlo_vdev_host_tid_to_link_map_resp event = {0};
+	struct wmi_unified *wmi_handle;
+	struct wlan_lmac_if_mlo_rx_ops *rx_ops;
+	QDF_STATUS status;
+
+	if (!event_buff) {
+		mlme_err("Received NULL event ptr from FW");
+		return -EINVAL;
+	}
+
+	psoc = target_if_get_psoc_from_scn_hdl(scn);
+	if (!psoc) {
+		mlme_err("PSOC is NULL");
+		return -EINVAL;
+	}
+
+	rx_ops = target_if_mlo_get_rx_ops(psoc);
+	if (!rx_ops || !rx_ops->process_mlo_vdev_tid_to_link_map_event) {
+		target_if_err("callback not registered");
+		return -EINVAL;
+	}
+
+	wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+	if (!wmi_handle) {
+		mlme_err("wmi_handle is null");
+		return -EINVAL;
+	}
+
+	if (wmi_extract_mlo_vdev_tid_to_link_map_event(wmi_handle, event_buff,
+						       &event)) {
+		mlme_err("Failed to extract TID-to-link mapping event");
+		return -EINVAL;
+	}
+
+	status = rx_ops->process_mlo_vdev_tid_to_link_map_event(psoc, &event);
+
+	return qdf_status_to_os_return(status);
+}
+
+static inline void
+target_if_mlo_register_vdev_tid_to_link_map_event(
+		struct wmi_unified *wmi_handle)
+{
+	wmi_unified_register_event_handler(
+			wmi_handle, wmi_mlo_ap_vdev_tid_to_link_map_eventid,
+			target_if_mlo_vdev_tid_to_link_map_event_handler,
+			WMI_RX_EXECUTION_CTX);
+}
+
+static inline void
+target_if_mlo_unregister_vdev_tid_to_link_map_event(
+		struct wmi_unified *wmi_handle)
+{
+	wmi_unified_unregister_event_handler(
+			wmi_handle, wmi_mlo_ap_vdev_tid_to_link_map_eventid);
+}
+
 /**
  * target_if_mlo_register_tx_ops() - lmac handler to register mlo tx ops
  *  callback functions

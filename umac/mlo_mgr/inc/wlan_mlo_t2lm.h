@@ -66,6 +66,18 @@ uint8_t *wlan_mlo_add_t2lm_ie(uint8_t *frm,
 			      struct wlan_t2lm_onging_negotiation_info *t2lm);
 
 /**
+ * wlan_mlo_vdev_tid_to_link_map_event() - API to process the revceived T2LM
+ * event.
+ * @psoc: psoc object
+ * @event: Pointer to received T2LM info
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
+			struct wlan_objmgr_psoc *psoc,
+			struct mlo_vdev_host_tid_to_link_map_resp *event);
+
+/**
  * wlan_mlo_parse_t2lm_action_frame() - API to parse T2LM action frame
  * @t2lm: Pointer to T2LM structure
  * @action_frm: Pointer to action frame
