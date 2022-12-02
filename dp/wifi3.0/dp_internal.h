@@ -2552,6 +2552,14 @@ void dp_print_soc_tx_stats(struct dp_soc *soc);
  */
 void dp_print_soc_interrupt_stats(struct dp_soc *soc);
 
+/**
+ * dp_print_tx_ppeds_stats() - Print Tx in use stats for the soc in DS
+ * @soc: dp_soc handle
+ *
+ * Return: None
+ */
+
+void dp_print_tx_ppeds_stats(struct dp_soc *soc);
 #ifdef WLAN_DP_SRNG_USAGE_WM_TRACKING
 /**
  * dp_dump_srng_high_wm_stats() - Print the ring usage high watermark stats

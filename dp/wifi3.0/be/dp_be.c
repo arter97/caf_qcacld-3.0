@@ -84,6 +84,15 @@ static void dp_ppeds_rings_status(struct dp_soc *soc)
 	dp_print_ring_stat_from_hal(soc, &be_soc->ppe_wbm_release_ring,
 				    WBM2SW_RELEASE);
 }
+
+static void dp_ppeds_inuse_desc(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	DP_PRINT_STATS("PPE-DS Tx Descriptors in Use = %u num_free %u",
+		       be_soc->ppeds_tx_desc.num_allocated,
+		       be_soc->ppeds_tx_desc.num_free);
+}
 #endif
 
 static void dp_soc_cfg_attach_be(struct dp_soc *soc)
@@ -2493,6 +2502,7 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_soc_ppeds_stop = dp_ppeds_stop_soc_be;
 	arch_ops->dp_register_ppeds_interrupts = dp_register_ppeds_interrupts;
 	arch_ops->dp_free_ppeds_interrupts = dp_free_ppeds_interrupts;
+	arch_ops->dp_tx_ppeds_inuse_desc = dp_ppeds_inuse_desc;
 #endif
 	dp_init_near_full_arch_ops_be(arch_ops);
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_be;
