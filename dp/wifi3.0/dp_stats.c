@@ -7669,6 +7669,18 @@ dp_print_pdev_rx_stats(struct dp_pdev *pdev)
 		       pdev->stats.rx_buffer_pool.num_pool_bufs_replenish);
 }
 
+#ifdef WLAN_SUPPORT_PPEDS
+void dp_print_tx_ppeds_stats(struct dp_soc *soc)
+{
+	if (soc->arch_ops.dp_tx_ppeds_inuse_desc)
+		soc->arch_ops.dp_tx_ppeds_inuse_desc(soc);
+}
+#else
+void dp_print_tx_ppeds_stats(struct dp_soc *soc)
+{
+}
+#endif
+
 void
 dp_print_soc_tx_stats(struct dp_soc *soc)
 {
@@ -7710,6 +7722,7 @@ dp_print_soc_tx_stats(struct dp_soc *soc)
 		       soc->stats.tx.tx_comp_loop_pkt_limit_hit);
 	DP_PRINT_STATS("Tx comp HP out of sync2 = %d",
 		       soc->stats.tx.hp_oos2);
+	dp_print_tx_ppeds_stats(soc);
 }
 
 static
