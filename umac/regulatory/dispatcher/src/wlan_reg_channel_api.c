@@ -325,3 +325,19 @@ bool wlan_reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev)
 {
 	return reg_is_6g_domain_jp(pdev);
 }
+
+#ifdef CONFIG_BAND_6GHZ
+QDF_STATUS
+wlan_reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
+				    enum reg_6g_ap_type ap_pwr_type,
+				    bool is_client_power_needed,
+				    enum reg_6g_client_type client_type,
+				    struct channel_power *chan_eirp_list,
+				    uint8_t num_6g_chans)
+{
+	return reg_get_max_reg_eirp_from_list(pdev, ap_pwr_type,
+					      is_client_power_needed,
+					      client_type, chan_eirp_list,
+					      num_6g_chans);
+}
+#endif
