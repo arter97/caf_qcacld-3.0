@@ -20,6 +20,7 @@
 #include <hal_be_hw_headers.h>
 #include <dp_peer.h>
 #include <dp_tx.h>
+#include <dp_rx.h>
 #include <be/dp_be_tx.h>
 #include <hal_tx.h>
 #include <hal_be_api.h>
@@ -35,6 +36,56 @@
 
 #define DS_NAPI_BUDGET_TO_INTERNAL_BUDGET(n, s) (((n) << (s)) - 1)
 #define DS_INTERNAL_BUDGET_TO_NAPI_BUDGET(n, s) (((n) + 1) >> (s))
+
+/**
+ * dp_ppe_ds_ppe2tcl_irq_handler- Handle ppe2tcl ring interrupt
+ * @irq: irq numer
+ * @ctxt: context passed to the handler
+ *
+ * Handle ppe2tcl ring interrupt
+ *
+ * Return: IRQ_HANDLED
+ */
+irqreturn_t dp_ppe_ds_ppe2tcl_irq_handler(int irq, void *ctxt)
+{
+	ppe_ds_ppe2tcl_wlan_handle_intr(ctxt);
+
+	return IRQ_HANDLED;
+}
+
+/*
+ * dp_ppe_ds_reo2ppe_irq_handler: Handle reo2ppe ring interrupt
+ * @irq: IRQ number
+ * @ctxt: IRQ handler context
+ *
+ * Return: IRQ handle status
+ */
+irqreturn_t dp_ppe_ds_reo2ppe_irq_handler(int irq, void *ctxt)
+{
+	ppe_ds_reo2ppe_wlan_handle_intr(ctxt);
+
+	return IRQ_HANDLED;
+}
+
+/**
+ * dp_get_ppe_ds_ctxt - Get context from ppe ds driver
+ * @soc: dp soc
+ *
+ * Get context from ppe driver
+ *
+ * Return: context
+ */
+void *dp_get_ppe_ds_ctxt(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	ppe_ds_wlan_handle_t *ppeds_handle =
+				(ppe_ds_wlan_handle_t *)be_soc->ppeds_handle;
+
+	if (!ppeds_handle)
+		return NULL;
+
+	return ppe_ds_wlan_get_intr_ctxt(ppeds_handle);
+}
 
 /**
  * dp_ppeds_deinit_ppe_vp_tbl_be - PPE VP table dealoc
@@ -813,12 +864,33 @@ static uint16_t dp_ppeds_get_reo_prod_idx(ppe_ds_wlan_handle_t *ppeds_handle)
 }
 
 /**
+ * dp_ppeds_toggle_srng_intr() - Enable/Disable irq of ppe2tcl ring
+ * @ppeds_handle: PPE-DS WLAN handle
+ * @enable: enable/disable bit
+ *
+ * Return: None
+ */
+static inline void
+dp_ppeds_enable_srng_intr(ppe_ds_wlan_handle_t *ppeds_handle, bool enable)
+{
+	struct dp_soc *soc =
+			*((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+
+	if (enable)
+		dp_ppeds_enable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
+	else
+		dp_ppeds_disable_irq(&be_soc->soc, &be_soc->ppe2tcl_ring);
+}
+
+/**
  * ppeds_ops
  *	PPE-DS WLAN operations
  */
 static struct ppe_ds_wlan_ops ppeds_ops = {
 	.get_tx_desc_many = dp_ppeds_get_batched_tx_desc,
 	.release_tx_desc_single = dp_ppeds_release_tx_desc_single,
+	.enable_tx_consume_intr = dp_ppeds_enable_srng_intr,
 	.set_tcl_prod_idx  = dp_ppeds_set_tcl_prod_idx,
 	.set_reo_cons_idx = dp_ppeds_set_reo_cons_idx,
 	.get_tcl_cons_idx = dp_ppeds_get_tcl_cons_idx,
@@ -1220,6 +1292,7 @@ QDF_STATUS dp_ppeds_register_soc_be(struct dp_soc_be *be_soc,
 
 	idx->ppe2tcl_start_idx = reg_info.ppe2tcl_start_idx;
 	idx->reo2ppe_start_idx = reg_info.reo2ppe_start_idx;
+	be_soc->ppeds_int_mode_enabled = reg_info.ppe_ds_int_mode_enabled;
 
 	dp_info("ppe2tcl_start_idx %d reo2ppe_start_idx %d\n",
 		idx->ppe2tcl_start_idx, idx->reo2ppe_start_idx);
