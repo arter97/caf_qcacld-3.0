@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -20020,23 +20020,27 @@ static bool hdd_is_ap_mode(enum QDF_OPMODE mode)
  *
  * Return: void
  */
-static void
+static QDF_STATUS
 hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter,
 				      bool get_new_addr)
 {
 	uint8_t *new_mac;
 	bool is_mac_equal;
 	struct hdd_adapter *assoc_adapter;
+	struct qdf_mac_addr *assoc_mac;
+	QDF_STATUS status;
 
 	if (!adapter || !hdd_adapter_is_ml_adapter(adapter))
-		return;
+		return QDF_STATUS_SUCCESS;
 
 	assoc_adapter = hdd_get_assoc_link_adapter(adapter);
 	if (!assoc_adapter || qdf_is_macaddr_zero(&assoc_adapter->mld_addr))
-		return;
+		return QDF_STATUS_E_INVAL;
 
-	is_mac_equal = qdf_is_macaddr_equal(&assoc_adapter->mac_addr,
-					    &assoc_adapter->mld_addr);
+	assoc_mac = &assoc_adapter->mac_addr;
+
+	is_mac_equal = qdf_is_macaddr_equal(&assoc_adapter->mld_addr,
+					    assoc_mac);
 
 	if (get_new_addr) {
 		/* If both address are already different
@@ -20048,8 +20052,13 @@ hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter,
 		new_mac = wlan_hdd_get_intf_addr(adapter->hdd_ctx,
 						 QDF_STA_MODE);
 		if (new_mac) {
-			memcpy(assoc_adapter->mac_addr.bytes,
-			       new_mac, QDF_MAC_ADDR_SIZE);
+			memcpy(assoc_mac->bytes, new_mac, QDF_MAC_ADDR_SIZE);
+			status = ucfg_dp_create_intf(
+					assoc_adapter->hdd_ctx->psoc,
+					assoc_mac,
+					(qdf_netdev_t)assoc_adapter->dev);
+			if (QDF_IS_STATUS_ERROR(status))
+				return status;
 		}
 	} else {
 		/* If both address are already equal
@@ -20058,14 +20067,15 @@ hdd_adapter_update_mac_on_mode_change(struct hdd_adapter *adapter,
 		if (is_mac_equal)
 			goto out;
 
-		wlan_hdd_release_intf_addr(adapter->hdd_ctx,
-					   assoc_adapter->mac_addr.bytes);
-		qdf_copy_macaddr(&assoc_adapter->mac_addr, &adapter->mld_addr);
+		wlan_hdd_release_intf_addr(adapter->hdd_ctx, assoc_mac->bytes);
+		ucfg_dp_destroy_intf(adapter->hdd_ctx->psoc, assoc_mac);
+		qdf_copy_macaddr(assoc_mac, &adapter->mld_addr);
 	}
 out:
 	qdf_net_update_net_device_dev_addr(adapter->dev,
 					   adapter->mld_addr.bytes,
 					   QDF_MAC_ADDR_SIZE);
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -20192,7 +20202,10 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 					QDF_MAC_ADDR_FMT "\n",
 					QDF_MAC_ADDR_REF(ndev->dev_addr));
 			}
-			hdd_adapter_update_mac_on_mode_change(adapter, false);
+			status = hdd_adapter_update_mac_on_mode_change(adapter,
+								       false);
+			if (QDF_IS_STATUS_ERROR(status))
+				goto err;
 			hdd_set_ap_ops(adapter->dev);
 		} else {
 			hdd_err("Changing to device mode '%s' is not supported",
@@ -20207,7 +20220,10 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
 				hdd_err("change mode fail %d", errno);
 				goto err;
 			}
-			hdd_adapter_update_mac_on_mode_change(adapter, true);
+			status = hdd_adapter_update_mac_on_mode_change(adapter,
+								       true);
+			if (QDF_IS_STATUS_ERROR(status))
+				goto err;
 		} else if (hdd_is_ap_mode(new_mode)) {
 			adapter->device_mode = new_mode;
 
