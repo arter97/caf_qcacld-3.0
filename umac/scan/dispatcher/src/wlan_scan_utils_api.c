@@ -1731,7 +1731,7 @@ static void util_scan_update_esp_data(struct wlan_esp_ie *esp_information,
 }
 
 /**
- * util_scan_scm_update_bss_with_esp_dataa: calculate estimated air time
+ * util_scan_scm_update_bss_with_esp_data: calculate estimated air time
  * fraction
  * @scan_entry: new received entry
  *
@@ -1781,7 +1781,7 @@ static void util_scan_scm_update_bss_with_esp_data(
 
 /**
  * util_scan_scm_calc_nss_supported_by_ap() - finds out nss from AP
- * @scan_entry: new received entry
+ * @scan_params: new received entry
  *
  * Return: number of nss advertised by AP
  */
@@ -2041,7 +2041,7 @@ static void util_scan_set_security(struct scan_cache_entry *scan_params)
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-/**
+/*
  * Multi link IE field offsets
  *  ------------------------------------------------------------------------
  * | EID(1) | Len (1) | EID_EXT (1) | ML_CONTROL (2) | CMN_INFO (var) | ... |
@@ -2058,16 +2058,22 @@ static void util_scan_set_security(struct scan_cache_entry *scan_params)
  * This code is to be revisited for future drafts if the presence bitmap values
  * changes for the beacon, probe response and probe request frames.
  */
-static uint8_t util_get_link_info_offset(uint8_t *ml_ie)
+static uint8_t util_get_link_info_offset(uint8_t *ml_ie, bool *is_ml_ie_valid)
 {
 	qdf_size_t ml_ie_len = 0;
 	qdf_size_t parsed_ie_len = 0;
 	struct wlan_ie_multilink *mlie_fixed;
 	uint16_t mlcontrol;
 	uint16_t presencebm;
+	qdf_size_t actual_len;
 
 	if (!ml_ie) {
 		scm_err("ml_ie is null");
+		return 0;
+	}
+
+	if (!is_ml_ie_valid) {
+		scm_err_rl("is_ml_ie_valid is null");
 		return 0;
 	}
 
@@ -2120,7 +2126,15 @@ static uint8_t util_get_link_info_offset(uint8_t *ml_ie)
 	/* Offset calculation starts from the beginning of the ML IE (including
 	 * EID) hence, adding the size of IE header to ML IE length.
 	 */
-	if (parsed_ie_len < (ml_ie_len + sizeof(struct ie_header)))
+	actual_len = ml_ie_len + sizeof(struct ie_header);
+	if (parsed_ie_len <= actual_len) {
+		*is_ml_ie_valid = true;
+	} else {
+		*is_ml_ie_valid = false;
+		scm_err("Invalid ML IE, expect min len: %zu, actual len: %zu",
+			parsed_ie_len, actual_len);
+	}
+	if (parsed_ie_len < actual_len)
 		return parsed_ie_len;
 
 	return 0;
@@ -2129,7 +2143,8 @@ static uint8_t util_get_link_info_offset(uint8_t *ml_ie)
 static void util_get_ml_bv_partner_link_info(struct scan_cache_entry *scan_entry)
 {
 	uint8_t *ml_ie = scan_entry->ie_list.multi_link_bv;
-	uint8_t offset = util_get_link_info_offset(ml_ie);
+	bool is_ml_ie_valid;
+	uint8_t offset = util_get_link_info_offset(ml_ie, &is_ml_ie_valid);
 	uint16_t sta_ctrl;
 	uint8_t *stactrl_offset = NULL, *ielist_offset;
 	uint8_t perstaprof_len = 0, perstaprof_stainfo_len = 0, ielist_len = 0;
@@ -2246,6 +2261,8 @@ static void util_scan_update_ml_info(struct scan_cache_entry *scan_entry)
 	uint8_t *ml_ie = scan_entry->ie_list.multi_link_bv;
 	uint16_t multi_link_ctrl;
 	uint8_t offset;
+	uint8_t mlie_min_len;
+	bool is_ml_ie_valid = true;
 
 	if (!scan_entry->ie_list.ehtcap && scan_entry->ie_list.multi_link_bv) {
 		scan_entry->ie_list.multi_link_bv = NULL;
@@ -2253,6 +2270,12 @@ static void util_scan_update_ml_info(struct scan_cache_entry *scan_entry)
 	}
 	if (!scan_entry->ie_list.multi_link_bv)
 		return;
+
+	mlie_min_len = util_get_link_info_offset(ml_ie, &is_ml_ie_valid);
+	if (!is_ml_ie_valid) {
+		scan_entry->ie_list.multi_link_bv = NULL;
+		return;
+	}
 
 	multi_link_ctrl = *(uint16_t *)(ml_ie + ML_CONTROL_OFFSET);
 
