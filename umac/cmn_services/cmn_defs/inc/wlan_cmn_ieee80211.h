@@ -1644,6 +1644,10 @@ struct wlan_ie_vhtop {
 	uint16_t vhtop_basic_mcs_set;
 } qdf_packed;
 
+#define WLAN_HE_PHYCAP_SU_BFER_OFFSET 3
+#define WLAN_HE_PHYCAP_SU_BFER_IDX 7
+#define WLAN_HE_PHYCAP_SU_BFER_BITS 1
+
 #define WLAN_HE_PHYCAP_160_SUPPORT BIT(2)
 #define WLAN_HE_PHYCAP_80_80_SUPPORT BIT(3)
 #define WLAN_HE_MACCAP_LEN 6
