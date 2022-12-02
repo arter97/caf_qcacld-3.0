@@ -2606,7 +2606,6 @@ struct wlan_ml_rv_linfo_perstaprof {
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif /* WLAN_FEATURE_11BE */
 
-#ifdef WLAN_FEATURE_11BE
 /**
  * struct wlan_ie_tid_to_link_mapping - TID-to-link mapping IE
  * @elem_id: T2LM IE
@@ -2704,7 +2703,6 @@ struct wlan_action_frame_args {
 	uint32_t arg3;
 	uint8_t *arg4;
 };
-#endif /* WLAN_FEATURE_11BE */
 
 /**
  * struct he_oper_6g_param: 6 Ghz params for HE

@@ -490,8 +490,6 @@ struct mlpeer_auth_params {
 	void *rs;
 };
 
-#ifdef WLAN_FEATURE_11BE
-
 /**
  * enum wlan_t2lm_category - T2LM category
  *
@@ -611,7 +609,6 @@ struct wlan_mlo_peer_t2lm_policy {
 	struct wlan_prev_t2lm_negotiated_info t2lm_negotiated_info;
 	struct wlan_t2lm_onging_negotiation_info ongoing_tid_to_link_mapping;
 };
-#endif /* WLAN_FEATURE_11BE */
 
 /**
  * struct wlan_mlo_eml_cap - EML capabilities of MLD
