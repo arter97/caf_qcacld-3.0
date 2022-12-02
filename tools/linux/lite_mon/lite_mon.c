@@ -267,8 +267,15 @@ static void lite_mon_set_default_filter(struct lite_mon_config *mon_config,
 static void lite_mon_set_defaults(struct lite_mon_config *mon_config,
 				  int filter_input)
 {
-	lite_mon_set_default_filter(mon_config, filter_input);
-	lite_mon_set_default_len(mon_config);
+	switch (mon_config->cmdtype) {
+	case LITE_MON_SET_FILTER:
+		lite_mon_set_default_filter(mon_config, filter_input);
+		lite_mon_set_default_len(mon_config);
+		break;
+	default:
+		/* Default settings for other cmdtypes can be added here */
+		break;
+	}
 }
 
 
