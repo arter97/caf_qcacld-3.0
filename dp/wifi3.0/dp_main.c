@@ -7233,8 +7233,8 @@ static QDF_STATUS dp_vdev_attach_wifi3(struct cdp_soc_t *cdp_soc,
 			dp_err("LRO hash setup failure!");
 	}
 
-	dp_info("Created vdev %pK ("QDF_MAC_ADDR_FMT")", vdev,
-		QDF_MAC_ADDR_REF(vdev->mac_addr.raw));
+	dp_info("Created vdev %pK ("QDF_MAC_ADDR_FMT") vdev_id %d", vdev,
+		QDF_MAC_ADDR_REF(vdev->mac_addr.raw), vdev->vdev_id);
 	DP_STATS_INIT(vdev);
 
 	if (QDF_IS_STATUS_ERROR(soc->arch_ops.txrx_vdev_attach(soc, vdev)))
@@ -7628,6 +7628,9 @@ static QDF_STATUS dp_vdev_detach_wifi3(struct cdp_soc_t *cdp_soc,
 	TAILQ_INSERT_TAIL(&soc->inactive_vdev_list, vdev, inactive_list_elem);
 	qdf_spin_unlock_bh(&soc->inactive_vdev_list_lock);
 
+	dp_info("detach vdev %pK id %d pending refs %d",
+		vdev, vdev->vdev_id, qdf_atomic_read(&vdev->ref_cnt));
+
 	/* release reference taken at dp_vdev_create */
 	dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CONFIG);
 
@@ -7936,7 +7939,13 @@ dp_peer_create_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			dp_peer_hw_txrx_stats_init(soc, peer->txrx_peer);
 		}
 
-		dp_peer_update_state(soc, peer, DP_PEER_STATE_INIT);
+		dp_info("vdev %pK Reused peer %pK ("QDF_MAC_ADDR_FMT
+			") vdev_ref_cnt "
+			"%d peer_ref_cnt: %d",
+			vdev, peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw),
+			qdf_atomic_read(&vdev->ref_cnt),
+			qdf_atomic_read(&peer->ref_cnt));
+			dp_peer_update_state(soc, peer, DP_PEER_STATE_INIT);
 
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
 		return QDF_STATUS_SUCCESS;
@@ -8973,8 +8982,9 @@ static QDF_STATUS dp_peer_delete_wifi3(struct cdp_soc_t *soc_hdl,
 
 	peer->valid = 0;
 
-	dp_init_info("%pK: peer %pK (" QDF_MAC_ADDR_FMT ")",
-		     soc, peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+	dp_init_info("%pK: peer %pK (" QDF_MAC_ADDR_FMT ") pending-refs %d",
+		     soc, peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw),
+		     qdf_atomic_read(&peer->ref_cnt));
 
 	dp_peer_rx_reo_shared_qaddr_delete(soc, peer);
 
