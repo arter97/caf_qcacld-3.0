@@ -2304,10 +2304,7 @@ static struct dp_int_mask_assignment dp_mask_assignment[NUM_INTERRUPT_COMBINATIO
 #endif
 #endif
 
-/**
- * g_wlan_srng_cfg[] - Per ring_type specific configuration
- *
- */
+/* g_wlan_srng_cfg[] - Per ring_type specific configuration */
 struct wlan_srng_cfg g_wlan_srng_cfg[MAX_RING_TYPES];
 
 /* REO_DST ring configuration */
@@ -2598,8 +2595,8 @@ wlan_soc_ipa_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 /**
  * wlan_soc_ipa_cfg_attach() - Update ipa config in dp soc
  *  cfg context
- * @psoc - Object manager psoc
- * @wlan_cfg_ctx - dp soc cfg ctx
+ * @psoc: Object manager psoc
+ * @wlan_cfg_ctx: dp soc cfg ctx
  *
  * Return: None
  */
@@ -2652,8 +2649,8 @@ wlan_soc_hw_cc_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 /**
  * wlan_soc_ppe_cfg_attach() - Update ppe config in dp soc
  *  cfg context
- * @psoc - Object manager psoc
- * @wlan_cfg_ctx - dp soc cfg ctx
+ * @psoc: Object manager psoc
+ * @wlan_cfg_ctx: dp soc cfg ctx
  *
  * Return: None
  */
@@ -2681,6 +2678,7 @@ wlan_soc_ppe_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 /**
  * wlan_cfg_get_lsb_set_pos() - returns position of LSB which is set
+ * @val: value to test
  *
  * Return: position of LSB which is set
  */
@@ -2701,8 +2699,8 @@ static uint8_t wlan_cfg_get_lsb_set_pos(uint8_t val)
 /**
  * wlan_multi_soc_mlo_cfg_attach() - Update multi soc mlo config in dp soc
  *  cfg context
- * @psoc - Object manager psoc
- * @wlan_cfg_ctx - dp soc cfg ctx
+ * @psoc: Object manager psoc
+ * @wlan_cfg_ctx: dp soc cfg ctx
  *
  * Return: None
  */
@@ -2728,8 +2726,8 @@ wlan_multi_soc_mlo_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 /**
  * wlan_soc_mlo_cfg_attach() - Update mlo config in dp soc
  *  cfg context
- * @psoc - Object manager psoc
- * @wlan_cfg_ctx - dp soc cfg ctx
+ * @psoc: Object manager psoc
+ * @wlan_cfg_ctx: dp soc cfg ctx
  *
  * Return: None
  */
@@ -2751,8 +2749,8 @@ wlan_soc_mlo_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 /**
  * wlan_soc_vdev_hw_stats_cfg_attach() - Update hw vdev stats config in dp soc
  *  cfg context
- * @psoc - Object manager psoc
- * @wlan_cfg_ctx - dp soc cfg ctx
+ * @psoc: Object manager psoc
+ * @wlan_cfg_ctx: dp soc cfg ctx
  *
  * Return: None
  */
@@ -2799,8 +2797,8 @@ wlan_cfg_soc_update_tgt_params(struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx,
 /**
  * wlan_soc_sawf_stats_cfg_attach() - Update sawf stats config in dp soc
  *  cfg context
- * @psoc - Object manager psoc
- * @wlan_cfg_ctx - dp soc cfg ctx
+ * @psoc: Object manager psoc
+ * @wlan_cfg_ctx: dp soc cfg ctx
  *
  * Return: None
  */
@@ -2822,14 +2820,6 @@ void wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg,
 	cfg->sawf_stats = val;
 }
 #else
-/**
- * wlan_soc_sawf_stats_cfg_attach() - Update sawf stats config in dp soc
- *  cfg context
- * @psoc - Object manager psoc
- * @wlan_cfg_ctx - dp soc cfg ctx
- *
- * Return: None
- */
 static void
 wlan_soc_sawf_stats_cfg_attach(struct cdp_ctrl_objmgr_psoc *psoc,
 			       struct wlan_cfg_dp_soc_ctxt *wlan_cfg_ctx)
@@ -2847,11 +2837,6 @@ void wlan_cfg_set_sawf_stats_config(struct wlan_cfg_dp_soc_ctxt *cfg,
 }
 #endif /* CONFIG_SAWF_STATS */
 
-/**
- * wlan_cfg_soc_attach() - Allocate and prepare SoC configuration
- * @psoc - Object manager psoc
- * Return: wlan_cfg_ctx - Handle to Configuration context
- */
 struct wlan_cfg_dp_soc_ctxt *
 wlan_cfg_soc_attach(struct cdp_ctrl_objmgr_psoc *psoc)
 {
