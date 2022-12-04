@@ -1927,10 +1927,10 @@ struct dp_arch_ops {
 						struct dp_rx_desc **r_rx_desc);
 
 	bool
-	(*dp_rx_intrabss_handle_nawds)(struct dp_soc *soc,
-				       struct dp_txrx_peer *ta_txrx_peer,
-				       qdf_nbuf_t nbuf_copy,
-				       struct cdp_tid_rx_stats *tid_stats);
+	(*dp_rx_intrabss_mcast_handler)(struct dp_soc *soc,
+					struct dp_txrx_peer *ta_txrx_peer,
+					qdf_nbuf_t nbuf_copy,
+					struct cdp_tid_rx_stats *tid_stats);
 
 	void (*dp_rx_word_mask_subscribe)(
 				struct dp_soc *soc,

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1613,8 +1613,50 @@ void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 {
 }
 #endif
-/*
- * dp_rx_intrabss_handle_nawds_be() - Forward mcbc intrabss pkts in nawds case
+
+#if defined(WLAN_MCAST_MLO) && defined(CONFIG_MLO_SINGLE_DEV)
+static inline
+bool dp_rx_intrabss_mlo_mcbc_fwd(struct dp_soc *soc, struct dp_vdev *vdev,
+				 qdf_nbuf_t nbuf_copy)
+{
+	struct dp_vdev *mcast_primary_vdev = NULL;
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct cdp_tx_exception_metadata tx_exc_metadata = {0};
+
+	if (!vdev->mlo_vdev)
+		return false;
+
+	tx_exc_metadata.is_mlo_mcast = 1;
+	mcast_primary_vdev = dp_mlo_get_mcast_primary_vdev(be_soc,
+							   be_vdev,
+							   DP_MOD_ID_RX);
+
+	if (!mcast_primary_vdev)
+		return false;
+
+	nbuf_copy = dp_tx_send_exception((struct cdp_soc_t *)
+					 mcast_primary_vdev->pdev->soc,
+					 mcast_primary_vdev->vdev_id,
+					 nbuf_copy, &tx_exc_metadata);
+
+	if (nbuf_copy)
+		qdf_nbuf_free(nbuf_copy);
+
+	dp_vdev_unref_delete(mcast_primary_vdev->pdev->soc,
+			     mcast_primary_vdev, DP_MOD_ID_RX);
+	return true;
+}
+#else
+static inline
+bool dp_rx_intrabss_mlo_mcbc_fwd(struct dp_soc *soc, struct dp_vdev *vdev,
+				 qdf_nbuf_t nbuf_copy)
+{
+	return false;
+}
+#endif
+/**
+ * dp_rx_intrabss_mcast_handler_be() - handler for mcast packets
  * @soc: core txrx main context
  * @ta_txrx_peer: source txrx_peer entry
  * @nbuf_copy: nbuf that has to be intrabss forwarded
@@ -1623,10 +1665,10 @@ void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
  * Return: true if it is forwarded else false
  */
 bool
-dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc,
-			       struct dp_txrx_peer *ta_txrx_peer,
-			       qdf_nbuf_t nbuf_copy,
-			       struct cdp_tid_rx_stats *tid_stats)
+dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
+				struct dp_txrx_peer *ta_txrx_peer,
+				qdf_nbuf_t nbuf_copy,
+				struct cdp_tid_rx_stats *tid_stats)
 {
 	if (qdf_unlikely(ta_txrx_peer->vdev->nawds_enabled)) {
 		struct cdp_tx_exception_metadata tx_exc_metadata = {0};
@@ -1635,10 +1677,11 @@ dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc,
 		tx_exc_metadata.peer_id = ta_txrx_peer->peer_id;
 		tx_exc_metadata.is_intrabss_fwd = 1;
 		tx_exc_metadata.tid = HTT_TX_EXT_TID_INVALID;
+
 		if (dp_tx_send_exception((struct cdp_soc_t *)soc,
-					 ta_txrx_peer->vdev->vdev_id,
-					 nbuf_copy,
-					 &tx_exc_metadata)) {
+					  ta_txrx_peer->vdev->vdev_id,
+					  nbuf_copy,
+					  &tx_exc_metadata)) {
 			DP_PEER_PER_PKT_STATS_INC_PKT(ta_txrx_peer,
 						      rx.intra_bss.fail, 1,
 						      len);
@@ -1652,6 +1695,11 @@ dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc,
 		}
 		return true;
 	}
+
+	if (dp_rx_intrabss_mlo_mcbc_fwd(soc, ta_txrx_peer->vdev,
+					nbuf_copy))
+		return true;
+
 	return false;
 }
 

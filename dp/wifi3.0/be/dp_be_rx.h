@@ -58,8 +58,8 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
 			   struct hal_rx_msdu_metadata msdu_metadata);
 #endif
 
-/*
- * dp_rx_intrabss_handle_nawds_be() - Forward mcbc intrabss pkts in nawds case
+/**
+ * dp_rx_intrabss_mcast_handler_be() - intrabss mcast handler
  * @soc: core txrx main context
  * @ta_txrx_peer: source txrx_peer entry
  * @nbuf_copy: nbuf that has to be intrabss forwarded
@@ -68,9 +68,10 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc,
  * Return: true if it is forwarded else false
  */
 bool
-dp_rx_intrabss_handle_nawds_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
-			       qdf_nbuf_t nbuf_copy,
-			       struct cdp_tid_rx_stats *tid_stats);
+dp_rx_intrabss_mcast_handler_be(struct dp_soc *soc,
+				struct dp_txrx_peer *ta_txrx_peer,
+				qdf_nbuf_t nbuf_copy,
+				struct cdp_tid_rx_stats *tid_stats);
 
 void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 				  uint32_t *msg_word,

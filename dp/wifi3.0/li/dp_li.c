@@ -643,7 +643,8 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_peer_setup = dp_peer_setup_li;
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_li;
-	arch_ops->dp_rx_intrabss_handle_nawds = dp_rx_intrabss_handle_nawds_li;
+	arch_ops->dp_rx_intrabss_mcast_handler =
+					dp_rx_intrabss_handle_nawds_li;
 	arch_ops->dp_rx_word_mask_subscribe = dp_rx_word_mask_subscribe_li;
 	arch_ops->dp_rxdma_ring_sel_cfg = dp_rxdma_ring_sel_cfg_li;
 	arch_ops->dp_rx_peer_metadata_peer_id_get =

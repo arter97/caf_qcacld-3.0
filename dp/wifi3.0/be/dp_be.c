@@ -2502,7 +2502,8 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 #endif
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_be;
-	arch_ops->dp_rx_intrabss_handle_nawds = dp_rx_intrabss_handle_nawds_be;
+	arch_ops->dp_rx_intrabss_mcast_handler =
+				dp_rx_intrabss_mcast_handler_be;
 	arch_ops->dp_rx_word_mask_subscribe = dp_rx_word_mask_subscribe_be;
 
 	arch_ops->txrx_soc_attach = dp_soc_attach_be;
