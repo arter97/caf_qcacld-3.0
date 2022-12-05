@@ -259,6 +259,8 @@
 #define WLAN_VDEV_C_RESTRICT_OFFCHAN     0x00000200
   /* CAPABILITY: eMLSR capability */
 #define WLAN_VDEV_C_EMLSR_CAP            0x00000400
+  /* CAPABILITY: Exclude per sta profile in unicast Probe req */
+#define WLAN_VDEV_C_EXCL_STA_PROF_PRB_REQ   0x00000800
 
 /* Invalid VDEV identifier */
 #define WLAN_INVALID_VDEV_ID 255
