@@ -146,6 +146,9 @@ typedef union {
  * @rx.dev.priv_cb_w.peer_id: peer_id for RX packet
  * @rx.dev.priv_cb_w.flag_intra_bss: flag to indicate this is intra bss packet
  * @rx.dev.priv_cb_w.protocol_tag: protocol tag set by app for rcvd packet type
+ * @rx.dev.priv_cb_w.flow_idx_invalid: flow entry is not found
+ * @rx.dev.priv_cb_w.flow_idx_timeout: flow entry search timed out
+ * @rx.dev.priv_cb_w.rsvd: rerserved bits
  * @rx.dev.priv_cb_w.flow_tag: flow tag set by application for 5 tuples rcvd
  *
  * @rx.dev.priv_cb_m.peer_cached_buf_frm: peer cached buffer
@@ -263,7 +266,10 @@ struct qdf_nbuf_cb {
 						 flag_intra_bss : 1,
 						 ipa_smmu_map : 1;
 					uint16_t peer_id;
-					uint16_t protocol_tag;
+					uint8_t protocol_tag;
+					uint8_t flow_idx_invalid: 1,
+						flow_idx_timeout: 1,
+						rsvd:6;
 					uint16_t flow_tag;
 				} priv_cb_w;
 				struct {

@@ -41,6 +41,22 @@
 #include "dp_hist.h"
 #include "dp_rx_buffer_pool.h"
 
+#ifdef WLAN_SUPPORT_RX_FLOW_TAG
+static inline void
+dp_rx_update_flow_info(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+{
+	qdf_nbuf_set_rx_flow_idx_invalid(nbuf,
+				 hal_rx_msdu_flow_idx_invalid_be(rx_tlv_hdr));
+	qdf_nbuf_set_rx_flow_idx_timeout(nbuf,
+				 hal_rx_msdu_flow_idx_invalid_be(rx_tlv_hdr));
+}
+#else
+static inline void
+dp_rx_update_flow_info(qdf_nbuf_t nbuf, uint8_t *rx_tlv_hdr)
+{
+}
+#endif
+
 #ifndef AST_OFFLOAD_ENABLE
 static void
 dp_rx_wds_learn(struct dp_soc *soc,
@@ -783,6 +799,7 @@ done:
 		}
 
 		dp_rx_cksum_offload(vdev->pdev, nbuf, rx_tlv_hdr);
+		dp_rx_update_flow_info(nbuf, rx_tlv_hdr);
 
 		if (qdf_unlikely(!rx_pdev->rx_fast_flag)) {
 			/*
