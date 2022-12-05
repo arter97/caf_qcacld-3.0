@@ -1127,6 +1127,7 @@ enum wlan_status_code {
 #define WLAN_AKM_FILS_FT_SHA256   0x10
 #define WLAN_AKM_FILS_FT_SHA384   0x11
 #define WLAN_AKM_OWE              0x12
+#define WLAN_AKM_SAE_EXT_KEY      0x18
 
 #define WLAN_ASE_NONE                    0x00
 #define WLAN_ASE_8021X_UNSPEC            0x01
