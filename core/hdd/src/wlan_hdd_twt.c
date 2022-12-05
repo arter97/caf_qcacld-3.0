@@ -4730,7 +4730,7 @@ void hdd_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
 		hdd_debug("SAP vdev exist");
 		status = hdd_send_twt_responder_enable_cmd(twt_arg->hdd_ctx);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("TWT responder enable cmd to firmware failed");
+			hdd_warn("TWT responder enable cmd to firmware failed");
 			return;
 		}
 		sme_twt_update_beacon_template(twt_arg->hdd_ctx->mac_handle);
@@ -4741,7 +4741,7 @@ void hdd_twt_concurrency_update_on_dbs(struct wlan_objmgr_pdev *pdev,
 		hdd_debug("STA vdev exist");
 		status = hdd_send_twt_requestor_enable_cmd(twt_arg->hdd_ctx);
 		if (QDF_IS_STATUS_ERROR(status)) {
-			hdd_err("TWT requestor enable cmd to firmware failed");
+			hdd_warn("TWT requestor enable cmd to firmware failed");
 			return;
 		}
 	}
