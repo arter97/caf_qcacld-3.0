@@ -86,6 +86,7 @@ qca_wlan_vendor_twt_nudge_dialog_policy[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAX + 1] 
 	[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_WAKE_TIME] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_NEXT_TWT_SIZE] = {.type = NLA_U32 },
 	[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_MAC_ADDR] = VENDOR_NLA_POLICY_MAC_ADDR,
+	[QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_SP_START_OFFSET] = {.type = NLA_S32},
 };
 
 static const struct nla_policy
@@ -459,6 +460,17 @@ osif_twt_ack_wait_response(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+static void
+osif_send_twt_delete_cmd(struct wlan_objmgr_vdev *vdev,
+			 struct qdf_mac_addr *peer_mac, uint8_t dialog_id)
+{
+	uint32_t twt_next_action = HOST_TWT_SEND_DELETE_CMD;
+
+	ucfg_twt_set_work_params(vdev, peer_mac,
+				 dialog_id, twt_next_action);
+	qdf_sched_work(0, &vdev->twt_work);
+}
+
 static int
 osif_send_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 			struct wlan_objmgr_psoc *psoc,
@@ -508,8 +520,22 @@ osif_send_twt_setup_req(struct wlan_objmgr_vdev *vdev,
 	if (ack_priv->status) {
 		osif_err("Received TWT ack error: %d. Reset twt command",
 			 ack_priv->status);
-		ucfg_twt_init_context(psoc, &twt_params->peer_macaddr,
-				      twt_params->dialog_id);
+
+		if (ucfg_twt_is_setup_done(psoc,
+					   &twt_params->peer_macaddr,
+					   twt_params->dialog_id)) {
+			/* If TWT setup is already done then this is
+			 * renegotiation failure scenario.
+			 * Terminate TWT session on renegotiation failure.
+			 */
+			osif_debug("setup_done set, renego failure");
+			osif_send_twt_delete_cmd(vdev,
+						 &twt_params->peer_macaddr,
+						 twt_params->dialog_id);
+		} else {
+			ucfg_twt_init_context(psoc, &twt_params->peer_macaddr,
+					      twt_params->dialog_id);
+		}
 
 		switch (ack_priv->status) {
 		case HOST_ADD_TWT_STATUS_INVALID_PARAM:
@@ -1073,7 +1099,6 @@ osif_twt_handle_renego_failure(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_pdev *pdev;
 	struct wlan_objmgr_vdev *vdev;
 	uint32_t vdev_id;
-	uint32_t twt_next_action = 0;
 
 	if (!event)
 		return;
@@ -1099,9 +1124,8 @@ osif_twt_handle_renego_failure(struct wlan_objmgr_psoc *psoc,
 		goto end;
 	}
 
-	twt_next_action = HOST_TWT_SEND_DELETE_CMD;
-	ucfg_twt_set_work_params(vdev, &event->params, twt_next_action);
-	qdf_sched_work(0, &vdev->twt_work);
+	osif_send_twt_delete_cmd(vdev, &event->params.peer_macaddr,
+				 event->params.dialog_id);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_TWT_ID);
 
@@ -1551,6 +1575,7 @@ int osif_twt_nudge_req(struct wlan_objmgr_vdev *vdev,
 	int ret = 0, id;
 	uint32_t vdev_id;
 	struct  twt_nudge_dialog_cmd_param params = {0};
+	QDF_STATUS status;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 	if (!psoc) {
@@ -1602,12 +1627,26 @@ int osif_twt_nudge_req(struct wlan_objmgr_vdev *vdev,
 	}
 	params.next_twt_size = nla_get_u32(tb[id]);
 
+	id = QCA_WLAN_VENDOR_ATTR_TWT_NUDGE_SP_START_OFFSET;
+	if (tb[id]) {
+		uint8_t peer_cap = 0;
+
+		status = ucfg_twt_get_peer_capabilities(psoc,
+							&params.peer_macaddr,
+							&peer_cap);
+		if (QDF_IS_STATUS_SUCCESS(status) &&
+		    (peer_cap & WLAN_TWT_CAPA_FLEXIBLE)) {
+			params.sp_start_offset = nla_get_s32(tb[id]);
+		}
+	}
+
 	osif_debug("twt_nudge: vdev_id %d dialog_id %d ", params.vdev_id,
 		   params.dialog_id);
 	osif_debug("twt_nudge: suspend_duration %d next_twt_size %d",
 		   params.suspend_duration, params.next_twt_size);
 	osif_debug("peer mac_addr " QDF_MAC_ADDR_FMT,
 		   QDF_MAC_ADDR_REF(params.peer_macaddr.bytes));
+	osif_debug("twt_nudge: sp_start_offset %d", params.sp_start_offset);
 
 	return osif_send_twt_nudge_req(vdev, psoc, &params);
 }

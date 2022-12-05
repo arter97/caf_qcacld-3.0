@@ -2861,10 +2861,30 @@ QDF_STATUS sme_send_rso_connect_params(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_set_he_bss_color(mac_handle_t mac_handle, uint8_t session_id,
 				uint8_t bss_color);
+/**
+ * sme_reconfig_obss_scan_param() - reconfig obss scan param
+ *
+ * @mac_handle: The handle returned by mac_open
+ * @session_id: session_id of the request
+ * @is_scan_reconfig: true if modify OBSS scan periodicity, otherwise false
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS sme_reconfig_obss_scan_param(mac_handle_t mac_handle,
+					uint8_t session_id,
+					bool is_scan_reconfig);
 #else
 static inline
 QDF_STATUS sme_set_he_bss_color(mac_handle_t mac_handle, uint8_t session_id,
 				uint8_t bss_color)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS sme_reconfig_obss_scan_param(mac_handle_t mac_handle,
+					uint8_t session_id,
+					bool is_scan_reconfig)
 {
 	return QDF_STATUS_SUCCESS;
 }
@@ -3110,6 +3130,16 @@ void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 void sme_update_eht_cap_nss(mac_handle_t mac_handle, uint8_t session_id,
 			    uint8_t nss);
 
+/**
+ * sme_set_eht_bw_cap() - sets the EHT 320 MHz bandwidth capability
+ * @mac_handle: Opaque handle to the global MAC context
+ * @vdev_id: vdev id
+ * @chwidth: channel width
+ *
+ * Return: None
+ */
+void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
+			enum eSirMacHTChannelWidth chwidth);
 #else
 static inline void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 					  struct wma_tgt_cfg *cfg,
@@ -3119,6 +3149,10 @@ static inline void sme_update_tgt_eht_cap(mac_handle_t mac_handle,
 static inline void sme_update_eht_cap_nss(mac_handle_t mac_handle,
 					  uint8_t session_id,
 					  uint8_t nss)
+{}
+
+static inline void sme_set_eht_bw_cap(mac_handle_t mac_handle, uint8_t vdev_id,
+				      enum eSirMacHTChannelWidth chwidth)
 {}
 #endif
 
@@ -4235,6 +4269,17 @@ QDF_STATUS sme_update_hidden_ssid_status_cb(mac_handle_t mac_handle,
  */
 QDF_STATUS sme_update_owe_info(struct mac_context *mac,
 			       struct assoc_ind *assoc_ind);
+
+/**
+ * sme_update_ft_info() - Update FT info
+ * @mac: mac context
+ * @assoc_ind: assoc ind
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS sme_update_ft_info(struct mac_context *mac,
+			      struct assoc_ind *assoc_ind);
 
 #ifdef WLAN_MWS_INFO_DEBUGFS
 /**

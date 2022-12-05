@@ -37,6 +37,8 @@
 #include "wlan_dp_nud_tracking.h"
 #include <i_qdf_net_stats.h>
 #include <qdf_types.h>
+#include "htc_api.h"
+#include "wlan_dp_wfds.h"
 
 #ifndef NUM_TX_RX_HISTOGRAM
 #define NUM_TX_RX_HISTOGRAM 128
@@ -264,6 +266,11 @@ struct link_monitoring {
 	uint8_t is_rx_linkspeed_good;
 };
 
+struct direct_link_info {
+	bool config_set;
+	bool low_latency;
+};
+
 /**
  * struct wlan_dp_intf - DP interface object related info
  * @dp_ctx: DP context reference
@@ -348,6 +355,9 @@ struct wlan_dp_intf {
 	enum bss_intf_state bss_state;
 	qdf_event_t qdf_sta_eap_frm_done_event;
 	struct dp_traffic_end_indication traffic_end_ind;
+#ifdef FEATURE_DIRECT_LINK
+	struct direct_link_info direct_link_config;
+#endif
 };
 
 /**
@@ -359,6 +369,22 @@ enum RX_OFFLOAD {
 	CFG_LRO_ENABLED = 1,
 	CFG_GRO_ENABLED,
 };
+
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * struct dp_direct_link_context - Datapath Direct Link context
+ * @dp_ctx: pointer to DP psoc priv context
+ * @lpass_ep_id: LPASS data msg service endpoint id
+ * @direct_link_refill_ring_hdl: Direct Link refill ring handle
+ * @dl_wfds: pointer to direct link WFDS context
+ */
+struct dp_direct_link_context {
+	struct wlan_dp_psoc_context *dp_ctx;
+	HTC_ENDPOINT_ID lpass_ep_id;
+	struct dp_srng *direct_link_refill_ring_hdl;
+	struct dp_direct_link_wfds_context *dl_wfds;
+};
+#endif
 
 /**
  * struct wlan_dp_psoc_context - psoc related data required for DP
@@ -375,6 +401,7 @@ enum RX_OFFLOAD {
  * @rtpm_tput_policy_ctx: Runtime Tput policy context
  * @txrx_hist: TxRx histogram
  * @bbm_ctx: bus bandwidth manager context
+ * @dp_direct_link_ctx: DP Direct Link context
  */
 struct wlan_dp_psoc_context {
 	struct wlan_objmgr_psoc *psoc;
@@ -459,6 +486,9 @@ struct wlan_dp_psoc_context {
 	qdf_wake_lock_t rx_wake_lock;
 
 	enum RX_OFFLOAD ol_enable;
+#ifdef FEATURE_DIRECT_LINK
+	struct dp_direct_link_context *dp_direct_link_ctx;
+#endif
 };
 
 #endif /* end  of _WLAN_DP_PRIV_STRUCT_H_ */

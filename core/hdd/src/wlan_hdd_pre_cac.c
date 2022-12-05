@@ -116,6 +116,7 @@ void hdd_close_pre_cac_adapter(struct hdd_context *hdd_ctx)
 	if (!pre_cac_adapter)
 		return;
 
+	ucfg_pre_cac_clear_work(hdd_ctx->psoc);
 	errno = osif_vdev_sync_trans_start_wait(pre_cac_adapter->dev,
 						&vdev_sync);
 	if (errno)
@@ -148,9 +149,10 @@ static int wlan_set_def_pre_cac_chan(struct hdd_context *hdd_ctx,
 		return -EINVAL;
 	}
 	ch_params.ch_width = *ch_width;
-	wlan_reg_set_channel_params_for_freq(hdd_ctx->pdev,
-					     pre_cac_ch_freq, 0,
-					     &ch_params);
+	wlan_reg_set_channel_params_for_pwrmode(hdd_ctx->pdev,
+						pre_cac_ch_freq, 0,
+						&ch_params,
+						REG_CURRENT_PWR_MODE);
 	switch (ch_params.sec_ch_offset) {
 	case HIGH_PRIMARY_CH:
 		channel_type = NL80211_CHAN_HT40MINUS;

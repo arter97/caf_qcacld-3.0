@@ -32,10 +32,10 @@
 
 /**
  * action_oui_string_to_hex() - convert string to uint8_t hex array
- * @token - string to be converted
- * @hex - output string to hold converted string
- * @no_of_lengths - count of possible lengths for input string
- * @possible_lengths - array holding possible lengths
+ * @token: string to be converted
+ * @hex: output string to hold converted string
+ * @no_of_lengths: count of possible lengths for input string
+ * @possible_lengths: array holding possible lengths
  *
  * This function converts the continuous input string of even length and
  * containing hexa decimal characters into hexa decimal array of uint8_t type.
@@ -80,7 +80,7 @@ static bool action_oui_string_to_hex(uint8_t *token, uint8_t *hex,
 
 /**
  * action_oui_token_string() - converts enum value to string
- * token_id: enum value to be converted to string
+ * @token_id: enum value to be converted to string
  *
  * This function converts the enum value of type action_oui_token_type
  * to string
@@ -471,7 +471,7 @@ validate_and_convert_capability(uint8_t *token,
 
 /**
  * action_oui_extension_store() - store action oui extension
- * @priv_obj: pointer to action_oui priv obj
+ * @psoc_priv: pointer to action_oui priv obj
  * @oui_priv: type of the action
  * @ext: oui extension to store in sme
  *
@@ -689,10 +689,6 @@ QDF_STATUS action_oui_send(struct action_oui_psoc_priv *psoc_priv,
 
 	extension_list = &oui_priv->extension_list;
 	qdf_mutex_acquire(&oui_priv->extension_lock);
-	if (qdf_list_empty(extension_list)) {
-		qdf_mutex_release(&oui_priv->extension_lock);
-		return QDF_STATUS_SUCCESS;
-	}
 
 	no_oui_extensions = qdf_list_size(extension_list);
 	len = sizeof(*req) + no_oui_extensions * sizeof(*extension);
@@ -866,6 +862,33 @@ action_oui_get_oui_ptr(struct action_oui_extension *extension,
 					       extension->oui_length,
 					       attr->ie_data,
 					       attr->ie_length);
+}
+
+bool
+action_oui_is_empty(struct action_oui_psoc_priv *psoc_priv,
+		    enum action_oui_id action_id)
+{
+	struct action_oui_priv *oui_priv;
+	qdf_list_t *extension_list;
+
+	oui_priv = psoc_priv->oui_priv[action_id];
+	if (!oui_priv) {
+		action_oui_debug("action oui for id %d is empty",
+				 action_id);
+		return true;
+	}
+
+	extension_list = &oui_priv->extension_list;
+	qdf_mutex_acquire(&oui_priv->extension_lock);
+	if (qdf_list_empty(extension_list)) {
+		qdf_mutex_release(&oui_priv->extension_lock);
+		action_oui_debug("action oui for id %d list is empty",
+				 action_id);
+		return true;
+	}
+	qdf_mutex_release(&oui_priv->extension_lock);
+
+	return false;
 }
 
 bool

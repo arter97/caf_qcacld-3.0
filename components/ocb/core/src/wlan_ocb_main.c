@@ -36,10 +36,10 @@
 #include "target_if_ocb.h"
 
 /**
- * ocb_get_cmd_type_str() - parse cmd to string
- * @cmd_type: ocb cmd type
+ * ocb_get_evt_type_str() - parse event to string
+ * @evt_type: ocb event type
  *
- * This function parse ocb cmd to string.
+ * This function parse ocb event to string.
  *
  * Return: command string
  */
@@ -555,7 +555,7 @@ QDF_STATUS ocb_pdev_obj_destroy_notification(struct wlan_objmgr_pdev *pdev,
 						       WLAN_UMAC_COMP_OCB,
 						       ocb_obj);
 	if (QDF_IS_STATUS_ERROR(status))
-		ocb_err("Failed to detatch ocb pdev object");
+		ocb_err("Failed to detach ocb pdev object");
 
 	qdf_mem_free(ocb_obj);
 

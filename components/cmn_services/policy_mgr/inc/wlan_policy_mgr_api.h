@@ -108,6 +108,7 @@ static inline const char *pcl_type_to_string(uint32_t idx)
 	CASE_RETURN_STRING(PM_SCC_ON_5_5G_SCC_ON_24G);
 	CASE_RETURN_STRING(PM_SCC_ON_24_SCC_ON_5_24G);
 	CASE_RETURN_STRING(PM_SCC_ON_24_SCC_ON_5_5G);
+	CASE_RETURN_STRING(PM_SCC_ON_24_CH_24G);
 	CASE_RETURN_STRING(PM_SCC_ON_5_SCC_ON_24);
 	CASE_RETURN_STRING(PM_SCC_ON_24_SCC_ON_5);
 	CASE_RETURN_STRING(PM_MCC_CH_24G);
@@ -317,6 +318,33 @@ bool policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(
 QDF_STATUS
 policy_mgr_get_multi_sap_allowed_on_same_band(struct wlan_objmgr_psoc *psoc,
 				bool *multi_sap_allowed_on_same_band);
+
+/**
+ * policy_mgr_set_original_bw_for_sap_restart() - to set use_sap_original_bw
+ * @psoc: pointer to psoc
+ * @use_sap_original_bw: value to be set
+ *
+ * This API is used to set use_sap_original_bw
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_set_original_bw_for_sap_restart(struct wlan_objmgr_psoc *psoc,
+					   bool use_sap_original_bw);
+
+/**
+ * policy_mgr_get_original_bw_for_sap_restart() - to find out if sap original
+ * bw is used as default BW when do sap restart
+ * @psoc: pointer to psoc
+ * @use_sap_original_bw: value to be filled
+ *
+ * This API is used to find out whether sap original BW is used as default BW
+ *
+ * Return: QDF_STATUS_SUCCESS up on success and any other status for failure.
+ */
+QDF_STATUS
+policy_mgr_get_original_bw_for_sap_restart(struct wlan_objmgr_psoc *psoc,
+					   bool *use_sap_original_bw);
 
 /*
  * policy_mgr_get_connected_vdev_band_mask() - to get the connected vdev band
@@ -688,6 +716,29 @@ static inline void policy_mgr_check_concurrent_intf_and_restart_sap(
  */
 uint32_t policy_mgr_get_conc_vdev_on_same_mac(struct wlan_objmgr_psoc *psoc,
 					      uint32_t vdev_id, uint8_t mac_id);
+
+#ifdef WLAN_FEATURE_SR
+/**
+ * policy_mgr_sr_same_mac_conc_enabled() - Function to check same MAC
+ *					   concurrency support in Spatial Reuse
+ * @psoc: PSOC object information
+ *
+ * This function is used to check whether concurrency is supported
+ * on same mac or not with Spatial Reuse enabled.
+ *
+ * Return: True if same MAC concurrency is supported with Spatial Reuse
+ *	   else False.
+ */
+bool policy_mgr_sr_same_mac_conc_enabled(struct wlan_objmgr_psoc *psoc);
+#else
+static inline
+bool policy_mgr_sr_same_mac_conc_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
+}
+
+#endif
+
 /**
  * policy_mgr_is_mcc_in_24G() - Function to check for MCC in 2.4GHz
  * @psoc: PSOC object information
@@ -1478,6 +1529,77 @@ policy_mgr_change_hw_mode_sta_connect(struct wlan_objmgr_psoc *psoc,
  */
 bool policy_mgr_is_dbs_allowed_for_concurrency(
 		struct wlan_objmgr_psoc *psoc, enum QDF_OPMODE new_conn_mode);
+
+/**
+ * policy_mgr_get_pcl_chlist_for_ll_sap() - Get pcl channel list for LL SAP
+ * @psoc: PSOC object information
+ * @len: length of the PCL
+ * @pcl_channels: Preferred channel freq list
+ * @pcl_weight: Weights of the PCL
+ *
+ * This function provides the preferred channel list on which the ll sap
+ * can come.
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_get_pcl_chlist_for_ll_sap(struct wlan_objmgr_psoc *psoc,
+				     uint32_t *len, uint32_t *pcl_channels,
+				     uint8_t *pcl_weight);
+
+/**
+ * policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present() - Get pcl channel
+ * list for SAP/GO when LL SAP is present
+ * @psoc: PSOC object information
+ * @len: length of the PCL
+ * @pcl_channels: Preferred channel freq list
+ * @pcl_weight: Weights of the PCL
+ *
+ * This function provides the preferred channel list for SAP/GO when LL SAP
+ * is present
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+policy_mgr_get_pcl_ch_for_sap_go_with_ll_sap_present(
+					struct wlan_objmgr_psoc *psoc,
+					uint32_t *len, uint32_t *pcl_channels,
+					uint8_t *pcl_weight);
+
+/**
+ * policy_mgr_get_pcl_channel_for_ll_sap_concurrency() - Get pcl channel list
+ * for LL SAP concurrency
+ * @psoc: PSOC object information
+ * @mode: Device mode
+ * @vdev_id: Vdev id
+ * @pcl_channels: Preferred channel freq list
+ * @pcl_weight: Weights of the PCL
+ * @len: length of the PCL
+ *
+ * Return: QDF_STATUS
+ */
+
+QDF_STATUS
+policy_mgr_get_pcl_channel_for_ll_sap_concurrency(
+					struct wlan_objmgr_psoc *psoc,
+					enum policy_mgr_con_mode curr_mode,
+					uint32_t vdev_id,
+					uint32_t *pcl_channels,
+					uint8_t *pcl_weight, uint32_t *len);
+
+/**
+ * policy_mgr_is_ll_sap_present() - Check whether LL SAP is present or not
+ * @psoc: psoc object
+ * @mode: device mode
+ * @vdev_id: vdev id
+ *
+ * Return: true if it's present otherwise false
+ */
+bool
+policy_mgr_is_ll_sap_present(struct wlan_objmgr_psoc *psoc,
+			     enum policy_mgr_con_mode mode,
+			     uint32_t vdev_id);
 
 /**
  * policy_mgr_get_preferred_dbs_action_table() - get dbs action table type
@@ -2609,6 +2731,17 @@ void policy_mgr_hw_mode_transition_cb(uint32_t old_hw_mode_index,
 		struct wlan_objmgr_psoc *context);
 
 /**
+ * policy_mgr_will_freq_lead_to_mcc() - Check if the given freq can lead to
+ * MCC scenario with existing connection
+ * @psoc: psoc pointer
+ * @freq: freq to check with existing connections
+ *
+ * Return: true or false
+ */
+bool policy_mgr_will_freq_lead_to_mcc(struct wlan_objmgr_psoc *psoc,
+				      qdf_freq_t freq);
+
+/**
  * policy_mgr_current_concurrency_is_scc() - To check the current
  * concurrency combination if it is doing SCC
  * @psoc: PSOC object information
@@ -2928,8 +3061,7 @@ policy_mgr_allow_4th_new_freq(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_are_sbs_chan() - Function to check whether both the
  * input frequency are in SBS frequency range
  *
- * @pm_ctx: Policy Mgr context
- * @freq_range: freq range to check
+ * @psoc: Pointer to Psoc
  * @freq_1: Frequency 1 to check
  * @freq_2: Frequency 2 to check
  *
@@ -4582,4 +4714,26 @@ bool policy_mgr_any_other_vdev_on_same_mac_as_freq(
  */
 QDF_STATUS policy_mgr_get_sbs_cfg(struct wlan_objmgr_psoc *psoc, bool *sbs);
 
+/**
+ * policy_mgr_get_ll_sap_freq()- Function to get ll sap freq if it's present
+ * @psoc: PSOC object
+ *
+ * Return: True if it's LL SAP otherwise false
+ *
+ */
+qdf_freq_t policy_mgr_get_ll_sap_freq(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_is_ll_sap_concurrency_valid() - Function to check whether
+ * low latency SAP + STA/SAP/GC/GO concurrency allowed or not
+ * @psoc: PSOC object
+ * @freq: Channel frequency
+ * @mode: Device mode
+ *
+ * Return: True if concurrency are allowed otherwise false
+ *
+ */
+bool policy_mgr_is_ll_sap_concurrency_valid(struct wlan_objmgr_psoc *psoc,
+					    qdf_freq_t freq,
+					    enum policy_mgr_con_mode mode);
 #endif /* __WLAN_POLICY_MGR_API_H */

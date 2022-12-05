@@ -239,6 +239,14 @@ static QDF_STATUS wlansap_owe_init(struct sap_context *sap_ctx)
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS wlansap_ft_init(struct sap_context *sap_ctx)
+{
+	qdf_list_create(&sap_ctx->ft_pending_assoc_ind_list, 0);
+	qdf_event_create(&sap_ctx->ft_pending_event);
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void wlansap_owe_cleanup(struct sap_context *sap_ctx)
 {
 	struct mac_context *mac;
@@ -289,9 +297,63 @@ static void wlansap_owe_cleanup(struct sap_context *sap_ctx)
 	}
 }
 
+static void wlansap_ft_cleanup(struct sap_context *sap_ctx)
+{
+	struct mac_context *mac;
+	struct ft_assoc_ind *ft_assoc_ind;
+	struct assoc_ind *assoc_ind = NULL;
+	qdf_list_node_t *node = NULL, *next_node = NULL;
+	QDF_STATUS status;
+
+	if (!sap_ctx) {
+		sap_err("Invalid SAP context");
+		return;
+	}
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return;
+	}
+
+	if (QDF_STATUS_SUCCESS !=
+	    qdf_list_peek_front(&sap_ctx->ft_pending_assoc_ind_list,
+				&node)) {
+		sap_debug("Failed to find assoc ind list");
+		return;
+	}
+
+	while (node) {
+		qdf_list_peek_next(&sap_ctx->ft_pending_assoc_ind_list,
+				   node, &next_node);
+		ft_assoc_ind = qdf_container_of(node, struct ft_assoc_ind,
+						node);
+		status = qdf_list_remove_node(
+				    &sap_ctx->ft_pending_assoc_ind_list, node);
+		if (status == QDF_STATUS_SUCCESS) {
+			assoc_ind = ft_assoc_ind->assoc_ind;
+			qdf_mem_free(ft_assoc_ind);
+			assoc_ind->ft_ie = NULL;
+			assoc_ind->ft_ie_len = 0;
+			assoc_ind->ft_status = STATUS_UNSPECIFIED_FAILURE;
+			qdf_mem_free(assoc_ind);
+		} else {
+			sap_err("Failed to remove assoc ind");
+		}
+		node = next_node;
+		next_node = NULL;
+	}
+}
+
 static void wlansap_owe_deinit(struct sap_context *sap_ctx)
 {
 	qdf_list_destroy(&sap_ctx->owe_pending_assoc_ind_list);
+}
+
+static void wlansap_ft_deinit(struct sap_context *sap_ctx)
+{
+	qdf_list_destroy(&sap_ctx->ft_pending_assoc_ind_list);
+	qdf_event_destroy(&sap_ctx->ft_pending_event);
 }
 
 QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
@@ -334,6 +396,11 @@ QDF_STATUS sap_init_ctx(struct sap_context *sap_ctx,
 			sap_err("OWE init failed");
 			return QDF_STATUS_E_FAILURE;
 		}
+		status = wlansap_ft_init(sap_ctx);
+		if (QDF_STATUS_SUCCESS != status) {
+			sap_err("FT init failed");
+			return QDF_STATUS_E_FAILURE;
+		}
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -351,9 +418,10 @@ QDF_STATUS sap_deinit_ctx(struct sap_context *sap_ctx)
 		return QDF_STATUS_E_FAULT;
 	}
 
+	wlansap_ft_cleanup(sap_ctx);
+	wlansap_ft_deinit(sap_ctx);
 	wlansap_owe_cleanup(sap_ctx);
 	wlansap_owe_deinit(sap_ctx);
-
 	mac = sap_get_mac_context();
 	if (!mac) {
 		sap_err("Invalid MAC context");
@@ -1297,8 +1365,9 @@ wlansap_get_csa_chanwidth_from_phymode(struct sap_context *sap_context,
 	ch_params.ch_width = ch_width;
 	if (sap_phymode_is_eht(sap_context->phyMode))
 		wlan_reg_set_create_punc_bitmap(&ch_params, true);
-	wlan_reg_set_channel_params_for_freq(mac->pdev, chan_freq, sec_ch_freq,
-					     &ch_params);
+	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, chan_freq,
+						sec_ch_freq, &ch_params,
+						REG_CURRENT_PWR_MODE);
 	ch_width = ch_params.ch_width;
 	if (tgt_ch_params)
 		*tgt_ch_params = ch_params;
@@ -1429,9 +1498,10 @@ wlansap_set_chan_params_for_csa(struct mac_context *mac,
 	}
 	if (sap_phymode_is_eht(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params, true);
-	wlan_reg_set_channel_params_for_freq(
+	wlan_reg_set_channel_params_for_pwrmode(
 		mac->pdev, target_chan_freq, 0,
-		&mac->sap.SapDfsInfo.new_ch_params);
+		&mac->sap.SapDfsInfo.new_ch_params,
+		REG_CURRENT_PWR_MODE);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1537,8 +1607,9 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 
 	if (sap_phymode_is_eht(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(&tmp_ch_params, true);
-	wlan_reg_set_channel_params_for_freq(mac->pdev, target_chan_freq, 0,
-					     &tmp_ch_params);
+	wlan_reg_set_channel_params_for_pwrmode(mac->pdev, target_chan_freq, 0,
+						&tmp_ch_params,
+						REG_CURRENT_PWR_MODE);
 	if (sap_ctx->chan_freq == target_chan_freq &&
 	    sap_ctx->ch_params.ch_width == tmp_ch_params.ch_width) {
 		sap_nofl_debug("target freq and bw %d not changed",
@@ -1622,7 +1693,7 @@ QDF_STATUS wlansap_set_channel_change_with_csa(struct sap_context *sap_ctx,
 			 * that were suspended in HDD before the channel
 			 * request was issued.
 			 */
-			mac->sap.SapDfsInfo.sap_radar_found_status = true;
+			sap_ctx->sap_radar_found_status = true;
 			mac->sap.SapDfsInfo.cac_state =
 					eSAP_DFS_DO_NOT_SKIP_CAC;
 			sap_cac_reset_notify(mac_handle);
@@ -1873,8 +1944,9 @@ QDF_STATUS wlansap_channel_change_request(struct sap_context *sap_ctx,
 	ch_params = &mac_ctx->sap.SapDfsInfo.new_ch_params;
 	if (sap_phymode_is_eht(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(ch_params, true);
-	wlan_reg_set_channel_params_for_freq(mac_ctx->pdev, target_chan_freq,
-			0, ch_params);
+	wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev, target_chan_freq,
+						0, ch_params,
+						REG_CURRENT_PWR_MODE);
 	sap_ctx->ch_params = *ch_params;
 	sap_ctx->freq_before_ch_switch = sap_ctx->chan_freq;
 	/* Update the channel as this will be used to
@@ -1920,7 +1992,7 @@ QDF_STATUS wlansap_start_beacon_req(struct sap_context *sap_ctx)
 	}
 
 	/* No Radar was found during CAC WAIT, So start Beaconing */
-	if (mac->sap.SapDfsInfo.sap_radar_found_status == false) {
+	if (!sap_ctx->sap_radar_found_status) {
 		/* CAC Wait done without any Radar Detection */
 		dfs_cac_wait_status = true;
 		wlan_pre_cac_complete_set(sap_ctx->vdev, false);
@@ -1954,9 +2026,10 @@ QDF_STATUS wlansap_dfs_send_csa_ie_request(struct sap_context *sap_ctx)
 	if (sap_phymode_is_eht(sap_ctx->phyMode))
 		wlan_reg_set_create_punc_bitmap(
 			&mac->sap.SapDfsInfo.new_ch_params, true);
-	wlan_reg_set_channel_params_for_freq(mac->pdev,
+	wlan_reg_set_channel_params_for_pwrmode(mac->pdev,
 			mac->sap.SapDfsInfo.target_chan_freq,
-			0, &mac->sap.SapDfsInfo.new_ch_params);
+			0, &mac->sap.SapDfsInfo.new_ch_params,
+			REG_CURRENT_PWR_MODE);
 
 	sap_get_cac_dur_dfs_region(sap_ctx, &new_cac_ms, &dfs_region,
 				   mac->sap.SapDfsInfo.target_chan_freq,
@@ -2381,9 +2454,10 @@ wlansap_son_update_sap_config_phymode(struct wlan_objmgr_vdev *vdev,
 		}
 	}
 
-	wlan_reg_set_channel_params_for_freq(pdev, config->chan_freq,
-					     config->sec_ch_freq,
-					     &config->ch_params);
+	wlan_reg_set_channel_params_for_pwrmode(pdev, config->chan_freq,
+						config->sec_ch_freq,
+						&config->ch_params,
+						REG_CURRENT_PWR_MODE);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -2997,6 +3071,71 @@ QDF_STATUS wlansap_update_owe_info(struct sap_context *sap_ctx,
 		qdf_mem_free(assoc_ind);
 	}
 
+	return status;
+}
+
+QDF_STATUS wlansap_update_ft_info(struct sap_context *sap_ctx,
+				  uint8_t *peer, const uint8_t *ie,
+				  uint32_t ie_len, uint16_t ft_status)
+{
+	struct mac_context *mac;
+	struct ft_assoc_ind *ft_assoc_ind;
+	struct assoc_ind *assoc_ind = NULL;
+	qdf_list_node_t *node = NULL, *next_node = NULL;
+	QDF_STATUS status;
+
+	if (!sap_ctx) {
+		sap_err("Invalid SAP context");
+		return QDF_STATUS_E_FAULT;
+	}
+
+	mac = sap_get_mac_context();
+	if (!mac) {
+		sap_err("Invalid MAC context");
+		return QDF_STATUS_E_FAULT;
+	}
+	status = qdf_wait_single_event(&sap_ctx->ft_pending_event,
+				       500);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		sap_err("wait for ft pending event timeout");
+		wlansap_ft_cleanup(sap_ctx);
+		return QDF_STATUS_E_FAULT;
+	}
+
+	if (QDF_STATUS_SUCCESS !=
+		qdf_list_peek_front(&sap_ctx->ft_pending_assoc_ind_list,
+				    &next_node)) {
+		sap_err("Failed to find ft assoc ind list");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	do {
+		node = next_node;
+		ft_assoc_ind = qdf_container_of(node, struct ft_assoc_ind, node);
+		if (qdf_mem_cmp(peer,
+				ft_assoc_ind->assoc_ind->peerMacAddr,
+				QDF_MAC_ADDR_SIZE) == 0) {
+			status = qdf_list_remove_node(&sap_ctx->ft_pending_assoc_ind_list,
+						      node);
+			if (status != QDF_STATUS_SUCCESS) {
+				sap_err("Failed to remove ft assoc ind");
+				return status;
+			}
+			assoc_ind = ft_assoc_ind->assoc_ind;
+			qdf_mem_free(ft_assoc_ind);
+			break;
+		}
+	} while (QDF_STATUS_SUCCESS ==
+		 qdf_list_peek_next(&sap_ctx->ft_pending_assoc_ind_list,
+				    node, &next_node));
+
+	if (assoc_ind) {
+		assoc_ind->ft_ie = ie;
+		assoc_ind->ft_ie_len = ie_len;
+		assoc_ind->ft_status = ft_status;
+		status = sme_update_ft_info(mac, assoc_ind);
+		qdf_mem_free(assoc_ind);
+	}
 	return status;
 }
 

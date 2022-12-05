@@ -51,13 +51,14 @@ void ucfg_dp_update_inf_mac(struct wlan_objmgr_psoc *psoc,
 	dp_intf = dp_get_intf_by_macaddr(dp_ctx, cur_mac);
 	if (!dp_intf) {
 		dp_err("DP interface not found addr:" QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(cur_mac));
+		       QDF_MAC_ADDR_REF(cur_mac->bytes));
 		QDF_BUG(0);
 		return;
 	}
 
 	dp_info("MAC update from " QDF_MAC_ADDR_FMT " to " QDF_MAC_ADDR_FMT "",
-		QDF_MAC_ADDR_REF(cur_mac), QDF_MAC_ADDR_REF(new_mac));
+		QDF_MAC_ADDR_REF(cur_mac->bytes),
+		QDF_MAC_ADDR_REF(new_mac->bytes));
 
 	qdf_copy_macaddr(&dp_intf->mac_addr, new_mac);
 }
@@ -73,12 +74,12 @@ ucfg_dp_create_intf(struct wlan_objmgr_psoc *psoc,
 	dp_ctx =  dp_get_context();
 
 	dp_info("DP interface create addr:" QDF_MAC_ADDR_FMT,
-		QDF_MAC_ADDR_REF(intf_addr));
+		QDF_MAC_ADDR_REF(intf_addr->bytes));
 
 	dp_intf = __qdf_mem_malloc(sizeof(*dp_intf), __func__, __LINE__);
 	if (!dp_intf) {
 		dp_err("DP intf memory alloc failed addr:" QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(intf_addr));
+		       QDF_MAC_ADDR_REF(intf_addr->bytes));
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -112,14 +113,17 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 	dp_ctx =  dp_get_context();
 
 	dp_info("DP interface destroy addr:" QDF_MAC_ADDR_FMT,
-		QDF_MAC_ADDR_REF(intf_addr));
+		QDF_MAC_ADDR_REF(intf_addr->bytes));
 
 	dp_intf = dp_get_intf_by_macaddr(dp_ctx, intf_addr);
 	if (!dp_intf) {
 		dp_err("DP interface not found addr:" QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(intf_addr));
+		       QDF_MAC_ADDR_REF(intf_addr->bytes));
 		return QDF_STATUS_E_FAILURE;
 	}
+
+	if (dp_intf->device_mode == QDF_SAP_MODE)
+		dp_config_direct_link(dp_intf, false, false);
 
 	dp_periodic_sta_stats_mutex_destroy(dp_intf);
 	dp_nud_deinit_tracking(dp_intf);
@@ -603,7 +607,7 @@ void ucfg_dp_update_dhcp_state_on_disassoc(struct wlan_objmgr_vdev *vdev,
 					   WLAN_DP_ID);
 	if (!peer) {
 		dp_err("Peer object not found mac:" QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(mac_addr));
+		       QDF_MAC_ADDR_REF(mac_addr->bytes));
 		return;
 	}
 
@@ -2322,5 +2326,68 @@ void ucfg_dp_rx_skip_fisa(uint32_t value)
 
 	if (dp_soc)
 		dp_rx_skip_fisa(dp_soc, value);
+}
+#endif
+
+#ifdef FEATURE_DIRECT_LINK
+QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return dp_direct_link_init(dp_ctx);
+}
+
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_psoc_get_priv(psoc);
+
+	if (!dp_ctx) {
+		dp_err("DP context not found");
+		return;
+	}
+
+	dp_direct_link_deinit(dp_ctx);
+}
+
+void
+ucfg_dp_wfds_handle_request_mem_ind(struct wlan_qmi_wfds_mem_ind_msg *mem_msg)
+{
+	dp_wfds_handle_request_mem_ind(mem_msg);
+}
+
+void
+ucfg_dp_wfds_handle_ipcc_map_n_cfg_ind(struct wlan_qmi_wfds_ipcc_map_n_cfg_ind_msg *ipcc_msg)
+{
+	dp_wfds_handle_ipcc_map_n_cfg_ind(ipcc_msg);
+}
+
+QDF_STATUS ucfg_dp_wfds_new_server(void)
+{
+	return dp_wfds_new_server();
+}
+
+void ucfg_dp_wfds_del_server(void)
+{
+	dp_wfds_del_server();
+}
+
+QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+				      bool config_direct_link,
+				      bool enable_low_latency)
+{
+	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return dp_config_direct_link(dp_intf, config_direct_link,
+				     enable_low_latency);
 }
 #endif

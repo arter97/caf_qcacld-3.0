@@ -254,8 +254,9 @@ static qdf_freq_t sap_random_channel_sel(struct sap_context *sap_ctx)
 		chan_freq = sap_ctx->candidate_freq;
 		if (sap_phymode_is_eht(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(ch_params, true);
-		wlan_reg_set_channel_params_for_freq(pdev, chan_freq, 0,
-						     ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(pdev, chan_freq, 0,
+							ch_params,
+							REG_CURRENT_PWR_MODE);
 		sap_debug("random chan select candidate freq=%d", chan_freq);
 		sap_ctx->candidate_freq = 0;
 	} else if (QDF_IS_STATUS_ERROR(
@@ -1175,8 +1176,8 @@ validation_done:
 	sap_debug("for configured channel, Ch_freq = %d",
 		  sap_context->chan_freq);
 
-	if (!policy_mgr_is_safe_channel(mac_ctx->psoc,
-					sap_context->chan_freq)) {
+	if (!policy_mgr_is_sap_freq_allowed(mac_ctx->psoc,
+					    sap_context->chan_freq)) {
 		sap_warn("Abort SAP start due to unsafe channel");
 		return QDF_STATUS_E_ABORTED;
 	}
@@ -1898,6 +1899,27 @@ static bool sap_save_owe_pending_assoc_ind(struct sap_context *sap_ctx,
 	return true;
 }
 
+static bool sap_save_ft_pending_assoc_ind(struct sap_context *sap_ctx,
+					  struct assoc_ind *sme_assoc_ind)
+{
+	struct ft_assoc_ind *assoc_ind;
+	QDF_STATUS status;
+
+	assoc_ind = qdf_mem_malloc(sizeof(*assoc_ind));
+	if (!assoc_ind)
+		return false;
+	assoc_ind->assoc_ind = sme_assoc_ind;
+	status = qdf_list_insert_back(&sap_ctx->ft_pending_assoc_ind_list,
+				      &assoc_ind->node);
+	if (QDF_STATUS_SUCCESS != status) {
+		qdf_mem_free(assoc_ind);
+		return false;
+	}
+	qdf_event_set(&sap_ctx->ft_pending_event);
+
+	return true;
+}
+
 #ifdef FEATURE_RADAR_HISTORY
 /* Last cac result */
 static struct prev_cac_result prev_cac_history;
@@ -2312,6 +2334,18 @@ QDF_STATUS sap_signal_hdd_event(struct sap_context *sap_ctx,
 				return QDF_STATUS_E_INVAL;
 			}
 			csr_roaminfo->owe_pending_assoc_ind = NULL;
+		}
+
+		if (csr_roaminfo->ft_pending_assoc_ind) {
+			if (!sap_save_ft_pending_assoc_ind(sap_ctx,
+			    csr_roaminfo->ft_pending_assoc_ind)) {
+				sap_err("Failed to save ft assoc ind");
+				qdf_mem_free(csr_roaminfo->ft_pending_assoc_ind);
+				csr_roaminfo->ft_pending_assoc_ind = NULL;
+				qdf_mem_free(sap_ap_event);
+				return QDF_STATUS_E_INVAL;
+			}
+			csr_roaminfo->ft_pending_assoc_ind = NULL;
 		}
 		break;
 	case eSAP_START_BSS_EVENT:
@@ -2805,7 +2839,7 @@ static void wlansap_pre_cac_end_notify(struct sap_context *sap_context,
 				       uint8_t intf)
 {
 	sap_context->isCacEndNotified = true;
-	mac->sap.SapDfsInfo.sap_radar_found_status = false;
+	sap_context->sap_radar_found_status = false;
 	sap_context->fsm_state = SAP_STARTED;
 
 	sap_warn("pre cac end notify on %d: move to state SAP_STARTED", intf);
@@ -2866,7 +2900,7 @@ QDF_STATUS sap_cac_end_notify(mac_handle_t mac_handle,
 				return qdf_status;
 			}
 			sap_context->isCacEndNotified = true;
-			mac->sap.SapDfsInfo.sap_radar_found_status = false;
+			sap_context->sap_radar_found_status = false;
 			sap_debug("sapdfs: Start beacon request on sapctx[%pK]",
 				  sap_context);
 
@@ -2979,10 +3013,11 @@ static QDF_STATUS sap_validate_dfs_nol(struct sap_context *sap_ctx,
 		if (sap_phymode_is_eht(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
 							true);
-		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
-						     sap_ctx->chan_freq,
-						     sap_ctx->sec_ch_freq,
-						     &sap_ctx->ch_params);
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
+							sap_ctx->chan_freq,
+							sap_ctx->sec_ch_freq,
+							&sap_ctx->ch_params,
+							REG_CURRENT_PWR_MODE);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -3012,17 +3047,19 @@ static void sap_validate_chanmode_and_chwidth(struct mac_context *mac_ctx,
 	     sap_ctx->phyMode == eCSR_DOT11_MODE_11g ||
 	     sap_ctx->phyMode == eCSR_DOT11_MODE_11b)) {
 		sap_ctx->ch_params.ch_width = CH_WIDTH_20MHZ;
-		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 					       sap_ctx->chan_freq,
 					       sap_ctx->ch_params.sec_ch_offset,
-					       &sap_ctx->ch_params);
+					       &sap_ctx->ch_params,
+					       REG_CURRENT_PWR_MODE);
 	} else if (sap_ctx->ch_params.ch_width > CH_WIDTH_40MHZ &&
 		   sap_ctx->phyMode == eCSR_DOT11_MODE_11n) {
 		sap_ctx->ch_params.ch_width = CH_WIDTH_40MHZ;
-		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 					       sap_ctx->chan_freq,
 					       sap_ctx->ch_params.sec_ch_offset,
-					       &sap_ctx->ch_params);
+					       &sap_ctx->ch_params,
+					       REG_CURRENT_PWR_MODE);
 	}
 
 	if (orig_ch_width != sap_ctx->ch_params.ch_width ||
@@ -3149,10 +3186,11 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 			if (sap_phymode_is_eht(sap_ctx->phyMode))
 				wlan_reg_set_create_punc_bitmap(
 					&sap_ctx->ch_params, true);
-			wlan_reg_set_channel_params_for_freq(
+			wlan_reg_set_channel_params_for_pwrmode(
 						    mac_ctx->pdev,
 						    con_ch_freq, 0,
-						    &sap_ctx->ch_params);
+						    &sap_ctx->ch_params,
+						    REG_CURRENT_PWR_MODE);
 		}
 	}
 
@@ -3239,7 +3277,7 @@ static QDF_STATUS sap_goto_starting(struct sap_context *sap_ctx,
 	/* Reset radar found flag before start sap, the flag will
 	 * be set when radar found in CAC wait.
 	 */
-	mac_ctx->sap.SapDfsInfo.sap_radar_found_status = false;
+	sap_ctx->sap_radar_found_status = false;
 
 	sap_debug("session: %d", sap_ctx->sessionId);
 
@@ -3345,9 +3383,9 @@ static QDF_STATUS sap_fsm_handle_radar_during_cac(struct sap_context *sap_ctx,
 		if (sap_phymode_is_eht(sap_ctx->phyMode))
 			wlan_reg_set_create_punc_bitmap(&sap_ctx->ch_params,
 							true);
-		wlan_reg_set_channel_params_for_freq(mac_ctx->pdev,
+		wlan_reg_set_channel_params_for_pwrmode(mac_ctx->pdev,
 				    mac_ctx->sap.SapDfsInfo.target_chan_freq, 0,
-				    &sap_ctx->ch_params);
+				    &sap_ctx->ch_params, REG_CURRENT_PWR_MODE);
 	} else {
 		sap_err("Invalid target channel freq %d",
 			 mac_ctx->sap.SapDfsInfo.target_chan_freq);
@@ -3608,7 +3646,7 @@ static QDF_STATUS sap_fsm_state_starting(struct sap_context *sap_ctx,
 							       mac_handle);
 			} else {
 				sap_debug("skip cac timer");
-				mac_ctx->sap.SapDfsInfo.sap_radar_found_status = false;
+				sap_ctx->sap_radar_found_status = false;
 				/*
 				 * If hostapd starts AP on dfs channel,
 				 * hostapd will wait for CAC START/CAC END
@@ -4387,7 +4425,7 @@ qdf_freq_t sap_indicate_radar(struct sap_context *sap_ctx)
 		return sap_ctx->chan_freq;
 
 	/* set the Radar Found flag in SapDfsInfo */
-	mac->sap.SapDfsInfo.sap_radar_found_status = true;
+	sap_ctx->sap_radar_found_status = true;
 
 	chan_freq = wlan_pre_cac_get_freq_before_pre_cac(sap_ctx->vdev);
 	if (chan_freq) {

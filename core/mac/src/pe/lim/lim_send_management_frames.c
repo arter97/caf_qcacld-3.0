@@ -230,6 +230,16 @@ lim_populate_ml_probe_req(struct mac_context *mac,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+static bool
+lim_check_join_req_and_num_of_partner_link(struct pe_session *session)
+{
+	if (session && session->lim_join_req &&
+	    session->lim_join_req->partner_info.num_partner_links)
+		return true;
+
+	return false;
+}
 #else
 static QDF_STATUS
 lim_populate_ml_probe_req(struct mac_context *mac,
@@ -238,6 +248,12 @@ lim_populate_ml_probe_req(struct mac_context *mac,
 			  uint16_t *ml_probe_req_len)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static bool
+lim_check_join_req_and_num_of_partner_link(struct pe_session *session)
+{
+	return false;
 }
 #endif
 
@@ -348,7 +364,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 		p2pie = limGetP2pIEPtr(mac_ctx, additional_ie, addn_ielen);
 
 	/*
-	 * Don't include 11b rate if it is a P2P serach or probe request is
+	 * Don't include 11b rate if it is a P2P search or probe request is
 	 * sent by P2P Client
 	 */
 	if ((MLME_DOT11_MODE_11B != dot11mode) && (p2pie) &&
@@ -394,7 +410,7 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	}
 
 	/*
-	 * Set channelbonding information as "disabled" when tunned to a
+	 * Set channelbonding information as "disabled" when tuned to a
 	 * 2.4 GHz channel
 	 */
 	if (wlan_reg_is_24ghz_ch_freq(chan_freq)) {
@@ -435,7 +451,8 @@ lim_send_probe_req_mgmt_frame(struct mac_context *mac_ctx,
 	populate_dot11f_he_6ghz_cap(mac_ctx, pesession,
 				    &pr->he_6ghz_band_cap);
 
-	if (IS_DOT11_MODE_EHT(dot11mode) && pesession) {
+	if (IS_DOT11_MODE_EHT(dot11mode) && pesession &&
+	    lim_check_join_req_and_num_of_partner_link(pesession)) {
 		lim_update_session_eht_capable(mac_ctx, pesession);
 		lim_populate_ml_probe_req(mac_ctx, pesession,
 					  &ml_probe_req_ie,
@@ -687,10 +704,10 @@ static QDF_STATUS lim_get_addn_ie_for_probe_resp(struct mac_context *mac,
  * lim_add_additional_ie() - Add additional IE to management frame
  * @frame:          pointer to frame
  * @frame_offset:   current offset of frame
- * @add_ie:         pointer to addtional ie
- * @add_ie_len:     length of addtional ie
+ * @add_ie:         pointer to additional ie
+ * @add_ie_len:     length of additional ie
  * @p2p_ie:         pointer to p2p ie
- * @noa_ie:         pointer to noa ie, this is seperate p2p ie
+ * @noa_ie:         pointer to noa ie, this is separate p2p ie
  * @noa_ie_len:     length of noa ie
  * @noa_stream:     pointer to noa stream, this is noa attribute only
  * @noa_stream_len: length of noa stream
@@ -707,7 +724,7 @@ static void lim_add_additional_ie(uint8_t *frame, uint32_t frame_offset,
 	uint16_t p2p_ie_offset;
 
 	if (!add_ie_len || !add_ie) {
-		pe_debug("no valid addtional ie");
+		pe_debug("no valid additional ie");
 		return;
 	}
 
@@ -1632,6 +1649,7 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	bool is_band_2g;
 	uint16_t ie_buf_size;
 	uint16_t mlo_ie_len = 0;
+	struct element_info ie;
 
 	if (!pe_session) {
 		pe_err("pe_session is NULL");
@@ -1906,9 +1924,10 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 
 	bytes += sizeof(tSirMacMgmtHdr) + payload + mlo_ie_len;
 
-	if (sta)
+	if (sta) {
 		bytes += sta->mlmStaContext.owe_ie_len;
-
+		bytes += sta->mlmStaContext.ft_ie_len;
+	}
 	qdf_status = cds_packet_alloc((uint16_t) bytes, (void **)&frame,
 				      (void **)&packet);
 	if (!QDF_IS_STATUS_SUCCESS(qdf_status)) {
@@ -2028,6 +2047,13 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 		payload += sta->mlmStaContext.owe_ie_len;
 	}
 
+	if (sta && sta->mlmStaContext.ft_ie_len) {
+		qdf_mem_copy(frame + sizeof(tSirMacMgmtHdr) + payload,
+			     sta->mlmStaContext.ft_ie,
+			     sta->mlmStaContext.ft_ie_len);
+		payload += sta->mlmStaContext.ft_ie_len;
+	}
+
 	if (sta && mlo_ie_len) {
 		qdf_status = lim_fill_complete_mlo_ie(pe_session, mlo_ie_len,
 				      frame + sizeof(tSirMacMgmtHdr) + payload);
@@ -2050,6 +2076,11 @@ lim_send_assoc_rsp_mgmt_frame(struct mac_context *mac_ctx,
 	    pe_session->opmode == QDF_P2P_CLIENT_MODE ||
 	    pe_session->opmode == QDF_P2P_GO_MODE)
 		tx_flag |= HAL_USE_BD_RATE2_FOR_MANAGEMENT_FRAME;
+
+	ie.ptr = frame + sizeof(tSirMacMgmtHdr) + WLAN_ASSOC_RSP_IES_OFFSET;
+	ie.len = payload - WLAN_ASSOC_RSP_IES_OFFSET;
+
+	mlme_set_peer_assoc_rsp_ie(mac_ctx->psoc, peer_addr, &ie);
 
 	MTRACE(qdf_trace(QDF_MODULE_ID_PE, TRACE_CODE_TX_MGMT,
 			 pe_session->peSessionId, mac_hdr->fc.subType));
@@ -2358,7 +2389,7 @@ static QDF_STATUS lim_assoc_tx_complete_cnf(void *context,
 
 #ifdef WLAN_ADAPTIVE_11R
 /**
- * lim_fill_adaptive_11r_ie() - Populate the Vendor secific adaptive 11r
+ * lim_fill_adaptive_11r_ie() - Populate the Vendor specific adaptive 11r
  * IE to association request frame
  * @pe_session: pointer to PE session
  * @ie_buf: buffer to which Adaptive 11r IE will be copied
@@ -2497,7 +2528,7 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 
 	vdev_id = pe_session->vdev_id;
 
-	/* check this early to avoid unncessary operation */
+	/* check this early to avoid unnecessary operation */
 	if (!pe_session->lim_join_req) {
 		pe_err("pe_session->lim_join_req is NULL");
 		qdf_mem_free(mlm_assoc_req);
@@ -2674,7 +2705,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		vht_enabled = true;
 		if (pe_session->gLimOperatingMode.present &&
 		    pe_session->ch_width == CH_WIDTH_20MHZ &&
-		    frm->VHTCaps.present) {
+		    frm->VHTCaps.present &&
+		    !IS_DOT11_MODE_HE(pe_session->dot11mode)) {
 			populate_dot11f_operating_mode(mac_ctx,
 					&frm->OperatingMode, pe_session);
 		}
@@ -2875,7 +2907,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 		rsnx_ie_len = rsnx_ie[1] + 2;
 	}
 	/* MSCS ext ie */
-	if (wlan_get_ext_ie_ptr_from_ext_id(MSCS_OUI_TYPE, MSCS_OUI_SIZE,
+	if (add_ie &&
+	    wlan_get_ext_ie_ptr_from_ext_id(MSCS_OUI_TYPE, MSCS_OUI_SIZE,
 					    add_ie, add_ie_len)) {
 		mscs_ext_ie = qdf_mem_malloc(WLAN_MAX_IE_LEN + 2);
 		if (!mscs_ext_ie)
@@ -2900,8 +2933,10 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * TLVs with same attribute in a single IE.
 	 * Strip off the MBO IE from add_ie and append it at the end.
 	 */
-	if (wlan_get_vendor_ie_ptr_from_oui(SIR_MAC_MBO_OUI,
-	    SIR_MAC_MBO_OUI_SIZE, add_ie, add_ie_len)) {
+	if (add_ie &&
+	    wlan_get_vendor_ie_ptr_from_oui(SIR_MAC_MBO_OUI,
+					    SIR_MAC_MBO_OUI_SIZE, add_ie,
+					    add_ie_len)) {
 		mbo_ie = qdf_mem_malloc(DOT11F_IE_MBO_IE_MAX_LEN + 2);
 		if (!mbo_ie)
 			goto end;
@@ -2939,7 +2974,8 @@ lim_send_assoc_req_mgmt_frame(struct mac_context *mac_ctx,
 	 * Append the IEs just before MBO IEs as MBO IEs have to be at the
 	 * end of the frame.
 	 */
-	if (wlan_get_ie_ptr_from_eid(WLAN_ELEMID_VENDOR, add_ie, add_ie_len)) {
+	if (add_ie &&
+	    wlan_get_ie_ptr_from_eid(WLAN_ELEMID_VENDOR, add_ie, add_ie_len)) {
 		vendor_ies = qdf_mem_malloc(MAX_VENDOR_IES_LEN + 2);
 		if (vendor_ies) {
 			current_len = add_ie_len;
@@ -6610,6 +6646,19 @@ void lim_send_mgmt_frame_tx(struct mac_context *mac_ctx,
 		if (auth_algo == eSIR_AUTH_TYPE_SAE)
 			lim_handle_sae_auth_retry(mac_ctx, vdev_id,
 						  mb_msg->data, msg_len);
+		if (auth_algo == eSIR_FT_AUTH) {
+			struct tLimPreAuthNode *sta_pre_auth_ctx;
+
+			sta_pre_auth_ctx = lim_search_pre_auth_list(mac_ctx,
+				((tpSirMacMgmtHdr)(mb_msg->data))->da);
+			pe_debug("FT Auth TX to " QDF_MAC_ADDR_FMT,
+				 QDF_MAC_ADDR_REF(((tpSirMacMgmtHdr)(mb_msg->data))->da));
+			if (sta_pre_auth_ctx) {
+				pe_debug("STA is AUTHENTICATED_STATE");
+				sta_pre_auth_ctx->mlmState =
+					eLIM_MLM_AUTHENTICATED_STATE;
+			}
+		}
 	}
 	mac_ctx->auth_ack_status = LIM_ACK_NOT_RCD;
 	lim_send_frame(mac_ctx, vdev_id, mb_msg->data, msg_len);

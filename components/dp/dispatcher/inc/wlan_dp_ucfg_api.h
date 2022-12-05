@@ -34,6 +34,7 @@
 #include <wlan_dp_public_struct.h>
 #include <cdp_txrx_misc.h>
 #include "wlan_dp_objmgr.h"
+#include "wlan_qmi_public_struct.h"
 
 #define DP_IGNORE_NUD_FAIL                      0
 #define DP_DISCONNECT_AFTER_NUD_FAIL            1
@@ -1341,4 +1342,110 @@ void *ucfg_dp_prealloc_get_consistent_mem_unaligned(qdf_size_t size,
  */
 void ucfg_dp_prealloc_put_consistent_mem_unaligned(void *va_unaligned);
 #endif
-#endif /* _WLAN_DP_UCFGi_API_H_ */
+
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * ucfg_dp_direct_link_init() - Initializes Direct Link datapath
+ * @psoc: psoc handle
+ *
+ * Return: QDF status
+ */
+QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_direct_link_deinit() - De-initializes Direct Link datapath
+ * @psoc: psoc handle
+ *
+ * Return: None
+ */
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * ucfg_dp_wfds_handle_request_mem_ind() - Process request memory indication
+ *  received from QMI server
+ * @mem_msg: pointer to memory request indication message
+ *
+ * Return: None
+ */
+void
+ucfg_dp_wfds_handle_request_mem_ind(struct wlan_qmi_wfds_mem_ind_msg *mem_msg);
+
+/**
+ * ucfg_dp_wfds_handle_ipcc_map_n_cfg_ind() - Process IPCC map and configure
+ *  indication received from QMI server
+ * @ipcc_msg: pointer to IPCC map and configure indication message
+ *
+ * Return: None
+ */
+void
+ucfg_dp_wfds_handle_ipcc_map_n_cfg_ind(struct wlan_qmi_wfds_ipcc_map_n_cfg_ind_msg *ipcc_msg);
+
+/**
+ * ucfg_dp_wfds_new_server() - New server callback triggered when service is up.
+ *  Connect to the service as part of this call.
+ *
+ * Return: QDF status
+ */
+QDF_STATUS ucfg_dp_wfds_new_server(void);
+
+/**
+ * ucfg_dp_wfds_del_server() - Del server callback triggered when service is
+ *  down.
+ *
+ * Return: None
+ */
+void ucfg_dp_wfds_del_server(void);
+
+/**
+ * ucfg_dp_config_direct_link() - Set direct link config for vdev
+ * @vdev: objmgr Vdev handle
+ * @config_direct_link: Flag to enable direct link path
+ * @enable_low_latency: Flag to enable low link latency
+ *
+ * Return: QDF Status
+ */
+QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+				      bool config_direct_link,
+				      bool enable_low_latency);
+#else
+static inline
+QDF_STATUS ucfg_dp_direct_link_init(struct wlan_objmgr_psoc *psoc)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
+{
+}
+
+#ifdef QMI_WFDS
+static inline void
+ucfg_dp_wfds_handle_request_mem_ind(struct wlan_qmi_wfds_mem_ind_msg *mem_msg)
+{
+}
+
+static inline void
+ucfg_dp_wfds_handle_ipcc_map_n_cfg_ind(struct wlan_qmi_wfds_ipcc_map_n_cfg_ind_msg *ipcc_msg)
+{
+}
+
+static inline QDF_STATUS ucfg_dp_wfds_new_server(void)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void ucfg_dp_wfds_del_server(void)
+{
+}
+#endif
+
+static inline
+QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+				      bool enable_direct_link,
+				      bool enable_low_latency)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+#endif /* _WLAN_DP_UCFG_API_H_ */

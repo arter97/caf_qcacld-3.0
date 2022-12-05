@@ -392,7 +392,7 @@ static void hdd_wmm_inactivity_timer_cb(void *user_data)
 	QDF_STATUS qdf_status;
 	uint32_t traffic_count = 0;
 	sme_ac_enum_type ac_type;
-	uint8_t cpu;
+	unsigned int cpu;
 
 	if (!qos_context) {
 		hdd_err("invalid user data");
@@ -461,7 +461,7 @@ hdd_wmm_enable_inactivity_timer(struct hdd_wmm_qos_context *qos_context,
 	struct hdd_adapter *adapter = qos_context->adapter;
 	sme_ac_enum_type ac_type = qos_context->ac_type;
 	struct hdd_wmm_ac_status *ac;
-	uint8_t cpu;
+	unsigned int cpu;
 
 	adapter = qos_context->adapter;
 	ac = &adapter->hdd_wmm_status.ac_status[ac_type];
@@ -1761,6 +1761,41 @@ QDF_STATUS hdd_wmm_adapter_close(struct hdd_adapter *adapter)
 }
 
 /**
+ * hdd_check_upgrade_vo_vi_qos() - Check and upgrade QOS for UDP packets
+ *				   based on request type received
+ * @adapter: [in] pointer to the adapter context (Should not be invalid)
+ * @user_pri: [out] priority set for this packet
+ *
+ * This function checks for the request type and upgrade based on request type
+ *
+ * UDP_QOS_UPGRADE_ALL: Upgrade QoS of all UDP packets if the current set
+ *	priority is below the pre-configured threshold for upgrade.
+ *
+ * UDP_QOS_UPGRADE_BK_BE: Upgrade QoS of all UDP packets if the current set
+ *	priority is below the AC VI.
+ */
+static inline void
+hdd_check_upgrade_vo_vi_qos(struct hdd_adapter *adapter,
+			    enum sme_qos_wmmuptype *user_pri)
+{
+	switch (adapter->udp_qos_upgrade_type) {
+	case UDP_QOS_UPGRADE_ALL:
+		if (*user_pri <
+		    qca_wlan_ac_to_sme_qos(adapter->upgrade_udp_qos_threshold))
+			*user_pri = qca_wlan_ac_to_sme_qos(
+					adapter->upgrade_udp_qos_threshold);
+		break;
+	case UDP_QOS_UPGRADE_BK_BE:
+		if (*user_pri < qca_wlan_ac_to_sme_qos(QCA_WLAN_AC_VI))
+			*user_pri = qca_wlan_ac_to_sme_qos(
+					adapter->upgrade_udp_qos_threshold);
+		break;
+	default:
+		break;
+	}
+}
+
+/**
  * hdd_check_and_upgrade_udp_qos() - Check and upgrade the qos for UDP packets
  *				     if the current set priority is below the
  *				     pre-configured threshold for upgrade.
@@ -1794,11 +1829,7 @@ hdd_check_and_upgrade_udp_qos(struct hdd_adapter *adapter,
 		break;
 	case QCA_WLAN_AC_VI:
 	case QCA_WLAN_AC_VO:
-		if (*user_pri <
-		    qca_wlan_ac_to_sme_qos(adapter->upgrade_udp_qos_threshold))
-			*user_pri = qca_wlan_ac_to_sme_qos(
-					adapter->upgrade_udp_qos_threshold);
-
+		hdd_check_upgrade_vo_vi_qos(adapter, user_pri);
 		break;
 	default:
 		break;
@@ -2598,27 +2629,27 @@ hdd_wlan_wmm_status_e hdd_wmm_addts(struct hdd_adapter *adapter,
 				    uint32_t handle,
 				    struct sme_qos_wmmtspecinfo *tspec)
 {
-	struct hdd_wmm_qos_context *qos_context;
+	struct hdd_wmm_qos_context *qos_context = NULL;
+	struct hdd_wmm_qos_context *cur_entry;
 	hdd_wlan_wmm_status_e status = HDD_WLAN_WMM_STATUS_SETUP_SUCCESS;
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
 	enum sme_qos_statustype sme_status;
 #endif
-	bool found = false;
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
 
 	hdd_debug("Entered with handle 0x%x", handle);
 
 	/* see if a context already exists with the given handle */
 	mutex_lock(&adapter->hdd_wmm_status.mutex);
-	list_for_each_entry(qos_context,
+	list_for_each_entry(cur_entry,
 			    &adapter->hdd_wmm_status.context_list, node) {
-		if (qos_context->handle == handle) {
-			found = true;
+		if (cur_entry->handle == handle) {
+			qos_context = cur_entry;
 			break;
 		}
 	}
 	mutex_unlock(&adapter->hdd_wmm_status.mutex);
-	if (found) {
+	if (qos_context) {
 		/* record with that handle already exists */
 		hdd_err("Record already exists with handle 0x%x", handle);
 
@@ -2776,8 +2807,8 @@ hdd_wlan_wmm_status_e hdd_wmm_addts(struct hdd_adapter *adapter,
 hdd_wlan_wmm_status_e hdd_wmm_delts(struct hdd_adapter *adapter,
 				    uint32_t handle)
 {
-	struct hdd_wmm_qos_context *qos_context;
-	bool found = false;
+	struct hdd_wmm_qos_context *qos_context = NULL;
+	struct hdd_wmm_qos_context *cur_entry;
 	sme_ac_enum_type ac_type = 0;
 	uint32_t flow_id = 0;
 	hdd_wlan_wmm_status_e status = HDD_WLAN_WMM_STATUS_SETUP_SUCCESS;
@@ -2790,25 +2821,26 @@ hdd_wlan_wmm_status_e hdd_wmm_delts(struct hdd_adapter *adapter,
 
 	/* locate the context with the given handle */
 	mutex_lock(&adapter->hdd_wmm_status.mutex);
-	list_for_each_entry(qos_context,
+	list_for_each_entry(cur_entry,
 			    &adapter->hdd_wmm_status.context_list, node) {
-		if (qos_context->handle == handle) {
-			found = true;
-			ac_type = qos_context->ac_type;
-			flow_id = qos_context->flow_id;
+		if (cur_entry->handle == handle) {
+			qos_context = cur_entry;
 			break;
 		}
 	}
 	mutex_unlock(&adapter->hdd_wmm_status.mutex);
 
-	if (false == found) {
+	if (!qos_context) {
 		/* we didn't find the handle */
 		hdd_info("handle 0x%x not found", handle);
 		return HDD_WLAN_WMM_STATUS_RELEASE_FAILED_BAD_PARAM;
 	}
 
-	hdd_debug("found handle 0x%x, flow %d, AC %d, context %pK",
-		 handle, flow_id, ac_type, qos_context);
+	ac_type = qos_context->ac_type;
+	flow_id = qos_context->flow_id;
+
+	hdd_debug("found handle 0x%x, flow %d, AC %d",
+		 handle, flow_id, ac_type);
 
 #ifndef WLAN_MDM_CODE_REDUCTION_OPT
 	sme_status = sme_qos_release_req(mac_handle, adapter->vdev_id,

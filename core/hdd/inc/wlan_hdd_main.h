@@ -121,6 +121,10 @@
 #include "wlan_osif_features.h"
 #include "wlan_dp_public_struct.h"
 
+#ifdef WLAN_FEATURE_TSF_ACCURACY
+#include "qdf_hrtimer.h"
+#endif
+
 /*
  * Preprocessor definitions and constants
  */
@@ -132,6 +136,8 @@ static qdf_atomic_t dp_protect_entry_count;
 #define MAX_SSR_WAIT_ITERATIONS 100
 #define MAX_SSR_PROTECT_LOG (16)
 
+#define HDD_MAX_OEM_DATA_LEN 1024
+#define HDD_MAX_FILE_NAME_LEN 64
 #ifdef FEATURE_WLAN_APF
 /**
  * struct hdd_apf_context - hdd Context for apf
@@ -833,6 +839,7 @@ struct hdd_fw_txrx_stats {
  * @acs_in_progress: In progress acs flag for an adapter
  * @client_count: client count per dot11_mode
  * @country_ie_updated: country ie is updated or not by hdd hostapd
+ * @during_auth_offload: auth mgmt frame is offloading to hostapd
  */
 struct hdd_ap_ctx {
 	struct hdd_hostapd_state hostapd_state;
@@ -853,6 +860,7 @@ struct hdd_ap_ctx {
 	qdf_atomic_t acs_in_progress;
 	uint16_t client_count[QCA_WLAN_802_11_MODE_INVALID];
 	bool country_ie_updated;
+	bool during_auth_offload;
 };
 
 /**
@@ -924,6 +932,7 @@ struct hdd_chan_change_params {
  * @monitor_mode: monitor mode context to prevent/allow runtime pm
  * @wow_unit_test: wow unit test mode context to prevent/allow runtime pm
  * @system_suspend: system suspend context to prevent/allow runtime pm
+ * @dyn_mac_addr_update: update mac addr context to prevent/allow runtime pm
  *
  * Runtime PM control for underlying activities
  */
@@ -935,6 +944,7 @@ struct hdd_runtime_pm_context {
 	qdf_runtime_lock_t monitor_mode;
 	qdf_runtime_lock_t wow_unit_test;
 	qdf_runtime_lock_t system_suspend;
+	qdf_runtime_lock_t dyn_mac_addr_update;
 };
 
 /*
@@ -990,16 +1000,34 @@ struct wlm_multi_client_info_table {
 #endif
 
 /**
+ * enum udp_qos_upgrade - Enumeration of the various User priority (UP) types
+ *			  UDP QoS upgrade request
+ * @UDP_QOS_UPGRADE_NONE: Do not upgrade UDP QoS AC
+ * @UDP_QOS_UPGRADE_BK_BE: Upgrade UDP QoS for BK/BE only
+ * @UDP_QOS_UPGRADE_ALL: Upgrade UDP QoS for all packets
+ * @UDP_QOS_UPGRADE_MAX: Max enum limit, not to add new beyond this
+ */
+enum udp_qos_upgrade {
+	UDP_QOS_UPGRADE_NONE,
+	UDP_QOS_UPGRADE_BK_BE,
+	UDP_QOS_UPGRADE_ALL,
+	UDP_QOS_UPGRADE_MAX
+};
+
+/**
  * struct hdd_adapter - hdd vdev/net_device context
  * @vdev: object manager vdev context
  * @vdev_lock: lock to protect vdev context access
  * @vdev_id: Unique identifier assigned to the vdev
  * @event_flags: a bitmap of hdd_adapter_flags
  * @enable_dynamic_tsf_sync: Enable/Disable TSF sync through NL interface
+ * @host_target_sync_force: Force update host to TSF mapping
  * @dynamic_tsf_sync_interval: TSF sync interval configure through NL interface
  * @gpio_tsf_sync_work: work to sync send TSF CAP WMI command
  * @cache_sta_count: number of currently cached stations
  * @acs_complete_event: acs complete event
+ * @host_trigger_gpio_timer: A hrtimer used for TSF Accuracy Feature to
+ *                           indicate TSF cycle complete
  * @latency_level: 0 - normal, 1 - xr, 2 - low, 3 - ultralow
  * @multi_client_ll_support: to check multi client ll support in driver
  * @client_info: To store multi client id information
@@ -1013,6 +1041,7 @@ struct wlm_multi_client_info_table {
  *                          as per enum qca_sta_connect_fail_reason_codes
  * @upgrade_udp_qos_threshold: The threshold for user priority upgrade for
 			       any UDP packet.
+ * @udp_qos_upgrade_type: UDP QoS packet upgrade request type
  * @handle_feature_update: Handle feature update only if it is triggered
  *			   by hdd_netdev_feature_update
  * @netdev_features_update_work: work for handling the netdev features update
@@ -1167,7 +1196,11 @@ struct hdd_adapter {
 	/* spin lock for read/write timestamps */
 	qdf_spinlock_t host_target_sync_lock;
 	qdf_mc_timer_t host_target_sync_timer;
+#ifdef WLAN_FEATURE_TSF_ACCURACY
+	qdf_hrtimer_data_t host_trigger_gpio_timer;
+#endif
 	bool enable_dynamic_tsf_sync;
+	bool host_target_sync_force;
 	uint32_t dynamic_tsf_sync_interval;
 	uint64_t cur_host_time;
 	uint64_t last_host_time;
@@ -1227,6 +1260,7 @@ struct hdd_adapter {
 #endif
 	uint8_t link_status;
 	uint8_t upgrade_udp_qos_threshold;
+	enum udp_qos_upgrade udp_qos_upgrade_type;
 
 	/* variable for temperature in Celsius */
 	int temperature;
@@ -1690,6 +1724,7 @@ enum wlan_state_ctrl_str_id {
  * @bus_bw_work: work for periodically computing DDR bus bandwidth requirements
  * @g_event_flags: a bitmap of hdd_driver_flags
  * @psoc_idle_timeout_work: delayed work for psoc idle shutdown
+ * @tsf_accuracy_context: Holds TSF Accuracy feature activated vdev adapter.
  * @dynamic_nss_chains_support: Per vdev dynamic nss chains update capability
  * @sar_cmd_params: SAR command params to be configured to the FW
  * @country_change_work: work for updating vdev when country changes
@@ -1922,6 +1957,9 @@ struct hdd_context {
 	qdf_atomic_t cap_tsf_flag;
 	/* the context that is capturing tsf */
 	struct hdd_adapter *cap_tsf_context;
+#ifdef WLAN_FEATURE_TSF_ACCURACY
+	struct hdd_adapter *tsf_accuracy_context;
+#endif
 #endif
 #ifdef WLAN_FEATURE_TSF_PTP
 	struct ptp_clock_info ptp_cinfo;
@@ -2024,9 +2062,6 @@ struct hdd_context {
 	bool is_wifi3_0_target;
 	bool dump_in_progress;
 	struct hdd_dual_sta_policy dual_sta_policy;
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
-	struct hdd_mld_mac_info mld_mac_info;
-#endif
 #ifdef THERMAL_STATS_SUPPORT
 	bool is_therm_stats_in_progress;
 #endif
@@ -2038,10 +2073,9 @@ struct hdd_context {
 #endif
 	bool is_wlan_disabled;
 
-	uint8_t *oem_data;
+	uint8_t oem_data[HDD_MAX_OEM_DATA_LEN];
 	uint8_t oem_data_len;
-	uint8_t *file_name;
-	qdf_mutex_t wifi_kobj_lock;
+	uint8_t file_name[HDD_MAX_FILE_NAME_LEN];
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 	enum coex_dbam_config_mode dbam_mode;
 #endif
@@ -2286,7 +2320,7 @@ QDF_STATUS hdd_add_adapter_front(struct hdd_context *hdd_ctx,
 				 struct hdd_adapter *adapter);
 
 /**
- * typedef hdd_adapter_iterate_cb() – Iteration callback function
+ * typedef hdd_adapter_iterate_cb() - Iteration callback function
  * @adapter: current adapter of interest
  * @context: user context supplied to the iterator
  *
@@ -2301,7 +2335,7 @@ typedef QDF_STATUS (*hdd_adapter_iterate_cb)(struct hdd_adapter *adapter,
 					     void *context);
 
 /**
- * hdd_adapter_iterate() – Safely iterate over all adapters
+ * hdd_adapter_iterate() - Safely iterate over all adapters
  * @cb: callback function to invoke for each adapter
  * @context: user-supplied context to pass to @cb
  *
@@ -2906,6 +2940,19 @@ static inline bool hdd_roaming_supported(struct hdd_context *hdd_ctx)
 
 	return val;
 }
+
+#ifdef WLAN_NS_OFFLOAD
+static inline void
+hdd_adapter_flush_ipv6_notifier_work(struct hdd_adapter *adapter)
+{
+	flush_work(&adapter->ipv6_notifier_work);
+}
+#else
+static inline void
+hdd_adapter_flush_ipv6_notifier_work(struct hdd_adapter *adapter)
+{
+}
+#endif
 
 #ifdef CFG80211_SCAN_RANDOM_MAC_ADDR
 static inline bool hdd_scan_random_mac_addr_supported(void)
@@ -4050,6 +4097,31 @@ int wlan_hdd_set_mon_chan(struct hdd_adapter *adapter, qdf_freq_t freq,
 			  uint32_t bandwidth)
 {
 	return 0;
+}
+#endif
+
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
+/**
+ *  hdd_set_mld_address() - Set the MLD address of the adapter
+ *  @adapter: Handle to adapter
+ *  @mac_addr: MAC address to be copied
+ *
+ *  The function copies the MAC address sent in @mac_addr to
+ *  the adapter's MLD address and the MLD address of each
+ *  link adapter mapped of the @adapter.
+ *  The mode of operation must be 11be capable and @adapter
+ *  has to be ML type.
+ *
+ *  Return: void
+ */
+void
+hdd_set_mld_address(struct hdd_adapter *adapter,
+		    struct qdf_mac_addr *mac_addr);
+#else
+static inline void
+hdd_set_mld_address(struct hdd_adapter *adapter,
+		    struct qdf_mac_addr *mac_addr)
+{
 }
 #endif
 

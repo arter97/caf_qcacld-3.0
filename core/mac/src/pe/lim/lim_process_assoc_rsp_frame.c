@@ -573,6 +573,26 @@ static inline void lim_process_he_info(tpSirProbeRespBeacon beacon,
 }
 #endif
 
+#ifdef WLAN_FEATURE_SR
+static QDF_STATUS lim_process_srp_ie(tpSirAssocRsp ar, tpDphHashNode sta_ds)
+{
+	QDF_STATUS status = QDF_STATUS_E_NOSUPPORT;
+
+	if (ar->srp_ie.present) {
+		sta_ds->parsed_ies.srp_ie = ar->srp_ie;
+		status = QDF_STATUS_SUCCESS;
+	}
+
+	return status;
+}
+#else
+static inline QDF_STATUS
+lim_process_srp_ie(tpSirAssocRsp ar, tpDphHashNode sta_ds)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 #ifdef WLAN_FEATURE_11BE
 static void lim_process_eht_info(tpSirProbeRespBeacon beacon,
 				 tpDphHashNode sta_ds)
@@ -763,7 +783,7 @@ lim_update_iot_aggr_sz(struct mac_context *mac_ctx, uint8_t *ie_ptr,
 
 /**
  * hdd_cm_update_mcs_rate_set() - Update MCS rate set from HT capability
- * @vdev: Pointer to vdev boject
+ * @vdev: Pointer to vdev object
  * @ht_cap: pointer to parsed HT capability
  *
  * Return: None.
@@ -1222,7 +1242,7 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	 */
 	if (!lim_verify_fils_params_assoc_rsp(mac_ctx, session_entry,
 						assoc_rsp, &assoc_cnf)) {
-		pe_err("FILS params doesnot match");
+		pe_err("FILS params does not match");
 		assoc_cnf.resultCode = eSIR_SME_INVALID_ASSOC_RSP_RXED;
 		assoc_cnf.protStatusCode = STATUS_UNSPECIFIED_FAILURE;
 		/* Send advisory Disassociation frame to AP */
@@ -1483,8 +1503,11 @@ lim_process_assoc_rsp_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 		sta_ds->parsed_ies.vht_operation = beacon->VHTOperation;
 
 	lim_process_he_info(beacon, sta_ds);
+	if (lim_process_srp_ie(assoc_rsp, sta_ds) == QDF_STATUS_SUCCESS)
+		lim_update_vdev_sr_elements(session_entry, sta_ds);
 
-	lim_process_eht_info(beacon, sta_ds);
+	if (lim_is_session_eht_capable(session_entry))
+		lim_process_eht_info(beacon, sta_ds);
 
 	if (mac_ctx->lim.gLimProtectionControl !=
 	    MLME_FORCE_POLICY_PROTECTION_DISABLE)

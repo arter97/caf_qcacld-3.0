@@ -89,6 +89,11 @@ struct reassoc_params {
 #define BSS_COLOR_SWITCH_COUNTDOWN 5
 #define OBSS_COLOR_COLLISION_DETECTION_STA_PERIOD_MS 120000
 #define OBSS_COLOR_COLLISION_DETECTION_AP_PERIOD_MS 120000
+/*
+ * Have OBSS scan duration as 1200 seconds(20 minutes) when there is an active
+ * NDP to avoid glitches during NDP traffic due the scan.
+ */
+#define OBSS_COLOR_COLLISION_DETECTION_NDP_PERIOD_MS 1200000
 #define OBSS_COLOR_COLLISION_SCAN_PERIOD_MS 200
 #define OBSS_COLOR_COLLISION_FREE_SLOT_EXPIRY_MS 50000
 struct bss_color_info {
@@ -409,7 +414,7 @@ struct pe_session {
 	ePhyChanBondState htSecondaryChannelOffset;
 	enum reg_wifi_band limRFBand;
 
-	/* These global varibales moved to session Table to support BT-AMP : Oct 9th review */
+	/* These global variables moved to session Table to support BT-AMP : Oct 9th review */
 	tAniAuthType limCurrentAuthType;
 	uint16_t limCurrentBssCaps;
 	uint8_t limCurrentBssQosCaps;
@@ -419,7 +424,7 @@ struct pe_session {
 	/* Parameters  For Reassociation */
 	tSirMacAddr limReAssocbssId;
 	uint32_t lim_reassoc_chan_freq;
-	/* CB paramaters required/duplicated for Reassoc since re-assoc mantains its own params in lim */
+	/* CB parameters required/duplicated for Reassoc since re-assoc maintains its own params in lim */
 	uint8_t reAssocHtSupportedChannelWidthSet;
 	uint8_t reAssocHtRecommendedTxWidthSet;
 	ePhyChanBondState reAssocHtSecondaryChannelOffset;
@@ -578,6 +583,9 @@ struct pe_session {
 	/* center freq number as advertized OTA */
 	uint8_t ch_center_freq_seg0;
 	enum phy_ch_width ch_width;
+#ifdef WLAN_FEATURE_11BE
+	uint16_t puncture_bitmap;
+#endif
 	uint8_t ch_center_freq_seg1;
 	uint8_t enableVhtpAid;
 	uint8_t enableVhtGid;
@@ -703,7 +711,7 @@ struct pe_session {
 	bool isNonRoamReassoc;
 	qdf_mc_timer_t pmf_retry_timer;
 	struct comeback_timer_info pmf_retry_timer_info;
-	/* timer for resetting protection fileds at regular intervals */
+	/* timer for resetting protection fields at regular intervals */
 	qdf_mc_timer_t protection_fields_reset_timer;
 	/* timer to decrement CSA/ECSA count */
 	qdf_mc_timer_t ap_ecsa_timer;
@@ -818,7 +826,7 @@ struct pe_session {
 };
 
 /*-------------------------------------------------------------------------
-   Function declarations and documenation
+   Function declarations and documentation
    ------------------------------------------------------------------------*/
 
 #ifdef WLAN_ALLOCATE_GLOBAL_BUFFERS_DYNAMICALLY

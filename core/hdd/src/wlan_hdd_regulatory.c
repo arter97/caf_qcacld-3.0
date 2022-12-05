@@ -255,6 +255,38 @@ void hdd_update_coex_unsafe_chan_reg_disable(
 }
 #endif
 
+#if defined(CONFIG_AFC_SUPPORT) && defined(CONFIG_BAND_6GHZ)
+static inline
+void hdd_update_afc_config(struct hdd_context *hdd_ctx,
+			   struct reg_config_vars *config_vars)
+{
+	bool enable_6ghz_sp_pwrmode_supp = false;
+	bool afc_disable_timer_check = false;
+	bool afc_disable_request_id_check = false;
+	bool is_afc_reg_noaction = false;
+
+	ucfg_mlme_get_enable_6ghz_sp_mode_support(hdd_ctx->psoc,
+						  &enable_6ghz_sp_pwrmode_supp);
+	config_vars->enable_6ghz_sp_pwrmode_supp = enable_6ghz_sp_pwrmode_supp;
+	ucfg_mlme_get_afc_disable_timer_check(hdd_ctx->psoc,
+					      &afc_disable_timer_check);
+	config_vars->afc_disable_timer_check = afc_disable_timer_check;
+	ucfg_mlme_get_afc_disable_request_id_check(
+				hdd_ctx->psoc, &afc_disable_request_id_check);
+	config_vars->afc_disable_request_id_check =
+				afc_disable_request_id_check;
+	ucfg_mlme_get_afc_reg_noaction(hdd_ctx->psoc,
+				       &is_afc_reg_noaction);
+	config_vars->is_afc_reg_noaction = is_afc_reg_noaction;
+}
+#else
+static inline
+void hdd_update_afc_config(struct hdd_context *hdd_ctx,
+			   struct reg_config_vars *config_vars)
+{
+}
+#endif
+
 static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 				    struct reg_config_vars *config_vars)
 {
@@ -322,6 +354,7 @@ static void reg_program_config_vars(struct hdd_context *hdd_ctx,
 						enable_5dot9_ghz_chan;
 	hdd_update_coex_unsafe_chan_nb_user_prefer(hdd_ctx, config_vars);
 	hdd_update_coex_unsafe_chan_reg_disable(hdd_ctx, config_vars);
+	hdd_update_afc_config(hdd_ctx, config_vars);
 	config_vars->sta_sap_scc_on_indoor_channel =
 		ucfg_policy_mgr_get_sta_sap_scc_on_indoor_chnl(hdd_ctx->psoc);
 }
@@ -1624,15 +1657,23 @@ static void hdd_country_change_update_sta(struct hdd_context *hdd_ctx)
 								    adapter,
 								    oper_freq);
 
-			if (hdd_is_vdev_in_conn_state(adapter) &&
-			    (phy_changed || freq_changed || width_changed)) {
-				hdd_debug("changed: phy %d, freq %d, width %d",
-					  phy_changed, freq_changed,
-					  width_changed);
-				wlan_hdd_cm_issue_disconnect(adapter,
+			if (hdd_is_vdev_in_conn_state(adapter)) {
+				if (phy_changed || freq_changed ||
+				    width_changed) {
+					hdd_debug("changed: phy %d, freq %d, width %d",
+						  phy_changed, freq_changed,
+						  width_changed);
+					wlan_hdd_cm_issue_disconnect(
+							adapter,
 							REASON_UNSPEC_FAILURE,
 							false);
-				sta_ctx->reg_phymode = csr_phy_mode;
+					sta_ctx->reg_phymode = csr_phy_mode;
+				} else {
+					hdd_debug("Remain on current channel but update tx power");
+					wlan_reg_update_tx_power_on_ctry_change(
+							pdev,
+							adapter->vdev_id);
+				}
 			}
 			break;
 		default:
@@ -1768,6 +1809,10 @@ static void hdd_country_change_update_sap(struct hdd_context *hdd_ctx)
 			else
 				policy_mgr_check_sap_restart(hdd_ctx->psoc,
 							     adapter->vdev_id);
+				hdd_debug("Update tx power due to ctry change");
+				wlan_reg_update_tx_power_on_ctry_change(
+							pdev,
+							adapter->vdev_id);
 			break;
 		default:
 			break;
@@ -1925,7 +1970,6 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 {
 	bool offload_enabled;
 	struct regulatory_channel *cur_chan_list;
-	uint8_t alpha2[REG_ALPHA2_LEN + 1];
 	int ret;
 
 	cur_chan_list = qdf_mem_malloc(sizeof(*cur_chan_list) * NUM_CHANNELS);
@@ -1967,7 +2011,7 @@ int hdd_regulatory_init(struct hdd_context *hdd_ctx, struct wiphy *wiphy)
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_2GHZ);
 	fill_wiphy_band_channels(wiphy, cur_chan_list, NL80211_BAND_5GHZ);
 	fill_wiphy_6ghz_band_channels(wiphy, cur_chan_list);
-	qdf_mem_copy(hdd_ctx->reg.alpha2, alpha2, REG_ALPHA2_LEN + 1);
+	qdf_mem_zero(hdd_ctx->reg.alpha2, REG_ALPHA2_LEN + 1);
 
 	qdf_mem_free(cur_chan_list);
 	return 0;
