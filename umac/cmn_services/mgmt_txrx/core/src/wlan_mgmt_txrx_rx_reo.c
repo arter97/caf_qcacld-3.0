@@ -710,6 +710,21 @@ mgmt_rx_reo_invalidate_stale_snapshots
 	if (!mac_hw_ss->valid)
 		return QDF_STATUS_SUCCESS;
 
+	if (host_ss->valid) {
+		if (!mgmt_rx_reo_compare_global_timestamps_gte
+					(mac_hw_ss->global_timestamp,
+					 host_ss->global_timestamp) ||
+		    !mgmt_rx_reo_compare_pkt_ctrs_gte
+					(mac_hw_ss->mgmt_pkt_ctr,
+					 host_ss->mgmt_pkt_ctr)) {
+			mgmt_rx_reo_print_snapshots(mac_hw_ss, fw_forwarded_ss,
+						    fw_consumed_ss, host_ss);
+			mgmt_rx_reo_debug("Invalidate host snapshot, link %u",
+					  link);
+			host_ss->valid = false;
+		}
+	}
+
 	if (fw_forwarded_ss->valid) {
 		if (!mgmt_rx_reo_compare_global_timestamps_gte
 					(mac_hw_ss->global_timestamp,
@@ -717,6 +732,20 @@ mgmt_rx_reo_invalidate_stale_snapshots
 		    !mgmt_rx_reo_compare_pkt_ctrs_gte
 					(mac_hw_ss->mgmt_pkt_ctr,
 					 fw_forwarded_ss->mgmt_pkt_ctr)) {
+			mgmt_rx_reo_print_snapshots(mac_hw_ss, fw_forwarded_ss,
+						    fw_consumed_ss, host_ss);
+			mgmt_rx_reo_debug("Invalidate FW forwarded SS, link %u",
+					  link);
+			fw_forwarded_ss->valid = false;
+		}
+
+		if (host_ss->valid && fw_forwarded_ss->valid &&
+		    (mgmt_rx_reo_compare_global_timestamps_gte
+					(host_ss->global_timestamp,
+					 fw_forwarded_ss->global_timestamp) !=
+		     mgmt_rx_reo_compare_pkt_ctrs_gte
+					(host_ss->mgmt_pkt_ctr,
+					 fw_forwarded_ss->mgmt_pkt_ctr))) {
 			mgmt_rx_reo_print_snapshots(mac_hw_ss, fw_forwarded_ss,
 						    fw_consumed_ss, host_ss);
 			mgmt_rx_reo_debug("Invalidate FW forwarded SS, link %u",
@@ -738,20 +767,19 @@ mgmt_rx_reo_invalidate_stale_snapshots
 					  link);
 			fw_consumed_ss->valid = false;
 		}
-	}
 
-	if (host_ss->valid) {
-		if (!mgmt_rx_reo_compare_global_timestamps_gte
-					(mac_hw_ss->global_timestamp,
-					 host_ss->global_timestamp) ||
-		    !mgmt_rx_reo_compare_pkt_ctrs_gte
-					(mac_hw_ss->mgmt_pkt_ctr,
-					 host_ss->mgmt_pkt_ctr)) {
+		if (host_ss->valid && fw_consumed_ss->valid &&
+		    (mgmt_rx_reo_compare_global_timestamps_gte
+					(host_ss->global_timestamp,
+					 fw_consumed_ss->global_timestamp) !=
+		     mgmt_rx_reo_compare_pkt_ctrs_gte
+					(host_ss->mgmt_pkt_ctr,
+					 fw_consumed_ss->mgmt_pkt_ctr))) {
 			mgmt_rx_reo_print_snapshots(mac_hw_ss, fw_forwarded_ss,
 						    fw_consumed_ss, host_ss);
-			mgmt_rx_reo_debug("Invalidate host snapshot, link %u",
+			mgmt_rx_reo_debug("Invalidate FW consumed SS, link %u",
 					  link);
-			host_ss->valid = false;
+			fw_consumed_ss->valid = false;
 		}
 	}
 
