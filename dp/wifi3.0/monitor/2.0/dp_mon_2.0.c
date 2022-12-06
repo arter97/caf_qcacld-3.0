@@ -885,7 +885,7 @@ QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 	struct dp_intr_stats *intr_stats = &int_ctx->intr_stats;
 	struct dp_mon_soc_be *mon_soc_be = dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	uint32_t num_entries_avail;
-	int sync_hw_ptr = 1, hp = 0, tp = 0;
+	int sync_hw_ptr = 1, hp = 0, tp = 0, num_entries;
 	void *hal_srng;
 
 	rx_mon_buf_ring = &soc->rxdma_mon_buf_ring[0];
@@ -900,10 +900,14 @@ QDF_STATUS dp_rx_mon_refill_buf_ring_2_0(struct dp_intr *int_ctx)
 	hal_get_sw_hptp(soc->hal_soc, (hal_ring_handle_t)hal_srng, &tp, &hp);
 	hal_srng_access_end(soc->hal_soc, hal_srng);
 
-	if (num_entries_avail)
+	num_entries = num_entries_avail;
+	if (mon_soc_be->rx_mon_ring_fill_level < rx_mon_buf_ring->num_entries)
+		num_entries = num_entries_avail - mon_soc_be->rx_mon_ring_fill_level;
+
+	if (num_entries)
 		dp_mon_buffers_replenish(soc, rx_mon_buf_ring,
 					 &mon_soc_be->rx_desc_mon,
-					 num_entries_avail, &desc_list, &tail,
+					 num_entries, &desc_list, &tail,
 					 NULL);
 
 	return QDF_STATUS_SUCCESS;
