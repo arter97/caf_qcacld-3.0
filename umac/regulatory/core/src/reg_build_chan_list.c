@@ -857,6 +857,32 @@ static void reg_modify_chan_list_for_nol_list(
 	}
 }
 
+#ifdef CONFIG_REG_CLIENT
+/**
+ * reg_modify_chan_list_for_static_puncture() - Disable the channel if
+ * static_puncture is set.
+ * @chan_list: Pointer to regulatory channel list.
+ */
+static void
+reg_modify_chan_list_for_static_puncture(struct regulatory_channel *chan_list)
+{
+	enum channel_enum chan_enum;
+
+	for (chan_enum = 0; chan_enum < NUM_CHANNELS; chan_enum++) {
+		if (chan_list[chan_enum].is_static_punctured) {
+			chan_list[chan_enum].state = CHANNEL_STATE_DISABLE;
+			chan_list[chan_enum].chan_flags |=
+				REGULATORY_CHAN_DISABLED;
+		}
+	}
+}
+#else
+static void
+reg_modify_chan_list_for_static_puncture(struct regulatory_channel *chan_list)
+{
+}
+#endif
+
 /**
  * reg_find_low_limit_chan_enum() - Find low limit 2G and 5G channel enums.
  * @chan_list: Pointer to regulatory channel list.
@@ -2924,6 +2950,7 @@ void reg_compute_pdev_current_chan_list(struct wlan_regulatory_pdev_priv_obj
 					      pdev_priv_obj->dfs_enabled);
 
 	reg_modify_chan_list_for_nol_list(pdev_priv_obj->cur_chan_list);
+	reg_modify_chan_list_for_static_puncture(pdev_priv_obj->cur_chan_list);
 
 	reg_modify_chan_list_for_indoor_channels(pdev_priv_obj);
 

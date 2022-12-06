@@ -1384,6 +1384,23 @@ void wlan_reg_set_create_punc_bitmap(struct ch_params *ch_params,
 {
 	reg_set_create_punc_bitmap(ch_params, is_create_punc_bitmap);
 }
+
+#ifdef CONFIG_REG_CLIENT
+QDF_STATUS wlan_reg_apply_puncture(struct wlan_objmgr_pdev *pdev,
+				   uint16_t puncture_bitmap,
+				   qdf_freq_t freq,
+				   enum phy_ch_width bw,
+				   qdf_freq_t cen320_freq)
+{
+	return reg_apply_puncture(pdev, puncture_bitmap, freq, bw,
+				  cen320_freq);
+}
+
+QDF_STATUS wlan_reg_remove_puncture(struct wlan_objmgr_pdev *pdev)
+{
+	return reg_remove_puncture(pdev);
+}
+#endif
 #endif /* WLAN_FEATURE_11BE */
 
 #ifdef CONFIG_REG_6G_PWRMODE

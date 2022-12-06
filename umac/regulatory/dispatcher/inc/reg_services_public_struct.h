@@ -971,6 +971,7 @@ struct get_usable_chan_req_params {
  *                   intolerance.
  * @psd_flag: is PSD channel or not
  * @psd_eirp: PSD power level
+ * @is_static_punctured: is static punctured
  */
 struct regulatory_channel {
 	qdf_freq_t center_freq;
@@ -990,6 +991,9 @@ struct regulatory_channel {
 #ifdef CONFIG_BAND_6GHZ
 	bool psd_flag;
 	uint16_t psd_eirp;
+#endif
+#ifdef CONFIG_REG_CLIENT
+	uint8_t is_static_punctured;
 #endif
 };
 
