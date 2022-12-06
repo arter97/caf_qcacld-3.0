@@ -20144,6 +20144,8 @@ static void populate_tlv_events_id_mlo(uint32_t *event_ids)
 			WMI_QUIET_HANDLING_EVENTID;
 	event_ids[wmi_mlo_ap_vdev_tid_to_link_map_eventid] =
 			WMI_MLO_AP_VDEV_TID_TO_LINK_MAP_EVENTID;
+	event_ids[wmi_mlo_link_removal_eventid] =
+			WMI_MLO_LINK_REMOVAL_EVENTID;
 }
 #else /* WLAN_FEATURE_11BE_MLO */
 static inline void populate_tlv_events_id_mlo(uint32_t *event_ids)
