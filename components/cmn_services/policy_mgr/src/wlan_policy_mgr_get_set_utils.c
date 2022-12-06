@@ -10042,7 +10042,7 @@ bool policy_mgr_is_ap_ap_mcc_allow(struct wlan_objmgr_psoc *psoc,
 {
 	enum QDF_OPMODE mode;
 	enum policy_mgr_con_mode con_mode;
-	uint8_t mcc_to_scc_switch;
+	uint8_t mcc_to_scc_switch = 0;
 	uint32_t num_connections;
 	bool is_dfs_ch = false;
 	union conc_ext_flag conc_ext_flags;
