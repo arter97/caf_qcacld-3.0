@@ -27962,7 +27962,7 @@ static int __wlan_hdd_cfg80211_get_channel(struct wiphy *wiphy,
 	uint8_t vdev_id;
 	enum phy_ch_width ch_width;
 	enum wlan_phymode peer_phymode;
-	struct hdd_station_ctx *sta_ctx;
+	struct hdd_station_ctx *sta_ctx = NULL;
 	struct ch_params ch_params = {0};
 
 	hdd_enter_dev(wdev->netdev);
