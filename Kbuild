@@ -2264,6 +2264,20 @@ endif
 
 $(call add-wlan-objs,dcs,$(DCS_OBJS))
 
+###### AFC ######
+AFC_OS_IF_SRC   := os_if/afc/src
+AFC_DISP_SRC    := components/afc/dispatcher/src
+
+AFC_OS_IF_INC   := -I$(WLAN_ROOT)/os_if/afc/inc
+AFC_DISP_INC    := -I$(WLAN_ROOT)/components/afc/dispatcher/inc
+
+ifeq ($(CONFIG_AFC_SUPPORT), y)
+AFC_BOJS := $(AFC_OS_IF_SRC)/wlan_cfg80211_afc.o \
+	    $(AFC_DISP_SRC)/wlan_afc_ucfg_api.o
+endif
+
+$(call add-wlan-objs,afc,$(AFC_BOJS))
+
 ###### INTEROP ISSUES AP ########
 INTEROP_ISSUES_AP_OS_IF_SRC      := os_if/interop_issues_ap/src
 INTEROP_ISSUES_AP_TGT_SRC        := components/target_if/interop_issues_ap/src
@@ -2774,6 +2788,9 @@ INCS +=		$(CP_MC_STATS_COMPONENT_INC)
 ################ Dynamic ACS ####################
 INCS +=		$(DCS_TGT_IF_INC)
 INCS +=		$(DCS_DISP_INC)
+############### AFC ################
+INCS +=         $(AFC_DISP_INC)
+INCS +=         $(AFC_OS_IF_INC)
 ################ INTEROP ISSUES AP ################
 INCS +=		$(INTEROP_ISSUES_AP_OS_IF_INC)
 INCS +=		$(INTEROP_ISSUES_AP_TGT_INC)

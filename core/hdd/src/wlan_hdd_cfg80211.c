@@ -173,6 +173,8 @@
 #include "wlan_hdd_avoid_freq_ext.h"
 #include "qdf_util.h"
 #include "wlan_hdd_mdns_offload.h"
+#include "wlan_cfg80211_afc.h"
+
 
 #define g_mode_rates_size (12)
 #define a_mode_rates_size (8)
@@ -1731,6 +1733,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 #ifdef WLAN_FEATURE_CONNECTIVITY_LOGGING
 	FEATURE_CONNECTIVITY_LOGGING_EVENT
 #endif
+	FEATURE_AFC_VENDOR_EVENTS
 };
 
 /**
@@ -16813,6 +16816,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	FEATURE_RADAR_HISTORY_VENDOR_COMMANDS
 	FEATURE_AVOID_FREQ_EXT_VENDOR_COMMANDS
 	FEATURE_MDNS_OFFLOAD_VENDOR_COMMANDS
+	FEATURE_AFC_VENDOR_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)
