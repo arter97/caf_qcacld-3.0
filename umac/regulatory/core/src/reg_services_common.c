@@ -6982,6 +6982,88 @@ reg_remove_indoor_concurrency(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 	return QDF_STATUS_E_FAILURE;
 }
 
+void
+reg_init_indoor_channel_list(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct indoor_concurrency_list *list;
+	uint8_t i;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return;
+	}
+
+	list = pdev_priv_obj->indoor_list;
+	for (i = 0; i < MAX_INDOOR_LIST_SIZE; i++, list++) {
+		list->freq = 0;
+		list->vdev_id = INVALID_VDEV_ID;
+		list->chan_range = NULL;
+	}
+}
+
+QDF_STATUS
+reg_compute_indoor_list_on_cc_change(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct wlan_channel *des_chan;
+	enum channel_enum chan_enum;
+	uint8_t vdev_id;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (pdev_priv_obj->indoor_chan_enabled ||
+	    !pdev_priv_obj->sta_sap_scc_on_indoor_channel)
+		return QDF_STATUS_SUCCESS;
+
+	/* Iterate through VDEV list */
+	for (vdev_id = 0; vdev_id < WLAN_UMAC_PSOC_MAX_VDEVS; vdev_id++) {
+		vdev =
+		wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						     WLAN_REGULATORY_SB_ID);
+		if (!vdev)
+			goto next;
+
+		if (vdev->vdev_mlme.vdev_opmode != QDF_STA_MODE &&
+		    vdev->vdev_mlme.vdev_opmode != QDF_P2P_CLIENT_MODE)
+			goto next;
+
+		des_chan = vdev->vdev_mlme.des_chan;
+		if (!des_chan)
+			goto next;
+
+		if (!reg_is_5ghz_ch_freq(des_chan->ch_freq))
+			goto next;
+
+		chan_enum = reg_get_chan_enum_for_freq(des_chan->ch_freq);
+		if (reg_is_chan_enum_invalid(chan_enum)) {
+			reg_err_rl("Invalid chan enum %d", chan_enum);
+			goto next;
+		}
+
+		if (pdev_priv_obj->mas_chan_list[chan_enum].state !=
+		    CHANNEL_STATE_DISABLE &&
+		    pdev_priv_obj->mas_chan_list[chan_enum].chan_flags &
+		    REGULATORY_CHAN_INDOOR_ONLY)
+			reg_add_indoor_concurrency(pdev, vdev_id,
+						   des_chan->ch_freq,
+						   des_chan->ch_width);
+
+next:
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_REGULATORY_SB_ID);
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 #if defined(CONFIG_BAND_6GHZ)

@@ -1686,6 +1686,40 @@ reg_add_indoor_concurrency(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 QDF_STATUS
 reg_remove_indoor_concurrency(struct wlan_objmgr_pdev *pdev, uint8_t vdev_id,
 			      uint32_t freq);
+
+/**
+ * reg_init_indoor_channel_list() - Initialize the indoor concurrency list
+ *
+ * @pdev: pointer to pdev
+ *
+ * Return: None
+ */
+void
+reg_init_indoor_channel_list(struct wlan_objmgr_pdev *pdev);
+/**
+ * reg_compute_indoor_list_on_cc_change() - Recompute the indoor concurrency
+ * list on a country change
+ *
+ * @psoc: pointer to psoc
+ * @pdev: pointer to pdev
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+reg_compute_indoor_list_on_cc_change(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_pdev *pdev);
+#else
+static inline void
+reg_init_indoor_channel_list(struct wlan_objmgr_pdev *pdev)
+{
+}
+
+static inline QDF_STATUS
+reg_compute_indoor_list_on_cc_change(struct wlan_objmgr_psoc *psoc,
+				     struct wlan_objmgr_pdev *pdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 #if defined(CONFIG_BAND_6GHZ)

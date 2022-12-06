@@ -3223,6 +3223,9 @@ void reg_propagate_mas_chan_list_to_pdev(struct wlan_objmgr_psoc *psoc,
 	pdev_priv_obj->chan_list_recvd =
 		psoc_priv_obj->chan_list_recvd[phy_id];
 
+	reg_init_indoor_channel_list(pdev);
+	reg_compute_indoor_list_on_cc_change(psoc, pdev);
+
 	reg_update_max_phymode_chwidth_for_pdev(pdev);
 	reg_update_channel_ranges(pdev);
 	reg_modify_chan_list_for_outdoor(pdev_priv_obj);
