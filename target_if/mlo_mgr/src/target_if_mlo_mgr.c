@@ -23,6 +23,8 @@
 #include <wmi_unified_11be_api.h>
 #include <init_deinit_lmac.h>
 #include "target_if_mlo_mgr.h"
+#include <wlan_objmgr_peer_obj.h>
+#include <wlan_mlo_t2lm.h>
 
 /**
  * target_if_mlo_link_set_active_resp_handler() - function to handle mlo link
@@ -238,6 +240,92 @@ target_if_mlo_unregister_vdev_tid_to_link_map_event(
 			wmi_handle, wmi_mlo_ap_vdev_tid_to_link_map_eventid);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+/**
+ * target_if_fill_provisioned_links() - API to fill the provisioned links
+ * @params: Pointer to T2LM params structure
+ * @t2lm: Pointer to T2LM info structure
+ *
+ * Return: none
+ */
+static inline void target_if_fill_provisioned_links(
+		struct wmi_host_tid_to_link_map_params *params,
+		struct wlan_t2lm_info *t2lm)
+{
+	qdf_mem_copy(&params->t2lm_info[params->num_dir].t2lm_provisioned_links,
+		     &t2lm->ieee_link_map_tid,
+		     sizeof(uint16_t) * T2LM_MAX_NUM_TIDS);
+}
+#else
+static inline void target_if_fill_provisioned_links(
+		struct wmi_host_tid_to_link_map_params *params,
+		struct wlan_t2lm_info *t2lm)
+{
+	qdf_mem_copy(&params->t2lm_info[params->num_dir].t2lm_provisioned_links,
+		     &t2lm->hw_link_map_tid,
+		     sizeof(uint16_t) * T2LM_MAX_NUM_TIDS);
+}
+#endif
+
+static QDF_STATUS
+target_if_mlo_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
+				       struct wlan_t2lm_info *t2lm)
+{
+	struct wmi_unified *wmi_handle = NULL;
+	struct wmi_host_tid_to_link_map_params params = {0};
+	struct wlan_objmgr_pdev *pdev = NULL;
+	int tid = 0;
+	QDF_STATUS status;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev) {
+		t2lm_err("null pdev");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	wmi_handle = lmac_get_pdev_wmi_handle(pdev);
+	if (!wmi_handle) {
+		t2lm_err("null wmi handle");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	params.pdev_id = wlan_objmgr_pdev_get_pdev_id(pdev);
+	qdf_mem_copy(params.peer_macaddr, vdev->vdev_objmgr.bss_peer->macaddr,
+		     QDF_MAC_ADDR_SIZE);
+
+	t2lm_debug("Fill T2LM WMI info for peer: " QDF_MAC_ADDR_FMT " pdev_id:%d",
+		   QDF_MAC_ADDR_REF(params.peer_macaddr), params.pdev_id);
+
+	params.t2lm_info[params.num_dir].direction = t2lm->direction;
+	params.t2lm_info[params.num_dir].default_link_mapping =
+		t2lm->default_link_mapping;
+
+	if (!params.t2lm_info[params.num_dir].default_link_mapping)
+		target_if_fill_provisioned_links(&params, t2lm);
+
+	t2lm_debug("num_dir:%d direction:%d default_link_mapping:%d",
+		   params.num_dir, params.t2lm_info[params.num_dir].direction,
+		   params.t2lm_info[params.num_dir].default_link_mapping);
+
+	for (tid = 0; tid < T2LM_MAX_NUM_TIDS; tid++) {
+		t2lm_debug("tid:%d hw_link_map:%x ieee_lin_map:%x", tid,
+			   params.t2lm_info[params.num_dir].t2lm_provisioned_links[tid],
+			   t2lm->ieee_link_map_tid[tid]);
+	}
+
+	params.num_dir++;
+
+	status = wmi_send_mlo_peer_tid_to_link_map_cmd(wmi_handle, &params);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		t2lm_err("Failed to send T2LM WMI command for pdev_id:%d peer_mac: " QDF_MAC_ADDR_FMT,
+			 params.pdev_id,
+			 QDF_MAC_ADDR_REF(params.peer_macaddr));
+		return status;
+	}
+
+	return status;
+}
+
 /**
  * target_if_mlo_register_tx_ops() - lmac handler to register mlo tx ops
  *  callback functions
@@ -266,6 +354,8 @@ target_if_mlo_register_tx_ops(struct wlan_lmac_if_tx_ops *tx_ops)
 	mlo_tx_ops->unregister_events =
 		target_if_mlo_unregister_event_handler;
 	mlo_tx_ops->link_set_active = target_if_mlo_link_set_active;
+	mlo_tx_ops->send_tid_to_link_mapping =
+		target_if_mlo_send_tid_to_link_mapping;
 
 	return QDF_STATUS_SUCCESS;
 }

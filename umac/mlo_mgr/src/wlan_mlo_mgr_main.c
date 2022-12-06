@@ -29,6 +29,7 @@
 #include <wlan_cm_public_struct.h>
 #include "wlan_mlo_mgr_msgq.h"
 #include <target_if_mlo_mgr.h>
+#include <wlan_mlo_t2lm.h>
 
 static void mlo_global_ctx_deinit(void)
 {
@@ -436,10 +437,12 @@ QDF_STATUS wlan_mlo_check_valid_config(struct wlan_mlo_dev_context *ml_dev,
  * mlo_t2lm_ctx_init() - API to initialize the t2lm context with the default
  * values.
  * @ml_dev: Pointer to ML Dev context
+ * @vdev: Pointer to vdev structure
  *
  * Return: None
  */
-static inline void mlo_t2lm_ctx_init(struct wlan_mlo_dev_context *ml_dev)
+static inline void mlo_t2lm_ctx_init(struct wlan_mlo_dev_context *ml_dev,
+				     struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_t2lm_info *t2lm;
 
@@ -450,6 +453,8 @@ static inline void mlo_t2lm_ctx_init(struct wlan_mlo_dev_context *ml_dev)
 	ml_dev->t2lm_ctx.num_of_t2lm_ie = 1;
 	t2lm->direction = WLAN_T2LM_BIDI_DIRECTION;
 	t2lm->default_link_mapping = 1;
+
+	wlan_mlo_t2lm_timer_init(vdev);
 }
 
 static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
@@ -527,7 +532,7 @@ static QDF_STATUS mlo_dev_ctx_init(struct wlan_objmgr_vdev *vdev)
 		qdf_list_insert_back(&g_mlo_ctx->ml_dev_list, &ml_dev->node);
 	ml_link_lock_release(g_mlo_ctx);
 
-	mlo_t2lm_ctx_init(ml_dev);
+	mlo_t2lm_ctx_init(ml_dev, vdev);
 
 	return status;
 }

@@ -300,6 +300,7 @@ enum wlan_t2lm_direction {
 	WLAN_T2LM_INVALID_DIRECTION,
 };
 
+#define T2LM_EXPECTED_DURATION_MAX_VALUE 0xFFFFFF
 /**
  * struct wlan_t2lm_info - TID-to-Link mapping information for the frames
  * transmitted on the uplink, downlink and bidirectional.
@@ -352,11 +353,21 @@ struct wlan_mlo_t2lm_ie {
  * struct wlan_t2lm_timer - T2LM timer information
  *
  * @t2lm_timer: T2LM timer
- * @timer_interval: T2LM timer interval value
+ * @timer_interval: T2LM Timer value
+ * @timer_started: T2LM timer started or not
+ * @t2lm_ie_index: T2LM IE index value
+ * @t2lm_dev_lock: lock to access struct
  */
 struct wlan_t2lm_timer {
 	qdf_timer_t t2lm_timer;
 	uint32_t timer_interval;
+	bool timer_started;
+	uint8_t t2lm_ie_index;
+#ifdef WLAN_MLO_USE_SPINLOCK
+	qdf_spinlock_t t2lm_dev_lock;
+#else
+	qdf_mutex_t t2lm_dev_lock;
+#endif
 };
 
 /**
@@ -366,6 +377,7 @@ struct wlan_t2lm_timer {
  * @t2lm_ie: T2LM IE information
  * @t2lm_timer: T2LM timer information
  * @t2lm_dev_lock: t2lm dev context lock
+ * @tsf: time sync func value received via beacon
  */
 struct wlan_t2lm_context {
 	uint8_t num_of_t2lm_ie;
@@ -376,6 +388,7 @@ struct wlan_t2lm_context {
 #else
 	qdf_mutex_t t2lm_dev_lock;
 #endif
+	uint64_t tsf;
 };
 
 /*

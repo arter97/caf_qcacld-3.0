@@ -45,6 +45,86 @@
 
 #define WLAN_T2LM_MAX_NUM_LINKS 16
 
+#ifdef WLAN_MLO_USE_SPINLOCK
+/**
+ * t2lm_dev_lock_create - Create T2LM device mutex/spinlock
+ * @t2lm_ctx: T2LM context
+ *
+ * Creates mutex/spinlock
+ *
+ * Return: void
+ */
+static inline void
+t2lm_dev_lock_create(struct wlan_t2lm_context *t2lm_ctx)
+{
+	qdf_spinlock_create(&t2lm_ctx->t2lm_dev_lock);
+}
+
+/**
+ * t2lm_dev_lock_destroy - Destroy T2LM mutex/spinlock
+ * @t2lm_ctx: T2LM context
+ *
+ * Destroy mutex/spinlock
+ *
+ * Return: void
+ */
+static inline void
+t2lm_dev_lock_destroy(struct wlan_t2lm_context *t2lm_ctx)
+{
+	qdf_spinlock_destroy(&t2lm_ctx->t2lm_dev_lock);
+}
+
+/**
+ * t2lm_dev_lock_acquire - acquire T2LM mutex/spinlock
+ * @t2lm_ctx: T2LM context
+ *
+ * acquire mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void t2lm_dev_lock_acquire(struct wlan_t2lm_context *t2lm_ctx)
+{
+	qdf_spin_lock_bh(&t2lm_ctx->t2lm_dev_lock);
+}
+
+/**
+ * t2lm_dev_lock_release - release T2LM dev mutex/spinlock
+ * @t2lm_ctx: T2LM context
+ *
+ * release mutex/spinlock
+ *
+ * return: void
+ */
+static inline
+void t2lm_dev_lock_release(struct wlan_t2lm_context *t2lm_ctx)
+{
+	qdf_spin_unlock_bh(&t2lm_ctx->t2lm_dev_lock);
+}
+#else /* WLAN_MLO_USE_SPINLOCK */
+static inline
+void t2lm_dev_lock_create(struct wlan_t2lm_context *t2lm_ctx)
+{
+	qdf_mutex_create(&t2lm_ctx->t2lm_dev_lock);
+}
+
+static inline
+void t2lm_dev_lock_destroy(struct wlan_t2lm_context *t2lm_ctx)
+{
+	qdf_mutex_destroy(&t2lm_ctx->t2lm_dev_lock);
+}
+
+static inline void t2lm_dev_lock_acquire(struct wlan_t2lm_context *t2lm_ctx)
+{
+	qdf_mutex_acquire(&t2lm_ctx->t2lm_dev_lock);
+}
+
+static inline void t2lm_dev_lock_release(struct wlan_t2lm_context *t2lm_ctx)
+{
+	qdf_mutex_release(&t2lm_ctx->t2lm_dev_lock);
+}
+#endif
+
 /**
  * wlan_mlo_parse_t2lm_ie() - API to parse the T2LM IE
  * @t2lm: Pointer to T2LM structure
@@ -122,6 +202,69 @@ QDF_STATUS wlan_mlo_parse_bcn_prbresp_t2lm_ie(
  * Return: Updated frame pointer
  */
 uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm);
+
+/**
+ * wlan_mlo_t2lm_timer_init() - API to add TID-to-link mapping IE
+ * @vdev: Pointer to vdev
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+wlan_mlo_t2lm_timer_init(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlo_t2lm_timer_start() - API to start T2LM timer
+ * @vdev: Pointer to vdev
+ * @interval: T2LM timer interval
+ * @t2lm_ie_index: T2LM IE index
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+wlan_mlo_t2lm_timer_start(struct wlan_objmgr_vdev *vdev,
+			  uint32_t interval, uint8_t t2lm_ie_index);
+
+/**
+ * wlan_mlo_t2lm_timer_stop() - API to stop TID-to-link mapping timer
+ * @vdev: Pointer to vdev
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+wlan_mlo_t2lm_timer_stop(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlo_t2lm_timer_expiry_handler() - API to handle t2lm timer expiry
+ * @vdev: Pointer to vdev structure
+ *
+ * Return: none
+ */
+void
+wlan_mlo_t2lm_timer_expiry_handler(void *vdev);
+
+/**
+ * wlan_handle_t2lm_timer() - API to handle TID-to-link mapping timer
+ * @vdev: Pointer to vdev
+ * @ie_idx: ie index value
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+wlan_handle_t2lm_timer(struct wlan_objmgr_vdev *vdev, uint8_t ie_idx);
+
+/**
+ * wlan_process_bcn_prbrsp_t2lm_ie() - API to process the received T2LM IE from
+ * beacon/probe response.
+ * @vdev: Pointer to vdev
+ * @rx_t2lm_ie: Received T2LM IE
+ * @tsf: Local TSF value
+ *
+ * Return QDF_STATUS
+ */
+QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(struct wlan_objmgr_vdev *vdev,
+					   struct wlan_t2lm_context *rx_t2lm_ie,
+					   uint64_t tsf);
+
 #else
 static inline QDF_STATUS wlan_mlo_parse_t2lm_ie(
 	struct wlan_t2lm_onging_negotiation_info *t2lm, uint8_t *ie)
@@ -164,6 +307,43 @@ static inline
 uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm)
 {
 	return frm;
+}
+
+static inline QDF_STATUS
+wlan_mlo_t2lm_timer_init(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_mlo_t2lm_timer_start(struct wlan_objmgr_vdev *vdev,
+			  uint32_t interval, uint8_t t2lm_ie_index)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_mlo_t2lm_timer_stop(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline void
+wlan_mlo_t2lm_timer_expiry_handler(void *vdev)
+{}
+
+static inline QDF_STATUS
+wlan_handle_t2lm_timer(struct wlan_objmgr_vdev *vdev, uint8_t ie_idx)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_process_bcn_prbrsp_t2lm_ie(struct wlan_objmgr_vdev *vdev,
+				struct wlan_t2lm_context *rx_t2lm_ie,
+				uint64_t tsf)
+{
+	return QDF_STATUS_SUCCESS;
 }
 #endif /* WLAN_FEATURE_11BE */
 #endif /* _WLAN_MLO_T2LM_H_ */
