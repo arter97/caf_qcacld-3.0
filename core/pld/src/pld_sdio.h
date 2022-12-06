@@ -191,6 +191,13 @@ static inline void *pld_hif_sdio_get_virt_ramdump_mem(struct device *dev,
 static inline void pld_hif_sdio_release_ramdump_mem(unsigned long *address)
 {
 }
+static inline int pld_sdio_wlan_enable(struct device *dev,
+				       struct pld_wlan_enable_cfg *config,
+				       enum pld_driver_mode mode,
+				       const char *host_version)
+{
+	return 0;
+}
 #else
 #ifdef CONFIG_PLD_SDIO_CNSS2
 #include <net/cnss2.h>

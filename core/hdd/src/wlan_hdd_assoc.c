@@ -163,6 +163,14 @@ uint8_t ccp_rsn_oui_90[HDD_RSN_OUI_SIZE] = {0x00, 0x0F, 0xAC, 0x09};
 static const
 u8 ccp_rsn_oui_13[HDD_RSN_OUI_SIZE] = {0x50, 0x6F, 0x9A, 0x01};
 
+#ifdef FEATURE_WLAN_WAPI
+#define HDD_WAPI_OUI_SIZE 4
+/* WPI-SMS4 */
+uint8_t ccp_wapi_oui01[HDD_WAPI_OUI_SIZE] = { 0x00, 0x14, 0x72, 0x01 };
+/* WAI-PSK */
+uint8_t ccp_wapi_oui02[HDD_WAPI_OUI_SIZE] = { 0x00, 0x14, 0x72, 0x02 };
+#endif  /* FEATURE_WLAN_WAPI */
+
 /* Offset where the EID-Len-IE, start. */
 #define ASSOC_RSP_IES_OFFSET 6  /* Capability(2) + AID(2) + Status Code(2) */
 #define ASSOC_REQ_IES_OFFSET 4  /* Capability(2) + LI(2) */
@@ -2254,6 +2262,50 @@ static inline void hdd_translate_sae_rsn_to_csr_auth(int8_t auth_suite[4],
 }
 #endif
 
+void *hdd_filter_ft_info(const uint8_t *frame, size_t len,
+			 uint32_t *ft_info_len)
+{
+	uint32_t ft_ie_len, md_ie_len, rsn_ie_len, ie_len;
+	const uint8_t *rsn_ie, *md_ie, *ft_ie;
+	void *ft_info;
+
+	ft_ie_len = 0;
+	md_ie_len = 0;
+	rsn_ie_len = 0;
+	ie_len = len - DOT11F_FF_CAPABILITIES_LEN - DOT11F_FF_STATUS_LEN
+			   - DOT11F_IE_AID_MAX_LEN - sizeof(tSirMacMgmtHdr);
+	rsn_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_RSN, frame, ie_len);
+
+	if (rsn_ie) {
+		rsn_ie_len = rsn_ie[1] + 2;
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			(void *)rsn_ie, rsn_ie_len);
+	}
+	md_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_MOBILITYDOMAIN,
+					 frame, ie_len);
+	if (md_ie) {
+		md_ie_len = md_ie[1] + 2;
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			(void *)md_ie, md_ie_len);
+	}
+	ft_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_FTINFO, frame, ie_len);
+	if (ft_ie)
+		ft_ie_len = ft_ie[1] + 2;
+
+	*ft_info_len = rsn_ie_len + md_ie_len + ft_ie_len;
+	ft_info = qdf_mem_malloc(*ft_info_len);
+	if (!ft_info)
+		return NULL;
+	if (rsn_ie_len)
+		qdf_mem_copy(ft_info, rsn_ie, rsn_ie_len);
+	if (md_ie_len)
+		qdf_mem_copy(ft_info + rsn_ie_len, md_ie, md_ie_len);
+	if (ft_ie_len)
+		qdf_mem_copy(ft_info + rsn_ie_len + md_ie_len,
+			     ft_ie, ft_ie_len);
+	return ft_info;
+}
+
 /**
  * hdd_translate_rsn_to_csr_auth_type() - Translate RSN to CSR auth type
  * @auth_suite: auth suite
@@ -2393,6 +2445,36 @@ hdd_translate_wpa_to_csr_encryption_type(uint8_t cipher_suite[4])
 
 	return cipher_type;
 }
+
+#ifdef FEATURE_WLAN_WAPI
+enum csr_akm_type hdd_translate_wapi_to_csr_auth_type(uint8_t auth_suite[4])
+{
+	enum csr_akm_type auth_type;
+
+	if (memcmp(auth_suite, ccp_wapi_oui01, 4) == 0)
+		auth_type = eCSR_AUTH_TYPE_WAPI_WAI_CERTIFICATE;
+	else if (memcmp(auth_suite, ccp_wapi_oui02, 4) == 0)
+		auth_type = eCSR_AUTH_TYPE_WAPI_WAI_PSK;
+	else
+		auth_type = eCSR_AUTH_TYPE_UNKNOWN;
+
+	return auth_type;
+}
+
+eCsrEncryptionType
+hdd_translate_wapi_to_csr_encryption_type(uint8_t cipher_suite[4])
+{
+	eCsrEncryptionType cipher_type;
+
+	if (memcmp(cipher_suite, ccp_wapi_oui01, 4) == 0 ||
+		   memcmp(cipher_suite, ccp_wapi_oui02, 4) == 0)
+		cipher_type = eCSR_ENCRYPT_TYPE_WPI;
+	else
+		cipher_type = eCSR_ENCRYPT_TYPE_FAILED;
+
+	return cipher_type;
+}
+#endif /* FEATURE_WLAN_WAPI */
 
 #ifdef WLAN_FEATURE_FILS_SK
 bool hdd_is_fils_connection(struct hdd_context *hdd_ctx,

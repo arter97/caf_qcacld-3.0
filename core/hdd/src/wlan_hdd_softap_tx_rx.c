@@ -224,8 +224,8 @@ static inline struct sk_buff *hdd_skb_orphan(struct hdd_adapter *adapter,
 	struct sk_buff *nskb;
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0))
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-#endif
 	int cpu;
+#endif
 
 	hdd_skb_fill_gso_size(adapter->dev, skb);
 
@@ -629,8 +629,9 @@ static QDF_STATUS hdd_softap_validate_peer_state(struct hdd_adapter *adapter,
 		}
 
 		if (peer_state == OL_TXRX_PEER_STATE_CONN) {
-			if (ntohs(skb->protocol) != HDD_ETHERTYPE_802_1_X) {
-				hdd_sapd_debug_rl("NON-EAPOL packet in non-Authenticated state");
+			if (ntohs(skb->protocol) != HDD_ETHERTYPE_802_1_X &&
+			    !IS_HDD_ETHERTYPE_WAI(skb)) {
+				hdd_sapd_debug_rl("NON EAPOL/WAPI pkt in non-Auth");
 				return QDF_STATUS_E_FAILURE;
 			}
 		}

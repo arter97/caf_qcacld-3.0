@@ -15960,13 +15960,20 @@ hdd_get_all_iface_mode_mask(void)
 {
 	uint32_t mode_mask = 0;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 	mode_mask = (1 << NL80211_IFTYPE_STATION) |
 			(1 << NL80211_IFTYPE_AP) |
 			(1 << NL80211_IFTYPE_P2P_GO) |
 			(1 << NL80211_IFTYPE_P2P_CLIENT) |
 			(1 << NL80211_IFTYPE_P2P_DEVICE) |
 			(1 << NL80211_IFTYPE_NAN);
-
+#else
+	mode_mask = (1 << NL80211_IFTYPE_STATION) |
+			(1 << NL80211_IFTYPE_AP) |
+			(1 << NL80211_IFTYPE_P2P_GO) |
+			(1 << NL80211_IFTYPE_P2P_CLIENT) |
+			(1 << NL80211_IFTYPE_P2P_DEVICE);
+#endif
 	return mode_mask;
 }
 
@@ -15986,8 +15993,10 @@ hdd_convert_nl80211_to_reg_band_mask(enum nl80211_band band)
 		reg_band |= 1 << REG_BAND_2G;
 	if (band & 1 << NL80211_BAND_5GHZ)
 		reg_band |= 1 << REG_BAND_5G;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 	if (band & 1 << NL80211_BAND_6GHZ)
 		reg_band |= 1 << REG_BAND_6G;
+#endif
 	if (band & 1 << NL80211_BAND_60GHZ)
 		hdd_err("band: %d not supported", NL80211_BAND_60GHZ);
 
@@ -19400,6 +19409,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	int errno;
 	int32_t cipher_cap, ucast_cipher = 0;
 	struct qdf_mac_addr mac_address;
+	struct hdd_ap_ctx *hdd_ap_ctx;
 
 	hdd_enter();
 
@@ -19466,6 +19476,11 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 	switch (adapter->device_mode) {
 	case QDF_SAP_MODE:
 	case QDF_P2P_GO_MODE:
+		hdd_ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(adapter);
+		if (hdd_ap_ctx->during_auth_offload) {
+			hdd_err("don't need install key during auth");
+			return -EINVAL;
+		}
 		errno = wlan_hdd_add_key_sap(adapter, pairwise,
 					     key_index, cipher);
 		break;
@@ -23001,11 +23016,11 @@ static enum rate_info_flags hdd_map_hdd_bw_to_os(enum hdd_rate_info_bw hdd_bw)
 		return RATE_INFO_FLAGS_80_MHZ_WIDTH;
 	case HDD_RATE_BW_160:
 		return RATE_INFO_FLAGS_160_MHZ_WIDTH;
+	default:
+		hdd_err("Unhandled HDD_RATE_BW: %d", hdd_bw);
+		return (enum rate_info_flags)0;
 	}
 
-	hdd_err("Unhandled HDD_RATE_BW: %d", hdd_bw);
-
-	return (enum rate_info_flags)0;
 }
 
 void hdd_set_rate_bw(struct rate_info *info, enum hdd_rate_info_bw hdd_bw)
@@ -23510,6 +23525,7 @@ static int wlan_hdd_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 	return errno;
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 static void wlan_hdd_select_queue(struct net_device *dev, struct sk_buff *skb)
 {
@@ -23627,6 +23643,7 @@ static int wlan_hdd_cfg80211_tx_control_port(struct wiphy *wiphy,
 						  adapter->mac_addr.bytes,
 						  dest, proto, unencrypted);
 }
+#endif
 #endif
 
 #if defined(CFG80211_CTRL_FRAME_SRC_ADDR_TA_ADDR)
@@ -23796,5 +23813,7 @@ static struct cfg80211_ops wlan_hdd_cfg80211_ops = {
 	.get_antenna = wlan_hdd_cfg80211_get_chainmask,
 	.get_channel = wlan_hdd_cfg80211_get_channel,
 	.set_bitrate_mask = wlan_hdd_cfg80211_set_bitrate_mask,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 0, 0))
 	.tx_control_port = wlan_hdd_cfg80211_tx_control_port,
+#endif
 };
