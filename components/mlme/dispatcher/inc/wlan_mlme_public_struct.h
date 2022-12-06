@@ -252,21 +252,6 @@ enum mlme_dot11_mode {
 };
 
 /**
- * enum mlme_vdev_dot11_mode - Dot11 mode of the vdev
- * MLME_VDEV_DOT11_MODE_AUTO: vdev uses mlme_dot11_mode
- * MLME_VDEV_DOT11_MODE_11N: vdev supports 11N mode
- * MLME_VDEV_DOT11_MODE_11AC: vdev supports 11AC mode
- * MLME_VDEV_DOT11_MODE_11AX: vdev supports 11AX mode
- */
-enum mlme_vdev_dot11_mode {
-	MLME_VDEV_DOT11_MODE_AUTO,
-	MLME_VDEV_DOT11_MODE_11N,
-	MLME_VDEV_DOT11_MODE_11AC,
-	MLME_VDEV_DOT11_MODE_11AX,
-	MLME_VDEV_DOT11_MODE_11BE,
-};
-
-/**
  * struct wlan_mlme_dot11_mode - dot11 mode
  *
  * @dot11_mode: dot11 mode supported
@@ -1609,6 +1594,8 @@ enum dot11p_mode {
  * @disable_rx_mrc:                  disable 2 rx chains, in rx nss 1 mode
  * @disable_tx_mrc:                  disable 2 tx chains, in tx nss 1 mode
  * @enable_dynamic_nss_chains_cfg:   enable the dynamic nss chain config to FW
+ * @restart_sap_on_dyn_nss_chains_cfg: restart SAP on dynamic NSS chains
+ * update
  */
 struct wlan_mlme_nss_chains {
 	uint32_t num_tx_chains[NSS_CHAINS_BAND_MAX];
@@ -1621,6 +1608,7 @@ struct wlan_mlme_nss_chains {
 	bool disable_rx_mrc[NSS_CHAINS_BAND_MAX];
 	bool disable_tx_mrc[NSS_CHAINS_BAND_MAX];
 	bool enable_dynamic_nss_chains_cfg;
+	bool restart_sap_on_dyn_nss_chains_cfg;
 };
 
 /**
