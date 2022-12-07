@@ -1633,6 +1633,11 @@ static inline QDF_STATUS dp_monitor_drop_inv_peer_pkts(struct dp_vdev *vdev)
 
 	return QDF_STATUS_E_FAILURE;
 }
+#else
+static inline QDF_STATUS dp_monitor_drop_inv_peer_pkts(struct dp_vdev *vdev)
+{
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
 
 /*
@@ -3407,6 +3412,12 @@ static inline QDF_STATUS dp_monitor_filter_neighbour_peer(struct dp_pdev *pdev,
 	}
 
 	return monitor_ops->mon_filter_neighbour_peer(pdev, rx_pkt_hdr);
+}
+#else
+static inline QDF_STATUS dp_monitor_filter_neighbour_peer(struct dp_pdev *pdev,
+							  uint8_t *rx_pkt_hdr)
+{
+	return QDF_STATUS_E_FAILURE;
 }
 #endif
 

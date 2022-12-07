@@ -1345,7 +1345,7 @@ struct ol_if_ops {
 
 	void (*update_dp_stats)(void *soc, void *stats, uint16_t id,
 			uint8_t type);
-#ifdef FEATURE_NAC_RSSI
+#ifdef RX_PEER_INVALID_ENH
 	uint8_t (*rx_invalid_peer)(struct cdp_ctrl_objmgr_psoc *soc,
 				   uint8_t pdev_id, void *msg);
 #else

@@ -1347,7 +1347,7 @@ QDF_STATUS dp_rx_filter_mesh_packets(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 #endif
 
-#ifdef FEATURE_NAC_RSSI
+#ifdef RX_PEER_INVALID_ENH
 /**
  * dp_rx_process_invalid_peer(): Function to pass invalid peer list to umac
  * @soc: DP SOC handle
