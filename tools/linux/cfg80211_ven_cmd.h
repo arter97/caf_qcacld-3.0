@@ -833,6 +833,7 @@ enum {
 	IEEE80211_PARAM_DROP_3ADDR_MCAST  = 788,  /* Flag to enable/disable 3address multicast pkt drops */
 #ifdef WLAN_FEATURE_11BE
 	IEEE80211_PARAM_EHT_CONFIG_CCFS0 = 789, /* Set 11be - EHT Config CCFS0 in 6GHz */
+	IEEE80211_PARAM_EHT_MAX_SUPP_LTF = 790, /* Set 11be - EHT Max LTF Support */
 #endif /* WLAN_FEATURE_11BE */
 };
 
@@ -2507,6 +2508,8 @@ struct vendor_commands vap_vendor_cmds[] = {
 #ifdef WLAN_FEATURE_11BE
 	{"eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, SET_PARAM, 1},
 	{"get_eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, GET_PARAM, 0},
+	{"eht_max_supp_ltf", IEEE80211_PARAM_EHT_MAX_SUPP_LTF, SET_PARAM, 1},
+	{"get_eht_max_supp_ltf",   IEEE80211_PARAM_EHT_MAX_SUPP_LTF, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
 };
 
