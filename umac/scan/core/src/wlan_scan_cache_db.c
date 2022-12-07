@@ -244,7 +244,7 @@ static void scm_del_scan_node(qdf_list_t *list,
 /**
  * scm_del_scan_node_from_db() - API to del the scan entry
  * @scan_db: scan database
- * @scan_entry:entry scan_node
+ * @scan_node:entry scan_node
  *
  * API to flush the scan entry. This should be called while
  * holding scan_db_lock.
@@ -471,7 +471,7 @@ scm_get_next_node(struct scan_dbs *scan_db,
 /**
  * scm_check_and_age_out() - check and age out the old entries
  * @scan_db: scan db
- * @scan_node: node to check for age out
+ * @node: node to check for age out
  * @scan_aging_time: scan cache aging time
  *
  * Return: void
@@ -882,6 +882,46 @@ scm_find_duplicate(struct wlan_objmgr_pdev *pdev,
 	return false;
 }
 
+/*
+ * Buffer len size to conside the 8 char for MLD print, 17 char MLD address
+ * 3 char for space and 3 char for number of link.
+ */
+#define ML_MAX_CHAR_LENGTH 32
+
+#ifdef WLAN_FEATURE_11BE_MLO
+/**
+ * scm_dump_ml_scan_info(): Dump ml scan info
+ * @scan_params: new received entry
+ * @int_ctx_str: Buffer pointer
+ *
+ * Return: void
+ */
+static void scm_dump_ml_scan_info(struct scan_cache_entry *scan_params,
+				  char *int_ctx_str)
+{
+	char *buf;
+	int buf_len;
+
+	buf = int_ctx_str;
+	buf_len = ML_MAX_CHAR_LENGTH;
+
+	/* Scenario: When both STA and AP support ML then
+	 * Driver will fill ml_info structure and print the MLD address and no.
+	 * of links.
+	 */
+	if (!qdf_is_macaddr_zero(&scan_params->ml_info.mld_mac_addr))
+		qdf_scnprintf(buf, buf_len,
+			      "MLD " QDF_MAC_ADDR_FMT " links %d",
+			      QDF_MAC_ADDR_REF(scan_params->ml_info.mld_mac_addr.bytes),
+			      scan_params->ml_info.num_links);
+}
+#else
+static void scm_dump_ml_scan_info(struct scan_cache_entry *scan_params,
+				  char *int_ctx_str)
+{
+}
+#endif
+
 /**
  * scm_add_update_entry() - add or update scan entry
  * @psoc: psoc ptr
@@ -900,6 +940,7 @@ static QDF_STATUS scm_add_update_entry(struct wlan_objmgr_psoc *psoc,
 	struct scan_dbs *scan_db;
 	struct wlan_scan_obj *scan_obj;
 	uint8_t security_type;
+	char *int_ctx_str = NULL;
 
 	scan_db = wlan_pdev_get_scan_db(psoc, pdev);
 	if (!scan_db) {
@@ -929,7 +970,13 @@ static QDF_STATUS scm_add_update_entry(struct wlan_objmgr_psoc *psoc,
 					  &dup_node);
 
 	security_type = scan_params->security_type;
-	scm_nofl_debug("Received %s: " QDF_MAC_ADDR_FMT " \"" QDF_SSID_FMT "\" freq %d rssi %d tsf_delta %u seq %d snr %d phy %d hidden %d mismatch %d %s%s%s%s pdev %d boot_time %llu ns",
+	int_ctx_str = qdf_mem_malloc(ML_MAX_CHAR_LENGTH);
+	if (!int_ctx_str)
+		return QDF_STATUS_E_INVAL;
+
+	scm_dump_ml_scan_info(scan_params, int_ctx_str);
+
+	scm_nofl_debug("Received %s: " QDF_MAC_ADDR_FMT " \"" QDF_SSID_FMT "\" freq %d rssi %d tsf_delta %u seq %d snr %d phy %d hidden %d mismatch %d %s%s%s%s pdev %d boot_time %llu ns %s",
 		       (scan_params->frm_subtype == MGMT_SUBTYPE_PROBE_RESP) ?
 		       "prb rsp" : "bcn",
 		       QDF_MAC_ADDR_REF(scan_params->bssid.bytes),
@@ -945,7 +992,9 @@ static QDF_STATUS scm_add_update_entry(struct wlan_objmgr_psoc *psoc,
 		       security_type & SCAN_SECURITY_TYPE_WAPI ? "[WAPI]" : "",
 		       security_type & SCAN_SECURITY_TYPE_WEP ? "[WEP]" : "",
 		       wlan_objmgr_pdev_get_pdev_id(pdev),
-		       scan_params->boottime_ns);
+		       scan_params->boottime_ns, int_ctx_str);
+
+	qdf_mem_free(int_ctx_str);
 
 	if (scan_obj->cb.inform_beacon)
 		scan_obj->cb.inform_beacon(pdev, scan_params);
@@ -1606,6 +1655,7 @@ QDF_STATUS scm_flush_results(struct wlan_objmgr_pdev *pdev,
 
 /**
  * scm_filter_channels() - Remove entries not belonging to channel list
+ * @pdev: pointer to pdev
  * @scan_db: scan db
  * @db_node: node on which filters are applied
  * @chan_freq_list: valid channel frequency (in MHz) list
