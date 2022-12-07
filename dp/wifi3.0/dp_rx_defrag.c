@@ -86,6 +86,7 @@ static void dp_rx_defrag_frames_free(qdf_nbuf_t frames)
 	}
 }
 
+#ifndef WLAN_SOFTUMAC_SUPPORT /* WLAN_SOFTUMAC_SUPPORT */
 /**
  * dp_rx_clear_saved_desc_info() - Clears descriptor info
  * @txrx_peer: Pointer to the peer data structure
@@ -140,6 +141,18 @@ static void dp_rx_return_head_frag_desc(struct dp_txrx_peer *txrx_peer,
 				  "%s: Failed to return link desc", __func__);
 	}
 }
+#else
+
+static void dp_rx_clear_saved_desc_info(struct dp_txrx_peer *txrx_peer,
+					unsigned int tid)
+{
+}
+
+static void dp_rx_return_head_frag_desc(struct dp_txrx_peer *txrx_peer,
+					unsigned int tid)
+{
+}
+#endif /* WLAN_SOFTUMAC_SUPPORT */
 
 void dp_rx_reorder_flush_frag(struct dp_txrx_peer *txrx_peer,
 			      unsigned int tid)
@@ -1584,44 +1597,6 @@ void dp_rx_defrag_cleanup(struct dp_txrx_peer *txrx_peer, unsigned int tid)
 	txrx_peer->rx_tid[tid].curr_seq_num = 0;
 }
 
-/**
- * dp_rx_defrag_save_info_from_ring_desc() - Save info from REO ring descriptor
- * @soc: Pointer to the SOC data structure
- * @ring_desc: Pointer to the dst ring descriptor
- * @rx_desc: Pointer to rx descriptor
- * @txrx_peer: Pointer to the peer
- * @tid: Transmit Identifier
- *
- * Return: None
- */
-static QDF_STATUS
-dp_rx_defrag_save_info_from_ring_desc(struct dp_soc *soc,
-				      hal_ring_desc_t ring_desc,
-				      struct dp_rx_desc *rx_desc,
-				      struct dp_txrx_peer *txrx_peer,
-				      unsigned int tid)
-{
-	void *dst_ring_desc;
-
-	dst_ring_desc = qdf_mem_malloc(hal_srng_get_entrysize(soc->hal_soc,
-							      REO_DST));
-
-	if (!dst_ring_desc) {
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			"%s: Memory alloc failed !", __func__);
-		QDF_ASSERT(0);
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	qdf_mem_copy(dst_ring_desc, ring_desc,
-		     hal_srng_get_entrysize(soc->hal_soc, REO_DST));
-
-	txrx_peer->rx_tid[tid].dst_ring_desc = dst_ring_desc;
-	txrx_peer->rx_tid[tid].head_frag_desc = rx_desc;
-
-	return QDF_STATUS_SUCCESS;
-}
-
 #ifdef DP_RX_DEFRAG_ADDR1_CHECK_WAR
 #ifdef WLAN_FEATURE_11BE_MLO
 /**
@@ -1688,6 +1663,154 @@ static inline bool dp_rx_defrag_addr1_check(struct dp_soc *soc,
 	return true;
 }
 #endif
+
+QDF_STATUS dp_rx_defrag_add_last_frag(struct dp_soc *soc,
+				      struct dp_txrx_peer *txrx_peer,
+				      uint16_t tid,
+				      uint16_t rxseq, qdf_nbuf_t nbuf)
+{
+	struct dp_rx_tid_defrag *rx_tid = &txrx_peer->rx_tid[tid];
+	struct dp_rx_reorder_array_elem *rx_reorder_array_elem;
+	uint8_t all_frag_present;
+	uint32_t msdu_len;
+	QDF_STATUS status;
+
+	rx_reorder_array_elem = txrx_peer->rx_tid[tid].array;
+
+	/*
+	 * HW may fill in unexpected peer_id in RX PKT TLV,
+	 * if this peer_id related peer is valid by coincidence,
+	 * but actually this peer won't do dp_peer_rx_init(like SAP vdev
+	 * self peer), then invalid access to rx_reorder_array_elem happened.
+	 */
+	if (!rx_reorder_array_elem) {
+		dp_verbose_debug(
+			"peer id:%d drop rx frame!",
+			txrx_peer->peer_id);
+		DP_STATS_INC(soc, rx.err.defrag_peer_uninit, 1);
+		dp_rx_nbuf_free(nbuf);
+		goto fail;
+	}
+
+	if (rx_reorder_array_elem->head &&
+	    rxseq != rx_tid->curr_seq_num) {
+		/* Drop stored fragments if out of sequence
+		 * fragment is received
+		 */
+		dp_rx_reorder_flush_frag(txrx_peer, tid);
+
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			  "%s: No list found for TID %d Seq# %d",
+				__func__, tid, rxseq);
+		dp_rx_nbuf_free(nbuf);
+		goto fail;
+	}
+
+	msdu_len = hal_rx_msdu_start_msdu_len_get(soc->hal_soc,
+						  qdf_nbuf_data(nbuf));
+
+	qdf_nbuf_set_pktlen(nbuf, (msdu_len + soc->rx_pkt_tlv_size));
+
+	status = dp_rx_defrag_fraglist_insert(txrx_peer, tid,
+					      &rx_reorder_array_elem->head,
+			&rx_reorder_array_elem->tail, nbuf,
+			&all_frag_present);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "%s Fragment insert failed", __func__);
+
+		goto fail;
+	}
+
+	if (soc->rx.flags.defrag_timeout_check)
+		dp_rx_defrag_waitlist_remove(txrx_peer, tid);
+
+	if (!all_frag_present) {
+		uint32_t now_ms =
+			qdf_system_ticks_to_msecs(qdf_system_ticks());
+
+		txrx_peer->rx_tid[tid].defrag_timeout_ms =
+			now_ms + soc->rx.defrag.timeout_ms;
+
+		dp_rx_defrag_waitlist_add(txrx_peer, tid);
+
+		return QDF_STATUS_SUCCESS;
+	}
+
+	status = dp_rx_defrag(txrx_peer, tid, rx_reorder_array_elem->head,
+			      rx_reorder_array_elem->tail);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "%s Fragment processing failed", __func__);
+
+		dp_rx_return_head_frag_desc(txrx_peer, tid);
+		dp_rx_defrag_cleanup(txrx_peer, tid);
+
+		goto fail;
+	}
+
+	/* Re-inject the fragments back to REO for further processing */
+	status = dp_rx_defrag_reo_reinject(txrx_peer, tid,
+					   rx_reorder_array_elem->head);
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		rx_reorder_array_elem->head = NULL;
+		rx_reorder_array_elem->tail = NULL;
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
+			  "%s: Frag seq successfully reinjected",
+			__func__);
+	} else {
+		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
+			  "%s: Frag seq reinjection failed", __func__);
+		dp_rx_return_head_frag_desc(txrx_peer, tid);
+	}
+
+	dp_rx_defrag_cleanup(txrx_peer, tid);
+	return QDF_STATUS_SUCCESS;
+
+fail:
+	return QDF_STATUS_E_DEFRAG_ERROR;
+}
+
+#ifndef WLAN_SOFTUMAC_SUPPORT /* WLAN_SOFTUMAC_SUPPORT */
+/**
+ * dp_rx_defrag_save_info_from_ring_desc() - Save info from REO ring descriptor
+ * @soc: Pointer to the SOC data structure
+ * @ring_desc: Pointer to the dst ring descriptor
+ * @rx_desc: Pointer to rx descriptor
+ * @txrx_peer: Pointer to the peer
+ * @tid: Transmit Identifier
+ *
+ * Return: None
+ */
+static QDF_STATUS
+dp_rx_defrag_save_info_from_ring_desc(struct dp_soc *soc,
+				      hal_ring_desc_t ring_desc,
+				      struct dp_rx_desc *rx_desc,
+				      struct dp_txrx_peer *txrx_peer,
+				      unsigned int tid)
+{
+	void *dst_ring_desc;
+
+	dst_ring_desc = qdf_mem_malloc(hal_srng_get_entrysize(soc->hal_soc,
+							      REO_DST));
+
+	if (!dst_ring_desc) {
+		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
+			"%s: Memory alloc failed !", __func__);
+		QDF_ASSERT(0);
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	qdf_mem_copy(dst_ring_desc, ring_desc,
+		     hal_srng_get_entrysize(soc->hal_soc, REO_DST));
+
+	txrx_peer->rx_tid[tid].dst_ring_desc = dst_ring_desc;
+	txrx_peer->rx_tid[tid].head_frag_desc = rx_desc;
+
+	return QDF_STATUS_SUCCESS;
+}
 
 /**
  * dp_rx_defrag_store_fragment() - Store incoming fragments
@@ -2078,111 +2201,4 @@ uint32_t dp_rx_frag_handle(struct dp_soc *soc, hal_ring_desc_t ring_desc,
 	return rx_bufs_used;
 }
 
-QDF_STATUS dp_rx_defrag_add_last_frag(struct dp_soc *soc,
-				      struct dp_txrx_peer *txrx_peer,
-				      uint16_t tid,
-				      uint16_t rxseq, qdf_nbuf_t nbuf)
-{
-	struct dp_rx_tid_defrag *rx_tid = &txrx_peer->rx_tid[tid];
-	struct dp_rx_reorder_array_elem *rx_reorder_array_elem;
-	uint8_t all_frag_present;
-	uint32_t msdu_len;
-	QDF_STATUS status;
-
-	rx_reorder_array_elem = txrx_peer->rx_tid[tid].array;
-
-	/*
-	 * HW may fill in unexpected peer_id in RX PKT TLV,
-	 * if this peer_id related peer is valid by coincidence,
-	 * but actually this peer won't do dp_peer_rx_init(like SAP vdev
-	 * self peer), then invalid access to rx_reorder_array_elem happened.
-	 */
-	if (!rx_reorder_array_elem) {
-		dp_verbose_debug(
-			"peer id:%d drop rx frame!",
-			txrx_peer->peer_id);
-		DP_STATS_INC(soc, rx.err.defrag_peer_uninit, 1);
-		dp_rx_nbuf_free(nbuf);
-		goto fail;
-	}
-
-	if (rx_reorder_array_elem->head &&
-	    rxseq != rx_tid->curr_seq_num) {
-		/* Drop stored fragments if out of sequence
-		 * fragment is received
-		 */
-		dp_rx_reorder_flush_frag(txrx_peer, tid);
-
-		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_ERROR,
-			  "%s: No list found for TID %d Seq# %d",
-				__func__, tid, rxseq);
-		dp_rx_nbuf_free(nbuf);
-		goto fail;
-	}
-
-	msdu_len = hal_rx_msdu_start_msdu_len_get(soc->hal_soc,
-						  qdf_nbuf_data(nbuf));
-
-	qdf_nbuf_set_pktlen(nbuf, (msdu_len + soc->rx_pkt_tlv_size));
-
-	status = dp_rx_defrag_fraglist_insert(txrx_peer, tid,
-					      &rx_reorder_array_elem->head,
-			&rx_reorder_array_elem->tail, nbuf,
-			&all_frag_present);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "%s Fragment insert failed", __func__);
-
-		goto fail;
-	}
-
-	if (soc->rx.flags.defrag_timeout_check)
-		dp_rx_defrag_waitlist_remove(txrx_peer, tid);
-
-	if (!all_frag_present) {
-		uint32_t now_ms =
-			qdf_system_ticks_to_msecs(qdf_system_ticks());
-
-		txrx_peer->rx_tid[tid].defrag_timeout_ms =
-			now_ms + soc->rx.defrag.timeout_ms;
-
-		dp_rx_defrag_waitlist_add(txrx_peer, tid);
-
-		return QDF_STATUS_SUCCESS;
-	}
-
-	status = dp_rx_defrag(txrx_peer, tid, rx_reorder_array_elem->head,
-			      rx_reorder_array_elem->tail);
-
-	if (QDF_IS_STATUS_ERROR(status)) {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "%s Fragment processing failed", __func__);
-
-		dp_rx_return_head_frag_desc(txrx_peer, tid);
-		dp_rx_defrag_cleanup(txrx_peer, tid);
-
-		goto fail;
-	}
-
-	/* Re-inject the fragments back to REO for further processing */
-	status = dp_rx_defrag_reo_reinject(txrx_peer, tid,
-					   rx_reorder_array_elem->head);
-	if (QDF_IS_STATUS_SUCCESS(status)) {
-		rx_reorder_array_elem->head = NULL;
-		rx_reorder_array_elem->tail = NULL;
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_INFO,
-			  "%s: Frag seq successfully reinjected",
-			__func__);
-	} else {
-		QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_ERROR,
-			  "%s: Frag seq reinjection failed", __func__);
-		dp_rx_return_head_frag_desc(txrx_peer, tid);
-	}
-
-	dp_rx_defrag_cleanup(txrx_peer, tid);
-	return QDF_STATUS_SUCCESS;
-
-fail:
-	return QDF_STATUS_E_DEFRAG_ERROR;
-}
+#endif /* WLAN_SOFTUMAC_SUPPORT */

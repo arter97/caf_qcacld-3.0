@@ -43,6 +43,8 @@
 #include "dp_ratetable.h"
 #endif
 
+#ifndef WLAN_SOFTUMAC_SUPPORT /* WLAN_SOFTUMAC_SUPPORT */
+
 #ifdef DUP_RX_DESC_WAR
 void dp_rx_dump_info_and_assert(struct dp_soc *soc,
 				hal_ring_handle_t hal_ring,
@@ -106,7 +108,115 @@ fail:
 
 }
 #endif
+
+uint32_t dp_rx_srng_get_num_pending(hal_soc_handle_t hal_soc,
+				    hal_ring_handle_t hal_ring_hdl,
+				    uint32_t num_entries,
+				    bool *near_full)
+{
+	uint32_t num_pending = 0;
+
+	num_pending = hal_srng_dst_num_valid_locked(hal_soc,
+						    hal_ring_hdl,
+						    true);
+
+	if (num_entries && (num_pending >= num_entries >> 1))
+		*near_full = true;
+	else
+		*near_full = false;
+
+	return num_pending;
+}
+
+#ifdef RX_DESC_DEBUG_CHECK
+QDF_STATUS dp_rx_desc_nbuf_sanity_check(struct dp_soc *soc,
+					hal_ring_desc_t ring_desc,
+					struct dp_rx_desc *rx_desc)
+{
+	struct hal_buf_info hbi;
+
+	hal_rx_reo_buf_paddr_get(soc->hal_soc, ring_desc, &hbi);
+	/* Sanity check for possible buffer paddr corruption */
+	if (dp_rx_desc_paddr_sanity_check(rx_desc, (&hbi)->paddr))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_FAILURE;
+}
+
+/**
+ * dp_rx_desc_nbuf_len_sanity_check - Add sanity check to catch Rx buffer
+ *				      out of bound access from H.W
+ *
+ * @soc: DP soc
+ * @pkt_len: Packet length received from H.W
+ *
+ * Return: NONE
+ */
+static inline void
+dp_rx_desc_nbuf_len_sanity_check(struct dp_soc *soc,
+				 uint32_t pkt_len)
+{
+	struct rx_desc_pool *rx_desc_pool;
+
+	rx_desc_pool = &soc->rx_desc_buf[0];
+	qdf_assert_always(pkt_len <= rx_desc_pool->buf_size);
+}
+#else
+static inline void
+dp_rx_desc_nbuf_len_sanity_check(struct dp_soc *soc, uint32_t pkt_len) { }
+#endif
+
+#ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
+void
+dp_rx_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
+			hal_ring_desc_t ring_desc)
+{
+	struct dp_buf_info_record *record;
+	struct hal_buf_info hbi;
+	uint32_t idx;
+
+	if (qdf_unlikely(!soc->rx_ring_history[ring_num]))
+		return;
+
+	hal_rx_reo_buf_paddr_get(soc->hal_soc, ring_desc, &hbi);
+
+	/* buffer_addr_info is the first element of ring_desc */
+	hal_rx_buf_cookie_rbm_get(soc->hal_soc, (uint32_t *)ring_desc,
+				  &hbi);
+
+	idx = dp_history_get_next_index(&soc->rx_ring_history[ring_num]->index,
+					DP_RX_HIST_MAX);
+
+	/* No NULL check needed for record since its an array */
+	record = &soc->rx_ring_history[ring_num]->entry[idx];
+
+	record->timestamp = qdf_get_log_timestamp();
+	record->hbi.paddr = hbi.paddr;
+	record->hbi.sw_cookie = hbi.sw_cookie;
+	record->hbi.rbm = hbi.rbm;
+}
+#endif
+
+#ifdef WLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET
+void dp_rx_mark_first_packet_after_wow_wakeup(struct dp_pdev *pdev,
+					      uint8_t *rx_tlv,
+					      qdf_nbuf_t nbuf)
+{
+	struct dp_soc *soc;
+
+	if (!pdev->is_first_wakeup_packet)
+		return;
+
+	soc = pdev->soc;
+	if (hal_get_first_wow_wakeup_packet(soc->hal_soc, rx_tlv)) {
+		qdf_nbuf_mark_wakeup_frame(nbuf);
+		dp_info("First packet after WOW Wakeup rcvd");
+	}
+}
+#endif
+
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
+#endif /* WLAN_SOFTUMAC_SUPPORT */
 
 /**
  * dp_pdev_frag_alloc_and_map() - Allocate frag for desc buffer and map
@@ -2408,44 +2518,6 @@ int dp_wds_rx_policy_check(uint8_t *rx_tlv_hdr,
 }
 #endif
 
-#ifdef RX_DESC_DEBUG_CHECK
-QDF_STATUS dp_rx_desc_nbuf_sanity_check(struct dp_soc *soc,
-					hal_ring_desc_t ring_desc,
-					struct dp_rx_desc *rx_desc)
-{
-	struct hal_buf_info hbi;
-
-	hal_rx_reo_buf_paddr_get(soc->hal_soc, ring_desc, &hbi);
-	/* Sanity check for possible buffer paddr corruption */
-	if (dp_rx_desc_paddr_sanity_check(rx_desc, (&hbi)->paddr))
-		return QDF_STATUS_SUCCESS;
-
-	return QDF_STATUS_E_FAILURE;
-}
-
-/**
- * dp_rx_desc_nbuf_len_sanity_check - Add sanity check to catch Rx buffer
- *				      out of bound access from H.W
- *
- * @soc: DP soc
- * @pkt_len: Packet length received from H.W
- *
- * Return: NONE
- */
-static inline void
-dp_rx_desc_nbuf_len_sanity_check(struct dp_soc *soc,
-				 uint32_t pkt_len)
-{
-	struct rx_desc_pool *rx_desc_pool;
-
-	rx_desc_pool = &soc->rx_desc_buf[0];
-	qdf_assert_always(pkt_len <= rx_desc_pool->buf_size);
-}
-#else
-static inline void
-dp_rx_desc_nbuf_len_sanity_check(struct dp_soc *soc, uint32_t pkt_len) { }
-#endif
-
 #ifdef DP_RX_PKT_NO_PEER_DELIVER
 #ifdef DP_RX_UDP_OVER_PEER_ROAM
 /**
@@ -2593,25 +2665,6 @@ void dp_rx_deliver_to_stack_no_peer(struct dp_soc *soc, qdf_nbuf_t nbuf)
 }
 #endif
 
-uint32_t dp_rx_srng_get_num_pending(hal_soc_handle_t hal_soc,
-				    hal_ring_handle_t hal_ring_hdl,
-				    uint32_t num_entries,
-				    bool *near_full)
-{
-	uint32_t num_pending = 0;
-
-	num_pending = hal_srng_dst_num_valid_locked(hal_soc,
-						    hal_ring_hdl,
-						    true);
-
-	if (num_entries && (num_pending >= num_entries >> 1))
-		*near_full = true;
-	else
-		*near_full = false;
-
-	return num_pending;
-}
-
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
 #ifdef WLAN_SUPPORT_RX_FISA
@@ -2638,37 +2691,6 @@ bool dp_rx_is_raw_frame_dropped(qdf_nbuf_t nbuf)
 	}
 
 	return false;
-}
-#endif
-
-#ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
-void
-dp_rx_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
-			hal_ring_desc_t ring_desc)
-{
-	struct dp_buf_info_record *record;
-	struct hal_buf_info hbi;
-	uint32_t idx;
-
-	if (qdf_unlikely(!soc->rx_ring_history[ring_num]))
-		return;
-
-	hal_rx_reo_buf_paddr_get(soc->hal_soc, ring_desc, &hbi);
-
-	/* buffer_addr_info is the first element of ring_desc */
-	hal_rx_buf_cookie_rbm_get(soc->hal_soc, (uint32_t *)ring_desc,
-				  &hbi);
-
-	idx = dp_history_get_next_index(&soc->rx_ring_history[ring_num]->index,
-					DP_RX_HIST_MAX);
-
-	/* No NULL check needed for record since its an array */
-	record = &soc->rx_ring_history[ring_num]->entry[idx];
-
-	record->timestamp = qdf_get_log_timestamp();
-	record->hbi.paddr = hbi.paddr;
-	record->hbi.sw_cookie = hbi.sw_cookie;
-	record->hbi.rbm = hbi.rbm;
 }
 #endif
 
@@ -3138,23 +3160,5 @@ bool dp_rx_deliver_special_frame(struct dp_soc *soc,
 	}
 
 	return false;
-}
-#endif
-
-#ifdef WLAN_FEATURE_MARK_FIRST_WAKEUP_PACKET
-void dp_rx_mark_first_packet_after_wow_wakeup(struct dp_pdev *pdev,
-					      uint8_t *rx_tlv,
-					      qdf_nbuf_t nbuf)
-{
-	struct dp_soc *soc;
-
-	if (!pdev->is_first_wakeup_packet)
-		return;
-
-	soc = pdev->soc;
-	if (hal_get_first_wow_wakeup_packet(soc->hal_soc, rx_tlv)) {
-		qdf_nbuf_mark_wakeup_frame(nbuf);
-		dp_info("First packet after WOW Wakeup rcvd");
-	}
 }
 #endif
