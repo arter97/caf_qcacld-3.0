@@ -2153,6 +2153,32 @@ static void dp_mlo_mcast_reset_pri_mcast(struct dp_vdev_be *be_vdev,
 	be_ptnr_vdev->mcast_primary = false;
 }
 
+#if defined(CONFIG_MLO_SINGLE_DEV)
+static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
+					struct dp_vdev *vdev,
+					cdp_config_param_type val)
+{
+	struct dp_vdev_be *be_vdev = dp_get_be_vdev_from_dp_vdev(vdev);
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(
+						be_vdev->vdev.pdev->soc);
+
+	be_vdev->mcast_primary = val.cdp_vdev_param_mcast_vdev;
+	vdev->mlo_vdev = true;
+
+	if (be_vdev->mcast_primary) {
+		struct cdp_txrx_peer_params_update params = {0};
+
+		params.chip_id = be_soc->mlo_chip_id;
+		params.pdev_id = be_vdev->vdev.pdev->pdev_id;
+		params.osif_vdev = be_vdev->vdev.osif_vdev;
+		dp_wdi_event_handler(
+				WDI_EVENT_MCAST_PRIMARY_UPDATE,
+				be_vdev->vdev.pdev->soc,
+				(void *)&params, CDP_INVALID_PEER,
+				WDI_NO_VAL, params.pdev_id);
+	}
+}
+#else
 static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 					struct dp_vdev *vdev,
 					cdp_config_param_type val)
@@ -2185,6 +2211,7 @@ static void dp_txrx_set_mlo_mcast_primary_vdev_param_be(
 				WDI_NO_VAL, params.pdev_id);
 	}
 }
+#endif
 
 static void dp_txrx_reset_mlo_mcast_primary_vdev_param_be(
 					struct dp_vdev *vdev,

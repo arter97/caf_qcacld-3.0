@@ -2257,9 +2257,31 @@ int dp_tx_frame_is_drop(struct dp_vdev *vdev, uint8_t *srcmac, uint8_t *dstmac)
 /* MLO vdev id inc offset */
 #define DP_MLO_VDEV_ID_OFFSET 0x80
 
-static inline void
-dp_tx_bypass_reinjection(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+static inline bool
+dp_tx_wds_ext_check(struct cdp_tx_exception_metadata *tx_exc_metadata)
 {
+	if (tx_exc_metadata && tx_exc_metadata->is_wds_extended)
+		return true;
+
+	return false;
+}
+#else
+static inline bool
+dp_tx_wds_ext_check(struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	return false;
+}
+#endif
+
+static inline void
+dp_tx_bypass_reinjection(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
+			 struct cdp_tx_exception_metadata *tx_exc_metadata)
+{
+	/* wds ext enabled will not set the TO_FW bit */
+	if (dp_tx_wds_ext_check(tx_exc_metadata))
+		return;
+
 	if (!(tx_desc->flags & DP_TX_DESC_FLAG_TO_FW)) {
 		tx_desc->flags |= DP_TX_DESC_FLAG_TO_FW;
 		qdf_atomic_inc(&soc->num_tx_exception);
@@ -2291,7 +2313,8 @@ dp_tx_update_mcast_param(uint16_t peer_id,
 }
 #else
 static inline void
-dp_tx_bypass_reinjection(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc)
+dp_tx_bypass_reinjection(struct dp_soc *soc, struct dp_tx_desc_s *tx_desc,
+			 struct cdp_tx_exception_metadata *tx_exc_metadata)
 {
 }
 
@@ -2391,7 +2414,7 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 					    DP_TCL_METADATA_TYPE_PEER_BASED);
 		DP_TX_TCL_METADATA_PEER_ID_SET(htt_tcl_metadata,
 					       peer_id);
-		dp_tx_bypass_reinjection(soc, tx_desc);
+		dp_tx_bypass_reinjection(soc, tx_desc, tx_exc_metadata);
 	} else
 		htt_tcl_metadata = vdev->htt_tcl_metadata;
 
@@ -3953,7 +3976,8 @@ int dp_tx_proxy_arp(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 }
 #endif
 
-#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
+#if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
+	!defined(CONFIG_MLO_SINGLE_DEV)
 #ifdef WLAN_MCAST_MLO
 static bool
 dp_tx_reinject_mlo_hdl(struct dp_soc *soc, struct dp_vdev *vdev,
@@ -5574,7 +5598,7 @@ void dp_tx_prefetch_next_nbuf_data(struct dp_tx_desc_s *next)
  * Return: true when packet is reinjected
  */
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
-	defined(WLAN_MCAST_MLO)
+	defined(WLAN_MCAST_MLO) && !defined(CONFIG_MLO_SINGLE_DEV)
 static inline bool
 dp_tx_mcast_reinject_handler(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 {

@@ -813,7 +813,7 @@ hal_tx_vdev_mismatch_routing_set(hal_soc_handle_t hal_soc_hdl,
  * Return: void
  */
 #if defined(HWIO_TCL_R0_CMN_CONFIG_MCAST_CMN_PN_SN_MLO_REINJECT_ENABLE_BMSK) && \
-	defined(WLAN_MCAST_MLO)
+	defined(WLAN_MCAST_MLO) && !defined(CONFIG_MLO_SINGLE_DEV)
 static inline void
 hal_tx_mcast_mlo_reinject_routing_set(
 				hal_soc_handle_t hal_soc_hdl,

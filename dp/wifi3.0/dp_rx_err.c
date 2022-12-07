@@ -1924,7 +1924,7 @@ fail:
 }
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP) && \
-	defined(WLAN_MCAST_MLO)
+	defined(WLAN_MCAST_MLO) && !defined(CONFIG_MLO_SINGLE_DEV)
 static bool dp_rx_igmp_handler(struct dp_soc *soc,
 			       struct dp_vdev *vdev,
 			       struct dp_txrx_peer *peer,
