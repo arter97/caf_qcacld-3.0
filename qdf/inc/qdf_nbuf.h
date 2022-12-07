@@ -98,6 +98,8 @@
 #define QDF_NBUF_TRAC_DOUBLE_VLAN_IP_OFFSET	22
 /* One dword for IPv4 header size unit */
 #define QDF_NBUF_IPV4_HDR_SIZE_UNIT	4
+#define QDF_NBUF_TRAC_IPV4_TOTAL_LEN_OFFSET 16
+#define QDF_NBUF_TRAC_IPV6_PAYLOAD_LEN_OFFSET 18
 
 /* EAPOL Related MASK */
 #define EAPOL_PACKET_TYPE_OFFSET		15
@@ -150,6 +152,14 @@
 #define QDF_NBUF_PKT_TCPOP_ACK			0x10
 #define QDF_NBUF_PKT_TCP_SRC_PORT_OFFSET	34
 #define QDF_NBUF_PKT_TCP_DST_PORT_OFFSET	36
+#define QDF_NBUF_PKT_IPV4_TCP_HDR_LEN_OFFSET 46
+#define QDF_NBUF_PKT_IPV4_TCP_OPCODE_OFFSET 47
+#define QDF_NBUF_PKT_IPV6_TCP_HDR_LEN_OFFSET 66
+#define QDF_NBUF_PKT_IPV6_TCP_OPCODE_OFFSET 67
+#define QDF_NBUF_PKT_TCP_HDR_LEN_MASK 0xF0
+#define QDF_NBUF_PKT_TCP_HDR_LEN_LSB 4
+#define QDF_NBUF_PKT_TCP_HDR_LEN_UNIT 4
+#define QDF_NBUF_PKT_TCP_ACK_MAX_LEN 100
 
 /* DNS Related MASK */
 #define QDF_NBUF_PKT_DNS_OVER_UDP_OPCODE_OFFSET	44
@@ -4246,6 +4256,75 @@ static inline
 bool qdf_nbuf_is_mcast_replay(qdf_nbuf_t buf)
 {
 	return __qdf_nbuf_is_mcast_replay(buf);
+}
+
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+/* Reuse bit24~31 in skb->priority for packet type */
+#define QDF_NBUF_PRIORITY_PKT_TYPE_MASK 0xFF000000
+#define QDF_NBUF_PRIORITY_PKT_TYPE_LSB 24
+/* TCP ACK */
+#define QDF_NBUF_PRIORITY_PKT_TCP_ACK 0x1
+
+#define QDF_NBUF_GET_PRIORITY_PKT_TYPE(_pri) \
+	(((_pri) & QDF_NBUF_PRIORITY_PKT_TYPE_MASK) >> \
+	 QDF_NBUF_PRIORITY_PKT_TYPE_LSB)
+
+#define QDF_NBUF_PRIORITY_PKT_TYPE(_pkt_type) \
+	(((_pkt_type) << QDF_NBUF_PRIORITY_PKT_TYPE_LSB) & \
+	 QDF_NBUF_PRIORITY_PKT_TYPE_MASK)
+
+/**
+ * qdf_nbuf_get_priority_pkt_type() - Get packet type from priority
+ * @nbuf: pointer to network buffer
+ *
+ * Return: packet type
+ */
+static inline
+uint8_t qdf_nbuf_get_priority_pkt_type(qdf_nbuf_t nbuf)
+{
+	return QDF_NBUF_GET_PRIORITY_PKT_TYPE(nbuf->priority);
+}
+
+/**
+ * qdf_nbuf_set_priority_pkt_type() - Set packet type to priority
+ * @nbuf: pointer to network buffer
+ * @pkt_type: packet type to be set
+ *
+ * Return: none
+ */
+static inline
+void qdf_nbuf_set_priority_pkt_type(qdf_nbuf_t nbuf, uint8_t pkt_type)
+{
+	nbuf->priority |= QDF_NBUF_PRIORITY_PKT_TYPE(pkt_type);
+}
+
+/**
+ * qdf_nbuf_remove_priority_pkt_type() - Remove the packet type bits
+ *					 from priority
+ * @@nbuf: pointer to network buffer
+ *
+ * Return: none
+ */
+static inline
+void qdf_nbuf_remove_priority_pkt_type(qdf_nbuf_t nbuf)
+{
+	nbuf->priority &= ~QDF_NBUF_PRIORITY_PKT_TYPE_MASK;
+}
+#endif
+
+/**
+ * qdf_nbuf_is_ipv4_v6_pure_tcp_ack() - check if it is pure tcp ack
+ *					without data payload
+ * @buf: Network buffer
+ *
+ * Check whether the packet is pure TCP ack without data payload.
+ *
+ * Return : true if TCP ack, else return false
+ */
+static inline
+bool qdf_nbuf_is_ipv4_v6_pure_tcp_ack(qdf_nbuf_t buf)
+{
+	return __qdf_nbuf_is_ipv4_v6_pure_tcp_ack(buf);
 }
 
 /**

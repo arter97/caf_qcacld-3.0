@@ -91,6 +91,7 @@ typedef struct skb_shared_info *__qdf_nbuf_shared_info_t;
 #define QDF_NBUF_CB_PACKET_TYPE_ICMPv6 6
 #define QDF_NBUF_CB_PACKET_TYPE_DHCPV6 7
 #define QDF_NBUF_CB_PACKET_TYPE_END_INDICATION 8
+#define QDF_NBUF_CB_PACKET_TYPE_TCP_ACK 9
 
 #define RADIOTAP_BASE_HEADER_LEN sizeof(struct ieee80211_radiotap_header)
 
@@ -961,6 +962,7 @@ uint8_t __qdf_nbuf_data_get_ipv6_tc(uint8_t *data);
 void __qdf_nbuf_data_set_ipv4_tos(uint8_t *data, uint8_t tos);
 void __qdf_nbuf_data_set_ipv6_tc(uint8_t *data, uint8_t tc);
 bool __qdf_nbuf_is_ipv4_last_fragment(struct sk_buff *skb);
+bool __qdf_nbuf_is_ipv4_v6_pure_tcp_ack(struct sk_buff *skb);
 
 #ifdef QDF_NBUF_GLOBAL_COUNT
 int __qdf_nbuf_count_get(void);

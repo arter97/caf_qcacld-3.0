@@ -1813,6 +1813,27 @@
 	CFG_INI_BOOL("host_ast_db_enable", false, \
 	"Host AST entries database Enable/Disable")
 
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+/*
+ * <ini>
+ * TX packet inspect for ILP - Enable/Disable
+ *
+ * @Default: true
+ *
+ * This ini enable/disables TX packet inspection for ILP feature
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_TX_PKT_INSPECT_FOR_ILP \
+	CFG_INI_BOOL("tx_pkt_inspect_for_ilp", true, \
+	"TX packet inspect for ILP")
+#define CFG_TX_PKT_INSPECT_FOR_ILP_CFG CFG(CFG_TX_PKT_INSPECT_FOR_ILP)
+#else
+#define CFG_TX_PKT_INSPECT_FOR_ILP_CFG
+#endif
+
 #define CFG_DP \
 		CFG(CFG_DP_HTT_PACKET_TYPE) \
 		CFG(CFG_DP_INT_BATCH_THRESHOLD_OTHER) \
@@ -1934,5 +1955,6 @@
 		CFG(CFG_DP_HOST_AST_DB_ENABLE) \
 		CFG_DP_SAWF_STATS_CONFIG \
 		CFG(CFG_DP_HANDLE_INVALID_DECAP_TYPE_DISABLE) \
-		CFG(CFG_DP_TXMON_SW_PEER_FILTERING)
+		CFG(CFG_DP_TXMON_SW_PEER_FILTERING) \
+		CFG_TX_PKT_INSPECT_FOR_ILP_CFG
 #endif /* _CFG_DP_H_ */

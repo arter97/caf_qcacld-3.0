@@ -3102,6 +3102,80 @@ bool __qdf_nbuf_is_arp_local(struct sk_buff *skb)
 	return false;
 }
 
+/**
+ * __qdf_nbuf_data_get_tcp_hdr_len() - get TCP header length
+ * @data: pointer to data of network buffer
+ * @tcp_hdr_len_offset: bytes offset for tcp header length of ethernet packets
+ *
+ * Return: TCP header length in unit of byte
+ */
+static inline
+uint8_t __qdf_nbuf_data_get_tcp_hdr_len(uint8_t *data,
+					uint8_t tcp_hdr_len_offset)
+{
+	uint8_t tcp_hdr_len;
+
+	tcp_hdr_len =
+		*((uint8_t *)(data + tcp_hdr_len_offset));
+
+	tcp_hdr_len = ((tcp_hdr_len & QDF_NBUF_PKT_TCP_HDR_LEN_MASK) >>
+		       QDF_NBUF_PKT_TCP_HDR_LEN_LSB) *
+		       QDF_NBUF_PKT_TCP_HDR_LEN_UNIT;
+
+	return tcp_hdr_len;
+}
+
+bool __qdf_nbuf_is_ipv4_v6_pure_tcp_ack(struct sk_buff *skb)
+{
+	bool is_tcp_ack = false;
+	uint8_t op_code, tcp_hdr_len;
+	uint16_t ip_payload_len;
+	uint8_t *data = skb->data;
+
+	/*
+	 * If packet length > TCP ACK max length or it's nonlinearized,
+	 * then it must not be TCP ACK.
+	 */
+	if (qdf_nbuf_len(skb) > QDF_NBUF_PKT_TCP_ACK_MAX_LEN ||
+	    qdf_nbuf_is_nonlinear(skb))
+		return false;
+
+	if (qdf_nbuf_is_ipv4_tcp_pkt(skb)) {
+		ip_payload_len =
+			QDF_SWAP_U16(*((uint16_t *)(data +
+				     QDF_NBUF_TRAC_IPV4_TOTAL_LEN_OFFSET)))
+					- QDF_NBUF_TRAC_IPV4_HEADER_SIZE;
+
+		tcp_hdr_len = __qdf_nbuf_data_get_tcp_hdr_len(
+					data,
+					QDF_NBUF_PKT_IPV4_TCP_HDR_LEN_OFFSET);
+
+		op_code = (uint8_t)(*(uint8_t *)(data +
+				QDF_NBUF_PKT_IPV4_TCP_OPCODE_OFFSET));
+
+		if (ip_payload_len == tcp_hdr_len &&
+		    op_code == QDF_NBUF_PKT_TCPOP_ACK)
+			is_tcp_ack = true;
+
+	} else if (qdf_nbuf_is_ipv6_tcp_pkt(skb)) {
+		ip_payload_len =
+			QDF_SWAP_U16(*((uint16_t *)(data +
+				QDF_NBUF_TRAC_IPV6_PAYLOAD_LEN_OFFSET)));
+
+		tcp_hdr_len = __qdf_nbuf_data_get_tcp_hdr_len(
+					data,
+					QDF_NBUF_PKT_IPV6_TCP_HDR_LEN_OFFSET);
+		op_code = (uint8_t)(*(uint8_t *)(data +
+				QDF_NBUF_PKT_IPV6_TCP_OPCODE_OFFSET));
+
+		if (ip_payload_len == tcp_hdr_len &&
+		    op_code == QDF_NBUF_PKT_TCPOP_ACK)
+			is_tcp_ack = true;
+	}
+
+	return is_tcp_ack;
+}
+
 #ifdef NBUF_MEMORY_DEBUG
 
 static spinlock_t g_qdf_net_buf_track_lock[QDF_NET_BUF_TRACK_MAX_SIZE];

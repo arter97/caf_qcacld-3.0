@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -445,6 +445,7 @@ static inline uint8_t dp_tx_get_rbm_id_be(struct dp_soc *soc,
 	return rbm;
 }
 #endif
+
 #ifdef QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES
 
 /*
@@ -486,6 +487,40 @@ static inline void
 dp_tx_set_min_rates_for_critical_frames(struct dp_soc *soc,
 					uint32_t *hal_tx_desc_cached,
 					qdf_nbuf_t nbuf)
+{
+}
+#endif
+
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+/**
+ * dp_tx_set_particular_tx_queue() - set particular TX TQM flow queue 3 for
+ *				     TX packets, currently TCP ACK only
+ * @soc: DP soc structure pointer
+ * @hal_tx_desc: HAL descriptor where fields are set
+ * @nbuf: skb to be considered for particular TX queue
+ *
+ * Return: None
+ */
+static inline
+void dp_tx_set_particular_tx_queue(struct dp_soc *soc,
+				   uint32_t *hal_tx_desc,
+				   qdf_nbuf_t nbuf)
+{
+	if (!soc->wlan_cfg_ctx->tx_pkt_inspect_for_ilp)
+		return;
+
+	if (qdf_unlikely(QDF_NBUF_CB_GET_PACKET_TYPE(nbuf) ==
+			 QDF_NBUF_CB_PACKET_TYPE_TCP_ACK)) {
+		hal_tx_desc_set_flow_override_enable(hal_tx_desc, 1);
+		hal_tx_desc_set_flow_override(hal_tx_desc, 1);
+		hal_tx_desc_set_who_classify_info_sel(hal_tx_desc, 1);
+	}
+}
+#else
+static inline
+void dp_tx_set_particular_tx_queue(struct dp_soc *soc,
+				   uint32_t *hal_tx_desc,
+				   qdf_nbuf_t nbuf)
 {
 }
 #endif
@@ -1079,6 +1114,8 @@ dp_tx_hw_enqueue_be(struct dp_soc *soc, struct dp_vdev *vdev,
 
 	dp_tx_set_min_rates_for_critical_frames(soc, hal_tx_desc_cached,
 						tx_desc->nbuf);
+	dp_tx_set_particular_tx_queue(soc, hal_tx_desc_cached,
+				      tx_desc->nbuf);
 	dp_tx_desc_set_ktimestamp(vdev, tx_desc);
 
 	hal_ring_hdl = dp_tx_get_hal_ring_hdl(soc, ring_id);

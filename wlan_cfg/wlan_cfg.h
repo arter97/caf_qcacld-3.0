@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -327,6 +327,8 @@ struct wlan_srng_cfg {
  * @notify_frame_support: flag indicating capability to mark notify frames
  * @is_handle_invalid_decap_type_disabled: flag to indicate if invalid decap
  *                                         type handling is disabled
+ * @tx_pkt_inspect_for_ilp: flag to indicate if TX packet inspection for HW
+ *			    based ILP feature is enabled
  */
 struct wlan_cfg_dp_soc_ctxt {
 	int num_int_ctxts;
@@ -516,6 +518,9 @@ struct wlan_cfg_dp_soc_ctxt {
 	uint8_t napi_scale_factor;
 	uint8_t notify_frame_support;
 	bool is_handle_invalid_decap_type_disabled;
+#ifdef DP_TX_PACKET_INSPECT_FOR_ILP
+	bool tx_pkt_inspect_for_ilp;
+#endif
 };
 
 /**
