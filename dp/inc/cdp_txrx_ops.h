@@ -48,6 +48,11 @@
 #define CDP_PEER_DO_NOT_START_UNMAP_TIMER      1
 
 struct hif_opaque_softc;
+/**
+ * cdp_ctrl_mlo_mgr - opaque handle for mlo manager context
+ */
+struct cdp_ctrl_mlo_mgr;
+
 
 /* same as ieee80211_nac_param */
 enum cdp_nac_param_cmd {
@@ -148,6 +153,8 @@ enum cdp_peer_txq_flush_policy {
  * @mlo_update_delta_tsf2: update delta tsf2 for link
  * @mlo_update_delta_tqm: update delta tqm for SOC
  * @mlo_update_mlo_ts_offset: update MLO timestamp offset for SOC
+ * @mlo_ctxt_attach: Attach DP MLO context
+ * @mlo_ctxt_detach: Detach DP MLO context
  */
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 struct cdp_mlo_ops {
@@ -160,6 +167,8 @@ struct cdp_mlo_ops {
 					   int8_t *vdev_ids, uint8_t num_vdevs,
 					   uint8_t vdev_id);
 	void (*mlo_setup_complete)(struct cdp_mlo_ctxt *mlo_ctxt);
+	struct cdp_mlo_ctxt *(*mlo_ctxt_attach)(struct cdp_ctrl_mlo_mgr *m_ctx);
+	void (*mlo_ctxt_detach)(struct cdp_mlo_ctxt *mlo_ctxt);
 	void (*mlo_update_delta_tsf2)(struct cdp_soc_t *soc_hdl,
 				      uint8_t pdev_id,
 				      uint64_t delta_tsf2);

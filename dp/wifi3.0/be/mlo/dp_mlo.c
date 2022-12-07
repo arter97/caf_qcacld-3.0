@@ -523,6 +523,8 @@ static struct cdp_mlo_ops dp_mlo_ops = {
 	.mlo_update_delta_tsf2 = dp_mlo_update_delta_tsf2,
 	.mlo_update_delta_tqm = dp_mlo_update_delta_tqm,
 	.mlo_update_mlo_ts_offset = dp_mlo_update_mlo_ts_offset,
+	.mlo_ctxt_attach = dp_mlo_ctxt_attach_wifi3,
+	.mlo_ctxt_detach = dp_mlo_ctxt_detach_wifi3,
 };
 
 void dp_soc_mlo_fill_params(struct dp_soc *soc,
