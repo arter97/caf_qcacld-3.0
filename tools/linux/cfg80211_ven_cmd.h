@@ -1418,6 +1418,9 @@ enum _ol_ath_param_t {
 #endif
 	OL_ATH_PARAM_MON_MAC_FILTER = 520,
 	OL_ATH_PARAM_PUNC_EIRP_THRES = 521,
+	/* Display the current 6G client type */
+	OL_ATH_PARAM_DISPLAY_CLIENT_TYPE = 522,
+	OL_ATH_PARAM_EXCLUDE_EML_IN_SLO = 523,
 };
 
 #ifdef CONFIG_SUPPORT_VENCMDTABLE
@@ -3743,6 +3746,10 @@ struct vendor_commands radio_vendor_cmds[] = {
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PUNC_EIRP_THRES, SET_PARAM, 1},
 	{"g_punc_eirp_thres",
 		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_PUNC_EIRP_THRES, GET_PARAM, 0},
+	{"disable_eml_in_slo",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EXCLUDE_EML_IN_SLO, SET_PARAM, 1},
+	{"get_disable_eml_in_slo",
+		OL_ATH_PARAM_SHIFT | OL_ATH_PARAM_EXCLUDE_EML_IN_SLO, GET_PARAM, 0},
 };
 #endif
 
