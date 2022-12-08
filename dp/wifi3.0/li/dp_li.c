@@ -613,6 +613,8 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_rx_desc_pool_deinit = dp_rx_desc_pool_deinit_li;
 	arch_ops->dp_tx_compute_hw_delay = dp_tx_compute_tx_delay_li;
 	arch_ops->dp_rx_chain_msdus = dp_rx_chain_msdus_li;
+	arch_ops->dp_rx_wbm_err_reap_desc = dp_rx_wbm_err_reap_desc_li;
+	arch_ops->dp_rx_null_q_desc_handle = dp_rx_null_q_desc_handle_li;
 #else
 	arch_ops->dp_rx_desc_pool_init = dp_rx_desc_pool_init_generic;
 	arch_ops->dp_rx_desc_pool_deinit = dp_rx_desc_pool_deinit_generic;

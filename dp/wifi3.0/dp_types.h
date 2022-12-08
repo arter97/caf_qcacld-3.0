@@ -2200,6 +2200,8 @@ enum dp_context_type {
  * @txrx_soc_ppeds_stop:
  * @dp_register_ppeds_interrupts:
  * @dp_free_ppeds_interrupts:
+ * @dp_rx_wbm_err_reap_desc: Reap WBM Error Ring Descriptor
+ * @dp_rx_null_q_desc_handle: Handle Null Queue Exception Error
  */
 struct dp_arch_ops {
 	/* INIT/DEINIT Arch Ops */
@@ -2411,6 +2413,17 @@ struct dp_arch_ops {
 	void (*dp_free_ppeds_interrupts)(struct dp_soc *soc,
 					 struct dp_srng *srng, int ring_type,
 					 int ring_num);
+	qdf_nbuf_t (*dp_rx_wbm_err_reap_desc)(struct dp_intr *int_ctx,
+					      struct dp_soc *soc,
+					      hal_ring_handle_t hal_ring_hdl,
+					      uint32_t quota,
+					      uint32_t *rx_bufs_used);
+	QDF_STATUS (*dp_rx_null_q_desc_handle)(struct dp_soc *soc,
+					       qdf_nbuf_t nbuf,
+					       uint8_t *rx_tlv_hdr,
+					       uint8_t pool_id,
+					       struct dp_txrx_peer *txrx_peer,
+					       bool is_reo_exception);
 };
 
 /**

@@ -282,4 +282,55 @@ QDF_STATUS dp_peer_rx_reorder_queue_setup_li(struct dp_soc *soc,
 
 	return QDF_STATUS_SUCCESS;
 }
+
+/**
+ * dp_rx_wbm_err_reap_desc_li() - Function to reap and replenish
+ *                                WBM RX Error descriptors
+ *
+ * @int_ctx: pointer to DP interrupt context
+ * @soc: core DP main context
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Error Ring, to be serviced
+ * @quota: No. of units (packets) that can be serviced in one shot.
+ * @rx_bufs_used: No. of descriptors reaped
+ *
+ * This function implements the core Rx functionality like reap and
+ * replenish the RX error ring Descriptors, and create a nbuf list
+ * out of it. It also reads wbm error information from descriptors
+ * and update the nbuf tlv area.
+ *
+ * Return: qdf_nbuf_t: head pointer to the nbuf list created
+ */
+qdf_nbuf_t
+dp_rx_wbm_err_reap_desc_li(struct dp_intr *int_ctx, struct dp_soc *soc,
+			   hal_ring_handle_t hal_ring_hdl, uint32_t quota,
+			   uint32_t *rx_bufs_used);
+
+/**
+ * dp_rx_null_q_desc_handle_li() - Function to handle NULL Queue
+ *                                 descriptor violation on either a
+ *                                 REO or WBM ring
+ *
+ * @soc: core DP main context
+ * @nbuf: buffer pointer
+ * @rx_tlv_hdr: start of rx tlv header
+ * @pool_id: mac id
+ * @txrx_peer: txrx peer handle
+ * @is_reo_exception: flag to check if the error is from REO or WBM
+ *
+ * This function handles NULL queue descriptor violations arising out
+ * a missing REO queue for a given peer or a given TID. This typically
+ * may happen if a packet is received on a QOS enabled TID before the
+ * ADDBA negotiation for that TID, when the TID queue is setup. Or
+ * it may also happen for MC/BC frames if they are not routed to the
+ * non-QOS TID queue, in the absence of any other default TID queue.
+ * This error can show up both in a REO destination or WBM release ring.
+ *
+ * Return: QDF_STATUS_SUCCESS, if nbuf handled successfully. QDF status code
+ *         if nbuf could not be handled or dropped.
+ */
+QDF_STATUS
+dp_rx_null_q_desc_handle_li(struct dp_soc *soc, qdf_nbuf_t nbuf,
+			    uint8_t *rx_tlv_hdr, uint8_t pool_id,
+			    struct dp_txrx_peer *txrx_peer,
+			    bool is_reo_exception);
 #endif

@@ -74,6 +74,8 @@
 #define dp_rx_info_rl(params...) \
 	__QDF_TRACE_RL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP_RX, ## params)
 #define dp_rx_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_RX, params)
+#define dp_rx_err_err(params...) \
+	QDF_TRACE_ERROR(QDF_MODULE_ID_DP_RX_ERROR, params)
 
 /**
  * enum dp_rx_desc_state
@@ -3234,4 +3236,104 @@ void dp_rx_nbuf_list_dup_deliver(struct dp_soc *soc,
 
 #endif /* DP_TX_RX_TPUT_SIMULATE */
 
+/**
+ * dp_rx_wbm_desc_nbuf_sanity_check() - Add sanity check to for WBM rx_desc
+ *                                      paddr corruption
+ * @soc: core txrx main context
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Error Ring
+ * @ring_desc: REO ring descriptor
+ * @rx_desc: Rx descriptor
+ *
+ * Return: NONE
+ */
+QDF_STATUS dp_rx_wbm_desc_nbuf_sanity_check(struct dp_soc *soc,
+					    hal_ring_handle_t hal_ring_hdl,
+					    hal_ring_desc_t ring_desc,
+					    struct dp_rx_desc *rx_desc);
+/**
+ * dp_rx_is_sg_formation_required() - Check if sg formation is required
+ * @info: WBM desc info
+ *
+ * Return: True if sg is required else false
+ */
+bool dp_rx_is_sg_formation_required(struct hal_wbm_err_desc_info *info);
+
+/**
+ * dp_rx_err_tlv_invalidate() - Invalidate network buffer
+ * @soc: core txrx main context
+ * @nbuf: Network buffer to invalidate
+ *
+ * Return: NONE
+ */
+void dp_rx_err_tlv_invalidate(struct dp_soc *soc,
+			      qdf_nbuf_t nbuf);
+
+/*
+ * dp_rx_wbm_sg_list_last_msdu_war() - war for HW issue
+ *
+ * This is a war for HW issue where length is only valid in last msdu
+ * @soc: DP SOC handle
+ *
+ * Return: NONE
+ */
+void dp_rx_wbm_sg_list_last_msdu_war(struct dp_soc *soc);
+
+/**
+ * dp_rx_check_pkt_len() - Check for pktlen validity
+ * @soc: DP SOC context
+ * @pkt_len: computed length of the pkt from caller in bytes
+ *
+ * Return: true if pktlen > RX_BUFFER_SIZE, else return false
+ *
+ */
+bool dp_rx_check_pkt_len(struct dp_soc *soc, uint32_t pkt_len);
+
+/**
+ * dp_rx_null_q_handle_invalid_peer_id_exception() - to find exception
+ * @soc: pointer to dp_soc struct
+ * @pool_id: Pool id to find dp_pdev
+ * @rx_tlv_hdr: TLV header of received packet
+ * @nbuf: SKB
+ *
+ * In certain types of packets if peer_id is not correct then
+ * driver may not be able find. Try finding peer by addr_2 of
+ * received MPDU. If you find the peer then most likely sw_peer_id &
+ * ast_idx is corrupted.
+ *
+ * Return: True if you find the peer by addr_2 of received MPDU else false
+ */
+bool dp_rx_null_q_handle_invalid_peer_id_exception(struct dp_soc *soc,
+						   uint8_t pool_id,
+						   uint8_t *rx_tlv_hdr,
+						   qdf_nbuf_t nbuf);
+
+/**
+ * dp_rx_err_drop_3addr_mcast() - Check if feature drop_3ddr_mcast is enabled
+ *                                If so, drop the multicast frame.
+ * @vdev: datapath vdev
+ * @rx_tlv_hdr: TLV header
+ *
+ * Return: true if packet is to be dropped,
+ *         false, if packet is not dropped.
+ */
+bool dp_rx_err_drop_3addr_mcast(struct dp_vdev *vdev, uint8_t *rx_tlv_hdr);
+
+/*
+ * dp_rx_deliver_to_osif_stack() - function to deliver rx pkts to stack
+ * @soc: DP soc
+ * @vdev: DP vdev handle
+ * @txrx_peer: pointer to the txrx_peer object
+ * @nbuf: skb list head
+ * @tail: skb list tail
+ * @is_eapol: eapol pkt check
+ *
+ * Return: None
+ */
+void
+dp_rx_deliver_to_osif_stack(struct dp_soc *soc,
+			    struct dp_vdev *vdev,
+			    struct dp_txrx_peer *txrx_peer,
+			    qdf_nbuf_t nbuf,
+			    qdf_nbuf_t tail,
+			    bool is_eapol);
 #endif /* _DP_RX_H */
