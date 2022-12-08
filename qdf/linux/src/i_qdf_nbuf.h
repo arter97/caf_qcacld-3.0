@@ -2595,6 +2595,12 @@ void __qdf_nbuf_queue_head_purge(struct sk_buff_head *skb_queue_head)
 	return skb_queue_purge(skb_queue_head);
 }
 
+static inline
+int __qdf_nbuf_queue_empty(__qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	return skb_queue_empty(nbuf_queue_head);
+}
+
 /**
  * __qdf_nbuf_queue_head_lock() - Acquire the skb list lock
  * @head: skb list for which lock is to be acquired
@@ -2903,6 +2909,33 @@ __qdf_nbuf_set_gso_size(struct sk_buff *skb, unsigned int val)
 static inline void __qdf_nbuf_kfree(struct sk_buff *skb)
 {
 	kfree_skb(skb);
+}
+
+/**
+ * __qdf_nbuf_dev_kfree_list() - Free nbuf list using dev based os call
+ * @skb_queue_head: Pointer to nbuf queue head
+ *
+ * This function is called to free the nbuf list on failure cases
+ *
+ * Return: None
+ */
+void
+__qdf_nbuf_dev_kfree_list(__qdf_nbuf_queue_head_t *nbuf_queue_head);
+
+/**
+ * __qdf_nbuf_dev_queue_head() - queue a buffer using dev at the list head
+ * @skb_queue_head: Pointer to skb list head
+ * @buff: Pointer to nbuf
+ *
+ * This function is called to queue buffer at the skb list head
+ *
+ * Return: None
+ */
+static inline void
+__qdf_nbuf_dev_queue_head(__qdf_nbuf_queue_head_t *nbuf_queue_head,
+			  __qdf_nbuf_t buff)
+{
+	 __skb_queue_head(nbuf_queue_head, buff);
 }
 
 /**
