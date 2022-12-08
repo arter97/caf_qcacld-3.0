@@ -6863,6 +6863,9 @@ QDF_STATUS dp_send_cts_frame_to_stack(struct dp_soc *soc,
 		return QDF_STATUS_E_NOMEM;
 	}
 
+	tx_capture_info.mpdu_info.frame_ctrl = (IEEE80211_FC0_VERSION_0 |
+						IEEE80211_FC0_TYPE_CTL |
+						IEEE80211_FC0_SUBTYPE_CTS);
 	dp_gen_cts_frame(ppdu_info, peer,
 			 tx_capture_info.mpdu_nbuf);
 	DP_TX_PEER_DEL_REF(peer);
@@ -6899,6 +6902,9 @@ void dp_send_usr_ack_frm_to_stack(struct dp_soc *soc,
 	uint32_t peer_id;
 	uint32_t ast_index;
 	uint8_t *ptr_mac_addr;
+	struct cdp_tx_indication_mpdu_info *mpdu_info = NULL;
+
+	mpdu_info = &tx_capture_info.mpdu_info;
 
 	if (rx_user_info->qos_control_info_valid &&
 	    ((rx_user_info->qos_control &
@@ -6932,6 +6938,11 @@ void dp_send_usr_ack_frm_to_stack(struct dp_soc *soc,
 				       4, FALSE);
 		if (!tx_capture_info.mpdu_nbuf)
 			return;
+
+		mpdu_info->frame_ctrl = (IEEE80211_FC0_VERSION_0 |
+					 IEEE80211_FC0_TYPE_CTL |
+					 IEEE80211_FC0_SUBTYPE_ACK);
+
 		dp_gen_ack_frame(ppdu_info, NULL,
 				 tx_capture_info.mpdu_nbuf);
 		TX_CAP_WDI_EVENT_HANDLER(pdev->soc, pdev->pdev_id,
@@ -6979,6 +6990,10 @@ void dp_send_usr_ack_frm_to_stack(struct dp_soc *soc,
 
 	if (peer->rx_tid[rx_user_status->tid].ba_status == DP_RX_BA_ACTIVE ||
 	    ppdu_info->sw_frame_group_id == HAL_MPDU_SW_FRAME_GROUP_CTRL_BAR) {
+		mpdu_info->frame_ctrl = (IEEE80211_FC0_VERSION_0 |
+					 IEEE80211_FC0_TYPE_CTL |
+					 IEEE80211_FC0_BLOCK_ACK);
+
 		dp_gen_block_ack_frame(ppdu_info,
 				       rx_user_status,
 				       rx_user_info,
@@ -6987,6 +7002,10 @@ void dp_send_usr_ack_frm_to_stack(struct dp_soc *soc,
 		tx_capture_info.mpdu_info.tid = rx_user_status->tid;
 
 	} else {
+		mpdu_info->frame_ctrl = (IEEE80211_FC0_VERSION_0 |
+					 IEEE80211_FC0_TYPE_CTL |
+					 IEEE80211_FC0_SUBTYPE_ACK);
+
 		dp_gen_ack_frame(ppdu_info, peer,
 				 tx_capture_info.mpdu_nbuf);
 	}
@@ -7264,6 +7283,11 @@ QDF_STATUS dp_send_noack_frame_to_stack(struct dp_soc *soc,
 		DP_TX_PEER_DEL_REF(peer);
 		return QDF_STATUS_E_NOMEM;
 	}
+
+	tx_capture_info.mpdu_info.frame_ctrl =
+			(IEEE80211_FC0_VERSION_0 |
+			 IEEE80211_FC0_TYPE_CTL |
+			 IEEE80211_FCO_SUBTYPE_ACTION_NO_ACK);
 
 	dp_gen_noack_frame(ppdu_info, peer,
 			   tx_capture_info.mpdu_nbuf, mon_mpdu);
