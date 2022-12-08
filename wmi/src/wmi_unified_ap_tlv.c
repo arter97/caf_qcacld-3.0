@@ -1330,6 +1330,8 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	wmi_channel *chan_info;
 	struct mlme_channel_param *tchan_info;
 	uint16_t len = sizeof(*cmd);
+	uint16_t cmn_param_sz;
+	uint16_t num_mvr_vdevs;
 
 	if (!param->num_vdevs) {
 		wmi_err("vdev's not found for MVR cmd");
@@ -1337,15 +1339,28 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 		goto end;
 	}
 	len += sizeof(wmi_channel);
+	num_mvr_vdevs = param->num_vdevs;
+
+	if (param->mvr_bmap_enabled) {
+		/* For mvr-bitmap method, FW expects num_vdevs as
+		 * number of 32-bit bitmap entries in vdev_ids array
+		 */
+		param->num_vdevs = qdf_ceil(param->max_vdevs,
+					    BITS_PER_BYTE * sizeof(uint32_t));
+		/* mvr-bitmap sees same phymode, tx/rx-streams for all vdevs */
+		cmn_param_sz = 1;
+	} else {
+		cmn_param_sz = param->num_vdevs;
+	}
 
 	/* Add length of num_vdevs + tlv_hdr_size for vdev_id */
 	len += sizeof(uint32_t) * param->num_vdevs + WMI_TLV_HDR_SIZE;
-	/* Add length of num_vdevs + tlv_hdr_size for phymode */
-	len += sizeof(uint32_t) * param->num_vdevs + WMI_TLV_HDR_SIZE;
-	/* Add length of num_vdevs + tlv_hdr_size for Preferred TX Streams */
-	len += sizeof(uint32_t) * param->num_vdevs + WMI_TLV_HDR_SIZE;
-	/* Add length of num_vdevs + tlv_hdr_size for Preferred RX Streams */
-	len += sizeof(uint32_t) * param->num_vdevs + WMI_TLV_HDR_SIZE;
+	/* Add length of cmn_param_sz + tlv_hdr_size for phymode */
+	len += sizeof(uint32_t) * cmn_param_sz + WMI_TLV_HDR_SIZE;
+	/* Add length of cmn_param_sz + tlv_hdr_size for Preferred TX Streams */
+	len += sizeof(uint32_t) * cmn_param_sz + WMI_TLV_HDR_SIZE;
+	/* Add length of cmn_param_sz + tlv_hdr_size for Preferred RX Streams */
+	len += sizeof(uint32_t) * cmn_param_sz + WMI_TLV_HDR_SIZE;
 
 	buf = wmi_buf_alloc(wmi_handle, len);
 	if (!buf) {
@@ -1381,9 +1396,19 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 		       WMITLV_TAG_ARRAY_UINT32,
 		       sizeof(uint32_t) * param->num_vdevs);
 	vdev_ids = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
-	for (i = 0; i < param->num_vdevs; i++)
-		vdev_ids[i] = param->vdev_ids[i];
+	if (param->mvr_bmap_enabled) {
+		/*wmi-buf is zeroed on alloc, so just set required bits*/
+		for (i = 0; i < num_mvr_vdevs; i++)
+			qdf_set_bit(param->vdev_ids[i],
+					   (unsigned long *)vdev_ids);
+		for (i = 0; i < param->num_vdevs; i++)
+			wmi_info("mvr-bmap[%d]: %08x", i, vdev_ids[i]);
+	} else {
+		for (i = 0; i < param->num_vdevs; i++)
+			vdev_ids[i] = param->vdev_ids[i];
+	}
 
+	/*bitmap-mvr: 32bit array size; legacy-mvr: actual mvr-cnt*/
 	buf_ptr += (sizeof(uint32_t) * param->num_vdevs) + WMI_TLV_HDR_SIZE;
 
 	WMITLV_SET_HDR(buf_ptr,
@@ -1437,27 +1462,27 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	buf_ptr += sizeof(*chan_info);
 	WMITLV_SET_HDR(buf_ptr,
 		       WMITLV_TAG_ARRAY_UINT32,
-		       sizeof(uint32_t) * param->num_vdevs);
+		       sizeof(uint32_t) * cmn_param_sz);
 	phymode = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
-	for (i = 0; i < param->num_vdevs; i++)
+	for (i = 0; i < cmn_param_sz; i++)
 		WMI_MULTIPLE_VDEV_RESTART_FLAG_SET_PHYMODE(
 				phymode[i], param->mvr_param[i].phymode);
 
-	buf_ptr += (sizeof(uint32_t) * param->num_vdevs) + WMI_TLV_HDR_SIZE;
+	buf_ptr += (sizeof(uint32_t) * cmn_param_sz) + WMI_TLV_HDR_SIZE;
 	WMITLV_SET_HDR(buf_ptr,
 		       WMITLV_TAG_ARRAY_UINT32,
-		       sizeof(uint32_t) * param->num_vdevs);
+		       sizeof(uint32_t) * cmn_param_sz);
 	preferred_tx_streams = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
-	for (i = 0; i < param->num_vdevs; i++)
+	for (i = 0; i < cmn_param_sz; i++)
 		preferred_tx_streams[i] = param->mvr_param[i].preferred_tx_streams;
 
 
-	buf_ptr += (sizeof(uint32_t) * param->num_vdevs) + WMI_TLV_HDR_SIZE;
+	buf_ptr += (sizeof(uint32_t) * cmn_param_sz) + WMI_TLV_HDR_SIZE;
 	WMITLV_SET_HDR(buf_ptr,
 		       WMITLV_TAG_ARRAY_UINT32,
-		       sizeof(uint32_t) * param->num_vdevs);
+		       sizeof(uint32_t) * cmn_param_sz);
 	preferred_rx_streams = (uint32_t *)(buf_ptr + WMI_TLV_HDR_SIZE);
-	for (i = 0; i < param->num_vdevs; i++)
+	for (i = 0; i < cmn_param_sz; i++)
 		preferred_rx_streams[i] = param->mvr_param[i].preferred_rx_streams;
 
 	/* Target expects flag for phymode processing */
@@ -1467,7 +1492,9 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	 * expected by host corresponding to this request.
 	 */
 	WMI_MULTIPLE_VDEV_RESTART_FLAG_SET_MVRR_EVENT_SUPPORT(cmd->flags, 1);
-
+	/* Target expects to be informed if this MVR is Bitmap or legacy */
+	WMI_MULTIPLE_VDEV_RESTART_FLAG_SET_BITMAP_SUPPORT(cmd->flags,
+		      param->mvr_bmap_enabled);
 	wmi_mtrace(WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_CMDID, NO_SESSION, 0);
 	qdf_status = wmi_unified_cmd_send(wmi_handle, buf, len,
 				WMI_PDEV_MULTIPLE_VDEV_RESTART_REQUEST_CMDID);
