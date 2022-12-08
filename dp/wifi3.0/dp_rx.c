@@ -3128,6 +3128,12 @@ dp_pdev_rx_buffers_attach(struct dp_soc *dp_soc, uint32_t mac_id,
 					rx_desc_pool->buf_size, true,
 					__func__, __LINE__);
 
+			dp_audio_smmu_map(dp_soc->osdev,
+					  qdf_mem_paddr_from_dmaaddr(dp_soc->osdev,
+								     QDF_NBUF_CB_PADDR(nbuf)),
+					  QDF_NBUF_CB_PADDR(nbuf),
+					  rx_desc_pool->buf_size);
+
 			desc_list = next;
 		}
 
@@ -3366,7 +3372,7 @@ dp_rx_pdev_buffers_free(struct dp_pdev *pdev)
 
 	rx_desc_pool = &soc->rx_desc_buf[mac_for_pdev];
 
-	dp_rx_desc_nbuf_free(soc, rx_desc_pool);
+	dp_rx_desc_nbuf_free(soc, rx_desc_pool, false);
 	dp_rx_buffer_pool_deinit(soc, mac_for_pdev);
 }
 

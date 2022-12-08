@@ -931,7 +931,8 @@ void dp_rx_desc_nbuf_and_pool_free(struct dp_soc *soc, uint32_t pool_id,
  * Return: None
  */
 void dp_rx_desc_nbuf_free(struct dp_soc *soc,
-			  struct rx_desc_pool *rx_desc_pool);
+			  struct rx_desc_pool *rx_desc_pool,
+			  bool is_mon_pool);
 
 #ifdef DP_RX_MON_MEM_FRAG
 /*
@@ -2378,6 +2379,52 @@ bool dp_rx_pkt_tracepoints_enabled(void)
 		qdf_trace_dp_rx_pkt_enabled());
 }
 
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * dp_audio_smmu_map()- Map memory region into Audio SMMU CB
+ * @qdf_dev: pointer to QDF device structure
+ * @paddr: physical address
+ * @iova: DMA address
+ * @size: memory region size
+ *
+ * Return: 0 on success else failure code
+ */
+static inline
+int dp_audio_smmu_map(qdf_device_t qdf_dev, qdf_dma_addr_t paddr,
+		      qdf_dma_addr_t iova, qdf_size_t size)
+{
+	return pld_audio_smmu_map(qdf_dev->dev, paddr, iova, size);
+}
+
+/**
+ * dp_audio_smmu_unmap()- Remove memory region mapping from Audio SMMU CB
+ * @qdf_dev: pointer to QDF device structure
+ * @iova: DMA address
+ * @size: memory region size
+ *
+ * Return: None
+ */
+static inline
+void dp_audio_smmu_unmap(qdf_device_t qdf_dev, qdf_dma_addr_t iova,
+			 qdf_size_t size)
+{
+	pld_audio_smmu_unmap(qdf_dev->dev, iova, size);
+}
+#else
+static inline
+int dp_audio_smmu_map(qdf_device_t qdf_dev, qdf_dma_addr_t paddr,
+		      qdf_dma_addr_t iova, qdf_size_t size)
+{
+	return 0;
+}
+
+static inline
+void dp_audio_smmu_unmap(qdf_device_t qdf_dev, qdf_dma_addr_t iova,
+			 qdf_size_t size)
+{
+}
+#endif
+
 #if defined(QCA_DP_RX_NBUF_NO_MAP_UNMAP) && !defined(BUILD_X86)
 static inline
 QDF_STATUS dp_pdev_rx_buffers_attach_simple(struct dp_soc *soc, uint32_t mac_id,
@@ -2596,6 +2643,11 @@ void dp_rx_nbuf_unmap(struct dp_soc *soc,
 
 	rx_desc_pool = &soc->rx_desc_buf[rx_desc->pool_id];
 	dp_ipa_reo_ctx_buf_mapping_lock(soc, reo_ring_num);
+
+	dp_audio_smmu_unmap(soc->osdev,
+			    QDF_NBUF_CB_PADDR(rx_desc->nbuf),
+			    rx_desc_pool->buf_size);
+
 	dp_ipa_handle_rx_buf_smmu_mapping(soc, rx_desc->nbuf,
 					  rx_desc_pool->buf_size,
 					  false, __func__, __LINE__);
@@ -2612,6 +2664,8 @@ void dp_rx_nbuf_unmap_pool(struct dp_soc *soc,
 			   struct rx_desc_pool *rx_desc_pool,
 			   qdf_nbuf_t nbuf)
 {
+	dp_audio_smmu_unmap(soc->osdev, QDF_NBUF_CB_PADDR(nbuf),
+			    rx_desc_pool->buf_size);
 	dp_ipa_handle_rx_buf_smmu_mapping(soc, nbuf, rx_desc_pool->buf_size,
 					  false, __func__, __LINE__);
 	qdf_nbuf_unmap_nbytes_single(soc->osdev, nbuf, QDF_DMA_FROM_DEVICE,

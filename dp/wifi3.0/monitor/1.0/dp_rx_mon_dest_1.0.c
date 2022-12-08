@@ -915,7 +915,7 @@ void dp_rx_pdev_mon_buf_buffers_free(struct dp_pdev *pdev, uint32_t mac_id)
 	if (rx_desc_pool->rx_mon_dest_frag_enable)
 		dp_rx_desc_frag_free(soc, rx_desc_pool);
 	else
-		dp_rx_desc_nbuf_free(soc, rx_desc_pool);
+		dp_rx_desc_nbuf_free(soc, rx_desc_pool, true);
 }
 
 QDF_STATUS

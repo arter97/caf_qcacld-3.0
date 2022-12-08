@@ -1343,6 +1343,11 @@ static QDF_STATUS dp_rx_defrag_reo_reinject(struct dp_txrx_peer *txrx_peer,
 	dp_ipa_handle_rx_buf_smmu_mapping(soc, head, rx_desc_pool->buf_size,
 					  true, __func__, __LINE__);
 
+	dp_audio_smmu_map(soc->osdev,
+			  qdf_mem_paddr_from_dmaaddr(soc->osdev,
+						     QDF_NBUF_CB_PADDR(head)),
+			  QDF_NBUF_CB_PADDR(head), rx_desc_pool->buf_size);
+
 	/*
 	 * As part of rx frag handler buffer was unmapped and rx desc
 	 * unmapped is set to 1. So again for defrag reinject frame reset
