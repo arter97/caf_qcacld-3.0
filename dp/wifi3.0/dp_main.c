@@ -6745,8 +6745,9 @@ static inline
 void dp_soc_txrx_peer_setup(enum wlan_op_mode vdev_opmode, struct dp_soc *soc,
 			    struct dp_peer *peer)
 {
-	/* TODO: Need to check with STA mode */
-	if (vdev_opmode == wlan_op_mode_ap && soc->arch_ops.txrx_peer_setup) {
+	if (((vdev_opmode == wlan_op_mode_ap) ||
+	     (vdev_opmode == wlan_op_mode_sta)) &&
+	     (soc->arch_ops.txrx_peer_setup)) {
 		if (soc->arch_ops.txrx_peer_setup(soc, peer)
 				!= QDF_STATUS_SUCCESS) {
 			dp_err("unable to setup target peer features");
