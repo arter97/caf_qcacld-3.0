@@ -100,7 +100,7 @@ struct psoc_mlme_obj {
 #ifdef FEATURE_VDEV_OPS_WAKELOCK
 	struct psoc_mlme_wakelock psoc_mlme_wakelock;
 #endif
-	struct wlan_6ghz_rnr_global_cache rnr_6ghz_cache;
+	struct wlan_6ghz_rnr_global_cache rnr_6ghz_cache[WLAN_UMAC_MAX_PDEVS];
 	struct psoc_config psoc_cfg;
 };
 
