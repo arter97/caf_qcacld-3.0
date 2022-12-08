@@ -33,6 +33,7 @@
 #ifdef WLAN_SUPPORT_PPEDS
 #include "be/dp_ppeds.h"
 #include <ppe_vp_public.h>
+#include <ppe_drv_sc.h>
 #endif
 
 /* Generic AST entry aging timer value */
@@ -533,9 +534,10 @@ static QDF_STATUS dp_peer_ppeds_default_route_be(struct dp_soc *soc,
 	be_vdev = dp_get_be_vdev_from_dp_vdev(be_peer->peer.vdev);
 
 	/*
-	 * Get these Values fron INIT
+	 * Program service code bypass to avoid L2 new mac address
+	 * learning exception when fdb learning is disabled.
 	 */
-	service_code = 0;
+	service_code = PPE_DRV_SC_SPF_BYPASS;
 	priority_valid = be_peer->priority_valid;
 
 	/*
