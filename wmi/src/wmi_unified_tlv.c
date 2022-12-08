@@ -21119,6 +21119,8 @@ static void populate_tlv_service(uint32_t *wmi_service)
 	wmi_service[wmi_service_mawc] = WMI_SERVICE_MAWC;
 	wmi_service[wmi_service_multiple_vdev_restart] =
 			WMI_SERVICE_MULTIPLE_VDEV_RESTART;
+	wmi_service[wmi_service_multiple_vdev_restart_bmap] =
+			WMI_SERVICE_MULTIPLE_VDEV_RESTART_BITMAP_SUPPORT;
 	wmi_service[wmi_service_smart_antenna_sw_support] =
 				WMI_SERVICE_SMART_ANTENNA_SW_SUPPORT;
 	wmi_service[wmi_service_smart_antenna_hw_support] =

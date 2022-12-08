@@ -802,12 +802,14 @@ static QDF_STATUS vdev_mgr_multiple_restart_param_update(
 	param->cac_duration_ms = WLAN_DFS_WAIT_MS;
 	param->num_vdevs = num_vdevs;
 
-	qdf_mem_copy(param->vdev_ids, vdev_ids,
-		     sizeof(uint32_t) * (param->num_vdevs));
 	qdf_mem_copy(&param->ch_param, chan,
 		     sizeof(struct mlme_channel_param));
-	qdf_mem_copy(param->mvr_param, mvr_param,
-		     sizeof(*mvr_param) * (param->num_vdevs));
+
+	param->vdev_ids = vdev_ids;
+	param->mvr_param = mvr_param;
+	param->max_vdevs = wlan_pdev_get_max_vdev_count(pdev);
+	param->mvr_bmap_enabled = wlan_pdev_nif_feat_cap_get(pdev,
+				    WLAN_PDEV_F_MULTIVDEV_RESTART_BMAP);
 
 	return QDF_STATUS_SUCCESS;
 }

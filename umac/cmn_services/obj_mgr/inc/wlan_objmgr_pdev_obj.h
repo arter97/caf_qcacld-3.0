@@ -79,8 +79,8 @@
 #define WLAN_PDEV_F_STA_AMPDU_DIS           0x01000000
 /* do not send probe request in passive channel */
 #define WLAN_PDEV_F_STRICT_PSCAN_EN         0x02000000
-  /* dupie (ANA,pre ANA ) */
-/*#define WLAN_PDEV_F_DUPIE                 0x00200000*/
+/* Multivdev restart enabled with Bitmap */
+#define WLAN_PDEV_F_MULTIVDEV_RESTART_BMAP  0x04000000
 /* Chan concurrency enabled */
 #define WLAN_PDEV_F_CHAN_CONCURRENCY        0x08000000
 /* Multivdev restart enabled */
