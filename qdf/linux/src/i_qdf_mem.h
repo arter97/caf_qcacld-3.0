@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -219,6 +219,14 @@ void __qdf_kmem_cache_free(qdf_kmem_cache_t cache, void *node);
 #define QDF_RET_IP ((void *)_RET_IP_)
 
 #define __qdf_mempool_elem_size(_pool) ((_pool)->elem_size)
+#endif
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0))
+#define __qdf_ioremap(HOST_CE_ADDRESS, HOST_CE_SIZE) \
+		   ioremap(HOST_CE_ADDRESS, HOST_CE_SIZE)
+#else
+#define __qdf_ioremap(HOST_CE_ADDRESS, HOST_CE_SIZE) \
+		   ioremap_nocache(HOST_CE_ADDRESS, HOST_CE_SIZE)
 #endif
 
 /**

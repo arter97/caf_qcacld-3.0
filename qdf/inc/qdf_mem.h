@@ -1318,6 +1318,9 @@ void qdf_mem_tx_desc_cnt_update(qdf_atomic_t pending_tx_descs,
  */
 #define qdf_mem_valloc(size) __qdf_mem_valloc(size, __func__, __LINE__)
 
+#define qdf_ioremap(HOST_CE_ADDRESS, HOST_CE_SIZE) \
+			__qdf_ioremap(HOST_CE_ADDRESS, HOST_CE_SIZE)
+
 #if IS_ENABLED(CONFIG_ARM_SMMU) && defined(ENABLE_SMMU_S1_TRANSLATION)
 /*
  * typedef qdf_iommu_domain_t: Platform independent iommu domain
