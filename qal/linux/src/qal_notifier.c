@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -19,6 +20,9 @@
 #include "qal_notifier.h"
 #include "qdf_module.h"
 #include "qdf_trace.h"
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+#include <linux/panic_notifier.h>
+#endif
 
 static struct notifier_block qal_panic_nb;
 
