@@ -1060,8 +1060,8 @@ void utils_dfs_init_nol(struct wlan_objmgr_pdev *pdev)
 	}
 	qdf_mem_free(dfs_nolinfo);
 }
-#endif
 qdf_export_symbol(utils_dfs_init_nol);
+#endif
 
 #ifndef QCA_DFS_NOL_PLATFORM_DRV_SUPPORT
 void utils_dfs_save_nol(struct wlan_objmgr_pdev *pdev)
