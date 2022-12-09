@@ -50,6 +50,7 @@ dp_htt_sawf_get_host_queue(struct dp_soc *soc, uint32_t *msg_word,
 	case CDP_ARCH_TYPE_LI:
 		*host_queue = DP_SAWF_DEFAULT_Q_MAX +
 			      (ast_idx - 2) * DP_SAWF_TID_MAX + hlos_tid;
+		qdf_info("|AST idx: %d|HLOS TID:%d", ast_idx, hlos_tid);
 		qdf_assert_always((ast_idx == 2) || (ast_idx == 3));
 		break;
 	case CDP_ARCH_TYPE_BE:
@@ -57,14 +58,15 @@ dp_htt_sawf_get_host_queue(struct dp_soc *soc, uint32_t *msg_word,
 		HTT_T2H_SAWF_MSDUQ_INFO_HTT_WHO_CLASS_INFO_SEL_GET(*msg_word);
 		fl_override =
 		HTT_T2H_SAWF_MSDUQ_INFO_HTT_FLOW_OVERRIDE_GET(*msg_word);
-		*host_queue = (cl_info * DP_SAWF_DEFAULT_Q_MAX) + (fl_override)
-			       + (hlos_tid << 1);
+		*host_queue = (cl_info * DP_SAWF_DEFAULT_Q_MAX) +
+			      (fl_override * DP_SAWF_TID_MAX) + hlos_tid;
+		qdf_info("|Cl Info:%u|FL Override:%u|HLOS TID:%u", cl_info,
+			 fl_override, hlos_tid);
 		break;
 	default:
 		dp_err("unkonwn arch_id 0x%x", soc->arch_id);
 		return QDF_STATUS_E_FAILURE;
 	}
-	qdf_info("|AST idx: %d|HLOS TID:%d", ast_idx, hlos_tid);
 
 	return QDF_STATUS_SUCCESS;
 }
