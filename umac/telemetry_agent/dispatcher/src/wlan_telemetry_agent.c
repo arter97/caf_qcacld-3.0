@@ -80,9 +80,12 @@ telemetry_agent_peer_create_handler(struct wlan_objmgr_peer *peer,
 	struct wlan_objmgr_vdev *vdev = wlan_peer_get_vdev(peer);
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
-	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP) {
+	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP ||
+	    wlan_peer_get_peer_type(peer) == WLAN_PEER_STA_TEMP ||
+	    wlan_peer_get_peer_type(peer) == WLAN_PEER_MLO_TEMP) {
 		return status;
 	}
+
 	peer_obj.peer_back_pointer = peer;
 	peer_obj.pdev_back_pointer = pdev;
 	peer_obj.psoc_back_pointer = psoc;
@@ -146,7 +149,9 @@ telemetry_agent_peer_delete_handler(struct wlan_objmgr_peer *peer,
 	struct wlan_objmgr_vdev *vdev = wlan_peer_get_vdev(peer);
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 
-	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP) {
+	if (wlan_peer_get_peer_type(peer) == WLAN_PEER_AP ||
+	    wlan_peer_get_peer_type(peer) == WLAN_PEER_STA_TEMP ||
+	    wlan_peer_get_peer_type(peer) == WLAN_PEER_MLO_TEMP) {
 		return status;
 	}
 
