@@ -2347,7 +2347,8 @@ cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev)
  * @cm_ctx: connection manager context
  * @cm_id: cm id
  *
- * If connect req is a reassoc req and received in not connected state
+ * If connect req is a reassoc req and received in not connected state.
+ * Caller should take cm_ctx lock.
  *
  * Return: bool
  */
@@ -2362,7 +2363,6 @@ static bool cm_is_connect_id_reassoc_in_non_connected(struct cnx_mgr *cm_ctx,
 	if (prefix != CONNECT_REQ_PREFIX)
 		return is_reassoc;
 
-	cm_req_lock_acquire(cm_ctx);
 	qdf_list_peek_front(&cm_ctx->req_list, &cur_node);
 	while (cur_node) {
 		qdf_list_peek_next(&cm_ctx->req_list, cur_node, &next_node);
@@ -2371,20 +2371,19 @@ static bool cm_is_connect_id_reassoc_in_non_connected(struct cnx_mgr *cm_ctx,
 		if (cm_req->cm_id == cm_id) {
 			if (cm_req->connect_req.req.reassoc_in_non_connected)
 				is_reassoc = true;
-			cm_req_lock_release(cm_ctx);
 			return is_reassoc;
 		}
 
 		cur_node = next_node;
 		next_node = NULL;
 	}
-	cm_req_lock_release(cm_ctx);
 
 	return is_reassoc;
 }
 
 QDF_STATUS cm_notify_connect_complete(struct cnx_mgr *cm_ctx,
-				      struct wlan_cm_connect_resp *resp)
+				      struct wlan_cm_connect_resp *resp,
+				      bool acquire_lock)
 {
 	enum wlan_cm_sm_state sm_state;
 
@@ -2398,12 +2397,18 @@ QDF_STATUS cm_notify_connect_complete(struct cnx_mgr *cm_ctx,
 	 * kernel flags
 	 */
 	if (QDF_IS_STATUS_ERROR(resp->connect_status) &&
-	    sm_state == WLAN_CM_S_INIT &&
-	    cm_is_connect_id_reassoc_in_non_connected(cm_ctx, resp->cm_id)) {
-		resp->send_disconnect = true;
-		mlme_debug(CM_PREFIX_FMT "Set send disconnect to true to indicate disconnect instead of connect resp",
-			   CM_PREFIX_REF(wlan_vdev_get_id(cm_ctx->vdev),
-					 resp->cm_id));
+	    sm_state == WLAN_CM_S_INIT) {
+		if (acquire_lock)
+			cm_req_lock_acquire(cm_ctx);
+		if (cm_is_connect_id_reassoc_in_non_connected(cm_ctx,
+							      resp->cm_id)) {
+			resp->send_disconnect = true;
+			mlme_debug(CM_PREFIX_FMT "Set send disconnect to true to indicate disconnect instead of connect resp",
+				   CM_PREFIX_REF(wlan_vdev_get_id(cm_ctx->vdev),
+						 resp->cm_id));
+		}
+		if (acquire_lock)
+			cm_req_lock_release(cm_ctx);
 	}
 	mlme_cm_osif_connect_complete(cm_ctx->vdev, resp);
 	cm_if_mgr_inform_connect_complete(cm_ctx->vdev,
@@ -2446,7 +2451,7 @@ QDF_STATUS cm_connect_complete(struct cnx_mgr *cm_ctx,
 		send_ind = false;
 
 	if (send_ind)
-		cm_notify_connect_complete(cm_ctx, resp);
+		cm_notify_connect_complete(cm_ctx, resp, 1);
 
 	/* Update scan entry in case connect is success or fails with bssid */
 	if (!qdf_is_macaddr_zero(&resp->bssid)) {

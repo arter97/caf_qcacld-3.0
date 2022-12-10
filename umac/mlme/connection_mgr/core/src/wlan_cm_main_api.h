@@ -226,13 +226,16 @@ QDF_STATUS cm_connect_rsp(struct wlan_objmgr_vdev *vdev,
  * connect response notification
  * @cm_ctx: connection manager context
  * @resp: connection complete resp.
+ * @acquire_lock: Flag to indicate whether this function needs
+ * cm_ctx lock or not.
  *
  * This API would be called after connection completion resp from VDEV mgr
  *
  * Return: QDF status
  */
 QDF_STATUS cm_notify_connect_complete(struct cnx_mgr *cm_ctx,
-				      struct wlan_cm_connect_resp *resp);
+				      struct wlan_cm_connect_resp *resp,
+				      bool acquire_lock);
 /**
  * cm_connect_complete() - This API would be called after connect complete
  * request from the serialization.
