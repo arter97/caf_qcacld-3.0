@@ -91,11 +91,13 @@ QDF_STATUS ucfg_green_ap_set_ps_config(struct wlan_objmgr_pdev *pdev,
 }
 
 #ifdef WLAN_SUPPORT_GAP_LL_PS_MODE
+#define MAX_COOKIE_ID 256
 
 QDF_STATUS ucfg_green_ap_ll_ps(struct wlan_objmgr_pdev *pdev,
 			       struct wlan_objmgr_vdev *vdev,
 			       enum wlan_green_ap_ll_ps_state state,
-			       uint32_t bcn_interval)
+			       uint32_t bcn_interval,
+			       uint64_t *cookie_id)
 {
 	struct wlan_pdev_green_ap_ctx *green_ap_ctx;
 	struct wlan_lmac_if_green_ap_tx_ops *green_ap_tx_ops;
@@ -136,6 +138,8 @@ QDF_STATUS ucfg_green_ap_ll_ps(struct wlan_objmgr_pdev *pdev,
 		wlan_green_ap_get_cookie_id(
 				green_ap_ctx,
 				(enum wlan_green_ap_ll_ps_state)state);
+
+	*cookie_id = green_ap_ll_ps_params.cookie;
 
 	return green_ap_tx_ops->ll_ps(vdev, &green_ap_ll_ps_params);
 }
