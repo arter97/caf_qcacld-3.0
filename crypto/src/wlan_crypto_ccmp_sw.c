@@ -30,18 +30,16 @@ static void ccmp_aad_nonce(const struct wlan_frame_hdr *hdr, const uint8_t *data
 	    (WLAN_FC1_DSTODS))
 		addr4 = 1;
 
+	aad[0] = hdr->i_fc[0];
+	aad[1] = hdr->i_fc[1];
 
 	if (WLAN_FC0_GET_TYPE(hdr->i_fc[0]) == WLAN_FC0_TYPE_DATA) {
-		aad[0] = (hdr->i_fc[0]) & 0x0c;
+		aad[0] &= 0x8f;  // mask bits 4,5,6 to 0
 
 		if (stype & 0x08) {
-			const uint8_t *qc;
 			qos = 1;
 			aad[1] &= ~WLAN_FC1_ORDER;
-			qc = (const uint8_t *) (hdr + 1);
-			if (addr4)
-				qc += QDF_MAC_ADDR_SIZE;
-			nonce[0] = qc[0] & 0x0f;
+			nonce[0] = wlan_get_tid(hdr);
 		}
 	} else if (WLAN_FC0_GET_TYPE(hdr->i_fc[0])
 						== WLAN_FC0_TYPE_MGMT) {
@@ -50,7 +48,6 @@ static void ccmp_aad_nonce(const struct wlan_frame_hdr *hdr, const uint8_t *data
 
 	aad[1] &= ~(WLAN_FC1_RETRY | WLAN_FC1_PWRMGT | WLAN_FC1_MOREDATA);
 	aad[1] |= WLAN_FC1_ISWEP;
-	aad[1] |= hdr->i_fc[1] & WLAN_FC1_DIR_MASK;
 
 	pos = aad + 2;
 	qdf_mem_copy(pos, hdr->i_addr1, 3 * QDF_MAC_ADDR_SIZE);
@@ -63,11 +60,9 @@ static void ccmp_aad_nonce(const struct wlan_frame_hdr *hdr, const uint8_t *data
 	qdf_mem_copy(pos, hdr + 1, addr4 * QDF_MAC_ADDR_SIZE + qos * 2);
 	pos += addr4 * QDF_MAC_ADDR_SIZE;
 	if (qos) {
-		pos[0] &= ~0x70;
-		if (1 /* FIX: either device has SPP A-MSDU Capab = 0 */)
-			pos[0] &= ~0x80;
-		pos++;
-		*pos++ = 0x00;
+		pos[0] = wlan_get_tid(hdr);
+		pos[1] = 0x00;
+		pos += 2;
 	}
 
 	*aad_len = pos - aad;
