@@ -233,6 +233,11 @@ mlo_validate_disconn_req(struct wlan_objmgr_vdev *vdev,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static QDF_STATUS mlo_validate_mlo_cap(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #else
 /**
  * mlo_is_mld_connected - Check whether MLD is connected
@@ -496,6 +501,14 @@ mlo_validate_connect_req(struct wlan_objmgr_vdev *vdev,
 	}
 	return status;
 }
+
+static QDF_STATUS mlo_validate_mlo_cap(struct wlan_objmgr_vdev *vdev)
+{
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		return QDF_STATUS_SUCCESS;
+
+	return QDF_STATUS_E_FAILURE;
+}
 #endif
 
 QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
@@ -509,6 +522,10 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 	if (mlo_dev_ctx)
 		sta_ctx = mlo_dev_ctx->sta_ctx;
 	if (sta_ctx) {
+		status = mlo_validate_mlo_cap(vdev);
+		if (QDF_IS_STATUS_ERROR(status))
+			return wlan_cm_start_connect(vdev, req);
+
 		mlo_dev_lock_acquire(mlo_dev_ctx);
 		status = mlo_validate_connect_req(vdev, mlo_dev_ctx, req);
 
