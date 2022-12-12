@@ -246,7 +246,7 @@ ucfg_mlme_get_twt_bcast_requestor(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 ucfg_mlme_get_twt_bcast_responder(struct wlan_objmgr_psoc *psoc,
 				  bool *val);
-/**
+/*
  * 1. If both of the new service caps
  * WMI_SERVICE_BROADCAST_TWT_REQUESTER And
  * WMI_SERVICE_BROADCAST_TWT_RESPONDER are enabled then the old
