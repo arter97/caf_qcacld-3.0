@@ -5628,7 +5628,9 @@ void lim_calculate_tpc(struct mac_context *mac,
 							&is_psd_power,
 							&tx_power_within_bw,
 							&psd_power_within_bw,
-							&ap_power_type_6g) ==
+							&ap_power_type_6g,
+							REG_BEST_PWR_MODE,
+							NO_SCHANS_PUNC) ==
 							QDF_STATUS_SUCCESS) {
 						pe_debug("get pwr attr from secondary list");
 						reg_max = tx_power_within_bw;
