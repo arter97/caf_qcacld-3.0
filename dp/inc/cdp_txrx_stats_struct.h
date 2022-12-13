@@ -1840,6 +1840,7 @@ struct cdp_tx_ingress_stats {
 		uint32_t fail_per_pkt_vdev_id_check;
 		uint32_t drop_ingress;
 		uint32_t invalid_peer_id_in_exc_path;
+		uint32_t tx_mcast_drop;
 	} dropped;
 
 	/* Mesh packets info */

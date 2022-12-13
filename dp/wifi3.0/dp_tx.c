@@ -3088,6 +3088,34 @@ static inline bool dp_tx_mcast_enhance(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 }
 #endif
 
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+/**
+ * dp_tx_mcast_drop() - Drop mcast frame if drop_tx_mcast is set in WDS_EXT
+ * @vdev: vdev handle
+ * @nbuf: skb
+ *
+ * Return: true if frame is dropped, false otherwise
+ */
+static inline bool dp_tx_mcast_drop(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
+{
+	/* Drop tx mcast and WDS Extended feature check */
+	if (qdf_unlikely((vdev->drop_tx_mcast) && (vdev->wds_ext_enabled))) {
+		qdf_ether_header_t *eh = (qdf_ether_header_t *)
+						qdf_nbuf_data(nbuf);
+		if (DP_FRAME_IS_MULTICAST((eh)->ether_dhost)) {
+			DP_STATS_INC(vdev, tx_i.dropped.tx_mcast_drop, 1);
+			return true;
+		}
+	}
+
+	return false;
+}
+#else
+static inline bool dp_tx_mcast_drop(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
+{
+	return false;
+}
+#endif
 /**
  * dp_tx_per_pkt_vdev_id_check() - vdev id check for frame
  * @nbuf: qdf_nbuf_t
@@ -3698,6 +3726,9 @@ qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 
 	if (qdf_unlikely(!dp_tx_mcast_enhance(vdev, nbuf)))
 		return NULL;
+
+	if (qdf_unlikely(dp_tx_mcast_drop(vdev, nbuf)))
+		return nbuf;
 
 	/* RAW */
 	if (qdf_unlikely(vdev->tx_encap_type == htt_cmn_pkt_type_raw)) {

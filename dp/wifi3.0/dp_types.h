@@ -3258,6 +3258,7 @@ struct dp_vdev {
 
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	bool wds_ext_enabled;
+	bool drop_tx_mcast;
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 	bool drop_3addr_mcast;
 #ifdef WLAN_VENDOR_SPECIFIC_BAR_UPDATE

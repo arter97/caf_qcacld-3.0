@@ -1421,6 +1421,7 @@ enum cdp_pdev_param_type {
  * @cdp_sawf_stats: SAWF stats config
  * @cdp_vdev_param_traffic_end_ind: Traffic end indication enable/disable
  * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
+ * @cdp_drop_tx_mcast: Enable/Disable tx mcast drop
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1510,6 +1511,7 @@ typedef union cdp_config_param_t {
 	bool cdp_drop_3addr_mcast;
 	bool cdp_vdev_param_traffic_end_ind;
 	bool cdp_umac_rst_skel;
+	bool cdp_drop_tx_mcast;
 } cdp_config_param_type;
 
 /**
@@ -1587,6 +1589,7 @@ enum cdp_pdev_bpr_param {
  * @CDP_ENABLE_IGMP_MCAST_EN: enable/disable igmp multicast enhancement
  * @CDP_ENABLE_HLOS_TID_OVERRIDE: set hlos tid override flag
  * @CDP_CFG_WDS_EXT: enable/disable wds ext feature
+ * @CDP_DROP_TX_MCAST: enable/disable tx mcast drop
  * @CDP_ENABLE_PEER_AUTHORIZE: enable peer authorize flag
  * @CDP_ENABLE_PEER_TID_LATENCY: set peer tid latency enable flag
  * @CDP_SET_VAP_MESH_TID: Set latency tid in vap
@@ -1626,6 +1629,7 @@ enum cdp_vdev_param_type {
 	CDP_ENABLE_HLOS_TID_OVERRIDE,
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	CDP_CFG_WDS_EXT,
+	CDP_DROP_TX_MCAST,
 #endif /* QCA_SUPPORT_WDS_EXTENDED */
 	CDP_ENABLE_PEER_AUTHORIZE,
 #ifdef WLAN_SUPPORT_MESH_LATENCY
