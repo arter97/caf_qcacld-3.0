@@ -21,7 +21,6 @@
 #define __NAN_CFG_H__
 
 /**
- *
  * DOC: nan_cfg.h
  *
  * NAN feature INI configuration parameter definitions
