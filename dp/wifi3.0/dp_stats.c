@@ -6179,6 +6179,38 @@ dp_print_mu_ppdu_rates_info(struct cdp_rx_mu *rx_mu)
 	}
 }
 
+#ifdef WLAN_FEATURE_11BE
+static inline void dp_print_rx_bw_stats(struct dp_pdev *pdev)
+{
+	DP_PRINT_STATS("BW Counts = 20MHz %d, 40MHz %d, 80MHz %d, 160MHz %d, 320MHz %d",
+		       pdev->stats.rx.bw[0], pdev->stats.rx.bw[1],
+		       pdev->stats.rx.bw[2], pdev->stats.rx.bw[3],
+		       pdev->stats.rx.bw[4]);
+}
+
+static inline void dp_print_tx_bw_stats(struct dp_pdev *pdev)
+{
+	DP_PRINT_STATS("BW Counts = 20MHz %d, 40MHz %d, 80MHz %d, 160MHz %d, 320MHz %d",
+		       pdev->stats.tx.bw[0], pdev->stats.tx.bw[1],
+		       pdev->stats.tx.bw[2], pdev->stats.tx.bw[3],
+		       pdev->stats.tx.bw[4]);
+}
+#else
+static inline void dp_print_rx_bw_stats(struct dp_pdev *pdev)
+{
+	DP_PRINT_STATS("BW Counts = 20MHz %d, 40MHz %d, 80MHz %d, 160MHz %d",
+		       pdev->stats.rx.bw[0], pdev->stats.rx.bw[1],
+		       pdev->stats.rx.bw[2], pdev->stats.rx.bw[3]);
+}
+
+static inline void dp_print_tx_bw_stats(struct dp_pdev *pdev)
+{
+	DP_PRINT_STATS("BW Counts = 20MHz %d, 40MHz %d, 80MHz %d, 160MHz %d",
+		       pdev->stats.tx.bw[0], pdev->stats.tx.bw[1],
+		       pdev->stats.tx.bw[2], pdev->stats.tx.bw[3]);
+}
+#endif
+
 void dp_print_rx_rates(struct dp_vdev *vdev)
 {
 	struct dp_pdev *pdev = (struct dp_pdev *)vdev->pdev;
@@ -6202,9 +6234,9 @@ void dp_print_rx_rates(struct dp_vdev *vdev)
 		       pdev->stats.rx.sgi_count[1],
 		       pdev->stats.rx.sgi_count[2],
 		       pdev->stats.rx.sgi_count[3]);
-	DP_PRINT_STATS("BW Counts = 20MHZ %d, 40MHZ %d, 80MHZ %d, 160MHZ %d",
-		       pdev->stats.rx.bw[0], pdev->stats.rx.bw[1],
-		       pdev->stats.rx.bw[2], pdev->stats.rx.bw[3]);
+
+	dp_print_rx_bw_stats(pdev);
+
 	DP_PRINT_STATS("Reception Type ="
 		       "SU: %d MU_MIMO:%d MU_OFDMA:%d MU_OFDMA_MIMO:%d",
 		       pdev->stats.rx.reception_type[0],
@@ -6235,9 +6267,7 @@ void dp_print_tx_rates(struct dp_vdev *vdev)
 		       pdev->stats.tx.sgi_count[2],
 		       pdev->stats.tx.sgi_count[3]);
 
-	DP_PRINT_STATS("BW Counts = 20MHZ %d, 40MHZ %d, 80MHZ %d, 160MHZ %d",
-		       pdev->stats.tx.bw[0], pdev->stats.tx.bw[1],
-		       pdev->stats.tx.bw[2], pdev->stats.tx.bw[3]);
+	dp_print_tx_bw_stats(pdev);
 
 	DP_PRINT_STATS("OFDMA = %d", pdev->stats.tx.ofdma);
 	DP_PRINT_STATS("STBC = %d", pdev->stats.tx.stbc);
