@@ -1153,16 +1153,6 @@ struct wmi_host_tid_to_link_map_resp {
 	enum wlan_t2lm_status status;
 	uint8_t mapping_switch_tsf;
 };
-
-/**
- * struct wmi_host_bcast_t2lm_info - TID-to-link mapping broadcast info
- * @vdev_id: Vdev id
- * @expected_duration: Expected duration for vdev t2lm ie
- */
-struct wmi_host_bcast_t2lm_info {
-	uint8_t vdev_id;
-	uint32_t expected_duration;
-};
 #endif /* WLAN_FEATURE_11BE */
 
 #ifdef WLAN_FEATURE_11BE_MLO

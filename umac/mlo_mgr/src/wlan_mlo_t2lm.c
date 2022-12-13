@@ -591,7 +591,7 @@ static void wlan_mlo_t2lm_handle_mapping_switch_time_expiry(
 		/* Mapping switch time will always present at index 1. Hence,
 		 * skip the index 0.
 		 */
-		if (i != 1)
+		if (i == 0)
 			continue;
 
 		qdf_mem_copy(&t2lm_ctx->t2lm_ie[0], &t2lm_ctx->t2lm_ie[1],
@@ -601,6 +601,9 @@ static void wlan_mlo_t2lm_handle_mapping_switch_time_expiry(
 		t2lm_debug("vdev_id:%d mark the advertised T2LM as established",
 			   vdev_id);
 	}
+
+	/* Notify the registered caller about the link update*/
+	wlan_mlo_dev_t2lm_notify_link_update(vdev->mlo_dev_ctx);
 }
 
 /**
@@ -648,6 +651,9 @@ static void wlan_mlo_t2lm_handle_expected_duration_expiry(
 				   vdev_id);
 		}
 	}
+
+	/* Notify the registered caller about the link update*/
+	wlan_mlo_dev_t2lm_notify_link_update(vdev->mlo_dev_ctx);
 }
 
 QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
@@ -1004,6 +1010,62 @@ QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(
 			wlan_handle_t2lm_timer(vdev, i);
 			break;
 		}
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+int wlan_register_t2lm_link_update_notify_handler(
+		wlan_mlo_t2lm_link_update_handler handler,
+		struct wlan_mlo_dev_context *mldev)
+{
+	struct wlan_t2lm_context *t2lm_ctx = &mldev->t2lm_ctx;
+	int i;
+
+	for (i = 0; i < MAX_T2LM_HANDLERS; i++) {
+		if (t2lm_ctx->is_valid_handler[i])
+			continue;
+
+		t2lm_ctx->link_update_handler[i] = handler;
+		t2lm_ctx->is_valid_handler[i] = true;
+		break;
+	}
+
+	if (i == MAX_T2LM_HANDLERS) {
+		t2lm_err("Failed to register the link disablement callback");
+		return -EINVAL;
+	}
+
+	return i;
+}
+
+void wlan_unregister_t2lm_link_update_notify_handler(
+		struct wlan_mlo_dev_context *mldev,
+		uint8_t index)
+{
+	if (index >= MAX_T2LM_HANDLERS)
+		return;
+
+	mldev->t2lm_ctx.link_update_handler[index] = NULL;
+	mldev->t2lm_ctx.is_valid_handler[index] = false;
+}
+
+QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
+		struct wlan_mlo_dev_context *mldev)
+{
+	struct wlan_t2lm_context *t2lm_ctx = &mldev->t2lm_ctx;
+	wlan_mlo_t2lm_link_update_handler handler;
+	int i;
+
+	for (i = 0; i < MAX_T2LM_HANDLERS; i++) {
+		if (!t2lm_ctx->is_valid_handler[i])
+			continue;
+
+		handler = t2lm_ctx->link_update_handler[i];
+		if (!(handler && t2lm_ctx->num_of_t2lm_ie))
+			continue;
+
+		handler(mldev, &t2lm_ctx->t2lm_ie[0].t2lm.ieee_link_map_tid[0]);
 	}
 
 	return QDF_STATUS_SUCCESS;

@@ -22,6 +22,265 @@
 #define _WLAN_MLO_T2LM_H_
 
 #include <wlan_cmn_ieee80211.h>
+#include <wlan_mlo_mgr_public_structs.h>
+
+struct mlo_vdev_host_tid_to_link_map_resp;
+struct wlan_mlo_dev_context;
+
+/* Max T2LM TIDS count */
+#define T2LM_MAX_NUM_TIDS 8
+
+/* Max T2LM callback handlers */
+#define MAX_T2LM_HANDLERS 50
+
+#define T2LM_EXPECTED_DURATION_MAX_VALUE 0xFFFFFF
+/**
+ * enum wlan_t2lm_direction - Indicates the direction for which TID-to-link
+ * mapping is available.
+ *
+ * @WLAN_T2LM_DL_DIRECTION: Downlink
+ * @WLAN_T2LM_UL_DIRECTION: Uplink
+ * @WLAN_T2LM_BIDI_DIRECTION: Both downlink and uplink
+ * @WLAN_T2LM_MAX_DIRECTION: Max direction, this is used only internally
+ * @WLAN_T2LM_INVALID_DIRECTION: Invalid, this is used only internally to check
+ *                               if the mapping present in wlan_t2lm_info
+ *                               structure is valid or not.
+ */
+enum wlan_t2lm_direction {
+	WLAN_T2LM_DL_DIRECTION,
+	WLAN_T2LM_UL_DIRECTION,
+	WLAN_T2LM_BIDI_DIRECTION,
+	WLAN_T2LM_MAX_DIRECTION,
+	WLAN_T2LM_INVALID_DIRECTION,
+};
+
+/**
+ * struct wlan_t2lm_info - TID-to-Link mapping information for the frames
+ * transmitted on the uplink, downlink and bidirectional.
+ *
+ * @direction:  0 - Downlink, 1 - uplink 2 - Both uplink and downlink
+ * @default_link_mapping: value 1 indicates the default T2LM, where all the TIDs
+ *                        are mapped to all the links.
+ *                        value 0 indicates the preferred T2LM mapping
+ * @mapping_switch_time_present: Indicates if mapping switch time field present
+ *                               in the T2LM IE
+ * @expected_duration_present: Indicates if expected duration present in the
+ *                             T2LM IE
+ * @mapping_switch_time: Mapping switch time of this T2LM IE
+ * @expected_duration: Expected duration of this T2LM IE
+ * @ieee_link_map_tid: Indicates ieee link id mapping of all the TIDS
+ * @hw_link_map_tid: Indicates hw link id mapping of all the TIDS
+ * @timer_started: flag to check if T2LM timer is started for this T2LM IE
+ */
+struct wlan_t2lm_info {
+	enum wlan_t2lm_direction direction;
+	bool default_link_mapping;
+	bool mapping_switch_time_present;
+	bool expected_duration_present;
+	uint16_t mapping_switch_time;
+	uint32_t expected_duration;
+	uint16_t ieee_link_map_tid[T2LM_MAX_NUM_TIDS];
+	uint16_t hw_link_map_tid[T2LM_MAX_NUM_TIDS];
+	bool timer_started;
+};
+
+/**
+ * enum wlan_t2lm_category - T2LM category
+ *
+ * @WLAN_T2LM_CATEGORY_NONE: none
+ * @WLAN_T2LM_CATEGORY_REQUEST: T2LM request
+ * @WLAN_T2LM_CATEGORY_RESPONSE: T2LM response
+ * @WLAN_T2LM_CATEGORY_TEARDOWN: T2LM teardown
+ * @WLAN_T2LM_CATEGORY_INVALID: Invalid
+ */
+enum wlan_t2lm_category {
+	WLAN_T2LM_CATEGORY_NONE = 0,
+	WLAN_T2LM_CATEGORY_REQUEST = 1,
+	WLAN_T2LM_CATEGORY_RESPONSE = 2,
+	WLAN_T2LM_CATEGORY_TEARDOWN = 3,
+	WLAN_T2LM_CATEGORY_INVALID,
+};
+
+/**
+ * enum wlan_t2lm_tx_status - Status code applicable for the T2LM frames
+ * transmitted by the current peer.
+ *
+ * @WLAN_T2LM_TX_STATUS_NONE: Status code is not applicable
+ * @WLAN_T2LM_TX_STATUS_SUCCESS: AP/STA successfully transmitted the T2LM frame
+ * @WLAN_T2LM_TX_STATUS_FAILURE: Tx failure received from the FW.
+ * @WLAN_T2LM_TX_STATUS_RX_TIMEOUT: T2LM response frame not received from the
+ *                              peer for the transmitted T2LM request frame.
+ * @WLAN_T2LM_TX_STATUS_INVALID: Invalid status code
+ */
+enum wlan_t2lm_tx_status {
+	WLAN_T2LM_TX_STATUS_NONE = 0,
+	WLAN_T2LM_TX_STATUS_SUCCESS = 1,
+	WLAN_T2LM_TX_STATUS_FAILURE = 2,
+	WLAN_T2LM_TX_STATUS_RX_TIMEOUT = 3,
+	WLAN_T2LM_TX_STATUS_INVALID,
+};
+
+/**
+ * enum wlan_t2lm_resp_frm_type - T2LM status corresponds to T2LM response frame
+ *
+ * @WLAN_T2LM_RESP_TYPE_SUCCESS: T2LM mapping provided in the T2LM request is
+ *                       accepted either by the AP or STA
+ * @WLAN_T2LM_RESP_TYPE_DENIED_TID_TO_LINK_MAPPING: T2LM Request denied because
+ *                       the requested TID-to-link mapping is unacceptable.
+ * @WLAN_T2LM_RESP_TYPE_PREFERRED_TID_TO_LINK_MAPPING: T2LM Request rejected and
+ *                       preferred TID-to-link mapping is suggested.
+ * @WLAN_T2LM_RESP_TYPE_INVALID: Status code is not applicable.
+ */
+enum wlan_t2lm_resp_frm_type {
+	WLAN_T2LM_RESP_TYPE_SUCCESS = 0,
+	WLAN_T2LM_RESP_TYPE_DENIED_TID_TO_LINK_MAPPING = 133,
+	WLAN_T2LM_RESP_TYPE_PREFERRED_TID_TO_LINK_MAPPING = 134,
+	WLAN_T2LM_RESP_TYPE_INVALID,
+};
+
+/**
+ * enum wlan_t2lm_enable - TID-to-link negotiation supported by the mlo peer
+ *
+ * @WLAN_T2LM_NOT_SUPPORTED: T2LM is not supported by the MLD
+ * @WLAN_T2LM_MAP_ALL_TIDS_TO_SAME_LINK_SET: MLD only supports the mapping of
+ *    all TIDs to the same link set.
+ * @WLAN_T2LM_MAP_RESERVED: reserved value
+ * @WLAN_T2LM_MAP_EACH_TID_TO_SAME_OR_DIFFERENET_LINK_SET: MLD supports the
+ *    mapping of each TID to the same or different link set (Disjoint mapping).
+ * @WLAN_T2LM_ENABLE_INVALID: invalid
+ */
+enum wlan_t2lm_enable {
+	WLAN_T2LM_NOT_SUPPORTED = 0,
+	WLAN_T2LM_MAP_ALL_TIDS_TO_SAME_LINK_SET = 1,
+	WLAN_T2LM_MAP_RESERVED = 2,
+	WLAN_T2LM_MAP_EACH_TID_TO_SAME_OR_DIFFERENET_LINK_SET = 3,
+	WLAN_T2LM_ENABLE_INVALID,
+};
+
+/**
+ * struct wlan_prev_t2lm_negotiated_info - Previous successful T2LM negotiation
+ * is saved here.
+ *
+ * @dialog_token: Save the dialog token used in T2LM request and response frame.
+ * @t2lm_info: Provides the TID to LINK mapping information
+ */
+struct wlan_prev_t2lm_negotiated_info {
+	uint16_t dialog_token;
+	struct wlan_t2lm_info t2lm_info[WLAN_T2LM_MAX_DIRECTION];
+};
+
+/**
+ * struct wlan_t2lm_onging_negotiation_info - Current ongoing T2LM negotiation
+ * (information about transmitted T2LM request/response frame)
+ *
+ * @category: T2LM category as T2LM request frame
+ * @dialog_token: Save the dialog token used in T2LM request and response frame.
+ * @t2lm_info: Provides the TID-to-link mapping info for UL/DL/BiDi
+ * @t2lm_tx_status: Status code corresponds to the transmitted T2LM frames
+ * @t2lm_resp_type: T2LM status corresponds to T2LM response frame.
+ */
+struct wlan_t2lm_onging_negotiation_info {
+	enum wlan_t2lm_category category;
+	uint8_t dialog_token;
+	struct wlan_t2lm_info t2lm_info[WLAN_T2LM_MAX_DIRECTION];
+	enum wlan_t2lm_tx_status t2lm_tx_status;
+	enum wlan_t2lm_resp_frm_type t2lm_resp_type;
+};
+
+/**
+ * struct wlan_mlo_peer_t2lm_policy - TID-to-link mapping information
+ *
+ * @self_gen_dialog_token: self generated dialog token used to send T2LM request
+ *                         frame;
+ * @t2lm_enable_val: TID-to-link enable value supported by this peer.
+ * @t2lm_negotiated_info: Previous successful T2LM negotiation is saved here.
+ * @ongoing_tid_to_link_mapping: This has the ongoing TID-to-link mapping info
+ *                               transmitted by this peer to the connected peer.
+ */
+struct wlan_mlo_peer_t2lm_policy {
+	uint8_t self_gen_dialog_token;
+	enum wlan_t2lm_enable t2lm_enable_val;
+	struct wlan_prev_t2lm_negotiated_info t2lm_negotiated_info;
+	struct wlan_t2lm_onging_negotiation_info ongoing_tid_to_link_mapping;
+};
+
+/**
+ * struct wlan_mlo_t2lm_ie - T2LM information
+ *
+ * @disabled_link_bitmap: Bitmap of disabled links. This is used to update the
+ *                        disabled link field of RNR IE
+ * @t2lm: T2LM info structure
+ */
+struct wlan_mlo_t2lm_ie {
+	uint16_t disabled_link_bitmap;
+	struct wlan_t2lm_info t2lm;
+};
+
+/*
+ * In a beacon or probe response frame, at max two T2LM IEs can be present
+ * first one to represent the already existing mapping and the other one
+ * represents the new T2LM mapping that is yet to establish.
+ */
+#define WLAN_MAX_T2LM_IE 2
+/**
+ * struct wlan_t2lm_timer - T2LM timer information
+ *
+ * @t2lm_timer: T2LM timer
+ * @timer_interval: T2LM Timer value
+ * @timer_started: T2LM timer started or not
+ * @t2lm_ie_index: T2LM IE index value
+ * @t2lm_dev_lock: lock to access struct
+ */
+struct wlan_t2lm_timer {
+	qdf_timer_t t2lm_timer;
+	uint32_t timer_interval;
+	bool timer_started;
+	uint8_t t2lm_ie_index;
+#ifdef WLAN_MLO_USE_SPINLOCK
+	qdf_spinlock_t t2lm_dev_lock;
+#else
+	qdf_mutex_t t2lm_dev_lock;
+#endif
+};
+
+struct wlan_mlo_dev_context;
+
+/**
+ * typedef wlan_mlo_t2lm_link_update_handler - T2LM handler API to notify the
+ * link update.
+ * @mldev: Pointer to mlo_dev_context
+ * @arg: ieee_link_map
+ *
+ * Return: QDF_STATUS
+ */
+typedef QDF_STATUS (*wlan_mlo_t2lm_link_update_handler)(
+		struct wlan_mlo_dev_context *mldev, void *arg);
+
+/**
+ * struct wlan_t2lm_context - T2LM IE information
+ *
+ * @num_of_t2lm_ie: Number of T2LM IE
+ * @t2lm_ie: T2LM IE information
+ * @t2lm_timer: T2LM timer information
+ * @t2lm_dev_lock: t2lm dev context lock
+ * @tsf: time sync func value received via beacon
+ * @link_update_handler: handler to update T2LM link
+ * @is_valid_handler: T2LM handler is valid or not
+ */
+struct wlan_t2lm_context {
+	uint8_t num_of_t2lm_ie;
+	struct wlan_mlo_t2lm_ie t2lm_ie[WLAN_MAX_T2LM_IE];
+	struct wlan_t2lm_timer t2lm_timer;
+#ifdef WLAN_MLO_USE_SPINLOCK
+	qdf_spinlock_t t2lm_dev_lock;
+#else
+	qdf_mutex_t t2lm_dev_lock;
+#endif
+	uint64_t tsf;
+	wlan_mlo_t2lm_link_update_handler
+		link_update_handler[MAX_T2LM_HANDLERS];
+	bool is_valid_handler[MAX_T2LM_HANDLERS];
+};
 
 #ifdef WLAN_FEATURE_11BE
 
@@ -124,6 +383,39 @@ static inline void t2lm_dev_lock_release(struct wlan_t2lm_context *t2lm_ctx)
 	qdf_mutex_release(&t2lm_ctx->t2lm_dev_lock);
 }
 #endif
+
+/**
+ * wlan_register_t2lm_link_update_notify_handler() - API to register the
+ * handlers to receive link update notification
+ * @handler: handler for T2LM link update
+ * @mldev: Pointer to mlo context
+ *
+ * Return: Index on which handler is registered
+ */
+int wlan_register_t2lm_link_update_notify_handler(
+		wlan_mlo_t2lm_link_update_handler handler,
+		struct wlan_mlo_dev_context *mldev);
+
+/**
+ * wlan_unregister_t2lm_link_update_notify_handler() - API to unregister the
+ * T2LM related handlers
+ * @mldev: Pointer to mlo context
+ * @index: Index on which the handler was registered
+ *
+ * Return: None
+ */
+void wlan_unregister_t2lm_link_update_notify_handler(
+		struct wlan_mlo_dev_context *mldev, uint8_t index);
+
+/**
+ * wlan_mlo_dev_t2lm_notify_link_update() - API to call the registered handlers
+ * when there is a link update happens using T2LM
+ * @mldev: Pointer to mlo context
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
+		struct wlan_mlo_dev_context *mldev);
 
 /**
  * wlan_mlo_parse_t2lm_ie() - API to parse the T2LM IE
@@ -342,6 +634,26 @@ static inline QDF_STATUS
 wlan_process_bcn_prbrsp_t2lm_ie(struct wlan_objmgr_vdev *vdev,
 				struct wlan_t2lm_context *rx_t2lm_ie,
 				uint64_t tsf)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+int wlan_register_t2lm_link_update_notify_handler(
+		wlan_mlo_t2lm_link_update_handler handler,
+		struct wlan_mlo_dev_context *mldev)
+{
+	return 0;
+}
+
+static inline
+void wlan_unregister_t2lm_link_update_notify_handler(
+		struct wlan_mlo_dev_context *mldev, uint8_t index)
+{
+}
+
+static inline QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
+		struct wlan_mlo_dev_context *mldev)
 {
 	return QDF_STATUS_SUCCESS;
 }

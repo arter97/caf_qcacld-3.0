@@ -171,7 +171,7 @@ QDF_STATUS
 wmi_extract_mlo_vdev_bcast_tid_to_link_map_event(
 				     wmi_unified_t wmi,
 				     void *evt_buf,
-				     struct wmi_host_bcast_t2lm_info *bcast);
+				     struct mlo_bcast_t2lm_info *bcast);
 #endif /* WLAN_FEATURE_11BE */
 
 #endif /*_WMI_UNIFIED_11BE_API_H_*/

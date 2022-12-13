@@ -856,6 +856,18 @@ struct mlo_mgmt_ml_info {
 	uint16_t cu_vdev_map[CU_MAX_MLO_LINKS];
 	uint8_t  vdev_bpcc[MAX_AP_MLDS_PER_LINK * CU_MAX_MLO_LINKS];
 };
+
+/**
+ * struct mlo_bcast_t2lm_info - TID-to-link mapping broadcast info
+ * @num_vdevs: Number of vdevs for which FW populated the expected duration
+ * @vdev_id: Array of vdev ids
+ * @expected_duration: Array of expected duration for vdev ids
+ */
+struct mlo_bcast_t2lm_info {
+	uint8_t num_vdevs;
+	uint8_t vdev_id[MAX_AP_MLDS_PER_LINK];
+	uint32_t expected_duration[MAX_AP_MLDS_PER_LINK];
+};
 #endif
 
 /**
@@ -886,6 +898,7 @@ struct mlo_mgmt_ml_info {
  * @frm_con_ap: Frame is from connected ap
  * @link_removal_info: MLO link removal information array
  * @num_link_removal_info: Number of elements in @link_removal_info
+ * @t2lm_params: T2LM related info received from FW
  */
 struct mgmt_rx_event_params {
 	uint32_t    chan_freq;
@@ -912,6 +925,7 @@ struct mgmt_rx_event_params {
 	struct mlo_mgmt_ml_info cu_params;
 	struct mgmt_rx_mlo_link_removal_info *link_removal_info;
 	int num_link_removal_info;
+	struct mlo_bcast_t2lm_info t2lm_params;
 #endif
 };
 

@@ -3127,7 +3127,7 @@ QDF_STATUS (*extract_mlo_vdev_tid_to_link_map_event)(
 QDF_STATUS (*extract_mlo_vdev_bcast_tid_to_link_map_event)(
 			struct wmi_unified *wmi_handle,
 			void *buf,
-			struct wmi_host_bcast_t2lm_info *bcast_info);
+			struct mlo_bcast_t2lm_info *bcast_info);
 #endif /* WLAN_FEATURE_11BE */
 
 QDF_STATUS

@@ -97,7 +97,7 @@ QDF_STATUS
 wmi_extract_mlo_vdev_bcast_tid_to_link_map_event(
 				     wmi_unified_t wmi,
 				     void *evt_buf,
-				     struct wmi_host_bcast_t2lm_info *bcast)
+				     struct mlo_bcast_t2lm_info *bcast)
 {
 	if (wmi->ops->extract_mlo_vdev_bcast_tid_to_link_map_event) {
 		return wmi->ops->extract_mlo_vdev_bcast_tid_to_link_map_event(

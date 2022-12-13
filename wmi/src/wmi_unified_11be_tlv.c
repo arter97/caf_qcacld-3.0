@@ -1180,10 +1180,11 @@ static QDF_STATUS
 extract_mlo_vdev_bcast_tid_to_link_map_event_tlv(
 				struct wmi_unified *wmi_handle,
 				void *buf,
-				struct wmi_host_bcast_t2lm_info *bcast_info)
+				struct mlo_bcast_t2lm_info *bcast_info)
 {
 	WMI_MGMT_RX_EVENTID_param_tlvs *param_tlvs;
 	wmi_mlo_bcast_t2lm_info *info;
+	int i;
 
 	param_tlvs = (WMI_MGMT_RX_EVENTID_param_tlvs *)buf;
 	if (!param_tlvs) {
@@ -1191,19 +1192,32 @@ extract_mlo_vdev_bcast_tid_to_link_map_event_tlv(
 		return QDF_STATUS_E_INVAL;
 	}
 
-	info = param_tlvs->mlo_bcast_t2lm_info;
-	if (!info) {
-		wmi_debug("mgmt_ml_info TLV is not sent by FW");
+	if (param_tlvs->num_mlo_bcast_t2lm_info > MAX_AP_MLDS_PER_LINK) {
+		wmi_err("num_mlo_bcast_t2lm_info is greater than %d",
+			MAX_AP_MLDS_PER_LINK);
 		return QDF_STATUS_E_INVAL;
 	}
 
-	bcast_info->vdev_id =
-		WMI_MLO_BROADCAST_TID_TO_LINK_MAP_INFO_VDEV_ID_GET(
-			info->vdev_id_expec_dur);
+	info = param_tlvs->mlo_bcast_t2lm_info;
+	if (!info) {
+		wmi_debug("mlo_bcast_t2lm_info is not applicable");
+		return QDF_STATUS_SUCCESS;
+	}
 
-	bcast_info->expected_duration =
-		WMI_MLO_BROADCAST_TID_TO_LINK_MAP_INFO_EXP_DUR_GET(
-				info->vdev_id_expec_dur);
+	bcast_info->num_vdevs = param_tlvs->num_mlo_bcast_t2lm_info;
+	wmi_debug("num_vdevs:%d", bcast_info->num_vdevs);
+	for (i = 0; i < param_tlvs->num_mlo_bcast_t2lm_info; i++) {
+		bcast_info->vdev_id[i] =
+			WMI_MLO_BROADCAST_TID_TO_LINK_MAP_INFO_VDEV_ID_GET(
+					info->vdev_id_expec_dur);
+
+		bcast_info->expected_duration[i] =
+			WMI_MLO_BROADCAST_TID_TO_LINK_MAP_INFO_EXP_DUR_GET(
+					info->vdev_id_expec_dur);
+		wmi_debug("vdev_id:%d expected_duration:%d",
+			  bcast_info->vdev_id[i],
+			  bcast_info->expected_duration[i]);
+	}
 
 	return QDF_STATUS_SUCCESS;
 }
