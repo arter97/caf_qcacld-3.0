@@ -761,7 +761,8 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 	hdr_frag_size = qdf_nbuf_get_frag_size_by_idx(mpdu, 0);
 
 	/* Adjust page frag offset to point to 802.11 header */
-	qdf_nbuf_trim_add_frag_size(head_msdu, 0, -(hdr_frag_size - mpdu_buf_len), 0);
+	if (hdr_frag_size > mpdu_buf_len)
+		qdf_nbuf_trim_add_frag_size(head_msdu, 0, -(hdr_frag_size - mpdu_buf_len), 0);
 
 	msdu_meta = (struct hal_rx_mon_msdu_info *)(((void *)qdf_nbuf_get_frag_addr(mpdu, 1)) - (DP_RX_MON_PACKET_OFFSET + DP_RX_MON_NONRAW_L2_HDR_PAD_BYTE));
 
@@ -833,7 +834,8 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 			if (prev_msdu_end_received) {
 				hdr_frag_size = qdf_nbuf_get_frag_size_by_idx(msdu_cur, frag_iter);
 				/* Adjust page frag offset to point to llc/snap header */
-				qdf_nbuf_trim_add_frag_size(msdu_cur, frag_iter, -(hdr_frag_size - msdu_llc_len), 0);
+				if (hdr_frag_size > msdu_llc_len)
+					qdf_nbuf_trim_add_frag_size(msdu_cur, frag_iter, -(hdr_frag_size - msdu_llc_len), 0);
 				prev_msdu_end_received = false;
 				continue;
 			}
@@ -893,7 +895,8 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 			if (msdu_meta->first_buffer) {
 				/* Adjust page frag offset to point to 802.11 header */
 				hdr_frag_size = qdf_nbuf_get_frag_size_by_idx(msdu_cur, frag_iter-1);
-				qdf_nbuf_trim_add_frag_size(msdu_cur, frag_iter - 1, -(hdr_frag_size - (msdu_llc_len + amsdu_pad)), 0);
+				if (hdr_frag_size > (msdu_llc_len + amsdu_pad))
+					qdf_nbuf_trim_add_frag_size(msdu_cur, frag_iter - 1, -(hdr_frag_size - (msdu_llc_len + amsdu_pad)), 0);
 
 				/* Adjust page frag offset to appropriate after decap header */
 				frag_page_offset =
