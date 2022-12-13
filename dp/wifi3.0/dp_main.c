@@ -10775,6 +10775,11 @@ static QDF_STATUS dp_get_vdev_param(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 	case CDP_DROP_3ADDR_MCAST:
 		val->cdp_drop_3addr_mcast = vdev->drop_3addr_mcast;
 		break;
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	case CDP_DROP_TX_MCAST:
+		val->cdp_drop_tx_mcast = vdev->drop_tx_mcast;
+		break;
+#endif
 	default:
 		dp_cdp_err("%pK: param value %d is wrong",
 			   soc, param);
@@ -10896,6 +10901,11 @@ dp_set_vdev_param(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 	case CDP_CFG_WDS_EXT:
 		if (vdev->opmode == wlan_op_mode_ap)
 			vdev->wds_ext_enabled = val.cdp_vdev_param_wds_ext;
+		break;
+	case CDP_DROP_TX_MCAST:
+		dp_info("vdev_id %d drop tx mcast :%d", vdev_id,
+			val.cdp_drop_tx_mcast);
+		vdev->drop_tx_mcast = val.cdp_drop_tx_mcast;
 		break;
 #endif
 	case CDP_ENABLE_PEER_AUTHORIZE:
