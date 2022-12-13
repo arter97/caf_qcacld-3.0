@@ -385,7 +385,7 @@ struct wlan_mlme_edca_params {
 
 /* To configure EDCA/PIFS param for LL SAP */
 #define CFG_EDCA_PARAM_ACM         0
-#define CFG_EDCA_PARAM_AIFSN       1
+#define CFG_EDCA_PARAM_AIFSN       2
 #define CFG_EDCA_PARAM_ACI         3
 #define CFG_EDCA_PARAM_CWMIN       2
 #define CFG_EDCA_PARAM_CWMAX       3
