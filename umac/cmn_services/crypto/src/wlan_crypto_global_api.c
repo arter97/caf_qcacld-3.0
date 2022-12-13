@@ -4630,6 +4630,7 @@ QDF_STATUS wlan_crypto_set_key_req(struct wlan_objmgr_vdev *vdev,
 {
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_lmac_if_tx_ops *tx_ops;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 
 	psoc = wlan_vdev_get_psoc(vdev);
 
@@ -4640,11 +4641,10 @@ QDF_STATUS wlan_crypto_set_key_req(struct wlan_objmgr_vdev *vdev,
 	}
 
 	if (psoc && WLAN_CRYPTO_TX_OPS_SET_KEY(tx_ops))
-		WLAN_CRYPTO_TX_OPS_SET_KEY(tx_ops)(vdev, req, key_type);
-	else
-		return QDF_STATUS_E_FAILURE;
+		status = WLAN_CRYPTO_TX_OPS_SET_KEY(tx_ops)(vdev, req,
+							    key_type);
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 
 void wlan_crypto_update_set_key_peer(struct wlan_objmgr_vdev *vdev,
