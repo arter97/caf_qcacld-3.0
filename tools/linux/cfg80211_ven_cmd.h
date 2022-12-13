@@ -834,6 +834,9 @@ enum {
 #ifdef WLAN_FEATURE_11BE
 	IEEE80211_PARAM_EHT_CONFIG_CCFS0 = 789, /* Set 11be - EHT Config CCFS0 in 6GHz */
 #endif /* WLAN_FEATURE_11BE */
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	IEEE80211_PARAM_DROP_TX_MCAST  = 790,  /* Flag to enable/disable tx mcast pkt drops */
+#endif
 };
 
 enum {
@@ -2508,6 +2511,10 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, SET_PARAM, 1},
 	{"get_eht_config_ccfs0",	IEEE80211_PARAM_EHT_CONFIG_CCFS0, GET_PARAM, 0},
 #endif /* WLAN_FEATURE_11BE */
+#ifdef QCA_SUPPORT_WDS_EXTENDED
+	{"drop_tx_mcast",      IEEE80211_PARAM_DROP_TX_MCAST, SET_PARAM, 1},
+	{"get_drop_tx_mcast",  IEEE80211_PARAM_DROP_TX_MCAST, GET_PARAM, 0},
+#endif
 };
 
 struct vendor_commands radio_vendor_cmds[] = {
