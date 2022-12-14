@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2019,2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1197,6 +1197,52 @@ typedef enum {
 	 */
 
 	EVENT_WLAN_CONN_DP = 0xD23,
+
+	/*
+	 * <diag_event>
+	 * EVENT_WLAN_NBR_RPT
+	 * @diag_cmn: Common diag info
+	 * @version: structure version
+	 * @token: dialog token. Dialog Token is a nonzero value chosen by the
+	 * STA
+	 * @num_rpt: the number of neighbor report elements in response frame.
+	 * @num_freq: Number of frequency in response frame
+	 * @ssid: SSID
+	 * @freq: Frequency list in response frame
+	 *
+	 * This Event is used to send Neighbor report
+	 *
+	 * Supported Feature: STA
+	 *
+	 * </diag_event>
+	 */
+
+	EVENT_WLAN_NBR_RPT = 0xD37,
+
+	/*
+	 * <diag_event>
+	 * @diag_cmn: Common diag info
+	 * @version: structure version
+	 * @token: A nonzero number that is unique among the Measurement Request
+	 * elements
+	 * @op_class: Operating classes that include primary channels
+	 * @chan: The channel number field in the beacon report request.
+	 * @req_mode: hex value defines Duration mandatory, parallel, enable,
+	 * request, and report bits.
+	 * @num_rpt: the number of neighbor report elements in response frame.
+	 * @duration: The duration over which the Beacon report was
+	 * measured.(in ms)
+	 * @mode: Mode used for measurement.Values defined in IEEE
+	 * Std 802.11‐2020 Table 9-103.
+	 *
+	 * This Event is used to send Beacon report
+	 *
+	 * Supported Feature: STA
+	 *
+	 * </diag_event>
+	 */
+
+	EVENT_WLAN_BCN_RPT = 0xD38,
 
 	EVENT_MAX_ID = 0x0FFF
 } event_id_enum_type;
