@@ -1269,8 +1269,12 @@ void dp_ppeds_stop_soc_be(struct dp_soc *soc)
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
 	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
 
-	if (!be_soc->ppeds_handle)
+	if (!be_soc->ppeds_handle || be_soc->ppeds_stopped)
 		return;
+
+	be_soc->ppeds_stopped = 1;
+
+	dp_info("stopping ppe ds for soc %pK ", soc);
 
 	napi_disable(&napi_ctxt->napi);
 
@@ -1300,6 +1304,10 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 	}
 
 	napi_enable(&napi_ctxt->napi);
+
+	be_soc->ppeds_stopped = 0;
+
+	dp_info("starting ppe ds for soc %pK ", soc);
 
 	if (ppe_ds_wlan_inst_start(be_soc->ppeds_handle) != 0) {
 		dp_err("%p: ppeds start failed", soc);
