@@ -5400,14 +5400,8 @@ void dp_tx_prefetch_next_nbuf_data(struct dp_tx_desc_s *next)
 
 	if (next)
 		nbuf = next->nbuf;
-	if (nbuf) {
-		/* prefetch skb->next and first few bytes of skb->cb */
-		qdf_prefetch(next->shinfo_addr);
+	if (nbuf)
 		qdf_prefetch(nbuf);
-		/* prefetch skb fields present in different cachelines */
-		qdf_prefetch(&nbuf->len);
-		qdf_prefetch(&nbuf->users);
-	}
 }
 #else
 static inline
@@ -5460,6 +5454,50 @@ dp_tx_mcast_reinject_handler(struct dp_soc *soc, struct dp_tx_desc_s *desc)
 }
 #endif
 
+#ifdef QCA_DP_TX_NBUF_LIST_FREE
+static inline void
+dp_tx_nbuf_queue_head_init(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	qdf_nbuf_queue_head_init(nbuf_queue_head);
+}
+
+static inline void
+dp_tx_nbuf_dev_queue_free(qdf_nbuf_queue_head_t *nbuf_queue_head,
+			  struct dp_tx_desc_s *desc)
+{
+	qdf_nbuf_t nbuf = NULL;
+
+	nbuf = desc->nbuf;
+	if (qdf_likely(desc->flags & DP_TX_DESC_FLAG_FAST))
+		qdf_nbuf_dev_queue_head(nbuf_queue_head, nbuf);
+	else
+		qdf_nbuf_free(nbuf);
+}
+
+static inline void
+dp_tx_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+	qdf_nbuf_dev_kfree_list(nbuf_queue_head);
+}
+#else
+static inline void
+dp_tx_nbuf_queue_head_init(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+}
+
+static inline void
+dp_tx_nbuf_dev_queue_free(qdf_nbuf_queue_head_t *nbuf_queue_head,
+			  struct dp_tx_desc_s *desc)
+{
+	qdf_nbuf_free(desc->nbuf);
+}
+
+static inline void
+dp_tx_nbuf_dev_kfree_list(qdf_nbuf_queue_head_t *nbuf_queue_head)
+{
+}
+#endif
+
 /**
  * dp_tx_comp_process_desc_list() - Tx complete software descriptor handler
  * @soc: core txrx main context
@@ -5481,8 +5519,11 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 	struct dp_txrx_peer *txrx_peer = NULL;
 	uint16_t peer_id = DP_INVALID_PEER;
 	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	qdf_nbuf_queue_head_t h;
 
 	desc = comp_head;
+
+	dp_tx_nbuf_queue_head_init(&h);
 
 	while (desc) {
 		next = desc->next;
@@ -5534,7 +5575,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			dp_tx_desc_history_add(soc, desc->dma_addr, desc->nbuf,
 					       desc->id, DP_TX_COMP_UNMAP);
 			dp_tx_nbuf_unmap(soc, desc);
-			qdf_nbuf_free_simple(desc->nbuf);
+			dp_tx_nbuf_dev_queue_free(&h, desc);
 			dp_tx_desc_free(soc, desc, desc->pool_id);
 			desc = next;
 			continue;
@@ -5550,6 +5591,7 @@ dp_tx_comp_process_desc_list(struct dp_soc *soc,
 		dp_tx_desc_release(desc, desc->pool_id);
 		desc = next;
 	}
+	dp_tx_nbuf_dev_kfree_list(&h);
 	if (txrx_peer)
 		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_TX_COMP);
 }

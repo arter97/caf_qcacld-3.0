@@ -41,7 +41,7 @@ struct __attribute__((__packed__)) dp_tx_comp_peer_id {
 #define DP_TX_HLOS_TID_GET(_var) \
 	(((_var) & 0x0e) >> 1)
 #define DP_TX_FLOW_OVERRIDE_GET(_var) \
-	((_var) & 0x1)
+	((_var >> 3) & 0x1)
 #define DP_TX_WHO_CLFY_INF_SEL_GET(_var) \
 	(((_var) & 0x30) >> 4)
 #define DP_TX_FLOW_OVERRIDE_ENABLE 0x1

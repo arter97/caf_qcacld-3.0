@@ -33,6 +33,74 @@
 #define HAL_TX_NUM_DSCP_REGISTER_SIZE 32
 
 /**
+ * hal_tx_ppe2tcl_ring_halt_set() - Enable ring halt for the ppe2tcl ring
+ * @hal_soc: HAL SoC context
+ *
+ * Return: none
+ */
+static void hal_tx_ppe2tcl_ring_halt_set_9224(hal_soc_handle_t hal_soc)
+{
+	uint32_t cmn_reg_addr;
+	uint32_t regval;
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
+
+	cmn_reg_addr =
+		HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_ADDR(MAC_TCL_REG_REG_BASE);
+
+	/* Enable RING_HALT */
+	regval = HAL_REG_READ(soc, cmn_reg_addr);
+	regval |=
+	    (1 <<
+	    HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_PPE2TCL1_RNG_HALT_SHFT);
+
+	HAL_REG_WRITE(soc, cmn_reg_addr, regval);
+}
+
+/**
+ * hal_tx_ppe2tcl_ring_halt_reset() - Disable ring halt for the ppe2tcl ring
+ * @hal_soc: HAL SoC context
+ *
+ * Return: none
+ */
+static void hal_tx_ppe2tcl_ring_halt_reset_9224(hal_soc_handle_t hal_soc)
+{
+	uint32_t cmn_reg_addr;
+	uint32_t regval;
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
+
+	cmn_reg_addr =
+		HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_ADDR(MAC_TCL_REG_REG_BASE);
+
+	/* Disable RING_HALT */
+	regval = HAL_REG_READ(soc, cmn_reg_addr);
+	regval &= ~(1 <<
+	    HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_PPE2TCL1_RNG_HALT_SHFT);
+
+	HAL_REG_WRITE(soc, cmn_reg_addr, regval);
+}
+
+/**
+ * hal_tx_ppe2tcl_ring_halt_done() - Check if ring halt is done for ppe2tcl ring
+ * @hal_soc: HAL SoC context
+ *
+ * Return: true if halt done
+ */
+static bool hal_tx_ppe2tcl_ring_halt_done_9224(hal_soc_handle_t hal_soc)
+{
+	uint32_t cmn_reg_addr;
+	uint32_t regval;
+	struct hal_soc *soc = (struct hal_soc *)hal_soc;
+
+	cmn_reg_addr =
+		HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_ADDR(MAC_TCL_REG_REG_BASE);
+
+	regval = HAL_REG_READ(soc, cmn_reg_addr);
+	regval &= (1 << HWIO_TCL_R0_CONS_RING_CMN_CTRL_REG_PPE2TCL1_RNG_HALT_STAT_SHFT);
+
+	return(!!regval);
+}
+
+/**
  * hal_tx_set_dscp_tid_map_9224() - Configure default DSCP to TID map table
  * @soc: HAL SoC context
  * @map: DSCP-TID mapping table
