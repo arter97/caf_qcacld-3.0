@@ -283,12 +283,13 @@ enum tdls_event_type {
 
 /**
  * enum tdls_state_t - tdls state
- * @QCA_WIFI_HAL_TDLS_DISABLED: TDLS is not enabled, or is disabled now
- * @QCA_WIFI_HAL_TDLS_ENABLED: TDLS is enabled, but not yet tried
- * @QCA_WIFI_HAL_TDLS_ESTABLISHED: Direct link is established
- * @QCA_WIFI_HAL_TDLS_ESTABLISHED_OFF_CHANNEL: Direct link established using MCC
- * @QCA_WIFI_HAL_TDLS_DROPPED: Direct link was established, but is now dropped
- * @QCA_WIFI_HAL_TDLS_FAILED: Direct link failed
+ * @QCA_WIFI_HAL_TDLS_S_DISABLED: TDLS is not enabled, or is disabled now
+ * @QCA_WIFI_HAL_TDLS_S_ENABLED: TDLS is enabled, but not yet tried
+ * @QCA_WIFI_HAL_TDLS_S_ESTABLISHED: Direct link is established
+ * @QCA_WIFI_HAL_TDLS_S_ESTABLISHED_OFF_CHANNEL: Direct link established using
+ *                                               MCC
+ * @QCA_WIFI_HAL_TDLS_S_DROPPED: Direct link was established, but is now dropped
+ * @QCA_WIFI_HAL_TDLS_S_FAILED: Direct link failed
  */
 enum tdls_state_t {
 	QCA_WIFI_HAL_TDLS_S_DISABLED = 1,
@@ -343,7 +344,7 @@ enum tdls_event_msg_type {
  * handle this
  * @TDLS_EXIT_BT_BUSY: BT exited busy mode, TDLS connection tracker needs to
  * handle this
- * @DLS_SCAN_STARTED: TDLS module received a scan start event, TDLS connection
+ * @TDLS_SCAN_STARTED: TDLS module received a scan start event, TDLS connection
  * tracker needs to handle this
  * @TDLS_SCAN_COMPLETED: TDLS module received a scan complete event, TDLS
  * connection tracker needs to handle this
@@ -385,6 +386,7 @@ enum tdls_disable_sources {
  * @vdev: vdev object
  * @reason: used with teardown indication
  * @peer_mac: MAC address of the TDLS peer
+ * @status: operation status
  */
 struct tdls_osif_indication {
 	struct wlan_objmgr_vdev *vdev;
@@ -580,7 +582,7 @@ struct tdls_rx_mgmt_frame {
 };
 
 /**
- * tdls_rx_callback() - Callback for rx mgmt frame
+ * typedef tdls_rx_callback() - Callback for rx mgmt frame
  * @user_data: user data associated to this rx mgmt frame.
  * @rx_frame: RX mgmt frame
  *
@@ -592,8 +594,8 @@ typedef void (*tdls_rx_callback)(void *user_data,
 	struct tdls_rx_mgmt_frame *rx_frame);
 
 /**
- * tdls_wmm_check() - Callback for wmm info
- * @psoc: psoc object
+ * typedef tdls_wmm_check() - Callback for wmm info
+ * @vdev_id: ID of the vdev to check
  *
  * This callback will be used to check wmm information
  *
@@ -637,7 +639,8 @@ typedef QDF_STATUS
 typedef void (*tdls_offchan_parms_callback)(struct wlan_objmgr_vdev *vdev);
 
 /**
- * tdls_vdev_init_cb() - Callback for initializing the tdls private structure
+ * typedef tdls_vdev_init_cb() - Callback for initializing the tdls private
+ *                               structure
  * @vdev: vdev object
  *
  * This callback will be used to create the vdev private object and store
@@ -646,8 +649,10 @@ typedef void (*tdls_offchan_parms_callback)(struct wlan_objmgr_vdev *vdev);
  * Return: QDF_STATUS
  */
 typedef QDF_STATUS (*tdls_vdev_init_cb)(struct wlan_objmgr_vdev *vdev);
+
 /**
- * tdls_vdev_deinit_cb() - Callback for deinitializing the tdls private struct
+ * typedef tdls_vdev_deinit_cb() - Callback for deinitializing the tdls
+ *                                 private structure
  * @vdev: vdev object
  *
  * This callback will be used to destroy the vdev private object.
@@ -657,7 +662,7 @@ typedef QDF_STATUS (*tdls_vdev_init_cb)(struct wlan_objmgr_vdev *vdev);
 typedef void (*tdls_vdev_deinit_cb)(struct wlan_objmgr_vdev *vdev);
 
 /**
- * tdls_osif_cb() - Callbacks for updating osif params.
+ * struct tdls_osif_cb - Callbacks for updating osif params.
  * @tdls_osif_conn_update: Update osif params when TDLS peer is connected
  * @tdls_osif_disconn_update: Update osif params when TDLS peer is disconnected
  *
@@ -677,6 +682,10 @@ struct tdls_osif_cb {
  * @tdls_update_peer_state: pass WMA_UPDATE_TDLS_PEER_STATE value
  * @tdls_del_all_peers: pass eWNI_SME_DEL_ALL_TDLS_PEERS
  * @tdls_update_dp_vdev_flags: pass CDP_UPDATE_TDLS_FLAGS
+ * @tdls_rx_cb: TDLS RX callback
+ * @tdls_rx_cb_data: TDLS RX callback context
+ * @tdls_wmm_cb: TDLS WMM check callback
+ * @tdls_wmm_cb_data: TDLS WMM check callback context
  * @tdls_event_cb: tdls event callback
  * @tdls_evt_cb_data: tdls event data
  * @tdls_peer_context: userdata for register/deregister TDLS peer
@@ -684,7 +693,7 @@ struct tdls_osif_cb {
  * @tdls_dp_vdev_update: update vdev flags in datapath
  * @tdls_osif_init_cb: callback to initialize the tdls priv
  * @tdls_osif_deinit_cb: callback to deinitialize the tdls priv
- * @tdls_osif_cb: callback to update osif params
+ * @tdls_osif_update_cb: callback to update osif params
  */
 struct tdls_start_params {
 	struct tdls_user_config config;
@@ -753,7 +762,7 @@ struct tdls_del_peer_request {
 };
 
 /**
- * struct vhgmcsinfo - VHT MCS information
+ * struct vhtmcsinfo - VHT MCS information
  * @rx_mcs_map: RX MCS map 2 bits for each stream, total 8 streams
  * @rx_highest: Indicates highest long GI VHT PPDU data rate
  *      STA can receive. Rate expressed in units of 1 Mbps.
@@ -777,7 +786,7 @@ struct vhtmcsinfo {
  *
  * This structure is the "VHT capabilities element" as
  * described in 802.11ac D3.0 8.4.2.160
- * @vht_cap_info: VHT capability info
+ * @vht_capinfo: VHT capability info
  * @supp_mcs: VHT MCS supported rates
  */
 struct vhtcap {
@@ -785,6 +794,7 @@ struct vhtcap {
 	struct vhtmcsinfo supp_mcs;
 };
 
+#ifdef WLAN_FEATURE_11AX
 /**
  * struct hecap - HE capabilities
  *
@@ -792,8 +802,8 @@ struct vhtcap {
  * described in 802.11ax D4.0 section 9.4.2.232.3
  * @mac_cap_info: MAC capability info
  * @phycap_info: Phy Capability info
+ * @he_cap_mcs_info: HE capabilities MCS information
  */
-#ifdef WLAN_FEATURE_11AX
 struct hecap {
 	uint8_t mac_cap_info[6];
 	uint8_t phycap_info[11];
@@ -976,6 +986,7 @@ struct tdls_peer_params {
  * struct tdls_peer_update_state - TDLS peer state parameters
  * @vdev_id: vdev id
  * @peer_macaddr: peer mac address
+ * @peer_state: peer state
  * @peer_cap: peer capabality
  * @resp_reqd: response needed
  */
@@ -993,6 +1004,7 @@ struct tdls_peer_update_state {
  * @peer_mac_addr: Peer mac address
  * @tdls_off_ch_bw_offset: Target off-channel bandwidth offset
  * @tdls_off_ch: Target Off Channel
+ * @tdls_sw_mode: Switch mode
  * @oper_class: Operating class for target channel
  * @is_responder: Responder or initiator
  * @tdls_off_chan_freq: Target Off Channel frequency
@@ -1059,7 +1071,7 @@ struct tdls_event_notify {
 };
 
 /**
- * struct tdls_event_notify - tdls event notify
+ * struct tdls_send_mgmt - tdls send management frame
  * @peer_mac: peer's mac address
  * @frame_type: Type of TDLS mgmt frame to be sent
  * @dialog: dialog token used in the frame.
@@ -1112,7 +1124,7 @@ struct tdls_get_all_peers {
 };
 
 /**
- * struct tdls_send_action_frame_request - tdls send mgmt request
+ * struct tdls_action_frame_request - tdls send mgmt request
  * @vdev: vdev object
  * @chk_frame: This struct used to validate mgmt frame
  * @session_id: session id
@@ -1152,6 +1164,7 @@ struct tdls_set_responder_req {
  * @tdls_prohibited: peer mac addr
  * @tdls_chan_swit_prohibited: peer type
  * @lfr_roam: is trigger due to lfr
+ * @user_disconnect: should userspace be notified of disconnect
  * @session_id: session id
  */
 struct tdls_sta_notify_params {
@@ -1220,7 +1233,7 @@ struct tdls_set_offchannel {
 };
 
 /**
- * struct tdls_set_offchan_mode - TDLS set offchannel mode
+ * struct tdls_set_offchanmode - TDLS set offchannel mode
  * @vdev: vdev object
  * @offchan_mode: Updated tdls offchannel mode value.
  * @callback: callback to release vdev ref.
@@ -1232,7 +1245,7 @@ struct tdls_set_offchanmode {
 };
 
 /**
- * struct tdls_set_offchan_offset - TDLS set offchannel mode
+ * struct tdls_set_secoffchanneloffset - TDLS set secondary offchannel offset
  * @vdev: vdev object
  * @offchan_offset: Offchan offset value.
  * @callback: callback to release vdev ref.
@@ -1310,7 +1323,7 @@ struct tdls_del_sta_rsp {
 	struct wlan_objmgr_psoc *psoc;
 };
 
-/*
+/**
  * struct tdls_send_mgmt_request - tdls management request
  * @message_type: type of pe message
  * @length: length of the frame.
@@ -1322,6 +1335,7 @@ struct tdls_del_sta_rsp {
  * @peer_capability: peer capability information
  * @bssid: bssid
  * @peer_mac: mac address of the peer
+ * @ac: Access Category to use
  * @add_ie: additional ie's to be included
  */
 struct tdls_send_mgmt_request {
@@ -1359,8 +1373,10 @@ struct tdls_send_mgmt_request {
  * @vht_cap: vht capability
  * @he_cap_len: he capability length
  * @he_cap: he capability
+ * @he_6ghz_cap: HE 6 GHz capability
  * @uapsd_queues: uapsd queue as sSirMacQosInfoStation
  * @max_sp: maximum service period
+ * @is_pmf: is PMF active
  */
 struct tdls_add_sta_req {
 	uint16_t message_type;
