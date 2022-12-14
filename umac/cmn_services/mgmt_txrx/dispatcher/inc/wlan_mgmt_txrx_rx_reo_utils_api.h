@@ -42,6 +42,17 @@ int8_t
 wlan_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev);
 
 /**
+ * wlan_get_mlo_grp_id_from_pdev() - Helper API to get the MLO Group id
+ * from the pdev object.
+ * @pdev: Pointer to pdev object
+ *
+ * Return: On success returns the MLO Group id corresponding to the pdev
+ * object. On failure returns -1.
+ */
+int8_t
+wlan_get_mlo_grp_id_from_pdev(struct wlan_objmgr_pdev *pdev);
+
+/**
  * wlan_get_pdev_from_mlo_link_id() - Helper API to get the pdev
  * object from the link id.
  * @mlo_link_id: MLO HW link id

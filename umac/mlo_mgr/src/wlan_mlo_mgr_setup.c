@@ -25,16 +25,97 @@
 #include <wlan_mgmt_txrx_rx_reo_utils_api.h>
 
 #ifdef WLAN_MLO_MULTI_CHIP
-bool mlo_is_ml_soc(struct wlan_objmgr_psoc *psoc)
+static inline
+bool mlo_psoc_get_index_id(struct wlan_objmgr_psoc *psoc,
+			   uint8_t grp_id,
+			   uint8_t *index,
+			   bool teardown)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
-	uint8_t chip_idx;
+	uint8_t id;
 
 	if (!mlo_ctx)
 		return false;
 
-	for (chip_idx = 0; chip_idx < MAX_MLO_CHIPS; chip_idx++)
-		if (mlo_ctx->setup_info.soc_list[chip_idx] == psoc)
+	if (!psoc)
+		return false;
+
+	if (!index)
+		return false;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return false;
+	}
+
+	for (id = 0; id < mlo_ctx->setup_info[grp_id].tot_socs; id++)
+		if (mlo_ctx->setup_info[grp_id].curr_soc_list[id] == psoc) {
+			*index = id;
+			return true;
+		}
+
+	if (teardown)
+		return false;
+
+	for (id = 0; id < mlo_ctx->setup_info[grp_id].tot_socs; id++)
+		if (!mlo_ctx->setup_info[grp_id].curr_soc_list[id]) {
+			*index = id;
+			return true;
+		}
+
+	return false;
+}
+
+bool mlo_psoc_get_grp_id(struct wlan_objmgr_psoc *psoc, uint8_t *ret_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	uint8_t grp_id;
+	uint8_t tot_socs;
+	uint8_t id;
+
+	if (!mlo_ctx)
+		return false;
+
+	if (!psoc)
+		return false;
+
+	if (!ret_id)
+		return false;
+
+	for (grp_id = 0; grp_id < mlo_ctx->total_grp; grp_id++) {
+		tot_socs = mlo_ctx->setup_info[grp_id].tot_socs;
+		for (id = 0; id < tot_socs; id++)
+			if (mlo_ctx->setup_info[grp_id].soc_list[id] == psoc) {
+				*ret_id = grp_id;
+				return true;
+			}
+	}
+
+	return false;
+}
+
+qdf_export_symbol(mlo_psoc_get_grp_id);
+
+bool mlo_is_ml_soc(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	uint8_t id;
+
+	if (!mlo_ctx)
+		return false;
+
+	if (!psoc)
+		return false;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return false;
+	}
+
+	for (id = 0; id < mlo_ctx->setup_info[grp_id].tot_socs; id++)
+		if (mlo_ctx->setup_info[grp_id].curr_soc_list[id] == psoc)
 			return true;
 
 	return false;
@@ -42,49 +123,113 @@ bool mlo_is_ml_soc(struct wlan_objmgr_psoc *psoc)
 
 qdf_export_symbol(mlo_is_ml_soc);
 
-void mlo_get_soc_list(struct wlan_objmgr_psoc **soc_list)
+static void mlo_set_soc_list(uint8_t grp_id, struct wlan_objmgr_psoc *psoc)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
-	uint8_t chip_idx;
-
-	if (!mlo_ctx) {
-		for (chip_idx = 0; chip_idx < MAX_MLO_CHIPS; chip_idx++)
-			soc_list[chip_idx] = NULL;
-
-		return;
-	}
-
-	for (chip_idx = 0; chip_idx < MAX_MLO_CHIPS; chip_idx++)
-		soc_list[chip_idx] = mlo_ctx->setup_info.soc_list[chip_idx];
-}
-
-qdf_export_symbol(mlo_get_soc_list);
-
-void mlo_cleanup_asserted_soc_setup_info(struct wlan_objmgr_psoc *psoc)
-{
-	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
-	uint8_t link_idx;
-	struct wlan_objmgr_pdev *pdev;
+	uint8_t idx;
 
 	if (!mlo_ctx)
 		return;
 
-	if (!mlo_ctx->setup_info.num_links)
+	if (!psoc)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	for (idx = 0; idx < mlo_ctx->setup_info[grp_id].tot_socs; idx++) {
+		if (mlo_ctx->setup_info[grp_id].soc_id_list[idx] ==
+				psoc->soc_objmgr.psoc_id) {
+			mlo_ctx->setup_info[grp_id].soc_list[idx] = psoc;
+		}
+	}
+}
+
+void mlo_get_soc_list(struct wlan_objmgr_psoc **soc_list,
+		      uint8_t grp_id,
+		      uint8_t total_socs,
+		      enum MLO_SOC_LIST curr)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	uint8_t chip_idx;
+
+	if (!mlo_ctx)
+		goto err_case;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		goto err_case;
+	}
+
+	if (total_socs != mlo_ctx->setup_info[grp_id].tot_socs) {
+		mlo_err("Mismatch in number of socs in the grp id %d, expected %d observed %d",
+			grp_id, total_socs,
+			mlo_ctx->setup_info[grp_id].tot_socs);
+		goto err_case;
+	}
+
+	if (curr == WLAN_MLO_GROUP_CURRENT_SOC_LIST) {
+		for (chip_idx = 0; chip_idx < total_socs; chip_idx++)
+			soc_list[chip_idx] =
+			mlo_ctx->setup_info[grp_id].curr_soc_list[chip_idx];
+	} else {
+		for (chip_idx = 0; chip_idx < total_socs; chip_idx++)
+			soc_list[chip_idx] =
+				mlo_ctx->setup_info[grp_id].soc_list[chip_idx];
+	}
+
+	return;
+
+err_case:
+		for (chip_idx = 0; chip_idx < total_socs; chip_idx++)
+			soc_list[chip_idx] = NULL;
+
+		return;
+}
+
+qdf_export_symbol(mlo_get_soc_list);
+
+void mlo_cleanup_asserted_soc_setup_info(struct wlan_objmgr_psoc *psoc,
+					 uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	uint8_t link_idx;
+	struct wlan_objmgr_pdev *pdev;
+	struct mlo_setup_info *setup_info;
+
+	if (!mlo_ctx)
+		return;
+
+	if (!psoc)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	setup_info = &mlo_ctx->setup_info[grp_id];
+
+	if (!setup_info->num_links)
 		return;
 
 	if (!psoc) {
-		qdf_info("NULL psoc");
+		mlo_info("NULL psoc");
 		return;
 	}
 
 	for (link_idx = 0; link_idx < MAX_MLO_LINKS; link_idx++) {
-		pdev = mlo_ctx->setup_info.pdev_list[link_idx];
+		pdev = setup_info->pdev_list[link_idx];
 		if (pdev) {
 			if (wlan_pdev_get_psoc(pdev) == psoc) {
-				mlo_ctx->setup_info.pdev_list[link_idx] = NULL;
-				mlo_ctx->setup_info.state[link_idx] =
-					MLO_LINK_TEARDOWN;
-				mlo_ctx->setup_info.num_links--;
+				setup_info->pdev_list[link_idx] = NULL;
+				setup_info->state[link_idx] = MLO_LINK_TEARDOWN;
+				setup_info->num_links--;
 			}
 		}
 	}
@@ -92,20 +237,70 @@ void mlo_cleanup_asserted_soc_setup_info(struct wlan_objmgr_psoc *psoc)
 
 qdf_export_symbol(mlo_cleanup_asserted_soc_setup_info);
 
-void mlo_setup_update_total_socs(uint8_t tot_socs)
+void mlo_setup_update_soc_id_list(uint8_t grp_id, uint8_t *soc_id_list)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	uint32_t tot_socs;
+	uint32_t num_soc;
+	uint8_t *soc_list;
+
+	if (!mlo_ctx)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	tot_socs = mlo_ctx->setup_info[grp_id].tot_socs;
+	soc_list = mlo_ctx->setup_info[grp_id].soc_id_list;
+
+	for (num_soc = 0; num_soc < tot_socs; num_soc++)
+		soc_list[num_soc] = soc_id_list[num_soc];
+}
+
+qdf_export_symbol(mlo_setup_update_soc_id_list);
+
+uint8_t mlo_setup_get_total_socs(uint8_t grp_id)
+{
+	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
+	if (!mlo_ctx)
+		return 0;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return 0;
+	}
+
+	return mlo_ctx->setup_info[grp_id].tot_socs;
+}
+
+qdf_export_symbol(mlo_setup_get_total_socs);
+
+void mlo_setup_update_total_socs(uint8_t grp_id, uint8_t tot_socs)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
 	if (!mlo_ctx)
 		return;
 
-	mlo_ctx->setup_info.tot_socs = tot_socs;
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	mlo_ctx->setup_info[grp_id].tot_socs = tot_socs;
+	mlo_ctx->setup_info[grp_id].ml_grp_id = grp_id;
 }
 
 qdf_export_symbol(mlo_setup_update_total_socs);
 
 static QDF_STATUS mlo_find_pdev_idx(struct wlan_objmgr_pdev *pdev,
-				    uint8_t *link_idx)
+				    uint8_t *link_idx, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	uint8_t idx;
@@ -113,11 +308,20 @@ static QDF_STATUS mlo_find_pdev_idx(struct wlan_objmgr_pdev *pdev,
 	if (!mlo_ctx)
 		return QDF_STATUS_E_FAILURE;
 
+	if (!pdev)
+		return QDF_STATUS_E_FAILURE;
+
 	if (!link_idx)
 		return QDF_STATUS_E_FAILURE;
 
-	for (idx = 0; idx < mlo_ctx->setup_info.tot_links; idx++) {
-		if (mlo_ctx->setup_info.pdev_list[idx] == pdev) {
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	for (idx = 0; idx < mlo_ctx->setup_info[grp_id].tot_links; idx++) {
+		if (mlo_ctx->setup_info[grp_id].pdev_list[idx] == pdev) {
 			*link_idx = idx;
 			return QDF_STATUS_SUCCESS;
 		}
@@ -155,27 +359,39 @@ static void mlo_check_state(struct wlan_objmgr_psoc *psoc,
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	struct mlo_state_params *params = (struct mlo_state_params *)args;
 
+	uint8_t grp_id = params->grp_id;
 	pdev = (struct wlan_objmgr_pdev *)obj;
 
 	if (!mlo_ctx)
 		return;
 
-	if (mlo_find_pdev_idx(pdev, &link_idx) != QDF_STATUS_SUCCESS) {
-		qdf_info("Failed to find pdev");
+	if (!psoc)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
 		return;
 	}
 
-	if (mlo_ctx->setup_info.state[link_idx] != params->check_state)
+	if (mlo_find_pdev_idx(pdev, &link_idx, grp_id) != QDF_STATUS_SUCCESS) {
+		mlo_info("Failed to find pdev");
+		return;
+	}
+
+	if (mlo_ctx->setup_info[grp_id].state[link_idx] != params->check_state)
 		params->link_state_fail = 1;
 }
 
 QDF_STATUS mlo_check_all_pdev_state(struct wlan_objmgr_psoc *psoc,
+				    uint8_t grp_id,
 				    enum MLO_LINK_STATE state)
 {
 	QDF_STATUS status = QDF_STATUS_E_INVAL;
 	struct mlo_state_params params = {0};
 
 	params.check_state = state;
+	params.grp_id = grp_id;
 
 	wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
 				     mlo_check_state, &params,
@@ -189,16 +405,34 @@ QDF_STATUS mlo_check_all_pdev_state(struct wlan_objmgr_psoc *psoc,
 	return status;
 }
 
-void mlo_setup_init(void)
+void mlo_setup_init(uint8_t total_grp)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *setup_info;
+	uint8_t id;
 
 	if (!mlo_ctx)
 		return;
 
-	if (qdf_event_create(&mlo_ctx->setup_info.event) !=
-						QDF_STATUS_SUCCESS) {
-		mlo_err("Unable to create teardown event");
+	if (!total_grp && total_grp > WLAN_MAX_MLO_GROUPS) {
+		mlo_err("Total number of groups (%d) is greater than MAX (%d), MLD Setup failed!!",
+			total_grp, WLAN_MAX_MLO_GROUPS);
+		return;
+	}
+
+	mlo_ctx->total_grp = total_grp;
+	setup_info = qdf_mem_malloc(sizeof(struct mlo_setup_info) *
+					      total_grp);
+
+	if (!setup_info)
+		return;
+
+	mlo_ctx->setup_info = setup_info;
+	mlo_ctx->setup_info[0].ml_grp_id = 0;
+	for (id = 0; id < total_grp; id++) {
+		if (qdf_event_create(&mlo_ctx->setup_info[id].event) !=
+							QDF_STATUS_SUCCESS)
+			mlo_err("Unable to create teardown event");
 	}
 }
 
@@ -207,111 +441,170 @@ qdf_export_symbol(mlo_setup_init);
 void mlo_setup_deinit(void)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	uint8_t id;
 
 	if (!mlo_ctx)
 		return;
 
-	qdf_event_destroy(&mlo_ctx->setup_info.event);
+	if (!mlo_ctx->setup_info)
+		return;
+
+	for (id = 0; id < mlo_ctx->total_grp; id++)
+		qdf_event_destroy(&mlo_ctx->setup_info[id].event);
+
+	qdf_mem_free(mlo_ctx->setup_info);
+	mlo_ctx->setup_info = NULL;
 }
 
 qdf_export_symbol(mlo_setup_deinit);
 
 void mlo_setup_update_num_links(struct wlan_objmgr_psoc *psoc,
-				uint8_t num_links)
+				uint8_t grp_id, uint8_t num_links)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
 	if (!mlo_ctx)
 		return;
 
-	mlo_ctx->setup_info.tot_links += num_links;
+	if (!psoc)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	mlo_ctx->setup_info[grp_id].tot_links += num_links;
 }
 
 qdf_export_symbol(mlo_setup_update_num_links);
 
-void mlo_setup_update_soc_ready(struct wlan_objmgr_psoc *psoc)
+void mlo_setup_update_soc_ready(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
-	uint8_t chip_idx, tot_socs = 0;
+	struct mlo_setup_info *setup_info;
+	uint8_t chip_idx, tot_socs;
 	struct cdp_mlo_ctxt *dp_mlo_ctxt;
 
-	if (!mlo_ctx || !mlo_ctx->setup_info.tot_socs)
+	if (!mlo_ctx)
 		return;
 
-	tot_socs = mlo_ctx->setup_info.tot_socs;
-	chip_idx = wlan_psoc_get_id(psoc);
+	if (!psoc)
+		return;
 
-	if (!(chip_idx < MAX_MLO_CHIPS)) {
-		qdf_err("Invalid chip index, SoC setup failed");
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
 		return;
 	}
 
-	mlo_ctx->setup_info.soc_list[chip_idx] = psoc;
-	mlo_ctx->setup_info.num_soc++;
-	qdf_debug("soc updated to mld list, id %d num soc %d",
-		  chip_idx, mlo_ctx->setup_info.num_soc);
+	setup_info = &mlo_ctx->setup_info[grp_id];
 
-	if (mlo_ctx->setup_info.num_soc != mlo_ctx->setup_info.tot_socs)
+	if (!setup_info->tot_socs)
 		return;
-	dp_mlo_ctxt = cdp_mlo_ctxt_attach(wlan_psoc_get_dp_handle(psoc),
-					  (struct cdp_ctrl_mlo_mgr *)mlo_ctx);
-	wlan_objmgr_set_dp_mlo_ctx(dp_mlo_ctxt);
 
-	for (chip_idx = 0; chip_idx < MAX_MLO_CHIPS; chip_idx++) {
+	tot_socs = setup_info->tot_socs;
+	if (!mlo_psoc_get_index_id(psoc, grp_id, &chip_idx, 0))  {
+		mlo_err("Unable to fetch chip idx for psoc id %d grp id %d",
+			psoc->soc_objmgr.psoc_id,
+			grp_id);
+		return;
+	}
+
+	if (!(chip_idx < tot_socs)) {
+		mlo_err("Invalid chip index, SoC setup failed");
+		return;
+	}
+
+	setup_info->curr_soc_list[chip_idx] = psoc;
+	mlo_set_soc_list(grp_id, psoc);
+	setup_info->num_soc++;
+
+	mlo_debug("SoC updated to mld grp %d , chip idx %d num soc %d",
+		  grp_id, chip_idx, setup_info->num_soc);
+
+	if (setup_info->num_soc != tot_socs)
+		return;
+
+	dp_mlo_ctxt = cdp_mlo_ctxt_attach(wlan_psoc_get_dp_handle(psoc),
+			(struct cdp_ctrl_mlo_mgr *)mlo_ctx);
+	wlan_objmgr_set_dp_mlo_ctx(dp_mlo_ctxt, grp_id);
+
+	for (chip_idx = 0; chip_idx < tot_socs; chip_idx++) {
 		struct wlan_objmgr_psoc *tmp_soc =
-			mlo_ctx->setup_info.soc_list[chip_idx];
+			setup_info->curr_soc_list[chip_idx];
 		if (tmp_soc)
 			cdp_soc_mlo_soc_setup(wlan_psoc_get_dp_handle(tmp_soc),
-					      mlo_ctx->setup_info.dp_handle);
+					      setup_info->dp_handle);
 	}
 
 	cdp_mlo_setup_complete(wlan_psoc_get_dp_handle(psoc),
-			       mlo_ctx->setup_info.dp_handle);
+			       setup_info->dp_handle);
 }
 
 qdf_export_symbol(mlo_setup_update_soc_ready);
 
-void mlo_setup_link_ready(struct wlan_objmgr_pdev *pdev)
+void mlo_setup_link_ready(struct wlan_objmgr_pdev *pdev, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *setup_info;
 	uint8_t link_idx;
 	uint16_t link_id;
 
-	if (!mlo_ctx || !mlo_ctx->setup_info.tot_links)
+	if (!mlo_ctx)
 		return;
 
-	if (mlo_find_pdev_idx(pdev, &link_idx) == QDF_STATUS_SUCCESS) {
-		qdf_debug("pdev already part of list link idx %d", link_idx);
+	if (!pdev)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
 		return;
 	}
 
-	for (link_idx = 0; link_idx < mlo_ctx->setup_info.tot_links; link_idx++)
-		if (!mlo_ctx->setup_info.pdev_list[link_idx])
+	setup_info = &mlo_ctx->setup_info[grp_id];
+
+	if (!setup_info->tot_links) {
+		mlo_err("Setup info total links %d for grp id %d",
+			setup_info->tot_links, grp_id);
+		return;
+	}
+
+	if (mlo_find_pdev_idx(pdev, &link_idx, grp_id) == QDF_STATUS_SUCCESS) {
+		mlo_debug("Pdev already part of list link idx %d", link_idx);
+		return;
+	}
+
+	for (link_idx = 0; link_idx < setup_info->tot_links; link_idx++)
+		if (!setup_info->pdev_list[link_idx])
 			break;
 
-	if (link_idx >= mlo_ctx->setup_info.tot_links) {
-		qdf_err("Exceeding max total mld links");
+	if (link_idx >= setup_info->tot_links) {
+		mlo_err("Exceeding max total mld links");
 		return;
 	}
 
-	mlo_ctx->setup_info.pdev_list[link_idx] = pdev;
-	mlo_ctx->setup_info.state[link_idx] = MLO_LINK_SETUP_INIT;
-	mlo_ctx->setup_info.num_links++;
+	setup_info->pdev_list[link_idx] = pdev;
+	setup_info->state[link_idx] = MLO_LINK_SETUP_INIT;
+	setup_info->num_links++;
 
 	link_id = wlan_mlo_get_pdev_hw_link_id(pdev);
 	if (link_id == INVALID_HW_LINK_ID) {
-		qdf_err("Invalid HW link id for the pdev");
+		mlo_err("Invalid HW link id for the pdev");
 		return;
 	}
-	mlo_ctx->setup_info.valid_link_bitmap |= (1 << link_id);
+	setup_info->valid_link_bitmap |= (1 << link_id);
 
-	qdf_debug("pdev updated to mld link %d num_links %d",
-		  link_idx, mlo_ctx->setup_info.num_links);
+	mlo_debug("Pdev updated to Grp id %d mld link %d num_links %d  hw link id %d Valid link bitmap %d",
+		  grp_id, link_idx, setup_info->num_links,
+		  link_id, setup_info->valid_link_bitmap);
 
 	qdf_assert_always(link_idx < MAX_MLO_LINKS);
 
-	if (mlo_ctx->setup_info.num_links == mlo_ctx->setup_info.tot_links &&
-	    mlo_ctx->setup_info.num_soc == mlo_ctx->setup_info.tot_socs) {
+	if (setup_info->num_links == setup_info->tot_links &&
+	    setup_info->num_soc == setup_info->tot_socs) {
 		struct wlan_objmgr_psoc *psoc;
 		struct wlan_lmac_if_tx_ops *tx_ops;
 		QDF_STATUS status;
@@ -325,50 +618,65 @@ void mlo_setup_link_ready(struct wlan_objmgr_pdev *pdev)
 			qdf_assert_always(0);
 		}
 
-		qdf_debug("Trigger MLO Setup request");
+		mlo_debug("Trigger MLO Setup request");
 		if (tx_ops && tx_ops->mops.target_if_mlo_setup_req) {
 			tx_ops->mops.target_if_mlo_setup_req(
-					mlo_ctx->setup_info.pdev_list,
-					mlo_ctx->setup_info.num_links,
-					mlo_ctx->setup_info.ml_grp_id);
+					setup_info->pdev_list,
+					setup_info->num_links,
+					grp_id);
 		}
 	}
 }
 
 qdf_export_symbol(mlo_setup_link_ready);
 
-void mlo_link_setup_complete(struct wlan_objmgr_pdev *pdev)
+void mlo_link_setup_complete(struct wlan_objmgr_pdev *pdev, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *setup_info;
 	uint8_t link_idx;
 
 	if (!mlo_ctx)
 		return;
 
-	for (link_idx = 0; link_idx < mlo_ctx->setup_info.tot_links; link_idx++)
-		if (mlo_ctx->setup_info.pdev_list[link_idx] == pdev) {
-			mlo_ctx->setup_info.state[link_idx] =
+	if (!pdev)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	setup_info = &mlo_ctx->setup_info[grp_id];
+
+	for (link_idx = 0; link_idx < setup_info->tot_links; link_idx++)
+		if (setup_info->pdev_list[link_idx] == pdev) {
+			setup_info->state[link_idx] =
 							MLO_LINK_SETUP_DONE;
 			break;
 		}
 
-	for (link_idx = 0; link_idx < mlo_ctx->setup_info.tot_links; link_idx++)
-		if (mlo_ctx->setup_info.state[link_idx] == MLO_LINK_SETUP_DONE)
+	mlo_debug("Setup complete for pdev id %d mlo group %d",
+		  pdev->pdev_objmgr.wlan_pdev_id, grp_id);
+
+	for (link_idx = 0; link_idx < setup_info->tot_links; link_idx++)
+		if (setup_info->state[link_idx] == MLO_LINK_SETUP_DONE)
 			continue;
 		else
 			break;
 
-	if (link_idx == mlo_ctx->setup_info.tot_links) {
+	if (link_idx == setup_info->tot_links) {
 		struct wlan_objmgr_psoc *psoc;
 		struct wlan_lmac_if_tx_ops *tx_ops;
 
 		psoc = wlan_pdev_get_psoc(pdev);
 		tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
-		/* Trigger MLO ready */
+		mlo_debug("Trigger MLO ready");
 		if (tx_ops && tx_ops->mops.target_if_mlo_ready) {
 			tx_ops->mops.target_if_mlo_ready(
-					mlo_ctx->setup_info.pdev_list,
-					mlo_ctx->setup_info.num_links);
+					setup_info->pdev_list,
+					setup_info->num_links);
 		}
 	}
 }
@@ -381,75 +689,110 @@ static void mlo_setup_link_down(struct wlan_objmgr_psoc *psoc,
 	struct wlan_objmgr_pdev *pdev;
 	uint8_t link_idx;
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *setup_info;
 	uint16_t link_id;
+	uint8_t grp_id = *(uint8_t *)args;
+
+	if (!mlo_ctx)
+		return;
+
+	if (!psoc)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
+
+	setup_info = &mlo_ctx->setup_info[grp_id];
 
 	pdev = (struct wlan_objmgr_pdev *)obj;
 
-	if (mlo_find_pdev_idx(pdev, &link_idx) != QDF_STATUS_SUCCESS) {
-		qdf_info("Failed to find pdev");
+	if (mlo_find_pdev_idx(pdev, &link_idx, grp_id) != QDF_STATUS_SUCCESS) {
+		mlo_info("Failed to find pdev");
 		return;
 	}
 
-	mlo_ctx->setup_info.pdev_list[link_idx] = NULL;
-	mlo_ctx->setup_info.state[link_idx] = MLO_LINK_UNINITIALIZED;
-	mlo_ctx->setup_info.num_links--;
+	setup_info->pdev_list[link_idx] = NULL;
+	setup_info->state[link_idx] = MLO_LINK_UNINITIALIZED;
+	setup_info->num_links--;
 
 	link_id = wlan_mlo_get_pdev_hw_link_id(pdev);
 	if (link_id == INVALID_HW_LINK_ID) {
-		qdf_err("Invalid HW link id for the pdev");
+		mlo_err("Invalid HW link id for the pdev");
 		return;
 	}
-	mlo_ctx->setup_info.valid_link_bitmap &= ~(1 << link_id);
+	setup_info->valid_link_bitmap &= ~(1 << link_id);
 
-	qdf_debug("link down link_idx %d num_links %d",
-		  link_idx, mlo_ctx->setup_info.num_links);
+	mlo_debug("Pdev link down grp_id %d link_idx %d num_links %d",
+		  grp_id, link_idx, setup_info->num_links);
 }
 
-void mlo_setup_update_soc_down(struct wlan_objmgr_psoc *psoc)
+void mlo_setup_update_soc_down(struct wlan_objmgr_psoc *psoc, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *setup_info;
 	uint8_t chip_idx;
 
 	if (!mlo_ctx)
 		return;
 
-	if (!mlo_ctx->setup_info.num_links) {
-		qdf_debug("Links are already down");
+	if (!psoc)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
 		return;
 	}
 
-	wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
-				     mlo_setup_link_down, NULL,
-				     0, WLAN_MLME_NB_ID);
+	setup_info = &mlo_ctx->setup_info[grp_id];
 
-	chip_idx = wlan_psoc_get_id(psoc);
+	if (setup_info->num_links) {
+		wlan_objmgr_iterate_obj_list(psoc, WLAN_PDEV_OP,
+					     mlo_setup_link_down, &grp_id,
+					     0, WLAN_MLME_NB_ID);
+	}
+
+	if (!mlo_psoc_get_index_id(psoc, grp_id, &chip_idx, 1)) {
+		mlo_err("Unable to fetch chip idx for psoc id %d grp id %d",
+			psoc->soc_objmgr.psoc_id,
+			grp_id);
+		return;
+	}
 
 	if (!(chip_idx < MAX_MLO_CHIPS)) {
-		qdf_err("Invalid chip index, SoC setup down failed");
+		mlo_err("Invalid chip index, SoC setup down failed");
 		return;
 	}
 
-	mlo_ctx->setup_info.soc_list[chip_idx] = NULL;
-	mlo_ctx->setup_info.num_soc--;
+	setup_info->curr_soc_list[chip_idx] = NULL;
+	setup_info->num_soc--;
 
-	qdf_debug("Soc down, num soc %d num links %d",
-		  mlo_ctx->setup_info.num_soc,
-		  mlo_ctx->setup_info.num_links);
+	mlo_debug("Soc down, mlo group %d num soc %d num links %d",
+		  grp_id, setup_info->num_soc,
+		  setup_info->num_links);
 }
 
 qdf_export_symbol(mlo_setup_update_soc_down);
 
 static void mlo_dp_ctxt_detach(struct wlan_objmgr_psoc *psoc,
+			       uint8_t grp_id,
 			       struct cdp_mlo_ctxt *dp_mlo_ctxt)
 {
-	wlan_objmgr_set_dp_mlo_ctx(NULL);
+	if (!psoc)
+		return;
+
+	wlan_objmgr_set_dp_mlo_ctx(NULL, grp_id);
 	if (dp_mlo_ctxt)
 		cdp_mlo_ctxt_detach(wlan_psoc_get_dp_handle(psoc), dp_mlo_ctxt);
 }
 
-void mlo_link_teardown_complete(struct wlan_objmgr_pdev *pdev)
+void mlo_link_teardown_complete(struct wlan_objmgr_pdev *pdev, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
+	struct mlo_setup_info *setup_info;
 	uint8_t link_idx;
 	struct wlan_objmgr_psoc *soc;
 	uint8_t chip_idx;
@@ -458,114 +801,147 @@ void mlo_link_teardown_complete(struct wlan_objmgr_pdev *pdev)
 	if (!mlo_ctx)
 		return;
 
-	if (!mlo_ctx->setup_info.num_links) {
-		qdf_err("Delayed response ignore");
+	if (!pdev)
+		return;
+
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
 		return;
 	}
 
-	if (mlo_find_pdev_idx(pdev, &link_idx) != QDF_STATUS_SUCCESS) {
-		qdf_info("Failed to find pdev");
+	setup_info = &mlo_ctx->setup_info[grp_id];
+
+	if (!setup_info->num_links) {
+		mlo_err("Delayed response ignore");
 		return;
 	}
 
-	qdf_debug("Teardown link idx = %d", link_idx);
-	mlo_ctx->setup_info.state[link_idx] = MLO_LINK_TEARDOWN;
+	if (mlo_find_pdev_idx(pdev, &link_idx, grp_id) != QDF_STATUS_SUCCESS) {
+		mlo_info("Failed to find pdev");
+		return;
+	}
+
+	mlo_debug("Teardown link idx = %d", link_idx);
+	setup_info->state[link_idx] = MLO_LINK_TEARDOWN;
 
 	/* Waiting for teardown on other links */
-	for (link_idx = 0; link_idx < mlo_ctx->setup_info.tot_links; link_idx++)
-		if (mlo_ctx->setup_info.state[link_idx] != MLO_LINK_TEARDOWN)
+	for (link_idx = 0; link_idx < setup_info->tot_links; link_idx++)
+		if (setup_info->state[link_idx] != MLO_LINK_TEARDOWN)
 			return;
 
-	qdf_info("Teardown complete");
+	mlo_debug("Teardown complete");
 
-	for (chip_idx = 0; chip_idx < MAX_MLO_CHIPS; chip_idx++) {
-		soc = mlo_ctx->setup_info.soc_list[chip_idx];
+	for (chip_idx = 0; chip_idx < setup_info->tot_socs; chip_idx++) {
+		soc = setup_info->curr_soc_list[chip_idx];
 		if (soc) {
 			num_soc++;
 			cdp_soc_mlo_soc_teardown(wlan_psoc_get_dp_handle(soc),
-						 mlo_ctx->setup_info.dp_handle,
+						 setup_info->dp_handle,
 						 false);
-			if (num_soc == mlo_ctx->setup_info.tot_socs)
-				mlo_dp_ctxt_detach(soc,
-						 mlo_ctx->setup_info.dp_handle);
+			if (num_soc == setup_info->tot_socs)
+				mlo_dp_ctxt_detach(soc, grp_id,
+						   setup_info->dp_handle);
 		}
 	}
 
-	qdf_event_set(&mlo_ctx->setup_info.event);
+	qdf_event_set(&setup_info->event);
 }
 
 qdf_export_symbol(mlo_link_teardown_complete);
 
-static void mlo_force_teardown(void)
+static void mlo_force_teardown(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 	struct wlan_objmgr_psoc *soc;
-	uint8_t link_idx = 0;
+	struct mlo_setup_info *setup_info;
+	uint8_t link_idx;
 	uint8_t chip_idx;
 	uint8_t num_soc = 0;
 
 	if (!mlo_ctx)
 		return;
 
-	for (link_idx = 0; link_idx < mlo_ctx->setup_info.tot_links; link_idx++)
-		mlo_ctx->setup_info.state[link_idx] = MLO_LINK_TEARDOWN;
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return;
+	}
 
-	for (chip_idx = 0; chip_idx < MAX_MLO_CHIPS; chip_idx++) {
-		soc = mlo_ctx->setup_info.soc_list[chip_idx];
+	setup_info = &mlo_ctx->setup_info[grp_id];
+
+	for (link_idx = 0; link_idx < setup_info->tot_links; link_idx++)
+		setup_info->state[link_idx] = MLO_LINK_TEARDOWN;
+
+	for (chip_idx = 0; chip_idx < setup_info->tot_socs; chip_idx++) {
+		soc = setup_info->curr_soc_list[chip_idx];
 		if (soc) {
 			num_soc++;
 			cdp_soc_mlo_soc_teardown(wlan_psoc_get_dp_handle(soc),
-						 mlo_ctx->setup_info.dp_handle,
+						 setup_info->dp_handle,
 						 true);
-			if (num_soc == mlo_ctx->setup_info.tot_socs)
-				mlo_dp_ctxt_detach(soc,
-						 mlo_ctx->setup_info.dp_handle);
+			if (num_soc == setup_info->tot_socs)
+				mlo_dp_ctxt_detach(soc, grp_id,
+						   setup_info->dp_handle);
 		}
 	}
 }
 
 #define MLO_MGR_TEARDOWN_TIMEOUT 3000
 QDF_STATUS mlo_link_teardown_link(struct wlan_objmgr_psoc *psoc,
+				  uint8_t grp_id,
 				  uint32_t reason)
 {
 	struct wlan_lmac_if_tx_ops *tx_ops;
 	QDF_STATUS status;
+	struct mlo_setup_info *setup_info;
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
 	if (!mlo_ctx)
 		return QDF_STATUS_E_FAILURE;
 
-	qdf_debug("Teardown req with num_soc %d num_link %d",
-		  mlo_ctx->setup_info.num_soc,
-		  mlo_ctx->setup_info.num_links);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
 
-	if (!mlo_ctx->setup_info.num_soc)
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return QDF_STATUS_E_INVAL;
+	}
+
+	setup_info = &mlo_ctx->setup_info[grp_id];
+
+	mlo_debug("Teardown req with grp_id %d num_soc %d num_link %d",
+		  grp_id, setup_info->num_soc, setup_info->num_links);
+
+	if (!setup_info->num_soc)
 		return QDF_STATUS_SUCCESS;
 
-	if (!mlo_check_all_pdev_state(psoc, MLO_LINK_TEARDOWN))
+	if (!mlo_check_all_pdev_state(psoc, grp_id, MLO_LINK_TEARDOWN))
 		return QDF_STATUS_SUCCESS;
 
 	tx_ops = wlan_psoc_get_lmac_if_txops(psoc);
 	/* Trigger MLO teardown */
 	if (tx_ops && tx_ops->mops.target_if_mlo_teardown_req) {
 		tx_ops->mops.target_if_mlo_teardown_req(
-				mlo_ctx->setup_info.pdev_list,
-				mlo_ctx->setup_info.num_links,
+				setup_info->pdev_list,
+				setup_info->num_links,
 				reason);
 	}
 
 	if (reason == WMI_MLO_TEARDOWN_REASON_SSR) {
 		/* do not wait for teardown event completion here for SSR */
-		mlo_dp_ctxt_detach(psoc, mlo_ctx->setup_info.dp_handle);
+		mlo_dp_ctxt_detach(psoc, grp_id, setup_info->dp_handle);
 		return QDF_STATUS_SUCCESS;
 	}
 
 	status = qdf_wait_for_event_completion(
-			&mlo_ctx->setup_info.event,
+			&setup_info->event,
 			MLO_MGR_TEARDOWN_TIMEOUT);
+
 	if (status != QDF_STATUS_SUCCESS) {
-		qdf_info("Teardown timeout");
-		mlo_force_teardown();
+		qdf_debug("Teardown timeout");
+		mlo_force_teardown(grp_id);
 	}
 
 	return status;

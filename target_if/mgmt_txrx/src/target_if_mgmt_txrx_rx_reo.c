@@ -28,7 +28,7 @@
 #include <target_if_mgmt_txrx_rx_reo.h>
 #include <wlan_lmac_if_api.h>
 #include <init_deinit_lmac.h>
-
+#include <wlan_mlo_mgr_setup.h>
 /**
  * target_if_mgmt_rx_reo_fw_consumed_event_handler() - WMI event handler to
  * process MGMT Rx FW consumed event handler

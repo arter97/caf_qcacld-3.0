@@ -301,7 +301,7 @@ uint8_t mlo_get_link_vdev_ix(struct wlan_mlo_dev_context *ml_dev,
 }
 
 #ifdef WLAN_MLO_MULTI_CHIP
-int8_t wlan_mlo_get_max_num_links(void)
+int8_t wlan_mlo_get_max_num_links(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx;
 
@@ -309,21 +309,35 @@ int8_t wlan_mlo_get_max_num_links(void)
 	if (!mlo_ctx)
 		return WLAN_MLO_INVALID_NUM_LINKS;
 
-	return mlo_ctx->setup_info.tot_socs * WLAN_MAX_MLO_LINKS_PER_SOC;
+	if (grp_id >= mlo_ctx->total_grp) {
+		mlo_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return WLAN_MLO_INVALID_NUM_LINKS;
+	}
+
+	return (mlo_ctx->setup_info[grp_id].tot_socs *
+		WLAN_MAX_MLO_LINKS_PER_SOC);
 }
 
-int8_t wlan_mlo_get_num_active_links(void)
+int8_t wlan_mlo_get_num_active_links(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx;
 
 	mlo_ctx = wlan_objmgr_get_mlo_ctx();
+
 	if (!mlo_ctx)
 		return WLAN_MLO_INVALID_NUM_LINKS;
 
-	return mlo_ctx->setup_info.tot_links;
+	if (grp_id >= mlo_ctx->total_grp) {
+		qdf_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return WLAN_MLO_INVALID_NUM_LINKS;
+	}
+
+	return mlo_ctx->setup_info[grp_id].tot_links;
 }
 
-uint16_t wlan_mlo_get_valid_link_bitmap(void)
+uint16_t wlan_mlo_get_valid_link_bitmap(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx;
 
@@ -331,7 +345,13 @@ uint16_t wlan_mlo_get_valid_link_bitmap(void)
 	if (!mlo_ctx)
 		return 0;
 
-	return mlo_ctx->setup_info.valid_link_bitmap;
+	if (grp_id >= mlo_ctx->total_grp) {
+		qdf_err("Invalid grp id %d, total no of groups %d",
+			grp_id, mlo_ctx->total_grp);
+		return 0;
+	}
+
+	return mlo_ctx->setup_info[grp_id].valid_link_bitmap;
 }
 
 uint16_t wlan_mlo_get_pdev_hw_link_id(struct wlan_objmgr_pdev *pdev)

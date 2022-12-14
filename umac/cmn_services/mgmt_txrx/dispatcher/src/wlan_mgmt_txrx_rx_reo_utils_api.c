@@ -27,6 +27,7 @@
 #include <wlan_mgmt_txrx_tgt_api.h>
 #include<wlan_mgmt_txrx_rx_reo_tgt_api.h>
 #include <wlan_mlo_mgr_cmn.h>
+#include <wlan_mlo_mgr_setup.h>
 
 QDF_STATUS
 wlan_mgmt_rx_reo_deinit(void)
@@ -82,6 +83,22 @@ wlan_get_mlo_link_id_from_pdev(struct wlan_objmgr_pdev *pdev)
 }
 
 qdf_export_symbol(wlan_get_mlo_link_id_from_pdev);
+
+int8_t
+wlan_get_mlo_grp_id_from_pdev(struct wlan_objmgr_pdev *pdev)
+{
+	struct wlan_objmgr_psoc *psoc = wlan_pdev_get_psoc(pdev);
+	uint8_t grp_id;
+
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mgmt_rx_reo_err("Failed to get valid MLO Group id");
+		return -EINVAL;
+	}
+
+	return grp_id;
+}
+
+qdf_export_symbol(wlan_get_mlo_grp_id_from_pdev);
 
 /**
  * wlan_get_pdev_from_mlo_link_id() - Helper API to get the pdev

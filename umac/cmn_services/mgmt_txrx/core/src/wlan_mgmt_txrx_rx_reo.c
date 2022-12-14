@@ -25,6 +25,7 @@
 #include "wlan_mgmt_txrx_main_i.h"
 #include <qdf_util.h>
 #include <wlan_mlo_mgr_cmn.h>
+#include <wlan_mlo_mgr_setup.h>
 
 static struct mgmt_rx_reo_context *g_rx_reo_ctx;
 
@@ -170,6 +171,7 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 	uint16_t valid_link_bitmap;
 	int8_t num_active_links_shmem;
 	int8_t num_active_links;
+	uint8_t grp_id = 0;
 	QDF_STATUS status;
 
 	if (!psoc) {
@@ -188,7 +190,12 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 	}
 	qdf_assert_always(num_active_links_shmem > 0);
 
-	num_active_links = wlan_mlo_get_num_active_links();
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mgmt_rx_reo_err("Failed to get valid MLO Group id");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	num_active_links = wlan_mlo_get_num_active_links(grp_id);
 	qdf_assert_always(num_active_links > 0);
 
 	qdf_assert_always(num_active_links_shmem == num_active_links);
@@ -201,7 +208,7 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 	}
 	qdf_assert_always(valid_link_bitmap_shmem != 0);
 
-	valid_link_bitmap = wlan_mlo_get_valid_link_bitmap();
+	valid_link_bitmap = wlan_mlo_get_valid_link_bitmap(grp_id);
 	qdf_assert_always(valid_link_bitmap_shmem != 0);
 
 	qdf_assert_always(valid_link_bitmap_shmem == valid_link_bitmap);
@@ -212,11 +219,13 @@ mgmt_rx_reo_validate_mlo_link_info(struct wlan_objmgr_psoc *psoc)
 #ifndef WLAN_MGMT_RX_REO_SIM_SUPPORT
 /**
  * mgmt_rx_reo_is_valid_link() - Check whether the given HW link is valid
+ * @link_id: Link id to be checked
+ * @grp_id: MLO Group id which it belongs to
  *
  * Return: true if @link_id is a valid link else false
  */
 static bool
-mgmt_rx_reo_is_valid_link(uint8_t link_id)
+mgmt_rx_reo_is_valid_link(uint8_t link_id, uint8_t grp_id)
 {
 	uint16_t valid_hw_link_bitmap;
 
@@ -225,7 +234,7 @@ mgmt_rx_reo_is_valid_link(uint8_t link_id)
 		return false;
 	}
 
-	valid_hw_link_bitmap = wlan_mlo_get_valid_link_bitmap();
+	valid_hw_link_bitmap = wlan_mlo_get_valid_link_bitmap(grp_id);
 	qdf_assert_always(valid_hw_link_bitmap);
 
 	return (valid_hw_link_bitmap & (1 << link_id));
@@ -235,18 +244,21 @@ mgmt_rx_reo_is_valid_link(uint8_t link_id)
  * mgmt_rx_reo_get_num_mlo_links() - Get number of MLO HW links active in the
  * system
  * @reo_context: Pointer to reo context object
+ * @grp_id: MLO group id which it belongs to
  *
  * Return: On success returns number of active MLO HW links. On failure
  * returns WLAN_MLO_INVALID_NUM_LINKS.
  */
 static int8_t
-mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context) {
+mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context,
+			      uint8_t grp_id)
+{
 	if (!reo_context) {
 		mgmt_rx_reo_err("Mgmt reo context is null");
 		return WLAN_MLO_INVALID_NUM_LINKS;
 	}
 
-	return wlan_mlo_get_num_active_links();
+	return wlan_mlo_get_num_active_links(grp_id);
 }
 
 static QDF_STATUS
@@ -356,7 +368,9 @@ mgmt_rx_reo_sim_get_num_mlo_links(struct mgmt_rx_reo_sim_context *sim_context)
  * returns WLAN_MLO_INVALID_NUM_LINKS.
  */
 static int8_t
-mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context) {
+mgmt_rx_reo_get_num_mlo_links(struct mgmt_rx_reo_context *reo_context,
+			      uint8_t grp_id)
+{
 	if (!reo_context) {
 		mgmt_rx_reo_err("Mgmt reo context is null");
 		return WLAN_MLO_INVALID_NUM_LINKS;
@@ -987,6 +1001,7 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 {
 	QDF_STATUS status;
 	uint8_t link;
+	int8_t grp_id;
 	int8_t in_frame_link;
 	int frames_pending, delta_fwd_host;
 	uint8_t snapshot_id;
@@ -1026,9 +1041,10 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 
 	/* Get the MLO link ID of incoming frame */
 	in_frame_link = wlan_get_mlo_link_id_from_pdev(in_frame_pdev);
+	grp_id = wlan_get_mlo_grp_id_from_pdev(in_frame_pdev);
 	qdf_assert_always(in_frame_link >= 0);
 	qdf_assert_always(in_frame_link < MAX_MLO_LINKS);
-	qdf_assert_always(mgmt_rx_reo_is_valid_link(in_frame_link));
+	qdf_assert_always(mgmt_rx_reo_is_valid_link(in_frame_link, grp_id));
 
 	in_frame_rx_reo_pdev_ctx =
 			wlan_mgmt_rx_reo_get_priv_object(in_frame_pdev);
@@ -1042,7 +1058,7 @@ wlan_mgmt_rx_reo_algo_calculate_wait_count(
 	/* Iterate over all the valid MLO links */
 	for (link = 0; link < MAX_MLO_LINKS; link++) {
 		/* No need wait for any frames on an invalid link */
-		if (!mgmt_rx_reo_is_valid_link(link)) {
+		if (!mgmt_rx_reo_is_valid_link(link, grp_id)) {
 			frames_pending = 0;
 			goto update_pending_frames;
 		}

@@ -77,7 +77,6 @@ static void mlo_global_ctx_init(void)
 	ml_aid_lock_create(mlo_mgr_ctx);
 	mlo_mgr_ctx->mlo_is_force_primary_umac = 0;
 	mlo_msgq_init();
-	mlo_setup_init();
 }
 
 QDF_STATUS wlan_mlo_mgr_psoc_enable(struct wlan_objmgr_psoc *psoc)
@@ -376,19 +375,46 @@ static inline
 QDF_STATUS wlan_mlo_pdev_check(struct wlan_objmgr_pdev *ref_pdev,
 			       struct wlan_objmgr_vdev *vdev)
 {
-	struct wlan_objmgr_pdev *pdev = NULL;
-	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_objmgr_pdev *pdev;
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t grp_id = 0;
 
 	pdev = wlan_vdev_get_pdev(vdev);
 
 	psoc = wlan_pdev_get_psoc(ref_pdev);
-	if (mlo_check_all_pdev_state(psoc, MLO_LINK_SETUP_DONE)) {
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mlo_err("Unable to get the MLO Group ID for the vdev");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (mlo_check_all_pdev_state(psoc, grp_id, MLO_LINK_SETUP_DONE)) {
 		mlo_err("Pdev link is not in ready state, initial link setup failed");
 		return QDF_STATUS_E_FAILURE;
 	}
 
 	if (ref_pdev == pdev) {
 		mlo_err("MLD vdev for this pdev already found, investigate config");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_mlo_check_grp_id(uint8_t ref_id,
+				 struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_objmgr_psoc *psoc;
+	uint8_t grp_id = 0;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!mlo_psoc_get_grp_id(psoc, &grp_id)) {
+		mlo_err("Unable to get mlo group id");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (grp_id != ref_id) {
+		mlo_err("Error : MLD VAP Configuration with different WSI/MLD Groups");
 		return QDF_STATUS_E_FAILURE;
 	}
 
@@ -422,6 +448,13 @@ QDF_STATUS wlan_mlo_pdev_check(struct wlan_objmgr_pdev *ref_pdev,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline
+QDF_STATUS wlan_mlo_check_grp_id(uint8_t ref_id,
+				 struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 QDF_STATUS wlan_mlo_check_valid_config(struct wlan_mlo_dev_context *ml_dev,
@@ -429,13 +462,24 @@ QDF_STATUS wlan_mlo_check_valid_config(struct wlan_mlo_dev_context *ml_dev,
 				       enum QDF_OPMODE opmode)
 {
 	uint32_t id = 0;
-	struct wlan_objmgr_vdev *vdev = NULL;
+	uint8_t ref_id = 0;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_psoc *psoc;
 
 	if (!ml_dev)
 		return QDF_STATUS_E_FAILURE;
 
 	if (!pdev)
 		return QDF_STATUS_E_FAILURE;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
+		return QDF_STATUS_E_FAILURE;
+
+	if (!mlo_psoc_get_grp_id(psoc, &ref_id)) {
+		mlo_err("Unable to get mlo group id");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	mlo_dev_lock_acquire(ml_dev);
 	while (id < WLAN_UMAC_MLO_MAX_VDEVS) {
@@ -450,6 +494,11 @@ QDF_STATUS wlan_mlo_check_valid_config(struct wlan_mlo_dev_context *ml_dev,
 				mlo_err("Invalid opmode %d type found expected %d, investigate config",
 					wlan_vdev_mlme_get_opmode(vdev),
 					opmode);
+				mlo_dev_lock_release(ml_dev);
+				return QDF_STATUS_E_FAILURE;
+			}
+
+			if (wlan_mlo_check_grp_id(ref_id, vdev)) {
 				mlo_dev_lock_release(ml_dev);
 				return QDF_STATUS_E_FAILURE;
 			}

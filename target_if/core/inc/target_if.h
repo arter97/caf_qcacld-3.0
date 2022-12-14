@@ -268,6 +268,8 @@ struct tgt_info {
  * @cfr_support_enable: CFR support enable
  * @set_pktlog_checksum: Set the pktlog checksum from FW ready event to pl_dev
  * @csa_switch_count_status: CSA event handler
+ * @mlo_capable: Checks if the SoC is MLO capable
+ * @mlo_get_group_id: Get the MLO group id of the SoC
  * @mlo_setup_done_event: MLO setup sequence complete event handler
  */
 struct target_ops {
@@ -334,6 +336,7 @@ struct target_ops {
 	void (*ema_init)(struct wlan_objmgr_pdev *pdev);
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(WLAN_MLO_MULTI_CHIP)
 	bool (*mlo_capable)(struct wlan_objmgr_psoc *psoc);
+	uint8_t (*mlo_get_group_id)(struct wlan_objmgr_psoc *psoc);
 	void (*mlo_setup_done_event)(struct wlan_objmgr_psoc *psoc);
 #endif
 };
