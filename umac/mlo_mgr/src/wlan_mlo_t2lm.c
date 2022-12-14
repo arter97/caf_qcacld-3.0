@@ -672,6 +672,8 @@ QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
 
 	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
 
+	t2lm_debug("status:%d", event->status);
+
 	switch (event->status) {
 	case WLAN_MAP_SWITCH_TIMER_TSF:
 		for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {

@@ -235,6 +235,8 @@ target_if_mlo_register_event_handler(struct wlan_objmgr_psoc *psoc)
 			status = QDF_STATUS_SUCCESS;
 	}
 
+	target_if_mlo_register_vdev_tid_to_link_map_event(wmi_handle);
+
 	return status;
 }
 
@@ -266,6 +268,8 @@ target_if_mlo_unregister_event_handler(struct wlan_objmgr_psoc *psoc)
 
 	wmi_unified_unregister_event(wmi_handle,
 				     wmi_mlo_link_removal_eventid);
+
+	target_if_mlo_unregister_vdev_tid_to_link_map_event(wmi_handle);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -345,8 +349,7 @@ static int target_if_mlo_vdev_tid_to_link_map_event_handler(
 	return qdf_status_to_os_return(status);
 }
 
-static inline void
-target_if_mlo_register_vdev_tid_to_link_map_event(
+void target_if_mlo_register_vdev_tid_to_link_map_event(
 		struct wmi_unified *wmi_handle)
 {
 	wmi_unified_register_event_handler(
@@ -355,8 +358,7 @@ target_if_mlo_register_vdev_tid_to_link_map_event(
 			WMI_RX_EXECUTION_CTX);
 }
 
-static inline void
-target_if_mlo_unregister_vdev_tid_to_link_map_event(
+void target_if_mlo_unregister_vdev_tid_to_link_map_event(
 		struct wmi_unified *wmi_handle)
 {
 	wmi_unified_unregister_event_handler(

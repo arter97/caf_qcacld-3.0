@@ -107,6 +107,26 @@ target_if_extract_mlo_link_removal_info_mgmt_rx(
 		wmi_unified_t wmi_handle,
 		void *evt_buf,
 		struct mgmt_rx_event_params *rx_event);
+
+/**
+ * target_if_mlo_register_vdev_tid_to_link_map_event() - Register T2LM event
+ * handler.
+ * @wmi_handle: WMI handle
+ *
+ * Return: None
+ */
+void target_if_mlo_register_vdev_tid_to_link_map_event(
+		struct wmi_unified *wmi_handle);
+
+/**
+ * target_if_mlo_unregister_vdev_tid_to_link_map_event() - Unregister T2LM event
+ * handler.
+ * @wmi_handle: WMI handle
+ *
+ * Return: None
+ */
+void target_if_mlo_unregister_vdev_tid_to_link_map_event(
+		struct wmi_unified *wmi_handle);
 #else
 static inline QDF_STATUS
 target_if_extract_mlo_link_removal_info_mgmt_rx(
@@ -115,6 +135,18 @@ target_if_extract_mlo_link_removal_info_mgmt_rx(
 		struct mgmt_rx_event_params *rx_event)
 {
 	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+void target_if_mlo_register_vdev_tid_to_link_map_event(
+		struct wmi_unified *wmi_handle)
+{
+}
+
+static inline
+void target_if_mlo_unregister_vdev_tid_to_link_map_event(
+		struct wmi_unified *wmi_handle)
+{
 }
 #endif
 #endif /* __TARGET_IF_MLO_MGR_H__ */
