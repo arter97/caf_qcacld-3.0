@@ -1718,6 +1718,25 @@ static inline void cdp_txrx_intr_detach(ol_txrx_soc_handle soc)
 }
 
 /**
+ * cdp_txrx_ppeds_stop(): function to stop ppeds
+ * @soc: soc handle
+ */
+static inline void cdp_txrx_ppeds_stop(ol_txrx_soc_handle soc)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance:");
+		QDF_BUG(0);
+		return;
+	}
+
+	if (!soc->ops->cmn_drv_ops ||
+	    !soc->ops->cmn_drv_ops->txrx_ppeds_stop)
+		return;
+
+	soc->ops->cmn_drv_ops->txrx_ppeds_stop(soc);
+}
+
+/**
  * cdp_txrx_umac_reset_deinit(): De-initialize UMAC HW reset module
  * @soc: soc handle
  */
