@@ -4662,7 +4662,9 @@ cppflags-y += -DHW_TX_DELAY_STATS_ENABLE
 endif
 
 #Flags to enable/disable Dynamic WLAN interface control feature
-cppflags-$(CONFIG_CNSS_HW_SECURE_DISABLE) += -DFEATURE_CNSS_HW_SECURE_DISABLE
+ifeq ($(CONFIG_CNSS_HW_SECURE_DISABLE), y)
+cppflags-y += -DFEATURE_CNSS_HW_SECURE_DISABLE
+endif
 
 #DBAM feature needs COEX feature to be enabled
 ifeq ($(CONFIG_FEATURE_COEX), y)
