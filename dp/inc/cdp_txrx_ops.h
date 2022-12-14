@@ -531,6 +531,7 @@ struct cdp_cmn_ops {
 
 	QDF_STATUS (*txrx_intr_attach)(struct cdp_soc_t *soc_handle);
 	void (*txrx_intr_detach)(struct cdp_soc_t *soc_handle);
+	void (*txrx_ppeds_stop)(struct cdp_soc_t *soc_handle);
 	QDF_STATUS  (*set_pn_check)(struct cdp_soc_t *soc_handle,
 				    uint8_t vdev_id, uint8_t *peermac,
 				    enum cdp_sec_type sec_type,

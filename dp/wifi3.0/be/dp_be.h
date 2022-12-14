@@ -308,7 +308,8 @@ struct dp_soc_be {
 	struct dp_hw_cookie_conversion_t tx_cc_ctx[MAX_TXDESC_POOLS];
 	struct dp_hw_cookie_conversion_t rx_cc_ctx[MAX_RXDESC_POOLS];
 #ifdef WLAN_SUPPORT_PPEDS
-	bool ppeds_int_mode_enabled;
+	uint8_t ppeds_int_mode_enabled:1,
+		ppeds_stopped:1;
 	struct dp_srng reo2ppe_ring;
 	struct dp_srng ppe2tcl_ring;
 	struct dp_srng ppe_release_ring;
