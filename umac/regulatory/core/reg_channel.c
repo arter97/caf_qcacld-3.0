@@ -1619,3 +1619,82 @@ bool reg_is_6g_domain_jp(struct wlan_objmgr_pdev *pdev)
 	}
 	return pdev_priv_obj->reg_6g_superid == MKK1_6G_0B;
 }
+
+#ifdef CONFIG_BAND_6GHZ
+/**
+ * reg_copy_power_to_eirp_power_list() - Copy power and channel information
+ * from regulatory master channel list to chan_eirp_list.
+ * @chan_eirp_list: Pointer to chan_eirp_list
+ * @mas_chan_list: Pointer to mas_chan_list
+ * @num_6g_chans: Number of 6G channels
+ */
+static void
+reg_copy_power_to_chan_eirp_list(struct channel_power *chan_eirp_list,
+				 struct regulatory_channel *mas_chan_list,
+				 uint8_t num_6g_chans)
+{
+	uint8_t i;
+
+	if (!mas_chan_list) {
+		reg_err("mas_chan_list is NULL");
+		return;
+	}
+
+	for (i = 0; i < num_6g_chans; i++) {
+		if (mas_chan_list[i].state == CHANNEL_STATE_ENABLE) {
+			chan_eirp_list[i].chan_num = mas_chan_list[i].chan_num;
+			chan_eirp_list[i].center_freq =
+						mas_chan_list[i].center_freq;
+			chan_eirp_list[i].tx_power = mas_chan_list[i].tx_power;
+		}
+	}
+}
+
+QDF_STATUS reg_get_max_reg_eirp_from_list(struct wlan_objmgr_pdev *pdev,
+					  enum reg_6g_ap_type ap_pwr_type,
+					  bool is_client_power_needed,
+					  enum reg_6g_client_type client_type,
+					  struct channel_power *chan_eirp_list,
+					  uint8_t num_6g_chans)
+{
+	struct wlan_regulatory_pdev_priv_obj *pdev_priv_obj;
+	struct regulatory_channel *mas_chan_list;
+
+	pdev_priv_obj = reg_get_pdev_obj(pdev);
+	if (!IS_VALID_PDEV_REG_OBJ(pdev_priv_obj)) {
+		reg_err("reg pdev priv obj is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (ap_pwr_type >= REG_MAX_SUPP_AP_TYPE) {
+		reg_err("Unsupported 6G AP power type %d", ap_pwr_type);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!chan_eirp_list) {
+		reg_err("chan_eirp_list is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!num_6g_chans || num_6g_chans > NUM_6GHZ_CHANNELS) {
+		reg_err("Incorrect number of channels %d", num_6g_chans);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (is_client_power_needed) {
+		if (client_type >= REG_MAX_CLIENT_TYPE) {
+			reg_err("Incorrect client type %d", client_type);
+			return QDF_STATUS_E_FAILURE;
+		}
+
+		mas_chan_list =
+			pdev_priv_obj->mas_chan_list_6g_client[ap_pwr_type][client_type];
+	} else {
+		mas_chan_list =
+			pdev_priv_obj->mas_chan_list_6g_ap[ap_pwr_type];
+	}
+	reg_copy_power_to_chan_eirp_list(chan_eirp_list, mas_chan_list, num_6g_chans);
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif
