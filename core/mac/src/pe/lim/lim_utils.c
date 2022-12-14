@@ -580,11 +580,18 @@ lim_process_pasn_delete_all_peers(struct mac_context *mac,
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	QDF_STATUS status;
 
+	if (!wma)
+		return QDF_STATUS_E_INVAL;
+
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(mac->psoc, msg->vdev_id,
 						    WLAN_WIFI_POS_CORE_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
 	status = wma_delete_all_pasn_peers(wma, vdev);
 	if (QDF_IS_STATUS_ERROR(status))
-		pe_err("Failed to delete all PASN peers");
+		pe_err("Failed to delete all PASN peers for vdev:%d",
+		       msg->vdev_id);
 
 	wlan_objmgr_vdev_release_ref(vdev, WLAN_WIFI_POS_CORE_ID);
 
@@ -3827,11 +3834,17 @@ void lim_update_sta_run_time_ht_switch_chnl_params(struct mac_context *mac,
 						   struct pe_session *pe_session)
 {
 	qdf_freq_t chan_freq;
+	uint32_t self_cb_mode = mac->roam.configParam.channelBondingMode5GHz;
+
+	if (WLAN_REG_IS_24GHZ_CH_FREQ(pe_session->curr_op_freq))
+		self_cb_mode = mac->roam.configParam.channelBondingMode24GHz;
 
 	/* If self capability is set to '20Mhz only', then do not change the CB mode. */
-	if (!lim_get_ht_capability
-		    (mac, eHT_SUPPORTED_CHANNEL_WIDTH_SET, pe_session))
+	if (self_cb_mode == WNI_CFG_CHANNEL_BONDING_MODE_DISABLE) {
+		pe_debug("self_cb_mode 0 for freq %d",
+			 pe_session->curr_op_freq);
 		return;
+	}
 
 	if (wlan_reg_is_24ghz_ch_freq(pe_session->curr_op_freq) &&
 	    pe_session->force_24ghz_in_ht20) {
@@ -5749,7 +5762,9 @@ static bool is_dot11mode_support_ht_cap(enum csr_cfgdot11mode dot11mode)
 	    (dot11mode == eCSR_CFG_DOT11_MODE_11N_ONLY) ||
 	    (dot11mode == eCSR_CFG_DOT11_MODE_11AC_ONLY) ||
 	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY)) {
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY) ||
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11BE) ||
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11BE_ONLY)) {
 		return true;
 	}
 
@@ -5770,7 +5785,9 @@ static bool is_dot11mode_support_vht_cap(enum csr_cfgdot11mode dot11mode)
 	    (dot11mode == eCSR_CFG_DOT11_MODE_11AC) ||
 	    (dot11mode == eCSR_CFG_DOT11_MODE_11AC_ONLY) ||
 	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY)) {
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY) ||
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11BE) ||
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11BE_ONLY)) {
 		return true;
 	}
 
@@ -5789,7 +5806,9 @@ static bool is_dot11mode_support_he_cap(enum csr_cfgdot11mode dot11mode)
 {
 	if ((dot11mode == eCSR_CFG_DOT11_MODE_AUTO) ||
 	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX) ||
-	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY)) {
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11AX_ONLY) ||
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11BE) ||
+	    (dot11mode == eCSR_CFG_DOT11_MODE_11BE_ONLY)) {
 		return true;
 	}
 

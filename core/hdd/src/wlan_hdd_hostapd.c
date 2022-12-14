@@ -400,7 +400,7 @@ static void hdd_hostapd_channel_allow_suspend(struct hdd_adapter *adapter,
  * Called when, 1. bss started, 2. channel switch
  *
  * @adapter: pointer to hdd adapter
- * @chna_freq: current channel frequency
+ * @chan_freq: current channel frequency
  *
  * Return - None
  */
@@ -517,7 +517,7 @@ static int __hdd_hostapd_open(struct net_device *dev)
 
 /**
  * hdd_hostapd_open() - SSR wrapper for __hdd_hostapd_open
- * @dev: pointer to net device
+ * @net_dev: pointer to net device
  *
  * Return: 0 on success, error number otherwise
  */
@@ -580,7 +580,7 @@ int hdd_hostapd_stop_no_trans(struct net_device *dev)
 
 /**
  * hdd_hostapd_stop() - SSR wrapper for__hdd_hostapd_stop
- * @dev: pointer to net_device
+ * @net_dev: pointer to net_device
  *
  * This is called in response to ifconfig down
  *
@@ -945,6 +945,8 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 	enum nl80211_channel_type channel_type;
 	uint32_t freq;
 	mac_handle_t mac_handle = adapter->hdd_ctx->mac_handle;
+	struct wlan_objmgr_vdev *vdev;
+	uint16_t link_id = 0;
 
 	if (!mac_handle) {
 		hdd_err("mac_handle is NULL");
@@ -1015,10 +1017,20 @@ QDF_STATUS hdd_chan_change_notify(struct hdd_adapter *adapter,
 				chan_change.chan_params.mhz_freq_seg0;
 	}
 
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+		link_id = wlan_vdev_get_link_id(vdev);
+
+	hdd_debug("link_id is %d", link_id);
+
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
 	hdd_debug("notify: chan:%d width:%d freq1:%d freq2:%d",
 		  chandef.chan->center_freq, chandef.width,
 		  chandef.center_freq1, chandef.center_freq2);
-	wlan_cfg80211_ch_switch_notify(dev, &chandef, 0);
+	wlan_cfg80211_ch_switch_notify(dev, &chandef, link_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1382,7 +1394,7 @@ enum qca_wlan_802_11_mode hdd_convert_dot11mode_from_phymode(int phymode)
 
 /**
  * hdd_fill_station_info() - fill stainfo once connected
- * @stainfo: peer stainfo associate to SAP
+ * @adapter: pointer to hdd adapter
  * @event: associate/reassociate event received
  *
  * The function is to update rate stats to stainfo
@@ -1872,6 +1884,59 @@ release_ref:
 	}
 }
 
+#ifdef WLAN_MLD_AP_STA_CONNECT_SUPPORT
+static void
+hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
+				  struct station_info *sta_info,
+				  uint8_t *peer_mac)
+{
+	bool is_mlo_vdev;
+	QDF_STATUS status;
+	struct wlan_objmgr_vdev *vdev;
+	struct wlan_objmgr_peer *sta_peer;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+	if (!vdev) {
+		hdd_err("Failed to get link id, VDEV NULL");
+		return;
+	}
+
+	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(vdev);
+	if (is_mlo_vdev)
+		sta_info->link_id = wlan_vdev_get_link_id(vdev);
+	else
+		sta_info->link_id = -1;
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+	if (!is_mlo_vdev)
+		return;
+
+	sta_peer = wlan_objmgr_get_peer_by_mac(adapter->hdd_ctx->psoc,
+					       peer_mac, WLAN_OSIF_ID);
+
+	if (!sta_peer) {
+		hdd_err("Peer not found with MAC " QDF_MAC_ADDR_FMT,
+			QDF_MAC_ADDR_REF(peer_mac));
+		return;
+	}
+	qdf_mem_copy(sta_info->mld_addr, wlan_peer_mlme_get_mldaddr(sta_peer),
+		     ETH_ALEN);
+
+	status = ucfg_mlme_peer_get_assoc_rsp_ies(
+					sta_peer,
+					&sta_info->assoc_resp_ies,
+					&sta_info->assoc_resp_ies_len);
+	wlan_objmgr_peer_release_ref(sta_peer, WLAN_OSIF_ID);
+}
+#else
+static void
+hdd_hostapd_sap_fill_peer_ml_info(struct hdd_adapter *adapter,
+				  struct station_info *sta_info,
+				  uint8_t *peer_mac)
+{
+}
+#endif
+
 QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				    void *context)
 {
@@ -1910,6 +1975,7 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 	uint8_t pdev_id;
 	bool notify_new_sta = true;
 	struct wlan_objmgr_vdev *vdev;
+	struct qdf_mac_addr sta_addr = {0};
 	qdf_freq_t dfs_freq;
 
 	dev = context;
@@ -2509,6 +2575,14 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			 */
 			sta_info->filled |= STATION_INFO_ASSOC_REQ_IES;
 #endif
+			/* For ML clients need to fill assoc resp IEs
+			 * and MLD address.
+			 * For Legacy clients MLD address will be
+			 * NULL MAC address.
+			 */
+			hdd_hostapd_sap_fill_peer_ml_info(adapter, sta_info,
+							  event->staMac.bytes);
+
 			if (notify_new_sta)
 				cfg80211_new_sta(dev,
 						 (const u8 *)&event->
@@ -2607,7 +2681,8 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 			return QDF_STATUS_E_INVAL;
 		}
 
-		if (wlan_vdev_mlme_is_mlo_vdev(adapter->vdev)) {
+		if (wlan_vdev_mlme_is_mlo_vdev(adapter->vdev) &&
+		    !qdf_is_macaddr_zero(&stainfo->mld_addr)) {
 			mld_sta_info = hdd_get_sta_info_by_mac(
 						&adapter->sta_info_list,
 						stainfo->mld_addr.bytes,
@@ -2620,7 +2695,13 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 				hdd_put_sta_info_ref(&adapter->sta_info_list,
 						&mld_sta_info, true,
 						STA_INFO_HOSTAPD_SAP_EVENT_CB);
+				qdf_copy_macaddr(&sta_addr, &stainfo->mld_addr);
 			}
+		} else {
+			/* Copy legacy MAC address on
+			 * non-ML type client disassoc.
+			 */
+			qdf_copy_macaddr(&sta_addr, &disassoc_comp->staMac);
 		}
 
 		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
@@ -2674,12 +2755,12 @@ QDF_STATUS hdd_hostapd_sap_event_cb(struct sap_event *sap_event,
 		 * SSR in progress. Since supplicant will change mode
 		 * fail and down during this time.
 		 */
+
 		if ((adapter->device_mode != QDF_P2P_GO_MODE) ||
 		     (!cds_is_driver_recovering())) {
 			cfg80211_del_sta(dev,
-					 (const u8 *)&sap_event->sapevt.
-					 sapStationDisassocCompleteEvent.staMac.
-					 bytes[0], GFP_KERNEL);
+					 (const u8 *)&sta_addr.bytes[0],
+					 GFP_KERNEL);
 			hdd_debug("indicate sta deletion event");
 		}
 
@@ -3399,7 +3480,7 @@ int hdd_softap_set_channel_change(struct net_device *dev, int target_chan_freq,
 /**
  * wlan_hdd_get_sap_restriction_mask() - get restriction mask for sap
  * after sap start
- * @hdd_context: hdd context
+ * @hdd_ctx: hdd context
  *
  * Return: Restriction mask
  */
@@ -4831,7 +4912,7 @@ static void wlan_hdd_add_sap_obss_scan_ie(
 #endif
 
 /**
- * wlan_hdd_cfg80211_update_apies() - update ap mode 11ax ies
+ * hdd_update_11ax_apies() - update ap mode 11ax ies
  * @adapter: Pointer to hostapd adapter
  * @genie: generic IE buffer
  * @total_ielen: out param to update total ielen
@@ -5359,7 +5440,7 @@ static int wlan_hdd_sap_p2p_11ac_overrides(struct hdd_adapter *ap_adapter)
 
 /**
  * wlan_hdd_setup_driver_overrides : Overrides SAP / P2P GO Params
- * @adapter: pointer to adapter struct
+ * @ap_adapter: pointer to adapter struct
  *
  * This function overrides SAP / P2P Go configuration based on driver INI
  * parameters for 11AC override and ACS. These overrides are done to support
@@ -5424,7 +5505,7 @@ hdd_check_and_disconnect_sta_on_invalid_channel(struct hdd_context *hdd_ctx,
  * hdd_handle_acs_2g_preferred_sap_conc() - Handle 2G pereferred SAP
  * concurrency with GO
  * @psoc: soc object
- * @sap_ctx: sap context
+ * @adapter: SAP adapter
  * @sap_config: sap config
  *
  * In SAP+GO concurrency, if GO is started on 2G and SAP is doing ACS
@@ -6076,24 +6157,6 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 			goto deliver_start_err;
 		}
 	}
-	/*
-	 * For STA+SAP concurrency support from GUI, first STA connection gets
-	 * triggered and while it is in progress, SAP start also comes up.
-	 * Once STA association is successful, STA connect event is sent to
-	 * kernel which gets queued in kernel workqueue and supplicant won't
-	 * process M1 received from AP and send M2 until this NL80211_CONNECT
-	 * event is received. Workqueue is not scheduled as RTNL lock is already
-	 * taken by hostapd thread which has issued start_bss command to driver.
-	 * Driver cannot complete start_bss as the pending command at the head
-	 * of the SME command pending list is hw_mode_update for STA session
-	 * which cannot be processed as SME is in WAITforKey state for STA
-	 * interface. The start_bss command for SAP interface is queued behind
-	 * the hw_mode_update command and so it cannot be processed until
-	 * hw_mode_update command is processed. This is causing a deadlock so
-	 * disconnect the STA interface first if connection or key exchange is
-	 * in progress and then start SAP interface.
-	 */
-	hdd_abort_ongoing_sta_connection(hdd_ctx);
 
 	mac_handle = hdd_ctx->mac_handle;
 
@@ -6736,7 +6799,7 @@ int wlan_hdd_cfg80211_start_bss(struct hdd_adapter *adapter,
 					    FTM_TIME_SYNC_BSS_STARTED);
 
 	hdd_set_connection_in_progress(false);
-	policy_mgr_nan_sap_post_enable_conc_check(hdd_ctx->psoc);
+	policy_mgr_process_force_scc_for_nan(hdd_ctx->psoc);
 	ret = 0;
 	goto free;
 
@@ -6860,13 +6923,6 @@ static int __wlan_hdd_cfg80211_stop_ap(struct wiphy *wiphy,
 	hdd_debug("Event flags 0x%lx(%s) Device_mode %s(%d)",
 		  adapter->event_flags, (adapter->dev)->name,
 		  qdf_opmode_str(adapter->device_mode), adapter->device_mode);
-
-	/*
-	 * If a STA connection is in progress in another adapter, disconnect
-	 * the STA and complete the SAP operation. STA will reconnect
-	 * after SAP stop is done.
-	 */
-	hdd_abort_ongoing_sta_connection(hdd_ctx);
 
 	if (adapter->device_mode == QDF_SAP_MODE) {
 		wlan_hdd_del_station(adapter, NULL);
@@ -7439,7 +7495,6 @@ wlan_util_get_centre_freq(struct wireless_dev *wdev, unsigned int link_id)
  * based on user space input and concurrency combination.
  * @adapter:  Pointer to hostapd adapter
  * @params: Pointer to AP configuration from cfg80211
- * @iface_start: Interface start or not
  *
  * Return: void
  */
@@ -7501,6 +7556,8 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 	enum QDF_OPMODE vdev_opmode;
 	uint8_t vdev_id_list[MAX_NUMBER_OF_CONC_CONNECTIONS], i;
 	enum policy_mgr_con_mode intf_pm_mode;
+	struct wlan_objmgr_vdev *vdev;
+	uint16_t link_id = 0;
 
 	hdd_enter();
 
@@ -7801,10 +7858,18 @@ static int __wlan_hdd_cfg80211_start_ap(struct wiphy *wiphy,
 			hdd_err("Error Start bss Failed");
 			goto err_start_bss;
 		}
+		vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_OSIF_ID);
+		if (!vdev)
+			return -EINVAL;
 
-		if (wlan_util_get_centre_freq(wdev, 0) !=
+		if (wlan_vdev_mlme_is_mlo_vdev(vdev))
+			link_id = wlan_vdev_get_link_id(vdev);
+
+		hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_ID);
+
+		if (wlan_util_get_centre_freq(wdev, link_id) !=
 				params->chandef.chan->center_freq)
-			params->chandef = wlan_util_get_chan_def(wdev, 0);
+			params->chandef = wlan_util_get_chan_def(wdev, link_id);
 		/*
 		 * If Do_Not_Break_Stream enabled send avoid channel list
 		 * to application.

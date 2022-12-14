@@ -113,7 +113,7 @@ void hdd_wlan_suspend_resume_event(uint8_t state)
 }
 
 /**
- * hdd_wlan_offload_event()- send offloads event
+ * hdd_wlan_offload_event() - send offloads event
  * @type: offload type
  * @state: enabled or disabled
  *
@@ -443,7 +443,7 @@ int wlan_hdd_ipv6_changed(struct notifier_block *nb,
 /**
  * hdd_fill_ipv6_uc_addr() - fill IPv6 unicast addresses
  * @idev: pointer to net device
- * @ipv6addr: destination array to fill IPv6 addresses
+ * @ipv6_uc_addr: destination array to fill IPv6 addresses
  * @ipv6addr_type: IPv6 Address type
  * @scope_array: scope of ipv6 addr
  * @count: number of IPv6 addresses
@@ -496,7 +496,7 @@ static int hdd_fill_ipv6_uc_addr(struct inet6_dev *idev,
 /**
  * hdd_fill_ipv6_ac_addr() - fill IPv6 anycast addresses
  * @idev: pointer to net device
- * @ipv6addr: destination array to fill IPv6 addresses
+ * @ipv6_ac_addr: destination array to fill IPv6 addresses
  * @ipv6addr_type: IPv6 Address type
  * @scope_array: scope of ipv6 addr
  * @count: number of IPv6 addresses
@@ -683,8 +683,7 @@ out:
 
 #if defined(WLAN_FEATURE_11BE_MLO) && defined(CFG80211_11BE_BASIC)
 static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter,
-				  struct hdd_context *hdd_ctx,
-				  enum sme_ps_cmd command)
+				  struct hdd_context *hdd_ctx)
 {
 	struct hdd_adapter *link_adapter;
 	struct hdd_mlo_adapter_info *mlo_adapter_info;
@@ -695,15 +694,12 @@ static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter,
 		link_adapter = mlo_adapter_info->link_adapter[i];
 		if (!link_adapter)
 			continue;
-		sme_ps_enable_disable(hdd_ctx->mac_handle,
-				      link_adapter->vdev_id,
-				      command);
+		sme_ps_update(hdd_ctx->mac_handle, link_adapter->vdev_id);
 	}
 }
 #else
 static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter,
-				  struct hdd_context *hdd_ctx,
-				  enum sme_ps_cmd command)
+				  struct hdd_context *hdd_ctx)
 {}
 #endif
 
@@ -719,26 +715,21 @@ static void hdd_send_mlo_ps_to_fw(struct hdd_adapter *adapter,
 static void hdd_send_ps_config_to_fw(struct hdd_adapter *adapter)
 {
 	struct hdd_context *hdd_ctx;
-	bool usr_ps_cfg;
-	enum sme_ps_cmd command;
 	bool is_mlo_vdev;
 
 	if (hdd_validate_adapter(adapter))
 		return;
 
 	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	usr_ps_cfg = ucfg_mlme_get_user_ps(hdd_ctx->psoc, adapter->vdev_id);
-	command = usr_ps_cfg ? SME_PS_ENABLE : SME_PS_DISABLE;
 
 	is_mlo_vdev = wlan_vdev_mlme_is_mlo_vdev(adapter->vdev);
 
 	if (!is_mlo_vdev) {
-		sme_ps_enable_disable(hdd_ctx->mac_handle, adapter->vdev_id,
-				      command);
+		sme_ps_update(hdd_ctx->mac_handle, adapter->vdev_id);
 		return;
 	}
 
-	hdd_send_mlo_ps_to_fw(adapter, hdd_ctx, command);
+	hdd_send_mlo_ps_to_fw(adapter, hdd_ctx);
 }
 
 /**
@@ -1662,7 +1653,7 @@ flush_mc_list:
 }
 
 /**
- * hdd_update_conn_state_mask(): record info needed by wma_suspend_req
+ * hdd_update_conn_state_mask() - record info needed by wma_suspend_req
  * @adapter: adapter to get info from
  * @conn_state_mask: mask of connection info
  *
@@ -1677,8 +1668,6 @@ static void hdd_update_conn_state_mask(struct hdd_adapter *adapter,
 
 /**
  * hdd_suspend_wlan() - Driver suspend function
- * @callback: Callback function to invoke when driver is ready to suspend
- * @callbackContext: Context to pass back to @callback function
  *
  * Return: 0 on success else error code.
  */
@@ -1918,7 +1907,7 @@ QDF_STATUS hdd_wlan_shutdown(void)
 
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 /**
- * hdd_wlan_ssr_reinit_event()- send ssr reinit state
+ * hdd_wlan_ssr_reinit_event() - send ssr reinit state
  *
  * This Function send send ssr reinit state diag event
  *
@@ -1941,7 +1930,8 @@ static inline void hdd_wlan_ssr_reinit_event(void)
 
 #ifdef WLAN_FEATURE_DBAM_CONFIG
 /**
- * hdd_retore_dbam_config - restore and send dbam config to fw
+ * hdd_restore_dbam_config() - restore and send dbam config to fw
+ * @hdd_ctx: HDD context
  *
  * This function is used to send  store dbam config to fw
  * in case of wlan re-init
@@ -1998,7 +1988,8 @@ static void hdd_restore_dual_sta_config(struct hdd_context *hdd_ctx)
 }
 
 /**
- * hdd_send_default_scan_ies - send default scan ies to fw
+ * hdd_send_default_scan_ies() - send default scan ies to fw
+ * @hdd_ctx: HDD context
  *
  * This function is used to send default scan ies to fw
  * in case of wlan re-init
@@ -2026,7 +2017,7 @@ static void hdd_send_default_scan_ies(struct hdd_context *hdd_ctx)
 }
 
 /**
- * hdd_restore_sar_config - Restore the saved SAR config after SSR
+ * hdd_restore_sar_config() - Restore the saved SAR config after SSR
  * @hdd_ctx: HDD context
  *
  * Restore the SAR config that was lost during SSR.
@@ -2175,12 +2166,10 @@ err_ctx_null:
 }
 
 int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
-	bool allow_power_save, uint32_t timeout)
+			   bool allow_power_save, uint32_t timeout)
 {
-	mac_handle_t mac_handle;
 	struct hdd_context *hdd_ctx;
-	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	bool is_bmps_enabled;
+	QDF_STATUS status;
 	struct hdd_station_ctx *hdd_sta_ctx = NULL;
 
 	if (!adapter) {
@@ -2200,85 +2189,17 @@ int wlan_hdd_set_powersave(struct hdd_adapter *adapter,
 		return -EINVAL;
 	}
 
-	hdd_debug("Allow power save: %d", allow_power_save);
-	mac_handle = hdd_ctx->mac_handle;
-
-	/*
-	 * This is a workaround for defective AP's that send a disassoc
-	 * immediately after WPS connection completes. Defer powersave by a
-	 * small amount if the affected AP is detected.
-	 */
-	if (allow_power_save &&
-	    adapter->device_mode == QDF_STA_MODE &&
-	    !adapter->session.station.ap_supports_immediate_power_save) {
-		timeout = AUTO_PS_DEFER_TIMEOUT_MS;
-		hdd_debug("Defer power-save due to AP spec non-conformance");
-	}
-
-	if (allow_power_save) {
-		if (QDF_STA_MODE == adapter->device_mode ||
-		    QDF_P2P_CLIENT_MODE == adapter->device_mode) {
-			hdd_debug("Disabling Auto Power save timer");
-			status = sme_ps_disable_auto_ps_timer(mac_handle,
-						adapter->vdev_id);
-			if (status != QDF_STATUS_SUCCESS)
-				goto end;
-		}
-
-		ucfg_mlme_is_bmps_enabled(hdd_ctx->psoc, &is_bmps_enabled);
-		if (is_bmps_enabled) {
-			hdd_debug("Wlan driver Entering Power save");
-
-			/*
-			 * Enter Power Save command received from GUI
-			 * this means DHCP is completed
-			 */
-			if (timeout) {
-				status = sme_ps_enable_auto_ps_timer(mac_handle,
-							    adapter->vdev_id,
-							    timeout);
-				if (status != QDF_STATUS_SUCCESS)
-					goto end;
-			} else {
-				status = sme_ps_enable_disable(mac_handle,
-						adapter->vdev_id,
-						SME_PS_ENABLE);
-				if (status != QDF_STATUS_SUCCESS)
-					goto end;
-			}
-		} else {
-			hdd_debug("Power Save is not enabled in the cfg");
-		}
-	} else {
-		hdd_debug("Wlan driver Entering Full Power");
-
-		/*
-		 * Enter Full power command received from GUI
-		 * this means we are disconnected
-		 */
-		status = sme_ps_disable_auto_ps_timer(mac_handle,
-					adapter->vdev_id);
-
-		if (status != QDF_STATUS_SUCCESS)
-			goto end;
-
-		ucfg_mlme_is_bmps_enabled(hdd_ctx->psoc, &is_bmps_enabled);
-		if (is_bmps_enabled) {
-			status = sme_ps_enable_disable(mac_handle,
-						       adapter->vdev_id,
-						       SME_PS_DISABLE);
-			if (status != QDF_STATUS_SUCCESS)
-				goto end;
-		}
-
-		if (adapter->device_mode == QDF_STA_MODE) {
+	status = sme_ps_set_powersave(
+		hdd_ctx->mac_handle, adapter->vdev_id,
+		allow_power_save, timeout,
+		hdd_sta_ctx->ap_supports_immediate_power_save);
+	if (!allow_power_save) {
+		if (adapter->device_mode == QDF_STA_MODE)
 			hdd_twt_del_dialog_in_ps_disable(hdd_ctx,
 						&hdd_sta_ctx->conn_info.bssid,
 						adapter->vdev_id);
-		}
 	}
 
-end:
 	return qdf_status_to_os_return(status);
 }
 
@@ -2433,7 +2354,7 @@ static int _wlan_hdd_cfg80211_resume_wlan(struct wiphy *wiphy)
 		return 0;
 	}
 
-	/**
+	/*
 	 * Return success if recovery is in progress, otherwise, linux kernel
 	 * will shutdown all interfaces in wiphy_resume.
 	 */
@@ -2888,9 +2809,6 @@ static int wlan_hdd_set_ps(struct wlan_objmgr_psoc *psoc,
 			   bool allow_power_save, int timeout)
 {
 	int status;
-
-	ucfg_mlme_set_user_ps(psoc, adapter->vdev_id,
-			      allow_power_save);
 
 	status = wlan_hdd_set_powersave(adapter, allow_power_save, timeout);
 

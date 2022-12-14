@@ -1379,6 +1379,7 @@ UMAC_MLO_MGR_OBJS := $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_mgr_main.o \
 			  $(MLO_MGR_TARGET_IF_DIR)/src/target_if_mlo_mgr.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_mlo_mgr_roam.o \
 			  $(UMAC_MLO_MGR_CLD_DIR)/src/wlan_t2lm_api.o \
+			  $(UMAC_MLO_MGR_CMN_DIR)/src/wlan_mlo_t2lm.o \
 
 $(call add-wlan-objs,umac_mlomgr,$(UMAC_MLO_MGR_OBJS))
 endif
@@ -2574,7 +2575,37 @@ WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_fisa_rx.o
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_rx_fst.o
 endif
 
+ifeq ($(CONFIG_FEATURE_DIRECT_LINK), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_wfds.o
+endif
+
 $(call add-wlan-objs,dp_comp,$(WLAN_DP_COMP_OBJS))
+
+#######################################################
+
+######################### QMI_COMPONENT #########################
+QMI_COMP_CORE_DIR := components/qmi/core/src
+QMI_COMP_UCFG_DIR := components/qmi/dispatcher/src
+QMI_COMP_OS_IF_DIR := os_if/qmi/src
+
+QMI_COMP_INC := -I$(WLAN_ROOT)/components/qmi/core/inc       \
+		-I$(WLAN_ROOT)/components/qmi/core/src       \
+		-I$(WLAN_ROOT)/components/qmi/dispatcher/inc \
+		-I$(WLAN_ROOT)/os_if/qmi/inc
+
+ifeq ($(CONFIG_QMI_COMPONENT_ENABLE), y)
+WLAN_QMI_COMP_OBJS := $(QMI_COMP_CORE_DIR)/wlan_qmi_main.o \
+		 $(QMI_COMP_UCFG_DIR)/wlan_qmi_ucfg_api.o  \
+		 $(QMI_COMP_OS_IF_DIR)/os_if_qmi.o
+
+ifeq ($(CONFIG_QMI_WFDS), y)
+WLAN_QMI_COMP_OBJS += $(QMI_COMP_OS_IF_DIR)/os_if_qmi_wifi_driver_service_v01.o
+WLAN_QMI_COMP_OBJS += $(QMI_COMP_OS_IF_DIR)/os_if_qmi_wfds.o
+WLAN_QMI_COMP_OBJS += $(QMI_COMP_UCFG_DIR)/wlan_qmi_wfds_api.o
+endif
+endif
+
+$(call add-wlan-objs,qmi_comp,$(WLAN_QMI_COMP_OBJS))
 
 #######################################################
 
@@ -3129,6 +3160,8 @@ INCS +=		$(NAN_TGT_INC)
 INCS +=		$(NAN_OS_IF_INC)
 ###########DP_COMPONENT ####################
 INCS +=		$(DP_COMP_INC)
+###########QMI_COMPONENT ####################
+INCS +=		$(QMI_COMP_INC)
 ################ SON ################
 INCS +=		$(SON_CORE_INC)
 INCS +=		$(SON_UCFG_INC)
@@ -3603,6 +3636,10 @@ cppflags-$(CONFIG_MULTI_IF_LOG) += -DMULTI_IF_LOG
 
 #Set SLUB_MEM_OPTIMIZE
 cppflags-$(CONFIG_SLUB_MEM_OPTIMIZE) += -DSLUB_MEM_OPTIMIZE
+
+ifeq ($(CONFIG_ARCH_SDXBAAGHA), y)
+cppflags-$(CONFIG_WLAN_MEMORY_OPT) += -DWLAN_MEMORY_OPT
+endif
 
 #Set DFS_PRI_MULTIPLIER
 cppflags-$(CONFIG_DFS_PRI_MULTIPLIER) += -DDFS_PRI_MULTIPLIER
@@ -4262,6 +4299,13 @@ cppflags-$(CONFIG_WLAN_TRACEPOINTS) += -DWLAN_TRACEPOINTS
 cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DFEATURE_PERPKT_INFO
 cppflags-$(CONFIG_QCACLD_FEATURE_SON) += -DQCA_ENHANCED_STATS_SUPPORT
 
+ifeq ($(CONFIG_QMI_COMPONENT_ENABLE), y)
+cppflags-y += -DQMI_COMPONENT_ENABLE
+ifeq ($(CONFIG_QMI_WFDS), y)
+cppflags-y += -DQMI_WFDS
+endif
+endif
+
 ifdef CONFIG_MAX_LOGS_PER_SEC
 ccflags-y += -DWLAN_MAX_LOGS_PER_SEC=$(CONFIG_MAX_LOGS_PER_SEC)
 endif
@@ -4333,6 +4377,10 @@ endif
 
 ifdef CONFIG_CFG_BMISS_OFFLOAD_MAX_VDEV
 ccflags-y += -DCFG_TGT_DEFAULT_BMISS_OFFLOAD_MAX_VDEV=$(CONFIG_CFG_BMISS_OFFLOAD_MAX_VDEV)
+endif
+
+ifdef CONFIG_WLAN_UMAC_MLO_MAX_DEV
+ccflags-y += -DWLAN_UMAC_MLO_MAX_DEV=$(CONFIG_WLAN_UMAC_MLO_MAX_DEV)
 endif
 
 ifdef CONFIG_CFG_ROAM_OFFLOAD_MAX_VDEV
@@ -4699,6 +4747,8 @@ ccflags-y += -DWLAN_OBJMGR_RATELIMIT_THRESH=0
 #then WLAN_SCHED_REDUCTION_LIMIT will be 32 for
 # WIN.
 ccflags-y += -DWLAN_SCHED_REDUCTION_LIMIT=0
+
+ccflags-y += -DIRQ_DISABLED_MAX_DURATION_NS=100000000
 
 # Determine if we are building against an arm architecture host
 ifeq ($(findstring arm, $(ARCH)),)

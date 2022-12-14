@@ -38,6 +38,7 @@
 #include <i_qdf_net_stats.h>
 #include <qdf_types.h>
 #include "htc_api.h"
+#include "wlan_dp_wfds.h"
 
 #ifndef NUM_TX_RX_HISTOGRAM
 #define NUM_TX_RX_HISTOGRAM 128
@@ -265,6 +266,11 @@ struct link_monitoring {
 	uint8_t is_rx_linkspeed_good;
 };
 
+struct direct_link_info {
+	bool config_set;
+	bool low_latency;
+};
+
 /**
  * struct wlan_dp_intf - DP interface object related info
  * @dp_ctx: DP context reference
@@ -349,6 +355,9 @@ struct wlan_dp_intf {
 	enum bss_intf_state bss_state;
 	qdf_event_t qdf_sta_eap_frm_done_event;
 	struct dp_traffic_end_indication traffic_end_ind;
+#ifdef FEATURE_DIRECT_LINK
+	struct direct_link_info direct_link_config;
+#endif
 };
 
 /**
@@ -367,11 +376,13 @@ enum RX_OFFLOAD {
  * @dp_ctx: pointer to DP psoc priv context
  * @lpass_ep_id: LPASS data msg service endpoint id
  * @direct_link_refill_ring_hdl: Direct Link refill ring handle
+ * @dl_wfds: pointer to direct link WFDS context
  */
 struct dp_direct_link_context {
 	struct wlan_dp_psoc_context *dp_ctx;
 	HTC_ENDPOINT_ID lpass_ep_id;
 	struct dp_srng *direct_link_refill_ring_hdl;
+	struct dp_direct_link_wfds_context *dl_wfds;
 };
 #endif
 

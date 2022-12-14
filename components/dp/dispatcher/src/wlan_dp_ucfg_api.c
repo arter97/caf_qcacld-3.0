@@ -122,6 +122,9 @@ ucfg_dp_destroy_intf(struct wlan_objmgr_psoc *psoc,
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	if (dp_intf->device_mode == QDF_SAP_MODE)
+		dp_config_direct_link(dp_intf, false, false);
+
 	dp_periodic_sta_stats_mutex_destroy(dp_intf);
 	dp_nud_deinit_tracking(dp_intf);
 	dp_mic_deinit_work(dp_intf);
@@ -2349,5 +2352,42 @@ void ucfg_dp_direct_link_deinit(struct wlan_objmgr_psoc *psoc)
 	}
 
 	dp_direct_link_deinit(dp_ctx);
+}
+
+void
+ucfg_dp_wfds_handle_request_mem_ind(struct wlan_qmi_wfds_mem_ind_msg *mem_msg)
+{
+	dp_wfds_handle_request_mem_ind(mem_msg);
+}
+
+void
+ucfg_dp_wfds_handle_ipcc_map_n_cfg_ind(struct wlan_qmi_wfds_ipcc_map_n_cfg_ind_msg *ipcc_msg)
+{
+	dp_wfds_handle_ipcc_map_n_cfg_ind(ipcc_msg);
+}
+
+QDF_STATUS ucfg_dp_wfds_new_server(void)
+{
+	return dp_wfds_new_server();
+}
+
+void ucfg_dp_wfds_del_server(void)
+{
+	dp_wfds_del_server();
+}
+
+QDF_STATUS ucfg_dp_config_direct_link(struct wlan_objmgr_vdev *vdev,
+				      bool config_direct_link,
+				      bool enable_low_latency)
+{
+	struct wlan_dp_intf *dp_intf = dp_get_vdev_priv_obj(vdev);
+
+	if (!dp_intf) {
+		dp_err("Unable to get DP interface");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	return dp_config_direct_link(dp_intf, config_direct_link,
+				     enable_low_latency);
 }
 #endif

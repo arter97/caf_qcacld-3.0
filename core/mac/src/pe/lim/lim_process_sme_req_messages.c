@@ -1931,28 +1931,31 @@ static void lim_check_oui_and_update_session(struct mac_context *mac_ctx,
 }
 
 static enum mlme_dot11_mode
-lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode)
+lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode,
+			uint8_t vdev_id)
 {
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_obj *vdev_mlme;
+	enum mlme_vdev_dot11_mode vdev_dot11_mode;
 	enum mlme_dot11_mode self_dot11_mode =
 				mac_ctx->mlme_cfg->dot11_mode.dot11_mode;
-	enum mlme_vdev_dot11_mode vdev_dot11_mode;
-	uint8_t dot11_mode_indx;
-	uint32_t vdev_type_dot11_mode =
-			mac_ctx->mlme_cfg->dot11_mode.vdev_type_dot11_mode;
 
 	switch (opmode) {
 	case QDF_STA_MODE:
-		dot11_mode_indx = STA_DOT11_MODE_INDX;
-		break;
 	case QDF_P2P_CLIENT_MODE:
-		dot11_mode_indx = P2P_DEV_DOT11_MODE_INDX;
 		break;
 	default:
 		return self_dot11_mode;
 	}
 
-	vdev_dot11_mode = QDF_GET_BITS(vdev_type_dot11_mode, dot11_mode_indx,
-				       4);
+	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac_ctx->pdev, vdev_id,
+						    WLAN_MLME_OBJMGR_ID);
+	if (!vdev)
+		return self_dot11_mode;
+
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	vdev_dot11_mode = vdev_mlme->proto.vdev_dot11_mode;
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_MLME_OBJMGR_ID);
 
 	pe_debug("self_dot11_mode %d, vdev_dot11 %d, dev_mode %d",
 		  self_dot11_mode, vdev_dot11_mode, opmode);
@@ -1971,6 +1974,10 @@ lim_get_self_dot11_mode(struct mac_context *mac_ctx, enum QDF_OPMODE opmode)
 	if (IS_DOT11_MODE_HE(self_dot11_mode) &&
 	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11AX)
 		return MLME_DOT11_MODE_11AX;
+
+	if (IS_DOT11_MODE_EHT(self_dot11_mode) &&
+	    vdev_dot11_mode == MLME_VDEV_DOT11_MODE_11BE)
+		return MLME_DOT11_MODE_11BE;
 
 	return self_dot11_mode;
 }
@@ -2613,7 +2620,8 @@ lim_fill_dot11_mode(struct mac_context *mac_ctx, struct pe_session *session,
 	enum mlme_dot11_mode bss_dot11_mode;
 	enum mlme_dot11_mode intersected_mode;
 
-	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, session->opmode);
+	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, session->opmode,
+						  session->vdev_id);
 	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
 
 	pe_debug("vdev id %d opmode %d self dot11mode %d bss_dot11 mode %d",
@@ -2979,7 +2987,7 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	struct ps_global_info *ps_global_info = &mac_ctx->sme.ps_global_info;
 	struct ps_params *ps_param =
 				&ps_global_info->ps_params[session->vdev_id];
-	uint32_t join_timeout;
+	uint32_t timeout;
 	uint8_t programmed_country[REG_ALPHA2_LEN + 1];
 	enum reg_6g_ap_type power_type_6g;
 	bool ctry_code_match;
@@ -3064,14 +3072,27 @@ lim_fill_pe_session(struct mac_context *mac_ctx, struct pe_session *session,
 	 * Join timeout: if we find a BeaconInterval in the BssDescription,
 	 * then set the Join Timeout to be 10 x the BeaconInterval.
 	 */
-	join_timeout = mac_ctx->mlme_cfg->timeouts.join_failure_timeout_ori;
+	timeout = mac_ctx->mlme_cfg->timeouts.join_failure_timeout_ori;
 	if (bss_desc->beaconInterval)
-		join_timeout = QDF_MAX(10 * bss_desc->beaconInterval,
-				       join_timeout);
+		timeout = QDF_MAX(10 * bss_desc->beaconInterval, timeout);
 
 	mac_ctx->mlme_cfg->timeouts.join_failure_timeout =
-		QDF_MIN(join_timeout,
+		QDF_MIN(timeout,
 			mac_ctx->mlme_cfg->timeouts.join_failure_timeout_ori);
+	/*
+	 * Calculate probe request retry timeout,
+	 * Change probe req retry to MAX_JOIN_PROBE_REQ if sta freq
+	 * can cause MCC
+	 */
+	timeout = JOIN_PROBE_REQ_TIMER_MS;
+	if (policy_mgr_will_freq_lead_to_mcc(mac_ctx->psoc,
+					     bss_desc->chan_freq)) {
+		 /* Send MAX_JOIN_PROBE_REQ probe req during join timeout */
+		timeout = mac_ctx->mlme_cfg->timeouts.join_failure_timeout/
+							MAX_JOIN_PROBE_REQ;
+		timeout = QDF_MAX(JOIN_PROBE_REQ_TIMER_MS, timeout);
+	}
+	mac_ctx->mlme_cfg->timeouts.probe_req_retry_timeout = timeout;
 
 	lim_join_req_update_ht_vht_caps(mac_ctx, session, bss_desc,
 					ie_struct);
@@ -3883,8 +3904,6 @@ lim_fill_rsn_ie(struct mac_context *mac_ctx, struct pe_session *session,
 		lim_update_pmksa_to_profile(session->vdev, pmksa_peer);
 	}
 
-	lim_strip_rsnx_ie(mac_ctx, session, req);
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -3992,6 +4011,8 @@ static void lim_fill_crypto_params(struct mac_context *mac_ctx,
 		lim_fill_wpa_ie(mac_ctx, session, req);
 	else if (lim_is_wapi_profile(session))
 		lim_fill_wapi_ie(mac_ctx, session, req);
+
+	lim_strip_rsnx_ie(mac_ctx, session, req);
 
 	lim_update_fils_config(mac_ctx, session, req);
 }
@@ -4715,6 +4736,8 @@ static void lim_handle_reassoc_req(struct cm_vdev_join_req *req)
 	else if (lim_is_wapi_profile(session_entry))
 		lim_fill_wapi_ie(mac_ctx, session_entry, req);
 
+	lim_strip_rsnx_ie(mac_ctx, session_entry, req);
+
 	if (lim_is_rsn_profile(session_entry) &&
 	    !util_scan_entry_rsnxe(req->entry)) {
 		pe_debug("Bss bcn has no RSNXE, strip if has");
@@ -5012,7 +5035,8 @@ QDF_STATUS cm_process_reassoc_req(struct scheduler_msg *msg)
 
 static QDF_STATUS
 lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
-				tpSirFTPreAuthReq req)
+				tpSirFTPreAuthReq req,
+				uint8_t vdev_id)
 {
 	QDF_STATUS status;
 	tDot11fBeaconIEs *ie_struct;
@@ -5028,7 +5052,8 @@ lim_fill_preauth_req_dot11_mode(struct mac_context *mac_ctx,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, QDF_STA_MODE);
+	self_dot11_mode = lim_get_self_dot11_mode(mac_ctx, QDF_STA_MODE,
+						  vdev_id);
 	bss_dot11_mode = lim_get_bss_dot11_mode(mac_ctx, bss_desc, ie_struct);
 
 	status = lim_get_intersected_dot11_mode_sta_ap(mac_ctx, self_dot11_mode,
@@ -5090,14 +5115,14 @@ static QDF_STATUS lim_cm_handle_preauth_req(struct wlan_preauth_req *req)
 		goto end;
 	}
 
+	vdev_id = req->vdev_id;
 	preauth_req->pbssDescription = bss_desc;
-	status = lim_fill_preauth_req_dot11_mode(mac_ctx, preauth_req);
+	status = lim_fill_preauth_req_dot11_mode(mac_ctx, preauth_req, vdev_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		pe_err("dot11mode doesn't get proper filling");
 		goto end;
 	}
 
-	vdev_id = req->vdev_id;
 	vdev = wlan_objmgr_get_vdev_by_id_from_pdev(mac_ctx->pdev, vdev_id,
 						    WLAN_MLME_CM_ID);
 	if (!vdev) {
@@ -9614,6 +9639,75 @@ void lim_process_set_he_bss_color(struct mac_context *mac_ctx, uint32_t *msg_buf
 	lim_send_beacon_params(mac_ctx, &beacon_params, session_entry);
 	lim_send_obss_color_collision_cfg(mac_ctx, session_entry,
 			OBSS_COLOR_COLLISION_DETECTION_DISABLE);
+}
+
+void lim_reconfig_obss_scan_param(struct mac_context *mac_ctx,
+				  uint32_t *msg_buf)
+{
+	struct sir_cfg_obss_scan *obss_scan_param;
+	struct pe_session *session = NULL;
+	struct wmi_obss_color_collision_cfg_param *cfg_param;
+	struct scheduler_msg msg = {0};
+
+	if (!msg_buf) {
+		pe_err("Buffer is Pointing to NULL");
+		return;
+	}
+
+	obss_scan_param = (struct sir_cfg_obss_scan *)msg_buf;
+	session = pe_find_session_by_vdev_id(mac_ctx, obss_scan_param->vdev_id);
+	if (!session) {
+		pe_err("Session not found for given vdev_id %d",
+		       obss_scan_param->vdev_id);
+		return;
+	}
+
+	if (!session->he_capable ||
+	    !session->is_session_obss_color_collision_det_enabled ||
+	    session->obss_color_collision_dec_evt ==
+				OBSS_COLOR_COLLISION_DETECTION_DISABLE) {
+		pe_debug("%d: obss color det not enabled, he_cap:%d, sup:%d:%d event_type:%d",
+			 session->smeSessionId, session->he_capable,
+			 session->is_session_obss_color_collision_det_enabled,
+			 mac_ctx->mlme_cfg->obss_ht40.obss_color_collision_offload_enabled,
+			 session->obss_color_collision_dec_evt);
+		return;
+	}
+
+	cfg_param = qdf_mem_malloc(sizeof(*cfg_param));
+	if (!cfg_param)
+		return;
+
+	pe_debug("vdev_id %d: sending event:%d scan_reconfig:%d",
+		 session->smeSessionId, session->obss_color_collision_dec_evt,
+		 obss_scan_param->is_scan_reconfig);
+	cfg_param->vdev_id = session->smeSessionId;
+	cfg_param->evt_type = session->obss_color_collision_dec_evt;
+	cfg_param->current_bss_color = session->he_op.bss_color;
+
+	if (obss_scan_param->is_scan_reconfig)
+		cfg_param->detection_period_ms =
+				OBSS_COLOR_COLLISION_DETECTION_NDP_PERIOD_MS;
+	else
+		cfg_param->detection_period_ms =
+				OBSS_COLOR_COLLISION_DETECTION_STA_PERIOD_MS;
+	cfg_param->scan_period_ms = OBSS_COLOR_COLLISION_SCAN_PERIOD_MS;
+
+	if (session->obss_color_collision_dec_evt ==
+	    OBSS_COLOR_FREE_SLOT_TIMER_EXPIRY)
+		cfg_param->free_slot_expiry_time_ms =
+			OBSS_COLOR_COLLISION_FREE_SLOT_EXPIRY_MS;
+
+	msg.type = WMA_OBSS_COLOR_COLLISION_REQ;
+	msg.bodyptr = cfg_param;
+	msg.reserved = 0;
+
+	if (QDF_IS_STATUS_ERROR(scheduler_post_message(QDF_MODULE_ID_PE,
+						       QDF_MODULE_ID_WMA,
+						       QDF_MODULE_ID_WMA,
+						       &msg))) {
+		qdf_mem_free(cfg_param);
+	}
 }
 
 void lim_send_obss_color_collision_cfg(struct mac_context *mac_ctx,
