@@ -5377,11 +5377,11 @@ send_update_edca_pifs_param_cmd_tlv(wmi_unified_t wmi_handle,
 			       WMITLV_GET_STRUCT_TLVLEN(wmi_wmm_params));
 
 		wmm_params->cwmin =
-			edca_pifs->param.edca_pifs_param.eparam.acvo_cwmin;
+			BIT(edca_pifs->param.edca_pifs_param.eparam.acvo_cwmin) - 1;
 		wmm_params->cwmax =
-			edca_pifs->param.edca_pifs_param.eparam.acvo_cwmax;
+			BIT(edca_pifs->param.edca_pifs_param.eparam.acvo_cwmax) - 1;
 		wmm_params->aifs =
-			edca_pifs->param.edca_pifs_param.eparam.acvo_aifsn;
+			edca_pifs->param.edca_pifs_param.eparam.acvo_aifsn - 1;
 		wmm_params->txoplimit =
 			edca_pifs->param.edca_pifs_param.eparam.acvo_txoplimit;
 		wmm_params->acm =
