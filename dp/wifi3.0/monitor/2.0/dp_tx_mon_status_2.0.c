@@ -108,7 +108,7 @@ dp_tx_mon_status_free_packet_buf(struct dp_pdev *pdev,
 	} while ((tx_tlv - tx_tlv_start) < end_offset);
 }
 
-#if defined(WLAN_TX_PKT_CAPTURE_ENH_BE) && defined(QCA_MONITOR_2_0_SUPPORT)
+#if defined(WLAN_TX_PKT_CAPTURE_ENH_BE) && defined(WLAN_PKT_CAPTURE_TX_2_0)
 /**
  * dp_tx_mon_status_queue_free() - API to free status buffer
  * @pdev: pdev Handle

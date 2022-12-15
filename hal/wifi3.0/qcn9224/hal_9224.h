@@ -39,7 +39,7 @@
 #include <uniform_reo_status_header.h>
 #include <wbm_release_ring_tx.h>
 #include <phyrx_location.h>
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 #include <mon_ingress_ring.h>
 #include <mon_destination_ring.h>
 #endif
@@ -1770,7 +1770,7 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_get_rx_max_ba_window_qcn9224;
 	hal_soc->ops->hal_get_reo_qdesc_size = hal_qcn9224_get_reo_qdesc_size;
 	/* TX MONITOR */
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 	hal_soc->ops->hal_txmon_is_mon_buf_addr_tlv =
 				hal_txmon_is_mon_buf_addr_tlv_generic_be;
 	hal_soc->ops->hal_txmon_populate_packet_info =
@@ -1786,7 +1786,7 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 	hal_soc->ops->hal_txmon_get_word_mask =
 				hal_txmon_get_word_mask_generic_be;
 #endif /* TX_MONITOR_WORD_MASK */
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 	hal_soc->ops->hal_compute_reo_remap_ix0 = NULL;
 	hal_soc->ops->hal_tx_vdev_mismatch_routing_set =
 		hal_tx_vdev_mismatch_routing_set_generic_be;

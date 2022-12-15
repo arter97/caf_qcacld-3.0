@@ -32,7 +32,7 @@
  */
 #define SHOW_DEFINED(x) do {} while (0)
 
-#if defined(QCA_MONITOR_2_0_SUPPORT) && !defined(TX_MONITOR_WORD_MASK)
+#if defined(WLAN_PKT_CAPTURE_TX_2_0) && !defined(TX_MONITOR_WORD_MASK)
 typedef struct tx_fes_setup hal_tx_fes_setup_t;
 typedef struct tx_peer_entry hal_tx_peer_entry_t;
 typedef struct tx_queue_extension hal_tx_queue_ext_t;
@@ -338,7 +338,7 @@ hal_rx_fst_get_fse_size_be(void)
  * TX MONITOR
  */
 
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 /**
  * hal_txmon_is_mon_buf_addr_tlv_generic_be() - api to find mon buffer tlv
  * @tx_tlv_hdr: pointer to TLV header
@@ -3243,7 +3243,7 @@ hal_txmon_status_parse_tlv_generic_be(void *data_ppdu_info,
 
 	return status;
 }
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 
 #ifdef REO_SHARED_QREF_TABLE_EN
 static void hal_reo_shared_qaddr_cache_clear_be(hal_soc_handle_t hal_soc_hdl)

@@ -1444,7 +1444,7 @@ hal_clear_rx_status_done(uint8_t *rx_tlv)
 	return QDF_STATUS_SUCCESS;
 }
 
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 /**
  * struct hal_txmon_word_mask_config - hal tx monitor word mask filter setting
  * @pcu_ppdu_setup_init: PCU_PPDU_SETUP TLV word mask
@@ -1477,5 +1477,5 @@ struct hal_txmon_word_mask_config {
  * typedef hal_txmon_word_mask_config_t - handle for tx monitor word mask
  */
 typedef struct hal_txmon_word_mask_config hal_txmon_word_mask_config_t;
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 #endif

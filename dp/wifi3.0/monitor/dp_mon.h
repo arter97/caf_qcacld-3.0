@@ -535,7 +535,7 @@ bool dp_ppdu_stats_ind_handler(struct htt_soc *soc,
 #endif
 
 #if defined(QCA_ENHANCED_STATS_SUPPORT) && \
-	(!defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(QCA_MONITOR_2_0_SUPPORT))
+	(!defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(WLAN_PKT_CAPTURE_TX_2_0))
 /**
  * dp_ppdu_desc_deliver(): Function to deliver Tx PPDU status descriptor
  * to upper layer

@@ -133,7 +133,7 @@ enum dp_mpdu_filter_category {
  */
 struct dp_mon_filter_be {
 	struct dp_mon_filter rx_tlv_filter;
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 	struct htt_tx_ring_tlv_filter tx_tlv_filter;
 #endif
 	bool tx_valid;
@@ -527,7 +527,7 @@ qdf_size_t dp_mon_get_context_size_be(enum dp_context_type context_type)
 }
 #endif
 
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 /**
  * dp_get_be_mon_soc_from_dp_mon_soc() - get dp_mon_soc_be from dp_mon_soc
  * @soc: dp_mon_soc pointer

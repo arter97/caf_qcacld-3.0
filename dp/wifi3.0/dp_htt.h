@@ -274,7 +274,7 @@ struct htt_soc {
 	HTT_TX_MUTEX_TYPE htt_tx_mutex;
 };
 
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 /**
  * struct dp_tx_mon_downstream_tlv_config - Enable/Disable TxMon
  * downstream TLVs
@@ -596,7 +596,7 @@ struct htt_tx_ring_tlv_filter {
 		 data_mpdu_log:1;
 	uint8_t  enable:1;
 };
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 
 /**
  * struct htt_rx_ring_tlv_filter - Rx ring TLV filter

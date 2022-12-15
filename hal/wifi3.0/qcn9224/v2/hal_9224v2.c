@@ -502,7 +502,7 @@ struct hal_hw_srng_config hw_srng_table_9224v2[] = {
 		HWIO_WBM_R0_PPE_RELEASE_RING_BASE_MSB_RING_SIZE_BMSK >>
 		HWIO_WBM_R0_PPE_RELEASE_RING_BASE_MSB_RING_SIZE_SHFT,
 	},
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 	{ /* TX_MONITOR_BUF */
 		.start_ring_id = HAL_SRNG_SW2TXMON_BUF0,
 		.max_rings = 1,

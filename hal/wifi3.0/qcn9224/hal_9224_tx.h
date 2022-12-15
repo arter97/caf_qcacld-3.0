@@ -350,7 +350,7 @@ hal_tx_init_cmd_credit_ring_9224(hal_soc_handle_t hal_soc_hdl,
 }
 
 /* TX MONITOR */
-#if defined(QCA_MONITOR_2_0_SUPPORT) && defined(TX_MONITOR_WORD_MASK)
+#if defined(WLAN_PKT_CAPTURE_TX_2_0) && defined(TX_MONITOR_WORD_MASK)
 
 #define TX_FES_SETUP_MASK 0x3
 typedef struct tx_fes_setup_compact_9224 hal_tx_fes_setup_t;

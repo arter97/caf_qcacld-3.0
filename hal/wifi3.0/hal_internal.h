@@ -1398,7 +1398,7 @@ struct hal_hw_txrx_ops {
 	void (*hal_txmon_populate_packet_info)(void *tx_tlv_hdr,
 					       void *pkt_info);
 	/* TX MONITOR */
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_TX_2_0
 	uint32_t (*hal_txmon_status_parse_tlv)(void *data_ppdu_info,
 					       void *prot_ppdu_info,
 					       void *data_status_info,
@@ -1408,7 +1408,7 @@ struct hal_hw_txrx_ops {
 	uint32_t (*hal_txmon_status_get_num_users)(void *tx_tlv_hdr,
 						   uint8_t *num_users);
 	void (*hal_txmon_get_word_mask)(void *wmask);
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 */
 	QDF_STATUS (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl,
 						 struct reo_queue_ref_table
 						 *reo_qref);
