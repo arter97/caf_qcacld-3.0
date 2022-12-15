@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -913,26 +913,32 @@ void wlan_objmgr_set_mlo_ctx(struct mlo_mgr_context *ctx)
 }
 
 #ifdef WLAN_MLO_MULTI_CHIP
-void wlan_objmgr_set_dp_mlo_ctx(void *dp_handle)
+void wlan_objmgr_set_dp_mlo_ctx(void *dp_handle, uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
 	if (!mlo_ctx)
 		return;
 
-	mlo_ctx->setup_info.dp_handle = dp_handle;
+	if (grp_id >= mlo_ctx->total_grp)
+		return;
+
+	mlo_ctx->setup_info[grp_id].dp_handle = dp_handle;
 }
 
 qdf_export_symbol(wlan_objmgr_set_dp_mlo_ctx);
 
-void *wlan_objmgr_get_dp_mlo_ctx(void)
+void *wlan_objmgr_get_dp_mlo_ctx(uint8_t grp_id)
 {
 	struct mlo_mgr_context *mlo_ctx = wlan_objmgr_get_mlo_ctx();
 
 	if (!mlo_ctx)
 		return NULL;
 
-	return mlo_ctx->setup_info.dp_handle;
+	if (grp_id >= mlo_ctx->total_grp)
+		return NULL;
+
+	return mlo_ctx->setup_info[grp_id].dp_handle;
 }
 
 qdf_export_symbol(wlan_objmgr_get_dp_mlo_ctx);
