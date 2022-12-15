@@ -578,7 +578,6 @@ typedef struct sSapDfsNolInfo {
 
 typedef struct sSapDfsInfo {
 	qdf_mc_timer_t sap_dfs_cac_timer;
-	uint8_t sap_radar_found_status;
 	/*
 	 * New channel frequency to move to when a  Radar is
 	 * detected on current Channel
@@ -1500,6 +1499,20 @@ void wlansap_cleanup_cac_timer(struct sap_context *sap_ctx);
 QDF_STATUS wlansap_update_owe_info(struct sap_context *sap_ctx,
 				   uint8_t *peer, const uint8_t *ie,
 				   uint32_t ie_len, uint16_t owe_status);
+
+/**
+ * wlansap_update_ft_info() - Update FT info
+ * @sap_ctx: sap context
+ * @peer: peer mac
+ * @ie: IE from hostapd
+ * @ie_len: IE length
+ * @ft_status: wlan status codes
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlansap_update_ft_info(struct sap_context *sap_ctx,
+				  uint8_t *peer, const uint8_t *ie,
+				  uint32_t ie_len, uint16_t ft_status);
 
 /**
  * wlansap_filter_ch_based_acs() -filter out channel based on acs

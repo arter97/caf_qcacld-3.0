@@ -49,13 +49,14 @@ wma_pasn_peer_remove(struct wlan_objmgr_psoc *psoc,
 
 	if (!wma_objmgr_peer_exist(wma, peer_addr->bytes, &peer_vdev_id)) {
 		wma_err("peer doesn't exist peer_addr " QDF_MAC_ADDR_FMT " vdevid %d",
-			QDF_MAC_ADDR_REF(peer_addr), vdev_id);
+			QDF_MAC_ADDR_REF(peer_addr->bytes), vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
 	if (peer_vdev_id != vdev_id) {
 		wma_err("peer " QDF_MAC_ADDR_FMT " is on vdev id %d but delete req on vdevid %d",
-			QDF_MAC_ADDR_REF(peer_addr), peer_vdev_id, vdev_id);
+			QDF_MAC_ADDR_REF(peer_addr->bytes),
+			peer_vdev_id, vdev_id);
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -251,6 +252,11 @@ wma_pasn_peer_delete_all_complete(struct wlan_objmgr_vdev *vdev)
 	tp_wma_handle wma = cds_get_context(QDF_MODULE_ID_WMA);
 	struct wma_target_req *req_msg;
 	uint8_t vdev_id = wlan_vdev_get_id(vdev);
+
+	if (!wma) {
+		wma_err("wma_handle is NULL");
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	req_msg = wma_find_remove_req_msgtype(wma, vdev_id,
 					      WMA_PASN_PEER_DELETE_REQUEST);

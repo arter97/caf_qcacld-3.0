@@ -59,6 +59,9 @@
 #define STA_ENTRY_PEER              STA_ENTRY_OTHER
 #ifdef FEATURE_WLAN_TDLS
 #define STA_ENTRY_TDLS_PEER         4
+#define IS_TDLS_PEER(type) ((type) == STA_ENTRY_TDLS_PEER)
+#else /* !FEATURE_WLAN_TDLS */
+#define IS_TDLS_PEER(type) false
 #endif /* FEATURE_WLAN_TDLS */
 #define STA_ENTRY_NDI_PEER          5
 
@@ -185,6 +188,10 @@ struct med_sync_delay {
  * @eht_op: EHT operation
  * @mld_mac_addr: mld mac address
  * @is_assoc_peer: is assoc peer or not
+ * @emlsr_support: is EMLSR mode supported or not
+ * @msd_caps_present: is MSD capability present in MLO IE or not
+ * @link_id: per link id
+ * @emlsr_trans_timeout: EMLSR transition timeout value
  *
  * This structure contains parameter required for
  * add sta request of upper layer.

@@ -315,6 +315,8 @@ QDF_STATUS nan_scheduled_msg_handler(struct scheduler_msg *msg)
 	if (status != WLAN_SER_CMD_ACTIVE && status != WLAN_SER_CMD_PENDING) {
 		nan_err("unable to serialize command");
 		wlan_objmgr_vdev_release_ref(cmd.vdev, WLAN_NAN_ID);
+		qdf_mem_free(msg->bodyptr);
+		msg->bodyptr = NULL;
 		return QDF_STATUS_E_INVAL;
 	}
 	return QDF_STATUS_SUCCESS;
@@ -867,7 +869,7 @@ static QDF_STATUS nan_handle_enable_rsp(struct nan_event_params *nan_event)
 			nan_debug("NAN vdev_id: %u", vdev_id);
 			policy_mgr_incr_active_session(psoc, QDF_NAN_DISC_MODE,
 						       vdev_id);
-			policy_mgr_nan_sap_post_enable_conc_check(psoc);
+			policy_mgr_process_force_scc_for_nan(psoc);
 
 		} else {
 			/*
@@ -888,7 +890,15 @@ fail:
 	psoc_nan_obj->nan_social_ch_2g_freq = 0;
 	psoc_nan_obj->nan_social_ch_5g_freq = 0;
 	nan_set_discovery_state(psoc, NAN_DISC_DISABLED);
-	policy_mgr_check_n_start_opportunistic_timer(psoc);
+	if (ucfg_is_nan_dbs_supported(psoc))
+		policy_mgr_check_n_start_opportunistic_timer(psoc);
+
+	/*
+	 * If FW respond with NAN enable failure, then TDLS should be enable
+	 * again if there is TDLS connection exist earlier.
+	 * decrement the active TDLS session.
+	 */
+	ucfg_tdls_notify_connect_failure(psoc);
 
 done:
 	nan_conc_callback = psoc_nan_obj->cb_obj.nan_concurrency_update;
@@ -1116,7 +1126,6 @@ bool nan_is_enable_allowed(struct wlan_objmgr_psoc *psoc, uint32_t nan_ch_freq)
 	}
 
 	return (NAN_DISC_DISABLED == nan_get_discovery_state(psoc) &&
-		ucfg_is_nan_conc_control_supported(psoc) &&
 		policy_mgr_allow_concurrency(psoc, PM_NAN_DISC_MODE,
 					     nan_ch_freq, HW_MODE_20_MHZ,
 					     0));

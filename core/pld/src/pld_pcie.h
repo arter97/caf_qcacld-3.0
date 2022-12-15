@@ -412,6 +412,11 @@ static inline int pld_pcie_get_msi_irq(struct device *dev, unsigned int vector)
 	return 0;
 }
 
+static inline bool pld_pcie_is_one_msi(struct device *dev)
+{
+	return false;
+}
+
 static inline void pld_pcie_get_msi_address(struct device *dev,
 					    uint32_t *msi_addr_low,
 					    uint32_t *msi_addr_high)
@@ -425,6 +430,11 @@ static inline int pld_pcie_is_drv_connected(struct device *dev)
 }
 
 static inline bool pld_pcie_platform_driver_support(void)
+{
+	return false;
+}
+
+static inline bool pld_pcie_is_direct_link_supported(struct device *dev)
 {
 	return false;
 }
@@ -702,6 +712,18 @@ static inline int pld_pcie_get_msi_irq(struct device *dev, unsigned int vector)
 	return cnss_get_msi_irq(dev, vector);
 }
 
+#ifdef WLAN_ONE_MSI_VECTOR
+static inline bool pld_pcie_is_one_msi(struct device *dev)
+{
+	return cnss_is_one_msi(dev);
+}
+#else
+static inline bool pld_pcie_is_one_msi(struct device *dev)
+{
+	return false;
+}
+#endif
+
 static inline void pld_pcie_get_msi_address(struct device *dev,
 					    uint32_t *msi_addr_low,
 					    uint32_t *msi_addr_high)
@@ -718,5 +740,17 @@ static inline bool pld_pcie_platform_driver_support(void)
 {
 	return true;
 }
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
+static inline bool pld_pcie_is_direct_link_supported(struct device *dev)
+{
+	return cnss_get_fw_cap(dev, CNSS_FW_CAP_DIRECT_LINK_SUPPORT);
+}
+#else
+static inline bool pld_pcie_is_direct_link_supported(struct device *dev)
+{
+	return false;
+}
+#endif
 #endif
 #endif

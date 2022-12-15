@@ -49,7 +49,7 @@
 /**
  * hdd_nan_datapath_target_config() - Configure NAN datapath features
  * @hdd_ctx: Pointer to HDD context
- * @cfg: Pointer to target device capability information
+ * @tgt_cfg: Pointer to target device capability information
  *
  * NAN datapath functionality is enabled if it is enabled in
  * .ini file and also supported on target device.
@@ -522,7 +522,7 @@ void hdd_ndp_event_handler(struct hdd_adapter *adapter,
 }
 
 /**
- * __wlan_hdd_cfg80211_process_ndp_cmds() - handle NDP request
+ * __wlan_hdd_cfg80211_process_ndp_cmd() - handle NDP request
  * @wiphy: pointer to wireless wiphy structure.
  * @wdev: pointer to wireless_dev structure.
  * @data: Pointer to the data to be passed via vendor interface
@@ -1079,6 +1079,29 @@ void hdd_ndp_session_end_handler(struct hdd_adapter *adapter)
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_OSIF_NAN_ID);
 }
 
+/**
+ * hdd_send_obss_scan_req() - send OBSS scan request to SME layer.
+ * @hdd_ctx: hdd context pointer
+ * @val: true if new NDP peer is added and false when last peer NDP is deleted.
+ *
+ * Return: void
+ */
+static void hdd_send_obss_scan_req(struct hdd_context *hdd_ctx, bool val)
+{
+	QDF_STATUS status;
+	uint32_t sta_vdev_id = 0;
+
+	status = hdd_get_first_connected_sta_vdev_id(hdd_ctx, &sta_vdev_id);
+
+	if (QDF_IS_STATUS_SUCCESS(status)) {
+		hdd_debug("reconfig OBSS scan param: %d", val);
+		sme_reconfig_obss_scan_param(hdd_ctx->mac_handle, sta_vdev_id,
+					     val);
+	} else {
+		hdd_debug("Connected STA not found");
+	}
+}
+
 int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 			struct qdf_mac_addr *peer_mac_addr, bool first_peer)
 {
@@ -1147,6 +1170,7 @@ int hdd_ndp_new_peer_handler(uint8_t vdev_id, uint16_t sta_id,
 		 */
 		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
 			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 1);
+		hdd_send_obss_scan_req(hdd_ctx, true);
 
 		wlan_twt_concurrency_update(hdd_ctx);
 	}
@@ -1227,6 +1251,7 @@ void hdd_ndp_peer_departed_handler(uint8_t vdev_id, uint16_t sta_id,
 		 */
 		if (!NDI_CONCURRENCY_SUPPORTED(hdd_ctx->psoc))
 			hdd_indicate_active_ndp_cnt(hdd_ctx->psoc, vdev_id, 0);
+		hdd_send_obss_scan_req(hdd_ctx, false);
 
 		wlan_twt_concurrency_update(hdd_ctx);
 	}

@@ -33,6 +33,12 @@
 #include "wlan_dp_nud_tracking.h"
 #include "target_if_dp_comp.h"
 #include "wlan_dp_txrx.h"
+#include "init_deinit_lmac.h"
+#include <hif.h>
+#include <htc_api.h>
+#ifdef FEATURE_DIRECT_LINK
+#include "dp_internal.h"
+#endif
 
 /* Global DP context */
 static struct wlan_dp_psoc_context *gp_dp_ctx;
@@ -852,7 +858,7 @@ dp_peer_obj_create_notification(struct wlan_objmgr_peer *peer, void *arg)
 	sta_info->dhcp_nego_status = DHCP_NEGO_STOP;
 
 	dp_info("sta info created mac:" QDF_MAC_ADDR_FMT,
-		QDF_MAC_ADDR_REF(&sta_info->sta_mac));
+		QDF_MAC_ADDR_REF(sta_info->sta_mac.bytes));
 
 	return status;
 }
@@ -903,7 +909,7 @@ dp_vdev_obj_create_notification(struct wlan_objmgr_vdev *vdev, void *arg)
 	dev = dp_ctx->dp_ops.dp_get_netdev_by_vdev_mac(mac_addr);
 	if (!dev) {
 		dp_err("Failed to get intf mac:" QDF_MAC_ADDR_FMT,
-		       QDF_MAC_ADDR_REF(mac_addr));
+		       QDF_MAC_ADDR_REF(mac_addr->bytes));
 		return QDF_STATUS_E_INVAL;
 	}
 
@@ -1050,7 +1056,7 @@ dp_pdev_obj_destroy_notification(struct wlan_objmgr_pdev *pdev, void *arg)
 						       WLAN_COMP_DP,
 						       dp_ctx);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		dp_err("Failed to detatch dp_ctx from pdev");
+		dp_err("Failed to detach dp_ctx from pdev");
 		return status;
 	}
 	if (!dp_ctx->pdev)
@@ -1539,3 +1545,234 @@ bool dp_is_data_stall_event_enabled(uint32_t evt)
 
 	return false;
 }
+
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * dp_lpass_h2t_tx_complete() - Copy completion handler for LPASS data
+ * message service
+ * @ctx: DP Direct Link context
+ * @pkt: htc packet
+ *
+ * Return: None
+ */
+static void dp_lpass_h2t_tx_complete(void *ctx, HTC_PACKET *pkt)
+{
+	dp_info("Unexpected lpass tx complete trigger");
+	qdf_assert(0);
+}
+
+/**
+ * dp_lpass_t2h_msg_handler() - target to host message handler for LPASS data
+ * message service
+ * @ctx: DP Direct Link context
+ * @pkt: htc packet
+ *
+ * Return: None
+ */
+static void dp_lpass_t2h_msg_handler(void *ctx, HTC_PACKET *pkt)
+{
+	dp_info("Unexpected receive msg trigger for lpass service");
+	qdf_assert(0);
+}
+
+/**
+ * dp_lpass_connect_htc_service() - Connect lpass data message htc service
+ * @dp_direct_link_ctx: DP Direct Link context
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+dp_lpass_connect_htc_service(struct dp_direct_link_context *dp_direct_link_ctx)
+{
+	struct htc_service_connect_req connect = {0};
+	struct htc_service_connect_resp response = {0};
+	HTC_HANDLE htc_handle = cds_get_context(QDF_MODULE_ID_HTC);
+	QDF_STATUS status;
+
+	if (!htc_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	connect.EpCallbacks.pContext = dp_direct_link_ctx;
+	connect.EpCallbacks.EpTxComplete = dp_lpass_h2t_tx_complete;
+	connect.EpCallbacks.EpRecv = dp_lpass_t2h_msg_handler;
+
+	/* disable flow control for LPASS data message service */
+	connect.ConnectionFlags |= HTC_CONNECT_FLAGS_DISABLE_CREDIT_FLOW_CTRL;
+	connect.service_id = LPASS_DATA_MSG_SVC;
+
+	status = htc_connect_service(htc_handle, &connect, &response);
+
+	if (status != QDF_STATUS_SUCCESS) {
+		dp_err("LPASS_DATA_MSG connect service failed");
+		return status;
+	}
+
+	dp_direct_link_ctx->lpass_ep_id = response.Endpoint;
+
+	dp_err("LPASS_DATA_MSG connect service successful");
+
+	return status;
+}
+
+/**
+ * dp_direct_link_refill_ring_init() - Initialize refill ring that would be used
+ *  for Direct Link DP
+ * @direct_link_ctx: DP Direct Link context
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+dp_direct_link_refill_ring_init(struct dp_direct_link_context *direct_link_ctx)
+{
+	struct cdp_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint8_t pdev_id;
+
+	if (!soc)
+		return QDF_STATUS_E_FAILURE;
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(direct_link_ctx->dp_ctx->pdev);
+
+	direct_link_ctx->direct_link_refill_ring_hdl =
+				dp_setup_direct_link_refill_ring(soc,
+								 pdev_id);
+	if (!direct_link_ctx->direct_link_refill_ring_hdl) {
+		dp_err("Refill ring init for Direct Link failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+/**
+ * dp_direct_link_refill_ring_deinit() - De-initialize refill ring that would be
+ *  used for Direct Link DP
+ * @direct_link_ctx: DP Direct Link context
+ *
+ * Return: None
+ */
+static void
+dp_direct_link_refill_ring_deinit(struct dp_direct_link_context *dlink_ctx)
+{
+	struct cdp_soc_t *soc = cds_get_context(QDF_MODULE_ID_SOC);
+	uint8_t pdev_id;
+
+	if (!soc)
+		return;
+
+	pdev_id = wlan_objmgr_pdev_get_pdev_id(dlink_ctx->dp_ctx->pdev);
+	dp_destroy_direct_link_refill_ring(soc, pdev_id);
+	dlink_ctx->direct_link_refill_ring_hdl = NULL;
+}
+
+QDF_STATUS dp_direct_link_init(struct wlan_dp_psoc_context *dp_ctx)
+{
+	struct dp_direct_link_context *dp_direct_link_ctx;
+	QDF_STATUS status;
+
+	if (!pld_is_direct_link_supported(dp_ctx->qdf_dev->dev)) {
+		dp_info("FW does not support Direct Link");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	dp_direct_link_ctx = qdf_mem_malloc(sizeof(*dp_direct_link_ctx));
+	if (!dp_direct_link_ctx) {
+		dp_err("Failed to allocate memory for DP Direct Link context");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	dp_direct_link_ctx->dp_ctx = dp_ctx;
+
+	status = dp_lpass_connect_htc_service(dp_direct_link_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Failed to connect to LPASS data msg service");
+		qdf_mem_free(dp_direct_link_ctx);
+		return status;
+	}
+
+	status = dp_direct_link_refill_ring_init(dp_direct_link_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		qdf_mem_free(dp_direct_link_ctx);
+		return status;
+	}
+
+	status = dp_wfds_init(dp_direct_link_ctx);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_err("Failed to initialize QMI for Direct Link");
+		dp_direct_link_refill_ring_deinit(dp_ctx->dp_direct_link_ctx);
+		qdf_mem_free(dp_direct_link_ctx);
+		return status;
+	}
+
+	dp_ctx->dp_direct_link_ctx = dp_direct_link_ctx;
+
+	return status;
+}
+
+void dp_direct_link_deinit(struct wlan_dp_psoc_context *dp_ctx)
+{
+	if (!pld_is_direct_link_supported(dp_ctx->qdf_dev->dev))
+		return;
+
+	if (!dp_ctx->dp_direct_link_ctx)
+		return;
+
+	dp_wfds_deinit(dp_ctx->dp_direct_link_ctx);
+	dp_direct_link_refill_ring_deinit(dp_ctx->dp_direct_link_ctx);
+
+	qdf_mem_free(dp_ctx->dp_direct_link_ctx);
+	dp_ctx->dp_direct_link_ctx = NULL;
+}
+
+QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
+				 bool config_direct_link,
+				 bool enable_low_latency)
+{
+	struct wlan_dp_psoc_context *dp_ctx = dp_intf->dp_ctx;
+	struct direct_link_info *config = &dp_intf->direct_link_config;
+	void *htc_handle;
+	bool prev_ll, update_ll;
+
+	if (!dp_ctx || !dp_ctx->psoc) {
+		dp_err("DP Handle is NULL");
+		return QDF_STATUS_E_CANCELED;
+	}
+
+	if (!dp_ctx->dp_direct_link_ctx) {
+		dp_err("Direct link not enabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	htc_handle = lmac_get_htc_hdl(dp_ctx->psoc);
+	if (!htc_handle) {
+		dp_err("HTC handle is NULL");
+		return QDF_STATUS_E_EMPTY;
+	}
+
+	qdf_spin_lock(&dp_intf->vdev_lock);
+	prev_ll = config->low_latency;
+	update_ll = config_direct_link ? enable_low_latency : prev_ll;
+	config->config_set = config_direct_link;
+	config->low_latency = enable_low_latency;
+	qdf_spin_unlock(&dp_intf->vdev_lock);
+
+	if (config_direct_link) {
+		htc_vote_link_up(htc_handle, HTC_LINK_VOTE_SAP_USER_ID);
+		if (update_ll)
+			hif_prevent_link_low_power_states(
+						htc_get_hif_device(htc_handle));
+		else if (prev_ll)
+			hif_allow_link_low_power_states(
+						htc_get_hif_device(htc_handle));
+		dp_info("Direct link config set. Low link latency enabled: %d",
+			enable_low_latency);
+	} else {
+		htc_vote_link_down(htc_handle, HTC_LINK_VOTE_SAP_USER_ID);
+		if (update_ll)
+			hif_allow_link_low_power_states(
+						htc_get_hif_device(htc_handle));
+		dp_info("Direct link config cleared.");
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+#endif

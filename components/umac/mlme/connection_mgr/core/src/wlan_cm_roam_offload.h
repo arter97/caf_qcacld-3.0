@@ -421,10 +421,51 @@ QDF_STATUS cm_roam_update_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 QDF_STATUS
 cm_roam_send_rt_stats_config(struct wlan_objmgr_psoc *psoc,
 			     uint8_t vdev_id, uint8_t param_value);
+
+/**
+ * cm_roam_send_ho_delay_config() - Send HO delay value to FW to delay
+ * hand-off (in msec) by the specified duration to receive pending rx frames
+ * from current BSS.
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev id
+ * @param_value: HO delay value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_roam_send_ho_delay_config(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id, uint16_t param_value);
+
+/**
+ * cm_exclude_rm_partial_scan_freq() - Exclude the channels in roam full scan
+ * that are already scanned as part of partial scan.
+ * @psoc: PSOC pointer
+ * @vdev_id: vdev id
+ * @param_value: include/exclude the partial scan channels in roam full scan
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+cm_exclude_rm_partial_scan_freq(struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id, uint8_t param_value);
 #else
 static inline QDF_STATUS
 cm_roam_send_rt_stats_config(struct wlan_objmgr_psoc *psoc,
 			     uint8_t vdev_id, uint8_t param_value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+cm_roam_send_ho_delay_config(struct wlan_objmgr_psoc *psoc,
+			     uint8_t vdev_id, uint16_t param_value)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+cm_exclude_rm_partial_scan_freq(struct wlan_objmgr_psoc *psoc,
+				uint8_t vdev_id, uint8_t param_value)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

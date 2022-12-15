@@ -340,7 +340,7 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	struct wlan_scan_features scan_feature_set;
 	struct wlan_twt_features twt_feature_set;
 	struct wlan_mlme_features mlme_feature_set;
-	struct wlan_tdls_features tdls_feature_set;
+	struct wlan_tdls_features tdls_feature_set = {0};
 
 	psoc = wma_handle->psoc;
 	if (!psoc) {
@@ -437,9 +437,9 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->supported_dot11mode = feature_set->wifi_standard;
 	feature_set->sap_wpa3_support = true;
 	feature_set->assurance_disconnect_reason_api = true;
-	feature_set->frame_pcap_log_mgmt = true;
-	feature_set->frame_pcap_log_ctrl = true;
-	feature_set->frame_pcap_log_data = true;
+	feature_set->frame_pcap_log_mgmt = false;
+	feature_set->frame_pcap_log_ctrl = false;
+	feature_set->frame_pcap_log_data = false;
 
 	/*
 	 * This information is hardcoded based on hdd_sta_akm_suites,
@@ -479,7 +479,7 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->peer_bigdata_getbssinfo_support = true;
 	feature_set->peer_bigdata_assocreject_info_support = true;
 	feature_set->peer_getstainfo_support = true;
-	feature_set->feature_set_version = 1;
+	feature_set->feature_set_version = 2;
 }
 
 /**
@@ -8775,8 +8775,8 @@ static QDF_STATUS wma_mc_process_msg(struct scheduler_msg *msg)
 		goto end;
 	}
 
-	wma_debug("msg->type = %x %s", msg->type,
-		 mac_trace_get_wma_msg_string(msg->type));
+	wma_nofl_debug("Handle msg %s(0x%x)",
+		       mac_trace_get_wma_msg_string(msg->type), msg->type);
 
 	wma_handle = cds_get_context(QDF_MODULE_ID_WMA);
 	if (!wma_handle) {
