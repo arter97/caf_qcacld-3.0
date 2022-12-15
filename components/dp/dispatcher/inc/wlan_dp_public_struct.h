@@ -406,7 +406,7 @@ enum dp_nud_state {
 };
 
 struct opaque_hdd_callback_handle;
-/**
+/*
  * typedef hdd_cb_handle - HDD Handle
  *
  * Handle to the HDD.  The HDD handle is given to the DP component from the

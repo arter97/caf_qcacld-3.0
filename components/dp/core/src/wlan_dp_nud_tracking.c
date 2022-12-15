@@ -334,7 +334,7 @@ static void dp_nud_process_failure_event(struct wlan_dp_intf *dp_intf)
 
 /**
  * dp_nud_filter_netevent() - filter netevents for STA interface
- * @neighbour: Pointer to neighbour
+ * @netdev_addr: Pointer to neighbour
  * @gw_mac_addr: Gateway MAC address
  * @nud_state: Current NUD state
  *
