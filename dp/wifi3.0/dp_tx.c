@@ -3344,6 +3344,8 @@ dp_tx_send_exception(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 			goto fail;
 		}
 
+		DP_STATS_INC(vdev,  tx_i.rcvd.num, msdu_info.num_seg - 1);
+
 		goto send_multiple;
 	}
 
@@ -3668,7 +3670,7 @@ qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	 * (TID override disabled)
 	 */
 	msdu_info.tid = HTT_TX_EXT_TID_INVALID;
-	DP_STATS_INC_PKT(vdev, tx_i.rcvd, 1, qdf_nbuf_headlen(nbuf));
+	DP_STATS_INC_PKT(vdev, tx_i.rcvd, 1, qdf_nbuf_len(nbuf));
 
 	if (qdf_unlikely(vdev->mesh_vdev)) {
 		qdf_nbuf_t nbuf_mesh = dp_tx_extract_mesh_meta_data(vdev, nbuf,
@@ -3721,6 +3723,8 @@ qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 					 qdf_nbuf_len(nbuf));
 			return nbuf;
 		}
+
+		DP_STATS_INC(vdev,  tx_i.rcvd.num, msdu_info.num_seg - 1);
 
 		goto send_multiple;
 	}
@@ -5331,7 +5335,7 @@ void dp_tx_comp_process_tx_status(struct dp_soc *soc,
 	}
 
 	eh = (qdf_ether_header_t *)qdf_nbuf_data(nbuf);
-	length = qdf_nbuf_len(nbuf);
+	length = dp_tx_get_pkt_len(tx_desc);
 
 	dp_status = dp_tx_hw_to_qdf(ts->status);
 	DPTRACE(qdf_dp_trace_ptr(tx_desc->nbuf,

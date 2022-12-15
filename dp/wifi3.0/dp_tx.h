@@ -1320,4 +1320,25 @@ dp_tx_outstanding_dec(struct dp_pdev *pdev)
 	dp_update_tx_desc_stats(pdev);
 }
 #endif //QCA_TX_LIMIT_CHECK
+/**
+ * dp_tx_get_pkt_len() - Get the packet length of a msdu
+ * @tx_desc: tx descriptor
+ *
+ * Return: Packet length of a msdu. If the packet is fragmented,
+ * it will return the single fragment length.
+ *
+ * In TSO mode, the msdu from stack will be fragmented into small
+ * fragments and each of these new fragments will be transmitted
+ * as an individual msdu.
+ *
+ * Please note that the length of a msdu from stack may be smaller
+ * than the length of the total length of the fragments it has been
+ * fragmentted because each of the fragments has a nbuf header.
+ */
+static inline uint32_t dp_tx_get_pkt_len(struct dp_tx_desc_s *tx_desc)
+{
+	return tx_desc->frm_type == dp_tx_frm_tso ?
+		tx_desc->msdu_ext_desc->tso_desc->seg.total_len :
+		qdf_nbuf_len(tx_desc->nbuf);
+}
 #endif
