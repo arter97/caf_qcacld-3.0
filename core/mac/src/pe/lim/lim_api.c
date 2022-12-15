@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -4106,7 +4106,7 @@ void lim_update_vdev_sr_elements(struct pe_session *session_entry,
 				   srp_ie->srg_info.info.srg_color);
 	lim_store_array_to_bit_map(&srg_partial_bssid_bit_map,
 				   srp_ie->srg_info.info.srg_partial_bssid);
-	pe_debug("Spatial Reuse Control field: %x Non-SRG Max PD Offset: %x SRG range %d - %d srg_color_bit_map:%lu srg_partial_bssid_bit_map: %lu",
+	pe_debug("Spatial Reuse Control field: %x Non-SRG Max PD Offset: %x SRG range %d - %d srg_color_bit_map:%llu srg_partial_bssid_bit_map: %llu",
 		 sr_ctrl, non_srg_max_pd_offset, srg_min_pd_offset,
 		 srg_max_pd_offset, srg_color_bit_map,
 		 srg_partial_bssid_bit_map);
