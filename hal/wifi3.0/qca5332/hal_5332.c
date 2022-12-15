@@ -1383,7 +1383,7 @@ static void hal_hw_txrx_ops_attach_qca5332(struct hal_soc *hal_soc)
 					hal_rx_link_desc_msdu0_ptr_5332;
 	hal_soc->ops->hal_reo_status_get_header =
 					hal_reo_status_get_header_5332;
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
 	hal_soc->ops->hal_rx_status_get_tlv_info =
 					hal_rx_status_get_tlv_info_wrapper_be;
 #endif
@@ -1949,7 +1949,7 @@ struct hal_hw_srng_config hw_srng_table_5332[] = {
 		.reg_size = {},
 		.max_size = HAL_RXDMA_MAX_RING_SIZE,
 	},
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
 	{ /* RXDMA_MONITOR_BUF */
 		.start_ring_id = HAL_SRNG_WMAC1_SW2RXDMA2_BUF,
 		.max_rings = 1,
@@ -1979,7 +1979,7 @@ struct hal_hw_srng_config hw_srng_table_5332[] = {
 		.reg_size = {},
 		.max_size = HAL_RXDMA_MAX_RING_SIZE,
 	},
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
 	{ /* RXDMA_MONITOR_DST */
 		.start_ring_id = HAL_SRNG_WMAC1_RXMON2SW0,
 		.max_rings = 2,

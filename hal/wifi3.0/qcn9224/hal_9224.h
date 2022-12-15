@@ -1588,7 +1588,7 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 					hal_rx_link_desc_msdu0_ptr_9224;
 	hal_soc->ops->hal_reo_status_get_header =
 					hal_reo_status_get_header_9224;
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
 	hal_soc->ops->hal_rx_status_get_tlv_info =
 					hal_rx_status_get_tlv_info_wrapper_be;
 #endif

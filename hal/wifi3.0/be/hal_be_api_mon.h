@@ -2326,7 +2326,7 @@ hal_rx_parse_receive_user_info(struct hal_soc *hal_soc, uint8_t *tlv,
 	return HAL_TLV_STATUS_PPDU_NOT_DONE;
 }
 
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#ifdef WLAN_PKT_CAPTURE_RX_2_0
 static inline void
 hal_rx_status_get_mpdu_retry_cnt(struct hal_rx_ppdu_info *ppdu_info,
 				 hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user)

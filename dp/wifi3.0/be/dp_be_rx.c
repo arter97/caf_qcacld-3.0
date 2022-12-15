@@ -1524,7 +1524,7 @@ rel_da_peer:
 #endif /* WLAN_MLO_MULTI_CHIP */
 #endif /* INTRA_BSS_FWD_OFFLOAD */
 
-#if defined(QCA_MONITOR_2_0_SUPPORT) || defined(CONFIG_WORD_BASED_TLV)
+#if defined(WLAN_PKT_CAPTURE_RX_2_0) || defined(CONFIG_WORD_BASED_TLV)
 void dp_rx_word_mask_subscribe_be(struct dp_soc *soc,
 				  uint32_t *msg_word,
 				  void *rx_filter)

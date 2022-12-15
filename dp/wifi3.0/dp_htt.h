@@ -706,7 +706,7 @@ struct htt_rx_ring_tlv_filter {
 	u_int32_t phy_err_mask;
 	u_int32_t phy_err_mask_cont;
 #endif
-#if defined(QCA_MONITOR_2_0_SUPPORT) || defined(CONFIG_WORD_BASED_TLV) || \
+#if defined(WLAN_PKT_CAPTURE_RX_2_0) || defined(CONFIG_WORD_BASED_TLV) || \
 	defined(CONFIG_MON_WORD_BASED_TLV)
 	uint32_t rx_mpdu_start_wmask;
 	uint16_t rx_mpdu_end_wmask;
