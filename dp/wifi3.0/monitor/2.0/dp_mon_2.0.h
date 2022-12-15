@@ -505,7 +505,8 @@ void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 					    uint16_t protocol_index);
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
 
-#if !defined(DISABLE_MON_CONFIG) && defined(QCA_MONITOR_2_0_SUPPORT)
+#if !defined(DISABLE_MON_CONFIG) && (defined(WLAN_PKT_CAPTURE_TX_2_0) || \
+	defined(WLAN_PKT_CAPTURE_RX_2_0))
 /**
  * dp_mon_get_context_size_be() - get BE specific size for mon pdev/soc
  * @context_type: context type for which the size is needed

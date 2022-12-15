@@ -4549,7 +4549,8 @@ static inline bool dp_monitor_is_rx_cap_enabled(struct dp_peer *peer)
 	return peer->monitor_peer ? peer->monitor_peer->rx_cap_enabled : 0;
 }
 
-#if !(!defined(DISABLE_MON_CONFIG) && defined(QCA_MONITOR_2_0_SUPPORT))
+#if !(!defined(DISABLE_MON_CONFIG) && (defined(WLAN_PKT_CAPTURE_TX_2_0) || \
+	defined(WLAN_PKT_CAPTURE_RX_2_0)))
 /**
  * dp_mon_get_context_size_be() - get BE specific size for mon pdev/soc
  * @context_type: context type for which the size is needed

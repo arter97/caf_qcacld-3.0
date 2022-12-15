@@ -25,7 +25,8 @@
 #include "dp_be_tx.h"
 #include "dp_be_rx.h"
 #ifdef WIFI_MONITOR_SUPPORT
-#if !defined(DISABLE_MON_CONFIG) && defined(QCA_MONITOR_2_0_SUPPORT)
+#if !defined(DISABLE_MON_CONFIG) && (defined(WLAN_PKT_CAPTURE_TX_2_0) || \
+	defined(WLAN_PKT_CAPTURE_RX_2_0))
 #include "dp_mon_2.0.h"
 #endif
 #include "dp_mon.h"

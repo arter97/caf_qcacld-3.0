@@ -4796,7 +4796,8 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 	}
 }
 
-#if !defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(QCA_MONITOR_2_0_SUPPORT)
+#if !defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(WLAN_PKT_CAPTURE_TX_2_0) || \
+	defined(WLAN_PKT_CAPTURE_RX_2_0)
 /**
  * dp_tx_ppdu_desc_notify() - Notify to upper layer about PPDU via WDI
  *
@@ -6187,7 +6188,7 @@ void dp_mon_ops_register(struct dp_soc *soc)
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA5332:
 	case TARGET_TYPE_QCN6432:
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#if defined(WLAN_PKT_CAPTURE_TX_2_0) || defined(WLAN_PKT_CAPTURE_RX_2_0)
 		dp_mon_ops_register_2_0(mon_soc);
 #endif
 		break;
@@ -6258,12 +6259,12 @@ void dp_mon_cdp_ops_register(struct dp_soc *soc)
 	case TARGET_TYPE_QCN9224:
 	case TARGET_TYPE_QCA5332:
 	case TARGET_TYPE_QCN6432:
-#ifdef QCA_MONITOR_2_0_SUPPORT
+#if defined(WLAN_PKT_CAPTURE_TX_2_0) || defined(WLAN_PKT_CAPTURE_RX_2_0)
 		dp_mon_cdp_ops_register_2_0(ops);
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 		dp_cfr_filter_register_2_0(ops);
 #endif
-#endif /* QCA_MONITOR_2_0_SUPPORT */
+#endif /* WLAN_PKT_CAPTURE_TX_2_0 && WLAN_PKT_CAPTURE_RX_2_0 */
 		break;
 	default:
 		dp_mon_err("%s: Unknown tgt type %d", __func__, target_type);
