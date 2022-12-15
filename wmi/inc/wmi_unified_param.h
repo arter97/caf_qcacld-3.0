@@ -5880,6 +5880,7 @@ typedef enum {
 	VDEV_PARAM(vdev_param_sifs_trigger_rate, UNAVAILABLE_PARAM),
 	VDEV_PARAM(vdev_param_ap_keepalive_max_idle_inactive_secs,
 		   VDEV_PARAM_AP_KEEPALIVE_MAX_IDLE_INACTIVE_TIME_SECS),
+	VDEV_PARAM(vdev_param_set_extra_eht_ltf, VDEV_PARAM_EXTRA_EHT_LTF),
 	vdev_param_max,
 } wmi_conv_vdev_param_id;
 
