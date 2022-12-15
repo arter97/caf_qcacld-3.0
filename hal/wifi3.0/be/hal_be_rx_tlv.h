@@ -355,7 +355,7 @@ struct rx_mpdu_start_compact {
 		 mpdu_duration_valid			:  1,
 		 mpdu_frame_control_valid		:  1;
 	uint32_t mpdu_duration_field			: 16,
-		 mpdu_frame_control_field		: 16,
+		 mpdu_frame_control_field		: 16;
 	uint32_t mac_addr_ad1_31_0			: 32;
 	uint32_t mac_addr_ad2_15_0			: 16,
 		 mac_addr_ad1_47_32			: 16;
