@@ -216,6 +216,34 @@ struct wlan_mlo_dev_context *mlo_get_next_mld_ctx(qdf_list_t *ml_list,
 	return mld_next;
 }
 
+uint8_t wlan_mlo_get_sta_mld_ctx_count(void)
+{
+	struct wlan_mlo_dev_context *mld_cur;
+	struct wlan_mlo_dev_context *mld_next;
+	qdf_list_t *ml_list;
+	struct mlo_mgr_context *mlo_mgr_ctx = wlan_objmgr_get_mlo_ctx();
+	uint8_t count = 0;
+
+	if (!mlo_mgr_ctx)
+		return count;
+
+	ml_link_lock_acquire(mlo_mgr_ctx);
+	ml_list = &mlo_mgr_ctx->ml_dev_list;
+	/* Get first mld context */
+	mld_cur = mlo_list_peek_head(ml_list);
+
+	while (mld_cur) {
+		/* get next mld node */
+		if (mld_cur->sta_ctx)
+			count++;
+		mld_next = mlo_get_next_mld_ctx(ml_list, mld_cur);
+		mld_cur = mld_next;
+	}
+	ml_link_lock_release(mlo_mgr_ctx);
+
+	return count;
+}
+
 struct wlan_mlo_dev_context
 *wlan_mlo_get_mld_ctx_by_mldaddr(struct qdf_mac_addr *mldaddr)
 {

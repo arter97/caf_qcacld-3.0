@@ -785,6 +785,15 @@ QDF_STATUS wlan_mlo_mgr_update_mld_addr(struct qdf_mac_addr *old_mac,
 bool wlan_mlo_is_mld_ctx_exist(struct qdf_mac_addr *mldaddr);
 
 /**
+ * wlan_mlo_get_sta_mld_ctx_count() - Get number of sta mld device context
+ *
+ * API to get number of sta mld device context
+ *
+ * Return: number of sta mld device context
+ */
+uint8_t wlan_mlo_get_sta_mld_ctx_count(void);
+
+/**
  * wlan_mlo_get_mld_ctx_by_mldaddr() - Get mld device context using mld
  *                                     MAC address
  *
@@ -845,6 +854,12 @@ static inline
 bool mlo_mgr_ml_peer_exist(uint8_t *peer_addr)
 {
 	return false;
+}
+
+static inline
+uint8_t wlan_mlo_get_sta_mld_ctx_count(void)
+{
+	return 0;
 }
 #endif
 #endif
