@@ -182,6 +182,7 @@
 #include "wifi_pos_public_struct.h"
 #include "wifi_pos_pasn_api.h"
 #include "os_if_pkt_capture.h"
+#include "os_if_dp_local_pkt_capture.h"
 #include "wlan_hdd_son.h"
 #include "wlan_hdd_mcc_quota.h"
 #include "wlan_hdd_peer_txq_flush.h"
@@ -17880,7 +17881,34 @@ static int wlan_hdd_cfg80211_get_usable_channel(struct wiphy *wiphy,
 }
 #endif
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+/**
+ * os_if_monitor_mode_configure() - Wifi monitor mode configuration
+ * vendor command
+ * @adapter: hdd adapter
+ * @data: Vendor command data buffer
+ * @data_len: Buffer length
+ *
+ * Return: QDF_STATUS
+ */
+static
+QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
+					const void *data, int data_len)
+{
+	struct wlan_objmgr_vdev *vdev;
+	QDF_STATUS status;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	if (!vdev)
+		return QDF_STATUS_E_INVAL;
+
+	status = os_if_dp_set_lpc_configure(vdev, data, data_len);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+	return status;
+}
+#endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
+
+#if defined(WLAN_FEATURE_PKT_CAPTURE) || defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
 
 /**
  * __wlan_hdd_cfg80211_set_monitor_mode() - Wifi monitor mode configuration
@@ -17910,13 +17938,18 @@ __wlan_hdd_cfg80211_set_monitor_mode(struct wiphy *wiphy,
 		return -EPERM;
 	}
 
-	if (!ucfg_pkt_capture_get_mode(hdd_ctx->psoc) ||
-	    !hdd_is_pkt_capture_mon_enable(adapter))
-		return -EPERM;
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
 
 	errno = hdd_validate_adapter(adapter);
 	if (errno)
 		return errno;
+
+	if (!(ucfg_pkt_capture_get_mode(hdd_ctx->psoc) ||
+	      hdd_is_pkt_capture_mon_enable(adapter) ||
+	      ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc)))
+		return -EPERM;
 
 	status = os_if_monitor_mode_configure(adapter, data, data_len);
 
@@ -19008,7 +19041,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 
 	FEATURE_GREEN_AP_LOW_LATENCY_PWR_SAVE_COMMANDS
 
-#ifdef WLAN_FEATURE_PKT_CAPTURE
+#if defined(WLAN_FEATURE_PKT_CAPTURE) || defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
 	FEATURE_MONITOR_MODE_VENDOR_COMMANDS
 #endif
 

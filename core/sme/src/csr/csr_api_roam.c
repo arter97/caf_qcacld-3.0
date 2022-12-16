@@ -6278,7 +6278,7 @@ void csr_get_vdev_type_nss(enum QDF_OPMODE dev_mode, uint8_t *nss_2g,
 	default:
 		*nss_2g = 1;
 		*nss_5g = 1;
-		sme_err("Unknown device mode");
+		sme_err("Unknown device mode: %d", dev_mode);
 		break;
 	}
 	sme_debug("mode - %d: nss_2g - %d, 5g - %d",

@@ -2563,6 +2563,12 @@ endif
 
 ifeq (y,$(filter y,$(CONFIG_LITHIUM) $(CONFIG_BERYLLIUM) $(CONFIG_RHINE)))
 WLAN_DP_COMP_OBJS += $(DP_COMP_CORE_DIR)/wlan_dp_prealloc.o
+
+ifeq ($(CONFIG_WLAN_TX_MON_2_0), y)
+ifeq ($(CONFIG_WLAN_DP_LOCAL_PKT_CAPTURE), y)
+WLAN_DP_COMP_OBJS += $(DP_COMP_OS_IF_DIR)/os_if_dp_local_pkt_capture.o
+endif #CONFIG_WLAN_DP_LOCAL_PKT_CAPTURE
+endif #CONFIG_WLAN_TX_MON_2_0
 endif
 
 ifeq ($(CONFIG_WLAN_FEATURE_DP_RX_THREADS), y)
