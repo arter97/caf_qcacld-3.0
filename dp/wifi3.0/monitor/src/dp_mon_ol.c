@@ -304,7 +304,7 @@ QDF_STATUS convert_tx_to_rx_stats(struct cdp_tx_indication_info *tx_info,
 	rx_status->ppdu_id = m_info->ppdu_id;
 	rx_status->rssi_comb = m_info->ack_rssi;
 	rx_status->tid = m_info->tid;
-	rx_status->frame_control_info_valid = m_info->frame_ctrl;
+	rx_status->frame_control = m_info->frame_ctrl;
 	rx_status->nss = m_info->nss;
 	rx_status->sgi = m_info->gi;
 	rx_status->mcs = m_info->mcs;
