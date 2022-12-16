@@ -46,6 +46,14 @@
 #define SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE \
 	QCA_WLAN_VENDOR_ATTR_SET_MONITOR_MODE_CTRL_RX_FRAME_TYPE
 
+/* Short name for QCA_NL80211_VENDOR_SUBCMD_GET_MONITOR_MODE command */
+#define GET_MONITOR_MODE_CONFIG_MAX \
+	QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_MAX
+#define GET_MONITOR_MODE_INVALID \
+	QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_INVALID
+#define GET_MONITOR_MODE_STATUS \
+	QCA_WLAN_VENDOR_ATTR_GET_MONITOR_MODE_STATUS
+
 #define MGMT_FRAME_TYPE    0
 #define DATA_FRAME_TYPE    1
 #define CTRL_FRAME_TYPE    2
@@ -155,7 +163,7 @@ static QDF_STATUS os_if_stop_capture_allowed(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_NOSUPPORT;
 	}
 
-	if (!cdp_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID)) {
+	if (!cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID)) {
 		osif_debug("local pkt capture not running, no need to stop");
 		return QDF_STATUS_E_PERM;
 	}
@@ -309,5 +317,66 @@ QDF_STATUS os_if_dp_local_pkt_capture_stop(struct wlan_objmgr_vdev *vdev)
 		return status;
 
 	return cdp_stop_local_pkt_capture(soc, OL_TXRX_PDEV_ID);
+}
+
+QDF_STATUS os_if_dp_get_lpc_state(struct wlan_objmgr_vdev *vdev,
+				  const void *data, int data_len)
+{
+	struct wlan_objmgr_psoc *psoc;
+	struct vdev_osif_priv *osif_priv;
+	struct sk_buff *reply_skb;
+	uint32_t skb_len = NLMSG_HDRLEN, val;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+	struct wireless_dev *wdev;
+	bool running;
+	void *soc;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc)
+		return QDF_STATUS_E_INVAL;
+
+	osif_priv = wlan_vdev_get_ospriv(vdev);
+	if (!osif_priv) {
+		osif_err("osif_priv is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	wdev = osif_priv->wdev;
+	if (!wdev) {
+		osif_err("wireless dev is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc)
+		return QDF_STATUS_E_INVAL;
+
+	/* Length of attribute QCA_WLAN_VENDOR_ATTR_SET_MONITOR_MODE_STATUS */
+	skb_len += nla_total_size(sizeof(u32));
+
+	reply_skb = wlan_cfg80211_vendor_cmd_alloc_reply_skb(wdev->wiphy,
+							     skb_len);
+	if (!reply_skb) {
+		osif_err("alloc reply skb failed");
+		return QDF_STATUS_E_NOMEM;
+	}
+
+	running = cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID);
+	val = running ? QCA_WLAN_VENDOR_MONITOR_MODE_CAPTURE_RUNNING :
+			QCA_WLAN_VENDOR_MONITOR_MODE_NO_CAPTURE_RUNNING;
+
+	if (nla_put_u32(reply_skb, GET_MONITOR_MODE_STATUS, val)) {
+		osif_err("nla put failed");
+		status = QDF_STATUS_E_INVAL;
+		goto fail;
+	}
+
+	if (wlan_cfg80211_vendor_cmd_reply(reply_skb))
+		status = QDF_STATUS_E_INVAL;
+
+	return status;
+fail:
+	wlan_cfg80211_vendor_free_skb(reply_skb);
+	return status;
 }
 

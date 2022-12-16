@@ -17906,6 +17906,7 @@ QDF_STATUS os_if_monitor_mode_configure(struct hdd_adapter *adapter,
 	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
 	return status;
 }
+
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 
 #if defined(WLAN_FEATURE_PKT_CAPTURE) || defined(WLAN_FEATURE_LOCAL_PKT_CAPTURE)
@@ -17987,7 +17988,89 @@ static int wlan_hdd_cfg80211_set_monitor_mode(struct wiphy *wiphy,
 
 	return errno;
 }
+#endif
 
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+
+/**
+ * __wlan_hdd_cfg80211_get_monitor_mode() - Get wifi monitor mode configuration
+ * vendor command
+ * @wiphy: wiphy device pointer
+ * @wdev: wireless device pointer
+ * @data: Vendor command data buffer
+ * @data_len: Buffer length
+ *
+ * Return: 0 for Success and negative value for failure
+ */
+static int
+__wlan_hdd_cfg80211_get_monitor_mode(struct wiphy *wiphy,
+				     struct wireless_dev *wdev,
+				     const void *data, int data_len)
+{
+	struct net_device *dev = wdev->netdev;
+	struct hdd_adapter *adapter = WLAN_HDD_GET_PRIV_PTR(dev);
+	struct hdd_context *hdd_ctx  = wiphy_priv(wiphy);
+	struct wlan_objmgr_vdev *vdev;
+	int errno;
+	QDF_STATUS status;
+
+	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE) {
+		hdd_err("Command not allowed in FTM mode");
+		return -EPERM;
+	}
+
+	errno = wlan_hdd_validate_context(hdd_ctx);
+	if (errno)
+		return errno;
+
+	errno = hdd_validate_adapter(adapter);
+	if (errno)
+		return errno;
+
+	if (!ucfg_dp_is_local_pkt_capture_enabled(hdd_ctx->psoc))
+		return -EPERM;
+
+	vdev = hdd_objmgr_get_vdev_by_user(adapter, WLAN_DP_ID);
+	if (!vdev)
+		return -EINVAL;
+
+	status = os_if_dp_get_lpc_state(vdev, data, data_len);
+	hdd_objmgr_put_vdev_by_user(vdev, WLAN_DP_ID);
+
+	return qdf_status_to_os_return(status);
+}
+
+/**
+ * wlan_hdd_cfg80211_get_monitor_mode() - get monitor mode
+ * @wiphy: wiphy pointer
+ * @wdev: pointer to struct wireless_dev
+ * @data: pointer to incoming NL vendor data
+ * @data_len: length of @data
+ *
+ * Return: 0 on success; error number otherwise.
+ */
+static int wlan_hdd_cfg80211_get_monitor_mode(struct wiphy *wiphy,
+					      struct wireless_dev *wdev,
+					      const void *data, int data_len)
+{
+	int errno;
+	struct osif_vdev_sync *vdev_sync;
+
+	hdd_enter_dev(wdev->netdev);
+
+	errno = osif_vdev_sync_op_start(wdev->netdev, &vdev_sync);
+	if (errno)
+		return errno;
+
+	errno = __wlan_hdd_cfg80211_get_monitor_mode(wiphy, wdev,
+						     data, data_len);
+
+	osif_vdev_sync_op_stop(vdev_sync);
+
+	hdd_exit();
+
+	return errno;
+}
 #endif
 
 /**

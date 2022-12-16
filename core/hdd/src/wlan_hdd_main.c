@@ -552,7 +552,7 @@ wlan_hdd_lpc_del_monitor_interface(struct hdd_context *hdd_ctx)
 	if (!soc)
 		return;
 
-	running = cdp_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID);
+	running = cdp_is_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID);
 	if (!running)
 		return;
 

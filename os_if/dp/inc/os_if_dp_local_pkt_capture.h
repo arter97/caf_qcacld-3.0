@@ -32,6 +32,15 @@
 		.doit = wlan_hdd_cfg80211_set_monitor_mode,		   \
 		vendor_command_policy(set_monitor_mode_policy,		   \
 				QCA_WLAN_VENDOR_ATTR_SET_MONITOR_MODE_MAX) \
+	},								   \
+	{								   \
+		.info.vendor_id = QCA_NL80211_VENDOR_ID,		   \
+		.info.subcmd = QCA_NL80211_VENDOR_SUBCMD_GET_MONITOR_MODE, \
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV |			   \
+			WIPHY_VENDOR_CMD_NEED_NETDEV |			   \
+			WIPHY_VENDOR_CMD_NEED_RUNNING,			   \
+		.doit = wlan_hdd_cfg80211_get_monitor_mode,		   \
+		vendor_command_policy(VENDOR_CMD_RAW_DATA, 0)		   \
 	},
 
 extern const struct nla_policy
@@ -58,6 +67,19 @@ QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
  */
 QDF_STATUS os_if_dp_local_pkt_capture_stop(struct wlan_objmgr_vdev *vdev);
 
+/**
+ * os_if_dp_get_lpc_state() - get local packet capture state
+ * in the received vendor command
+ * @vdev: vdev
+ * @data: NL data
+ * @data_len: NL data length
+ *
+ * Return: QDF_STATUS_SUCCESS if Success;
+ *         QDF_STATUS_E_* if Failure
+ */
+QDF_STATUS os_if_dp_get_lpc_state(struct wlan_objmgr_vdev *vdev,
+				  const void *data, int data_len);
+
 #else
 static inline
 QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
@@ -68,6 +90,13 @@ QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
 
 static inline
 QDF_STATUS os_if_dp_local_pkt_capture_stop(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS os_if_dp_get_lpc_state(struct wlan_objmgr_vdev *vdev,
+				  const void *data, int data_len)
 {
 	return QDF_STATUS_SUCCESS;
 }
