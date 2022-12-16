@@ -875,6 +875,7 @@ struct dp_mon_ops {
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 	QDF_STATUS (*start_local_pkt_capture)(struct dp_pdev *pdev);
 	QDF_STATUS (*stop_local_pkt_capture)(struct dp_pdev *pdev);
+	bool (*is_local_pkt_capture_running)(struct dp_pdev *pdev);
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 };
 
@@ -1220,6 +1221,9 @@ struct  dp_mon_pdev {
 	bool rssi_dbm_conv_support;
 	struct dp_rx_mon_rssi_offset rssi_offsets;
 	uint8_t phy_ppdu_id_size;
+#ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+	bool is_local_pkt_capture_running;
+#endif
 };
 
 struct  dp_mon_vdev {

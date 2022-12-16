@@ -894,6 +894,37 @@ fail:
 }
 
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
+QDF_STATUS dp_mon_set_local_pkt_capture_running(struct dp_mon_pdev *mon_pdev,
+						bool val)
+{
+	if (!mon_pdev) {
+		dp_mon_filter_err("Invalid monitor pdev");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	mon_pdev->is_local_pkt_capture_running = val;
+	dp_mon_filter_debug("local_pkt_capture_running is set to %d", val);
+	return QDF_STATUS_SUCCESS;
+}
+
+bool dp_mon_get_is_local_pkt_capture_running(struct cdp_soc_t *cdp_soc,
+					     uint8_t pdev_id)
+{
+	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+	struct dp_mon_pdev *mon_pdev;
+
+	if (!pdev || !pdev->monitor_pdev) {
+		dp_mon_filter_err("Invalid pdev_id %u", pdev_id);
+		return false;
+	}
+
+	mon_pdev = pdev->monitor_pdev;
+
+	return mon_pdev->is_local_pkt_capture_running;
+}
+
 static void
 dp_mon_set_local_pkt_capture_rx_filter(struct dp_pdev *pdev,
 				       struct cdp_monitor_filter *src_filter)
@@ -974,8 +1005,8 @@ QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 	}
 
 	mon_pdev = pdev->monitor_pdev;
-	local_pkt_capture_running = dp_mon_get_local_pkt_capture_running(cdp_soc,
-					pdev_id);
+	local_pkt_capture_running =
+		dp_mon_get_is_local_pkt_capture_running(cdp_soc, pdev_id);
 	if (local_pkt_capture_running) {
 		dp_mon_filter_err("Can't start local pkt capture. Already running");
 		return QDF_STATUS_E_ALREADY;
@@ -1007,6 +1038,7 @@ QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 
 	dp_mon_filter_debug("local pkt capture tx filter set");
 
+	dp_mon_set_local_pkt_capture_running(mon_pdev, true);
 	return status;
 }
 
@@ -1026,7 +1058,7 @@ QDF_STATUS dp_mon_stop_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 
 	mon_pdev = pdev->monitor_pdev;
 	local_pkt_capture_running =
-			dp_mon_get_local_pkt_capture_running(cdp_soc, pdev_id);
+			dp_mon_get_is_local_pkt_capture_running(cdp_soc, pdev_id);
 	if (!local_pkt_capture_running) {
 		dp_mon_filter_err("Local pkt capture is not running");
 		return QDF_STATUS_SUCCESS;
@@ -1053,6 +1085,7 @@ QDF_STATUS dp_mon_stop_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
 	dp_mon_filter_debug("local pkt capture stopped");
 
+	dp_mon_set_local_pkt_capture_running(mon_pdev, false);
 	return QDF_STATUS_SUCCESS;
 }
 

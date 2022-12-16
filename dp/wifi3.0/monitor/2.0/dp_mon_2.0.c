@@ -1456,6 +1456,7 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 	.start_local_pkt_capture = NULL,
 	.stop_local_pkt_capture = NULL,
+	.is_local_pkt_capture_running = NULL,
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 };
 

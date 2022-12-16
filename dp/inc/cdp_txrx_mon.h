@@ -356,6 +356,29 @@ QDF_STATUS cdp_stop_local_pkt_capture(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	return soc->ops->mon_ops->stop_local_pkt_capture(soc, pdev_id);
 }
 
+/**
+ * cdp_is_local_pkt_capture_running() - get is local packet capture running
+ * @soc: opaque soc handle
+ * @pdev_id: pdev id
+ *
+ * Return: true if running
+ *         false if not running
+ */
+static inline
+bool cdp_is_local_pkt_capture_running(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return false;
+	}
+
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->is_local_pkt_capture_running)
+		return false;
+
+	return soc->ops->mon_ops->is_local_pkt_capture_running(soc, pdev_id);
+}
 #else
 static inline
 QDF_STATUS cdp_start_local_pkt_capture(ol_txrx_soc_handle soc,
@@ -371,6 +394,11 @@ QDF_STATUS cdp_stop_local_pkt_capture(ol_txrx_soc_handle soc, uint8_t pdev_id)
 	return QDF_STATUS_E_NOSUPPORT;
 }
 
+static inline
+bool cdp_is_local_pkt_capture_running(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	return false;
+}
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 
 #endif

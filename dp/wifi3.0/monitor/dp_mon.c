@@ -6013,6 +6013,7 @@ QDF_STATUS dp_mon_pdev_init(struct dp_pdev *pdev)
 		mon_ops->mon_rx_pdev_tlv_logger_init(pdev);
 
 	mon_pdev->is_dp_mon_pdev_initialized = true;
+	dp_mon_set_local_pkt_capture_running(mon_pdev, false);
 
 	return QDF_STATUS_SUCCESS;
 
@@ -6084,6 +6085,7 @@ QDF_STATUS dp_mon_pdev_deinit(struct dp_pdev *pdev)
 	if (mon_pdev->invalid_mon_peer)
 		qdf_mem_free(mon_pdev->invalid_mon_peer);
 	mon_pdev->is_dp_mon_pdev_initialized = false;
+	dp_mon_set_local_pkt_capture_running(mon_pdev, false);
 
 	return QDF_STATUS_SUCCESS;
 }

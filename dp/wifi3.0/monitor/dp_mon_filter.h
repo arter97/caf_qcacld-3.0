@@ -582,7 +582,30 @@ QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
  */
 QDF_STATUS dp_mon_stop_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 					 uint8_t pdev_id);
+
+/**
+ * dp_mon_set_local_pkt_capture_running() - set local packet capture running
+ * @mon_pdev: monitor pdev
+ * @val: value
+ */
+QDF_STATUS dp_mon_set_local_pkt_capture_running(struct dp_mon_pdev *mon_pdev,
+						bool val);
+
+/**
+ * dp_mon_get_is_local_pkt_capture_running() - get local packet capture running
+ * @cdp_soc: cdp soc
+ * @pdev_id: pdev id
+ */
+bool dp_mon_get_is_local_pkt_capture_running(struct cdp_soc_t *cdp_soc,
+					     uint8_t pdev_id);
 #else
+static inline
+QDF_STATUS dp_mon_set_local_pkt_capture_running(struct dp_mon_pdev *mon_pdev,
+						   bool val)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 static inline
 QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 					  uint8_t pdev_id,
@@ -596,6 +619,13 @@ QDF_STATUS dp_mon_stop_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 					 uint8_t pdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+bool dp_mon_get_is_local_pkt_capture_running(struct cdp_soc_t *cdp_soc,
+					     uint8_t pdev_id)
+{
+	return false;
 }
 
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */

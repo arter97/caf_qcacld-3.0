@@ -995,6 +995,7 @@ struct cdp_me_ops {
  * @txrx_update_mon_mac_filter: Handler to configure mon mac filter
  * @start_local_pkt_capture: start local packet capture
  * @stop_local_pkt_capture: stop local packet capture
+ * @is_local_pkt_capture_running: is local packet capture running
  */
 struct cdp_mon_ops {
 
@@ -1109,6 +1110,8 @@ struct cdp_mon_ops {
 			 struct cdp_monitor_filter *filter);
 
 	QDF_STATUS (*stop_local_pkt_capture)(struct cdp_soc_t *soc,
+					     uint8_t pdev_id);
+	bool (*is_local_pkt_capture_running)(struct cdp_soc_t *soc,
 					     uint8_t pdev_id);
 #endif
 };
