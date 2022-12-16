@@ -105,6 +105,41 @@ static QDF_STATUS os_if_start_capture_allowed(struct wlan_objmgr_vdev *vdev)
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS os_if_stop_capture_allowed(struct wlan_objmgr_vdev *vdev)
+{
+	enum QDF_OPMODE mode;
+	struct wlan_objmgr_psoc *psoc;
+	void *soc;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc)
+		return QDF_STATUS_E_INVAL;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		osif_err("NULL psoc");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mode = wlan_vdev_mlme_get_opmode(vdev);
+	if (mode != QDF_MONITOR_MODE) {
+		osif_warn("Operation not permitted in mode: %d", mode);
+		return QDF_STATUS_E_PERM;
+	}
+
+	if (!ucfg_dp_is_local_pkt_capture_enabled(psoc)) {
+		osif_err("local pkt capture feature not enabled");
+		return QDF_STATUS_E_NOSUPPORT;
+	}
+
+	if (!cdp_local_pkt_capture_running(soc, OL_TXRX_PDEV_ID)) {
+		osif_debug("local pkt capture not running, no need to stop");
+		return QDF_STATUS_E_PERM;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static
 QDF_STATUS os_if_dp_local_pkt_capture_start(struct wlan_objmgr_vdev *vdev,
 					    struct nlattr **tb)
@@ -235,5 +270,21 @@ QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
 
 error:
 	return status;
+}
+
+QDF_STATUS os_if_dp_local_pkt_capture_stop(struct wlan_objmgr_vdev *vdev)
+{
+	QDF_STATUS status;
+	void *soc;
+
+	soc = cds_get_context(QDF_MODULE_ID_SOC);
+	if (!soc || !vdev)
+		return QDF_STATUS_E_INVAL;
+
+	status = os_if_stop_capture_allowed(vdev);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	return cdp_stop_local_pkt_capture(soc, OL_TXRX_PDEV_ID);
 }
 
