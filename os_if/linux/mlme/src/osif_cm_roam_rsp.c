@@ -509,7 +509,7 @@ static int osif_send_roam_auth_event(struct wlan_objmgr_vdev *vdev,
 				(ETH_ALEN * num_of_links) +
 				req_ie_len + resp_ie_len +
 				sizeof(uint8_t) + REPLAY_CTR_LEN +
-				KCK_KEY_LEN + roaming_info->kek_len +
+				roaming_info->kck_len + roaming_info->kek_len +
 				sizeof(uint16_t) + sizeof(uint8_t) +
 				(9 * NLMSG_HDRLEN) + fils_params_len,
 				QCA_NL80211_VENDOR_SUBCMD_KEY_MGMT_ROAM_AUTH_INDEX,
@@ -520,7 +520,7 @@ static int osif_send_roam_auth_event(struct wlan_objmgr_vdev *vdev,
 				ETH_ALEN + req_ie_len +
 				resp_ie_len +
 				sizeof(uint8_t) + REPLAY_CTR_LEN +
-				KCK_KEY_LEN + roaming_info->kek_len +
+				roaming_info->kck_len + roaming_info->kek_len +
 				sizeof(uint16_t) + sizeof(uint8_t) +
 				(9 * NLMSG_HDRLEN) + fils_params_len,
 				QCA_NL80211_VENDOR_SUBCMD_KEY_MGMT_ROAM_AUTH_INDEX,
@@ -571,6 +571,7 @@ static int osif_send_roam_auth_event(struct wlan_objmgr_vdev *vdev,
 			goto nla_put_failure;
 		}
 		if (roaming_info->kek_len > MAX_KEK_LENGTH ||
+		    roaming_info->kck_len > MAX_KCK_LEN ||
 		    nla_put(skb,
 			    QCA_WLAN_VENDOR_ATTR_ROAM_AUTH_PTK_KCK,
 			    roaming_info->kck_len, roaming_info->kck) ||
@@ -599,8 +600,10 @@ static int osif_send_roam_auth_event(struct wlan_objmgr_vdev *vdev,
 		 * into power save state.
 		 */
 		osif_cm_save_gtk(vdev, rsp);
-		osif_debug("roam_info_ptr->replay_ctr 0x%llx",
-			   *((uint64_t *)roaming_info->replay_ctr));
+		osif_debug("replay_ctr 0x%llx kck %d kek %d",
+			   *((uint64_t *)roaming_info->replay_ctr),
+			   roaming_info->kck_len,
+			   roaming_info->kek_len);
 
 	} else {
 		osif_debug("No Auth Params TLV's");
