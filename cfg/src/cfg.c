@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -895,6 +895,13 @@ free_store:
 	cfg_store_free(store);
 
 	return status;
+}
+
+bool cfg_valid_ini_check(const char *path)
+{
+	cfg_enter();
+
+	return qdf_valid_ini_check(path);
 }
 
 void cfg_release(void)
