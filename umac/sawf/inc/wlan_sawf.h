@@ -24,6 +24,8 @@
 #define _WLAN_SAWF_H_
 
 #include <qdf_status.h>
+#include "qdf_atomic.h"
+#include "qdf_lock.h"
 
 #define SAWF_SVC_CLASS_MIN 1
 #define SAWF_SVC_CLASS_MAX 128
@@ -96,6 +98,23 @@
 #define DEF_SAWF_CONFIG_VALUE 0xFFFFFFFF
 
 #define SAWF_INVALID_TID 0xFF
+
+#define SERVICE_CLASS_TYPE_SAWF     1
+#define SERVICE_CLASS_TYPE_SCS      2
+#define SERVICE_CLASS_TYPE_SAWF_SCS 3
+#define SAWF_INVALID_TYPE 0xFF
+
+#define SAWF_INVALID_SERVICE_CLASS_ID                  0xFF
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_MIN_THRUPUT       0
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_MAX_THRUPUT       0xFFFFFFFF
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_BURST_SIZE        0
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_SVC_INTERVAL      0xFFFFFFFF
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_DELAY_BOUND       0xFFFFFFFF
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_TIME_TO_LIVE      0xFFFFFFFF
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_PRIORITY          0
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_TID               0xFFFFFFFF
+#define SAWF_SVC_CLASS_PARAM_DEFAULT_MSDU_LOSS_RATE    0
+
 /**
  * struct wlan_sawf_scv_class_params- Service Class Parameters
  * @svc_id: Service ID
@@ -112,6 +131,9 @@
  * @configured: indicating if the serivice class is configured.
  * @ul_service_interval: Uplink service interval
  * @ul_burst_size: Uplink Burst Size
+ * @type: type of service class
+ * @ref_count: Number of sawf/scs procedures using the service class
+ * @peer_count: Number of peers having initialized a flow in this service class
  */
 
 struct wlan_sawf_scv_class_params {
@@ -129,13 +151,18 @@ struct wlan_sawf_scv_class_params {
 	bool configured;
 	uint32_t ul_service_interval;
 	uint32_t ul_burst_size;
+	uint8_t type;
+	uint32_t ref_count;
+	uint32_t peer_count;
 };
 
 /**
  * struct sawf_ctx- SAWF context
+ * @lock: Lock to add or delete entry from sawf params structure
  * @svc_classes: List of all service classes
  */
 struct sawf_ctx {
+	qdf_spinlock_t lock;
 	struct wlan_sawf_scv_class_params svc_classes[SAWF_SVC_CLASS_MAX];
 };
 
@@ -196,7 +223,6 @@ bool wlan_service_id_configured(uint8_t svc_id);
  */
 uint8_t wlan_service_id_tid(uint8_t svc_id);
 
-
 /* wlan_delay_bound_configured() - Is delay-bound configured
  *
  * Is the service ID configured
@@ -232,6 +258,15 @@ void wlan_print_service_class(struct wlan_sawf_scv_class_params *params);
  */
 void wlan_update_sawf_params(struct wlan_sawf_scv_class_params *params);
 
+/* wlan_update_sawf_params_nolock() - Update service class params
+ *
+ * Update service class params
+ * Caller has to take care of acquiring lock
+ *
+ * Return: none
+ */
+void wlan_update_sawf_params_nolock(struct wlan_sawf_scv_class_params *params);
+
 /* wlan_validate_sawf_params() - Validate service class params
  *
  * Validate service class params
@@ -265,5 +300,160 @@ wlan_sawf_get_uplink_params(uint8_t svc_id, uint8_t *tid,
 int
 wlan_sawf_sla_process_sla_event(uint8_t svc_id, uint8_t *peer_mac,
 				uint8_t *peer_mld_mac, uint8_t flag);
-#endif
 
+/* wlan_service_id_configured_nolock() - Is service ID configured
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: true or false
+ */
+bool wlan_service_id_configured_nolock(uint8_t svc_id);
+
+/* wlan_service_id_tid_nolock() - TID for the service class
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: TID
+ */
+uint8_t wlan_service_id_tid_nolock(uint8_t svc_id);
+
+/* wlan_service_id_get_type() - get type for the service class
+ *
+ * @svc_id : service-class id
+ *
+ * Return: type
+ */
+uint8_t wlan_service_id_get_type(uint8_t svc_id);
+
+/* wlan_service_id_get_type_nolock() - get type for the service class
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: type
+ */
+uint8_t wlan_service_id_get_type_nolock(uint8_t svc_id);
+
+/* wlan_service_id_set_type() - set type for the service class
+ *
+ * @svc_id : service-class id
+ * @type : service-class type
+ *
+ * Return: void
+ */
+void wlan_service_id_set_type(uint8_t svc_id, uint8_t type);
+
+/* wlan_service_id_set_type_nolock() - set type for the service class
+ *
+ * @svc_id : service-class id
+ * @type : service-class type
+ * Caller has to take care of acquiring lock
+ *
+ * Return: void
+ */
+void wlan_service_id_set_type_nolock(uint8_t svc_id, uint8_t type);
+
+/* wlan_service_id_get_ref_count_nolock() - Get ref count
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: ref_count
+ */
+uint32_t wlan_service_id_get_ref_count_nolock(uint8_t svc_id);
+
+/* wlan_service_id_dec_ref_count_nolock() - Decrement ref count
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: void
+ */
+void wlan_service_id_dec_ref_count_nolock(uint8_t svc_id);
+
+/* wlan_service_id_inc_ref_count_nolock() - Increment ref count
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: void
+ */
+void wlan_service_id_inc_ref_count_nolock(uint8_t svc_id);
+
+/* wlan_service_id_get_peer_count_nolock() - Get peer count
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: peer_count
+ */
+uint32_t wlan_service_id_get_peer_count_nolock(uint8_t svc_id);
+
+/* wlan_service_id_dec_peer_count_nolock() - Decrement peer count
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: void
+ */
+void wlan_service_id_dec_peer_count_nolock(uint8_t svc_id);
+
+/* wlan_service_id_inc_peer_count_nolock() - Increment peer count
+ *
+ * @svc_id : service-class id
+ * Caller has to take care of acquiring lock
+ *
+ * Return: void
+ */
+void wlan_service_id_inc_peer_count_nolock(uint8_t svc_id);
+
+/* wlan_service_id_get_ref_count() - Get ref count
+ *
+ * @svc_id : service-class id
+ *
+ * Return: ref_count
+ */
+uint32_t wlan_service_id_get_ref_count(uint8_t svc_id);
+
+/* wlan_service_id_dec_ref_count() - Decrement ref count
+ *
+ * @svc_id : service-class id
+ *
+ * Return: void
+ */
+void wlan_service_id_dec_ref_count(uint8_t svc_id);
+
+/* wlan_service_id_inc_ref_count() - Increment ref count
+ *
+ * @svc_id : service-class id
+ *
+ * Return: void
+ */
+void wlan_service_id_inc_ref_count(uint8_t svc_id);
+
+/* wlan_service_id_get_peer_count() - Get peer count
+ *
+ * @svc_id : service-class id
+ *
+ * Return: peer_count
+ */
+uint32_t wlan_service_id_get_peer_count(uint8_t svc_id);
+
+/* wlan_service_id_dec_peer_count() - Decrement peer count
+ *
+ * @svc_id : service-class id
+ *
+ * Return: void
+ */
+void wlan_service_id_dec_peer_count(uint8_t svc_id);
+
+/* wlan_service_id_inc_peer_count() - Increment peer count
+ *
+ * @svc_id : service-class id
+ *
+ * Return: void
+ */
+void wlan_service_id_inc_peer_count(uint8_t svc_id);
+#endif
