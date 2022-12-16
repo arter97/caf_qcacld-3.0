@@ -332,11 +332,41 @@ QDF_STATUS cdp_start_local_pkt_capture(ol_txrx_soc_handle soc,
 	return soc->ops->mon_ops->start_local_pkt_capture(soc, pdev_id, filter);
 }
 
+/**
+ * cdp_stop_local_pkt_capture() - stop local pkt capture
+ * @soc: opaque soc handle
+ * @pdev_id: pdev_id
+ *
+ * Return: QDF_STATUS_SUCCESS if success
+ *         QDF_STATUS_E_FAILURE if error
+ */
+static inline
+QDF_STATUS cdp_stop_local_pkt_capture(ol_txrx_soc_handle soc, uint8_t pdev_id)
+{
+	if (!soc || !soc->ops) {
+		dp_cdp_debug("Invalid Instance");
+		QDF_BUG(0);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!soc->ops->mon_ops ||
+	    !soc->ops->mon_ops->stop_local_pkt_capture)
+		return QDF_STATUS_E_FAILURE;
+
+	return soc->ops->mon_ops->stop_local_pkt_capture(soc, pdev_id);
+}
+
 #else
 static inline
 QDF_STATUS cdp_start_local_pkt_capture(ol_txrx_soc_handle soc,
 				       uint8_t pdev_id,
 				       struct cdp_monitor_filter *filter)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline
+QDF_STATUS cdp_stop_local_pkt_capture(ol_txrx_soc_handle soc, uint8_t pdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }

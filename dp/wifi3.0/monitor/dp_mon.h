@@ -874,6 +874,7 @@ struct dp_mon_ops {
 				   struct htt_rx_ring_tlv_filter *tlv_filter);
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 	QDF_STATUS (*start_local_pkt_capture)(struct dp_pdev *pdev);
+	QDF_STATUS (*stop_local_pkt_capture)(struct dp_pdev *pdev);
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 };
 

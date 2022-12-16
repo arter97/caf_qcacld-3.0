@@ -1010,4 +1010,50 @@ QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 	return status;
 }
 
+QDF_STATUS dp_mon_stop_local_pkt_capture(struct cdp_soc_t *cdp_soc,
+					 uint8_t pdev_id)
+{
+	bool local_pkt_capture_running;
+	struct dp_soc *soc = cdp_soc_t_to_dp_soc(cdp_soc);
+	struct dp_pdev *pdev = dp_get_pdev_from_soc_pdev_id_wifi3(soc, pdev_id);
+	struct dp_mon_pdev *mon_pdev;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	if (!pdev) {
+		dp_mon_filter_err("pdev Context is null");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	mon_pdev = pdev->monitor_pdev;
+	local_pkt_capture_running =
+			dp_mon_get_local_pkt_capture_running(cdp_soc, pdev_id);
+	if (!local_pkt_capture_running) {
+		dp_mon_filter_err("Local pkt capture is not running");
+		return QDF_STATUS_SUCCESS;
+	}
+
+	qdf_spin_lock_bh(&mon_pdev->mon_lock);
+	dp_mon_reset_local_pkt_capture_rx_filter(pdev);
+	status = dp_mon_filter_update(pdev);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		dp_mon_filter_err("local pkt capture set rx filter failed");
+		qdf_spin_unlock_bh(&mon_pdev->mon_lock);
+		return status;
+	}
+	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
+
+	mon_pdev->mon_filter_mode = 0;
+	mon_pdev->fp_mgmt_filter = 0;
+	mon_pdev->fp_ctrl_filter = 0;
+	mon_pdev->fp_data_filter = 0;
+
+	qdf_spin_lock_bh(&mon_pdev->mon_lock);
+	dp_mon_filter_reset_tx_mon_mode(pdev);
+	dp_tx_mon_filter_update(pdev);
+	qdf_spin_unlock_bh(&mon_pdev->mon_lock);
+	dp_mon_filter_debug("local pkt capture stopped");
+
+	return QDF_STATUS_SUCCESS;
+}
+
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */

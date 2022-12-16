@@ -1455,6 +1455,7 @@ struct cdp_mon_ops dp_ops_mon_2_0 = {
 	.txrx_update_mon_mac_filter = NULL,
 #ifdef WLAN_FEATURE_LOCAL_PKT_CAPTURE
 	.start_local_pkt_capture = NULL,
+	.stop_local_pkt_capture = NULL,
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 };
 

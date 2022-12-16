@@ -574,6 +574,14 @@ dp_rx_mon_hdr_length_set(uint32_t *msg_word,
 QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 					  uint8_t pdev_id,
 					  struct cdp_monitor_filter *filter);
+
+/**
+ * dp_mon_stop_local_pkt_capture() - stop local packet capture
+ * @cdp_soc: cdp soc
+ * @pdev_id: pdev id
+ */
+QDF_STATUS dp_mon_stop_local_pkt_capture(struct cdp_soc_t *cdp_soc,
+					 uint8_t pdev_id);
 #else
 static inline
 QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
@@ -582,5 +590,13 @@ QDF_STATUS dp_mon_start_local_pkt_capture(struct cdp_soc_t *cdp_soc,
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
+
+static inline
+QDF_STATUS dp_mon_stop_local_pkt_capture(struct cdp_soc_t *cdp_soc,
+					 uint8_t pdev_id)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 #endif /* #ifndef _DP_MON_FILTER_H_ */

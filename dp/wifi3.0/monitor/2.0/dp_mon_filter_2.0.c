@@ -3469,8 +3469,13 @@ void dp_mon_filter_reset_local_pkt_capture_tx(struct dp_pdev *pdev)
 	enum dp_mon_filter_srng_type srng_type =
 				DP_MON_FILTER_SRNG_TYPE_TXMON_DEST;
 	struct dp_mon_pdev_be *mon_pdev_be = NULL;
+	struct dp_pdev_tx_monitor_be *tx_mon_be;
 
 	mon_pdev_be = dp_get_be_mon_pdev_from_dp_mon_pdev(mon_pdev);
+
+	tx_mon_be = &mon_pdev_be->tx_monitor_be;
+	tx_mon_be->mode = TX_MON_BE_DISABLE;
+	mon_pdev_be->tx_mon_mode = 0;
 	filter.tx_valid = true;
 	mon_pdev_be->filter_be[mode][srng_type] = filter;
 }

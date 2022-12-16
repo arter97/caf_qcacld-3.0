@@ -994,6 +994,7 @@ struct cdp_me_ops {
  * @txrx_cfr_filter: Handler to configure host rx monitor status ring
  * @txrx_update_mon_mac_filter: Handler to configure mon mac filter
  * @start_local_pkt_capture: start local packet capture
+ * @stop_local_pkt_capture: stop local packet capture
  */
 struct cdp_mon_ops {
 
@@ -1106,6 +1107,9 @@ struct cdp_mon_ops {
 	QDF_STATUS (*start_local_pkt_capture)
 			(struct cdp_soc_t *soc, uint8_t pdev_id,
 			 struct cdp_monitor_filter *filter);
+
+	QDF_STATUS (*stop_local_pkt_capture)(struct cdp_soc_t *soc,
+					     uint8_t pdev_id);
 #endif
 };
 
