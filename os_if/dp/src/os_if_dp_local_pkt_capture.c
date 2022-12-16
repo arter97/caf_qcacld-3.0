@@ -63,6 +63,29 @@ set_monitor_mode_policy[SET_MONITOR_MODE_CONFIG_MAX + 1] = {
 static
 bool os_if_local_pkt_capture_concurrency_allowed(struct wlan_objmgr_psoc *psoc)
 {
+	uint32_t num_connections, sta_count;
+
+	num_connections = policy_mgr_get_connection_count(psoc);
+	osif_debug("Total connections %d", num_connections);
+
+	/*
+	 * No connections, local packet capture is allowed
+	 * Only 1 connection and its STA, then local packet capture is allowed
+	 * 2+ port concurrency, local packet capture is not allowed
+	 */
+	if (!num_connections)
+		return true;
+
+	if (num_connections > 1)
+		return false;
+
+	sta_count = policy_mgr_mode_specific_connection_count(psoc,
+							      PM_STA_MODE,
+							      NULL);
+	osif_debug("sta_count %d", sta_count);
+	if (sta_count == 1)
+		return true;
+
 	return false;
 }
 

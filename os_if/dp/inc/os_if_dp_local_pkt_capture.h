@@ -57,6 +57,7 @@ QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
  * Return: 0 for Success and negative value for failure
  */
 QDF_STATUS os_if_dp_local_pkt_capture_stop(struct wlan_objmgr_vdev *vdev);
+
 #else
 static inline
 QDF_STATUS os_if_dp_set_lpc_configure(struct wlan_objmgr_vdev *vdev,
@@ -70,5 +71,6 @@ QDF_STATUS os_if_dp_local_pkt_capture_stop(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
+
 #endif /* WLAN_FEATURE_LOCAL_PKT_CAPTURE */
 #endif
