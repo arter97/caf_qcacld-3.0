@@ -29,8 +29,11 @@
 #include <scheduler_api.h>
 #include <wlan_crypto_global_api.h>
 #include <utils_mlo.h>
+#include <wlan_mlme_cmn.h>
+#include <wlan_scan_utils_api.h>
 #include <qdf_time.h>
 #include <wlan_objmgr_peer_obj.h>
+#include <wlan_scan_api.h>
 
 #ifdef WLAN_FEATURE_11BE_MLO
 static inline void
@@ -1987,10 +1990,83 @@ static void mlo_process_link_remove(struct wlan_objmgr_vdev *vdev,
 		      qdf_time_uint_to_ms(tbtt_count * bcn_int));
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
+static inline
+QDF_STATUS mlo_process_link_add(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct mlo_partner_info *cache_partner_info,
+				struct mlo_partner_info *partner_info,
+				uint16_t vdev_count)
+{
+	return QDF_STATUS_E_INVAL;
+}
+#else
+static
+QDF_STATUS mlo_process_link_add(struct wlan_objmgr_psoc *psoc,
+				struct wlan_objmgr_vdev *vdev,
+				struct mlo_partner_info *cache_partner_info,
+				struct mlo_partner_info *partner_info,
+				uint16_t vdev_count)
+{
+	struct wlan_mlo_dev_context *ml_ctx = vdev->mlo_dev_ctx;
+	struct wlan_objmgr_vdev *inactive_vdev[WLAN_UMAC_MLO_MAX_VDEVS];
+	uint8_t i = 0, j = 0, k = 0;
+	struct scan_cache_entry *scan_entry = NULL;
+	/* Check if ini to support dynamic link add is enable
+	 * or not
+	 */
+	if (!mlme_mlo_is_reconfig_reassoc_enable(psoc)) {
+		mlo_debug("ML Reconfig link add support disabled");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	if (vdev_count == ml_ctx->wlan_vdev_count) {
+		/* All links are participating in current ML connection */
+		return QDF_STATUS_E_INVAL;
+	}
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (wlan_cm_is_vdev_disconnected(ml_ctx->wlan_vdev_list[i]))
+			inactive_vdev[j++] = ml_ctx->wlan_vdev_list[i];
+	}
+	/* check if any new link in scan entry */
+	if (partner_info->num_partner_links ==
+	    cache_partner_info->num_partner_links) {
+		if (!qdf_mem_cmp(cache_partner_info, partner_info,
+				 sizeof(struct mlo_partner_info))) {
+			mlo_debug("No new link found");
+			return QDF_STATUS_E_INVAL;
+		}
+	}
+
+	/* Partner info changed compared to the cached scan entry.
+	 * Process link add
+	 */
+	for (i = 0; i < j; i++) {
+		for (k = 0; k < partner_info->num_partner_links; k++) {
+			scan_entry = wlan_scan_get_entry_by_bssid(
+					wlan_vdev_get_pdev(inactive_vdev[i]),
+					&partner_info->partner_link_info[k].link_addr);
+			if (scan_entry) {
+				mlo_err("Link addition detected, issue disconnect");
+				mlo_disconnect(vdev, CM_SB_DISCONNECT,
+					       REASON_UNSPEC_FAILURE, NULL);
+				return QDF_STATUS_SUCCESS;
+			}
+		}
+	}
+
+	return QDF_STATUS_E_INVAL;
+}
+#endif
+
 void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
 				struct scan_cache_entry *scan_entry,
-				uint8_t *ml_ie, qdf_size_t ml_ie_len)
+				uint8_t *ml_ie, qdf_size_t ml_ie_len,
+				struct mlo_partner_info *partner_info)
 {
+	struct wlan_objmgr_psoc *psoc = NULL;
+	struct wlan_objmgr_pdev *pdev = NULL;
 	struct wlan_objmgr_vdev *co_mld_vdev = NULL;
 	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
 	uint16_t vdev_count = 0;
@@ -1998,11 +2074,20 @@ void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
 	uint8_t i = 0;
 	uint8_t link_ix = 0;
 	struct ml_rv_info reconfig_info = {0};
+	struct mlo_partner_info ml_partner_info = {0};
 	uint8_t *ml_rv_ie = NULL;
 	qdf_size_t ml_rv_ie_len = 0;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!vdev || !mlo_is_mld_sta(vdev))
+		return;
+
+	pdev = wlan_vdev_get_pdev(vdev);
+	if (!pdev)
+		return;
+
+	psoc = wlan_pdev_get_psoc(pdev);
+	if (!psoc)
 		return;
 
 	mlo_get_ml_vdev_list(vdev, &vdev_count, wlan_vdev_list);
@@ -2011,8 +2096,23 @@ void mlo_process_ml_reconfig_ie(struct wlan_objmgr_vdev *vdev,
 		return;
 	}
 
-	/* Add code for link add here */
+	if (!scan_entry ||
+	    QDF_IS_STATUS_ERROR(util_scan_get_ml_partner_info(scan_entry,
+							      &ml_partner_info))) {
+		mlo_debug("Unable to fetch the partner info in scan db");
+		goto check_ml_rv;
+	}
 
+	/* Processing for link add */
+	if (QDF_IS_STATUS_SUCCESS(mlo_process_link_add(psoc, vdev,
+						       partner_info,
+						       &ml_partner_info,
+						       vdev_count))) {
+		mlo_err("Issued MLD disconnect for link add");
+		goto err_release_refs;
+	}
+
+check_ml_rv:
 	/* Processing for ML Reconfig IE */
 	if (vdev_count == 1) {
 		/* Single link MLO, no need to process link delete */

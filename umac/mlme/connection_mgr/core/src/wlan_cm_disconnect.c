@@ -523,21 +523,28 @@ cm_inform_dlm_disconnect_complete(struct wlan_objmgr_vdev *vdev,
 #ifdef WLAN_FEATURE_11BE_MLO
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 static inline void
-cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev)
+cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev,
+		      struct wlan_cm_discon_rsp *rsp)
 {
 	wlan_vdev_mlme_clear_mlo_vdev(vdev);
 }
 #else /*WLAN_FEATURE_11BE_MLO_ADV_FEATURE*/
 static inline void
-cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev)
+cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev,
+		      struct wlan_cm_discon_rsp *rsp)
 {
 	if (mlo_is_mld_sta(vdev) && ucfg_mlo_is_mld_disconnected(vdev))
 		ucfg_mlo_mld_clear_mlo_cap(vdev);
+	if (rsp->req.req.reason_code == REASON_HOST_TRIGGERED_LINK_DELETE) {
+		wlan_vdev_mlme_clear_mlo_vdev(vdev);
+		wlan_vdev_mlme_clear_mlo_link_vdev(vdev);
+	}
 }
 #endif /*WLAN_FEATURE_11BE_MLO_ADV_FEATURE*/
 #else /*WLAN_FEATURE_11BE_MLO*/
 static inline void
-cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev)
+cm_clear_vdev_mlo_cap(struct wlan_objmgr_vdev *vdev,
+		      struct wlan_cm_discon_rsp *rsp)
 { }
 #endif /*WLAN_FEATURE_11BE_MLO*/
 
@@ -584,7 +591,7 @@ QDF_STATUS cm_disconnect_complete(struct cnx_mgr *cm_ctx,
 	/* Set the disconnect wait event once all disconnect are completed */
 	if (!cm_ctx->disconnect_count) {
 		/* Clear MLO cap only when it is the last disconnect req */
-		cm_clear_vdev_mlo_cap(cm_ctx->vdev);
+		cm_clear_vdev_mlo_cap(cm_ctx->vdev, resp);
 		qdf_event_set(&cm_ctx->disconnect_complete);
 	}
 

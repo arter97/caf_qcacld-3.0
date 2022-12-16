@@ -2065,3 +2065,46 @@ done:
 
 	return status;
 }
+
+struct scan_cache_entry *
+scm_scan_get_entry_by_bssid(struct wlan_objmgr_pdev *pdev,
+			    struct qdf_mac_addr *bssid)
+{
+	struct scan_filter *scan_filter;
+	qdf_list_t *list = NULL;
+	struct scan_cache_node *first_node = NULL;
+	qdf_list_node_t *cur_node = NULL;
+	struct scan_cache_entry *entry = NULL, *scan_entry = NULL;
+
+	if (!pdev)
+		return NULL;
+
+	scan_filter = qdf_mem_malloc(sizeof(*scan_filter));
+	if (!scan_filter)
+		return NULL;
+
+	scan_filter->num_of_bssid = 1;
+	qdf_mem_copy(scan_filter->bssid_list[0].bytes,
+		     bssid, sizeof(struct qdf_mac_addr));
+	list = scm_get_scan_result(pdev, scan_filter);
+	qdf_mem_free(scan_filter);
+
+	if (!list || (!qdf_list_size(list))) {
+		scm_debug("Scan entry for bssid: "QDF_MAC_ADDR_FMT" not found",
+			  QDF_MAC_ADDR_REF(bssid->bytes));
+		goto exit;
+	}
+
+	qdf_list_peek_front(list, &cur_node);
+	first_node = qdf_container_of(cur_node, struct scan_cache_node,
+				      node);
+	if (first_node && first_node->entry) {
+		entry = first_node->entry;
+		scan_entry = util_scan_copy_cache_entry(entry);
+	}
+exit:
+	if (list)
+		scm_purge_scan_results(list);
+
+	return scan_entry;
+}

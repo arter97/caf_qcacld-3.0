@@ -102,9 +102,36 @@
 #define CFG_MLME_11BE_ALL
 #endif /* WLAN_FEATURE_11BE */
 
+/*
+ * <ini>
+ * mlme_mlo_reconfig_reassoc_enable- Flag for non-AP MLD re-association
+ * upon detecting ML Reconfig AP addition
+ * @Min: false
+ * @Max: true
+ * @Default: false
+ *
+ * This flag when set to true enables re-association by non-AP MLD when
+ * the non-AP MLD detects that the AP MLD it is associated with has
+ * added a new AP using ML Reconfiguration.
+ *
+ * Related: None
+ *
+ * Supported Feature: 11be MLO Reconfig
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_MLME_MLO_RECONFIG_REASSOC_ENABLE CFG_INI_UINT( \
+	"mlme_mlo_reconfig_reassoc_enable",\
+	0, 1, 0, \
+	CFG_VALUE_OR_DEFAULT, \
+	"MLO reconfig reassoc is supported by target")
+
 #define CFG_CMN_MLME_ALL \
 	CFG(CFG_MLME_MAX_CHAN_SWITCH_IE_ENABLE) \
 	CFG(CFG_MLME_11BE_TARGET_CAPAB) \
+	CFG(CFG_MLME_MLO_RECONFIG_REASSOC_ENABLE) \
 	CFG_MLME_11BE_ALL
 
 #endif /* __CFG_CMN_MLME_H */

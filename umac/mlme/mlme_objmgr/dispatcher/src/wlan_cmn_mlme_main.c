@@ -848,3 +848,20 @@ void mlme_vdev_reconfig_timer_cb(void *arg)
 	    vdev_mlme->ops->mlme_vdev_reconfig_timer_complete)
 		vdev_mlme->ops->mlme_vdev_reconfig_timer_complete(vdev_mlme);
 }
+
+bool mlme_mlo_is_reconfig_reassoc_enable(struct wlan_objmgr_psoc *psoc)
+{
+	struct psoc_mlme_obj *mlme_psoc_obj;
+	struct psoc_mlo_config *mlo_config;
+
+	if (!psoc)
+		return false;
+
+	mlme_psoc_obj = wlan_psoc_mlme_get_cmpt_obj(psoc);
+	if (!mlme_psoc_obj)
+		return false;
+
+	mlo_config = &mlme_psoc_obj->psoc_cfg.mlo_config;
+
+	return mlo_config->reconfig_reassoc_en;
+}

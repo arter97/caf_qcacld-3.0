@@ -318,4 +318,15 @@ QDF_STATUS
 scm_scan_get_entry_by_mac_addr(struct wlan_objmgr_pdev *pdev,
 			       struct qdf_mac_addr *bssid,
 			       struct element_info *frame);
+
+/**
+ * scm_scan_get_entry_by_bssid() - function to get scan entry by bssid
+ * @pdev: pdev object
+ * @bssid: bssid to be fetched from scan db
+ *
+ * Return : scan entry if found, else NULL
+ */
+struct scan_cache_entry *
+scm_scan_get_entry_by_bssid(struct wlan_objmgr_pdev *pdev,
+			    struct qdf_mac_addr *bssid);
 #endif

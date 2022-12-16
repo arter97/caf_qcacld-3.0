@@ -75,13 +75,23 @@ struct psoc_phy_config {
 };
 
 /**
+ * struct psoc_mlo_config - psoc mlo config
+ * @reconfig_reassoc_en: If reassoc on ML reconfig AP addition is enabled
+ */
+struct psoc_mlo_config {
+	uint8_t reconfig_reassoc_en;
+};
+
+/**
  * struct psoc_config - psoc level configs
  * @score_config:          BSS scoring related config
  * @phy_config:            Psoc Phy config
+ * @mlo_config:            Psoc mlo config
  */
 struct psoc_config {
 	struct scoring_cfg score_config;
 	struct psoc_phy_config phy_config;
+	struct psoc_mlo_config mlo_config;
 };
 
 /**

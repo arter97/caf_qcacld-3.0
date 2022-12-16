@@ -753,3 +753,10 @@ wlan_scan_get_entry_by_mac_addr(struct wlan_objmgr_pdev *pdev,
 {
 	return scm_scan_get_entry_by_mac_addr(pdev, bssid, frame);
 }
+
+struct scan_cache_entry *
+wlan_scan_get_entry_by_bssid(struct wlan_objmgr_pdev *pdev,
+			     struct qdf_mac_addr *bssid)
+{
+	return scm_scan_get_entry_by_bssid(pdev, bssid);
+}
