@@ -2109,6 +2109,7 @@ DP_INC := -I$(WLAN_COMMON_INC)/dp/inc \
 	-I$(WLAN_COMMON_INC)/target_if/dp/inc \
 	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor \
 	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/1.0 \
+	-I$(WLAN_COMMON_INC)/dp/wifi3.0/monitor/2.0 \
 	-I$(WLAN_COMMON_INC)/dp/cmn_dp_api
 
 DP_SRC := $(WLAN_COMMON_ROOT)/dp/wifi3.0
@@ -2144,9 +2145,23 @@ endif
 DP_OBJS += $(DP_SRC)/../cmn_dp_api/dp_ratetable.o
 
 ifeq ($(CONFIG_BERYLLIUM), y)
+DP_INC += -I$(WLAN_COMMON_INC)/dp/wifi3.0/be
+
 DP_OBJS += $(DP_SRC)/be/dp_be.o
 DP_OBJS += $(DP_SRC)/be/dp_be_tx.o
 DP_OBJS += $(DP_SRC)/be/dp_be_rx.o
+
+ifeq ($(CONFIG_WIFI_MONITOR_SUPPORT), y)
+ifeq ($(CONFIG_WLAN_TX_MON_2_0), y)
+DP_OBJS += $(DP_SRC)/monitor/2.0/dp_mon_2.0.o \
+		$(DP_SRC)/monitor/2.0/dp_mon_filter_2.0.o
+DP_OBJS += $(DP_SRC)/monitor/2.0/dp_tx_mon_2.0.o \
+		$(DP_SRC)/monitor/2.0/dp_tx_mon_status_2.0.o
+ccflags-$(CONFIG_WLAN_TX_MON_2_0) += -DWLAN_PKT_CAPTURE_TX_2_0
+ccflags-y += -DWLAN_TX_PKT_CAPTURE_ENH_BE
+ccflags-y += -DQDF_FRAG_CACHE_SUPPORT
+endif
+endif
 endif
 
 ifeq ($(CONFIG_LITHIUM), y)
