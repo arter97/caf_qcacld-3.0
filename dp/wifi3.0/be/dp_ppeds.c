@@ -322,8 +322,6 @@ static void dp_ppeds_del_napi_ctxt(struct dp_soc_be *be_soc)
 {
 	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
 
-	napi_disable(&napi_ctxt->napi);
-
 	netif_napi_del(&napi_ctxt->napi);
 }
 
@@ -346,8 +344,6 @@ static void dp_ppeds_add_napi_ctxt(struct dp_soc_be *be_soc)
 
 	netif_napi_add(&napi_ctxt->ndev, &napi_ctxt->napi,
 		       dp_ppeds_tx_comp_poll, napi_budget);
-
-	napi_enable(&napi_ctxt->napi);
 }
 
 /**
@@ -507,12 +503,39 @@ static QDF_STATUS dp_ppeds_tx_desc_pool_init(struct dp_soc *soc)
 }
 
 /**
+ * dp_ppeds_tx_desc_free_nolock() - PPE DS tx desc free nolocks
+ * @be_soc: SoC
+ * @tx_desc: tx desc
+ *
+ * PPE DS tx desc free witout locks
+ *
+ * Return: void
+ */
+static
+void dp_ppeds_tx_desc_free_nolock(struct dp_soc *soc,
+				  struct dp_tx_desc_s *tx_desc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppe_tx_desc_pool_s *pool = NULL;
+
+	tx_desc->nbuf = NULL;
+	tx_desc->flags = 0;
+
+	pool = &be_soc->ppeds_tx_desc;
+	tx_desc->next = pool->freelist;
+	pool->freelist = tx_desc;
+	pool->num_allocated--;
+	pool->num_free++;
+}
+
+/**
  * dp_ppeds_tx_desc_clean_up() -  Clean up the ppeds tx dexcriptors
  * @ctxt: context passed
  * @elem: element to be cleaned up
  * @elem_list: element list
  *
  */
+static
 void dp_ppeds_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
 {
 	struct dp_soc *soc = (struct dp_soc *)ctxt;
@@ -520,7 +543,7 @@ void dp_ppeds_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
 
 	if (tx_desc->nbuf) {
 		qdf_nbuf_free(tx_desc->nbuf);
-		dp_ppeds_tx_desc_free(soc, tx_desc);
+		dp_ppeds_tx_desc_free_nolock(soc, tx_desc);
 	}
 }
 
@@ -542,11 +565,17 @@ dp_ppeds_tx_desc_pool_cleanup(struct dp_soc_be *be_soc,
 	struct dp_hw_cookie_conversion_t *cc_ctx;
 	struct dp_ppe_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
 
-	if (pool)
+	if (pool) {
+		TX_DESC_LOCK_LOCK(&pool->lock);
+
 		qdf_tx_desc_pool_free_bufs(&be_soc->soc, &pool->desc_pages,
 					   pool->elem_size, pool->elem_count,
 					   true, &dp_ppeds_tx_desc_clean_up,
 					   NULL);
+
+		pool->freelist = NULL;
+		TX_DESC_LOCK_UNLOCK(&pool->lock);
+	}
 
 	cc_ctx  = &be_soc->ppeds_tx_cc_ctx;
 
@@ -656,13 +685,20 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 				      uint32_t headroom)
 {
 	uint32_t i = 0;
-	unsigned int cpu;
 	struct dp_tx_desc_s *tx_desc;
 	struct dp_soc *soc = *((struct dp_soc **)ppe_ds_wlan_priv(ppeds_handle));
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppe_tx_desc_pool_s *pool = &be_soc->ppeds_tx_desc;
 	qdf_dma_addr_t paddr;
 
-	cpu = qdf_get_cpu();
+	/*
+	 * If the tx desc pool is empty, we need to return.
+	 */
+	if (!pool->freelist) {
+		dp_err("ran out of txdesc");
+		return 0;
+	}
+
 	for (i = 0; i < num_buff_req; i++) {
 
 		/*
@@ -1231,9 +1267,12 @@ QDF_STATUS dp_ppeds_vdev_enable_pri2tid_be(struct cdp_soc_t *soc_hdl,
 void dp_ppeds_stop_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
 
 	if (!be_soc->ppeds_handle)
 		return;
+
+	napi_disable(&napi_ctxt->napi);
 
 	ppe_ds_wlan_inst_stop(be_soc->ppeds_handle);
 	dp_ppeds_tx_desc_pool_deinit(be_soc);
@@ -1248,6 +1287,7 @@ void dp_ppeds_stop_soc_be(struct dp_soc *soc)
 QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 {
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_ppeds_napi *napi_ctxt = &be_soc->ppeds_napi_ctxt;
 
 	if (!be_soc->ppeds_handle) {
 		dp_err("%p: ppeds not allocated", soc);
@@ -1258,6 +1298,8 @@ QDF_STATUS dp_ppeds_start_soc_be(struct dp_soc *soc)
 		dp_err("%p: ppeds tx desc pool init failed", soc);
 		return QDF_STATUS_SUCCESS;
 	}
+
+	napi_enable(&napi_ctxt->napi);
 
 	if (ppe_ds_wlan_inst_start(be_soc->ppeds_handle) != 0) {
 		dp_err("%p: ppeds start failed", soc);
