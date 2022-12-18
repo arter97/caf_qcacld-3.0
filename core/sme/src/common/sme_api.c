@@ -3942,8 +3942,9 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 			  enum nss_chains_band_info band,
 			  uint8_t rf_chains_supported)
 {
-	uint8_t nss_chain_shift, btc_chain_mode;
+	uint8_t nss_chain_shift;
 	uint8_t max_supported_nss;
+	enum coex_btc_chain_mode btc_chain_mode;
 	struct wlan_mlme_nss_chains *nss_chains_ini_cfg =
 					&mac_ctx->mlme_cfg->nss_chains_ini_cfg;
 	QDF_STATUS status;
@@ -3968,7 +3969,8 @@ sme_fill_nss_chain_params(struct mac_context *mac_ctx,
 	}
 
 	if (band == NSS_CHAINS_BAND_2GHZ &&
-	    btc_chain_mode == QCA_BTC_CHAIN_SEPARATED)
+	    (btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_FDD ||
+	     btc_chain_mode == WLAN_COEX_BTC_CHAIN_MODE_HYBRID))
 		max_supported_nss = NSS_1x1_MODE;
 
 	/* If the fw doesn't support two chains, num rf chains can max be 1 */
@@ -13786,10 +13788,6 @@ QDF_STATUS sme_add_dialog_cmd(mac_handle_t mac_handle,
 		return status;
 	}
 
-	mlme_set_twt_command_in_progress(mac->psoc,
-				(struct qdf_mac_addr *)twt_params->peer_macaddr,
-				twt_params->dialog_id, WLAN_TWT_SETUP);
-
 	/*
 	 * Add the dialog id to TWT context to drop back to back
 	 * commands
@@ -13797,6 +13795,10 @@ QDF_STATUS sme_add_dialog_cmd(mac_handle_t mac_handle,
 	mlme_add_twt_session(mac->psoc,
 			     (struct qdf_mac_addr *)twt_params->peer_macaddr,
 			     twt_params->dialog_id);
+
+	mlme_set_twt_command_in_progress(mac->psoc,
+				(struct qdf_mac_addr *)twt_params->peer_macaddr,
+				twt_params->dialog_id, WLAN_TWT_SETUP);
 
 	/* Serialize the req through MC thread */
 	mac->sme.twt_add_dialog_cb = twt_add_dialog_cb;
