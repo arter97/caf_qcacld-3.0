@@ -1161,13 +1161,22 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 	qdf_minidump_log(hal, sizeof(*hal), "hal_soc");
 
 	qdf_atomic_init(&hal->active_work_cnt);
-	hal_delayed_reg_write_init(hal);
+	if (hal_delayed_reg_write_init(hal) != QDF_STATUS_SUCCESS) {
+		hal_err("unable to initialize delayed reg write");
+		goto fail3;
+	}
 
-	hal_reo_shared_qaddr_setup((hal_soc_handle_t)hal);
+	if (hal_reo_shared_qaddr_setup((hal_soc_handle_t)hal)
+	    != QDF_STATUS_SUCCESS) {
+		hal_err("unable to setup reo shared qaddr");
+		goto fail4;
+	}
 
 	hif_rtpm_register(HIF_RTPM_ID_HAL_REO_CMD, NULL);
 
 	return (void *)hal;
+fail4:
+	hal_delayed_reg_write_deinit(hal);
 fail3:
 	qdf_mem_free_consistent(qdf_dev, qdf_dev->dev,
 				sizeof(*hal->shadow_wrptr_mem_vaddr) *

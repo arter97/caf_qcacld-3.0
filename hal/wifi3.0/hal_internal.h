@@ -1257,7 +1257,7 @@ struct hal_hw_txrx_ops {
 	uint32_t (*hal_txmon_status_get_num_users)(void *tx_tlv_hdr,
 						   uint8_t *num_users);
 #endif /* QCA_MONITOR_2_0_SUPPORT */
-	void (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl);
+	QDF_STATUS (*hal_reo_shared_qaddr_setup)(hal_soc_handle_t hal_soc_hdl);
 	void (*hal_reo_shared_qaddr_init)(hal_soc_handle_t hal_soc_hdl,
 					  int qref_reset);
 	void (*hal_reo_shared_qaddr_detach)(hal_soc_handle_t hal_soc_hdl);
