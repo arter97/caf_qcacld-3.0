@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1483,6 +1483,7 @@ QDF_STATUS util_validate_sta_prof_ie(const uint8_t *sta_prof_ie,
  * @reportingsta_ie_len: Length for reporting sta ie
  * @plink_frame_currpos: Pointer to Link frame current pos
  * @plink_frame_currlen: Current length of link frame.
+ * @link_frame_maxsize: Maximum size of the frame to be generated
  * @linkid: Link Id value
  *
  * Add the basic variant Multi-Link element when
@@ -1496,6 +1497,7 @@ util_add_mlie_for_prb_rsp_gen(const uint8_t *reportingsta_ie,
 			      qdf_size_t reportingsta_ie_len,
 			      uint8_t **plink_frame_currpos,
 			      qdf_size_t *plink_frame_currlen,
+			      qdf_size_t link_frame_maxsize,
 			      uint8_t linkid)
 {
 	uint8_t mlie_len = 0;
@@ -1526,6 +1528,17 @@ util_add_mlie_for_prb_rsp_gen(const uint8_t *reportingsta_ie,
 		     mlie_len,
 		     common_info_len,
 		     link_id_offset);
+
+	/*
+	 * Validate the buffer available before copying ML IE.
+	 * Incase if mlie_len is modified at later place, move this validation
+	 * there to make sure no buffer overflow happens.
+	 */
+	if ((link_frame_maxsize - link_frame_currlen) < mlie_len) {
+		mlo_err("Insufficient space in link specific frame for ML IE. Required: %u octets, available: %zu octets",
+			mlie_len, (link_frame_maxsize - link_frame_currlen));
+		return QDF_STATUS_E_NOMEM;
+	}
 
 	mlie_frame = qdf_mem_malloc(mlie_len);
 	if (!mlie_frame)
@@ -1586,6 +1599,7 @@ util_add_mlie_for_prb_rsp_gen(const uint8_t *reportingsta_ie,
 			      qdf_size_t reportingsta_ie_len,
 			      uint8_t **plink_frame_currpos,
 			      qdf_size_t *plink_frame_currlen,
+			      qdf_size_t link_frame_maxsize,
 			      uint8_t linkid)
 {
 	return QDF_STATUS_SUCCESS;
@@ -2420,11 +2434,13 @@ QDF_STATUS util_gen_link_reqrsp_cmn(uint8_t *frame, qdf_size_t frame_len,
 
 			/* Add BV ML IE for link specific probe response */
 			if (subtype == WLAN_FC0_STYPE_PROBE_RESP) {
-				ret = util_add_mlie_for_prb_rsp_gen(reportingsta_ie,
-								    reportingsta_ie[TAG_LEN_POS],
-								    &link_frame_currpos,
-								    &link_frame_currlen,
-								    linkid);
+				ret = util_add_mlie_for_prb_rsp_gen(
+					reportingsta_ie,
+					reportingsta_ie[TAG_LEN_POS],
+					&link_frame_currpos,
+					&link_frame_currlen,
+					link_frame_maxsize,
+					linkid);
 				if (QDF_IS_STATUS_ERROR(ret)) {
 					qdf_mem_free(mlieseqpayload_copy);
 					return ret;
