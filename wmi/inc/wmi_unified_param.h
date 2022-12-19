@@ -5547,6 +5547,7 @@ typedef enum {
 	wmi_vdev_param_default_latency_level_configuration,
 	wmi_vdev_param_amsdu_aggregation_size_optimization,
 	wmi_vdev_param_non_agg_sw_retry_th,
+	wmi_vdev_param_set_extra_eht_ltf,
 } wmi_conv_vdev_param_id;
 
 /**

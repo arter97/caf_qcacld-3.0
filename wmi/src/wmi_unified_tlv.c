@@ -721,6 +721,8 @@ static const uint32_t vdev_param_tlv[] = {
 			WMI_VDEV_PARAM_AMSDU_AGGREGATION_SIZE_OPTIMIZATION,
 	[wmi_vdev_param_non_agg_sw_retry_th] =
 					WMI_VDEV_PARAM_NON_AGG_SW_RETRY_TH,
+	[wmi_vdev_param_set_extra_eht_ltf] =
+					WMI_VDEV_PARAM_EXTRA_EHT_LTF,
 };
 #endif
 
