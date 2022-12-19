@@ -715,7 +715,7 @@ static void hif_exec_napi_kill(struct hif_exec_context *ctx)
 	int irq_ind;
 
 	if (ctx->inited) {
-		napi_disable(&n_ctx->napi);
+		qdf_napi_disable(&n_ctx->napi);
 		ctx->inited = 0;
 	}
 
@@ -723,7 +723,7 @@ static void hif_exec_napi_kill(struct hif_exec_context *ctx)
 		hif_irq_affinity_remove(ctx->os_irq[irq_ind]);
 
 	hif_core_ctl_set_boost(false);
-	netif_napi_del(&(n_ctx->napi));
+	qdf_netif_napi_del(&(n_ctx->napi));
 }
 
 struct hif_execution_ops napi_sched_ops = {
@@ -748,9 +748,9 @@ static struct hif_exec_context *hif_exec_napi_create(uint32_t scale)
 	ctx->exec_ctx.inited = true;
 	ctx->exec_ctx.scale_bin_shift = scale;
 	qdf_net_if_create_dummy_if((struct qdf_net_if *)&ctx->netdev);
-	netif_napi_add(&(ctx->netdev), &(ctx->napi), hif_exec_poll,
-		       QCA_NAPI_BUDGET);
-	napi_enable(&ctx->napi);
+	qdf_netif_napi_add(&(ctx->netdev), &(ctx->napi), hif_exec_poll,
+			   QCA_NAPI_BUDGET);
+	qdf_napi_enable(&ctx->napi);
 
 	return &ctx->exec_ctx;
 }
