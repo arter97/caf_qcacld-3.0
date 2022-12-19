@@ -2814,7 +2814,7 @@ endif
 
 HIF_CE_OBJS +=  $(WLAN_COMMON_ROOT)/$(HIF_CE_DIR)/ce_service_srng.o
 else ifeq ($(CONFIG_BERYLLIUM), y)
-ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2)))
+ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2) $CONFIG_CNSS_PEACH))
 HIF_CE_OBJS +=  $(WLAN_COMMON_ROOT)/$(HIF_DIR)/src/kiwidef.o
 endif
 
@@ -2942,7 +2942,7 @@ HAL_OBJS +=	$(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/be/hal_be_generic_api.o
 
 HAL_OBJS +=	$(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/be/hal_be_reo.o \
 
-ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2)))
+ifeq (y,$(findstring y,$(CONFIG_CNSS_KIWI) $(CONFIG_CNSS_KIWI_V2) $(CONFIG_CNSS_PEACH)))
 HAL_INC += -I$(WLAN_COMMON_INC)/$(HAL_DIR)/wifi3.0/kiwi
 HAL_OBJS += $(WLAN_COMMON_ROOT)/$(HAL_DIR)/wifi3.0/kiwi/hal_kiwi.o
 else
@@ -3079,11 +3079,15 @@ ifeq ($(CONFIG_CNSS_QCA6750), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/qca6750/v1
 endif
 
+ifeq ($(CONFIG_CNSS_PEACH), y)
+TARGET_INC +=	-I$(WLAN_FW_API)/hw/peach/v1/
+else
 ifeq ($(CONFIG_CNSS_KIWI_V2), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/kiwi/v2/
 else
 ifeq ($(CONFIG_CNSS_KIWI), y)
 TARGET_INC +=	-I$(WLAN_FW_API)/hw/kiwi/v1/
+endif
 endif
 endif
 
