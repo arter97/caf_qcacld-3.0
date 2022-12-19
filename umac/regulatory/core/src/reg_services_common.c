@@ -7111,7 +7111,7 @@ reg_compute_indoor_list_on_cc_change(struct wlan_objmgr_psoc *psoc,
 		wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
 						     WLAN_REGULATORY_SB_ID);
 		if (!vdev)
-			goto next;
+			continue;
 
 		if (vdev->vdev_mlme.vdev_opmode != QDF_STA_MODE &&
 		    vdev->vdev_mlme.vdev_opmode != QDF_P2P_CLIENT_MODE)
