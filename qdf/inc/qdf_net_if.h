@@ -76,6 +76,16 @@ qdf_net_if_release_dev(struct qdf_net_if *nif);
 void qdf_napi_enable(struct napi_struct *napi);
 
 /**
+ * qdf_napi_disable() - Disable the napi schedule
+ * @napi: NAPI context
+ *
+ * This function suspends NAPI from being scheduled on this context
+ *
+ * Return: NONE
+ */
+void qdf_napi_disable(struct napi_struct *napi);
+
+/**
  * qdf_netif_napi_add - initialize a NAPI context
  * @netdev:  network device
  * @napi: NAPI context
@@ -150,6 +160,12 @@ static inline void
 qdf_napi_enable(struct napi_struct *napi)
 {
 	__qdf_napi_enable(napi);
+}
+
+static inline void
+qdf_napi_disable(struct napi_struct *napi)
+{
+	__qdf_napi_disable(napi);
 }
 
 static inline void

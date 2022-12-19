@@ -117,6 +117,13 @@ void qdf_napi_enable(struct napi_struct *napi)
 
 qdf_export_symbol(qdf_napi_enable);
 
+void qdf_napi_disable(struct napi_struct *napi)
+{
+	__qdf_napi_disable(napi);
+}
+
+qdf_export_symbol(qdf_napi_disable);
+
 void qdf_netif_napi_add(struct net_device *netdev, struct napi_struct *napi,
 			int (*poll)(struct napi_struct *, int), int weight)
 {

@@ -139,6 +139,20 @@ __qdf_napi_enable(struct napi_struct *napi)
 	napi_enable(napi);
 }
 
+/**
+ * __qdf_napi_disable() - Disable the napi schedule
+ * @napi: NAPI context
+ *
+ * This function suspends NAPI from being scheduled on this context
+ *
+ * Return: NONE
+ */
+static inline void
+__qdf_napi_disable(struct napi_struct *napi)
+{
+	napi_disable(napi);
+}
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0))
 /**
  * __qdf_netif_napi_add - initialize a NAPI context
