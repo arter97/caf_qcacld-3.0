@@ -139,6 +139,7 @@ __qdf_napi_enable(struct napi_struct *napi)
 	napi_enable(napi);
 }
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0))
 /**
  * __qdf_netif_napi_add - initialize a NAPI context
  * @netdev:  network device
@@ -146,14 +147,31 @@ __qdf_napi_enable(struct napi_struct *napi)
  * @poll: polling function
  * @weight: default weight
  *
+ * Upstream commit b48b89f9c189 ("net: drop the weight argument from
+ * netif_napi_add") was introduced in Linux 6.1.  As described by the
+ * subject, this removes the weight argument from netif_napi_add().
+ *
+ * This was preceded by commit 58caed3dacb4 ("netdev: reshuffle
+ * netif_napi_add() APIs to allow dropping weight") in Linux 5.19
+ * which added new APIs to call when a non-default weight wishes to be
+ * sent.
+ *
  * Return: NONE
  */
 static inline void
 __qdf_netif_napi_add(struct net_device *netdev, struct napi_struct *napi,
 		     int (*poll)(struct napi_struct *, int), int weight)
 {
+	netif_napi_add_weight(netdev, napi, poll, weight);
+}
+#else
+static inline void
+__qdf_netif_napi_add(struct net_device *netdev, struct napi_struct *napi,
+		     int (*poll)(struct napi_struct *, int), int weight)
+{
 	netif_napi_add(netdev, napi, poll, weight);
 }
+#endif
 
 /**
  * __qdf_netif_napi_del: remove a NAPI context
