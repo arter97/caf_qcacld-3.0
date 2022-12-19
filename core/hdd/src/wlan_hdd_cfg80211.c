@@ -5727,6 +5727,30 @@ hdd_set_roam_rx_linkspeed_threshold(struct wlan_objmgr_psoc *psoc,
 /* Include the 6 GHz channels in roam full scan only on prior discovery */
 #define INCLUDE_6GHZ_IN_FULL_SCAN_IF_DISC	1
 
+#ifdef WLAN_VENDOR_HANDOFF_CONTROL
+/**
+ * hdd_get_handoff_param() - get vendor handoff parameters
+ * @hdd_ctx: HDD context
+ * @vdev_id: vdev id
+ *
+ * Wrapper function for hdd_cm_get_handoff_param
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS hdd_get_handoff_param(struct hdd_context *hdd_ctx,
+					uint8_t vdev_id)
+{
+	return hdd_cm_get_handoff_param(hdd_ctx->psoc, vdev_id,
+					VENDOR_CONTROL_PARAM_ROAM_ALL);
+}
+#else
+static inline QDF_STATUS
+hdd_get_handoff_param(struct hdd_context *hdd_ctx, uint8_t vdev_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+#endif
+
 /**
  * hdd_set_roam_with_control_config() - Set roam control configuration
  * @hdd_ctx: HDD context
@@ -5797,10 +5821,7 @@ hdd_set_roam_with_control_config(struct hdd_context *hdd_ctx,
 		if (roam_control_enable &&
 		    ucfg_cm_roam_is_vendor_handoff_control_enable(
 			hdd_ctx->psoc)) {
-			status =
-				hdd_cm_get_handoff_param(hdd_ctx->psoc, adapter,
-						adapter->vdev_id,
-						ROAM_VENDOR_CONTROL_PARAM_ALL);
+			status = hdd_get_handoff_param(hdd_ctx, vdev_id);
 			if (QDF_IS_STATUS_ERROR(status)) {
 				hdd_err("failed to get vendor handoff params");
 				return qdf_status_to_os_return(status);

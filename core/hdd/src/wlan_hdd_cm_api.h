@@ -116,23 +116,14 @@ hdd_cm_get_vendor_handoff_params(struct wlan_objmgr_psoc *psoc,
 /**
  * hdd_cm_get_handoff_param() - send get vendor handoff param request to fw
  * @psoc: psoc common object
- * @hdd_adapter: adapter context
  * @vdev_id: vdev id
- * @param_id: Param ID from enum WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
+ * @param_id: param id from enum vendor_control_roam_param
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
-				    struct hdd_adapter *hdd_adapter,
-				    uint8_t vdev_id, uint32_t param_id);
-#else
-static inline QDF_STATUS
-hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
-			 struct hdd_adapter *hdd_adapter,
-			 uint8_t vdev_id, uint32_t param_value)
-{
-	return QDF_STATUS_SUCCESS;
-}
+				    uint8_t vdev_id,
+				    enum vendor_control_roam_param param_id);
 #endif
 
 /**

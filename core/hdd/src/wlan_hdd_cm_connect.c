@@ -1568,8 +1568,8 @@ QDF_STATUS hdd_cm_send_vdev_keys(struct wlan_objmgr_vdev *vdev,
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 #define WLAN_WAIT_TIME_HANDOFF_PARAMS 1000
 QDF_STATUS hdd_cm_get_handoff_param(struct wlan_objmgr_psoc *psoc,
-				    struct hdd_adapter *adapter,
-				    uint8_t vdev_id, uint32_t param_id)
+				    uint8_t vdev_id,
+				    enum vendor_control_roam_param param_id)
 {
 	QDF_STATUS status;
 	int retval;

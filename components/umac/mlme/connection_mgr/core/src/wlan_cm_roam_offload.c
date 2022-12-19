@@ -823,7 +823,8 @@ QDF_STATUS cm_roam_update_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 	struct rso_cfg_params *cfg_params;
 	uint8_t vdev_id;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
-	uint32_t param_id, param_value, i;
+	uint32_t param_value, i;
+	enum vendor_control_roam_param param_id;
 
 	vdev_id = list->vdev_id;
 
@@ -851,30 +852,30 @@ QDF_STATUS cm_roam_update_vendor_handoff_config(struct wlan_objmgr_psoc *psoc,
 		mlme_debug("param id:%d, param value:%d", param_id,
 			   param_value);
 		switch (param_id) {
-		case ROAM_VENDOR_CONTROL_PARAM_TRIGGER:
+		case VENDOR_CONTROL_PARAM_ROAM_TRIGGER:
 			cfg_params->neighbor_lookup_threshold =
 							abs(param_value);
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_DELTA:
+		case VENDOR_CONTROL_PARAM_ROAM_DELTA:
 			cfg_params->roam_rssi_diff = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_FULL_SCANPERIOD:
+		case VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD:
 			cfg_params->full_roam_scan_period = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_PARTIAL_SCANPERIOD:
+		case VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD:
 			cfg_params->empty_scan_refresh_period =
 							param_value * 1000;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_ACTIVE_CH_DWELLTIME:
+		case VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME:
 			cfg_params->max_chan_scan_time = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_PASSIVE_CH_DWELLTIME:
+		case VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME:
 			cfg_params->passive_max_chan_time = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_HOME_CH_TIME:
+		case VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME:
 			cfg_params->neighbor_scan_period = param_value;
 			break;
-		case ROAM_VENDOR_CONTROL_PARAM_AWAY_TIME:
+		case VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME:
 			cfg_params->roam_scan_home_away_time = param_value;
 			break;
 		default:

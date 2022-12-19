@@ -3465,6 +3465,77 @@ extract_roam_candidate_frame_tlv(wmi_unified_t wmi_handle, uint8_t *event,
 }
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
+/**
+ * convert_roam_vendor_control_param() - Function to convert
+ * vendor_control_roam_param enum to TLV specific
+ * WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
+ * @param_id: Roam vendor control param id
+ *
+ * Return: wmi roam vendor control param id
+ */
+static WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
+convert_roam_vendor_control_param(enum vendor_control_roam_param param_id)
+{
+	switch (param_id) {
+	case VENDOR_CONTROL_PARAM_ROAM_TRIGGER:
+		return ROAM_VENDOR_CONTROL_PARAM_TRIGGER;
+	case VENDOR_CONTROL_PARAM_ROAM_DELTA:
+		return ROAM_VENDOR_CONTROL_PARAM_DELTA;
+	case VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD:
+		return ROAM_VENDOR_CONTROL_PARAM_FULL_SCANPERIOD;
+	case VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD:
+		return ROAM_VENDOR_CONTROL_PARAM_PARTIAL_SCANPERIOD;
+	case VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME:
+		return ROAM_VENDOR_CONTROL_PARAM_ACTIVE_CH_DWELLTIME;
+	case VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME:
+		return ROAM_VENDOR_CONTROL_PARAM_PASSIVE_CH_DWELLTIME;
+	case VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME:
+		return ROAM_VENDOR_CONTROL_PARAM_HOME_CH_TIME;
+	case VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME:
+		return ROAM_VENDOR_CONTROL_PARAM_AWAY_TIME;
+	case VENDOR_CONTROL_PARAM_ROAM_ALL:
+		return ROAM_VENDOR_CONTROL_PARAM_ALL;
+	default:
+		wmi_debug("Invalid param id");
+		return 0;
+	}
+}
+
+/**
+ * convert_wmi_roam_vendor_control_param() - Function to convert TLV specific
+ * WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID to vendor_control_roam_param
+ * @param_id: wmi vendor control param id
+ *
+ * Return: roam vendor control param id
+ */
+static enum vendor_control_roam_param convert_wmi_roam_vendor_control_param(
+			WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID param_id)
+{
+	switch (param_id) {
+	case ROAM_VENDOR_CONTROL_PARAM_TRIGGER:
+		return VENDOR_CONTROL_PARAM_ROAM_TRIGGER;
+	case ROAM_VENDOR_CONTROL_PARAM_DELTA:
+		return VENDOR_CONTROL_PARAM_ROAM_DELTA;
+	case ROAM_VENDOR_CONTROL_PARAM_FULL_SCANPERIOD:
+		return VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD;
+	case ROAM_VENDOR_CONTROL_PARAM_PARTIAL_SCANPERIOD:
+		return VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD;
+	case ROAM_VENDOR_CONTROL_PARAM_ACTIVE_CH_DWELLTIME:
+		return VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME;
+	case ROAM_VENDOR_CONTROL_PARAM_PASSIVE_CH_DWELLTIME:
+		return VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME;
+	case ROAM_VENDOR_CONTROL_PARAM_HOME_CH_TIME:
+		return VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME;
+	case ROAM_VENDOR_CONTROL_PARAM_AWAY_TIME:
+		return VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME;
+	case ROAM_VENDOR_CONTROL_PARAM_ALL:
+		return VENDOR_CONTROL_PARAM_ROAM_ALL;
+	default:
+		wmi_debug("Invalid param id");
+		return 0;
+	}
+}
+
 static QDF_STATUS
 extract_roam_vendor_control_param_event_tlv(wmi_unified_t wmi_handle,
 				uint8_t *event, uint32_t len,
@@ -3518,7 +3589,8 @@ extract_roam_vendor_control_param_event_tlv(wmi_unified_t wmi_handle,
 
 	param_info = &dst_list->param_info[0];
 	for (i = 0; i < num_entries; i++) {
-		param_info->param_id = src_list->param_id;
+		param_info->param_id =
+		     convert_wmi_roam_vendor_control_param(src_list->param_id);
 		param_info->param_value = src_list->param_value;
 		wmi_debug("param_info->param_id:%d, param_info->param_value:%d",
 			  param_info->param_id, param_info->param_value);
@@ -3565,7 +3637,7 @@ send_process_roam_vendor_handoff_req_cmd_tlv(wmi_unified_t wmi_handle,
 	     WMITLV_GET_STRUCT_TLVLEN
 		       (wmi_roam_get_vendor_control_param_cmd_fixed_param));
 	cmd->vdev_id = vdev_id;
-	cmd->param_id = param_id;
+	cmd->param_id = convert_roam_vendor_control_param(param_id);
 	wmi_debug("Send GET_VENDOR_CONTROL_PARAM cmd vdev_id:%d, param_id:0x%x",
 		cmd->vdev_id, cmd->param_id);
 	wmi_mtrace(WMI_ROAM_GET_VENDOR_CONTROL_PARAM_CMDID, cmd->vdev_id, 0);
