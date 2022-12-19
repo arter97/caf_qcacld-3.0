@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -804,6 +804,7 @@ wlan_mlo_t2lm_timer_init(struct wlan_objmgr_vdev *vdev)
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	t2lm_dev_lock_create(&vdev->mlo_dev_ctx->t2lm_ctx);
 	t2lm_dev_lock_acquire(&vdev->mlo_dev_ctx->t2lm_ctx);
 	qdf_timer_init(NULL, &t2lm_timer->t2lm_timer,
 		       wlan_mlo_t2lm_timer_expiry_handler,
@@ -1067,6 +1068,29 @@ QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
 
 		handler(mldev, &t2lm_ctx->t2lm_ie[0].t2lm.ieee_link_map_tid[0]);
 	}
+	return QDF_STATUS_SUCCESS;
+}
 
+QDF_STATUS
+wlan_mlo_t2lm_timer_deinit(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_t2lm_timer *t2lm_timer = NULL;
+
+	if (!vdev || !vdev->mlo_dev_ctx)
+		return QDF_STATUS_E_FAILURE;
+
+	t2lm_timer = &vdev->mlo_dev_ctx->t2lm_ctx.t2lm_timer;
+	if (!t2lm_timer) {
+		t2lm_err("t2lm timer ctx is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	t2lm_dev_lock_acquire(&vdev->mlo_dev_ctx->t2lm_ctx);
+	t2lm_timer->timer_started = false;
+	t2lm_timer->timer_interval = 0;
+	t2lm_timer->t2lm_ie_index = 0;
+	t2lm_dev_lock_release(&vdev->mlo_dev_ctx->t2lm_ctx);
+	qdf_timer_free(&t2lm_timer->t2lm_timer);
+	t2lm_dev_lock_destroy(&vdev->mlo_dev_ctx->t2lm_ctx);
 	return QDF_STATUS_SUCCESS;
 }

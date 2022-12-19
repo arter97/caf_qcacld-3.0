@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -496,13 +496,22 @@ QDF_STATUS wlan_mlo_parse_bcn_prbresp_t2lm_ie(
 uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm);
 
 /**
- * wlan_mlo_t2lm_timer_init() - API to add TID-to-link mapping IE
+ * wlan_mlo_t2lm_timer_init() - API to initialize t2lm timer
  * @vdev: Pointer to vdev
  *
  * Return: qdf status
  */
 QDF_STATUS
 wlan_mlo_t2lm_timer_init(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * wlan_mlo_t2lm_timer_deinit() - API to deinit t2lm timer
+ * @vdev: Pointer to vdev
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+wlan_mlo_t2lm_timer_deinit(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_mlo_t2lm_timer_start() - API to start T2LM timer
@@ -603,6 +612,12 @@ uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm)
 
 static inline QDF_STATUS
 wlan_mlo_t2lm_timer_init(struct wlan_objmgr_vdev *vdev)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline QDF_STATUS
+wlan_mlo_t2lm_timer_deinit(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
