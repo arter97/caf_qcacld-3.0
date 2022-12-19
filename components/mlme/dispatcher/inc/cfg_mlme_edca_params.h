@@ -484,28 +484,6 @@
 
 /*
  * <ini>
- * enable_wmm_txop - Enable WMM based txop feature
- * @Min: 0
- * @Max: 1
- * @Default: 1
- *
- * This ini is used to enable/disable the WMM based txop feature in FW
- *
- * Related: None
- *
- * Supported Feature: STA
- *
- * Usage: Internal
- *
- * </ini>
- */
-#define CFG_ENABLE_WMM_TXOP CFG_INI_BOOL( \
-		"enable_wmm_txop", \
-		1, \
-		"Enable WMM TXOP")
-
-/*
- * <ini>
  * gEdcaVoCwmin - Set Cwmin value for QCA_WLAN_AC_VO
  * @Min: 0
  * @Max: 0x15
@@ -861,7 +839,6 @@
 	CFG(CFG_EDCA_BK_AIFS) \
 	CFG(CFG_EDCA_BE_CWMIN) \
 	CFG(CFG_EDCA_BE_CWMAX) \
-	CFG(CFG_ENABLE_WMM_TXOP) \
 	CFG(CFG_EDCA_BE_AIFS)
 
 #endif  /* __CFG_MLME_EDCA__PARAM_H */
