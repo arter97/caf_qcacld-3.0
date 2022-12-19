@@ -9568,7 +9568,7 @@ struct wmi_health_mon_params {
 /**
  * struct edca_pifs_vparam - edca/pifs param for ll sap
  * @vdev_id: vdev id
- * @param - pointer to wlan_edca_pifs_param_ie struct
+ * @param: pointer to wlan_edca_pifs_param_ie struct
  */
 struct edca_pifs_vparam {
 	uint8_t vdev_id;
