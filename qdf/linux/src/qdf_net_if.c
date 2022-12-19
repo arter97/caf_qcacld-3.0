@@ -112,7 +112,7 @@ qdf_export_symbol(qdf_net_update_net_device_dev_addr);
 
 void qdf_napi_enable(struct napi_struct *napi)
 {
-	napi_enable(napi);
+	__qdf_napi_enable(napi);
 }
 
 qdf_export_symbol(qdf_napi_enable);
@@ -120,14 +120,14 @@ qdf_export_symbol(qdf_napi_enable);
 void qdf_netif_napi_add(struct net_device *netdev, struct napi_struct *napi,
 			int (*poll)(struct napi_struct *, int), int weight)
 {
-	netif_napi_add(netdev, napi, poll, weight);
+	__qdf_netif_napi_add(netdev, napi, poll, weight);
 }
 
 qdf_export_symbol(qdf_netif_napi_add);
 
 void qdf_netif_napi_del(struct napi_struct *napi)
 {
-	netif_napi_del(napi);
+	__qdf_netif_napi_del(napi);
 }
 
 qdf_export_symbol(qdf_netif_napi_del);
