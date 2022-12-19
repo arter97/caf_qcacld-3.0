@@ -265,9 +265,18 @@ static void dp_mlo_soc_setup(struct cdp_soc_t *soc_hdl,
 	struct dp_soc *soc = cdp_soc_t_to_dp_soc(soc_hdl);
 	struct dp_mlo_ctxt *mlo_ctxt = cdp_mlo_ctx_to_dp(cdp_ml_ctxt);
 	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	uint8_t pdev_id;
 
 	if (!cdp_ml_ctxt)
 		return;
+
+	be_soc->ml_ctxt = mlo_ctxt;
+
+	for (pdev_id = 0; pdev_id < MAX_PDEV_CNT; pdev_id++) {
+		if (soc->pdev_list[pdev_id])
+			dp_mlo_update_link_to_pdev_map(soc,
+						       soc->pdev_list[pdev_id]);
+	}
 
 	dp_mlo_set_soc_by_chip_id(mlo_ctxt, soc, be_soc->mlo_chip_id);
 }

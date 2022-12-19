@@ -98,6 +98,7 @@ enum MLO_LINK_STATE {
  * @valid_link_bitmap: valid MLO link bitmap
  * @state_lock: lock to protect access to link state
  * @qdf_event_t: event for teardown completion
+ * @dp_handle: pointer to DP ML context
  */
 #define MAX_MLO_LINKS 6
 #define MAX_MLO_CHIPS 5
@@ -113,6 +114,7 @@ struct mlo_setup_info {
 	uint16_t valid_link_bitmap;
 	qdf_spinlock_t state_lock;
 	qdf_event_t event;
+	 struct cdp_mlo_ctxt *dp_handle;
 };
 
 /**
@@ -141,7 +143,6 @@ struct mlo_state_params {
  * @msgq_ctx: Context switch mgr
  * @mlo_is_force_primary_umac: Force Primary UMAC enable
  * @mlo_forced_primary_umac_id: Force Primary UMAC ID
- * @dp_handle: pointer to DP ML context
  */
 struct mlo_mgr_context {
 #ifdef WLAN_MLO_USE_SPINLOCK
@@ -163,7 +164,6 @@ struct mlo_mgr_context {
 	struct ctxt_switch_mgr *msgq_ctx;
 	bool mlo_is_force_primary_umac;
 	uint8_t mlo_forced_primary_umac_id;
-	void *dp_handle;
 };
 
 /*
