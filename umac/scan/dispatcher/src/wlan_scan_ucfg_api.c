@@ -827,6 +827,8 @@ wlan_scan_global_init(struct wlan_objmgr_psoc *psoc,
 
 	scan_obj->scan_def.skip_6g_and_indoor_freq =
 		cfg_get(psoc, CFG_SKIP_6GHZ_AND_INDOOR_FREQ_SCAN);
+	scan_obj->scan_def.last_scan_ageout_time =
+		cfg_get(psoc, CFG_LAST_SCAN_AGEOUT_TIME);
 
 	/* init scan id seed */
 	qdf_atomic_init(&scan_obj->scan_ids);

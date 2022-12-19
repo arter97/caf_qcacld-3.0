@@ -654,6 +654,18 @@ bool wlan_scan_cfg_skip_6g_and_indoor_freq(struct wlan_objmgr_psoc *psoc)
 	return scan_obj->scan_def.skip_6g_and_indoor_freq;
 }
 
+void wlan_scan_get_last_scan_ageout_time(struct wlan_objmgr_psoc *psoc,
+					 uint32_t *last_scan_ageout_time)
+{
+	struct wlan_scan_obj *scan_obj;
+
+	scan_obj = wlan_psoc_get_scan_obj(psoc);
+	if (!scan_obj)
+		*last_scan_ageout_time = 0;
+	*last_scan_ageout_time =
+	scan_obj->scan_def.last_scan_ageout_time;
+}
+
 #ifdef FEATURE_SET
 /**
  * wlan_scan_get_pno_scan_support() - Check if pno scan support is enabled

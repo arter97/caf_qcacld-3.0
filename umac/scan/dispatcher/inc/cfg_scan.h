@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1456,6 +1456,34 @@ enum scan_mode_6ghz {
 			"skip_6g_and_indoor_freq_scan", \
 			false, \
 			"skip sta scan on 6Ghz and 5Ghz indoor channel")
+/*
+ * <ini>
+ * last_scan_ageout_time - To use cached scan results for provided time
+ * duration.
+ * @Min: 0
+ * @Max: 30000 ms
+ * @Default: 0
+ *
+ * This is used to use last cached scan results for provided time.
+ * Instead of issuing new scan, cached scan results can be used to
+ * select best SAP channel if channels are scanned with in the provided
+ * value.
+ *
+ * Related: None.
+ *
+ * Supported Feature: ACS scan optimization
+ *
+ * Usage: Internal
+ *
+ * </ini>
+ */
+#define CFG_LAST_SCAN_AGEOUT_TIME CFG_INI_UINT( \
+			"last_scan_ageout_time", \
+			0, \
+			30000, \
+			0, \
+			CFG_VALUE_OR_DEFAULT, \
+			"last scan ageout time")
 #define CFG_SCAN_ALL \
 	CFG(CFG_DROP_BCN_ON_CHANNEL_MISMATCH) \
 	CFG(CFG_DROP_BCN_ON_INVALID_FREQ) \
@@ -1495,6 +1523,6 @@ enum scan_mode_6ghz {
 	CFG(CFG_6GHZ_SCAN_MODE_DUTY_CYCLE) \
 	CFG(CFG_SCAN_ALLOW_BSS_WITH_CORRUPTED_IE) \
 	CFG(CFG_SKIP_6GHZ_AND_INDOOR_FREQ_SCAN) \
-	CFG_SCAN_PNO
-
+	CFG_SCAN_PNO \
+	CFG(CFG_LAST_SCAN_AGEOUT_TIME)
 #endif /* __CONFIG_SCAN_H */
