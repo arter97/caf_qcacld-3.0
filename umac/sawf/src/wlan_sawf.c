@@ -36,6 +36,7 @@
 #ifdef WLAN_FEATURE_11BE_MLO
 #include <wlan_mlo_mgr_peer.h>
 #endif
+#include <wlan_telemetry_agent.h>
 
 static struct sawf_ctx *g_wlan_sawf_ctx;
 
@@ -370,6 +371,13 @@ static inline QDF_STATUS wlan_sawf_fill_mld_mac(struct wlan_objmgr_peer *peer,
 	return QDF_STATUS_SUCCESS;
 }
 #endif
+
+int
+wlan_sawf_sla_process_sla_event(uint8_t svc_id, uint8_t *peer_mac,
+				uint8_t *peer_mld_mac, uint8_t flag)
+{
+	return telemetry_sawf_reset_peer_stats(peer_mac);
+}
 
 static void wlan_sawf_send_breach_nl(struct wlan_objmgr_peer *peer,
 				     struct psoc_peer_iter *itr)
