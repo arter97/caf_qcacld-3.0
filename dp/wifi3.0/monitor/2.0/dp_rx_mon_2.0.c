@@ -975,6 +975,76 @@ dp_rx_mon_handle_full_mon(struct dp_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
+static inline int
+dp_rx_mon_flush_packet_tlv(struct dp_pdev *pdev, void *buf, uint16_t end_offset,
+			   union dp_mon_desc_list_elem_t **desc_list,
+			   union dp_mon_desc_list_elem_t **tail)
+{
+	struct dp_soc *soc = pdev->soc;
+	struct dp_mon_pdev *mon_pdev = pdev->monitor_pdev;
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	uint16_t work_done = 0;
+	qdf_frag_t addr;
+	uint8_t *rx_tlv;
+	uint8_t *rx_tlv_start;
+	uint16_t tlv_status = HAL_TLV_STATUS_BUF_DONE;
+	struct hal_rx_ppdu_info *ppdu_info;
+
+	if (!buf)
+		return work_done;
+
+	ppdu_info = &mon_pdev->ppdu_info;
+	if (!ppdu_info) {
+		dp_mon_err("ppdu_info malloc failed pdev: %pK", pdev);
+		return work_done;
+	}
+	qdf_mem_zero(ppdu_info, sizeof(struct hal_rx_ppdu_info));
+	rx_tlv = buf;
+	rx_tlv_start = buf;
+
+	do {
+		tlv_status = hal_rx_status_get_tlv_info(rx_tlv,
+							ppdu_info,
+							pdev->soc->hal_soc,
+							buf);
+
+		if (tlv_status == HAL_TLV_STATUS_MON_BUF_ADDR) {
+			struct dp_mon_desc *mon_desc = (struct dp_mon_desc *)(uintptr_t)ppdu_info->packet_info.sw_cookie;
+
+			qdf_assert_always(mon_desc);
+			addr = mon_desc->buf_addr;
+
+			if (!mon_desc->unmapped) {
+				qdf_mem_unmap_page(soc->osdev,
+						   (qdf_dma_addr_t)mon_desc->paddr,
+						   DP_MON_DATA_BUFFER_SIZE,
+						   QDF_DMA_FROM_DEVICE);
+				mon_desc->unmapped = 1;
+			}
+			dp_mon_add_to_free_desc_list(desc_list, tail, mon_desc);
+			work_done++;
+
+			if (addr) {
+				qdf_frag_free(addr);
+				DP_STATS_INC(mon_soc, frag_free, 1);
+			}
+		}
+
+		rx_tlv = hal_rx_status_get_next_tlv(rx_tlv, 1);
+
+		if ((rx_tlv - rx_tlv_start) >= (end_offset + 1))
+			break;
+
+	} while ((tlv_status == HAL_TLV_STATUS_PPDU_NOT_DONE) ||
+		 (tlv_status == HAL_TLV_STATUS_HEADER) ||
+		 (tlv_status == HAL_TLV_STATUS_MPDU_END) ||
+		 (tlv_status == HAL_TLV_STATUS_MSDU_END) ||
+		 (tlv_status == HAL_TLV_STATUS_MON_BUF_ADDR) ||
+		 (tlv_status == HAL_TLV_STATUS_MPDU_START));
+
+	return work_done;
+}
+
 /**
  * dp_rx_mon_flush_status_buf_queue () - Flush status buffer queue
  *
@@ -999,6 +1069,7 @@ dp_rx_mon_flush_status_buf_queue(struct dp_pdev *pdev)
 	struct dp_mon_desc_pool *rx_mon_desc_pool = &mon_soc_be->rx_desc_mon;
 	uint16_t work_done = 0;
 	uint16_t status_buf_count;
+	uint16_t end_offset = 0;
 
 	if (!mon_pdev_be->desc_count) {
 		dp_mon_info("no of status buffer count is zero: %pK", pdev);
@@ -1014,9 +1085,13 @@ dp_rx_mon_flush_status_buf_queue(struct dp_pdev *pdev)
 		}
 
 		buf = mon_desc->buf_addr;
+		end_offset = mon_desc->end_offset;
 
 		dp_mon_add_to_free_desc_list(&desc_list, &tail, mon_desc);
 		work_done++;
+
+		work_done += dp_rx_mon_flush_packet_tlv(pdev, buf, end_offset,
+							&desc_list, &tail);
 
 		/* set status buffer pointer to NULL */
 		mon_pdev_be->status[idx] = NULL;
@@ -1055,13 +1130,19 @@ dp_rx_mon_handle_flush_n_trucated_ppdu(struct dp_soc *soc,
 			dp_get_be_mon_soc_from_dp_mon_soc(mon_soc);
 	struct dp_mon_desc_pool *rx_mon_desc_pool = &mon_soc_be->rx_desc_mon;
 	uint16_t work_done;
+	void *buf;
+	uint16_t end_offset = 0;
 
 	/* Flush status buffers in queue */
 	dp_rx_mon_flush_status_buf_queue(pdev);
+	buf = mon_desc->buf_addr;
+	end_offset = mon_desc->end_offset;
 	qdf_frag_free(mon_desc->buf_addr);
 	DP_STATS_INC(mon_soc, frag_free, 1);
 	dp_mon_add_to_free_desc_list(&desc_list, &tail, mon_desc);
 	work_done = 1;
+	work_done += dp_rx_mon_flush_packet_tlv(pdev, buf, end_offset,
+						&desc_list, &tail);
 	if (desc_list)
 		dp_mon_add_desc_list_to_free_list(soc, &desc_list, &tail,
 						  rx_mon_desc_pool);
