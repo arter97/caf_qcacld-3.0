@@ -4178,9 +4178,15 @@ QDF_STATUS csr_roam_issue_disassociate(tpAniSirGlobal pMac, uint32_t sessionId,
 	    (NewSubstate != eCSR_ROAM_SUBSTATE_DISASSOC_HANDOFF)) {
 		tpCsrNeighborRoamControlInfo pNeighborRoamInfo =
 			&pMac->roam.neighborRoamInfo[sessionId];
-		qdf_copy_macaddr(&bssId,
-			      pNeighborRoamInfo->csrNeighborRoamProfile.BSSIDs.
-			      bssid);
+		if (pNeighborRoamInfo->csrNeighborRoamProfile.BSSIDs.bssid) {
+			qdf_copy_macaddr(&bssId,
+				pNeighborRoamInfo->csrNeighborRoamProfile.BSSIDs.
+				bssid);
+		} else if (pSession->pConnectBssDesc) {
+			qdf_mem_copy(&bssId.bytes,
+				     pSession->pConnectBssDesc->bssId,
+				     sizeof(struct qdf_mac_addr));
+		}
 	} else if (pSession->pConnectBssDesc) {
 		qdf_mem_copy(&bssId.bytes, pSession->pConnectBssDesc->bssId,
 			     sizeof(struct qdf_mac_addr));
