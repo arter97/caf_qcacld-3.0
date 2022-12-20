@@ -59,6 +59,7 @@ struct hal_rx_flow {
  * @key_cache: Toepliz Key Cache configured key
  * @add_flow_count: Add flow count
  * @del_flow_count: Delete flow count
+ * @fst_entry_size: size of each flow entry
  */
 struct hal_rx_fst {
 	uint8_t *base_vaddr;
@@ -73,6 +74,7 @@ struct hal_rx_fst {
 	uint16_t hash_mask;
 	uint32_t add_flow_count;
 	uint32_t del_flow_count;
+	uint32_t fst_entry_size;
 };
 
 #endif /* HAL_RX_FLOW_DEFINES_H */

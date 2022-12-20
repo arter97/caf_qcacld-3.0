@@ -541,13 +541,10 @@ static QDF_STATUS dp_peer_ppeds_default_route_be(struct dp_soc *soc,
 	priority_valid = be_peer->priority_valid;
 
 	/*
-	 * if FST is enabled and MLO is disabled then
-	 * let flow rule take the decision of routing
-	 * the pkt to DS or host
+	 * if FST is enabled then let flow rule take the decision of
+	 * routing the pkt to DS or host
 	 */
-	if (wlan_cfg_is_rx_flow_tag_enabled(cfg) &&
-	    qdf_is_macaddr_zero((struct qdf_mac_addr *)
-				 be_vdev->vdev.mld_mac_addr.raw))
+	if (wlan_cfg_is_rx_flow_tag_enabled(cfg))
 		use_ppe_ds = 0;
 
 	if (soc->cdp_soc.ol_ops->peer_set_ppeds_default_routing) {
@@ -722,6 +719,26 @@ dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
 	be_vdev->mcast_primary = false;
 	vdev->mlo_vdev = false;
 }
+
+static void dp_set_rx_fst_be(struct dp_soc *soc, struct dp_rx_fst *fst)
+{
+	dp_mlo_set_rx_fst(soc, fst);
+}
+
+static struct dp_rx_fst *dp_get_rx_fst_be(struct dp_soc *soc)
+{
+	return dp_mlo_get_rx_fst(soc);
+}
+
+static uint8_t dp_rx_fst_deref_be(struct dp_soc *soc)
+{
+	return dp_mlo_rx_fst_deref(soc);
+}
+
+static void dp_rx_fst_ref_be(struct dp_soc *soc)
+{
+	dp_mlo_rx_fst_ref(soc);
+}
 #else
 static inline void
 dp_mlo_mcast_init(struct dp_soc *soc, struct dp_vdev *vdev)
@@ -730,6 +747,24 @@ dp_mlo_mcast_init(struct dp_soc *soc, struct dp_vdev *vdev)
 
 static inline void
 dp_mlo_mcast_deinit(struct dp_soc *soc, struct dp_vdev *vdev)
+{
+}
+
+static void dp_set_rx_fst_be(struct dp_soc *soc, struct dp_rx_fst *fst)
+{
+}
+
+static struct dp_rx_fst *dp_get_rx_fst_be(struct dp_soc *soc)
+{
+	return NULL;
+}
+
+static uint8_t dp_rx_fst_deref_be(struct dp_soc *soc)
+{
+	return 1;
+}
+
+static void dp_rx_fst_ref_be(struct dp_soc *soc)
 {
 }
 #endif
@@ -766,6 +801,24 @@ static void dp_get_rx_hash_key_be(struct dp_soc *soc,
 				  struct cdp_lro_hash_config *lro_hash)
 {
 	dp_get_rx_hash_key_bytes(lro_hash);
+}
+
+static void dp_set_rx_fst_be(struct dp_soc *soc, struct dp_rx_fst *fst)
+{
+}
+
+static struct dp_rx_fst *dp_get_rx_fst_be(struct dp_soc *soc)
+{
+	return NULL;
+}
+
+static uint8_t dp_rx_fst_deref_be(struct dp_soc *soc)
+{
+	return 1;
+}
+
+static void dp_rx_fst_ref_be(struct dp_soc *soc)
+{
 }
 #endif
 
@@ -2369,6 +2422,10 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 #endif
 	dp_init_near_full_arch_ops_be(arch_ops);
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_be;
+	arch_ops->dp_set_rx_fst = dp_set_rx_fst_be;
+	arch_ops->dp_get_rx_fst = dp_get_rx_fst_be;
+	arch_ops->dp_rx_fst_deref = dp_rx_fst_deref_be;
+	arch_ops->dp_rx_fst_ref = dp_rx_fst_ref_be;
 	arch_ops->print_mlo_ast_stats = dp_print_mlo_ast_stats_be;
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_be;
 	arch_ops->reo_remap_config = dp_reo_remap_config_be;

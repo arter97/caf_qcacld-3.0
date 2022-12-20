@@ -3257,6 +3257,26 @@ void dp_rx_fst_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 #endif
 
 /**
+ * dp_rx_fst_attach_wrapper() - wrapper API for dp_rx_fst_attach
+ * @soc: SoC handle
+ * @pdev: Pdev handle
+ *
+ * Return: Handle to flow search table entry
+ */
+extern QDF_STATUS
+dp_rx_fst_attach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev);
+
+/**
+ * dp_rx_fst_detach_wrapper() - wrapper API for dp_rx_fst_detach
+ * @soc: SoC handle
+ * @pdev: Pdev handle
+ *
+ * Return: None
+ */
+extern void
+dp_rx_fst_detach_wrapper(struct dp_soc *soc, struct dp_pdev *pdev);
+
+/**
  * dp_vdev_get_ref() - API to take a reference for VDEV object
  *
  * @soc		: core DP soc context
