@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2000,6 +2000,10 @@ struct dp_arch_ops {
 				       unsigned int tid);
 	void (*get_rx_hash_key)(struct dp_soc *soc,
 				struct cdp_lro_hash_config *lro_hash);
+	void (*dp_set_rx_fst)(struct dp_soc *soc, struct dp_rx_fst *fst);
+	struct dp_rx_fst *(*dp_get_rx_fst)(struct dp_soc *soc);
+	uint8_t (*dp_rx_fst_deref)(struct dp_soc *soc);
+	void (*dp_rx_fst_ref)(struct dp_soc *soc);
 	void (*txrx_print_peer_stats)(struct cdp_peer_stats *peer_stats,
 				      enum peer_stats_type stats_type);
 	/* Dp peer reorder queue setup */

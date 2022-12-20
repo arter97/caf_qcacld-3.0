@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -742,6 +742,50 @@ void dp_mlo_get_rx_hash_key(struct dp_soc *soc,
 	qdf_mem_copy(lro_hash->toeplitz_hash_ipv6, ml_ctxt->toeplitz_hash_ipv6,
 		     (sizeof(lro_hash->toeplitz_hash_ipv6[0]) *
 		      LRO_IPV6_SEED_ARR_SZ));
+}
+
+void dp_mlo_set_rx_fst(struct dp_soc *soc, struct dp_rx_fst *fst)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *ml_ctxt = be_soc->ml_ctxt;
+
+	if (be_soc->mlo_enabled && ml_ctxt)
+		ml_ctxt->rx_fst = fst;
+}
+
+struct dp_rx_fst *dp_mlo_get_rx_fst(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *ml_ctxt = be_soc->ml_ctxt;
+
+	if (be_soc->mlo_enabled && ml_ctxt)
+		return ml_ctxt->rx_fst;
+
+	return NULL;
+}
+
+void dp_mlo_rx_fst_ref(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *ml_ctxt = be_soc->ml_ctxt;
+
+	if (be_soc->mlo_enabled && ml_ctxt)
+		ml_ctxt->rx_fst_ref_cnt++;
+}
+
+uint8_t dp_mlo_rx_fst_deref(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *ml_ctxt = be_soc->ml_ctxt;
+	uint8_t rx_fst_ref_cnt;
+
+	if (be_soc->mlo_enabled && ml_ctxt) {
+		rx_fst_ref_cnt = ml_ctxt->rx_fst_ref_cnt;
+		ml_ctxt->rx_fst_ref_cnt--;
+		return rx_fst_ref_cnt;
+	}
+
+	return 1;
 }
 
 struct dp_soc *

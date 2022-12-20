@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -419,6 +419,7 @@ hal_rx_fst_attach(hal_soc_handle_t hal_soc_hdl,
 	fst->hash_mask = max_entries - 1;
 
 	fst_entry_size = hal_rx_fst_get_fse_size(hal_soc_hdl);
+	fst->fst_entry_size = fst_entry_size;
 
 	QDF_TRACE(QDF_MODULE_ID_TXRX, QDF_TRACE_LEVEL_DEBUG,
 		  "HAL FST allocation %pK %d * %d\n", fst,
@@ -473,15 +474,14 @@ qdf_export_symbol(hal_rx_fst_attach);
 void hal_rx_fst_detach(hal_soc_handle_t hal_soc_hdl, struct hal_rx_fst *rx_fst,
 		       qdf_device_t qdf_dev, uint64_t fst_cmem_base)
 {
-	uint32_t fst_entry_size;
 
 	if (!rx_fst || !qdf_dev)
 		return;
 
 	if (fst_cmem_base == 0 && rx_fst->base_vaddr) {
-		fst_entry_size = hal_rx_fst_get_fse_size(hal_soc_hdl);
 		qdf_mem_free_consistent(qdf_dev, qdf_dev->dev,
-					rx_fst->max_entries * fst_entry_size,
+					rx_fst->max_entries *
+					rx_fst->fst_entry_size,
 					rx_fst->base_vaddr, rx_fst->base_paddr,
 					0);
 	}

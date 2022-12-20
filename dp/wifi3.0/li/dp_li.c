@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -631,6 +631,10 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->txrx_peer_map_attach = dp_peer_map_attach_li;
 	arch_ops->txrx_peer_map_detach = dp_peer_map_detach_li;
 	arch_ops->get_rx_hash_key = dp_get_rx_hash_key_li;
+	arch_ops->dp_set_rx_fst = NULL;
+	arch_ops->dp_get_rx_fst = NULL;
+	arch_ops->dp_rx_fst_ref = NULL;
+	arch_ops->dp_rx_fst_deref = NULL;
 	arch_ops->txrx_peer_setup = dp_peer_setup_li;
 	arch_ops->dp_rx_desc_cookie_2_va =
 			dp_rx_desc_cookie_2_va_li;
