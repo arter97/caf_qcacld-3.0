@@ -611,7 +611,7 @@ static void display_help(void)
 		    "STA MAC Address for STA stats:\n"
 		    "    -m xx:xx:xx:xx:xx:xx or --stamacaddr xx:xx:xx:xx:xx:xx\n"
 		    "\n"
-		    "Service ID set only in STA mode for SAWFDELAY and SWFATX features:\n"
+		    "Service ID set only in STA mode for SAWFDELAY and SAWFTX features:\n"
 		    "    -t <serviceid>\n"
 		    "\n"
 		    "OTHER OPTIONS:\n"
