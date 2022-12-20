@@ -42,13 +42,18 @@ enum CMEM_MEM_CLIENTS {
 #define DP_CC_SPT_PAGE_MAX_ENTRIES_MASK (DP_CC_SPT_PAGE_MAX_ENTRIES - 1)
 
 /* maximum number of entries in primary page table */
-#define DP_CC_PPT_MAX_ENTRIES 1024
+#define DP_CC_PPT_MAX_ENTRIES \
+	DP_CC_PPT_MEM_SIZE / DP_CC_PPT_ENTRY_SIZE_4K_ALIGNED
 
 /* cookie conversion required CMEM offset from CMEM pool */
 #define DP_CC_MEM_OFFSET_IN_CMEM 0
 
 /* cookie conversion primary page table size 4K */
+#if defined(WLAN_MAX_PDEVS) && (WLAN_MAX_PDEVS == 1)
 #define DP_CC_PPT_MEM_SIZE 4096
+#else
+#define DP_CC_PPT_MEM_SIZE 8192
+#endif
 
 /* FST required CMEM offset from CMEM pool */
 #define DP_FST_MEM_OFFSET_IN_CMEM \
