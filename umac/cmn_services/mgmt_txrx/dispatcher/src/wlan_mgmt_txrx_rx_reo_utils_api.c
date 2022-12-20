@@ -173,7 +173,19 @@ wlan_mgmt_rx_reo_get_snapshot_info
 			 enum mgmt_rx_reo_shared_snapshot_id id,
 			 struct mgmt_rx_reo_snapshot_info *snapshot_info)
 {
-	return mgmt_rx_reo_sim_get_snapshot_info(pdev, id, snapshot_info);
+	QDF_STATUS status;
+
+	status = mgmt_rx_reo_sim_get_snapshot_address(pdev, id,
+						      &snapshot_info->address);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		mgmt_rx_reo_err("Failed to get snapshot address for ID = %d",
+				id);
+		return status;
+	}
+
+	snapshot_info->version = 1;
+
+	return QDF_STATUS_SUCCESS;
 }
 
 /**
@@ -337,6 +349,8 @@ wlan_mgmt_rx_reo_is_feature_enabled_at_pdev(struct wlan_objmgr_pdev *pdev)
 {
 	return true;
 }
+
+qdf_export_symbol(wlan_mgmt_rx_reo_is_feature_enabled_at_pdev);
 
 QDF_STATUS
 wlan_mgmt_rx_reo_sim_start(uint8_t ml_grp_id)

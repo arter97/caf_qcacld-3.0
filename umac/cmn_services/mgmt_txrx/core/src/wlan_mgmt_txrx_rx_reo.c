@@ -4336,7 +4336,6 @@ mgmt_rx_reo_sim_receive_from_air(struct mgmt_rx_reo_sim_mac_hw *mac_hw,
 				 struct mgmt_rx_frame_params *frame)
 {
 	uint8_t valid_link_list_index;
-	QDF_STATUS status;
 	int8_t link_id;
 
 	if (!mac_hw) {
@@ -4604,19 +4603,19 @@ mgmt_rx_reo_sim_deinit_master_frame_list(
  */
 static QDF_STATUS
 mgmt_rx_reo_sim_generate_unique_link_id(
-		struct wlan_objmgr_pdev *link_id_to_pdev_map, uint8_t *link_id)
+		struct wlan_objmgr_pdev **link_id_to_pdev_map, uint8_t *link_id)
 {
 	uint8_t random_link_id;
-	uint8_t link_id;
+	uint8_t link;
 
 	if (!link_id_to_pdev_map || !link_id)
 		return QDF_STATUS_E_NULL_VALUE;
 
-	for (link_id = 0; link_id < MAX_MLO_LINKS; link_id++)
-		if (!link_id_to_pdev_map[link_id])
+	for (link = 0; link < MAX_MLO_LINKS; link++)
+		if (!link_id_to_pdev_map[link])
 			break;
 
-	if (link_id == MAX_MLO_LINKS) {
+	if (link == MAX_MLO_LINKS) {
 		mgmt_rx_reo_err("All link ids are already allocated");
 		return QDF_STATUS_E_FAILURE;
 	}
@@ -4651,6 +4650,7 @@ mgmt_rx_reo_sim_insert_into_link_id_to_pdev_map(
 		struct wlan_objmgr_pdev *pdev)
 {
 	uint8_t link_id;
+	QDF_STATUS status;
 
 	if (!link_id_to_pdev_map) {
 		mgmt_rx_reo_err("Link id to pdev map is null");
@@ -4665,7 +4665,7 @@ mgmt_rx_reo_sim_insert_into_link_id_to_pdev_map(
 	qdf_spin_lock(&link_id_to_pdev_map->lock);
 
 	status = mgmt_rx_reo_sim_generate_unique_link_id(
-					link_id_to_pdev_map->map, &link_id)
+					link_id_to_pdev_map->map, &link_id);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		qdf_spin_unlock(&link_id_to_pdev_map->lock);
 		return QDF_STATUS_E_FAILURE;
@@ -4886,13 +4886,15 @@ mgmt_rx_reo_sim_stop(uint8_t ml_grp_id)
 				sim_context->host_mgmt_frame_handler[link_id]);
 	}
 
-	status = mgmt_rx_reo_print_ingress_frame_debug_info();
+	status = mgmt_rx_reo_print_ingress_frame_info
+			(MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to print ingress frame debug info");
 		return status;
 	}
 
-	status = mgmt_rx_reo_print_egress_frame_debug_info();
+	status = mgmt_rx_reo_print_egress_frame_info
+			(MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		mgmt_rx_reo_err("Failed to print egress frame debug info");
 		return status;

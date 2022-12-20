@@ -72,12 +72,14 @@
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_WAIT_COUNT_MAX_SIZE   (69)
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_PER_LINK_SNAPSHOTS_MAX_SIZE   (94)
 #define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE     (22)
+#define MGMT_RX_REO_EGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES     (0)
 
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_BOARDER_MAX_SIZE   (785)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_FLAG_MAX_SIZE   (13)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_WAIT_COUNT_MAX_SIZE   (69)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_PER_LINK_SNAPSHOTS_MAX_SIZE   (94)
 #define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_SNAPSHOT_MAX_SIZE     (22)
+#define MGMT_RX_REO_INGRESS_FRAME_DEBUG_INFO_PRINT_MAX_FRAMES     (0)
 #endif /* WLAN_MGMT_RX_REO_DEBUG_SUPPORT*/
 
 /*
@@ -450,7 +452,7 @@ struct mgmt_rx_reo_sim_context {
 	struct workqueue_struct *fw_mgmt_frame_handler[MAX_MLO_LINKS];
 	struct mgmt_rx_reo_master_frame_list master_frame_list;
 	struct mgmt_rx_reo_mac_hw_simulator mac_hw_sim;
-	struct mgmt_rx_reo_snapshot snapshot[MAX_MLO_LINKS]
+	struct mgmt_rx_reo_shared_snapshot snapshot[MAX_MLO_LINKS]
 					    [MGMT_RX_REO_SHARED_SNAPSHOT_MAX];
 	struct mgmt_rx_reo_sim_link_id_to_pdev_map link_id_to_pdev_map;
 	uint8_t mlo_grp_id;
@@ -1052,7 +1054,7 @@ QDF_STATUS
 mgmt_rx_reo_sim_get_snapshot_address(
 			struct wlan_objmgr_pdev *pdev,
 			enum mgmt_rx_reo_shared_snapshot_id id,
-			struct mgmt_rx_reo_snapshot **address);
+			struct mgmt_rx_reo_shared_snapshot **address);
 
 /**
  * mgmt_rx_reo_sim_pdev_object_create_notification() - pdev create handler for
