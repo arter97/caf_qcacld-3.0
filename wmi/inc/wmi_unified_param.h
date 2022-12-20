@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -8967,6 +8967,9 @@ struct wmi_roam_result {
  *  @btm_query_token: BTM query dialog token.
  *  @btm_query_reason: BTM query reasons as defined in
  *  IEEE802.11v spec table 7-43x
+ *  @req_token: Request token
+ *  @resp_token: Response Token
+ *  @num_rpt: Number of report element
  */
 struct wmi_neighbor_report_data {
 	bool present;
@@ -8978,6 +8981,9 @@ struct wmi_neighbor_report_data {
 	uint32_t freq[MAX_ROAM_SCAN_CHAN];
 	uint16_t btm_query_token;
 	uint8_t btm_query_reason;
+	uint8_t req_token;
+	uint8_t resp_token;
+	uint8_t num_rpt;
 };
 
 /**
