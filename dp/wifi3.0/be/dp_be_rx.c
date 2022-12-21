@@ -149,7 +149,7 @@ dp_rx_set_msdu_lmac_id(qdf_nbuf_t nbuf, uint32_t peer_mdata)
  * dp_rx_process_be() - Brain of the Rx processing functionality
  *		     Called from the bottom half (tasklet/NET_RX_SOFTIRQ)
  * @int_ctx: per interrupt context
- * @hal_ring: opaque pointer to the HAL Rx Ring, which will be serviced
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Ring, which will be serviced
  * @reo_ring_num: ring number (0, 1, 2 or 3) of the reo ring.
  * @quota: No. of units (packets) that can be serviced in one shot.
  *
@@ -1329,13 +1329,6 @@ static inline bool
 dp_rx_intrabss_fwd_mlo_allow(struct dp_txrx_peer *ta_peer,
 			     struct dp_txrx_peer *da_peer)
 {
-	/* one of TA/DA peer should belong to MLO connection peer,
-	 * only MLD peer type is as expected
-	 */
-	if (!IS_MLO_DP_MLD_TXRX_PEER(ta_peer) &&
-	    !IS_MLO_DP_MLD_TXRX_PEER(da_peer))
-		return false;
-
 	/* TA peer and DA peer's vdev should be partner MLO vdevs */
 	if (dp_peer_find_mac_addr_cmp(&ta_peer->vdev->mld_mac_addr,
 				      &da_peer->vdev->mld_mac_addr))
@@ -1355,38 +1348,51 @@ dp_rx_intrabss_fwd_mlo_allow(struct dp_txrx_peer *ta_peer,
 #ifdef INTRA_BSS_FWD_OFFLOAD
 /**
  * dp_rx_intrabss_ucast_check_be() - Check if intrabss is allowed
-				     for unicast frame
- * @soc: SOC handle
+ *				     for unicast frame
  * @nbuf: RX packet buffer
  * @ta_peer: transmitter DP peer handle
+ * @rx_tlv_hdr: Rx TLV header
  * @msdu_metadata: MSDU meta data info
- * @p_tx_vdev_id: get vdev id for Intra-BSS TX
+ * @params: params to be filled in
  *
  * Return: true - intrabss allowed
-	   false - not allow
+ *	   false - not allow
  */
 static bool
 dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 			      struct dp_txrx_peer *ta_peer,
+			      uint8_t *rx_tlv_hdr,
 			      struct hal_rx_msdu_metadata *msdu_metadata,
 			      struct dp_be_intrabss_params *params)
 {
-	uint16_t da_peer_id;
-	struct dp_txrx_peer *da_peer;
-	dp_txrx_ref_handle txrx_ref_handle = NULL;
+	uint8_t dest_chip_id, dest_chip_pmac_id;
+	struct dp_vdev_be *be_vdev =
+		dp_get_be_vdev_from_dp_vdev(ta_peer->vdev);
+	struct dp_soc_be *be_soc =
+		dp_get_be_soc_from_dp_soc(params->dest_soc);
 
 	if (!qdf_nbuf_is_intra_bss(nbuf))
 		return false;
 
-	da_peer_id = dp_rx_peer_metadata_peer_id_get_be(
-						params->dest_soc,
-						msdu_metadata->da_idx);
-	da_peer = dp_txrx_peer_get_ref_by_id(params->dest_soc, da_peer_id,
-					     &txrx_ref_handle, DP_MOD_ID_RX);
-	if (!da_peer)
+	hal_rx_tlv_get_dest_chip_pmac_id(rx_tlv_hdr,
+					 &dest_chip_id,
+					 &dest_chip_pmac_id);
+	qdf_assert_always(dest_chip_id <= (DP_MLO_MAX_DEST_CHIP_ID - 1));
+
+	if (dest_chip_id == be_soc->mlo_chip_id) {
+		/* TODO: adding to self list is better */
+		params->tx_vdev_id = ta_peer->vdev->vdev_id;
+		return true;
+	}
+
+	params->dest_soc =
+		dp_mlo_get_soc_ref_by_chip_id(be_soc->ml_ctxt,
+					      dest_chip_id);
+	if (!params->dest_soc)
 		return false;
-	params->tx_vdev_id = da_peer->vdev->vdev_id;
-	dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_RX);
+
+	params->tx_vdev_id =
+		be_vdev->partner_vdev_list[dest_chip_id][dest_chip_pmac_id];
 
 	return true;
 }
@@ -1395,6 +1401,7 @@ dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 static bool
 dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 			      struct dp_txrx_peer *ta_peer,
+			      uint8_t *rx_tlv_hdr,
 			      struct hal_rx_msdu_metadata *msdu_metadata,
 			      struct dp_be_intrabss_params *params)
 {
@@ -1492,6 +1499,7 @@ rel_da_peer:
 static bool
 dp_rx_intrabss_ucast_check_be(qdf_nbuf_t nbuf,
 			      struct dp_txrx_peer *ta_peer,
+			      uint8_t *rx_tlv_hdr,
 			      struct hal_rx_msdu_metadata *msdu_metadata,
 			      struct dp_be_intrabss_params *params)
 {
@@ -1670,7 +1678,7 @@ bool dp_rx_intrabss_fwd_be(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 		return true;
 
 	params.dest_soc = soc;
-	if (dp_rx_intrabss_ucast_check_be(nbuf, ta_peer,
+	if (dp_rx_intrabss_ucast_check_be(nbuf, ta_peer, rx_tlv_hdr,
 					  &msdu_metadata, &params)) {
 		ret = dp_rx_intrabss_ucast_fwd(params.dest_soc, ta_peer,
 					       params.tx_vdev_id,

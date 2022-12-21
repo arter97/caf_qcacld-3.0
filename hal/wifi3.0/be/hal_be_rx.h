@@ -21,6 +21,7 @@
 #define _HAL_BE_RX_H_
 
 #include "hal_be_hw_headers.h"
+#include "hal_be_rx_tlv.h"
 #include "hal_rx.h"
 #include <wbm_release_ring_rx.h>
 
@@ -224,20 +225,28 @@
 #define HAL_RX_PEER_ID_GET(msdu_metadata) \
 	(((msdu_metadata)->da_idx) & HAL_RX_DA_IDX_PEER_ID_MASK)
 
+#define HAL_RX_TLV_DEST_CHIP_ID_GET(_rx_pkt_tlv)	\
+	HAL_RX_MSDU_END(_rx_pkt_tlv).dest_chip_id
+
+#ifdef INTRA_BSS_FWD_OFFLOAD
+#define HAL_RX_TLV_DEST_CHIP_PMAC_ID_GET(_rx_pkt_tlv)	\
+	HAL_RX_MSDU_END(_rx_pkt_tlv).dest_chip_pmac_id
+#endif
+
 /**
  * enum hal_be_rx_wbm_error_source: Indicates which module initiated the
  * release of this buffer or descriptor
  *
- * @ HAL_BE_RX_WBM_ERR_SRC_RXDMA: RXDMA released this buffer or descriptor
- * @ HAL_BE_RX_WBM_ERR_SRC_REO: REO released this buffer or descriptor
- * @ HAL_BE_RX_WBM_ERR_SRC_FW_RX: FW released this buffer or descriptor from the
+ * @HAL_BE_RX_WBM_ERR_SRC_RXDMA: RXDMA released this buffer or descriptor
+ * @HAL_BE_RX_WBM_ERR_SRC_REO: REO released this buffer or descriptor
+ * @HAL_BE_RX_WBM_ERR_SRC_FW_RX: FW released this buffer or descriptor from the
  *				RX path
- * @ HAL_BE_RX_WBM_ERR_SRC_SW_RX: SW released this buffer or descriptor from the
+ * @HAL_BE_RX_WBM_ERR_SRC_SW_RX: SW released this buffer or descriptor from the
  *				RX path
- * @ HAL_BE_RX_WBM_ERR_SRC_TQM : TQM released this buffer or descriptor
- * @ HAL_BE_RX_WBM_ERR_SRC_FW_TX: FW released this buffer or descriptor from the
+ * @HAL_BE_RX_WBM_ERR_SRC_TQM : TQM released this buffer or descriptor
+ * @HAL_BE_RX_WBM_ERR_SRC_FW_TX: FW released this buffer or descriptor from the
  *				RX path
- * @ HAL_BE_RX_WBM_ERR_SRC_SW_TX: SW released this buffer or descriptor from the
+ * @HAL_BE_RX_WBM_ERR_SRC_SW_TX: SW released this buffer or descriptor from the
  *				RX path
  */
 enum hal_be_rx_wbm_error_source {
@@ -509,4 +518,24 @@ static inline uint8_t hal_rx_sw_exception_get_be(void *reo_desc)
 {
 	return HAL_RX_GET(reo_desc, REO_DESTINATION_RING, SW_EXCEPTION);
 }
+
+#ifdef INTRA_BSS_FWD_OFFLOAD
+/**
+ * hal_rx_tlv_get_dest_chip_pmac_id() - Get destination chip and PMAC ID
+ * @buf: Rx TLV buffer
+ * @d_chip_id: chip id being filled in
+ * @d_chip_pmac_id: chip pmac id being filled in
+ *
+ * Return: void
+ */
+static inline void
+hal_rx_tlv_get_dest_chip_pmac_id(uint8_t *buf,
+				 uint8_t *d_chip_id, uint8_t *d_chip_pmac_id)
+{
+	struct rx_pkt_tlvs *rx_pkt_tlvs = (struct rx_pkt_tlvs *)buf;
+
+	*d_chip_id = HAL_RX_TLV_DEST_CHIP_ID_GET(rx_pkt_tlvs);
+	*d_chip_pmac_id = HAL_RX_TLV_DEST_CHIP_PMAC_ID_GET(rx_pkt_tlvs);
+}
+#endif /* INTRA_BSS_FWD_OFFLOAD */
 #endif /* _HAL_BE_RX_H_ */
