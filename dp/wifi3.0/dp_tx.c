@@ -2422,7 +2422,6 @@ dp_tx_send_msdu_single(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 release_desc:
 	dp_tx_desc_release(tx_desc, tx_q->desc_pool_id);
-	tx_sw_drop_stats_inc(pdev, nbuf, drop_code);
 
 fail_return:
 	dp_tx_get_tid(vdev, nbuf, msdu_info);
