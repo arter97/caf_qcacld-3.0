@@ -176,7 +176,7 @@ struct direct_buf_rx_module_debug {
  * @dbr_ring_cfg: Pointer to direct buf rx ring config struct
  * @dbr_buf_pool: Pointer to direct buf rx buffer pool struct
  * @dbr_rsp_handler: Pointer to direct buf rx response handler for the module
- * @registered: Whether the module @mod_id has successfully registered for this
+ * @srng_initialized: Whether the DBR ring is successfully initialized for this
  * @pdev_id @srng_id
  */
 struct direct_buf_rx_module_param {
@@ -189,7 +189,7 @@ struct direct_buf_rx_module_param {
 	struct direct_buf_rx_buf_info *dbr_buf_pool;
 	bool (*dbr_rsp_handler)(struct wlan_objmgr_pdev *pdev,
 				struct direct_buf_rx_data *dbr_data);
-	bool registered;
+	bool srng_initialized;
 };
 
 /**
