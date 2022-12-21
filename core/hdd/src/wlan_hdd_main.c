@@ -138,6 +138,8 @@
 #include "nan_public_structs.h"
 #include "nan_ucfg_api.h"
 #include "wlan_reg_ucfg_api.h"
+#include "wlan_hdd_afc.h"
+#include "wlan_afc_ucfg_api.h"
 #include "wlan_dfs_ucfg_api.h"
 #include "wlan_hdd_rx_monitor.h"
 #include "sme_power_save_api.h"
@@ -4782,6 +4784,8 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 		hdd_sr_register_callbacks(hdd_ctx);
 
 		wlan_hdd_register_btc_chain_mode_handler(hdd_ctx->psoc);
+
+		wlan_hdd_register_afc_pld_cb(hdd_ctx->psoc);
 
 		status = cds_pre_enable();
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
@@ -18102,8 +18106,14 @@ static QDF_STATUS hdd_component_init(void)
 	if (QDF_IS_STATUS_ERROR(status))
 		goto qmi_deinit;
 
+	status = ucfg_afc_init();
+	if (QDF_IS_STATUS_ERROR(status))
+		goto ll_sap_deinit;
+
 	return QDF_STATUS_SUCCESS;
 
+ll_sap_deinit:
+	ucfg_ll_sap_deinit();
 qmi_deinit:
 	ucfg_qmi_deinit();
 dp_deinit:
@@ -18156,6 +18166,7 @@ mlme_global_deinit:
 static void hdd_component_deinit(void)
 {
 	/* deinitialize non-converged components */
+	ucfg_afc_deinit();
 	ucfg_ll_sap_deinit();
 	ucfg_qmi_deinit();
 	ucfg_dp_deinit();

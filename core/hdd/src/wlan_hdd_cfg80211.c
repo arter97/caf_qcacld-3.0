@@ -163,6 +163,7 @@
 #include "wlan_cm_roam_ucfg_api.h"
 #include "hif.h"
 #include "wlan_reg_ucfg_api.h"
+#include "wlan_hdd_afc.h"
 #include "wlan_hdd_twt.h"
 #include "wlan_hdd_gpio.h"
 #include "wlan_hdd_medium_assess.h"
@@ -1964,6 +1965,7 @@ static const struct nl80211_vendor_cmd_info wlan_hdd_cfg80211_vendor_events[] = 
 		.subcmd = QCA_NL80211_VENDOR_SUBCMD_LINK_RECONFIG,
 	},
 #endif
+	FEATURE_AFC_VENDOR_EVENTS
 };
 
 /**
@@ -19633,6 +19635,7 @@ const struct wiphy_vendor_command hdd_wiphy_vendor_commands[] = {
 	},
 	FEATURE_COAP_OFFLOAD_COMMANDS
 	FEATURE_ML_LINK_STATE_COMMANDS
+	FEATURE_AFC_VENDOR_COMMANDS
 };
 
 struct hdd_context *hdd_cfg80211_wiphy_alloc(void)

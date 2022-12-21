@@ -2745,6 +2745,19 @@ bool pld_is_one_msi(struct device *dev)
 	return ret;
 }
 
+#ifdef CONFIG_AFC_SUPPORT
+int pld_send_buffer_to_afcmem(struct device *dev, const uint8_t *afcdb,
+			      uint32_t len, uint8_t slotid)
+{
+	return cnss_send_buffer_to_afcmem(dev, afcdb, len, slotid);
+}
+
+int pld_reset_afcmem(struct device *dev, uint8_t slotid)
+{
+	return cnss_reset_afcmem(dev, slotid);
+}
+#endif
+
 #ifdef FEATURE_DIRECT_LINK
 int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
 		       size_t size)
