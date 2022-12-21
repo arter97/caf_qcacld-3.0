@@ -17978,7 +17978,10 @@ void csr_cleanup_session(struct mac_context *mac, uint32_t sessionId)
 	if (CSR_IS_SESSION_VALID(mac, sessionId)) {
 		struct csr_roam_session *pSession = CSR_GET_SESSION(mac,
 								sessionId);
-
+		if (!pSession) {
+			sme_err("Session_ID Invalid %d", sessionId);
+			return;
+		}
 		csr_roam_stop(mac, sessionId);
 
 		/* Clean up FT related data structures */
