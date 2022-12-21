@@ -559,9 +559,10 @@ static QDF_STATUS dp_peer_ppeds_default_route_be(struct dp_soc *soc,
 				src_info, vdev_id, use_ppe_ds,
 				peer_routing_enabled);
 		if (status != QDF_STATUS_SUCCESS) {
-			qdf_err("vdev_id: %d, PPE peer routing mac:"
-				 QDF_MAC_ADDR_FMT, vdev_id,
-				QDF_MAC_ADDR_REF(be_peer->peer.mac_addr.raw));
+			dp_err("vdev_id: %d, PPE peer routing mac:"
+			       QDF_MAC_ADDR_FMT, vdev_id,
+			       QDF_MAC_ADDR_REF(be_peer->peer.mac_addr.raw));
+
 			return QDF_STATUS_E_FAILURE;
 		}
 	}
@@ -580,7 +581,7 @@ static QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 
 	if (!be_peer) {
-		qdf_err("BE peer is null");
+		dp_err("BE peer is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
@@ -600,15 +601,14 @@ static QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 			link_peer = link_peers_info.link_peers[i];
 			be_peer = dp_get_be_peer_from_dp_peer(link_peer);
 			if (!be_peer) {
-				qdf_err("BE peer is null for peer id %d ",
-							link_peer->peer_id);
+				dp_err("BE peer is null");
 				continue;
 			}
 
 			be_vdev = dp_get_be_vdev_from_dp_vdev(link_peer->vdev);
 			if (!be_vdev) {
-				qdf_err("BE vap is null for peer id %d ",
-							link_peer->peer_id);
+				dp_err("BE vap is null for peer id %d ",
+				       link_peer->peer_id);
 				continue;
 			}
 
@@ -628,7 +628,7 @@ static QDF_STATUS dp_peer_setup_ppeds_be(struct dp_soc *soc,
 
 		be_vdev = dp_get_be_vdev_from_dp_vdev(mld_peer->vdev);
 		if (!be_vdev) {
-			qdf_err("BE vap is null");
+			dp_err("BE vap is null");
 			return QDF_STATUS_E_NULL_VALUE;
 		}
 
