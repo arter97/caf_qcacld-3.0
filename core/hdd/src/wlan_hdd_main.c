@@ -7537,6 +7537,25 @@ static void wlan_hdd_cfg80211_scan_block_cb(struct work_struct *work)
 	osif_vdev_sync_op_stop(vdev_sync);
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+static inline void
+wlan_hdd_set_ml_cap_for_sap_intf(struct hdd_adapter_create_param *create_params,
+				 enum QDF_OPMODE mode)
+{
+	if (mode != QDF_SAP_MODE)
+		return;
+
+	create_params->is_single_link = true;
+	create_params->is_ml_adapter = true;
+}
+#else
+static inline void
+wlan_hdd_set_ml_cap_for_sap_intf(struct hdd_adapter_create_param *create_params,
+				 enum QDF_OPMODE mode)
+{
+}
+#endif
+
 /**
  * hdd_open_adapter() - open and setup the hdd adapter
  * @hdd_ctx: global hdd context
@@ -7724,11 +7743,7 @@ struct hdd_adapter *hdd_open_adapter(struct hdd_context *hdd_ctx,
 		INIT_WORK(&adapter->ipv6_notifier_work,
 			  hdd_ipv6_notifier_work_queue);
 #endif
-		if (session_type == QDF_SAP_MODE) {
-			/* Create all SAP mode adapters as ML type */
-			params->is_ml_adapter = true;
-			params->is_single_link = true;
-		}
+		wlan_hdd_set_ml_cap_for_sap_intf(params, session_type);
 
 		break;
 	case QDF_FTM_MODE:
