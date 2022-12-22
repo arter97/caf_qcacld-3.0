@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011,2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3255,6 +3255,11 @@ target_if_spectral_report_params_init(
 	    target_type == TARGET_TYPE_MANGO) {
 		rparams->detid_mode_table[SPECTRAL_DETECTOR_ID_1] =
 						SPECTRAL_SCAN_MODE_AGILE;
+		rparams->detid_mode_table[SPECTRAL_DETECTOR_ID_2] =
+						SPECTRAL_SCAN_MODE_INVALID;
+	} else if (target_type == TARGET_TYPE_QCA5332) {
+		rparams->detid_mode_table[SPECTRAL_DETECTOR_ID_1] =
+						SPECTRAL_SCAN_MODE_INVALID;
 		rparams->detid_mode_table[SPECTRAL_DETECTOR_ID_2] =
 						SPECTRAL_SCAN_MODE_INVALID;
 	} else {
