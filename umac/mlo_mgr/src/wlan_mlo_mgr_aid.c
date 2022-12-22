@@ -805,6 +805,9 @@ void mlme_free_aid(struct wlan_objmgr_vdev *vdev, uint16_t assoc_id)
 		return;
 	}
 
+	if (!ml_dev->ap_ctx)
+		return;
+
 	ml_aid_mgr = ml_dev->ap_ctx->ml_aid_mgr;
 	if (!ml_aid_mgr)
 		return;
