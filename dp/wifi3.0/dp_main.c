@@ -7864,7 +7864,13 @@ dp_peer_create_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		dp_peer_vdev_list_add(soc, vdev, peer);
 		dp_peer_find_hash_add(soc, peer);
 
-		dp_peer_rx_tids_create(peer);
+		if (dp_peer_rx_tids_create(peer) != QDF_STATUS_SUCCESS) {
+			dp_alert("RX tid alloc fail for peer %pK (" QDF_MAC_ADDR_FMT ")",
+				 peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+			dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
+			return QDF_STATUS_E_FAILURE;
+		}
+
 		if (IS_MLO_DP_MLD_PEER(peer))
 			dp_mld_peer_init_link_peers_info(peer);
 
@@ -8012,7 +8018,11 @@ dp_peer_create_wifi3(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 		peer->sta_self_peer = 1;
 	}
 
-	dp_peer_rx_tids_create(peer);
+	if (dp_peer_rx_tids_create(peer) != QDF_STATUS_SUCCESS) {
+		dp_alert("RX tid alloc fail for peer %pK (" QDF_MAC_ADDR_FMT ")",
+			 peer, QDF_MAC_ADDR_REF(peer->mac_addr.raw));
+		goto fail;
+	}
 
 	peer->valid = 1;
 	dp_local_peer_id_alloc(pdev, peer);
@@ -11974,7 +11984,7 @@ QDF_STATUS dp_sysfs_deinitialize_stats(struct dp_soc *soc_hdl)
 
 	status = qdf_event_destroy(&soc->sysfs_config->sysfs_txrx_fw_request_done);
 	if (status != QDF_STATUS_SUCCESS)
-		dp_cdp_err("Failed to detroy event sysfs_txrx_fw_request_done ");
+		dp_cdp_err("Failed to destroy event sysfs_txrx_fw_request_done");
 
 	qdf_mutex_destroy(&soc->sysfs_config->sysfs_read_lock);
 	qdf_spinlock_destroy(&soc->sysfs_config->rw_stats_lock);
