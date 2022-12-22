@@ -540,16 +540,42 @@ struct wlan_cm_connect_resp {
 };
 
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
-/* As per enum WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID */
+/* As per enum vendor_control_roam_param */
 #define MAX_VENDOR_CONTROL_PARAMS 8
+
+/**
+ * enum vendor_control_roam_param - vendor control roam parameters
+ * @VENDOR_CONTROL_PARAM_ROAM_TRIGGER: roam trigger
+ * @VENDOR_CONTROL_PARAM_ROAM_DELTA: roam delta
+ * @VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD: full scan period
+ * @VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD: partial scan period
+ * @VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME: active ch dwell time
+ * @VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME: passive ch dwell time
+ * @VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME: home ch dwell time
+ * @VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME: away time
+ * @VENDOR_CONTROL_PARAM_ROAM_ALL: Sending query for all params of
+ * enum vendor_control_roam_param
+ */
+enum vendor_control_roam_param {
+	VENDOR_CONTROL_PARAM_ROAM_TRIGGER = 1,
+	VENDOR_CONTROL_PARAM_ROAM_DELTA,
+	VENDOR_CONTROL_PARAM_ROAM_FULL_SCANPERIOD,
+	VENDOR_CONTROL_PARAM_ROAM_PARTIAL_SCANPERIOD,
+	VENDOR_CONTROL_PARAM_ROAM_ACTIVE_CH_DWELLTIME,
+	VENDOR_CONTROL_PARAM_ROAM_PASSIVE_CH_DWELLTIME,
+	VENDOR_CONTROL_PARAM_ROAM_HOME_CH_TIME,
+	VENDOR_CONTROL_PARAM_ROAM_AWAY_TIME,
+	VENDOR_CONTROL_PARAM_ROAM_ALL = 0xFFFFFFFF,
+};
+
 /*
  * struct roam_param_info: vendor handoff related parameters
- * @param_id : vendor control Param ID from enum
- * WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
- * @param_value : vendor control param value
+ * @param_id: vendor control Param ID from enum
+ * vendor_control_roam_param
+ * @param_value: vendor control param value
  */
 struct roam_param_info {
-	uint32_t param_id;
+	enum vendor_control_roam_param param_id;
 	uint32_t param_value;
 };
 
