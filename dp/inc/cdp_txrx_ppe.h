@@ -33,7 +33,7 @@ QDF_STATUS cdp_ppesds_entry_attach(struct cdp_soc_t *soc, uint8_t vdev_id,
 	if (!soc || !soc->ops || !soc->ops->ppeds_ops) {
 		QDF_TRACE(QDF_MODULE_ID_DP, QDF_TRACE_LEVEL_FATAL,
 			  "%s invalid instance", __func__);
-		return QDF_STATUS_E_INVAL;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	if (soc->ops->ppeds_ops->ppeds_entry_attach)
@@ -41,7 +41,7 @@ QDF_STATUS cdp_ppesds_entry_attach(struct cdp_soc_t *soc, uint8_t vdev_id,
 							       vpai,
 							       ppe_vp_num);
 
-	return QDF_STATUS_E_NOSUPPORT;
+	return QDF_STATUS_E_INVAL;
 }
 
 /**
