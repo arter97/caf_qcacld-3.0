@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1237,6 +1237,24 @@ static const char *qdf_dp_subtype_to_str(enum qdf_proto_subtype subtype)
 		return "ROAM COMP";
 	case QDF_ROAM_EVENTID:
 		return "ROAM EVENTID";
+	case QDF_PROTO_EAP_REQUEST:
+		return "EAP REQ";
+	case QDF_PROTO_EAP_RESPONSE:
+		return "EAP RSP";
+	case QDF_PROTO_EAP_SUCCESS:
+		return "EAP SUC";
+	case QDF_PROTO_EAP_FAILURE:
+		return "EAP FAIL";
+	case QDF_PROTO_EAP_INITIATE:
+		return "EAP INIT";
+	case QDF_PROTO_EAP_FINISH:
+		return "EAP FINISH";
+	case QDF_PROTO_EAPOL_START:
+		return "START";
+	case QDF_PROTO_EAPOL_LOGOFF:
+		return "LOGOFF";
+	case QDF_PROTO_EAPOL_ASF:
+		return "ASF";
 	default:
 		return "invalid";
 	}
@@ -1519,6 +1537,24 @@ uint8_t *qdf_get_pkt_type_string(uint8_t type, uint8_t subtype)
 		return "DNS_Q";
 	case QDF_PROTO_DNS_RES:
 		return "DNS_RS";
+	case QDF_PROTO_EAP_REQUEST:
+		return "EAP_REQ";
+	case QDF_PROTO_EAP_RESPONSE:
+		return "EAP-RSP";
+	case QDF_PROTO_EAP_SUCCESS:
+		return "EAP-SUCCESS";
+	case QDF_PROTO_EAP_FAILURE:
+		return "EAP-FAIL";
+	case QDF_PROTO_EAP_INITIATE:
+		return "EAP-INIT";
+	case QDF_PROTO_EAP_FINISH:
+		return "EAP-FINISH";
+	case QDF_PROTO_EAPOL_START:
+		return "EAPOL-START";
+	case QDF_PROTO_EAPOL_LOGOFF:
+		return "EAPOL-LOGOFF";
+	case QDF_PROTO_EAPOL_ASF:
+		return "EAPOL-ASF";
 	default:
 		switch (type) {
 		case QDF_PROTO_TYPE_EAPOL:
@@ -1775,6 +1811,16 @@ static int qdf_subtype_to_wlan_main_tag(enum qdf_proto_subtype subtype)
 		return WLAN_CONN_DIAG_EAPOL_M3_EVENT;
 	case QDF_PROTO_EAPOL_M4:
 		return WLAN_CONN_DIAG_EAPOL_M4_EVENT;
+	case QDF_PROTO_EAP_REQUEST:
+		return WLAN_CONN_DIAG_EAP_REQ_EVENT;
+	case QDF_PROTO_EAP_RESPONSE:
+		return WLAN_CONN_DIAG_EAP_RESP_EVENT;
+	case QDF_PROTO_EAP_SUCCESS:
+		return WLAN_CONN_DIAG_EAP_SUCC_EVENT;
+	case QDF_PROTO_EAP_FAILURE:
+		return WLAN_CONN_DIAG_EAP_FAIL_EVENT;
+	case QDF_PROTO_EAPOL_START:
+		return WLAN_CONN_DIAG_EAP_START_EVENT;
 	default:
 		return WLAN_CONN_DIAG_MAX;
 	}

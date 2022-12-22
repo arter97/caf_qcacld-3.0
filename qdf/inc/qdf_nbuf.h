@@ -110,6 +110,7 @@
 #define EAPOL_PACKET_TYPE_START                 1
 #define EAPOL_PACKET_TYPE_LOGOFF                2
 #define EAPOL_PACKET_TYPE_KEY                   3
+#define EAPOL_PACKET_TYPE_ASF			4
 
 #define EAPOL_KEY_TYPE_MASK			0x0800
 #define EAPOL_KEY_ENCRYPTED_MASK		0x0010
