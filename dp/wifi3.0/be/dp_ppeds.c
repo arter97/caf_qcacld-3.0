@@ -984,7 +984,7 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	    vdev->mesh_vdev || vdev->mesh_rx_filter) {
 		dp_err("Unsupported Vdev config for id:%d", vdev_id);
 		dp_vdev_unref_delete(soc, vdev, DP_MOD_ID_CDP);
-		return QDF_STATUS_E_INVAL;
+		return QDF_STATUS_E_NOSUPPORT;
 	}
 
 	osif = vdev->osif_vdev;
