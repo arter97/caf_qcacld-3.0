@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -404,20 +404,6 @@ static void wlan_ipa_forward(struct wlan_ipa_priv *ipa_ctx,
 	}
 }
 
-/**
- * wlan_ipa_intrabss_forward() - Forward intra bss packets.
- * @ipa_ctx: pointer to IPA IPA struct
- * @iface_ctx: ipa interface context
- * @desc: Firmware descriptor
- * @skb: Data buffer
- *
- * Return:
- *      WLAN_IPA_FORWARD_PKT_NONE
- *      WLAN_IPA_FORWARD_PKT_DISCARD
- *      WLAN_IPA_FORWARD_PKT_LOCAL_STACK
- *
- */
-
 #ifndef QCA_IPA_LL_TX_FLOW_CONTROL
 static inline
 bool wlan_ipa_tx_desc_thresh_reached(struct cdp_soc_t *soc, uint8_t vdev_id)
@@ -450,6 +436,19 @@ bool wlan_ipa_get_peer_state(struct cdp_soc_t *soc, uint8_t vdev_id,
 }
 #endif
 
+/**
+ * wlan_ipa_intrabss_forward() - Forward intra bss packets.
+ * @ipa_ctx: pointer to IPA IPA struct
+ * @iface_ctx: ipa interface context
+ * @desc: Firmware descriptor
+ * @skb: Data buffer
+ *
+ * Return:
+ *      WLAN_IPA_FORWARD_PKT_NONE
+ *      WLAN_IPA_FORWARD_PKT_DISCARD
+ *      WLAN_IPA_FORWARD_PKT_LOCAL_STACK
+ *
+ */
 static enum wlan_ipa_forward_type wlan_ipa_intrabss_forward(
 		struct wlan_ipa_priv *ipa_ctx,
 		struct wlan_ipa_iface_context *iface_ctx,
@@ -603,7 +602,7 @@ wlan_ipa_wdi_setup(struct wlan_ipa_priv *ipa_ctx,
 #ifdef FEATURE_METERING
 /**
  * wlan_ipa_wdi_init_metering() - IPA WDI metering init
- * @ipa_ctx: IPA context
+ * @ipa_ctxt: IPA context
  * @in: IPA WDI in param
  *
  * Return: QDF_STATUS
@@ -623,7 +622,7 @@ static inline void wlan_ipa_wdi_init_metering(struct wlan_ipa_priv *ipa_ctxt,
 
 #ifdef IPA_WDS_EASYMESH_FEATURE
 /**
- * wlan_ipa_update_wds_params();
+ * wlan_ipa_update_wds_params() - IPA update WDS parameters
  * @ipa_ctx: IPA context
  * @in: IPA wdi init in params
  *
@@ -638,7 +637,7 @@ static void wlan_ipa_update_wds_params(struct wlan_ipa_priv *ipa_ctx,
 }
 
 /**
- * wlan_ipa_msg_wds_update();
+ * wlan_ipa_msg_wds_update() - IPA message WDS update
  * @ipa_wds: IPA WDS status
  * @msg: Meta data message for IPA
  *
@@ -737,7 +736,7 @@ static inline int wlan_ipa_wdi_teardown_sys_pipe(struct wlan_ipa_priv *ipa_ctx,
 
 /**
  * wlan_ipa_pm_flush() - flush queued packets
- * @work: pointer to the scheduled work
+ * @data: IPA context
  *
  * Called during PM resume to send packets to TL which were queued
  * while host was in the process of suspending.
@@ -991,7 +990,7 @@ static inline int wlan_ipa_wdi_teardown_sys_pipe(
 
 /**
  * wlan_ipa_pm_flush() - flush queued packets
- * @work: pointer to the scheduled work
+ * @data: IPA context
  *
  * Called during PM resume to send packets to TL which were queued
  * while host was in the process of suspending.
@@ -1073,6 +1072,7 @@ wlan_ipa_rx_intrabss_fwd(struct wlan_ipa_priv *ipa_ctx,
 /**
  * wlan_ipa_send_sta_eapol_to_nw() - Send Rx EAPOL pkt for STA to Kernel
  * @skb: network buffer
+ * @pdev: pdev obj
  *
  * Called when a EAPOL packet is received via IPA Exception path
  * before wlan_ipa_setup_iface is done for STA.
@@ -1849,6 +1849,7 @@ static int wlan_ipa_get_ifaceid(struct wlan_ipa_priv *ipa_ctx,
 /**
  * wlan_ipa_cleanup_iface() - Cleanup IPA on a given interface
  * @iface_context: interface-specific IPA context
+ * @mac_addr: MAC address
  *
  * Return: None
  */
@@ -2004,9 +2005,8 @@ static uint8_t wlan_ipa_set_session_id(uint8_t session_id, bool is_2g_iface)
  * @ipa_ctx: IPA IPA global context
  * @net_dev: Interface net device
  * @device_mode: Net interface device mode
- * @adapter: Interface upon which IPA is being setup
- * @session_id: Station ID of the API instance
- * @mac_addr: MAC addr of the API instance
+ * @session_id: Session ID
+ * @mac_addr: MAC address associated with the event
  * @is_2g_iface: true if Net interface is operating on 2G band, otherwise false
  *
  * Return: QDF STATUS
@@ -2384,7 +2384,6 @@ bool wlan_ipa_uc_is_loaded(struct wlan_ipa_priv *ipa_ctx)
 /**
  * wlan_ipa_intrabss_enable_disable() - wdi intrabss enable/disable notify to fw
  * @ipa_ctx: global IPA context
- * @offload_type: MCC or SCC
  * @session_id: Session Id
  * @enable: intrabss enable or disable
  *
@@ -2509,7 +2508,7 @@ void wlan_ipa_uc_bw_monitor(struct wlan_ipa_priv *ipa_ctx, bool stop)
  * wlan_ipa_send_msg() - Allocate and send message to IPA
  * @net_dev: Interface net device
  * @type: event enum of type ipa_wlan_event
- * @mac_address: MAC address associated with the event
+ * @mac_addr: MAC address associated with the event
  *
  * Return: QDF STATUS
  */
@@ -2715,9 +2714,10 @@ wlan_ipa_set_peer_id(struct wlan_ipa_priv *ipa_ctx,
  * @device_mode: Net interface device mode
  * @session_id: session id for the event
  * @type: event enum of type ipa_wlan_event
- * @mac_address: MAC address associated with the event
+ * @mac_addr: MAC address associated with the event
  * @is_2g_iface: @net_dev is 2G or not for QDF_IPA_STA_CONNECT and
  *		 QDF_IPA_AP_CONNECT
+ * @ipa_obj: IPA object
  *
  * This function is meant to be called from within wlan_ipa_ctx.c
  *
@@ -2786,7 +2786,7 @@ static QDF_STATUS __wlan_ipa_wlan_evt(qdf_netdev_t net_dev, uint8_t device_mode,
 			 ipa_ctx->resource_loading ?
 			 "load" : "unload");
 
-		/* Wait until completion of the long/unloading */
+		/* Wait until completion of the loading/unloading */
 		status = qdf_wait_for_event_completion(
 				&ipa_ctx->ipa_resource_comp,
 				IPA_RESOURCE_COMP_WAIT_TIME);
@@ -3426,8 +3426,9 @@ static uint8_t wlan_ipa_device_mode_switch(uint8_t device_mode)
  * @device_mode: Net interface device mode
  * @session_id: session id for the event
  * @ipa_event_type: event enum of type wlan_ipa_wlan_event
- * @mac_address: MAC address associated with the event
+ * @mac_addr: MAC address associated with the event
  * @is_2g_iface: @net_dev is 2g interface or not
+ * @ipa_obj: IPA object
  *
  * Return: QDF_STATUS
  */
@@ -3682,6 +3683,7 @@ static inline uint8_t wlan_ipa_get_rx_ipa_client(struct wlan_ipa_priv *ipa_ctx)
 
 /**
  * wlan_ipa_uc_send_wdi_control_msg() - Set WDI control message
+ * @ipa_ctx: IPA context
  * @ctrl: WDI control value
  *
  * Send WLAN_WDI_ENABLE for ctrl = true and WLAN_WDI_DISABLE otherwise.
@@ -4253,8 +4255,7 @@ connect_pipe_fail:
 /**
  * wlan_ipa_uc_op_cb() - IPA uC operation callback
  * @op_msg: operation message received from firmware
- * @usr_ctxt: user context registered with TL (we register the IPA Global
- *	context)
+ * @ipa_ctx: IPA context
  *
  * Return: None
  */
@@ -4404,7 +4405,7 @@ static void wlan_ipa_uc_fw_op_event_handler(void *data)
 /**
  * wlan_ipa_uc_op_event_handler() - IPA UC OP event handler
  * @op_msg: operation message received from firmware
- * @ipa_ctx: Global IPA context
+ * @ctx: Global IPA context
  *
  * Return: None
  */
@@ -4582,6 +4583,7 @@ QDF_STATUS wlan_ipa_uc_ol_deinit(struct wlan_ipa_priv *ipa_ctx)
  * @net_dev: Interface net device
  * @type: event type
  * @mac_addr: pointer to mac address
+ * @ipa_priv: IPA private context
  *
  * Send event to IPA driver
  *
