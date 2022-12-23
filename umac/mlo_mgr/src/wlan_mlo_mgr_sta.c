@@ -539,7 +539,6 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 
 		mlo_dev_lock_acquire(mlo_dev_ctx);
 		status = mlo_validate_connect_req(vdev, mlo_dev_ctx, req);
-
 		copied_conn_req_lock_acquire(sta_ctx);
 		if (!sta_ctx->copied_conn_req)
 			sta_ctx->copied_conn_req = qdf_mem_malloc(
@@ -1814,6 +1813,7 @@ done:
 	return handled;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 void mlo_internal_disconnect_links(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_mlo_dev_context *mlo_dev_ctx = NULL;
@@ -1863,6 +1863,11 @@ void mlo_internal_disconnect_links(struct wlan_objmgr_vdev *vdev)
 		mlo_release_vdev_ref(wlan_vdev_list[i]);
 	}
 }
+#else
+void mlo_internal_disconnect_links(struct wlan_objmgr_vdev *vdev)
+{
+}
+#endif /* WLAN_FEATURE_11BE_MLO_ADV_FEATURE */
 
 void mlo_sta_get_vdev_list(struct wlan_objmgr_vdev *vdev, uint16_t *vdev_count,
 			   struct wlan_objmgr_vdev **wlan_vdev_list)
