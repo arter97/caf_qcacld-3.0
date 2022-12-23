@@ -608,10 +608,10 @@ void
 wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 				     struct scan_event *event)
 {
-	static u32 last_scanid;
 	enum QDF_OPMODE opmode;
 	struct wlan_objmgr_pdev *pdev = wlan_vdev_get_pdev(vdev);
 	struct wlan_rptr_pdev_priv *pdev_priv = NULL;
+	struct wlan_rptr_vdev_priv *vdev_priv = NULL;
 	struct wlan_rptr_global_priv *g_priv = NULL;
 	struct rptr_ext_cbacks *ext_cb = NULL;
 	wlan_rptr_same_ssid_feature_t   *ss_info;
@@ -628,10 +628,15 @@ wlan_rptr_core_ss_parse_scan_entries(struct wlan_objmgr_vdev *vdev,
 			if (wlan_rptr_is_psta_vdev(vdev))
 				return;
 
-			if (last_scanid == event->scan_id)
+			vdev_priv = wlan_rptr_get_vdev_priv(vdev);
+			if (!vdev_priv)
 				return;
 
-			last_scanid = event->scan_id;
+			if (vdev_priv->vdev_scan_id == event->scan_id) {
+				return;
+			}
+
+			vdev_priv->vdev_scan_id = event->scan_id;
 			pdev_priv = wlan_rptr_get_pdev_priv(pdev);
 			OS_MEMSET(pdev_priv->preferred_bssid, 0,
 				  QDF_MAC_ADDR_SIZE);
