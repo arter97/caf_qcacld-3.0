@@ -432,6 +432,29 @@ void hal_tx_set_ppe_vp_entry_9224(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
+ * hal_ppeds_cfg_ast_override_map_reg_9224() - Set the PPE index mapping table
+ * @hal_soc_hdl: HAL SoC context
+ * @idx: index into the table
+ * @idx_map: HAL PPE INDESX MAPPING config
+ *
+ * Return: void
+ */
+static inline void
+hal_ppeds_cfg_ast_override_map_reg_9224(hal_soc_handle_t hal_soc_hdl,
+					uint8_t idx,
+					union hal_tx_ppe_idx_map_config *idx_map)
+{
+	struct hal_soc *soc = (struct hal_soc *)hal_soc_hdl;
+	uint32_t reg_addr;
+
+	reg_addr =
+		HWIO_TCL_R0_PPE_INDEX_MAPPING_TABLE_n_ADDR(MAC_TCL_REG_REG_BASE,
+							   idx);
+
+	HAL_REG_WRITE(soc, reg_addr, idx_map->val);
+}
+
+/**
  * hal_tx_set_ppe_pri2tid_map1_9224()
  * @hal_soc_hdl: HAL SoC handle
  * @val : PRI to TID value

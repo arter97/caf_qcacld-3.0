@@ -1553,6 +1553,8 @@ static void hal_hw_txrx_ops_attach_qcn9224(struct hal_soc *hal_soc)
 			hal_tx_set_ppe_cmn_config_9224;
 	hal_soc->ops->hal_tx_set_ppe_vp_entry =
 			hal_tx_set_ppe_vp_entry_9224;
+	hal_soc->ops->hal_ppeds_cfg_ast_override_map_reg =
+			hal_ppeds_cfg_ast_override_map_reg_9224;
 	hal_soc->ops->hal_tx_set_ppe_pri2tid =
 			hal_tx_set_ppe_pri2tid_map_9224;
 	hal_soc->ops->hal_tx_update_ppe_pri2tid =

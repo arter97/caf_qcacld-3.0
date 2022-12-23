@@ -2493,6 +2493,8 @@ void dp_initialize_arch_ops_be(struct dp_arch_ops *arch_ops)
 	arch_ops->dp_register_ppeds_interrupts = dp_register_ppeds_interrupts;
 	arch_ops->dp_free_ppeds_interrupts = dp_free_ppeds_interrupts;
 	arch_ops->dp_tx_ppeds_inuse_desc = dp_ppeds_inuse_desc;
+	arch_ops->dp_tx_ppeds_cfg_astidx_cache_mapping =
+				dp_tx_ppeds_cfg_astidx_cache_mapping;
 #endif
 	dp_init_near_full_arch_ops_be(arch_ops);
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_be;
