@@ -167,6 +167,35 @@ static void dp_ppeds_get_vdev_vp_config_be(struct dp_vdev_be *be_vdev,
 }
 
 /**
+ * dp_tx_ppeds_cfg_astidx_cache_mapping - Set ppe index mapping table value
+ * @soc: DP SoC context
+ * @vdev: DP vdev
+ * @peer_map: map if true, unmap if false
+ *
+ * Return: void
+ */
+void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
+					  struct dp_vdev *vdev, bool peer_map)
+{
+	union hal_tx_ppe_idx_map_config ppeds_idx_mapping = {0};
+
+	if (vdev->opmode == wlan_op_mode_sta) {
+		/*
+		 * Peer map event provides bss_ast_idx and bss_ast_hash params
+		 * which are used as search index and cache set numbers.
+		 */
+		if (peer_map) {
+			ppeds_idx_mapping.search_idx = vdev->bss_ast_idx;
+			ppeds_idx_mapping.cache_set = vdev->bss_ast_hash;
+		}
+
+		hal_ppeds_cfg_ast_override_map_reg(soc->hal_soc,
+						   DP_PPEDS_STAMODE_ASTIDX_MAP_REG_IDX,
+						   &ppeds_idx_mapping);
+	}
+}
+
+/**
  * dp_ppeds_setup_vp_entry_be: Setup the PPE VP entry
  * be_soc: Be Soc
  * be_vdev: BE vdev
@@ -1035,6 +1064,10 @@ QDF_STATUS dp_ppeds_attach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	vp_profile->to_fw = 0;
 	vp_profile->use_ppe_int_pri = 0;
 	vp_profile->drop_prec_enable = 0;
+
+	if (vdev->opmode == wlan_op_mode_sta)
+		be_vdev->ppe_vp_profile.search_idx_reg_num =
+					DP_PPEDS_STAMODE_ASTIDX_MAP_REG_IDX;
 
 	/*
 	 * For the sta mode fill up the index reg number.

@@ -198,4 +198,15 @@ irqreturn_t dp_ppe_ds_reo2ppe_irq_handler(int irq, void *ctxr);
  * Return: ppeds handle
  */
 void *dp_get_ppe_ds_ctxt(struct dp_soc *soc);
+
+/**
+ * dp_tx_ppeds_cfg_astidx_cache_mapping - Set ppe index mapping table value
+ * @soc: DP SoC context
+ * @vdev: DP vdev
+ * @peer_map: map if true, unmap if false
+ *
+ * Return: void
+ */
+void dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc,
+					  struct dp_vdev *vdev, bool peer_map);
 #endif /* _DP_PPEDS_H_ */
