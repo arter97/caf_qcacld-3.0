@@ -2460,6 +2460,32 @@ fail_return:
 }
 
 /**
+ * dp_tdls_tx_comp_free_buff() - Free non std buffer when TDLS flag is set
+ * @soc: Soc handle
+ * @desc: software Tx descriptor to be processed
+ *
+ * Return: 0 if Success
+ */
+#ifdef FEATURE_WLAN_TDLS
+static inline int
+dp_tdls_tx_comp_free_buff(struct dp_soc *soc, struct dp_tx_desc_s *desc)
+{
+	/* If it is TDLS mgmt, don't unmap or free the frame */
+	if (desc->flags & DP_TX_DESC_FLAG_TDLS_FRAME) {
+		dp_non_std_htt_tx_comp_free_buff(soc, desc);
+		return 0;
+	}
+	return 1;
+}
+#else
+static inline int
+dp_tdls_tx_comp_free_buff(struct dp_soc *soc, struct dp_tx_desc_s *desc)
+{
+	return 1;
+}
+#endif
+
+/**
  * dp_tx_comp_free_buf() - Free nbuf associated with the Tx Descriptor
  * @soc: Soc handle
  * @desc: software Tx descriptor to be processed
@@ -2477,11 +2503,8 @@ qdf_nbuf_t dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc,
 	if (!nbuf)
 		return NULL;
 
-	/* If it is TDLS mgmt, don't unmap or free the frame */
-	if (desc->flags & DP_TX_DESC_FLAG_TDLS_FRAME) {
-		dp_non_std_htt_tx_comp_free_buff(soc, desc);
+	if (!dp_tdls_tx_comp_free_buff(soc, desc))
 		return NULL;
-	}
 
 	/* 0 : MSDU buffer, 1 : MLE */
 	if (desc->msdu_ext_desc) {
