@@ -2241,6 +2241,51 @@ static void cm_list_insert_sorted(qdf_list_t *scan_list,
 		qdf_list_insert_back(scan_list, &scan_entry->node);
 }
 
+#ifdef CONN_MGR_ADV_FEATURE
+/**
+ * cm_is_bad_rssi_entry() - check the entry have rssi value, if rssi is lower
+ * than threshold limit, then it is considered ad bad rssi value.
+ * @scan_entry: pointer to scan cache entry
+ * @score_config: pointer to score config structure
+ * @bssid_hint: bssid hint
+ *
+ * Return: true if rssi is lower than threshold
+ */
+static
+bool cm_is_bad_rssi_entry(struct scan_cache_entry *scan_entry,
+			  struct scoring_cfg *score_config,
+			  struct qdf_mac_addr *bssid_hint)
+{
+	int8_t rssi_threshold =
+		score_config->rssi_score.con_non_hint_target_rssi_threshold;
+
+	 /* do not need to consider BSSID hint if it is invalid entry(zero) */
+	if (qdf_is_macaddr_zero(bssid_hint))
+		return false;
+
+	if (score_config->is_bssid_hint_priority &&
+	    !qdf_is_macaddr_equal(bssid_hint, &scan_entry->bssid) &&
+	    scan_entry->rssi_raw < rssi_threshold) {
+		mlme_nofl_debug("Candidate(  " QDF_MAC_ADDR_FMT "  freq %d): remove entry, rssi %d lower than rssi_threshold %d",
+				QDF_MAC_ADDR_REF(scan_entry->bssid.bytes),
+				scan_entry->channel.chan_freq,
+				scan_entry->rssi_raw, rssi_threshold);
+		return true;
+	}
+
+	return false;
+}
+#else
+static inline
+bool cm_is_bad_rssi_entry(struct scan_cache_entry *scan_entry,
+			  struct scoring_cfg *score_config,
+			  struct qdf_mac_addr *bssid_hint)
+
+{
+	return false;
+}
+#endif
+
 void wlan_cm_calculate_bss_score(struct wlan_objmgr_pdev *pdev,
 				 struct pcl_freq_weight_list *pcl_lst,
 				 qdf_list_t *scan_list,
@@ -2258,6 +2303,7 @@ void wlan_cm_calculate_bss_score(struct wlan_objmgr_pdev *pdev,
 	bool assoc_allowed;
 	struct scan_cache_node *force_connect_candidate = NULL;
 	bool are_all_candidate_denylisted = true;
+	bool is_rssi_bad = false;
 
 	psoc = wlan_pdev_get_psoc(pdev);
 
@@ -2296,10 +2342,13 @@ void wlan_cm_calculate_bss_score(struct wlan_objmgr_pdev *pdev,
 		scan_entry = qdf_container_of(cur_node, struct scan_cache_node,
 					      node);
 
+		is_rssi_bad = cm_is_bad_rssi_entry(scan_entry->entry,
+						   score_config, bssid_hint);
+
 		assoc_allowed = cm_is_assoc_allowed(mlme_psoc_obj,
 						    scan_entry->entry);
 
-		if (assoc_allowed)
+		if (assoc_allowed && !is_rssi_bad)
 			denylist_action = wlan_denylist_action_on_bssid(pdev,
 							scan_entry->entry);
 		else
@@ -2386,7 +2435,7 @@ void wlan_cm_calculate_bss_score(struct wlan_objmgr_pdev *pdev,
 		 */
 		if (denylist_action == CM_DLM_REMOVE ||
 		    denylist_action == CM_DLM_FORCE_REMOVE) {
-			if (assoc_allowed)
+			if (assoc_allowed && !is_rssi_bad)
 				mlme_nofl_debug("Candidate( " QDF_MAC_ADDR_FMT " freq %d): rssi %d, dlm action %d is in Denylist, remove entry",
 					QDF_MAC_ADDR_REF(scan_entry->entry->bssid.bytes),
 					scan_entry->entry->channel.chan_freq,
@@ -2906,6 +2955,9 @@ void wlan_cm_init_score_config(struct wlan_objmgr_psoc *psoc,
 
 	score_cfg->rssi_score.rssi_pref_5g_rssi_thresh =
 		cfg_get(psoc, CFG_SCORING_RSSI_PREF_5G_THRESHOLD);
+
+	score_cfg->rssi_score.con_non_hint_target_rssi_threshold =
+		cfg_get(psoc, CFG_CON_NON_HINT_TARGET_MIN_RSSI);
 
 	score_cfg->esp_qbss_scoring.num_slot =
 		cfg_get(psoc, CFG_SCORING_NUM_ESP_QBSS_SLOTS);
