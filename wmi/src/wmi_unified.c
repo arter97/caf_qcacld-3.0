@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -876,7 +876,7 @@ wmi_print_mgmt_event_log(wmi_unified_t wmi, uint32_t count,
 
 /* debugfs routines*/
 
-/**
+/*
  * debug_wmi_##func_base##_show() - debugfs functions to display content of
  * command and event buffers. Macro uses max buffer length to display
  * buffer when it is wraparound.
@@ -1058,7 +1058,7 @@ static int debug_wmi_log_size_show(struct seq_file *m, void *v)
 				 wmi_diag_log_max_entry);
 }
 
-/**
+/*
  * debug_wmi_##func_base##_write() - debugfs functions to clear
  * wmi logging command/event buffer and management command/event buffer.
  *
@@ -1176,7 +1176,7 @@ struct wmi_debugfs_info {
 #define DEBUG_FOO(func_base) { .name = #func_base,			\
 	.ops = &debug_##func_base##_ops }
 
-/**
+/*
  * debug_##func_base##_open() - Open debugfs entry for respective command
  * and event buffer.
  *
@@ -1241,7 +1241,6 @@ struct wmi_debugfs_info wmi_debugfs_infos[NUM_DEBUG_INFOS] = {
  *
  * @wmi_handle: wmi handle
  * @par_entry: debug directory entry
- * @id: Index to debug info data array
  *
  * Return: none
  */
@@ -1278,8 +1277,6 @@ out:
 /**
  * wmi_debugfs_remove() - Remove debugfs entry for wmi logging.
  * @wmi_handle: wmi handle
- * @dentry: debugfs directory entry
- * @id: Index to debug info data array
  *
  * Return: none
  */
@@ -1301,9 +1298,9 @@ static void wmi_debugfs_remove(wmi_unified_t wmi_handle)
 
 /**
  * wmi_debugfs_init() - debugfs functions to create debugfs directory and to
- * create debugfs enteries.
- *
- * @h: wmi handler
+ *                      create debugfs entries.
+ * @wmi_handle: wmi handler
+ * @pdev_idx: pdev id
  *
  * Return: init status
  */
@@ -1327,17 +1324,6 @@ static QDF_STATUS wmi_debugfs_init(wmi_unified_t wmi_handle, uint32_t pdev_idx)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wmi_mgmt_cmd_record() - Wrapper function for mgmt command logging macro
- *
- * @wmi_handle: wmi handle
- * @cmd: mgmt command
- * @header: pointer to 802.11 header
- * @vdev_id: vdev id
- * @chanfreq: channel frequency
- *
- * Return: none
- */
 void wmi_mgmt_cmd_record(wmi_unified_t wmi_handle, uint32_t cmd,
 			void *header, uint32_t vdev_id, uint32_t chanfreq)
 {
@@ -1356,14 +1342,6 @@ void wmi_mgmt_cmd_record(wmi_unified_t wmi_handle, uint32_t cmd,
 	qdf_spin_unlock_bh(&wmi_handle->log_info.wmi_record_lock);
 }
 #else
-/**
- * wmi_debugfs_remove() - Remove debugfs entry for wmi logging.
- * @wmi_handle: wmi handle
- * @dentry: debugfs directory entry
- * @id: Index to debug info data array
- *
- * Return: none
- */
 static void wmi_debugfs_remove(wmi_unified_t wmi_handle) { }
 void wmi_mgmt_cmd_record(wmi_unified_t wmi_handle, uint32_t cmd,
 			void *header, uint32_t vdev_id, uint32_t chanfreq) { }
@@ -1378,6 +1356,7 @@ qdf_export_symbol(wmi_mgmt_cmd_record);
 /**
  * wmi_ext_dbg_msg_enqueue() - enqueue wmi message
  * @wmi_handle: wmi handler
+ * @msg: WMI message
  *
  * Return: size of wmi message queue after enqueue
  */
@@ -1571,7 +1550,7 @@ static QDF_STATUS wmi_ext_dbg_msg_write(void *priv, const char *buf,
 static struct qdf_debugfs_fops wmi_ext_dbgfs_ops[WMI_MAX_RADIOS];
 
 /**
- * wmi_ext_debugfs_init() - init debugfs items for extended wmi dump.
+ * wmi_ext_dbgfs_init() - init debugfs items for extended wmi dump.
  * @wmi_handle: wmi handler
  * @pdev_idx: pdev index
  *
@@ -1619,7 +1598,7 @@ static QDF_STATUS wmi_ext_dbgfs_init(struct wmi_unified *wmi_handle,
 }
 
 /**
- * wmi_ext_debugfs_deinit() - cleanup/deinit debugfs items of extended wmi dump.
+ * wmi_ext_dbgfs_deinit() - cleanup/deinit debugfs items of extended wmi dump.
  * @wmi_handle: wmi handler
  *
  * Return: QDF_STATUS_SUCCESS if cleanup is successful
@@ -1760,14 +1739,6 @@ void wmi_buf_free(wmi_buf_t net_buf)
 qdf_export_symbol(wmi_buf_free);
 #endif
 
-/**
- * wmi_get_max_msg_len() - get maximum WMI message length
- * @wmi_handle: WMI handle.
- *
- * This function returns the maximum WMI message length
- *
- * Return: maximum WMI message length
- */
 uint16_t wmi_get_max_msg_len(wmi_unified_t wmi_handle)
 {
 	return wmi_handle->max_msg_len - WMI_MIN_HEAD_ROOM;
@@ -2440,9 +2411,8 @@ static QDF_STATUS wmi_process_fw_event_handler(struct scheduler_msg *msg)
 /**
  * wmi_process_fw_event_sched_thread_ctx() - common event handler to serialize
  *                                  event processing through scheduler thread
- * @ctx: wmi context
+ * @wmi: wmi context
  * @ev: event buffer
- * @rx_ctx: rx execution context
  *
  * Return: 0 on success, errno on failure
  */
@@ -2754,27 +2724,11 @@ int wmi_process_qmi_fw_event(void *wmi_cb_ctx, void *buf, int len)
 }
 #endif
 
-/**
- * wmi_process_fw_event() - process any fw event
- * @wmi_handle: wmi handle
- * @evt_buf: fw event buffer
- *
- * This function process fw event in caller context
- *
- * Return: none
- */
 void wmi_process_fw_event(struct wmi_unified *wmi_handle, wmi_buf_t evt_buf)
 {
 	__wmi_control_rx(wmi_handle, evt_buf);
 }
 
-/**
- * __wmi_control_rx() - process serialize wmi event callback
- * @wmi_handle: wmi handle
- * @evt_buf: fw event buffer
- *
- * Return: none
- */
 void __wmi_control_rx(struct wmi_unified *wmi_handle, wmi_buf_t evt_buf)
 {
 	uint32_t id;
@@ -3002,21 +2956,12 @@ static void wmi_runtime_pm_init(struct wmi_unified *wmi_handle)
 	qdf_atomic_init(&wmi_handle->runtime_pm_inprogress);
 }
 
-/**
- * wmi_set_runtime_pm_inprogress() - set runtime pm progress flag
- * @wmi_handle: wmi context
- * @val: runtime pm progress flag
- */
 void wmi_set_runtime_pm_inprogress(wmi_unified_t wmi_handle, A_BOOL val)
 {
 	qdf_atomic_set(&wmi_handle->runtime_pm_inprogress, val);
 }
 
-/**
- * wmi_get_runtime_pm_inprogress() - get runtime pm progress flag
- * @wmi_handle: wmi context
- */
-inline bool wmi_get_runtime_pm_inprogress(wmi_unified_t wmi_handle)
+bool wmi_get_runtime_pm_inprogress(wmi_unified_t wmi_handle)
 {
 	return qdf_atomic_read(&wmi_handle->runtime_pm_inprogress);
 }
@@ -3026,12 +2971,6 @@ static void wmi_runtime_pm_init(struct wmi_unified *wmi_handle)
 }
 #endif
 
-/**
- * wmi_unified_get_soc_handle: Get WMI SoC handle
- * @param wmi_handle: WMI context got from wmi_attach
- *
- * return: Pointer to Soc handle
- */
 void *wmi_unified_get_soc_handle(struct wmi_unified *wmi_handle)
 {
 	return wmi_handle->soc;
@@ -3039,9 +2978,10 @@ void *wmi_unified_get_soc_handle(struct wmi_unified *wmi_handle)
 
 /**
  * wmi_interface_logging_init: Interface looging init
- * @param wmi_handle: Pointer to wmi handle object
+ * @wmi_handle: Pointer to wmi handle object
+ * @pdev_idx: pdev index
  *
- * return: None
+ * Return: None
  */
 #ifdef WMI_INTERFACE_EVENT_LOGGING
 static inline void wmi_interface_logging_init(struct wmi_unified *wmi_handle,
@@ -3088,13 +3028,6 @@ static QDF_STATUS wmi_initialize_worker_context(struct wmi_unified *wmi_handle)
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wmi_unified_get_pdev_handle: Get WMI SoC handle
- * @param wmi_soc: Pointer to wmi soc object
- * @param pdev_idx: pdev index
- *
- * return: Pointer to wmi handle or NULL on failure
- */
 void *wmi_unified_get_pdev_handle(struct wmi_soc *soc, uint32_t pdev_idx)
 {
 	struct wmi_unified *wmi_handle;
@@ -3173,7 +3106,7 @@ qdf_export_symbol(wmi_unified_register_module);
  * wmi_wbuff_register() - register wmi with wbuff
  * @wmi_handle: handle to wmi
  *
- * @Return: void
+ * Return: void
  */
 static void wmi_wbuff_register(struct wmi_unified *wmi_handle)
 {
@@ -3196,7 +3129,7 @@ static void wmi_wbuff_register(struct wmi_unified *wmi_handle)
  * wmi_wbuff_deregister() - deregister wmi with wbuff
  * @wmi_handle: handle to wmi
  *
- * @Return: void
+ * Return: void
  */
 static inline void wmi_wbuff_deregister(struct wmi_unified *wmi_handle)
 {
@@ -3204,17 +3137,6 @@ static inline void wmi_wbuff_deregister(struct wmi_unified *wmi_handle)
 	wmi_handle->wbuff_handle = NULL;
 }
 
-/**
- * wmi_unified_attach() -  attach for unified WMI
- * @scn_handle: handle to SCN
- * @osdev: OS device context
- * @target_type: TLV or not-TLV based target
- * @use_cookie: cookie based allocation enabled/disabled
- * @ops: umac rx callbacks
- * @psoc: objmgr psoc
- *
- * @Return: wmi handle.
- */
 void *wmi_unified_attach(void *scn_handle,
 			 struct wmi_unified_attach_params *param)
 {
@@ -3302,13 +3224,6 @@ error:
 	return NULL;
 }
 
-/**
- * wmi_unified_detach() -  detach for unified WMI
- *
- * @wmi_handle  : handle to wmi.
- *
- * @Return: none.
- */
 void wmi_unified_detach(struct wmi_unified *wmi_handle)
 {
 	wmi_buf_t buf;
@@ -3385,17 +3300,6 @@ void wmi_unified_detach(struct wmi_unified *wmi_handle)
 	qdf_mem_free(soc);
 }
 
-/**
- * wmi_unified_remove_work() - detach for WMI work
- * @wmi_handle: handle to WMI
- *
- * A function that does not fully detach WMI, but just remove work
- * queue items associated with it. This is used to make sure that
- * before any other processing code that may destroy related contexts
- * (HTC, etc), work queue processing on WMI has already been stopped.
- *
- * Return: None
- */
 void
 wmi_unified_remove_work(struct wmi_unified *wmi_handle)
 {
@@ -3425,9 +3329,9 @@ wmi_unified_remove_work(struct wmi_unified *wmi_handle)
  * wmi_htc_tx_complete() - Process htc tx completion
  *
  * @ctx: handle to wmi
- * @htc_packet: pointer to htc packet
+ * @htc_pkt: pointer to htc packet
  *
- * @Return: none.
+ * Return: none.
  */
 static void wmi_htc_tx_complete(void *ctx, HTC_PACKET *htc_pkt)
 {
@@ -3496,7 +3400,7 @@ static void wmi_htc_tx_complete(void *ctx, HTC_PACKET *htc_pkt)
  * @ctx: handle of WMI context
  * @htc_pkt: handle of HTC packet
  *
- * @Return: none
+ * Return: none
  */
 static void wmi_htc_log_pkt(void *ctx, HTC_PACKET *htc_pkt)
 {
@@ -3518,11 +3422,10 @@ static void wmi_htc_log_pkt(void *ctx, HTC_PACKET *htc_pkt)
 
 /**
  * wmi_connect_pdev_htc_service() -  WMI API to get connect to HTC service
- *
- * @wmi_handle: handle to WMI.
+ * @soc: handle to WMI SoC
  * @pdev_idx: Pdev index
  *
- * @Return: QDF_STATUS
+ * Return: QDF_STATUS
  */
 static QDF_STATUS wmi_connect_pdev_htc_service(struct wmi_soc *soc,
 					       uint32_t pdev_idx)
@@ -3667,13 +3570,6 @@ QDF_STATUS wmi_dbr_connect_pdev_htc_service(struct wmi_unified *wmi_handle,
 }
 #endif
 
-/**
- * wmi_get_host_credits() -  WMI API to get updated host_credits
- *
- * @wmi_handle: handle to WMI.
- *
- * @Return: updated host_credits.
- */
 int wmi_get_host_credits(wmi_unified_t wmi_handle)
 {
 	int host_credits = 0;
@@ -3683,69 +3579,28 @@ int wmi_get_host_credits(wmi_unified_t wmi_handle)
 	return host_credits;
 }
 
-/**
- * wmi_get_pending_cmds() - WMI API to get WMI Pending Commands in the HTC
- *                          queue
- *
- * @wmi_handle: handle to WMI.
- *
- * @Return: Pending Commands in the HTC queue.
- */
 int wmi_get_pending_cmds(wmi_unified_t wmi_handle)
 {
 	return qdf_atomic_read(&wmi_handle->pending_cmds);
 }
 
-/**
- * wmi_set_target_suspend() -  WMI API to set target suspend state
- *
- * @wmi_handle: handle to WMI.
- * @val: suspend state boolean.
- *
- * @Return: none.
- */
 void wmi_set_target_suspend(wmi_unified_t wmi_handle, A_BOOL val)
 {
 	qdf_atomic_set(&wmi_handle->is_target_suspended, val);
 }
 
-/**
- * wmi_set_target_suspend_acked() -  WMI API to set target suspend acked flag
- *
- * @wmi_handle: handle to WMI.
- * @val: target suspend command acked flag.
- *
- * @Return: none.
- */
 void wmi_set_target_suspend_acked(wmi_unified_t wmi_handle, A_BOOL val)
 {
 	qdf_atomic_set(&wmi_handle->is_target_suspend_acked, val);
 	qdf_atomic_set(&wmi_handle->num_stats_over_qmi, 0);
 }
 
-/**
- * wmi_is_target_suspended() - WMI API to check target suspend state
- * @wmi_handle: handle to WMI.
- *
- * WMI API to check target suspend state
- *
- * Return: true if target is suspended, else false.
- */
 bool wmi_is_target_suspended(struct wmi_unified *wmi_handle)
 {
 	return qdf_atomic_read(&wmi_handle->is_target_suspended);
 }
 qdf_export_symbol(wmi_is_target_suspended);
 
-/**
- * wmi_is_target_suspend_acked() - WMI API to check target suspend command is
- *                                 acked or not
- * @wmi_handle: handle to WMI.
- *
- * WMI API to check whether the target suspend command is acked or not
- *
- * Return: true if target suspend command is acked, else false.
- */
 bool wmi_is_target_suspend_acked(struct wmi_unified *wmi_handle)
 {
 	return qdf_atomic_read(&wmi_handle->is_target_suspend_acked);
@@ -3764,21 +3619,11 @@ bool wmi_is_qmi_stats_enabled(struct wmi_unified *wmi_handle)
 }
 #endif
 
-/**
- * WMI API to set crash injection state
- * @param wmi_handle:	handle to WMI.
- * @param val:		crash injection state boolean.
- */
 void wmi_tag_crash_inject(wmi_unified_t wmi_handle, A_BOOL flag)
 {
 	wmi_handle->tag_crash_inject = flag;
 }
 
-/**
- * WMI API to set bus suspend state
- * @param wmi_handle:	handle to WMI.
- * @param val:		suspend state boolean.
- */
 void wmi_set_is_wow_bus_suspended(wmi_unified_t wmi_handle, A_BOOL val)
 {
 	qdf_atomic_set(&wmi_handle->is_wow_bus_suspended, val);
@@ -3789,12 +3634,6 @@ void wmi_set_tgt_assert(wmi_unified_t wmi_handle, bool val)
 	wmi_handle->tgt_force_assert_enable = val;
 }
 
-/**
- * wmi_stop() - generic function to block unified WMI command
- * @wmi_handle: handle to WMI.
- *
- * @Return: success always.
- */
 int
 wmi_stop(wmi_unified_t wmi_handle)
 {
@@ -3804,12 +3643,6 @@ wmi_stop(wmi_unified_t wmi_handle)
 	return 0;
 }
 
-/**
- * wmi_start() - generic function to allow unified WMI command
- * @wmi_handle: handle to WMI.
- *
- * @Return: success always.
- */
 int
 wmi_start(wmi_unified_t wmi_handle)
 {
@@ -3819,23 +3652,12 @@ wmi_start(wmi_unified_t wmi_handle)
 	return 0;
 }
 
-/**
- * wmi_is_blocked() - generic function to check if WMI is blocked
- * @wmi_handle: handle to WMI.
- *
- * @Return: true, if blocked, false if not blocked
- */
 bool
 wmi_is_blocked(wmi_unified_t wmi_handle)
 {
 	return (!(!wmi_handle->wmi_stopinprogress));
 }
 
-/**
- * API to flush all the previous packets  associated with the wmi endpoint
- *
- * @param wmi_handle      : handle to WMI.
- */
 void
 wmi_flush_endpoint(wmi_unified_t wmi_handle)
 {
@@ -3844,15 +3666,6 @@ wmi_flush_endpoint(wmi_unified_t wmi_handle)
 }
 qdf_export_symbol(wmi_flush_endpoint);
 
-/**
- * wmi_pdev_id_conversion_enable() - API to enable pdev_id/phy_id conversion
- *                     in WMI. By default pdev_id conversion is not done in WMI.
- *                     This API can be used enable conversion in WMI.
- * @param wmi_handle   : handle to WMI
- * @param pdev_map     : pointer to pdev_map
- * @size               : size of pdev_id_map
- * Return none
- */
 void wmi_pdev_id_conversion_enable(wmi_unified_t wmi_handle,
 				   uint32_t *pdev_id_map,
 				   uint8_t size)

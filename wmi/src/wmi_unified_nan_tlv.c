@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -115,7 +115,7 @@ extract_nan_event_rsp_tlv(wmi_unified_t wmi_handle, void *evt_buf,
  * @wmi_handle: wmi handle
  * @nan_msg: request data which will be non-null
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_nan_disable_req_cmd_tlv(wmi_unified_t wmi_handle,
 					       struct nan_disable_req *nan_msg)
@@ -228,7 +228,7 @@ static QDF_STATUS send_nan_disable_req_cmd_tlv(wmi_unified_t wmi_handle,
  * @wmi_handle: wmi handle
  * @nan_msg: request data which will be non-null
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_nan_req_cmd_tlv(wmi_unified_t wmi_handle,
 				       struct nan_msg_params *nan_msg)

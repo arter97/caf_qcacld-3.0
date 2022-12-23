@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,18 +24,20 @@
 #ifndef _WMI_UNIFIED_TWT_PARAM_H_
 #define _WMI_UNIFIED_TWT_PARAM_H_
 
-/* enum WMI_TWT_ROLE - role specified in ext conf in wmi_twt_enable/disable_cmd
- * WMI_TWT_ROLE_REQUESTOR: TWT role is requestor
- * WMI_TWT_ROLE_RESPONDER: TWT role is responder
+/**
+ * enum WMI_TWT_ROLE - role specified in ext conf in wmi_twt_enable/disable_cmd
+ * @WMI_TWT_ROLE_REQUESTOR: TWT role is requestor
+ * @WMI_TWT_ROLE_RESPONDER: TWT role is responder
  */
 enum WMI_TWT_ROLE {
 	WMI_TWT_ROLE_REQUESTOR,
 	WMI_TWT_ROLE_RESPONDER,
 };
 
-/* enum WMI_TWT_OPERATION - specified in ext conf in wmi_twt_enable/disable_cmd
- * WMI_TWT_OPERATION_INDIVIDUAL: Individual TWT operation
- * WMI_TWT_OPERATION_BROADCAST: Broadcast TWT operation
+/**
+ * enum WMI_TWT_OPERATION - specified in ext conf in wmi_twt_enable/disable_cmd
+ * @WMI_TWT_OPERATION_INDIVIDUAL: Individual TWT operation
+ * @WMI_TWT_OPERATION_BROADCAST: Broadcast TWT operation
  */
 enum WMI_TWT_OPERATION {
 	WMI_TWT_OPERATION_INDIVIDUAL,
@@ -43,6 +45,7 @@ enum WMI_TWT_OPERATION {
 };
 
 /**
+ * struct wmi_twt_enable_param - TWT Enable parameters
  * @pdev_id: pdev_id for identifying the MAC.
  * @sta_cong_timer_ms: STA TWT congestion timer TO value in terms of ms
  * @mbss_support: Flag indicating if AP TWT feature supported in
@@ -132,7 +135,7 @@ enum WMI_HOST_ENABLE_TWT_STATUS {
 
 /**
  * struct wmi_twt_enable_complete_event_param:
- * @pdev_is: pdev_id for identifying the MAC.
+ * @pdev_id: pdev_id for identifying the MAC.
  * @status: From enum WMI_HOST_ENABLE_TWT_STATUS
  */
 struct wmi_twt_enable_complete_event_param {
@@ -163,7 +166,7 @@ struct wmi_twt_disable_complete_event {
 };
 
 /**
- * wmi_twt_ack_complete_event_param:
+ * struct wmi_twt_ack_complete_event_param -
  * @vdev_id: vdev id
  * @peer_macaddr: peer mac address
  * @dialog_id: dialog id
@@ -228,7 +231,7 @@ struct wmi_host_twt_session_stats_info {
 };
 
 /**
- * struct wmi_twt_session_stats_event:
+ * struct wmi_twt_session_stats_event_param -
  * @pdev_id: pdev_id for identifying the MAC.
  * @num_sessions: number of TWT sessions
  * @twt_sessions: received TWT sessions
@@ -287,7 +290,7 @@ enum WMI_HOST_TWT_COMMAND {
  * @b_twt_recommendation: defines types of frames tx during bTWT SP
  * @b_twt_persistence: Countdown VAL frames to param update/teardown
  * @wake_time_tsf: Absolute TSF value to start first TWT service period
- * @annouce_timeout_us: Timeout value before sending QoS NULL frame.
+ * @announce_timeout_us: Timeout value before sending QoS NULL frame.
  */
 struct wmi_twt_add_dialog_param {
 	uint32_t vdev_id;
@@ -386,7 +389,7 @@ enum WMI_HOST_ADD_TWT_STATUS {
  *                          0 means responder pm mode field is not valid
  * @pm_responder_bit: 1 means that responder set responder pm mode to 1
  *                    0 means that responder set responder pm mode to 0
- * @wake_dura_us: wake duration in us
+ * @wake_dur_us: wake duration in us
  * @wake_intvl_us: wake time interval in us
  * @sp_offset_us: Time until initial TWT SP occurs
  * @sp_tsf_us_lo: TWT service period tsf in usecs lower bits - 31:0
@@ -410,7 +413,8 @@ struct wmi_twt_add_dialog_additional_params {
 };
 
 /**
- * struct wmi_twt_add_dialog_complete_param -
+ * struct wmi_twt_add_dialog_complete_event_param - parameters from TWT
+ *	Add Dialog Complete event
  * @vdev_id: VDEV identifier
  * @peer_macaddr: Peer mac address
  * @dialog_id: TWT dialog ID
@@ -426,8 +430,8 @@ struct wmi_twt_add_dialog_complete_event_param {
 };
 
 /**
- * struct wmi_twt_cap_bitmap_params -
- * twt_cap_bitmap: TWT capability bitmap
+ * struct wmi_twt_cap_bitmap_params - TWT capabilities bitmap
+ * @twt_ack_support_cap: TWT ACK supported
  *
  */
 struct wmi_twt_cap_bitmap_params {
@@ -799,12 +803,12 @@ struct wmi_twt_btwt_remove_sta_complete_event_param {
 
 /**
  * enum WMI_HOST_TWT_CMD_FOR_ACK_EVENT - Ack event for different TWT command
- * WMI_HOST_TWT_ADD_DIALOG_CMDID: Ack event for add dialog command
- * WMI_HOST_TWT_DEL_DIALOG_CMDID: Ack event for delete dialog command
- * WMI_HOST_TWT_PAUSE_DIALOG_CMDID: Ack event for pause command
- * WMI_HOST_TWT_RESUME_DIALOG_CMDID: Ack event for resume command
- * WMI_HOST_TWT_NUDGE_DIALOG_CMDID: Ack event for nudge command
- * WMI_HOST_TWT_UNKNOWN_CMDID: Ack event for unknown TWT command
+ * @WMI_HOST_TWT_ADD_DIALOG_CMDID: Ack event for add dialog command
+ * @WMI_HOST_TWT_DEL_DIALOG_CMDID: Ack event for delete dialog command
+ * @WMI_HOST_TWT_PAUSE_DIALOG_CMDID: Ack event for pause command
+ * @WMI_HOST_TWT_RESUME_DIALOG_CMDID: Ack event for resume command
+ * @WMI_HOST_TWT_NUDGE_DIALOG_CMDID: Ack event for nudge command
+ * @WMI_HOST_TWT_UNKNOWN_CMDID: Ack event for unknown TWT command
  */
 enum WMI_HOST_TWT_CMD_FOR_ACK_EVENT {
 	WMI_HOST_TWT_ADD_DIALOG_CMDID = 0,

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -25,8 +26,7 @@
 /**
  * send_dbr_cfg_cmd_tlv() - configure DMA rings for Direct Buf RX
  * @wmi_handle: wmi handle
- * @data_len: len of dma cfg req
- * @data: dma cfg req
+ * @cfg: dma cfg req
  *
  * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
  */

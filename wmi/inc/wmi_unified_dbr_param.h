@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -76,8 +77,9 @@
  * struct direct_buf_rx_rsp: direct buffer rx response structure
  *
  * @pdev_id: Index of the pdev for which response is received
- * @mod_mod: Index of the module for which respone is received
+ * @mod_id: Index of the module for which respone is received
  * @num_buf_release_entry: Number of buffers released through event
+ * @num_meta_data_entry:
  * @dbr_entries: Pointer to direct buffer rx entry struct
  */
 struct direct_buf_rx_rsp {
@@ -101,6 +103,8 @@ struct direct_buf_rx_rsp {
  * @tail_idx_paddr_hi: Higher 32bits of tail idx register address
  * @buf_size: Size of the buffer for each pointer in the ring
  * @num_elems: Number of pointers allocated and part of the source ring
+ * @event_timeout_ms:
+ * @num_resp_per_event:
  */
 struct direct_buf_rx_cfg_req {
 	uint32_t pdev_id;
@@ -137,8 +141,8 @@ struct direct_buf_rx_metadata {
 /**
  * struct direct_buf_rx_entry: direct buffer rx release entry structure
  *
- * @addr_lo: LSB 32-bits of the buffer
- * @addr_hi: MSB 32-bits of the buffer
+ * @paddr_lo: LSB 32-bits of the buffer
+ * @paddr_hi: MSB 32-bits of the buffer
  * @len: Length of the buffer
  */
 struct direct_buf_rx_entry {

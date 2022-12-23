@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -927,13 +927,6 @@ QDF_STATUS wmi_unified_snr_cmd(wmi_unified_t wmi_handle, uint8_t vdev_id)
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wmi_unified_link_status_req_cmd() - process link status request from UMAC
- * @wmi_handle: wmi handle
- * @params: get link status params
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
 QDF_STATUS wmi_unified_link_status_req_cmd(wmi_unified_t wmi_handle,
 					   struct link_status_params *params)
 {
@@ -1583,13 +1576,6 @@ QDF_STATUS wmi_unified_remove_beacon_filter_cmd_send(
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wmi_unified_get_pn_send_cmd() - send command to get PN for peer
- * @wmi_hdl: wmi handle
- * @wmi_peer_tx_pn_request_cmd_fixed_param: pn request params
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
 QDF_STATUS wmi_unified_get_pn_send_cmd(wmi_unified_t wmi_hdl,
 				       struct peer_request_pn_param *pn_params)
 {
@@ -1611,29 +1597,6 @@ QDF_STATUS wmi_unified_get_rxpn_send_cmd(
 	return QDF_STATUS_E_FAILURE;
 }
 qdf_export_symbol(wmi_unified_get_rxpn_send_cmd);
-
-/**
- *  wmi_unified_mgmt_cmd_send() - WMI mgmt cmd function
- *  @param wmi_handle      : handle to WMI.
- *  @param macaddr        : MAC address
- *  @param param    : pointer to hold mgmt parameter
- *
- *  @return QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
-#if 0
-QDF_STATUS wmi_unified_mgmt_cmd_send(void *wmi_hdl,
-				uint8_t macaddr[QDF_MAC_ADDR_SIZE],
-				struct mgmt_params *param)
-{
-	wmi_unified_t wmi_handle = (wmi_unified_t) wmi_hdl;
-
-	if (wmi_handle->ops->send_mgmt_cmd)
-		return wmi_handle->ops->send_mgmt_cmd(wmi_handle,
-				  macaddr, param);
-
-	return QDF_STATUS_E_FAILURE;
-}
-#endif
 
 QDF_STATUS wmi_unified_addba_clearresponse_cmd_send(
 			wmi_unified_t wmi_handle,
@@ -2074,14 +2037,6 @@ wmi_extract_fips_extend_event_data(wmi_unified_t wmi_handle, void *evt_buf,
 }
 #endif
 
-/**
- * wmi_unified_extract_pn() - extract pn event data
- * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @param param: pointer to get pn event param
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
 QDF_STATUS wmi_unified_extract_pn(wmi_unified_t wmi_hdl, void *evt_buf,
 				  struct wmi_host_get_pn_event *param)
 {
@@ -3823,14 +3778,6 @@ wmi_unified_extract_halphy_stats_event_count(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wmi_unified_send_vdev_tsf_tstamp_action_cmd() - send vdev tsf action command
- * @wmi: wmi handle
- * @vdev_id: vdev id
- *
- * TSF_TSTAMP_READ_VALUE is the only operation supported
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
 QDF_STATUS wmi_unified_send_vdev_tsf_tstamp_action_cmd(wmi_unified_t wmi_hdl,
 						       uint8_t vdev_id)
 {
@@ -3843,14 +3790,6 @@ QDF_STATUS wmi_unified_send_vdev_tsf_tstamp_action_cmd(wmi_unified_t wmi_hdl,
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wmi_extract_vdev_tsf_report_event() - extract vdev tsf report from event
- * @wmi_handle: wmi handle
- * @param evt_buf: pointer to event buffer
- * @wmi_host_tsf_event param: Pointer to hold event info
- *
- * Return: QDF_STATUS_SUCCESS on success and QDF_STATUS_E_FAILURE for failure
- */
 QDF_STATUS wmi_extract_vdev_tsf_report_event(wmi_unified_t wmi_hdl,
 					     uint8_t *evt_buf,
 					     struct wmi_host_tsf_event *param)
@@ -4011,13 +3950,6 @@ wmi_unified_peer_ppe_ds_param_send(wmi_unified_t wmi_handle,
 }
 #endif /* WLAN_SUPPORT_PPEDS */
 
-/**
- * wmi_unified_pn_mgmt_rxfilter_send_cmd() - Send PN mgmt RxFilter command to FW
- * @wmi_handle: WMI handle
- * @params: RxFilter params
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
 QDF_STATUS wmi_unified_pn_mgmt_rxfilter_send_cmd(
 		struct wmi_unified *wmi_handle,
 		struct vdev_pn_mgmt_rxfilter_params *params)
@@ -4043,14 +3975,6 @@ wmi_extract_pktlog_decode_info_event(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wmi_extract_pdev_telemetry_stats_tlv - extract pdev telemetry stats
- * @wmi_handle: wmi handle
- * @evt_buf: pointer to event buffer
- * @pdev stats: Pointer to hold pdev telemetry stats
- *
- * Return: QDF_STATUS_SUCCESS for success or error code
- */
 QDF_STATUS wmi_extract_pdev_telemetry_stats(
 		wmi_unified_t wmi_handle, void *evt_buf,
 		struct wmi_host_pdev_telemetry_stats *pdev_stats)

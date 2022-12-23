@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,9 +30,6 @@ QDF_STATUS wmi_unified_send_peer_cfr_capture_cmd(wmi_unified_t wmi_handle,
 	return QDF_STATUS_E_FAILURE;
 }
 
-/**
- * wmi_extract_cfr_peer_tx_event_param() - extract tx event params from event
- */
 QDF_STATUS
 wmi_extract_cfr_peer_tx_event_param(wmi_unified_t wmi_handle, void *evt_buf,
 				    wmi_cfr_peer_tx_event_param *peer_tx_event)

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -5748,7 +5748,7 @@ static QDF_STATUS send_p2p_go_set_beacon_ie_cmd_tlv(wmi_unified_t wmi_handle,
  *
  * set scan probe OUI parameters in firmware
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_scan_probe_setoui_cmd_tlv(wmi_unified_t wmi_handle,
 			  struct scan_mac_oui *psetoui)
@@ -5868,7 +5868,7 @@ static QDF_STATUS send_ipa_offload_control_cmd_tlv(wmi_unified_t wmi_handle,
  *
  * This function request FW to stop ongoing PNO operation.
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_pno_stop_cmd_tlv(wmi_unified_t wmi_handle, uint8_t vdev_id)
 {
@@ -6247,7 +6247,7 @@ static void wmi_dump_pno_scan_freq_list(struct chan_list *scan_freq_list)
  * @pno: PNO request
  *
  * This function request FW to start PNO request.
- * Request: CDF status
+ * Request: QDF status
  */
 static QDF_STATUS send_pno_start_cmd_tlv(wmi_unified_t wmi_handle,
 		   struct pno_scan_req_params *pno)
@@ -6849,7 +6849,7 @@ static QDF_STATUS send_unified_ll_stats_get_sta_cmd_tlv(
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_congestion_cmd_tlv(wmi_unified_t wmi_handle,
 			uint8_t vdev_id)
@@ -6925,7 +6925,7 @@ static QDF_STATUS send_snr_request_cmd_tlv(wmi_unified_t wmi_handle)
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_snr_cmd_tlv(wmi_unified_t wmi_handle, uint8_t vdev_id)
 {
@@ -6961,7 +6961,7 @@ static QDF_STATUS send_snr_cmd_tlv(wmi_unified_t wmi_handle, uint8_t vdev_id)
  * @wmi_handle: wmi handle
  * @link_status: get link params
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_link_status_req_cmd_tlv(wmi_unified_t wmi_handle,
 				 struct link_status_params *link_status)
@@ -7208,7 +7208,7 @@ static QDF_STATUS send_stop_11d_scan_cmd_tlv(wmi_unified_t wmi_handle,
  * @data_len: the length of @data
  * @data: the pointer to data buf
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_start_oem_data_cmd_tlv(wmi_unified_t wmi_handle,
 					      uint32_t data_len,
@@ -7425,7 +7425,7 @@ send_dfs_phyerr_filter_offload_en_cmd_tlv(wmi_unified_t wmi_handle,
  * @cmd_id: pktlog cmd id
  * @user_triggered: user triggered input for PKTLOG enable mode
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_pktlog_wmi_send_cmd_tlv(wmi_unified_t wmi_handle,
 				   WMI_PKTLOG_EVENT pktlog_event,
@@ -7514,7 +7514,7 @@ wmi_send_failed:
  * @wmi_handle: wmi handle
  * @preq: stats ext params
  *
- * Return: CDF status
+ * Return: QDF status
  */
 static QDF_STATUS send_stats_ext_req_cmd_tlv(wmi_unified_t wmi_handle,
 			struct stats_ext_params *preq)
