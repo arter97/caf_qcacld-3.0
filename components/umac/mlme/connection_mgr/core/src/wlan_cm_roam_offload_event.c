@@ -347,6 +347,10 @@ QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		status = wlan_cm_roam_state_change(pdev, vdev_id,
 						   WLAN_ROAM_RSO_ENABLED,
 						   REASON_ROAM_ABORT);
+	else if (MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
+		status = wlan_cm_roam_state_change(pdev, vdev_id,
+						   WLAN_ROAM_DEINIT,
+						   REASON_ROAM_ABORT);
 
 	cm_abort_fw_roam(cm_ctx, cm_id);
 rel_ref:
@@ -420,6 +424,17 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 			qdf_mem_free(roam_synch_frame_ind->bcn_probe_rsp);
 		roam_synch_frame_ind->bcn_probe_rsp =
 			sync_frame_ind->bcn_probe_rsp;
+	}
+
+	if (sync_frame_ind->link_bcn_probe_rsp_len) {
+		roam_synch_frame_ind->link_bcn_probe_rsp_len =
+			sync_frame_ind->link_bcn_probe_rsp_len;
+		roam_synch_frame_ind->is_link_beacon =
+			sync_frame_ind->is_link_beacon;
+		if (roam_synch_frame_ind->link_bcn_probe_rsp)
+			qdf_mem_free(roam_synch_frame_ind->link_bcn_probe_rsp);
+		roam_synch_frame_ind->link_bcn_probe_rsp =
+			sync_frame_ind->link_bcn_probe_rsp;
 	}
 
 	if (sync_frame_ind->reassoc_req_len) {
@@ -504,7 +519,18 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 	}
 
 	/* 24 byte MAC header and 12 byte to ssid IE */
-	if (sync_ind->beaconProbeRespLength >
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
+	    sync_ind->link_beacon_probe_resp_length) {
+		if (sync_ind->link_beacon_probe_resp_length >
+		    (QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET)) {
+			ie_len = sync_ind->link_beacon_probe_resp_length -
+					(QDF_IEEE80211_3ADDR_HDR_LEN +
+					 MAC_B_PR_SSID_OFFSET);
+		} else {
+			mlme_err("LFR3: MLO: Invalid link Beacon Length");
+			goto err;
+		}
+	} else if (sync_ind->beaconProbeRespLength >
 			(QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET)) {
 		ie_len = sync_ind->beaconProbeRespLength -
 			(QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET);

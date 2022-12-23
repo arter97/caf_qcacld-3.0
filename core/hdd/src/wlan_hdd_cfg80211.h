@@ -209,11 +209,11 @@ extern const struct nla_policy wlan_hdd_wisa_cmd_policy[
 #endif
 
 /**
- * enum eDFS_CAC_STATUS: CAC status
+ * typedef eDFS_CAC_STATUS - CAC status
  *
  * @DFS_CAC_NEVER_DONE: CAC never done
  * @DFS_CAC_IN_PROGRESS: CAC is in progress
- * @DFS_CAC_IN_PROGRESS: CAC already done
+ * @DFS_CAC_ALREADY_DONE: CAC already done
  */
 typedef enum {
 	DFS_CAC_NEVER_DONE,
@@ -270,7 +270,7 @@ typedef enum {
 /* Add more features here */
 #define WIFI_TDLS_SUPPORT			BIT(0)
 #define WIFI_TDLS_EXTERNAL_CONTROL_SUPPORT	BIT(1)
-#define WIIF_TDLS_OFFCHANNEL_SUPPORT		BIT(2)
+#define WIFI_TDLS_OFFCHANNEL_SUPPORT		BIT(2)
 
 #define CFG_NON_AGG_RETRY_MAX                  (64)
 #define CFG_AGG_RETRY_MAX                      (64)
@@ -590,7 +590,7 @@ int wlan_hdd_change_hw_mode_for_given_chnl(struct hdd_adapter *adapter,
 					   enum policy_mgr_conn_update_reason reason);
 
 /**
- * hdd_rate_info_bw: an HDD internal rate bandwidth representation
+ * enum hdd_rate_info_bw: an HDD internal rate bandwidth representation
  * @HDD_RATE_BW_5: 5MHz
  * @HDD_RATE_BW_10: 10MHz
  * @HDD_RATE_BW_20: 20MHz
@@ -610,7 +610,7 @@ enum hdd_rate_info_bw {
 };
 
 /**
- * hdd_chain_mode : Representation of Number of chains available.
+ * enum hdd_chain_mode : Representation of Number of chains available.
  * @HDD_CHAIN_MODE_1X1: Chain mask Not Configurable as only one chain available
  * @HDD_CHAIN_MODE_2X2: Chain mask configurable as both chains available
  */
@@ -620,7 +620,7 @@ enum hdd_chain_mode {
 };
 
 /**
- * hdd_ba_mode: Representation of Number to configure BA mode
+ * enum hdd_ba_mode: Representation of Number to configure BA mode
  * @HDD_BA_MODE_AUTO: Auto mode
  * @HDD_BA_MODE_MANUAL: Manual mode
  * @HDD_BA_MODE_64: For buffer size 64

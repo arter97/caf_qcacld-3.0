@@ -370,7 +370,7 @@ hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
 	uint8_t *str;
 	bool usr_disable_eht;
 
-	if (!hdd_ctx->config->action_oui_enable)
+	if (!ucfg_action_oui_enabled(hdd_ctx->psoc))
 		return;
 
 	usr_disable_eht = ucfg_mlme_get_usr_disable_sta_eht(hdd_ctx->psoc);
@@ -406,8 +406,8 @@ hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
 				ACTION_OUI_11BE_OUI_ALLOW);
 			return;
 		}
-		str =
-		hdd_ctx->config->action_oui_str[ACTION_OUI_11BE_OUI_ALLOW];
+		str = ucfg_action_oui_get_config(hdd_ctx->psoc,
+						 ACTION_OUI_11BE_OUI_ALLOW);
 		if (!qdf_str_len(str))
 			goto send_oui;
 
@@ -437,6 +437,23 @@ hdd_update_action_oui_for_connect(struct hdd_context *hdd_ctx,
 }
 #endif
 
+#ifdef WLAN_FEATURE_11BE
+static inline bool
+hdd_config_is_dot11mode_11be_only(struct hdd_config *config)
+{
+	if (config->dot11Mode == eHDD_DOT11_MODE_11be_ONLY)
+		return true;
+	else
+		return false;
+}
+#else
+static inline bool
+hdd_config_is_dot11mode_11be_only(struct hdd_config *config)
+{
+	return false;
+}
+#endif
+
 /**
  * hdd_get_dot11mode_filter() - Get dot11 mode filter
  * @hdd_ctx: HDD context
@@ -457,6 +474,8 @@ hdd_get_dot11mode_filter(struct hdd_context *hdd_ctx)
 		return ALLOW_11AC_ONLY;
 	else if (config->dot11Mode == eHDD_DOT11_MODE_11ax_ONLY)
 		return ALLOW_11AX_ONLY;
+	else if (hdd_config_is_dot11mode_11be_only(config))
+		return ALLOW_11BE_ONLY;
 	else
 		return ALLOW_ALL;
 }
@@ -570,11 +589,15 @@ bool wlan_hdd_cm_handle_sap_sta_dfs_conc(struct hdd_context *hdd_ctx,
 		qdf_mem_copy(scan_filter->bssid_list[0].bytes, req->bssid,
 			     QDF_MAC_ADDR_SIZE);
 	}
-	scan_filter->num_of_ssid = 1;
-	scan_filter->ssid_list[0].length =
-				QDF_MIN(req->ssid_len, QDF_MAC_ADDR_SIZE);
-	qdf_mem_copy(scan_filter->ssid_list[0].ssid, req->ssid,
-		     scan_filter->ssid_list[0].length);
+	if (req->ssid_len > WLAN_SSID_MAX_LEN) {
+		scan_filter->num_of_ssid = 0;
+		hdd_err("req ssid len invalid %zu", req->ssid_len);
+	} else {
+		scan_filter->num_of_ssid = 1;
+		scan_filter->ssid_list[0].length = req->ssid_len;
+		qdf_mem_copy(scan_filter->ssid_list[0].ssid, req->ssid,
+			     scan_filter->ssid_list[0].length);
+	}
 	scan_filter->ignore_auth_enc_type = true;
 	list = ucfg_scan_get_result(hdd_ctx->pdev, scan_filter);
 	qdf_mem_free(scan_filter);
@@ -1242,18 +1265,22 @@ struct hdd_adapter *hdd_get_assoc_link_adapter(struct hdd_adapter *ml_adapter)
 {
 	int i;
 	bool eht_capab;
+	struct hdd_adapter *link_adapter;
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(ml_adapter);
 
 	ucfg_psoc_mlme_get_11be_capab(hdd_ctx->psoc, &eht_capab);
-	if (!eht_capab)
+	if (!eht_capab || hdd_adapter_is_sl_ml_adapter(ml_adapter))
 		return ml_adapter;
 
 	for (i = 0; i < WLAN_MAX_MLD; i++) {
-		if (hdd_adapter_is_associated_with_ml_adapter(
-		    ml_adapter->mlo_adapter_info.link_adapter[i])) {
-			return ml_adapter->mlo_adapter_info.link_adapter[i];
+		link_adapter = ml_adapter->mlo_adapter_info.link_adapter[i];
+		if (link_adapter) {
+			if (hdd_adapter_is_associated_with_ml_adapter(
+								link_adapter))
+				return link_adapter;
 		}
 	}
+
 	return NULL;
 }
 #endif
@@ -1345,7 +1372,7 @@ hdd_cm_connect_success_pre_user_update(struct wlan_objmgr_vdev *vdev,
 	 * hdd_send_ft_assoc_response,
 	 */
 
-	hdd_ipa_set_tx_flow_info();
+	wlan_hdd_set_tx_flow_info();
 	hdd_place_marker(adapter, "ASSOCIATION COMPLETE", NULL);
 
 	if (policy_mgr_is_mcc_in_24G(hdd_ctx->psoc)) {

@@ -1112,6 +1112,35 @@ int pld_request_bus_bandwidth(struct device *dev, int bandwidth)
 }
 
 /**
+ * pld_is_direct_link_supported() - Get whether direct_link is supported
+ *                                  by FW or not
+ * @dev: device
+ *
+ * Return: true if supported
+ *         false on failure or if not supported
+ */
+bool pld_is_direct_link_supported(struct device *dev)
+{
+	bool ret = false;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_is_direct_link_supported(dev);
+		break;
+	case PLD_BUS_TYPE_PCIE_FW_SIM:
+	case PLD_BUS_TYPE_IPCI_FW_SIM:
+	case PLD_BUS_TYPE_SNOC_FW_SIM:
+	case PLD_BUS_TYPE_SNOC:
+	case PLD_BUS_TYPE_IPCI:
+	case PLD_BUS_TYPE_SDIO:
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+/**
  * pld_get_platform_cap() - Get platform capabilities
  * @dev: device
  * @cap: buffer to the capabilities
@@ -3391,3 +3420,49 @@ int pld_get_audio_wlan_timestamp(struct device *dev,
 	return ret;
 }
 #endif /* FEATURE_WLAN_TIME_SYNC_FTM */
+
+bool pld_is_one_msi(struct device *dev)
+{
+	bool ret = false;
+	enum pld_bus_type type = pld_get_bus_type(dev);
+
+	switch (type) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_is_one_msi(dev);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+#ifdef FEATURE_DIRECT_LINK
+int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
+		       size_t size)
+{
+	int ret;
+
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		ret = pld_pcie_audio_smmu_map(dev, paddr, iova, size);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
+void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
+{
+	switch (pld_get_bus_type(dev)) {
+	case PLD_BUS_TYPE_PCIE:
+		pld_pcie_audio_smmu_unmap(dev, iova, size);
+		break;
+	default:
+		break;
+	}
+}
+#endif
