@@ -92,6 +92,19 @@ mlo_roam_get_chan_freq(uint8_t vdev_id,
 		       struct roam_offload_synch_ind *sync_ind);
 
 /**
+ * mlo_roam_get_link_freq_from_mac_addr - get given link frequency
+ * @sync_ind: roam sync ind pointer
+ * @link_mac_addr: Link mac address
+ *
+ * This api will be called to get the link frequency.
+ *
+ * Return: channel frequency
+ */
+uint32_t
+mlo_roam_get_link_freq_from_mac_addr(struct roam_offload_synch_ind *sync_ind,
+				     uint8_t *link_mac_addr);
+
+/**
  * mlo_roam_get_link_id - get link id
  *
  * @vdev_id: vdev id
@@ -190,6 +203,24 @@ bool
 mlo_get_single_link_ml_roaming(struct wlan_objmgr_psoc *psoc,
 			       uint8_t vdev_id);
 
+/**
+ * mlo_roam_get_bssid_chan_for_link - get link mac addr and channel info
+ *
+ * @vdev_id: vdev id
+ * @sync_ind: roam sync ind pointer
+ * @bssid: link mac addr pointer
+ * @chan: link wmi channel pointer
+ *
+ * This api will be called to get link mac addr and channel info.
+ *
+ * Return: qdf status
+ */
+QDF_STATUS
+mlo_roam_get_bssid_chan_for_link(uint8_t vdev_id,
+				 struct roam_offload_synch_ind *sync_ind,
+				 struct qdf_mac_addr *bssid,
+				 wmi_channel *chan);
+
 #ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /**
  * mlo_cm_roam_sync_cb - Callback function from CM to MLO mgr
@@ -198,7 +229,7 @@ mlo_get_single_link_ml_roaming(struct wlan_objmgr_psoc *psoc,
  * @event: event ptr
  * @event_data_len: event data len
  *
- * This api will be called from connection manger to mlo
+ * This api will be called from connection manager to mlo
  * manager to start roam sync request on link vdev's.
  *
  * Return: qdf status
@@ -211,16 +242,43 @@ void mlo_cm_roam_sync_cb(struct wlan_objmgr_vdev *vdev,
  * wlan_mlo_roam_abort_on_link - Abort roam on link
  *
  * @psoc: psoc pointer
- * @sync_ind: Roam sync indication
+ * @event: Roam sync indication event pointer
+ * @vdev_id: vdev id value
  *
- * Abort roaming on all the links except the primary. Roam abort on primary
- * link would be taken care in legacy path.
+ * Abort roaming on all the links except the vdev id passed.
+ * Roam abort on vdev id link would be taken care in legacy path.
  *
  * Return: QDF_STATUS
  */
 QDF_STATUS
 wlan_mlo_roam_abort_on_link(struct wlan_objmgr_psoc *psoc,
-			    struct roam_offload_synch_ind *sync_ind);
+			    uint8_t *event, uint8_t vdev_id);
+
+/**
+ * mlo_check_if_all_links_up - Check if all links are up
+ * @vdev: vdev pointer
+ *
+ * This api will check if all the requested links are  in CM connected
+ * state.
+ *
+ * Return: QDF_STATUS
+ */
+bool
+mlo_check_if_all_links_up(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_roam_set_link_id - set link id post roaming
+ *
+ * @vdev: vdev pointer
+ * @sync_ind: roam sync indication pointer
+ *
+ * This api will be called to set link id post roaming
+ *
+ * Return: none
+ */
+void
+mlo_roam_set_link_id(struct wlan_objmgr_vdev *vdev,
+		     struct roam_offload_synch_ind *sync_ind);
 
 #else /* WLAN_FEATURE_11BE_MLO */
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
@@ -290,7 +348,7 @@ mlo_roam_update_connected_links(struct wlan_objmgr_vdev *vdev,
 
 static inline QDF_STATUS
 wlan_mlo_roam_abort_on_link(struct wlan_objmgr_psoc *psoc,
-			    struct roam_offload_synch_ind *sync_ind)
+			    uint8_t *event, uint8_t vdev_id)
 {
 	return QDF_STATUS_E_NOSUPPORT;
 }
@@ -308,5 +366,25 @@ mlo_get_single_link_ml_roaming(struct wlan_objmgr_psoc *psoc,
 {
 	return false;
 }
+
+static inline QDF_STATUS
+mlo_roam_get_bssid_chan_for_link(uint8_t vdev_id,
+				 struct roam_offload_synch_ind *sync_ind,
+				 struct qdf_mac_addr *bssid,
+				 wmi_channel *chan)
+{
+	return QDF_STATUS_E_NOSUPPORT;
+}
+
+static inline bool
+mlo_check_if_all_links_up(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
+
+static inline void
+mlo_roam_set_link_id(struct wlan_objmgr_vdev *vdev,
+		     struct roam_offload_synch_ind *sync_ind)
+{}
 #endif /* WLAN_FEATURE_11BE_MLO */
 #endif

@@ -176,7 +176,7 @@ uint8_t ccp_wapi_oui02[HDD_WAPI_OUI_SIZE] = { 0x00, 0x14, 0x72, 0x02 };
 
 #define HDD_PEER_AUTHORIZE_WAIT 10
 
-/**
+/*
  * beacon_filter_table - table of IEs used for beacon filtering
  */
 static const int beacon_filter_table[] = {
@@ -187,6 +187,8 @@ static const int beacon_filter_table[] = {
 	WLAN_ELEMID_HTINFO_ANA,
 	WLAN_ELEMID_OP_MODE_NOTIFY,
 	WLAN_ELEMID_VHTOP,
+	WLAN_ELEMID_QUIET_CHANNEL,
+	WLAN_ELEMID_TWT,
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
 	/*
 	 * EID: 221 vendor IE is being used temporarily by 11AX
@@ -195,6 +197,18 @@ static const int beacon_filter_table[] = {
 	 * number.
 	 */
 	WLAN_ELEMID_VENDOR,
+#endif
+};
+
+/*
+ * beacon_filter_extn_table - table of extn IEs used for beacon filtering
+ */
+static const int beacon_filter_extn_table[] = {
+	WLAN_EXTN_ELEMID_HEOP,
+	WLAN_EXTN_ELEMID_UORA,
+	WLAN_EXTN_ELEMID_MUEDCA,
+#ifdef WLAN_FEATURE_11BE
+	WLAN_EXTN_ELEMID_EHTOP,
 #endif
 };
 
@@ -219,18 +233,31 @@ static const int beacon_filter_table[] = {
 #if defined (CFG80211_SAE_AUTH_TA_ADDR_SUPPORT)
 static inline
 void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
-			       struct hdd_adapter *adapter)
+			       struct hdd_adapter *adapter,
+			       struct sir_sae_info *sae_info)
 {
-	if (wlan_vdev_mlme_is_mlo_vdev(adapter->vdev)) {
+	struct qdf_mac_addr ta = QDF_MAC_ADDR_ZERO_INIT;
+	QDF_STATUS status = QDF_STATUS_SUCCESS;
+
+	status = ucfg_cm_get_sae_auth_ta(adapter->hdd_ctx->pdev,
+					 sae_info->vdev_id,
+					 &ta);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		qdf_mem_copy(params->tx_addr, ta.bytes, QDF_MAC_ADDR_SIZE);
+	else if (wlan_vdev_mlme_is_mlo_vdev(adapter->vdev))
 		qdf_mem_copy(params->tx_addr,
 			     wlan_vdev_mlme_get_linkaddr(adapter->vdev),
 			     QDF_MAC_ADDR_SIZE);
-	}
+
+	hdd_debug("status:%d ta:" QDF_MAC_ADDR_FMT, status,
+		  QDF_MAC_ADDR_REF(params->tx_addr));
+
 }
 #else
 static inline
 void wlan_hdd_sae_copy_ta_addr(struct cfg80211_external_auth_params *params,
-			       struct hdd_adapter *adapter)
+			       struct hdd_adapter *adapter,
+			       struct sir_sae_info *sae_info)
 {
 }
 #endif
@@ -269,8 +296,7 @@ static void wlan_hdd_sae_callback(struct hdd_adapter *adapter,
 	params.action = NL80211_EXTERNAL_AUTH_START;
 	qdf_mem_copy(params.bssid, sae_info->peer_mac_addr.bytes,
 		     QDF_MAC_ADDR_SIZE);
-
-	wlan_hdd_sae_copy_ta_addr(&params, adapter);
+	wlan_hdd_sae_copy_ta_addr(&params, adapter, sae_info);
 
 	qdf_mem_copy(params.ssid.ssid, sae_info->ssid.ssId,
 		     sae_info->ssid.length);
@@ -380,6 +406,7 @@ enum band_info hdd_conn_get_connected_band(struct hdd_adapter *adapter)
 
 /**
  * hdd_conn_get_connected_cipher_algo() - get current connection cipher type
+ * @adapter: pointer to the hdd adapter
  * @sta_ctx: pointer to global HDD Station context
  * @pConnectedCipherAlgo: pointer to connected cipher algo
  *
@@ -421,17 +448,6 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 		    (QDF_P2P_DEVICE_MODE == adapter->device_mode)) {
 			if (hdd_cm_is_connecting(adapter)) {
 				hdd_debug("vdev_id %d: Connection is in progress",
-					  adapter->vdev_id);
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
-								  dbgid);
-				return adapter;
-			} else if (hdd_cm_is_vdev_associated(adapter) &&
-				   sme_is_sta_key_exchange_in_progress(
-							hdd_ctx->mac_handle,
-							adapter->vdev_id)) {
-				hdd_debug("vdev_id %d: Key exchange is in progress",
 					  adapter->vdev_id);
 				hdd_adapter_dev_put_debug(adapter, dbgid);
 				if (next_adapter)
@@ -483,6 +499,36 @@ bool hdd_is_any_sta_connected(struct hdd_context *hdd_ctx)
 	return false;
 }
 
+QDF_STATUS hdd_get_first_connected_sta_vdev_id(struct hdd_context *hdd_ctx,
+					       uint32_t *vdev_id)
+{
+	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
+	wlan_net_dev_ref_dbgid dbgid =
+				NET_DEV_HOLD_IS_ANY_STA_CONNECTED;
+
+	if (!hdd_ctx) {
+		hdd_err("HDD context is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
+					   dbgid) {
+		if (adapter->device_mode == QDF_STA_MODE ||
+		    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
+			if (hdd_cm_is_vdev_connected(adapter)) {
+				*vdev_id = adapter->vdev_id;
+				hdd_adapter_dev_put_debug(adapter, dbgid);
+				if (next_adapter)
+					hdd_adapter_dev_put_debug(next_adapter,
+								  dbgid);
+				return QDF_STATUS_SUCCESS;
+			}
+		}
+		hdd_adapter_dev_put_debug(adapter, dbgid);
+	}
+	return QDF_STATUS_E_FAILURE;
+}
+
 /**
  * hdd_remove_beacon_filter() - remove beacon filter
  * @adapter: Pointer to the hdd adapter
@@ -512,8 +558,12 @@ int hdd_add_beacon_filter(struct hdd_adapter *adapter)
 	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 
 	for (i = 0; i < ARRAY_SIZE(beacon_filter_table); i++)
-		qdf_set_bit((beacon_filter_table[i]),
-				(unsigned long int *)ie_map);
+		qdf_set_bit(beacon_filter_table[i],
+			    (unsigned long *)ie_map);
+
+	for (i = 0; i < ARRAY_SIZE(beacon_filter_extn_table); i++)
+		qdf_set_bit(beacon_filter_extn_table[i] + WLAN_ELEMID_EXTN_ELEM,
+			    (unsigned long *)ie_map);
 
 	status = sme_add_beacon_filter(hdd_ctx->mac_handle,
 				       adapter->vdev_id, ie_map);
@@ -1518,9 +1568,6 @@ bool hdd_any_valid_peer_present(struct hdd_adapter *adapter)
  * hdd_roam_mic_error_indication_handler() - MIC error indication handler
  * @adapter: pointer to adapter
  * @roam_info: pointer to roam info
- * @roam_id: roam id
- * @roam_status: roam status
- * @roam_result: roam result
  *
  * This function indicates the Mic failure to the supplicant
  *
@@ -2078,7 +2125,6 @@ static void hdd_roam_channel_switch_handler(struct hdd_adapter *adapter,
 
 	policy_mgr_check_concurrent_intf_and_restart_sap(hdd_ctx->psoc);
 	wlan_twt_concurrency_update(hdd_ctx);
-	hdd_update_he_obss_pd(adapter, NULL, true);
 }
 
 #ifdef WLAN_FEATURE_HOST_ROAM
@@ -2231,6 +2277,50 @@ static inline void hdd_translate_sae_rsn_to_csr_auth(int8_t auth_suite[4],
 {
 }
 #endif
+
+void *hdd_filter_ft_info(const uint8_t *frame, size_t len,
+			 uint32_t *ft_info_len)
+{
+	uint32_t ft_ie_len, md_ie_len, rsn_ie_len, ie_len;
+	const uint8_t *rsn_ie, *md_ie, *ft_ie;
+	void *ft_info;
+
+	ft_ie_len = 0;
+	md_ie_len = 0;
+	rsn_ie_len = 0;
+	ie_len = len - DOT11F_FF_CAPABILITIES_LEN - DOT11F_FF_STATUS_LEN
+			   - DOT11F_IE_AID_MAX_LEN - sizeof(tSirMacMgmtHdr);
+	rsn_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_RSN, frame, ie_len);
+
+	if (rsn_ie) {
+		rsn_ie_len = rsn_ie[1] + 2;
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			(void *)rsn_ie, rsn_ie_len);
+	}
+	md_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_MOBILITYDOMAIN,
+					 frame, ie_len);
+	if (md_ie) {
+		md_ie_len = md_ie[1] + 2;
+		QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+			(void *)md_ie, md_ie_len);
+	}
+	ft_ie = wlan_get_ie_ptr_from_eid(DOT11F_EID_FTINFO, frame, ie_len);
+	if (ft_ie)
+		ft_ie_len = ft_ie[1] + 2;
+
+	*ft_info_len = rsn_ie_len + md_ie_len + ft_ie_len;
+	ft_info = qdf_mem_malloc(*ft_info_len);
+	if (!ft_info)
+		return NULL;
+	if (rsn_ie_len)
+		qdf_mem_copy(ft_info, rsn_ie, rsn_ie_len);
+	if (md_ie_len)
+		qdf_mem_copy(ft_info + rsn_ie_len, md_ie, md_ie_len);
+	if (ft_ie_len)
+		qdf_mem_copy(ft_info + rsn_ie_len + md_ie_len,
+			     ft_ie, ft_ie_len);
+	return ft_info;
+}
 
 /**
  * hdd_translate_rsn_to_csr_auth_type() - Translate RSN to CSR auth type
@@ -2502,6 +2592,7 @@ struct osif_cm_ops osif_ops = {
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 	.vendor_handoff_params_cb = hdd_cm_get_vendor_handoff_params,
 #endif
+	.send_vdev_keys_cb = hdd_cm_send_vdev_keys,
 };
 
 QDF_STATUS hdd_cm_register_cb(void)

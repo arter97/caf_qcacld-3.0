@@ -165,7 +165,7 @@ void wmi_rssi_monitor_attach_tlv(struct wmi_unified *wmi_handle)
 
 /**
  * send_roam_scan_offload_rssi_thresh_cmd_tlv() - set scan offload
- *                                                rssi threashold
+ *                                                rssi threshold
  * @wmi_handle: wmi handle
  * @roam_req:   Roaming request buffer
  *
@@ -375,7 +375,7 @@ send_roam_scan_offload_scan_period_cmd_tlv(
 			param->roam_inactive_data_packet_count;
 	scan_period_fp->roam_scan_period_after_inactivity =
 			param->roam_scan_period_after_inactivity;
-	/* Firmware expects the full scan preriod in msec whereas host
+	/* Firmware expects the full scan period in msec whereas host
 	 * provides the same in seconds.
 	 * Convert it to msec and send to firmware
 	 */
@@ -2102,7 +2102,7 @@ static void
 wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 				struct roam_offload_synch_ind *roam_sync_ind)
 {
-	uint8_t *bcn_probersp_ptr;
+	uint8_t *bcn_probersp_ptr, *link_bcn_probersp_ptr;
 	uint8_t *reassoc_rsp_ptr;
 	uint8_t *reassoc_req_ptr;
 
@@ -2119,10 +2119,29 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 	qdf_mem_free(rso_cfg->roam_sync_frame_ind.bcn_probe_rsp);
 	rso_cfg->roam_sync_frame_ind.bcn_probe_rsp = NULL;
 
+	/* Link beacon/probe rsp data */
+	if (rso_cfg->roam_sync_frame_ind.link_bcn_probe_rsp) {
+		roam_sync_ind->link_beacon_probe_resp_offset =
+			sizeof(struct roam_offload_synch_ind) +
+			roam_sync_ind->beaconProbeRespLength;
+		roam_sync_ind->link_beacon_probe_resp_length =
+			rso_cfg->roam_sync_frame_ind.link_bcn_probe_rsp_len;
+		roam_sync_ind->is_link_beacon =
+			rso_cfg->roam_sync_frame_ind.is_link_beacon;
+		link_bcn_probersp_ptr = (uint8_t *)roam_sync_ind +
+				  roam_sync_ind->link_beacon_probe_resp_offset;
+		qdf_mem_copy(link_bcn_probersp_ptr,
+			     rso_cfg->roam_sync_frame_ind.link_bcn_probe_rsp,
+			     roam_sync_ind->link_beacon_probe_resp_length);
+		qdf_mem_free(rso_cfg->roam_sync_frame_ind.link_bcn_probe_rsp);
+		rso_cfg->roam_sync_frame_ind.link_bcn_probe_rsp = NULL;
+	}
+
 	/* ReAssoc Rsp data */
 	roam_sync_ind->reassocRespOffset =
 		sizeof(struct roam_offload_synch_ind) +
-		roam_sync_ind->beaconProbeRespLength;
+		roam_sync_ind->beaconProbeRespLength +
+		roam_sync_ind->link_beacon_probe_resp_length;
 	roam_sync_ind->reassocRespLength =
 		rso_cfg->roam_sync_frame_ind.reassoc_rsp_len;
 	reassoc_rsp_ptr = (uint8_t *)roam_sync_ind +
@@ -2137,6 +2156,7 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 	roam_sync_ind->reassoc_req_offset =
 		sizeof(struct roam_offload_synch_ind) +
 		roam_sync_ind->beaconProbeRespLength +
+		roam_sync_ind->link_beacon_probe_resp_length +
 		roam_sync_ind->reassocRespLength;
 	roam_sync_ind->reassoc_req_length =
 		rso_cfg->roam_sync_frame_ind.reassoc_req_len;
@@ -2183,6 +2203,10 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 		synch_event->bcn_probe_rsp_len;
 	qdf_mem_copy(bcn_probersp_ptr, param_buf->bcn_probe_rsp_frame,
 		     roam_sync_ind->beaconProbeRespLength);
+	/*
+	 * Firmware doesn't support link beacon/Probe Rsp data in roam sync
+	 * event. It's always sent in sync_frame event
+	 */
 	/* ReAssoc Rsp data */
 	roam_sync_ind->reassocRespOffset =
 		sizeof(struct roam_offload_synch_ind) +
@@ -2207,53 +2231,82 @@ wmi_fill_data_synch_event(struct roam_offload_synch_ind *roam_sync_ind,
 }
 
 #ifdef WLAN_FEATURE_11BE_MLO
-static void
-wmi_fill_roam_mlo_info(WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
+static QDF_STATUS
+wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
+		       WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
 		       struct roam_offload_synch_ind *roam_sync_ind)
 {
 	uint8_t i;
 	wmi_roam_ml_setup_links_param *setup_links;
 	wmi_roam_ml_key_material_param *ml_key_param;
+	struct ml_setup_link_param *link;
+	struct ml_key_material_param *key;
 
 	if (param_buf->num_setup_links_param) {
-		roam_sync_ind->num_setup_links = param_buf->num_setup_links_param;
+		if (param_buf->num_setup_links_param >
+		    WLAN_UMAC_MLO_MAX_VDEVS) {
+			wmi_err("Number of umac mlo vdev entries %d exceeded max vdev supported %d",
+				param_buf->num_setup_links_param,
+				WLAN_UMAC_MLO_MAX_VDEVS);
+			return QDF_STATUS_E_INVAL;
+		}
+		roam_sync_ind->num_setup_links =
+			param_buf->num_setup_links_param;
 		setup_links = param_buf->setup_links_param;
 
 		for (i = 0; i < roam_sync_ind->num_setup_links; i++) {
-			roam_sync_ind->ml_link[i].link_id = setup_links->link_id;
-			roam_sync_ind->ml_link[i].vdev_id = setup_links->vdev_id;
-			roam_sync_ind->ml_link[i].channel = setup_links->channel;
-			roam_sync_ind->ml_link[i].flags = setup_links->flags;
+			link = &roam_sync_ind->ml_link[i];
+			link->link_id = setup_links->link_id;
+			link->vdev_id = setup_links->vdev_id;
+			link->channel = setup_links->channel;
+			link->flags = setup_links->flags;
+
 			WMI_MAC_ADDR_TO_CHAR_ARRAY(&setup_links->link_addr,
-						   roam_sync_ind->ml_link[i].link_addr.bytes);
+						   link->link_addr.bytes);
+			wmi_debug("link_id: %u vdev_id: %u flags: 0x%x addr:" QDF_MAC_ADDR_FMT,
+				  link->link_id, link->vdev_id,
+				  link->flags, link->link_addr.bytes);
+			wmi_debug("channel: %u mhz center_freq1: %u center_freq2: %u",
+				  link->channel.mhz,
+				  link->channel.band_center_freq1,
+				  link->channel.band_center_freq2);
 			setup_links++;
 		}
 	}
 	if (param_buf->num_ml_key_material) {
-		roam_sync_ind->num_ml_key_material = param_buf->num_ml_key_material;
+		roam_sync_ind->num_ml_key_material =
+			param_buf->num_ml_key_material;
 		ml_key_param = param_buf->ml_key_material;
 
 		for (i = 0; i < roam_sync_ind->num_ml_key_material; i++) {
-			roam_sync_ind->ml_key[i].link_id = ml_key_param->link_id;
-			roam_sync_ind->ml_key[i].key_idx = ml_key_param->key_ix;
-			roam_sync_ind->ml_key[i].key_cipher = ml_key_param->key_cipher;
-			qdf_mem_copy(roam_sync_ind->ml_key[i].pn,
-				     ml_key_param->pn, WMI_MAX_PN_LEN);
-			qdf_mem_copy(roam_sync_ind->ml_key[i].key_buff,
-				     ml_key_param->key_buff, WMI_MAX_KEY_LEN);
+			key = &roam_sync_ind->ml_key[i];
+			key->link_id = ml_key_param->link_id;
+			key->key_idx = ml_key_param->key_ix;
+			key->key_cipher = ml_key_param->key_cipher;
+			qdf_mem_copy(key->pn, ml_key_param->pn,
+				     WMI_MAX_PN_LEN);
+			qdf_mem_copy(key->key_buff, ml_key_param->key_buff,
+				     WMI_MAX_KEY_LEN);
+			wmi_debug("link_id: %u key_idx: %u key_cipher: %u",
+				  key->link_id, key->key_idx, key->key_cipher);
 			ml_key_param++;
 		}
 	}
+	return QDF_STATUS_SUCCESS;
 }
 #else
-static void wmi_fill_roam_mlo_info(WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
-				   struct roam_offload_synch_ind *roam_sync_ind)
+static QDF_STATUS
+wmi_fill_roam_mlo_info(wmi_unified_t wmi_handle,
+		       WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf,
+		       struct roam_offload_synch_ind *roam_sync_ind)
 {
+	return QDF_STATUS_SUCCESS;
 }
 #endif
 
 static QDF_STATUS
-wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
+wmi_fill_roam_sync_buffer(wmi_unified_t wmi_handle,
+			  struct wlan_objmgr_vdev *vdev,
 			  struct rso_config *rso_cfg,
 			  struct roam_offload_synch_ind *roam_sync_ind,
 			  WMI_ROAM_SYNCH_EVENTID_param_tlvs *param_buf)
@@ -2301,6 +2354,7 @@ wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
 			wlan_cm_free_roam_synch_frame_ind(rso_cfg);
 			return status;
 		}
+
 		if (!rso_cfg->roam_sync_frame_ind.reassoc_rsp) {
 			wmi_err("LFR3: reassoc_rsp is NULL");
 			QDF_ASSERT(rso_cfg->roam_sync_frame_ind.reassoc_rsp);
@@ -2422,7 +2476,11 @@ wmi_fill_roam_sync_buffer(struct wlan_objmgr_vdev *vdev,
 			     pmk_cache_info->pmkid, PMKID_LEN);
 	}
 
-	wmi_fill_roam_mlo_info(param_buf, roam_sync_ind);
+	status = wmi_fill_roam_mlo_info(wmi_handle, param_buf, roam_sync_ind);
+	if (QDF_IS_STATUS_ERROR(status)) {
+		wmi_err("Failed to fill roam mlo info");
+		return status;
+	}
 	wlan_cm_free_roam_synch_frame_ind(rso_cfg);
 	return QDF_STATUS_SUCCESS;
 }
@@ -2448,7 +2506,7 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	struct wlan_objmgr_psoc *psoc = NULL;
 	struct rso_config *rso_cfg;
 	uint32_t roam_synch_data_len;
-	uint32_t bcn_probe_rsp_len;
+	uint32_t bcn_probe_rsp_len, link_bcn_probe_rsp_len;
 	uint32_t reassoc_rsp_len;
 	uint32_t reassoc_req_len;
 	wmi_pdev_hw_mode_transition_event_fixed_param *hw_mode_trans_param;
@@ -2533,15 +2591,21 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	if ((!synch_event->bcn_probe_rsp_len) &&
 	    (!synch_event->reassoc_req_len) &&
 	    (!synch_event->reassoc_rsp_len)) {
-		bcn_probe_rsp_len = rso_cfg->roam_sync_frame_ind.bcn_probe_rsp_len;
+		bcn_probe_rsp_len =
+			rso_cfg->roam_sync_frame_ind.bcn_probe_rsp_len;
+		link_bcn_probe_rsp_len =
+			rso_cfg->roam_sync_frame_ind.link_bcn_probe_rsp_len;
 		reassoc_req_len = rso_cfg->roam_sync_frame_ind.reassoc_req_len;
 		reassoc_rsp_len = rso_cfg->roam_sync_frame_ind.reassoc_rsp_len;
 
-		roam_synch_data_len = bcn_probe_rsp_len + reassoc_rsp_len +
-			reassoc_req_len + sizeof(struct roam_offload_synch_ind);
+		roam_synch_data_len =
+			bcn_probe_rsp_len + link_bcn_probe_rsp_len +
+			reassoc_rsp_len + reassoc_req_len +
+			sizeof(struct roam_offload_synch_ind);
 
-		wmi_debug("Updated synch payload: LEN bcn:%d, req:%d, rsp:%d",
+		wmi_debug("Updated synch payload: LEN bcn:%d, link bcn: %d req:%d, rsp:%d",
 			  bcn_probe_rsp_len,
+			  link_bcn_probe_rsp_len,
 			  reassoc_req_len,
 			  reassoc_rsp_len);
 	} else {
@@ -2588,7 +2652,7 @@ extract_roam_sync_event_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 	}
 
 	*roam_sync_ind = roam_sync;
-	status = wmi_fill_roam_sync_buffer(vdev, rso_cfg,
+	status = wmi_fill_roam_sync_buffer(wmi_handle, vdev, rso_cfg,
 					   roam_sync, param_buf);
 
 end:
@@ -2617,8 +2681,8 @@ extract_roam_sync_frame_event_tlv(wmi_unified_t wmi_handle, void *event,
 				  struct roam_synch_frame_ind *frame_ptr)
 {
 	WMI_ROAM_SYNCH_FRAME_EVENTID_param_tlvs *param_buf = NULL;
-	struct roam_synch_frame_ind *roam_sync_frame_ind;
-	wmi_roam_synch_frame_event_fixed_param *synch_frame_event;
+	struct roam_synch_frame_ind *frame_ind;
+	wmi_roam_synch_frame_event_fixed_param *frame_evt;
 
 	if (!event) {
 		wmi_err("Event param null");
@@ -2631,97 +2695,111 @@ extract_roam_sync_frame_event_tlv(wmi_unified_t wmi_handle, void *event,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	synch_frame_event = param_buf->fixed_param;
-
-	if (!synch_frame_event) {
+	frame_evt = param_buf->fixed_param;
+	if (!frame_evt) {
 		wmi_err("received null event data from target");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	if (synch_frame_event->vdev_id >= WLAN_MAX_VDEVS) {
-		wmi_err("received invalid vdev_id %d",
-			synch_frame_event->vdev_id);
+	if (frame_evt->vdev_id >= WLAN_MAX_VDEVS) {
+		wmi_err("received invalid vdev_id %d", frame_evt->vdev_id);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	if (synch_frame_event->bcn_probe_rsp_len >
-	    param_buf->num_bcn_probe_rsp_frame ||
-	    synch_frame_event->reassoc_req_len >
-	    param_buf->num_reassoc_req_frame ||
-	    synch_frame_event->reassoc_rsp_len >
-	    param_buf->num_reassoc_rsp_frame) {
+	/*
+	 * Firmware can send more than one roam synch frame event to host
+	 * driver. So Bcn_prb_rsp_len/reassoc_req_len/reassoc_rsp_len can be 0
+	 * in some of the events.
+	 */
+	if (frame_evt->bcn_probe_rsp_len > param_buf->num_bcn_probe_rsp_frame ||
+	    frame_evt->reassoc_req_len > param_buf->num_reassoc_req_frame ||
+	    frame_evt->reassoc_rsp_len > param_buf->num_reassoc_rsp_frame ||
+	    (frame_evt->bcn_probe_rsp_len &&
+	     frame_evt->bcn_probe_rsp_len < sizeof(struct wlan_frame_hdr)) ||
+	    (frame_evt->reassoc_req_len &&
+	     frame_evt->reassoc_req_len < sizeof(struct wlan_frame_hdr)) ||
+	    (frame_evt->reassoc_rsp_len &&
+	     frame_evt->reassoc_rsp_len < sizeof(struct wlan_frame_hdr))) {
 		wmi_err("fixed/actual len err: bcn:%d/%d req:%d/%d rsp:%d/%d",
-			synch_frame_event->bcn_probe_rsp_len,
+			frame_evt->bcn_probe_rsp_len,
 			param_buf->num_bcn_probe_rsp_frame,
-			synch_frame_event->reassoc_req_len,
+			frame_evt->reassoc_req_len,
 			param_buf->num_reassoc_req_frame,
-			synch_frame_event->reassoc_rsp_len,
+			frame_evt->reassoc_rsp_len,
 			param_buf->num_reassoc_rsp_frame);
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	roam_sync_frame_ind = frame_ptr;
-	roam_sync_frame_ind->vdev_id = synch_frame_event->vdev_id;
+	frame_ind = frame_ptr;
+	frame_ind->vdev_id = frame_evt->vdev_id;
 
-	wmi_debug("synch frame payload: LEN bcn:%d, req:%d, rsp:%d",
-		  synch_frame_event->bcn_probe_rsp_len,
-		  synch_frame_event->reassoc_req_len,
-		  synch_frame_event->reassoc_rsp_len);
+	wmi_debug("synch frame payload: LEN %s bcn:%d, req:%d, rsp:%d",
+		  frame_evt->reassoc_rsp_len ? "Assoc" : "Link",
+		  frame_evt->bcn_probe_rsp_len,
+		  frame_evt->reassoc_req_len,
+		  frame_evt->reassoc_rsp_len);
 
-	if (synch_frame_event->bcn_probe_rsp_len) {
-		roam_sync_frame_ind->bcn_probe_rsp_len =
-			synch_frame_event->bcn_probe_rsp_len;
+	if (frame_evt->bcn_probe_rsp_len &&
+	    frame_evt->reassoc_rsp_len) {
+		frame_ind->bcn_probe_rsp_len = frame_evt->bcn_probe_rsp_len;
 
-		roam_sync_frame_ind->is_beacon =
-			synch_frame_event->is_beacon;
+		frame_ind->is_beacon = frame_evt->is_beacon;
 
-		if (roam_sync_frame_ind->bcn_probe_rsp)
-			qdf_mem_free(roam_sync_frame_ind->bcn_probe_rsp);
-
-		roam_sync_frame_ind->bcn_probe_rsp =
-			qdf_mem_malloc(roam_sync_frame_ind->bcn_probe_rsp_len);
-		if (!roam_sync_frame_ind->bcn_probe_rsp) {
-			QDF_ASSERT(roam_sync_frame_ind->bcn_probe_rsp);
+		frame_ind->bcn_probe_rsp =
+			qdf_mem_malloc(frame_ind->bcn_probe_rsp_len);
+		if (!frame_ind->bcn_probe_rsp) {
+			QDF_ASSERT(frame_ind->bcn_probe_rsp);
 			return QDF_STATUS_E_NOMEM;
 		}
-		qdf_mem_copy(roam_sync_frame_ind->bcn_probe_rsp,
+		qdf_mem_copy(frame_ind->bcn_probe_rsp,
 			     param_buf->bcn_probe_rsp_frame,
-			     roam_sync_frame_ind->bcn_probe_rsp_len);
-	}
+			     frame_ind->bcn_probe_rsp_len);
+	} else if (frame_evt->bcn_probe_rsp_len) {
+		frame_ind->link_bcn_probe_rsp_len =
+			frame_evt->bcn_probe_rsp_len;
 
-	if (synch_frame_event->reassoc_req_len) {
-		roam_sync_frame_ind->reassoc_req_len =
-				synch_frame_event->reassoc_req_len;
+		frame_ind->is_link_beacon = frame_evt->is_beacon;
 
-		if (roam_sync_frame_ind->reassoc_req)
-			qdf_mem_free(roam_sync_frame_ind->reassoc_req);
-		roam_sync_frame_ind->reassoc_req =
-			qdf_mem_malloc(roam_sync_frame_ind->reassoc_req_len);
-		if (!roam_sync_frame_ind->reassoc_req) {
-			QDF_ASSERT(roam_sync_frame_ind->reassoc_req);
+		if (frame_ind->link_bcn_probe_rsp)
+			qdf_mem_free(frame_ind->bcn_probe_rsp);
+
+		frame_ind->link_bcn_probe_rsp =
+			qdf_mem_malloc(frame_ind->link_bcn_probe_rsp_len);
+		if (!frame_ind->link_bcn_probe_rsp) {
+			QDF_ASSERT(frame_ind->link_bcn_probe_rsp);
 			return QDF_STATUS_E_NOMEM;
 		}
-		qdf_mem_copy(roam_sync_frame_ind->reassoc_req,
+		qdf_mem_copy(frame_ind->link_bcn_probe_rsp,
+			     param_buf->bcn_probe_rsp_frame,
+			     frame_ind->link_bcn_probe_rsp_len);
+	}
+
+	if (frame_evt->reassoc_req_len) {
+		frame_ind->reassoc_req_len = frame_evt->reassoc_req_len;
+
+		frame_ind->reassoc_req =
+			qdf_mem_malloc(frame_ind->reassoc_req_len);
+		if (!frame_ind->reassoc_req) {
+			QDF_ASSERT(frame_ind->reassoc_req);
+			return QDF_STATUS_E_NOMEM;
+		}
+		qdf_mem_copy(frame_ind->reassoc_req,
 			     param_buf->reassoc_req_frame,
-			     roam_sync_frame_ind->reassoc_req_len);
+			     frame_ind->reassoc_req_len);
 	}
 
-	if (synch_frame_event->reassoc_rsp_len) {
-		roam_sync_frame_ind->reassoc_rsp_len =
-				synch_frame_event->reassoc_rsp_len;
+	if (frame_evt->reassoc_rsp_len) {
+		frame_ind->reassoc_rsp_len = frame_evt->reassoc_rsp_len;
 
-		if (roam_sync_frame_ind->reassoc_rsp)
-			qdf_mem_free(roam_sync_frame_ind->reassoc_rsp);
-
-		roam_sync_frame_ind->reassoc_rsp =
-			qdf_mem_malloc(roam_sync_frame_ind->reassoc_rsp_len);
-		if (!roam_sync_frame_ind->reassoc_rsp) {
-			QDF_ASSERT(roam_sync_frame_ind->reassoc_rsp);
+		frame_ind->reassoc_rsp =
+			qdf_mem_malloc(frame_ind->reassoc_rsp_len);
+		if (!frame_ind->reassoc_rsp) {
+			QDF_ASSERT(frame_ind->reassoc_rsp);
 			return QDF_STATUS_E_NOMEM;
 		}
-		qdf_mem_copy(roam_sync_frame_ind->reassoc_rsp,
+		qdf_mem_copy(frame_ind->reassoc_rsp,
 			     param_buf->reassoc_rsp_frame,
-			     roam_sync_frame_ind->reassoc_rsp_len);
+			     frame_ind->reassoc_rsp_len);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -3234,6 +3312,8 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 
 	WMI_MAC_ADDR_TO_CHAR_ARRAY(&rso_auth_start_ev->candidate_ap_bssid,
 				   auth_event->ap_bssid.bytes);
+	WMI_MAC_ADDR_TO_CHAR_ARRAY(&rso_auth_start_ev->transmit_addr,
+				   auth_event->ta.bytes);
 	if (qdf_is_macaddr_zero(&auth_event->ap_bssid) ||
 	    qdf_is_macaddr_broadcast(&auth_event->ap_bssid) ||
 	    qdf_is_macaddr_group(&auth_event->ap_bssid)) {
@@ -3241,8 +3321,11 @@ extract_auth_offload_event_tlv(wmi_unified_t wmi_handle,
 		return -EINVAL;
 	}
 
-	wmi_debug("Received Roam auth offload event for bss:"QDF_MAC_ADDR_FMT" vdev_id:%d",
-		  QDF_MAC_ADDR_REF(auth_event->ap_bssid.bytes), auth_event->vdev_id);
+	wmi_debug("Received Roam auth offload event for bss:"
+		  QDF_MAC_ADDR_FMT " ta:" QDF_MAC_ADDR_FMT " vdev_id: %d",
+		  QDF_MAC_ADDR_REF(auth_event->ap_bssid.bytes),
+		  QDF_MAC_ADDR_REF(auth_event->ta.bytes),
+		  auth_event->vdev_id);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -3586,8 +3669,6 @@ extract_roam_event(wmi_unified_t wmi_handle, void *evt_buf, uint32_t len,
 }
 #endif /* WLAN_FEATURE_ROAM_OFFLOAD */
 
-#define ROAM_OFFLOAD_PMK_EXT_BYTES 16
-
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 /**
  * wmi_fill_roam_offload_11r_params() - Fill roam scan params to send it to fw
@@ -3608,6 +3689,7 @@ static void wmi_fill_roam_offload_11r_params(
 	if ((akm == WMI_AUTH_FT_RSNA_FILS_SHA256 ||
 	     akm == WMI_AUTH_FT_RSNA_FILS_SHA384) &&
 	    roam_req->fils_roam_config.fils_ft_len) {
+		wmi_debug("Update the FILS FT key to Firmware");
 		psk_msk = roam_req->fils_roam_config.fils_ft;
 		len = roam_req->fils_roam_config.fils_ft_len;
 	} else {
@@ -4089,9 +4171,13 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 				     src_11i_info->psk_pmk,
 				     roam_offload_11i->pmk_len);
 
-			roam_offload_11i->pmk_ext_len =
-			    src_11i_info->pmk_len > ROAM_OFFLOAD_PMK_BYTES ?
-			    ROAM_OFFLOAD_PMK_EXT_BYTES : 0;
+			roam_offload_11i->pmk_ext_len = 0;
+			if (src_11i_info->pmk_len > ROAM_OFFLOAD_PMK_BYTES) {
+				roam_offload_11i->pmk_ext_len =
+					QDF_MIN(src_11i_info->pmk_len -
+						ROAM_OFFLOAD_PMK_BYTES,
+						ROAM_OFFLOAD_PMK_BYTES);
+			}
 			qdf_mem_copy(
 				roam_offload_11i->pmk_ext,
 				&src_11i_info->psk_pmk[ROAM_OFFLOAD_PMK_BYTES],
@@ -4127,6 +4213,11 @@ wmi_fill_rso_tlvs(wmi_unified_t wmi_handle, uint8_t *buf,
 				QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI,
 						   QDF_TRACE_LEVEL_DEBUG,
 						   roam_offload_11i->pmk,
+						   WLAN_MAX_PMK_DUMP_BYTES);
+			if (roam_offload_11i->pmk_ext_len)
+				QDF_TRACE_HEX_DUMP(QDF_MODULE_ID_WMI,
+						   QDF_TRACE_LEVEL_DEBUG,
+						   roam_offload_11i->pmk_ext,
 						   WLAN_MAX_PMK_DUMP_BYTES);
 		}
 	} else {
@@ -4385,10 +4476,87 @@ send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
 		  score_param->eht_weightage_pcnt,
 		  score_param->mlo_weightage_pcnt);
 }
+
+static uint32_t convert_support_link_band_to_wmi(uint32_t bands)
+{
+	uint32_t target_bands = 0;
+
+	if (bands & BIT(REG_BAND_2G))
+		target_bands |= BIT(0);
+	if (bands & BIT(REG_BAND_5G))
+		target_bands |= BIT(1);
+	if (bands & BIT(REG_BAND_6G))
+		target_bands |= BIT(2);
+
+	return target_bands;
+}
+
+/**
+ * send_roam_mlo_config_tlv() - send roam mlo config parameters
+ * @wmi_handle: wmi handle
+ * @req: pointer to wlan roam mlo config parameters
+ *
+ * This function sends the roam mlo config parameters to fw.
+ *
+ * Return: QDF status
+ */
+static QDF_STATUS
+send_roam_mlo_config_tlv(wmi_unified_t wmi_handle,
+			 struct wlan_roam_mlo_config *req)
+{
+	wmi_roam_mlo_config_cmd_fixed_param *cmd;
+	wmi_buf_t buf;
+	uint32_t len;
+
+	len = sizeof(*cmd);
+	buf = wmi_buf_alloc(wmi_handle, len);
+	if (!buf)
+		return QDF_STATUS_E_NOMEM;
+
+	cmd = (wmi_roam_mlo_config_cmd_fixed_param *)wmi_buf_data(buf);
+	WMITLV_SET_HDR(
+	    &cmd->tlv_header,
+	    WMITLV_TAG_STRUC_wmi_roam_mlo_config_cmd_fixed_param,
+	    WMITLV_GET_STRUCT_TLVLEN(wmi_roam_mlo_config_cmd_fixed_param));
+
+	cmd->vdev_id = req->vdev_id;
+	cmd->support_link_num = req->support_link_num;
+	cmd->support_link_band = convert_support_link_band_to_wmi(
+						req->support_link_band);
+	WMI_CHAR_ARRAY_TO_MAC_ADDR(req->partner_link_addr.bytes,
+				   &cmd->partner_link_addr);
+
+	wmi_debug("RSO_CFG MLO: vdev_id:%d support_link_num:%d support_link_band:0x%0x link addr:"QDF_MAC_ADDR_FMT,
+		  cmd->vdev_id, cmd->support_link_num,
+		  cmd->support_link_band,
+		  QDF_MAC_ADDR_REF(req->partner_link_addr.bytes));
+
+	wmi_mtrace(WMI_ROAM_MLO_CONFIG_CMDID, cmd->vdev_id, 0);
+	if (wmi_unified_cmd_send(wmi_handle, buf, len,
+				 WMI_ROAM_MLO_CONFIG_CMDID)) {
+		wmi_err("Failed to send WMI_ROAM_MLO_CONFIG_CMDID");
+		wmi_buf_free(buf);
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
+{
+	struct wmi_ops *ops = wmi_handle->ops;
+
+	ops->send_roam_mlo_config = send_roam_mlo_config_tlv;
+}
+
 #else
 static void
 send_update_mlo_roam_params(wmi_roam_cnd_scoring_param *score_param,
 			    struct ap_profile_params *ap_profile)
+{
+}
+
+static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
 {
 }
 #endif
@@ -4418,6 +4586,7 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 	wmi_owe_ap_profile *owe_ap_profile;
 	enum roam_trigger_reason trig_reason;
 	uint32_t *authmode_list;
+	wmi_ssid *ssid;
 	int i;
 
 	len = sizeof(wmi_roam_ap_profile_fixed_param) + sizeof(wmi_ap_profile);
@@ -4480,14 +4649,15 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 				ap_profile->profile.rsn_mcastmgmtcipherset;
 	profile->rssi_abs_thresh = ap_profile->profile.rssi_abs_thresh;
 
-	wmi_debug("vdev %d AP PROFILE: flags:%x rssi_thres:%d bg_rssi_thres:%d ssid:%.*s authmode:%d uc cipher:%d mc cipher:%d mc mgmt cipher:%d rssi abs thresh:%d",
-		 roam_ap_profile_fp->vdev_id,
-		 profile->flags, profile->rssi_threshold,
-		 profile->bg_rssi_threshold,
-		 profile->ssid.ssid_len, ap_profile->profile.ssid.ssid,
-		 profile->rsn_authmode, profile->rsn_ucastcipherset,
-		 profile->rsn_mcastcipherset, profile->rsn_mcastmgmtcipherset,
-		 profile->rssi_abs_thresh);
+	wmi_debug("vdev %d AP PROFILE: flags:%x rssi_thres:%d bg_rssi_thres:%d ssid:" QDF_SSID_FMT " authmode:%d uc cipher:%d mc cipher:%d mc mgmt cipher:%d rssi abs thresh:%d",
+		  roam_ap_profile_fp->vdev_id,
+		  profile->flags, profile->rssi_threshold,
+		  profile->bg_rssi_threshold,
+		  QDF_SSID_REF(profile->ssid.ssid_len,
+			       ap_profile->profile.ssid.ssid),
+		  profile->rsn_authmode, profile->rsn_ucastcipherset,
+		  profile->rsn_mcastcipherset, profile->rsn_mcastmgmtcipherset,
+		  profile->rssi_abs_thresh);
 
 	buf_ptr += sizeof(wmi_ap_profile);
 
@@ -4723,18 +4893,17 @@ send_roam_scan_offload_ap_profile_cmd_tlv(wmi_unified_t wmi_handle,
 		buf_ptr += WMI_TLV_HDR_SIZE;
 
 		owe_ap_profile = (wmi_owe_ap_profile *)buf_ptr;
+		ssid = &owe_ap_profile->open_ssid_for_owe_transition;
 		WMITLV_SET_HDR(&owe_ap_profile->tlv_header,
 			       WMITLV_TAG_STRUC_wmi_owe_ap_profile,
 			       WMITLV_GET_STRUCT_TLVLEN(wmi_owe_ap_profile));
 
-		owe_ap_profile->open_ssid_for_owe_transition.ssid_len =
-					ap_profile->owe_ap_profile.ssid.length;
-		qdf_mem_copy(owe_ap_profile->open_ssid_for_owe_transition.ssid,
+		ssid->ssid_len = ap_profile->owe_ap_profile.ssid.length;
+		qdf_mem_copy(ssid->ssid,
 			     ap_profile->owe_ap_profile.ssid.ssid,
 			     ap_profile->owe_ap_profile.ssid.length);
-		wmi_debug("[OWE_TRANSITION]: open ssid:%.*s",
-		      owe_ap_profile->open_ssid_for_owe_transition.ssid_len,
-		     (char *)owe_ap_profile->open_ssid_for_owe_transition.ssid);
+		wmi_debug("[OWE_TRANSITION]: open ssid:" QDF_SSID_FMT,
+			  QDF_SSID_REF(ssid->ssid_len, (char *)ssid->ssid));
 
 		buf_ptr += sizeof(*owe_ap_profile);
 	} else {
@@ -5189,7 +5358,7 @@ static QDF_STATUS send_btm_config_cmd_tlv(wmi_unified_t wmi_handle,
 /**
  * send_roam_bss_load_config_tlv() - send roam load bss trigger configuration
  * @wmi_handle: wmi handle
- * @parms: pointer to wlan_roam_bss_load_config
+ * @params: pointer to wlan_roam_bss_load_config
  *
  * This function sends the roam load bss trigger configuration to fw.
  * the bss_load_threshold parameter is used to configure the maximum
@@ -5499,11 +5668,11 @@ send_offload_11k_cmd_tlv(wmi_unified_t wmi_handle,
 		  params->neighbor_report_params.low_rssi_offset,
 		  params->neighbor_report_params.bmiss_count_trigger,
 		  params->neighbor_report_params.per_threshold_offset);
-	wmi_debug("RSO_CFG: neighbor_report_cache_timeout:%u max_neighbor_report_req_cap:%u SSID:%.*s",
+	wmi_debug("RSO_CFG: neighbor_report_cache_timeout:%u max_neighbor_report_req_cap:%u SSID:" QDF_SSID_FMT,
 		  params->neighbor_report_params.neighbor_report_cache_timeout,
 		  params->neighbor_report_params.max_neighbor_report_req_cap,
-		  params->neighbor_report_params.ssid.length,
-		  params->neighbor_report_params.ssid.ssid);
+		  QDF_SSID_REF(params->neighbor_report_params.ssid.length,
+			       params->neighbor_report_params.ssid.ssid));
 
 	wmi_mtrace(WMI_11K_OFFLOAD_REPORT_CMDID, cmd->vdev_id, 0);
 	status = wmi_unified_cmd_send(wmi_handle, buf, len,
@@ -5596,6 +5765,7 @@ void wmi_roam_attach_tlv(wmi_unified_t wmi_handle)
 	ops->send_roam_preauth_status = send_roam_preauth_status_tlv;
 	ops->extract_roam_event = extract_roam_event_tlv;
 
+	wmi_roam_mlo_attach_tlv(wmi_handle);
 	wmi_lfr_subnet_detection_attach_tlv(wmi_handle);
 	wmi_rssi_monitor_attach_tlv(wmi_handle);
 	wmi_ese_attach_tlv(wmi_handle);

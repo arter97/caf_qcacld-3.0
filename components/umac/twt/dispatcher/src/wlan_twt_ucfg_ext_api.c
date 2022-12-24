@@ -48,6 +48,12 @@ ucfg_twt_cfg_get_responder(struct wlan_objmgr_psoc *psoc, bool *val)
 }
 
 QDF_STATUS
+ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
+{
+	return wlan_twt_cfg_set_responder(psoc, val);
+}
+
+QDF_STATUS
 ucfg_twt_setup_req(struct wlan_objmgr_psoc *psoc,
 		   struct twt_add_dialog_param *params,
 		   void *context)
@@ -105,6 +111,11 @@ bool ucfg_twt_is_setup_in_progress(struct wlan_objmgr_psoc *psoc,
 				   uint8_t dialog_id)
 {
 	return wlan_twt_is_setup_in_progress(psoc, peer_mac, dialog_id);
+}
+
+bool ucfg_twt_cfg_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return wlan_twt_cfg_is_twt_enabled(psoc);
 }
 
 QDF_STATUS
@@ -203,10 +214,12 @@ bool ucfg_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
 
 void ucfg_twt_set_work_params(
 		struct wlan_objmgr_vdev *vdev,
-		struct twt_add_dialog_complete_event_param *params,
+		struct qdf_mac_addr *peer_mac,
+		uint8_t dialog_id,
 		uint32_t twt_next_action)
 {
-	return wlan_twt_set_work_params(vdev, params, twt_next_action);
+	return wlan_twt_set_work_params(vdev, peer_mac, dialog_id,
+					twt_next_action);
 }
 
 void ucfg_twt_get_work_params(

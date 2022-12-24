@@ -347,6 +347,10 @@ QDF_STATUS cm_fw_roam_abort_req(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id)
 		status = wlan_cm_roam_state_change(pdev, vdev_id,
 						   WLAN_ROAM_RSO_ENABLED,
 						   REASON_ROAM_ABORT);
+	else if (MLME_IS_MLO_ROAM_SYNCH_IN_PROGRESS(psoc, vdev_id))
+		status = wlan_cm_roam_state_change(pdev, vdev_id,
+						   WLAN_ROAM_DEINIT,
+						   REASON_ROAM_ABORT);
 
 	cm_abort_fw_roam(cm_ctx, cm_id);
 rel_ref:
@@ -416,13 +420,28 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 			sync_frame_ind->bcn_probe_rsp_len;
 		roam_synch_frame_ind->is_beacon =
 			sync_frame_ind->is_beacon;
+		if (roam_synch_frame_ind->bcn_probe_rsp)
+			qdf_mem_free(roam_synch_frame_ind->bcn_probe_rsp);
 		roam_synch_frame_ind->bcn_probe_rsp =
 			sync_frame_ind->bcn_probe_rsp;
+	}
+
+	if (sync_frame_ind->link_bcn_probe_rsp_len) {
+		roam_synch_frame_ind->link_bcn_probe_rsp_len =
+			sync_frame_ind->link_bcn_probe_rsp_len;
+		roam_synch_frame_ind->is_link_beacon =
+			sync_frame_ind->is_link_beacon;
+		if (roam_synch_frame_ind->link_bcn_probe_rsp)
+			qdf_mem_free(roam_synch_frame_ind->link_bcn_probe_rsp);
+		roam_synch_frame_ind->link_bcn_probe_rsp =
+			sync_frame_ind->link_bcn_probe_rsp;
 	}
 
 	if (sync_frame_ind->reassoc_req_len) {
 		roam_synch_frame_ind->reassoc_req_len =
 				sync_frame_ind->reassoc_req_len;
+		if (roam_synch_frame_ind->reassoc_req)
+			qdf_mem_free(roam_synch_frame_ind->reassoc_req);
 		roam_synch_frame_ind->reassoc_req =
 			sync_frame_ind->reassoc_req;
 	}
@@ -430,6 +449,8 @@ cm_roam_sync_frame_event_handler(struct wlan_objmgr_psoc *psoc,
 	if (sync_frame_ind->reassoc_rsp_len) {
 		roam_synch_frame_ind->reassoc_rsp_len =
 				sync_frame_ind->reassoc_rsp_len;
+		if (roam_synch_frame_ind->reassoc_rsp)
+			qdf_mem_free(roam_synch_frame_ind->reassoc_rsp);
 		roam_synch_frame_ind->reassoc_rsp =
 			sync_frame_ind->reassoc_rsp;
 	}
@@ -498,7 +519,18 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 	}
 
 	/* 24 byte MAC header and 12 byte to ssid IE */
-	if (sync_ind->beaconProbeRespLength >
+	if (wlan_vdev_mlme_is_mlo_link_vdev(vdev) &&
+	    sync_ind->link_beacon_probe_resp_length) {
+		if (sync_ind->link_beacon_probe_resp_length >
+		    (QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET)) {
+			ie_len = sync_ind->link_beacon_probe_resp_length -
+					(QDF_IEEE80211_3ADDR_HDR_LEN +
+					 MAC_B_PR_SSID_OFFSET);
+		} else {
+			mlme_err("LFR3: MLO: Invalid link Beacon Length");
+			goto err;
+		}
+	} else if (sync_ind->beaconProbeRespLength >
 			(QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET)) {
 		ie_len = sync_ind->beaconProbeRespLength -
 			(QDF_IEEE80211_3ADDR_HDR_LEN + MAC_B_PR_SSID_OFFSET);
@@ -524,16 +556,16 @@ QDF_STATUS cm_roam_sync_event_handler_cb(struct wlan_objmgr_vdev *vdev,
 	 * processing beacon. Any mismatch of this value with firmware phymode
 	 * results in firmware assert.
 	 */
-	cm_update_phymode_on_roam(sync_ind->roamed_vdev_id,
-				  sync_ind->bssid.bytes,
-				  &sync_ind->chan);
+	cm_update_phymode_on_roam(vdev_id,
+				  sync_ind);
 	cm_fw_roam_sync_propagation(psoc,
 				    vdev_id,
 				    sync_ind);
 
 err:
 	if (QDF_IS_STATUS_ERROR(status)) {
-		wlan_mlo_roam_abort_on_link(psoc, sync_ind);
+		wlan_mlo_roam_abort_on_link(psoc, event,
+					    sync_ind->roamed_vdev_id);
 		cm_fw_roam_abort_req(psoc, sync_ind->roamed_vdev_id);
 		cm_roam_stop_req(psoc, sync_ind->roamed_vdev_id,
 				 REASON_ROAM_SYNCH_FAILED,
@@ -591,8 +623,8 @@ cm_roam_candidate_event_handler(struct wlan_objmgr_psoc *psoc,
 							   ie_ptr, ie_len);
 	if (extracted_ie && extracted_ie[0] == WLAN_ELEMID_SSID &&
 	    extracted_ie[1] > MIN_IE_LEN) {
-		mlme_debug("SSID of the candidate is %.*s", extracted_ie[1],
-			   &extracted_ie[2]);
+		mlme_debug("SSID of the candidate is " QDF_SSID_FMT,
+			   QDF_SSID_REF(extracted_ie[1], &extracted_ie[2]));
 		wlan_cm_set_roam_offload_ssid(vdev, extracted_ie);
 	}
 

@@ -61,12 +61,6 @@
 #include <cdp_txrx_cmn.h>
 #include <lim_mlo.h>
 
-#ifdef FEATURE_WLAN_TDLS
-#define IS_TDLS_PEER(type)  ((type) == STA_ENTRY_TDLS_PEER)
-#else
-#define IS_TDLS_PEER(type) 0
-#endif
-
 /**
  * lim_cmp_ssid() - utility function to compare SSIDs
  * @rx_ssid: Received SSID
@@ -79,7 +73,10 @@
  */
 uint32_t lim_cmp_ssid(tSirMacSSid *rx_ssid, struct pe_session *session_entry)
 {
-	return qdf_mem_cmp(rx_ssid, &session_entry->ssId,
+	if (session_entry->ssId.length != rx_ssid->length)
+		return 1;
+
+	return qdf_mem_cmp(rx_ssid->ssId, &session_entry->ssId.ssId,
 				session_entry->ssId.length);
 }
 
@@ -1592,6 +1589,13 @@ static bool lim_check_valid_mcs_for_nss(struct pe_session *session,
 		mcs_count--;
 	} while (mcs_count);
 
+	if ((session->ch_width == CH_WIDTH_160MHZ ||
+	     lim_is_session_chwidth_320mhz(session)) &&
+	     !he_caps->chan_width_2) {
+		pe_err("session BW 160/320 MHz but peer BW less than 160 MHz");
+		return false;
+	}
+
 	return true;
 
 }
@@ -1866,7 +1870,7 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 					  tDot11fIEeht_cap *eht_caps)
 {
 	tSirMacRateSet temp_rate_set;
-	tSirMacRateSet temp_rate_set2;
+	tSirMacRateSet temp_rate_set2 = {0};
 	uint32_t i, j, val, min, is_arate;
 	uint32_t phy_mode;
 	uint8_t mcs_set[SIZE_OF_SUPPORTED_MCS_SET];
@@ -1890,8 +1894,6 @@ QDF_STATUS lim_populate_matching_rate_set(struct mac_context *mac_ctx,
 			     session_entry->extRateSet.numRates);
 		temp_rate_set2.numRates =
 			(uint8_t) session_entry->extRateSet.numRates;
-	} else {
-		temp_rate_set2.numRates = 0;
 	}
 
 	lim_remove_membership_selectors(&temp_rate_set);
@@ -2242,6 +2244,34 @@ static inline void
 lim_update_peer_twt_caps(tpAddStaParams add_sta_params,
 			     struct pe_session *session_entry)
 {}
+#endif
+
+#ifdef WLAN_FEATURE_SR
+/**
+ * lim_update_srp_ie() - Updates SRP IE to STA node
+ * @bp_rsp: pointer to probe response / beacon frame
+ * @sta_ds: STA Node
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS lim_update_srp_ie(tSirProbeRespBeacon *bp_rsp,
+				    tpDphHashNode sta_ds)
+{
+	QDF_STATUS status = QDF_STATUS_E_NOSUPPORT;
+
+	if (bp_rsp->srp_ie.present) {
+		sta_ds->parsed_ies.srp_ie = bp_rsp->srp_ie;
+		status = QDF_STATUS_SUCCESS;
+	}
+
+	return status;
+}
+#else
+static QDF_STATUS lim_update_srp_ie(tSirProbeRespBeacon *bp_rsp,
+				    tpDphHashNode sta_ds)
+{
+	return QDF_STATUS_SUCCESS;
+}
 #endif
 
 /**
@@ -2745,6 +2775,7 @@ lim_del_sta(struct mac_context *mac,
 	 * link peer before post WMA_DELETE_STA_REQ, which will free
 	 * wlan_objmgr_peer of the link peer
 	 */
+	lim_mlo_notify_peer_disconn(pe_session, sta);
 	lim_mlo_delete_link_peer(pe_session, sta);
 	/* Update PE session ID */
 	pDelStaParams->sessionId = pe_session->peSessionId;
@@ -3145,11 +3176,13 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 {
 	tSirMacSSid current_ssid;
 	tLimMlmJoinCnf mlm_join_cnf;
+	tpDphHashNode sta_ds = NULL;
 	uint32_t val;
 	uint32_t *noa_duration_from_beacon = NULL;
 	uint32_t *noa2_duration_from_beacon = NULL;
 	uint32_t noa;
 	uint32_t total_num_noa_desc = 0;
+	uint16_t aid;
 	bool check_assoc_disallowed;
 
 	qdf_mem_copy(current_ssid.ssId,
@@ -3308,6 +3341,17 @@ lim_check_and_announce_join_success(struct mac_context *mac_ctx,
 			qdf_mem_copy(&session_entry->hs20vendor_ie.hs_id,
 				&beacon_probe_rsp->hs20vendor_ie.hs_id,
 				sizeof(beacon_probe_rsp->hs20vendor_ie.hs_id));
+	}
+
+	sta_ds =  dph_lookup_hash_entry(mac_ctx, session_entry->self_mac_addr,
+					&aid,
+					&session_entry->dph.dphHashTable);
+
+	if (sta_ds && QDF_IS_STATUS_SUCCESS(lim_update_srp_ie(beacon_probe_rsp,
+							      sta_ds))) {
+		/* update the SR parameters */
+		lim_update_vdev_sr_elements(session_entry, sta_ds);
+		/* TODO: Need to send SRP IE update event to userspace */
 	}
 }
 
@@ -3703,7 +3747,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 	listen_interval = mac->mlme_cfg->sap_cfg.listen_interval;
 	pAddBssParams->staContext.listenInterval = listen_interval;
 
-	/* Fill Assoc id from the dph table */
+	/* Get STA hash entry from the dph table */
 	sta = dph_lookup_hash_entry(mac, pAddBssParams->staContext.bssId,
 				&pAddBssParams->staContext.assocId,
 				&pe_session->dph.dphHashTable);
@@ -3715,6 +3759,9 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 			qdf_mem_free(pAddBssParams);
 			return QDF_STATUS_E_FAILURE;
 	}
+
+	/* Update Assoc id from pe_session for STA */
+	pAddBssParams->staContext.assocId = pe_session->limAID;
 
 	pAddBssParams->staContext.uAPSD =
 		pe_session->gUapsdPerAcBitmask;
@@ -3896,6 +3943,7 @@ QDF_STATUS lim_sta_send_add_bss(struct mac_context *mac, tpSirAssocRsp pAssocRsp
 		}
 	}
 
+	lim_extract_per_link_id(pe_session, pAddBssParams, pAssocRsp);
 	lim_intersect_ap_emlsr_caps(mac, pe_session, pAddBssParams, pAssocRsp);
 	lim_extract_msd_caps(mac, pe_session, pAddBssParams, pAssocRsp);
 
@@ -4290,7 +4338,7 @@ QDF_STATUS lim_sta_send_add_bss_pre_assoc(struct mac_context *mac,
 					      pe_session, retCode);
 	qdf_mem_free(pAddBssParams);
 	/*
-	 * Set retCode sucess as lim_process_sta_add_bss_rsp_pre_assoc take
+	 * Set retCode success as lim_process_sta_add_bss_rsp_pre_assoc take
 	 * care of failure
 	 */
 	retCode = QDF_STATUS_SUCCESS;
@@ -4439,7 +4487,7 @@ void lim_init_pre_auth_timer_table(struct mac_context *mac,
 
 /** -------------------------------------------------------------
    \fn lim_acquire_free_pre_auth_node
-   \brief Retrives a free Pre Auth node from Pre Auth Table.
+   \brief Retrieves a free Pre Auth node from Pre Auth Table.
    \param     struct mac_context *   mac
    \param     tpLimPreAuthTable pPreAuthTimerTable
    \return none
@@ -4632,3 +4680,14 @@ void lim_extract_ies_from_deauth_disassoc(struct pe_session *session,
 	mlme_set_peer_disconnect_ies(session->vdev, &ie);
 }
 
+uint8_t *lim_get_src_addr_from_frame(struct element_info *frame)
+{
+	struct wlan_frame_hdr *hdr;
+
+	if (!frame || !frame->len || frame->len < WLAN_MAC_HDR_LEN_3A)
+		return NULL;
+
+	hdr = (struct wlan_frame_hdr *)frame->ptr;
+
+	return hdr->i_addr2;
+}

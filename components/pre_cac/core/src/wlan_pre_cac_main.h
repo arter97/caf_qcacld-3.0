@@ -77,9 +77,11 @@ struct pre_cac_vdev_priv {
 /**
  * struct pre_cac_psoc_priv - Private object to be stored in psoc
  * @pre_cac_work: pre cac work handler
+ * @pre_cac_vdev_id: pre cac vdev id
  */
 struct pre_cac_psoc_priv {
 	qdf_work_t pre_cac_work;
+	uint8_t pre_cac_vdev_id;
 };
 
 /**
@@ -158,8 +160,8 @@ pre_cac_psoc_get_priv_fl(struct wlan_objmgr_psoc *psoc,
  *
  * Return: pre_cac psoc private object
  */
-#define pre_cac_psoc_get_priv(vdev) \
-			      pre_cac_psoc_get_priv_fl(vdev, __func__, __LINE__)
+#define pre_cac_psoc_get_priv(psoc) \
+			      pre_cac_psoc_get_priv_fl(psoc, __func__, __LINE__)
 
 /**
  * pre_cac_init() - pre cac component initialization.
@@ -197,6 +199,14 @@ void pre_cac_set_osif_cb(struct pre_cac_ops *osif_pre_cac_ops);
  * Return: status of pre_cac
  */
 bool pre_cac_is_active(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * pre_cac_clear_work(): clear pre cac work fn and arg
+ * @psoc: psoc object manager
+ *
+ * Return: None
+ */
+void pre_cac_clear_work(struct wlan_objmgr_psoc *psoc);
 
 /**
  * pre_cac_validate_and_get_freq() - Validate and get pre cac frequency

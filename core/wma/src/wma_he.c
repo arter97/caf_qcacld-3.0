@@ -1272,7 +1272,8 @@ void wma_populate_peer_he_cap(struct peer_assoc_params *peer,
 			 WMA_MCS_12_13_MAP_L80) & WMA_MCS_12_13_PEER_RATE_MAP;
 	}
 
-	if (params->ch_width > CH_WIDTH_80MHZ) {
+	if (params->ch_width > CH_WIDTH_80MHZ ||
+	    IS_TDLS_PEER(params->staType)) {
 		peer->peer_he_mcs_count = WMI_HOST_MAX_HE_RATE_SET;
 		peer->peer_he_rx_mcs_set[1] |=
 			params->supportedRates.rx_he_mcs_map_160;

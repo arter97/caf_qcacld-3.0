@@ -399,6 +399,7 @@ struct pld_dev_mem_info {
 };
 
 #define PLD_MAX_TIMESTAMP_LEN 32
+#define PLD_WLFW_MAX_BUILD_ID_LEN 128
 #define PLD_MAX_DEV_MEM_NUM 4
 
 /**
@@ -427,6 +428,7 @@ struct pld_soc_info {
 	char fw_build_timestamp[PLD_MAX_TIMESTAMP_LEN + 1];
 	struct pld_device_version device_version;
 	struct pld_dev_mem_info dev_mem_info[PLD_MAX_DEV_MEM_NUM];
+	char fw_build_id[PLD_WLFW_MAX_BUILD_ID_LEN + 1];
 };
 
 /**
@@ -824,6 +826,16 @@ int pld_auto_resume(struct device *dev);
 int pld_force_wake_request(struct device *dev);
 
 /**
+ * pld_is_direct_link_supported() - Get whether direct_link is supported
+ *                                  by FW or not
+ * @dev: device
+ *
+ * Return: true if supported
+ *         false on failure or if not supported
+ */
+bool pld_is_direct_link_supported(struct device *dev);
+
+/**
  * pld_force_wake_request_sync() - Request to awake MHI synchronously
  * @dev: device
  * @timeout_us: timeout in micro-sec request to wake
@@ -854,8 +866,6 @@ int pld_get_mhi_state(struct device *dev);
 int pld_is_pci_ep_awake(struct device *dev);
 int pld_get_ce_id(struct device *dev, int irq);
 int pld_get_irq(struct device *dev, int ce_id);
-void pld_lock_pm_sem(struct device *dev);
-void pld_release_pm_sem(struct device *dev);
 void pld_lock_reg_window(struct device *dev, unsigned long *flags);
 void pld_unlock_reg_window(struct device *dev, unsigned long *flags);
 int pld_get_pci_slot(struct device *dev);
@@ -1250,4 +1260,47 @@ static inline bool pld_get_enable_intx(struct device *dev)
 	return false;
 }
 
+/**
+ * pld_is_one_msi()- whether one MSI is used or not
+ * @dev: device structure
+ *
+ * Return: true if it is one MSI
+ */
+bool pld_is_one_msi(struct device *dev);
+
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * pld_audio_smmu_map()- Map memory region into Audio SMMU CB
+ * @dev: pointer to device structure
+ * @paddr: physical address
+ * @iova: DMA address
+ * @size: memory region size
+ *
+ * Return: 0 on success else failure code
+ */
+int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
+		       size_t size);
+
+/**
+ * pld_audio_smmu_unmap()- Remove memory region mapping from Audio SMMU CB
+ * @dev: pointer to device structure
+ * @iova: DMA address
+ * @size: memory region size
+ *
+ * Return: None
+ */
+void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size);
+#else
+static inline
+int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
+		       size_t size)
+{
+	return 0;
+}
+
+static inline
+void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
+{
+}
+#endif
 #endif

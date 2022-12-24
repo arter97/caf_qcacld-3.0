@@ -1,24 +1,23 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * Permission to use, copy, modify, and/or distribute this software for
- * any purpose with or without fee is hereby granted, provided that the
- * above copyright notice and this permission notice appear in all
- * copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
- * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
- * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
- * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
  */
 
 #include <wlan_objmgr_pdev_obj.h>
-#include <dp_txrx.h>
+#include <wlan_dp_prealloc.h>
 #include <dp_types.h>
 #include <dp_internal.h>
 #include <cdp_txrx_cmn.h>
@@ -28,179 +27,9 @@
 #include <ce_api.h>
 #include <ce_internal.h>
 #include <wlan_cfg.h>
-
-/**
- * dp_rx_refill_thread_schedule() - Schedule rx refill thread
- * @soc: ol_txrx_soc_handle object
- *
- */
-#ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
-static void dp_rx_refill_thread_schedule(ol_txrx_soc_handle soc)
-{
-	struct dp_rx_refill_thread *rx_thread;
-	struct dp_txrx_handle *dp_ext_hdl;
-
-	if (!soc)
-		return;
-
-	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(soc);
-	if (!dp_ext_hdl)
-		return;
-
-	rx_thread = &dp_ext_hdl->refill_thread;
-	qdf_set_bit(RX_REFILL_POST_EVENT, &rx_thread->event_flag);
-	qdf_wake_up_interruptible(&rx_thread->wait_q);
-}
-#else
-static void dp_rx_refill_thread_schedule(ol_txrx_soc_handle soc)
-{
-}
-#endif
-
-/**
- * dp_get_rx_threads_num() - Get number of threads in use
- * @soc: ol_txrx_soc_handle object
- *
- * Return: number of threads
- */
-static uint8_t dp_get_rx_threads_num(ol_txrx_soc_handle soc)
-{
-	return cdp_get_num_rx_contexts(soc);
-}
-
-QDF_STATUS dp_txrx_init(ol_txrx_soc_handle soc, uint8_t pdev_id,
-			struct dp_txrx_config *config)
-{
-	struct dp_txrx_handle *dp_ext_hdl;
-	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
-	uint8_t num_dp_rx_threads;
-	struct dp_pdev *pdev;
-	struct dp_soc *dp_soc;
-
-	if (qdf_unlikely(!soc)) {
-		dp_err("soc is NULL");
-		return 0;
-	}
-
-	pdev = dp_get_pdev_from_soc_pdev_id_wifi3(cdp_soc_t_to_dp_soc(soc),
-						  pdev_id);
-	if (!pdev) {
-		dp_err("pdev is NULL");
-		return 0;
-	}
-
-	dp_ext_hdl = qdf_mem_malloc(sizeof(*dp_ext_hdl));
-	if (!dp_ext_hdl) {
-		QDF_ASSERT(0);
-		return QDF_STATUS_E_NOMEM;
-	}
-
-	dp_info("dp_txrx_handle allocated");
-	dp_ext_hdl->soc = soc;
-	dp_ext_hdl->pdev = dp_pdev_to_cdp_pdev(pdev);
-	cdp_soc_set_dp_txrx_handle(soc, dp_ext_hdl);
-	qdf_mem_copy(&dp_ext_hdl->config, config, sizeof(*config));
-	dp_ext_hdl->rx_tm_hdl.txrx_handle_cmn =
-				dp_txrx_get_cmn_hdl_frm_ext_hdl(dp_ext_hdl);
-
-	dp_soc = cdp_soc_t_to_dp_soc(soc);
-	if (wlan_cfg_is_rx_refill_buffer_pool_enabled(dp_soc->wlan_cfg_ctx)) {
-		dp_ext_hdl->refill_thread.soc = soc;
-		dp_ext_hdl->refill_thread.enabled = true;
-		qdf_status =
-			dp_rx_refill_thread_init(&dp_ext_hdl->refill_thread);
-		if (qdf_status != QDF_STATUS_SUCCESS) {
-			dp_err("Failed to initialize RX refill thread status:%d",
-			       qdf_status);
-			return qdf_status;
-		}
-		cdp_register_rx_refill_thread_sched_handler(soc,
-						dp_rx_refill_thread_schedule);
-	}
-
-	num_dp_rx_threads = dp_get_rx_threads_num(soc);
-	dp_info("%d RX threads in use", num_dp_rx_threads);
-
-	if (dp_ext_hdl->config.enable_rx_threads) {
-		qdf_status = dp_rx_tm_init(&dp_ext_hdl->rx_tm_hdl,
-					   num_dp_rx_threads);
-	}
-
-	return qdf_status;
-}
-
-QDF_STATUS dp_txrx_deinit(ol_txrx_soc_handle soc)
-{
-	struct dp_txrx_handle *dp_ext_hdl;
-	struct dp_soc *dp_soc;
-
-	if (!soc)
-		return QDF_STATUS_E_INVAL;
-
-	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(soc);
-	if (!dp_ext_hdl)
-		return QDF_STATUS_E_FAULT;
-
-	dp_soc = cdp_soc_t_to_dp_soc(soc);
-	if (wlan_cfg_is_rx_refill_buffer_pool_enabled(dp_soc->wlan_cfg_ctx)) {
-		dp_rx_refill_thread_deinit(&dp_ext_hdl->refill_thread);
-		dp_ext_hdl->refill_thread.soc = NULL;
-		dp_ext_hdl->refill_thread.enabled = false;
-	}
-
-	if (dp_ext_hdl->config.enable_rx_threads)
-		dp_rx_tm_deinit(&dp_ext_hdl->rx_tm_hdl);
-
-	qdf_mem_free(dp_ext_hdl);
-	dp_info("dp_txrx_handle_t de-allocated");
-
-	cdp_soc_set_dp_txrx_handle(soc, NULL);
-
-	return QDF_STATUS_SUCCESS;
-}
-
-/**
- * dp_rx_tm_get_pending() - get number of frame in thread
- * nbuf queue pending
- * @soc: ol_txrx_soc_handle object
- *
- * Return: number of frames
- */
-#ifdef FEATURE_WLAN_DP_RX_THREADS
-int dp_rx_tm_get_pending(ol_txrx_soc_handle soc)
-{
-	int i;
-	int num_pending = 0;
-	struct dp_rx_thread *rx_thread;
-	struct dp_txrx_handle *dp_ext_hdl;
-	struct dp_rx_tm_handle *rx_tm_hdl;
-
-	if (!soc)
-		return 0;
-
-	dp_ext_hdl = cdp_soc_get_dp_txrx_handle(soc);
-	if (!dp_ext_hdl)
-		return 0;
-
-	rx_tm_hdl = &dp_ext_hdl->rx_tm_hdl;
-
-	for (i = 0; i < rx_tm_hdl->num_dp_rx_threads; i++) {
-		rx_thread = rx_tm_hdl->rx_thread[i];
-		if (!rx_thread)
-			continue;
-		num_pending += qdf_nbuf_queue_head_qlen(&rx_thread->nbuf_queue);
-	}
-
-	if (num_pending)
-		dp_debug("pending frames in thread queue %d", num_pending);
-
-	return num_pending;
-}
-#else
-int dp_rx_tm_get_pending(ol_txrx_soc_handle soc)
-{
-	return 0;
-}
+#include "wlan_dp_prealloc.h"
+#ifdef WIFI_MONITOR_SUPPORT
+#include <dp_mon.h>
 #endif
 
 #ifdef DP_MEM_PRE_ALLOC
@@ -260,7 +89,7 @@ struct dp_consistent_prealloc {
  */
 struct dp_multi_page_prealloc {
 	enum dp_desc_type desc_type;
-	size_t element_size;
+	qdf_size_t element_size;
 	uint16_t element_num;
 	bool in_use;
 	bool cacheable;
@@ -312,6 +141,17 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 	 NULL},
 	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
 	 NULL},
+#ifdef CONFIG_BERYLLIUM
+	/* 4 extra Rx ring history */
+	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
+	 NULL},
+	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
+	 NULL},
+	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
+	 NULL},
+	{DP_RX_RING_HIST_TYPE, sizeof(struct dp_rx_history), false, false,
+	 NULL},
+#endif /* CONFIG_BERYLLIUM */
 	/* 1 Rx error ring history */
 	{DP_RX_ERR_RING_HIST_TYPE, sizeof(struct dp_rx_err_history),
 	 false, false, NULL},
@@ -325,69 +165,67 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 	false, false, NULL},
 #endif	/* WLAN_FEATURE_DP_RX_RING_HISTORY */
 #ifdef DP_TX_HW_DESC_HISTORY
-	/* 3 Slots */
 	{DP_TX_HW_DESC_HIST_TYPE,
-	 DP_TX_HW_DESC_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_hw_desc_evt),
-	 false, false, NULL},
+	DP_TX_HW_DESC_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_hw_desc_evt),
+	false, false, NULL},
 	{DP_TX_HW_DESC_HIST_TYPE,
-	 DP_TX_HW_DESC_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_hw_desc_evt),
-	 false, false, NULL},
+	DP_TX_HW_DESC_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_hw_desc_evt),
+	false, false, NULL},
 	{DP_TX_HW_DESC_HIST_TYPE,
-	 DP_TX_HW_DESC_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_hw_desc_evt),
-	 false, false, NULL},
+	DP_TX_HW_DESC_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_hw_desc_evt),
+	false, false, NULL},
 #endif
 #ifdef WLAN_FEATURE_DP_TX_DESC_HISTORY
-	/* 8 Slots */
 	{DP_TX_TCL_HIST_TYPE,
-	 DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_TCL_HIST_TYPE,
-	 DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_TCL_HIST_TYPE,
-	 DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_TCL_HIST_TYPE,
-	 DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_TCL_HIST_TYPE,
-	 DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_TCL_HIST_TYPE,
-	 DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_TCL_HIST_TYPE,
-	 DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_TCL_HIST_TYPE,
-	 DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_TCL_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 
-	/* 8 Slots */
 	{DP_TX_COMP_HIST_TYPE,
-	 DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_COMP_HIST_TYPE,
-	 DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_COMP_HIST_TYPE,
-	 DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_COMP_HIST_TYPE,
-	 DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_COMP_HIST_TYPE,
-	 DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_COMP_HIST_TYPE,
-	 DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_COMP_HIST_TYPE,
-	 DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
 	{DP_TX_COMP_HIST_TYPE,
-	 DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
-	 false, false, NULL},
+	DP_TX_COMP_HIST_PER_SLOT_MAX * sizeof(struct dp_tx_desc_event),
+	false, false, NULL},
+
 #endif	/* WLAN_FEATURE_DP_TX_DESC_HISTORY */
 #ifdef WLAN_SUPPORT_RX_FISA
 	{DP_FISA_RX_FT_TYPE, sizeof(struct dp_fisa_rx_sw_ft) * FISA_RX_FT_SIZE,
@@ -397,18 +235,30 @@ static struct dp_prealloc_context g_dp_context_allocs[] = {
 	{DP_MON_STATUS_BUF_HIST_TYPE, sizeof(struct dp_mon_status_ring_history),
 	 false, false, NULL},
 #endif
+#ifdef WIFI_MONITOR_SUPPORT
+	{DP_MON_PDEV_TYPE, sizeof(struct dp_mon_pdev),
+	 false, false, NULL},
+#endif
 };
 
 static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
-	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
-	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
-	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
-	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
 #ifdef CONFIG_BERYLLIUM
-	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
-	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
-	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
-	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0, NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
+	{REO_DST, (sizeof(struct reo_destination_ring)) * REO_DST_RING_SIZE, 0,
+	NULL, NULL, 0, 0},
 #endif
 	/* 3 TCL data rings */
 	{TCL_DATA, 0, 0, NULL, NULL, 0, 0},
@@ -422,14 +272,23 @@ static struct  dp_consistent_prealloc g_dp_consistent_allocs[] = {
 	/* SW2WBM link descriptor return ring */
 	{SW2WBM_RELEASE, 0, 0, NULL, 0, 0},
 	/* 1 WBM idle link desc ring */
-	{WBM_IDLE_LINK, (sizeof(struct wbm_link_descriptor_ring)) * WBM_IDLE_LINK_RING_SIZE, 0, NULL, NULL, 0, 0},
+	{WBM_IDLE_LINK, (sizeof(struct wbm_link_descriptor_ring)) *
+	WBM_IDLE_LINK_RING_SIZE, 0, NULL, NULL, 0, 0},
 	/* 2 RXDMA DST ERR rings */
 	{RXDMA_DST, 0, 0, NULL, NULL, 0, 0},
 	{RXDMA_DST, 0, 0, NULL, NULL, 0, 0},
 	/* REFILL ring 0 */
-	{RXDMA_BUF, (sizeof(struct wbm_buffer_ring)) * WLAN_CFG_RXDMA_REFILL_RING_SIZE, 0, NULL, NULL, 0, 0},
+	{RXDMA_BUF, 0, 0, NULL, NULL, 0, 0},
+	/* 2 RXDMA buffer rings */
+	{RXDMA_BUF, 0, 0, NULL, NULL, 0, 0},
+	{RXDMA_BUF, 0, 0, NULL, NULL, 0, 0},
 	/* REO Exception ring */
 	{REO_EXCEPTION, 0, 0, NULL, NULL, 0, 0},
+	/* 1 REO status ring */
+	{REO_STATUS, 0, 0, NULL, NULL, 0, 0},
+	/* 2 monitor status rings */
+	{RXDMA_MONITOR_STATUS, 0, 0, NULL, NULL, 0, 0},
+	{RXDMA_MONITOR_STATUS, 0, 0, NULL, NULL, 0, 0},
 };
 
 /* Number of HW link descriptors needed (rounded to power of 2) */
@@ -495,7 +354,8 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 
 	/* DP RX DESCs BUF pools */
 	{DP_RX_DESC_BUF_TYPE, sizeof(union dp_rx_desc_list_elem_t),
-	 WLAN_CFG_RX_SW_DESC_WEIGHT_SIZE * WLAN_CFG_RXDMA_REFILL_RING_SIZE, 0, CACHEABLE, { 0 } },
+	 WLAN_CFG_RX_SW_DESC_WEIGHT_SIZE * WLAN_CFG_RXDMA_REFILL_RING_SIZE, 0,
+	 CACHEABLE, { 0 } },
 
 #ifdef DISABLE_MON_CONFIG
 	/* no op */
@@ -507,7 +367,8 @@ static struct  dp_multi_page_prealloc g_dp_multi_page_allocs[] = {
 	 WLAN_CFG_RXDMA_MONITOR_STATUS_RING_SIZE + 1, 0, CACHEABLE, { 0 } },
 #endif
 	/* DP HW Link DESCs pools */
-	{DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0, NON_CACHEABLE, { 0 } },
+	{DP_HW_LINK_DESC_TYPE, HW_LINK_DESC_SIZE, NUM_HW_LINK_DESCS, 0,
+	NON_CACHEABLE, { 0 } },
 #ifdef CONFIG_BERYLLIUM
 	{DP_HW_CC_SPT_PAGE_TYPE, qdf_page_size,
 	 ((DP_TX_RX_DESC_MAX_NUM * sizeof(uint64_t)) / qdf_page_size),
@@ -681,6 +542,23 @@ dp_update_mem_size_by_ring_type(struct wlan_dp_prealloc_cfg *cfg,
 		*mem_size = (sizeof(struct reo_destination_ring)) *
 			    cfg->num_reo_exception_ring_entries;
 		return;
+	case REO_DST:
+		*mem_size = (sizeof(struct reo_destination_ring)) *
+			    cfg->num_reo_dst_ring_entries;
+		return;
+	case RXDMA_BUF:
+		*mem_size = (sizeof(struct wbm_buffer_ring)) *
+			    cfg->num_rxdma_refill_ring_entries;
+		return;
+	case REO_STATUS:
+		*mem_size = (sizeof(struct tlv_32_hdr) +
+			     sizeof(struct reo_get_queue_stats_status)) *
+			    cfg->num_reo_status_ring_entries;
+		return;
+	case RXDMA_MONITOR_STATUS:
+		*mem_size = (sizeof(struct wbm_buffer_ring)) *
+			    cfg->num_mon_status_ring_entries;
+		return;
 	default:
 		return;
 	}
@@ -836,7 +714,7 @@ deinit:
 	return QDF_STATUS_E_FAILURE;
 }
 
-void *dp_prealloc_get_context_memory(uint32_t ctxt_type, size_t ctxt_size)
+void *dp_prealloc_get_context_memory(uint32_t ctxt_type, qdf_size_t ctxt_size)
 {
 	int i;
 	struct dp_prealloc_context *cp;
@@ -930,7 +808,7 @@ void dp_prealloc_put_coherent(qdf_size_t size, void *vaddr_unligned,
 }
 
 void dp_prealloc_get_multi_pages(uint32_t desc_type,
-				 size_t element_size,
+				 qdf_size_t element_size,
 				 uint16_t element_num,
 				 struct qdf_mem_multi_page_t *pages,
 				 bool cacheable)
@@ -947,8 +825,7 @@ void dp_prealloc_get_multi_pages(uint32_t desc_type,
 			mp->in_use = true;
 			*pages = mp->pages;
 
-			dp_info("i %d: desc_type %d cacheable_pages %pK"
-				"dma_pages %pK num_pages %d",
+			dp_info("i %d: desc_type %d cacheable_pages %pK dma_pages %pK num_pages %d",
 				i, desc_type,
 				mp->pages.cacheable_pages,
 				mp->pages.dma_pages,
@@ -994,7 +871,7 @@ void dp_prealloc_put_multi_pages(uint32_t desc_type,
 			pages->dma_pages);
 }
 
-void *dp_prealloc_get_consistent_mem_unaligned(size_t size,
+void *dp_prealloc_get_consistent_mem_unaligned(qdf_size_t size,
 					       qdf_dma_addr_t *base_addr,
 					       uint32_t ring_type)
 {

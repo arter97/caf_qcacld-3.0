@@ -102,7 +102,7 @@
 #define WLAN_FILS_MAX_RIK_LENGTH WLAN_FILS_MAX_RRK_LENGTH
 #define WLAN_FILS_FT_MAX_LEN          48
 
-#define WLAN_MAX_PMK_DUMP_BYTES 6
+#define WLAN_MAX_PMK_DUMP_BYTES 2
 #define DEFAULT_ROAM_SCAN_SCHEME_BITMAP 0
 #define ROAM_MAX_CFG_VALUE 0xffffffff
 
@@ -130,7 +130,6 @@
 #define ROAM_REASON_MASK 0x0F
 
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-#define ROAM_SCAN_PSK_SIZE    48
 #define ROAM_R0KH_ID_MAX_LEN  48
 /* connected but not authenticated */
 #define ROAM_AUTH_STATUS_CONNECTED      0x1
@@ -308,6 +307,7 @@ struct rso_cfg_params {
 	uint32_t full_roam_scan_period;
 	bool enable_scoring_for_roam;
 	uint8_t roam_rssi_diff;
+	uint8_t roam_rssi_diff_6ghz;
 	uint8_t bg_rssi_threshold;
 	uint16_t roam_scan_home_away_time;
 	uint8_t roam_scan_n_probes;
@@ -440,6 +440,9 @@ struct roam_synch_frame_ind {
 	uint32_t bcn_probe_rsp_len;
 	uint8_t *bcn_probe_rsp;
 	uint8_t is_beacon;
+	uint32_t link_bcn_probe_rsp_len;
+	uint8_t *link_bcn_probe_rsp;
+	uint8_t is_link_beacon;
 	uint32_t reassoc_req_len;
 	uint8_t *reassoc_req;
 	uint32_t reassoc_rsp_len;
@@ -486,7 +489,7 @@ struct owe_transition_mode_info {
  * ROAM_TRIGGER_REASON_PER, ROAM_TRIGGER_REASON_BMISS
  * @cfg_param: per vdev config params
  * @assoc_ie: assoc IE
- * @prev_ap_bcn_ie: last connetced AP ie
+ * @prev_ap_bcn_ie: last connected AP ie
  * @occupied_chan_lst: occupied channel list
  * @roam_candidate_count: candidate count
  * @is_ese_assoc: is ese assoc
@@ -538,7 +541,7 @@ struct rso_config {
 #endif
 #endif
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
-	uint8_t psk_pmk[ROAM_SCAN_PSK_SIZE];
+	uint8_t psk_pmk[MAX_PMK_LEN];
 	uint8_t pmk_len;
 #endif
 	struct owe_transition_mode_info owe_info;
@@ -575,7 +578,7 @@ enum sta_roam_policy_dfs_mode {
  * struct rso_roam_policy_params - sta roam policy params for station
  * @dfs_mode: tell is DFS channels needs to be skipped while scanning
  * @skip_unsafe_channels: tells if unsafe channels needs to be skip in scanning
- * @sap_operating_band: Opearting band for SAP
+ * @sap_operating_band: Operating band for SAP
  */
 struct rso_roam_policy_params {
 	enum sta_roam_policy_dfs_mode dfs_mode;
@@ -644,7 +647,7 @@ struct rso_config_params {
  * @NEIGHBOR_SCAN_PERIOD: neighbour scan period
  * @ROAM_CONFIG_ENABLE: Roam config enable
  * @ROAM_PREFERRED_CHAN: preferred channel list
- * @ROAM_SPECIFIC_CHAN: spedific channel list
+ * @ROAM_SPECIFIC_CHAN: specific channel list
  * @ROAM_RSSI_DIFF: rssi diff
  * @NEIGHBOUR_LOOKUP_THRESHOLD: lookup threshold
  * @SCAN_N_PROBE: scan n probe
@@ -659,6 +662,7 @@ struct rso_config_params {
  * @MBO_OCE_ENABLED_AP: MBO/OCE enabled network
  * @LOST_LINK_RSSI: lost link RSSI
  * @ROAM_BAND: Allowed band for roaming in FW
+ * @ROAM_RSSI_DIFF_6GHZ: roam rssi diff for 6 GHz AP
  */
 enum roam_cfg_param {
 	RSSI_CHANGE_THRESHOLD,
@@ -689,11 +693,12 @@ enum roam_cfg_param {
 	LOST_LINK_RSSI,
 	ROAM_BAND,
 	HI_RSSI_SCAN_RSSI_DELTA,
+	ROAM_RSSI_DIFF_6GHZ,
 };
 
 /**
  * enum roam_offload_init_flags  - Flags sent in Roam offload initialization.
- * @WLAN_ROAM_FW_OFFLOAD_ENABLE: Init roaming module at firwmare
+ * @WLAN_ROAM_FW_OFFLOAD_ENABLE: Init roaming module at firmware
  * @WLAN_ROAM_BMISS_FINAL_SCAN_ENABLE: Enable partial scan after final beacon
  * miss event at firmware
  * @WLAN_ROAM_SKIP_EAPOL_4WAY_HANDSHAKE: Disable 4 Way-HS offload to firmware
@@ -753,8 +758,8 @@ struct wlan_cm_roam_vendor_btm_params {
  * struct ap_profile - Structure ap profile to match candidate
  * @flags: flags
  * @rssi_threshold: the value of the the candidate AP should higher by this
- *                  threshold than the rssi of the currrently associated AP
- * @ssid: ssid vlaue to be matched
+ *                  threshold than the rssi of the currently associated AP
+ * @ssid: ssid value to be matched
  * @rsn_authmode: security params to be matched
  * @rsn_ucastcipherset: unicast cipher set
  * @rsn_mcastcipherset: mcast/group cipher set
@@ -1314,11 +1319,11 @@ struct wlan_roam_fils_params {
  * one VDEV is active
  * @max_rest_time: max rest time in msec on the BSS channel,only valid if
  * at least one VDEV is active
- * @probe_spacing_time: time in msec between 2 consequetive probe requests with
+ * @probe_spacing_time: time in msec between 2 consecutive probe requests with
  * in a set
  * @probe_delay: delay in msec before sending first probe request after
  * switching to a channel
- * @repeat_probe_time: time in msec between 2 consequetive probe requests within
+ * @repeat_probe_time: time in msec between 2 consecutive probe requests within
  * a set
  * @max_scan_time: maximum time in msec allowed for scan
  * @idle_time: data inactivity time in msec on bss channel that will be used by
@@ -1451,7 +1456,7 @@ struct wlan_rso_11i_params {
 	bool fw_okc;
 	bool fw_pmksa_cache;
 	bool is_sae_same_pmk;
-	uint8_t psk_pmk[WMI_ROAM_SCAN_PSK_SIZE];
+	uint8_t psk_pmk[MAX_PMK_LEN];
 	uint8_t pmk_len;
 };
 
@@ -1469,7 +1474,7 @@ struct wlan_rso_11r_params {
 	bool is_11r_assoc;
 	bool is_adaptive_11r;
 	bool enable_ft_im_roaming;
-	uint8_t psk_pmk[WMI_ROAM_SCAN_PSK_SIZE];
+	uint8_t psk_pmk[MAX_PMK_LEN];
 	uint8_t pmk_len;
 	uint32_t r0kh_id_length;
 	uint8_t r0kh_id[WMI_ROAM_R0KH_ID_MAX_LEN];
@@ -1735,6 +1740,25 @@ enum roam_rt_stats_params {
 	ROAM_RT_STATS_SUSPEND_MODE_ENABLE,
 };
 
+/*
+ * struct wlan_roam_mlo_config - Roam MLO config parameters
+ * @vdev_id: VDEV id
+ * @partner_link_addr: Assigned link address which can be used as self
+ *  link addr when vdev is not created
+ * @support_link_num: Configure max number of link mlo connection supports.
+ *  Invalid value or 0 will use max supported value by fw.
+ * @support_link_band: Configure the band bitmap of mlo connection supports
+ *  Bit 0: 2G band support if 1
+ *  Bit 1: 5G band support if 1
+ *  Bit 2: 6G band support if 1
+ */
+struct wlan_roam_mlo_config {
+	uint8_t vdev_id;
+	struct qdf_mac_addr partner_link_addr;
+	uint32_t support_link_num;
+	uint32_t support_link_band;
+};
+
 /**
  * struct wlan_roam_start_config - structure containing parameters for
  * roam start config
@@ -1755,6 +1779,14 @@ enum roam_rt_stats_params {
  * @disconnect_params: disconnect params
  * @idle_params: idle params
  * @wlan_roam_rt_stats_config: roam events stats config
+ * @roam_mlo_params: roam mlo config params
+ * @wlan_roam_ho_delay_config: roam HO delay value
+ * @wlan_exclude_rm_partial_scan_freq: Include/exclude the channels in roam full
+ * scan that are already scanned as part of partial scan.
+ * @wlan_roam_full_scan_6ghz_on_disc: Include the 6 GHz channels in roam full
+ * scan only on prior discovery of any 6 GHz support in the environment.
+ * @wlan_roam_rssi_diff_6ghz: This value is used as to how better the RSSI of
+ * the new/roamable 6GHz AP should be for roaming.
  */
 struct wlan_roam_start_config {
 	struct wlan_roam_offload_scan_rssi_params rssi_params;
@@ -1775,6 +1807,11 @@ struct wlan_roam_start_config {
 	struct wlan_roam_disconnect_params disconnect_params;
 	struct wlan_roam_idle_params idle_params;
 	uint8_t wlan_roam_rt_stats_config;
+	struct wlan_roam_mlo_config roam_mlo_params;
+	uint16_t wlan_roam_ho_delay_config;
+	uint8_t wlan_exclude_rm_partial_scan_freq;
+	uint8_t wlan_roam_full_scan_6ghz_on_disc;
+	uint8_t wlan_roam_rssi_diff_6ghz;
 	/* other wmi cmd structures */
 };
 
@@ -1825,6 +1862,13 @@ struct wlan_roam_stop_config {
  * @idle_params: idle params
  * @roam_triggers: roam triggers parameters
  * @wlan_roam_rt_stats_config: roam events stats config
+ * @wlan_roam_ho_delay_config: roam HO delay value
+ * @wlan_exclude_rm_partial_scan_freq: Include/exclude the channels in roam full
+ * scan that are already scanned as part of partial scan.
+ * @wlan_roam_full_scan_6ghz_on_disc: Include the 6 GHz channels in roam full
+ * scan only on prior discovery of any 6 GHz support in the environment.
+ * @wlan_roam_rssi_diff_6ghz: This value is used as to how better the RSSI of
+ * the new/roamable 6GHz AP should be for roaming.
  */
 struct wlan_roam_update_config {
 	struct wlan_roam_beacon_miss_cnt beacon_miss_cnt;
@@ -1840,6 +1884,10 @@ struct wlan_roam_update_config {
 	struct wlan_roam_idle_params idle_params;
 	struct wlan_roam_triggers roam_triggers;
 	uint8_t wlan_roam_rt_stats_config;
+	uint16_t wlan_roam_ho_delay_config;
+	uint8_t wlan_exclude_rm_partial_scan_freq;
+	uint8_t wlan_roam_full_scan_6ghz_on_disc;
+	uint8_t wlan_roam_rssi_diff_6ghz;
 };
 
 #if defined(WLAN_FEATURE_HOST_ROAM) || defined(WLAN_FEATURE_ROAM_OFFLOAD)
@@ -1897,8 +1945,8 @@ struct roam_btm_response_data {
  *  struct roam_initial_data - Roam initial related data
  *  @present:                Flag to check if the roam btm_rsp tlv is present
  *  @roam_full_scan_count:   Roam full scan count
- *  @rssi_th:                RSSI threhold
- *  @cu_th:                  Channel utilization threhold
+ *  @rssi_th:                RSSI threshold
+ *  @cu_th:                  Channel utilization threshold
  *  @fw_cancel_timer_bitmap: FW timers, which are getting cancelled
  */
 struct roam_initial_data {
@@ -2031,7 +2079,7 @@ struct set_pcl_req {
  * @target_bssid: target mac address
  * @ch_freq: channel frequency
  * @frame_len: frame length, includs mac header, fixed params and ies
- * @frame_buf: buffer contaning probe response or beacon
+ * @frame_buf: buffer containing probe response or beacon
  * @is_same_bssid: flag to indicate if roaming is requested for same bssid
  * @forced_roaming: Roam to any bssid in any ch (here bssid & ch is not given)
  */
@@ -2275,11 +2323,13 @@ struct roam_stats_event {
 /*
  * struct auth_offload_event - offload data carried by roam event
  * @vdev_id: vdev id
- * @ap_bssid: SAE authentication offload MAC Addess
+ * @ap_bssid: SAE authentication offload AP MAC Address
+ * @ta: SAE authentication offload Tx MAC Address
  */
 struct auth_offload_event {
 	uint8_t vdev_id;
 	struct qdf_mac_addr ap_bssid;
+	struct qdf_mac_addr ta;
 };
 
 /*
@@ -2308,6 +2358,11 @@ struct roam_pmkid_req_event {
  * @send_roam_abort: send roam abort
  * @send_roam_disable_config: send roam disable config
  * @send_roam_rt_stats_config: Send roam events vendor command param value to FW
+ * @send_roam_ho_delay_config: Send roam Hand-off delay value to FW
+ * @send_exclude_rm_partial_scan_freq: Include/exclude the channels in roam full
+ * scan that are already scanned as part of partial scan.
+ * @send_roam_full_scan_6ghz_on_disc: Include the 6 GHz channels in roam full
+ * scan only on prior discovery of any 6 GHz support in the environment.
  * @send_roam_linkspeed_state: Send roam link speed good/poor state to FW
  * @send_roam_vendor_handoff_config: send vendor handoff config command to FW
  */
@@ -2340,6 +2395,17 @@ struct wlan_cm_roam_tx_ops {
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	QDF_STATUS (*send_roam_rt_stats_config)(struct wlan_objmgr_vdev *vdev,
 						uint8_t vdev_id, uint8_t value);
+	QDF_STATUS (*send_roam_ho_delay_config)(struct wlan_objmgr_vdev *vdev,
+						uint8_t vdev_id,
+						uint16_t value);
+	QDF_STATUS (*send_exclude_rm_partial_scan_freq)(
+						struct wlan_objmgr_vdev *vdev,
+						uint8_t value);
+	QDF_STATUS (*send_roam_full_scan_6ghz_on_disc)(
+						struct wlan_objmgr_vdev *vdev,
+						uint8_t value);
+	QDF_STATUS (*send_roam_mcc_disallow)(struct wlan_objmgr_vdev *vdev,
+					     uint8_t vdev_id, uint8_t value);
 #ifdef FEATURE_RX_LINKSPEED_ROAM_TRIGGER
 	QDF_STATUS (*send_roam_linkspeed_state)(struct wlan_objmgr_vdev *vdev,
 						uint8_t vdev_id, bool value);
@@ -2349,6 +2415,10 @@ struct wlan_cm_roam_tx_ops {
 	QDF_STATUS (*send_roam_vendor_handoff_config)(
 					struct wlan_objmgr_vdev *vdev,
 					uint8_t vdev_id, uint32_t param_id);
+#endif
+#ifdef WLAN_FEATURE_11BE_MLO
+	QDF_STATUS (*send_roam_mlo_config)(struct wlan_objmgr_vdev *vdev,
+					   struct wlan_roam_mlo_config *req);
 #endif
 };
 
@@ -2373,7 +2443,7 @@ enum roam_scan_freq_scheme {
  * struct wlan_cm_vendor_handoff_param - vendor handoff configuration
  * structure
  * @vendor_handoff_context_cb: vendor handoff context
- * @req_in_progress: to check whether vendor handoff reqest in progress or not
+ * @req_in_progress: to check whether vendor handoff request in progress or not
  */
 struct wlan_cm_vendor_handoff_param {
 	void *vendor_handoff_context;
@@ -2423,7 +2493,7 @@ struct cm_roam_values_copy {
 #define MAX_PN_LEN 8
 #define MAX_KEY_LEN 32
 
-/* MAX_FREQ_RANGE_NUM shouldn't exceed as only in case od SBS there will be 3
+/* MAX_FREQ_RANGE_NUM shouldn't exceed as only in case of SBS there will be 3
  * frequency ranges, For DBS, it will be 2. For SMM, it will be 1
  */
 #define MAX_FREQ_RANGE_NUM 3
@@ -2561,6 +2631,9 @@ struct roam_offload_synch_ind {
 	uint8_t is_assoc;
 	enum wlan_phymode phy_mode; /*phy mode sent by fw */
 	wmi_channel chan;
+	uint16_t link_beacon_probe_resp_offset;
+	uint16_t link_beacon_probe_resp_length;
+	uint8_t is_link_beacon;
 #ifdef WLAN_FEATURE_11BE_MLO
 	uint8_t num_setup_links;
 	struct ml_setup_link_param ml_link[WLAN_UMAC_MLO_MAX_VDEVS];

@@ -35,6 +35,7 @@
 #include "cfg_nan.h"
 #include "wlan_mlme_api.h"
 #include "cfg_nan_api.h"
+#include "wlan_tdls_ucfg_api.h"
 
 struct wlan_objmgr_psoc;
 struct wlan_objmgr_vdev;
@@ -593,6 +594,21 @@ static void ucfg_nan_request_process_cb(void *cookie)
 	}
 }
 
+#ifdef WLAN_FEATURE_SR
+static void
+nan_register_sr_concurrency_callback(struct nan_psoc_priv_obj *psoc_obj,
+				     struct nan_callbacks *cb_obj)
+{
+	psoc_obj->cb_obj.nan_sr_concurrency_update =
+				cb_obj->nan_sr_concurrency_update;
+}
+#else
+static inline void
+nan_register_sr_concurrency_callback(struct nan_psoc_priv_obj *psoc_obj,
+				     struct nan_callbacks *cb_obj)
+{}
+#endif
+
 int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				    struct nan_callbacks *cb_obj)
 {
@@ -623,7 +639,7 @@ int ucfg_nan_register_hdd_callbacks(struct wlan_objmgr_psoc *psoc,
 				ucfg_nan_request_process_cb;
 	psoc_obj->cb_obj.nan_concurrency_update =
 				cb_obj->nan_concurrency_update;
-
+	nan_register_sr_concurrency_callback(psoc_obj, cb_obj);
 	return 0;
 }
 
@@ -734,7 +750,8 @@ QDF_STATUS ucfg_nan_discovery_req(void *in_req, uint32_t req_type)
 		.priv_size = 0,
 		.timeout_ms = 4000,
 	};
-	int err;
+	int err = 0;
+	bool recovery;
 
 	if (!in_req) {
 		nan_alert("NAN Discovery req is null");
@@ -869,16 +886,26 @@ post_msg:
 	}
 
 	if (req_type != NAN_GENERIC_REQ) {
-		err = osif_request_wait_for_response(request);
-		if (err) {
-			nan_debug("NAN request: %u timed out: %d",
-				  req_type, err);
+		recovery = cds_is_driver_recovering();
+		if (!recovery)
+			err = osif_request_wait_for_response(request);
+		if (recovery || err) {
+			nan_debug("NAN request: %u recovery %d or timed out %d",
+				  req_type, recovery, err);
 
 			if (req_type == NAN_ENABLE_REQ) {
 				nan_set_discovery_state(psoc,
 							NAN_DISC_DISABLED);
-				policy_mgr_check_n_start_opportunistic_timer(
-									psoc);
+				if (ucfg_is_nan_dbs_supported(psoc))
+					policy_mgr_check_n_start_opportunistic_timer(psoc);
+
+				/*
+				 * If FW respond with NAN enable failure, then
+				 * TDLS should be enable again if there is TDLS
+				 * connection exist earlier.
+				 * decrement the active TDLS session.
+				 */
+				ucfg_tdls_notify_connect_failure(psoc);
 			} else if (req_type == NAN_DISABLE_REQ) {
 				nan_disable_cleanup(psoc);
 			}

@@ -31,7 +31,7 @@
 #include <cdp_txrx_peer_ops.h>
 #include <cdp_txrx_misc.h>
 #include <cdp_txrx_flow_ctrl_v2.h>
-#include "dp_txrx.h"
+#include "wlan_dp_rx_thread.h"
 #include "nan_public_structs.h"
 #include "nan_ucfg_api.h"
 #include <wlan_cm_ucfg_api.h>
@@ -48,7 +48,7 @@
 
 /* Type declarations */
 
-/* Function definitions and documenation */
+/* Function definitions and documentation */
 #ifdef QCA_DP_SAP_DUMP_SK_BUFF
 /**
  * dp_softap_dump_nbuf() - Dump an nbuf
@@ -207,8 +207,8 @@ void dp_softap_check_wait_for_tx_eap_pkt(struct wlan_dp_intf *dp_intf,
 /**
  * dp_post_dhcp_ind() - Send DHCP START/STOP indication to FW
  * @dp_intf: pointer to DP interface
- * @sta_id: peer station ID
- * @type: WMA message type
+ * @mac_addr: mac address
+ * @dhcp_start: dhcp start
  *
  * Return: error number
  */
@@ -216,7 +216,7 @@ int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf, uint8_t *mac_addr,
 		     bool dhcp_start)
 {
 	struct dp_dhcp_ind msg;
-	struct wlan_dp_psoc_sb_ops *sb_ops = &dp_intf->dp_ctx->sb_ops;
+	struct wlan_dp_psoc_sb_ops *sb_ops;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	dp_info("Post DHCP indication,sta_mac=" QDF_MAC_ADDR_FMT
@@ -227,6 +227,7 @@ int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf, uint8_t *mac_addr,
 		return QDF_STATUS_E_INVAL;
 	}
 
+	sb_ops = &dp_intf->dp_ctx->sb_ops;
 	msg.dhcp_start = dhcp_start;
 	msg.device_mode = dp_intf->device_mode;
 	qdf_mem_copy(msg.intf_mac_addr.bytes,
@@ -249,8 +250,8 @@ int dp_post_dhcp_ind(struct wlan_dp_intf *dp_intf, uint8_t *mac_addr,
 
 /**
  * dp_softap_notify_dhcp_ind() - Notify SAP for DHCP indication for tx desc
- * @context: pointer to DP interface context
- * @netbuf: pointer to OS packet (sk_buff)
+ * @intf_context: pointer to DP interface context
+ * @nbuf: pointer to OS packet (sk_buff)
  *
  * Return: None
  */
@@ -609,6 +610,20 @@ dp_softap_inspect_traffic_end_indication_pkt(struct wlan_dp_intf *dp_intf,
 {}
 #endif
 
+#ifdef FEATURE_DIRECT_LINK
+static inline void dp_intf_tx_to_fw(struct wlan_dp_intf *dp_intf,
+				    qdf_nbuf_t nbuf)
+{
+	if (qdf_unlikely(dp_intf->direct_link_config.config_set))
+		QDF_NBUF_CB_TX_PACKET_TO_FW(nbuf) = 1;
+}
+#else
+static inline void dp_intf_tx_to_fw(struct wlan_dp_intf *dp_intf,
+				    qdf_nbuf_t nbuf)
+{
+}
+#endif
+
 /**
  * dp_softap_start_xmit() - Transmit a frame
  * @nbuf: pointer to Network buffer
@@ -671,6 +686,8 @@ QDF_STATUS dp_softap_start_xmit(qdf_nbuf_t nbuf, struct wlan_dp_intf *dp_intf)
 	if (dp_softap_traffic_end_indication_enabled(dp_intf))
 		dp_softap_inspect_traffic_end_indication_pkt(dp_intf, nbuf);
 
+	dp_intf_tx_to_fw(dp_intf, nbuf);
+
 	dp_softap_config_tx_pkt_tracing(dp_intf, nbuf);
 
 	/* check whether need to linearize skb, like non-linear udp data */
@@ -727,8 +744,8 @@ void dp_softap_tx_timeout(struct wlan_dp_intf *dp_intf)
 /**
  * dp_softap_notify_tx_compl_cbk() - callback to notify tx completion
  * @nbuf: pointer to n/w buffer
- * @dp_intf: pointer to DP interface
- * @flags: tx status flag
+ * @context: pointer to DP interface
+ * @flag: tx status flag
  *
  * Return: None
  */

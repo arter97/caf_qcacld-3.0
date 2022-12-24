@@ -149,8 +149,8 @@ ucfg_twt_get_single_peer_session_params(struct wlan_objmgr_psoc *psoc_obj,
  * ucfg_twt_get_peer_session_param() - Obtains twt session parameters of
  * a peer if twt session is valid
  * @mc_cp_stats: pointer to peer specific stats
- * @param: Pointer to copy twt session parameters
- * @num_twt_sessions Pointer holding total number of valid twt sessions
+ * @params: Pointer to copy twt session parameters
+ * @num_twt_session: Pointer holding total number of valid twt sessions
  *
  * Return: QDF_STATUS success if valid twt session parameters are obtained
  * else other qdf error values
@@ -188,7 +188,7 @@ ucfg_twt_get_peer_session_param(struct peer_mc_cp_stats *mc_cp_stats,
  * ucfg_twt_get_all_peer_session_params()- Retrieves twt session parameters
  * of all peers with valid twt session
  * @psoc_obj: psoc object
- * @vdvev_id: vdev_id
+ * @vdev_id: vdev_id
  * @params: array of pointer to store peer twt session parameters
  *
  * Return: total number of valid twt sessions
@@ -206,7 +206,7 @@ ucfg_twt_get_all_peer_session_params(struct wlan_objmgr_psoc *psoc_obj,
 	struct peer_mc_cp_stats *mc_cp_stats;
 	int num_twt_session = 0;
 	enum QDF_OPMODE opmode;
-	int sap_max_peer;
+	int sap_max_peer = 0;
 
 	if (!psoc_obj) {
 		cp_stats_err("psoc is NULL");
@@ -939,6 +939,28 @@ QDF_STATUS ucfg_mc_cp_stats_get_pending_req(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * ucfg_mc_cp_stats_free_peer_stats_info_ext() - API to free peer stats info ext
+ * structure
+ * @ev: structure from where peer stats info ext needs to be freed
+ *
+ * Return: none
+ */
+static void ucfg_mc_cp_stats_free_peer_stats_info_ext(struct stats_event *ev)
+{
+	struct peer_stats_info_ext_event *peer_stats_info =
+							ev->peer_stats_info_ext;
+	uint16_t i;
+
+	for (i = 0; i < ev->num_peer_stats_info_ext; i++) {
+		qdf_mem_free(peer_stats_info->tx_pkt_per_mcs);
+		qdf_mem_free(peer_stats_info->rx_pkt_per_mcs);
+		peer_stats_info++;
+	}
+
+	qdf_mem_free(ev->peer_stats_info_ext);
+}
+
 void ucfg_mc_cp_stats_free_stats_resources(struct stats_event *ev)
 {
 	if (!ev)
@@ -952,7 +974,7 @@ void ucfg_mc_cp_stats_free_stats_resources(struct stats_event *ev)
 	qdf_mem_free(ev->vdev_summary_stats);
 	qdf_mem_free(ev->vdev_chain_rssi);
 	qdf_mem_free(ev->peer_extended_stats);
-	qdf_mem_free(ev->peer_stats_info_ext);
+	ucfg_mc_cp_stats_free_peer_stats_info_ext(ev);
 	qdf_mem_zero(ev, sizeof(*ev));
 }
 

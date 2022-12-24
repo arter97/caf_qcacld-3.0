@@ -38,6 +38,12 @@
 #define FISA_FLOW_MAX_CUMULATIVE_IP_LEN \
 	(FISA_MAX_SINGLE_CUMULATIVE_IP_LEN * FISA_FLOW_MAX_AGGR_COUNT)
 
+/* minimal pure UDP data length required for FISA */
+#define FISA_MIN_UDP_DATA_LEN 16
+/* minimal length without L2/L3 header required for FISA */
+#define FISA_MIN_L4_AND_DATA_LEN \
+	(FISA_UDP_HDR_LEN + FISA_MIN_UDP_DATA_LEN)
+
 #define IPSEC_PORT 500
 #define IPSEC_NAT_PORT 4500
 #define DNS_SERVER_PORT 53
@@ -110,21 +116,6 @@ QDF_STATUS dp_rx_fisa_flush_by_ctx_id(struct dp_soc *soc, int napi_id);
  * Return: Success on flushing the flows for the vdev
  */
 QDF_STATUS dp_rx_fisa_flush_by_vdev_id(struct dp_soc *soc, uint8_t vdev_id);
-
-/**
- * dp_rx_skip_fisa() - Set flags to skip fisa aggregation
- * @cdp_soc: core txrx main context
- * @value: allow or skip fisa
- *
- * Return: None
- */
-static inline
-void dp_rx_skip_fisa(struct cdp_soc_t *cdp_soc, uint32_t value)
-{
-	struct dp_soc *soc = (struct dp_soc *)cdp_soc;
-
-	qdf_atomic_set(&soc->skip_fisa_param.skip_fisa, !value);
-}
 
 /**
  * dp_set_fisa_disallowed_for_vdev() - Set fisa disallowed flag for vdev

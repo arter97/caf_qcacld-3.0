@@ -32,7 +32,7 @@
 /**
  * wlan_hdd_cm_connect() - cfg80211 connect api
  * @wiphy: Pointer to wiphy
- * @dev: Pointer to network device
+ * @ndev: Pointer to network device
  * @req: Pointer to cfg80211 connect request
  *
  * This function is used to issue connect request to connection manager
@@ -85,11 +85,27 @@ QDF_STATUS hdd_cm_connect_complete(struct wlan_objmgr_vdev *vdev,
 				   struct wlan_cm_connect_resp *rsp,
 				   enum osif_cb_type type);
 
+/**
+ * hdd_cm_send_vdev_keys() - send vdev keys
+ * @vdev: Pointer to vdev
+ * @key_index: key index value
+ * @pairwise: pairwise boolean value
+ * @cipher_type: cipher type enum value
+ *
+ * This function is used to send vdev keys
+ *
+ * Context: Any context.
+ * Return: QDF_STATUS
+ */
+QDF_STATUS hdd_cm_send_vdev_keys(struct wlan_objmgr_vdev *vdev,
+				 u8 key_index, bool pairwise,
+				 enum wlan_crypto_cipher_type cipher_type);
+
 #ifdef WLAN_VENDOR_HANDOFF_CONTROL
 /**
  * hdd_cm_get_vendor_handoff_params() - to get vendor handoff params from fw
  * @psoc: Pointer to psoc object
- * @event_data: Pointer to vendor handoff event rsp
+ * @vendor_handoff_context: Pointer to vendor handoff event rsp
  *
  * Return: QDF_STATUS
  */
@@ -99,7 +115,7 @@ hdd_cm_get_vendor_handoff_params(struct wlan_objmgr_psoc *psoc,
 
 /**
  * hdd_cm_get_handoff_param() - send get vendor handoff param request to fw
- * @pdev: pdev common object
+ * @psoc: psoc common object
  * @hdd_adapter: adapter context
  * @vdev_id: vdev id
  * @param_id: Param ID from enum WMI_ROAM_GET_VENDOR_CONTROL_PARAM_ID
@@ -330,14 +346,6 @@ bool hdd_cm_is_connecting(struct hdd_adapter *adapter);
  * Return: true if disconnected, false otherwise
  */
 bool hdd_cm_is_disconnected(struct hdd_adapter *adapter);
-
-/**
- * hdd_cm_is_disconnecting() - Function to check disconnection in progress
- * @adapter: pointer to the adapter structure
- *
- * Return: true if disconnecting, false otherwise
- */
-bool hdd_cm_is_disconnecting(struct hdd_adapter *adapter);
 
 /**
  * hdd_cm_is_vdev_roaming() - Function to check roaming in progress

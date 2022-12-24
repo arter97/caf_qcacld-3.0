@@ -517,7 +517,7 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		 * Spec. doesn't say anything about such condition
 		 * Since section 7.4.6.2 (IEEE802.11k-2008) says-rrm report
 		 * frame should contain one or more report IEs. It probably
-		 * means dont send any respose if no matching BSS found.
+		 * means dont send any response if no matching BSS found.
 		 * Moreover, there is no flag or field in measurement report
 		 * IE(7.3.2.22) OR beacon report IE(7.3.2.22.6) that can be set
 		 * to indicate no BSS found on a given channel. If we finished
@@ -568,21 +568,21 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 					 sizeof(next_result));
 	if (!scanresults_arr) {
 		status = QDF_STATUS_E_NOMEM;
-		goto rrm_send_scan_results_done;
+		goto send_scan_results;
 	}
 
 	status = wlan_mlme_get_bssid_vdev_id(mac_ctx->pdev, session_id,
 					     &bss_peer_mac);
 	if (QDF_IS_STATUS_ERROR(status)) {
-		sme_err("Invaild session %d", session_id);
+		sme_err("BSSID not found for vdev: %d", session_id);
 		status = QDF_STATUS_E_FAILURE;
-		goto rrm_send_scan_results_done;
+		goto send_scan_results;
 	}
 
 	if (!cm_is_vdevid_connected(mac_ctx->pdev, session_id)) {
-		sme_err("Invaild session");
+		sme_err("vdev:%d is not connected", session_id);
 		status = QDF_STATUS_E_FAILURE;
-		goto rrm_send_scan_results_done;
+		goto send_scan_results;
 	}
 
 	while (scan_results) {
@@ -623,6 +623,8 @@ static QDF_STATUS sme_rrm_send_scan_result(struct mac_context *mac_ctx,
 		if (counter >= num_scan_results)
 			break;
 	}
+
+send_scan_results:
 	/*
 	 * The beacon report should be sent whether the counter is zero or
 	 * non-zero. There might be a few scan results in the cache but not
@@ -1699,10 +1701,10 @@ static void rrm_change_default_config_param(struct mac_context *mac)
 }
 
 /**
- * rrm_open() - Initialze all RRM module
+ * rrm_open() - Initialize all RRM module
  * @ mac: The handle returned by mac_open.
  *
- * Initialze all RRM module.
+ * Initialize all RRM module.
  *
  * Return: QDF_STATUS
  */

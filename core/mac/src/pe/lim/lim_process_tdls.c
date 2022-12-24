@@ -220,8 +220,7 @@ static void populate_dot11f_tdls_offchannel_params(
 	uint8_t nss_5g;
 	qdf_freq_t ch_freq;
 	bool is_vlp_country;
-	uint8_t band_mask;
-	uint8_t *ap_cc;
+	uint8_t ap_cc[REG_ALPHA2_LEN + 1];
 	uint8_t reg_cc[REG_ALPHA2_LEN + 1];
 
 	numChans = mac->mlme_cfg->reg.valid_channel_list_num;
@@ -236,7 +235,7 @@ static void populate_dot11f_tdls_offchannel_params(
 	nss_2g = QDF_MIN(mac->vdev_type_nss_2g.tdls,
 			 mac->user_configured_nss);
 
-	ap_cc = mac->scan.countryCodeCurrent;
+	wlan_cm_get_country_code(mac->pdev, pe_session->vdev_id, ap_cc);
 	wlan_reg_read_current_country(mac->psoc, reg_cc);
 	is_vlp_country = wlan_reg_ctry_support_vlp(ap_cc) &&
 			 wlan_reg_ctry_support_vlp(reg_cc);
@@ -315,9 +314,8 @@ static void populate_dot11f_tdls_offchannel_params(
 	wlan_reg_dmn_get_curr_opclasses(&numClasses, &classes[0]);
 
 	for (i = 0; i < numClasses; i++) {
-		band_mask = wlan_reg_get_band_cap_from_op_class(reg_cc, 1,
-								&classes[i]);
-		if ((band_mask & BIT(REG_BAND_6G)) && !is_vlp_country)
+		if (wlan_reg_is_6ghz_op_class(mac->pdev, classes[i]) &&
+		    !is_vlp_country)
 			continue;
 
 		suppOperClasses->classes[count_opclss] = classes[i];
@@ -437,7 +435,7 @@ static uint32_t lim_prepare_tdls_frame_header(struct mac_context *mac, uint8_t *
 
 	/*
 	 * if TDLS frame goes through the AP link, it follows normal address
-	 * pattern, if TDLS frame goes thorugh the direct link, then
+	 * pattern, if TDLS frame goes through the direct link, then
 	 * A1--> Peer STA addr, A2-->Self STA address, A3--> BSSID
 	 */
 	(tdlsLinkType == TDLS_LINK_AP) ? ((addr1 = (link_iden->bssid)),
@@ -539,7 +537,7 @@ static QDF_STATUS lim_mgmt_tdls_tx_complete(void *context,
 
 /*
  * This function can be used for bacst or unicast discovery request
- * We are not differentiating it here, it will all depnds on peer MAC address,
+ * We are not differentiating it here, it will all depend on peer MAC address,
  */
 static QDF_STATUS lim_send_tdls_dis_req_frame(struct mac_context *mac,
 					      struct qdf_mac_addr peer_mac,
@@ -1109,6 +1107,8 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 	qdf_list_t *head;
 	qdf_list_node_t *p_node;
 	int i = 0;
+	uint16_t rx_he_mcs_map_160 = 0xfffa;
+	uint16_t tx_he_mcs_map_160 = 0xfffa;
 	QDF_STATUS status;
 
 	tdls_obj = wlan_vdev_get_tdls_vdev_obj(session->vdev);
@@ -1138,14 +1138,24 @@ static void lim_tdls_fill_he_wideband_offchannel_mcs(struct mac_context *mac_ctx
 		return;
 	}
 
-	if (stads->ch_width == CH_WIDTH_160MHZ ||
-	    (tdls_peer_candidate->pref_off_chan_width &
-	     (1 << BW_160_OFFSET_BIT))) {
+	if (stads->ch_width == CH_WIDTH_160MHZ) {
 		lim_populate_he_mcs_per_bw(
 			mac_ctx, &rates->rx_he_mcs_map_160,
 			&rates->tx_he_mcs_map_160,
 			*((uint16_t *)peer_he_caps->rx_he_mcs_map_160),
 			*((uint16_t *)peer_he_caps->tx_he_mcs_map_160),
+			nss,
+			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+				rx_he_mcs_map_160),
+			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
+					tx_he_mcs_map_160));
+	} else if (tdls_peer_candidate->pref_off_chan_width &
+	     (1 << BW_160_OFFSET_BIT)) {
+		lim_populate_he_mcs_per_bw(
+			mac_ctx, &rates->rx_he_mcs_map_160,
+			&rates->tx_he_mcs_map_160,
+			rx_he_mcs_map_160,
+			tx_he_mcs_map_160,
 			nss,
 			*((uint16_t *)mac_ctx->mlme_cfg->he_caps.dot11_he_cap.
 				rx_he_mcs_map_160),
@@ -3879,7 +3889,7 @@ void lim_update_tdls_2g_bw(struct pe_session *session)
 	 * For 2.4 GHz band, if AP switches its BW from 40 MHz to 20 Mhz, it
 	 * changes its beacon respectivily with ch_width 20 Mhz without STA
 	 * disconnection.
-	 * This will result in TDLS remaining on 40 MHz and not follwoing APs BW
+	 * This will result in TDLS remaining on 40 MHz and not following APs BW
 	 * on 2.4 GHz.
 	 * Better Teardown the link here and with traffic going on between peers
 	 * the tdls connection will again be restablished with the new BW

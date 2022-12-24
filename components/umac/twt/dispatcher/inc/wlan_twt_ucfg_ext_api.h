@@ -170,6 +170,14 @@ bool ucfg_twt_is_setup_in_progress(struct wlan_objmgr_psoc *psoc,
 				   uint8_t dialog_id);
 
 /**
+ * ucfg_twt_cfg_is_twt_enabled() - Get if TWT is enabled
+ * @psoc: PSOC pointer
+ *
+ * Return: True if TWT is enabled
+ */
+bool ucfg_twt_cfg_is_twt_enabled(struct wlan_objmgr_psoc *psoc);
+
+/**
  * ucfg_twt_set_command_in_progress() - Set TWT command is in progress
  * @psoc: Pointer to psoc object
  * @peer_mac: Pointer to peer mac address
@@ -273,14 +281,16 @@ bool ucfg_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
 /**
  * ucfg_twt_set_work_params() - Set TWT work params
  * @vdev: Vdev pointer
- * @params: TWT params
+ * @peer_mac: peer mac address
+ * @dialog_id: dialog_id
  * @twt_next_action: Set TWT next action to do before work schedule
  *
  * Return: None
  */
 void ucfg_twt_set_work_params(
 		struct wlan_objmgr_vdev *vdev,
-		struct twt_add_dialog_complete_event_param *params,
+		struct qdf_mac_addr *peer_mac,
+		uint8_t dialog_id,
 		uint32_t twt_next_action);
 
 /**
@@ -294,6 +304,15 @@ void ucfg_twt_set_work_params(
 void ucfg_twt_get_work_params(struct wlan_objmgr_vdev *vdev,
 			      struct twt_work_params *params,
 			      uint32_t *next_action);
+
+/**
+ * ucfg_twt_cfg_set_responder() - Set TWT responder capability
+ * @psoc: Pointer to global PSOC object
+ * @val: pointer to value to be set
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val);
 #else
 static inline
 QDF_STATUS ucfg_twt_psoc_open(struct wlan_objmgr_psoc *psoc)
@@ -387,7 +406,8 @@ ucfg_twt_is_command_in_progress(struct wlan_objmgr_psoc *psoc,
 static inline void
 ucfg_twt_set_work_params(
 		struct wlan_objmgr_vdev *vdev,
-		struct twt_add_dialog_complete_event_param *params,
+		struct qdf_mac_addr *peer_mac,
+		uint8_t dialog_id,
 		uint32_t twt_next_action)
 {
 }
@@ -398,6 +418,18 @@ ucfg_twt_get_work_params(
 		struct twt_work_params *params,
 		uint32_t *next_action)
 {
+}
+
+static inline
+QDF_STATUS ucfg_twt_cfg_set_responder(struct wlan_objmgr_psoc *psoc, bool val)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+bool ucfg_twt_cfg_is_twt_enabled(struct wlan_objmgr_psoc *psoc)
+{
+	return false;
 }
 #endif
 #endif

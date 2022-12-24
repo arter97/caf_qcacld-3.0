@@ -16,7 +16,7 @@
  */
 
 /**
- * DOC : os_if_son.c
+ * DOC: os_if_son.c
  *
  * WLAN Host Device Driver file for son (Self Organizing Network)
  * support.
@@ -475,7 +475,9 @@ int os_if_son_get_ssid(struct wlan_objmgr_vdev *vdev,
 	}
 
 	ucfg_wlan_vdev_mgr_get_param_ssid(vdev, ssid, ssid_len);
-	osif_debug("vdev %d ssid %s", wlan_vdev_get_id(vdev), ssid);
+	osif_debug("vdev %d ssid " QDF_SSID_FMT,
+		   wlan_vdev_get_id(vdev),
+		   QDF_SSID_REF(*ssid_len, ssid));
 
 	return 0;
 }
@@ -946,6 +948,23 @@ static QDF_STATUS os_if_son_get_apcap(struct wlan_objmgr_vdev *vdev,
 		apcap->hecap.he_su_bfer = he_cap.su_beamformer;
 		apcap->hecap.he_su_bfee = he_cap.su_beamformee;
 		apcap->hecap.he_mu_bfer = he_cap.mu_beamformer;
+		apcap->hecap.supported_he_mcs[0] = he_cap.rx_he_mcs_map_lt_80;
+		apcap->hecap.supported_he_mcs[1] = he_cap.tx_he_mcs_map_lt_80;
+		apcap->hecap.supported_he_mcs[2] =
+					he_cap.rx_he_mcs_map_160[0][0] |
+					(he_cap.rx_he_mcs_map_160[0][1] << 8);
+		apcap->hecap.supported_he_mcs[3] =
+					he_cap.tx_he_mcs_map_160[0][0] |
+					(he_cap.tx_he_mcs_map_160[0][1] << 8);
+		apcap->hecap.supported_he_mcs[4] =
+					he_cap.rx_he_mcs_map_80_80[0][0] |
+					(he_cap.rx_he_mcs_map_80_80[0][1] << 8);
+		apcap->hecap.supported_he_mcs[5] =
+					he_cap.tx_he_mcs_map_80_80[0][0] |
+					(he_cap.tx_he_mcs_map_80_80[0][1] << 8);
+		apcap->hecap.he_ul_mumimo = QDF_GET_BITS(he_cap.ul_mu, 0, 1);
+		apcap->hecap.he_ul_muofdma = QDF_GET_BITS(he_cap.ul_mu, 1, 1);
+		apcap->hecap.he_dl_muofdma = he_cap.dl_mu_mimo_part_bw;
 	}
 	return QDF_STATUS_SUCCESS;
 }

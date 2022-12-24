@@ -395,7 +395,7 @@ static uint8_t lim_convert_phymode_to_dot11mode(enum wlan_phymode phymode)
  * @bcn: beacon structure
  * @band: reg_wifi_band
  *
- * The function is to calculate dot11 mode in case fw doen't send phy mode.
+ * The function is to calculate dot11 mode in case fw doesn't send phy mode.
  *
  * Return: dot11mode.
  */
@@ -758,11 +758,8 @@ void lim_fill_ft_session(struct mac_context *mac,
 	}
 	ft_session->encryptType = pe_session->encryptType;
 	ft_session->limRmfEnabled = pe_session->limRmfEnabled;
-
-	if ((ft_session->limRFBand == REG_BAND_2G) &&
-		(ft_session->htSupportedChannelWidthSet ==
-		eHT_CHANNEL_WIDTH_40MHZ))
-		lim_init_obss_params(mac, ft_session);
+	/* Load default OBSS parameters to session entry */
+	lim_init_obss_params(mac, ft_session);
 
 	ft_session->enableHtSmps = pe_session->enableHtSmps;
 	ft_session->htSmpsvalue = pe_session->htSmpsvalue;

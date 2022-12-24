@@ -46,6 +46,7 @@
 #include "wlan_mlme_api.h"
 #include "wlan_connectivity_logging.h"
 #include "lim_types.h"
+#include <wlan_mlo_mgr_main.h>
 
 /**
  * is_auth_valid
@@ -102,7 +103,7 @@ static inline unsigned int is_auth_valid(struct mac_context *mac,
  * @wep_params: pointer to wlan_mlme_wep_cfg
  * @key_id: key id
  * @default_key: output of the key
- * @key_len: output of ket length
+ * @key_len: output of key length
  *
  * Return: QDF_STATUS
  */
@@ -377,7 +378,7 @@ void lim_sae_auth_cleanup_retry(struct mac_context *mac_ctx,
  * @q_len: length of queued sae auth retry frame
  * @rx_pkt_info: Rx packet
  *
- * Return: True if SAE auth seq is mached else false
+ * Return: True if SAE auth seq is matched else false
  */
 static bool lim_is_sae_auth_algo_match(uint8_t *queued_frame, uint16_t q_len,
 				       uint8_t *rx_pkt_info)
@@ -508,6 +509,73 @@ static inline void  lim_process_sae_auth_frame(struct mac_context *mac_ctx,
 {}
 #endif
 
+static void lim_process_ft_auth_frame(struct mac_context *mac_ctx,
+				      uint8_t *rx_pkt_info,
+				      struct pe_session *pe_session)
+{
+	tpSirMacMgmtHdr mac_hdr;
+	uint32_t frame_len;
+	uint8_t *body_ptr;
+	enum rxmgmt_flags rx_flags = RXMGMT_FLAG_NONE;
+	uint16_t auth_algo;
+
+	mac_hdr = WMA_GET_RX_MAC_HEADER(rx_pkt_info);
+	body_ptr = WMA_GET_RX_MPDU_DATA(rx_pkt_info);
+	frame_len = WMA_GET_RX_PAYLOAD_LEN(rx_pkt_info);
+
+	pe_debug("FT Auth RX type %d subtype %d from " QDF_MAC_ADDR_FMT,
+		 mac_hdr->fc.type, mac_hdr->fc.subType,
+		 QDF_MAC_ADDR_REF(mac_hdr->sa));
+
+	if (LIM_IS_AP_ROLE(pe_session)) {
+		struct tLimPreAuthNode *sta_pre_auth_ctx;
+
+		rx_flags = RXMGMT_FLAG_EXTERNAL_AUTH;
+		/* Extract pre-auth context for the STA, if any. */
+		sta_pre_auth_ctx = lim_search_pre_auth_list(mac_ctx,
+							    mac_hdr->sa);
+		if (sta_pre_auth_ctx) {
+			pe_debug("STA Auth ctx have ininted");
+			/* Pre-auth context exists for the STA */
+			if (sta_pre_auth_ctx->mlmState == eLIM_MLM_WT_FT_AUTH_STATE) {
+				pe_warn("previous Auth not completed, don't process this auth frame");
+				return;
+			}
+			lim_delete_pre_auth_node(mac_ctx, mac_hdr->sa);
+		}
+
+		/* Create entry for this STA in pre-auth list */
+		sta_pre_auth_ctx = lim_acquire_free_pre_auth_node(mac_ctx,
+			&mac_ctx->lim.gLimPreAuthTimerTable);
+		if (!sta_pre_auth_ctx) {
+			pe_warn("Max pre-auth nodes reached ");
+			lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGW);
+			return;
+		}
+		pe_debug("Alloc new data: %pK peer", sta_pre_auth_ctx);
+		auth_algo = *(uint16_t *)body_ptr;
+		lim_print_mac_addr(mac_ctx, mac_hdr->sa, LOGD);
+		qdf_mem_copy((uint8_t *)sta_pre_auth_ctx->peerMacAddr,
+			     mac_hdr->sa, sizeof(tSirMacAddr));
+		sta_pre_auth_ctx->mlmState = eLIM_MLM_WT_FT_AUTH_STATE;
+		sta_pre_auth_ctx->authType = (tAniAuthType) auth_algo;
+		sta_pre_auth_ctx->fSeen = 0;
+		sta_pre_auth_ctx->fTimerStarted = 0;
+		sta_pre_auth_ctx->seq_num =
+				((mac_hdr->seqControl.seqNumHi << 4) |
+				(mac_hdr->seqControl.seqNumLo));
+		sta_pre_auth_ctx->timestamp = qdf_mc_timer_get_system_ticks();
+		lim_add_pre_auth_node(mac_ctx, sta_pre_auth_ctx);
+		lim_send_sme_mgmt_frame_ind(mac_ctx, mac_hdr->fc.subType,
+			(uint8_t *)mac_hdr,
+			frame_len + sizeof(tSirMacMgmtHdr),
+			pe_session->smeSessionId,
+			WMA_GET_RX_FREQ(rx_pkt_info),
+			WMA_GET_RX_RSSI_NORMALIZED(rx_pkt_info),
+			rx_flags);
+	}
+}
+
 static uint8_t
 lim_get_pasn_peer_vdev_id(struct mac_context *mac, uint8_t *bssid)
 {
@@ -561,6 +629,40 @@ lim_process_pasn_auth_frame(struct mac_context *mac_ctx,
 	return QDF_STATUS_SUCCESS;
 }
 
+static QDF_STATUS
+lim_validate_mac_address_in_auth_frame(struct mac_context *mac_ctx,
+				       tpSirMacMgmtHdr mac_hdr,
+				       tSirMacAuthFrameBody *rx_auth_frm_body)
+{
+	struct wlan_objmgr_vdev *vdev;
+
+	/* SA is same as any of the device vdev, return failure */
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac_ctx->pdev,
+							 mac_hdr->sa,
+							 WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	vdev = wlan_objmgr_get_vdev_by_macaddr_from_pdev(
+					mac_ctx->pdev,
+					rx_auth_frm_body->peer_mld.bytes,
+					WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		return QDF_STATUS_E_ALREADY;
+	}
+
+	if (mlo_mgr_ml_peer_exist(mac_hdr->sa))
+		return QDF_STATUS_E_ALREADY;
+
+	if (mlo_mgr_ml_peer_exist(rx_auth_frm_body->peer_mld.bytes))
+		return QDF_STATUS_E_ALREADY;
+
+	return QDF_STATUS_SUCCESS;
+}
+
 static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 		tpSirMacMgmtHdr mac_hdr,
 		tSirMacAuthFrameBody *rx_auth_frm_body,
@@ -571,6 +673,7 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 	struct tLimPreAuthNode *auth_node;
 	uint32_t maxnum_preauth;
 	uint16_t associd = 0;
+	QDF_STATUS status;
 
 	/* AuthFrame 1 */
 	sta_ds_ptr = dph_lookup_hash_entry(mac_ctx, mac_hdr->sa,
@@ -718,15 +821,11 @@ static void lim_process_auth_frame_type1(struct mac_context *mac_ctx,
 	if (lim_is_auth_algo_supported(mac_ctx,
 			(tAniAuthType) rx_auth_frm_body->authAlgoNumber,
 			pe_session)) {
-		struct wlan_objmgr_vdev *vdev;
-
-		vdev =
-		  wlan_objmgr_get_vdev_by_macaddr_from_pdev(mac_ctx->pdev,
-							    mac_hdr->sa,
-							    WLAN_LEGACY_MAC_ID);
-		/* SA is same as any of the device vdev, return failure */
-		if (vdev) {
-			wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+		status = lim_validate_mac_address_in_auth_frame(
+						mac_ctx, mac_hdr,
+						rx_auth_frm_body);
+		if (QDF_IS_STATUS_ERROR(status)) {
+			pe_err("Duplicate MAC address found, reject auth");
 			auth_frame->authAlgoNumber =
 				rx_auth_frm_body->authAlgoNumber;
 			auth_frame->authTransactionSeqNumber =
@@ -1182,7 +1281,7 @@ static void lim_process_auth_frame_type3(struct mac_context *mac_ctx,
 					auth_node->challengeText,
 					SIR_MAC_SAP_AUTH_CHALLENGE_LENGTH)) {
 			/*
-			 * Challenge match. STA is autheticated
+			 * Challenge match. STA is authenticated
 			 * Delete Authentication response timer if running
 			 */
 			lim_deactivate_and_change_per_sta_id_timer(mac_ctx,
@@ -1343,7 +1442,7 @@ static void lim_process_auth_frame_type4(struct mac_context *mac_ctx,
  * NOTE:
  * 1. Authentication failures are reported to SME with same status code
  *    received from the peer MAC entity.
- * 2. Authentication frame2/4 received with alogirthm number other than
+ * 2. Authentication frame2/4 received with algorithm number other than
  *    one requested in frame1/3 are logged with an error and auth confirm
  *    will be sent to SME only after auth failure timeout.
  * 3. Inconsistency in the spec:
@@ -1668,6 +1767,11 @@ lim_process_auth_frame(struct mac_context *mac_ctx, uint8_t *rx_pkt_info,
 	} else if (auth_alg == eSIR_AUTH_TYPE_PASN) {
 		lim_process_pasn_auth_frame(mac_ctx, pe_session->vdev_id,
 					    rx_pkt_info);
+		goto free;
+	} else if (auth_alg == eSIR_FT_AUTH && LIM_IS_AP_ROLE(pe_session)) {
+		pe_debug("Auth Frame auth_alg  eSIR_FT_AUTH");
+			lim_process_ft_auth_frame(mac_ctx,
+						  rx_pkt_info, pe_session);
 		goto free;
 	} else if ((sir_convert_auth_frame2_struct(mac_ctx, body_ptr,
 				frame_len, rx_auth_frame) != QDF_STATUS_SUCCESS)
