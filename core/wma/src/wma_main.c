@@ -332,12 +332,13 @@ wma_get_concurrency_support(struct wlan_objmgr_psoc *psoc)
  * Version 1 - Base feature version
  * Version 2 - WMI_HOST_VENDOR1_REQ1_VERSION_3_30 updated.
  * Version 3 - min sleep period for TWT and Scheduled PM in FW updated
+ * Version4 -  WMI_HOST_VENDOR1_REQ1_VERSION_3_40 updated.
  *
  * Return: None
  */
 static void wma_update_set_feature_version(struct target_feature_set *fs)
 {
-	fs->feature_set_version = 3;
+	fs->feature_set_version = 4;
 }
 
 /**
@@ -495,9 +496,7 @@ static void wma_set_feature_set_info(tp_wma_handle wma_handle,
 	feature_set->peer_bigdata_getbssinfo_support = true;
 	feature_set->peer_bigdata_assocreject_info_support = true;
 	feature_set->peer_getstainfo_support = true;
-
 	wma_update_set_feature_version(feature_set);
-
 }
 
 /**
