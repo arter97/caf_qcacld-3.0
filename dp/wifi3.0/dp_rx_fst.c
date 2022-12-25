@@ -344,6 +344,9 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 	struct dp_rx_fse *fse;
 	struct dp_soc *soc = pdev->soc;
 	struct dp_rx_fst *fst;
+	uint8_t chip_id;
+	struct dp_soc *partner_soc;
+	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
 
 	fst = pdev->rx_fst;
 
@@ -410,27 +413,43 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 		qdf_atomic_set(&fst->is_cache_update_pending, 1);
 	} else {
 		QDF_STATUS status;
-		/**
-		 * Send HTT cache invalidation command to firmware to
-		 * reflect the added flow
-		 */
-		status = dp_rx_flow_send_htt_operation_cmd(
+
+		for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
+			partner_soc = soc->arch_ops.dp_rx_replenish_soc_get(soc,
+								    chip_id);
+
+			/**
+			 * unlike LI, BE SOC has only one DMAC so there is
+			 * no concept of FST per pdev, also there is only one
+			 * single FST table maintained across SOCs which are
+			 * part of one ML group.
+			 */
+			if (qdf_likely(
+			      !wlan_cfg_is_rx_flow_search_table_per_pdev(cfg)))
+				pdev = partner_soc->pdev_list[0];
+
+			/**
+			 * Send HTT cache invalidation command to firmware to
+			 * reflect the added flow
+			 */
+			status = dp_rx_flow_send_htt_operation_cmd(
 					pdev,
 					DP_HTT_FST_CACHE_INVALIDATE_ENTRY,
 					rx_flow_info);
 
-		if (QDF_STATUS_SUCCESS != status) {
-			dp_err("Send cache invalidate entry to fw failed: %u",
-			       status);
-			dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
-			/* Free DP FSE and HAL FSE */
-			hal_rx_flow_delete_entry(soc->hal_soc, fst->hal_rx_fst,
-						 fse->hal_rx_fse);
-			fse->is_valid = false;
-			return status;
+			if (QDF_STATUS_SUCCESS != status) {
+				dp_err("Send cache invalidate entry to fw failed: %u",
+				       status);
+				dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
+				/* Free DP FSE and HAL FSE */
+				hal_rx_flow_delete_entry(soc->hal_soc,
+							 fst->hal_rx_fst,
+							 fse->hal_rx_fse);
+				fse->is_valid = false;
+				return status;
+			}
 		}
 	}
-
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -449,6 +468,9 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	struct dp_soc *soc = pdev->soc;
 	struct dp_rx_fst *fst;
 	QDF_STATUS status;
+	uint8_t chip_id;
+	struct dp_soc *partner_soc;
+	struct wlan_cfg_dp_soc_ctxt *cfg = soc->wlan_cfg_ctx;
 
 	fst = pdev->rx_fst;
 
@@ -476,24 +498,38 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 	if (soc->is_rx_fse_full_cache_invalidate_war_enabled) {
 		qdf_atomic_set(&fst->is_cache_update_pending, 1);
 	} else {
-		/**
-		 * Send HTT cache invalidation command to firmware
-		 * to reflect the deleted flow
-		 */
-		status = dp_rx_flow_send_htt_operation_cmd(
+		for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
+			partner_soc = soc->arch_ops.dp_rx_replenish_soc_get(soc,
+								    chip_id);
+
+			/**
+			 * unlike LI, BE SOC has only one DMAC so there is
+			 * no concept of FST per pdev, also there is only one
+			 * single FST table maintained across SOCs which are
+			 * part of one ML group.
+			 */
+			if (qdf_likely(
+			      !wlan_cfg_is_rx_flow_search_table_per_pdev(cfg)))
+				pdev = partner_soc->pdev_list[0];
+
+			/**
+			 * Send HTT cache invalidation command to firmware to
+			 * reflect the added flow
+			 */
+			status = dp_rx_flow_send_htt_operation_cmd(
 					pdev,
 					DP_HTT_FST_CACHE_INVALIDATE_ENTRY,
 					rx_flow_info);
 
-		if (QDF_STATUS_SUCCESS != status) {
-			dp_err("Send cache invalidate entry to fw failed: %u",
-			       status);
-			dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
-			/* Do not add entry back in DP FSE and HAL FSE */
-			return status;
+			if (QDF_STATUS_SUCCESS != status) {
+				dp_err("Send cache invalidate entry to fw failed: %u",
+				       status);
+				dp_rx_flow_dump_flow_entry(fst, rx_flow_info);
+				/* Do not add entry back in DP FSE and HAL FSE */
+				return status;
+			}
 		}
 	}
-
 	return QDF_STATUS_SUCCESS;
 }
 
