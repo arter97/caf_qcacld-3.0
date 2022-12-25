@@ -793,6 +793,8 @@ struct dp_mon_ops {
 				     struct htt_rx_ring_tlv_filter *tlv_filter);
 	void (*rx_wmask_subscribe)(uint32_t *msg_word,
 				   struct htt_rx_ring_tlv_filter *tlv_filter);
+	void (*rx_pkt_tlv_offset)(uint32_t *msg_word,
+				  struct htt_rx_ring_tlv_filter *tlv_filter);
 	void (*rx_enable_mpdu_logging)(uint32_t *msg_word,
 				       struct htt_rx_ring_tlv_filter *tlv_filter);
 	void (*rx_enable_fpmo)(uint32_t *msg_word,
@@ -3830,6 +3832,7 @@ void dp_monitor_pdev_reset_scan_spcl_vap_stats_enable(struct dp_pdev *pdev,
 }
 #endif
 
+#if defined(CONFIG_MON_WORD_BASED_TLV)
 static inline void
 dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
 			  struct htt_rx_ring_tlv_filter *tlv_filter)
@@ -3850,6 +3853,34 @@ dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
 	}
 
 	monitor_ops->rx_wmask_subscribe(msg_word, tlv_filter);
+}
+#else
+static inline void
+dp_mon_rx_wmask_subscribe(struct dp_soc *soc, uint32_t *msg_word,
+			  struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+}
+#endif
+
+static inline void
+dp_mon_rx_enable_pkt_tlv_offset(struct dp_soc *soc, uint32_t *msg_word,
+				struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+	struct dp_mon_soc *mon_soc = soc->monitor_soc;
+	struct dp_mon_ops *monitor_ops;
+
+	if (!mon_soc) {
+		dp_mon_debug("mon soc is NULL");
+		return;
+	}
+
+	monitor_ops = mon_soc->mon_ops;
+	if (!monitor_ops || !monitor_ops->rx_pkt_tlv_offset) {
+		dp_mon_debug("callback not registered");
+		return;
+	}
+
+	monitor_ops->rx_pkt_tlv_offset(msg_word, tlv_filter);
 }
 
 static inline void

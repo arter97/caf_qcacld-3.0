@@ -104,9 +104,14 @@ defined(QCA_SINGLE_WIFI_3_0)
 	PHYRX_RSSI_LEGACY_PREAMBLE_RSSI_INFO_DETAILS_RSSI_PRI20_CHAIN0_OFFSET
 #endif
 
+#define RX_MON_MPDU_START_WMASK               0x07F0
+#define RX_MON_MSDU_END_WMASK                 0x0AE1
+#define RX_MON_PPDU_END_USR_STATS_WMASK       0xB7E
+
 #ifdef CONFIG_MON_WORD_BASED_TLV
 #ifndef BIG_ENDIAN_HOST
 struct rx_mpdu_start_mon_data {
+	uint32_t peer_meta_data                    : 32;
 	uint32_t rxpcu_mpdu_filter_in_category     : 2,
 		 sw_frame_group_id                 : 7,
 		 ndp_frame                         : 1,
@@ -136,6 +141,19 @@ struct rx_mpdu_start_mon_data {
 		 encrypted                         : 1,
 		 mpdu_retry                        : 1,
 		 mpdu_sequence_number              : 12;
+	uint32_t key_id_octet                      :  8,
+		 new_peer_entry                    :  1,
+		 decrypt_needed                    :  1,
+		 decap_type                        :  2,
+		 rx_insert_vlan_c_tag_padding      :  1,
+		 rx_insert_vlan_s_tag_padding      :  1,
+		 strip_vlan_c_tag_decap            :  1,
+		 strip_vlan_s_tag_decap            :  1,
+		 pre_delim_count                   : 12,
+		 ampdu_flag                        :  1,
+		 bar_frame                         :  1,
+		 raw_mpdu                          :  1,
+		 reserved_12                       :  1;
 	uint32_t mpdu_length                       : 14,
 		 first_mpdu                        : 1,
 		 mcast_bcast                       : 1,
@@ -160,6 +178,13 @@ struct rx_mpdu_start_mon_data {
 	uint32_t mac_addr_ad1_31_0                 : 32;
 	uint32_t mac_addr_ad1_47_32                : 16,
 		 mac_addr_ad2_15_0                 : 16;
+	uint32_t mac_addr_ad2_47_16                : 32;
+	uint32_t mac_addr_ad3_31_0                 : 32;
+	uint32_t mac_addr_ad3_47_32                : 16,
+		 mpdu_sequence_control_field       : 16;
+	uint32_t mac_addr_ad4_31_0                 : 32;
+	uint32_t mac_addr_ad4_47_32                : 16,
+		 mpdu_qos_control_field            : 16;
 };
 
 struct rx_msdu_end_mon_data {
@@ -167,33 +192,140 @@ struct rx_msdu_end_mon_data {
 		 sw_frame_group_id                 : 7,
 		 reserved_0                        : 7,
 		 phy_ppdu_id                       : 16;
-	uint32_t tcp_udp_chksum                    : 16,
-		 sa_idx_timeout                    : 1,
-		 da_idx_timeout                    : 1,
-		 msdu_limit_error                  : 1,
-		 flow_idx_timeout                  : 1,
-		 flow_idx_invalid                  : 1,
-		 wifi_parser_error                 : 1,
-		 amsdu_parser_error                : 1,
-		 sa_is_valid                       : 1,
-		 da_is_valid                       : 1,
-		 da_is_mcbc                        : 1,
-		 l3_header_padding                 : 2,
-		 first_msdu                        : 1,
-		 last_msdu                         : 1,
-		 tcp_udp_chksum_fail               : 1,
-		 ip_chksum_fail                    : 1;
-	uint32_t msdu_drop                         : 1,
-		 reo_destination_indication        : 5,
+	uint32_t ip_hdr_chksum                     : 16,
+		 reported_mpdu_length              : 14,
+		 reserved_1a                       :  2;
+	uint32_t sa_sw_peer_id                     : 16,
+		 sa_idx_timeout                    :  1,
+		 da_idx_timeout                    :  1,
+		 to_ds                             :  1,
+		 tid                               :  4,
+		 sa_is_valid                       :  1,
+		 da_is_valid                       :  1,
+		 da_is_mcbc                        :  1,
+		 l3_header_padding                 :  2,
+		 first_msdu                        :  1,
+		 last_msdu                         :  1,
+		 fr_ds                             :  1,
+		 ip_chksum_fail_copy               :  1;
+	uint32_t sa_idx                            : 16,
+		 da_idx_or_sw_peer_id              : 16;
+	uint32_t msdu_drop                         :  1,
+		 reo_destination_indication        :  5,
 		 flow_idx                          : 20,
-		 reserved_12a                      : 6;
+		 use_ppe                           :  1,
+		 mesh_sta                          :  2,
+		 vlan_ctag_stripped                :  1,
+		 vlan_stag_stripped                :  1,
+		 fragment_flag                     :  1;
 	uint32_t fse_metadata                      : 32;
 	uint32_t cce_metadata                      : 16,
-		 sa_sw_peer_id                     : 16;
+		 tcp_udp_chksum                    : 16;
+	uint32_t aggregation_count                 :  8,
+		 flow_aggregation_continuation     :  1,
+		 fisa_timeout                      :  1,
+		 tcp_udp_chksum_fail_copy          :  1,
+		 msdu_limit_error                  :  1,
+		 flow_idx_timeout                  :  1,
+		 flow_idx_invalid                  :  1,
+		 cce_match                         :  1,
+		 amsdu_parser_error                :  1,
+		 cumulative_ip_length              : 16;
+	uint32_t msdu_length                       : 14,
+		 stbc                              :  1,
+		 ipsec_esp                         :  1,
+		 l3_offset                         :  7,
+		 ipsec_ah                          :  1,
+		 l4_offset                         :  8;
+	uint32_t msdu_number                       :  8,
+		 decap_format                      :  2,
+		 ipv4_proto                        :  1,
+		 ipv6_proto                        :  1,
+		 tcp_proto                         :  1,
+		 udp_proto                         :  1,
+		 ip_frag                           :  1,
+		 tcp_only_ack                      :  1,
+		 da_is_bcast_mcast                 :  1,
+		 toeplitz_hash_sel                 :  2,
+		 ip_fixed_header_valid             :  1,
+		 ip_extn_header_valid              :  1,
+		 tcp_udp_header_valid              :  1,
+		 mesh_control_present              :  1,
+		 ldpc                              :  1,
+		 ip4_protocol_ip6_next_header      :  8;
+	uint32_t user_rssi                         :  8,
+		 pkt_type                          :  4,
+		 sgi                               :  2,
+		 rate_mcs                          :  4,
+		 receive_bandwidth                 :  3,
+		 reception_type                    :  3,
+		 mimo_ss_bitmap                    :  7,
+		 msdu_done_copy                    :  1;
+	uint32_t flow_id_toeplitz                  : 32;
+};
+
+struct rx_ppdu_end_user_mon_data {
+	uint32_t sw_peer_id                        : 16,
+		 mpdu_cnt_fcs_err                  : 11,
+		 sw2rxdma0_buf_source_used         :  1,
+		 fw2rxdma_pmac0_buf_source_used    :  1,
+		 sw2rxdma1_buf_source_used         :  1,
+		 sw2rxdma_exception_buf_source_used:  1,
+		 fw2rxdma_pmac1_buf_source_used    :  1;
+	uint32_t mpdu_cnt_fcs_ok                   : 11,
+		 frame_control_info_valid          :  1,
+		 qos_control_info_valid	           :  1,
+		 ht_control_info_valid             :  1,
+		 data_sequence_control_info_valid  :  1,
+		 ht_control_info_null_valid        :  1,
+		 rxdma2fw_pmac1_ring_used          :  1,
+		 rxdma2reo_ring_used               :  1,
+		 rxdma2fw_pmac0_ring_used          :  1,
+		 rxdma2sw_ring_used                :  1,
+		 rxdma_release_ring_used           :  1,
+		 ht_control_field_pkt_type         :  4,
+		 rxdma2reo_remote0_ring_used       :  1,
+		 rxdma2reo_remote1_ring_used       :  1,
+		 reserved_3b                       :  5;
+	uint32_t ast_index                         : 16,
+		 frame_control_field               : 16;
+	uint32_t first_data_seq_ctrl               : 16,
+		 qos_control_field                 : 16;
+	uint32_t ht_control_field                  : 32;
+	uint32_t fcs_ok_bitmap_31_0                : 32;
+	uint32_t fcs_ok_bitmap_63_32               : 32;
+	uint32_t udp_msdu_count                    : 16,
+		 tcp_msdu_count                    : 16;
+	uint32_t other_msdu_count                  : 16,
+		 tcp_ack_msdu_count                : 16;
+	uint32_t sw_response_reference_ptr         : 32;
+	uint32_t received_qos_data_tid_bitmap      : 16,
+		 received_qos_data_tid_eosp_bitmap : 16;
+	uint32_t qosctrl_15_8_tid0                 :  8,
+		 qosctrl_15_8_tid1                 :  8,
+		 qosctrl_15_8_tid2                 :  8,
+		 qosctrl_15_8_tid3                 :  8;
+	uint32_t qosctrl_15_8_tid12                :  8,
+		 qosctrl_15_8_tid13                :  8,
+		 qosctrl_15_8_tid14                :  8,
+		 qosctrl_15_8_tid15                :  8;
+	uint32_t mpdu_ok_byte_count                : 25,
+		 ampdu_delim_ok_count_6_0          :  7;
+	uint32_t ampdu_delim_err_count             : 25,
+		 ampdu_delim_ok_count_13_7         :  7;
+	uint32_t mpdu_err_byte_count               : 25,
+		 ampdu_delim_ok_count_20_14        :  7;
+	uint32_t sw_response_reference_ptr_ext     : 32;
+	uint32_t corrupted_due_to_fifo_delay       :  1,
+		 frame_control_info_null_valid     :  1,
+		 frame_control_field_null          : 16,
+		 retried_mpdu_count                : 11,
+		 reserved_23a                      :  3;
 };
 #else
 struct rx_mpdu_start_mon_data {
-	uint32_t phy_ppdu_id                       : 16;
+	uint32_t peer_meta_data                    : 32;
+	uint32_t phy_ppdu_id                       : 16,
 		 reserved_0a                       : 2,
 		 ast_based_lookup_valid            : 1,
 		 protocol_version_err              : 1,
@@ -201,10 +333,10 @@ struct rx_mpdu_start_mon_data {
 		 phy_err                           : 1,
 		 ndp_frame                         : 1,
 		 sw_frame_group_id                 : 7,
-		 rxpcu_mpdu_filter_in_category     : 2,
-	uint32_t sw_peer_id                        : 16;
-		 ast_index                         : 16,
-	uint32_t mpdu_sequence_number              : 12;
+		 rxpcu_mpdu_filter_in_category     : 2;
+	uint32_t sw_peer_id                        : 16,
+		 ast_index                         : 16;
+	uint32_t mpdu_sequence_number              : 12,
 		 mpdu_retry                        : 1,
 		 encrypted                         : 1,
 		 to_ds                             : 1,
@@ -221,7 +353,20 @@ struct rx_mpdu_start_mon_data {
 		 mac_addr_ad2_valid                : 1,
 		 mac_addr_ad1_valid                : 1,
 		 mpdu_duration_valid               : 1,
-		 mpdu_frame_control_valid          : 1,
+		 mpdu_frame_control_valid          : 1;
+	uint32_t reserved_12                       :  1,
+		 raw_mpdu                          :  1,
+		 bar_frame                         :  1,
+		 ampdu_flag                        :  1,
+		 pre_delim_count                   : 12,
+		 strip_vlan_s_tag_decap            :  1,
+		 strip_vlan_c_tag_decap            :  1,
+		 rx_insert_vlan_s_tag_padding      :  1,
+		 rx_insert_vlan_c_tag_padding      :  1,
+		 decap_type                        :  2,
+		 decrypt_needed                    :  1,
+		 new_peer_entry                    :  1,
+		 key_id_octet                      :  8;
 	uint32_t reserved_13                       : 1;
 		 amsdu_present                     : 1,
 		 directed                          : 1,
@@ -241,52 +386,174 @@ struct rx_mpdu_start_mon_data {
 		 mcast_bcast                       : 1,
 		 first_mpdu                        : 1,
 		 mpdu_length                       : 14,
-	uint32_t mpdu_duration_field               : 16;
-		 mpdu_frame_control_field          : 16,
+	uint32_t mpdu_duration_field               : 16,
+		 mpdu_frame_control_field          : 16;
 	uint32_t mac_addr_ad1_31_0                 : 32;
-	uint32_t mac_addr_ad2_15_0                 : 16;
-		 mac_addr_ad1_47_32                : 16,
+	uint32_t mac_addr_ad2_15_0                 : 16,
+		 mac_addr_ad1_47_32                : 16;
+	uint32_t mac_addr_ad2_47_16                : 32;
+	uint32_t mac_addr_ad3_31_0                 : 32;
+	uint32_t mpdu_sequence_control_field       : 16,
+		 mac_addr_ad3_47_32                : 16;
+	uint32_t mac_addr_ad4_31_0                 : 32;
+	uint32_t mpdu_qos_control_field            : 16,
+		 mac_addr_ad4_47_32                : 16;
 };
 
 struct rx_msdu_end_mon_data {
-	uint32_t phy_ppdu_id                       : 16;
+	uint32_t phy_ppdu_id                       : 16,
 		 reserved_0                        : 7,
 		 sw_frame_group_id                 : 7,
-		 rxpcu_mpdu_filter_in_category     : 2,
-	uint32_t ip_chksum_fail                    : 1;
-		 tcp_udp_chksum_fail               : 1,
-		 last_msdu                         : 1,
-		 first_msdu                        : 1,
-		 l3_header_padding                 : 2,
-		 da_is_mcbc                        : 1,
-		 da_is_valid                       : 1,
-		 sa_is_valid                       : 1,
-		 amsdu_parser_error                : 1,
-		 wifi_parser_error                 : 1,
-		 flow_idx_invalid                  : 1,
-		 flow_idx_timeout                  : 1,
-		 msdu_limit_error                  : 1,
-		 da_idx_timeout                    : 1,
-		 sa_idx_timeout                    : 1,
-		 tcp_udp_chksum                    : 16,
-	uint32_t reserved_12a                      : 6;
+		 rxpcu_mpdu_filter_in_category     : 2;
+	uint32_t reserved_1a                       : 2,
+		 reported_mpdu_length              : 14,
+		 ip_hdr_chksum                     : 16;
+	uint32_t ip_chksum_fail_copy               :  1,
+		 fr_ds                             :  1,
+		 last_msdu                         :  1,
+		 first_msdu                        :  1,
+		 l3_header_padding                 :  2,
+		 da_is_mcbc                        :  1,
+		 da_is_valid                       :  1,
+		 sa_is_valid                       :  1,
+		 tid                               :  4,
+		 to_ds                             :  1,
+		 da_idx_timeout                    :  1,
+		 sa_idx_timeout                    :  1,
+		 sa_sw_peer_id                     : 16;
+	uint32_t da_idx_or_sw_peer_id              : 16,
+		 sa_idx                            : 16;
+	uint32_t fragment_flag                     :  1,
+		 vlan_stag_stripped                :  1,
+		 vlan_ctag_stripped                :  1,
+		 mesh_sta                          :  2,
+		 use_ppe                           :  1,
 		 flow_idx                          : 20,
-		 reo_destination_indication        : 5,
-		 msdu_drop                         : 1,
+		 reo_destination_indication        :  5,
+		 msdu_drop                         :  1;
 	uint32_t fse_metadata                      : 32;
-	uint32_t sa_sw_peer_id                     : 16;
-		 cce_metadata                      : 16,
+	uint32_t cce_metadata                      : 16,
+		 tcp_udp_chksum                    : 16;
+	uint32_t cumulative_ip_length              : 16,
+		 amsdu_parser_error                :  1,
+		 cce_match                         :  1,
+		 flow_idx_invalid                  :  1,
+		 flow_idx_timeout                  :  1,
+		 msdu_limit_error                  :  1,
+		 tcp_udp_chksum_fail_copy          :  1,
+		 fisa_timeout                      :  1,
+		 flow_aggregation_continuation     :  1,
+		 aggregation_count                 :  8;
+	uint32_t l4_offset                         :  8,
+		 ipsec_ah                          :  1,
+		 l3_offset                         :  7,
+		 ipsec_esp                         :  1,
+		 stbc                              :  1,
+		 msdu_length                       : 14;
+	uint32_t ip4_protocol_ip6_next_header      :  8,
+		 ldpc                              :  1,
+		 mesh_control_present              :  1,
+		 tcp_udp_header_valid              :  1,
+		 ip_extn_header_valid              :  1,
+		 ip_fixed_header_valid             :  1,
+		 toeplitz_hash_sel                 :  2,
+		 da_is_bcast_mcast                 :  1,
+		 tcp_only_ack                      :  1,
+		 ip_frag                           :  1,
+		 udp_proto                         :  1,
+		 tcp_proto                         :  1,
+		 ipv6_proto                        :  1,
+		 ipv4_proto                        :  1,
+		 decap_format                      :  2,
+		 msdu_number                       :  8;
+	uint32_t msdu_done_copy                    :  1,
+		 mimo_ss_bitmap                    :  7,
+		 reception_type                    :  3,
+		 receive_bandwidth                 :  3,
+		 rate_mcs                          :  4,
+		 sgi                               :  2,
+		 pkt_type                          :  4,
+		 user_rssi                         :  8;
+	uint32_t flow_id_toeplitz                  : 32;
+};
+
+struct rx_ppdu_end_user_mon_data {
+	uint32_t fw2rxdma_pmac1_buf_source_used    :  1,
+		 sw2rxdma_exception_buf_source_used:  1,
+		 sw2rxdma1_buf_source_used         :  1,
+		 fw2rxdma_pmac0_buf_source_used    :  1,
+		 sw2rxdma0_buf_source_used         :  1,
+		 mpdu_cnt_fcs_err                  : 11,
+		 sw_peer_id                        : 16;
+	uint32_t reserved_3b                       :  5,
+		 rxdma2reo_remote1_ring_used       :  1,
+		 rxdma2reo_remote0_ring_used       :  1,
+		 ht_control_field_pkt_type         :  4,
+		 rxdma_release_ring_used           :  1,
+		 rxdma2sw_ring_used                :  1,
+		 rxdma2fw_pmac0_ring_used          :  1,
+		 rxdma2reo_ring_used               :  1,
+		 rxdma2fw_pmac1_ring_used          :  1,
+		 ht_control_info_null_valid        :  1,
+		 data_sequence_control_info_valid  :  1,
+		 ht_control_info_valid             :  1,
+		 qos_control_info_valid            :  1,
+		 frame_control_info_valid          :  1,
+		 mpdu_cnt_fcs_ok                   : 11;
+	uint32_t frame_control_field               : 16,
+		 ast_index                         : 16;
+	uint32_t qos_control_field                 : 16,
+		 first_data_seq_ctrl               : 16;
+	uint32_t ht_control_field                  : 32;
+	uint32_t fcs_ok_bitmap_31_0                : 32;
+	uint32_t fcs_ok_bitmap_63_32               : 32;
+	uint32_t tcp_msdu_count                    : 16,
+		 udp_msdu_count                    : 16;
+	uint32_t tcp_ack_msdu_count                : 16,
+		 other_msdu_count                  : 16;
+	uint32_t sw_response_reference_ptr         : 32;
+	uint32_t received_qos_data_tid_eosp_bitmap : 16,
+		 received_qos_data_tid_bitmap      : 16;
+	uint32_t qosctrl_15_8_tid3                 :  8,
+		 qosctrl_15_8_tid2                 :  8,
+		 qosctrl_15_8_tid1                 :  8,
+		 qosctrl_15_8_tid0                 :  8;
+	uint32_t qosctrl_15_8_tid15                :  8,
+		 qosctrl_15_8_tid14                :  8,
+		 qosctrl_15_8_tid13                :  8,
+		 qosctrl_15_8_tid12                :  8;
+	uint32_t ampdu_delim_ok_count_6_0          :  7,
+		 mpdu_ok_byte_count                : 25;
+	uint32_t ampdu_delim_ok_count_13_7         :  7,
+		 ampdu_delim_err_count             : 25;
+	uint32_t ampdu_delim_ok_count_20_14        :  7,
+		 mpdu_err_byte_count               : 25;
+	uint32_t sw_response_reference_ptr_ext     : 32;
+	uint32_t reserved_23a                      :  3,
+		 retried_mpdu_count                : 11,
+		 frame_control_field_null          : 16,
+		 frame_control_info_null_valid     :  1,
+		 corrupted_due_to_fifo_delay       :  1;
 };
 #endif
 
+struct rx_mpdu_start_mon_data_t {
+	struct rx_mpdu_start_mon_data rx_mpdu_info_details;
+};
+
+struct rx_msdu_end_mon_data_t {
+	struct rx_msdu_end_mon_data rx_mpdu_info_details;
+};
 /* TLV struct for word based Tlv */
-typedef struct rx_mpdu_start_mon_data hal_rx_mon_mpdu_start_t;
+typedef struct rx_mpdu_start_mon_data_t hal_rx_mon_mpdu_start_t;
 typedef struct rx_msdu_end_mon_data hal_rx_mon_msdu_end_t;
+typedef struct rx_ppdu_end_user_mon_data hal_rx_mon_ppdu_end_user_t;
 
 #else
 
 typedef struct rx_mpdu_start hal_rx_mon_mpdu_start_t;
 typedef struct rx_msdu_end hal_rx_mon_msdu_end_t;
+typedef struct rx_ppdu_end_user_stats hal_rx_mon_ppdu_end_user_t;
 #endif
 
 /*
@@ -479,45 +746,37 @@ hal_be_get_mon_dest_status(hal_soc_handle_t hal_soc,
 defined(RX_PPDU_END_USER_STATS_SW_RESPONSE_REFERENCE_PTR_EXT_OFFSET)
 
 static inline void
-hal_rx_handle_mu_ul_info(void *rx_tlv,
+hal_rx_handle_mu_ul_info(hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user,
 			 struct mon_rx_user_status *mon_rx_user_status)
 {
 	mon_rx_user_status->mu_ul_user_v0_word0 =
-		HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-			      SW_RESPONSE_REFERENCE_PTR);
+		rx_ppdu_end_user->sw_response_reference_ptr;
 
 	mon_rx_user_status->mu_ul_user_v0_word1 =
-		HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-			      SW_RESPONSE_REFERENCE_PTR_EXT);
+		rx_ppdu_end_user->sw_response_reference_ptr_ext;
 }
 #else
 static inline void
-hal_rx_handle_mu_ul_info(void *rx_tlv,
+hal_rx_handle_mu_ul_info(hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user,
 			 struct mon_rx_user_status *mon_rx_user_status)
 {
 }
 #endif
 
 static inline void
-hal_rx_populate_byte_count(void *rx_tlv, void *ppduinfo,
+hal_rx_populate_byte_count(hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user,
+			   void *ppduinfo,
 			   struct mon_rx_user_status *mon_rx_user_status)
 {
-	uint32_t mpdu_ok_byte_count;
-	uint32_t mpdu_err_byte_count;
-
-	mpdu_ok_byte_count = HAL_RX_GET_64(rx_tlv,
-					   RX_PPDU_END_USER_STATS,
-					   MPDU_OK_BYTE_COUNT);
-	mpdu_err_byte_count = HAL_RX_GET_64(rx_tlv,
-					    RX_PPDU_END_USER_STATS,
-					    MPDU_ERR_BYTE_COUNT);
-
-	mon_rx_user_status->mpdu_ok_byte_count = mpdu_ok_byte_count;
-	mon_rx_user_status->mpdu_err_byte_count = mpdu_err_byte_count;
+	mon_rx_user_status->mpdu_ok_byte_count =
+				rx_ppdu_end_user->mpdu_ok_byte_count;
+	mon_rx_user_status->mpdu_err_byte_count =
+				rx_ppdu_end_user->mpdu_err_byte_count;
 }
 
 static inline void
-hal_rx_populate_mu_user_info(void *rx_tlv, void *ppduinfo, uint32_t user_id,
+hal_rx_populate_mu_user_info(hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user,
+			     void *ppduinfo, uint32_t user_id,
 			     struct mon_rx_user_status *mon_rx_user_status)
 {
 	struct mon_rx_info *mon_rx_info;
@@ -576,7 +835,8 @@ hal_rx_populate_mu_user_info(void *rx_tlv, void *ppduinfo, uint32_t user_id,
 		     sizeof(ppdu_info->com_info.mpdu_fcs_ok_bitmap[0]));
 	mon_rx_user_status->retry_mpdu =
 			ppdu_info->rx_status.mpdu_retry_cnt;
-	hal_rx_populate_byte_count(rx_tlv, ppdu_info, mon_rx_user_status);
+	hal_rx_populate_byte_count(rx_ppdu_end_user, ppdu_info,
+				   mon_rx_user_status);
 }
 
 #define HAL_RX_UPDATE_RSSI_PER_CHAIN_BW(chain, \
@@ -613,18 +873,15 @@ hal_rx_update_rssi_chain(struct hal_rx_ppdu_info *ppdu_info,
 
 #ifdef WLAN_TX_PKT_CAPTURE_ENH
 static inline void
-hal_get_qos_control(void *rx_tlv,
+hal_get_qos_control(hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user,
 		    struct hal_rx_ppdu_info *ppdu_info)
 {
 	ppdu_info->rx_info.qos_control_info_valid =
-		HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-			      QOS_CONTROL_INFO_VALID);
+		rx_ppdu_end_user->qos_control_info_valid;
 
 	if (ppdu_info->rx_info.qos_control_info_valid)
 		ppdu_info->rx_info.qos_control =
-			HAL_RX_GET_64(rx_tlv,
-				      RX_PPDU_END_USER_STATS,
-				      QOS_CONTROL_FIELD);
+			rx_ppdu_end_user->qos_control_field;
 }
 
 static inline void
@@ -649,7 +906,7 @@ hal_get_mac_addr1(hal_rx_mon_mpdu_start_t *rx_mpdu_start,
 }
 #else
 static inline void
-hal_get_qos_control(void *rx_tlv,
+hal_get_qos_control(hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user,
 		    struct hal_rx_ppdu_info *ppdu_info)
 {
 }
@@ -1876,11 +2133,10 @@ hal_rx_parse_receive_user_info(struct hal_soc *hal_soc, uint8_t *tlv,
 #ifdef QCA_MONITOR_2_0_SUPPORT
 static inline void
 hal_rx_status_get_mpdu_retry_cnt(struct hal_rx_ppdu_info *ppdu_info,
-				 void *rx_tlv)
+				 hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user)
 {
 		ppdu_info->rx_status.mpdu_retry_cnt =
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      RETRIED_MPDU_COUNT);
+			rx_ppdu_end_user->retried_mpdu_count;
 }
 
 static inline void
@@ -1912,7 +2168,7 @@ hal_rx_update_ppdu_drop_cnt(uint8_t *rx_tlv,
 #else
 static inline void
 hal_rx_status_get_mpdu_retry_cnt(struct hal_rx_ppdu_info *ppdu_info,
-				 void *rx_tlv)
+				 hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user)
 {
 		ppdu_info->rx_status.mpdu_retry_cnt = 0;
 }
@@ -2066,15 +2322,14 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 	 */
 	case WIFIRX_PPDU_END_USER_STATS_E:
 	{
+		hal_rx_mon_ppdu_end_user_t *rx_ppdu_end_user = rx_tlv;
 		unsigned long tid = 0;
 		uint16_t seq = 0;
 
 		ppdu_info->rx_status.ast_index =
-				HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-					      AST_INDEX);
+				rx_ppdu_end_user->ast_index;
 
-		tid = HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				    RECEIVED_QOS_DATA_TID_BITMAP);
+		tid = rx_ppdu_end_user->received_qos_data_tid_bitmap;
 		ppdu_info->rx_status.tid = qdf_find_first_bit(&tid,
 							      sizeof(tid) * 8);
 
@@ -2082,45 +2337,39 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 			ppdu_info->rx_status.tid = HAL_TID_INVALID;
 
 		ppdu_info->rx_status.tcp_msdu_count =
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      TCP_MSDU_COUNT) +
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      TCP_ACK_MSDU_COUNT);
+			rx_ppdu_end_user->tcp_msdu_count +
+			rx_ppdu_end_user->tcp_ack_msdu_count;
+
 		ppdu_info->rx_status.udp_msdu_count =
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      UDP_MSDU_COUNT);
+			rx_ppdu_end_user->udp_msdu_count;
+
 		ppdu_info->rx_status.other_msdu_count =
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      OTHER_MSDU_COUNT);
-		hal_rx_status_get_mpdu_retry_cnt(ppdu_info, rx_tlv);
+			rx_ppdu_end_user->other_msdu_count;
+
+		hal_rx_status_get_mpdu_retry_cnt(ppdu_info, rx_ppdu_end_user);
 
 		if (ppdu_info->sw_frame_group_id
 		    != HAL_MPDU_SW_FRAME_GROUP_NULL_DATA) {
 			ppdu_info->rx_status.frame_control_info_valid =
-				HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-					      FRAME_CONTROL_INFO_VALID);
+				rx_ppdu_end_user->frame_control_info_valid;
 
 			if (ppdu_info->rx_status.frame_control_info_valid)
 				ppdu_info->rx_status.frame_control =
-					HAL_RX_GET_64(rx_tlv,
-						      RX_PPDU_END_USER_STATS,
-						      FRAME_CONTROL_FIELD);
+					rx_ppdu_end_user->frame_control_field;
 
-			hal_get_qos_control(rx_tlv, ppdu_info);
+			hal_get_qos_control(rx_ppdu_end_user, ppdu_info);
 		}
 
 		ppdu_info->rx_status.data_sequence_control_info_valid =
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      DATA_SEQUENCE_CONTROL_INFO_VALID);
+			rx_ppdu_end_user->data_sequence_control_info_valid;
 
-		seq = HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				    FIRST_DATA_SEQ_CTRL);
+		seq = rx_ppdu_end_user->first_data_seq_ctrl;
+
 		if (ppdu_info->rx_status.data_sequence_control_info_valid)
 			ppdu_info->rx_status.first_data_seq_ctrl = seq;
 
 		ppdu_info->rx_status.preamble_type =
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      HT_CONTROL_FIELD_PKT_TYPE);
+			rx_ppdu_end_user->ht_control_field_pkt_type;
 
 		ppdu_info->end_user_stats_cnt++;
 
@@ -2140,11 +2389,9 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 		}
 
 		ppdu_info->com_info.mpdu_cnt_fcs_ok =
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      MPDU_CNT_FCS_OK);
+			rx_ppdu_end_user->mpdu_cnt_fcs_ok;
 		ppdu_info->com_info.mpdu_cnt_fcs_err =
-			HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-				      MPDU_CNT_FCS_ERR);
+			rx_ppdu_end_user->mpdu_cnt_fcs_err;
 		if ((ppdu_info->com_info.mpdu_cnt_fcs_ok |
 			ppdu_info->com_info.mpdu_cnt_fcs_err) > 1)
 			ppdu_info->rx_status.rs_flags |= IEEE80211_AMPDU_FLAG;
@@ -2153,22 +2400,21 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 				(~IEEE80211_AMPDU_FLAG);
 
 		ppdu_info->com_info.mpdu_fcs_ok_bitmap[0] =
-				HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-					      FCS_OK_BITMAP_31_0);
+				rx_ppdu_end_user->fcs_ok_bitmap_31_0;
 
 		ppdu_info->com_info.mpdu_fcs_ok_bitmap[1] =
-				HAL_RX_GET_64(rx_tlv, RX_PPDU_END_USER_STATS,
-					      FCS_OK_BITMAP_63_32);
+				rx_ppdu_end_user->fcs_ok_bitmap_63_32;
 
 		if (user_id < HAL_MAX_UL_MU_USERS) {
 			mon_rx_user_status =
 				&ppdu_info->rx_user_status[user_id];
 
-			hal_rx_handle_mu_ul_info(rx_tlv, mon_rx_user_status);
+			hal_rx_handle_mu_ul_info(rx_ppdu_end_user,
+						 mon_rx_user_status);
 
 			ppdu_info->com_info.num_users++;
 
-			hal_rx_populate_mu_user_info(rx_tlv, ppdu_info,
+			hal_rx_populate_mu_user_info(rx_ppdu_end_user, ppdu_info,
 						     user_id,
 						     mon_rx_user_status);
 		}

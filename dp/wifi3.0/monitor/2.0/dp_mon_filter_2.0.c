@@ -179,22 +179,67 @@ void
 dp_rx_mon_word_mask_subscribe(uint32_t *msg_word,
 				  struct htt_rx_ring_tlv_filter *tlv_filter)
 {
+	if (!msg_word || !tlv_filter)
+		return;
 
-#ifdef QCA_MONITOR_2_0_SUPPORT_WAR /* Yet to get FW support */
-	HTT_RX_RING_SELECTION_CFG_RX_MPDU_END_WORD_MASK_SET(*msg_word,
-			tlv_filter->rx_mpdu_end_wmask);
-#endif
+	if (!tlv_filter->enable)
+		return;
+
+	HTT_RX_RING_SELECTION_CFG_WORD_MASK_COMPACTION_ENABLE_SET(*msg_word, 1);
+
+	/* word 14 */
+	msg_word += 3;
+	*msg_word = 0;
+
+	HTT_RX_RING_SELECTION_CFG_RX_MPDU_START_WORD_MASK_SET(
+				*msg_word,
+				RX_MON_MPDU_START_WMASK);
+
 	/* word 15 */
 	msg_word++;
+	*msg_word = 0;
+	HTT_RX_RING_SELECTION_CFG_RX_MSDU_END_WORD_MASK_SET(
+				*msg_word,
+				RX_MON_MSDU_END_WMASK);
 
 	/* word 16 */
 	msg_word++;
+	/* word 17 */
+	msg_word++;
+	*msg_word = 0;
+	HTT_RX_RING_SELECTION_CFG_RX_MPDU_START_WORD_MASK_V2_SET(
+				*msg_word,
+				RX_MON_MPDU_START_WMASK);
+
+	/* word 18 */
+	msg_word++;
+	*msg_word = 0;
+	HTT_RX_RING_SELECTION_CFG_RX_MSDU_END_WORD_MASK_V2_SET(
+				*msg_word,
+				RX_MON_MSDU_END_WMASK);
+	/* word 19 */
+	msg_word++;
+	*msg_word = 0;
+	HTT_RX_RING_SELECTION_CFG_RX_PPDU_END_USR_STATS_WORD_MASK_V2_SET(
+				*msg_word,
+				RX_MON_PPDU_END_USR_STATS_WMASK);
+}
+
+void
+dp_rx_mon_pkt_tlv_offset_subscribe(uint32_t *msg_word,
+				   struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+	if (!msg_word || !tlv_filter)
+		return;
+
+	/* word 16 */
 	*msg_word = 0;
 	if (tlv_filter->rx_pkt_tlv_offset) {
 		HTT_RX_RING_SELECTION_CFG_ENABLE_RX_PKT_TLV_OFFSET_SET(*msg_word, 1);
 		HTT_RX_RING_SELECTION_CFG_RX_PKT_TLV_OFFSET_SET(*msg_word,
 								tlv_filter->rx_pkt_tlv_offset);
 	}
+
 }
 
 void
@@ -1505,7 +1550,6 @@ static void dp_mon_filter_set_mon_2_0(struct dp_mon_pdev *mon_pdev,
 	filter->tlv_filter.ctrl_mpdu_log = DP_MON_MSDU_LOGGING;
 	filter->tlv_filter.data_mpdu_log = DP_MON_MSDU_LOGGING;
 
-
 	if (mon_pdev->mon_filter_mode & MON_FILTER_OTHER) {
 		filter->tlv_filter.enable_mo = 1;
 		filter->tlv_filter.mo_mgmt_filter = FILTER_MGMT_ALL;
@@ -2464,22 +2508,6 @@ dp_rx_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
 		    !tlv_filter->data_mpdu_log)
 			tlv_filter->data_mpdu_log =
 				src_tlv_filter->data_mpdu_log;
-
-		/*
-		 * set mpdu start wmask
-		 */
-		if (src_tlv_filter->rx_mpdu_start_wmask &&
-		    !tlv_filter->rx_mpdu_start_wmask)
-			tlv_filter->rx_mpdu_start_wmask =
-				src_tlv_filter->rx_mpdu_start_wmask;
-
-		/*
-		 * set msdu end wmask
-		 */
-		if (src_tlv_filter->rx_msdu_end_wmask &&
-		    !tlv_filter->rx_msdu_end_wmask)
-			tlv_filter->rx_msdu_end_wmask =
-				src_tlv_filter->rx_msdu_end_wmask;
 
 		/*
 		 * set hdr tlv length

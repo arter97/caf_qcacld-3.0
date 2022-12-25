@@ -960,6 +960,12 @@ dp_mon_rx_mac_filter_set(struct dp_soc *soc, uint32_t *msg_word,
 {
 }
 
+static inline void
+dp_mon_rx_enable_pkt_tlv_offset(struct dp_soc *soc, uint32_t *msg_word,
+				struct htt_rx_ring_tlv_filter *tlv_filter)
+{
+}
+
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 static inline
 void dp_monitor_peer_telemetry_stats(struct dp_peer *peer,
