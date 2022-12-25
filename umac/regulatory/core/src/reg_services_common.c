@@ -5318,6 +5318,7 @@ reg_get_320_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 	enum channel_state temp_chan_state, prim_chan_state;
 	uint16_t startchan_cfreq, endchan_cfreq;
 	uint16_t max_cont_bw, i;
+	enum channel_state update_state = CHANNEL_STATE_ENABLE;
 
 	*out_punc_bitmap = ALL_SCHANS_PUNC;
 
@@ -5342,6 +5343,9 @@ reg_get_320_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 			if (reg_is_state_allowed(temp_chan_state)) {
 				max_cont_bw += SUB_CHAN_BW;
 				*out_punc_bitmap &= ~BIT(i);
+				/* Remember if sub20 channel is DFS channel */
+				if (temp_chan_state == CHANNEL_STATE_DFS)
+					update_state = CHANNEL_STATE_DFS;
 			}
 
 			if (temp_chan_state < chan_state)
@@ -5349,6 +5353,11 @@ reg_get_320_bonded_channel_state_for_pwrmode(struct wlan_objmgr_pdev *pdev,
 		}
 		startchan_cfreq = startchan_cfreq + SUB_CHAN_BW;
 		i++;
+	}
+
+	/* Validate puncture bitmap. Update channel state. */
+	if (reg_is_punc_bitmap_valid(CH_WIDTH_320MHZ, *out_punc_bitmap)) {
+		chan_state = update_state;
 	}
 
 	prim_chan_state =
