@@ -431,7 +431,6 @@ static QDF_STATUS mlo_disconnect_no_lock(struct wlan_objmgr_vdev *vdev,
 						  reason_code, bssid);
 		if (QDF_IS_STATUS_ERROR(status)) {
 			mlo_debug("Connect in progress, deferring disconnect");
-			mlo_dev_lock_release(mlo_dev_ctx);
 			return status;
 		}
 
