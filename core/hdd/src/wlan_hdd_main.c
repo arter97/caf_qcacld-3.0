@@ -2866,7 +2866,7 @@ int hdd_wlan_start_modules(struct hdd_context *hdd_ctx, bool reinit)
 				goto cds_free;
 			}
 
-			hdd_info("epping mode enabled");
+			//hdd_info("epping mode enabled");
 			break;
 		}
 
