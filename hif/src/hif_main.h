@@ -99,6 +99,7 @@
 #define QCA6490_EMULATION_DEVICE_ID (0x010a)
 #define QCA6490_DEVICE_ID (0x1103)
 #define MANGO_DEVICE_ID (0x110a)
+#define PEACH_DEVICE_ID (0x110e)
 
 /* TODO: change IDs for Moselle */
 #define QCA6750_EMULATION_DEVICE_ID (0x010c)
