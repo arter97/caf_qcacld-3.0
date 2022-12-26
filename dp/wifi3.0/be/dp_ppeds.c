@@ -1088,7 +1088,7 @@ void dp_ppeds_detach_vdev_be(struct cdp_soc_t *soc_hdl, uint8_t vdev_id)
 		return;
 	}
 
-	ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_profile->ppe_vp_num_idx);
+	ppe_ds_wlan_vp_free(be_soc->ppeds_handle, vp_profile->vp_num);
 
 	dp_ppeds_dealloc_vp_tbl_entry_be(be_soc, vp_profile->ppe_vp_num_idx);
 
