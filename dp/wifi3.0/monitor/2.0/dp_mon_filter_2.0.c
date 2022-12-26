@@ -246,7 +246,6 @@ void
 dp_rx_mon_enable_fpmo(uint32_t *msg_word,
 		      struct htt_rx_ring_tlv_filter *tlv_filter)
 {
-#ifdef FW_SUPPORT_NOT_YET
 	if (!msg_word || !tlv_filter)
 		return;
 
@@ -388,7 +387,7 @@ dp_rx_mon_enable_fpmo(uint32_t *msg_word,
 			(tlv_filter->fpmo_ctrl_filter &
 			FILTER_CTRL_CFEND_CFACK) ? 1 : 0);
 
-		/* word 18 */
+		/* word 21 */
 		msg_word++;
 		*msg_word = 0;
 
@@ -407,15 +406,14 @@ dp_rx_mon_enable_fpmo(uint32_t *msg_word,
 			FILTER_DATA_NULL) ? 1 : 0);
 
 	} else {
-		/* clear word 18 if fpmo is disabled
-		 * word 17 is already cleared by caller
+		/* clear word 21 if fpmo is disabled
+		 * word 20 is already cleared by caller
 		 */
 
-		/* word 18 */
+		/* word 21 */
 		msg_word++;
 		*msg_word = 0;
 	}
-#endif
 }
 
 static void

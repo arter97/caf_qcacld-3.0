@@ -1651,13 +1651,11 @@ int htt_h2t_rx_ring_cfg(struct htt_soc *htt_soc, int pdev_id,
 
 	dp_mon_rx_enable_pkt_tlv_offset(soc->dp_soc, msg_word, htt_tlv_filter);
 
-#ifdef FW_SUPPORT_NOT_YET
 	/* word 20 and 21*/
 	msg_word += 4;
 	*msg_word = 0;
 
 	dp_mon_rx_enable_fpmo(soc->dp_soc, msg_word, htt_tlv_filter);
-#endif/* FW_SUPPORT_NOT_YET */
 
 	/* "response_required" field should be set if a HTT response message is
 	 * required after setting up the ring.
