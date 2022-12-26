@@ -212,8 +212,8 @@ __ol_transfer_bin_file(struct ol_context *ol_ctx, enum ATH_BIN_FILE file,
 	case ATH_FIRMWARE_FILE:
 		if (QDF_IS_EPPING_ENABLED(cds_get_conparam())) {
 			filename = bmi_ctx->fw_files.epping_file;
-			BMI_INFO("%s: Loading epping firmware file %s",
-						__func__, filename);
+			/*BMI_INFO("%s: Loading epping firmware file %s",
+						__func__, filename);*/
 			break;
 		}
 #ifdef QCA_WIFI_FTM
