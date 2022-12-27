@@ -2996,7 +2996,191 @@ dp_pdev_telemetry_stats_update(
 	DP_STATS_INC(pdev, telemetry_stats.tx_mpdu_total[ac],
 		     mpdu_tried);
 }
+
+/*
+ * dp_ppdu_desc_get_txmode() - Get TX mode
+ * @ppdu: PPDU Descriptor
+ *
+ * Return: None
+ */
+static inline
+void dp_ppdu_desc_get_txmode(struct cdp_tx_completion_ppdu *ppdu)
+{
+	uint16_t frame_type = ppdu->htt_frame_type;
+
+	if (ppdu->frame_type != CDP_PPDU_FTYPE_DATA)
+		return;
+
+	ppdu->txmode_type = TX_MODE_TYPE_UNKNOWN;
+
+	if (frame_type == HTT_STATS_FTYPE_SGEN_MU_BAR ||
+	    frame_type == HTT_STATS_FTYPE_SGEN_BE_MU_BAR) {
+		ppdu->txmode = TX_MODE_UL_OFDMA_MU_BAR_TRIGGER;
+		ppdu->txmode_type = TX_MODE_TYPE_UL;
+
+		return;
+	}
+
+	switch (ppdu->htt_seq_type) {
+	case HTT_SEQTYPE_SU:
+		if (frame_type == HTT_STATS_FTYPE_TIDQ_DATA_SU) {
+			ppdu->txmode = TX_MODE_DL_SU_DATA;
+			ppdu->txmode_type = TX_MODE_TYPE_DL;
+		}
+		break;
+	case HTT_SEQTYPE_MU_OFDMA:
+	case HTT_SEQTYPE_BE_MU_OFDMA:
+		if (frame_type == HTT_STATS_FTYPE_TIDQ_DATA_MU) {
+			ppdu->txmode = TX_MODE_DL_OFDMA_DATA;
+			ppdu->txmode_type = TX_MODE_TYPE_DL;
+		}
+		break;
+	case HTT_SEQTYPE_AC_MU_MIMO:
+	case HTT_SEQTYPE_AX_MU_MIMO:
+	case HTT_SEQTYPE_BE_MU_MIMO:
+		if (frame_type == HTT_STATS_FTYPE_TIDQ_DATA_MU) {
+			ppdu->txmode = TX_MODE_DL_MUMIMO_DATA;
+			ppdu->txmode_type = TX_MODE_TYPE_DL;
+		}
+		break;
+	case HTT_SEQTYPE_UL_MU_OFDMA_TRIG:
+	case HTT_SEQTYPE_BE_UL_MU_OFDMA_TRIG:
+		if (frame_type == HTT_STATS_FTYPE_SGEN_MU_TRIG ||
+		    frame_type == HTT_STATS_FTYPE_SGEN_BE_MU_TRIG) {
+			ppdu->txmode = TX_MODE_UL_OFDMA_BASIC_TRIGGER_DATA;
+			ppdu->txmode_type = TX_MODE_TYPE_UL;
+		}
+		break;
+	case HTT_SEQTYPE_UL_MU_MIMO_TRIG:
+	case HTT_SEQTYPE_BE_UL_MU_MIMO_TRIG:
+		if (frame_type == HTT_STATS_FTYPE_SGEN_MU_TRIG ||
+		    frame_type == HTT_STATS_FTYPE_SGEN_BE_MU_TRIG) {
+			ppdu->txmode = TX_MODE_UL_MUMIMO_BASIC_TRIGGER_DATA;
+			ppdu->txmode_type = TX_MODE_TYPE_UL;
+		}
+		break;
+	default:
+		ppdu->txmode_type = TX_MODE_TYPE_UNKNOWN;
+		break;
+	}
+}
+
+/*
+ * dp_ppdu_desc_get_msduq() - Get msduq index from bitmap
+ * @ppdu: PPDU Descriptor
+ * @msduq_index: MSDUQ index
+ *
+ * Return: None
+ */
+static inline void
+dp_ppdu_desc_get_msduq(uint32_t msduq_bitmap, uint32_t *msduq_index)
+{
+	if ((msduq_bitmap & BIT(HTT_MSDUQ_INDEX_NON_UDP)) ||
+	    (msduq_bitmap & BIT(HTT_MSDUQ_INDEX_UDP))) {
+		*msduq_index = MSDUQ_INDEX_DEFAULT;
+	} else if (msduq_bitmap & BIT(HTT_MSDUQ_INDEX_CUSTOM_PRIO_0)) {
+		*msduq_index = MSDUQ_INDEX_CUSTOM_PRIO_0;
+	} else if (msduq_bitmap & BIT(HTT_MSDUQ_INDEX_CUSTOM_PRIO_1)) {
+		*msduq_index = MSDUQ_INDEX_CUSTOM_PRIO_1;
+	} else if (msduq_bitmap & BIT(HTT_MSDUQ_INDEX_CUSTOM_EXT_PRIO_0)) {
+		*msduq_index = MSDUQ_INDEX_CUSTOM_EXT_PRIO_0;
+	} else if (msduq_bitmap & BIT(HTT_MSDUQ_INDEX_CUSTOM_EXT_PRIO_1)) {
+		*msduq_index = MSDUQ_INDEX_CUSTOM_EXT_PRIO_1;
+	} else if (msduq_bitmap & BIT(HTT_MSDUQ_INDEX_CUSTOM_EXT_PRIO_2)) {
+		*msduq_index = MSDUQ_INDEX_CUSTOM_EXT_PRIO_2;
+	} else if (msduq_bitmap & BIT(HTT_MSDUQ_INDEX_CUSTOM_EXT_PRIO_3)) {
+		*msduq_index = MSDUQ_INDEX_CUSTOM_EXT_PRIO_3;
+	} else {
+		*msduq_index = MSDUQ_INDEX_MAX;
+	}
+}
+
+/*
+ * dp_ppdu_desc_user_deter_stats_update() - Update per-peer deterministic stats
+ * @pdev: Datapath pdev handle
+ * @peer: Datapath peer handle
+ * @ppdu_desc: PPDU Descriptor
+ * @user: PPDU Descriptor per user
+ *
+ * Return: None
+ */
+static void
+dp_ppdu_desc_user_deter_stats_update(struct dp_pdev *pdev,
+				     struct dp_peer *peer,
+				     struct cdp_tx_completion_ppdu *ppdu_desc,
+				     struct cdp_tx_completion_ppdu_user *user)
+{
+	struct dp_mon_peer *mon_peer = NULL;
+	uint32_t msduq;
+	uint8_t txmode;
+	uint8_t tid;
+
+	if (!pdev || !ppdu_desc || !user || !peer)
+		return;
+
+	if (ppdu_desc->frame_type != CDP_PPDU_FTYPE_DATA)
+		return;
+
+	if (user->tid >= CDP_DATA_TID_MAX)
+		return;
+
+	mon_peer = peer->monitor_peer;
+	if (qdf_unlikely(!mon_peer))
+		return;
+
+	if (ppdu_desc->txmode_type == TX_MODE_TYPE_UNKNOWN)
+		return;
+
+	txmode = ppdu_desc->txmode;
+	tid = user->tid;
+	if (ppdu_desc->txmode_type == TX_MODE_TYPE_DL) {
+		dp_ppdu_desc_get_msduq(user->msduq_bitmap, &msduq);
+		if (msduq == MSDUQ_INDEX_MAX)
+			return;
+
+		DP_STATS_INC(mon_peer,
+			     deter_stats[tid].dl_det[msduq][txmode].mode_cnt,
+			     1);
+		DP_STATS_UPD(mon_peer,
+			     deter_stats[tid].dl_det[msduq][txmode].avg_rate,
+			     mon_peer->stats.tx.avg_tx_rate);
+	} else {
+		DP_STATS_INC(mon_peer,
+			     deter_stats[tid].ul_det[txmode].mode_cnt,
+			     1);
+		DP_STATS_UPD(mon_peer,
+			     deter_stats[tid].ul_det[txmode].avg_rate,
+			     mon_peer->stats.tx.avg_tx_rate);
+		if (!user->completion_status) {
+			DP_STATS_INC(mon_peer,
+				     deter_stats[tid].ul_det[txmode].trigger_success,
+				     1);
+		} else {
+			DP_STATS_INC(mon_peer,
+				     deter_stats[tid].ul_det[txmode].trigger_fail,
+				     1);
+		}
+	}
+}
 #else
+static inline
+void dp_ppdu_desc_get_txmode(struct cdp_tx_completion_ppdu *ppdu)
+{
+}
+
+static inline void
+dp_ppdu_desc_get_msduq(uint32_t msduq_bitmap, uint32_t *msduq_index)
+{
+}
+
+static void
+dp_ppdu_desc_user_deter_stats_update(struct dp_pdev *pdev,
+				     struct dp_peer *peer,
+				     struct cdp_tx_completion_ppdu *ppdu_desc,
+				     struct cdp_tx_completion_ppdu_user *user)
+{
+}
+
 static inline void
 dp_pdev_telemetry_stats_update(
 		struct dp_pdev *pdev,
@@ -3008,15 +3192,15 @@ dp_pdev_telemetry_stats_update(
  * dp_tx_stats_update() - Update per-peer statistics
  * @pdev: Datapath pdev handle
  * @peer: Datapath peer handle
- * @ppdu: PPDU Descriptor
- * @ack_rssi: RSSI of last ack received
+ * @ppdu: PPDU Descriptor per user
+ * @ppdu_desc: PPDU Descriptor
  *
  * Return: None
  */
 static void
 dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 		   struct cdp_tx_completion_ppdu_user *ppdu,
-		   uint32_t ack_rssi)
+		   struct cdp_tx_completion_ppdu *ppdu_desc)
 {
 	uint8_t preamble, mcs;
 	uint16_t num_msdu;
@@ -3124,7 +3308,7 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 	DP_STATS_INCC(mon_peer, tx.stbc, num_msdu, ppdu->stbc);
 	DP_STATS_INCC(mon_peer, tx.ldpc, num_msdu, ppdu->ldpc);
 	if (!(ppdu->is_mcast) && ppdu->ack_rssi_valid)
-		DP_STATS_UPD(mon_peer, tx.last_ack_rssi, ack_rssi);
+		DP_STATS_UPD(mon_peer, tx.last_ack_rssi, ppdu_desc->ack_rssi);
 
 	if (!ppdu->is_mcast) {
 		DP_STATS_INC(mon_peer, tx.tx_ucast_success.num, num_msdu);
@@ -3175,6 +3359,9 @@ dp_tx_stats_update(struct dp_pdev *pdev, struct dp_peer *peer,
 
 	dp_tx_rate_stats_update(peer, ppdu);
 	dp_pdev_telemetry_stats_update(pdev, ppdu);
+
+	dp_ppdu_desc_user_deter_stats_update(pdev, peer, ppdu_desc,
+					     ppdu);
 
 	dp_peer_stats_notify(pdev, peer);
 
@@ -3262,6 +3449,9 @@ dp_process_ppdu_stats_common_tlv(struct dp_pdev *pdev,
 	tag_buf = start_tag_buf + HTT_GET_STATS_CMN_INDEX(QTYPE_FRM_TYPE);
 	frame_type = HTT_PPDU_STATS_COMMON_TLV_FRM_TYPE_GET(*tag_buf);
 	ppdu_desc->htt_frame_type = frame_type;
+
+	ppdu_desc->htt_seq_type =
+			HTT_PPDU_STATS_COMMON_TLV_PPDU_SEQ_TYPE_GET(*tag_buf);
 
 	frame_ctrl = ppdu_desc->frame_ctrl;
 
@@ -3465,6 +3655,9 @@ static void dp_process_ppdu_stats_user_common_tlv(
 			     peer->mac_addr.raw, QDF_MAC_ADDR_SIZE);
 		dp_peer_unref_delete(peer, DP_MOD_ID_TX_PPDU_STATS);
 	}
+
+	tag_buf += 10;
+	ppdu_user_desc->msduq_bitmap = *tag_buf;
 }
 
 /**
@@ -4526,6 +4719,8 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 	}
 	qdf_assert_always(ppdu_desc->num_users <= ppdu_desc->max_users);
 
+	dp_ppdu_desc_get_txmode(ppdu_desc);
+
 	for (i = 0; i < num_users; i++) {
 		ppdu_desc->num_mpdu += ppdu_desc->user[i].num_mpdu;
 		ppdu_desc->num_msdu += ppdu_desc->user[i].num_msdu;
@@ -4582,7 +4777,7 @@ dp_ppdu_desc_user_stats_update(struct dp_pdev *pdev,
 		      (ppdu_desc->frame_type != CDP_PPDU_FTYPE_CTRL)) {
 			dp_tx_stats_update(pdev, peer,
 					   &ppdu_desc->user[i],
-					   ppdu_desc->ack_rssi);
+					   ppdu_desc);
 		}
 
 		dp_peer_unref_delete(peer, DP_MOD_ID_TX_PPDU_STATS);

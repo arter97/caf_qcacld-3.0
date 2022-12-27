@@ -2041,6 +2041,7 @@ struct cdp_delayed_tx_completion_ppdu_user {
  * @punc_mode: puncutured mode to indicate punctured bw
  * @punc_pattern_bitmap: bitmap indicating punctured pattern
  * @mprot_type: medium protection type
+ * @msduq_bitmap: msduq bitmap
  * @rts_success: rts success
  * @rts_failure: rts failure
  */
@@ -2147,6 +2148,7 @@ struct cdp_tx_completion_ppdu_user {
 	uint32_t mpdu_bytes;
 	uint8_t punc_mode;
 	uint16_t punc_pattern_bitmap;
+	uint32_t msduq_bitmap;
 	uint8_t mprot_type:3,
 		rts_success:1,
 		rts_failure:1;
@@ -2313,6 +2315,9 @@ struct cdp_tx_mgmt_comp_info {
  * @sched_cmdid: schedule command id
  * @phy_ppdu_tx_time_us: Phy per PPDU TX duration
  * @ppdu_bytes: accumulated bytes per ppdu for mem limit feature
+ * @htt_seq_type: Seq type
+ * @txmode_type: tx mode type UL/DL
+ * @txmode: tx mode
  * @user: per-User stats (array of per-user structures)
  */
 struct cdp_tx_completion_ppdu {
@@ -2358,6 +2363,9 @@ struct cdp_tx_completion_ppdu {
 	uint16_t sched_cmdid;
 	uint16_t phy_ppdu_tx_time_us;
 	uint32_t ppdu_bytes;
+	uint8_t htt_seq_type;
+	uint8_t txmode_type;
+	uint8_t txmode;
 	struct cdp_tx_completion_ppdu_user user[];
 };
 

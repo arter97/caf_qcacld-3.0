@@ -327,6 +327,65 @@ enum cdp_tx_transmit_type {
 };
 
 /*
+ * cdp_tx_mode_type: Uplink transmit mode type
+ * TX_MODE_TYPE_DL: DL TX mode
+ * TX_MODE_TYPE_UL: UL TX mode
+ * TX_MODE_TYPE_UNKNOWN: UL TX mode unknown
+ */
+enum cdp_tx_mode_type {
+	TX_MODE_TYPE_DL = 0,
+	TX_MODE_TYPE_UL,
+	TX_MODE_TYPE_UNKNOWN,
+};
+
+/*
+ * cdp_tx_mode_dl: Downlink transmit mode index
+ * TX_MODE_DL_SU_DATA: SU Transmit type index
+ * TX_MODE_DL_OFDMA_DATA: OFDMA Transmit type index
+ * TX_MODE_DL_MUMIMO_DATA: MIMO Transmit type index
+ */
+enum cdp_tx_mode_dl {
+	TX_MODE_DL_SU_DATA = 0,
+	TX_MODE_DL_OFDMA_DATA,
+	TX_MODE_DL_MUMIMO_DATA,
+	TX_MODE_DL_MAX,
+};
+
+/*
+ * cdp_tx_mode_ul: Uplink transmit mode index
+ * TX_MODE_UL_OFDMA_BASIC_TRIGGER_DATA: UL ofdma trigger index
+ * TX_MODE_UL_MUMIMO_BASIC_TRIGGER_DATA: UL mimo trigger index
+ * TX_MODE_UL_OFDMA_MU_BAR_TRIGGER: UL ofdma MU-BAR trigger index
+ */
+enum cdp_tx_mode_ul {
+	TX_MODE_UL_OFDMA_BASIC_TRIGGER_DATA = 0,
+	TX_MODE_UL_MUMIMO_BASIC_TRIGGER_DATA,
+	TX_MODE_UL_OFDMA_MU_BAR_TRIGGER,
+	TX_MODE_UL_MAX,
+};
+
+/*
+ * cdp_msduq_index: TX msdu queue
+ * MSDUQ_INDEX_DEFAULT: TCP/UDP msduq index
+ * MSDUQ_INDEX_CUSTOM_PRIO_0: custom priority msduq index
+ * MSDUQ_INDEX_CUSTOM_PRIO_1: custom priority msduq index
+ * MSDUQ_INDEX_CUSTOM_EXT_PRIO_0: custom ext priority msduq index
+ * MSDUQ_INDEX_CUSTOM_EXT_PRIO_1: custom ext priority msduq index
+ * MSDUQ_INDEX_CUSTOM_EXT_PRIO_2: custom ext priority msduq index
+ * MSDUQ_INDEX_CUSTOM_EXT_PRIO_3: custom ext priority msduq index
+ */
+enum cdp_msduq_index {
+	MSDUQ_INDEX_DEFAULT = 0,
+	MSDUQ_INDEX_CUSTOM_PRIO_0,
+	MSDUQ_INDEX_CUSTOM_PRIO_1,
+	MSDUQ_INDEX_CUSTOM_EXT_PRIO_0,
+	MSDUQ_INDEX_CUSTOM_EXT_PRIO_1,
+	MSDUQ_INDEX_CUSTOM_EXT_PRIO_2,
+	MSDUQ_INDEX_CUSTOM_EXT_PRIO_3,
+	MSDUQ_INDEX_MAX,
+};
+
+/*
  * cdp_ru_index: Different RU index
  *
  * RU_26_INDEX : 26-tone Resource Unit index
@@ -2853,6 +2912,30 @@ struct cdp_peer_telemetry_stats {
 	uint16_t tx_airtime_consumption[WME_AC_MAX];
 	uint16_t rx_airtime_consumption[WME_AC_MAX];
 	uint8_t snr;
+};
+
+/**
+ * struct cdp_peer_tx_dl_deter- Structure to hold peer DL deterministic stats
+ * @avg_rate: Average TX rate
+ * @mode_cnt: TX mode count
+ */
+struct cdp_peer_tx_dl_deter {
+	uint64_t avg_rate;
+	uint32_t mode_cnt;
+};
+
+/**
+ * struct cdp_peer_tx_ul_deter- Structure to hold peer UL deterministic stats
+ * @avg_rate: Average TX rate
+ * @mode_cnt: TX mode count
+ * @trigger_success: Trigger frame received success
+ * @trigger_fail: Trigger frame received fail
+ */
+struct cdp_peer_tx_ul_deter {
+	uint64_t avg_rate;
+	uint32_t mode_cnt;
+	uint32_t trigger_success;
+	uint32_t trigger_fail;
 };
 #endif
 

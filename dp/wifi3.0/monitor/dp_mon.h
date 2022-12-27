@@ -911,6 +911,16 @@ struct dp_mon_peer_airtime_stats {
 	struct dp_mon_peer_airtime_consumption rx_airtime_consumption[WME_AC_MAX];
 	uint64_t last_update_time;
 };
+
+/**
+ * struct dp_mon_peer_deterministic - Monitor peer deterministic stats
+ * @dl_det: Downlink deterministic stats
+ * @ul_det: Uplink deterministic stats
+ */
+struct dp_mon_peer_deterministic {
+	struct cdp_peer_tx_dl_deter dl_det[MSDUQ_INDEX_MAX][TX_MODE_DL_MAX];
+	struct cdp_peer_tx_ul_deter ul_det[TX_MODE_UL_MAX];
+};
 #endif
 
 /**
@@ -918,6 +928,7 @@ struct dp_mon_peer_airtime_stats {
  * @tx: tx stats
  * @rx: rx stats
  * @airtime_stats: mon peer airtime stats
+ * @deter_stats: Deterministic stats
  */
 struct dp_mon_peer_stats {
 #ifdef QCA_ENHANCED_STATS_SUPPORT
@@ -925,6 +936,7 @@ struct dp_mon_peer_stats {
 	dp_mon_peer_rx_stats rx;
 #ifdef WLAN_TELEMETRY_STATS_SUPPORT
 	struct dp_mon_peer_airtime_stats airtime_stats;
+	struct dp_mon_peer_deterministic deter_stats[CDP_DATA_TID_MAX];
 #endif
 #endif
 };
