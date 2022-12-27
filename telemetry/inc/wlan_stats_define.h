@@ -573,6 +573,8 @@ struct advance_data_tx_stats {
 	u_int32_t non_ampdu_cnt;
 	u_int32_t per;
 	u_int32_t tx_rate;
+	u_int32_t wme_ac_type[STATS_IF_WME_AC_MAX];
+	u_int64_t wme_ac_type_bytes[STATS_IF_WME_AC_MAX];
 };
 
 struct advance_data_rx_stats {
@@ -598,6 +600,7 @@ struct advance_data_rx_stats {
 	u_int32_t bar_recv_cnt;
 	u_int32_t rx_retries;
 	u_int32_t multipass_rx_pkt_drop;
+	u_int64_t wme_ac_type_bytes[STATS_IF_WME_AC_MAX];
 };
 
 /* Advance Peer Data */
