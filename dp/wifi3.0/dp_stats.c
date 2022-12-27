@@ -8086,6 +8086,8 @@ dp_print_soc_rx_stats(struct dp_soc *soc)
 		       soc->stats.rx.err.rx_invalid_tid_err);
 	DP_PRINT_STATS("Rx Defrag Address1 Invalid:%d",
 		       soc->stats.rx.err.defrag_ad1_invalid);
+	DP_PRINT_STATS("Rx decrypt error frame for valid peer:%d",
+		       soc->stats.rx.err.decrypt_err_drop);
 }
 
 #ifdef FEATURE_TSO_STATS
