@@ -10864,6 +10864,29 @@ static QDF_STATUS dp_get_vdev_param(struct cdp_soc_t *cdp_soc, uint8_t vdev_id,
 		val->cdp_drop_tx_mcast = vdev->drop_tx_mcast;
 		break;
 #endif
+
+#ifdef MESH_MODE_SUPPORT
+	case CDP_MESH_RX_FILTER:
+		val->cdp_vdev_param_mesh_rx_filter = vdev->mesh_rx_filter;
+		break;
+	case CDP_MESH_MODE:
+		val->cdp_vdev_param_mesh_mode = vdev->mesh_vdev;
+		break;
+#endif
+	case CDP_ENABLE_NAWDS:
+		val->cdp_vdev_param_nawds = vdev->nawds_enabled;
+		break;
+
+	case CDP_ENABLE_WRAP:
+		val->cdp_vdev_param_wrap = vdev->wrap_vdev;
+		break;
+
+#ifdef DP_TRAFFIC_END_INDICATION
+	case CDP_ENABLE_TRAFFIC_END_INDICATION:
+		val->cdp_vdev_param_traffic_end_ind = vdev->traffic_end_ind_en;
+		break;
+#endif
+
 	default:
 		dp_cdp_err("%pK: param value %d is wrong",
 			   soc, param);
