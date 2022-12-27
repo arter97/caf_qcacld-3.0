@@ -190,11 +190,13 @@ struct wlan_rptr_pdev_priv {
  * @vdev:                     objmgr vdev
  * @vdev_feature_caps:        vdev feature caps
  * @vdev_allow_events:        vdev allow events
+ * @vdev_scan_id:             vdev scan ID
  */
 struct wlan_rptr_vdev_priv {
 	struct wlan_objmgr_vdev *vdev;
 	u32    vdev_feature_caps;
 	u8     vdev_allow_events;
+	uint32_t vdev_scan_id;
 };
 
 /**
