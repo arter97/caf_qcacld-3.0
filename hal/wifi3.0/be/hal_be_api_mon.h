@@ -2367,10 +2367,22 @@ hal_rx_status_get_tlv_info_generic_be(void *rx_tlv_hdr, void *ppduinfo,
 			ppdu_info->rx_status.nss = 0;
 #endif
 			break;
-		case TARGET_TYPE_QCA6490:
-		case TARGET_TYPE_QCA6750:
 		case TARGET_TYPE_KIWI:
 		case TARGET_TYPE_MANGO:
+			ppdu_info->rx_status.is_stbc =
+				HAL_RX_GET(vht_sig_a_info,
+					   VHT_SIG_A_INFO, STBC);
+			value =  HAL_RX_GET(vht_sig_a_info,
+					    VHT_SIG_A_INFO, N_STS);
+			value = value & VHT_SIG_SU_NSS_MASK;
+			if (ppdu_info->rx_status.is_stbc && (value > 0))
+				value = ((value + 1) >> 1) - 1;
+			ppdu_info->rx_status.nss =
+				((value & VHT_SIG_SU_NSS_MASK) + 1);
+
+			break;
+		case TARGET_TYPE_QCA6490:
+		case TARGET_TYPE_QCA6750:
 			ppdu_info->rx_status.nss = 0;
 			break;
 		default:
