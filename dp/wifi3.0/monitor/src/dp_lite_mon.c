@@ -82,6 +82,7 @@ dp_lite_mon_reset_config(struct dp_lite_mon_config *config)
 	config->metadata = 0;
 	config->debug = 0;
 	config->lite_mon_vdev = NULL;
+	config->legacy_filter_enabled = 0;
 }
 
 /**
@@ -170,6 +171,8 @@ dp_lite_mon_update_config(struct dp_pdev *pdev,
 			}
 		}
 
+		curr_config->legacy_filter_enabled =
+			new_config->legacy_filter_enabled;
 		curr_config->enable = true;
 	} else {
 		/* if new config disable is set then it means
@@ -1011,6 +1014,39 @@ dp_lite_mon_is_enabled(struct cdp_soc_t *soc_hdl,
 		return dp_lite_mon_is_tx_enabled(pdev->monitor_pdev);
 
 	return 0;
+}
+
+/**
+ *dp_lite_mon_get_legacy_feature_enabled - get legacy filter currently enabled
+ * @soc_hdl: dp soc hdl
+ * @pdev_id: pdev id
+ * @direction: tx/rx
+ *
+ * Return: Currently enabled legacy filter
+ */
+int
+dp_lite_mon_get_legacy_feature_enabled(struct cdp_soc_t *soc_hdl,
+				       uint8_t pdev_id, uint8_t direction)
+{
+	struct dp_pdev *pdev =
+		dp_get_pdev_from_soc_pdev_id_wifi3(cdp_soc_t_to_dp_soc(soc_hdl),
+						   pdev_id);
+	struct dp_mon_pdev_be *be_mon_pdev;
+
+	if (!pdev)
+		return 0;
+
+	if (!pdev->monitor_pdev)
+		return 0;
+
+	be_mon_pdev = dp_get_be_mon_pdev_from_dp_mon_pdev(pdev->monitor_pdev);
+
+	if (direction == CDP_LITE_MON_DIRECTION_RX)
+		return be_mon_pdev->lite_mon_rx_config->rx_config.legacy_filter_enabled;
+	else if (direction == CDP_LITE_MON_DIRECTION_TX)
+		return be_mon_pdev->lite_mon_tx_config->tx_config.legacy_filter_enabled;
+	else
+		return 0;
 }
 
 /**

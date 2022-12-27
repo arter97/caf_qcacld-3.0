@@ -1099,6 +1099,7 @@ int wlan_set_lite_monitor_config(void *vscn,
 	config->disable = mon_config->data.filter_config.disable;
 	if (!config->disable) {
 		/* enable */
+		config->legacy_filter_enabled = mon_config->data.filter_config.legacy_filter_enabled;
 		config->level = mon_config->data.filter_config.level;
 		ifname = mon_config->data.filter_config.interface_name;
 		if (strlen(ifname)) {
