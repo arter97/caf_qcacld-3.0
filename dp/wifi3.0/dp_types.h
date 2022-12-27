@@ -46,6 +46,20 @@
 #include <hal_api_mon.h>
 #include "hal_rx.h"
 
+#define dp_init_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_DP_INIT, params)
+#define dp_init_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_DP_INIT, params)
+#define dp_init_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_DP_INIT, params)
+#define dp_init_info(params...) \
+	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP_INIT, ## params)
+#define dp_init_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_INIT, params)
+
+#define dp_vdev_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_DP_VDEV, params)
+#define dp_vdev_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_DP_VDEV, params)
+#define dp_vdev_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_DP_VDEV, params)
+#define dp_vdev_info(params...) \
+	__QDF_TRACE_FL(QDF_TRACE_LEVEL_INFO_HIGH, QDF_MODULE_ID_DP_VDEV, ## params)
+#define dp_vdev_debug(params...) QDF_TRACE_DEBUG(QDF_MODULE_ID_DP_VDEV, params)
+
 #define MAX_BW 8
 #define MAX_RETRIES 4
 #define MAX_RECEPTION_TYPES 4
@@ -164,6 +178,8 @@
 
 #define DP_TX_MAGIC_PATTERN_INUSE	0xABCD1234
 #define DP_TX_MAGIC_PATTERN_FREE	0xDEADBEEF
+
+#define DP_INTR_POLL_TIMER_MS	5
 
 #ifdef IPA_OFFLOAD
 #define DP_PEER_REO_STATS_TID_SHIFT 16
@@ -5039,6 +5055,7 @@ struct dp_req_rx_hw_stats_t {
 #endif
 /* soc level structure to declare arch specific ops for DP */
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 /**
  * dp_hw_link_desc_pool_banks_free() - Free h/w link desc pool banks
  * @soc: DP SOC handle
@@ -5072,6 +5089,23 @@ QDF_STATUS dp_hw_link_desc_pool_banks_alloc(struct dp_soc *soc,
  * Return: None
  */
 void dp_link_desc_ring_replenish(struct dp_soc *soc, uint32_t mac_id);
+#else
+static inline void dp_hw_link_desc_pool_banks_free(struct dp_soc *soc,
+						   uint32_t mac_id)
+{
+}
+
+static inline QDF_STATUS dp_hw_link_desc_pool_banks_alloc(struct dp_soc *soc,
+							  uint32_t mac_id)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline void dp_link_desc_ring_replenish(struct dp_soc *soc,
+					       uint32_t mac_id)
+{
+}
+#endif
 
 #ifdef WLAN_FEATURE_RX_PREALLOC_BUFFER_POOL
 void dp_rx_refill_buff_pool_enqueue(struct dp_soc *soc);

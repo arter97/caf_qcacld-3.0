@@ -5325,6 +5325,7 @@ dp_cfg_event_record_peer_setup_evt(struct dp_soc *soc,
 }
 #endif
 
+#ifndef WLAN_SOFTUMAC_SUPPORT
 /**
  * dp_soc_interrupt_detach() - Deregister any allocations done for interrupts
  * @txrx_soc: DP SOC handle
@@ -5332,6 +5333,7 @@ dp_cfg_event_record_peer_setup_evt(struct dp_soc *soc,
  * Return: none
  */
 void dp_soc_interrupt_detach(struct cdp_soc_t *txrx_soc);
+#endif
 
 /**
  * dp_get_peer_stats()- Get peer stats
