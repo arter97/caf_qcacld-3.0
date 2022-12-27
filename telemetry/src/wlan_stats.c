@@ -1026,6 +1026,11 @@ static QDF_STATUS get_advance_peer_data_tx(struct unified_stats *stats,
 		data->nss[inx] = tx->nss[inx];
 	for (inx = 0; inx < MAX_BW; inx++)
 		data->bw[inx] = tx->bw[inx];
+	for (inx = 0; inx < WME_AC_MAX; inx++) {
+		data->wme_ac_type[inx] = tx->wme_ac_type[inx];
+		data->wme_ac_type_bytes[inx] = tx->wme_ac_type_bytes[inx];
+	}
+
 	data->retries = tx->retries;
 	data->non_amsdu_cnt = tx->non_amsdu_cnt;
 	data->amsdu_cnt = tx->amsdu_cnt;
@@ -1065,8 +1070,11 @@ static QDF_STATUS get_advance_peer_data_rx(struct unified_stats *stats,
 	data->bcast.bytes = rx->bcast.bytes;
 	for (inx = 0; inx < MAX_MCS; inx++)
 		data->su_ax_ppdu_cnt[inx] = rx->su_ax_ppdu_cnt.mcs_count[inx];
-	for (inx = 0; inx < WME_AC_MAX; inx++)
+	for (inx = 0; inx < WME_AC_MAX; inx++) {
 		data->wme_ac_type[inx] = rx->wme_ac_type[inx];
+		data->wme_ac_type_bytes[inx] = rx->wme_ac_type_bytes[inx];
+	}
+
 	for (inx = 0; inx < MAX_GI; inx++)
 		data->sgi_count[inx] = rx->sgi_count[inx];
 	for (inx = 0; inx < SS_COUNT; inx++)
@@ -1544,6 +1552,11 @@ static QDF_STATUS get_advance_vdev_data_tx(struct unified_stats *stats,
 		data->nss[inx] = tx->nss[inx];
 	for (inx = 0; inx < MAX_BW; inx++)
 		data->bw[inx] = tx->bw[inx];
+	for (inx = 0; inx < WME_AC_MAX; inx++) {
+		data->wme_ac_type[inx] = tx->wme_ac_type[inx];
+		data->wme_ac_type_bytes[inx] = tx->wme_ac_type_bytes[inx];
+	}
+
 	data->retries = tx->retries;
 	data->non_amsdu_cnt = tx->non_amsdu_cnt;
 	data->amsdu_cnt = tx->amsdu_cnt;
@@ -1584,8 +1597,11 @@ static QDF_STATUS get_advance_vdev_data_rx(struct unified_stats *stats,
 	data->bcast.bytes = rx->bcast.bytes;
 	for (inx = 0; inx < MAX_MCS; inx++)
 		data->su_ax_ppdu_cnt[inx] = rx->su_ax_ppdu_cnt.mcs_count[inx];
-	for (inx = 0; inx < WME_AC_MAX; inx++)
+	for (inx = 0; inx < WME_AC_MAX; inx++) {
 		data->wme_ac_type[inx] = rx->wme_ac_type[inx];
+		data->wme_ac_type_bytes[inx] = rx->wme_ac_type_bytes[inx];
+	}
+
 	for (inx = 0; inx < MAX_GI; inx++)
 		data->sgi_count[inx] = rx->sgi_count[inx];
 	for (inx = 0; inx < SS_COUNT; inx++)
@@ -2035,6 +2051,11 @@ static QDF_STATUS get_advance_pdev_data_tx(struct unified_stats *stats,
 		data->nss[inx] = tx->nss[inx];
 	for (inx = 0; inx < MAX_BW; inx++)
 		data->bw[inx] = tx->bw[inx];
+	for (inx = 0; inx < WME_AC_MAX; inx++) {
+		data->wme_ac_type[inx] = tx->wme_ac_type[inx];
+		data->wme_ac_type_bytes[inx] = tx->wme_ac_type_bytes[inx];
+	}
+
 	data->retries = tx->retries;
 	data->non_amsdu_cnt = tx->non_amsdu_cnt;
 	data->amsdu_cnt = tx->amsdu_cnt;
@@ -2085,8 +2106,10 @@ static QDF_STATUS get_advance_pdev_data_rx(struct unified_stats *stats,
 	data->bcast.bytes = rx->bcast.bytes;
 	for (inx = 0; inx < MAX_MCS; inx++)
 		data->su_ax_ppdu_cnt[inx] = rx->su_ax_ppdu_cnt.mcs_count[inx];
-	for (inx = 0; inx < WME_AC_MAX; inx++)
+	for (inx = 0; inx < WME_AC_MAX; inx++) {
 		data->wme_ac_type[inx] = rx->wme_ac_type[inx];
+		data->wme_ac_type_bytes[inx] = rx->wme_ac_type_bytes[inx];
+	}
 	for (inx = 0; inx < MAX_GI; inx++)
 		data->sgi_count[inx] = rx->sgi_count[inx];
 	for (inx = 0; inx < SS_COUNT; inx++)

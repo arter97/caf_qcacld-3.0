@@ -310,6 +310,8 @@ struct advance_peer_data_tx {
 	u_int32_t amsdu_cnt;
 	u_int32_t ampdu_cnt;
 	u_int32_t non_ampdu_cnt;
+	u_int32_t wme_ac_type[WME_AC_MAX];
+	u_int64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
 struct advance_peer_data_rx {
@@ -333,6 +335,7 @@ struct advance_peer_data_rx {
 	u_int32_t bar_recv_cnt;
 	u_int32_t rx_retries;
 	u_int32_t multipass_rx_pkt_drop;
+	u_int64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
 struct advance_peer_data_raw {
@@ -427,6 +430,8 @@ struct advance_vdev_data_tx {
 	u_int32_t ampdu_cnt;
 	u_int32_t non_ampdu_cnt;
 	u_int32_t cce_classified;
+	u_int32_t wme_ac_type[WME_AC_MAX];
+	u_int64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
 struct advance_vdev_data_rx {
@@ -450,6 +455,7 @@ struct advance_vdev_data_rx {
 	u_int32_t bar_recv_cnt;
 	u_int32_t rx_retries;
 	u_int32_t multipass_rx_pkt_drop;
+	u_int64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
 struct advance_vdev_data_me {
@@ -542,6 +548,8 @@ struct advance_pdev_data_tx {
 	u_int32_t ampdu_cnt;
 	u_int32_t non_ampdu_cnt;
 	u_int32_t cce_classified;
+	u_int32_t wme_ac_type[WME_AC_MAX];
+	u_int64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
 struct advance_pdev_data_rx {
@@ -566,6 +574,7 @@ struct advance_pdev_data_rx {
 	u_int32_t bar_recv_cnt;
 	u_int32_t rx_retries;
 	u_int32_t multipass_rx_pkt_drop;
+	u_int64_t wme_ac_type_bytes[WME_AC_MAX];
 };
 
 struct advance_pdev_data_me {
