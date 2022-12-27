@@ -838,6 +838,9 @@ enum {
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 	IEEE80211_PARAM_DROP_TX_MCAST  = 790,  /* Flag to enable/disable tx mcast pkt drops */
 #endif
+#if ATH_SUPPORT_DSCP_OVERRIDE
+	IEEE80211_PARAM_GDSCP_TID_MAP = 791, /* Get dscp-tid map */
+#endif
 };
 
 enum {
@@ -1930,7 +1933,7 @@ struct vendor_commands vap_vendor_cmds[] = {
 	{"set_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, SET_PARAM, 1},
 	{"get_dscp_ovride",     IEEE80211_PARAM_DSCP_MAP_ID, GET_PARAM, 0},
 	{"s_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, SET_PARAM, 2},
-	{"g_dscp_tid_map",      IEEE80211_PARAM_DSCP_TID_MAP, GET_PARAM, 0},
+	{"g_dscp_tid_map",      IEEE80211_PARAM_GDSCP_TID_MAP, SET_PARAM, 1},
 #endif
 	{"set_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, SET_PARAM, 2},
 	{"get_monrxfilter",     IEEE80211_PARAM_RX_FILTER_MONITOR, GET_PARAM, 0},
