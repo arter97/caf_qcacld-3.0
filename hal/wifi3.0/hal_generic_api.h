@@ -589,6 +589,16 @@ static inline void hal_srng_hw_reg_offset_init_generic(struct hal_soc *hal_soc)
 				REG_OFFSET(SRC, CONSUMER_PREFETCH_TIMER);
 #endif
 }
+#else
+static inline
+void hal_srng_src_hw_init_generic(struct hal_soc *hal,
+				  struct hal_srng *srng, bool idle_check,
+				  uint32_t idx) {}
+
+static inline
+void hal_srng_dst_hw_init_generic(struct hal_soc *hal,
+				  struct hal_srng *srng, bool idle_check,
+				  uint32_t idx) {}
 #endif
 
 #ifdef FEATURE_DIRECT_LINK
