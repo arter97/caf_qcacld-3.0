@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2011-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1422,6 +1422,7 @@ enum cdp_pdev_param_type {
  * @cdp_vdev_param_traffic_end_ind: Traffic end indication enable/disable
  * @cdp_skel_enable : Enable/Disable skeleton code for Umac reset debug
  * @cdp_drop_tx_mcast: Enable/Disable tx mcast drop
+ * @cdp_vdev_tx_to_fw: Set to_fw bit for all tx packets for the vdev
  */
 typedef union cdp_config_param_t {
 	/* peer params */
@@ -1512,6 +1513,7 @@ typedef union cdp_config_param_t {
 	bool cdp_vdev_param_traffic_end_ind;
 	bool cdp_umac_rst_skel;
 	bool cdp_drop_tx_mcast;
+	bool cdp_vdev_tx_to_fw;
 } cdp_config_param_type;
 
 /**
@@ -1601,6 +1603,7 @@ enum cdp_pdev_bpr_param {
  * @CDP_DROP_3ADDR_MCAST: enable/disable drop 3addr multicast flag
  * @CDP_ENABLE_WRAP: qwrap ap
  * @CDP_ENABLE_TRAFFIC_END_INDICATION: enable/disable traffic end indication
+ * @CDP_VDEV_TX_TO_FW: Set to_fw bit for tx packets for the vdev
  */
 enum cdp_vdev_param_type {
 	CDP_ENABLE_NAWDS,
@@ -1647,6 +1650,9 @@ enum cdp_vdev_param_type {
 	CDP_ENABLE_WRAP,
 #ifdef DP_TRAFFIC_END_INDICATION
 	CDP_ENABLE_TRAFFIC_END_INDICATION,
+#endif
+#ifdef FEATURE_DIRECT_LINK
+	CDP_VDEV_TX_TO_FW,
 #endif
 };
 

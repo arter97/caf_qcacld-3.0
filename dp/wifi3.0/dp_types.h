@@ -3574,6 +3574,10 @@ struct dp_vdev {
 	/* per vdev nbuf queue for traffic end indication packets */
 	qdf_nbuf_queue_t end_ind_pkt_q;
 #endif
+#ifdef FEATURE_DIRECT_LINK
+	/* Flag to indicate if to_fw should be set for tx pkts on this vdev */
+	bool to_fw;
+#endif
 };
 
 enum {

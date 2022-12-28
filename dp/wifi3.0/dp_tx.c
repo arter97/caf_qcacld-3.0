@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3648,6 +3648,25 @@ qdf_nbuf_t dp_tx_exc_drop(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 }
 #endif
 
+#ifdef FEATURE_DIRECT_LINK
+/*
+ * dp_vdev_tx_mark_to_fw() - Mark to_fw bit for the tx packet
+ * @nbuf: skb
+ * @vdev: DP vdev handle
+ *
+ * Return: None
+ */
+static inline void dp_vdev_tx_mark_to_fw(qdf_nbuf_t nbuf, struct dp_vdev *vdev)
+{
+	if (qdf_unlikely(vdev->to_fw))
+		QDF_NBUF_CB_TX_PACKET_TO_FW(nbuf) = 1;
+}
+#else
+static inline void dp_vdev_tx_mark_to_fw(qdf_nbuf_t nbuf, struct dp_vdev *vdev)
+{
+}
+#endif
+
 /*
  * dp_tx_send() - Transmit a frame on a given VAP
  * @soc: DP soc handle
@@ -3687,6 +3706,8 @@ qdf_nbuf_t dp_tx_send(struct cdp_soc_t *soc_hdl, uint8_t vdev_id,
 	vdev = soc->vdev_id_map[vdev_id];
 	if (qdf_unlikely(!vdev))
 		return nbuf;
+
+	dp_vdev_tx_mark_to_fw(nbuf, vdev);
 
 	/*
 	 * Set Default Host TID value to invalid TID
