@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,6 +38,7 @@
 #include <htc_api.h>
 #ifdef FEATURE_DIRECT_LINK
 #include "dp_internal.h"
+#include "cdp_txrx_ctrl.h"
 #endif
 
 /* Global DP context */
@@ -1731,6 +1732,8 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	struct direct_link_info *config = &dp_intf->direct_link_config;
 	void *htc_handle;
 	bool prev_ll, update_ll;
+	cdp_config_param_type vdev_param = {0};
+	QDF_STATUS status;
 
 	if (!dp_ctx || !dp_ctx->psoc) {
 		dp_err("DP Handle is NULL");
@@ -1753,6 +1756,10 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 	update_ll = config_direct_link ? enable_low_latency : prev_ll;
 	config->config_set = config_direct_link;
 	config->low_latency = enable_low_latency;
+	vdev_param.cdp_vdev_tx_to_fw = config_direct_link;
+	status = cdp_txrx_set_vdev_param(wlan_psoc_get_dp_handle(dp_ctx->psoc),
+					 dp_intf->intf_id, CDP_VDEV_TX_TO_FW,
+					 vdev_param);
 	qdf_spin_unlock(&dp_intf->vdev_lock);
 
 	if (config_direct_link) {
@@ -1773,6 +1780,6 @@ QDF_STATUS dp_config_direct_link(struct wlan_dp_intf *dp_intf,
 		dp_info("Direct link config cleared.");
 	}
 
-	return QDF_STATUS_SUCCESS;
+	return status;
 }
 #endif
