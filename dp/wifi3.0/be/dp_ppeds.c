@@ -88,6 +88,14 @@ void *dp_get_ppe_ds_ctxt(struct dp_soc *soc)
 	return ppe_ds_wlan_get_intr_ctxt(ppeds_handle);
 }
 
+#if defined(QCA_DP_NBUF_FAST_PPEDS)
+#define dp_nbuf_alloc_ppe_ds(d, s, r, a, p) \
+	qdf_nbuf_alloc_ppe_ds(d, s, r, a, p)
+#else
+#define dp_nbuf_alloc_ppe_ds(d, s, r, a, p) \
+	qdf_nbuf_alloc_simple(d, s, r, a, p)
+#endif
+
 /**
  * dp_ppeds_deinit_ppe_vp_tbl_be - PPE VP table dealoc
  * @be_soc: BE SoC
@@ -700,11 +708,11 @@ uint32_t dp_ppeds_get_batched_tx_desc(ppe_ds_wlan_handle_t *ppeds_handle,
 	}
 
 	for (i = 0; i < num_buff_req; i++) {
-
+		qdf_nbuf_t nbuf = NULL;
 		/*
 		 * Get a free skb.
 		 */
-		qdf_nbuf_t nbuf = qdf_nbuf_alloc_simple(soc->osdev, buff_size, 0, 0, 0);
+		nbuf = dp_nbuf_alloc_ppe_ds(soc->osdev, buff_size, 0, 0, 0);
 		if (qdf_unlikely(!nbuf)) {
 			break;
 		}
