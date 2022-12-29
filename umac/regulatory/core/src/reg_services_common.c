@@ -421,8 +421,8 @@ reg_get_bonded_chan_entry(qdf_freq_t freq,
 			return &bonded_chan_arr[i];
 	}
 
-	reg_debug("Could not find a bonded pair for freq %d and width %d",
-		  freq, chwidth);
+	reg_debug("Could not find a bonded pair for freq %d and width %d cen320_freq %u",
+		  freq, chwidth, cen320_freq);
 	return NULL;
 }
 
