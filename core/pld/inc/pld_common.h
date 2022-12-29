@@ -826,6 +826,16 @@ int pld_auto_resume(struct device *dev);
 int pld_force_wake_request(struct device *dev);
 
 /**
+ * pld_is_direct_link_supported() - Get whether direct_link is supported
+ *                                  by FW or not
+ * @dev: device
+ *
+ * Return: true if supported
+ *         false on failure or if not supported
+ */
+bool pld_is_direct_link_supported(struct device *dev);
+
+/**
  * pld_force_wake_request_sync() - Request to awake MHI synchronously
  * @dev: device
  * @timeout_us: timeout in micro-sec request to wake
@@ -1250,4 +1260,47 @@ static inline bool pld_get_enable_intx(struct device *dev)
 	return false;
 }
 
+/**
+ * pld_is_one_msi()- whether one MSI is used or not
+ * @dev: device structure
+ *
+ * Return: true if it is one MSI
+ */
+bool pld_is_one_msi(struct device *dev);
+
+#ifdef FEATURE_DIRECT_LINK
+/**
+ * pld_audio_smmu_map()- Map memory region into Audio SMMU CB
+ * @dev: pointer to device structure
+ * @paddr: physical address
+ * @iova: DMA address
+ * @size: memory region size
+ *
+ * Return: 0 on success else failure code
+ */
+int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
+		       size_t size);
+
+/**
+ * pld_audio_smmu_unmap()- Remove memory region mapping from Audio SMMU CB
+ * @dev: pointer to device structure
+ * @iova: DMA address
+ * @size: memory region size
+ *
+ * Return: None
+ */
+void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size);
+#else
+static inline
+int pld_audio_smmu_map(struct device *dev, phys_addr_t paddr, dma_addr_t iova,
+		       size_t size)
+{
+	return 0;
+}
+
+static inline
+void pld_audio_smmu_unmap(struct device *dev, dma_addr_t iova, size_t size)
+{
+}
+#endif
 #endif
