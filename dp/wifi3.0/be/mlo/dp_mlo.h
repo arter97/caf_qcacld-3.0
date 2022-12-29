@@ -39,6 +39,8 @@
  *           Associated peer with this MAC address)
  * @mld_peer_hash_lock: lock to protect mld_peer_hash
  * @link_to_pdev_map: link to pdev mapping
+ * @rx_fst: pointer to rx_fst handle
+ * @rx_fst_ref_cnt: ref count of rx_fst
  */
 struct dp_mlo_ctxt {
 	struct cdp_ctrl_mlo_mgr *ctrl_ctxt;
@@ -56,6 +58,8 @@ struct dp_mlo_ctxt {
 	uint32_t toeplitz_hash_ipv6[LRO_IPV6_SEED_ARR_SZ];
 	struct dp_pdev_be *link_to_pdev_map[WLAN_MAX_MLO_CHIPS *
 		WLAN_MAX_MLO_LINKS_PER_SOC];
+	struct dp_rx_fst *rx_fst;
+	uint8_t rx_fst_ref_cnt;
 };
 
 /**
@@ -113,6 +117,37 @@ dp_mlo_get_soc_ref_by_chip_id(struct dp_mlo_ctxt *ml_ctxt, uint8_t chip_id);
  */
 void dp_mlo_get_rx_hash_key(struct dp_soc *soc,
 			    struct cdp_lro_hash_config *lro_hash);
+
+/**
+ * dp_mlo_rx_fst_deref() - decrement rx_fst
+ * @soc: dp soc
+ *
+ * return: soc cnt
+ */
+uint8_t dp_mlo_rx_fst_deref(struct dp_soc *soc);
+
+/**
+ * dp_mlo_rx_fst_ref() - increment ref of rx_fst
+ * @soc: dp soc
+ *
+ */
+void dp_mlo_rx_fst_ref(struct dp_soc *soc);
+
+/**
+ * dp_mlo_get_rx_fst() - Get Rx FST from MLO context
+ * @soc: DP SOC
+ *
+ * Return: struct dp_rx_fst pointer
+ */
+struct dp_rx_fst *dp_mlo_get_rx_fst(struct dp_soc *soc);
+
+/**
+ * dp_mlo_set_rx_fst() - Set Rx FST in MLO context
+ * @soc: DP SOC
+ * @fst: pointer dp_rx_fst
+ *
+ */
+void dp_mlo_set_rx_fst(struct dp_soc *soc, struct dp_rx_fst *fst);
 
 /**
  * dp_mlo_update_link_to_pdev_map : map link-id to pdev mapping
