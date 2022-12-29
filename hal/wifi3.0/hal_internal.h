@@ -165,6 +165,7 @@ typedef struct rx_msdu_desc_info *rx_msdu_desc_info_t;
 union hal_tx_ppe_vp_config;
 union hal_tx_cmn_config_ppe;
 union hal_tx_bank_config;
+union hal_tx_ppe_idx_map_config;
 
 /* TBD: This should be movded to shared HW header file */
 enum hal_srng_ring_id {
@@ -887,6 +888,8 @@ struct hal_hw_txrx_ops {
 	void (*hal_tx_set_ppe_vp_entry)(hal_soc_handle_t hal_soc_hdl,
 					union hal_tx_ppe_vp_config *vp_cfg,
 					int ppe_vp_idx);
+	void (*hal_ppeds_cfg_ast_override_map_reg)(hal_soc_handle_t hal_soc_hdl,
+		uint8_t idx, union hal_tx_ppe_idx_map_config *ppeds_idx_map);
 	void (*hal_tx_set_ppe_pri2tid)(hal_soc_handle_t hal_soc_hdl,
 				       uint32_t val,
 				       uint8_t map_no);

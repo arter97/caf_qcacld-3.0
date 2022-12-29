@@ -3027,6 +3027,23 @@ void dp_rx_reset_roaming_peer(struct dp_soc *soc, uint8_t vdev_id,
 }
 #endif
 
+#ifdef WLAN_SUPPORT_PPEDS
+static void
+dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc, struct dp_vdev *vdev,
+				     bool peer_map)
+{
+	if (soc->arch_ops.dp_tx_ppeds_cfg_astidx_cache_mapping)
+		soc->arch_ops.dp_tx_ppeds_cfg_astidx_cache_mapping(soc, vdev,
+								   peer_map);
+}
+#else
+static void
+dp_tx_ppeds_cfg_astidx_cache_mapping(struct dp_soc *soc, struct dp_vdev *vdev,
+				     bool peer_map)
+{
+}
+#endif
+
 /**
  * dp_rx_peer_map_handler() - handle peer map event from firmware
  * @soc_handle - genereic soc handle
@@ -3091,6 +3108,8 @@ dp_rx_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 					   CDP_LINK_PEER_TYPE);
 
 		if (peer) {
+			bool peer_map = true;
+
 			vdev = peer->vdev;
 			/* Only check for STA Vdev and peer is not for TDLS */
 			if (wlan_op_mode_sta == vdev->opmode &&
@@ -3108,6 +3127,9 @@ dp_rx_peer_map_handler(struct dp_soc *soc, uint16_t peer_id,
 					ast_hash, hw_peer_id);
 				vdev->bss_ast_hash = ast_hash;
 				vdev->bss_ast_idx = hw_peer_id;
+
+				dp_tx_ppeds_cfg_astidx_cache_mapping(soc, vdev,
+								     peer_map);
 			}
 
 			/* Add ast entry incase self ast entry is
@@ -3241,6 +3263,15 @@ dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 	 */
 	dp_peer_rx_reo_shared_qaddr_delete(soc, peer);
 
+	vdev = peer->vdev;
+
+	/* only if peer is in STA mode and not tdls peer */
+	if (wlan_op_mode_sta == vdev->opmode && !peer->is_tdls_peer) {
+		bool peer_map = false;
+
+		dp_tx_ppeds_cfg_astidx_cache_mapping(soc, vdev, peer_map);
+	}
+
 	dp_peer_find_id_to_obj_remove(soc, peer_id);
 
 	if (soc->arch_ops.dp_partner_chips_unmap)
@@ -3259,7 +3290,6 @@ dp_rx_peer_unmap_handler(struct dp_soc *soc, uint16_t peer_id,
 				peer_id, vdev_id, mac_addr);
 	}
 
-	vdev = peer->vdev;
 	dp_update_vdev_stats_on_peer_unmap(vdev, peer);
 
 	dp_peer_update_state(soc, peer, DP_PEER_STATE_INACTIVE);

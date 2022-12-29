@@ -867,6 +867,24 @@ hal_tx_populate_ppe_vp_entry(hal_soc_handle_t hal_soc_hdl,
 }
 
 /**
+ * hal_ppeds_cfg_ast_override_map_reg - Set ppe index mapping table value
+ * @hal_soc: HAL SoC context
+ * @reg_idx: index into the table
+ * @ppeds_astoveride_map: HAL PPE INDEX MAPPING config
+ *
+ * Return: void
+ */
+static inline void
+hal_ppeds_cfg_ast_override_map_reg(hal_soc_handle_t hal_soc_hdl,
+	uint8_t reg_idx, union hal_tx_ppe_idx_map_config *ppeds_astoveride_map)
+{
+	struct hal_soc *hal_soc = (struct hal_soc *)hal_soc_hdl;
+
+	hal_soc->ops->hal_ppeds_cfg_ast_override_map_reg(hal_soc_hdl, reg_idx,
+							 ppeds_astoveride_map);
+}
+
+/**
  * hal_tx_set_int_pri2id - Set the prit2tid table.
  * @hal_soc: HAL SoC context
  * @pri2tid: Reference to SW INT_PRI to TID table
