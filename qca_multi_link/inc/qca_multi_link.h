@@ -93,6 +93,7 @@ typedef struct qca_multi_link_statistics {
  * @no_backhaul: is no_backhaul radio
  * @is_fast_lane: is fast_lane radio
  * @sta_dev: radio's station net device
+ * @sta_mld_mac: radio's station MLD MAC address
  */
 typedef struct qca_multi_link_radio_list_node {
 	qdf_list_node_t node;
@@ -100,6 +101,7 @@ typedef struct qca_multi_link_radio_list_node {
 	bool no_backhaul;
 	bool is_fast_lane;
 	struct net_device *sta_dev;
+	uint8_t sta_mld_mac[QDF_MAC_ADDR_SIZE];
 } qca_multi_link_radio_node_t;
 
 /**
@@ -148,7 +150,7 @@ bool qca_multi_link_remove_no_backhaul_radio(struct wiphy *no_bl_wiphy);
 bool qca_multi_link_add_no_backhaul_radio(struct wiphy *no_bl_wiphy);
 bool qca_multi_link_remove_station_vap(struct wiphy *wiphy);
 bool qca_multi_link_add_station_vap(struct wiphy *wiphy,
-				   struct net_device *sta_dev);
+				    struct net_device *sta_dev, uint8_t *mld_mac);
 bool qca_multi_link_ap_rx(struct net_device *net_dev, qdf_nbuf_t nbuf);
 bool qca_multi_link_sta_rx(struct net_device *net_dev, qdf_nbuf_t nbuf, struct net_device **prim_dev);
 bool qca_multi_link_sta_tx(struct net_device *net_dev, qdf_nbuf_t nbuf);
