@@ -1124,7 +1124,7 @@ wlan_rptr_conn_up_dbdc_process(struct wlan_objmgr_vdev *vdev,
 	RPTR_GLOBAL_UNLOCK(&g_priv->rptr_global_lock);
 
 	if (wiphy && dev)
-		qca_multi_link_add_station_vap(wiphy, dev);
+		qca_multi_link_add_station_vap(wiphy, dev, wlan_vdev_mlme_get_mldaddr(vdev));
 
 	qca_multi_link_append_num_sta(true);
 
