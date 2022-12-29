@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -922,6 +922,8 @@ bool __qdf_nbuf_data_is_ipv6_mdns_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv4_eapol_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv4_igmp_pkt(uint8_t *data);
 bool __qdf_nbuf_data_is_ipv6_igmp_pkt(uint8_t *data);
+bool __qdf_nbuf_is_ipv4_igmp_leave_pkt(__qdf_nbuf_t buf);
+bool __qdf_nbuf_is_ipv6_igmp_leave_pkt(__qdf_nbuf_t buf);
 bool __qdf_nbuf_data_is_ipv4_arp_pkt(uint8_t *data);
 bool __qdf_nbuf_is_bcast_pkt(__qdf_nbuf_t nbuf);
 bool __qdf_nbuf_is_mcast_replay(__qdf_nbuf_t nbuf);

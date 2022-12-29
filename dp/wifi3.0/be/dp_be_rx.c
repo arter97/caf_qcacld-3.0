@@ -1283,6 +1283,12 @@ bool dp_rx_mlo_igmp_handler(struct dp_soc *soc,
 					       NULL);
 	}
 
+	if (qdf_nbuf_is_ipv4_igmp_leave_pkt(nbuf) ||
+	    qdf_nbuf_is_ipv6_igmp_leave_pkt(nbuf)) {
+		qdf_nbuf_free(nbuf);
+		return true;
+	}
+
 	dp_rx_dummy_src_mac(vdev, nbuf);
 	dp_rx_deliver_to_stack(mcast_primary_vdev->pdev->soc,
 			       mcast_primary_vdev,
