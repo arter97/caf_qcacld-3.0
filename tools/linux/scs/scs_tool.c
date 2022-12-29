@@ -168,6 +168,11 @@ static char *scs_tool_ipv6_str(struct in6_addr *addr)
 	return addr_buf;
 }
 
+static void scs_tool_get_mac_addr(void *data, uint8_t *mac_addr)
+{
+	memcpy(mac_addr, data, ETH_ALEN);
+}
+
 static int
 scs_tool_fill_sal_rule(uint8_t *data, size_t len, struct sp_rule *rule)
 {
@@ -394,7 +399,25 @@ parse_tclas10:
 			SCS_ATTR_CLASSIFIER_TYPE_TCLAS10)
 		rule_precedence++;
 
-	PRINT_IF_VERB("Rule Precedence                  %u", rule_precedence);
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_DST_MAC_ADDR];
+	if (tb) {
+		scs_tool_get_mac_addr(nla_data(tb), rule->dst_mac);
+		rule->flags |= SP_RULE_FLAG_MATCH_DST_MAC;
+		PRINT_IF_VERB("Destination MAC_ADDR: %02x:%02x:%02x:%02x:%02x:%02x",
+			      rule->dst_mac[0], rule->dst_mac[1],
+			      rule->dst_mac[2], rule->dst_mac[3],
+			      rule->dst_mac[4], rule->dst_mac[5]);
+		rule_precedence++;
+	}
+
+	tb = tb_array[QCA_WLAN_VENDOR_ATTR_SCS_RULE_CONFIG_NETDEV_IF_INDEX];
+	if (tb) {
+		val32 = nla_get_u32(tb);
+		PRINT_IF_VERB("Netdev Interface Index: %u", val32);
+		rule_precedence++;
+	}
+
+	PRINT_IF_VERB("Rule Precedence:                %u", rule_precedence);
 	rule->precedence = rule_precedence;
 	rule->flags |= SP_RULE_FLAG_MATCH_PRECEDENCE;
 
