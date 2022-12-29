@@ -67,8 +67,6 @@ QDF_STATUS wlan_cp_stats_vdev_cs_init(struct vdev_cp_stats *vdev_cs)
 		cp_stats_err("malloc failed");
 		return QDF_STATUS_E_NOMEM;
 	}
-	vdev_cs->ucast_rx_pnerr_stats_inc =
-		ucfg_vdev_ucast_cp_stats_rx_pnerr_inc;
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -76,7 +74,6 @@ QDF_STATUS wlan_cp_stats_vdev_cs_deinit(struct vdev_cp_stats *vdev_cs)
 {
 	qdf_mem_free(vdev_cs->vdev_stats);
 	vdev_cs->vdev_stats = NULL;
-	vdev_cs->ucast_rx_pnerr_stats_inc = NULL;
 	return QDF_STATUS_SUCCESS;
 }
 
