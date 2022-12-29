@@ -1,6 +1,6 @@
  /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1435,9 +1435,9 @@ int wma_extscan_capabilities_event_handler(void *handle,
 	dest_capab->max_number_epno_networks_by_ssid =
 				event->num_epno_networks;
 	dest_capab->max_number_of_allow_listed_ssid =
-				event->num_roam_ssid_allowlist;
+				event->num_roam_ssid_whitelist;
 	dest_capab->max_number_of_deny_listed_bssid =
-				event->num_roam_bssid_denylist;
+				event->num_roam_bssid_blacklist;
 	dest_capab->status = 0;
 
 	wma_debug("request_id: %u status: %d",
