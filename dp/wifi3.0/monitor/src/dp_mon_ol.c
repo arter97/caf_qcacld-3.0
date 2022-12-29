@@ -457,6 +457,98 @@ static int ol_set_tx_sniffer_mode(struct ol_ath_softc_net80211 *scn,
 }
 
 #if defined(WLAN_TX_PKT_CAPTURE_ENH) || defined(WLAN_RX_PKT_CAPTURE_ENH)
+#ifdef QCA_SUPPORT_LITE_MONITOR
+int
+ol_ath_ucfg_set_peer_pkt_capture_mon_2_0(void *vscn,
+					 struct ieee80211_pkt_capture_enh *peer_info)
+{
+	struct ol_ath_softc_net80211 *scn =
+		(struct ol_ath_softc_net80211 *)vscn;
+	struct ieee80211com *ic = &scn->sc_ic;
+	uint8_t action;
+	struct lite_mon_config *mon_config = NULL;
+	struct ieee80211vap *vap = NULL;
+	struct ieee80211_node *ni = NULL;
+
+	if (!ic->ic_mon_vap) {
+		qdf_err("Monitor VAP doesn't exist");
+		return -EINVAL;
+	}
+
+	vap = ic->ic_mon_vap;
+
+	if (peer_info->rx_pkt_cap_enable || peer_info->tx_pkt_cap_enable)
+		action = LITE_MON_PEER_ADD;
+	else
+		action = LITE_MON_PEER_REMOVE;
+
+	ni = ieee80211_find_node(ic, peer_info->peer_mac, WLAN_MLME_SB_ID);
+	if (!ni && action == LITE_MON_PEER_ADD) {
+		qdf_err("VAP doesn't exist");
+		return -EINVAL;
+	}
+
+	if (ni) {
+		if (!ni->ni_vap) {
+			ieee80211_free_node(ni, WLAN_MLME_SB_ID);
+			return -EINVAL;
+		}
+
+		vap = ni->ni_vap;
+		if (ni == vap->iv_bss) {
+			ieee80211_free_node(ni, WLAN_MLME_SB_ID);
+			return -EINVAL;
+		}
+	}
+
+	mon_config = qdf_mem_malloc(sizeof(struct lite_mon_config));
+	if (!mon_config) {
+		qdf_err("Memory allocation failed");
+		ieee80211_free_node(ni, WLAN_MLME_SB_ID);
+		return A_NO_MEMORY;
+	}
+
+	mon_config->cmdtype = LITE_MON_SET_PEER;
+	mon_config->debug = LITE_MON_TRACE_INFO;
+
+	strlcpy(mon_config->data.peer_config.interface_name,
+		vap->iv_netdev_name,
+		sizeof(mon_config->data.peer_config.interface_name));
+
+	mon_config->data.peer_config.count = 1;
+	qdf_mem_copy(mon_config->data.peer_config.mac_addr[0], peer_info->peer_mac, QDF_MAC_ADDR_SIZE);
+
+	mon_config->direction = LITE_MON_DIRECTION_RX;
+	if (peer_info->rx_pkt_cap_enable)
+		mon_config->data.peer_config.action = LITE_MON_PEER_ADD;
+	else
+		mon_config->data.peer_config.action = LITE_MON_PEER_REMOVE;
+
+	wlan_set_lite_monitor_peer_config(scn, mon_config);
+
+	mon_config->direction = LITE_MON_DIRECTION_TX;
+	if (peer_info->tx_pkt_cap_enable)
+		mon_config->data.peer_config.action = LITE_MON_PEER_ADD;
+	else
+		mon_config->data.peer_config.action = LITE_MON_PEER_REMOVE;
+
+	wlan_set_lite_monitor_peer_config(scn, mon_config);
+
+	ieee80211_free_node(ni, WLAN_MLME_SB_ID);
+	qdf_mem_free(mon_config);
+	mon_config = NULL;
+
+	return 0;
+}
+#else
+int
+ol_ath_ucfg_set_peer_pkt_capture_mon_2_0(void *vscn,
+					 struct ieee80211_pkt_capture_enh *peer_info)
+{
+	qdf_err("Couldn't send command. Lite mon is not supported");
+	return -EINVAL;
+}
+#endif
 int
 ol_ath_ucfg_set_peer_pkt_capture(void *vscn,
 				 struct ieee80211_pkt_capture_enh *peer_info)
@@ -482,34 +574,40 @@ ol_ath_ucfg_set_peer_pkt_capture(void *vscn,
 		return -EFAULT;
 	}
 
-	status =
-		cdp_update_peer_pkt_capture_params(soc_handle,
-						   wlan_objmgr_pdev_get_pdev_id(scn->sc_pdev),
-						   peer_info->rx_pkt_cap_enable,
-						   peer_info->tx_pkt_cap_enable,
-						   peer_info->peer_mac);
-	if (status != QDF_STATUS_SUCCESS)
-		return -EINVAL;
+	if (scn->sc_ic.ic_monitor_version == MONITOR_VERSION_2) {
+		if (ol_ath_ucfg_set_peer_pkt_capture_mon_2_0(vscn, peer_info))
+			return -EINVAL;
+	} else{
+		status =
+			cdp_update_peer_pkt_capture_params
+					(soc_handle,
+					wlan_objmgr_pdev_get_pdev_id(scn->sc_pdev),
+					peer_info->rx_pkt_cap_enable,
+					peer_info->tx_pkt_cap_enable,
+					peer_info->peer_mac);
+		if (status != QDF_STATUS_SUCCESS)
+			return -EINVAL;
 
-	dp_mon_info("Set Rx & TX packet capture [%d, %d] for peer %02x:%02x:%02x:%02x:%02x:%02x",
-		 peer_info->rx_pkt_cap_enable, peer_info->tx_pkt_cap_enable,
-		 peer_info->peer_mac[0], peer_info->peer_mac[1],
-		 peer_info->peer_mac[2], peer_info->peer_mac[3],
-		 peer_info->peer_mac[4], peer_info->peer_mac[5]);
+		dp_mon_info("Set Rx & TX packet capture [%d, %d] for peer %02x:%02x:%02x:%02x:%02x:%02x",
+			    peer_info->rx_pkt_cap_enable, peer_info->tx_pkt_cap_enable,
+			    peer_info->peer_mac[0], peer_info->peer_mac[1],
+			    peer_info->peer_mac[2], peer_info->peer_mac[3],
+			    peer_info->peer_mac[4], peer_info->peer_mac[5]);
 
 #ifdef QCA_NSS_WIFI_OFFLOAD_SUPPORT
-	if (scn->sc_ic.nss_radio_ops) {
-		if (peer_info->tx_pkt_cap_enable) {
-			status = scn->sc_ic.nss_radio_ops->ic_nss_ol_peer_cfg_tx_capture(scn,
-					peer_info->tx_pkt_cap_enable, peer_info->peer_mac);
+		if (scn->sc_ic.nss_radio_ops) {
+			if (peer_info->tx_pkt_cap_enable) {
+				status = scn->sc_ic.nss_radio_ops->ic_nss_ol_peer_cfg_tx_capture(scn,
+						peer_info->tx_pkt_cap_enable, peer_info->peer_mac);
+			}
 		}
-	}
-	if (status != QDF_STATUS_SUCCESS) {
-		qdf_err("Peer Tx capture enable for NSS offload failed for peer = " QDF_MAC_ADDR_FMT,
-			QDF_MAC_ADDR_REF(peer_info->peer_mac));
-		return -EINVAL;
-	}
+		if (status != QDF_STATUS_SUCCESS) {
+			qdf_err("Peer Tx capture enable for NSS offload failed for peer = " QDF_MAC_ADDR_FMT,
+				QDF_MAC_ADDR_REF(peer_info->peer_mac));
+			return -EINVAL;
+		}
 #endif  /* QCA_NSS_WIFI_OFFLOAD_SUPPORT */
+	}
 
 	return 0;
 }
@@ -660,6 +758,94 @@ void process_rx_mpdu(void *pdev, enum WDI_EVENT event, void *data,
 	ol_if_process_rx_mpdu(scn, event, data, peer_id);
 }
 
+#ifdef QCA_SUPPORT_LITE_MONITOR
+int ol_set_lite_mode_rx_2_0(struct ol_ath_softc_net80211 *scn, int val)
+{
+	ol_txrx_soc_handle soc_txrx_handle;
+	struct ieee80211com *ic = &scn->sc_ic;
+	struct lite_mon_config *mon_config = NULL;
+	uint8_t pdev_id = wlan_objmgr_pdev_get_pdev_id(scn->sc_pdev);
+
+	soc_txrx_handle = wlan_psoc_get_dp_handle(scn->soc->psoc_obj);
+
+	if ((ic->ic_rx_mon_lite == RX_ENH_CAPTURE_MPDU ||
+	     ic->ic_rx_mon_lite == RX_ENH_CAPTURE_MPDU_MSDU) &&
+	    val != RX_ENH_CAPTURE_DISABLED) {
+		qdf_err("Rx Enhance capture already enabled");
+		return A_ERROR;
+	}
+
+	if (ic->ic_rx_mon_lite == RX_ENH_CAPTURE_DISABLED &&
+	    val == RX_ENH_CAPTURE_DISABLED) {
+		qdf_err("Rx Enhance capture already disabled");
+		return A_ERROR;
+	}
+
+	mon_config = qdf_mem_malloc(sizeof(struct lite_mon_config));
+	if (!mon_config) {
+		qdf_err("Memory allocation failed");
+		return A_NO_MEMORY;
+	}
+
+	if (val == RX_ENH_CAPTURE_MPDU || val == RX_ENH_CAPTURE_MPDU_MSDU) {
+		if (cdp_is_lite_mon_enabled(
+					soc_txrx_handle,
+					pdev_id,
+					LITE_MON_DIRECTION_RX)) {
+			qdf_err("Lite monitor filter is already enabled, disable it first");
+			qdf_mem_free(mon_config);
+			mon_config = NULL;
+			return A_ERROR;
+		}
+
+		mon_config->direction = LITE_MON_DIRECTION_RX;
+		mon_config->cmdtype = LITE_MON_SET_FILTER;
+		mon_config->debug = LITE_MON_TRACE_INFO;
+
+		mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FP] = LITE_MON_FILTER_ALL;
+		mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FP] = LITE_MON_FILTER_ALL;
+		mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FP] = LITE_MON_FILTER_ALL;
+		mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_MO] = LITE_MON_FILTER_ALL;
+		mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_MO] = LITE_MON_FILTER_ALL;
+		mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_MO] = LITE_MON_FILTER_ALL;
+		mon_config->data.filter_config.mgmt_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
+		mon_config->data.filter_config.data_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
+		mon_config->data.filter_config.ctrl_filter[LITE_MON_MODE_FILTER_FPMO] = LITE_MON_FILTER_ALL;
+
+		mon_config->data.filter_config.len[LITE_MON_TYPE_DATA] = LITE_MON_LEN_2;
+		mon_config->data.filter_config.len[LITE_MON_TYPE_MGMT] = LITE_MON_LEN_2;
+		mon_config->data.filter_config.len[LITE_MON_TYPE_CTRL] = LITE_MON_LEN_2;
+
+		mon_config->data.filter_config.legacy_filter_enabled = LEGACY_FILTER_RX_ENH_CAPTURE;
+
+		if (val == RX_ENH_CAPTURE_MPDU) {
+			mon_config->data.filter_config.level = LITE_MON_LEVEL_MPDU;
+			mon_config->data.filter_config.metadata = 0x0001;
+		} else if (val == RX_ENH_CAPTURE_MPDU_MSDU) {
+			mon_config->data.filter_config.level = LITE_MON_LEVEL_MSDU;
+			mon_config->data.filter_config.metadata = 0x0003;
+		}
+	} else if (val == RX_ENH_CAPTURE_DISABLED) {
+		mon_config->cmdtype = LITE_MON_SET_FILTER;
+		mon_config->data.filter_config.disable = 1;
+		mon_config->direction = LITE_MON_DIRECTION_RX;
+	}
+
+	monitor_set_lite_monitor_config(scn, mon_config);
+
+	qdf_mem_free(mon_config);
+	mon_config = NULL;
+
+	return A_OK;
+}
+#else
+int ol_set_lite_mode_rx_2_0(struct ol_ath_softc_net80211 *scn, int val)
+{
+	qdf_err("Couldn't send command. Lite mon is not supported");
+	return A_EEROR;
+}
+#endif
+
 static int ol_set_lite_mode(struct ol_ath_softc_net80211 *scn,
 			    uint8_t pdev_id,
 			    ol_txrx_soc_handle soc_txrx_handle,
@@ -669,29 +855,25 @@ static int ol_set_lite_mode(struct ol_ath_softc_net80211 *scn,
 	struct ieee80211com *ic = &scn->sc_ic;
 
 	if (ic->ic_monitor_version == MONITOR_VERSION_2) {
-		dp_mon_err("cmd not supported");
-		return -EINVAL;
-	}
-
-	val.cdp_pdev_param_en_tx_cap = value;
-	if (QDF_STATUS_SUCCESS !=
-	    cdp_txrx_set_pdev_param(soc_txrx_handle, pdev_id,
-				    CDP_CONFIG_ENH_RX_CAPTURE, val))
-		return -EINVAL;
-	if (ic->ic_rx_mon_lite == RX_ENH_CAPTURE_DISABLED &&
-	    value != RX_ENH_CAPTURE_DISABLED) {
-		scn->soc->scn_rx_lite_monitor_mpdu_subscriber.callback
-				= process_rx_mpdu;
-		scn->soc->scn_rx_lite_monitor_mpdu_subscriber.context  = scn;
-		cdp_wdi_event_sub(soc_txrx_handle, pdev_id,
-				  &scn->soc->scn_rx_lite_monitor_mpdu_subscriber,
-				  WDI_EVENT_RX_MPDU);
-	} else if (ic->ic_rx_mon_lite != RX_ENH_CAPTURE_DISABLED &&
-		   value == RX_ENH_CAPTURE_DISABLED) {
-		scn->soc->scn_rx_lite_monitor_mpdu_subscriber.context  = scn;
-		cdp_wdi_event_unsub(soc_txrx_handle, pdev_id,
-				    &scn->soc->scn_rx_lite_monitor_mpdu_subscriber,
-				    WDI_EVENT_RX_MPDU);
+		if (ol_set_lite_mode_rx_2_0(scn, value))
+			return A_ERROR;
+	} else {
+		val.cdp_pdev_param_en_tx_cap = value;
+		if (QDF_STATUS_SUCCESS != cdp_txrx_set_pdev_param(soc_txrx_handle, pdev_id, CDP_CONFIG_ENH_RX_CAPTURE, val))
+			return -EINVAL;
+		if (ic->ic_rx_mon_lite == RX_ENH_CAPTURE_DISABLED && value != RX_ENH_CAPTURE_DISABLED) {
+			scn->soc->scn_rx_lite_monitor_mpdu_subscriber.callback = process_rx_mpdu;
+			scn->soc->scn_rx_lite_monitor_mpdu_subscriber.context  = scn;
+			cdp_wdi_event_sub(soc_txrx_handle, pdev_id,
+					  &scn->soc->scn_rx_lite_monitor_mpdu_subscriber,
+					  WDI_EVENT_RX_MPDU);
+		} else if (ic->ic_rx_mon_lite != RX_ENH_CAPTURE_DISABLED &&
+				value == RX_ENH_CAPTURE_DISABLED) {
+			scn->soc->scn_rx_lite_monitor_mpdu_subscriber.context  = scn;
+			cdp_wdi_event_unsub(soc_txrx_handle, pdev_id,
+					    &scn->soc->scn_rx_lite_monitor_mpdu_subscriber,
+					    WDI_EVENT_RX_MPDU);
+		}
 	}
 	ic->ic_rx_mon_lite = value;
 
