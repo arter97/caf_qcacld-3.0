@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -35,7 +35,7 @@
 
 /**
  * wlan_cfr_is_ini_disabled() - Check if cfr feature is disabled
- * @pdev - the physical device object.
+ * @pdev: the physical device object.
  *
  * Return : true if cfr is disabled, else false.
  */
@@ -64,7 +64,7 @@ wlan_cfr_is_ini_disabled(struct wlan_objmgr_pdev *pdev)
 
 /**
  * wlan_cfr_get_dbr_num_entries() - Get entry number of DBR ring
- * @pdev - the physical device object.
+ * @pdev: the physical device object.
  *
  * Return : Entry number of DBR ring.
  */
@@ -113,6 +113,7 @@ wlan_cfr_get_dbr_num_entries(struct wlan_objmgr_pdev *pdev)
 #ifdef WLAN_CFR_PM
 /**
  * cfr_wakelock_init(): Create/init wake lock for CFR
+ * @pcfr: CFR pdev context
  *
  * Create/init wake lock for CFR
  *
@@ -132,6 +133,7 @@ static void cfr_wakelock_init(struct pdev_cfr *pcfr)
 
 /**
  * cfr_wakelock_deinit(): Destroy/deinit wake lock for CFR
+ * @pcfr: CFR pdev context
  *
  * Destroy/deinit wake lock for CFR
  *
