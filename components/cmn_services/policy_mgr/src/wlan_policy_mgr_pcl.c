@@ -416,8 +416,9 @@ policy_mgr_update_valid_ch_freq_list(struct policy_mgr_psoc_priv_obj *pm_ctx,
 	for (i = 0; i < NUM_CHANNELS; i++) {
 		ch_freq = reg_ch_list[i].center_freq;
 		if (is_client)
-			state = wlan_reg_get_channel_state_for_freq(
-							pm_ctx->pdev, ch_freq);
+			state = wlan_reg_get_channel_state_for_pwrmode(
+							pm_ctx->pdev, ch_freq,
+							REG_CURRENT_PWR_MODE);
 		else
 			state =
 			wlan_reg_get_channel_state_from_secondary_list_for_freq(
@@ -474,7 +475,7 @@ policy_mgr_reg_chan_change_callback(struct wlan_objmgr_psoc *psoc,
 	}
 
 	/*
-	 * The ch_list buffer can accomadate a maximum of
+	 * The ch_list buffer can accommodate a maximum of
 	 * NUM_CHANNELS and hence the ch_cnt should also not
 	 * exceed NUM_CHANNELS.
 	 */
@@ -573,7 +574,7 @@ void policy_mgr_update_with_safe_channel_list(struct wlan_objmgr_psoc *psoc,
 		}
 		if (is_unsafe && scc_on_lte_coex &&
 		    policy_mgr_is_sta_sap_scc(psoc, current_channel_list[i])) {
-			policy_mgr_debug("CH %d unsafe ingored when STA present on it",
+			policy_mgr_debug("CH %d unsafe ignored when STA present on it",
 					 current_channel_list[i]);
 			is_unsafe = 0;
 		}
@@ -601,8 +602,9 @@ static QDF_STATUS policy_mgr_modify_pcl_based_on_enabled_channels(
 	uint32_t i, pcl_len = 0;
 
 	for (i = 0; i < *pcl_len_org; i++) {
-		if (!wlan_reg_is_passive_or_disable_for_freq(
-			pm_ctx->pdev, pcl_list_org[i])) {
+		if (!wlan_reg_is_passive_or_disable_for_pwrmode(
+			pm_ctx->pdev, pcl_list_org[i],
+			REG_CURRENT_PWR_MODE)) {
 			pcl_list_org[pcl_len] = pcl_list_org[i];
 			weight_list_org[pcl_len++] = weight_list_org[i];
 		}
@@ -913,7 +915,7 @@ policy_mgr_modify_pcl_based_on_indoor(struct wlan_objmgr_psoc *psoc,
 		include_indoor_channel = true;
 
 	if (include_indoor_channel) {
-		policy_mgr_debug("Indoor channels allowed. PCL not modifed for indoor channels");
+		policy_mgr_debug("Indoor channels allowed. PCL not modified for indoor channels");
 		return QDF_STATUS_SUCCESS;
 	}
 
@@ -2593,7 +2595,7 @@ static void policy_mgr_get_index_for_3_given_freq_sbs(
 	if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq1, freq2)) {
 		/*
 		 * If freq1 is 2.4 GHZ that mean freq2 is 5 / 6 GHZ.
-		 * so take desision using freq2.
+		 * so take decision using freq2.
 		 */
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq1))
 			shared_5_ghz_freq = freq2;
@@ -2603,7 +2605,7 @@ static void policy_mgr_get_index_for_3_given_freq_sbs(
 	} else if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq2, freq3)) {
 		/*
 		 * If freq2 is 2.4 GHZ that mean freq3 is 5 / 6 GHZ.
-		 * so take desision using freq3.
+		 * so take decision using freq3.
 		 */
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq2))
 			shared_5_ghz_freq = freq3;
@@ -2613,7 +2615,7 @@ static void policy_mgr_get_index_for_3_given_freq_sbs(
 	} else if (policy_mgr_2_freq_same_mac_in_sbs(pm_ctx, freq3, freq1)) {
 		/*
 		 * If freq1 is 2.4 GHZ that mean freq3 is 5 / 6 GHZ.
-		 * so take desision using freq3.
+		 * so take decision using freq3.
 		 */
 		if (WLAN_REG_IS_24GHZ_CH_FREQ(freq1))
 			shared_5_ghz_freq = freq3;
@@ -3275,9 +3277,22 @@ policy_mgr_get_sap_mandatory_channel(struct wlan_objmgr_psoc *psoc,
 	struct policy_mgr_pcl_list pcl;
 	uint32_t i;
 	uint32_t sap_new_freq;
+	uint8_t mcc_to_scc_switch;
+	uint8_t sta_count;
 	qdf_freq_t user_config_freq = 0;
 	bool sta_sap_scc_on_indoor_channel =
 		 policy_mgr_get_sta_sap_scc_allowed_on_indoor_chnl(psoc);
+
+	mcc_to_scc_switch =
+		policy_mgr_get_mcc_to_scc_switch_mode(psoc);
+
+	sta_count =
+		policy_mgr_mode_specific_connection_count(psoc, PM_STA_MODE,
+							  NULL);
+
+	if (!sta_count || mcc_to_scc_switch !=
+			QDF_MCC_TO_SCC_SWITCH_WITH_FAVORITE_CHANNEL)
+		return QDF_STATUS_E_FAILURE;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -3851,4 +3866,104 @@ bool policy_mgr_is_sta_chan_valid_for_connect_and_roam(
 		return false;
 
 	return true;
+}
+
+bool
+policy_mgr_is_ll_sap_present_in_current_mode(struct wlan_objmgr_psoc *psoc,
+					     enum policy_mgr_con_mode curr_mode,
+					     uint32_t vdev_id)
+{
+	struct wlan_objmgr_vdev *vdev;
+	bool is_ll_sap = false;
+	enum host_concurrent_ap_policy profile =
+					HOST_CONCURRENT_AP_POLICY_UNSPECIFIED;
+	if (curr_mode != PM_SAP_MODE)
+		return is_ll_sap;
+
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, vdev_id,
+						    WLAN_POLICY_MGR_ID);
+	if (!vdev) {
+		policy_mgr_err("vdev %d: invalid vdev", vdev_id);
+		return is_ll_sap;
+	}
+
+	profile = wlan_mlme_get_ap_policy(vdev);
+	if (profile == HOST_CONCURRENT_AP_POLICY_GAMING_AUDIO ||
+	    profile == HOST_CONCURRENT_AP_POLICY_LOSSLESS_AUDIO_STREAMING)
+		is_ll_sap = true;
+
+	wlan_objmgr_vdev_release_ref(vdev, WLAN_POLICY_MGR_ID);
+	return is_ll_sap;
+}
+
+QDF_STATUS
+policy_mgr_get_pcl_chlist_for_ll_sap(struct wlan_objmgr_psoc *psoc,
+				     enum policy_mgr_con_mode curr_mode,
+				     uint32_t vdev_id, uint32_t *pcl_channels,
+				     uint8_t *pcl_weight, uint32_t *len)
+{
+	struct policy_mgr_psoc_priv_obj *pm_ctx;
+	uint32_t pcl_len = 0, i, conn_idx = 0;
+	uint32_t pcl_list[NUM_CHANNELS], total_connection = 0;
+	uint8_t weight_list[NUM_CHANNELS];
+	qdf_freq_t freq;
+
+	pm_ctx = policy_mgr_get_context(psoc);
+	if (!pm_ctx) {
+		policy_mgr_err("pm_ctx is null");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	if (!policy_mgr_is_ll_sap_present_in_current_mode(psoc, curr_mode,
+							  vdev_id)) {
+		policy_mgr_debug("LL SAP is not present in current mode %d",
+				 curr_mode);
+		return QDF_STATUS_SUCCESS;
+	}
+
+	total_connection = policy_mgr_get_connection_count(psoc);
+	if (!total_connection && curr_mode == PM_SAP_MODE) {
+		for (i = 0; i < *len; i++) {
+			if (WLAN_REG_IS_24GHZ_CH_FREQ(pcl_channels[i]))
+				continue;
+
+			pcl_list[pcl_len] = pcl_channels[i];
+			weight_list[pcl_len++] = pcl_weight[i];
+		}
+		qdf_mem_zero(pcl_channels, *len * sizeof(*pcl_channels));
+		qdf_mem_copy(pcl_channels, pcl_list,
+			     pcl_len * sizeof(*pcl_channels));
+	} else {
+		qdf_mutex_acquire(&pm_ctx->qdf_conc_list_lock);
+		for (conn_idx = 0; conn_idx < MAX_NUMBER_OF_CONC_CONNECTIONS;
+		     conn_idx++) {
+			if (!pm_conc_connection_list[conn_idx].in_use)
+				continue;
+
+			freq = pm_conc_connection_list[conn_idx].freq;
+
+			for (i = 0; i < *len; i++) {
+				if (policy_mgr_2_freq_always_on_same_mac(
+								psoc,
+								pcl_channels[i],
+								freq) ||
+				    WLAN_REG_IS_24GHZ_CH_FREQ(pcl_channels[i]))
+					continue;
+				pcl_list[pcl_len] = pcl_channels[i];
+				weight_list[pcl_len++] = pcl_weight[i];
+			}
+			*len = pcl_len;
+			qdf_mem_zero(pcl_channels,
+				     *len * sizeof(*pcl_channels));
+			qdf_mem_copy(pcl_channels, pcl_list,
+				     pcl_len * sizeof(*pcl_channels));
+		}
+		qdf_mutex_release(&pm_ctx->qdf_conc_list_lock);
+	}
+
+	qdf_mem_zero(pcl_weight, *len * sizeof(*pcl_weight));
+	qdf_mem_copy(pcl_weight, weight_list, pcl_len);
+	*len = pcl_len;
+
+	return QDF_STATUS_SUCCESS;
 }

@@ -51,11 +51,6 @@
 #include <net/tcp.h>
 
 #include "dp_txrx.h"
-#if defined(WLAN_SUPPORT_RX_FISA)
-#include "dp_fisa_rx.h"
-#else
-#include <net/ieee80211_radiotap.h>
-#endif
 #include <ol_defines.h>
 #include "cfg_ucfg_api.h"
 #include "target_type.h"
@@ -465,7 +460,7 @@ int hdd_set_udp_qos_upgrade_config(struct hdd_adapter *adapter,
 	}
 
 	if (priority >= QCA_WLAN_AC_ALL) {
-		hdd_err_rl("Invlid data priority: %d", priority);
+		hdd_err_rl("Invalid data priority: %d", priority);
 		return -EINVAL;
 	}
 
@@ -550,7 +545,7 @@ static void __hdd_hard_start_xmit(struct sk_buff *skb,
 	/*
 	 * Make sure we already have access to this access category
 	 * or it is EAPOL or WAPI frame during initial authentication which
-	 * can have artifically boosted higher qos priority.
+	 * can have artificially boosted higher qos priority.
 	 */
 
 	if (((adapter->psb_changed & (1 << ac)) &&

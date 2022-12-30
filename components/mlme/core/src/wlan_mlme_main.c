@@ -387,7 +387,7 @@ static void mlme_init_ratemask_cfg(struct wlan_objmgr_psoc *psoc,
 					&len);
 
 	if (status != QDF_STATUS_SUCCESS || len != CFG_MLME_RATE_MASK_LEN) {
-		/* Do not enable ratemaks if config is invalid */
+		/* Do not enable ratemask if config is invalid */
 		ratemask_cfg->type = WLAN_MLME_RATEMASK_TYPE_NO_MASK;
 		mlme_legacy_err("Failed to parse ratemask");
 		return;
@@ -1269,7 +1269,7 @@ static void mlme_init_he_cap_in_cfg(struct wlan_objmgr_psoc *psoc,
 	he_caps->dot11_he_cap.ht_vht_trg_frm_rx_supp =
 			cfg_default(CFG_HE_HT_VHT_TRG_FRM_RX);
 	he_caps->dot11_he_cap.rx_pream_puncturing =
-			cfg_default(CFG_HE_RX_PREAM_PUNC);
+			cfg_get(psoc, CFG_HE_RX_PREAM_PUNC);
 	he_caps->dot11_he_cap.device_class =
 			cfg_default(CFG_HE_CLASS_OF_DEVICE);
 	he_caps->dot11_he_cap.ldpc_coding = cfg_default(CFG_HE_LDPC);
@@ -2348,7 +2348,10 @@ mlme_init_wifi_pos_11az_config(struct wlan_objmgr_psoc *psoc,
 {
 	bool rsta_sec_ltf_enabled =
 			cfg_get(psoc, CFG_RESPONDER_SECURE_LTF_SUPPORT);
+	bool rsta_11az_ranging_enabled = cfg_get(psoc,
+						 CFG_RESPONDER_11AZ_SUPPORT);
 
+	wifi_pos_set_rsta_11az_ranging_cap(rsta_11az_ranging_enabled);
 	wifi_pos_set_rsta_sec_ltf_cap(rsta_sec_ltf_enabled);
 }
 #else
@@ -2920,7 +2923,7 @@ mlme_init_iot_cfg(struct wlan_objmgr_psoc *psoc,
 }
 
 /**
- * mlme_init_dual_sta_config - Initialize dual sta configuratons
+ * mlme_init_dual_sta_config - Initialize dual sta configurations
  * @gen: Generic CFG config items
  *
  * Return: None

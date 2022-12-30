@@ -30,7 +30,7 @@
 #ifndef __PARSE_H__
 #define __PARSE_H__
 
-#include <stdarg.h>
+#include "qdf_types.h"
 #include "sir_mac_prop_exts.h"
 #include "dot11f.h"
 #include "lim_ft_defs.h"
@@ -295,6 +295,9 @@ typedef struct sSirProbeRespBeacon {
 	tDot11fIEqcn_ie qcn_ie;
 	tDot11fIEhe_cap he_cap;
 	tDot11fIEhe_op he_op;
+#ifdef WLAN_FEATURE_SR
+	tDot11fIEspatial_reuse srp_ie;
+#endif
 	tDot11fIEeht_cap eht_cap;
 	tDot11fIEeht_op eht_op;
 #ifdef WLAN_FEATURE_11AX_BSS_COLOR
@@ -488,6 +491,9 @@ typedef struct sSirAssocRsp {
 	tDot11fIEqcn_ie qcn_ie;
 	tDot11fIEhe_cap he_cap;
 	tDot11fIEhe_op he_op;
+#ifdef WLAN_FEATURE_SR
+	tDot11fIEspatial_reuse srp_ie;
+#endif
 	tDot11fIEhe_6ghz_band_cap he_6ghz_band_cap;
 	tDot11fIEeht_cap eht_cap;
 	tDot11fIEeht_op eht_op;
@@ -1532,7 +1538,7 @@ void lim_ieee80211_pack_ehtcap(uint8_t *ie, tDot11fIEeht_cap dot11f_eht_cap,
  * @dot11f_he_cap: dot11f HE capabilities IE structure
  * @freq: frequency
  *
- * This API is used to strip and decode EHT caps IE which is of varaible in
+ * This API is used to strip and decode EHT caps IE which is of variable in
  * length depending on the HE capabilities IE content.
  *
  * Return: QDF_STATUS
@@ -1569,7 +1575,7 @@ void lim_ieee80211_pack_ehtop(uint8_t *ie, tDot11fIEeht_op dot11f_eht_op,
  * @dot11f_he_op: dot11f HE operation IE structure
  * @dot11f_ht_info: dot11f HT info IE structure
  *
- * This API is used to strip and decode EHT operations IE which is of varaible
+ * This API is used to strip and decode EHT operations IE which is of variable
  * in length depending on the HE capabilities IE content.
  *
  * Return: QDF_STATUS
@@ -1684,7 +1690,7 @@ QDF_STATUS populate_dot11f_btm_extended_caps(struct mac_context *mac_ctx,
 					     struct sDot11fIEExtCap *dot11f);
 
 /**
- * lim_truncate_ppet: truncates ppet of trailling zeros
+ * lim_truncate_ppet: truncates ppet of trailing zeros
  * @ppet: ppet to truncate
  * max_len: max length of ppet
  *

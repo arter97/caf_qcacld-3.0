@@ -291,7 +291,7 @@ wlansap_filter_unsafe_ch(struct wlan_objmgr_psoc *psoc,
 	 * would contain the channels in acs cfg. Now since the scan takes time
 	 * there could be channels present in acs cfg that could become unsafe
 	 * in the mean time, so it is better to filter out those channels from
-	 * the acs channel list before chosing one of them as a default channel
+	 * the acs channel list before choosing one of them as a default channel
 	 */
 	for (i = 0; i < sap_ctx->acs_cfg->ch_list_count; i++) {
 		freq = sap_ctx->acs_cfg->freq_list[i];
@@ -467,13 +467,15 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 		    sap_ctx->ch_params.ch_width, 0) == CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else if (sap_ctx->ch_params.ch_width == CH_WIDTH_80P80MHZ) {
-		if (wlan_reg_get_channel_state_for_freq(
+		if (wlan_reg_get_channel_state_for_pwrmode(
 						mac_ctx->pdev,
-						target_chan_freq) ==
+						target_chan_freq,
+						REG_CURRENT_PWR_MODE) ==
 		    CHANNEL_STATE_DFS ||
-		    wlan_reg_get_channel_state_for_freq(
+		    wlan_reg_get_channel_state_for_pwrmode(
 					mac_ctx->pdev,
-					sap_ctx->ch_params.mhz_freq_seg1) ==
+					sap_ctx->ch_params.mhz_freq_seg1,
+					REG_CURRENT_PWR_MODE) ==
 				CHANNEL_STATE_DFS)
 			is_ch_dfs = true;
 	} else {
@@ -490,10 +492,8 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 	sap_ctx->chan_freq = target_chan_freq;
 	/* check if currently selected channel is a DFS channel */
 	if (is_ch_dfs && wlan_pre_cac_complete_get(sap_ctx->vdev)) {
-		/* Start beaconing on the new pre cac channel */
-		wlansap_start_beacon_req(sap_ctx);
 		sap_ctx->fsm_state = SAP_STARTING;
-		mac_ctx->sap.SapDfsInfo.sap_radar_found_status = false;
+		sap_ctx->sap_radar_found_status = false;
 		sap_event.event = eSAP_MAC_START_BSS_SUCCESS;
 		sap_event.params = csr_roam_info;
 		sap_event.u1 = eCSR_ROAM_INFRA_IND;
@@ -512,10 +512,8 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 			sap_event.u1 = 0;
 			sap_event.u2 = 0;
 		} else {
-			/* Start beaconing on the new channel */
-			wlansap_start_beacon_req(sap_ctx);
 			sap_ctx->fsm_state = SAP_STARTING;
-			mac_ctx->sap.SapDfsInfo.sap_radar_found_status = false;
+			sap_ctx->sap_radar_found_status = false;
 			sap_event.event = eSAP_MAC_START_BSS_SUCCESS;
 			sap_event.params = csr_roam_info;
 			sap_event.u1 = eCSR_ROAM_INFRA_IND;
@@ -524,7 +522,7 @@ wlansap_roam_process_ch_change_success(struct mac_context *mac_ctx,
 	} else {
 		/* non-DFS channel */
 		sap_ctx->fsm_state = SAP_STARTING;
-		mac_ctx->sap.SapDfsInfo.sap_radar_found_status = false;
+		sap_ctx->sap_radar_found_status = false;
 		sap_event.event = eSAP_MAC_START_BSS_SUCCESS;
 		sap_event.params = csr_roam_info;
 		sap_event.u1 = eCSR_ROAM_INFRA_IND;
@@ -719,7 +717,7 @@ wlansap_roam_process_dfs_radar_found(struct mac_context *mac_ctx,
 			sap_err("sapdfs: DFS channel switch disabled");
 			return;
 		}
-		if (false == mac_ctx->sap.SapDfsInfo.sap_radar_found_status) {
+		if (!sap_ctx->sap_radar_found_status) {
 			sap_err("sapdfs: sap_radar_found_status is false");
 			return;
 		}
@@ -1181,9 +1179,10 @@ QDF_STATUS wlansap_roam_callback(void *ctx,
 			    NULL) {
 				sap_context =
 				    mac_ctx->sap.sapCtxList[intf].sap_context;
-				if (!wlan_reg_is_passive_or_disable_for_freq(
+				if (!wlan_reg_is_passive_or_disable_for_pwrmode(
 						mac_ctx->pdev,
-						sap_context->chan_freq))
+						sap_context->chan_freq,
+						REG_CURRENT_PWR_MODE))
 					continue;
 				sap_debug("Vdev %d no channel available , stop bss",
 					  sap_context->sessionId);

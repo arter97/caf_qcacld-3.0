@@ -270,6 +270,9 @@ extern enum policy_mgr_conc_next_action
  * @sbs_enable: To enable/disable SBS
  * @multi_sap_allowed_on_same_band: Enable/Disable multi sap started
  *                                  on same band
+ * @sr_in_same_mac_conc: Enable/Disable SR in same MAC concurrency
+ * @use_sap_original_bw: Enable/Disable sap original BW as default
+ *                       BW when do restart
  */
 struct policy_mgr_cfg {
 	uint8_t mcc_to_scc_switch;
@@ -295,6 +298,10 @@ struct policy_mgr_cfg {
 	enum policy_mgr_pcl_band_priority pcl_band_priority;
 	bool sbs_enable;
 	bool multi_sap_allowed_on_same_band;
+#ifdef WLAN_FEATURE_SR
+	bool sr_in_same_mac_conc;
+#endif
+	bool use_sap_original_bw;
 };
 
 /**
@@ -442,6 +449,25 @@ union conc_ext_flag {
 
 	uint32_t value;
 };
+#endif
+
+#ifdef WLAN_FEATURE_SR
+/**
+ * policy_mgr_get_same_mac_conc_sr_status() - Function returns value of INI
+ * g_enable_sr_in_same_mac_conc
+ *
+ * @psoc: Pointer to PSOC
+ *
+ * Return: Returns True / False
+ */
+bool policy_mgr_get_same_mac_conc_sr_status(struct wlan_objmgr_psoc *psoc);
+
+#else
+static inline
+bool policy_mgr_get_same_mac_conc_sr_status(struct wlan_objmgr_psoc *psoc)
+{
+	return true;
+}
 #endif
 
 struct policy_mgr_psoc_priv_obj *policy_mgr_get_context(

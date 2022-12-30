@@ -607,7 +607,7 @@
  * @OUTPUT: rssi
  *  wlan0	rssi_chk:56
  *
- * This IOTCL used to chek rssi
+ * This IOTCL used to check rssi
  *
  * @E.g: iwpriv wlan0 rssi_chk <value>
  *
@@ -6416,7 +6416,7 @@ static int __iw_setnone_getnone(struct net_device *dev,
 		/*
 		 * 1.OBSS Scan is mandatory while operating in 2.4GHz
 		 * 2.OBSS scan is stopped by Firmware during the disassociation
-		 * 3.OBSS stop comamnd is added for debugging purpose
+		 * 3.OBSS stop command is added for debugging purpose
 		 */
 		if (!mac_handle) {
 			hdd_err("mac_handle context is NULL");
@@ -7013,7 +7013,7 @@ static int __iw_add_tspec(struct net_device *dev, struct iw_request_info *info,
 	if (0 != ret)
 		return ret;
 
-	/* make sure the application is sufficiently priviledged */
+	/* make sure the application is sufficiently privileged */
 	/* note that the kernel will do this for "set" ioctls, but since */
 	/* this ioctl wants to return status to user space it must be */
 	/* defined as a "get" ioctl */
@@ -7192,7 +7192,7 @@ static int __iw_del_tspec(struct net_device *dev, struct iw_request_info *info,
 	if (0 != ret)
 		return ret;
 
-	/* make sure the application is sufficiently priviledged */
+	/* make sure the application is sufficiently privileged */
 	/* note that the kernel will do this for "set" ioctls, but since */
 	/* this ioctl wants to return status to user space it must be */
 	/* defined as a "get" ioctl */
@@ -8131,10 +8131,9 @@ static int __iw_set_pno(struct net_device *dev,
 			goto exit;
 		}
 
-		hdd_debug("PNO len %d ssid %.*s auth %d encry %d channel count %d offset %d",
-			  req.networks_list[i].ssid.length,
-			  req.networks_list[i].ssid.length,
-			  req.networks_list[i].ssid.ssid,
+		hdd_debug("PNO ssid " QDF_SSID_FMT " auth %d encry %d channel count %d offset %d",
+			  QDF_SSID_REF(req.networks_list[i].ssid.length,
+				       req.networks_list[i].ssid.ssid),
 			  req.networks_list[i].authentication,
 			  req.networks_list[i].encryption,
 			  req.networks_list[i].pno_chan_list.num_chan, offset);

@@ -45,6 +45,20 @@ enum csr_akm_type
 hdd_translate_rsn_to_csr_auth_type(uint8_t auth_suite[4]);
 
 /**
+ * hdd_filter_ft_info() -
+ * This function to filter fast BSS transition related IE
+ * @frame: pointer to the input frame.
+ * @len: input frame length.
+ * @ft_info_len: store the total length of FT related IE.
+ *
+ * Return: pointer to a buffer which stored the FT related IE
+ * This is a malloced memory that must be freed by the caller
+ */
+
+void *hdd_filter_ft_info(const uint8_t *frame,
+			 size_t len, uint32_t *ft_info_len);
+
+/**
  * hdd_softap_set_channel_change() -
  * This function to support SAP channel change with CSA IE
  * set in the beacons.
@@ -63,7 +77,7 @@ int hdd_softap_set_channel_change(struct net_device *dev,
 					bool forced);
 /**
  * hdd_stop_sap_set_tx_power() - Function to set tx power
- * for unsafe chanel if restriction bit mask is set else stop the SAP.
+ * for unsafe channel if restriction bit mask is set else stop the SAP.
  *
  * @psoc: PSOC object information
  * @vdev_id: vdev id
@@ -166,7 +180,7 @@ wlan_get_sap_acs_band(struct wlan_objmgr_psoc *psoc, uint8_t vdev_id,
  * @ch_params: output channel parameters
  *
  * This function is used to get prefer sap target channel bw during sap force
- * scc CSA. The new bw will not exceed the orginal bw during start ap
+ * scc CSA. The new bw will not exceed the original bw during start ap
  * request.
  *
  * Return: QDF_STATUS_SUCCESS if successfully
@@ -448,27 +462,6 @@ void hdd_stop_sap_due_to_invalid_channel(struct work_struct *work);
  * Return: true if any sta is connecting
  */
 bool hdd_is_any_sta_connecting(struct hdd_context *hdd_ctx);
-
-#ifdef WLAN_FEATURE_11AX
-/**
- * hdd_update_he_obss_pd() - Enable or disable spatial reuse
- * based on user space input and concurrency combination.
- * @adapter:  Pointer to hostapd adapter
- * @params: Pointer to AP configuration from cfg80211
- * @iface_start: Interface start or not
- *
- * Return: void
- */
-void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
-			   struct cfg80211_ap_settings *params,
-			   bool iface_start);
-#else
-static inline void hdd_update_he_obss_pd(struct hdd_adapter *adapter,
-					 struct cfg80211_ap_settings *params,
-					 bool iface_start)
-{
-}
-#endif
 
 #ifdef WLAN_FEATURE_11BE_MLO
 /**

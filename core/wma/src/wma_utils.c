@@ -319,10 +319,10 @@ uint16_t wma_mcs_rate_match(uint16_t raw_rate, bool is_he,
 
 #ifdef WLAN_FEATURE_11AX
 /**
- * wma_get_mcs_idx() - get mcs index
+ * wma_match_he_rate() - get matching rate for HE
  * @raw_rate: raw rate from fw
  * @rate_flags: rate flags
- * @he_mcs_12_13_map: he mcs12/13 map
+ * @is_he_mcs_12_13_supported: is HE MCS12/MCS13 supported
  * @nss: nss
  * @dcm: dcm
  * @guard_interval: guard interval
@@ -650,7 +650,7 @@ enum eSmpsModeValue host_map_smps_mode(A_UINT32 fw_smps_mode)
 
 /**
  * wma_smps_mode_to_force_mode_param() - Map smps mode to force
- * mode commmand param
+ * mode command param
  * @smps_mode: SMPS mode according to the protocol
  *
  * Return: int > 0 for success else failure
@@ -1164,6 +1164,7 @@ static tSirLLStatsResults *wma_get_ll_stats_ext_buf(uint32_t *len,
  * @fix_param: parameters with fixed length in WMI event
  * @param_buf: parameters without fixed length in WMI event
  * @buf: buffer for TLV parameters
+ * @buf_length: length of @buf
  *
  * Return: QDF_STATUS
  */
@@ -1333,6 +1334,7 @@ wma_fill_tx_stats(struct sir_wifi_ll_ext_stats *ll_stats,
  * @fix_param: parameters with fixed length in WMI event
  * @param_buf: parameters without fixed length in WMI event
  * @buf: buffer for TLV parameters
+ * @buf_length: length of @buf
  *
  * Return: QDF_STATUS
  */
@@ -1453,9 +1455,9 @@ wma_fill_rx_stats(struct sir_wifi_ll_ext_stats *ll_stats,
 
 /**
  * wma_ll_stats_evt_handler() - handler for MAC layer counters.
- * @handle - wma handle
- * @event - FW event
- * @len - length of FW event
+ * @handle: wma handle
+ * @event: FW event
+ * @len: length of FW event
  *
  * return: 0 success.
  */
@@ -1838,7 +1840,7 @@ static int wma_unified_link_peer_stats_event_handler(void *handle,
 
 /**
  * wma_unified_link_stats_results_mem_free() - Free link stats results memory
- * #link_stats_results: pointer to link stats result
+ * @link_stats_results: pointer to link stats result
  *
  * Return: 0 on success, error number otherwise.
  */
@@ -2739,7 +2741,7 @@ QDF_STATUS wma_process_ll_stats_get_req(tp_wma_handle wma,
 
 /**
  * wma_unified_link_iface_stats_event_handler() - link iface stats event handler
- * @wma:wma handle
+ * @handle: wma handle
  * @cmd_param_info: data from event
  * @len: length
  *
@@ -2863,9 +2865,10 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 		iface_link_stats->rssi_data += WMA_TGT_NOISE_FLOOR_DBM;
 		iface_link_stats->rssi_ack += WMA_TGT_NOISE_FLOOR_DBM;
 	}
-	wma_debug("db2dbm: %d, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d",
-		 db2dbm_enabled, iface_link_stats->rssi_mgmt,
-		 iface_link_stats->rssi_data, iface_link_stats->rssi_ack);
+	wma_debug("db2dbm: %d, rssi_mgmt: %d, rssi_data: %d, rssi_ack: %d, beacon_rx %u",
+		  db2dbm_enabled, iface_link_stats->rssi_mgmt,
+		  iface_link_stats->rssi_data, iface_link_stats->rssi_ack,
+		  iface_link_stats->beacon_rx);
 
 	/* Copy roaming state */
 	iface_stat->info.roaming = link_stats->roam_state;
@@ -2912,7 +2915,7 @@ int wma_unified_link_iface_stats_event_handler(void *handle,
 /**
  * wma_config_stats_ext_threshold - set threthold for MAC counters
  * @wma: wma handler
- * @threshold: threhold for MAC counters
+ * @thresh: threshold for MAC counters
  *
  * For each MAC layer counter, FW holds two copies. One is the current value.
  * The other is the last report. Once a current counter's increment is larger
@@ -4108,6 +4111,8 @@ QDF_STATUS wma_send_vdev_down_to_fw(t_wma_handle *wma, uint8_t vdev_id)
 	}
 
 	status = vdev_mgr_down_send(vdev_mlme);
+	if (QDF_IS_STATUS_SUCCESS(status))
+		wma_sr_update(wma, vdev_id, false);
 
 	return status;
 }
@@ -4432,6 +4437,7 @@ QDF_STATUS wma_sta_vdev_up_send(struct vdev_mlme_obj *vdev_mlme,
 		status = QDF_STATUS_E_FAILURE;
 	} else {
 		wma_set_vdev_mgmt_rate(wma, vdev_id);
+		wma_sr_update(wma, vdev_id, true);
 		if (iface->beacon_filter_enabled)
 			wma_add_beacon_filter(
 					wma,
@@ -5037,11 +5043,26 @@ int wma_oem_event_handler(void *wma_ctx, uint8_t *event_buff, uint32_t len)
 		oem_event_data.file_name_len = param_buf->num_file_name;
 	}
 
-	if (pmac->sme.oem_data_event_handler_cb)
-		pmac->sme.oem_data_event_handler_cb(&oem_event_data,
-						    pmac->sme.oem_data_vdev_id);
-	else if (pmac->sme.oem_data_async_event_handler_cb)
-		pmac->sme.oem_data_async_event_handler_cb(&oem_event_data);
+	if (event->event_cause == WMI_OEM_DATA_EVT_CAUSE_UNSPECIFIED) {
+		if (pmac->sme.oem_data_event_handler_cb)
+			pmac->sme.oem_data_event_handler_cb(
+					&oem_event_data,
+					pmac->sme.oem_data_vdev_id);
+		else if (pmac->sme.oem_data_async_event_handler_cb)
+			pmac->sme.oem_data_async_event_handler_cb(
+					&oem_event_data);
+	} else if (event->event_cause == WMI_OEM_DATA_EVT_CAUSE_CMD_REQ) {
+		if (pmac->sme.oem_data_event_handler_cb)
+			pmac->sme.oem_data_event_handler_cb(
+					&oem_event_data,
+					pmac->sme.oem_data_vdev_id);
+	} else if (event->event_cause == WMI_OEM_DATA_EVT_CAUSE_ASYNC) {
+		if (pmac->sme.oem_data_async_event_handler_cb)
+			pmac->sme.oem_data_async_event_handler_cb(
+					&oem_event_data);
+	} else {
+		return QDF_STATUS_E_FAILURE;
+	}
 
 	return QDF_STATUS_SUCCESS;
 }

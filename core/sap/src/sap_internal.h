@@ -133,6 +133,7 @@ struct sap_context {
 
 	/* Include the SME(CSR) sessionId here */
 	uint8_t sessionId;
+	uint8_t sap_radar_found_status;
 
 	/* vdev object corresponding to sessionId */
 	struct wlan_objmgr_vdev *vdev;
@@ -212,7 +213,7 @@ struct sap_context {
 	/*
 	 * sap_state, sap_status are created
 	 * to inform upper layers about ACS scan status.
-	 * Don't use these members for anyother purposes.
+	 * Don't use these members for any other purposes.
 	 */
 	eSapHddEvent sap_state;
 	eSapStatus sap_status;
@@ -229,6 +230,8 @@ struct sap_context {
 	/* Disabled mcs13 by sap or not */
 	bool disabled_mcs13;
 	qdf_list_t owe_pending_assoc_ind_list;
+	qdf_list_t ft_pending_assoc_ind_list;
+	qdf_event_t ft_pending_event;
 	uint32_t freq_before_ch_switch;
 #ifdef WLAN_FEATURE_P2P_P2P_STA
 /*

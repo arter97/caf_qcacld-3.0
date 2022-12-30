@@ -362,7 +362,7 @@ hdd_wlan_retry_tsf_cap(struct hdd_adapter *adapter)
 
 	hddctx = WLAN_HDD_GET_CTX(adapter);
 	if (count == MAX_CONTINUOUS_RETRY_CNT) {
-		hdd_debug("Max retry countr reached");
+		hdd_debug("Max retry count reached");
 		return 0;
 	}
 	qdf_atomic_set(&hddctx->cap_tsf_flag, 0);
@@ -838,7 +838,7 @@ static enum hdd_tsf_op_result hdd_indicate_tsf_internal(
 #define MAX_ALLOWED_DEVIATION_NS (100 * NSEC_PER_USEC)
 #define MAX_CONTINUOUS_ERROR_CNT 3
 
-/* to distinguish 32-bit overflow case, this inverval should:
+/* to distinguish 32-bit overflow case, this interval should:
  * equal or less than (1/2 * OVERFLOW_INDICATOR32 us)
  */
 #if defined(WLAN_FEATURE_TSF_PLUS_EXT_GPIO_IRQ) || \
@@ -923,11 +923,11 @@ static inline void hdd_reset_timestamps(struct hdd_adapter *adapter)
 
 /**
  * hdd_check_timestamp_status() - return the tstamp status
- *
  * @last_target_time: the last saved target time
  * @last_sync_time: the last saved sync time
- * @cur_target_time : new target time
- * @cur_sync_time : new sync time
+ * @cur_target_time: new target time
+ * @cur_sync_time: new sync time
+ * @force_sync: flag to force new timestamp-pair as valid
  *
  * This function check the new timstamp-pair(cur_host_time/cur_target_time)or
  * (cur_qtime_time/cur_target_time)
@@ -943,7 +943,8 @@ enum hdd_ts_status hdd_check_timestamp_status(
 		uint64_t last_target_time,
 		uint64_t last_sync_time,
 		uint64_t cur_target_time,
-		uint64_t cur_sync_time)
+		uint64_t cur_sync_time,
+		bool force_sync)
 {
 	uint64_t delta_ns, delta_target_time, delta_sync_time;
 
@@ -979,7 +980,7 @@ enum hdd_ts_status hdd_check_timestamp_status(
 			(delta_sync_time - delta_target_time));
 	hdd_warn("timestamps deviation - delta: %llu ns", delta_ns);
 	/* the deviation should be smaller than a threshold */
-	if (delta_ns > MAX_ALLOWED_DEVIATION_NS) {
+	if (!force_sync && delta_ns > MAX_ALLOWED_DEVIATION_NS) {
 		hdd_warn("Invalid timestamps - delta: %llu ns", delta_ns);
 		return HDD_TS_STATUS_INVALID;
 	}
@@ -1177,7 +1178,6 @@ static inline int32_t hdd_get_soctime_from_tsf64time(
  *
  * @adapter: Adapter pointer
  * @qtime: current qtime, us
- * @tsf_sync_qtime: qtime of the tsf, us
  * @tsf_time: current tsf time(qtime), us
  *
  * This function determines current tsf time
@@ -1187,10 +1187,10 @@ static inline int32_t hdd_get_soctime_from_tsf64time(
  */
 static inline int32_t
 hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
-			   uint64_t tsf_sync_qtime, uint64_t *tsf_time)
+			   uint64_t *tsf_time)
 {
 	int32_t ret = -EINVAL;
-	uint64_t delta64_tsf64time;
+	uint64_t delta64_tsf64time, tsf_sync_qtime;
 	bool in_cap_state;
 
 	in_cap_state = hdd_tsf_is_in_cap(adapter);
@@ -1201,6 +1201,9 @@ hdd_get_tsftime_from_qtime(struct hdd_adapter *adapter, uint64_t qtime,
 	 */
 	if (in_cap_state)
 		qdf_spin_lock_bh(&adapter->host_target_sync_lock);
+
+	tsf_sync_qtime = adapter->last_tsf_sync_soc_time;
+	tsf_sync_qtime = qdf_do_div(tsf_sync_qtime, NSEC_PER_USEC);
 
 	if (qtime > tsf_sync_qtime) {
 		delta64_tsf64time = qtime - tsf_sync_qtime;
@@ -1222,7 +1225,7 @@ QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
 			    uint64_t *tsf_time)
 {
 	struct hdd_adapter *adapter;
-	uint64_t tsf_sync_qtime, qtime;
+	uint64_t qtime;
 
 	/* Sanity check on inputs */
 	if (unlikely((!adapter_ctx) || (!input_time))) {
@@ -1237,11 +1240,8 @@ QDF_STATUS hdd_get_tsf_time(void *adapter_ctx, uint64_t input_time,
 		return QDF_STATUS_E_FAILURE;
 	}
 
-	tsf_sync_qtime = adapter->last_tsf_sync_soc_time;
-	tsf_sync_qtime = qdf_do_div(tsf_sync_qtime, NSEC_PER_USEC);
-
 	qtime = qdf_log_timestamp_to_usecs(input_time);
-	hdd_get_tsftime_from_qtime(adapter, qtime, tsf_sync_qtime, tsf_time);
+	hdd_get_tsftime_from_qtime(adapter, qtime, tsf_time);
 	return QDF_STATUS_SUCCESS;
 }
 
@@ -1370,7 +1370,11 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter)
 		  hdd_check_timestamp_status(adapter->last_target_time,
 					     adapter->last_tsf_sync_soc_time,
 					     adapter->cur_target_time,
-					     adapter->cur_tsf_sync_soc_time);
+					     adapter->cur_tsf_sync_soc_time,
+					     adapter->host_target_sync_force);
+	if (adapter->host_target_sync_force)
+		adapter->host_target_sync_force = false;
+
 	hdd_info("sync_status %d", sync_status);
 	switch (sync_status) {
 	case HDD_TS_STATUS_INVALID:
@@ -1465,16 +1469,14 @@ static ssize_t __hdd_wlan_tsf_show(struct device *dev,
 	if (!hdd_ctx)
 		return scnprintf(buf, PAGE_SIZE, "Invalid HDD context\n");
 
-	tsf_sync_qtime = adapter->last_tsf_sync_soc_time;
-	do_div(tsf_sync_qtime, NSEC_PER_USEC);
-
 	reg_qtime = qdf_get_log_timestamp();
 	host_time = hdd_get_monotonic_host_time(hdd_ctx);
 
 	qtime = qdf_log_timestamp_to_usecs(reg_qtime);
 	do_div(host_time, NSEC_PER_USEC);
-	hdd_get_tsftime_from_qtime(adapter, qtime, tsf_sync_qtime,
-				   &target_time);
+	hdd_get_tsftime_from_qtime(adapter, qtime, &target_time);
+	tsf_sync_qtime = adapter->last_tsf_sync_soc_time;
+	do_div(tsf_sync_qtime, NSEC_PER_USEC);
 
 	if (adapter->device_mode == QDF_STA_MODE ||
 	    adapter->device_mode == QDF_P2P_CLIENT_MODE) {
@@ -1527,10 +1529,15 @@ static void hdd_update_timestamp(struct hdd_adapter *adapter,
 	if (target_time > 0)
 		adapter->cur_target_time = target_time;
 
-	sync_status = hdd_check_timestamp_status(adapter->last_target_time,
-						 adapter->last_host_time,
-						 adapter->cur_target_time,
-						 adapter->cur_host_time);
+	sync_status =
+		  hdd_check_timestamp_status(adapter->last_target_time,
+					     adapter->last_host_time,
+					     adapter->cur_target_time,
+					     adapter->cur_host_time,
+					     adapter->host_target_sync_force);
+	if (adapter->host_target_sync_force)
+		adapter->host_target_sync_force = false;
+
 	hdd_info("sync_status %d", sync_status);
 	switch (sync_status) {
 	case HDD_TS_STATUS_INVALID:
@@ -1792,6 +1799,34 @@ int hdd_start_tsf_sync(struct hdd_adapter *adapter)
 
 	return (__hdd_start_tsf_sync(adapter) ==
 		HDD_TSF_OP_SUCC) ? 0 : -EINVAL;
+}
+
+void hdd_restart_tsf_sync_post_wlan_resume(struct hdd_adapter *adapter)
+{
+	QDF_STATUS status;
+	qdf_mc_timer_t *sync_timer;
+
+	if (!hdd_get_th_sync_status(adapter)) {
+		hdd_err("Host TSF sync is not initialized!!");
+		return;
+	}
+
+	sync_timer = &adapter->host_target_sync_timer;
+	if (QDF_TIMER_STATE_RUNNING ==
+		qdf_mc_timer_get_current_state(sync_timer)) {
+		status = qdf_mc_timer_stop_sync(sync_timer);
+		if (status != QDF_STATUS_SUCCESS) {
+			hdd_err("Couldn't stop Host TSF sync running timer!!");
+			return;
+		}
+
+		adapter->host_target_sync_force = true;
+		status = qdf_mc_timer_start(sync_timer, 10);
+		if (status != QDF_STATUS_SUCCESS)
+			hdd_err("Host TSF sync timer restart failed");
+
+		hdd_debug("Host TSF sync timer restarted post wlan resume");
+	}
 }
 
 int hdd_stop_tsf_sync(struct hdd_adapter *adapter)
@@ -2532,7 +2567,7 @@ end:
 
 /**
  * wlan_hdd_phc_init() - phc init
- * @hdd_ctx: pointer to the hdd_contex.
+ * @hdd_ctx: pointer to the hdd_context.
  *
  * Return: NULL
  */
@@ -2546,7 +2581,7 @@ static void wlan_hdd_phc_init(struct hdd_context *hdd_ctx)
 
 /**
  * wlan_hdd_phc_deinit() - phc deinit
- * @hdd_ctx: pointer to the hdd_contex.
+ * @hdd_ctx: pointer to the hdd_context.
  *
  * Return: NULL
  */
@@ -2752,7 +2787,7 @@ static inline QDF_STATUS hdd_set_delta_tsf(struct hdd_adapter *adapter,
  *
  * This function handle the event that reported by firmware at first.
  * The event contains the vdev_id, current tsf value of this vdev,
- * tsf value is 64bits, discripted in two varaible tsf_low and tsf_high.
+ * tsf value is 64bits, discripted in two variable tsf_low and tsf_high.
  * These two values each is uint32.
  *
  * Return: 0 for success or non-zero negative failure code

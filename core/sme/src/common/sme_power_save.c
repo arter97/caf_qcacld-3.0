@@ -288,7 +288,7 @@ QDF_STATUS sme_ps_process_command(struct mac_context *mac_ctx, uint32_t session_
 		sme_err("Invalid Session_id: %d", session_id);
 		return QDF_STATUS_E_INVAL;
 	}
-	sme_debug("Power Save command %d", command);
+	sme_debug("Vdev id %d, Power Save command %d", session_id, command);
 	switch (command) {
 	case SME_PS_ENABLE:
 		status = sme_ps_enable_ps_req_params(mac_ctx, session_id);
@@ -378,7 +378,7 @@ QDF_STATUS sme_ps_enable_disable(mac_handle_t mac_handle, uint32_t session_id,
 	status =  sme_enable_sta_ps_check(mac_ctx, session_id, command);
 	if (status != QDF_STATUS_SUCCESS) {
 		/*
-		 * In non associated state driver wont handle the power save
+		 * In non associated state driver won't handle the power save
 		 * But kernel expects return status success even
 		 * in the disconnected state.
 		 */
@@ -784,7 +784,7 @@ QDF_STATUS sme_ps_disable_auto_ps_timer(mac_handle_t mac_handle,
 
 	ps_param = &ps_global_info->ps_params[session_id];
 	/*
-	 * Stop the auto ps entry timer if runnin
+	 * Stop the auto ps entry timer if running
 	 */
 	if (QDF_TIMER_STATE_RUNNING ==
 			qdf_mc_timer_get_current_state(

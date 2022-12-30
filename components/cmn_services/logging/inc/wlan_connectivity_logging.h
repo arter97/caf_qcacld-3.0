@@ -160,6 +160,7 @@ enum wlan_main_tag {
  * @WLAN_CONN_DIAG_EAP_SUCC_EVENT: EAP success
  * @WLAN_CONN_DIAG_EAP_FAIL_EVENT: EAP failure
  * @WLAN_CONN_DIAG_CUSTOM_EVENT: Additional WLAN logs
+ * @WLAN_CONN_DIAG_EAP_START_EVENT: EAPOL start frame
  * @WLAN_CONN_DIAG_MAX: MAX tag
  */
 enum qca_conn_diag_log_event_type {
@@ -203,6 +204,7 @@ enum qca_conn_diag_log_event_type {
 	WLAN_CONN_DIAG_EAP_SUCC_EVENT,
 	WLAN_CONN_DIAG_EAP_FAIL_EVENT,
 	WLAN_CONN_DIAG_CUSTOM_EVENT,
+	WLAN_CONN_DIAG_EAP_START_EVENT,
 	WLAN_CONN_DIAG_MAX
 };
 
@@ -453,7 +455,7 @@ struct wlan_diag_packet_info {
  * Table 12-10—Integrity and key wrap algorithms.
  * @grp_cipher: Group cipher suite value as defined in
  * Table 12-10—Integrity and key wrap algorithm in IEEE 802.11 2020.
- * grp_mgmt: Group manangement cipher suite as defined in
+ * grp_mgmt: Group management cipher suite as defined in
  * Table 12-10—Integrity and key wrap algorithms in IEEE 802.11 2020.
  */
 struct wlan_diag_connect {
@@ -466,8 +468,8 @@ struct wlan_diag_connect {
 	char ssid[WLAN_SSID_MAX_LEN];
 	uint8_t bssid_hint[6];
 	uint16_t reason;
-	uint16_t akm;
-	uint16_t subtype;
+	uint32_t akm;
+	uint32_t subtype;
 	uint32_t freq;
 	uint32_t freq_hint;
 	uint32_t pairwise_cipher;
@@ -638,7 +640,7 @@ struct wlan_packet_info {
  * Table 12-10—Integrity and key wrap algorithms.
  * @group: Group cipher suite value as defined in
  * Table 12-10—Integrity and key wrap algorithms.
- * @group_mgmt: Group manangement cipher suite as defined in
+ * @group_mgmt: Group management cipher suite as defined in
  * Table 12-10—Integrity and key wrap algorithms.
  * @auth_type: Authentication algorithm number field as defined in
  * IEEE 802.11 - 2020 standard section 9.4.1.1
@@ -667,7 +669,7 @@ struct wlan_connect_info {
 #define MAX_RECORD_IN_SINGLE_EVT 5
 
 /**
- * struct wlan_log_record  - Structure for indvidual records in the ring
+ * struct wlan_log_record  - Structure for individual records in the ring
  * buffer
  * @timestamp_us: Timestamp(time of the day) in microseconds
  * @fw_timestamp_us: timestamp at which roam scan was triggered
