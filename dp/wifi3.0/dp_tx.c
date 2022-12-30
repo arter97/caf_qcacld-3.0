@@ -1513,12 +1513,7 @@ void dp_tx_update_stats(struct dp_soc *soc,
 			struct dp_tx_desc_s *tx_desc,
 			uint8_t ring_id)
 {
-	uint32_t stats_len = 0;
-
-	if (tx_desc->frm_type == dp_tx_frm_tso)
-		stats_len  = tx_desc->msdu_ext_desc->tso_desc->seg.total_len;
-	else
-		stats_len = qdf_nbuf_len(tx_desc->nbuf);
+	uint32_t stats_len = dp_tx_get_pkt_len(tx_desc);
 
 	DP_STATS_INC_PKT(soc, tx.egress[ring_id], 1, stats_len);
 }
@@ -1542,12 +1537,7 @@ dp_tx_attempt_coalescing(struct dp_soc *soc, struct dp_vdev *vdev,
 	tcl_data.nbuf = tx_desc->nbuf;
 	tcl_data.tid = tid;
 	tcl_data.ring_id = ring_id;
-	if (tx_desc->frm_type == dp_tx_frm_tso) {
-		tcl_data.pkt_len  =
-			tx_desc->msdu_ext_desc->tso_desc->seg.total_len;
-	} else {
-		tcl_data.pkt_len = qdf_nbuf_len(tx_desc->nbuf);
-	}
+	tcl_data.pkt_len = dp_tx_get_pkt_len(tx_desc);
 	tcl_data.num_ll_connections = vdev->num_latency_critical_conn;
 	swlm_query_data.tcl_data = &tcl_data;
 
