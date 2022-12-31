@@ -136,7 +136,7 @@ struct mlo_setup_info {
 	uint16_t valid_link_bitmap;
 	qdf_spinlock_t state_lock;
 	qdf_event_t event;
-	 struct cdp_mlo_ctxt *dp_handle;
+	struct cdp_mlo_ctxt *dp_handle;
 };
 
 /**

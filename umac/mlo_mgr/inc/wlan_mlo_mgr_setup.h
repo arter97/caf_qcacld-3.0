@@ -221,5 +221,11 @@ QDF_STATUS mlo_check_all_pdev_state(struct wlan_objmgr_psoc *psoc,
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline
+bool mlo_psoc_get_grp_id(struct wlan_objmgr_psoc *psoc, uint8_t *grp_id)
+{
+	return 0;
+}
 #endif /* WLAN_MLO_MULTI_CHIP */
 #endif /* _WLAN_MLO_MGR_SETUP_H_ */

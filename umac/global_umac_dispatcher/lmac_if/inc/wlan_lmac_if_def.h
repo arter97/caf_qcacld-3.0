@@ -251,10 +251,12 @@ struct wlan_lmac_if_global_shmem_local_ops {
 	bool implemented;
 
 	QDF_STATUS (*init_shmem_arena_ctx)(void *arena_vaddr,
-					   size_t arena_len);
-	QDF_STATUS (*deinit_shmem_arena_ctx)(void);
-	void *(*get_crash_reason_address)(uint8_t chip_id);
-	uint8_t (*get_no_of_chips_from_crash_info)(void);
+					   size_t arena_len,
+					   uint8_t grp_id);
+	QDF_STATUS (*deinit_shmem_arena_ctx)(uint8_t grp_id);
+	void *(*get_crash_reason_address)(uint8_t grp_id,
+					  uint8_t chip_id);
+	uint8_t (*get_no_of_chips_from_crash_info)(uint8_t grp_id);
 };
 #endif
 
@@ -277,13 +279,14 @@ struct wlan_lmac_if_global_shmem_local_ops {
  */
 struct wlan_lmac_if_mgmt_rx_reo_low_level_ops {
 	bool implemented;
-	int (*get_num_links)(void);
-	uint16_t (*get_valid_link_bitmap)(void);
+	int (*get_num_links)(uint8_t grp_id);
+	uint16_t (*get_valid_link_bitmap)(uint8_t grp_id);
 	void* (*get_snapshot_address)
-			(uint8_t link_id,
+			(uint8_t grp_id, uint8_t link_id,
 			 enum mgmt_rx_reo_shared_snapshot_id snapshot_id);
 	int8_t (*get_snapshot_version)
-			(enum mgmt_rx_reo_shared_snapshot_id snapshot_id);
+			(uint8_t grp_id,
+			 enum mgmt_rx_reo_shared_snapshot_id snapshot_id);
 	bool (*snapshot_is_valid)(uint32_t snapshot_low,
 				  uint8_t snapshot_version);
 	uint16_t (*snapshot_get_mgmt_pkt_ctr)(uint32_t snapshot_low,
