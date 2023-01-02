@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2054,6 +2054,7 @@ void hif_allow_link_low_power_states(struct hif_opaque_softc *hif)
 
 void *hif_get_dev_ba(struct hif_opaque_softc *hif_handle);
 void *hif_get_dev_ba_ce(struct hif_opaque_softc *hif_handle);
+void *hif_get_dev_ba_pmm(struct hif_opaque_softc *hif_handle);
 
 /**
  * hif_get_dev_ba_cmem() - get base address of CMEM

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -253,6 +253,7 @@ struct hif_softc {
 	void __iomem *mem;
 	void __iomem *mem_ce;
 	void __iomem *mem_cmem;
+	void __iomem *mem_pmm_base;
 	enum qdf_bus_type bus_type;
 	struct hif_bus_ops bus_ops;
 	void *ce_id_to_state[CE_COUNT_MAX];

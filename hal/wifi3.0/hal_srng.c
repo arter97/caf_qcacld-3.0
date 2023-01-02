@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1112,6 +1112,7 @@ void *hal_attach(struct hif_opaque_softc *hif_handle, qdf_device_t qdf_dev)
 	hal->dev_base_addr = hif_get_dev_ba(hif_handle); /* UMAC */
 	hal->dev_base_addr_ce = hif_get_dev_ba_ce(hif_handle); /* CE */
 	hal->dev_base_addr_cmem = hif_get_dev_ba_cmem(hif_handle); /* CMEM */
+	hal->dev_base_addr_pmm = hif_get_dev_ba_pmm(hif_handle); /* PMM */
 	hal->qdf_dev = qdf_dev;
 	hal->shadow_rdptr_mem_vaddr = (uint32_t *)qdf_mem_alloc_consistent(
 		qdf_dev, qdf_dev->dev, sizeof(*(hal->shadow_rdptr_mem_vaddr)) *

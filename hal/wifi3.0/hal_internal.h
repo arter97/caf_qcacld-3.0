@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1426,6 +1426,8 @@ struct hal_soc {
 	void *dev_base_addr_ce;
 
 	void *dev_base_addr_cmem;
+
+	void *dev_base_addr_pmm;
 	/* HAL internal state for all SRNG rings.
 	 * TODO: See if this is required
 	 */

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -110,8 +110,6 @@
 #include "hal_be_rx_tlv.h"
 #include <hal_be_generic_api.h>
 
-#define PMM_SCRATCH_BASE_QCA5332 0xCB500FC
-#define PMM_SCRATCH_SIZE 0x100
 
 /**
  * hal_read_pmm_scratch_reg_5332(): API to read PMM Scratch register
@@ -126,11 +124,9 @@ uint32_t hal_read_pmm_scratch_reg_5332(struct hal_soc *soc,
 				       enum hal_scratch_reg_enum reg_enum)
 {
 	uint32_t val = 0;
-	void __iomem *bar;
 
-	bar = ioremap_nocache(PMM_SCRATCH_BASE_QCA5332, PMM_SCRATCH_SIZE);
-	pld_reg_read(soc->qdf_dev->dev, (reg_enum * 4), &val, bar);
-	iounmap(bar);
+	pld_reg_read(soc->qdf_dev->dev, (reg_enum * 4), &val,
+		     soc->dev_base_addr_pmm);
 	return val;
 }
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -213,6 +213,7 @@
 #define HOST_IS_ADDRESS           (scn->target_ce_def->d_HOST_IS_ADDRESS)
 #define HOST_CE_ADDRESS           (scn->target_ce_def->d_HOST_CE_ADDRESS)
 #define HOST_CMEM_ADDRESS         (scn->target_ce_def->d_HOST_CMEM_ADDRESS)
+#define PMM_SCRATCH_BASE	  (scn->target_ce_def->d_PMM_SCRATCH_BASE)
 
 #define SRC_WATERMARK_LOW_SET(x) \
 	(((x) << SRC_WATERMARK_LOW_LSB) & SRC_WATERMARK_LOW_MASK)
