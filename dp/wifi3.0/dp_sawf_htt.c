@@ -313,7 +313,7 @@ dp_htt_sawf_def_queues_map_report_conf(struct htt_soc *soc,
 
 	sawf_ctx = dp_peer_sawf_ctx_get(peer);
 	if (!sawf_ctx) {
-		dp_peer_unref_delete(peer, DP_MOD_ID_CDP);
+		dp_peer_unref_delete(peer, DP_MOD_ID_HTT);
 		qdf_err("Invalid SAWF ctx");
 		return QDF_STATUS_E_FAILURE;
 	}
