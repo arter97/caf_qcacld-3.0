@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,6 +34,7 @@
  * @ctrl_ctxt: opaque handle of cp mlo mgr
  * @ml_soc_list: list of socs which are mlo enabled. This also maintains
  *               mlo_chip_id to dp_soc mapping
+ * @ml_soc_cnt: number of SOCs
  * @ml_soc_list_lock: lock to protect ml_soc_list
  * @mld_peer_hash: peer hash table for ML peers
  *           Associated peer with this MAC address)
@@ -45,6 +46,7 @@
 struct dp_mlo_ctxt {
 	struct cdp_ctrl_mlo_mgr *ctrl_ctxt;
 	struct dp_soc *ml_soc_list[DP_MAX_MLO_CHIPS];
+	uint8_t ml_soc_cnt;
 	qdf_spinlock_t ml_soc_list_lock;
 	struct {
 		uint32_t mask;
