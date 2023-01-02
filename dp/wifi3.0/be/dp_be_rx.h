@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -246,11 +246,19 @@ dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id);
 
 struct dp_soc *
 dp_soc_get_by_idle_bm_id(struct dp_soc *soc, uint8_t idle_bm_id);
+
+uint8_t dp_soc_get_num_soc_be(struct dp_soc *soc);
 #else
 static inline struct dp_soc *
 dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
 {
 	return soc;
+}
+
+static inline uint8_t
+dp_soc_get_num_soc_be(struct dp_soc *soc)
+{
+	return 1;
 }
 #endif
 

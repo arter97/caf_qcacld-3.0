@@ -98,6 +98,15 @@ void dp_mlo_set_soc_by_chip_id(struct dp_mlo_ctxt *ml_ctxt,
 {
 	qdf_spin_lock_bh(&ml_ctxt->ml_soc_list_lock);
 	ml_ctxt->ml_soc_list[chip_id] = soc;
+
+	/* The same API is called during soc_attach and soc_detach
+	 * soc parameter is non-null or null accordingly.
+	 */
+	if (soc)
+		ml_ctxt->ml_soc_cnt++;
+	else
+		ml_ctxt->ml_soc_cnt--;
+
 	qdf_spin_unlock_bh(&ml_ctxt->ml_soc_list_lock);
 }
 
@@ -808,6 +817,17 @@ dp_rx_replensih_soc_get(struct dp_soc *soc, uint8_t chip_id)
 	}
 
 	return replenish_soc;
+}
+
+uint8_t dp_soc_get_num_soc_be(struct dp_soc *soc)
+{
+	struct dp_soc_be *be_soc = dp_get_be_soc_from_dp_soc(soc);
+	struct dp_mlo_ctxt *mlo_ctxt = be_soc->ml_ctxt;
+
+	if (!be_soc->mlo_enabled || !mlo_ctxt)
+		return 1;
+
+	return mlo_ctxt->ml_soc_cnt;
 }
 
 struct dp_soc *

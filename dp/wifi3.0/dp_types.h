@@ -2019,6 +2019,7 @@ struct dp_arch_ops {
 	struct dp_soc * (*dp_rx_replenish_soc_get)(struct dp_soc *soc,
 						   uint8_t chip_id);
 
+	uint8_t (*dp_soc_get_num_soc)(struct dp_soc *soc);
 	void (*dp_reconfig_tx_vdev_mcast_ctrl)(struct dp_soc *soc,
 					       struct dp_vdev *vdev);
 

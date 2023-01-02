@@ -583,6 +583,11 @@ static struct dp_soc *dp_rx_replensih_soc_get_li(struct dp_soc *soc,
 	return soc;
 }
 
+static uint8_t dp_soc_get_num_soc_li(struct dp_soc *soc)
+{
+	return 1;
+}
+
 static QDF_STATUS dp_txrx_get_vdev_mcast_param_li(struct dp_soc *soc,
 						  struct dp_vdev *vdev,
 						  cdp_config_param_type *val)
@@ -653,6 +658,7 @@ void dp_initialize_arch_ops_li(struct dp_arch_ops *arch_ops)
 	arch_ops->peer_get_reo_hash = dp_peer_get_reo_hash_li;
 	arch_ops->reo_remap_config = dp_reo_remap_config_li;
 	arch_ops->dp_rx_replenish_soc_get = dp_rx_replensih_soc_get_li;
+	arch_ops->dp_soc_get_num_soc = dp_soc_get_num_soc_li;
 	arch_ops->get_reo_qdesc_addr = dp_rx_get_reo_qdesc_addr_li;
 	arch_ops->txrx_get_vdev_mcast_param = dp_txrx_get_vdev_mcast_param_li;
 }
