@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2428,7 +2428,7 @@ bool wlan_crypto_is_mmie_valid(struct wlan_objmgr_vdev *vdev,
 			crypto_err("expected pn = %x received pn = %x",
 				   *ipn++, *su++);
 		}
-		wlan_cp_stats_vdev_ucast_rx_pnerr(vdev);
+		wlan_cp_stats_vdev_mcast_rx_pnerr(vdev);
 		wlan_cp_stats_peer_rx_pnerr(peer);
 		return false;
 	}

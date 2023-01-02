@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018,2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -149,13 +149,13 @@ QDF_STATUS wlan_cp_stats_comp_obj_cfg(
 		void *data);
 
 /**
- * wlan_cp_stats_vdev_ucast_rx_pnerr() - public API to umac for updating
+ * wlan_cp_stats_vdev_mcast_rx_pnerr() - public API to umac for updating
  * vdev rx_pnerr stats
  * @vdev: pointer to vdev
  *
  * Return: None
  */
-void wlan_cp_stats_vdev_ucast_rx_pnerr(struct wlan_objmgr_vdev *vdev);
+void wlan_cp_stats_vdev_mcast_rx_pnerr(struct wlan_objmgr_vdev *vdev);
 
 /**
  * wlan_cp_stats_peer_rx_pnerr() - public API to umac for updating
@@ -190,7 +190,7 @@ tgt_cp_stats_twt_get_session_evt_handler(
 
 #else /* QCA_SUPPORT_CP_STATS */
 static inline
-void wlan_cp_stats_vdev_ucast_rx_pnerr(struct wlan_objmgr_vdev *vdev)
+void wlan_cp_stats_vdev_mcast_rx_pnerr(struct wlan_objmgr_vdev *vdev)
 {}
 
 static inline
