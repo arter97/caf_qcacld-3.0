@@ -1599,6 +1599,8 @@ enum qdf_suspend_type {
  * @QDF_SELF_PEER_DEL_FAILED: Failed to send self peer deletion cmd to fw
  * @QDF_DEL_SELF_STA_FAILED: Received del self sta without del bss
  * @QDF_FLUSH_LOGS : Recovery needed when sending flush completion to userspace
+ * @QDF_WMI_CMD_SENT_DURING_SUSPEND: WMI command is received when target is
+ * suspended
  */
 enum qdf_hang_reason {
 	QDF_REASON_UNSPECIFIED,
@@ -1635,6 +1637,7 @@ enum qdf_hang_reason {
 	QDF_SELF_PEER_DEL_FAILED,
 	QDF_DEL_SELF_STA_FAILED,
 	QDF_FLUSH_LOGS,
+	QDF_WMI_CMD_SENT_DURING_SUSPEND,
 };
 
 /**
