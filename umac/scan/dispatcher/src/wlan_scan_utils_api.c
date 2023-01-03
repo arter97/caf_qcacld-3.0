@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -3285,12 +3285,11 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 				mbssid_info.split_prof_continue = false;
 
 			if (subie_len > MAX_SUBELEM_LEN) {
-				scm_err_rl("Corrupt frame with subie_len: %d\n"
-					   "split_prof_continue: %d\n"
-					   "prof_residue: %d\n",
-					   subie_len,
-					   mbssid_info.split_prof_continue,
-					   mbssid_info.prof_residue);
+				scm_debug_rl("Corrupt frame with subie_len: %d "
+					     "split_prof_continue: %d,prof_residue: %d",
+					     subie_len,
+					     mbssid_info.split_prof_continue,
+					     mbssid_info.prof_residue);
 				if (mbssid_info.split_prof_continue) {
 					qdf_mem_free(split_prof_start);
 					split_prof_start = NULL;
@@ -3311,10 +3310,9 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 							bssid, new_bssid);
 
 			if (retval == INVALID_SPLIT_PROF) {
-				scm_err_rl("Corrupt frame with ID_POS: %d\n"
-					   "TAG_LEN_POS: %d\n",
-					   subelement[ID_POS],
-					   subelement[TAG_LEN_POS]);
+				scm_debug_rl("Corrupt frame with ID_POS: %d,TAG_LEN_POS: %d",
+					     subelement[ID_POS],
+					     subelement[TAG_LEN_POS]);
 				qdf_mem_free(split_prof_start);
 				split_prof_start = NULL;
 				qdf_mem_free(new_ie);
@@ -3448,9 +3446,9 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 					split_prof_start = NULL;
 				}
 				qdf_mem_free(new_ie);
-				scm_err("Invalid frame:Stop MBSSIE parsing");
-				scm_err("Frame_len: %zu,ielen:%u,new_ie_len:%u",
-					frame_len, ielen, new_ie_len);
+				scm_debug_rl("Invalid frame:Stop MBSSIE parsing, Frame_len: %zu "
+					     "ielen:%u,new_ie_len:%u",
+					     frame_len, ielen, new_ie_len);
 				return QDF_STATUS_E_INVAL;
 			}
 
@@ -3504,9 +3502,9 @@ static QDF_STATUS util_scan_parse_mbssid(struct wlan_objmgr_pdev *pdev,
 						     sizeof(mbssid_info));
 				}
 				qdf_mem_free(new_frame);
-				scm_err_rl("failed to generate a scan entry");
-				scm_err_rl("split_prof_continue: %d",
-					   mbssid_info.split_prof_continue);
+				scm_debug_rl("failed to generate a scan entry "
+					     "split_prof_continue: %d",
+					     mbssid_info.split_prof_continue);
 				break;
 			}
 			/* scan entry makes its own copy so free the frame*/
