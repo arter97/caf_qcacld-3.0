@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -105,6 +105,15 @@ bool mlo_is_mld_sta(struct wlan_objmgr_vdev *vdev);
  * Return: true if mld is disconnected, false otherwise
  */
 bool ucfg_mlo_is_mld_disconnected(struct wlan_objmgr_vdev *vdev);
+
+/**
+ * mlo_is_mld_disconnecting_connecting - Check whether MLD is disconnecting or
+ * connecting
+ * @vdev: pointer to vdev
+ *
+ * Return: true if mld is disconnecting or connecting, false otherwise
+ */
+bool mlo_is_mld_disconnecting_connecting(struct wlan_objmgr_vdev *vdev);
 
 #ifndef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 /**
@@ -631,6 +640,12 @@ bool ucfg_mlo_is_mld_disconnected(struct wlan_objmgr_vdev *vdev)
 	return true;
 }
 #endif
+
+static inline
+bool mlo_is_mld_disconnecting_connecting(struct wlan_objmgr_vdev *vdev)
+{
+	return false;
+}
 
 static inline
 bool mlo_is_mld_sta(struct wlan_objmgr_vdev *vdev)
