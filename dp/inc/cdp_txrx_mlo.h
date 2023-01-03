@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,10 +18,6 @@
 #include "cdp_txrx_ops.h"
 
 struct cdp_mlo_ctxt;
-
-struct
-cdp_mlo_ctxt *dp_mlo_ctxt_attach_wifi3(struct cdp_ctrl_mlo_mgr *ctrl_ctxt);
-void dp_mlo_ctxt_detach_wifi3(struct cdp_mlo_ctxt *ml_ctxt);
 
 static inline
 struct cdp_mlo_ctxt *cdp_mlo_ctxt_attach(ol_txrx_soc_handle soc,

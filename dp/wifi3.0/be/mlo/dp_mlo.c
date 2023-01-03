@@ -24,12 +24,14 @@
 #include <dp_internal.h>
 #include <wlan_cfg.h>
 #include <wlan_mlo_mgr_cmn.h>
-/*
- * dp_mlo_ctxt_attach_wifi3 () – Attach DP MLO context
+
+/**
+ * dp_mlo_ctxt_attach_wifi3() - Attach DP MLO context
+ * @ctrl_ctxt: CDP control context
  *
  * Return: DP MLO context handle on success, NULL on failure
  */
-struct cdp_mlo_ctxt *
+static struct cdp_mlo_ctxt *
 dp_mlo_ctxt_attach_wifi3(struct cdp_ctrl_mlo_mgr *ctrl_ctxt)
 {
 	struct dp_mlo_ctxt *mlo_ctxt =
@@ -60,16 +62,13 @@ dp_mlo_ctxt_attach_wifi3(struct cdp_ctrl_mlo_mgr *ctrl_ctxt)
 	return dp_mlo_ctx_to_cdp(mlo_ctxt);
 }
 
-qdf_export_symbol(dp_mlo_ctxt_attach_wifi3);
-
-/*
- * dp_mlo_ctxt_detach_wifi3 () – Detach DP MLO context
- *
- * @ml_ctxt: pointer to DP MLO context
+/**
+ * dp_mlo_ctxt_detach_wifi3() - Detach DP MLO context
+ * @cdp_ml_ctxt: pointer to CDP DP MLO context
  *
  * Return: void
  */
-void dp_mlo_ctxt_detach_wifi3(struct cdp_mlo_ctxt *cdp_ml_ctxt)
+static void dp_mlo_ctxt_detach_wifi3(struct cdp_mlo_ctxt *cdp_ml_ctxt)
 {
 	struct dp_mlo_ctxt *mlo_ctxt = cdp_mlo_ctx_to_dp(cdp_ml_ctxt);
 
@@ -80,8 +79,6 @@ void dp_mlo_ctxt_detach_wifi3(struct cdp_mlo_ctxt *cdp_ml_ctxt)
 	dp_mlo_peer_find_hash_detach_be(mlo_ctxt);
 	qdf_mem_free(mlo_ctxt);
 }
-
-qdf_export_symbol(dp_mlo_ctxt_detach_wifi3);
 
 /*
  * dp_mlo_set_soc_by_chip_id() – Add DP soc to ML context soc list
