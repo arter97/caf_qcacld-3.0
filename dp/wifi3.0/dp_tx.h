@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -251,16 +251,6 @@ void dp_tx_deinit_pair_by_index(struct dp_soc *soc, int index);
 void
 dp_tx_comp_process_desc_list(struct dp_soc *soc,
 			     struct dp_tx_desc_s *comp_head, uint8_t ring_id);
-void dp_tx_tso_cmn_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
-void dp_tx_tso_cmn_desc_pool_free(struct dp_soc *soc, uint8_t num_pool);
-void dp_tx_tso_cmn_desc_pool_deinit(struct dp_soc *soc, uint8_t num_pool);
-void dp_tx_tso_cmn_desc_pool_free(struct dp_soc *soc, uint8_t num_pool);
-QDF_STATUS dp_tx_tso_cmn_desc_pool_alloc(struct dp_soc *soc,
-					 uint8_t num_pool,
-					 uint32_t num_desc);
-QDF_STATUS dp_tx_tso_cmn_desc_pool_init(struct dp_soc *soc,
-					uint8_t num_pool,
-					uint32_t num_desc);
 qdf_nbuf_t dp_tx_comp_free_buf(struct dp_soc *soc, struct dp_tx_desc_s *desc,
 			       bool delayed_free);
 void dp_tx_desc_release(struct dp_tx_desc_s *tx_desc, uint8_t desc_pool_id);
