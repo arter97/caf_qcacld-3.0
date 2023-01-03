@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1976,6 +1976,7 @@ struct dp_arch_ops {
 	struct dp_soc * (*dp_rx_replenish_soc_get)(struct dp_soc *soc,
 						   uint8_t chip_id);
 
+	uint8_t (*dp_soc_get_num_soc)(struct dp_soc *soc);
 	void (*dp_reconfig_tx_vdev_mcast_ctrl)(struct dp_soc *soc,
 					       struct dp_vdev *vdev);
 
