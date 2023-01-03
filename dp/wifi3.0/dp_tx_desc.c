@@ -66,13 +66,13 @@ dp_tx_desc_pool_counter_initialize(struct dp_tx_desc_pool_s *tx_desc_pool,
 
 #ifdef DP_UMAC_HW_RESET_SUPPORT
 /**
- * dp_tx_desc_clean_up() -  Clean up the tx dexcriptors
+ * dp_tx_desc_clean_up() - Clean up the tx descriptors
  * @ctxt: context passed
  * @elem: element to be cleaned up
  * @elem_list: element list
  *
  */
-void dp_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
+static void dp_tx_desc_clean_up(void *ctxt, void *elem, void *elem_list)
 {
 	struct dp_soc *soc = (struct dp_soc *)ctxt;
 	struct dp_tx_desc_s *tx_desc = (struct dp_tx_desc_s *)elem;
