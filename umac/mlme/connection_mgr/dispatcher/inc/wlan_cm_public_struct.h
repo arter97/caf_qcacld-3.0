@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015,2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -364,6 +364,7 @@ struct wlan_cm_vdev_discon_req {
  * @CM_SER_FAILURE: Failed to serialize command
  * @CM_SER_TIMEOUT: Serialization cmd timeout
  * @CM_GENERIC_FAILURE: Generic failure apart from above
+ * @CM_VALID_CANDIDATE_CHECK_FAIL: Valid Candidate Check fail
  */
 enum wlan_cm_connect_fail_reason {
 	CM_NO_CANDIDATE_FOUND,
@@ -380,6 +381,7 @@ enum wlan_cm_connect_fail_reason {
 	CM_SER_FAILURE,
 	CM_SER_TIMEOUT,
 	CM_GENERIC_FAILURE,
+	CM_VALID_CANDIDATE_CHECK_FAIL,
 };
 
 #ifdef WLAN_FEATURE_FILS_SK

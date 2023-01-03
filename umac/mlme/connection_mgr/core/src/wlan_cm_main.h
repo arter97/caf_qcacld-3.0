@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2015, 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -111,6 +111,7 @@ struct cm_state_sm {
  * @cur_candidate_retries: attempts for current candidate
  * @connect_attempts: number of connect attempts tried
  * @connect_active_time: timestamp when connect became active
+ * @first_candidate_rsp: connect response for first candidate
  */
 struct cm_connect_req {
 	wlan_cm_id cm_id;
@@ -121,6 +122,9 @@ struct cm_connect_req {
 	uint8_t cur_candidate_retries;
 	uint8_t connect_attempts;
 	qdf_time_t connect_active_time;
+#ifdef CONN_MGR_ADV_FEATURE
+	struct wlan_cm_connect_resp *first_candidate_rsp;
+#endif
 };
 
 /**
