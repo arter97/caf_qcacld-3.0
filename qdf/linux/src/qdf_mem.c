@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -2330,7 +2330,7 @@ qdf_export_symbol(qdf_aligned_malloc_fl);
  * @ctxt: Context to be passed to the cb
  * @pages: Multi page information storage
  * @elem_size: Each element size
- * @elem_count: Total number of elements should be allocated
+ * @elem_count: Total number of elements in the pool.
  * @cacheable: Coherent memory or cacheable memory
  * @cb: Callback to free the elements
  * @elem_list: elem list for delayed free
@@ -2345,7 +2345,7 @@ int qdf_tx_desc_pool_free_bufs(void *ctxt, struct qdf_mem_multi_page_t *pages,
 	uint16_t i, i_int;
 	void *page_info;
 	void *elem;
-	uint32_t num_link = 0;
+	uint32_t num_elem = 0;
 
 	for (i = 0; i < pages->num_pages; i++) {
 		if (cacheable)
@@ -2358,29 +2358,12 @@ int qdf_tx_desc_pool_free_bufs(void *ctxt, struct qdf_mem_multi_page_t *pages,
 
 		elem = page_info;
 		for (i_int = 0; i_int < pages->num_element_per_page; i_int++) {
-			if (i_int == (pages->num_element_per_page - 1)) {
-				cb(ctxt, elem, elem_list);
-
-				if ((i + 1) == pages->num_pages)
-					break;
-				if (cacheable)
-					elem =
-					(void *)(pages->cacheable_pages[i + 1]);
-				else
-					elem = (void *)(pages->
-					dma_pages[i + 1].page_v_addr_start);
-
-				num_link++;
-
-				break;
-			}
-
 			cb(ctxt, elem, elem_list);
 			elem = ((char *)elem + elem_size);
-			num_link++;
+			num_elem++;
 
-			/* Last link established exit */
-			if (num_link == (elem_count - 1))
+			/* Number of desc pool elements reached */
+			if (num_elem == (elem_count - 1))
 				break;
 		}
 	}
