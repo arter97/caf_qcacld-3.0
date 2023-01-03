@@ -415,6 +415,9 @@ QDF_STATUS dp_rx_flow_add_entry(struct dp_pdev *pdev,
 		QDF_STATUS status;
 
 		for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
+			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
+				return QDF_STATUS_SUCCESS;
+
 			partner_soc = soc->arch_ops.dp_rx_replenish_soc_get(soc,
 								    chip_id);
 
@@ -499,6 +502,9 @@ QDF_STATUS dp_rx_flow_delete_entry(struct dp_pdev *pdev,
 		qdf_atomic_set(&fst->is_cache_update_pending, 1);
 	} else {
 		for (chip_id = 0; chip_id < WLAN_MAX_MLO_CHIPS; chip_id++) {
+			if (chip_id >= soc->arch_ops.dp_soc_get_num_soc(soc))
+				return QDF_STATUS_SUCCESS;
+
 			partner_soc = soc->arch_ops.dp_rx_replenish_soc_get(soc,
 								    chip_id);
 
