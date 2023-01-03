@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -1429,19 +1429,35 @@ reg_get_first_valid_freq_on_power_mode(struct wlan_regulatory_pdev_priv_obj
 	return QDF_STATUS_SUCCESS;
 }
 
+/**
+ * reg_get_first_valid_freq_on_cur_chan() - Get first valid frequency for
+ * the given current channel list.
+ * @cur_chan_list: pointer to regulatory current channel list.
+ * @first_valid_freq: This is the output argument. If a valid frequency is
+ * found this is set to a non-zero positive value else it is set to zero.
+ * @bw: The input bandwidth may be zero and it is a valid input, because
+ * sometimes even if the bandwidth is not available, the caller may still
+ * want to know a valid frequency, which may be used later.
+ *
+ * Return: QDF_STATUS_SUCCESS.
+ */
 static QDF_STATUS
 reg_get_first_valid_freq_on_cur_chan(struct regulatory_channel *cur_chan_list,
 				     qdf_freq_t *first_valid_freq,
 				     int bw)
 {
+	if (!first_valid_freq)
+	    return QDF_STATUS_SUCCESS;
+
+	*first_valid_freq = 0;
+
 	if (wlan_reg_is_chan_disabled_and_not_nol(cur_chan_list))
 		return QDF_STATUS_SUCCESS;
 
-	if (!*first_valid_freq)
+	if (!bw) {
 		*first_valid_freq = cur_chan_list->center_freq;
-
-	if (!bw)
 		return QDF_STATUS_SUCCESS;
+	}
 
 	if (cur_chan_list->min_bw <= bw &&
 	    cur_chan_list->max_bw >= bw)
