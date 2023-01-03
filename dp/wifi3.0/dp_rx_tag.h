@@ -21,6 +21,9 @@
 
 #include "dp_internal.h"
 #include "dp_types.h"
+#if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
+#include <ppe_drv.h>
+#endif
 
 #ifdef DP_RX_MON_MEM_FRAG
 #define DP_RX_MON_PF_TAG_SIZE (4)
@@ -157,5 +160,10 @@ void dp_rx_mon_update_protocol_flow_tag(struct dp_soc *soc,
 					struct dp_pdev *dp_pdev,
 					qdf_nbuf_t msdu, void *rx_desc);
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG || WLAN_SUPPORT_RX_FLOW_TAG */
+
+#if defined(WLAN_SUPPORT_PPEDS) || (QCA_PPE_VP)
+bool dp_rx_ppe_add_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info);
+bool dp_rx_ppe_del_flow_entry(struct ppe_drv_fse_rule_info *ppe_flow_info);
+#endif
 
 #endif /* _DP_RX_TAG_H_ */
