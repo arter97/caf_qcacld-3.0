@@ -416,15 +416,16 @@ static void mlme_multivdev_restart(struct pdev_mlme_obj *pdev_mlme)
 
 		qdf_atomic_init(&pdev_mlme->multivdev_restart_wait_cnt);
 		des_chan = wlan_pdev_mlme_get_restart_des_chan(pdev);
-		if (!wlan_pdev_nif_feat_cap_get(pdev,
-						WLAN_PDEV_F_MULTIVDEV_RESTART))
+		if (wlan_pdev_nif_feat_cap_get(pdev,
+				(WLAN_PDEV_F_MULTIVDEV_RESTART |
+				WLAN_PDEV_F_MULTIVDEV_RESTART_BMAP)))
+			mlme_vdev_ops_multivdev_restart_fw_cmd_send(pdev);
+		else
 			wlan_objmgr_pdev_iterate_obj_list
 				(pdev,  WLAN_VDEV_OP,
 				 wlan_vdev_restart_fw_send,
 				 pdev_mlme->restart_send_vdev_bmap, 0,
 				 WLAN_MLME_NB_ID);
-		else
-			mlme_vdev_ops_multivdev_restart_fw_cmd_send(pdev);
 
 		if (wlan_util_map_is_any_index_set(
 				pdev_mlme->start_send_vdev_arr,

@@ -10598,6 +10598,8 @@ static void populate_non_tlv_service(uint32_t *wmi_service)
 				WMI_SERVICE_MULTIPLE_VDEV_RESTART;
 	wmi_service[wmi_service_multiple_vdev_restart_ext] =
 				WMI_SERVICE_MULTI_VDEV_RESTART_EXT_COMMAND;
+	wmi_service[wmi_service_multiple_vdev_restart_bmap] =
+				WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_peer_assoc_conf] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_egap] = WMI_SERVICE_UNAVAILABLE;
 	wmi_service[wmi_service_sta_pmf_offload] = WMI_SERVICE_UNAVAILABLE;
