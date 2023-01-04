@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -208,8 +208,9 @@ static inline uint8_t pmo_get_wow_default_ptrn(
 }
 
 /**
- * pmo_get_wow_default_ptrn() -Set wow default ptrn
+ * pmo_set_wow_default_ptrn() - Set wow default ptrn
  * @vdev_ctx: pmo vdev priv ctx
+ * @value: WoW default pattern
  *
  * API to set wow default ptrn
  *
@@ -324,7 +325,7 @@ QDF_STATUS pmo_core_add_wow_user_pattern(struct wlan_objmgr_vdev *vdev,
 /**
  * pmo_core_del_wow_user_pattern() - Function which will delete the WoWL pattern
  * @vdev: pointer to the vdev
- * @ptrn: pointer to the pattern string to be delete
+ * @pattern_id: pointer to the pattern string to be delete
  *
  * Return: error if any errors encountered, QDF_STATUS_SUCCESS otherwise
  */
@@ -356,7 +357,7 @@ void pmo_core_disable_wakeup_event(struct wlan_objmgr_psoc *psoc,
 				   WOW_WAKE_EVENT_TYPE wow_event);
 
 /**
- * pmo_is_wow_applicable(): should enable wow
+ * pmo_core_is_wow_applicable(): should enable wow
  * @psoc: objmgr psoc object
  *
  *  Enable WOW if any one of the condition meets,
@@ -393,7 +394,7 @@ void pmo_core_update_wow_enable(struct pmo_psoc_priv_obj *psoc_ctx,
 }
 
 /**
- * pmo_core_is_wow_mode_enabled() - check if wow needs to be enabled in fw
+ * pmo_core_is_wow_enabled() - check if wow needs to be enabled in fw
  * @psoc_ctx: Pointer to objmgr psoc handle
  *
  * API to check if wow mode is enabled in fwr as part of apps suspend or not
@@ -607,7 +608,7 @@ void pmo_core_update_p2plo_in_progress(struct wlan_objmgr_vdev *vdev,
 #ifdef WLAN_FEATURE_LPSS
 /**
  * pmo_core_is_lpass_enabled() - check if lpass is enabled
- * @posc: objmgr psoc object
+ * @psoc: objmgr psoc object
  *
  * WoW is needed if LPASS or NaN feature is enabled in INI because
  * target can't wake up itself if its put in PDEV suspend when LPASS

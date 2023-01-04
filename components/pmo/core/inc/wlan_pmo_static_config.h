@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,7 +43,7 @@ void pmo_register_wow_wakeup_events(struct wlan_objmgr_vdev *vdev);
 
 /**
  * pmo_register_wow_default_patterns() - register default wow patterns with fw
- * @vdev_id: vdev id
+ * @vdev: objmgr vdev
  *
  * WoW default wake up pattern rule is:
  *  - For STA & P2P CLI mode register for same STA specific wow patterns

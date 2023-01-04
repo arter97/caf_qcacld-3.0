@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2019, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -59,8 +59,8 @@ QDF_STATUS pmo_psoc_object_created_notification(struct wlan_objmgr_psoc *psoc,
 						void *arg);
 
 /**
- *  pmo_psoc_object_destroyed_notification(): pmo psoc delete handler
- * @psco: psoc which is going to delete by objmgr
+ * pmo_psoc_object_destroyed_notification(): pmo psoc delete handler
+ * @psoc: psoc which is going to delete by objmgr
  * @arg: argument for vdev delete handler
  *
  * PMO, register this api with objmgr to detect psoc is deleted in fwr

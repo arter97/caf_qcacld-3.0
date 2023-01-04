@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -130,6 +131,7 @@ bool pmo_is_vdev_in_beaconning_mode(enum QDF_OPMODE vdev_opmode);
 
 /**
  * pmo_core_is_ap_mode_supports_arp_ns() - To check ap mode supports arp/ns
+ * @psoc: objmgr psoc handle
  * @vdev_opmode: vdev opmode
  *
  * API to check if ap mode supports arp/ns offload
