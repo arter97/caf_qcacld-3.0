@@ -839,7 +839,7 @@ enum wlan_t2lm_status {
 struct mlo_vdev_host_tid_to_link_map_resp {
 	uint8_t vdev_id;
 	enum wlan_t2lm_status status;
-	uint8_t mapping_switch_tsf;
+	uint32_t mapping_switch_tsf;
 };
 
 /**

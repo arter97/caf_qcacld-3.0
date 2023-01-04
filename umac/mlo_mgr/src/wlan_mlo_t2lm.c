@@ -116,8 +116,8 @@ QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
 		t2lm->ieee_link_map_tid[tid_num] =
 		    qdf_le16_to_cpu(*(uint16_t *)link_mapping_of_tids);
 
-		t2lm_debug("link mapping of TID%d is %x", tid_num,
-			   t2lm->ieee_link_map_tid[tid_num]);
+		t2lm_rl_debug("link mapping of TID%d is %x", tid_num,
+			      t2lm->ieee_link_map_tid[tid_num]);
 
 		link_mapping_of_tids += sizeof(uint16_t);
 	}
@@ -128,18 +128,17 @@ QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
 QDF_STATUS wlan_mlo_parse_bcn_prbresp_t2lm_ie(
 		struct wlan_t2lm_context *t2lm_ctx, uint8_t *ie)
 {
+	struct wlan_t2lm_info t2lm = {0};
 	struct extn_ie_header *ext_ie_hdr;
 	QDF_STATUS retval;
 	int i = 0;
 
-	for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {
-		qdf_mem_zero(&t2lm_ctx->t2lm_ie[i].t2lm,
-			     sizeof(struct wlan_t2lm_info));
-		t2lm_ctx->t2lm_ie[i].t2lm.direction =
-			WLAN_T2LM_INVALID_DIRECTION;
-	}
+	qdf_mem_zero(&t2lm_ctx->established_t2lm,
+		     sizeof(struct wlan_mlo_t2lm_ie));
+	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm, sizeof(struct wlan_mlo_t2lm_ie));
 
-	t2lm_ctx->num_of_t2lm_ie = 0;
+	t2lm_ctx->established_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
 
 	for (i = 0; i < WLAN_MAX_T2LM_IE; i++) {
 		if (!ie) {
@@ -149,19 +148,27 @@ QDF_STATUS wlan_mlo_parse_bcn_prbresp_t2lm_ie(
 
 		ext_ie_hdr = (struct extn_ie_header *)ie;
 
-		if (ext_ie_hdr->ie_id == WLAN_ELEMID_EXTN_ELEM &&
-		    ext_ie_hdr->ie_extn_id == WLAN_EXTN_ELEMID_T2LM) {
-			retval = wlan_mlo_parse_t2lm_info(
-					ie, &t2lm_ctx->t2lm_ie[i].t2lm);
-			if (retval) {
-				t2lm_err("Failed to parse the T2LM IE");
-				return retval;
-			}
+		if (!(ext_ie_hdr->ie_id == WLAN_ELEMID_EXTN_ELEM &&
+		      ext_ie_hdr->ie_extn_id == WLAN_EXTN_ELEMID_T2LM))
+			continue;
 
-			t2lm_ctx->num_of_t2lm_ie++;
-
-			ie += ext_ie_hdr->ie_len + sizeof(struct ie_header);
+		t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
+		retval = wlan_mlo_parse_t2lm_info(ie, &t2lm);
+		if (retval) {
+			t2lm_err("Failed to parse the T2LM IE");
+			return retval;
 		}
+
+		if (!t2lm.mapping_switch_time_present &&
+		    t2lm.expected_duration_present) {
+			qdf_mem_copy(&t2lm_ctx->established_t2lm.t2lm, &t2lm,
+				     sizeof(struct wlan_t2lm_info));
+		} else if (t2lm.mapping_switch_time_present) {
+			qdf_mem_copy(&t2lm_ctx->upcoming_t2lm.t2lm, &t2lm,
+				     sizeof(struct wlan_t2lm_info));
+		}
+
+		ie += ext_ie_hdr->ie_len + sizeof(struct ie_header);
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -223,14 +230,8 @@ QDF_STATUS wlan_mlo_parse_t2lm_ie(
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * wlan_mlo_add_t2lm_info_ie() - Add T2LM IE for UL/DL/Bidirection
- * @frm: Pointer to buffer
- * @t2lm: Pointer to t2lm mapping structure
- *
- * Return: Updated frame pointer
- */
-uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm)
+uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm,
+				   struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_ie_tid_to_link_mapping *t2lm_ie;
 	uint16_t t2lm_control = 0;
@@ -239,6 +240,7 @@ uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm)
 	uint8_t tid_num;
 	uint8_t num_tids = 0;
 	uint8_t link_mapping_presence_indicator = 0;
+	struct vdev_mlme_obj *vdev_mlme;
 
 	t2lm_ie = (struct wlan_ie_tid_to_link_mapping *)frm;
 	t2lm_ie->elem_id = WLAN_ELEMID_EXTN_ELEM;
@@ -298,8 +300,13 @@ uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm)
 		t2lm_ie->elem_len += sizeof(uint16_t);
 	}
 
-	if (t2lm->mapping_switch_time_present) {
-		*frm = htole16(t2lm->mapping_switch_time);
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (vdev_mlme && t2lm->mapping_switch_time_present) {
+		/* Mapping switch time is different for each vdevs. Hence,
+		 * populate the mapping switch time from vdev_mlme_obj.
+		 */
+		*(uint16_t *)frm =
+			htole16(vdev_mlme->proto.ap.mapping_switch_time);
 		frm += sizeof(uint16_t);
 		t2lm_ie->elem_len += sizeof(uint16_t);
 	}
@@ -308,7 +315,7 @@ uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm)
 		qdf_mem_copy(frm, &t2lm->expected_duration,
 			     WLAN_T2LM_EXPECTED_DURATION_SIZE *
 			     sizeof(uint8_t));
-		frm += WLAN_T2LM_EXPECTED_DURATION_SIZE;
+		frm += WLAN_T2LM_EXPECTED_DURATION_SIZE * sizeof(uint8_t);
 		t2lm_ie->elem_len +=
 			WLAN_T2LM_EXPECTED_DURATION_SIZE * sizeof(uint8_t);
 	}
@@ -340,7 +347,8 @@ uint8_t *wlan_mlo_add_t2lm_info_ie(uint8_t *frm, struct wlan_t2lm_info *t2lm)
 }
 
 uint8_t *wlan_mlo_add_t2lm_ie(uint8_t *frm,
-			      struct wlan_t2lm_onging_negotiation_info *t2lm)
+			      struct wlan_t2lm_onging_negotiation_info *t2lm,
+			      struct wlan_objmgr_vdev *vdev)
 {
 	uint8_t dir;
 
@@ -371,7 +379,8 @@ uint8_t *wlan_mlo_add_t2lm_ie(uint8_t *frm,
 		if (t2lm->t2lm_info[dir].direction !=
 			WLAN_T2LM_INVALID_DIRECTION)
 			frm = wlan_mlo_add_t2lm_info_ie(frm,
-							&t2lm->t2lm_info[dir]);
+							&t2lm->t2lm_info[dir],
+							vdev);
 	}
 
 	return frm;
@@ -514,7 +523,7 @@ static uint8_t *wlan_mlo_add_t2lm_request_action_frame(
 
 	t2lm_info("T2LM request frame: category:%d action:%d dialog_token:%d",
 		  args->category, args->action, args->arg1);
-	return wlan_mlo_add_t2lm_ie(frm, (void *)buf);
+	return wlan_mlo_add_t2lm_ie(frm, (void *)buf, NULL);
 }
 
 static uint8_t *wlan_mlo_add_t2lm_response_action_frame(
@@ -533,7 +542,7 @@ static uint8_t *wlan_mlo_add_t2lm_response_action_frame(
 		  args->category, args->action, args->arg1, args->arg2);
 
 	if (args->arg2 == WLAN_T2LM_RESP_TYPE_PREFERRED_TID_TO_LINK_MAPPING)
-		frm = wlan_mlo_add_t2lm_ie(frm, (void *)buf);
+		frm = wlan_mlo_add_t2lm_ie(frm, (void *)buf, NULL);
 
 	return frm;
 }
@@ -574,26 +583,28 @@ static void wlan_mlo_t2lm_handle_mapping_switch_time_expiry(
 		struct wlan_t2lm_context *t2lm_ctx,
 		struct wlan_objmgr_vdev *vdev)
 {
-	uint8_t vdev_id = wlan_vdev_get_id(vdev);
-	int i = 0;
+	struct wlan_t2lm_info *t2lm;
 
-	for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {
-		if (!t2lm_ctx->t2lm_ie[i].t2lm.mapping_switch_time_present)
-			continue;
+	t2lm_debug("Mapping switch time expired for vdev_id:%d ",
+		   wlan_vdev_get_id(vdev));
 
-		/* Mapping switch time will always present at index 1. Hence,
-		 * skip the index 0.
-		 */
-		if (i == 0)
-			continue;
+	qdf_mem_copy(&t2lm_ctx->established_t2lm, &t2lm_ctx->upcoming_t2lm,
+		     sizeof(struct wlan_mlo_t2lm_ie));
 
-		qdf_mem_copy(&t2lm_ctx->t2lm_ie[0], &t2lm_ctx->t2lm_ie[1],
-			     sizeof(struct wlan_mlo_t2lm_ie));
-		t2lm_ctx->t2lm_ie[0].t2lm.mapping_switch_time_present = false;
-		t2lm_ctx->t2lm_ie[0].t2lm.mapping_switch_time = 0;
-		t2lm_debug("vdev_id:%d mark the advertised T2LM as established",
-			   vdev_id);
-	}
+	t2lm_ctx->established_t2lm.t2lm.mapping_switch_time_present = false;
+	t2lm_ctx->established_t2lm.t2lm.mapping_switch_time = 0;
+
+	t2lm = &t2lm_ctx->established_t2lm.t2lm;
+	t2lm_debug("Established mapping: disabled_link_bitmap:%x dir:%d default_map:%d MSTP:%d EDP:%d MST:%d ED:%d ieee_link_map:%x hw_link_map:%x",
+		   t2lm_ctx->established_t2lm.disabled_link_bitmap,
+		   t2lm->direction, t2lm->default_link_mapping,
+		   t2lm->mapping_switch_time_present,
+		   t2lm->expected_duration_present,
+		   t2lm->mapping_switch_time, t2lm->expected_duration,
+		   t2lm->ieee_link_map_tid[0], t2lm->hw_link_map_tid[0]);
+
+	qdf_mem_zero(&t2lm_ctx->upcoming_t2lm, sizeof(struct wlan_mlo_t2lm_ie));
+	t2lm_ctx->upcoming_t2lm.t2lm.direction = WLAN_T2LM_INVALID_DIRECTION;
 
 	/* Notify the registered caller about the link update*/
 	wlan_mlo_dev_t2lm_notify_link_update(vdev->mlo_dev_ctx);
@@ -611,39 +622,30 @@ static void wlan_mlo_t2lm_handle_expected_duration_expiry(
 		struct wlan_t2lm_context *t2lm_ctx,
 		struct wlan_objmgr_vdev *vdev)
 {
-	uint8_t vdev_id = wlan_vdev_get_id(vdev);
-	int i = 0;
+	t2lm_debug("Expected duration expired for vdev_id:%d ",
+		   wlan_vdev_get_id(vdev));
 
-	for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {
-		if (!t2lm_ctx->t2lm_ie[i].t2lm.expected_duration_present)
-			continue;
-
-		/* If two T2LM IEs are present, and expected duration of first
-		 * T2LM IE is expired, copy the T2LM IE from index 1 to index 0.
-		 * Mark mapping switch time present as false and clear the
-		 * mapping switch time value.
-		 * If one T2LM IE is present, and the expected duration is
-		 * expired, configure the T2LM IE with the default values.
+	if (t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time_present) {
+		/* Copy the new non-default ongoing mapping to established
+		 * mapping if expected duration expires for the established
+		 * mapping.
 		 */
-		if (!i && t2lm_ctx->num_of_t2lm_ie == WLAN_MAX_T2LM_IE) {
-			qdf_mem_copy(&t2lm_ctx->t2lm_ie[0],
-				     &t2lm_ctx->t2lm_ie[1],
-				     sizeof(struct wlan_mlo_t2lm_ie));
-			t2lm_ctx->t2lm_ie[0].t2lm.mapping_switch_time_present =
-				false;
-			t2lm_ctx->t2lm_ie[0].t2lm.mapping_switch_time = 0;
-			t2lm_debug("vdev_id:%d mark the advertised T2LM as established",
-				   vdev_id);
-		} else {
-			qdf_mem_zero(&t2lm_ctx->t2lm_ie[i],
-				     sizeof(struct wlan_mlo_t2lm_ie));
-			t2lm_ctx->t2lm_ie[i].t2lm.direction =
-				WLAN_T2LM_BIDI_DIRECTION;
-			t2lm_ctx->t2lm_ie[i].t2lm.default_link_mapping = 1;
-			t2lm_debug("vdev_id:%d Expected duration is expired",
-				   vdev_id);
-		}
+		wlan_mlo_t2lm_handle_mapping_switch_time_expiry(t2lm_ctx,
+								vdev);
+		return;
 	}
+
+	/* Use the default mapping when expected duration expires for the
+	 * established mapping and no new non-default T2LM announcement is
+	 * ongoing.
+	 */
+	qdf_mem_zero(&t2lm_ctx->established_t2lm,
+		     sizeof(struct wlan_mlo_t2lm_ie));
+
+	t2lm_ctx->established_t2lm.t2lm.direction = WLAN_T2LM_BIDI_DIRECTION;
+	t2lm_ctx->established_t2lm.t2lm.default_link_mapping = 1;
+	t2lm_ctx->established_t2lm.disabled_link_bitmap = 0;
+	t2lm_debug("Set established mapping to default mapping");
 
 	/* Notify the registered caller about the link update*/
 	wlan_mlo_dev_t2lm_notify_link_update(vdev->mlo_dev_ctx);
@@ -655,7 +657,7 @@ QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
 {
 	struct wlan_objmgr_vdev *vdev;
 	struct wlan_t2lm_context *t2lm_ctx;
-	int i = 0;
+	struct vdev_mlme_obj *vdev_mlme;
 
 	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(psoc, event->vdev_id,
 						    WLAN_MLO_MGR_ID);
@@ -669,23 +671,35 @@ QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme) {
+		t2lm_err("null vdev_mlme");
+		return QDF_STATUS_E_FAILURE;
+	}
+
 	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
 
-	t2lm_debug("status:%d", event->status);
+	t2lm_debug("psoc_id:%d vdev_id:%d status:%d",
+		   wlan_psoc_get_id(psoc), event->vdev_id, event->status);
 
+	t2lm_dev_lock_acquire(t2lm_ctx);
 	switch (event->status) {
 	case WLAN_MAP_SWITCH_TIMER_TSF:
-		for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {
-			if (!t2lm_ctx->t2lm_ie[i].t2lm.mapping_switch_time_present)
-				continue;
 
-			t2lm_ctx->t2lm_ie[i].t2lm.mapping_switch_time =
-				event->mapping_switch_tsf;
-			t2lm_debug("vdev_id:%d updated mapping switch time:%d",
-				   event->vdev_id, event->mapping_switch_tsf);
-		}
+		/* Mapping switch time is different for each AP vdev of a given
+		 * MLD as these vdevs can have separate beacon TDF value.
+		 */
+		if (t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time_present)
+			vdev_mlme->proto.ap.mapping_switch_time =
+				(event->mapping_switch_tsf &
+				 WLAN_T2LM_MAPPING_SWITCH_TSF_BITS) >> 10;
+
+		t2lm_debug("vdev_id:%d updated mapping switch time:%d",
+			   event->vdev_id,
+			   vdev_mlme->proto.ap.mapping_switch_time);
 		break;
 	case WLAN_MAP_SWITCH_TIMER_EXPIRED:
+		vdev_mlme->proto.ap.mapping_switch_time = 0;
 		wlan_mlo_t2lm_handle_mapping_switch_time_expiry(t2lm_ctx, vdev);
 		break;
 	case WLAN_EXPECTED_DUR_EXPIRED:
@@ -695,6 +709,7 @@ QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
 		t2lm_err("Invalid status");
 	}
 
+	t2lm_dev_lock_release(t2lm_ctx);
 	mlo_release_vdev_ref(vdev);
 
 	return QDF_STATUS_SUCCESS;
@@ -759,28 +774,33 @@ void wlan_mlo_t2lm_timer_expiry_handler(void *vdev)
 
 	struct wlan_t2lm_timer *t2lm_timer;
 	struct wlan_t2lm_context *t2lm_ctx;
-	uint8_t t2lm_ie_idx;
 
 	if (!vdev_ctx || !vdev_ctx->mlo_dev_ctx)
 		return;
 
 	t2lm_ctx = &vdev_ctx->mlo_dev_ctx->t2lm_ctx;
 	t2lm_timer = &vdev_ctx->mlo_dev_ctx->t2lm_ctx.t2lm_timer;
-	t2lm_ie_idx = t2lm_timer->t2lm_ie_index;
-	if (t2lm_ie_idx >= WLAN_MAX_T2LM_IE)
-		return;
 
 	wlan_mlo_t2lm_timer_stop(vdev_ctx);
 
-	if (t2lm_ctx->t2lm_ie[t2lm_ie_idx].t2lm.mapping_switch_time_present) {
-		wlan_send_tid_to_link_mapping(
-				vdev, &t2lm_ctx->t2lm_ie[t2lm_ie_idx].t2lm);
-		wlan_mlo_t2lm_handle_mapping_switch_time_expiry(t2lm_ctx, vdev);
-		wlan_handle_t2lm_timer(vdev_ctx, t2lm_timer->t2lm_ie_index);
-	} else if (!t2lm_ie_idx) {
+	/* Since qdf_mutex_acquire cannot be called from interrupt context,
+	 * change needed to create a workqueue and offload the timer expiry
+	 * handling to workqueue.
+	 */
+	if (t2lm_ctx->established_t2lm.t2lm.expected_duration_present) {
 		wlan_mlo_t2lm_handle_expected_duration_expiry(t2lm_ctx, vdev);
-		wlan_handle_t2lm_timer(vdev_ctx, t2lm_timer->t2lm_ie_index);
+		wlan_send_tid_to_link_mapping(
+				vdev, &t2lm_ctx->established_t2lm.t2lm);
+
+		wlan_handle_t2lm_timer(vdev_ctx);
+	} else if (t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time_present) {
+		wlan_mlo_t2lm_handle_mapping_switch_time_expiry(t2lm_ctx, vdev);
+		wlan_send_tid_to_link_mapping(
+				vdev, &t2lm_ctx->established_t2lm.t2lm);
+
+		wlan_handle_t2lm_timer(vdev_ctx);
 	}
+
 }
 
 QDF_STATUS
@@ -805,30 +825,23 @@ wlan_mlo_t2lm_timer_init(struct wlan_objmgr_vdev *vdev)
 
 	t2lm_timer->timer_started = false;
 	t2lm_timer->timer_interval = 0;
-	t2lm_timer->t2lm_ie_index = 0;
+	t2lm_timer->timer_out_time = 0;
 	t2lm_dev_lock_release(&vdev->mlo_dev_ctx->t2lm_ctx);
 	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS
 wlan_mlo_t2lm_timer_start(struct wlan_objmgr_vdev *vdev,
-			  uint32_t interval, uint8_t t2lm_ie_index)
+			  uint32_t interval)
 {
 	struct wlan_t2lm_timer *t2lm_timer;
 	struct wlan_t2lm_context *t2lm_ctx;
-	struct vdev_mlme_obj *vdev_mlme;
+	uint32_t target_out_time;
 
-	if (!vdev || !vdev->mlo_dev_ctx)
-		return QDF_STATUS_E_NULL_VALUE;
-
-	if (interval == 0) {
+	if (!interval) {
 		t2lm_debug("Timer interval is 0");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-
-	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
-	if (!vdev_mlme)
-		return QDF_STATUS_E_FAILURE;
 
 	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
 	t2lm_timer = &vdev->mlo_dev_ctx->t2lm_ctx.t2lm_timer;
@@ -837,19 +850,29 @@ wlan_mlo_t2lm_timer_start(struct wlan_objmgr_vdev *vdev,
 		return QDF_STATUS_E_NULL_VALUE;
 	}
 
-	t2lm_debug("t2lm timer started with interval %d", interval);
-	t2lm_dev_lock_acquire(&vdev->mlo_dev_ctx->t2lm_ctx);
-	if (t2lm_ctx->t2lm_ie[t2lm_ie_index].t2lm.mapping_switch_time_present)
-		t2lm_timer->timer_interval =
-			t2lm_ctx->t2lm_ie[t2lm_ie_index].t2lm.mapping_switch_time;
-	else
-		t2lm_timer->timer_interval = interval *
-			vdev_mlme->proto.generic.beacon_interval * 1000;
+	interval = (interval * 1024) / 1000;
+	target_out_time = qdf_system_ticks_to_msecs(qdf_system_ticks());
+	target_out_time += interval;
+	t2lm_debug("earlier timer @%u ms out, new @%u ms out",
+		   t2lm_timer->timer_out_time, target_out_time);
 
-	t2lm_timer->t2lm_ie_index = t2lm_ie_index;
+	/* sometimes the host process the beacon maybe delay, it may help for
+	 * update the new expected time.
+	 */
+	if (t2lm_timer->timer_out_time &&
+	    (target_out_time > t2lm_timer->timer_out_time ||
+	     (t2lm_timer->timer_out_time - target_out_time) <
+	      WLAN_T2LM_MAPPING_SWITCH_TIME_DELAY))
+		return QDF_STATUS_E_NULL_VALUE;
+
+	if (t2lm_timer->timer_started)
+		qdf_timer_stop(&t2lm_timer->t2lm_timer);
+
+	t2lm_debug("t2lm timer started with interval %d ms", interval);
+	t2lm_timer->timer_interval = interval;
 	t2lm_timer->timer_started = true;
+	t2lm_timer->timer_out_time = target_out_time;
 	qdf_timer_start(&t2lm_timer->t2lm_timer, t2lm_timer->timer_interval);
-	t2lm_dev_lock_release(&vdev->mlo_dev_ctx->t2lm_ctx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -873,51 +896,40 @@ wlan_mlo_t2lm_timer_stop(struct wlan_objmgr_vdev *vdev)
 		qdf_timer_stop(&t2lm_timer->t2lm_timer);
 		t2lm_timer->timer_started = false;
 		t2lm_timer->timer_interval = 0;
+		t2lm_timer->timer_out_time = 0;
 	}
 	t2lm_dev_lock_release(&vdev->mlo_dev_ctx->t2lm_ctx);
 	return QDF_STATUS_SUCCESS;
 }
 
-QDF_STATUS wlan_handle_t2lm_timer(struct wlan_objmgr_vdev *vdev, uint8_t ie_idx)
+QDF_STATUS wlan_handle_t2lm_timer(struct wlan_objmgr_vdev *vdev)
 {
 	struct wlan_t2lm_context *t2lm_ctx;
+	struct vdev_mlme_obj *vdev_mlme;
 	QDF_STATUS status = QDF_STATUS_SUCCESS;
 
 	if (!vdev || !vdev->mlo_dev_ctx)
 		return QDF_STATUS_E_NULL_VALUE;
 
 	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
-	if (!t2lm_ctx->num_of_t2lm_ie) {
-		t2lm_err("No T2LM IE present");
-		return QDF_STATUS_SUCCESS;
-	}
 
-	if (ie_idx >= WLAN_MAX_T2LM_IE) {
-		t2lm_err("Invalid T2LM IE index");
+	vdev_mlme = wlan_vdev_mlme_get_cmpt_obj(vdev);
+	if (!vdev_mlme)
 		return QDF_STATUS_E_FAILURE;
-	}
 
-	if (!t2lm_ctx->t2lm_ie[ie_idx].t2lm.mapping_switch_time_present &&
-	    !t2lm_ctx->t2lm_ie[ie_idx].t2lm.expected_duration_present) {
-		/* non-default to default mapping case */
-		wlan_send_tid_to_link_mapping(vdev,
-					      &t2lm_ctx->t2lm_ie[ie_idx].t2lm);
-	} else if (t2lm_ctx->t2lm_ie[ie_idx].t2lm.mapping_switch_time_present) {
-		/* Default to non-default mapping case */
+	if (t2lm_ctx->established_t2lm.t2lm.expected_duration_present) {
+		if (t2lm_ctx->established_t2lm.t2lm.expected_duration ==
+		    T2LM_EXPECTED_DURATION_MAX_VALUE) {
+			return status;
+		}
+
 		status = wlan_mlo_t2lm_timer_start(
 				vdev,
-				t2lm_ctx->t2lm_ie[ie_idx].t2lm.mapping_switch_time,
-				ie_idx);
-	} else if (t2lm_ctx->t2lm_ie[ie_idx].t2lm.expected_duration_present) {
-		wlan_send_tid_to_link_mapping(
-				vdev, &t2lm_ctx->t2lm_ie[ie_idx].t2lm);
-
-		if (t2lm_ctx->t2lm_ie[ie_idx].t2lm.expected_duration !=
-		    T2LM_EXPECTED_DURATION_MAX_VALUE)
-			status = wlan_mlo_t2lm_timer_start(
-					vdev,
-					t2lm_ctx->t2lm_ie[ie_idx].t2lm.expected_duration,
-					ie_idx);
+				t2lm_ctx->established_t2lm.t2lm.expected_duration);
+	} else if (t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time_present) {
+		status = wlan_mlo_t2lm_timer_start(
+				vdev,
+				t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time);
 	}
 
 	return status;
@@ -932,52 +944,69 @@ QDF_STATUS wlan_handle_t2lm_timer(struct wlan_objmgr_vdev *vdev, uint8_t ie_idx)
  *
  * Return: None
  */
-static void wlan_update_mapping_switch_time_expected_dur(
-		struct wlan_objmgr_vdev *vdev, struct wlan_t2lm_info *rx_t2lm,
-		uint64_t tsf)
+static QDF_STATUS wlan_update_mapping_switch_time_expected_dur(
+		struct wlan_objmgr_vdev *vdev,
+		struct wlan_t2lm_context *rx_t2lm, uint64_t tsf)
 {
 	struct wlan_t2lm_context *t2lm_ctx;
-	uint16_t tsf_bit25_16, ms_time;
-	bool match_found = false;
-	int j;
+	uint16_t tsf_bit25_10, ms_time;
 
-	tsf_bit25_16 = (tsf & 0x3FF0000) >> 16;
+	tsf_bit25_10 = (tsf & WLAN_T2LM_MAPPING_SWITCH_TSF_BITS) >> 10;
 	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
 
-	for (j = 0; j < t2lm_ctx->num_of_t2lm_ie; j++) {
-		/* Match not found */
-		if (qdf_mem_cmp(rx_t2lm->ieee_link_map_tid,
-				t2lm_ctx->t2lm_ie[j].t2lm.ieee_link_map_tid,
-				sizeof(uint16_t) * T2LM_MAX_NUM_TIDS))
-			continue;
+	t2lm_dev_lock_acquire(t2lm_ctx);
 
-		if (t2lm_ctx->t2lm_ie[j].t2lm.mapping_switch_time_present) {
-			ms_time = rx_t2lm->mapping_switch_time;
-
-			if (ms_time > tsf_bit25_16) {
-				t2lm_ctx->t2lm_ie[j].t2lm.mapping_switch_time =
-					((ms_time - tsf_bit25_16) * 1024) / 1000;
-			} else {
-				t2lm_ctx->t2lm_ie[j].t2lm.mapping_switch_time =
-					((0xFFFF - (tsf_bit25_16 - ms_time)) * 1024) / 1000;
-			}
+	if (t2lm_ctx->established_t2lm.t2lm.expected_duration_present &&
+	    rx_t2lm->established_t2lm.t2lm.expected_duration_present) {
+		/* Established T2LM is already saved in the T2LM context.
+		 * T2LM IE in the beacon/probe response frame has the updated
+		 * expected duration.
+		 */
+		if (!qdf_mem_cmp(t2lm_ctx->established_t2lm.t2lm.ieee_link_map_tid,
+				 rx_t2lm->established_t2lm.t2lm.ieee_link_map_tid,
+				 sizeof(uint16_t) * T2LM_MAX_NUM_TIDS)) {
+			t2lm_ctx->established_t2lm.t2lm.expected_duration =
+				rx_t2lm->established_t2lm.t2lm.expected_duration;
 		}
-
-		if (t2lm_ctx->t2lm_ie[j].t2lm.expected_duration_present) {
-			t2lm_ctx->t2lm_ie[j].t2lm.expected_duration =
-				rx_t2lm->expected_duration;
-		}
-
-		match_found = true;
-		break;
+	} else if (rx_t2lm->established_t2lm.t2lm.expected_duration_present &&
+		   !rx_t2lm->established_t2lm.t2lm.mapping_switch_time_present) {
+		/* Mapping switch time is already expired when STA receives the
+		 * T2LM IE from beacon/probe response frame.
+		 */
+		qdf_mem_copy(&t2lm_ctx->established_t2lm.t2lm,
+			     &rx_t2lm->established_t2lm.t2lm,
+			     sizeof(struct wlan_t2lm_info));
+		wlan_send_tid_to_link_mapping(
+				vdev, &t2lm_ctx->established_t2lm.t2lm);
 	}
 
-	if (!match_found &&
-	    t2lm_ctx->num_of_t2lm_ie < WLAN_MAX_T2LM_IE) {
-		qdf_mem_copy(&t2lm_ctx->t2lm_ie[t2lm_ctx->num_of_t2lm_ie].t2lm,
-			     rx_t2lm, sizeof(struct wlan_t2lm_info));
-		t2lm_ctx->num_of_t2lm_ie++;
+	if (rx_t2lm->upcoming_t2lm.t2lm.mapping_switch_time_present) {
+		if (!qdf_mem_cmp(t2lm_ctx->established_t2lm.t2lm.ieee_link_map_tid,
+				 rx_t2lm->upcoming_t2lm.t2lm.ieee_link_map_tid,
+				 sizeof(uint16_t) * T2LM_MAX_NUM_TIDS)) {
+			t2lm_debug("Ongoing mapping is already established");
+			t2lm_dev_lock_release(t2lm_ctx);
+			return QDF_STATUS_E_ALREADY;
+		}
+
+		qdf_mem_copy(&t2lm_ctx->upcoming_t2lm.t2lm,
+			     &rx_t2lm->upcoming_t2lm.t2lm,
+			     sizeof(struct wlan_t2lm_info));
+
+		ms_time = t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time;
+		/* Per test, -300ms is fine */
+		if (ms_time > tsf_bit25_10) {
+			t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time =
+				(ms_time - tsf_bit25_10 - (3 * WLAN_T2LM_MAPPING_SWITCH_TIME_DELAY));
+		} else {
+			t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time =
+				0xFFFF - (tsf_bit25_10 - ms_time) - (3 * WLAN_T2LM_MAPPING_SWITCH_TIME_DELAY);
+		}
 	}
+
+	t2lm_dev_lock_release(t2lm_ctx);
+
+	return QDF_STATUS_SUCCESS;
 }
 
 QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(
@@ -985,26 +1014,25 @@ QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(
 		struct wlan_t2lm_context *rx_t2lm_ie, uint64_t tsf)
 {
 	struct wlan_t2lm_context *t2lm_ctx;
-	int i;
+	QDF_STATUS status;
 
-	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
-
-	for (i = 0; i < rx_t2lm_ie->num_of_t2lm_ie; i++) {
-		wlan_update_mapping_switch_time_expected_dur(
-				vdev, &rx_t2lm_ie->t2lm_ie[i].t2lm, tsf);
-	}
-
+	/* Do not parse the T2LM IE if STA is not in connected state */
 	if (!wlan_cm_is_vdev_connected(vdev))
 		return QDF_STATUS_SUCCESS;
 
-	/* Do not start the timer if STA is not in connected state */
-	for (i = 0; i < t2lm_ctx->num_of_t2lm_ie; i++) {
-		if (t2lm_ctx->t2lm_ie[i].t2lm.mapping_switch_time_present ||
-		    t2lm_ctx->t2lm_ie[i].t2lm.expected_duration_present) {
-			wlan_handle_t2lm_timer(vdev, i);
-			break;
-		}
+	t2lm_ctx = &vdev->mlo_dev_ctx->t2lm_ctx;
+
+	status = wlan_update_mapping_switch_time_expected_dur(
+			vdev, rx_t2lm_ie, tsf);
+	if (QDF_IS_STATUS_ERROR(status))
+		return status;
+
+	t2lm_dev_lock_acquire(t2lm_ctx);
+	if (t2lm_ctx->established_t2lm.t2lm.expected_duration_present ||
+	    t2lm_ctx->upcoming_t2lm.t2lm.mapping_switch_time_present) {
+		wlan_handle_t2lm_timer(vdev);
 	}
+	t2lm_dev_lock_release(t2lm_ctx);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -1056,10 +1084,11 @@ QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
 			continue;
 
 		handler = t2lm_ctx->link_update_handler[i];
-		if (!(handler && t2lm_ctx->num_of_t2lm_ie))
+		if (!handler)
 			continue;
 
-		handler(mldev, &t2lm_ctx->t2lm_ie[0].t2lm.ieee_link_map_tid[0]);
+		handler(mldev,
+			&t2lm_ctx->established_t2lm.t2lm.ieee_link_map_tid[0]);
 	}
 	return QDF_STATUS_SUCCESS;
 }
@@ -1081,7 +1110,6 @@ wlan_mlo_t2lm_timer_deinit(struct wlan_objmgr_vdev *vdev)
 	t2lm_dev_lock_acquire(&vdev->mlo_dev_ctx->t2lm_ctx);
 	t2lm_timer->timer_started = false;
 	t2lm_timer->timer_interval = 0;
-	t2lm_timer->t2lm_ie_index = 0;
 	t2lm_dev_lock_release(&vdev->mlo_dev_ctx->t2lm_ctx);
 	qdf_timer_free(&t2lm_timer->t2lm_timer);
 	t2lm_dev_lock_destroy(&vdev->mlo_dev_ctx->t2lm_ctx);

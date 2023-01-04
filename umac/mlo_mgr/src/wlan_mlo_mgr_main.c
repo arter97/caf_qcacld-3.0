@@ -505,11 +505,10 @@ static inline void mlo_t2lm_ctx_init(struct wlan_mlo_dev_context *ml_dev,
 {
 	struct wlan_t2lm_info *t2lm;
 
-	t2lm = &ml_dev->t2lm_ctx.t2lm_ie[0].t2lm;
+	t2lm = &ml_dev->t2lm_ctx.established_t2lm.t2lm;
 
 	qdf_mem_zero(&ml_dev->t2lm_ctx, sizeof(struct wlan_t2lm_context));
 
-	ml_dev->t2lm_ctx.num_of_t2lm_ie = 1;
 	t2lm->direction = WLAN_T2LM_BIDI_DIRECTION;
 	t2lm->default_link_mapping = 1;
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -86,9 +86,10 @@ struct vdev_mlme_proto_generic {
 
 /**
  * struct vdev_mlme_proto_ap - ap specific mlme protocol
- * @.
+ * @mapping_switch_time: Mapping switch time of T2LM
  */
 struct vdev_mlme_proto_ap {
+	uint16_t mapping_switch_time;
 };
 
 /**

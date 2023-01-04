@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -433,7 +433,7 @@ target_if_mlo_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 		   params.t2lm_info[params.num_dir].default_link_mapping);
 
 	for (tid = 0; tid < T2LM_MAX_NUM_TIDS; tid++) {
-		t2lm_debug("tid:%d hw_link_map:%x ieee_lin_map:%x", tid,
+		t2lm_debug("tid:%d hw_link_map:%x ieee_link_map:%x", tid,
 			   params.t2lm_info[params.num_dir].t2lm_provisioned_links[tid],
 			   t2lm->ieee_link_map_tid[tid]);
 	}
