@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -779,7 +779,7 @@ void wmi_ese_attach_tlv(wmi_unified_t wmi_handle)
 /**
  * convert_roam_trigger_reason() - Function to convert unified Roam trigger
  * enum to TLV specific WMI_ROAM_TRIGGER_REASON_ID
- * @reason: Roam trigger reason
+ * @trigger_reason: Roam trigger reason
  *
  * Return: WMI roam trigger reason
  */
@@ -986,7 +986,7 @@ wmi_extract_pdev_hw_mode_trans_ind(
 }
 
 /**
- * extract_roam_sync_event_tlv() - Extract the roam event
+ * extract_roam_event_tlv() - Extract the roam event
  * @wmi_handle: wmi handle
  * @evt_buf: Pointer to the event buffer
  * @len: Data length
@@ -1549,8 +1549,7 @@ static void wmi_fill_min_rssi_params(
 /**
  * send_set_roam_trigger_cmd_tlv() - send set roam triggers to fw
  * @wmi_handle: wmi handle
- * @vdev_id: vdev id
- * @trigger_bitmap: roam trigger bitmap to be enabled
+ * @triggers: roam trigger bitmap to be enabled
  *
  * Send WMI_ROAM_ENABLE_DISABLE_TRIGGER_REASON_CMDID to fw.
  *
@@ -2008,7 +2007,7 @@ wmi_get_converted_tx_status(
  * @wmi_handle: wmi handle
  * @evt_buf:    Pointer to the event buffer
  * @dst:        Pointer to destination structure to fill data
- * @idx:        TLV id
+ * @frame_idx:  TLV id
  * @num_frames: Number of Frame TLVs to be extracted
  */
 static QDF_STATUS
@@ -2087,9 +2086,8 @@ extract_roam_frame_info_tlv(wmi_unified_t wmi_handle, void *evt_buf,
 /**
  * wmi_fill_data_synch_frame_event() - Fill the the roam sync data buffer using
  * synch frame event data
- * @wma: Global WMA Handle
+ * @rso_cfg: Source buffer
  * @roam_sync_ind: Buffer to be filled
- * @param_buf: Source buffer
  *
  * Firmware sends all the required information required for roam
  * synch propagation as TLV's and stored in param_buf. These
@@ -2172,7 +2170,6 @@ wmi_fill_data_synch_frame_event(struct rso_config *rso_cfg,
 /**
  * wmi_fill_data_synch_event() - Fill the the roam sync data buffer
  * using synch event data
- * @wma: Global WMA Handle
  * @roam_sync_ind: Buffer to be filled
  * @param_buf: Source buffer
  *
@@ -2676,9 +2673,9 @@ abort_roam:
  * extract_roam_sync_frame_event_tlv() - Extract the roam sync frame event
  * from the wmi_roam_synch_event_id
  * @wmi_handle: wmi handle
- * @event:    Pointer to the event buffer
- * @len:        Data length
- * @roam_synch_frame_ind_ptr: wmi sync frame event ptr
+ * @event: Pointer to the event buffer
+ * @len: event buffer length
+ * @frame_ptr: wmi sync frame event ptr
  */
 static QDF_STATUS
 extract_roam_sync_frame_event_tlv(wmi_unified_t wmi_handle, void *event,
@@ -3539,6 +3536,7 @@ extract_roam_vendor_control_param_event_tlv(wmi_unified_t wmi_handle,
  * to fw.
  * @wmi_handle: wmi handle
  * @vdev_id: vdev id
+ * @param_id: parameter ID to set
  *
  * Return: QDF STATUS
  */
@@ -3756,7 +3754,7 @@ static bool wmi_is_ft_akm(int akm,
 }
 
 /**
- * wmi_get_rso_cmd_buf_len() - calculate the length needed to allocate buffer
+ * wmi_get_rso_buf_len() - calculate the length needed to allocate buffer
  * for RSO mode command
  * @roam_req: roam request parameters
  */
@@ -4370,8 +4368,7 @@ wmi_set_rso_stop_report_status(wmi_roam_scan_mode_fixed_param *rso_fp)
 /**
  * send_roam_scan_offload_mode_cmd_tlv() - send roam scan mode request to fw
  * @wmi_handle: wmi handle
- * @scan_cmd_fp: start scan command ptr
- * @roam_req: roam request param
+ * @rso_req: roam request param
  *
  * send WMI_ROAM_SCAN_MODE TLV to firmware. It has a piggyback
  * of WMI_ROAM_SCAN_MODE.
@@ -4570,7 +4567,7 @@ static void wmi_roam_mlo_attach_tlv(struct wmi_unified *wmi_handle)
 /**
  * send_roam_scan_offload_ap_profile_cmd_tlv() - set roam ap profile in fw
  * @wmi_handle: wmi handle
- * @ap_profile_p: ap profile
+ * @ap_profile: ap profile
  *
  * Send WMI_ROAM_AP_PROFILE to firmware
  *
@@ -5006,6 +5003,7 @@ error:
 /**
  * send_roam_scan_offload_chan_list_cmd_tlv() - set roam offload channel list
  * @wmi_handle: wmi handle
+ * @rso_ch_info: Roam offload channel information
  *
  * Set roam offload channel list.
  *
@@ -5076,9 +5074,7 @@ error:
 /**
  * send_roam_scan_offload_rssi_change_cmd_tlv() - set roam offload RSSI th
  * @wmi_handle: wmi handle
- * @rssi_change_thresh: RSSI Change threshold
- * @bcn_rssi_weight: beacon RSSI weight
- * @vdev_id: vdev id
+ * @params: RSSI change parameters
  *
  * Send WMI_ROAM_SCAN_RSSI_CHANGE_THRESHOLD parameters to fw.
  *
@@ -5418,8 +5414,8 @@ send_roam_bss_load_config_tlv(wmi_unified_t wmi_handle,
 /**
  * send_disconnect_roam_params_tlv() - send disconnect roam trigger parameters
  * @wmi_handle: wmi handle
- * @disconnect_roam: pointer to wlan_roam_disconnect_params which carries the
- * disconnect_roam_trigger parameters from CSR
+ * @req: pointer to wlan_roam_disconnect_params which carries the
+ * disconnect_roam_trigger parameters
  *
  * This function sends the disconnect roam trigger parameters to fw.
  *
