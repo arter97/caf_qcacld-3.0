@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -143,9 +143,6 @@ QDF_STATUS dp_ipa_set_doorbell_paddr(struct cdp_soc_t *soc_hdl,
 QDF_STATUS dp_ipa_iounmap_doorbell_vaddr(struct cdp_soc_t *soc_hdl,
 					 uint8_t pdev_id);
 
-QDF_STATUS dp_ipa_uc_set_active(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
-				bool uc_active, bool is_tx);
-
 /**
  * dp_ipa_op_response() - Handle OP command response from firmware
  * @soc_hdl - data path soc handle
@@ -278,10 +275,6 @@ QDF_STATUS dp_ipa_setup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 QDF_STATUS dp_ipa_cleanup(struct cdp_soc_t *soc_hdl, uint8_t pdev_id,
 			  uint32_t tx_pipe_handle,
 			  uint32_t rx_pipe_handle, qdf_ipa_wdi_hdl_t hdl);
-QDF_STATUS dp_ipa_remove_header(char *name);
-int dp_ipa_add_header_info(char *ifname, uint8_t *mac_addr,
-		uint8_t session_id, bool is_ipv6_enabled);
-int dp_ipa_register_interface(char *ifname, bool is_ipv6_enabled);
 QDF_STATUS dp_ipa_setup_iface(char *ifname, uint8_t *mac_addr,
 		qdf_ipa_client_type_t prod_client,
 		qdf_ipa_client_type_t cons_client,
