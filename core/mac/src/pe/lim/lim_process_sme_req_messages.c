@@ -5011,6 +5011,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 	uint8_t i = 0;
 	int8_t max_tx_power;
 	uint16_t reg_max = 0, psd_power = 0;
+	uint16_t tx_power_within_bw = 0, psd_power_within_bw = 0;
 	uint16_t local_constraint, bw_val = 0;
 	uint32_t num_pwr_levels, ap_power_type_6g = 0;
 	qdf_freq_t oper_freq, start_freq = 0;
@@ -5058,7 +5059,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 		}
 	}
 
-	if (mlme_obj->reg_tpc_obj.num_pwr_levels) {
+	if (LIM_IS_STA_ROLE(session) && mlme_obj->reg_tpc_obj.num_pwr_levels) {
 		is_tpe_present = true;
 		num_pwr_levels = mlme_obj->reg_tpc_obj.num_pwr_levels;
 	} else {
@@ -5096,14 +5097,29 @@ void lim_calculate_tpc(struct mac_context *mac,
 					 mlme_obj->reg_tpc_obj.frequency[i],
 					 &is_psd_power, &reg_max, &psd_power);
 				} else {
-					ap_power_type_6g =
+					if (wlan_reg_decide_6ghz_power_within_bw_for_freq(
+							mac->pdev, oper_freq,
+							session->ch_width,
+							&is_psd_power,
+							&tx_power_within_bw,
+							&psd_power_within_bw,
+							&ap_power_type_6g) ==
+							QDF_STATUS_SUCCESS) {
+						pe_debug("get pwr attr from secondary list");
+						reg_max = tx_power_within_bw;
+						psd_power = psd_power_within_bw;
+					} else {
 						wlan_reg_get_cur_6g_ap_pwr_type(
 							mac->pdev,
 							&ap_power_type_6g);
-					wlan_reg_get_6g_chan_ap_power(
-					mac->pdev,
-					mlme_obj->reg_tpc_obj.frequency[i],
-					&is_psd_power, &reg_max, &psd_power);
+						wlan_reg_get_6g_chan_ap_power(
+							mac->pdev,
+							mlme_obj->reg_tpc_obj.
+							frequency[i],
+							&is_psd_power,
+							&reg_max,
+							&psd_power);
+					}
 				}
 			}
 		}
@@ -5125,7 +5141,7 @@ void lim_calculate_tpc(struct mac_context *mac,
 				max_tx_power = reg_max - local_constraint;
 		}
 		/* If TPE is present */
-		if (is_tpe_present && !skip_tpe) {
+		if (LIM_IS_STA_ROLE(session) && is_tpe_present && !skip_tpe) {
 			if (!is_psd_power && mlme_obj->reg_tpc_obj.eirp_power)
 				tpe_power =  mlme_obj->reg_tpc_obj.eirp_power;
 			else
@@ -5134,28 +5150,22 @@ void lim_calculate_tpc(struct mac_context *mac,
 			pe_debug("TPE: %d", tpe_power);
 		}
 
-		/** If firmware updated max tx power is non zero,
-		 * then allocate the min of firmware updated ap tx
-		 * power and max power derived from above mentioned
-		 * parameters.
-		 */
-		if (mlme_obj->mgmt.generic.tx_pwrlimit)
-			max_tx_power =
-				QDF_MIN(max_tx_power, (int8_t)
-					mlme_obj->mgmt.generic.tx_pwrlimit);
+		if (is_psd_power)
+			mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
+						(uint8_t)psd_power;
 		else
-			pe_err("HW power limit from FW is zero");
-		mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
+			mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power =
 						(uint8_t)max_tx_power;
 
-		pe_debug("freq: %d max_tx_power: %d",
-			 mlme_obj->reg_tpc_obj.frequency[i], max_tx_power);
+		pe_debug("freq: %d reg power: %d, max_tx_power(eirp/psd): %d",
+			 mlme_obj->reg_tpc_obj.frequency[i], reg_max,
+			 mlme_obj->reg_tpc_obj.chan_power_info[i].tx_power);
 	}
 
 	mlme_obj->reg_tpc_obj.num_pwr_levels = num_pwr_levels;
-	mlme_obj->reg_tpc_obj.is_psd_power = is_psd_power;
 	mlme_obj->reg_tpc_obj.eirp_power = reg_max;
 	mlme_obj->reg_tpc_obj.power_type_6g = ap_power_type_6g;
+	mlme_obj->reg_tpc_obj.is_psd_power = is_psd_power;
 
 	pe_debug("num_pwr_levels: %d, is_psd_power: %d, total eirp_power: %d, ap_pwr_type: %d",
 		 num_pwr_levels, is_psd_power, reg_max, ap_power_type_6g);

@@ -2999,6 +2999,8 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 	uint16_t channelChangeReasonCode;
 	struct pe_session *pe_session;
 	struct wlan_channel *vdev_chan;
+	struct wlan_lmac_if_reg_tx_ops *tx_ops;
+	struct vdev_mlme_obj *mlme_obj;
 	/* we need to process the deferred message since the initiating req. there might be nested request. */
 	/* in the case of nested request the new request initiated from the response will take care of resetting */
 	/* the deffered flag. */
@@ -3064,6 +3066,17 @@ void lim_process_switch_channel_rsp(struct mac_context *mac,
 			ucfg_pkt_capture_record_channel(pe_session->vdev);
 		break;
 	case LIM_SWITCH_CHANNEL_SAP_DFS:
+		if (QDF_IS_STATUS_SUCCESS(status) &&
+		    wlan_reg_is_ext_tpc_supported(mac->psoc)) {
+			mlme_obj =
+				wlan_vdev_mlme_get_cmpt_obj(pe_session->vdev);
+			lim_calculate_tpc(mac, pe_session, false, 0, false);
+			tx_ops = wlan_reg_get_tx_ops(mac->psoc);
+			if (tx_ops->set_tpc_power)
+				tx_ops->set_tpc_power(mac->psoc,
+						      pe_session->vdev_id,
+						      &mlme_obj->reg_tpc_obj);
+		}
 		/* Note: This event code specific to SAP mode
 		 * When SAP session issues channel change as performing
 		 * DFS, we will come here. Other sessions, for e.g. P2P
