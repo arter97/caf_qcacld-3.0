@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2792,6 +2792,7 @@ cm_roam_stats_get_trigger_detail_str(struct wmi_roam_trigger_info *ptr,
  * @data:  Pointer to the roam trigger data
  * @scan_data: Roam scan data pointer
  * @vdev_id: Vdev ID
+ * @is_full_scan: Was a full scan performed
  *
  * Prints the vdev, roam trigger reason, time of the day at which roaming
  * was triggered.
@@ -2828,8 +2829,10 @@ cm_roam_stats_print_trigger_info(struct wlan_objmgr_psoc *psoc,
 
 /**
  * cm_roam_stats_print_btm_rsp_info - BTM RSP related details
+ * @trigger_info:   Roam scan trigger reason
  * @data:    Pointer to the btm rsp data
  * @vdev_id: vdev id
+ * @is_wtc: is WTC?
  *
  * Prints the vdev, btm status, target_bssid and vsie reason
  *
@@ -3012,7 +3015,9 @@ cm_roam_stats_print_scan_info(struct wlan_objmgr_psoc *psoc,
 /**
  * cm_roam_stats_print_roam_result()  - Print roam result related info
  * @psoc: Pointer to psoc object
+ * @trigger: roam trigger information
  * @res:     Roam result structure pointer
+ * @scan_data: scan data
  * @vdev_id: Vdev id
  *
  * Print roam result and failure reason if roaming failed.
