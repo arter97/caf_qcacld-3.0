@@ -51,7 +51,8 @@ struct vdev_mlme_obj;
 /* Max LINK PEER support */
 #define MAX_MLO_LINK_PEERS WLAN_UMAC_MLO_MAX_VDEVS
 
-#define MAX_MLO_PEER_ID 2048
+/* MAX MLO peer_id supported by FW is 128 */
+#define MAX_MLO_PEER_ID 128
 #define MLO_INVALID_PEER_ID 0xFFFF
 
 /* IE nomenclature */
@@ -134,7 +135,8 @@ struct mlo_state_params {
  * @context: Array of MLO device context
  * @mlo_peer_id_bmap: bitmap to allocate MLO Peer ID
  * @max_mlo_peer_id: Max MLO Peer ID
- * @info: MLO setup info
+ * @last_mlo_peer_id: Previously allocated ML peer ID
+ * @setup_info: MLO setup_info of all groups
  * @mlme_ops: MLO MLME callback function pointers
  * @msgq_ctx: Context switch mgr
  * @mlo_is_force_primary_umac: Force Primary UMAC enable
@@ -154,6 +156,7 @@ struct mlo_mgr_context {
 	qdf_list_t ml_dev_list;
 	qdf_bitmap(mlo_peer_id_bmap, MAX_MLO_PEER_ID);
 	uint16_t max_mlo_peer_id;
+	uint16_t last_mlo_peer_id;
 #ifdef WLAN_MLO_MULTI_CHIP
 	struct mlo_setup_info setup_info;
 #endif
