@@ -248,6 +248,18 @@ struct mlo_sta_csa_params {
 };
 
 /**
+ * mlo_sta_cu_params - critical update parameters in mlo mgr
+ * @vdev_id: vdev id
+ * @bpcc: bss parameter change count
+ * @initialized: flag about the parameter is valid or not
+ */
+struct mlo_sta_cu_params {
+	uint8_t vdev_id;
+	uint8_t bpcc;
+	bool initialized;
+};
+
+/**
  * struct mlo_sta_quiet_status - MLO sta quiet status
  * @link_id: link id
  * @quiet_status: true if corresponding ap in quiet status
@@ -268,6 +280,7 @@ struct mlo_sta_quiet_status {
  * @copied_conn_req_lock: lock for the original connect request
  * @assoc_rsp: Raw assoc response frame
  * @mlo_csa_param: CSA request parameters for mlo sta
+ * @mlo_cu_param: critical update parameters for mlo sta
  * @disconn_req: disconnect req params
  * @copied_reassoc_rsp: Reassoc response copied from assoc link roam handling
  *                      to re-use while link connect in case of deferred/need
@@ -287,6 +300,7 @@ struct wlan_mlo_sta {
 	struct element_info assoc_rsp;
 	struct mlo_sta_quiet_status mlo_quiet_status[WLAN_UMAC_MLO_MAX_VDEVS];
 	struct mlo_sta_csa_params mlo_csa_param[WLAN_UMAC_MLO_MAX_VDEVS];
+	struct mlo_sta_cu_params mlo_cu_param[WLAN_UMAC_MLO_MAX_VDEVS];
 	struct wlan_cm_disconnect_req *disconn_req;
 #ifdef WLAN_FEATURE_ROAM_OFFLOAD
 	struct wlan_cm_connect_resp *copied_reassoc_rsp;

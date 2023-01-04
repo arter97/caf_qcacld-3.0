@@ -190,6 +190,46 @@ mlo_update_connected_links_bmap(struct wlan_mlo_dev_context *mlo_dev_ctx,
 void mlo_clear_connected_links_bmap(struct wlan_objmgr_vdev *vdev);
 
 /**
+ * mlo_set_cu_bpcc() - set the bpcc per link id
+ * @vdev: vdev object
+ * @vdev_id: the id of vdev
+ * @bpcc: bss parameters change count
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlo_set_cu_bpcc(struct wlan_objmgr_vdev *vdev, uint8_t vdev_id,
+			   uint8_t bpcc);
+
+/**
+ * mlo_get_cu_bpcc() - get the bpcc per link id
+ * @vdev: vdev object
+ * @vdev_id: the id of vdev
+ * @bpcc: the bss parameters change count pointer to save value
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS mlo_get_cu_bpcc(struct wlan_objmgr_vdev *vdev, uint8_t vdev_id,
+			   uint8_t *bpcc);
+
+/**
+ * mlo_init_cu_bpcc() - initialize the bpcc for vdev
+ * @mlo_dev_ctx: wlan mlo dev context
+ * @vdev_id: vdev id
+ *
+ * Return: void
+ */
+void mlo_init_cu_bpcc(struct wlan_mlo_dev_context *mlo_dev_ctx,
+		      uint8_t vdev_id);
+
+/**
+ * mlo_clear_cu_bpcc() - clear the bpcc info
+ * @vdev: vdev object
+ *
+ * Return: void
+ */
+void mlo_clear_cu_bpcc(struct wlan_objmgr_vdev *vdev);
+
+/**
  * API to have operation on ml vdevs
  */
 typedef void (*mlo_vdev_op_handler)(struct wlan_objmgr_vdev *vdev,

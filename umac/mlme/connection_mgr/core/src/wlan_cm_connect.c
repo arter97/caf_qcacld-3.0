@@ -36,6 +36,7 @@
 #endif
 #include <wlan_utility.h>
 #include <wlan_mlo_mgr_sta.h>
+#include "wlan_mlo_mgr_op.h"
 #include <wlan_objmgr_vdev_obj.h>
 #include "wlan_psoc_mlme_api.h"
 
@@ -601,6 +602,7 @@ static void cm_create_bss_peer(struct cnx_mgr *cm_ctx,
 				      &eht_capab);
 	if (eht_capab) {
 		cm_set_vdev_link_id(cm_ctx, req);
+		wlan_mlo_init_cu_bpcc(cm_ctx->vdev);
 		mld_mac = cm_get_bss_peer_mld_addr(req);
 		is_assoc_link = cm_bss_peer_is_assoc_peer(req);
 	}

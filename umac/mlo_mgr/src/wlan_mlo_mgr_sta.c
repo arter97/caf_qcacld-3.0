@@ -544,6 +544,109 @@ static QDF_STATUS mlo_validate_mlo_cap(struct wlan_objmgr_vdev *vdev)
 }
 #endif
 
+QDF_STATUS mlo_set_cu_bpcc(struct wlan_objmgr_vdev *vdev,
+			   uint8_t vdev_id, uint8_t bpcc)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_sta_cu_params *cu_param;
+	uint8_t i;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx) {
+		mlo_err("ML dev ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cu_param = &mlo_dev_ctx->sta_ctx->mlo_cu_param[0];
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (cu_param[i].initialized && cu_param[i].vdev_id == vdev_id) {
+			cu_param[i].bpcc = bpcc;
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	return QDF_STATUS_E_INVAL;
+}
+
+QDF_STATUS mlo_get_cu_bpcc(struct wlan_objmgr_vdev *vdev,
+			   uint8_t vdev_id, uint8_t *bpcc)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx;
+	struct mlo_sta_cu_params *cu_param;
+	uint8_t i;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx) {
+		mlo_err("ML dev ctx is NULL");
+		return QDF_STATUS_E_INVAL;
+	}
+
+	cu_param = &mlo_dev_ctx->sta_ctx->mlo_cu_param[0];
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (cu_param[i].initialized &&
+		    cu_param[i].vdev_id == vdev_id) {
+			*bpcc = cu_param[i].bpcc;
+			return QDF_STATUS_SUCCESS;
+		}
+	}
+
+	return QDF_STATUS_E_INVAL;
+}
+
+void mlo_init_cu_bpcc(struct wlan_mlo_dev_context *mlo_dev_ctx,
+		      uint8_t vdev_id)
+{
+	uint8_t i;
+	struct mlo_sta_cu_params *cu_param;
+	uint8_t empty_slot = 0xff;
+
+	cu_param = &mlo_dev_ctx->sta_ctx->mlo_cu_param[0];
+
+	for (i = 0; i < WLAN_UMAC_MLO_MAX_VDEVS; i++) {
+		if (cu_param[i].initialized &&
+		    cu_param[i].vdev_id == vdev_id) {
+			cu_param[i].bpcc = 0;
+			return;
+		}
+
+		if (!cu_param[i].initialized && empty_slot == 0xff)
+			empty_slot = i;
+	}
+
+	if (empty_slot != 0xff) {
+		cu_param[empty_slot].bpcc = 0;
+		cu_param[empty_slot].vdev_id = vdev_id;
+		cu_param[empty_slot].initialized = true;
+		mlo_debug("init cu bpcc idx %d, vdev_id %d",
+			  empty_slot, vdev_id);
+	} else {
+		mlo_debug("No bpcc idx for vdev_id %d", vdev_id);
+	}
+}
+
+void mlo_clear_cu_bpcc(struct wlan_objmgr_vdev *vdev)
+{
+	struct wlan_mlo_dev_context *mlo_dev_ctx = NULL;
+	struct wlan_mlo_sta *sta_ctx = NULL;
+	uint32_t size;
+
+	if (!vdev)
+		return;
+
+	mlo_dev_ctx = vdev->mlo_dev_ctx;
+	if (!mlo_dev_ctx)
+		return;
+
+	sta_ctx = mlo_dev_ctx->sta_ctx;
+	if (!sta_ctx)
+		return;
+
+	size = sizeof(sta_ctx->mlo_cu_param);
+	qdf_mem_zero(sta_ctx->mlo_cu_param, size);
+
+	mlo_debug("clear cu bpcc");
+}
+
 QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 		       struct wlan_cm_connect_req *req)
 {
@@ -584,6 +687,7 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 		}
 
 		if (QDF_IS_STATUS_SUCCESS(status)) {
+			mlo_clear_cu_bpcc(vdev);
 			mlo_clear_connected_links_bmap(vdev);
 			mlo_dev_lock_release(mlo_dev_ctx);
 
