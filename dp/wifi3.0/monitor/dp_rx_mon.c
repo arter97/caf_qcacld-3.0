@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -250,6 +250,7 @@ dp_rx_populate_cfr_non_assoc_sta(struct dp_pdev *pdev,
 
 /**
  * dp_bb_captured_chan_status() - Get the bb_captured_channel status
+ * @pdev: pdev ctx
  * @ppdu_info: structure for rx ppdu ring
  *
  * Return: Success/ Failure
@@ -284,7 +285,7 @@ dp_bb_captured_chan_status(struct dp_pdev *pdev,
  *			index in the rssi_chain[chain][bw] array
  *
  * @chain: BB chain index
- * @pdev: pdev structure
+ * @mon_pdev: pdev structure
  *
  * Return: return RF chain index
  *
@@ -662,10 +663,10 @@ end:
 }
 
 /**
- * dp_rx_stats_update() - Update per-peer statistics
- * @soc: Datapath SOC handle
+ * dp_rx_rate_stats_update() - Update per-peer rate statistics
  * @peer: Datapath peer handle
  * @ppdu: PPDU Descriptor
+ * @user: user index
  *
  * Return: None
  */

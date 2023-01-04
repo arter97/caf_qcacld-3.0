@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -138,7 +138,7 @@ __dp_rx_mon_free_ppdu_info(struct dp_mon_pdev *mon_pdev,
 }
 
 /**
- * dp_rx_mon_nbuf_add_rx_frag () -  Add frag to SKB
+ * dp_rx_mon_nbuf_add_rx_frag() -  Add frag to SKB
  *
  * @nbuf: SKB to which frag is going to be added
  * @frag: frag to be added to SKB
@@ -174,7 +174,7 @@ dp_rx_mon_nbuf_add_rx_frag(qdf_nbuf_t nbuf, qdf_frag_t *frag,
  * @mon_pdev: monitor pdev
  * @nbuf: SKB to be freed
  *
- * @Return: void
+ * Return: void
  */
 void
 dp_mon_free_parent_nbuf(struct dp_mon_pdev *mon_pdev,
@@ -385,7 +385,7 @@ static void dp_rx_mon_free_mpdu_queue(struct dp_mon_pdev *mon_pdev,
 }
 
 /**
- * dp_rx_mon_free_ppdu_info () - Free PPDU info
+ * dp_rx_mon_free_ppdu_info() - Free PPDU info
  * @pdev: DP pdev
  * @ppdu_info: PPDU info
  *
@@ -441,7 +441,7 @@ void dp_rx_mon_drain_wq(struct dp_pdev *pdev)
  *
  * @mon_pdev: monitor pdev
  * @mpdu: MPDU nbuf
- * @status: monitor status
+ * @rx_status: monitor status
  *
  * Return: QDF_STATUS
  */
@@ -471,7 +471,7 @@ dp_rx_mon_deliver_mpdu(struct dp_mon_pdev *mon_pdev,
 }
 
 /**
- * dp_rx_mon_process_ppdu_info () - Process PPDU info
+ * dp_rx_mon_process_ppdu_info() - Process PPDU info
  * @pdev: DP pdev
  * @ppdu_info: PPDU info
  *
@@ -565,7 +565,7 @@ dp_rx_mon_process_ppdu_info(struct dp_pdev *pdev,
 }
 
 /**
- * dp_rx_mon_process_ppdu ()-  Deferred monitor processing
+ * dp_rx_mon_process_ppdu()-  Deferred monitor processing
  * This workqueue API handles:
  * a. Full monitor
  * b. Lite monitor
@@ -610,9 +610,9 @@ void dp_rx_mon_process_ppdu(void *context)
 }
 
 /**
- * dp_rx_mon_add_ppdu_info_to_wq () - Add PPDU info to workqueue
+ * dp_rx_mon_add_ppdu_info_to_wq() - Add PPDU info to workqueue
  *
- * @mon_pdev: monitor pdev
+ * @pdev: monitor pdev
  * @ppdu_info: ppdu info to be added to workqueue
  *
  * Return: SUCCESS or FAILIRE
@@ -1042,7 +1042,7 @@ dp_rx_mon_flush_packet_tlv(struct dp_pdev *pdev, void *buf, uint16_t end_offset,
 }
 
 /**
- * dp_rx_mon_flush_status_buf_queue () - Flush status buffer queue
+ * dp_rx_mon_flush_status_buf_queue() - Flush status buffer queue
  *
  * @pdev: DP pdev handle
  *
@@ -1108,7 +1108,7 @@ dp_rx_mon_flush_status_buf_queue(struct dp_pdev *pdev)
 }
 
 /**
- * dp_rx_mon_handle_flush_n_trucated_ppdu () - Handle flush and truncated ppdu
+ * dp_rx_mon_handle_flush_n_trucated_ppdu() - Handle flush and truncated ppdu
  *
  * @soc: DP soc handle
  * @pdev: pdev handle
@@ -1497,7 +1497,7 @@ uint8_t dp_rx_mon_process_tlv_status(struct dp_pdev *pdev,
 }
 
 /**
- * dp_rx_mon_process_status_tlv () - Handle mon status process TLV
+ * dp_rx_mon_process_status_tlv() - Handle mon status process TLV
  *
  * @pdev: DP pdev handle
  *
@@ -1618,6 +1618,8 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
 	return ppdu_info;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO
+#define DP_PEER_ID_MASK 0x3FFF
 /**
  * dp_rx_mon_update_peer_id() - Update sw_peer_id with link peer_id
  *
@@ -1626,8 +1628,6 @@ dp_rx_mon_process_status_tlv(struct dp_pdev *pdev)
  *
  * Return: none
  */
-#ifdef WLAN_FEATURE_11BE_MLO
-#define DP_PEER_ID_MASK 0x3FFF
 static inline
 void dp_rx_mon_update_peer_id(struct dp_pdev *pdev,
 			      struct hal_rx_ppdu_info *ppdu_info)

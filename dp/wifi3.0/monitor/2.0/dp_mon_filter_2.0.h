@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,7 +43,7 @@ struct dp_mon_pdev_be;
 /**
  * dp_rx_mon_enable_set() - Setup rx monitor feature
  * @msg_word: msg word
- * @htt_tlv_filter: rx ring filter configuration
+ * @tlv_filter: rx ring filter configuration
  */
 void
 dp_rx_mon_enable_set(uint32_t *msg_word,
@@ -52,7 +52,7 @@ dp_rx_mon_enable_set(uint32_t *msg_word,
 /**
  * dp_rx_mon_hdr_length_set() - Setup rx monitor hdr tlv length
  * @msg_word: msg word
- * @htt_tlv_filter: rx ring filter configuration
+ * @tlv_filter: rx ring filter configuration
  */
 void
 dp_rx_mon_hdr_length_set(uint32_t *msg_word,
@@ -61,7 +61,7 @@ dp_rx_mon_hdr_length_set(uint32_t *msg_word,
 /**
  * dp_rx_mon_packet_length_set() - Setup rx monitor per packet type length
  * @msg_word: msg word
- * @htt_tlv_filter: rx ring filter configuration
+ * @tlv_filter: rx ring filter configuration
  */
 void
 dp_rx_mon_packet_length_set(uint32_t *msg_word,
@@ -70,7 +70,7 @@ dp_rx_mon_packet_length_set(uint32_t *msg_word,
 /**
  * dp_rx_mon_word_mask_subscribe() - Setup rx monitor word mask subscription
  * @msg_word: msg word
- * @htt_tlv_filter: rx ring filter configuration
+ * @tlv_filter: rx ring filter configuration
  */
 void
 dp_rx_mon_word_mask_subscribe(uint32_t *msg_word,
@@ -79,7 +79,7 @@ dp_rx_mon_word_mask_subscribe(uint32_t *msg_word,
 /**
  * dp_rx_mon_enable_mpdu_logging() - Setup rx monitor per packet mpdu logging
  * @msg_word: msg word
- * @htt_tlv_filter: rx ring filter configuration
+ * @tlv_filter: rx ring filter configuration
  */
 void
 dp_rx_mon_enable_mpdu_logging(uint32_t *msg_word,
@@ -88,7 +88,7 @@ dp_rx_mon_enable_mpdu_logging(uint32_t *msg_word,
 /**
  * dp_rx_mon_enable_fpmo() - Setup rx monitor fpmo mode type/subtype filters
  * @msg_word: msg word
- * @htt_tlv_filter: rx ring filter configuration
+ * @tlv_filter: rx ring filter configuration
  */
 void
 dp_rx_mon_enable_fpmo(uint32_t *msg_word,
@@ -96,13 +96,13 @@ dp_rx_mon_enable_fpmo(uint32_t *msg_word,
 
 #ifdef QCA_ENHANCED_STATS_SUPPORT
 /**
- * dp_mon_filter_setup_enhanced_stats() - Setup the enhanced stats filter
+ * dp_mon_filter_setup_enhanced_stats_2_0() - Setup the enhanced stats filter
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_setup_enhanced_stats_2_0(struct dp_pdev *pdev);
 
-/***
- * dp_mon_filter_reset_enhanced_stats() - Reset the enhanced stats filter
+/**
+ * dp_mon_filter_reset_enhanced_stats_2_0() - Reset the enhanced stats filter
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_reset_enhanced_stats_2_0(struct dp_pdev *pdev);
@@ -119,15 +119,15 @@ dp_mon_filter_reset_enhanced_stats_2_0(struct dp_pdev *pdev)
 #endif
 
 #ifdef QCA_UNDECODED_METADATA_SUPPORT
-/*
- * dp_mon_filter_setup_undecoded_metadata_capture() - Setup the filter
+/**
+ * dp_mon_filter_setup_undecoded_metadata_capture_2_0() - Setup the filter
  * for undecoded metadata capture
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_setup_undecoded_metadata_capture_2_0(struct dp_pdev *pdev);
 
-/*
- * dp_mon_filter_reset_undecoded_metadata_capture() - Reset the filter
+/**
+ * dp_mon_filter_reset_undecoded_metadata_capture_2_0() - Reset the filter
  * for undecoded metadata capture
  * @pdev: DP pdev handle
  */
@@ -145,32 +145,33 @@ dp_mon_filter_reset_undecoded_metadata_capture_2_0(struct dp_pdev *pdev)
 #endif
 
 /**
- * dp_mon_filter_setup_rx_mon_mode() - Setup the Rx monitor mode filter
+ * dp_mon_filter_setup_rx_mon_mode_2_0() - Setup the Rx monitor mode filter
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_setup_rx_mon_mode_2_0(struct dp_pdev *pdev);
 
 /**
- * dp_mon_filter_reset_mon_mode() - Reset the Rx monitor mode filter
+ * dp_mon_filter_reset_rx_mon_mode_2_0() - Reset the Rx monitor mode filter
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_reset_rx_mon_mode_2_0(struct dp_pdev *pdev);
 
 /**
- * dp_mon_filter_setup_tx_mon_mode() - Setup the Tx monitor mode filter
+ * dp_mon_filter_setup_tx_mon_mode_2_0() - Setup the Tx monitor mode filter
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_setup_tx_mon_mode_2_0(struct dp_pdev *pdev);
 
 /**
- * dp_mon_filter_reset_tx_mon_mode() - Reset the Tx monitor mode filter
+ * dp_mon_filter_reset_tx_mon_mode_2_0() - Reset the Tx monitor mode filter
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_reset_tx_mon_mode_2_0(struct dp_pdev *pdev);
 
 #ifdef WDI_EVENT_ENABLE
 /**
- * dp_mon_filter_setup_rx_pkt_log_full() - Setup the Rx pktlog full mode filter
+ * dp_mon_filter_setup_rx_pkt_log_full_2_0() - Setup the Rx pktlog full mode
+ *                                             filter
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_setup_rx_pkt_log_full_2_0(struct dp_pdev *pdev);
@@ -182,27 +183,28 @@ void dp_mon_filter_setup_rx_pkt_log_full_2_0(struct dp_pdev *pdev);
 void dp_mon_filter_reset_rx_pkt_log_full_2_0(struct dp_pdev *pdev);
 
 /**
- * dp_mon_filter_setup_rx_pkt_log_lite() - Setup the Rx pktlog lite mode filter
- * in the radio object.
+ * dp_mon_filter_setup_rx_pkt_log_lite_2_0() - Setup the Rx pktlog lite mode
+ *                                             filter in the radio object.
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_setup_rx_pkt_log_lite_2_0(struct dp_pdev *pdev);
 
 /**
- * dp_mon_filter_reset_rx_pkt_log_lite() - Reset the Rx pktlog lite mode filter
+ * dp_mon_filter_reset_rx_pkt_log_lite_2_0() - Reset the Rx pktlog lite mode
+ *                                             filter in the radio object.
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_reset_rx_pkt_log_lite_2_0(struct dp_pdev *pdev);
 
 /**
- * dp_mon_filter_setup_rx_pkt_log_cbf() - Setup the Rx pktlog cbf mode filter
- * in the radio object.
+ * dp_mon_filter_setup_rx_pkt_log_cbf_2_0() - Setup the Rx pktlog cbf mode
+ *                                            filter in the radio object.
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_setup_rx_pkt_log_cbf_2_0(struct dp_pdev *pdev);
 
 /**
- * dp_mon_filter_reset_rx_pktlog_cbf() - Reset the Rx pktlog cbf mode filter
+ * dp_mon_filter_reset_rx_pktlog_cbf_2_0() - Reset the Rx pktlog cbf mode filter
  * @pdev: DP pdev handle
  */
 void dp_mon_filter_reset_rx_pktlog_cbf_2_0(struct dp_pdev *pdev);

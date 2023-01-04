@@ -63,10 +63,10 @@ dp_mon_populate_ppdu_info_1_0(struct hal_rx_ppdu_info *hal_ppdu_info,
 	ppdu->punc_bw = 0;
 }
 
-/*
+/**
  * is_ppdu_txrx_capture_enabled() - API to check both pktlog and debug_sniffer
  *                              modes are enabled or not.
- * @dp_pdev: dp pdev handle.
+ * @pdev: dp pdev handle.
  *
  * Return: bool
  */
@@ -534,7 +534,7 @@ budget_done:
 
 /* MCL specific functions */
 #if defined(DP_CON_MON)
-/*
+/**
  * dp_mon_reap_timer_handler()- timer to reap monitor rings
  * reqd as we are not getting ppdu end interrupts
  * @arg: SoC Handle
@@ -816,8 +816,8 @@ QDF_STATUS dp_mon_htt_srng_setup_1_0(struct dp_soc *soc,
 /* MCL specific functions */
 #if defined(DP_CON_MON)
 
-/*
- * dp_service_mon_rings()- service monitor rings
+/**
+ * dp_service_mon_rings() - service monitor rings
  * @soc: soc dp handle
  * @quota: number of ring entry that can be serviced
  *
@@ -841,8 +841,8 @@ void dp_service_mon_rings(struct  dp_soc *soc, uint32_t quota)
 }
 #endif
 
-/*
- * dp_mon_peer_tx_init() – Initialize receive TID state in monitor peer
+/**
+ * dp_mon_peer_tx_init() - Initialize receive TID state in monitor peer
  * @pdev: Datapath pdev
  * @peer: Datapath peer
  *
@@ -857,8 +857,8 @@ dp_mon_peer_tx_init(struct dp_pdev *pdev, struct dp_peer *peer)
 	dp_peer_update_80211_hdr(peer->vdev, peer);
 }
 
-/*
- * dp_mon_peer_tx_cleanup() – Deinitialize receive TID state in monitor peer
+/**
+ * dp_mon_peer_tx_cleanup() - Deinitialize receive TID state in monitor peer
  * @vdev: Datapath vdev
  * @peer: Datapath peer
  *
@@ -940,7 +940,7 @@ static void dp_ppdu_desc_notify_1_0(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 
 	ppdu_desc = (struct cdp_tx_completion_ppdu *)qdf_nbuf_data(nbuf);
 
-	/**
+	/*
 	 * Deliver PPDU stats only for valid (acked) data
 	 * frames if sniffer mode is not enabled.
 	 * If sniffer mode is enabled, PPDU stats
@@ -971,7 +971,7 @@ static void dp_ppdu_desc_notify_1_0(struct dp_pdev *pdev, qdf_nbuf_t nbuf)
 #endif
 
 /**
- * dp_ppdu_stats_feat_enable_check_1_0 - Check if feature(s) is enabled to
+ * dp_ppdu_stats_feat_enable_check_1_0() - Check if feature(s) is enabled to
  *				consume ppdu stats from FW
  *
  * @pdev: Datapath pdev handle
@@ -990,12 +990,12 @@ static bool dp_ppdu_stats_feat_enable_check_1_0(struct dp_pdev *pdev)
 }
 
 /**
- * dp_mon_tx_stats_update_1_0 - Update Tx stats from HTT PPDU completion path
+ * dp_mon_tx_stats_update_1_0() - Update Tx stats from HTT PPDU completion path
  *
- * @monitor: Monitor peer
+ * @mon_peer: Monitor peer
  * @ppdu: Tx PPDU user completion info
  */
-void
+static void
 dp_mon_tx_stats_update_1_0(struct dp_mon_peer *mon_peer,
 			   struct cdp_tx_completion_ppdu_user *ppdu)
 {
@@ -1005,7 +1005,7 @@ dp_mon_tx_stats_update_1_0(struct dp_mon_peer *mon_peer,
 
 #ifndef QCA_SUPPORT_FULL_MON
 /**
- * dp_rx_mon_process () - Core brain processing for monitor mode
+ * dp_rx_mon_process() - Core brain processing for monitor mode
  *
  * This API processes monitor destination ring followed by monitor status ring
  * Called from bottom half (tasklet/NET_RX_SOFTIRQ)
@@ -1015,7 +1015,7 @@ dp_mon_tx_stats_update_1_0(struct dp_mon_peer *mon_peer,
  * @mac_id: mac_id on which interrupt is received
  * @quota: Number of status ring entry that can be serviced in one shot.
  *
- * @Return: Number of reaped status ring entries
+ * Return: Number of reaped status ring entries
  */
 static inline uint32_t
 dp_rx_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,

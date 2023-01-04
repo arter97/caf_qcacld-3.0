@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -130,7 +130,9 @@ struct dp_mon_desc_pool {
 	qdf_frag_cache_t pf_cache;
 };
 
-/**
+/*
+ * NB: intentionally not using kernel-doc comment because the kernel-doc
+ *     script does not handle the TAILQ_HEAD macro
  * struct dp_mon_pdev_be - BE specific monitor pdev object
  * @mon_pdev: monitor pdev structure
  * @filter_be: filters sent to fw
@@ -217,7 +219,7 @@ struct dp_mon_soc_be {
 /**
  * dp_mon_desc_pool_init() - Monitor descriptor pool init
  * @mon_desc_pool: mon desc pool
- * @pool_size
+ * @pool_size: Pool size
  *
  * Return: non-zero for failure, zero for success
  */
@@ -225,7 +227,7 @@ QDF_STATUS
 dp_mon_desc_pool_init(struct dp_mon_desc_pool *mon_desc_pool,
 		      uint32_t pool_size);
 
-/*
+/**
  * dp_mon_desc_pool_deinit()- monitor descriptor pool deinit
  * @mon_desc_pool: mon desc pool
  *
@@ -234,7 +236,7 @@ dp_mon_desc_pool_init(struct dp_mon_desc_pool *mon_desc_pool,
  */
 void dp_mon_desc_pool_deinit(struct dp_mon_desc_pool *mon_desc_pool);
 
-/*
+/**
  * dp_mon_desc_pool_free()- monitor descriptor pool free
  * @mon_desc_pool: mon desc pool
  *
@@ -245,19 +247,19 @@ void dp_mon_desc_pool_free(struct dp_mon_desc_pool *mon_desc_pool);
 
 /**
  * dp_mon_desc_pool_alloc() - Monitor descriptor pool alloc
- * @mon_desc_pool: mon desc pool
  * @pool_size: Pool size
+ * @mon_desc_pool: mon desc pool
  *
  * Return: non-zero for failure, zero for success
  */
 QDF_STATUS dp_mon_desc_pool_alloc(uint32_t pool_size,
 				  struct dp_mon_desc_pool *mon_desc_pool);
 
-/*
+/**
  * dp_mon_pool_frag_unmap_and_free() - free the mon desc frag called during
  *			    de-initialization of wifi module.
  *
- * @soc: DP soc handle
+ * @dp_soc: DP soc handle
  * @mon_desc_pool: monitor descriptor pool pointer
  *
  * Return: None
@@ -265,10 +267,10 @@ QDF_STATUS dp_mon_desc_pool_alloc(uint32_t pool_size,
 void dp_mon_pool_frag_unmap_and_free(struct dp_soc *dp_soc,
 				     struct dp_mon_desc_pool *mon_desc_pool);
 
-/*
+/**
  * dp_mon_buffers_replenish() - replenish monitor ring with nbufs
  *
- * @soc: core txrx main context
+ * @dp_soc: core txrx main context
  * @dp_mon_srng: dp monitor circular ring
  * @mon_desc_pool: Pointer to free mon descriptor pool
  * @num_req_buffers: number of buffer to be replenished
@@ -276,7 +278,7 @@ void dp_mon_pool_frag_unmap_and_free(struct dp_soc *dp_soc,
  *	       or NULL during dp rx initialization or out of buffer
  *	       interrupt.
  * @tail: tail of descs list
- * @relenish_cnt_ref: pointer to update replenish_cnt
+ * @replenish_cnt_ref: pointer to update replenish_cnt
  *
  * Return: return success or failure
  */
@@ -291,7 +293,7 @@ QDF_STATUS dp_mon_buffers_replenish(struct dp_soc *dp_soc,
 /**
  * dp_mon_filter_show_tx_filter_be() - Show the set filters
  * @mode: The filter modes
- * @tlv_filter: tlv filter
+ * @filter: tlv filter
  */
 void dp_mon_filter_show_tx_filter_be(enum dp_mon_filter_mode mode,
 				     struct dp_mon_filter_be *filter);
@@ -299,7 +301,7 @@ void dp_mon_filter_show_tx_filter_be(enum dp_mon_filter_mode mode,
 /**
  * dp_mon_filter_show_rx_filter_be() - Show the set filters
  * @mode: The filter modes
- * @tlv_filter: tlv filter
+ * @filter: tlv filter
  */
 void dp_mon_filter_show_rx_filter_be(enum dp_mon_filter_mode mode,
 				     struct dp_mon_filter_be *filter);
@@ -332,7 +334,7 @@ enum cdp_punctured_modes
 dp_mon_get_puncture_type(uint16_t puncture_pattern, uint8_t bw);
 #endif
 
-/*
+/**
  * dp_mon_desc_get() - get monitor sw descriptor
  *
  * @cookie: cookie
@@ -346,7 +348,7 @@ struct dp_mon_desc *dp_mon_desc_get(uint64_t *cookie)
 }
 
 /**
- * dp_rx_add_to_free_desc_list() - Adds to a local free descriptor list
+ * __dp_mon_add_to_free_desc_list() - Adds to a local free descriptor list
  *
  * @head: pointer to the head of local free list
  * @tail: pointer to the tail of local free list
@@ -376,7 +378,7 @@ void __dp_mon_add_to_free_desc_list(union dp_mon_desc_list_elem_t **head,
 #define dp_mon_add_to_free_desc_list(head, tail, new) \
 	__dp_mon_add_to_free_desc_list(head, tail, new, __func__)
 
-/*
+/**
  * dp_mon_add_desc_list_to_free_list() - append unused desc_list back to
  * freelist.
  *
@@ -393,7 +395,7 @@ dp_mon_add_desc_list_to_free_list(struct dp_soc *soc,
 				  struct dp_mon_desc_pool *mon_desc_pool);
 
 /**
- * dp_rx_mon_add_frag_to_skb () - Add page frag to skb
+ * dp_rx_mon_add_frag_to_skb() - Add page frag to skb
  *
  * @ppdu_info: PPDU status info
  * @nbuf: SKB to which frag need to be added
@@ -423,7 +425,8 @@ dp_rx_mon_add_frag_to_skb(struct hal_rx_ppdu_info *ppdu_info,
 
 #if defined(WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG) ||\
 	defined(WLAN_SUPPORT_RX_FLOW_TAG)
-/** dp_mon_rx_update_rx_err_protocol_tag_stats() - Update mon protocols's
+/**
+ * dp_mon_rx_update_rx_protocol_tag_stats() - Update mon protocols's
  *					      statistics from given protocol
  *					      type
  * @pdev: pdev handle
@@ -438,7 +441,7 @@ void dp_mon_rx_update_rx_protocol_tag_stats(struct dp_pdev *pdev,
 #if !defined(DISABLE_MON_CONFIG) && defined(QCA_MONITOR_2_0_SUPPORT)
 /**
  * dp_mon_get_context_size_be() - get BE specific size for mon pdev/soc
- * @arch_ops: arch ops pointer
+ * @context_type: context type for which the size is needed
  *
  * Return: size in bytes for the context_type
  */
@@ -471,7 +474,7 @@ struct dp_mon_soc_be *dp_get_be_mon_soc_from_dp_mon_soc(struct dp_mon_soc *soc)
 
 /**
  * dp_get_be_mon_pdev_from_dp_mon_pdev() - get dp_mon_pdev_be from dp_mon_pdev
- * @pdev: dp_mon_pdev pointer
+ * @mon_pdev: dp_mon_pdev pointer
  *
  * Return: dp_mon_pdev_be pointer
  */

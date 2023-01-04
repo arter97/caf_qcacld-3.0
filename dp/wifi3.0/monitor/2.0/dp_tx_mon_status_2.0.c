@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,15 +28,6 @@
 
 #define MAX_PPDU_INFO_LIST_DEPTH 64
 
-/**
- * dp_tx_mon_status_free_packet_buf() - API to free packet buffer
- * @pdev: pdev Handle
- * @status_frag: status frag
- * @end_offset: status fragment end offset
- * @mon_desc_list_ref: tx monitor descriptor list reference
- *
- * Return: void
- */
 void
 dp_tx_mon_status_free_packet_buf(struct dp_pdev *pdev,
 				 qdf_frag_t status_frag, uint32_t end_offset,
@@ -156,6 +147,7 @@ dp_tx_mon_status_queue_free(struct dp_pdev *pdev,
 
 /**
  * dp_tx_mon_enqueue_mpdu_nbuf() - API to enqueue nbuf from per user mpdu queue
+ * @pdev: pdev Handle
  * @tx_ppdu_info: pointer to tx ppdu info structure
  * @user_id: user index
  * @mpdu_nbuf: nbuf to be enqueue
@@ -1010,6 +1002,7 @@ dp_tx_mon_alloc_mpdu(struct dp_pdev *pdev, struct dp_tx_ppdu_info *tx_ppdu_info)
  * dp_tx_mon_generate_data_frm() - API to generate data frame
  * @pdev: pdev Handle
  * @tx_ppdu_info: pointer to tx ppdu info structure
+ * @take_ref:
  *
  * Return: void
  */
@@ -1446,9 +1439,9 @@ dp_tx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
+/**
  * dp_tx_mon_process_tlv_2_0() - API to parse PPDU worth information
- * @pdev_handle: DP_PDEV handle
+ * @pdev: DP_PDEV handle
  * @mon_desc_list_ref: tx monitor descriptor list reference
  *
  * Return: status
@@ -1662,15 +1655,6 @@ dp_tx_mon_process_tlv_2_0(struct dp_pdev *pdev,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * dp_tx_mon_update_end_reason() - API to update end reason
- *
- * @mon_pdev - DP_MON_PDEV handle
- * @ppdu_id - ppdu_id
- * @end_reason - monitor destination descriptor end reason
- *
- * Return: void
- */
 void dp_tx_mon_update_end_reason(struct dp_mon_pdev *mon_pdev,
 				 int ppdu_id, int end_reason)
 {
@@ -1686,19 +1670,6 @@ void dp_tx_mon_update_end_reason(struct dp_mon_pdev *mon_pdev,
 	tx_mon_be->be_end_reason_bitmap |= (1 << end_reason);
 }
 
-/*
- * dp_tx_mon_process_status_tlv() - API to processed TLV
- * invoked from interrupt handler
- *
- * @soc - DP_SOC handle
- * @pdev - DP_PDEV handle
- * @mon_ring_desc - descriptor status info
- * @addr - status buffer frag address
- * @end_offset - end offset of buffer that has valid buffer
- * @mon_desc_list_ref: tx monitor descriptor list reference
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS
 dp_tx_mon_process_status_tlv(struct dp_soc *soc,
 			     struct dp_pdev *pdev,
@@ -1812,19 +1783,6 @@ free_status_buffer:
 
 #else
 
-/**
- * dp_tx_mon_process_status_tlv() - API to processed TLV
- * invoked from interrupt handler
- *
- * @soc - DP_SOC handle
- * @pdev - DP_PDEV handle
- * @mon_ring_desc - descriptor status info
- * @addr - status buffer frag address
- * @end_offset - end offset of buffer that has valid buffer
- * @mon_desc_list_ref: tx monitor descriptor list reference
- *
- * Return: QDF_STATUS
- */
 QDF_STATUS
 dp_tx_mon_process_status_tlv(struct dp_soc *soc,
 			     struct dp_pdev *pdev,
@@ -1859,15 +1817,6 @@ dp_tx_mon_process_status_tlv(struct dp_soc *soc,
 	return QDF_STATUS_E_INVAL;
 }
 
-/**
- * dp_tx_mon_update_end_reason() - API to update end reason
- *
- * @mon_pdev - DP_MON_PDEV handle
- * @ppdu_id - ppdu_id
- * @end_reason - monitor destination descriptor end reason
- *
- * Return: void
- */
 void dp_tx_mon_update_end_reason(struct dp_mon_pdev *mon_pdev,
 				 int ppdu_id, int end_reason)
 {

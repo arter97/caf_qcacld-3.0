@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -20,7 +20,7 @@
 #ifndef _DP_MON_FILTER_H_
 #define _DP_MON_FILTER_H_
 
-/**
+/*
  * Accessor Macros to access the software
  * defined HTT filter htt_rx_ring_tlv_filter.
  */
@@ -96,7 +96,9 @@ struct dp_mon_filter {
 	struct htt_rx_ring_tlv_filter tlv_filter;
 };
 
-/**
+/*
+ * NB: intentionally not using kernel-doc comment because the kernel-doc
+ *     script does not handle the complex conditional compilation
  * enum dp_mon_filter_mode - Different modes for SRNG filters
  * @DP_MON_FILTER_ENHACHED_STATS_MODE: PPDU enhanced stats mode
  * @DP_MON_FILTER_SMART_MONITOR_MODE: Smart monitor mode
@@ -107,7 +109,9 @@ struct dp_mon_filter {
  * @DP_MON_FILTER_PKT_LOG_LITE_MODE: Packet log lite mode
  * @DP_MON_FILTER_PKT_LOG_CBF_MODE: Packet log cbf mode
  * @DP_MON_FILTER_PKT_LOG_HYBRID_MODE: Packet log hybrid mode
- * @DP_MON_FILTER_RX_UNDECODED_METADATA_CAPTURE_MODE: Undecoded frame capture
+ * @DP_MON_FILTER_UNDECODED_METADATA_CAPTURE_MODE: Undecoded frame capture
+ * @DP_MON_FILTER_LITE_MON_MODE:
+ * @DP_MON_FILTER_MAX_MODE: max filter mode
  */
 enum dp_mon_filter_mode {
 #ifdef QCA_ENHANCED_STATS_SUPPORT
@@ -163,8 +167,8 @@ enum dp_mon_filter_srng_type {
 /**
  * enum dp_mon_filter_action - Action for storing the filters
  * into the radio structure.
- * @DP_MON_FILTER_CLEAR - Clears the filter for a mode
- * @DP_MON_FILTER_SET - Set the filtes for a mode
+ * @DP_MON_FILTER_CLEAR: Clears the filter for a mode
+ * @DP_MON_FILTER_SET: Set the filtes for a mode
  */
 enum dp_mon_filter_action {
 	DP_MON_FILTER_CLEAR,
@@ -396,9 +400,9 @@ struct dp_mon_filter  **dp_mon_filter_alloc(struct dp_mon_pdev *mon_pdev);
 
 /**
  * dp_mon_filter_show_filter() - Show the set filters
- * @pdev: DP pdev handle
+ * @mon_pdev: DP pdev handle
  * @mode: The filter modes
- * @tlv_filter: tlv filter
+ * @filter: tlv filter
  */
 void dp_mon_filter_show_filter(struct dp_mon_pdev *mon_pdev,
 			       enum dp_mon_filter_mode mode,
@@ -430,7 +434,7 @@ dp_mon_filter_reset_mon_srng(struct dp_soc *soc, struct dp_pdev *pdev,
 
 /**
  * dp_mon_filter_set_mon_cmn() - Setp the common mon filters
- * @pdev: DP pdev handle
+ * @mon_pdev: DP pdev handle
  * @filter: DP mon filter
  *
  * Return: QDF_STATUS
@@ -440,7 +444,7 @@ void dp_mon_filter_set_mon_cmn(struct dp_mon_pdev *mon_pdev,
 
 /**
  * dp_mon_filter_set_status_cmn() - Setp the common status filters
- * @pdev: DP pdev handle
+ * @mon_pdev: DP pdev handle
  * @filter: Dp mon filters
  *
  * Return: QDF_STATUS
@@ -488,7 +492,7 @@ QDF_STATUS dp_tx_mon_filter_update(struct dp_pdev *pdev);
 /**
  * dp_mon_filter_dealloc() - Deallocate the filter objects to be stored in
  * the radio object.
- * @pdev: DP pdev handle
+ * @mon_pdev: DP pdev handle
  */
 void dp_mon_filter_dealloc(struct dp_mon_pdev *mon_pdev);
 
@@ -499,8 +503,8 @@ void dp_mon_filter_dealloc(struct dp_mon_pdev *mon_pdev);
  */
 struct dp_mon_filter **dp_mon_filter_alloc(struct dp_mon_pdev *mon_pdev);
 
-/*
- * dp_mon_filter_h2t_setup () - Setup filter
+/**
+ * dp_mon_filter_h2t_setup() - Setup filter
  * @soc: Dp soc handle
  * @pdev: pdev handle
  * @srng_type: srng type
@@ -511,7 +515,7 @@ void dp_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
 			     struct dp_mon_filter *filter);
 
 /**
- * dp_mon_ht2_rx_ring_cfg () - Configure filter to HW
+ * dp_mon_ht2_rx_ring_cfg() - Configure filter to HW
  * @soc: Dp soc handle
  * @pdev: Dp pdev handle
  * @srng_type: SRNG type

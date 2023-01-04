@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -23,7 +23,7 @@
 #include <dp_mon_filter.h>
 #include <dp_mon.h>
 
-/**
+/*
  * dp_mon_filter_mode_type_to_str
  * Monitor Filter mode to string
  */
@@ -135,13 +135,7 @@ dp_mon_set_fp_phy_err_filter(struct htt_rx_ring_tlv_filter *tlv_filter,
 {
 }
 #endif
-/**
- * dp_mon_filter_h2t_setup() - Setup the filter for the Target setup
- * @soc: DP soc handle
- * @pdev: DP pdev handle
- * @srng_type: The srng type for which filter will be set
- * @tlv_filter: tlv filter
- */
+
 void dp_mon_filter_h2t_setup(struct dp_soc *soc, struct dp_pdev *pdev,
 			     enum dp_mon_filter_srng_type srng_type,
 			     struct dp_mon_filter *filter)
@@ -733,11 +727,6 @@ void dp_mon_filter_set_cbf_cmn(struct dp_pdev *pdev,
 	filter->tlv_filter.enable_mo = 0;
 }
 
-/**
- * dp_mon_filter_dealloc() - Deallocate the filter objects to be stored in
- * the radio object.
- * @pdev: DP pdev handle
- */
 void dp_mon_filter_dealloc(struct dp_mon_pdev *mon_pdev)
 {
 	enum dp_mon_filter_mode mode;
@@ -774,11 +763,6 @@ void dp_mon_filter_dealloc(struct dp_mon_pdev *mon_pdev)
 	mon_pdev->filter = NULL;
 }
 
-/**
- * dp_mon_filter_alloc() - Allocate the filter objects to be stored in
- * the radio object.
- * @mon_pdev: Monitor pdev handle
- */
 struct dp_mon_filter **dp_mon_filter_alloc(struct dp_mon_pdev *mon_pdev)
 {
 	struct dp_mon_filter **mon_filter = NULL;

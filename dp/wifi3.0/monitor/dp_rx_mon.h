@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -69,11 +69,11 @@
 /**
  * enum dp_mon_reap_status - monitor status ring ppdu status
  *
- * @DP_MON_STATUS_NO_DMA - DMA not done for status ring entry
- * @DP_MON_STATUS_MATCH - status and dest ppdu id matches
- * @DP_MON_STATUS_LAG - status ppdu id is lagging
- * @DP_MON_STATUS_LEAD - status ppdu id is leading
- * @DP_MON_STATUS_REPLENISH - status ring entry is NULL
+ * @DP_MON_STATUS_NO_DMA: DMA not done for status ring entry
+ * @DP_MON_STATUS_MATCH: status and dest ppdu id matches
+ * @DP_MON_STATUS_LAG: status ppdu id is lagging
+ * @DP_MON_STATUS_LEAD: status ppdu id is leading
+ * @DP_MON_STATUS_REPLENISH: status ring entry is NULL
  */
 enum dp_mon_reap_status {
 	DP_MON_STATUS_NO_DMA,
@@ -83,7 +83,7 @@ enum dp_mon_reap_status {
 	DP_MON_STATUS_REPLENISH
 };
 
-/*
+/**
  * dp_rx_mon_status_process() - Process monitor status ring and
  *			TLV in status ring.
  *
@@ -91,20 +91,20 @@ enum dp_mon_reap_status {
  * @int_ctx: interrupt context
  * @mac_id: mac_id which is one of 3 mac_ids
  * @quota: No. of ring entry that can be serviced in one shot.
-
+ *
  * Return: uint32_t: No. of ring entry that is processed.
  */
 uint32_t
 dp_rx_mon_status_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 			 uint32_t mac_id, uint32_t quota);
 
-/*
+/**
  * dp_rx_populate_cbf_hdr - Send CBF frame with htt header
  * @soc: Datapath soc handle
  * @mac_id: Datapath mac id
  * @event: WDI event
- * @mpdu: mpdu buffer
- * @msdu_timesstamp: time stamp
+ * @data: mpdu buffer
+ * @msdu_timestamp: time stamp
  *
  * Return: QDF_STATUS
  */
@@ -113,7 +113,7 @@ QDF_STATUS dp_rx_populate_cbf_hdr(struct dp_soc *soc,
 				  qdf_nbuf_t data, uint32_t msdu_timestamp);
 
 /**
- * dp_rx_mon_handle_status_buf_done () - Handle DMA not done case for
+ * dp_rx_mon_handle_status_buf_done() - Handle DMA not done case for
  * monitor status ring
  *
  * @pdev: DP pdev handle
@@ -150,7 +150,7 @@ void dp_full_mon_attach(struct dp_pdev *pdev);
 void dp_full_mon_detach(struct dp_pdev *pdev);
 
 /**
- * dp_rx_mon_process ()- API to process monitor destination ring for
+ * dp_rx_mon_process()- API to process monitor destination ring for
  * full monitor mode
  *
  * @soc: dp soc handle
@@ -216,7 +216,8 @@ uint32_t dp_mon_process(struct dp_soc *soc, struct dp_intr *int_ctx,
 
 QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 	qdf_nbuf_t head_msdu, qdf_nbuf_t tail_msdu);
-/*
+
+/**
  * dp_rx_mon_deliver_non_std() - deliver frames for non standard path
  * @soc: core txrx main context
  * @mac_id: MAC ID
@@ -229,7 +230,7 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc, uint32_t mac_id,
 QDF_STATUS dp_rx_mon_deliver_non_std(struct dp_soc *soc, uint32_t mac_id);
 
 #ifndef REMOVE_MON_DBG_STATS
-/*
+/**
  * dp_rx_mon_update_dbg_ppdu_stats() - Update status ring TLV count
  * @ppdu_info: HAL RX PPDU info retrieved from status ring TLV
  * @rx_mon_stats: monitor mode status/destination ring PPDU and MPDU count
@@ -268,7 +269,7 @@ dp_rx_mon_update_dbg_ppdu_stats(struct hal_rx_ppdu_info *ppdu_info,
 	}
 }
 
-/*
+/**
  * dp_rx_mon_init_dbg_ppdu_stats() - initialization for monitor mode stats
  * @ppdu_info: HAL RX PPDU info retrieved from status ring TLV
  * @rx_mon_stats: monitor mode status/destination ring PPDU and MPDU count
@@ -305,7 +306,7 @@ dp_rx_populate_rx_rssi_chain(struct hal_rx_ppdu_info *ppdu_info,
 			     struct cdp_rx_indication_ppdu *cdp_rx_ppdu,
 			     struct dp_pdev *pdev);
 
-/*
+/**
  * dp_rx_populate_su_evm_details() - Populate su evm info
  * @ppdu_info: ppdu info structure from ppdu ring
  * @cdp_rx_ppdu: rx ppdu indication structure
@@ -442,6 +443,7 @@ dp_rx_mcopy_handle_last_mpdu(struct dp_soc *soc, struct dp_pdev *pdev,
 
 /**
  * dp_rx_mcopy_process_ppdu_info() - update mcopy ppdu info
+ * @pdev: pdev structure
  * @ppdu_info: structure for rx ppdu ring
  * @tlv_status: processed TLV status
  *
@@ -502,7 +504,8 @@ int
 dp_rx_handle_smart_mesh_mode(struct dp_soc *soc, struct dp_pdev *pdev,
 			      struct hal_rx_ppdu_info *ppdu_info,
 			      qdf_nbuf_t nbuf);
-/*
+
+/**
  * dp_rx_nbuf_prepare() - prepare RX nbuf
  * @soc: core txrx main context
  * @pdev: core txrx pdev context
@@ -517,7 +520,7 @@ dp_rx_nbuf_prepare(struct dp_soc *soc, struct dp_pdev *pdev);
 
 #if defined(WLAN_CFR_ENABLE) && defined(WLAN_ENH_CFR_ENABLE)
 
-/*
+/**
  * dp_rx_mon_handle_cfr_mu_info() - Gather macaddr and ast_index of peer(s) in
  * the PPDU received, this will be used for correlation of CFR data captured
  * for an UL-MU-PPDU
@@ -532,7 +535,7 @@ dp_rx_mon_handle_cfr_mu_info(struct dp_pdev *pdev,
 			     struct hal_rx_ppdu_info *ppdu_info,
 			     struct cdp_rx_indication_ppdu *cdp_rx_ppdu);
 
-/*
+/**
  * dp_rx_mon_populate_cfr_ppdu_info() - Populate cdp ppdu info from hal ppdu
  * info
  * @pdev: pdev ctx
@@ -555,7 +558,7 @@ dp_rx_mon_populate_cfr_ppdu_info(struct dp_pdev *pdev,
 bool
 dp_cfr_rcc_mode_status(struct dp_pdev *pdev);
 
-/*
+/**
  * dp_rx_mon_populate_cfr_info() - Populate cdp ppdu info from hal cfr info
  * @pdev: pdev ctx
  * @ppdu_info: ppdu info structure from ppdu ring
@@ -579,7 +582,7 @@ void
 dp_update_cfr_dbg_stats(struct dp_pdev *pdev,
 			struct hal_rx_ppdu_info *ppdu_info);
 
-/*
+/**
  * dp_rx_handle_cfr() - Gather cfr info from hal ppdu info
  * @soc: core txrx main context
  * @pdev: pdev ctx
@@ -653,7 +656,7 @@ dp_cfr_rcc_mode_status(struct dp_pdev *pdev)
 }
 #endif /* WLAN_CFR_ENABLE && WLAN_ENH_CFR_ENABLE */
 
-/*
+/**
  * dp_rx_mon_deliver(): function to deliver packets to stack
  * @soc: DP soc
  * @mac_id: MAC ID
@@ -668,15 +671,15 @@ QDF_STATUS dp_rx_mon_deliver(struct dp_soc *soc,
 			     qdf_nbuf_t tail_msdu);
 
 /**
-* dp_rx_mon_deliver_non_std()
-* @soc: core txrx main context
-* @mac_id: MAC ID
-*
-* This function delivers the radio tap and dummy MSDU
-* into user layer application for preamble only PPDU.
-*
-* Return: QDF_STATUS
-*/
+ * dp_rx_mon_deliver_non_std()
+ * @soc: core txrx main context
+ * @mac_id: MAC ID
+ *
+ * This function delivers the radio tap and dummy MSDU
+ * into user layer application for preamble only PPDU.
+ *
+ * Return: QDF_STATUS
+ */
 QDF_STATUS dp_rx_mon_deliver_non_std(struct dp_soc *soc,
 				     uint32_t mac_id);
 
@@ -730,7 +733,7 @@ qdf_frag_t dp_rx_mon_get_nbuf_80211_hdr(qdf_nbuf_t nbuf)
 }
 #endif
 
-/*
+/**
  * dp_rx_mon_process_dest_pktlog(): function to log packet contents to
  * pktlog buffer and send to pktlog module
  * @soc: DP soc

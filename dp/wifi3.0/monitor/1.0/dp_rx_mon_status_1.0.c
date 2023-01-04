@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -47,7 +47,7 @@ QDF_STATUS dp_rx_mon_status_buffers_replenish(struct dp_soc *dp_soc,
 					      uint8_t owner);
 
 /**
- * dp_rx_mon_handle_status_buf_done () - Handle status buf DMA not done
+ * dp_rx_mon_handle_status_buf_done() - Handle status buf DMA not done
  *
  * @pdev: DP pdev handle
  * @mon_status_srng: Monitor status SRNG

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -104,9 +104,9 @@ QDF_STATUS
 dp_rx_mon_buf_desc_pool_alloc(struct dp_soc *soc);
 
 /**
- * dp_rx_mon_stats_update_2_0 () - update rx stats
+ * dp_rx_mon_stats_update_2_0() - update rx stats
  *
- * @peer: monitor peer handle
+ * @mon_peer: monitor peer handle
  * @ppdu: Rx PPDU status metadata object
  * @ppdu_user: Rx PPDU user status metadata object
  *
@@ -117,7 +117,7 @@ void dp_rx_mon_stats_update_2_0(struct dp_mon_peer *mon_peer,
 				struct cdp_rx_stats_ppdu_user *ppdu_user);
 
 /**
- * dp_rx_mon_populate_ppdu_usr_info_2_0 () - Populate ppdu user info
+ * dp_rx_mon_populate_ppdu_usr_info_2_0() - Populate ppdu user info
  *
  * @rx_user_status: Rx user status
  * @ppdu_user: ppdu user metadata
@@ -129,7 +129,7 @@ dp_rx_mon_populate_ppdu_usr_info_2_0(struct mon_rx_user_status *rx_user_status,
 				     struct cdp_rx_stats_ppdu_user *ppdu_user);
 
 /**
- * dp_rx_mon_populate_ppdu_info_2_0 () --  Populate ppdu info
+ * dp_rx_mon_populate_ppdu_info_2_0() --  Populate ppdu info
  *
  * @hal_ppdu_info: HAL PPDU info
  * @ppdu: Rx PPDU status metadata object
@@ -140,7 +140,7 @@ void
 dp_rx_mon_populate_ppdu_info_2_0(struct hal_rx_ppdu_info *hal_ppdu_info,
 				 struct cdp_rx_indication_ppdu *ppdu);
 
-/*
+/**
  * dp_rx_process_pktlog_be() - process pktlog
  * @soc: dp soc handle
  * @pdev: dp pdev handle
@@ -148,7 +148,7 @@ dp_rx_mon_populate_ppdu_info_2_0(struct hal_rx_ppdu_info *hal_ppdu_info,
  * @status_frag: frag pointer which needs to be added to nbuf
  * @end_offset: Offset in frag to be added to nbuf_frags
  *
- * Return: SUCCESS or Failure
+ * Return: QDF_STATUS_SUCCESS or Failure
  */
 QDF_STATUS dp_rx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
 				   struct hal_rx_ppdu_info *ppdu_info,
@@ -156,7 +156,7 @@ QDF_STATUS dp_rx_process_pktlog_be(struct dp_soc *soc, struct dp_pdev *pdev,
 
 #if !defined(DISABLE_MON_CONFIG)
 /*
- * dp_rx_mon_process_2_0 () - Process Rx monitor interrupt
+ * dp_rx_mon_process_2_0() - Process Rx monitor interrupt
  *
  * @soc: DP soc handle
  * @int_ctx: Interrupt context
@@ -168,7 +168,7 @@ dp_rx_mon_process_2_0(struct dp_soc *soc, struct dp_intr *int_ctx,
 		      uint32_t mac_id, uint32_t quota);
 
 /**
- * dp_rx_mon_process_ppdu () - RxMON Workqueue processing API
+ * dp_rx_mon_process_ppdu() - RxMON Workqueue processing API
  *
  * @context: workqueue context
  */
@@ -215,7 +215,7 @@ void dp_rx_mon_drain_wq(struct dp_pdev *pdev);
  * @mon_pdev: monitor pdev
  * @nbuf: SKB to be freed
  *
- * @Return: void
+ * Return: void
  */
 void
 dp_mon_free_parent_nbuf(struct dp_mon_pdev *mon_pdev,
@@ -234,7 +234,7 @@ void dp_rx_mon_shift_pf_tag_in_headroom(qdf_nbuf_t nbuf, struct dp_soc *soc)
 }
 #endif /* WLAN_SUPPORT_RX_PROTOCOL_TYPE_TAG */
 /**
- * dp_mon_rx_print_advanced_stats_2_0 () - print advanced monitor statistics
+ * dp_mon_rx_print_advanced_stats_2_0() - print advanced monitor statistics
  *
  * @soc: DP soc handle
  * @pdev: DP pdev handle

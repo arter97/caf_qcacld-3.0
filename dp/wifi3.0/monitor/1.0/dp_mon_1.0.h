@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -71,7 +71,7 @@ struct dp_mon_pdev_li {
 
 /**
  * dp_mon_get_context_size_li() - get LI specific size for mon pdev/soc
- * @arch_ops: arch ops pointer
+ * @context_type: context type for which the size is needed
  *
  * Return: size in bytes for the context_type
  */

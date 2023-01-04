@@ -56,7 +56,7 @@ void dp_rx_pdev_mon_desc_pool_free(struct dp_pdev *pdev);
  *	Called from the bottom half (tasklet/NET_RX_SOFTIRQ)
  * @soc: core txrx main context
  * @int_ctx: interrupt context
- * @hal_ring: opaque pointer to the HAL Rx Ring, which will be serviced
+ * @mac_id: mac id
  * @quota: No. of units (packets) that can be serviced in one shot.
  *
  * This function implements the core of Rx functionality. This is
@@ -122,9 +122,9 @@ dp_mon_dest_srng_drop_for_mac(struct dp_pdev *pdev, uint32_t mac_id);
 
 /**
  * dp_rxdma_err_process() - RxDMA error processing functionality
+ * @int_ctx: interrupt context
  * @soc: core txrx main context
- * @mac_id: mac id which is one of 3 mac_ids
- * @hal_ring: opaque pointer to the HAL Rx Ring, which will be serviced
+ * @mac_id: mac id
  * @quota: No. of units (packets) that can be serviced in one shot.
  *
  * Return: num of buffers processed
@@ -147,6 +147,8 @@ void dp_mon_buf_delayed_replenish(struct dp_pdev *pdev);
  *
  * @dp_pdev: core txrx pdev context
  * @buf_addr_info: void pointer to monitor link descriptor buf addr info
+ * @mac_id: mac id which is one of 3 mac_ids
+ *
  * Return: QDF_STATUS
  */
 QDF_STATUS
@@ -249,6 +251,9 @@ void dp_rx_mon_frag_adjust_frag_len(uint32_t *total_len, uint32_t *frag_len,
 
 /**
  * DP_RX_MON_GET_NBUF_FROM_DESC() - Get nbuf from desc
+ * @rx_desc: RX descriptor
+ *
+ * Return: nbuf address
  */
 #define DP_RX_MON_GET_NBUF_FROM_DESC(rx_desc) \
 	NULL
@@ -290,6 +295,9 @@ dp_rx_mon_add_msdu_to_list_failure_handler(void *rx_tlv_hdr,
 
 /**
  * dp_rx_mon_get_paddr_from_desc() - Get paddr from desc
+ * @rx_desc: RX descriptor
+ *
+ * Return: Physical address of the buffer
  */
 static inline
 qdf_dma_addr_t dp_rx_mon_get_paddr_from_desc(struct dp_rx_desc *rx_desc)
@@ -299,6 +307,9 @@ qdf_dma_addr_t dp_rx_mon_get_paddr_from_desc(struct dp_rx_desc *rx_desc)
 
 /**
  * DP_RX_MON_IS_BUFFER_ADDR_NULL() - Is Buffer received from hw is NULL
+ * @rx_desc: RX descriptor
+ *
+ * Return: true if the buffer is NULL, otherwise false
  */
 #define DP_RX_MON_IS_BUFFER_ADDR_NULL(rx_desc) \
 	(!(rx_desc->rx_buf_start))
@@ -377,19 +388,20 @@ QDF_STATUS dp_rx_mon_alloc_parent_buffer(qdf_nbuf_t *head_msdu)
 
 /**
  * dp_rx_mon_parse_desc_buffer() - Parse desc buffer based.
+ * @dp_soc:             struct dp_soc*
+ * @msdu_info:          struct hal_rx_msdu_desc_info*
+ * @is_frag_p:          is_frag *
+ * @total_frag_len_p:   Remaining frag len to be updated
+ * @frag_len_p:         frag len
+ * @l2_hdr_offset_p:    l2 hdr offset
+ * @rx_desc_tlv:        rx_desc_tlv
+ * @first_rx_desc_tlv:
+ * @is_frag_non_raw_p:  Non raw frag
+ * @data:               NBUF Data
  *
  * Below code will parse desc buffer, handle continuation frame,
  * adjust frag length and update l2_hdr_padding
  *
- * @soc                : struct dp_soc*
- * @msdu_info          : struct hal_rx_msdu_desc_info*
- * @is_frag_p          : is_frag *
- * @total_frag_len_p   : Remaining frag len to be updated
- * @frag_len_p         : frag len
- * @l2_hdr_offset_p    : l2 hdr offset
- * @rx_desc_tlv        : rx_desc_tlv
- * @is_frag_non_raw_p  : Non raw frag
- * @data               : NBUF Data
  */
 static inline void
 dp_rx_mon_parse_desc_buffer(struct dp_soc *dp_soc,
@@ -511,6 +523,8 @@ dp_rx_mon_parse_desc_buffer(struct dp_soc *dp_soc,
 
 /**
  * dp_rx_mon_buffer_set_pktlen() - set pktlen for buffer
+ * @msdu: MSDU
+ * @size: MSDU size
  */
 static inline void dp_rx_mon_buffer_set_pktlen(qdf_nbuf_t msdu, uint32_t size)
 {
@@ -878,8 +892,8 @@ uint8_t *dp_rx_mon_get_buffer_data(struct dp_rx_desc *rx_desc)
 /**
  * dp_rx_cookie_2_mon_link_desc() - Retrieve Link descriptor based on target
  * @pdev: core physical device context
- * @hal_buf_info: structure holding the buffer info
- * mac_id: mac number
+ * @buf_info: structure holding the buffer info
+ * @mac_id: mac number
  *
  * Return: link descriptor address
  */
@@ -899,7 +913,8 @@ void *dp_rx_cookie_2_mon_link_desc(struct dp_pdev *pdev,
  * dp_rx_monitor_link_desc_return() - Return Link descriptor based on target
  * @pdev: core physical device context
  * @p_last_buf_addr_info: MPDU Link descriptor
- * mac_id: mac number
+ * @mac_id: mac number
+ * @bm_action:
  *
  * Return: QDF_STATUS
  */
