@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -458,16 +458,6 @@ QDF_STATUS policy_mgr_update_and_wait_for_connection_update(
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * policy_mgr_is_dbs_allowed_for_concurrency() - If dbs is allowed for current
- * concurreny
- * @new_conn_mode: new connection mode
- *
- * When a new connection is about to come up, check if dbs is allowed for
- * STA+STA or STA+P2P
- *
- * Return: true if dbs is allowed for STA+STA or STA+P2P else false
- */
 bool policy_mgr_is_dbs_allowed_for_concurrency(
 		struct wlan_objmgr_psoc *psoc, enum QDF_OPMODE new_conn_mode)
 {
@@ -2699,17 +2689,6 @@ policy_mgr_valid_sap_conc_channel_check(struct wlan_objmgr_psoc *psoc,
 	return QDF_STATUS_SUCCESS;
 }
 
-/**
- * policy_mgr_check_concurrent_intf_and_restart_sap() - Check
- * concurrent change intf
- * @psoc: PSOC object information
- * @operation_channel: operation channel
- * @vdev_id: vdev id of SAP
- *
- * Checks the concurrent change interface and restarts SAP
- *
- * Return: None
- */
 void policy_mgr_check_concurrent_intf_and_restart_sap(
 		struct wlan_objmgr_psoc *psoc)
 {

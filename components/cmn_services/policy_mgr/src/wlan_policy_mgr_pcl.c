@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -397,7 +397,7 @@ void policy_mgr_decr_session_set_pcl(struct wlan_objmgr_psoc *psoc,
 /**
  * policy_mgr_update_valid_ch_freq_list() - Update policy manager valid ch list
  * @pm_ctx: policy manager context data
- * @ch_list: Regulatory channel list
+ * @reg_ch_list: Regulatory channel list
  * @is_client: true if caller is a client, false if it is a beaconing entity
  *
  * When regulatory component channel list is updated this internal function is
@@ -2373,7 +2373,7 @@ policy_mgr_get_index_for_ml_sta_sap_dbs(
 }
 
 /**
- * policy_mgr_get_index_for_ml_sta_sap_sbs() - Find the index for next
+ * policy_mgr_get_index_for_ml_sta_sap_hwmode_sbs() - Find the index for next
  * connection for ML STA + SAP, in case current HW mode is SBS but ML STA is
  * with 2 GHz + 5/6 GHz.
  * @pm_ctx: policy manager context
