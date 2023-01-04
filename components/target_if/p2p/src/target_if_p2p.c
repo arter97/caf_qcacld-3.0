@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -49,8 +49,8 @@ target_if_p2p_lo_register_tx_ops(struct wlan_lmac_if_p2p_tx_ops *p2p_tx_ops)
 /**
  * target_p2p_lo_event_handler() - WMI callback for lo stop event
  * @scn:       pointer to scn
- * @event_buf: event buffer
- * @len:       buffer length
+ * @data:      event buffer
+ * @datalen:   buffer length
  *
  * This function gets called from WMI when triggered wmi event
  * wmi_p2p_lo_stop_event_id.
@@ -203,8 +203,8 @@ target_if_p2p_lo_register_tx_ops(struct wlan_lmac_if_p2p_tx_ops *p2p_tx_ops)
 /**
  * target_p2p_noa_event_handler() - WMI callback for noa event
  * @scn:       pointer to scn
- * @event_buf: event buffer
- * @len:       buffer length
+ * @data:      event buffer
+ * @datalen:   buffer length
  *
  * This function gets called from WMI when triggered WMI event
  * wmi_p2p_noa_event_id.
