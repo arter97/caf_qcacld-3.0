@@ -394,11 +394,11 @@ void DP_PRINT_STATS(const char *fmt, ...)
 	va_end(val);
 }
 #endif /* WLAN_SYSFS_DP_STATS */
-/*
- * dp_print_stats_string_tlv: display htt_stats_string_tlv
+/**
+ * dp_print_stats_string_tlv() - display htt_stats_string_tlv
  * @tag_buf: buffer containing the tlv htt_stats_string_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_stats_string_tlv(uint32_t *tag_buf)
 {
@@ -425,11 +425,11 @@ static void dp_print_stats_string_tlv(uint32_t *tag_buf)
 	qdf_mem_free(data);
 }
 
-/*
- * dp_print_tx_pdev_stats_cmn_tlv: display htt_tx_pdev_stats_cmn_tlv
+/**
+ * dp_print_tx_pdev_stats_cmn_tlv() - display htt_tx_pdev_stats_cmn_tlv
  * @tag_buf: buffer containing the tlv htt_tx_pdev_stats_cmn_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_stats_cmn_tlv(uint32_t *tag_buf)
 {
@@ -519,11 +519,11 @@ static void dp_print_tx_pdev_stats_cmn_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->coex_abort_mpdu_cnt);
 }
 
-/*
- * dp_print_tx_pdev_stats_urrn_tlv_v: display htt_tx_pdev_stats_urrn_tlv_v
+/**
+ * dp_print_tx_pdev_stats_urrn_tlv_v() - display htt_tx_pdev_stats_urrn_tlv_v
  * @tag_buf: buffer containing the tlv htt_tx_pdev_stats_urrn_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_stats_urrn_tlv_v(uint32_t *tag_buf)
 {
@@ -550,11 +550,11 @@ static void dp_print_tx_pdev_stats_urrn_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(urrn_stats);
 }
 
-/*
- * dp_print_tx_pdev_stats_flush_tlv_v: display htt_tx_pdev_stats_flush_tlv_v
+/**
+ * dp_print_tx_pdev_stats_flush_tlv_v() - display htt_tx_pdev_stats_flush_tlv_v
  * @tag_buf: buffer containing the tlv htt_tx_pdev_stats_flush_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_stats_flush_tlv_v(uint32_t *tag_buf)
 {
@@ -583,11 +583,11 @@ static void dp_print_tx_pdev_stats_flush_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(flush_errs);
 }
 
-/*
- * dp_print_tx_pdev_stats_sifs_tlv_v: display htt_tx_pdev_stats_sifs_tlv_v
+/**
+ * dp_print_tx_pdev_stats_sifs_tlv_v() - display htt_tx_pdev_stats_sifs_tlv_v
  * @tag_buf: buffer containing the tlv htt_tx_pdev_stats_sifs_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_stats_sifs_tlv_v(uint32_t *tag_buf)
 {
@@ -615,11 +615,11 @@ static void dp_print_tx_pdev_stats_sifs_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(sifs_status);
 }
 
-/*
- * dp_print_tx_pdev_stats_phy_err_tlv_v: display htt_tx_pdev_stats_phy_err_tlv_v
+/**
+ * dp_print_tx_pdev_stats_phy_err_tlv_v() - display htt_tx_pdev_stats_phy_err_tlv_v
  * @tag_buf: buffer containing the tlv htt_tx_pdev_stats_phy_err_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_stats_phy_err_tlv_v(uint32_t *tag_buf)
 {
@@ -647,11 +647,11 @@ static void dp_print_tx_pdev_stats_phy_err_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(phy_errs);
 }
 
-/*
- * dp_print_hw_stats_intr_misc_tlv: display htt_hw_stats_intr_misc_tlv
+/**
+ * dp_print_hw_stats_intr_misc_tlv() - display htt_hw_stats_intr_misc_tlv
  * @tag_buf: buffer containing the tlv htt_hw_stats_intr_misc_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_hw_stats_intr_misc_tlv(uint32_t *tag_buf)
 {
@@ -680,11 +680,11 @@ static void dp_print_hw_stats_intr_misc_tlv(uint32_t *tag_buf)
 	qdf_mem_free(hw_intr_name);
 }
 
-/*
- * dp_print_hw_stats_wd_timeout_tlv: display htt_hw_stats_wd_timeout_tlv
+/**
+ * dp_print_hw_stats_wd_timeout_tlv() - display htt_hw_stats_wd_timeout_tlv
  * @tag_buf: buffer containing the tlv htt_hw_stats_wd_timeout_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_hw_stats_wd_timeout_tlv(uint32_t *tag_buf)
 {
@@ -711,11 +711,11 @@ static void dp_print_hw_stats_wd_timeout_tlv(uint32_t *tag_buf)
 	qdf_mem_free(hw_module_name);
 }
 
-/*
- * dp_print_hw_stats_pdev_errs_tlv: display htt_hw_stats_pdev_errs_tlv
+/**
+ * dp_print_hw_stats_pdev_errs_tlv() - display htt_hw_stats_pdev_errs_tlv
  * @tag_buf: buffer containing the tlv htt_hw_stats_pdev_errs_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_hw_stats_pdev_errs_tlv(uint32_t *tag_buf)
 {
@@ -747,11 +747,11 @@ static void dp_print_hw_stats_pdev_errs_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->rx_timeout_reset);
 }
 
-/*
- * dp_print_msdu_flow_stats_tlv: display htt_msdu_flow_stats_tlv
+/**
+ * dp_print_msdu_flow_stats_tlv() - display htt_msdu_flow_stats_tlv
  * @tag_buf: buffer containing the tlv htt_msdu_flow_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_msdu_flow_stats_tlv(uint32_t *tag_buf)
 {
@@ -775,11 +775,11 @@ static void dp_print_msdu_flow_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->tx_flow_no__tid_num__drop_rule);
 }
 
-/*
- * dp_print_tx_tid_stats_tlv: display htt_tx_tid_stats_tlv
+/**
+ * dp_print_tx_tid_stats_tlv() - display htt_tx_tid_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_tid_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tid_stats_tlv(uint32_t *tag_buf)
 {
@@ -830,11 +830,11 @@ static void dp_print_tx_tid_stats_tlv(uint32_t *tag_buf)
 	qdf_mem_free(tid_name);
 }
 
-/*
- * dp_print_tx_tid_stats_v1_tlv: display htt_tx_tid_stats_v1_tlv
+/**
+ * dp_print_tx_tid_stats_v1_tlv() - display htt_tx_tid_stats_v1_tlv
  * @tag_buf: buffer containing the tlv htt_tx_tid_stats_v1_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tid_stats_v1_tlv(uint32_t *tag_buf)
 {
@@ -885,11 +885,11 @@ static void dp_print_tx_tid_stats_v1_tlv(uint32_t *tag_buf)
 	qdf_mem_free(tid_name);
 }
 
-/*
- * dp_print_rx_tid_stats_tlv: display htt_rx_tid_stats_tlv
+/**
+ * dp_print_rx_tid_stats_tlv() - display htt_rx_tid_stats_tlv
  * @tag_buf: buffer containing the tlv htt_rx_tid_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_tid_stats_tlv(uint32_t *tag_buf)
 {
@@ -924,11 +924,11 @@ static void dp_print_rx_tid_stats_tlv(uint32_t *tag_buf)
 	qdf_mem_free(tid_name);
 }
 
-/*
- * dp_print_counter_tlv: display htt_counter_tlv
+/**
+ * dp_print_counter_tlv() - display htt_counter_tlv
  * @tag_buf: buffer containing the tlv htt_counter_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_counter_tlv(uint32_t *tag_buf)
 {
@@ -955,11 +955,11 @@ static void dp_print_counter_tlv(uint32_t *tag_buf)
 	qdf_mem_free(counter_name);
 }
 
-/*
- * dp_print_peer_stats_cmn_tlv: display htt_peer_stats_cmn_tlv
+/**
+ * dp_print_peer_stats_cmn_tlv() - display htt_peer_stats_cmn_tlv
  * @tag_buf: buffer containing the tlv htt_peer_stats_cmn_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_peer_stats_cmn_tlv(uint32_t *tag_buf)
 {
@@ -983,11 +983,11 @@ static void dp_print_peer_stats_cmn_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->inactive_time);
 }
 
-/*
- * dp_print_peer_details_tlv: display htt_peer_details_tlv
+/**
+ * dp_print_peer_details_tlv() - display htt_peer_details_tlv
  * @tag_buf: buffer containing the tlv htt_peer_details_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_peer_details_tlv(uint32_t *tag_buf)
 {
@@ -1011,11 +1011,11 @@ static void dp_print_peer_details_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->qpeer_flags);
 }
 
-/*
- * dp_print_tx_peer_rate_stats_tlv: display htt_tx_peer_rate_stats_tlv
+/**
+ * dp_print_tx_peer_rate_stats_tlv() - display htt_tx_peer_rate_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_peer_rate_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_peer_rate_stats_tlv(uint32_t *tag_buf)
 {
@@ -1182,11 +1182,11 @@ fail1:
 	qdf_mem_free(str_buf);
 }
 
-/*
- * dp_print_rx_peer_rate_stats_tlv: display htt_rx_peer_rate_stats_tlv
+/**
+ * dp_print_rx_peer_rate_stats_tlv() - display htt_rx_peer_rate_stats_tlv
  * @tag_buf: buffer containing the tlv htt_rx_peer_rate_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_peer_rate_stats_tlv(uint32_t *tag_buf)
 {
@@ -1352,11 +1352,11 @@ fail1:
 	qdf_mem_free(str_buf);
 }
 
-/*
- * dp_print_tx_hwq_mu_mimo_sch_stats_tlv: display htt_tx_hwq_mu_mimo_sch_stats
+/**
+ * dp_print_tx_hwq_mu_mimo_sch_stats_tlv() - display htt_tx_hwq_mu_mimo_sch_stats
  * @tag_buf: buffer containing the tlv htt_tx_hwq_mu_mimo_sch_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_hwq_mu_mimo_sch_stats_tlv(uint32_t *tag_buf)
 {
@@ -1372,11 +1372,11 @@ static void dp_print_tx_hwq_mu_mimo_sch_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->mu_mimo_ppdu_posted);
 }
 
-/*
- * dp_print_tx_hwq_mu_mimo_mpdu_stats_tlv: display htt_tx_hwq_mu_mimo_mpdu_stats
+/**
+ * dp_print_tx_hwq_mu_mimo_mpdu_stats_tlv() - display htt_tx_hwq_mu_mimo_mpdu_stats
  * @tag_buf: buffer containing the tlv htt_tx_hwq_mu_mimo_mpdu_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_hwq_mu_mimo_mpdu_stats_tlv(uint32_t *tag_buf)
 {
@@ -1400,11 +1400,11 @@ static void dp_print_tx_hwq_mu_mimo_mpdu_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->mu_mimo_ampdu_underrun_usr);
 }
 
-/*
- * dp_print_tx_hwq_mu_mimo_cmn_stats_tlv: display htt_tx_hwq_mu_mimo_cmn_stats
+/**
+ * dp_print_tx_hwq_mu_mimo_cmn_stats_tlv() - display htt_tx_hwq_mu_mimo_cmn_stats
  * @tag_buf: buffer containing the tlv htt_tx_hwq_mu_mimo_cmn_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static inline void dp_print_tx_hwq_mu_mimo_cmn_stats_tlv(uint32_t *tag_buf)
 {
@@ -1416,11 +1416,11 @@ static inline void dp_print_tx_hwq_mu_mimo_cmn_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->mac_id__hwq_id__word);
 }
 
-/*
- * dp_print_tx_hwq_stats_cmn_tlv: display htt_tx_hwq_stats_cmn_tlv
+/**
+ * dp_print_tx_hwq_stats_cmn_tlv() - display htt_tx_hwq_stats_cmn_tlv
  * @tag_buf: buffer containing the tlv htt_tx_hwq_stats_cmn_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_hwq_stats_cmn_tlv(uint32_t *tag_buf)
 {
@@ -1470,12 +1470,12 @@ static void dp_print_tx_hwq_stats_cmn_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->false_mpdu_ack_count);
 }
 
-/*
- * dp_print_tx_hwq_difs_latency_stats_tlv_v: display
- *					htt_tx_hwq_difs_latency_stats_tlv_v
+/**
+ * dp_print_tx_hwq_difs_latency_stats_tlv_v() -
+ *			display htt_tx_hwq_difs_latency_stats_tlv_v
  * @tag_buf: buffer containing the tlv htt_tx_hwq_difs_latency_stats_tlv_v
  *
- *return:void
+ * Return: void
  */
 static void dp_print_tx_hwq_difs_latency_stats_tlv_v(uint32_t *tag_buf)
 {
@@ -1508,11 +1508,11 @@ static void dp_print_tx_hwq_difs_latency_stats_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(difs_latency_hist);
 }
 
-/*
- * dp_print_tx_hwq_cmd_result_stats_tlv_v: display htt_tx_hwq_cmd_result_stats
+/**
+ * dp_print_tx_hwq_cmd_result_stats_tlv_v() - display htt_tx_hwq_cmd_result_stats
  * @tag_buf: buffer containing the tlv htt_tx_hwq_cmd_result_stats_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_hwq_cmd_result_stats_tlv_v(uint32_t *tag_buf)
 {
@@ -1540,11 +1540,11 @@ static void dp_print_tx_hwq_cmd_result_stats_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(cmd_result);
 }
 
-/*
- * dp_print_tx_hwq_cmd_stall_stats_tlv_v: display htt_tx_hwq_cmd_stall_stats_tlv
+/**
+ * dp_print_tx_hwq_cmd_stall_stats_tlv_v() - display htt_tx_hwq_cmd_stall_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_hwq_cmd_stall_stats_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_hwq_cmd_stall_stats_tlv_v(uint32_t *tag_buf)
 {
@@ -1573,11 +1573,11 @@ static void dp_print_tx_hwq_cmd_stall_stats_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(cmd_stall_status);
 }
 
-/*
- * dp_print_tx_hwq_fes_result_stats_tlv_v: display htt_tx_hwq_fes_result_stats
+/**
+ * dp_print_tx_hwq_fes_result_stats_tlv_v() - display htt_tx_hwq_fes_result_stats
  * @tag_buf: buffer containing the tlv htt_tx_hwq_fes_result_stats_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_hwq_fes_result_stats_tlv_v(uint32_t *tag_buf)
 {
@@ -1605,11 +1605,11 @@ static void dp_print_tx_hwq_fes_result_stats_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(fes_result);
 }
 
-/*
- * dp_print_tx_selfgen_cmn_stats_tlv: display htt_tx_selfgen_cmn_stats_tlv
+/**
+ * dp_print_tx_selfgen_cmn_stats_tlv() - display htt_tx_selfgen_cmn_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_selfgen_cmn_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_selfgen_cmn_stats_tlv(uint32_t *tag_buf)
 {
@@ -1642,11 +1642,11 @@ static void dp_print_tx_selfgen_cmn_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->delayed_bar_7);
 }
 
-/*
- * dp_print_tx_selfgen_ac_stats_tlv: display htt_tx_selfgen_ac_stats_tlv
+/**
+ * dp_print_tx_selfgen_ac_stats_tlv() - display htt_tx_selfgen_ac_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_selfgen_ac_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_selfgen_ac_stats_tlv(uint32_t *tag_buf)
 {
@@ -1670,11 +1670,11 @@ static void dp_print_tx_selfgen_ac_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->ac_mu_mimo_brpoll_3);
 }
 
-/*
- * dp_print_tx_selfgen_ax_stats_tlv: display htt_tx_selfgen_ax_stats_tlv
+/**
+ * dp_print_tx_selfgen_ax_stats_tlv() - display htt_tx_selfgen_ax_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_selfgen_ax_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_selfgen_ax_stats_tlv(uint32_t *tag_buf)
 {
@@ -1714,11 +1714,11 @@ static void dp_print_tx_selfgen_ax_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->ax_mu_rts_trigger);
 }
 
-/*
- * dp_print_tx_selfgen_ac_err_stats_tlv: display htt_tx_selfgen_ac_err_stats_tlv
+/**
+ * dp_print_tx_selfgen_ac_err_stats_tlv() - display htt_tx_selfgen_ac_err_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_selfgen_ac_err_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_selfgen_ac_err_stats_tlv(uint32_t *tag_buf)
 {
@@ -1745,7 +1745,7 @@ static void dp_print_tx_selfgen_ac_err_stats_tlv(uint32_t *tag_buf)
 /* dp_print_tx_selfgen_be_err_stats_tlv: display htt_tx_selfgen_be_err_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_selfgen_be_err_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_selfgen_be_err_stats_tlv(uint32_t *tag_buf)
 {
@@ -1794,11 +1794,11 @@ static void dp_print_tx_selfgen_be_err_stats_tlv(uint32_t *tag_buf)
 			       i, dp_stats_buf->be_ul_mumimo_trigger_err[i]);
 }
 
-/*
- * dp_print_tx_selfgen_be_stats_tlv: display htt_tx_selfgen_be_stats_tlv
+/**
+ * dp_print_tx_selfgen_be_stats_tlv() - display htt_tx_selfgen_be_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_selfgen_be_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_selfgen_be_stats_tlv(uint32_t *tag_buf)
 {
@@ -1844,11 +1844,11 @@ static void dp_print_tx_selfgen_be_stats_tlv(uint32_t *tag_buf)
 			       i, dp_stats_buf->be_ul_mumimo_trigger[i]);
 }
 
-/*
- * dp_print_tx_selfgen_ax_err_stats_tlv: display htt_tx_selfgen_ax_err_stats_tlv
+/**
+ * dp_print_tx_selfgen_ax_err_stats_tlv() - display htt_tx_selfgen_ax_err_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_selfgen_ax_err_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_selfgen_ax_err_stats_tlv(uint32_t *tag_buf)
 {
@@ -1888,11 +1888,11 @@ static void dp_print_tx_selfgen_ax_err_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->ax_mu_rts_trigger_err);
 }
 
-/*
- * dp_print_tx_sounding_stats_tlv: display htt_tx_sounding_stats_tlv
+/**
+ * dp_print_tx_sounding_stats_tlv() - display htt_tx_sounding_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_soundig_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_sounding_stats_tlv(uint32_t *tag_buf)
 {
@@ -2077,11 +2077,11 @@ static void dp_print_tx_sounding_stats_tlv(uint32_t *tag_buf)
 	}
 }
 
-/*
- * dp_print_tx_pdev_mu_mimo_sch_stats_tlv: display htt_tx_pdev_mu_mimo_sch_stats
+/**
+ * dp_print_tx_pdev_mu_mimo_sch_stats_tlv() - display htt_tx_pdev_mu_mimo_sch_stats
  * @tag_buf: buffer containing the tlv htt_tx_pdev_mu_mimo_sch_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_mu_mimo_sch_stats_tlv(uint32_t *tag_buf)
 {
@@ -2119,12 +2119,12 @@ static void dp_print_tx_pdev_mu_mimo_sch_stats_tlv(uint32_t *tag_buf)
 	}
 }
 
-/*
- * dp_print_tx_pdev_mu_mimo_mpdu_stats_tlv: display
+/**
+ * dp_print_tx_pdev_mu_mimo_mpdu_stats_tlv() - display
  *				htt_tx_pdev_mu_mimo_mpdu_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_pdev_mu_mimo_mpdu_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_mu_mimo_mpdu_stats_tlv(uint32_t *tag_buf)
 {
@@ -2248,11 +2248,11 @@ static void dp_print_tx_pdev_mu_mimo_mpdu_stats_tlv(uint32_t *tag_buf)
 	}
 }
 
-/*
- * dp_print_sched_txq_cmd_posted_tlv_v: display htt_sched_txq_cmd_posted_tlv_v
+/**
+ * dp_print_sched_txq_cmd_posted_tlv_v() - display htt_sched_txq_cmd_posted_tlv_v
  * @tag_buf: buffer containing the tlv htt_sched_txq_cmd_posted_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_sched_txq_cmd_posted_tlv_v(uint32_t *tag_buf)
 {
@@ -2281,11 +2281,11 @@ static void dp_print_sched_txq_cmd_posted_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(sched_cmd_posted);
 }
 
-/*
- * dp_print_sched_txq_cmd_reaped_tlv_v: display htt_sched_txq_cmd_reaped_tlv_v
+/**
+ * dp_print_sched_txq_cmd_reaped_tlv_v() - display htt_sched_txq_cmd_reaped_tlv_v
  * @tag_buf: buffer containing the tlv htt_sched_txq_cmd_reaped_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_sched_txq_cmd_reaped_tlv_v(uint32_t *tag_buf)
 {
@@ -2314,12 +2314,12 @@ static void dp_print_sched_txq_cmd_reaped_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(sched_cmd_reaped);
 }
 
-/*
- * dp_print_tx_pdev_stats_sched_per_txq_tlv: display
+/**
+ * dp_print_tx_pdev_stats_sched_per_txq_tlv() - display
  *				htt_tx_pdev_stats_sched_per_txq_tlv
  * @tag_buf: buffer containing the tlv htt_tx_pdev_stats_sched_per_txq_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_stats_sched_per_txq_tlv(uint32_t *tag_buf)
 {
@@ -2369,11 +2369,11 @@ static void dp_print_tx_pdev_stats_sched_per_txq_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->notify_sched);
 }
 
-/*
- * dp_print_stats_tx_sched_cmn_tlv: display htt_stats_tx_sched_cmn_tlv
+/**
+ * dp_print_stats_tx_sched_cmn_tlv() - display htt_stats_tx_sched_cmn_tlv
  * @tag_buf: buffer containing the tlv htt_stats_tx_sched_cmn_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_stats_tx_sched_cmn_tlv(uint32_t *tag_buf)
 {
@@ -2387,11 +2387,11 @@ static void dp_print_stats_tx_sched_cmn_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->current_timestamp);
 }
 
-/*
- * dp_print_tx_tqm_gen_mpdu_stats_tlv_v: display htt_tx_tqm_gen_mpdu_stats_tlv_v
+/**
+ * dp_print_tx_tqm_gen_mpdu_stats_tlv_v() - display htt_tx_tqm_gen_mpdu_stats_tlv_v
  * @tag_buf: buffer containing the tlv htt_tx_tqm_gen_mpdu_stats_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tqm_gen_mpdu_stats_tlv_v(uint32_t *tag_buf)
 {
@@ -2421,11 +2421,11 @@ static void dp_print_tx_tqm_gen_mpdu_stats_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(gen_mpdu_end_reason);
 }
 
-/*
- * dp_print_tx_tqm_list_mpdu_stats_tlv_v: display htt_tx_tqm_list_mpdu_stats_tlv
+/**
+ * dp_print_tx_tqm_list_mpdu_stats_tlv_v() - display htt_tx_tqm_list_mpdu_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_tqm_list_mpdu_stats_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tqm_list_mpdu_stats_tlv_v(uint32_t *tag_buf)
 {
@@ -2456,11 +2456,11 @@ static void dp_print_tx_tqm_list_mpdu_stats_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(list_mpdu_end_reason);
 }
 
-/*
- * dp_print_tx_tqm_list_mpdu_cnt_tlv_v: display htt_tx_tqm_list_mpdu_cnt_tlv_v
+/**
+ * dp_print_tx_tqm_list_mpdu_cnt_tlv_v() - display htt_tx_tqm_list_mpdu_cnt_tlv_v
  * @tag_buf: buffer containing the tlv htt_tx_tqm_list_mpdu_cnt_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tqm_list_mpdu_cnt_tlv_v(uint32_t *tag_buf)
 {
@@ -2490,11 +2490,11 @@ static void dp_print_tx_tqm_list_mpdu_cnt_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(list_mpdu_cnt_hist);
 }
 
-/*
- * dp_print_tx_tqm_pdev_stats_tlv_v: display htt_tx_tqm_pdev_stats_tlv_v
+/**
+ * dp_print_tx_tqm_pdev_stats_tlv_v() - display htt_tx_tqm_pdev_stats_tlv_v
  * @tag_buf: buffer containing the tlv htt_tx_tqm_pdev_stats_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tqm_pdev_stats_tlv_v(uint32_t *tag_buf)
 {
@@ -2558,11 +2558,11 @@ static void dp_print_tx_tqm_pdev_stats_tlv_v(uint32_t *tag_buf)
 		       dp_stats_buf->notify_mpdu_state_valid);
 }
 
-/*
- * dp_print_tx_tqm_cmn_stats_tlv: display htt_tx_tqm_cmn_stats_tlv
+/**
+ * dp_print_tx_tqm_cmn_stats_tlv() - display htt_tx_tqm_cmn_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_tqm_cmn_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tqm_cmn_stats_tlv(uint32_t *tag_buf)
 {
@@ -2588,11 +2588,11 @@ static void dp_print_tx_tqm_cmn_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->desc_threshold);
 }
 
-/*
- * dp_print_tx_tqm_error_stats_tlv: display htt_tx_tqm_error_stats_tlv
+/**
+ * dp_print_tx_tqm_error_stats_tlv() - display htt_tx_tqm_error_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_tqm_error_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tqm_error_stats_tlv(uint32_t *tag_buf)
 {
@@ -2608,11 +2608,11 @@ static void dp_print_tx_tqm_error_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->add_msdu_failure);
 }
 
-/*
- * dp_print_tx_tqm_cmdq_status_tlv: display htt_tx_tqm_cmdq_status_tlv
+/**
+ * dp_print_tx_tqm_cmdq_status_tlv() - display htt_tx_tqm_cmdq_status_tlv
  * @tag_buf: buffer containing the tlv htt_tx_tqm_cmdq_status_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_tqm_cmdq_status_tlv(uint32_t *tag_buf)
 {
@@ -2646,11 +2646,11 @@ static void dp_print_tx_tqm_cmdq_status_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->update_msduq_cmd);
 }
 
-/*
- * dp_print_tx_de_eapol_packets_stats_tlv: display htt_tx_de_eapol_packets_stats
+/**
+ * dp_print_tx_de_eapol_packets_stats_tlv() - display htt_tx_de_eapol_packets_stats
  * @tag_buf: buffer containing the tlv htt_tx_de_eapol_packets_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_de_eapol_packets_stats_tlv(uint32_t *tag_buf)
 {
@@ -2672,12 +2672,12 @@ static void dp_print_tx_de_eapol_packets_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->g2_packets);
 }
 
-/*
- * dp_print_tx_de_classify_failed_stats_tlv: display
+/**
+ * dp_print_tx_de_classify_failed_stats_tlv() - display
  *				htt_tx_de_classify_failed_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_de_classify_failed_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_de_classify_failed_stats_tlv(uint32_t *tag_buf)
 {
@@ -2709,11 +2709,11 @@ static void dp_print_tx_de_classify_failed_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->fse_tid_override);
 }
 
-/*
- * dp_print_tx_de_classify_stats_tlv: display htt_tx_de_classify_stats_tlv
+/**
+ * dp_print_tx_de_classify_stats_tlv() - display htt_tx_de_classify_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_de_classify_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_de_classify_stats_tlv(uint32_t *tag_buf)
 {
@@ -2781,12 +2781,12 @@ static void dp_print_tx_de_classify_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->bcast_entry);
 }
 
-/*
- * dp_print_tx_de_classify_status_stats_tlv: display
+/**
+ * dp_print_tx_de_classify_status_stats_tlv() - display
  *				htt_tx_de_classify_status_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_de_classify_status_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_de_classify_status_stats_tlv(uint32_t *tag_buf)
 {
@@ -2812,12 +2812,12 @@ static void dp_print_tx_de_classify_status_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->status_invalid);
 }
 
-/*
- * dp_print_tx_de_enqueue_packets_stats_tlv: display
+/**
+ * dp_print_tx_de_enqueue_packets_stats_tlv() - display
  *				htt_tx_de_enqueue_packets_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_de_enqueue_packets_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_de_enqueue_packets_stats_tlv(uint32_t *tag_buf)
 {
@@ -2833,12 +2833,12 @@ static void dp_print_tx_de_enqueue_packets_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->to_tqm_bypass);
 }
 
-/*
- * dp_print_tx_de_enqueue_discard_stats_tlv: display
+/**
+ * dp_print_tx_de_enqueue_discard_stats_tlv() - display
  *					htt_tx_de_enqueue_discard_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_de_enqueue_discard_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_de_enqueue_discard_stats_tlv(uint32_t *tag_buf)
 {
@@ -2854,11 +2854,11 @@ static void dp_print_tx_de_enqueue_discard_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->is_ext_msdu);
 }
 
-/*
- * dp_print_tx_de_compl_stats_tlv: display htt_tx_de_compl_stats_tlv
+/**
+ * dp_print_tx_de_compl_stats_tlv() - display htt_tx_de_compl_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_de_compl_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_de_compl_stats_tlv(uint32_t *tag_buf)
 {
@@ -2878,11 +2878,11 @@ static void dp_print_tx_de_compl_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->tqm_bypass_frame);
 }
 
-/*
- * dp_print_tx_de_cmn_stats_tlv: display htt_tx_de_cmn_stats_tlv
+/**
+ * dp_print_tx_de_cmn_stats_tlv() - display htt_tx_de_cmn_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_de_cmn_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_de_cmn_stats_tlv(uint32_t *tag_buf)
 {
@@ -2906,11 +2906,11 @@ static void dp_print_tx_de_cmn_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->invalid_pdev);
 }
 
-/*
- * dp_print_ring_if_stats_tlv: display htt_ring_if_stats_tlv
+/**
+ * dp_print_ring_if_stats_tlv() - display htt_ring_if_stats_tlv
  * @tag_buf: buffer containing the tlv htt_ring_if_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_ring_if_stats_tlv(uint32_t *tag_buf)
 {
@@ -2969,11 +2969,11 @@ static void dp_print_ring_if_stats_tlv(uint32_t *tag_buf)
 	DP_PRINT_STATS("high_wm_hit_count = %s\n", wm_hit_count);
 }
 
-/*
- * dp_print_ring_if_cmn_tlv: display htt_ring_if_cmn_tlv
+/**
+ * dp_print_ring_if_cmn_tlv() - display htt_ring_if_cmn_tlv
  * @tag_buf: buffer containing the tlv htt_ring_if_cmn_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_ring_if_cmn_tlv(uint32_t *tag_buf)
 {
@@ -2987,11 +2987,11 @@ static void dp_print_ring_if_cmn_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->num_records);
 }
 
-/*
- * dp_print_sfm_client_user_tlv_v: display htt_sfm_client_user_tlv_v
+/**
+ * dp_print_sfm_client_user_tlv_v() - display htt_sfm_client_user_tlv_v
  * @tag_buf: buffer containing the tlv htt_sfm_client_user_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_sfm_client_user_tlv_v(uint32_t *tag_buf)
 {
@@ -3019,11 +3019,11 @@ static void dp_print_sfm_client_user_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(dwords_used_by_user_n);
 }
 
-/*
- * dp_print_sfm_client_tlv: display htt_sfm_client_tlv
+/**
+ * dp_print_sfm_client_tlv() - display htt_sfm_client_tlv
  * @tag_buf: buffer containing the tlv htt_sfm_client_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_sfm_client_tlv(uint32_t *tag_buf)
 {
@@ -3047,11 +3047,11 @@ static void dp_print_sfm_client_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->num_users);
 }
 
-/*
- * dp_print_sfm_cmn_tlv: display htt_sfm_cmn_tlv
+/**
+ * dp_print_sfm_cmn_tlv() - display htt_sfm_cmn_tlv
  * @tag_buf: buffer containing the tlv htt_sfm_cmn_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_sfm_cmn_tlv(uint32_t *tag_buf)
 {
@@ -3071,11 +3071,11 @@ static void dp_print_sfm_cmn_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->num_records);
 }
 
-/*
- * dp_print_sring_stats_tlv: display htt_sring_stats_tlv
+/**
+ * dp_print_sring_stats_tlv() - display htt_sring_stats_tlv
  * @tag_buf: buffer containing the tlv htt_sring_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_sring_stats_tlv(uint32_t *tag_buf)
 {
@@ -3103,11 +3103,11 @@ static void dp_print_sring_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->prefetch_count__internal_tail_ptr);
 }
 
-/*
- * dp_print_sring_cmn_tlv: display htt_sring_cmn_tlv
+/**
+ * dp_print_sring_cmn_tlv() - display htt_sring_cmn_tlv
  * @tag_buf: buffer containing the tlv htt_sring_cmn_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_sring_cmn_tlv(uint32_t *tag_buf)
 {
@@ -3119,11 +3119,11 @@ static void dp_print_sring_cmn_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->num_records);
 }
 
-/*
- * dp_print_tx_pdev_rate_stats_tlv: display htt_tx_pdev_rate_stats_tlv
+/**
+ * dp_print_tx_pdev_rate_stats_tlv() - display htt_tx_pdev_rate_stats_tlv
  * @tag_buf: buffer containing the tlv htt_tx_pdev_rate_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_tx_pdev_rate_stats_tlv(uint32_t *tag_buf)
 {
@@ -3505,11 +3505,13 @@ fail1:
 	qdf_mem_free(str_buf);
 }
 
-/*
- * dp_print_rx_pdev_rate_ext_stats_tlv: display htt_rx_pdev_rate_ext_stats_tlv
+/**
+ * dp_print_rx_pdev_rate_ext_stats_tlv() -
+ *					display htt_rx_pdev_rate_ext_stats_tlv
+ * @pdev: pdev pointer
  * @tag_buf: buffer containing the tlv htt_rx_pdev_rate_ext_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_pdev_rate_ext_stats_tlv(struct dp_pdev *pdev,
 						uint32_t *tag_buf)
@@ -3663,11 +3665,12 @@ fail1:
 	qdf_mem_free(str_buf);
 }
 
-/*
- * dp_print_rx_pdev_rate_stats_tlv: display htt_rx_pdev_rate_stats_tlv
+/**
+ * dp_print_rx_pdev_rate_stats_tlv() - display htt_rx_pdev_rate_stats_tlv
+ * @pdev: pdev pointer
  * @tag_buf: buffer containing the tlv htt_rx_pdev_rate_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_pdev_rate_stats_tlv(struct dp_pdev *pdev,
 					    uint32_t *tag_buf)
@@ -4000,11 +4003,11 @@ fail1:
 
 }
 
-/*
- * dp_print_rx_soc_fw_stats_tlv: display htt_rx_soc_fw_stats_tlv
+/**
+ * dp_print_rx_soc_fw_stats_tlv() - display htt_rx_soc_fw_stats_tlv
  * @tag_buf: buffer containing the tlv htt_rx_soc_fw_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_soc_fw_stats_tlv(uint32_t *tag_buf)
 {
@@ -4037,12 +4040,12 @@ static void dp_print_rx_soc_fw_stats_tlv(uint32_t *tag_buf)
 
 }
 
-/*
- * dp_print_rx_soc_fw_refill_ring_empty_tlv_v: display
+/**
+ * dp_print_rx_soc_fw_refill_ring_empty_tlv_v() - display
  *					htt_rx_soc_fw_refill_ring_empty_tlv_v
  * @tag_buf: buffer containing the tlv htt_rx_soc_fw_refill_ring_empty_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_soc_fw_refill_ring_empty_tlv_v(uint32_t *tag_buf)
 {
@@ -4072,12 +4075,12 @@ static void dp_print_rx_soc_fw_refill_ring_empty_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(refill_ring_empty_cnt);
 }
 
-/*
- * dp_print_rx_soc_fw_refill_ring_num_refill_tlv_v: display
+/**
+ * dp_print_rx_soc_fw_refill_ring_num_refill_tlv_v() - display
  *				htt_rx_soc_fw_refill_ring_num_refill_tlv_v
  * @tag_buf: buffer containing the tlv htt_rx_soc_fw_refill_ring_num_refill_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_soc_fw_refill_ring_num_refill_tlv_v(
 		uint32_t *tag_buf)
@@ -4108,11 +4111,11 @@ static void dp_print_rx_soc_fw_refill_ring_num_refill_tlv_v(
 	qdf_mem_free(refill_ring_num_refill);
 }
 
-/*
- * dp_print_rx_pdev_fw_stats_tlv: display htt_rx_pdev_fw_stats_tlv
+/**
+ * dp_print_rx_pdev_fw_stats_tlv() - display htt_rx_pdev_fw_stats_tlv
  * @tag_buf: buffer containing the tlv htt_rx_pdev_fw_stats_tlv
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_pdev_fw_stats_tlv(uint32_t *tag_buf)
 {
@@ -4229,12 +4232,12 @@ static void dp_print_rx_pdev_fw_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->rx_flush_cnt);
 }
 
-/*
- * dp_print_rx_pdev_fw_ring_mpdu_err_tlv_v: display
+/**
+ * dp_print_rx_pdev_fw_ring_mpdu_err_tlv_v() - display
  *				htt_rx_pdev_fw_ring_mpdu_err_tlv_v
  * @tag_buf: buffer containing the tlv htt_rx_pdev_fw_ring_mpdu_err_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_pdev_fw_ring_mpdu_err_tlv_v(uint32_t *tag_buf)
 {
@@ -4260,11 +4263,11 @@ static void dp_print_rx_pdev_fw_ring_mpdu_err_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(fw_ring_mpdu_err);
 }
 
-/*
- * dp_print_rx_pdev_fw_mpdu_drop_tlv_v: display htt_rx_pdev_fw_mpdu_drop_tlv_v
+/**
+ * dp_print_rx_pdev_fw_mpdu_drop_tlv_v() - display htt_rx_pdev_fw_mpdu_drop_tlv_v
  * @tag_buf: buffer containing the tlv htt_rx_pdev_fw_mpdu_drop_tlv_v
  *
- * return:void
+ * Return: void
  */
 static void dp_print_rx_pdev_fw_mpdu_drop_tlv_v(uint32_t *tag_buf)
 {
@@ -4292,12 +4295,12 @@ static void dp_print_rx_pdev_fw_mpdu_drop_tlv_v(uint32_t *tag_buf)
 	qdf_mem_free(fw_mpdu_drop);
 }
 
-/*
+/**
  * dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv() - Accounts for rxdma error
  * packets
+ * @tag_buf: Buffer
  *
- * tag_buf - Buffer
- * Return - NULL
+ * Return: void
  */
 static uint64_t
 dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(uint32_t *tag_buf)
@@ -4318,7 +4321,7 @@ dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(uint32_t *tag_buf)
 	for (i = 0; i <  tag_len; i++) {
 		index += snprintf(&rxdma_err_cnt[index],
 				DP_MAX_STRING_LEN - index,
-				" %u:%u,", i,
+				" %u() -%u,", i,
 				dp_stats_buf->rxdma_err[i]);
 		total_rxdma_err_cnt += dp_stats_buf->rxdma_err[i];
 	}
@@ -4328,12 +4331,12 @@ dp_print_rx_soc_fw_refill_ring_num_rxdma_err_tlv(uint32_t *tag_buf)
 	return total_rxdma_err_cnt;
 }
 
-/*
+/**
  * dp_print_rx_soc_fw_refill_ring_num_reo_err_tlv() - Accounts for reo error
  * packets
+ * @tag_buf: Buffer
  *
- * tag_buf - Buffer
- * Return - NULL
+ * Return: void
  */
 static void dp_print_rx_soc_fw_refill_ring_num_reo_err_tlv(uint32_t *tag_buf)
 {
@@ -4352,18 +4355,18 @@ static void dp_print_rx_soc_fw_refill_ring_num_reo_err_tlv(uint32_t *tag_buf)
 	for (i = 0; i <  tag_len; i++) {
 		index += snprintf(&reo_err_cnt[index],
 				DP_MAX_STRING_LEN - index,
-				" %u:%u,", i,
+				" %u() -%u,", i,
 				dp_stats_buf->reo_err[i]);
 	}
 
 	DP_PRINT_STATS("reo_err = %s\n", reo_err_cnt);
 }
 
-/*
+/**
  * dp_print_rx_reo_debug_stats_tlv() - REO Statistics
+ * @tag_buf: Buffer
  *
- * tag_buf - Buffer
- * Return - NULL
+ * Return: void
  */
 static void dp_print_rx_reo_debug_stats_tlv(uint32_t *tag_buf)
 {
@@ -4372,7 +4375,7 @@ static void dp_print_rx_reo_debug_stats_tlv(uint32_t *tag_buf)
 
 	DP_PRINT_STATS("HTT_RX_REO_RESOURCE_STATS_TLV");
 
-	DP_PRINT_STATS("sample_id: %u ",
+	DP_PRINT_STATS("sample_id() - %u ",
 		       dp_stats_buf->sample_id);
 	DP_PRINT_STATS("total_max: %u ",
 		       dp_stats_buf->total_max);
@@ -4394,11 +4397,11 @@ static void dp_print_rx_reo_debug_stats_tlv(uint32_t *tag_buf)
 		       dp_stats_buf->last_non_zeros_sample);
 }
 
-/*
+/**
  * dp_print_rx_pdev_fw_stats_phy_err_tlv() - Accounts for phy errors
+ * @tag_buf: Buffer
  *
- * tag_buf - Buffer
- * Return - NULL
+ * Return: void
  */
 static void dp_print_rx_pdev_fw_stats_phy_err_tlv(uint32_t *tag_buf)
 {
@@ -4411,7 +4414,7 @@ static void dp_print_rx_pdev_fw_stats_phy_err_tlv(uint32_t *tag_buf)
 
 	DP_PRINT_STATS("HTT_RX_PDEV_FW_STATS_PHY_ERR_TLV");
 
-	DP_PRINT_STATS("mac_id_word: %u",
+	DP_PRINT_STATS("mac_id_word() - %u",
 		       dp_stats_buf->mac_id__word);
 	DP_PRINT_STATS("total_phy_err_cnt: %u",
 		       dp_stats_buf->total_phy_err_cnt);
@@ -4425,15 +4428,6 @@ static void dp_print_rx_pdev_fw_stats_phy_err_tlv(uint32_t *tag_buf)
 	DP_PRINT_STATS("phy_errs: %s\n",  phy_errs);
 }
 
-/*
- * dp_htt_stats_print_tag: function to select the tag type and
- * print the corresponding tag structure
- * @pdev: pdev pointer
- * @tag_type: tag type that is to be printed
- * @tag_buf: pointer to the tag structure
- *
- * return: void
- */
 void dp_htt_stats_print_tag(struct dp_pdev *pdev,
 			    uint8_t tag_type, uint32_t *tag_buf)
 {
@@ -4742,15 +4736,6 @@ void dp_htt_stats_print_tag(struct dp_pdev *pdev,
 	}
 }
 
-/*
- * dp_htt_stats_copy_tag: function to select the tag type and
- * copy the corresponding tag structure
- * @pdev: DP_PDEV handle
- * @tag_type: tag type that is to be printed
- * @tag_buf: pointer to the tag structure
- *
- * return: void
- */
 void dp_htt_stats_copy_tag(struct dp_pdev *pdev, uint8_t tag_type, uint32_t *tag_buf)
 {
 	void *dest_ptr = NULL;
@@ -5824,15 +5809,6 @@ dp_print_pdev_cfg_params(struct dp_pdev *pdev)
 		       pdev_cfg_ctx->num_mac_rings);
 }
 
-/**
- * dp_print_ring_stat_from_hal(): Print hal level ring stats
- * @soc: DP_SOC handle
- * @srng: DP_SRNG handle
- * @ring_name: SRNG name
- * @ring_type: srng src/dst ring
- *
- * Return: void
- */
 void
 dp_print_ring_stat_from_hal(struct dp_soc *soc,  struct dp_srng *srng,
 			    enum hal_ring_type ring_type)
@@ -5925,7 +5901,7 @@ void dp_print_tso_seg_stats(struct dp_pdev *pdev, uint32_t id)
 #endif /* FEATURE_TSO_STATS */
 
 /**
- * dp_print_mon_ring_stats_from_hal() - Print stat for monitor rings based
+ * dp_print_mon_ring_stat_from_hal() - Print stat for monitor rings based
  *					on target
  * @pdev: physical device handle
  * @mac_id: mac id
@@ -6059,7 +6035,7 @@ dp_print_ring_stats(struct dp_pdev *pdev)
  * dp_print_common_rates_info(): Print common rate for tx or rx
  * @pkt_type_array: rate type array contains rate info
  *
- * Return:void
+ * Return: void
  */
 static inline void
 dp_print_common_rates_info(struct cdp_pkt_type *pkt_type_array)
@@ -6086,7 +6062,7 @@ dp_print_common_rates_info(struct cdp_pkt_type *pkt_type_array)
  * @pkt_type_array: rate type array contains rate info
  * @pkt_type: packet type
  *
- * Return:void
+ * Return: void
  */
 #ifdef WLAN_FEATURE_11BE
 static inline void
@@ -6141,7 +6117,7 @@ dp_print_common_ppdu_rates_info(struct cdp_pkt_type *pkt_type_array,
  * dp_print_mu_be_ppdu_rates_info(): Print mu be rate for tx or rx
  * @pkt_type_array: rate type array contains rate info
  *
- * Return:void
+ * Return: void
  */
 #ifdef WLAN_FEATURE_11BE
 static inline void
@@ -6300,7 +6276,7 @@ void dp_print_tx_rates(struct dp_vdev *vdev)
  * @pnss: nss count array
  * @ss_count: number of nss
  *
- * Return:void
+ * Return: void
  */
 static void dp_print_nss(char *nss, uint32_t *pnss, uint32_t ss_count)
 {
@@ -6358,9 +6334,10 @@ static void dp_print_jitter_stats(struct dp_peer *peer, struct dp_pdev *pdev)
 #endif /* WLAN_PEER_JITTER */
 
 #ifdef QCA_PEER_EXT_STATS
-/*
- * dp_print_hist_stats() : Print delay histogram
+/**
+ * dp_print_hist_stats() - Print delay histogram
  * @hstats: Histogram stats
+ * @hist_type: histogram type
  *
  * Return: void
  */
@@ -6402,10 +6379,10 @@ static void dp_print_hist_stats(struct cdp_hist_stats *hstats,
 }
 
 #ifdef CONFIG_SAWF
-/*
+/**
  * dp_accumulate_delay_avg_stats(): Accumulate the delay average stats
  * @stats: cdp_delay_tid stats
- * @dst_hstats: Destination delay Tx stats
+ * @dst_stats: Destination delay Tx stats
  * @tid: TID value
  *
  * Return: void
@@ -6449,13 +6426,14 @@ static void dp_accumulate_delay_avg_stats(struct cdp_delay_tid_stats stats[]
 }
 #endif
 
-/*
+/**
  * dp_accumulate_delay_tid_stats(): Accumulate the tid stats to the
  *                                  hist stats.
  * @soc: DP SoC handle
  * @stats: cdp_delay_tid stats
  * @dst_hstats: Destination histogram to copy tid stats
  * @tid: TID value
+ * @mode:
  *
  * Return: void
  */
@@ -6516,15 +6494,15 @@ static void dp_accumulate_delay_tid_stats(struct dp_soc *soc,
 	}
 }
 
-/*
- * dp_peer_print_delay_stats(): Print peer delay stats
- * @soc: DP SoC handle
+/**
+ * dp_peer_print_tx_delay_stats() - Print peer delay stats
+ * @pdev: DP pdev handle
  * @peer: DP peer handle
  *
  * Return: void
  */
-void dp_peer_print_tx_delay_stats(struct dp_pdev *pdev,
-				  struct dp_peer *peer)
+static void dp_peer_print_tx_delay_stats(struct dp_pdev *pdev,
+					 struct dp_peer *peer)
 {
 	struct dp_peer_delay_stats *delay_stats;
 	struct dp_soc *soc = NULL;
@@ -6563,15 +6541,15 @@ void dp_peer_print_tx_delay_stats(struct dp_pdev *pdev,
 	}
 }
 
-/*
- * dp_peer_print_rx_delay_stats(): Print peer delay stats
- * @soc: DP SoC handle
+/**
+ * dp_peer_print_rx_delay_stats() - Print peer delay stats
+ * @pdev: DP pdev handle
  * @peer: DP peer handle
  *
  * Return: void
  */
-void dp_peer_print_rx_delay_stats(struct dp_pdev *pdev,
-				  struct dp_peer *peer)
+static void dp_peer_print_rx_delay_stats(struct dp_pdev *pdev,
+					 struct dp_peer *peer)
 {
 	struct dp_peer_delay_stats *delay_stats;
 	struct dp_soc *soc = NULL;
@@ -7407,8 +7385,8 @@ void dp_txrx_path_stats(struct dp_soc *soc)
 	}
 }
 
-/*
- * dp_aggregate_pdev_ctrl_frames_stats()- function to agreegate peer stats
+/**
+ * dp_peer_ctrl_frames_stats_get() - function to agreegate peer stats
  * Current scope is bar received count
  *
  * @soc : Datapath SOC handle
@@ -8380,7 +8358,7 @@ QDF_STATUS dp_txrx_get_peer_extd_stats_param(struct dp_peer *peer,
  * dp_is_wds_extended() - Check if wds ext is enabled
  * @txrx_peer: DP txrx_peer handle
  *
- * return: true if enabled, false if not
+ * Return: true if enabled, false if not
  */
 #ifdef QCA_SUPPORT_WDS_EXTENDED
 static inline
