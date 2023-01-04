@@ -487,6 +487,16 @@ QDF_STATUS wlan_mlo_parse_bcn_prbresp_t2lm_ie(
 		struct wlan_t2lm_context *t2lm_ctx, uint8_t *ie);
 
 /**
+ * wlan_mlo_parse_t2lm_info() - Parse T2LM IE fields
+ * @ie: Pointer to T2LM IE
+ * @t2lm: Pointer to T2LM structure
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
+				    struct wlan_t2lm_info *t2lm);
+
+/**
  * wlan_mlo_add_t2lm_info_ie() - Add T2LM IE for UL/DL/Bidirection
  * @frm: Pointer to buffer
  * @t2lm: Pointer to t2lm mapping structure
@@ -600,6 +610,13 @@ uint8_t *wlan_mlo_add_t2lm_action_frame(
 static inline
 QDF_STATUS wlan_mlo_parse_bcn_prbresp_t2lm_ie(
 		struct wlan_t2lm_context *t2lm_ctx, uint8_t *ie)
+{
+	return QDF_STATUS_E_FAILURE;
+}
+
+static inline
+QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
+				    struct wlan_t2lm_info *t2lm)
 {
 	return QDF_STATUS_E_FAILURE;
 }

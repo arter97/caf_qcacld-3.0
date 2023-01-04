@@ -27,15 +27,8 @@
 #include <qdf_util.h>
 #include <wlan_cm_api.h>
 
-/**
- * wlan_mlo_parse_t2lm_info() - Parse T2LM IE fields
- * @ie: Pointer to T2LM IE
- * @t2lm: Pointer to T2LM structure
- *
- * Return: QDF_STATUS
- */
-static QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
-					   struct wlan_t2lm_info *t2lm)
+QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
+				    struct wlan_t2lm_info *t2lm)
 {
 	struct wlan_ie_tid_to_link_mapping *t2lm_ie;
 	enum wlan_t2lm_direction dir;
