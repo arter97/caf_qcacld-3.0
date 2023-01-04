@@ -954,6 +954,34 @@ QDF_STATUS dp_sawf_tx_enqueue_fail_peer_stats(struct dp_soc *soc,
 #endif
 
 #ifdef WLAN_SUPPORT_PPEDS
+
+/*
+ * dp_ppeds_stats() - Accounting fw2wbm_tx_drop drops in Tx path
+ * @soc: Handle to DP Soc structure
+ * @peer_id: Peer ID in the descriptor
+ *
+ * Return: NONE
+ */
+
+static inline
+void dp_ppeds_stats(struct dp_soc *soc, uint16_t peer_id)
+{
+	struct dp_vdev *vdev = NULL;
+	struct dp_txrx_peer *txrx_peer = NULL;
+	dp_txrx_ref_handle txrx_ref_handle = NULL;
+
+	DP_STATS_INC(soc, tx.fw2wbm_tx_drop, 1);
+	txrx_peer = dp_txrx_peer_get_ref_by_id(soc,
+					       peer_id,
+					       &txrx_ref_handle,
+					       DP_MOD_ID_TX_COMP);
+	if (txrx_peer) {
+		vdev = txrx_peer->vdev;
+		DP_STATS_INC(vdev, tx_i.dropped.fw2wbm_tx_drop, 1);
+		dp_txrx_peer_unref_delete(txrx_ref_handle, DP_MOD_ID_TX_COMP);
+	}
+}
+
 /**
  * dp_ppeds_tx_comp_handler()- Handle tx completions for ppe2tcl ring
  * @soc: Handle to DP Soc structure
@@ -965,7 +993,7 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 {
 	uint32_t num_avail_for_reap = 0;
 	void *tx_comp_hal_desc;
-	uint8_t buf_src;
+	uint8_t buf_src, status = 0;
 	uint32_t count = 0;
 	struct dp_tx_desc_s *tx_desc = NULL;
 	struct dp_tx_desc_s *head_desc = NULL;
@@ -1026,6 +1054,10 @@ int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota)
 		tx_desc->buffer_src = buf_src;
 
 		if (qdf_unlikely(buf_src == HAL_TX_COMP_RELEASE_SOURCE_FW)) {
+			status = hal_tx_comp_get_tx_status(tx_comp_hal_desc);
+			if (status != HTT_TX_FW2WBM_TX_STATUS_OK)
+				dp_ppeds_stats(soc, tx_desc->peer_id);
+
 			qdf_nbuf_free(tx_desc->nbuf);
 			dp_ppeds_tx_desc_free(soc, tx_desc);
 		} else {

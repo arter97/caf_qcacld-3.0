@@ -227,6 +227,18 @@ void dp_tx_desc_pool_deinit_be(struct dp_soc *soc,
  * Return: Number of tx completions processed
  */
 int dp_ppeds_tx_comp_handler(struct dp_soc_be *be_soc, uint32_t quota);
+
+/*
+ * dp_ppeds_stats() - Accounting fw2wbm_tx_drop drops in Tx path
+ * @soc: Handle to DP Soc structure
+ * @peer_id: Peer ID in the descriptor
+ *
+ * Return: NONE
+ */
+
+static inline
+void dp_ppeds_stats(struct dp_soc *soc, uint16_t peer_id);
+
 #endif
 #ifdef WLAN_FEATURE_11BE_MLO
 /**

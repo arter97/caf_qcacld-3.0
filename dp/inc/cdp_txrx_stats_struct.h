@@ -1914,6 +1914,7 @@ struct cdp_tx_ingress_stats {
 		uint32_t drop_ingress;
 		uint32_t invalid_peer_id_in_exc_path;
 		uint32_t tx_mcast_drop;
+		uint32_t fw2wbm_tx_drop;
 	} dropped;
 
 	/* Mesh packets info */

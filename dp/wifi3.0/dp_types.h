@@ -1196,6 +1196,8 @@ struct dp_soc_stats {
 		uint32_t tx_comp_force_freed;
 		/* Tx completion ring near full */
 		uint32_t near_full;
+		/* Tx drops with buffer src as HAL_TX_COMP_RELEASE_SOURCE_FW */
+		uint32_t fw2wbm_tx_drop;
 	} tx;
 
 	/* SOC level RX stats */

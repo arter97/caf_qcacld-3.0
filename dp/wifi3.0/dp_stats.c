@@ -7476,6 +7476,8 @@ dp_print_pdev_tx_stats(struct dp_pdev *pdev)
 		       pdev->stats.tx_i.dropped.invalid_peer_id_in_exc_path);
 	DP_PRINT_STATS("	Tx Mcast Drop = %u",
 		       pdev->stats.tx_i.dropped.tx_mcast_drop);
+	DP_PRINT_STATS("	PPE-DS FW2WBM Tx Drop = %u",
+		       pdev->stats.tx_i.dropped.fw2wbm_tx_drop);
 	DP_PRINT_STATS("Tx failed = %u",
 		       pdev->stats.tx.tx_failed);
 	DP_PRINT_STATS("	FW removed Pkts = %u",
@@ -7726,6 +7728,9 @@ void dp_print_tx_ppeds_stats(struct dp_soc *soc)
 {
 	if (soc->arch_ops.dp_tx_ppeds_inuse_desc)
 		soc->arch_ops.dp_tx_ppeds_inuse_desc(soc);
+
+	DP_PRINT_STATS("PPE-DS Tx desc fw2wbm_tx_drop %u",
+		       soc->stats.tx.fw2wbm_tx_drop);
 }
 #else
 void dp_print_tx_ppeds_stats(struct dp_soc *soc)
@@ -8838,7 +8843,8 @@ void dp_update_vdev_ingress_stats(struct dp_vdev *tgtobj)
 		tgtobj->stats.tx_i.dropped.drop_ingress +
 		tgtobj->stats.tx_i.dropped.headroom_insufficient +
 		tgtobj->stats.tx_i.dropped.invalid_peer_id_in_exc_path +
-		tgtobj->stats.tx_i.dropped.tx_mcast_drop;
+		tgtobj->stats.tx_i.dropped.tx_mcast_drop +
+		tgtobj->stats.tx_i.dropped.fw2wbm_tx_drop;
 }
 
 void dp_update_vdev_rate_stats(struct cdp_vdev_stats *tgtobj,
@@ -8891,6 +8897,7 @@ void dp_update_pdev_ingress_stats(struct dp_pdev *tgtobj,
 	DP_STATS_AGGR(tgtobj, srcobj, tx_i.dropped.headroom_insufficient);
 	DP_STATS_AGGR(tgtobj, srcobj, tx_i.dropped.invalid_peer_id_in_exc_path);
 	DP_STATS_AGGR(tgtobj, srcobj, tx_i.dropped.tx_mcast_drop);
+	DP_STATS_AGGR(tgtobj, srcobj, tx_i.dropped.fw2wbm_tx_drop);
 	DP_STATS_AGGR(tgtobj, srcobj, tx_i.cce_classified);
 	DP_STATS_AGGR(tgtobj, srcobj, tx_i.cce_classified_raw);
 	DP_STATS_AGGR_PKT(tgtobj, srcobj, tx_i.sniffer_rcvd);
