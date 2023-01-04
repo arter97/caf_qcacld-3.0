@@ -2968,6 +2968,7 @@ static void dp_print_ring_if_stats_tlv(uint32_t *tag_buf)
 				dp_stats_buf->high_wm_hit_count[i]);
 	}
 	DP_PRINT_STATS("high_wm_hit_count = %s\n", wm_hit_count);
+	qdf_mem_free(wm_hit_count);
 }
 
 /**
