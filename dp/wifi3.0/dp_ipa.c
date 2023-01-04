@@ -462,6 +462,80 @@ dp_ipa_setup_tx_smmu_params_bank_id(struct dp_soc *soc,
 }
 #endif
 
+#ifdef QCA_IPA_LL_TX_FLOW_CONTROL
+static void
+dp_ipa_setup_tx_alt_params_pmac_id(struct dp_soc *soc,
+				   qdf_ipa_wdi_pipe_setup_info_t *tx)
+{
+	uint8_t pmac_id = 0;
+
+	/* Set Pmac ID, extract pmac_id from second radio for TX_ALT ring */
+	if (soc->pdev_count > 1)
+		pmac_id = soc->pdev_list[soc->pdev_count - 1]->lmac_id;
+
+	QDF_IPA_WDI_SETUP_INFO_RX_PMAC_ID(tx, pmac_id);
+}
+
+static void
+dp_ipa_setup_tx_alt_smmu_params_pmac_id(struct dp_soc *soc,
+					qdf_ipa_wdi_pipe_setup_info_smmu_t *tx_smmu)
+{
+	uint8_t pmac_id = 0;
+
+	/* Set Pmac ID, extract pmac_id from second radio for TX_ALT ring */
+	if (soc->pdev_count > 1)
+		pmac_id = soc->pdev_list[soc->pdev_count - 1]->lmac_id;
+
+	QDF_IPA_WDI_SETUP_INFO_SMMU_RX_PMAC_ID(tx_smmu, pmac_id);
+}
+
+static void
+dp_ipa_setup_tx_params_pmac_id(struct dp_soc *soc,
+			       qdf_ipa_wdi_pipe_setup_info_t *tx)
+{
+	uint8_t pmac_id;
+
+	pmac_id = soc->pdev_list[0]->lmac_id;
+
+	QDF_IPA_WDI_SETUP_INFO_RX_PMAC_ID(tx, pmac_id);
+}
+
+static void
+dp_ipa_setup_tx_smmu_params_pmac_id(struct dp_soc *soc,
+				    qdf_ipa_wdi_pipe_setup_info_smmu_t *tx_smmu)
+{
+	uint8_t pmac_id;
+
+	pmac_id = soc->pdev_list[0]->lmac_id;
+
+	QDF_IPA_WDI_SETUP_INFO_SMMU_RX_PMAC_ID(tx_smmu, pmac_id);
+}
+#else
+static inline void
+dp_ipa_setup_tx_alt_params_pmac_id(struct dp_soc *soc,
+				   qdf_ipa_wdi_pipe_setup_info_t *tx)
+{
+}
+
+static inline void
+dp_ipa_setup_tx_alt_smmu_params_pmac_id(struct dp_soc *soc,
+					qdf_ipa_wdi_pipe_setup_info_smmu_t *tx_smmu)
+{
+}
+
+static inline void
+dp_ipa_setup_tx_params_pmac_id(struct dp_soc *soc,
+			       qdf_ipa_wdi_pipe_setup_info_t *tx)
+{
+}
+
+static inline void
+dp_ipa_setup_tx_smmu_params_pmac_id(struct dp_soc *soc,
+				    qdf_ipa_wdi_pipe_setup_info_smmu_t *tx_smmu)
+{
+}
+#endif
+
 #ifdef IPA_WDI3_TX_TWO_PIPES
 static void dp_ipa_tx_alt_pool_detach(struct dp_soc *soc, struct dp_pdev *pdev)
 {
@@ -849,6 +923,9 @@ static void dp_ipa_wdi_tx_alt_pipe_params(struct dp_soc *soc,
 	QDF_IPA_WDI_SETUP_INFO_PKT_OFFSET(tx) = 0;
 
 	dp_ipa_setup_tx_params_bank_id(soc, tx);
+
+	/* Set Pmac ID, extract pmac_id from second radio for TX_ALT ring */
+	dp_ipa_setup_tx_alt_params_pmac_id(soc, tx);
 }
 
 static void
@@ -885,6 +962,9 @@ dp_ipa_wdi_tx_alt_pipe_smmu_params(struct dp_soc *soc,
 	QDF_IPA_WDI_SETUP_INFO_SMMU_PKT_OFFSET(tx_smmu) = 0;
 
 	dp_ipa_setup_tx_smmu_params_bank_id(soc, tx_smmu);
+
+	/* Set Pmac ID, extract pmac_id from second radio for TX_ALT ring */
+	dp_ipa_setup_tx_alt_smmu_params_pmac_id(soc, tx_smmu);
 }
 
 static void dp_ipa_setup_tx_alt_pipe(struct dp_soc *soc,
@@ -2222,6 +2302,9 @@ static void dp_ipa_wdi_tx_params(struct dp_soc *soc,
 	QDF_IPA_WDI_SETUP_INFO_PKT_OFFSET(tx) = 0;
 
 	dp_ipa_setup_tx_params_bank_id(soc, tx);
+
+	/* Set Pmac ID, extract pmac_id from pdev_id 0 for TX ring */
+	dp_ipa_setup_tx_params_pmac_id(soc, tx);
 }
 
 static void dp_ipa_wdi_rx_params(struct dp_soc *soc,
@@ -2310,6 +2393,9 @@ dp_ipa_wdi_tx_smmu_params(struct dp_soc *soc,
 	QDF_IPA_WDI_SETUP_INFO_SMMU_PKT_OFFSET(tx_smmu) = 0;
 
 	dp_ipa_setup_tx_smmu_params_bank_id(soc, tx_smmu);
+
+	/* Set Pmac ID, extract pmac_id from first pdev for TX ring */
+	dp_ipa_setup_tx_smmu_params_pmac_id(soc, tx_smmu);
 }
 
 static void
