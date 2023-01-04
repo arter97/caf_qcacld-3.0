@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -250,6 +250,10 @@ static QDF_STATUS mlo_validate_mlo_cap(struct wlan_objmgr_vdev *vdev)
 {
 	return QDF_STATUS_SUCCESS;
 }
+
+static inline
+void mlo_mld_clear_mlo_cap(struct wlan_objmgr_vdev *vdev)
+{ }
 #else
 /**
  * mlo_is_mld_connected - Check whether MLD is connected
@@ -565,7 +569,10 @@ QDF_STATUS mlo_connect(struct wlan_objmgr_vdev *vdev,
 			mlo_clear_connected_links_bmap(vdev);
 			mlo_dev_lock_release(mlo_dev_ctx);
 
-			return wlan_cm_start_connect(vdev, req);
+			status = wlan_cm_start_connect(vdev, req);
+			if (QDF_IS_STATUS_ERROR(status))
+				mlo_mld_clear_mlo_cap(vdev);
+			return status;
 		}
 
 		mlo_dev_lock_release(mlo_dev_ctx);
