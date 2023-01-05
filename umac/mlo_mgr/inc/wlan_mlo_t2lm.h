@@ -594,6 +594,17 @@ QDF_STATUS wlan_process_bcn_prbrsp_t2lm_ie(struct wlan_objmgr_vdev *vdev,
 					   struct wlan_t2lm_context *rx_t2lm_ie,
 					   uint64_t tsf);
 
+/**
+ * wlan_send_tid_to_link_mapping() - API to send T2LM info received from beacon,
+ * probe response or action frame to FW.
+ *
+ * @vdev: Pointer to vdev
+ * @t2lm: T2LM info
+ *
+ * Return QDF_STATUS
+ */
+QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_t2lm_info *t2lm);
 #else
 static inline QDF_STATUS wlan_mlo_parse_t2lm_ie(
 	struct wlan_t2lm_onging_negotiation_info *t2lm, uint8_t *ie)
@@ -706,6 +717,13 @@ void wlan_unregister_t2lm_link_update_notify_handler(
 
 static inline QDF_STATUS wlan_mlo_dev_t2lm_notify_link_update(
 		struct wlan_mlo_dev_context *mldev)
+{
+	return QDF_STATUS_SUCCESS;
+}
+
+static inline
+QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_t2lm_info *t2lm)
 {
 	return QDF_STATUS_SUCCESS;
 }

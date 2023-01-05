@@ -100,8 +100,7 @@ QDF_STATUS wlan_mlo_parse_t2lm_info(uint8_t *ie,
 		ie_ptr += WLAN_T2LM_EXPECTED_DURATION_SIZE * (sizeof(uint8_t));
 	}
 
-	t2lm_debug("direction:%d default_link_mapping:%d mapping_switch_time:%d expected_duration:%d",
-		   t2lm->direction, t2lm->default_link_mapping,
+	t2lm_debug("mapping_switch_time:%d expected_duration:%d",
 		   t2lm->mapping_switch_time, t2lm->expected_duration);
 
 	if (t2lm->default_link_mapping)
@@ -715,34 +714,36 @@ QDF_STATUS wlan_mlo_vdev_tid_to_link_map_event(
 	return QDF_STATUS_SUCCESS;
 }
 
+#ifdef WLAN_FEATURE_11BE_MLO_ADV_FEATURE
 static
-QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
-					 struct wlan_t2lm_info *t2lm)
+QDF_STATUS wlan_send_t2lm_info(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_t2lm_info *t2lm,
+			       struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops)
 {
-	struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	if (!wlan_vdev_mlme_is_mlo_vdev(vdev)) {
+		t2lm_err("vdev is not MLO vdev");
+		return status;
+	}
+
+	status = mlo_tx_ops->send_tid_to_link_mapping(vdev, t2lm);
+	if (QDF_IS_STATUS_ERROR(status))
+		t2lm_err("Failed to send T2LM command to FW");
+
+	return status;
+}
+#else
+static
+QDF_STATUS wlan_send_t2lm_info(struct wlan_objmgr_vdev *vdev,
+			       struct wlan_t2lm_info *t2lm,
+			       struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops)
+{
 	struct wlan_objmgr_vdev *co_mld_vdev;
-	struct wlan_objmgr_psoc *psoc;
-	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS] = {NULL};
+	struct wlan_objmgr_vdev *wlan_vdev_list[WLAN_UMAC_MLO_MAX_VDEVS];
 	uint16_t vdev_count = 0;
 	int i = 0;
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-
-	psoc = wlan_vdev_get_psoc(vdev);
-	if (!psoc) {
-		t2lm_err("null psoc");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	mlo_tx_ops = &psoc->soc_cb.tx_ops->mlo_ops;
-	if (!mlo_tx_ops) {
-		t2lm_err("tx_ops is null!");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
-
-	if (!mlo_tx_ops->send_tid_to_link_mapping) {
-		t2lm_err("send_tid_to_link_mapping is null");
-		return QDF_STATUS_E_NULL_VALUE;
-	}
 
 	mlo_get_ml_vdev_list(vdev, &vdev_count, wlan_vdev_list);
 	if (!vdev_count) {
@@ -764,6 +765,36 @@ QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
 			t2lm_err("Failed to send T2LM command to FW");
 		mlo_release_vdev_ref(co_mld_vdev);
 	}
+
+	return status;
+}
+#endif
+
+QDF_STATUS wlan_send_tid_to_link_mapping(struct wlan_objmgr_vdev *vdev,
+					 struct wlan_t2lm_info *t2lm)
+{
+	struct wlan_lmac_if_mlo_tx_ops *mlo_tx_ops;
+	struct wlan_objmgr_psoc *psoc;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	psoc = wlan_vdev_get_psoc(vdev);
+	if (!psoc) {
+		t2lm_err("null psoc");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	mlo_tx_ops = &psoc->soc_cb.tx_ops->mlo_ops;
+	if (!mlo_tx_ops) {
+		t2lm_err("tx_ops is null!");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	if (!mlo_tx_ops->send_tid_to_link_mapping) {
+		t2lm_err("send_tid_to_link_mapping is null");
+		return QDF_STATUS_E_NULL_VALUE;
+	}
+
+	status = wlan_send_t2lm_info(vdev, t2lm, mlo_tx_ops);
 
 	return status;
 }
