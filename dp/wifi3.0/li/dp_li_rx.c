@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -61,7 +61,7 @@ bool is_sa_da_idx_valid(uint32_t max_ast,
 /**
  * dp_rx_mec_check_wrapper() - wrapper to dp_rx_mcast_echo_check
  * @soc: core DP main context
- * @peer: dp peer handler
+ * @txrx_peer: dp peer handler
  * @rx_tlv_hdr: start of the rx TLV header
  * @nbuf: pkt buffer
  *
@@ -188,19 +188,6 @@ dp_rx_intrabss_fwd_li(struct dp_soc *soc,
 }
 #endif
 
-/**
- * dp_rx_process_li() - Brain of the Rx processing functionality
- *		     Called from the bottom half (tasklet/NET_RX_SOFTIRQ)
- * @int_ctx: per interrupt context
- * @hal_ring: opaque pointer to the HAL Rx Ring, which will be serviced
- * @reo_ring_num: ring number (0, 1, 2 or 3) of the reo ring.
- * @quota: No. of units (packets) that can be serviced in one shot.
- *
- * This function implements the core of Rx functionality. This is
- * expected to handle only non-error frames.
- *
- * Return: uint32_t: No. of elements processed
- */
 uint32_t dp_rx_process_li(struct dp_intr *int_ctx,
 			  hal_ring_handle_t hal_ring_hdl, uint8_t reo_ring_num,
 			  uint32_t quota)

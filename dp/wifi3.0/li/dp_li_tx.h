@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -26,10 +26,9 @@
  * @soc: DP Soc Handle
  * @vdev: DP vdev handle
  * @tx_desc: Tx Descriptor Handle
- * @tid: TID from HLOS for overriding default DSCP-TID mapping
  * @fw_metadata: Metadata to send to Target Firmware along with frame
- * @ring_id: Ring ID of H/W ring to which we enqueue the packet
  * @tx_exc_metadata: Handle that holds exception path meta data
+ * @msdu_info: MSDU information
  *
  *  Gets the next free TCL HW DMA descriptor and sets up required parameters
  *  from software Tx descriptor
@@ -58,7 +57,7 @@ void dp_tx_comp_get_params_from_hal_desc_li(struct dp_soc *soc,
  * dp_tx_process_htt_completion_li() - Tx HTT Completion Indication Handler
  * @soc: Handle to DP soc structure
  * @tx_desc: software descriptor head pointer
- * @status : Tx completion status from HTT descriptor
+ * @status: Tx completion status from HTT descriptor
  * @ring_id: ring number
  *
  * This function will process HTT Tx indication messages from Target

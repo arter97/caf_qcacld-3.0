@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -24,6 +24,19 @@
 #include <dp_rx.h>
 #include "dp_li.h"
 
+/**
+ * dp_rx_process_li() - Brain of the Rx processing functionality
+ *		     Called from the bottom half (tasklet/NET_RX_SOFTIRQ)
+ * @int_ctx: per interrupt context
+ * @hal_ring_hdl: opaque pointer to the HAL Rx Ring, which will be serviced
+ * @reo_ring_num: ring number (0, 1, 2 or 3) of the reo ring.
+ * @quota: No. of units (packets) that can be serviced in one shot.
+ *
+ * This function implements the core of Rx functionality. This is
+ * expected to handle only non-error frames.
+ *
+ * Return: uint32_t: No. of elements processed
+ */
 uint32_t dp_rx_process_li(struct dp_intr *int_ctx,
 			  hal_ring_handle_t hal_ring_hdl, uint8_t reo_ring_num,
 			  uint32_t quota);
@@ -202,7 +215,8 @@ void *dp_rx_cookie_2_va_rxdma_buf_prefetch(struct dp_soc *soc, uint32_t cookie)
 
 /**
  * dp_rx_prefetch_hw_sw_nbuf_desc() - function to prefetch HW and SW desc
- * @soc: Handle to HAL Soc structure
+ * @soc: Handle to DP Soc structure
+ * @hal_soc: Handle to HAL Soc structure
  * @num_entries: valid number of HW descriptors
  * @hal_ring_hdl: Destination ring pointer
  * @last_prefetched_hw_desc: pointer to the last prefetched HW descriptor
