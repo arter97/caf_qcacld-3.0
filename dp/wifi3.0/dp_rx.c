@@ -167,10 +167,11 @@ dp_pdev_frag_alloc_and_map(struct dp_soc *dp_soc,
  * dp_rx_refill_ring_record_entry() - Record an entry into refill_ring history
  * @soc: Datapath soc structure
  * @ring_num: Refill ring number
+ * @hal_ring_hdl:
  * @num_req: number of buffers requested for refill
  * @num_refill: number of buffers refilled
  *
- * Returns: None
+ * Return: None
  */
 static inline void
 dp_rx_refill_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
@@ -209,8 +210,8 @@ dp_rx_refill_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
 #endif
 
 /**
- * dp_pdev_nbuf_alloc_and_map() - Allocate nbuf for desc buffer and map
- *
+ * dp_pdev_nbuf_alloc_and_map_replenish() - Allocate nbuf for desc buffer and
+ *                                          map
  * @dp_soc: struct dp_soc *
  * @mac_id: Mac id
  * @num_entries_avail: num_entries_avail
@@ -599,9 +600,8 @@ qdf_dma_addr_t dp_rx_rep_retrieve_paddr(struct dp_soc *dp_soc, qdf_nbuf_t nbuf,
 }
 #endif
 
-/*
+/**
  * dp_rx_desc_replenish() - Replenish the rx descriptors one at a time
- *
  * @soc: core txrx main context
  * @dp_rxdma_srng: rxdma ring
  * @rx_desc_pool: rx descriptor pool
@@ -636,14 +636,6 @@ void dp_rx_desc_replenish(struct dp_soc *soc, struct dp_srng *dp_rxdma_srng,
 	hal_srng_access_end_unlocked(soc->hal_soc, rxdma_srng);
 }
 
-/*
- * dp_rx_desc_reuse() - Reuse the rx descriptors to fill the rx buf ring
- *
- * @soc: core txrx main context
- * @nbuf_list: nbuf list for delayed free
- *
- * Return: void
- */
 void dp_rx_desc_reuse(struct dp_soc *soc, qdf_nbuf_t *nbuf_list)
 {
 	int mac_id, i, j;
@@ -707,24 +699,6 @@ void dp_rx_desc_reuse(struct dp_soc *soc, qdf_nbuf_t *nbuf_list)
 }
 #endif
 
-/*
- * dp_rx_buffers_replenish() - replenish rxdma ring with rx nbufs
- *			       called during dp rx initialization
- *			       and at the end of dp_rx_process.
- *
- * @soc: core txrx main context
- * @mac_id: mac_id which is one of 3 mac_ids
- * @dp_rxdma_srng: dp rxdma circular ring
- * @rx_desc_pool: Pointer to free Rx descriptor pool
- * @num_req_buffers: number of buffer to be replenished
- * @desc_list: list of descs if called from dp_rx_process
- *	       or NULL during dp rx initialization or out of buffer
- *	       interrupt.
- * @tail: tail of descs list
- * @req_only: If true don't replenish more than req buffers
- * @func_name: name of the caller function
- * Return: return success or failure
- */
 QDF_STATUS __dp_rx_buffers_replenish(struct dp_soc *dp_soc, uint32_t mac_id,
 				struct dp_srng *dp_rxdma_srng,
 				struct rx_desc_pool *rx_desc_pool,
@@ -933,17 +907,6 @@ free_descs:
 
 qdf_export_symbol(__dp_rx_buffers_replenish);
 
-/*
- * dp_rx_deliver_raw() - process RAW mode pkts and hand over the
- *				pkts to RAW mode simulation to
- *				decapsulate the pkt.
- *
- * @vdev: vdev on which RAW mode is enabled
- * @nbuf_list: list of RAW pkts to process
- * @txrx_peer: peer object from which the pkt is rx
- *
- * Return: void
- */
 void
 dp_rx_deliver_raw(struct dp_vdev *vdev, qdf_nbuf_t nbuf_list,
 		  struct dp_txrx_peer *txrx_peer)
@@ -990,7 +953,7 @@ void dp_rx_da_learn(struct dp_soc *soc, uint8_t *rx_tlv_hdr,
 #endif
 
 #ifdef QCA_SUPPORT_TX_MIN_RATES_FOR_SPECIAL_FRAMES
-/*
+/**
  * dp_classify_critical_pkts() - API for marking critical packets
  * @soc: dp_soc context
  * @vdev: vdev on which packet is to be sent
@@ -1031,17 +994,6 @@ void dp_rx_nbuf_queue_mapping_set(qdf_nbuf_t nbuf, uint8_t ring_id)
 }
 #endif
 
-/*
- * dp_rx_intrabss_mcbc_fwd() - Does intrabss forward for mcast packets
- *
- * @soc: core txrx main context
- * @ta_peer	: source peer entry
- * @rx_tlv_hdr	: start address of rx tlvs
- * @nbuf	: nbuf that has to be intrabss forwarded
- * @tid_stats	: tid stats pointer
- *
- * Return: bool: true if it is forwarded else false
- */
 bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			     uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
 			     struct cdp_tid_rx_stats *tid_stats)
@@ -1092,18 +1044,6 @@ bool dp_rx_intrabss_mcbc_fwd(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 	return false;
 }
 
-/*
- * dp_rx_intrabss_ucast_fwd() - Does intrabss forward for unicast packets
- *
- * @soc: core txrx main context
- * @ta_peer: source peer entry
- * @tx_vdev_id: VDEV ID for Intra-BSS TX
- * @rx_tlv_hdr: start address of rx tlvs
- * @nbuf: nbuf that has to be intrabss forwarded
- * @tid_stats: tid stats pointer
- *
- * Return: bool: true if it is forwarded else false
- */
 bool dp_rx_intrabss_ucast_fwd(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 			      uint8_t tx_vdev_id,
 			      uint8_t *rx_tlv_hdr, qdf_nbuf_t nbuf,
@@ -1156,20 +1096,6 @@ bool dp_rx_intrabss_ucast_fwd(struct dp_soc *soc, struct dp_txrx_peer *ta_peer,
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
 #ifdef MESH_MODE_SUPPORT
-
-/**
- * dp_rx_fill_mesh_stats() - Fills the mesh per packet receive stats
- *
- * @vdev: DP Virtual device handle
- * @nbuf: Buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- * @txrx_peer: pointer to peer
- *
- * This function allocated memory for mesh receive stats and fill the
- * required stats. Stores the memory address in skb cb.
- *
- * Return: void
- */
 
 void dp_rx_fill_mesh_stats(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 			   uint8_t *rx_tlv_hdr,
@@ -1269,19 +1195,6 @@ void dp_rx_fill_mesh_stats(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 
 }
 
-/**
- * dp_rx_filter_mesh_packets() - Filters mesh unwanted packets
- *
- * @vdev: DP Virtual device handle
- * @nbuf: Buffer pointer
- * @rx_tlv_hdr: start of rx tlv header
- *
- * This checks if the received packet is matching any filter out
- * catogery and and drop the packet if it matches.
- *
- * Return: status(0 indicates drop, 1 indicate to no drop)
- */
-
 QDF_STATUS dp_rx_filter_mesh_packets(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 					uint8_t *rx_tlv_hdr)
 {
@@ -1349,15 +1262,6 @@ QDF_STATUS dp_rx_filter_mesh_packets(struct dp_vdev *vdev, qdf_nbuf_t nbuf,
 #endif
 
 #ifdef RX_PEER_INVALID_ENH
-/**
- * dp_rx_process_invalid_peer(): Function to pass invalid peer list to umac
- * @soc: DP SOC handle
- * @mpdu: mpdu for which peer is invalid
- * @mac_id: mac_id which is one of 3 mac_ids(Assuming mac_id and
- * pool_id has same mapping)
- *
- * return: integer type
- */
 uint8_t dp_rx_process_invalid_peer(struct dp_soc *soc, qdf_nbuf_t mpdu,
 				   uint8_t mac_id)
 {
@@ -1472,16 +1376,6 @@ free:
 	return 0;
 }
 
-/**
- * dp_rx_process_invalid_peer_wrapper(): Function to wrap invalid peer handler
- * @soc: DP SOC handle
- * @mpdu: mpdu for which peer is invalid
- * @mpdu_done: if an mpdu is completed
- * @mac_id: mac_id which is one of 3 mac_ids(Assuming mac_id and
- * pool_id has same mapping)
- *
- * return: integer type
- */
 void dp_rx_process_invalid_peer_wrapper(struct dp_soc *soc,
 					qdf_nbuf_t mpdu, bool mpdu_done,
 					uint8_t mac_id)
@@ -1594,15 +1488,6 @@ static void dp_rx_print_offload_info(struct dp_soc *soc,
 	dp_verbose_debug("---------------------------------------------------------");
 }
 
-/**
- * dp_rx_fill_gro_info() - Fill GRO info from RX TLV into skb->cb
- * @soc: DP SOC handle
- * @rx_tlv: RX TLV received for the msdu
- * @msdu: msdu for which GRO info needs to be filled
- * @rx_ol_pkt_cnt: counter to be incremented for GRO eligible packets
- *
- * Return: None
- */
 void dp_rx_fill_gro_info(struct dp_soc *soc, uint8_t *rx_tlv,
 			 qdf_nbuf_t msdu, uint32_t *rx_ol_pkt_cnt)
 {
@@ -1697,17 +1582,6 @@ static inline uint32_t dp_get_l3_hdr_pad_len(struct dp_soc *soc,
 	return l3_hdr_pad;
 }
 
-/**
- * dp_rx_sg_create() - create a frag_list for MSDUs which are spread across
- *		     multiple nbufs.
- * @soc: DP SOC handle
- * @nbuf: pointer to the first msdu of an amsdu.
- *
- * This function implements the creation of RX frag_list for cases
- * where an MSDU is spread across multiple nbufs.
- *
- * Return: returns the head nbuf which contains complete frag_list.
- */
 qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf)
 {
 	qdf_nbuf_t parent, frag_list, next = NULL;
@@ -1807,11 +1681,6 @@ qdf_nbuf_t dp_rx_sg_create(struct dp_soc *soc, qdf_nbuf_t nbuf)
 }
 
 #ifdef DP_RX_SG_FRAME_SUPPORT
-/**
- * dp_rx_is_sg_supported() - SG packets processing supported or not.
- *
- * Return: returns true when processing is supported else false.
- */
 bool dp_rx_is_sg_supported(void)
 {
 	return true;
@@ -1826,13 +1695,6 @@ bool dp_rx_is_sg_supported(void)
 #endif /* QCA_HOST_MODE_WIFI_DISABLED */
 
 #ifdef QCA_PEER_EXT_STATS
-/*
- * dp_rx_compute_tid_delay - Computer per TID delay stats
- * @peer: DP soc context
- * @nbuf: NBuffer
- *
- * Return: Void
- */
 void dp_rx_compute_tid_delay(struct cdp_delay_tid_stats *stats,
 			     qdf_nbuf_t nbuf)
 {
@@ -1843,15 +1705,6 @@ void dp_rx_compute_tid_delay(struct cdp_delay_tid_stats *stats,
 }
 #endif /* QCA_PEER_EXT_STATS */
 
-/**
- * dp_rx_compute_delay() - Compute and fill in all timestamps
- *				to pass in correct fields
- *
- * @vdev: pdev handle
- * @tx_desc: tx descriptor
- * @tid: tid value
- * Return: none
- */
 void dp_rx_compute_delay(struct dp_vdev *vdev, qdf_nbuf_t nbuf)
 {
 	uint8_t ring_id = QDF_NBUF_CB_RX_CTX_ID(nbuf);
@@ -1958,13 +1811,6 @@ dp_rx_deliver_to_stack_ext(struct dp_soc *soc, struct dp_vdev *vdev,
 #endif
 
 #ifdef PEER_CACHE_RX_PKTS
-/**
- * dp_rx_flush_rx_cached() - flush cached rx frames
- * @peer: peer
- * @drop: flag to drop frames or forward to net stack
- *
- * Return: None
- */
 void dp_rx_flush_rx_cached(struct dp_peer *peer, bool drop)
 {
 	struct dp_peer_cached_bufq *bufqi;
@@ -2140,9 +1986,8 @@ dp_rx_enqueue_rx(struct dp_peer *peer,
  * using the appropriate call back functions.
  * @soc: soc
  * @vdev: vdev
- * @peer: peer
+ * @txrx_peer: peer
  * @nbuf_head: skb list head
- * @nbuf_tail: skb list tail
  *
  * Return: None
  */
@@ -2171,7 +2016,6 @@ static void dp_rx_check_delivery_to_stack(struct dp_soc *soc,
  * @vdev: vdev
  * @txrx_peer: txrx peer
  * @nbuf_head: skb list head
- * @nbuf_tail: skb list tail
  *
  * Check the return status of the call back function and drop
  * the packets if the return status indicates a failure.
@@ -2203,12 +2047,12 @@ static void dp_rx_check_delivery_to_stack(struct dp_soc *soc,
 }
 #endif /* ifdef DELIVERY_TO_STACK_STATUS_CHECK */
 
-/*
+/**
  * dp_rx_validate_rx_callbacks() - validate rx callbacks
- * @soc DP soc
+ * @soc: DP soc
  * @vdev: DP vdev handle
  * @txrx_peer: pointer to the txrx peer object
- * nbuf_head: skb list head
+ * @nbuf_head: skb list head
  *
  * Return: QDF_STATUS - QDF_STATUS_SUCCESS
  *			QDF_STATUS_E_FAILURE
@@ -2498,18 +2342,6 @@ dp_peer_update_rx_pkt_per_lmac(struct dp_txrx_peer *txrx_peer,
 }
 #endif
 
-/**
- * dp_rx_msdu_stats_update() - update per msdu stats.
- * @soc: core txrx main context
- * @nbuf: pointer to the first msdu of an amsdu.
- * @rx_tlv_hdr: pointer to the start of RX TLV headers.
- * @txrx_peer: pointer to the txrx peer object.
- * @ring_id: reo dest ring number on which pkt is reaped.
- * @tid_stats: per tid rx stats.
- *
- * update all the per msdu stats for that nbuf.
- * Return: void
- */
 void dp_rx_msdu_stats_update(struct dp_soc *soc, qdf_nbuf_t nbuf,
 			     uint8_t *rx_tlv_hdr,
 			     struct dp_txrx_peer *txrx_peer,
@@ -2561,15 +2393,6 @@ int dp_wds_rx_policy_check(uint8_t *rx_tlv_hdr,
 #endif
 
 #ifdef RX_DESC_DEBUG_CHECK
-/**
- * dp_rx_desc_nbuf_sanity_check - Add sanity check to catch REO rx_desc paddr
- *				  corruption
- *
- * @ring_desc: REO ring descriptor
- * @rx_desc: Rx descriptor
- *
- * Return: NONE
- */
 QDF_STATUS dp_rx_desc_nbuf_sanity_check(struct dp_soc *soc,
 					hal_ring_desc_t ring_desc,
 					struct dp_rx_desc *rx_desc)
@@ -2651,18 +2474,6 @@ static bool dp_rx_is_udp_allowed_over_roam_peer(struct dp_vdev *vdev,
 	return false;
 }
 #endif
-/**
- * dp_rx_deliver_to_stack_no_peer() - try deliver rx data even if
- *				      no corresbonding peer found
- * @soc: core txrx main context
- * @nbuf: pkt skb pointer
- *
- * This function will try to deliver some RX special frames to stack
- * even there is no peer matched found. for instance, LFR case, some
- * eapol data will be sent to host before peer_map done.
- *
- * Return: None
- */
 void dp_rx_deliver_to_stack_no_peer(struct dp_soc *soc, qdf_nbuf_t nbuf)
 {
 	uint16_t peer_id;
@@ -2766,23 +2577,6 @@ void dp_rx_deliver_to_stack_no_peer(struct dp_soc *soc, qdf_nbuf_t nbuf)
 }
 #endif
 
-/**
- * dp_rx_srng_get_num_pending() - get number of pending entries
- * @hal_soc: hal soc opaque pointer
- * @hal_ring: opaque pointer to the HAL Rx Ring
- * @num_entries: number of entries in the hal_ring.
- * @near_full: pointer to a boolean. This is set if ring is near full.
- *
- * The function returns the number of entries in a destination ring which are
- * yet to be reaped. The function also checks if the ring is near full.
- * If more than half of the ring needs to be reaped, the ring is considered
- * approaching full.
- * The function useses hal_srng_dst_num_valid_locked to get the number of valid
- * entries. It should not be called within a SRNG lock. HW pointer value is
- * synced into cached_hp.
- *
- * Return: Number of pending entries if any
- */
 uint32_t dp_rx_srng_get_num_pending(hal_soc_handle_t hal_soc,
 				    hal_ring_handle_t hal_ring_hdl,
 				    uint32_t num_entries,
@@ -2820,13 +2614,6 @@ void dp_rx_skip_tlvs(struct dp_soc *soc, qdf_nbuf_t nbuf, uint32_t l3_padding)
 #ifndef QCA_HOST_MODE_WIFI_DISABLED
 
 #ifdef DP_RX_DROP_RAW_FRM
-/**
- * dp_rx_is_raw_frame_dropped() - if raw frame nbuf, free and drop
- * @nbuf: pkt skb pointer
- *
- * Return: true - raw frame, dropped
- *	   false - not raw frame, do nothing
- */
 bool dp_rx_is_raw_frame_dropped(qdf_nbuf_t nbuf)
 {
 	if (qdf_nbuf_is_raw_frame(nbuf)) {
@@ -2839,14 +2626,6 @@ bool dp_rx_is_raw_frame_dropped(qdf_nbuf_t nbuf)
 #endif
 
 #ifdef WLAN_FEATURE_DP_RX_RING_HISTORY
-/**
- * dp_rx_ring_record_entry() - Record an entry into the rx ring history.
- * @soc: Datapath soc structure
- * @ring_num: REO ring number
- * @ring_desc: REO ring descriptor
- *
- * Returns: None
- */
 void
 dp_rx_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
 			hal_ring_desc_t ring_desc)
@@ -2878,13 +2657,6 @@ dp_rx_ring_record_entry(struct dp_soc *soc, uint8_t ring_num,
 #endif
 
 #ifdef WLAN_DP_FEATURE_SW_LATENCY_MGR
-/**
- * dp_rx_update_stats() - Update soc level rx packet count
- * @soc: DP soc handle
- * @nbuf: nbuf received
- *
- * Returns: none
- */
 void dp_rx_update_stats(struct dp_soc *soc, qdf_nbuf_t nbuf)
 {
 	DP_STATS_INC_PKT(soc, rx.ingress, 1,
@@ -2893,16 +2665,6 @@ void dp_rx_update_stats(struct dp_soc *soc, qdf_nbuf_t nbuf)
 #endif
 
 #ifdef WLAN_FEATURE_PKT_CAPTURE_V2
-/**
- * dp_rx_deliver_to_pkt_capture() - deliver rx packet to packet capture
- * @soc : dp_soc handle
- * @pdev: dp_pdev handle
- * @peer_id: peer_id of the peer for which completion came
- * @ppdu_id: ppdu_id
- * @netbuf: Buffer pointer
- *
- * This function is used to deliver rx packet to packet capture
- */
 void dp_rx_deliver_to_pkt_capture(struct dp_soc *soc,  struct dp_pdev *pdev,
 				  uint16_t peer_id, uint32_t is_offload,
 				  qdf_nbuf_t netbuf)
@@ -3162,21 +2924,6 @@ dp_pdev_rx_buffers_attach(struct dp_soc *dp_soc, uint32_t mac_id,
 
 qdf_export_symbol(dp_pdev_rx_buffers_attach);
 
-/**
- * dp_rx_enable_mon_dest_frag() - Enable frag processing for
- *              monitor destination ring via frag.
- *
- * Enable this flag only for monitor destination buffer processing
- * if DP_RX_MON_MEM_FRAG feature is enabled.
- * If flag is set then frag based function will be called for alloc,
- * map, prep desc and free ops for desc buffer else normal nbuf based
- * function will be called.
- *
- * @rx_desc_pool: Rx desc pool
- * @is_mon_dest_desc: Is it for monitor dest buffer
- *
- * Return: None
- */
 #ifdef DP_RX_MON_MEM_FRAG
 void dp_rx_enable_mon_dest_frag(struct rx_desc_pool *rx_desc_pool,
 				bool is_mon_dest_desc)
@@ -3197,15 +2944,6 @@ void dp_rx_enable_mon_dest_frag(struct rx_desc_pool *rx_desc_pool,
 
 qdf_export_symbol(dp_rx_enable_mon_dest_frag);
 
-/*
- * dp_rx_pdev_desc_pool_alloc() -  allocate memory for software rx descriptor
- *				   pool
- *
- * @pdev: core txrx pdev context
- *
- * Return: QDF_STATUS - QDF_STATUS_SUCCESS
- *			QDF_STATUS_E_NOMEM
- */
 QDF_STATUS
 dp_rx_pdev_desc_pool_alloc(struct dp_pdev *pdev)
 {
@@ -3240,11 +2978,6 @@ dp_rx_pdev_desc_pool_alloc(struct dp_pdev *pdev)
 	return status;
 }
 
-/*
- * dp_rx_pdev_desc_pool_free() - free software rx descriptor pool
- *
- * @pdev: core txrx pdev context
- */
 void dp_rx_pdev_desc_pool_free(struct dp_pdev *pdev)
 {
 	int mac_for_pdev = pdev->lmac_id;
@@ -3256,14 +2989,6 @@ void dp_rx_pdev_desc_pool_free(struct dp_pdev *pdev)
 	dp_rx_desc_pool_free(soc, rx_desc_pool);
 }
 
-/*
- * dp_rx_pdev_desc_pool_init() - initialize software rx descriptors
- *
- * @pdev: core txrx pdev context
- *
- * Return: QDF_STATUS - QDF_STATUS_SUCCESS
- *			QDF_STATUS_E_NOMEM
- */
 QDF_STATUS dp_rx_pdev_desc_pool_init(struct dp_pdev *pdev)
 {
 	int mac_for_pdev = pdev->lmac_id;
@@ -3275,7 +3000,7 @@ QDF_STATUS dp_rx_pdev_desc_pool_init(struct dp_pdev *pdev)
 
 	rx_desc_pool = &soc->rx_desc_buf[mac_for_pdev];
 	if (wlan_cfg_get_dp_pdev_nss_enabled(pdev->wlan_cfg_ctx)) {
-		/**
+		/*
 		 * If NSS is enabled, rx_desc_pool is already filled.
 		 * Hence, just disable desc_pool frag flag.
 		 */
@@ -3308,13 +3033,6 @@ QDF_STATUS dp_rx_pdev_desc_pool_init(struct dp_pdev *pdev)
 	return QDF_STATUS_SUCCESS;
 }
 
-/*
- * dp_rx_pdev_desc_pool_deinit() - de-initialize software rx descriptor pools
- * @pdev: core txrx pdev context
- *
- * This function resets the freelist of rx descriptors and destroys locks
- * associated with this list of descriptors.
- */
 void dp_rx_pdev_desc_pool_deinit(struct dp_pdev *pdev)
 {
 	int mac_for_pdev = pdev->lmac_id;
@@ -3326,14 +3044,6 @@ void dp_rx_pdev_desc_pool_deinit(struct dp_pdev *pdev)
 	dp_rx_desc_pool_deinit(soc, rx_desc_pool, mac_for_pdev);
 }
 
-/*
- * dp_rx_pdev_buffers_alloc() - Allocate nbufs (skbs) and replenish RxDMA ring
- *
- * @pdev: core txrx pdev context
- *
- * Return: QDF_STATUS - QDF_STATUS_SUCCESS
- *			QDF_STATUS_E_NOMEM
- */
 QDF_STATUS
 dp_rx_pdev_buffers_alloc(struct dp_pdev *pdev)
 {
@@ -3359,11 +3069,6 @@ dp_rx_pdev_buffers_alloc(struct dp_pdev *pdev)
 						rxdma_entries - 1);
 }
 
-/*
- * dp_rx_pdev_buffers_free - Free nbufs (skbs)
- *
- * @pdev: core txrx pdev context
- */
 void
 dp_rx_pdev_buffers_free(struct dp_pdev *pdev)
 {
