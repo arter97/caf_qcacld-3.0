@@ -435,6 +435,7 @@ struct wlan_vdev_aid_mgr {
  * @max_chan_switch_time: Max channel switch time in milliseconds.
  * @last_bcn_ts_ms: Timestamp (in milliseconds) of the last beacon sent on the
  *                  CSA triggered channel.
+ * @is_acs_mode: True if SAP is started in ACS mode
  */
 struct vdev_mlme_mgmt_ap {
 	bool hidden_ssid;
@@ -442,6 +443,7 @@ struct vdev_mlme_mgmt_ap {
 	struct wlan_vdev_aid_mgr *aid_mgr;
 	uint32_t max_chan_switch_time;
 	unsigned long last_bcn_ts_ms;
+	bool is_acs_mode;
 };
 
 /**

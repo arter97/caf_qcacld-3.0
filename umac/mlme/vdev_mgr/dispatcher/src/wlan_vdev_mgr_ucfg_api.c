@@ -206,3 +206,10 @@ QDF_STATUS ucfg_vdev_mgr_cdp_vdev_detach(struct wlan_objmgr_vdev *vdev)
 
 qdf_export_symbol(ucfg_vdev_mgr_cdp_vdev_detach);
 #endif
+
+void
+ucfg_util_vdev_mgr_set_acs_mode_for_vdev(struct wlan_objmgr_vdev *vdev,
+					 bool is_acs_mode)
+{
+	wlan_util_vdev_mgr_set_acs_mode_for_vdev(vdev, is_acs_mode);
+}
