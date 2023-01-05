@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1437,6 +1438,12 @@ static QDF_STATUS send_multiple_vdev_restart_req_cmd_tlv(
 	else  if (tchan_info->allow_ht)
 		WMI_SET_CHANNEL_FLAG(chan_info,
 				     WMI_CHAN_FLAG_ALLOW_HT);
+
+	if (tchan_info->half_rate)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_HALF_RATE);
+	else if (tchan_info->quarter_rate)
+		WMI_SET_CHANNEL_FLAG(chan_info, WMI_CHAN_FLAG_QUARTER_RATE);
+
 	WMI_SET_CHANNEL_MODE(chan_info, tchan_info->phy_mode);
 	WMI_SET_CHANNEL_MIN_POWER(chan_info, tchan_info->minpower);
 	WMI_SET_CHANNEL_MAX_POWER(chan_info, tchan_info->maxpower);
