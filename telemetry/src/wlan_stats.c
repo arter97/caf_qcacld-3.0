@@ -1404,6 +1404,13 @@ static void fill_advance_data_tx_stats(struct advance_data_tx_stats *tx,
 	loop_cnt = qdf_min((uint8_t)MAX_BW, (uint8_t)STATS_IF_MAX_BW);
 	for (inx = 0; inx < loop_cnt; inx++)
 		tx->bw[inx] = cdp_tx->bw[inx];
+	loop_cnt = qdf_min((uint8_t)WME_AC_MAX, (uint8_t)STATS_IF_WME_AC_MAX);
+	for (inx = 0; inx < loop_cnt; inx++) {
+		tx->wme_ac_type[inx] = cdp_tx->wme_ac_type[inx];
+		tx->wme_ac_type_bytes[inx] =
+					cdp_tx->wme_ac_type_bytes[inx];
+	}
+
 	tx->retries = cdp_tx->retries;
 	tx->per = cdp_tx->per;
 	tx->tx_rate = cdp_tx->tx_byte_rate;
@@ -1433,8 +1440,11 @@ static void fill_advance_data_rx_stats(struct advance_data_rx_stats *rx,
 		rx->rx_mpdu_cnt[inx] = cdp_rx->rx_mpdu_cnt[inx];
 	}
 	loop_cnt = qdf_min((uint8_t)WME_AC_MAX, (uint8_t)STATS_IF_WME_AC_MAX);
-	for (inx = 0; inx < loop_cnt; inx++)
+	for (inx = 0; inx < loop_cnt; inx++) {
 		rx->wme_ac_type[inx] = cdp_rx->wme_ac_type[inx];
+		rx->wme_ac_type_bytes[inx] = cdp_rx->wme_ac_type_bytes[inx];
+	}
+
 	loop_cnt = qdf_min((uint8_t)MAX_GI, (uint8_t)STATS_IF_MAX_GI);
 	for (inx = 0; inx < loop_cnt; inx++)
 		rx->sgi_count[inx] = cdp_rx->sgi_count[inx];

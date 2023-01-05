@@ -879,6 +879,26 @@ void print_advance_data_tx_stats(struct advance_data_tx_stats *tx)
 	STATS_32(stdout, "MSDU's Part of AMSDU", tx->amsdu_cnt);
 	STATS_32(stdout, "MSDU's With No MSDU Level Aggregation",
 		 tx->non_amsdu_cnt);
+	STATS_PRINT("\tTx Data Packets per AC\n");
+	STATS_32(stdout, "     Best effort",
+		 tx->wme_ac_type[STATS_IF_WME_AC_BE]);
+	STATS_32(stdout, "      Background",
+		 tx->wme_ac_type[STATS_IF_WME_AC_BK]);
+	STATS_32(stdout, "           Video",
+		 tx->wme_ac_type[STATS_IF_WME_AC_VI]);
+	STATS_32(stdout, "           Voice",
+		 tx->wme_ac_type[STATS_IF_WME_AC_VO]);
+
+	STATS_PRINT("\tTx  Data Bytes per AC\n");
+	STATS_64(stdout, "     Best effort",
+		 tx->wme_ac_type_bytes[STATS_IF_WME_AC_BE]);
+	STATS_64(stdout, "      Background",
+		 tx->wme_ac_type_bytes[STATS_IF_WME_AC_BK]);
+	STATS_64(stdout, "           Video",
+		 tx->wme_ac_type_bytes[STATS_IF_WME_AC_VI]);
+	STATS_64(stdout, "           Voice",
+		 tx->wme_ac_type_bytes[STATS_IF_WME_AC_VO]);
+
 	print_advance_data_be_stats(tx, "Tx");
 }
 
@@ -926,6 +946,16 @@ void print_advance_data_rx_stats(struct advance_data_rx_stats *rx)
 		 rx->wme_ac_type[STATS_IF_WME_AC_VI]);
 	STATS_32(stdout, "           Voice",
 		 rx->wme_ac_type[STATS_IF_WME_AC_VO]);
+
+	STATS_PRINT("\tRx Data Bytes per AC\n");
+	STATS_64(stdout, "     Best effort",
+		 rx->wme_ac_type_bytes[STATS_IF_WME_AC_BE]);
+	STATS_64(stdout, "      Background",
+		 rx->wme_ac_type_bytes[STATS_IF_WME_AC_BK]);
+	STATS_64(stdout, "           Video",
+		 rx->wme_ac_type_bytes[STATS_IF_WME_AC_VI]);
+	STATS_64(stdout, "           Voice",
+		 rx->wme_ac_type_bytes[STATS_IF_WME_AC_VO]);
 	STATS_PRINT("\tRx Aggregation:\n");
 	STATS_32(stdout, "MSDU's Part of AMPDU", rx->ampdu_cnt);
 	STATS_32(stdout, "MSDU's With No MPDU Level Aggregation",
