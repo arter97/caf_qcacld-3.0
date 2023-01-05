@@ -686,16 +686,17 @@ policy_mgr_handle_conc_multiport(struct wlan_objmgr_psoc *psoc,
  * policy_mgr_check_concurrent_intf_and_restart_sap() - Check
  * concurrent change intf
  * @psoc: PSOC object information
+ * @is_acs_mode: Indicates whether SAP is started in ACS mode
  *
  * Checks the concurrent change interface and restarts SAP
  *
  * Return: None
  */
 void policy_mgr_check_concurrent_intf_and_restart_sap(
-		struct wlan_objmgr_psoc *psoc);
+		struct wlan_objmgr_psoc *psoc, bool is_acs_mode);
 #else
-static inline void policy_mgr_check_concurrent_intf_and_restart_sap(
-		struct wlan_objmgr_psoc *psoc)
+void policy_mgr_check_concurrent_intf_and_restart_sap(
+		struct wlan_objmgr_psoc *psoc, bool is_acs_mode)
 {
 
 }
@@ -4135,6 +4136,7 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc);
  * @psoc: psoc object data
  * @sap_vdev_id: sap vdev id
  * @intf_ch_freq: sap channel frequency
+ * @is_acs_mode: Indicates whether SAP is started in ACS mode or fixed channel
  *
  * Check if SAP should be moved to a non dfs channel after STA disconnection.
  * This API applicable only for STA+SAP SCC and ini 'sta_sap_scc_on_dfs_chan'
@@ -4144,7 +4146,7 @@ void policy_mgr_nan_sap_post_disable_conc_check(struct wlan_objmgr_psoc *psoc);
  */
 bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			struct wlan_objmgr_psoc *psoc, uint32_t sap_vdev_id,
-			uint32_t *intf_ch_freq);
+			uint32_t *intf_ch_freq, bool is_acs_mode);
 
 /**
  * policy_mgr_is_sta_sap_scc() - check whether SAP is doing SCC with
