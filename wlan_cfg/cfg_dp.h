@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -471,11 +471,11 @@
 #define WLAN_CFG_RADIO_DEFAULT_REO_MIN 0x1
 #define WLAN_CFG_RADIO_DEFAULT_REO_MAX 0x4
 
-#define WLAN_CFG_REO2PPE_RING_SIZE 2048
+#define WLAN_CFG_REO2PPE_RING_SIZE 8192
 #define WLAN_CFG_REO2PPE_RING_SIZE_MIN 64
 #define WLAN_CFG_REO2PPE_RING_SIZE_MAX 16384
 
-#define WLAN_CFG_PPE2TCL_RING_SIZE 2048
+#define WLAN_CFG_PPE2TCL_RING_SIZE 8192
 #define WLAN_CFG_PPE2TCL_RING_SIZE_MIN 64
 #define WLAN_CFG_PPE2TCL_RING_SIZE_MAX 32768
 
