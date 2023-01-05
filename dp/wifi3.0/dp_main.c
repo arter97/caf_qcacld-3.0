@@ -2208,12 +2208,12 @@ static inline void dp_srng_mem_free_consistent(struct dp_soc *soc,
 #endif /* DP_MEM_PRE_ALLOC */
 
 #ifdef QCA_SUPPORT_WDS_EXTENDED
-static bool dp_vdev_is_wds_ext_enabled(struct dp_vdev *vdev)
+bool dp_vdev_is_wds_ext_enabled(struct dp_vdev *vdev)
 {
 	return vdev->wds_ext_enabled;
 }
 #else
-static bool dp_vdev_is_wds_ext_enabled(struct dp_vdev *vdev)
+bool dp_vdev_is_wds_ext_enabled(struct dp_vdev *vdev)
 {
 	return false;
 }
