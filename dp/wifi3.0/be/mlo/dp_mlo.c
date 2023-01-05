@@ -80,18 +80,17 @@ static void dp_mlo_ctxt_detach_wifi3(struct cdp_mlo_ctxt *cdp_ml_ctxt)
 	qdf_mem_free(mlo_ctxt);
 }
 
-/*
- * dp_mlo_set_soc_by_chip_id() – Add DP soc to ML context soc list
- *
+/**
+ * dp_mlo_set_soc_by_chip_id() - Add DP soc to ML context soc list
  * @ml_ctxt: DP ML context handle
  * @soc: DP soc handle
  * @chip_id: MLO chip id
  *
  * Return: void
  */
-void dp_mlo_set_soc_by_chip_id(struct dp_mlo_ctxt *ml_ctxt,
-			       struct dp_soc *soc,
-			       uint8_t chip_id)
+static void dp_mlo_set_soc_by_chip_id(struct dp_mlo_ctxt *ml_ctxt,
+				      struct dp_soc *soc,
+				      uint8_t chip_id)
 {
 	qdf_spin_lock_bh(&ml_ctxt->ml_soc_list_lock);
 	ml_ctxt->ml_soc_list[chip_id] = soc;
@@ -107,16 +106,6 @@ void dp_mlo_set_soc_by_chip_id(struct dp_mlo_ctxt *ml_ctxt,
 	qdf_spin_unlock_bh(&ml_ctxt->ml_soc_list_lock);
 }
 
-/*
- * dp_mlo_get_soc_ref_by_chip_id() – Get DP soc from DP ML context.
- * This API will increment a reference count for DP soc. Caller has
- * to take care for decrementing refcount.
- *
- * @ml_ctxt: DP ML context handle
- * @chip_id: MLO chip id
- *
- * Return: dp_soc
- */
 struct dp_soc*
 dp_mlo_get_soc_ref_by_chip_id(struct dp_mlo_ctxt *ml_ctxt,
 			      uint8_t chip_id)
