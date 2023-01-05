@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -925,84 +925,99 @@ static int hdd_son_set_phymode(struct wlan_objmgr_vdev *vdev,
 }
 
 /**
- * hdd_phymode_chwidth_freq_to_son_phymode() - get son phymode from csr phymode
- *                                             chan width and freq
- * @phymode: csr phymode
- * @chwidth: chan width
- * @freq: chan frequence
+ * hdd_wlan_phymode_to_son_phymode() - get son phymode from wlan_phymode phymode
+ * @phymode: wlan_phymode phymode
  *
  * Return: ieee80211_phymode
  */
-static enum ieee80211_phymode hdd_phymode_chwidth_freq_to_son_phymode(
-					eCsrPhyMode phymode,
-					enum eSirMacHTChannelWidth chwidth,
-					qdf_freq_t freq)
+static enum ieee80211_phymode hdd_wlan_phymode_to_son_phymode(
+					enum wlan_phymode phymode)
 {
-	uint32_t band_2g = WLAN_REG_IS_24GHZ_CH_FREQ(freq);
 	enum ieee80211_phymode son_phymode;
 
 	switch (phymode) {
-	case eCSR_DOT11_MODE_abg:
-	case eCSR_DOT11_MODE_AUTO:
+	case WLAN_PHYMODE_AUTO:
 		son_phymode = IEEE80211_MODE_AUTO;
 		break;
-	case eCSR_DOT11_MODE_11a:
+	case WLAN_PHYMODE_11A:
 		son_phymode = IEEE80211_MODE_11A;
 		break;
-	case eCSR_DOT11_MODE_11b:
-	case eCSR_DOT11_MODE_11b_ONLY:
+	case WLAN_PHYMODE_11B:
 		son_phymode = IEEE80211_MODE_11B;
 		break;
-	case eCSR_DOT11_MODE_11g:
-	case eCSR_DOT11_MODE_11g_ONLY:
+	case WLAN_PHYMODE_11G:
+	case WLAN_PHYMODE_11G_ONLY:
 		son_phymode = IEEE80211_MODE_11G;
 		break;
-	case eCSR_DOT11_MODE_11n:
-	case eCSR_DOT11_MODE_11n_ONLY:
-		if (chwidth == eHT_CHANNEL_WIDTH_40MHZ) {
-			if (band_2g)
-				son_phymode = IEEE80211_MODE_11NG_HT40;
-			else
-				son_phymode = IEEE80211_MODE_11NA_HT40;
-		} else {
-			if (band_2g)
-				son_phymode = IEEE80211_MODE_11NG_HT20;
-			else
-				son_phymode = IEEE80211_MODE_11NA_HT20;
-		}
+	case WLAN_PHYMODE_11NA_HT20:
+		son_phymode = IEEE80211_MODE_11NA_HT20;
 		break;
-	case eCSR_DOT11_MODE_11ac:
-	case eCSR_DOT11_MODE_11ac_ONLY:
-		if (chwidth == eHT_CHANNEL_WIDTH_160MHZ)
-			son_phymode = IEEE80211_MODE_11AC_VHT160;
-		else if (chwidth == eHT_CHANNEL_WIDTH_80P80MHZ)
-			son_phymode = IEEE80211_MODE_11AC_VHT80_80;
-		else if (chwidth == eHT_CHANNEL_WIDTH_80MHZ)
-			son_phymode = IEEE80211_MODE_11AC_VHT80;
-		else if (chwidth == eHT_CHANNEL_WIDTH_40MHZ)
-			son_phymode = IEEE80211_MODE_11AC_VHT40;
-		else
-			son_phymode = IEEE80211_MODE_11AC_VHT20;
+	case WLAN_PHYMODE_11NG_HT20:
+		son_phymode = IEEE80211_MODE_11NG_HT20;
 		break;
-	case eCSR_DOT11_MODE_11ax:
-	case eCSR_DOT11_MODE_11ax_ONLY:
-		if (chwidth == eHT_CHANNEL_WIDTH_160MHZ) {
-			son_phymode = IEEE80211_MODE_11AXA_HE160;
-		} else if (chwidth == eHT_CHANNEL_WIDTH_80P80MHZ) {
-			son_phymode = IEEE80211_MODE_11AXA_HE80_80;
-		} else if (chwidth == eHT_CHANNEL_WIDTH_80MHZ) {
-			son_phymode = IEEE80211_MODE_11AXA_HE80;
-		} else if (chwidth == eHT_CHANNEL_WIDTH_40MHZ) {
-			if (band_2g)
-				son_phymode = IEEE80211_MODE_11AXG_HE40;
-			else
-				son_phymode = IEEE80211_MODE_11AXA_HE40;
-		} else {
-			if (band_2g)
-				son_phymode = IEEE80211_MODE_11AXG_HE20;
-			else
-				son_phymode = IEEE80211_MODE_11AXA_HE20;
-		}
+	case WLAN_PHYMODE_11NA_HT40:
+		son_phymode = IEEE80211_MODE_11NA_HT40;
+		break;
+	case WLAN_PHYMODE_11NG_HT40PLUS:
+		son_phymode = IEEE80211_MODE_11NG_HT40PLUS;
+		break;
+	case WLAN_PHYMODE_11NG_HT40MINUS:
+		son_phymode = IEEE80211_MODE_11NG_HT40MINUS;
+		break;
+	case WLAN_PHYMODE_11NG_HT40:
+		son_phymode = IEEE80211_MODE_11NG_HT40;
+		break;
+	case WLAN_PHYMODE_11AC_VHT20:
+	case WLAN_PHYMODE_11AC_VHT20_2G:
+		son_phymode = IEEE80211_MODE_11AC_VHT20;
+		break;
+	case WLAN_PHYMODE_11AC_VHT40:
+	case WLAN_PHYMODE_11AC_VHT40_2G:
+		son_phymode = IEEE80211_MODE_11AC_VHT40;
+		break;
+	case WLAN_PHYMODE_11AC_VHT40PLUS_2G:
+		son_phymode = IEEE80211_MODE_11AC_VHT40PLUS;
+		break;
+	case WLAN_PHYMODE_11AC_VHT40MINUS_2G:
+		son_phymode = IEEE80211_MODE_11AC_VHT40MINUS;
+		break;
+	case WLAN_PHYMODE_11AC_VHT80:
+	case WLAN_PHYMODE_11AC_VHT80_2G:
+		son_phymode = IEEE80211_MODE_11AC_VHT80;
+		break;
+	case WLAN_PHYMODE_11AC_VHT160:
+		son_phymode = IEEE80211_MODE_11AC_VHT160;
+		break;
+	case WLAN_PHYMODE_11AC_VHT80_80:
+		son_phymode = IEEE80211_MODE_11AC_VHT80_80;
+		break;
+	case WLAN_PHYMODE_11AXA_HE20:
+		son_phymode = IEEE80211_MODE_11AXA_HE20;
+		break;
+	case WLAN_PHYMODE_11AXG_HE20:
+		son_phymode = IEEE80211_MODE_11AXG_HE20;
+		break;
+	case WLAN_PHYMODE_11AXA_HE40:
+		son_phymode = IEEE80211_MODE_11AXA_HE40;
+		break;
+	case WLAN_PHYMODE_11AXG_HE40PLUS:
+		son_phymode = IEEE80211_MODE_11AXG_HE40PLUS;
+		break;
+	case WLAN_PHYMODE_11AXG_HE40MINUS:
+		son_phymode = IEEE80211_MODE_11AXG_HE40MINUS;
+		break;
+	case WLAN_PHYMODE_11AXG_HE40:
+	case WLAN_PHYMODE_11AXG_HE80:
+		son_phymode = IEEE80211_MODE_11AXG_HE40;
+		break;
+	case WLAN_PHYMODE_11AXA_HE80:
+		son_phymode = IEEE80211_MODE_11AXA_HE80;
+		break;
+	case WLAN_PHYMODE_11AXA_HE160:
+		son_phymode = IEEE80211_MODE_11AXA_HE160;
+		break;
+	case WLAN_PHYMODE_11AXA_HE80_80:
+		son_phymode = IEEE80211_MODE_11AXA_HE80_80;
 		break;
 	default:
 		son_phymode = IEEE80211_MODE_AUTO;
@@ -1020,47 +1035,19 @@ static enum ieee80211_phymode hdd_phymode_chwidth_freq_to_son_phymode(
  */
 static enum ieee80211_phymode hdd_son_get_phymode(struct wlan_objmgr_vdev *vdev)
 {
-	enum eSirMacHTChannelWidth chwidth;
-	eCsrPhyMode phymode;
-	struct hdd_adapter *adapter;
-	qdf_freq_t freq;
-	struct wlan_objmgr_pdev *pdev;
-	struct hdd_context *hdd_ctx;
+	struct wlan_channel *des_chan;
 
 	if (!vdev) {
 		hdd_err("null vdev");
 		return IEEE80211_MODE_AUTO;
 	}
-	adapter = wlan_hdd_get_adapter_from_objmgr(vdev);
-	if (!adapter) {
-		hdd_err("null adapter");
+	des_chan = wlan_vdev_mlme_get_des_chan(vdev);
+	if (!des_chan) {
+		hdd_err("null des_chan");
 		return IEEE80211_MODE_AUTO;
 	}
 
-	pdev = wlan_vdev_get_pdev(vdev);
-	if (!pdev) {
-		hdd_err("null pdev");
-		return IEEE80211_MODE_AUTO;
-	}
-
-	freq = ucfg_son_get_operation_chan_freq_vdev_id(pdev, adapter->vdev_id);
-
-	chwidth = wma_cli_get_command(adapter->vdev_id, WMI_VDEV_PARAM_CHWIDTH,
-				      VDEV_CMD);
-
-	if (chwidth < 0) {
-		hdd_err("Failed to get chwidth");
-		return IEEE80211_MODE_AUTO;
-	}
-	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	if (!hdd_ctx) {
-		hdd_err("null hdd ctx");
-		return IEEE80211_MODE_AUTO;
-	}
-
-	phymode = sme_get_phy_mode(hdd_ctx->mac_handle);
-
-	return hdd_phymode_chwidth_freq_to_son_phymode(phymode, chwidth, freq);
+	return hdd_wlan_phymode_to_son_phymode(des_chan->ch_phymode);
 }
 
 /**
